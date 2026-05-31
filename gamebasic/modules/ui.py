@@ -13,6 +13,9 @@ Built-ins:
     UI_TABLE(id$, x, y, w, h, headers, cells
              [, cell_colors[, col_widths[, cell_bg_colors]]])
                                                  -> INTEGER (geklickte Zeile, -1 wenn keine)
+    UI_TABLE_SELECTED(id$)                       -> INTEGER (persistent selektierte Zeile, -1)
+    UI_TABLE_SET_SELECTED(id$, row)              ' Selektion programmatisch setzen (-1 = keine)
+    UI_TABLE_HEADER_CLICK(id$)                   -> INTEGER (geklickte Header-Spalte, -1) -- Sortierung
     UI_END_FRAME()                               ' am Ende JEDES Frames vor FLIP()
     UI_RESET()                                   ' allen State loeschen
 
@@ -646,8 +649,14 @@ def _table(g, *args):
             "scroll_x": 0, "scroll_y": 0,
             "drag_v": False, "drag_h": False,
             "drag_off": 0,
+            "selected": -1,          # persistente Zeilen-Selektion
         }
     st = _state.tables[id_str]
+    # Selektion an (evtl. geschrumpfte) Zeilenzahl anpassen
+    if st["selected"] >= n_rows:
+        st["selected"] = -1
+    # Header-Klick dieses Frames (von UI_TABLE_HEADER_CLICK abgefragt)
+    st["header_col"] = -1
 
     # Geometrie
     body_x = x + 1
@@ -802,7 +811,12 @@ def _table(g, *args):
                               row_y + _TBL_ROW_H - 1, bg)
                 cx += cell_w
 
-        # Pass 2: Hover-Highlight ueberschreibt cell-bgs auf der hovered-Zeile
+        # Pass 2a: Selektions-Highlight (persistent, unter dem Hover)
+        if r == st["selected"]:
+            g.box(body_x, row_y, body_x + body_w - 1,
+                  row_y + _TBL_ROW_H - 1, 0x2A4E6A)
+
+        # Pass 2b: Hover-Highlight ueberschreibt cell-bgs auf der hovered-Zeile
         if r == hover_row:
             g.box(body_x, row_y, body_x + body_w - 1,
                   row_y + _TBL_ROW_H - 1, 0x2A2E4A)
@@ -880,7 +894,72 @@ def _table(g, *args):
         except (ValueError, IndexError):
             pass
 
+    # Geklickte Zeile wird zur persistenten Selektion
+    if clicked_row >= 0:
+        st["selected"] = clicked_row
+
+    # --- Klick-Erkennung auf Spalten-Header (fuer Sortierung) -------
+    # Liefert die Spalte unter mx in der Kopfzeile (-1 wenn keine).
+    def _header_col_at(px, py):
+        if not _in_box(px, py, x, y, body_w_raw, _TBL_HEADER_H):
+            return -1
+        rel = px - (body_x - st["scroll_x"])
+        acc = 0
+        for c in range(n_cols):
+            if acc <= rel < acc + col_widths[c]:
+                return c
+            acc += col_widths[c]
+        return -1
+
+    if over_table and just_pressed:
+        hc = _header_col_at(mx, my)
+        if hc >= 0:
+            _state.click_origin = f"{id_str}#hdr#{hc}"
+    if (over_table and just_released
+            and isinstance(_state.click_origin, str)
+            and _state.click_origin.startswith(f"{id_str}#hdr#")):
+        try:
+            origin_col = int(_state.click_origin.split("#")[2])
+            if origin_col == _header_col_at(mx, my):
+                st["header_col"] = origin_col
+        except (ValueError, IndexError):
+            pass
+
     return clicked_row
+
+
+@graphics_builtin("UI_TABLE_SELECTED", arity=1)
+def _table_selected(g, *args):
+    """Liefert den Index der persistent selektierten Zeile einer Tabelle
+    (-1 = keine). Die Selektion wird gesetzt, wenn UI_TABLE in einem Frame
+    einen Zeilen-Klick meldet, und ueberlebt zwischen den Frames."""
+    id_str = _check_id(args[0], "UI_TABLE_SELECTED")
+    st = _state.tables.get(id_str)
+    return st["selected"] if st else -1
+
+
+@graphics_builtin("UI_TABLE_SET_SELECTED", arity=2)
+def _table_set_selected(g, *args):
+    """Setzt die selektierte Zeile programmatisch (-1 = Selektion aufheben).
+    Greift erst, nachdem die Tabelle mindestens einmal mit UI_TABLE
+    gezeichnet wurde (id muss bekannt sein)."""
+    id_str = _check_id(args[0], "UI_TABLE_SET_SELECTED")
+    row = _check_int(args[1], "UI_TABLE_SET_SELECTED", "row")
+    st = _state.tables.get(id_str)
+    if st is not None:
+        st["selected"] = row if row >= 0 else -1
+    return None
+
+
+@graphics_builtin("UI_TABLE_HEADER_CLICK", arity=1)
+def _table_header_click(g, *args):
+    """Liefert den Index der in DIESEM Frame angeklickten Spalten-Kopfzeile
+    (-1 = keine). Ermoeglicht klickbare Header fuer Sortierung: das Spiel
+    sortiert seine eigenen Daten und uebergibt sie neu an UI_TABLE. Direkt
+    nach dem UI_TABLE-Aufruf im selben Frame abfragen."""
+    id_str = _check_id(args[0], "UI_TABLE_HEADER_CLICK")
+    st = _state.tables.get(id_str)
+    return st.get("header_col", -1) if st else -1
 
 
 # --- Immediate-Mode-Fenster -----------------------------------------

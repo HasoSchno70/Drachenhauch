@@ -51,6 +51,14 @@ METRICS = {
     "pad": 6,               # horizontaler Text-Innenabstand
 }
 
+# Tabellen-Layout (Retained-Mode GUI_TABLE). Fixe Metriken -- analog zum
+# Immediate-Mode-UI_TABLE, damit beide Tabellen sich gleich anfuehlen.
+_TBL_HEADER_H = 22          # Hoehe der fixierten Kopfzeile
+_TBL_ROW_H = 20             # Hoehe einer Datenzeile
+_TBL_SCROLL_W = 12          # Breite/Hoehe der Scrollbalken
+_TBL_PADDING = 6            # horizontaler Text-Innenabstand pro Zelle
+_TBL_MIN_COL_W = 40         # Mindest-Spaltenbreite bei Auto-Verteilung
+
 # SDL-Keycodes (wie im ui-Modul)
 _KEY_BACKSPACE = 8
 
@@ -85,7 +93,7 @@ class _Widget:
     __slots__ = (
         "kind", "window", "x", "y", "w", "h", "text", "color",
         "value", "min", "max", "checked", "placeholder",
-        "clicked", "hovered", "on_click", "on_change", "ov",
+        "clicked", "hovered", "on_click", "on_change", "ov", "tbl",
     )
 
     def __init__(self, kind, window, x, y, w, h):
@@ -107,6 +115,7 @@ class _Widget:
         self.on_click = None    # optionale FUNCREF (GUI_ON_CLICK)
         self.on_change = None   # optionale FUNCREF (GUI_ON_CHANGE)
         self.ov = None          # optionale Farb-Overrides {rolle: farbe}
+        self.tbl = None         # nur fuer kind=="table": Tabellen-State (dict)
 
     def abs_rect(self):
         """Absolute Bildschirm-Koordinaten (x, y, w, h)."""
@@ -162,6 +171,8 @@ class _GuiManager:
         self.drag_dx = 0
         self.drag_dy = 0
         self.active_slider = None    # gerade gezogener Slider
+        self.active_table = None      # Tabelle mit laufendem Scrollbar-Drag
+        self.table_press = None       # (table_widget, row) eines begonnenen Zeilen-Klicks
         self.press_origin = None     # Widget, auf dem ein Klick begann (Button)
         self._pending = []           # in diesem Frame ausgeloeste Callback-FuncRefs
         self.was_mouse_down = False
@@ -198,6 +209,9 @@ class _GuiManager:
             for wdg in win.widgets:
                 wdg.clicked = False
                 wdg.hovered = False
+                if wdg.kind == "table":
+                    wdg.tbl["hover_row"] = -1
+                    wdg.tbl["clicked_row"] = -1
 
         # Hover (nur oberstes Fenster unter der Maus)
         top = self._topmost_window_at(mx, my)
@@ -205,6 +219,8 @@ class _GuiManager:
             for wdg in top.widgets:
                 if self._in(mx, my, wdg.abs_rect()):
                     wdg.hovered = True
+                    if wdg.kind == "table":
+                        self._table_hover(g, wdg, mx, my)
 
         # Laufendes Fenster-Drag
         if self.drag_window is not None:
@@ -221,11 +237,21 @@ class _GuiManager:
             else:
                 self.active_slider = None
 
+        # Laufendes Tabellen-Scrollbar-Drag
+        if self.active_table is not None:
+            if is_down:
+                self._table_drag(self.active_table, mx, my)
+            else:
+                t = self.active_table.tbl
+                t["drag_v"] = t["drag_h"] = False
+                self.active_table = None
+
         # Neuer Druck: Hit-Test
-        if just_pressed and self.drag_window is None and self.active_slider is None:
+        if (just_pressed and self.drag_window is None
+                and self.active_slider is None and self.active_table is None):
             self._handle_press(mx, my)
 
-        # Loslassen: Button-Klick bestaetigen
+        # Loslassen: Button-Klick bzw. Tabellen-Zeilen-Klick bestaetigen
         if just_released:
             if self.press_origin is not None:
                 ox, oy, ow, oh = self.press_origin.abs_rect()
@@ -235,6 +261,14 @@ class _GuiManager:
                     if self.press_origin.on_click is not None:
                         self._pending.append(self.press_origin.on_click)
             self.press_origin = None
+            if self.table_press is not None:
+                wdg, row = self.table_press
+                if row >= 0 and wdg.tbl["hover_row"] == row:
+                    wdg.tbl["selected"] = row
+                    wdg.tbl["clicked_row"] = row
+                    if wdg.on_change is not None:
+                        self._pending.append(wdg.on_change)
+                self.table_press = None
 
         # Tastatur fuer fokussiertes TextInput
         if self.focus_widget is not None and self.focus_widget.kind == "textinput":
@@ -300,6 +334,9 @@ class _GuiManager:
             self._drag_slider(hit, mx)
         elif hit.kind == "textinput":
             self.focus_widget = hit
+        elif hit.kind == "table":
+            self.focus_widget = None
+            self._table_press(hit, mx, my)
         else:
             # Label/Panel: nicht interaktiv -> Fokus loeschen
             self.focus_widget = None
@@ -325,6 +362,91 @@ class _GuiManager:
             wdg.text = wdg.text[:-1]
         if wdg.text != old and wdg.on_change is not None:
             self._pending.append(wdg.on_change)
+
+    # -- Tabelle: Interaktion ----------------------------------------
+    def _table_hover(self, g, wdg, mx, my):
+        """Hover-Zeile + Scroll-Clamp + Mausrad fuer eine Tabelle aktualisieren.
+        Wird pro Frame fuer die Tabelle unter dem Cursor (oberstes Fenster)
+        gerufen."""
+        t = wdg.tbl
+        gm = _table_geom(wdg)
+        # Scroll an aktuelle Content-Groesse anpassen (Daten koennen schrumpfen)
+        t["scroll_y"] = min(max(0, t["scroll_y"]), gm["max_scroll_y"])
+        t["scroll_x"] = min(max(0, t["scroll_x"]), gm["max_scroll_x"])
+        # Mausrad scrollt vertikal, solange ueber dem Body
+        wheel = g.pop_mouse_wheel() if hasattr(g, "pop_mouse_wheel") else 0
+        if wheel and self._in(mx, my, (gm["body_x"], gm["body_y"],
+                                       gm["body_w"], gm["body_h"])):
+            t["scroll_y"] = max(0, min(gm["max_scroll_y"],
+                                       t["scroll_y"] - wheel * _TBL_ROW_H))
+        # Hover-Zeile (nur ueber dem Body, nicht ueber Scrollbalken)
+        if (not t["drag_v"] and not t["drag_h"]
+                and self._in(mx, my, (gm["body_x"], gm["body_y"],
+                                      gm["body_w"], gm["body_h"]))):
+            hr = (my - gm["body_y"] + t["scroll_y"]) // _TBL_ROW_H
+            t["hover_row"] = hr if 0 <= hr < gm["n_rows"] else -1
+
+    def _table_press(self, wdg, mx, my):
+        """Press auf eine Tabelle: Scrollbar-Griff -> Drag starten, sonst
+        Zeilen-Klick vormerken (bestaetigt beim Loslassen ueber derselben
+        Zeile)."""
+        t = wdg.tbl
+        gm = _table_geom(wdg)
+        # Vertikale Scrollbar?
+        if gm["need_v"]:
+            sb_x = gm["ax"] + gm["body_w_raw"] - _TBL_SCROLL_W + 1
+            if self._in(mx, my, (sb_x, gm["body_y"], _TBL_SCROLL_W, gm["body_h"])):
+                t["drag_v"] = True
+                self.active_table = wdg
+                t["drag_off"] = self._table_grab_off(
+                    gm, "v", my, t["scroll_y"])
+                self._table_drag(wdg, mx, my)
+                return
+        # Horizontale Scrollbar?
+        if gm["need_h"]:
+            hs_y = gm["ay"] + gm["h"] - _TBL_SCROLL_W - 1
+            if self._in(mx, my, (gm["body_x"], hs_y, gm["body_w"], _TBL_SCROLL_W)):
+                t["drag_h"] = True
+                self.active_table = wdg
+                t["drag_off"] = self._table_grab_off(
+                    gm, "h", mx, t["scroll_x"])
+                self._table_drag(wdg, mx, my)
+                return
+        # Sonst: Zeilen-Klick vormerken (Selektion beim Release)
+        if t["hover_row"] >= 0:
+            self.table_press = (wdg, t["hover_row"])
+
+    @staticmethod
+    def _table_grab_off(gm, axis, m, scroll):
+        """Greif-Offset innerhalb des Scrollbar-Griffs (Maus minus Griff-Start).
+        Liefert die halbe Griff-Groesse als Naeherung (Track-Klick zentriert
+        den Griff) -- der genaue Wert wird beim Drag ohnehin nachgefuehrt."""
+        if axis == "v":
+            track = gm["body_h"]
+            handle = max(16, int(track * (gm["body_h"] / gm["total_h"]))) if gm["total_h"] else track
+        else:
+            track = gm["body_w"]
+            handle = max(16, int(track * (gm["body_w"] / gm["total_w"]))) if gm["total_w"] else track
+        return handle // 2
+
+    def _table_drag(self, wdg, mx, my):
+        """Scrollbar-Drag: Maus-Position -> scroll_x/scroll_y."""
+        t = wdg.tbl
+        gm = _table_geom(wdg)
+        if t["drag_v"] and gm["max_scroll_y"]:
+            track = gm["body_h"]
+            handle = max(16, int(track * (gm["body_h"] / gm["total_h"])))
+            new_y = (my - gm["body_y"]) - t["drag_off"]
+            new_y = max(0, min(track - handle, new_y))
+            pos = new_y / max(1, track - handle)
+            t["scroll_y"] = int(pos * gm["max_scroll_y"])
+        elif t["drag_h"] and gm["max_scroll_x"]:
+            track = gm["body_w"]
+            handle = max(16, int(track * (gm["body_w"] / gm["total_w"])))
+            new_x = (mx - gm["body_x"]) - t["drag_off"]
+            new_x = max(0, min(track - handle, new_x))
+            pos = new_x / max(1, track - handle)
+            t["scroll_x"] = int(pos * gm["max_scroll_x"])
 
     # -- Draw --------------------------------------------------------
     def draw(self, g):
@@ -408,6 +530,98 @@ class _GuiManager:
             if focused and (self.frame_count // METRICS["caret_period"]) % 2 == 0:
                 cx = min(ax + 5 + len(wdg.text) * 8, ax + w - 3)
                 g.line(cx, ay + 3, cx, ay + h - 4, fg)
+        elif kind == "table":
+            self._draw_table(g, wdg)
+
+    def _draw_table(self, g, wdg):
+        """Tabelle zeichnen: fixierte Kopfzeile + scrollbarer Body, theme-aware.
+        Clipping via push_clip/pop_clip; selektierte/hovered Zeile farbig."""
+        t = wdg.tbl
+        gm = _table_geom(wdg)
+        ax, ay, w, h = gm["ax"], gm["ay"], gm["w"], gm["h"]
+        n_cols, n_rows = gm["n_cols"], gm["n_rows"]
+        col_widths = gm["col_widths"]
+        body_x, body_y = gm["body_x"], gm["body_y"]
+        body_w, body_h = gm["body_w"], gm["body_h"]
+
+        bg = _wcol(wdg, "bg", "widget_bg")
+        border = _wcol(wdg, "border", "widget_border")
+        fg = _wcol(wdg, "fg", "text_fg")
+        accent = _wcol(wdg, "accent", "accent")
+        sel_bg = _shade(accent, -110)
+        hover_bg = _shade(bg, 22)
+
+        # Aussenrahmen + Korpus
+        g.box(ax, ay, ax + w - 1, ay + h - 1, bg)
+        g.rect(ax, ay, ax + w - 1, ay + h - 1, border)
+        # Kopfzeile
+        g.box(ax + 1, ay + 1, ax + w - 2, ay + _TBL_HEADER_H - 1,
+              THEME["title_bg"])
+        g.line(ax, ay + _TBL_HEADER_H - 1, ax + w - 1, ay + _TBL_HEADER_H - 1, border)
+
+        # Kopf-Zellen (horizontal mitscrollen, auf Header-Breite geclippt)
+        g.push_clip(ax + 1, ay + 1, gm["body_w_raw"], _TBL_HEADER_H - 2)
+        cx = body_x - t["scroll_x"]
+        for c in range(n_cols):
+            if cx + col_widths[c] > ax + 1 and cx < ax + 1 + gm["body_w_raw"]:
+                g.text(cx + _TBL_PADDING, ay + 4, t["headers"][c],
+                       _wcol(wdg, "fg", "title_fg"))
+                if c < n_cols - 1:
+                    tx = cx + col_widths[c]
+                    g.line(tx, ay + 1, tx, ay + _TBL_HEADER_H - 2, border)
+            cx += col_widths[c]
+        g.pop_clip()
+
+        # Body
+        g.push_clip(body_x, body_y, body_w, body_h)
+        first = max(0, t["scroll_y"] // _TBL_ROW_H)
+        last = min(n_rows, (t["scroll_y"] + body_h) // _TBL_ROW_H + 1)
+        for r in range(first, last):
+            row_y = body_y + r * _TBL_ROW_H - t["scroll_y"]
+            if r == t["selected"]:
+                g.box(body_x, row_y, body_x + body_w - 1,
+                      row_y + _TBL_ROW_H - 1, sel_bg)
+            if r == t["hover_row"]:
+                g.box(body_x, row_y, body_x + body_w - 1,
+                      row_y + _TBL_ROW_H - 1, hover_bg)
+            cx = body_x - t["scroll_x"]
+            row = t["rows"][r]
+            for c in range(n_cols):
+                cw = col_widths[c]
+                if cx + cw > body_x and cx < body_x + body_w:
+                    g.push_clip(
+                        max(body_x, cx + 1), row_y,
+                        min(cw - 2, (body_x + body_w) - max(body_x, cx + 1)),
+                        _TBL_ROW_H)
+                    g.text(cx + _TBL_PADDING, row_y + 3, row[c], fg)
+                    g.pop_clip()
+                cx += cw
+            g.line(body_x, row_y + _TBL_ROW_H - 1,
+                   body_x + body_w - 1, row_y + _TBL_ROW_H - 1, _shade(bg, 14))
+        g.pop_clip()
+
+        # Vertikale Scrollbar
+        if gm["need_v"]:
+            sb_x = ax + gm["body_w_raw"] - _TBL_SCROLL_W + 1
+            track = body_h
+            handle = max(16, int(track * (body_h / gm["total_h"])))
+            ratio = t["scroll_y"] / gm["max_scroll_y"] if gm["max_scroll_y"] else 0
+            hy = body_y + int((track - handle) * ratio)
+            g.box(sb_x, body_y, sb_x + _TBL_SCROLL_W - 1, body_y + track - 1,
+                  _shade(bg, -8))
+            g.box(sb_x + 2, hy, sb_x + _TBL_SCROLL_W - 3, hy + handle - 1,
+                  accent if t["drag_v"] else border)
+        # Horizontale Scrollbar
+        if gm["need_h"]:
+            hs_y = ay + h - _TBL_SCROLL_W - 1
+            track = body_w
+            handle = max(16, int(track * (body_w / gm["total_w"])))
+            ratio = t["scroll_x"] / gm["max_scroll_x"] if gm["max_scroll_x"] else 0
+            hx = body_x + int((track - handle) * ratio)
+            g.box(body_x, hs_y, body_x + track - 1, hs_y + _TBL_SCROLL_W - 1,
+                  _shade(bg, -8))
+            g.box(hx, hs_y + 2, hx + handle - 1, hs_y + _TBL_SCROLL_W - 3,
+                  accent if t["drag_h"] else border)
 
     def reset(self):
         self.windows.clear()
@@ -415,6 +629,8 @@ class _GuiManager:
         self.focus_widget = None
         self.drag_window = None
         self.active_slider = None
+        self.active_table = None
+        self.table_press = None
         self.press_origin = None
         self._pending = []
         self.was_mouse_down = False
@@ -445,6 +661,77 @@ def _shade(color, delta):
     g = max(0, min(255, ((color >> 8) & 0xFF) + delta))
     b = max(0, min(255, (color & 0xFF) + delta))
     return (r << 16) | (g << 8) | b
+
+
+def _table_geom(wdg):
+    """Berechnet das Tabellen-Layout aus aktuellem State + Daten. Einzige
+    Wahrheit fuer Hit-Test (update) und Zeichnen (draw) -- so koennen die
+    beiden nicht auseinanderdriften.
+
+    Liefert ein Dict mit Body-Rechteck, aufgeloesten Spaltenbreiten,
+    Scrollbalken-Bedarf und Scroll-Maxima.
+    """
+    t = wdg.tbl
+    ax, ay, w, h = wdg.abs_rect()
+    n_cols = len(t["headers"])
+    n_rows = len(t["rows"])
+    cw = t["col_widths"]
+    if cw and len(cw) == n_cols:
+        col_widths = list(cw)
+    else:
+        avail = w - _TBL_SCROLL_W - 2
+        per = max(_TBL_MIN_COL_W, avail // n_cols) if n_cols else 0
+        col_widths = [per] * n_cols
+    body_x = ax + 1
+    body_y = ay + _TBL_HEADER_H
+    body_w_raw = w - 2
+    body_h_raw = h - _TBL_HEADER_H - 1
+    total_w = sum(col_widths)
+    total_h = n_rows * _TBL_ROW_H
+    need_v = total_h > body_h_raw
+    need_h = total_w > body_w_raw - (_TBL_SCROLL_W if need_v else 0)
+    if need_h and total_h > body_h_raw - _TBL_SCROLL_W:
+        need_v = True
+    body_w = body_w_raw - (_TBL_SCROLL_W if need_v else 0)
+    body_h = body_h_raw - (_TBL_SCROLL_W if need_h else 0)
+    return {
+        "ax": ax, "ay": ay, "w": w, "h": h,
+        "n_cols": n_cols, "n_rows": n_rows, "col_widths": col_widths,
+        "body_x": body_x, "body_y": body_y, "body_w": body_w, "body_h": body_h,
+        "body_w_raw": body_w_raw, "body_h_raw": body_h_raw,
+        "total_w": total_w, "total_h": total_h,
+        "need_v": need_v, "need_h": need_h,
+        "max_scroll_y": max(0, total_h - body_h),
+        "max_scroll_x": max(0, total_w - body_w),
+    }
+
+
+def _str_array_1d(v, fn, name):
+    """Konvertiert ein 1D ARRAY OF STRING zu einer Python-Liste."""
+    from ..interpreter import _GBArray
+    if (not isinstance(v, _GBArray) or v.element_type != "string"
+            or len(v.dims) != 1):
+        raise TypeMismatchError(f"{fn}: {name} muss 1D ARRAY OF STRING sein")
+    return [v.values[i] for i in range(v.dims[0])]
+
+
+def _str_array_2d(v, fn, name):
+    """Konvertiert ein 2D ARRAY OF STRING zu list[list[str]]."""
+    from ..interpreter import _GBArray
+    if (not isinstance(v, _GBArray) or v.element_type != "string"
+            or len(v.dims) != 2):
+        raise TypeMismatchError(f"{fn}: {name} muss 2D ARRAY OF STRING sein")
+    r, c = v.dims
+    return [[v.values[i * c + j] for j in range(c)] for i in range(r)]
+
+
+def _int_array_1d(v, fn, name):
+    """Konvertiert ein 1D ARRAY OF INTEGER zu einer Python-Liste."""
+    from ..interpreter import _GBArray
+    if (not isinstance(v, _GBArray) or v.element_type != "integer"
+            or len(v.dims) != 1):
+        raise TypeMismatchError(f"{fn}: {name} muss 1D ARRAY OF INTEGER sein")
+    return [int(v.values[i]) for i in range(v.dims[0])]
 
 
 # --- Typ-Pruef-Helfer -----------------------------------------------
@@ -627,6 +914,121 @@ def _b_textinput(*args):
     return wdg
 
 
+# --- Tabelle (Retained-Mode) ----------------------------------------
+
+def _new_table_state():
+    return {
+        "headers": [], "rows": [], "col_widths": None,
+        "scroll_x": 0, "scroll_y": 0,
+        "drag_v": False, "drag_h": False, "drag_off": 0,
+        "selected": -1, "hover_row": -1, "clicked_row": -1,
+    }
+
+
+def _table_set_rows(t, rows, fn):
+    """Setzt die Datenzeilen + passt Selektion an die neue Zeilenzahl an."""
+    n_cols = len(t["headers"])
+    if rows and n_cols and len(rows[0]) != n_cols:
+        raise GBRuntimeError(
+            f"{fn}: Zeilen haben {len(rows[0])} Spalten, "
+            f"Header hat {n_cols}")
+    t["rows"] = rows
+    if t["selected"] >= len(rows):
+        t["selected"] = -1
+
+
+@builtin("GUI_TABLE", arity=(5, 7))
+def _b_table(*args):
+    """Persistente Tabelle als Widget. Optional koennen headers (1D ARRAY OF
+    STRING) und cells (2D ARRAY OF STRING) gleich uebergeben werden -- sonst
+    spaeter via GUI_TABLE_HEADERS / GUI_TABLE_ROWS setzen.
+
+    Fixierte Kopfzeile, vertikal + horizontal scrollbarer Body (Mausrad +
+    Scrollbalken-Drag), Hover-Highlight, persistente Zeilen-Selektion. Klick
+    auf eine Zeile selektiert sie (Polling via GUI_TABLE_CLICKED /
+    GUI_TABLE_SELECTED, optional GUI_ON_CHANGE-Callback)."""
+    win = _win(args[0], "GUI_TABLE")
+    x = _check_int(args[1], "GUI_TABLE", "x")
+    y = _check_int(args[2], "GUI_TABLE", "y")
+    w = _check_int(args[3], "GUI_TABLE", "w")
+    h = _check_int(args[4], "GUI_TABLE", "h")
+    wdg = _add_widget(win, "GUI_TABLE", "table", x, y, w, h)
+    wdg.tbl = _new_table_state()
+    if len(args) == 7:
+        wdg.tbl["headers"] = _str_array_1d(args[5], "GUI_TABLE", "headers")
+        _table_set_rows(wdg.tbl,
+                        _str_array_2d(args[6], "GUI_TABLE", "cells"), "GUI_TABLE")
+    elif len(args) == 6:
+        raise GBRuntimeError(
+            "GUI_TABLE: entweder ohne Daten oder mit headers UND cells aufrufen")
+    return wdg
+
+
+@builtin("GUI_TABLE_HEADERS", arity=2)
+def _b_table_headers(wdg, headers):
+    """Setzt die Spalten-Kopfzeilen (1D ARRAY OF STRING)."""
+    w = _widget(wdg, "GUI_TABLE_HEADERS", "table")
+    w.tbl["headers"] = _str_array_1d(headers, "GUI_TABLE_HEADERS", "headers")
+    return None
+
+
+@builtin("GUI_TABLE_ROWS", arity=2)
+def _b_table_rows(wdg, cells):
+    """Setzt die Datenzeilen (2D ARRAY OF STRING). Spaltenzahl muss zu den
+    Headern passen (falls gesetzt). Selektion wird angepasst, wenn sie
+    ausserhalb der neuen Zeilenzahl liegt."""
+    w = _widget(wdg, "GUI_TABLE_ROWS", "table")
+    _table_set_rows(w.tbl, _str_array_2d(cells, "GUI_TABLE_ROWS", "cells"),
+                    "GUI_TABLE_ROWS")
+    return None
+
+
+@builtin("GUI_TABLE_COL_WIDTHS", arity=2)
+def _b_table_col_widths(wdg, widths):
+    """Setzt explizite Spaltenbreiten (1D ARRAY OF INTEGER). Laenge muss der
+    Header-Anzahl entsprechen. NIL/leer -> gleichmaessige Auto-Verteilung."""
+    w = _widget(wdg, "GUI_TABLE_COL_WIDTHS", "table")
+    if widths is None:
+        w.tbl["col_widths"] = None
+        return None
+    cols = _int_array_1d(widths, "GUI_TABLE_COL_WIDTHS", "widths")
+    n_cols = len(w.tbl["headers"])
+    if n_cols and len(cols) != n_cols:
+        raise GBRuntimeError(
+            f"GUI_TABLE_COL_WIDTHS: {len(cols)} Breiten, Header hat {n_cols} Spalten")
+    w.tbl["col_widths"] = cols
+    return None
+
+
+@builtin("GUI_TABLE_SELECTED", arity=1)
+def _b_table_selected(wdg):
+    """Liefert den Index der selektierten Zeile (-1 = keine)."""
+    return _widget(wdg, "GUI_TABLE_SELECTED", "table").tbl["selected"]
+
+
+@builtin("GUI_TABLE_SET_SELECTED", arity=2)
+def _b_table_set_selected(wdg, row):
+    """Selektiert eine Zeile programmatisch. -1 = Selektion aufheben; Werte
+    ausserhalb der Zeilenzahl werden auf -1 gesetzt."""
+    w = _widget(wdg, "GUI_TABLE_SET_SELECTED", "table")
+    r = _check_int(row, "GUI_TABLE_SET_SELECTED", "row")
+    w.tbl["selected"] = r if 0 <= r < len(w.tbl["rows"]) else -1
+    return None
+
+
+@builtin("GUI_TABLE_CLICKED", arity=1)
+def _b_table_clicked(wdg):
+    """Liefert den Index der in DIESEM Frame angeklickten Zeile (-1 = keine).
+    Nur im Frame des Klicks gesetzt -- fuers Polling pro Frame abfragen."""
+    return _widget(wdg, "GUI_TABLE_CLICKED", "table").tbl["clicked_row"]
+
+
+@builtin("GUI_TABLE_ROW_COUNT", arity=1)
+def _b_table_row_count(wdg):
+    """Liefert die Anzahl der Datenzeilen."""
+    return len(_widget(wdg, "GUI_TABLE_ROW_COUNT", "table").tbl["rows"])
+
+
 # --- Frame: Update + Draw (graphics_builtins) -----------------------
 
 @graphics_builtin("GUI_UPDATE", arity=0)
@@ -711,14 +1113,15 @@ def _b_on_click(wdg, handler):
 def _b_on_change(wdg, handler):
     """Registriert eine FUNCREF, die aufgerufen wird, wenn sich der Wert des
     Widgets aendert: Slider-Wert (waehrend des Ziehens), TextInput-Text (beim
-    Tippen/Loeschen) oder Checkbox-Zustand (beim Toggle). Parameterloser
-    Handler, am Frame-Ende von GUI_UPDATE() aufgerufen; NIL entfernt ihn.
-    Stand drin abfragen via GUI_VALUE/GUI_TEXT/GUI_CHECKED."""
+    Tippen/Loeschen), Checkbox-Zustand (beim Toggle) oder Tabellen-Selektion
+    (Klick auf eine Zeile). Parameterloser Handler, am Frame-Ende von
+    GUI_UPDATE() aufgerufen; NIL entfernt ihn. Stand drin abfragen via
+    GUI_VALUE/GUI_TEXT/GUI_CHECKED/GUI_TABLE_SELECTED."""
     from ..interpreter import _FuncRef
     w = _widget(wdg, "GUI_ON_CHANGE")
-    if w.kind not in ("slider", "textinput", "checkbox"):
+    if w.kind not in ("slider", "textinput", "checkbox", "table"):
         raise GBRuntimeError(
-            "GUI_ON_CHANGE: nur fuer slider, textinput oder checkbox")
+            "GUI_ON_CHANGE: nur fuer slider, textinput, checkbox oder table")
     if handler is None:
         w.on_change = None
         return None
