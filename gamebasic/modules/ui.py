@@ -81,6 +81,34 @@ class _UIState:
 _state = _UIState()
 
 
+# --- Theme-Palette (global via UI_THEME_SET aenderbar) --------------
+THEME = {
+    "accent":        0x80C0FF,
+    "text_fg":       0xFFFFFF,
+    "muted_fg":      0x707080,
+    "button_bg":     0x40445C,
+    "panel_bg":      0x252840,
+    "panel_border":  0x60607A,
+    "panel_title_bg": 0x383C5C,
+    "field_bg":      0x1A1C2A,
+    "field_border":  0x808088,
+    "slider_track":  0x404060,
+    "progress_fg":   0x4CAF50,
+    "progress_bg":   0x303040,
+    "win_bg":        0x1A1C2A,
+    "win_border":    0x60607A,
+    "win_title_bg":  0x383C5C,
+    "win_title_bg_focus": 0x2A5C72,
+}
+METRICS = {
+    "checkbox_size": 14,
+    "slider_h": 14,
+    "win_title_h": 20,
+}
+_DEFAULT_THEME = dict(THEME)
+_DEFAULT_METRICS = dict(METRICS)
+
+
 # Wichtige SDL-Keycodes fuer TEXTFIELD-Handling
 _KEY_BACKSPACE = 8
 _KEY_RETURN = 13
@@ -160,7 +188,7 @@ def _label(g, *args):
     x += _state.offset_x
     y += _state.offset_y
     text = _check_str(args[2], "UI_LABEL", "text")
-    color = _check_color(args[3], "UI_LABEL") if len(args) == 4 else 0xFFFFFF
+    color = _check_color(args[3], "UI_LABEL") if len(args) == 4 else THEME["text_fg"]
     g.text(x, y, text, color)
     return None
 
@@ -177,8 +205,8 @@ def _button(g, *args):
     w = _check_int(args[3], "UI_BUTTON", "w")
     h = _check_int(args[4], "UI_BUTTON", "h")
     text = _check_str(args[5], "UI_BUTTON", "text")
-    bg_color = _check_color(args[6], "UI_BUTTON") if len(args) >= 7 else 0x40445C
-    fg_color = _check_color(args[7], "UI_BUTTON") if len(args) >= 8 else 0xFFFFFF
+    bg_color = _check_color(args[6], "UI_BUTTON") if len(args) >= 7 else THEME["button_bg"]
+    fg_color = _check_color(args[7], "UI_BUTTON") if len(args) >= 8 else THEME["text_fg"]
 
     mx, my = _mouse(g)
     is_down = g.mouse_button(0)
@@ -234,7 +262,7 @@ def _checkbox(g, *args):
         else:
             _state.checkbox[id_str] = False
 
-    box_size = 14
+    box_size = METRICS["checkbox_size"]
     mx, my = _mouse(g)
     is_down = g.mouse_button(0)
     hovered = _in_box(mx, my, x, y, box_size, box_size)
@@ -244,14 +272,14 @@ def _checkbox(g, *args):
         _state.checkbox[id_str] = not _state.checkbox[id_str]
 
     # Zeichnen: Rahmen, Fuellung wenn angekreuzt, Label rechts
-    border = 0xC0C0C0
-    fill = 0x80C0FF
+    border = THEME["field_border"]
+    fill = THEME["accent"]
     g.rect(x, y, x + box_size - 1, y + box_size - 1, border)
     if hovered:
         g.rect(x - 1, y - 1, x + box_size, y + box_size, fill)
     if _state.checkbox[id_str]:
         g.box(x + 3, y + 3, x + box_size - 4, y + box_size - 4, fill)
-    g.text(x + box_size + 5, y, label, 0xFFFFFF)
+    g.text(x + box_size + 5, y, label, THEME["text_fg"])
     return _state.checkbox[id_str]
 
 
@@ -278,7 +306,7 @@ def _slider(g, *args):
         else:
             _state.slider[id_str] = min_val
 
-    h = 14
+    h = METRICS["slider_h"]
     handle_w = 10
     mx, my = _mouse(g)
     is_down = g.mouse_button(0)
@@ -290,9 +318,9 @@ def _slider(g, *args):
         _state.slider[id_str] = min_val + rel * (max_val - min_val)
 
     # Zeichnen: Track + Handle
-    track_color = 0x404060
-    border = 0xFFFFFF
-    handle_color = 0x80C0FF
+    track_color = THEME["slider_track"]
+    border = THEME["text_fg"]
+    handle_color = THEME["accent"]
     g.box(x, y + h // 2 - 1, x + w - 1, y + h // 2 + 1, track_color)
     g.rect(x, y, x + w - 1, y + h - 1, border)
     handle_pos = (_state.slider[id_str] - min_val) / (max_val - min_val)
@@ -317,8 +345,8 @@ def _progress(g, *args):
     h = _check_int(args[3], "UI_PROGRESS", "h")
     value = _check_num(args[4], "UI_PROGRESS", "value")
     max_val = _check_num(args[5], "UI_PROGRESS", "max")
-    fg = _check_color(args[6], "UI_PROGRESS") if len(args) >= 7 else 0x4CAF50
-    bg = _check_color(args[7], "UI_PROGRESS") if len(args) >= 8 else 0x303040
+    fg = _check_color(args[6], "UI_PROGRESS") if len(args) >= 7 else THEME["progress_fg"]
+    bg = _check_color(args[7], "UI_PROGRESS") if len(args) >= 8 else THEME["progress_bg"]
 
     if max_val <= 0:
         raise GBRuntimeError("UI_PROGRESS: max muss > 0 sein")
@@ -330,7 +358,7 @@ def _progress(g, *args):
 
     # Hintergrund + Rahmen
     g.box(x, y, x + w - 1, y + h - 1, bg)
-    g.rect(x, y, x + w - 1, y + h - 1, 0xFFFFFF)
+    g.rect(x, y, x + w - 1, y + h - 1, THEME["text_fg"])
     # Fuellbalken (1 px Padding)
     if fill_w > 0:
         g.box(x + 1, y + 1, x + 1 + fill_w - 1, y + h - 2, fg)
@@ -351,17 +379,17 @@ def _panel(g, *args):
     w = _check_int(args[2], "UI_PANEL", "w")
     h = _check_int(args[3], "UI_PANEL", "h")
     title = _check_str(args[4], "UI_PANEL", "title") if len(args) >= 5 else ""
-    bg = _check_color(args[5], "UI_PANEL") if len(args) >= 6 else 0x252840
+    bg = _check_color(args[5], "UI_PANEL") if len(args) >= 6 else THEME["panel_bg"]
 
     # Hintergrund + Rahmen
     g.box(x, y, x + w - 1, y + h - 1, bg)
-    g.rect(x, y, x + w - 1, y + h - 1, 0x60607A)
+    g.rect(x, y, x + w - 1, y + h - 1, THEME["panel_border"])
     # Titel-Bar wenn Titel gesetzt
     if title:
         title_h = 18
-        g.box(x, y, x + w - 1, y + title_h - 1, 0x383C5C)
-        g.rect(x, y, x + w - 1, y + title_h - 1, 0x60607A)
-        g.text(x + 6, y + 2, title, 0xFFFFFF)
+        g.box(x, y, x + w - 1, y + title_h - 1, THEME["panel_title_bg"])
+        g.rect(x, y, x + w - 1, y + title_h - 1, THEME["panel_border"])
+        g.text(x + 6, y + 2, title, THEME["text_fg"])
     return None
 
 
@@ -412,16 +440,16 @@ def _textfield(g, *args):
             _state.text[id_str] = _state.text[id_str][:-1]
 
     # Zeichnen
-    border = 0xFFFFFF if _state.focused == id_str else 0x808088
-    bg = 0x1A1C2A
+    border = THEME["accent"] if _state.focused == id_str else THEME["field_border"]
+    bg = THEME["field_bg"]
     g.box(x, y, x + w - 1, y + h - 1, bg)
     g.rect(x, y, x + w - 1, y + h - 1, border)
 
     text = _state.text[id_str]
     if text:
-        g.text(x + 5, y + (h - 14) // 2, text, 0xFFFFFF)
+        g.text(x + 5, y + (h - 14) // 2, text, THEME["text_fg"])
     elif placeholder and _state.focused != id_str:
-        g.text(x + 5, y + (h - 14) // 2, placeholder, 0x707080)
+        g.text(x + 5, y + (h - 14) // 2, placeholder, THEME["muted_fg"])
 
     # Blinkender Caret nur wenn fokussiert (32-Frame-Periode)
     if _state.focused == id_str and (_state.frame_count // 16) % 2 == 0:
@@ -429,7 +457,7 @@ def _textfield(g, *args):
         # Schaetzung fuer die Default-Schrift; gut genug fuer einen Cursor.
         cx = x + 5 + len(text) * 8
         cx = min(cx, x + w - 3)
-        g.line(cx, y + 3, cx, y + h - 4, 0xFFFFFF)
+        g.line(cx, y + 3, cx, y + h - 4, THEME["text_fg"])
 
     return _state.text[id_str]
 
@@ -480,20 +508,20 @@ def _radio(g, *args):
         cy = y + i * row_h + row_h // 2
         cx = x + radius + 2
         # Rahmen-Kreis
-        g.circle(cx, cy, radius, 0x1A1C2A)
+        g.circle(cx, cy, radius, THEME["field_bg"])
         # Cycle: Edge-Detect-Klick
         in_row = _in_box(mx, my, x, y + i * row_h, 200, row_h)
         if in_row and is_down and not _state.was_mouse_down:
             _state.radio[id_str] = i
         # Aussenring
         if i == _state.radio[id_str]:
-            g.circle(cx, cy, radius, 0x80C0FF)
-            g.circle(cx, cy, radius - 2, 0xFFFFFF)
+            g.circle(cx, cy, radius, THEME["accent"])
+            g.circle(cx, cy, radius - 2, THEME["text_fg"])
         else:
-            g.rect(cx - radius, cy - radius, cx + radius, cy + radius, 0xC0C0C0)
+            g.rect(cx - radius, cy - radius, cx + radius, cy + radius, THEME["field_border"])
         # Label rechts vom Kreis
         g.text(x + 2 * radius + 8, y + i * row_h + 2,
-               options.values[i], 0xFFFFFF)
+               options.values[i], THEME["text_fg"])
 
     return _state.radio[id_str]
 
@@ -857,7 +885,6 @@ def _table(g, *args):
 
 # --- Immediate-Mode-Fenster -----------------------------------------
 
-_WIN_TITLE_H = 20
 _WIN_COLLAPSE = 12       # Kantenlaenge des Einklapp-Buttons
 
 
@@ -891,16 +918,16 @@ def _window_begin(g, *args):
 
     # Besitzt dieses Fenster den Input? (oberstes gehovertes Fenster aus Vorframe)
     owns = (_state.active_win is None or _state.active_win == id_str)
-    full_h = _WIN_TITLE_H if st["collapsed"] else h
+    full_h = METRICS["win_title_h"] if st["collapsed"] else h
     if _in_box(mx, my, wx, wy, w, full_h):
         _state.hover_win = id_str          # letzter Schreiber = oberstes Fenster
 
     cb_x = wx + 4
-    cb_y = wy + (_WIN_TITLE_H - _WIN_COLLAPSE) // 2
+    cb_y = wy + (METRICS["win_title_h"] - _WIN_COLLAPSE) // 2
     if owns and just_pressed:
         if _in_box(mx, my, cb_x, cb_y, _WIN_COLLAPSE, _WIN_COLLAPSE):
             st["collapsed"] = not st["collapsed"]
-        elif _in_box(mx, my, wx, wy, w, _WIN_TITLE_H):
+        elif _in_box(mx, my, wx, wy, w, METRICS["win_title_h"]):
             _state.drag_win = id_str
             _state.drag_off = (mx - wx, my - wy)
     if _state.drag_win == id_str and is_down:
@@ -909,19 +936,20 @@ def _window_begin(g, *args):
         st["x"], st["y"] = wx, wy
 
     # Zeichnen: Korpus (nur wenn offen) + Titelleiste + Einklapp-Pfeil + Titel
-    draw_h = _WIN_TITLE_H if st["collapsed"] else h
-    g.box(wx, wy, wx + w - 1, wy + draw_h - 1, 0x1A1C2A)
-    g.rect(wx, wy, wx + w - 1, wy + draw_h - 1, 0x60607A)
-    g.box(wx, wy, wx + w - 1, wy + _WIN_TITLE_H - 1,
-          0x2A5C72 if owns else 0x383C5C)
-    g.rect(wx, wy, wx + w - 1, wy + _WIN_TITLE_H - 1, 0x60607A)
-    g.text(cb_x, cb_y - 2, "+" if st["collapsed"] else "-", 0xFFFFFF)
-    g.text(wx + _WIN_COLLAPSE + 8, wy + 3, title, 0xFFFFFF)
+    th = METRICS["win_title_h"]
+    draw_h = th if st["collapsed"] else h
+    g.box(wx, wy, wx + w - 1, wy + draw_h - 1, THEME["win_bg"])
+    g.rect(wx, wy, wx + w - 1, wy + draw_h - 1, THEME["win_border"])
+    g.box(wx, wy, wx + w - 1, wy + th - 1,
+          THEME["win_title_bg_focus"] if owns else THEME["win_title_bg"])
+    g.rect(wx, wy, wx + w - 1, wy + th - 1, THEME["win_border"])
+    g.text(cb_x, cb_y - 2, "+" if st["collapsed"] else "-", THEME["text_fg"])
+    g.text(wx + _WIN_COLLAPSE + 8, wy + 3, title, THEME["text_fg"])
 
     # Offset + Input-Block pushen (Widgets bis UI_WINDOW_END sind relativ)
     _state.win_stack.append((_state.offset_x, _state.offset_y, _state.input_blocked))
     _state.offset_x = wx
-    _state.offset_y = wy + _WIN_TITLE_H
+    _state.offset_y = wy + METRICS["win_title_h"]
     _state.input_blocked = not owns
     return not st["collapsed"]
 
@@ -991,4 +1019,104 @@ def _reset(g):
     _state.click_origin = None
     _state.prev_keys.clear()
     _state.frame_count = 0
+    THEME.clear(); THEME.update(_DEFAULT_THEME)
+    METRICS.clear(); METRICS.update(_DEFAULT_METRICS)
+    return None
+
+
+# --- Theming: Palette, Metriken, Presets ----------------------------
+
+_UI_METRIC_MIN = 1
+
+
+@graphics_builtin("UI_THEME_SET", arity=2)
+def _ui_theme_set(g, key, color):
+    """Setzt eine globale Theme-Farbe. Schluessel: accent, text_fg, muted_fg,
+    button_bg, panel_bg, panel_border, panel_title_bg, field_bg, field_border,
+    slider_track, progress_fg, progress_bg, win_bg, win_border, win_title_bg,
+    win_title_bg_focus."""
+    k = _check_str(key, "UI_THEME_SET", "key")
+    if k not in THEME:
+        raise GBRuntimeError(
+            f"UI_THEME_SET: unbekannter Schluessel '{k}' "
+            f"(gueltig: {', '.join(sorted(THEME))})")
+    THEME[k] = _check_color(color, "UI_THEME_SET")
+    return None
+
+
+@graphics_builtin("UI_THEME_GET", arity=1)
+def _ui_theme_get(g, key):
+    """Liefert die aktuelle Theme-Farbe (INTEGER)."""
+    k = _check_str(key, "UI_THEME_GET", "key")
+    if k not in THEME:
+        raise GBRuntimeError(f"UI_THEME_GET: unbekannter Schluessel '{k}'")
+    return THEME[k]
+
+
+@graphics_builtin("UI_METRIC_SET", arity=2)
+def _ui_metric_set(g, key, value):
+    """Setzt eine Layout-Metrik global. Schluessel: checkbox_size, slider_h,
+    win_title_h. Wirkt sofort (Immediate-Mode zeichnet jeden Frame neu)."""
+    k = _check_str(key, "UI_METRIC_SET", "key")
+    if k not in METRICS:
+        raise GBRuntimeError(
+            f"UI_METRIC_SET: unbekannter Schluessel '{k}' "
+            f"(gueltig: {', '.join(sorted(METRICS))})")
+    v = _check_int(value, "UI_METRIC_SET", "value")
+    if v < _UI_METRIC_MIN:
+        raise GBRuntimeError(f"UI_METRIC_SET: Wert muss >= {_UI_METRIC_MIN} sein")
+    METRICS[k] = v
+    return None
+
+
+@graphics_builtin("UI_METRIC_GET", arity=1)
+def _ui_metric_get(g, key):
+    """Liefert den aktuellen Wert einer Layout-Metrik (INTEGER)."""
+    k = _check_str(key, "UI_METRIC_GET", "key")
+    if k not in METRICS:
+        raise GBRuntimeError(f"UI_METRIC_GET: unbekannter Schluessel '{k}'")
+    return METRICS[k]
+
+
+# Fertige Farbschemata. Jeder Eintrag ueberschreibt nur Farben (keine Metriken).
+_UI_PRESETS = {
+    "dark": dict(_DEFAULT_THEME),
+    "light": {
+        "accent": 0x2A7DE1, "text_fg": 0x202428, "muted_fg": 0x90969C,
+        "button_bg": 0xD8DCE2, "panel_bg": 0xECEFF3, "panel_border": 0xB0B6BE,
+        "panel_title_bg": 0xD0D5DC, "field_bg": 0xFFFFFF, "field_border": 0x9AA0A8,
+        "slider_track": 0xC4C9D0, "progress_fg": 0x2FA84F, "progress_bg": 0xCBD0D6,
+        "win_bg": 0xF4F6F9, "win_border": 0xA8AEB6, "win_title_bg": 0xD0D5DC,
+        "win_title_bg_focus": 0x2A7DE1,
+    },
+    "retro": {  # Gruen-auf-Schwarz, Terminal-Look
+        "accent": 0x33FF66, "text_fg": 0x33FF66, "muted_fg": 0x1F8C3C,
+        "button_bg": 0x0A1A0A, "panel_bg": 0x041004, "panel_border": 0x1F8C3C,
+        "panel_title_bg": 0x0A2A0A, "field_bg": 0x020802, "field_border": 0x1F8C3C,
+        "slider_track": 0x0A2A0A, "progress_fg": 0x33FF66, "progress_bg": 0x0A2A0A,
+        "win_bg": 0x020802, "win_border": 0x1F8C3C, "win_title_bg": 0x0A2A0A,
+        "win_title_bg_focus": 0x0F4F1F,
+    },
+    "contrast": {  # Schwarz/Gelb, maximale Lesbarkeit
+        "accent": 0xFFD400, "text_fg": 0xFFFFFF, "muted_fg": 0xAAAAAA,
+        "button_bg": 0x000000, "panel_bg": 0x000000, "panel_border": 0xFFD400,
+        "panel_title_bg": 0x202000, "field_bg": 0x000000, "field_border": 0xFFD400,
+        "slider_track": 0x303000, "progress_fg": 0xFFD400, "progress_bg": 0x303030,
+        "win_bg": 0x000000, "win_border": 0xFFD400, "win_title_bg": 0x202000,
+        "win_title_bg_focus": 0x4F4F00,
+    },
+}
+
+
+@graphics_builtin("UI_THEME_PRESET", arity=1)
+def _ui_theme_preset(g, name):
+    """Aktiviert ein fertiges Farbschema: "dark" (Default), "light", "retro",
+    "contrast"."""
+    n = _check_str(name, "UI_THEME_PRESET", "name").lower()
+    preset = _UI_PRESETS.get(n)
+    if preset is None:
+        raise GBRuntimeError(
+            f"UI_THEME_PRESET: unbekanntes Preset '{n}' "
+            f"(gueltig: {', '.join(sorted(_UI_PRESETS))})")
+    THEME.update(preset)
     return None

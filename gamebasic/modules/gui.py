@@ -38,12 +38,18 @@ from ..errors import GBRuntimeError, TypeMismatchError
 from . import register_type, call_funcref
 
 
-# --- Layout-Konstanten ----------------------------------------------
-TITLE_H = 22            # Hoehe der Titelleiste
-SLIDER_H = 14           # Hoehe eines Sliders
-CHECK_SIZE = 16         # Kantenlaenge der Checkbox
-SLIDER_HANDLE_W = 10
-CARET_PERIOD = 16       # Frames pro Caret-Blink-Halbphase
+# --- Layout-Metriken (zur Laufzeit via GUI_METRIC_SET aenderbar) ------
+# Groessen-Metriken fliessen beim ANLEGEN eines Widgets in dessen w/h ein
+# (check_size, slider_h); am besten vor dem UI-Aufbau setzen. title_h, pad,
+# caret_period u.a. werden live gelesen.
+METRICS = {
+    "title_h": 22,          # Hoehe der Titelleiste
+    "slider_h": 14,         # Hoehe eines Sliders (neue Slider)
+    "check_size": 16,       # Kantenlaenge der Checkbox (neue Checkboxen)
+    "slider_handle_w": 10,  # Breite des Slider-Griffs
+    "caret_period": 16,     # Frames pro Caret-Blink-Halbphase
+    "pad": 6,               # horizontaler Text-Innenabstand
+}
 
 # SDL-Keycodes (wie im ui-Modul)
 _KEY_BACKSPACE = 8
@@ -64,6 +70,10 @@ THEME = {
     "close_hover":   0xC04848,
 }
 
+# Default-Schnappschuesse fuer GUI_RESET (stellt Theme + Metriken wieder her).
+_DEFAULT_THEME = dict(THEME)
+_DEFAULT_METRICS = dict(METRICS)
+
 
 # --- Widget/Window-Datentypen ---------------------------------------
 
@@ -75,7 +85,7 @@ class _Widget:
     __slots__ = (
         "kind", "window", "x", "y", "w", "h", "text", "color",
         "value", "min", "max", "checked", "placeholder",
-        "clicked", "hovered", "on_click", "on_change",
+        "clicked", "hovered", "on_click", "on_change", "ov",
     )
 
     def __init__(self, kind, window, x, y, w, h):
@@ -96,11 +106,12 @@ class _Widget:
         self.hovered = False
         self.on_click = None    # optionale FUNCREF (GUI_ON_CLICK)
         self.on_change = None   # optionale FUNCREF (GUI_ON_CHANGE)
+        self.ov = None          # optionale Farb-Overrides {rolle: farbe}
 
     def abs_rect(self):
         """Absolute Bildschirm-Koordinaten (x, y, w, h)."""
         win = self.window
-        return (win.x + self.x, win.y + TITLE_H + self.y, self.w, self.h)
+        return (win.x + self.x, win.y + METRICS["title_h"] + self.y, self.w, self.h)
 
     def __repr__(self):
         return f"<GUI_WIDGET {self.kind}>"
@@ -126,10 +137,11 @@ class _Window:
 
     def close_button_rect(self):
         """(x, y, w, h) des Schliess-Buttons in der Titelleiste."""
-        return (self.x + self.w - TITLE_H, self.y, TITLE_H, TITLE_H)
+        th = METRICS["title_h"]
+        return (self.x + self.w - th, self.y, th, th)
 
     def title_rect(self):
-        return (self.x, self.y, self.w, TITLE_H)
+        return (self.x, self.y, self.w, METRICS["title_h"])
 
     def __repr__(self):
         return f"<GUI_WINDOW {self.title!r}>"
@@ -323,13 +335,15 @@ class _GuiManager:
     def _draw_window(self, g, win):
         focused = (win is self.focus_window)
         x, y, w, h = win.x, win.y, win.w, win.h
+        th = METRICS["title_h"]
+        pad = METRICS["pad"]
         # Korpus
         g.box(x, y, x + w - 1, y + h - 1, THEME["win_bg"])
         g.rect(x, y, x + w - 1, y + h - 1, THEME["win_border"])
         # Titelleiste
         title_bg = THEME["title_bg_focus"] if focused else THEME["title_bg"]
-        g.box(x, y, x + w - 1, y + TITLE_H - 1, title_bg)
-        g.text(x + 6, y + 4, win.title, THEME["title_fg"])
+        g.box(x, y, x + w - 1, y + th - 1, title_bg)
+        g.text(x + pad, y + 4, win.title, THEME["title_fg"])
         # Schliess-Button
         if win.closable:
             cx, cy, cw, ch = win.close_button_rect()
@@ -342,54 +356,58 @@ class _GuiManager:
     def _draw_widget(self, g, wdg):
         ax, ay, w, h = wdg.abs_rect()
         kind = wdg.kind
+        pad = METRICS["pad"]
         if kind == "label":
-            g.text(ax, ay, wdg.text, wdg.color)
+            # Label-fg: GUI_SET_COLOR("fg") vor GUI_LABEL-Farbe (wdg.color).
+            fg = wdg.ov["fg"] if (wdg.ov is not None and "fg" in wdg.ov) else wdg.color
+            g.text(ax, ay, wdg.text, fg)
         elif kind == "panel":
-            g.box(ax, ay, ax + w - 1, ay + h - 1, THEME["widget_bg"])
-            g.rect(ax, ay, ax + w - 1, ay + h - 1, THEME["widget_border"])
+            g.box(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "bg", "widget_bg"))
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "border", "widget_border"))
             if wdg.text:
                 g.box(ax, ay, ax + w - 1, ay + 17, THEME["win_border"])
-                g.text(ax + 5, ay + 2, wdg.text, THEME["title_fg"])
+                g.text(ax + 5, ay + 2, wdg.text, _wcol(wdg, "fg", "title_fg"))
         elif kind == "button":
-            bg = THEME["widget_bg"]
+            bg = _wcol(wdg, "bg", "widget_bg")
             if self.press_origin is wdg:
                 bg = _shade(bg, -30)
             elif wdg.hovered:
                 bg = _shade(bg, 30)
             g.box(ax, ay, ax + w - 1, ay + h - 1, bg)
-            g.rect(ax, ay, ax + w - 1, ay + h - 1, THEME["widget_border"])
-            g.text(ax + 6, ay + (h - 14) // 2, wdg.text, THEME["text_fg"])
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "border", "widget_border"))
+            g.text(ax + pad, ay + (h - 14) // 2, wdg.text, _wcol(wdg, "fg", "text_fg"))
         elif kind == "checkbox":
-            g.rect(ax, ay, ax + CHECK_SIZE - 1, ay + CHECK_SIZE - 1,
-                   THEME["widget_border"])
+            acc = _wcol(wdg, "accent", "accent")
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "border", "widget_border"))
             if wdg.hovered:
-                g.rect(ax - 1, ay - 1, ax + CHECK_SIZE, ay + CHECK_SIZE,
-                       THEME["accent"])
+                g.rect(ax - 1, ay - 1, ax + w, ay + h, acc)
             if wdg.checked:
-                g.box(ax + 3, ay + 3, ax + CHECK_SIZE - 4, ay + CHECK_SIZE - 4,
-                      THEME["accent"])
-            g.text(ax + CHECK_SIZE + 6, ay, wdg.text, THEME["text_fg"])
+                g.box(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc)
+            g.text(ax + w + pad, ay, wdg.text, _wcol(wdg, "fg", "text_fg"))
         elif kind == "slider":
+            handle_w = METRICS["slider_handle_w"]
             g.box(ax, ay + h // 2 - 1, ax + w - 1, ay + h // 2 + 1,
-                  THEME["widget_bg"])
-            g.rect(ax, ay, ax + w - 1, ay + h - 1, THEME["widget_border"])
+                  _wcol(wdg, "bg", "widget_bg"))
+            g.rect(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "border", "widget_border"))
             span = wdg.max - wdg.min
             ratio = (wdg.value - wdg.min) / span if span else 0.0
-            hx = ax + int(ratio * (w - SLIDER_HANDLE_W))
-            g.box(hx, ay, hx + SLIDER_HANDLE_W - 1, ay + h - 1, THEME["accent"])
+            hx = ax + int(ratio * (w - handle_w))
+            g.box(hx, ay, hx + handle_w - 1, ay + h - 1, _wcol(wdg, "accent", "accent"))
         elif kind == "textinput":
             focused = (wdg is self.focus_widget)
-            g.box(ax, ay, ax + w - 1, ay + h - 1, THEME["win_bg"])
+            fg = _wcol(wdg, "fg", "text_fg")
+            g.box(ax, ay, ax + w - 1, ay + h - 1, _wcol(wdg, "bg", "win_bg"))
             g.rect(ax, ay, ax + w - 1, ay + h - 1,
-                   THEME["accent"] if focused else THEME["widget_border"])
+                   _wcol(wdg, "accent", "accent") if focused
+                   else _wcol(wdg, "border", "widget_border"))
             if wdg.text:
-                g.text(ax + 5, ay + (h - 14) // 2, wdg.text, THEME["text_fg"])
+                g.text(ax + 5, ay + (h - 14) // 2, wdg.text, fg)
             elif wdg.placeholder and not focused:
                 g.text(ax + 5, ay + (h - 14) // 2, wdg.placeholder,
                        THEME["muted_fg"])
-            if focused and (self.frame_count // CARET_PERIOD) % 2 == 0:
+            if focused and (self.frame_count // METRICS["caret_period"]) % 2 == 0:
                 cx = min(ax + 5 + len(wdg.text) * 8, ax + w - 3)
-                g.line(cx, ay + 3, cx, ay + h - 4, THEME["text_fg"])
+                g.line(cx, ay + 3, cx, ay + h - 4, fg)
 
     def reset(self):
         self.windows.clear()
@@ -402,9 +420,23 @@ class _GuiManager:
         self.was_mouse_down = False
         self.prev_keys = set()
         self.frame_count = 0
+        # Theme + Metriken auf Defaults zuruecksetzen (frischer Start).
+        THEME.clear()
+        THEME.update(_DEFAULT_THEME)
+        METRICS.clear()
+        METRICS.update(_DEFAULT_METRICS)
 
 
 _mgr = _GuiManager()
+
+
+def _wcol(wdg, role, theme_key):
+    """Farbe fuer eine Widget-Rolle: Per-Widget-Override (GUI_SET_COLOR) vor
+    Theme-Default. `role` in {bg, fg, border, accent}."""
+    ov = wdg.ov
+    if ov is not None and role in ov:
+        return ov[role]
+    return THEME[theme_key]
 
 
 def _shade(color, delta):
@@ -544,7 +576,8 @@ def _b_checkbox(*args):
     x = _check_int(args[2], "GUI_CHECKBOX", "x")
     y = _check_int(args[3], "GUI_CHECKBOX", "y")
     default = _check_bool(args[4], "GUI_CHECKBOX", "default") if len(args) == 5 else False
-    wdg = _add_widget(win, "GUI_CHECKBOX", "checkbox", x, y, CHECK_SIZE, CHECK_SIZE)
+    cs = METRICS["check_size"]
+    wdg = _add_widget(win, "GUI_CHECKBOX", "checkbox", x, y, cs, cs)
     wdg.text = label
     wdg.checked = default
     return wdg
@@ -561,7 +594,7 @@ def _b_slider(*args):
     if mx <= mn:
         raise GBRuntimeError("GUI_SLIDER: max muss > min sein")
     default = _check_num(args[6], "GUI_SLIDER", "default") if len(args) == 7 else mn
-    wdg = _add_widget(win, "GUI_SLIDER", "slider", x, y, w, SLIDER_H)
+    wdg = _add_widget(win, "GUI_SLIDER", "slider", x, y, w, METRICS["slider_h"])
     wdg.min = mn
     wdg.max = mx
     wdg.value = max(mn, min(mx, default))
@@ -695,15 +728,132 @@ def _b_on_change(wdg, handler):
     return None
 
 
-# --- Theme / Reset ---------------------------------------------------
+# --- Theme / Metriken / Per-Widget-Farben ---------------------------
+
+_COLOR_ROLES = ("bg", "fg", "border", "accent")
+
 
 @builtin("GUI_THEME", arity=1)
 def _b_theme(accent):
+    """Setzt die Akzentfarbe (Kurzform fuer GUI_THEME_SET("accent", ...))."""
     THEME["accent"] = _check_color(accent, "GUI_THEME")
+    return None
+
+
+@builtin("GUI_THEME_SET", arity=2)
+def _b_theme_set(key, color):
+    """Setzt eine einzelne Theme-Farbe global. Gueltige Schluessel:
+    win_bg, win_border, title_bg, title_bg_focus, title_fg, widget_bg,
+    widget_border, text_fg, muted_fg, accent, close_hover."""
+    k = _check_str(key, "GUI_THEME_SET", "key")
+    if k not in THEME:
+        raise GBRuntimeError(
+            f"GUI_THEME_SET: unbekannter Schluessel '{k}' "
+            f"(gueltig: {', '.join(sorted(THEME))})")
+    THEME[k] = _check_color(color, "GUI_THEME_SET")
+    return None
+
+
+@builtin("GUI_THEME_GET", arity=1)
+def _b_theme_get(key):
+    """Liefert die aktuelle Theme-Farbe zu einem Schluessel (INTEGER)."""
+    k = _check_str(key, "GUI_THEME_GET", "key")
+    if k not in THEME:
+        raise GBRuntimeError(f"GUI_THEME_GET: unbekannter Schluessel '{k}'")
+    return THEME[k]
+
+
+@builtin("GUI_METRIC_SET", arity=2)
+def _b_metric_set(key, value):
+    """Setzt eine Layout-Metrik global. Gueltige Schluessel: title_h,
+    slider_h, check_size, slider_handle_w, caret_period, pad. Groessen
+    (check_size, slider_h) wirken nur auf NEU angelegte Widgets -- am besten
+    vor dem UI-Aufbau setzen."""
+    k = _check_str(key, "GUI_METRIC_SET", "key")
+    if k not in METRICS:
+        raise GBRuntimeError(
+            f"GUI_METRIC_SET: unbekannter Schluessel '{k}' "
+            f"(gueltig: {', '.join(sorted(METRICS))})")
+    v = _check_int(value, "GUI_METRIC_SET", "value")
+    if v < 0:
+        raise GBRuntimeError("GUI_METRIC_SET: Wert muss >= 0 sein")
+    METRICS[k] = v
+    return None
+
+
+@builtin("GUI_METRIC_GET", arity=1)
+def _b_metric_get(key):
+    """Liefert den aktuellen Wert einer Layout-Metrik (INTEGER)."""
+    k = _check_str(key, "GUI_METRIC_GET", "key")
+    if k not in METRICS:
+        raise GBRuntimeError(f"GUI_METRIC_GET: unbekannter Schluessel '{k}'")
+    return METRICS[k]
+
+
+@builtin("GUI_SET_COLOR", arity=3)
+def _b_set_color(wdg, role, color):
+    """Ueberschreibt eine Farbe fuer EIN Widget (vor dem Theme-Default).
+    `role`: "bg", "fg", "border" oder "accent". Farbe -1 entfernt den
+    Override wieder (Widget nutzt dann wieder das Theme)."""
+    w = _widget(wdg, "GUI_SET_COLOR")
+    r = _check_str(role, "GUI_SET_COLOR", "role")
+    if r not in _COLOR_ROLES:
+        raise GBRuntimeError(
+            f"GUI_SET_COLOR: role muss eine von {_COLOR_ROLES} sein")
+    if type(color) is not int:
+        raise TypeMismatchError("GUI_SET_COLOR: Farbe muss INTEGER sein")
+    if color == -1:
+        if w.ov is not None:
+            w.ov.pop(r, None)
+        return None
+    _check_color(color, "GUI_SET_COLOR")
+    if w.ov is None:
+        w.ov = {}
+    w.ov[r] = color
     return None
 
 
 @builtin("GUI_RESET", arity=0)
 def _b_reset():
+    """Loescht alle Fenster/Widgets UND setzt Theme + Metriken auf Defaults."""
     _mgr.reset()
+    return None
+
+
+# --- Preset-Farbschemata --------------------------------------------
+
+_GUI_PRESETS = {
+    "dark": dict(_DEFAULT_THEME),
+    "light": {
+        "win_bg": 0xF4F6F9, "win_border": 0xA8AEB6, "title_bg": 0xD0D5DC,
+        "title_bg_focus": 0x2A7DE1, "title_fg": 0x202428, "widget_bg": 0xD8DCE2,
+        "widget_border": 0x9AA0A8, "text_fg": 0x202428, "muted_fg": 0x90969C,
+        "accent": 0x2A7DE1, "close_hover": 0xC04848,
+    },
+    "retro": {
+        "win_bg": 0x020802, "win_border": 0x1F8C3C, "title_bg": 0x0A2A0A,
+        "title_bg_focus": 0x0F4F1F, "title_fg": 0x33FF66, "widget_bg": 0x0A1A0A,
+        "widget_border": 0x1F8C3C, "text_fg": 0x33FF66, "muted_fg": 0x1F8C3C,
+        "accent": 0x33FF66, "close_hover": 0xC04848,
+    },
+    "contrast": {
+        "win_bg": 0x000000, "win_border": 0xFFD400, "title_bg": 0x202000,
+        "title_bg_focus": 0x4F4F00, "title_fg": 0xFFFFFF, "widget_bg": 0x000000,
+        "widget_border": 0xFFD400, "text_fg": 0xFFFFFF, "muted_fg": 0xAAAAAA,
+        "accent": 0xFFD400, "close_hover": 0xFF4040,
+    },
+}
+
+
+@builtin("GUI_THEME_PRESET", arity=1)
+def _b_theme_preset(name):
+    """Aktiviert ein fertiges Farbschema: "dark" (Default), "light", "retro",
+    "contrast"."""
+    n = _check_str(name, "GUI_THEME_PRESET", "name").lower()
+    preset = _GUI_PRESETS.get(n)
+    if preset is None:
+        raise GBRuntimeError(
+            f"GUI_THEME_PRESET: unbekanntes Preset '{n}' "
+            f"(gueltig: {', '.join(sorted(_GUI_PRESETS))})")
+    THEME.update(preset)
     return None

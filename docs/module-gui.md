@@ -43,8 +43,12 @@ IMPORT "gui"
 | `GUI_SET_VALUE(widget, wert)` | — | Slider-Wert setzen (wird geclamped) |
 | `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF-Callback bei Klick (Button/Checkbox) |
 | `GUI_ON_CHANGE(widget, funcref)` | — | FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox) |
-| `GUI_THEME(accent)` | — | Akzentfarbe (RGB) umstellen |
-| `GUI_RESET()` | — | alle Fenster/Widgets löschen |
+| `GUI_THEME(accent)` | — | Akzentfarbe (RGB) umstellen (Kurzform) |
+| `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
+| `GUI_THEME_PRESET(name$)` | — | Farbschema: dark/light/retro/contrast |
+| `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
+| `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent; -1 entfernt) |
+| `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
 ## Externe Typen
 
@@ -175,10 +179,64 @@ GUI_PANEL(win, x, y, w, h[, titel$]) -> GUI_WIDGET
 
 Rein dekorativer Container (Rahmen + optionale Titelzeile). Nicht interaktiv.
 
-## Theme
+## Aussehen ändern (Theme, Metriken, Per-Widget)
 
-Default ist die Logo-Cyan-Palette (konsistent zum Editor). `GUI_THEME(accent)`
-stellt die Akzentfarbe (RGB-INTEGER) um, z. B. `GUI_THEME(RGB(255, 160, 60))`.
+Das Aussehen lässt sich auf drei Ebenen steuern:
+
+### 1. Fertige Farbschemata
+
+```basic
+GUI_THEME_PRESET("dark")      ' Default (Logo-Cyan)
+GUI_THEME_PRESET("light")     ' helles Schema
+GUI_THEME_PRESET("retro")     ' grün auf schwarz (Terminal)
+GUI_THEME_PRESET("contrast")  ' schwarz/gelb, maximaler Kontrast
+```
+
+### 2. Einzelne Theme-Farben (global)
+
+```basic
+GUI_THEME_SET(schluessel$, farbe)   ' eine Palette-Farbe setzen
+GUI_THEME_GET(schluessel$)          ' -> aktuelle Farbe (INTEGER)
+GUI_THEME(accent)                   ' Kurzform für GUI_THEME_SET("accent", ...)
+```
+
+Gültige Schlüssel: `win_bg`, `win_border`, `title_bg`, `title_bg_focus`,
+`title_fg`, `widget_bg`, `widget_border`, `text_fg`, `muted_fg`, `accent`,
+`close_hover`.
+
+```basic
+GUI_THEME_SET("win_bg", RGB(20, 20, 30))
+GUI_THEME_SET("accent", RGB(255, 160, 60))
+```
+
+### 3. Layout-Metriken (Größen)
+
+```basic
+GUI_METRIC_SET(schluessel$, wert)   ' eine Metrik setzen (INTEGER-Pixel)
+GUI_METRIC_GET(schluessel$)         ' -> aktueller Wert
+```
+
+Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
+`slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand).
+**Hinweis:** Größen, die in die Widget-Maße einfließen (`check_size`,
+`slider_h`), wirken nur auf **neu angelegte** Widgets — am besten vor dem
+UI-Aufbau setzen. `title_h`/`pad`/`caret_period` wirken sofort.
+
+### 4. Einzelnes Widget einfärben (überschreibt das Theme)
+
+```basic
+GUI_SET_COLOR(widget, rolle$, farbe)   ' rolle: "bg" / "fg" / "border" / "accent"
+GUI_SET_COLOR(widget, rolle$, -1)      ' Override entfernen (zurück zum Theme)
+```
+
+```basic
+DIM warn AS GUI_WIDGET
+warn = GUI_BUTTON(win, "Löschen", 20, 100, 100, 30)
+GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' nur dieser Button ist rot
+```
+
+`GUI_RESET()` setzt Theme **und** Metriken wieder auf die Defaults zurück
+(und löscht alle Fenster/Widgets).
 
 ## Callbacks: GUI_ON_CLICK
 

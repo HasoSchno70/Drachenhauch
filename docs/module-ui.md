@@ -23,7 +23,10 @@ IMPORT "ui"
 | `UI_WINDOW_BEGIN(id$, titel$, x, y, w, h)` | BOOLEAN | verschiebbares Fenster; FALSE wenn eingeklappt |
 | `UI_WINDOW_END()` | — | Fenster abschließen (immer paaren) |
 | `UI_END_FRAME()` | — | **Pflicht** am Ende jedes Frames vor `FLIP()` |
-| `UI_RESET()` | — | allen UI-State löschen |
+| `UI_RESET()` | — | allen UI-State löschen + Theme/Metriken zurücksetzen |
+| `UI_THEME_SET(key$, farbe)` / `UI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
+| `UI_THEME_PRESET(name$)` | — | Farbschema: dark/light/retro/contrast |
+| `UI_METRIC_SET(key$, wert)` / `UI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 
 ## Konzept: Immediate-Mode
 
@@ -452,6 +455,33 @@ Siehe auch [examples/33_ui.gb](../examples/33_ui.gb) — komplettes lauffähiges
   UI_BUTTON("b", 10, y, 80, 24, "B")
   ```
 - **Scroll-Trick**: für Listen mit vielen Buttons kann man eine `scroll_y`-Variable an alle `y`-Werte addieren — billige Scroll-Liste.
+
+## Aussehen ändern (Theme & Metriken)
+
+Die Default-Farben aller Komponenten lassen sich global umstellen — entweder per fertigem Schema oder pro Einzelfarbe. (Farben, die du direkt als Argument übergibst, z. B. `UI_BUTTON(..., bg, fg)`, haben weiterhin Vorrang.)
+
+```basic
+UI_THEME_PRESET("dark")       ' Default
+UI_THEME_PRESET("light")      ' helles Schema
+UI_THEME_PRESET("retro")      ' grün auf schwarz
+UI_THEME_PRESET("contrast")   ' schwarz/gelb
+
+UI_THEME_SET("button_bg", RGB(60, 40, 90))   ' eine Farbe global
+DIM c AS INTEGER
+c = UI_THEME_GET("accent")
+```
+
+Theme-Schlüssel: `accent`, `text_fg`, `muted_fg`, `button_bg`, `panel_bg`, `panel_border`, `panel_title_bg`, `field_bg`, `field_border`, `slider_track`, `progress_fg`, `progress_bg`, `win_bg`, `win_border`, `win_title_bg`, `win_title_bg_focus`.
+
+Größen über Metriken:
+
+```basic
+UI_METRIC_SET("checkbox_size", 20)   ' größere Checkbox
+UI_METRIC_SET("slider_h", 18)
+UI_METRIC_SET("win_title_h", 24)     ' Titelleiste der UI_WINDOW_BEGIN-Fenster
+```
+
+`UI_RESET()` setzt auch Theme + Metriken auf die Defaults zurück.
 
 ## Limitationen (Stand jetzt)
 

@@ -1,0 +1,87 @@
+' 79_gui_theme.gb - Aussehen des "gui"-Moduls zur Laufzeit aendern
+'
+' Zeigt alle vier Theming-Ebenen:
+'   1. GUI_THEME_PRESET  - fertige Farbschemata durchschalten (Button "Theme")
+'   2. GUI_THEME_SET     - eine einzelne Theme-Farbe (Akzent per Slider)
+'   3. GUI_METRIC_SET    - Layout-Groesse (Titelleisten-Hoehe per Slider)
+'   4. GUI_SET_COLOR     - EIN Widget einfaerben (der rote "Loeschen"-Button)
+
+IMPORT "gui"
+
+SCREEN(520, 380, "GUI-Theming-Demo", 2)
+
+' --- Fenster + Widgets einmalig aufbauen ---------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Aussehen", 90, 50, 340, 280)
+GUI_WINDOW_MOVABLE(win, TRUE)
+GUI_WINDOW_CLOSABLE(win, TRUE)
+
+DIM lbl_theme AS GUI_WIDGET
+lbl_theme = GUI_LABEL(win, "Preset: dark", 20, 16)
+
+DIM btn_theme AS GUI_WIDGET
+btn_theme = GUI_BUTTON(win, "Theme wechseln", 20, 40, 160, 30)
+
+DIM lbl_acc AS GUI_WIDGET
+lbl_acc = GUI_LABEL(win, "Akzent-Farbton", 20, 84)
+DIM sld_acc AS GUI_WIDGET
+sld_acc = GUI_SLIDER(win, 20, 106, 280, 0.0, 1.0, 0.5)
+
+DIM lbl_th AS GUI_WIDGET
+lbl_th = GUI_LABEL(win, "Titelleisten-Hoehe", 20, 140)
+DIM sld_th AS GUI_WIDGET
+sld_th = GUI_SLIDER(win, 20, 162, 280, 18.0, 48.0, 22.0)
+
+DIM chk AS GUI_WIDGET
+chk = GUI_CHECKBOX(win, "Effekt an", 20, 196, TRUE)
+
+' Per-Widget-Farbe: dieser Button bleibt rot, egal welches Theme aktiv ist.
+DIM btn_del AS GUI_WIDGET
+btn_del = GUI_BUTTON(win, "Loeschen", 20, 224, 120, 30)
+GUI_SET_COLOR(btn_del, "bg", RGB(170, 45, 45))
+GUI_SET_COLOR(btn_del, "fg", RGB(255, 235, 235))
+
+' Preset-Namen zum Durchschalten.
+DIM presets AS ARRAY OF STRING
+presets = SPLIT$("dark|light|retro|contrast", "|")
+DIM pidx AS INTEGER
+pidx = 0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+
+    CLS(RGB(8, 10, 18))
+    GUI_UPDATE()
+
+    ' 1) Preset durchschalten
+    IF GUI_CLICKED(btn_theme) THEN
+        pidx = (pidx + 1) MOD 4
+        GUI_THEME_PRESET(presets[pidx])
+        GUI_SET_TEXT(lbl_theme, "Preset: " + presets[pidx])
+        ' GUI_SET_COLOR ueberlebt den Preset-Wechsel -> Loeschen bleibt rot.
+    END IF
+
+    ' 2) Akzentfarbe live aus dem Slider (Farbton ueber den Rot/Gruen/Blau-Mix)
+    DIM t AS FLOAT
+    t = GUI_VALUE(sld_acc)
+    DIM r AS INTEGER
+    DIM gg AS INTEGER
+    DIM bb AS INTEGER
+    r = INT(128.0 + 127.0 * SIN(t * 6.28))
+    gg = INT(128.0 + 127.0 * SIN(t * 6.28 + 2.09))
+    bb = INT(128.0 + 127.0 * SIN(t * 6.28 + 4.18))
+    GUI_THEME_SET("accent", RGB(r, gg, bb))
+
+    ' 3) Titelleisten-Hoehe live (Metrik wirkt sofort)
+    GUI_METRIC_SET("title_h", INT(GUI_VALUE(sld_th)))
+
+    IF GUI_CLICKED(btn_del) THEN
+        GUI_SET_TEXT(lbl_theme, "Loeschen gedrueckt!")
+    END IF
+
+    IF GUI_WINDOW_CLOSED(win) THEN BREAK
+
+    GUI_DRAW()
+    FLIP()
+    SLEEP(16)
+WEND
