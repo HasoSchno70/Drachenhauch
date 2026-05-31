@@ -1,0 +1,26 @@
+[package]
+name = "gb_runtime"
+version = "0.1.0"
+edition = "2021"
+description = "Native GameBasic runtime (Rust). Loads .gbc bytecode, executes VM core; optional raylib graphics."
+
+[[bin]]
+name = "gbrt"
+path = "src/main.rs"
+
+[dependencies]
+# preserve_order: JSON-Objekt-Keys behalten Einfuege-Reihenfolge (wie Python
+# json) -- noetig fuer bit-identisches JSON_STRINGIFY.
+serde_json = { version = "1", features = ["preserve_order"] }
+# Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
+# `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
+# libclang fuer bindgen -- siehe rust/build_runtime.py).
+raylib = { version = "5.5", optional = true }
+
+[features]
+default = []
+graphics = ["dep:raylib"]
+
+[profile.release]
+opt-level = 3
+lto = true
