@@ -1,0 +1,31 @@
+' USB-HID-Geraete auflisten
+' Voraussetzung: pip install hidapi
+'
+' Auf Windows zeigt das alle HID-Klassen-Geraete: Tastaturen, Maeuse,
+' Gamepads, Custom-Macropads etc.
+
+IMPORT "usb"
+
+DIM liste AS STRING
+liste = USB_LIST()
+
+IF LEN(liste) = 0 THEN
+    PRINT "Keine HID-Geraete gefunden."
+ELSE
+    PRINT "Gefundene HID-Geraete:"
+    PRINT "  VID:PID  | Produkt | Hersteller"
+    PRINT "  ---------+---------+-----------"
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = SPLIT$(liste, CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        PRINT "  ", zeilen[i]
+    NEXT
+END IF
+
+print i
+' Beispiel zum Oeffnen (VID/PID anpassen):
+' DIM dev AS USB_HANDLE
+' dev = USB_OPEN(&H046D, &HC52B)   ' Logitech-Receiver
+' PRINT "Modell: ", USB_PRODUCT(dev)
+' USB_CLOSE(dev)

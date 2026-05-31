@@ -1,0 +1,90 @@
+' TRY/CATCH/THROW - Fehlerbehandlung in GameBasic.
+
+PRINT "=== Eigene Fehler werfen und fangen ==="
+TRY
+    PRINT "  Im TRY-Block"
+    THROW "Nicht gut!"
+    PRINT "  (wird nicht ausgefuehrt)"
+CATCH msg
+    PRINT "  Gefangen:", msg
+END TRY
+
+PRINT ""
+PRINT "=== Runtime-Fehler abfangen ==="
+
+DIM zaehler AS INTEGER
+zaehler = 0
+DIM i AS INTEGER
+FOR i = 1 TO 5
+    TRY
+        DIM x AS INTEGER
+        IF i = 3 THEN
+            x = 10 / 0
+        END IF
+        PRINT "  i =", i, "OK"
+        zaehler = zaehler + 1
+    CATCH e
+        PRINT "  i =", i, "Fehler gefangen:", e
+    END TRY
+NEXT
+PRINT "  Erfolgreiche Iterationen:", zaehler
+
+PRINT ""
+PRINT "=== THROW konvertiert beliebige Werte zu STRING ==="
+
+FUNCTION SafeDivide(a AS INTEGER, b AS INTEGER) AS INTEGER
+    IF b = 0 THEN THROW "Division durch 0 verboten"
+    RETURN a / b
+END FUNCTION
+
+DIM j AS INTEGER
+FOR j = -1 TO 2
+    TRY
+        DIM r AS INTEGER
+        r = SafeDivide(10, j)
+        PRINT "  10 /", j, "=", r
+    CATCH msg
+        PRINT "  10 /", j, "->", msg
+    END TRY
+NEXT
+
+PRINT ""
+PRINT "=== Verschachtelte TRYs ==="
+
+CLASS Aufgabe
+    DIM titel AS STRING
+    DIM punkte AS INTEGER
+
+    SUB Init(t AS STRING, p AS INTEGER)
+        titel = t
+        IF p < 0 THEN THROW "Punkte muessen >= 0 sein (war " + STR$(p) + ")"
+        punkte = p
+    END SUB
+END CLASS
+
+DIM aufgaben[3] AS Aufgabe
+
+DIM eingaben[3] AS INTEGER
+eingaben[0] = 10
+eingaben[1] = -5     ' loest Exception aus
+eingaben[2] = 7
+
+FOR i = 0 TO LEN(eingaben) - 1
+    TRY
+        aufgaben[i] = NEW Aufgabe("Aufgabe " + STR$(i + 1), eingaben[i])
+        PRINT "  ", aufgaben[i].titel, ":", aufgaben[i].punkte, "Punkte"
+    CATCH msg
+        PRINT "  Aufgabe", i + 1, "abgelehnt:", msg
+    END TRY
+NEXT
+
+PRINT ""
+PRINT "=== TRY ohne CATCH-Variable ==="
+TRY
+    THROW "Wird verworfen"
+CATCH
+    PRINT "  Catch-Block ohne Namen funktioniert auch."
+END TRY
+
+PRINT ""
+PRINT "Programm sauber zu Ende."

@@ -1,0 +1,19 @@
+' Kurzer Smoketest: 30 Frames Grafik, dann automatisches Ende.
+Screen(200, 100, "Smoketest")
+
+DIM frame AS INTEGER
+DIM running AS BOOLEAN
+running = TRUE
+frame = 0
+
+WHILE running
+    Cls(BLACK)
+    Box(10, 10, 50, 50, RED)
+    Circle(120, 40, 20, BLUE)
+    Text(10, 70, "Frame " + STR$(frame), WHITE)
+    Flip()
+    frame = frame + 1
+    IF frame >= 30 THEN running = FALSE
+WEND
+
+PRINT "Smoketest fertig nach", frame, "Frames"

@@ -1,0 +1,162 @@
+' Mini-Pong in GameBasic.
+' Steuerung: W/S = links hoch/runter, Pfeil hoch/runter = rechts.
+' ESC oder Fenster-X = beenden.
+'
+' Migrationsstand: nutzt Static Class Members fuer Konstanten (statt
+' magic numbers im Code), das input-Modul fuer Action-basiertes Mapping
+' (rebindable, gleichzeitig WASD oder Pfeile), und WITH-Bloecke fuer
+' kompakte Init-Methoden.
+
+IMPORT "input"
+
+CLASS Field
+    STATIC CONST WIDTH AS INTEGER = 320
+    STATIC CONST HEIGHT AS INTEGER = 240
+END CLASS
+
+CLASS Paddle
+    STATIC CONST H AS INTEGER = 40
+    STATIC CONST W AS INTEGER = 6
+    STATIC CONST SPEED AS INTEGER = 3
+
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM score AS INTEGER
+
+    SUB Init(startX AS INTEGER, startY AS INTEGER)
+        WITH Self
+            .x = startX
+            .y = startY
+            .score = 0
+        END WITH
+    END SUB
+
+    SUB MoveBy(dy AS INTEGER)
+        y = y + dy
+        IF y < 0 THEN y = 0
+        IF y + Paddle.H > Field.HEIGHT THEN y = Field.HEIGHT - Paddle.H
+    END SUB
+
+    SUB Draw()
+        Box(x, y, x + Paddle.W, y + Paddle.H, WHITE)
+    END SUB
+
+    FUNCTION Top() AS INTEGER
+        RETURN y
+    END FUNCTION
+
+    FUNCTION Bottom() AS INTEGER
+        RETURN y + Paddle.H
+    END FUNCTION
+END CLASS
+
+CLASS Ball
+    STATIC CONST RADIUS AS INTEGER = 4
+    STATIC CONST SPEED AS INTEGER = 2
+
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+
+    SUB Init()
+        WITH Self
+            .x = Field.WIDTH / 2
+            .y = Field.HEIGHT / 2
+            .dx = Ball.SPEED
+            .dy = Ball.SPEED
+        END WITH
+    END SUB
+
+    SUB Reset(richtung AS INTEGER)
+        WITH Self
+            .x = Field.WIDTH / 2
+            .y = Field.HEIGHT / 2
+            .dx = richtung * Ball.SPEED
+            .dy = Ball.SPEED
+        END WITH
+    END SUB
+
+    SUB Update()
+        x = x + dx
+        y = y + dy
+        IF y < Ball.RADIUS THEN dy = ABS(dy)
+        IF y > Field.HEIGHT - Ball.RADIUS THEN dy = -ABS(dy)
+    END SUB
+
+    SUB Draw()
+        Circle(x, y, Ball.RADIUS, YELLOW)
+    END SUB
+END CLASS
+
+' --- Kollision (frei, kein Klassen-Member) ---
+FUNCTION HitsPaddle(b AS Ball, p AS Paddle) AS BOOLEAN
+    IF b.x < p.x - Ball.RADIUS THEN RETURN FALSE
+    IF b.x > p.x + Paddle.W + Ball.RADIUS THEN RETURN FALSE
+    IF b.y < p.Top() THEN RETURN FALSE
+    IF b.y > p.Bottom() THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' --- Setup ---
+Screen(Field.WIDTH, Field.HEIGHT, "GameBasic - Pong")
+
+' Input-Mapping. Beide Spielerseiten kriegen jeweils zwei Tastatur-
+' Bindungen -- Player 1 standardmaessig W/S, aber Pfeile gehen auch.
+INPUT_BIND("p1_up",   KEY_W)
+INPUT_BIND("p1_down", KEY_S)
+INPUT_BIND("p2_up",   KEY_UP)
+INPUT_BIND("p2_down", KEY_DOWN)
+INPUT_BIND("quit",    KEY_ESCAPE)
+
+DIM links AS Paddle
+DIM rechts AS Paddle
+DIM ball AS Ball
+
+links  = NEW Paddle(8, (Field.HEIGHT - Paddle.H) / 2)
+rechts = NEW Paddle(Field.WIDTH - 14, (Field.HEIGHT - Paddle.H) / 2)
+ball   = NEW Ball()
+
+DIM running AS BOOLEAN
+running = TRUE
+
+' --- Hauptschleife ---
+WHILE running AND NOT QuitRequested()
+    INPUT_UPDATE()
+
+    IF INPUT_HELD("quit") THEN running = FALSE
+
+    ' Eingabe -- INPUT_AXIS gibt -1/0/+1 fuer up/down zurueck.
+    links.MoveBy(INPUT_AXIS("p1_up", "p1_down") * Paddle.SPEED)
+    rechts.MoveBy(INPUT_AXIS("p2_up", "p2_down") * Paddle.SPEED)
+
+    ' Ball bewegen
+    ball.Update()
+
+    ' Paddle-Kollision
+    IF HitsPaddle(ball, links) THEN
+        ball.dx = ABS(ball.dx)
+    ELSEIF HitsPaddle(ball, rechts) THEN
+        ball.dx = -ABS(ball.dx)
+    END IF
+
+    ' Tor?
+    IF ball.x < 0 THEN
+        rechts.score = rechts.score + 1
+        ball.Reset(1)
+    ELSEIF ball.x > Field.WIDTH THEN
+        links.score = links.score + 1
+        ball.Reset(-1)
+    END IF
+
+    ' Zeichnen
+    Cls(RGB(0, 16, 32))
+    Line(Field.WIDTH / 2, 0, Field.WIDTH / 2, Field.HEIGHT, DARKGRAY)
+    links.Draw()
+    rechts.Draw()
+    ball.Draw()
+    Text(40, 8, STR$(links.score), WHITE)
+    Text(Field.WIDTH - 50, 8, STR$(rechts.score), WHITE)
+    Text(80, Field.HEIGHT - 20, "W/S vs UP/DOWN  ESC=quit", GRAY)
+    Flip()
+WEND

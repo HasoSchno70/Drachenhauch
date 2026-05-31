@@ -1,0 +1,34 @@
+' Mikro-Bench: Methodenaufrufe in tiefer Vererbungs-Hierarchie.
+' Methoden werden in Klasse A definiert; aufgerufen auf Instanz von E
+' -> _resolve_method muss A,B,C,D,E durchlaufen ohne Cache.
+CLASS A
+    DIM n AS INTEGER
+
+    SUB tick()
+        n = n + 1
+    END SUB
+
+    FUNCTION getN() AS INTEGER
+        RETURN n
+    END FUNCTION
+END CLASS
+
+CLASS B EXTENDS A
+END CLASS
+
+CLASS C EXTENDS B
+END CLASS
+
+CLASS D EXTENDS C
+END CLASS
+
+CLASS E EXTENDS D
+END CLASS
+
+DIM x AS E
+x = NEW E()
+DIM i AS INTEGER
+FOR i = 1 TO 100000
+    x.tick()
+NEXT i
+PRINT x.getN()

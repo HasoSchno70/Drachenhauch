@@ -1,0 +1,17 @@
+' Identische Logik wie 01_if.gb - aber mit SELECT CASE.
+'
+' Lies beide Dateien nebeneinander: welche Form findest du klarer?
+
+DIM score AS INTEGER
+score = 1500
+
+SELECT CASE score
+    CASE IS < 100
+        PRINT "Rang: Anfaenger"
+    CASE IS < 1000
+        PRINT "Rang: Solide"
+    CASE IS < 5000
+        PRINT "Rang: Profi"
+    CASE ELSE
+        PRINT "Rang: Ass"
+END SELECT

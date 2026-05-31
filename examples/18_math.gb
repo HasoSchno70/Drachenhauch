@@ -1,0 +1,89 @@
+' Math + Zeit + String/Bitwise-Demos.
+
+PRINT "=== Math ==="
+PRINT "PI =", PI
+PRINT "EXP(1) =", EXP(1)
+PRINT ""
+
+DIM grad AS INTEGER
+PRINT "Sinustabelle:"
+FOR grad = 0 TO 90 STEP 15
+    DIM rad AS FLOAT
+    rad = grad * PI / 180.0
+    PRINT "  ", PADL$(STR$(grad), 3), " Grad   sin =", PADL$(STR$(SIN(rad)), 6), " cos =", COS(rad)
+NEXT
+
+PRINT ""
+PRINT "Vektor: aus (3, 4) -> Laenge und Winkel:"
+DIM laenge AS FLOAT
+DIM winkel AS FLOAT
+laenge = SQR(3 * 3 + 4 * 4)
+winkel = ATAN2(4.0, 3.0) * 180.0 / PI
+PRINT "  Laenge:", laenge, "  Winkel:", winkel, "Grad"
+
+PRINT ""
+PRINT "MIN/MAX/CLAMP:"
+PRINT "  MIN(5, 2, 9, 1, 7) =", MIN(5, 2, 9, 1, 7)
+PRINT "  MAX(5, 2, 9, 1, 7) =", MAX(5, 2, 9, 1, 7)
+PRINT "  CLAMP(-5, 0, 100)  =", CLAMP(-5, 0, 100)
+PRINT "  CLAMP(150, 0, 100) =", CLAMP(150, 0, 100)
+PRINT "  CLAMP(42, 0, 100)  =", CLAMP(42, 0, 100)
+
+PRINT ""
+PRINT "FLOOR/CEIL/ROUND:"
+PRINT "  FLOOR(3.7) =", FLOOR(3.7)
+PRINT "  CEIL(3.2)  =", CEIL(3.2)
+PRINT "  ROUND(2.5) =", ROUND(2.5)
+
+PRINT ""
+PRINT "=== Strings ==="
+PRINT "  PADL$('42', 6, '0')  =", PADL$("42", 6, "0")
+PRINT "  PADR$('hi', 8, '.')  =", PADR$("hi", 8, ".")
+PRINT "  REPEAT$('=*', 5)     =", REPEAT$("=*", 5)
+PRINT "  SPACE$(8)            ='" + SPACE$(8) + "'"
+PRINT "  HEX$(255)            =", HEX$(255)
+PRINT "  HEX$(RGB(255, 128, 64)) =", HEX$(RGB(255, 128, 64))
+
+PRINT ""
+PRINT "=== Bitwise ==="
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = 0
+a = a BOR (1 SHL 0)          ' Bit 0 setzen
+a = a BOR (1 SHL 3)          ' Bit 3 setzen
+a = a BOR (1 SHL 5)          ' Bit 5 setzen
+PRINT "  Flags = 0x" + HEX$(a)
+PRINT "  Bit 3 gesetzt?", (a BAND (1 SHL 3)) <> 0
+PRINT "  Bit 4 gesetzt?", (a BAND (1 SHL 4)) <> 0
+
+PRINT ""
+PRINT "=== Zeit ==="
+PRINT "Aktuelle Zeit:", TIME$()
+PRINT "Datum:        ", DATE$()
+
+PRINT ""
+PRINT "=== Bench: SIN-Berechnungen ==="
+DIM t1 AS INTEGER
+DIM t2 AS INTEGER
+DIM s AS FLOAT
+DIM i AS INTEGER
+s = 0.0
+t1 = MILLIS()
+FOR i = 0 TO 100000
+    s = s + SIN(i * 0.001)
+NEXT
+t2 = MILLIS()
+PRINT "100k SIN-Aufrufe:", t2 - t1, "ms     Summe:", s
+
+PRINT ""
+PRINT "=== Determinismus mit RANDOMIZE ==="
+RANDOMIZE(42)
+PRINT "Seed=42:"
+FOR i = 1 TO 5
+    PRINT "  ", RND(100)
+NEXT
+RANDOMIZE(42)
+PRINT "Wieder Seed=42 (gleiche Zahlen):"
+FOR i = 1 TO 5
+    PRINT "  ", RND(100)
+NEXT

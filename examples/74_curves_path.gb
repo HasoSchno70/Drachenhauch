@@ -1,0 +1,122 @@
+' Wave-Path-Demo mit dem curves-Modul.
+'
+' Drei Sprite-Bewegungen ueber den Bildschirm:
+'   1. Bezier-Kurve: 4 Control-Points, glatte Schwung-Bewegung.
+'   2. Catmull-Rom durch 4 Punkte: interpoliert exakt durch P1 und P2.
+'   3. Sinus-Wave (klassisch, kein curve-Builtin -- Vergleich).
+'
+' Visualisiert das Spektrum: parametrische Curves liefern lebendigere
+' Bewegungen als reine Sinus/Linear-Animationen, ohne dass der User
+' selbst Bezier-Math macht.
+
+IMPORT "curves"
+
+SCREEN(320, 240, "Curves Wave-Path", 2)
+
+' --- Pfad-1: Bezier ---
+' P0=(20,200) Start unten links
+' P1=(40,40)  oberer Schwung links
+' P2=(280,40) oberer Schwung rechts
+' P3=(300,200) Ende unten rechts
+' Klassischer S-Bogen.
+
+' --- Pfad-2: Catmull-Rom durch (60,180), (120,80), (200,80), (260,180) ---
+' P0/P3 sind Tangenten-Stuetzen ausserhalb der Bahn.
+
+DIM start_ms AS INTEGER
+start_ms = MILLIS()
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    DIM elapsed AS INTEGER
+    elapsed = MILLIS() - start_ms
+    DIM t AS FLOAT
+    t = (elapsed MOD 4000) / 4000.0      ' 4-Sekunden-Loop, t in [0, 1)
+
+    CLS(RGB(15, 18, 30))
+
+    ' --- Bezier-Pfad zeichnen (60 Samples als duenne Linie) ---
+    DIM i AS INTEGER
+    DIM prev_x AS INTEGER
+    DIM prev_y AS INTEGER
+    prev_x = 20
+    prev_y = 200
+    FOR i = 1 TO 60
+        DIM ti AS FLOAT
+        ti = i / 60.0
+        DIM pt AS TUPLE
+        pt = CURVE_BEZIER2(ti, 20.0, 200.0, 40.0, 40.0, 280.0, 40.0, 300.0, 200.0)
+        DIM nx AS INTEGER
+        DIM ny AS INTEGER
+        nx = INT(pt[0])
+        ny = INT(pt[1])
+        LINE(prev_x, prev_y, nx, ny, RGB(60, 80, 120))
+        prev_x = nx
+        prev_y = ny
+    NEXT
+
+    ' --- Catmull-Rom-Pfad zeichnen ---
+    prev_x = 60
+    prev_y = 180
+    FOR i = 1 TO 60
+        DIM ti2 AS FLOAT
+        ti2 = i / 60.0
+        DIM pt2 AS TUPLE
+        ' P0/P3 sind Tangenten-Stuetzen ausserhalb der Bahn:
+        pt2 = CURVE_CATMULL2(ti2, 0.0, 240.0, 60.0, 180.0, 200.0, 80.0, 320.0, 240.0)
+        ' Oh -- diese 4 Punkte: P1=(60,180), P2=(200,80), die Bahn geht
+        ' von P1 nach P2. P0/P3 setzen die Tangente am Anfang/Ende.
+        ' Wir teilen das in zwei Segmente: erst P1->P2, dann P2->P3.
+        ' Hier zeigen wir nur das erste Segment.
+        DIM nx2 AS INTEGER
+        DIM ny2 AS INTEGER
+        nx2 = INT(pt2[0])
+        ny2 = INT(pt2[1])
+        LINE(prev_x, prev_y, nx2, ny2, RGB(120, 60, 100))
+        prev_x = nx2
+        prev_y = ny2
+    NEXT
+
+    ' --- Sprite-1: laeuft entlang Bezier ---
+    DIM b_pt AS TUPLE
+    b_pt = CURVE_BEZIER2(t, 20.0, 200.0, 40.0, 40.0, 280.0, 40.0, 300.0, 200.0)
+    CIRCLE(INT(b_pt[0]), INT(b_pt[1]), 5, RGB(80, 200, 250))
+
+    ' --- Sprite-2: laeuft entlang Catmull-Rom ---
+    DIM c_pt AS TUPLE
+    c_pt = CURVE_CATMULL2(t, 0.0, 240.0, 60.0, 180.0, 200.0, 80.0, 320.0, 240.0)
+    CIRCLE(INT(c_pt[0]), INT(c_pt[1]), 5, RGB(220, 100, 180))
+
+    ' --- Sprite-3: klassischer Sinus zum Vergleich (Lerp + Smoothstep) ---
+    ' x bewegt sich linear, y per Sinus
+    DIM sx AS INTEGER
+    sx = INT(CURVE_LERP(20.0, 300.0, t))
+    DIM sy AS INTEGER
+    ' Smoothstep gibt einen S-Easing fuer die Auf-Ab-Bewegung
+    DIM bobs AS FLOAT
+    bobs = SIN(t * 2.0 * 3.14159265 * 3.0)   ' 3 volle Oszillationen pro Loop
+    sy = 220 + INT(bobs * 18.0)
+    CIRCLE(sx, sy, 5, RGB(240, 220, 80))
+
+    ' Smoothstep-Demo: Easing-Vergleich. Linke Box bewegt sich linear,
+    ' rechte mit smoothstep -- gleiche Endpunkte, andere Beschleunigung.
+    DIM box_t AS FLOAT
+    box_t = t
+    DIM linear_x AS INTEGER
+    linear_x = 30 + INT(CURVE_LERP(0.0, 240.0, box_t))
+    DIM smooth_x AS INTEGER
+    smooth_x = 30 + INT(CURVE_LERP(0.0, 240.0, CURVE_SMOOTHSTEP(0.0, 1.0, box_t)))
+    BOX(linear_x, 14, linear_x + 6, 20, RGB(120, 200, 120))
+    BOX(smooth_x, 28, smooth_x + 6, 34, RGB(200, 120, 120))
+
+    ' HUD
+    TEXT(4, 4, f"t = {INT(t * 1000) / 1000.0}", RGB(220, 220, 220))
+    TEXT(4, 226, "Linear (gruen) vs Smoothstep (rot) -- ESC=Ende",
+         RGB(180, 180, 180))
+
+    FLIP()
+    SLEEP(16)
+WEND
+
+PRINT "Bye!"

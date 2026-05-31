@@ -1,0 +1,23 @@
+' AABB-Kollisionstest: PHYSICS_BOX_BOX in der Konsole demonstriert.
+'
+' Box A liegt fest bei (50, 50) und ist 20x20. Box B verschieben wir
+' Pixel fuer Pixel nach rechts und schauen, wann sich die Boxen
+' ueberlappen.
+
+IMPORT "physics"
+
+PRINT "AABB-Kollision: Box A (50,50,20,20) vs Box B (bx,50,20,20)"
+PRINT ""
+
+DIM bx  AS INTEGER
+DIM hit AS BOOLEAN
+
+FOR bx = 0 TO 100 STEP 10
+    hit = PHYSICS_BOX_BOX(50, 50, 20, 20, bx, 50, 20, 20)
+    PRINT f"  bx={bx}: hit = {hit}"
+NEXT bx
+
+PRINT ""
+PRINT "Erlaeuterung: A reicht von x=50..70. B ueberlappt, wenn"
+PRINT "             B-rechts (bx+20) > 50  UND  B-links (bx) < 70."
+PRINT "             -> bx von 31 bis 69 ergibt einen Treffer."

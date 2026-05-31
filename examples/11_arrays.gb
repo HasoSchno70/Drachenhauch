@@ -1,0 +1,69 @@
+' Arrays, CONST, BREAK, CONTINUE
+
+CONST MAX_PUNKTE AS INTEGER = 5
+CONST PI AS FLOAT = 3.141592653589793
+CONST GRUSS = "Hallo aus GameBasic"   ' Typ wird abgeleitet -> STRING
+
+PRINT GRUSS
+PRINT "PI =", PI
+PRINT "MAX_PUNKTE =", MAX_PUNKTE
+
+' --- Array von INTEGER ---
+DIM scores[MAX_PUNKTE] AS INTEGER
+
+DIM i AS INTEGER
+FOR i = 0 TO LEN(scores) - 1
+    scores[i] = (i + 1) * 10
+NEXT
+
+PRINT ""
+PRINT "Punkteliste (LEN =", LEN(scores), "):"
+FOR i = 0 TO LEN(scores) - 1
+    PRINT "  scores[", i, "] =", scores[i]
+NEXT
+
+' --- BREAK / CONTINUE ---
+PRINT ""
+PRINT "Erste Zahl 1..20 ohne Rest mod 7 (mit BREAK):"
+FOR i = 1 TO 20
+    IF i mod 7 = 0 THEN
+        PRINT "  Treffer:", i
+        BREAK
+    END IF
+NEXT
+
+PRINT ""
+PRINT "Ungerade Zahlen 1..10 (mit CONTINUE):"
+FOR i = 1 TO 10
+    IF i mod 2 = 0 THEN CONTINUE
+    PRINT "  ", i
+NEXT
+
+' --- Array von Klassen-Objekten ---
+CLASS Spieler
+    DIM name AS STRING
+    DIM punkte AS INTEGER
+
+    SUB Init(n AS STRING)
+        name = n
+        punkte = 0
+    END SUB
+END CLASS
+
+DIM team[3] AS Spieler
+team[0] = NEW Spieler("Anna")
+team[1] = NEW Spieler("Bert")
+team[2] = NEW Spieler("Cilly")
+
+team[0].punkte = 42
+team[1].punkte = 23
+team[2].punkte = 99
+
+PRINT ""
+PRINT "Mannschaft:"
+FOR i = 0 TO LEN(team) - 1
+    PRINT "  ", team[i].name, "->", team[i].punkte
+NEXT
+
+' CONST darf nicht ueberschrieben werden:
+' MAX_PUNKTE = 99   ' wuerde Fehler werfen

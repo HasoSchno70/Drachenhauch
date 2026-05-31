@@ -1,0 +1,71 @@
+' UI-Modul Demo: Label, Button, Checkbox, Slider im Immediate-Mode.
+' Zeigt ein Mini-Settings-Dialog mit Lautstaerke, Sound-Toggle und Buttons.
+
+IMPORT "ui"
+
+CONST W AS INTEGER = 320
+CONST H AS INTEGER = 240
+SCREEN(W, H, "UI-Demo (ESC = Ende)", 2)
+
+DIM klicks AS INTEGER
+klicks = 0
+
+DIM beendet AS BOOLEAN
+beendet = FALSE
+
+WHILE NOT QUITREQUESTED() AND NOT beendet
+    IF KEYPRESSED(KEY_ESCAPE) THEN
+        BREAK
+    END IF
+
+    CLS(RGB(20, 25, 40))
+
+    ' Titel
+    UI_LABEL(10, 10, "Einstellungen", RGB(255, 220, 80))
+    UI_LABEL(10, 28, "----------------", RGB(120, 120, 140))
+
+    ' Lautstaerke
+    UI_LABEL(10, 50, "Lautstaerke:")
+    DIM lautstaerke AS FLOAT
+    lautstaerke = UI_SLIDER("vol", 110, 50, 180, 0.0, 1.0, 0.7)
+    UI_LABEL(10, 70, "  Wert: " + STR$(ROUND(lautstaerke * 100)) + "%", RGB(180, 220, 255))
+
+    ' Sound-Toggle
+    DIM sound_an AS BOOLEAN
+    sound_an = UI_CHECKBOX("snd", 10, 100, "Sound an", TRUE)
+
+    DIM musik_an AS BOOLEAN
+    musik_an = UI_CHECKBOX("mus", 10, 120, "Musik an", FALSE)
+
+    ' Schwierigkeit (drei Buttons - der zuletzt geklickte gewinnt)
+    UI_LABEL(10, 150, "Schwierigkeit:")
+    DIM gewaehlt AS STRING
+    gewaehlt = ""
+    IF UI_BUTTON("easy", 110, 145, 60, 24, "Leicht") THEN
+        gewaehlt = "Leicht"
+        klicks = klicks + 1
+    END IF
+    IF UI_BUTTON("normal", 175, 145, 60, 24, "Normal") THEN
+        gewaehlt = "Normal"
+        klicks = klicks + 1
+    END IF
+    IF UI_BUTTON("hard", 240, 145, 60, 24, "Hart") THEN
+        gewaehlt = "Hart"
+        klicks = klicks + 1
+    END IF
+
+    ' Anzeige des aktuellen Status
+    UI_LABEL(10, 180, "Sound: " + STR$(sound_an) + "  Musik: " + STR$(musik_an), RGB(180, 200, 255))
+    UI_LABEL(10, 196, "Klicks gesamt: " + STR$(klicks), RGB(180, 200, 255))
+
+    ' Beenden-Knopf
+    IF UI_BUTTON("quit", 240, 200, 70, 24, "Beenden", RGB(120, 40, 40)) THEN
+        beendet = TRUE
+    END IF
+
+    ' Wichtig: am Ende des Frames vor FLIP()
+    UI_END_FRAME()
+
+    FLIP()
+    SLEEP(16)
+WEND

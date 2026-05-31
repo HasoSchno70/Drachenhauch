@@ -1,0 +1,72 @@
+' Bild-Effekte: SCALE, ROTATE, FLIP, TINT, COPY.
+' Diese Demo laedt ein Asset, wendet Effekte an und schreibt die
+' resultierenden Groessen in die Konsole. Kein SCREEN noetig - jedes
+' Effekt-Builtin gibt ein neues IMAGE zurueck, das Original bleibt erhalten.
+IMPORT "imgfx"
+
+DIM hero AS IMAGE
+hero = LOADIMAGE("assets/hero.png")
+PRINT "Original:    ", IMAGEWIDTH(hero), "x", IMAGEHEIGHT(hero)
+
+PRINT ""
+PRINT "=== IMAGE_SCALE ==="
+DIM klein AS IMAGE
+klein = IMAGE_SCALE(hero, 16, 16)
+PRINT "  klein:     ", IMAGEWIDTH(klein), "x", IMAGEHEIGHT(klein)
+
+DIM gross AS IMAGE
+gross = IMAGE_SCALE(hero, 128, 128)
+PRINT "  gross:     ", IMAGEWIDTH(gross), "x", IMAGEHEIGHT(gross)
+
+PRINT "  Original unveraendert? ", IMAGEWIDTH(hero), "x", IMAGEHEIGHT(hero)
+
+PRINT ""
+PRINT "=== IMAGE_ROTATE ==="
+DIM rot90 AS IMAGE
+rot90 = IMAGE_ROTATE(hero, 90.0)
+PRINT "  90 Grad:   ", IMAGEWIDTH(rot90), "x", IMAGEHEIGHT(rot90)
+
+DIM rot45 AS IMAGE
+rot45 = IMAGE_ROTATE(hero, 45.0)
+PRINT "  45 Grad:   ", IMAGEWIDTH(rot45), "x", IMAGEHEIGHT(rot45), " (Bounding-Box waechst)"
+
+PRINT ""
+PRINT "=== IMAGE_FLIP ==="
+DIM mirror_x AS IMAGE
+mirror_x = IMAGE_FLIP(hero, TRUE, FALSE)
+PRINT "  horizontal: ", IMAGEWIDTH(mirror_x), "x", IMAGEHEIGHT(mirror_x)
+
+DIM mirror_xy AS IMAGE
+mirror_xy = IMAGE_FLIP(hero, TRUE, TRUE)
+PRINT "  beide:      ", IMAGEWIDTH(mirror_xy), "x", IMAGEHEIGHT(mirror_xy)
+
+PRINT ""
+PRINT "=== IMAGE_TINT ==="
+DIM rot_held AS IMAGE
+rot_held = IMAGE_TINT(hero, RGB(255, 80, 80))
+PRINT "  rot getoent:  ", IMAGEWIDTH(rot_held), "x", IMAGEHEIGHT(rot_held)
+
+DIM gruen AS IMAGE
+gruen = IMAGE_TINT(hero, RGB(0, 255, 0))
+PRINT "  gruen:        ", IMAGEWIDTH(gruen), "x", IMAGEHEIGHT(gruen)
+
+PRINT ""
+PRINT "=== IMAGE_COPY ==="
+DIM kopie AS IMAGE
+kopie = IMAGE_COPY(hero)
+PRINT "  unabhaengige Kopie: ", IMAGEWIDTH(kopie), "x", IMAGEHEIGHT(kopie)
+
+PRINT ""
+PRINT "=== Verkettung: scale -> tint -> rotate ==="
+DIM kombi AS IMAGE
+kombi = IMAGE_ROTATE(IMAGE_TINT(IMAGE_SCALE(hero, 64, 64), RGB(255, 200, 0)), 30.0)
+PRINT "  Endgroesse:   ", IMAGEWIDTH(kombi), "x", IMAGEHEIGHT(kombi)
+
+PRINT ""
+PRINT "=== Fehlerfall ==="
+TRY
+    DIM bad AS IMAGE
+    bad = IMAGE_SCALE(hero, 0, 16)
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY

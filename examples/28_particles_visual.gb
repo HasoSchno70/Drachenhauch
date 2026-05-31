@@ -1,0 +1,52 @@
+' Interaktive Partikel-Demo: Funkenregen folgt der Maus.
+' Klicken laesst eine groessere Eruption los. ESC oder Fenster schliessen
+' beendet.
+IMPORT "particles"
+
+SCREEN(640, 480, "Partikel-Demo (Maus bewegen, klicken fuer Eruption)")
+
+DIM funken AS PARTICLE_SYSTEM
+funken = PARTICLE_SYSTEM_NEW(320.0, 240.0)
+
+' Warmweiss, Schwerkraft, kleiner Streufaktor.
+PARTICLE_SET_COLOR(funken, RGB(255, 200, 80))
+PARTICLE_SET_VELOCITY(funken, -80.0, 80.0, -150.0, -50.0)
+PARTICLE_SET_LIFETIME(funken, 400, 900)
+PARTICLE_SET_GRAVITY(funken, 0.0, 350.0)
+PARTICLE_SET_SIZE(funken, 2, 4)
+
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+
+WHILE NOT QUITREQUESTED()
+    ' Keyboard: ESC beendet.
+    IF KEYPRESSED(27) THEN
+        ' Fenster wird beim naechsten QUITREQUESTED-Check geschlossen.
+        ' Wir koennen einfach aus der Schleife brechen.
+        BREAK
+    END IF
+
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+
+    ' Emitter folgt Maus.
+    PARTICLE_SET_POS(funken, MOUSEX() * 1.0, MOUSEY() * 1.0)
+
+    ' Klick: Eruption von 60 Partikeln.
+    IF MOUSEBUTTON(0) THEN
+        PARTICLE_EMIT(funken, 4)         ' kontinuierlich beim Halten
+    ELSE
+        PARTICLE_EMIT(funken, 1)         ' sanfter Trail
+    END IF
+
+    PARTICLE_UPDATE(funken, dt)
+
+    CLS(RGB(0, 0, 30))
+    PARTICLE_DRAW(funken)
+    TEXT(8, 8, "Partikel: " + STR$(PARTICLE_COUNT(funken)), RGB(200, 200, 200))
+    FLIP()
+    SLEEP(16)
+WEND

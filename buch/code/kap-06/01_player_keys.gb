@@ -1,0 +1,37 @@
+' Star Pilot - Kap 6, Schritt 1: Player bewegt sich.
+'
+' Die Player-Position ist jetzt eine Variable (player_x), nicht mehr fest
+' an 140. Pro Frame: Pfeiltasten lesen, Position aendern, dann zeichnen.
+'
+' Hinweis: in dieser Version laeuft der Player NOCH aus dem Bild raus,
+' wenn du dauerhaft eine Pfeiltaste drueckst. Das fixen wir in Schritt 2.
+
+CONST WIDTH    AS INTEGER = 320
+CONST HEIGHT   AS INTEGER = 240
+CONST BG_COLOR AS INTEGER = &H141E3C
+CONST PLAYER_C AS INTEGER = &HFFDC00
+CONST PLAYER_W AS INTEGER = 40
+CONST PLAYER_H AS INTEGER = 24
+
+DIM player_x AS INTEGER
+DIM player_y AS INTEGER
+player_x = 140
+player_y = 200
+
+SCREEN(WIDTH, HEIGHT, "Star Pilot", 2)
+
+WHILE NOT QUITREQUESTED()
+    ' --- Update: Eingabe lesen, Position aendern ---
+    IF KEYPRESSED(KEY_LEFT) THEN
+        player_x -= 2
+    END IF
+    IF KEYPRESSED(KEY_RIGHT) THEN
+        player_x += 2
+    END IF
+
+    ' --- Draw: Bildschirm neu zeichnen ---
+    CLS(BG_COLOR)
+    BOX(player_x, player_y, player_x + PLAYER_W, player_y + PLAYER_H, PLAYER_C)
+    FLIP()
+    SLEEP(16)
+WEND

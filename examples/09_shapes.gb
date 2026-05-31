@@ -1,0 +1,45 @@
+' Grafik-Demo: Formen, Farben, Animation.
+' Beenden mit ESC, dem Fenster-X, oder nach ~10 Sekunden automatisch.
+
+Screen(320, 240, "GameBasic - Formen-Demo")
+
+DIM frame AS INTEGER
+DIM running AS BOOLEAN
+DIM x AS INTEGER
+DIM y AS INTEGER
+
+frame = 0
+running = TRUE
+
+WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
+    Cls(BLACK)
+
+    ' --- Statische Formen ---
+    Box(10, 10, 60, 40, RED)              ' gefuelltes Rechteck
+    Rect(70, 10, 120, 40, GREEN)          ' Rahmen
+    Circle(150, 25, 15, BLUE)             ' gefuellter Kreis
+    Line(180, 10, 230, 40, YELLOW)        ' Linie
+
+    ' --- Pixelfeld mit eigenem RGB ---
+    FOR y = 0 TO 30
+        FOR x = 0 TO 30
+            Plot(250 + x, 10 + y, RGB(x * 8, y * 8, 128))
+        NEXT
+    NEXT
+
+    ' --- Bouncender Ball ---
+    DIM bx AS INTEGER
+    DIM by AS INTEGER
+    bx = 20 + (frame * 3) mod 280
+    by = 150 + ABS((frame mod 80) - 40)
+    Circle(bx, by, 8, CYAN)
+
+    ' --- Beschriftung ---
+    Text(10, 70, "GameBasic Grafik", WHITE)
+    Text(10, 90, "Frame: " + STR$(frame), LIGHTGRAY)
+    Text(10, 110, "ESC zum Beenden", GRAY)
+
+    Flip()
+    frame = frame + 1
+    IF frame > 600 THEN running = FALSE
+WEND

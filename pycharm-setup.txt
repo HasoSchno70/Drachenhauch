@@ -1,0 +1,194 @@
+==============================================================
+GameBasic in PyCharm einrichten
+==============================================================
+
+1) PROJEKT-INTERPRETER AUF DIE .venv UMSTELLEN
+----------------------------------------------
+File -> Settings -> Project: GameBasic -> Python Interpreter
+Zahnrad oben rechts -> "Add Interpreter" -> "Add Local Interpreter"
+-> "Existing" -> Pfad waehlen:
+    C:\Programmieren\Python\GameBasic\.venv\Scripts\python.exe
+Bestaetigen. PyCharm sieht jetzt pygame und alle anderen Pakete.
+
+
+2) RUN-KONFIGURATION FUER gbrun.py
+----------------------------------
+Rechtsklick auf gbrun.py -> "Modify Run Configuration..."
+oder oben rechts -> "Edit Configurations..." -> "+ Python".
+
+Name:               Pong (oder beliebig)
+Script path:        C:\Programmieren\Python\GameBasic\gbrun.py
+Parameters:         examples/10_pong.gb
+Working directory:  C:\Programmieren\Python\GameBasic
+Python Interpreter: Project Default (.venv)
+
+Das gleiche kannst du fuer 09_shapes, 12_sprite, 13_sound usw.
+duplizieren.
+
+
+3) WENN PYCHARM NUR DIE EINZELDATEI ZEIGT
+-----------------------------------------
+Falls du bisher nur gbrun.py geoeffnet hast (kein Projektbaum):
+  File -> Close Project
+  File -> Open... -> ORDNER C:\Programmieren\Python\GameBasic auswaehlen
+  -> "Trust Project"
+
+Links das Projekt-Tool-Fenster mit Alt+1 einblenden.
+Du siehst dann die Struktur:
+  GameBasic/
+    .venv/                  <- PyCharm verbirgt das oft, ist normal
+    examples/
+      assets/
+      *.gb
+    gamebasic/              <- das ist das Python-Paket
+      *.py
+    gbrun.py
+    pyproject.toml
+
+
+4) .gb-DATEIEN MIT SYNTAX-HIGHLIGHTING
+--------------------------------------
+File -> Settings -> Editor -> File Types
+-> Recognized File Types -> "+"
+
+Name:                     GameBasic
+Description:              BASIC-Dialekt fuer die Spieleentwicklung
+Line comment:             '
+Line comment at first column: NICHT angekreuzt (BASIC erlaubt
+                          Kommentare nicht nur am Zeilenanfang)
+Hex prefix:               0x
+Support paired braces:    angekreuzt
+Support paired brackets:  angekreuzt
+Support paired parens:    angekreuzt
+Support string escapes:   angekreuzt
+Ignore case:              ANGEKREUZT  (GameBasic ist case-insensitive!)
+
+Dann unten in den vier Keyword-Spalten Folgendes einfuegen
+(jede Spalte ein Wort pro Zeile, EXAKT diese Listen):
+
+Keyword 1 (Steuerstrukturen):
+DIM
+CONST
+AS
+IF
+THEN
+ELSE
+ELSEIF
+END
+WHILE
+WEND
+FOR
+TO
+STEP
+NEXT
+SUB
+FUNCTION
+RETURN
+CLASS
+NEW
+EXTENDS
+BREAK
+CONTINUE
+PRINT
+INPUT
+REM
+
+Keyword 2 (Operatoren / Literale):
+AND
+OR
+NOT
+MOD
+TRUE
+FALSE
+
+Keyword 3 (Typen):
+INTEGER
+FLOAT
+STRING
+BOOLEAN
+IMAGE
+SOUND
+
+Keyword 4 (eingebaute Funktionen):
+STR$
+VAL
+INT
+ABS
+LEN
+CHR$
+ASC
+SQR
+RND
+UPPER$
+LOWER$
+RGB
+SCREEN
+CLS
+PLOT
+LINE
+BOX
+RECT
+CIRCLE
+TEXT
+FLIP
+SLEEP
+KEYPRESSED
+QUITREQUESTED
+MOUSEX
+MOUSEY
+MOUSEBUTTON
+LOADIMAGE
+DRAWIMAGE
+DRAWIMAGEPART
+IMAGEWIDTH
+IMAGEHEIGHT
+LOADSOUND
+PLAYSOUND
+STOPSOUND
+PLAYMUSIC
+STOPMUSIC
+
+Unten -> "Registered Patterns" -> "+" -> *.gb hinzufuegen.
+
+OK druecken. Jetzt sind .gb-Dateien farbig und tab-getreu hervorgehoben.
+
+
+5) STARTEN OHNE PYCHARM
+-----------------------
+Aus jedem Terminal im Projekt-Ordner:
+
+    gb.cmd examples\10_pong.gb           (Windows-CMD/PowerShell)
+    ./gb.sh examples/10_pong.gb          (Git-Bash, WSL)
+
+beide nutzen automatisch den .venv-Python und brauchen nichts global.
+
+
+6) SPIELE ALS .EXE VERTEILEN
+----------------------------
+Voraussetzung: native VM ist gebaut (gb-build.cmd).
+
+    gb-package examples\10_pong.gb --windowed --onefile
+        -> dist\10_pong.exe (etwa 17 MB, einzelne Datei)
+
+    gb-package examples\17_tilemap.gb --windowed
+        -> dist\17_tilemap\17_tilemap.exe (Ordner mit allen DLLs,
+           etwa 40 MB, schneller Start)
+
+Optionen:
+    --windowed     Kein Konsolenfenster (Release-Modus). Ohne diese Option
+                   kommt eine Konsole mit, was beim Debuggen hilft.
+    --onefile      Eine einzige .exe statt eines Ordners. Startet etwas
+                   langsamer (extrahiert beim Start in den Temp-Ordner),
+                   aber simpler zu verteilen.
+    --icon=mein.ico  Eigenes Icon fuer die .exe.
+    --name=Sonic     Eigener Name (sonst aus Dateiname abgeleitet).
+    --clean        Loescht alte Build-Artefakte vorher.
+
+Verteilen:
+- Bei --onefile: nur die .exe-Datei kopieren. Die assets/ liegen drin.
+- Bei Ordner-Build: den ganzen Ordner aus dist/<name>/ verschicken
+  (z.B. zippen).
+
+Sicherheitshinweis: Manche Antivirus-Programme melden PyInstaller-.exes
+als verdaechtig (False Positive). Wenn das stoert, mit Microsoft Defender
+ausschliessen oder die .exe signieren.

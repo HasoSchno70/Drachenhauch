@@ -1,0 +1,421 @@
+' Star Pilot - Kap 12: ENUMs + Wave-Manager.
+'
+' Was sich gegenueber Kap 11 geaendert hat:
+'   - GameState als ENUM (PLAYING, WAVE_INTRO, GAMEOVER)
+'   - EnemyType als ENUM (GRUNT, BOMBER) fuer SpawnEnemy
+'   - Wave-Klasse: trackt Wellen-Nummer und Spawn-Mechanik
+'   - Zwischen den Wellen: 90 Frames Pause mit "Welle X" - Anzeige
+
+IMPORT "physics"
+
+CONST WIDTH        AS INTEGER = 320
+CONST HEIGHT       AS INTEGER = 240
+CONST BG_COLOR     AS INTEGER = &H141E3C
+CONST PLAYER_C     AS INTEGER = &HFFDC00
+CONST BULLET_C     AS INTEGER = &HFFFFFF
+CONST GRUNT_C      AS INTEGER = &HFF6677
+CONST BOMBER_C     AS INTEGER = &HFFAA33
+CONST PLAYER_SPEED AS INTEGER = 3
+CONST BULLET_SPEED AS INTEGER = 5
+CONST BULLET_POOL  AS INTEGER = 20
+CONST ENEMY_POOL   AS INTEGER = 15
+CONST GRUNT_PTS    AS INTEGER = 100
+CONST BOMBER_PTS   AS INTEGER = 250
+CONST INTRO_FRAMES AS INTEGER = 90
+
+' --- ENUMs ---
+ENUM GameState = PLAYING, WAVE_INTRO, GAMEOVER
+ENUM EnemyType = GRUNT, BOMBER
+
+' --- Helper ---
+FUNCTION Clamp(wert AS INTEGER, lo AS INTEGER, hi AS INTEGER) AS INTEGER
+    IF wert < lo THEN RETURN lo
+    IF wert > hi THEN RETURN hi
+    RETURN wert
+END FUNCTION
+
+' --- Klassen wie in Kap 11 ---
+
+CLASS Entity
+    DIM x      AS INTEGER
+    DIM y      AS INTEGER
+    DIM w      AS INTEGER
+    DIM h      AS INTEGER
+    DIM alive  AS BOOLEAN
+
+    SUB Init(start_x AS INTEGER, start_y AS INTEGER)
+        x = start_x
+        y = start_y
+        alive = TRUE
+        w = 16
+        h = 16
+    END SUB
+
+    SUB Update()
+    END SUB
+
+    SUB Draw()
+    END SUB
+END CLASS
+
+CLASS Player EXTENDS Entity
+    DIM lives AS INTEGER
+
+    SUB Init(start_x AS INTEGER, start_y AS INTEGER)
+        x = start_x
+        y = start_y
+        alive = TRUE
+        w = 40
+        h = 24
+        lives = 3
+    END SUB
+
+    SUB Update()
+        IF KEYPRESSED(KEY_LEFT)  THEN x = x - PLAYER_SPEED
+        IF KEYPRESSED(KEY_RIGHT) THEN x = x + PLAYER_SPEED
+        x = Clamp(x, 0, WIDTH - w)
+    END SUB
+
+    SUB Draw()
+        BOX(x, y, x + w, y + h, PLAYER_C)
+    END SUB
+
+    SUB TakeHit()
+        lives = lives - 1
+        IF lives <= 0 THEN alive = FALSE
+    END SUB
+END CLASS
+
+CLASS Grunt EXTENDS Entity
+    SUB Spawn(at_x AS INTEGER)
+        x = at_x
+        y = -16
+        w = 16
+        h = 14
+        alive = TRUE
+    END SUB
+    SUB Update()
+        IF NOT alive THEN RETURN
+        y = y + 1
+        IF y > HEIGHT THEN alive = FALSE
+    END SUB
+    SUB Draw()
+        IF alive THEN BOX(x, y, x + w, y + h, GRUNT_C)
+    END SUB
+END CLASS
+
+CLASS Bomber EXTENDS Entity
+    DIM dx AS INTEGER
+
+    SUB Spawn(at_x AS INTEGER)
+        x = at_x
+        y = -20
+        w = 22
+        h = 18
+        alive = TRUE
+        dx = 1
+    END SUB
+    SUB Update()
+        IF NOT alive THEN RETURN
+        y = y + 1
+        x = x + dx
+        IF x < 0 OR x > WIDTH - w THEN dx = -dx
+        IF y > HEIGHT THEN alive = FALSE
+    END SUB
+    SUB Draw()
+        IF alive THEN BOX(x, y, x + w, y + h, BOMBER_C)
+    END SUB
+END CLASS
+
+CLASS Bullet
+    DIM x      AS INTEGER
+    DIM y      AS INTEGER
+    DIM w      AS INTEGER
+    DIM h      AS INTEGER
+    DIM alive  AS BOOLEAN
+
+    SUB Init()
+        w = 3
+        h = 8
+        alive = FALSE
+    END SUB
+    SUB Spawn(at_x AS INTEGER, at_y AS INTEGER)
+        x = at_x
+        y = at_y
+        alive = TRUE
+    END SUB
+    SUB Update()
+        IF NOT alive THEN RETURN
+        y = y - BULLET_SPEED
+        IF y < -h THEN alive = FALSE
+    END SUB
+    SUB Draw()
+        IF alive THEN BOX(x, y, x + w, y + h, BULLET_C)
+    END SUB
+END CLASS
+
+' --- Wave-Manager ---
+CLASS Wave
+    DIM number          AS INTEGER
+    DIM enemies_left    AS INTEGER
+    DIM spawn_timer     AS INTEGER
+    DIM spawn_interval  AS INTEGER
+
+    SUB Init()
+        number = 1
+        StartCurrent()
+    END SUB
+
+    SUB StartCurrent()
+        enemies_left   = 4 + number * 2
+        spawn_interval = 60 - number * 5
+        IF spawn_interval < 20 THEN spawn_interval = 20
+        spawn_timer    = spawn_interval
+    END SUB
+
+    FUNCTION ShouldSpawn() AS BOOLEAN
+        IF enemies_left <= 0 THEN RETURN FALSE
+        spawn_timer = spawn_timer - 1
+        IF spawn_timer <= 0 THEN
+            spawn_timer  = spawn_interval
+            enemies_left = enemies_left - 1
+            RETURN TRUE
+        END IF
+        RETURN FALSE
+    END FUNCTION
+
+    FUNCTION Cleared() AS BOOLEAN
+        RETURN enemies_left <= 0
+    END FUNCTION
+
+    SUB NextWave()
+        number = number + 1
+        StartCurrent()
+    END SUB
+END CLASS
+
+' --- Globale Spielobjekte ---
+DIM player                 AS Player
+DIM bullets[BULLET_POOL]   AS Bullet
+DIM grunts[ENEMY_POOL]     AS Grunt
+DIM bombers[ENEMY_POOL]    AS Bomber
+DIM wave                   AS Wave
+
+DIM score              AS INTEGER
+DIM space_was_pressed  AS BOOLEAN
+DIM state              AS GameState
+DIM intro_frames_left  AS INTEGER
+
+' --- Setup ---
+SUB Setup()
+    player = NEW Player(WIDTH / 2 - 20, HEIGHT - 40)
+    DIM i AS INTEGER
+    FOR i = 0 TO BULLET_POOL - 1
+        bullets[i] = NEW Bullet()
+    NEXT i
+    FOR i = 0 TO ENEMY_POOL - 1
+        grunts[i] = NEW Grunt(0, 0)
+        grunts[i].alive = FALSE
+        bombers[i] = NEW Bomber(0, 0)
+        bombers[i].alive = FALSE
+    NEXT i
+    wave = NEW Wave()
+
+    score = 0
+    space_was_pressed = FALSE
+    state = GameState.WAVE_INTRO
+    intro_frames_left = INTRO_FRAMES
+
+    RANDOMIZE(MILLIS())
+    SCREEN(WIDTH, HEIGHT, "Star Pilot", 2)
+END SUB
+
+SUB SpawnBullet(at_x AS INTEGER, at_y AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO BULLET_POOL - 1
+        IF NOT bullets[i].alive THEN
+            bullets[i].Spawn(at_x, at_y)
+            RETURN
+        END IF
+    NEXT i
+END SUB
+
+' Spawnt einen Gegner; Typ wird per ENUM uebergeben.
+SUB SpawnEnemy(typ AS EnemyType, at_x AS INTEGER)
+    DIM i AS INTEGER
+    SELECT CASE typ
+        CASE EnemyType.GRUNT
+            FOR i = 0 TO ENEMY_POOL - 1
+                IF NOT grunts[i].alive THEN
+                    grunts[i].Spawn(at_x)
+                    RETURN
+                END IF
+            NEXT i
+        CASE EnemyType.BOMBER
+            FOR i = 0 TO ENEMY_POOL - 1
+                IF NOT bombers[i].alive THEN
+                    bombers[i].Spawn(at_x)
+                    RETURN
+                END IF
+            NEXT i
+    END SELECT
+END SUB
+
+' Wie viele Gegner sind aktuell auf dem Bildschirm?
+FUNCTION EnemiesAlive() AS INTEGER
+    DIM count AS INTEGER
+    count = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO ENEMY_POOL - 1
+        IF grunts[i].alive  THEN count = count + 1
+        IF bombers[i].alive THEN count = count + 1
+    NEXT i
+    RETURN count
+END FUNCTION
+
+SUB CheckBulletEnemyCollisions()
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO BULLET_POOL - 1
+        IF NOT bullets[i].alive THEN CONTINUE
+        FOR j = 0 TO ENEMY_POOL - 1
+            IF grunts[j].alive THEN
+                IF PHYSICS_BOX_BOX(bullets[i].x, bullets[i].y, bullets[i].w, bullets[i].h, _
+                                   grunts[j].x, grunts[j].y, grunts[j].w, grunts[j].h) THEN
+                    bullets[i].alive = FALSE
+                    grunts[j].alive  = FALSE
+                    score = score + GRUNT_PTS
+                END IF
+            END IF
+        NEXT j
+        IF NOT bullets[i].alive THEN CONTINUE
+        FOR j = 0 TO ENEMY_POOL - 1
+            IF bombers[j].alive THEN
+                IF PHYSICS_BOX_BOX(bullets[i].x, bullets[i].y, bullets[i].w, bullets[i].h, _
+                                   bombers[j].x, bombers[j].y, bombers[j].w, bombers[j].h) THEN
+                    bullets[i].alive = FALSE
+                    bombers[j].alive = FALSE
+                    score = score + BOMBER_PTS
+                END IF
+            END IF
+        NEXT j
+    NEXT i
+END SUB
+
+SUB CheckPlayerEnemyCollisions()
+    DIM j AS INTEGER
+    FOR j = 0 TO ENEMY_POOL - 1
+        IF grunts[j].alive THEN
+            IF PHYSICS_BOX_BOX(player.x, player.y, player.w, player.h, _
+                               grunts[j].x, grunts[j].y, grunts[j].w, grunts[j].h) THEN
+                grunts[j].alive = FALSE
+                player.TakeHit()
+            END IF
+        END IF
+        IF bombers[j].alive THEN
+            IF PHYSICS_BOX_BOX(player.x, player.y, player.w, player.h, _
+                               bombers[j].x, bombers[j].y, bombers[j].w, bombers[j].h) THEN
+                bombers[j].alive = FALSE
+                player.TakeHit()
+            END IF
+        END IF
+    NEXT j
+END SUB
+
+' --- Update fuer den Spielzustand PLAYING ---
+SUB UpdatePlaying()
+    player.Update()
+
+    DIM space_now AS BOOLEAN
+    space_now = KEYPRESSED(KEY_SPACE)
+    IF space_now AND NOT space_was_pressed THEN
+        SpawnBullet(player.x + player.w / 2 - 1, player.y - 8)
+    END IF
+    space_was_pressed = space_now
+
+    DIM i AS INTEGER
+    FOR i = 0 TO BULLET_POOL - 1
+        bullets[i].Update()
+    NEXT i
+    FOR i = 0 TO ENEMY_POOL - 1
+        grunts[i].Update()
+        bombers[i].Update()
+    NEXT i
+
+    CheckBulletEnemyCollisions()
+    CheckPlayerEnemyCollisions()
+
+    IF NOT player.alive THEN
+        state = GameState.GAMEOVER
+        RETURN
+    END IF
+
+    ' Wave-Logik: spawnen falls noetig, oder Welle abschliessen
+    IF wave.ShouldSpawn() THEN
+        DIM typ AS EnemyType
+        IF INT(RND() * 2) = 0 THEN
+            typ = EnemyType.GRUNT
+            SpawnEnemy(typ, INT(RND() * (WIDTH - 16)))
+        ELSE
+            typ = EnemyType.BOMBER
+            SpawnEnemy(typ, INT(RND() * (WIDTH - 22)))
+        END IF
+    END IF
+
+    IF wave.Cleared() AND EnemiesAlive() = 0 THEN
+        wave.NextWave()
+        state = GameState.WAVE_INTRO
+        intro_frames_left = INTRO_FRAMES
+    END IF
+END SUB
+
+SUB UpdateWaveIntro()
+    intro_frames_left = intro_frames_left - 1
+    IF intro_frames_left <= 0 THEN
+        state = GameState.PLAYING
+    END IF
+END SUB
+
+SUB DrawAll()
+    CLS(BG_COLOR)
+
+    DIM i AS INTEGER
+    FOR i = 0 TO BULLET_POOL - 1
+        bullets[i].Draw()
+    NEXT i
+    FOR i = 0 TO ENEMY_POOL - 1
+        grunts[i].Draw()
+        bombers[i].Draw()
+    NEXT i
+    player.Draw()
+
+    TEXT(8, 8,  f"Score: {score}",        PLAYER_C)
+    TEXT(8, 22, f"Lives: {player.lives}", &HFFFFFF)
+    TEXT(WIDTH - 80, 8, f"Welle: {wave.number}", &HFFFFFF)
+
+    SELECT CASE state
+        CASE GameState.WAVE_INTRO
+            TEXT(WIDTH / 2 - 36, HEIGHT / 2 - 4, f"WELLE {wave.number}", &HFFDC00)
+        CASE GameState.GAMEOVER
+            TEXT(WIDTH / 2 - 36, HEIGHT / 2 - 4, "GAME OVER", &HFF4444)
+    END SELECT
+
+    FLIP()
+END SUB
+
+' --- Hauptprogramm ---
+Setup()
+
+WHILE NOT QUITREQUESTED()
+    SELECT CASE state
+        CASE GameState.PLAYING
+            UpdatePlaying()
+        CASE GameState.WAVE_INTRO
+            UpdateWaveIntro()
+        CASE GameState.GAMEOVER
+            ' Eingefroren - Bild bleibt stehen
+    END SELECT
+
+    DrawAll()
+    SLEEP(16)
+WEND

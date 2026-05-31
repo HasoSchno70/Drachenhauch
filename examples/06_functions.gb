@@ -1,0 +1,48 @@
+' SUB und FUNCTION mit Parametern und Rueckgabewert
+
+' SUB ohne Rueckgabewert
+SUB Greet(name AS STRING)
+    PRINT "Hallo, " + name + "!"
+END SUB
+
+' FUNCTION mit Rueckgabewert
+FUNCTION Add(a AS INTEGER, b AS INTEGER) AS INTEGER
+    RETURN a + b
+END FUNCTION
+
+' Rekursion: Faktoriell
+FUNCTION Faktoriell(n AS INTEGER) AS INTEGER
+    IF n <= 1 THEN RETURN 1
+    RETURN n * Faktoriell(n - 1)
+END FUNCTION
+
+' Rekursion: Fibonacci
+FUNCTION Fib(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    RETURN Fib(n - 1) + Fib(n - 2)
+END FUNCTION
+
+' Hoisting funktioniert: Aufruf vor Deklaration ist OK,
+' weil alle SUB/FUNCTION vorab gesammelt werden.
+PRINT "Summe(3, 4) =", Add(3, 4)
+Greet("Atari ST")
+Greet("Amiga 500")
+
+DIM i AS INTEGER
+PRINT ""
+PRINT "Faktoriell:"
+FOR i = 0 TO 7
+    PRINT "  ", i, "! =", Faktoriell(i)
+NEXT
+
+PRINT ""
+PRINT "Fibonacci(0..10):"
+FOR i = 0 TO 10
+    PRINT "  Fib(", i, ") =", Fib(i)
+NEXT
+
+' FUNCTIONs sind auch in Ausdruecken verwendbar
+DIM doppelt AS INTEGER
+doppelt = Add(Add(1, 2), Add(3, 4))
+PRINT ""
+PRINT "Add(Add(1,2), Add(3,4)) =", doppelt

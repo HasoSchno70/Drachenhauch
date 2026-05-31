@@ -1,0 +1,25 @@
+' Star Pilot - Kap 5, Endstand: konstanten-basiert, lesbar.
+'
+' Oeffnet ein Fenster, zeichnet einen dunklen Hintergrund und den Player
+' als gelben Block am unteren Rand. Laeuft bis das Fenster zugemacht oder
+' ESC gedrueckt wird.
+'
+' Was sich gegenueber 03_box.gb geaendert hat:
+'   - Magic Numbers durch CONST ersetzt
+'   - Hex-Farb-Notation statt RGB(...) (kompakter)
+'   - Erstmals der "Stand am Kapitelende" - in den naechsten Kapiteln
+'     wird hier weiter gebaut.
+
+CONST WIDTH     AS INTEGER = 320
+CONST HEIGHT    AS INTEGER = 240
+CONST BG_COLOR  AS INTEGER = &H141E3C
+CONST PLAYER_C  AS INTEGER = &HFFDC00
+
+SCREEN(WIDTH, HEIGHT, "Star Pilot", 2)
+
+WHILE NOT QUITREQUESTED()
+    CLS(BG_COLOR)
+    BOX(140, 200, 180, 224, PLAYER_C)
+    FLIP()
+    SLEEP(16)
+WEND

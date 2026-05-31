@@ -1,0 +1,45 @@
+' 59_input.gb -- Input-Mapping mit Action-Namen statt Keycodes.
+'
+' Vorher: KEYPRESSED(1073741904) ueberall verstreut. Schwer lesbar,
+' nicht rebindable, kein Joystick-Support.
+'
+' Mit dem input-Modul: Actions werden einmal gebunden und dann unter
+' lesbarem Namen abgefragt. Mehrere Tasten pro Action moeglich
+' (z.B. Pfeiltasten + WASD), Edge-Detection (PRESSED/RELEASED) frei
+' verfuegbar.
+
+IMPORT "input"
+
+' --- Setup: Bindings einmal beim Start definieren -----------------
+INPUT_BIND("move_left",  KEY_LEFT,  KEY_A)
+INPUT_BIND("move_right", KEY_RIGHT, KEY_D)
+INPUT_BIND("move_up",    KEY_UP,    KEY_W)
+INPUT_BIND("move_down",  KEY_DOWN,  KEY_S)
+INPUT_BIND("jump",       KEY_SPACE)
+INPUT_BIND("quit",       KEY_ESCAPE, KEY_Q)
+
+PRINT "=== Bindings ==="
+PRINT "  jump bound? ", INPUT_BOUND("jump")
+PRINT "  fire bound? ", INPUT_BOUND("fire")
+
+PRINT ""
+PRINT "=== Game-Loop-Skelett ==="
+PRINT "(In einem echten Spiel: SCREEN(...), dann Loop bis quit.)"
+
+CONST DEMO_FRAMES = 3
+DIM frame AS INTEGER
+FOR frame = 1 TO DEMO_FRAMES
+    PRINT "  Frame", frame, ":"
+    INPUT_UPDATE()              ' Snapshot der gedrueckten Tasten
+    PRINT "    move-axis x =", INPUT_AXIS("move_left", "move_right")
+    PRINT "    move-axis y =", INPUT_AXIS("move_up", "move_down")
+    IF INPUT_PRESSED("jump") THEN PRINT "    sprung!"
+    IF INPUT_HELD("quit") THEN PRINT "    quit-taste haelt"
+NEXT
+
+PRINT ""
+PRINT "=== Re-Binding ==="
+INPUT_BIND("jump", KEY_W, KEY_UP)        ' Jump auf W oder Up
+PRINT "  jump bound (jetzt 2 Tasten)? ", INPUT_BOUND("jump")
+INPUT_UNBIND("quit")
+PRINT "  quit bound (entfernt)? ", INPUT_BOUND("quit")

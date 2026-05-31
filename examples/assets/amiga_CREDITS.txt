@@ -1,0 +1,20 @@
+5 Action Chiptunes -- Juhani Junkala
+====================================
+
+Eingebunden:
+  amiga_action_level1.ogg  (Track "Level 1" aus dem Pack)
+  amiga_title.ogg          (Track "Title Screen" aus dem Pack)
+
+Lizenz: CC0 1.0 Universal (Public Domain)
+Quelle: https://opengameart.org/content/5-chiptunes-action
+Autor:  Juhani Junkala  (https://opengameart.org/users/subspaceaudio)
+
+Mirror mit OGG-Direkt-Downloads:
+        https://archive.org/details/JuhaniJunkalafiveactionchiptunes
+
+Verwendung in:
+  - examples/65_amiga_demo.gb  (Action-Track als Demoszene-Background)
+  - examples/67_wobbler.gb     (Title-Track als Wobbler-Score)
+
+CC0 erlaubt jegliche Verwendung -- inkl. Kommerz, ohne Nennungspflicht.
+Wir crediten den Autor trotzdem als Geste der Anerkennung.

@@ -1,0 +1,107 @@
+' Sprach-Features-Showcase: alle in dieser Session ergaenzten Features
+' in einem Demo. Zeigt:
+'
+'   * DATA / READ / RESTORE  - Inline-Datentabellen
+'   * REPEAT / UNTIL          - Post-Test-Schleife
+'   * Hex- und Binaer-Literale (&HFF, &B11010110)
+'   * f-Strings               - "Hallo {name}"
+'   * Compound-Assignment     - +=  -=  *=  /=
+'   * FORMAT$()               - printf-Stil-Formatierung
+'   * Default-Parameter       - SUB foo(x AS INT, y AS INT = 10)
+'   * TIMER()                 - FPS-Counter
+'   * Implizite Zeilenforts.  - lange Calls in Klammern
+'
+' Steuerung: ESC = Ende. Sonst nur zugucken.
+
+SCREEN(480, 320, "Sprach-Showcase", 2)
+
+' --- Daten via DATA: 4 farbige Quadrate mit Namen + Speed -------------
+DATA "Rot",   &HFF4040, 50,  50,  2
+DATA "Gruen", &H40FF40, 50,  120, 3
+DATA "Blau",  &H4080FF, 50,  190, 1
+DATA "Gelb",  &HFFCC44, 50,  260, 4
+
+CONST N AS INTEGER = 4
+DIM names[N]  AS STRING
+DIM colors[N] AS INTEGER
+DIM xs[N]     AS INTEGER
+DIM ys[N]     AS INTEGER
+DIM dxs[N]    AS INTEGER
+
+' READ ueber alle Zeilen
+DIM i AS INTEGER
+FOR i = 0 TO N - 1
+    READ names[i], colors[i], xs[i], ys[i], dxs[i]
+NEXT
+
+' --- Helper mit Default-Parametern ------------------------------------
+SUB DrawCard(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, _
+             title AS STRING, fg AS INTEGER = &HFFFFFF, _
+             bg AS INTEGER = &H1A1C2A)
+    BOX(x, y, x + w - 1, y + h - 1, bg)
+    RECT(x, y, x + w - 1, y + h - 1, fg)
+    TEXT(x + 6, y + 4, title, fg)
+END SUB
+
+' --- Game-Loop --------------------------------------------------------
+DIM frame AS INTEGER
+DIM fps AS INTEGER
+DIM last_fps_time AS FLOAT
+DIM frame_count AS INTEGER
+
+frame = 0
+fps = 0
+last_fps_time = TIMER()
+frame_count = 0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    CLS(&H0F1220)
+
+    ' REPEAT/UNTIL: Quadrate bewegen + zeichnen
+    i = 0
+    REPEAT
+        ' Compound-Assignment: kuerzer als xs[i] = xs[i] + dxs[i]
+        xs[i] += dxs[i]
+        IF xs[i] > 460 OR xs[i] < 20 THEN dxs[i] = -dxs[i]
+
+        ' Implizite Zeilenforts. in offenen Klammern - kein _ noetig
+        BOX(
+            xs[i],
+            ys[i],
+            xs[i] + 30,
+            ys[i] + 30,
+            colors[i]
+        )
+
+        ' f-String mit auto-STR$ um den Ausdruck im {...}
+        TEXT(xs[i], ys[i] - 14, f"{names[i]} (speed {dxs[i]})", colors[i])
+
+        i += 1
+    UNTIL i >= N
+
+    ' HUD - eine Karte oben, FORMAT$ formatiert die Felder ausgerichtet
+    DrawCard(8, 8, 280, 30, "Showcase")
+    TEXT(8 + 100, 8 + 4, FORMAT$(frame, "Frame: %06d"), &HCCD0E0)
+
+    ' FPS aus TIMER, alle 0.5 s aktualisieren
+    frame_count += 1
+    DIM elapsed_since AS FLOAT
+    elapsed_since = TIMER() - last_fps_time
+    IF elapsed_since >= 0.5 THEN
+        fps = INT(frame_count / elapsed_since)
+        frame_count = 0
+        last_fps_time = TIMER()
+    END IF
+    DrawCard(298, 8, 174, 30, "Stats", &H80FF80)
+    TEXT(298 + 60, 8 + 4, FORMAT$(fps, "FPS: %3d"), &HCCD0E0)
+
+    ' Hinweis-Karte unten - Defaults der Helper-SUB greifen,
+    ' nur title uebergeben.
+    DrawCard(8, 290, 464, 22, "ESC = Ende - alle Features aktiv im Loop")
+
+    FLIP()
+    SLEEP(16)
+    frame += 1
+WEND

@@ -1,0 +1,54 @@
+' Vererbung: gemeinsame Felder + Verhalten in einer Basisklasse.
+'
+' Entity ist die Basisklasse. Sie definiert was ALLE Spielobjekte
+' gemeinsam haben: eine Position, eine Update-Methode, eine Draw-Methode.
+'
+' Konkrete Klassen wie Grunt, Bomber, Player ERBEN davon - sie kriegen
+' Felder und Methoden geschenkt und ueberschreiben nur, was anders sein soll.
+
+CLASS Entity
+    DIM x      AS INTEGER
+    DIM y      AS INTEGER
+    DIM alive  AS BOOLEAN
+
+    SUB Init(start_x AS INTEGER, start_y AS INTEGER)
+        x = start_x
+        y = start_y
+        alive = TRUE
+    END SUB
+
+    ' Generische Bewegung: tu nichts. Konkrete Klassen ueberschreiben das.
+    SUB Update()
+    END SUB
+
+    SUB Kill()
+        alive = FALSE
+    END SUB
+END CLASS
+
+CLASS Grunt EXTENDS Entity
+    ' Erbt: x, y, alive, Init, Kill
+    ' Ueberschreibt: Update
+
+    SUB Update()
+        IF NOT alive THEN RETURN
+        y = y + 1     ' Grunts fliegen geradeaus runter
+        IF y > 240 THEN
+            alive = FALSE
+        END IF
+    END SUB
+END CLASS
+
+' Test
+DIM g AS Grunt
+g = NEW Grunt(100, 0)
+PRINT f"Grunt startet bei ({g.x}, {g.y}), alive = {g.alive}"
+
+DIM frame AS INTEGER
+FOR frame = 1 TO 100
+    g.Update()
+NEXT frame
+PRINT f"Nach 100 Frames: y = {g.y}, alive = {g.alive}"
+
+g.Kill()
+PRINT f"Nach Kill: alive = {g.alive}"

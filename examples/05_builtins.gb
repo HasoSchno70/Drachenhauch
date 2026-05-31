@@ -1,0 +1,22 @@
+' Eingebaute Funktionen
+DIM s AS STRING
+DIM x AS FLOAT
+DIM n AS INTEGER
+
+s = "GameBasic"
+PRINT "LEN(", s, ") =", LEN(s)
+PRINT "UPPER$:", UPPER$(s)
+PRINT "LOWER$:", LOWER$(s)
+PRINT "ASC erstes Zeichen:", ASC(s)
+PRINT "CHR$(65):", CHR$(65)
+
+x = 2.0
+PRINT "SQR(2) =", SQR(x)
+PRINT "ABS(-7) =", ABS(-7)
+PRINT "INT(3.7) =", INT(3.7)
+
+PRINT ""
+PRINT "5 Wuerfelwuerfe:"
+FOR n = 1 TO 5
+    PRINT "  ", RND(6) + 1
+NEXT

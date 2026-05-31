@@ -1,0 +1,361 @@
+' === GameBasic 2026 Showcase ===
+' Dungeon-RPG-Mini, das ALLE neuen Sprach-Features zeigt:
+'   Properties (GET/SET), List-Comprehensions, Variadic-Functions,
+'   Pattern-Matching mit Guards, IN-Operator, Method-Syntax,
+'   Tupel-Returns + Destructuring, VEC2 + Operator-Overloading,
+'   Bitwise-Operatoren, FUNCREF, WITH-Block, Static Class Members,
+'   Slicing, String-Multiplikation, ELIF, Regex.
+'
+' Einzig fehlt: input + Pygame-Loop (rein Console-Demo).
+
+IMPORT "vec2"
+IMPORT "regex"
+
+CONST LINE_WIDTH AS INTEGER = 50
+
+' --- Variadic Logger mit Severity-Levels --------------------------------
+SUB log(level AS STRING, ...parts)
+    DIM msg AS STRING
+    msg = "[" + level + "]"
+    DIM i AS INTEGER
+    FOR i = 0 TO parts.length() - 1
+        msg = msg + " " + STR$(parts[i])
+    NEXT
+    PRINT msg
+END SUB
+
+' --- Item-Flags via Bitwise --------------------------------------------
+CLASS ItemFlag
+    STATIC CONST SWORD  AS INTEGER = 1     ' = 1 SHL 0
+    STATIC CONST SHIELD AS INTEGER = 2     ' = 1 SHL 1
+    STATIC CONST POTION AS INTEGER = 4     ' = 1 SHL 2
+    STATIC CONST AMULET AS INTEGER = 8     ' = 1 SHL 3
+END CLASS
+
+' --- Combat-State als ENUM ---------------------------------------------
+ENUM CombatState = IDLE, ATTACK, FLEE, DEAD
+
+' --- Hero-Klasse mit Properties ----------------------------------------
+CLASS Hero
+    STATIC CONST MAX_HP AS INTEGER = 100
+    STATIC CONST MAX_MP AS INTEGER = 50
+
+    DIM _hp AS INTEGER
+    DIM _mp AS INTEGER
+    DIM _exp AS INTEGER
+    DIM name AS STRING
+    DIM pos AS VEC2
+    DIM flags AS INTEGER       ' bitwise: gehaltene Items
+
+    SUB Init(n AS STRING)
+        WITH Self
+            .name = n
+            ._hp = Hero.MAX_HP
+            ._mp = Hero.MAX_MP
+            ._exp = 0
+            .pos = VEC2_ZERO()
+            .flags = 0
+        END WITH
+    END SUB
+
+    ' Read/Write-Property: HP wird auf 0..MAX_HP geclamped.
+    PROPERTY GET hp() AS INTEGER
+        RETURN Self._hp
+    END PROPERTY
+    PROPERTY SET hp(v AS INTEGER)
+        IF v < 0 THEN v = 0
+        IF v > Hero.MAX_HP THEN v = Hero.MAX_HP
+        Self._hp = v
+    END PROPERTY
+
+    ' Computed Property: Tier-Stufe basierend auf Erfahrung.
+    PROPERTY GET tier() AS INTEGER
+        IF Self._exp >= 1000 THEN RETURN 3
+        IF Self._exp >= 500 THEN RETURN 2
+        IF Self._exp >= 100 THEN RETURN 1
+        RETURN 0
+    END PROPERTY
+
+    ' Computed Property: Status als String.
+    PROPERTY GET status() AS STRING
+        IF Self._hp <= 0 THEN RETURN "tot"
+        IF Self._hp <= 30 THEN RETURN "verwundet"
+        IF Self._hp <= 70 THEN RETURN "angeschlagen"
+        RETURN "fit"
+    END PROPERTY
+
+    ' Computed Property: Kurzform des Namens (erste 3 Buchstaben gross).
+    PROPERTY GET tag() AS STRING
+        RETURN Self.name[0:3].upper()
+    END PROPERTY
+
+    ' Bitwise-Helper: hat Item?
+    FUNCTION has_item(flag AS INTEGER) AS BOOLEAN
+        RETURN (Self.flags BAND flag) <> 0
+    END FUNCTION
+
+    SUB give_item(flag AS INTEGER)
+        Self.flags = Self.flags BOR flag
+    END SUB
+
+    SUB grant_xp(n AS INTEGER)
+        Self._exp = Self._exp + n
+    END SUB
+END CLASS
+
+' --- FUNCREFs fuer Sort/Filter -----------------------------------------
+FUNCTION by_hp_desc(a AS Hero, b AS Hero) AS INTEGER
+    RETURN b.hp - a.hp
+END FUNCTION
+
+FUNCTION is_alive(h AS Hero) AS BOOLEAN
+    RETURN h.hp > 0
+END FUNCTION
+
+' --- Tupel-Return-Helper -----------------------------------------------
+FUNCTION hp_minmax(party AS TUPLE) AS TUPLE
+    DIM mn AS INTEGER
+    DIM mx AS INTEGER
+    mn = 9999
+    mx = -1
+    DIM i AS INTEGER
+    FOR i = 0 TO party.length() - 1
+        DIM h AS Hero
+        h = party[i]
+        IF h.hp < mn THEN mn = h.hp
+        IF h.hp > mx THEN mx = h.hp
+    NEXT
+    RETURN (mn, mx)
+END FUNCTION
+
+' --- Banner-Helper -----------------------------------------------------
+SUB banner(title AS STRING)
+    PRINT "=" * LINE_WIDTH
+    PRINT " " + title
+    PRINT "=" * LINE_WIDTH
+END SUB
+
+' === Programm ==========================================================
+
+banner("GameBasic 2026 Showcase  --  Dungeon Crawler")
+
+' Helden-Erzeugung via Comprehension + RANGE
+log("INFO", "Spawne Heldenparty...")
+DIM names AS TUPLE
+names = ("Aelfric", "Brunhilde", "Cuthbert", "Dragana", "Eowyn")
+
+' Comprehension baut die ganze Party in einer Zeile
+DIM party AS TUPLE
+party = [_make_hero(names[i]) FOR i IN RANGE(names.length())]
+
+FUNCTION _make_hero(n AS STRING) AS Hero
+    DIM h AS Hero
+    h = NEW Hero(n)
+    RETURN h
+END FUNCTION
+
+' Test der Property-Auto-Validation
+party[0].hp = 200    ' wird zu 100 geclamped
+party[1].hp = -50    ' wird zu 0 geclamped
+party[2].hp = 25     ' verwundet
+party[3].grant_xp(750)  ' tier 2
+party[4].grant_xp(1500) ' tier 3
+
+' Items via Bitwise-Flags
+party[0].give_item(ItemFlag.SWORD)
+party[0].give_item(ItemFlag.SHIELD)
+party[2].give_item(ItemFlag.POTION)
+party[3].give_item(ItemFlag.AMULET)
+party[4].give_item(ItemFlag.SWORD BOR ItemFlag.AMULET)
+
+PRINT ""
+log("INFO", "Party-Roster:")
+DIM i AS INTEGER
+FOR i = 0 TO party.length() - 1
+    DIM h AS Hero
+    h = party[i]
+    PRINT "  " + h.tag + " " + h.name + ": HP=" + STR$(h.hp) + _
+          " (" + h.status + ")  Tier " + STR$(h.tier)
+NEXT
+
+' Tupel-Returns: Min/Max-HP in einem Aufruf via Destructuring
+PRINT ""
+DIM hp_min AS INTEGER
+DIM hp_max AS INTEGER
+(hp_min, hp_max) = hp_minmax(party)
+log("STAT", "Party-HP-Spanne:", hp_min, "..", hp_max)
+
+' Comprehension + Property: Lebende filtern
+DIM alive AS TUPLE
+alive = [h FOR h IN party WHERE is_alive(h)]
+log("STAT", "Lebend:", alive.length(), "/", party.length())
+
+' IN-Operator + Bitwise-Pruefung
+DIM with_sword AS TUPLE
+with_sword = [h FOR h IN party WHERE h.has_item(ItemFlag.SWORD)]
+log("STAT", "Schwerttraeger:", [h.name FOR h IN with_sword])
+
+' Combat-Round-Simulation: Pattern-Matching mit Guards
+PRINT ""
+banner("Kampfrunde")
+
+SUB resolve_round(h AS Hero, action AS CombatState)
+    SELECT CASE action
+        CASE CombatState.ATTACK WHERE h.hp > 30 AND h.has_item(ItemFlag.SWORD)
+            log("CMBT", h.name, "greift kraftvoll an!")
+            h.grant_xp(50)
+        CASE CombatState.ATTACK WHERE h.hp > 30
+            log("CMBT", h.name, "greift mit blossen Faeusten an")
+        CASE CombatState.ATTACK
+            log("CMBT", h.name, "ist zu schwach zum Angriff (HP=" + STR$(h.hp) + ")")
+        CASE CombatState.FLEE WHERE h.has_item(ItemFlag.POTION)
+            log("CMBT", h.name, "flieht und trinkt einen Trank!")
+            h.hp = h.hp + 30
+        CASE CombatState.FLEE
+            log("CMBT", h.name, "flieht ohne Trank")
+        CASE CombatState.DEAD
+            log("CMBT", h.name, "ist bereits tot")
+        CASE ELSE
+            log("CMBT", h.name, "tut nichts (state=" + STR$(action) + ")")
+    END SELECT
+END SUB
+
+resolve_round(party[0], CombatState.ATTACK)    ' Sword + voll-HP
+resolve_round(party[1], CombatState.ATTACK)    ' HP=0 -> zu schwach
+resolve_round(party[2], CombatState.FLEE)      ' Potion -> heilen
+resolve_round(party[3], CombatState.ATTACK)    ' kein Schwert
+resolve_round(party[4], CombatState.ATTACK)    ' Sword + xp
+
+' VEC2-Math: Bewegung
+PRINT ""
+banner("Bewegung in der Welt")
+
+' Helden auf eine Linie verteilen.
+FOR i = 0 TO party.length() - 1
+    party[i].pos = VEC2_NEW(i * 10.0, 0.0)
+NEXT
+
+' Alle bewegen sich um (3, 4) -- Vec2-Addition.
+DIM offset AS VEC2
+offset = VEC2_NEW(3.0, 4.0)
+FOR i = 0 TO party.length() - 1
+    party[i].pos = party[i].pos + offset
+NEXT
+
+' Distanz-Comprehension: alle Distanzen zum Ursprung
+DIM origin AS VEC2
+origin = VEC2_ZERO()
+DIM distances AS TUPLE
+distances = [VEC2_DISTANCE(h.pos, origin) FOR h in party]
+log("MATH", "Distanzen vom Ursprung:", distances)
+
+' Method-Syntax + Slicing: Spitznamen
+PRINT ""
+banner("Spitznamen-Generator")
+
+DIM nicknames AS TUPLE
+nicknames = [h.name[0:4] + "-" + STR$(h.tier) FOR h IN party]
+log("INFO", "Spitznamen:", nicknames)
+
+' Regex-Validation: nur "X X X X X X"-Spitznamen sind valide
+PRINT ""
+banner("Name-Validation per Regex")
+
+DIM pattern AS STRING
+pattern = "^[A-Z][a-zA-Z]+$"
+FOR i = 0 TO party.length() - 1
+    DIM h AS Hero
+    h = party[i]
+    IF REGEX_TEST(h.name, pattern) THEN
+        log("OK ", h.name, "-> Format OK")
+    ELIF h.name = "" THEN
+        log("WARN", "Leerer Name -- Demo")
+    ELSE
+        log("FAIL", h.name, "-> ungueltiges Format")
+    END IF
+NEXT
+
+' Sort via FUNCREF (manuelle Bubble-Sort weil GB keinen Sort-Built-in
+' hat -- aber zeigt FUNCREF im Einsatz)
+PRINT ""
+banner("FUNCREF: Party-Sort nach HP")
+
+DIM party_arr[5] AS Hero
+FOR i = 0 TO 4
+    party_arr[i] = party[i]
+NEXT
+
+SUB bubble_sort(arr AS ARRAY OF Hero, cmp AS FUNCREF, n AS INTEGER)
+    DIM j AS INTEGER
+    DIM k AS INTEGER
+    FOR j = 0 TO n - 2
+        FOR k = 0 TO n - 2 - j
+            IF cmp(arr[k], arr[k + 1]) > 0 THEN
+                DIM tmp AS Hero
+                tmp = arr[k]
+                arr[k] = arr[k + 1]
+                arr[k + 1] = tmp
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+bubble_sort(party_arr, by_hp_desc, 5)
+FOR i = 0 TO 4
+    PRINT "  " + STR$(i + 1) + ". " + party_arr[i].name + " HP=" + STR$(party_arr[i].hp)
+NEXT
+
+' Map mit Method-Syntax + Comprehension
+PRINT ""
+banner("Inventar als Map")
+
+DIM stock AS MAP OF INTEGER
+stock.put("trank_klein",  5)
+stock.put("trank_gross",  2)
+stock.put("schwert_eisen", 0)
+stock.put("schwert_stahl", 1)
+stock.put("schild_holz", 3)
+
+PRINT "  Komplettes Inventar:"
+DIM keys_arr AS ARRAY OF STRING
+keys_arr = stock.keys()
+FOR i = 0 TO keys_arr.length() - 1
+    DIM key AS STRING
+    key = keys_arr[i]
+    PRINT "    " + PADR$(key, 16, ".") + ": " + STR$(stock.get(key))
+NEXT
+
+' Comprehension + IN: ausverkaufte Items
+DIM sold_out AS TUPLE
+sold_out = [k FOR k IN stock WHERE stock.get(k) = 0]
+PRINT ""
+log("WARN", "Ausverkauft:", sold_out)
+
+' IN-Test mit Tupel-Mitgliedschaft
+DIM ware AS STRING
+ware = "trank_klein"
+IF ware IN ("trank_klein", "trank_gross") THEN
+    log("CHECK", "'" + ware + "' ist ein Trank")
+END IF
+
+' === Final ============================================================
+PRINT ""
+banner("Demo abgeschlossen")
+
+DIM features AS TUPLE
+features = ("Properties", "Comprehensions", "Variadic", "Guards", _
+            "IN-Operator", "Methods", "Tuples", "VEC2", "Bitwise", _
+            "FUNCREF", "WITH", "Static-Members", "Slicing", "*", _
+            "ELIF", "Regex")
+
+PRINT "Demonstrierte Features (" + STR$(features.length()) + " Stueck):"
+DIM line AS STRING
+line = ""
+FOR i = 0 TO features.length() - 1
+    line = line + features[i]
+    IF i < features.length() - 1 THEN line = line + ", "
+NEXT
+PRINT "  " + line
+PRINT ""
+PRINT "  TW = Tree-Walker, VM = Python-VM, Native = Cython-VM."
+PRINT "  Alle drei Pfade liefern bit-identischen Output. \\o/"

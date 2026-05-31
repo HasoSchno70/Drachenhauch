@@ -1,0 +1,51 @@
+' Bullet als Klasse mit eigener Update-Logik.
+'
+' Wir simulieren die Bewegung in der Konsole, ohne SCREEN. Pro "Frame"
+' rufen wir bullet.Update() auf. Wenn der Bullet aus dem Bild fliegt,
+' setzt er sich selbst auf alive = FALSE.
+
+CONST HEIGHT AS INTEGER = 240
+
+CLASS Bullet
+    DIM x      AS INTEGER
+    DIM y      AS INTEGER
+    DIM speed  AS INTEGER
+    DIM alive  AS BOOLEAN
+
+    SUB Init(start_x AS INTEGER, start_y AS INTEGER)
+        x = start_x
+        y = start_y
+        speed = 5
+        alive = TRUE
+    END SUB
+
+    SUB Update()
+        IF NOT alive THEN RETURN
+        y = y - speed
+        IF y < -10 THEN
+            alive = FALSE
+        END IF
+    END SUB
+END CLASS
+
+DIM b AS Bullet
+b = NEW Bullet(160, HEIGHT - 30)
+
+PRINT f"Anfang:  y = {b.y}, alive = {b.alive}"
+
+' 10 Frames simulieren
+DIM frame AS INTEGER
+FOR frame = 1 TO 10
+    b.Update()
+NEXT frame
+PRINT f"10 Frames: y = {b.y}, alive = {b.alive}"
+
+' Solange weiter, bis der Bullet stirbt
+DIM total AS INTEGER
+total = 10
+WHILE b.alive
+    b.Update()
+    total = total + 1
+WEND
+
+PRINT f"Tot nach {total} Frames"

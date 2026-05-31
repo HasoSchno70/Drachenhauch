@@ -1,0 +1,113 @@
+' Audio-Modul-Demo: Tone-Generation, Channels, Music.
+' Braucht: pygame.mixer (laeuft auch ohne Soundkarte mit dummy-Driver,
+' aber ohne Soundkarte hoert man halt nichts).
+IMPORT "audio"
+
+PRINT "=== Audio-Demo ==="
+PRINT ""
+
+' Optional: explizite Init mit Wunsch-Parametern. Wenn weggelassen, nutzt
+' der Mixer beim ersten Aufruf seine Defaults.
+AUDIO_INIT(44100, 2, 512)
+
+PRINT "Aktive Channels: ", AUDIO_NUM_CHANNELS()
+AUDIO_SET_NUM_CHANNELS(16)
+PRINT "Nach SET_NUM_CHANNELS(16): ", AUDIO_NUM_CHANNELS()
+PRINT ""
+
+' --- 1) Tone-Generation: Sinus, Square, Saw, Triangle, Noise -----
+PRINT "Generiere 5 Toene a 200ms..."
+DIM t_sine AS SOUND
+DIM t_square AS SOUND
+DIM t_saw AS SOUND
+DIM t_tri AS SOUND
+DIM t_noise AS SOUND
+t_sine = AUDIO_TONE(440.0, 200, "sine", 0.5)
+t_square = AUDIO_TONE(330.0, 200, "square", 0.4)
+t_saw = AUDIO_TONE(220.0, 200, "saw", 0.4)
+t_tri = AUDIO_TONE(523.25, 200, "triangle", 0.5)
+t_noise = AUDIO_NOISE(150, 0.3)
+
+' Nacheinander abspielen (jedes wartet bis zum Ende).
+DIM tones[5] AS SOUND
+tones[0] = t_sine
+tones[1] = t_square
+tones[2] = t_saw
+tones[3] = t_tri
+tones[4] = t_noise
+
+DIM names[5] AS STRING
+names[0] = "Sine 440Hz"
+names[1] = "Square 330Hz"
+names[2] = "Saw 220Hz"
+names[3] = "Triangle C5"
+names[4] = "Noise"
+
+DIM i AS INTEGER
+DIM ch AS AUDIO_CHANNEL
+FOR i = 0 TO 4
+    PRINT "  ", names[i]
+    ch = AUDIO_PLAY(tones[i])
+    ' Warten bis fertig
+    WHILE AUDIO_IS_PLAYING(ch)
+    WEND
+NEXT
+
+' --- 2) Akkord parallel auf 3 Channels --------------------------
+PRINT ""
+PRINT "Akkord (C-Dur, 3 parallel)..."
+DIM c1 AS SOUND
+DIM c2 AS SOUND
+DIM c3 AS SOUND
+c1 = AUDIO_TONE(261.63, 800, "sine", 0.3)
+c2 = AUDIO_TONE(329.63, 800, "sine", 0.3)
+c3 = AUDIO_TONE(392.00, 800, "sine", 0.3)
+
+DIM ch1 AS AUDIO_CHANNEL
+DIM ch2 AS AUDIO_CHANNEL
+DIM ch3 AS AUDIO_CHANNEL
+ch1 = AUDIO_PLAY(c1)
+ch2 = AUDIO_PLAY(c2)
+ch3 = AUDIO_PLAY(c3)
+PRINT "  busy: ", AUDIO_BUSY_CHANNELS(), " channels"
+
+' --- 3) Stereo-Pan: nur links, dann nur rechts -----------------
+DIM tdur AS INTEGER
+tdur = MILLIS() + 800
+WHILE MILLIS() < tdur
+WEND
+
+PRINT ""
+PRINT "Pan-Test: links / rechts..."
+DIM pan_tone AS SOUND
+pan_tone = AUDIO_TONE(440.0, 400, "sine", 0.5)
+
+DIM lp AS AUDIO_CHANNEL
+lp = AUDIO_PLAY(pan_tone)
+AUDIO_PAN(lp, 1.0, 0.0)
+WHILE AUDIO_IS_PLAYING(lp)
+WEND
+
+DIM rp AS AUDIO_CHANNEL
+rp = AUDIO_PLAY(pan_tone)
+AUDIO_PAN(rp, 0.0, 1.0)
+WHILE AUDIO_IS_PLAYING(rp)
+WEND
+
+' --- 4) Fadeout demonstrieren ----------------------------------
+PRINT ""
+PRINT "Fadeout (200ms)..."
+DIM long_tone AS SOUND
+long_tone = AUDIO_TONE(440.0, 2000, "sine", 0.5)
+DIM lc AS AUDIO_CHANNEL
+lc = AUDIO_PLAY(long_tone)
+DIM stop_ms AS INTEGER
+stop_ms = MILLIS() + 500
+WHILE MILLIS() < stop_ms
+WEND
+AUDIO_STOP(lc, 200)
+WHILE AUDIO_IS_PLAYING(lc)
+WEND
+
+PRINT ""
+PRINT "Fertig."

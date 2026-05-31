@@ -1,0 +1,222 @@
+' Pong mit Scene- und Save-Modul.
+'
+' Drei Bildschirme - Menue, Spiel, Game-Over - werden ueber den
+' Scene-Stack gewechselt statt mit globalen Flags. Der Highscore
+' (hoechster bisher erreichter Sieger-Score) wird in pong.save
+' persistiert und beim Start geladen.
+'
+' Steuerung:
+'   Menue:    ENTER -> Spiel
+'   Spiel:    W/S = links, UP/DOWN = rechts. Erste Seite mit 5 Punkten gewinnt.
+'   GameOver: ENTER -> zurueck ins Menue
+'   ueberall: ESC -> beenden
+
+IMPORT "scene"
+IMPORT "save"
+
+' --- Konfiguration --------------------------------------------------
+CONST WIDTH AS INTEGER = 320
+CONST HEIGHT AS INTEGER = 240
+CONST WIN_SCORE AS INTEGER = 5
+CONST PADDLE_H AS INTEGER = 40
+CONST PADDLE_SPD AS INTEGER = 3
+CONST BALL_SPD AS INTEGER = 2
+CONST SAVE_PATH AS STRING = "pong.save"
+
+' --- Klassen --------------------------------------------------------
+
+CLASS Paddle
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM score AS INTEGER
+
+    SUB Init(startX AS INTEGER)
+        x = startX
+        y = HEIGHT / 2 - PADDLE_H / 2
+        score = 0
+    END SUB
+
+    SUB MoveBy(dy AS INTEGER)
+        y = y + dy
+        IF y < 0 THEN y = 0
+        IF y + PADDLE_H > HEIGHT THEN y = HEIGHT - PADDLE_H
+    END SUB
+
+    SUB Draw()
+        Box(x, y, x + 6, y + PADDLE_H, WHITE)
+    END SUB
+END CLASS
+
+CLASS Ball
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+
+    SUB Reset(richtung AS INTEGER)
+        x = WIDTH / 2
+        y = HEIGHT / 2
+        dx = richtung * BALL_SPD
+        dy = BALL_SPD
+    END SUB
+
+    SUB Update()
+        x = x + dx
+        y = y + dy
+        IF y < 4 THEN dy = ABS(dy)
+        IF y > HEIGHT - 4 THEN dy = -ABS(dy)
+    END SUB
+
+    SUB Draw()
+        Circle(x, y, 4, YELLOW)
+    END SUB
+END CLASS
+
+FUNCTION HitsPaddle(b AS Ball, p AS Paddle) AS BOOLEAN
+    IF b.x < p.x - 4 THEN RETURN FALSE
+    IF b.x > p.x + 10 THEN RETURN FALSE
+    IF b.y < p.y THEN RETURN FALSE
+    IF b.y > p.y + PADDLE_H THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' --- Globale Spielobjekte (existieren waehrend ALLER Scenes) -------
+DIM links AS Paddle
+DIM rechts AS Paddle
+DIM ball AS Ball
+DIM saveData AS SAVE_HANDLE
+
+links = NEW Paddle(8)
+rechts = NEW Paddle(WIDTH - 14)
+ball = NEW Ball()
+saveData = SAVE_LOAD_OR_NEW(SAVE_PATH)
+
+' --- Hilfsfunktionen ------------------------------------------------
+
+FUNCTION Highscore() AS INTEGER
+    RETURN SAVE_GET_INT_OR(saveData, "highscore", 0)
+END FUNCTION
+
+SUB UpdateHighscore(score AS INTEGER)
+    IF score > Highscore() THEN
+        SAVE_SET_INT(saveData, "highscore", score)
+        SAVE_WRITE(saveData, SAVE_PATH)
+    END IF
+END SUB
+
+SUB ResetMatch()
+    links.score = 0
+    rechts.score = 0
+    ball.Reset(1)
+END SUB
+
+' --- Menue-Scene ----------------------------------------------------
+
+SUB DrawMenu()
+    Cls(RGB(0, 16, 32))
+    Text(110, 70, "GAMEBASIC PONG", WHITE)
+    Text(80, 110, "Druecke ENTER zum Spielen", LIGHTGRAY)
+    Text(80, 130, "ESC zum Beenden", DARKGRAY)
+    Text(80, 170, "Highscore: " + STR$(Highscore()), YELLOW)
+END SUB
+
+SUB UpdateMenu()
+    IF KeyPressed(KEY_RETURN) THEN
+        ResetMatch()
+        SCENE_SWITCH("playing")
+    END IF
+END SUB
+
+' --- Playing-Scene --------------------------------------------------
+
+SUB UpdatePlaying()
+    IF KeyPressed(KEY_W) THEN links.MoveBy(-PADDLE_SPD)
+    IF KeyPressed(KEY_S) THEN links.MoveBy(PADDLE_SPD)
+    IF KeyPressed(KEY_UP) THEN rechts.MoveBy(-PADDLE_SPD)
+    IF KeyPressed(KEY_DOWN) THEN rechts.MoveBy(PADDLE_SPD)
+
+    ball.Update()
+
+    IF HitsPaddle(ball, links) THEN
+        ball.dx = ABS(ball.dx)
+    ELSEIF HitsPaddle(ball, rechts) THEN
+        ball.dx = -ABS(ball.dx)
+    END IF
+
+    IF ball.x < 0 THEN
+        rechts.score = rechts.score + 1
+        ball.Reset(1)
+    ELSEIF ball.x > WIDTH THEN
+        links.score = links.score + 1
+        ball.Reset(-1)
+    END IF
+
+    IF links.score >= WIN_SCORE OR rechts.score >= WIN_SCORE THEN
+        DIM siegerScore AS INTEGER
+        IF links.score >= WIN_SCORE THEN
+            siegerScore = links.score
+            SCENE_SWITCH("gameover")
+            SCENE_SET_STRING("winner", "LINKS")
+        ELSE
+            siegerScore = rechts.score
+            SCENE_SWITCH("gameover")
+            SCENE_SET_STRING("winner", "RECHTS")
+        END IF
+        SCENE_SET_INT("score", siegerScore)
+        UpdateHighscore(siegerScore)
+    END IF
+END SUB
+
+SUB DrawPlaying()
+    Cls(RGB(0, 16, 32))
+    Line(WIDTH / 2, 0, WIDTH / 2, HEIGHT, DARKGRAY)
+    links.Draw()
+    rechts.Draw()
+    ball.Draw()
+    Text(40, 8, STR$(links.score), WHITE)
+    Text(WIDTH - 50, 8, STR$(rechts.score), WHITE)
+    Text(80, HEIGHT - 16, "W/S vs UP/DOWN  ESC=quit", GRAY)
+END SUB
+
+' --- GameOver-Scene -------------------------------------------------
+
+SUB UpdateGameOver()
+    IF KeyPressed(KEY_RETURN) THEN
+        SCENE_SWITCH("menu")
+    END IF
+END SUB
+
+SUB DrawGameOver()
+    Cls(RGB(0, 16, 32))
+    DIM winner AS STRING
+    DIM finalScore AS INTEGER
+    winner = SCENE_GET_STRING("winner")
+    finalScore = SCENE_GET_INT("score")
+
+    Text(120, 60, "GAME OVER", WHITE)
+    Text(100, 100, winner + " gewinnt!", YELLOW)
+    Text(100, 120, "Endstand: " + STR$(finalScore), LIGHTGRAY)
+    Text(100, 160, "Highscore: " + STR$(Highscore()), GREEN)
+    Text(70, HEIGHT - 30, "ENTER = zurueck zum Menue", DARKGRAY)
+END SUB
+
+' --- Hauptschleife --------------------------------------------------
+
+Screen(WIDTH, HEIGHT, "GameBasic Pong - Scenes")
+
+SCENE_SWITCH("menu")
+
+WHILE NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
+    SELECT CASE SCENE_CURRENT()
+        CASE "menu"
+            UpdateMenu()
+            DrawMenu()
+        CASE "playing"
+            UpdatePlaying()
+            DrawPlaying()
+        CASE "gameover"
+            UpdateGameOver()
+            DrawGameOver()
+    END SELECT
+    Flip()
+WEND

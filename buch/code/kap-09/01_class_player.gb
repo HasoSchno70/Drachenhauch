@@ -1,0 +1,44 @@
+' Player als Klasse - die ersten Schritte mit OOP.
+'
+' Felder mit DIM (innen), Methoden mit SUB / FUNCTION (auch innen).
+' Die Init-Methode wird automatisch von NEW Player(...) aufgerufen.
+
+CLASS Player
+    DIM x      AS INTEGER
+    DIM y      AS INTEGER
+    DIM lives  AS INTEGER
+
+    SUB Init(start_x AS INTEGER, start_y AS INTEGER)
+        x = start_x
+        y = start_y
+        lives = 3
+    END SUB
+
+    SUB MoveBy(dx AS INTEGER, dy AS INTEGER)
+        x = x + dx
+        y = y + dy
+    END SUB
+
+    SUB TakeDamage()
+        lives = lives - 1
+    END SUB
+
+    FUNCTION IsAlive() AS BOOLEAN
+        RETURN lives > 0
+    END FUNCTION
+END CLASS
+
+DIM hero AS Player
+hero = NEW Player(100, 200)
+
+PRINT f"Player startet bei ({hero.x}, {hero.y}) mit {hero.lives} Leben"
+
+hero.MoveBy(10, -5)
+PRINT f"Nach MoveBy: ({hero.x}, {hero.y})"
+
+hero.TakeDamage()
+hero.TakeDamage()
+PRINT f"Nach 2 Treffern: {hero.lives} Leben, lebt: {hero.IsAlive()}"
+
+hero.TakeDamage()
+PRINT f"Nach 3 Treffern: {hero.lives} Leben, lebt: {hero.IsAlive()}"

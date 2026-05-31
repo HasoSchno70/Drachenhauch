@@ -1,0 +1,30 @@
+' Bluetooth Low Energy - in der Naehe befindliche Geraete scannen
+' Voraussetzung: pip install bleak
+'
+' Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10.
+
+IMPORT "bt"
+
+PRINT "Scanne 5 Sekunden nach BLE-Geraeten ..."
+DIM gefunden AS STRING
+gefunden = BT_SCAN(5.0)
+
+IF LEN(gefunden) = 0 THEN
+    PRINT "Nichts gefunden."
+ELSE
+    PRINT ""
+    PRINT "Adresse           | Name | RSSI"
+    PRINT "------------------+------+-----"
+    DIM zeilen AS ARRAY OF STRING
+    zeilen = SPLIT$(gefunden, CHR$(10))
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(zeilen) - 1
+        PRINT "  ", zeilen[i]
+    NEXT
+END IF
+
+' Beispiel: zu einem konkreten Geraet verbinden, Service-UUIDs lesen
+' DIM dev AS BT_HANDLE
+' dev = BT_CONNECT("AA:BB:CC:DD:EE:FF")
+' PRINT BT_SERVICES(dev)
+' BT_DISCONNECT(dev)

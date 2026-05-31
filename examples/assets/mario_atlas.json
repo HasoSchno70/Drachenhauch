@@ -1,0 +1,35 @@
+{
+  "image": "mario.png",
+  "sprites": {
+    "mario_idle": [
+      0,
+      0,
+      16,
+      16
+    ],
+    "mario_walk_a": [
+      16,
+      0,
+      16,
+      16
+    ],
+    "mario_walk_b": [
+      32,
+      0,
+      16,
+      16
+    ],
+    "mario_jump": [
+      48,
+      0,
+      16,
+      16
+    ],
+    "mario_hit": [
+      64,
+      0,
+      16,
+      16
+    ]
+  }
+}

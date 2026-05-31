@@ -1,0 +1,108 @@
+' SQLite-Datenbank Demo. IMPORT "db" laedt das Built-in-Modul gleichen Namens
+' (siehe gamebasic/modules/db.py).
+IMPORT "db"
+
+' Wir nutzen :memory: - eine In-Memory-Datenbank, die mit DB_CLOSE verschwindet.
+DIM con AS DB_CONN
+con = DB_OPEN(":memory:")
+
+PRINT "=== Schema anlegen ==="
+DB_EXEC(con, "CREATE TABLE spieler (id INTEGER PRIMARY KEY, name TEXT NOT NULL, score INTEGER DEFAULT 0, dabei INTEGER)")
+PRINT "Tabelle spieler angelegt."
+
+PRINT ""
+PRINT "=== Daten einfuegen (mit Parameter-Binding) ==="
+DIM rows AS INTEGER
+rows = DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Anna", 1500, TRUE)
+PRINT "Anna eingefuegt, rowid =", DB_LAST_ROWID(con)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Bert", 980, TRUE)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Cilly", 2100, FALSE)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Dora", 750, TRUE)
+
+PRINT ""
+PRINT "=== Alle Aktiven nach Score absteigend ==="
+DIM r AS DB_RESULT
+r = DB_QUERY(con, "SELECT id, name, score FROM spieler WHERE dabei = ? ORDER BY score DESC", TRUE)
+
+PRINT "Anzahl Spalten:", DB_COL_COUNT(r)
+DIM i AS INTEGER
+FOR i = 0 TO DB_COL_COUNT(r) - 1
+    PRINT "  Spalte ", i, ": ", DB_COL_NAME(r, i)
+NEXT
+PRINT ""
+
+WHILE DB_NEXT(r)
+    PRINT "  #", DB_GET_INT(r, 0), "  ", PADR$(DB_GET_STRING(r, 1), 6), " = ", DB_GET_INT(r, 2)
+WEND
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "=== Update ==="
+DIM affected AS INTEGER
+affected = DB_EXEC(con, "UPDATE spieler SET score = score + 100 WHERE name = ?", "Bert")
+PRINT "Berts Score wurde erhoeht, ", affected, " Zeile(n) betroffen."
+
+PRINT ""
+PRINT "=== Aggregat ==="
+r = DB_QUERY(con, "SELECT COUNT(*), AVG(score), MAX(score) FROM spieler WHERE dabei = ?", TRUE)
+IF DB_NEXT(r) THEN
+    PRINT "Anzahl Aktive:    ", DB_GET_INT(r, 0)
+    PRINT "Durchschnitt:     ", DB_GET_FLOAT(r, 1)
+    PRINT "Hoechster Score:  ", DB_GET_INT(r, 2)
+END IF
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "=== NULL-Behandlung ==="
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, NULL, ?)", "Emil", FALSE)
+r = DB_QUERY(con, "SELECT name, score FROM spieler WHERE name = ?", "Emil")
+IF DB_NEXT(r) THEN
+    PRINT "Name:           ", DB_GET_STRING(r, 0)
+    PRINT "score IS NULL:  ", DB_IS_NULL(r, 1)
+    PRINT "DB_GET_INT bei NULL gibt Default: ", DB_GET_INT(r, 1)
+END IF
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "=== Boolean lesen ==="
+r = DB_QUERY(con, "SELECT name, dabei FROM spieler WHERE name IN (?, ?)", "Anna", "Cilly")
+WHILE DB_NEXT(r)
+    PRINT "  ", PADR$(DB_GET_STRING(r, 0), 6), " dabei? ", DB_GET_BOOL(r, 1)
+WEND
+DB_CLOSE_RESULT(r)
+
+PRINT ""
+PRINT "=== Transaktion: ROLLBACK haelt Datenbank konsistent ==="
+DB_BEGIN(con)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Frieda", 999, TRUE)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Gustav", 888, TRUE)
+PRINT "  Vor Rollback: ", DB_LAST_ROWID(con), " war letzte ID"
+DB_ROLLBACK(con)
+
+r = DB_QUERY(con, "SELECT COUNT(*) FROM spieler WHERE name IN (?, ?)", "Frieda", "Gustav")
+DIM gefunden AS INTEGER
+gefunden = 0
+IF DB_NEXT(r) THEN
+    gefunden = DB_GET_INT(r, 0)
+END IF
+DB_CLOSE_RESULT(r)
+PRINT "  Nach Rollback: gefunden =", gefunden, " (erwartet 0)"
+
+PRINT ""
+PRINT "=== Transaktion: COMMIT macht Aenderungen permanent ==="
+DB_BEGIN(con)
+DB_EXEC(con, "INSERT INTO spieler (name, score, dabei) VALUES (?, ?, ?)", "Heidi", 500, TRUE)
+DB_COMMIT(con)
+PRINT "  Heidi committet."
+
+PRINT ""
+PRINT "=== Fehlerfall: ungueltiges SQL ==="
+TRY
+    DB_EXEC(con, "DAS IST KEIN SQL")
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY
+
+DB_CLOSE(con)
+PRINT ""
+PRINT "Verbindung geschlossen."

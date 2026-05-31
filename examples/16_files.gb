@@ -1,0 +1,92 @@
+' Datei-I/O: Highscore-Liste lesen, ergaenzen, sortieren, schreiben.
+
+CONST HIGHSCORE_FILE = "highscores.txt"
+
+STRUCT Highscore
+    DIM name AS STRING
+    DIM punkte AS INTEGER
+END STRUCT
+
+' --- Demo-Datei mit ein paar Eintraegen anlegen, falls nicht vorhanden ---
+IF NOT FileExists(HIGHSCORE_FILE) THEN
+    DIM out AS FILE
+    out = OpenFile(HIGHSCORE_FILE, "w")
+    WriteLine(out, "Anna;420")
+    WriteLine(out, "Bert;180")
+    WriteLine(out, "Cilly;310")
+    CloseFile(out)
+    PRINT "Demo-Datei", HIGHSCORE_FILE, "neu erstellt."
+END IF
+
+' --- Datei einlesen ---
+DIM eintraege[20] AS Highscore
+DIM anzahl AS INTEGER
+anzahl = 0
+
+DIM f AS FILE
+f = OpenFile(HIGHSCORE_FILE, "r")
+WHILE NOT EndOfFile(f)
+    DIM zeile AS STRING
+    zeile = ReadLine(f)
+    IF LEN(zeile) > 0 AND anzahl < LEN(eintraege) THEN
+        DIM teile AS ARRAY OF STRING
+        teile = SPLIT$(zeile, ";")
+        IF LEN(teile) = 2 THEN
+            eintraege[anzahl].name = teile[0]
+            eintraege[anzahl].punkte = VAL(teile[1])
+            anzahl = anzahl + 1
+        END IF
+    END IF
+WEND
+CloseFile(f)
+
+PRINT ""
+PRINT "Geladen:", anzahl, "Eintraege"
+
+' --- Neuen Eintrag hinzufuegen ---
+IF anzahl < LEN(eintraege) THEN
+    eintraege[anzahl].name = "Dora"
+    eintraege[anzahl].punkte = 555
+    anzahl = anzahl + 1
+END IF
+
+' --- Sortieren absteigend (Bubble-Sort - macht Spass in BASIC) ---
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR i = 0 TO anzahl - 2
+    FOR j = 0 TO anzahl - 2 - i
+        IF eintraege[j].punkte < eintraege[j + 1].punkte THEN
+            ' STRUCT-Werte tauschen ueber Hilfsvariablen
+            DIM tmpName AS STRING
+            DIM tmpPunkte AS INTEGER
+            tmpName = eintraege[j].name
+            tmpPunkte = eintraege[j].punkte
+            eintraege[j].name = eintraege[j + 1].name
+            eintraege[j].punkte = eintraege[j + 1].punkte
+            eintraege[j + 1].name = tmpName
+            eintraege[j + 1].punkte = tmpPunkte
+        END IF
+    NEXT
+NEXT
+
+' --- Anzeigen ---
+PRINT ""
+PRINT "Sortierte Highscore-Liste:"
+PRINT "  Platz Name           Punkte"
+PRINT "  ----- -------------- ------"
+FOR i = 0 TO anzahl - 1
+    DIM platz AS STRING
+    platz = STR$(i + 1) + "."
+    PRINT "    " + platz + "  " + eintraege[i].name + "  " + STR$(eintraege[i].punkte)
+NEXT
+
+' --- Zurueckschreiben ---
+DIM w AS FILE
+w = OpenFile(HIGHSCORE_FILE, "w")
+FOR i = 0 TO anzahl - 1
+    WriteLine(w, eintraege[i].name + ";" + STR$(eintraege[i].punkte))
+NEXT
+CloseFile(w)
+
+PRINT ""
+PRINT "In", HIGHSCORE_FILE, "geschrieben."

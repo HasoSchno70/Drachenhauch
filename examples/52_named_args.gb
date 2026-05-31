@@ -1,0 +1,78 @@
+' Named-Arguments-Demo: SUB/FUNCTION/NEW mit Mix aus positional und named.
+'
+' Regeln:
+'   - Positional muss immer vor allen Named-Args kommen.
+'   - Named-Args koennen in beliebiger Reihenfolge auftreten.
+'   - Slots ohne Wert nehmen ihren Default - auch "in der Mitte".
+'   - Doppelt-Belegung (positional + named auf gleichem Slot) ist Fehler.
+
+SUB Greet(name AS STRING, _
+          age AS INTEGER, _
+          greeting AS STRING = "Hallo", _
+          suffix AS STRING = "")
+    PRINT greeting + ", " + name + " (" + STR$(age) + ")" + suffix
+END SUB
+
+PRINT "--- alle positional ---"
+Greet("Anna", 30)
+
+PRINT ""
+PRINT "--- ein Named am Ende ---"
+Greet("Bob", 25, greeting: "Hi")
+
+PRINT ""
+PRINT "--- alles named (Reihenfolge egal) ---"
+Greet(age: 40, name: "Cara", suffix: "!")
+
+PRINT ""
+PRINT "--- Slot in der Mitte nimmt Default ---"
+'   greeting bleibt "Hallo", weil nur suffix named ist
+Greet("Dora", 50, suffix: "?")
+
+' --- Function mit Default ---
+PRINT ""
+PRINT "--- Function mit Named ---"
+
+FUNCTION Pow(base AS FLOAT, exponent AS FLOAT = 2.0) AS FLOAT
+    DIM result AS FLOAT
+    result = 1.0
+    DIM i AS INTEGER
+    FOR i = 1 TO INT(exponent)
+        result = result * base
+    NEXT i
+    RETURN result
+END FUNCTION
+
+PRINT "5^2  =", Pow(5)                         ' default exponent = 2
+PRINT "3^4  =", Pow(3, 4)                      ' alle positional
+PRINT "2^10 =", Pow(base: 2, exponent: 10)     ' alle named
+
+' --- NEW Class mit Init ---
+PRINT ""
+PRINT "--- NEW Klasse mit Named ---"
+
+CLASS Point
+    DIM px AS INTEGER
+    DIM py AS INTEGER
+    DIM pcolor AS INTEGER
+
+    SUB Init(x AS INTEGER, y AS INTEGER, color AS INTEGER = &HFFFFFF)
+        px = x
+        py = y
+        pcolor = color
+    END SUB
+
+    SUB Show()
+        PRINT "Point(" + STR$(px) + "," + STR$(py) + ") color=" + HEX$(pcolor)
+    END SUB
+END CLASS
+
+DIM p AS Point
+p = NEW Point(10, 20)
+p.Show()
+
+p = NEW Point(x: 0, y: 0, color: &HFF0000)
+p.Show()
+
+p = NEW Point(100, 200, color: &H00FF00)
+p.Show()

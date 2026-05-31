@@ -1,0 +1,41 @@
+' Camera/Viewport: Logik-Test ohne Pygame-Fenster.
+' Testet CAMERA_SET, CAMERA_RESET, CAMERA_FOLLOW, S2W-Konvertierung.
+IMPORT "camera"
+
+PRINT "=== Default-Camera ==="
+PRINT "x:", CAMERA_X()
+PRINT "y:", CAMERA_Y()
+PRINT "zoom:", CAMERA_ZOOM()
+
+PRINT ""
+PRINT "=== CAMERA_SET(100, 200, 2.0) ==="
+CAMERA_SET(100.0, 200.0, 2.0)
+PRINT "x:", CAMERA_X()
+PRINT "y:", CAMERA_Y()
+PRINT "zoom:", CAMERA_ZOOM()
+
+PRINT ""
+PRINT "=== Screen -> World mit zoom=2 ==="
+PRINT "Screen 0 -> World x:", CAMERA_S2W_X(0.0), " (erwartet 100.0)"
+PRINT "Screen 200 -> World x:", CAMERA_S2W_X(200.0), " (erwartet 200.0)"
+PRINT "Screen 0 -> World y:", CAMERA_S2W_Y(0.0), " (erwartet 200.0)"
+
+PRINT ""
+PRINT "=== CAMERA_FOLLOW(target=500,500, screen=200x200) bei zoom=2 ==="
+CAMERA_FOLLOW(500.0, 500.0, 200.0, 200.0)
+PRINT "x:", CAMERA_X(), " (erwartet 450.0 - sw/zoom/2 = 50 unter target)"
+PRINT "y:", CAMERA_Y(), " (erwartet 450.0)"
+PRINT "zoom unveraendert:", CAMERA_ZOOM()
+
+PRINT ""
+PRINT "=== CAMERA_RESET ==="
+CAMERA_RESET()
+PRINT "x:", CAMERA_X(), "  y:", CAMERA_Y(), "  zoom:", CAMERA_ZOOM()
+
+PRINT ""
+PRINT "=== Fehlerfall: zoom <= 0 ==="
+TRY
+    CAMERA_SET(0.0, 0.0, -1.0)
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY

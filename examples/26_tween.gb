@@ -1,0 +1,72 @@
+' Tweening-Modul: Werteinterpolation ueber Zeit. Hier als Konsolen-Demo,
+' aber genauso fuer Bewegungen/Fades in Pygame nutzbar.
+IMPORT "tween"
+
+PRINT "=== Linearer Tween, 500ms, von 0 nach 100 ==="
+DIM t AS TWEEN
+t = TWEEN_NEW(0.0, 100.0, 500, "linear")
+
+DIM start_ms AS INTEGER
+start_ms = MILLIS()
+DIM i AS INTEGER
+FOR i = 0 TO 5
+    DIM target_ms AS INTEGER
+    target_ms = start_ms + i * 100 + 5     ' kleines Polster gegen Loop-Drift
+    WHILE MILLIS() < target_ms
+    WEND
+    PRINT "  ", PADL$(STR$(MILLIS() - start_ms), 4), "ms  progress=", PADL$(STR$(ROUND(TWEEN_PROGRESS(t) * 100)), 3), "%  wert=", TWEEN_VALUE(t)
+NEXT
+PRINT "  done? ", TWEEN_DONE(t)
+
+PRINT ""
+PRINT "=== out_bounce, gleicher Tween (restartet) ==="
+TWEEN_RESTART(t)
+' Stilbruch: wir mochten die Easing-Kurve sehen, also nutzen wir einen
+' neuen Tween mit out_bounce.
+DIM b AS TWEEN
+b = TWEEN_NEW(0.0, 100.0, 500, "out_bounce")
+start_ms = MILLIS()
+FOR i = 0 TO 5
+    DIM target2 AS INTEGER
+    target2 = start_ms + i * 100
+    WHILE MILLIS() < target2
+    WEND
+    PRINT "  ", PADL$(STR$(MILLIS() - start_ms), 4), "ms  wert=", TWEEN_VALUE(b)
+NEXT
+
+PRINT ""
+PRINT "=== Pause/Resume ==="
+DIM p AS TWEEN
+p = TWEEN_NEW(0.0, 100.0, 1000, "linear")
+DIM target3 AS INTEGER
+target3 = MILLIS() + 200
+WHILE MILLIS() < target3
+WEND
+PRINT "  Vor Pause:    progress=", ROUND(TWEEN_PROGRESS(p) * 100), "%"
+TWEEN_PAUSE(p)
+
+target3 = MILLIS() + 300
+WHILE MILLIS() < target3
+WEND
+PRINT "  Nach 300ms Pause: progress=", ROUND(TWEEN_PROGRESS(p) * 100), "% (eingefroren)"
+
+TWEEN_RESUME(p)
+target3 = MILLIS() + 100
+WHILE MILLIS() < target3
+WEND
+PRINT "  Nach 100ms Lauf weiter: progress=", ROUND(TWEEN_PROGRESS(p) * 100), "%"
+
+PRINT ""
+PRINT "=== Reverse ==="
+DIM rv AS TWEEN
+rv = TWEEN_NEW(0.0, 100.0, 200, "linear")
+DIM target4 AS INTEGER
+target4 = MILLIS() + 100
+WHILE MILLIS() < target4
+WEND
+PRINT "  Vor Reverse:  wert ungefaehr 50  -> tatsaechlich:", ROUND(TWEEN_VALUE(rv))
+TWEEN_REVERSE(rv)
+target4 = MILLIS() + 100
+WHILE MILLIS() < target4
+WEND
+PRINT "  100ms nach Reverse:                            ", ROUND(TWEEN_VALUE(rv))

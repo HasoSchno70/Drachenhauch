@@ -1,0 +1,145 @@
+' Bullet-Hell-Demo mit dem ECS-Modul.
+'
+' Klassische ECS-Architektur:
+'   - World haelt alle Entities + Components.
+'   - Movement-System:  Query (pos, vel) -> pos += vel * dt
+'   - Lifetime-System:  Query (life)     -> life -= dt; <0 -> destroy
+'   - Render-System:    Query (pos, color) -> CIRCLE/BOX zeichnen
+'
+' Player: Pfeiltasten bewegen, Bullet spawnen mit zufaelliger X-Position
+' alle 150ms vom oberen Bildrand. ESC schliesst.
+
+IMPORT "ecs"
+
+SCREEN(320, 240, "ECS Bullet-Hell", 2)
+RANDOMIZE(MILLIS())
+
+DIM world AS ECS_WORLD
+world = ECS_NEW_WORLD()
+
+' --- Player als Entity ---
+DIM player AS INTEGER
+player = ECS_NEW_ENTITY(world)
+ECS_ADD_FLOAT(world, player, "px", 160.0)
+ECS_ADD_FLOAT(world, player, "py", 200.0)
+ECS_ADD_INT(world, player, "color", RGB(80, 220, 120))
+ECS_ADD_INT(world, player, "size", 6)
+
+' --- Spawn-Funktion fuer Bullets ---
+SUB spawn_bullet(world AS ECS_WORLD)
+    DIM b AS INTEGER
+    b = ECS_NEW_ENTITY(world)
+    ECS_ADD_FLOAT(world, b, "px", RND(320) + 0.0)
+    ECS_ADD_FLOAT(world, b, "py", -8.0)
+    ECS_ADD_FLOAT(world, b, "vx", (RND(81) - 40) / 40.0)  ' -1.0..+1.0
+    ECS_ADD_FLOAT(world, b, "vy", 1.0 + RND(20) / 10.0)   ' 1.0..3.0
+    ECS_ADD_FLOAT(world, b, "life", 4000.0)               ' 4 Sekunden
+    ECS_ADD_INT(world, b, "color", RGB(220, 80, 80))
+    ECS_ADD_INT(world, b, "size", 2)
+END SUB
+
+' --- Game-Loop ---
+DIM last_ms AS INTEGER
+DIM next_spawn_ms AS INTEGER
+DIM frame AS INTEGER
+last_ms = MILLIS()
+next_spawn_ms = last_ms + 150
+frame = 0
+
+WHILE NOT QUITREQUESTED()
+    DIM now AS INTEGER
+    now = MILLIS()
+    DIM dt AS INTEGER
+    dt = now - last_ms
+    last_ms = now
+    IF dt > 100 THEN dt = 100   ' Cap gegen Pause-Spikes
+
+    IF KEYPRESSED(27) THEN     ' ESC
+        BREAK
+    END IF
+
+    ' --- Player-Input ---
+    DIM speed AS FLOAT
+    speed = dt * 0.18
+    DIM pp_x AS FLOAT
+    DIM pp_y AS FLOAT
+    pp_x = ECS_GET_FLOAT(world, player, "px")
+    pp_y = ECS_GET_FLOAT(world, player, "py")
+    IF KEYPRESSED(KEY_LEFT) THEN  pp_x = pp_x - speed
+    IF KEYPRESSED(KEY_RIGHT) THEN pp_x = pp_x + speed
+    IF KEYPRESSED(KEY_UP) THEN    pp_y = pp_y - speed
+    IF KEYPRESSED(KEY_DOWN) THEN  pp_y = pp_y + speed
+    IF pp_x < 4.0 THEN pp_x = 4.0
+    IF pp_x > 316.0 THEN pp_x = 316.0
+    IF pp_y < 4.0 THEN pp_y = 4.0
+    IF pp_y > 236.0 THEN pp_y = 236.0
+    ECS_ADD_FLOAT(world, player, "px", pp_x)
+    ECS_ADD_FLOAT(world, player, "py", pp_y)
+
+    ' --- Spawn-System: alle 150ms ein neuer Bullet ---
+    WHILE now >= next_spawn_ms
+        spawn_bullet(world)
+        next_spawn_ms = next_spawn_ms + 150
+    WEND
+
+    ' --- Movement-System: Query (px, py, vx, vy) ---
+    DIM movers AS ARRAY OF INTEGER
+    movers = ECS_QUERY3(world, "px", "vx", "vy")
+    DIM dt_f AS FLOAT
+    dt_f = dt * 0.06       ' fuer halbweg lesbare Geschwindigkeit
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(movers) - 1
+        DIM ent AS INTEGER
+        ent = movers[i]
+        ECS_ADD_FLOAT(world, ent, "px",
+                      ECS_GET_FLOAT(world, ent, "px")
+                      + ECS_GET_FLOAT(world, ent, "vx") * dt_f)
+        ECS_ADD_FLOAT(world, ent, "py",
+                      ECS_GET_FLOAT(world, ent, "py")
+                      + ECS_GET_FLOAT(world, ent, "vy") * dt_f)
+    NEXT
+
+    ' --- Lifetime-System: Bullets nach Ablauf entfernen ---
+    DIM lifers AS ARRAY OF INTEGER
+    lifers = ECS_QUERY(world, "life")
+    FOR i = 0 TO LEN(lifers) - 1
+        DIM lent AS INTEGER
+        lent = lifers[i]
+        DIM remaining AS FLOAT
+        remaining = ECS_GET_FLOAT(world, lent, "life") - dt
+        IF remaining <= 0.0 THEN
+            ECS_DESTROY(world, lent)
+        ELSE
+            ECS_ADD_FLOAT(world, lent, "life", remaining)
+        END IF
+    NEXT
+
+    ' --- Render-System ---
+    CLS(RGB(20, 24, 40))
+    DIM drawables AS ARRAY OF INTEGER
+    drawables = ECS_QUERY3(world, "px", "py", "color")
+    FOR i = 0 TO LEN(drawables) - 1
+        DIM dent AS INTEGER
+        dent = drawables[i]
+        DIM dx AS INTEGER
+        DIM dy AS INTEGER
+        dx = INT(ECS_GET_FLOAT(world, dent, "px"))
+        dy = INT(ECS_GET_FLOAT(world, dent, "py"))
+        DIM col AS INTEGER
+        DIM sz AS INTEGER
+        col = ECS_GET_INT(world, dent, "color")
+        sz = ECS_GET_OR_INT(world, dent, "size", 2)
+        CIRCLE(dx, dy, sz, col)
+    NEXT
+
+    ' HUD
+    TEXT(4, 4, f"Entities: {ECS_COUNT(world)}", RGB(220, 220, 220))
+    TEXT(4, 14, f"Frame: {frame}  dt: {dt}ms", RGB(160, 160, 160))
+    TEXT(4, 226, "Pfeile=Bewegen  ESC=Ende", RGB(120, 140, 160))
+
+    FLIP()
+    SLEEP(16)
+    frame = frame + 1
+WEND
+
+PRINT "Bye! Final entities: ", ECS_COUNT(world)

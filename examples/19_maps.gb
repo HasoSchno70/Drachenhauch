@@ -1,0 +1,86 @@
+' Hash-Maps: Mini-Spielzustand mit Spieler-HP, Punkten und Inventar.
+
+' --- Map of INTEGER (Lebenspunkte) ---
+DIM hp AS MAP OF INTEGER
+MapPut(hp, "Held",   100)
+MapPut(hp, "Knappe",  50)
+MapPut(hp, "Drache", 800)
+MapPut(hp, "Goblin",  25)
+
+PRINT "=== Lebenspunkte ==="
+PRINT "Anzahl Charaktere:", MapSize(hp)
+
+DIM keys AS ARRAY OF STRING
+keys = MapKeys(hp)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(keys) - 1
+    PRINT "  ", PADR$(keys[i], 12, "."), MapGet(hp, keys[i])
+NEXT
+
+' --- Schaden anwenden ---
+PRINT ""
+PRINT "Drache trifft Held mit 20 Schaden:"
+MapPut(hp, "Held", MapGet(hp, "Held") - 20)
+PRINT "  Held HP:", MapGet(hp, "Held")
+
+' --- Map of STRING (einfaches Inventar: Slot -> Item-Name) ---
+DIM inventar AS MAP OF STRING
+MapPut(inventar, "links",  "Schwert")
+MapPut(inventar, "rechts", "Schild")
+MapPut(inventar, "kopf",   "Helm")
+
+PRINT ""
+PRINT "=== Inventar ==="
+DIM slots AS ARRAY OF STRING
+slots = MapKeys(inventar)
+FOR i = 0 TO LEN(slots) - 1
+    PRINT "  ", PADR$(slots[i], 8, " "), "= ", MapGet(inventar, slots[i])
+NEXT
+
+' --- MapGetOr fuer leere Slots ---
+PRINT ""
+PRINT "Slot 'fuesse':", MapGetOr(inventar, "fuesse", "(leer)")
+PRINT "Slot 'kopf'  :", MapGetOr(inventar, "kopf",   "(leer)")
+
+' --- Map of FLOAT (Geschwindigkeiten) ---
+DIM speed AS MAP OF FLOAT
+MapPut(speed, "Held",   3.5)
+MapPut(speed, "Knappe", 2.0)
+MapPut(speed, "Drache", 1.2)
+
+PRINT ""
+PRINT "=== Geschwindigkeiten ==="
+FOR i = 0 TO LEN(MapKeys(speed)) - 1
+    DIM k AS STRING
+    k = MapKeys(speed)[i]
+    PRINT "  ", PADR$(k, 12, "."), MapGet(speed, k)
+NEXT
+
+' --- Map als Cache: Fibonacci mit Memoization ---
+DIM cache AS MAP OF INTEGER
+
+FUNCTION FibCached(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    DIM key AS STRING
+    key = STR$(n)
+    IF MapHas(cache, key) THEN RETURN MapGet(cache, key)
+    DIM result AS INTEGER
+    result = FibCached(n - 1) + FibCached(n - 2)
+    MapPut(cache, key, result)
+    RETURN result
+END FUNCTION
+
+PRINT ""
+PRINT "=== Memoized Fibonacci ==="
+DIM t1 AS INTEGER
+t1 = MILLIS()
+DIM j AS INTEGER
+FOR j = 0 TO 30
+    PRINT "  Fib(" + PADL$(STR$(j), 2, " ") + ") =", FibCached(j)
+NEXT
+PRINT "Cache-Eintraege:", MapSize(cache), "    Zeit:", MILLIS() - t1, "ms"
+
+' --- Aufraeumen ---
+MapClear(cache)
+PRINT ""
+PRINT "Nach MapClear: Cache-Groesse =", MapSize(cache)

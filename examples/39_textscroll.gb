@@ -1,0 +1,99 @@
+' Klassischer Amiga-/C64-Demo-Effekt: bunter Lauftext mit Sinus-Wave.
+' Demonstriert TEXT_SIZE / TEXT_BOLD / TEXT_WIDTH und Color-Cycling
+' ueber RGB() mit phasenverschobenen Sinus-Wellen pro R/G/B.
+'
+' Steuerung: ESC = beenden.
+
+SCREEN(640, 360, "Textscroll-Demo", 2)
+TEXT_SIZE(64)
+TEXT_BOLD(TRUE)
+
+DIM message AS STRING
+message = "GAMEBASIC ROCKT * * * GROSSE BUNTE BUCHSTABEN SCROLLEN UEBER DEN SCHIRM * * * "
+
+DIM scroll_x AS FLOAT
+DIM tick AS INTEGER
+DIM speed AS FLOAT
+DIM mid_y AS INTEGER
+DIM amp AS INTEGER
+
+scroll_x = 640.0
+tick = 0
+speed = 2.5
+mid_y = 140
+amp = 60
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN
+        BREAK
+    END IF
+
+    CLS(0)
+
+    ' Punkt-Hintergrund: gleichmaessig verteilt, gibt Tiefe
+    DIM si AS INTEGER
+    DIM sx AS INTEGER
+    DIM sy AS INTEGER
+    FOR si = 0 TO 79
+        sx = (si * 37) MOD 640
+        sy = (si * 71) MOD 360
+        PLOT(sx, sy, RGB(60, 60, 90))
+    NEXT
+
+    ' Lauftext zeichnen - jeder Buchstabe in eigener Farbe + Sinus-Wave
+    DIM cur_x AS FLOAT
+    DIM y AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    DIM phase AS FLOAT
+    DIM ch AS STRING
+    DIM i AS INTEGER
+
+    cur_x = scroll_x
+    FOR i = 0 TO LEN(message) - 1
+        ch = MID$(message, i, 1)
+        ' Nur zeichnen wenn der Buchstabe im sichtbaren Bereich liegt
+        IF cur_x > -80 AND cur_x < 640 THEN
+            ' Vertikale Sinus-Bewegung pro Buchstabe + zeitabhaengige Phase
+            phase = (i * 0.35) + (tick * 0.07)
+            y = mid_y + INT(SIN(phase) * amp)
+
+            ' Regenbogen: drei phasenverschobene Sinus-Wellen fuer R/G/B
+            r = INT(127.0 + SIN(phase) * 127.0)
+            g = INT(127.0 + SIN(phase + 2.094) * 127.0)
+            b = INT(127.0 + SIN(phase + 4.189) * 127.0)
+            IF r < 0 THEN r = 0
+            IF r > 255 THEN r = 255
+            IF g < 0 THEN g = 0
+            IF g > 255 THEN g = 255
+            IF b < 0 THEN b = 0
+            IF b > 255 THEN b = 255
+
+            TEXT(INT(cur_x), y, ch, RGB(r, g, b))
+        END IF
+        cur_x = cur_x + TEXT_WIDTH(ch)
+    NEXT
+
+    ' Untere Info-Zeile - kleine Schrift, kontrastiv
+    TEXT_SIZE(16)
+    TEXT_BOLD(FALSE)
+    TEXT(8, 340, "ESC = Ende", RGB(180, 180, 200))
+    ' Zurueck auf Lauftext-Schrift
+    TEXT_SIZE(64)
+    TEXT_BOLD(TRUE)
+
+    FLIP()
+    SLEEP(16)
+
+    ' Position fortschreiben - links runter; wenn der ganze Text durch ist,
+    ' rechts wieder anhaengen.
+    scroll_x = scroll_x - speed
+    ' Wenn der erste Buchstabe weit genug links rausgewandert ist, neu starten.
+    ' Wir nehmen 60 px pro Buchstabe als grobe Schaetzung statt einer
+    ' Gesamtbreitenrechnung - reicht fuer den optischen Loop.
+    IF scroll_x < -1.0 * LEN(message) * 60.0 THEN
+        scroll_x = 640.0
+    END IF
+    tick = tick + 1
+WEND

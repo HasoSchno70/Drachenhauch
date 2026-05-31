@@ -1,0 +1,92 @@
+' Z-Layers + Sprite-Atlas + Batch-Draw zusammen.
+'
+' Demonstriert das volle "AAA-Pattern":
+' 1. ATLAS_LOAD laedt EIN Bild mit allen Sprites + benannte Rects.
+' 2. LAYER_DEFINE setzt explizite Z-Reihenfolge (bg -> sprites -> ui).
+' 3. BATCH_DRAW queued hunderte Tiles, ein BATCH_FLUSH rendert alle in
+'    EINEM pygame.Surface.blits()-Call -- spuerbar schneller bei vielen
+'    Sprites pro Frame.
+' 4. UI-Layer ist Screen-Space (Camera reset bevor wir reinzeichnen).
+'
+' Tilemap: 30x20 zufaellige Tiles + paar Items oben.
+
+SCREEN(480, 320, "Layers + Atlas Demo")
+
+' --- Assets ---------------------------------------------------------
+DIM atlas AS SPRITE_ATLAS
+atlas = ATLAS_LOAD("assets/tiles_atlas.json")
+
+' --- Layers definieren ----------------------------------------------
+LAYER_DEFINE("bg", 0)
+LAYER_DEFINE("items", 10)
+LAYER_DEFINE("ui", 100)
+
+' --- Tilemap-Daten (random, deterministisch via Seed) ---------------
+RANDOMIZE(42)
+DIM tilemap[30, 20] AS INTEGER  ' "map" ist Keyword
+DIM r AS INTEGER
+DIM c AS INTEGER
+FOR r = 0 TO 19
+    FOR c = 0 TO 29
+        DIM roll AS INTEGER
+        roll = RND(10)
+        IF roll < 7 THEN
+            tilemap[c, r] = 0    ' grass
+        ELSEIF roll < 8 THEN
+            tilemap[c, r] = 1    ' water
+        ELSEIF roll < 9 THEN
+            tilemap[c, r] = 2    ' sand
+        ELSE
+            tilemap[c, r] = 3    ' stone
+        END IF
+    NEXT
+NEXT
+
+DIM tile_names AS ARRAY OF STRING
+DIM tn[4] AS STRING
+tn[0] = "grass"
+tn[1] = "water"
+tn[2] = "sand"
+tn[3] = "stone"
+
+' --- Game-Loop ------------------------------------------------------
+DIM frame AS INTEGER
+DIM cam_x AS INTEGER
+DIM running AS BOOLEAN
+running = TRUE
+FOR frame = 0 TO 600
+    IF NOT running THEN
+        BREAK
+    END IF
+    cam_x = frame * 0 ' kein Scrolling fuer dieses simple Beispiel
+
+    ' BG-Layer: alle Tiles batchen, dann EINMAL flushen.
+    LAYER("bg")
+    FOR r = 0 TO 19
+        FOR c = 0 TO 29
+            BATCH_DRAW(atlas, tn[tilemap[c, r]], c * 16, r * 16)
+        NEXT
+    NEXT
+    BATCH_FLUSH()
+
+    ' Items-Layer: paar dekorative Sprites oben drueber.
+    LAYER("items")
+    BATCH_DRAW(atlas, "coin",  100, 50)
+    BATCH_DRAW(atlas, "coin",  140, 50)
+    BATCH_DRAW(atlas, "coin",  180, 50)
+    BATCH_DRAW(atlas, "heart",  60, 50)
+    BATCH_DRAW(atlas, "star",  240, 50)
+    BATCH_DRAW(atlas, "skull", 380, 50)
+    BATCH_FLUSH()
+
+    ' UI-Layer: HUD-Text. (Wer Camera-Scrolling im Spiel hat, ruft hier
+    ' CAMERA_RESET() vor dem Text -- braucht IMPORT "camera".)
+    LAYER("ui")
+    TEXT(10, 10, "Frame: " + STR$(frame))
+    TEXT(10, 28, "Tiles: 600 batched per frame (1x blits-Call)")
+
+    FLIP()
+    IF KEYPRESSED(KEY_ESCAPE) THEN
+        running = FALSE
+    END IF
+NEXT

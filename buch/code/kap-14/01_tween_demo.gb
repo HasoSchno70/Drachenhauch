@@ -1,0 +1,43 @@
+' Vier Boxen, vier Easings - direkter Vergleich.
+'
+' Alle Boxen bewegen sich von links (x=40) nach rechts (x=280) und wieder
+' zurueck, jede mit einem anderen Easing. Beobachte: linear ist robotisch,
+' out_quad bremst sanft am Ende, out_bounce springt nach, inout_sine ist
+' das natuerlichste fuer die meisten UI-Animationen.
+
+IMPORT "tween"
+
+CONST WIDTH    AS INTEGER = 320
+CONST HEIGHT   AS INTEGER = 240
+CONST BG_COLOR AS INTEGER = &H141E3C
+
+DIM t1 AS TWEEN
+DIM t2 AS TWEEN
+DIM t3 AS TWEEN
+DIM t4 AS TWEEN
+
+t1 = TWEEN_NEW_PINGPONG(40.0, 280.0, 2000, "linear")
+t2 = TWEEN_NEW_PINGPONG(40.0, 280.0, 2000, "out_quad")
+t3 = TWEEN_NEW_PINGPONG(40.0, 280.0, 2000, "out_bounce")
+t4 = TWEEN_NEW_PINGPONG(40.0, 280.0, 2000, "inout_sine")
+
+SCREEN(WIDTH, HEIGHT, "Easing Vergleich", 2)
+
+WHILE NOT QUITREQUESTED()
+    CLS(BG_COLOR)
+
+    BOX(INT(TWEEN_VALUE(t1)) - 8, 30, INT(TWEEN_VALUE(t1)) + 8, 50, &HFFFF00)
+    TEXT(8, 35, "linear", &HFFFFFF)
+
+    BOX(INT(TWEEN_VALUE(t2)) - 8, 80, INT(TWEEN_VALUE(t2)) + 8, 100, &HFFAA00)
+    TEXT(8, 85, "out_quad", &HFFFFFF)
+
+    BOX(INT(TWEEN_VALUE(t3)) - 8, 130, INT(TWEEN_VALUE(t3)) + 8, 150, &HFF6677)
+    TEXT(8, 135, "out_bounce", &HFFFFFF)
+
+    BOX(INT(TWEEN_VALUE(t4)) - 8, 180, INT(TWEEN_VALUE(t4)) + 8, 200, &H33CCFF)
+    TEXT(8, 185, "inout_sine", &HFFFFFF)
+
+    FLIP()
+    SLEEP(16)
+WEND

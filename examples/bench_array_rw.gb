@@ -1,0 +1,12 @@
+' Array-lastig: 1 Mio Read/Write-Operationen auf 1D-INTEGER-Array.
+' Typisches Pattern fuer Pixel-Buffer / Tilemap-Updates.
+DIM buf[10000] AS INTEGER
+DIM i AS INTEGER
+DIM j AS INTEGER
+FOR j = 0 TO 99
+    FOR i = 0 TO 9999
+        buf[i] = buf[i] + i + j
+    NEXT
+NEXT
+PRINT "buf[42] =", buf[42]
+PRINT "buf[9999] =", buf[9999]

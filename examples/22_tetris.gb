@@ -1,0 +1,366 @@
+' Tetris-Klon in GameBasic.
+' Steuerung: Pfeile = bewegen, Hoch = rotate, Runter = soft drop,
+'            Space = hard drop, P = pause, ESC = beenden.
+'
+' Migrationsstand: Edge-Detection laeuft jetzt komplett ueber das
+' input-Modul -- die manuellen `lastLeft/lastRight/lastUp/lastSpace/
+' lastP`-BOOLEANs sind weg. SpawnPiece nutzt WITH fuer den Init-Burst.
+
+IMPORT "input"
+
+CONST FIELD_W AS INTEGER = 10
+CONST FIELD_H AS INTEGER = 20
+CONST CELL    AS INTEGER = 22
+CONST WIDTH   AS INTEGER = 400
+CONST HEIGHT  AS INTEGER = 460
+CONST FIELD_X AS INTEGER = 12
+CONST FIELD_Y AS INTEGER = 12
+
+Screen(WIDTH, HEIGHT, "GameBasic Tetris")
+
+' --- Input-Mapping ---------------------------------------------------
+INPUT_BIND("left",  KEY_LEFT)
+INPUT_BIND("right", KEY_RIGHT)
+INPUT_BIND("rotate", KEY_UP)
+INPUT_BIND("soft",  KEY_DOWN)
+INPUT_BIND("hard",  KEY_SPACE)
+INPUT_BIND("pause", KEY_P)
+INPUT_BIND("quit",  KEY_ESCAPE)
+
+' --- Tetromino-Daten ---------------------------------------------------
+' SHAPES[kind, rotation, cell] - cell ist row*4 + col im 4x4-Grid.
+' 7 Stuecke (I, O, T, S, Z, J, L), je 4 Rotationen, je 16 Zellen.
+DIM SHAPES[7, 4, 16] AS INTEGER
+
+SUB DefShape(kind AS INTEGER, r0 AS STRING, r1 AS STRING, r2 AS STRING, r3 AS STRING)
+    DIM rots AS ARRAY OF STRING
+    rots = SPLIT$(r0 + "|" + r1 + "|" + r2 + "|" + r3, "|")
+    DIM rot AS INTEGER
+    DIM i AS INTEGER
+    FOR rot = 0 TO 3
+        DIM s AS STRING
+        s = rots[rot]
+        FOR i = 0 TO 15
+            IF MID$(s, i, 1) = "1" THEN SHAPES[kind, rot, i] = 1
+        NEXT
+    NEXT
+END SUB
+
+SUB InitShapes()
+    DefShape(0, "0000111100000000", "0010001000100010", "0000000011110000", "0100010001000100")
+    DefShape(1, "0110011000000000", "0110011000000000", "0110011000000000", "0110011000000000")
+    DefShape(2, "0100111000000000", "0100011001000000", "0000111001000000", "0100110001000000")
+    DefShape(3, "0110110000000000", "0100011000100000", "0000011011000000", "1000110001000000")
+    DefShape(4, "1100011000000000", "0010011001000000", "0000110001100000", "0100110010000000")
+    DefShape(5, "1000111000000000", "0110010001000000", "0000111000100000", "0100010011000000")
+    DefShape(6, "0010111000000000", "0100010001100000", "0000111010000000", "1100010001000000")
+END SUB
+
+FUNCTION ShapeCell(kind AS INTEGER, rot AS INTEGER, dx AS INTEGER, dy AS INTEGER) AS INTEGER
+    RETURN SHAPES[kind, rot, dy * 4 + dx]
+END FUNCTION
+
+FUNCTION ColorFor(kind AS INTEGER) AS INTEGER
+    IF kind = 0 THEN RETURN CYAN       ' I
+    IF kind = 1 THEN RETURN YELLOW     ' O
+    IF kind = 2 THEN RETURN MAGENTA    ' T
+    IF kind = 3 THEN RETURN GREEN      ' S
+    IF kind = 4 THEN RETURN RED        ' Z
+    IF kind = 5 THEN RETURN BLUE       ' J
+    RETURN ORANGE                       ' L
+END FUNCTION
+
+' --- Spielzustand ------------------------------------------------------
+
+STRUCT Piece
+    DIM kind AS INTEGER
+    DIM rot  AS INTEGER
+    DIM x    AS INTEGER
+    DIM y    AS INTEGER
+END STRUCT
+
+DIM field[FIELD_H, FIELD_W] AS INTEGER  ' 0=leer, 1..7=Farbindex (=kind+1)
+DIM current AS Piece
+DIM nextKind AS INTEGER
+DIM score AS INTEGER
+DIM lines AS INTEGER
+DIM level AS INTEGER
+DIM gameOver AS BOOLEAN
+
+' --- Logik -------------------------------------------------------------
+
+FUNCTION CanPlace(kind AS INTEGER, col AS INTEGER, row AS INTEGER, rot AS INTEGER) AS BOOLEAN
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = 0 TO 3
+        FOR dx = 0 TO 3
+            IF ShapeCell(kind, rot, dx, dy) = 1 THEN
+                DIM cx AS INTEGER
+                DIM cy AS INTEGER
+                cx = col + dx
+                cy = row + dy
+                IF cx < 0 THEN RETURN FALSE
+                IF cx >= FIELD_W THEN RETURN FALSE
+                IF cy >= FIELD_H THEN RETURN FALSE
+                IF cy >= 0 THEN
+                    IF field[cy, cx] <> 0 THEN RETURN FALSE
+                END IF
+            END IF
+        NEXT
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+SUB LockPiece()
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = 0 TO 3
+        FOR dx = 0 TO 3
+            IF ShapeCell(current.kind, current.rot, dx, dy) = 1 THEN
+                DIM cy AS INTEGER
+                cy = current.y + dy
+                IF cy >= 0 AND cy < FIELD_H THEN
+                    field[cy, current.x + dx] = current.kind + 1
+                END IF
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB ClearLines()
+    DIM cleared AS INTEGER
+    cleared = 0
+    DIM r AS INTEGER
+    DIM c AS INTEGER
+    r = FIELD_H - 1
+    WHILE r >= 0
+        DIM full AS BOOLEAN
+        full = TRUE
+        FOR c = 0 TO FIELD_W - 1
+            IF field[r, c] = 0 THEN full = FALSE
+        NEXT
+        IF full THEN
+            DIM rr AS INTEGER
+            FOR rr = r TO 1 STEP -1
+                FOR c = 0 TO FIELD_W - 1
+                    field[rr, c] = field[rr - 1, c]
+                NEXT
+            NEXT
+            FOR c = 0 TO FIELD_W - 1
+                field[0, c] = 0
+            NEXT
+            cleared = cleared + 1
+        ELSE
+            r = r - 1
+        END IF
+    WEND
+
+    IF cleared = 1 THEN score = score + 100 * level
+    IF cleared = 2 THEN score = score + 300 * level
+    IF cleared = 3 THEN score = score + 500 * level
+    IF cleared >= 4 THEN score = score + 800 * level
+    lines = lines + cleared
+    level = 1 + INT(lines / 10)
+END SUB
+
+SUB SpawnPiece()
+    WITH current
+        .kind = nextKind
+        .rot = 0
+        .x = 3
+        .y = 0
+    END WITH
+    nextKind = RND(7)
+    IF NOT CanPlace(current.kind, current.x, current.y, current.rot) THEN
+        gameOver = TRUE
+    END IF
+END SUB
+
+SUB TryMove(dx AS INTEGER, dy AS INTEGER)
+    IF CanPlace(current.kind, current.x + dx, current.y + dy, current.rot) THEN
+        current.x = current.x + dx
+        current.y = current.y + dy
+    END IF
+END SUB
+
+FUNCTION TryRotate() AS BOOLEAN
+    DIM newRot AS INTEGER
+    newRot = (current.rot + 1) mod 4
+    IF CanPlace(current.kind, current.x, current.y, newRot) THEN
+        current.rot = newRot
+        RETURN TRUE
+    END IF
+    ' Wallkicks: ein Schritt nach links/rechts versuchen
+    IF CanPlace(current.kind, current.x - 1, current.y, newRot) THEN
+        current.x = current.x - 1
+        current.rot = newRot
+        RETURN TRUE
+    END IF
+    IF CanPlace(current.kind, current.x + 1, current.y, newRot) THEN
+        current.x = current.x + 1
+        current.rot = newRot
+        RETURN TRUE
+    END IF
+    RETURN FALSE
+END FUNCTION
+
+SUB SoftDrop()
+    IF CanPlace(current.kind, current.x, current.y + 1, current.rot) THEN
+        current.y = current.y + 1
+    ELSE
+        LockPiece()
+        ClearLines()
+        SpawnPiece()
+    END IF
+END SUB
+
+SUB HardDrop()
+    WHILE CanPlace(current.kind, current.x, current.y + 1, current.rot)
+        current.y = current.y + 1
+        score = score + 2
+    WEND
+    LockPiece()
+    ClearLines()
+    SpawnPiece()
+END SUB
+
+' --- Rendering ---------------------------------------------------------
+
+SUB DrawBlock(col AS INTEGER, row AS INTEGER, color AS INTEGER, ox AS INTEGER, oy AS INTEGER)
+    DIM x1 AS INTEGER
+    DIM y1 AS INTEGER
+    x1 = ox + col * CELL
+    y1 = oy + row * CELL
+    Box(x1 + 1, y1 + 1, x1 + CELL - 2, y1 + CELL - 2, color)
+    ' Hellerer Highlight oben/links
+    Line(x1 + 1, y1 + 1, x1 + CELL - 2, y1 + 1, WHITE)
+    Line(x1 + 1, y1 + 1, x1 + 1, y1 + CELL - 2, WHITE)
+END SUB
+
+SUB DrawField()
+    Cls(RGB(15, 15, 25))
+    Rect(FIELD_X - 2, FIELD_Y - 2, _
+         FIELD_X + FIELD_W * CELL + 1, FIELD_Y + FIELD_H * CELL + 1, GRAY)
+    DIM r AS INTEGER
+    DIM c AS INTEGER
+    FOR r = 0 TO FIELD_H - 1
+        FOR c = 0 TO FIELD_W - 1
+            DIM v AS INTEGER
+            v = field[r, c]
+            IF v <> 0 THEN
+                DrawBlock(c, r, ColorFor(v - 1), FIELD_X, FIELD_Y)
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB DrawCurrent()
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = 0 TO 3
+        FOR dx = 0 TO 3
+            IF ShapeCell(current.kind, current.rot, dx, dy) = 1 THEN
+                IF current.y + dy >= 0 THEN
+                    DrawBlock(current.x + dx, current.y + dy, _
+                              ColorFor(current.kind), FIELD_X, FIELD_Y)
+                END IF
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB DrawNext(x AS INTEGER, y AS INTEGER)
+    Rect(x - 2, y - 2, x + 4 * 16 + 1, y + 4 * 16 + 1, GRAY)
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    FOR dy = 0 TO 3
+        FOR dx = 0 TO 3
+            IF SHAPES[nextKind, 0, dy * 4 + dx] = 1 THEN
+                Box(x + dx * 16 + 1, y + dy * 16 + 1, _
+                    x + dx * 16 + 14, y + dy * 16 + 14, ColorFor(nextKind))
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB DrawSidebar()
+    DIM sx AS INTEGER
+    sx = FIELD_X + FIELD_W * CELL + 18
+    Text(sx, 12,  "TETRIS",       WHITE)
+    Text(sx, 36,  "Score",        LIGHTGRAY)
+    Text(sx, 52,  STR$(score),    YELLOW)
+    Text(sx, 76,  "Level",        LIGHTGRAY)
+    Text(sx, 92,  STR$(level),    YELLOW)
+    Text(sx, 116, "Linien",       LIGHTGRAY)
+    Text(sx, 132, STR$(lines),    YELLOW)
+    Text(sx, 162, "Naechster:",   LIGHTGRAY)
+    DrawNext(sx, 182)
+    Text(sx, 280, "Pfeile: bewegen", GRAY)
+    Text(sx, 296, "Hoch:   drehen",  GRAY)
+    Text(sx, 312, "Unten:  soft",    GRAY)
+    Text(sx, 328, "Space:  hart",    GRAY)
+    Text(sx, 344, "P:      Pause",   GRAY)
+    Text(sx, 360, "ESC:    quit",    GRAY)
+END SUB
+
+' --- Hauptschleife -----------------------------------------------------
+
+InitShapes()
+RANDOMIZE(MILLIS())
+nextKind = RND(7)
+level = 1
+SpawnPiece()
+
+DIM frame AS INTEGER
+DIM dropCounter AS INTEGER
+DIM paused AS BOOLEAN
+
+WHILE NOT QuitRequested() AND NOT INPUT_HELD("quit")
+    INPUT_UPDATE()
+
+    ' Pause umschalten beim ersten Druecken (Edge).
+    IF INPUT_PRESSED("pause") THEN paused = NOT paused
+
+    IF NOT gameOver AND NOT paused THEN
+        ' Edge-getriggert: einmal pro Tastendruck.
+        IF INPUT_PRESSED("left")   THEN TryMove(-1, 0)
+        IF INPUT_PRESSED("right")  THEN TryMove(1, 0)
+        IF INPUT_PRESSED("rotate") THEN TryRotate()
+        IF INPUT_PRESSED("hard")   THEN HardDrop()
+
+        ' Auto-Repeat fuer links/rechts wenn weiter gehalten
+        IF INPUT_HELD("left")  AND (frame mod 5) = 0 THEN TryMove(-1, 0)
+        IF INPUT_HELD("right") AND (frame mod 5) = 0 THEN TryMove(1, 0)
+
+        ' Soft-Drop wenn unten gehalten
+        IF INPUT_HELD("soft") AND (frame mod 2) = 0 THEN
+            SoftDrop()
+            score = score + 1
+        END IF
+
+        ' Auto-Drop, Geschwindigkeit waechst mit Level
+        DIM dropEvery AS INTEGER
+        dropEvery = MAX(60 - (level - 1) * 5, 6)
+        dropCounter = dropCounter + 1
+        IF dropCounter >= dropEvery THEN
+            dropCounter = 0
+            SoftDrop()
+        END IF
+    END IF
+
+    DrawField()
+    DrawCurrent()
+    DrawSidebar()
+
+    IF paused AND NOT gameOver THEN
+        Text(FIELD_X + 60, FIELD_Y + 200, "PAUSE", YELLOW)
+    END IF
+    IF gameOver THEN
+        Text(FIELD_X + 36, FIELD_Y + 180, "GAME OVER", RED)
+        Text(FIELD_X + 30, FIELD_Y + 210, "Score: " + STR$(score), WHITE)
+        Text(FIELD_X + 14, FIELD_Y + 240, "ESC zum Beenden", GRAY)
+    END IF
+
+    Flip()
+    frame = frame + 1
+WEND

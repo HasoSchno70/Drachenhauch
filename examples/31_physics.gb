@@ -1,0 +1,110 @@
+' Physics-Demo: ein Ball, der durch eine Box-Welt huepft.
+' Demonstriert: BOX_CIRCLE-Collision, REFLECT, RAY_BOX (Geschoss-Trajektorie).
+IMPORT "physics"
+
+SCREEN(640, 480, "Physics-Demo", 1)
+
+' Ball-Zustand
+DIM bx AS FLOAT
+DIM by AS FLOAT
+DIM bvx AS FLOAT
+DIM bvy AS FLOAT
+DIM br AS INTEGER
+bx = 100.0
+by = 100.0
+bvx = 200.0
+bvy = 150.0
+br = 12
+
+' Hindernis-Box
+DIM ox AS INTEGER
+DIM oy AS INTEGER
+DIM ow AS INTEGER
+DIM oh AS INTEGER
+ox = 280
+oy = 200
+ow = 80
+oh = 80
+
+DIM dt AS FLOAT
+dt = 0.016
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    ' Bewegung
+    bx = bx + bvx * dt
+    by = by + bvy * dt
+
+    ' Wand-Collision: Reflektion an Bildschirm-Raendern
+    IF bx - br < 0 THEN
+        bx = br
+        bvx = -bvx
+    END IF
+    IF bx + br > 640 THEN
+        bx = 640 - br
+        bvx = -bvx
+    END IF
+    IF by - br < 0 THEN
+        by = br
+        bvy = -bvy
+    END IF
+    IF by + br > 480 THEN
+        by = 480 - br
+        bvy = -bvy
+    END IF
+
+    ' Hindernis-Collision: BOX_CIRCLE -> Reflektion
+    IF PHYSICS_BOX_CIRCLE(ox, oy, ow, oh, bx, by, br) THEN
+        ' Closest-Point-Vektor zur Bestimmung der Normale
+        DIM nx AS FLOAT
+        DIM ny AS FLOAT
+        nx = bx - CLAMP(bx, ox, ox + ow)
+        ny = by - CLAMP(by, oy, oy + oh)
+        DIM newvx AS FLOAT
+        DIM newvy AS FLOAT
+        newvx = PHYSICS_REFLECT_X(bvx, bvy, nx, ny)
+        newvy = PHYSICS_REFLECT_Y(bvx, bvy, nx, ny)
+        bvx = newvx
+        bvy = newvy
+        ' Aus der Box pushen
+        bx = bx + PHYSICS_NORM_X(nx, ny) * 2
+        by = by + PHYSICS_NORM_Y(nx, ny) * 2
+    END IF
+
+    ' Zeichnen
+    CLS()
+
+    ' Hindernis
+    BOX(ox, oy, ox + ow - 1, oy + oh - 1, RGB(60, 60, 80))
+
+    ' Ray vom Ball zur Maus, Treffer auf der Box anzeigen
+    DIM mx AS INTEGER
+    DIM my AS INTEGER
+    mx = MOUSEX()
+    my = MOUSEY()
+    DIM rdx AS FLOAT
+    DIM rdy AS FLOAT
+    rdx = mx - bx
+    rdy = my - by
+    LINE(bx, by, mx, my, RGB(80, 80, 80))
+    DIM t AS FLOAT
+    t = PHYSICS_RAY_BOX(bx, by, rdx, rdy, ox, oy, ow, oh)
+    IF t >= 0.0 THEN
+        DIM hx AS FLOAT
+        DIM hy AS FLOAT
+        hx = bx + rdx * t
+        hy = by + rdy * t
+        CIRCLE(hx, hy, 4, RGB(255, 100, 100))
+        TEXT(8, 8, "Ray-Treffer auf Hindernis", WHITE)
+    ELSE
+        TEXT(8, 8, "Ray verfehlt das Hindernis", RGB(180, 180, 180))
+    END IF
+
+    ' Ball
+    CIRCLE(bx, by, br, RGB(80, 200, 255))
+
+    TEXT(8, 460, "ESC = Ende. Bewege die Maus, um den Ray zu sehen.", WHITE)
+    FLIP()
+    SLEEP(16)
+WEND

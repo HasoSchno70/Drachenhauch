@@ -1,0 +1,34 @@
+' ECS-Movement-Bench v2: Bulk-System-API.
+' Identische Semantik zu bench_ecs_movement.gb, aber statt eines BASIC-
+' Loops mit pro-Entity ECS_GET/ADD-Calls nutzt diese Variante das neue
+' ECS_INTEGRATE_FLOAT-Builtin -- ein C-Call pro System-Tick statt
+' 6*N Builtin-Calls.
+'
+' Erwartet: gleiche Ausgabe wie v1.
+
+IMPORT "ecs"
+RANDOMIZE(42)
+
+DIM world AS ECS_WORLD
+world = ECS_NEW_WORLD()
+
+' 500 Entities mit Pos+Vel anlegen
+DIM i AS INTEGER
+FOR i = 1 TO 500
+    DIM e AS INTEGER
+    e = ECS_NEW_ENTITY(world)
+    ECS_ADD_FLOAT(world, e, "px", RND(320) + 0.0)
+    ECS_ADD_FLOAT(world, e, "py", RND(240) + 0.0)
+    ECS_ADD_FLOAT(world, e, "vx", (RND(20) - 10) / 10.0)
+    ECS_ADD_FLOAT(world, e, "vy", (RND(20) - 10) / 10.0)
+NEXT
+
+' 100 Frames Movement-System -- jetzt zwei Builtin-Calls pro Frame
+' statt N*6 Calls. Der Inner-Loop laeuft in einer cdef-Funktion.
+DIM frame AS INTEGER
+FOR frame = 1 TO 100
+    ECS_INTEGRATE_FLOAT(world, "px", "vx")
+    ECS_INTEGRATE_FLOAT(world, "py", "vy")
+NEXT
+
+PRINT "Entities:", ECS_COUNT(world)

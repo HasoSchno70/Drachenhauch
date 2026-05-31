@@ -1,0 +1,14 @@
+' Score-zu-Rang-Bewertung mit IF/ELSEIF/ELSE.
+
+DIM score AS INTEGER
+score = 1500
+
+IF score < 100 THEN
+    PRINT "Rang: Anfaenger"
+ELSEIF score < 1000 THEN
+    PRINT "Rang: Solide"
+ELSEIF score < 5000 THEN
+    PRINT "Rang: Profi"
+ELSE
+    PRINT "Rang: Ass"
+END IF

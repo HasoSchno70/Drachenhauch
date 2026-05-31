@@ -1,0 +1,47 @@
+' Star Pilot - Spielsituationen mit SELECT CASE bewerten.
+'
+' Demonstriert alle drei CASE-Formen: einzelner Wert, Liste, Bereich, Vergleich.
+
+DIM score AS INTEGER
+DIM lives AS INTEGER
+DIM wave  AS INTEGER
+
+score = 2400
+lives = 2
+wave  = 3
+
+' Schwierigkeit nach Welle
+SELECT CASE wave
+    CASE 1
+        PRINT "Welle 1: Aufwaermen"
+    CASE 2, 3
+        PRINT "Welle 2-3: Schwung kommt rein"
+    CASE 4 TO 9
+        PRINT "Welle 4-9: jetzt wird's ernst"
+    CASE IS >= 10
+        PRINT "Welle 10+: Endlos-Modus"
+END SELECT
+
+' Bewertung des aktuellen Score
+PRINT ""
+SELECT CASE score
+    CASE 0
+        PRINT "Score: leer"
+    CASE 1 TO 999
+        PRINT f"Score: bescheiden ({score})"
+    CASE 1000 TO 4999
+        PRINT f"Score: solide ({score})"
+    CASE IS >= 5000
+        PRINT f"Score: stark ({score})"
+END SELECT
+
+' Lebensanzeige
+PRINT ""
+SELECT CASE lives
+    CASE 0
+        PRINT "Game Over"
+    CASE 1
+        PRINT "Letztes Leben - Vorsicht!"
+    CASE ELSE
+        PRINT f"Leben: {lives}"
+END SELECT

@@ -1,0 +1,78 @@
+' Sprites: Bild laden, ueber Pfeiltasten bewegen, Coins einsammeln
+' Beenden: ESC oder Fenster-X.
+
+CONST WIDTH AS INTEGER = 1024
+CONST HEIGHT AS INTEGER = 768
+CONST SPEED AS INTEGER = 2
+CONST COIN_COUNT AS INTEGER = 6
+
+Screen(WIDTH, HEIGHT, "GameBasic - Sprite-Demo")
+
+DIM hero AS IMAGE
+DIM coinImg AS IMAGE
+hero = LoadImage("assets/hero.png")
+coinImg = LoadImage("assets/coin.png")
+
+DIM heroX AS INTEGER
+DIM heroY AS INTEGER
+heroX = 152
+heroY = 112
+
+' Coin-Positionen als Arrays
+DIM coinX[COIN_COUNT] AS INTEGER
+DIM coinY[COIN_COUNT] AS INTEGER
+DIM coinAlive[COIN_COUNT] AS BOOLEAN
+
+DIM i AS INTEGER
+FOR i = 0 TO COIN_COUNT - 1
+    coinX[i] = 16 + RND(WIDTH - 32)
+    coinY[i] = 16 + RND(HEIGHT - 32)
+    coinAlive[i] = TRUE
+NEXT
+
+DIM score AS INTEGER
+DIM running AS BOOLEAN
+running = TRUE
+score = 0
+
+WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
+    ' Eingabe
+    IF KeyPressed(KEY_LEFT)  THEN heroX = heroX - SPEED
+    IF KeyPressed(KEY_RIGHT) THEN heroX = heroX + SPEED
+    IF KeyPressed(KEY_UP)    THEN heroY = heroY - SPEED
+    IF KeyPressed(KEY_DOWN)  THEN heroY = heroY + SPEED
+
+    ' Begrenzung
+    IF heroX < 0 THEN heroX = 0
+    IF heroY < 0 THEN heroY = 0
+    IF heroX > WIDTH - ImageWidth(hero) THEN heroX = WIDTH - ImageWidth(hero)
+    IF heroY > HEIGHT - ImageHeight(hero) THEN heroY = HEIGHT - ImageHeight(hero)
+
+    ' Coin-Aufsammlung (mit BREAK nach Treffer)
+    FOR i = 0 TO COIN_COUNT - 1
+        IF NOT coinAlive[i] THEN CONTINUE
+        IF ABS(heroX + 8 - coinX[i] - 4) < 8 AND ABS(heroY + 8 - coinY[i] - 4) < 8 THEN
+            coinAlive[i] = FALSE
+            score = score + 1
+        END IF
+    NEXT
+
+    ' Zeichnen
+    Cls(RGB(20, 24, 40))
+    FOR i = 0 TO COIN_COUNT - 1
+        IF coinAlive[i] THEN DrawImage(coinImg, coinX[i], coinY[i])
+    NEXT
+    DrawImage(hero, heroX, heroY)
+    Text(8, 8, "Punkte: " + STR$(score), WHITE)
+    Text(8, 24, "Pfeile: bewegen, ESC: Ende", LIGHTGRAY)
+
+    ' Wenn alle Coins gesammelt -> ende
+    IF score >= COIN_COUNT THEN
+        Text(110, 110, "ALLE GESAMMELT!", YELLOW)
+        Flip()
+        Sleep(1500)
+        running = FALSE
+    ELSE
+        Flip()
+    END IF
+WEND

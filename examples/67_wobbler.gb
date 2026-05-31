@@ -1,0 +1,130 @@
+' === GameBasic Logo-Wobbler ===
+'
+' Klassischer Amiga-Demoszene-Effekt: das Logo wird zeilenweise
+' horizontal verschoben, mit Sinus-Wellen pro Zeile. Plus Sternenfeld
+' und Farb-Cycle-Streifen im Hintergrund.
+'
+' Steuerung: ESC = Ende
+'
+IMPORT "imgfx"
+
+CONST WIDTH  AS INTEGER = 320
+CONST HEIGHT AS INTEGER = 200
+
+SCREEN(WIDTH, HEIGHT, "GameBasic Wobbler", 3)
+RANDOMIZE(7)
+
+' --- Music (CC0 Chiptune von Juhani Junkala, optional) ---------------
+DIM MUSIC_PATH AS STRING
+MUSIC_PATH = "assets/amiga_title.ogg"
+IF FILEEXISTS(MUSIC_PATH) THEN
+    PLAYMUSIC(MUSIC_PATH, -1, 0.55)
+END IF
+
+' --- Logo laden + auf 200px Breite skalieren --------------------------
+DIM raw AS IMAGE
+raw = LOADIMAGE("assets/logo.png")
+DIM rw AS INTEGER
+DIM rh AS INTEGER
+rw = IMAGEWIDTH(raw)
+rh = IMAGEHEIGHT(raw)
+CONST LOGO_W AS INTEGER = 220
+DIM logo AS IMAGE
+logo = IMAGE_SCALE(raw, LOGO_W, INT(LOGO_W * rh / rw))
+DIM lw AS INTEGER
+DIM lh AS INTEGER
+lw = IMAGEWIDTH(logo)
+lh = IMAGEHEIGHT(logo)
+
+' --- Sternenfeld -- Z-walking dots fuer Tiefen-Eindruck ---------------
+CONST NUM_STARS AS INTEGER = 60
+DIM sx[NUM_STARS] AS FLOAT
+DIM sy[NUM_STARS] AS FLOAT
+DIM sz[NUM_STARS] AS FLOAT
+DIM ss[NUM_STARS] AS INTEGER         ' brightness 0..255
+
+DIM i AS INTEGER
+FOR i = 0 TO NUM_STARS - 1
+    sx[i] = (RND(WIDTH * 2) - WIDTH) * 1.0
+    sy[i] = (RND(HEIGHT * 2) - HEIGHT) * 1.0
+    sz[i] = RND(100) / 100.0 + 0.1
+    ss[i] = 100 + RND(155)
+NEXT
+
+' --- Haupt-Schleife ---------------------------------------------------
+DIM t AS FLOAT
+t = 0.0
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+cx = WIDTH / 2
+cy = HEIGHT / 2
+DIM y AS INTEGER
+DIM offset AS INTEGER
+DIM amp AS FLOAT
+DIM freq AS FLOAT
+DIM speed AS FLOAT
+freq = 0.18
+speed = 0.07
+DIM bar_y AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+    CLS(RGB(8, 14, 26))
+
+    ' --- Stars: nach vorn fliegen, am Rand respawnen ------------------
+    FOR i = 0 TO NUM_STARS - 1
+        sz[i] = sz[i] - 0.012
+        IF sz[i] < 0.05 THEN
+            sx[i] = (RND(WIDTH * 2) - WIDTH) * 1.0
+            sy[i] = (RND(HEIGHT * 2) - HEIGHT) * 1.0
+            sz[i] = 1.0
+            ss[i] = 100 + RND(155)
+        END IF
+        DIM px AS INTEGER
+        DIM py AS INTEGER
+        px = INT(cx + sx[i] / sz[i])
+        py = INT(cy + sy[i] / sz[i])
+        IF px >= 0 AND px < WIDTH AND py >= 0 AND py < HEIGHT THEN
+            DIM b AS INTEGER
+            b = INT(ss[i] * (1.0 - sz[i]))
+            IF b < 30 THEN b = 30
+            IF b > 255 THEN b = 255
+            PLOT(px, py, RGB(b, b, b))
+        END IF
+    NEXT
+
+    ' --- Copper-Bars: Farbgradienten oben und unten -------------------
+    FOR i = 0 TO 5
+        bar_y = INT(20 + SIN(t * 1.4 + i * 0.7) * 8) + i * 4
+        DIM hue AS FLOAT
+        DIM r AS INTEGER
+        DIM g AS INTEGER
+        DIM b2 AS INTEGER
+        hue = t * 0.3 + i * 0.4
+        r = INT(127 + SIN(hue) * 127)
+        g = INT(127 + SIN(hue + 2.094) * 127)
+        b2 = INT(127 + SIN(hue + 4.188) * 127)
+        BOX(0, bar_y, WIDTH - 1, bar_y + 1, RGB(r, g, b2))
+    NEXT
+
+    ' --- Logo zeilenweise mit Sinus-Wobble ----------------------------
+    amp = 18 + SIN(t * 0.3) * 8
+    DIM lx AS INTEGER
+    DIM ly AS INTEGER
+    lx = cx - lw / 2
+    ly = cy - lh / 2
+    FOR y = 0 TO lh - 1
+        offset = INT(SIN(t + y * freq) * amp)
+        DRAWIMAGEPART(logo, 0, y, lw, 1, lx + offset, ly + y)
+    NEXT
+
+    ' --- Footer-Bar mit dezentem Pulse --------------------------------
+    DIM pulse AS INTEGER
+    pulse = INT(80 + SIN(t * 2.0) * 60)
+    BOX(0, HEIGHT - 8, WIDTH - 1, HEIGHT - 5, RGB(0, pulse, pulse))
+    TEXT(8, HEIGHT - 18, "ESC = Ende", RGB(160, 220, 230))
+
+    FLIP()
+    SLEEP(16)
+    t = t + speed
+WEND

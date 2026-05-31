@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gamebasic"
+version = "0.1.0"
+description = "GameBasic - eine BASIC-artige Sprache fuer die Spieleentwicklung"
+requires-python = ">=3.10"
+authors = [{ name = "Hans" }]
+readme = { text = "GameBasic - BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, fuer Spiele.", content-type = "text/plain" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Interpreters",
+]
+dependencies = []
+
+[project.optional-dependencies]
+graphics = ["pygame>=2.5"]
+dev = ["pytest>=7"]
+# Hardware-Module (jeweils separat installierbar via `pip install gamebasic[serial]`)
+serial = ["pyserial>=3.5"]
+usb = ["hidapi>=0.14"]
+bt = ["bleak>=0.21"]
+# wifi: braucht keine externe Lib (nutzt Windows netsh)
+hw = [
+    "pyserial>=3.5",
+    "hidapi>=0.14",
+    "bleak>=0.21",
+]
+
+[project.scripts]
+gbrun = "gamebasic.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["gamebasic*"]
+exclude = ["tests*", "examples*"]

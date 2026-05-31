@@ -1,0 +1,49 @@
+' JSON-Modul Demo. IMPORT "json" laedt das Built-in-Modul gleichen Namens
+' (siehe gamebasic/modules/json.py).
+IMPORT "json"
+
+DIM doc AS STRING
+doc = "{""user"":{""name"":""Anna"",""alter"":30,""aktiv"":true},""hobbies"":[""Lesen"",""Code"",""Wandern""],""score"":98.5}"
+
+DIM j AS JSON_HANDLE
+j = JSON_PARSE(doc)
+
+PRINT "=== Felder lesen ==="
+PRINT "Name:    ", JSON_GET_STRING(j, "user.name")
+PRINT "Alter:   ", JSON_GET_INT(j, "user.alter")
+PRINT "Aktiv:   ", JSON_GET_BOOL(j, "user.aktiv")
+PRINT "Score:   ", JSON_GET_FLOAT(j, "score")
+
+PRINT ""
+PRINT "=== Arrays ==="
+PRINT "Anzahl Hobbies: ", JSON_LEN(j, "hobbies")
+DIM i AS INTEGER
+FOR i = 0 TO JSON_LEN(j, "hobbies") - 1
+    PRINT "  Hobby ", i, ": ", JSON_GET_STRING(j, "hobbies." + STR$(i))
+NEXT
+
+PRINT ""
+PRINT "=== Existenz und Typen ==="
+PRINT "user.name existiert:    ", JSON_HAS(j, "user.name")
+PRINT "user.email existiert:   ", JSON_HAS(j, "user.email")
+PRINT "Typ von user.alter:     ", JSON_TYPE(j, "user.alter")
+PRINT "Typ von user.aktiv:     ", JSON_TYPE(j, "user.aktiv")
+PRINT "Typ von hobbies:        ", JSON_TYPE(j, "hobbies")
+PRINT "Typ von hobbies.0:      ", JSON_TYPE(j, "hobbies.0")
+
+PRINT ""
+PRINT "=== Kompakter Roundtrip ==="
+PRINT JSON_STRINGIFY(j)
+
+PRINT ""
+PRINT "=== Pretty-Print ==="
+PRINT JSON_PRETTY(j)
+
+PRINT ""
+PRINT "=== Fehlerfall ==="
+TRY
+    DIM x AS INTEGER
+    x = JSON_GET_INT(j, "user.name")     ' name ist STRING, nicht INT
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY

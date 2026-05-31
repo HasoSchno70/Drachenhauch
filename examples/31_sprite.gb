@@ -1,0 +1,70 @@
+' Sprite-Modul: Logik-Test ohne SCREEN. LOADIMAGE initialisiert Pygame
+' selbst, FLIP/SPRITE_DRAW werden nicht aufgerufen.
+IMPORT "sprite"
+
+DIM sheet AS IMAGE
+sheet = LOADIMAGE("assets/hero_walk.png")
+PRINT "Sheet:    ", IMAGEWIDTH(sheet), "x", IMAGEHEIGHT(sheet), " (4 Frames a 16x16)"
+
+DIM hero AS SPRITE
+hero = SPRITE_NEW(sheet, 16, 16)
+
+PRINT "Sprite-Groesse:", SPRITE_GET_WIDTH(hero), "x", SPRITE_GET_HEIGHT(hero)
+
+PRINT ""
+PRINT "=== Animationen registrieren ==="
+SPRITE_ADD_ANIM(hero, "idle", 0, 0, 1.0)
+SPRITE_ADD_ANIM(hero, "walk", 0, 3, 8.0)
+SPRITE_ADD_ANIM(hero, "punch", 0, 3, 12.0)
+
+PRINT ""
+PRINT "=== Looping (walk @ 8 fps) ==="
+SPRITE_PLAY(hero, "walk")
+PRINT "  current_anim: ", SPRITE_CURRENT_ANIM(hero)
+
+' Bei 8 fps ist 1 Frame = 125ms. Nach 0/125/250/375/500/625/750ms:
+DIM tick AS INTEGER
+DIM total AS INTEGER
+total = 0
+PRINT "  bei   0ms: frame =", SPRITE_GET_FRAME(hero)
+FOR tick = 1 TO 6
+    SPRITE_UPDATE(hero, 125)
+    total = total + 125
+    PRINT "  bei ", PADL$(STR$(total), 3), "ms: frame =", SPRITE_GET_FRAME(hero)
+NEXT
+
+PRINT ""
+PRINT "=== Once-Mode (punch @ 12 fps) ==="
+SPRITE_PLAY_ONCE(hero, "punch")
+PRINT "  finished?", SPRITE_IS_FINISHED(hero), " (am Anfang FALSE)"
+
+' Bei 12 fps: ~83ms pro Frame, 4 Frames = 333ms. Nach 400ms sollte fertig sein.
+SPRITE_UPDATE(hero, 400)
+PRINT "  Nach 400ms: frame =", SPRITE_GET_FRAME(hero), "  finished?", SPRITE_IS_FINISHED(hero)
+SPRITE_UPDATE(hero, 200)   ' weiter laufen - Frame bleibt stehen
+PRINT "  Nach 200ms mehr: frame =", SPRITE_GET_FRAME(hero), "  finished?", SPRITE_IS_FINISHED(hero)
+
+PRINT ""
+PRINT "=== Position & Velocity ==="
+SPRITE_SET_POS(hero, 0.0, 0.0)
+SPRITE_SET_VELOCITY(hero, 100.0, -50.0)   ' 100 px/s nach rechts, 50 nach oben
+SPRITE_UPDATE(hero, 1000)                 ' 1 Sekunde
+PRINT "  Nach 1s: x =", SPRITE_GET_X(hero), "  y =", SPRITE_GET_Y(hero)
+
+PRINT ""
+PRINT "=== Kollision (AABB) ==="
+DIM h2 AS SPRITE
+h2 = SPRITE_NEW(sheet, 16, 16)
+SPRITE_SET_POS(h2, 90.0, -60.0)            ' ueberlappt mit (100, -50)
+PRINT "  hero @ (100,-50) 16x16, h2 @ (90,-60) 16x16: collides?", SPRITE_COLLIDES(hero, h2)
+
+SPRITE_SET_POS(h2, 200.0, 0.0)
+PRINT "  h2 @ (200, 0): collides?", SPRITE_COLLIDES(hero, h2)
+
+PRINT ""
+PRINT "=== Fehlerfall: unbekannte Animation ==="
+TRY
+    SPRITE_PLAY(hero, "fly")
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY

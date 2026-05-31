@@ -1,0 +1,81 @@
+' UI-Modul: erweiterte Komponenten
+' UI_PANEL, UI_PROGRESS, UI_TEXTFIELD, UI_RADIO im Zusammenspiel.
+'
+' Steuerung: Maus zum Klicken, Tippen ins Textfeld nach Klick rein,
+' Backspace loescht. ESC = Ende.
+
+IMPORT "ui"
+
+SCREEN(480, 360, "UI Erweitert", 2)
+
+' Spieler-Stats die wir in der HUD anzeigen
+DIM hp AS INTEGER
+DIM mana AS INTEGER
+DIM xp AS INTEGER
+hp = 75
+mana = 40
+xp = 230
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN
+        BREAK
+    END IF
+    CLS(RGB(20, 25, 45))
+
+    ' --- Linke Seite: HUD im Panel ---------------------------------
+    UI_PANEL(10, 10, 200, 130, "Held")
+    UI_LABEL(20, 35, "HP", RGB(220, 100, 100))
+    UI_PROGRESS(50, 36, 150, 12, hp, 100, RGB(220, 60, 60), RGB(60, 30, 30))
+    UI_LABEL(20, 55, "MP", RGB(120, 160, 240))
+    UI_PROGRESS(50, 56, 150, 12, mana, 100, RGB(80, 130, 240), RGB(30, 40, 80))
+    UI_LABEL(20, 75, "XP", RGB(220, 200, 80))
+    UI_PROGRESS(50, 76, 150, 12, xp, 500, RGB(220, 200, 80), RGB(70, 60, 30))
+
+    ' Buttons zum Aendern der Werte
+    IF UI_BUTTON("dmg", 20, 100, 80, 26, "Schaden") THEN
+        hp = hp - 10
+        IF hp < 0 THEN hp = 0
+    END IF
+    IF UI_BUTTON("heal", 110, 100, 80, 26, "Heilen") THEN
+        hp = hp + 15
+        IF hp > 100 THEN hp = 100
+    END IF
+
+    ' --- Rechte Seite: Settings im Panel ---------------------------
+    UI_PANEL(230, 10, 240, 200, "Einstellungen")
+
+    ' Text-Eingabe fuer Spielername
+    UI_LABEL(240, 35, "Name:")
+    DIM name AS STRING
+    name = UI_TEXTFIELD("name", 240, 52, 220, 26, "Hier tippen ...")
+
+    ' Radio: Schwierigkeit
+    UI_LABEL(240, 90, "Schwierigkeit:")
+    DIM diff_options AS ARRAY OF STRING
+    diff_options = SPLIT$("Leicht|Mittel|Schwer", "|")
+    DIM diff AS INTEGER
+    diff = UI_RADIO("diff", 240, 110, diff_options, 1)
+
+    ' Slider: Lautstaerke
+    UI_LABEL(240, 175, "Lautstaerke:")
+    DIM vol AS FLOAT
+    vol = UI_SLIDER("vol", 240, 192, 220, 0.0, 1.0, 0.5)
+
+    ' --- Footer-Anzeige der gewaehlten Werte ----------------------
+    UI_PANEL(10, 220, 460, 130, "Status")
+    UI_LABEL(20, 245, "Name: " + name, RGB(220, 220, 240))
+    UI_LABEL(20, 263, "Schwierigkeit: " + diff_options[diff], RGB(220, 220, 240))
+
+    DIM vol_pct AS INTEGER
+    vol_pct = INT(vol * 100)
+    UI_LABEL(20, 281, "Volume: " + STR$(vol_pct) + "%", RGB(220, 220, 240))
+
+    DIM stats AS STRING
+    stats = "HP " + STR$(hp) + "/100   MP " + STR$(mana) + "/100   XP " + STR$(xp) + "/500"
+    UI_LABEL(20, 305, stats, RGB(180, 200, 200))
+    UI_LABEL(20, 325, "ESC = Ende  |  Klick ins Textfeld + tippen", RGB(140, 150, 170))
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

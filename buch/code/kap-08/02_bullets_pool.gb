@@ -1,0 +1,64 @@
+' Bullet-Pool ohne Bild - die Mechanik in der Konsole simuliert.
+'
+' Drei parallele Arrays: bullets_x, bullets_y, bullets_alive. Index i in
+' allen Arrays gehoert zum selben Bullet. So speichern wir Position UND
+' Lebensstatus pro Bullet, ohne Klassen zu brauchen (die kommen in Kap 9).
+
+CONST POOL_SIZE AS INTEGER = 5
+
+DIM bullets_x[POOL_SIZE]      AS INTEGER
+DIM bullets_y[POOL_SIZE]      AS INTEGER
+DIM bullets_alive[POOL_SIZE]  AS BOOLEAN
+
+' Pool initial: alle tot
+DIM i AS INTEGER
+FOR i = 0 TO POOL_SIZE - 1
+    bullets_alive[i] = FALSE
+NEXT i
+
+' Spawn: ersten freien Slot finden, befuellen
+SUB Spawn(x AS INTEGER, y AS INTEGER)
+    DIM j AS INTEGER
+    FOR j = 0 TO POOL_SIZE - 1
+        IF NOT bullets_alive[j] THEN
+            bullets_x[j] = x
+            bullets_y[j] = y
+            bullets_alive[j] = TRUE
+            PRINT f"  Spawn slot {j} bei ({x},{y})"
+            RETURN
+        END IF
+    NEXT j
+    PRINT "  Pool voll - kein Spawn"
+END SUB
+
+SUB ShowPool()
+    DIM j AS INTEGER
+    FOR j = 0 TO POOL_SIZE - 1
+        IF bullets_alive[j] THEN
+            PRINT f"  [{j}] alive: ({bullets_x[j]}, {bullets_y[j]})"
+        ELSE
+            PRINT f"  [{j}] frei"
+        END IF
+    NEXT j
+END SUB
+
+PRINT "Spawne 3 Bullets:"
+Spawn(100, 200)
+Spawn(110, 200)
+Spawn(120, 200)
+
+PRINT ""
+PRINT "Pool-Status:"
+ShowPool()
+
+PRINT ""
+PRINT "Bullet 1 stirbt (z.B. weil aus dem Bild gefolgen):"
+bullets_alive[1] = FALSE
+
+PRINT ""
+PRINT "Spawne nochmal - sollte Slot 1 wiederbenutzen:"
+Spawn(150, 200)
+
+PRINT ""
+PRINT "Pool-Status danach:"
+ShowPool()

@@ -1,0 +1,53 @@
+' String-Funktionen: LEFT$, RIGHT$, MID$, INSTR, SPLIT$, JOIN$, REPLACE$, TRIM$
+' Indizes sind 0-basiert (wie Arrays).
+
+DIM s AS STRING
+s = "GameBasic ist toll"
+PRINT "Original: '" + s + "'"
+PRINT "LEN     :", LEN(s)
+PRINT "LEFT$ 4 :", LEFT$(s, 4)
+PRINT "RIGHT$ 4:", RIGHT$(s, 4)
+PRINT "MID$(10, 3):", MID$(s, 10, 3)
+PRINT "MID$ ab 10 :", MID$(s, 10)
+PRINT "UPPER$  :", UPPER$(s)
+PRINT "LOWER$  :", LOWER$(s)
+
+PRINT ""
+PRINT "INSTR-Suche (0-basiert, -1 wenn nicht gefunden):"
+PRINT "  'Basic'  ->", INSTR(s, "Basic")
+PRINT "  'xyz'    ->", INSTR(s, "xyz")
+
+PRINT ""
+PRINT "REPLACE$:", REPLACE$(s, "toll", "klasse")
+
+PRINT ""
+PRINT "TRIM$:"
+DIM t AS STRING
+t = "   viel Whitespace   "
+PRINT "  '" + t + "'"
+PRINT "  '" + TRIM$(t) + "'"
+
+PRINT ""
+PRINT "SPLIT$ + JOIN$:"
+DIM parts AS ARRAY OF STRING
+parts = SPLIT$("Anna,Bert,Cilly,Dora", ",")
+PRINT "  Anzahl Teile:", LEN(parts)
+DIM i AS INTEGER
+FOR i = 0 TO LEN(parts) - 1
+    PRINT "  parts[", i, "] = '", parts[i], "'"
+NEXT
+PRINT "  Wieder zusammen:", JOIN$(parts, " | ")
+
+PRINT ""
+PRINT "Eigene Funktion - Reverse:"
+FUNCTION Reverse$(s AS STRING) AS STRING
+    DIM out AS STRING
+    DIM j AS INTEGER
+    out = ""
+    FOR j = LEN(s) - 1 TO 0 STEP -1
+        out = out + MID$(s, j, 1)
+    NEXT
+    RETURN out
+END FUNCTION
+
+PRINT "  Reverse$('Hallo') =", Reverse$("Hallo")

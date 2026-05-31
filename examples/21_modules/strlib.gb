@@ -1,0 +1,16 @@
+' String-Helfer
+
+FUNCTION Reverse$(s AS STRING) AS STRING
+    DIM out AS STRING
+    DIM i AS INTEGER
+    out = ""
+    FOR i = LEN(s) - 1 TO 0 STEP -1
+        out = out + MID$(s, i, 1)
+    NEXT
+    RETURN out
+END FUNCTION
+
+FUNCTION StartsWith(s AS STRING, prefix AS STRING) AS BOOLEAN
+    IF LEN(s) < LEN(prefix) THEN RETURN FALSE
+    RETURN LEFT$(s, LEN(prefix)) = prefix
+END FUNCTION

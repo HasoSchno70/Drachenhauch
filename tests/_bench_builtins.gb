@@ -1,0 +1,15 @@
+' Mikro-Bench: viele Builtin-Aufrufe in engen Schleifen.
+' Output: einzelne Endsumme, damit --bench deterministische Equivalence prueft.
+DIM s AS FLOAT
+DIM i AS INTEGER
+s = 0.0
+FOR i = 1 TO 50000
+    s = s + SIN(i) + COS(i) + SQR(ABS(i))
+NEXT i
+DIM t AS STRING
+t = ""
+FOR i = 1 TO 5000
+    t = UPPER$(CHR$(65 + (i MOD 26)))
+NEXT i
+PRINT INT(s)
+PRINT t

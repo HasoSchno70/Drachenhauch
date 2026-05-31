@@ -1,0 +1,37 @@
+' Serielle Kommunikation - z.B. mit Arduino oder ESP32
+' Voraussetzung: pip install pyserial
+'
+' Liste aller verfuegbaren Ports anzeigen, dann (falls vorhanden) am
+' ersten Port "ping" senden und auf eine Antwort hoeren.
+
+IMPORT "serial"
+
+DIM ports AS STRING
+ports = SERIAL_PORTS()
+PRINT "Verfuegbare Ports: ", ports
+
+IF LEN(ports) = 0 THEN
+    PRINT "Kein serieller Port gefunden - Beispiel uebersprungen."
+ELSE
+    DIM port AS SERIAL_HANDLE
+    DIM first$ AS STRING
+    DIM komma AS INTEGER
+
+    ' ersten Port aus der komma-getrennten Liste herausnehmen
+    komma = INSTR(ports, ",")
+    IF komma > 0 THEN
+        first$ = LEFT$(ports, komma - 1)
+    ELSE
+        first$ = ports
+    END IF
+    first$ = TRIM$(first$)
+
+    PRINT "Oeffne ", first$, " mit 9600 Baud ..."
+    port = SERIAL_OPEN(first$, 9600)
+    SERIAL_TIMEOUT(port, 2.0)
+
+    SERIAL_WRITE(port, "ping" + CHR$(10))
+    PRINT "Antwort: ", SERIAL_READLINE(port)
+
+    SERIAL_CLOSE(port)
+END IF

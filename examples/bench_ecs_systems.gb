@@ -1,0 +1,51 @@
+' ECS-System-Bench: Bullet-Hell-Style Game-Loop. Zeigt das volle
+' Bulk-Op-Pattern -- alle Update-Logik laeuft in cdef-Funktionen,
+' nicht in BASIC-Loops.
+'
+' Pro Frame:
+'   1. Movement   (px += vx,  py += vy)
+'   2. Friction   (vx *= 0.99, vy *= 0.99)
+'   3. Bounds     (px in [0..640], py in [0..480])
+'   4. HP-Decay   (hp -= 1)            via INTEGRATE_INT mit "regen"-Component (-1)
+'   5. Cleanup    (Entities mit hp <= 0 zerstoeren)
+'
+' 1000 Bullets * 200 Frames = 200.000 Entity-Updates pro System,
+' 5 Systeme + Cleanup -> ueber eine Million logische Updates -- alle
+' in einer C-Loop pro Frame.
+
+IMPORT "ecs"
+RANDOMIZE(42)
+
+DIM world AS ECS_WORLD
+world = ECS_NEW_WORLD()
+
+' 1000 Bullets erzeugen
+DIM i AS INTEGER
+FOR i = 1 TO 1000
+    DIM e AS INTEGER
+    e = ECS_NEW_ENTITY(world)
+    ECS_ADD_FLOAT(world, e, "px", RND(640) + 0.0)
+    ECS_ADD_FLOAT(world, e, "py", RND(480) + 0.0)
+    ECS_ADD_FLOAT(world, e, "vx", (RND(40) - 20) * 0.5)
+    ECS_ADD_FLOAT(world, e, "vy", (RND(40) - 20) * 0.5)
+    ECS_ADD_INT(world, e, "hp", 100 + RND(100))
+    ECS_ADD_INT(world, e, "regen", -1)        ' wird pro Frame auf hp addiert
+NEXT
+
+PRINT "Start Bullets:", ECS_COUNT_WITH(world, "hp")
+
+' 200 Frames Game-Tick. Jedes System ist genau ein Builtin-Call.
+DIM frame AS INTEGER
+FOR frame = 1 TO 200
+    ECS_INTEGRATE_FLOAT(world, "px", "vx")
+    ECS_INTEGRATE_FLOAT(world, "py", "vy")
+    ECS_SCALE_FLOAT(world, "vx", 0.99)
+    ECS_SCALE_FLOAT(world, "vy", 0.99)
+    ECS_CLAMP_FLOAT(world, "px", 0.0, 640.0)
+    ECS_CLAMP_FLOAT(world, "py", 0.0, 480.0)
+    ECS_INTEGRATE_INT(world, "hp", "regen")
+    ECS_REMOVE_DEAD(world, "hp", 0.0)
+NEXT
+
+PRINT "Lebende Bullets:", ECS_COUNT_WITH(world, "hp")
+PRINT "Total Entities:", ECS_COUNT(world)

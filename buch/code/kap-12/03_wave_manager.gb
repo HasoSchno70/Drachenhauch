@@ -1,0 +1,80 @@
+' Wave-Manager-Klasse: trackt Wellen-Nummer, geplante Spawns, Spawn-Timer.
+'
+' Pro Welle X:
+'   enemies_left   = 4 + X * 2          (Welle 1: 6, Welle 2: 8, ...)
+'   spawn_interval = max(20, 60 - X*5)  (schnellere Spawns in spaeteren Wellen)
+'
+' Cleared() liefert TRUE, wenn alle geplanten Gegner gespawnt wurden.
+
+CLASS Wave
+    DIM number          AS INTEGER
+    DIM enemies_left    AS INTEGER
+    DIM spawn_timer     AS INTEGER
+    DIM spawn_interval  AS INTEGER
+
+    SUB Init()
+        number = 1
+        StartCurrent()
+    END SUB
+
+    SUB StartCurrent()
+        enemies_left   = 4 + number * 2
+        spawn_interval = 60 - number * 5
+        IF spawn_interval < 20 THEN spawn_interval = 20
+        spawn_timer    = spawn_interval
+    END SUB
+
+    FUNCTION ShouldSpawn() AS BOOLEAN
+        IF enemies_left <= 0 THEN RETURN FALSE
+        spawn_timer = spawn_timer - 1
+        IF spawn_timer <= 0 THEN
+            spawn_timer  = spawn_interval
+            enemies_left = enemies_left - 1
+            RETURN TRUE
+        END IF
+        RETURN FALSE
+    END FUNCTION
+
+    FUNCTION Cleared() AS BOOLEAN
+        RETURN enemies_left <= 0
+    END FUNCTION
+
+    SUB NextWave()
+        number = number + 1
+        StartCurrent()
+    END SUB
+END CLASS
+
+' Test: Welle 1 simulieren bis Cleared
+DIM w AS Wave
+w = NEW Wave()
+PRINT f"Welle {w.number}: {w.enemies_left} Gegner geplant, alle {w.spawn_interval} Frames"
+
+DIM frame AS INTEGER
+DIM spawns AS INTEGER
+spawns = 0
+FOR frame = 1 TO 1000
+    IF w.ShouldSpawn() THEN
+        spawns = spawns + 1
+    END IF
+    IF w.Cleared() THEN BREAK
+NEXT frame
+
+PRINT f"  -> {spawns} Spawns, abgeschlossen nach Frame {frame}"
+
+' Welle 2
+w.NextWave()
+PRINT ""
+PRINT f"Welle {w.number}: {w.enemies_left} Gegner geplant, alle {w.spawn_interval} Frames"
+
+' Welle 5 simulieren - zeigt das Schwierigkeits-Plateau bei spawn_interval = 20
+w.number = 4
+w.NextWave()
+PRINT ""
+PRINT f"Welle {w.number}: {w.enemies_left} Gegner geplant, alle {w.spawn_interval} Frames"
+
+w.number = 9
+w.NextWave()
+PRINT ""
+PRINT f"Welle {w.number}: {w.enemies_left} Gegner geplant, alle {w.spawn_interval} Frames"
+PRINT "(Plateau erreicht: spawn_interval kann nicht unter 20 fallen)"

@@ -1,0 +1,57 @@
+' html-Modul: HTTP-Client + HTML-Parser kombiniert.
+' Holt eine simple Beispiel-Seite und zeigt den Titel + die ersten Links.
+'
+' Voraussetzung: aktive Internet-Verbindung. example.com liefert ein
+' minimales HTML-Dokument das sich zum Demonstrieren eignet.
+
+IMPORT "html"
+
+DIM url AS STRING
+url = "https://example.com/"
+
+PRINT "Lade ", url, " ..."
+PRINT ""
+
+TRY
+    DIM page AS STRING
+    page = HTTP_GET(url)
+
+    PRINT "HTTP-Status: ", HTTP_STATUS()
+    PRINT "Content-Type: ", HTTP_HEADER("Content-Type")
+    PRINT ""
+
+    ' Title aus dem <title>-Tag holen
+    DIM titles AS ARRAY OF STRING
+    titles = HTML_FIND_ALL(page, "title")
+    IF LEN(titles) > 0 THEN
+        PRINT "Titel: ", HTML_TEXT(titles[0])
+    END IF
+
+    ' Erste H1
+    DIM h1s AS ARRAY OF STRING
+    h1s = HTML_FIND_ALL(page, "h1")
+    IF LEN(h1s) > 0 THEN
+        PRINT "Ueberschrift: ", HTML_TEXT(h1s[0])
+    END IF
+
+    ' Alle Links
+    DIM links AS ARRAY OF STRING
+    links = HTML_FIND_ALL(page, "a")
+    PRINT ""
+    PRINT "Gefundene Links: ", LEN(links)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(links) - 1
+        PRINT "  - ", HTML_TEXT(links[i])
+    NEXT
+
+    ' Anzeigen wie URL_ENCODE/URL_DECODE arbeiten
+    PRINT ""
+    DIM enc AS STRING
+    enc = URL_ENCODE("Hallo Welt & co")
+    PRINT "URL_ENCODE('Hallo Welt & co') = ", enc
+    PRINT "URL_DECODE(enc)              = ", URL_DECODE(enc)
+
+CATCH e
+    PRINT "Fehler: ", e
+    PRINT "(Internet-Verbindung pruefen.)"
+END TRY

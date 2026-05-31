@@ -1,0 +1,26 @@
+# PyCharm
+.idea/
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build / Distribution
+build/
+dist/
+*.spec
+*.pyd
+*.so
+gamebasic/vm_native.c
+
+# OS
+.DS_Store
+Thumbs.db

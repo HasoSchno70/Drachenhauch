@@ -1,0 +1,71 @@
+' A*-Pathfinding-Demo: kleines Labyrinth, Pfad als ASCII-Art ausgeben.
+'
+' Zeigt das astar-Modul mit einem 12x8-Grid, ein paar Waenden, und dem
+' kuerzesten Pfad von links oben nach rechts unten. Diagonal-Bewegung
+' aktiv, damit der Pfad kuerzer wird.
+
+IMPORT "astar"
+
+CONST W AS INTEGER = 12
+CONST H AS INTEGER = 8
+
+DIM grid AS ASTAR_GRID
+grid = ASTAR_NEW(W, H)
+
+ASTAR_SET_DIAGONAL(grid, TRUE)
+ASTAR_SET_HEURISTIC(grid, "chebyshev")
+ASTAR_SET_DIAGONAL_COST(grid, 1.4)
+
+' --- Walls aufbauen (vertikale Hindernisse) ------------------------
+DIM y AS INTEGER
+FOR y = 0 TO 5
+    ASTAR_SET_WALL(grid, 4, y)
+NEXT y
+FOR y = 2 TO 7
+    ASTAR_SET_WALL(grid, 8, y)
+NEXT y
+
+' --- Pfad suchen ---------------------------------------------------
+DIM found AS BOOLEAN
+found = ASTAR_FIND(grid, 0, 0, W - 1, H - 1)
+
+IF NOT found THEN
+    PRINT "Kein Pfad gefunden!"
+ELSE
+    PRINT "Pfad mit", ASTAR_PATH_LEN(grid), "Schritten gefunden."
+    PRINT "Gesamtkosten:", ASTAR_PATH_COST(grid)
+    PRINT ""
+
+    ' --- Pfad als Lookup-Map fuer den ASCII-Render -----------------
+    DIM pathMap[W, H] AS INTEGER
+    DIM idx AS INTEGER
+    FOR idx = 0 TO ASTAR_PATH_LEN(grid) - 1
+        pathMap[ASTAR_PATH_X(grid, idx), ASTAR_PATH_Y(grid, idx)] = 1
+    NEXT idx
+
+    ' --- ASCII-Render ----------------------------------------------
+    '   #  = Wand
+    '   .  = passierbar
+    '   *  = Pfad
+    '   S  = Start
+    '   E  = Ende
+    DIM x AS INTEGER
+    FOR y = 0 TO H - 1
+        DIM row AS STRING
+        row = ""
+        FOR x = 0 TO W - 1
+            IF x = 0 AND y = 0 THEN
+                row = row + "S "
+            ELSEIF x = W - 1 AND y = H - 1 THEN
+                row = row + "E "
+            ELSEIF ASTAR_IS_WALL(grid, x, y) THEN
+                row = row + "# "
+            ELSEIF pathMap[x, y] = 1 THEN
+                row = row + "* "
+            ELSE
+                row = row + ". "
+            END IF
+        NEXT x
+        PRINT row
+    NEXT y
+END IF

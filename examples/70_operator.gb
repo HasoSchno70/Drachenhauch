@@ -1,0 +1,106 @@
+' OPERATOR-Overloading auf User-Klassen.
+'
+' OPERATOR <op> (other AS T) AS T  ... END OPERATOR
+'   wird intern als Methode mit reserviertem Namen registriert
+'   (`__op_add__`, `__op_sub__`, ...). Tree-Walker und beide VMs
+'   konsultieren sie beim BinaryOp-Dispatch.
+'
+' Erlaubte Operatoren:  +  -  *  /  MOD  =  <>  <  >  <=  >=
+'
+' Was nicht geht:
+'   - keine reflektierten Operatoren a la Python (`__radd__`)
+'     -- aber Reverse-Dispatch greift, wenn LHS keine Methode hat:
+'     bei `5 + money` versucht der Dispatch zuerst LHS (INTEGER, kein Op),
+'     dann RHS (Money) -- ergo Money braucht ein `__op_add__(other AS INTEGER)`.
+'   - kein Method-Overloading: pro Operator gibt's genau eine Methode.
+
+' --- Money: Zahl + Vergleich ---
+CLASS Money
+    DIM cents AS INTEGER
+
+    OPERATOR + (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents + other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR - (other AS Money) AS Money
+        DIM r AS Money
+        r = NEW Money()
+        r.cents = Self.cents - other.cents
+        RETURN r
+    END OPERATOR
+
+    OPERATOR = (other AS Money) AS BOOLEAN
+        RETURN Self.cents = other.cents
+    END OPERATOR
+
+    OPERATOR < (other AS Money) AS BOOLEAN
+        RETURN Self.cents < other.cents
+    END OPERATOR
+
+    FUNCTION show() AS STRING
+        RETURN STR$(Self.cents \ 100) + "." + PADL$(STR$(Self.cents MOD 100), 2, "0")
+    END FUNCTION
+END CLASS
+
+DIM a AS Money
+DIM b AS Money
+a = NEW Money()
+b = NEW Money()
+a.cents = 1250
+b.cents = 350
+
+DIM s AS Money
+s = a + b
+PRINT "1250c + 350c = ", s.show(), "c"
+
+DIM d AS Money
+d = a - b
+PRINT "1250c - 350c = ", d.show(), "c"
+
+PRINT "a = b: ", a = b
+PRINT "a < b: ", a < b
+PRINT "b < a: ", b < a
+
+' --- Polynomial: Multiplikation per Operator ---
+CLASS Poly
+    ' Sehr simple Polynom-Klasse: a + b*x + c*x^2
+    DIM a AS INTEGER
+    DIM b AS INTEGER
+    DIM c AS INTEGER
+
+    OPERATOR + (other AS Poly) AS Poly
+        DIM r AS Poly
+        r = NEW Poly()
+        r.a = Self.a + other.a
+        r.b = Self.b + other.b
+        r.c = Self.c + other.c
+        RETURN r
+    END OPERATOR
+
+    FUNCTION eval(x AS INTEGER) AS INTEGER
+        RETURN Self.a + Self.b * x + Self.c * x * x
+    END FUNCTION
+END CLASS
+
+DIM p1 AS Poly
+DIM p2 AS Poly
+p1 = NEW Poly()
+p2 = NEW Poly()
+p1.a = 1 : p1.b = 2 : p1.c = 3
+p2.a = 10 : p2.b = 20 : p2.c = 30
+
+DIM sum AS Poly
+sum = p1 + p2
+PRINT "sum.eval(2) = ", sum.eval(2)
+
+' --- Reverse-Dispatch: 100c + Money ---
+' Wenn LHS kein Op anbietet, versucht der Dispatch RHS. Money muesste
+' dafuer `OPERATOR + (other AS INTEGER) AS Money` haben -- das gibt's
+' oben nicht, also wirft das. Hier nur Demonstration der Symmetrie:
+DIM e AS Money
+e = NEW Money()
+e.cents = 0
+PRINT "e leer:", e.show()

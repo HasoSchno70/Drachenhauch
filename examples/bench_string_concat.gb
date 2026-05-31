@@ -1,0 +1,9 @@
+' String-Heavy: 10.000 Konkatenationen + STR$-Konversionen.
+' Typisch fuer Debug-HUDs / Log-Output.
+DIM s AS STRING
+DIM i AS INTEGER
+s = ""
+FOR i = 1 TO 10000
+    s = s + STR$(i) + ","
+NEXT
+PRINT "Length:", LEN(s)

@@ -1,0 +1,58 @@
+' Klassen mit Feldern und Methoden
+
+CLASS Paddle
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM score AS INTEGER
+
+    ' Konstruktor: wird von NEW Paddle(args) automatisch aufgerufen
+    SUB Init(startX AS INTEGER, startY AS INTEGER)
+        x = startX
+        y = startY
+        score = 0
+    END SUB
+
+    SUB MoveBy(dy AS INTEGER)
+        y = y + dy
+        IF y < 0 THEN y = 0
+        IF y > 200 THEN y = 200
+    END SUB
+
+    FUNCTION GetScore() AS INTEGER
+        RETURN score
+    END FUNCTION
+
+    SUB AddPoint()
+        score = score + 1
+    END SUB
+END CLASS
+
+' Erstellen mit Konstruktor-Argumenten
+DIM links AS Paddle
+links = NEW Paddle(10, 100)
+
+DIM rechts AS Paddle
+rechts = NEW Paddle(310, 100)
+
+PRINT "Linkes Paddle bei", links.x, ",", links.y
+PRINT "Rechtes Paddle bei", rechts.x, ",", rechts.y
+
+' Methoden aufrufen - Felder werden persistent geaendert
+links.MoveBy(20)
+links.MoveBy(-5)
+PRINT "Links nach 2x MoveBy:", links.y
+
+' Feld direkt setzen (alle Felder sind public, wie besprochen)
+links.x = 15
+PRINT "Links neuer x:", links.x
+
+' Punkte zaehlen
+links.AddPoint()
+links.AddPoint()
+links.AddPoint()
+rechts.AddPoint()
+PRINT "Spielstand:", links.GetScore(), ":", rechts.GetScore()
+
+' Eine Variable kann nach DIM noch leer sein (NIL)
+DIM platzhalter AS Paddle
+PRINT "Leer:", platzhalter

@@ -1,0 +1,39 @@
+' BYREF: per Referenz uebergeben.
+'
+' Ein normaler Parameter ist eine Kopie - Aenderungen in der Funktion
+' wirken sich nicht auf den Aufrufer aus. Mit BYREF schon: die Variable
+' des Aufrufers wird selbst geaendert.
+'
+' Hauptanwendung: Multi-Return - eine Funktion will mehrere Werte
+' zurueckgeben, kann aber nur einen direkt per RETURN.
+'
+' Wichtig: BYREF wird im VM-Pfad noch nicht unterstuetzt. Diese Datei
+' nur mit dem Tree-Walker laufen lassen (gbrun.py ohne --vm).
+
+' Klassisches swap: tauscht zwei Variablen aus.
+SUB Swap(BYREF a AS INTEGER, BYREF b AS INTEGER)
+    DIM tmp AS INTEGER
+    tmp = a
+    a = b
+    b = tmp
+END SUB
+
+DIM x AS INTEGER
+DIM y AS INTEGER
+x = 1
+y = 2
+PRINT f"Vor:  x={x}, y={y}"
+Swap(x, y)
+PRINT f"Nach: x={x}, y={y}"
+
+' DivMod: gibt Quotient und Rest gleichzeitig zurueck.
+'   Quotient via RETURN, Rest via BYREF.
+FUNCTION DivMod(a AS INTEGER, b AS INTEGER, BYREF rest AS INTEGER) AS INTEGER
+    rest = a MOD b
+    RETURN a \ b
+END FUNCTION
+
+DIM r AS INTEGER
+DIM q AS INTEGER
+q = DivMod(17, 5, r)
+PRINT f"17 / 5 = {q} Rest {r}"

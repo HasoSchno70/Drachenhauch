@@ -1,0 +1,42 @@
+' Drei UI-Widgets nebeneinander: Button, Checkbox, Slider.
+'
+' Jeder Aufruf braucht eine ID-String (eindeutig, sonst kollidieren die
+' Widget-States). Werte werden zur Laufzeit zurueckgegeben.
+'
+' Pflicht: UI_END_FRAME() VOR jedem FLIP(). Sonst weiss das Modul nicht,
+' wann ein Frame zu Ende ist - Mausklick-Erkennung wuerde brechen.
+
+IMPORT "ui"
+
+CONST WIDTH    AS INTEGER = 320
+CONST HEIGHT   AS INTEGER = 240
+CONST BG_COLOR AS INTEGER = &H141E3C
+
+DIM clicks AS INTEGER
+clicks = 0
+
+SCREEN(WIDTH, HEIGHT, "UI Demo", 2)
+
+WHILE NOT QUITREQUESTED()
+    CLS(BG_COLOR)
+
+    ' --- Button ---
+    IF UI_BUTTON("btn_count", 20, 30, 100, 24, "Klick mich") THEN
+        clicks = clicks + 1
+    END IF
+    UI_LABEL(140, 36, f"Klicks: {clicks}", &HFFFFFF)
+
+    ' --- Checkbox ---
+    DIM trail_on AS BOOLEAN
+    trail_on = UI_CHECKBOX("cb_trail", 20, 80, "Trail an", TRUE)
+    UI_LABEL(140, 80, f"Trail: {trail_on}", &HFFFFFF)
+
+    ' --- Slider: Geschwindigkeit 1..10 ---
+    DIM speed AS FLOAT
+    speed = UI_SLIDER("sl_speed", 20, 130, 100, 1.0, 10.0, 5.0)
+    UI_LABEL(140, 132, f"Speed: {INT(speed)}", &HFFFFFF)
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

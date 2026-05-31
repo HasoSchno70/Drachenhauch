@@ -1,0 +1,42 @@
+' WiFi-Management (Windows-only, nutzt netsh wlan)
+' Keine externe Lib noetig.
+'
+' Zeigt aktuelles Netzwerk + scannt verfuegbare WiFi-Netze.
+
+IMPORT "wifi"
+
+IF NOT WIFI_AVAILABLE() THEN
+    PRINT "Kein WLAN-Adapter gefunden (oder kein Windows)."
+ELSE
+    DIM ssid AS STRING
+    ssid = WIFI_CURRENT()
+
+    IF LEN(ssid) > 0 THEN
+        PRINT "Verbunden mit: ", ssid, "  (", WIFI_SIGNAL(), "%)"
+    ELSE
+        PRINT "Aktuell nicht verbunden."
+    END IF
+
+    PRINT ""
+    PRINT "Scan laeuft ..."
+    DIM netze AS STRING
+    netze = WIFI_SCAN()
+
+    IF LEN(netze) = 0 THEN
+        PRINT "  (keine Netze sichtbar)"
+    ELSE
+        PRINT "Sichtbare Netze (sortiert nach Signal):"
+        ' netze enthaelt Zeilen "ssid|signal", eine pro Netz
+        DIM zeilen AS ARRAY OF STRING
+        zeilen = SPLIT$(netze, CHR$(10))
+        DIM i AS INTEGER
+        FOR i = 0 TO LEN(zeilen) - 1
+            PRINT "  ", zeilen[i]
+        NEXT
+    END IF
+END IF
+
+' Beispiel zum Verbinden (auskommentiert - Zugangsdaten anpassen):
+' IF WIFI_CONNECT("MeinNetz", "geheim123") THEN
+'     PRINT "Connect-Befehl gesendet."
+' END IF

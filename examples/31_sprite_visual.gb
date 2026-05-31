@@ -1,0 +1,154 @@
+' Interaktives Sprite-Demo: Held lauft mit Pfeiltasten ueber das Schachbrett.
+' Zeigt: Sheet-basierte Animation, Flip beim Wechsel der Richtung,
+' Velocity, Kollision mit "Goldstuecken" (zaehlt sie ab).
+IMPORT "sprite"
+IMPORT "camera"
+
+CONST W AS INTEGER = 320
+CONST H AS INTEGER = 240
+SCREEN(W, H, "Sprite-Demo (Pfeile = laufen, ESC = Ende)", 2)
+
+' Held aus 4-Frame Walk-Cycle (64x16, 4x 16x16).
+DIM sheet AS IMAGE
+sheet = LOADIMAGE("assets/hero_walk.png")
+
+DIM held AS SPRITE
+held = SPRITE_NEW(sheet, 16, 16)
+SPRITE_SET_POS(held, 100.0, 100.0)
+SPRITE_ADD_ANIM(held, "idle", 0, 0, 1.0)
+SPRITE_ADD_ANIM(held, "walk", 0, 3, 8.0)
+SPRITE_PLAY(held, "idle")
+
+' Goldstuecke verteilen.
+DIM gold_sheet AS IMAGE
+gold_sheet = LOADIMAGE("assets/coin.png")
+
+DIM gold AS ARRAY OF SPRITE
+DIM n_gold AS INTEGER
+n_gold = 5
+DIM i AS INTEGER
+
+' Wir koennen ARRAY OF SPRITE nicht ohne Index initialisieren - nutzen
+' eine Map STATT ARRAY waere komplizierter, also bauen wir sie linear.
+DIM g0 AS SPRITE
+DIM g1 AS SPRITE
+DIM g2 AS SPRITE
+DIM g3 AS SPRITE
+DIM g4 AS SPRITE
+g0 = SPRITE_NEW(gold_sheet, 8, 8)
+g1 = SPRITE_NEW(gold_sheet, 8, 8)
+g2 = SPRITE_NEW(gold_sheet, 8, 8)
+g3 = SPRITE_NEW(gold_sheet, 8, 8)
+g4 = SPRITE_NEW(gold_sheet, 8, 8)
+SPRITE_SET_POS(g0, 50.0, 60.0)
+SPRITE_SET_POS(g1, 200.0, 80.0)
+SPRITE_SET_POS(g2, 80.0, 180.0)
+SPRITE_SET_POS(g3, 250.0, 200.0)
+SPRITE_SET_POS(g4, 160.0, 130.0)
+
+DIM gefangen AS INTEGER
+gefangen = 0
+
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN
+        BREAK
+    END IF
+
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+
+    ' Eingabe -> Velocity
+    DIM vx AS FLOAT
+    DIM vy AS FLOAT
+    vx = 0.0
+    vy = 0.0
+    IF KEYPRESSED(1073741904) THEN     ' LEFT
+        vx = -80.0
+        SPRITE_SET_FLIP(held, TRUE, FALSE)
+    END IF
+    IF KEYPRESSED(1073741903) THEN     ' RIGHT
+        vx = 80.0
+        SPRITE_SET_FLIP(held, FALSE, FALSE)
+    END IF
+    IF KEYPRESSED(1073741906) THEN     ' UP
+        vy = -80.0
+    END IF
+    IF KEYPRESSED(1073741905) THEN     ' DOWN
+        vy = 80.0
+    END IF
+
+    SPRITE_SET_VELOCITY(held, vx, vy)
+
+    IF vx <> 0.0 OR vy <> 0.0 THEN
+        SPRITE_PLAY(held, "walk")
+    ELSE
+        SPRITE_PLAY(held, "idle")
+    END IF
+
+    SPRITE_UPDATE(held, dt)
+
+    ' Kollisionen mit Gold pruefen (offscreen verschieben statt loeschen).
+    IF SPRITE_COLLIDES(held, g0) THEN
+        SPRITE_SET_POS(g0, -100.0, -100.0)
+        gefangen = gefangen + 1
+    END IF
+    IF SPRITE_COLLIDES(held, g1) THEN
+        SPRITE_SET_POS(g1, -100.0, -100.0)
+        gefangen = gefangen + 1
+    END IF
+    IF SPRITE_COLLIDES(held, g2) THEN
+        SPRITE_SET_POS(g2, -100.0, -100.0)
+        gefangen = gefangen + 1
+    END IF
+    IF SPRITE_COLLIDES(held, g3) THEN
+        SPRITE_SET_POS(g3, -100.0, -100.0)
+        gefangen = gefangen + 1
+    END IF
+    IF SPRITE_COLLIDES(held, g4) THEN
+        SPRITE_SET_POS(g4, -100.0, -100.0)
+        gefangen = gefangen + 1
+    END IF
+
+    ' Camera folgt dem Helden (zentriert).
+    CAMERA_FOLLOW(SPRITE_GET_X(held) + 8.0, SPRITE_GET_Y(held) + 8.0, W * 1.0, H * 1.0)
+
+    CLS(RGB(40, 30, 50))
+
+    ' Hintergrund: Schachbrett-Welt
+    DIM rr AS INTEGER
+    DIM cc AS INTEGER
+    FOR rr = 0 TO 9
+        FOR cc = 0 TO 14
+            DIM color AS INTEGER
+            IF (rr + cc) MOD 2 = 0 THEN
+                color = RGB(60, 50, 80)
+            ELSE
+                color = RGB(50, 40, 70)
+            END IF
+            BOX(cc * 32, rr * 32, cc * 32 + 31, rr * 32 + 31, color)
+        NEXT
+    NEXT
+
+    SPRITE_DRAW(g0)
+    SPRITE_DRAW(g1)
+    SPRITE_DRAW(g2)
+    SPRITE_DRAW(g3)
+    SPRITE_DRAW(g4)
+    SPRITE_DRAW(held)
+
+    ' HUD im Screen-Space
+    CAMERA_RESET()
+    TEXT(4, 4, "Gold: " + STR$(gefangen) + " / 5", RGB(255, 220, 80))
+    IF gefangen >= 5 THEN
+        TEXT(W / 2 - 30, H / 2, "GESCHAFFT!", RGB(255, 255, 255))
+    END IF
+
+    FLIP()
+    SLEEP(16)
+WEND

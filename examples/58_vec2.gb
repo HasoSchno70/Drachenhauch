@@ -1,0 +1,72 @@
+' 58_vec2.gb -- 2D-Vektoren mit Operator-Overloading.
+'
+' Statt parallele vx/vy-Variablen oder Tupel haben wir jetzt einen
+' echten Vektor-Typ. Die Operatoren `+`, `-`, `*`, `/`, `=`, `<>` sind
+' fuer VEC2 ueberladen -- alles andere wirft TypeMismatch.
+
+IMPORT "vec2"
+
+PRINT "=== Konstruktion und Komponenten ==="
+DIM v AS VEC2
+DIM w AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+w = VEC2_NEW(1.0, 2.0)
+PRINT "v =", v
+PRINT "  v.x =", VEC2_X(v)
+PRINT "  v.y =", VEC2_Y(v)
+
+PRINT ""
+PRINT "=== Arithmetik direkt mit Operatoren ==="
+PRINT "v + w  =", v + w
+PRINT "v - w  =", v - w
+PRINT "v * 2  =", v * 2.0
+PRINT "v / 2  =", v / 2.0
+PRINT "(v+w)*2 - v =", (v + w) * 2.0 - v
+
+PRINT ""
+PRINT "=== Geometrische Operationen ==="
+PRINT "Laenge von v       =", VEC2_LENGTH(v)
+PRINT "normalisiertes v   =", VEC2_NORMALIZE(v)
+PRINT "Distanz v zu w     =", VEC2_DISTANCE(v, w)
+PRINT "Punktprodukt v.w   =", VEC2_DOT(v, w)
+PRINT "Kreuzprodukt v x w =", VEC2_CROSS(v, w)
+
+PRINT ""
+PRINT "=== Reflexion und Rotation ==="
+
+DIM ball_dir AS VEC2
+DIM wall_normal AS VEC2
+ball_dir = VEC2_NEW(3.0, 4.0)            ' Ball bewegt sich diagonal
+wall_normal = VEC2_NEW(0.0, 1.0)         ' Wand ist horizontal
+
+PRINT "Eingehende Richtung:", ball_dir
+PRINT "Wand-Normale:       ", wall_normal
+PRINT "Reflektiert:        ", VEC2_REFLECT(ball_dir, wall_normal)
+
+PRINT ""
+PRINT "Senkrecht zu (1,0)  =", VEC2_PERP(VEC2_NEW(1.0, 0.0))
+
+PRINT ""
+PRINT "=== Polar -> Kartesisch ==="
+PRINT "0 rad, Laenge 5       =", VEC2_FROM_ANGLE(0.0, 5.0)
+PRINT "Pi/2 rad, Laenge 5    =", VEC2_FROM_ANGLE(1.5707963267948966, 5.0)
+
+PRINT ""
+PRINT "=== Lerp -- linearer Uebergang ==="
+DIM start AS VEC2
+DIM target AS VEC2
+start = VEC2_NEW(0.0, 0.0)
+target = VEC2_NEW(100.0, 200.0)
+PRINT "t=0.0:", VEC2_LERP(start, target, 0.0)
+PRINT "t=0.25:", VEC2_LERP(start, target, 0.25)
+PRINT "t=0.5:", VEC2_LERP(start, target, 0.5)
+PRINT "t=1.0:", VEC2_LERP(start, target, 1.0)
+
+PRINT ""
+PRINT "=== Gleichheit ==="
+DIM a AS VEC2
+DIM b AS VEC2
+a = VEC2_NEW(5.0, 7.0)
+b = VEC2_NEW(5.0, 7.0)
+PRINT "a = b?", a = b
+PRINT "a <> v?", a <> v

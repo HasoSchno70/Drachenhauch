@@ -1,0 +1,72 @@
+' Demo des ENUM-Statements - typsichere Konstanten mit Namespace.
+'
+' Zwei Schreibweisen:
+'   Compact: ENUM Name = M1, M2, M3
+'   Block:   ENUM Name
+'                M1 [= wert]
+'                ...
+'            END ENUM
+'
+' Member ohne expliziten Wert werden auto-nummeriert. Member-Namen duerfen
+' GB-Keywords sein (READ, FILE etc.) - der qualifizierte Zugriff
+' (`Name.Member`) ist eindeutig.
+
+' --- Compact-Form ---------------------------------------------------
+ENUM State = MENU, PLAYING, PAUSED, GAMEOVER
+
+PRINT "State.MENU =", State.MENU
+PRINT "State.PLAYING =", State.PLAYING
+PRINT "State.PAUSED =", State.PAUSED
+PRINT "State.GAMEOVER =", State.GAMEOVER
+
+' --- Block-Form mit expliziten Werten -------------------------------
+ENUM Permission
+    NONE = 0
+    READ = 1
+    WRITE = 2
+    EXEC = 4
+    RW = 3
+END ENUM
+
+PRINT ""
+PRINT "Permission-Bits:"
+PRINT "  R   =", Permission.READ
+PRINT "  W   =", Permission.WRITE
+PRINT "  X   =", Permission.EXEC
+PRINT "  R+W =", Permission.READ + Permission.WRITE
+
+' --- DIM x AS EnumName ist wie INTEGER ------------------------------
+DIM s AS State
+s = State.PLAYING
+
+PRINT ""
+PRINT "DIM s AS State; s = State.PLAYING"
+PRINT "  Wert von s:", s
+
+' --- Im SELECT CASE ------------------------------------------------
+PRINT ""
+PRINT "SELECT-Dispatch:"
+SELECT CASE s
+    CASE State.MENU
+        PRINT "  -> Hauptmenue"
+    CASE State.PLAYING
+        PRINT "  -> Spielt gerade"
+    CASE State.PAUSED, State.GAMEOVER
+        PRINT "  -> Spielt nicht"
+END SELECT
+
+' --- Mixed-Form mit Auto + Explicit --------------------------------
+ENUM HttpStatus = OK = 200, CREATED, ACCEPTED, _
+                  BAD_REQUEST = 400, UNAUTHORIZED, _
+                  NOT_FOUND = 404, _
+                  SERVER_ERROR = 500
+
+PRINT ""
+PRINT "HTTP-Codes (Auto-Increment ab Explicit):"
+PRINT "  OK             =", HttpStatus.OK
+PRINT "  CREATED        =", HttpStatus.CREATED
+PRINT "  ACCEPTED       =", HttpStatus.ACCEPTED
+PRINT "  BAD_REQUEST    =", HttpStatus.BAD_REQUEST
+PRINT "  UNAUTHORIZED   =", HttpStatus.UNAUTHORIZED
+PRINT "  NOT_FOUND      =", HttpStatus.NOT_FOUND
+PRINT "  SERVER_ERROR   =", HttpStatus.SERVER_ERROR

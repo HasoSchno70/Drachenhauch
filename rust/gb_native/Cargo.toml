@@ -1,0 +1,17 @@
+[package]
+name = "gb_native"
+version = "0.1.0"
+edition = "2021"
+description = "Native Beschleuniger fuer GameBasic (PyO3): A*, Broadphase-Kollision, Tile-Sweep."
+
+[lib]
+name = "gb_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module", "abi3-py38"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

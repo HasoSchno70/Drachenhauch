@@ -1,0 +1,25 @@
+' Smoketest: 30 Frames Sprite-Rendering, dann Auto-Quit.
+Screen(160, 120, "Sprite-Smoketest")
+
+DIM h AS IMAGE
+DIM c AS IMAGE
+h = LoadImage("assets/hero.png")
+c = LoadImage("assets/coin.png")
+
+PRINT "Hero size:", ImageWidth(h), "x", ImageHeight(h)
+PRINT "Coin size:", ImageWidth(c), "x", ImageHeight(c)
+
+DIM beep AS SOUND
+beep = LoadSound("assets/beep.wav")
+PlaySound(beep)
+
+DIM frame AS INTEGER
+frame = 0
+WHILE frame < 30
+    Cls(BLACK)
+    DrawImage(h, 50 + frame, 40)
+    DrawImage(c, 80, 60)
+    Flip()
+    frame = frame + 1
+WEND
+PRINT "OK,", frame, "Frames gerendert."

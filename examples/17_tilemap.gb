@@ -1,0 +1,155 @@
+' Tilemap mit 2D-Array + Walk-Animation + Kollisionserkennung.
+' Pfeile: bewegen.  Held kann Wasser/Steine nicht durchqueren.
+
+CONST TILE_W AS INTEGER = 16
+CONST TILE_H AS INTEGER = 16
+CONST MAP_ROWS AS INTEGER = 12
+CONST MAP_COLS AS INTEGER = 20
+
+CONST TILE_GRAS = 0
+CONST TILE_ERDE = 1
+CONST TILE_STEIN = 2
+CONST TILE_WASSER = 3
+
+' Bildschirm: 320 x 192
+Screen(MAP_COLS * TILE_W, MAP_ROWS * TILE_H, "GameBasic - Tilemap-Demo")
+
+DIM tileset AS IMAGE
+DIM heroSheet AS IMAGE
+tileset = LoadImage("assets/tileset.png")
+heroSheet = LoadImage("assets/hero_walk.png")
+
+' --- Karte als 2D-Array von Tile-Indizes ---
+DIM level[MAP_ROWS, MAP_COLS] AS INTEGER
+DIM r AS INTEGER
+DIM c AS INTEGER
+
+' Boden = Gras, Rand = Stein
+FOR r = 0 TO MAP_ROWS - 1
+    FOR c = 0 TO MAP_COLS - 1
+        IF r = 0 OR r = MAP_ROWS - 1 OR c = 0 OR c = MAP_COLS - 1 THEN
+            level[r, c] = TILE_STEIN
+        ELSE
+            level[r, c] = TILE_GRAS
+        END IF
+    NEXT
+NEXT
+
+' Erd-Pfad horizontal
+FOR c = 3 TO 16
+    level[3, c] = TILE_ERDE
+NEXT
+
+
+
+' Wasser-Teich
+FOR r = 6 TO 8
+    FOR c = 9 TO 12
+        level[r, c] = TILE_WASSER
+    NEXT
+NEXT
+
+' Stein-Felsen mittig
+level[7, 5] = TILE_STEIN
+level[8, 5] = TILE_STEIN
+level[7, 15] = TILE_STEIN
+
+' --- Animierter Held ---
+CLASS Hero
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM frame AS INTEGER       ' 0..3
+    DIM frameTimer AS INTEGER
+    DIM moving AS BOOLEAN
+
+    SUB Init(sx AS INTEGER, sy AS INTEGER)
+        x = sx
+        y = sy
+        frame = 0
+        frameTimer = 0
+        moving = FALSE
+    END SUB
+
+    SUB Tick()
+        IF moving THEN
+            frameTimer = frameTimer + 1
+            IF frameTimer >= 6 THEN
+                frameTimer = 0
+                frame = (frame + 1) mod 4
+            END IF
+        ELSE
+            frame = 0
+            frameTimer = 0
+        END IF
+    END SUB
+
+    SUB Draw(sheet AS IMAGE)
+        DrawImagePart(sheet, frame * 16, 0, 16, 16, x, y)
+    END SUB
+END CLASS
+
+' --- Kollision: ist die Pixelposition (px, py) blockiert? ---
+FUNCTION Blocked(level AS ARRAY OF INTEGER, px AS INTEGER, py AS INTEGER) AS BOOLEAN
+    DIM rr AS INTEGER
+    DIM cc AS INTEGER
+    cc = INT(px / TILE_W)
+    rr = INT(py / TILE_H)
+    IF rr < 0 OR rr >= MAP_ROWS THEN RETURN TRUE
+    IF cc < 0 OR cc >= MAP_COLS THEN RETURN TRUE
+    DIM t AS INTEGER
+    t = level[rr, cc]
+    IF t = TILE_STEIN THEN RETURN TRUE
+    IF t = TILE_WASSER THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+' --- Setup ---
+DIM held AS Hero
+held = NEW Hero(48, 48)
+
+DIM running AS BOOLEAN
+running = TRUE
+
+' --- Hauptschleife ---
+WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    dx = 0
+    dy = 0
+    IF KeyPressed(KEY_LEFT)  THEN dx = -2
+    IF KeyPressed(KEY_RIGHT) THEN dx = 2
+    IF KeyPressed(KEY_UP)    THEN dy = -2
+    IF KeyPressed(KEY_DOWN)  THEN dy = 2
+
+    held.moving = dx <> 0 OR dy <> 0
+
+    ' X-Achse: Kollision an oberen + unteren Fuessen pruefen
+    IF dx <> 0 THEN
+        DIM nx AS INTEGER
+        nx = held.x + dx
+        IF NOT Blocked(level, nx + 4, held.y + 6) THEN
+            IF NOT Blocked(level, nx + 11, held.y + 14) THEN
+                held.x = nx
+            END IF
+        END IF
+    END IF
+
+    ' Y-Achse
+    IF dy <> 0 THEN
+        DIM ny AS INTEGER
+        ny = held.y + dy
+        IF NOT Blocked(level, held.x + 4, ny + 14) THEN
+            IF NOT Blocked(level, held.x + 11, ny + 6) THEN
+                held.y = ny
+            END IF
+        END IF
+    END IF
+
+    held.Tick()
+
+    ' Zeichnen
+    Cls(BLACK)
+    DrawTilemap(tileset, level, TILE_W, TILE_H, 0, 0)
+    held.Draw(heroSheet)
+    Flip()
+WEND

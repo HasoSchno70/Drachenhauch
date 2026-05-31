@@ -1,0 +1,26 @@
+' Method-Dispatch-Heavy: 200.000 Methoden-Calls auf User-Klasse.
+' Misst die VM-Overhead pro Method-Call -- kritisch fuer OOP-lastige
+' Game-Logik (Player-Update, Enemy-Tick, ...).
+
+CLASS Counter
+    DIM total AS INTEGER
+
+    FUNCTION add(n AS INTEGER) AS INTEGER
+        Self.total = Self.total + n
+        RETURN Self.total
+    END FUNCTION
+
+    FUNCTION result() AS INTEGER
+        RETURN Self.total
+    END FUNCTION
+END CLASS
+
+DIM c AS Counter
+c = NEW Counter()
+c.total = 0
+
+DIM i AS INTEGER
+FOR i = 1 TO 200000
+    c.add(i MOD 7)
+NEXT
+PRINT "Result:", c.result()

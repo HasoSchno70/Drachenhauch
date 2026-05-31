@@ -1,0 +1,50 @@
+' Shape-Demo: TRIANGLE, POLYGON, ELLIPSE, ARC
+' (Phase nach den Klassik-Befehlen BOX/CIRCLE/LINE)
+
+SCREEN(640, 480, "Shapes-Demo", 1)
+
+DIM tick AS INTEGER
+tick = 0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    CLS()
+
+    ' --- Reihe 1: Dreiecke ---
+    TEXT(10, 10, "TRIANGLE / TRIANGLEOUTLINE", WHITE)
+    TRIANGLE(60, 60, 110, 60, 85, 110, RED)
+    TRIANGLEOUTLINE(160, 60, 210, 60, 185, 110, GREEN, 2)
+    TRIANGLE(260, 110, 310, 60, 360, 110, ORANGE)
+
+    ' --- Reihe 2: Polygon (5-Eck) ---
+    TEXT(10, 140, "POLYGON (Pentagon mit Punkt-Array)", WHITE)
+    DIM pts[10] AS INTEGER
+    pts[0] = 100
+    pts[1] = 200
+    pts[2] = 140
+    pts[3] = 175
+    pts[4] = 180
+    pts[5] = 200
+    pts[6] = 165
+    pts[7] = 245
+    pts[8] = 115
+    pts[9] = 245
+    POLYGON(pts, MAGENTA)
+    POLYGONOUTLINE(pts, WHITE, 1)
+
+    ' --- Reihe 3: Ellipse + ELLIPSEOUTLINE ---
+    TEXT(10, 280, "ELLIPSE / ELLIPSEOUTLINE", WHITE)
+    ELLIPSE(60, 320, 200, 380, BLUE)
+    ELLIPSEOUTLINE(220, 320, 360, 380, CYAN, 2)
+
+    ' --- Reihe 4: ARC (rotierender Bogen) ---
+    TEXT(10, 400, "ARC (rotierend)", WHITE)
+    DIM phase AS FLOAT
+    phase = tick * 0.05
+    ARC(60, 410, 160, 470, phase, phase + 3.14, YELLOW, 3)
+
+    FLIP()
+    SLEEP(16)
+    tick = tick + 1
+WEND

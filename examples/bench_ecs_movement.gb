@@ -1,0 +1,38 @@
+' ECS-Movement-Bench: 100 Frames * 500 Entities mit (pos, vel) -> 50.000
+' Component-Updates. Typisches "Bullet-Hell"-Profil.
+
+IMPORT "ecs"
+RANDOMIZE(42)
+
+DIM world AS ECS_WORLD
+world = ECS_NEW_WORLD()
+
+' 500 Entities mit Pos+Vel anlegen
+DIM i AS INTEGER
+FOR i = 1 TO 500
+    DIM e AS INTEGER
+    e = ECS_NEW_ENTITY(world)
+    ECS_ADD_FLOAT(world, e, "px", RND(320) + 0.0)
+    ECS_ADD_FLOAT(world, e, "py", RND(240) + 0.0)
+    ECS_ADD_FLOAT(world, e, "vx", (RND(20) - 10) / 10.0)
+    ECS_ADD_FLOAT(world, e, "vy", (RND(20) - 10) / 10.0)
+NEXT
+
+' 100 Frames Movement-System
+DIM frame AS INTEGER
+FOR frame = 1 TO 100
+    DIM movers AS ARRAY OF INTEGER
+    movers = ECS_QUERY3(world, "px", "py", "vx")
+    FOR i = 0 TO LEN(movers) - 1
+        DIM ent AS INTEGER
+        ent = movers[i]
+        ECS_ADD_FLOAT(world, ent, "px",
+                      ECS_GET_FLOAT(world, ent, "px")
+                      + ECS_GET_FLOAT(world, ent, "vx"))
+        ECS_ADD_FLOAT(world, ent, "py",
+                      ECS_GET_FLOAT(world, ent, "py")
+                      + ECS_GET_FLOAT(world, ent, "vy"))
+    NEXT
+NEXT
+
+PRINT "Entities:", ECS_COUNT(world)

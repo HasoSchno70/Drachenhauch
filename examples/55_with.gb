@@ -1,0 +1,104 @@
+' 55_with.gb -- WITH ... END WITH-Block.
+'
+' Klassisches BASIC-Konstrukt fuer kompakte Member-Zuweisungen.
+' Innerhalb des Block ist `.member` Shortcut fuer `<target>.member`.
+' Das WITH-Ziel wird genau EINMAL evaluiert.
+
+CLASS Player
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM hp AS INTEGER
+    DIM xp AS INTEGER
+    DIM name AS STRING
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+
+' --- Vorher: viel Wiederholung ---
+' p.x = 100.0
+' p.y = 50.0
+' p.hp = 100
+' p.xp = 0
+' p.name = "Alice"
+
+' --- Mit WITH: kompakt ---
+WITH p
+    .x = 100.0
+    .y = 50.0
+    .hp = 100
+    .xp = 0
+    .name = "Alice"
+END WITH
+
+PRINT "Player:"
+PRINT "  Name:", p.name
+PRINT "  Position:", p.x, p.y
+PRINT "  HP/XP:", p.hp, p.xp
+
+PRINT ""
+PRINT "=== Read-Zugriff im WITH-Block ==="
+
+CLASS Vec2
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+END CLASS
+
+DIM v AS Vec2
+v = NEW Vec2()
+v.x = 3.0
+v.y = 4.0
+
+DIM len AS FLOAT
+WITH v
+    len = SQR(.x * .x + .y * .y)
+END WITH
+PRINT "Laenge von (3, 4):", len
+
+PRINT ""
+PRINT "=== Compound-Operatoren funktionieren auch ==="
+
+CLASS Score
+    DIM points AS INTEGER
+    DIM combo AS INTEGER
+END CLASS
+
+DIM s AS Score
+s = NEW Score()
+s.points = 10
+s.combo = 1
+
+WITH s
+    .points += 50
+    .combo *= 2
+    .points = .points + .combo * 10
+END WITH
+
+PRINT "Punkte:", s.points
+PRINT "Combo: ", s.combo
+
+PRINT ""
+PRINT "=== Verschachtelte WITHs (innerstes gewinnt) ==="
+
+CLASS Outer
+    DIM tag AS STRING
+    DIM inner AS Inner
+END CLASS
+
+CLASS Inner
+    DIM val AS INTEGER
+END CLASS
+
+DIM o AS Outer
+o = NEW Outer()
+o.inner = NEW Inner()
+
+WITH o
+    .tag = "outside"
+    WITH .inner
+        .val = 42
+    END WITH
+END WITH
+
+PRINT "Outer.tag    =", o.tag
+PRINT "Outer.inner.val =", o.inner.val

@@ -1,0 +1,11 @@
+' Built-in-Math-Heavy: 500.000 SIN+COS-Calls.
+' Misst die Built-in-Dispatch-Overhead. Pro Iteration: 2 Math-Calls,
+' 2 Multiplikationen, 1 Akkumulation -- typisch fuer "Particle Field"
+' oder Trigonometrie-Animationen.
+DIM s AS FLOAT
+DIM i AS INTEGER
+s = 0.0
+FOR i = 1 TO 500000
+    s = s + SIN(i * 0.001) * COS(i * 0.0007)
+NEXT
+PRINT "Sum:", s

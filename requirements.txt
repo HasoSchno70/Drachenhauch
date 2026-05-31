@@ -1,0 +1,10 @@
+# Phase 1: keine externen Abhaengigkeiten
+# Phase 2c (Grafik) wird folgendes brauchen:
+# pygame>=2.5
+# Entwicklungswerkzeuge (optional):
+# pytest>=7
+# Code-Editor + Sprite-Editor (optional, beide PySide6-basiert):
+# PySide6>=6.5                # GUI-Framework fuer Code-Editor und Pixel-Art-Editor
+# Pillow>=10                  # Logo/Icon-Skalierung + Sprite-Editor-Pixel-Manipulation
+# Module (optional, abhaengig von welche IMPORTs verwendet werden):
+# numpy>=1.24                 # particles (vektorisierte Update-Schleife)

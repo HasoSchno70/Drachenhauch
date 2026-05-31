@@ -1,0 +1,762 @@
+' === ORBITAL - GameBasic Showcase =====================================
+' Pusht den Tree-Walking-Interpreter ueber den Anschlag und zeigt
+' gleichzeitig wie viel die Sprache draufhat:
+'
+'   * 100+ Klasseninstanzen (Asteroidenguertel + Planeten + Mond + Komet)
+'   * Vererbung (CLASS Comet EXTENDS Body) mit Override + Polymorphie
+'   * Pro Frame: ~270 COS/SIN-Auswertungen, ~270 CIRCLE-Aufrufe,
+'     ~200 PLOT-Aufrufe fuer den Sternenhimmel, dazu Partikel-System
+'   * IMPORT-Module: particles (vektorisierte NumPy-Trails),
+'     tween (Easing-Animationen), camera (Welt-/Screen-Trafo),
+'     input (Action-basiertes Eingabe-Mapping mit Edge-Detection)
+'   * Sprach-Features: CLASS+EXTENDS, ARRAY OF Klasse, MAP OF STRING,
+'     SELECT CASE, DATA/READ/RESTORE, f-Strings, FORMAT$,
+'     Compound-Assignment, CONST, REPEAT/UNTIL, Default-Parameter,
+'     Tupel-Returns mit Destructuring, PROPERTY GET, List-Comprehensions
+'     mit RANGE
+'
+' Steuerung:
+'   0..6     Fokus: Sonne / Merkur / Venus / Erde / Mars / Jupiter / Komet
+'   F        Free-Mode an/aus (Maus zieht die Kamera)
+'   + / -    Zoom rein/raus
+'   R        Reset (Sonne zentriert, Zoom 1.0)
+'   SPACE    Zeit einfrieren
+'   M        Sound + Musik an/aus
+'   F11      Vollbild an/aus
+'   ESC      Ende
+'
+' Hintergrund-Musik: assets/ambient.ogg (CC0, "Space Music: Out There" -
+' https://opengameart.org/content/space-music-out-there). Fehlt das
+' Asset, laeuft das Demo stumm weiter (FILEEXISTS-Check).
+
+IMPORT "particles"
+IMPORT "tween"
+IMPORT "camera"
+IMPORT "input"
+
+' --- Logische Aufloesung 640x400, Scale 2 -> Fenster 1280x800. -------
+CONST WIDTH AS INTEGER = 640
+CONST HEIGHT AS INTEGER = 400
+CONST N_PLANETS AS INTEGER = 6
+CONST N_ASTEROIDS AS INTEGER = 100
+CONST N_STARS AS INTEGER = 200
+CONST TWO_PI AS FLOAT = 6.2831853
+
+SCREEN(WIDTH, HEIGHT, "Orbital - GameBasic Showcase", 2)
+RANDOMIZE(7)               ' deterministisch fuer reproduzierbare Verteilung
+
+' --- Input-Bindings ---------------------------------------------------
+' Statt sieben einzelner KEYPRESSED(KEY_n)-Zweige: ein Loop, der dynamisch
+' "focus0".."focus6" an die Tasten 0..6 bindet. Die anderen Actions sind
+' Toggles (Edge-Detection) oder Hold (Zoom).
+DIM bi AS INTEGER
+FOR bi = 0 TO 6
+    INPUT_BIND("focus" + STR$(bi), KEY_0 + bi)
+NEXT
+INPUT_BIND("free",       KEY_F)
+INPUT_BIND("zoom_in",    43)            ' "+"
+INPUT_BIND("zoom_out",   45)            ' "-"
+INPUT_BIND("reset_view", KEY_R)
+INPUT_BIND("freeze",     KEY_SPACE)
+INPUT_BIND("mute",       KEY_M)
+INPUT_BIND("fullscreen", KEY_F11)
+INPUT_BIND("quit",       KEY_ESCAPE)
+
+' --- Hintergrundmusik: lazy laden, falls Asset vorhanden ---------------
+'   Track:  "Space Music: Out There" (CC0)
+'   Quelle: https://opengameart.org/content/space-music-out-there
+CONST MUSIC_PATH AS STRING = "assets/ambient.ogg"
+CONST MUSIC_VOL  AS FLOAT  = 0.4
+DIM has_music AS BOOLEAN
+has_music = FILEEXISTS(MUSIC_PATH)
+IF has_music THEN
+    PLAYMUSIC(MUSIC_PATH, -1, MUSIC_VOL)    ' loops=-1 = endlos
+END IF
+
+' ===== Klassenhierarchie =============================================
+
+' Basis: ein Himmelskoerper auf einer Kreisbahn um (cx, cy).
+CLASS Body
+    DIM name AS STRING
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM cx AS FLOAT
+    DIM cy AS FLOAT
+    DIM radius AS FLOAT
+    DIM color AS INTEGER
+    DIM orbit_r AS FLOAT
+    DIM speed AS FLOAT      ' rad pro ms
+    DIM angle AS FLOAT
+    ' Atmosphaere: zwei konzentrische Ringe hinter dem Body. Bleibt 0
+    ' wenn nicht via SetAtmosphere() gesetzt -> nichts gezeichnet.
+    DIM atm_outer AS INTEGER
+    DIM atm_inner AS INTEGER
+    DIM atm_thickness AS FLOAT
+
+    SUB Init(n AS STRING, c AS INTEGER, rd AS FLOAT, _
+             orb AS FLOAT, sp AS FLOAT, ang AS FLOAT)
+        name = n
+        color = c
+        radius = rd
+        orbit_r = orb
+        speed = sp
+        angle = ang
+        cx = 0.0
+        cy = 0.0
+        x = orb
+        y = 0.0
+    END SUB
+
+    SUB SetCenter(px AS FLOAT, py AS FLOAT)
+        cx = px
+        cy = py
+    END SUB
+
+    SUB Update(dt_ms AS INTEGER)
+        angle += speed * dt_ms
+        IF angle > TWO_PI THEN angle -= TWO_PI
+        x = cx + COS(angle) * orbit_r
+        y = cy + SIN(angle) * orbit_r
+    END SUB
+
+    SUB DrawOrbit(col AS INTEGER)
+        IF orbit_r >= 1.0 THEN
+            ELLIPSEOUTLINE(cx, cy, orbit_r, orbit_r, col)
+        END IF
+    END SUB
+
+    ' Read-only Property -- liefert Position als Tupel.
+    ' Camera-Code kann damit `(tx, ty) = body.pos` schreiben.
+    PROPERTY GET pos() AS TUPLE
+        RETURN (Self.x, Self.y)
+    END PROPERTY
+
+    SUB DrawBody()
+        ' Atmosphaere zuerst (hinten), dann Body drueber.
+        ' Aussenring blendet zur Schwaerze, Innenring ist dichter Glow.
+        IF atm_thickness > 0.01 THEN
+            CIRCLE(x, y, radius + atm_thickness, atm_outer)
+            CIRCLE(x, y, radius + atm_thickness * 0.5, atm_inner)
+        END IF
+        CIRCLE(x, y, radius, color)
+    END SUB
+
+    ' Optionale Atmosphaere setzen. Mercury haette z.B. nichts,
+    ' Venus kraeftig cremig, Erde Sky-Blue, etc.
+    SUB SetAtmosphere(outer_col AS INTEGER, inner_col AS INTEGER, _
+                      thickness AS FLOAT)
+        atm_outer = outer_col
+        atm_inner = inner_col
+        atm_thickness = thickness
+    END SUB
+END CLASS
+
+' Komet: erbt Bahn-Logik, zeichnet eine elliptische Bahn (eccent < 1),
+' tragt einen Partikel-Schweif mit sich.
+CLASS Comet EXTENDS Body
+    DIM eccent AS FLOAT
+    DIM trail AS PARTICLE_SYSTEM
+
+    SUB Init(orb AS FLOAT, sp AS FLOAT, ang AS FLOAT, e AS FLOAT)
+        name = "Komet"
+        color = &HCCEEFF
+        radius = 2.5
+        orbit_r = orb
+        speed = sp
+        angle = ang
+        cx = 0.0
+        cy = 0.0
+        x = orb
+        y = 0.0
+        eccent = e
+        trail = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+        PARTICLE_SET_COLOR(trail, &H99CCFF)
+        ' Kuerzere Lebensdauer -> kompakter Trail, weniger ueberlappende
+        ' "Geister-Bahnen" beim Scrollen oder Zoom.
+        PARTICLE_SET_LIFETIME(trail, 250, 600)
+        PARTICLE_SET_VELOCITY(trail, -6.0, 6.0, -6.0, 6.0)
+        PARTICLE_SET_SIZE(trail, 1, 2)
+        PARTICLE_SET_FADE(trail, TRUE)
+    END SUB
+
+    ' Override: kosinus-/sinus-getrennt mit Stauchung in Y.
+    SUB Update(dt_ms AS INTEGER)
+        angle += speed * dt_ms
+        IF angle > TWO_PI THEN angle -= TWO_PI
+        x = cx + COS(angle) * orbit_r
+        y = cy + SIN(angle) * orbit_r * eccent
+    END SUB
+
+    SUB UpdateTrail(dt_ms AS INTEGER)
+        PARTICLE_SET_POS(trail, x, y)
+        PARTICLE_EMIT(trail, 2)
+        PARTICLE_UPDATE(trail, dt_ms)
+    END SUB
+
+    SUB DrawTrail()
+        PARTICLE_DRAW(trail)
+    END SUB
+
+    SUB DrawOrbitEllipse(col AS INTEGER)
+        ELLIPSEOUTLINE(cx, cy, orbit_r, orbit_r * eccent, col)
+    END SUB
+
+    ' Body- und Trail-Farbe nachtraeglich umfaerben - so reicht
+    ' der einheitliche Konstruktor fuer beliebig viele bunte Kometen.
+    SUB SetColors(body_col AS INTEGER, trail_col AS INTEGER)
+        color = body_col
+        PARTICLE_SET_COLOR(trail, trail_col)
+    END SUB
+END CLASS
+
+' ===== Daten =========================================================
+
+' Planeten via DATA-Tabelle. Format:
+'   Name, Farbe, Radius, Orbit-Radius, Speed (rad/ms), Startwinkel
+DATA "Merkur",  &HBBAA88, 2.5,  50.0,  0.00350, 0.0
+DATA "Venus",   &HEEAA66, 3.5,  78.0,  0.00240, 1.2
+DATA "Erde",    &H4080FF, 4.0,  110.0, 0.00160, 2.4
+DATA "Mars",    &HCC5533, 3.0,  145.0, 0.00115, 3.7
+DATA "Jupiter", &HCCAA88, 8.0,  220.0, 0.00055, 5.1
+DATA "Saturn",  &HEECC99, 6.5,  290.0, 0.00033, 0.7
+
+' ===== Setup =========================================================
+
+DIM planets[N_PLANETS] AS Body
+DIM info AS MAP OF STRING
+DIM i AS INTEGER
+
+' READ-Schleife laedt die Planeten aus der DATA-Tabelle.
+DIM p_name AS STRING
+DIM p_col  AS INTEGER
+DIM p_rad  AS FLOAT
+DIM p_orb  AS FLOAT
+DIM p_spd  AS FLOAT
+DIM p_ang  AS FLOAT
+
+FOR i = 0 TO N_PLANETS - 1
+    READ p_name, p_col, p_rad, p_orb, p_spd, p_ang
+    planets[i] = NEW Body(p_name, p_col, p_rad, p_orb, p_spd, p_ang)
+NEXT
+
+' --- Atmosphaeren ----------------------------------------------------
+' Zwei Schichten hinterm Body: schwacher Aussenring (Outer) der zur
+' Schwaerze blendet, und ein hellerer Innenring (Inner) als Limb-Glow.
+' Werte sind reine Optik, keine Physik.
+'   planets[0] Merkur - keine Atmosphaere (kein SetAtmosphere-Aufruf)
+planets[1].SetAtmosphere(&H553322, &HDDCC88, 2.5)   ' Venus  - dick, cremig
+planets[2].SetAtmosphere(&H1A3050, &H88BBEE, 2.0)   ' Erde   - Sky Blue
+planets[3].SetAtmosphere(&H552E22, &HDD7755, 1.0)   ' Mars   - duenne Roetung
+planets[4].SetAtmosphere(&H554433, &HBBAA77, 2.5)   ' Jupiter- Gas-Haze
+planets[5].SetAtmosphere(&H554433, &HDDBB88, 2.0)   ' Saturn - pale Gold
+
+' Beschreibungen pro Koerper - ueber Map nachgeschlagen im HUD.
+MAPPUT(info, "Sonne",   "G2V Stern - Pulsiert mit inout_sine Tween")
+MAPPUT(info, "Merkur",  "Heisser Felsbrocken - innerster Planet")
+MAPPUT(info, "Venus",   "Glutofen unter Schwefelwolken")
+MAPPUT(info, "Erde",    "Blauer Punkt mit eigenem Mond")
+MAPPUT(info, "Mars",    "Rostroter Wuestenplanet")
+MAPPUT(info, "Jupiter", "Gasriese - mit ~100 Asteroiden im Guertel davor")
+MAPPUT(info, "Komet",   "Gast aus den Tiefen - Trail vektorisiert per NumPy")
+
+' Erdmond: Body, dessen Center jeden Frame auf die Erdposition gesetzt wird.
+DIM moon AS Body
+moon = NEW Body("Mond", &HDDDDDD, 1.5, 9.0, 0.012, 0.0)
+
+' Komet: separate Variable, weil wir spezialisierte Methoden brauchen.
+DIM comet AS Comet
+comet = NEW Comet(380.0, 0.00080, 0.0, 0.35)
+
+' Zusaetzliche Meteoriten - eigene Bahnen, eigene Trail-Farben.
+' Reine Spektakel-Objekte; Key 6 fokussiert weiter den Original-Komet.
+CONST N_METEORS AS INTEGER = 3
+DIM meteors[N_METEORS] AS Comet
+meteors[0] = NEW Comet(270.0, 0.00115, 1.05, 0.55)
+meteors[0].SetColors(&HAAFFCC, &H66FF99)              ' gruen-cyan
+meteors[1] = NEW Comet(440.0, 0.00060, 3.14, 0.25)
+meteors[1].SetColors(&HFFAACC, &HFF66BB)              ' pink-magenta
+meteors[2] = NEW Comet(350.0, 0.00095, 4.71, 0.40)
+meteors[2].SetColors(&HFFDD88, &HFFAA44)              ' gelb-orange
+
+' Asteroidenguertel: 100 Body-Instanzen mit Streuung in Radius/Farbe/Speed.
+' Vorher: 8-zeilige FOR-Schleife mit fuenf temporaeren Variablen.
+' Jetzt: Helper + List-Comprehension ueber RANGE.
+FUNCTION make_asteroid() AS Body
+    DIM grey AS INTEGER
+    grey = 110 + INT(RND() * 60)
+    RETURN NEW Body("ast", RGB(grey + 10, grey, grey - 15), _
+                    0.7 + RND() * 1.0, _
+                    175.0 + RND() * 20.0, _
+                    0.00080 + RND() * 0.00030, _
+                    RND() * TWO_PI)
+END FUNCTION
+
+DIM asteroids AS TUPLE
+asteroids = [make_asteroid() FOR i IN RANGE(N_ASTEROIDS)]
+
+' Sterne im Hintergrund. Screen-Space (immer scharf, Camera-unabhaengig).
+' Drei parallele Arrays werden zu einem Tupel-of-Tupel: (x, y, brightness).
+FUNCTION make_star() AS TUPLE
+    RETURN (INT(RND() * WIDTH), INT(RND() * HEIGHT), 80 + INT(RND() * 175))
+END FUNCTION
+
+DIM stars AS TUPLE
+stars = [make_star() FOR i IN RANGE(N_STARS)]
+
+' Sonnen-Pulsation per Tween (Pingpong, Sinus-Easing).
+DIM sun_pulse AS TWEEN
+sun_pulse = TWEEN_NEW_PINGPONG(0.92, 1.12, 2400, "inout_sine")
+
+' Klick-SFX bei Fokuswechsel (laeuft parallel zur Hintergrundmusik).
+DIM sfx_click AS SOUND
+sfx_click = LOADSOUND("assets/pickup.wav")
+
+' --- Sinus-Scroller a la Amiga: bunter Lauftext mit Sinus-Welle ------
+DIM scroll_msg AS STRING
+scroll_msg = "    *** GAMEBASIC (c)2026 ba HASOSOFT***    100+ KLASSEN-INSTANZEN, 270 COS/SIN PRO FRAME, NUMPY-PARTIKEL, TWEEN-EASING, KAMERA-FOLLOW    ALLES IM TREE-WALKING-INTERPRETER    *** EIN SINUS-SCROLLER WIE FRUEHER AUF DEM AMIGA ***    PRESS 0..6 TO FOCUS, F FOR FREE-CAM, +/- TO ZOOM    *** ROLL ON ***    "
+DIM scroll_x AS FLOAT
+scroll_x = WIDTH * 1.0
+
+' --- Camera State ----------------------------------------------------
+DIM focus AS INTEGER       ' 0 = Sonne, 1..6 = Planet[0..5], 7 = Komet
+DIM zoom  AS FLOAT
+DIM frozen AS BOOLEAN
+DIM free_mode AS BOOLEAN
+focus = 0
+zoom = 1.0
+frozen = FALSE
+free_mode = FALSE
+
+' --- Camera-Smoothing -----------------------------------------------
+' Strategie: wenn auf einen Body fokussiert ist, snappt die Camera
+' DIREKT auf seine Position -- so bleibt der Body pixelgenau zentriert
+' und zuckt nicht durch dt-Spikes. Smoothing aktiviert sich beim
+' Fokus-Wechsel: prev_focus != focus -> Lerp zum neuen Ziel, bis die
+' Camera dort ankommt, dann wieder hart locken.
+DIM smooth_x AS FLOAT
+DIM smooth_y AS FLOAT
+DIM smooth_zoom AS FLOAT
+DIM transition_active AS BOOLEAN
+smooth_x = 0.0
+smooth_y = 0.0
+smooth_zoom = zoom
+transition_active = FALSE
+
+CONST CAM_LERP_RATE AS FLOAT = 0.020     ' kleiner = traeger, groesser = schneller
+CONST ZOOM_LERP_RATE AS FLOAT = 0.020
+CONST TRANSITION_EPS AS FLOAT = 0.5      ' "angekommen"-Schwelle in Welt-Pixeln
+
+' --- Frame-/FPS-Tracking --------------------------------------------
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+DIM frame_no AS INTEGER
+DIM frame_count AS INTEGER
+DIM fps AS INTEGER
+DIM last_fps AS FLOAT
+last_fps = TIMER()
+frame_no = 0
+frame_count = 0
+fps = 0
+
+' Toggle-State: was vom INPUT_PRESSED zurueckgesetzt wird, lebt
+' direkt in den Toggle-Variablen (frozen, free_mode, muted, fs_on).
+DIM fs_on AS BOOLEAN
+fs_on = FALSE
+
+' Sound-Toggle plus Focus-Tracker fuer SFX-Trigger.
+DIM muted AS BOOLEAN
+DIM prev_focus AS INTEGER
+muted = FALSE
+prev_focus = focus
+
+' Default-Argumente: helper rendert eine HUD-Karte.
+SUB DrawCard(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, _
+             title AS STRING, fg AS INTEGER = &HFFFFFF, _
+             bg AS INTEGER = &H0F1424)
+    BOX(x, y, x + w - 1, y + h - 1, bg)
+    RECT(x, y, x + w - 1, y + h - 1, fg)
+    TEXT(x + 5, y + 3, title, fg)
+END SUB
+
+' Sinus-Scroller-Farbe: drei phasenverschobene Sinusse zu (r, g, b).
+' Tupel-Return ersetzt die fruehere Inline-Berechnung mit drei
+' Variablen + drei manuellen Clamping-IFs (12 Zeilen -> 1 Aufruf).
+FUNCTION SinscrollRGB(phase AS FLOAT) AS TUPLE
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT(127.0 + SIN(phase)         * 127.0)
+    g = INT(127.0 + SIN(phase + 2.094) * 127.0)
+    b = INT(127.0 + SIN(phase + 4.189) * 127.0)
+    RETURN (CLAMP(r, 0, 255), CLAMP(g, 0, 255), CLAMP(b, 0, 255))
+END FUNCTION
+
+' ===== Main Loop ====================================================
+
+WHILE NOT QUITREQUESTED()
+    INPUT_UPDATE()
+    IF INPUT_HELD("quit") THEN BREAK
+
+    ' --- Input ------------------------------------------------------
+    ' Fokus 0..6 in einem einzigen Loop -- sieben fast identische
+    ' IF-Branches sind weg.
+    DIM ki AS INTEGER
+    FOR ki = 0 TO 6
+        IF INPUT_PRESSED("focus" + STR$(ki)) THEN
+            focus = ki
+            free_mode = FALSE
+            transition_active = TRUE     ' Camera lerpt zum neuen Body
+        END IF
+    NEXT
+
+    ' Edge-Toggles: jeweils eine Zeile, vorher fuenf-sechs Zeilen
+    ' mit lokaler `_was`-Variable.
+    IF INPUT_PRESSED("free") THEN
+        free_mode = NOT free_mode
+        transition_active = TRUE
+    END IF
+    IF INPUT_PRESSED("freeze") THEN frozen    = NOT frozen
+
+    IF INPUT_PRESSED("mute") THEN
+        muted = NOT muted
+        ' Musik ebenfalls toggeln (kein Live-Volume-Setter aus GB).
+        IF has_music THEN
+            IF muted THEN
+                STOPMUSIC()
+            ELSE
+                PLAYMUSIC(MUSIC_PATH, -1, MUSIC_VOL)
+            END IF
+        END IF
+    END IF
+
+    ' F11 = Vollbild-Toggle. Pygame baut das Display dabei neu auf,
+    ' der logische Buffer und alle Coords bleiben unveraendert.
+    IF INPUT_PRESSED("fullscreen") THEN
+        fs_on = NOT fs_on
+        SET_FULLSCREEN(fs_on)
+    END IF
+
+    ' Hold-Aktionen (Zoom + Reset).
+    IF INPUT_HELD("zoom_in") THEN
+        zoom *= 1.03
+        IF zoom > 4.0 THEN zoom = 4.0
+    END IF
+    IF INPUT_HELD("zoom_out") THEN
+        zoom /= 1.03
+        IF zoom < 0.30 THEN zoom = 0.30
+    END IF
+    IF INPUT_HELD("reset_view") THEN
+        focus = 0
+        zoom = 1.0
+        free_mode = FALSE
+    END IF
+
+    ' --- Zeit -------------------------------------------------------
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+    IF dt > 100 THEN dt = 100        ' clamp gegen Pause-Spikes
+    IF frozen THEN dt = 0
+
+    ' --- Update -----------------------------------------------------
+    ' Planeten - klassische Polymorphie haetten wir mit ARRAY of Body,
+    ' rufen wir sie alle mit derselben Schnittstelle auf.
+    FOR i = 0 TO N_PLANETS - 1
+        planets[i].Update(dt)
+    NEXT
+
+    ' Mond folgt der Erde (planets[2]). Center pro Frame neu setzen.
+    moon.SetCenter(planets[2].x, planets[2].y)
+    moon.Update(dt)
+
+    ' Asteroiden - REPEAT/UNTIL als Showcase einer Post-Test-Schleife.
+    i = 0
+    REPEAT
+        asteroids[i].Update(dt)
+        i += 1
+    UNTIL i >= N_ASTEROIDS
+
+    ' Komet: ueberschriebenes Update + Trail.
+    comet.Update(dt)
+    comet.UpdateTrail(dt)
+
+    ' Weitere Meteoriten - jeder mit eigener Bahn und eigenem Trail.
+    FOR i = 0 TO N_METEORS - 1
+        meteors[i].Update(dt)
+        meteors[i].UpdateTrail(dt)
+    NEXT
+
+    ' SFX-Klick wenn Fokus wechselt (User-initiiert, einmal pro Edge).
+    IF focus <> prev_focus AND NOT muted THEN
+        PLAYSOUND(sfx_click, 0, 0.4)
+    END IF
+    prev_focus = focus
+
+    ' --- Camera-Ziel bestimmen --------------------------------------
+    DIM tx AS FLOAT
+    DIM ty AS FLOAT
+    DIM focus_name AS STRING
+
+    IF free_mode THEN
+        ' Maus-Position als Welt-Punkt - die Kamera schwebt damit frei.
+        tx = CAMERA_S2W_X(MOUSEX())
+        ty = CAMERA_S2W_Y(MOUSEY())
+        focus_name = "Frei"
+    ELSE
+        ' Body.pos liefert (x, y) als Tupel -- via Destructuring
+        ' direkt in tx/ty entpackt. Kein wiederholter `.x`/`.y`-Lookup.
+        SELECT CASE focus
+            CASE 0
+                tx = 0.0
+                ty = 0.0
+                focus_name = "Sonne"
+            CASE 1, 2, 3, 4, 5
+                (tx, ty) = planets[focus - 1].pos
+                focus_name = planets[focus - 1].name
+            CASE 6
+                (tx, ty) = comet.pos
+                focus_name = "Komet"
+            CASE ELSE
+                tx = 0.0
+                ty = 0.0
+                focus_name = "?"
+        END SELECT
+    END IF
+
+    ' --- Zeichnen ---------------------------------------------------
+    CLS(&H05060F)
+
+    ' 1) Sterne im Screen-Space (Camera explizit zurueck)
+    CAMERA_RESET()
+    FOR i = 0 TO N_STARS - 1
+        ' Tupel-Destructuring: jeder Stern liefert seine drei Werte
+        ' direkt aus dem Tupel-of-Tupel.
+        DIM sx AS INTEGER
+        DIM sy AS INTEGER
+        DIM base_b AS INTEGER
+        (sx, sy, base_b) = stars[i]
+        ' Smoothes Twinkle via Sinus -- sanftes Atmen statt hartes On/Off.
+        ' Rate 0.12 = etwa 1 voller Pulse pro Sekunde bei 60fps.
+        DIM phase AS FLOAT
+        phase = (frame_no + i * 11) * 0.12
+        DIM b AS INTEGER
+        b = base_b + INT(SIN(phase) * 40.0)
+        IF b < 30 THEN b = 30
+        IF b > 255 THEN b = 255
+        PLOT(sx, sy, RGB(b, b, MIN(255, b + 25)))
+    NEXT
+
+    ' 2) Camera-Position bestimmen.
+    ' - Free-Mode: hart auf tx/ty (Maus), kein Lerp (Feedback-Cycle).
+    ' - Transition-Active: Lerp zum neuen Ziel, bis Distanz < EPS.
+    ' - Sonst: HARD locken auf tx/ty -- so kann der Planet sich nicht
+    '   relativ zur Camera "verlaufen", egal wie dt schwankt.
+    IF free_mode THEN
+        smooth_x = tx
+        smooth_y = ty
+    ELSEIF transition_active THEN
+        DIM lerp AS FLOAT
+        lerp = CAM_LERP_RATE * dt
+        IF lerp > 0.6 THEN lerp = 0.6
+        IF lerp < 0.0 THEN lerp = 0.0
+        smooth_x = smooth_x + (tx - smooth_x) * lerp
+        smooth_y = smooth_y + (ty - smooth_y) * lerp
+        ' Angekommen? -> hart einrasten und Transition beenden
+        IF ABS(tx - smooth_x) < TRANSITION_EPS _
+           AND ABS(ty - smooth_y) < TRANSITION_EPS THEN
+            smooth_x = tx
+            smooth_y = ty
+            transition_active = FALSE
+        END IF
+    ELSE
+        ' Hard-Lock: Body bleibt pixelgenau zentriert.
+        smooth_x = tx
+        smooth_y = ty
+    END IF
+    ' Zoom wird IMMER smooth -- der Zoom-Toggle macht sonst Schmalsehen.
+    DIM zlerp AS FLOAT
+    zlerp = ZOOM_LERP_RATE * dt
+    IF zlerp > 0.6 THEN zlerp = 0.6
+    IF zlerp < 0.0 THEN zlerp = 0.0
+    smooth_zoom = smooth_zoom + (zoom - smooth_zoom) * zlerp
+
+    CAMERA_SET(0.0, 0.0, smooth_zoom)
+    CAMERA_FOLLOW(smooth_x, smooth_y, WIDTH, HEIGHT)
+
+    ' Bahnen als faint-Ellipsen. Planet-Bahnen sehr dunkel, damit sie
+    ' beim Scrollen nicht aufdraengen. Meteor-Bahnen sind weggelassen --
+    ' sie ueberlappten geometrisch mit der Komet-Bahn und wirkten beim
+    ' Scrollen wie Doppel-Linien (der Trail zeigt die Bahn ohnehin).
+    FOR i = 0 TO N_PLANETS - 1
+        planets[i].DrawOrbit(&H121626)
+    NEXT
+    comet.DrawOrbitEllipse(&H1A1E32)
+
+    ' Asteroidenguertel
+    FOR i = 0 TO N_ASTEROIDS - 1
+        asteroids[i].DrawBody()
+    NEXT
+
+    ' Sonne mit erweitertem Halo + Pulsation. Sechs konzentrische Schichten
+    ' fuer einen weicheren Glow-Uebergang von Schwarz nach Innen-Weiss.
+    DIM scale AS FLOAT
+    scale = TWEEN_VALUE(sun_pulse)
+    CIRCLE(0, 0, 38 * scale, &H1A1009)
+    CIRCLE(0, 0, 28 * scale, &H332211)
+    CIRCLE(0, 0, 22 * scale, &H66441A)
+    CIRCLE(0, 0, 16 * scale, &HCC8833)
+    CIRCLE(0, 0, 10 * scale, &HFFCC44)
+    CIRCLE(0, 0,  6 * scale, &HFFEE99)
+    CIRCLE(0, 0,  3 * scale, &HFFFFFF)
+
+    ' Planeten
+    FOR i = 0 TO N_PLANETS - 1
+        planets[i].DrawBody()
+    NEXT
+
+    ' Saturn-Ring (planets[5]). Ueberlappung mit Planet egal - Ring hinten
+    ' und vorn ueberlappt visuell, das ist hier OK.
+    ELLIPSEOUTLINE(planets[5].x, planets[5].y, 12.0, 4.0, &HCCBB88)
+    ELLIPSEOUTLINE(planets[5].x, planets[5].y, 10.0, 3.0, &HEEDDAA)
+
+    ' Erde + Mond
+    moon.DrawBody()
+
+    ' Erst alle Trails (zusammen layern), dann alle Bodies darueber.
+    FOR i = 0 TO N_METEORS - 1
+        meteors[i].DrawTrail()
+    NEXT
+    comet.DrawTrail()
+    FOR i = 0 TO N_METEORS - 1
+        meteors[i].DrawBody()
+    NEXT
+    comet.DrawBody()
+
+    ' Komet-Glanz: heller Mittelpunkt
+    CIRCLE(comet.x, comet.y, 1.5, &HFFFFFF)
+
+    ' Fokus-Marker -- kleines Fadenkreuz EXAKT in der Bildschirmmitte.
+    ' Vorher in Welt-Koord um (tx, ty) -- bei Camera-Lag wanderte der
+    ' Marker mit, jetzt steht er fix zentral. Im Free-Mode zeichnen wir
+    ' nicht, da freier Cursor nicht zwingend zentriert ist.
+    CAMERA_RESET()
+    IF NOT free_mode THEN
+        DIM mx AS INTEGER
+        DIM my AS INTEGER
+        mx = WIDTH / 2
+        my = HEIGHT / 2
+        LINE(mx - 8, my, mx - 3, my, &H88FFAA)
+        LINE(mx + 3, my, mx + 8, my, &H88FFAA)
+        LINE(mx, my - 8, mx, my - 3, &H88FFAA)
+        LINE(mx, my + 3, mx, my + 8, &H88FFAA)
+    END IF
+
+    ' --- HUD --------------------------------------------------------
+    CAMERA_RESET()
+
+    ' --- Sinus-Scroller (Amiga-Style) ------------------------------
+    ' Eigenes Band ueber der Info-Karte. Buchstaben einzeln, Y aus
+    ' SIN(phase), Farben aus drei phasenverschobenen Sinussen (R/G/B).
+    DIM band_y AS INTEGER
+    DIM band_h AS INTEGER
+    band_y = HEIGHT - 100
+    band_h = 38
+
+    BOX(0, band_y, WIDTH - 1, band_y + band_h - 1, &H050810)
+    LINE(0, band_y, WIDTH - 1, band_y, &H1A2A40)
+    LINE(0, band_y + band_h - 1, WIDTH - 1, band_y + band_h - 1, &H1A2A40)
+
+    DIM scroll_mid AS INTEGER
+    scroll_mid = band_y + band_h / 2
+
+    TEXT_SIZE(22)
+    TEXT_BOLD(TRUE)
+
+    DIM cur_x AS FLOAT
+    DIM ch AS STRING
+    DIM si AS INTEGER
+    DIM phase AS FLOAT
+    DIM sy AS INTEGER
+    DIM sr AS INTEGER
+    DIM sg AS INTEGER
+    DIM sb AS INTEGER
+
+    cur_x = scroll_x
+    FOR si = 0 TO LEN(scroll_msg) - 1
+        ch = MID$(scroll_msg, si, 1)
+        IF cur_x > -32 AND cur_x < WIDTH THEN
+            phase = (si * 0.30) + (frame_no * 0.06)
+            sy = scroll_mid - 11 + INT(SIN(phase) * 10.0)
+            ' Drei Phasen-Sinusse + drei Clampings auf einmal -- Tupel-
+            ' Destructuring statt drei zusaetzlicher Variablen.
+            (sr, sg, sb) = SinscrollRGB(phase)
+            TEXT(INT(cur_x), sy, ch, RGB(sr, sg, sb))
+        END IF
+        cur_x += TEXT_WIDTH(ch)
+    NEXT
+
+    TEXT_SIZE(20)
+    TEXT_BOLD(FALSE)
+
+    IF NOT frozen THEN
+        scroll_x -= 2.0
+    END IF
+    IF scroll_x < -1.0 * LEN(scroll_msg) * 16.0 THEN
+        scroll_x = WIDTH * 1.0
+    END IF
+
+    ' FPS-Update alle 0.5 s.
+    frame_count += 1
+    DIM elapsed AS FLOAT
+    elapsed = TIMER() - last_fps
+    IF elapsed >= 0.5 THEN
+        fps = INT(frame_count / elapsed)
+        frame_count = 0
+        last_fps = TIMER()
+    END IF
+
+    ' Linke Karte: Status
+    DrawCard(4, 4, 220, 26, "Orbital", &HCCDDEE)
+    TEXT(4 + 70, 4 + 5, f"Fokus: {focus_name}", &HFFCC66)
+
+    ' Rechte Karte: Performance + Sound-Indikator + Frame-Counter
+    DrawCard(WIDTH - 240, 4, 236, 26, "Stats", &H88FFAA)
+    TEXT(WIDTH - 240 + 56, 4 + 5, FORMAT$(fps, "FPS:%3d"), &HCCDDEE)
+    TEXT(WIDTH - 240 + 110, 4 + 5, FORMAT$(frame_no, "F:%06d"), &H99AAEE)
+    DIM snd_label AS STRING
+    IF muted THEN
+        snd_label = "[MUTE]"
+    ELSE
+        snd_label = "[SND ]"
+    END IF
+    TEXT(WIDTH - 240 + 188, 4 + 5, snd_label, &HFFCC66)
+
+    ' Untere Karte: Info auf einer Zeile (Titel links, Beschreibung
+    ' rechts) - selbes Schema wie die Top-Karten, kein vertikales Overlap.
+    DIM info_text AS STRING
+    IF MAPHAS(info, focus_name) THEN
+        info_text = MAPGET(info, focus_name)
+    ELSE
+        info_text = "freie Kamera - Maus bewegt den Blickpunkt"
+    END IF
+    DrawCard(4, HEIGHT - 56, WIDTH - 8, 26, "Info", &HBBCCDD)
+    TEXT(4 + 56, HEIGHT - 56 + 5, info_text, &HCCDDEE)
+
+    ' Help-Zeile in eigener Reihe ganz unten -- Zoom-Indikator als
+    ' kompakter Suffix damit nichts ueber den Bildschirmrand laeuft.
+    TEXT(8, HEIGHT - 24, _
+         "0..6=Fokus  F=Frei  +/-=Zoom  SPACE=Pause  M=Sound  F11=Vollbild  ESC=Ende  z=" _
+         + FORMAT$(INT(zoom * 100), "%03d") + "%", _
+         &H7788BB)
+
+    ' Pause-Banner mittig
+    IF frozen THEN
+        TEXT(WIDTH / 2 - 30, 46, "[ PAUSE ]", &HFFCC66)
+    END IF
+
+    FLIP()
+    SLEEP(16)
+    frame_no += 1
+WEND

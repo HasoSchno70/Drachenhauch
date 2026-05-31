@@ -1,0 +1,83 @@
+' SELECT CASE Demo - lesbarer als zig IF/ELSEIF.
+' Drei Match-Formen: einzelner Wert, Listenwert, Bereich (TO).
+
+PRINT "=== Wuerfel-Auswertung ==="
+DIM augen AS INTEGER
+FOR augen = 1 TO 7
+    SELECT CASE augen
+        CASE 1
+            PRINT augen, "-> Eins"
+        CASE 2, 3, 4
+            PRINT augen, "-> Zwei bis Vier"
+        CASE 5, 6
+            PRINT augen, "-> Fuenf oder Sechs"
+        CASE ELSE
+            PRINT augen, "-> ungueltig"
+    END SELECT
+NEXT
+
+PRINT ""
+PRINT "=== Notenbereich ==="
+DIM punkte AS INTEGER
+DIM grade AS INTEGER
+FOR grade = 0 TO 6
+    punkte = grade * 17
+    SELECT CASE punkte
+        CASE 0 TO 30
+            PRINT PADL$(STR$(punkte), 3), "Punkte: ungenuegend"
+        CASE 31 TO 50
+            PRINT PADL$(STR$(punkte), 3), "Punkte: mangelhaft"
+        CASE 51 TO 70
+            PRINT PADL$(STR$(punkte), 3), "Punkte: befriedigend"
+        CASE 71 TO 90
+            PRINT PADL$(STR$(punkte), 3), "Punkte: gut"
+        CASE 91 TO 100
+            PRINT PADL$(STR$(punkte), 3), "Punkte: sehr gut"
+        CASE ELSE
+            PRINT PADL$(STR$(punkte), 3), "Punkte: ausserhalb [0..100]"
+    END SELECT
+NEXT
+
+PRINT ""
+PRINT "=== Strings als Subject ==="
+DIM cmd AS STRING
+DIM cmds AS ARRAY OF STRING
+DIM nc AS INTEGER
+
+cmds = SPLIT$("hilfe,start,stop,unbekannt", ",")
+FOR nc = 0 TO LEN(cmds) - 1
+    cmd = cmds[nc]
+    SELECT CASE cmd
+        CASE "hilfe", "?"
+            PRINT "  ", cmd, ": Hilfe-Anzeige"
+        CASE "start"
+            PRINT "  ", cmd, ": Spiel startet"
+        CASE "stop", "exit", "quit"
+            PRINT "  ", cmd, ": Spiel beendet"
+        CASE ELSE
+            PRINT "  ", cmd, ": unbekannter Befehl"
+    END SELECT
+NEXT
+
+PRINT ""
+PRINT "=== Subject wird nur einmal evaluiert ==="
+DIM aufrufe AS INTEGER
+aufrufe = 0
+
+FUNCTION zaehl_und_gib() AS INTEGER
+    aufrufe = aufrufe + 1
+    RETURN 7
+END FUNCTION
+
+SELECT CASE zaehl_und_gib()
+    CASE 1, 2, 3
+        PRINT "klein"
+    CASE 4 TO 6
+        PRINT "mittel"
+    CASE 7, 8, 9
+        PRINT "gross"
+    CASE ELSE
+        PRINT "anders"
+END SELECT
+
+PRINT "Aufrufe von zaehl_und_gib():", aufrufe, " (erwartet 1)"

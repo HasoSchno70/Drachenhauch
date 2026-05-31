@@ -1,0 +1,183 @@
+' Sprite-Collision + Easing-Demo: ein Spieler-Sprite weicht Hindernis-
+' Boxen aus, sammelt Coin-Sprites ein, mit Bounce-Easing fuer den
+' Spawn-Effekt der Coins.
+'
+' Steuerung: Pfeiltasten = bewegen, ESC = Ende.
+'
+' Voraussetzung: pygame; Sprite-/Tween-Module sind in GameBasic eingebaut.
+
+IMPORT "sprite"
+IMPORT "tween"
+
+SCREEN(480, 320, "Collision + Easing", 2)
+
+' --- Assets: Held 16x16, Coin 8x8 (Frame-Groessen muessen exakt
+' der Asset-Aufloesung entsprechen, sonst gibt es subsurface-Fehler) ----
+DIM hero_img AS IMAGE
+hero_img = LOADIMAGE("assets/hero.png")
+DIM coin_img AS IMAGE
+coin_img = LOADIMAGE("assets/coin.png")
+
+DIM player AS SPRITE
+player = SPRITE_NEW(hero_img, 16, 16)
+SPRITE_SET_POS(player, 240, 160)
+
+' --- 4 Coins via DATA-Liste plus Bounce-In-Tween fuer Spawn ------------
+DATA 80,  60
+DATA 380, 60
+DATA 80,  260
+DATA 380, 260
+CONST N_COINS AS INTEGER = 4
+
+DIM coins[N_COINS] AS SPRITE
+DIM coin_alive[N_COINS] AS BOOLEAN
+DIM coin_scale_tween[N_COINS] AS TWEEN
+DIM coin_bob_tween[N_COINS] AS TWEEN          ' Idle-Bob (kontinuierlich)
+DIM coin_base_y[N_COINS] AS INTEGER           ' Original-Y zum Bobbing-Offset
+
+DIM cx AS INTEGER
+DIM cy AS INTEGER
+DIM i AS INTEGER
+SUB SpawnCoins()
+    DIM j AS INTEGER
+    DIM xx AS INTEGER
+    DIM yy AS INTEGER
+    RESTORE                          ' Coin-Positionen erneut von Anfang lesen
+    FOR j = 0 TO N_COINS - 1
+        READ xx, yy
+        coin_base_y[j] = yy
+        SPRITE_SET_POS(coins[j], xx, yy)
+        SPRITE_SET_SCALE(coins[j], 0.01, 0.01)
+        coin_alive[j] = TRUE
+        ' Pop-In: einmaliges Schwingen mit out_elastic
+        coin_scale_tween[j] = TWEEN_NEW(0.01, 2.0, 1500 + j * 300, "out_elastic")
+        ' Idle-Bob: pingpong-Tween ueber +/- 4 px Y-Offset, sanftes Easing.
+        ' Stagger pro Coin (50 ms Versatz) damit sie nicht synchron huepfen.
+        coin_bob_tween[j] = TWEEN_NEW_PINGPONG(-4.0, 4.0, 600 + j * 50, "inout_sine")
+    NEXT
+END SUB
+
+FOR i = 0 TO N_COINS - 1
+    READ cx, cy                      ' nur damit der DATA-Pointer weiterzaehlt
+    coins[i] = SPRITE_NEW(coin_img, 8, 8)
+    coin_alive[i] = TRUE
+NEXT
+SpawnCoins()                          ' RESTORE + initialer Spawn mit Tweens
+
+' --- 3 Hindernis-Boxen (statisch) als reine Rechtecke ------------------
+DATA 120, 140, 80, 30
+DATA 280, 140, 80, 30
+DATA 200, 220, 80, 30
+DIM box_x[3] AS INTEGER
+DIM box_y[3] AS INTEGER
+DIM box_w[3] AS INTEGER
+DIM box_h[3] AS INTEGER
+FOR i = 0 TO 2
+    READ box_x[i], box_y[i], box_w[i], box_h[i]
+NEXT
+
+DIM score AS INTEGER
+score = 0
+
+DIM r_was_down AS BOOLEAN
+r_was_down = FALSE
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    ' R-Taste mit Edge-Detection: spawnt alle Coins neu, Tweens spielen
+    ' den Pop-In nochmal ab. So sieht man das out_elastic so oft man will.
+    DIM r_now AS BOOLEAN
+    r_now = KEYPRESSED(KEY_R)
+    IF r_now AND NOT r_was_down THEN
+        SpawnCoins()
+    END IF
+    r_was_down = r_now
+
+    ' Spieler-Bewegung mit Pfeil-Tasten - achsen-separat testen, damit
+    ' der Held an Waenden entlanggleiten kann (Top-Down-Standard).
+    DIM cur_x AS FLOAT
+    DIM cur_y AS FLOAT
+    cur_x = SPRITE_GET_X(player)
+    cur_y = SPRITE_GET_Y(player)
+
+    DIM dx AS FLOAT
+    DIM dy AS FLOAT
+    dx = 0.0
+    dy = 0.0
+    IF KEYPRESSED(KEY_LEFT)  THEN dx = -3.0
+    IF KEYPRESSED(KEY_RIGHT) THEN dx = 3.0
+    IF KEYPRESSED(KEY_UP)    THEN dy = -3.0
+    IF KEYPRESSED(KEY_DOWN)  THEN dy = 3.0
+
+    ' --- X-Achse versuchen, bei Kollision zurueck ---
+    SPRITE_SET_POS(player, cur_x + dx, cur_y)
+    FOR i = 0 TO 2
+        IF SPRITE_HIT_BOX(player, box_x[i], box_y[i], box_w[i], box_h[i]) THEN
+            SPRITE_SET_POS(player, cur_x, cur_y)
+            BREAK
+        END IF
+    NEXT
+    ' Stand nach X-Versuch sichern
+    cur_x = SPRITE_GET_X(player)
+
+    ' --- Y-Achse versuchen, bei Kollision zurueck ---
+    SPRITE_SET_POS(player, cur_x, cur_y + dy)
+    FOR i = 0 TO 2
+        IF SPRITE_HIT_BOX(player, box_x[i], box_y[i], box_w[i], box_h[i]) THEN
+            SPRITE_SET_POS(player, cur_x, cur_y)
+            BREAK
+        END IF
+    NEXT
+
+    ' Coins einsammeln via SPRITE_COLLIDE
+    FOR i = 0 TO N_COINS - 1
+        IF coin_alive[i] AND SPRITE_COLLIDE(player, coins[i]) THEN
+            coin_alive[i] = FALSE
+            score += 10
+        END IF
+    NEXT
+
+    ' --- Zeichnen --------------------------------------------------
+    CLS(&H1A1C2A)
+
+    ' Hindernisse
+    FOR i = 0 TO 2
+        BOX(box_x[i], box_y[i], box_x[i] + box_w[i], box_y[i] + box_h[i], &H4A4A6A)
+        RECT(box_x[i], box_y[i], box_x[i] + box_w[i], box_y[i] + box_h[i], &H8090C0)
+    NEXT
+
+    ' Coins mit Pop-In-Skalierung + kontinuierlichem Idle-Bob. Pop-In
+    ' (one-shot) endet, der Bob (pingpong) laeuft forever. Wenn der
+    ' Pop-In nicht mehr aktiv ist, lassen wir Scale auf dem Endwert
+    ' (saubere 2.0) und nur der Bob bewegt's.
+    FOR i = 0 TO N_COINS - 1
+        IF coin_alive[i] THEN
+            DIM s AS FLOAT
+            IF TWEEN_DONE(coin_scale_tween[i]) THEN
+                s = 2.0
+            ELSE
+                s = TWEEN_VALUE(coin_scale_tween[i])
+                IF s < 0.01 THEN s = 0.01
+            END IF
+            SPRITE_SET_SCALE(coins[i], s, s)
+
+            DIM bob AS FLOAT
+            bob = TWEEN_VALUE(coin_bob_tween[i])
+            SPRITE_SET_POS(coins[i], SPRITE_GET_X(coins[i]),
+                                       coin_base_y[i] + bob)
+
+            SPRITE_DRAW(coins[i])
+        END IF
+    NEXT
+
+    ' Spieler
+    SPRITE_DRAW(player)
+
+    ' HUD
+    TEXT(8, 8, f"Score: {score}", &HFFCC44)
+    TEXT(8, 300, "Pfeile = bewegen | R = Coins neu | ESC = Ende", &H8090A0)
+
+    FLIP()
+    SLEEP(16)
+WEND

@@ -1,0 +1,235 @@
+' Mini-Platformer mit Tiled-Level + Character-Controller + Pickups.
+'
+' Pipeline:
+'   - Level in Tiled gebaut (levels/level1.json)
+'   - Tile-Sprites aus dem Sprite-Atlas (assets/tiles_atlas.json)
+'   - Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump
+'   - Coin-Pickups via TILED_TILE_SET
+'   - Z-Layer fuer ordentliches Rendering
+'   - Action-Input: Tastatur (WASD + Pfeile) + Gamepad
+'
+' Steuerung:
+'   Tastatur: A/D oder Pfeile = laufen; W/Pfeil-Hoch/Space = Sprung; ESC = Ende
+'   Gamepad:  Linker Stick + DPad = laufen; A oder Hoch = Sprung; Back = Ende
+
+IMPORT "tiled"
+IMPORT "controller"
+IMPORT "input"
+
+SCREEN(480, 160, "Tiled Platformer Demo",3)
+
+' Level + Atlas laden
+DIM lvl AS TILED_MAP
+lvl = TILED_LOAD("levels/level1.json")
+
+DIM atlas AS SPRITE_ATLAS
+atlas = ATLAS_LOAD("assets/tiles_atlas.json")
+
+' Mario-Sprite-Atlas (5 Frames: idle, walk_a, walk_b, jump, hit)
+DIM mario AS SPRITE_ATLAS
+mario = ATLAS_LOAD("assets/mario_atlas.json")
+
+' Z-Layer
+LAYER_DEFINE("bg",      0)
+LAYER_DEFINE("tiles",   5)
+LAYER_DEFINE("player",  10)
+LAYER_DEFINE("ui",      100)
+
+' --- Character-Controller einrichten ----------------------------
+DIM player AS CHAR_CONTROLLER
+player = CHAR_NEW(
+    TILED_OBJECT_X(lvl, "spawns", 0),    ' player_start
+    TILED_OBJECT_Y(lvl, "spawns", 0),
+    12.0, 14.0
+)
+CHAR_SET_MOVE_SPEED(player, 2.0)
+CHAR_SET_JUMP_VELOCITY(player, 6.0)
+CHAR_SET_GRAVITY(player, 0.25)
+CHAR_SET_MAX_FALL(player, 7.0)
+CHAR_SET_COYOTE_TIME(player, 6)
+CHAR_SET_JUMP_BUFFER(player, 6)
+CHAR_SET_VARIABLE_JUMP(player, TRUE)
+
+' --- Input-Mapping (Tastatur + Gamepad) -------------------------
+INPUT_BIND("left",  KEY_LEFT,  KEY_A, JOY_DPAD_LEFT)
+INPUT_BIND("right", KEY_RIGHT, KEY_D, JOY_DPAD_RIGHT)
+INPUT_BIND("jump",  KEY_SPACE, KEY_W, KEY_UP, JOY_BUTTON_A, JOY_DPAD_UP)
+INPUT_BIND("hit",   KEY_H, JOY_BUTTON_X)  ' Debug: Hit-Anim manuell triggern
+INPUT_BIND("quit",  KEY_ESCAPE, JOY_BUTTON_BACK)
+
+' --- Animations-State -----------------------------------------
+DIM anim_frame AS INTEGER
+anim_frame = 0
+DIM hit_timer AS INTEGER
+hit_timer = 0
+
+' Gamepad-Status fuer HUD
+DIM has_pad AS BOOLEAN
+has_pad = INPUT_JOY_COUNT() > 0
+DIM pad_name AS STRING
+pad_name = ""
+IF has_pad THEN
+    pad_name = INPUT_JOY_NAME(0)
+END IF
+
+' Tile-Namen pro Tile-ID
+DIM tile_names[8] AS STRING
+tile_names[0] = "grass"
+tile_names[1] = "water"
+tile_names[2] = "sand"
+tile_names[3] = "stone"
+tile_names[4] = "coin"
+tile_names[5] = "heart"
+tile_names[6] = "star"
+tile_names[7] = "skull"
+
+DIM MAPW AS INTEGER
+DIM MAPH AS INTEGER
+DIM TW AS INTEGER
+DIM TH AS INTEGER
+MAPW = TILED_WIDTH(lvl)
+MAPH = TILED_HEIGHT(lvl)
+TW = TILED_TILE_WIDTH(lvl)
+TH = TILED_TILE_HEIGHT(lvl)
+
+' Total Coins zaehlen
+DIM total_coins AS INTEGER
+DIM score AS INTEGER
+score = 0
+DIM ix AS INTEGER
+DIM iy AS INTEGER
+FOR iy = 0 TO MAPH - 1
+    FOR ix = 0 TO MAPW - 1
+        DIM g0 AS INTEGER
+        g0 = TILED_TILE_AT(lvl, 0, ix, iy)
+        IF g0 > 0 AND TILED_TILE_PROP_BOOL(lvl, g0, "pickup") THEN
+            total_coins = total_coins + 1
+        END IF
+    NEXT
+NEXT
+
+' --- Game-Loop ---------------------------------------------------
+DIM running AS BOOLEAN
+running = TRUE
+
+WHILE running
+    INPUT_UPDATE()
+    IF INPUT_PRESSED("quit") THEN running = FALSE
+
+    ' --- Input + Controller-Update ----------------------------
+    DIM axis_x AS INTEGER
+    axis_x = INPUT_AXIS("left", "right")
+    ' Optional: Analog-Stick mit ueberschreiben, wenn der Pad ihn benutzt
+    IF has_pad THEN
+        DIM stick AS FLOAT
+        stick = INPUT_JOY_AXIS(0, "left_x")
+        IF stick < -0.3 THEN
+            axis_x = -1
+        ELSEIF stick > 0.3 THEN
+            axis_x = 1
+        END IF
+    END IF
+    CHAR_SET_INPUT(player, axis_x,
+                   INPUT_PRESSED("jump"),
+                   INPUT_HELD("jump"))
+    CHAR_UPDATE(player, lvl, 0)
+
+    ' --- Pickup-Check ----------------------------------------
+    DIM px AS FLOAT
+    DIM py AS FLOAT
+    px = CHAR_X(player)
+    py = CHAR_Y(player)
+    DIM PW AS FLOAT
+    DIM PH AS FLOAT
+    PW = CHAR_W(player)
+    PH = CHAR_H(player)
+    DIM lx AS INTEGER
+    DIM rxx AS INTEGER
+    DIM ty_top AS INTEGER
+    DIM ty_bot AS INTEGER
+    lx     = INT(px) \ TW
+    rxx    = INT(px + PW - 1) \ TW
+    ty_top = INT(py) \ TH
+    ty_bot = INT(py + PH - 1) \ TH
+    DIM cx AS INTEGER
+    DIM cy AS INTEGER
+    FOR cy = ty_top TO ty_bot
+        FOR cx = lx TO rxx
+            DIM gid AS INTEGER
+            gid = TILED_TILE_AT(lvl, 0, cx, cy)
+            IF gid > 0 AND TILED_TILE_PROP_BOOL(lvl, gid, "pickup") THEN
+                TILED_TILE_SET(lvl, 0, cx, cy, 0)
+                score = score + 1
+            END IF
+        NEXT
+    NEXT
+
+    ' --- Render ----------------------------------------------
+    LAYER("bg")
+    CLS(RGB(50, 80, 130))
+
+    LAYER("tiles")
+    DIM tx AS INTEGER
+    DIM ty AS INTEGER
+    FOR ty = 0 TO MAPH - 1
+        FOR tx = 0 TO MAPW - 1
+            DIM tgid AS INTEGER
+            tgid = TILED_TILE_AT(lvl, 0, tx, ty)
+            IF tgid > 0 THEN
+                BATCH_DRAW(atlas, tile_names[tgid - 1], tx * TW, ty * TH)
+            END IF
+        NEXT
+    NEXT
+    BATCH_FLUSH()
+
+    ' --- Animations-State waehlen --------------------------
+    ' Prioritaet: hit > jump > walk > idle
+    anim_frame = anim_frame + 1
+    IF INPUT_PRESSED("hit") THEN
+        hit_timer = 30
+    END IF
+    IF hit_timer > 0 THEN
+        hit_timer = hit_timer - 1
+    END IF
+
+    DIM sprite_name AS STRING
+    IF hit_timer > 0 THEN
+        sprite_name = "mario_hit"
+    ELSEIF NOT CHAR_ON_GROUND(player) THEN
+        sprite_name = "mario_jump"
+    ELSEIF axis_x <> 0 THEN
+        ' Walk-Loop: 2 Frames, alle 8 Frames wechseln (= 7.5 fps)
+        IF (anim_frame \ 8) MOD 2 = 0 THEN
+            sprite_name = "mario_walk_a"
+        ELSE
+            sprite_name = "mario_walk_b"
+        END IF
+    ELSE
+        sprite_name = "mario_idle"
+    END IF
+
+    LAYER("player")
+    ' Mario-Sprite (16x16) auf Box (12x14) zentriert: Offset (-2, -2).
+    ' Spiegeln, wenn der Charakter nach links schaut (CHAR_FACING = -1).
+    DIM flip AS BOOLEAN
+    flip = CHAR_FACING(player) = -1
+    ATLAS_DRAW_FLIPPED(mario, sprite_name, INT(px) - 2, INT(py) - 2, flip, FALSE)
+
+    LAYER("ui")
+    IF has_pad THEN
+        TEXT(8, 8, "Gamepad: " + pad_name, RGB(120, 220, 255))
+    ELSE
+        TEXT(8, 8, "A/D laufen, Space Sprung, H Hit, ESC Ende")
+    END IF
+    DIM hud AS STRING
+    hud = "Coins: " + STR$(score) + " / " + STR$(total_coins)
+    TEXT(8, 24, hud, RGB(255, 220, 80))
+    IF CHAR_ON_GROUND(player) THEN
+        TEXT(8, 40, "[on ground]", RGB(120, 220, 120))
+    END IF
+    IF score = total_coins THEN
+        TEXT(180, 70, "ALLE COINS!", RGB(255, 100, 200))
+    END IF
+
+    FLIP()
+WEND

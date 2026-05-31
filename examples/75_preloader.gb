@@ -1,0 +1,45 @@
+' Asset-Preloader-Pattern.
+'
+' Statt LOADIMAGE-Calls im Spielcode verstreut zu haben (die jedes Mal
+' Disk-IO machen, wenn man's vergisst), laedt das LOAD_ASSETS-Builtin
+' alles aus einem zentralen Manifest vorab in einen Cache.
+'
+' Nach dem Preload sind die Bilder unter ihrem Alias UND unter ihrem
+' Pfad abrufbar -- beides trifft den Cache. So bleibt der Skript-Code
+' lesbar (`LOADIMAGE("hero")` statt `LOADIMAGE("assets/sprites/hero.png")`).
+'
+' Reihenfolge-Hinweis: LOAD_ASSETS nach SCREEN aufrufen, sonst werden die
+' Bilder nicht convert_alpha-optimiert.
+
+SCREEN(480, 320, "Asset Preloader Demo")
+
+' Eine Zeile -- 5 Bilder geladen, alle unter ihrem Alias gecached.
+DIM n AS INTEGER
+n = LOAD_ASSETS("assets/manifest.json")
+PRINT "Assets geladen:", n
+
+' Ab jetzt: LOADIMAGE trifft den Cache (kein Disk-IO mehr).
+DIM coin AS IMAGE
+DIM hero AS IMAGE
+DIM logo AS IMAGE
+coin = LOADIMAGE("coin")          ' Alias
+hero = LOADIMAGE("hero")
+logo = LOADIMAGE("logo")
+
+' Auch der Pfad funktioniert -- gleiche gecachte Surface.
+DIM coin_via_path AS IMAGE
+coin_via_path = LOADIMAGE("assets/coin.png")
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 180
+    CLS(BLACK)
+    DRAWIMAGE(logo, 120, 30)
+    DRAWIMAGE(hero, 100, 180)
+    DRAWIMAGE(coin, 220, 200)
+    DRAWIMAGE(coin_via_path, 300, 200)
+    TEXT(10, 290, "LOAD_ASSETS = 1 Manifest-Call, " + STR$(n) + " Bilder gecached")
+    FLIP()    ' FLIP cappt intern auf 60 fps via clock.tick(60)
+    IF KEYPRESSED(KEY_ESCAPE) THEN
+        BREAK
+    END IF
+NEXT

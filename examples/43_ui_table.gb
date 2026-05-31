@@ -1,0 +1,116 @@
+' UI_TABLE Demo: Highscore-Liste mit per-Zelle-Farben + Scrolling.
+'
+' - 25 Spieler -> braucht vertikale Scrollbar
+' - 5 Spalten breiter als der sichtbare Bereich -> horizontale Scrollbar
+' - HP-Spalte wird je nach Wert gruen/gelb/rot eingefaerbt
+' - Klick auf eine Zeile zeigt unten den Spielernamen
+'
+' Bedienung: Mausrad scrollt vertikal, Scrollbalken-Drag funktioniert
+' fuer beide Achsen, Klick auf eine Zeile selektiert. ESC = Ende.
+
+IMPORT "ui"
+
+CONST ROWS AS INTEGER = 25
+CONST COLS AS INTEGER = 5
+
+SCREEN(560, 380, "UI Table Demo", 2)
+
+DIM headers AS ARRAY OF STRING
+headers = SPLIT$("Rang|Name|Klasse|HP|Punkte", "|")
+
+DIM cells[ROWS, COLS] AS STRING
+DIM colors[ROWS, COLS] AS INTEGER
+DIM bgs[ROWS, COLS] AS INTEGER     ' Per-Zelle-Hintergrund (-1 = kein BG)
+DIM widths[COLS] AS INTEGER
+
+' Daten generieren - 25 Spieler mit zufaelligen Stats
+SUB Init()
+    DIM klassen AS ARRAY OF STRING
+    klassen = SPLIT$("Krieger|Magier|Schurke|Heiler|Jaeger", "|")
+
+    DIM r AS INTEGER
+    FOR r = 0 TO ROWS - 1
+        cells[r, 0] = "#" + STR$(r + 1)
+        cells[r, 1] = "Spieler_" + STR$(r + 1)
+        cells[r, 2] = klassen[r MOD 5]
+        DIM hp AS INTEGER
+        hp = 30 + (r * 17) MOD 70
+        cells[r, 3] = STR$(hp) + "/100"
+        cells[r, 4] = STR$(((r + 1) * 313) MOD 9999)
+
+        ' Default-Farbe weiss + Zebra-Streifen-Hintergrund (gerade Zeilen
+        ' bekommen einen Hauch dunkleren BG, ungerade keinen).
+        DIM c AS INTEGER
+        FOR c = 0 TO COLS - 1
+            colors[r, c] = RGB(220, 220, 230)
+            IF r MOD 2 = 0 THEN
+                bgs[r, c] = RGB(30, 34, 52)
+            ELSE
+                bgs[r, c] = -1
+            END IF
+        NEXT
+        ' Rang-Spalte gold/silber/bronze fuer Top 3
+        IF r = 0 THEN colors[r, 0] = RGB(255, 215, 0)      ' Gold
+        IF r = 1 THEN colors[r, 0] = RGB(192, 192, 192)    ' Silber
+        IF r = 2 THEN colors[r, 0] = RGB(205, 127, 50)     ' Bronze
+        ' Klassen-Farben fuer Spalte 2
+        IF cells[r, 2] = "Krieger" THEN colors[r, 2] = RGB(220, 80, 80)
+        IF cells[r, 2] = "Magier"  THEN colors[r, 2] = RGB(100, 150, 255)
+        IF cells[r, 2] = "Schurke" THEN colors[r, 2] = RGB(140, 200, 100)
+        IF cells[r, 2] = "Heiler"  THEN colors[r, 2] = RGB(255, 200, 100)
+        IF cells[r, 2] = "Jaeger"  THEN colors[r, 2] = RGB(180, 140, 220)
+        ' HP-Spalte: Vordergrund weiss, Hintergrund je nach Wert (Ampel)
+        colors[r, 3] = RGB(255, 255, 255)
+        IF hp >= 70 THEN bgs[r, 3] = RGB(40, 130, 50)
+        IF hp >= 40 AND hp < 70 THEN bgs[r, 3] = RGB(180, 140, 30)
+        IF hp < 40 THEN bgs[r, 3] = RGB(170, 40, 40)
+    NEXT
+END SUB
+
+Init()
+
+' Spaltenbreiten (Summe groesser als sichtbar -> H-Scrollbar)
+widths[0] = 60       ' Rang
+widths[1] = 140      ' Name
+widths[2] = 100      ' Klasse
+widths[3] = 80       ' HP
+widths[4] = 100      ' Punkte
+' Summe: 480 - bei sichtbarer Breite ~280 reicht das fuer h-scroll
+
+DIM selected AS INTEGER
+selected = -1
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    CLS(RGB(15, 18, 32))
+
+    UI_LABEL(10, 8, "Highscore-Liste (Mausrad oder Scrollbar zum Scrollen)", RGB(255, 220, 80))
+
+    ' Tabelle - sichtbare Groesse 300x280, Inhalt 480x500 -> beide Scrollbars
+    DIM clicked AS INTEGER
+    clicked = UI_TABLE("scores", 10, 30, 300, 280, headers, cells, colors, widths, bgs)
+
+    IF clicked >= 0 THEN
+        selected = clicked
+    END IF
+
+    ' Detail-Panel rechts
+    UI_PANEL(320, 30, 230, 200, "Detail")
+    IF selected >= 0 THEN
+        UI_LABEL(330, 60, "Rang:    " + cells[selected, 0])
+        UI_LABEL(330, 80, "Name:    " + cells[selected, 1])
+        UI_LABEL(330, 100, "Klasse:  " + cells[selected, 2], colors[selected, 2])
+        UI_LABEL(330, 120, "HP:      " + cells[selected, 3], colors[selected, 3])
+        UI_LABEL(330, 140, "Punkte:  " + cells[selected, 4])
+    ELSE
+        UI_LABEL(330, 100, "Klick auf eine Zeile", RGB(150, 150, 170))
+    END IF
+
+    UI_LABEL(10, 320, "ESC = Ende", RGB(140, 150, 170))
+    UI_LABEL(10, 340, "Tip: Klick eine Zeile, scrolle mit Mausrad/Scrollbar", RGB(140, 150, 170))
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

@@ -1,0 +1,46 @@
+' Sound-Demo: SPACE = Beep, P = Pickup-Sound
+' Beenden mit ESC.
+
+Screen(320, 200, "GameBasic - Sound-Demo")
+
+DIM beep AS SOUND
+DIM pickup AS SOUND
+beep = LoadSound("assets/beep.wav")
+pickup = LoadSound("assets/pickup.wav")
+
+DIM lastSpace AS BOOLEAN
+DIM lastP AS BOOLEAN
+DIM count AS INTEGER
+DIM running AS BOOLEAN
+running = TRUE
+lastSpace = FALSE
+lastP = FALSE
+count = 0
+
+WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
+    ' Edge-Detection: nur bei Tastendruck (nicht jedem Frame waehrend gehalten)
+    DIM spaceNow AS BOOLEAN
+    DIM pNow AS BOOLEAN
+    spaceNow = KeyPressed(KEY_SPACE)
+    pNow = KeyPressed(KEY_P)
+
+    IF spaceNow AND NOT lastSpace THEN
+        PlaySound(beep)
+        count = count + 1
+    END IF
+    IF pNow AND NOT lastP THEN
+        PlaySound(pickup, 0, 0.7)
+        count = count + 1
+    END IF
+
+    lastSpace = spaceNow
+    lastP = pNow
+
+    Cls(RGB(20, 8, 30))
+    Text(40, 40, "GameBasic Sound-Demo", WHITE)
+    Text(40, 80, "SPACE = Beep", YELLOW)
+    Text(40, 100, "P     = Pickup-Sound", CYAN)
+    Text(40, 120, "ESC   = Beenden", LIGHTGRAY)
+    Text(40, 160, "Tastendruecke: " + STR$(count), WHITE)
+    Flip()
+WEND

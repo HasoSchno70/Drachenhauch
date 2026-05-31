@@ -1,0 +1,188 @@
+' Mini-Plattformer -- zeigt Pixel-Scaling, DrawImageFlipped, Collides.
+' Steuerung: Pfeile = laufen, Space = springen, ESC = beenden.
+'
+' Migrationsstand: Position und Velocity laufen jetzt ueber VEC2 (statt
+' parallele x/y/vx/vy-Variablen). Input ueber das input-Modul mit Action-
+' Bindings. Konstanten in einer Cfg-Klasse als STATIC CONST.
+
+IMPORT "vec2"
+IMPORT "input"
+
+CLASS Cfg
+    STATIC CONST LOG_W   AS INTEGER = 240
+    STATIC CONST LOG_H   AS INTEGER = 160
+    STATIC CONST SCALE   AS INTEGER = 3
+    STATIC CONST GRAVITY AS FLOAT   = 0.4
+    STATIC CONST JUMP_V  AS FLOAT   = -7.0
+    STATIC CONST MOVE    AS FLOAT   = 2.0
+    STATIC CONST SPRITE  AS INTEGER = 16
+END CLASS
+
+Screen(Cfg.LOG_W, Cfg.LOG_H, "Mini-Plattformer (skala=3)", Cfg.SCALE)
+
+INPUT_BIND("left",  KEY_LEFT,  KEY_A)
+INPUT_BIND("right", KEY_RIGHT, KEY_D)
+INPUT_BIND("jump",  KEY_SPACE, KEY_W, KEY_UP)
+INPUT_BIND("quit",  KEY_ESCAPE)
+
+DIM hero AS IMAGE
+hero = LoadImage("assets/hero.png")    ' 16x16 Sprite
+
+' --- Spieler-Zustand ---
+STRUCT Player
+    DIM pos AS VEC2          ' Position (x, y)
+    DIM v AS VEC2            ' Velocity (vx, vy)
+    DIM onGround AS BOOLEAN
+    DIM facing AS INTEGER    ' -1 = links, 1 = rechts
+END STRUCT
+
+DIM p AS Player
+WITH p
+    .pos = VEC2_NEW(50.0, 50.0)
+    .v = VEC2_ZERO()
+    .facing = 1
+END WITH
+
+' --- Plattformen als feste Liste ---
+CONST N_PLAT AS INTEGER = 6
+DIM platX[N_PLAT] AS INTEGER
+DIM platY[N_PLAT] AS INTEGER
+DIM platW[N_PLAT] AS INTEGER
+
+' Boden
+platX[0] = 0
+platY[0] = 144
+platW[0] = 240
+platX[1] = 30
+platY[1] = 110
+platW[1] = 50
+platX[2] = 110
+platY[2] = 90
+platW[2] = 40
+platX[3] = 170
+platY[3] = 70
+platW[3] = 50
+platX[4] = 90
+platY[4] = 50
+platW[4] = 30
+platX[5] = 0
+platY[5] = 30
+platW[5] = 40
+
+' --- Sammelobjekt ---
+DIM coin AS VEC2
+coin = VEC2_NEW(200.0, 50.0)
+DIM score AS INTEGER
+
+FUNCTION StandsOnAny(px AS FLOAT, py AS FLOAT) AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO N_PLAT - 1
+        ' Fuesse des 16x16-Sprites: y+15 bis y+16, Breite 14
+        IF Collides(px + 1, py + 15, 14, 1, _
+                    platX[i], platY[i], platW[i], 4) THEN
+            RETURN TRUE
+        END IF
+    NEXT
+    RETURN FALSE
+END FUNCTION
+
+' Liefert (steht, snap_y) -- wenn `steht` TRUE ist, ist `snap_y` die
+' Y-Einrast-Position. Sonst ist `snap_y` der unveraenderte newY-Wert.
+FUNCTION StandsAndSnap(px AS FLOAT, py AS FLOAT) AS TUPLE
+    DIM i AS INTEGER
+    FOR i = 0 TO N_PLAT - 1
+        IF Collides(px + 1, py + 15, 14, 1, _
+                    platX[i], platY[i], platW[i], 4) THEN
+            RETURN (TRUE, platY[i] - Cfg.SPRITE)
+        END IF
+    NEXT
+    RETURN (FALSE, py)
+END FUNCTION
+
+DIM running AS BOOLEAN
+running = TRUE
+
+WHILE running AND NOT QuitRequested()
+    INPUT_UPDATE()
+
+    IF INPUT_HELD("quit") THEN running = FALSE
+
+    ' Eingabe -- Velocity aus Axis-Mapping berechnen.
+    DIM vx AS FLOAT
+    vx = INPUT_AXIS("left", "right") * Cfg.MOVE
+    IF vx < 0.0 THEN p.facing = -1
+    IF vx > 0.0 THEN p.facing = 1
+
+    DIM vy AS FLOAT
+    vy = VEC2_Y(p.v)
+    IF INPUT_PRESSED("jump") AND p.onGround THEN
+        vy = Cfg.JUMP_V
+        p.onGround = FALSE
+    END IF
+
+    ' Physik -- Schwerkraft auf vy, dann v aktualisieren.
+    vy = vy + Cfg.GRAVITY
+    p.v = VEC2_NEW(vx, vy)
+
+    ' X-Bewegung mit Welt-Grenzen.
+    DIM newX AS FLOAT
+    newX = VEC2_X(p.pos) + vx
+    IF newX < 0.0 THEN newX = 0.0
+    IF newX > Cfg.LOG_W - Cfg.SPRITE THEN newX = Cfg.LOG_W - Cfg.SPRITE
+
+    ' Y-Bewegung: ein einziger Helper-Call statt der frueheren Doppel-
+    ' Schleife (StandsOnAny + Collides-Loop fuer Snap).
+    DIM newY AS FLOAT
+    newY = VEC2_Y(p.pos) + vy
+    DIM stands AS BOOLEAN
+    DIM snapY AS FLOAT
+    IF vy > 0.0 THEN
+        (stands, snapY) = StandsAndSnap(newX, newY)
+        IF stands THEN
+            newY = snapY
+            p.v = VEC2_NEW(vx, 0.0)
+            p.onGround = TRUE
+        ELSE
+            p.onGround = FALSE
+        END IF
+    ELSE
+        p.onGround = FALSE
+    END IF
+
+    p.pos = VEC2_NEW(newX, newY)
+
+    ' Aus dem Bild gefallen -> Reset
+    IF VEC2_Y(p.pos) > Cfg.LOG_H + 30 THEN
+        p.pos = VEC2_NEW(50.0, 50.0)
+        p.v = VEC2_ZERO()
+    END IF
+
+    ' Coin einsammeln
+    IF Collides(VEC2_X(p.pos), VEC2_Y(p.pos), Cfg.SPRITE, Cfg.SPRITE, _
+                VEC2_X(coin), VEC2_Y(coin), 8, 8) THEN
+        score = score + 1
+        coin = VEC2_NEW(20.0 + RND(Cfg.LOG_W - 50), 20.0 + RND(80))
+    END IF
+
+    ' Zeichnen (alles in LOGISCHEN Pixeln)
+    Cls(RGB(60, 100, 180))
+
+    ' Plattformen
+    DIM j AS INTEGER
+    FOR j = 0 TO N_PLAT - 1
+        Box(platX[j], platY[j], platX[j] + platW[j] - 1, platY[j] + 3, RGB(120, 80, 40))
+        Line(platX[j], platY[j], platX[j] + platW[j] - 1, platY[j], RGB(180, 220, 100))
+    NEXT
+
+    ' Coin
+    Circle(VEC2_X(coin) + 4, VEC2_Y(coin) + 4, 3, YELLOW)
+
+    ' Held mit Sprite-Flip je nach Blickrichtung
+    DrawImageFlipped(hero, INT(VEC2_X(p.pos)), INT(VEC2_Y(p.pos)), p.facing < 0, FALSE)
+
+    ' UI
+    Text(4, 2, "Score: " + STR$(score), WHITE)
+    Text(4, 14, "Pfeile + Space", LIGHTGRAY)
+
+    Flip()
+WEND

@@ -1,0 +1,113 @@
+' Chat-artiges Beispiel mit dem net-Modul: Server + Client im selben
+' Programm, ohne Threading. Zeigt den klassischen non-blocking-Loop:
+' Server startet -> Client verbindet -> beide tauschen Nachrichten aus.
+'
+' GameBasic hat kein Threading -- echte Server+Client-Anwendungen lauft
+' man als separate Programme (zwei Terminals: einmal mit dem Code unten
+' "ROLE = server" und einmal "ROLE = client"). Hier zeigt das Demo den
+' Roundtrip im selben Prozess.
+'
+' Pattern: jedes Mal pro Game-Frame
+'   1. NET_TCP_ACCEPT(listener)  -- gibt NIL wenn niemand verbindet
+'   2. NET_RECV(sock, max)        -- gibt "" wenn nichts angekommen ist
+'   3. eigene Logik: Frame-Update, Render, ...
+'   4. NET_SEND(sock, ...)        wenn was zu senden ist
+' So bleibt der Game-Loop bei 60fps ohne Network-Stalls.
+
+IMPORT "net"
+
+PRINT "=== net-Modul Demo: Mini-Chat-Roundtrip ==="
+PRINT ""
+
+' --- 1. Server starten ---
+DIM server AS NET_LISTENER
+server = NET_TCP_LISTEN(0)        ' port=0 -> OS waehlt freien Port
+PRINT "Server laeuft auf Port ", NET_LISTENER_PORT(server)
+
+' Trick: wir wissen den Port erst nach LISTEN; dem Demo-Client geben wir ihn
+' im naechsten Schritt direkt.
+
+' --- 2. Client verbinden ---
+DIM client AS NET_SOCKET
+client = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(server))
+PRINT "Client verbunden zu ", NET_PEER_ADDR(client), ":", NET_PEER_PORT(client)
+
+' --- 3. Server: Connection annehmen ---
+' Non-blocking ACCEPT kann beim ersten Versuch NIL liefern, auch wenn der
+' OS-TCP-Stack die Connection schon im Backlog hat. Wir loopen kurz.
+DIM srv_conn AS NET_SOCKET
+DIM tries AS INTEGER
+tries = 0
+WHILE IS_NIL(srv_conn) AND tries < 50
+    srv_conn = NET_TCP_ACCEPT(server)
+    IF IS_NIL(srv_conn) THEN
+        SLEEP(10)
+        tries = tries + 1
+    END IF
+WEND
+
+IF IS_NIL(srv_conn) THEN
+    PRINT "FEHLER: ACCEPT hat keine Connection bekommen"
+    NET_CLOSE(client)
+    NET_CLOSE_LISTENER(server)
+    THROW "ACCEPT timeout"
+END IF
+PRINT "Server hat Connection von ", NET_PEER_ADDR(srv_conn), " angenommen"
+
+' --- 4. Roundtrip: 3 Nachrichten in jede Richtung ---
+PRINT ""
+PRINT "=== Nachrichten-Roundtrip ==="
+
+DIM messages[3] AS STRING
+messages[0] = "Hallo Server, hier Client!"
+messages[1] = "Wie geht es dir?"
+messages[2] = "Ende."
+
+DIM i AS INTEGER
+FOR i = 0 TO 2
+    ' Client schickt
+    DIM out_msg AS STRING
+    out_msg = messages[i]
+    NET_SEND(client, out_msg)
+    PRINT "Client -> Server: ", out_msg
+
+    ' Server liest (kann mehrere Frames brauchen, daher Loop)
+    DIM received AS STRING
+    received = ""
+    DIM read_tries AS INTEGER
+    read_tries = 0
+    WHILE received = "" AND read_tries < 50
+        received = NET_RECV(srv_conn, 1024)
+        IF received = "" THEN
+            SLEEP(10)
+            read_tries = read_tries + 1
+        END IF
+    WEND
+    PRINT "Server <- Client: ", received
+
+    ' Server antwortet
+    DIM reply AS STRING
+    reply = "[" + STR$(i + 1) + "/3] gehoert: " + received
+    NET_SEND(srv_conn, reply)
+
+    ' Client liest die Antwort
+    DIM cli_received AS STRING
+    cli_received = ""
+    read_tries = 0
+    WHILE cli_received = "" AND read_tries < 50
+        cli_received = NET_RECV(client, 1024)
+        IF cli_received = "" THEN
+            SLEEP(10)
+            read_tries = read_tries + 1
+        END IF
+    WEND
+    PRINT "Server -> Client: ", cli_received
+    PRINT ""
+NEXT
+
+' --- 5. Cleanup ---
+PRINT "=== Aufraeumen ==="
+NET_CLOSE(srv_conn)
+NET_CLOSE(client)
+NET_CLOSE_LISTENER(server)
+PRINT "Sockets geschlossen. Fertig."

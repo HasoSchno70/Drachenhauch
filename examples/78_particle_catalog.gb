@@ -1,0 +1,248 @@
+' ============================================================================
+'  GameBasic Partikel-Effekt-Katalog  --  10 Rezepte nebeneinander
+' ============================================================================
+'
+'  Zeigt die Render-Modi (circle/pixel/square/streak/glow) und den
+'  Farbverlauf (PARTICLE_SET_COLOR -> PARTICLE_SET_COLOR_END) des
+'  Partikelsystems. 1600x800, nativ (scale = 1).
+'
+'    FEUER       glow,   gelb -> rot,    steigt auf
+'    RAUCH       glow,   grau -> dunkel, langsam aufsteigend
+'    FUNKENREGEN streak, weiss -> orange, faellt (Striche in Flugrichtung)
+'    MAGIE       glow,   weiss -> blau,  radial, schwerelos
+'    EXPLOSION   square, orange -> dunkel, radialer Auswurf mit Schwerkraft
+'    WASSER      circle, blau -> dunkelblau, Fontaene mit Schwerkraft
+'    SCHNEE      circle, weiss -> hellblau, langsam fallend, seitlich wandernd
+'    LASER       streak, cyan -> blau, schneller radialer Funkenburst
+'    HEILUNG     glow,   hellgruen -> gruen, sanft aufsteigend
+'    STAUB       pixel,  hellblau -> dunkel, treibend (Bulk-Plot)
+'
+'  Jeder Konfig-Block unten ist ein fertiges Copy-Paste-Rezept.
+'  Steuerung:  ESC = Ende
+' ============================================================================
+
+IMPORT "particles"
+
+CONST W AS INTEGER = 1600
+CONST H AS INTEGER = 800
+
+SCREEN(W, H, "GameBasic Partikel-Effekt-Katalog")
+RANDOMIZE(7)
+
+' === Zehn Partikelsysteme, je eines pro Effekt ===========================
+
+' 1) FEUER -- additive Glow-Flammen, gelb -> rot, leichter Auftrieb.
+DIM ps_fire AS PARTICLE_SYSTEM
+ps_fire = PARTICLE_SYSTEM_NEW(160, 380)
+PARTICLE_SET_VELOCITY(ps_fire, -25.0, 25.0, -150.0, -90.0)
+PARTICLE_SET_GRAVITY(ps_fire, 0.0, -40.0)
+PARTICLE_SET_LIFETIME(ps_fire, 500, 950)
+PARTICLE_SET_SIZE(ps_fire, 5, 11)
+PARTICLE_SET_COLOR(ps_fire, &HFFE070)
+PARTICLE_SET_COLOR_END(ps_fire, &HE01800)
+PARTICLE_SET_FADE(ps_fire, TRUE)
+PARTICLE_SET_MODE(ps_fire, "glow")
+
+' 2) RAUCH -- weiche graue Glow-Schwaden, langsam aufsteigend.
+DIM ps_smoke AS PARTICLE_SYSTEM
+ps_smoke = PARTICLE_SYSTEM_NEW(480, 385)
+PARTICLE_SET_VELOCITY(ps_smoke, -18.0, 18.0, -55.0, -25.0)
+PARTICLE_SET_GRAVITY(ps_smoke, 0.0, -12.0)
+PARTICLE_SET_LIFETIME(ps_smoke, 1100, 1900)
+PARTICLE_SET_SIZE(ps_smoke, 9, 18)
+PARTICLE_SET_COLOR(ps_smoke, &H9098A0)
+PARTICLE_SET_COLOR_END(ps_smoke, &H101018)
+PARTICLE_SET_FADE(ps_smoke, TRUE)
+PARTICLE_SET_MODE(ps_smoke, "glow")
+
+' 3) FUNKENREGEN -- fallende Striche entlang der Flugrichtung.
+DIM ps_rain AS PARTICLE_SYSTEM
+ps_rain = PARTICLE_SYSTEM_NEW(800, 70)
+PARTICLE_SET_VELOCITY(ps_rain, -30.0, 30.0, 120.0, 260.0)
+PARTICLE_SET_GRAVITY(ps_rain, 0.0, 260.0)
+PARTICLE_SET_LIFETIME(ps_rain, 450, 900)
+PARTICLE_SET_SIZE(ps_rain, 2, 4)
+PARTICLE_SET_COLOR(ps_rain, &HFFFFC0)
+PARTICLE_SET_COLOR_END(ps_rain, &HFF6000)
+PARTICLE_SET_FADE(ps_rain, TRUE)
+PARTICLE_SET_MODE(ps_rain, "streak")
+
+' 4) MAGIE -- schwerelose Glow-Funken, weiss -> blau, radial.
+DIM ps_magic AS PARTICLE_SYSTEM
+ps_magic = PARTICLE_SYSTEM_NEW(1120, 230)
+PARTICLE_SET_VELOCITY(ps_magic, -70.0, 70.0, -70.0, 70.0)
+PARTICLE_SET_GRAVITY(ps_magic, 0.0, 0.0)
+PARTICLE_SET_LIFETIME(ps_magic, 700, 1300)
+PARTICLE_SET_SIZE(ps_magic, 3, 7)
+PARTICLE_SET_COLOR(ps_magic, &HFFFFFF)
+PARTICLE_SET_COLOR_END(ps_magic, &H4060FF)
+PARTICLE_SET_FADE(ps_magic, TRUE)
+PARTICLE_SET_MODE(ps_magic, "glow")
+
+' 5) EXPLOSION -- chunky Quadrat-Debris, radial mit Schwerkraft.
+DIM ps_boom AS PARTICLE_SYSTEM
+ps_boom = PARTICLE_SYSTEM_NEW(1440, 230)
+PARTICLE_SET_VELOCITY(ps_boom, -180.0, 180.0, -180.0, 120.0)
+PARTICLE_SET_GRAVITY(ps_boom, 0.0, 260.0)
+PARTICLE_SET_LIFETIME(ps_boom, 500, 1000)
+PARTICLE_SET_SIZE(ps_boom, 2, 5)
+PARTICLE_SET_COLOR(ps_boom, &HFFC040)
+PARTICLE_SET_COLOR_END(ps_boom, &H401000)
+PARTICLE_SET_FADE(ps_boom, TRUE)
+PARTICLE_SET_MODE(ps_boom, "square")
+
+' 6) WASSERFONTAENE -- runde blaue Tropfen, hoher Auswurf, faellt zurueck.
+DIM ps_water AS PARTICLE_SYSTEM
+ps_water = PARTICLE_SYSTEM_NEW(160, 760)
+PARTICLE_SET_VELOCITY(ps_water, -70.0, 70.0, -350.0, -250.0)
+PARTICLE_SET_GRAVITY(ps_water, 0.0, 220.0)
+PARTICLE_SET_LIFETIME(ps_water, 1400, 2200)
+PARTICLE_SET_SIZE(ps_water, 2, 5)
+PARTICLE_SET_COLOR(ps_water, &H50B0FF)
+PARTICLE_SET_COLOR_END(ps_water, &H123E78)
+PARTICLE_SET_FADE(ps_water, TRUE)
+PARTICLE_SET_MODE(ps_water, "circle")
+
+' 7) SCHNEEGESTOEBER -- langsam fallende weisse Flocken (Emitter wandert).
+DIM ps_snow AS PARTICLE_SYSTEM
+ps_snow = PARTICLE_SYSTEM_NEW(480, 415)
+PARTICLE_SET_VELOCITY(ps_snow, -25.0, 25.0, 40.0, 90.0)
+PARTICLE_SET_GRAVITY(ps_snow, 0.0, 0.0)
+PARTICLE_SET_LIFETIME(ps_snow, 1400, 2200)
+PARTICLE_SET_SIZE(ps_snow, 2, 4)
+PARTICLE_SET_COLOR(ps_snow, &HFFFFFF)
+PARTICLE_SET_COLOR_END(ps_snow, &HA8C8E8)
+PARTICLE_SET_FADE(ps_snow, TRUE)
+PARTICLE_SET_MODE(ps_snow, "circle")
+
+' 8) LASER-IMPACT -- schneller radialer Funkenburst, kurze Lebensdauer.
+DIM ps_laser AS PARTICLE_SYSTEM
+ps_laser = PARTICLE_SYSTEM_NEW(800, 600)
+PARTICLE_SET_VELOCITY(ps_laser, -260.0, 260.0, -260.0, 260.0)
+PARTICLE_SET_GRAVITY(ps_laser, 0.0, 140.0)
+PARTICLE_SET_LIFETIME(ps_laser, 250, 550)
+PARTICLE_SET_SIZE(ps_laser, 2, 3)
+PARTICLE_SET_COLOR(ps_laser, &HC0FFFF)
+PARTICLE_SET_COLOR_END(ps_laser, &H1060FF)
+PARTICLE_SET_FADE(ps_laser, TRUE)
+PARTICLE_SET_MODE(ps_laser, "streak")
+
+' 9) HEILUNGS-AURA -- sanft aufsteigende gruene Glow-Funken.
+DIM ps_heal AS PARTICLE_SYSTEM
+ps_heal = PARTICLE_SYSTEM_NEW(1120, 760)
+PARTICLE_SET_VELOCITY(ps_heal, -35.0, 35.0, -90.0, -45.0)
+PARTICLE_SET_GRAVITY(ps_heal, 0.0, -12.0)
+PARTICLE_SET_LIFETIME(ps_heal, 900, 1500)
+PARTICLE_SET_SIZE(ps_heal, 4, 8)
+PARTICLE_SET_COLOR(ps_heal, &HC8FFD0)
+PARTICLE_SET_COLOR_END(ps_heal, &H20A848)
+PARTICLE_SET_FADE(ps_heal, TRUE)
+PARTICLE_SET_MODE(ps_heal, "glow")
+
+' 10) STAUB -- viele kleine Pixel, treibend (Bulk-Plot intern).
+DIM ps_dust AS PARTICLE_SYSTEM
+ps_dust = PARTICLE_SYSTEM_NEW(1440, 600)
+PARTICLE_SET_VELOCITY(ps_dust, -40.0, 40.0, -40.0, 40.0)
+PARTICLE_SET_GRAVITY(ps_dust, 0.0, 0.0)
+PARTICLE_SET_LIFETIME(ps_dust, 900, 1700)
+PARTICLE_SET_SIZE(ps_dust, 1, 2)
+PARTICLE_SET_COLOR(ps_dust, &H80C0E0)
+PARTICLE_SET_COLOR_END(ps_dust, &H203040)
+PARTICLE_SET_FADE(ps_dust, TRUE)
+PARTICLE_SET_MODE(ps_dust, "pixel")
+
+' === Iterier-Tabellen (Tupel halten Handles + Parameter) =================
+DIM systems AS TUPLE
+systems = (ps_fire, ps_smoke, ps_rain, ps_magic, ps_boom, _
+           ps_water, ps_snow, ps_laser, ps_heal, ps_dust)
+DIM emit_n AS TUPLE
+emit_n = (6, 3, 5, 5, 5, 7, 4, 6, 4, 10)
+DIM ex AS TUPLE
+ex = (160, 480, 800, 1120, 1440, 160, 480, 800, 1120, 1440)
+DIM ey AS TUPLE
+ey = (380, 385, 70, 230, 230, 760, 415, 600, 760, 600)
+' Seitliches Wandern des Emitters (0 = fest). Schnee deckt so die Zelle ab.
+DIM swing AS TUPLE
+swing = (12, 8, 0, 0, 0, 10, 130, 0, 6, 0)
+
+DIM labels AS TUPLE
+labels = ("FEUER (glow)", "RAUCH (glow)", "FUNKENREGEN (streak)", _
+          "MAGIE (glow)", "EXPLOSION (square)", "WASSER (circle)", _
+          "SCHNEE (circle)", "LASER (streak)", "HEILUNG (glow)", _
+          "STAUB (pixel)")
+DIM lbx AS TUPLE
+lbx = (12, 332, 652, 972, 1292, 12, 332, 652, 972, 1292)
+DIM lby AS TUPLE
+lby = (46, 46, 46, 46, 46, 406, 406, 406, 406, 406)
+DIM cell_l AS TUPLE
+cell_l = (0, 320, 640, 960, 1280, 0, 320, 640, 960, 1280)
+DIM cell_r AS TUPLE
+cell_r = (319, 639, 959, 1279, 1599, 319, 639, 959, 1279, 1599)
+
+' === State ===============================================================
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+DIM fps AS FLOAT
+fps = 60.0
+DIM t AS FLOAT
+t = 0.0
+
+' === Hauptschleife =======================================================
+WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+    IF dt < 1 THEN dt = 1
+    IF dt > 100 THEN dt = 100
+    t = t + dt * 0.001
+    fps = fps * 0.9 + (1000.0 / dt) * 0.1
+
+    ' --- Hintergrund + Raster (5 x 2) ---
+    CLS(&H070A12)
+    DIM gx AS INTEGER
+    FOR gx = 1 TO 4
+        LINE(gx * 320, 38, gx * 320, H - 1, &H182838)
+    NEXT
+    LINE(0, 399, W - 1, 399, &H182838)
+
+    ' --- Alle zehn Effekte aktualisieren + zeichnen ---
+    DIM k AS INTEGER
+    DIM total AS INTEGER
+    total = 0
+    DIM px AS INTEGER
+    FOR k = 0 TO 9
+        px = ex[k] + INT(SIN(t * 1.3 + k * 0.6) * swing[k])
+        PARTICLE_SET_POS(systems[k], px, ey[k])
+        PARTICLE_EMIT(systems[k], emit_n[k])
+        PARTICLE_UPDATE(systems[k], dt)
+        PARTICLE_DRAW(systems[k])
+        total = total + PARTICLE_COUNT(systems[k])
+    NEXT
+
+    ' --- Labels mit dunkler Hinterlegung (ueber den Partikeln) ---
+    TEXT_SIZE(16)
+    TEXT_BOLD(TRUE)
+    FOR k = 0 TO 9
+        BOX(cell_l[k] + 6, lby[k] - 4, cell_r[k] - 6, lby[k] + 20, &H0C1018)
+        TEXT(lbx[k] + 10, lby[k], labels[k], &H9FE8F0)
+    NEXT
+    TEXT_BOLD(FALSE)
+
+    ' --- Titel + Footer ---
+    TEXT_SIZE(26)
+    TEXT_BOLD(TRUE)
+    DIM title AS STRING
+    title = "PARTIKEL-EFFEKT-KATALOG"
+    TEXT(W \ 2 - TEXT_WIDTH(title) \ 2, 8, title, &H2DE0E0)
+    TEXT_BOLD(FALSE)
+
+    TEXT_SIZE(15)
+    TEXT(14, H - 22, "FPS " + STR$(INT(fps)) + "    " + STR$(total) + _
+         " Partikel aktiv    1600x800 nativ    ESC = Ende", &H7088A0)
+    TEXT_SIZE(18)
+
+    FLIP()
+    SLEEP(4)
+WEND

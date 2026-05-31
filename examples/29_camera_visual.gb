@@ -1,0 +1,81 @@
+' Interaktives Camera-Demo: scrollen mit Pfeilen, zoomen mit + / -.
+' Die Welt ist ein Gitter aus farbigen Feldern, das groesser ist als der
+' Bildschirm. Die Kamera bewegt sich darueber.
+IMPORT "camera"
+
+CONST W AS INTEGER = 320
+CONST H AS INTEGER = 240
+SCREEN(W, H, "Camera-Demo (Pfeile = scrollen, +/- = zoomen, R = reset)", 2)
+
+DIM cam_x AS FLOAT
+DIM cam_y AS FLOAT
+DIM zoom AS FLOAT
+cam_x = 0.0
+cam_y = 0.0
+zoom = 1.0
+
+' Welt-Konstanten
+CONST TILE AS INTEGER = 32
+CONST COLS AS INTEGER = 30
+CONST ROWS AS INTEGER = 20
+
+WHILE NOT QUITREQUESTED()
+    ' Eingabe
+    IF KEYPRESSED(1073741904) THEN     ' LEFT
+        cam_x = cam_x - 4.0
+    END IF
+    IF KEYPRESSED(1073741903) THEN     ' RIGHT
+        cam_x = cam_x + 4.0
+    END IF
+    IF KEYPRESSED(1073741906) THEN     ' UP
+        cam_y = cam_y - 4.0
+    END IF
+    IF KEYPRESSED(1073741905) THEN     ' DOWN
+        cam_y = cam_y + 4.0
+    END IF
+    IF KEYPRESSED(43) THEN              ' +
+        zoom = zoom * 1.05
+    END IF
+    IF KEYPRESSED(45) THEN              ' -
+        zoom = zoom / 1.05
+        IF zoom < 0.2 THEN
+            zoom = 0.2
+        END IF
+    END IF
+    IF KEYPRESSED(114) THEN             ' r
+        cam_x = 0.0
+        cam_y = 0.0
+        zoom = 1.0
+    END IF
+
+    CAMERA_SET(cam_x, cam_y, zoom)
+
+    CLS(RGB(20, 20, 35))
+
+    ' Welt zeichnen: Schachbrett-Tiles in World-Koordinaten.
+    DIM r AS INTEGER
+    DIM c AS INTEGER
+    FOR r = 0 TO ROWS - 1
+        FOR c = 0 TO COLS - 1
+            DIM color AS INTEGER
+            IF (r + c) MOD 2 = 0 THEN
+                color = RGB(60, 80, 120)
+            ELSE
+                color = RGB(80, 120, 60)
+            END IF
+            BOX(c * TILE, r * TILE, c * TILE + TILE - 1, r * TILE + TILE - 1, color)
+        NEXT
+    NEXT
+
+    ' Markante Welt-Punkte
+    CIRCLE(0, 0, 8, RGB(255, 80, 80))                          ' Welt-Origin
+    CIRCLE(COLS * TILE / 2, ROWS * TILE / 2, 12, RGB(255, 255, 0))  ' Welt-Mitte
+
+    ' HUD im Screen-Space (Camera tempordr aus)
+    CAMERA_RESET()
+    TEXT(4, 4, "cam=(" + STR$(ROUND(cam_x)) + "," + STR$(ROUND(cam_y)) + ")  zoom=" + STR$(zoom), RGB(255, 255, 255))
+    TEXT(4, 18, "Pfeile=scrollen  +/-=zoom  R=reset", RGB(180, 180, 180))
+
+    FLIP()
+    SLEEP(16)
+WEND

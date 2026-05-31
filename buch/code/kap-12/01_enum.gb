@@ -1,0 +1,31 @@
+' ENUM: typsichere Konstanten mit Namespace.
+'
+' Compact-Form: ENUM Name = M1, M2, M3 - automatische Werte 0, 1, 2, ...
+' Block-Form mit eigenen Werten: gut fuer Bitfelder oder HTTP-Codes.
+
+' --- Compact ---
+ENUM State = MENU, PLAYING, PAUSED, GAMEOVER
+
+PRINT "Compact-Form (auto-nummeriert ab 0):"
+PRINT f"  MENU     = {State.MENU}"
+PRINT f"  PLAYING  = {State.PLAYING}"
+PRINT f"  PAUSED   = {State.PAUSED}"
+PRINT f"  GAMEOVER = {State.GAMEOVER}"
+
+' --- Block mit expliziten Werten (Bit-Flags) ---
+ENUM Permission
+    NONE  = 0
+    READ  = 1
+    WRITE = 2
+    EXEC  = 4
+END ENUM
+
+PRINT ""
+PRINT "Block-Form mit Bit-Flags:"
+PRINT f"  READ + WRITE = {Permission.READ + Permission.WRITE}"
+
+' --- ENUM-Wert in einer Variable speichern ---
+DIM aktueller_zustand AS State
+aktueller_zustand = State.PLAYING
+PRINT ""
+PRINT f"Aktueller Zustand: {aktueller_zustand}"

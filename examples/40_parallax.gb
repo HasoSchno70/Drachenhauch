@@ -1,0 +1,146 @@
+' Parallax-Scrolling - 4 Layer bei verschiedenen Geschwindigkeiten.
+' Klassischer Sidescroller-Tiefeneffekt: Hintergrund langsam, Vordergrund
+' schnell. Demonstriert wie man mit RECT/CIRCLE/TRIANGLE einen kompletten
+' Pseudo-3D-Look mit reinen 2D-Primitiven baut - kein Asset-Bedarf.
+'
+' Steuerung: Pfeil-Links/Rechts = Geschwindigkeit, ESC = Ende.
+
+CONST WIDTH AS INTEGER = 480
+CONST HEIGHT AS INTEGER = 270
+
+SCREEN(WIDTH, HEIGHT, "Parallax-Scrolling", 2)
+
+' Layer-Offsets (bewegen sich nach links bei vorwaerts-Scrolling).
+' Schnellere Layer haben groesseren Speed-Multiplikator.
+DIM off_sky AS FLOAT      ' 0.0 - statischer Himmel mit Sonne
+DIM off_far AS FLOAT      ' 0.2 - ferne Berge
+DIM off_mid AS FLOAT      ' 0.5 - Huegel
+DIM off_near AS FLOAT     ' 1.0 - Vordergrund-Gras
+off_sky = 0.0
+off_far = 0.0
+off_mid = 0.0
+off_near = 0.0
+
+DIM speed AS FLOAT
+speed = 1.5
+
+DIM tick AS INTEGER
+tick = 0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN
+        BREAK
+    END IF
+    ' Pfeile beeinflussen die Geschwindigkeit (nach links = rueckwaerts)
+    IF KEYPRESSED(1073741903) THEN     ' KEY_RIGHT
+        speed = speed + 0.05
+        IF speed > 6.0 THEN speed = 6.0
+    END IF
+    IF KEYPRESSED(1073741904) THEN     ' KEY_LEFT
+        speed = speed - 0.05
+        IF speed < -6.0 THEN speed = -6.0
+    END IF
+
+    ' Himmel-Gradient: vier horizontale Streifen
+    BOX(0, 0, WIDTH, 70, RGB(35, 50, 100))
+    BOX(0, 70, WIDTH, 110, RGB(70, 90, 140))
+    BOX(0, 110, WIDTH, 150, RGB(150, 130, 130))
+    BOX(0, 150, WIDTH, 215, RGB(200, 160, 130))
+
+    ' Sonne langsam pulsierend
+    DIM sun_x AS INTEGER
+    DIM sun_y AS INTEGER
+    sun_x = WIDTH - 80
+    sun_y = 70
+    CIRCLE(sun_x, sun_y, 28, RGB(255, 220, 130))
+    CIRCLE(sun_x, sun_y, 22, RGB(255, 240, 180))
+
+    ' --- Layer 1: ferne Berge (langsam) - gefuellte Dreiecke ------------
+    ' GameBasic hat kein TRIANGLE, also stapeln wir horizontale LINEs
+    ' von Spitze nach Boden: pro Zeile berechnet sich die Halb-Breite
+    ' linear vom Peak aus.
+    DIM mtn_w AS INTEGER
+    DIM mtn_peak_y AS INTEGER
+    DIM mtn_base_y AS INTEGER
+    mtn_w = 140
+    mtn_peak_y = 110
+    mtn_base_y = 200
+    DIM start_x AS INTEGER
+    DIM x AS INTEGER
+    DIM peak_x AS INTEGER
+    start_x = -INT(off_far) MOD mtn_w - mtn_w
+    x = start_x
+    WHILE x < WIDTH + mtn_w
+        peak_x = x + mtn_w / 2
+        DIM yy AS INTEGER
+        FOR yy = mtn_peak_y TO mtn_base_y
+            DIM tprog AS FLOAT
+            tprog = (yy - mtn_peak_y) / (mtn_base_y - mtn_peak_y)
+            DIM half AS INTEGER
+            half = INT((mtn_w / 2) * tprog)
+            LINE(peak_x - half, yy, peak_x + half, yy, RGB(80, 70, 95))
+        NEXT
+        ' Heller Akzent oben (Schnee-Andeutung)
+        FOR yy = mtn_peak_y TO mtn_peak_y + 12
+            tprog = (yy - mtn_peak_y) / (mtn_base_y - mtn_peak_y)
+            half = INT((mtn_w / 2) * tprog)
+            LINE(peak_x - half, yy, peak_x + half, yy, RGB(140, 130, 155))
+        NEXT
+        x = x + mtn_w
+    WEND
+
+    ' --- Layer 2: mittlere Huegel - sanfte Halbkreise -------------------
+    ' CIRCLE zeichnet einen vollen Kreis. Wir setzen ihn so, dass die
+    ' obere Haelfte sichtbar ist und die untere im Boden verschwindet.
+    DIM hill_w AS INTEGER
+    DIM hill_y AS INTEGER       ' Y-Koordinate des Kreismittelpunkts
+    DIM hill_r AS INTEGER
+    hill_w = 90
+    hill_y = 215
+    hill_r = 32
+    start_x = -INT(off_mid) MOD hill_w - hill_w
+    x = start_x
+    WHILE x < WIDTH + hill_w
+        CIRCLE(x + hill_w / 2, hill_y, hill_r, RGB(60, 110, 70))
+        x = x + hill_w
+    WEND
+
+    ' --- Layer 3: Vordergrund-Boden (gefuellt!) -----------------------
+    BOX(0, 215, WIDTH, HEIGHT, RGB(40, 80, 40))
+
+    ' --- Layer 4: schnelle Grashalme im Vordergrund ----------------------
+    DIM grass_step AS INTEGER
+    grass_step = 8
+    start_x = -INT(off_near) MOD grass_step - grass_step
+    x = start_x
+    WHILE x < WIDTH + grass_step
+        ' Hash mit der WELT-Position des Halms (= screen-x + Scroll-Offset).
+        ' Sonst aendert sich die "Zufalls"-Hoehe jeden Frame, weil sich
+        ' der screen-x desselben Halms beim Scrollen verschiebt.
+        DIM world_x AS INTEGER
+        world_x = x + INT(off_near)
+        DIM h AS INTEGER
+        h = ((world_x * 17) MOD 11) + 4
+        LINE(x, 215 - h, x, 215, RGB(20, 110, 30))
+        LINE(x + 1, 215 - h + 2, x + 1, 215, RGB(40, 140, 50))
+        x = x + grass_step
+    WEND
+
+    ' HUD - aktuelle Geschwindigkeit + Steuerungs-Hinweis
+    TEXT_SIZE(14)
+    TEXT_BOLD(TRUE)
+    TEXT(8, 8, "Speed: " + STR$(INT(speed * 100) / 100), RGB(255, 255, 255))
+    TEXT_BOLD(FALSE)
+    TEXT_SIZE(11)
+    TEXT(8, HEIGHT - 18, "Pfeile = Speed   ESC = Ende", RGB(200, 200, 220))
+
+    FLIP()
+    SLEEP(16)
+
+    ' Offsets fortschreiben mit Layer-spezifischem Speed-Faktor.
+    ' Negative Speed = Rueckwaerts-Scrolling.
+    off_far = off_far + speed * 0.2
+    off_mid = off_mid + speed * 0.5
+    off_near = off_near + speed * 1.0
+    tick = tick + 1
+WEND

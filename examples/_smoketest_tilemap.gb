@@ -1,0 +1,42 @@
+' Smoketest: parsed Tilemap-Demo, rendert 30 Frames, exit.
+CONST TILE_W AS INTEGER = 16
+CONST TILE_H AS INTEGER = 16
+CONST MAP_ROWS AS INTEGER = 8
+CONST MAP_COLS AS INTEGER = 12
+
+Screen(MAP_COLS * TILE_W, MAP_ROWS * TILE_H, "Tilemap-Smoketest")
+
+DIM ts AS IMAGE
+ts = LoadImage("assets/tileset.png")
+
+DIM hero AS IMAGE
+hero = LoadImage("assets/hero_walk.png")
+
+DIM level[MAP_ROWS, MAP_COLS] AS INTEGER
+DIM r AS INTEGER
+DIM c AS INTEGER
+FOR r = 0 TO MAP_ROWS - 1
+    FOR c = 0 TO MAP_COLS - 1
+        IF r = 0 OR c = 0 OR r = MAP_ROWS - 1 OR c = MAP_COLS - 1 THEN
+            level[r, c] = 2
+        ELSE
+            level[r, c] = 0
+        END IF
+    NEXT
+NEXT
+level[3, 3] = 3
+level[3, 4] = 3
+
+PRINT "Map dims:", DIMSIZE(level, 0), "x", DIMSIZE(level, 1)
+PRINT "Map[3,3]:", level[3, 3]
+
+DIM frame AS INTEGER
+frame = 0
+WHILE frame < 30
+    Cls(BLACK)
+    DrawTilemap(ts, level, TILE_W, TILE_H, 0, 0)
+    DrawImagePart(hero, (frame mod 4) * 16, 0, 16, 16, 32 + frame, 32)
+    Flip()
+    frame = frame + 1
+WEND
+PRINT "OK -", frame, "Frames gerendert"

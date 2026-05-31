@@ -1,0 +1,66 @@
+' Vererbung mit EXTENDS
+
+CLASS Animal
+    DIM name AS STRING
+    DIM laute AS INTEGER
+
+    SUB Init(n AS STRING)
+        name = n
+        laute = 0
+    END SUB
+
+    SUB Sprich()
+        PRINT name + " macht ein Geraeusch."
+        laute = laute + 1
+    END SUB
+
+    FUNCTION LauteCount() AS INTEGER
+        RETURN laute
+    END FUNCTION
+END CLASS
+
+CLASS Hund EXTENDS Animal
+    DIM rasse AS STRING
+
+    SUB SetRasse(r AS STRING)
+        rasse = r
+    END SUB
+
+    ' Ueberschreibt Animal.Sprich
+    SUB Sprich()
+        PRINT name + " (" + rasse + ") bellt: WAU!"
+        laute = laute + 1
+    END SUB
+END CLASS
+
+CLASS Katze EXTENDS Animal
+    SUB Sprich()
+        PRINT name + " miaut: MIAUUUU"
+        laute = laute + 1
+    END SUB
+END CLASS
+
+DIM rex AS Hund
+rex = NEW Hund("Rex")
+rex.SetRasse("Schaeferhund")
+
+DIM mia AS Katze
+mia = NEW Katze("Mia")
+
+rex.Sprich()
+rex.Sprich()
+mia.Sprich()
+rex.Sprich()
+
+PRINT ""
+PRINT "Rex hat", rex.LauteCount(), "Laute gemacht"
+PRINT "Mia hat", mia.LauteCount(), "Laute gemacht"
+
+' Polymorphie: Variable vom Typ Animal kann Hund/Katze halten
+PRINT ""
+PRINT "Polymorphie-Test:"
+DIM tier AS Animal
+tier = rex
+tier.Sprich()
+tier = mia
+tier.Sprich()

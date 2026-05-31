@@ -1,0 +1,16 @@
+' Klassische Konkatenation vs. f-String - direkter Vergleich.
+'
+' Beide Zeilen erzeugen den exakt gleichen Output. Die f-String-Variante
+' ist deutlich lesbarer, sobald mehr als ein Wert eingebettet ist.
+
+DIM score AS INTEGER
+DIM combo AS INTEGER
+score = 1234
+combo = 7
+
+' Klassisch: jeder Wert muss mit STR$ in Text verwandelt werden,
+' verbunden mit + und passenden Leerzeichen/Zeichen drumherum.
+PRINT "Score: " + STR$(score) + " (Combo x" + STR$(combo) + ")"
+
+' f-String: Variablen direkt in geschweiften Klammern eingebettet.
+PRINT f"Score: {score} (Combo x{combo})"

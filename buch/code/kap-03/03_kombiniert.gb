@@ -1,0 +1,26 @@
+' AND, OR, NOT - kombinierte Bedingungen.
+
+DIM score      AS INTEGER
+DIM lives      AS INTEGER
+DIM highscore  AS INTEGER
+
+score     = 4500
+lives     = 2
+highscore = 5000
+
+' Highscore-Modus: viel Score UND noch am Leben
+IF score >= 4000 AND lives > 0 THEN
+    PRINT "Highscore-Modus aktiv!"
+END IF
+
+' Game-Over: keine Leben uebrig
+IF lives = 0 THEN
+    PRINT "Game Over"
+END IF
+
+' NOT umkehrt eine Bedingung: "wenn der Score noch NICHT den Highscore knackt"
+IF NOT (score >= highscore) THEN
+    DIM diff AS INTEGER
+    diff = highscore - score
+    PRINT f"Noch {diff} Punkte zum Highscore!"
+END IF

@@ -1,0 +1,55 @@
+' Doppel-Schleife: 3 Bullets gegen 3 Enemies pruefen.
+'
+' Das ist die Mechanik, die im echten Spiel pro Frame laeuft - nur dort
+' mit deutlich mehr Bullets und Enemies. Die Konsolen-Simulation hier
+' macht klar, was geprueft wird, ohne SCREEN/FLIP-Drumherum.
+
+IMPORT "physics"
+
+' Bullets und Enemies als parallel-Arrays (zur Demo - im Spiel sind das
+' Klassen-Instanzen).
+DIM bx[3]      AS INTEGER
+DIM by[3]      AS INTEGER
+DIM ex[3]      AS INTEGER
+DIM ey[3]      AS INTEGER
+DIM ealive[3]  AS BOOLEAN
+
+bx[0] = 100
+by[0] = 100
+bx[1] = 200
+by[1] = 100
+bx[2] = 300
+by[2] = 100
+
+ex[0] = 102
+ey[0] = 105
+ealive[0] = TRUE
+
+ex[1] = 250
+ey[1] = 100
+ealive[1] = TRUE
+
+ex[2] = 295
+ey[2] = 95
+ealive[2] = TRUE
+
+' Doppelte Schleife: jeder Bullet gegen jeden lebenden Enemy.
+DIM i AS INTEGER
+DIM j AS INTEGER
+
+FOR i = 0 TO 2
+    FOR j = 0 TO 2
+        IF ealive[j] THEN
+            IF PHYSICS_BOX_BOX(bx[i], by[i], 3, 8, ex[j], ey[j], 16, 14) THEN
+                PRINT f"  Bullet {i} bei ({bx[i]},{by[i]}) trifft Enemy {j} bei ({ex[j]},{ey[j]})"
+                ealive[j] = FALSE
+            END IF
+        END IF
+    NEXT j
+NEXT i
+
+PRINT ""
+PRINT "Status nach Loop:"
+FOR j = 0 TO 2
+    PRINT f"  Enemy {j}: alive = {ealive[j]}"
+NEXT j

@@ -1,0 +1,20 @@
+' Mikro-Bench: viele globale Variablen-Zugriffe in engen Schleifen.
+DIM a AS INTEGER
+DIM b AS INTEGER
+DIM c AS INTEGER
+DIM d AS INTEGER
+DIM e AS INTEGER
+DIM i AS INTEGER
+a = 1
+b = 2
+c = 3
+d = 4
+e = 5
+FOR i = 1 TO 200000
+    a = a + b
+    c = c + d + e
+    b = b + 1
+NEXT i
+PRINT a
+PRINT b
+PRINT c

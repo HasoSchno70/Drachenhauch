@@ -1,0 +1,235 @@
+' === Realistischer Schneefall (mit Klassen-Architektur) ===
+' Schneeflocken sind Instanzen einer CLASS Flocke - mit Methoden Spawn,
+' Update und Reset. Pool von 250 Flocken in einem ARRAY OF Flocke.
+'
+' Boden-Schnee als bodenhoehe[] pro Pixel-Spalte, mit Rutsch-Algorithmus
+' der zu steile Stufen ausgleicht. Wind aendert sich zeitabhaengig, mit
+' 10% Wahrscheinlichkeit fuer Boen.
+'
+' Steuerung: ESC = Ende, R = Boden zuruecksetzen, B = Boe ausloesen.
+
+CONST W AS INTEGER = 320
+CONST H AS INTEGER = 240
+CONST GROUND_Y AS INTEGER = 230
+CONST MAX_FLOCKEN AS INTEGER = 250
+
+' --- Flocken-Klasse -----------------------------------------------
+CLASS Flocke
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM vy AS FLOAT             ' Fallgeschwindigkeit (px/s)
+    DIM groesse AS INTEGER      ' 1..3
+    DIM phase AS FLOAT          ' fuer Wackel-Sinus
+    DIM alive AS BOOLEAN
+
+    SUB Init()
+        alive = FALSE
+    END SUB
+
+    SUB Spawn(welt_breite AS INTEGER)
+        ' Spawn etwas links/rechts ueber den Rand hinaus, damit Wind-getragene
+        ' Flocken auch von der Seite reinkommen koennen.
+        x = RND(welt_breite + 40) * 1.0 - 20.0
+        y = -5.0 - RND(20) * 1.0
+        vy = 25.0 + RND(50) * 1.0
+        groesse = 1 + RND(3)
+        phase = RND(628) / 100.0
+        alive = TRUE
+    END SUB
+
+    SUB Update(dt_s AS FLOAT, wind AS FLOAT)
+        phase = phase + dt_s * 2.0
+        DIM wackel AS FLOAT
+        wackel = SIN(phase) * 8.0       ' +-8 px/s seitlich
+        x = x + (wind + wackel) * dt_s
+        y = y + vy * dt_s
+    END SUB
+END CLASS
+
+' --- Setup --------------------------------------------------------
+SCREEN(W, H, "Schneefall", 2)
+RANDOMIZE(MILLIS())
+
+DIM flocken[250] AS Flocke
+DIM i AS INTEGER
+
+' Pool initialisieren - alle Slots NEW + alive=FALSE
+FOR i = 0 TO MAX_FLOCKEN - 1
+    flocken[i] = NEW Flocke()
+NEXT
+
+' Boden-Schnee: Hoehe pro Pixel-Spalte
+DIM bodenhoehe[320] AS INTEGER
+
+' Wind-Zustand
+DIM wind AS FLOAT
+DIM wind_target AS FLOAT
+DIM wind_change_at AS INTEGER
+DIM ist_boe AS BOOLEAN
+wind = 0.0
+wind_target = 0.0
+wind_change_at = MILLIS()
+ist_boe = FALSE
+
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+
+' === Hauptschleife ================================================
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN
+        BREAK
+    END IF
+
+    ' --- dt berechnen, oben kappen ---
+    DIM now_ms AS INTEGER
+    DIM dt AS INTEGER
+    now_ms = MILLIS()
+    dt = now_ms - last_ms
+    last_ms = now_ms
+    IF dt > 50 THEN
+        dt = 50
+    END IF
+    DIM dt_s AS FLOAT
+    dt_s = dt / 1000.0
+
+    ' --- Tasten ---
+    IF KEYPRESSED(KEY_R) THEN
+        DIM rx AS INTEGER
+        FOR rx = 0 TO W - 1
+            bodenhoehe[rx] = 0
+        NEXT
+    END IF
+    IF KEYPRESSED(KEY_B) THEN
+        IF RND(2) = 0 THEN
+            wind_target = -120.0
+        ELSE
+            wind_target = 120.0
+        END IF
+        wind_change_at = now_ms + 1500
+        ist_boe = TRUE
+    END IF
+
+    ' --- Wind ---
+    IF now_ms >= wind_change_at THEN
+        IF RND(10) = 0 THEN
+            ' Boe (10%): -130..-50 oder 50..130
+            DIM richtung AS INTEGER
+            richtung = RND(2) * 2 - 1
+            wind_target = richtung * (50.0 + RND(80) * 1.0)
+            ist_boe = TRUE
+            wind_change_at = now_ms + 1200 + RND(800)
+        ELSE
+            wind_target = (RND(101) - 50) * 1.0
+            ist_boe = FALSE
+            wind_change_at = now_ms + 1500 + RND(2500)
+        END IF
+    END IF
+    wind = wind + (wind_target - wind) * 0.03
+
+    ' --- Spawn (1..3 pro Frame) ---
+    DIM spawn AS INTEGER
+    spawn = 1 + RND(3)
+    DIM n AS INTEGER
+    FOR n = 1 TO spawn
+        FOR i = 0 TO MAX_FLOCKEN - 1
+            IF NOT flocken[i].alive THEN
+                flocken[i].Spawn(W)
+                BREAK
+            END IF
+        NEXT
+    NEXT
+
+    ' --- Update + Bodencheck ---
+    FOR i = 0 TO MAX_FLOCKEN - 1
+        IF flocken[i].alive THEN
+            flocken[i].Update(dt_s, wind)
+
+            ' Wrap-around an den Seiten
+            IF flocken[i].x < -5.0 THEN
+                flocken[i].x = W + 5.0
+            END IF
+            IF flocken[i].x > W + 5.0 THEN
+                flocken[i].x = -5.0
+            END IF
+
+            ' Bodenkollision an aktueller Spalte
+            DIM ix AS INTEGER
+            ix = INT(flocken[i].x)
+            IF ix < 0 THEN
+                ix = 0
+            END IF
+            IF ix >= W THEN
+                ix = W - 1
+            END IF
+            DIM landung_y AS INTEGER
+            landung_y = GROUND_Y - bodenhoehe[ix]
+            IF flocken[i].y >= landung_y THEN
+                bodenhoehe[ix] = bodenhoehe[ix] + 1
+                flocken[i].alive = FALSE
+            END IF
+        END IF
+    NEXT
+
+    ' --- "Rutsch": Stufen ausgleichen ---
+    DIM pass AS INTEGER
+    FOR pass = 0 TO 1
+        DIM x AS INTEGER
+        FOR x = 1 TO W - 2
+            IF bodenhoehe[x] - bodenhoehe[x - 1] > 2 THEN
+                bodenhoehe[x] = bodenhoehe[x] - 1
+                bodenhoehe[x - 1] = bodenhoehe[x - 1] + 1
+            END IF
+            IF bodenhoehe[x] - bodenhoehe[x + 1] > 2 THEN
+                bodenhoehe[x] = bodenhoehe[x] - 1
+                bodenhoehe[x + 1] = bodenhoehe[x + 1] + 1
+            END IF
+        NEXT
+    NEXT
+
+    ' === Zeichnen =================================================
+    CLS(RGB(15, 20, 40))             ' Nachthimmel
+
+    ' Boden-Schnee als Vertikal-Linien
+    DIM gx AS INTEGER
+    FOR gx = 0 TO W - 1
+        IF bodenhoehe[gx] > 0 THEN
+            DIM top_y AS INTEGER
+            top_y = GROUND_Y - bodenhoehe[gx]
+            LINE(gx, top_y, gx, GROUND_Y, RGB(240, 245, 255))
+            PLOT(gx, top_y, RGB(255, 255, 255))   ' heller Saum oben
+        END IF
+    NEXT
+
+    ' Untergrund (gefroren)
+    BOX(0, GROUND_Y + 1, W - 1, H - 1, RGB(40, 60, 85))
+
+    ' Aktive Flocken
+    FOR i = 0 TO MAX_FLOCKEN - 1
+        IF flocken[i].alive THEN
+            DIM helligkeit AS INTEGER
+            helligkeit = 200 + flocken[i].groesse * 18
+            IF helligkeit > 255 THEN
+                helligkeit = 255
+            END IF
+            DIM color AS INTEGER
+            color = RGB(helligkeit, helligkeit, helligkeit)
+            IF flocken[i].groesse = 1 THEN
+                PLOT(INT(flocken[i].x), INT(flocken[i].y), color)
+            ELSE
+                CIRCLE(INT(flocken[i].x), INT(flocken[i].y), flocken[i].groesse - 1, color)
+            END IF
+        END IF
+    NEXT
+
+    ' --- HUD ---
+    DIM wind_label AS STRING
+    wind_label = "Wind: " + STR$(ROUND(wind)) + " px/s"
+    IF ist_boe THEN
+        wind_label = wind_label + "  (BOE!)"
+    END IF
+    TEXT(8, 8, wind_label, RGB(180, 220, 255))
+    TEXT(8, 22, "ESC = Ende, R = Boden weg, B = Boe", RGB(120, 150, 180))
+
+    FLIP()
+    SLEEP(16)
+WEND

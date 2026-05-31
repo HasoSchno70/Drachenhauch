@@ -1,0 +1,339 @@
+' === GameBasic Amiga Tribute Demo ===
+'
+' Klassische Demoszene-Effekte im Geist der Amiga 500/1200-Aera:
+'   - Star-Field 3D (Z-Walk, Perspektiv-Projektion)
+'   - Kupfer-Bars (gradient-Streifen, Sinuswellen)
+'   - Vector-Bobs (Sinus-Bewegung, Trail)
+'   - Pulsierendes Logo mit Glow
+'   - Sinus-Scroller mit Regenbogen-Farben
+'   - Hintergrund-Musik
+'
+' Steuerung: ESC = Ende, SPACE = Pause
+'
+' Hintergrund-Musik: assets/ambient.ogg (CC0 -- siehe 48_orbital.gb).
+' Fehlt das Asset, laeuft das Demo stumm.
+
+IMPORT "vec2"
+IMPORT "input"
+
+' --- Aufloesung 320x200 wie auf dem Amiga (Scale 3 = 960x600) ---------
+CONST WIDTH AS INTEGER = 320
+CONST HEIGHT AS INTEGER = 200
+
+SCREEN(WIDTH, HEIGHT, "GameBasic Amiga Tribute", 3)
+RANDOMIZE(42)
+
+' --- Music ------------------------------------------------------------
+' Bevorzugt: Action-Chiptune von Juhani Junkala (CC0).
+' Fallback: das alte Ambient-File (falls vorhanden).
+DIM MUSIC_PATH AS STRING
+MUSIC_PATH = "assets/amiga_action_level1.ogg"
+IF NOT FILEEXISTS(MUSIC_PATH) THEN
+    MUSIC_PATH = "assets/ambient.ogg"
+END IF
+DIM has_music AS BOOLEAN
+has_music = FILEEXISTS(MUSIC_PATH)
+IF has_music THEN
+    PLAYMUSIC(MUSIC_PATH, -1, 0.6)
+END IF
+
+' --- Input-Bindings ---------------------------------------------------
+INPUT_BIND("quit",  KEY_ESCAPE)
+INPUT_BIND("pause", KEY_SPACE)
+
+' === Star-Field 3D ====================================================
+CONST N_STARS AS INTEGER = 120
+CONST STAR_DEPTH AS FLOAT = 250.0
+CONST STAR_SPEED AS FLOAT = 1.4
+
+' Stern als Tupel (x, y, z) -- x/y im Welt-Bereich +/-160, z = 1..STAR_DEPTH.
+FUNCTION new_star() AS TUPLE
+    RETURN (RND() * 320.0 - 160.0, _
+            RND() * 200.0 - 100.0, _
+            1.0 + RND() * STAR_DEPTH)
+END FUNCTION
+
+' Comprehension fuer Initial-Stars.
+DIM stars[N_STARS] AS TUPLE
+DIM i AS INTEGER
+FOR i = 0 TO N_STARS - 1
+    stars[i] = new_star()
+NEXT
+
+' === Vector-Bobs ======================================================
+CONST N_BOBS AS INTEGER = 36
+DIM bob_phase AS FLOAT
+bob_phase = 0.0
+
+' === Kupfer-Bars ======================================================
+CONST N_BARS AS INTEGER = 6
+DIM bar_phase AS FLOAT
+bar_phase = 0.0
+
+' === Sinus-Scroller ===================================================
+DIM scroll_msg AS STRING
+scroll_msg = "                    *** GAMEBASIC AMIGA TRIBUTE 2026 ***    HALLO ALTE DEMO-CODER!    HIER ROLLT EIN STUECK 80er-DEMOSZENE - PROGRAMMIERT IN GAMEBASIC, EINEM PASCAL-STRIKTEN BASIC-DIALEKT MIT 3 AUSFUEHRUNGSPFADEN: TREE-WALKER, PYTHON-VM UND CYTHON-VM    *** GREETINGS TO HASOSOFT ***    ALLE EFFEKTE LAUFEN UNTER 1ms PRO FRAME, OHNE GPU-TRICKS    ROLL ON ROLL ON ROLL ON                    "
+DIM scroll_x AS FLOAT
+scroll_x = WIDTH * 1.0
+
+' === Logo-Tween =======================================================
+' Pulsierender Skalierungsfaktor fuer das Logo. Sinus-Easing erzeugt das
+' typische Amiga-Logo-Atmen.
+DIM logo_phase AS FLOAT
+logo_phase = 0.0
+
+' === State ============================================================
+DIM frame_no AS INTEGER
+DIM last_ms AS INTEGER
+DIM frozen AS BOOLEAN
+last_ms = MILLIS()
+frozen = FALSE
+
+' === Helpers ==========================================================
+
+' Sinus-Scroller-Farbe: drei phasenverschobene Sinusse zu (R, G, B).
+' Liefert Tupel mit gestrickten 0..255-Werten.
+FUNCTION sinscroll_rgb(phase AS FLOAT) AS TUPLE
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT(127.0 + SIN(phase)         * 127.0)
+    g = INT(127.0 + SIN(phase + 2.094) * 127.0)
+    b = INT(127.0 + SIN(phase + 4.189) * 127.0)
+    RETURN (CLAMP(r, 0, 255), CLAMP(g, 0, 255), CLAMP(b, 0, 255))
+END FUNCTION
+
+' Kupferbar mit Gradient: heller in der Mitte, dunkler an den Raendern.
+' Klassischer Amiga-Effekt -- Original wurde via Copper-Liste in der
+' VBL-Interrupt umgesetzt.
+SUB draw_kupfer_bar(y AS INTEGER, h AS INTEGER, base_r AS INTEGER, _
+                     base_g AS INTEGER, base_b AS INTEGER)
+    DIM j AS INTEGER
+    FOR j = 0 TO h - 1
+        ' Distance from middle, 0..1
+        DIM dmid AS FLOAT
+        dmid = ABS((j - h / 2.0) / (h / 2.0))
+        ' Smooth fall-off via 1 - dmid^2
+        DIM br AS FLOAT
+        br = 1.0 - dmid * dmid
+        IF br < 0.0 THEN br = 0.0
+        DIM r AS INTEGER
+        DIM g AS INTEGER
+        DIM b AS INTEGER
+        r = INT(base_r * br)
+        g = INT(base_g * br)
+        b = INT(base_b * br)
+        LINE(0, y + j, WIDTH - 1, y + j, RGB(r, g, b))
+    NEXT
+END SUB
+
+' Logo-Render: Pixel-Schrift via wiederholtes TEXT mit Offset.
+' Fake-Bold-Effekt -- der eigentliche Glow kommt vom Pulsing.
+SUB draw_logo(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT)
+    DIM glow_r AS INTEGER
+    DIM glow_g AS INTEGER
+    DIM glow_b AS INTEGER
+    glow_r = INT(180.0 + SIN(logo_phase) * 60.0)
+    glow_g = INT(160.0 + SIN(logo_phase + 1.0) * 50.0)
+    glow_b = INT(220.0 + SIN(logo_phase + 2.0) * 30.0)
+    glow_r = CLAMP(glow_r, 0, 255)
+    glow_g = CLAMP(glow_g, 0, 255)
+    glow_b = CLAMP(glow_b, 0, 255)
+
+    TEXT_SIZE(INT(20 * scale))
+    TEXT_BOLD(TRUE)
+    DIM logo AS STRING
+    logo = "GAMEBASIC"
+    DIM tw AS INTEGER
+    tw = TEXT_WIDTH(logo)
+    DIM tx AS INTEGER
+    tx = cx - tw \ 2
+
+    ' Mehrere Halo-Layer hintereinander zeichnen, jeweils 1px versetzt
+    DIM offset AS INTEGER
+    FOR offset = 3 TO 1 STEP -1
+        DIM dim_factor AS FLOAT
+        dim_factor = 1.0 - offset * 0.25
+        DIM hr AS INTEGER
+        DIM hg AS INTEGER
+        DIM hb AS INTEGER
+        hr = INT(glow_r * dim_factor)
+        hg = INT(glow_g * dim_factor)
+        hb = INT(glow_b * dim_factor)
+        TEXT(tx - offset, cy, logo, RGB(hr, hg, hb))
+        TEXT(tx + offset, cy, logo, RGB(hr, hg, hb))
+        TEXT(tx, cy - offset, logo, RGB(hr, hg, hb))
+        TEXT(tx, cy + offset, logo, RGB(hr, hg, hb))
+    NEXT
+    ' Heller Kern
+    TEXT(tx, cy, logo, RGB(glow_r, glow_g, glow_b))
+    TEXT_SIZE(20)
+    TEXT_BOLD(FALSE)
+END SUB
+
+' === Main Loop ========================================================
+WHILE NOT QUITREQUESTED() AND NOT INPUT_HELD("quit")
+    INPUT_UPDATE()
+
+    IF INPUT_PRESSED("pause") THEN frozen = NOT frozen
+
+    DIM now_ms AS INTEGER
+    now_ms = MILLIS()
+    DIM dt AS INTEGER
+    dt = now_ms - last_ms
+    last_ms = now_ms
+    IF dt > 100 THEN dt = 100
+    IF frozen THEN dt = 0
+
+    ' --- Update-Phasen ----------------------------------------------
+    bob_phase = bob_phase + dt * 0.003
+    bar_phase = bar_phase + dt * 0.0025
+    logo_phase = logo_phase + dt * 0.004
+
+    ' --- Clear -----------------------------------------------------
+    CLS(&H05060F)
+
+    ' --- 1) Kupfer-Bars als Hintergrund -----------------------------
+    DIM bi AS INTEGER
+    FOR bi = 0 TO N_BARS - 1
+        DIM ph AS FLOAT
+        ph = bar_phase + bi * 0.7
+        DIM y_bar AS INTEGER
+        y_bar = INT(HEIGHT / 2 + SIN(ph) * 60.0) - 6
+        ' Farbe je Bar: phasenverschoben Sinus
+        DIM cr AS INTEGER
+        DIM cg AS INTEGER
+        DIM cb AS INTEGER
+        cr = INT(127.0 + SIN(ph * 0.5)         * 127.0)
+        cg = INT(127.0 + SIN(ph * 0.5 + 2.094) * 127.0)
+        cb = INT(127.0 + SIN(ph * 0.5 + 4.189) * 127.0)
+        cr = CLAMP(cr, 30, 255)
+        cg = CLAMP(cg, 30, 255)
+        cb = CLAMP(cb, 30, 255)
+        draw_kupfer_bar(y_bar, 12, cr, cg, cb)
+    NEXT
+
+    ' --- 2) Star-Field 3D -------------------------------------------
+    FOR i = 0 TO N_STARS - 1
+        DIM sx AS FLOAT
+        DIM sy AS FLOAT
+        DIM sz AS FLOAT
+        (sx, sy, sz) = stars[i]
+        ' Z-Walk: zum Betrachter zu
+        sz = sz - STAR_SPEED * dt * 0.06
+        IF sz < 1.0 THEN
+            stars[i] = new_star()
+        ELSE
+            stars[i] = (sx, sy, sz)
+        END IF
+        ' Projection: 1/z
+        DIM px AS INTEGER
+        DIM py AS INTEGER
+        px = INT(WIDTH / 2 + sx * 100.0 / sz)
+        py = INT(HEIGHT / 2 + sy * 100.0 / sz)
+        ' Helligkeit naeher = heller
+        DIM br AS INTEGER
+        br = INT(255.0 * (1.0 - sz / STAR_DEPTH))
+        IF br < 60 THEN br = 60
+        IF br > 255 THEN br = 255
+        IF px >= 0 AND px < WIDTH AND py >= 0 AND py < HEIGHT THEN
+            ' Naehere Sterne als kleines Plus, weiter als Punkt
+            IF sz < 50.0 THEN
+                LINE(px - 1, py, px + 1, py, RGB(br, br, br))
+                LINE(px, py - 1, px, py + 1, RGB(br, br, br))
+            ELSE
+                PLOT(px, py, RGB(br, br, br))
+            END IF
+        END IF
+    NEXT
+
+    ' --- 3) Vector-Bobs (Sinuswelle) --------------------------------
+    DIM bo AS INTEGER
+    
+    FOR bo = 0 TO N_BOBS - 1
+        DIM bx AS FLOAT
+        DIM by AS FLOAT
+        bx = (bo / (N_BOBS - 1.0)) * (WIDTH - 30) + 15
+        by = 50 + SIN(bob_phase + bo * 0.32) * 30.0
+        ' Farbe per Bob, leicht verschoben
+        DIM bp AS FLOAT
+        bp = bob_phase * 1.5 + bo * 0.18
+        DIM cr AS INTEGER
+        DIM cg AS INTEGER
+        DIM cb AS INTEGER
+        (cr, cg, cb) = sinscroll_rgb(bp)
+        ' Bob = kleiner gefuellter Kreis mit Highlight.
+        ' Integer-Division \ liefert INTEGER (statt FLOAT bei /).
+        CIRCLE(bx, by, 4, RGB(cr \ 2, cg \ 2, cb \ 2))
+        CIRCLE(bx, by, 2, RGB(cr, cg, cb))
+        PLOT(bx - 1, by - 1, RGB(MIN(255, cr + 80), MIN(255, cg + 80), MIN(255, cb + 80)))
+    NEXT
+
+    ' --- 4) Logo (oben, pulsierend) ---------------------------------
+    DIM logo_scale AS FLOAT
+    logo_scale = 1.0 + SIN(logo_phase) * 0.05
+    draw_logo(WIDTH / 2, 10, logo_scale)
+
+    ' --- 5) Sinus-Scroller (gross, unten) ---------------------------
+    DIM band_y AS INTEGER
+    band_y = HEIGHT - 50
+
+    ' Schwarzer Streifen als Background
+    BOX(0, band_y, WIDTH - 1, band_y + 38, &H050810)
+    LINE(0, band_y, WIDTH - 1, band_y, &H1A2A40)
+    LINE(0, band_y + 37, WIDTH - 1, band_y + 37, &H1A2A40)
+
+    DIM scroll_mid AS INTEGER
+    scroll_mid = band_y + 18
+
+    TEXT_SIZE(20)
+    TEXT_BOLD(TRUE)
+
+    DIM cur_x AS FLOAT
+    DIM ch AS STRING
+    DIM si AS INTEGER
+    DIM phase AS FLOAT
+    DIM text_y AS INTEGER       ' umbenannt aus sy -- Konflikt mit Star-y oben
+    DIM sr AS INTEGER
+    DIM sg AS INTEGER
+    DIM sb AS INTEGER
+
+    cur_x = scroll_x
+    FOR si = 0 TO LEN(scroll_msg) - 1
+        ch = MID$(scroll_msg, si, 1)
+        IF cur_x > -32 AND cur_x < WIDTH THEN
+            phase = (si * 0.32) + (frame_no * 0.07)
+            text_y = scroll_mid - 11 + INT(SIN(phase) * 12.0)
+            (sr, sg, sb) = sinscroll_rgb(phase)
+            TEXT(INT(cur_x), text_y, ch, RGB(sr, sg, sb))
+        END IF
+        cur_x = cur_x + TEXT_WIDTH(ch)
+    NEXT
+
+    TEXT_SIZE(20)
+    TEXT_BOLD(FALSE)
+
+    IF NOT frozen THEN
+        scroll_x = scroll_x - 2.5
+    END IF
+    IF scroll_x < -1.0 * LEN(scroll_msg) * 16.0 THEN
+        scroll_x = WIDTH * 1.0
+    END IF
+
+    ' --- 6) Pause-Banner mittig -------------------------------------
+    IF frozen THEN
+        TEXT_SIZE(28)
+        TEXT_BOLD(TRUE)
+        TEXT(WIDTH / 2 - 60, HEIGHT / 2 - 15, "[ PAUSE ]", &HFFCC66)
+        TEXT_SIZE(20)
+        TEXT_BOLD(FALSE)
+    END IF
+
+    FLIP()
+    SLEEP(16)
+    frame_no = frame_no + 1
+WEND
+
+IF has_music THEN
+    STOPMUSIC()
+END IF

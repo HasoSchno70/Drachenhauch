@@ -1,0 +1,9 @@
+{
+  "images": {
+    "coin":       "coin.png",
+    "coin_anim":  "coin_anim.png",
+    "hero":       "hero.png",
+    "hero_walk":  "hero_walk.png",
+    "logo":       "logo.png"
+  }
+}

@@ -1,0 +1,10 @@
+' Naiver rekursiver Fibonacci - rechenintensiv genug, um den
+' Unterschied Tree-Walker vs Bytecode-VM messbar zu machen.
+' Fib(25) = 75025, ca. 240.000 rekursive Aufrufe.
+
+FUNCTION Fib(n AS INTEGER) AS INTEGER
+    IF n < 2 THEN RETURN n
+    RETURN Fib(n - 1) + Fib(n - 2)
+END FUNCTION
+
+PRINT "Fib(25) =", Fib(25)

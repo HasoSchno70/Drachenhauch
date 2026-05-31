@@ -1,0 +1,84 @@
+' STRUCT: leichtgewichtige Daten ohne Methoden, automatisch initialisiert.
+' Unterschied zu CLASS:
+'   - DIM v AS Vector2     -> sofort verwendbar (auto-init)
+'   - DIM o AS MyClass     -> NIL bis NEW MyClass(...)
+
+STRUCT Vector2
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+END STRUCT
+
+STRUCT Color
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+END STRUCT
+
+STRUCT Particle
+    DIM pos AS Vector2          ' Struct in Struct - auch auto-init!
+    DIM vel AS Vector2
+    DIM tint AS Color
+    DIM lifetime AS INTEGER
+END STRUCT
+
+' --- Direkte Nutzung ohne NEW ---
+DIM ziel AS Vector2
+ziel.x = 10.0
+ziel.y = 20.0
+PRINT "Ziel:", ziel.x, ",", ziel.y
+
+' --- Verschachtelt ---
+DIM funke AS Particle
+funke.pos.x = 100.0
+funke.pos.y = 50.0
+funke.vel.x = 1.5
+funke.vel.y = -2.0
+funke.tint.r = 255
+funke.tint.g = 200
+funke.tint.b = 0
+funke.lifetime = 60
+
+PRINT ""
+PRINT "Funke:"
+PRINT "  pos =", funke.pos.x, "/", funke.pos.y
+PRINT "  vel =", funke.vel.x, "/", funke.vel.y
+PRINT "  tint =", funke.tint.r, "/", funke.tint.g, "/", funke.tint.b
+PRINT "  lifetime =", funke.lifetime
+
+' --- Array von STRUCTs: alle Slots auto-init ---
+DIM partikel[5] AS Particle
+DIM i AS INTEGER
+
+PRINT ""
+PRINT "Partikel-System (alles auto-init auf 0):"
+FOR i = 0 TO LEN(partikel) - 1
+    PRINT "  partikel[", i, "].pos =", partikel[i].pos.x, "/", partikel[i].pos.y
+NEXT
+
+' Jetzt befuellen
+FOR i = 0 TO LEN(partikel) - 1
+    partikel[i].pos.x = i * 10.0
+    partikel[i].pos.y = 50.0
+    partikel[i].lifetime = 30 + i * 5
+NEXT
+
+PRINT ""
+PRINT "Nach Befuellung:"
+FOR i = 0 TO LEN(partikel) - 1
+    PRINT "  partikel[", i, "] pos =", partikel[i].pos.x, "/", partikel[i].pos.y, "life=", partikel[i].lifetime
+NEXT
+
+' --- STRUCT als Funktions-Parameter / Rueckgabe ---
+FUNCTION DistanceSq(a AS Vector2, b AS Vector2) AS FLOAT
+    DIM dx AS FLOAT
+    DIM dy AS FLOAT
+    dx = a.x - b.x
+    dy = a.y - b.y
+    RETURN dx * dx + dy * dy
+END FUNCTION
+
+DIM heim AS Vector2
+heim.x = 0.0
+heim.y = 0.0
+PRINT ""
+PRINT "Quadratischer Abstand Funke <-> Heim =", DistanceSq(funke.pos, heim)

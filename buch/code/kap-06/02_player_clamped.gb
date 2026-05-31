@@ -1,0 +1,41 @@
+' Star Pilot - Kap 6, Schritt 2: Player bleibt im Spielfeld.
+'
+' Nach dem Update der Position pruefen wir, ob sie ausserhalb des
+' Bildschirms liegt - wenn ja, klemmen wir sie zurueck. So kann der
+' Player nicht mehr aus dem Bild fliegen.
+
+CONST WIDTH    AS INTEGER = 320
+CONST HEIGHT   AS INTEGER = 240
+CONST BG_COLOR AS INTEGER = &H141E3C
+CONST PLAYER_C AS INTEGER = &HFFDC00
+CONST PLAYER_W AS INTEGER = 40
+CONST PLAYER_H AS INTEGER = 24
+
+DIM player_x AS INTEGER
+DIM player_y AS INTEGER
+player_x = 140
+player_y = 200
+
+SCREEN(WIDTH, HEIGHT, "Star Pilot", 2)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_LEFT) THEN
+        player_x -= 2
+    END IF
+    IF KEYPRESSED(KEY_RIGHT) THEN
+        player_x += 2
+    END IF
+
+    ' --- Begrenzen: 0 <= player_x <= WIDTH - PLAYER_W ---
+    IF player_x < 0 THEN
+        player_x = 0
+    END IF
+    IF player_x > WIDTH - PLAYER_W THEN
+        player_x = WIDTH - PLAYER_W
+    END IF
+
+    CLS(BG_COLOR)
+    BOX(player_x, player_y, player_x + PLAYER_W, player_y + PLAYER_H, PLAYER_C)
+    FLIP()
+    SLEEP(16)
+WEND

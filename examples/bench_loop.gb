@@ -1,0 +1,8 @@
+' Schleifen-lastig: 100.000 Iterationen mit Arithmetik.
+DIM s AS INTEGER
+DIM i AS INTEGER
+s = 0
+FOR i = 1 TO 100000
+    s = s + i * 2 - 1
+NEXT
+PRINT "Summe:", s

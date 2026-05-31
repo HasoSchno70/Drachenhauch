@@ -1,0 +1,378 @@
+' === Coin Quest ===
+' Mini-Spiel das alle neuen Module integriert:
+'   sprite     - Held-Animation, Coins
+'   particles  - Funkenspritzer beim Sammeln
+'   tween      - Score-Pop, Coin-Spawn-Pulsar, Banner-Slide-In
+'   camera     - folgt dem Helden in der Welt
+'   db         - Highscore-Liste in SQLite
+'   json       - Settings-Datei (optional, Defaults werden genutzt)
+'   input      - Action-basiertes Input-Mapping
+' Plus: ENUM-State-Machine, ARRAY OF SPRITE, RANDOMIZE.
+'
+' Steuerung: Pfeile/WASD = laufen, ENTER = (Re-)Start, ESC = Beenden.
+'
+' Migrationsstand: hardcoded Keycodes ersetzt durch INPUT_BIND-Actions,
+' state-String durch ENUM, Konstanten in einer Cfg-Klasse.
+
+IMPORT "sprite"
+IMPORT "particles"
+IMPORT "tween"
+IMPORT "camera"
+IMPORT "db"
+IMPORT "json"
+IMPORT "input"
+
+' --- Konstanten -----------------------------------------------------
+CLASS Cfg
+    STATIC CONST SCREEN_W AS INTEGER = 320
+    STATIC CONST SCREEN_H AS INTEGER = 240
+    STATIC CONST WORLD_W  AS INTEGER = 480
+    STATIC CONST WORLD_H  AS INTEGER = 320
+    STATIC CONST TILE     AS INTEGER = 32
+    STATIC CONST DB_PATH  AS STRING  = "coinquest.db"
+END CLASS
+
+ENUM GameState = INTRO, PLAYING, GAMEOVER
+
+' --- Settings (per JSON ueberschreibbar) ----------------------------
+DIM max_coins AS INTEGER
+DIM time_limit_s AS INTEGER
+DIM score_per_coin AS INTEGER
+max_coins = 8
+time_limit_s = 30
+score_per_coin = 100
+
+IF FILEEXISTS("settings.json") THEN
+    DIM cfg AS JSON_HANDLE
+    cfg = JSON_LOAD("settings.json")
+    IF JSON_HAS(cfg, "max_coins") THEN
+        max_coins = JSON_GET_INT(cfg, "max_coins")
+    END IF
+    IF JSON_HAS(cfg, "time_limit_s") THEN
+        time_limit_s = JSON_GET_INT(cfg, "time_limit_s")
+    END IF
+    IF JSON_HAS(cfg, "score_per_coin") THEN
+        score_per_coin = JSON_GET_INT(cfg, "score_per_coin")
+    END IF
+END IF
+
+' --- DB initialisieren ----------------------------------------------
+DIM con AS DB_CONN
+con = DB_OPEN(Cfg.DB_PATH)
+DB_EXEC(con, "CREATE TABLE IF NOT EXISTS scores (score INTEGER NOT NULL, datum TEXT NOT NULL)")
+
+' --- Pygame ---------------------------------------------------------
+SCREEN(Cfg.SCREEN_W, Cfg.SCREEN_H, "Coin Quest", 2)
+
+' --- Input-Mapping (frueher: hardcoded Keycode-CONSTs) --------------
+INPUT_BIND("left",  KEY_LEFT,  KEY_A)
+INPUT_BIND("right", KEY_RIGHT, KEY_D)
+INPUT_BIND("up",    KEY_UP,    KEY_W)
+INPUT_BIND("down",  KEY_DOWN,  KEY_S)
+INPUT_BIND("start", KEY_ENTER)
+INPUT_BIND("quit",  KEY_ESCAPE)
+
+DIM hero_sheet AS IMAGE
+hero_sheet = LOADIMAGE("assets/hero_walk.png")
+DIM coin_img AS IMAGE
+coin_img = LOADIMAGE("assets/coin.png")
+
+DIM held AS SPRITE
+held = SPRITE_NEW(hero_sheet, 16, 16)
+SPRITE_ADD_ANIM(held, "idle", 0, 0, 1.0)
+SPRITE_ADD_ANIM(held, "walk", 0, 3, 8.0)
+SPRITE_PLAY(held, "idle")
+
+DIM coins[8] AS SPRITE
+DIM coin_alive[8] AS BOOLEAN          ' kollidiert mit Held
+DIM coin_spawn[8] AS TWEEN            ' Erscheinungs-Pulsar
+DIM coin_popping[8] AS BOOLEAN        ' Pickup-Animation laeuft
+DIM coin_pickup[8] AS TWEEN           ' Skalierung beim Pickup
+
+' --- Spielzustand ---------------------------------------------------
+DIM state AS GameState
+DIM score AS INTEGER
+DIM gefangen AS INTEGER
+DIM start_ms AS INTEGER
+DIM remaining_s AS INTEGER
+DIM banner_tween AS TWEEN
+DIM score_pop AS TWEEN
+score_pop = TWEEN_NEW(1.0, 1.0, 0, "linear")  ' default "fertig"
+
+' --- Funken-Effekt --------------------------------------------------
+DIM funken AS PARTICLE_SYSTEM
+funken = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_COLOR(funken, RGB(255, 220, 80))
+PARTICLE_SET_VELOCITY(funken, -120.0, 120.0, -180.0, -40.0)
+PARTICLE_SET_LIFETIME(funken, 300, 600)
+PARTICLE_SET_GRAVITY(funken, 0.0, 400.0)
+PARTICLE_SET_SIZE(funken, 2, 4)
+PARTICLE_SET_FADE(funken, TRUE)
+
+' --- Coin-Platzierung -----------------------------------------------
+SUB place_coins()
+    RANDOMIZE(MILLIS())
+    DIM i AS INTEGER
+    FOR i = 0 TO max_coins - 1
+        coins[i] = SPRITE_NEW(coin_img, 8, 8)
+        DIM cx AS FLOAT
+        DIM cy AS FLOAT
+        cx = 24.0 + RND(Cfg.WORLD_W - 48) * 1.0
+        cy = 24.0 + RND(Cfg.WORLD_H - 48) * 1.0
+        SPRITE_SET_POS(coins[i], cx, cy)
+        SPRITE_SET_SCALE(coins[i], 1.0, 1.0)
+        SPRITE_TINT_CLEAR(coins[i])
+        coin_alive[i] = TRUE
+        coin_popping[i] = FALSE
+        ' Spawn-Pulsar: Tween 0 -> 1 fuer das Pop-Effekt-Timing.
+        coin_spawn[i] = TWEEN_NEW(0.0, 1.0, 250 + RND(200), "out_bounce")
+    NEXT
+END SUB
+
+' --- Spiel starten / zuruecksetzen ----------------------------------
+SUB start_game()
+    score = 0
+    gefangen = 0
+    SPRITE_SET_POS(held, Cfg.WORLD_W / 2.0, Cfg.WORLD_H / 2.0)
+    SPRITE_SET_VELOCITY(held, 0.0, 0.0)
+    SPRITE_PLAY(held, "idle")
+    PARTICLE_CLEAR(funken)
+    place_coins()
+    start_ms = MILLIS()
+    state = GameState.PLAYING
+END SUB
+
+' --- Highscore speichern und Top 3 ausgeben -------------------------
+FUNCTION top_scores_text() AS STRING
+    DIM r AS DB_RESULT
+    r = DB_QUERY(con, "SELECT score, datum FROM scores ORDER BY score DESC LIMIT 3")
+    DIM out AS STRING
+    out = ""
+    DIM rank AS INTEGER
+    rank = 1
+    WHILE DB_NEXT(r)
+        IF rank > 1 THEN
+            out = out + "  "
+        END IF
+        out = out + STR$(rank) + ". " + STR$(DB_GET_INT(r, 0))
+        rank = rank + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+    IF out = "" THEN
+        out = "(noch keine)"
+    END IF
+    RETURN out
+END FUNCTION
+
+' --- Initialer State ------------------------------------------------
+state = GameState.INTRO
+banner_tween = TWEEN_NEW(-200.0, 80.0, 600, "out_quad")
+
+DIM last_ms AS INTEGER
+last_ms = MILLIS()
+
+' === Main Loop ======================================================
+WHILE NOT QUITREQUESTED()
+    INPUT_UPDATE()
+
+    IF INPUT_HELD("quit") THEN
+        BREAK
+    END IF
+
+    DIM now_ms AS INTEGER
+    DIM dt AS INTEGER
+    now_ms = MILLIS()
+    dt = now_ms - last_ms
+    last_ms = now_ms
+
+    SELECT CASE state
+        CASE GameState.INTRO
+            ' Banner kommt von links reingeflogen.
+            IF INPUT_PRESSED("start") THEN
+                start_game()
+            END IF
+
+        CASE GameState.PLAYING
+            ' Eingabe -> Velocity, ueber INPUT_AXIS-Mapping.
+            DIM vx AS FLOAT
+            DIM vy AS FLOAT
+            vx = INPUT_AXIS("left", "right") * 90.0
+            vy = INPUT_AXIS("up", "down") * 90.0
+            IF vx < 0.0 THEN
+                SPRITE_SET_FLIP(held, TRUE, FALSE)
+            ELSEIF vx > 0.0 THEN
+                SPRITE_SET_FLIP(held, FALSE, FALSE)
+            END IF
+            SPRITE_SET_VELOCITY(held, vx, vy)
+            IF vx <> 0.0 OR vy <> 0.0 THEN
+                SPRITE_PLAY(held, "walk")
+            ELSE
+                SPRITE_PLAY(held, "idle")
+            END IF
+
+            SPRITE_UPDATE(held, dt)
+
+            ' Welt-Grenzen erzwingen
+            DIM hx AS FLOAT
+            DIM hy AS FLOAT
+            hx = SPRITE_GET_X(held)
+            hy = SPRITE_GET_Y(held)
+            IF hx < 0.0 THEN
+                SPRITE_SET_POS(held, 0.0, hy)
+            END IF
+            IF hx > Cfg.WORLD_W - 16 THEN
+                SPRITE_SET_POS(held, Cfg.WORLD_W - 16.0, hy)
+            END IF
+            IF hy < 0.0 THEN
+                SPRITE_SET_POS(held, SPRITE_GET_X(held), 0.0)
+            END IF
+            IF hy > Cfg.WORLD_H - 16 THEN
+                SPRITE_SET_POS(held, SPRITE_GET_X(held), Cfg.WORLD_H - 16.0)
+            END IF
+
+            ' Coin-Kollisionen + laufende Pickup-Animationen
+            DIM ci AS INTEGER
+            FOR ci = 0 TO max_coins - 1
+                IF coin_alive[ci] AND SPRITE_COLLIDES(held, coins[ci]) THEN
+                    coin_alive[ci] = FALSE        ' nicht mehr kollidierbar
+                    coin_popping[ci] = TRUE       ' Pickup-Animation startet
+                    coin_pickup[ci] = TWEEN_NEW(1.0, 2.2, 200, "out_quad")
+                    SPRITE_TINT(coins[ci], RGB(255, 255, 255))
+                    score = score + score_per_coin
+                    gefangen = gefangen + 1
+                    ' Funken am Coin-Punkt
+                    PARTICLE_SET_POS(funken, SPRITE_GET_X(coins[ci]) + 4.0, SPRITE_GET_Y(coins[ci]) + 4.0)
+                    PARTICLE_EMIT(funken, 25)
+                    ' HUD-Score-Pop: skaliert kurz auf 1.5 und zurueck
+                    score_pop = TWEEN_NEW(1.6, 1.0, 350, "out_quad")
+                END IF
+                ' Pickup-Animation fortschreiben
+                IF coin_popping[ci] THEN
+                    DIM s AS FLOAT
+                    s = TWEEN_VALUE(coin_pickup[ci])
+                    SPRITE_SET_SCALE(coins[ci], s, s)
+                    IF TWEEN_DONE(coin_pickup[ci]) THEN
+                        coin_popping[ci] = FALSE  ' jetzt komplett weg
+                    END IF
+                END IF
+            NEXT
+
+            PARTICLE_UPDATE(funken, dt)
+
+            ' Zeit pruefen
+            DIM elapsed_ms AS INTEGER
+            elapsed_ms = now_ms - start_ms
+            remaining_s = time_limit_s - elapsed_ms \ 1000
+            IF remaining_s <= 0 OR gefangen >= max_coins THEN
+                ' Score in DB sichern
+                DB_EXEC(con, "INSERT INTO scores (score, datum) VALUES (?, ?)", score, DATE$())
+                banner_tween = TWEEN_NEW(-200.0, 80.0, 700, "out_quad")
+                state = GameState.GAMEOVER
+            END IF
+
+        CASE GameState.GAMEOVER
+            IF INPUT_PRESSED("start") THEN
+                banner_tween = TWEEN_NEW(-200.0, 80.0, 600, "out_quad")
+                start_game()
+            END IF
+
+    END SELECT
+
+    ' --- Zeichnen ---------------------------------------------------
+    CLS(RGB(20, 25, 40))
+
+    ' Camera folgt im Spiel; sonst zentriert auf Welt-Mitte.
+    SELECT CASE state
+        CASE GameState.PLAYING
+            CAMERA_FOLLOW(SPRITE_GET_X(held) + 8.0, SPRITE_GET_Y(held) + 8.0, _
+                          Cfg.SCREEN_W * 1.0, Cfg.SCREEN_H * 1.0)
+        CASE ELSE
+            CAMERA_FOLLOW(Cfg.WORLD_W / 2.0, Cfg.WORLD_H / 2.0, _
+                          Cfg.SCREEN_W * 1.0, Cfg.SCREEN_H * 1.0)
+    END SELECT
+
+    ' Welt-Hintergrund
+    DIM rr AS INTEGER
+    DIM cc AS INTEGER
+    FOR rr = 0 TO Cfg.WORLD_H / Cfg.TILE - 1
+        FOR cc = 0 TO Cfg.WORLD_W / Cfg.TILE - 1
+            DIM color AS INTEGER
+            IF (rr + cc) MOD 2 = 0 THEN
+                color = RGB(45, 35, 65)
+            ELSE
+                color = RGB(35, 30, 55)
+            END IF
+            BOX(cc * Cfg.TILE, rr * Cfg.TILE, _
+                cc * Cfg.TILE + Cfg.TILE - 1, rr * Cfg.TILE + Cfg.TILE - 1, color)
+        NEXT
+    NEXT
+
+    ' Welt-Rand
+    RECT(0, 0, Cfg.WORLD_W - 1, Cfg.WORLD_H - 1, RGB(120, 110, 160))
+
+    ' Coins zeichnen: alive (mit Spawn-Pulsar) ODER popping (Pickup-Anim).
+    DIM ck AS INTEGER
+    FOR ck = 0 TO max_coins - 1
+        IF coin_alive[ck] THEN
+            IF TWEEN_VALUE(coin_spawn[ck]) > 0.5 THEN
+                SPRITE_DRAW(coins[ck])
+            END IF
+        ELSEIF coin_popping[ck] THEN
+            SPRITE_DRAW(coins[ck])
+        END IF
+    NEXT
+
+    SPRITE_DRAW(held)
+    PARTICLE_DRAW(funken)
+
+    ' --- HUD im Screen-Space ----------------------------------------
+    CAMERA_RESET()
+
+    SELECT CASE state
+        CASE GameState.INTRO
+            DIM by AS INTEGER
+            by = ROUND(TWEEN_VALUE(banner_tween))
+            BOX(20, by, Cfg.SCREEN_W - 20, by + 80, RGB(0, 0, 0))
+            RECT(20, by, Cfg.SCREEN_W - 20, by + 80, RGB(255, 220, 80))
+            TEXT(40, by + 14, "COIN QUEST", RGB(255, 220, 80))
+            TEXT(40, by + 36, "Sammle " + STR$(max_coins) + " Goldstuecke in " + STR$(time_limit_s) + "s!", RGB(255, 255, 255))
+            TEXT(40, by + 56, "ENTER startet", RGB(180, 180, 180))
+
+        CASE GameState.PLAYING
+            ' Score-Pop: skaliert das Score-Label
+            DIM s_factor AS FLOAT
+            s_factor = TWEEN_VALUE(score_pop)
+            DIM label AS STRING
+            label = "Score: " + STR$(score)
+            ' Wir haben kein direktes Text-Scaling; stattdessen ROUND-up als
+            ' visueller Effekt: bei groesserem Tween-Wert ein "+1"-Indikator.
+            TEXT(8, 8, label, RGB(255, 255, 255))
+            IF s_factor > 1.05 THEN
+                TEXT(80, 8, "+" + STR$(score_per_coin), RGB(255, 220, 80))
+            END IF
+            TEXT(8, 22, "Coins: " + STR$(gefangen) + "/" + STR$(max_coins), RGB(220, 220, 220))
+            TEXT(Cfg.SCREEN_W - 70, 8, "Zeit: " + STR$(remaining_s), RGB(220, 220, 220))
+
+        CASE GameState.GAMEOVER
+            DIM by2 AS INTEGER
+            by2 = ROUND(TWEEN_VALUE(banner_tween))
+            BOX(20, by2, Cfg.SCREEN_W - 20, by2 + 100, RGB(0, 0, 0))
+            RECT(20, by2, Cfg.SCREEN_W - 20, by2 + 100, RGB(120, 220, 255))
+            DIM headline AS STRING
+            IF gefangen >= max_coins THEN
+                headline = "GESCHAFFT!"
+            ELSE
+                headline = "ZEIT VORBEI"
+            END IF
+            TEXT(40, by2 + 10, headline, RGB(255, 255, 255))
+            TEXT(40, by2 + 30, "Score: " + STR$(score), RGB(255, 220, 80))
+            TEXT(40, by2 + 50, "Top 3: " + top_scores_text(), RGB(180, 220, 255))
+            TEXT(40, by2 + 76, "ENTER nochmal, ESC beendet", RGB(180, 180, 180))
+
+    END SELECT
+
+    FLIP()
+    SLEEP(16)
+WEND
+
+DB_CLOSE(con)

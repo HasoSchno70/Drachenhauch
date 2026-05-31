@@ -1,0 +1,49 @@
+' Dict- und Set-Comprehensions.
+'
+' Dict-Comprehension:  {key: val FOR var IN iterable [WHERE filter]}  -> MAP
+' Set-Comprehension:   {expr FOR var IN iterable [WHERE filter]}      -> TUPLE (deduped)
+'
+' Dict-Keys MUESSEN STRING sein (GameBasic-MAP-Konvention). Set-Comp
+' liefert ein TUPLE mit deduplizierten Werten in der Reihenfolge des
+' ersten Auftretens.
+
+' --- Dict-Comprehension ---
+PRINT "=== Dict-Comprehension ==="
+DIM squares AS MAP OF INTEGER
+squares = {STR$(x) + "sq": x * x FOR x IN (1, 2, 3, 4, 5)}
+PRINT "Quadrate: groesse = ", MAPSIZE(squares)
+PRINT "1sq -> ", MAPGET(squares, "1sq")
+PRINT "5sq -> ", MAPGET(squares, "5sq")
+
+' Mit Filter: nur gerade
+DIM evens AS MAP OF INTEGER
+evens = {STR$(n): n FOR n IN (1, 2, 3, 4, 5, 6, 7, 8) WHERE n MOD 2 = 0}
+PRINT "Gerade: ", MAPSIZE(evens)
+PRINT "  hat 4? ", MAPHAS(evens, "4")
+PRINT "  hat 5? ", MAPHAS(evens, "5")
+
+' Aus Array
+DIM nums[4] AS INTEGER
+nums[0] = 10 : nums[1] = 20 : nums[2] = 30 : nums[3] = 40
+DIM by_idx AS MAP OF STRING
+by_idx = {STR$(n): "wert" + STR$(n) FOR n IN nums}
+PRINT "Map aus Array: ", MAPSIZE(by_idx)
+
+' --- Set-Comprehension ---
+PRINT ""
+PRINT "=== Set-Comprehension (deduped TUPLE) ==="
+
+' Eindeutige Mod-3-Werte
+DIM mod3 AS TUPLE
+mod3 = {x MOD 3 FOR x IN (0, 1, 2, 3, 4, 5, 6, 7, 8)}
+PRINT "MOD 3 distinct: ", mod3
+
+' Eindeutige Zeichen aus String
+DIM chars AS TUPLE
+chars = {c FOR c IN "mississippi"}
+PRINT "Eindeutige Zeichen von 'mississippi': ", chars
+
+' Mit Filter
+DIM big AS TUPLE
+big = {x FOR x IN (1, 2, 3, 1, 2, 3, 4, 5, 4, 5) WHERE x > 2}
+PRINT "Distinct > 2: ", big

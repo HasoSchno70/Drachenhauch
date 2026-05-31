@@ -1,0 +1,19 @@
+' Wiederverwendbare Math-Helfer fuer Spiele.
+
+CONST DEG2RAD AS FLOAT = 0.017453292519943295    ' = PI / 180
+
+FUNCTION Distance(x1 AS FLOAT, y1 AS FLOAT, x2 AS FLOAT, y2 AS FLOAT) AS FLOAT
+    DIM dx AS FLOAT
+    DIM dy AS FLOAT
+    dx = x2 - x1
+    dy = y2 - y1
+    RETURN SQR(dx * dx + dy * dy)
+END FUNCTION
+
+FUNCTION Lerp(a AS FLOAT, b AS FLOAT, t AS FLOAT) AS FLOAT
+    RETURN a + (b - a) * t
+END FUNCTION
+
+FUNCTION DegToRad(grad AS FLOAT) AS FLOAT
+    RETURN grad * DEG2RAD
+END FUNCTION

@@ -1,0 +1,5 @@
+{
+  "max_coins": 8,
+  "time_limit_s": 30,
+  "score_per_coin": 100
+}

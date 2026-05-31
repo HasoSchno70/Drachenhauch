@@ -1,0 +1,3 @@
+' Erstes Beispiel: Hallo Welt
+PRINT "Hallo, GameBasic!"
+PRINT "Willkommen zurueck im 8/16-Bit-Zeitalter."

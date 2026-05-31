@@ -1,0 +1,23 @@
+' Variablen mit strikter Typisierung (Pascal-Stil)
+DIM name AS STRING
+DIM alter AS INTEGER
+DIM groesse AS FLOAT
+DIM aktiv AS BOOLEAN
+
+name = "Atari"
+alter = 40
+groesse = 1.85
+aktiv = TRUE
+
+PRINT "Name:    ", name
+PRINT "Alter:   ", alter
+PRINT "Groesse: ", groesse
+PRINT "Aktiv:   ", aktiv
+
+REM Arithmetik mit gemischten Typen
+DIM summe AS INTEGER
+summe = alter + 10
+PRINT "Alter + 10 =", summe
+
+REM String-Verkettung mit +
+PRINT "Hallo " + name + "!"

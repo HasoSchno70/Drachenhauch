@@ -1,0 +1,63 @@
+' f-String-Demo: String-Interpolation mit Ausdruecken in {...}
+'
+' Lexer expandiert f"..." zu ("text" + STR$(expr) + "text" + ...).
+' Der Wrapper STR$ bedeutet: jeder Wert geht (auch INTEGER, FLOAT, BOOL,
+' Klassen, etc.). Wer formatiert STR$ schon korrekt fuer die GB-Typen.
+'
+' Konvention: doppelt-geklammertes {{ und }} sind Escapes fuer literale
+' geschweifte Klammern.
+
+' --- Einfache Variablen ---
+DIM name AS STRING
+DIM punkte AS INTEGER
+name = "Anna"
+punkte = 1337
+
+PRINT f"Spieler: {name}"
+PRINT f"Punkte: {punkte}"
+PRINT f"{name} hat {punkte} Punkte"
+
+' --- Ausdruecke statt nur Variablen ---
+DIM a AS INTEGER
+DIM b AS INTEGER
+a = 5
+b = 7
+PRINT f"{a} + {b} = {a + b}"
+PRINT f"Doppelt: {a * 2}"
+
+' --- Methoden- und Property-Aufrufe ---
+DIM s AS STRING
+s = "hello"
+PRINT f"upper: {s.upper()}"
+PRINT f"length: {s.length()}"
+
+' --- Geschachtelte Klammern (Funktionsaufrufe) ---
+PRINT f"max: {MAX(a, b)}"
+PRINT f"abs: {ABS(-42)}"
+
+' --- Escaped Braces ---
+PRINT f"literal: {{kein Ausdruck}} aber {a}"
+
+' --- Format-Tricks ---
+DIM hp AS INTEGER
+DIM max_hp AS INTEGER
+hp = 75
+max_hp = 100
+PRINT f"HP: {hp}/{max_hp} ({hp * 100 / max_hp} %)"
+
+' --- Klassen-Member ---
+CLASS Player
+    DIM name AS STRING
+    DIM hp AS INTEGER
+END CLASS
+
+DIM p AS Player
+p = NEW Player()
+p.name = "Bob"
+p.hp = 42
+PRINT f"<{p.name}: {p.hp} HP>"
+
+' --- Nahe an PRINT, aber nuetzlich fuer Strings konstruieren ---
+DIM msg AS STRING
+msg = f"Konstruiert: {name} hat jetzt {p.hp + 10} HP"
+PRINT msg

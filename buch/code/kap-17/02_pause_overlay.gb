@@ -1,0 +1,64 @@
+' Pause-Mechanik isoliert: ein Spiel-Mock + Pause-Overlay als Scene-Push.
+'
+' Im "playing": Box bewegt sich nach rechts, P toggelt Pause.
+' Im "pause": Box steht still, "Resume"-Button bringt zurueck.
+' Pause als PUSH bewahrt den Spielzustand - POP setzt nahtlos fort.
+
+IMPORT "scene"
+IMPORT "ui"
+
+CONST WIDTH    AS INTEGER = 320
+CONST HEIGHT   AS INTEGER = 240
+CONST BG_COLOR AS INTEGER = &H141E3C
+
+DIM box_x AS INTEGER
+DIM p_was_pressed AS BOOLEAN
+box_x = 20
+p_was_pressed = FALSE
+
+SCENE_SWITCH("playing")
+
+SCREEN(WIDTH, HEIGHT, "Pause-Demo", 2)
+
+WHILE NOT QUITREQUESTED()
+    ' P-Edge-Detection (in beiden Scenes nutzbar)
+    DIM p_now AS BOOLEAN
+    p_now = KEYPRESSED(KEY_P)
+    DIM p_pressed_now AS BOOLEAN
+    p_pressed_now = p_now AND NOT p_was_pressed
+    p_was_pressed = p_now
+
+    SELECT CASE SCENE_CURRENT()
+        CASE "playing"
+            box_x = box_x + 1
+            IF box_x > WIDTH - 20 THEN box_x = 20
+
+            CLS(BG_COLOR)
+            BOX(box_x, 100, box_x + 20, 140, &HFFDC00)
+            TEXT(8, 8, f"x = {box_x}", &HFFFFFF)
+            TEXT(8, 220, "P = Pause", &HCCCCCC)
+
+            IF p_pressed_now THEN SCENE_PUSH("pause")
+
+        CASE "pause"
+            ' Spielwelt unten weiter zeichnen (eingefroren)
+            CLS(BG_COLOR)
+            BOX(box_x, 100, box_x + 20, 140, &HFFDC00)
+            TEXT(8, 8, f"x = {box_x}", &HFFFFFF)
+
+            ' Halbtransparentes Overlay durch Stripe-Pattern andeuten
+            BOX(60, 70, 260, 170, &H1E2845)
+            RECT(60, 70, 260, 170, &HFFDC00)
+            TEXT(120, 80, "PAUSE", &HFFDC00)
+
+            IF UI_BUTTON("btn_resume", 80, 110, 160, 22, "Weiter (oder P)") THEN
+                SCENE_POP()
+            END IF
+
+            IF p_pressed_now THEN SCENE_POP()
+    END SELECT
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

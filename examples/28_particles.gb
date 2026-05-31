@@ -1,0 +1,72 @@
+' Partikel-System: Konfiguration, Emit, Update, Lifecycle.
+' Diese Demo ist nicht-grafisch und prueft nur die Logik. Ein Pygame-
+' Beispiel waere typischerweise: jeden Frame PARTICLE_EMIT(sys, 5),
+' PARTICLE_UPDATE(sys, dt), PARTICLE_DRAW(sys).
+IMPORT "particles"
+
+' Determinismus fuer den Bench-Vergleich.
+RANDOMIZE(42)
+
+DIM sys AS PARTICLE_SYSTEM
+sys = PARTICLE_SYSTEM_NEW(100.0, 100.0)
+
+PRINT "=== Default-Setup ==="
+PARTICLE_EMIT(sys, 10)
+PRINT "Nach EMIT(10): count =", PARTICLE_COUNT(sys)
+
+PARTICLE_UPDATE(sys, 100)
+PRINT "Nach 100ms:    count =", PARTICLE_COUNT(sys), " (alle leben noch, min Lifetime 500ms)"
+
+PARTICLE_UPDATE(sys, 500)
+PRINT "Nach 600ms:    count =", PARTICLE_COUNT(sys), " (manche koennten gestorben sein)"
+
+PARTICLE_UPDATE(sys, 1000)
+PRINT "Nach 1600ms:   count =", PARTICLE_COUNT(sys), " (max Lifetime 1000ms, alle tot)"
+
+PRINT ""
+PRINT "=== CLEAR + Custom-Konfiguration ==="
+PARTICLE_CLEAR(sys)
+PRINT "Nach CLEAR: count =", PARTICLE_COUNT(sys)
+
+' Funkenregen nach rechts: alle x-Velocity positiv, fast keine y-Streuung.
+PARTICLE_SET_VELOCITY(sys, 100.0, 200.0, -10.0, 10.0)
+PARTICLE_SET_LIFETIME(sys, 2000, 2000)
+PARTICLE_SET_GRAVITY(sys, 0.0, 0.0)        ' Schwerelosigkeit
+PARTICLE_SET_COLOR(sys, RGB(255, 200, 0))
+PARTICLE_SET_SIZE(sys, 3, 3)
+PARTICLE_SET_FADE(sys, FALSE)
+
+PARTICLE_EMIT(sys, 5)
+PRINT "5 Partikel mit fester Velocity 100..200 nach rechts ausgestossen."
+
+PARTICLE_UPDATE(sys, 1000)              ' eine Sekunde
+PRINT "Nach 1000ms: count =", PARTICLE_COUNT(sys), " (Lifetime ist 2000ms)"
+
+PRINT ""
+PRINT "=== Schwerkraft-Test ==="
+PARTICLE_CLEAR(sys)
+PARTICLE_SET_VELOCITY(sys, 0.0, 0.0, -50.0, -50.0)  ' alle starten mit -50 px/s
+PARTICLE_SET_GRAVITY(sys, 0.0, 100.0)               ' 100 px/s² nach unten
+PARTICLE_SET_LIFETIME(sys, 5000, 5000)              ' kein Tod waehrend Test
+PARTICLE_EMIT(sys, 3)
+
+' Bei v0 = -50 und g = 100 ist die Partikel nach 0.5s wieder auf Start-y
+' (steigt erst nach oben, fallt dann zurueck). Wir testen die Logik mit
+' einem festen kleinen Schritt: wir laufen 100ms Schritte und schauen.
+PRINT "Schwerkraft-Demo (3 Partikel, Start vy=-50, g=100):"
+DIM step_ms AS INTEGER
+step_ms = 0
+DIM iter AS INTEGER
+FOR iter = 1 TO 6
+    PARTICLE_UPDATE(sys, 100)
+    step_ms = step_ms + 100
+    PRINT "  ", PADL$(STR$(step_ms), 4), "ms: count =", PARTICLE_COUNT(sys)
+NEXT
+
+PRINT ""
+PRINT "=== Fehlerfall: ungueltige Lifetime ==="
+TRY
+    PARTICLE_SET_LIFETIME(sys, 1000, 500)
+CATCH e
+    PRINT "Erwarteter Fehler: ", e
+END TRY
