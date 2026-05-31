@@ -31,6 +31,14 @@ IMPORT "gui"
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | Eingabefeld |
+| `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
+| `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
+| `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
+| `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
+| `GUI_TABLE_SELECTED(tbl)` | INTEGER | selektierte Zeile (-1 wenn keine) |
+| `GUI_TABLE_SET_SELECTED(tbl, row)` | — | Selektion setzen (-1 = keine) |
+| `GUI_TABLE_CLICKED(tbl)` | INTEGER | in diesem Frame geklickte Zeile (-1) |
+| `GUI_TABLE_ROW_COUNT(tbl)` | INTEGER | Anzahl Datenzeilen |
 | `GUI_UPDATE()` | — | **Pflicht** pro Frame: Maus/Tasten verarbeiten |
 | `GUI_DRAW()` | — | alle Fenster zeichnen (hinten→vorne) |
 | `GUI_CLICKED(widget)` | BOOLEAN | Button in diesem Frame geklickt? |
@@ -42,7 +50,7 @@ IMPORT "gui"
 | `GUI_SET_CHECKED(widget, an)` | — | Checkbox setzen |
 | `GUI_SET_VALUE(widget, wert)` | — | Slider-Wert setzen (wird geclamped) |
 | `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF-Callback bei Klick (Button/Checkbox) |
-| `GUI_ON_CHANGE(widget, funcref)` | — | FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox) |
+| `GUI_ON_CHANGE(widget, funcref)` | — | FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox/Table-Selektion) |
 | `GUI_THEME(accent)` | — | Akzentfarbe (RGB) umstellen (Kurzform) |
 | `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
 | `GUI_THEME_PRESET(name$)` | — | Farbschema: dark/light/retro/contrast |
@@ -178,6 +186,71 @@ GUI_PANEL(win, x, y, w, h[, titel$]) -> GUI_WIDGET
 ```
 
 Rein dekorativer Container (Rahmen + optionale Titelzeile). Nicht interaktiv.
+
+## Tabelle
+
+```basic
+GUI_TABLE(win, x, y, w, h[, headers, cells]) -> GUI_WIDGET
+```
+
+Persistente Tabelle mit **fixierter Kopfzeile** und **scrollbarem Body**
+(vertikal + horizontal). Komplement zum Immediate-Mode-`UI_TABLE`: die Daten
+leben am Widget, gesetzt einmal beim Aufbau (oder jederzeit per Setter) statt
+jeden Frame neu übergeben.
+
+Daten gleich beim Anlegen mitgeben (beide Arrays oder keins) — oder leer
+anlegen und später setzen:
+
+```basic
+DIM headers AS ARRAY OF STRING
+headers = SPLIT$("Name|HP|Level", "|")
+
+DIM cells[3, 3] AS STRING
+' ... cells füllen ...
+
+DIM tbl AS GUI_WIDGET
+tbl = GUI_TABLE(win, 10, 40, 280, 160, headers, cells)
+' alternativ:
+'   tbl = GUI_TABLE(win, 10, 40, 280, 160)
+'   GUI_TABLE_HEADERS(tbl, headers)
+'   GUI_TABLE_ROWS(tbl, cells)
+```
+
+**Setter** (jederzeit, z. B. bei Daten-Updates):
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_HEADERS(tbl, headers)` | Spaltentitel (1D `ARRAY OF STRING`) |
+| `GUI_TABLE_ROWS(tbl, cells)` | Datenzeilen (2D `ARRAY OF STRING`); Spaltenzahl muss zu den Headern passen |
+| `GUI_TABLE_COL_WIDTHS(tbl, widths)` | Pixelbreite pro Spalte (1D `ARRAY OF INTEGER`); `NIL` = gleichmäßig verteilen |
+
+**Bedienung & Polling:**
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_SELECTED(tbl)` | persistent selektierte Zeile (-1 wenn keine) |
+| `GUI_TABLE_SET_SELECTED(tbl, row)` | Selektion programmatisch setzen (-1 = keine; out-of-range → -1) |
+| `GUI_TABLE_CLICKED(tbl)` | nur im Frame des Klicks die geklickte Zeile, sonst -1 |
+| `GUI_TABLE_ROW_COUNT(tbl)` | Anzahl Datenzeilen |
+
+**Verhalten:**
+- Kopfzeile (22 px) ist fixiert; der Body scrollt je nach Inhalt.
+- **Mausrad** scrollt vertikal (über dem Body), **Scrollbalken-Drag** auf beiden Achsen.
+- Klick auf eine Zeile **selektiert** sie persistent (zweites Highlight unter dem Hover).
+- Schrumpfen die Daten unter den selektierten Index, fällt die Selektion auf -1.
+- Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
+- Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
+
+```basic
+GUI_UPDATE()
+GUI_DRAW()
+IF GUI_TABLE_CLICKED(tbl) >= 0 THEN
+    PRINT "Zeile " + STR$(GUI_TABLE_SELECTED(tbl)) + " gewaehlt"
+END IF
+```
+
+**Beispiel:** [examples/81_table_select.gb](../examples/81_table_select.gb) zeigt
+beide Tabellen (Retained `gui` + Immediate `ui`) nebeneinander.
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 

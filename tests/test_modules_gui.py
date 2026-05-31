@@ -24,6 +24,7 @@ class FakeGraphics:
         self._mb = [False, False, False]
         self._typed = ""
         self._keys: set = set()
+        self._wheel = 0          # was pop_mouse_wheel() liefert
         self.draw_calls = []
 
     def mouse_x(self): return self._mx
@@ -34,6 +35,12 @@ class FakeGraphics:
         self._typed = ""
         return s
     def keys_pressed(self): return set(self._keys)
+    def pop_mouse_wheel(self):
+        v = self._wheel
+        self._wheel = 0
+        return v
+    def push_clip(self, *a): self.draw_calls.append(("push_clip", a))
+    def pop_clip(self):      self.draw_calls.append(("pop_clip", ()))
     def box(self, *a):    self.draw_calls.append(("box", a))
     def rect(self, *a):   self.draw_calls.append(("rect", a))
     def text(self, *a):   self.draw_calls.append(("text", a))
@@ -453,3 +460,175 @@ def test_on_change_no_dispatch_without_value_change(g):
     b("gui_on_change", s, _funcref("moved"))
     _press(g, 120, 145)                          # value bleibt 0.0
     assert eng.calls == []
+
+
+# --- GUI_TABLE (Retained-Mode-Tabelle) ------------------------------
+
+def _sarr1(items):
+    from gamebasic.interpreter import _GBArray
+    a = _GBArray("string", [len(items)], lambda: "")
+    for i, v in enumerate(items):
+        a.values[i] = v
+    return a
+
+
+def _sarr2(rows):
+    from gamebasic.interpreter import _GBArray
+    nr = len(rows)
+    nc = len(rows[0]) if rows else 0
+    a = _GBArray("string", [nr, nc], lambda: "")
+    for r in range(nr):
+        for c in range(nc):
+            a.values[r * nc + c] = rows[r][c]
+    return a
+
+
+def _iarr1(items):
+    from gamebasic.interpreter import _GBArray
+    a = _GBArray("integer", [len(items)], lambda: 0)
+    for i, v in enumerate(items):
+        a.values[i] = v
+    return a
+
+
+def _mk_table(g, rows=("Anna 100", "Bert 75", "Cilly 40"),
+              wx=100, wy=100, ww=300, wh=260, tx=10, ty=10, tw=260, th=140):
+    """Hilfe: Fenster + GUI_TABLE mit 2-spaltigen Daten. Liefert (win, tbl)."""
+    win = b("gui_window", "T", wx, wy, ww, wh)
+    cells = [r.split(" ") for r in rows]
+    tbl = b("gui_table", win, tx, ty, tw, th,
+            _sarr1(["Name", "HP"]), _sarr2(cells))
+    return win, tbl
+
+
+def test_table_construct_with_data(g):
+    win, tbl = _mk_table(g)
+    assert isinstance(tbl, gui_mod._Widget)
+    assert tbl.kind == "table"
+    assert tbl in win.widgets
+    assert b("gui_table_row_count", tbl) == 3
+    assert b("gui_table_selected", tbl) == -1
+
+
+def test_table_construct_empty_then_set():
+    win = b("gui_window", "T", 0, 0, 300, 200)
+    tbl = b("gui_table", win, 10, 10, 260, 140)
+    assert b("gui_table_row_count", tbl) == 0
+    b("gui_table_headers", tbl, _sarr1(["A", "B"]))
+    b("gui_table_rows", tbl, _sarr2([["1", "2"], ["3", "4"]]))
+    assert b("gui_table_row_count", tbl) == 2
+
+
+def test_table_six_args_rejected():
+    win = b("gui_window", "T", 0, 0, 300, 200)
+    with pytest.raises(GBRuntimeError, match="headers UND cells"):
+        b("gui_table", win, 10, 10, 260, 140, _sarr1(["A"]))
+
+
+def test_table_rows_col_mismatch():
+    win = b("gui_window", "T", 0, 0, 300, 200)
+    tbl = b("gui_table", win, 10, 10, 260, 140)
+    b("gui_table_headers", tbl, _sarr1(["A", "B"]))
+    with pytest.raises(GBRuntimeError, match="Spalten"):
+        b("gui_table_rows", tbl, _sarr2([["nur eine"]]))
+
+
+def test_table_needs_table_widget():
+    win = b("gui_window", "T", 0, 0, 200, 200)
+    btn = b("gui_button", win, "OK", 0, 0, 80, 30)
+    with pytest.raises(GBRuntimeError, match="table"):
+        b("gui_table_selected", btn)
+
+
+def test_table_click_selects_row(g):
+    # Fenster (100,100); title_h=22; Tabelle x=10,y=10 -> abs (110,132,260,140)
+    # body_y = 132+22 = 154; Zeile 1 = 154+20 = 174..194, Mitte ~184
+    win, tbl = _mk_table(g)
+    _press(g, 150, 184)
+    assert b("gui_table_selected", tbl) == -1     # nur Press -> noch keine Wahl
+    _release(g, 150, 184)
+    assert b("gui_table_selected", tbl) == 1
+    assert b("gui_table_clicked", tbl) == 1
+
+
+def test_table_clicked_only_one_frame(g):
+    win, tbl = _mk_table(g)
+    _press(g, 150, 184)
+    _release(g, 150, 184)
+    assert b("gui_table_clicked", tbl) == 1
+    gr("gui_update", g)                            # naechster Frame
+    assert b("gui_table_clicked", tbl) == -1
+    assert b("gui_table_selected", tbl) == 1       # Selektion bleibt
+
+
+def test_table_no_select_press_a_release_b(g):
+    win, tbl = _mk_table(g)
+    _press(g, 150, 184)                            # Zeile 1
+    _release(g, 150, 164)                          # Zeile 0 (154..174)
+    assert b("gui_table_selected", tbl) == -1
+
+
+def test_table_set_selected_and_clamp(g):
+    win, tbl = _mk_table(g)
+    b("gui_table_set_selected", tbl, 2)
+    assert b("gui_table_selected", tbl) == 2
+    b("gui_table_set_selected", tbl, 99)           # out of range -> -1
+    assert b("gui_table_selected", tbl) == -1
+    b("gui_table_set_selected", tbl, 1)
+    b("gui_table_set_selected", tbl, -1)           # deselektieren
+    assert b("gui_table_selected", tbl) == -1
+
+
+def test_table_selected_reset_when_rows_shrink(g):
+    win, tbl = _mk_table(g)
+    b("gui_table_set_selected", tbl, 2)
+    b("gui_table_rows", tbl, _sarr2([["x", "1"]]))  # nur noch 1 Zeile
+    assert b("gui_table_selected", tbl) == -1
+
+
+def test_table_on_change_on_select(g):
+    eng = FakeEngine()
+    g._gb_engine = eng
+    win, tbl = _mk_table(g)
+    b("gui_on_change", tbl, _funcref("sel"))
+    _press(g, 150, 184)
+    assert eng.calls == []                         # noch nichts (nur Press)
+    _release(g, 150, 184)
+    assert eng.calls == [("sel", [])]
+
+
+def test_table_wheel_scrolls(g):
+    # 10 Zeilen -> Body laeuft ueber -> vertikale Scrollbar, Mausrad scrollt
+    win, tbl = _mk_table(g, rows=tuple(f"R{i} {i}" for i in range(10)))
+    g._mx, g._my = 150, 200                        # ueber dem Body
+    g._wheel = -2                                  # nach unten scrollen
+    gr("gui_update", g)
+    assert tbl.tbl["scroll_y"] == 40               # 2 * row_h(20)
+
+
+def test_table_col_widths_explicit(g):
+    win = b("gui_window", "T", 0, 0, 300, 200)
+    tbl = b("gui_table", win, 10, 10, 260, 140,
+            _sarr1(["A", "B"]), _sarr2([["1", "2"]]))
+    b("gui_table_col_widths", tbl, _iarr1([60, 120]))
+    assert tbl.tbl["col_widths"] == [60, 120]
+    b("gui_table_col_widths", tbl, None)           # zurueck auf Auto
+    assert tbl.tbl["col_widths"] is None
+
+
+def test_table_col_widths_count_mismatch(g):
+    win = b("gui_window", "T", 0, 0, 300, 200)
+    tbl = b("gui_table", win, 10, 10, 260, 140,
+            _sarr1(["A", "B"]), _sarr2([["1", "2"]]))
+    with pytest.raises(GBRuntimeError, match="Breiten"):
+        b("gui_table_col_widths", tbl, _iarr1([60]))
+
+
+def test_table_draw_balanced_clip(g):
+    win, tbl = _mk_table(g)
+    gr("gui_draw", g)
+    kinds = {c[0] for c in g.draw_calls}
+    assert "box" in kinds and "text" in kinds
+    pushes = sum(1 for c in g.draw_calls if c[0] == "push_clip")
+    pops = sum(1 for c in g.draw_calls if c[0] == "pop_clip")
+    assert pushes == pops and pushes > 0

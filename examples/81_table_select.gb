@@ -1,0 +1,147 @@
+' 81_table_select.gb
+' Tabellen-Selektion + klickbare Header (Sortierung) -- beide GUI-Module:
+'   Links : Immediate-Mode  UI_TABLE   (ui)  -- Header-Klick sortiert auf/ab,
+'           Selektion bleibt erhalten (UI_TABLE_SELECTED).
+'   Rechts: Retained-Mode   GUI_TABLE  (gui) -- im verschiebbaren Fenster,
+'           eigene persistente Zeilen-Selektion (GUI_TABLE_SELECTED/CLICKED).
+' Beide zeigen dieselben (sortierten) Daten. ESC = Ende.
+
+IMPORT "ui"
+IMPORT "gui"
+
+CONST N AS INTEGER = 8
+CONST COLS AS INTEGER = 3
+
+SCREEN(640, 420, "Table Select Demo", 1)
+
+' --- Stammdaten als parallele Arrays; order[] haelt die Sortier-Reihenfolge --
+DIM pname[N] AS STRING
+DIM plevel[N] AS INTEGER
+DIM pscore[N] AS INTEGER
+DIM order[N] AS INTEGER
+
+DIM headers AS ARRAY OF STRING
+headers = SPLIT$("Name|Level|Punkte", "|")
+DIM cells[N, COLS] AS STRING
+
+DIM sortCol AS INTEGER
+sortCol = -1
+DIM sortDir AS INTEGER
+sortDir = 1
+
+SUB Init()
+    DIM names AS ARRAY OF STRING
+    names = SPLIT$("Greta|Bert|Anna|Dora|Egon|Frida|Cilly|Hanna", "|")
+    DIM i AS INTEGER
+    FOR i = 0 TO N - 1
+        pname[i] = names[i]
+        plevel[i] = 1 + (i * 7) MOD 20
+        pscore[i] = ((i + 1) * 1234) MOD 9000
+        order[i] = i
+    NEXT
+END SUB
+
+' Vergleicht zwei Stammdaten-Indizes nach Spalte col -> -1 / 0 / 1.
+FUNCTION cmp(a AS INTEGER, b AS INTEGER, col AS INTEGER) AS INTEGER
+    IF col = 0 THEN
+        IF pname[a] < pname[b] THEN RETURN -1
+        IF pname[a] > pname[b] THEN RETURN 1
+        RETURN 0
+    END IF
+    DIM va AS INTEGER
+    DIM vb AS INTEGER
+    IF col = 1 THEN
+        va = plevel[a] : vb = plevel[b]
+    ELSE
+        va = pscore[a] : vb = pscore[b]
+    END IF
+    IF va < vb THEN RETURN -1
+    IF va > vb THEN RETURN 1
+    RETURN 0
+END FUNCTION
+
+SUB SortBy(col AS INTEGER)
+    ' Bubble-Sort auf order[] nach Spalte col in Richtung sortDir.
+    DIM i AS INTEGER
+    DIM j AS INTEGER
+    FOR i = 0 TO N - 2
+        FOR j = 0 TO N - 2 - i
+            IF cmp(order[j], order[j + 1], col) * sortDir > 0 THEN
+                DIM t AS INTEGER
+                t = order[j]
+                order[j] = order[j + 1]
+                order[j + 1] = t
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB RebuildCells()
+    DIM i AS INTEGER
+    FOR i = 0 TO N - 1
+        DIM s AS INTEGER
+        s = order[i]
+        cells[i, 0] = pname[s]
+        cells[i, 1] = STR$(plevel[s])
+        cells[i, 2] = STR$(pscore[s])
+    NEXT
+END SUB
+
+Init()
+RebuildCells()
+
+' --- Retained-Fenster mit GUI_TABLE ---------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Retained (gui)", 330, 24, 290, 250)
+GUI_WINDOW_MOVABLE(win, TRUE)
+DIM gtbl AS GUI_WIDGET
+gtbl = GUI_TABLE(win, 10, 10, 268, 200, headers, cells)
+
+DIM info AS STRING
+info = "Klick eine Zeile"
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    CLS(RGB(16, 20, 34))
+
+    UI_LABEL(10, 6, "Immediate (ui) -- Header klicken = sortieren", RGB(120, 210, 255))
+
+    ' Immediate-Tabelle (jeden Frame neu uebergeben)
+    UI_TABLE("imm", 10, 26, 300, 250, headers, cells)
+
+    ' Header-Klick -> Spalte sortieren (Richtung toggeln bei gleicher Spalte)
+    DIM hc AS INTEGER
+    hc = UI_TABLE_HEADER_CLICK("imm")
+    IF hc >= 0 THEN
+        IF sortCol = hc THEN
+            sortDir = -sortDir
+        ELSE
+            sortDir = 1
+            sortCol = hc
+        END IF
+        SortBy(hc)
+        RebuildCells()
+        GUI_TABLE_ROWS(gtbl, cells)        ' Retained-Tabelle nachziehen
+    END IF
+
+    DIM immSel AS INTEGER
+    immSel = UI_TABLE_SELECTED("imm")
+    IF sortCol >= 0 THEN
+        UI_LABEL(10, 286, "Sortiert: " + headers[sortCol] + IIF(sortDir > 0, " (auf)", " (ab)"), RGB(255, 220, 120))
+    END IF
+    UI_LABEL(10, 306, "Auswahl (ui): " + IIF(immSel >= 0, cells[immSel, 0], "-"))
+
+    ' Retained-Tabelle im Fenster
+    GUI_UPDATE()
+    GUI_DRAW()
+    IF GUI_TABLE_CLICKED(gtbl) >= 0 THEN
+        info = "gui-Zeile: " + cells[GUI_TABLE_SELECTED(gtbl), 0]
+    END IF
+    UI_LABEL(330, 286, info, RGB(180, 255, 180))
+
+    UI_LABEL(10, 398, "ESC = Ende  |  Fenster an der Titelleiste ziehbar", RGB(140, 150, 170))
+
+    UI_END_FRAME()
+    FLIP()
+    SLEEP(16)
+WEND

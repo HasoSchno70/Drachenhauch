@@ -661,6 +661,105 @@ def test_table_clip_stack_balanced(g):
     assert pushes == pops, f"{pushes} push vs {pops} pop - Stack unausgeglichen"
 
 
+# --- UI_TABLE: Selektion + Header-Klick -----------------------------
+
+def test_table_click_sets_selection(g):
+    headers = _str_array(["Name"])
+    cells = _str_array_2d([["Anna"], ["Bert"], ["Cilly"]])
+    assert call_ui("ui_table_selected", g, "tbl") == -1   # noch nie gezeichnet
+    # Zeile 1 (Bert): body bei y=22, Zeile 1 = 42..62, Mitte ~52
+    g._mx, g._my = 50, 52
+    g._mb[0] = True
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    end_frame(g)
+    g._mb[0] = False
+    rc = call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert rc == 1
+    assert call_ui("ui_table_selected", g, "tbl") == 1
+
+
+def test_table_selection_survives_frames(g):
+    headers = _str_array(["A"])
+    cells = _str_array_2d([["x"], ["y"]])
+    # set_selected vor dem ersten Zeichnen ist no-op (id unbekannt)
+    call_ui("ui_table_set_selected", g, "tbl", 0)
+    assert call_ui("ui_table_selected", g, "tbl") == -1
+    # zeichnen, dann programmatisch selektieren
+    call_ui("ui_table", g, "tbl", 0, 0, 100, 100, headers, cells)
+    call_ui("ui_table_set_selected", g, "tbl", 1)
+    assert call_ui("ui_table_selected", g, "tbl") == 1
+    # weiterer Frame ohne Klick -> Selektion bleibt
+    end_frame(g)
+    call_ui("ui_table", g, "tbl", 0, 0, 100, 100, headers, cells)
+    assert call_ui("ui_table_selected", g, "tbl") == 1
+
+
+def test_table_set_selected_negative_is_deselect(g):
+    headers = _str_array(["A"])
+    cells = _str_array_2d([["x"], ["y"]])
+    call_ui("ui_table", g, "tbl", 0, 0, 100, 100, headers, cells)
+    call_ui("ui_table_set_selected", g, "tbl", 1)
+    call_ui("ui_table_set_selected", g, "tbl", -5)
+    assert call_ui("ui_table_selected", g, "tbl") == -1
+
+
+def test_table_selection_reset_on_shrink(g):
+    headers = _str_array(["A"])
+    call_ui("ui_table", g, "tbl", 0, 0, 100, 100, headers,
+            _str_array_2d([["x"], ["y"], ["z"]]))
+    call_ui("ui_table_set_selected", g, "tbl", 2)
+    end_frame(g)
+    # naechster Frame nur 1 Zeile -> Selektion ungueltig -> -1
+    call_ui("ui_table", g, "tbl", 0, 0, 100, 100, headers,
+            _str_array_2d([["x"]]))
+    assert call_ui("ui_table_selected", g, "tbl") == -1
+
+
+def test_table_header_click_returns_col(g):
+    headers = _str_array(["Name", "HP"])
+    cells = _str_array_2d([["Anna", "100"], ["Bert", "75"]])
+    # Header-Band y=0..22; Spalte 1 liegt rechts (auto ~93px breit)
+    g._mx, g._my = 150, 10
+    g._mb[0] = True
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert call_ui("ui_table_header_click", g, "tbl") == -1   # nur Press
+    end_frame(g)
+    g._mb[0] = False
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert call_ui("ui_table_header_click", g, "tbl") == 1
+    # Klick auf Zeile setzt KEINE Header-Spalte
+    assert call_ui("ui_table_selected", g, "tbl") == -1
+
+
+def test_table_header_click_only_one_frame(g):
+    headers = _str_array(["Name", "HP"])
+    cells = _str_array_2d([["Anna", "100"]])
+    g._mx, g._my = 30, 10
+    g._mb[0] = True
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    end_frame(g)
+    g._mb[0] = False
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert call_ui("ui_table_header_click", g, "tbl") == 0
+    end_frame(g)
+    # naechster Frame ohne neuen Klick -> wieder -1
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert call_ui("ui_table_header_click", g, "tbl") == -1
+
+
+def test_table_header_click_press_a_release_b(g):
+    headers = _str_array(["Name", "HP"])
+    cells = _str_array_2d([["Anna", "100"]])
+    g._mx, g._my = 30, 10           # Press auf Spalte 0
+    g._mb[0] = True
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    end_frame(g)
+    g._mx, g._my = 150, 10          # Release auf Spalte 1 -> kein Klick
+    g._mb[0] = False
+    call_ui("ui_table", g, "tbl", 0, 0, 200, 200, headers, cells)
+    assert call_ui("ui_table_header_click", g, "tbl") == -1
+
+
 # --- Reset ----------------------------------------------------------
 
 def test_reset_loescht_state(g):

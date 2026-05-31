@@ -20,6 +20,9 @@ IMPORT "ui"
 | `UI_TEXTFIELD_SET(id$, value$)` | — | Wert programmatisch setzen |
 | `UI_RADIO(id$, x, y, options[, default_idx])` | INTEGER | gewählter Index |
 | `UI_TABLE(id$, x, y, w, h, headers, cells[, cell_colors[, col_widths[, cell_bg_colors]]])` | INTEGER | Index der geklickten Zeile (-1 wenn keine) |
+| `UI_TABLE_SELECTED(id$)` | INTEGER | persistent selektierte Zeile (-1 wenn keine) |
+| `UI_TABLE_SET_SELECTED(id$, row)` | — | Selektion programmatisch setzen (-1 = keine) |
+| `UI_TABLE_HEADER_CLICK(id$)` | INTEGER | in diesem Frame geklickte Header-Spalte (-1) — Sortier-Hook |
 | `UI_WINDOW_BEGIN(id$, titel$, x, y, w, h)` | BOOLEAN | verschiebbares Fenster; FALSE wenn eingeklappt |
 | `UI_WINDOW_END()` | — | Fenster abschließen (immer paaren) |
 | `UI_END_FRAME()` | — | **Pflicht** am Ende jedes Frames vor `FLIP()` |
@@ -311,6 +314,46 @@ WEND
 - Für **dynamische Updates** (Liste wächst): die Arrays mit Maximalgröße deklarieren und nicht-existente Zeilen mit Leerstrings füllen.
 - **Klick auf Scrollbalken** scrollt nur — die Zeile darunter wird nicht versehentlich „geklickt" weil die Scrollbar als Klickziel die Klick-Erkennung blockiert.
 - **Komplettes Beispiel** mit Per-Zelle-Farben (Gold/Silber/Bronze, Klassen-Farben, HP-Ampel) und Detail-Panel: [examples/43_ui_table.gb](../examples/43_ui_table.gb).
+
+### Persistente Selektion
+
+```basic
+UI_TABLE_SELECTED(id$)         -> INTEGER   ' selektierte Zeile, -1 wenn keine
+UI_TABLE_SET_SELECTED(id$, row)             ' programmatisch setzen, -1 = keine
+```
+
+`UI_TABLE` setzt die Selektion automatisch auf die Zeile, die in einem Frame geklickt wird — anders als der Rückgabewert (nur im Klick-Frame `>= 0`) **bleibt** sie über Frames erhalten und wird als zweites Highlight (unter dem Hover) gezeichnet. So muss das Spiel die Auswahl nicht mehr selbst in einer Variable mitführen:
+
+```basic
+UI_TABLE("scores", 10, 10, 340, 300, headers, cells)
+DIM sel AS INTEGER
+sel = UI_TABLE_SELECTED("scores")
+IF sel >= 0 THEN UI_LABEL(10, 320, "Ausgewaehlt: " + cells[sel, 0])
+```
+
+Schrumpfen die Daten (weniger Zeilen als der selektierte Index), fällt die Selektion automatisch auf `-1` zurück. `UI_TABLE_SET_SELECTED` greift erst, nachdem die Tabelle einmal mit `UI_TABLE` gezeichnet wurde (die `id$` muss bekannt sein).
+
+### Klickbare Header / Sortierung
+
+```basic
+UI_TABLE_HEADER_CLICK(id$)     -> INTEGER   ' geklickte Header-Spalte, -1 wenn keine
+```
+
+Liefert die Spalte, deren **Kopfzeile** in diesem Frame angeklickt wurde (Press + Release auf derselben Spalte). Da `UI_TABLE` Immediate-Mode ist und die Daten dem Spiel gehören, sortiert die Tabelle **nicht** selbst — sie meldet nur den Klick, das Spiel sortiert seine Arrays und übergibt sie im nächsten Frame neu:
+
+```basic
+DIM col AS INTEGER
+col = UI_TABLE_HEADER_CLICK("scores")
+IF col >= 0 THEN
+    sort_dir = IIF(sort_col = col, -sort_dir, 1)   ' Toggle auf/ab
+    sort_col = col
+    sortiere_daten(cells, col, sort_dir)            ' eigene Sortier-Routine
+END IF
+```
+
+Direkt **nach** dem `UI_TABLE`-Aufruf im selben Frame abfragen.
+
+**Vollständiges Beispiel** mit Selektion, klickbaren Headern (auf-/absteigend) und Detail-Panel: [examples/81_table_select.gb](../examples/81_table_select.gb).
 
 ## Immediate-Mode-Fenster (UI_WINDOW_BEGIN / UI_WINDOW_END)
 
