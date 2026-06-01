@@ -3,11 +3,12 @@
 //! `GUI_UPDATE` (Maus/Tasten) + `GUI_DRAW` (zeichnen). Events per Polling.
 //!
 //! Stand: Kern portiert -- Window + Button/Label/Checkbox/Slider/TextInput/
-//! Panel, Drag/Z-Order/Fokus/Close, programmierbares Theme. **Noch nicht
-//! nativ:** `GUI_TABLE` (eigener Pass) und das *Aufrufen* von FUNCREF-Callbacks
-//! (`GUI_ON_CLICK/CHANGE` werden akzeptiert, aber nicht gefeuert -- Polling
-//! via `GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT` funktioniert). Handles sind
-//! INTEGER: Window = Index, Widget = (win<<20)|idx.
+//! Panel, Drag/Z-Order/Fokus/Close, programmierbares Theme, Polling
+//! (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`) UND FUNCREF-Callbacks
+//! (`GUI_ON_CLICK`/`GUI_ON_CHANGE`): ausgeloeste Handler sammelt `update()` in
+//! `pending`; die VM leert die Queue nach `GUI_UPDATE` und ruft sie auf.
+//! **Noch nicht nativ:** `GUI_TABLE` (eigener Pass). Handles sind INTEGER:
+//! Window = Index, Widget = (win<<20)|idx.
 #![cfg(feature = "graphics")]
 
 use std::collections::HashMap;
@@ -106,6 +107,10 @@ pub struct Gui {
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
+    // In diesem Frame ausgeloeste FUNCREF-Callbacks (Namen). Die VM leert die
+    // Liste nach GUI_UPDATE und ruft sie auf -- so kann ein Callback nicht
+    // mitten im State-Update die GUI re-entrant veraendern.
+    pending: Vec<String>,
 }
 
 const WIDGET_SHIFT: i64 = 20;
@@ -120,8 +125,12 @@ impl Gui {
             active_slider: None, press_origin: None,
             was_mouse_down: false, prev_backspace: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
+            pending: Vec::new(),
         }
     }
+
+    /// Entnimmt die in diesem Frame ausgeloesten Callback-Namen (FIFO).
+    pub fn take_pending(&mut self) -> Vec<String> { std::mem::take(&mut self.pending) }
 
     pub fn reset(&mut self) {
         let theme = default_theme();
@@ -364,13 +373,17 @@ impl Gui {
             if let Some((wi, i)) = self.press_origin {
                 let r = { let w = &self.windows[wi].widgets[i]; self.abs_rect(wi, w) };
                 let w = &mut self.windows[wi].widgets[i];
-                if w.kind == Kind::Button && Self::in_rect(mx, my, r) { w.clicked = true; }
+                let fire = if w.kind == Kind::Button && Self::in_rect(mx, my, r) {
+                    w.clicked = true; w.on_click.clone()
+                } else { None };
+                if let Some(f) = fire { self.pending.push(f); }
             }
             self.press_origin = None;
         }
         // Tastatur fuer fokussiertes TextInput (nur Backspace + Zeichen).
         if let Some((wi, i)) = self.focus_widget {
             if self.windows[wi].widgets[i].kind == Kind::TextInput {
+                let before = self.windows[wi].widgets[i].text.clone();
                 let typed = g.pop_text_input();
                 if !typed.is_empty() {
                     let t: String = typed.chars().filter(|c| *c != '\t').collect();
@@ -381,6 +394,10 @@ impl Gui {
                     self.windows[wi].widgets[i].text.pop();
                 }
                 self.prev_backspace = bs;
+                if self.windows[wi].widgets[i].text != before {
+                    let f = self.windows[wi].widgets[i].on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
             }
         }
         self.was_mouse_down = is_down;
@@ -391,7 +408,12 @@ impl Gui {
         let ax = self.windows[wi].x + self.windows[wi].widgets[i].x;
         let w = &mut self.windows[wi].widgets[i];
         let rel = ((mx - ax) as f64 / (w.w - 1).max(1) as f64).clamp(0.0, 1.0);
-        w.value = w.min + rel * (w.max - w.min);
+        let new_val = w.min + rel * (w.max - w.min);
+        if new_val != w.value {
+            w.value = new_val;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
@@ -431,6 +453,10 @@ impl Gui {
             Kind::Checkbox => {
                 let w = &mut self.windows[win].widgets[i];
                 w.checked = !w.checked;
+                let oc = w.on_click.clone();
+                let och = w.on_change.clone();
+                if let Some(f) = oc { self.pending.push(f); }
+                if let Some(f) = och { self.pending.push(f); }
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
             Kind::TextInput => self.focus_widget = Some((win, i)),
@@ -521,5 +547,38 @@ impl Gui {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Checkbox-Klick (Press-basiert, ohne Graphics) muss togglen UND die
+    // Callbacks in der Reihenfolge on_click, on_change in die pending-Queue
+    // legen -- identisch zur Python-Referenz (_handle_press).
+    #[test]
+    fn checkbox_press_queues_callbacks_and_toggles() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 200, 200);
+        let cb = g.checkbox(win, "X".into(), 10, 10, false).unwrap();
+        g.on_click(cb, Some("clicked".into())).unwrap();
+        g.on_change(cb, Some("toggled".into())).unwrap();
+        // abs Checkbox-Rect: (10, 22+10, 16, 16) -> Mitte (18, 40).
+        g.handle_press(18, 40);
+        assert_eq!(g.take_pending(), vec!["clicked".to_string(), "toggled".to_string()]);
+        assert!(g.checked(cb).unwrap());
+        // Zweite Abfrage liefert leere Queue (FIFO geleert).
+        assert!(g.take_pending().is_empty());
+    }
+
+    // Klick ins Leere (kein Fenster) loescht den Fokus und feuert nichts.
+    #[test]
+    fn press_empty_clears_focus_no_callback() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 100, 100);
+        let _b = g.button(win, "OK".into(), 10, 10, 50, 20).unwrap();
+        g.handle_press(400, 400); // weit weg
+        assert!(g.take_pending().is_empty());
     }
 }

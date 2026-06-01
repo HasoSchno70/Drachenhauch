@@ -1131,8 +1131,18 @@ impl<'p> Vm<'p> {
             n if n.starts_with("gui_table") =>
                 return Err("GUI_TABLE ist noch nicht in der nativen Runtime portiert (im Python/F5-Pfad verfuegbar)".into()),
             "gui_update" => {
-                let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
-                self.gui.update(g);
+                {
+                    let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
+                    self.gui.update(g);
+                }
+                // Ausgeloeste FUNCREF-Callbacks feuern (parameterlos), nachdem
+                // der State-Update fertig ist -- so kann ein Callback die GUI
+                // sicher veraendern; neu ausgeloeste Events landen naechsten Frame.
+                for fname in self.gui.take_pending() {
+                    let f = self.prog.functions.get(fname.as_str()).ok_or_else(||
+                        format!("GUI-Callback: Funktion '{}' existiert nicht", fname))?;
+                    self.exec(f, Vec::new(), None)?;
+                }
                 Value::Nil
             }
             "gui_draw" => {

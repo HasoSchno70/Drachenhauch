@@ -80,9 +80,14 @@ def main() -> int:
         print(f"cmake:    {cmake}")
         print(f"libclang: {libclang}")
 
-    cmd = ["cargo", "build"]
-    if release:
-        cmd.append("--release")
+    # `--test` fuehrt die Rust-Unit-Tests aus (mit derselben Toolchain-Env),
+    # sonst wird das Binary gebaut.
+    if "--test" in args:
+        cmd = ["cargo", "test"]
+    else:
+        cmd = ["cargo", "build"]
+        if release:
+            cmd.append("--release")
     if graphics:
         cmd += ["--features", "graphics"]
 

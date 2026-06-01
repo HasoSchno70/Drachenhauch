@@ -320,10 +320,13 @@ programmierbares Theme (`GUI_THEME_SET/GET/PRESET`, `GUI_METRIC_SET/GET`,
 INTEGER (Window = Index, Widget = `(win<<20)|idx`); Z-Order über separate
 `z_order`-Liste, damit Handles stabil bleiben. Render per Screenshot verifiziert
 (`examples/45_gui.gb`); Interaktion ist ein 1:1-Port der (getesteten) Python-
-Logik — headless nicht klickbar testbar. *Noch offen:* `GUI_TABLE` (eigener
-Pass, klare Fehlermeldung wenn aufgerufen) und das **Feuern** von FUNCREF-
-Callbacks (`GUI_ON_CLICK/CHANGE` werden akzeptiert/gespeichert, aber nicht
-aufgerufen — Polling deckt den Fall ab).
+Logik — headless nicht klickbar testbar. **FUNCREF-Callbacks**
+(`GUI_ON_CLICK`/`GUI_ON_CHANGE`) feuern: `update()` sammelt ausgeloeste Handler
+in `pending`, die VM leert die Queue nach `GUI_UPDATE` und ruft sie (parameter-
+los) via `exec` auf — so kann ein Callback die GUI sicher verändern, neue
+Events landen nächsten Frame. Rust-Unit-Tests decken das Queueing ab
+(`cargo test`/`build_runtime.py --test`). *Noch offen:* `GUI_TABLE` (eigener
+Pass, klare Fehlermeldung wenn aufgerufen).
 
 **Noch offen (Module):** `UI_TABLE` (Immediate-Mode) + `GUI_TABLE` (Retained).
 Hardware/Netzwerk + `regex` bleiben außen vor.
