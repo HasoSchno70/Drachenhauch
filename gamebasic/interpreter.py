@@ -3252,6 +3252,42 @@ def _g_set_fullscreen(g, fs):
     return None
 
 
+@graphics_builtin("DELTA", arity=0)
+def _g_delta(g):
+    """Sekunden seit dem letzten FLIP() -- fuer framerate-unabhaengige Bewegung
+    (`x = x + speed * DELTA()`)."""
+    return float(g.delta())
+
+
+@graphics_builtin("FPS", arity=0)
+def _g_fps(g):
+    """Aktuelle Bilder/Sekunde (gleitender Mittelwert)."""
+    return int(g.fps())
+
+
+@graphics_builtin("SETFPS", arity=1, types=("int",))
+def _g_setfps(g, n):
+    """Ziel-Framerate fuer FLIP setzen (0 = ungedrosselt)."""
+    if n < 0:
+        raise GBRuntimeError("SETFPS: Wert muss >= 0 sein")
+    g.set_target_fps(n)
+    return None
+
+
+@graphics_builtin("SAVESCREENSHOT", arity=1, types=("str",))
+def _g_savescreenshot(g, path):
+    """Speichert den aktuellen Frame als Bilddatei (Endung bestimmt das Format)."""
+    g.save_screenshot(path)
+    return None
+
+
+@graphics_builtin("SETWINDOWTITLE", arity=1, types=("str",))
+def _g_setwindowtitle(g, title):
+    """Aendert den Fenstertitel zur Laufzeit."""
+    g.set_window_title(title)
+    return None
+
+
 @graphics_builtin("CLS", arity=(0, 1))
 def _g_cls(g, *args):
     color = _check_int(args[0], "CLS") if args else 0

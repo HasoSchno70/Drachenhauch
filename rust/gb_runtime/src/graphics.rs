@@ -492,6 +492,16 @@ impl Graphics {
     /// einmal lesen). Positiv = nach oben/vorn.
     pub fn pop_mouse_wheel(&self) -> i64 { self.rl.get_mouse_wheel_move() as i64 }
 
+    // --- Game-Loop-Grundlagen ---
+    pub fn delta(&self) -> f64 { self.rl.get_frame_time() as f64 }
+    pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
+    pub fn set_target_fps(&mut self, n: i64) { self.rl.set_target_fps(n.max(0) as u32); }
+    pub fn set_window_title(&mut self, title: &str) { self.rl.set_window_title(&self.thread, title); }
+    pub fn save_screenshot(&mut self, path: &str) { self.rl.take_screenshot(&self.thread, path); }
+    pub fn set_fullscreen(&mut self, fs: bool) {
+        if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
+    }
+
     /// Clip-Rechteck auf den Stack legen (Scissor). Koordinaten werden wie bei
     /// allen Draws kamera-transformiert; der Screen-Scale kommt beim Replay.
     pub fn push_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {

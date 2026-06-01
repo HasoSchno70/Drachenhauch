@@ -196,7 +196,14 @@ cmake), LLVM für `libclang.dll` (`winget install LLVM.LLVM`). `cl.exe` findet d
 `POLYGON`/`POLYGONOUTLINE`, `TEXT`/`TEXT_SIZE`/`TEXT_WIDTH`/`TEXT_HEIGHT`,
 `TEXT_BOLD`/`TEXT_ITALIC` (No-Op — Default-Font), `LOADIMAGE`/`DRAWIMAGE`/
 `IMAGEWIDTH`/`IMAGEHEIGHT`, `KEYPRESSED`, `MOUSEX`/`MOUSEY`/`MOUSEBUTTON`,
-`QUITREQUESTED`, `SLEEP`, `SET_FULLSCREEN` (No-Op headless).
+`QUITREQUESTED`, `SLEEP`.
+
+**Game-Loop-Grundlagen** (in beiden Pfaden, pygame + raylib): `DELTA()`
+(Sekunden seit letztem FLIP, framerate-unabhaengige Bewegung), `FPS()`,
+`SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt), `SET_FULLSCREEN(an)` (nativ
+echtes `ToggleFullscreen`, nicht mehr No-Op), `SETWINDOWTITLE(s)`,
+`SAVESCREENSHOT(pfad)`. Nativ ueber raylibs `GetFrameTime`/`GetFPS`/
+`SetTargetFPS`/`ToggleFullscreen`/`SetWindowTitle`/`TakeScreenshot`.
 
 **Bulk-Draws:** `PLOTS`/`BOXES`/`CIRCLES`/`LINES` (Koordinaten-Arrays + Farbe als
 INT oder ARRAY). **Bilder erweitert:** `DRAWIMAGEPART`, `DRAWIMAGEFLIPPED`,

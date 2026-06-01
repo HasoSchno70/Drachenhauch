@@ -1660,7 +1660,12 @@ impl<'p> Vm<'p> {
                 std::thread::sleep(std::time::Duration::from_millis(ms));
                 Value::Nil
             }
-            "set_fullscreen" => Value::Nil, // headless: No-Op
+            "set_fullscreen" => { g!().set_fullscreen(gb(a, 0)); Value::Nil }
+            "delta" => Value::Float(g!().delta()),
+            "fps" => Value::Int(g!().fps()),
+            "setfps" => { g!().set_target_fps(gi(a, 0, "SETFPS")?); Value::Nil }
+            "setwindowtitle" => { g!().set_window_title(gs(a, 0, "SETWINDOWTITLE")?); Value::Nil }
+            "savescreenshot" => { g!().save_screenshot(gs(a, 0, "SAVESCREENSHOT")?); Value::Nil }
 
             // --- 3D (Modul g3d) ---
             "camera3d" => {

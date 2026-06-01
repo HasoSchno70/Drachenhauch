@@ -163,6 +163,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | Bulk-Plot | `PLOTS(xs, ys, color)` — viele Pixel in EINEM Aufruf (vektorisiert via `pygame.surfarray`/numpy), `color` = INT (alle gleich) oder ARRAY OF INT (pro Pixel). Groessenordnungen schneller als `PLOT` in einer Schleife (Starfields, Punktwolken). | — |
 | Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; pygame-Draw bleibt pro Shape). `color` = INT oder ARRAY. | — |
 | Bulk-Tilemap | `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`) — siehe `tiled`-Modul. `DRAWTILEMAP` rendert intern via `blits()`-Batch (1 Call statt rows×cols). | — |
+| Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. Beide Pfade (pygame + native raylib). | — |
 
 Module mit eigenem Typ registrieren ihn lowercase (`register_type("json_handle", _JSONHandle)`),
 GB-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).

@@ -226,6 +226,8 @@ class Graphics:
         pygame.init()
         self._pygame = pygame
         self._clock = pygame.time.Clock()
+        self._target_fps = 60      # SETFPS aenderbar; FLIP taktet darauf
+        self._delta = 0.0          # Sekunden seit dem letzten FLIP (DELTA())
 
     def _require_screen(self):
         self._ensure_pygame()
@@ -280,6 +282,28 @@ class Graphics:
         else:
             scaled = pg.transform.scale(self._main_buffer, self._screen.get_size())
             self._screen.blit(scaled, (0, 0))
+
+    def delta(self) -> float:
+        """Sekunden seit dem letzten FLIP (fuer framerate-unabhaengige Bewegung)."""
+        return float(getattr(self, "_delta", 0.0))
+
+    def fps(self) -> int:
+        """Aktuelle Bilder/Sekunde (gleitend)."""
+        self._ensure_pygame()
+        return int(round(self._clock.get_fps()))
+
+    def set_target_fps(self, n: int):
+        """Ziel-Framerate fuer FLIP (0 = ungedrosselt)."""
+        self._target_fps = max(0, int(n))
+
+    def save_screenshot(self, path: str):
+        """Speichert den aktuellen Frame als Bild (PNG/JPG je nach Endung)."""
+        self._require_screen()
+        self._pygame.image.save(self._screen, str(path))
+
+    def set_window_title(self, title: str):
+        self._ensure_pygame()
+        self._pygame.display.set_caption(str(title))
 
     def set_fullscreen(self, fullscreen: bool):
         """Toggle Fullscreen zur Laufzeit - der logische Buffer bleibt gleich,
@@ -1080,7 +1104,8 @@ class Graphics:
             self._screen.blit(scaled, (0, 0))
         self._pygame.display.flip()
         self._pump()
-        self._clock.tick(60)
+        # Auf die Ziel-FPS takten und die vergangene Frame-Zeit merken (DELTA()).
+        self._delta = self._clock.tick(self._target_fps) / 1000.0
 
     def sleep_ms(self, ms: int):
         self._ensure_pygame()
