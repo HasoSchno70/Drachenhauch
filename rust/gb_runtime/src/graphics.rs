@@ -35,6 +35,22 @@ enum Cmd {
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
 }
 
+/// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
+/// `begin_mode3D`-Block VOR den 2D-Layern gerendert -- das 2D-HUD liegt also
+/// immer obenauf. Koordinaten sind Welt-Einheiten (kein Screen-Scale `s`).
+#[derive(Clone)]
+enum Cmd3D {
+    Cube(f32, f32, f32, f32, f32, f32, Color),       // x,y,z, w,h,d
+    CubeWires(f32, f32, f32, f32, f32, f32, Color),
+    Sphere(f32, f32, f32, f32, Color),               // cx,cy,cz, r
+    SphereWires(f32, f32, f32, f32, Color),
+    Cylinder(f32, f32, f32, f32, f32, f32, Color),   // x,y,z, r_top,r_bot, h
+    Plane(f32, f32, f32, f32, f32, Color),           // cx,cy,cz, size_x,size_z
+    Line(f32, f32, f32, f32, f32, f32, Color),       // x1,y1,z1, x2,y2,z2
+    Point(f32, f32, f32, Color),
+    Grid(i32, f32),                                  // slices, spacing
+}
+
 struct Layer {
     z: i32,
     cmds: Vec<Cmd>,
@@ -67,6 +83,10 @@ pub struct Graphics {
     cam_x: f64,
     cam_y: f64,
     cam_zoom: f64,
+    // 3D (Modul `g3d`): Befehlsliste + Perspektiv-Kamera. cmds3d wird pro
+    // FLIP geleert; cam3d wird von CAMERA3D gesetzt (sonst Default-Blick).
+    cmds3d: Vec<Cmd3D>,
+    cam3d: Camera3D,
     text_size: i32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
@@ -102,6 +122,13 @@ impl Graphics {
             active: 0,
             clear_color: Color::BLACK,
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
+            cmds3d: Vec::new(),
+            // Default-Blick: schraeg von vorn-oben auf den Ursprung.
+            cam3d: Camera3D::perspective(
+                Vector3::new(6.0, 5.0, 6.0),
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(0.0, 1.0, 0.0),
+                45.0),
             text_size: 20,
             textures: Vec::new(),
             image_cache: HashMap::new(),
@@ -130,6 +157,47 @@ impl Graphics {
     pub fn camera(&self) -> (f64, f64, f64) { (self.cam_x, self.cam_y, self.cam_zoom) }
     pub fn s2w_x(&self, sx: f64) -> f64 { if self.cam_zoom == 0.0 { sx } else { sx / self.cam_zoom + self.cam_x } }
     pub fn s2w_y(&self, sy: f64) -> f64 { if self.cam_zoom == 0.0 { sy } else { sy / self.cam_zoom + self.cam_y } }
+
+    // --- 3D (Modul `g3d`) ---
+    #[allow(clippy::too_many_arguments)]
+    pub fn set_camera3d(&mut self, px: f32, py: f32, pz: f32,
+                        tx: f32, ty: f32, tz: f32, fovy: f32) {
+        self.cam3d = Camera3D::perspective(
+            Vector3::new(px, py, pz),
+            Vector3::new(tx, ty, tz),
+            Vector3::new(0.0, 1.0, 0.0),
+            fovy);
+    }
+    fn emit3d(&mut self, c: Cmd3D) { self.cmds3d.push(c); }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn cube(&mut self, x: f32, y: f32, z: f32, w: f32, h: f32, d: f32, col_: i64, wires: bool) {
+        let c = col(col_);
+        if wires { self.emit3d(Cmd3D::CubeWires(x, y, z, w, h, d, c)); }
+        else { self.emit3d(Cmd3D::Cube(x, y, z, w, h, d, c)); }
+    }
+    pub fn sphere(&mut self, x: f32, y: f32, z: f32, r: f32, col_: i64, wires: bool) {
+        let c = col(col_);
+        if wires { self.emit3d(Cmd3D::SphereWires(x, y, z, r, c)); }
+        else { self.emit3d(Cmd3D::Sphere(x, y, z, r, c)); }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn cylinder(&mut self, x: f32, y: f32, z: f32, rt: f32, rb: f32, h: f32, col_: i64) {
+        self.emit3d(Cmd3D::Cylinder(x, y, z, rt, rb, h, col(col_)));
+    }
+    pub fn plane(&mut self, x: f32, y: f32, z: f32, sx: f32, sz: f32, col_: i64) {
+        self.emit3d(Cmd3D::Plane(x, y, z, sx, sz, col(col_)));
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn line3d(&mut self, x1: f32, y1: f32, z1: f32, x2: f32, y2: f32, z2: f32, col_: i64) {
+        self.emit3d(Cmd3D::Line(x1, y1, z1, x2, y2, z2, col(col_)));
+    }
+    pub fn point3d(&mut self, x: f32, y: f32, z: f32, col_: i64) {
+        self.emit3d(Cmd3D::Point(x, y, z, col(col_)));
+    }
+    pub fn grid3d(&mut self, slices: i32, spacing: f32) {
+        self.emit3d(Cmd3D::Grid(slices.max(0), spacing));
+    }
 
     pub fn cls(&mut self, color: i64) {
         // CLS setzt die Hintergrundfarbe (beim FLIP gecleart) und leert den
@@ -429,10 +497,36 @@ impl Graphics {
         // Layer aufsteigend nach z komponieren (niedrigstes z = hinten).
         let mut order: Vec<usize> = (0..self.layers.len()).collect();
         order.sort_by_key(|&i| self.layers[i].z);
-        let Graphics { rl, thread, layers, textures, .. } = self;
+        let Graphics { rl, thread, layers, textures, cmds3d, cam3d, .. } = self;
         {
             let mut d = rl.begin_drawing(thread);
             d.clear_background(clear_color);
+            // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
+            if !cmds3d.is_empty() {
+                let mut d3 = d.begin_mode3D(*cam3d);
+                for c in cmds3d.iter() {
+                    match c {
+                        Cmd3D::Cube(x, y, z, w, h, dd, col) =>
+                            d3.draw_cube(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
+                        Cmd3D::CubeWires(x, y, z, w, h, dd, col) =>
+                            d3.draw_cube_wires(Vector3::new(*x, *y, *z), *w, *h, *dd, *col),
+                        Cmd3D::Sphere(x, y, z, r, col) =>
+                            d3.draw_sphere(Vector3::new(*x, *y, *z), *r, *col),
+                        Cmd3D::SphereWires(x, y, z, r, col) =>
+                            d3.draw_sphere_wires(Vector3::new(*x, *y, *z), *r, 12, 12, *col),
+                        Cmd3D::Cylinder(x, y, z, rt, rb, h, col) =>
+                            d3.draw_cylinder(Vector3::new(*x, *y, *z), *rt, *rb, *h, 16, *col),
+                        Cmd3D::Plane(x, y, z, sx, sz, col) =>
+                            d3.draw_plane(Vector3::new(*x, *y, *z), Vector2::new(*sx, *sz), *col),
+                        Cmd3D::Line(x1, y1, z1, x2, y2, z2, col) =>
+                            d3.draw_line_3D(Vector3::new(*x1, *y1, *z1), Vector3::new(*x2, *y2, *z2), *col),
+                        Cmd3D::Point(x, y, z, col) =>
+                            d3.draw_point3D(Vector3::new(*x, *y, *z), *col),
+                        Cmd3D::Grid(slices, spacing) =>
+                            d3.draw_grid(*slices, *spacing),
+                    }
+                }
+            }
             for &li in &order {
               for c in layers[li].cmds.iter() {
                 match c {
@@ -526,8 +620,9 @@ impl Graphics {
               }
             }
         }
-        // Layer fuer den naechsten Frame leeren (Immediate-Mode pro Frame).
+        // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
+        self.cmds3d.clear();
         self.frame_count += 1;
         // Headless-Screenshot beim Erreichen der Frame-Grenze.
         if let (Some(mx), Some(path), false) = (self.max_frames, self.screenshot.clone(), self.shot_taken) {

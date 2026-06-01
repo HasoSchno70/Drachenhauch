@@ -1186,6 +1186,56 @@ impl<'p> Vm<'p> {
             }
             "set_fullscreen" => Value::Nil, // headless: No-Op
 
+            // --- 3D (Modul g3d) ---
+            "camera3d" => {
+                g!().set_camera3d(
+                    need_f(a,0,"CAMERA3D")? as f32, need_f(a,1,"CAMERA3D")? as f32, need_f(a,2,"CAMERA3D")? as f32,
+                    need_f(a,3,"CAMERA3D")? as f32, need_f(a,4,"CAMERA3D")? as f32, need_f(a,5,"CAMERA3D")? as f32,
+                    need_f(a,6,"CAMERA3D")? as f32);
+                Value::Nil
+            }
+            "cube" | "cube_wires" => {
+                let wires = name == "cube_wires";
+                let f = if wires { "CUBE_WIRES" } else { "CUBE" };
+                g!().cube(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
+                          need_f(a,3,f)? as f32, need_f(a,4,f)? as f32, need_f(a,5,f)? as f32,
+                          gi(a,6,f)?, wires);
+                Value::Nil
+            }
+            "sphere" | "sphere_wires" => {
+                let wires = name == "sphere_wires";
+                let f = if wires { "SPHERE_WIRES" } else { "SPHERE" };
+                g!().sphere(need_f(a,0,f)? as f32, need_f(a,1,f)? as f32, need_f(a,2,f)? as f32,
+                            need_f(a,3,f)? as f32, gi(a,4,f)?, wires);
+                Value::Nil
+            }
+            "cylinder" => {
+                g!().cylinder(need_f(a,0,"CYLINDER")? as f32, need_f(a,1,"CYLINDER")? as f32, need_f(a,2,"CYLINDER")? as f32,
+                              need_f(a,3,"CYLINDER")? as f32, need_f(a,4,"CYLINDER")? as f32, need_f(a,5,"CYLINDER")? as f32,
+                              gi(a,6,"CYLINDER")?);
+                Value::Nil
+            }
+            "plane" => {
+                g!().plane(need_f(a,0,"PLANE")? as f32, need_f(a,1,"PLANE")? as f32, need_f(a,2,"PLANE")? as f32,
+                           need_f(a,3,"PLANE")? as f32, need_f(a,4,"PLANE")? as f32, gi(a,5,"PLANE")?);
+                Value::Nil
+            }
+            "line3d" => {
+                g!().line3d(need_f(a,0,"LINE3D")? as f32, need_f(a,1,"LINE3D")? as f32, need_f(a,2,"LINE3D")? as f32,
+                            need_f(a,3,"LINE3D")? as f32, need_f(a,4,"LINE3D")? as f32, need_f(a,5,"LINE3D")? as f32,
+                            gi(a,6,"LINE3D")?);
+                Value::Nil
+            }
+            "point3d" => {
+                g!().point3d(need_f(a,0,"POINT3D")? as f32, need_f(a,1,"POINT3D")? as f32, need_f(a,2,"POINT3D")? as f32,
+                             gi(a,3,"POINT3D")?);
+                Value::Nil
+            }
+            "grid3d" => {
+                g!().grid3d(gi(a,0,"GRID3D")? as i32, need_f(a,1,"GRID3D")? as f32);
+                Value::Nil
+            }
+
             // --- Bulk-Draws ---
             "plots" => {
                 let xs = arr_i32(&a[0], "PLOTS")?; let ys = arr_i32(&a[1], "PLOTS")?;

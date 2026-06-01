@@ -16,7 +16,7 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
    geboxt — die Typ-Strenge von GB hilft). ✅ *erledigt*
 4. raylib einbinden, Grafik-Builtins nach Rust. ✅ *erledigt (Core-2D)*
 5. Module portieren (gui/ui/physics …) nach Bedarf. 🚧 *in Arbeit (vec2/curves/physics)*
-6. 3D-Builtins auf raylibs Mesh/Kamera-API.
+6. 3D-Builtins auf raylibs Mesh/Kamera-API. ✅ *Core-Primitive erledigt (Modul `g3d`)*
 7. Editor: „Export → native Exe bundeln".
 
 **Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
@@ -322,3 +322,35 @@ serialize-Fehler mehr** (vorher 6).
 
 **Nicht geplant:** Hardware/Netzwerk-Module (`bt`/`serial`/`usb`/`wifi`/`net`/
 `html`/`db`/`audio`) und `regex` (Python-`re` nicht bit-identisch nachbaubar).
+
+## Schritt 6: 3D-Grafik (Modul `g3d`)
+
+3D ist **native-only**: raylib hat eine echte 3D-Pipeline, pygame nicht. Das
+Modul `g3d` registriert die Builtins (damit der Compiler `CALL_BUILTIN`
+emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
+(„… nur in der nativen Runtime … mit F6"). In `gbrt` rendern sie über raylibs
+`begin_mode3D`-API.
+
+**Builtins** ([`g3d.py`](../gamebasic/modules/g3d.py), Rendering in
+`graphics.rs`/`vm.rs`):
+- `CAMERA3D(px,py,pz, tx,ty,tz, fovy)` — Perspektiv-Kamera (Up = +Y), pro Frame.
+- `CUBE` / `CUBE_WIRES` `(x,y,z, w,h,d, farbe)` — gefüllter / Drahtgitter-Quader.
+- `SPHERE` / `SPHERE_WIRES` `(x,y,z, r, farbe)`.
+- `CYLINDER(x,y,z, r_oben, r_unten, h, farbe)` — `r_oben=0` ⇒ Kegel.
+- `PLANE(x,y,z, size_x, size_z, farbe)` — XZ-Ebene.
+- `LINE3D(x1,y1,z1, x2,y2,z2, farbe)`, `POINT3D(x,y,z, farbe)`.
+- `GRID3D(linien, abstand)` — Boden-Raster.
+
+**Render-Modell** (erweitert das 2D-Recording): 3D-Cmds landen in einer eigenen
+Liste `cmds3d`; beim `FLIP` rendert `gbrt` **zuerst** alle 3D-Cmds in einem
+`begin_mode3D(cam3d)`-Block, **danach** die 2D-Layer obenauf — das 2D-HUD liegt
+also immer über der Szene. Koordinaten sind Welt-Einheiten (kein Screen-Scale),
+Farben `0xRRGGBB`. `cmds3d` wird pro Frame geleert; ohne `CAMERA3D` gilt ein
+Default-Blick (schräg von vorn-oben auf den Ursprung).
+
+Demo: [examples/82_3d_intro.gb](../examples/82_3d_intro.gb) (Würfel, Kugel,
+Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
+
+**Offen (3D):** Mesh-/Modell-Laden (OBJ/GLTF via `LoadModel`), Texturen auf
+Meshes, Beleuchtung/Shader, frei steuerbare Kamera-Modi. Die Primitive decken
+den Einstieg ab; Modelle sind der nächste sinnvolle Schritt.
