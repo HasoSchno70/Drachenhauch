@@ -156,7 +156,8 @@ SystemTime — NICHT bit-identisch, per Definition).
 
 **Noch nicht im Kern:** Datei-I/O, ENUM/STATIC-Namespaces (deren const-Pool-
 Handles noch nicht serialisierbar sind), Module (`IMPORT` → Schritt 5),
-Bulk-Draws (`PLOTS`/`BOXES`/…), Layer/Atlas, Audio.
+Bulk-Draws (`PLOTS`/`BOXES`/…), Layer/Atlas. *(Diese sind inzwischen alle
+implementiert — siehe die jeweiligen Schritte unten.)*
 
 ### Validierung
 
@@ -321,7 +322,26 @@ geladen; `LOAD_MEMBER` löst Member case-insensitiv auf. Damit gibt es **keine
 serialize-Fehler mehr** (vorher 6).
 
 **Nicht geplant:** Hardware/Netzwerk-Module (`bt`/`serial`/`usb`/`wifi`/`net`/
-`html`/`db`/`audio`) und `regex` (Python-`re` nicht bit-identisch nachbaubar).
+`html`/`db`) und `regex` (Python-`re` nicht bit-identisch nachbaubar). Das
+erweiterte `audio`-Modul (Kanäle, Pan, Ton-Generierung) bleibt vorerst
+Python-only — die **Core-Audio-Builtins** sind aber nativ (siehe unten).
+
+## Audio (Core: SFX + Stream-Musik)
+
+Native Audio über raylib (Modul `audio.rs`, feature-gated wie die Grafik —
+raylib bundelt den Mixer mit). **Core-Builtins, kein `IMPORT` nötig:**
+- `LOADSOUND(pfad$) -> SOUND` (Handle = INTEGER-Index), `PLAYSOUND(sound[,
+  loops, lautstaerke])`, `STOPSOUND(sound)`.
+- `PLAYMUSIC(pfad$[, loops, lautstaerke])`, `STOPMUSIC()` — ein Stream
+  gleichzeitig; `gbrt` ruft `update_stream` pro `FLIP` (sonst stockt die
+  Wiedergabe). Musik loopt (raylib-Default).
+
+WAV/OGG/MP3/FLAC je nach raylib-Build. Audio ist **nicht bit-identisch** zur
+pygame-Version (anderer Mixer) — wie `RND`/`MILLIS`/`tween` nur funktional.
+*Grenze:* `loops` wird nativ (noch) nicht ausgewertet — SFX spielen einmal,
+Musik loopt immer. Lifetime-Trick: das `RaylibAudio`-Gerät wird per `Box::leak`
+zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
+(kein self-referential struct). Demo: [examples/83_audio.gb](../examples/83_audio.gb).
 
 ## Schritt 6: 3D-Grafik (Modul `g3d`)
 

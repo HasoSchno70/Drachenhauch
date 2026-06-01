@@ -11,6 +11,8 @@
 //! --native` reicht den Namen der `.gb`-Quelldatei durch.
 
 mod astar;
+#[cfg(feature = "graphics")]
+mod audio;
 mod builtins;
 mod ecs;
 #[cfg(feature = "graphics")]

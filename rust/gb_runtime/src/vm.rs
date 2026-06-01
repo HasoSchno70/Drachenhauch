@@ -154,6 +154,9 @@ pub struct Vm<'p> {
     cur_line: u32,
     #[cfg(feature = "graphics")]
     gfx: Option<crate::graphics::Graphics>,
+    // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
+    #[cfg(feature = "graphics")]
+    audio: Option<crate::audio::Audio>,
 }
 
 type R<T> = Result<T, String>;
@@ -190,6 +193,8 @@ impl<'p> Vm<'p> {
             cur_line: 0,
             #[cfg(feature = "graphics")]
             gfx: None,
+            #[cfg(feature = "graphics")]
+            audio: None,
         };
         vm.register_default_globals();
         vm
@@ -1028,6 +1033,15 @@ impl<'p> Vm<'p> {
         Ok(None)
     }
 
+    /// Audio-Geraet lazy initialisieren (bei erstem Sound-/Musik-Builtin).
+    #[cfg(feature = "graphics")]
+    fn audio_mut(&mut self) -> R<&mut crate::audio::Audio> {
+        if self.audio.is_none() {
+            self.audio = Some(crate::audio::Audio::new()?);
+        }
+        Ok(self.audio.as_mut().unwrap())
+    }
+
     #[cfg(feature = "graphics")]
     fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Hilfen: strikte INTEGER- bzw. STRING-Extraktion (wie _check_int/_check_str).
@@ -1170,7 +1184,12 @@ impl<'p> Vm<'p> {
             }
             "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
             "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
-            "flip" => { g!().flip(); Value::Nil }
+            "flip" => {
+                g!().flip();
+                // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
+                if let Some(au) = self.audio.as_ref() { au.update(); }
+                Value::Nil
+            }
             "keypressed" => Value::Bool(g!().key_down(gi(a,0,"KEYPRESSED")?)),
             "quitrequested" => Value::Bool(g!().quit_requested()),
             "mousex" => Value::Int(g!().mouse_x()),
@@ -1235,6 +1254,34 @@ impl<'p> Vm<'p> {
                 g!().grid3d(gi(a,0,"GRID3D")? as i32, need_f(a,1,"GRID3D")? as f32);
                 Value::Nil
             }
+
+            // --- Audio (Core: SFX + Stream-Musik) ---
+            "loadsound" => {
+                let path = gs(a, 0, "LOADSOUND")?.to_string();
+                Value::Int(self.audio_mut()?.load_sound(&path)?)
+            }
+            "playsound" => {
+                // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
+                // (raylib-Sounds loopen nicht) -- SFX spielen einmal.
+                let idx = gi(a, 0, "PLAYSOUND")?;
+                let vol = if a.len() >= 3 { need_f(a, 2, "PLAYSOUND")? } else { 1.0 };
+                self.audio_mut()?.play_sound(idx, vol)?;
+                Value::Nil
+            }
+            "stopsound" => {
+                let idx = gi(a, 0, "STOPSOUND")?;
+                self.audio_mut()?.stop_sound(idx)?;
+                Value::Nil
+            }
+            "playmusic" => {
+                // PLAYMUSIC(pfad$[, loops, volume]). Musik loopt (raylib-Default);
+                // `loops` wird nativ nicht ausgewertet.
+                let path = gs(a, 0, "PLAYMUSIC")?.to_string();
+                let vol = if a.len() >= 3 { need_f(a, 2, "PLAYMUSIC")? } else { 1.0 };
+                self.audio_mut()?.play_music(&path, vol)?;
+                Value::Nil
+            }
+            "stopmusic" => { self.audio_mut()?.stop_music(); Value::Nil }
 
             // --- Bulk-Draws ---
             "plots" => {
