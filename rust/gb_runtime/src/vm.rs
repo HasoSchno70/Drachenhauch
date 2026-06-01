@@ -1739,6 +1739,26 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "stopmusic" => { self.audio_mut()?.stop_music(); Value::Nil }
+            "audio_fft" => {
+                // AUDIO_FFT(arr): fuellt ein 1D ARRAY OF FLOAT mit B Band-Pegeln
+                // (0..1) aus dem aktuell hoerbaren Audio (echte FFT).
+                let arr = match a.first() {
+                    Some(Value::Array(x)) => x.clone(),
+                    _ => return Err("AUDIO_FFT: erwartet ARRAY OF FLOAT".into()),
+                };
+                let n = {
+                    let b = arr.borrow();
+                    if b.element_type != "float" || b.dims.len() != 1 {
+                        return Err("AUDIO_FFT: erwartet 1D ARRAY OF FLOAT".into());
+                    }
+                    b.values.len()
+                };
+                let mut tmp = vec![0.0f32; n];
+                self.audio_mut()?.fft_bands(&mut tmp);
+                let mut b = arr.borrow_mut();
+                for i in 0..n { b.values[i] = Value::Float(tmp[i] as f64); }
+                Value::Nil
+            }
 
             // --- Bulk-Draws ---
             "plots" => {

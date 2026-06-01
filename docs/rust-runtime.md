@@ -366,6 +366,16 @@ raylib bundelt den Mixer mit). **Core-Builtins, kein `IMPORT` nötig:**
   gleichzeitig; `gbrt` ruft `update_stream` pro `FLIP` (sonst stockt die
   Wiedergabe). Musik loopt (raylib-Default).
 
+**Audio-Reaktivität (FFT):** `AUDIO_FFT(bands)` füllt ein `ARRAY OF FLOAT` mit
+B logarithmisch verteilten Frequenzband-Pegeln (0..1) des **aktuell hörbaren**
+Audios. Dafür hängt `Audio::new` via `AttachAudioMixedProcessor` einen
+`extern "C"`-Callback an die gesamte raylib-Audio-Pipeline; der schiebt das
+gemischte Mono-Signal in einen globalen Ringpuffer (`try_lock`, Audio-Thread
+blockiert nie). `fft_bands` fenstert (Hann), rechnet eine eigene Radix-2-FFT
+(1024), bündelt log-spaced, normalisiert per Auto-Gain und glättet per
+Peak-Hold. Im pygame-Pfad (kein Mix-Tap) füllt `AUDIO_FFT` Nullen. So tanzen
+Spektrum **und** Geometrie der Demo wirklich zur Musik.
+
 WAV/OGG/MP3/FLAC je nach raylib-Build. Audio ist **nicht bit-identisch** zur
 pygame-Version (anderer Mixer) — wie `RND`/`MILLIS`/`tween` nur funktional.
 *Grenze:* `loops` wird nativ (noch) nicht ausgewertet — SFX spielen einmal,
@@ -408,10 +418,13 @@ den Einstieg ab; Modelle sind der nächste sinnvolle Schritt.
 ## Showcase-Demo
 
 [examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in
-einem 1280×720-Frame, was die native Runtime kann: eine orbitierende 3D-Welt
-(Grid, pulsierende Kugel, beat-skalierter Würfel-Ring mit Lichtsäulen), darüber
-ein 2D-Overlay (Glow-Partikel-Salven zum Takt, Bulk-`BOXES`-Spektrum, Titel,
-Laufschrift) und eine geloopte Trance-Spur. Nur nativ:
+einem 1280×720-Frame, was die native Runtime kann — **audio-reaktiv** (echte
+FFT der laufenden Musik via `AUDIO_FFT`) und mit **Szenen-Wechsel alle 16
+Takte**: `TUNNEL` (zufliegende Wireframe-Ringe) → `RING` (Doppelring + Bass-
+Kugel + Säule, Kamera-Punch/Shake) → `PLASMA` (audio-reaktives Würfel-Terrain).
+Dazu durchgehend ein 2D-Overlay: FFT-Spektrum (`BOXES`-Bulk, oben+unten),
+Glow-Funken + Cyber-Regen (zwei Partikelsysteme), pulsierender Titel,
+Laufschrift, dezenter Beat-Flash. Nur nativ:
 `gbrun.py --native examples\85_cybermatic_demo.gb` (oder F6).
 
 Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,

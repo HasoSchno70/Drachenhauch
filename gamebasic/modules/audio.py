@@ -493,3 +493,21 @@ def _audio_noise(*args):
         raise GBRuntimeError("AUDIO_NOISE: dauer_ms zu klein fuer Sample-Rate")
     wave = np.random.uniform(-1.0, 1.0, n_samples).astype(np.float64)
     return _make_sound_from_wave(wave, volume)
+
+
+@builtin("AUDIO_FFT", arity=1)
+def _audio_fft(arr):
+    """AUDIO_FFT(bands) -- fuellt ein 1D ARRAY OF FLOAT mit Frequenzband-Pegeln
+    (0..1) des aktuell hoerbaren Audios (echte FFT).
+
+    NUR in der nativen Runtime (gbrt) liefert das echte Werte -- dort haengt
+    ein Mix-Processor an der Audio-Pipeline. Im Python/pygame-Pfad gibt es
+    keinen solchen Tap; die Funktion fuellt dann Nullen (kein Crash, keine
+    Reaktivitaet). Laenge des Arrays = Anzahl der Baender."""
+    from ..interpreter import _GBArray
+    if (not isinstance(arr, _GBArray) or arr.element_type != "float"
+            or len(arr.dims) != 1):
+        raise TypeMismatchError("AUDIO_FFT: erwartet 1D ARRAY OF FLOAT")
+    for i in range(arr.dims[0]):
+        arr.values[i] = 0.0
+    return None
