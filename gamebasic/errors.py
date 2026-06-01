@@ -14,6 +14,16 @@ class GameBasicError(Exception):
             return f"[Zeile {self.line}] {kind}: {self.message}"
         return f"{kind}: {self.message}"
 
+    def set_line(self, line: int) -> "GameBasicError":
+        """Setzt nachtraeglich eine Quell-Zeile (nur wenn noch keine gesetzt)
+        und aktualisiert die formatierte Meldung. `str(e)` enthaelt die
+        Zeile erst dann -- die Exception-Args werden bei __init__ EINMAL
+        eingefroren, darum hier neu formatieren. Liefert self (chainbar)."""
+        if line and not self.line:
+            self.line = line
+            self.args = (self._format(),)
+        return self
+
 
 class LexerError(GameBasicError):
     pass

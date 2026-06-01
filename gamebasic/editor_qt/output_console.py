@@ -388,21 +388,23 @@ class OutputConsole(QWidget):
         os.close(fd)
         tmp_path = Path(tmp)
         self.clear()
+        # Schon vor dem Kompilieren setzen, damit der `[Zeile N]`-Link einer
+        # Compile-Fehlermeldung auf diese Datei springt (statt ins Leere).
+        self._current_run_file = file_path
         self.append(f"▶ Nativ (gbrt): {file_path.name}\n\n", "info")
         try:
             from gamebasic.serialize import compile_file_to_gbc
             compile_file_to_gbc(file_path, tmp_path)
         except GameBasicError as exc:
-            self.append(f"Compile-Fehler: {exc}\n", "error")
+            self.append(f"Compile-Fehler in {file_path.name}:\n  {exc}\n", "error")
             tmp_path.unlink(missing_ok=True)
             return False
         except Exception as exc:  # pragma: no cover - defensiv
-            self.append(f"Compile-Fehler: {exc}\n", "error")
+            self.append(f"Compile-Fehler in {file_path.name}:\n  {exc}\n", "error")
             tmp_path.unlink(missing_ok=True)
             return False
 
         self._user_stopped = False
-        self._current_run_file = file_path
         self._native_gbc = tmp_path
 
         proc = QProcess(self)

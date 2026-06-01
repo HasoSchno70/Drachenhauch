@@ -238,7 +238,7 @@ class Compiler:
 
         # Phase 1: Klassen registrieren (Felder + Methodennamen)
         for cd in cls_decls:
-            self._register_class(cd)
+            self._at(cd, lambda cd=cd: self._register_class(cd))
         # Eltern-Referenzen aufloesen
         for ci in self.classes.values():
             if ci.parent_name:
@@ -251,11 +251,11 @@ class Compiler:
 
         # Phase 2: Funktions-Stubs (Forward-Referenzen)
         for d in fn_decls:
-            self._register_stub(d)
+            self._at(d, lambda d=d: self._register_stub(d))
 
         # Phase 3: Funktionen kompilieren
         for d in fn_decls:
-            self._compile_function(d, current_class=None)
+            self._at(d, lambda d=d: self._compile_function(d, current_class=None))
 
         # Phase 4a: Methoden-Stubs eintragen, BEVOR irgendeine kompiliert wird.
         # So kann beim Kompilieren von Methode A bereits eine Methode B
@@ -270,7 +270,8 @@ class Compiler:
         for cd in cls_decls:
             ci = self.classes[cd.name]
             for m in cd.methods:
-                fn = self._compile_function(m, current_class=ci)
+                fn = self._at(m, lambda m=m, ci=ci:
+                              self._compile_function(m, current_class=ci))
                 ci.methods[m.name] = fn
 
         # Phase 5: Hauptprogramm
@@ -451,6 +452,17 @@ class Compiler:
         )
 
     # -------- Statements -----------------------------------------------
+    def _at(self, node, thunk):
+        """Fuehrt `thunk()` aus und haengt `node.line` an eine CompileError, die
+        noch keine Zeile traegt. So bekommen Compile-Fehler eine Quell-Zeile
+        (`[Zeile N]`), genau wie Parser-Fehler -- relevant fuer die native
+        Runtime / den --native-Pfad, wo es keinen Tree-Walker-Fallback gibt."""
+        try:
+            return thunk()
+        except CompileError as e:
+            e.set_line(getattr(node, "line", 0))
+            raise
+
     def _stmt(self, s):
         # Aktuelle Quell-Zeile fuer alle Instruktionen dieses Statements
         # stempeln (der Parser haengt `.line` an jedes Statement).
@@ -460,9 +472,15 @@ class Compiler:
         method = getattr(self, f"_stmt_{type(s).__name__}", None)
         if method is None:
             raise CompileError(
-                f"VM unterstuetzt {type(s).__name__} noch nicht (Phase 3b/3c)"
+                f"VM unterstuetzt {type(s).__name__} noch nicht (Phase 3b/3c)",
+                line=ln,
             )
-        method(s)
+        # Compile-Fehler im Statement-Body kriegen die Statement-Zeile.
+        try:
+            method(s)
+        except CompileError as e:
+            e.set_line(ln)
+            raise
 
     def _stmt_MultiDim(self, s: MultiDim):
         """Mehrere DIMs gleichen Typs: einfach hintereinander emittieren.

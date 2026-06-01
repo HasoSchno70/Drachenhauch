@@ -64,6 +64,13 @@ Die Python/Cython-VMs ignorieren `lines` (additives Feld, kein Recompile nötig)
 `gbrt <datei.gbc>` ohne Label nutzt den `.gbc`-Pfad. Zeile `0` (untracked) →
 Meldung ohne Zeilenangabe.
 
+**Compile-Fehler** (vor der Ausführung, in Python) tragen ebenfalls eine Zeile:
+Parser-Fehler ohnehin, und `CompileError` wird zentral mit der Statement- bzw.
+Deklarations-Zeile angereichert (`Compiler._at` + `_stmt`, via
+`GameBasicError.set_line`). So zeigt der `--native`/F6-Pfad z. B.
+`[Zeile 4] CompileError: SUB 'foo' bereits deklariert` — im Editor als
+klickbarer Link in die Quelldatei.
+
 ## Schritt 1: `.gbc`-Serialisierung
 
 [`gamebasic/serialize.py`](../gamebasic/serialize.py) wandelt ein vom

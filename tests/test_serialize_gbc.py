@@ -127,6 +127,40 @@ def test_lines_point_at_failing_statement():
     assert fn.lines[idivs[0]] == 3
 
 
+def test_compile_error_carries_line():
+    """Compile-Fehler tragen eine Quell-Zeile (`[Zeile N]`) -- wichtig fuer den
+    --native/F6-Pfad, der keinen Tree-Walker-Fallback hat."""
+    from gamebasic.compiler import CompileError
+
+    # Doppelte SUB -> Fehler auf Zeile 4 (Hoisting-Phase, ueber decl.line).
+    with pytest.raises(CompileError) as ei:
+        _compile("SUB foo()\n  PRINT 1\nEND SUB\nSUB foo()\n"
+                 "  PRINT 2\nEND SUB\nfoo()\n")
+    assert ei.value.line == 4
+    assert "[Zeile 4]" in str(ei.value)
+
+    # BREAK ausserhalb Schleife -> Statement-Zeile 2 (ueber _stmt).
+    with pytest.raises(CompileError) as ei2:
+        _compile("PRINT 1\nBREAK\n")
+    assert ei2.value.line == 2
+    assert "[Zeile 2]" in str(ei2.value)
+
+
+def test_set_line_does_not_override_existing():
+    """set_line ueberschreibt eine bereits gesetzte Zeile nicht (Parser-Fehler
+    behalten ihre eigene, praezisere Zeile)."""
+    from gamebasic.errors import GameBasicError as _E
+    e = _E("test", line=7)
+    e.set_line(99)
+    assert e.line == 7
+    assert "[Zeile 7]" in str(e)
+    # Ohne vorher gesetzte Zeile greift set_line.
+    e2 = _E("test")
+    e2.set_line(99)
+    assert e2.line == 99
+    assert "[Zeile 99]" in str(e2)
+
+
 def test_builtin_call_compiles_to_call_builtin_in_fresh_process():
     """Regression: LEN/INT/... muessen zu CALL_BUILTIN (Op 51) kompilieren,
     nicht zu LOAD_NAME + CALL_VALUE. Das haengt daran, dass serialize.py die
