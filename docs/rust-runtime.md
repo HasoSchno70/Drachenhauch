@@ -422,6 +422,28 @@ Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
 Meshes, Beleuchtung/Shader, frei steuerbare Kamera-Modi. Die Primitive decken
 den Einstieg ab; Modelle sind der nächste sinnvolle Schritt.
 
+## Shader / Post-Processing (native)
+
+GPU-Fragment-Shader fuer Ganzbild-Effekte (CRT, Bloom, Vignette, …) — **nur
+native** (raylib/OpenGL). Builtins: `SHADER_LOAD(pfad$_oder_glsl$)` (Datei ODER
+GLSL-Quelltext → SHADER-Handle/-1), `SHADER_SET`/`SHADER_SET2`/`SHADER_SET3`
+(float/vec2/vec3-Uniforms), `POSTFX(h)` (Frame durch den Shader; -1 = aus).
+
+**Render-Modell:** Ist ein Post-Shader aktiv, rendert `FLIP` die ganze Szene
+(3D + 2D + Scissor) nicht direkt auf den Screen, sondern in eine
+`RenderTexture2D`; danach wird diese Textur full-screen durch
+`BeginShaderMode(shader)` praesentiert (Y-flip wegen RT-Konvention). Der
+Replay-Code ist generisch (`fn render_scene<D: RaylibDraw>`), laeuft also
+identisch auf den Screen *oder* in die RenderTexture — `RaylibDrawHandle` und
+`RaylibTextureMode` implementieren beide `RaylibDraw`. Shader-Handles liegen in
+`Graphics.shaders`, der aktive Index in `post_shader_idx`.
+
+Im pygame-Pfad sind die Builtins No-Ops (`SHADER_LOAD` → -1) — das Programm
+laeuft ohne Effekt statt zu craschen. Beispiel-Shader (GLSL 330):
+[examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
+`vignette.fs`), Demo [examples/86_postfx_shaders.gb](../examples/86_postfx_shaders.gb)
+(zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
+
 ## Showcase-Demo
 
 [examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in

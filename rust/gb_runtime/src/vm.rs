@@ -1667,6 +1667,32 @@ impl<'p> Vm<'p> {
             "setwindowtitle" => { g!().set_window_title(gs(a, 0, "SETWINDOWTITLE")?); Value::Nil }
             "savescreenshot" => { g!().save_screenshot(gs(a, 0, "SAVESCREENSHOT")?); Value::Nil }
 
+            // --- Shader / Post-Processing ---
+            "shader_load" => {
+                // SHADER_LOAD(quelle$): Datei-Pfad ODER GLSL-Quelltext.
+                let arg = gs(a, 0, "SHADER_LOAD")?;
+                let code = match std::fs::read_to_string(arg) {
+                    Ok(text) => text,
+                    Err(_) => arg.to_string(), // kein Pfad -> als Code behandeln
+                };
+                Value::Int(g!().load_shader(&code))
+            }
+            "shader_set" => {
+                g!().shader_set_float(gi(a,0,"SHADER_SET")?, gs(a,1,"SHADER_SET")?, need_f(a,2,"SHADER_SET")?);
+                Value::Nil
+            }
+            "shader_set2" => {
+                g!().shader_set_vec2(gi(a,0,"SHADER_SET2")?, gs(a,1,"SHADER_SET2")?,
+                    need_f(a,2,"SHADER_SET2")?, need_f(a,3,"SHADER_SET2")?);
+                Value::Nil
+            }
+            "shader_set3" => {
+                g!().shader_set_vec3(gi(a,0,"SHADER_SET3")?, gs(a,1,"SHADER_SET3")?,
+                    need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?);
+                Value::Nil
+            }
+            "postfx" => { g!().set_postfx(gi(a, 0, "POSTFX")?); Value::Nil }
+
             // --- 3D (Modul g3d) ---
             "camera3d" => {
                 g!().set_camera3d(

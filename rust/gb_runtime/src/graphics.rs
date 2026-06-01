@@ -12,6 +12,7 @@
 use std::collections::HashMap;
 
 use raylib::prelude::*;
+use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 
 #[derive(Clone)]
 enum Cmd {
@@ -99,6 +100,11 @@ pub struct Graphics {
     max_frames: Option<u64>,
     screenshot: Option<String>,
     shot_taken: bool,
+    // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
+    // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
+    shaders: Vec<Shader>,
+    post_shader_idx: Option<usize>,
+    scene_rt: Option<RenderTexture2D>,
 }
 
 /// GB-Farbe (0xRRGGBB INTEGER) -> raylib Color.
@@ -119,8 +125,11 @@ impl Graphics {
         let screenshot = std::env::var("GBRT_SCREENSHOT").ok();
         let mut layer_names = HashMap::new();
         layer_names.insert(String::new(), 0usize); // Main-Layer
+        // Szene-Render-Target (Fenstergroesse) fuer Post-Processing.
+        let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
         Graphics {
             rl, thread, width, height, scale,
+            shaders: Vec::new(), post_shader_idx: None, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -511,6 +520,39 @@ impl Graphics {
     }
     pub fn pop_clip(&mut self) { self.emit(Cmd::ScissorPop); }
 
+    // --- Shader / Post-Processing ---
+    /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
+    pub fn load_shader(&mut self, code: &str) -> i64 {
+        let sh = self.rl.load_shader_from_memory(&self.thread, None, Some(code));
+        if !sh.is_shader_valid() { return -1; }
+        self.shaders.push(sh);
+        (self.shaders.len() - 1) as i64
+    }
+    pub fn shader_set_float(&mut self, h: i64, name: &str, v: f64) {
+        if let Some(sh) = self.shaders.get_mut(h as usize) {
+            let loc = sh.get_shader_location(name);
+            if loc >= 0 { sh.set_shader_value(loc, v as f32); }
+        }
+    }
+    pub fn shader_set_vec2(&mut self, h: i64, name: &str, x: f64, y: f64) {
+        if let Some(sh) = self.shaders.get_mut(h as usize) {
+            let loc = sh.get_shader_location(name);
+            if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32]); }
+        }
+    }
+    pub fn shader_set_vec3(&mut self, h: i64, name: &str, x: f64, y: f64, z: f64) {
+        if let Some(sh) = self.shaders.get_mut(h as usize) {
+            let loc = sh.get_shader_location(name);
+            if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32, z as f32]); }
+        }
+    }
+    /// Aktiven Post-Processing-Shader setzen (-1 = aus).
+    pub fn set_postfx(&mut self, h: i64) {
+        self.post_shader_idx = if h >= 0 && (h as usize) < self.shaders.len() {
+            Some(h as usize)
+        } else { None };
+    }
+
     pub fn quit_requested(&self) -> bool {
         if let Some(mx) = self.max_frames {
             if self.frame_count >= mx { return true; }
@@ -521,19 +563,63 @@ impl Graphics {
     pub fn flip(&mut self) {
         let s = self.scale;
         let clear_color = self.clear_color;
-        // Layer aufsteigend nach z komponieren (niedrigstes z = hinten).
         let mut order: Vec<usize> = (0..self.layers.len()).collect();
         order.sort_by_key(|&i| self.layers[i].z);
-        let Graphics { rl, thread, layers, textures, cmds3d, cam3d, .. } = self;
-        // Clip-Stack (Scissor): jeder Eintrag ist das aktive, bereits
-        // verschnittene Rechteck in Screen-Pixeln.
-        let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
-        {
+        // RT-Groesse = Fenstergroesse (bekannt, ohne mehrdeutigen Textur-Query).
+        let (tw, th) = ((self.width * self.scale) as f32, (self.height * self.scale) as f32);
+        let Graphics { rl, thread, layers, textures, cmds3d, cam3d, scene_rt, shaders, post_shader_idx, .. } = self;
+        let cam = *cam3d;
+        // Post-FX aktiv? -> (Shader-Index, Render-Target). Sonst direkt zeichnen.
+        let postfx = match *post_shader_idx {
+            Some(i) if i < shaders.len() => scene_rt.as_mut().map(|rt| (i, rt)),
+            _ => None,
+        };
+        if let Some((idx, rt)) = postfx {
+            // 1) Szene in die RenderTexture rendern.
+            {
+                let mut tx = rl.begin_texture_mode(thread, rt);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, cmds3d, cam);
+            }
+            // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
+            let src = Rectangle::new(0.0, 0.0, tw, -th);
+            let dst = Rectangle::new(0.0, 0.0, tw, th);
             let mut d = rl.begin_drawing(thread);
-            d.clear_background(clear_color);
+            d.clear_background(Color::BLACK);
+            {
+                let mut sm = d.begin_shader_mode(&mut shaders[idx]);
+                sm.draw_texture_pro(&*rt, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+            }
+        } else {
+            let mut d = rl.begin_drawing(thread);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, cmds3d, cam);
+        }
+        // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
+        for l in self.layers.iter_mut() { l.cmds.clear(); }
+        self.cmds3d.clear();
+        self.frame_count += 1;
+        // Headless-Screenshot beim Erreichen der Frame-Grenze.
+        if let (Some(mx), Some(path), false) = (self.max_frames, self.screenshot.clone(), self.shot_taken) {
+            if self.frame_count >= mx {
+                self.rl.take_screenshot(&self.thread, &path);
+                self.shot_taken = true;
+            }
+        }
+    }
+}
+
+/// Spielt 3D-Befehle (begin_mode3D) + 2D-Layer (mit Scissor-Clip-Stack) auf ein
+/// beliebiges Draw-Ziel ab -- den Screen ODER eine RenderTexture (beide impl
+/// `RaylibDraw`). So laeuft derselbe Replay-Code mit und ohne Post-Shader.
+fn render_scene<D: RaylibDraw>(
+    d: &mut D, s: i32, clear: Color,
+    layers: &[Layer], order: &[usize], textures: &[Tex],
+    cmds3d: &[Cmd3D], cam3d: Camera3D,
+) {
+    let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
+    d.clear_background(clear);
             // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
             if !cmds3d.is_empty() {
-                let mut d3 = d.begin_mode3D(*cam3d);
+                let mut d3 = d.begin_mode3D(cam3d);
                 for c in cmds3d.iter() {
                     match c {
                         Cmd3D::Cube(x, y, z, w, h, dd, col) =>
@@ -557,7 +643,7 @@ impl Graphics {
                     }
                 }
             }
-            for &li in &order {
+            for &li in order {
               for c in layers[li].cmds.iter() {
                 match c {
                     Cmd::Clear(col) => d.clear_background(*col),
@@ -670,20 +756,8 @@ impl Graphics {
             }
             // Sicherheit: unbalancierte Clips nicht in den naechsten Frame lecken.
             if !clip_stack.is_empty() { unsafe { raylib::ffi::EndScissorMode(); } }
-        }
-        // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
-        for l in self.layers.iter_mut() { l.cmds.clear(); }
-        self.cmds3d.clear();
-        self.frame_count += 1;
-        // Headless-Screenshot beim Erreichen der Frame-Grenze.
-        if let (Some(mx), Some(path), false) = (self.max_frames, self.screenshot.clone(), self.shot_taken) {
-            if self.frame_count >= mx {
-                self.rl.take_screenshot(&self.thread, &path);
-                self.shot_taken = true;
-            }
-        }
-    }
 }
+
 
 /// SDL/pygame-Keycode (Wert der GB-KEY_*-Konstanten) -> raylib KeyboardKey.
 fn map_key(code: i64) -> Option<KeyboardKey> {

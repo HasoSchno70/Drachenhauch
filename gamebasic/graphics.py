@@ -305,6 +305,22 @@ class Graphics:
         self._ensure_pygame()
         self._pygame.display.set_caption(str(title))
 
+    # --- Shader / Post-Processing: GPU-only, im pygame-Pfad No-Op ----------
+    def load_shader(self, src: str) -> int:
+        return -1   # pygame hat keine GLSL-Pipeline -> kein Shader
+
+    def shader_set_float(self, h, name, v):
+        return None
+
+    def shader_set_vec2(self, h, name, x, y):
+        return None
+
+    def shader_set_vec3(self, h, name, x, y, z):
+        return None
+
+    def set_postfx(self, h):
+        return None
+
     def set_fullscreen(self, fullscreen: bool):
         """Toggle Fullscreen zur Laufzeit - der logische Buffer bleibt gleich,
         nur das Display-Surface wird neu erzeugt."""

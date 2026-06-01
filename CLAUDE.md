@@ -164,6 +164,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; pygame-Draw bleibt pro Shape). `color` = INT oder ARRAY. | — |
 | Bulk-Tilemap | `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`) — siehe `tiled`-Modul. `DRAWTILEMAP` rendert intern via `blits()`-Batch (1 Call statt rows×cols). | — |
 | Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. Beide Pfade (pygame + native raylib). | — |
+| Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Im pygame-Pfad No-Op (Szene ohne Effekt). Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.gb`. | — |
 
 Module mit eigenem Typ registrieren ihn lowercase (`register_type("json_handle", _JSONHandle)`),
 GB-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).

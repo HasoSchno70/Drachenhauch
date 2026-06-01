@@ -3288,6 +3288,43 @@ def _g_setwindowtitle(g, title):
     return None
 
 
+@graphics_builtin("SHADER_LOAD", arity=1, types=("str",))
+def _g_shader_load(g, src):
+    """Laedt einen Fragment-Shader (GLSL): `src` ist ein Datei-Pfad oder direkt
+    GLSL-Quelltext. Liefert ein SHADER-Handle (INTEGER) oder -1. **Nur native
+    Runtime** (raylib/GPU) -- im pygame-Pfad immer -1 (kein Effekt)."""
+    return int(g.load_shader(src))
+
+
+@graphics_builtin("SHADER_SET", arity=3, types=("int", "str", "num"))
+def _g_shader_set(g, h, name, v):
+    """Setzt eine FLOAT-Uniform im Shader (z.B. Zeit)."""
+    g.shader_set_float(h, name, float(v))
+    return None
+
+
+@graphics_builtin("SHADER_SET2", arity=4, types=("int", "str", "num", "num"))
+def _g_shader_set2(g, h, name, x, y):
+    """Setzt eine vec2-Uniform (z.B. resolution)."""
+    g.shader_set_vec2(h, name, float(x), float(y))
+    return None
+
+
+@graphics_builtin("SHADER_SET3", arity=5, types=("int", "str", "num", "num", "num"))
+def _g_shader_set3(g, h, name, x, y, z):
+    """Setzt eine vec3-Uniform."""
+    g.shader_set_vec3(h, name, float(x), float(y), float(z))
+    return None
+
+
+@graphics_builtin("POSTFX", arity=1, types=("int",))
+def _g_postfx(g, h):
+    """Aktiviert einen Post-Processing-Shader fuer das ganze Bild (Handle aus
+    SHADER_LOAD); -1 schaltet ihn ab. **Nur native Runtime.**"""
+    g.set_postfx(h)
+    return None
+
+
 @graphics_builtin("CLS", arity=(0, 1))
 def _g_cls(g, *args):
     color = _check_int(args[0], "CLS") if args else 0
