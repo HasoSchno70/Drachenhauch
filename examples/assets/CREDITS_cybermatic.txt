@@ -1,0 +1,12 @@
+Musik-Asset fuer examples/85_cybermatic_demo.gb
+================================================
+
+Datei:   cybermatic_pulse.ogg
+Titel:   "Cybermatic pulse" (LOOP-Version)
+Autor:   Alexandr Zhelanov   (https://soundcloud.com/alexandr-zhelanov)
+Quelle:  https://opengameart.org/content/cybermatic-pulse
+Lizenz:  CC-BY 4.0  (https://creativecommons.org/licenses/by/4.0/)
+
+Verwendung erfordert Namensnennung (Attribution). Die Demo nennt den
+Autor in der Laufschrift; bei Weitergabe bitte diese Credits beibehalten.
+Keine Aenderungen an der Audiodatei vorgenommen (reiner Download).

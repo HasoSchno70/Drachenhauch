@@ -404,3 +404,17 @@ Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
 **Offen (3D):** Mesh-/Modell-Laden (OBJ/GLTF via `LoadModel`), Texturen auf
 Meshes, Beleuchtung/Shader, frei steuerbare Kamera-Modi. Die Primitive decken
 den Einstieg ab; Modelle sind der nächste sinnvolle Schritt.
+
+## Showcase-Demo
+
+[examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in
+einem 1280×720-Frame, was die native Runtime kann: eine orbitierende 3D-Welt
+(Grid, pulsierende Kugel, beat-skalierter Würfel-Ring mit Lichtsäulen), darüber
+ein 2D-Overlay (Glow-Partikel-Salven zum Takt, Bulk-`BOXES`-Spektrum, Titel,
+Laufschrift) und eine geloopte Trance-Spur. Nur nativ:
+`gbrun.py --native examples\85_cybermatic_demo.gb` (oder F6).
+
+Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
+CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
+`py examples/assets/download_cybermatic.py`. Die Demo läuft auch ohne (stumm,
+via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.txt`.

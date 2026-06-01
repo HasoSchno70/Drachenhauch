@@ -24,3 +24,6 @@ gamebasic/vm_native.c
 # OS
 .DS_Store
 Thumbs.db
+
+# Grosses Demo-Musik-Asset (CC-BY, via examples/assets/download_cybermatic.py)
+examples/assets/cybermatic_pulse.ogg

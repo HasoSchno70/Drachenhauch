@@ -1,0 +1,174 @@
+' ============================================================================
+'  85_cybermatic_demo.gb  --  "CYBERMATIC"  (native GameBasic Showcase, HiRes)
+'
+'  Zeigt, was die native Runtime (gbrt) kann: 3D (g3d), GPU-Partikel,
+'  Bulk-2D (BOXES), beat-synchrone Animation und Stream-Musik -- alles in
+'  einem Frame, 1280x720.
+'
+'  AUSFUEHREN (nur nativ!):   gbrun.py --native examples\85_cybermatic_demo.gb
+'                             oder im Editor: F6
+'  ESC beendet.
+'
+'  Musik: "Cybermatic pulse" von Alexandr Zhelanov (opengameart.org),
+'         Lizenz CC-BY 4.0.  Siehe examples/assets/CREDITS_cybermatic.txt
+' ============================================================================
+
+IMPORT "g3d"
+IMPORT "particles"
+
+CONST W AS INTEGER = 1280
+CONST H AS INTEGER = 720
+CONST TWO_PI AS FLOAT = 6.2831853
+CONST NB AS INTEGER = 64            ' Anzahl Spektrum-Balken
+CONST RING AS INTEGER = 16          ' Wuerfel im 3D-Ring
+CONST BPS AS FLOAT = 2.0833         ' Beats/Sekunde (~125 BPM)
+
+SCREEN(W, H, "GameBasic -- CYBERMATIC (native)", 1)
+
+' Musik nur, wenn vorhanden -- sonst laeuft die Demo stumm weiter.
+' Fehlt die Datei: einmal  py examples\assets\download_cybermatic.py  laufen.
+IF FILEEXISTS("assets/cybermatic_pulse.ogg") THEN
+    PLAYMUSIC("assets/cybermatic_pulse.ogg", -1, 0.7)
+END IF
+
+' --- Glow-Funken in der Bildmitte (2D-Overlay, beat-getriggert) -------------
+DIM sparks AS PARTICLE_SYSTEM
+sparks = PARTICLE_SYSTEM_NEW(W / 2, H / 2)
+PARTICLE_SET_VELOCITY(sparks, -340.0, 340.0, -340.0, 340.0)
+PARTICLE_SET_LIFETIME(sparks, 350, 850)
+PARTICLE_SET_GRAVITY(sparks, 0.0, 90.0)
+PARTICLE_SET_SIZE(sparks, 2, 6)
+PARTICLE_SET_MODE(sparks, "glow")
+PARTICLE_SET_FADE(sparks, TRUE)
+
+' --- Spektrum-Balken (Bulk via BOXES) ---------------------------------------
+DIM bx1[NB] AS INTEGER
+DIM by1[NB] AS INTEGER
+DIM bx2[NB] AS INTEGER
+DIM by2[NB] AS INTEGER
+DIM bcol[NB] AS INTEGER
+
+' Farbe aus Phase + Helligkeit -> RGB.
+FUNCTION hue(p AS FLOAT, bright AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * bright * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * bright * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * bright * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION
+
+DIM t0 AS INTEGER
+t0 = MILLIS()
+DIM last_beat AS INTEGER
+last_beat = -1
+
+DIM scroll_msg AS STRING
+scroll_msg = "GAMEBASIC NATIVE RUNTIME  ***  3D + PARTIKEL + BULK-2D + STREAM-AUDIO, ALLES NATIV VIA RAYLIB  ***  MUSIK: CYBERMATIC PULSE VON ALEXANDR ZHELANOV (CC-BY 4.0)  ***  ESC = ENDE  ***   "
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    DIM t AS FLOAT
+    t = (MILLIS() - t0) / 1000.0
+
+    ' Beat-Puls: 0..1, Spitze am Taktschlag.
+    DIM beatf AS FLOAT
+    beatf = t * BPS
+    DIM pulse AS FLOAT
+    pulse = 0.5 + 0.5 * SIN(beatf * TWO_PI)
+    DIM beat AS INTEGER
+    beat = INT(beatf)
+    IF beat <> last_beat THEN
+        ' Neuer Taktschlag: Funken-Salve in wechselnder Farbe.
+        PARTICLE_SET_COLOR(sparks, hue(beat * 0.7, 1.0))
+        PARTICLE_SET_COLOR_END(sparks, hue(beat * 0.7 + 2.0, 1.0))
+        PARTICLE_EMIT(sparks, 90)
+        last_beat = beat
+    END IF
+
+    CLS(&H05070E)
+
+    ' ---------------- 3D-Welt (Hintergrund) ----------------
+    DIM camx AS FLOAT
+    DIM camz AS FLOAT
+    camx = COS(t * 0.35) * 17.0
+    camz = SIN(t * 0.35) * 17.0
+    CAMERA3D(camx, 8.0 + SIN(t * 0.6) * 3.0, camz, 0.0, 1.5, 0.0, 55.0)
+
+    GRID3D(48, 1.0)
+
+    ' Pulsierende Zentralkugel.
+    DIM sr AS FLOAT
+    sr = 2.0 + pulse * 1.2
+    SPHERE(0.0, 1.5, 0.0, sr, hue(t * 0.8, 1.0))
+    SPHERE_WIRES(0.0, 1.5, 0.0, sr + 0.15, &H0A1830)
+
+    ' Ring aus bobbenden, beat-skalierten Wuerfeln.
+    DIM i AS INTEGER
+    FOR i = 0 TO RING - 1
+        DIM ang AS FLOAT
+        ang = (i / RING) * TWO_PI + t * 0.6
+        DIM rx AS FLOAT
+        DIM rz AS FLOAT
+        rx = COS(ang) * 7.0
+        rz = SIN(ang) * 7.0
+        DIM by AS FLOAT
+        by = 1.0 + SIN(t * 2.5 + i * 0.55) * 1.8
+        DIM cs AS FLOAT
+        cs = 0.9 + pulse * 0.7
+        DIM cc AS INTEGER
+        cc = hue(i * 0.4 + t, 1.0)
+        CUBE(rx, by, rz, cs, cs, cs, cc)
+        CUBE_WIRES(rx, by, rz, cs, cs, cs, &H0A1830)
+        ' Lichtsaeule vom Boden hoch (jeder 2. Wuerfel).
+        IF i MOD 2 = 0 THEN LINE3D(rx, 0.0, rz, rx, by + 2.5, rz, cc)
+    NEXT
+
+    ' ---------------- 2D-Overlay (ueber dem 3D) ----------------
+    ' Spektrum-Balken am unteren Rand -- pseudo-audioreaktiv (Sinus + Beat).
+    DIM bw AS INTEGER
+    bw = W / NB
+    FOR i = 0 TO NB - 1
+        DIM amp AS FLOAT
+        amp = 0.30 + 0.70 * (0.5 + 0.5 * SIN(t * 4.0 + i * 0.4)) * (0.4 + 0.6 * pulse)
+        DIM bh AS INTEGER
+        bh = INT(amp * 200.0)
+        bx1[i] = i * bw + 2
+        bx2[i] = i * bw + bw - 2
+        by2[i] = H - 70
+        by1[i] = H - 70 - bh
+        bcol[i] = hue(i * 0.18 + t * 1.5, 0.55 + 0.45 * pulse)
+    NEXT
+    BOXES(bx1, by1, bx2, by2, bcol)
+
+    ' Glow-Funken updaten + zeichnen.
+    PARTICLE_UPDATE(sparks, 16)
+    PARTICLE_DRAW(sparks)
+
+    ' Titel (gross, pulsierend).
+    TEXT_SIZE(56)
+    DIM tcol AS INTEGER
+    tcol = hue(t * 1.2, 0.6 + 0.4 * pulse)
+    TEXT(W / 2 - 200, 28, "C Y B E R M A T I C", tcol)
+    TEXT_SIZE(20)
+    TEXT(W / 2 - 150, 92, "native GameBasic demo", &H6FA8C8)
+
+    ' Laufschrift unten (Credits).
+    DIM mw AS INTEGER
+    mw = TEXT_WIDTH(scroll_msg)
+    DIM period AS INTEGER
+    period = mw + W
+    DIM sx AS INTEGER
+    sx = W - (INT(t * 160.0) MOD period)
+    TEXT(sx, H - 34, scroll_msg, &H30C0E0)
+
+    ' HUD.
+    TEXT(14, H - 60, f"t={t:.1f}s  beat={beat}", &H507088)
+
+    FLIP()
+    SLEEP(8)
+WEND
+
+STOPMUSIC()
