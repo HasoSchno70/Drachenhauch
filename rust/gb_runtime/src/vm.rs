@@ -1634,6 +1634,9 @@ impl<'p> Vm<'p> {
             "text_size" => { g!().set_text_size(gi(a,0,"TEXT_SIZE")? as i32); Value::Nil }
             "text_width" => Value::Int(g!().text_width(gs(a,0,"TEXT_WIDTH")?) as i64),
             "text_height" => Value::Int(g!().text_height() as i64),
+            "loadfont" => Value::Int(g!().load_font(gs(a,0,"LOADFONT")?, gi(a,1,"LOADFONT")? as i32)?),
+            "setfont" => { g!().set_font(gi(a,0,"SETFONT")?)?; Value::Nil }
+            "text_spacing" => { g!().set_text_spacing(gi(a,0,"TEXT_SPACING")? as i32); Value::Nil }
             "loadimage" => Value::Int(g!().load_texture(gs(a,0,"LOADIMAGE")?)?),
             "drawimage" => {
                 let idx = gi(a, 0, "DRAWIMAGE")?;
@@ -1740,6 +1743,39 @@ impl<'p> Vm<'p> {
             }
             "grid3d" => {
                 g!().grid3d(gi(a,0,"GRID3D")? as i32, need_f(a,1,"GRID3D")? as f32);
+                Value::Nil
+            }
+            "loadmodel" => Value::Int(g!().load_model(gs(a,0,"LOADMODEL")?)?),
+            "mesh_cube" => Value::Int(g!().mesh_cube(
+                need_f(a,0,"MESH_CUBE")? as f32, need_f(a,1,"MESH_CUBE")? as f32, need_f(a,2,"MESH_CUBE")? as f32)?),
+            "mesh_sphere" => Value::Int(g!().mesh_sphere(
+                need_f(a,0,"MESH_SPHERE")? as f32, gi(a,1,"MESH_SPHERE")? as i32, gi(a,2,"MESH_SPHERE")? as i32)?),
+            "mesh_cylinder" => Value::Int(g!().mesh_cylinder(
+                need_f(a,0,"MESH_CYLINDER")? as f32, need_f(a,1,"MESH_CYLINDER")? as f32, gi(a,2,"MESH_CYLINDER")? as i32)?),
+            "mesh_torus" => Value::Int(g!().mesh_torus(
+                need_f(a,0,"MESH_TORUS")? as f32, need_f(a,1,"MESH_TORUS")? as f32, gi(a,2,"MESH_TORUS")? as i32, gi(a,3,"MESH_TORUS")? as i32)?),
+            "mesh_knot" => Value::Int(g!().mesh_knot(
+                need_f(a,0,"MESH_KNOT")? as f32, need_f(a,1,"MESH_KNOT")? as f32, gi(a,2,"MESH_KNOT")? as i32, gi(a,3,"MESH_KNOT")? as i32)?),
+            "mesh_plane" => Value::Int(g!().mesh_plane(
+                need_f(a,0,"MESH_PLANE")? as f32, need_f(a,1,"MESH_PLANE")? as f32, gi(a,2,"MESH_PLANE")? as i32, gi(a,3,"MESH_PLANE")? as i32)?),
+            "model" => {
+                g!().draw_model(gi(a,0,"MODEL")?, need_f(a,1,"MODEL")? as f32, need_f(a,2,"MODEL")? as f32,
+                                need_f(a,3,"MODEL")? as f32, need_f(a,4,"MODEL")? as f32, gi(a,5,"MODEL")?)?;
+                Value::Nil
+            }
+            "model_ex" => {
+                g!().draw_model_ex(gi(a,0,"MODEL_EX")?, need_f(a,1,"MODEL_EX")? as f32, need_f(a,2,"MODEL_EX")? as f32, need_f(a,3,"MODEL_EX")? as f32,
+                                   need_f(a,4,"MODEL_EX")? as f32, need_f(a,5,"MODEL_EX")? as f32, need_f(a,6,"MODEL_EX")? as f32,
+                                   need_f(a,7,"MODEL_EX")? as f32, need_f(a,8,"MODEL_EX")? as f32, gi(a,9,"MODEL_EX")?)?;
+                Value::Nil
+            }
+            "model_wires" => {
+                g!().draw_model_wires(gi(a,0,"MODEL_WIRES")?, need_f(a,1,"MODEL_WIRES")? as f32, need_f(a,2,"MODEL_WIRES")? as f32,
+                                      need_f(a,3,"MODEL_WIRES")? as f32, need_f(a,4,"MODEL_WIRES")? as f32, gi(a,5,"MODEL_WIRES")?)?;
+                Value::Nil
+            }
+            "model_texture" => {
+                g!().model_set_texture(gi(a,0,"MODEL_TEXTURE")?, gi(a,1,"MODEL_TEXTURE")?)?;
                 Value::Nil
             }
 

@@ -3570,6 +3570,23 @@ def _g_text_height(g):
     return g.text_height()
 
 
+@graphics_builtin("LOADFONT", arity=2, types=("str", "intish"))
+def _g_load_font(g, path, size):
+    return g.load_font(path, size)
+
+
+@graphics_builtin("SETFONT", arity=1, types=("int",))
+def _g_set_font(g, handle):
+    g.set_font(handle)
+    return None
+
+
+@graphics_builtin("TEXT_SPACING", arity=1, types=("intish",))
+def _g_text_spacing(g, px):
+    g.text_spacing(px)
+    return None
+
+
 @graphics_builtin("SCROLL", arity=2, types=("intish", "intish"))
 def _g_scroll(g, dx, dy):
     g.scroll(dx, dy)

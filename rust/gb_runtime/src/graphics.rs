@@ -27,7 +27,8 @@ enum Cmd {
     Ellipse(i32, i32, i32, i32, Color, bool), // cx, cy, rh, rv, color, filled
     Poly(Vec<(i32, i32)>, Color, bool),       // points, color, closed
     FillPoly(Vec<(i32, i32)>, Color),
-    Text(i32, i32, String, i32, Color),
+    // x, y, text, size, color, font_idx (-1 = Default), spacing
+    Text(i32, i32, String, i32, Color, i64, f32),
     Texture(usize, i32, i32),
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
@@ -54,6 +55,11 @@ enum Cmd3D {
     Line(f32, f32, f32, f32, f32, f32, Color),       // x1,y1,z1, x2,y2,z2
     Point(f32, f32, f32, Color),
     Grid(i32, f32),                                  // slices, spacing
+    // Geladene/prozedurale Modelle (Index in Graphics.models).
+    Model(usize, f32, f32, f32, f32, Color),         // idx, x,y,z, scale, tint
+    // idx, x,y,z, achse_x,achse_y,achse_z, winkel, scale, tint
+    ModelEx(usize, f32, f32, f32, f32, f32, f32, f32, f32, Color),
+    ModelWires(usize, f32, f32, f32, f32, Color),    // idx, x,y,z, scale, tint
 }
 
 struct Layer {
@@ -92,7 +98,14 @@ pub struct Graphics {
     // FLIP geleert; cam3d wird von CAMERA3D gesetzt (sonst Default-Blick).
     cmds3d: Vec<Cmd3D>,
     cam3d: Camera3D,
+    // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
+    models: Vec<Model>,
     text_size: i32,
+    // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
+    // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
+    fonts: Vec<Font>,
+    active_font: i64,
+    text_spacing: f32,
     textures: Vec<Tex>,
     image_cache: HashMap<String, i64>,
     atlases: Vec<Atlas>,
@@ -136,6 +149,7 @@ impl Graphics {
             clear_color: Color::BLACK,
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
             cmds3d: Vec::new(),
+            models: Vec::new(),
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
                 Vector3::new(6.0, 5.0, 6.0),
@@ -143,6 +157,9 @@ impl Graphics {
                 Vector3::new(0.0, 1.0, 0.0),
                 45.0),
             text_size: 20,
+            fonts: Vec::new(),
+            active_font: -1,
+            text_spacing: 0.0,
             textures: Vec::new(),
             image_cache: HashMap::new(),
             atlases: Vec::new(),
@@ -210,6 +227,88 @@ impl Graphics {
     }
     pub fn grid3d(&mut self, slices: i32, spacing: f32) {
         self.emit3d(Cmd3D::Grid(slices.max(0), spacing));
+    }
+
+    // --- 3D-Modelle ---
+    /// Laedt ein Modell von Datei (OBJ/GLTF/...) -> MODEL-Handle (Index).
+    pub fn load_model(&mut self, path: &str) -> Result<i64, String> {
+        let m = self.rl.load_model(&self.thread, path)
+            .map_err(|e| format!("LOADMODEL: '{}' nicht ladbar: {}", path, e))?;
+        self.models.push(m);
+        Ok((self.models.len() - 1) as i64)
+    }
+    /// Baut aus einem generierten Mesh ein Modell und gibt das Handle zurueck.
+    fn push_model_from_mesh(&mut self, mesh: Mesh, fn_: &str) -> Result<i64, String> {
+        // load_model_from_mesh uebernimmt das Mesh (WeakMesh = kein Drop).
+        let weak = unsafe { mesh.make_weak() };
+        let m = self.rl.load_model_from_mesh(&self.thread, weak)
+            .map_err(|e| format!("{}: Mesh-Modell fehlgeschlagen: {}", fn_, e))?;
+        self.models.push(m);
+        Ok((self.models.len() - 1) as i64)
+    }
+    pub fn mesh_cube(&mut self, w: f32, h: f32, d: f32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_cube(&self.thread, w, h, d);
+        self.push_model_from_mesh(mesh, "MESH_CUBE")
+    }
+    pub fn mesh_sphere(&mut self, r: f32, rings: i32, slices: i32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_sphere(&self.thread, r, rings.max(3), slices.max(3));
+        self.push_model_from_mesh(mesh, "MESH_SPHERE")
+    }
+    pub fn mesh_cylinder(&mut self, r: f32, h: f32, slices: i32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_cylinder(&self.thread, r, h, slices.max(3));
+        self.push_model_from_mesh(mesh, "MESH_CYLINDER")
+    }
+    pub fn mesh_torus(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_torus(&self.thread, r, size, rad_seg.max(3), sides.max(3));
+        self.push_model_from_mesh(mesh, "MESH_TORUS")
+    }
+    pub fn mesh_knot(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_knot(&self.thread, r, size, rad_seg.max(3), sides.max(3));
+        self.push_model_from_mesh(mesh, "MESH_KNOT")
+    }
+    pub fn mesh_plane(&mut self, w: f32, l: f32, res_x: i32, res_z: i32) -> Result<i64, String> {
+        let mesh = Mesh::gen_mesh_plane(&self.thread, w, l, res_x.max(1), res_z.max(1));
+        self.push_model_from_mesh(mesh, "MESH_PLANE")
+    }
+    fn check_model(&self, idx: i64, fn_: &str) -> Result<usize, String> {
+        let i = idx as usize;
+        if idx < 0 || i >= self.models.len() {
+            return Err(format!("{}: ungueltiges MODEL-Handle {}", fn_, idx));
+        }
+        Ok(i)
+    }
+    pub fn draw_model(&mut self, idx: i64, x: f32, y: f32, z: f32, scale: f32, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL")?;
+        self.emit3d(Cmd3D::Model(i, x, y, z, scale, col(col_)));
+        Ok(())
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_model_ex(&mut self, idx: i64, x: f32, y: f32, z: f32,
+                         ax: f32, ay: f32, az: f32, angle: f32, scale: f32, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_EX")?;
+        self.emit3d(Cmd3D::ModelEx(i, x, y, z, ax, ay, az, angle, scale, col(col_)));
+        Ok(())
+    }
+    pub fn draw_model_wires(&mut self, idx: i64, x: f32, y: f32, z: f32, scale: f32, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_WIRES")?;
+        self.emit3d(Cmd3D::ModelWires(i, x, y, z, scale, col(col_)));
+        Ok(())
+    }
+    /// Legt eine via LOADIMAGE geladene Textur als Diffuse-/Albedo-Map an.
+    pub fn model_set_texture(&mut self, model_idx: i64, tex_idx: i64) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_TEXTURE")?;
+        let ti = tex_idx as usize;
+        if tex_idx < 0 || ti >= self.textures.len() {
+            return Err(format!("MODEL_TEXTURE: ungueltiges IMAGE-Handle {}", tex_idx));
+        }
+        let mats = self.models[mi].materials_mut();
+        if mats.is_empty() {
+            return Err("MODEL_TEXTURE: Modell hat kein Material".into());
+        }
+        mats[0].set_material_texture(
+            raylib::consts::MaterialMapIndex::MATERIAL_MAP_ALBEDO,
+            &self.textures[ti].tex);
+        Ok(())
     }
 
     pub fn cls(&mut self, color: i64) {
@@ -300,10 +399,35 @@ impl Graphics {
         // Position via w2s (inkl. Zoom), aber Font-Groesse bleibt -- wie Python.
         let (x, y) = self.w2s(x, y);
         let sz = self.text_size;
-        self.emit(Cmd::Text(x, y, s, sz, col(c)));
+        let font = self.active_font;
+        let spacing = self.text_spacing;
+        self.emit(Cmd::Text(x, y, s, sz, col(c), font, spacing));
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
+
+    /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
+    pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
+        let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
+            .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
+        self.fonts.push(f);
+        Ok((self.fonts.len() - 1) as i64)
+    }
+    /// Aktiven Font setzen (-1 = Default). Ungueltige Handles -> Fehler.
+    pub fn set_font(&mut self, h: i64) -> Result<(), String> {
+        if h < -1 || h >= self.fonts.len() as i64 {
+            return Err(format!("SETFONT: ungueltiges FONT-Handle {}", h));
+        }
+        self.active_font = h;
+        Ok(())
+    }
+    pub fn set_text_spacing(&mut self, px: i32) { self.text_spacing = px as f32; }
+
     pub fn text_width(&self, s: &str) -> i32 {
+        if self.active_font >= 0 {
+            if let Some(f) = self.fonts.get(self.active_font as usize) {
+                return f.measure_text(s, self.text_size as f32, self.text_spacing).x as i32;
+            }
+        }
         let c = std::ffi::CString::new(s).unwrap_or_default();
         unsafe { raylib::ffi::MeasureText(c.as_ptr(), self.text_size) }
     }
@@ -567,7 +691,7 @@ impl Graphics {
         order.sort_by_key(|&i| self.layers[i].z);
         // RT-Groesse = Fenstergroesse (bekannt, ohne mehrdeutigen Textur-Query).
         let (tw, th) = ((self.width * self.scale) as f32, (self.height * self.scale) as f32);
-        let Graphics { rl, thread, layers, textures, cmds3d, cam3d, scene_rt, shaders, post_shader_idx, .. } = self;
+        let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models, scene_rt, shaders, post_shader_idx, .. } = self;
         let cam = *cam3d;
         // Post-FX aktiv? -> (Shader-Index, Render-Target). Sonst direkt zeichnen.
         let postfx = match *post_shader_idx {
@@ -578,7 +702,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, cmds3d, cam);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -591,7 +715,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, cmds3d, cam);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -612,8 +736,8 @@ impl Graphics {
 /// `RaylibDraw`). So laeuft derselbe Replay-Code mit und ohne Post-Shader.
 fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Color,
-    layers: &[Layer], order: &[usize], textures: &[Tex],
-    cmds3d: &[Cmd3D], cam3d: Camera3D,
+    layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
+    cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
 ) {
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
     d.clear_background(clear);
@@ -640,6 +764,23 @@ fn render_scene<D: RaylibDraw>(
                             d3.draw_point3D(Vector3::new(*x, *y, *z), *col),
                         Cmd3D::Grid(slices, spacing) =>
                             d3.draw_grid(*slices, *spacing),
+                        Cmd3D::Model(i, x, y, z, sc, col) => {
+                            if let Some(m) = models.get(*i) {
+                                d3.draw_model(m, Vector3::new(*x, *y, *z), *sc, *col);
+                            }
+                        }
+                        Cmd3D::ModelEx(i, x, y, z, ax, ay, az, ang, sc, col) => {
+                            if let Some(m) = models.get(*i) {
+                                d3.draw_model_ex(m, Vector3::new(*x, *y, *z),
+                                    Vector3::new(*ax, *ay, *az), *ang,
+                                    Vector3::new(*sc, *sc, *sc), *col);
+                            }
+                        }
+                        Cmd3D::ModelWires(i, x, y, z, sc, col) => {
+                            if let Some(m) = models.get(*i) {
+                                d3.draw_model_wires(m, Vector3::new(*x, *y, *z), *sc, *col);
+                            }
+                        }
                     }
                 }
             }
@@ -702,7 +843,14 @@ fn render_scene<D: RaylibDraw>(
                             d.draw_triangle_fan(&v, *col);
                         }
                     }
-                    Cmd::Text(x, y, txt, sz, col) => d.draw_text(txt, x * s, y * s, sz * s, *col),
+                    Cmd::Text(x, y, txt, sz, col, font, spacing) => {
+                        match fonts.get(*font as usize) {
+                            Some(f) if *font >= 0 => d.draw_text_ex(
+                                f, txt, Vector2::new((x * s) as f32, (y * s) as f32),
+                                (sz * s) as f32, spacing * s as f32, *col),
+                            _ => d.draw_text(txt, x * s, y * s, sz * s, *col),
+                        }
+                    }
                     Cmd::Texture(i, x, y) => {
                         if s == 1 { d.draw_texture(&textures[*i].tex, *x, *y, Color::WHITE); }
                         else { d.draw_texture_ex(&textures[*i].tex, Vector2::new((x * s) as f32, (y * s) as f32), 0.0, s as f32, Color::WHITE); }

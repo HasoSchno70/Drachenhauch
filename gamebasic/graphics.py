@@ -125,6 +125,12 @@ class Graphics:
         self._font_bold = False
         self._font_italic = False
         self._font_cache: dict = {}
+        # TTF-Fonts (LOADFONT): Liste von (pfad, basis_groesse). Handle = Index.
+        # _active_font = -1 -> Default-SysFont; sonst TTF aus _fonts[idx].
+        # _text_spacing wirkt nur native (raylib DrawTextEx); pygame ignoriert es.
+        self._fonts: list = []
+        self._active_font = -1
+        self._text_spacing = 0
         # Asset-Caches: key (abs-Path ODER Alias) -> Surface bzw. Sound.
         # LOADIMAGE / LOADSOUND pruefen diese vor dem File-IO. LOAD_ASSETS
         # nutzt sie zum Pre-Warmen. Aliase werden beim Manifest-Load
@@ -861,7 +867,22 @@ class Graphics:
         return pts
 
     def _get_font(self):
-        """Liefert das aktuell konfigurierte Font-Objekt (gecachet)."""
+        """Liefert das aktuell konfigurierte Font-Objekt (gecachet).
+
+        Ist ein TTF via LOADFONT/SETFONT aktiv, wird ein
+        ``pygame.font.Font(pfad, _font_size)`` gebaut (pro Groesse gecachet),
+        sonst der Default-SysFont. TEXT_SIZE skaliert in beiden Faellen."""
+        if self._active_font >= 0:
+            path, _base = self._fonts[self._active_font]
+            key = ("ttf", self._active_font, self._font_size,
+                   self._font_bold, self._font_italic)
+            f = self._font_cache.get(key)
+            if f is None:
+                f = self._pygame.font.Font(path, self._font_size)
+                f.set_bold(self._font_bold)
+                f.set_italic(self._font_italic)
+                self._font_cache[key] = f
+            return f
         key = (self._font_size, self._font_bold, self._font_italic)
         f = self._font_cache.get(key)
         if f is None:
@@ -871,6 +892,32 @@ class Graphics:
             )
             self._font_cache[key] = f
         return f
+
+    def load_font(self, path: str, size: int) -> int:
+        """Laedt einen TTF/OTF-Font und liefert ein FONT-Handle (INTEGER).
+        ``size`` ist die Basis-Groesse; TEXT_SIZE skaliert beim Zeichnen."""
+        self._require_screen()
+        if size < 4 or size > 400:
+            raise GBRuntimeError("LOADFONT: Groesse muss zwischen 4 und 400 liegen")
+        try:
+            # Frueh validieren, damit ein fehlender Pfad sofort meldet.
+            self._pygame.font.Font(path, int(size))
+        except Exception as e:
+            raise GBRuntimeError(f"LOADFONT: Font '{path}' nicht ladbar: {e}")
+        self._fonts.append((path, int(size)))
+        return len(self._fonts) - 1
+
+    def set_font(self, handle: int):
+        """Aktiviert einen via LOADFONT geladenen Font. -1 = Default-Font."""
+        self._require_screen()
+        if handle < -1 or handle >= len(self._fonts):
+            raise GBRuntimeError(f"SETFONT: ungueltiges FONT-Handle {handle}")
+        self._active_font = int(handle)
+
+    def text_spacing(self, px: int):
+        """Buchstabenabstand fuer TTF-Text (wirkt nur in der nativen Runtime)."""
+        self._require_screen()
+        self._text_spacing = int(px)
 
     def text(self, x, y, s: str, color: int = 0xFFFFFF):
         """Text wird nur translatiert, nicht skaliert (sonst verschwommen).

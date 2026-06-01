@@ -29,14 +29,15 @@ unten).
 Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT`),
 **Game-Loop** (`DELTA`/`FPS`/`SETFPS`/`SET_FULLSCREEN`/`SETWINDOWTITLE`/
 `SAVESCREENSHOT`), **Shader/Post-Processing** (`SHADER_LOAD`/`SET`/`SET2`/`SET3`/
-`POSTFX`, CRT/Bloom/Vignette). Die native Runtime deckt damit ein komplettes
+`POSTFX`, CRT/Bloom/Vignette), **TTF-Fonts** (`LOADFONT`/`SETFONT`/
+`TEXT_SPACING`). Die native Runtime deckt damit ein komplettes
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D vertiefen:** Modelle laden (OBJ/GLTF via `LoadModel`) + `DrawModel`,
-  `GenMesh*`-Primitive (Torus/Knot/Heightmap), 3D-Kameramodi (`UpdateCamera`
-  orbit/first-person), Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`).
-- **TTF-Fonts:** `LoadFontEx` + `DrawTextEx` (Schrift in beliebiger Größe/Spacing).
+- **3D weiter vertiefen:** Heightmap-Meshes, 3D-Kameramodi (`UpdateCamera`
+  orbit/first-person), Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`),
+  Beleuchtung/Material-Shader. (Modell-Laden + GenMesh-Primitive sind nun da —
+  siehe unten.)
 - **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
   (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
 - **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
@@ -444,9 +445,40 @@ Default-Blick (schräg von vorn-oben auf den Ursprung).
 Demo: [examples/82_3d_intro.gb](../examples/82_3d_intro.gb) (Würfel, Kugel,
 Zylinder, Kegel, Linien, Gitter + 2D-HUD), per Screenshot verifiziert.
 
-**Offen (3D):** Mesh-/Modell-Laden (OBJ/GLTF via `LoadModel`), Texturen auf
-Meshes, Beleuchtung/Shader, frei steuerbare Kamera-Modi. Die Primitive decken
-den Einstieg ab; Modelle sind der nächste sinnvolle Schritt.
+### 3D-Modelle (geladen + prozedural)
+
+Über die Immediate-Mode-Primitive hinaus gibt es **wiederverwendbare
+Modell-Handles** (INTEGER), die einmal erzeugt und über beliebig viele Frames
+gezeichnet werden — anders als `CUBE`/`SPHERE`, die jeden Frame neu aufgebaut
+werden.
+
+- `LOADMODEL(pfad$) -> MODEL` — lädt OBJ/GLTF/IQM/… via raylib `LoadModel`.
+- **Prozedurale Meshes** (kein Asset nötig) via `GenMesh*` →
+  `LoadModelFromMesh`: `MESH_CUBE(w,h,d)`, `MESH_SPHERE(r, ringe, segmente)`,
+  `MESH_CYLINDER(r, h, segmente)`, `MESH_TORUS(r, dicke, rad_seg, seiten)`,
+  `MESH_KNOT(r, dicke, rad_seg, seiten)`, `MESH_PLANE(w, l, res_x, res_z)`.
+  Torus/Knot sind neue Formen ggü. den Immediate-Primitiven.
+- **Zeichnen:** `MODEL(m, x,y,z, scale, farbe)` (`DrawModel`),
+  `MODEL_EX(m, x,y,z, achse_x,achse_y,achse_z, winkel_grad, scale, farbe)`
+  (`DrawModelEx` — Rotation um eine Achse), `MODEL_WIRES(m, x,y,z, scale, farbe)`.
+- `MODEL_TEXTURE(m, bild)` — ein via `LOADIMAGE` geladenes Bild als
+  Diffuse-/Albedo-Map (`MATERIAL_MAP_ALBEDO`) auf das Modell legen.
+
+**Umsetzung** ([graphics.rs](../rust/gb_runtime/src/graphics.rs)): `models:
+Vec<Model>` lebt über die ganze Laufzeit (Handles bleiben gültig). Die Draw-
+Builtins emittieren `Cmd3D::Model`/`ModelEx`/`ModelWires` mit dem Model-**Index**
+(nicht dem Model selbst → `Cmd3D` bleibt `Clone`); der 3D-Pass in `render_scene`
+(jetzt mit `models: &[Model]`-Parameter) zeichnet sie via `draw_model[_ex|_wires]`.
+GenMesh-Meshes werden mit `make_weak()` an `load_model_from_mesh` übergeben (kein
+Doppel-Drop). Handle-Validierung in den Wrappern (`check_model`).
+
+Demo [examples/88_3d_models.gb](../examples/88_3d_models.gb): rotierender Torus,
+Knoten (Wireframe) und pulsierende Kugel auf einer Ebene, umkreisende Kamera +
+2D-HUD — rein prozedural, **kein Modell-Asset im Repo nötig**. Per Screenshot
+verifiziert (inkl. `MODEL_TEXTURE` mit `assets/coin.png` auf einem Würfel).
+
+**Offen (3D):** Heightmap-Meshes, Beleuchtung/Material-Shader, frei steuerbare
+Kamera-Modi (`UpdateCamera`), Billboards, Ray-Kollision.
 
 ## Shader / Post-Processing (native)
 
@@ -469,6 +501,39 @@ laeuft ohne Effekt statt zu craschen. Beispiel-Shader (GLSL 330):
 [examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
 `vignette.fs`), Demo [examples/86_postfx_shaders.gb](../examples/86_postfx_shaders.gb)
 (zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
+
+## TTF-Fonts (`LOADFONT` / `SETFONT` / `TEXT_SPACING`)
+
+Eigene TrueType-/OpenType-Schriften statt nur des eingebauten Default-Fonts.
+**Core-Builtins, kein `IMPORT` nötig** — in beiden Pfaden registriert:
+
+- `LOADFONT(pfad$, groesse) -> FONT` — lädt eine TTF/OTF in der Basis-Größe
+  `groesse` (Glyph-Auflösung) und liefert ein **FONT-Handle (INTEGER)**.
+- `SETFONT(font)` — aktiviert den Font für nachfolgende `TEXT`-Aufrufe.
+  `SETFONT(-1)` schaltet zurück auf den Default-Font.
+- `TEXT_SPACING(px)` — Buchstabenabstand für TTF-Text (wirkt nativ über
+  `DrawTextEx`; pygame ignoriert es als Näherung).
+
+`TEXT_SIZE` skaliert den aktiven Font weiterhin frei (nativ skaliert raylib die
+einmal geladene Glyph-Textur; pygame baut pro Größe eine `pygame.font.Font`).
+`TEXT_WIDTH` misst in der **aktiven** Schrift (nativ `MeasureTextEx`) — damit
+funktioniert Zentrieren/Rechtsbündig auch mit TTF. `TEXT_BOLD`/`TEXT_ITALIC`
+wirken im pygame-Pfad (Synthese), nativ bleiben sie No-Op (raylib hat keine
+synthetische Variante — dafür eine fette/kursive Font-Datei laden).
+
+**Native Umsetzung** ([graphics.rs](../rust/gb_runtime/src/graphics.rs)): `fonts:
+Vec<Font>` (raylib `load_font_ex`), `active_font` (-1 = Default), `text_spacing`.
+`Cmd::Text` trägt jetzt Font-Index + Spacing; beim Replay zeichnet ein gültiger
+Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. **pygame-Pfad**
+([graphics.py](../gamebasic/graphics.py)): `_get_font()` baut bei aktivem TTF ein
+`pygame.font.Font(pfad, _font_size)` (pro Größe gecachet).
+
+**Bit-Identität gilt nicht** (Renderer/Font-Metriken unterscheiden sich) — wie
+bei der übrigen Grafik nur funktional. Es liegt **kein Font-Asset im Repo**;
+Demo [examples/87_ttf_fonts.gb](../examples/87_ttf_fonts.gb) sucht einen
+System-Font (`FILEEXISTS`) und fällt sonst auf den Default-Font zurück. Per
+Screenshot verifiziert (Größen-Skalierung, Spacing, zentrierter Text via
+`TEXT_WIDTH`).
 
 ## Showcase-Demo
 

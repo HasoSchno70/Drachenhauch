@@ -104,3 +104,77 @@ def _grid3d(g, *args):
     """GRID3D(linien, abstand) -- Boden-Gitter in der XZ-Ebene (zentriert),
     Hilfsraster fuer die Orientierung."""
     _native_only("GRID3D")
+
+
+# --- 3D-Modelle (geladen oder prozedural generiert) -----------------
+# Alle liefern ein MODEL-Handle (INTEGER), das mit MODEL/MODEL_EX/
+# MODEL_WIRES gezeichnet wird. Handles bleiben ueber Frames gueltig
+# (anders als die Immediate-Primitive CUBE/SPHERE) -- einmal laden/erzeugen,
+# beliebig oft zeichnen.
+
+@graphics_builtin("LOADMODEL", arity=1)
+def _load_model(g, *args):
+    """LOADMODEL(pfad$) -> MODEL -- laedt ein 3D-Modell (OBJ/GLTF/IQM/...)."""
+    _native_only("LOADMODEL")
+
+
+@graphics_builtin("MESH_CUBE", arity=3)
+def _mesh_cube(g, *args):
+    """MESH_CUBE(breite, hoehe, tiefe) -> MODEL -- prozeduraler Quader."""
+    _native_only("MESH_CUBE")
+
+
+@graphics_builtin("MESH_SPHERE", arity=3)
+def _mesh_sphere(g, *args):
+    """MESH_SPHERE(radius, ringe, segmente) -> MODEL -- prozedurale Kugel."""
+    _native_only("MESH_SPHERE")
+
+
+@graphics_builtin("MESH_CYLINDER", arity=3)
+def _mesh_cylinder(g, *args):
+    """MESH_CYLINDER(radius, hoehe, segmente) -> MODEL -- prozeduraler Zylinder."""
+    _native_only("MESH_CYLINDER")
+
+
+@graphics_builtin("MESH_TORUS", arity=4)
+def _mesh_torus(g, *args):
+    """MESH_TORUS(radius, dicke, rad_segmente, seiten) -> MODEL -- Torus (Donut)."""
+    _native_only("MESH_TORUS")
+
+
+@graphics_builtin("MESH_KNOT", arity=4)
+def _mesh_knot(g, *args):
+    """MESH_KNOT(radius, dicke, rad_segmente, seiten) -> MODEL -- Kleeblatt-Knoten."""
+    _native_only("MESH_KNOT")
+
+
+@graphics_builtin("MESH_PLANE", arity=4)
+def _mesh_plane(g, *args):
+    """MESH_PLANE(breite, laenge, res_x, res_z) -> MODEL -- unterteilte XZ-Ebene."""
+    _native_only("MESH_PLANE")
+
+
+@graphics_builtin("MODEL", arity=6)
+def _model(g, *args):
+    """MODEL(modell, x, y, z, skalierung, farbe) -- Modell gefuellt zeichnen."""
+    _native_only("MODEL")
+
+
+@graphics_builtin("MODEL_EX", arity=10)
+def _model_ex(g, *args):
+    """MODEL_EX(modell, x, y, z, achse_x, achse_y, achse_z, winkel_grad,
+    skalierung, farbe) -- Modell mit Rotation um eine Achse zeichnen."""
+    _native_only("MODEL_EX")
+
+
+@graphics_builtin("MODEL_WIRES", arity=6)
+def _model_wires(g, *args):
+    """MODEL_WIRES(modell, x, y, z, skalierung, farbe) -- Drahtgitter."""
+    _native_only("MODEL_WIRES")
+
+
+@graphics_builtin("MODEL_TEXTURE", arity=2)
+def _model_texture(g, *args):
+    """MODEL_TEXTURE(modell, bild) -- ein via LOADIMAGE geladenes Bild als
+    Diffuse-/Albedo-Textur auf das Modell legen."""
+    _native_only("MODEL_TEXTURE")

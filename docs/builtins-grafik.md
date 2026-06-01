@@ -92,6 +92,37 @@ SLEEP(2000)
 
 **Hinweis zu BOX/RECT:** beide nehmen `(x1, y1, x2, y2)` als Eckpunkte (inklusive). `BOX(0, 0, 9, 9)` zeichnet 10×10 Pixel.
 
+## Schrift
+
+| Funktion | Wirkung |
+|---|---|
+| `TEXT(x, y, s$[, color])` | Text bei (x, y) in der aktiven Schrift |
+| `TEXT_SIZE(px)` | Schriftgröße für folgende `TEXT`-Aufrufe (4–400) |
+| `TEXT_WIDTH(s$)` | Pixelbreite von `s$` in der aktiven Schrift/Größe |
+| `TEXT_HEIGHT()` | Zeilenhöhe der aktiven Schrift |
+| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | Fett/Kursiv (pygame-Pfad; nativ No-Op) |
+| `LOADFONT(pfad$, groesse)` → FONT | TTF/OTF laden → FONT-Handle (INTEGER) |
+| `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
+| `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ; pygame ignoriert es) |
+
+`LOADFONT` lädt eine eigene TrueType-/OpenType-Schrift; `TEXT_SIZE` skaliert sie
+anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
+sich zentrieren/rechtsbündig setzen. Echte Glyphen rendert die native Runtime
+(raylib `LoadFontEx`/`DrawTextEx`); im pygame-Pfad über `pygame.font.Font`.
+
+```basic
+DIM titlefont AS INTEGER
+titlefont = LOADFONT("assets/PressStart2P.ttf", 32)
+SETFONT(titlefont)
+TEXT_SIZE(32)
+DIM w AS INTEGER
+w = TEXT_WIDTH("GAME OVER")
+TEXT(320 - w \ 2, 100, "GAME OVER", RGB(255, 60, 60))   ' zentriert
+SETFONT(-1)                                             ' zurueck zum Default
+```
+
+Demo: [examples/87_ttf_fonts.gb](../examples/87_ttf_fonts.gb).
+
 ## Bilder
 
 | Funktion | Zweck |
