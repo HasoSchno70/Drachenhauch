@@ -313,7 +313,19 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   *Noch vertagt:* **`UI_TABLE`** (Scrolling, Spaltenbreiten, Zell-Farben, zwei
   Scrollbars mit Drag, klickbare Zeilen — ~300 LOC, eigener Pass).
 
-**Noch offen (Module):** `UI_TABLE`, `gui` (Retained-Mode, 859 LOC).
+**`gui` (Retained-Mode)** — Kern portiert ([gui.rs](../rust/gb_runtime/src/gui.rs)):
+Window + Button/Label/Checkbox/Slider/TextInput/Panel, Drag/Z-Order/Fokus/Close,
+programmierbares Theme (`GUI_THEME_SET/GET/PRESET`, `GUI_METRIC_SET/GET`,
+`GUI_SET_COLOR`), Polling (`GUI_CLICKED/CHECKED/VALUE/TEXT`, Setter). Handles =
+INTEGER (Window = Index, Widget = `(win<<20)|idx`); Z-Order über separate
+`z_order`-Liste, damit Handles stabil bleiben. Render per Screenshot verifiziert
+(`examples/45_gui.gb`); Interaktion ist ein 1:1-Port der (getesteten) Python-
+Logik — headless nicht klickbar testbar. *Noch offen:* `GUI_TABLE` (eigener
+Pass, klare Fehlermeldung wenn aufgerufen) und das **Feuern** von FUNCREF-
+Callbacks (`GUI_ON_CLICK/CHANGE` werden akzeptiert/gespeichert, aber nicht
+aufgerufen — Polling deckt den Fall ab).
+
+**Noch offen (Module):** `UI_TABLE` (Immediate-Mode) + `GUI_TABLE` (Retained).
 Hardware/Netzwerk + `regex` bleiben außen vor.
 
 **ENUM / STATIC CONST:** `_EnumNamespace`/`_ClassStaticNamespace` werden als

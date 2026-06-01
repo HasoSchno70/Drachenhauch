@@ -17,6 +17,8 @@ mod builtins;
 mod ecs;
 #[cfg(feature = "graphics")]
 mod graphics;
+#[cfg(feature = "graphics")]
+mod gui;
 mod model;
 mod value;
 mod vm;

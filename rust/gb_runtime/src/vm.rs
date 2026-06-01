@@ -157,6 +157,9 @@ pub struct Vm<'p> {
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
     #[cfg(feature = "graphics")]
     audio: Option<crate::audio::Audio>,
+    // Retained-Mode-GUI (Modul gui): persistente Fenster/Widgets.
+    #[cfg(feature = "graphics")]
+    gui: crate::gui::Gui,
 }
 
 type R<T> = Result<T, String>;
@@ -195,6 +198,8 @@ impl<'p> Vm<'p> {
             gfx: None,
             #[cfg(feature = "graphics")]
             audio: None,
+            #[cfg(feature = "graphics")]
+            gui: crate::gui::Gui::new(),
         };
         vm.register_default_globals();
         vm
@@ -672,6 +677,8 @@ impl<'p> Vm<'p> {
                     // Reihenfolge: scene (VM-State) -> Grafik (gfx-State) -> pure.
                     if let Some(v) = self.try_scene(name, &bargs)? {
                         stack.push(v);
+                    } else if let Some(v) = self.try_gui(name, &bargs)? {
+                        stack.push(v);
                     } else if let Some(v) = self.try_graphics(name, &bargs)? {
                         stack.push(v);
                     } else {
@@ -1031,6 +1038,111 @@ impl<'p> Vm<'p> {
     #[cfg(not(feature = "graphics"))]
     fn try_graphics(&mut self, _name: &str, _args: &[Value]) -> R<Option<Value>> {
         Ok(None)
+    }
+
+    #[cfg(not(feature = "graphics"))]
+    fn try_gui(&mut self, _name: &str, _a: &[Value]) -> R<Option<Value>> { Ok(None) }
+
+    /// Retained-Mode-GUI (Modul `gui`). Liefert Ok(None) wenn `name` kein
+    /// gui-Builtin ist. GUI_UPDATE/GUI_DRAW brauchen die Grafik (self.gfx),
+    /// alles andere nur den GUI-State (self.gui).
+    #[cfg(feature = "graphics")]
+    fn try_gui(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n),
+                _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+        }
+        fn gs(a: &[Value], i: usize, f: &str) -> R<String> {
+            match a.get(i) { Some(Value::Str(s)) => Ok(s.to_string()),
+                _ => Err(format!("{}: erwartet STRING (Arg {})", f, i + 1)) }
+        }
+        fn gbool(a: &[Value], i: usize, f: &str) -> R<bool> {
+            match a.get(i) { Some(Value::Bool(b)) => Ok(*b),
+                _ => Err(format!("{}: erwartet BOOLEAN (Arg {})", f, i + 1)) }
+        }
+        fn gnum(a: &[Value], i: usize, f: &str) -> R<f64> {
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n as f64), Some(Value::Float(x)) => Ok(*x),
+                _ => Err(format!("{}: erwartet Zahl (Arg {})", f, i + 1)) }
+        }
+        // FUNCREF-Arg -> Option<Name>; NIL entfernt den Callback.
+        fn gfunc(a: &[Value], i: usize, f: &str) -> R<Option<String>> {
+            match a.get(i) {
+                Some(Value::Nil) | None => Ok(None),
+                Some(Value::FuncRef(n)) => Ok(Some(n.to_string())),
+                _ => Err(format!("{}: handler muss FUNCREF sein", f)),
+            }
+        }
+        let r = match name {
+            "gui_window" => Value::Int(self.gui.new_window(
+                gs(a,0,"GUI_WINDOW")?, gi(a,1,"GUI_WINDOW")? as i32, gi(a,2,"GUI_WINDOW")? as i32,
+                gi(a,3,"GUI_WINDOW")? as i32, gi(a,4,"GUI_WINDOW")? as i32)),
+            "gui_window_movable" => { self.gui.window_movable(gi(a,0,"GUI_WINDOW_MOVABLE")?, gbool(a,1,"GUI_WINDOW_MOVABLE")?)?; Value::Nil }
+            "gui_window_closable" => { self.gui.window_closable(gi(a,0,"GUI_WINDOW_CLOSABLE")?, gbool(a,1,"GUI_WINDOW_CLOSABLE")?)?; Value::Nil }
+            "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
+            "gui_window_closed" => Value::Bool(self.gui.window_closed(gi(a,0,"GUI_WINDOW_CLOSED")?)?),
+            "gui_button" => Value::Int(self.gui.button(gi(a,0,"GUI_BUTTON")?, gs(a,1,"GUI_BUTTON")?,
+                gi(a,2,"GUI_BUTTON")? as i32, gi(a,3,"GUI_BUTTON")? as i32,
+                gi(a,4,"GUI_BUTTON")? as i32, gi(a,5,"GUI_BUTTON")? as i32)?),
+            "gui_label" => {
+                let color = if a.len() >= 5 { Some(gi(a,4,"GUI_LABEL")?) } else { None };
+                Value::Int(self.gui.label(gi(a,0,"GUI_LABEL")?, gs(a,1,"GUI_LABEL")?,
+                    gi(a,2,"GUI_LABEL")? as i32, gi(a,3,"GUI_LABEL")? as i32, color)?)
+            }
+            "gui_checkbox" => {
+                let def = if a.len() >= 5 { gbool(a,4,"GUI_CHECKBOX")? } else { false };
+                Value::Int(self.gui.checkbox(gi(a,0,"GUI_CHECKBOX")?, gs(a,1,"GUI_CHECKBOX")?,
+                    gi(a,2,"GUI_CHECKBOX")? as i32, gi(a,3,"GUI_CHECKBOX")? as i32, def)?)
+            }
+            "gui_slider" => {
+                let mn = gnum(a,4,"GUI_SLIDER")?; let mx = gnum(a,5,"GUI_SLIDER")?;
+                let def = if a.len() >= 7 { gnum(a,6,"GUI_SLIDER")? } else { mn };
+                Value::Int(self.gui.slider(gi(a,0,"GUI_SLIDER")?, gi(a,1,"GUI_SLIDER")? as i32,
+                    gi(a,2,"GUI_SLIDER")? as i32, gi(a,3,"GUI_SLIDER")? as i32, mn, mx, def)?)
+            }
+            "gui_panel" => {
+                let title = if a.len() >= 6 { gs(a,5,"GUI_PANEL")? } else { String::new() };
+                Value::Int(self.gui.panel(gi(a,0,"GUI_PANEL")?, gi(a,1,"GUI_PANEL")? as i32, gi(a,2,"GUI_PANEL")? as i32,
+                    gi(a,3,"GUI_PANEL")? as i32, gi(a,4,"GUI_PANEL")? as i32, title)?)
+            }
+            "gui_textinput" => {
+                let ph = if a.len() >= 6 { gs(a,5,"GUI_TEXTINPUT")? } else { String::new() };
+                Value::Int(self.gui.textinput(gi(a,0,"GUI_TEXTINPUT")?, gi(a,1,"GUI_TEXTINPUT")? as i32, gi(a,2,"GUI_TEXTINPUT")? as i32,
+                    gi(a,3,"GUI_TEXTINPUT")? as i32, gi(a,4,"GUI_TEXTINPUT")? as i32, ph)?)
+            }
+            "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
+            "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
+            "gui_checked" => Value::Bool(self.gui.checked(gi(a,0,"GUI_CHECKED")?)?),
+            "gui_value" => Value::Float(self.gui.value(gi(a,0,"GUI_VALUE")?)?),
+            "gui_text" => Value::str_rc(&self.gui.text(gi(a,0,"GUI_TEXT")?)?),
+            "gui_set_text" => { self.gui.set_text(gi(a,0,"GUI_SET_TEXT")?, gs(a,1,"GUI_SET_TEXT")?)?; Value::Nil }
+            "gui_set_checked" => { self.gui.set_checked(gi(a,0,"GUI_SET_CHECKED")?, gbool(a,1,"GUI_SET_CHECKED")?)?; Value::Nil }
+            "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
+            "gui_on_click" => { self.gui.on_click(gi(a,0,"GUI_ON_CLICK")?, gfunc(a,1,"GUI_ON_CLICK")?)?; Value::Nil }
+            "gui_on_change" => { self.gui.on_change(gi(a,0,"GUI_ON_CHANGE")?, gfunc(a,1,"GUI_ON_CHANGE")?)?; Value::Nil }
+            "gui_theme" => { self.gui.theme_accent(gi(a,0,"GUI_THEME")?); Value::Nil }
+            "gui_theme_set" => { self.gui.theme_set(gs(a,0,"GUI_THEME_SET")?, gi(a,1,"GUI_THEME_SET")?)?; Value::Nil }
+            "gui_theme_get" => Value::Int(self.gui.theme_get(&gs(a,0,"GUI_THEME_GET")?)?),
+            "gui_metric_set" => { self.gui.metric_set(gs(a,0,"GUI_METRIC_SET")?, gi(a,1,"GUI_METRIC_SET")? as i32)?; Value::Nil }
+            "gui_metric_get" => Value::Int(self.gui.metric_get(&gs(a,0,"GUI_METRIC_GET")?)? as i64),
+            "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
+            "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
+            "gui_reset" => { self.gui.reset(); Value::Nil }
+            // GUI_TABLE ist noch nicht nativ (eigener Pass) -- klare Meldung.
+            n if n.starts_with("gui_table") =>
+                return Err("GUI_TABLE ist noch nicht in der nativen Runtime portiert (im Python/F5-Pfad verfuegbar)".into()),
+            "gui_update" => {
+                let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;
+                self.gui.update(g);
+                Value::Nil
+            }
+            "gui_draw" => {
+                let g = self.gfx.as_mut().ok_or("GUI_DRAW: vor SCREEN aufgerufen")?;
+                self.gui.draw(g);
+                Value::Nil
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(r))
     }
 
     /// Audio-Geraet lazy initialisieren (bei erstem Sound-/Musik-Builtin).
