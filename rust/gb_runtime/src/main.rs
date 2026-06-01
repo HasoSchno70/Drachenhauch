@@ -4,7 +4,11 @@
 //! `gamebasic/serialize.py`) und fuehrt den VM-Kern aus. Ausgabe nach stdout
 //! soll bit-identisch zur Python-VM sein.
 //!
-//! Verwendung: gbrt <datei.gbc>
+//! Verwendung: gbrt <datei.gbc> [quell-label]
+//!
+//! Das optionale `quell-label` (z.B. `spiel.gb`) wird nur fuer Laufzeitfehler-
+//! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `gbrun.py
+//! --native` reicht den Namen der `.gb`-Quelldatei durch.
 
 mod astar;
 mod builtins;
@@ -25,6 +29,8 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
     let path = &args[1];
+    // Optionales Quell-Label fuer Fehlermeldungen; sonst der .gbc-Pfad.
+    let source_label = args.get(2).cloned().unwrap_or_else(|| path.clone());
     let text = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(e) => {
@@ -60,13 +66,19 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
+            // Zeile VOR take_output() lesen (take_output konsumiert die VM).
+            let line = machine.error_line();
             // Bei Laufzeitfehler trotzdem bisherige Ausgabe zeigen.
             let out = machine.take_output();
             let stdout = std::io::stdout();
             let mut h = stdout.lock();
             let _ = h.write_all(out.as_bytes());
             let _ = h.flush();
-            eprintln!("Laufzeitfehler: {}", e);
+            if line != 0 {
+                eprintln!("Laufzeitfehler in {}:{}: {}", source_label, line, e);
+            } else {
+                eprintln!("Laufzeitfehler in {}: {}", source_label, e);
+            }
             ExitCode::from(2)
         }
     }

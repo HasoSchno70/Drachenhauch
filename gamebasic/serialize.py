@@ -90,6 +90,9 @@ def _enc_func(fn: CompiledFunction) -> dict:
         "constants": [_enc(c) for c in fn.constants],
         # Instruktionen: [op, arg]. Op ist bereits ein IntEnum-Wert.
         "code": [[int(op), _enc(arg)] for (op, arg) in fn.code],
+        # Quell-Zeile pro Instruction (parallel zu code) -- fuer Laufzeitfehler
+        # mit Zeilenangabe in der nativen Runtime. Leer wenn nicht getrackt.
+        "lines": list(fn.lines),
     }
 
 

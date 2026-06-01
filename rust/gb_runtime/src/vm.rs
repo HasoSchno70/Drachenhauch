@@ -148,6 +148,10 @@ pub struct Vm<'p> {
     ui_state: UiState,
     // Modul `scene`: globaler Stack (name, daten). Daten = key->typisierter Wert.
     scene_stack: Vec<(String, HashMap<String, Value>)>,
+    // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
+    // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
+    // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
+    cur_line: u32,
     #[cfg(feature = "graphics")]
     gfx: Option<crate::graphics::Graphics>,
 }
@@ -183,6 +187,7 @@ impl<'p> Vm<'p> {
             input_state: InputModule::default(),
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
+            cur_line: 0,
             #[cfg(feature = "graphics")]
             gfx: None,
         };
@@ -386,6 +391,14 @@ impl<'p> Vm<'p> {
         while *ip < n {
             let instr = &code[*ip];
             let arg = &instr.arg;
+            // Quell-Zeile dieser Instruktion merken (fuer Laufzeitfehler).
+            // Bei einem Fehler in dieser oder einer von hier gerufenen Funktion
+            // bleibt die innerste Zeile stehen (sie lief zuletzt).
+            if let Some(ln) = fn_.lines.get(*ip) {
+                if *ln != 0 {
+                    self.cur_line = *ln;
+                }
+            }
             *ip += 1;
 
             match instr.op {
@@ -942,6 +955,12 @@ impl<'p> Vm<'p> {
             }
         }
         Ok(dims)
+    }
+
+    /// Quell-Zeile des zuletzt ausgefuehrten Befehls (fuer Fehlermeldungen).
+    /// 0 = unbekannt (z.B. wenn der Compiler keine Zeilen getrackt hat).
+    pub fn error_line(&self) -> u32 {
+        self.cur_line
     }
 
     /// Zugriff auf den frame_count (fuer main.rs-Schleifenlogik), 0 ohne Grafik.

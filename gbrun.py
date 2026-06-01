@@ -4,6 +4,7 @@ Verwendung:
     python gbrun.py <datei.gb>
     python gbrun.py --tokens <datei.gb>   # nur Tokens ausgeben (Debug)
     python gbrun.py --ast <datei.gb>      # nur AST ausgeben (Debug)
+    python gbrun.py --native <datei.gb>   # nativ via gbrt-Runtime ausfuehren
 """
 import os
 import sys
@@ -82,7 +83,7 @@ def main(argv):
             return 3
         return rc
 
-    if args and args[0] in ("--tokens", "--ast", "--vm", "--bench"):
+    if args and args[0] in ("--tokens", "--ast", "--vm", "--bench", "--native"):
         mode = args.pop(0)[2:]
 
     # --- Ohne Argumente: Editor starten, sonst Hilfe ---
@@ -105,6 +106,10 @@ def main(argv):
     # Damit LoadImage("assets/...") aus dem Programm relativ zur .gb-Datei
     # funktioniert, ins Verzeichnis der Quelldatei wechseln.
     os.chdir(abs_path.parent)
+
+    # --- Native Runtime (gbrt): kompilieren -> .gbc -> ausfuehren ---
+    if mode == "native":
+        return _run_native(abs_path, path)
 
     # IMPORT-Preprocessor: textuelle Inklusion vor dem Lexen.
     from gamebasic.preprocess import process as _preprocess
@@ -152,6 +157,63 @@ def _resolve_vm():
     except ImportError:
         from gamebasic.vm import VM as PyVM
         return PyVM, "python"
+
+
+def _find_gbrt():
+    """Sucht das gebaute `gbrt`-Binary (Release bevorzugt, sonst Debug)."""
+    base = Path(__file__).resolve().parent / "rust" / "gb_runtime" / "target"
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = base / variant / exe
+        if p.exists():
+            return p
+    return None
+
+
+def _run_native(abs_path, path):
+    """Kompiliert die `.gb`-Datei nach `.gbc` und fuehrt sie mit `gbrt` aus.
+
+    Der Compiler laeuft weiter in Python (Lexer/Parser/Compiler bleiben dort);
+    `gbrt` uebernimmt nur die Ausfuehrung. stdout/stderr und ein etwaiges
+    Grafik-Fenster werden direkt durchgereicht. Rueckgabe = Exit-Code von gbrt
+    (bzw. 2 bei Compile-Fehler, 3 wenn gbrt fehlt)."""
+    import subprocess
+    import tempfile
+    from gamebasic.serialize import compile_file_to_gbc
+
+    gbrt = _find_gbrt()
+    if gbrt is None:
+        print("Native Runtime 'gbrt' nicht gefunden. Einmalig bauen mit:")
+        print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
+        print("(ohne Grafik: rust\\build_runtime.py --no-graphics)")
+        return 3
+
+    # In eine temporaere .gbc kompilieren (neben der Quelle waere auch ok,
+    # aber temp haelt das Projektverzeichnis sauber).
+    fd, tmp = tempfile.mkstemp(suffix=".gbc")
+    os.close(fd)
+    try:
+        try:
+            compile_file_to_gbc(abs_path, tmp)
+        except GameBasicError as e:
+            print(f"Compile-Fehler in {path.name}:")
+            print(f"  {e}")
+            return 2
+        # gbrt im Verzeichnis der Quelldatei ausfuehren (relative Assets),
+        # stdout/stderr erben -> Live-Ausgabe + Fenster. Der Quell-Dateiname
+        # wird als 2. Arg durchgereicht -> Laufzeitfehler zeigen datei.gb:Zeile.
+        try:
+            result = subprocess.run([str(gbrt), tmp, path.name],
+                                    cwd=str(abs_path.parent))
+        except OSError as e:
+            print(f"Konnte gbrt nicht starten: {e}")
+            return 3
+        return result.returncode
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
 
 
 def _bench(ast, path):

@@ -19,6 +19,45 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 6. 3D-Builtins auf raylibs Mesh/Kamera-API.
 7. Editor: „Export → native Exe bundeln".
 
+**Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
+ein Befehl kompiliert (Python) → `.gbc` → startet `gbrt`. ✅ *erledigt* (siehe
+unten).
+
+## Dev-Run-Loop: `gbrun.py --native`
+
+Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
+
+```
+.venv\Scripts\python.exe gbrun.py --native examples\30_shapes.gb
+```
+
+Das kompiliert die `.gb`-Datei (Lexer/Parser/Compiler bleiben in Python),
+serialisiert sie in eine **temporäre `.gbc`** und startet `gbrt` im Verzeichnis
+der Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")`
+stimmen). stdout/stderr und ein etwaiges Grafik-Fenster werden direkt
+durchgereicht; der Exit-Code von `gbrt` wird weitergegeben. Fehlt das Binary,
+verweist die Meldung auf `rust\build_runtime.py`.
+
+So bleibt Python die Toolchain (und später nur noch der Editor), während die
+Ausführung nativ läuft — kein manuelles `serialize` + `gbrt` mehr.
+
+### Laufzeitfehler mit Zeilennummer
+
+Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** (`stmt.line`
+vom Parser) in ein zu `code` paralleles `lines`-Array (`CompiledFunction.lines`,
+serialisiert als `"lines"` in der `.gbc`). Die Rust-VM merkt sich die Zeile der
+zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei einem propagierenden
+Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `gbrun.py --native`
+reicht den Quell-Dateinamen als 2. Arg an `gbrt` durch, sodass die Meldung lautet:
+
+```
+Laufzeitfehler in spiel.gb:42: Index 10 ausserhalb [0..2] in Dimension 0
+```
+
+Die Python/Cython-VMs ignorieren `lines` (additives Feld, kein Recompile nötig);
+`gbrt <datei.gbc>` ohne Label nutzt den `.gbc`-Pfad. Zeile `0` (untracked) →
+Meldung ohne Zeilenangabe.
+
 ## Schritt 1: `.gbc`-Serialisierung
 
 [`gamebasic/serialize.py`](../gamebasic/serialize.py) wandelt ein vom

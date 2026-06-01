@@ -203,6 +203,11 @@ class CompiledFunction:
     # Bei Polymorphie (selber Call-Site, mehrere Klassen) thrasht der Cache;
     # ein Miss kostet eine Population (dict-Lookup), Korrektheit bleibt.
     caches: list = field(default_factory=list)
+    # Quell-Zeilennummer pro Bytecode-Instruction (parallel zu code), gestempelt
+    # vom Compiler aus `stmt.line`. Optional -- leer wenn nicht getrackt. Wird
+    # von den Python/Cython-VMs ignoriert; die native Rust-Runtime nutzt es fuer
+    # Laufzeitfehler-Meldungen mit `datei.gb:Zeile`.
+    lines: list = field(default_factory=list)
 
     @property
     def n_locals(self) -> int:

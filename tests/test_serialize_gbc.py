@@ -95,6 +95,38 @@ def test_serialize_function_metadata():
     assert fn["local_types"][0] == "integer"
 
 
+def test_lines_parallel_to_code():
+    """Jede Funktion traegt ein `lines`-Array parallel zu `code` -- die native
+    Runtime nutzt es fuer Laufzeitfehler mit Zeilenangabe."""
+    module = _compile(
+        "DIM a AS INTEGER\n"       # Zeile 1
+        "a = 1\n"                  # Zeile 2
+        "PRINT a\n"                # Zeile 3
+    )
+    obj = serialize_module(module)
+    main = obj["main"]
+    assert len(main["lines"]) == len(main["code"])
+    # Alle gestempelten Zeilen liegen im Quell-Bereich (1..3); >=1 echte Zeile.
+    nonzero = [ln for ln in main["lines"] if ln]
+    assert nonzero, "keine Zeilen gestempelt"
+    assert max(main["lines"]) <= 3
+
+
+def test_lines_point_at_failing_statement():
+    """Die Instruktion(en) eines Statements tragen dessen Quell-Zeile."""
+    from gamebasic.bytecode import Op
+    module = _compile(
+        "DIM a AS INTEGER\n"       # 1
+        "PRINT 1\n"                # 2
+        "a = 10 \\ 0\n"            # 3  (Integer-Division -> INT_DIV)
+    )
+    fn = module.main
+    # Finde die INT_DIV-Instruktion und pruefe ihre gestempelte Zeile.
+    idivs = [i for i, (op, _) in enumerate(fn.code) if op == Op.INT_DIV]
+    assert idivs, "kein INT_DIV emittiert"
+    assert fn.lines[idivs[0]] == 3
+
+
 def test_builtin_call_compiles_to_call_builtin_in_fresh_process():
     """Regression: LEN/INT/... muessen zu CALL_BUILTIN (Op 51) kompilieren,
     nicht zu LOAD_NAME + CALL_VALUE. Das haengt daran, dass serialize.py die

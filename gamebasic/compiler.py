@@ -76,6 +76,11 @@ class _FnCtx:
         self.name = name
         self.is_main = is_main
         self.code: list = []
+        # Quell-Zeile pro Instruction (parallel zu code) + aktuell aktive Zeile,
+        # gesetzt vom Statement-Dispatch. Fuer Laufzeitfehler in der nativen
+        # Runtime (datei.gb:Zeile).
+        self.lines: list = []
+        self.cur_line: int = 0
         self.constants: list = []
         self.const_index: dict = {}
         self.local_slots: dict = {}
@@ -108,6 +113,7 @@ class _FnCtx:
     def emit(self, op: int, arg=None) -> int:
         ip = len(self.code)
         self.code.append((op, arg))
+        self.lines.append(self.cur_line)
         return ip
 
     def patch_jump(self, ip: int, target: int):
@@ -425,6 +431,7 @@ class Compiler:
             stub.local_types = compiled.local_types
             stub.local_defaults = compiled.local_defaults
             stub.caches = compiled.caches
+            stub.lines = compiled.lines
             return stub
         return compiled
 
@@ -440,10 +447,16 @@ class Compiler:
             is_sub=ctx.is_sub,
             is_main=ctx.is_main,
             caches=[None] * len(ctx.code),  # Inline-Cache-Slots, lazy gefuellt
+            lines=list(ctx.lines),
         )
 
     # -------- Statements -----------------------------------------------
     def _stmt(self, s):
+        # Aktuelle Quell-Zeile fuer alle Instruktionen dieses Statements
+        # stempeln (der Parser haengt `.line` an jedes Statement).
+        ln = getattr(s, "line", 0)
+        if ln:
+            self.fn.cur_line = ln
         method = getattr(self, f"_stmt_{type(s).__name__}", None)
         if method is None:
             raise CompileError(

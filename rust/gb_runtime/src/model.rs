@@ -174,6 +174,10 @@ pub struct Func {
     pub local_defaults: Vec<Value>,
     pub constants: Vec<Value>,
     pub code: Vec<Instr>,
+    /// Quell-Zeile pro Instruktion (parallel zu `code`). Leer wenn der
+    /// Compiler keine Zeilen getrackt hat -- dann faellt die Fehlermeldung auf
+    /// "Zeile unbekannt" zurueck.
+    pub lines: Vec<u32>,
 }
 
 pub struct FieldDecl {
@@ -297,6 +301,10 @@ fn decode_func(j: &J) -> Func {
                 .collect()
         })
         .unwrap_or_default();
+    let lines = get("lines")
+        .as_array()
+        .map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u32).collect())
+        .unwrap_or_default();
 
     Func {
         name: get("name").as_str().unwrap_or("").to_string(),
@@ -311,6 +319,7 @@ fn decode_func(j: &J) -> Func {
         local_defaults,
         constants,
         code,
+        lines,
     }
 }
 
