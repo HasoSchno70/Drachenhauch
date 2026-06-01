@@ -15,13 +15,39 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 3. Strings/Arrays/Maps/Structs in Rust nachziehen (echte Rust-Typen statt
    geboxt — die Typ-Strenge von GB hilft). ✅ *erledigt*
 4. raylib einbinden, Grafik-Builtins nach Rust. ✅ *erledigt (Core-2D)*
-5. Module portieren (gui/ui/physics …) nach Bedarf. 🚧 *in Arbeit (vec2/curves/physics)*
-6. 3D-Builtins auf raylibs Mesh/Kamera-API. ✅ *Core-Primitive erledigt (Modul `g3d`)*
-7. Editor: „Export → native Exe bundeln".
+5. Module portieren (gui/ui/physics …). ✅ *erledigt — ALLE Module nativ inkl.
+   ui (komplett, mit UI_TABLE) + gui (komplett, mit GUI_TABLE + Callbacks)*
+6. 3D-Builtins auf raylibs Mesh/Kamera-API. ✅ *Core-Primitive erledigt (`g3d`)*
+7. Editor: „Export → native Exe bundeln". ⬜ *offen*
 
 **Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
 ein Befehl kompiliert (Python) → `.gbc` → startet `gbrt`. ✅ *erledigt* (siehe
 unten).
+
+## Offen / nächste Schritte (Stand 2026-06-01)
+
+Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT`),
+**Game-Loop** (`DELTA`/`FPS`/`SETFPS`/`SET_FULLSCREEN`/`SETWINDOWTITLE`/
+`SAVESCREENSHOT`), **Shader/Post-Processing** (`SHADER_LOAD`/`SET`/`SET2`/`SET3`/
+`POSTFX`, CRT/Bloom/Vignette). Die native Runtime deckt damit ein komplettes
+2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
+
+**Lohnende nächste Hebel (raylib bietet noch mehr):**
+- **3D vertiefen:** Modelle laden (OBJ/GLTF via `LoadModel`) + `DrawModel`,
+  `GenMesh*`-Primitive (Torus/Knot/Heightmap), 3D-Kameramodi (`UpdateCamera`
+  orbit/first-person), Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`).
+- **TTF-Fonts:** `LoadFontEx` + `DrawTextEx` (Schrift in beliebiger Größe/Spacing).
+- **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
+  (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
+- **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
+  bündeln (Spiele ohne Python ausliefern).
+- Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
+  2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
+  Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
+
+**Bewusst außen vor:** `regex` + Hardware/Netz (`bt`/`serial`/`usb`/`wifi`/
+`net`/`html`/`db`); das erweiterte `audio`-Modul (Kanäle/Pan/Ton-Generierung)
+bleibt Python-only (Core-Audio ist nativ).
 
 ## Dev-Run-Loop: `gbrun.py --native`
 
