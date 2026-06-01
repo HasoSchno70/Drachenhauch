@@ -50,6 +50,15 @@ struct UiState {
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i64>,
+    // UI_TABLE (Immediate-Mode): persistenter Scroll-/Selektions-State pro id.
+    tables: HashMap<String, UiTable>,
+}
+
+#[derive(Default)]
+struct UiTable {
+    scroll_x: i32, scroll_y: i32,
+    drag_v: bool, drag_h: bool, drag_off: i32,
+    selected: i32, header_col: i32,
 }
 
 const DEFAULT_UI_THEME: &[(&str, i64)] = &[
@@ -75,6 +84,7 @@ impl UiState {
             was_mouse_down: false, click_origin: None, frame_count: 0,
             theme: DEFAULT_UI_THEME.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
             metrics: DEFAULT_UI_METRICS.iter().map(|(k, v)| (k.to_string(), *v)).collect(),
+            tables: HashMap::new(),
         }
     }
     fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
@@ -1229,6 +1239,266 @@ impl<'p> Vm<'p> {
         Ok(self.audio.as_mut().unwrap())
     }
 
+    /// UI_TABLE (Immediate-Mode): scrollbare Tabelle mit fixierter Kopfzeile,
+    /// optionalen Zell-Farben, Selektion + klickbaren Headern. 1:1-Port der
+    /// Python-Referenz. Liefert die in diesem Frame geklickte Zeile (-1).
+    #[cfg(feature = "graphics")]
+    fn ui_table(&mut self, a: &[Value]) -> R<Value> {
+        const HDR: i32 = 22; const ROW: i32 = 20; const SCR: i32 = 12; const PAD: i32 = 6;
+        // --- Arg-Extraktion (lokal) ---
+        fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
+        }
+        fn gid(a: &[Value], f: &str) -> R<String> {
+            match a.first() { Some(Value::Str(s)) => Ok(s.to_string()), _ => Err(format!("{}: id muss STRING sein", f)) }
+        }
+        fn str1d(v: &Value, f: &str) -> R<Vec<String>> {
+            match v { Value::Array(arr) => { let arr = arr.borrow();
+                if arr.element_type != "string" || arr.dims.len() != 1 { return Err(format!("{}: headers muss 1D ARRAY OF STRING sein", f)); }
+                Ok(arr.values.iter().map(|x| match x { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()) }
+                _ => Err(format!("{}: headers muss ARRAY OF STRING sein", f)) }
+        }
+        fn str2d(v: &Value, ncols: usize, f: &str) -> R<Vec<Vec<String>>> {
+            match v { Value::Array(arr) => { let arr = arr.borrow();
+                if arr.element_type != "string" || arr.dims.len() != 2 { return Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)); }
+                let (r, c) = (arr.dims[0] as usize, arr.dims[1] as usize);
+                if c != ncols { return Err(format!("{}: cells hat {} Spalten, headers {}", f, c, ncols)); }
+                Ok((0..r).map(|ri| (0..c).map(|ci| match &arr.values[ri * c + ci] { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()).collect()) }
+                _ => Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)) }
+        }
+        // Optionales 2D INTEGER-Array -> flach (row-major), Validierung dims.
+        fn int2d_opt(a: &[Value], i: usize, nr: usize, nc: usize, f: &str) -> R<Option<Vec<i64>>> {
+            match a.get(i) { None | Some(Value::Nil) => Ok(None),
+                Some(Value::Array(arr)) => { let arr = arr.borrow();
+                    if arr.element_type != "integer" || arr.dims.len() != 2 || arr.dims[0] as usize != nr || arr.dims[1] as usize != nc {
+                        return Err(format!("{}: erwartet 2D ARRAY OF INTEGER [{}, {}]", f, nr, nc)); }
+                    Ok(Some(arr.values.iter().map(|x| match x { Value::Int(n) => *n, _ => 0 }).collect())) }
+                _ => Err(format!("{}: erwartet 2D ARRAY OF INTEGER", f)) }
+        }
+        fn int1d_opt(a: &[Value], i: usize, n: usize, f: &str) -> R<Option<Vec<i32>>> {
+            match a.get(i) { None | Some(Value::Nil) => Ok(None),
+                Some(Value::Array(arr)) => { let arr = arr.borrow();
+                    if arr.element_type != "integer" || arr.dims.len() != 1 || arr.dims[0] as usize != n {
+                        return Err(format!("{}: col_widths muss 1D ARRAY OF INTEGER ({}) sein", f, n)); }
+                    Ok(Some(arr.values.iter().map(|x| match x { Value::Int(v) => *v as i32, _ => 0 }).collect())) }
+                _ => Err(format!("{}: col_widths muss ARRAY OF INTEGER sein", f)) }
+        }
+        let in_box = |mx: i32, my: i32, x: i32, y: i32, w: i32, h: i32| mx >= x && mx < x + w && my >= y && my < y + h;
+
+        let id = gid(a, "UI_TABLE")?;
+        let mut x = gi(a, 1, "UI_TABLE")? as i32 + self.ui_state.offset_x;
+        let mut y = gi(a, 2, "UI_TABLE")? as i32 + self.ui_state.offset_y;
+        let w = gi(a, 3, "UI_TABLE")? as i32;
+        let h = gi(a, 4, "UI_TABLE")? as i32;
+        let headers = str1d(a.get(5).ok_or("UI_TABLE: headers fehlt")?, "UI_TABLE")?;
+        let n_cols = headers.len();
+        if n_cols == 0 { return Err("UI_TABLE: headers darf nicht leer sein".into()); }
+        let cells = str2d(a.get(6).ok_or("UI_TABLE: cells fehlt")?, n_cols, "UI_TABLE")?;
+        let n_rows = cells.len();
+        let cell_colors = int2d_opt(a, 7, n_rows, n_cols, "UI_TABLE")?;
+        let col_widths: Vec<i32> = match int1d_opt(a, 8, n_cols, "UI_TABLE")? {
+            Some(cw) => cw,
+            None => { let avail = w - SCR - 2; let per = (avail / n_cols as i32).max(40); vec![per; n_cols] }
+        };
+        let cell_bg = int2d_opt(a, 9, n_rows, n_cols, "UI_TABLE")?;
+        let _ = (&mut x, &mut y);
+
+        // --- State init ---
+        let st = self.ui_state.tables.entry(id.clone()).or_insert_with(|| UiTable { selected: -1, ..Default::default() });
+        if st.selected >= n_rows as i32 { st.selected = -1; }
+        st.header_col = -1;
+
+        // --- Geometrie ---
+        let body_x = x + 1; let body_y = y + HDR;
+        let body_w_raw = w - 2; let body_h_raw = h - HDR - 1;
+        let total_w: i32 = col_widths.iter().sum();
+        let total_h = n_rows as i32 * ROW;
+        let mut need_v = total_h > body_h_raw;
+        let need_h = total_w > body_w_raw - if need_v { SCR } else { 0 };
+        if need_h && total_h > body_h_raw - SCR { need_v = true; }
+        let body_w = body_w_raw - if need_v { SCR } else { 0 };
+        let body_h = body_h_raw - if need_h { SCR } else { 0 };
+        let max_sy = (total_h - body_h).max(0);
+        let max_sx = (total_w - body_w).max(0);
+
+        // --- Maus / Wheel ---
+        let (mx, my, down) = self.ui_mouse_gated()?;
+        let wheel = { let g = self.gfx.as_ref().ok_or("UI_TABLE: vor SCREEN")?; g.pop_mouse_wheel() };
+        let was_down = self.ui_state.was_mouse_down;
+        let just_pressed = down && !was_down;
+        let just_released = !down && was_down;
+        let over_table = in_box(mx, my, x, y, w, h);
+
+        let st = self.ui_state.tables.get_mut(&id).unwrap();
+        st.scroll_y = st.scroll_y.clamp(0, max_sy);
+        st.scroll_x = st.scroll_x.clamp(0, max_sx);
+        if over_table && wheel != 0 {
+            st.scroll_y = (st.scroll_y - wheel as i32 * ROW).clamp(0, max_sy);
+        }
+        // Vertikale Scrollbar
+        if need_v {
+            let sb_x = x + body_w_raw - SCR + 1; let sb_y = body_y; let sb_h = body_h;
+            let handle_h = ((sb_h as f64 * (body_h as f64 / total_h as f64)) as i32).max(16);
+            if just_pressed && in_box(mx, my, sb_x, sb_y, SCR, sb_h) {
+                let ratio = if max_sy > 0 { st.scroll_y as f64 / max_sy as f64 } else { 0.0 };
+                let handle_y = sb_y + ((sb_h - handle_h) as f64 * ratio) as i32;
+                if in_box(mx, my, sb_x, handle_y, SCR, handle_h) {
+                    st.drag_v = true; st.drag_off = my - handle_y;
+                } else {
+                    let hy = (my - handle_h / 2).clamp(sb_y, sb_y + sb_h - handle_h);
+                    st.drag_v = true; st.drag_off = handle_h / 2;
+                    let tp = (hy - sb_y) as f64 / (sb_h - handle_h).max(1) as f64;
+                    st.scroll_y = (tp * max_sy as f64) as i32;
+                }
+            }
+            if st.drag_v && down {
+                let nh = (my - st.drag_off).clamp(sb_y, sb_y + sb_h - handle_h);
+                let tp = (nh - sb_y) as f64 / (sb_h - handle_h).max(1) as f64;
+                st.scroll_y = (tp * max_sy as f64) as i32;
+            }
+            if just_released { st.drag_v = false; }
+        } else { st.drag_v = false; }
+        // Horizontale Scrollbar
+        if need_h {
+            let hs_x = body_x; let hs_y = y + h - SCR - 1; let hs_w = body_w;
+            let handle_w = ((hs_w as f64 * (body_w as f64 / total_w as f64)) as i32).max(16);
+            if just_pressed && in_box(mx, my, hs_x, hs_y, hs_w, SCR) {
+                let ratio = if max_sx > 0 { st.scroll_x as f64 / max_sx as f64 } else { 0.0 };
+                let handle_x = hs_x + ((hs_w - handle_w) as f64 * ratio) as i32;
+                if in_box(mx, my, handle_x, hs_y, handle_w, SCR) {
+                    st.drag_h = true; st.drag_off = mx - handle_x;
+                } else {
+                    let hx = (mx - handle_w / 2).clamp(hs_x, hs_x + hs_w - handle_w);
+                    st.drag_h = true; st.drag_off = handle_w / 2;
+                    let tp = (hx - hs_x) as f64 / (hs_w - handle_w).max(1) as f64;
+                    st.scroll_x = (tp * max_sx as f64) as i32;
+                }
+            }
+            if st.drag_h && down {
+                let nx = (mx - st.drag_off).clamp(hs_x, hs_x + hs_w - handle_w);
+                let tp = (nx - hs_x) as f64 / (hs_w - handle_w).max(1) as f64;
+                st.scroll_x = (tp * max_sx as f64) as i32;
+            }
+            if just_released { st.drag_h = false; }
+        } else { st.drag_h = false; }
+
+        let (scroll_x, scroll_y, drag_v, drag_h) = (st.scroll_x, st.scroll_y, st.drag_v, st.drag_h);
+        // Hover-Zeile (ueber Body, nicht ueber Scrollbalken)
+        let hover_row = if over_table && in_box(mx, my, body_x, body_y, body_w, body_h) && !drag_v && !drag_h {
+            let hr = (my - body_y + scroll_y) / ROW;
+            if hr >= 0 && hr < n_rows as i32 { hr } else { -1 }
+        } else { -1 };
+
+        // --- Klick-Erkennung Zeile (Press+Release auf derselben) ---
+        let mut clicked_row = -1;
+        let sb_block = over_table && in_box(mx, my, x + body_w_raw - SCR + 1, body_y, SCR, body_h);
+        if over_table && just_pressed && hover_row >= 0 && !sb_block {
+            self.ui_state.click_origin = Some(format!("{}#row#{}", id, hover_row));
+        }
+        if over_table && just_released && hover_row >= 0 {
+            if self.ui_state.click_origin.as_deref() == Some(format!("{}#row#{}", id, hover_row).as_str()) {
+                clicked_row = hover_row;
+            }
+        }
+        if clicked_row >= 0 { self.ui_state.tables.get_mut(&id).unwrap().selected = clicked_row; }
+
+        // --- Header-Klick (fuer Sortierung) ---
+        let header_col_at = |px: i32, py: i32| -> i32 {
+            if !in_box(px, py, x, y, body_w_raw, HDR) { return -1; }
+            let rel = px - (body_x - scroll_x);
+            let mut acc = 0;
+            for c in 0..n_cols { if acc <= rel && rel < acc + col_widths[c] { return c as i32; } acc += col_widths[c]; }
+            -1
+        };
+        if over_table && just_pressed {
+            let hc = header_col_at(mx, my);
+            if hc >= 0 { self.ui_state.click_origin = Some(format!("{}#hdr#{}", id, hc)); }
+        }
+        if over_table && just_released {
+            if let Some(co) = self.ui_state.click_origin.clone() {
+                if let Some(rest) = co.strip_prefix(&format!("{}#hdr#", id)) {
+                    if let Ok(oc) = rest.parse::<i32>() {
+                        if oc == header_col_at(mx, my) { self.ui_state.tables.get_mut(&id).unwrap().header_col = oc; }
+                    }
+                }
+            }
+        }
+        let selected = self.ui_state.tables[&id].selected;
+
+        // --- Zeichnen ---
+        let g = self.gfx.as_mut().ok_or("UI_TABLE: vor SCREEN")?;
+        g.box_fill(x, y, x + w - 1, y + h - 1, 0x1A1C2A);
+        g.rect(x, y, x + w - 1, y + h - 1, 0x60607A);
+        g.box_fill(x + 1, y + 1, x + w - 2, y + HDR - 1, 0x383C5C);
+        g.rect(x, y, x + w - 1, y + HDR - 1, 0x60607A);
+        // Kopf-Zellen
+        g.push_clip(x + 1, y + 1, body_w_raw, HDR - 2);
+        let mut cx = body_x - scroll_x;
+        for c in 0..n_cols {
+            if cx + col_widths[c] > x + 1 && cx < x + 1 + body_w_raw {
+                g.text(cx + PAD, y + 4, headers[c].clone(), 0xFFFFFF);
+                if c < n_cols - 1 { g.line(cx + col_widths[c], y + 1, cx + col_widths[c], y + HDR - 2, 0x60607A); }
+            }
+            cx += col_widths[c];
+        }
+        g.pop_clip();
+        // Body
+        g.push_clip(body_x, body_y, body_w, body_h);
+        let first = (scroll_y / ROW).max(0);
+        let last = ((scroll_y + body_h) / ROW + 1).min(n_rows as i32);
+        for r in first..last {
+            let row_y = body_y + r * ROW - scroll_y;
+            // Pass 1: Zell-Hintergruende
+            if let Some(ref bg) = cell_bg {
+                let mut bx = body_x - scroll_x;
+                for c in 0..n_cols {
+                    let cw = col_widths[c];
+                    if bx + cw > body_x && bx < body_x + body_w {
+                        let v = bg[r as usize * n_cols + c];
+                        if v >= 0 { g.box_fill(bx, row_y, bx + cw - 1, row_y + ROW - 1, v); }
+                    }
+                    bx += cw;
+                }
+            }
+            if r == selected { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + ROW - 1, 0x2A4E6A); }
+            if r == hover_row { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + ROW - 1, 0x2A2E4A); }
+            let mut cx = body_x - scroll_x;
+            let row = &cells[r as usize];
+            for c in 0..n_cols {
+                let cw = col_widths[c];
+                if cx + cw > body_x && cx < body_x + body_w {
+                    let clip_x = (cx + 1).max(body_x);
+                    let clip_w = (cw - 2).min((body_x + body_w) - clip_x);
+                    g.push_clip(clip_x, row_y, clip_w, ROW);
+                    let color = match &cell_colors { Some(cc) => cc[r as usize * n_cols + c], None => 0xFFFFFF };
+                    g.text(cx + PAD, row_y + 3, row[c].clone(), color);
+                    g.pop_clip();
+                }
+                cx += cw;
+            }
+            g.line(body_x, row_y + ROW - 1, body_x + body_w - 1, row_y + ROW - 1, 0x2A2E4A);
+        }
+        g.pop_clip();
+        // Scrollbalken
+        if need_v {
+            let sb_x = x + body_w_raw - SCR + 1; let sb_h = body_h;
+            let handle_h = ((sb_h as f64 * (body_h as f64 / total_h as f64)) as i32).max(16);
+            let ratio = if max_sy > 0 { scroll_y as f64 / max_sy as f64 } else { 0.0 };
+            let hy = body_y + ((sb_h - handle_h) as f64 * ratio) as i32;
+            g.box_fill(sb_x, body_y, sb_x + SCR - 1, body_y + sb_h - 1, 0x252840);
+            g.box_fill(sb_x + 2, hy, sb_x + SCR - 3, hy + handle_h - 1, if drag_v { 0x80C0FF } else { 0x60607A });
+        }
+        if need_h {
+            let hs_y = y + h - SCR - 1; let hs_w = body_w;
+            let handle_w = ((hs_w as f64 * (body_w as f64 / total_w as f64)) as i32).max(16);
+            let ratio = if max_sx > 0 { scroll_x as f64 / max_sx as f64 } else { 0.0 };
+            let hx = body_x + ((hs_w - handle_w) as f64 * ratio) as i32;
+            g.box_fill(body_x, hs_y, body_x + hs_w - 1, hs_y + SCR - 1, 0x252840);
+            g.box_fill(hx, hs_y + 2, hx + handle_w - 1, hs_y + SCR - 3, if drag_h { 0x80C0FF } else { 0x60607A });
+        }
+        Ok(Value::Int(clicked_row as i64))
+    }
+
     #[cfg(feature = "graphics")]
     fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Hilfen: strikte INTEGER- bzw. STRING-Extraktion (wie _check_int/_check_str).
@@ -1886,6 +2156,21 @@ impl<'p> Vm<'p> {
                     self.ui_state.input_blocked = blk;
                 }
                 Value::Nil
+            }
+            "ui_table" => self.ui_table(a)?,
+            "ui_table_selected" => {
+                let id = gs(a,0,"UI_TABLE_SELECTED")?;
+                Value::Int(self.ui_state.tables.get(id).map(|t| t.selected).unwrap_or(-1) as i64)
+            }
+            "ui_table_set_selected" => {
+                let id = gs(a,0,"UI_TABLE_SET_SELECTED")?.to_string();
+                let row = gi(a,1,"UI_TABLE_SET_SELECTED")?;
+                if let Some(t) = self.ui_state.tables.get_mut(&id) { t.selected = if row >= 0 { row as i32 } else { -1 }; }
+                Value::Nil
+            }
+            "ui_table_header_click" => {
+                let id = gs(a,0,"UI_TABLE_HEADER_CLICK")?;
+                Value::Int(self.ui_state.tables.get(id).map(|t| t.header_col).unwrap_or(-1) as i64)
             }
             "ui_end_frame" => {
                 let (down, bs) = {

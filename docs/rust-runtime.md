@@ -310,8 +310,14 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   Input-Gating überdeckter Fenster via `ui_mouse_gated`, Titel-Drag +
   Einklapp-Pfeil, Z-Order über Vorframe-Hit-Test `active_win`/`hover_win` in
   `UI_END_FRAME`). Beide per Headless-Screenshot verifiziert.
-  *Noch vertagt:* **`UI_TABLE`** (Scrolling, Spaltenbreiten, Zell-Farben, zwei
-  Scrollbars mit Drag, klickbare Zeilen — ~300 LOC, eigener Pass).
+  **`UI_TABLE`** ist nun ebenfalls portiert: fixierte Kopfzeile, V/H-Scroll
+  (Mausrad + Scrollbalken-Drag inkl. Track-Klick), Per-Zelle-Text- und
+  -Hintergrundfarben, Hover-/Selektions-Highlight, klickbare Zeilen
+  (Rueckgabe = geklickte Zeile) + `UI_TABLE_SELECTED`/`SET_SELECTED`/
+  `HEADER_CLICK` (Sortier-Hook). State per id in `UiState.tables`; nutzt den
+  neuen Clip-Stack + Mausrad. Verifiziert per Screenshot
+  ([examples/43_ui_table.gb](../examples/43_ui_table.gb), Zell-Farben +
+  beide Scrollbars).
 
 **`gui` (Retained-Mode)** — Kern portiert ([gui.rs](../rust/gb_runtime/src/gui.rs)):
 Window + Button/Label/Checkbox/Slider/TextInput/Panel, Drag/Z-Order/Fokus/Close,
@@ -337,8 +343,8 @@ Rust-Unit-Tests decken Callback-Queueing, Tabellen-Layout (`table_geom`) und
 Press→Selektion ab (`build_runtime.py --test`). *Noch offen:* der Immediate-
 Mode-`UI_TABLE` (separates Modul `ui`).
 
-**Noch offen (Module):** `UI_TABLE` (Immediate-Mode `ui`). `GUI_TABLE`
-(Retained) ist portiert. Hardware/Netzwerk + `regex` bleiben außen vor.
+**Tabellen komplett:** `UI_TABLE` (Immediate-Mode) **und** `GUI_TABLE`
+(Retained) sind nativ. Hardware/Netzwerk + `regex` bleiben außen vor.
 
 **ENUM / STATIC CONST:** `_EnumNamespace`/`_ClassStaticNamespace` werden als
 `{"ns": {name, members}}` serialisiert und in Rust als `Value::Namespace`
