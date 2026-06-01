@@ -2,13 +2,14 @@
 //! `gamebasic/modules/gui.py`. Persistente Fenster/Widgets; pro Frame
 //! `GUI_UPDATE` (Maus/Tasten) + `GUI_DRAW` (zeichnen). Events per Polling.
 //!
-//! Stand: Kern portiert -- Window + Button/Label/Checkbox/Slider/TextInput/
-//! Panel, Drag/Z-Order/Fokus/Close, programmierbares Theme, Polling
-//! (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`) UND FUNCREF-Callbacks
+//! Stand: vollstaendig portiert -- Window + Button/Label/Checkbox/Slider/
+//! TextInput/Panel/Table, Drag/Z-Order/Fokus/Close, programmierbares Theme,
+//! Polling (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`) UND FUNCREF-Callbacks
 //! (`GUI_ON_CLICK`/`GUI_ON_CHANGE`): ausgeloeste Handler sammelt `update()` in
 //! `pending`; die VM leert die Queue nach `GUI_UPDATE` und ruft sie auf.
-//! **Noch nicht nativ:** `GUI_TABLE` (eigener Pass). Handles sind INTEGER:
-//! Window = Index, Widget = (win<<20)|idx.
+//! `GUI_TABLE` mit fixierter Kopfzeile, V/H-Scroll (Mausrad + Scrollbalken),
+//! Hover-/Selektions-Highlight; Layout aus einer Quelle (`table_geom`).
+//! Handles sind INTEGER: Window = Index, Widget = (win<<20)|idx.
 #![cfg(feature = "graphics")]
 
 use std::collections::HashMap;
@@ -16,6 +17,13 @@ use std::collections::HashMap;
 use crate::graphics::Graphics;
 
 const KEY_BACKSPACE: i64 = 8;
+
+// Tabellen-Layout (analog zum Immediate-Mode-UI_TABLE).
+const TBL_HEADER_H: i32 = 22;
+const TBL_ROW_H: i32 = 20;
+const TBL_SCROLL_W: i32 = 12;
+const TBL_PADDING: i32 = 6;
+const TBL_MIN_COL_W: i32 = 40;
 
 fn default_theme() -> HashMap<String, i64> {
     [
@@ -66,7 +74,17 @@ fn shade(color: i64, delta: i32) -> i64 {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel }
+pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel, Table }
+
+#[derive(Default)]
+pub struct TableState {
+    headers: Vec<String>,
+    rows: Vec<Vec<String>>,
+    col_widths: Option<Vec<i32>>,
+    scroll_x: i32, scroll_y: i32,
+    drag_v: bool, drag_h: bool, drag_off: i32,
+    selected: i32, hover_row: i32, clicked_row: i32,
+}
 
 pub struct Widget {
     kind: Kind,
@@ -81,6 +99,7 @@ pub struct Widget {
     on_click: Option<String>,
     on_change: Option<String>,
     ov: HashMap<String, i64>,
+    tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
 }
 
 pub struct Window {
@@ -93,6 +112,15 @@ pub struct Window {
     close_clicked: bool,
 }
 
+// Aufgeloestes Tabellen-Layout (einzige Wahrheit fuer Hit-Test + Zeichnen).
+struct TGeom {
+    ax: i32, ay: i32, w: i32, h: i32,
+    n_cols: usize, n_rows: usize, col_widths: Vec<i32>,
+    body_x: i32, body_y: i32, body_w: i32, body_h: i32,
+    body_w_raw: i32, total_w: i32, total_h: i32,
+    need_v: bool, need_h: bool, max_scroll_y: i32, max_scroll_x: i32,
+}
+
 pub struct Gui {
     windows: Vec<Window>,        // stabile Indizes (Handles!)
     z_order: Vec<usize>,         // Zeichen-/Hit-Reihenfolge (umordbar)
@@ -101,6 +129,8 @@ pub struct Gui {
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     active_slider: Option<(usize, usize)>,
+    active_table: Option<(usize, usize)>,
+    table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
     press_origin: Option<(usize, usize)>,
     was_mouse_down: bool,
     prev_backspace: bool,
@@ -122,7 +152,7 @@ impl Gui {
             windows: Vec::new(), z_order: Vec::new(),
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
-            active_slider: None, press_origin: None,
+            active_slider: None, active_table: None, table_press: None, press_origin: None,
             was_mouse_down: false, prev_backspace: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             pending: Vec::new(),
@@ -187,7 +217,7 @@ impl Gui {
             kind, x, y, w, h, text: String::new(), color: 0xFFFFFF,
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
-            on_click: None, on_change: None, ov: HashMap::new(),
+            on_click: None, on_change: None, ov: HashMap::new(), tbl: None,
         }
     }
 
@@ -240,6 +270,152 @@ impl Gui {
         self.add_widget(win, "GUI_TEXTINPUT", wd)
     }
 
+    // --- Tabelle ---
+    fn tbl_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TableState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Table { return Err(format!("{}: Widget ist keine Tabelle", fn_)); }
+        Ok(w.tbl.as_mut().unwrap())
+    }
+    fn tbl_ref(&self, h: i64, fn_: &str) -> Result<&TableState, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Table { return Err(format!("{}: Widget ist keine Tabelle", fn_)); }
+        Ok(w.tbl.as_ref().unwrap())
+    }
+    pub fn table(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Table, x, y, w, h);
+        wd.tbl = Some(Box::new(TableState { selected: -1, hover_row: -1, clicked_row: -1, ..Default::default() }));
+        self.add_widget(win, "GUI_TABLE", wd)
+    }
+    pub fn table_set_headers(&mut self, h: i64, headers: Vec<String>) -> Result<(), String> {
+        self.tbl_mut(h, "GUI_TABLE_HEADERS")?.headers = headers; Ok(())
+    }
+    pub fn table_set_rows(&mut self, h: i64, rows: Vec<Vec<String>>) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_ROWS")?;
+        let n_cols = t.headers.len();
+        if !rows.is_empty() && n_cols != 0 && rows[0].len() != n_cols {
+            return Err(format!("GUI_TABLE_ROWS: Zeilen haben {} Spalten, Header hat {}", rows[0].len(), n_cols));
+        }
+        t.rows = rows;
+        if t.selected >= t.rows.len() as i32 { t.selected = -1; }
+        Ok(())
+    }
+    pub fn table_set_col_widths(&mut self, h: i64, widths: Option<Vec<i32>>) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_COL_WIDTHS")?;
+        if let Some(ref cw) = widths {
+            let n = t.headers.len();
+            if n != 0 && cw.len() != n {
+                return Err(format!("GUI_TABLE_COL_WIDTHS: {} Breiten, Header hat {} Spalten", cw.len(), n));
+            }
+        }
+        t.col_widths = widths; Ok(())
+    }
+    pub fn table_selected(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_SELECTED")?.selected as i64) }
+    pub fn table_set_selected(&mut self, h: i64, row: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SET_SELECTED")?;
+        let n = t.rows.len() as i64;
+        t.selected = if row >= 0 && row < n { row as i32 } else { -1 };
+        Ok(())
+    }
+    pub fn table_clicked(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED")?.clicked_row as i64) }
+    pub fn table_row_count(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.rows.len() as i64) }
+
+    fn table_geom(&self, wi: usize, idx: usize) -> TGeom {
+        let w = &self.windows[wi].widgets[idx];
+        let (ax, ay, ww, hh) = self.abs_rect(wi, w);
+        let t = w.tbl.as_ref().unwrap();
+        let n_cols = t.headers.len();
+        let n_rows = t.rows.len();
+        let col_widths: Vec<i32> = match &t.col_widths {
+            Some(cw) if cw.len() == n_cols => cw.clone(),
+            _ => {
+                let avail = ww - TBL_SCROLL_W - 2;
+                let per = if n_cols > 0 { (avail / n_cols as i32).max(TBL_MIN_COL_W) } else { 0 };
+                vec![per; n_cols]
+            }
+        };
+        let body_x = ax + 1;
+        let body_y = ay + TBL_HEADER_H;
+        let body_w_raw = ww - 2;
+        let body_h_raw = hh - TBL_HEADER_H - 1;
+        let total_w: i32 = col_widths.iter().sum();
+        let total_h = n_rows as i32 * TBL_ROW_H;
+        let mut need_v = total_h > body_h_raw;
+        let need_h = total_w > body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
+        if need_h && total_h > body_h_raw - TBL_SCROLL_W { need_v = true; }
+        let body_w = body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
+        let body_h = body_h_raw - if need_h { TBL_SCROLL_W } else { 0 };
+        TGeom {
+            ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths,
+            body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
+            need_v, need_h,
+            max_scroll_y: (total_h - body_h).max(0), max_scroll_x: (total_w - body_w).max(0),
+        }
+    }
+
+    fn handle_height(track: i32, visible: i32, total: i32) -> i32 {
+        if total > 0 { ((track as f64 * (visible as f64 / total as f64)) as i32).max(16) } else { track }
+    }
+
+    fn table_hover(&mut self, wi: usize, idx: usize, mx: i32, my: i32, g: &mut Graphics) {
+        let gm = self.table_geom(wi, idx);
+        let wheel = g.pop_mouse_wheel();
+        let over = Self::in_rect(mx, my, (gm.body_x, gm.body_y, gm.body_w, gm.body_h));
+        let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+        t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y);
+        t.scroll_x = t.scroll_x.clamp(0, gm.max_scroll_x);
+        if wheel != 0 && over {
+            t.scroll_y = (t.scroll_y - wheel as i32 * TBL_ROW_H).clamp(0, gm.max_scroll_y);
+        }
+        if !t.drag_v && !t.drag_h && over {
+            let hr = (my - gm.body_y + t.scroll_y) / TBL_ROW_H;
+            t.hover_row = if hr >= 0 && hr < gm.n_rows as i32 { hr } else { -1 };
+        }
+    }
+
+    fn table_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
+        let gm = self.table_geom(wi, idx);
+        if gm.need_v {
+            let sb_x = gm.ax + gm.body_w_raw - TBL_SCROLL_W + 1;
+            if Self::in_rect(mx, my, (sb_x, gm.body_y, TBL_SCROLL_W, gm.body_h)) {
+                let off = Self::handle_height(gm.body_h, gm.body_h, gm.total_h) / 2;
+                { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_v = true; t.drag_off = off; }
+                self.active_table = Some((wi, idx));
+                self.table_drag(wi, idx, mx, my);
+                return;
+            }
+        }
+        if gm.need_h {
+            let hs_y = gm.ay + gm.h - TBL_SCROLL_W - 1;
+            if Self::in_rect(mx, my, (gm.body_x, hs_y, gm.body_w, TBL_SCROLL_W)) {
+                let off = Self::handle_height(gm.body_w, gm.body_w, gm.total_w) / 2;
+                { let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap(); t.drag_h = true; t.drag_off = off; }
+                self.active_table = Some((wi, idx));
+                self.table_drag(wi, idx, mx, my);
+                return;
+            }
+        }
+        let hr = self.windows[wi].widgets[idx].tbl.as_ref().unwrap().hover_row;
+        if hr >= 0 { self.table_press = Some((wi, idx, hr)); }
+    }
+
+    fn table_drag(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
+        let gm = self.table_geom(wi, idx);
+        let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+        if t.drag_v && gm.max_scroll_y > 0 {
+            let track = gm.body_h;
+            let handle = Self::handle_height(track, gm.body_h, gm.total_h);
+            let new_y = ((my - gm.body_y) - t.drag_off).clamp(0, track - handle);
+            let pos = new_y as f64 / (track - handle).max(1) as f64;
+            t.scroll_y = (pos * gm.max_scroll_y as f64) as i32;
+        } else if t.drag_h && gm.max_scroll_x > 0 {
+            let track = gm.body_w;
+            let handle = Self::handle_height(track, gm.body_w, gm.total_w);
+            let new_x = ((mx - gm.body_x) - t.drag_off).clamp(0, track - handle);
+            let pos = new_x as f64 / (track - handle).max(1) as f64;
+            t.scroll_x = (pos * gm.max_scroll_x as f64) as i32;
+        }
+    }
+
     // --- Polling / Setter ---
     pub fn clicked(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_CLICKED")?.clicked) }
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
@@ -270,8 +446,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput oder checkbox".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox oder table".into());
         }
         w.on_change = func; Ok(())
     }
@@ -343,14 +519,23 @@ impl Gui {
 
         // Transiente Flags ruecksetzen.
         for win in self.windows.iter_mut() {
-            for wdg in win.widgets.iter_mut() { wdg.clicked = false; wdg.hovered = false; }
+            for wdg in win.widgets.iter_mut() {
+                wdg.clicked = false; wdg.hovered = false;
+                if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
+            }
         }
-        // Hover (nur oberstes Fenster).
+        // Hover (nur oberstes Fenster); Tabellen aktualisieren Scroll/Hover/Wheel.
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
             for i in 0..n {
-                let r = { let w = &self.windows[top].widgets[i]; self.abs_rect(top, w) };
-                if Self::in_rect(mx, my, r) { self.windows[top].widgets[i].hovered = true; }
+                let (r, is_table) = {
+                    let w = &self.windows[top].widgets[i];
+                    (self.abs_rect(top, w), w.kind == Kind::Table)
+                };
+                if Self::in_rect(mx, my, r) {
+                    self.windows[top].widgets[i].hovered = true;
+                    if is_table { self.table_hover(top, i, mx, my, g); }
+                }
             }
         }
         // Laufendes Fenster-Drag.
@@ -364,8 +549,18 @@ impl Gui {
         if let Some((wi, i)) = self.active_slider {
             if is_down { self.drag_slider(wi, i, mx); } else { self.active_slider = None; }
         }
+        // Laufendes Tabellen-Scrollbar-Drag.
+        if let Some((wi, i)) = self.active_table {
+            if is_down {
+                self.table_drag(wi, i, mx, my);
+            } else {
+                if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() { t.drag_v = false; t.drag_h = false; }
+                self.active_table = None;
+            }
+        }
         // Neuer Druck.
-        if just_pressed && self.drag_window.is_none() && self.active_slider.is_none() {
+        if just_pressed && self.drag_window.is_none() && self.active_slider.is_none()
+            && self.active_table.is_none() {
             self.handle_press(mx, my);
         }
         // Loslassen -> Button-Klick bestaetigen.
@@ -379,6 +574,16 @@ impl Gui {
                 if let Some(f) = fire { self.pending.push(f); }
             }
             self.press_origin = None;
+            // Tabellen-Zeilen-Klick bestaetigen (Selektion + on_change).
+            if let Some((wi, i, row)) = self.table_press.take() {
+                let hr = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.hover_row).unwrap_or(-1);
+                if row >= 0 && hr == row {
+                    let w = &mut self.windows[wi].widgets[i];
+                    if let Some(t) = w.tbl.as_mut() { t.selected = row; t.clicked_row = row; }
+                    let f = w.on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
         }
         // Tastatur fuer fokussiertes TextInput (nur Backspace + Zeichen).
         if let Some((wi, i)) = self.focus_widget {
@@ -460,6 +665,7 @@ impl Gui {
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
             Kind::TextInput => self.focus_widget = Some((win, i)),
+            Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
             _ => self.focus_widget = None,
         }
     }
@@ -546,6 +752,88 @@ impl Gui {
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
             }
+            Kind::Table => self.draw_table(g, wi, idx),
+        }
+    }
+
+    fn draw_table(&self, g: &mut Graphics, wi: usize, idx: usize) {
+        let gm = self.table_geom(wi, idx);
+        let wdg = &self.windows[wi].widgets[idx];
+        let t = wdg.tbl.as_ref().unwrap();
+        let (ax, ay, w, h) = (gm.ax, gm.ay, gm.w, gm.h);
+        let (body_x, body_y, body_w, body_h) = (gm.body_x, gm.body_y, gm.body_w, gm.body_h);
+
+        let bg = self.wcol(wdg, "bg", "widget_bg");
+        let border = self.wcol(wdg, "border", "widget_border");
+        let fg = self.wcol(wdg, "fg", "text_fg");
+        let title_fg = self.wcol(wdg, "fg", "title_fg");
+        let accent = self.wcol(wdg, "accent", "accent");
+        let sel_bg = shade(accent, -110);
+        let hover_bg = shade(bg, 22);
+
+        // Aussenrahmen + Kopfzeile.
+        g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
+        g.rect(ax, ay, ax + w - 1, ay + h - 1, border);
+        g.box_fill(ax + 1, ay + 1, ax + w - 2, ay + TBL_HEADER_H - 1, self.th("title_bg"));
+        g.line(ax, ay + TBL_HEADER_H - 1, ax + w - 1, ay + TBL_HEADER_H - 1, border);
+
+        // Kopf-Zellen (horizontal mitscrollend, auf Header-Breite geclippt).
+        g.push_clip(ax + 1, ay + 1, gm.body_w_raw, TBL_HEADER_H - 2);
+        let mut cx = body_x - t.scroll_x;
+        for c in 0..gm.n_cols {
+            let cw = gm.col_widths[c];
+            if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
+                g.text(cx + TBL_PADDING, ay + 4, t.headers[c].clone(), title_fg);
+                if c < gm.n_cols - 1 { g.line(cx + cw, ay + 1, cx + cw, ay + TBL_HEADER_H - 2, border); }
+            }
+            cx += cw;
+        }
+        g.pop_clip();
+
+        // Body.
+        g.push_clip(body_x, body_y, body_w, body_h);
+        let first = (t.scroll_y / TBL_ROW_H).max(0);
+        let last = ((t.scroll_y + body_h) / TBL_ROW_H + 1).min(gm.n_rows as i32);
+        for r in first..last {
+            let row_y = body_y + r * TBL_ROW_H - t.scroll_y;
+            if r == t.selected { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + TBL_ROW_H - 1, sel_bg); }
+            if r == t.hover_row { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + TBL_ROW_H - 1, hover_bg); }
+            let mut cx = body_x - t.scroll_x;
+            let row = &t.rows[r as usize];
+            for c in 0..gm.n_cols {
+                let cw = gm.col_widths[c];
+                if cx + cw > body_x && cx < body_x + body_w {
+                    let clip_x = (cx + 1).max(body_x);
+                    let clip_w = (cw - 2).min((body_x + body_w) - clip_x);
+                    g.push_clip(clip_x, row_y, clip_w, TBL_ROW_H);
+                    g.text(cx + TBL_PADDING, row_y + 3, row[c].clone(), fg);
+                    g.pop_clip();
+                }
+                cx += cw;
+            }
+            g.line(body_x, row_y + TBL_ROW_H - 1, body_x + body_w - 1, row_y + TBL_ROW_H - 1, shade(bg, 14));
+        }
+        g.pop_clip();
+
+        // Vertikale Scrollbar.
+        if gm.need_v {
+            let sb_x = ax + gm.body_w_raw - TBL_SCROLL_W + 1;
+            let track = body_h;
+            let handle = Self::handle_height(track, body_h, gm.total_h);
+            let ratio = if gm.max_scroll_y > 0 { t.scroll_y as f64 / gm.max_scroll_y as f64 } else { 0.0 };
+            let hy = body_y + ((track - handle) as f64 * ratio) as i32;
+            g.box_fill(sb_x, body_y, sb_x + TBL_SCROLL_W - 1, body_y + track - 1, shade(bg, -8));
+            g.box_fill(sb_x + 2, hy, sb_x + TBL_SCROLL_W - 3, hy + handle - 1, if t.drag_v { accent } else { border });
+        }
+        // Horizontale Scrollbar.
+        if gm.need_h {
+            let hs_y = ay + h - TBL_SCROLL_W - 1;
+            let track = body_w;
+            let handle = Self::handle_height(track, body_w, gm.total_w);
+            let ratio = if gm.max_scroll_x > 0 { t.scroll_x as f64 / gm.max_scroll_x as f64 } else { 0.0 };
+            let hx = body_x + ((track - handle) as f64 * ratio) as i32;
+            g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + TBL_SCROLL_W - 1, shade(bg, -8));
+            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + TBL_SCROLL_W - 3, if t.drag_h { accent } else { border });
         }
     }
 }
@@ -580,5 +868,54 @@ mod tests {
         let _b = g.button(win, "OK".into(), 10, 10, 50, 20).unwrap();
         g.handle_press(400, 400); // weit weg
         assert!(g.take_pending().is_empty());
+    }
+
+    fn rows(n: usize) -> Vec<Vec<String>> {
+        (0..n).map(|i| vec![format!("r{}", i), format!("{}", i)]).collect()
+    }
+
+    // Tabellen-Layout: 14 Zeilen ueberlaufen -> vertikale Scrollbar, korrekte
+    // Body-Hoehe + Scroll-Maximum.
+    #[test]
+    fn table_geom_overflow_needs_vscroll() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 360, 250);
+        let tbl = g.table(win, 14, 12, 332, 170).unwrap();
+        g.table_set_headers(tbl, vec!["Name".into(), "Lvl".into()]).unwrap();
+        g.table_set_rows(tbl, rows(14)).unwrap();
+        let gm = g.table_geom(0, 0);
+        assert_eq!(gm.n_rows, 14);
+        assert!(gm.need_v && !gm.need_h);
+        assert_eq!(gm.body_h, 170 - TBL_HEADER_H - 1);          // 147
+        assert_eq!(gm.total_h, 14 * TBL_ROW_H);                  // 280
+        assert_eq!(gm.max_scroll_y, gm.total_h - gm.body_h);     // 133
+    }
+
+    // Press auf eine Body-Zeile (kein Scrollbar) merkt den Zeilen-Klick vor;
+    // Selektion folgt beim Release ueber derselben Zeile.
+    #[test]
+    fn table_row_press_then_release_selects() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 360, 250);
+        let tbl = g.table(win, 14, 12, 332, 170).unwrap();
+        g.table_set_headers(tbl, vec!["Name".into(), "Lvl".into()]).unwrap();
+        g.table_set_rows(tbl, rows(14)).unwrap();
+        // Hover-Zeile setzen (sonst von table_hover/Graphics abhaengig).
+        g.windows[0].widgets[0].tbl.as_mut().unwrap().hover_row = 3;
+        // Body-Koordinate (nicht Titel, nicht Scrollbar).
+        g.handle_press(100, 90);
+        assert_eq!(g.table_press, Some((0, 0, 3)));
+        // Release ueber derselben Zeile -> Selektion + clicked_row.
+        g.was_mouse_down = true;            // simulate prior press frame
+        // Manuelles Release-Pendant (update braucht Graphics): Logik spiegeln.
+        if let Some((wi, i, row)) = g.table_press.take() {
+            let hr = g.windows[wi].widgets[i].tbl.as_ref().unwrap().hover_row;
+            if row >= 0 && hr == row {
+                let t = g.windows[wi].widgets[i].tbl.as_mut().unwrap();
+                t.selected = row; t.clicked_row = row;
+            }
+        }
+        assert_eq!(g.table_selected(tbl).unwrap(), 3);
+        assert_eq!(g.table_clicked(tbl).unwrap(), 3);
     }
 }

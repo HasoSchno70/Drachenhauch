@@ -324,12 +324,21 @@ Logik — headless nicht klickbar testbar. **FUNCREF-Callbacks**
 (`GUI_ON_CLICK`/`GUI_ON_CHANGE`) feuern: `update()` sammelt ausgeloeste Handler
 in `pending`, die VM leert die Queue nach `GUI_UPDATE` und ruft sie (parameter-
 los) via `exec` auf — so kann ein Callback die GUI sicher verändern, neue
-Events landen nächsten Frame. Rust-Unit-Tests decken das Queueing ab
-(`cargo test`/`build_runtime.py --test`). *Noch offen:* `GUI_TABLE` (eigener
-Pass, klare Fehlermeldung wenn aufgerufen).
+Events landen nächsten Frame.
 
-**Noch offen (Module):** `UI_TABLE` (Immediate-Mode) + `GUI_TABLE` (Retained).
-Hardware/Netzwerk + `regex` bleiben außen vor.
+**`GUI_TABLE`** ist nativ portiert: fixierte Kopfzeile, V/H-Scroll
+(Mausrad + Scrollbalken-Drag), Hover-/Selektions-Highlight, klickbare Zeilen,
+`GUI_TABLE_HEADERS/ROWS/COL_WIDTHS/SELECTED/SET_SELECTED/CLICKED/ROW_COUNT` +
+`GUI_ON_CHANGE` bei Selektionswechsel. Layout aus einer Quelle (`table_geom`).
+Dafür hat die Grafik neu: **Mausrad** (`pop_mouse_wheel`) und einen
+**Clip-Stack** (`push_clip`/`pop_clip` → raylib-Scissor mit Verschnitt). Render
+per Screenshot verifiziert ([examples/84_gui_table.gb](../examples/84_gui_table.gb));
+Rust-Unit-Tests decken Callback-Queueing, Tabellen-Layout (`table_geom`) und
+Press→Selektion ab (`build_runtime.py --test`). *Noch offen:* der Immediate-
+Mode-`UI_TABLE` (separates Modul `ui`).
+
+**Noch offen (Module):** `UI_TABLE` (Immediate-Mode `ui`). `GUI_TABLE`
+(Retained) ist portiert. Hardware/Netzwerk + `regex` bleiben außen vor.
 
 **ENUM / STATIC CONST:** `_EnumNamespace`/`_ClassStaticNamespace` werden als
 `{"ns": {name, members}}` serialisiert und in Rust als `Value::Namespace`

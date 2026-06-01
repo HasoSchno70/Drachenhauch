@@ -1072,6 +1072,55 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: handler muss FUNCREF sein", f)),
             }
         }
+        // 1D ARRAY OF STRING -> Vec<String>.
+        fn gstrs(a: &[Value], i: usize, f: &str) -> R<Vec<String>> {
+            match a.get(i) {
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    if arr.element_type != "string" || arr.dims.len() != 1 {
+                        return Err(format!("{}: erwartet 1D ARRAY OF STRING", f));
+                    }
+                    Ok(arr.values.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect())
+                }
+                _ => Err(format!("{}: erwartet ARRAY OF STRING", f)),
+            }
+        }
+        // 2D ARRAY OF STRING -> Vec<Vec<String>>.
+        fn gstrs2(a: &[Value], i: usize, f: &str) -> R<Vec<Vec<String>>> {
+            match a.get(i) {
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    if arr.element_type != "string" || arr.dims.len() != 2 {
+                        return Err(format!("{}: erwartet 2D ARRAY OF STRING", f));
+                    }
+                    let (rows, cols) = (arr.dims[0] as usize, arr.dims[1] as usize);
+                    let mut out = Vec::with_capacity(rows);
+                    for r in 0..rows {
+                        let mut row = Vec::with_capacity(cols);
+                        for c in 0..cols {
+                            row.push(match &arr.values[r * cols + c] { Value::Str(s) => s.to_string(), o => o.fmt() });
+                        }
+                        out.push(row);
+                    }
+                    Ok(out)
+                }
+                _ => Err(format!("{}: erwartet 2D ARRAY OF STRING", f)),
+            }
+        }
+        // 1D ARRAY OF INTEGER -> Vec<i32> (oder None bei NIL).
+        fn gints_opt(a: &[Value], i: usize, f: &str) -> R<Option<Vec<i32>>> {
+            match a.get(i) {
+                Some(Value::Nil) | None => Ok(None),
+                Some(Value::Array(arr)) => {
+                    let arr = arr.borrow();
+                    if arr.element_type != "integer" || arr.dims.len() != 1 {
+                        return Err(format!("{}: erwartet 1D ARRAY OF INTEGER", f));
+                    }
+                    Ok(Some(arr.values.iter().map(|v| match v { Value::Int(n) => *n as i32, _ => 0 }).collect()))
+                }
+                _ => Err(format!("{}: erwartet ARRAY OF INTEGER oder NIL", f)),
+            }
+        }
         let r = match name {
             "gui_window" => Value::Int(self.gui.new_window(
                 gs(a,0,"GUI_WINDOW")?, gi(a,1,"GUI_WINDOW")? as i32, gi(a,2,"GUI_WINDOW")? as i32,
@@ -1127,9 +1176,25 @@ impl<'p> Vm<'p> {
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_reset" => { self.gui.reset(); Value::Nil }
-            // GUI_TABLE ist noch nicht nativ (eigener Pass) -- klare Meldung.
-            n if n.starts_with("gui_table") =>
-                return Err("GUI_TABLE ist noch nicht in der nativen Runtime portiert (im Python/F5-Pfad verfuegbar)".into()),
+            // --- Tabelle ---
+            "gui_table" => {
+                let h = self.gui.table(gi(a,0,"GUI_TABLE")?, gi(a,1,"GUI_TABLE")? as i32, gi(a,2,"GUI_TABLE")? as i32,
+                    gi(a,3,"GUI_TABLE")? as i32, gi(a,4,"GUI_TABLE")? as i32)?;
+                if a.len() == 7 {
+                    self.gui.table_set_headers(h, gstrs(a,5,"GUI_TABLE")?)?;
+                    self.gui.table_set_rows(h, gstrs2(a,6,"GUI_TABLE")?)?;
+                } else if a.len() == 6 {
+                    return Err("GUI_TABLE: entweder ohne Daten oder mit headers UND cells aufrufen".into());
+                }
+                Value::Int(h)
+            }
+            "gui_table_headers" => { self.gui.table_set_headers(gi(a,0,"GUI_TABLE_HEADERS")?, gstrs(a,1,"GUI_TABLE_HEADERS")?)?; Value::Nil }
+            "gui_table_rows" => { self.gui.table_set_rows(gi(a,0,"GUI_TABLE_ROWS")?, gstrs2(a,1,"GUI_TABLE_ROWS")?)?; Value::Nil }
+            "gui_table_col_widths" => { self.gui.table_set_col_widths(gi(a,0,"GUI_TABLE_COL_WIDTHS")?, gints_opt(a,1,"GUI_TABLE_COL_WIDTHS")?)?; Value::Nil }
+            "gui_table_selected" => Value::Int(self.gui.table_selected(gi(a,0,"GUI_TABLE_SELECTED")?)?),
+            "gui_table_set_selected" => { self.gui.table_set_selected(gi(a,0,"GUI_TABLE_SET_SELECTED")?, gi(a,1,"GUI_TABLE_SET_SELECTED")?)?; Value::Nil }
+            "gui_table_clicked" => Value::Int(self.gui.table_clicked(gi(a,0,"GUI_TABLE_CLICKED")?)?),
+            "gui_table_row_count" => Value::Int(self.gui.table_row_count(gi(a,0,"GUI_TABLE_ROW_COUNT")?)?),
             "gui_update" => {
                 {
                     let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;

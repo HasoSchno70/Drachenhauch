@@ -33,6 +33,10 @@ enum Cmd {
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool), // tex, sx,sy,sw,sh, dx,dy, flip_h
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
+    // Clip-Stack (Scissor): Push schneidet mit dem aktuellen Clip, Pop stellt
+    // den vorigen wieder her. Koordinaten logisch (pre-scale), beim Replay * s.
+    ScissorPush(i32, i32, i32, i32),
+    ScissorPop,
 }
 
 /// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
@@ -484,6 +488,19 @@ impl Graphics {
     }
     pub fn millis(&self) -> i64 { (self.rl.get_time() * 1000.0) as i64 }
 
+    /// Mausrad-Delta dieses Frames (raylib liefert es pro Frame; "pop" =
+    /// einmal lesen). Positiv = nach oben/vorn.
+    pub fn pop_mouse_wheel(&self) -> i64 { self.rl.get_mouse_wheel_move() as i64 }
+
+    /// Clip-Rechteck auf den Stack legen (Scissor). Koordinaten werden wie bei
+    /// allen Draws kamera-transformiert; der Screen-Scale kommt beim Replay.
+    pub fn push_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        let (x, y) = self.w2s(x, y);
+        let (w, h) = (self.ssize(w), self.ssize(h));
+        self.emit(Cmd::ScissorPush(x, y, w, h));
+    }
+    pub fn pop_clip(&mut self) { self.emit(Cmd::ScissorPop); }
+
     pub fn quit_requested(&self) -> bool {
         if let Some(mx) = self.max_frames {
             if self.frame_count >= mx { return true; }
@@ -498,6 +515,9 @@ impl Graphics {
         let mut order: Vec<usize> = (0..self.layers.len()).collect();
         order.sort_by_key(|&i| self.layers[i].z);
         let Graphics { rl, thread, layers, textures, cmds3d, cam3d, .. } = self;
+        // Clip-Stack (Scissor): jeder Eintrag ist das aktive, bereits
+        // verschnittene Rechteck in Screen-Pixeln.
+        let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
         {
             let mut d = rl.begin_drawing(thread);
             d.clear_background(clear_color);
@@ -616,9 +636,30 @@ impl Graphics {
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0,*tint);
                     }
+                    Cmd::ScissorPush(x, y, w, h) => {
+                        // Logische -> Screen-Pixel, dann mit aktuellem Clip schneiden.
+                        let mut rx = x * s; let mut ry = y * s;
+                        let mut rw = w * s; let mut rh = h * s;
+                        if let Some(&(cx, cy, cw, ch)) = clip_stack.last() {
+                            let nx = rx.max(cx); let ny = ry.max(cy);
+                            let nx2 = (rx + rw).min(cx + cw); let ny2 = (ry + rh).min(cy + ch);
+                            rx = nx; ry = ny; rw = (nx2 - nx).max(0); rh = (ny2 - ny).max(0);
+                        }
+                        clip_stack.push((rx, ry, rw, rh));
+                        unsafe { raylib::ffi::BeginScissorMode(rx, ry, rw, rh); }
+                    }
+                    Cmd::ScissorPop => {
+                        clip_stack.pop();
+                        match clip_stack.last() {
+                            Some(&(rx, ry, rw, rh)) => unsafe { raylib::ffi::BeginScissorMode(rx, ry, rw, rh); },
+                            None => unsafe { raylib::ffi::EndScissorMode(); },
+                        }
+                    }
                 }
               }
             }
+            // Sicherheit: unbalancierte Clips nicht in den naechsten Frame lecken.
+            if !clip_stack.is_empty() { unsafe { raylib::ffi::EndScissorMode(); } }
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
