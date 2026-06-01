@@ -375,6 +375,14 @@ class GameBasicEditor(QMainWindow):
         self.act_stop.triggered.connect(self.console.stop_run)
         self.act_stop.setEnabled(False)
 
+        self.act_run_native = QAction(
+            icons.get("run"), "Run nativ (gbrt)", self)
+        self.act_run_native.setShortcut(QKeySequence("F6"))
+        self.act_run_native.setToolTip(
+            "Nativ ausfuehren via gbrt-Runtime (F6) -- kompiliert + startet die "
+            "native Rust-Runtime")
+        self.act_run_native.triggered.connect(self._run_native_active)
+
         self.act_bench = QAction(icons.get("bench"), "Benchmark (TW vs Python-VM vs Native-VM)", self)
         self.act_bench.setShortcut(QKeySequence("Ctrl+F5"))
         self.act_bench.triggered.connect(self._bench_active)
@@ -432,6 +440,7 @@ class GameBasicEditor(QMainWindow):
             tb.addAction(a)
         tb.addSeparator()
         tb.addAction(self.act_run)
+        tb.addAction(self.act_run_native)
         tb.addAction(self.act_stop)
         tb.addAction(self.act_bench)
         tb.addSeparator()
@@ -443,6 +452,7 @@ class GameBasicEditor(QMainWindow):
         # Objektnamen fuer farbige Hover-Akzente (siehe theme.global_qss):
         # Run gruen, Stop magenta.
         for act, obj_name in ((self.act_run, "RunButton"),
+                              (self.act_run_native, "RunNativeButton"),
                               (self.act_stop, "StopButton")):
             w = tb.widgetForAction(act)
             if w is not None:
@@ -490,6 +500,7 @@ class GameBasicEditor(QMainWindow):
 
         m_run = mb.addMenu("Aus&fuehren")
         m_run.addAction(self.act_run)
+        m_run.addAction(self.act_run_native)
         m_run.addAction(self.act_stop)
         m_run.addSeparator()
         m_run.addAction(self.act_bench)
@@ -971,6 +982,13 @@ class GameBasicEditor(QMainWindow):
         assert st is not None and st.file_path is not None
         self.console.start_run(st.file_path)
 
+    def _run_native_active(self) -> None:
+        if not self._ensure_saved_for_run():
+            return
+        st = self.tabs.active
+        assert st is not None and st.file_path is not None
+        self.console.start_run_native(st.file_path)
+
     def _run_selection(self, snippet: str) -> None:
         """Schreibt den selektierten Code in eine temp-Datei und startet
         gbrun.py darauf -- erlaubt schnelles Ausprobieren ohne den Buffer
@@ -1040,12 +1058,14 @@ class GameBasicEditor(QMainWindow):
 
     def _on_run_started(self) -> None:
         self.act_run.setEnabled(False)
+        self.act_run_native.setEnabled(False)
         self.act_bench.setEnabled(False)
         self.act_stop.setEnabled(True)
         self.statusBar().showMessage("Laeuft ...")
 
     def _on_run_finished(self, _rc: int) -> None:
         self.act_run.setEnabled(True)
+        self.act_run_native.setEnabled(True)
         self.act_bench.setEnabled(True)
         self.act_stop.setEnabled(False)
         self.statusBar().showMessage("Bereit", 3000)
@@ -1185,7 +1205,7 @@ class GameBasicEditor(QMainWindow):
             self.act_theme,
         ])
         add_action_group("Ausfuehren", [
-            self.act_run, self.act_stop, self.act_bench,
+            self.act_run, self.act_run_native, self.act_stop, self.act_bench,
         ])
         add_action_group("Hilfe", [
             self.act_show_readme, self.act_shortcuts, self.act_about,
@@ -1258,7 +1278,7 @@ class GameBasicEditor(QMainWindow):
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,
-            self.act_run, self.act_stop, self.act_bench,
+            self.act_run, self.act_run_native, self.act_stop, self.act_bench,
             self.act_view_files, self.act_view_outline, self.act_view_builtins,
             self.act_toggle_minimap, self.act_fold, self.act_unfold_all,
             self.act_theme, self.act_show_readme, self.act_about,

@@ -41,6 +41,19 @@ _LINK_FILE_HEADER = re.compile(r"Fehler in ([^\n:]+?\.gb):")
 _LINK_FILE_LINE = re.compile(r"(\S+\.gb):(\d+)")
 
 
+def _find_gbrt(project_root: Path) -> Path | None:
+    """Sucht das gebaute `gbrt`-Binary der nativen Runtime (Release bevorzugt).
+    Spiegelt `gbrun._find_gbrt` -- bewusst dupliziert, damit der Editor nicht
+    das Top-Level-Script `gbrun.py` importieren muss."""
+    base = project_root / "rust" / "gb_runtime" / "target"
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = base / variant / exe
+        if p.exists():
+            return p
+    return None
+
+
 class _LinkableText(QPlainTextEdit):
     """`QPlainTextEdit`, das Anker-Klicks (AnchorHref) als Signal emittiert."""
 
@@ -89,6 +102,8 @@ class OutputConsole(QWidget):
         self._proc: QProcess | None = None
         self._user_stopped = False
         self._current_run_file: Path | None = None
+        # Temporaere .gbc des aktuellen Native-Runs (nach Finish geloescht).
+        self._native_gbc: Path | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -346,6 +361,70 @@ class OutputConsole(QWidget):
         self.process_started.emit()
         return True
 
+    def start_run_native(self, file_path: Path) -> bool:
+        """Kompiliert die Datei nach `.gbc` (Python) und fuehrt sie mit der
+        nativen Runtime `gbrt` aus -- direkt als QProcess, damit der Stop-Button
+        gbrt selbst beendet (kein verwaister Prozess wie bei gbrun.py --native).
+
+        Der Quell-Dateiname wird als 2. Arg an gbrt durchgereicht, sodass
+        Laufzeitfehler `datei.gb:Zeile` zeigen. Arbeitsverzeichnis ist der
+        Ordner der Quelldatei (relative Asset-Pfade)."""
+        if self.is_running():
+            return False
+
+        gbrt = _find_gbrt(self.project_root)
+        if gbrt is None:
+            self.clear()
+            self.append("Native Runtime 'gbrt' nicht gefunden.\n", "error")
+            self.append("Einmalig bauen mit:\n", "muted")
+            self.append("  .venv\\Scripts\\python.exe rust\\build_runtime.py\n",
+                        "muted")
+            return False
+
+        # In temporaere .gbc kompilieren (Compile-Fehler sauber melden).
+        import tempfile
+        from gamebasic.errors import GameBasicError
+        fd, tmp = tempfile.mkstemp(suffix=".gbc")
+        os.close(fd)
+        tmp_path = Path(tmp)
+        self.clear()
+        self.append(f"▶ Nativ (gbrt): {file_path.name}\n\n", "info")
+        try:
+            from gamebasic.serialize import compile_file_to_gbc
+            compile_file_to_gbc(file_path, tmp_path)
+        except GameBasicError as exc:
+            self.append(f"Compile-Fehler: {exc}\n", "error")
+            tmp_path.unlink(missing_ok=True)
+            return False
+        except Exception as exc:  # pragma: no cover - defensiv
+            self.append(f"Compile-Fehler: {exc}\n", "error")
+            tmp_path.unlink(missing_ok=True)
+            return False
+
+        self._user_stopped = False
+        self._current_run_file = file_path
+        self._native_gbc = tmp_path
+
+        proc = QProcess(self)
+        proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        # Arbeitsverzeichnis = Quell-Ordner, damit LOADIMAGE("assets/...") greift.
+        proc.setWorkingDirectory(str(file_path.parent))
+        proc.readyReadStandardOutput.connect(self._on_stdout)
+        proc.finished.connect(self._on_finished)
+        proc.errorOccurred.connect(self._on_error)
+        proc.start(str(gbrt), [str(tmp_path), file_path.name])
+        if not proc.waitForStarted(3000):
+            self.append("Konnte gbrt nicht starten.\n", "error")
+            tmp_path.unlink(missing_ok=True)
+            self._native_gbc = None
+            return False
+        self._proc = proc
+        self.input_entry.setEnabled(True)
+        self.input_entry.setPlaceholderText("Eingabe (Enter sendet) ...")
+        self.input_entry.setFocus()
+        self.process_started.emit()
+        return True
+
     def stop_run(self) -> None:
         if not self.is_running():
             return
@@ -377,6 +456,10 @@ class OutputConsole(QWidget):
         else:
             self.append(f"\n✗ Programm beendet mit Fehler-Code {exit_code}.\n", "error")
         self._proc = None
+        # Temporaere .gbc eines Native-Runs aufraeumen.
+        if self._native_gbc is not None:
+            self._native_gbc.unlink(missing_ok=True)
+            self._native_gbc = None
         self.input_entry.setEnabled(False)
         self.input_entry.setPlaceholderText("(kein Programm aktiv)")
         self.input_entry.clear()

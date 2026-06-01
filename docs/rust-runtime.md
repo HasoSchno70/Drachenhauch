@@ -41,6 +41,12 @@ verweist die Meldung auf `rust\build_runtime.py`.
 So bleibt Python die Toolchain (und später nur noch der Editor), während die
 Ausführung nativ läuft — kein manuelles `serialize` + `gbrt` mehr.
 
+**Im Editor:** Toolbar-/Menü-Button **„Run nativ (gbrt)" (F6)**. Der Editor
+kompiliert die Datei in-process in eine temporäre `.gbc` und startet `gbrt`
+**direkt** als `QProcess` (nicht über `gbrun.py`) — so beendet der `Stop`-Button
+auch den nativen Prozess (kein verwaister gbrt). Output und Laufzeitfehler
+(`datei.gb:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
+
 ### Laufzeitfehler mit Zeilennummer
 
 Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** (`stmt.line`

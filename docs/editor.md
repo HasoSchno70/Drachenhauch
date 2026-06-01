@@ -112,8 +112,9 @@ Oder ohne Argumente:
 | Kürzel | Aktion |
 |---|---|
 | `F5` | Programm starten (Tree-Walker) |
+| `F6` | Nativ starten (gbrt-Runtime) — kompiliert + führt die native Rust-Runtime aus |
 | Toolbar `Bench` | Vergleicht Tree-Walker, Python-VM, Native-VM |
-| Toolbar `Stop` | Laufendes Programm abbrechen |
+| Toolbar `Stop` | Laufendes Programm abbrechen (auch den nativen `gbrt`-Prozess) |
 
 ## Befehlspalette (`Strg+Shift+P`)
 
@@ -314,6 +315,7 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 ## Run / Bench / Stop
 
 - **`Run` (F5)**: führt `gbrun.py <datei>` aus, Tree-Walker. Output in der Konsole.
+- **`Run nativ` (F6)**: kompiliert die Datei (Python) in eine temporäre `.gbc` und führt sie mit der nativen Rust-Runtime `gbrt` aus — direkt als Prozess, sodass `Stop` ihn auch beendet. Arbeitsverzeichnis ist der Ordner der Quelldatei (relative Asset-Pfade). Laufzeitfehler erscheinen als klickbares `datei.gb:Zeile`. Ist `gbrt` nicht gebaut, weist die Konsole auf `rust\build_runtime.py` hin. (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
 - **`Bench`**: führt `gbrun.py --bench <datei>` aus — kompiliert + läuft Tree-Walker, Python-VM und (wenn vorhanden) Native-VM auf derselben Datei. Output zeigt Performance-Zahlen pro Pfad und ob alle Outputs identisch sind.
 
   ```
