@@ -80,6 +80,95 @@ struct Tex {
     img: Image,
 }
 
+/// Beleuchtung (Blinn-Phong via Standard-rlights-Shader). Bis zu 4 Lichter.
+const MAX_LIGHTS: usize = 4;
+
+/// Ein Licht + die gecachten Uniform-Locations im Lighting-Shader.
+struct LightData {
+    enabled: bool,
+    kind: i32,        // 0 = directional, 1 = point
+    pos: [f32; 3],
+    target: [f32; 3],
+    color: [f32; 4],
+    loc_enabled: i32,
+    loc_type: i32,
+    loc_pos: i32,
+    loc_target: i32,
+    loc_color: i32,
+}
+
+/// Eingebetteter Lighting-Vertex-Shader (raylib rlights, GLSL 330).
+const LIGHT_VS: &str = r#"#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+uniform mat4 mvp;
+uniform mat4 matModel;
+uniform mat4 matNormal;
+out vec3 fragPosition;
+out vec2 fragTexCoord;
+out vec4 fragColor;
+out vec3 fragNormal;
+void main()
+{
+    fragPosition = vec3(matModel*vec4(vertexPosition, 1.0));
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    fragNormal = normalize(vec3(matNormal*vec4(vertexNormal, 1.0)));
+    gl_Position = mvp*vec4(vertexPosition, 1.0);
+}
+"#;
+
+/// Eingebetteter Lighting-Fragment-Shader (raylib rlights, GLSL 330).
+const LIGHT_FS: &str = r#"#version 330
+in vec3 fragPosition;
+in vec2 fragTexCoord;
+in vec4 fragColor;
+in vec3 fragNormal;
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+out vec4 finalColor;
+#define MAX_LIGHTS 4
+#define LIGHT_DIRECTIONAL 0
+#define LIGHT_POINT 1
+struct Light {
+    int enabled;
+    int type;
+    vec3 position;
+    vec3 target;
+    vec4 color;
+};
+uniform Light lights[MAX_LIGHTS];
+uniform vec4 ambient;
+uniform vec3 viewPos;
+void main()
+{
+    vec4 texelColor = texture(texture0, fragTexCoord);
+    vec3 lightDot = vec3(0.0);
+    vec3 normal = normalize(fragNormal);
+    vec3 viewD = normalize(viewPos - fragPosition);
+    vec3 specular = vec3(0.0);
+    for (int i = 0; i < MAX_LIGHTS; i++)
+    {
+        if (lights[i].enabled == 1)
+        {
+            vec3 light = vec3(0.0);
+            if (lights[i].type == LIGHT_DIRECTIONAL) light = -normalize(lights[i].target - lights[i].position);
+            if (lights[i].type == LIGHT_POINT) light = normalize(lights[i].position - fragPosition);
+            float NdotL = max(dot(normal, light), 0.0);
+            lightDot += lights[i].color.rgb*NdotL;
+            float specCo = 0.0;
+            if (NdotL > 0.0) specCo = pow(max(0.0, dot(viewD, reflect(-(light), normal))), 16.0);
+            specular += specCo;
+        }
+    }
+    finalColor = (texelColor*((colDiffuse + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
+    finalColor += texelColor*(ambient/10.0)*colDiffuse;
+    finalColor = pow(finalColor, vec4(1.0/2.2));
+}
+"#;
+
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -102,6 +191,13 @@ pub struct Graphics {
     cam3d: Camera3D,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
+    // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
+    // ersten LIGHT_ENABLE geladen; lights[] sind bis zu MAX_LIGHTS Lichter.
+    light_shader: Option<Shader>,
+    lights: Vec<LightData>,
+    light_ambient: [f32; 4],
+    loc_view: i32,
+    loc_ambient: i32,
     text_size: i32,
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
@@ -152,6 +248,11 @@ impl Graphics {
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
             cmds3d: Vec::new(),
             models: Vec::new(),
+            light_shader: None,
+            lights: Vec::new(),
+            light_ambient: [0.1, 0.1, 0.1, 1.0],
+            loc_view: -1,
+            loc_ambient: -1,
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
                 Vector3::new(6.0, 5.0, 6.0),
@@ -200,6 +301,28 @@ impl Graphics {
             Vector3::new(0.0, 1.0, 0.0),
             fovy);
     }
+    /// Kamera per raylib-Controller bewegen (liest Tastatur/Maus). mode:
+    /// 1=free, 2=orbital, 3=first_person, 4=third_person (sonst custom/no-op).
+    /// cam3d bleibt zwischen Frames erhalten -> CAMERA3D einmal initial setzen,
+    /// dann jeden Frame CAMERA3D_UPDATE(mode).
+    pub fn camera3d_update(&mut self, mode: i64) {
+        use raylib::consts::CameraMode::*;
+        let m = match mode {
+            1 => CAMERA_FREE,
+            2 => CAMERA_ORBITAL,
+            3 => CAMERA_FIRST_PERSON,
+            4 => CAMERA_THIRD_PERSON,
+            _ => CAMERA_CUSTOM,
+        };
+        self.rl.update_camera(&mut self.cam3d, m);
+    }
+    pub fn cam3d_pos(&self) -> (f64, f64, f64) {
+        (self.cam3d.position.x as f64, self.cam3d.position.y as f64, self.cam3d.position.z as f64)
+    }
+    pub fn cam3d_target(&self) -> (f64, f64, f64) {
+        (self.cam3d.target.x as f64, self.cam3d.target.y as f64, self.cam3d.target.z as f64)
+    }
+
     fn emit3d(&mut self, c: Cmd3D) { self.cmds3d.push(c); }
 
     #[allow(clippy::too_many_arguments)]
@@ -372,6 +495,109 @@ impl Graphics {
         let r = self.mouse_ray();
         self.ray_hit_sphere(r.position.x, r.position.y, r.position.z,
                             r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, radius)
+    }
+
+    // --- Beleuchtung (Blinn-Phong via rlights-Shader) ---
+    /// Laedt den Lighting-Shader (einmal) und aktiviert die Beleuchtung. Die
+    /// Uniform-Locations fuer viewPos/ambient werden gecacht.
+    pub fn light_enable(&mut self) {
+        if self.light_shader.is_some() { return; }
+        let mut sh = self.rl.load_shader_from_memory(&self.thread, Some(LIGHT_VS), Some(LIGHT_FS));
+        // matModel fuer fragPosition (Weltkoordinaten) explizit binden.
+        let loc_model = sh.get_shader_location("matModel");
+        sh.locs_mut()[raylib::consts::ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as usize] = loc_model;
+        self.loc_view = sh.get_shader_location("viewPos");
+        self.loc_ambient = sh.get_shader_location("ambient");
+        self.light_shader = Some(sh);
+    }
+    pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
+        let v = col_ as u32;
+        let f = intensity as f32;
+        self.light_ambient = [
+            ((v >> 16) & 0xFF) as f32 / 255.0 * f,
+            ((v >> 8) & 0xFF) as f32 / 255.0 * f,
+            (v & 0xFF) as f32 / 255.0 * f,
+            1.0,
+        ];
+    }
+    /// Fuegt ein Licht hinzu (kind: 0=directional, 1=point). Liefert den Index
+    /// oder -1 wenn MAX_LIGHTS erreicht. Bei directional ist (x,y,z) die
+    /// Richtung (Ziel), die Position liegt im Ursprung.
+    pub fn light_add(&mut self, kind: i64, x: f32, y: f32, z: f32, col_: i64) -> i64 {
+        if self.light_shader.is_none() { self.light_enable(); }
+        if self.lights.len() >= MAX_LIGHTS { return -1; }
+        let i = self.lights.len();
+        let v = col_ as u32;
+        let color = [((v >> 16) & 0xFF) as f32 / 255.0, ((v >> 8) & 0xFF) as f32 / 255.0,
+                     (v & 0xFF) as f32 / 255.0, 1.0];
+        let (pos, target) = if kind == 0 {
+            ([0.0, 0.0, 0.0], [x, y, z])   // directional: Richtung = target
+        } else {
+            ([x, y, z], [0.0, 0.0, 0.0])   // point: Position
+        };
+        let sh = self.light_shader.as_mut().unwrap();
+        let ld = LightData {
+            enabled: true, kind: kind as i32, pos, target, color,
+            loc_enabled: sh.get_shader_location(&format!("lights[{}].enabled", i)),
+            loc_type:    sh.get_shader_location(&format!("lights[{}].type", i)),
+            loc_pos:     sh.get_shader_location(&format!("lights[{}].position", i)),
+            loc_target:  sh.get_shader_location(&format!("lights[{}].target", i)),
+            loc_color:   sh.get_shader_location(&format!("lights[{}].color", i)),
+        };
+        self.lights.push(ld);
+        i as i64
+    }
+    pub fn light_set_pos(&mut self, idx: i64, x: f32, y: f32, z: f32) -> Result<(), String> {
+        let l = self.lights.get_mut(idx as usize).ok_or("LIGHT_SET_POS: ungueltiger Licht-Index")?;
+        if l.kind == 0 { l.target = [x, y, z]; } else { l.pos = [x, y, z]; }
+        Ok(())
+    }
+    pub fn light_set_color(&mut self, idx: i64, col_: i64) -> Result<(), String> {
+        let v = col_ as u32;
+        let l = self.lights.get_mut(idx as usize).ok_or("LIGHT_SET_COLOR: ungueltiger Licht-Index")?;
+        l.color = [((v >> 16) & 0xFF) as f32 / 255.0, ((v >> 8) & 0xFF) as f32 / 255.0, (v & 0xFF) as f32 / 255.0, 1.0];
+        Ok(())
+    }
+    pub fn light_set_enabled(&mut self, idx: i64, on: bool) -> Result<(), String> {
+        let l = self.lights.get_mut(idx as usize).ok_or("LIGHT_SET_ENABLED: ungueltiger Licht-Index")?;
+        l.enabled = on;
+        Ok(())
+    }
+    /// Haengt den Lighting-Shader an alle Materialien eines Modells.
+    pub fn model_lit(&mut self, model_idx: i64) -> Result<(), String> {
+        if self.light_shader.is_none() {
+            return Err("MODEL_LIT: zuerst LIGHT_ENABLE() / ein Licht hinzufuegen".into());
+        }
+        let mi = self.check_model(model_idx, "MODEL_LIT")?;
+        let sh_ffi = *self.light_shader.as_ref().unwrap().as_ref();   // ffi::Shader (Copy)
+        for mat in self.models[mi].materials_mut() {
+            mat.as_mut().shader = sh_ffi;
+        }
+        Ok(())
+    }
+    /// Setzt pro Frame viewPos + ambient + alle Licht-Uniforms. Wird in flip()
+    /// vor dem 3D-Pass gerufen, solange Beleuchtung aktiv ist.
+    fn update_light_uniforms(&mut self) {
+        if self.light_shader.is_none() { return; }
+        let view = [self.cam3d.position.x, self.cam3d.position.y, self.cam3d.position.z];
+        let ambient = self.light_ambient;
+        let loc_view = self.loc_view;
+        let loc_ambient = self.loc_ambient;
+        // Licht-Daten lokal kopieren (Borrow-Trennung zum Shader).
+        let lights: Vec<(i32,i32,i32,i32,i32, i32, i32, [f32;3], [f32;3], [f32;4])> =
+            self.lights.iter().map(|l| (
+                l.loc_enabled, l.loc_type, l.loc_pos, l.loc_target, l.loc_color,
+                if l.enabled {1} else {0}, l.kind, l.pos, l.target, l.color)).collect();
+        let sh = self.light_shader.as_mut().unwrap();
+        if loc_view >= 0 { sh.set_shader_value(loc_view, view); }
+        if loc_ambient >= 0 { sh.set_shader_value(loc_ambient, ambient); }
+        for (le, lt, lp, ltg, lc, en, kind, pos, target, color) in lights {
+            if le >= 0 { sh.set_shader_value(le, en); }
+            if lt >= 0 { sh.set_shader_value(lt, kind); }
+            if lp >= 0 { sh.set_shader_value(lp, pos); }
+            if ltg >= 0 { sh.set_shader_value(ltg, target); }
+            if lc >= 0 { sh.set_shader_value(lc, color); }
+        }
     }
 
     pub fn cls(&mut self, color: i64) {
@@ -748,6 +974,8 @@ impl Graphics {
     }
 
     pub fn flip(&mut self) {
+        // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
+        self.update_light_uniforms();
         let s = self.scale;
         let clear_color = self.clear_color;
         let mut order: Vec<usize> = (0..self.layers.len()).collect();

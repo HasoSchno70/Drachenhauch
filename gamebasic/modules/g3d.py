@@ -227,3 +227,104 @@ def _pick_sphere(g, *args):
     """PICK_SPHERE(cx, cy, cz, r) -> FLOAT -- Mausstrahl gegen eine Kugel;
     Distanz oder -1."""
     _native_only("PICK_SPHERE")
+
+
+# --- Kamera-Modi (raylib UpdateCamera) ------------------------------
+# CAMERA3D(...) einmal initial setzen, dann pro Frame CAMERA3D_UPDATE(mode).
+
+@graphics_builtin("CAMERA3D_UPDATE", arity=1)
+def _camera3d_update(g, *args):
+    """CAMERA3D_UPDATE(mode) -- Kamera per raylib-Controller bewegen (liest
+    Tastatur/Maus). mode: 1=free, 2=orbital, 3=first_person, 4=third_person."""
+    _native_only("CAMERA3D_UPDATE")
+
+
+@graphics_builtin("CAMERA3D_X", arity=0)
+def _camera3d_x(g, *args):
+    """CAMERA3D_X() -> FLOAT -- aktuelle Kamera-Position X."""
+    _native_only("CAMERA3D_X")
+
+
+@graphics_builtin("CAMERA3D_Y", arity=0)
+def _camera3d_y(g, *args):
+    """CAMERA3D_Y() -> FLOAT -- aktuelle Kamera-Position Y."""
+    _native_only("CAMERA3D_Y")
+
+
+@graphics_builtin("CAMERA3D_Z", arity=0)
+def _camera3d_z(g, *args):
+    """CAMERA3D_Z() -> FLOAT -- aktuelle Kamera-Position Z."""
+    _native_only("CAMERA3D_Z")
+
+
+@graphics_builtin("CAMERA3D_TARGET_X", arity=0)
+def _camera3d_target_x(g, *args):
+    """CAMERA3D_TARGET_X() -> FLOAT -- aktueller Kamera-Zielpunkt X."""
+    _native_only("CAMERA3D_TARGET_X")
+
+
+@graphics_builtin("CAMERA3D_TARGET_Y", arity=0)
+def _camera3d_target_y(g, *args):
+    """CAMERA3D_TARGET_Y() -> FLOAT -- aktueller Kamera-Zielpunkt Y."""
+    _native_only("CAMERA3D_TARGET_Y")
+
+
+@graphics_builtin("CAMERA3D_TARGET_Z", arity=0)
+def _camera3d_target_z(g, *args):
+    """CAMERA3D_TARGET_Z() -> FLOAT -- aktueller Kamera-Zielpunkt Z."""
+    _native_only("CAMERA3D_TARGET_Z")
+
+
+# --- Beleuchtung (Blinn-Phong, bis zu 4 Lichter) --------------------
+
+@graphics_builtin("LIGHT_ENABLE", arity=0)
+def _light_enable(g, *args):
+    """LIGHT_ENABLE() -- Beleuchtung aktivieren (laedt den Lighting-Shader).
+    Modelle leuchten erst nach MODEL_LIT(modell)."""
+    _native_only("LIGHT_ENABLE")
+
+
+@graphics_builtin("LIGHT_AMBIENT", arity=2)
+def _light_ambient(g, *args):
+    """LIGHT_AMBIENT(farbe, intensitaet) -- Grundhelligkeit (Umgebungslicht)."""
+    _native_only("LIGHT_AMBIENT")
+
+
+@graphics_builtin("LIGHT_DIRECTIONAL", arity=4)
+def _light_directional(g, *args):
+    """LIGHT_DIRECTIONAL(dx, dy, dz, farbe) -> INTEGER -- gerichtetes Licht
+    (Sonne); (dx,dy,dz) ist die Lichtrichtung. Liefert den Licht-Index oder -1."""
+    _native_only("LIGHT_DIRECTIONAL")
+
+
+@graphics_builtin("LIGHT_POINT", arity=4)
+def _light_point(g, *args):
+    """LIGHT_POINT(x, y, z, farbe) -> INTEGER -- Punktlicht an (x,y,z).
+    Liefert den Licht-Index oder -1 (max. 4 Lichter)."""
+    _native_only("LIGHT_POINT")
+
+
+@graphics_builtin("LIGHT_SET_POS", arity=4)
+def _light_set_pos(g, *args):
+    """LIGHT_SET_POS(idx, x, y, z) -- Licht-Position (bzw. -Richtung bei
+    directional) animieren."""
+    _native_only("LIGHT_SET_POS")
+
+
+@graphics_builtin("LIGHT_SET_COLOR", arity=2)
+def _light_set_color(g, *args):
+    """LIGHT_SET_COLOR(idx, farbe) -- Lichtfarbe aendern."""
+    _native_only("LIGHT_SET_COLOR")
+
+
+@graphics_builtin("LIGHT_SET_ENABLED", arity=2)
+def _light_set_enabled(g, *args):
+    """LIGHT_SET_ENABLED(idx, an) -- Licht ein-/ausschalten."""
+    _native_only("LIGHT_SET_ENABLED")
+
+
+@graphics_builtin("MODEL_LIT", arity=1)
+def _model_lit(g, *args):
+    """MODEL_LIT(modell) -- den Lighting-Shader an ein Modell haengen, damit es
+    von den Lichtern beleuchtet wird."""
+    _native_only("MODEL_LIT")

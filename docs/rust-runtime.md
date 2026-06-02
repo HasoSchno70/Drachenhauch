@@ -34,9 +34,9 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D weiter vertiefen:** Beleuchtung/Material-Shader, 3D-Kameramodi
-  (`UpdateCamera` orbit/first-person). (Modell-Laden, GenMesh inkl. Heightmap,
-  Billboards und Ray-Kollision/Picking sind nun da — siehe unten.)
+- **3D weiter vertiefen:** Schatten, normal/roughness-Maps, Third-Person-
+  Kollision. (Modelle, GenMesh inkl. Heightmap, Texturen, Billboards, Ray-
+  Kollision/Picking, **Beleuchtung** und **Kamera-Modi** sind nun da — unten.)
 - **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
   (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
 - **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
@@ -506,8 +506,43 @@ hängt am Maus-/Fensterzustand (headless: Maus `(0,0)` → alles `-1`). Demo
 [examples/90_billboards_picking.gb](../examples/90_billboards_picking.gb):
 Coin-Billboards + per Maus selektierbarer Würfel/Kugel. Per Screenshot verifiziert.
 
-**Offen (3D):** Beleuchtung/Material-Shader, frei steuerbare Kamera-Modi
-(`UpdateCamera` orbit/first-person).
+### Kamera-Modi (`UpdateCamera`)
+
+`cam3d` lebt über Frames hinweg. Statt jeden Frame `CAMERA3D(...)` neu zu setzen,
+kann man die Kamera von raylib bewegen lassen:
+
+- `CAMERA3D(...)` einmal initial setzen, dann pro Frame `CAMERA3D_UPDATE(mode)` —
+  `mode`: `1`=free, `2`=orbital, `3`=first_person, `4`=third_person. raylib liest
+  Tastatur/Maus (WASD + Mouse-Look) bzw. rotiert bei *orbital* automatisch.
+- Getter: `CAMERA3D_X/Y/Z()` (Position) und `CAMERA3D_TARGET_X/Y/Z()` — z. B. für
+  First-Person (Spielerposition = Kamera). Verifiziert (Position/Ziel exakt zurück).
+
+### Beleuchtung (Blinn-Phong, bis zu 4 Lichter)
+
+Echte Pro-Pixel-Beleuchtung über den eingebetteten rlights-Shader (GLSL 330, als
+`const LIGHT_VS`/`LIGHT_FS` im Crate — **kein Shader-Asset nötig**):
+
+- `LIGHT_ENABLE()` lädt den Lighting-Shader (einmal) und cached die Uniform-
+  Locations (`viewPos`, `ambient`).
+- `LIGHT_AMBIENT(farbe, intensitaet)` — Grundhelligkeit.
+- `LIGHT_DIRECTIONAL(dx,dy,dz, farbe)` (Sonne, Richtung) / `LIGHT_POINT(x,y,z, farbe)`
+  (Punktlicht) → Licht-Index (max. 4, sonst `-1`).
+- `LIGHT_SET_POS/COLOR/ENABLED(idx, …)` — Lichter pro Frame animieren.
+- `MODEL_LIT(modell)` — hängt den Lighting-Shader an die Materialien des Modells
+  (setzt `material.shader` direkt über das ffi-Feld; der Shader bleibt in
+  `Graphics.light_shader` am Leben). Erst danach wird das Modell beleuchtet.
+
+`flip()` ruft vor dem 3D-Pass `update_light_uniforms()`: `viewPos` (= Kamera-
+Position), `ambient` und alle `lights[i].*`-Uniforms werden auf den Shader
+geschrieben. raylib bindet `matModel`/`matNormal`/`mvp` automatisch über die
+Standard-Uniform-Namen; nur `matModel` setzen wir explizit in die `locs`. Demo
+[examples/91_lighting.gb](../examples/91_lighting.gb): Sonne + bewegtes Punktlicht
+auf Kugel/Würfel/Torus, orbitale Kamera. Per Screenshot verifiziert (Diffus +
+Specular-Highlights + Lichtkegel des Punktlichts am Boden).
+
+**Offen (3D):** Schatten, normal/roughness-Maps, Third-Person-Kollision — die
+gängigen 3D-Bausteine (Modelle, Meshes, Texturen, Billboards, Picking, Licht,
+Kamera-Modi) sind nun nativ abgedeckt.
 
 ## Shader / Post-Processing (native)
 

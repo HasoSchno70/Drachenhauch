@@ -31,6 +31,12 @@ _ALL = {
     # Billboards + Ray-Kollision/Picking
     "billboard": 6, "ray_hit_box": 12, "ray_hit_sphere": 10,
     "pick_box": 6, "pick_sphere": 4,
+    # Kamera-Modi
+    "camera3d_update": 1, "camera3d_x": 0, "camera3d_y": 0, "camera3d_z": 0,
+    "camera3d_target_x": 0, "camera3d_target_y": 0, "camera3d_target_z": 0,
+    # Beleuchtung
+    "light_enable": 0, "light_ambient": 2, "light_directional": 4, "light_point": 4,
+    "light_set_pos": 4, "light_set_color": 2, "light_set_enabled": 2, "model_lit": 1,
 }
 
 
@@ -46,9 +52,10 @@ def test_native_only_message(name, arity):
         _gr(name, *([1] * arity))
 
 
-@pytest.mark.parametrize("name,arity", list(_ALL.items()))
+@pytest.mark.parametrize("name,arity", [(n, a) for n, a in _ALL.items() if a > 0])
 def test_arity_checked_before_body(name, arity):
     # Zu wenige Argumente -> Arity-Fehler (nicht die native-only-Meldung).
+    # (Nur fuer arity > 0 sinnvoll -- bei arity 0 gibt es kein "zu wenig".)
     with pytest.raises(GBRuntimeError) as ei:
         _gr(name, *([1] * (arity - 1)))
     assert "nativen Runtime" not in str(ei.value)

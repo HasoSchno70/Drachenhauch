@@ -1802,6 +1802,30 @@ impl<'p> Vm<'p> {
                 need_f(a,0,"PICK_SPHERE")? as f32, need_f(a,1,"PICK_SPHERE")? as f32, need_f(a,2,"PICK_SPHERE")? as f32,
                 need_f(a,3,"PICK_SPHERE")? as f32)),
 
+            // --- Kamera-Modi (raylib UpdateCamera) ---
+            "camera3d_update" => { g!().camera3d_update(gi(a,0,"CAMERA3D_UPDATE")?); Value::Nil }
+            "camera3d_x" => Value::Float(g!().cam3d_pos().0),
+            "camera3d_y" => Value::Float(g!().cam3d_pos().1),
+            "camera3d_z" => Value::Float(g!().cam3d_pos().2),
+            "camera3d_target_x" => Value::Float(g!().cam3d_target().0),
+            "camera3d_target_y" => Value::Float(g!().cam3d_target().1),
+            "camera3d_target_z" => Value::Float(g!().cam3d_target().2),
+
+            // --- Beleuchtung (Blinn-Phong) ---
+            "light_enable" => { g!().light_enable(); Value::Nil }
+            "light_ambient" => { g!().light_ambient(gi(a,0,"LIGHT_AMBIENT")?, need_f(a,1,"LIGHT_AMBIENT")?); Value::Nil }
+            "light_directional" => Value::Int(g!().light_add(
+                0, need_f(a,0,"LIGHT_DIRECTIONAL")? as f32, need_f(a,1,"LIGHT_DIRECTIONAL")? as f32,
+                need_f(a,2,"LIGHT_DIRECTIONAL")? as f32, gi(a,3,"LIGHT_DIRECTIONAL")?)),
+            "light_point" => Value::Int(g!().light_add(
+                1, need_f(a,0,"LIGHT_POINT")? as f32, need_f(a,1,"LIGHT_POINT")? as f32,
+                need_f(a,2,"LIGHT_POINT")? as f32, gi(a,3,"LIGHT_POINT")?)),
+            "light_set_pos" => { g!().light_set_pos(gi(a,0,"LIGHT_SET_POS")?,
+                need_f(a,1,"LIGHT_SET_POS")? as f32, need_f(a,2,"LIGHT_SET_POS")? as f32, need_f(a,3,"LIGHT_SET_POS")? as f32)?; Value::Nil }
+            "light_set_color" => { g!().light_set_color(gi(a,0,"LIGHT_SET_COLOR")?, gi(a,1,"LIGHT_SET_COLOR")?)?; Value::Nil }
+            "light_set_enabled" => { g!().light_set_enabled(gi(a,0,"LIGHT_SET_ENABLED")?, gb(a,1))?; Value::Nil }
+            "model_lit" => { g!().model_lit(gi(a,0,"MODEL_LIT")?)?; Value::Nil }
+
             // --- Audio (Core: SFX + Stream-Musik) ---
             "loadsound" => {
                 let path = gs(a, 0, "LOADSOUND")?.to_string();
