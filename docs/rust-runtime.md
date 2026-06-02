@@ -38,8 +38,6 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 - **3D weiter vertiefen:** Schatten, normal/roughness-Maps, Third-Person-
   Kollision. (Modelle, GenMesh inkl. Heightmap, Texturen, Billboards, Ray-
   Kollision/Picking, **Beleuchtung** und **Kamera-Modi** sind nun da — unten.)
-- **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
-  (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
 - Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
@@ -284,7 +282,14 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
 - `input` — `INPUT_BIND/UNBIND/RESET/UPDATE/HELD/PRESSED/RELEASED/AXIS/BOUND`.
   Edge-Detection über prev/cur-Snapshots; Tastenstatus via raylib (`INPUT_UPDATE`
   ohne Fenster = keine Tasten, wie pygame ohne Display → Konsolen-Demos
-  bit-identisch). Gamepad (`INPUT_JOY_*`) noch nicht (`INPUT_JOY_COUNT`=0).
+  bit-identisch). **Gamepad** ist nun nativ: die `JOY_BUTTON_*`/`JOY_DPAD_*`-
+  Bind-Codes (negativ) sind als Globals registriert und `key_down(negativer Code)`
+  pollt über `IsGamepadButtonDown` **alle** verbundenen Pads (wie Pythons
+  `_poll_joysticks_into`) — `INPUT_BIND("jump", JOY_BUTTON_A)` + `INPUT_HELD/
+  PRESSED` funktionieren. `INPUT_JOY_COUNT` (zusammenhängend ab Slot 0),
+  `INPUT_JOY_NAME(idx)`, `INPUT_JOY_AXIS(pad, "left_x"|…|"rt")` (Deadzone 0.15
+  für Sticks) über raylibs Gamepad-API. Achsen-Namen → `GamepadAxis`-Indizes
+  wie pygame. Ohne Pad: Count 0, Achsen 0.0, Buttons false (kein Crash).
 - `camera` — `CAMERA_SET/RESET/X/Y/ZOOM/FOLLOW/S2W_X/S2W_Y`. World→Screen-Transform
   (`w2s`/`ssize`) wird in allen Draw-Methoden angewandt; TEXT-Position transformiert,
   Font-Größe bleibt. 29_camera_visual rendert korrekt.
@@ -530,6 +535,13 @@ Echte Pro-Pixel-Beleuchtung über den eingebetteten rlights-Shader (GLSL 330, al
 - `MODEL_LIT(modell)` — hängt den Lighting-Shader an die Materialien des Modells
   (setzt `material.shader` direkt über das ffi-Feld; der Shader bleibt in
   `Graphics.light_shader` am Leben). Erst danach wird das Modell beleuchtet.
+- `LIGHT_FOG(farbe, dichte)` — exponentieller Tiefen-Fog für die beleuchteten
+  Modelle (`dichte 0` = aus). Ferne Objekte verblassen zur Fog-Farbe; im
+  Fragment-Shader `mix(fogColor, finalColor, 1/exp((dist·dichte)²))`. Tipp:
+  `CLS(fogColor)` für einen nahtlosen Horizont. Per Screenshot verifiziert
+  (Säulenreihe verschwindet im Dunst, [examples/92_fog.gb](../examples/92_fog.gb)).
+  *Grenze:* wirkt nur auf `MODEL_LIT`-Modelle (nutzen den Lighting-Shader),
+  nicht auf Immediate-Primitive/Grid.
 
 `flip()` ruft vor dem 3D-Pass `update_light_uniforms()`: `viewPos` (= Kamera-
 Position), `ambient` und alle `lights[i].*`-Uniforms werden auf den Shader
@@ -539,9 +551,12 @@ Standard-Uniform-Namen; nur `matModel` setzen wir explizit in die `locs`. Demo
 auf Kugel/Würfel/Torus, orbitale Kamera. Per Screenshot verifiziert (Diffus +
 Specular-Highlights + Lichtkegel des Punktlichts am Boden).
 
-**Offen (3D):** Schatten, normal/roughness-Maps, Third-Person-Kollision — die
-gängigen 3D-Bausteine (Modelle, Meshes, Texturen, Billboards, Picking, Licht,
-Kamera-Modi) sind nun nativ abgedeckt.
+**Offen (3D):** Schatten (Shadow-Mapping — Multi-Pass mit Depth-RenderTexture +
+Light-Space-Matrix, großes Feature) und normal/roughness-Maps (PBR — asset-
+abhängig, braucht Tangenten + erweiterten Shader). Die gängigen 3D-Bausteine
+(Modelle, Meshes inkl. Heightmap, Texturen, Billboards, Picking, Beleuchtung
+inkl. **Fog**, Kamera-Modi) sind nun nativ abgedeckt; Third-Person-Kollision ist
+Gameplay-Logik (kein Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 

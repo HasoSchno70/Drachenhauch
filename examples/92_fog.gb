@@ -1,0 +1,50 @@
+' 92_fog.gb -- Tiefen-Fog fuer beleuchtete Szenen (native-only, F6)
+'
+' LIGHT_FOG(farbe, dichte) -- exponentieller Fog fuer MODEL_LIT-Modelle.
+'   dichte 0 = aus; ferne Objekte verblassen zur Fog-Farbe (Tiefe/Stimmung).
+'
+' Eine Reihe beleuchteter Saeulen zieht sich in die Ferne -- mit Fog
+' verschwinden die hinteren sanft im Dunst.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Tiefen-Fog", 1)
+
+DIM FOGCOL AS INTEGER
+FOGCOL = &H0C1622
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.25)
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.5, &HFFF0E0)
+LIGHT_FOG(FOGCOL, 0.045)            ' Fog-Farbe = Hintergrund, mittlere Dichte
+
+DIM pillar AS INTEGER
+DIM ground AS INTEGER
+pillar = MESH_CUBE(1.0, 4.0, 1.0)
+ground = MESH_PLANE(12.0, 120.0, 1, 1)
+MODEL_LIT(pillar)
+MODEL_LIT(ground)
+
+CAMERA3D(3.5, 3.0, 8.0, 0, 1.5, -30, 50)
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    CLS(FOGCOL)                     ' Clear in Fog-Farbe -> nahtloser Horizont
+
+    MODEL(ground, 0, 0, -45, 1.0, &H40484F)
+
+    ' Zwei Reihen Saeulen, die in die Tiefe (−z) laufen.
+    DIM i AS INTEGER
+    FOR i = 0 TO 24
+        DIM z AS FLOAT
+        z = -i * 4.0
+        MODEL(pillar, -3.0, 2.0, z, 1.0, &HB05040)
+        MODEL(pillar,  3.0, 2.0, z, 1.0, &H4070B0)
+    NEXT
+
+    TEXT(12, 10, "LIGHT_FOG: ferne Saeulen verblassen im Dunst", WHITE)
+    TEXT(12, 34, "dichte 0.045 -- exponentieller Tiefen-Fog", &H88AACC)
+
+    FLIP()
+NEXT

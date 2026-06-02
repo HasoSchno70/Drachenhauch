@@ -290,6 +290,14 @@ def _light_ambient(g, *args):
     _native_only("LIGHT_AMBIENT")
 
 
+@graphics_builtin("LIGHT_FOG", arity=2)
+def _light_fog(g, *args):
+    """LIGHT_FOG(farbe, dichte) -- exponentieller Tiefen-Fog fuer beleuchtete
+    Modelle (MODEL_LIT). dichte 0 = aus; typisch 0.02..0.15. Ferne Objekte
+    verblassen zur Fog-Farbe (atmosphaerische Tiefe)."""
+    _native_only("LIGHT_FOG")
+
+
 @graphics_builtin("LIGHT_DIRECTIONAL", arity=4)
 def _light_directional(g, *args):
     """LIGHT_DIRECTIONAL(dx, dy, dz, farbe) -> INTEGER -- gerichtetes Licht

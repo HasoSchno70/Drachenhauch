@@ -142,6 +142,8 @@ struct Light {
 uniform Light lights[MAX_LIGHTS];
 uniform vec4 ambient;
 uniform vec3 viewPos;
+uniform vec4 fogColor;
+uniform float fogDensity;
 void main()
 {
     vec4 texelColor = texture(texture0, fragTexCoord);
@@ -166,6 +168,10 @@ void main()
     finalColor = (texelColor*((colDiffuse + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
     finalColor += texelColor*(ambient/10.0)*colDiffuse;
     finalColor = pow(finalColor, vec4(1.0/2.2));
+    // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt).
+    float fd = length(viewPos - fragPosition)*fogDensity;
+    float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
+    finalColor = mix(fogColor, finalColor, fog);
 }
 "#;
 
@@ -196,8 +202,12 @@ pub struct Graphics {
     light_shader: Option<Shader>,
     lights: Vec<LightData>,
     light_ambient: [f32; 4],
+    light_fog: [f32; 4],
+    light_fog_density: f32,
     loc_view: i32,
     loc_ambient: i32,
+    loc_fog_color: i32,
+    loc_fog_density: i32,
     text_size: i32,
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
@@ -251,8 +261,12 @@ impl Graphics {
             light_shader: None,
             lights: Vec::new(),
             light_ambient: [0.1, 0.1, 0.1, 1.0],
+            light_fog: [0.0, 0.0, 0.0, 1.0],
+            light_fog_density: 0.0,
             loc_view: -1,
             loc_ambient: -1,
+            loc_fog_color: -1,
+            loc_fog_density: -1,
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
                 Vector3::new(6.0, 5.0, 6.0),
@@ -508,7 +522,15 @@ impl Graphics {
         sh.locs_mut()[raylib::consts::ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as usize] = loc_model;
         self.loc_view = sh.get_shader_location("viewPos");
         self.loc_ambient = sh.get_shader_location("ambient");
+        self.loc_fog_color = sh.get_shader_location("fogColor");
+        self.loc_fog_density = sh.get_shader_location("fogDensity");
         self.light_shader = Some(sh);
+    }
+    pub fn light_fog(&mut self, col_: i64, density: f64) {
+        let v = col_ as u32;
+        self.light_fog = [((v >> 16) & 0xFF) as f32 / 255.0, ((v >> 8) & 0xFF) as f32 / 255.0,
+                          (v & 0xFF) as f32 / 255.0, 1.0];
+        self.light_fog_density = density.max(0.0) as f32;
     }
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
         let v = col_ as u32;
@@ -583,6 +605,8 @@ impl Graphics {
         let ambient = self.light_ambient;
         let loc_view = self.loc_view;
         let loc_ambient = self.loc_ambient;
+        let (fog_color, fog_density) = (self.light_fog, self.light_fog_density);
+        let (loc_fog_color, loc_fog_density) = (self.loc_fog_color, self.loc_fog_density);
         // Licht-Daten lokal kopieren (Borrow-Trennung zum Shader).
         let lights: Vec<(i32,i32,i32,i32,i32, i32, i32, [f32;3], [f32;3], [f32;4])> =
             self.lights.iter().map(|l| (
@@ -591,6 +615,8 @@ impl Graphics {
         let sh = self.light_shader.as_mut().unwrap();
         if loc_view >= 0 { sh.set_shader_value(loc_view, view); }
         if loc_ambient >= 0 { sh.set_shader_value(loc_ambient, ambient); }
+        if loc_fog_color >= 0 { sh.set_shader_value(loc_fog_color, fog_color); }
+        if loc_fog_density >= 0 { sh.set_shader_value(loc_fog_density, fog_density); }
         for (le, lt, lp, ltg, lc, en, kind, pos, target, color) in lights {
             if le >= 0 { sh.set_shader_value(le, en); }
             if lt >= 0 { sh.set_shader_value(lt, kind); }
@@ -891,7 +917,61 @@ impl Graphics {
     }
 
     pub fn key_down(&self, code: i64) -> bool {
+        // Negative Codes = Gamepad-Buttons/DPad (siehe DEFAULT_KEYS joy_*).
+        if code < 0 { return self.joy_button_down(code); }
         match map_key(code) { Some(k) => self.rl.is_key_down(k), None => false }
+    }
+
+    // --- Gamepad (Modul input: INPUT_JOY_*) ---
+    /// Anzahl zusammenhaengend verfuegbarer Pads ab Slot 0.
+    pub fn joy_count(&self) -> i64 {
+        let mut n = 0;
+        while self.rl.is_gamepad_available(n) { n += 1; }
+        n as i64
+    }
+    pub fn joy_name(&self, idx: i64) -> String {
+        if idx < 0 || !self.rl.is_gamepad_available(idx as i32) { return String::new(); }
+        self.rl.get_gamepad_name(idx as i32).unwrap_or_default()
+    }
+    /// Rohe Achsen-Bewegung (-1..+1) fuer Achs-Index 0..5 (Deadzone macht der Aufrufer).
+    pub fn joy_axis(&self, pad: i64, axis_idx: i32) -> f64 {
+        use raylib::consts::GamepadAxis::*;
+        if pad < 0 || !self.rl.is_gamepad_available(pad as i32) { return 0.0; }
+        let ax = match axis_idx {
+            0 => GAMEPAD_AXIS_LEFT_X, 1 => GAMEPAD_AXIS_LEFT_Y,
+            2 => GAMEPAD_AXIS_RIGHT_X, 3 => GAMEPAD_AXIS_RIGHT_Y,
+            4 => GAMEPAD_AXIS_LEFT_TRIGGER, 5 => GAMEPAD_AXIS_RIGHT_TRIGGER,
+            _ => return 0.0,
+        };
+        self.rl.get_gamepad_axis_movement(pad as i32, ax) as f64
+    }
+    /// Ist der durch den negativen Bind-Code bezeichnete Button/DPad an
+    /// IRGENDEINEM verbundenen Pad gedrueckt? (wie Pythons _poll_joysticks_into)
+    pub fn joy_button_down(&self, code: i64) -> bool {
+        use raylib::consts::GamepadButton::*;
+        let btn = match code {
+            -100 => GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+            -101 => GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+            -102 => GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+            -103 => GAMEPAD_BUTTON_RIGHT_FACE_UP,
+            -104 => GAMEPAD_BUTTON_LEFT_TRIGGER_1,
+            -105 => GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+            -106 => GAMEPAD_BUTTON_MIDDLE_LEFT,
+            -107 => GAMEPAD_BUTTON_MIDDLE_RIGHT,
+            -108 => GAMEPAD_BUTTON_LEFT_THUMB,
+            -109 => GAMEPAD_BUTTON_RIGHT_THUMB,
+            -200 => GAMEPAD_BUTTON_LEFT_FACE_UP,
+            -201 => GAMEPAD_BUTTON_LEFT_FACE_DOWN,
+            -202 => GAMEPAD_BUTTON_LEFT_FACE_LEFT,
+            -203 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+            _ => return false,
+        };
+        let mut i = 0;
+        while self.rl.is_gamepad_available(i) {
+            if self.rl.is_gamepad_button_down(i, btn) { return true; }
+            i += 1;
+        }
+        false
     }
     /// Leert raylibs Tipp-Zeichen-Queue dieses Frames und liefert die getippten
     /// Zeichen als String (für UI_TEXTFIELD). Wie pygames Text-Input-Puffer.

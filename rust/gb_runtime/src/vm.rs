@@ -1814,6 +1814,7 @@ impl<'p> Vm<'p> {
             // --- Beleuchtung (Blinn-Phong) ---
             "light_enable" => { g!().light_enable(); Value::Nil }
             "light_ambient" => { g!().light_ambient(gi(a,0,"LIGHT_AMBIENT")?, need_f(a,1,"LIGHT_AMBIENT")?); Value::Nil }
+            "light_fog" => { g!().light_fog(gi(a,0,"LIGHT_FOG")?, need_f(a,1,"LIGHT_FOG")?); Value::Nil }
             "light_directional" => Value::Int(g!().light_add(
                 0, need_f(a,0,"LIGHT_DIRECTIONAL")? as f32, need_f(a,1,"LIGHT_DIRECTIONAL")? as f32,
                 need_f(a,2,"LIGHT_DIRECTIONAL")? as f32, gi(a,3,"LIGHT_DIRECTIONAL")?)),
@@ -1993,7 +1994,27 @@ impl<'p> Vm<'p> {
                 let action = gs(a, 0, "INPUT_BOUND")?.to_lowercase();
                 Value::Bool(self.input_state.actions.get(&action).map(|k| !k.is_empty()).unwrap_or(false))
             }
-            "input_joy_count" => Value::Int(0), // kein Gamepad-Support im Rust-Kern
+            "input_joy_count" => Value::Int(self.gfx.as_ref().map(|g| g.joy_count()).unwrap_or(0)),
+            "input_joy_name" => {
+                let idx = gi(a, 0, "INPUT_JOY_NAME")?;
+                Value::Str(self.gfx.as_ref().map(|g| g.joy_name(idx)).unwrap_or_default().into())
+            }
+            "input_joy_axis" => {
+                let pad = gi(a, 0, "INPUT_JOY_AXIS")?;
+                let name = gs(a, 1, "INPUT_JOY_AXIS")?.to_lowercase();
+                let axis_idx = match name.as_str() {
+                    "left_x" => 0, "left_y" => 1, "right_x" => 2, "right_y" => 3,
+                    "lt" => 4, "rt" => 5,
+                    _ => return Err(format!(
+                        "INPUT_JOY_AXIS: unbekannte Achse '{}' (erlaubt: left_x, left_y, right_x, right_y, lt, rt)", name)),
+                };
+                let mut v = self.gfx.as_ref().map(|g| g.joy_axis(pad, axis_idx)).unwrap_or(0.0);
+                // Deadzone fuer Sticks (Trigger unangetastet) -- wie Python.
+                if (name.starts_with("left_") || name.starts_with("right_")) && v.abs() < 0.15 {
+                    v = 0.0;
+                }
+                Value::Float(v)
+            }
 
             // --- Modul: camera ---
             "camera_set" => {
@@ -2398,6 +2419,11 @@ const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_f1", 1073741882), ("key_f2", 1073741883), ("key_f3", 1073741884), ("key_f4", 1073741885),
     ("key_f5", 1073741886), ("key_f6", 1073741887), ("key_f7", 1073741888), ("key_f8", 1073741889),
     ("key_f9", 1073741890), ("key_f10", 1073741891), ("key_f11", 1073741892), ("key_f12", 1073741893),
+    // Gamepad-Bind-Codes (negativ, kollidieren nicht mit Tasten) -- wie graphics.KEYS.
+    ("joy_button_a", -100), ("joy_button_b", -101), ("joy_button_x", -102), ("joy_button_y", -103),
+    ("joy_button_lb", -104), ("joy_button_rb", -105), ("joy_button_back", -106), ("joy_button_start", -107),
+    ("joy_button_lstick", -108), ("joy_button_rstick", -109),
+    ("joy_dpad_up", -200), ("joy_dpad_down", -201), ("joy_dpad_left", -202), ("joy_dpad_right", -203),
 ];
 
 // ===========================================================================
