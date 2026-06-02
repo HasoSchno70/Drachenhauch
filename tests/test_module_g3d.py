@@ -28,6 +28,7 @@ _ALL = {
     "loadmodel": 1, "mesh_cube": 3, "mesh_sphere": 3, "mesh_cylinder": 3,
     "mesh_torus": 4, "mesh_knot": 4, "mesh_plane": 4, "mesh_heightmap": 4,
     "model": 6, "model_ex": 10, "model_wires": 6, "model_texture": 2,
+    "model_texture_normal": 2,
     # Billboards + Ray-Kollision/Picking
     "billboard": 6, "ray_hit_box": 12, "ray_hit_sphere": 10,
     "pick_box": 6, "pick_sphere": 4,

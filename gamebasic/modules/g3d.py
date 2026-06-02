@@ -188,6 +188,14 @@ def _model_texture(g, *args):
     _native_only("MODEL_TEXTURE")
 
 
+@graphics_builtin("MODEL_TEXTURE_NORMAL", arity=2)
+def _model_texture_normal(g, *args):
+    """MODEL_TEXTURE_NORMAL(modell, bild) -- eine Normal-Map (via LOADIMAGE) auf
+    das Modell legen. Wirkt nur bei MODEL_LIT-Modellen (Tangenten + Lighting-
+    Shader); die Oberflaeche bekommt feine Beleuchtungs-Details ohne mehr Geometrie."""
+    _native_only("MODEL_TEXTURE_NORMAL")
+
+
 # --- Billboards (zur Kamera ausgerichtete Texturen) -----------------
 
 @graphics_builtin("BILLBOARD", arity=6)

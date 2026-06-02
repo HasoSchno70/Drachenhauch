@@ -103,6 +103,7 @@ in vec3 vertexPosition;
 in vec2 vertexTexCoord;
 in vec3 vertexNormal;
 in vec4 vertexColor;
+in vec4 vertexTangent;
 uniform mat4 mvp;
 uniform mat4 matModel;
 uniform mat4 matNormal;
@@ -110,12 +111,14 @@ out vec3 fragPosition;
 out vec2 fragTexCoord;
 out vec4 fragColor;
 out vec3 fragNormal;
+out vec3 fragTangent;
 void main()
 {
     fragPosition = vec3(matModel*vec4(vertexPosition, 1.0));
     fragTexCoord = vertexTexCoord;
     fragColor = vertexColor;
     fragNormal = normalize(vec3(matNormal*vec4(vertexNormal, 1.0)));
+    fragTangent = normalize(vec3(matModel*vec4(vertexTangent.xyz, 0.0)));
     gl_Position = mvp*vec4(vertexPosition, 1.0);
 }
 "#;
@@ -126,7 +129,10 @@ in vec3 fragPosition;
 in vec2 fragTexCoord;
 in vec4 fragColor;
 in vec3 fragNormal;
+in vec3 fragTangent;
 uniform sampler2D texture0;
+uniform sampler2D texture2;   // MATERIAL_MAP_NORMAL (nur wenn useNormalMap == 1)
+uniform int useNormalMap;
 uniform vec4 colDiffuse;
 out vec4 finalColor;
 #define MAX_LIGHTS 4
@@ -153,7 +159,15 @@ void main()
 {
     vec4 texelColor = texture(texture0, fragTexCoord);
     vec3 lightDot = vec3(0.0);
-    vec3 normal = normalize(fragNormal);
+    // Normale aus Geometrie + (optionaler) Normal-Map ueber TBN. Flache
+    // Default-Map (0.5,0.5,1.0) => keine Aenderung an der Geometrie-Normale.
+    vec3 geomN = normalize(fragNormal);
+    vec3 T = normalize(fragTangent - dot(fragTangent, geomN)*geomN);
+    vec3 B = cross(geomN, T);
+    vec3 nmap = texture(texture2, fragTexCoord).rgb*2.0 - 1.0;
+    vec3 perturbed = normalize(mat3(T, B, geomN)*nmap);
+    // useNormalMap=0 -> reine Geometrie-Normale (kein Texture2-Abhaengigkeit).
+    vec3 normal = (useNormalMap == 1) ? perturbed : geomN;
     vec3 viewD = normalize(viewPos - fragPosition);
     vec3 specular = vec3(0.0);
     for (int i = 0; i < MAX_LIGHTS; i++)
@@ -230,6 +244,9 @@ pub struct Graphics {
     // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
     // ersten LIGHT_ENABLE geladen; lights[] sind bis zu MAX_LIGHTS Lichter.
     light_shader: Option<Shader>,
+    // Modell-Indizes mit Normal-Map (useNormalMap=1 nur fuer diese).
+    normal_mapped: std::collections::HashSet<usize>,
+    loc_use_normal: i32,
     lights: Vec<LightData>,
     light_ambient: [f32; 4],
     light_fog: [f32; 4],
@@ -301,6 +318,8 @@ impl Graphics {
             cmds3d: Vec::new(),
             models: Vec::new(),
             light_shader: None,
+            normal_mapped: std::collections::HashSet::new(),
+            loc_use_normal: -1,
             lights: Vec::new(),
             light_ambient: [0.1, 0.1, 0.1, 1.0],
             light_fog: [0.0, 0.0, 0.0, 1.0],
@@ -577,6 +596,7 @@ impl Graphics {
         self.loc_ambient = sh.get_shader_location("ambient");
         self.loc_fog_color = sh.get_shader_location("fogColor");
         self.loc_fog_density = sh.get_shader_location("fogDensity");
+        self.loc_use_normal = sh.get_shader_location("useNormalMap");
         self.light_shader = Some(sh);
     }
     pub fn light_fog(&mut self, col_: i64, density: f64) {
@@ -638,16 +658,35 @@ impl Graphics {
         l.enabled = on;
         Ok(())
     }
-    /// Haengt den Lighting-Shader an alle Materialien eines Modells.
+    /// Haengt den Lighting-Shader an alle Materialien eines Modells und erzeugt
+    /// die Tangenten (Voraussetzung fuer Normal-Mapping via MODEL_TEXTURE_NORMAL).
     pub fn model_lit(&mut self, model_idx: i64) -> Result<(), String> {
         if self.light_shader.is_none() {
             return Err("MODEL_LIT: zuerst LIGHT_ENABLE() / ein Licht hinzufuegen".into());
         }
         let mi = self.check_model(model_idx, "MODEL_LIT")?;
+        // Tangenten erzeugen (sonst ist die TBN-Basis im Shader degeneriert).
+        for m in self.models[mi].meshes_mut() {
+            m.gen_mesh_tangents(&self.thread);
+        }
         let sh_ffi = *self.light_shader.as_ref().unwrap().as_ref();   // ffi::Shader (Copy)
         for mat in self.models[mi].materials_mut() {
             mat.as_mut().shader = sh_ffi;
         }
+        Ok(())
+    }
+    /// Legt eine via LOADIMAGE geladene Textur als Normal-Map (MATERIAL_MAP_NORMAL).
+    /// Aktiviert useNormalMap fuer dieses Modell.
+    pub fn model_set_normal(&mut self, model_idx: i64, tex_idx: i64) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_TEXTURE_NORMAL")?;
+        let ti = tex_idx as usize;
+        if tex_idx < 0 || ti >= self.textures.len() {
+            return Err(format!("MODEL_TEXTURE_NORMAL: ungueltiges IMAGE-Handle {}", tex_idx));
+        }
+        for mat in self.models[mi].materials_mut() {
+            mat.set_material_texture(raylib::consts::MaterialMapIndex::MATERIAL_MAP_NORMAL, &self.textures[ti].tex);
+        }
+        self.normal_mapped.insert(mi);
         Ok(())
     }
     /// Setzt pro Frame viewPos + ambient + alle Licht-Uniforms. Wird in flip()
@@ -1228,7 +1267,10 @@ impl Graphics {
         order.sort_by_key(|&i| self.layers[i].z);
         // RT-Groesse = Fenstergroesse (bekannt, ohne mehrdeutigen Textur-Query).
         let (tw, th) = ((self.width * self.scale) as f32, (self.height * self.scale) as f32);
-        let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models, scene_rt, shaders, post_shader_idx, .. } = self;
+        let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
+            light_shader, normal_mapped, loc_use_normal, scene_rt, shaders, post_shader_idx, .. } = self;
+        let lun = *loc_use_normal;
+        let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let cam = *cam3d;
         // Post-FX aktiv? -> (Shader-Index, Render-Target). Sonst direkt zeichnen.
         let postfx = match *post_shader_idx {
@@ -1239,7 +1281,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), lun, nmap_set);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -1252,7 +1294,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), lun, nmap_set);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -1275,7 +1317,16 @@ fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Color,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
+    mut light_shader: Option<&mut Shader>, loc_use_normal: i32,
+    normal_mapped: &std::collections::HashSet<usize>,
 ) {
+    // Setzt useNormalMap (1 fuer Modelle mit Normal-Map, sonst 0) vor dem Draw.
+    let mut set_normal = |ls: &mut Option<&mut Shader>, idx: usize| {
+        if loc_use_normal < 0 { return; }
+        if let Some(sh) = ls.as_mut() {
+            sh.set_shader_value(loc_use_normal, if normal_mapped.contains(&idx) { 1i32 } else { 0i32 });
+        }
+    };
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
     d.clear_background(clear);
             // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
@@ -1303,11 +1354,13 @@ fn render_scene<D: RaylibDraw>(
                             d3.draw_grid(*slices, *spacing),
                         Cmd3D::Model(i, x, y, z, sc, col) => {
                             if let Some(m) = models.get(*i) {
+                                set_normal(&mut light_shader, *i);
                                 d3.draw_model(m, Vector3::new(*x, *y, *z), *sc, *col);
                             }
                         }
                         Cmd3D::ModelEx(i, x, y, z, ax, ay, az, ang, sc, col) => {
                             if let Some(m) = models.get(*i) {
+                                set_normal(&mut light_shader, *i);
                                 d3.draw_model_ex(m, Vector3::new(*x, *y, *z),
                                     Vector3::new(*ax, *ay, *az), *ang,
                                     Vector3::new(*sc, *sc, *sc), *col);
@@ -1315,6 +1368,7 @@ fn render_scene<D: RaylibDraw>(
                         }
                         Cmd3D::ModelWires(i, x, y, z, sc, col) => {
                             if let Some(m) = models.get(*i) {
+                                set_normal(&mut light_shader, *i);
                                 d3.draw_model_wires(m, Vector3::new(*x, *y, *z), *sc, *col);
                             }
                         }

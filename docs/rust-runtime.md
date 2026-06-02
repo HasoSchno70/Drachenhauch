@@ -35,9 +35,10 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D weiter vertiefen:** Schatten, normal/roughness-Maps, Third-Person-
-  Kollision. (Modelle, GenMesh inkl. Heightmap, Texturen, Billboards, Ray-
-  Kollision/Picking, **Beleuchtung** und **Kamera-Modi** sind nun da — unten.)
+- **3D-Rest:** voll-PBR (Metalness/Roughness — eigener Shader statt Blinn-Phong).
+  Modelle, GenMesh inkl. Heightmap, Texturen, **Normal-Maps**, Billboards, Ray-
+  Kollision/Picking, Beleuchtung, **Fog**, **Schatten** und **Kamera-Modi** sind
+  nun da — siehe unten.
 - Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
@@ -584,10 +585,32 @@ Schatten). Ein schattenwerfendes directional Light. Demo
 [examples/93_shadows.gb](../examples/93_shadows.gb): schwebende Kugel/Würfel/Torus
 werfen weiche Schatten auf den Boden (per Screenshot verifiziert).
 
-**Offen (3D):** normal/roughness-Maps (PBR — asset-abhängig, braucht Tangenten +
-erweiterten Shader). Modelle, Meshes inkl. Heightmap, Texturen, Billboards,
-Picking, Beleuchtung inkl. **Fog** und **Schatten**, Kamera-Modi sind nun nativ;
-Third-Person-Kollision ist Gameplay-Logik (kein Engine-Primitive).
+### Normal-Mapping
+
+Pro-Pixel-Oberflächendetail ohne mehr Geometrie, integriert in den Lighting-
+Shader:
+
+- `MODEL_TEXTURE_NORMAL(modell, bild)` — eine via `LOADIMAGE` geladene Normal-Map
+  (Tangent-Space, RGB = Normale·0.5+0.5) auf ein `MODEL_LIT`-Modell legen
+  (`MATERIAL_MAP_NORMAL` = Shader-Sampler `texture2`).
+- `MODEL_LIT` erzeugt jetzt zusätzlich die **Tangenten** (`gen_mesh_tangents` auf
+  allen Meshes) — Voraussetzung für die TBN-Basis im Shader.
+
+**Shader:** der VS reicht `vertexTangent` (world-space) durch; der FS baut aus
+`fragNormal` + `fragTangent` eine TBN-Matrix, sampelt die Normal-Map und stört die
+Normale pro Pixel. Ein `useNormalMap`-Uniform (Default 0) gated das — pro Modell
+in `render_scene` gesetzt (1 nur für Modelle in `normal_mapped`). So bleiben lit
+Modelle ohne Normal-Map **pixelgenau** wie zuvor (keine Abhängigkeit von einer
+Default-Textur). Demo [examples/94_normalmap.gb](../examples/94_normalmap.gb):
+Platte + Kugel links mit, rechts ohne Normal-Map unter kreisendem Punktlicht —
+links wandern die Wellen-Bumps, rechts bleibt es glatt (per Screenshot
+verifiziert; Normal-Map `examples/assets/normal_waves.png` prozedural generiert).
+
+**Offen (3D):** voll-PBR (Metalness/Roughness-Workflow — bräuchte einen eigenen
+PBR-Shader statt Blinn-Phong). Modelle, Meshes inkl. Heightmap, Texturen,
+Normal-Maps, Billboards, Picking, Beleuchtung inkl. **Fog** und **Schatten**,
+Kamera-Modi sind nun nativ; Third-Person-Kollision ist Gameplay-Logik (kein
+Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 
