@@ -186,3 +186,44 @@ def _model_texture(g, *args):
     """MODEL_TEXTURE(modell, bild) -- ein via LOADIMAGE geladenes Bild als
     Diffuse-/Albedo-Textur auf das Modell legen."""
     _native_only("MODEL_TEXTURE")
+
+
+# --- Billboards (zur Kamera ausgerichtete Texturen) -----------------
+
+@graphics_builtin("BILLBOARD", arity=6)
+def _billboard(g, *args):
+    """BILLBOARD(bild, x, y, z, groesse, farbe) -- eine via LOADIMAGE geladene
+    Textur im 3D-Raum, die immer zur Kamera zeigt (Baeume/Sprites/Funken)."""
+    _native_only("BILLBOARD")
+
+
+# --- Ray-Kollision / Picking ----------------------------------------
+# Liefern die Distanz vom Ray-Ursprung zum Treffer oder -1 bei keinem Treffer.
+# Trefferpunkt = ursprung + richtung * distanz.
+
+@graphics_builtin("RAY_HIT_BOX", arity=12)
+def _ray_hit_box(g, *args):
+    """RAY_HIT_BOX(ox, oy, oz, dx, dy, dz, cx, cy, cz, sx, sy, sz) -> FLOAT --
+    Distanz zum Treffer mit einer AABB (Mittelpunkt c, Vollgroesse s) oder -1."""
+    _native_only("RAY_HIT_BOX")
+
+
+@graphics_builtin("RAY_HIT_SPHERE", arity=10)
+def _ray_hit_sphere(g, *args):
+    """RAY_HIT_SPHERE(ox, oy, oz, dx, dy, dz, cx, cy, cz, r) -> FLOAT --
+    Distanz zum Treffer mit einer Kugel oder -1."""
+    _native_only("RAY_HIT_SPHERE")
+
+
+@graphics_builtin("PICK_BOX", arity=6)
+def _pick_box(g, *args):
+    """PICK_BOX(cx, cy, cz, sx, sy, sz) -> FLOAT -- Mausstrahl durch die aktuelle
+    3D-Kamera gegen eine AABB; Distanz oder -1. Fuer Klick-Selektion."""
+    _native_only("PICK_BOX")
+
+
+@graphics_builtin("PICK_SPHERE", arity=4)
+def _pick_sphere(g, *args):
+    """PICK_SPHERE(cx, cy, cz, r) -> FLOAT -- Mausstrahl gegen eine Kugel;
+    Distanz oder -1."""
+    _native_only("PICK_SPHERE")

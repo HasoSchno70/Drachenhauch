@@ -34,10 +34,9 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D weiter vertiefen:** 3D-Kameramodi (`UpdateCamera` orbit/first-person),
-  Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`),
-  Beleuchtung/Material-Shader. (Modell-Laden, GenMesh-Primitive inkl. Heightmap
-  sind nun da — siehe unten.)
+- **3D weiter vertiefen:** Beleuchtung/Material-Shader, 3D-Kameramodi
+  (`UpdateCamera` orbit/first-person). (Modell-Laden, GenMesh inkl. Heightmap,
+  Billboards und Ray-Kollision/Picking sind nun da — siehe unten.)
 - **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
   (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
 - **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
@@ -485,8 +484,30 @@ imgfx gehalten) via `GenMeshHeightmap` ein Terrain-Mesh. Demo
 Kamera umkreistes Terrain mit Drahtgitter-Overlay (`examples/assets/heightmap.png`,
 ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
 
+### Billboards + Ray-Kollision / Picking
+
+- `BILLBOARD(bild, x,y,z, groesse, farbe)` — eine `LOADIMAGE`-Textur im 3D-Raum,
+  die über `DrawBillboard` immer zur Kamera zeigt (Bäume, Sprites, Funken).
+  Eigene `Cmd3D::Billboard` (Textur-Index); der 3D-Pass hat Kamera **und**
+  `textures` zur Hand.
+- **Ray-Kollision** (liefert Distanz vom Ursprung zum Treffer oder `-1`,
+  Trefferpunkt = `ursprung + richtung * distanz`):
+  - `RAY_HIT_BOX(ox,oy,oz, dx,dy,dz, cx,cy,cz, sx,sy,sz)` — AABB (Mittelpunkt c,
+    Vollgröße s) via `GetRayCollisionBox`.
+  - `RAY_HIT_SPHERE(ox,oy,oz, dx,dy,dz, cx,cy,cz, r)` via `GetRayCollisionSphere`.
+- **Maus-Picking** (Strahl vom Cursor durch die aktuelle 3D-Kamera,
+  `GetScreenToWorldRay` + Treffertest): `PICK_BOX(cx,cy,cz, sx,sy,sz)`,
+  `PICK_SPHERE(cx,cy,cz, r)` — ideal für Klick-Selektion. Nächstes Objekt =
+  kleinste nicht-negative Distanz.
+
+`RAY_HIT_*` ist reine Geometrie und deterministisch (verifiziert: Kugel/Box bei
+`(5,0,0)` entlang +X → Distanz `4.0`, senkrechter Strahl → `-1.0`). `PICK_*`
+hängt am Maus-/Fensterzustand (headless: Maus `(0,0)` → alles `-1`). Demo
+[examples/90_billboards_picking.gb](../examples/90_billboards_picking.gb):
+Coin-Billboards + per Maus selektierbarer Würfel/Kugel. Per Screenshot verifiziert.
+
 **Offen (3D):** Beleuchtung/Material-Shader, frei steuerbare Kamera-Modi
-(`UpdateCamera`), Billboards, Ray-Kollision.
+(`UpdateCamera` orbit/first-person).
 
 ## Shader / Post-Processing (native)
 

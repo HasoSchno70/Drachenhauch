@@ -60,6 +60,8 @@ enum Cmd3D {
     // idx, x,y,z, achse_x,achse_y,achse_z, winkel, scale, tint
     ModelEx(usize, f32, f32, f32, f32, f32, f32, f32, f32, Color),
     ModelWires(usize, f32, f32, f32, f32, Color),    // idx, x,y,z, scale, tint
+    // Billboard: Textur (Index), die immer zur Kamera zeigt. idx, x,y,z, size, tint
+    Billboard(usize, f32, f32, f32, f32, Color),
 }
 
 struct Layer {
@@ -323,6 +325,53 @@ impl Graphics {
             raylib::consts::MaterialMapIndex::MATERIAL_MAP_ALBEDO,
             &self.textures[ti].tex);
         Ok(())
+    }
+
+    /// Billboard: eine Textur (LOADIMAGE-Handle), die im 3D-Raum immer zur
+    /// Kamera zeigt -- ideal fuer Baeume/Sprites/Funken in 3D.
+    pub fn billboard(&mut self, tex_idx: i64, x: f32, y: f32, z: f32, size: f32, col_: i64) -> Result<(), String> {
+        let i = tex_idx as usize;
+        if tex_idx < 0 || i >= self.textures.len() {
+            return Err(format!("BILLBOARD: ungueltiges IMAGE-Handle {}", tex_idx));
+        }
+        self.emit3d(Cmd3D::Billboard(i, x, y, z, size, col(col_)));
+        Ok(())
+    }
+
+    // --- Ray-Kollision / Picking (3D) ---
+    // Liefern die Distanz vom Ray-Ursprung zum Treffer (Welt-Einheiten) oder
+    // -1.0 bei keinem Treffer. Trefferpunkt = ursprung + richtung * distanz.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ray_hit_box(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
+                       cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
+        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        let bb = BoundingBox::new(
+            Vector3::new(cx - sx / 2.0, cy - sy / 2.0, cz - sz / 2.0),
+            Vector3::new(cx + sx / 2.0, cy + sy / 2.0, cz + sz / 2.0));
+        let rc = bb.get_ray_collision_box(ray);
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn ray_hit_sphere(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
+                          cx: f32, cy: f32, cz: f32, r: f32) -> f64 {
+        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        let rc = get_ray_collision_sphere(ray, Vector3::new(cx, cy, cz), r);
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
+    /// Mausstrahl durch die aktuelle 3D-Kamera (Fenster-Pixel -> Welt-Ray).
+    fn mouse_ray(&self) -> Ray {
+        let m = self.rl.get_mouse_position();
+        self.rl.get_screen_to_world_ray(m, self.cam3d)
+    }
+    pub fn pick_box(&self, cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_box(r.position.x, r.position.y, r.position.z,
+                         r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, sx, sy, sz)
+    }
+    pub fn pick_sphere(&self, cx: f32, cy: f32, cz: f32, radius: f32) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_sphere(r.position.x, r.position.y, r.position.z,
+                            r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, radius)
     }
 
     pub fn cls(&mut self, color: i64) {
@@ -793,6 +842,11 @@ fn render_scene<D: RaylibDraw>(
                         Cmd3D::ModelWires(i, x, y, z, sc, col) => {
                             if let Some(m) = models.get(*i) {
                                 d3.draw_model_wires(m, Vector3::new(*x, *y, *z), *sc, *col);
+                            }
+                        }
+                        Cmd3D::Billboard(i, x, y, z, size, col) => {
+                            if let Some(t) = textures.get(*i) {
+                                d3.draw_billboard(cam3d, &t.tex, Vector3::new(*x, *y, *z), *size, *col);
                             }
                         }
                     }
