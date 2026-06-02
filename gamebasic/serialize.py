@@ -138,12 +138,10 @@ def dump_gbc(module: Module, path: str | Path, *, indent: int | None = None) -> 
     Path(path).write_text(text, encoding="utf-8")
 
 
-def compile_file_to_gbc(src_path: str | Path, out_path: str | Path,
-                        *, indent: int | None = None) -> Module:
-    """End-to-End: `.gb`-Quelldatei -> Compiler -> `.gbc`-Datei.
+def compile_gb_to_module(src_path: str | Path) -> Module:
+    """`.gb`-Quelldatei -> Preprocess+Lex+Parse+Compile -> `Module`.
 
-    Nutzt denselben Preprocess+Lex+Parse+Compile-Pfad wie `gbrun.py --vm`.
-    Gibt das kompilierte `Module` zurueck (praktisch fuer Tests/Bench).
+    Identischer Pfad wie `gbrun.py --vm`.
     """
     from .lexer import Lexer
     from .parser import Parser
@@ -161,7 +159,22 @@ def compile_file_to_gbc(src_path: str | Path, out_path: str | Path,
     source = src_path.read_text(encoding="utf-8")
     source, _origins = _preprocess(source, src_path.parent, file_label=src_path.name)
     ast = Parser(Lexer(source).tokenize()).parse()
-    module = Compiler().compile(ast)
+    return Compiler().compile(ast)
+
+
+def compile_gb_to_gbc_text(src_path: str | Path, *, indent: int | None = None) -> str:
+    """`.gb`-Quelldatei -> kompakter `.gbc`-JSON-Text (fuer In-Memory-Bundling)."""
+    module = compile_gb_to_module(src_path)
+    return json.dumps(serialize_module(module), indent=indent, allow_nan=True)
+
+
+def compile_file_to_gbc(src_path: str | Path, out_path: str | Path,
+                        *, indent: int | None = None) -> Module:
+    """End-to-End: `.gb`-Quelldatei -> Compiler -> `.gbc`-Datei.
+
+    Gibt das kompilierte `Module` zurueck (praktisch fuer Tests/Bench).
+    """
+    module = compile_gb_to_module(src_path)
     dump_gbc(module, out_path, indent=indent)
     return module
 

@@ -5,6 +5,7 @@ Verwendung:
     python gbrun.py --tokens <datei.gb>   # nur Tokens ausgeben (Debug)
     python gbrun.py --ast <datei.gb>      # nur AST ausgeben (Debug)
     python gbrun.py --native <datei.gb>   # nativ via gbrt-Runtime ausfuehren
+    python gbrun.py --export <datei.gb> [ordner]  # standalone .exe buendeln
 """
 import os
 import sys
@@ -83,8 +84,16 @@ def main(argv):
             return 3
         return rc
 
-    if args and args[0] in ("--tokens", "--ast", "--vm", "--bench", "--native"):
+    if args and args[0] in ("--tokens", "--ast", "--vm", "--bench", "--native", "--export"):
         mode = args.pop(0)[2:]
+
+    # --- Export: standalone .exe buendeln (Schritt 7) ---
+    # Vor dem chdir/Editor-Pfad behandeln; nimmt optional ein Ausgabeverzeichnis.
+    if mode == "export":
+        if not args:
+            print("Verwendung: python gbrun.py --export <datei.gb> [ausgabe-ordner]")
+            return 1
+        return _run_export(Path(args[0]), args[1] if len(args) > 1 else None)
 
     # --- Ohne Argumente: Editor starten, sonst Hilfe ---
     if not args:
@@ -214,6 +223,33 @@ def _run_native(abs_path, path):
             os.unlink(tmp)
         except OSError:
             pass
+
+
+def _run_export(src, out_dir):
+    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe (gbrt + Bytecode + Assets).
+
+    Rueckgabe: 0 ok, 1 Quelle fehlt, 2 Compile-Fehler, 3 Runtime fehlt."""
+    src = Path(src)
+    if not src.exists():
+        print(f"Datei nicht gefunden: {src}")
+        return 1
+    gbrt = _find_gbrt()
+    if gbrt is None:
+        print("Native Runtime 'gbrt' nicht gefunden. Einmalig bauen mit:")
+        print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
+        return 3
+    from gamebasic.export import export_standalone
+    try:
+        exe = export_standalone(src, gbrt, out_dir=out_dir)
+    except GameBasicError as e:
+        print(f"Compile-Fehler in {src.name}:")
+        print(f"  {e}")
+        return 2
+    size_mb = exe.stat().st_size / (1024 * 1024)
+    print(f"Standalone-Export erstellt: {exe}  ({size_mb:.1f} MB)")
+    print(f"  -> laeuft ohne Python; Ordner '{exe.parent.name}' weitergeben.")
+    print("  Assets-Konvention: Dateien unter 'assets/' werden mitkopiert.")
+    return 0
 
 
 def _bench(ast, path):

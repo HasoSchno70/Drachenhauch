@@ -23,7 +23,8 @@ gamebasic/
   builtins_registry.py   # @builtin / @graphics_builtin Decorators
   modules/               # Built-in-Module (json, db, tween, imgfx, particles, camera, ecs, ...)
   modules/ecs_native.pyx # cdef _World/_Component mit Bulk-System-Ops (Native-ECS)
-gbrun.py                 # CLI mit Editor, --vm, --bench, --tokens, --ast
+gbrun.py                 # CLI mit Editor, --vm, --bench, --tokens, --ast, --native, --export
+gamebasic/export.py      # Standalone-.exe bundeln (gbrt + Bytecode + assets/)
 examples/*.gb            # Demos -- 1-76+, inkl. bench_*.gb fuer Performance-Vergleiche
 tests/                   # pytest-Tests (1100+, alle drei Pfade bit-identisch)
 ```

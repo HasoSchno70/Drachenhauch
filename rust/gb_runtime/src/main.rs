@@ -26,7 +26,39 @@ mod vm;
 use std::io::Write;
 use std::process::ExitCode;
 
+/// Magic am Ende einer gebundelten `.exe`. Layout der letzten 16 Bytes:
+/// `[u64 Laenge der .gbc-Bytes, little-endian][8 Byte Magic]`. Die `.gbc`-Bytes
+/// liegen direkt vor diesem Footer. So wird `gbrt` selbst zur Spiel-Exe:
+/// `export.py` haengt `<gbc><laenge><magic>` an eine Kopie von `gbrt.exe`.
+const PAYLOAD_MAGIC: &[u8; 8] = b"GBRTPAY1";
+
+/// Liest eine eingebettete `.gbc` aus der eigenen Exe (Bundle-Modus) -- oder
+/// None, wenn kein Payload angehaengt ist (normaler Dev-Modus).
+fn embedded_gbc() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let data = std::fs::read(&exe).ok()?;
+    if data.len() < 16 { return None; }
+    let footer = data.len() - 16;
+    if &data[footer + 8..] != PAYLOAD_MAGIC { return None; }
+    let len = u64::from_le_bytes(data[footer..footer + 8].try_into().ok()?) as usize;
+    if len == 0 || len + 16 > data.len() { return None; }
+    String::from_utf8(data[footer - len..footer].to_vec()).ok()
+}
+
 fn main() -> ExitCode {
+    // Bundle-Modus: eingebettete .gbc am Ende der eigenen Exe?
+    if let Some(text) = embedded_gbc() {
+        // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
+        // (LOADIMAGE("assets/...")) auch beim Doppelklick von ueberall stimmen.
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() { let _ = std::env::set_current_dir(dir); }
+        }
+        let label = std::env::current_exe().ok()
+            .and_then(|p| p.file_name().map(|s| s.to_string_lossy().into_owned()))
+            .unwrap_or_else(|| "spiel".into());
+        return run_gbc_text(&text, &label);
+    }
+
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         eprintln!("Verwendung: {} <datei.gbc>", args[0]);
@@ -42,10 +74,16 @@ fn main() -> ExitCode {
             return ExitCode::from(1);
         }
     };
-    let json: serde_json::Value = match serde_json::from_str(&text) {
+    run_gbc_text(&text, &source_label)
+}
+
+/// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
+/// (Datei aus Argumenten) und Bundle-Modus (eingebettet in die Exe).
+fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
+    let json: serde_json::Value = match serde_json::from_str(text) {
         Ok(j) => j,
         Err(e) => {
-            eprintln!("JSON-Fehler in '{}': {}", path, e);
+            eprintln!("JSON-Fehler in '{}': {}", source_label, e);
             return ExitCode::from(1);
         }
     };

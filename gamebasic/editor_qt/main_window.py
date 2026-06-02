@@ -383,6 +383,14 @@ class GameBasicEditor(QMainWindow):
             "native Rust-Runtime")
         self.act_run_native.triggered.connect(self._run_native_active)
 
+        self.act_export = QAction(
+            icons.get("save"), "Export → standalone .exe", self)
+        self.act_export.setShortcut(QKeySequence("Ctrl+F6"))
+        self.act_export.setToolTip(
+            "Standalone-.exe buendeln (Ctrl+F6) -- gbrt + Bytecode + assets/ in "
+            "einen Ordner; laeuft ohne Python")
+        self.act_export.triggered.connect(self._export_active)
+
         self.act_bench = QAction(icons.get("bench"), "Benchmark (TW vs Python-VM vs Native-VM)", self)
         self.act_bench.setShortcut(QKeySequence("Ctrl+F5"))
         self.act_bench.triggered.connect(self._bench_active)
@@ -443,6 +451,7 @@ class GameBasicEditor(QMainWindow):
         tb.addAction(self.act_run_native)
         tb.addAction(self.act_stop)
         tb.addAction(self.act_bench)
+        tb.addAction(self.act_export)
         tb.addSeparator()
         tb.addAction(self.act_find)
         tb.addAction(self.act_replace)
@@ -504,6 +513,7 @@ class GameBasicEditor(QMainWindow):
         m_run.addAction(self.act_stop)
         m_run.addSeparator()
         m_run.addAction(self.act_bench)
+        m_run.addAction(self.act_export)
 
         m_help = mb.addMenu("&Hilfe")
         m_help.addAction(self.act_show_readme)
@@ -989,6 +999,49 @@ class GameBasicEditor(QMainWindow):
         assert st is not None and st.file_path is not None
         self.console.start_run_native(st.file_path)
 
+    def _export_active(self) -> None:
+        """Buendelt die aktive Datei zu einer standalone .exe (gbrt + Bytecode +
+        assets/). Laeuft ohne Python; Ergebnis-Ordner wird im Explorer geoeffnet."""
+        if not self._ensure_saved_for_run():
+            return
+        st = self.tabs.active
+        if st is None or st.file_path is None:
+            return
+        from .output_console import _find_gbrt
+        from gamebasic.export import export_standalone
+        from gamebasic.errors import GameBasicError
+        from PySide6.QtGui import QGuiApplication, QDesktopServices
+        from PySide6.QtCore import QUrl, Qt
+
+        gbrt = _find_gbrt(self.project_root)
+        if gbrt is None:
+            self.console.append(
+                "Native Runtime 'gbrt' nicht gefunden -- erst bauen:\n"
+                "  .venv\\Scripts\\python.exe rust\\build_runtime.py\n", "error")
+            self.statusBar().showMessage("Export: gbrt fehlt", 4000)
+            return
+        self.console.append(f"⚙ Exportiere {st.file_path.name} ...\n", "info")
+        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            exe = export_standalone(st.file_path, gbrt)
+        except GameBasicError as exc:
+            QGuiApplication.restoreOverrideCursor()
+            self.console.append(f"Compile-Fehler: {exc}\n", "error")
+            self.statusBar().showMessage("Export fehlgeschlagen", 4000)
+            return
+        except Exception as exc:  # noqa: BLE001 -- alle Fehler dem User zeigen
+            QGuiApplication.restoreOverrideCursor()
+            self.console.append(f"Export-Fehler: {exc}\n", "error")
+            self.statusBar().showMessage("Export fehlgeschlagen", 4000)
+            return
+        QGuiApplication.restoreOverrideCursor()
+        mb = exe.stat().st_size / (1024 * 1024)
+        self.console.append(
+            f"✓ Standalone-Export: {exe}  ({mb:.1f} MB)\n"
+            f"  Ordner '{exe.parent.name}' weitergeben -- laeuft ohne Python.\n", "info")
+        self.statusBar().showMessage(f"Exportiert: {exe.name}", 5000)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(exe.parent)))
+
     def _run_selection(self, snippet: str) -> None:
         """Schreibt den selektierten Code in eine temp-Datei und startet
         gbrun.py darauf -- erlaubt schnelles Ausprobieren ohne den Buffer
@@ -1206,6 +1259,7 @@ class GameBasicEditor(QMainWindow):
         ])
         add_action_group("Ausfuehren", [
             self.act_run, self.act_run_native, self.act_stop, self.act_bench,
+            self.act_export,
         ])
         add_action_group("Hilfe", [
             self.act_show_readme, self.act_shortcuts, self.act_about,

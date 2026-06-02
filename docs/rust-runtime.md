@@ -18,7 +18,8 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 5. Module portieren (gui/ui/physics …). ✅ *erledigt — ALLE Module nativ inkl.
    ui (komplett, mit UI_TABLE) + gui (komplett, mit GUI_TABLE + Callbacks)*
 6. 3D-Builtins auf raylibs Mesh/Kamera-API. ✅ *Core-Primitive erledigt (`g3d`)*
-7. Editor: „Export → native Exe bundeln". ⬜ *offen*
+7. Editor: „Export → native Exe bundeln". ✅ *erledigt (Bytecode + Assets in
+   eine standalone `.exe` gebündelt — siehe unten)*
 
 **Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
 ein Befehl kompiliert (Python) → `.gbc` → startet `gbrt`. ✅ *erledigt* (siehe
@@ -39,8 +40,6 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
   Kollision/Picking, **Beleuchtung** und **Kamera-Modi** sind nun da — unten.)
 - **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
   (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
-- **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
-  bündeln (Spiele ohne Python ausliefern).
 - Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
@@ -615,3 +614,51 @@ Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
 CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
 `py examples/assets/download_cybermatic.py`. Die Demo läuft auch ohne (stumm,
 via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.txt`.
+
+## Schritt 7: Standalone-Export (`gbrun.py --export` / Editor)
+
+Ein GameBasic-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
+Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
+
+**Prinzip (kein Recompile):** Der kompilierte Bytecode (`.gbc`) wird an eine
+Kopie von `gbrt.exe` **angehängt**. `gbrt` erkennt beim Start den Payload und
+führt ihn aus. Das Anhängen von Daten ans Ende einer PE-`.exe` bricht sie nicht
+(gleiches Prinzip wie PyInstaller-onefile) — der PE-Loader ignoriert Trailing-
+Bytes. Layout der **letzten 16 Bytes** der gebundelten Exe:
+
+```
+[u64 Länge der .gbc-Bytes, little-endian][8 Byte Magic "GBRTPAY1"]
+```
+
+Die `.gbc`-Bytes liegen direkt vor diesem Footer.
+
+**Runtime-Seite** ([main.rs](../rust/gb_runtime/src/main.rs)): `embedded_gbc()`
+liest die eigene Exe (`current_exe()`), prüft den Magic-Footer und extrahiert den
+Bytecode. Ist ein Payload da (Bundle-Modus), wechselt `gbrt` ins Exe-Verzeichnis
+(damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den
+eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`gbrt datei.gbc`).
+Beide Pfade teilen sich `run_gbc_text(text, label)`.
+
+**Export-Seite** ([gamebasic/export.py](../gamebasic/export.py)):
+`export_standalone(src_gb, gbrt_path, out_dir)` kompiliert in-memory zu `.gbc`,
+hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
+Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
+`LOADIMAGE("assets/…")` & Co.).
+
+**Aufruf:**
+```
+.venv\Scripts\python.exe gbrun.py --export examples\89_heightmap.gb [ausgabe-ordner]
+```
+Default-Ausgabe: `<quelle>_dist/`. Im **Editor**: Menü *Ausführen → Export →
+standalone .exe* bzw. **Ctrl+F6** (Toolbar-Button neben Run/Bench) — bündelt die
+aktive Datei und öffnet den Ausgabeordner.
+
+Verifiziert: `89_heightmap.gb` exportiert (~3.7 MB Exe), die Exe **ohne
+Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte
+`assets/heightmap.png` und rendert das Terrain (Screenshot). Dev-Modus
+(`--native`, Konsolen-Programme bit-identisch) bleibt unverändert.
+
+**Grenzen:** Assets müssen unter `assets/` liegen (werden sonst nicht kopiert).
+Die `.gbc` ist unkomprimiert eingebettet (JSON); die Exe-Größe entspricht
+`gbrt` + Bytecode. Cross-Compiling ist nicht vorgesehen — der Export bündelt das
+`gbrt` der aktuellen Plattform.
