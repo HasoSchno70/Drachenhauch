@@ -35,8 +35,8 @@ _ALL = {
     # Kamera-Modi
     "camera3d_update": 1, "camera3d_x": 0, "camera3d_y": 0, "camera3d_z": 0,
     "camera3d_target_x": 0, "camera3d_target_y": 0, "camera3d_target_z": 0,
-    # Beleuchtung + Fog
-    "light_enable": 0, "light_ambient": 2, "light_fog": 2,
+    # Beleuchtung + Fog + IBL
+    "light_enable": 0, "light_ambient": 2, "light_fog": 2, "light_env": 3,
     "light_directional": 4, "light_point": 4,
     "light_set_pos": 4, "light_set_color": 2, "light_set_enabled": 2, "model_lit": 1,
     # Shadow-Mapping (SHADOW_ENABLE separat -- variable arity)

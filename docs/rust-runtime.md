@@ -35,10 +35,10 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D-Rest:** Image-Based-Lighting (Cubemap-Reflexionen) als PBR-Veredelung.
-  Modelle, GenMesh inkl. Heightmap, Texturen, **Normal-Maps**, **PBR**, Billboards,
-  Ray-Kollision/Picking, Beleuchtung, **Fog**, **Schatten** und **Kamera-Modi**
-  sind nun da — siehe unten.
+- **3D-Stack vollständig:** Modelle, GenMesh inkl. Heightmap, Texturen,
+  **Normal-Maps**, **PBR + analytisches IBL** (`LIGHT_ENV`), Billboards,
+  Ray-Kollision/Picking, Beleuchtung, **Fog**, **Schatten**, **Kamera-Modi** —
+  siehe unten. (Optional offen: echtes HDR-Cubemap-IBL.)
 - Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
@@ -546,6 +546,15 @@ Geometrie, Fresnel-Schlick) mit Reinhard-Tonemapping + Gamma; analytische Lichte
   Modell-Draw gesetzt — zusammen mit `useNormalMap`. Albedo = `colDiffuse`
   (MODEL-Tint) × `texture0`. Demo [examples/95_pbr.gb](../examples/95_pbr.gb):
   Kugel-Gitter Metalness × Roughness (per Screenshot verifiziert).
+- `LIGHT_ENV(himmel, boden, intensität)` — **analytisches Image-Based-Lighting**
+  (`intensität` 0 = aus). Die Umgebung ist ein vertikaler Farbgradient
+  (boden→himmel); der Shader fügt diffuse Hemisphären-Irradiance + eine
+  roughness-abhängig verwischte Sky-**Reflexion** (reflektierter View-Vektor) +
+  die analytische Environment-BRDF (Karis-Approximation statt LUT) hinzu, mit
+  roughness-Fresnel. **Kein HDR-Asset, keine Cubemap-Passes** — eine reine
+  Shader-Erweiterung. Erst damit wirken Metalle (`metalness` 1) wirklich
+  metallisch (sie reflektieren die Umgebung statt dunkel zu bleiben). Demo
+  [examples/96_ibl.gb](../examples/96_ibl.gb): Metall- vs. Dielektrikum-Reihe.
 - `LIGHT_FOG(farbe, dichte)` — exponentieller Tiefen-Fog für die beleuchteten
   Modelle (`dichte 0` = aus). Ferne Objekte verblassen zur Fog-Farbe; im
   Fragment-Shader `mix(fogColor, finalColor, 1/exp((dist·dichte)²))`. Tipp:
@@ -616,11 +625,13 @@ Platte + Kugel links mit, rechts ohne Normal-Map unter kreisendem Punktlicht —
 links wandern die Wellen-Bumps, rechts bleibt es glatt (per Screenshot
 verifiziert; Normal-Map `examples/assets/normal_waves.png` prozedural generiert).
 
-**Offen (3D):** Image-Based-Lighting (Environment-Cubemap-Reflexionen) als
-optionale Veredelung des PBR-Modells. Modelle, Meshes inkl. Heightmap, Texturen,
-Normal-Maps, **PBR (Metalness/Roughness)**, Billboards, Picking, Beleuchtung inkl.
-**Fog** und **Schatten**, Kamera-Modi sind nun nativ; Third-Person-Kollision ist
-Gameplay-Logik (kein Engine-Primitive).
+**Offen (3D):** echtes HDR-Cubemap-IBL (equirect→Cubemap, Irradiance-Convolution,
+Prefilter-Mips, BRDF-LUT) als optionale Veredelung über die analytische
+`LIGHT_ENV`-Näherung hinaus — großer Multi-Pass-Aufwand, geringer Mehrwert ohne
+HDR-Assets. Der native 3D-Stack ist ansonsten **vollständig**: Modelle, Meshes
+inkl. Heightmap, Texturen, Normal-Maps, **PBR + analytisches IBL**, Billboards,
+Picking, Beleuchtung inkl. Fog und Schatten, Kamera-Modi. Third-Person-Kollision
+ist Gameplay-Logik (kein Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 

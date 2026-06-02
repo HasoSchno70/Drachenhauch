@@ -315,6 +315,16 @@ def _light_fog(g, *args):
     _native_only("LIGHT_FOG")
 
 
+@graphics_builtin("LIGHT_ENV", arity=3)
+def _light_env(g, *args):
+    """LIGHT_ENV(himmel_farbe, boden_farbe, intensitaet) -- analytisches
+    Environment-Lighting (IBL-Naeherung): die Umgebung ist ein vertikaler
+    Gradient zwischen boden_farbe und himmel_farbe. Metalle (MODEL_PBR) spiegeln
+    sie, roughness verwischt die Reflexion; intensitaet 0 = aus. Hebt PBR-
+    Materialien deutlich an (Metalle wirken erst mit Umgebung wirklich metallisch)."""
+    _native_only("LIGHT_ENV")
+
+
 @graphics_builtin("LIGHT_DIRECTIONAL", arity=4)
 def _light_directional(g, *args):
     """LIGHT_DIRECTIONAL(dx, dy, dz, farbe) -> INTEGER -- gerichtetes Licht

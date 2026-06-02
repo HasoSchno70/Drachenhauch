@@ -153,6 +153,10 @@ uniform float metalness;   // 0 = Dielektrikum, 1 = Metall
 uniform float roughness;   // 0 = spiegelnd, 1 = matt
 uniform vec4 fogColor;
 uniform float fogDensity;
+// Analytisches Environment-Lighting (IBL-Approximation). envIntensity 0 = aus.
+uniform vec3 envSky;
+uniform vec3 envGround;
+uniform float envIntensity;
 // Shadow-Mapping (lights[0] = schattenwerfendes directional light).
 uniform mat4 lightVP;
 uniform sampler2D shadowMap;
@@ -174,6 +178,20 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float r) {
 }
 vec3 fresnelSchlick(float cosT, vec3 F0) {
     return F0 + (1.0 - F0)*pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0);
+}
+vec3 fresnelSchlickRough(float cosT, vec3 F0, float r) {
+    vec3 fr = max(vec3(1.0 - r), F0);
+    return F0 + (fr - F0)*pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0);
+}
+// Prozedurale Umgebung: vertikaler Gradient Boden<->Himmel.
+vec3 envSample(vec3 dir) { return mix(envGround, envSky, dir.y*0.5 + 0.5); }
+// Analytische Environment-BRDF (Karis-Mobile-Approximation, ersetzt die LUT).
+vec2 envBRDFApprox(float NoV, float r) {
+    vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
+    vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
+    vec4 rr = r*c0 + c1;
+    float a004 = min(rr.x*rr.x, exp2(-9.28*NoV))*rr.x + rr.y;
+    return vec2(-1.04, 1.04)*a004 + rr.zw;
 }
 float shadowFactor(vec3 N, vec3 l0) {
     if (shadowsEnabled != 1) return 0.0;
@@ -228,7 +246,24 @@ void main()
         if (i == 0) contrib *= (1.0 - shadow*0.9);   // nur Schattenlicht dimmen
         Lo += contrib;
     }
-    vec3 color = ambient.rgb*albedo + Lo;
+    vec3 ambientTerm = ambient.rgb*albedo;
+    // Image-Based-Lighting (analytische Umgebung): diffuse Hemisphaeren-Irradiance
+    // + spiegelnde Sky-Reflexion (roughness-abhaengig verschwommen) + Env-BRDF.
+    if (envIntensity > 0.0) {
+        float NoV = max(dot(N, V), 0.0);
+        vec3 F = fresnelSchlickRough(NoV, F0, rough);
+        vec3 kD = (vec3(1.0) - F)*(1.0 - metal);
+        vec3 irradiance = envSample(N)*envIntensity;
+        vec3 diffuseIBL = irradiance*albedo;
+        vec3 R = reflect(-V, N);
+        // schaerfe Reflexion (rough 0) bis Mittelwert der Umgebung (rough 1)
+        vec3 avg = (envSky + envGround)*0.5;
+        vec3 prefiltered = mix(envSample(R), avg, rough)*envIntensity;
+        vec2 brdf = envBRDFApprox(NoV, rough);
+        vec3 specularIBL = prefiltered*(F0*brdf.x + brdf.y);
+        ambientTerm += kD*diffuseIBL + specularIBL;
+    }
+    vec3 color = ambientTerm + Lo;
     color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
     color = pow(color, vec3(1.0/2.2));         // Gamma
     finalColor = vec4(color, 1.0);
@@ -275,6 +310,13 @@ pub struct Graphics {
     light_ambient: [f32; 4],
     light_fog: [f32; 4],
     light_fog_density: f32,
+    // Analytisches Environment-Lighting (IBL): Sky/Ground-Farbe + Intensitaet.
+    env_sky: [f32; 3],
+    env_ground: [f32; 3],
+    env_intensity: f32,
+    loc_env_sky: i32,
+    loc_env_ground: i32,
+    loc_env_intensity: i32,
     loc_view: i32,
     loc_ambient: i32,
     loc_fog_color: i32,
@@ -351,6 +393,12 @@ impl Graphics {
             light_ambient: [0.1, 0.1, 0.1, 1.0],
             light_fog: [0.0, 0.0, 0.0, 1.0],
             light_fog_density: 0.0,
+            env_sky: [0.5, 0.7, 1.0],
+            env_ground: [0.2, 0.2, 0.2],
+            env_intensity: 0.0,
+            loc_env_sky: -1,
+            loc_env_ground: -1,
+            loc_env_intensity: -1,
             loc_view: -1,
             loc_ambient: -1,
             loc_fog_color: -1,
@@ -626,6 +674,9 @@ impl Graphics {
         self.loc_use_normal = sh.get_shader_location("useNormalMap");
         self.loc_metalness = sh.get_shader_location("metalness");
         self.loc_roughness = sh.get_shader_location("roughness");
+        self.loc_env_sky = sh.get_shader_location("envSky");
+        self.loc_env_ground = sh.get_shader_location("envGround");
+        self.loc_env_intensity = sh.get_shader_location("envIntensity");
         self.light_shader = Some(sh);
     }
     pub fn light_fog(&mut self, col_: i64, density: f64) {
@@ -633,6 +684,17 @@ impl Graphics {
         self.light_fog = [((v >> 16) & 0xFF) as f32 / 255.0, ((v >> 8) & 0xFF) as f32 / 255.0,
                           (v & 0xFF) as f32 / 255.0, 1.0];
         self.light_fog_density = density.max(0.0) as f32;
+    }
+    fn rgb3(col_: i64) -> [f32; 3] {
+        let v = col_ as u32;
+        [((v >> 16) & 0xFF) as f32 / 255.0, ((v >> 8) & 0xFF) as f32 / 255.0, (v & 0xFF) as f32 / 255.0]
+    }
+    /// Analytisches Environment-Lighting (IBL): Sky-/Ground-Farbe + Intensitaet
+    /// (0 = aus). Metalle reflektieren die Umgebung, roughness verwischt sie.
+    pub fn light_env(&mut self, sky: i64, ground: i64, intensity: f64) {
+        self.env_sky = Self::rgb3(sky);
+        self.env_ground = Self::rgb3(ground);
+        self.env_intensity = intensity.max(0.0) as f32;
     }
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
         let v = col_ as u32;
@@ -734,6 +796,8 @@ impl Graphics {
         let loc_ambient = self.loc_ambient;
         let (fog_color, fog_density) = (self.light_fog, self.light_fog_density);
         let (loc_fog_color, loc_fog_density) = (self.loc_fog_color, self.loc_fog_density);
+        let (env_sky, env_ground, env_int) = (self.env_sky, self.env_ground, self.env_intensity);
+        let (loc_esky, loc_eground, loc_eint) = (self.loc_env_sky, self.loc_env_ground, self.loc_env_intensity);
         // Licht-Daten lokal kopieren (Borrow-Trennung zum Shader).
         let lights: Vec<(i32,i32,i32,i32,i32, i32, i32, [f32;3], [f32;3], [f32;4])> =
             self.lights.iter().map(|l| (
@@ -744,6 +808,9 @@ impl Graphics {
         if loc_ambient >= 0 { sh.set_shader_value(loc_ambient, ambient); }
         if loc_fog_color >= 0 { sh.set_shader_value(loc_fog_color, fog_color); }
         if loc_fog_density >= 0 { sh.set_shader_value(loc_fog_density, fog_density); }
+        if loc_esky >= 0 { sh.set_shader_value(loc_esky, env_sky); }
+        if loc_eground >= 0 { sh.set_shader_value(loc_eground, env_ground); }
+        if loc_eint >= 0 { sh.set_shader_value(loc_eint, env_int); }
         for (le, lt, lp, ltg, lc, en, kind, pos, target, color) in lights {
             if le >= 0 { sh.set_shader_value(le, en); }
             if lt >= 0 { sh.set_shader_value(lt, kind); }
