@@ -38,6 +38,8 @@ _ALL = {
     "light_enable": 0, "light_ambient": 2, "light_fog": 2,
     "light_directional": 4, "light_point": 4,
     "light_set_pos": 4, "light_set_color": 2, "light_set_enabled": 2, "model_lit": 1,
+    # Shadow-Mapping (SHADOW_ENABLE separat -- variable arity)
+    "shadow_area": 2, "shadow_target": 3,
 }
 
 
@@ -59,4 +61,17 @@ def test_arity_checked_before_body(name, arity):
     # (Nur fuer arity > 0 sinnvoll -- bei arity 0 gibt es kein "zu wenig".)
     with pytest.raises(GBRuntimeError) as ei:
         _gr(name, *([1] * (arity - 1)))
+    assert "nativen Runtime" not in str(ei.value)
+
+
+def test_shadow_enable_registered_and_native_only():
+    from gamebasic.interpreter import GRAPHICS_BUILTINS
+    assert "shadow_enable" in GRAPHICS_BUILTINS
+    # Variable arity (0,1): beide Aufruf-Formen sind gueltig -> native-only-Meldung.
+    for args in ([], [2048]):
+        with pytest.raises(GBRuntimeError, match="nativen Runtime"):
+            _gr("shadow_enable", *args)
+    # Zu viele Argumente -> Arity-Fehler (nicht native-only).
+    with pytest.raises(GBRuntimeError) as ei:
+        _gr("shadow_enable", 1, 2)
     assert "nativen Runtime" not in str(ei.value)

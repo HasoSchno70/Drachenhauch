@@ -551,12 +551,43 @@ Standard-Uniform-Namen; nur `matModel` setzen wir explizit in die `locs`. Demo
 auf Kugel/Würfel/Torus, orbitale Kamera. Per Screenshot verifiziert (Diffus +
 Specular-Highlights + Lichtkegel des Punktlichts am Boden).
 
-**Offen (3D):** Schatten (Shadow-Mapping — Multi-Pass mit Depth-RenderTexture +
-Light-Space-Matrix, großes Feature) und normal/roughness-Maps (PBR — asset-
-abhängig, braucht Tangenten + erweiterten Shader). Die gängigen 3D-Bausteine
-(Modelle, Meshes inkl. Heightmap, Texturen, Billboards, Picking, Beleuchtung
-inkl. **Fog**, Kamera-Modi) sind nun nativ abgedeckt; Third-Person-Kollision ist
-Gameplay-Logik (kein Engine-Primitive).
+### Schatten (Shadow-Mapping)
+
+Echte Schlagschatten über einen Depth-Pass aus Sicht des Lichts (Port des
+offiziellen raylib-`shaders_shadowmap`-Beispiels in die Recording-Pipeline):
+
+- `SHADOW_ENABLE([auflösung])` — legt ein **sampleable Depth-FBO** an
+  (`rlLoadFramebuffer` + `rlLoadTextureDepth(res, res, false)` + `rlFramebufferAttach`
+  als `RL_ATTACHMENT_DEPTH/TEXTURE2D`; die Default-`RenderTexture`-Tiefe ist ein
+  Renderbuffer, also *nicht* sampleable) und cached die Shader-Locations.
+  Default 1024, geclamped auf 256…4096.
+- `SHADOW_AREA(größe, distanz)` — halbe Kantenlänge des orthografischen
+  Schatten-Frustums + Abstand der Licht-Kamera (kleiner = schärfer).
+- `SHADOW_TARGET(x,y,z)` — Mittelpunkt des Schattenbereichs (z. B. dem Spieler
+  folgen lassen).
+
+**Ablauf pro Frame** (`render_shadow_map`, vor dem Haupt-Pass): aus dem ersten
+`LIGHT_DIRECTIONAL` wird eine orthografische Licht-Kamera gebaut; `rlEnableFramebuffer`
+→ `rlViewport(res)` → `BeginMode3D(lightCam)` → alle `MODEL`/`MODEL_EX`-Draws via
+`ffi::DrawModel*` in die Depth-Map gerendert. `lightVP = lightView·lightProj`
+(aus `rlGetMatrixModelview/Projection`) geht als Uniform in den Lighting-Shader;
+die Depth-Textur wird an Texture-Unit 10 gebunden (`rlActiveTextureSlot`/
+`rlEnableTexture`, der Sampler-Uniform auf 10 gesetzt — Material-Maps nutzen 0…2,
+kein Clash). Der Fragment-Shader transformiert jeden Punkt in Light-Space und
+vergleicht mit der Depth-Map (**3×3-PCF** + Normalen-abhängiger Bias gegen
+Shadow-Acne); im Schatten bleiben 15 % Direktlicht (Ambient unberührt).
+`shadowsEnabled`-Uniform (Default 0) → ohne `SHADOW_ENABLE` keinerlei Effekt,
+bestehende Lighting-Demos unverändert.
+
+*Caster/Receiver:* `MODEL_LIT`-Modelle (Immediate-Primitive/Grid werfen keine
+Schatten). Ein schattenwerfendes directional Light. Demo
+[examples/93_shadows.gb](../examples/93_shadows.gb): schwebende Kugel/Würfel/Torus
+werfen weiche Schatten auf den Boden (per Screenshot verifiziert).
+
+**Offen (3D):** normal/roughness-Maps (PBR — asset-abhängig, braucht Tangenten +
+erweiterten Shader). Modelle, Meshes inkl. Heightmap, Texturen, Billboards,
+Picking, Beleuchtung inkl. **Fog** und **Schatten**, Kamera-Modi sind nun nativ;
+Third-Person-Kollision ist Gameplay-Logik (kein Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 

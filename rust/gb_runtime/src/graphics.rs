@@ -144,6 +144,11 @@ uniform vec4 ambient;
 uniform vec3 viewPos;
 uniform vec4 fogColor;
 uniform float fogDensity;
+// Shadow-Mapping (lights[0] = schattenwerfendes directional light).
+uniform mat4 lightVP;
+uniform sampler2D shadowMap;
+uniform int shadowMapResolution;
+uniform int shadowsEnabled;
 void main()
 {
     vec4 texelColor = texture(texture0, fragTexCoord);
@@ -165,6 +170,31 @@ void main()
             specular += specCo;
         }
     }
+    // Shadow-Faktor (0 = voll beleuchtet, 1 = im Schatten) via PCF 3x3.
+    float shadow = 0.0;
+    if (shadowsEnabled == 1)
+    {
+        vec4 p = lightVP*vec4(fragPosition, 1.0);
+        vec3 proj = p.xyz/p.w;
+        proj = proj*0.5 + 0.5;
+        if (proj.z <= 1.0 && proj.x >= 0.0 && proj.x <= 1.0 && proj.y >= 0.0 && proj.y <= 1.0)
+        {
+            vec3 l0 = -normalize(lights[0].target - lights[0].position);
+            float bias = max(0.0015*(1.0 - dot(normal, l0)), 0.00015);
+            vec2 texel = vec2(1.0/float(shadowMapResolution));
+            int cnt = 0;
+            for (int x = -1; x <= 1; x++)
+                for (int y = -1; y <= 1; y++)
+                {
+                    float d = texture(shadowMap, proj.xy + vec2(x, y)*texel).r;
+                    if (proj.z - bias > d) cnt++;
+                }
+            shadow = float(cnt)/9.0;
+        }
+    }
+    float sf = 1.0 - shadow*0.85;     // im Schatten bleiben 15% Direktlicht
+    lightDot *= sf;
+    specular *= sf;
     finalColor = (texelColor*((colDiffuse + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
     finalColor += texelColor*(ambient/10.0)*colDiffuse;
     finalColor = pow(finalColor, vec4(1.0/2.2));
@@ -208,6 +238,18 @@ pub struct Graphics {
     loc_ambient: i32,
     loc_fog_color: i32,
     loc_fog_density: i32,
+    // Shadow-Mapping: eigenes Depth-FBO (sampleable) + Light-Space-Uniforms.
+    shadow_enabled: bool,
+    shadow_fbo: u32,
+    shadow_depth: u32,
+    shadow_res: i32,
+    shadow_area: f32,
+    shadow_dist: f32,
+    shadow_target: [f32; 3],
+    loc_light_vp: i32,
+    loc_shadow_map: i32,
+    loc_shadow_res: i32,
+    loc_shadows_on: i32,
     text_size: i32,
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
@@ -267,6 +309,17 @@ impl Graphics {
             loc_ambient: -1,
             loc_fog_color: -1,
             loc_fog_density: -1,
+            shadow_enabled: false,
+            shadow_fbo: 0,
+            shadow_depth: 0,
+            shadow_res: 1024,
+            shadow_area: 25.0,
+            shadow_dist: 50.0,
+            shadow_target: [0.0, 0.0, 0.0],
+            loc_light_vp: -1,
+            loc_shadow_map: -1,
+            loc_shadow_res: -1,
+            loc_shadows_on: -1,
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
                 Vector3::new(6.0, 5.0, 6.0),
@@ -1053,9 +1106,122 @@ impl Graphics {
         self.rl.window_should_close()
     }
 
+    // --- Shadow-Mapping ---
+    /// Aktiviert Shadow-Mapping: legt ein sampleable Depth-FBO an und cached die
+    /// Shader-Locations. Braucht Beleuchtung (LIGHT_ENABLE wird ggf. nachgeholt).
+    pub fn shadow_enable(&mut self, res: i32) -> Result<(), String> {
+        if self.light_shader.is_none() { self.light_enable(); }
+        let res = res.clamp(256, 4096);
+        if self.shadow_fbo == 0 {
+            unsafe {
+                let fbo = raylib::ffi::rlLoadFramebuffer();
+                if fbo == 0 { return Err("SHADOW_ENABLE: Framebuffer fehlgeschlagen".into()); }
+                raylib::ffi::rlEnableFramebuffer(fbo);
+                let depth = raylib::ffi::rlLoadTextureDepth(res, res, false);
+                // RL_ATTACHMENT_DEPTH=100, RL_ATTACHMENT_TEXTURE2D=100.
+                raylib::ffi::rlFramebufferAttach(fbo, depth, 100, 100, 0);
+                raylib::ffi::rlDisableFramebuffer();
+                self.shadow_fbo = fbo;
+                self.shadow_depth = depth;
+            }
+        }
+        self.shadow_res = res;
+        let (vp, map, r, on) = {
+            let sh = self.light_shader.as_ref().unwrap();
+            (sh.get_shader_location("lightVP"), sh.get_shader_location("shadowMap"),
+             sh.get_shader_location("shadowMapResolution"), sh.get_shader_location("shadowsEnabled"))
+        };
+        self.loc_light_vp = vp; self.loc_shadow_map = map;
+        self.loc_shadow_res = r; self.loc_shadows_on = on;
+        self.shadow_enabled = true;
+        Ok(())
+    }
+    pub fn shadow_area(&mut self, size: f64, dist: f64) {
+        self.shadow_area = (size as f32).max(1.0);
+        self.shadow_dist = (dist as f32).max(1.0);
+    }
+    pub fn shadow_target(&mut self, x: f32, y: f32, z: f32) { self.shadow_target = [x, y, z]; }
+
+    /// Rendert die beleuchteten Modelle aus Sicht des (ersten) directional
+    /// Lights in die Depth-Map und setzt lightVP + bindet die Map an Slot 10.
+    fn render_shadow_map(&mut self) {
+        if !self.shadow_enabled || self.light_shader.is_none() { return; }
+        // Schattenwerfendes Licht = erstes directional (kind 0). Sonst aus.
+        let dir = match self.lights.iter().find(|l| l.kind == 0) {
+            Some(l) => {
+                let d = [l.target[0] - l.pos[0], l.target[1] - l.pos[1], l.target[2] - l.pos[2]];
+                let len = (d[0]*d[0] + d[1]*d[1] + d[2]*d[2]).sqrt().max(1e-6);
+                [d[0]/len, d[1]/len, d[2]/len]
+            }
+            None => {
+                if self.loc_shadows_on >= 0 {
+                    let loc = self.loc_shadows_on;
+                    self.light_shader.as_mut().unwrap().set_shader_value(loc, 0i32);
+                }
+                return;
+            }
+        };
+        let t = self.shadow_target;
+        let cam_pos = Vector3::new(t[0] - dir[0]*self.shadow_dist,
+                                   t[1] - dir[1]*self.shadow_dist,
+                                   t[2] - dir[2]*self.shadow_dist);
+        let light_cam = Camera3D::orthographic(
+            cam_pos, Vector3::new(t[0], t[1], t[2]), Vector3::new(0.0, 1.0, 0.0), self.shadow_area*2.0);
+        let ffi_cam: raylib::ffi::Camera3D = light_cam.into();
+        let res = self.shadow_res;
+        let (win_w, win_h) = (self.width*self.scale, self.height*self.scale);
+        let white = raylib::ffi::Color { r: 255, g: 255, b: 255, a: 255 };
+        let (lv, lp);
+        unsafe {
+            raylib::ffi::rlEnableFramebuffer(self.shadow_fbo);
+            raylib::ffi::rlViewport(0, 0, res, res);
+            raylib::ffi::rlClearScreenBuffers();
+            raylib::ffi::BeginMode3D(ffi_cam);
+            lv = raylib::ffi::rlGetMatrixModelview();
+            lp = raylib::ffi::rlGetMatrixProjection();
+            for cmd in &self.cmds3d {
+                match cmd {
+                    Cmd3D::Model(i, x, y, z, sc, _) | Cmd3D::ModelWires(i, x, y, z, sc, _) => {
+                        if let Some(m) = self.models.get(*i) {
+                            raylib::ffi::DrawModel(*m.as_ref(),
+                                raylib::ffi::Vector3 { x: *x, y: *y, z: *z }, *sc, white);
+                        }
+                    }
+                    Cmd3D::ModelEx(i, x, y, z, ax, ay, az, ang, sc, _) => {
+                        if let Some(m) = self.models.get(*i) {
+                            raylib::ffi::DrawModelEx(*m.as_ref(),
+                                raylib::ffi::Vector3 { x: *x, y: *y, z: *z },
+                                raylib::ffi::Vector3 { x: *ax, y: *ay, z: *az }, *ang,
+                                raylib::ffi::Vector3 { x: *sc, y: *sc, z: *sc }, white);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            raylib::ffi::EndMode3D();
+            raylib::ffi::rlDisableFramebuffer();
+            raylib::ffi::rlViewport(0, 0, win_w, win_h);
+        }
+        // lightVP = lightView * lightProj (== raylibs MatrixMultiply(view, proj)).
+        let lvp = Matrix::from(lv) * Matrix::from(lp);
+        let (loc_vp, loc_res, loc_on, loc_map, depth) =
+            (self.loc_light_vp, self.loc_shadow_res, self.loc_shadows_on, self.loc_shadow_map, self.shadow_depth);
+        let sh = self.light_shader.as_mut().unwrap();
+        if loc_vp >= 0 { sh.set_shader_value_matrix(loc_vp, lvp); }
+        if loc_res >= 0 { sh.set_shader_value(loc_res, res); }
+        if loc_on >= 0 { sh.set_shader_value(loc_on, 1i32); }
+        if loc_map >= 0 { sh.set_shader_value(loc_map, 10i32); }   // Sampler -> Texture-Unit 10
+        // Depth-Textur an Unit 10 binden (Material-Maps nutzen 0..2 -> kein Clash).
+        unsafe {
+            raylib::ffi::rlActiveTextureSlot(10);
+            raylib::ffi::rlEnableTexture(depth);
+        }
+    }
+
     pub fn flip(&mut self) {
         // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
         self.update_light_uniforms();
+        self.render_shadow_map();
         let s = self.scale;
         let clear_color = self.clear_color;
         let mut order: Vec<usize> = (0..self.layers.len()).collect();

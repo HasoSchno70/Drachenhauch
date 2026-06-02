@@ -1,0 +1,64 @@
+' 93_shadows.gb -- Shadow-Mapping (native-only, F6)
+'
+' SHADOW_ENABLE([aufloesung])  Shadow-Mapping an (Depth-FBO + Light-Space-Matrix)
+' SHADOW_AREA(groesse, distanz) abgedeckter Bereich + Licht-Kamera-Abstand
+' SHADOW_TARGET(x, y, z)        Mittelpunkt des Schattenbereichs
+'
+' Das erste LIGHT_DIRECTIONAL wirft Schatten; MODEL_LIT-Modelle werfen UND
+' empfangen sie. Hier: schwebende Objekte werfen Schatten auf den Boden.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Shadow-Mapping", 1)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&HFFFFFF, 0.30)
+DIM sun AS INTEGER
+sun = LIGHT_DIRECTIONAL(-0.55, -1.0, -0.4, &HFFF2E0)   ' Sonne von schraeg oben
+
+SHADOW_ENABLE(2048)            ' hohe Aufloesung -> scharfe Schatten
+SHADOW_AREA(10.0, 40.0)        ' enger Bereich (10) -> mehr Schaerfe
+SHADOW_TARGET(0, 1, 0)
+
+DIM ground AS INTEGER
+DIM ball AS INTEGER
+DIM box AS INTEGER
+DIM torus AS INTEGER
+ground = MESH_PLANE(30.0, 30.0, 1, 1)
+ball   = MESH_SPHERE(1.0, 24, 24)
+box    = MESH_CUBE(1.4, 1.4, 1.4)
+torus  = MESH_TORUS(0.7, 0.28, 20, 28)
+MODEL_LIT(ground)
+MODEL_LIT(ball)
+MODEL_LIT(box)
+MODEL_LIT(torus)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.02
+
+    CLS(&H0C1018)
+    DIM cx AS FLOAT
+    DIM cz AS FLOAT
+    cx = COS(t * 0.5) * 9.0
+    cz = SIN(t * 0.5) * 9.0
+    CAMERA3D(cx, 7.0, cz, 0, 1.0, 0, 45)
+
+    MODEL(ground, 0, 0, 0, 1.0, &H687868)
+
+    ' Schwebende Objekte (bobben) -> sichtbare Schatten darunter.
+    DIM by AS FLOAT
+    by = 1.6 + SIN(t * 2.0) * 0.4
+    MODEL(ball, -2.6, by, 0, 1.0, &HD05060)
+    MODEL_EX(box, 0, 1.8, 0, 0, 1, 0, t * 50.0, 1.0, &H50A0E0)
+    MODEL_EX(torus, 2.6, 1.7, 0, 1, 1, 0, t * 60.0, 1.0, &H60C080)
+
+    TEXT(12, 10, "Shadow-Mapping: schwebende Objekte werfen Schatten", WHITE)
+    TEXT(12, 34, "SHADOW_ENABLE/AREA/TARGET + directional Sonne", &H88AACC)
+
+    FLIP()
+NEXT

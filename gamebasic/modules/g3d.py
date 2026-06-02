@@ -336,3 +336,28 @@ def _model_lit(g, *args):
     """MODEL_LIT(modell) -- den Lighting-Shader an ein Modell haengen, damit es
     von den Lichtern beleuchtet wird."""
     _native_only("MODEL_LIT")
+
+
+# --- Shadow-Mapping (Schatten des ersten directional Lights) --------
+
+@graphics_builtin("SHADOW_ENABLE", arity=(0, 1))
+def _shadow_enable(g, *args):
+    """SHADOW_ENABLE([aufloesung]) -- Shadow-Mapping aktivieren (Standard 1024).
+    Das erste LIGHT_DIRECTIONAL wirft Schatten; MODEL_LIT-Modelle werfen und
+    empfangen sie. SHADOW_AREA/SHADOW_TARGET steuern den abgedeckten Bereich."""
+    _native_only("SHADOW_ENABLE")
+
+
+@graphics_builtin("SHADOW_AREA", arity=2)
+def _shadow_area(g, *args):
+    """SHADOW_AREA(groesse, distanz) -- halbe Kantenlaenge des (orthografischen)
+    Schatten-Frustums und Abstand der Licht-Kamera (Default 25, 50). Kleiner =
+    schaerfere Schatten auf engerem Bereich."""
+    _native_only("SHADOW_AREA")
+
+
+@graphics_builtin("SHADOW_TARGET", arity=3)
+def _shadow_target(g, *args):
+    """SHADOW_TARGET(x, y, z) -- Mittelpunkt des Schattenbereichs (Default
+    Ursprung). Z.B. der Spielerposition folgen lassen."""
+    _native_only("SHADOW_TARGET")
