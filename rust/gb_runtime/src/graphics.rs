@@ -270,6 +270,20 @@ impl Graphics {
         let mesh = Mesh::gen_mesh_plane(&self.thread, w, l, res_x.max(1), res_z.max(1));
         self.push_model_from_mesh(mesh, "MESH_PLANE")
     }
+    /// Terrain-Mesh aus einer (Graustufen-)Image (LOADIMAGE-Handle): Helligkeit
+    /// = Hoehe. size = (Breite, Hoehenskalierung, Tiefe) in Welt-Einheiten.
+    pub fn mesh_heightmap(&mut self, tex_idx: i64, sx: f32, sy: f32, sz: f32) -> Result<i64, String> {
+        let ti = tex_idx as usize;
+        if tex_idx < 0 || ti >= self.textures.len() {
+            return Err(format!("MESH_HEIGHTMAP: ungueltiges IMAGE-Handle {}", tex_idx));
+        }
+        // Mesh aus dem CPU-Image bauen (haelt danach keinen Borrow auf self).
+        let mesh = {
+            let img = &self.textures[ti].img;
+            Mesh::gen_mesh_heightmap(&self.thread, img, Vector3::new(sx, sy, sz))
+        };
+        self.push_model_from_mesh(mesh, "MESH_HEIGHTMAP")
+    }
     fn check_model(&self, idx: i64, fn_: &str) -> Result<usize, String> {
         let i = idx as usize;
         if idx < 0 || i >= self.models.len() {

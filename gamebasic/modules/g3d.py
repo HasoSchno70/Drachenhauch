@@ -154,6 +154,14 @@ def _mesh_plane(g, *args):
     _native_only("MESH_PLANE")
 
 
+@graphics_builtin("MESH_HEIGHTMAP", arity=4)
+def _mesh_heightmap(g, *args):
+    """MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z) -> MODEL -- Terrain
+    aus einer (Graustufen-)Image (via LOADIMAGE). Helligkeit pro Pixel = Hoehe;
+    groesse_y skaliert die Hoehe, groesse_x/z spannen das Terrain in der Ebene."""
+    _native_only("MESH_HEIGHTMAP")
+
+
 @graphics_builtin("MODEL", arity=6)
 def _model(g, *args):
     """MODEL(modell, x, y, z, skalierung, farbe) -- Modell gefuellt zeichnen."""

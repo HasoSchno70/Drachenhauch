@@ -34,10 +34,10 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D weiter vertiefen:** Heightmap-Meshes, 3D-Kameramodi (`UpdateCamera`
-  orbit/first-person), Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`),
-  Beleuchtung/Material-Shader. (Modell-Laden + GenMesh-Primitive sind nun da —
-  siehe unten.)
+- **3D weiter vertiefen:** 3D-Kameramodi (`UpdateCamera` orbit/first-person),
+  Billboards, Ray-Kollision (`GetRayCollisionBox/Sphere/Mesh`),
+  Beleuchtung/Material-Shader. (Modell-Laden, GenMesh-Primitive inkl. Heightmap
+  sind nun da — siehe unten.)
 - **Gamepad:** `IsGamepadButtonDown/Pressed` + `GetGamepadAxisMovement`
   (`JOY_*`/`INPUT_JOY_*` — input-Modul-Lücke, `INPUT_JOY_COUNT`=0 nativ).
 - **Schritt 7 — Editor-Export:** `gbrt` + `.gbc` zu einer standalone `.exe`
@@ -456,7 +456,9 @@ werden.
 - **Prozedurale Meshes** (kein Asset nötig) via `GenMesh*` →
   `LoadModelFromMesh`: `MESH_CUBE(w,h,d)`, `MESH_SPHERE(r, ringe, segmente)`,
   `MESH_CYLINDER(r, h, segmente)`, `MESH_TORUS(r, dicke, rad_seg, seiten)`,
-  `MESH_KNOT(r, dicke, rad_seg, seiten)`, `MESH_PLANE(w, l, res_x, res_z)`.
+  `MESH_KNOT(r, dicke, rad_seg, seiten)`, `MESH_PLANE(w, l, res_x, res_z)`,
+  `MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z)` (Terrain aus einer
+  Graustufen-Image: Helligkeit = Höhe, `groesse_y` skaliert sie).
   Torus/Knot sind neue Formen ggü. den Immediate-Primitiven.
 - **Zeichnen:** `MODEL(m, x,y,z, scale, farbe)` (`DrawModel`),
   `MODEL_EX(m, x,y,z, achse_x,achse_y,achse_z, winkel_grad, scale, farbe)`
@@ -477,8 +479,14 @@ Knoten (Wireframe) und pulsierende Kugel auf einer Ebene, umkreisende Kamera +
 2D-HUD — rein prozedural, **kein Modell-Asset im Repo nötig**. Per Screenshot
 verifiziert (inkl. `MODEL_TEXTURE` mit `assets/coin.png` auf einem Würfel).
 
-**Offen (3D):** Heightmap-Meshes, Beleuchtung/Material-Shader, frei steuerbare
-Kamera-Modi (`UpdateCamera`), Billboards, Ray-Kollision.
+`MESH_HEIGHTMAP` baut aus dem CPU-`Image` (`self.textures[i].img`, bereits für
+imgfx gehalten) via `GenMeshHeightmap` ein Terrain-Mesh. Demo
+[examples/89_heightmap.gb](../examples/89_heightmap.gb): texturiertes, von einer
+Kamera umkreistes Terrain mit Drahtgitter-Overlay (`examples/assets/heightmap.png`,
+ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
+
+**Offen (3D):** Beleuchtung/Material-Shader, frei steuerbare Kamera-Modi
+(`UpdateCamera`), Billboards, Ray-Kollision.
 
 ## Shader / Post-Processing (native)
 

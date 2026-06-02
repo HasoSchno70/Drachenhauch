@@ -26,7 +26,7 @@ _ALL = {
     "cylinder": 7, "plane": 6, "line3d": 7, "point3d": 4, "grid3d": 2,
     # 3D-Modelle (geladen + prozedural)
     "loadmodel": 1, "mesh_cube": 3, "mesh_sphere": 3, "mesh_cylinder": 3,
-    "mesh_torus": 4, "mesh_knot": 4, "mesh_plane": 4,
+    "mesh_torus": 4, "mesh_knot": 4, "mesh_plane": 4, "mesh_heightmap": 4,
     "model": 6, "model_ex": 10, "model_wires": 6, "model_texture": 2,
 }
 

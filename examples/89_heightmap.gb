@@ -1,0 +1,44 @@
+' 89_heightmap.gb -- Terrain aus einer Heightmap (native-only, F6)
+'
+' MESH_HEIGHTMAP(bild, groesse_x, groesse_y, groesse_z) -> MODEL
+'   bild        : (Graustufen-)Image via LOADIMAGE -- Helligkeit = Hoehe
+'   groesse_x/z : Ausdehnung des Terrains in der XZ-Ebene (Welt-Einheiten)
+'   groesse_y   : Hoehenskalierung (max. Hoehe der hellsten Pixel)
+'
+' Das Modell-Handle bleibt gueltig -> einmal bauen, jeden Frame zeichnen.
+
+IMPORT "g3d"
+
+SCREEN(800, 480, "Heightmap-Terrain", 1)
+
+DIM hmap AS INTEGER
+DIM terrain AS INTEGER
+hmap = LOADIMAGE("assets/heightmap.png")          ' Graustufen-Hoehenkarte
+terrain = MESH_HEIGHTMAP(hmap, 16.0, 4.0, 16.0)   ' 16x16 Grundflaeche, 4 hoch
+MODEL_TEXTURE(terrain, hmap)                       ' Relief-Textur (Graustufen)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 300
+    t = t + 0.025
+    CLS(&H0A0E16)
+
+    ' Kamera kreist ueber dem Terrain (zentriert auf die Mitte, leicht erhoeht).
+    DIM cx AS FLOAT
+    DIM cz AS FLOAT
+    cx = 8.0 + COS(t) * 14.0
+    cz = 8.0 + SIN(t) * 14.0
+    CAMERA3D(cx, 11.0, cz, 8.0, 1.0, 8.0, 45)
+
+    ' Terrain: texturiert gefuellt + dezentes Drahtgitter darueber.
+    MODEL(terrain, 0, 0, 0, 1.0, &H80B0A0)
+    MODEL_WIRES(terrain, 0, 0.02, 0, 1.0, &H203038)
+
+    ' 2D-HUD obenauf.
+    TEXT(12, 10, "MESH_HEIGHTMAP: Terrain aus assets/heightmap.png", WHITE)
+    TEXT(12, 34, "16x16 Grundflaeche . Hoehe 4 . MODEL_TEXTURE", &H88AACC)
+
+    FLIP()
+NEXT
