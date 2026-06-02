@@ -200,10 +200,13 @@ WHILE NOT QUITREQUESTED()
 
     ' --- 2D-Overlay: feines Spektrum unten (geglaettet), Titel, Funken ---
     DIM bw AS INTEGER
+    DIM maxbh AS INTEGER
     bw = W / NB
+    maxbh = INT(H * 0.28)                 ' Balken nie hoeher als 28% -> kein Vollbild
     FOR i = 0 TO NB - 1
         DIM bh AS INTEGER
-        bh = INT(sm[i] * (H * 0.42))
+        bh = INT(sm[i] * (H * 0.30))
+        IF bh > maxbh THEN bh = maxbh      ' laute Baender deckeln
         IF bh > 2 THEN
             BOX(i * bw + 1, H - bh, i * bw + bw - 1, H - 1, hue(i * 0.09 + t * 0.4, 1.0))
         END IF
