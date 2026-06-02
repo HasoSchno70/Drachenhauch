@@ -691,9 +691,10 @@ Screenshot verifiziert (Größen-Skalierung, Spacing, zentrierter Text via
 ## Showcase-Demos
 
 [examples/97_pbr_reactor.gb](../examples/97_pbr_reactor.gb) — **„PBR REACTOR"**,
-das Fullscreen-Schaustück der **neuen** Grafik-Pipeline: ein Ring chrom­glänzender
-**PBR**-Kugeln (eine pro FFT-Band, Größe = Pegel) um einen rotierenden Chrom-Knoten
-auf einem spiegelnden Metallboden, beleuchtet per **Image-Based-Lighting**
+das Fullscreen-Schaustück der **neuen** Grafik-Pipeline: chrom­glänzende
+**PBR**-Kugeln (eine pro FFT-Band, geglättet = sanftes „Atmen") um einen
+rotierenden Chrom-Knoten auf einem spiegelnden Metallboden, mit **Szenenwechsel
+alle 14 s** (RING → WAVE → HELIX), beleuchtet per **Image-Based-Lighting**
 (`LIGHT_ENV`, animierte Sky-Farbe) + Sonne mit **Schatten** (`SHADOW_ENABLE`) +
 zwei bass-pulsierenden Punktlichtern, dazu **Fog**, **Bloom** (`POSTFX`),
 Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
