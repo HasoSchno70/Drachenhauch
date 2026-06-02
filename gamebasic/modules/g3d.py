@@ -196,6 +196,15 @@ def _model_texture_normal(g, *args):
     _native_only("MODEL_TEXTURE_NORMAL")
 
 
+@graphics_builtin("MODEL_PBR", arity=3)
+def _model_pbr(g, *args):
+    """MODEL_PBR(modell, metalness, roughness) -- PBR-Materialparameter (je 0..1).
+    metalness: 0 = Dielektrikum (Plastik/Stein), 1 = Metall. roughness: 0 =
+    spiegelnd-glatt, 1 = matt. Die Beleuchtung nutzt das Cook-Torrance-Modell;
+    nur bei MODEL_LIT-Modellen wirksam (Default 0 / 0.6)."""
+    _native_only("MODEL_PBR")
+
+
 # --- Billboards (zur Kamera ausgerichtete Texturen) -----------------
 
 @graphics_builtin("BILLBOARD", arity=6)

@@ -138,6 +138,7 @@ out vec4 finalColor;
 #define MAX_LIGHTS 4
 #define LIGHT_DIRECTIONAL 0
 #define LIGHT_POINT 1
+const float PI = 3.14159265359;
 struct Light {
     int enabled;
     int type;
@@ -148,6 +149,8 @@ struct Light {
 uniform Light lights[MAX_LIGHTS];
 uniform vec4 ambient;
 uniform vec3 viewPos;
+uniform float metalness;   // 0 = Dielektrikum, 1 = Metall
+uniform float roughness;   // 0 = spiegelnd, 1 = matt
 uniform vec4 fogColor;
 uniform float fogDensity;
 // Shadow-Mapping (lights[0] = schattenwerfendes directional light).
@@ -155,63 +158,80 @@ uniform mat4 lightVP;
 uniform sampler2D shadowMap;
 uniform int shadowMapResolution;
 uniform int shadowsEnabled;
+
+// --- Cook-Torrance BRDF ---
+float DistributionGGX(vec3 N, vec3 H, float r) {
+    float a = r*r; float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0); float d = NdotH*NdotH*(a2 - 1.0) + 1.0;
+    return a2/(PI*d*d + 1e-7);
+}
+float GeometrySchlickGGX(float NdotV, float r) {
+    float k = (r + 1.0); k = (k*k)/8.0;
+    return NdotV/(NdotV*(1.0 - k) + k);
+}
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float r) {
+    return GeometrySchlickGGX(max(dot(N, V), 0.0), r)*GeometrySchlickGGX(max(dot(N, L), 0.0), r);
+}
+vec3 fresnelSchlick(float cosT, vec3 F0) {
+    return F0 + (1.0 - F0)*pow(clamp(1.0 - cosT, 0.0, 1.0), 5.0);
+}
+float shadowFactor(vec3 N, vec3 l0) {
+    if (shadowsEnabled != 1) return 0.0;
+    vec4 p = lightVP*vec4(fragPosition, 1.0);
+    vec3 proj = p.xyz/p.w; proj = proj*0.5 + 0.5;
+    if (proj.z > 1.0 || proj.x < 0.0 || proj.x > 1.0 || proj.y < 0.0 || proj.y > 1.0) return 0.0;
+    float bias = max(0.0015*(1.0 - dot(N, l0)), 0.00015);
+    vec2 texel = vec2(1.0/float(shadowMapResolution));
+    int cnt = 0;
+    for (int x = -1; x <= 1; x++)
+        for (int y = -1; y <= 1; y++) {
+            float d = texture(shadowMap, proj.xy + vec2(x, y)*texel).r;
+            if (proj.z - bias > d) cnt++;
+        }
+    return float(cnt)/9.0;
+}
 void main()
 {
-    vec4 texelColor = texture(texture0, fragTexCoord);
-    vec3 lightDot = vec3(0.0);
-    // Normale aus Geometrie + (optionaler) Normal-Map ueber TBN. Flache
-    // Default-Map (0.5,0.5,1.0) => keine Aenderung an der Geometrie-Normale.
+    vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb;
+    float metal = clamp(metalness, 0.0, 1.0);
+    float rough = clamp(roughness, 0.04, 1.0);
+    // Normale aus Geometrie + (optionaler) Normal-Map ueber TBN.
     vec3 geomN = normalize(fragNormal);
     vec3 T = normalize(fragTangent - dot(fragTangent, geomN)*geomN);
     vec3 B = cross(geomN, T);
     vec3 nmap = texture(texture2, fragTexCoord).rgb*2.0 - 1.0;
-    vec3 perturbed = normalize(mat3(T, B, geomN)*nmap);
-    // useNormalMap=0 -> reine Geometrie-Normale (kein Texture2-Abhaengigkeit).
-    vec3 normal = (useNormalMap == 1) ? perturbed : geomN;
-    vec3 viewD = normalize(viewPos - fragPosition);
-    vec3 specular = vec3(0.0);
+    vec3 N = (useNormalMap == 1) ? normalize(mat3(T, B, geomN)*nmap) : geomN;
+    vec3 V = normalize(viewPos - fragPosition);
+    vec3 F0 = mix(vec3(0.04), albedo, metal);
+    vec3 l0dir = -normalize(lights[0].target - lights[0].position);
+    float shadow = shadowFactor(N, l0dir);
+    vec3 Lo = vec3(0.0);
     for (int i = 0; i < MAX_LIGHTS; i++)
     {
-        if (lights[i].enabled == 1)
-        {
-            vec3 light = vec3(0.0);
-            if (lights[i].type == LIGHT_DIRECTIONAL) light = -normalize(lights[i].target - lights[i].position);
-            if (lights[i].type == LIGHT_POINT) light = normalize(lights[i].position - fragPosition);
-            float NdotL = max(dot(normal, light), 0.0);
-            lightDot += lights[i].color.rgb*NdotL;
-            float specCo = 0.0;
-            if (NdotL > 0.0) specCo = pow(max(0.0, dot(viewD, reflect(-(light), normal))), 16.0);
-            specular += specCo;
+        if (lights[i].enabled != 1) continue;
+        vec3 L; float atten = 1.0;
+        if (lights[i].type == LIGHT_DIRECTIONAL) {
+            L = -normalize(lights[i].target - lights[i].position);
+        } else {
+            vec3 d = lights[i].position - fragPosition;
+            L = normalize(d); float dist = length(d); atten = 1.0/(dist*dist);
         }
+        vec3 H = normalize(V + L);
+        vec3 radiance = lights[i].color.rgb*atten;
+        float NDF = DistributionGGX(N, H, rough);
+        float G = GeometrySmith(N, V, L, rough);
+        vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+        vec3 spec = (NDF*G*F)/(4.0*max(dot(N, V), 0.0)*max(dot(N, L), 0.0) + 1e-4);
+        vec3 kD = (vec3(1.0) - F)*(1.0 - metal);
+        float NdotL = max(dot(N, L), 0.0);
+        vec3 contrib = (kD*albedo/PI + spec)*radiance*NdotL;
+        if (i == 0) contrib *= (1.0 - shadow*0.9);   // nur Schattenlicht dimmen
+        Lo += contrib;
     }
-    // Shadow-Faktor (0 = voll beleuchtet, 1 = im Schatten) via PCF 3x3.
-    float shadow = 0.0;
-    if (shadowsEnabled == 1)
-    {
-        vec4 p = lightVP*vec4(fragPosition, 1.0);
-        vec3 proj = p.xyz/p.w;
-        proj = proj*0.5 + 0.5;
-        if (proj.z <= 1.0 && proj.x >= 0.0 && proj.x <= 1.0 && proj.y >= 0.0 && proj.y <= 1.0)
-        {
-            vec3 l0 = -normalize(lights[0].target - lights[0].position);
-            float bias = max(0.0015*(1.0 - dot(normal, l0)), 0.00015);
-            vec2 texel = vec2(1.0/float(shadowMapResolution));
-            int cnt = 0;
-            for (int x = -1; x <= 1; x++)
-                for (int y = -1; y <= 1; y++)
-                {
-                    float d = texture(shadowMap, proj.xy + vec2(x, y)*texel).r;
-                    if (proj.z - bias > d) cnt++;
-                }
-            shadow = float(cnt)/9.0;
-        }
-    }
-    float sf = 1.0 - shadow*0.85;     // im Schatten bleiben 15% Direktlicht
-    lightDot *= sf;
-    specular *= sf;
-    finalColor = (texelColor*((colDiffuse + vec4(specular, 1.0))*vec4(lightDot, 1.0)));
-    finalColor += texelColor*(ambient/10.0)*colDiffuse;
-    finalColor = pow(finalColor, vec4(1.0/2.2));
+    vec3 color = ambient.rgb*albedo + Lo;
+    color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
+    color = pow(color, vec3(1.0/2.2));         // Gamma
+    finalColor = vec4(color, 1.0);
     // Exponentieller Tiefen-Fog (fogDensity 0 => kein Effekt).
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
@@ -247,6 +267,10 @@ pub struct Graphics {
     // Modell-Indizes mit Normal-Map (useNormalMap=1 nur fuer diese).
     normal_mapped: std::collections::HashSet<usize>,
     loc_use_normal: i32,
+    // Per-Modell PBR-Parameter (metalness, roughness); Default (0, 0.6).
+    pbr_params: std::collections::HashMap<usize, (f32, f32)>,
+    loc_metalness: i32,
+    loc_roughness: i32,
     lights: Vec<LightData>,
     light_ambient: [f32; 4],
     light_fog: [f32; 4],
@@ -320,6 +344,9 @@ impl Graphics {
             light_shader: None,
             normal_mapped: std::collections::HashSet::new(),
             loc_use_normal: -1,
+            pbr_params: std::collections::HashMap::new(),
+            loc_metalness: -1,
+            loc_roughness: -1,
             lights: Vec::new(),
             light_ambient: [0.1, 0.1, 0.1, 1.0],
             light_fog: [0.0, 0.0, 0.0, 1.0],
@@ -597,6 +624,8 @@ impl Graphics {
         self.loc_fog_color = sh.get_shader_location("fogColor");
         self.loc_fog_density = sh.get_shader_location("fogDensity");
         self.loc_use_normal = sh.get_shader_location("useNormalMap");
+        self.loc_metalness = sh.get_shader_location("metalness");
+        self.loc_roughness = sh.get_shader_location("roughness");
         self.light_shader = Some(sh);
     }
     pub fn light_fog(&mut self, col_: i64, density: f64) {
@@ -687,6 +716,12 @@ impl Graphics {
             mat.set_material_texture(raylib::consts::MaterialMapIndex::MATERIAL_MAP_NORMAL, &self.textures[ti].tex);
         }
         self.normal_mapped.insert(mi);
+        Ok(())
+    }
+    /// Setzt die PBR-Materialparameter eines Modells (metalness/roughness 0..1).
+    pub fn model_pbr(&mut self, model_idx: i64, metalness: f64, roughness: f64) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_PBR")?;
+        self.pbr_params.insert(mi, (metalness.clamp(0.0, 1.0) as f32, roughness.clamp(0.0, 1.0) as f32));
         Ok(())
     }
     /// Setzt pro Frame viewPos + ambient + alle Licht-Uniforms. Wird in flip()
@@ -1268,9 +1303,11 @@ impl Graphics {
         // RT-Groesse = Fenstergroesse (bekannt, ohne mehrdeutigen Textur-Query).
         let (tw, th) = ((self.width * self.scale) as f32, (self.height * self.scale) as f32);
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
-            light_shader, normal_mapped, loc_use_normal, scene_rt, shaders, post_shader_idx, .. } = self;
-        let lun = *loc_use_normal;
+            light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
+            scene_rt, shaders, post_shader_idx, .. } = self;
+        let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness);
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
+        let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
         let cam = *cam3d;
         // Post-FX aktiv? -> (Shader-Index, Render-Target). Sonst direkt zeichnen.
         let postfx = match *post_shader_idx {
@@ -1281,7 +1318,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), lun, nmap_set);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -1294,7 +1331,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), lun, nmap_set);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -1317,14 +1354,20 @@ fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Color,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
-    mut light_shader: Option<&mut Shader>, loc_use_normal: i32,
+    mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32),
     normal_mapped: &std::collections::HashSet<usize>,
+    pbr_params: &std::collections::HashMap<usize, (f32, f32)>,
 ) {
-    // Setzt useNormalMap (1 fuer Modelle mit Normal-Map, sonst 0) vor dem Draw.
-    let mut set_normal = |ls: &mut Option<&mut Shader>, idx: usize| {
-        if loc_use_normal < 0 { return; }
+    let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
+    // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
+    let mut set_material = |ls: &mut Option<&mut Shader>, idx: usize| {
         if let Some(sh) = ls.as_mut() {
-            sh.set_shader_value(loc_use_normal, if normal_mapped.contains(&idx) { 1i32 } else { 0i32 });
+            if loc_use_normal >= 0 {
+                sh.set_shader_value(loc_use_normal, if normal_mapped.contains(&idx) { 1i32 } else { 0i32 });
+            }
+            let (m, r) = pbr_params.get(&idx).copied().unwrap_or((0.0, 0.6));
+            if loc_metalness >= 0 { sh.set_shader_value(loc_metalness, m); }
+            if loc_roughness >= 0 { sh.set_shader_value(loc_roughness, r); }
         }
     };
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
@@ -1354,13 +1397,13 @@ fn render_scene<D: RaylibDraw>(
                             d3.draw_grid(*slices, *spacing),
                         Cmd3D::Model(i, x, y, z, sc, col) => {
                             if let Some(m) = models.get(*i) {
-                                set_normal(&mut light_shader, *i);
+                                set_material(&mut light_shader, *i);
                                 d3.draw_model(m, Vector3::new(*x, *y, *z), *sc, *col);
                             }
                         }
                         Cmd3D::ModelEx(i, x, y, z, ax, ay, az, ang, sc, col) => {
                             if let Some(m) = models.get(*i) {
-                                set_normal(&mut light_shader, *i);
+                                set_material(&mut light_shader, *i);
                                 d3.draw_model_ex(m, Vector3::new(*x, *y, *z),
                                     Vector3::new(*ax, *ay, *az), *ang,
                                     Vector3::new(*sc, *sc, *sc), *col);
@@ -1368,7 +1411,7 @@ fn render_scene<D: RaylibDraw>(
                         }
                         Cmd3D::ModelWires(i, x, y, z, sc, col) => {
                             if let Some(m) = models.get(*i) {
-                                set_normal(&mut light_shader, *i);
+                                set_material(&mut light_shader, *i);
                                 d3.draw_model_wires(m, Vector3::new(*x, *y, *z), *sc, *col);
                             }
                         }

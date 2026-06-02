@@ -35,10 +35,10 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 2D/3D-Spiel mit Sound, Menüs/Tabellen und GPU-Effekten ab.
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
-- **3D-Rest:** voll-PBR (Metalness/Roughness — eigener Shader statt Blinn-Phong).
-  Modelle, GenMesh inkl. Heightmap, Texturen, **Normal-Maps**, Billboards, Ray-
-  Kollision/Picking, Beleuchtung, **Fog**, **Schatten** und **Kamera-Modi** sind
-  nun da — siehe unten.
+- **3D-Rest:** Image-Based-Lighting (Cubemap-Reflexionen) als PBR-Veredelung.
+  Modelle, GenMesh inkl. Heightmap, Texturen, **Normal-Maps**, **PBR**, Billboards,
+  Ray-Kollision/Picking, Beleuchtung, **Fog**, **Schatten** und **Kamera-Modi**
+  sind nun da — siehe unten.
 - Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
@@ -522,10 +522,13 @@ kann man die Kamera von raylib bewegen lassen:
 - Getter: `CAMERA3D_X/Y/Z()` (Position) und `CAMERA3D_TARGET_X/Y/Z()` — z. B. für
   First-Person (Spielerposition = Kamera). Verifiziert (Position/Ziel exakt zurück).
 
-### Beleuchtung (Blinn-Phong, bis zu 4 Lichter)
+### Beleuchtung (PBR / Cook-Torrance, bis zu 4 Lichter)
 
-Echte Pro-Pixel-Beleuchtung über den eingebetteten rlights-Shader (GLSL 330, als
-`const LIGHT_VS`/`LIGHT_FS` im Crate — **kein Shader-Asset nötig**):
+Echte Pro-Pixel-Beleuchtung über den eingebetteten Lighting-Shader (GLSL 330, als
+`const LIGHT_VS`/`LIGHT_FS` im Crate — **kein Shader-Asset nötig**). Der Fragment-
+Shader nutzt das **Cook-Torrance-PBR-Modell** (GGX-Normalverteilung, Smith-
+Geometrie, Fresnel-Schlick) mit Reinhard-Tonemapping + Gamma; analytische Lichter
+(directional/point), kein IBL:
 
 - `LIGHT_ENABLE()` lädt den Lighting-Shader (einmal) und cached die Uniform-
   Locations (`viewPos`, `ambient`).
@@ -536,6 +539,13 @@ Echte Pro-Pixel-Beleuchtung über den eingebetteten rlights-Shader (GLSL 330, al
 - `MODEL_LIT(modell)` — hängt den Lighting-Shader an die Materialien des Modells
   (setzt `material.shader` direkt über das ffi-Feld; der Shader bleibt in
   `Graphics.light_shader` am Leben). Erst danach wird das Modell beleuchtet.
+- `MODEL_PBR(modell, metalness, roughness)` — PBR-Materialparameter (je 0..1):
+  `metalness` 0 = Dielektrikum (Plastik/Stein), 1 = Metall (Specular nimmt die
+  Albedo-Farbe an); `roughness` 0 = spiegelnd, 1 = matt. Pro Modell gespeichert
+  (`pbr_params`-Map, Default 0 / 0.6) und in `render_scene` als Uniform vor jedem
+  Modell-Draw gesetzt — zusammen mit `useNormalMap`. Albedo = `colDiffuse`
+  (MODEL-Tint) × `texture0`. Demo [examples/95_pbr.gb](../examples/95_pbr.gb):
+  Kugel-Gitter Metalness × Roughness (per Screenshot verifiziert).
 - `LIGHT_FOG(farbe, dichte)` — exponentieller Tiefen-Fog für die beleuchteten
   Modelle (`dichte 0` = aus). Ferne Objekte verblassen zur Fog-Farbe; im
   Fragment-Shader `mix(fogColor, finalColor, 1/exp((dist·dichte)²))`. Tipp:
@@ -606,11 +616,11 @@ Platte + Kugel links mit, rechts ohne Normal-Map unter kreisendem Punktlicht —
 links wandern die Wellen-Bumps, rechts bleibt es glatt (per Screenshot
 verifiziert; Normal-Map `examples/assets/normal_waves.png` prozedural generiert).
 
-**Offen (3D):** voll-PBR (Metalness/Roughness-Workflow — bräuchte einen eigenen
-PBR-Shader statt Blinn-Phong). Modelle, Meshes inkl. Heightmap, Texturen,
-Normal-Maps, Billboards, Picking, Beleuchtung inkl. **Fog** und **Schatten**,
-Kamera-Modi sind nun nativ; Third-Person-Kollision ist Gameplay-Logik (kein
-Engine-Primitive).
+**Offen (3D):** Image-Based-Lighting (Environment-Cubemap-Reflexionen) als
+optionale Veredelung des PBR-Modells. Modelle, Meshes inkl. Heightmap, Texturen,
+Normal-Maps, **PBR (Metalness/Roughness)**, Billboards, Picking, Beleuchtung inkl.
+**Fog** und **Schatten**, Kamera-Modi sind nun nativ; Third-Person-Kollision ist
+Gameplay-Logik (kein Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 

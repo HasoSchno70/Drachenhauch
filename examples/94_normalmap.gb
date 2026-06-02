@@ -33,6 +33,11 @@ MODEL_LIT(plate_l)
 MODEL_LIT(plate_r)
 MODEL_LIT(ball_l)
 MODEL_LIT(ball_r)
+' Etwas glaenzender (roughness 0.3) -> Normal-Map-Bumps treten klarer hervor.
+MODEL_PBR(plate_l, 0.0, 0.18)
+MODEL_PBR(plate_r, 0.0, 0.18)
+MODEL_PBR(ball_l, 0.0, 0.18)
+MODEL_PBR(ball_r, 0.0, 0.18)
 MODEL_TEXTURE_NORMAL(plate_l, nrm)     ' nur links die Normal-Map
 MODEL_TEXTURE_NORMAL(ball_l, nrm)
 
