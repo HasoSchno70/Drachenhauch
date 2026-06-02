@@ -1,0 +1,206 @@
+' ============================================================================
+'  97_pbr_reactor.gb  --  "PBR REACTOR"  (native GameBasic Showcase, Fullscreen)
+'
+'  Fullscreen-3D-Demo, das die NEUE Grafik-Pipeline der nativen Runtime zeigt:
+'    - PBR (Cook-Torrance) Metalle + Image-Based-Lighting (LIGHT_ENV)
+'    - echte Schlagschatten (SHADOW_ENABLE)
+'    - Bloom-Post-Processing (POSTFX)
+'    - 3D-Meshes (Plane/Sphere/Knot), bewegte Punktlichter, Fog
+'    - alles ECHT FFT-reaktiv zur laufenden Stereo-Techno-Musik (AUDIO_FFT)
+'
+'  Ein Ring chromglaenzender Kugeln (eine pro Frequenzband) pulsiert zur Musik,
+'  ein rotierender Knoten in der Mitte, ein spiegelnder Metallboden -- darueber
+'  ein 2D-Spektrum + Titel. Kamera kreist mit Bass-Punch.
+'
+'  NUR NATIV:  gbrun.py --native examples\97_pbr_reactor.gb   (oder F6).  ESC beendet.
+'
+'  Musik: "Technological Messup" von josepharaoh99 (opengameart.org), CC0.
+'  Fehlt die Datei:  py examples\assets\download_techno.py
+' ============================================================================
+
+IMPORT "g3d"
+IMPORT "particles"
+IMPORT "audio"
+
+CONST W AS INTEGER = 1280
+CONST H AS INTEGER = 720
+CONST TWO_PI AS FLOAT = 6.2831853
+CONST NB AS INTEGER = 32             ' FFT-Baender
+CONST RINGN AS INTEGER = 24          ' Kugeln im Ring
+
+DIM fft[NB] AS FLOAT
+DIM ring[24] AS INTEGER
+
+SCREEN(W, H, "GameBasic -- PBR REACTOR", 1)
+SET_FULLSCREEN(TRUE)
+SETFPS(60)
+
+IF FILEEXISTS("assets/techno_messup.ogg") THEN
+    PLAYMUSIC("assets/techno_messup.ogg", -1, 0.9)
+END IF
+
+' --- Beleuchtung: IBL-Umgebung + Sonne (Schattenwerfer) + 2 Punktlichter ------
+LIGHT_ENABLE()
+LIGHT_AMBIENT(0, 0)                          ' Ambient kommt komplett aus dem Environment
+LIGHT_ENV(&H4878C0, &H101018, 1.0)           ' Himmel/Boden -> Metalle spiegeln das
+DIM sun AS INTEGER
+sun = LIGHT_DIRECTIONAL(-0.5, -1.0, -0.35, &HFFF0E0)   ' lights[0] = Schattenwerfer
+DIM p1 AS INTEGER
+DIM p2 AS INTEGER
+p1 = LIGHT_POINT(0, 4, 6, &HFF3060)
+p2 = LIGHT_POINT(0, 4, -6, &H3060FF)
+LIGHT_FOG(&H070A12, 0.020)                   ' dezenter Tiefen-Fog
+
+SHADOW_ENABLE(1024)
+SHADOW_AREA(13.0, 40.0)
+SHADOW_TARGET(0, 1, 0)
+
+' --- Meshes (einmalig erzeugen, jeden Frame zeichnen) ------------------------
+DIM floor AS INTEGER
+DIM knot AS INTEGER
+floor = MESH_PLANE(60.0, 60.0, 1, 1)
+knot  = MESH_KNOT(0.9, 0.32, 36, 18)
+MODEL_LIT(floor)
+MODEL_LIT(knot)
+MODEL_PBR(floor, 0.9, 0.12)                  ' fast spiegelnder Metallboden
+MODEL_PBR(knot, 1.0, 0.18)                   ' Chrom-Knoten
+
+DIM i AS INTEGER
+FOR i = 0 TO RINGN - 1
+    DIM s AS INTEGER
+    s = MESH_SPHERE(0.45, 18, 18)
+    MODEL_LIT(s)
+    MODEL_PBR(s, 1.0, 0.16)                   ' Chrom-Kugeln
+    ring[i] = s
+NEXT
+
+' --- Bloom-Post-Processing ---------------------------------------------------
+DIM bloom AS INTEGER
+bloom = SHADER_LOAD("assets/shaders/bloom.fs")
+IF bloom >= 0 THEN POSTFX(bloom)
+
+' --- Funken-Partikel (2D-Overlay) -------------------------------------------
+DIM sparks AS PARTICLE_SYSTEM
+sparks = PARTICLE_SYSTEM_NEW(W / 2, H - 60)
+PARTICLE_SET_VELOCITY(sparks, -260.0, 260.0, -520.0, -120.0)
+PARTICLE_SET_LIFETIME(sparks, 300, 800)
+PARTICLE_SET_GRAVITY(sparks, 0.0, 420.0)
+PARTICLE_SET_SIZE(sparks, 2, 5)
+PARTICLE_SET_MODE(sparks, "glow")
+PARTICLE_SET_FADE(sparks, TRUE)
+
+' --- Spektrum-Bulk-Arrays ----------------------------------------------------
+DIM bx1[32] AS INTEGER
+DIM by1[32] AS INTEGER
+DIM bx2[32] AS INTEGER
+DIM by2[32] AS INTEGER
+DIM bcol[32] AS INTEGER
+
+DIM t0 AS INTEGER
+t0 = MILLIS()
+DIM bass_env AS FLOAT
+bass_env = 0.0
+
+WHILE NOT QUITREQUESTED()
+    DIM t AS FLOAT
+    t = (MILLIS() - t0) / 1000.0
+
+    ' --- Audio-Analyse ---
+    AUDIO_FFT(fft)
+    DIM bass AS FLOAT
+    DIM energy AS FLOAT
+    bass = (fft[0] + fft[1] + fft[2] + fft[3]) * 0.25
+    energy = 0.0
+    FOR i = 0 TO NB - 1
+        energy = energy + fft[i]
+    NEXT
+    energy = energy / NB
+    ' Kick = positive Abweichung des Bass von seinem gleitenden Mittel.
+    bass_env = bass_env * 0.92 + bass * 0.08
+    DIM kick AS FLOAT
+    kick = bass - bass_env
+    IF kick < 0.0 THEN kick = 0.0
+    kick = kick * 3.0
+    IF kick > 1.0 THEN kick = 1.0
+
+    ' --- Lichter animieren ---
+    LIGHT_ENV(hue(t * 0.25, 0.55), &H101018, 0.8 + energy * 0.8)
+    LIGHT_SET_POS(p1, COS(t * 0.9) * 7.0, 3.5 + bass * 3.0, SIN(t * 0.9) * 7.0)
+    LIGHT_SET_POS(p2, COS(t * 0.9 + 3.14) * 7.0, 3.5 + bass * 3.0, SIN(t * 0.9 + 3.14) * 7.0)
+    LIGHT_SET_COLOR(p1, hue(t * 1.3, 1.0))
+    LIGHT_SET_COLOR(p2, hue(t * 1.3 + 3.14, 1.0))
+
+    ' --- Kamera: kreisend + Bass-Punch (naeher ran auf dem Beat) ---
+    DIM cr AS FLOAT
+    cr = 12.5 - kick * 2.5
+    DIM cax AS FLOAT
+    cax = t * 0.32
+    CAMERA3D(COS(cax) * cr, 4.5 + SIN(t * 0.4) * 1.5, SIN(cax) * cr, 0, 1.5, 0, 48)
+
+    CLS(&H05070C)
+
+    ' --- Boden + zentraler Knoten ---
+    MODEL(floor, 0, -0.05, 0, 1.0, &H586068)
+    MODEL_EX(knot, 0, 3.0, 0, 0.3, 1.0, 0.2, t * 45.0, 1.5 + bass * 1.0, &HE8E8F0)
+
+    ' --- Ring aus Kugeln: eine pro Frequenzband, Hoehe+Groesse = Pegel ---
+    FOR i = 0 TO RINGN - 1
+        DIM ang AS FLOAT
+        ang = (i / RINGN) * TWO_PI + t * 0.15
+        DIM lvl AS FLOAT
+        lvl = fft[i MOD NB]
+        DIM rad AS FLOAT
+        rad = 6.0
+        DIM sx AS FLOAT
+        DIM sz AS FLOAT
+        DIM sy AS FLOAT
+        sx = COS(ang) * rad
+        sz = SIN(ang) * rad
+        sy = 1.0 + lvl * 4.5
+        MODEL(ring[i], sx, sy, sz, 0.7 + lvl * 1.6, hue(ang + t * 0.5, 1.0))
+    NEXT
+
+    ' --- 2D-Overlay: Spektrum unten, Titel, Funken ---
+    DIM bw AS INTEGER
+    bw = W / NB
+    FOR i = 0 TO NB - 1
+        DIM bh AS INTEGER
+        bh = INT(fft[i] * (H * 0.5))
+        bx1[i] = i * bw + 1
+        by1[i] = H - bh
+        bx2[i] = i * bw + bw - 2
+        by2[i] = H - 1
+        bcol[i] = hue(i * 0.14 + t * 0.4, 1.0)
+    NEXT
+    ' (Spektrum als einzelne Baender -- NB<=32, bcol je Band)
+    FOR i = 0 TO NB - 1
+        BOX(bx1[i], by1[i], bx2[i], by2[i], bcol[i])
+    NEXT
+
+    ' Funken auf dem Kick.
+    IF kick > 0.45 THEN
+        PARTICLE_SET_COLOR(sparks, hue(t * 2.0, 1.0))
+        PARTICLE_EMIT(sparks, INT(kick * 40.0))
+    END IF
+    PARTICLE_UPDATE(sparks, INT(DELTA() * 1000.0))
+    PARTICLE_DRAW(sparks)
+
+    TEXT_SIZE(44)
+    TEXT(28, 22, "PBR REACTOR", hue(t * 0.6, 1.0))
+    TEXT_SIZE(20)
+    TEXT(30, 70, "GameBasic native runtime : PBR . IBL . shadows . bloom . FFT", &H90A8C0)
+    TEXT(30, H - 28, f"bass={bass:.2f}  energy={energy:.2f}  fps={FPS()}", &H607890)
+
+    FLIP()
+WEND
+
+' --- Farb-Helfer (HSV-aehnlich ueber Sinus) ---------------------------------
+FUNCTION hue(p AS FLOAT, bright AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(p)) * bright * 255.0)
+    g = INT((0.5 + 0.5 * SIN(p + 2.094)) * bright * 255.0)
+    b = INT((0.5 + 0.5 * SIN(p + 4.188)) * bright * 255.0)
+    RETURN RGB(MIN(255, r), MIN(255, g), MIN(255, b))
+END FUNCTION

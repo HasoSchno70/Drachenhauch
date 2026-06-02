@@ -688,7 +688,19 @@ System-Font (`FILEEXISTS`) und fällt sonst auf den Default-Font zurück. Per
 Screenshot verifiziert (Größen-Skalierung, Spacing, zentrierter Text via
 `TEXT_WIDTH`).
 
-## Showcase-Demo
+## Showcase-Demos
+
+[examples/97_pbr_reactor.gb](../examples/97_pbr_reactor.gb) — **„PBR REACTOR"**,
+das Fullscreen-Schaustück der **neuen** Grafik-Pipeline: ein Ring chrom­glänzender
+**PBR**-Kugeln (eine pro FFT-Band, Größe = Pegel) um einen rotierenden Chrom-Knoten
+auf einem spiegelnden Metallboden, beleuchtet per **Image-Based-Lighting**
+(`LIGHT_ENV`, animierte Sky-Farbe) + Sonne mit **Schatten** (`SHADOW_ENABLE`) +
+zwei bass-pulsierenden Punktlichtern, dazu **Fog**, **Bloom** (`POSTFX`),
+Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
+(`AUDIO_FFT`) zu einem Stereo-Techno-Track. `SET_FULLSCREEN(TRUE)`, Kamera kreist
+mit Bass-Punch. Musik: „Technological Messup" von **josepharaoh99**, **CC0** —
+einmalig holen mit `py examples/assets/download_techno.py` (läuft auch ohne, stumm
+via `FILEEXISTS`-Guard). Nur nativ: `gbrun.py --native examples\97_pbr_reactor.gb`.
 
 [examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in
 einem 1280×720-Frame, was die native Runtime kann — **audio-reaktiv** (echte

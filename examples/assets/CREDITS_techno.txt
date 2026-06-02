@@ -1,0 +1,15 @@
+Musik-Asset fuer examples/97_pbr_reactor.gb
+===========================================
+
+Datei:   techno_messup.ogg
+Titel:   "Technological Messup"
+Autor:   josepharaoh99
+Quelle:  https://opengameart.org/content/cc0-upbeat-electronic-music
+Lizenz:  CC0 1.0 Universal (Public Domain Dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+
+CC0 = Gemeinfrei: keine Namensnennung erforderlich. Wir nennen den Autor
+trotzdem aus Hoeflichkeit. Die Datei (~3.4 MB, Stereo, 44.1 kHz OGG Vorbis)
+liegt nicht im Repo; einmalig holen mit:
+
+    py examples/assets/download_techno.py
