@@ -80,7 +80,11 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
 pub struct Audio {
     dev: &'static RaylibAudio,
     sounds: Vec<Sound<'static>>,
+    sound_vol: Vec<f32>,        // getrackte Volumes (raylib hat keinen Getter)
     music: Option<Music<'static>>,
+    music_vol: f32,            // getracktes Music-Volume
+    music_queue: Option<String>, // AUDIO_MUSIC_QUEUE -> bei Stream-Ende abspielen
+    num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
     bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
 }
@@ -92,7 +96,11 @@ impl Audio {
         let dev: &'static RaylibAudio = Box::leak(Box::new(dev));
         // Mix-Tap fuer die FFT anhaengen (gesamte Pipeline -> Mono-Ring).
         unsafe { raylib::ffi::AttachAudioMixedProcessor(Some(mixed_proc)); }
-        Ok(Audio { dev, sounds: Vec::new(), music: None, bands: Vec::new(), agc: 1e-4 })
+        Ok(Audio {
+            dev, sounds: Vec::new(), sound_vol: Vec::new(),
+            music: None, music_vol: 1.0, music_queue: None, num_channels: 16,
+            bands: Vec::new(), agc: 1e-4,
+        })
     }
 
     /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1) aus dem
@@ -139,6 +147,7 @@ impl Audio {
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
         let s = self.dev.new_sound(path).map_err(|e| format!("LOADSOUND: {}", e))?;
         self.sounds.push(s);
+        self.sound_vol.push(1.0);
         Ok((self.sounds.len() - 1) as i64)
     }
 
@@ -164,9 +173,12 @@ impl Audio {
     pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
         if let Some(m) = self.music.take() { m.stop_stream(); }
         let m = self.dev.new_music(path).map_err(|e| format!("PLAYMUSIC: {}", e))?;
-        m.set_volume(volume.clamp(0.0, 1.0) as f32);
+        let v = volume.clamp(0.0, 1.0) as f32;
+        m.set_volume(v);
         m.play_stream();
         self.music = Some(m);
+        self.music_vol = v;
+        self.music_queue = None;
         Ok(())
     }
 
@@ -175,8 +187,209 @@ impl Audio {
     }
 
     /// Pro Frame aufrufen (aus dem FLIP-Pfad), damit der Musik-Stream
-    /// nachgefuettert wird -- sonst stockt die Wiedergabe.
-    pub fn update(&self) {
-        if let Some(m) = &self.music { m.update_stream(); }
+    /// nachgefuettert wird -- sonst stockt die Wiedergabe. Spielt zudem einen
+    /// per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der aktuelle endet.
+    pub fn update(&mut self) {
+        if let Some(m) = &self.music {
+            m.update_stream();
+            if !m.is_stream_playing() && self.music_queue.is_some() {
+                let path = self.music_queue.take().unwrap();
+                if let Ok(nm) = self.dev.new_music(&path) {
+                    nm.set_volume(self.music_vol);
+                    nm.play_stream();
+                    self.music = Some(nm);
+                }
+            }
+        }
     }
+
+    // ===================================================================
+    // Erweitertes audio-Modul (AUDIO_*) -- funktional (nicht bit-identisch).
+    // SOUND/AUDIO_CHANNEL sind beide INTEGER-Handles (Index in `sounds`);
+    // ein "Channel" steuert die Wiedergabe genau dieses Sounds. raylib hat
+    // keine pygame-Channels -> ein Sound = ein steuerbarer Slot.
+    // ===================================================================
+
+    fn snd(&self, idx: i64, fn_: &str) -> Result<&Sound<'static>, String> {
+        self.sounds.get(idx as usize)
+            .ok_or_else(|| format!("{}: ungueltiges Handle {}", fn_, idx))
+    }
+
+    // -- Tone-Generation (liefert ein SOUND-Handle) --
+    pub fn tone(&mut self, freq: f64, dur_ms: i64, waveform: &str, volume: f64) -> Result<i64, String> {
+        if freq <= 0.0 { return Err("AUDIO_TONE: freq_hz muss > 0 sein".into()); }
+        if dur_ms <= 0 { return Err("AUDIO_TONE: dauer_ms muss > 0 sein".into()); }
+        let wf = waveform.to_lowercase();
+        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
+            return Err(format!(
+                "AUDIO_TONE: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
+        }
+        let sr: u32 = 44100;
+        let n = (sr as f64 * dur_ms as f64 / 1000.0) as usize;
+        if n == 0 { return Err("AUDIO_TONE: dauer_ms zu klein fuer Sample-Rate".into()); }
+        let mut buf = vec![0.0f64; n];
+        for (i, b) in buf.iter_mut().enumerate() {
+            let t = i as f64 / sr as f64;
+            *b = waveform_value(&wf, freq, t);
+        }
+        self.push_wave_sound(&buf, volume, sr)
+    }
+
+    pub fn noise(&mut self, dur_ms: i64, volume: f64) -> Result<i64, String> {
+        if dur_ms <= 0 { return Err("AUDIO_NOISE: dauer_ms muss > 0 sein".into()); }
+        let sr: u32 = 44100;
+        let n = (sr as f64 * dur_ms as f64 / 1000.0) as usize;
+        if n == 0 { return Err("AUDIO_NOISE: dauer_ms zu klein fuer Sample-Rate".into()); }
+        let mut buf = vec![0.0f64; n];
+        for b in buf.iter_mut() { *b = rng_uniform(); }
+        self.push_wave_sound(&buf, volume, sr)
+    }
+
+    /// Float-Buffer [-1,1] -> Anti-Click-Envelope -> Volume -> i16-PCM -> WAV
+    /// im RAM -> raylib Sound. Liefert das SOUND-Handle.
+    fn push_wave_sound(&mut self, buf: &[f64], volume: f64, sr: u32) -> Result<i64, String> {
+        let n = buf.len();
+        let vol = volume.clamp(0.0, 1.0);
+        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let mut samples = vec![0i16; n];
+        for i in 0..n {
+            let mut v = buf[i];
+            if fade > 0 {
+                if i < fade { v *= i as f64 / fade as f64; }
+                else if i >= n - fade { v *= (n - 1 - i) as f64 / fade as f64; }
+            }
+            v = (v * vol).clamp(-1.0, 1.0);
+            samples[i] = (v * 32767.0) as i16;
+        }
+        let wav = encode_wav_mono16(&samples, sr);
+        let wave = self.dev.new_wave_from_memory(".wav", &wav)
+            .map_err(|e| format!("AUDIO_TONE: {}", e))?;
+        let s = self.dev.new_sound_from_wave(&wave)
+            .map_err(|e| format!("AUDIO_TONE: {}", e))?;
+        self.sounds.push(s);
+        self.sound_vol.push(vol as f32);
+        Ok((self.sounds.len() - 1) as i64)
+    }
+
+    // -- Channel-Playback (Handle == Sound-Index) --
+    pub fn ch_play(&mut self, idx: i64, volume: f64) -> Result<i64, String> {
+        let v = volume.clamp(0.0, 1.0) as f32;
+        self.snd(idx, "AUDIO_PLAY")?.set_volume(v);
+        self.snd(idx, "AUDIO_PLAY")?.play();
+        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = v; }
+        Ok(idx)
+    }
+    pub fn ch_pause(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_PAUSE")?.pause(); Ok(()) }
+    pub fn ch_resume(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_RESUME")?.resume(); Ok(()) }
+    pub fn ch_stop(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_STOP")?.stop(); Ok(()) }
+    pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> { Ok(self.snd(idx, "AUDIO_IS_PLAYING")?.is_playing()) }
+    pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
+        let vol = v.clamp(0.0, 1.0) as f32;
+        self.snd(idx, "AUDIO_VOLUME")?.set_volume(vol);
+        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = vol; }
+        Ok(())
+    }
+    pub fn ch_get_volume(&self, idx: i64) -> Result<f64, String> {
+        Ok(*self.sound_vol.get(idx as usize)
+            .ok_or_else(|| format!("AUDIO_GET_VOLUME: ungueltiges Handle {}", idx))? as f64)
+    }
+    /// AUDIO_PAN(left,right) -> raylib hat nur (pan, volume). Naeherung:
+    /// volume=max(l,r), pan=l-Anteil (raylib-Pan kann gespiegelt sein).
+    pub fn ch_pan(&mut self, idx: i64, left: f64, right: f64) -> Result<(), String> {
+        let l = left.clamp(0.0, 1.0);
+        let r = right.clamp(0.0, 1.0);
+        let vol = l.max(r);
+        let pan = if l + r > 0.0 { l / (l + r) } else { 0.5 };
+        let s = self.snd(idx, "AUDIO_PAN")?;
+        s.set_volume(vol as f32);
+        s.set_pan(pan as f32);
+        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = vol as f32; }
+        Ok(())
+    }
+
+    // -- Mixer-weit --
+    pub fn pause_all(&self) { for s in &self.sounds { s.pause(); } }
+    pub fn resume_all(&self) { for s in &self.sounds { s.resume(); } }
+    pub fn stop_all(&self) { for s in &self.sounds { s.stop(); } }
+    pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
+    pub fn get_num_channels(&self) -> i64 { self.num_channels }
+    pub fn busy_channels(&self) -> i64 { self.sounds.iter().filter(|s| s.is_playing()).count() as i64 }
+
+    // -- Music erweitert --
+    pub fn music_load(&mut self, path: &str) -> Result<(), String> {
+        if let Some(m) = self.music.take() { m.stop_stream(); }
+        let m = self.dev.new_music(path).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
+        m.set_volume(self.music_vol);
+        self.music = Some(m);
+        self.music_queue = None;
+        Ok(())
+    }
+    pub fn music_play(&self) { if let Some(m) = &self.music { m.play_stream(); } }
+    pub fn music_stop(&mut self) { if let Some(m) = &self.music { m.stop_stream(); } }
+    pub fn music_pause(&self) { if let Some(m) = &self.music { m.pause_stream(); } }
+    pub fn music_resume(&self) { if let Some(m) = &self.music { m.resume_stream(); } }
+    pub fn music_set_volume(&mut self, v: f64) {
+        let vol = v.clamp(0.0, 1.0) as f32;
+        self.music_vol = vol;
+        if let Some(m) = &self.music { m.set_volume(vol); }
+    }
+    pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
+    pub fn music_position(&self) -> f64 {
+        match &self.music { Some(m) => m.get_time_played().max(0.0) as f64, None => 0.0 }
+    }
+    pub fn music_busy(&self) -> bool {
+        matches!(&self.music, Some(m) if m.is_stream_playing())
+    }
+    pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
+}
+
+const PI64: f64 = std::f64::consts::PI;
+
+/// Eine Periode bei (t*freq): Werte in [-1,1]. (noise wird separat erzeugt.)
+fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
+    match kind {
+        "sine" => (2.0 * PI64 * freq * t).sin(),
+        "square" => if (2.0 * PI64 * freq * t).sin() >= 0.0 { 1.0 } else { -1.0 },
+        "saw" => 2.0 * (t * freq - (0.5 + t * freq).floor()),
+        "triangle" => 2.0 * (2.0 * (t * freq - (0.5 + t * freq).floor())).abs() - 1.0,
+        "noise" => rng_uniform(),
+        _ => 0.0,
+    }
+}
+
+thread_local! {
+    static ARNG: std::cell::Cell<u64> = std::cell::Cell::new({
+        use std::time::{SystemTime, UNIX_EPOCH};
+        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(0x9E3779B9) | 1
+    });
+}
+/// Uniform [-1,1) (xorshift) -- nicht-deterministisch (wie np.random).
+fn rng_uniform() -> f64 {
+    ARNG.with(|s| {
+        let mut x = s.get();
+        x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+        s.set(x);
+        ((x >> 11) as f64 / (1u64 << 53) as f64) * 2.0 - 1.0
+    })
+}
+
+/// Minimaler PCM16-Mono-WAV-Encoder (RIFF/WAVE/fmt/data).
+fn encode_wav_mono16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
+    let data_len = (samples.len() * 2) as u32;
+    let mut v = Vec::with_capacity(44 + data_len as usize);
+    v.extend_from_slice(b"RIFF");
+    v.extend_from_slice(&(36 + data_len).to_le_bytes());
+    v.extend_from_slice(b"WAVE");
+    v.extend_from_slice(b"fmt ");
+    v.extend_from_slice(&16u32.to_le_bytes());
+    v.extend_from_slice(&1u16.to_le_bytes());   // PCM
+    v.extend_from_slice(&1u16.to_le_bytes());   // mono
+    v.extend_from_slice(&sample_rate.to_le_bytes());
+    v.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
+    v.extend_from_slice(&2u16.to_le_bytes());   // block align
+    v.extend_from_slice(&16u16.to_le_bytes());  // bits/sample
+    v.extend_from_slice(b"data");
+    v.extend_from_slice(&data_len.to_le_bytes());
+    for s in samples { v.extend_from_slice(&s.to_le_bytes()); }
+    v
 }

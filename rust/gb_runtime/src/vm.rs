@@ -1842,7 +1842,7 @@ impl<'p> Vm<'p> {
             "flip" => {
                 g!().flip();
                 // Musik-Stream nachfuettern (sonst stockt die Wiedergabe).
-                if let Some(au) = self.audio.as_ref() { au.update(); }
+                if let Some(au) = self.audio.as_mut() { au.update(); }
                 Value::Nil
             }
             "keypressed" => Value::Bool(g!().key_down(gi(a,0,"KEYPRESSED")?)),
@@ -2085,6 +2085,49 @@ impl<'p> Vm<'p> {
                 for i in 0..n { b.values[i] = Value::Float(tmp[i] as f64); }
                 Value::Nil
             }
+
+            // --- erweitertes audio-Modul (AUDIO_*) ---
+            "audio_init" => { self.audio_mut()?; Value::Nil }
+            "audio_set_num_channels" => { let n = gi(a, 0, "AUDIO_SET_NUM_CHANNELS")?; if n < 0 { return Err("AUDIO_SET_NUM_CHANNELS: n muss >= 0 sein".into()); } self.audio_mut()?.set_num_channels(n); Value::Nil }
+            "audio_num_channels" => Value::Int(self.audio_mut()?.get_num_channels()),
+            "audio_busy_channels" => Value::Int(self.audio_mut()?.busy_channels()),
+            "audio_pause_all" => { self.audio_mut()?.pause_all(); Value::Nil }
+            "audio_resume_all" => { self.audio_mut()?.resume_all(); Value::Nil }
+            "audio_stop_all" => { self.audio_mut()?.stop_all(); Value::Nil }
+            "audio_play" => {
+                let idx = gi(a, 0, "AUDIO_PLAY")?;
+                let vol = if a.len() >= 3 { need_f(a, 2, "AUDIO_PLAY")? } else { 1.0 };
+                Value::Int(self.audio_mut()?.ch_play(idx, vol)?)
+            }
+            "audio_pause" => { let i = gi(a, 0, "AUDIO_PAUSE")?; self.audio_mut()?.ch_pause(i)?; Value::Nil }
+            "audio_resume" => { let i = gi(a, 0, "AUDIO_RESUME")?; self.audio_mut()?.ch_resume(i)?; Value::Nil }
+            "audio_stop" => { let i = gi(a, 0, "AUDIO_STOP")?; self.audio_mut()?.ch_stop(i)?; Value::Nil }
+            "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
+            "audio_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
+            "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }
+            "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
+            "audio_tone" => {
+                let freq = need_f(a, 0, "AUDIO_TONE")?;
+                let dur = gi(a, 1, "AUDIO_TONE")?;
+                let wf = if a.len() >= 3 { gs(a, 2, "AUDIO_TONE")?.to_string() } else { "sine".to_string() };
+                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_TONE")? } else { 1.0 };
+                Value::Int(self.audio_mut()?.tone(freq, dur, &wf, vol)?)
+            }
+            "audio_noise" => {
+                let dur = gi(a, 0, "AUDIO_NOISE")?;
+                let vol = if a.len() >= 2 { need_f(a, 1, "AUDIO_NOISE")? } else { 1.0 };
+                Value::Int(self.audio_mut()?.noise(dur, vol)?)
+            }
+            "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
+            "audio_music_play" => { self.audio_mut()?.music_play(); Value::Nil }
+            "audio_music_stop" => { self.audio_mut()?.music_stop(); Value::Nil }
+            "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
+            "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
+            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
+            "audio_music_get_volume" => Value::Float(self.audio_mut()?.music_get_volume()),
+            "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
+            "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
+            "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
 
             // --- Bulk-Draws ---
             "plots" => {

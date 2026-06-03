@@ -54,8 +54,15 @@ feature-gated (Standard-`.exe` bleibt schlank).
   Platformer-Physik). Alle bit-identisch zu den Python-Pfaden verifiziert
   (`tiled`/`tile_collide`/`controller` gegen `examples/levels/level1.json`,
   `examples/77_tiled_platformer.gb` rendert nativ).
-- **Phase 2 (geplant):** erweitertes `audio` (Kanäle/Pan/Fade/Ton-Generierung,
-  `graphics`-Gate, raylib).
+- **Phase 2 — ERLEDIGT (erweitertes `audio`, `graphics`-Gate):** AUDIO_* (27 —
+  Mixer-Lifecycle, Channel-Playback mit Volume/Pan/Pause/Resume/Stop,
+  Music-Streaming mit Volume/Position/Queue, Ton-Generierung AUDIO_TONE/
+  AUDIO_NOISE via In-RAM-WAV → `new_wave_from_memory`/`new_sound_from_wave`).
+  Funktional (nicht bit-identisch — anderer Mixer als pygame). SOUND/
+  AUDIO_CHANNEL = INTEGER-Handles; raylib hat keine pygame-Channels, daher
+  steuert ein „Channel" die Wiedergabe genau seines Sounds (Volume per Handle
+  getrackt, da raylib keinen Getter hat). Fade/loops=N werden vereinfacht
+  (raylib kann das nicht direkt).
 - **Phase 3 (geplant):** `db` (rusqlite), `net` (std::net), `html` (HTTP+Parser)
   — feature-gated.
 - **Phase 4 (geplant):** Hardware/IoT `serial`/`usb`/`wifi`/`bt` — feature-gated.
