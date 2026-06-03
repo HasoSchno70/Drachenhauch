@@ -82,7 +82,10 @@ NEXT
 ' --- Bloom-Post-Processing ---------------------------------------------------
 DIM bloom AS INTEGER
 bloom = SHADER_LOAD("assets/shaders/bloom.fs")
-IF bloom >= 0 THEN POSTFX(bloom)
+IF bloom >= 0 THEN
+    SHADER_SET2(bloom, "resolution", W, H)   ' Pflicht -- sonst px=1/0 -> Artefakt-Linien
+    POSTFX(bloom)
+END IF
 
 ' --- Funken-Partikel (2D-Overlay) -------------------------------------------
 DIM sparks AS PARTICLE_SYSTEM
