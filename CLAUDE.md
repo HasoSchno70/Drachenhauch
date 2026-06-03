@@ -308,10 +308,20 @@ Python-VM und Cython-VM. Folgen davon:
 
 **Implementierung:** `_Coroutine` + `function_has_yield` in
 [interpreter.py](gamebasic/interpreter.py); Erzeugung in den `CALL_*`-Pfaden
-aller drei Engines (is_coroutine-Branch), Treiben ueber die `CORO_*`-Builtins.
+aller Engines (is_coroutine-Branch), Treiben ueber die `CORO_*`-Builtins.
 Pro-Thread-State (`env`/`call_depth`/`_method_stack`) im Tree-Walker liegt in
-`threading.local`. **Nicht in der nativen Rust-Runtime (gbrt)** -- dort ist die
-VM native-stack-rekursiv (sauberer Fehler bei Opcode 115, kein Crash).
+`threading.local`.
+
+**Auch nativ (gbrt/Rust, `--native` + Standalone-`.exe`).** Statt Threads nutzt
+die Rust-VM einen **Frame-Snapshot**: `dispatch` liefert `Step::Return | Yield`;
+bei YIELD wird der Frame (ip/locals/stack/try_handlers) in einem
+`Value::Coroutine` (`CoroState`) abgelegt und beim Resume restauriert. Moeglich
+ist das, weil **kein Cross-Frame-YIELD** existiert -- nur der oberste
+Coroutine-Frame muss fortsetzbar sein (verschachtelte Calls laufen normal
+rekursiv). Kein OS-Thread -> raylib-Main-Thread bleibt sicher, deterministisch
+per Konstruktion. `vm_native`-VM (Cython) bleibt thread-basiert wie die
+Python-VM. Alle VIER Pfade liefern bit-identisch.
+
 Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
 Doku-Demo [examples/98_coroutines.gb](examples/98_coroutines.gb), Tests
 [tests/test_coroutines.py](tests/test_coroutines.py).

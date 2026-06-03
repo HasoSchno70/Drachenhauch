@@ -679,7 +679,7 @@ Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 - **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
 - In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
-- **Nicht in der nativen Rust-Runtime** (`gbrt`/`--native`) verfügbar — dort liefert `YIELD` einen klaren Fehler.
+- Läuft in **allen vier Pfaden** bit-identisch — Tree-Walker, Python-VM, Cython-VM und die native Rust-Runtime (`gbrt`/`--native`, inkl. Standalone-`.exe`). Nativ via Frame-Snapshot statt Threads.
 
 Vollständiges Beispiel: [examples/98_coroutines.gb](../examples/98_coroutines.gb).
 

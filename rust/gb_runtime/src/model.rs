@@ -75,6 +75,9 @@ pub mod op {
     pub const DECLARE_GLOBAL_SLOT: u16 = 113;
     pub const DECLARE_GLOBAL_CONST_SLOT: u16 = 114;
 
+    /// Coroutine: pop yield-Wert -> suspendieren -> push send-Wert beim Resume.
+    pub const YIELD_VALUE: u16 = 115;
+
     pub const PRINT: u16 = 70;
 
     // Aufrufe / Werte
@@ -168,6 +171,9 @@ pub struct Func {
     pub is_variadic: bool,
     pub is_sub: bool,
     pub is_main: bool,
+    /// Coroutine gdw. der Body ein YIELD enthaelt -- Aufruf liefert dann ein
+    /// COROUTINE-Handle statt die Funktion auszufuehren.
+    pub is_coroutine: bool,
     pub return_type: String,
     pub param_defaults: Vec<Value>,
     pub local_types: Vec<String>,
@@ -313,6 +319,7 @@ fn decode_func(j: &J) -> Func {
         is_variadic: get("is_variadic").as_bool().unwrap_or(false),
         is_sub: get("is_sub").as_bool().unwrap_or(true),
         is_main: get("is_main").as_bool().unwrap_or(false),
+        is_coroutine: get("is_coroutine").as_bool().unwrap_or(false),
         return_type: get("return_type").as_str().unwrap_or("").to_string(),
         param_defaults,
         local_types,

@@ -11,7 +11,79 @@ use std::rc::Rc;
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
-use crate::value::{as_f64, is_num, value_eq, FieldVal, GbArray, GbMap, Instance, Value};
+use crate::value::{as_f64, is_num, value_eq, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
+
+/// Ergebnis eines Frame-Laufs: entweder Rueckgabe (Funktion/Coroutine fertig)
+/// oder Suspendierung an einem YIELD (nur in Coroutinen).
+enum Step {
+    Return(Value),
+    Yield(Value),
+}
+
+/// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
+/// von normalem Aufruf (exec) und Coroutine-Erststart.
+fn bind_params(fn_: &Func, args: Vec<Value>) -> R<Vec<Value>> {
+    let mut locals: Vec<Value> = fn_.local_defaults.clone();
+    let n_locals = fn_.local_types.len();
+    if locals.len() < n_locals {
+        locals.resize(n_locals, Value::Nil);
+    }
+    if fn_.is_variadic {
+        let normal_n = fn_.n_params - 1;
+        if args.len() < normal_n {
+            return Err(format!("{}: erwartet mind. {} Argument(e), erhalten {}",
+                fn_.name.to_uppercase(), normal_n, args.len()));
+        }
+        let mut it = args.into_iter();
+        for i in 0..normal_n {
+            let v = it.next().unwrap();
+            locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+        }
+        let rest: Vec<Value> = it.collect();
+        locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
+    } else {
+        let n_required = if fn_.n_required == 0 { fn_.n_params } else { fn_.n_required };
+        if args.len() < n_required || args.len() > fn_.n_params {
+            return Err(format!("{}: erwartet {}..{} Argument(e), erhalten {}",
+                fn_.name.to_uppercase(), n_required, fn_.n_params, args.len()));
+        }
+        let argn = args.len();
+        for (i, v) in args.into_iter().enumerate() {
+            locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+        }
+        for i in argn..fn_.n_params {
+            let default = fn_.param_defaults.get(i).cloned().unwrap_or(Value::Nil);
+            locals[i] = coerce(default, &fn_.local_types[i], "Default-Parameter")?;
+        }
+    }
+    Ok(locals)
+}
+
+/// Baut ein COROUTINE-Handle. Der Aufruf fuehrt den Body NICHT aus -- das
+/// passiert erst beim ersten CORO_RESUME. `fn_ptr` ist gueltig fuer die ganze
+/// Programmlaufzeit (siehe `CoroState`).
+fn make_coro(callee: &Func, args: Vec<Value>, self_obj: Option<Value>) -> Value {
+    Value::Coroutine(Rc::new(RefCell::new(CoroState {
+        fn_ptr: callee as *const Func,
+        self_obj,
+        name: callee.name.clone(),
+        args,
+        started: false,
+        done: false,
+        result: Value::Nil,
+        locals: Vec::new(),
+        stack: Vec::new(),
+        ip: 0,
+        try_handlers: Vec::new(),
+    })))
+}
+
+fn expect_coro(v: &Value, fname: &str) -> R<Rc<RefCell<CoroState>>> {
+    match v {
+        Value::Coroutine(rc) => Ok(rc.clone()),
+        _ => Err(format!("{}: Erwartet COROUTINE, erhalten {}", fname, v.type_name())),
+    }
+}
 
 struct Slot {
     ty: String,
@@ -340,58 +412,158 @@ impl<'p> Vm<'p> {
 
     // ---------------------------------------------------------------- exec
     fn exec(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
-        let mut locals: Vec<Value> = fn_.local_defaults.clone();
-        let n_locals = fn_.local_types.len();
-        if locals.len() < n_locals {
-            locals.resize(n_locals, Value::Nil);
-        }
-
-        // Parameter binden (mit Variadic + Defaults).
-        if fn_.is_variadic {
-            let normal_n = fn_.n_params - 1;
-            if args.len() < normal_n {
-                return Err(format!("{}: erwartet mind. {} Argument(e), erhalten {}",
-                    fn_.name.to_uppercase(), normal_n, args.len()));
-            }
-            let mut it = args.into_iter();
-            for i in 0..normal_n {
-                let v = it.next().unwrap();
-                locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
-            }
-            let rest: Vec<Value> = it.collect();
-            locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
-        } else {
-            let n_required = if fn_.n_required == 0 { fn_.n_params } else { fn_.n_required };
-            if args.len() < n_required || args.len() > fn_.n_params {
-                return Err(format!("{}: erwartet {}..{} Argument(e), erhalten {}",
-                    fn_.name.to_uppercase(), n_required, fn_.n_params, args.len()));
-            }
-            let argn = args.len();
-            for (i, v) in args.into_iter().enumerate() {
-                locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
-            }
-            for i in argn..fn_.n_params {
-                let default = fn_.param_defaults.get(i).cloned().unwrap_or(Value::Nil);
-                locals[i] = coerce(default, &fn_.local_types[i], "Default-Parameter")?;
-            }
-        }
-
+        let mut locals = bind_params(fn_, args)?;
         let mut stack: Vec<Value> = Vec::with_capacity(16);
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
+        match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref())? {
+            Step::Return(v) => Ok(v),
+            // Eine normale Funktion enthaelt kein YIELD (sonst waere sie eine
+            // Coroutine und wuerde nicht via exec ausgefuehrt).
+            Step::Yield(_) => Err("YIELD ausserhalb einer Coroutine".into()),
+        }
+    }
 
+    /// Treibt den Frame durch die Dispatch-Schleife inkl. TRY/CATCH-Unwinding,
+    /// bis ein RETURN/HALT (Step::Return) oder ein YIELD (Step::Yield) faellt.
+    fn run_frame(
+        &mut self,
+        fn_: &'p Func,
+        locals: &mut Vec<Value>,
+        stack: &mut Vec<Value>,
+        ip: &mut usize,
+        try_handlers: &mut Vec<(usize, usize)>,
+        self_obj: Option<&Value>,
+    ) -> R<Step> {
         loop {
-            match self.dispatch(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref()) {
-                Ok(v) => return Ok(v),
+            match self.dispatch(fn_, locals, stack, ip, try_handlers, self_obj) {
+                Ok(step) => return Ok(step),
                 Err(e) => match try_handlers.pop() {
                     Some((target, depth)) => {
                         stack.truncate(depth);
                         stack.push(Value::str_rc(&e));
-                        ip = target;
+                        *ip = target;
                     }
                     None => return Err(e),
                 },
             }
+        }
+    }
+
+    /// Setzt eine Coroutine fort (`send` wird der YIELD-Ausdruck im Body).
+    /// Liefert den naechsten YIELD-Wert bzw. den RETURN-Wert beim Ende.
+    fn coro_resume(&mut self, co: &Rc<RefCell<CoroState>>, send: Value) -> R<Value> {
+        if co.borrow().done {
+            return Err("CORO_RESUME/SEND auf bereits beendeter Coroutine".into());
+        }
+        // Func-Zeiger ist fuer 'p (Programmlaufzeit) gueltig -- siehe CoroState.
+        let ptr = co.borrow().fn_ptr;
+        let fn_: &'p Func = unsafe { &*ptr };
+        let self_obj = co.borrow().self_obj.clone();
+        let started = co.borrow().started;
+
+        let mut locals: Vec<Value>;
+        let mut stack: Vec<Value>;
+        let mut ip: usize;
+        let mut try_handlers: Vec<(usize, usize)>;
+        if !started {
+            let args = std::mem::take(&mut co.borrow_mut().args);
+            locals = bind_params(fn_, args)?;
+            stack = Vec::with_capacity(16);
+            ip = 0;
+            try_handlers = Vec::new();
+            co.borrow_mut().started = true;
+        } else {
+            let mut c = co.borrow_mut();
+            locals = std::mem::take(&mut c.locals);
+            stack = std::mem::take(&mut c.stack);
+            ip = c.ip;
+            try_handlers = std::mem::take(&mut c.try_handlers);
+            drop(c);
+            // Der YIELD-Ausdruck (`x = YIELD ...`) liefert den Sende-Wert.
+            stack.push(send);
+        }
+
+        match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref()) {
+            Ok(Step::Yield(v)) => {
+                let mut c = co.borrow_mut();
+                c.locals = locals;
+                c.stack = stack;
+                c.ip = ip;
+                c.try_handlers = try_handlers;
+                Ok(v)
+            }
+            Ok(Step::Return(v)) => {
+                let mut c = co.borrow_mut();
+                c.done = true;
+                c.result = v.clone();
+                Ok(v)
+            }
+            Err(e) => {
+                co.borrow_mut().done = true;
+                Err(e)
+            }
+        }
+    }
+
+    /// Eager: treibt die Coroutine bis zum Ende und sammelt alle YIELD-Werte
+    /// (RETURN-Wert nicht enthalten). Fuer FOR EACH / Comprehensions.
+    fn coro_drain(&mut self, co: &Rc<RefCell<CoroState>>) -> R<Vec<Value>> {
+        let mut out = Vec::new();
+        loop {
+            if co.borrow().done {
+                break;
+            }
+            let v = self.coro_resume(co, Value::Nil)?;
+            if co.borrow().done {
+                break; // letzter Resume hat beendet -> v ist der RETURN-Wert
+            }
+            out.push(v);
+        }
+        Ok(out)
+    }
+
+    /// CORO_*-Builtins (brauchen VM-State -> nicht in builtins.rs).
+    fn try_coro(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        // Builtin-Namen liegen im .gbc lowercase vor.
+        match name {
+            "coro_resume" => {
+                let co = expect_coro(&a[0], "CORO_RESUME")?;
+                Ok(Some(self.coro_resume(&co, Value::Nil)?))
+            }
+            "coro_send" => {
+                let co = expect_coro(&a[0], "CORO_SEND")?;
+                Ok(Some(self.coro_resume(&co, a[1].clone())?))
+            }
+            "coro_done" => {
+                let co = expect_coro(&a[0], "CORO_DONE")?;
+                let d = co.borrow().done;
+                Ok(Some(Value::Bool(d)))
+            }
+            "coro_result" => {
+                let co = expect_coro(&a[0], "CORO_RESULT")?;
+                let c = co.borrow();
+                if !c.done {
+                    return Err("CORO_RESULT: Coroutine ist noch nicht beendet".into());
+                }
+                Ok(Some(c.result.clone()))
+            }
+            "coro_close" => {
+                let co = expect_coro(&a[0], "CORO_CLOSE")?;
+                let mut c = co.borrow_mut();
+                c.done = true;
+                c.locals.clear();
+                c.stack.clear();
+                c.try_handlers.clear();
+                Ok(Some(Value::Nil))
+            }
+            // __comp_iter ueber eine Coroutine: eager drainen (FOR EACH / Comp).
+            "__comp_iter" if matches!(a.first(), Some(Value::Coroutine(_))) => {
+                let co = expect_coro(&a[0], "__comp_iter")?;
+                let items = self.coro_drain(&co)?;
+                Ok(Some(Value::Tuple(Rc::new(items))))
+            }
+            _ => Ok(None),
         }
     }
 
@@ -403,7 +575,7 @@ impl<'p> Vm<'p> {
         ip: &mut usize,
         try_handlers: &mut Vec<(usize, usize)>,
         self_obj: Option<&Value>,
-    ) -> R<Value> {
+    ) -> R<Step> {
         let code = &fn_.code;
         let constants = &fn_.constants;
         let n = code.len();
@@ -675,8 +847,12 @@ impl<'p> Vm<'p> {
                         .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?;
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
-                    let ret = self.exec(callee, call_args, None)?;
-                    if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                    if callee.is_coroutine {
+                        stack.push(make_coro(callee, call_args, None));
+                    } else {
+                        let ret = self.exec(callee, call_args, None)?;
+                        if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                    }
                 }
                 op::CALL_BUILTIN => {
                     let l = arg.list();
@@ -684,8 +860,10 @@ impl<'p> Vm<'p> {
                     let argc = l[1].as_usize();
                     let split = stack.len() - argc;
                     let bargs = stack.split_off(split);
-                    // Reihenfolge: scene (VM-State) -> Grafik (gfx-State) -> pure.
+                    // Reihenfolge: scene (VM-State) -> coro (VM-State) -> Grafik -> pure.
                     if let Some(v) = self.try_scene(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_coro(name, &bargs)? {
                         stack.push(v);
                     } else if let Some(v) = self.try_gui(name, &bargs)? {
                         stack.push(v);
@@ -720,8 +898,12 @@ impl<'p> Vm<'p> {
                         Value::FuncRef(name) => {
                             let tgt = self.prog.functions.get(name.as_ref())
                                 .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", name))?;
-                            let ret = self.exec(tgt, call_args, None)?;
-                            if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            if tgt.is_coroutine {
+                                stack.push(make_coro(tgt, call_args, None));
+                            } else {
+                                let ret = self.exec(tgt, call_args, None)?;
+                                if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            }
                         }
                         other => return Err(format!("Wert vom Typ {} ist nicht aufrufbar", other.type_name())),
                     }
@@ -738,8 +920,12 @@ impl<'p> Vm<'p> {
                             let cn = rc.borrow().class_name.clone();
                             let m = self.resolve_method(&cn, method)
                                 .ok_or_else(|| format!("Methode '{}' existiert nicht in {}", method, cn))?;
-                            let ret = self.exec(m, margs, Some(obj.clone()))?;
-                            if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            if m.is_coroutine {
+                                stack.push(make_coro(m, margs, Some(obj.clone())));
+                            } else {
+                                let ret = self.exec(m, margs, Some(obj.clone()))?;
+                                if !m.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
+                            }
                         }
                         Value::Nil => return Err(format!("Methodenaufruf '.{}' bei NIL-Referenz", method)),
                         _ => {
@@ -940,9 +1126,18 @@ impl<'p> Vm<'p> {
                 // --- Rueckgabe ---
                 op::RETURN => {
                     let v = stack.pop().unwrap();
-                    return coerce(v, &fn_.return_type, "RETURN");
+                    return Ok(Step::Return(coerce(v, &fn_.return_type, "RETURN")?));
                 }
-                op::RETURN_VOID => return Ok(Value::Nil),
+                op::RETURN_VOID => return Ok(Step::Return(Value::Nil)),
+                op::YIELD_VALUE => {
+                    // Coroutine: Wert abgeben und suspendieren. Beim Resume legt
+                    // coro_resume den Sende-Wert auf den Stack (Wert von `x = YIELD`).
+                    let mut yval = stack.pop().unwrap();
+                    if !fn_.return_type.is_empty() {
+                        yval = coerce(yval, &fn_.return_type, "YIELD")?;
+                    }
+                    return Ok(Step::Yield(yval));
+                }
 
                 // --- I/O ---
                 op::PRINT => {
@@ -958,12 +1153,12 @@ impl<'p> Vm<'p> {
                     }
                 }
 
-                op::HALT => return Ok(Value::Nil),
+                op::HALT => return Ok(Step::Return(Value::Nil)),
 
                 other => return Err(format!("Opcode {} im Rust-VM noch nicht implementiert (ip={})", other, *ip - 1)),
             }
         }
-        Ok(Value::Nil)
+        Ok(Step::Return(Value::Nil))
     }
 
     fn pop_dims(&self, stack: &mut Vec<Value>, num_dims: usize) -> R<Vec<i64>> {

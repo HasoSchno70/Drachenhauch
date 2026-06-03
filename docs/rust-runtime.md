@@ -183,14 +183,22 @@ Handles noch nicht serialisierbar sind), Module (`IMPORT` → Schritt 5),
 Bulk-Draws (`PLOTS`/`BOXES`/…), Layer/Atlas. *(Diese sind inzwischen alle
 implementiert — siehe die jeweiligen Schritte unten.)*
 
-**Nicht unterstützt — Coroutines/`YIELD`:** Die Python-VMs implementieren
-Coroutinen thread-basiert (ein Worker-Thread pro Coroutine, striktes
-Ping-Pong). Die native VM (`vm.rs::exec`) ist native-stack-rekursiv und kann
-keine Python-Threads hosten — Coroutinen sind hier daher **nicht verfügbar**.
-Backward-kompatibel: das zusätzliche `is_coroutine`-JSON-Feld wird ignoriert,
-und der Opcode `YIELD_VALUE` (115) liefert einen sauberen „Unbekannter
-Opcode"-Fehler statt eines Crashs. Wer 3D/Shader/Standalone-`.exe` braucht,
-nutzt für Coroutinen-Logik weiterhin State-Machines (`SELECT CASE state`).
+**Coroutines/`YIELD` — nativ unterstützt (Frame-Snapshot):** Die Python-VMs
+treiben Coroutinen thread-basiert; die native Rust-VM nutzt stattdessen einen
+**Frame-Snapshot** (keine OS-Threads → raylib-Main-Thread bleibt sicher,
+deterministisch per Konstruktion). `dispatch` liefert `Step::Return | Yield`;
+bei `YIELD_VALUE` (Opcode 115) wird der Frame (`ip`/`locals`/`stack`/
+`try_handlers`) in einem `Value::Coroutine` (`CoroState`) abgelegt und beim
+`CORO_RESUME`/`SEND` restauriert. Der `CoroState` hält einen rohen `*const Func`
+auf die — über die ganze Programmlaufzeit unveränderliche — `Func`, sodass
+`Value` keinen Lifetime-Parameter braucht. Möglich ist die Single-Frame-Lösung,
+weil GameBasic **kein Cross-Frame-`YIELD`** erlaubt (ein Helfer mit `YIELD` ist
+selbst eine Coroutine): nur der oberste Coroutine-Frame muss fortsetzbar sein,
+verschachtelte normale Calls laufen weiter rekursiv auf dem nativen Stack.
+`CORO_*`-Builtins laufen über `try_coro` (brauchen VM-State); `FOR EACH`/
+Comprehension über eine Coroutine drainen via `__comp_iter`. Verifiziert
+bit-identisch zu allen drei Python-Pfaden inkl. Standalone-`.exe`
+([examples/98_coroutines.gb](../examples/98_coroutines.gb)).
 
 ### Validierung
 

@@ -10,6 +10,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::model::Func;
+
 #[derive(Clone)]
 pub enum Value {
     Nil,
@@ -44,6 +46,32 @@ pub enum Value {
     Particles(Rc<RefCell<ParticleSys>>),
     /// Modul `ecs`: Entity-Component-System-World (Referenz-Typ).
     Ecs(Rc<RefCell<crate::ecs::World>>),
+    /// Coroutine-Handle (YIELD). Haelt den suspendierten Frame; die VM treibt
+    /// ihn synchron via CORO_RESUME/SEND (kein Thread -- raylib-Main-Thread-
+    /// sicher, deterministisch). Siehe `CoroState`.
+    Coroutine(Rc<RefCell<CoroState>>),
+}
+
+/// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
+/// try_handlers) wird beim YIELD hier abgelegt und beim Resume restauriert.
+///
+/// `fn_ptr` ist ein roher Zeiger auf die `Func` im geladenen Programm. Das ist
+/// sound, weil das `Program` die gesamte Laufzeit (Lifetime `'p`) lebt und nach
+/// dem Laden immutable ist -- es ueberlebt also alle Coroutinen. So braucht
+/// `Value` keinen Lifetime-Parameter.
+pub struct CoroState {
+    pub fn_ptr: *const Func,
+    pub self_obj: Option<Value>,
+    pub name: String,
+    pub args: Vec<Value>,   // nur bis zum ersten Resume (Parameter-Bindung)
+    pub started: bool,
+    pub done: bool,
+    pub result: Value,
+    // Suspendierter Frame:
+    pub locals: Vec<Value>,
+    pub stack: Vec<Value>,
+    pub ip: usize,
+    pub try_handlers: Vec<(usize, usize)>,
 }
 
 pub struct Particle {
@@ -345,6 +373,7 @@ impl Value {
             Value::AStar(g) => { let g = g.borrow(); format!("<AStar {}x{}>", g.w, g.h) }
             Value::Particles(p) => format!("<ParticleSystem {} particles>", p.borrow().particles.len()),
             Value::Ecs(w) => format!("<ECS_WORLD entities={}>", w.borrow().count()),
+            Value::Coroutine(c) => format!("<COROUTINE {}>", c.borrow().name),
         }
     }
 
@@ -382,6 +411,7 @@ impl Value {
             Value::AStar(_) => "ASTAR_GRID",
             Value::Particles(_) => "PARTICLE_SYSTEM",
             Value::Ecs(_) => "ECS_WORLD",
+            Value::Coroutine(_) => "COROUTINE",
         }
     }
 
