@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import math
 import sys
+import threading
 
 from .bytecode import Op, CompiledFunction, Module, VMClassInfo
 from .errors import GameBasicError, GBRuntimeError, TypeMismatchError
 from .interpreter import (  # type: ignore
     BUILTINS, GRAPHICS_BUILTINS,
     _Instance, _GBArray, _Image, _Sound, _GBFile, _GBMap,
-    _GBThrow, _EnumNamespace, _ClassStaticNamespace, _FuncRef,
+    _GBThrow, _EnumNamespace, _ClassStaticNamespace, _FuncRef, _Coroutine,
 )
 from .modules import dispatch_binary_op as _disp_op, NO_OP_MATCH as _NO_OP
 
@@ -33,6 +34,7 @@ _TYPE_DEFAULTS = {
     "file":    None,
     "tuple":   (),
     "funcref": None,
+    "coroutine": None,
 }
 
 
@@ -51,6 +53,8 @@ def _type_of(v) -> str:
         return f"TUPLE({len(v)})"
     if isinstance(v, _FuncRef):
         return f"FUNCREF<{v.name}>"
+    if isinstance(v, _Coroutine):
+        return f"COROUTINE<{v.name}>"
     from gamebasic.modules.vec2 import _Vec2 as _V2
     if isinstance(v, _V2):
         return "VEC2"
@@ -166,6 +170,12 @@ def _coerce_funcref(value, ctx):
     raise TypeMismatchError(f"{ctx}: Erwartet FUNCREF, erhalten {_type_of(value)}")
 
 
+def _coerce_coroutine(value, ctx):
+    if value is None or isinstance(value, _Coroutine):
+        return value
+    raise TypeMismatchError(f"{ctx}: Erwartet COROUTINE, erhalten {_type_of(value)}")
+
+
 _FAST_COERCE = {
     "any":     _coerce_any,
     "integer": _coerce_integer,
@@ -178,6 +188,7 @@ _FAST_COERCE = {
     "file":    _coerce_file,
     "tuple":   _coerce_tuple,
     "funcref": _coerce_funcref,
+    "coroutine": _coerce_coroutine,
 }
 
 
@@ -255,6 +266,8 @@ def _fmt(v) -> str:
         return "(" + ", ".join(_fmt(x) for x in v) + ")"
     if isinstance(v, _FuncRef):
         return f"<FUNCREF {v.name}>"
+    if isinstance(v, _Coroutine):
+        return f"<COROUTINE {v.name}>"
     from gamebasic.modules.vec2 import _Vec2 as _V2
     if isinstance(v, _V2):
         return f"Vec2({_fmt(v.x)}, {_fmt(v.y)})"
@@ -426,6 +439,10 @@ class VM:
         _register_default_globals(self.globals)
         self._graphics = None  # lazy
         self.data_ptr: int = 0     # READ liest hier sequenziell aus module.data
+        # Pro-Thread current_coro: YIELD_VALUE findet darueber das _Coroutine
+        # des aktuell laufenden Worker-Threads (Coroutinen laufen je auf einem
+        # eigenen Thread, striktes Ping-Pong -> deterministisch).
+        self._tls = threading.local()
 
     def _get_graphics(self):
         if self._graphics is None:
@@ -530,6 +547,22 @@ class VM:
 
     def _coerce(self, value, target, ctx):
         return _coerce(value, target, ctx, self.module.classes)
+
+    def _make_coroutine(self, callee: CompiledFunction, call_args: list, self_obj):
+        """Erzeugt ein _Coroutine-Handle. Der Body laeuft erst beim ersten
+        CORO_RESUME auf einem Worker-Thread (mit gesetztem current_coro)."""
+        snap = list(call_args)
+
+        def runner(coro):
+            prev = getattr(self._tls, "current_coro", None)
+            self._tls.current_coro = coro
+            try:
+                return self._exec(callee, snap, self_obj)
+            finally:
+                self._tls.current_coro = prev
+
+        return _Coroutine(runner, name=callee.name,
+                          return_type=callee.return_type)
 
     # ----------------------------------------------------------------
     def _exec(self, fn: CompiledFunction, args: list, self_obj=None):
@@ -1022,12 +1055,15 @@ class VM:
                           del stack[-argc:]
                       else:
                           call_args = []
-                      ret = self._exec(callee, call_args)
-                      if not callee.is_sub:
-                          push(ret)
+                      if callee.is_coroutine:
+                          push(self._make_coroutine(callee, call_args, None))
                       else:
-                          # SUB: trotzdem etwas auf den Stack legen, falls als Expr verwendet
-                          push(None)
+                          ret = self._exec(callee, call_args)
+                          if not callee.is_sub:
+                              push(ret)
+                          else:
+                              # SUB: trotzdem etwas auf den Stack legen, falls als Expr verwendet
+                              push(None)
                   elif op == OP.CALL_BUILTIN:
                       fn_name, argc = arg
                       if argc:
@@ -1094,11 +1130,14 @@ class VM:
                           raise GBRuntimeError(
                               f"FUNCREF: Funktion '{callee.name}' existiert nicht (mehr)"
                           )
-                      ret = self._exec(tgt, call_args)
-                      if not tgt.is_sub:
-                          push(ret)
+                      if tgt.is_coroutine:
+                          push(self._make_coroutine(tgt, call_args, None))
                       else:
-                          push(None)
+                          ret = self._exec(tgt, call_args)
+                          if not tgt.is_sub:
+                              push(ret)
+                          else:
+                              push(None)
                   elif op == OP.CALL_METHOD:
                       method_name, argc = arg
                       if argc:
@@ -1119,6 +1158,9 @@ class VM:
                               and type(obj) is _Instance
                               and obj.cls is cache[0]):
                           method = cache[1]
+                          if method.is_coroutine:
+                              push(self._make_coroutine(method, margs, obj))
+                              continue
                           ret = self._exec(method, margs, self_obj=obj)
                           if not method.is_sub:
                               push(ret)
@@ -1147,6 +1189,9 @@ class VM:
                               f"Methode '{method_name}' existiert nicht in {obj.cls.name}"
                           )
                       caches[ip - 1] = [obj.cls, method]
+                      if method.is_coroutine:
+                          push(self._make_coroutine(method, margs, obj))
+                          continue
                       ret = self._exec(method, margs, self_obj=obj)
                       if not method.is_sub:
                           push(ret)
@@ -1461,6 +1506,15 @@ class VM:
                               f"FUNCTION '{fn.name}' muss einen Wert mit RETURN zurueckgeben"
                           )
                       return None
+                  elif op == OP.YIELD_VALUE:
+                      # Laeuft auf dem Coroutine-Worker-Thread: Wert abgeben,
+                      # blockieren bis Resume, Sende-Wert auf den Stack.
+                      yval = stack.pop()
+                      coro = self._tls.current_coro
+                      if fn.return_type:
+                          yval = coerce_(yval, fn.return_type,
+                                         f"YIELD aus {fn.name.upper()}", classes)
+                      push(coro._yield(yval))
 
                   # --- I/O ---
                   elif op == OP.PRINT:

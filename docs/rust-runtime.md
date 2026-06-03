@@ -183,6 +183,15 @@ Handles noch nicht serialisierbar sind), Module (`IMPORT` → Schritt 5),
 Bulk-Draws (`PLOTS`/`BOXES`/…), Layer/Atlas. *(Diese sind inzwischen alle
 implementiert — siehe die jeweiligen Schritte unten.)*
 
+**Nicht unterstützt — Coroutines/`YIELD`:** Die Python-VMs implementieren
+Coroutinen thread-basiert (ein Worker-Thread pro Coroutine, striktes
+Ping-Pong). Die native VM (`vm.rs::exec`) ist native-stack-rekursiv und kann
+keine Python-Threads hosten — Coroutinen sind hier daher **nicht verfügbar**.
+Backward-kompatibel: das zusätzliche `is_coroutine`-JSON-Feld wird ignoriert,
+und der Opcode `YIELD_VALUE` (115) liefert einen sauberen „Unbekannter
+Opcode"-Fehler statt eines Crashs. Wer 3D/Shader/Standalone-`.exe` braucht,
+nutzt für Coroutinen-Logik weiterhin State-Machines (`SELECT CASE state`).
+
 ### Validierung
 
 `stdout` der Rust-VM ist bit-identisch zur Python-VM (modulo OS-Newline:

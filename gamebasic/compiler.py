@@ -25,8 +25,14 @@ from .ast_nodes import (
     IndexAccess, IndexAssign,
     Try, Throw, Select, CaseMatch,
     EnumDecl, NamedArg, TupleLit, TupleAssign, With, SliceAccess,
-    ListComp, DictComp, SetComp,
+    ListComp, DictComp, SetComp, Yield,
 )
+
+
+def _function_has_yield(body):
+    """Lazy-Wrapper (Single-Source in interpreter.py) -- Coroutine-Erkennung."""
+    from .interpreter import function_has_yield
+    return function_has_yield(body)
 from .bytecode import Op, CompiledFunction, Module, VMClassInfo, VMFieldDecl
 from .errors import GameBasicError
 from .builtins_registry import BUILTINS, GRAPHICS_BUILTINS
@@ -43,6 +49,7 @@ _TYPE_DEFAULTS = {
     "file":    None,
     "tuple":   (),
     "funcref": None,
+    "coroutine": None,
 }
 
 
@@ -377,6 +384,7 @@ class Compiler:
             return_type=("" if is_sub else decl.return_type),
             is_sub=is_sub,
             is_variadic=is_variadic,
+            is_coroutine=_function_has_yield(decl.body),
         )
         if decl.name in self.functions:
             kind = "SUB" if is_sub else "FUNCTION"
@@ -424,6 +432,7 @@ class Compiler:
         )
         compiled.is_variadic = bool(decl.params) and getattr(
             decl.params[-1], "is_variadic", False)
+        compiled.is_coroutine = _function_has_yield(decl.body)
         # Top-level Funktionen haben Stubs
         if current_class is None:
             stub = self.functions[decl.name]
@@ -433,6 +442,7 @@ class Compiler:
             stub.local_defaults = compiled.local_defaults
             stub.caches = compiled.caches
             stub.lines = compiled.lines
+            stub.is_coroutine = compiled.is_coroutine
             return stub
         return compiled
 
@@ -1559,6 +1569,18 @@ class Compiler:
                 return ft
             return ""
         return ""
+
+    def _expr_Yield(self, e: Yield):
+        # YIELD <expr>: Operand (oder NIL) auf den Stack, dann YIELD_VALUE.
+        # Die VM macht den Handoff und pusht den Sende-Wert (Wert von `x = YIELD`).
+        # Statement-Form `YIELD v` laeuft ueber _stmt_ExprStmt (expr + POP).
+        if self.fn.is_main:
+            raise CompileError("YIELD nur in SUB/FUNCTION erlaubt")
+        if e.value is not None:
+            self._expr(e.value)
+        else:
+            self.fn.emit(Op.LOAD_CONST, self.fn.add_const(None))
+        self.fn.emit(Op.YIELD_VALUE)
 
     def _expr_TernaryExpr(self, e):
         # Lazy Ternary (IIF): cond auswerten, via JUMP_IF_FALSE genau einen

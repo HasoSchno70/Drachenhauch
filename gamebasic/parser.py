@@ -35,7 +35,7 @@ from .ast_nodes import (
     Try, Throw, Select, CaseMatch,
     Repeat, Data, Read, Restore,
     EnumDecl, NamedArg, TupleLit, TupleAssign, With, SliceAccess,
-    PropertyDecl, ListComp, DictComp, SetComp, TernaryExpr,
+    PropertyDecl, ListComp, DictComp, SetComp, TernaryExpr, Yield,
 )
 
 
@@ -61,6 +61,7 @@ _TYPE_TOKENS = {
     TokenType.FILE: "file",
     TokenType.TUPLE: "tuple",
     TokenType.FUNCREF: "funcref",
+    TokenType.COROUTINE: "coroutine",
 }
 
 
@@ -1391,7 +1392,23 @@ class Parser:
 
     # ---- Ausdruecke --------------------------------------------------
     def _expression(self):
+        # YIELD ist ein niedrig-praezedenter Ausdruck: `x = YIELD a + b`
+        # parst als `x = YIELD (a + b)`. Als Statement (`YIELD v`) faellt es
+        # ueber den ExprStmt-Fallback hier herein.
+        if self._check(TokenType.YIELD):
+            return self._yield_expr()
         return self._or_expr()
+
+    def _yield_expr(self):
+        self._expect(TokenType.YIELD)
+        # Optionaler Operand: kein Wert, wenn ein Terminator/Klammer-Ende folgt.
+        if self._at_end() or self._check(
+            TokenType.NEWLINE, TokenType.EOF, TokenType.COLON,
+            TokenType.RPAREN, TokenType.RBRACKET, TokenType.RBRACE,
+            TokenType.COMMA, TokenType.ELSE,
+        ):
+            return Yield(None)
+        return Yield(self._expression())
 
     def _or_expr(self):
         left = self._and_expr()

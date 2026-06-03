@@ -7,8 +7,11 @@ Strikte Typpruefung: Zuweisungen werden auf den deklarierten Typ geprueft.
 - BOOLEAN  -> bool
 """
 import array as _array_mod
+import dataclasses as _dataclasses
 import math
+import queue as _queue
 import random
+import threading
 
 from .ast_nodes import (
     NumberLit, StringLit, BoolLit, Identifier, BinaryOp, UnaryOp, Call,
@@ -18,7 +21,7 @@ from .ast_nodes import (
     Const, Break, Continue, IndexAccess, IndexAssign,
     Try, Throw, Select, CaseMatch,
     Repeat, Data, Read, Restore,
-    EnumDecl, NamedArg,
+    EnumDecl, NamedArg, Yield, Node,
 )
 
 
@@ -220,11 +223,14 @@ class _GBMap:
 
 
 class _UserFunction:
-    __slots__ = ("decl", "kind")  # kind: "sub" | "function"
+    __slots__ = ("decl", "kind", "is_coroutine")  # kind: "sub" | "function"
 
     def __init__(self, decl, kind: str):
         self.decl = decl
         self.kind = kind
+        # Coroutine gdw. der Body ein YIELD enthaelt. Aufruf liefert dann ein
+        # _Coroutine-Objekt statt die Funktion auszufuehren.
+        self.is_coroutine = function_has_yield(decl.body)
 
 
 class _ClassInfo:
@@ -270,6 +276,145 @@ class _FuncRef:
 
     def __repr__(self):
         return f"<FUNCREF {self.name}>"
+
+
+# ---------------------------------------------------------------------------
+# Coroutines / YIELD
+# ---------------------------------------------------------------------------
+# Eine Funktion, deren Body ein YIELD enthaelt, ist eine Coroutine. Ihr Aufruf
+# liefert ein _Coroutine-Objekt statt sie auszufuehren. Resume/Send treiben sie
+# in allen DREI Pfaden ueber einen Worker-Thread mit striktem Ping-Pong (immer
+# nur ein Thread laeuft) -- so bleibt die Output-Reihenfolge deterministisch und
+# bit-identisch zwischen Tree-Walker, Python-VM und Cython-VM.
+
+_CORO_NOTHING = object()   # Sentinel: CORO_RESUME ohne Sende-Wert
+
+
+class _CoroClose(Exception):
+    """Intern: signalisiert dem Coroutine-Thread, sich abzubauen (CORO_CLOSE)."""
+
+
+def _contains_yield(obj) -> bool:
+    """Rekursiver Scan eines AST-Teilbaums nach einem Yield-Knoten.
+
+    Generisch ueber dataclass-Felder -- so muessen neue AST-Knoten hier nicht
+    eingetragen werden. GB hat keine verschachtelten Funktions-/Klassen-Decls
+    in Funktions-Bodies, daher ist der Scan scope-sicher.
+    """
+    if isinstance(obj, Yield):
+        return True
+    if isinstance(obj, Node):
+        for fld in _dataclasses.fields(obj):
+            if _contains_yield(getattr(obj, fld.name)):
+                return True
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            if _contains_yield(item):
+                return True
+    elif isinstance(obj, dict):
+        for item in obj.values():
+            if _contains_yield(item):
+                return True
+    return False
+
+
+def function_has_yield(body) -> bool:
+    """True, wenn der Funktions-Body (Statement-Liste) ein YIELD enthaelt."""
+    return any(_contains_yield(s) for s in body)
+
+
+class _Coroutine:
+    """Laufzeit-Handle einer suspendierbaren GB-Funktion.
+
+    Der Body laeuft auf einem eigenen Daemon-Thread; YIELD und Resume
+    synchronisieren ueber zwei Queues. Es laeuft immer nur ein Thread
+    gleichzeitig (striktes Ping-Pong), daher ist die Ausfuehrung deterministisch.
+    `runner(self)` fuehrt den path-spezifischen Body aus und liefert den
+    RETURN-Wert; YIELDs im Body rufen `self._yield(value)`.
+    """
+    __slots__ = ("_runner", "_thread", "_to_coro", "_from_coro",
+                 "started", "done", "result", "_exc", "name", "return_type")
+
+    def __init__(self, runner, name="", return_type=""):
+        self._runner = runner
+        self.name = name
+        self.return_type = return_type
+        self._to_coro = _queue.Queue()
+        self._from_coro = _queue.Queue()
+        self._thread = None
+        self.started = False
+        self.done = False
+        self.result = None
+        self._exc = None
+
+    def __repr__(self):
+        return f"<COROUTINE {self.name}>"
+
+    # -- vom aufrufenden Thread --------------------------------------------
+    def resume(self, value):
+        """Setzt die Coroutine fort. `value` wird der YIELD-Ausdruck im Body.
+        Liefert den naechsten YIELD-Wert, oder den RETURN-Wert wenn die
+        Coroutine endet. Wirft, wenn sie bereits beendet ist."""
+        if self.done:
+            raise GBRuntimeError("CORO_RESUME/SEND auf bereits beendeter Coroutine")
+        if not self.started:
+            self.started = True
+            self._thread = threading.Thread(target=self._thread_main, daemon=True)
+            self._thread.start()
+        else:
+            self._to_coro.put(("send", value))
+        kind, payload = self._from_coro.get()
+        if kind == "yield":
+            return payload
+        if kind == "return":
+            self.done = True
+            self.result = payload
+            return payload
+        # kind == "error": auf dem AUFRUFENDEN Thread re-raisen, damit TRY/CATCH
+        # um CORO_RESUME greift.
+        self.done = True
+        self._exc = payload
+        raise payload
+
+    def close(self):
+        """Beendet eine suspendierte Coroutine (injiziert _CoroClose)."""
+        if self.done or not self.started:
+            self.done = True
+            return
+        self._to_coro.put(("close", None))
+        kind, payload = self._from_coro.get()
+        self.done = True
+        if kind == "error":
+            raise payload
+
+    def drain(self):
+        """Eager: alle YIELD-Werte bis zum Ende sammeln (FOR EACH / Comp)."""
+        out = []
+        while not self.done:
+            v = self.resume(_CORO_NOTHING)
+            if self.done:
+                break
+            out.append(v)
+        return tuple(out)
+
+    # -- vom Coroutine-Thread ----------------------------------------------
+    def _yield(self, value):
+        self._from_coro.put(("yield", value))
+        cmd, sent = self._to_coro.get()
+        if cmd == "close":
+            raise _CoroClose()
+        return sent
+
+    def _thread_main(self):
+        try:
+            final = self._runner(self)
+            self._from_coro.put(("return", final))
+        except _CoroClose:
+            self._from_coro.put(("return", self.result))
+        except (GameBasicError, _GBThrow) as e:
+            self._from_coro.put(("error", e))
+        except Exception as e:   # defensiv: alles andere ebenfalls melden
+            self._from_coro.put(("error", e))
 
 
 class _ClassStaticNamespace:
@@ -416,6 +561,8 @@ def infer_type(value) -> str:
         return "class_static"
     if isinstance(value, _FuncRef):
         return "funcref"
+    if isinstance(value, _Coroutine):
+        return "coroutine"
     raise GBRuntimeError("Typ kann nicht abgeleitet werden")
 
 
@@ -430,6 +577,7 @@ TYPE_DEFAULTS = {
     "file": None,
     "tuple": (),
     "funcref": None,
+    "coroutine": None,
 }
 
 
@@ -440,6 +588,13 @@ class Interpreter:
         # expression-dichten Frames, z.B. Grafik-Demos).
         self._eval_cache: dict = {}
         self._exec_cache: dict = {}
+        # Pro-Thread-State: env / call_depth / _current_line / _method_stack
+        # liegen in einem threading.local, damit Coroutinen (jede auf einem
+        # eigenen Thread) ihren eigenen Scope-/Methoden-Kontext haben und sich
+        # nicht gegenseitig korrumpieren. Zugriff laeuft ueber Properties
+        # (siehe unten) -- die ~60 bestehenden self.env-Referenzen bleiben so
+        # unveraendert.
+        self._tls = threading.local()
         self.global_env = Environment()
         self.env = self.global_env
         self.functions: dict = {}
@@ -449,16 +604,65 @@ class Interpreter:
         self._current_line = 0
         # DATA / READ / RESTORE State.  Beim Programmstart sammelt
         # _collect_data_values alle DATA-Literale in self.data; READ
-        # liest sequenziell, RESTORE setzt den Pointer zurueck.
+        # liest sequenziell, RESTORE setzt den Pointer zurueck. data_ptr bleibt
+        # bewusst SHARED (ein globaler Lese-Cursor) -- unter dem Ping-Pong der
+        # Coroutinen ist das deterministisch.
         self.data: list = []
         self.data_ptr: int = 0
-        # Stack der gerade laufenden Methoden-Kontexte: jedes Element ist
-        # ein (_Instance, _ClassInfo)-Tupel.  Wird in _invoke gepusht/gepoppt
-        # und ermoeglicht zwei Bequemlichkeiten in Methoden-Bodies:
-        #   - `Self` als Identifier liefert die aktuelle Instanz
-        #   - bare `Method()` ruft eine Methode der eigenen Klasse auf
-        self._method_stack: list = []
+        # _method_stack: Stack der gerade laufenden Methoden-Kontexte (siehe
+        # Property unten). Pro-Thread fuer Coroutine-Sicherheit.
+        self._method_stack = []
         self._register_constants()
+
+    # ---- Thread-lokaler Pro-Lauf-State (Coroutine-Sicherheit) --------
+    @property
+    def env(self):
+        try:
+            return self._tls.env
+        except AttributeError:
+            self._tls.env = self.global_env
+            return self._tls.env
+
+    @env.setter
+    def env(self, value):
+        self._tls.env = value
+
+    @property
+    def call_depth(self):
+        try:
+            return self._tls.call_depth
+        except AttributeError:
+            self._tls.call_depth = 0
+            return 0
+
+    @call_depth.setter
+    def call_depth(self, value):
+        self._tls.call_depth = value
+
+    @property
+    def _current_line(self):
+        try:
+            return self._tls.current_line
+        except AttributeError:
+            self._tls.current_line = 0
+            return 0
+
+    @_current_line.setter
+    def _current_line(self, value):
+        self._tls.current_line = value
+
+    @property
+    def _method_stack(self):
+        try:
+            return self._tls.method_stack
+        except AttributeError:
+            ms = []
+            self._tls.method_stack = ms
+            return ms
+
+    @_method_stack.setter
+    def _method_stack(self, value):
+        self._tls.method_stack = value
 
     # ------------------------------------------------------------------
     def _register_constants(self):
@@ -1461,6 +1665,10 @@ class Interpreter:
             return list(container.values)
         if isinstance(container, _GBMap):
             return list(container.data.keys())
+        if isinstance(container, _Coroutine):
+            # Eager: Coroutine bis zum Ende treiben (Vorsicht bei unendlichen
+            # Generatoren -- dann CORO_RESUME manuell verwenden).
+            return list(container.drain())
         raise TypeMismatchError(
             f"Comprehension: nicht iterierbar ({self._type_of(container)})"
         )
@@ -2034,14 +2242,48 @@ class Interpreter:
         return False
 
     def _call_user(self, fn: "_UserFunction", args: list, arg_exprs=None):
+        if fn.is_coroutine:
+            return self._make_coroutine(fn, args, instance=None)
         return self._invoke(fn, args, instance=None, arg_exprs=arg_exprs)
 
     def _call_method(self, inst: _Instance, fn: "_UserFunction", args: list,
                       arg_exprs=None):
+        if fn.is_coroutine:
+            return self._make_coroutine(fn, args, instance=inst)
         return self._invoke(fn, args, instance=inst, arg_exprs=arg_exprs)
 
+    def _make_coroutine(self, fn: "_UserFunction", args: list, instance):
+        """Erzeugt ein _Coroutine-Handle. Der Aufruf fuehrt den Body NICHT aus
+        -- das passiert erst beim ersten CORO_RESUME auf einem Worker-Thread.
+        Args wurden bereits im Caller-Scope evaluiert. BYREF wird fuer
+        Coroutinen nicht unterstuetzt (Copy-Out-Zeitpunkt undefiniert)."""
+        decl = fn.decl
+        snapshot = list(args)
+        rtype = decl.return_type if fn.kind == "function" else ""
+
+        def runner(coro):
+            prev = getattr(self._tls, "current_coro", None)
+            self._tls.current_coro = coro
+            try:
+                return self._invoke(fn, snapshot, instance,
+                                    arg_exprs=None, as_coroutine=True)
+            finally:
+                self._tls.current_coro = prev
+
+        return _Coroutine(runner, name=decl.name, return_type=rtype)
+
+    def _eval_Yield(self, e: Yield):
+        coro = getattr(self._tls, "current_coro", None)
+        if coro is None:
+            raise GBRuntimeError("YIELD ausserhalb einer Coroutine")
+        val = self._eval(e.value) if e.value is not None else None
+        if coro.return_type:
+            val = self._coerce(val, coro.return_type,
+                               f"YIELD aus {coro.name.upper()}")
+        return coro._yield(val)
+
     def _invoke(self, fn: "_UserFunction", args: list, instance,
-                arg_exprs=None):
+                arg_exprs=None, as_coroutine=False):
         decl = fn.decl
         n_total = len(decl.params)
         # `args` kann zwei Formen haben (beide unterstuetzt fuer
@@ -2135,7 +2377,9 @@ class Interpreter:
         try:
             for stmt in decl.body:
                 self._exec(stmt)
-            if fn.kind == "function":
+            # Eine Coroutine darf ohne RETURN enden (wie ein Generator, der
+            # einfach auslaeuft) -- der finale Result ist dann NIL.
+            if fn.kind == "function" and not as_coroutine:
                 raise GBRuntimeError(
                     f"FUNCTION {decl.name.upper()} muss einen Wert mit RETURN zurueckgeben"
                 )
@@ -2247,6 +2491,12 @@ class Interpreter:
             # "any" ist intern -- z.B. fuer Compiler-generierte Slots wie
             # WITH-Targets. Kein Type-Check, value passiert unveraendert.
             return value
+        if target == "coroutine":
+            if value is None or isinstance(value, _Coroutine):
+                return value
+            raise TypeMismatchError(
+                f"{ctx}: Erwartet COROUTINE, erhalten {self._type_of(value)}"
+            )
         if target == "funcref":
             if isinstance(value, _FuncRef):
                 return value
@@ -2354,6 +2604,8 @@ class Interpreter:
             return f"TUPLE({len(value)})"
         if isinstance(value, _FuncRef):
             return f"FUNCREF<{value.name}>"
+        if isinstance(value, _Coroutine):
+            return f"COROUTINE<{value.name}>"
         # Vec2-Type aus dem Built-in-Modul. Lazy Import vermeidet Circular.
         from .modules.vec2 import _Vec2 as _V2
         if isinstance(value, _V2):
@@ -2387,6 +2639,8 @@ class Interpreter:
             return "(" + ", ".join(self._fmt(x) for x in v) + ")"
         if isinstance(v, _FuncRef):
             return f"<FUNCREF {v.name}>"
+        if isinstance(v, _Coroutine):
+            return f"<COROUTINE {v.name}>"
         from .modules.vec2 import _Vec2 as _V2
         if isinstance(v, _V2):
             return f"Vec2({self._fmt(v.x)}, {self._fmt(v.y)})"
@@ -2503,9 +2757,61 @@ def _b_comp_iter(v):
         return tuple(v.values)
     if isinstance(v, _GBMap):
         return tuple(v.data.keys())
+    if isinstance(v, _Coroutine):
+        # Eager-Drain (siehe _iter_for_comp) -- haelt FOR EACH / Comprehension
+        # ueber Coroutinen in allen drei Pfaden identisch.
+        return v.drain()
     raise TypeMismatchError(
         f"Comprehension: nicht iterierbar ({type(v).__name__.upper()})"
     )
+
+
+# --- Coroutine-Treiber-Builtins (path-agnostisch) ----------------------
+# Erzeugung passiert beim Aufruf einer Coroutine-Funktion (in den Call-Pfaden
+# aller drei Engines); diese Builtins treiben nur das _Coroutine-Objekt und
+# brauchen daher keinen neuen Opcode.
+
+def _require_coro(v, fn_name):
+    if not isinstance(v, _Coroutine):
+        raise TypeMismatchError(
+            f"{fn_name}: Erwartet COROUTINE, erhalten {type(v).__name__.upper()}"
+        )
+    return v
+
+
+@builtin("CORO_RESUME", arity=1, types=("any",))
+def _b_coro_resume(c):
+    """Setzt die Coroutine fort und liefert den naechsten YIELD-Wert (oder den
+    RETURN-Wert, wenn sie endet). Der YIELD-Ausdruck im Body erhaelt NIL."""
+    return _require_coro(c, "CORO_RESUME").resume(_CORO_NOTHING)
+
+
+@builtin("CORO_SEND", arity=2, types=("any", "any"))
+def _b_coro_send(c, value):
+    """Wie CORO_RESUME, aber der YIELD-Ausdruck im Body evaluiert zu `value`."""
+    return _require_coro(c, "CORO_SEND").resume(value)
+
+
+@builtin("CORO_DONE", arity=1, types=("any",))
+def _b_coro_done(c):
+    """TRUE, wenn die Coroutine beendet ist (RETURN/Ende/CLOSE)."""
+    return bool(_require_coro(c, "CORO_DONE").done)
+
+
+@builtin("CORO_RESULT", arity=1, types=("any",))
+def _b_coro_result(c):
+    """Liefert den finalen RETURN-Wert. Wirft, wenn die Coroutine noch laeuft."""
+    coro = _require_coro(c, "CORO_RESULT")
+    if not coro.done:
+        raise GBRuntimeError("CORO_RESULT: Coroutine ist noch nicht beendet")
+    return coro.result
+
+
+@builtin("CORO_CLOSE", arity=1, types=("any",))
+def _b_coro_close(c):
+    """Beendet eine suspendierte Coroutine (raeumt den Worker-Thread ab)."""
+    _require_coro(c, "CORO_CLOSE").close()
+    return None
 
 
 @builtin("__SET_DEDUP", arity=1)

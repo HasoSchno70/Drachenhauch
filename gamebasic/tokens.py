@@ -84,6 +84,8 @@ class TokenType(Enum):
     # PROPERTY und werden als Identifier ("get"/"set") gelesen. So bleibt
     # `FUNCTION Get() AS ...` als normale Methode unverandert moeglich.
     OPERATOR = auto()    # OPERATOR <op> in Klassen -- Operator-Overloading.
+    YIELD = auto()       # YIELD <expr> -- Coroutine-Suspendierung (Ausdruck)
+    COROUTINE = auto()   # DIM c AS COROUTINE -- Coroutine-Handle-Typ
 
     # Operatoren / Satzzeichen
     PLUS = auto()
@@ -203,4 +205,6 @@ KEYWORDS = {
     "where": TokenType.WHERE,
     "property": TokenType.PROPERTY,
     "operator": TokenType.OPERATOR,
+    "yield": TokenType.YIELD,
+    "coroutine": TokenType.COROUTINE,
 }

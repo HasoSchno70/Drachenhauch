@@ -8,12 +8,13 @@
 Volle Phase-3b/3c-Unterstuetzung: OOP, Arrays, Structs, Strings, Files, Grafik.
 """
 import math
+import threading
 
 from .errors import GameBasicError, GBRuntimeError, TypeMismatchError
 from .interpreter import (  # type: ignore
     BUILTINS, GRAPHICS_BUILTINS,
     _Instance, _GBArray, _Image, _Sound, _SpriteAtlas, _GBFile, _GBMap,
-    _GBThrow, _EnumNamespace, _ClassStaticNamespace, _FuncRef,
+    _GBThrow, _EnumNamespace, _ClassStaticNamespace, _FuncRef, _Coroutine,
     infer_type as _infer_type_canonical,
 )
 from .modules import dispatch_binary_op as _disp_op, NO_OP_MATCH as _NO_OP
@@ -106,6 +107,7 @@ cdef int OP_LOAD_GLOBAL_SLOT          = 111
 cdef int OP_STORE_GLOBAL_SLOT         = 112
 cdef int OP_DECLARE_GLOBAL_SLOT       = 113
 cdef int OP_DECLARE_GLOBAL_CONST_SLOT = 114
+cdef int OP_YIELD_VALUE               = 115
 
 
 _TYPE_DEFAULTS = {
@@ -119,6 +121,7 @@ _TYPE_DEFAULTS = {
     "file":    None,
     "tuple":   (),
     "funcref": None,
+    "coroutine": None,
 }
 
 
@@ -242,6 +245,8 @@ cdef str _type_of(value):
         return f"TUPLE({len(value)})"
     if isinstance(value, _FuncRef):
         return f"FUNCREF<{value.name}>"
+    if isinstance(value, _Coroutine):
+        return f"COROUTINE<{value.name}>"
     from gamebasic.modules.vec2 import _Vec2 as _V2
     if isinstance(value, _V2):
         return "VEC2"
@@ -333,6 +338,10 @@ cdef _coerce(value, str target, str ctx, dict classes):
         # Intern fuer Compiler-generierte Slots (z.B. WITH-Ziele,
         # Tupel-Destructuring-Tempvars). Kein Type-Check.
         return value
+    if target == "coroutine":
+        if value is None or isinstance(value, _Coroutine):
+            return value
+        raise TypeMismatchError(f"{ctx}: Erwartet COROUTINE, erhalten {_type_of(value)}")
     if target == "funcref":
         if isinstance(value, _FuncRef):
             return value
@@ -428,6 +437,8 @@ cdef str _fmt(value):
         return "(" + ", ".join(_fmt(x) for x in value) + ")"
     if isinstance(value, _FuncRef):
         return f"<FUNCREF {value.name}>"
+    if isinstance(value, _Coroutine):
+        return f"<COROUTINE {value.name}>"
     from gamebasic.modules.vec2 import _Vec2 as _V2
     if isinstance(value, _V2):
         return f"Vec2({_fmt(value.x)}, {_fmt(value.y)})"
@@ -487,12 +498,39 @@ cdef _register_default_globals(dict globals_dict):
     globals_dict["pi"] = _Slot("float", math.pi, True)
 
 
+cdef class _NativeCoroRunner:
+    """Callable, der den Coroutine-Body auf dem Worker-Thread ausfuehrt.
+
+    Als cdef-Klasse mit typisiertem `VM`-Feld, damit `self.vm._exec(...)` die
+    cdef-Methode auf C-Ebene aufloest (cdef-Methoden sind nicht via Python-
+    Attribut-Dispatch erreichbar)."""
+    cdef VM vm
+    cdef object callee
+    cdef list snap
+    cdef object self_obj
+
+    def __init__(self, VM vm, callee, list snap, self_obj):
+        self.vm = vm
+        self.callee = callee
+        self.snap = snap
+        self.self_obj = self_obj
+
+    def __call__(self, coro):
+        prev = getattr(self.vm._tls, "current_coro", None)
+        self.vm._tls.current_coro = coro
+        try:
+            return self.vm._exec(self.callee, self.snap, self.self_obj)
+        finally:
+            self.vm._tls.current_coro = prev
+
+
 cdef class VM:
     cdef public dict _globals
     cdef public object module
     cdef public list _global_slots
     cdef object _graphics
     cdef public int data_ptr
+    cdef object _tls
 
     def __init__(self):
         self._globals = {}
@@ -500,6 +538,16 @@ cdef class VM:
         self._global_slots = []
         self._graphics = None
         self.data_ptr = 0     # READ liest hier sequenziell aus module.data
+        # Pro-Thread current_coro fuer YIELD_VALUE (Coroutinen je auf einem
+        # eigenen Worker-Thread, striktes Ping-Pong).
+        self._tls = threading.local()
+
+    def _make_coroutine(self, callee, list call_args, self_obj):
+        """Erzeugt ein _Coroutine-Handle (Body laeuft erst beim CORO_RESUME)."""
+        cdef _NativeCoroRunner runner = _NativeCoroRunner(
+            self, callee, list(call_args), self_obj)
+        return _Coroutine(runner, name=callee.name,
+                          return_type=callee.return_type)
 
     @property
     def globals(self):
@@ -1084,11 +1132,14 @@ cdef class VM:
                           del stack[-argc:]
                       else:
                           call_args = []
-                      value = self._exec(callee, call_args, None)
-                      if not callee.is_sub:
-                          stack.append(value)
+                      if callee.is_coroutine:
+                          stack.append(self._make_coroutine(callee, call_args, None))
                       else:
-                          stack.append(None)
+                          value = self._exec(callee, call_args, None)
+                          if not callee.is_sub:
+                              stack.append(value)
+                          else:
+                              stack.append(None)
                   elif op == OP_CALL_BUILTIN:
                       fn_name = arg[0]
                       argc = <int>arg[1]
@@ -1147,11 +1198,14 @@ cdef class VM:
                           raise GBRuntimeError(
                               f"FUNCREF: Funktion '{callee.name}' existiert nicht (mehr)"
                           )
-                      ret = self._exec(tgt, call_args, None)
-                      if not tgt.is_sub:
-                          stack.append(ret)
+                      if tgt.is_coroutine:
+                          stack.append(self._make_coroutine(tgt, call_args, None))
                       else:
-                          stack.append(None)
+                          ret = self._exec(tgt, call_args, None)
+                          if not tgt.is_sub:
+                              stack.append(ret)
+                          else:
+                              stack.append(None)
                   elif op == OP_CALL_METHOD:
                       method_name = arg[0]
                       argc = <int>arg[1]
@@ -1172,6 +1226,9 @@ cdef class VM:
                               and type(obj) is _Instance
                               and obj.cls is cache[0]):
                           method = cache[1]
+                          if method.is_coroutine:
+                              stack.append(self._make_coroutine(method, call_args, obj))
+                              continue
                           value = self._exec(method, call_args, obj)
                           if not method.is_sub:
                               stack.append(value)
@@ -1199,6 +1256,9 @@ cdef class VM:
                               f"Methode '{method_name}' existiert nicht in {obj.cls.name}"
                           )
                       caches[ip - 1] = [obj.cls, method]
+                      if method.is_coroutine:
+                          stack.append(self._make_coroutine(method, call_args, obj))
+                          continue
                       value = self._exec(method, call_args, obj)
                       if not method.is_sub:
                           stack.append(value)
@@ -1217,6 +1277,15 @@ cdef class VM:
                               f"FUNCTION '{fn.name}' muss einen Wert mit RETURN zurueckgeben"
                           )
                       return None
+                  elif op == OP_YIELD_VALUE:
+                      # Coroutine-Worker-Thread: Wert abgeben, blockieren bis
+                      # Resume, Sende-Wert auf den Stack.
+                      yval = stack.pop()
+                      coro = self._tls.current_coro
+                      if fn.return_type:
+                          yval = _coerce(yval, fn.return_type,
+                                         f"YIELD aus {fn.name.upper()}", classes)
+                      stack.append(coro._yield(yval))
 
                   # --- I/O ---
                   elif op == OP_PRINT:

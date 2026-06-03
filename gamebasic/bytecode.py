@@ -119,6 +119,12 @@ class Op(IntEnum):
     DECLARE_GLOBAL_SLOT    = 113   # arg = (slot_idx, type_name, default)
     DECLARE_GLOBAL_CONST_SLOT = 114   # arg = (slot_idx, type_or_None); pop value
 
+    # Coroutine: pop yield-Wert -> Handoff an den Aufrufer -> push send-Wert.
+    # Laeuft auf dem Coroutine-Worker-Thread; findet das _Coroutine ueber
+    # threading.local (current_coro). Erzeugung der Coroutine passiert in den
+    # CALL_*-Handlern (is_coroutine-Branch), nicht hier.
+    YIELD_VALUE    = 115   # pop value, yield, push sent value
+
     ADD_NN         = 100
     SUB_NN         = 101
     MUL_NN         = 102
@@ -192,6 +198,9 @@ class CompiledFunction:
     return_type: str = ""
     is_sub: bool = True
     is_main: bool = False
+    # Coroutine gdw. der Body ein YIELD enthaelt. Die VM-CALL-Handler erzeugen
+    # dann ein _Coroutine-Objekt statt die Funktion auszufuehren.
+    is_coroutine: bool = False
     # Inline-Cache pro Bytecode-Instruction (parallel zu code). Lazy von der
     # VM gefuellt. Nutzt monomorphic-IC-Schema:
     #   caches[ip] = None  -> Cache leer / nicht-cacheable Op

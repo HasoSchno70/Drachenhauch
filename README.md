@@ -31,7 +31,7 @@ WEND
 
 Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
-- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings
+- **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — Pygame-Backend, Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
@@ -59,6 +59,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | `bench_ecs_movement_v2.gb` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.gb` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 | `77_tiled_platformer.gb` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
+| `98_coroutines.gb` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
 
 ## Architektur
 

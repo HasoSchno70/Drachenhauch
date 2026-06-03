@@ -59,6 +59,14 @@ class TernaryExpr(Expr):
 
 
 @dataclass
+class Yield(Expr):
+    """YIELD <expr> -- suspendiert die Coroutine und liefert <expr> an den
+    Aufrufer. Als Ausdruck evaluiert YIELD zum via CORO_SEND uebergebenen
+    Wert (NIL bei CORO_RESUME). `value` ist optional (YIELD ohne Wert)."""
+    value: Optional[Expr] = None
+
+
+@dataclass
 class Call(Expr):
     callee: Expr
     args: list   # list[Expr | NamedArg]

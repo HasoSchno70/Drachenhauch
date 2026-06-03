@@ -82,6 +82,7 @@ def _enc_func(fn: CompiledFunction) -> dict:
         "is_variadic": fn.is_variadic,
         "is_sub": fn.is_sub,
         "is_main": fn.is_main,
+        "is_coroutine": fn.is_coroutine,
         "return_type": fn.return_type,
         "param_defaults": [_enc(x) for x in fn.param_defaults],
         "param_names": list(fn.param_names),

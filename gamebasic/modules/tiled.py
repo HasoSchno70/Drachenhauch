@@ -118,8 +118,11 @@ class _TiledObject:
 class _TiledMap:
     """Geladene Tiled-Map. Praesentiert sich wie ein opaker Handle gegenueber
     GB; alle Zugriffe gehen ueber TILED_*-Builtins."""
+    # __weakref__ erlaubt schwache Referenzen (tile_collide cached Solid-Masken
+    # in einer WeakKeyDictionary, damit Eintraege beim GC der Map automatisch
+    # verschwinden -- sonst kann id()-Reuse stale Masken liefern).
     __slots__ = ("path", "width", "height", "tile_w", "tile_h",
-                 "tilesets", "layers", "_layer_by_name")
+                 "tilesets", "layers", "_layer_by_name", "__weakref__")
 
     def __init__(self):
         self.path = ""

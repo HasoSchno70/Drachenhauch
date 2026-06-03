@@ -21,6 +21,7 @@ GameBasic ist BASIC mit Pascal-strikter Typisierung. Wer schon mal QBasic, GW-BA
 - [Statement-Trenner](#statement-trenner)
 - [Funktionen: SUB und FUNCTION](#funktionen-sub-und-function)
 - [Named Arguments](#named-arguments)
+- [Coroutines: YIELD](#coroutines-yield)
 - [Arrays](#arrays)
 - [Maps](#maps)
 - [Klassen und Strukturen](#klassen-und-strukturen)
@@ -613,6 +614,74 @@ FUNCTION fib(n AS INTEGER) AS INTEGER
     RETURN fib(n - 1) + fib(n - 2)
 END FUNCTION
 ```
+
+## Coroutines: YIELD
+
+Eine `FUNCTION` oder `SUB`, deren Body ein `YIELD` enthält, ist eine **Coroutine**. Ihr Aufruf führt den Body *nicht* aus, sondern liefert ein `COROUTINE`-Handle, das man schrittweise weitertreibt.
+
+```basic
+FUNCTION zaehler() AS INTEGER
+    YIELD 1
+    YIELD 2
+    RETURN 99            ' Endwert (optional)
+END FUNCTION
+
+DIM c AS COROUTINE
+c = zaehler()
+PRINT CORO_RESUME(c)     ' 1
+PRINT CORO_RESUME(c)     ' 2
+PRINT CORO_RESUME(c)     ' 99  (jetzt beendet: CORO_DONE(c) = TRUE)
+```
+
+**Builtins:**
+
+| Builtin | Wirkung |
+|---|---|
+| `CORO_RESUME(c)` | Fortsetzen bis zum nächsten `YIELD`; liefert den YIELD-Wert (oder den RETURN-Wert, wenn die Coroutine endet). |
+| `CORO_SEND(c, v)` | Wie `CORO_RESUME`, aber der `YIELD`-Ausdruck im Body evaluiert zu `v`. |
+| `CORO_DONE(c)` | `BOOLEAN` — ob die Coroutine beendet ist. |
+| `CORO_RESULT(c)` | Finaler `RETURN`-Wert (wirft, wenn noch nicht beendet). |
+| `CORO_CLOSE(c)` | Suspendierte Coroutine abbauen. |
+
+**`YIELD` ist ein Ausdruck.** Als Statement (`YIELD v`) verwirft es den Sende-Wert; als Ausdruck liefert es den via `CORO_SEND` übergebenen Wert:
+
+```basic
+FUNCTION akkumulator() AS INTEGER
+    DIM sum AS INTEGER
+    sum = 0
+    WHILE TRUE
+        sum = sum + (YIELD sum)   ' gibt Summe ab, empfängt nächsten Summanden
+    WEND
+END FUNCTION
+
+DIM acc AS COROUTINE
+acc = akkumulator()
+PRINT CORO_RESUME(acc)     ' 0  (Sende-Wert des ERSTEN Resume ist immer NIL)
+PRINT CORO_SEND(acc, 10)   ' 10
+PRINT CORO_SEND(acc, 5)    ' 15
+CORO_CLOSE(acc)
+```
+
+**`FOR EACH` und Comprehensions** konsumieren eine Coroutine **eager** bis zum Ende (der `RETURN`-Wert ist nicht enthalten):
+
+```basic
+DIM total AS INTEGER
+total = 0
+FOR EACH n IN zaehler()
+    total = total + n          ' 1 + 2 = 3 (RETURN 99 nicht dabei)
+NEXT
+```
+
+Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
+
+**Semantik & Einschränkungen:**
+- Jede Coroutine läuft auf einem eigenen Thread (striktes Ping-Pong — immer nur einer läuft), daher in allen drei Pfaden bit-identisch.
+- **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
+- In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
+- Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
+- **Nicht in der nativen Rust-Runtime** (`gbrt`/`--native`) verfügbar — dort liefert `YIELD` einen klaren Fehler.
+
+Vollständiges Beispiel: [examples/98_coroutines.gb](../examples/98_coroutines.gb).
 
 ## Arrays
 

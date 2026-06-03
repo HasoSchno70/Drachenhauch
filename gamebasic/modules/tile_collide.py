@@ -30,6 +30,8 @@ Tile-Koordinaten (tx, ty) sind in Tile-Einheiten.
 """
 from __future__ import annotations
 
+from weakref import WeakKeyDictionary
+
 from ..builtins_registry import builtin
 from ..errors import GBRuntimeError, TypeMismatchError
 
@@ -43,26 +45,26 @@ try:
 except Exception:
     _NativeCollider = None
 
-# Pro (id(map), layer_idx) -> nativer TileCollider. Wie _SOLID_CACHE nie
-# invalidiert -- Maps sind nach dem Load immutable.
-_COLLIDER_CACHE: dict = {}
+# map -> {layer_idx: nativer TileCollider}. WeakKeyDictionary: Eintraege
+# verschwinden automatisch, wenn die Map vom GC eingesammelt wird -- sonst
+# koennte id()-Reuse (neue Map an alter Adresse) eine stale Solid-Maske
+# liefern. Maps sind nach dem Load immutable, daher kein weiteres Invalidieren.
+_COLLIDER_CACHE: "WeakKeyDictionary" = WeakKeyDictionary()
 
 
 # --- Solid-Detection-Cache ---------------------------------------
-# Pro (TiledMap, layer_idx) -> tuple(solid_aware: bool, solid_set: set[int]).
-# `solid_aware` heisst: das Tileset hat irgendwo ein `solid`-Property
-# gesetzt, also nutzen wir das. Sonst Fallback "alles != 0 ist solid".
-# Cache invalidiert nie -- Maps sind nach dem Load immutable.
-_SOLID_CACHE: dict = {}
+# map -> solid_aware(bool). `solid_aware` heisst: das Tileset hat irgendwo ein
+# `solid`-Property gesetzt, also nutzen wir das. Sonst Fallback "alles != 0 ist
+# solid". WeakKeyDictionary aus demselben Grund wie _COLLIDER_CACHE.
+_SOLID_CACHE: "WeakKeyDictionary" = WeakKeyDictionary()
 
 
 def _solid_check(m: _TiledMap, gid: int) -> bool:
     """Ist die GID solid? Liest Tile-Properties, mit Fallback."""
     if gid <= 0:
         return False
-    # Per-Tileset checken, ob "solid"-Property existiert; cache global.
-    key = id(m)
-    aware = _SOLID_CACHE.get(key)
+    # Per-Tileset checken, ob "solid"-Property existiert; cache pro Map.
+    aware = _SOLID_CACHE.get(m)
     if aware is None:
         any_solid_prop = False
         for ts in m.tilesets:
@@ -72,7 +74,7 @@ def _solid_check(m: _TiledMap, gid: int) -> bool:
                     break
             if any_solid_prop:
                 break
-        _SOLID_CACHE[key] = any_solid_prop
+        _SOLID_CACHE[m] = any_solid_prop
         aware = any_solid_prop
     if aware:
         # Property-Modus: nur Tiles mit explizitem solid=true sind solid.
@@ -129,15 +131,18 @@ def _get_collider(m: _TiledMap, layer: _TiledLayer, layer_idx: int):
     das Rust-Backend fehlt. Die Solid-Maske wird einmal gebaut und gecacht."""
     if _NativeCollider is None:
         return None
-    key = (id(m), layer_idx)
-    c = _COLLIDER_CACHE.get(key)
+    per_layer = _COLLIDER_CACHE.get(m)
+    if per_layer is None:
+        per_layer = {}
+        _COLLIDER_CACHE[m] = per_layer
+    c = per_layer.get(layer_idx)
     if c is None:
         solid = [_solid_check(m, gid) for gid in layer.tiles]
         c = _NativeCollider(
             layer.width, layer.height,
             float(m.tile_w), float(m.tile_h), solid,
         )
-        _COLLIDER_CACHE[key] = c
+        per_layer[layer_idx] = c
     return c
 
 

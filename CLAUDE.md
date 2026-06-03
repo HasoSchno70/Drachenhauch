@@ -257,28 +257,64 @@ Programme mit `MILLIS()`, `TIME$()`, `RND()` ohne Seed sind erwartet UNTERSCHIED
   ungetestet. Single-Source-Helfer (`_container_kind`, `infer_type`) vermeiden Drift;
   neue solche Logik ebenfalls einmalig in interpreter.py halten und importieren.
 
-## Geplant: Coroutines / YIELD
+## Coroutines / YIELD
 
-Aktuell **NICHT implementiert**. Wuerde Stack-Snapshots in den VMs und ein
-Generator-Wertobjekt mit suspended state brauchen -- substantieller
-Eingriff in die Drei-Pfade-Architektur.
+Eine `FUNCTION`/`SUB`, deren Body ein `YIELD` enthaelt, ist eine **Coroutine**.
+Ihr Aufruf fuehrt den Body NICHT aus, sondern liefert ein `COROUTINE`-Handle.
 
-**Skizze fuer eine spaetere Iteration:**
-- AST `YieldStmt(value)`. Einer FUNCTION mit YIELD wird zur Generator-
-  Function -- ihr Aufruf liefert ein `_Coroutine`-Objekt statt direktes
-  Ergebnis.
-- Tree-Walker: Python-Generators als Backend (yield from delegate), inkl.
-  send/return-Semantik.
-- Compiler/VM: braucht heap-allocated Frame-Objekte (statt Stack), damit
-  beim YIELD der gesamte Locals/Stack-Snapshot ueberlebt. Op-Codes
-  YIELD_VALUE und CORO_NEXT.
-- Cython-Pfad: am komplexesten, weil _exec aktuell C-Stack-rekursiv ist.
-  Workaround: Trampoline-Loop mit ip-Restore.
-- Use-Cases: Cutscene-DSL (`WAIT_FRAMES(60)`, `WAIT_KEY(KEY_SPACE)`),
-  procedurale Generation, Boss-Patterns, NPC-Dialoge.
+```basic
+FUNCTION zaehler() AS INTEGER
+    YIELD 1
+    YIELD 2
+    RETURN 99            ' Endwert (optional), via CORO_RESULT abrufbar
+END FUNCTION
 
-Wer's heute schon braucht, baut state machines mit `SELECT CASE state` --
-weniger ergonomisch, aber tut's.
+DIM c AS COROUTINE
+c = zaehler()
+PRINT CORO_RESUME(c)     ' 1
+PRINT CORO_RESUME(c)     ' 2
+PRINT CORO_RESUME(c)     ' 99 (beendet) -- CORO_DONE(c) ist jetzt TRUE
+```
+
+**API** (Builtins, kein neuer Opcode ausser `YIELD_VALUE`):
+- `CORO_RESUME(c)` -- fortsetzen bis zum naechsten YIELD, liefert den YIELD-Wert
+  (bzw. den RETURN-Wert, wenn die Coroutine in diesem Schritt endet).
+- `CORO_SEND(c, v)` -- wie RESUME, aber der `YIELD`-**Ausdruck** im Body
+  evaluiert zu `v`: `DIM x AS INTEGER : x = YIELD 5`. Der Sende-Wert des
+  ERSTEN Resume ist immer NIL (wie Python -- nicht lesen).
+- `CORO_DONE(c)` -- BOOLEAN, ob beendet (RETURN/Ende/CLOSE).
+- `CORO_RESULT(c)` -- finaler RETURN-Wert (wirft, wenn noch nicht beendet).
+- `CORO_CLOSE(c)` -- suspendierte Coroutine abbauen (raeumt den Worker-Thread).
+- `FOR EACH v IN coro` / Comprehensions -- treiben die Coroutine **eager** bis
+  zum Ende (RETURN-Wert nicht enthalten). Vorsicht bei unendlichen Generatoren
+  -- dort `CORO_RESUME`/`CORO_DONE` manuell verwenden.
+
+**`YIELD` ist ein Ausdruck** (niedrige Praezedenz): `YIELD v` als Statement
+verwirft den Sende-Wert; `x = YIELD v` liest ihn. Operand optional (`YIELD`).
+
+**Mechanismus:** Jede Coroutine laeuft auf einem eigenen **Daemon-Thread** mit
+striktem Ping-Pong (Queues; immer nur ein Thread laeuft gleichzeitig). Dadurch
+bleibt die Ausgabe deterministisch und **bit-identisch** ueber Tree-Walker,
+Python-VM und Cython-VM. Folgen davon:
+- **Kein Cross-Frame-Yield:** ein Helfer mit `YIELD` ist selbst eine Coroutine
+  (sein Aufruf liefert ein Handle), `YIELD` laeuft also nie ueber einen
+  normalen Call hinweg.
+- **Typ-Coercion:** in `FUNCTION ... AS T` werden YIELD- UND RETURN-Werte auf
+  `T` gecoerct (ein Typ fuer beide Kanaele). SUB-Coroutinen yielden "any".
+- **Idiom:** ein manueller `WHILE NOT CORO_DONE(c)`-Resume-Loop bekommt beim
+  letzten (beendenden) Aufruf den RETURN-Wert; gibt der Generator einen
+  typisierten `RETURN` zurueck, klappt die Zuweisung an eine typisierte
+  Variable -- sonst `FOR EACH` nutzen.
+
+**Implementierung:** `_Coroutine` + `function_has_yield` in
+[interpreter.py](gamebasic/interpreter.py); Erzeugung in den `CALL_*`-Pfaden
+aller drei Engines (is_coroutine-Branch), Treiben ueber die `CORO_*`-Builtins.
+Pro-Thread-State (`env`/`call_depth`/`_method_stack`) im Tree-Walker liegt in
+`threading.local`. **Nicht in der nativen Rust-Runtime (gbrt)** -- dort ist die
+VM native-stack-rekursiv (sauberer Fehler bei Opcode 115, kein Crash).
+Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
+Doku-Demo [examples/98_coroutines.gb](examples/98_coroutines.gb), Tests
+[tests/test_coroutines.py](tests/test_coroutines.py).
 
 ## Input-Mapping (Modul `input`)
 
