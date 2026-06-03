@@ -14,12 +14,14 @@ mod astar;
 #[cfg(feature = "graphics")]
 mod audio;
 mod builtins;
+mod controller;
 mod ecs;
 #[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "graphics")]
 mod gui;
 mod model;
+mod tiled;
 mod value;
 mod vm;
 

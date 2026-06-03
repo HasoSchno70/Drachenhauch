@@ -43,9 +43,22 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
   2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
   Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
 
-**Bewusst außen vor:** `regex` + Hardware/Netz (`bt`/`serial`/`usb`/`wifi`/
-`net`/`html`/`db`); das erweiterte `audio`-Modul (Kanäle/Pan/Ton-Generierung)
-bleibt Python-only (Core-Audio ist nativ).
+**Voll-Native-Portierung (laufend):** Ziel ist, ALLE Module nativ zu machen,
+sodass nur die Editoren Python brauchen. Schwere/optionale Module sind dabei
+feature-gated (Standard-`.exe` bleibt schlank).
+
+- **Phase 1 — ERLEDIGT (Spiel-Logik, always-on):** `regex` (Crate `regex`,
+  Pattern-Cache, `\1`→`${1}`-Replacement-Übersetzung), `tiled` (TILED_*, 36 —
+  JSON-Loader via serde_json, Properties, Objekte, Bulk-Ops inkl. Flood-Fill),
+  `tile_collide` (TILE_*, 4 — Box-Sweep-Port), `controller` (CHAR_*, 24 —
+  Platformer-Physik). Alle bit-identisch zu den Python-Pfaden verifiziert
+  (`tiled`/`tile_collide`/`controller` gegen `examples/levels/level1.json`,
+  `examples/77_tiled_platformer.gb` rendert nativ).
+- **Phase 2 (geplant):** erweitertes `audio` (Kanäle/Pan/Fade/Ton-Generierung,
+  `graphics`-Gate, raylib).
+- **Phase 3 (geplant):** `db` (rusqlite), `net` (std::net), `html` (HTTP+Parser)
+  — feature-gated.
+- **Phase 4 (geplant):** Hardware/IoT `serial`/`usb`/`wifi`/`bt` — feature-gated.
 
 ## Dev-Run-Loop: `gbrun.py --native`
 

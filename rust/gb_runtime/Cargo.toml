@@ -12,6 +12,8 @@ path = "src/main.rs"
 # preserve_order: JSON-Objekt-Keys behalten Einfuege-Reihenfolge (wie Python
 # json) -- noetig fuer bit-identisches JSON_STRINGIFY.
 serde_json = { version = "1", features = ["preserve_order"] }
+# regex-Modul (REGEX_*). Pure-Rust, klein -> immer dabei (kein Feature-Gate).
+regex = "1"
 # Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).

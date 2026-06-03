@@ -50,6 +50,10 @@ pub enum Value {
     /// ihn synchron via CORO_RESUME/SEND (kein Thread -- raylib-Main-Thread-
     /// sicher, deterministisch). Siehe `CoroState`.
     Coroutine(Rc<RefCell<CoroState>>),
+    /// Modul `tiled`: geladene Tiled-Map (Referenz-Typ, Bulk-Ops mutieren).
+    Tiled(Rc<RefCell<crate::tiled::TiledMap>>),
+    /// Modul `controller`: Character-Controller (Platformer-Physik).
+    CharController(Rc<RefCell<crate::controller::CharController>>),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -374,6 +378,17 @@ impl Value {
             Value::Particles(p) => format!("<ParticleSystem {} particles>", p.borrow().particles.len()),
             Value::Ecs(w) => format!("<ECS_WORLD entities={}>", w.borrow().count()),
             Value::Coroutine(c) => format!("<COROUTINE {}>", c.borrow().name),
+            Value::Tiled(m) => {
+                let m = m.borrow();
+                format!("<TILED_MAP {}x{} tiles, {} layers>", m.width, m.height, m.layers.len())
+            }
+            Value::CharController(c) => {
+                let c = c.borrow();
+                format!(
+                    "<CHAR_CONTROLLER pos=({:.1}, {:.1}) vel=({:.1}, {:.1}) ground={}>",
+                    c.x, c.y, c.vx, c.vy, if c.on_ground { "True" } else { "False" }
+                )
+            }
         }
     }
 
@@ -412,6 +427,8 @@ impl Value {
             Value::Particles(_) => "PARTICLE_SYSTEM",
             Value::Ecs(_) => "ECS_WORLD",
             Value::Coroutine(_) => "COROUTINE",
+            Value::Tiled(_) => "TILED_MAP",
+            Value::CharController(_) => "CHAR_CONTROLLER",
         }
     }
 

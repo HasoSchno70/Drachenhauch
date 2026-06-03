@@ -5,9 +5,11 @@
 //! sie liefern einen klaren Fehler (Grafik = Schritt 4).
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io::{BufRead, Read, Write};
 use std::rc::Rc;
 
+use crate::tiled::{TiledLayer, TiledMap, TiledObject};
 use crate::value::{as_f64, is_num, value_eq, FileH, GbArray, GbFile, GbMap, Particle, ParticleSys, SaveHandle, SpriteObj, TweenObj, Value};
 
 type R = Result<Value, String>;
@@ -82,6 +84,71 @@ fn str_of(v: &Value) -> String {
         Value::Str(s) => s.to_string(),
         other => other.fmt(),
     }
+}
+
+// --- regex-Modul (REGEX_*) -------------------------------------------------
+// Pattern-Cache (wie Python: 256 Eintraege, dann leeren). regex::Regex ist
+// Clone (intern Arc) -> billig.
+thread_local! {
+    static RE_CACHE: RefCell<HashMap<String, regex::Regex>> = RefCell::new(HashMap::new());
+}
+
+fn regex_compile(pat: &str) -> Result<regex::Regex, String> {
+    RE_CACHE.with(|c| {
+        if let Some(r) = c.borrow().get(pat) {
+            return Ok(r.clone());
+        }
+        match regex::Regex::new(pat) {
+            Ok(r) => {
+                let mut m = c.borrow_mut();
+                if m.len() >= 256 { m.clear(); }
+                m.insert(pat.to_string(), r.clone());
+                Ok(r)
+            }
+            Err(e) => Err(format!("Ungueltige Regex '{}': {}", pat, e)),
+        }
+    })
+}
+
+/// Uebersetzt einen Python-`re.sub`-Replacement-String in die Rust-regex-
+/// Syntax: `\1`->`${1}`, `\g<name>`->`${name}`, literales `$`->`$$`, `\\`->`\`.
+fn translate_repl(s: &str) -> String {
+    let mut out = String::new();
+    let mut it = s.chars().peekable();
+    while let Some(c) = it.next() {
+        match c {
+            '$' => out.push_str("$$"),
+            '\\' => match it.peek().copied() {
+                Some(d) if d.is_ascii_digit() => {
+                    let mut num = String::new();
+                    while let Some(d) = it.peek().copied() {
+                        if d.is_ascii_digit() { num.push(d); it.next(); } else { break; }
+                    }
+                    out.push_str(&format!("${{{}}}", num));
+                }
+                Some('g') => {
+                    it.next();
+                    if it.peek() == Some(&'<') {
+                        it.next();
+                        let mut name = String::new();
+                        while let Some(ch) = it.peek().copied() {
+                            it.next();
+                            if ch == '>' { break; }
+                            name.push(ch);
+                        }
+                        out.push_str(&format!("${{{}}}", name));
+                    } else {
+                        out.push('g');
+                    }
+                }
+                Some('\\') => { it.next(); out.push('\\'); }
+                Some(other) => { it.next(); out.push(other); }
+                None => out.push('\\'),
+            },
+            other => out.push(other),
+        }
+    }
+    out
 }
 
 fn new_str_array(items: Vec<String>) -> Value {
@@ -207,6 +274,61 @@ fn format_one(mask: &str, v: &Value) -> R {
 
 /// Liefert `Some(Result)` wenn `name` ein bekanntes pures Builtin ist;
 /// `None`, wenn unbekannt (dann pruefen die Aufrufer auf Grafik/etc.).
+// --- tiled-Modul (TILED_*) -------------------------------------------------
+fn tiled_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
+    match v {
+        Value::Tiled(m) => Ok(m.clone()),
+        _ => Err(format!("{} erwartet TILED_MAP", fn_)),
+    }
+}
+
+fn layer_by_idx<'a>(m: &'a TiledMap, idx: i64, fn_: &str) -> Result<&'a TiledLayer, String> {
+    if idx < 0 || idx as usize >= m.layers.len() {
+        return Err(format!("{}: Layer-Index {} ausserhalb [0..{}]", fn_, idx, m.layers.len() as i64 - 1));
+    }
+    Ok(&m.layers[idx as usize])
+}
+
+fn tile_layer_idx(m: &TiledMap, idx: i64, fn_: &str) -> Result<usize, String> {
+    let l = layer_by_idx(m, idx, fn_)?;
+    if l.kind != "tile" {
+        return Err(format!("{}: Layer {} ('{}') ist kein Tile-Layer", fn_, idx, l.name));
+    }
+    Ok(idx as usize)
+}
+
+fn layer_by_name<'a>(m: &'a TiledMap, name: &str, fn_: &str) -> Result<&'a TiledLayer, String> {
+    match m.layer_by_name.get(name) {
+        Some(&i) => Ok(&m.layers[i]),
+        None => Err(format!("{}: Layer '{}' nicht gefunden", fn_, name)),
+    }
+}
+
+fn get_obj<'a>(m: &'a TiledMap, name: &str, idx: i64, fn_: &str) -> Result<&'a TiledObject, String> {
+    let layer = layer_by_name(m, name, fn_)?;
+    if layer.kind != "object" {
+        return Err(format!("{}: Layer '{}' ist kein Object-Layer", fn_, name));
+    }
+    if idx < 0 || idx as usize >= layer.objects.len() {
+        return Err(format!("{}: Object-Index {} ausserhalb [0..{}]", fn_, idx, layer.objects.len() as i64 - 1));
+    }
+    Ok(&layer.objects[idx as usize])
+}
+
+fn need_bool(v: &Value, fn_: &str) -> Result<bool, String> {
+    match v {
+        Value::Bool(b) => Ok(*b),
+        _ => Err(format!("{} erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
+    }
+}
+
+fn char_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<crate::controller::CharController>>, String> {
+    match v {
+        Value::CharController(c) => Ok(c.clone()),
+        _ => Err(format!("{} erwartet CHAR_CONTROLLER", fn_)),
+    }
+}
+
 pub fn call_builtin(name: &str, args: &[Value]) -> Option<R> {
     Some(call_inner(name, args))
 }
@@ -1116,6 +1238,431 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "ecs_clamp_float" => { arity!(4); let n = ecs_h(&a[0], "ECS_CLAMP_FLOAT")?.borrow_mut().clamp_float(need_str(&a[1], "C")?, need_num(&a[2], "C")?, need_num(&a[3], "C")?)?; Ok(Value::Int(n)) }
         "ecs_remove_dead" => { arity!(3); Ok(Value::Int(ecs_h(&a[0], "ECS_REMOVE_DEAD")?.borrow_mut().remove_dead(need_str(&a[1], "R")?, need_num(&a[2], "ECS_REMOVE_DEAD")?))) }
         "ecs_count_with" => { arity!(2); Ok(Value::Int(ecs_h(&a[0], "ECS_COUNT_WITH")?.borrow().count_with(need_str(&a[1], "ECS_COUNT_WITH")?))) }
+
+        // --- tiled-Modul (TILED_*) ---
+        "tiled_load" => { arity!(1); Ok(Value::Tiled(crate::tiled::load(need_str(&a[0], "TILED_LOAD")?)?)) }
+        "tiled_width" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_WIDTH")?.borrow().width)) }
+        "tiled_height" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_HEIGHT")?.borrow().height)) }
+        "tiled_tile_width" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILE_WIDTH")?.borrow().tile_w)) }
+        "tiled_tile_height" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILE_HEIGHT")?.borrow().tile_h)) }
+        "tiled_layer_count" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_LAYER_COUNT")?.borrow().layers.len() as i64)) }
+        "tiled_layer_name" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_NAME")?; let mb = m.borrow();
+            Ok(Value::str_rc(&layer_by_idx(&mb, need_int(&a[1], "TILED_LAYER_NAME")?, "TILED_LAYER_NAME")?.name))
+        }
+        "tiled_layer_type" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_TYPE")?; let mb = m.borrow();
+            Ok(Value::str_rc(&layer_by_idx(&mb, need_int(&a[1], "TILED_LAYER_TYPE")?, "TILED_LAYER_TYPE")?.kind))
+        }
+        "tiled_layer_index" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_INDEX")?; let mb = m.borrow();
+            let name = need_str(&a[1], "TILED_LAYER_INDEX")?;
+            Ok(Value::Int(mb.layer_by_name.get(name).map(|&i| i as i64).unwrap_or(-1)))
+        }
+        "tiled_layer_width" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_WIDTH")?; let mb = m.borrow();
+            Ok(Value::Int(layer_by_idx(&mb, need_int(&a[1], "TILED_LAYER_WIDTH")?, "TILED_LAYER_WIDTH")?.width))
+        }
+        "tiled_layer_height" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_LAYER_HEIGHT")?; let mb = m.borrow();
+            Ok(Value::Int(layer_by_idx(&mb, need_int(&a[1], "TILED_LAYER_HEIGHT")?, "TILED_LAYER_HEIGHT")?.height))
+        }
+        "tiled_tile_at" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_TILE_AT")?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_TILE_AT")?, "TILED_TILE_AT")?;
+            let (tx, ty) = (need_int(&a[2], "TILED_TILE_AT")?, need_int(&a[3], "TILED_TILE_AT")?);
+            let layer = &mb.layers[li];
+            if tx < 0 || ty < 0 || tx >= layer.width || ty >= layer.height {
+                Ok(Value::Int(0))
+            } else {
+                Ok(Value::Int(layer.tiles[(ty * layer.width + tx) as usize]))
+            }
+        }
+        "tiled_tile_set" => {
+            arity!(5);
+            let m = tiled_h(&a[0], "TILED_TILE_SET")?; let mut mb = m.borrow_mut();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_TILE_SET")?, "TILED_TILE_SET")?;
+            let (tx, ty, gid) = (need_int(&a[2], "TILED_TILE_SET")?, need_int(&a[3], "TILED_TILE_SET")?, need_int(&a[4], "TILED_TILE_SET")?);
+            let layer = &mut mb.layers[li];
+            if tx < 0 || ty < 0 || tx >= layer.width || ty >= layer.height {
+                Ok(Value::Int(0))
+            } else {
+                let i = (ty * layer.width + tx) as usize;
+                let old = layer.tiles[i]; layer.tiles[i] = gid; Ok(Value::Int(old))
+            }
+        }
+        "tiled_count_gid" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_COUNT_GID")?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_COUNT_GID")?, "TILED_COUNT_GID")?;
+            let gid = need_int(&a[2], "TILED_COUNT_GID")?;
+            Ok(Value::Int(mb.layers[li].tiles.iter().filter(|&&g| g == gid).count() as i64))
+        }
+        "tiled_fill_rect" => {
+            arity!(7);
+            let m = tiled_h(&a[0], "TILED_FILL_RECT")?; let mut mb = m.borrow_mut();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FILL_RECT")?, "TILED_FILL_RECT")?;
+            let (tx, ty, w, h, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?, need_int(&a[5], "T")?, need_int(&a[6], "T")?);
+            let layer = &mut mb.layers[li];
+            let (lw, lh) = (layer.width, layer.height);
+            let (x0, y0) = (tx.max(0), ty.max(0));
+            let (x1, y1) = ((tx + w).min(lw), (ty + h).min(lh));
+            let mut n = 0i64;
+            let mut yy = y0;
+            while yy < y1 {
+                let base = yy * lw;
+                let mut xx = x0;
+                while xx < x1 {
+                    let i = (base + xx) as usize;
+                    if layer.tiles[i] != gid { layer.tiles[i] = gid; n += 1; }
+                    xx += 1;
+                }
+                yy += 1;
+            }
+            Ok(Value::Int(n))
+        }
+        "tiled_replace" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_REPLACE")?; let mut mb = m.borrow_mut();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_REPLACE")?, "TILED_REPLACE")?;
+            let (from, to) = (need_int(&a[2], "TILED_REPLACE")?, need_int(&a[3], "TILED_REPLACE")?);
+            let layer = &mut mb.layers[li];
+            let mut n = 0i64;
+            for g in layer.tiles.iter_mut() {
+                if *g == from { *g = to; n += 1; }
+            }
+            Ok(Value::Int(n))
+        }
+        "tiled_flood_fill" => {
+            arity!(5);
+            let m = tiled_h(&a[0], "TILED_FLOOD_FILL")?; let mut mb = m.borrow_mut();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILED_FLOOD_FILL")?, "TILED_FLOOD_FILL")?;
+            let (tx, ty, gid) = (need_int(&a[2], "T")?, need_int(&a[3], "T")?, need_int(&a[4], "T")?);
+            let layer = &mut mb.layers[li];
+            let (w, h) = (layer.width, layer.height);
+            Ok(Value::Int(crate::tiled::flood_fill(&mut layer.tiles, w, h, tx, ty, gid)))
+        }
+        "tiled_tile_prop_bool" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_TILE_PROP_BOOL")?; let mb = m.borrow();
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+        }
+        "tiled_tile_prop_int" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_TILE_PROP_INT")?; let mb = m.borrow();
+            Ok(Value::Int(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+        }
+        "tiled_tile_prop_float" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_TILE_PROP_FLOAT")?; let mb = m.borrow();
+            Ok(Value::Float(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+        }
+        "tiled_tile_prop_string" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_TILE_PROP_STRING")?; let mb = m.borrow();
+            Ok(Value::str_rc(&mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+        }
+        "tiled_tile_has_prop" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_TILE_HAS_PROP")?; let mb = m.borrow();
+            Ok(Value::Bool(mb.tile_property(need_int(&a[1], "T")?, need_str(&a[2], "T")?).is_some()))
+        }
+        "tiled_object_count" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_OBJECT_COUNT")?; let mb = m.borrow();
+            let layer = layer_by_name(&mb, need_str(&a[1], "TILED_OBJECT_COUNT")?, "TILED_OBJECT_COUNT")?;
+            if layer.kind != "object" {
+                return err(format!("TILED_OBJECT_COUNT: Layer '{}' ist kein Object-Layer", layer.name));
+            }
+            Ok(Value::Int(layer.objects.len() as i64))
+        }
+        "tiled_object_name" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_NAME")?; let mb = m.borrow();
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_NAME")?.name))
+        }
+        "tiled_object_type" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_TYPE")?; let mb = m.borrow();
+            Ok(Value::str_rc(&get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_TYPE")?.type_))
+        }
+        "tiled_object_x" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_X")?; let mb = m.borrow();
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_X")?.x))
+        }
+        "tiled_object_y" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_Y")?; let mb = m.borrow();
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_Y")?.y))
+        }
+        "tiled_object_width" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_WIDTH")?; let mb = m.borrow();
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_WIDTH")?.width))
+        }
+        "tiled_object_height" => {
+            arity!(3);
+            let m = tiled_h(&a[0], "TILED_OBJECT_HEIGHT")?; let mb = m.borrow();
+            Ok(Value::Float(get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_HEIGHT")?.height))
+        }
+        "tiled_object_prop_bool" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_OBJECT_PROP_BOOL")?; let mb = m.borrow();
+            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_BOOL")?;
+            Ok(Value::Bool(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_bool()).unwrap_or(false)))
+        }
+        "tiled_object_prop_int" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_OBJECT_PROP_INT")?; let mb = m.borrow();
+            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_INT")?;
+            Ok(Value::Int(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_int()).unwrap_or(0)))
+        }
+        "tiled_object_prop_float" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_OBJECT_PROP_FLOAT")?; let mb = m.borrow();
+            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_FLOAT")?;
+            Ok(Value::Float(o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_float()).unwrap_or(0.0)))
+        }
+        "tiled_object_prop_string" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILED_OBJECT_PROP_STRING")?; let mb = m.borrow();
+            let o = get_obj(&mb, need_str(&a[1], "T")?, need_int(&a[2], "T")?, "TILED_OBJECT_PROP_STRING")?;
+            Ok(Value::str_rc(&o.properties.get(need_str(&a[3], "T")?).map(|p| p.as_string()).unwrap_or_default()))
+        }
+        "tiled_tileset_count" => { arity!(1); Ok(Value::Int(tiled_h(&a[0], "TILED_TILESET_COUNT")?.borrow().tilesets.len() as i64)) }
+        "tiled_tileset_image" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_TILESET_IMAGE")?; let mb = m.borrow();
+            let idx = need_int(&a[1], "TILED_TILESET_IMAGE")?;
+            if idx < 0 || idx as usize >= mb.tilesets.len() {
+                return err(format!("TILED_TILESET_IMAGE: Index {} ausserhalb [0..{}]", idx, mb.tilesets.len() as i64 - 1));
+            }
+            Ok(Value::str_rc(&mb.tilesets[idx as usize].image))
+        }
+        "tiled_tileset_firstgid" => {
+            arity!(2);
+            let m = tiled_h(&a[0], "TILED_TILESET_FIRSTGID")?; let mb = m.borrow();
+            let idx = need_int(&a[1], "TILED_TILESET_FIRSTGID")?;
+            if idx < 0 || idx as usize >= mb.tilesets.len() {
+                return err("TILED_TILESET_FIRSTGID: Index ausserhalb".to_string());
+            }
+            Ok(Value::Int(mb.tilesets[idx as usize].first_gid))
+        }
+
+        // --- controller-Modul (CHAR_*) ---
+        "char_new" => {
+            arity!(4);
+            let x = need_num(&a[0], "CHAR_NEW")?;
+            let y = need_num(&a[1], "CHAR_NEW")?;
+            let w = need_num(&a[2], "CHAR_NEW")?;
+            let h = need_num(&a[3], "CHAR_NEW")?;
+            if w <= 0.0 || h <= 0.0 {
+                return err("CHAR_NEW: w und h muessen > 0 sein".to_string());
+            }
+            Ok(Value::CharController(Rc::new(RefCell::new(crate::controller::CharController::new(x, y, w, h)))))
+        }
+        "char_set_pos" => {
+            arity!(3);
+            let c = char_h(&a[0], "CHAR_SET_POS")?; let mut cc = c.borrow_mut();
+            cc.x = need_num(&a[1], "CHAR_SET_POS")?;
+            cc.y = need_num(&a[2], "CHAR_SET_POS")?;
+            Ok(Value::Nil)
+        }
+        "char_set_move_speed" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_MOVE_SPEED")?;
+            c.borrow_mut().move_speed = need_num(&a[1], "CHAR_SET_MOVE_SPEED")?.max(0.0);
+            Ok(Value::Nil)
+        }
+        "char_set_gravity" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_GRAVITY")?;
+            c.borrow_mut().gravity = need_num(&a[1], "CHAR_SET_GRAVITY")?;
+            Ok(Value::Nil)
+        }
+        "char_set_max_fall" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_MAX_FALL")?;
+            c.borrow_mut().max_fall = need_num(&a[1], "CHAR_SET_MAX_FALL")?.max(0.0);
+            Ok(Value::Nil)
+        }
+        "char_set_jump_velocity" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_JUMP_VELOCITY")?;
+            c.borrow_mut().jump_velocity = need_num(&a[1], "CHAR_SET_JUMP_VELOCITY")?.abs();
+            Ok(Value::Nil)
+        }
+        "char_set_coyote_time" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_COYOTE_TIME")?;
+            c.borrow_mut().coyote_max = need_int(&a[1], "CHAR_SET_COYOTE_TIME")?.max(0);
+            Ok(Value::Nil)
+        }
+        "char_set_jump_buffer" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_JUMP_BUFFER")?;
+            c.borrow_mut().jump_buffer_max = need_int(&a[1], "CHAR_SET_JUMP_BUFFER")?.max(0);
+            Ok(Value::Nil)
+        }
+        "char_set_variable_jump" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_VARIABLE_JUMP")?;
+            c.borrow_mut().variable_jump = need_bool(&a[1], "CHAR_SET_VARIABLE_JUMP")?;
+            Ok(Value::Nil)
+        }
+        "char_set_variable_jump_cut" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_VARIABLE_JUMP_CUT")?;
+            c.borrow_mut().variable_jump_cut = need_num(&a[1], "CHAR_SET_VARIABLE_JUMP_CUT")?.clamp(0.0, 1.0);
+            Ok(Value::Nil)
+        }
+        "char_set_input" => {
+            arity!(4);
+            let c = char_h(&a[0], "CHAR_SET_INPUT")?;
+            let ax = need_int(&a[1], "CHAR_SET_INPUT")?;
+            let jp = need_bool(&a[2], "CHAR_SET_INPUT")?;
+            let jh = need_bool(&a[3], "CHAR_SET_INPUT")?;
+            c.borrow_mut().set_input(ax, jp, jh);
+            Ok(Value::Nil)
+        }
+        "char_update" => {
+            arity!(3);
+            let c = char_h(&a[0], "CHAR_UPDATE")?;
+            let m = tiled_h(&a[1], "CHAR_UPDATE")?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[2], "CHAR_UPDATE")?, "CHAR_UPDATE")?;
+            c.borrow_mut().update(&mb, &mb.layers[li]);
+            Ok(Value::Nil)
+        }
+        "char_x" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_X")?.borrow().x)) }
+        "char_y" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_Y")?.borrow().y)) }
+        "char_w" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_W")?.borrow().w)) }
+        "char_h" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_H")?.borrow().h)) }
+        "char_vx" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_VX")?.borrow().vx)) }
+        "char_vy" => { arity!(1); Ok(Value::Float(char_h(&a[0], "CHAR_VY")?.borrow().vy)) }
+        "char_on_ground" => { arity!(1); Ok(Value::Bool(char_h(&a[0], "CHAR_ON_GROUND")?.borrow().on_ground)) }
+        "char_on_wall_left" => { arity!(1); Ok(Value::Bool(char_h(&a[0], "CHAR_ON_WALL_LEFT")?.borrow().on_wall_left)) }
+        "char_on_wall_right" => { arity!(1); Ok(Value::Bool(char_h(&a[0], "CHAR_ON_WALL_RIGHT")?.borrow().on_wall_right)) }
+        "char_facing" => { arity!(1); Ok(Value::Int(char_h(&a[0], "CHAR_FACING")?.borrow().facing)) }
+        "char_set_vx" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_VX")?;
+            c.borrow_mut().vx = need_num(&a[1], "CHAR_SET_VX")?;
+            Ok(Value::Nil)
+        }
+        "char_set_vy" => {
+            arity!(2);
+            let c = char_h(&a[0], "CHAR_SET_VY")?;
+            c.borrow_mut().vy = need_num(&a[1], "CHAR_SET_VY")?;
+            Ok(Value::Nil)
+        }
+
+        // --- tile_collide-Modul (TILE_*) ---
+        "tile_sweep_x" | "tile_sweep_y" => {
+            arity!(7);
+            let axis = if name == "tile_sweep_x" { 0 } else { 1 };
+            let fname = if axis == 0 { "TILE_SWEEP_X" } else { "TILE_SWEEP_Y" };
+            let m = tiled_h(&a[0], fname)?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[1], fname)?, fname)?;
+            let x = need_num(&a[2], fname)?;
+            let y = need_num(&a[3], fname)?;
+            let w = need_num(&a[4], fname)?;
+            let h = need_num(&a[5], fname)?;
+            let d = need_num(&a[6], fname)?;
+            if w <= 0.0 || h <= 0.0 {
+                return err(format!("{}: w und h muessen > 0 sein", fname));
+            }
+            let (np, hit) = mb.sweep_axis(&mb.layers[li], x, y, w, h, d, axis);
+            Ok(Value::Tuple(Rc::new(vec![Value::Float(np), Value::Bool(hit)])))
+        }
+        "tile_is_solid" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILE_IS_SOLID")?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILE_IS_SOLID")?, "TILE_IS_SOLID")?;
+            let tx = need_int(&a[2], "TILE_IS_SOLID")?;
+            let ty = need_int(&a[3], "TILE_IS_SOLID")?;
+            Ok(Value::Bool(mb.tile_is_solid_at(&mb.layers[li], tx, ty)))
+        }
+        "tile_at_pixel" => {
+            arity!(4);
+            let m = tiled_h(&a[0], "TILE_AT_PIXEL")?; let mb = m.borrow();
+            let li = tile_layer_idx(&mb, need_int(&a[1], "TILE_AT_PIXEL")?, "TILE_AT_PIXEL")?;
+            let px = need_num(&a[2], "TILE_AT_PIXEL")?;
+            let py = need_num(&a[3], "TILE_AT_PIXEL")?;
+            let (tw, th) = (mb.tile_w, mb.tile_h);
+            if tw <= 0 || th <= 0 {
+                Ok(Value::Int(0))
+            } else {
+                let tx = (px / tw as f64).floor() as i64;
+                let ty = (py / th as f64).floor() as i64;
+                let layer = &mb.layers[li];
+                let g = if tx < 0 || ty < 0 || tx >= layer.width || ty >= layer.height {
+                    0
+                } else {
+                    layer.tiles[(ty * layer.width + tx) as usize]
+                };
+                Ok(Value::Int(g))
+            }
+        }
+
+        // --- regex-Modul (REGEX_*) ---
+        "regex_match" => {
+            arity!(2);
+            let pat = format!("^(?:{})$", need_str(&a[1], "REGEX_MATCH")?);
+            Ok(Value::Bool(regex_compile(&pat)?.is_match(need_str(&a[0], "REGEX_MATCH")?)))
+        }
+        "regex_test" => {
+            arity!(2);
+            Ok(Value::Bool(regex_compile(need_str(&a[1], "REGEX_TEST")?)?
+                .is_match(need_str(&a[0], "REGEX_TEST")?)))
+        }
+        "regex_find" => {
+            arity!(2);
+            let re = regex_compile(need_str(&a[1], "REGEX_FIND")?)?;
+            let t = need_str(&a[0], "REGEX_FIND")?;
+            Ok(Value::str_rc(re.find(t).map(|m| m.as_str()).unwrap_or("")))
+        }
+        "regex_find_all" => {
+            arity!(2);
+            let re = regex_compile(need_str(&a[1], "REGEX_FIND_ALL")?)?;
+            let t = need_str(&a[0], "REGEX_FIND_ALL")?;
+            let mut flat: Vec<String> = Vec::new();
+            if re.captures_len() > 1 {
+                // mind. eine Capture-Gruppe -> Gruppe 1 (wie Python findall)
+                for cap in re.captures_iter(t) {
+                    flat.push(cap.get(1).map(|m| m.as_str()).unwrap_or("").to_string());
+                }
+            } else {
+                for m in re.find_iter(t) { flat.push(m.as_str().to_string()); }
+            }
+            Ok(new_str_array(flat))
+        }
+        "regex_replace" => {
+            arity!(3);
+            let re = regex_compile(need_str(&a[1], "REGEX_REPLACE")?)?;
+            let t = need_str(&a[0], "REGEX_REPLACE")?;
+            let rep = translate_repl(need_str(&a[2], "REGEX_REPLACE")?);
+            Ok(Value::str_rc(re.replace_all(t, rep.as_str()).as_ref()))
+        }
+        "regex_replace_once" => {
+            arity!(3);
+            let re = regex_compile(need_str(&a[1], "REGEX_REPLACE_ONCE")?)?;
+            let t = need_str(&a[0], "REGEX_REPLACE_ONCE")?;
+            let rep = translate_repl(need_str(&a[2], "REGEX_REPLACE_ONCE")?);
+            Ok(Value::str_rc(re.replace(t, rep.as_str()).as_ref()))
+        }
+        "regex_split" => {
+            arity!(2);
+            let re = regex_compile(need_str(&a[1], "REGEX_SPLIT")?)?;
+            let t = need_str(&a[0], "REGEX_SPLIT")?;
+            Ok(new_str_array(re.split(t).map(|s| s.to_string()).collect()))
+        }
 
         _ => err(format!("__UNKNOWN_BUILTIN__:{}", name)),
     }
