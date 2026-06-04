@@ -1,8 +1,10 @@
-"""Smoke-Tests: alle non-grafischen Examples laufen ohne Fehler durch.
+"""Smoke-Tests: alle non-grafischen Examples laufen im Tree-Walker ohne Fehler.
 
-Wir fuehren jedes Beispiel im Tree-Walker UND im Python-VM aus und vergleichen.
-Examples mit MILLIS()/TIME$()/RND-ohne-RANDOMIZE sind nicht-deterministisch und
-werden uebersprungen. Examples mit SCREEN/Pygame bleiben aussen vor (interaktiv).
+Seit dem Entfernen der Python-/Cython-Bytecode-VMs gibt es nur noch zwei Pfade:
+Tree-Walker (hier) und die native Runtime `gbrt`. Die Output-Identitaet
+Tree-Walker == gbrt fuer die deterministischen Beispiele prueft der dedizierte
+Sweep in `test_gbrt_parity.py`. Examples mit MILLIS()/TIME$()/RND-ohne-RANDOMIZE
+sind nicht-deterministisch; Examples mit SCREEN/Pygame bleiben aussen vor.
 """
 from pathlib import Path
 import pytest
@@ -43,8 +45,8 @@ _INTERACTIVE_OR_ASSETS = [
 ]
 
 
-def _run_example(rel: str):
-    """Tree-Walker + Python-VM laufen lassen, gibt (tw_out, vm_out) zurueck.
+def _run_example(rel: str) -> str:
+    """Fuehrt ein Beispiel im Tree-Walker aus und gibt stdout zurueck.
 
     CWD wird temporaer auf examples/ umgestellt, damit Programme mit
     LOADIMAGE("assets/...") die Datei finden (gleiches Verhalten wie gbrun.py).
@@ -53,57 +55,27 @@ def _run_example(rel: str):
     from gamebasic.lexer import Lexer
     from gamebasic.parser import Parser
     from gamebasic.interpreter import Interpreter
-    from gamebasic.compiler import Compiler
-    from gamebasic.vm import VM
     from gamebasic.preprocess import process
-    try:
-        from gamebasic.vm_native import VM as NativeVM  # type: ignore
-    except ImportError:
-        NativeVM = None
 
     path = _EXAMPLES / f"{rel}.gb"
     source = path.read_text(encoding="utf-8")
     prepped, _ = process(source, path.parent, file_label=path.name)
-    tokens = Lexer(prepped).tokenize()
-    ast = Parser(tokens).parse()
+    ast = Parser(Lexer(prepped).tokenize()).parse()
 
     saved_cwd = os.getcwd()
-    nv_out = None
     try:
         os.chdir(path.parent)
-        tw_buf = io.StringIO()
-        with contextlib.redirect_stdout(tw_buf):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
             Interpreter().run(ast)
-
-        module = Compiler().compile(ast)
-        vm_buf = io.StringIO()
-        with contextlib.redirect_stdout(vm_buf):
-            VM().run(module)
-
-        if NativeVM is not None:
-            nv_buf = io.StringIO()
-            with contextlib.redirect_stdout(nv_buf):
-                NativeVM().run(module)
-            nv_out = nv_buf.getvalue()
     finally:
         os.chdir(saved_cwd)
-
-    return tw_buf.getvalue(), vm_buf.getvalue(), nv_out
-
-
-@pytest.mark.parametrize("name", _DETERMINISTIC)
-def test_deterministic_example_treewalker_eq_vm(name):
-    tw, vm, nv = _run_example(name)
-    assert tw == vm, f"Tree-Walker und Python-VM divergieren bei {name}"
-    if nv is not None:
-        assert tw == nv, f"Tree-Walker und Native-VM divergieren bei {name}"
+    return buf.getvalue()
 
 
-@pytest.mark.parametrize("name", _NON_DETERMINISTIC)
-def test_nondeterministic_example_runs(name):
-    """Nur pruefen dass es nicht crasht - Outputs werden nicht verglichen."""
-    tw, vm, nv = _run_example(name)
-    assert tw != ""  # mindestens irgendein Output
-    assert vm != ""
-    if nv is not None:
-        assert nv != ""
+@pytest.mark.parametrize("name", _DETERMINISTIC + _NON_DETERMINISTIC)
+def test_example_runs_treewalker(name):
+    """Smoke-Test: jedes (nicht-grafische) Beispiel laeuft im Tree-Walker durch
+    und produziert Output. Output-Identitaet gegen gbrt -> test_gbrt_parity.py."""
+    out = _run_example(name)
+    assert out != "", f"Beispiel {name} hat keinen Output erzeugt"

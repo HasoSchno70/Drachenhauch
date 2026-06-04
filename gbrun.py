@@ -84,7 +84,7 @@ def main(argv):
             return 3
         return rc
 
-    if args and args[0] in ("--tokens", "--ast", "--vm", "--bench", "--native", "--export"):
+    if args and args[0] in ("--tokens", "--ast", "--bench", "--native", "--export"):
         mode = args.pop(0)[2:]
 
     # --- Export: standalone .exe buendeln (Schritt 7) ---
@@ -134,12 +134,6 @@ def main(argv):
         if mode == "ast":
             _print_ast(ast)
             return 0
-        if mode == "vm":
-            from gamebasic.compiler import Compiler
-            VMClass, kind = _resolve_vm()
-            module = Compiler().compile(ast)
-            VMClass().run(module)
-            return 0
         if mode == "bench":
             return _bench(ast, path)
         Interpreter().run(ast)
@@ -156,16 +150,6 @@ def main(argv):
         else:
             print(f"  {e}")
         return 2
-
-
-def _resolve_vm():
-    """Liefert (VMClass, kind). Bevorzugt nativ, faellt auf Python zurueck."""
-    try:
-        from gamebasic.vm_native import VM as NativeVM   # type: ignore
-        return NativeVM, "native"
-    except ImportError:
-        from gamebasic.vm import VM as PyVM
-        return PyVM, "python"
 
 
 def _find_gbrt():
@@ -253,23 +237,22 @@ def _run_export(src, out_dir):
 
 
 def _bench(ast, path):
-    """Vergleicht Tree-Walker, Python-VM und Native-VM auf demselben Programm."""
+    """Vergleicht Tree-Walker (in-process) und native Runtime `gbrt` (Subprozess)
+    auf demselben Programm -- Laufzeit + Output-Identitaet. `gbrt`-Zeit enthaelt
+    den Prozess-Start (kein reiner VM-Vergleich), zeigt aber die echte
+    Native-Laufzeit. Ist `gbrt` nicht gebaut, wird nur der Tree-Walker gemessen."""
     import io
+    import os as _os
     import time
+    import tempfile
+    import subprocess
     import contextlib
     from gamebasic.compiler import Compiler
-    from gamebasic.vm import VM as PyVM
-
-    NativeVM = None
-    try:
-        from gamebasic.vm_native import VM as _NV  # type: ignore
-        NativeVM = _NV
-    except ImportError:
-        pass
+    from gamebasic.serialize import dump_gbc
 
     print(f"=== Benchmark: {path.name} ===")
 
-    # Tree-Walker
+    # Tree-Walker (in-process)
     buf_tw = io.StringIO()
     t0 = time.perf_counter()
     with contextlib.redirect_stdout(buf_tw):
@@ -277,48 +260,49 @@ def _bench(ast, path):
     tw_time = time.perf_counter() - t0
     tw_out = buf_tw.getvalue()
 
-    # Compile
+    # Compile -> .gbc
     t0 = time.perf_counter()
     module = Compiler().compile(ast)
     compile_time = time.perf_counter() - t0
 
-    # Python-VM
-    buf_py = io.StringIO()
-    t0 = time.perf_counter()
-    with contextlib.redirect_stdout(buf_py):
-        PyVM().run(module)
-    py_time = time.perf_counter() - t0
-    py_out = buf_py.getvalue()
-
-    # Native-VM
+    # Native Runtime (gbrt, Subprozess mit erfasstem stdout)
+    gbrt = _find_gbrt()
     nv_time = None
     nv_out = None
-    if NativeVM is not None:
-        buf_nv = io.StringIO()
-        t0 = time.perf_counter()
-        with contextlib.redirect_stdout(buf_nv):
-            NativeVM().run(module)
-        nv_time = time.perf_counter() - t0
-        nv_out = buf_nv.getvalue()
+    if gbrt is not None:
+        fd, tmp = tempfile.mkstemp(suffix=".gbc")
+        _os.close(fd)
+        try:
+            dump_gbc(module, tmp)
+            t0 = time.perf_counter()
+            res = subprocess.run([str(gbrt), tmp, path.name],
+                                 capture_output=True, text=True)
+            nv_time = time.perf_counter() - t0
+            # gbrt schreibt LF, Python CRLF -> fuer den Vergleich angleichen.
+            nv_out = res.stdout.replace("\r\n", "\n")
+        finally:
+            try:
+                _os.unlink(tmp)
+            except OSError:
+                pass
 
     print(f"Tree-Walker:    {tw_time * 1000:9.2f} ms")
     print(f"Compile:        {compile_time * 1000:9.2f} ms")
-    print(f"Python-VM:      {py_time * 1000:9.2f} ms        Speedup vs TW: {tw_time / py_time:5.2f}x")
     if nv_time is not None:
-        print(f"Native-VM:      {nv_time * 1000:9.2f} ms        Speedup vs TW: {tw_time / nv_time:5.2f}x   (vs Py-VM: {py_time / nv_time:5.2f}x)")
+        print(f"gbrt (nativ):   {nv_time * 1000:9.2f} ms        Speedup vs TW: {tw_time / nv_time:5.2f}x   (inkl. Prozess-Start)")
     else:
-        print("Native-VM:      nicht gebaut (run 'python setup.py build_ext --inplace')")
+        print("gbrt (nativ):   nicht gebaut (run 'rust\\build_runtime.py')")
 
-    outs = {"Tree-Walker": tw_out, "Python-VM": py_out}
     if nv_out is not None:
-        outs["Native-VM"] = nv_out
-    if len(set(outs.values())) == 1:
-        print("Output:         ALLE IDENTISCH")
-    else:
-        print("Output:         UNTERSCHIEDLICH (!)")
-        for label, out in outs.items():
-            print(f"--- {label} ---")
-            print(out)
+        tw_norm = tw_out.replace("\r\n", "\n")
+        if tw_norm == nv_out:
+            print("Output:         IDENTISCH (Tree-Walker == gbrt)")
+        else:
+            print("Output:         UNTERSCHIEDLICH (!)")
+            print("--- Tree-Walker ---")
+            print(tw_out)
+            print("--- gbrt ---")
+            print(nv_out)
     return 0
 
 

@@ -1,10 +1,14 @@
-"""Build-Skript fuer die native VM.
+"""Build-Skript fuer die nativen Cython-Beschleuniger.
 
 Verwendung:
     .venv\\Scripts\\python.exe setup.py build_ext --inplace
 
-Das Ergebnis (.pyd) wird neben gamebasic/vm_native.pyx abgelegt.
-gbrun.py erkennt sie automatisch zur Laufzeit.
+Baut die cdef-Klassen, die den Tree-Walker beschleunigen: `_GBArray`
+(typed memoryviews) und die native ECS-World. Beide haben Pure-Python-
+Fallbacks -- fehlt die `.pyd`, laeuft der Tree-Walker trotzdem (nur langsamer).
+
+(Die fruehere Cython-VM `vm_native.pyx` wurde entfernt: die native Rust-Runtime
+`gbrt` hat sie als schnellen/Produktions-Pfad abgeloest.)
 """
 from setuptools import setup
 from Cython.Build import cythonize
@@ -13,7 +17,6 @@ setup(
     name="gamebasic-native",
     ext_modules=cythonize(
         [
-            "gamebasic/vm_native.pyx",
             "gamebasic/array_native.pyx",
             "gamebasic/modules/ecs_native.pyx",
         ],

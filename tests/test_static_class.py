@@ -125,8 +125,16 @@ PRINT C.NONEXISTENT
         run_vm(src)
 
 
-def test_duplicate_static_rejected_at_compile(run_vm):
-    """Doppelte STATIC CONST im VM-Pfad werfen CompileError beim Compile."""
+def _compile(src):
+    """Kompiliert Quelltext zu Bytecode (der Pfad, den gbrt konsumiert)."""
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler
+    return Compiler().compile(Parser(Lexer(src).tokenize()).parse())
+
+
+def test_duplicate_static_rejected_at_compile():
+    """Doppelte STATIC CONST werden beim Compile (fuer gbrt) abgelehnt."""
     from gamebasic.compiler import CompileError
     src = '''
 CLASS C
@@ -135,11 +143,11 @@ CLASS C
 END CLASS
 '''
     with pytest.raises(CompileError):
-        run_vm(src)
+        _compile(src)
 
 
-def test_static_non_literal_rejected(run_vm):
-    """STATIC CONST mit Ausdruck statt Literal -> CompileError."""
+def test_static_non_literal_rejected():
+    """STATIC CONST mit Ausdruck statt Literal -> CompileError beim Compile."""
     from gamebasic.compiler import CompileError
     src = '''
 CLASS C
@@ -147,7 +155,7 @@ CLASS C
 END CLASS
 '''
     with pytest.raises(CompileError):
-        run_vm(src)
+        _compile(src)
 
 
 def test_class_with_no_statics_unaffected(run_gb, run_vm):

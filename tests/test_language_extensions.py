@@ -502,20 +502,20 @@ def test_fstring_empty_expr_errors(run_gb):
         run_gb('PRINT f"{}"')
 
 
-# --- VM-Pfad: REPEAT/DATA/READ/RESTORE/Defaults ----------------------
+# --- REPEAT/DATA/READ/RESTORE/Defaults (frueher Python-VM, jetzt Tree-Walker) ---
 
 def _run_vm(src):
+    # Die Python-/Cython-Bytecode-VMs wurden entfernt; dieser Helfer laeuft jetzt
+    # ueber den Tree-Walker. Compiler-/gbrt-Abdeckung -> test_gbrt_parity.py.
     from gamebasic.lexer import Lexer
     from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.vm import VM
+    from gamebasic.interpreter import Interpreter
     import io as _io
     import contextlib as _ctx
     ast = Parser(Lexer(src).tokenize()).parse()
-    module = Compiler().compile(ast)
     buf = _io.StringIO()
     with _ctx.redirect_stdout(buf):
-        VM().run(module)
+        Interpreter().run(ast)
     return buf.getvalue()
 
 
@@ -576,13 +576,15 @@ def test_vm_fstring():
     assert "hi Bob" in out
 
 
-def test_vm_default_param_must_be_literal():
-    """Tree-Walker erlaubt Param-referenzierende Defaults; VM nicht."""
-    from gamebasic.compiler import CompileError
+def test_compiler_default_param_must_be_literal():
+    """Der Compiler (Bytecode fuer gbrt) verlangt Literal-Defaults; der
+    Tree-Walker ist hier nachsichtiger (Param-referenzierende Defaults ok)."""
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler, CompileError
+    ast = Parser(Lexer(
+        'SUB foo(a AS INTEGER, b AS INTEGER = a)\nEND SUB\n').tokenize()).parse()
     with pytest.raises(CompileError, match="Literale"):
-        _run_vm('''
-SUB foo(a AS INTEGER, b AS INTEGER = a)
-END SUB
-''')
+        Compiler().compile(ast)
 
 
