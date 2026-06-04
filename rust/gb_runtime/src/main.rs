@@ -86,6 +86,12 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "--runsrc" {
             return runsrc_main(&raw[2]);
         }
+        // Stufe 5: `gbrt run datei.gb` -- eigenstaendiger End-to-End-Lauf
+        // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
+        // relative Asset-Pfade). gbrt ist damit ohne Python lauffaehig.
+        if raw.len() >= 3 && raw[1] == "run" {
+            return run_main(&raw[2]);
+        }
     }
 
     // Bundle-Modus: eingebettete .gbc am Ende der eigenen Exe?
@@ -117,6 +123,11 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
     let path = &args[1];
+    // Komfort: `gbrt datei.gb` (ohne `run`) wird wie `gbrt run datei.gb`
+    // behandelt -- aus Quelltext, mit chdir. `.gbc` laeuft den VM-Pfad.
+    if path.to_lowercase().ends_with(".gb") {
+        return run_main(path);
+    }
     // Optionales Quell-Label fuer Fehlermeldungen; sonst der .gbc-Pfad.
     let source_label = args.get(2).cloned().unwrap_or_else(|| path.clone());
     let text = match std::fs::read_to_string(path) {
@@ -193,18 +204,11 @@ fn preprocess_main(path: &str) -> ExitCode {
     }
 }
 
-/// `gbrt --runsrc <datei.gb>` -- preprocesst IMPORTs, lext + parst + kompiliert
-/// (alles in Rust) und fuehrt das Ergebnis in der VM aus. Verifiziert die
-/// Rust-Front-End-Kette gegen den Python-Tree-Walker (Output-Parity, Stufe 3/4).
-fn runsrc_main(path: &str) -> ExitCode {
-    let raw_source = match std::fs::read_to_string(path) {
-        Ok(t) => t,
-        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
-    };
-    let base = std::path::Path::new(path).parent()
-        .map(|p| p.to_path_buf())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let (source, mods) = match preprocess::process(&raw_source, &base) {
+/// Volle Front-End-Kette in Rust: Preprocess (IMPORT) -> Lexer -> Parser ->
+/// Compiler -> VM. `base` = Verzeichnis fuer relative IMPORT-Pfade, `label` =
+/// Quell-Label fuer Laufzeitfehler-Meldungen. Geteilt von `--runsrc` und `run`.
+fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str) -> ExitCode {
+    let (source, mods) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
         Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); return ExitCode::from(2); }
     };
@@ -221,7 +225,40 @@ fn runsrc_main(path: &str) -> ExitCode {
         Ok(j) => j,
         Err(e) => { eprintln!("Compile: {}", e); return ExitCode::from(3); }
     };
-    run_program_value(json, path)
+    run_program_value(json, label)
+}
+
+/// `gbrt --runsrc <datei.gb>` -- volle Front-End-Kette in Rust, OHNE chdir
+/// (Dev-/Parity-Einstieg: Output gegen Python-Tree-Walker, Stufe 3/4).
+fn runsrc_main(path: &str) -> ExitCode {
+    let raw_source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let base = std::path::Path::new(path).parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    compile_and_run_source(&raw_source, &base, path)
+}
+
+/// `gbrt run <datei.gb>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
+/// Quelltext, ohne Python. Wechselt wie `gbrun.py` ins Verzeichnis der Datei,
+/// damit relative Asset-Pfade (`LOADIMAGE("assets/...")`) stimmen; Label fuer
+/// Laufzeitfehler ist der Dateiname.
+fn run_main(path: &str) -> ExitCode {
+    let abs = std::fs::canonicalize(path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let base = abs.parent().map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string());
+    let raw_source = match std::fs::read_to_string(&abs) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    // Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)).
+    let _ = std::env::set_current_dir(&base);
+    compile_and_run_source(&raw_source, &base, &label)
 }
 
 /// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus

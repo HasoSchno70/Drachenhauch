@@ -1,14 +1,16 @@
 # Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
 
-**Ziel:** `gbrt` soll perspektivisch ohne Python aus Quelltext Bytecode erzeugen
-und ausführen — dann läuft Python nur noch in den Editoren/Tools (+ als
-Referenz-Tree-Walker). Damit wird auch der [Web-Playground](web-playground.md)
-ein einziges reines Rust-WASM (kein Pyodide nötig).
+**Ziel (erreicht):** `gbrt` erzeugt jetzt selbst aus Quelltext Bytecode und
+führt ihn aus — `gbrt run datei.gb` ist ein eigenständiger End-to-End-Lauf
+**ohne Python**. Python bleibt nur noch in den Editoren/Tools (+ als
+Referenz-Tree-Walker). Damit kann auch der [Web-Playground](web-playground.md)
+ein reines Rust-WASM werden (kein Pyodide nötig).
 
-Heute macht gbrt nur die **Ausführung** (`.gbc` → VM). Die Front-End-Toolchain
-(`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/`preprocess`, ~5.100 Zeilen
-Python) wird inkrementell nach Rust portiert — **jede Stufe gegen Python
-verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
+Die Front-End-Toolchain (`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/
+`preprocess`, ~5.100 Zeilen Python) wurde inkrementell nach Rust portiert —
+**jede Stufe gegen Python verifiziert** (cargo + rustc verfügbar). **Alle 5
+Stufen fertig.** gbrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `gbrt run`
+(bzw. `gbrt datei.gb`) deckt jetzt den vollen Pfad Quelltext → Bytecode → Run ab.
 
 ## Stufen
 
@@ -18,7 +20,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
 | 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` | Merge-Ergebnis-Gleichheit (`gbrt --preprocess` == `process()`) | ✅ **fertig** |
-| 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
+| 5. **Verdrahtung** | `gbrt run datei.gb` (+ `.gb`-Auto-Detect) | Output-Parität (gbrt-self-compiled vs Python-TW) | ✅ **fertig** |
 
 ## Stufe 1 — Lexer (fertig)
 
@@ -150,9 +152,27 @@ importiert `name.lower()`). **Grenze:** aliasierte Modul-Builtins (`J_PARSE` aus
 (noch) nicht; das Merge-Ergebnis stimmt, der aliasierte *Aufruf* liefe in gbrt
 nicht.
 
-**Nächste Stufe** (eigener Commit): `gbrt run datei.gb` (Stufe 5 — `--runsrc`
-zum Default-Run machen, `os.chdir`-Äquivalent für relative Asset-Pfade). Damit
-liefe die Toolchain end-to-end ohne Python.
+## Stufe 5 — Verdrahtung / `gbrt run` (fertig)
+
+[`src/main.rs`](../rust/gb_runtime/src/main.rs): `gbrt run datei.gb` ist der
+eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
+in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
+(`set_current_dir`, wie `gbrun.py` `os.chdir(file.parent)`), damit relative
+IMPORT- **und** Laufzeit-Pfade (`OpenFile("data.txt")`, `LOADIMAGE("assets/…")`)
+stimmen, und nutzt den Dateinamen als Label für Laufzeitfehler. Komfort:
+`gbrt datei.gb` (ohne `run`, Endung `.gb`) wird genauso behandelt; `.gbc`-Pfade
+laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
+`compile_and_run_source(source, base, label)` gebündelt (geteilt mit `--runsrc`,
+das **ohne** chdir läuft — Dev-/Parity-Einstieg).
+
+Gate: stdout von `gbrt run` == Python-Tree-Walker mit demselben chdir
+([`tests/test_rust_run_parity.py`](../tests/test_rust_run_parity.py), 2 Tests:
+relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
+`gbrt <datei.gb>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
+
+Damit ist die Toolchain **end-to-end ohne Python** lauffähig — Ziel der
+Portierung erreicht. (Offen/optional, kein Blocker: `gbrt --export` aus Quelltext
+statt aus `.gbc`; aliasierte Modul-Builtins; Web-WASM-Build.)
 
 ## Prinzip
 
