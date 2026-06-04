@@ -88,8 +88,19 @@ def main() -> int:
         cmd = ["cargo", "build"]
         if release:
             cmd.append("--release")
+
+    # Feature-Auswahl: graphics (raylib) + Daten-Tier (db/net/http) sind der
+    # Standard-Dev-Build. `--no-data` laesst db/net/http weg, `--hardware`
+    # nimmt serial/usb/bt/wifi dazu (Phase 4).
+    feats = []
     if graphics:
-        cmd += ["--features", "graphics"]
+        feats.append("graphics")
+    if "--no-data" not in args:
+        feats += ["db", "net", "http"]
+    if "--hardware" in args:
+        feats += ["serial", "usb", "bt", "wifi"]
+    if feats:
+        cmd += ["--features", " ".join(feats)]
 
     print("->", " ".join(cmd))
     return subprocess.run(cmd, cwd=str(CRATE), env=env).returncode

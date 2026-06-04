@@ -63,8 +63,21 @@ feature-gated (Standard-`.exe` bleibt schlank).
   steuert ein „Channel" die Wiedergabe genau seines Sounds (Volume per Handle
   getrackt, da raylib keinen Getter hat). Fade/loops=N werden vereinfacht
   (raylib kann das nicht direkt).
-- **Phase 3 (geplant):** `db` (rusqlite), `net` (std::net), `html` (HTTP+Parser)
-  — feature-gated.
+- **Phase 3 — ERLEDIGT (Daten/Netz, feature-gated):**
+  - `db` (DB_*, 17, Feature `db` → `rusqlite` bundled): SQLite, `?`-Binding,
+    DB_QUERY laedt Zeilen eager (vermeidet self-referenzielle Cursor). DB_CONN/
+    DB_RESULT = INTEGER-Handles. **Bit-identisch** verifiziert (CRUD, rowid,
+    typed Getter, rowcount).
+  - `net` (NET_*, 19, Feature `net`, nur stdlib `std::net`): TCP-Listener/
+    -Sockets + UDP, non-blocking default, INTEGER-Handles. Loopback verifiziert.
+  - `html` (HTTP_*/HTML_*/URL_*, 10, Feature `http` → `ureq`+rustls): HTTP
+    GET/POST/DOWNLOAD (https/TLS), URL-Encode/Decode, HTML-Text/Tag-Find/Attr
+    als handgeschriebener Scanner. HTTP_GET verifiziert (Status 200, Body), HTML-
+    Parsing bit-identisch (ausser Non-ASCII-Konsolen-Encoding -- wie CRLF ein
+    OS-Artefakt).
+  - **Cargo-Features:** `db`/`net`/`http` + Aggregat `full`. `build_runtime.py`
+    baut Standard-Dev `graphics db net http` (`--no-data` laesst sie weg).
+    Wenn ein Feature fehlt, liefert der Builtin den „nicht verfuegbar"-Fehler.
 - **Phase 4 (geplant):** Hardware/IoT `serial`/`usb`/`wifi`/`bt` — feature-gated.
 
 ## Dev-Run-Loop: `gbrun.py --native`

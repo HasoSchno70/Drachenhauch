@@ -18,10 +18,19 @@ regex = "1"
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).
 raylib = { version = "5.5", optional = true }
+# db-Modul: SQLite (bundled = eigenes sqlite3.c, kein System-SQLite noetig).
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
+# html-Modul: blockierender HTTP-Client (rustls-TLS fuer https).
+ureq = { version = "2", optional = true }
 
 [features]
 default = []
 graphics = ["dep:raylib"]
+db = ["dep:rusqlite"]
+net = []                       # nur std::net -- Gate dient dem Opt-out
+http = ["dep:ureq"]
+# Aggregate (Hardware kommt in Phase 4 dazu).
+full = ["graphics", "db", "net", "http"]
 
 [profile.release]
 opt-level = 3

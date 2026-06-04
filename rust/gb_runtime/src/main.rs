@@ -15,7 +15,13 @@ mod astar;
 mod audio;
 mod builtins;
 mod controller;
+#[cfg(feature = "db")]
+mod db;
 mod ecs;
+#[cfg(feature = "http")]
+mod html;
+#[cfg(feature = "net")]
+mod net;
 #[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "graphics")]

@@ -85,6 +85,28 @@ fn expect_coro(v: &Value, fname: &str) -> R<Rc<RefCell<CoroState>>> {
     }
 }
 
+// Arg-Helfer fuer die Modul-Dispatcher (db/net/html).
+#[cfg(any(feature = "db", feature = "net", feature = "http"))]
+fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
+    match a.get(i) {
+        Some(Value::Int(n)) => Ok(*n),
+        Some(v) => Err(format!("{}: erwartet INTEGER, erhalten {}", fn_, v.type_name())),
+        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+    }
+}
+#[cfg(any(feature = "db", feature = "net", feature = "http"))]
+fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
+    match a.get(i) {
+        Some(Value::Str(s)) => Ok(s),
+        Some(v) => Err(format!("{}: erwartet STRING, erhalten {}", fn_, v.type_name())),
+        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+    }
+}
+#[cfg(feature = "db")]
+fn db_params(args: &[Value], fn_: &str) -> R<Vec<rusqlite::types::Value>> {
+    args.iter().map(|v| crate::db::gb_to_sql(v, fn_)).collect()
+}
+
 struct Slot {
     ty: String,
     value: Value,
@@ -242,6 +264,23 @@ pub struct Vm<'p> {
     // Retained-Mode-GUI (Modul gui): persistente Fenster/Widgets.
     #[cfg(feature = "graphics")]
     gui: crate::gui::Gui,
+    // Modul db (SQLite): Verbindungen + (eager geladene) Resultsets, INTEGER-Handles.
+    #[cfg(feature = "db")]
+    db_conns: Vec<Option<rusqlite::Connection>>,
+    #[cfg(feature = "db")]
+    db_results: Vec<crate::db::DbResult>,
+    // Modul net: TCP-Listener/-Sockets + UDP-Sockets, INTEGER-Handles.
+    #[cfg(feature = "net")]
+    tcp_listeners: Vec<Option<(std::net::TcpListener, i64)>>,
+    #[cfg(feature = "net")]
+    tcp_socks: Vec<Option<crate::net::NetSock>>,
+    #[cfg(feature = "net")]
+    udp_socks: Vec<Option<crate::net::UdpSock>>,
+    // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
+    #[cfg(feature = "http")]
+    http_status: i64,
+    #[cfg(feature = "http")]
+    http_headers: Vec<(String, String)>,
 }
 
 type R<T> = Result<T, String>;
@@ -282,6 +321,20 @@ impl<'p> Vm<'p> {
             audio: None,
             #[cfg(feature = "graphics")]
             gui: crate::gui::Gui::new(),
+            #[cfg(feature = "db")]
+            db_conns: Vec::new(),
+            #[cfg(feature = "db")]
+            db_results: Vec::new(),
+            #[cfg(feature = "net")]
+            tcp_listeners: Vec::new(),
+            #[cfg(feature = "net")]
+            tcp_socks: Vec::new(),
+            #[cfg(feature = "net")]
+            udp_socks: Vec::new(),
+            #[cfg(feature = "http")]
+            http_status: 0,
+            #[cfg(feature = "http")]
+            http_headers: Vec::new(),
         };
         vm.register_default_globals();
         vm
@@ -865,6 +918,12 @@ impl<'p> Vm<'p> {
                         stack.push(v);
                     } else if let Some(v) = self.try_coro(name, &bargs)? {
                         stack.push(v);
+                    } else if let Some(v) = self.try_db(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_net(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_html(name, &bargs)? {
+                        stack.push(v);
                     } else if let Some(v) = self.try_gui(name, &bargs)? {
                         stack.push(v);
                     } else if let Some(v) = self.try_graphics(name, &bargs)? {
@@ -1197,6 +1256,235 @@ impl<'p> Vm<'p> {
     }
 
     /// Modul `scene` (globaler Stack-State, kein Grafik-Bezug).
+    // ===================================================================
+    // Modul db (SQLite, Feature `db`)
+    // ===================================================================
+    fn try_db(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "db")]
+        { return self.try_db_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "db")]
+    fn db_conn(&self, idx: i64) -> R<&rusqlite::Connection> {
+        self.db_conns.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("DB: ungueltiges/geschlossenes DB_CONN-Handle {}", idx))
+    }
+    #[cfg(feature = "db")]
+    fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
+        let r = self.db_results.get(idx as usize)
+            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
+        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+        Ok(r)
+    }
+    #[cfg(feature = "db")]
+    fn db_res_mut(&mut self, idx: i64) -> R<&mut crate::db::DbResult> {
+        let r = self.db_results.get_mut(idx as usize)
+            .ok_or_else(|| format!("DB: ungueltiges DB_RESULT-Handle {}", idx))?;
+        if r.closed { return Err("DB: Result wurde bereits geschlossen".into()); }
+        Ok(r)
+    }
+
+    #[cfg(feature = "db")]
+    fn try_db_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::db;
+        let v = match name {
+            "db_open" => {
+                let conn = db::open(bi_str(a, 0, "DB_OPEN")?)?;
+                self.db_conns.push(Some(conn));
+                Value::Int((self.db_conns.len() - 1) as i64)
+            }
+            "db_close" => {
+                let i = bi_int(a, 0, "DB_CLOSE")? as usize;
+                if let Some(s) = self.db_conns.get_mut(i) { *s = None; }
+                Value::Nil
+            }
+            "db_last_rowid" => Value::Int(self.db_conn(bi_int(a, 0, "DB_LAST_ROWID")?)?.last_insert_rowid()),
+            "db_exec" => {
+                let params = db_params(a.get(2..).unwrap_or(&[]), "DB_EXEC")?;
+                let sql = bi_str(a, 1, "DB_EXEC")?.to_string();
+                Value::Int(db::exec(self.db_conn(bi_int(a, 0, "DB_EXEC")?)?, &sql, &params)?)
+            }
+            "db_query" => {
+                let params = db_params(a.get(2..).unwrap_or(&[]), "DB_QUERY")?;
+                let sql = bi_str(a, 1, "DB_QUERY")?.to_string();
+                let res = { let c = self.db_conn(bi_int(a, 0, "DB_QUERY")?)?; db::query(c, &sql, &params)? };
+                self.db_results.push(res);
+                Value::Int((self.db_results.len() - 1) as i64)
+            }
+            "db_next" => {
+                let r = self.db_res_mut(bi_int(a, 0, "DB_NEXT")?)?;
+                r.pos += 1;
+                Value::Bool((r.pos as usize) < r.rows.len())
+            }
+            "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?)?.columns.len() as i64),
+            "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?)?.col_name(i1)?) }
+            "db_close_result" => { self.db_res_mut(bi_int(a, 0, "DB_CLOSE_RESULT")?)?.closed = true; Value::Nil }
+            "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?)?.is_null(i1)?) }
+            "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?)?.get_string(i1)?) }
+            "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
+            "db_get_float" => { let i1 = bi_int(a, 1, "DB_GET_FLOAT")?; Value::Float(self.db_res(bi_int(a, 0, "DB_GET_FLOAT")?)?.get_float(i1)?) }
+            "db_get_bool" => { let i1 = bi_int(a, 1, "DB_GET_BOOL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_GET_BOOL")?)?.get_bool(i1)?) }
+            "db_begin" => { self.db_conn(bi_int(a, 0, "DB_BEGIN")?)?.execute_batch("BEGIN").map_err(|e| format!("DB_BEGIN: {}", e))?; Value::Nil }
+            "db_commit" => { self.db_conn(bi_int(a, 0, "DB_COMMIT")?)?.execute_batch("COMMIT").map_err(|e| format!("DB_COMMIT: {}", e))?; Value::Nil }
+            "db_rollback" => { self.db_conn(bi_int(a, 0, "DB_ROLLBACK")?)?.execute_batch("ROLLBACK").map_err(|e| format!("DB_ROLLBACK: {}", e))?; Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul net (std::net, Feature `net`)
+    // ===================================================================
+    fn try_net(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "net")]
+        { return self.try_net_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "net")]
+    fn net_listener(&self, idx: i64) -> R<&(std::net::TcpListener, i64)> {
+        self.tcp_listeners.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_LISTENER-Handle {}", idx))
+    }
+    #[cfg(feature = "net")]
+    fn net_sock(&self, idx: i64) -> R<&crate::net::NetSock> {
+        self.tcp_socks.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_SOCKET-Handle {}", idx))
+    }
+    #[cfg(feature = "net")]
+    fn net_sock_mut(&mut self, idx: i64) -> R<&mut crate::net::NetSock> {
+        self.tcp_socks.get_mut(idx as usize).and_then(|o| o.as_mut())
+            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_SOCKET-Handle {}", idx))
+    }
+    #[cfg(feature = "net")]
+    fn net_udp(&self, idx: i64) -> R<&crate::net::UdpSock> {
+        self.udp_socks.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_UDP-Handle {}", idx))
+    }
+    #[cfg(feature = "net")]
+    fn net_udp_mut(&mut self, idx: i64) -> R<&mut crate::net::UdpSock> {
+        self.udp_socks.get_mut(idx as usize).and_then(|o| o.as_mut())
+            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_UDP-Handle {}", idx))
+    }
+
+    #[cfg(feature = "net")]
+    fn try_net_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::net;
+        let v = match name {
+            "net_tcp_listen" => {
+                let (l, port) = net::listen(bi_int(a, 0, "NET_TCP_LISTEN")?)?;
+                self.tcp_listeners.push(Some((l, port)));
+                Value::Int((self.tcp_listeners.len() - 1) as i64)
+            }
+            "net_listener_port" => Value::Int(self.net_listener(bi_int(a, 0, "NET_LISTENER_PORT")?)?.1),
+            "net_tcp_accept" => {
+                let i = bi_int(a, 0, "NET_TCP_ACCEPT")?;
+                let res = { let l = &self.net_listener(i)?.0; net::accept(l)? };
+                match res {
+                    Some(sock) => { self.tcp_socks.push(Some(sock)); Value::Int((self.tcp_socks.len() - 1) as i64) }
+                    None => Value::Nil,
+                }
+            }
+            "net_tcp_connect" => {
+                let host = bi_str(a, 0, "NET_TCP_CONNECT")?.to_string();
+                let s = net::connect(&host, bi_int(a, 1, "NET_TCP_CONNECT")?)?;
+                self.tcp_socks.push(Some(s));
+                Value::Int((self.tcp_socks.len() - 1) as i64)
+            }
+            "net_send" => { let i = bi_int(a, 0, "NET_SEND")?; let t = bi_str(a, 1, "NET_SEND")?.to_string(); Value::Int(net::send(self.net_sock_mut(i)?, &t)?) }
+            "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(&net::recv(self.net_sock_mut(i)?, n)?) }
+            "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?)?.peer_host),
+            "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?)?.peer_port),
+            "net_close" => { let i = bi_int(a, 0, "NET_CLOSE")? as usize; if let Some(s) = self.tcp_socks.get_mut(i) { *s = None; } Value::Nil }
+            "net_close_listener" => { let i = bi_int(a, 0, "NET_CLOSE_LISTENER")? as usize; if let Some(s) = self.tcp_listeners.get_mut(i) { *s = None; } Value::Nil }
+            "net_set_timeout" => { let i = bi_int(a, 0, "NET_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_SET_TIMEOUT")?; net::set_timeout_tcp(&self.net_sock(i)?.stream, ms); Value::Nil }
+            "net_udp_bind" => { let s = net::udp_bind(bi_int(a, 0, "NET_UDP_BIND")?)?; self.udp_socks.push(Some(s)); Value::Int((self.udp_socks.len() - 1) as i64) }
+            "net_udp_open" => { let s = net::udp_open()?; self.udp_socks.push(Some(s)); Value::Int((self.udp_socks.len() - 1) as i64) }
+            "net_udp_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_PORT")?)?.bound_port),
+            "net_udp_send" => {
+                let i = bi_int(a, 0, "NET_UDP_SEND")?;
+                let h = bi_str(a, 1, "NET_UDP_SEND")?.to_string();
+                let p = bi_int(a, 2, "NET_UDP_SEND")?;
+                let t = bi_str(a, 3, "NET_UDP_SEND")?.to_string();
+                Value::Int(net::udp_send(self.net_udp(i)?, &h, p, &t)?)
+            }
+            "net_udp_recv" => { let i = bi_int(a, 0, "NET_UDP_RECV")?; let n = bi_int(a, 1, "NET_UDP_RECV")?; Value::str_rc(&net::udp_recv(self.net_udp_mut(i)?, n)?) }
+            "net_udp_last_from" => {
+                let s = self.net_udp(bi_int(a, 0, "NET_UDP_LAST_FROM")?)?;
+                if s.last_from.0.is_empty() { Value::str_rc("") } else { Value::str_rc(&format!("{}:{}", s.last_from.0, s.last_from.1)) }
+            }
+            "net_udp_set_timeout" => { let i = bi_int(a, 0, "NET_UDP_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_UDP_SET_TIMEOUT")?; net::set_timeout_udp(&self.net_udp(i)?.sock, ms); Value::Nil }
+            "net_udp_close" => { let i = bi_int(a, 0, "NET_UDP_CLOSE")? as usize; if let Some(s) = self.udp_socks.get_mut(i) { *s = None; } Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul html (HTTP/HTML/URL, Feature `http`)
+    // ===================================================================
+    fn try_html(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "http")]
+        { return self.try_html_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "http")]
+    fn try_html_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::html;
+        let v = match name {
+            "http_get" => {
+                let url = bi_str(a, 0, "HTTP_GET")?.to_string();
+                match html::http_get(&url) {
+                    Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::str_rc(&String::from_utf8_lossy(&r.body)) }
+                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
+                }
+            }
+            "http_post" => {
+                let url = bi_str(a, 0, "HTTP_POST")?.to_string();
+                let body = bi_str(a, 1, "HTTP_POST")?.to_string();
+                match html::http_post(&url, &body) {
+                    Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::str_rc(&String::from_utf8_lossy(&r.body)) }
+                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
+                }
+            }
+            "http_download" => {
+                let url = bi_str(a, 0, "HTTP_DOWNLOAD")?.to_string();
+                let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
+                match html::http_get(&url) {
+                    Ok(r) => {
+                        self.http_status = r.status; self.http_headers = r.headers;
+                        std::fs::write(&path, &r.body).map_err(|e| format!("HTTP_DOWNLOAD: Datei nicht schreibbar: {}", e))?;
+                        Value::Int(r.body.len() as i64)
+                    }
+                    Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
+                }
+            }
+            "http_status" => Value::Int(self.http_status),
+            "http_header" => {
+                let n = bi_str(a, 0, "HTTP_HEADER")?.to_lowercase();
+                Value::str_rc(self.http_headers.iter().find(|(k, _)| *k == n).map(|(_, v)| v.as_str()).unwrap_or(""))
+            }
+            "url_encode" => Value::str_rc(&html::url_encode(bi_str(a, 0, "URL_ENCODE")?)),
+            "url_decode" => Value::str_rc(&html::url_decode(bi_str(a, 0, "URL_DECODE")?)),
+            "html_text" => Value::str_rc(&html::html_text(bi_str(a, 0, "HTML_TEXT")?)),
+            "html_get_attr" => Value::str_rc(&html::html_get_attr(bi_str(a, 0, "HTML_GET_ATTR")?, bi_str(a, 1, "HTML_GET_ATTR")?)),
+            "html_find_all" => {
+                let items = html::html_find_all(bi_str(a, 0, "HTML_FIND_ALL")?, bi_str(a, 1, "HTML_FIND_ALL")?);
+                let n = items.len() as i64;
+                let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
+                for (i, s) in items.into_iter().enumerate() { arr.values[i] = Value::str_rc(&s); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
     fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING", fn_)) }
