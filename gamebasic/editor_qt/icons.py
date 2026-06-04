@@ -418,6 +418,31 @@ def _icon_particles() -> QPixmap:
     return pix
 
 
+def _icon_sfx() -> QPixmap:
+    """Lautsprecher + Schallwellen -- SFX-Generator."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    # Lautsprecher-Koerper (gefuellt)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["fg"])))
+    path = QPainterPath()
+    path.moveTo(4, 9)
+    path.lineTo(8, 9)
+    path.lineTo(12, 5)
+    path.lineTo(12, 19)
+    path.lineTo(8, 15)
+    path.lineTo(4, 15)
+    path.closeSubpath()
+    p.drawPath(path)
+    # Schallwellen (Boegen) in Akzent
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.setPen(_stroke(1.6, "accent"))
+    p.drawArc(QRectF(11, 7, 8, 10), -60 * 16, 120 * 16)
+    p.drawArc(QRectF(13, 4, 10, 16), -55 * 16, 110 * 16)
+    p.end()
+    return pix
+
+
 def _icon_settings() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -459,6 +484,7 @@ _BUILDERS = {
     "builtins": _icon_builtins,
     "sprite_editor": _icon_sprite_editor,
     "particles": _icon_particles,
+    "sfx": _icon_sfx,
 }
 
 

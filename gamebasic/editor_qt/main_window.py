@@ -349,6 +349,14 @@ class GameBasicEditor(QMainWindow):
             "Partikel-Editor -- Effekte live tunen + GB-Code exportieren")
         self.act_particle_editor.triggered.connect(self._open_particle_editor)
 
+        self.act_sfx_editor = QAction(
+            icons.get("sfx"), "SFX-Generator oeffnen ...", self,
+        )
+        self.act_sfx_editor.setShortcut(QKeySequence("Ctrl+Shift+J"))
+        self.act_sfx_editor.setToolTip(
+            "SFX-Generator -- Retro-Soundeffekte (sfxr-Stil), Export WAV/GB-Code")
+        self.act_sfx_editor.triggered.connect(self._open_sfx_editor)
+
         # Edit
         self.act_find = QAction(icons.get("find"), "Suchen ...", self)
         self.act_find.setShortcut(QKeySequence.StandardKey.Find)
@@ -533,6 +541,7 @@ class GameBasicEditor(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_sprite_editor)
         tb.addAction(self.act_particle_editor)
+        tb.addAction(self.act_sfx_editor)
         tb.addAction(self.act_theme)
         # Objektnamen fuer farbige Hover-Akzente (siehe theme.global_qss):
         # Run gruen, Stop magenta.
@@ -557,6 +566,7 @@ class GameBasicEditor(QMainWindow):
         m_file.addSeparator()
         m_file.addAction(self.act_sprite_editor)
         m_file.addAction(self.act_particle_editor)
+        m_file.addAction(self.act_sfx_editor)
         m_file.addSeparator()
         m_file.addAction(self.act_close_tab)
         m_file.addAction(self.act_reopen_tab)
@@ -1447,6 +1457,7 @@ class GameBasicEditor(QMainWindow):
             ("info",     self.act_about),
             ("sprite_editor", self.act_sprite_editor),
             ("particles", self.act_particle_editor),
+            ("sfx", self.act_sfx_editor),
         ):
             act.setIcon(icons.get(key))
         # Theme-Action haengt am aktuellen Theme.
@@ -1534,6 +1545,25 @@ class GameBasicEditor(QMainWindow):
         self._particle_editor_window.raise_()
         self._particle_editor_window.activateWindow()
 
+    def _open_sfx_editor(self) -> None:
+        """Oeffnet den SFX-Generator als zweites Top-Level-Fenster (in-process)."""
+        try:
+            from .. import sfxeditor_qt as sfx
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self, "SFX-Generator-Fehler",
+                f"Konnte SFX-Generator nicht laden:\n"
+                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
+            return
+        self._sfx_editor_window = sfx.SfxGenerator(self.project_root)
+        self._sfx_editor_window.setAttribute(
+            Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._sfx_editor_window.destroyed.connect(
+            lambda: setattr(self, "_sfx_editor_window", None))
+        self._sfx_editor_window.show()
+        self._sfx_editor_window.raise_()
+        self._sfx_editor_window.activateWindow()
+
     def _show_shortcuts(self) -> None:
         """Sammelt alle QActions + Editor-interne Shortcuts und zeigt sie."""
         entries: list[tuple[str, str]] = []
@@ -1546,7 +1576,7 @@ class GameBasicEditor(QMainWindow):
 
         add_action_group("Datei", [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
-            self.act_sprite_editor, self.act_particle_editor,
+            self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
         ])
         add_action_group("Bearbeiten", [
@@ -1630,7 +1660,7 @@ class GameBasicEditor(QMainWindow):
         """Liefert alle QActions, die der Command-Palette gezeigt werden."""
         return [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
-            self.act_sprite_editor, self.act_particle_editor,
+            self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,

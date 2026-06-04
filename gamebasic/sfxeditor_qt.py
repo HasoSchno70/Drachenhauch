@@ -1,0 +1,346 @@
+"""SFX-Generator fuer GameBasic (`gbsfx` / `gbrun.py --sfx`).
+
+sfxr-Stil-Tool fuer Retro-Soundeffekte: eigener Synthesizer (Waveform +
+Pitch-Slide + Hüllkurve + Vibrato), Live-Wellenform-Vorschau, Abspielen, und
+Export als **WAV** (per `LOADSOUND` ladbar) oder -- bei einfachen Toenen --
+als GB-Code (`AUDIO_TONE`/`AUDIO_NOISE`).
+
+Der Synth ist bewusst eigenstaendig: das `audio`-Modul kann nur konstante
+Toene (`AUDIO_TONE`) -- fuer Sweeps/Huellkurven brauchen wir mehr. Das
+Ergebnis wird als WAV-Asset exportiert.
+"""
+from __future__ import annotations
+
+import wave
+from pathlib import Path
+
+import numpy as np
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import (
+    QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFrame, QGroupBox,
+    QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QSpinBox,
+    QVBoxLayout, QWidget,
+)
+
+from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+
+_SAMPLE_RATE = 44100
+_WAVEFORMS = ("square", "saw", "sine", "triangle", "noise")
+
+# Presets: typische sfxr-Kategorien. Werte sind ein Startpunkt, "Zufall"
+# variiert sie. (waveform, base_freq, slide_hz_s, atk, sus, dec, vib_d, vib_s)
+_PRESETS = {
+    "Pickup/Coin":  ("square", 900,   600,  0,  40, 160, 0.0, 0),
+    "Laser/Shoot":  ("saw",    1000, -1400, 0,  30, 150, 0.0, 0),
+    "Explosion":    ("noise",  120,  -60,   0,  60, 420, 0.0, 0),
+    "Powerup":      ("square", 380,   700,  0,  90, 240, 0.15, 18),
+    "Hit/Hurt":     ("square", 500,  -500,  0,  20, 140, 0.0, 0),
+    "Jump":         ("square", 420,   560,  0,  50, 130, 0.0, 0),
+    "Blip/Select":  ("square", 820,   0,    0,  18, 70,  0.0, 0),
+}
+
+
+def synthesize(p: dict, sr: int = _SAMPLE_RATE) -> np.ndarray:
+    """Erzeugt das Float-Sample-Array [-1, 1] aus den Parametern."""
+    total_ms = max(1, p["attack"] + p["sustain"] + p["decay"])
+    n = max(1, int(sr * total_ms / 1000.0))
+    t = np.arange(n, dtype=np.float64) / sr
+    freq = p["base_freq"] + p["slide"] * t
+    if p["vib_depth"] > 0 and p["vib_speed"] > 0:
+        freq = freq * (1.0 + p["vib_depth"] * np.sin(2.0 * np.pi * p["vib_speed"] * t))
+    freq = np.clip(freq, 20.0, sr / 2.0)
+    wf = p["waveform"]
+    if wf == "noise":
+        wave_arr = np.random.uniform(-1.0, 1.0, n)
+    else:
+        phase = 2.0 * np.pi * np.cumsum(freq) / sr
+        ph = phase / (2.0 * np.pi)
+        if wf == "sine":
+            wave_arr = np.sin(phase)
+        elif wf == "square":
+            wave_arr = np.where(np.sin(phase) >= 0, 1.0, -1.0)
+        elif wf == "saw":
+            wave_arr = 2.0 * (ph - np.floor(0.5 + ph))
+        else:  # triangle
+            wave_arr = 2.0 * np.abs(2.0 * (ph - np.floor(0.5 + ph))) - 1.0
+    # Huellkurve (Attack-Ramp / Sustain / Decay-Ramp)
+    na = int(n * p["attack"] / total_ms)
+    nd = int(n * p["decay"] / total_ms)
+    env = np.ones(n)
+    if na > 0:
+        env[:na] = np.linspace(0.0, 1.0, na)
+    if nd > 0:
+        env[-nd:] = np.linspace(1.0, 0.0, nd)
+    return np.clip(wave_arr * env * p["volume"], -1.0, 1.0)
+
+
+def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
+    int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(int16.tobytes())
+
+
+def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
+    """Spielt die Samples ueber pygame.mixer (best effort -- ohne Audio-
+    Geraet still)."""
+    try:
+        import os
+        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
+        import pygame
+        if pygame.mixer.get_init() is None:
+            pygame.mixer.init(frequency=sr, size=-16, channels=1)
+        init = pygame.mixer.get_init()
+        int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
+        if init and init[2] == 2:
+            int16 = np.column_stack((int16, int16))
+        snd = pygame.sndarray.make_sound(int16)
+        snd.play()
+    except Exception:
+        pass
+
+
+class _WaveView(QWidget):
+    """Zeichnet die aktuelle Wellenform."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(140)
+        self._samples = np.zeros(1)
+
+    def set_samples(self, s: np.ndarray) -> None:
+        self._samples = s
+        self.update()
+
+    def paintEvent(self, _e):  # noqa: N802
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(COLORS["bg"]))
+        w = self.width()
+        h = self.height()
+        mid = h / 2.0
+        p.setPen(QPen(QColor(COLORS["border"]), 1))
+        p.drawLine(0, int(mid), w, int(mid))
+        s = self._samples
+        n = s.shape[0]
+        if n < 2 or w < 2:
+            return
+        p.setPen(QPen(QColor(COLORS["accent"]), 1))
+        step = max(1, n // w)
+        prev_x = 0
+        prev_y = mid - float(s[0]) * mid * 0.95
+        for x in range(1, w):
+            idx = min(n - 1, int(x / w * n))
+            # Peak im Fenster fuer dichtere Wellen.
+            seg = s[idx:min(n, idx + step)]
+            v = seg[np.argmax(np.abs(seg))] if seg.size else s[idx]
+            y = mid - float(v) * mid * 0.95
+            p.drawLine(prev_x, int(prev_y), x, int(y))
+            prev_x, prev_y = x, y
+
+
+class SfxGenerator(QMainWindow):
+    def __init__(self, project_root: Path):
+        super().__init__()
+        self.project_root = project_root
+        self.setWindowTitle("GameBasic SFX-Generator")
+        self.resize(720, 640)
+        self._counter = 0
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+
+        title = QLabel("SFX-Generator")
+        tf = QFont(); tf.setBold(True); tf.setPointSize(13)
+        title.setFont(tf)
+        root.addWidget(title)
+
+        # Presets
+        pre = QHBoxLayout()
+        pre.addWidget(QLabel("Preset:"))
+        for name in _PRESETS:
+            b = QPushButton(name)
+            b.clicked.connect(lambda _=False, n=name: self._load_preset(n))
+            pre.addWidget(b)
+        pre.addStretch(1)
+        root.addLayout(pre)
+
+        # Wellenform-Vorschau
+        self.wave_view = _WaveView()
+        root.addWidget(self.wave_view)
+
+        # Parameter
+        params = QHBoxLayout()
+        col1 = QGroupBox("Ton")
+        c1 = QVBoxLayout(col1)
+        self.waveform = QComboBox(); self.waveform.addItems(_WAVEFORMS)
+        self.waveform.currentTextChanged.connect(self._on_change)
+        self._row(c1, "Waveform", self.waveform)
+        self.base_freq = self._ispin(c1, "Frequenz (Hz)", 50, 8000, 800)
+        self.slide = self._ispin(c1, "Pitch-Slide (Hz/s)", -8000, 8000, 0)
+        self.volume = self._dspin(c1, "Lautstaerke", 0.0, 1.0, 0.7, 0.05)
+        params.addWidget(col1)
+
+        col2 = QGroupBox("Huellkurve & Vibrato")
+        c2 = QVBoxLayout(col2)
+        self.attack = self._ispin(c2, "Attack (ms)", 0, 2000, 0)
+        self.sustain = self._ispin(c2, "Sustain (ms)", 0, 4000, 40)
+        self.decay = self._ispin(c2, "Decay (ms)", 0, 4000, 150)
+        self.vib_depth = self._dspin(c2, "Vibrato-Tiefe", 0.0, 0.5, 0.0, 0.01)
+        self.vib_speed = self._ispin(c2, "Vibrato-Speed (Hz)", 0, 60, 0)
+        params.addWidget(col2)
+        root.addLayout(params)
+
+        # Buttons
+        btns = QHBoxLayout()
+        b_play = QPushButton("▶ Abspielen")
+        b_play.setProperty("accent", True)
+        b_play.clicked.connect(self._play)
+        btns.addWidget(b_play)
+        b_rand = QPushButton("Zufall")
+        b_rand.clicked.connect(self._randomize)
+        btns.addWidget(b_rand)
+        btns.addStretch(1)
+        b_wav = QPushButton("WAV exportieren ...")
+        b_wav.clicked.connect(self._export_wav)
+        btns.addWidget(b_wav)
+        b_code = QPushButton("GB-Code")
+        b_code.clicked.connect(self._export_code)
+        btns.addWidget(b_code)
+        root.addLayout(btns)
+        root.addStretch(1)
+
+        self._load_preset("Jump")
+
+    # ---- Helfer
+    def _row(self, layout, label, widget):
+        r = QHBoxLayout()
+        lab = QLabel(label); lab.setFixedWidth(140)
+        r.addWidget(lab); r.addWidget(widget, 1)
+        layout.addLayout(r)
+
+    def _ispin(self, layout, label, lo, hi, val):
+        sp = QSpinBox(); sp.setRange(lo, hi); sp.setValue(int(val))
+        sp.valueChanged.connect(self._on_change)
+        self._row(layout, label, sp)
+        return sp
+
+    def _dspin(self, layout, label, lo, hi, val, step):
+        sp = QDoubleSpinBox(); sp.setRange(lo, hi); sp.setSingleStep(step)
+        sp.setValue(val)
+        sp.valueChanged.connect(self._on_change)
+        self._row(layout, label, sp)
+        return sp
+
+    # ---- Parameter <-> UI
+    def _params(self) -> dict:
+        return {
+            "waveform": self.waveform.currentText(),
+            "base_freq": float(self.base_freq.value()),
+            "slide": float(self.slide.value()),
+            "volume": float(self.volume.value()),
+            "attack": int(self.attack.value()),
+            "sustain": int(self.sustain.value()),
+            "decay": int(self.decay.value()),
+            "vib_depth": float(self.vib_depth.value()),
+            "vib_speed": float(self.vib_speed.value()),
+        }
+
+    def _on_change(self, *_a) -> None:
+        self.wave_view.set_samples(synthesize(self._params()))
+
+    def _load_preset(self, name: str) -> None:
+        wf, base, slide, atk, sus, dec, vd, vs = _PRESETS[name]
+        self.waveform.setCurrentText(wf)
+        self.base_freq.setValue(base)
+        self.slide.setValue(slide)
+        self.attack.setValue(atk)
+        self.sustain.setValue(sus)
+        self.decay.setValue(dec)
+        self.vib_depth.setValue(vd)
+        self.vib_speed.setValue(vs)
+        self._on_change()
+        self._play()
+
+    def _randomize(self) -> None:
+        import random
+        self.waveform.setCurrentText(random.choice(_WAVEFORMS))
+        self.base_freq.setValue(random.randint(150, 1600))
+        self.slide.setValue(random.randint(-1600, 1600))
+        self.attack.setValue(random.choice([0, 0, 0, 20, 60]))
+        self.sustain.setValue(random.randint(10, 120))
+        self.decay.setValue(random.randint(60, 400))
+        self.vib_depth.setValue(round(random.choice([0, 0, 0.1, 0.2]), 2))
+        self.vib_speed.setValue(random.choice([0, 0, 12, 24]))
+        self._on_change()
+        self._play()
+
+    def _play(self) -> None:
+        play(synthesize(self._params()))
+
+    # ---- Export
+    def _export_wav(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "WAV speichern",
+            str(self.project_root / "assets" / "sfx.wav"),
+            "WAV-Dateien (*.wav)")
+        if not path:
+            return
+        if not path.lower().endswith(".wav"):
+            path += ".wav"
+        save_wav(Path(path), synthesize(self._params()))
+        name = Path(path).name
+        self._show_code(
+            f'DIM snd AS SOUND\n'
+            f'snd = LOADSOUND("{name}")\n'
+            f'PLAYSOUND(snd)\n', title=f"{name} gespeichert")
+
+    def _export_code(self) -> None:
+        p = self._params()
+        simple = p["slide"] == 0 and p["vib_depth"] == 0
+        if simple and p["waveform"] == "noise":
+            dur = p["attack"] + p["sustain"] + p["decay"]
+            code = ('IMPORT "audio"\n\nDIM snd AS SOUND\n'
+                    f'snd = AUDIO_NOISE({dur}, {p["volume"]:g})\n'
+                    'PLAYSOUND(snd)\n')
+        elif simple:
+            dur = p["attack"] + p["sustain"] + p["decay"]
+            code = ('IMPORT "audio"\n\nDIM snd AS SOUND\n'
+                    f'snd = AUDIO_TONE({p["base_freq"]:g}, {dur}, '
+                    f'"{p["waveform"]}", {p["volume"]:g})\n'
+                    'PLAYSOUND(snd)\n')
+        else:
+            code = ("' Dieser Effekt nutzt Pitch-Slide/Vibrato/Huellkurve --\n"
+                    "' das kann AUDIO_TONE nicht. Per 'WAV exportieren' als\n"
+                    "' Asset speichern und so laden:\n\n"
+                    'DIM snd AS SOUND\n'
+                    'snd = LOADSOUND("sfx.wav")\n'
+                    'PLAYSOUND(snd)\n')
+        self._show_code(code, title="GB-Code")
+
+    def _show_code(self, code: str, title: str) -> None:
+        dlg = QFrame(self, Qt.WindowType.Window)
+        dlg.setWindowTitle(title)
+        dlg.resize(520, 260)
+        dl = QVBoxLayout(dlg)
+        edit = QPlainTextEdit(); edit.setPlainText(code); edit.setReadOnly(True)
+        edit.setFont(QFont(EDITOR_FONT_FAMILY, 10))
+        dl.addWidget(edit)
+        row = QHBoxLayout(); row.addStretch(1)
+        b = QPushButton("In Zwischenablage"); b.setProperty("accent", True)
+        b.clicked.connect(lambda: QApplication.clipboard().setText(code))
+        row.addWidget(b)
+        dl.addLayout(row)
+        dlg.show()
+        self._code_dlg = dlg
+
+
+def launch(project_root: Path, initial_file: Path | None = None) -> int:
+    app = QApplication.instance() or QApplication([])
+    app.setStyleSheet(global_qss())
+    win = SfxGenerator(project_root)
+    win.show()
+    return app.exec()
