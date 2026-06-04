@@ -10,8 +10,15 @@ Features:
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Optional
+
+# Grafik-/3D-Programme initialisieren ein Fenster via SCREEN(...). Der
+# Benchmark (TW-Output vs gbrt-Output) eignet sich nur fuer deterministisch
+# terminierende Konsolen-Programme -- 3D wirft im Tree-Walker, Render-Loops
+# enden nicht von selbst. Damit erkennt der Bench-Button solche Programme.
+_SCREEN_CALL_RE = re.compile(r"\bSCREEN\s*\(", re.IGNORECASE)
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import (
@@ -393,8 +400,12 @@ class GameBasicEditor(QMainWindow):
             "einen Ordner; laeuft ohne Python")
         self.act_export.triggered.connect(self._export_active)
 
-        self.act_bench = QAction(icons.get("bench"), "Benchmark (TW vs Python-VM vs Native-VM)", self)
+        self.act_bench = QAction(
+            icons.get("bench"), "Benchmark (Tree-Walker vs gbrt)", self)
         self.act_bench.setShortcut(QKeySequence("Ctrl+F5"))
+        self.act_bench.setToolTip(
+            "Benchmark (Ctrl+F5) -- vergleicht Tree-Walker- und gbrt-Output. "
+            "Nur fuer terminierende Konsolen-Programme (kein Grafik/3D).")
         self.act_bench.triggered.connect(self._bench_active)
 
         # Debugger (Tree-Walker). Start via F7; Steuerung waehrend der Sitzung.
@@ -1191,6 +1202,20 @@ class GameBasicEditor(QMainWindow):
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
+        # Grafik-/3D-Programme eignen sich nicht fuer den stdout-Benchmark.
+        if _SCREEN_CALL_RE.search(st.editor.get_text()):
+            self.console.clear()
+            self.console.append("⚡ Benchmark übersprungen.\n\n", "info")
+            self.console.append(
+                "Der Benchmark vergleicht den stdout-Output von Tree-Walker "
+                "und gbrt und braucht ein deterministisch terminierendes "
+                "Programm.\nDieses Programm nutzt SCREEN(...) (Grafik/3D) — der "
+                "Tree-Walker kann kein 3D, und Render-Loops enden nicht von "
+                "selbst.\nTipp: mit 'Run nativ' (F6) starten und FPS() im "
+                "Programm messen.\n", "muted")
+            self.statusBar().showMessage(
+                "Benchmark nur fuer Konsolen-Programme", 4000)
+            return
         if self.console.start_run(st.file_path, ["--bench"]):
             self.tabs.set_running(st.file_path, "py")
             self.statusBar().showMessage(f"⚡ Benchmark: {st.file_path.name}")
