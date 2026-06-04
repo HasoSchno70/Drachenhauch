@@ -329,6 +329,8 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 
 - **`Stop`**: bricht den laufenden Prozess ab (für Game-Loops, die nicht von selbst enden).
 
+**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **▶** (Tree-Walker / F5) bzw. **⚙** (native Runtime / F6) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus (`▶ Läuft: x.gb (Tree-Walker)`). Beim Run-Ende wird die Markierung zurückgesetzt.
+
 ## Finden im Projekt
 
 `Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
@@ -392,6 +394,16 @@ Funktioniert ohne zusätzliches Paket (Qt-natives `dragEnterEvent`/`dropEvent`).
 VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.gb`-Dateien im Projekt. Tippe Teile des Datei-Namens oder Pfads — die Liste filtert live (gleiche Fuzzy-Logik wie die Befehlspalette). Pfeil-Up/Down navigiert, Enter öffnet den gewählten Tab.
 
 `.venv/`, `build/`, `dist/`, `__pycache__/` werden ausgespart.
+
+## Welcome-Panel & Showcase
+
+Startet der Editor ohne offene Datei, zeigt er ein **Welcome-Panel** (kein leerer Tab): Logo, Action-Buttons (Neu / Öffnen / Beispiele / Doku) und eine **Showcase-Galerie** — kuratierte Demos als anklickbare Karten mit echtem Screenshot-Thumbnail, Titel und Kurzbeschreibung (3D/PBR/IBL, Demoscene, Partikel, Platformer …). Klick auf eine Karte öffnet die Demo. Darunter die Liste der zuletzt geöffneten Dateien. Sobald eine Datei geöffnet oder ein neuer Tab angelegt wird, verschwindet das Welcome.
+
+Die Galerie-Liste ist die Single-Source-of-Truth in `gamebasic/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `gbrt` headless — `GBRT_FRAMES` + `GBRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
+
+## Explorer: Beispiele nach Kategorie
+
+Der Datei-Explorer gruppiert die flache `examples/`-Sammlung (100+ Dateien) virtuell nach Kategorie (Benchmarks, 3D & Rendering, Spiele, Module, Grafik & Demos, Sprache & Grundlagen, Weitere) — rein für die Anzeige, es werden keine Dateien verschoben. Andere Verzeichnisse behalten den normalen Ordner-Baum. Das Filterfeld blendet passende Kategorien auf.
 
 ## Workspace-Persistenz
 
