@@ -31,8 +31,62 @@ from .theme import COLORS, theme_signals
 _ICON_MODULE = "\U0001F9E9"          # puzzle piece
 _ICON_FOLDER = "\U0001F4C1"          # file folder
 _ICON_FILE = "\U0001F4C4"            # page
+_ICON_CATEGORY = "\U0001F516"        # bookmark -- virtuelle Beispiel-Kategorie
 _ICON_SECTION_MOD = "\U0001F9E9"
 _ICON_SECTION_FILES = "\U0001F5C2"   # card index dividers
+
+
+# Virtuelle Kategorien fuer die flache `examples/`-Sammlung (122 Dateien).
+# REIN fuer die Explorer-Anzeige -- es werden KEINE Dateien verschoben, daher
+# bleiben Pfade in gbrun.py, tests/ und docs/ unberuehrt. Klassifizierung per
+# Namens-Heuristik; die ERSTE passende Kategorie gewinnt (Reihenfolge =
+# Prioritaet bei Mehrdeutigkeit, z.B. "77_tiled_platformer" faellt unter
+# "Spiele" vor "Module"). Substrings werden gegen den Dateinamen geprueft.
+_EXAMPLE_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
+    ("Benchmarks", ("bench_",)),
+    ("3D & Rendering", (
+        "3d", "model", "heightmap", "billboard", "lighting", "_light",
+        "fog", "shadow", "normalmap", "pbr", "ibl", "postfx", "shader",
+    )),
+    ("Spiele", (
+        "pong", "tetris", "platformer", "coinquest", "amiga",
+        "cybermatic", "wobbler",
+    )),
+    ("Module", (
+        "json", "_db", "tween", "imgfx", "physics", "_ui", "gui", "astar",
+        "vec2", "input", "html", "net", "ecs", "curves", "preloader",
+        "tiled", "audio", "serial", "wifi", "usb", "_bt", "scene", "save",
+        "table", "window", "theme", "particle", "camera", "sprite",
+    )),
+    ("Grafik & Demos", (
+        "shapes", "sound", "tilemap", "parallax", "textscroll", "schneefall",
+        "hires", "showcase", "demo", "orbital", "layers", "atlas",
+        "render_target", "blend_gentex", "2d_extras", "ttf", "collision",
+        "editor",
+    )),
+    ("Sprache & Grundlagen", (
+        "hello", "variables", "loops", "fibonacci", "builtins", "functions",
+        "classes", "inheritance", "arrays", "maps", "strings", "math",
+        "struct", "files", "try", "enum", "named_args", "bitwise", "tuple",
+        "with", "static", "funcref", "slicing", "method_syntax", "qol",
+        "props_comp", "dictcomp", "fstring", "operator", "coroutines",
+        "select", "language",
+    )),
+]
+_EXAMPLE_CATEGORY_FALLBACK = "Weitere Beispiele"
+# Stabile Anzeige-Reihenfolge der Kategorien (Fallback ganz unten).
+_EXAMPLE_CATEGORY_ORDER = [name for name, _ in _EXAMPLE_CATEGORIES] + [
+    _EXAMPLE_CATEGORY_FALLBACK
+]
+
+
+def _classify_example(file_name: str) -> str:
+    """Ordnet einen examples/-Dateinamen einer virtuellen Kategorie zu."""
+    low = file_name.lower()
+    for cat, keys in _EXAMPLE_CATEGORIES:
+        if any(k in low for k in keys):
+            return cat
+    return _EXAMPLE_CATEGORY_FALLBACK
 
 
 def _list_builtin_modules() -> list[str]:
@@ -206,8 +260,34 @@ class FileBrowser(QWidget):
             dir_items[d] = it
             return it
 
+        # Die flache examples/-Sammlung wird virtuell nach Kategorie gruppiert
+        # (kein Datei-Move). Pro-Kategorie-Zaehler vorab fuer die Labels.
+        examples_dir = self.project_root / "examples"
+        cat_counts: dict[str, int] = {}
         for f in files:
-            parent_item = get_or_create_dir(f.parent)
+            if f.parent == examples_dir:
+                cat_counts[_classify_example(f.name)] = (
+                    cat_counts.get(_classify_example(f.name), 0) + 1)
+        cat_items: dict[str, QTreeWidgetItem] = {}
+
+        def get_or_create_category(cat: str) -> QTreeWidgetItem:
+            if cat in cat_items:
+                return cat_items[cat]
+            ex_item = get_or_create_dir(examples_dir)
+            it = QTreeWidgetItem(
+                [f"{_ICON_CATEGORY}  {cat}  ({cat_counts.get(cat, 0)})"])
+            it.setForeground(0, accent)
+            # Virtuell -- kein Pfad; im Activate/Filter wie ein Ordner behandelt.
+            it.setData(0, Qt.ItemDataRole.UserRole, ("catgroup", cat))
+            ex_item.addChild(it)
+            cat_items[cat] = it
+            return it
+
+        for f in files:
+            if f.parent == examples_dir:
+                parent_item = get_or_create_category(_classify_example(f.name))
+            else:
+                parent_item = get_or_create_dir(f.parent)
             file_item = QTreeWidgetItem([f"{_ICON_FILE}  {f.name}"])
             file_item.setData(0, Qt.ItemDataRole.UserRole, ("file", f))
             try:
@@ -217,6 +297,20 @@ class FileBrowser(QWidget):
                 pass
             parent_item.addChild(file_item)
             self._items_by_path[f] = file_item
+
+        # Kategorie-Knoten in stabile, sinnvolle Reihenfolge bringen (sie
+        # entstehen sonst in Datei-Iterations-Reihenfolge).
+        ex_item = dir_items.get(examples_dir)
+        if ex_item is not None:
+            ordered = sorted(
+                (ex_item.takeChild(0) for _ in range(ex_item.childCount())),
+                key=lambda c: _EXAMPLE_CATEGORY_ORDER.index(
+                    c.data(0, Qt.ItemDataRole.UserRole)[1])
+                if c.data(0, Qt.ItemDataRole.UserRole)[0] == "catgroup"
+                else len(_EXAMPLE_CATEGORY_ORDER),
+            )
+            for c in ordered:
+                ex_item.addChild(c)
 
         # Default: beide Sektionen offen (Module sofort sichtbar), tiefere
         # Ordner zugeklappt.
@@ -297,6 +391,6 @@ class FileBrowser(QWidget):
             # payload = docs/module-*.md -> main_window._open_file routet .md
             # automatisch in den Markdown-Viewer.
             self.file_activated.emit(payload)
-        elif kind in ("dir", "section"):
+        elif kind in ("dir", "section", "catgroup"):
             item.setExpanded(not item.isExpanded())
         # "module_nodoc": keine Aktion.
