@@ -399,6 +399,25 @@ def _icon_sprite_editor() -> QPixmap:
     return pix
 
 
+def _icon_particles() -> QPixmap:
+    """Partikel-Burst -- Zentrum + radial streuende bunte Punkte."""
+    import math
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["success"])))
+    p.drawEllipse(QPointF(12, 12), 2.6, 2.6)
+    cols = ("accent", "builtin", "danger", "accent", "success", "builtin")
+    for i in range(6):
+        a = i * math.pi / 3
+        x = 12 + math.cos(a) * 7.5
+        y = 12 + math.sin(a) * 7.5
+        p.setBrush(QBrush(QColor(COLORS[cols[i]])))
+        p.drawEllipse(QPointF(x, y), 1.7, 1.7)
+    p.end()
+    return pix
+
+
 def _icon_settings() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -439,6 +458,7 @@ _BUILDERS = {
     "outline":  _icon_outline,
     "builtins": _icon_builtins,
     "sprite_editor": _icon_sprite_editor,
+    "particles": _icon_particles,
 }
 
 

@@ -4,6 +4,10 @@ Standalone-Tool zum visuellen Tunen des [`particles`](README.md#module)-Moduls �
 
 ## Starten
 
+Aus dem **Code-Editor** heraus: Toolbar-Button (buntes Partikel-Symbol neben dem Sprite-Editor) oder `Datei → Partikel-Editor öffnen ...` (`Strg+Shift+K`).
+
+Standalone:
+
 ```
 gbparticles
 ```
