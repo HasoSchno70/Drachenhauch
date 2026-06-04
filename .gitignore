@@ -1,3 +1,6 @@
+# Lokale Claude-/Preview-Konfiguration (maschinenspezifische Pfade)
+.claude/launch.json
+
 # PyCharm
 .idea/
 *.iml

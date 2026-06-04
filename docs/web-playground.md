@@ -40,8 +40,8 @@ Konsolen-Ausgabe daneben.
 |---|---|
 | `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/gbrt.{js,wasm}` |
 | `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.gb` aus (Fallback `/program.gbc`) aus dem virtuellen FS |
-| `web/index.html` | Seite mit `<canvas id="canvas">` + Output-Bereich + Run-Button |
-| `web/playground.js` | emscripten-`Module`-Konfig: stdout→Div, Canvas binden, `callMain()` |
+| `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-Button |
+| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.gb`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. |
 
 ## Bauen
 
@@ -77,32 +77,37 @@ Die VM treibt ihren Frame-/Render-Loop **blockierend** in `vm.run()` (erst am
 Programmende kehrt sie zurück, stdout wird gepuffert). Im Browser darf der
 Main-Thread aber nicht blockieren. Zwei Wege:
 
-- **ASYNCIFY** (gewählt): emscripten entrollt den Stack an Blockier-Punkten —
-  der bestehende blockierende Loop läuft unverändert, nur langsamer und mit
-  größerem `.wasm`. `build_wasm.py` setzt `-s ASYNCIFY`.
-- **Umbau auf `emscripten_set_main_loop`** (perspektivisch schneller): die VM
+- **ASYNCIFY** (gesetzt): `build_wasm.py` setzt `-s ASYNCIFY`. **Reicht für
+  Grafik aber NICHT aus**, weil raylib im `PLATFORM_WEB`-Modus auf
+  `emscripten_set_main_loop` ausgelegt ist und in einem blockierenden Loop
+  nicht ans Browser-Event-Loop yieldet — ein `WHILE TRUE … FLIP()` blockiert
+  daher den Main-Thread (Tab hängt). Zusätzlich kollidiert ASYNCIFY mit dem
+  von rustc emittierten `-fwasm-exceptions` (Linker-Warnung).
+- **Umbau auf `emscripten_set_main_loop`** (nötig für Grafik im Browser): die VM
   müsste pro Frame zurückkehren statt selbst zu loopen — größerer Eingriff in
-  `vm.rs`/`graphics.rs`. Nicht umgesetzt.
+  `vm.rs`/`graphics.rs` (cfg `target_os="emscripten"`). **Nicht umgesetzt.**
 
-## Grenzen (Stand jetzt)
+## Stand & Grenzen (verifiziert 2026-06-04)
 
-- **Nicht in dieser Umgebung gebaut/verifiziert** — raylib-rs’ Web-Support ist
-  experimentell; die emscripten-Flags (`USE_GLFW=3`, `ASYNCIFY`, …) können je
-  nach raylib-rs-Version Anpassung brauchen.
-- **Compiler bleibt Python:** `.gb → .gbc` macht die Python-Toolchain. Der
-  Playground führt eine **vorab kompilierte** `.gbc` aus. Ein *Live*-Editor
-  („tippen → ausführen“) im Browser bräuchte zusätzlich den Compiler im
-  Browser — am ehesten via **Pyodide** (CPython-WASM) parallel zur gbrt-WASM.
-  Das ist der nächste Ausbauschritt.
+- **Konsolen-Programme: laufen im Browser ✅.** Im echten Browser geprüft (über
+  den Live-Editor): Quelle tippen → *Ausführen* → korrekte Ausgabe. gbrt
+  kompiliert die `.gb`-Quelle **selbst im WASM** (Front-End-Port) — **kein
+  Pyodide**, kein vorab kompiliertes `.gbc` nötig.
+- **Grafik-Programme: hängen aktuell ⚠️.** Der blockierende Render-Loop yieldet
+  nicht (siehe oben) → der Tab friert ein. Behebung = `emscripten_set_main_loop`-
+  Umbau (offen). Das Harness ist deshalb **hang-sicher**: *Ausführen* setzt ein
+  Einmal-Run-Flag (`gb_run`) in `sessionStorage`; ein simples Neuladen führt ein
+  hängendes Programm NICHT erneut aus (Editor-Inhalt bleibt in `gb_src` erhalten).
 - **Hardware-/Netz-Module** (`db/net/http/serial/usb/wifi/bt`) sind im
-  Web-Build nicht sinnvoll/verfügbar (nur `--features graphics`).
+  Web-Build nicht verfügbar (nur `--features graphics`).
 - **Audio/Threads:** Web-Audio + Coroutinen-Threads brauchen ggf. zusätzliche
   emscripten-Flags (`-s AUDIO_WORKLET`, `-pthread`) — offen.
 
 ## Nächste Schritte
 
-1. Toolchain lokal aufsetzen, `build_wasm.py` durchlaufen lassen, Flags
-   iterativ fixen bis `01_hello` (Konsole) im Browser läuft.
-2. Eine Grafik-Demo (z. B. `examples/03_*`) mit ASYNCIFY testen.
-3. Pyodide für Live-Kompilierung ergänzen (Editor-Textfeld → `.gbc` im Browser
-   → `FS.writeFile('/program.gbc')` → `callMain()`).
+1. ~~Konsole im Browser~~ ✅ erledigt (Live-Editor, verifiziert).
+2. **Grafik:** gbrt unter `cfg(target_os="emscripten")` auf
+   `emscripten_set_main_loop` umbauen (pro Frame zurückkehren) statt
+   blockierendem Loop — dann animieren Grafik-Demos im Canvas, ohne den Tab zu
+   blockieren. Ggf. ASYNCIFY/`-fwasm-exceptions`-Konflikt auflösen
+   (`-C panic=abort` o. ä.).

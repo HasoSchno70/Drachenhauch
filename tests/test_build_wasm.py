@@ -67,11 +67,13 @@ def test_web_harness_files_present():
     web = ROOT / "web"
     html = (web / "index.html").read_text(encoding="utf-8")
     assert 'id="canvas"' in html          # raylib/emscripten Canvas
+    assert 'id="src"' in html             # Quelltext-Editor (Live-Playground)
     assert "gbrt.js" in html              # laedt das wasm-Modul
     assert (web / "playground.js").exists()
     js = (web / "playground.js").read_text(encoding="utf-8")
-    assert "callMain" in js               # startet main()
-    assert "program.gbc" in js
+    # Live-Editor: schreibt die User-Quelle ins FS, laedt zum Lauf frisch.
+    assert "/program.gb" in js
+    assert "location.reload" in js
 
 
 def test_main_rs_has_wasm_entry():
