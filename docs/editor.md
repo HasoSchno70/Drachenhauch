@@ -369,6 +369,11 @@ Beide Themes sind VSCode-orientiert (Dark+ und Light+), Akzentfarbe ist ein mode
 
 Schneller geht's per Befehlspalette: `Strg+Shift+P`, dann „doku" tippen — alle Doc-Files erscheinen sofort gefiltert.
 
+Der **Markdown-Viewer** rendert die Doku theme-treu (helle Schrift auf dunklem Grund) und bietet zwei Navigationshilfen:
+
+- **Inhaltsverzeichnis** (links, Toggle `☰ Inhalt`): aus den Überschriften des Dokuments aufgebaut und nach Ebene eingerückt — Klick springt zur Stelle. Bei Dokumenten ohne Überschriften ausgeblendet.
+- **Suche** (`Strg+F`): Suchleiste mit `Weiter`/`Zurück`, Wrap-Around und Treffer-Zähler; **alle** Treffer werden hervorgehoben. `Esc` schließt die Leiste.
+
 ## Branding (Window-Icon + About-Dialog)
 
 Das GameBasic-Logo aus `gamebasic/assets/logo.png` wird automatisch:
