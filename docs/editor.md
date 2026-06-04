@@ -339,6 +339,26 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 
 **Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **▶** (Tree-Walker / F5) bzw. **⚙** (native Runtime / F6) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus (`▶ Läuft: x.gb (Tree-Walker)`). Beim Run-Ende wird die Markierung zurückgesetzt.
 
+## Debugger
+
+Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt und Variablen-Inspektion. Er läuft auf dem Python-Interpreter (Referenz-Pfad) — die native Runtime `gbrt` hat keinen Debug-Kanal. Am besten für Konsolen-/Logik-Programme geeignet.
+
+**Bedienung:**
+
+| Aktion | Kürzel |
+|---|---|
+| Breakpoint setzen/entfernen | Klick im **linken Gutter-Band** (roter Punkt) |
+| Debuggen starten | `F7` (Toolbar-Käfer / Menü *Debug*) |
+| Fortsetzen (bis nächster Breakpoint) | `F8` |
+| Step Over (Zeile, ohne in Aufrufe zu springen) | `F10` |
+| Step Into (in `SUB`/`FUNCTION` hinein) | `F11` |
+| Step Out (aus der aktuellen Funktion heraus) | `Shift+F11` |
+| Debug stoppen | Menü *Debug → Debug stoppen* |
+
+**Ablauf:** Setz einen oder mehrere Breakpoints, drück `F7`. Das Programm läuft bis zum ersten Breakpoint (oder hält am ersten Statement, wenn keiner gesetzt ist). Die **aktuelle Zeile** wird mit einem ▶-Pfeil im Gutter und einem Zeilen-Highlight markiert; das Panel **Variablen** (rechts) zeigt die lokalen und globalen Variablen (Name / Wert / Typ) — nur deine eigenen, die eingebauten Konstanten (`BLACK`, `KEY_*`, `PI` …) sind ausgeblendet. `PRINT`-Ausgabe landet in der Konsole.
+
+**Grenzen:** `INPUT` liefert im Debugger EOF (kein Hängen). Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem. Während einer Debug-Sitzung sind Run/Bench deaktiviert.
+
 ## Finden im Projekt
 
 `Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
