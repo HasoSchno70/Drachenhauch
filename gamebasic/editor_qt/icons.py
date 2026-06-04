@@ -136,6 +136,42 @@ def _icon_run() -> QPixmap:
     return pix
 
 
+def _icon_run_native() -> QPixmap:
+    """Doppel-Play (Fast-Forward) in Akzent -- der schnelle native Pfad."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    p.drawPolygon(QPolygonF([QPointF(4, 6), QPointF(4, 18), QPointF(12, 12)]))
+    p.drawPolygon(QPolygonF([QPointF(12, 6), QPointF(12, 18), QPointF(20, 12)]))
+    p.end()
+    return pix
+
+
+def _icon_debug() -> QPixmap:
+    """Kaefer -- klassisches Debugger-Symbol."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    accent = QColor(COLORS["accent"])
+    # Beine + Antennen (Stroke)
+    p.setPen(_stroke(1.5, "accent"))
+    for y in (10, 13, 16):                 # je drei Beinpaare
+        p.drawLine(8, y, 4, y - 2)
+        p.drawLine(16, y, 20, y - 2)
+    p.drawLine(10, 6, 8, 3)                 # Antennen
+    p.drawLine(14, 6, 16, 3)
+    # Koerper (gefuellt) + Kopf
+    p.setBrush(QBrush(accent))
+    p.setPen(_stroke(1.2, "accent"))
+    p.drawEllipse(QPointF(12, 13), 4.5, 6.0)
+    p.drawEllipse(QPointF(12, 6.5), 2.2, 2.2)
+    # Mittel-Naht in BG-Farbe (Kaefer-Ruecken)
+    p.setPen(_stroke(1.1, "bg"))
+    p.drawLine(12, 8, 12, 18)
+    p.end()
+    return pix
+
+
 def _icon_stop() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -386,6 +422,8 @@ _BUILDERS = {
     "save":     _icon_save,
     "save_as":  _icon_save_as,
     "run":      _icon_run,
+    "run_native": _icon_run_native,
+    "debug":    _icon_debug,
     "stop":     _icon_stop,
     "bench":    _icon_bench,
     "find":     _icon_find,

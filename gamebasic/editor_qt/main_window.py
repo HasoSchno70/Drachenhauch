@@ -378,7 +378,7 @@ class GameBasicEditor(QMainWindow):
         self.act_stop.setEnabled(False)
 
         self.act_run_native = QAction(
-            icons.get("run"), "Run nativ (gbrt)", self)
+            icons.get("run_native"), "Run nativ (gbrt)", self)
         self.act_run_native.setShortcut(QKeySequence("F6"))
         self.act_run_native.setToolTip(
             "Nativ ausfuehren via gbrt-Runtime (F6) -- kompiliert + startet die "
@@ -398,7 +398,7 @@ class GameBasicEditor(QMainWindow):
         self.act_bench.triggered.connect(self._bench_active)
 
         # Debugger (Tree-Walker). Start via F7; Steuerung waehrend der Sitzung.
-        self.act_debug = QAction(icons.get("run"), "Debuggen (Tree-Walker)", self)
+        self.act_debug = QAction(icons.get("debug"), "Debuggen (Tree-Walker)", self)
         self.act_debug.setShortcut(QKeySequence("F7"))
         self.act_debug.setToolTip(
             "Debuggen mit Breakpoints + Step (F7) -- Tree-Walker. Klick links "
@@ -1402,6 +1402,8 @@ class GameBasicEditor(QMainWindow):
             ("replace",  self.act_replace),
             ("settings", self.act_settings),
             ("run",      self.act_run),
+            ("run_native", self.act_run_native),
+            ("debug",    self.act_debug),
             ("stop",     self.act_stop),
             ("bench",    self.act_bench),
             ("fold",     self.act_fold),
