@@ -1615,19 +1615,25 @@ generieren (`python vscode-gamebasic/build_grammar.py`).
 selbst aus Quelltext Bytecode erzeugen (heute macht das die Python-Toolchain).
 Die Front-End-Stufen werden **inkrementell** nach Rust portiert, **jede gegen
 Python verifiziert** (cargo+rustc vorhanden → hier beweisbar). **Stufe 1 (Lexer)
-+ Stufe 2 (Parser) fertig.** Debug-Einstiege `gbrt --tokens` / `gbrt --ast`
-geben Token-Strom bzw. AST als kanonisches JSON aus → Parity gegen Python:
-[`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py) (137) +
-[`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96).
++ Stufe 2 (Parser) fertig, Stufe 3 (Compiler) in Arbeit (3a fertig).** Debug-/
+Run-Einstiege `gbrt --tokens` / `gbrt --ast` / `gbrt --runsrc` geben Token-Strom
+bzw. AST als JSON aus bzw. lexen+parsen+kompilieren+führen **alles in Rust** aus.
+Parity gegen Python: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
+(137) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96)
++ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (21).
 Dateien: [`src/lexer.rs`](rust/gb_runtime/src/lexer.rs),
 [`src/ast.rs`](rust/gb_runtime/src/ast.rs),
-[`src/parser.rs`](rust/gb_runtime/src/parser.rs). Plan + Gotchas:
-[docs/rust-frontend-port.md](docs/rust-frontend-port.md). **Nächste Stufe:
-Compiler** (`compiler.py` → `src/compiler.rs`, Gate = **Bytecode-`Module`-
-Gleichheit** ggü. `serialize.py`-`.gbc`), dann Preprocess. Der Tree-Walker bleibt
-Referenz + `@builtin`-Host. Bei AST-Parity: `.line` ist kein Dataclass-Feld
-(Struktur-Vergleich), `Param.by_ref` ist in Python ein Token (Test normalisiert
-auf bool).
+[`src/parser.rs`](rust/gb_runtime/src/parser.rs),
+[`src/compiler.rs`](rust/gb_runtime/src/compiler.rs). Plan/Stufen/Gotchas:
+[docs/rust-frontend-port.md](docs/rust-frontend-port.md).
+**Compiler-Gate = Output-Parität** (`gbrt --runsrc` stdout == Python-TW), NICHT
+byte-exakter Bytecode: gbrt's VM kann beide Opcode-Formen, der Rust-Compiler
+emittiert die generischen (kein Folding/`_NN`/IC) → identisches Verhalten, viel
+weniger Code. **3a = main-only Konsole** (Skalar-Globals, Arithmetik, IF/WHILE,
+Builtins); Nicht-3a → `Err("Stufe 3b: ...")`. Nächste Teil-Stufen 3b–3e (FOR/
+Arrays → Funktionen → Klassen → Comprehensions/SELECT/Tupel/WITH/TRY/Coroutinen),
+dann `gbrt run datei.gb` + Preprocess. Tree-Walker bleibt Referenz + `@builtin`-
+Host. AST-Parity-Gotchas: `.line` kein Feld, `Param.by_ref` ist ein Token.
 
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 

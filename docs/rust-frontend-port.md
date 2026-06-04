@@ -16,7 +16,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` (geplant) | **Bytecode-`Module`-Gleichheit** ggü. `serialize.py`-`.gbc` | offen |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a fertig** (Kern) |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
@@ -55,6 +55,36 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
   eines bool — der Test normalisiert auf `bool` (Rust nutzt korrekt bool).
   (c) `CASE IS <op>`: erstes `values`-Element ist ein roher Operator-String, kein
   `StringLit` → eigener `CaseVal::Op`-Zweig.
+
+## Stufe 3 — Compiler (in Arbeit)
+
+[`rust/gb_runtime/src/compiler.rs`](../rust/gb_runtime/src/compiler.rs): AST →
+`.gbc`-JSON. Debug-/Run-Einstieg `gbrt --runsrc <datei.gb>` macht **alles in
+Rust** (lex+parse+compile+run).
+
+**Gate-Entscheidung: Output-Parität statt byte-exaktem Bytecode.** gbrt's VM
+implementiert den vollen Opcode-Satz — sowohl generische (`ADD`, `LOAD_NAME`)
+als auch optimierte (`ADD_NN`, Slot-Globals, Inline-Caches). Der Rust-Compiler
+emittiert die **generischen** Opcodes (kein Constant-Folding, keine `_NN`, keine
+Inline-Caches) — das Verhalten ist identisch, der Code viel kleiner. Verifiziert
+wird per stdout-Vergleich `gbrt --runsrc` == Python-Tree-Walker
+([`tests/test_rust_compiler_parity.py`](../tests/test_rust_compiler_parity.py)),
+dasselbe Korrektheits-Prinzip wie `test_gbrt_parity`. (Performance-Parität —
+Optimierungs-Opcodes — kann später nachgezogen werden, ohne Verhalten zu ändern.)
+
+**Stufe 3a (fertig):** main-only Konsolen-Programme — Skalar-Globals (Slot-
+basiert, `DECLARE_GLOBAL_SLOT`), CONST, Arithmetik/Vergleich/Logik (mit
+`and`/`or`-Short-Circuit)/Bitwise/Unär, PRINT, Builtin-Calls, IF/ELSEIF/ELSE,
+WHILE, BREAK/CONTINUE. **21 Tests grün.** Nicht-3a-Konstrukte liefern
+`Err("Stufe 3b: ...")` → der Sweep überspringt sie.
+
+**Nächste Teil-Stufen** (je eigener Commit, Korpus wächst):
+3b Control-Flow-Rest + Arrays (`FOR`, `DECLARE_ARRAY_*`, `LOAD/STORE_INDEX`,
+member/index-Assign, `INPUT`, `DATA/READ`) · 3c User-`SUB`/`FUNCTION` (Locals,
+Params, Defaults, Variadic, `CALL_USER`, FUNCREF) · 3d Klassen/Structs (`NEW`,
+Member, `Self`, Properties, Operatoren, Statics, ENUM) · 3e Comprehensions,
+`SELECT`, Tupel, `WITH`, `TRY`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
+(Stufe 5) + Preprocess (Stufe 4).
 
 ## Prinzip
 

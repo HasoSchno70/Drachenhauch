@@ -15,6 +15,7 @@ mod astar;
 #[cfg(feature = "graphics")]
 mod audio;
 mod builtins;
+mod compiler;
 mod parser;
 mod controller;
 #[cfg(feature = "db")]
@@ -74,6 +75,10 @@ fn main() -> ExitCode {
         }
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);
+        }
+        // Stufe 3: Quelltext in Rust kompilieren + ausfuehren (Output-Parity).
+        if raw.len() >= 3 && raw[1] == "--runsrc" {
+            return runsrc_main(&raw[2]);
         }
     }
 
@@ -160,6 +165,29 @@ fn ast_main(path: &str) -> ExitCode {
     }
 }
 
+/// `gbrt --runsrc <datei.gb>` -- lext + parst + kompiliert (alles in Rust) und
+/// fuehrt das Ergebnis in der VM aus. Verifiziert die Rust-Front-End-Kette
+/// gegen den Python-Tree-Walker (Output-Parity, Stufe 3).
+fn runsrc_main(path: &str) -> ExitCode {
+    let source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let toks = match lexer::Lexer::new(&source).tokenize() {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Lexer {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
+    };
+    let ast = match parser::Parser::new(toks).parse() {
+        Ok(a) => a,
+        Err(e) => { eprintln!("Parse {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
+    };
+    let json = match compiler::compile_to_gbc(&ast) {
+        Ok(j) => j,
+        Err(e) => { eprintln!("Compile: {}", e); return ExitCode::from(3); }
+    };
+    run_program_value(json, path)
+}
+
 /// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
 /// (Datei aus Argumenten) und Bundle-Modus (eingebettet in die Exe).
 fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
@@ -170,6 +198,11 @@ fn run_gbc_text(text: &str, source_label: &str) -> ExitCode {
             return ExitCode::from(1);
         }
     };
+    run_program_value(json, source_label)
+}
+
+/// Laedt ein bereits geparstes `.gbc`-JSON-`Value` und fuehrt es aus.
+fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
     let prog = match model::load_program(&json) {
         Ok(p) => p,
         Err(e) => {
