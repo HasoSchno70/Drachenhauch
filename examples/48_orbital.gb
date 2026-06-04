@@ -45,6 +45,22 @@ CONST TWO_PI AS FLOAT = 6.2831853
 SCREEN(WIDTH, HEIGHT, "Orbital - GameBasic Showcase", 2)
 RANDOMIZE(7)               ' deterministisch fuer reproduzierbare Verteilung
 
+' --- TTF-Font: konsistente Metrik + scharfer Text auf BEIDEN Pfaden ---
+' Probiert gaengige System-Fonts; sonst Default (SETFONT(-1)). Behebt das
+' HUD-Layout, das sonst mit raylibs breiterem Default-Font ueberlappt.
+DIM hud_font AS INTEGER
+hud_font = -1
+IF FILEEXISTS("C:/Windows/Fonts/consola.ttf") THEN
+    hud_font = LOADFONT("C:/Windows/Fonts/consola.ttf", 32)
+ELSEIF FILEEXISTS("C:/Windows/Fonts/segoeui.ttf") THEN
+    hud_font = LOADFONT("C:/Windows/Fonts/segoeui.ttf", 32)
+END IF
+SETFONT(hud_font)
+TEXT_SPACING(1)
+
+' --- Direkt im Vollbild starten (F11 schaltet um) --------------------
+SET_FULLSCREEN(TRUE)
+
 ' --- Input-Bindings ---------------------------------------------------
 ' Statt sieben einzelner KEYPRESSED(KEY_n)-Zweige: ein Loop, der dynamisch
 ' "focus0".."focus6" an die Tasten 0..6 bindet. Die anderen Actions sind
@@ -361,7 +377,7 @@ fps = 0
 ' Toggle-State: was vom INPUT_PRESSED zurueckgesetzt wird, lebt
 ' direkt in den Toggle-Variablen (frozen, free_mode, muted, fs_on).
 DIM fs_on AS BOOLEAN
-fs_on = FALSE
+fs_on = TRUE               ' Start im Vollbild (siehe SET_FULLSCREEN oben)
 
 ' Sound-Toggle plus Focus-Tracker fuer SFX-Trigger.
 DIM muted AS BOOLEAN
@@ -377,6 +393,16 @@ SUB DrawCard(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, _
     RECT(x, y, x + w - 1, y + h - 1, fg)
     TEXT(x + 5, y + 3, title, fg)
 END SUB
+
+' Wie DrawCard, liefert aber die X-Position direkt hinter dem Titel --
+' damit der Wert font-unabhaengig (via TEXT_WIDTH) gesetzt werden kann.
+FUNCTION DrawCardL(x AS INTEGER, y AS INTEGER, w AS INTEGER, h AS INTEGER, _
+                   title AS STRING, fg AS INTEGER, bg AS INTEGER = &H0F1424) AS INTEGER
+    BOX(x, y, x + w - 1, y + h - 1, bg)
+    RECT(x, y, x + w - 1, y + h - 1, fg)
+    TEXT(x + 8, y + 4, title, fg)
+    RETURN x + 8 + TEXT_WIDTH(title) + 14
+END FUNCTION
 
 ' Sinus-Scroller-Farbe: drei phasenverschobene Sinusse zu (r, g, b).
 ' Tupel-Return ersetzt die fruehere Inline-Berechnung mit drei
@@ -729,39 +755,51 @@ WHILE NOT QUITREQUESTED()
         last_fps = TIMER()
     END IF
 
-    ' Linke Karte: Status
-    DrawCard(4, 4, 220, 26, "Orbital", &HCCDDEE)
-    TEXT(4 + 70, 4 + 5, f"Fokus: {focus_name}", &HFFCC66)
+    ' Linke Karte: Status (Wert direkt hinter dem Titel via TEXT_WIDTH).
+    DIM lvx AS INTEGER
+    lvx = DrawCardL(4, 4, 250, 28, "Orbital", &HCCDDEE)
+    TEXT(lvx, 4 + 4, f"Fokus: {focus_name}", &HFFCC66)
 
-    ' Rechte Karte: Performance + Sound-Indikator + Frame-Counter
-    DrawCard(WIDTH - 240, 4, 236, 26, "Stats", &H88FFAA)
-    TEXT(WIDTH - 240 + 56, 4 + 5, FORMAT$(fps, "FPS:%3d"), &HCCDDEE)
-    TEXT(WIDTH - 240 + 110, 4 + 5, FORMAT$(frame_no, "F:%06d"), &H99AAEE)
+    ' Rechte Karte: FPS + Sound-Indikator. Werte hintereinander via
+    ' TEXT_WIDTH -- so ueberlappt nichts, egal wie breit der Font ist.
     DIM snd_label AS STRING
+    DIM snd_col AS INTEGER
     IF muted THEN
         snd_label = "[MUTE]"
+        snd_col = &H8899AA
     ELSE
-        snd_label = "[SND ]"
+        snd_label = "[SND]"
+        snd_col = &H88FFAA
     END IF
-    TEXT(WIDTH - 240 + 188, 4 + 5, snd_label, &HFFCC66)
+    DIM rx AS INTEGER
+    rx = WIDTH - 256
+    DIM rvx AS INTEGER
+    rvx = DrawCardL(rx, 4, 252, 28, "Stats", &H88FFAA)
+    DIM s_fps AS STRING
+    s_fps = FORMAT$(fps, "FPS:%3d")
+    TEXT(rvx, 4 + 4, s_fps, &HCCDDEE)
+    rvx = rvx + TEXT_WIDTH(s_fps) + 14
+    TEXT(rvx, 4 + 4, snd_label, snd_col)
 
-    ' Untere Karte: Info auf einer Zeile (Titel links, Beschreibung
-    ' rechts) - selbes Schema wie die Top-Karten, kein vertikales Overlap.
+    ' Untere Karte: Info auf einer Zeile (Titel + Beschreibung).
     DIM info_text AS STRING
     IF MAPHAS(info, focus_name) THEN
         info_text = MAPGET(info, focus_name)
     ELSE
         info_text = "freie Kamera - Maus bewegt den Blickpunkt"
     END IF
-    DrawCard(4, HEIGHT - 56, WIDTH - 8, 26, "Info", &HBBCCDD)
-    TEXT(4 + 56, HEIGHT - 56 + 5, info_text, &HCCDDEE)
+    DIM ivx AS INTEGER
+    ivx = DrawCardL(4, HEIGHT - 56, WIDTH - 8, 28, "Info", &HBBCCDD)
+    TEXT(ivx, HEIGHT - 56 + 4, info_text, &HCCDDEE)
 
-    ' Help-Zeile in eigener Reihe ganz unten -- Zoom-Indikator als
-    ' kompakter Suffix damit nichts ueber den Bildschirmrand laeuft.
-    TEXT(8, HEIGHT - 24, _
-         "0..6=Fokus  F=Frei  +/-=Zoom  SPACE=Pause  M=Sound  F11=Vollbild  ESC=Ende  z=" _
-         + FORMAT$(INT(zoom * 100), "%03d") + "%", _
+    ' Help-Zeile in eigener Reihe ganz unten (kleiner, damit sie auch mit
+    ' dem breiteren TTF-Font in eine Zeile passt). Zoom als kompakter Suffix.
+    TEXT_SIZE(13)
+    TEXT(8, HEIGHT - 19, _
+         "0-6 Fokus  F Frei  +/- Zoom " + FORMAT$(INT(zoom * 100), "%03d") _
+         + "%  SPACE Pause  M Sound  F11 Vollbild  ESC Ende", _
          &H7788BB)
+    TEXT_SIZE(20)
 
     ' Pause-Banner mittig
     IF frozen THEN
