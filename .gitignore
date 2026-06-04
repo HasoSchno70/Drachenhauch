@@ -28,3 +28,5 @@ Thumbs.db
 # Grosse Demo-Musik-Assets (via examples/assets/download_*.py geladen)
 examples/assets/cybermatic_pulse.ogg
 examples/assets/techno_messup.ogg
+# HDR-Environment fuer HDR-IBL-Demo (via download_hdri.py geladen)
+examples/assets/ibl_env.hdr

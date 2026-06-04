@@ -115,10 +115,11 @@ durch echte Environment-Maps aus einem `.hdr`. Im Kern ein Port von raylibs
    Alternative.
 
 Dateien: `graphics.rs` (Shader-Consts + 3 Map-Felder + `gen_ibl()` +
-`light_env_hdr()`), `vm.rs` (Dispatch), `g3d.py` (native-only Stub). Braucht ein
-CC0-`.hdr` (Download-Skript-Pattern wie Audio-Assets, gitignored) + Demo
-`examples/99_ibl_hdr.gb`. Verifikation: headless-Screenshot, Chrom-Kugel spiegelt
-die Umgebung. GPU-/ffi-lastig, visuell zu prüfen → eigene Session.
+`light_env_hdr()`), `vm.rs` (Dispatch), `g3d.py` (native-only Stub) + Demo
+`examples/99_ibl_hdr.gb`. **Asset liegt bereit:** `examples/assets/download_hdri.py`
+holt ein CC0-1k-HDRI (Poly Haven) als `examples/assets/ibl_env.hdr` (gitignored).
+Verifikation: headless-Screenshot, Chrom-Kugel spiegelt die Umgebung.
+GPU-/ffi-lastig, visuell zu prüfen → eigene Session.
 
 ## Dev-Run-Loop: `gbrun.py --native`
 
