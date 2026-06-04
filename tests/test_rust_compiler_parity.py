@@ -98,6 +98,17 @@ _SNIPPETS = [
     "FUNCTION twice(g AS FUNCREF, x AS INTEGER) AS INTEGER\n  RETURN g(g(x))\nEND FUNCTION\nFUNCTION inc(n AS INTEGER) AS INTEGER\n  RETURN n + 1\nEND FUNCTION\nPRINT twice(inc, 10)\n",
     "FUNCTION fac(n AS INTEGER) AS INTEGER\n  DIM r AS INTEGER\n  DIM i AS INTEGER\n  r = 1\n  FOR i = 2 TO n\n    r = r * i\n  NEXT\n  RETURN r\nEND FUNCTION\nPRINT fac(6)\n",
     "DIM total AS INTEGER\nSUB addto(x AS INTEGER)\n  total = total + x\nEND SUB\ntotal = 0\naddto(5)\naddto(10)\nPRINT total\n",
+    # --- 3d: Klassen / Structs / ENUM ---
+    "ENUM State = MENU, PLAYING, PAUSED\nPRINT State.MENU, State.PLAYING, State.PAUSED\n",
+    "ENUM P\n  NONE = 0\n  READ = 1\n  WRITE = 4\nEND ENUM\nPRINT P.READ + P.WRITE\n",
+    "CLASS C\n  DIM v AS INTEGER\n  SUB Init()\n    Self.v = 7\n  END SUB\n  FUNCTION get() AS INTEGER\n    RETURN Self.v\n  END FUNCTION\nEND CLASS\nDIM c AS C\nc = NEW C()\nPRINT c.get()\nc.v = 99\nPRINT c.get()\n",
+    "CLASS Animal\n  FUNCTION voice() AS STRING\n    RETURN \"...\"\n  END FUNCTION\n  FUNCTION speak() AS STRING\n    RETURN \"sagt \" + voice()\n  END FUNCTION\nEND CLASS\nCLASS Dog EXTENDS Animal\n  FUNCTION voice() AS STRING\n    RETURN \"wuff\"\n  END FUNCTION\nEND CLASS\nDIM d AS Dog\nd = NEW Dog()\nPRINT d.speak()\n",
+    "CLASS Cfg\n  STATIC CONST MAX AS INTEGER = 42\n  STATIC CONST NAME AS STRING = \"x\"\nEND CLASS\nPRINT Cfg.MAX, Cfg.NAME\n",
+    "CLASS Money\n  DIM cents AS INTEGER\n  OPERATOR + (o AS Money) AS INTEGER\n    RETURN Self.cents + o.cents\n  END OPERATOR\nEND CLASS\nDIM a AS Money\nDIM b AS Money\na = NEW Money()\nb = NEW Money()\na.cents = 100\nb.cents = 250\nPRINT a + b\n",
+    "CLASS V\n  DIM x AS INTEGER\n  PROPERTY GET val() AS INTEGER\n    RETURN Self.x * 2\n  END PROPERTY\n  PROPERTY SET val(n AS INTEGER)\n    Self.x = n\n  END PROPERTY\nEND CLASS\nDIM v AS V\nv = NEW V()\nv.val = 10\nPRINT v.val\n",
+    "STRUCT Point\n  DIM x AS INTEGER\n  DIM y AS INTEGER\nEND STRUCT\nDIM p AS Point\np.x = 3\np.y = 4\nPRINT p.x + p.y\n",
+    "CLASS Counter\n  DIM n AS INTEGER\n  SUB inc()\n    Self.n = Self.n + 1\n  END SUB\nEND CLASS\nDIM c AS Counter\nc = NEW Counter()\nc.inc()\nc.inc()\nc.inc()\nPRINT c.n\n",
+    "CLASS Pt\n  DIM px AS INTEGER\n  SUB Init(v AS INTEGER)\n    Self.px = v\n  END SUB\nEND CLASS\nDIM p AS Pt\np = NEW Pt(v: 5)\nPRINT p.px\n",
 ]
 
 

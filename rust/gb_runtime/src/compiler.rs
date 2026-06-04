@@ -49,6 +49,7 @@ mod oc {
     pub const JUMP_IF_TRUE: i64 = 42;
     pub const CALL_USER: i64 = 50;
     pub const CALL_BUILTIN: i64 = 51;
+    pub const CALL_METHOD: i64 = 52;
     pub const LOAD_FUNCREF: i64 = 53;
     pub const CALL_VALUE: i64 = 54;
     pub const RETURN: i64 = 60;
@@ -68,6 +69,13 @@ mod oc {
     pub const LOAD_INDEX: i64 = 90;
     pub const STORE_INDEX: i64 = 91;
     pub const DECLARE_ARRAY_NAME: i64 = 92;
+    pub const NEW_INSTANCE: i64 = 80;
+    pub const LOAD_FIELD: i64 = 81;
+    pub const STORE_FIELD: i64 = 82;
+    pub const LOAD_MEMBER: i64 = 83;
+    pub const STORE_MEMBER: i64 = 84;
+    pub const DECLARE_STRUCT_NAME: i64 = 86;
+    pub const LOAD_SELF: i64 = 88;
     pub const LOAD_GLOBAL_SLOT: i64 = 111;
     pub const STORE_GLOBAL_SLOT: i64 = 112;
     pub const DECLARE_GLOBAL_SLOT: i64 = 113;
@@ -77,7 +85,11 @@ mod oc {
 
 /// Konstanter Wert im Pool -- wird wie `serialize._enc` kodiert.
 #[derive(Clone)]
-enum CVal { Nil, Bool(bool), Int(i64), Float(f64), Str(String) }
+enum CVal {
+    Nil, Bool(bool), Int(i64), Float(f64), Str(String),
+    /// ENUM-/STATIC-CONST-Namespace im const-Pool (-> {"ns": {...}}).
+    Ns { name: String, members: Vec<(String, CVal)> },
+}
 
 fn enc(c: &CVal) -> Value {
     match c {
@@ -86,6 +98,11 @@ fn enc(c: &CVal) -> Value {
         CVal::Int(i) => json!(i),
         CVal::Float(f) => json!({ "f": f }),
         CVal::Str(s) => json!(s),
+        CVal::Ns { name, members } => {
+            let mut m = Map::new();
+            for (k, v) in members { m.insert(k.clone(), enc(v)); }
+            json!({ "ns": { "name": name, "members": Value::Object(m) } })
+        }
     }
 }
 
@@ -111,13 +128,14 @@ struct Ctx {
     local_defaults: Vec<CVal>,
     is_main: bool,
     is_sub: bool,
+    current_class: Option<String>,
 }
 
 impl Ctx {
     fn new() -> Self {
         Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![],
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
-              is_main: true, is_sub: true }
+              is_main: true, is_sub: true, current_class: None }
     }
     fn alloc_temp(&mut self, type_name: &str) -> usize {
         let slot = self.local_types.len();
@@ -167,11 +185,28 @@ struct FnSig {
     is_coroutine: bool,
 }
 
+/// Ein Feld einer Klasse/Struct.
+struct FieldInfo { name: String, type_name: String, array_dims: Vec<i64> }
+
+/// Klassen-Metadaten (Compile-Zeit). `methods`/`properties` fuer Dispatch +
+/// Au_floesung; `compiled` haelt die fertigen Methoden-JSONs.
+struct ClassInfo {
+    name: String,
+    parent_name: String,
+    is_struct: bool,
+    fields: Vec<FieldInfo>,
+    method_sigs: HashMap<String, FnSig>,
+    property_set: Vec<String>,         // lowercase
+    compiled: Vec<(String, Value)>,    // method-name -> func-json
+}
+
 pub struct Compiler {
     global_slots: HashMap<String, usize>,
     global_vars: std::collections::HashSet<String>,
     fn_sigs: HashMap<String, FnSig>,
     compiled_fns: Vec<(String, Value)>,
+    classes: HashMap<String, ClassInfo>,
+    struct_names: std::collections::HashSet<String>,
     ctx: Ctx,
 }
 
@@ -179,12 +214,22 @@ impl Compiler {
     fn new() -> Self {
         Compiler { global_slots: HashMap::new(),
                    global_vars: std::collections::HashSet::new(),
-                   fn_sigs: HashMap::new(), compiled_fns: vec![], ctx: Ctx::new() }
+                   fn_sigs: HashMap::new(), compiled_fns: vec![],
+                   classes: HashMap::new(),
+                   struct_names: std::collections::HashSet::new(), ctx: Ctx::new() }
     }
 
     fn alloc_slot(&mut self, name: &str) {
         let n = self.global_slots.len();
         self.global_slots.entry(name.to_string()).or_insert(n);
+    }
+
+    /// Bekommt ein DIM einen Slot? Skalar (primitiv ODER Klasse), nicht
+    /// Array/Map/Struct (die haben eigene Init-Ops).
+    fn is_slot_dim(&self, type_name: &str, array_dims: &Option<Vec<Node>>) -> bool {
+        array_dims.is_none()
+            && !type_name.starts_with("array:") && !type_name.starts_with("map:")
+            && !self.struct_names.contains(type_name)
     }
 
     /// Pre-Pass: Top-Level-Globals (Skalar-DIM/CONST) -> Slot-Index.
@@ -193,17 +238,13 @@ impl Compiler {
             match s {
                 Node::Dim { name, type_name, array_dims } => {
                     self.global_vars.insert(name.clone());
-                    if array_dims.is_none() && is_simple_type(type_name) {
-                        self.alloc_slot(name);
-                    }
+                    if self.is_slot_dim(type_name, array_dims) { self.alloc_slot(name); }
                 }
                 Node::MultiDim { dims } => {
                     for d in dims {
                         if let Node::Dim { name, type_name, array_dims } = d {
                             self.global_vars.insert(name.clone());
-                            if array_dims.is_none() && is_simple_type(type_name) {
-                                self.alloc_slot(name);
-                            }
+                            if self.is_slot_dim(type_name, array_dims) { self.alloc_slot(name); }
                         }
                     }
                 }
@@ -215,6 +256,7 @@ impl Compiler {
                     self.global_vars.insert(var.clone());
                     self.alloc_slot(var);
                 }
+                Node::EnumDecl { name, .. } => { self.alloc_slot(name); }
                 _ => {}
             }
         }
@@ -281,6 +323,14 @@ impl Compiler {
                 self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
                 Ok(())
             }
+            Node::MemberAssign { target, name, value } => {
+                self.expr(target)?;
+                self.expr(value)?;
+                let idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::STORE_MEMBER, json!(idx));
+                Ok(())
+            }
+            Node::EnumDecl { name, members } => self.stmt_enum(name, members),
             Node::Input { prompt, target } => self.stmt_input(prompt, target),
             Node::Data { .. } => Ok(()),     // Werte werden separat eingesammelt
             Node::Restore => { self.ctx.emit(oc::RESET_DATA_PTR, Value::Null); Ok(()) }
@@ -296,33 +346,38 @@ impl Compiler {
         }
     }
 
+    fn known_elem(&self, t: &str) -> bool {
+        is_simple_type(t) || self.classes.contains_key(t)
+    }
+
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
-        // Sized-Array: `DIM x[10, 20] AS INTEGER` -- type_name = Element-Typ.
+        // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
-            if !is_simple_type(type_name) {
-                return Err(format!("Stufe 3d: Array-Element-Typ '{}' noch nicht unterstuetzt", type_name));
+            if !self.known_elem(type_name) {
+                return Err(format!("Stufe 3e: Array-Element-Typ '{}' nicht unterstuetzt", type_name));
             }
             for de in dims { self.expr(de)?; }
             let name_idx = self.ctx.add_const(json!(name));
-            self.ctx.emit(oc::DECLARE_ARRAY_NAME,
-                          json!([name_idx, type_name, dims.len()]));
+            self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
             return Ok(());
         }
-        // ARRAY OF T / MAP OF T (groessenlos) -- name-basiert, VM allokiert leer.
+        // ARRAY OF T / MAP OF T (groessenlos).
         if type_name.starts_with("array:") || type_name.starts_with("map:") {
-            let elem = &type_name[type_name.find(':').unwrap() + 1..];
-            if !is_simple_type(elem) {
-                return Err(format!("Stufe 3d: Element-Typ '{}' noch nicht unterstuetzt", elem));
-            }
             let name_idx = self.ctx.add_const(json!(name));
             let type_idx = self.ctx.add_const(json!(type_name));
             let default_idx = self.ctx.add_const(Value::Null);
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
             return Ok(());
         }
-        // Skalar (primitiv).
-        if !is_simple_type(type_name) {
-            return Err(format!("Stufe 3d: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
+        // STRUCT-Instanz -> Auto-Init via DECLARE_STRUCT_NAME.
+        if self.struct_names.contains(type_name) {
+            let name_idx = self.ctx.add_const(json!(name));
+            self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
+            return Ok(());
+        }
+        // Skalar: primitiv (Default je Typ) oder Klasse (Default NIL).
+        if !is_simple_type(type_name) && !self.classes.contains_key(type_name) {
+            return Err(format!("Stufe 3e: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
         }
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = self.ctx.add_const(json!(type_name));
@@ -334,6 +389,72 @@ impl Compiler {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }
         Ok(())
+    }
+
+    fn expr_new(&mut self, class_name: &str, args: &Option<Vec<Node>>) -> CR {
+        if !self.classes.contains_key(class_name) {
+            return Err(format!("Klasse '{}' nicht gefunden", class_name));
+        }
+        let args = match args {
+            None => { self.ctx.emit(oc::NEW_INSTANCE, json!([class_name, 0, false])); return Ok(()); }
+            Some(a) => a,
+        };
+        let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
+        if !has_named {
+            for a in args { self.expr(a)?; }
+            self.ctx.emit(oc::NEW_INSTANCE, json!([class_name, args.len(), true]));
+            return Ok(());
+        }
+        // Named-Args bei NEW -> Init-Methode aufloesen.
+        if self.find_method_sig(class_name, "init").is_none() {
+            return Err(format!("NEW {} mit Named-Args, aber keine Init-Methode", class_name));
+        }
+        let actions = self.resolve_method_named_args(class_name, "init", args)?;
+        let n = actions.len();
+        for act in actions {
+            match act {
+                RArg::Expr(e) => self.expr(e)?,
+                RArg::Default(cv) => { let c = self.ctx.add_const(enc(&cv)); self.ctx.emit(oc::LOAD_CONST, json!(c)); }
+            }
+        }
+        self.ctx.emit(oc::NEW_INSTANCE, json!([class_name, n, true]));
+        Ok(())
+    }
+
+    fn stmt_enum(&mut self, name: &str, members: &[(String, Option<Node>)]) -> CR {
+        let mut out: Vec<(String, CVal)> = Vec::new();
+        let mut next_auto: i64 = 0;
+        for (mname, expr) in members {
+            let v = match expr {
+                None => next_auto,
+                Some(e) => eval_int_literal(e).ok_or_else(||
+                    format!("ENUM {}.{}: Wert muss Integer-Literal sein", name, mname))?,
+            };
+            out.push((mname.to_lowercase(), CVal::Int(v)));
+            next_auto = v + 1;
+        }
+        let ns = CVal::Ns { name: name.to_string(), members: out };
+        self.emit_namespace_const(name, ns);
+        Ok(())
+    }
+
+    /// LOAD_CONST(ns) + DECLARE_GLOBAL_CONST_SLOT/DECLARE_CONST (wie ENUM/Static).
+    fn emit_namespace_const(&mut self, name: &str, ns: CVal) {
+        let name_idx = self.ctx.add_const(json!(name));
+        let type_idx = self.ctx.add_const(Value::Null);
+        let val_idx = self.ctx.add_const(enc(&ns));
+        self.ctx.emit(oc::LOAD_CONST, json!(val_idx));
+        if let Some(&slot) = self.global_slots.get(name) {
+            self.ctx.emit(oc::DECLARE_GLOBAL_CONST_SLOT, json!([slot as i64, name_idx, type_idx]));
+        } else {
+            self.ctx.emit(oc::DECLARE_CONST, json!([name_idx, type_idx]));
+        }
+    }
+
+    fn resolve_method_named_args<'a>(&self, class_name: &str, m: &str, args: &'a [Node])
+        -> Result<Vec<RArg<'a>>, String> {
+        let sig = self.find_method_sig(class_name, m).unwrap();
+        resolve_args_with_sig(sig, m, args)
     }
 
     fn stmt_input(&mut self, prompt: &Option<Box<Node>>, target: &str) -> CR {
@@ -542,9 +663,50 @@ impl Compiler {
     }
 
     // ---------------------------------------------------- Variablen
+    /// Ist `name` ein Feld der aktuellen Klasse (inkl. geerbter)?
+    fn is_field(&self, name: &str) -> bool {
+        let mut cur = self.ctx.current_class.as_deref();
+        while let Some(cn) = cur {
+            if let Some(ci) = self.classes.get(cn) {
+                if ci.fields.iter().any(|f| f.name == name) { return true; }
+                cur = if ci.parent_name.is_empty() { None } else { Some(&ci.parent_name) };
+            } else { return false; }
+        }
+        false
+    }
+
+    /// Methode `m` entlang der Vererbung der Klasse `class_name` finden?
+    fn resolve_method(&self, class_name: &str, m: &str) -> bool {
+        let mut cur = Some(class_name.to_string());
+        while let Some(cn) = cur {
+            if let Some(ci) = self.classes.get(&cn) {
+                if ci.method_sigs.contains_key(m) { return true; }
+                cur = if ci.parent_name.is_empty() { None } else { Some(ci.parent_name.clone()) };
+            } else { return false; }
+        }
+        false
+    }
+
+    /// Methoden-Signatur entlang der Vererbung (fuer Named-Args bei NEW).
+    fn find_method_sig(&self, class_name: &str, m: &str) -> Option<&FnSig> {
+        let mut cur = class_name.to_string();
+        loop {
+            let ci = self.classes.get(&cur)?;
+            if let Some(s) = ci.method_sigs.get(m) { return Some(s); }
+            if ci.parent_name.is_empty() { return None; }
+            cur = ci.parent_name.clone();
+        }
+    }
+
     fn load_var(&mut self, name: &str) {
-        if let Some(&slot) = self.ctx.local_slots.get(name) {
+        if self.ctx.local_slots.contains_key(name) {
+            let slot = self.ctx.local_slots[name];
             self.ctx.emit(oc::LOAD_LOCAL, json!(slot));
+        } else if name == "self" && self.ctx.current_class.is_some() {
+            self.ctx.emit(oc::LOAD_SELF, Value::Null);
+        } else if self.is_field(name) {
+            let idx = self.ctx.add_const(json!(name));
+            self.ctx.emit(oc::LOAD_FIELD, json!(idx));
         } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::LOAD_GLOBAL_SLOT, json!(slot));
         } else {
@@ -553,8 +715,12 @@ impl Compiler {
         }
     }
     fn store_var(&mut self, name: &str) {
-        if let Some(&slot) = self.ctx.local_slots.get(name) {
+        if self.ctx.local_slots.contains_key(name) {
+            let slot = self.ctx.local_slots[name];
             self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+        } else if self.is_field(name) {
+            let idx = self.ctx.add_const(json!(name));
+            self.ctx.emit(oc::STORE_FIELD, json!(idx));
         } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::STORE_GLOBAL_SLOT, json!(slot));
         } else {
@@ -579,8 +745,9 @@ impl Compiler {
                 let c = self.ctx.add_const(json!({ "b": b })); self.ctx.emit(oc::LOAD_CONST, json!(c)); Ok(())
             }
             Node::Identifier(name) => {
-                // Bare User-Function -> FUNCREF (User-Variable verschattet sie).
+                // Bare User-Function -> FUNCREF (Variable/Feld verschattet sie).
                 if !self.ctx.local_slots.contains_key(name)
+                    && !self.is_field(name)
                     && !self.global_vars.contains(name)
                     && self.fn_sigs.contains_key(name)
                 {
@@ -600,7 +767,14 @@ impl Compiler {
                 self.ctx.emit(oc::LOAD_INDEX, json!(indices.len()));
                 Ok(())
             }
-            other => Err(format!("Stufe 3c: Ausdruck {} noch nicht unterstuetzt",
+            Node::MemberAccess { target, name } => {
+                self.expr(target)?;
+                let idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
+                Ok(())
+            }
+            Node::New { class_name, args } => self.expr_new(class_name, args),
+            other => Err(format!("Stufe 3e: Ausdruck {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
     }
@@ -651,11 +825,33 @@ impl Compiler {
     }
 
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
+        // Methoden-Aufruf obj.method(...) (auch Container-Methoden wie .length()).
+        if let Node::MemberAccess { target, name } = callee {
+            if args.iter().any(|a| matches!(a, Node::NamedArg { .. })) {
+                return Err(format!("{}: Named-Args nur bei SUB/FUNCTION/NEW", name));
+            }
+            self.expr(target)?;
+            for a in args { self.expr(a)?; }
+            self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
+            return Ok(());
+        }
         let name = match callee {
             Node::Identifier(n) => n.clone(),
-            _ => return Err("Stufe 3d: Methoden-Aufrufe noch nicht unterstuetzt".into()),
+            _ => return Err("Stufe 3e: aufrufbare Werte noch nicht unterstuetzt".into()),
         };
         let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
+        // Impliziter Methoden-Aufruf: bare Name = Methode der eigenen Klasse.
+        if let Some(cn) = self.ctx.current_class.clone() {
+            if self.resolve_method(&cn, &name) {
+                if has_named {
+                    return Err(format!("{}: Named-Args bei Methoden-Call nicht unterstuetzt", name));
+                }
+                self.ctx.emit(oc::LOAD_SELF, Value::Null);
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_METHOD, json!([name, args.len()]));
+                return Ok(());
+            }
+        }
         let is_local = self.ctx.local_slots.contains_key(&name);
         let is_global = self.global_vars.contains(&name);
         // User-Funktion (Variable gleichen Namens verschattet sie).
@@ -702,47 +898,145 @@ impl Compiler {
         for (name, fnj) in self.compiled_fns {
             functions.insert(name, fnj);
         }
+        let mut classes = Map::new();
+        for (cname, ci) in &self.classes {
+            let mut methods = Map::new();
+            for (mn, mj) in &ci.compiled { methods.insert(mn.clone(), mj.clone()); }
+            let fields: Vec<Value> = ci.fields.iter().map(|f| json!({
+                "name": f.name, "type_name": f.type_name, "array_dims": f.array_dims,
+            })).collect();
+            let mut props = ci.property_set.clone();
+            props.sort();
+            classes.insert(cname.clone(), json!({
+                "name": ci.name, "parent_name": ci.parent_name, "is_struct": ci.is_struct,
+                "fields": fields, "methods": Value::Object(methods), "properties": props,
+            }));
+        }
         json!({
             "format": "gbc", "version": 1,
             "n_globals": self.global_slots.len(),
             "main": main, "functions": Value::Object(functions),
-            "classes": {}, "data": data,
+            "classes": Value::Object(classes), "data": data,
         })
     }
 
     // ---------------------------------------------------- User-Funktionen
     fn register_stub(&mut self, decl: &Node) -> Result<(), String> {
-        let (name, params, body, is_sub, return_type) = fn_parts(decl);
-        for p in params {
-            if p.by_ref {
-                return Err(format!("{}: BYREF-Parameter '{}' im VM-Pfad nicht unterstuetzt",
-                                   name, p.name));
-            }
-        }
-        let mut param_defaults: Vec<Option<CVal>> = Vec::new();
-        for p in params {
-            param_defaults.push(match &p.default {
-                Some(d) => Some(eval_literal_default(d)?),
-                None => None,
-            });
-        }
-        let n_required = param_defaults.iter().position(|d| d.is_some())
-            .unwrap_or(params.len());
-        let is_variadic = params.last().map(|p| p.is_variadic).unwrap_or(false);
+        let (name, _, _, _, _) = fn_parts(decl);
         if self.fn_sigs.contains_key(name) {
             return Err(format!("'{}' bereits deklariert", name));
         }
-        self.fn_sigs.insert(name.to_string(), FnSig {
-            n_params: params.len(),
-            n_required,
-            param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
-            param_defaults,
-            param_types: params.iter().map(|p| p.type_name.clone()).collect(),
-            is_variadic,
-            is_sub,
-            return_type: if is_sub { String::new() } else { return_type.to_string() },
-            is_coroutine: body_has_yield(body),
+        let sig = make_sig(decl)?;
+        self.fn_sigs.insert(name.to_string(), sig);
+        Ok(())
+    }
+
+    // ---------------------------------------------------- Klassen
+    fn register_class(&mut self, decl: &Node) -> Result<(), String> {
+        let (name, parent, fields, methods, is_struct, properties) = match decl {
+            Node::ClassDecl { name, parent, fields, methods, is_struct, properties, .. } =>
+                (name, parent, fields, methods, *is_struct, properties),
+            _ => unreachable!(),
+        };
+        if self.classes.contains_key(name) {
+            return Err(format!("Klasse '{}' bereits deklariert", name));
+        }
+        let mut field_infos = Vec::new();
+        for f in fields {
+            if let Node::Dim { name: fname, type_name, array_dims } = f {
+                let dims: Vec<i64> = match array_dims {
+                    None => vec![],
+                    Some(des) => {
+                        let mut v = vec![];
+                        for de in des {
+                            match de {
+                                Node::NumberLit(NumV::Int(i)) => v.push(*i),
+                                _ => return Err(format!(
+                                    "Array-Feld '{}' braucht konstante INTEGER-Groesse", fname)),
+                            }
+                        }
+                        v
+                    }
+                };
+                field_infos.push(FieldInfo { name: fname.clone(),
+                    type_name: type_name.clone(), array_dims: dims });
+            }
+        }
+        let mut method_sigs = HashMap::new();
+        for m in methods {
+            let (mname, _, _, _, _) = fn_parts(m);
+            method_sigs.insert(mname.to_string(), make_sig(m)?);
+        }
+        let property_set: Vec<String> = properties.iter().filter_map(|p| match p {
+            Node::PropertyDecl { name, .. } => Some(name.to_lowercase()),
+            _ => None,
+        }).collect();
+        self.classes.insert(name.clone(), ClassInfo {
+            name: name.clone(),
+            parent_name: parent.clone().unwrap_or_default(),
+            is_struct,
+            fields: field_infos,
+            method_sigs,
+            property_set,
+            compiled: vec![],
         });
+        Ok(())
+    }
+
+    fn compile_class_methods(&mut self, decl: &Node) -> Result<(), String> {
+        let (cname, methods) = match decl {
+            Node::ClassDecl { name, methods, .. } => (name.clone(), methods),
+            _ => unreachable!(),
+        };
+        for m in methods {
+            let (mname, params, body, is_sub, _rt) = fn_parts(m);
+            let mut ctx = Ctx::new();
+            ctx.is_main = false;
+            ctx.is_sub = is_sub;
+            ctx.current_class = Some(cname.clone());
+            for p in params {
+                let slot = ctx.local_types.len();
+                ctx.local_slots.insert(p.name.clone(), slot);
+                ctx.local_types.push(p.type_name.clone());
+                ctx.local_defaults.push(type_default(&p.type_name));
+            }
+            let saved = std::mem::replace(&mut self.ctx, ctx);
+            let r = (|| {
+                for s in body { self.stmt(s)?; }
+                if is_sub {
+                    self.ctx.emit(oc::RETURN_VOID, Value::Null);
+                } else {
+                    let c = self.ctx.add_const(json!(format!("__missing_return:{}", mname)));
+                    self.ctx.emit(oc::LOAD_CONST, json!(c));
+                    self.ctx.emit(oc::HALT, Value::Null);
+                }
+                Ok::<(), String>(())
+            })();
+            let fn_ctx = std::mem::replace(&mut self.ctx, saved);
+            r?;
+            let sig = &self.classes[&cname].method_sigs[mname];
+            let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
+                                 sig.is_variadic, sig.is_coroutine, &sig.return_type,
+                                 &sig.param_defaults, &sig.param_names);
+            self.classes.get_mut(&cname).unwrap().compiled.push((mname.to_string(), fnj));
+        }
+        Ok(())
+    }
+
+    fn emit_class_statics(&mut self, decl: &Node) -> Result<(), String> {
+        let (name, statics) = match decl {
+            Node::ClassDecl { name, statics, .. } => (name.clone(), statics),
+            _ => unreachable!(),
+        };
+        if statics.is_empty() { return Ok(()); }
+        let mut members: Vec<(String, CVal)> = Vec::new();
+        for c in statics {
+            if let Node::Const { name: cn, value, .. } = c {
+                members.push((cn.to_lowercase(), eval_literal_default(value)?));
+            }
+        }
+        let ns = CVal::Ns { name: name.clone(), members };
+        self.emit_namespace_const(&name, ns);
         Ok(())
     }
 
@@ -781,47 +1075,63 @@ impl Compiler {
 
     fn resolve_named_args<'a>(&self, name: &str, args: &'a [Node])
         -> Result<Vec<RArg<'a>>, String> {
-        let sig = &self.fn_sigs[name];
-        let n = sig.n_params;
-        let mut slots: Vec<Option<RArg<'a>>> = (0..n).map(|_| None).collect();
-        let pos_count = args.iter().position(|a| matches!(a, Node::NamedArg { .. }))
-            .unwrap_or(args.len());
-        if pos_count > n {
-            return Err(format!("{}: zu viele Argumente (max {})", name, n));
-        }
-        for j in pos_count..args.len() {
-            if !matches!(args[j], Node::NamedArg { .. }) {
-                return Err(format!("{}: positional Argument nach Named-Arg", name));
-            }
-        }
-        for i in 0..pos_count { slots[i] = Some(RArg::Expr(&args[i])); }
-        for j in pos_count..args.len() {
-            if let Node::NamedArg { name: an, value } = &args[j] {
-                let key = an.to_lowercase();
-                let idx = sig.param_names.iter().position(|p| *p == key)
-                    .ok_or_else(|| format!("{}: kein Parameter '{}'", name, an))?;
-                if slots[idx].is_some() {
-                    return Err(format!("{}: Parameter '{}' doppelt belegt", name, an));
-                }
-                slots[idx] = Some(RArg::Expr(value));
-            }
-        }
-        let mut actions = Vec::new();
-        for i in 0..n {
-            match slots[i].take() {
-                Some(a) => actions.push(a),
-                None => match sig.param_defaults.get(i).and_then(|d| d.clone()) {
-                    Some(cv) => actions.push(RArg::Default(cv)),
-                    None => return Err(format!("{}: Parameter '{}' fehlt", name,
-                        sig.param_names.get(i).cloned().unwrap_or_default())),
-                },
-            }
-        }
-        Ok(actions)
+        resolve_args_with_sig(&self.fn_sigs[name], name, args)
     }
 }
 
 enum RArg<'a> { Expr(&'a Node), Default(CVal) }
+
+/// Mappt (positional + named) Argumente auf die Param-Reihenfolge der Signatur,
+/// fuellt Defaults. Wie compiler._resolve_named_args.
+fn resolve_args_with_sig<'a>(sig: &FnSig, name: &str, args: &'a [Node])
+    -> Result<Vec<RArg<'a>>, String> {
+    let n = sig.n_params;
+    let mut slots: Vec<Option<RArg<'a>>> = (0..n).map(|_| None).collect();
+    let pos_count = args.iter().position(|a| matches!(a, Node::NamedArg { .. }))
+        .unwrap_or(args.len());
+    if pos_count > n {
+        return Err(format!("{}: zu viele Argumente (max {})", name, n));
+    }
+    for j in pos_count..args.len() {
+        if !matches!(args[j], Node::NamedArg { .. }) {
+            return Err(format!("{}: positional Argument nach Named-Arg", name));
+        }
+    }
+    for i in 0..pos_count { slots[i] = Some(RArg::Expr(&args[i])); }
+    for j in pos_count..args.len() {
+        if let Node::NamedArg { name: an, value } = &args[j] {
+            let key = an.to_lowercase();
+            let idx = sig.param_names.iter().position(|p| *p == key)
+                .ok_or_else(|| format!("{}: kein Parameter '{}'", name, an))?;
+            if slots[idx].is_some() {
+                return Err(format!("{}: Parameter '{}' doppelt belegt", name, an));
+            }
+            slots[idx] = Some(RArg::Expr(value));
+        }
+    }
+    let mut actions = Vec::new();
+    for i in 0..n {
+        match slots[i].take() {
+            Some(a) => actions.push(a),
+            None => match sig.param_defaults.get(i).and_then(|d| d.clone()) {
+                Some(cv) => actions.push(RArg::Default(cv)),
+                None => return Err(format!("{}: Parameter '{}' fehlt", name,
+                    sig.param_names.get(i).cloned().unwrap_or_default())),
+            },
+        }
+    }
+    Ok(actions)
+}
+
+/// Integer-Literal (NumberLit int / UnaryOp +/-) oder None. Fuer ENUM-Member.
+fn eval_int_literal(e: &Node) -> Option<i64> {
+    match e {
+        Node::NumberLit(NumV::Int(i)) => Some(*i),
+        Node::UnaryOp { op, operand } if op == "-" => eval_int_literal(operand).map(|i| -i),
+        Node::UnaryOp { op, operand } if op == "+" => eval_int_literal(operand),
+        _ => None,
+    }
+}
 
 /// (name, params, body, is_sub, return_type) eines SUB/FUNCTION-Knotens.
 fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
@@ -831,6 +1141,37 @@ fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
             (name, params, body, false, return_type),
         _ => unreachable!("fn_parts auf Nicht-Funktion"),
     }
+}
+
+/// FnSig aus einem SUB/FUNCTION/Methoden-Knoten.
+fn make_sig(decl: &Node) -> Result<FnSig, String> {
+    let (name, params, body, is_sub, return_type) = fn_parts(decl);
+    for p in params {
+        if p.by_ref {
+            return Err(format!("{}: BYREF-Parameter '{}' im VM-Pfad nicht unterstuetzt",
+                               name, p.name));
+        }
+    }
+    let mut param_defaults: Vec<Option<CVal>> = Vec::new();
+    for p in params {
+        param_defaults.push(match &p.default {
+            Some(d) => Some(eval_literal_default(d)?),
+            None => None,
+        });
+    }
+    let n_required = param_defaults.iter().position(|d| d.is_some()).unwrap_or(params.len());
+    let is_variadic = params.last().map(|p| p.is_variadic).unwrap_or(false);
+    Ok(FnSig {
+        n_params: params.len(),
+        n_required,
+        param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
+        param_defaults,
+        param_types: params.iter().map(|p| p.type_name.clone()).collect(),
+        is_variadic,
+        is_sub,
+        return_type: if is_sub { String::new() } else { return_type.to_string() },
+        is_coroutine: body_has_yield(body),
+    })
 }
 
 fn eval_literal_default(e: &Node) -> Result<CVal, String> {
@@ -915,6 +1256,13 @@ fn collect_data(stmts: &[Node], out: &mut Vec<Value>) -> Result<(), String> {
             | Node::Repeat { body, .. } | Node::ForEach { body, .. }
             | Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } =>
                 collect_data(body, out)?,
+            Node::ClassDecl { methods, .. } => {
+                for m in methods {
+                    if let Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } = m {
+                        collect_data(body, out)?;
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -969,21 +1317,39 @@ pub fn compile_to_gbc(ast: &Node) -> Result<Value, String> {
     };
     // Funktionen / Klassen / Hauptprogramm trennen.
     let mut fn_decls: Vec<&Node> = vec![];
+    let mut cls_decls: Vec<&Node> = vec![];
     let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
         match s {
             Node::SubDecl { .. } | Node::FunctionDecl { .. } => fn_decls.push(s),
-            Node::ClassDecl { .. } => return Err("Stufe 3d: CLASS/STRUCT noch nicht unterstuetzt".into()),
+            Node::ClassDecl { .. } => cls_decls.push(s),
             _ => main_stmts.push(s),
         }
     }
     let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
     let mut c = Compiler::new();
+    // Struct-Namen vor dem Slot-Pre-Pass kennen (Structs bekommen keinen Slot).
+    for cd in &cls_decls {
+        if let Node::ClassDecl { name, is_struct: true, .. } = cd {
+            c.struct_names.insert(name.clone());
+        }
+    }
     c.collect_globals(&main_owned)?;
-    // Phase: Stubs (Forward-Refs/Rekursion), dann Funktions-Bodies.
+    // Klassen-Statics bekommen einen Slot.
+    for cd in &cls_decls {
+        if let Node::ClassDecl { name, statics, .. } = cd {
+            if !statics.is_empty() { c.alloc_slot(name); }
+        }
+    }
+    // Phase 1: Klassen registrieren (Felder/Methoden-Sigs/Properties).
+    for cd in &cls_decls { c.register_class(cd)?; }
+    // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
     for d in &fn_decls { c.register_stub(d)?; }
     for d in &fn_decls { c.compile_function(d)?; }
-    // Hauptprogramm.
+    // Phase 4: Methoden kompilieren.
+    for cd in &cls_decls { c.compile_class_methods(cd)?; }
+    // Phase 5: Hauptprogramm (Klassen-Statics zuerst hoisten).
+    for cd in &cls_decls { c.emit_class_statics(cd)?; }
     for s in &main_owned { c.stmt(s)?; }
     c.ctx.emit(oc::HALT, Value::Null);
     let mut data = Vec::new();

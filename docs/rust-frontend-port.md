@@ -16,7 +16,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a+3b+3c fertig** |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3d fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
@@ -92,11 +92,19 @@ Rekursion), Body-Kompilierung in eigenem Ctx (Params als Locals), `RETURN`/
 Rekursion, Defaults, Named-Args, Variadic, Higher-Order via FUNCREF). Container-
 Methoden-Aufrufe (`rest.length()`) → noch `Err("Stufe 3d: ...")`.
 
+**Stufe 3d (fertig):** Klassen/Structs — Klassen-Registry (Felder/Methoden-Sigs/
+Properties/parent_name), Methoden in eigenem Ctx (`current_class`, `Self`→
+`LOAD_SELF`, Felder→`LOAD/STORE_FIELD`, implizite Methoden-Calls), `NEW`
+(`NEW_INSTANCE`, Named-Args via Init-Sig), Member-Zugriff/-Assign (`LOAD/STORE_
+MEMBER`), Methoden-/Container-Calls (`CALL_METHOD`), Vererbung (parent_name →
+MRO zur Laufzeit), Properties (GET/SET als `__get_`/`__set_`-Methoden + property-
+set), Operatoren (`__op_*`), STRUCT (Auto-Init `DECLARE_STRUCT_NAME`), STATIC
+CONST + ENUM (als `{"ns":...}`-Namespace im const-Pool). **50 Tests grün.**
+
 **Nächste Teil-Stufen** (je eigener Commit, Korpus wächst):
-3d Klassen/Structs (`NEW`, Member, `Self`, Properties, Operatoren, Statics,
-ENUM, Methoden-/Container-Calls `CALL_METHOD`, member-READ-Ziel) · 3e
-Comprehensions, `SELECT`, Tupel, `WITH`, `TRY`, `FOR EACH`, Coroutinen/`YIELD` ·
-dann `gbrt run datei.gb` (Stufe 5) + Preprocess (Stufe 4).
+3e Comprehensions, `SELECT`, Tupel/`TupleAssign`, `WITH`, `TRY`/`THROW`,
+`FOR EACH`, `SliceAccess`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
+(Stufe 5) + Preprocess (Stufe 4).
 
 ## Prinzip
 
