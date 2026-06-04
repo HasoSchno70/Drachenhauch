@@ -1609,6 +1609,21 @@ Lexer-Keywords + Built-ins **generiert** (`build_grammar.py`). Doku
 [docs/lsp.md](docs/lsp.md). **Bei neuen Keywords/Built-ins:** Grammatik neu
 generieren (`python vscode-gamebasic/build_grammar.py`).
 
+## Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
+
+**Laufendes Ziel:** Python langfristig nur noch in den Editoren — `gbrt` soll
+selbst aus Quelltext Bytecode erzeugen (heute macht das die Python-Toolchain).
+Die Front-End-Stufen werden **inkrementell** nach Rust portiert, **jede gegen
+Python verifiziert** (cargo+rustc vorhanden → hier beweisbar). **Stufe 1 (Lexer)
+fertig:** [`rust/gb_runtime/src/lexer.rs`](rust/gb_runtime/src/lexer.rs) (Port von
+`lexer.py`+`tokens.py`, inkl. f-Strings/`&H`/`&B`/Zeilenfortsetzung), Debug-
+Einstieg `gbrt --tokens <datei.gb>` (kanonischer JSON-Token-Dump), Parity-Test
+[`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py) (137 grün:
+alle Beispiele + Snippets, strukturell als `[TYP,wert,zeile]`). Plan + Stufen:
+[docs/rust-frontend-port.md](docs/rust-frontend-port.md). Nächste Stufen: Parser
+(AST-Gleichheit), Compiler (**Bytecode-`Module`-Gleichheit** ggü. `serialize.py`),
+Preprocess. Der Tree-Walker bleibt Referenz + `@builtin`-Host.
+
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 
 `gbrt` als WebAssembly (emscripten) im Browser. **Status: Gerüst, nicht

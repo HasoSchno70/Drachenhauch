@@ -34,6 +34,7 @@ mod wifi;
 mod graphics;
 #[cfg(feature = "graphics")]
 mod gui;
+mod lexer;
 mod model;
 mod tiled;
 mod value;
@@ -62,6 +63,15 @@ fn embedded_gbc() -> Option<String> {
 }
 
 fn main() -> ExitCode {
+    // Front-End-Debug: `gbrt --tokens <datei.gb>` gibt den Token-Strom als
+    // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
+    {
+        let raw: Vec<String> = std::env::args().collect();
+        if raw.len() >= 3 && raw[1] == "--tokens" {
+            return tokens_main(&raw[2]);
+        }
+    }
+
     // Bundle-Modus: eingebettete .gbc am Ende der eigenen Exe?
     if let Some(text) = embedded_gbc() {
         // Ins Exe-Verzeichnis wechseln, damit relative Asset-Pfade
@@ -101,6 +111,28 @@ fn main() -> ExitCode {
         }
     };
     run_gbc_text(&text, &source_label)
+}
+
+/// `gbrt --tokens <datei.gb>` -- lext die Quelldatei und gibt pro Token eine
+/// JSON-Zeile `[TYP, wert, zeile]` aus (fuer Lexer-Parity gegen Python).
+fn tokens_main(path: &str) -> ExitCode {
+    let source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    match lexer::dump_tokens_json(&source) {
+        Ok(dump) => {
+            let stdout = std::io::stdout();
+            let mut h = stdout.lock();
+            let _ = h.write_all(dump.as_bytes());
+            let _ = h.flush();
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("Lexer-Fehler {}:{}: {}", e.line, e.col, e.msg);
+            ExitCode::from(2)
+        }
+    }
 }
 
 /// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus
