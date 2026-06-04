@@ -4,11 +4,25 @@ GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
 Konsolen-Ausgabe daneben.
 
-> **Status: experimentell / Gerüst.** Der Code-Pfad ist vorbereitet
-> (cfg-gegateter WASM-Einstieg in `main.rs`, Build-Skript, Web-Harness), aber
-> ein lauffähiges `gbrt.wasm` **muss lokal mit voller Toolchain gebaut werden**
-> (emscripten + Rust-wasm-Target) und ist hier nicht beigelegt/verifiziert.
-> Siehe **Grenzen** unten.
+> **Status: baut & läuft (verifiziert 2026-06-04).** Mit installierter Toolchain
+> (emscripten 6.0.0 + Rust-Target `wasm32-unknown-emscripten`) erzeugt
+> `rust/build_wasm.py` ein lauffähiges `web/gbrt.js` + `web/gbrt.wasm`. Verifiziert
+> mit `examples/01_hello.gb`: unter Node (`node web/gbrt.js`) **bit-identische
+> Ausgabe zum Python-Tree-Walker** — und zwar aus der eingebetteten **Quelle**
+> (gbrt kompiliert im WASM selbst, kein Pyodide). Die Build-Artefakte
+> (`gbrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored, nicht eingecheckt.
+> Grafik-Demos (Render-Loop) brauchen den Browser-Canvas — siehe **Grenzen**.
+
+> **Windows-Toolchain wird automatisch verdrahtet.** `build_wasm.py`
+> (`setup_emscripten_env`) findet ein emsdk (Env `EMSDK` oder `%USERPROFILE%\emsdk`)
+> und setzt selbst: `CC/CXX/AR/Linker` auf die `.exe`-Varianten
+> (`emcc.exe`/`em++.exe`/`emar.exe` — sonst schmuggelt cc-rs `cmd /c emcc.bat`
+> in die CFLAGS), `BINDGEN_EXTRA_CLANG_ARGS` mit clang-Builtin- + Sysroot-Include
+> (sonst findet bindgen `stdarg.h` nicht), `CMAKE_GENERATOR=Ninja` + cmake/ninja
+> aus den VS-BuildTools auf PATH. So läuft `python rust/build_wasm.py datei.gb`
+> ohne manuelles Env-Setup. emsdk installieren: `git clone …/emsdk`,
+> `python emsdk/emsdk.py install latest` + `… activate latest`,
+> `rustup target add wasm32-unknown-emscripten`.
 
 > **Kein Pyodide mehr nötig (seit Front-End-Port).** Früher musste die `.gb`
 > in Python zu `.gbc` vorkompiliert werden, bevor sie der Browser ausführen

@@ -1661,9 +1661,11 @@ hängt Payload an Kopie der eigenen Exe (wie `export.py`, aber ohne Python),
 kopiert `assets/`. (b) **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j` —
 `compile_env` liefert `(alias, modul)`-Paare, der Compiler bildet `j_parse`→
 `json_parse` / `v`→`vec2` zurück (gbrt findet sie nativ), aliasierte externe
-Typen (`j_handle`/`v`) sind gültige DIM-Typen. (c) **WASM** — emscripten-Einstieg
-kompiliert `/program.gb` selbst (kein Pyodide), `build_wasm.py` bettet Quelle ein;
-der emscripten-Build bleibt toolchain-blockiert (kein `emcc` hier).
+Typen (`j_handle`/`v`) sind gültige DIM-Typen. (c) **WASM (gebaut + verifiziert)** — emscripten-Einstieg
+kompiliert `/program.gb` selbst (kein Pyodide), `build_wasm.py` bettet die Quelle
+ein + verdrahtet das Windows-emscripten-Env automatisch (`setup_emscripten_env`:
+CC/CXX/AR/Linker→`.exe`, bindgen-Includes, Ninja). `node web/gbrt.js` ==
+Tree-Walker verifiziert. Toolchain (emscripten 6.0.0 + wasm-Target) installiert.
 
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 

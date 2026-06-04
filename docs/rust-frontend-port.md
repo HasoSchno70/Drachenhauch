@@ -188,11 +188,14 @@ Portierung erreicht.
   sodass gbrt sie nativ findet. Test in
   [`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py)
   (`test_e2e_runsrc_module_alias`).
-- **WASM-Quellkompilierung im Browser:** der emscripten-Einstieg in `main.rs`
-  kompiliert `/program.gb` selbst (Fallback `/program.gbc`), `build_wasm.py`
-  bettet die Quelle ein → der Web-Playground braucht **kein Pyodide** mehr.
-  **Bleibt toolchain-blockiert:** der eigentliche emscripten-Build ist hier nicht
-  baubar/verifizierbar (kein `emcc`/wasm-Target). Details:
+- **WASM-Quellkompilierung im Browser (gebaut + verifiziert 2026-06-04):** der
+  emscripten-Einstieg in `main.rs` kompiliert `/program.gb` selbst (Fallback
+  `/program.gbc`), `build_wasm.py` bettet die Quelle ein → der Web-Playground
+  braucht **kein Pyodide** mehr. Toolchain installiert (emscripten 6.0.0 +
+  Rust-Target); `build_wasm.py` verdrahtet das Windows-emscripten-Env selbst
+  (`setup_emscripten_env`: CC/CXX/AR/Linker → `.exe`, bindgen-Includes,
+  Ninja-Generator, cmake/ninja auf PATH). Verifiziert: `node web/gbrt.js` ==
+  Python-Tree-Walker (aus eingebetteter Quelle). Details:
   [docs/web-playground.md](web-playground.md).
 
 ## Prinzip

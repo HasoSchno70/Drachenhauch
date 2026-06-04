@@ -39,20 +39,116 @@ CRATE = ROOT / "rust" / "gb_runtime"
 WEB = ROOT / "web"
 TARGET = "wasm32-unknown-emscripten"
 
+
+def _first_glob(base: Path, pattern: str) -> Path | None:
+    """Erstes Match von `base/pattern` (sortiert) oder None."""
+    hits = sorted(base.glob(pattern))
+    return hits[0] if hits else None
+
+
+def setup_emscripten_env() -> bool:
+    """Konfiguriert `os.environ` fuer den emscripten-Cross-Build (Windows),
+    sodass `build_wasm.py` ohne manuelles Env-Setup laeuft. Idempotent und
+    best-effort: setzt nur, was noch nicht gesetzt ist und was wirklich
+    existiert. Gibt True zurueck, wenn ein emsdk gefunden+verdrahtet wurde.
+
+    Hintergrund (Windows-Fallstricke, hart erkauft):
+      - cc-rs/cmake-rs wrappen `.bat`-Compiler als `cmd /c emcc.bat` und
+        schmuggeln das in CMAKE_C_FLAGS -> Build kaputt. Fix: CC/CXX/AR +
+        Linker auf die `.exe`-Varianten (emcc.exe/em++.exe/emar.exe) zeigen.
+      - bindgen nutzt die System-libclang, die emscriptens `stdarg.h` nicht
+        findet -> BINDGEN_EXTRA_CLANG_ARGS mit clang-Builtin- + sysroot-Include.
+      - emscripten-Cross-Compile braucht den Ninja-Generator + cmake/ninja auf
+        PATH (hier aus den VS-BuildTools).
+    """
+    if sys.platform != "win32":
+        return False  # Linux/macOS: `source emsdk_env.sh` genuegt i.d.R.
+    emsdk = Path(os.environ.get("EMSDK", Path.home() / "emsdk"))
+    em = emsdk / "upstream" / "emscripten"
+    emcc = em / "emcc.exe"
+    if not emcc.exists():
+        return False
+
+    def setdefault(key: str, val: str):
+        if not os.environ.get(key) and val:
+            os.environ[key] = val
+
+    setdefault("EMSDK", str(emsdk))
+    py = _first_glob(emsdk / "python", "*/python.exe")
+    if py:
+        setdefault("EMSDK_PYTHON", str(py))
+    node = _first_glob(emsdk / "node", "*/bin/node.exe")
+    if node:
+        setdefault("EMSDK_NODE", str(node))
+    setdefault("CC_wasm32_unknown_emscripten", str(emcc))
+    setdefault("CXX_wasm32_unknown_emscripten", str(em / "em++.exe"))
+    setdefault("AR_wasm32_unknown_emscripten", str(em / "emar.exe"))
+    setdefault("CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_LINKER", str(emcc))
+    setdefault("CMAKE_GENERATOR", "Ninja")
+    # bindgen: clang-Builtin-Header (stdarg.h) + emscripten-Sysroot.
+    clang_inc = _first_glob(emsdk / "upstream" / "lib" / "clang", "*/include")
+    sysroot_inc = emsdk / "upstream" / "emscripten" / "cache" / "sysroot" / "include"
+    if clang_inc and not os.environ.get("BINDGEN_EXTRA_CLANG_ARGS"):
+        os.environ["BINDGEN_EXTRA_CLANG_ARGS"] = (
+            f'-isystem "{clang_inc.as_posix()}" '
+            f'-isystem "{sysroot_inc.as_posix()}"')
+    # PATH: emsdk + emscripten + cmake/ninja vorne anstellen.
+    extra = [str(emsdk), str(em)]
+    cmake_dir = _find_cmake_dir()
+    if cmake_dir:
+        extra.append(str(cmake_dir))
+    ninja_dir = _find_ninja_dir()
+    if ninja_dir:
+        extra.append(str(ninja_dir))
+    os.environ["PATH"] = os.pathsep.join(extra + [os.environ.get("PATH", "")])
+    return True
+
+
+def _find_cmake_dir() -> Path | None:
+    if shutil.which("cmake"):
+        return None  # schon auf PATH
+    for base in (r"C:\Program Files (x86)\Microsoft Visual Studio",
+                 r"C:\Program Files\Microsoft Visual Studio"):
+        hit = _first_glob(Path(base),
+                          "*/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe")
+        if hit:
+            return hit.parent
+    return None
+
+
+def _find_ninja_dir() -> Path | None:
+    if shutil.which("ninja"):
+        return None
+    for base in (r"C:\Program Files (x86)\Microsoft Visual Studio",
+                 r"C:\Program Files\Microsoft Visual Studio"):
+        hit = _first_glob(Path(base),
+                          "*/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe")
+        if hit:
+            return hit.parent
+    return None
+
 # emscripten-Linker-Flags (an raylibs Web-Beispiele angelehnt).
 # ASYNCIFY laesst den blockierenden VM-/Render-Loop im Browser laufen, ohne die
 # Engine auf emscripten_set_main_loop umzubauen (langsamer, aber funktioniert).
-EMCC_FLAGS = [
-    "-s", "USE_GLFW=3",
-    "-s", "ASYNCIFY",
-    "-s", "ALLOW_MEMORY_GROWTH=1",
-    "-s", "ASSERTIONS=1",
-    "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print']",
-    # Quelle einbetten -> gbrt kompiliert im Browser (kein Pyodide); .gbc als
-    # Fallback (main.rs liest /program.gb zuerst, dann /program.gbc).
-    "--embed-file", "program.gb@/program.gb",
-    "--embed-file", "program.gbc@/program.gbc",
-]
+def emcc_flags(out_dir: str | Path) -> list:
+    """emscripten-Linker-Flags. Die `--embed-file`-Quellpfade sind ABSOLUT
+    (forward-slash), weil rustc den Linker nicht zwingend im `out_dir`-CWD
+    aufruft -> relative Pfade wuerden vom file_packager nicht gefunden.
+    (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)"""
+    out = Path(out_dir).resolve()
+    gb = (out / "program.gb").as_posix()
+    gbc = (out / "program.gbc").as_posix()
+    return [
+        "-s", "USE_GLFW=3",
+        "-s", "ASYNCIFY",
+        "-s", "ALLOW_MEMORY_GROWTH=1",
+        "-s", "ASSERTIONS=1",
+        "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print']",
+        # Quelle einbetten -> gbrt kompiliert im Browser (kein Pyodide); .gbc als
+        # Fallback (main.rs liest /program.gb zuerst, dann /program.gbc).
+        "--embed-file", f"{gb}@/program.gb",
+        "--embed-file", f"{gbc}@/program.gbc",
+    ]
 
 
 def check_toolchain() -> dict:
@@ -80,7 +176,7 @@ def compile_program(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
     return gbc
 
 
-def _print_manual(info: dict) -> None:
+def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("\n--- WASM-Build uebersprungen (Toolchain unvollstaendig) ---")
     print(f"  emcc (emscripten):           {'OK' if info['emcc'] else 'FEHLT'}")
     print(f"  cargo:                       {'OK' if info['cargo'] else 'FEHLT'}")
@@ -89,8 +185,8 @@ def _print_manual(info: dict) -> None:
     print("  1. emscripten installieren (https://emscripten.org), `emcc` in PATH.")
     print(f"  2. rustup target add {TARGET}")
     print("  3. Dieses Skript erneut ausfuehren.")
-    print("\nDie program.gbc wurde bereits erzeugt. Manueller Build-Befehl:")
-    print(f'  set EMCC_CFLAGS={" ".join(EMCC_FLAGS)}')
+    print("\nQuelle/.gbc wurden bereits erzeugt. Manueller Build-Befehl:")
+    print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
     print(f"    --target {TARGET} --features graphics --release")
     print("  -> target/wasm32-unknown-emscripten/release/gbrt.{js,wasm} nach web/ kopieren")
@@ -111,13 +207,17 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     print(f"Quelle eingebettet: {src}")
     gbc = compile_program(gb_path, out_dir)   # Fallback-Artefakt (Build-Zeit)
     print(f"kompiliert (Fallback): {gbc}")
+    # Windows: emscripten-Toolchain automatisch verdrahten (PATH + CC/CXX/AR/
+    # Linker/bindgen-Includes), damit der Build ohne manuelles Env-Setup laeuft.
+    if setup_emscripten_env():
+        print("emscripten-Env aus emsdk verdrahtet.")
     info = check_toolchain()
     if not all(info.values()):
-        _print_manual(info)
+        _print_manual(info, out_dir)
         return 0
     env = dict(os.environ)
-    # emscripten-Flags + die einzubettende .gbc muss im CWD des Builds liegen.
-    env["EMCC_CFLAGS"] = " ".join(EMCC_FLAGS)
+    # emscripten-Flags (absolute Embed-Pfade -> CWD-unabhaengig).
+    env["EMCC_CFLAGS"] = " ".join(emcc_flags(out_dir))
     cmd = ["cargo", "build", "--manifest-path", str(CRATE / "Cargo.toml"),
            "--target", TARGET, "--features", "graphics", "--release"]
     print("Build:", " ".join(cmd))
