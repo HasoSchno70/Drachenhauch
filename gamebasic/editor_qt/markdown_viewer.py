@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QTextDocument
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QTextBrowser, QVBoxLayout, QWidget,
 )
@@ -151,9 +151,31 @@ class MarkdownViewer(QWidget):
         # `searchPaths` erlaubt relative Bilder/Links aufzuloesen.
         self.browser.setSearchPaths([str(path.parent)])
         if path.suffix.lower() in (".md", ".markdown"):
-            self.browser.setMarkdown(text)
+            self.browser.setHtml(self._markdown_to_html(text))
         else:
             self.browser.setPlainText(text)
+
+    def _markdown_to_html(self, text: str) -> str:
+        """Markdown -> HTML, damit unser Theme-Stylesheet greift.
+
+        Qt's `QTextBrowser.setMarkdown()` ignoriert das via
+        `setDefaultStyleSheet()` gesetzte CSS komplett -- die Texte bekommen
+        keinerlei Foreground-Farbe und rendern im dunklen Default (auf dem
+        dunklen Editor-Hintergrund praktisch unlesbar). `setHtml()` dagegen
+        konsultiert das Default-Stylesheet und backt unsere Theme-Farben in
+        jedes Element. Also wandeln wir Markdown ueber ein Wegwerf-Dokument
+        zu HTML und rendern dieses HTML.
+        """
+        conv = QTextDocument()
+        conv.setDefaultFont(self.browser.font())   # Schriftgroesse beibehalten
+        conv.setMarkdown(text)
+        html = conv.toHtml()
+        # Qt backt fuer Links hart das Default-Blau `#0000ff` als Inline-Style
+        # ein -- das ueberstimmt unsere CSS-`a`-Regel und ist auf dunklem
+        # Grund kaum lesbar. Es ist die EINZIGE von conv eingebackte Farbe,
+        # daher koennen wir sie gefahrlos gegen die Theme-Link-Farbe tauschen.
+        html = html.replace("color:#0000ff", f"color:{COLORS['link']}")
+        return html
 
     def _reload(self) -> None:
         if self._current_path is not None:
