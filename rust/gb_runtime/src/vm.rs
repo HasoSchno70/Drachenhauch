@@ -2138,11 +2138,14 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "graphics")]
     fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        // Hilfen: strikte INTEGER- bzw. STRING-Extraktion (wie _check_int/_check_str).
+        // Grafik-Args sind "intish" (wie _check_int == _check_intish im Tree-
+        // Walker): INTEGER direkt, FLOAT wird zu int trunkiert (Richtung 0).
+        // So sind F5 (Tree-Walker) und F6 (gbrt) bei Float-Koordinaten konsistent.
         fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
             match a.get(i) {
                 Some(Value::Int(n)) => Ok(*n),
-                Some(v) => Err(format!("{}: erwartet INTEGER, erhalten {}", fn_, v.type_name())),
+                Some(Value::Float(f)) => Ok(*f as i64),
+                Some(v) => Err(format!("{}: erwartet Zahl, erhalten {}", fn_, v.type_name())),
                 None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
             }
         }
