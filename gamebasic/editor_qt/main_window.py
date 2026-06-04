@@ -992,6 +992,8 @@ class GameBasicEditor(QMainWindow):
         assert st is not None and st.file_path is not None
         if self.console.start_run(st.file_path):
             self.tabs.set_running(st.file_path, "py")
+            self.statusBar().showMessage(
+                f"▶ Laeuft: {st.file_path.name} (Tree-Walker)")
 
     def _run_native_active(self) -> None:
         if not self._ensure_saved_for_run():
@@ -1000,6 +1002,8 @@ class GameBasicEditor(QMainWindow):
         assert st is not None and st.file_path is not None
         if self.console.start_run_native(st.file_path):
             self.tabs.set_running(st.file_path, "native")
+            self.statusBar().showMessage(
+                f"⚙ Laeuft nativ: {st.file_path.name} (gbrt)")
 
     def _export_active(self) -> None:
         """Buendelt die aktive Datei zu einer standalone .exe (gbrt + Bytecode +
@@ -1097,6 +1101,7 @@ class GameBasicEditor(QMainWindow):
         assert st is not None and st.file_path is not None
         if self.console.start_run(st.file_path, ["--bench"]):
             self.tabs.set_running(st.file_path, "py")
+            self.statusBar().showMessage(f"⚡ Benchmark: {st.file_path.name}")
 
     def _ensure_saved_for_run(self) -> bool:
         if self.console.is_running():
