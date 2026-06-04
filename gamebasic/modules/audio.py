@@ -495,6 +495,35 @@ def _audio_noise(*args):
     return _make_sound_from_wave(wave, volume)
 
 
+@builtin("AUDIO_SFX", arity=9,
+         types=("str", "num", "num", "int", "int", "int", "num", "num", "num"))
+def _audio_sfx(waveform, freq, slide, attack_ms, sustain_ms, decay_ms,
+               vib_depth, vib_speed, volume):
+    """AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
+                 vib_depth, vib_speed, volume) -> SOUND
+
+    Prozeduraler sfxr-Stil-Effekt: Waveform mit Pitch-Slide (Hz/s, negativ =
+    fallend), ADSR-Huellkurve und optionalem Vibrato. Komplementaer zu
+    AUDIO_TONE (das nur konstante Toene kann). Der GameBasic-SFX-Generator
+    (`gbsfx`) exportiert genau solche Aufrufe."""
+    from ..synth import synthesize, WAVEFORMS
+    wf = waveform.lower()
+    if wf not in WAVEFORMS:
+        raise GBRuntimeError(
+            f"AUDIO_SFX: unbekannte Waveform '{waveform}' "
+            f"(erlaubt: {', '.join(WAVEFORMS)})")
+    if attack_ms < 0 or sustain_ms < 0 or decay_ms < 0:
+        raise GBRuntimeError("AUDIO_SFX: Attack/Sustain/Decay muessen >= 0 sein")
+    if attack_ms + sustain_ms + decay_ms <= 0:
+        raise GBRuntimeError("AUDIO_SFX: Gesamtdauer muss > 0 sein")
+    pg = _ensure_mixer()
+    sample_rate = pg.mixer.get_init()[0]
+    wave = synthesize(wf, float(freq), float(slide),
+                      attack_ms, sustain_ms, decay_ms,
+                      float(vib_depth), float(vib_speed), sr=sample_rate)
+    return _make_sound_from_wave(wave, _clamp01(volume))
+
+
 @builtin("AUDIO_FFT", arity=1)
 def _audio_fft(arr):
     """AUDIO_FFT(bands) -- fuellt ein 1D ARRAY OF FLOAT mit Frequenzband-Pegeln

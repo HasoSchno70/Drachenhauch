@@ -24,15 +24,21 @@ Standalone: `gbsfx` oder `.venv\Scripts\python.exe gbrun.py --sfx` (braucht `PyS
   snd = LOADSOUND("jump.wav")
   PLAYSOUND(snd)
   ```
-- **`GB-Code`** — bei einem **einfachen** Ton (kein Pitch-Slide/Vibrato) das passende `AUDIO_TONE`/`AUDIO_NOISE`-Snippet:
+- **`GB-Code`** — der `AUDIO_SFX`-Aufruf, der den Effekt **prozedural zur Laufzeit** erzeugt (kein WAV-Asset nötig):
   ```basic
   IMPORT "audio"
   DIM snd AS SOUND
-  snd = AUDIO_TONE(660, 160, "square", 0.7)
+  snd = AUDIO_SFX("saw", 1000, -1400, 0, 30, 150, 0, 0, 0.7)
   PLAYSOUND(snd)
   ```
-  Bei Sweeps/Vibrato/Hüllkurve kann `AUDIO_TONE` das nicht abbilden — dann den Effekt als **WAV** exportieren und mit `LOADSOUND` laden.
 
-## Hintergrund
+## `AUDIO_SFX` — der native Synth
 
-Das `audio`-Modul erzeugt mit `AUDIO_TONE` nur **konstante** Töne. Für sfxr-typische Effekte (fallender Laser, Explosions-Decay) braucht es einen eigenen Synth — der lebt im Tool, das Ergebnis kommt als WAV-Asset ins Spiel.
+```
+AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
+          vib_depth, vib_speed, volume) -> SOUND
+```
+
+Der Effekt wird im Spiel selbst synthetisiert — `slide` ist der Pitch-Sweep (Hz/s, negativ = fallend), Attack/Sustain/Decay die Hüllkurve, `vib_depth`/`vib_speed` ein optionales Vibrato. Komplementär zu `AUDIO_TONE` (das nur konstante Töne kann). Läuft in **beiden** Pfaden — Tree-Walker **und** native Runtime `gbrt` (gleicher Synth, [`gamebasic/synth.py`](../gamebasic/synth.py) bzw. `rust/gb_runtime/src/audio.rs`).
+
+`WAV exportieren` bleibt als Alternative, falls du den Effekt lieber als Asset bündeln willst.

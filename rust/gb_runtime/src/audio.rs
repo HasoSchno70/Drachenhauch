@@ -245,6 +245,54 @@ impl Audio {
         self.push_wave_sound(&buf, volume, sr)
     }
 
+    /// Prozeduraler sfxr-Stil-Effekt (siehe gamebasic/synth.py -- gleiche
+    /// Mathematik): Waveform mit Pitch-Slide (Phasen-Integration) + Vibrato +
+    /// ADSR-Huellkurve.
+    #[allow(clippy::too_many_arguments)]
+    pub fn sfx(&mut self, waveform: &str, base_freq: f64, slide: f64,
+               attack_ms: i64, sustain_ms: i64, decay_ms: i64,
+               vib_depth: f64, vib_speed: f64, volume: f64) -> Result<i64, String> {
+        let wf = waveform.to_lowercase();
+        if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
+            return Err(format!(
+                "AUDIO_SFX: unbekannte Waveform '{}' (erlaubt: sine, square, saw, triangle, noise)", waveform));
+        }
+        if attack_ms < 0 || sustain_ms < 0 || decay_ms < 0 {
+            return Err("AUDIO_SFX: Attack/Sustain/Decay muessen >= 0 sein".into());
+        }
+        let total_ms = (attack_ms + sustain_ms + decay_ms).max(1);
+        let sr: u32 = 44100;
+        let n = (sr as f64 * total_ms as f64 / 1000.0) as usize;
+        if n == 0 { return Err("AUDIO_SFX: Gesamtdauer zu klein".into()); }
+        let na = (n as f64 * attack_ms as f64 / total_ms as f64) as usize;
+        let nd = (n as f64 * decay_ms as f64 / total_ms as f64) as usize;
+        let mut buf = vec![0.0f64; n];
+        let mut phase = 0.0f64;          // integrierte Phase fuer Pitch-Slide
+        for i in 0..n {
+            let t = i as f64 / sr as f64;
+            let mut freq = base_freq + slide * t;
+            if vib_depth > 0.0 && vib_speed > 0.0 {
+                freq *= 1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin();
+            }
+            freq = freq.clamp(20.0, sr as f64 / 2.0);
+            let v = if wf == "noise" {
+                rng_uniform()
+            } else {
+                phase += 2.0 * PI64 * freq / sr as f64;
+                phase_value(&wf, phase)
+            };
+            let env = if na > 0 && i < na {
+                i as f64 / na as f64
+            } else if nd > 0 && i >= n - nd {
+                (n - 1 - i) as f64 / nd as f64
+            } else {
+                1.0
+            };
+            buf[i] = (v * env).clamp(-1.0, 1.0);
+        }
+        self.push_wave_sound(&buf, volume, sr)
+    }
+
     /// Float-Buffer [-1,1] -> Anti-Click-Envelope -> Volume -> i16-PCM -> WAV
     /// im RAM -> raylib Sound. Liefert das SOUND-Handle.
     fn push_wave_sound(&mut self, buf: &[f64], volume: f64, sr: u32) -> Result<i64, String> {
@@ -353,6 +401,19 @@ fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
         "saw" => 2.0 * (t * freq - (0.5 + t * freq).floor()),
         "triangle" => 2.0 * (2.0 * (t * freq - (0.5 + t * freq).floor())).abs() - 1.0,
         "noise" => rng_uniform(),
+        _ => 0.0,
+    }
+}
+
+/// Waveform-Wert aus der integrierten Phase (in Radiant) -- fuer Pitch-Slides,
+/// wo die Frequenz pro Sample variiert. `noise` wird separat erzeugt.
+fn phase_value(kind: &str, phase: f64) -> f64 {
+    let ph = phase / (2.0 * PI64);          // in Zyklen
+    match kind {
+        "sine" => phase.sin(),
+        "square" => if phase.sin() >= 0.0 { 1.0 } else { -1.0 },
+        "saw" => 2.0 * (ph - (0.5 + ph).floor()),
+        "triangle" => 2.0 * (2.0 * (ph - (0.5 + ph).floor())).abs() - 1.0,
         _ => 0.0,
     }
 }

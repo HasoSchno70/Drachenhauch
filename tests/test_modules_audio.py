@@ -122,6 +122,54 @@ def test_audio_noise_zero_duration_raises(call_builtin):
         call_builtin("audio_noise", [0])
 
 
+# --- SFX-Synth (AUDIO_SFX) -----------------------------------------
+
+def _sfx_args(waveform="saw"):
+    # waveform, freq, slide, attack, sustain, decay, vib_depth, vib_speed, vol
+    return [waveform, 1000.0, -1400.0, 0, 30, 150, 0.0, 0.0, 0.7]
+
+
+def test_audio_sfx_returns_sound(call_builtin):
+    snd = call_builtin("audio_sfx", _sfx_args())
+    from gamebasic.interpreter import _Sound
+    assert isinstance(snd, _Sound)
+
+
+@pytest.mark.parametrize("waveform", ["sine", "square", "saw", "triangle", "noise"])
+def test_audio_sfx_all_waveforms(call_builtin, waveform):
+    from gamebasic.interpreter import _Sound
+    assert isinstance(call_builtin("audio_sfx", _sfx_args(waveform)), _Sound)
+
+
+def test_audio_sfx_with_vibrato(call_builtin):
+    from gamebasic.interpreter import _Sound
+    args = ["square", 380.0, 700.0, 0, 90, 240, 0.15, 18.0, 0.6]
+    assert isinstance(call_builtin("audio_sfx", args), _Sound)
+
+
+def test_audio_sfx_unknown_waveform_raises(call_builtin):
+    with pytest.raises(GBRuntimeError, match="unbekannte Waveform"):
+        call_builtin("audio_sfx", _sfx_args("triangel"))
+
+
+def test_audio_sfx_zero_total_duration_raises(call_builtin):
+    with pytest.raises(GBRuntimeError, match="Gesamtdauer"):
+        call_builtin("audio_sfx", ["saw", 440.0, 0.0, 0, 0, 0, 0.0, 0.0, 0.7])
+
+
+def test_synth_matches_envelope_shape():
+    # Der geteilte Synth liefert ein env-geformtes Signal in [-1, 1] (ohne Vol).
+    import numpy as np
+    from gamebasic.synth import synthesize
+    w = synthesize("square", 440.0, 0.0, 0, 50, 50, sr=44100)
+    assert w.shape[0] == int(44100 * 100 / 1000)
+    assert abs(w[-1]) < 0.1         # Decay laeuft am Ende auf ~0 aus
+    assert np.abs(w).max() <= 1.0
+    # Mit Attack-Ramp startet das Signal bei ~0.
+    wa = synthesize("square", 440.0, 0.0, 30, 30, 30, sr=44100)
+    assert abs(wa[0]) < 0.1
+
+
 # --- Channel-Playback ---------------------------------------------
 
 def test_audio_play_returns_audio_channel(call_builtin):

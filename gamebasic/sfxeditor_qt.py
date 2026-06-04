@@ -24,9 +24,8 @@ from PySide6.QtWidgets import (
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
-
-_SAMPLE_RATE = 44100
-_WAVEFORMS = ("square", "saw", "sine", "triangle", "noise")
+from .synth import SAMPLE_RATE as _SAMPLE_RATE, WAVEFORMS as _WAVEFORMS
+from .synth import synthesize as _synth
 
 # Presets: typische sfxr-Kategorien. Werte sind ein Startpunkt, "Zufall"
 # variiert sie. (waveform, base_freq, slide_hz_s, atk, sus, dec, vib_d, vib_s)
@@ -42,37 +41,12 @@ _PRESETS = {
 
 
 def synthesize(p: dict, sr: int = _SAMPLE_RATE) -> np.ndarray:
-    """Erzeugt das Float-Sample-Array [-1, 1] aus den Parametern."""
-    total_ms = max(1, p["attack"] + p["sustain"] + p["decay"])
-    n = max(1, int(sr * total_ms / 1000.0))
-    t = np.arange(n, dtype=np.float64) / sr
-    freq = p["base_freq"] + p["slide"] * t
-    if p["vib_depth"] > 0 and p["vib_speed"] > 0:
-        freq = freq * (1.0 + p["vib_depth"] * np.sin(2.0 * np.pi * p["vib_speed"] * t))
-    freq = np.clip(freq, 20.0, sr / 2.0)
-    wf = p["waveform"]
-    if wf == "noise":
-        wave_arr = np.random.uniform(-1.0, 1.0, n)
-    else:
-        phase = 2.0 * np.pi * np.cumsum(freq) / sr
-        ph = phase / (2.0 * np.pi)
-        if wf == "sine":
-            wave_arr = np.sin(phase)
-        elif wf == "square":
-            wave_arr = np.where(np.sin(phase) >= 0, 1.0, -1.0)
-        elif wf == "saw":
-            wave_arr = 2.0 * (ph - np.floor(0.5 + ph))
-        else:  # triangle
-            wave_arr = 2.0 * np.abs(2.0 * (ph - np.floor(0.5 + ph))) - 1.0
-    # Huellkurve (Attack-Ramp / Sustain / Decay-Ramp)
-    na = int(n * p["attack"] / total_ms)
-    nd = int(n * p["decay"] / total_ms)
-    env = np.ones(n)
-    if na > 0:
-        env[:na] = np.linspace(0.0, 1.0, na)
-    if nd > 0:
-        env[-nd:] = np.linspace(1.0, 0.0, nd)
-    return np.clip(wave_arr * env * p["volume"], -1.0, 1.0)
+    """Float-Sample-Array [-1, 1] inkl. Lautstaerke -- nutzt den geteilten
+    Synth (`gamebasic.synth`), denselben Code wie der AUDIO_SFX-Builtin."""
+    wave = _synth(p["waveform"], p["base_freq"], p["slide"],
+                  p["attack"], p["sustain"], p["decay"],
+                  p["vib_depth"], p["vib_speed"], sr=sr)
+    return np.clip(wave * p["volume"], -1.0, 1.0)
 
 
 def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
@@ -300,26 +274,15 @@ class SfxGenerator(QMainWindow):
 
     def _export_code(self) -> None:
         p = self._params()
-        simple = p["slide"] == 0 and p["vib_depth"] == 0
-        if simple and p["waveform"] == "noise":
-            dur = p["attack"] + p["sustain"] + p["decay"]
-            code = ('IMPORT "audio"\n\nDIM snd AS SOUND\n'
-                    f'snd = AUDIO_NOISE({dur}, {p["volume"]:g})\n'
-                    'PLAYSOUND(snd)\n')
-        elif simple:
-            dur = p["attack"] + p["sustain"] + p["decay"]
-            code = ('IMPORT "audio"\n\nDIM snd AS SOUND\n'
-                    f'snd = AUDIO_TONE({p["base_freq"]:g}, {dur}, '
-                    f'"{p["waveform"]}", {p["volume"]:g})\n'
-                    'PLAYSOUND(snd)\n')
-        else:
-            code = ("' Dieser Effekt nutzt Pitch-Slide/Vibrato/Huellkurve --\n"
-                    "' das kann AUDIO_TONE nicht. Per 'WAV exportieren' als\n"
-                    "' Asset speichern und so laden:\n\n"
-                    'DIM snd AS SOUND\n'
-                    'snd = LOADSOUND("sfx.wav")\n'
-                    'PLAYSOUND(snd)\n')
-        self._show_code(code, title="GB-Code")
+        # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit -- laeuft in
+        # BEIDEN Pfaden (Tree-Walker + nativer gbrt), kein WAV-Asset noetig.
+        code = (
+            'IMPORT "audio"\n\nDIM snd AS SOUND\n'
+            f'snd = AUDIO_SFX("{p["waveform"]}", {p["base_freq"]:g}, '
+            f'{p["slide"]:g}, {p["attack"]}, {p["sustain"]}, {p["decay"]}, '
+            f'{p["vib_depth"]:g}, {p["vib_speed"]:g}, {p["volume"]:g})\n'
+            'PLAYSOUND(snd)\n')
+        self._show_code(code, title="GB-Code (AUDIO_SFX)")
 
     def _show_code(self, code: str, title: str) -> None:
         dlg = QFrame(self, Qt.WindowType.Window)

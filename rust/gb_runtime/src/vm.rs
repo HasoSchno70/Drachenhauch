@@ -2645,6 +2645,18 @@ impl<'p> Vm<'p> {
                 let vol = if a.len() >= 2 { need_f(a, 1, "AUDIO_NOISE")? } else { 1.0 };
                 Value::Int(self.audio_mut()?.noise(dur, vol)?)
             }
+            "audio_sfx" => {
+                let wf = gs(a, 0, "AUDIO_SFX")?.to_string();
+                let freq = need_f(a, 1, "AUDIO_SFX")?;
+                let slide = need_f(a, 2, "AUDIO_SFX")?;
+                let atk = gi(a, 3, "AUDIO_SFX")?;
+                let sus = gi(a, 4, "AUDIO_SFX")?;
+                let dec = gi(a, 5, "AUDIO_SFX")?;
+                let vd = need_f(a, 6, "AUDIO_SFX")?;
+                let vs = need_f(a, 7, "AUDIO_SFX")?;
+                let vol = need_f(a, 8, "AUDIO_SFX")?;
+                Value::Int(self.audio_mut()?.sfx(&wf, freq, slide, atk, sus, dec, vd, vs, vol)?)
+            }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => { self.audio_mut()?.music_play(); Value::Nil }
             "audio_music_stop" => { self.audio_mut()?.music_stop(); Value::Nil }
