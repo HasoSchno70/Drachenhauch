@@ -100,6 +100,8 @@ Oder ohne Argumente:
 | `Shift+F8` | **Voriger Fehler** |
 | `F12` | **Gehe zur Definition** — sucht erst im aktuellen Buffer, dann in `IMPORT`-Dateien |
 | `Strg+Klick` | Wie F12, aber per Maus |
+| `Alt+F12` | **Peek-Definition** — zeigt Signatur, Doc-Kommentar und den Anfang des Bodys in einem Popup am Cursor, ohne wegzuspringen. `Enter`/Button springt doch hin, `Esc` schließt |
+| `Shift+F12` | **Find-References** — listet alle Vorkommen in der Konsole (klickbar) |
 | `Strg+Leertaste` | Auto-Vervollständigung manuell auslösen. Beim Tippen öffnet sich das Popup auch automatisch (siehe unten); `↑`/`↓` navigiert, `Enter`/`Tab` committed, `Esc` oder Klick außerhalb schließt |
 | `Strg+Shift+P` | **Befehlspalette** (siehe unten) |
 | `Strg+P` | **Quick-Open** — Fuzzy-Search durch alle `.gb`-Dateien im Projekt |
@@ -254,6 +256,10 @@ WIFI         (Windows-only)
 - **Suchfeld oben** filtert live: `json` zeigt nur JSON-Befehle, `_get_` alle Getter quer durch alle Module. Während der Filter aktiv ist, werden alle matchenden Module automatisch aufgeklappt; der manuell gesetzte Auf-/Zu-Zustand wird zurückgespielt sobald der Filter geleert wird.
 - **Doppelklick** auf einen Eintrag fügt den Namen am aktuellen Cursor in die Datei ein.
 - **Signatur in Klammern** — z.B. `JSON_GET_STRING(h, path: STRING)` — zeigt direkt, was die Funktion erwartet. Lange Signaturen sind über die horizontale Scrollbar erreichbar.
+
+## Breadcrumbs (Scope-Pfad)
+
+Schmale Leiste direkt über dem Editor: zeigt, wo der Cursor gerade steckt — z. B. `game.gb  ›  C Player  ›  ▸ Init`, wenn er in der Methode `Init` der Klasse `Player` steht. Jedes Segment ist anklickbar und springt zur jeweiligen Definitionszeile (Dateiname → Zeile 1). Aktualisiert live beim Tippen und Cursor-Bewegen; auf Top-Level zeigt sie nur den Dateinamen. Gespeist aus demselben Scope-Scanner wie die Outline.
 
 ## Outline (Struktur-Sidebar)
 

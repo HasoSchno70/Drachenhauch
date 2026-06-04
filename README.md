@@ -36,11 +36,12 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — Pygame-Backend, Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **[Module](docs/README.md#module)** — `json`, `db`, `tween`, `imgfx`, `particles`, `physics`, `camera`, `sprite`, `ui`, `scene`, `save`, `astar`, `ecs`, `vec2`, `input`, `regex`, `audio`, `curves`, `net`
-- **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Debugger** (Breakpoints/Step/Variablen), Welcome-Showcase (Demo-Galerie mit Screenshots)
+- **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Debugger** (Breakpoints/Step/Variablen), Welcome-Showcase (Demo-Galerie mit Screenshots)
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`gbsprites`): Multi-Frame, Animation, Atlas-Export, Onion-Skin, Tile-Preview
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`gbparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, GB-Code-Export
 - **[SFX-Generator](docs/sfx-generator.md)** — Retro-Soundeffekte (`gbsfx`, sfxr-Stil): Synth mit Pitch-Slide/Hüllkurve/Vibrato, Export WAV/GB-Code
 - **[Tracker](docs/tracker.md)** — mehrspuriger Chiptune-Musik-Editor (`gbtracker`): 3 Ton-Kanäle + Drums, Pattern-Gitter + Klaviatur, Export als frame-basierter GB-Player
+- **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** — Tiles aufs Gitter malen (`gbtilemap`): mehrere Layer, Per-Tile-Properties (`solid`/`damage`), Stift/Füllen/Rechteck/Pipette, Speichern/Laden als Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer-Export
 
 ## Beispiele
 

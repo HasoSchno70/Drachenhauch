@@ -140,6 +140,7 @@ class CodeEditor(
     run_requested = Signal()
     open_requested = Signal()
     goto_definition_requested = Signal(str)   # Symbol-Name am Cursor
+    peek_definition_requested = Signal(str)    # Symbol-Name am Cursor (Popup)
     find_references_requested = Signal(str)
     rename_requested = Signal(str)
     run_selection_requested = Signal(str)     # selektierter Code-Snippet
@@ -1061,6 +1062,13 @@ class CodeEditor(
             cur = self.textCursor()
             if cur.hasSelection():
                 self.run_selection_requested.emit(cur.selectedText().replace(" ", "\n"))
+            return
+
+        # Alt+F12 -- Peek-Definition (Popup, ohne Sprung)
+        if key == Qt.Key.Key_F12 and (mods & Qt.KeyboardModifier.AltModifier):
+            sym = self._symbol_under_cursor()
+            if sym:
+                self.peek_definition_requested.emit(sym)
             return
 
         # F12 -- Goto-Definition

@@ -3,6 +3,7 @@ Hover-Doc)."""
 from gamebasic.editor_qt.symbols import (
     scan_definitions, scan_references, find_definition,
     all_user_identifier_positions, extract_user_doc,
+    scan_scopes, scope_path,
 )
 
 
@@ -210,3 +211,73 @@ def test_extract_user_doc_multiline_param_list():
     assert sig.endswith(")")
     assert "a AS INTEGER" in sig
     assert "c AS INTEGER" in sig
+
+
+# ---------------------------------------------------- Scope-Pfad (Breadcrumbs)
+
+_NESTED = (
+    "DIM g AS INTEGER\n"          # 1  top-level
+    "CLASS Player\n"             # 2
+    "    DIM hp AS INTEGER\n"    # 3
+    "    SUB Init()\n"          # 4
+    "        Self.hp = 100\n"   # 5
+    "    END SUB\n"            # 6
+    "    PROPERTY GET hp() AS INTEGER\n"  # 7
+    "        RETURN Self.hp\n"  # 8
+    "    END PROPERTY\n"       # 9
+    "END CLASS\n"             # 10
+    "FUNCTION add(a AS INTEGER, b AS INTEGER) AS INTEGER\n"  # 11
+    "    RETURN a + b\n"        # 12
+    "END FUNCTION\n"          # 13
+)
+
+
+def test_scan_scopes_ranges():
+    scopes = {(s.kind, s.name): (s.line, s.end) for s in scan_scopes(_NESTED)}
+    assert scopes[("class", "Player")] == (2, 10)
+    assert scopes[("sub", "Init")] == (4, 6)
+    assert scopes[("property", "hp")] == (7, 9)
+    assert scopes[("function", "add")] == (11, 13)
+
+
+def test_scope_path_toplevel_is_empty():
+    assert scope_path(_NESTED, 1) == []
+
+
+def test_scope_path_inside_method():
+    path = [(s.kind, s.name) for s in scope_path(_NESTED, 5)]
+    assert path == [("class", "Player"), ("sub", "Init")]
+
+
+def test_scope_path_on_opener_line():
+    # Cursor auf der SUB-Zeile selbst zaehlt schon zur SUB.
+    path = [(s.kind, s.name) for s in scope_path(_NESTED, 4)]
+    assert path == [("class", "Player"), ("sub", "Init")]
+
+
+def test_scope_path_property():
+    path = [(s.kind, s.name) for s in scope_path(_NESTED, 8)]
+    assert path == [("class", "Player"), ("property", "hp")]
+
+
+def test_scope_path_function_not_nested_in_class():
+    path = [(s.kind, s.name) for s in scope_path(_NESTED, 12)]
+    assert path == [("function", "add")]
+
+
+def test_scan_scopes_unclosed_block_ends_at_eof():
+    src = "SUB broken()\n    PRINT 1"
+    scopes = scan_scopes(src)
+    assert len(scopes) == 1
+    assert scopes[0].kind == "sub" and scopes[0].end == 2
+
+
+def test_scan_scopes_ignores_keywords_in_comments_and_strings():
+    src = (
+        'SUB real()\n'
+        "    ' END SUB in a comment\n"
+        '    PRINT "CLASS Fake"\n'
+        "END SUB\n"
+    )
+    scopes = scan_scopes(src)
+    assert [(s.kind, s.name, s.line, s.end) for s in scopes] == [("sub", "real", 1, 4)]

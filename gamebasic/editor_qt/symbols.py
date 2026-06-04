@@ -221,6 +221,84 @@ def find_definition(source: str, name: str) -> Definition | None:
     return None
 
 
+@dataclass
+class Scope:
+    kind: str        # "class" | "struct" | "sub" | "function" | "property"
+    name: str
+    line: int        # 1-basiert, Zeile der Block-Eroeffnung
+    end: int         # 1-basiert, Zeile des END (oder Dateiende bei offen)
+
+
+# Block-Oeffner: Prefix -> kind. PROPERTY separat (Name nach GET/SET).
+_SCOPE_OPENERS = (
+    ("CLASS ", "class"),
+    ("STRUCT ", "struct"),
+    ("SUB ", "sub"),
+    ("FUNCTION ", "function"),
+)
+_END_KIND = {
+    "END CLASS": "class", "END STRUCT": "struct", "END SUB": "sub",
+    "END FUNCTION": "function", "END PROPERTY": "property",
+}
+_PROP_RE = re.compile(
+    r"^\s*PROPERTY\s+(?:GET|SET)\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE)
+
+
+def scan_scopes(source: str) -> list[Scope]:
+    """Liefert alle CLASS/STRUCT/SUB/FUNCTION/PROPERTY-Bloecke mit ihrem
+    Zeilenbereich (`line`..`end`). Verschachtelung wird ueber einen Stack
+    aufgeloest; nicht geschlossene Bloecke enden am Dateiende.
+
+    Heuristik (string-/comment-aware via `_strip_comment_and_strings`),
+    nicht Lex-genau -- fuer Breadcrumbs/Scope-Pfad ausreichend.
+    """
+    lines = source.split("\n")
+    n = len(lines)
+    stack: list[Scope] = []
+    out: list[Scope] = []
+    for ln, raw in enumerate(lines, start=1):
+        s = _strip_comment_and_strings(raw).strip()
+        if not s:
+            continue
+        upper = s.upper()
+        # Block-Ende?
+        ender = None
+        if upper.startswith("END "):
+            two = " ".join(upper.split()[:2])
+            ender = _END_KIND.get(two)
+        if ender is not None:
+            # passenden Block vom Stack nehmen (top wenn Art passt)
+            for i in range(len(stack) - 1, -1, -1):
+                if stack[i].kind == ender:
+                    sc = stack[i]
+                    sc.end = ln
+                    del stack[i:]   # i und alles darueber schliessen
+                    break
+            continue
+        # Block-Anfang?
+        mprop = _PROP_RE.match(s)
+        if mprop:
+            sc = Scope("property", mprop.group(1), ln, n)
+            stack.append(sc); out.append(sc)
+            continue
+        for prefix, kind in _SCOPE_OPENERS:
+            if upper.startswith(prefix):
+                rest = s[len(prefix):].lstrip()
+                name = re.match(r"([A-Za-z_][A-Za-z0-9_]*)", rest)
+                sc = Scope(kind, name.group(1) if name else "?", ln, n)
+                stack.append(sc); out.append(sc)
+                break
+    return out
+
+
+def scope_path(source: str, line: int) -> list[Scope]:
+    """Kette der Bloecke (aussen -> innen), die Zeile `line` umschliessen.
+    Leere Liste auf Top-Level. Fuer die Breadcrumb-Leiste."""
+    path = [sc for sc in scan_scopes(source) if sc.line <= line <= sc.end]
+    path.sort(key=lambda sc: sc.line)
+    return path
+
+
 def extract_user_doc(source: str, name: str) -> tuple[str, str] | None:
     """Liefert `(signatur, doc)` zu einem User-Symbol -- analog zu
     `editor_qt.builtin_docs.get_doc`, aber fuer im Buffer definierte

@@ -256,7 +256,18 @@ class GameBasicEditor(QMainWindow):
         self.right_stack.addWidget(self.splitter_right)
 
         self.tabs = TabbedEditorArea()
-        self.splitter_right.addWidget(self.tabs)
+        # Breadcrumb-Leiste ueber dem Tab-Bereich (Scope-Pfad der Cursor-Pos).
+        from PySide6.QtWidgets import QVBoxLayout as _QVBoxLayout
+        from .breadcrumbs import Breadcrumbs
+        self.breadcrumbs = Breadcrumbs()
+        self.breadcrumbs.jump_requested.connect(self._breadcrumb_jump)
+        editor_pane = QWidget()
+        _ev = _QVBoxLayout(editor_pane)
+        _ev.setContentsMargins(0, 0, 0, 0)
+        _ev.setSpacing(0)
+        _ev.addWidget(self.breadcrumbs)
+        _ev.addWidget(self.tabs, 1)
+        self.splitter_right.addWidget(editor_pane)
 
         self.console = OutputConsole(self.project_root)
         self.splitter_right.addWidget(self.console)
@@ -364,6 +375,14 @@ class GameBasicEditor(QMainWindow):
         self.act_tracker_editor.setToolTip(
             "Tracker -- mehrspuriger Chiptune-Editor, Export als GB-Code")
         self.act_tracker_editor.triggered.connect(self._open_tracker_editor)
+
+        self.act_tilemap_editor = QAction(
+            icons.get("tilemap"), "Tilemap-/Level-Editor oeffnen ...", self,
+        )
+        self.act_tilemap_editor.setShortcut(QKeySequence("Ctrl+Shift+G"))
+        self.act_tilemap_editor.setToolTip(
+            "Tilemap-Editor -- Tiles aufs Gitter malen, Export als Tiled-JSON")
+        self.act_tilemap_editor.triggered.connect(self._open_tilemap_editor)
 
         # Edit
         self.act_find = QAction(icons.get("find"), "Suchen ...", self)
@@ -551,6 +570,7 @@ class GameBasicEditor(QMainWindow):
         tb.addAction(self.act_particle_editor)
         tb.addAction(self.act_sfx_editor)
         tb.addAction(self.act_tracker_editor)
+        tb.addAction(self.act_tilemap_editor)
         tb.addAction(self.act_theme)
         # Objektnamen fuer farbige Hover-Akzente (siehe theme.global_qss):
         # Run gruen, Stop magenta.
@@ -577,6 +597,7 @@ class GameBasicEditor(QMainWindow):
         m_file.addAction(self.act_particle_editor)
         m_file.addAction(self.act_sfx_editor)
         m_file.addAction(self.act_tracker_editor)
+        m_file.addAction(self.act_tilemap_editor)
         m_file.addSeparator()
         m_file.addAction(self.act_close_tab)
         m_file.addAction(self.act_reopen_tab)
@@ -662,6 +683,7 @@ class GameBasicEditor(QMainWindow):
 
     def _on_tab_opened(self, st: TabState) -> None:
         st.editor.cursorPositionChanged.connect(self._update_cursor_label)
+        st.editor.cursorPositionChanged.connect(self._update_breadcrumbs)
         st.editor.set_auto_complete(self._auto_complete_default)
         # Outline triggert auf Inhalts-Aenderungen mit Debounce.
         self._outline_timer = getattr(self, "_outline_timer", None) or self._make_outline_timer()
@@ -673,8 +695,9 @@ class GameBasicEditor(QMainWindow):
         # Breakpoints des Tabs -> Debugger (wenn dieser Tab debuggt wird).
         st.editor.breakpoints_changed.connect(
             lambda e=st.editor: self._on_breakpoints_changed(e))
-        # Goto / Find-Refs / Rename
+        # Goto / Peek / Find-Refs / Rename
         st.editor.goto_definition_requested.connect(self._goto_definition)
+        st.editor.peek_definition_requested.connect(self._peek_definition)
         st.editor.find_references_requested.connect(self._find_references)
         st.editor.rename_requested.connect(self._rename_symbol)
         # Run-Selection (Shift+F5)
@@ -756,6 +779,28 @@ class GameBasicEditor(QMainWindow):
         self.outline.update_for(text)
         if getattr(self, "todo_dock", None) is not None and self.todo_dock.isVisible():
             self.todo_panel.update_for(text)
+        self._update_breadcrumbs()
+
+    def _update_breadcrumbs(self) -> None:
+        bc = getattr(self, "breadcrumbs", None)
+        if bc is None:
+            return
+        st = self.tabs.active
+        if st is None:
+            bc.clear()
+            return
+        from . import symbols as gb_symbols
+        cursor = st.editor.textCursor()
+        line = cursor.blockNumber() + 1
+        scopes = gb_symbols.scope_path(st.editor.get_text(), line)
+        name = st.file_path.name if st.file_path else "(neu)"
+        bc.set_path(name, scopes)
+
+    def _breadcrumb_jump(self, line: int) -> None:
+        st = self.tabs.active
+        if st is not None and line > 0:
+            st.editor.goto_line(line)
+            st.editor.setFocus()
 
     # ----------------------------------------------------- Aktionen
     def _new_tab(self) -> TabState:
@@ -1038,6 +1083,41 @@ class GameBasicEditor(QMainWindow):
         cur.setPosition(block.position() + d.col_end - 1, cur.MoveMode.KeepAnchor)
         st.editor.setTextCursor(cur)
         st.editor.setFocus()
+
+    def _peek_definition(self, name: str) -> None:
+        """Zeigt die Definition von `name` als Popup am Cursor (ohne Sprung)."""
+        from . import symbols as gb_symbols
+        st = self.tabs.active
+        if st is None:
+            return
+        text = st.editor.get_text()
+        d = gb_symbols.find_definition(text, name)
+        if d is None:
+            self.statusBar().showMessage(
+                f"Keine Definition fuer '{name}' gefunden.", 3000)
+            return
+        info = gb_symbols.extract_user_doc(text, name)
+        signature = info[0] if info else name
+        doc = info[1] if info else ""
+        # Body-Auszug: ab Def-Zeile bis Block-Ende (falls Block), max 14 Zeilen.
+        lines = text.split("\n")
+        end_line = d.line
+        for sc in gb_symbols.scan_scopes(text):
+            if sc.line == d.line:
+                end_line = sc.end
+                break
+        last = min(end_line, d.line + 13)
+        body = "\n".join(lines[d.line - 1:last])
+        # Popup am Cursor positionieren.
+        cr = st.editor.cursorRect()
+        pt = st.editor.viewport().mapToGlobal(cr.bottomLeft())
+        popup = getattr(self, "_peek_popup", None)
+        if popup is None:
+            from .peek import PeekPopup
+            popup = PeekPopup(self)
+            popup.go_to.connect(self._breadcrumb_jump)
+            self._peek_popup = popup
+        popup.show_at(pt, signature, doc, body, d.line)
 
     def _find_references(self, name: str) -> None:
         from . import symbols as gb_symbols
@@ -1469,6 +1549,7 @@ class GameBasicEditor(QMainWindow):
             ("particles", self.act_particle_editor),
             ("sfx", self.act_sfx_editor),
             ("tracker", self.act_tracker_editor),
+            ("tilemap", self.act_tilemap_editor),
         ):
             act.setIcon(icons.get(key))
         # Theme-Action haengt am aktuellen Theme.
@@ -1594,6 +1675,25 @@ class GameBasicEditor(QMainWindow):
         self._tracker_editor_window.raise_()
         self._tracker_editor_window.activateWindow()
 
+    def _open_tilemap_editor(self) -> None:
+        """Oeffnet den Tilemap-/Level-Editor als zweites Top-Level-Fenster."""
+        try:
+            from .. import tilemapeditor_qt as tm
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self, "Tilemap-Editor-Fehler",
+                f"Konnte Tilemap-Editor nicht laden:\n"
+                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6'.")
+            return
+        self._tilemap_editor_window = tm.TileMapEditor(self.project_root)
+        self._tilemap_editor_window.setAttribute(
+            Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self._tilemap_editor_window.destroyed.connect(
+            lambda: setattr(self, "_tilemap_editor_window", None))
+        self._tilemap_editor_window.show()
+        self._tilemap_editor_window.raise_()
+        self._tilemap_editor_window.activateWindow()
+
     def _show_shortcuts(self) -> None:
         """Sammelt alle QActions + Editor-interne Shortcuts und zeigt sie."""
         entries: list[tuple[str, str]] = []
@@ -1607,6 +1707,7 @@ class GameBasicEditor(QMainWindow):
         add_action_group("Datei", [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
+            self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
         ])
         add_action_group("Bearbeiten", [
@@ -1635,6 +1736,7 @@ class GameBasicEditor(QMainWindow):
             ("Multi-Cursor: naechstes Vorkommen", "Ctrl+D"),
             ("Multi-Cursor verwerfen", "Esc"),
             ("Goto-Definition", "F12 / Ctrl+Click"),
+            ("Peek-Definition (Popup)", "Alt+F12"),
             ("Find-References", "Shift+F12"),
             ("Symbol umbenennen", "F2"),
             ("Auto-Completion manuell", "Ctrl+Space"),
@@ -1691,6 +1793,7 @@ class GameBasicEditor(QMainWindow):
         return [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
+            self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,
