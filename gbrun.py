@@ -57,6 +57,16 @@ def _launch_sprite_editor(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_particle_editor(project_root, initial_file=None):
+    try:
+        from gamebasic.particleeditor_qt import launch
+    except SystemExit:
+        return None
+    except ImportError:
+        return None
+    return launch(project_root, initial_file)
+
+
 def main(argv):
     args = argv[1:]
     mode = "run"
@@ -81,6 +91,17 @@ def main(argv):
             print("Sprite-Editor benoetigt 'PySide6' und 'Pillow'.")
             print("Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6 Pillow")
+            return 3
+        return rc
+
+    # --- Partikel-Editor explizit per Flag ---
+    if args and args[0] in ("--particles", "--particle-editor", "-P"):
+        args = args[1:]
+        rc = _launch_particle_editor(Path(__file__).resolve().parent, None)
+        if rc is None:
+            print("Partikel-Editor benoetigt 'PySide6' und 'numpy'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
             return 3
         return rc
 
