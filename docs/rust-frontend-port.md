@@ -17,7 +17,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
 | 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
-| 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
+| 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` | Merge-Ergebnis-Gleichheit (`gbrt --preprocess` == `process()`) | ✅ **fertig** |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
 ## Stufe 1 — Lexer (fertig)
@@ -117,9 +117,42 @@ Werttypen aus `_TYPE_DEFAULTS` erkannt (`TUPLE`/`COROUTINE`/`FUNCREF`/`IMAGE`/
 `FOR EACH`/`WITH` — der Rust-Port spiegelt das exakt (sonst weichen die
 DATA-Arrays ab).
 
-**Nächste Teil-Stufen** (je eigener Commit): `gbrt run datei.gb`
-(Stufe 5) + Preprocess/`IMPORT` (Stufe 4). Damit liefe die Toolchain
-end-to-end ohne Python.
+## Stufe 4 — Preprocess / `IMPORT` (fertig)
+
+[`rust/gb_runtime/src/preprocess.rs`](../rust/gb_runtime/src/preprocess.rs):
+Port von `gamebasic/preprocess.py`. `process(source, base)` expandiert
+`IMPORT`-Zeilen rekursiv **vor dem Lexen** und liefert `(merged_source,
+imported_modules)`:
+- **Quellcode-IMPORT** (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
+  rekursiv preprocessen, mit den exakten Markern `' === IMPORT … ===` /
+  `' === END IMPORT … ===` inlinen. `seen`-Set (kanonisierte Pfade) verhindert
+  Doppel-Inkludierung → `' [IMPORT bereits inkludiert: …]`.
+- **Built-in-Modul** (`IMPORT "json"` / `… AS j`): Zeile wird zu
+  `' === IMPORT MODULE json[ AS j] ===`. gbrt hat die Modul-Builtins nativ —
+  kein echtes Inlining nötig. Der Modul-Name wird gesammelt.
+- **Externe Modul-Typen:** `preprocess::external_types(mods)` mappt importierte
+  Module auf die Typen, die sie registrieren (`vec2`→`vec2`, `json`→`json_handle`,
+  …, Tabelle `MODULE_TYPES`). `compile_to_gbc(ast, external_types)` akzeptiert
+  diese dann als skalare `DIM`-Typen (Default NIL) — so kompiliert `DIM v AS VEC2`
+  nach `IMPORT "vec2"`.
+
+`gbrt --runsrc` schaltet den Preprocessor jetzt vor; `gbrt --preprocess <datei>`
+gibt die gemergte Quelle aus. **Gate = Merge-Ergebnis-Gleichheit** gegen
+`process()` ([`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py),
+7 Tests: Quellcode-/Modul-/Alias-/nested+duplicate-/Trailing-Comment-IMPORT,
+fehlender Import = Fehler in beiden, plus End-to-End `--runsrc`-Output-Parität).
+Gotchas: (a) `MODULES`/`MODULE_TYPES` müssen mit `modules.discover_modules()`/
+`register_type` synchron bleiben (29 Module hardcoded — gbrt hat sie nativ);
+(b) CRLF-Dateien: jede Zeile wird vor dem IMPORT-Regex `\r`-getrimmt (Python liest
+Textmodus, `\r\n`→`\n`); (c) Modul-Erkennung ist case-insensitiv (`load_module`
+importiert `name.lower()`). **Grenze:** aliasierte Modul-Builtins (`J_PARSE` aus
+`IMPORT "json" AS j`) sind eine Python-Registry-Laufzeit-Trick — gbrt hat sie
+(noch) nicht; das Merge-Ergebnis stimmt, der aliasierte *Aufruf* liefe in gbrt
+nicht.
+
+**Nächste Stufe** (eigener Commit): `gbrt run datei.gb` (Stufe 5 — `--runsrc`
+zum Default-Run machen, `os.chdir`-Äquivalent für relative Asset-Pfade). Damit
+liefe die Toolchain end-to-end ohne Python.
 
 ## Prinzip
 

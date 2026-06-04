@@ -1615,15 +1615,18 @@ generieren (`python vscode-gamebasic/build_grammar.py`).
 selbst aus Quelltext Bytecode erzeugen (heute macht das die Python-Toolchain).
 Die Front-End-Stufen werden **inkrementell** nach Rust portiert, **jede gegen
 Python verifiziert** (cargo+rustc vorhanden → hier beweisbar). **Stufe 1 (Lexer)
-+ Stufe 2 (Parser) fertig, Stufe 3 (Compiler) 3a–3e fertig.** Debug-/
-Run-Einstiege `gbrt --tokens` / `gbrt --ast` / `gbrt --runsrc` geben Token-Strom
-bzw. AST als JSON aus bzw. lexen+parsen+kompilieren+führen **alles in Rust** aus.
-Parity gegen Python: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
++ Stufe 2 (Parser) + Stufe 4 (Preprocess/IMPORT) fertig, Stufe 3 (Compiler)
+3a–3e fertig.** Debug-/Run-Einstiege `gbrt --tokens` / `gbrt --ast` /
+`gbrt --preprocess` / `gbrt --runsrc` geben Token-Strom bzw. AST bzw. gemergte
+Quelle als JSON/Text aus bzw. preprocessen+lexen+parsen+kompilieren+führen
+**alles in Rust** aus. Parity gegen Python: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
 (137) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96)
-+ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (71).
++ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (71)
++ [`tests/test_rust_preprocess_parity.py`](tests/test_rust_preprocess_parity.py) (7).
 Dateien: [`src/lexer.rs`](rust/gb_runtime/src/lexer.rs),
 [`src/ast.rs`](rust/gb_runtime/src/ast.rs),
 [`src/parser.rs`](rust/gb_runtime/src/parser.rs),
+[`src/preprocess.rs`](rust/gb_runtime/src/preprocess.rs),
 [`src/compiler.rs`](rust/gb_runtime/src/compiler.rs). Plan/Stufen/Gotchas:
 [docs/rust-frontend-port.md](docs/rust-frontend-port.md).
 **Compiler-Gate = Output-Parität** (`gbrt --runsrc` stdout == Python-TW), NICHT
@@ -1635,10 +1638,18 @@ Defaults/Variadic/FUNCREF, 3c) + Klassen/Structs (NEW/Member/Self/Methoden-
 Calls/Vererbung/Properties/Operatoren/STATIC/ENUM, 3d) + SELECT/FOR EACH/REPEAT/
 Tupel+Destructuring/WITH/TRY-CATCH-THROW/Slicing/List-Set-Dict-Comprehensions/
 IIF/Coroutinen-YIELD + TUPLE/COROUTINE/FUNCREF/IMAGE-DIM-Typen (3e). Nicht-
-unterstützt → `Err("Stufe 3e: ...")`. Nächste Stufen: `gbrt run datei.gb` +
-Preprocess/IMPORT. Tree-Walker bleibt Referenz + `@builtin`-
-Host. AST-Parity-Gotchas: `.line` kein Feld, `Param.by_ref` ist ein Token.
-3e-Gotcha: `_collect_data` rekursiert in SELECT/TRY, aber NICHT FOR EACH/WITH.
+unterstützt → `Err("Stufe 3e: ...")`. **Stufe 4 (Preprocess) fertig:**
+`src/preprocess.rs` portiert `preprocess.process()` — `IMPORT "datei.gb"`
+rekursiv inlinen (mit `' === IMPORT … ===`-Markern + `seen`-Dedup),
+`IMPORT "modul"[ AS x]` → Kommentar (gbrt hat Modul-Builtins nativ). Importierte
+Module liefern ihre externen Typen (`MODULE_TYPES`) an `compile_to_gbc(ast,
+external_types)` → `DIM v AS VEC2` kompiliert nach `IMPORT "vec2"`. `--runsrc`
+schaltet jetzt Preprocess vor. Nächste Stufe: `gbrt run datei.gb` (Stufe 5).
+Tree-Walker bleibt Referenz + `@builtin`-Host. AST-Parity-Gotchas: `.line` kein
+Feld, `Param.by_ref` ist ein Token. 3e-Gotcha: `_collect_data` rekursiert in
+SELECT/TRY, aber NICHT FOR EACH/WITH. 4-Gotcha: `MODULES`/`MODULE_TYPES` hardcoded,
+mit `modules.discover_modules()` synchron halten; aliasierte Modul-Builtins
+(`J_PARSE`) laufen in gbrt nicht (Python-Registry-Trick).
 
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 

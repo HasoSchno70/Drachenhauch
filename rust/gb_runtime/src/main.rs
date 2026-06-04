@@ -39,6 +39,7 @@ mod graphics;
 mod gui;
 mod lexer;
 mod model;
+mod preprocess;
 mod tiled;
 mod value;
 mod vm;
@@ -75,6 +76,11 @@ fn main() -> ExitCode {
         }
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);
+        }
+        // Stufe 4: IMPORT-Preprocessor -- gibt die gemergte Quelle aus
+        // (Merge-Parity gegen preprocess.process()).
+        if raw.len() >= 3 && raw[1] == "--preprocess" {
+            return preprocess_main(&raw[2]);
         }
         // Stufe 3: Quelltext in Rust kompilieren + ausfuehren (Output-Parity).
         if raw.len() >= 3 && raw[1] == "--runsrc" {
@@ -165,14 +171,44 @@ fn ast_main(path: &str) -> ExitCode {
     }
 }
 
-/// `gbrt --runsrc <datei.gb>` -- lext + parst + kompiliert (alles in Rust) und
-/// fuehrt das Ergebnis in der VM aus. Verifiziert die Rust-Front-End-Kette
-/// gegen den Python-Tree-Walker (Output-Parity, Stufe 3).
-fn runsrc_main(path: &str) -> ExitCode {
+/// `gbrt --preprocess <datei.gb>` -- expandiert IMPORTs und gibt die gemergte
+/// Quelle auf stdout aus (Merge-Parity gegen preprocess.process(), Stufe 4).
+fn preprocess_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
         Ok(t) => t,
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
+    let base = std::path::Path::new(path).parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    match preprocess::process(&source, &base) {
+        Ok((merged, _mods)) => {
+            let stdout = std::io::stdout();
+            let mut h = stdout.lock();
+            let _ = h.write_all(merged.as_bytes());
+            let _ = h.flush();
+            ExitCode::SUCCESS
+        }
+        Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); ExitCode::from(2) }
+    }
+}
+
+/// `gbrt --runsrc <datei.gb>` -- preprocesst IMPORTs, lext + parst + kompiliert
+/// (alles in Rust) und fuehrt das Ergebnis in der VM aus. Verifiziert die
+/// Rust-Front-End-Kette gegen den Python-Tree-Walker (Output-Parity, Stufe 3/4).
+fn runsrc_main(path: &str) -> ExitCode {
+    let raw_source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let base = std::path::Path::new(path).parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let (source, mods) = match preprocess::process(&raw_source, &base) {
+        Ok(r) => r,
+        Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); return ExitCode::from(2); }
+    };
+    let ext_types = preprocess::external_types(&mods);
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
         Err(e) => { eprintln!("Lexer {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
@@ -181,7 +217,7 @@ fn runsrc_main(path: &str) -> ExitCode {
         Ok(a) => a,
         Err(e) => { eprintln!("Parse {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
     };
-    let json = match compiler::compile_to_gbc(&ast) {
+    let json = match compiler::compile_to_gbc(&ast, &ext_types) {
         Ok(j) => j,
         Err(e) => { eprintln!("Compile: {}", e); return ExitCode::from(3); }
     };

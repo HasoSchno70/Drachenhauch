@@ -247,16 +247,25 @@ pub struct Compiler {
     compiled_fns: Vec<(String, Value)>,
     classes: HashMap<String, ClassInfo>,
     struct_names: std::collections::HashSet<String>,
+    /// Externe Typen importierter Module (lowercase) -- gueltige DIM-Typen
+    /// (z.B. "vec2", "json_handle"). Aus preprocess::external_types.
+    external_types: std::collections::HashSet<String>,
     ctx: Ctx,
 }
 
 impl Compiler {
-    fn new() -> Self {
+    fn new(external_types: std::collections::HashSet<String>) -> Self {
         Compiler { global_slots: HashMap::new(),
                    global_vars: std::collections::HashSet::new(),
                    fn_sigs: HashMap::new(), compiled_fns: vec![],
                    classes: HashMap::new(),
-                   struct_names: std::collections::HashSet::new(), ctx: Ctx::new() }
+                   struct_names: std::collections::HashSet::new(),
+                   external_types, ctx: Ctx::new() }
+    }
+
+    /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
+    fn is_known_value_type(&self, t: &str) -> bool {
+        is_value_type(t) || self.external_types.contains(t)
     }
 
     fn alloc_slot(&mut self, name: &str) {
@@ -400,7 +409,7 @@ impl Compiler {
     }
 
     fn known_elem(&self, t: &str) -> bool {
-        is_value_type(t) || self.classes.contains_key(t)
+        self.is_known_value_type(t) || self.classes.contains_key(t)
     }
 
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
@@ -428,8 +437,8 @@ impl Compiler {
             self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
             return Ok(());
         }
-        // Skalar: Werttyp (Default je Typ) oder Klasse (Default NIL).
-        if !is_value_type(type_name) && !self.classes.contains_key(type_name) {
+        // Skalar: Werttyp/externer Modul-Typ (Default je Typ) oder Klasse (NIL).
+        if !self.is_known_value_type(type_name) && !self.classes.contains_key(type_name) {
             return Err(format!("Stufe 3e: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
         }
         let name_idx = self.ctx.add_const(json!(name));
@@ -1765,8 +1774,12 @@ fn node_name(n: &Node) -> &'static str {
     }
 }
 
-/// AST -> `.gbc`-JSON (Stufe 3a). Fehler bei nicht unterstuetzten Konstrukten.
-pub fn compile_to_gbc(ast: &Node) -> Result<Value, String> {
+/// AST -> `.gbc`-JSON. `external_types` sind die von importierten Modulen
+/// registrierten Typ-Namen (lowercase, aus preprocess::external_types) --
+/// damit `DIM x AS VEC2` & Co. nach `IMPORT "vec2"` kompilieren.
+/// Fehler bei nicht unterstuetzten Konstrukten.
+pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>)
+    -> Result<Value, String> {
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err("Erwartet Program-Knoten".into()),
@@ -1783,7 +1796,7 @@ pub fn compile_to_gbc(ast: &Node) -> Result<Value, String> {
         }
     }
     let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
-    let mut c = Compiler::new();
+    let mut c = Compiler::new(external_types.clone());
     // Struct-Namen vor dem Slot-Pre-Pass kennen (Structs bekommen keinen Slot).
     for cd in &cls_decls {
         if let Node::ClassDecl { name, is_struct: true, .. } = cd {
