@@ -1,0 +1,850 @@
+"""Tilemap-/Level-Editor fuer GameBasic (`gbtilemap` / `gbrun.py --tilemap`).
+
+Atlas-Tiles auf ein Gitter malen, mehrere Layer, Per-Tile-Properties
+(`solid`, `damage`, ...), Speichern/Laden als Tiled-JSON (das `TILED_LOAD`
+direkt einliest) plus GB-Code-Export eines fertigen Renderers. Schliesst den
+Kreis mit dem Sprite-Atlas-Export des Sprite-Editors.
+
+Aufbau:
+  - links:  Tileset-Palette (Tile waehlen)
+  - mitte:  Karten-Canvas (malen mit Pencil/Eraser/Fill/Rect/Pipette)
+  - rechts: Layer-Liste (anlegen/loeschen/sortieren/Sichtbarkeit)
+
+Das Datenmodell + die Tiled-JSON-Serialisierung liegen Qt-frei in
+`gamebasic.tilemap.document` (headless getestet).
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtGui import (
+    QAction, QActionGroup, QColor, QFont, QKeySequence, QPainter, QPen, QPixmap,
+)
+from PySide6.QtWidgets import (
+    QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
+    QDockWidget, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
+    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit,
+    QPushButton, QScrollArea, QSpinBox, QTableWidget, QTableWidgetItem,
+    QToolBar, QVBoxLayout, QWidget,
+)
+
+from .editor_qt.icons import icons
+from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .tilemap.document import PROP_TYPES, TileMapDoc
+
+# Werkzeuge
+TOOL_PENCIL, TOOL_ERASER, TOOL_FILL, TOOL_RECT, TOOL_PICK = range(5)
+
+
+# ===================================================================
+#  Tileset-Palette
+# ===================================================================
+class _Palette(QWidget):
+    """Zeigt das Tileset, Gitter + Auswahl-Highlight. Klick waehlt ein Tile."""
+
+    tile_selected = Signal(int)            # lokale Tile-ID
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.doc: TileMapDoc | None = None
+        self.pixmap: QPixmap | None = None
+        self.zoom = 2
+        self.sel = 0
+        self.setMouseTracking(True)
+
+    def set_doc(self, doc: TileMapDoc, pixmap: QPixmap | None) -> None:
+        self.doc = doc
+        self.pixmap = pixmap
+        self._update_size()
+        self.update()
+
+    def set_zoom(self, z: int) -> None:
+        self.zoom = max(1, min(8, z))
+        self._update_size()
+        self.update()
+
+    def _update_size(self) -> None:
+        if self.pixmap and not self.pixmap.isNull():
+            self.setMinimumSize(self.pixmap.width() * self.zoom,
+                                self.pixmap.height() * self.zoom)
+        else:
+            self.setMinimumSize(200, 120)
+
+    def _tile_at(self, pos: QPoint) -> int:
+        if not self.doc or self.doc.columns <= 0:
+            return -1
+        tw = self.doc.tile_w * self.zoom
+        th = self.doc.tile_h * self.zoom
+        cx = pos.x() // tw
+        cy = pos.y() // th
+        if cx < 0 or cy < 0 or cx >= self.doc.columns:
+            return -1
+        lid = cy * self.doc.columns + cx
+        if lid >= self.doc.tile_count:
+            return -1
+        return lid
+
+    def mousePressEvent(self, e):  # noqa: N802
+        lid = self._tile_at(e.position().toPoint())
+        if lid >= 0:
+            self.sel = lid
+            self.tile_selected.emit(lid)
+            self.update()
+
+    def paintEvent(self, _e):  # noqa: N802
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(COLORS["bg"]))
+        if not self.pixmap or self.pixmap.isNull() or not self.doc:
+            p.setPen(QColor(COLORS["fg"]))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
+                       "Kein Tileset geladen\n(Werkzeugleiste: Tileset)")
+            return
+        z = self.zoom
+        scaled = QRect(0, 0, self.pixmap.width() * z, self.pixmap.height() * z)
+        p.drawPixmap(scaled, self.pixmap)
+        # Gitter
+        tw = self.doc.tile_w * z
+        th = self.doc.tile_h * z
+        p.setPen(QPen(QColor(0, 0, 0, 90)))
+        for cx in range(self.doc.columns + 1):
+            p.drawLine(cx * tw, 0, cx * tw, scaled.height())
+        rows = self.doc.tile_count // max(1, self.doc.columns)
+        for cy in range(rows + 1):
+            p.drawLine(0, cy * th, scaled.width(), cy * th)
+        # Auswahl
+        if self.doc.columns > 0:
+            sx = (self.sel % self.doc.columns) * tw
+            sy = (self.sel // self.doc.columns) * th
+            p.setPen(QPen(QColor(COLORS["accent"]), 2))
+            p.drawRect(sx + 1, sy + 1, tw - 2, th - 2)
+
+
+# ===================================================================
+#  Karten-Canvas
+# ===================================================================
+class _Canvas(QWidget):
+    """Rendert alle sichtbaren Layer + Gitter, malt mit dem aktiven Werkzeug."""
+
+    # (layer_idx, before_tiles, after_tiles) -- fuer Undo
+    committed = Signal(int, object, object)
+    cell_hovered = Signal(int, int)
+    picked = Signal(int)                   # Pipette -> lokale Tile-ID
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.doc: TileMapDoc | None = None
+        self.pixmap: QPixmap | None = None
+        self.zoom = 2
+        self.tool = TOOL_PENCIL
+        self.active_layer = 0
+        self.current_gid = 1               # zu malendes gid (lokale-ID + 1)
+        self.show_grid = True
+        self.dim_others = True
+        self._painting = False
+        self._erase = False
+        self._before: list | None = None
+        self._rect_start: tuple | None = None
+        self._rect_cur: tuple | None = None
+        self.setMouseTracking(True)
+
+    def set_doc(self, doc: TileMapDoc, pixmap: QPixmap | None) -> None:
+        self.doc = doc
+        self.pixmap = pixmap
+        self.active_layer = 0
+        self._update_size()
+        self.update()
+
+    def set_zoom(self, z: int) -> None:
+        self.zoom = max(1, min(8, z))
+        self._update_size()
+        self.update()
+
+    def _update_size(self) -> None:
+        if self.doc:
+            self.setFixedSize(self.doc.width * self.doc.tile_w * self.zoom,
+                              self.doc.height * self.doc.tile_h * self.zoom)
+
+    # ---------------------------------------------------- Maus
+    def _cell(self, pos: QPoint) -> tuple[int, int]:
+        if not self.doc:
+            return (-1, -1)
+        cw = self.doc.tile_w * self.zoom
+        ch = self.doc.tile_h * self.zoom
+        return (pos.x() // cw, pos.y() // ch)
+
+    def mousePressEvent(self, e):  # noqa: N802
+        if not self.doc:
+            return
+        cx, cy = self._cell(e.position().toPoint())
+        self._erase = (e.button() == Qt.MouseButton.RightButton)
+        layer = self.doc.layers[self.active_layer]
+        if self.tool == TOOL_PICK and not self._erase:
+            g = layer.get(cx, cy)
+            if g > 0:
+                self.picked.emit(g - 1)
+            return
+        self._before = list(layer.tiles)
+        if self.tool == TOOL_FILL and not self._erase:
+            self.doc.flood_fill(self.active_layer, cx, cy,
+                                self.current_gid)
+            self._commit(layer)
+            self.update()
+            return
+        if self.tool == TOOL_RECT and not self._erase:
+            self._rect_start = (cx, cy)
+            self._rect_cur = (cx, cy)
+            self.update()
+            return
+        # Pencil / Eraser / Rechtsklick-Loeschen
+        self._painting = True
+        self._paint_cell(cx, cy)
+        self.update()
+
+    def mouseMoveEvent(self, e):  # noqa: N802
+        if not self.doc:
+            return
+        cx, cy = self._cell(e.position().toPoint())
+        self.cell_hovered.emit(cx, cy)
+        if self._rect_start is not None:
+            self._rect_cur = (cx, cy)
+            self.update()
+        elif self._painting:
+            self._paint_cell(cx, cy)
+            self.update()
+
+    def mouseReleaseEvent(self, e):  # noqa: N802
+        if not self.doc:
+            return
+        layer = self.doc.layers[self.active_layer]
+        if self._rect_start is not None:
+            x0, y0 = self._rect_start
+            x1, y1 = self._rect_cur or self._rect_start
+            gid = 0 if self._erase else self.current_gid
+            for yy in range(min(y0, y1), max(y0, y1) + 1):
+                for xx in range(min(x0, x1), max(x0, x1) + 1):
+                    layer.set(xx, yy, gid)
+            self._rect_start = self._rect_cur = None
+            self._commit(layer)
+            self.update()
+        elif self._painting:
+            self._painting = False
+            self._commit(layer)
+
+    def _paint_cell(self, cx: int, cy: int) -> None:
+        layer = self.doc.layers[self.active_layer]
+        gid = 0 if (self._erase or self.tool == TOOL_ERASER) else self.current_gid
+        layer.set(cx, cy, gid)
+
+    def _commit(self, layer) -> None:
+        if self._before is not None and self._before != layer.tiles:
+            self.committed.emit(self.active_layer, self._before, list(layer.tiles))
+            self.doc.dirty = True
+        self._before = None
+
+    # ---------------------------------------------------- Zeichnen
+    def paintEvent(self, _e):  # noqa: N802
+        p = QPainter(self)
+        if not self.doc:
+            return
+        cw = self.doc.tile_w * self.zoom
+        ch = self.doc.tile_h * self.zoom
+        # Schachbrett-Hintergrund (zeigt Transparenz)
+        c1, c2 = QColor(40, 40, 48), QColor(48, 48, 58)
+        for ty in range(self.doc.height):
+            for tx in range(self.doc.width):
+                col = c1 if (tx + ty) % 2 == 0 else c2
+                p.fillRect(tx * cw, ty * ch, cw, ch, col)
+        # Layer
+        have_ts = self.pixmap and not self.pixmap.isNull() and self.doc.columns > 0
+        for li, layer in enumerate(self.doc.layers):
+            if not layer.visible:
+                continue
+            if self.dim_others and li != self.active_layer:
+                p.setOpacity(0.40)
+            else:
+                p.setOpacity(1.0)
+            if have_ts:
+                self._draw_layer_tiles(p, layer, cw, ch)
+            else:
+                self._draw_layer_ids(p, layer, cw, ch)
+        p.setOpacity(1.0)
+        # Rechteck-Vorschau
+        if self._rect_start is not None and self._rect_cur is not None:
+            x0, y0 = self._rect_start
+            x1, y1 = self._rect_cur
+            r = QRect(min(x0, x1) * cw, min(y0, y1) * ch,
+                      (abs(x1 - x0) + 1) * cw, (abs(y1 - y0) + 1) * ch)
+            p.setPen(QPen(QColor(COLORS["accent"]), 2))
+            p.drawRect(r)
+        # Gitter
+        if self.show_grid:
+            p.setPen(QPen(QColor(0, 0, 0, 70)))
+            for tx in range(self.doc.width + 1):
+                p.drawLine(tx * cw, 0, tx * cw, self.doc.height * ch)
+            for ty in range(self.doc.height + 1):
+                p.drawLine(0, ty * ch, self.doc.width * cw, ty * ch)
+
+    def _draw_layer_tiles(self, p, layer, cw, ch) -> None:
+        tw, th = self.doc.tile_w, self.doc.tile_h
+        cols = self.doc.columns
+        for ty in range(layer.height):
+            for tx in range(layer.width):
+                g = layer.tiles[ty * layer.width + tx]
+                if g <= 0:
+                    continue
+                lid = g - 1
+                src = QRect((lid % cols) * tw, (lid // cols) * th, tw, th)
+                dst = QRect(tx * cw, ty * ch, cw, ch)
+                p.drawPixmap(dst, self.pixmap, src)
+
+    def _draw_layer_ids(self, p, layer, cw, ch) -> None:
+        """Fallback ohne Tileset-Bild: gid als Zahl + Farbflaeche."""
+        p.setPen(QColor(COLORS["fg"]))
+        f = QFont(EDITOR_FONT_FAMILY, max(6, ch // 3))
+        p.setFont(f)
+        for ty in range(layer.height):
+            for tx in range(layer.width):
+                g = layer.tiles[ty * layer.width + tx]
+                if g <= 0:
+                    continue
+                hue = (g * 47) % 360
+                p.fillRect(tx * cw + 1, ty * ch + 1, cw - 2, ch - 2,
+                           QColor.fromHsv(hue, 120, 150))
+                p.drawText(QRect(tx * cw, ty * ch, cw, ch),
+                           Qt.AlignmentFlag.AlignCenter, str(g))
+
+
+# ===================================================================
+#  Tile-Eigenschaften-Dialog
+# ===================================================================
+class _PropDialog(QDialog):
+    def __init__(self, doc: TileMapDoc, local_id: int, parent=None):
+        super().__init__(parent)
+        self.doc = doc
+        self.local_id = local_id
+        self.setWindowTitle(f"Eigenschaften -- Tile #{local_id} (gid {local_id + 1})")
+        self.resize(420, 320)
+        lay = QVBoxLayout(self)
+        lay.addWidget(QLabel(
+            "Per-Tile-Properties (z.B. solid=bool, damage=int). "
+            "Das Kollisionssystem liest sie via TILED_TILE_PROP_*."))
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Name", "Typ", "Wert"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        lay.addWidget(self.table, 1)
+        # bestehende laden
+        props = doc.properties_of(local_id)
+        types = doc.tile_property_types.get(local_id, {})
+        for k, v in props.items():
+            self._add_row(k, types.get(k, "string"), v)
+
+        row = QHBoxLayout()
+        b_add = QPushButton("+ Zeile"); b_add.clicked.connect(lambda: self._add_row())
+        b_del = QPushButton("- Zeile"); b_del.clicked.connect(self._del_row)
+        row.addWidget(b_add); row.addWidget(b_del); row.addStretch(1)
+        lay.addLayout(row)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def _add_row(self, name="", ptype="string", value="") -> None:
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        self.table.setItem(r, 0, QTableWidgetItem(str(name)))
+        cb = QComboBox(); cb.addItems(PROP_TYPES)
+        cb.setCurrentText(ptype if ptype in PROP_TYPES else "string")
+        self.table.setCellWidget(r, 1, cb)
+        self.table.setItem(r, 2, QTableWidgetItem("" if value is None else str(value)))
+
+    def _del_row(self) -> None:
+        r = self.table.currentRow()
+        if r >= 0:
+            self.table.removeRow(r)
+
+    def apply_to_doc(self) -> None:
+        # alte komplett ersetzen
+        self.doc.tile_properties[self.local_id] = {}
+        self.doc.tile_property_types[self.local_id] = {}
+        for r in range(self.table.rowCount()):
+            name_item = self.table.item(r, 0)
+            name = name_item.text().strip() if name_item else ""
+            if not name:
+                continue
+            ptype = self.table.cellWidget(r, 1).currentText()
+            val_item = self.table.item(r, 2)
+            val = val_item.text() if val_item else ""
+            self.doc.set_property(self.local_id, name, val, ptype)
+
+
+# ===================================================================
+#  Neue-Karte-Dialog
+# ===================================================================
+def _ask_map_params(parent, w=20, h=15, tw=16, th=16):
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Neue Karte")
+    form = QFormLayout(dlg)
+    sw = QSpinBox(); sw.setRange(1, 1000); sw.setValue(w)
+    sh = QSpinBox(); sh.setRange(1, 1000); sh.setValue(h)
+    stw = QSpinBox(); stw.setRange(1, 256); stw.setValue(tw)
+    sth = QSpinBox(); sth.setRange(1, 256); sth.setValue(th)
+    form.addRow("Breite (Tiles):", sw)
+    form.addRow("Hoehe (Tiles):", sh)
+    form.addRow("Tile-Breite (px):", stw)
+    form.addRow("Tile-Hoehe (px):", sth)
+    bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                          QDialogButtonBox.StandardButton.Cancel)
+    bb.accepted.connect(dlg.accept); bb.rejected.connect(dlg.reject)
+    form.addRow(bb)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return (sw.value(), sh.value(), stw.value(), sth.value())
+
+
+# ===================================================================
+#  Hauptfenster
+# ===================================================================
+class TileMapEditor(QMainWindow):
+    def __init__(self, project_root: Path):
+        super().__init__()
+        self.project_root = Path(project_root)
+        self.setWindowTitle("GameBasic Tilemap-Editor")
+        self.resize(1080, 720)
+        self.doc = TileMapDoc()
+        self.tileset_pix: QPixmap | None = None
+        self.sel_local = 0
+        self.undo_stack: list = []
+        self.redo_stack: list = []
+
+        self._build_ui()
+        self._sync_layers()
+        self._refresh_views()
+
+    # ---------------------------------------------------- UI-Aufbau
+    def _build_ui(self) -> None:
+        self._make_toolbar()
+        self._make_menu()
+
+        # Mitte: Canvas in ScrollArea
+        self.canvas = _Canvas()
+        self.canvas.committed.connect(self._on_committed)
+        self.canvas.cell_hovered.connect(self._on_hover)
+        self.canvas.picked.connect(self._on_picked)
+        self.scroll = QScrollArea()
+        self.scroll.setWidget(self.canvas)
+        self.scroll.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setCentralWidget(self.scroll)
+
+        # Links: Palette
+        left = QWidget(); lv = QVBoxLayout(left)
+        lv.setContentsMargins(4, 4, 4, 4)
+        lv.addWidget(QLabel("Tileset"))
+        self.palette = _Palette()
+        self.palette.tile_selected.connect(self._on_palette_select)
+        pscroll = QScrollArea(); pscroll.setWidget(self.palette)
+        pscroll.setWidgetResizable(False)
+        pscroll.setMinimumWidth(220)
+        lv.addWidget(pscroll, 1)
+        b_props = QPushButton("Tile-Eigenschaften ...")
+        b_props.clicked.connect(self._edit_props)
+        lv.addWidget(b_props)
+        self.sel_label = QLabel("Tile: 0")
+        lv.addWidget(self.sel_label)
+        self._dock("Palette", left, Qt.DockWidgetArea.LeftDockWidgetArea)
+
+        # Rechts: Layer
+        right = QWidget(); rv = QVBoxLayout(right)
+        rv.setContentsMargins(4, 4, 4, 4)
+        rv.addWidget(QLabel("Layer (oben = vorne)"))
+        self.layer_list = QListWidget()
+        self.layer_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection)
+        self.layer_list.currentRowChanged.connect(self._on_layer_row)
+        self.layer_list.itemChanged.connect(self._on_layer_item_changed)
+        self.layer_list.itemDoubleClicked.connect(self._rename_layer)
+        rv.addWidget(self.layer_list, 1)
+        btns = QHBoxLayout()
+        for txt, fn in (("+", self._add_layer), ("-", self._del_layer),
+                        ("▲", lambda: self._move_layer(-1)),
+                        ("▼", lambda: self._move_layer(1))):
+            b = QPushButton(txt); b.setFixedWidth(36); b.clicked.connect(fn)
+            btns.addWidget(b)
+        btns.addStretch(1)
+        rv.addLayout(btns)
+        self._dock("Layer", right, Qt.DockWidgetArea.RightDockWidgetArea)
+
+        self.status = self.statusBar()
+        self._update_status()
+
+    def _dock(self, title, widget, area):
+        d = QDockWidget(title, self)
+        d.setWidget(widget)
+        d.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
+                      QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+        self.addDockWidget(area, d)
+        return d
+
+    def _make_toolbar(self) -> None:
+        tb = QToolBar("Haupt"); tb.setMovable(False)
+        tb.setIconSize(QSize(20, 20))
+        self.addToolBar(tb)
+
+        def act(icon, text, slot, shortcut=None):
+            a = QAction(icons.get(icon) if icon else icons.get("new"), text, self)
+            if shortcut:
+                a.setShortcut(QKeySequence(shortcut))
+            a.triggered.connect(slot)
+            tb.addAction(a)
+            return a
+
+        act("new", "Neu", self._new_map, "Ctrl+N")
+        act("open", "Oeffnen", self._open, "Ctrl+O")
+        act("save", "Speichern", self._save, "Ctrl+S")
+        act("save_as", "Speichern unter", self._save_as, "Ctrl+Shift+S")
+        tb.addSeparator()
+        act("sprite_editor", "Tileset laden", self._load_tileset)
+        tb.addSeparator()
+
+        # Werkzeuge (checkable)
+        grp = QActionGroup(self); grp.setExclusive(True)
+        self._tool_actions = {}
+        for tool, label, sc in (
+            (TOOL_PENCIL, "Stift", "B"), (TOOL_ERASER, "Radierer", "E"),
+            (TOOL_FILL, "Fuellen", "G"), (TOOL_RECT, "Rechteck", "R"),
+            (TOOL_PICK, "Pipette", "I"),
+        ):
+            a = QAction(label, self); a.setCheckable(True)
+            a.setShortcut(QKeySequence(sc))
+            a.triggered.connect(lambda _c, t=tool: self._set_tool(t))
+            grp.addAction(a); tb.addAction(a)
+            self._tool_actions[tool] = a
+        self._tool_actions[TOOL_PENCIL].setChecked(True)
+        tb.addSeparator()
+
+        a_grid = QAction("Gitter", self); a_grid.setCheckable(True)
+        a_grid.setChecked(True)
+        a_grid.triggered.connect(self._toggle_grid)
+        tb.addAction(a_grid)
+        a_dim = QAction("Andere abblenden", self); a_dim.setCheckable(True)
+        a_dim.setChecked(True)
+        a_dim.triggered.connect(self._toggle_dim)
+        tb.addAction(a_dim)
+        tb.addSeparator()
+        act("unfold", "Zoom +", lambda: self._zoom(1), "Ctrl++")
+        act("fold", "Zoom -", lambda: self._zoom(-1), "Ctrl+-")
+        tb.addSeparator()
+        act("bench", "GB-Code", self._export_code)
+
+    def _menu_action(self, menu, text, slot, shortcut=None) -> QAction:
+        a = QAction(text, self)
+        if shortcut:
+            a.setShortcut(QKeySequence(shortcut))
+        a.triggered.connect(slot)
+        menu.addAction(a)
+        return a
+
+    def _make_menu(self) -> None:
+        m = self.menuBar()
+        # Shortcuts fuer Datei-Aktionen liegen schon auf den Toolbar-Actions
+        # -> hier ohne, sonst meldet Qt mehrdeutige Shortcuts.
+        mf = m.addMenu("&Datei")
+        self._menu_action(mf, "Neu", self._new_map)
+        self._menu_action(mf, "Oeffnen ...", self._open)
+        self._menu_action(mf, "Speichern", self._save)
+        self._menu_action(mf, "Speichern unter ...", self._save_as)
+        mf.addSeparator()
+        self._menu_action(mf, "Tileset laden ...", self._load_tileset)
+        self._menu_action(mf, "GB-Code exportieren ...", self._export_code)
+        mf.addSeparator()
+        self._menu_action(mf, "Schliessen", self.close)
+
+        me = m.addMenu("&Bearbeiten")
+        self._menu_action(me, "Rueckgaengig", self._undo, "Ctrl+Z")
+        self._menu_action(me, "Wiederholen", self._redo, "Ctrl+Y")
+
+        mm = m.addMenu("&Karte")
+        self._menu_action(mm, "Groesse aendern ...", self._resize_map)
+
+    # ---------------------------------------------------- Tileset
+    def _load_tileset(self) -> None:
+        start = str(self.project_root)
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Tileset-Bild laden", start, "Bilder (*.png *.bmp *.jpg)")
+        if not path:
+            return
+        pix = QPixmap(path)
+        if pix.isNull():
+            QMessageBox.warning(self, "Fehler", "Bild konnte nicht geladen werden.")
+            return
+        self.doc.set_tileset(path, pix.width(), pix.height())
+        self.tileset_pix = pix
+        self._refresh_views()
+        self._update_status()
+
+    # ---------------------------------------------------- Datei
+    def _new_map(self) -> None:
+        params = _ask_map_params(self, self.doc.width, self.doc.height,
+                                 self.doc.tile_w, self.doc.tile_h)
+        if not params:
+            return
+        w, h, tw, th = params
+        self.doc = TileMapDoc(w, h, tw, th)
+        self.tileset_pix = None
+        self.sel_local = 0
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._sync_layers()
+        self._refresh_views()
+        self._update_status()
+
+    def _open(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Tiled-Map oeffnen", str(self.project_root),
+            "Tiled-Map (*.json *.tmj)")
+        if not path:
+            return
+        try:
+            self.doc = TileMapDoc.load_json(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
+            return
+        # Tileset-Bild laden, wenn vorhanden
+        self.tileset_pix = None
+        if self.doc.tileset_image_abs and os.path.exists(self.doc.tileset_image_abs):
+            pix = QPixmap(self.doc.tileset_image_abs)
+            if not pix.isNull():
+                self.tileset_pix = pix
+        self.sel_local = 0
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._sync_layers()
+        self._refresh_views()
+        self._update_status()
+
+    def _save(self) -> None:
+        if not self.doc.path:
+            self._save_as()
+            return
+        self._do_save(self.doc.path)
+
+    def _save_as(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Tiled-Map speichern", str(self.project_root),
+            "Tiled-Map (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith((".json", ".tmj")):
+            path += ".json"
+        self._do_save(path)
+
+    def _do_save(self, path: str) -> None:
+        try:
+            self.doc.save_json(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
+            return
+        self.setWindowTitle(f"GameBasic Tilemap-Editor -- {Path(path).name}")
+        self.status.showMessage(f"Gespeichert: {path}", 4000)
+
+    def _export_code(self) -> None:
+        code = self.doc.gb_code(self.doc.path or None)
+        dlg = QDialog(self); dlg.setWindowTitle("GB-Code (Tilemap-Renderer)")
+        dlg.resize(680, 560)
+        dl = QVBoxLayout(dlg)
+        dl.addWidget(QLabel(
+            "Selbststaendiger Renderer. Map als .json speichern + Tileset-Bild "
+            "daneben legen, dann ausfuehren."))
+        edit = QPlainTextEdit(); edit.setPlainText(code); edit.setReadOnly(True)
+        edit.setFont(QFont(EDITOR_FONT_FAMILY, 10))
+        dl.addWidget(edit, 1)
+        row = QHBoxLayout(); row.addStretch(1)
+        b = QPushButton("In Zwischenablage"); b.setProperty("accent", True)
+        b.clicked.connect(lambda: QApplication.clipboard().setText(code))
+        row.addWidget(b)
+        dl.addLayout(row)
+        dlg.exec()
+
+    # ---------------------------------------------------- Werkzeuge/Ansicht
+    def _set_tool(self, tool: int) -> None:
+        self.canvas.tool = tool
+
+    def _toggle_grid(self, on: bool) -> None:
+        self.canvas.show_grid = on
+        self.canvas.update()
+
+    def _toggle_dim(self, on: bool) -> None:
+        self.canvas.dim_others = on
+        self.canvas.update()
+
+    def _zoom(self, delta: int) -> None:
+        self.canvas.set_zoom(self.canvas.zoom + delta)
+
+    # ---------------------------------------------------- Palette/Auswahl
+    def _on_palette_select(self, lid: int) -> None:
+        self.sel_local = lid
+        self.canvas.current_gid = lid + 1
+        self.sel_label.setText(f"Tile: {lid} (gid {lid + 1})")
+
+    def _on_picked(self, lid: int) -> None:
+        self.palette.sel = lid
+        self.palette.update()
+        self._on_palette_select(lid)
+
+    def _edit_props(self) -> None:
+        if self.doc.columns <= 0:
+            QMessageBox.information(self, "Kein Tileset",
+                                   "Erst ein Tileset laden.")
+            return
+        dlg = _PropDialog(self.doc, self.sel_local, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.apply_to_doc()
+
+    # ---------------------------------------------------- Layer
+    def _sync_layers(self) -> None:
+        """Layer-Liste aus dem Doc neu aufbauen (oberster = vorderster)."""
+        self.layer_list.blockSignals(True)
+        self.layer_list.clear()
+        for li in reversed(range(len(self.doc.layers))):
+            l = self.doc.layers[li]
+            it = QListWidgetItem(l.name)
+            it.setData(Qt.ItemDataRole.UserRole, li)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            it.setCheckState(Qt.CheckState.Checked if l.visible
+                             else Qt.CheckState.Unchecked)
+            self.layer_list.addItem(it)
+        # aktive Zeile = aktiver Layer
+        self._select_layer_row(self.canvas.active_layer)
+        self.layer_list.blockSignals(False)
+
+    def _select_layer_row(self, layer_idx: int) -> None:
+        for row in range(self.layer_list.count()):
+            if self.layer_list.item(row).data(Qt.ItemDataRole.UserRole) == layer_idx:
+                self.layer_list.setCurrentRow(row)
+                return
+
+    def _on_layer_row(self, row: int) -> None:
+        if row < 0:
+            return
+        li = self.layer_list.item(row).data(Qt.ItemDataRole.UserRole)
+        self.canvas.active_layer = li
+        self.canvas.update()
+
+    def _on_layer_item_changed(self, item: QListWidgetItem) -> None:
+        li = item.data(Qt.ItemDataRole.UserRole)
+        if li is None or li >= len(self.doc.layers):
+            return
+        self.doc.layers[li].visible = (item.checkState() == Qt.CheckState.Checked)
+        self.doc.dirty = True
+        self.canvas.update()
+
+    def _rename_layer(self, item: QListWidgetItem) -> None:
+        li = item.data(Qt.ItemDataRole.UserRole)
+        name, ok = QInputDialog.getText(self, "Layer umbenennen", "Name:",
+                                        text=self.doc.layers[li].name)
+        if ok and name.strip():
+            self.doc.layers[li].name = name.strip()
+            self.doc.dirty = True
+            self._sync_layers()
+
+    def _add_layer(self) -> None:
+        idx = self.doc.add_layer()
+        self.canvas.active_layer = idx
+        self._sync_layers()
+        self.canvas.update()
+
+    def _del_layer(self) -> None:
+        if len(self.doc.layers) <= 1:
+            return
+        self.doc.remove_layer(self.canvas.active_layer)
+        self.canvas.active_layer = min(self.canvas.active_layer,
+                                       len(self.doc.layers) - 1)
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._sync_layers()
+        self.canvas.update()
+
+    def _move_layer(self, delta: int) -> None:
+        new = self.doc.move_layer(self.canvas.active_layer, delta)
+        self.canvas.active_layer = new
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._sync_layers()
+        self.canvas.update()
+
+    # ---------------------------------------------------- Karte
+    def _resize_map(self) -> None:
+        params = _ask_map_params(self, self.doc.width, self.doc.height,
+                                 self.doc.tile_w, self.doc.tile_h)
+        if not params:
+            return
+        w, h, tw, th = params
+        retile = (tw != self.doc.tile_w or th != self.doc.tile_h)
+        self.doc.tile_w, self.doc.tile_h = tw, th
+        self.doc.resize(w, h)
+        if retile and self.tileset_pix:
+            # Spaltenzahl neu berechnen
+            self.doc.set_tileset(self.doc.tileset_image_abs,
+                                 self.tileset_pix.width(),
+                                 self.tileset_pix.height())
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._refresh_views()
+        self._update_status()
+
+    # ---------------------------------------------------- Undo/Redo
+    def _on_committed(self, layer_idx, before, after) -> None:
+        self.undo_stack.append((layer_idx, before, after))
+        self.redo_stack.clear()
+
+    def _undo(self) -> None:
+        if not self.undo_stack:
+            return
+        li, before, after = self.undo_stack.pop()
+        if li < len(self.doc.layers):
+            self.doc.layers[li].tiles = list(before)
+            self.redo_stack.append((li, before, after))
+            self.canvas.update()
+
+    def _redo(self) -> None:
+        if not self.redo_stack:
+            return
+        li, before, after = self.redo_stack.pop()
+        if li < len(self.doc.layers):
+            self.doc.layers[li].tiles = list(after)
+            self.undo_stack.append((li, before, after))
+            self.canvas.update()
+
+    # ---------------------------------------------------- Views/Status
+    def _refresh_views(self) -> None:
+        self.canvas.set_doc(self.doc, self.tileset_pix)
+        self.palette.set_doc(self.doc, self.tileset_pix)
+        self.canvas.current_gid = self.sel_local + 1
+        self._sync_layers()
+
+    def _on_hover(self, cx: int, cy: int) -> None:
+        if 0 <= cx < self.doc.width and 0 <= cy < self.doc.height:
+            self.status.showMessage(f"Tile ({cx}, {cy})")
+
+    def _update_status(self) -> None:
+        ts = (f"{self.doc.columns}x"
+              f"{self.doc.tile_count // max(1, self.doc.columns)} Tiles"
+              if self.doc.columns else "kein Tileset")
+        self.status.showMessage(
+            f"Karte {self.doc.width}x{self.doc.height} @ "
+            f"{self.doc.tile_w}x{self.doc.tile_h}px  |  Tileset: {ts}")
+
+
+def launch(project_root: Path, initial_file: Path | None = None) -> int:
+    app = QApplication.instance() or QApplication([])
+    app.setStyleSheet(global_qss())
+    win = TileMapEditor(project_root)
+    if initial_file and Path(initial_file).exists():
+        try:
+            win.doc = TileMapDoc.load_json(str(initial_file))
+            if win.doc.tileset_image_abs and os.path.exists(win.doc.tileset_image_abs):
+                pix = QPixmap(win.doc.tileset_image_abs)
+                if not pix.isNull():
+                    win.tileset_pix = pix
+            win._refresh_views(); win._update_status()
+        except Exception:
+            pass
+    win.show()
+    return app.exec()

@@ -463,6 +463,29 @@ def _icon_tracker() -> QPixmap:
     return pix
 
 
+def _icon_tilemap() -> QPixmap:
+    """3x3-Gitter mit ein paar gefuellten Zellen -- Tilemap/Level."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(_stroke(1.4))
+    # Gitterrahmen
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRect(QRectF(4, 4, 16, 16))
+    # innere Linien
+    for off in (4 + 16 / 3, 4 + 32 / 3):
+        p.drawLine(QPointF(off, 4), QPointF(off, 20))
+        p.drawLine(QPointF(4, off), QPointF(20, off))
+    # gefuellte Zellen (Akzent)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    cell = 16 / 3
+    for (cx, cy) in ((0, 0), (1, 1), (2, 0), (1, 2)):
+        p.drawRect(QRectF(4 + cx * cell + 1.2, 4 + cy * cell + 1.2,
+                          cell - 2.4, cell - 2.4))
+    p.end()
+    return pix
+
+
 def _icon_settings() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -506,6 +529,7 @@ _BUILDERS = {
     "particles": _icon_particles,
     "sfx": _icon_sfx,
     "tracker": _icon_tracker,
+    "tilemap": _icon_tilemap,
 }
 
 

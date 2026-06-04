@@ -1566,6 +1566,30 @@ Bresenham, Brush-Offsets, Symmetrie), `tests/test_spriteeditor_tool_context.py`
 `begin/move/end`, registrieren sich in `SpriteEditorWindow._setup_tools()`.
 Tool-Konvention im `tools.py`-Header dokumentiert.
 
+## Tilemap-/Level-Editor (`gbtilemap`)
+
+PySide6-Tool [`gamebasic/tilemapeditor_qt.py`](gamebasic/tilemapeditor_qt.py)
+(UI) + Qt-freies Datenmodell [`gamebasic/tilemap/document.py`](gamebasic/tilemap/document.py)
+(`TileMapDoc`/`TileLayer` + Tiled-JSON-Serialisierung, headless testbar).
+Tiles aus einem Tileset-PNG aufs Gitter malen (Stift/Radierer/Füllen/Rechteck/
+Pipette), mehrere Layer (Sichtbarkeit/Sortierung/umbenennen), Per-Tile-Properties
+(`solid`/`damage`/...), Undo/Redo. **Speichern/Laden = Tiled-JSON** (genau das
+Format, das `gamebasic/modules/tiled.py` via `TILED_LOAD` liest: ein eingebettetes
+Tileset mit `firstgid=1`, CSV-Tile-Daten, Per-Tile-Props als `{name,type,value}`).
+`GB-Code` exportiert einen selbstständigen Renderer (`LOADIMAGE` + `TILED_LOAD` +
+`DRAWIMAGEPART`, Quell-Rect aus `gid-1`). Schließt den Kreis mit dem Sprite-Atlas-
+Export (Atlas-PNG als Tileset).
+
+**Start:** `gbtilemap [datei.json]` / `gbrun.py --tilemap` / im Editor Toolbar +
+`Datei`-Menü + `Strg+Shift+G` (in-process via `_open_tilemap_editor`, Icon
+`"tilemap"` in `editor_qt/icons.py`). User-Doku: [docs/tilemap-editor.md](docs/tilemap-editor.md).
+
+**Tests:** [`tests/test_tilemapeditor.py`](tests/test_tilemapeditor.py) — Datenmodell
+(set/get/flood-fill/resize/Layer-Ops) + **Roundtrip-Garantie**: Editor-Export →
+`TILED_LOAD` → identische Werte; eigener Save/Load-Roundtrip; der GB-Code-Export
+lext+parst+kompiliert. **Stolperstein:** `MAP` ist ein Keyword (MAP OF T) → im
+GB-Code-Export keine Variable `map` (heißt `lvl`).
+
 ## Build und Test (mit Cython-Modulen)
 
 ```

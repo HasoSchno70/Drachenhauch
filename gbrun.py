@@ -87,6 +87,16 @@ def _launch_tracker_editor(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_tilemap_editor(project_root, initial_file=None):
+    try:
+        from gamebasic.tilemapeditor_qt import launch
+    except SystemExit:
+        return None
+    except ImportError:
+        return None
+    return launch(project_root, initial_file)
+
+
 def main(argv):
     args = argv[1:]
     mode = "run"
@@ -144,6 +154,18 @@ def main(argv):
             print("Tracker benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
+            return 3
+        return rc
+
+    # --- Tilemap-/Level-Editor explizit per Flag ---
+    if args and args[0] in ("--tilemap", "--level", "--map-editor"):
+        args = args[1:]
+        initial = Path(args[0]) if args else None
+        rc = _launch_tilemap_editor(Path(__file__).resolve().parent, initial)
+        if rc is None:
+            print("Tilemap-Editor benoetigt 'PySide6'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6")
             return 3
         return rc
 
