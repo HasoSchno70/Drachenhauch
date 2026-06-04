@@ -486,6 +486,23 @@ def _icon_tilemap() -> QPixmap:
     return pix
 
 
+def _icon_profiler() -> QPixmap:
+    """Balkendiagramm (aufsteigend) -- Profiler/Hotpath."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    # Achsen
+    p.setPen(_stroke(1.4, "fg_muted"))
+    p.drawLine(5, 4, 5, 20)
+    p.drawLine(5, 20, 21, 20)
+    # Balken
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    for bx, bh in ((7, 4), (11, 8), (15, 12)):
+        p.drawRect(QRectF(bx, 20 - bh, 3, bh))
+    p.end()
+    return pix
+
+
 def _icon_settings() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -530,6 +547,7 @@ _BUILDERS = {
     "sfx": _icon_sfx,
     "tracker": _icon_tracker,
     "tilemap": _icon_tilemap,
+    "profiler": _icon_profiler,
 }
 
 

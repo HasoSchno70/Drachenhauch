@@ -112,6 +112,7 @@ class GameBasicEditor(QMainWindow):
         self._build_menubar()
         self._wire_signals()
         self._setup_debugger()
+        self._setup_profiler()
         self._setup_todo_panel()
         self.setAcceptDrops(True)
 
@@ -459,6 +460,15 @@ class GameBasicEditor(QMainWindow):
             "im Gutter setzt Breakpoints.")
         self.act_debug.triggered.connect(self._debug_start)
 
+        # Profiler (Tree-Walker). Laeuft das Programm durch und misst pro
+        # Zeile/Funktion Treffer + Zeit.
+        self.act_profile = QAction(icons.get("profiler"), "Profiler (Tree-Walker)", self)
+        self.act_profile.setShortcut(QKeySequence("Ctrl+Shift+Y"))
+        self.act_profile.setToolTip(
+            "Profiler -- misst Hotpath pro Zeile/Funktion (Tree-Walker). "
+            "Am besten fuer Konsolen-/Logik-Programme.")
+        self.act_profile.triggered.connect(self._profile_start)
+
         self.act_dbg_continue = QAction("Fortsetzen", self)
         self.act_dbg_continue.setShortcut(QKeySequence("F8"))
         self.act_dbg_continue.triggered.connect(self._debug_continue)
@@ -559,6 +569,7 @@ class GameBasicEditor(QMainWindow):
         tb.addAction(self.act_run)
         tb.addAction(self.act_run_native)
         tb.addAction(self.act_debug)
+        tb.addAction(self.act_profile)
         tb.addAction(self.act_stop)
         tb.addAction(self.act_bench)
         tb.addAction(self.act_export)
@@ -641,6 +652,7 @@ class GameBasicEditor(QMainWindow):
 
         m_debug = mb.addMenu("&Debug")
         m_debug.addAction(self.act_debug)
+        m_debug.addAction(self.act_profile)
         m_debug.addSeparator()
         m_debug.addAction(self.act_dbg_continue)
         m_debug.addAction(self.act_dbg_step_over)
@@ -1377,6 +1389,56 @@ class GameBasicEditor(QMainWindow):
         self.debugger.output.connect(self._on_debug_output)
         self.debugger.failed.connect(self._on_debug_failed)
 
+    def _setup_profiler(self) -> None:
+        from PySide6.QtWidgets import QDockWidget
+        from .profiler import Profiler
+        from .profile_panel import ProfilePanel
+        self.profiler = Profiler(self)
+        self.profile_panel = ProfilePanel()
+        self.profile_dock = QDockWidget("Profiler", self)
+        self.profile_dock.setObjectName("ProfilerDock")
+        self.profile_dock.setWidget(self.profile_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.profile_dock)
+        self.profile_dock.hide()
+        self.profile_panel.jump_requested.connect(self._goto_line_in_active)
+        self.profiler.finished.connect(self._on_profile_finished)
+        self.profiler.failed.connect(self._on_profile_failed)
+
+    def _profile_start(self) -> None:
+        if self.profiler.is_running():
+            self.profiler.stop()
+            self.statusBar().showMessage("Profiler: wird abgebrochen ...", 3000)
+            return
+        if self.debugger.is_active():
+            return
+        if not self._ensure_saved_for_run():
+            return
+        st = self.tabs.active
+        if st is None or st.file_path is None:
+            return
+        base = st.file_path.parent
+        self.console.clear()
+        self.console.append(f"⏱ Profiler: {st.file_path.name}\n\n", "info")
+        self.profile_dock.show()
+        self.profile_panel.set_status("läuft ...")
+        self.statusBar().showMessage("Profiler: läuft ...")
+        self.profiler.start(st.editor.get_text(), base)
+
+    def _on_profile_finished(self, result: object) -> None:
+        if result.output:
+            self.console.append(result.output)
+        self.profile_panel.show_result(result)
+        self.profile_dock.show()
+        self.profile_dock.raise_()
+        ms = result.total_time * 1000.0
+        self.statusBar().showMessage(f"Profiler fertig: {ms:.1f} ms", 5000)
+
+    def _on_profile_failed(self, message: str, editor_line: int) -> None:
+        self.profile_panel.set_status("Fehler")
+        loc = f" (Zeile {editor_line})" if editor_line and editor_line > 0 else ""
+        self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
+        self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
+
     def _setup_todo_panel(self) -> None:
         from PySide6.QtWidgets import QDockWidget
         from .todo_panel import TodoPanel
@@ -1540,6 +1602,7 @@ class GameBasicEditor(QMainWindow):
             ("run",      self.act_run),
             ("run_native", self.act_run_native),
             ("debug",    self.act_debug),
+            ("profiler", self.act_profile),
             ("stop",     self.act_stop),
             ("bench",    self.act_bench),
             ("fold",     self.act_fold),
@@ -1722,7 +1785,7 @@ class GameBasicEditor(QMainWindow):
         ])
         add_action_group("Ausfuehren", [
             self.act_run, self.act_run_native, self.act_stop, self.act_bench,
-            self.act_export,
+            self.act_export, self.act_profile,
         ])
         add_action_group("Hilfe", [
             self.act_show_readme, self.act_shortcuts, self.act_about,
@@ -1798,6 +1861,7 @@ class GameBasicEditor(QMainWindow):
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,
             self.act_run, self.act_run_native, self.act_stop, self.act_bench,
+            self.act_profile,
             self.act_view_files, self.act_view_outline, self.act_view_builtins,
             self.act_toggle_minimap, self.act_fold, self.act_unfold_all,
             self.act_theme, self.act_show_readme, self.act_about,

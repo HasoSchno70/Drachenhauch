@@ -1,0 +1,86 @@
+"""Tests fuer den Tree-Walking-Profiler-Kern (Qt-frei nutzbar -- die hier
+getestete `run_profile` braucht kein laufendes QApplication)."""
+from gamebasic.editor_qt.profiler import run_profile
+
+
+def test_basic_counts_and_output():
+    src = (
+        "DIM i AS INTEGER\n"
+        "DIM s AS INTEGER\n"
+        "s = 0\n"
+        "FOR i = 1 TO 100\n"
+        "    s = s + i\n"
+        "NEXT\n"
+        "PRINT s\n"
+    )
+    r = run_profile(src, ".")
+    assert r.output.strip() == "5050"
+    by_line = {s.line: s for s in r.lines}
+    # Zeile 5 (s = s + i) lief 100x.
+    assert by_line[5].count == 100
+    # Zeile 3 (s = 0) lief 1x.
+    assert by_line[3].count == 1
+    # Quelltext wird mitgeliefert.
+    assert by_line[5].text == "s = s + i"
+
+
+def test_hot_line_ranks_first():
+    src = (
+        "DIM i AS INTEGER\n"
+        "DIM x AS INTEGER\n"
+        "x = 0\n"
+        "FOR i = 1 TO 5000\n"
+        "    x = x + 1\n"
+        "NEXT\n"
+    )
+    r = run_profile(src, ".")
+    # Zeitlich teuerste Zeile ist die Schleifen-Innenzeile.
+    assert r.lines[0].line == 5
+    assert r.lines[0].count == 5000
+
+
+def test_function_aggregation_and_calls():
+    src = (
+        "FUNCTION sq(n AS INTEGER) AS INTEGER\n"
+        "    RETURN n * n\n"
+        "END FUNCTION\n"
+        "DIM i AS INTEGER\n"
+        "DIM t AS INTEGER\n"
+        "t = 0\n"
+        "FOR i = 1 TO 10\n"
+        "    t = t + sq(i)\n"
+        "NEXT\n"
+    )
+    r = run_profile(src, ".")
+    funcs = {f.name: f for f in r.funcs}
+    assert "sq" in funcs
+    # sq wird 10x aufgerufen -> Aufrufzahl ~ Treffer der ersten Body-Zeile.
+    assert funcs["sq"].count == 10
+    assert funcs["sq"].kind == "function"
+
+
+def test_total_time_positive():
+    r = run_profile("PRINT 1\n", ".")
+    assert r.total_time >= 0.0
+    assert r.stopped is False
+
+
+def test_stop_callback_aborts():
+    # Endlosschleife -- should_stop bricht nach dem ersten Hook ab.
+    src = "DIM i AS INTEGER\ni = 0\nWHILE TRUE\n    i = i + 1\nWEND\n"
+    calls = {"n": 0}
+
+    def should_stop():
+        calls["n"] += 1
+        return calls["n"] > 50      # nach 50 Hooks abbrechen
+
+    r = run_profile(src, ".", should_stop=should_stop)
+    assert r.stopped is True
+
+
+def test_error_propagates():
+    import pytest
+    from gamebasic.errors import GameBasicError
+    # Laufzeitfehler (Division durch 0) soll als GameBasicError hochkommen.
+    with pytest.raises(GameBasicError):
+        run_profile("DIM x AS INTEGER\nx = 1 \\ 0\n", ".")

@@ -389,6 +389,15 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 **Grenzen:** `INPUT` liefert im Debugger EOF (kein Hängen). Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem. Während einer Debug-Sitzung sind Run/Bench deaktiviert.
 
+## Profiler
+
+`Strg+Shift+Y` (oder Toolbar-Button / `Debug → Profiler`) führt das Programm im Tree-Walker durch und misst pro Statement **Trefferzahl** und **Zeit**. Das Ergebnis erscheint im **Profiler**-Panel (rechts):
+
+- **Zeilen** — jede ausgeführte Zeile mit Treffern, Zeit (ms), Anteil (Balken + %) und Quelltext, nach Zeit sortiert (Hotspots oben). Doppelklick springt zur Zeile.
+- **Funktionen** — pro `SUB`/`FUNCTION` aggregiert: Aufrufzahl + Gesamtzeit.
+
+**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Wie der Debugger nur Tree-Walker, am besten für Konsolen-/Logik-Programme; ein laufender Profiler-Lauf lässt sich mit erneutem `Strg+Shift+Y` abbrechen (Endlos-Loops). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
+
 ## Finden im Projekt
 
 `Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
