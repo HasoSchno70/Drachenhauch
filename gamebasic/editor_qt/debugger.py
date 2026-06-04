@@ -30,18 +30,29 @@ class _DebugStop(Exception):
 
 
 class _EmitWriter:
-    """Datei-artiges Objekt: leitet stdout-Writes an ein Qt-Signal."""
+    """Datei-artiges stdout-Surrogat: Writes aus dem **Worker-Thread** gehen
+    ans Qt-Signal (Programm-Ausgabe), alle anderen (z.B. UI-Thread-Prints
+    waehrend einer Pause) durch zum echten stdout -- der Redirect ist global,
+    soll aber nur die Programm-Ausgabe abfangen."""
 
-    def __init__(self, signal):
+    def __init__(self, signal, passthrough, worker_ident):
         self._signal = signal
+        self._passthrough = passthrough
+        self._worker_ident = worker_ident
 
     def write(self, text):
-        if text:
+        if not text:
+            return 0
+        if threading.get_ident() == self._worker_ident:
             self._signal.emit(text)
+        elif self._passthrough is not None:
+            self._passthrough.write(text)
         return len(text)
 
     def flush(self):
-        pass
+        if self._passthrough is not None and \
+                threading.get_ident() != self._worker_ident:
+            self._passthrough.flush()
 
 
 class _EofReader:
@@ -99,6 +110,7 @@ class DebugController(QObject):
         self._stop = False
         self._thread: threading.Thread | None = None
         self._interp = None
+        self._baseline_globals: set = set()
 
     # ----------------------------------------------------- Status
     def is_active(self) -> bool:
@@ -137,6 +149,10 @@ class DebugController(QObject):
         interp = Interpreter()
         interp._debug_hook = self._hook
         self._interp = interp
+        # Vorregistrierte Built-in-Konstanten (BLACK, KEY_*, PI, ...) merken,
+        # um sie aus der Globals-Anzeige rauszufiltern -- der User will nur
+        # seine eigenen Globals sehen.
+        self._baseline_globals = set(interp.global_env.vars.keys())
         self._stop = False
         self._mode = "running"
         # Mit Breakpoints: bis zum ersten BP laufen. Ohne: am ersten
@@ -151,7 +167,7 @@ class DebugController(QObject):
         import sys
         from ..errors import GameBasicError
         old_out, old_in = sys.stdout, sys.stdin
-        sys.stdout = _EmitWriter(self.output)
+        sys.stdout = _EmitWriter(self.output, old_out, threading.get_ident())
         sys.stdin = _EofReader()
         reason = "fertig"
         try:
@@ -196,16 +212,18 @@ class DebugController(QObject):
         self._mode = "running"
 
     def _snapshot(self, interp) -> dict:
-        def collect(env):
+        def collect(env, skip=None):
             rows = []
             for name, slot in env.vars.items():
                 if name.startswith("__"):
+                    continue
+                if skip is not None and name in skip:
                     continue
                 rows.append((name, slot.get("type", "?"),
                              _fmt_value(slot.get("value"))))
             return rows
 
-        glob = collect(interp.global_env)
+        glob = collect(interp.global_env, skip=self._baseline_globals)
         locs: list = []
         env = interp.env
         while env is not None and env is not interp.global_env:

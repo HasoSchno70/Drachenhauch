@@ -104,6 +104,7 @@ class GameBasicEditor(QMainWindow):
         self._build_toolbar()
         self._build_menubar()
         self._wire_signals()
+        self._setup_debugger()
         self.setAcceptDrops(True)
 
         # Initial-Auto-Complete-Setting auf alle (zukuenftigen) Editoren.
@@ -395,6 +396,33 @@ class GameBasicEditor(QMainWindow):
         self.act_bench.setShortcut(QKeySequence("Ctrl+F5"))
         self.act_bench.triggered.connect(self._bench_active)
 
+        # Debugger (Tree-Walker). Start via F7; Steuerung waehrend der Sitzung.
+        self.act_debug = QAction(icons.get("run"), "Debuggen (Tree-Walker)", self)
+        self.act_debug.setShortcut(QKeySequence("F7"))
+        self.act_debug.setToolTip(
+            "Debuggen mit Breakpoints + Step (F7) -- Tree-Walker. Klick links "
+            "im Gutter setzt Breakpoints.")
+        self.act_debug.triggered.connect(self._debug_start)
+
+        self.act_dbg_continue = QAction("Fortsetzen", self)
+        self.act_dbg_continue.setShortcut(QKeySequence("F8"))
+        self.act_dbg_continue.triggered.connect(self._debug_continue)
+        self.act_dbg_step_over = QAction("Step Over", self)
+        self.act_dbg_step_over.setShortcut(QKeySequence("F10"))
+        self.act_dbg_step_over.triggered.connect(self._debug_step_over)
+        self.act_dbg_step_into = QAction("Step Into", self)
+        self.act_dbg_step_into.setShortcut(QKeySequence("F11"))
+        self.act_dbg_step_into.triggered.connect(self._debug_step_into)
+        self.act_dbg_step_out = QAction("Step Out", self)
+        self.act_dbg_step_out.setShortcut(QKeySequence("Shift+F11"))
+        self.act_dbg_step_out.triggered.connect(self._debug_step_out)
+        self.act_dbg_stop = QAction("Debug stoppen", self)
+        self.act_dbg_stop.triggered.connect(self._debug_stop)
+        for a in (self.act_dbg_continue, self.act_dbg_step_over,
+                  self.act_dbg_step_into, self.act_dbg_step_out,
+                  self.act_dbg_stop):
+            a.setEnabled(False)
+
         # View
         from .theme import active_theme as _at
         theme_icon_key = "theme_light" if _at() == "dark" else "theme_dark"
@@ -449,6 +477,7 @@ class GameBasicEditor(QMainWindow):
         tb.addSeparator()
         tb.addAction(self.act_run)
         tb.addAction(self.act_run_native)
+        tb.addAction(self.act_debug)
         tb.addAction(self.act_stop)
         tb.addAction(self.act_bench)
         tb.addAction(self.act_export)
@@ -515,6 +544,16 @@ class GameBasicEditor(QMainWindow):
         m_run.addAction(self.act_bench)
         m_run.addAction(self.act_export)
 
+        m_debug = mb.addMenu("&Debug")
+        m_debug.addAction(self.act_debug)
+        m_debug.addSeparator()
+        m_debug.addAction(self.act_dbg_continue)
+        m_debug.addAction(self.act_dbg_step_over)
+        m_debug.addAction(self.act_dbg_step_into)
+        m_debug.addAction(self.act_dbg_step_out)
+        m_debug.addSeparator()
+        m_debug.addAction(self.act_dbg_stop)
+
         m_help = mb.addMenu("&Hilfe")
         m_help.addAction(self.act_show_readme)
         m_help.addAction(self.act_shortcuts)
@@ -555,6 +594,9 @@ class GameBasicEditor(QMainWindow):
         st.editor.textChanged.connect(self._schedule_outline_refresh)
         # Minimap-Sichtbarkeit gemaess globaler Toggle-Action.
         st.minimap.setVisible(self.act_toggle_minimap.isChecked())
+        # Breakpoints des Tabs -> Debugger (wenn dieser Tab debuggt wird).
+        st.editor.breakpoints_changed.connect(
+            lambda e=st.editor: self._on_breakpoints_changed(e))
         # Goto / Find-Refs / Rename
         st.editor.goto_definition_requested.connect(self._goto_definition)
         st.editor.find_references_requested.connect(self._find_references)
@@ -986,6 +1028,8 @@ class GameBasicEditor(QMainWindow):
 
     # ---------------------------------------------------- Run-Hooks
     def _run_active(self) -> None:
+        if self.debugger.is_active():
+            return
         if not self._ensure_saved_for_run():
             return
         st = self.tabs.active
@@ -1131,6 +1175,123 @@ class GameBasicEditor(QMainWindow):
         self.act_stop.setEnabled(False)
         self.tabs.set_running(None)        # Run-Markierung am Tab abraeumen
         self.statusBar().showMessage("Bereit", 3000)
+
+    # ----------------------------------------------------- Debugger
+    def _setup_debugger(self) -> None:
+        from PySide6.QtWidgets import QDockWidget
+        from .debugger import DebugController
+        from .debug_panel import VariablesPanel
+        self.debugger = DebugController(self)
+        self.variables_panel = VariablesPanel()
+        self.var_dock = QDockWidget("Variablen", self)
+        self.var_dock.setObjectName("VariablesDock")
+        self.var_dock.setWidget(self.variables_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.var_dock)
+        self.var_dock.hide()
+        self._debug_editor = None          # Editor der laufenden Sitzung
+        self.debugger.paused.connect(self._on_debug_paused)
+        self.debugger.finished.connect(self._on_debug_finished)
+        self.debugger.output.connect(self._on_debug_output)
+        self.debugger.failed.connect(self._on_debug_failed)
+
+    def _on_breakpoints_changed(self, editor) -> None:
+        # Nur relevant, wenn dieser Editor gerade debuggt wird -- dann live an
+        # den Controller weiterreichen.
+        if self.debugger.is_active() and editor is self._debug_editor:
+            self.debugger.set_breakpoints(editor.breakpoints())
+
+    def _debug_start(self) -> None:
+        if self.debugger.is_active():
+            return
+        if not self._ensure_saved_for_run():
+            return
+        st = self.tabs.active
+        if st is None or st.file_path is None:
+            return
+        self._debug_editor = st.editor
+        base = st.file_path.parent
+        self.console.clear()
+        self.console.append(f"🐞 Debug: {st.file_path.name}\n\n", "info")
+        self.debugger.set_breakpoints(st.editor.breakpoints())
+        if not self.debugger.start(st.editor.get_text(), base):
+            self._debug_editor = None
+            return
+        self._set_debug_controls(active=True, paused=False)
+        self.act_debug.setEnabled(False)
+        for a in (self.act_run, self.act_run_native, self.act_bench):
+            a.setEnabled(False)
+        self.var_dock.show()
+        self.variables_panel.set_status("läuft ...")
+        self.statusBar().showMessage("Debug: läuft ...")
+
+    def _on_debug_paused(self, editor_line: int, frames: object) -> None:
+        self._set_debug_controls(active=True, paused=True)
+        self.variables_panel.update_frames(frames)
+        self.variables_panel.set_status(f"angehalten @ Zeile {editor_line}")
+        if self._debug_editor is not None and editor_line > 0:
+            self._debug_editor.set_debug_line(editor_line)
+            self.statusBar().showMessage(f"Debug: angehalten in Zeile {editor_line}")
+        else:
+            self.statusBar().showMessage("Debug: angehalten (importierte Datei)")
+
+    def _on_debug_output(self, text: str) -> None:
+        self.console.append(text)
+
+    def _on_debug_finished(self, reason: str) -> None:
+        if self._debug_editor is not None:
+            self._debug_editor.set_debug_line(None)
+        self._set_debug_controls(active=False, paused=False)
+        self.act_debug.setEnabled(True)
+        for a in (self.act_run, self.act_run_native, self.act_bench):
+            a.setEnabled(True)
+        self.variables_panel.set_status(reason)
+        self.variables_panel.clear()
+        icon = {"fertig": "✓", "abgebrochen": "■"}.get(reason, "✗")
+        self.console.append(f"\n{icon} Debug {reason}.\n",
+                            "info" if reason == "fertig" else "muted")
+        self.statusBar().showMessage(f"Debug {reason}", 3000)
+        self._debug_editor = None
+
+    def _on_debug_failed(self, message: str, editor_line: int) -> None:
+        loc = f" (Zeile {editor_line})" if editor_line and editor_line > 0 else ""
+        self.console.append(f"Laufzeitfehler{loc}: {message}\n", "error")
+        if self._debug_editor is not None and editor_line and editor_line > 0:
+            self._debug_editor.set_debug_line(editor_line)
+
+    def _debug_continue(self) -> None:
+        if self.debugger.is_paused():
+            self._clear_debug_line_keep_session()
+            self.debugger.cont()
+
+    def _debug_step_over(self) -> None:
+        if self.debugger.is_paused():
+            self._clear_debug_line_keep_session()
+            self.debugger.step_over()
+
+    def _debug_step_into(self) -> None:
+        if self.debugger.is_paused():
+            self._clear_debug_line_keep_session()
+            self.debugger.step_into()
+
+    def _debug_step_out(self) -> None:
+        if self.debugger.is_paused():
+            self._clear_debug_line_keep_session()
+            self.debugger.step_out()
+
+    def _debug_stop(self) -> None:
+        if self.debugger.is_active():
+            self.debugger.stop()
+
+    def _clear_debug_line_keep_session(self) -> None:
+        if self._debug_editor is not None:
+            self._debug_editor.set_debug_line(None)
+        self._set_debug_controls(active=True, paused=False)
+
+    def _set_debug_controls(self, *, active: bool, paused: bool) -> None:
+        for a in (self.act_dbg_continue, self.act_dbg_step_over,
+                  self.act_dbg_step_into, self.act_dbg_step_out):
+            a.setEnabled(paused)
+        self.act_dbg_stop.setEnabled(active)
 
     def _on_console_jump(self, file: object, line: int) -> None:
         target_path: Path | None = None
