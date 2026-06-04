@@ -1620,7 +1620,7 @@ Run-Einstiege `gbrt --tokens` / `gbrt --ast` / `gbrt --runsrc` geben Token-Strom
 bzw. AST als JSON aus bzw. lexen+parsen+kompilieren+führen **alles in Rust** aus.
 Parity gegen Python: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
 (137) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96)
-+ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (31).
++ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (40).
 Dateien: [`src/lexer.rs`](rust/gb_runtime/src/lexer.rs),
 [`src/ast.rs`](rust/gb_runtime/src/ast.rs),
 [`src/parser.rs`](rust/gb_runtime/src/parser.rs),
@@ -1629,9 +1629,10 @@ Dateien: [`src/lexer.rs`](rust/gb_runtime/src/lexer.rs),
 **Compiler-Gate = Output-Parität** (`gbrt --runsrc` stdout == Python-TW), NICHT
 byte-exakter Bytecode: gbrt's VM kann beide Opcode-Formen, der Rust-Compiler
 emittiert die generischen (kein Folding/`_NN`/IC) → identisches Verhalten, viel
-weniger Code. **3a+3b fertig:** Skalar-Globals, Arithmetik, IF/WHILE, Builtins (3a) +
-FOR/Arrays/Index/INPUT/DATA-READ + Local-Slots (3b). Nicht-unterstützt →
-`Err("Stufe 3c/3d: ...")`. Nächste Teil-Stufen 3c–3e (Funktionen → Klassen →
+weniger Code. **3a+3b+3c fertig:** Skalar-Globals/Arithmetik/IF/WHILE/Builtins (3a) +
+FOR/Arrays/Index/INPUT/DATA-READ/Local-Slots (3b) + User-SUB/FUNCTION (Stubs/
+Rekursion/RETURN/CALL_USER/Named-Args/Defaults/Variadic/FUNCREF, 3c). Nicht-
+unterstützt → `Err("Stufe 3d/3e: ...")`. Nächste Teil-Stufen 3d–3e (Klassen →
 Comprehensions/SELECT/Tupel/WITH/TRY/Coroutinen), dann `gbrt run datei.gb` +
 Preprocess. Tree-Walker bleibt Referenz + `@builtin`-
 Host. AST-Parity-Gotchas: `.line` kein Feld, `Param.by_ref` ist ein Token.

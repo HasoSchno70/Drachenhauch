@@ -88,6 +88,16 @@ _SNIPPETS = [
     "DATA 1, 2, 3\nDIM a AS INTEGER\nDIM b AS INTEGER\nREAD a, b\nRESTORE\nREAD a\nPRINT a, b\n",
     "DIM i AS INTEGER\nDIM j AS INTEGER\nFOR i = 1 TO 3\n  FOR j = 1 TO 3\n    PRINT i * 10 + j\n  NEXT\nNEXT\n",
     "DIM f AS FLOAT\nFOR f = 0.0 TO 1.0 STEP 0.5\n  PRINT f\nNEXT\n",
+    # --- 3c: User-SUB/FUNCTION ---
+    "SUB greet(n AS STRING)\n  PRINT \"hi \" + n\nEND SUB\ngreet(\"welt\")\n",
+    "FUNCTION sq(x AS INTEGER) AS INTEGER\n  RETURN x * x\nEND FUNCTION\nPRINT sq(7)\n",
+    "FUNCTION fib(n AS INTEGER) AS INTEGER\n  IF n < 2 THEN RETURN n\n  RETURN fib(n - 1) + fib(n - 2)\nEND FUNCTION\nPRINT fib(15)\n",
+    "FUNCTION add(a AS INTEGER, b AS INTEGER = 10) AS INTEGER\n  RETURN a + b\nEND FUNCTION\nPRINT add(5), add(5, 100)\n",
+    "FUNCTION mk(name AS STRING, age AS INTEGER = 0) AS STRING\n  RETURN name + STR$(age)\nEND FUNCTION\nPRINT mk(age: 30, name: \"x\")\n",
+    "SUB log(level AS STRING, ...rest)\n  PRINT level\nEND SUB\nlog(\"WARN\", 1, 2, 3)\nlog(\"INFO\")\n",
+    "FUNCTION twice(g AS FUNCREF, x AS INTEGER) AS INTEGER\n  RETURN g(g(x))\nEND FUNCTION\nFUNCTION inc(n AS INTEGER) AS INTEGER\n  RETURN n + 1\nEND FUNCTION\nPRINT twice(inc, 10)\n",
+    "FUNCTION fac(n AS INTEGER) AS INTEGER\n  DIM r AS INTEGER\n  DIM i AS INTEGER\n  r = 1\n  FOR i = 2 TO n\n    r = r * i\n  NEXT\n  RETURN r\nEND FUNCTION\nPRINT fac(6)\n",
+    "DIM total AS INTEGER\nSUB addto(x AS INTEGER)\n  total = total + x\nEND SUB\ntotal = 0\naddto(5)\naddto(10)\nPRINT total\n",
 ]
 
 

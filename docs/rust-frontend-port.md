@@ -16,7 +16,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a+3b fertig** |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a+3b+3c fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
@@ -85,12 +85,18 @@ Konstrukte liefern `Err("Stufe 3c/3d: ...")` → der Sweep überspringt sie.
 *Bekannte gbrt-Grenze (nicht 3b-spezifisch):* sizeless `DIM x AS ARRAY OF T`
 wird von gbrt nicht leer initialisiert (auch bei Python-kompiliertem `.gbc`).
 
+**Stufe 3c (fertig):** User-`SUB`/`FUNCTION` — Stub-Phase (Forward-Refs +
+Rekursion), Body-Kompilierung in eigenem Ctx (Params als Locals), `RETURN`/
+`RETURN_VOID`, `CALL_USER` mit Named-Arg-/Default-Auflösung + Variadic, FUNCREF
+(`LOAD_FUNCREF` für bare Funktionsnamen, `CALL_VALUE`). **40 Tests grün** (fib-
+Rekursion, Defaults, Named-Args, Variadic, Higher-Order via FUNCREF). Container-
+Methoden-Aufrufe (`rest.length()`) → noch `Err("Stufe 3d: ...")`.
+
 **Nächste Teil-Stufen** (je eigener Commit, Korpus wächst):
-3c User-`SUB`/`FUNCTION` (Locals, Params, Defaults, Variadic, `CALL_USER`,
-FUNCREF) · 3d Klassen/Structs (`NEW`, Member, `Self`, Properties, Operatoren,
-Statics, ENUM, member/index-READ-Ziel) · 3e Comprehensions, `SELECT`, Tupel,
-`WITH`, `TRY`, `FOR EACH`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
-(Stufe 5) + Preprocess (Stufe 4).
+3d Klassen/Structs (`NEW`, Member, `Self`, Properties, Operatoren, Statics,
+ENUM, Methoden-/Container-Calls `CALL_METHOD`, member-READ-Ziel) · 3e
+Comprehensions, `SELECT`, Tupel, `WITH`, `TRY`, `FOR EACH`, Coroutinen/`YIELD` ·
+dann `gbrt run datei.gb` (Stufe 5) + Preprocess (Stufe 4).
 
 ## Prinzip
 

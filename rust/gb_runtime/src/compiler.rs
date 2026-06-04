@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 use crate::ast::{NumV, Node};
 
@@ -47,8 +47,12 @@ mod oc {
     pub const JUMP: i64 = 40;
     pub const JUMP_IF_FALSE: i64 = 41;
     pub const JUMP_IF_TRUE: i64 = 42;
+    pub const CALL_USER: i64 = 50;
     pub const CALL_BUILTIN: i64 = 51;
+    pub const LOAD_FUNCREF: i64 = 53;
     pub const CALL_VALUE: i64 = 54;
+    pub const RETURN: i64 = 60;
+    pub const RETURN_VOID: i64 = 61;
     pub const BAND: i64 = 62;
     pub const BOR: i64 = 63;
     pub const BXOR: i64 = 64;
@@ -105,12 +109,15 @@ struct Ctx {
     local_slots: HashMap<String, usize>,
     local_types: Vec<String>,
     local_defaults: Vec<CVal>,
+    is_main: bool,
+    is_sub: bool,
 }
 
 impl Ctx {
     fn new() -> Self {
         Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![],
-              local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![] }
+              local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
+              is_main: true, is_sub: true }
     }
     fn alloc_temp(&mut self, type_name: &str) -> usize {
         let slot = self.local_types.len();
@@ -147,16 +154,32 @@ impl Ctx {
     }
 }
 
+/// Signatur einer User-Funktion (fuer CALL_USER-Aufloesung + FUNCREF).
+struct FnSig {
+    n_params: usize,
+    n_required: usize,
+    param_names: Vec<String>,
+    param_defaults: Vec<Option<CVal>>,
+    param_types: Vec<String>,
+    is_variadic: bool,
+    is_sub: bool,
+    return_type: String,
+    is_coroutine: bool,
+}
+
 pub struct Compiler {
     global_slots: HashMap<String, usize>,
     global_vars: std::collections::HashSet<String>,
+    fn_sigs: HashMap<String, FnSig>,
+    compiled_fns: Vec<(String, Value)>,
     ctx: Ctx,
 }
 
 impl Compiler {
     fn new() -> Self {
         Compiler { global_slots: HashMap::new(),
-                   global_vars: std::collections::HashSet::new(), ctx: Ctx::new() }
+                   global_vars: std::collections::HashSet::new(),
+                   fn_sigs: HashMap::new(), compiled_fns: vec![], ctx: Ctx::new() }
     }
 
     fn alloc_slot(&mut self, name: &str) {
@@ -230,6 +253,27 @@ impl Compiler {
                 self.stmt_for(var, start, end, step, body),
             Node::Break => self.emit_break(),
             Node::Continue => self.emit_continue(),
+            Node::Return(value) => {
+                if self.ctx.is_main {
+                    return Err("RETURN nur in SUB/FUNCTION".into());
+                }
+                match value {
+                    Some(v) => {
+                        if self.ctx.is_sub {
+                            return Err("SUB darf RETURN nicht mit Wert verwenden".into());
+                        }
+                        self.expr(v)?;
+                        self.ctx.emit(oc::RETURN, Value::Null);
+                    }
+                    None => {
+                        if !self.ctx.is_sub {
+                            return Err("FUNCTION braucht einen Wert bei RETURN".into());
+                        }
+                        self.ctx.emit(oc::RETURN_VOID, Value::Null);
+                    }
+                }
+                Ok(())
+            }
             Node::IndexAssign { target, indices, value } => {
                 self.expr(target)?;
                 for ix in indices { self.expr(ix)?; }
@@ -534,7 +578,19 @@ impl Compiler {
             Node::BoolLit(b) => {
                 let c = self.ctx.add_const(json!({ "b": b })); self.ctx.emit(oc::LOAD_CONST, json!(c)); Ok(())
             }
-            Node::Identifier(name) => { self.load_var(name); Ok(()) }
+            Node::Identifier(name) => {
+                // Bare User-Function -> FUNCREF (User-Variable verschattet sie).
+                if !self.ctx.local_slots.contains_key(name)
+                    && !self.global_vars.contains(name)
+                    && self.fn_sigs.contains_key(name)
+                {
+                    let idx = self.ctx.add_const(json!(name));
+                    self.ctx.emit(oc::LOAD_FUNCREF, json!(idx));
+                } else {
+                    self.load_var(name);
+                }
+                Ok(())
+            }
             Node::UnaryOp { op, operand } => self.expr_unary(op, operand),
             Node::BinaryOp { op, left, right } => self.expr_binary(op, left, right),
             Node::Call { callee, args } => self.expr_call(callee, args),
@@ -597,16 +653,38 @@ impl Compiler {
     fn expr_call(&mut self, callee: &Node, args: &[Node]) -> CR {
         let name = match callee {
             Node::Identifier(n) => n.clone(),
-            _ => return Err("Stufe 3b: aufrufbare Werte/Methoden noch nicht unterstuetzt".into()),
+            _ => return Err("Stufe 3d: Methoden-Aufrufe noch nicht unterstuetzt".into()),
         };
-        for a in args {
-            if matches!(a, Node::NamedArg { .. }) {
-                return Err("Stufe 3b: Named-Args noch nicht unterstuetzt".into());
+        let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
+        let is_local = self.ctx.local_slots.contains_key(&name);
+        let is_global = self.global_vars.contains(&name);
+        // User-Funktion (Variable gleichen Namens verschattet sie).
+        if self.fn_sigs.contains_key(&name) && !is_local && !is_global {
+            if self.fn_sigs[&name].is_variadic {
+                if has_named { return Err(format!("{}: keine Named-Args bei variadic", name)); }
+                for a in args { self.expr(a)?; }
+                self.ctx.emit(oc::CALL_USER, json!([name, args.len()]));
+                return Ok(());
             }
+            let actions = self.resolve_named_args(&name, args)?;
+            let n = actions.len();
+            for act in actions {
+                match act {
+                    RArg::Expr(e) => self.expr(e)?,
+                    RArg::Default(cv) => {
+                        let c = self.ctx.add_const(enc(&cv));
+                        self.ctx.emit(oc::LOAD_CONST, json!(c));
+                    }
+                }
+            }
+            self.ctx.emit(oc::CALL_USER, json!([name, n]));
+            return Ok(());
         }
-        // 3a kennt keine User-Funktionen -> Identifier-Call ist ein Builtin
-        // (sonst: globale FUNCREF-Variable -> CALL_VALUE).
-        if self.global_vars.contains(&name) {
+        if has_named {
+            return Err(format!("{}: Named-Args nur bei SUB/FUNCTION", name));
+        }
+        // Globale FUNCREF-Variable -> CALL_VALUE, sonst Builtin.
+        if is_global || is_local {
             self.load_var(&name);
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_VALUE, json!(args.len()));
@@ -617,25 +695,208 @@ impl Compiler {
         Ok(())
     }
 
-    fn finish_main(self, data: Vec<Value>) -> Value {
-        let code: Vec<Value> = self.ctx.code.iter()
-            .map(|(op, arg)| json!([op, arg])).collect();
-        let lines: Vec<Value> = self.ctx.code.iter().map(|_| json!(0)).collect();
-        let local_defaults: Vec<Value> = self.ctx.local_defaults.iter().map(enc).collect();
-        let main = json!({
-            "name": "__main__", "n_params": 0, "n_required": 0,
-            "is_variadic": false, "is_sub": true, "is_main": true,
-            "is_coroutine": false, "return_type": "",
-            "param_defaults": [], "param_names": [],
-            "local_types": self.ctx.local_types, "local_defaults": local_defaults,
-            "constants": self.ctx.consts, "code": code, "lines": lines,
-        });
+    fn finish(self, data: Vec<Value>) -> Value {
+        let main = build_func(&self.ctx, "__main__", true, true, 0, 0,
+                              false, false, "", &[], &[]);
+        let mut functions = Map::new();
+        for (name, fnj) in self.compiled_fns {
+            functions.insert(name, fnj);
+        }
         json!({
             "format": "gbc", "version": 1,
             "n_globals": self.global_slots.len(),
-            "main": main, "functions": {}, "classes": {}, "data": data,
+            "main": main, "functions": Value::Object(functions),
+            "classes": {}, "data": data,
         })
     }
+
+    // ---------------------------------------------------- User-Funktionen
+    fn register_stub(&mut self, decl: &Node) -> Result<(), String> {
+        let (name, params, body, is_sub, return_type) = fn_parts(decl);
+        for p in params {
+            if p.by_ref {
+                return Err(format!("{}: BYREF-Parameter '{}' im VM-Pfad nicht unterstuetzt",
+                                   name, p.name));
+            }
+        }
+        let mut param_defaults: Vec<Option<CVal>> = Vec::new();
+        for p in params {
+            param_defaults.push(match &p.default {
+                Some(d) => Some(eval_literal_default(d)?),
+                None => None,
+            });
+        }
+        let n_required = param_defaults.iter().position(|d| d.is_some())
+            .unwrap_or(params.len());
+        let is_variadic = params.last().map(|p| p.is_variadic).unwrap_or(false);
+        if self.fn_sigs.contains_key(name) {
+            return Err(format!("'{}' bereits deklariert", name));
+        }
+        self.fn_sigs.insert(name.to_string(), FnSig {
+            n_params: params.len(),
+            n_required,
+            param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
+            param_defaults,
+            param_types: params.iter().map(|p| p.type_name.clone()).collect(),
+            is_variadic,
+            is_sub,
+            return_type: if is_sub { String::new() } else { return_type.to_string() },
+            is_coroutine: body_has_yield(body),
+        });
+        Ok(())
+    }
+
+    fn compile_function(&mut self, decl: &Node) -> Result<(), String> {
+        let (name, params, body, is_sub, _rt) = fn_parts(decl);
+        let mut ctx = Ctx::new();
+        ctx.is_main = false;
+        ctx.is_sub = is_sub;
+        for p in params {
+            let slot = ctx.local_types.len();
+            ctx.local_slots.insert(p.name.clone(), slot);
+            ctx.local_types.push(p.type_name.clone());
+            ctx.local_defaults.push(type_default(&p.type_name));
+        }
+        let saved = std::mem::replace(&mut self.ctx, ctx);
+        let r = (|| {
+            for s in body { self.stmt(s)?; }
+            if is_sub {
+                self.ctx.emit(oc::RETURN_VOID, Value::Null);
+            } else {
+                let c = self.ctx.add_const(json!(format!("__missing_return:{}", name)));
+                self.ctx.emit(oc::LOAD_CONST, json!(c));
+                self.ctx.emit(oc::HALT, Value::Null);
+            }
+            Ok::<(), String>(())
+        })();
+        let fn_ctx = std::mem::replace(&mut self.ctx, saved);
+        r?;
+        let sig = &self.fn_sigs[name];
+        let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
+                             sig.is_variadic, sig.is_coroutine, &sig.return_type,
+                             &sig.param_defaults, &sig.param_names);
+        self.compiled_fns.push((name.to_string(), fnj));
+        Ok(())
+    }
+
+    fn resolve_named_args<'a>(&self, name: &str, args: &'a [Node])
+        -> Result<Vec<RArg<'a>>, String> {
+        let sig = &self.fn_sigs[name];
+        let n = sig.n_params;
+        let mut slots: Vec<Option<RArg<'a>>> = (0..n).map(|_| None).collect();
+        let pos_count = args.iter().position(|a| matches!(a, Node::NamedArg { .. }))
+            .unwrap_or(args.len());
+        if pos_count > n {
+            return Err(format!("{}: zu viele Argumente (max {})", name, n));
+        }
+        for j in pos_count..args.len() {
+            if !matches!(args[j], Node::NamedArg { .. }) {
+                return Err(format!("{}: positional Argument nach Named-Arg", name));
+            }
+        }
+        for i in 0..pos_count { slots[i] = Some(RArg::Expr(&args[i])); }
+        for j in pos_count..args.len() {
+            if let Node::NamedArg { name: an, value } = &args[j] {
+                let key = an.to_lowercase();
+                let idx = sig.param_names.iter().position(|p| *p == key)
+                    .ok_or_else(|| format!("{}: kein Parameter '{}'", name, an))?;
+                if slots[idx].is_some() {
+                    return Err(format!("{}: Parameter '{}' doppelt belegt", name, an));
+                }
+                slots[idx] = Some(RArg::Expr(value));
+            }
+        }
+        let mut actions = Vec::new();
+        for i in 0..n {
+            match slots[i].take() {
+                Some(a) => actions.push(a),
+                None => match sig.param_defaults.get(i).and_then(|d| d.clone()) {
+                    Some(cv) => actions.push(RArg::Default(cv)),
+                    None => return Err(format!("{}: Parameter '{}' fehlt", name,
+                        sig.param_names.get(i).cloned().unwrap_or_default())),
+                },
+            }
+        }
+        Ok(actions)
+    }
+}
+
+enum RArg<'a> { Expr(&'a Node), Default(CVal) }
+
+/// (name, params, body, is_sub, return_type) eines SUB/FUNCTION-Knotens.
+fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
+    match decl {
+        Node::SubDecl { name, params, body } => (name, params, body, true, ""),
+        Node::FunctionDecl { name, params, return_type, body } =>
+            (name, params, body, false, return_type),
+        _ => unreachable!("fn_parts auf Nicht-Funktion"),
+    }
+}
+
+fn eval_literal_default(e: &Node) -> Result<CVal, String> {
+    match e {
+        Node::NumberLit(NumV::Int(i)) => Ok(CVal::Int(*i)),
+        Node::NumberLit(NumV::Float(f)) => Ok(CVal::Float(*f)),
+        Node::StringLit(s) => Ok(CVal::Str(s.clone())),
+        Node::BoolLit(b) => Ok(CVal::Bool(*b)),
+        Node::UnaryOp { op, operand } if op == "-" => match eval_literal_default(operand)? {
+            CVal::Int(i) => Ok(CVal::Int(-i)),
+            CVal::Float(f) => Ok(CVal::Float(-f)),
+            _ => Err("Default '-' nur auf Zahlen".into()),
+        },
+        _ => Err("Default-Parameter muessen Literale sein (VM-Pfad)".into()),
+    }
+}
+
+fn body_has_yield(stmts: &[Node]) -> bool {
+    fn ny(e: &Node) -> bool {
+        match e {
+            Node::Yield(_) => true,
+            Node::BinaryOp { left, right, .. } => ny(left) || ny(right),
+            Node::UnaryOp { operand, .. } => ny(operand),
+            Node::Call { callee, args } => ny(callee) || args.iter().any(ny),
+            Node::IndexAccess { target, indices } => ny(target) || indices.iter().any(ny),
+            Node::TernaryExpr { cond, then_expr, else_expr } =>
+                ny(cond) || ny(then_expr) || ny(else_expr),
+            _ => false,
+        }
+    }
+    fn ns(s: &Node) -> bool {
+        match s {
+            Node::ExprStmt { expr } | Node::Throw { value: expr } => ny(expr),
+            Node::Assign { value, .. } | Node::Const { value, .. } => ny(value),
+            Node::Return(Some(v)) => ny(v),
+            Node::If { then_block, elseif_branches, else_block, .. } =>
+                then_block.iter().any(ns)
+                || elseif_branches.iter().any(|(_, b)| b.iter().any(ns))
+                || else_block.iter().any(ns),
+            Node::While { body, .. } | Node::For { body, .. }
+            | Node::Repeat { body, .. } | Node::ForEach { body, .. } => body.iter().any(ns),
+            _ => false,
+        }
+    }
+    stmts.iter().any(ns)
+}
+
+/// Baut das `_enc_func`-JSON aus einem fertig kompilierten Ctx.
+#[allow(clippy::too_many_arguments)]
+fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
+              n_params: usize, n_required: usize, is_variadic: bool,
+              is_coroutine: bool, return_type: &str,
+              param_defaults: &[Option<CVal>], param_names: &[String]) -> Value {
+    let code: Vec<Value> = ctx.code.iter().map(|(op, arg)| json!([op, arg])).collect();
+    let lines: Vec<Value> = ctx.code.iter().map(|_| json!(0)).collect();
+    let local_defaults: Vec<Value> = ctx.local_defaults.iter().map(enc).collect();
+    let pdef: Vec<Value> = param_defaults.iter()
+        .map(|d| match d { Some(cv) => enc(cv), None => Value::Null }).collect();
+    json!({
+        "name": name, "n_params": n_params, "n_required": n_required,
+        "is_variadic": is_variadic, "is_sub": is_sub, "is_main": is_main,
+        "is_coroutine": is_coroutine, "return_type": return_type,
+        "param_defaults": pdef, "param_names": param_names,
+        "local_types": ctx.local_types.clone(), "local_defaults": local_defaults,
+        "constants": ctx.consts.clone(), "code": code, "lines": lines,
+    })
 }
 
 /// DATA-Literale rekursiv einsammeln (wie compiler._collect_data, 3b-Subset).
@@ -651,7 +912,9 @@ fn collect_data(stmts: &[Node], out: &mut Vec<Value>) -> Result<(), String> {
                 collect_data(else_block, out)?;
             }
             Node::While { body, .. } | Node::For { body, .. }
-            | Node::Repeat { body, .. } | Node::ForEach { body, .. } => collect_data(body, out)?,
+            | Node::Repeat { body, .. } | Node::ForEach { body, .. }
+            | Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } =>
+                collect_data(body, out)?,
             _ => {}
         }
     }
@@ -704,17 +967,26 @@ pub fn compile_to_gbc(ast: &Node) -> Result<Value, String> {
         Node::Program { statements } => statements,
         _ => return Err("Erwartet Program-Knoten".into()),
     };
-    // 3a: keine Funktionen/Klassen.
+    // Funktionen / Klassen / Hauptprogramm trennen.
+    let mut fn_decls: Vec<&Node> = vec![];
+    let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
-        if matches!(s, Node::SubDecl { .. } | Node::FunctionDecl { .. } | Node::ClassDecl { .. }) {
-            return Err("Stufe 3b: SUB/FUNCTION/CLASS noch nicht unterstuetzt".into());
+        match s {
+            Node::SubDecl { .. } | Node::FunctionDecl { .. } => fn_decls.push(s),
+            Node::ClassDecl { .. } => return Err("Stufe 3d: CLASS/STRUCT noch nicht unterstuetzt".into()),
+            _ => main_stmts.push(s),
         }
     }
+    let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
     let mut c = Compiler::new();
-    c.collect_globals(stmts)?;
-    for s in stmts { c.stmt(s)?; }
+    c.collect_globals(&main_owned)?;
+    // Phase: Stubs (Forward-Refs/Rekursion), dann Funktions-Bodies.
+    for d in &fn_decls { c.register_stub(d)?; }
+    for d in &fn_decls { c.compile_function(d)?; }
+    // Hauptprogramm.
+    for s in &main_owned { c.stmt(s)?; }
     c.ctx.emit(oc::HALT, Value::Null);
     let mut data = Vec::new();
     collect_data(stmts, &mut data)?;
-    Ok(c.finish_main(data))
+    Ok(c.finish(data))
 }
