@@ -1,5 +1,0 @@
-' Neue GameBasic-Datei
-dim a as INTEGER
-
-INPUT a
-print " Du hast",a ," eingegeben"
