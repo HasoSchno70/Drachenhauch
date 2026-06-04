@@ -443,6 +443,26 @@ def _icon_sfx() -> QPixmap:
     return pix
 
 
+def _icon_tracker() -> QPixmap:
+    """Zwei gebalkte Achtelnoten -- Musik/Tracker."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(_stroke(1.6, "accent"))
+    # Notenhaelse
+    p.drawLine(8, 17, 8, 5)
+    p.drawLine(17, 15, 17, 4)
+    # Balken oben
+    p.setPen(_stroke(2.2, "accent"))
+    p.drawLine(8, 5, 17, 4)
+    # Notenkoepfe (gefuellt)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    p.drawEllipse(QPointF(6.5, 17.5), 3.0, 2.3)
+    p.drawEllipse(QPointF(15.5, 15.5), 3.0, 2.3)
+    p.end()
+    return pix
+
+
 def _icon_settings() -> QPixmap:
     pix = _new_pixmap()
     p = _painter(pix)
@@ -485,6 +505,7 @@ _BUILDERS = {
     "sprite_editor": _icon_sprite_editor,
     "particles": _icon_particles,
     "sfx": _icon_sfx,
+    "tracker": _icon_tracker,
 }
 
 

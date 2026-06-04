@@ -77,6 +77,16 @@ def _launch_sfx_editor(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_tracker_editor(project_root, initial_file=None):
+    try:
+        from gamebasic.trackereditor_qt import launch
+    except SystemExit:
+        return None
+    except ImportError:
+        return None
+    return launch(project_root, initial_file)
+
+
 def main(argv):
     args = argv[1:]
     mode = "run"
@@ -121,6 +131,17 @@ def main(argv):
         rc = _launch_sfx_editor(Path(__file__).resolve().parent, None)
         if rc is None:
             print("SFX-Generator benoetigt 'PySide6' und 'numpy'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
+            return 3
+        return rc
+
+    # --- Tracker (Musik-Editor) explizit per Flag ---
+    if args and args[0] in ("--tracker", "--music"):
+        args = args[1:]
+        rc = _launch_tracker_editor(Path(__file__).resolve().parent, None)
+        if rc is None:
+            print("Tracker benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
             return 3

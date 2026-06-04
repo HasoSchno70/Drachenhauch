@@ -40,6 +40,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`gbsprites`): Multi-Frame, Animation, Atlas-Export, Onion-Skin, Tile-Preview
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`gbparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, GB-Code-Export
 - **[SFX-Generator](docs/sfx-generator.md)** — Retro-Soundeffekte (`gbsfx`, sfxr-Stil): Synth mit Pitch-Slide/Hüllkurve/Vibrato, Export WAV/GB-Code
+- **[Tracker](docs/tracker.md)** — mehrspuriger Chiptune-Musik-Editor (`gbtracker`): 3 Ton-Kanäle + Drums, Pattern-Gitter + Klaviatur, Export als frame-basierter GB-Player
 
 ## Beispiele
 
