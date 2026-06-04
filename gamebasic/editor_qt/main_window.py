@@ -105,6 +105,7 @@ class GameBasicEditor(QMainWindow):
         self._build_menubar()
         self._wire_signals()
         self._setup_debugger()
+        self._setup_todo_panel()
         self.setAcceptDrops(True)
 
         # Initial-Auto-Complete-Setting auf alle (zukuenftigen) Editoren.
@@ -458,6 +459,18 @@ class GameBasicEditor(QMainWindow):
         self.act_toggle_minimap.setChecked(bool(self.settings.get("minimap_visible", True)))
         self.act_toggle_minimap.toggled.connect(self._on_minimap_toggled)
 
+        self.act_toggle_wrap = QAction("Zeilenumbruch", self)
+        self.act_toggle_wrap.setCheckable(True)
+        self.act_toggle_wrap.setShortcut(QKeySequence("Alt+Z"))
+        self.act_toggle_wrap.setChecked(bool(self.settings.get("word_wrap", False)))
+        self.act_toggle_wrap.toggled.connect(self._on_wrap_toggled)
+
+        self.act_toggle_todo = QAction("TODO / FIXME-Liste", self)
+        self.act_toggle_todo.setCheckable(True)
+        self.act_toggle_todo.setShortcut(QKeySequence("Ctrl+Shift+M"))
+        self.act_toggle_todo.toggled.connect(
+            lambda on: self.todo_dock.setVisible(on))
+
         self.act_fold = QAction(icons.get("fold"), "Block falten/auffalten", self)
         self.act_fold.setShortcut(QKeySequence("Ctrl+Shift+["))
         self.act_fold.triggered.connect(self._fold_at_cursor)
@@ -532,6 +545,8 @@ class GameBasicEditor(QMainWindow):
         m_view.addAction(self.act_view_builtins)
         m_view.addSeparator()
         m_view.addAction(self.act_toggle_minimap)
+        m_view.addAction(self.act_toggle_wrap)
+        m_view.addAction(self.act_toggle_todo)
         m_view.addAction(self.act_fold)
         m_view.addAction(self.act_unfold_all)
         m_view.addAction(self.act_theme)
@@ -594,6 +609,8 @@ class GameBasicEditor(QMainWindow):
         st.editor.textChanged.connect(self._schedule_outline_refresh)
         # Minimap-Sichtbarkeit gemaess globaler Toggle-Action.
         st.minimap.setVisible(self.act_toggle_minimap.isChecked())
+        # Zeilenumbruch gemaess globaler Toggle-Action.
+        st.editor.set_word_wrap(self.act_toggle_wrap.isChecked())
         # Breakpoints des Tabs -> Debugger (wenn dieser Tab debuggt wird).
         st.editor.breakpoints_changed.connect(
             lambda e=st.editor: self._on_breakpoints_changed(e))
@@ -653,6 +670,11 @@ class GameBasicEditor(QMainWindow):
             st.minimap.setVisible(on)
         self.settings["minimap_visible"] = bool(on)
 
+    def _on_wrap_toggled(self, on: bool) -> None:
+        for st in self.tabs.states:
+            st.editor.set_word_wrap(on)
+        self.settings["word_wrap"] = bool(on)
+
     def _make_outline_timer(self) -> QTimer:
         t = QTimer(self)
         t.setSingleShot(True)
@@ -666,7 +688,10 @@ class GameBasicEditor(QMainWindow):
 
     def _refresh_outline(self) -> None:
         st = self.tabs.active
-        self.outline.update_for(st.editor.get_text() if st is not None else None)
+        text = st.editor.get_text() if st is not None else None
+        self.outline.update_for(text)
+        if getattr(self, "todo_dock", None) is not None and self.todo_dock.isVisible():
+            self.todo_panel.update_for(text)
 
     # ----------------------------------------------------- Aktionen
     def _new_tab(self) -> TabState:
@@ -1193,6 +1218,26 @@ class GameBasicEditor(QMainWindow):
         self.debugger.finished.connect(self._on_debug_finished)
         self.debugger.output.connect(self._on_debug_output)
         self.debugger.failed.connect(self._on_debug_failed)
+
+    def _setup_todo_panel(self) -> None:
+        from PySide6.QtWidgets import QDockWidget
+        from .todo_panel import TodoPanel
+        self.todo_panel = TodoPanel()
+        self.todo_dock = QDockWidget("TODO / FIXME", self)
+        self.todo_dock.setObjectName("TodoDock")
+        self.todo_dock.setWidget(self.todo_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.todo_dock)
+        self.todo_dock.hide()
+        self.todo_panel.jump_requested.connect(self._goto_line_in_active)
+        # Sichtbarkeit togglet die View-Action; beim Einblenden frisch scannen.
+        self.act_toggle_todo.setChecked(False)
+        self.todo_dock.visibilityChanged.connect(self._on_todo_visibility)
+
+    def _on_todo_visibility(self, visible: bool) -> None:
+        self.act_toggle_todo.setChecked(visible)
+        if visible:
+            st = self.tabs.active
+            self.todo_panel.update_for(st.editor.get_text() if st else None)
 
     def _on_breakpoints_changed(self, editor) -> None:
         # Nur relevant, wenn dieser Editor gerade debuggt wird -- dann live an

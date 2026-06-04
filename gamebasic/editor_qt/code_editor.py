@@ -603,6 +603,11 @@ class CodeEditor(
         self._line_area.update()
         self.breakpoints_changed.emit()
 
+    def set_word_wrap(self, on: bool) -> None:
+        self.setLineWrapMode(
+            QPlainTextEdit.LineWrapMode.WidgetWidth if on
+            else QPlainTextEdit.LineWrapMode.NoWrap)
+
     def breakpoints(self) -> set[int]:
         return set(self._breakpoints)
 
