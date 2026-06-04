@@ -145,9 +145,16 @@ nutzen 0..2, Shadow 10 → kein Clash). Dispatch `"light_env_hdr"` in
   schwarz; prefiltert werden nur die ersten 5 Roughness-Level
   (`MAX_REFLECTION_LOD=4`).
 
+**Skybox** `SKYBOX(an)` zeichnet die env-Cubemap zusätzlich als sichtbaren 3D-
+Hintergrund (eigener `SKYBOX_VS/FS`; `mat3(matView)` entfernt die Translation →
+kamerazentriert/unendlich; als erstes im 3D-Pass mit `rlDisableDepthMask` +
+`rlDisableBackfaceCulling`, Modelle zeichnen darüber). Die env-Cubemap wird dafür
+nach der IBL-Generierung aufbewahrt (`ibl_env`). Ohne `LIGHT_ENV_HDR` ein No-Op.
+
 Demo [examples/99_ibl_hdr.gb](../examples/99_ibl_hdr.gb): Reihe Chrom-Metallkugeln
-(`MODEL_PBR` metalness 1, Roughness-Verlauf) spiegeln das HDRI; `FILEEXISTS`-Guard
-fällt ohne `.hdr` auf analytisches `LIGHT_ENV` zurück. **Asset:**
+(`MODEL_PBR` metalness 1, Roughness-Verlauf) spiegeln das HDRI **vor der als
+Skybox sichtbaren Umgebung**; `FILEEXISTS`-Guard fällt ohne `.hdr` auf
+analytisches `LIGHT_ENV` zurück. **Asset:**
 `py examples/assets/download_hdri.py` holt ein CC0-1k-HDRI (Poly Haven,
 kloofendal_43d_clear) als `examples/assets/ibl_env.hdr` (gitignored). Per
 Screenshot verifiziert (Spiegel→diffus über die Roughness-Reihe). Bit-Identität

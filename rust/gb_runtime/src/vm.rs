@@ -2542,6 +2542,7 @@ impl<'p> Vm<'p> {
                 let intensity = if a.len() >= 2 { need_f(a, 1, "LIGHT_ENV_HDR")? } else { 1.0 };
                 g!().light_env_hdr(&path, intensity)?; Value::Nil
             }
+            "skybox" => { g!().skybox(gb(a, 0)); Value::Nil }
             "light_directional" => Value::Int(g!().light_add(
                 0, need_f(a,0,"LIGHT_DIRECTIONAL")? as f32, need_f(a,1,"LIGHT_DIRECTIONAL")? as f32,
                 need_f(a,2,"LIGHT_DIRECTIONAL")? as f32, gi(a,3,"LIGHT_DIRECTIONAL")?)),

@@ -524,6 +524,35 @@ void main()
 }
 "#;
 
+/// Skybox-Vertex-Shader: Translation aus der View-Matrix entfernen (mat3),
+/// damit die Cubemap immer um die Kamera zentriert (unendlich weit) erscheint.
+const SKYBOX_VS: &str = r#"#version 330
+in vec3 vertexPosition;
+uniform mat4 matProjection;
+uniform mat4 matView;
+out vec3 fragPosition;
+void main()
+{
+    fragPosition = vertexPosition;
+    mat4 rotView = mat4(mat3(matView));   // Translation raus -> folgt der Kamera
+    gl_Position = matProjection*rotView*vec4(vertexPosition, 1.0);
+}
+"#;
+
+/// Skybox-Fragment-Shader: Cubemap in Blickrichtung sampeln (+ Gamma, da die
+/// env-Cubemap linear-geclampte HDR-Werte haelt).
+const SKYBOX_FS: &str = r#"#version 330
+in vec3 fragPosition;
+uniform samplerCube environmentMap;   // Texture-Unit 0
+out vec4 finalColor;
+void main()
+{
+    vec3 color = texture(environmentMap, fragPosition).rgb;
+    color = pow(color, vec3(1.0/2.2));   // linear -> sRGB
+    finalColor = vec4(color, 1.0);
+}
+"#;
+
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -576,6 +605,12 @@ pub struct Graphics {
     ibl_irradiance: u32,
     ibl_prefilter: u32,
     ibl_brdf: u32,
+    // env-Cubemap (LDR) -- fuer die Skybox aufbewahrt (sonst nach IBL-Gen frei).
+    ibl_env: u32,
+    skybox_enabled: bool,
+    skybox_shader: Option<Shader>,
+    skybox_loc_proj: i32,
+    skybox_loc_view: i32,
     use_ibl_maps: bool,
     loc_use_ibl: i32,
     loc_irradiance: i32,
@@ -668,6 +703,11 @@ impl Graphics {
             ibl_irradiance: 0,
             ibl_prefilter: 0,
             ibl_brdf: 0,
+            ibl_env: 0,
+            skybox_enabled: false,
+            skybox_shader: None,
+            skybox_loc_proj: -1,
+            skybox_loc_view: -1,
             use_ibl_maps: false,
             loc_use_ibl: -1,
             loc_irradiance: -1,
@@ -1204,13 +1244,26 @@ impl Graphics {
         let prefilter = self.ibl_render_prefilter(env, 128)?;
         // 5) BRDF-LUT (512, 2D).
         let brdf = self.ibl_render_brdf(512)?;
-        // Equirect + env-Cubemap werden nicht mehr gebraucht -> freigeben.
-        unsafe { raylib::ffi::rlUnloadTexture(pano_id); raylib::ffi::rlUnloadTexture(env); }
+        // Equirect freigeben; env-Cubemap fuer die Skybox aufbewahren.
+        unsafe { raylib::ffi::rlUnloadTexture(pano_id); }
+        self.ibl_env = env;
         self.ibl_irradiance = irradiance;
         self.ibl_prefilter = prefilter;
         self.ibl_brdf = brdf;
         self.use_ibl_maps = true;
         Ok(())
+    }
+
+    /// Skybox an/aus: zeichnet die env-Cubemap (von LIGHT_ENV_HDR) als 3D-
+    /// Hintergrund. Ohne vorheriges LIGHT_ENV_HDR (ibl_env == 0) ein No-Op.
+    pub fn skybox(&mut self, on: bool) {
+        if on && self.skybox_shader.is_none() {
+            let sh = self.rl.load_shader_from_memory(&self.thread, Some(SKYBOX_VS), Some(SKYBOX_FS));
+            self.skybox_loc_proj = sh.get_shader_location("matProjection");
+            self.skybox_loc_view = sh.get_shader_location("matView");
+            self.skybox_shader = Some(sh);
+        }
+        self.skybox_enabled = on;
     }
 
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
@@ -1963,6 +2016,10 @@ impl Graphics {
         // HDR-IBL-Maps: im Draw-Kontext (binnen begin_drawing) an Slots 11/12/13
         // binden, damit die Bindung sicher bis zum Modell-Draw steht.
         let ibl = (self.use_ibl_maps, self.ibl_irradiance, self.ibl_prefilter, self.ibl_brdf);
+        // Skybox-Info (Shader-ID + Locs + env-Cubemap), falls aktiv + HDR geladen.
+        let skybox = if self.skybox_enabled && self.ibl_env != 0 {
+            self.skybox_shader.as_ref().map(|s| (s.id, self.skybox_loc_proj, self.skybox_loc_view, self.ibl_env))
+        } else { None };
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
@@ -1984,7 +2041,7 @@ impl Graphics {
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
                     &[], cam, &[], None, (-1, -1, -1), &empty_set, &empty_map,
-                    (false, 0, 0, 0), &[]);
+                    (false, 0, 0, 0), &[], None);
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -1997,7 +2054,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -2010,7 +2067,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -2038,6 +2095,7 @@ fn render_scene<D: RaylibDraw>(
     pbr_params: &std::collections::HashMap<usize, (f32, f32)>,
     ibl: (bool, u32, u32, u32),
     render_targets: &[RenderTarget],
+    skybox: Option<(u32, i32, i32, u32)>,   // (shader_id, loc_proj, loc_view, env_cubemap)
 ) {
     let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
     // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
@@ -2069,8 +2127,28 @@ fn render_scene<D: RaylibDraw>(
                 }
             }
             // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
-            if !cmds3d.is_empty() {
+            if !cmds3d.is_empty() || skybox.is_some() {
                 let mut d3 = d.begin_mode3D(cam3d);
+                // Skybox ganz zuerst (Hintergrund): env-Cubemap in Blickrichtung,
+                // ohne Depth-Write (Modelle zeichnen darueber), Cube von innen.
+                if let Some((sid, lproj, lview, env)) = skybox {
+                    unsafe {
+                        let view = raylib::ffi::rlGetMatrixModelview();
+                        let proj = raylib::ffi::rlGetMatrixProjection();
+                        raylib::ffi::rlDisableBackfaceCulling();
+                        raylib::ffi::rlDisableDepthMask();
+                        raylib::ffi::rlEnableShader(sid);
+                        raylib::ffi::rlSetUniformMatrix(lproj, proj);
+                        raylib::ffi::rlSetUniformMatrix(lview, view);
+                        raylib::ffi::rlActiveTextureSlot(0);
+                        raylib::ffi::rlEnableTextureCubemap(env);
+                        raylib::ffi::rlLoadDrawCube();
+                        raylib::ffi::rlDisableTextureCubemap();
+                        raylib::ffi::rlDisableShader();
+                        raylib::ffi::rlEnableDepthMask();
+                        raylib::ffi::rlEnableBackfaceCulling();
+                    }
+                }
                 for c in cmds3d.iter() {
                     match c {
                         Cmd3D::Cube(x, y, z, w, h, dd, col) =>

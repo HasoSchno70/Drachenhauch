@@ -337,6 +337,14 @@ def _light_env_hdr(g, *args):
     _native_only("LIGHT_ENV_HDR")
 
 
+@graphics_builtin("SKYBOX", arity=1, types=("bool",))
+def _skybox(g, *args):
+    """SKYBOX(an) -- zeichnet die mit LIGHT_ENV_HDR geladene HDR-Umgebung als
+    sichtbaren 3D-Hintergrund (Skybox). Ohne vorheriges LIGHT_ENV_HDR wirkungslos.
+    NUR native Runtime (gbrt/F6)."""
+    _native_only("SKYBOX")
+
+
 @graphics_builtin("LIGHT_DIRECTIONAL", arity=4)
 def _light_directional(g, *args):
     """LIGHT_DIRECTIONAL(dx, dy, dz, farbe) -> INTEGER -- gerichtetes Licht

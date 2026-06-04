@@ -20,6 +20,7 @@ LIGHT_DIRECTIONAL(-0.4, -0.7, -0.5, &H303030) ' dezente Sonne fuer einen Glanzpu
 ' Echtes HDR-IBL wenn das Panorama vorhanden ist, sonst analytische Naeherung.
 IF FILEEXISTS("assets/ibl_env.hdr") THEN
     LIGHT_ENV_HDR("assets/ibl_env.hdr", 1.0)
+    SKYBOX(TRUE)                                ' HDR-Umgebung als 3D-Hintergrund
 ELSE
     LIGHT_ENV(&H6090E0, &H201810, 1.0)
     PRINT "Kein assets/ibl_env.hdr -- analytisches LIGHT_ENV (download_hdri.py)"
