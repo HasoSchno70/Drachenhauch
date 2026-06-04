@@ -1398,6 +1398,7 @@ class GameBasicEditor(QMainWindow):
             ("open",     self.act_open),
             ("save",     self.act_save),
             ("save_as",  self.act_save_as),  # in der Toolbar sichtbar
+            ("save",     self.act_export),   # Export teilt das Save-Icon
             ("find",     self.act_find),
             ("replace",  self.act_replace),
             ("settings", self.act_settings),
