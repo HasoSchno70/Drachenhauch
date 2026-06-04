@@ -36,12 +36,19 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
 
 **Lohnende nächste Hebel (raylib bietet noch mehr):**
 - **3D-Stack vollständig:** Modelle, GenMesh inkl. Heightmap, Texturen,
-  **Normal-Maps**, **PBR + analytisches IBL** (`LIGHT_ENV`), Billboards,
-  Ray-Kollision/Picking, Beleuchtung, **Fog**, **Schatten**, **Kamera-Modi** —
-  siehe unten. (Optional offen: echtes HDR-Cubemap-IBL.)
-- Mittel: Blend-Modes (additiv/multiply), Render-Texturen als GB-Handle,
-  2D-Extras (dicke Linien/Gradient/runde Rechtecke/Splines), prozedurale
-  Texturen, Sound-Pan/Aliase, Datei-Drag&Drop/Clipboard.
+  **Normal-Maps**, **PBR + analytisches IBL** (`LIGHT_ENV`) **+ echtes
+  HDR-Cubemap-IBL** (`LIGHT_ENV_HDR`), Billboards, Ray-Kollision/Picking,
+  Beleuchtung, **Fog**, **Schatten**, **Kamera-Modi** — siehe unten.
+- 2D-Politur **erledigt (2026-06-04):** 2D-Extras (`LINEW`/`BOXROUND`/`RECTROUND`/
+  `GRADIENTV`/`GRADIENTH`/`SPLINE`, dual-path), Blend-Modes (`BLEND_MODE`, nativ),
+  prozedurale Texturen (`GENTEX_PERLIN`/`GRADIENT`/`CHECKED`/`COLOR`, nativ),
+  Clipboard + Drag&Drop (`CLIPBOARD_GET/SET`, `FILES_DROPPED`/`FILE_DROPPED`,
+  nativ), **Render-Targets** (`RENDERTARGET_NEW`/`BEGIN`/`END`/`DRAW`, dual-path —
+  gbrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die
+  RenderTexture gerendert). Sound-Pan existiert bereits (`AUDIO_PAN`). Demos
+  `examples/100_2d_extras.gb`, `101_blend_gentex.gb`, `102_render_target.gb`.
+- **Noch offen (klein):** Sound-Aliase (`LoadSoundAlias`, ueberlappende Wiedergabe
+  desselben Sounds); Render-Target-Trails (aktuell pro Frame transparent gecleart).
 
 **Voll-Native-Portierung (laufend):** Ziel ist, ALLE Module nativ zu machen,
 sodass nur die Editoren Python brauchen. Schwere/optionale Module sind dabei
@@ -96,30 +103,55 @@ feature-gated (Standard-`.exe` bleibt schlank).
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.
 
-### Geplant (nächster Schritt): echtes HDR-Cubemap-IBL
+### Echtes HDR-Cubemap-IBL (`LIGHT_ENV_HDR`) — erledigt
 
-Einziges noch offenes 3D-Feature. Ersetzt die analytische `LIGHT_ENV`-Näherung
-durch echte Environment-Maps aus einem `.hdr`. Im Kern ein Port von raylibs
-`shaders_basic_pbr`-Beispiel (die `GenTexture*`-Helfer sind nicht in raylib-core
-— via raylib-rs `ffi`/`rlgl` nachbauen, wie beim Shadow-Mapping schon gemacht):
+Ersetzt die analytische `LIGHT_ENV`-Näherung durch echte Environment-Maps aus
+einem `.hdr`. Port von raylibs `shaders_basic_pbr` / learnopengl-IBL, rein über
+raylib-rs `ffi`/`rlgl` (wie das Shadow-Mapping). Builtin
+**`LIGHT_ENV_HDR(pfad$ [, intensität])`** (native-only). Pipeline einmalig in
+[`graphics.rs`](../rust/gb_runtime/src/graphics.rs) (`light_env_hdr()`):
 
-1. `.hdr` laden (equirect-Panorama-Textur, R32G32B32).
-2. equirect → Cubemap (FBO + Cubemap-Shader, 6 Faces).
-3. Irradiance-Cubemap (Convolution, ~32px) — diffuse IBL.
-4. Prefilter-Cubemap (GGX, Roughness-Mips) — specular IBL.
-5. BRDF-LUT (2D, 512²) — einmalig.
-6. Eingebetteten PBR-`LIGHT_FS` erweitern: `samplerCube irradianceMap/prefilterMap`
-   + `sampler2D brdfLUT` + `useIBLMaps`-Gate; Fallback = bestehender analytischer
-   Pfad (bleibt erhalten, kein `.hdr` nötig).
-7. Builtin `LIGHT_ENV_HDR(pfad$)` (native-only); `LIGHT_ENV` bleibt als billige
-   Alternative.
+1. **`.hdr` laden** — eigener Radiance-RGBE-Dekoder (`load_hdr_rgbe`) → RGBA32F
+   2D-Float-Textur via `rlLoadTexture`. (Nötig, weil raylib-sys 5.5.1 **ohne**
+   `SUPPORT_FILEFORMAT_HDR` gebaut ist — `LoadImage("*.hdr")` schlägt fehl.)
+2. **equirect → Cubemap** (512², `ibl_render_cube` + `EQUIRECT_FS`, 6 Faces über
+   `rlLoadDrawCube`).
+3. **Irradiance-Cubemap** (32², `IRRADIANCE_FS`-Convolution) — diffuse IBL.
+4. **Prefilter-Cubemap** (128² + Roughness-Mips, `PREFILTER_FS` GGX-Importance) —
+   specular IBL.
+5. **BRDF-LUT** (512², 2D, `BRDF_FS` + `rlLoadDrawQuad`) — einmalig.
+6. **PBR-`LIGHT_FS`** um `samplerCube irradianceMap/prefilterMap` +
+   `sampler2D brdfLUT` + **`useIBLMaps`-Gate** erweitert. Gesetzt → echte Maps
+   (`texture(irradianceMap,N)`, `textureLod(prefilterMap,R,rough·4)`,
+   `texture(brdfLUT,vec2(NoV,rough))`); sonst der **bestehende analytische
+   `LIGHT_ENV`-Pfad** (Default `useIBLMaps=0` → kein `.hdr` nötig, alle Demos
+   unverändert). `envIntensity` bleibt das gemeinsame An/Aus-Gate.
 
-Dateien: `graphics.rs` (Shader-Consts + 3 Map-Felder + `gen_ibl()` +
-`light_env_hdr()`), `vm.rs` (Dispatch), `g3d.py` (native-only Stub) + Demo
-`examples/99_ibl_hdr.gb`. **Asset liegt bereit:** `examples/assets/download_hdri.py`
-holt ein CC0-1k-HDRI (Poly Haven) als `examples/assets/ibl_env.hdr` (gitignored).
-Verifikation: headless-Screenshot, Chrom-Kugel spiegelt die Umgebung.
-GPU-/ffi-lastig, visuell zu prüfen → eigene Session.
+Maps liegen als GL-Texturen in `Graphics` (`ibl_irradiance/_prefilter/_brdf`),
+werden in `render_scene` im Draw-Kontext an die Slots 11/12/13 gebunden (Cubemaps
+via `rlEnableTextureCubemap`, BRDF-LUT 2D via `rlEnableTexture`; Material-Maps
+nutzen 0..2, Shadow 10 → kein Clash). Dispatch `"light_env_hdr"` in
+[`vm.rs`](../rust/gb_runtime/src/vm.rs), native-only-Stub in
+[`g3d.py`](../gamebasic/modules/g3d.py).
+
+**Drei rlgl-Stolpersteine** (für Nachbauten):
+- `rlFramebufferAttach` endet mit `glBindFramebuffer(0)` → **nach jedem Attach das
+  FBO neu `rlEnableFramebuffer`** (sonst landet der Cube auf dem Screen, Cubemap
+  bleibt schwarz).
+- Leere **Float-Cubemaps** (R32/R16) werden von `rlLoadTextureCubemap` abgelehnt →
+  **R8G8B8A8** (LDR; sehr helle Werte clampen, für Reflexionen ausreichend).
+- Prefilter-Cubemap braucht den **vollen Mip-Chain** (128→1 = 8 Level), sonst ist
+  sie mit `LINEAR_MIPMAP_LINEAR` nicht *mipmap-complete* und sampelt komplett
+  schwarz; prefiltert werden nur die ersten 5 Roughness-Level
+  (`MAX_REFLECTION_LOD=4`).
+
+Demo [examples/99_ibl_hdr.gb](../examples/99_ibl_hdr.gb): Reihe Chrom-Metallkugeln
+(`MODEL_PBR` metalness 1, Roughness-Verlauf) spiegeln das HDRI; `FILEEXISTS`-Guard
+fällt ohne `.hdr` auf analytisches `LIGHT_ENV` zurück. **Asset:**
+`py examples/assets/download_hdri.py` holt ein CC0-1k-HDRI (Poly Haven,
+kloofendal_43d_clear) als `examples/assets/ibl_env.hdr` (gitignored). Per
+Screenshot verifiziert (Spiegel→diffus über die Roughness-Reihe). Bit-Identität
+entfällt (GPU/3D); analytisches `96_ibl` bleibt unverändert.
 
 ## Dev-Run-Loop: `gbrun.py --native`
 
@@ -716,13 +748,11 @@ Platte + Kugel links mit, rechts ohne Normal-Map unter kreisendem Punktlicht —
 links wandern die Wellen-Bumps, rechts bleibt es glatt (per Screenshot
 verifiziert; Normal-Map `examples/assets/normal_waves.png` prozedural generiert).
 
-**Offen (3D):** echtes HDR-Cubemap-IBL (equirect→Cubemap, Irradiance-Convolution,
-Prefilter-Mips, BRDF-LUT) als optionale Veredelung über die analytische
-`LIGHT_ENV`-Näherung hinaus — großer Multi-Pass-Aufwand, geringer Mehrwert ohne
-HDR-Assets. Der native 3D-Stack ist ansonsten **vollständig**: Modelle, Meshes
-inkl. Heightmap, Texturen, Normal-Maps, **PBR + analytisches IBL**, Billboards,
-Picking, Beleuchtung inkl. Fog und Schatten, Kamera-Modi. Third-Person-Kollision
-ist Gameplay-Logik (kein Engine-Primitive).
+Der native 3D-Stack ist damit **vollständig**: Modelle, Meshes inkl. Heightmap,
+Texturen, Normal-Maps, **PBR + analytisches IBL (`LIGHT_ENV`) + echtes
+HDR-Cubemap-IBL (`LIGHT_ENV_HDR`)**, Billboards, Picking, Beleuchtung inkl. Fog
+und Schatten, Kamera-Modi (siehe „Echtes HDR-Cubemap-IBL" oben). Third-Person-
+Kollision ist Gameplay-Logik (kein Engine-Primitive).
 
 ## Shader / Post-Processing (native)
 

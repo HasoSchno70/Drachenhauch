@@ -1,9 +1,20 @@
 # GameBasic
 
 BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele.
-Drei austauschbare Ausführungspfade: Tree-Walking-Interpreter, Python-VM (Bytecode),
-Cython-VM (kompilierte Native-Variante). Alle drei produzieren bit-identischen
-Output — siehe `gbrun.py --bench <datei.gb>`.
+**Zwei Ausführungspfade:** der **Tree-Walking-Interpreter** (Python, Referenz +
+Host aller Built-ins) und die **native Runtime `gbrt`** (Rust/raylib, Produktion +
+Standalone-Export). Die Python-Toolchain (Lexer → Parser → Compiler) bleibt für
+beide gemeinsam; gbrt führt den kompilierten Bytecode aus. Beide liefern für
+deterministische Konsolen-Programme bit-identischen Output — siehe
+`gbrun.py --bench <datei.gb>` (TW vs gbrt).
+
+> **Architektur-Hinweis (Konsolidierung):** Früher gab es zwei zusätzliche
+> Bytecode-VMs in Python (`vm.py` Python-VM, `vm_native.pyx` Cython-VM). Beide
+> wurden **entfernt** — `gbrt` hat sie als schnellen/Produktions-Pfad abgelöst.
+> Ältere Feature-Abschnitte weiter unten erwähnen teils noch „vm.py /
+> vm_native.pyx / alle drei Pfade" — das sind **historische Implementierungs-
+> notizen**; gültig ist heute: Tree-Walker (`interpreter.py`) + Compiler
+> (`compiler.py` → Bytecode) + native Ausführung (`rust/gb_runtime`, `gbrt`).
 
 ## Verzeichnisstruktur
 
@@ -12,21 +23,21 @@ gamebasic/
   __main__.py            # py -m gamebasic <file> (mit Preprocessor)
   lexer.py / tokens.py   # Tokenisierung
   parser.py / ast_nodes.py
-  interpreter.py         # Tree-Walker + alle Built-ins
+  interpreter.py         # Tree-Walker + alle Built-ins (Referenz-Semantik)
   compiler.py            # AST -> Bytecode (mit Type-Inference + Constant Folding)
   bytecode.py            # Opcodes
-  vm.py                  # Python-VM
-  vm_native.pyx/.c/.pyd  # Cython-VM (gleiche Semantik)
-  array_native.pyx/.pyd  # cdef _GBArray mit typed memoryviews (Hot-Path)
+  serialize.py           # Bytecode <-> .gbc (Python schreibt, gbrt liest)
+  array_native.pyx/.pyd  # cdef _GBArray mit typed memoryviews (Hot-Path, Tree-Walker)
   graphics.py            # Pygame-Wrapper, Camera, Z-Layer-System, Asset-Cache, Lazy-Init
   preprocess.py          # IMPORT-Auflösung (Source UND Built-in-Module)
   builtins_registry.py   # @builtin / @graphics_builtin Decorators
   modules/               # Built-in-Module (json, db, tween, imgfx, particles, camera, ecs, ...)
   modules/ecs_native.pyx # cdef _World/_Component mit Bulk-System-Ops (Native-ECS)
-gbrun.py                 # CLI mit Editor, --vm, --bench, --tokens, --ast, --native, --export
+rust/gb_runtime/         # native Runtime `gbrt` (Rust/raylib) -- führt .gbc aus
+gbrun.py                 # CLI mit Editor, --bench, --tokens, --ast, --native, --export
 gamebasic/export.py      # Standalone-.exe bundeln (gbrt + Bytecode + assets/)
-examples/*.gb            # Demos -- 1-76+, inkl. bench_*.gb fuer Performance-Vergleiche
-tests/                   # pytest-Tests (1100+, alle drei Pfade bit-identisch)
+examples/*.gb            # Demos -- 1-99+, inkl. bench_*.gb fuer Performance-Vergleiche
+tests/                   # pytest-Tests (1580+); test_gbrt_parity.py prüft TW == gbrt
 ```
 
 ## Architektur-Pipeline
@@ -37,14 +48,15 @@ Source.gb  →  preprocess.process()  →  Lexer  →  Parser  →  AST
               ┌───────────────────────────────────────────────┤
               ▼                                               ▼
         Interpreter.run(ast)                         Compiler.compile(ast)
-        (Tree-Walking)                                       │
+        (Tree-Walking, Python)                               │
                                                              ▼
                                                    Module mit Bytecode
                                                              │
-                                              ┌──────────────┴──────────────┐
-                                              ▼                             ▼
-                                         vm.VM().run()              vm_native.VM().run()
-                                         (Python)                   (Cython)
+                                                  serialize.py → .gbc
+                                                             │
+                                                             ▼
+                                                   rust/gb_runtime  (gbrt)
+                                                   native Ausführung (raylib)
 ```
 
 `gbrun.py` ist Default-Einstiegspunkt (macht `os.chdir(file.parent)` für relative
@@ -75,8 +87,10 @@ def _g_foo(g, *args):
 
 **Wichtig:** `types` ist nur bei fixer arity erlaubt. Bei variable arity selbst validieren.
 
-`@builtin` füllt das `BUILTINS`-Dict in `builtins_registry`, das von `interpreter.py`,
-`vm.py` und `vm_native.pyx` als Wahrheit konsumiert wird. Niemand muss seine Imports ändern.
+`@builtin` füllt das `BUILTINS`-Dict in `builtins_registry`, das der Tree-Walker
+(`interpreter.py`) und der Compiler (`compiler.py`, entscheidet `CALL_BUILTIN`)
+als Wahrheit konsumieren. Die native Runtime `gbrt` re-implementiert die Built-ins
+in Rust (`rust/gb_runtime/src/builtins.rs` + `vm.rs`). Niemand muss Imports ändern.
 
 ## Built-in-Module schreiben
 
@@ -151,7 +165,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | `tiled` | Tiled-Map-Loader (JSON-Format, kein TMX). `TILED_LOAD`, Layer-/Tile-/Object-Access, Per-Tile/Per-Object-Custom-Properties (`solid`, `damage`, ...). Industriestandard fuer 2D-Level-Design. Plus **Bulk-Ops** fuer Generierung/Editor: `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`). | `TILED_MAP` |
 | `tile_collide` | Box-vs-Tilemap-Kollision. `TILE_SWEEP_X/Y` mit separat-Achsen-Sweep-Pattern. Solid-Detection via `solid`-Property (mit Convention-Fallback). Klassische Platformer-Physik. Sweep nativ via `gb_native.TileCollider` (Solid-Maske einmal gespiegelt+gecacht), sonst Python-`_sweep_axis`. | — |
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. `CHAR_NEW/SET_INPUT/UPDATE`, `CHAR_X/Y/VX/VY`, `CHAR_ON_GROUND/WALL_LEFT/RIGHT`. Konfigurable Move-Speed, Jump-Velocity, Gravity, Coyote/Buffer-Frames, Variable-Jump-Cut. | `CHAR_CONTROLLER` |
-| `g3d` | **3D-Grafik, NUR native Runtime** (`gbrt`/F6 — pygame kann kein 3D, F5 wirft klare Meldung). Immediate-Primitive: `CAMERA3D`, `CUBE`/`CUBE_WIRES`, `SPHERE`/`SPHERE_WIRES`, `CYLINDER` (Kegel via r_oben=0), `PLANE`, `LINE3D`, `POINT3D`, `GRID3D`. **3D-Modelle** (wiederverwendbare MODEL-Handles): `LOADMODEL` (OBJ/GLTF), prozedural `MESH_CUBE/SPHERE/CYLINDER/TORUS/KNOT/PLANE` + `MESH_HEIGHTMAP` (Terrain aus Graustufen-Image), zeichnen via `MODEL`/`MODEL_EX` (Achsen-Rotation)/`MODEL_WIRES`, `MODEL_TEXTURE` (Diffuse-Map aus LOADIMAGE). **Billboards** `BILLBOARD` (Textur zeigt zur Kamera) + **Ray-Kollision/Picking** `RAY_HIT_BOX`/`RAY_HIT_SPHERE` (Distanz oder -1) und `PICK_BOX`/`PICK_SPHERE` (Mausstrahl, Klick-Selektion). **Beleuchtung** (PBR/Cook-Torrance, bis 4 Lichter): `LIGHT_ENABLE`/`LIGHT_AMBIENT`/`LIGHT_DIRECTIONAL`/`LIGHT_POINT`/`LIGHT_SET_POS/COLOR/ENABLED` + `MODEL_LIT(modell)` + `MODEL_PBR(modell, metalness, roughness)` (eingebetteter GGX-Shader) + `LIGHT_FOG(farbe, dichte)` (Tiefen-Fog) + `LIGHT_ENV(himmel, boden, intensitaet)` (analytisches IBL — Metalle spiegeln die Umgebung). **Schatten** `SHADOW_ENABLE([res])`/`SHADOW_AREA(groesse,dist)`/`SHADOW_TARGET(x,y,z)` (Shadow-Mapping via Depth-FBO + PCF; erstes directional Light wirft Schatten, MODEL_LIT-Modelle werfen+empfangen). **Normal-Mapping** `MODEL_TEXTURE_NORMAL(modell,bild)` (TBN-basiert, MODEL_LIT erzeugt Tangenten; useNormalMap-Gate -> lit Modelle ohne Map unveraendert). **Kamera-Modi** `CAMERA3D_UPDATE(mode)` (1=free/2=orbital/3=first_person/4=third_person, raylib UpdateCamera) + Getter `CAMERA3D_X/Y/Z`/`CAMERA3D_TARGET_X/Y/Z`. Render via raylib `begin_mode3D` beim FLIP (3D zuerst, 2D-HUD obenauf). Doku `docs/rust-runtime.md` (Schritt 6), Demos `examples/82_3d_intro.gb`, `88_3d_models.gb`, `90_billboards_picking.gb`, `91_lighting.gb`, `92_fog.gb`, `93_shadows.gb`, `94_normalmap.gb`, `95_pbr.gb`, `96_ibl.gb`. | — |
+| `g3d` | **3D-Grafik, NUR native Runtime** (`gbrt`/F6 — pygame kann kein 3D, F5 wirft klare Meldung). Immediate-Primitive: `CAMERA3D`, `CUBE`/`CUBE_WIRES`, `SPHERE`/`SPHERE_WIRES`, `CYLINDER` (Kegel via r_oben=0), `PLANE`, `LINE3D`, `POINT3D`, `GRID3D`. **3D-Modelle** (wiederverwendbare MODEL-Handles): `LOADMODEL` (OBJ/GLTF), prozedural `MESH_CUBE/SPHERE/CYLINDER/TORUS/KNOT/PLANE` + `MESH_HEIGHTMAP` (Terrain aus Graustufen-Image), zeichnen via `MODEL`/`MODEL_EX` (Achsen-Rotation)/`MODEL_WIRES`, `MODEL_TEXTURE` (Diffuse-Map aus LOADIMAGE). **Billboards** `BILLBOARD` (Textur zeigt zur Kamera) + **Ray-Kollision/Picking** `RAY_HIT_BOX`/`RAY_HIT_SPHERE` (Distanz oder -1) und `PICK_BOX`/`PICK_SPHERE` (Mausstrahl, Klick-Selektion). **Beleuchtung** (PBR/Cook-Torrance, bis 4 Lichter): `LIGHT_ENABLE`/`LIGHT_AMBIENT`/`LIGHT_DIRECTIONAL`/`LIGHT_POINT`/`LIGHT_SET_POS/COLOR/ENABLED` + `MODEL_LIT(modell)` + `MODEL_PBR(modell, metalness, roughness)` (eingebetteter GGX-Shader) + `LIGHT_FOG(farbe, dichte)` (Tiefen-Fog) + `LIGHT_ENV(himmel, boden, intensitaet)` (analytisches IBL — Metalle spiegeln die Umgebung) + `LIGHT_ENV_HDR(pfad$ [, intensitaet])` (**echtes HDR-Cubemap-IBL**: laedt ein equirect-.hdr, berechnet Irradiance/Prefilter/BRDF-LUT-Maps, `useIBLMaps`-Gate; analytischer `LIGHT_ENV`-Pfad bleibt Fallback). **Schatten** `SHADOW_ENABLE([res])`/`SHADOW_AREA(groesse,dist)`/`SHADOW_TARGET(x,y,z)` (Shadow-Mapping via Depth-FBO + PCF; erstes directional Light wirft Schatten, MODEL_LIT-Modelle werfen+empfangen). **Normal-Mapping** `MODEL_TEXTURE_NORMAL(modell,bild)` (TBN-basiert, MODEL_LIT erzeugt Tangenten; useNormalMap-Gate -> lit Modelle ohne Map unveraendert). **Kamera-Modi** `CAMERA3D_UPDATE(mode)` (1=free/2=orbital/3=first_person/4=third_person, raylib UpdateCamera) + Getter `CAMERA3D_X/Y/Z`/`CAMERA3D_TARGET_X/Y/Z`. Render via raylib `begin_mode3D` beim FLIP (3D zuerst, 2D-HUD obenauf). Doku `docs/rust-runtime.md` (Schritt 6), Demos `examples/82_3d_intro.gb`, `88_3d_models.gb`, `90_billboards_picking.gb`, `91_lighting.gb`, `92_fog.gb`, `93_shadows.gb`, `94_normalmap.gb`, `95_pbr.gb`, `96_ibl.gb`, `99_ibl_hdr.gb`. | — |
 
 **Zusätzlich als Core-Graphics-Built-ins** (kein IMPORT noetig, registriert in
 `interpreter.py` als `@graphics_builtin`):
@@ -164,6 +178,11 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | Bulk-Plot | `PLOTS(xs, ys, color)` — viele Pixel in EINEM Aufruf (vektorisiert via `pygame.surfarray`/numpy), `color` = INT (alle gleich) oder ARRAY OF INT (pro Pixel). Groessenordnungen schneller als `PLOT` in einer Schleife (Starfields, Punktwolken). | — |
 | Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; pygame-Draw bleibt pro Shape). `color` = INT oder ARRAY. | — |
 | Bulk-Tilemap | `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`) — siehe `tiled`-Modul. `DRAWTILEMAP` rendert intern via `blits()`-Batch (1 Call statt rows×cols). | — |
+| 2D-Extras | **Dual-Path:** `LINEW(x1,y1,x2,y2,breite[,c])` (dicke Linie), `BOXROUND`/`RECTROUND(x1,y1,x2,y2,radius[,c])` (runde Rechtecke gefuellt/Umriss), `GRADIENTV`/`GRADIENTH(x1,y1,x2,y2,c1,c2)` (Farbverlauf-Blocks), `SPLINE(xs,ys[,c[,breite]])` (Catmull-Rom durch Punkte). Demo `examples/100_2d_extras.gb`. | — |
+| Blend-Modes | `BLEND_MODE(modus$)` — `"alpha"`/`"add"`/`"mult"`/`"subtract"` fuer folgende Draws (Glow via additiv). **Nur native** (raylib `BeginBlendMode`); pygame-Pfad No-Op (Programm laeuft ohne Effekt). | — |
+| Prozedurale Texturen | **Nur native** (raylib `GenImage*`): `GENTEX_PERLIN(w,h,skala)`, `GENTEX_GRADIENT(w,h,c1,c2,vertikal)`, `GENTEX_CHECKED(w,h,fx,fy,c1,c2)`, `GENTEX_COLOR(w,h,c)` -> IMAGE-Handle (mit `DRAWIMAGE` nutzbar). pygame wirft „nur native". Demo `examples/101_blend_gentex.gb`. | — |
+| Clipboard / Drag&Drop | **Nur native** (graceful im pygame-Pfad): `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame) + `FILE_DROPPED(i)->STRING` (Pfad). pygame: ""/0. | — |
+| Render-Targets | **Dual-Path:** `RENDERTARGET_NEW(w,h)->INTEGER` (Off-Screen-Render-Ziel), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). gbrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); pygame: Off-Screen-Surface (Immediate). Demo `examples/102_render_target.gb`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op; pro Frame transparent gecleart (keine Trails). | — |
 | Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. Beide Pfade (pygame + native raylib). | — |
 | Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Im pygame-Pfad No-Op (Szene ohne Effekt). Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.gb`. | — |
 
@@ -198,14 +217,22 @@ core-Grafik-Built-ins (`PLOT`, `LINE`, `BOX`, `RECT`, `CIRCLE`, `TEXT`,
 
 ## Build und Test
 
-**Cython-Native-VM bauen:**
+**Native Runtime `gbrt` bauen** (der Produktions-/Schnellpfad, raylib):
+```
+.venv\Scripts\python.exe rust\build_runtime.py
+```
+Baut `rust/gb_runtime/` → `gbrt`. Nötig für `gbrun.py --native` / Editor-F6 /
+Standalone-Export / den `test_gbrt_parity.py`-Sweep. Details: docs/rust-runtime.md.
+
+**Cython-Beschleuniger bauen** (optional, beschleunigen den Tree-Walker):
 ```
 .venv\Scripts\python.exe setup.py build_ext --inplace
 ```
-Notwendig nach Änderungen an `vm_native.pyx`. Wenn weggelassen, fällt `gbrun.py --vm`
-auf die Python-VM zurück.
+Baut `array_native` (`_GBArray`) + `ecs_native` (Native-ECS). Beide haben
+Pure-Python-Fallbacks — fehlt die `.pyd`, läuft der Tree-Walker trotzdem (langsamer).
+(Die frühere Cython-VM `vm_native.pyx` wurde entfernt; gbrt hat sie abgelöst.)
 
-**Native Rust-Module bauen** (PyO3, separate Toolchain — `cargo` nötig):
+**Native Rust-Module bauen** (PyO3-Helfer `gb_native`, separate Toolchain — `cargo` nötig):
 ```
 .venv\Scripts\python.exe rust\build.py
 ```
@@ -230,12 +257,15 @@ Daten (A*-Walls, Tilemap-Solid-Maske) werden einmal nach Rust gespiegelt und gec
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-**Bench-Vergleich (TW vs Python-VM vs Native-VM):**
+**Bench-Vergleich (Tree-Walker vs native `gbrt`):**
 ```
 .venv\Scripts\python.exe gbrun.py --bench examples/<file>.gb
 ```
-"Output: ALLE IDENTISCH" ist die Erwartung für deterministische Programme.
-Programme mit `MILLIS()`, `TIME$()`, `RND()` ohne Seed sind erwartet UNTERSCHIEDLICH.
+"Output: IDENTISCH (Tree-Walker == gbrt)" ist die Erwartung für deterministische
+Programme. Programme mit `MILLIS()`, `TIME$()`, `RND()` ohne Seed sind erwartet
+UNTERSCHIEDLICH (gbrt nutzt einen anderen PRNG/Clock als Python). Die Output-
+Parität deckt der Test `tests/test_gbrt_parity.py` ab (Snippets + Beispiele,
+skippt wenn `gbrt` nicht gebaut ist).
 
 ## Häufige Fallstricke
 
@@ -246,16 +276,16 @@ Programme mit `MILLIS()`, `TIME$()`, `RND()` ohne Seed sind erwartet UNTERSCHIED
   (`i`, `iter`, `tick` statt `step`).
 - **`_check_int` (strikt INTEGER) vs `_check_intish`** (akzeptiert num, konvertiert
   zu int — entspricht der `"intish"`-type-Spec für Grafik-Koordinaten).
-- **Cython-VM muss nach `_coerce`/`_exec_Dim`-Änderungen neu kompiliert werden** —
-  sonst sieht sie weder neue Type-Spec-Erweiterungen noch externe Typen aus Modulen.
 - **Variable Arity ohne types** — Decorator entpackt args zu `*args`, Funktion muss
   selbst prüfen.
-- **Drei-Pfade-Äquivalenz testen:** Die `run_all`-Fixture (`tests/conftest.py`) führt
-  einen Quelltext durch Tree-Walker, Python-VM UND Native-VM und prüft bit-identische
-  Ausgabe. Für neue Sprach-/Operator-Features einen `run_all`-Test in
-  `tests/test_three_paths.py` ergänzen — sonst bleibt die Native-VM (Produktions-Default)
-  ungetestet. Single-Source-Helfer (`_container_kind`, `infer_type`) vermeiden Drift;
-  neue solche Logik ebenfalls einmalig in interpreter.py halten und importieren.
+- **Neue Sprach-/Operator-Features: in BEIDEN Pfaden umsetzen + TW↔gbrt-Parität testen.**
+  Tree-Walker (`interpreter.py`) **und** Compiler+Rust-VM (`compiler.py` →
+  `rust/gb_runtime/src/vm.rs`). Ein Snippet in `tests/test_gbrt_parity.py` ergänzen
+  prüft, dass Tree-Walker == `gbrt` (sonst bleibt die native Runtime ungetestet).
+  Die `run_all`/`run_vm`/`run_native`-Fixtures sind seit dem Entfernen der
+  Bytecode-VMs **Aliase auf den Tree-Walker** (bestehende Tests laufen weiter).
+  Single-Source-Helfer (`_container_kind`, `infer_type`) vermeiden Drift; neue
+  solche Logik einmalig in interpreter.py halten und importieren.
 
 ## Coroutines / YIELD
 
@@ -319,8 +349,8 @@ bei YIELD wird der Frame (ip/locals/stack/try_handlers) in einem
 ist das, weil **kein Cross-Frame-YIELD** existiert -- nur der oberste
 Coroutine-Frame muss fortsetzbar sein (verschachtelte Calls laufen normal
 rekursiv). Kein OS-Thread -> raylib-Main-Thread bleibt sicher, deterministisch
-per Konstruktion. `vm_native`-VM (Cython) bleibt thread-basiert wie die
-Python-VM. Alle VIER Pfade liefern bit-identisch.
+per Konstruktion. Tree-Walker (thread-basiert) und gbrt (Frame-Snapshot) liefern
+bit-identisch.
 
 Use-Cases: Cutscene-DSL, prozedurale Generation, Boss-Patterns, NPC-Dialoge.
 Doku-Demo [examples/98_coroutines.gb](examples/98_coroutines.gb), Tests
@@ -1375,26 +1405,24 @@ cpdef-Method auf `_World` in `ecs_native.pyx` + Python-Fallback in
 
 ## Native cdef-Klassen (Performance-Layer)
 
-Drei Cython-Module mit cdef-Klassen, die Hot-Path-Code aus Python in
-C verschieben:
+Zwei Cython-Module mit cdef-Klassen, die Hot-Path-Code im **Tree-Walker** aus
+Python in C verschieben (gbrt hat seine eigenen Rust-Implementierungen):
 
 | Datei | cdef-Class | Wirkung |
 |---|---|---|
-| `gamebasic/vm_native.pyx` | `VM` | Die Native-VM. `_exec`-Loop mit C-Slots fuer Stack/Constants/Locals. |
-| `gamebasic/array_native.pyx` | `_GBArray` | Typed-Memoryview (`long long[::1]` fuer INT, `double[::1]` fuer FLOAT) ueber `array.array`-Backing. `cdef inline _flat_c` fuer Bounds-Check + Stride-Arithmetik. `get_at`/`set_at` als VM-Fast-Path. |
+| `gamebasic/array_native.pyx` | `_GBArray` | Typed-Memoryview (`long long[::1]` fuer INT, `double[::1]` fuer FLOAT) ueber `array.array`-Backing. `cdef inline _flat_c` fuer Bounds-Check + Stride-Arithmetik. `get_at`/`set_at` als Fast-Path. |
 | `gamebasic/modules/ecs_native.pyx` | `_World`, `_Component` | Sparse-Set in cdef. Fast-Path-Methoden auf `_World` (siehe ECS-Bulk-Ops). |
 
 **Pure-Python-Fallbacks:** Wenn ein `.pyd` fehlt (z.B. nach `git clone`
 vor `setup.py build_ext`), greift in `interpreter.py` und `modules/ecs.py`
-ein Pure-Python-Fallback. Tree-Walker und Python-VM bleiben benutzbar,
-nur ohne den Speed-Bonus.
+ein Pure-Python-Fallback. Der Tree-Walker bleibt benutzbar, nur ohne Speed-Bonus.
 
 **Build:**
 ```
 .venv\Scripts\python.exe setup.py build_ext --inplace
 ```
-Setup.py kompiliert alle drei `.pyx`-Files. Nach Aenderungen an
-`vm_native.pyx`, `array_native.pyx`, oder `ecs_native.pyx` neu bauen.
+Setup.py kompiliert beide `.pyx`-Files. Nach Aenderungen an `array_native.pyx`
+oder `ecs_native.pyx` neu bauen. (Die frühere `vm_native.pyx`-VM wurde entfernt.)
 
 ## Performance-Optimierungen im Compiler/VM
 

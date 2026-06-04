@@ -2224,6 +2224,81 @@ impl<'p> Vm<'p> {
                 let c = if a.len() == 4 { gi(a, 3, "CIRCLE")? } else { 0xFFFFFF };
                 g!().circle(gi(a,0,"CIRCLE")? as i32, gi(a,1,"CIRCLE")? as i32, gi(a,2,"CIRCLE")? as i32, c); Value::Nil
             }
+            "linew" => {
+                let c = if a.len() == 6 { gi(a, 5, "LINEW")? } else { 0xFFFFFF };
+                g!().line_thick(gi(a,0,"LINEW")? as i32, gi(a,1,"LINEW")? as i32, gi(a,2,"LINEW")? as i32,
+                    gi(a,3,"LINEW")? as i32, need_f(a,4,"LINEW")?, c); Value::Nil
+            }
+            "boxround" => {
+                let c = if a.len() == 6 { gi(a, 5, "BOXROUND")? } else { 0xFFFFFF };
+                g!().round_rect(gi(a,0,"BOXROUND")? as i32, gi(a,1,"BOXROUND")? as i32, gi(a,2,"BOXROUND")? as i32,
+                    gi(a,3,"BOXROUND")? as i32, gi(a,4,"BOXROUND")? as i32, c, true); Value::Nil
+            }
+            "rectround" => {
+                let c = if a.len() == 6 { gi(a, 5, "RECTROUND")? } else { 0xFFFFFF };
+                g!().round_rect(gi(a,0,"RECTROUND")? as i32, gi(a,1,"RECTROUND")? as i32, gi(a,2,"RECTROUND")? as i32,
+                    gi(a,3,"RECTROUND")? as i32, gi(a,4,"RECTROUND")? as i32, c, false); Value::Nil
+            }
+            "gradientv" => {
+                g!().gradient_rect(gi(a,0,"GRADIENTV")? as i32, gi(a,1,"GRADIENTV")? as i32, gi(a,2,"GRADIENTV")? as i32,
+                    gi(a,3,"GRADIENTV")? as i32, gi(a,4,"GRADIENTV")?, gi(a,5,"GRADIENTV")?, true); Value::Nil
+            }
+            "gradienth" => {
+                g!().gradient_rect(gi(a,0,"GRADIENTH")? as i32, gi(a,1,"GRADIENTH")? as i32, gi(a,2,"GRADIENTH")? as i32,
+                    gi(a,3,"GRADIENTH")? as i32, gi(a,4,"GRADIENTH")?, gi(a,5,"GRADIENTH")?, false); Value::Nil
+            }
+            "spline" => {
+                let xs = arr_i32(&a[0], "SPLINE")?;
+                let ys = arr_i32(&a[1], "SPLINE")?;
+                if xs.len() != ys.len() { return Err("SPLINE: xs und ys muessen gleich lang sein".into()); }
+                let w = if a.len() >= 4 { need_f(a, 3, "SPLINE")? } else { 1.0 };
+                let c = if a.len() >= 3 { gi(a, 2, "SPLINE")? } else { 0xFFFFFF };
+                g!().spline(&xs, &ys, w, c); Value::Nil
+            }
+            // --- Blend-Modes (Batch 2) ---
+            "blend_mode" => {
+                let s = gs(a, 0, "BLEND_MODE")?.to_lowercase();
+                let m = match s.as_str() {
+                    "alpha" | "none" | "normal" => 0,
+                    "add" | "additive" => 1,
+                    "mult" | "multiply" | "multiplied" => 2,
+                    "subtract" | "sub" => 4,
+                    _ => return Err(format!("BLEND_MODE: unbekannter Modus '{}' (alpha/add/mult/subtract)", s)),
+                };
+                g!().blend_mode(m); Value::Nil
+            }
+            // --- Prozedurale Texturen (Batch 3) -> IMAGE-Handle ---
+            "gentex_perlin" => Value::Int(g!().gen_tex_perlin(
+                gi(a,0,"GENTEX_PERLIN")? as i32, gi(a,1,"GENTEX_PERLIN")? as i32, need_f(a,2,"GENTEX_PERLIN")?)?),
+            "gentex_gradient" => Value::Int(g!().gen_tex_gradient(
+                gi(a,0,"GENTEX_GRADIENT")? as i32, gi(a,1,"GENTEX_GRADIENT")? as i32,
+                gi(a,2,"GENTEX_GRADIENT")?, gi(a,3,"GENTEX_GRADIENT")?, gb(a,4))?),
+            "gentex_checked" => Value::Int(g!().gen_tex_checked(
+                gi(a,0,"GENTEX_CHECKED")? as i32, gi(a,1,"GENTEX_CHECKED")? as i32,
+                gi(a,2,"GENTEX_CHECKED")? as i32, gi(a,3,"GENTEX_CHECKED")? as i32,
+                gi(a,4,"GENTEX_CHECKED")?, gi(a,5,"GENTEX_CHECKED")?)?),
+            "gentex_color" => Value::Int(g!().gen_tex_color(
+                gi(a,0,"GENTEX_COLOR")? as i32, gi(a,1,"GENTEX_COLOR")? as i32, gi(a,2,"GENTEX_COLOR")?)?),
+            // --- Clipboard + Drag&Drop (Batch 5) ---
+            "clipboard_get" => Value::Str(g!().clipboard_get().into()),
+            "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }
+            "files_dropped" => Value::Int(g!().dropped_files().len() as i64),
+            "file_dropped" => {
+                let i = gi(a, 0, "FILE_DROPPED")? as usize;
+                Value::Str(g!().dropped_files().get(i).cloned().unwrap_or_default().into())
+            }
+            // --- Render-Targets (Batch 4) ---
+            "rendertarget_new" => Value::Int(g!().rendertarget_new(
+                gi(a,0,"RENDERTARGET_NEW")? as i32, gi(a,1,"RENDERTARGET_NEW")? as i32)?),
+            "rendertarget_begin" => { g!().rendertarget_begin(gi(a,0,"RENDERTARGET_BEGIN")?)?; Value::Nil }
+            "rendertarget_end" => { g!().rendertarget_end(); Value::Nil }
+            "rendertarget_draw" => {
+                let scale = if a.len() >= 4 { need_f(a,3,"RENDERTARGET_DRAW")? } else { 1.0 };
+                let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };
+                g!().rendertarget_draw(gi(a,0,"RENDERTARGET_DRAW")?,
+                    gi(a,1,"RENDERTARGET_DRAW")? as i32, gi(a,2,"RENDERTARGET_DRAW")? as i32,
+                    scale, tint)?; Value::Nil
+            }
             "triangle" => {
                 let c = if a.len() == 7 { gi(a, 6, "TRIANGLE")? } else { 0xFFFFFF };
                 g!().triangle(gi(a,0,"TRIANGLE")? as i32, gi(a,1,"TRIANGLE")? as i32, gi(a,2,"TRIANGLE")? as i32,
@@ -2461,6 +2536,12 @@ impl<'p> Vm<'p> {
             "light_ambient" => { g!().light_ambient(gi(a,0,"LIGHT_AMBIENT")?, need_f(a,1,"LIGHT_AMBIENT")?); Value::Nil }
             "light_fog" => { g!().light_fog(gi(a,0,"LIGHT_FOG")?, need_f(a,1,"LIGHT_FOG")?); Value::Nil }
             "light_env" => { g!().light_env(gi(a,0,"LIGHT_ENV")?, gi(a,1,"LIGHT_ENV")?, need_f(a,2,"LIGHT_ENV")?); Value::Nil }
+            "light_env_hdr" => {
+                // LIGHT_ENV_HDR(pfad$[, intensitaet]) -- echtes HDR-Cubemap-IBL.
+                let path = gs(a, 0, "LIGHT_ENV_HDR")?.to_string();
+                let intensity = if a.len() >= 2 { need_f(a, 1, "LIGHT_ENV_HDR")? } else { 1.0 };
+                g!().light_env_hdr(&path, intensity)?; Value::Nil
+            }
             "light_directional" => Value::Int(g!().light_add(
                 0, need_f(a,0,"LIGHT_DIRECTIONAL")? as f32, need_f(a,1,"LIGHT_DIRECTIONAL")? as f32,
                 need_f(a,2,"LIGHT_DIRECTIONAL")? as f32, gi(a,3,"LIGHT_DIRECTIONAL")?)),
@@ -3158,6 +3239,7 @@ fn container_kind(v: &Value) -> Option<&'static str> {
         Value::Str(_) => Some("string"),
         Value::Array(_) => Some("array"),
         Value::Map(_) => Some("map"),
+        Value::Tuple(_) => Some("tuple"),
         _ => None,
     }
 }
@@ -3180,6 +3262,7 @@ fn container_method(kind: &str, method: &str) -> Option<&'static str> {
         ("map", "size") | ("map", "length") | ("map", "len") => "mapsize",
         ("map", "remove") => "mapremove", ("map", "clear") => "mapclear",
         ("map", "values") => "mapvalues", ("map", "items") => "mapitems",
+        ("tuple", "length") | ("tuple", "len") => "len",
         _ => return None,
     })
 }

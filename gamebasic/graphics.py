@@ -110,6 +110,11 @@ class Graphics:
         self._main_buffer = None # Original-Buffer (Compose-Ziel beim FLIP)
         self._scale = 1          # Faktor: Display = Buffer * scale
         self._buf_size = (0, 0)
+        # Render-Targets (RENDERTARGET_*): Off-Screen-Surfaces. BEGIN lenkt
+        # _buffer auf das Target um (Stack fuer Verschachtelung), END stellt
+        # den vorigen Draw-Target wieder her.
+        self._render_targets = []
+        self._rt_stack = []
         # Z-Layer-State. Wenn der User LAYER("name") aufruft, wird
         # _buffer auf die Layer-Surface umgeleitet. FLIP composited
         # alle Layer in z-Order auf _main_buffer und cleart sie.
@@ -671,6 +676,136 @@ class Graphics:
             self._buffer, _rgb_tuple(color),
             (sx, sy), self._scale_size(r),
         )
+
+    # --- 2D-Extras (Batch 1) ------------------------------------------
+    def line_thick(self, x1, y1, x2, y2, w, color: int = 0xFFFFFF):
+        self._require_screen()
+        sx1, sy1 = self._w2s(x1, y1)
+        sx2, sy2 = self._w2s(x2, y2)
+        width = max(1, int(w * self._cam_zoom))
+        self._pygame.draw.line(self._buffer, _rgb_tuple(color), (sx1, sy1), (sx2, sy2), width)
+
+    def round_rect(self, x1, y1, x2, y2, radius, color: int = 0xFFFFFF, filled: bool = True):
+        self._require_screen()
+        sx1, sy1 = self._w2s(x1, y1)
+        sx2, sy2 = self._w2s(x2, y2)
+        x = min(sx1, sx2); y = min(sy1, sy2)
+        w = abs(sx2 - sx1) + 1; h = abs(sy2 - sy1) + 1
+        rad = max(0, min(self._scale_size(radius), min(w, h) // 2))
+        self._pygame.draw.rect(self._buffer, _rgb_tuple(color), (x, y, w, h),
+                               0 if filled else 1, border_radius=rad)
+
+    def gradient_rect(self, x1, y1, x2, y2, c1: int, c2: int, vertical: bool = True):
+        self._require_screen()
+        sx1, sy1 = self._w2s(x1, y1)
+        sx2, sy2 = self._w2s(x2, y2)
+        x = min(sx1, sx2); y = min(sy1, sy2)
+        w = abs(sx2 - sx1) + 1; h = abs(sy2 - sy1) + 1
+        r1, g1, b1 = _rgb_tuple(c1); r2, g2, b2 = _rgb_tuple(c2)
+        n = h if vertical else w
+        if n <= 1:
+            self._pygame.draw.rect(self._buffer, _rgb_tuple(c1), (x, y, w, h)); return
+        line = self._pygame.draw.line
+        buf = self._buffer
+        for i in range(n):
+            t = i / (n - 1)
+            col = (int(r1 + (r2 - r1) * t), int(g1 + (g2 - g1) * t), int(b1 + (b2 - b1) * t))
+            if vertical:
+                line(buf, col, (x, y + i), (x + w - 1, y + i))
+            else:
+                line(buf, col, (x + i, y), (x + i, y + h - 1))
+
+    def spline(self, xs, ys, w, color: int = 0xFFFFFF):
+        """Catmull-Rom-Spline durch die Punkte (Endpunkte verdoppelt)."""
+        self._require_screen()
+        pts = [self._w2s(x, y) for x, y in zip(xs, ys)]
+        width = max(1, int(w * self._cam_zoom))
+        if len(pts) < 2:
+            return
+        if len(pts) < 4:
+            self._pygame.draw.lines(self._buffer, _rgb_tuple(color), False, pts, width)
+            return
+        ext = [pts[0]] + pts + [pts[-1]]
+        curve = []
+        steps = 16
+        for i in range(1, len(ext) - 2):
+            p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
+            for s in range(steps + 1):
+                t = s / steps; t2 = t * t; t3 = t2 * t
+                cx = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+                            + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                            + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
+                cy = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+                            + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                            + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+                curve.append((cx, cy))
+        self._pygame.draw.lines(self._buffer, _rgb_tuple(color), False, curve, width)
+
+    # --- Blend-Modes (Batch 2): nativ; pygame-Primitive kennen kein Blend-Flag
+    #     -> graceful No-Op (Programm laeuft, nur ohne additiven/Multiply-Effekt).
+    def blend_mode(self, mode):
+        return None
+
+    # --- Prozedurale Texturen (Batch 3): native-only (liefern ein IMAGE-Handle,
+    #     das pygame ohne echte Implementierung nicht erzeugen kann).
+    def _native_gfx_only(self, name):
+        raise GBRuntimeError(
+            f"{name}: nur in der nativen Runtime (gbrt) -- mit F6 bzw. "
+            f"'gbrun.py --native' ausfuehren (nicht F5/Tree-Walker)")
+
+    def gen_tex_perlin(self, *a):   self._native_gfx_only("GENTEX_PERLIN")
+    def gen_tex_gradient(self, *a): self._native_gfx_only("GENTEX_GRADIENT")
+    def gen_tex_checked(self, *a):  self._native_gfx_only("GENTEX_CHECKED")
+    def gen_tex_color(self, *a):    self._native_gfx_only("GENTEX_COLOR")
+
+    # --- Clipboard + Drag&Drop (Batch 5): nativ; pygame graceful (leer / keine
+    #     Drops), damit F5-Programme nicht crashen.
+    def clipboard_get(self):    return ""
+    def clipboard_set(self, s): return None
+    def files_dropped(self):    return 0
+    def file_dropped(self, i):  return ""
+
+    # --- Render-Targets (Batch 4): Off-Screen-Surfaces (Immediate-Mode) ---
+    def rendertarget_new(self, w, h):
+        self._require_screen()
+        surf = self._pygame.Surface((max(1, int(w)), max(1, int(h))),
+                                    self._pygame.SRCALPHA)
+        self._render_targets.append(surf)
+        return len(self._render_targets) - 1
+
+    def _check_rt(self, idx, name):
+        if (isinstance(idx, bool) or not isinstance(idx, int)
+                or idx < 0 or idx >= len(self._render_targets)):
+            raise GBRuntimeError(f"{name}: ungueltiges RENDERTARGET-Handle {idx}")
+        return idx
+
+    def rendertarget_begin(self, idx):
+        self._require_screen()
+        i = self._check_rt(idx, "RENDERTARGET_BEGIN")
+        self._rt_stack.append(self._buffer)
+        self._buffer = self._render_targets[i]
+        # Pro Frame transparent clearen (wie die native Runtime).
+        self._buffer.fill((0, 0, 0, 0))
+
+    def rendertarget_end(self):
+        if self._rt_stack:
+            self._buffer = self._rt_stack.pop()
+
+    def rendertarget_draw(self, idx, x, y, scale=1.0, tint=None):
+        self._require_screen()
+        i = self._check_rt(idx, "RENDERTARGET_DRAW")
+        surf = self._render_targets[i]
+        sx, sy = self._w2s(x, y)
+        factor = scale * self._cam_zoom
+        if factor != 1.0:
+            nw = max(1, int(surf.get_width() * factor))
+            nh = max(1, int(surf.get_height() * factor))
+            surf = self._pygame.transform.scale(surf, (nw, nh))
+        if tint is not None and tint != 0xFFFFFF:
+            surf = surf.copy()
+            surf.fill((*_rgb_tuple(tint), 255),
+                      special_flags=self._pygame.BLEND_RGBA_MULT)
+        self._buffer.blit(surf, (sx, sy))
 
     # --- Bulk-Primitive: viele Shapes in EINEM Aufruf -------------------
     # Spart den Builtin-Dispatch pro Shape (1 Call statt N). Die pygame-

@@ -3805,6 +3805,194 @@ def _g_polygon_outline(g, *args):
     return None
 
 
+# --- 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines ---
+
+@graphics_builtin("LINEW", arity=(5, 6))
+def _g_linew(g, *args):
+    """LINEW(x1, y1, x2, y2, breite [, farbe]) -- Linie mit Strichbreite."""
+    coords = [_check_int(args[i], "LINEW") for i in range(4)]
+    width = _check_num(args[4], "LINEW")
+    color = _check_int(args[5], "LINEW") if len(args) == 6 else 0xFFFFFF
+    g.line_thick(*coords, width, color)
+    return None
+
+
+@graphics_builtin("BOXROUND", arity=(5, 6))
+def _g_boxround(g, *args):
+    """BOXROUND(x1, y1, x2, y2, radius [, farbe]) -- gefuelltes Rechteck mit
+    abgerundeten Ecken (radius in Pixeln)."""
+    coords = [_check_int(args[i], "BOXROUND") for i in range(5)]
+    color = _check_int(args[5], "BOXROUND") if len(args) == 6 else 0xFFFFFF
+    g.round_rect(*coords, color, True)
+    return None
+
+
+@graphics_builtin("RECTROUND", arity=(5, 6))
+def _g_rectround(g, *args):
+    """RECTROUND(x1, y1, x2, y2, radius [, farbe]) -- Umriss-Rechteck mit
+    abgerundeten Ecken."""
+    coords = [_check_int(args[i], "RECTROUND") for i in range(5)]
+    color = _check_int(args[5], "RECTROUND") if len(args) == 6 else 0xFFFFFF
+    g.round_rect(*coords, color, False)
+    return None
+
+
+@graphics_builtin("GRADIENTV", arity=6)
+def _g_gradientv(g, *args):
+    """GRADIENTV(x1, y1, x2, y2, farbe_oben, farbe_unten) -- vertikaler
+    Farbverlauf-Block (oben -> unten)."""
+    coords = [_check_int(args[i], "GRADIENTV") for i in range(4)]
+    c1 = _check_int(args[4], "GRADIENTV"); c2 = _check_int(args[5], "GRADIENTV")
+    g.gradient_rect(*coords, c1, c2, True)
+    return None
+
+
+@graphics_builtin("GRADIENTH", arity=6)
+def _g_gradienth(g, *args):
+    """GRADIENTH(x1, y1, x2, y2, farbe_links, farbe_rechts) -- horizontaler
+    Farbverlauf-Block (links -> rechts)."""
+    coords = [_check_int(args[i], "GRADIENTH") for i in range(4)]
+    c1 = _check_int(args[4], "GRADIENTH"); c2 = _check_int(args[5], "GRADIENTH")
+    g.gradient_rect(*coords, c1, c2, False)
+    return None
+
+
+@graphics_builtin("SPLINE", arity=(2, 4))
+def _g_spline(g, *args):
+    """SPLINE(xs, ys [, farbe [, breite]]) -- glatte Catmull-Rom-Kurve durch die
+    Punkte (xs/ys = ARRAY OF INTEGER, gleich lang)."""
+    xs = _plots_seq(args[0], "SPLINE xs")
+    ys = _plots_seq(args[1], "SPLINE ys")
+    color = _check_int(args[2], "SPLINE") if len(args) >= 3 else 0xFFFFFF
+    width = _check_num(args[3], "SPLINE") if len(args) >= 4 else 1
+    g.spline(xs, ys, width, color)
+    return None
+
+
+# --- Blend-Modes (Batch 2) -- nativ; pygame No-Op ---
+
+@graphics_builtin("BLEND_MODE", arity=1, types=("str",))
+def _g_blend_mode(g, name):
+    """BLEND_MODE(modus$) -- Blend-Modus fuer folgende Draws: "alpha" (Default),
+    "add"/"additive" (Glow), "mult"/"multiply", "subtract". NUR native (gbrt);
+    im pygame-Pfad wirkungslos (Programm laeuft ohne Effekt)."""
+    g.blend_mode(name)
+    return None
+
+
+# --- Prozedurale Texturen (Batch 3) -- native-only, liefern ein IMAGE ---
+
+@graphics_builtin("GENTEX_PERLIN", arity=3)
+def _g_gentex_perlin(g, *args):
+    """GENTEX_PERLIN(breite, hoehe, skala) -> IMAGE -- prozedurale Perlin-Noise-
+    Textur. NUR native Runtime (gbrt/F6)."""
+    return g.gen_tex_perlin(_check_int(args[0], "GENTEX_PERLIN"),
+                            _check_int(args[1], "GENTEX_PERLIN"),
+                            _check_num(args[2], "GENTEX_PERLIN"))
+
+
+@graphics_builtin("GENTEX_GRADIENT", arity=5)
+def _g_gentex_gradient(g, *args):
+    """GENTEX_GRADIENT(breite, hoehe, farbe1, farbe2, vertikal) -> IMAGE --
+    linearer Farbverlauf als Textur. NUR native Runtime (gbrt/F6)."""
+    return g.gen_tex_gradient(_check_int(args[0], "GENTEX_GRADIENT"),
+                              _check_int(args[1], "GENTEX_GRADIENT"),
+                              _check_int(args[2], "GENTEX_GRADIENT"),
+                              _check_int(args[3], "GENTEX_GRADIENT"),
+                              bool(args[4]))
+
+
+@graphics_builtin("GENTEX_CHECKED", arity=6)
+def _g_gentex_checked(g, *args):
+    """GENTEX_CHECKED(breite, hoehe, felder_x, felder_y, farbe1, farbe2) -> IMAGE
+    -- Schachbrett-Textur. NUR native Runtime (gbrt/F6)."""
+    return g.gen_tex_checked(_check_int(args[0], "GENTEX_CHECKED"),
+                             _check_int(args[1], "GENTEX_CHECKED"),
+                             _check_int(args[2], "GENTEX_CHECKED"),
+                             _check_int(args[3], "GENTEX_CHECKED"),
+                             _check_int(args[4], "GENTEX_CHECKED"),
+                             _check_int(args[5], "GENTEX_CHECKED"))
+
+
+@graphics_builtin("GENTEX_COLOR", arity=3)
+def _g_gentex_color(g, *args):
+    """GENTEX_COLOR(breite, hoehe, farbe) -> IMAGE -- einfarbige Textur.
+    NUR native Runtime (gbrt/F6)."""
+    return g.gen_tex_color(_check_int(args[0], "GENTEX_COLOR"),
+                           _check_int(args[1], "GENTEX_COLOR"),
+                           _check_int(args[2], "GENTEX_COLOR"))
+
+
+# --- Clipboard + Drag&Drop (Batch 5) -- nativ; pygame graceful ---
+
+@graphics_builtin("CLIPBOARD_GET", arity=0)
+def _g_clipboard_get(g, *args):
+    """CLIPBOARD_GET() -> STRING -- Text aus der System-Zwischenablage (nativ;
+    pygame liefert "")."""
+    return g.clipboard_get()
+
+
+@graphics_builtin("CLIPBOARD_SET", arity=1, types=("str",))
+def _g_clipboard_set(g, s):
+    """CLIPBOARD_SET(text$) -- Text in die System-Zwischenablage legen (nativ;
+    pygame No-Op)."""
+    g.clipboard_set(s)
+    return None
+
+
+@graphics_builtin("FILES_DROPPED", arity=0)
+def _g_files_dropped(g, *args):
+    """FILES_DROPPED() -> INTEGER -- Anzahl in diesem Frame per Drag&Drop
+    fallengelassener Dateien (nativ; pygame 0)."""
+    return g.files_dropped()
+
+
+@graphics_builtin("FILE_DROPPED", arity=1)
+def _g_file_dropped(g, *args):
+    """FILE_DROPPED(index) -> STRING -- Pfad der i-ten fallengelassenen Datei
+    (nativ; pygame "")."""
+    return g.file_dropped(_check_int(args[0], "FILE_DROPPED"))
+
+
+# --- Render-Targets (Batch 4) -- dual-path (Off-Screen-Render-Ziel) ---
+
+@graphics_builtin("RENDERTARGET_NEW", arity=2)
+def _g_rt_new(g, *args):
+    """RENDERTARGET_NEW(breite, hoehe) -> INTEGER -- legt ein Off-Screen-Render-
+    Ziel an (RenderTexture). Mit RENDERTARGET_BEGIN/END bezeichnen, mit
+    RENDERTARGET_DRAW wie ein Bild zeichnen."""
+    return g.rendertarget_new(_check_int(args[0], "RENDERTARGET_NEW"),
+                              _check_int(args[1], "RENDERTARGET_NEW"))
+
+
+@graphics_builtin("RENDERTARGET_BEGIN", arity=1)
+def _g_rt_begin(g, *args):
+    """RENDERTARGET_BEGIN(rt) -- folgende Draws gehen ins Render-Ziel (pro Frame
+    transparent gecleart), bis RENDERTARGET_END()."""
+    g.rendertarget_begin(_check_int(args[0], "RENDERTARGET_BEGIN"))
+    return None
+
+
+@graphics_builtin("RENDERTARGET_END", arity=0)
+def _g_rt_end(g, *args):
+    """RENDERTARGET_END() -- zurueck auf den vorigen Draw-Target (Screen/Layer)."""
+    g.rendertarget_end()
+    return None
+
+
+@graphics_builtin("RENDERTARGET_DRAW", arity=(3, 5))
+def _g_rt_draw(g, *args):
+    """RENDERTARGET_DRAW(rt, x, y [, skala [, tint]]) -- das Render-Ziel als Bild
+    an (x,y) zeichnen (optional skaliert/getoent)."""
+    rt = _check_int(args[0], "RENDERTARGET_DRAW")
+    x = _check_int(args[1], "RENDERTARGET_DRAW")
+    y = _check_int(args[2], "RENDERTARGET_DRAW")
+    scale = _check_num(args[3], "RENDERTARGET_DRAW") if len(args) >= 4 else 1.0
+    tint = _check_int(args[4], "RENDERTARGET_DRAW") if len(args) >= 5 else None
+    g.rendertarget_draw(rt, x, y, scale, tint)
+    return None
+
+
 @graphics_builtin("ELLIPSE", arity=(4, 5))
 def _g_ellipse(g, *args):
     coords = [_check_int(args[i], "ELLIPSE") for i in range(4)]

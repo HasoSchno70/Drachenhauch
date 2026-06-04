@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use raylib::prelude::*;
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
+use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
 #[derive(Clone)]
 enum Cmd {
@@ -39,6 +40,13 @@ enum Cmd {
     // den vorigen wieder her. Koordinaten logisch (pre-scale), beim Replay * s.
     ScissorPush(i32, i32, i32, i32),
     ScissorPop,
+    // 2D-Extras (Batch 1): dicke Linien, runde Rechtecke, Gradienten, Splines.
+    LineEx(i32, i32, i32, i32, f32, Color),            // x1,y1,x2,y2, thick, color
+    RoundRect(i32, i32, i32, i32, i32, Color, bool),   // x1,y1,x2,y2, radius, color, filled
+    GradientRect(i32, i32, i32, i32, Color, Color, bool), // x1,y1,x2,y2, c1, c2, vertical
+    Spline(Vec<(i32, i32)>, f32, Color),               // points, thick, color
+    BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
+    RtDraw(usize, i32, i32, f32, Color),               // render-target idx, x, y, scale, tint
 }
 
 /// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
@@ -66,6 +74,14 @@ enum Cmd3D {
 
 struct Layer {
     z: i32,
+    cmds: Vec<Cmd>,
+}
+
+/// Render-Target (RENDERTARGET_*): eine RenderTexture2D mit eigenem Command-
+/// Buffer. RENDERTARGET_BEGIN lenkt `emit` hierher um; beim FLIP wird der Buffer
+/// (falls nicht leer) auf die Textur gerendert, bevor die Hauptszene laeuft.
+struct RenderTarget {
+    rt: RenderTexture2D,
     cmds: Vec<Cmd>,
 }
 
@@ -157,6 +173,12 @@ uniform float fogDensity;
 uniform vec3 envSky;
 uniform vec3 envGround;
 uniform float envIntensity;
+// Echtes HDR-Cubemap-IBL (LIGHT_ENV_HDR). useIBLMaps 1 => die drei Maps statt
+// des analytischen envSample-Pfades. Default 0 -> LIGHT_ENV-Naeherung.
+uniform int useIBLMaps;
+uniform samplerCube irradianceMap;   // diffuse Hemisphaeren-Irradiance
+uniform samplerCube prefilterMap;    // spekulare GGX-Prefilter (Roughness-Mips)
+uniform sampler2D brdfLUT;           // Environment-BRDF (NoV x roughness)
 // Shadow-Mapping (lights[0] = schattenwerfendes directional light).
 uniform mat4 lightVP;
 uniform sampler2D shadowMap;
@@ -253,15 +275,27 @@ void main()
         float NoV = max(dot(N, V), 0.0);
         vec3 F = fresnelSchlickRough(NoV, F0, rough);
         vec3 kD = (vec3(1.0) - F)*(1.0 - metal);
-        vec3 irradiance = envSample(N)*envIntensity;
-        vec3 diffuseIBL = irradiance*albedo;
         vec3 R = reflect(-V, N);
-        // schaerfe Reflexion (rough 0) bis Mittelwert der Umgebung (rough 1)
-        vec3 avg = (envSky + envGround)*0.5;
-        vec3 prefiltered = mix(envSample(R), avg, rough)*envIntensity;
-        vec2 brdf = envBRDFApprox(NoV, rough);
-        vec3 specularIBL = prefiltered*(F0*brdf.x + brdf.y);
-        ambientTerm += kD*diffuseIBL + specularIBL;
+        vec3 diffuseIBL;
+        vec3 specularIBL;
+        if (useIBLMaps == 1) {
+            // Echtes HDR-Cubemap-IBL: vorberechnete Maps abtasten.
+            vec3 irradiance = texture(irradianceMap, N).rgb;
+            diffuseIBL = irradiance*albedo;
+            const float MAX_REFLECTION_LOD = 4.0;   // prefilterMap hat 5 Mips (0..4)
+            vec3 prefiltered = textureLod(prefilterMap, R, rough*MAX_REFLECTION_LOD).rgb;
+            vec2 brdf = texture(brdfLUT, vec2(NoV, rough)).rg;
+            specularIBL = prefiltered*(F*brdf.x + brdf.y);
+        } else {
+            // Analytische Naeherung (LIGHT_ENV): vertikaler Gradient + Karis-BRDF.
+            vec3 irradiance = envSample(N);
+            diffuseIBL = irradiance*albedo;
+            vec3 avg = (envSky + envGround)*0.5;
+            vec3 prefiltered = mix(envSample(R), avg, rough);
+            vec2 brdf = envBRDFApprox(NoV, rough);
+            specularIBL = prefiltered*(F0*brdf.x + brdf.y);
+        }
+        ambientTerm += (kD*diffuseIBL + specularIBL)*envIntensity;
     }
     vec3 color = ambientTerm + Lo;
     color = color/(color + vec3(1.0));        // Reinhard-Tonemapping
@@ -271,6 +305,222 @@ void main()
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
     finalColor = mix(fogColor, finalColor, fog);
+}
+"#;
+
+// === HDR-Cubemap-IBL (LIGHT_ENV_HDR) ===
+// Vorberechnungs-Shader, Port von raylibs `shaders_basic_pbr`-Beispiel /
+// learnopengl IBL. Gerendert in FBOs ueber `rlLoadDrawCube`/`rlLoadDrawQuad`
+// (immediate glDrawArrays mit dem via rlEnableShader gebundenen Shader; die
+// matProjection/matView-Uniforms werden pro Face per rlSetUniformMatrix gesetzt).
+
+/// Gemeinsamer Cubemap-Vertex-Shader (equirect / irradiance / prefilter).
+/// vertexPosition liegt auf Attrib-Location 0 (rlLoadDrawCube-Layout).
+const CUBEMAP_VS: &str = r#"#version 330
+in vec3 vertexPosition;
+uniform mat4 matProjection;
+uniform mat4 matView;
+out vec3 fragPosition;
+void main()
+{
+    fragPosition = vertexPosition;
+    gl_Position = matProjection*matView*vec4(vertexPosition, 1.0);
+}
+"#;
+
+/// equirectangular Panorama -> Cubemap (sphaerische Projektion).
+const EQUIRECT_FS: &str = r#"#version 330
+in vec3 fragPosition;
+uniform sampler2D equirectangularMap;   // Texture-Unit 0
+out vec4 finalColor;
+vec2 SampleSphericalMap(vec3 v)
+{
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv *= vec2(0.1591, 0.3183);   // 1/(2*PI), 1/PI
+    uv += 0.5;
+    return uv;
+}
+void main()
+{
+    vec2 uv = SampleSphericalMap(normalize(fragPosition));
+    finalColor = vec4(texture(equirectangularMap, uv).rgb, 1.0);
+}
+"#;
+
+/// Diffuse Irradiance-Convolution ueber die Environment-Cubemap (Hemisphaere).
+const IRRADIANCE_FS: &str = r#"#version 330
+in vec3 fragPosition;
+uniform samplerCube environmentMap;   // Texture-Unit 0
+out vec4 finalColor;
+const float PI = 3.14159265359;
+void main()
+{
+    vec3 N = normalize(fragPosition);
+    vec3 irradiance = vec3(0.0);
+    vec3 up = vec3(0.0, 1.0, 0.0);
+    vec3 right = normalize(cross(up, N));
+    up = normalize(cross(N, right));
+    float sampleDelta = 0.025;
+    float nrSamples = 0.0;
+    for (float phi = 0.0; phi < 2.0*PI; phi += sampleDelta)
+    {
+        for (float theta = 0.0; theta < 0.5*PI; theta += sampleDelta)
+        {
+            vec3 tangent = vec3(sin(theta)*cos(phi), sin(theta)*sin(phi), cos(theta));
+            vec3 sampleVec = tangent.x*right + tangent.y*up + tangent.z*N;
+            irradiance += texture(environmentMap, sampleVec).rgb*cos(theta)*sin(theta);
+            nrSamples++;
+        }
+    }
+    irradiance = PI*irradiance*(1.0/nrSamples);
+    finalColor = vec4(irradiance, 1.0);
+}
+"#;
+
+/// Prefilter: GGX-Importance-Sampling der Environment-Cubemap pro Roughness-Mip.
+const PREFILTER_FS: &str = r#"#version 330
+in vec3 fragPosition;
+uniform samplerCube environmentMap;   // Texture-Unit 0
+uniform float roughness;
+out vec4 finalColor;
+const float PI = 3.14159265359;
+float DistributionGGX(vec3 N, vec3 H, float r)
+{
+    float a = r*r; float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float d = NdotH*NdotH*(a2 - 1.0) + 1.0;
+    return a2/(PI*d*d);
+}
+float RadicalInverse_VdC(uint bits)
+{
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    return float(bits)*2.3283064365386963e-10;
+}
+vec2 Hammersley(uint i, uint n) { return vec2(float(i)/float(n), RadicalInverse_VdC(i)); }
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float r)
+{
+    float a = r*r;
+    float phi = 2.0*PI*Xi.x;
+    float cosTheta = sqrt((1.0 - Xi.y)/(1.0 + (a*a - 1.0)*Xi.y));
+    float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+    vec3 H = vec3(cos(phi)*sinTheta, sin(phi)*sinTheta, cosTheta);
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, N));
+    vec3 bitangent = cross(N, tangent);
+    return normalize(tangent*H.x + bitangent*H.y + N*H.z);
+}
+void main()
+{
+    vec3 N = normalize(fragPosition);
+    vec3 R = N; vec3 V = R;
+    const uint SAMPLE_COUNT = 1024u;
+    vec3 prefiltered = vec3(0.0);
+    float totalWeight = 0.0;
+    for (uint i = 0u; i < SAMPLE_COUNT; i++)
+    {
+        vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+        vec3 H = ImportanceSampleGGX(Xi, N, roughness);
+        vec3 L = normalize(2.0*dot(V, H)*H - V);
+        float NdotL = max(dot(N, L), 0.0);
+        if (NdotL > 0.0)
+        {
+            float D = DistributionGGX(N, H, roughness);
+            float NdotH = max(dot(N, H), 0.0);
+            float HdotV = max(dot(H, V), 0.0);
+            float pdf = D*NdotH/(4.0*HdotV) + 0.0001;
+            float resolution = 512.0;   // Quell-Cubemap-Face-Aufloesung
+            float saTexel = 4.0*PI/(6.0*resolution*resolution);
+            float saSample = 1.0/(float(SAMPLE_COUNT)*pdf + 0.0001);
+            float mipLevel = roughness == 0.0 ? 0.0 : 0.5*log2(saSample/saTexel);
+            prefiltered += textureLod(environmentMap, L, mipLevel).rgb*NdotL;
+            totalWeight += NdotL;
+        }
+    }
+    prefiltered = prefiltered/totalWeight;
+    finalColor = vec4(prefiltered, 1.0);
+}
+"#;
+
+/// BRDF-LUT-Vertex-Shader (Fullscreen-Quad via rlLoadDrawQuad: pos@0, uv@2).
+const BRDF_VS: &str = r#"#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+out vec2 fragTexCoord;
+void main()
+{
+    fragTexCoord = vertexTexCoord;
+    gl_Position = vec4(vertexPosition, 1.0);
+}
+"#;
+
+/// BRDF-Integration (Environment-BRDF-LUT: x=NdotV, y=roughness).
+const BRDF_FS: &str = r#"#version 330
+in vec2 fragTexCoord;
+out vec4 finalColor;
+const float PI = 3.14159265359;
+float RadicalInverse_VdC(uint bits)
+{
+    bits = (bits << 16u) | (bits >> 16u);
+    bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+    bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+    bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+    bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+    return float(bits)*2.3283064365386963e-10;
+}
+vec2 Hammersley(uint i, uint n) { return vec2(float(i)/float(n), RadicalInverse_VdC(i)); }
+vec3 ImportanceSampleGGX(vec2 Xi, vec3 N, float r)
+{
+    float a = r*r;
+    float phi = 2.0*PI*Xi.x;
+    float cosTheta = sqrt((1.0 - Xi.y)/(1.0 + (a*a - 1.0)*Xi.y));
+    float sinTheta = sqrt(1.0 - cosTheta*cosTheta);
+    vec3 H = vec3(cos(phi)*sinTheta, sin(phi)*sinTheta, cosTheta);
+    vec3 up = abs(N.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(up, N));
+    vec3 bitangent = cross(N, tangent);
+    return normalize(tangent*H.x + bitangent*H.y + N*H.z);
+}
+float GeometrySchlickGGX(float NdotV, float r)
+{
+    float k = (r*r)/2.0;   // IBL-Variante
+    return NdotV/(NdotV*(1.0 - k) + k);
+}
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float r)
+{
+    return GeometrySchlickGGX(max(dot(N, L), 0.0), r)*GeometrySchlickGGX(max(dot(N, V), 0.0), r);
+}
+vec2 IntegrateBRDF(float NdotV, float roughness)
+{
+    vec3 V = vec3(sqrt(1.0 - NdotV*NdotV), 0.0, NdotV);
+    float A = 0.0; float B = 0.0;
+    vec3 N = vec3(0.0, 0.0, 1.0);
+    const uint SAMPLE_COUNT = 1024u;
+    for (uint i = 0u; i < SAMPLE_COUNT; i++)
+    {
+        vec2 Xi = Hammersley(i, SAMPLE_COUNT);
+        vec3 H = ImportanceSampleGGX(Xi, N, roughness);
+        vec3 L = normalize(2.0*dot(V, H)*H - V);
+        float NdotL = max(L.z, 0.0);
+        float NdotH = max(H.z, 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+        if (NdotL > 0.0)
+        {
+            float G = GeometrySmith(N, V, L, roughness);
+            float G_Vis = (G*VdotH)/(NdotH*NdotV);
+            float Fc = pow(1.0 - VdotH, 5.0);
+            A += (1.0 - Fc)*G_Vis;
+            B += Fc*G_Vis;
+        }
+    }
+    return vec2(A, B)/float(SAMPLE_COUNT);
+}
+void main()
+{
+    finalColor = vec4(IntegrateBRDF(fragTexCoord.x, fragTexCoord.y), 0.0, 1.0);
 }
 "#;
 
@@ -285,6 +535,10 @@ pub struct Graphics {
     layers: Vec<Layer>,
     layer_names: HashMap<String, usize>,
     active: usize,
+    // Render-Targets (RENDERTARGET_*): leben ueber Frames; active_rt lenkt `emit`
+    // um, solange ein Target via RENDERTARGET_BEGIN aktiv ist.
+    render_targets: Vec<RenderTarget>,
+    active_rt: Option<usize>,
     clear_color: Color,
     // Kamera (Modul `camera`): World->Screen-Transform fuer alle Draws.
     cam_x: f64,
@@ -317,6 +571,16 @@ pub struct Graphics {
     loc_env_sky: i32,
     loc_env_ground: i32,
     loc_env_intensity: i32,
+    // Echtes HDR-Cubemap-IBL (LIGHT_ENV_HDR): vorberechnete GL-Texturen +
+    // Locs. use_ibl_maps gatet den Cubemap-Pfad im Shader (sonst analytisch).
+    ibl_irradiance: u32,
+    ibl_prefilter: u32,
+    ibl_brdf: u32,
+    use_ibl_maps: bool,
+    loc_use_ibl: i32,
+    loc_irradiance: i32,
+    loc_prefilter: i32,
+    loc_brdf: i32,
     loc_view: i32,
     loc_ambient: i32,
     loc_fog_color: i32,
@@ -379,6 +643,8 @@ impl Graphics {
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
+            render_targets: Vec::new(),
+            active_rt: None,
             clear_color: Color::BLACK,
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
             cmds3d: Vec::new(),
@@ -399,6 +665,14 @@ impl Graphics {
             loc_env_sky: -1,
             loc_env_ground: -1,
             loc_env_intensity: -1,
+            ibl_irradiance: 0,
+            ibl_prefilter: 0,
+            ibl_brdf: 0,
+            use_ibl_maps: false,
+            loc_use_ibl: -1,
+            loc_irradiance: -1,
+            loc_prefilter: -1,
+            loc_brdf: -1,
             loc_view: -1,
             loc_ambient: -1,
             loc_fog_color: -1,
@@ -435,8 +709,45 @@ impl Graphics {
     }
 
     fn emit(&mut self, c: Cmd) {
-        let a = self.active;
-        self.layers[a].cmds.push(c);
+        // Ist ein Render-Target aktiv (RENDERTARGET_BEGIN), gehen alle Draws in
+        // dessen Command-Buffer statt in den aktiven Layer.
+        if let Some(rt) = self.active_rt {
+            self.render_targets[rt].cmds.push(c);
+        } else {
+            let a = self.active;
+            self.layers[a].cmds.push(c);
+        }
+    }
+
+    // --- Render-Targets (RENDERTARGET_*) ---
+    /// Legt ein neues Render-Target (RenderTexture2D) an -> Handle (Index).
+    pub fn rendertarget_new(&mut self, w: i32, h: i32) -> Result<i64, String> {
+        let rt = self.rl.load_render_texture(&self.thread, w.max(1) as u32, h.max(1) as u32)
+            .map_err(|e| format!("RENDERTARGET_NEW: {}", e))?;
+        self.render_targets.push(RenderTarget { rt, cmds: Vec::new() });
+        Ok((self.render_targets.len() - 1) as i64)
+    }
+    fn check_rt(&self, idx: i64, fn_: &str) -> Result<usize, String> {
+        let i = idx as usize;
+        if idx < 0 || i >= self.render_targets.len() {
+            return Err(format!("{}: ungueltiges RENDERTARGET-Handle {}", fn_, idx));
+        }
+        Ok(i)
+    }
+    /// Folgende Draws gehen in das Target, bis RENDERTARGET_END.
+    pub fn rendertarget_begin(&mut self, idx: i64) -> Result<(), String> {
+        let i = self.check_rt(idx, "RENDERTARGET_BEGIN")?;
+        self.active_rt = Some(i);
+        Ok(())
+    }
+    pub fn rendertarget_end(&mut self) { self.active_rt = None; }
+    /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.
+    pub fn rendertarget_draw(&mut self, idx: i64, x: i32, y: i32, scale: f64, tint: Option<i64>) -> Result<(), String> {
+        let i = self.check_rt(idx, "RENDERTARGET_DRAW")?;
+        let (x, y) = self.w2s(x, y);
+        let tcol = match tint { Some(c) => col(c), None => Color::WHITE };
+        self.emit(Cmd::RtDraw(i, x, y, (scale * self.cam_zoom).max(0.0) as f32, tcol));
+        Ok(())
     }
 
     // --- Kamera (Modul `camera`) ---
@@ -677,6 +988,10 @@ impl Graphics {
         self.loc_env_sky = sh.get_shader_location("envSky");
         self.loc_env_ground = sh.get_shader_location("envGround");
         self.loc_env_intensity = sh.get_shader_location("envIntensity");
+        self.loc_use_ibl = sh.get_shader_location("useIBLMaps");
+        self.loc_irradiance = sh.get_shader_location("irradianceMap");
+        self.loc_prefilter = sh.get_shader_location("prefilterMap");
+        self.loc_brdf = sh.get_shader_location("brdfLUT");
         self.light_shader = Some(sh);
     }
     pub fn light_fog(&mut self, col_: i64, density: f64) {
@@ -696,6 +1011,208 @@ impl Graphics {
         self.env_ground = Self::rgb3(ground);
         self.env_intensity = intensity.max(0.0) as f32;
     }
+    // --- Echtes HDR-Cubemap-IBL (LIGHT_ENV_HDR) ---
+    // Port von raylibs `shaders_basic_pbr`-Beispiel: equirect -> Cubemap,
+    // Irradiance-Convolution, Prefilter-Mips, BRDF-LUT. Gerendert ueber FBOs +
+    // `rlLoadDrawCube`/`rlLoadDrawQuad` (immediate glDrawArrays, kein Render-
+    // Batch -> die per rlSetUniformMatrix gesetzten View/Proj-Uniforms bleiben
+    // stehen). Wie das Shadow-Mapping rein rlgl-/ffi-basiert.
+    //
+    // WICHTIG: raylibs `rlLoadTextureCubemap` legt fuer NULL-Daten KEINE Float-
+    // Cubemaps an (R32/R16 werden abgelehnt) -> wir nutzen R8G8B8A8 (LDR). Sehr
+    // helle Werte (Sonne) clampen; fuer Reflexionen/IBL visuell ausreichend.
+
+    /// Die 6 Cubemap-View-Matrizen (Blick aus dem Zentrum auf jede Achse),
+    /// direkt als ffi::Matrix (Copy) fuer rlSetUniformMatrix.
+    fn ibl_cube_views() -> [raylib::ffi::Matrix; 6] {
+        let o = Vector3::zero();
+        [
+            Matrix::look_at(o, Vector3::new( 1.0,  0.0,  0.0), Vector3::new(0.0, -1.0,  0.0)).into(),
+            Matrix::look_at(o, Vector3::new(-1.0,  0.0,  0.0), Vector3::new(0.0, -1.0,  0.0)).into(),
+            Matrix::look_at(o, Vector3::new( 0.0,  1.0,  0.0), Vector3::new(0.0,  0.0,  1.0)).into(),
+            Matrix::look_at(o, Vector3::new( 0.0, -1.0,  0.0), Vector3::new(0.0,  0.0, -1.0)).into(),
+            Matrix::look_at(o, Vector3::new( 0.0,  0.0,  1.0), Vector3::new(0.0, -1.0,  0.0)).into(),
+            Matrix::look_at(o, Vector3::new( 0.0,  0.0, -1.0), Vector3::new(0.0, -1.0,  0.0)).into(),
+        ]
+    }
+
+    /// 90deg-Projektion fuer die Cubemap-Passes (aspect 1).
+    fn ibl_cube_proj() -> raylib::ffi::Matrix {
+        let (near, far) = unsafe {
+            (raylib::ffi::rlGetCullDistanceNear() as f32, raylib::ffi::rlGetCullDistanceFar() as f32)
+        };
+        Matrix::perspective(90.0_f32.to_radians(), 1.0, near, far).into()
+    }
+
+    /// Rendert eine einfache (1-Mip) Cubemap mit `fs` ueber die 6 Faces. Quelle ist
+    /// eine 2D-Textur (equirect) oder eine Cubemap (irradiance). Liefert die GL-ID.
+    fn ibl_render_cube(&mut self, fs: &str, src_id: u32, src_cubemap: bool, size: i32) -> Result<u32, String> {
+        let sh = self.rl.load_shader_from_memory(&self.thread, Some(CUBEMAP_VS), Some(fs));
+        let id = sh.id;
+        if id == 0 { return Err("LIGHT_ENV_HDR: Cubemap-Shader nicht ladbar".into()); }
+        let loc_proj = sh.get_shader_location("matProjection");
+        let loc_view = sh.get_shader_location("matView");
+        let views = Self::ibl_cube_views();
+        let proj = Self::ibl_cube_proj();
+        let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
+        let cubemap;
+        unsafe {
+            raylib::ffi::rlDisableBackfaceCulling();
+            let rbo = raylib::ffi::rlLoadTextureDepth(size, size, true);   // Renderbuffer
+            // R8G8B8A8 (=7): einzige fuer leere Cubemaps unterstuetzte Form.
+            cubemap = raylib::ffi::rlLoadTextureCubemap(std::ptr::null(), size, 7, 1);
+            let fbo = raylib::ffi::rlLoadFramebuffer();
+            // RL_ATTACHMENT_DEPTH=100, RL_ATTACHMENT_RENDERBUFFER=200.
+            raylib::ffi::rlFramebufferAttach(fbo, rbo, 100, 200, 0);
+            // RL_ATTACHMENT_COLOR_CHANNEL0=0, RL_ATTACHMENT_CUBEMAP_POSITIVE_X=0.
+            raylib::ffi::rlFramebufferAttach(fbo, cubemap, 0, 0, 0);
+            raylib::ffi::rlEnableShader(id);
+            raylib::ffi::rlSetUniformMatrix(loc_proj, proj);
+            raylib::ffi::rlActiveTextureSlot(0);
+            if src_cubemap { raylib::ffi::rlEnableTextureCubemap(src_id); }
+            else { raylib::ffi::rlEnableTexture(src_id); }
+            raylib::ffi::rlViewport(0, 0, size, size);
+            for i in 0..6 {
+                raylib::ffi::rlSetUniformMatrix(loc_view, views[i as usize]);
+                raylib::ffi::rlFramebufferAttach(fbo, cubemap, 0, i, 0);   // +X + i
+                // rlFramebufferAttach unbindet das FBO (glBindFramebuffer 0) ->
+                // pro Face neu binden, sonst landet der Cube auf dem Screen.
+                raylib::ffi::rlEnableFramebuffer(fbo);
+                raylib::ffi::rlClearScreenBuffers();
+                raylib::ffi::rlLoadDrawCube();
+            }
+            raylib::ffi::rlDisableShader();
+            if src_cubemap { raylib::ffi::rlDisableTextureCubemap(); }
+            else { raylib::ffi::rlDisableTexture(); }
+            raylib::ffi::rlDisableFramebuffer();
+            raylib::ffi::rlUnloadFramebuffer(fbo);
+            raylib::ffi::rlEnableBackfaceCulling();
+            raylib::ffi::rlViewport(0, 0, win_w, win_h);
+        }
+        Ok(cubemap)
+    }
+
+    /// Prefilter-Cubemap: GGX-Importance-Sampling pro Roughness-Mip-Level.
+    /// `rlLoadTextureCubemap(.., mips)` legt die Mip-Speicher direkt an (kein
+    /// rlGenTextureMipmaps fuer Cubemaps moeglich -> bindet GL_TEXTURE_2D).
+    fn ibl_render_prefilter(&mut self, env_cubemap: u32, size: i32) -> Result<u32, String> {
+        const MIPS: i32 = 5;
+        let sh = self.rl.load_shader_from_memory(&self.thread, Some(CUBEMAP_VS), Some(PREFILTER_FS));
+        let id = sh.id;
+        if id == 0 { return Err("LIGHT_ENV_HDR: Prefilter-Shader nicht ladbar".into()); }
+        let loc_proj = sh.get_shader_location("matProjection");
+        let loc_view = sh.get_shader_location("matView");
+        let loc_rough = sh.get_shader_location("roughness");
+        let views = Self::ibl_cube_views();
+        let proj = Self::ibl_cube_proj();
+        let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
+        let prefilter;
+        // Voller Mip-Chain (128->1 = 8 Level), damit die Cubemap mit
+        // LINEAR_MIPMAP_LINEAR *mipmap-complete* ist (sonst sampelt sie komplett
+        // schwarz). Prefiltert werden nur die ersten MIPS Roughness-Level
+        // (MAX_REFLECTION_LOD im PBR-Shader = MIPS-1); hoehere Mips bleiben leer,
+        // werden aber nie gesampelt (max lod = MIPS-1).
+        let full_mips = (32 - (size as u32).leading_zeros()) as i32;
+        unsafe {
+            raylib::ffi::rlDisableBackfaceCulling();
+            prefilter = raylib::ffi::rlLoadTextureCubemap(std::ptr::null(), size, 7, full_mips);
+            let rbo = raylib::ffi::rlLoadTextureDepth(size, size, true);
+            let fbo = raylib::ffi::rlLoadFramebuffer();
+            raylib::ffi::rlFramebufferAttach(fbo, rbo, 100, 200, 0);   // DEPTH, RENDERBUFFER
+            raylib::ffi::rlEnableShader(id);
+            raylib::ffi::rlSetUniformMatrix(loc_proj, proj);
+            raylib::ffi::rlActiveTextureSlot(0);
+            raylib::ffi::rlEnableTextureCubemap(env_cubemap);
+            for mip in 0..MIPS {
+                let msize = (size as f32 * 0.5f32.powi(mip)).max(1.0) as i32;
+                raylib::ffi::rlViewport(0, 0, msize, msize);
+                let roughness = mip as f32 / (MIPS - 1) as f32;
+                raylib::ffi::rlSetUniform(
+                    loc_rough, &roughness as *const f32 as *const std::os::raw::c_void, 0 /*FLOAT*/, 1);
+                for i in 0..6 {
+                    raylib::ffi::rlSetUniformMatrix(loc_view, views[i as usize]);
+                    raylib::ffi::rlFramebufferAttach(fbo, prefilter, 0, i, mip);
+                    raylib::ffi::rlEnableFramebuffer(fbo);
+                    raylib::ffi::rlClearScreenBuffers();
+                    raylib::ffi::rlLoadDrawCube();
+                }
+            }
+            raylib::ffi::rlDisableShader();
+            raylib::ffi::rlDisableTextureCubemap();
+            raylib::ffi::rlDisableFramebuffer();
+            raylib::ffi::rlUnloadFramebuffer(fbo);
+            raylib::ffi::rlEnableBackfaceCulling();
+            raylib::ffi::rlViewport(0, 0, win_w, win_h);
+        }
+        Ok(prefilter)
+    }
+
+    /// BRDF-Integrations-LUT (2D, NdotV x roughness) via Fullscreen-Quad.
+    fn ibl_render_brdf(&mut self, size: i32) -> Result<u32, String> {
+        let sh = self.rl.load_shader_from_memory(&self.thread, Some(BRDF_VS), Some(BRDF_FS));
+        let id = sh.id;
+        if id == 0 { return Err("LIGHT_ENV_HDR: BRDF-Shader nicht ladbar".into()); }
+        let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
+        let brdf;
+        unsafe {
+            brdf = raylib::ffi::rlLoadTexture(std::ptr::null(), size, size, 7, 1);
+            let fbo = raylib::ffi::rlLoadFramebuffer();
+            raylib::ffi::rlFramebufferAttach(fbo, brdf, 0, 100, 0);   // COLOR0, TEXTURE2D
+            raylib::ffi::rlEnableFramebuffer(fbo);
+            raylib::ffi::rlViewport(0, 0, size, size);
+            raylib::ffi::rlEnableShader(id);
+            raylib::ffi::rlClearScreenBuffers();
+            raylib::ffi::rlLoadDrawQuad();
+            raylib::ffi::rlDisableShader();
+            raylib::ffi::rlDisableFramebuffer();
+            raylib::ffi::rlUnloadFramebuffer(fbo);
+            raylib::ffi::rlViewport(0, 0, win_w, win_h);
+        }
+        Ok(brdf)
+    }
+
+    /// Laedt ein `.hdr`-Equirect-Panorama und berechnet die drei IBL-Maps
+    /// (Irradiance + Prefilter + BRDF-LUT) einmalig. Aktiviert den Cubemap-IBL-
+    /// Pfad im Shader (useIBLMaps=1). `intensity` skaliert den IBL-Beitrag
+    /// (= envIntensity; 0 = aus). Idempotent: weitere Aufrufe setzen nur die
+    /// Intensitaet (kein Neu-Generieren).
+    pub fn light_env_hdr(&mut self, path: &str, intensity: f64) -> Result<(), String> {
+        if self.light_shader.is_none() { self.light_enable(); }
+        self.env_intensity = intensity.max(0.0) as f32;
+        if self.use_ibl_maps { return Ok(()); }
+        // 1) HDR-Equirect laden. raylib-sys ist OHNE SUPPORT_FILEFORMAT_HDR
+        // gebaut -> wir dekodieren das Radiance-RGBE selbst zu RGBA32F und laden
+        // es als 2D-Float-Textur (rlLoadTexture unterstuetzt Float mit Daten).
+        let (hdr, hw, hh) = load_hdr_rgbe(path)
+            .map_err(|e| format!("LIGHT_ENV_HDR: '{}' -- {}", path, e))?;
+        let pano_id = unsafe {
+            // RL_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32 = 10.
+            raylib::ffi::rlLoadTexture(hdr.as_ptr() as *const std::os::raw::c_void, hw, hh, 10, 1)
+        };
+        if pano_id == 0 { return Err("LIGHT_ENV_HDR: Panorama-Textur fehlgeschlagen".into()); }
+        unsafe {
+            // Bilineare Filterung + Clamp fuer sauberes equirect-Sampling.
+            let tex = raylib::ffi::Texture2D { id: pano_id, width: hw, height: hh, mipmaps: 1, format: 10 };
+            raylib::ffi::SetTextureFilter(tex, 1 /*BILINEAR*/);
+            raylib::ffi::SetTextureWrap(tex, 1 /*CLAMP*/);
+        }
+        // 2) equirect -> Cubemap (512).
+        let env = self.ibl_render_cube(EQUIRECT_FS, pano_id, false, 512)?;
+        // 3) Irradiance-Cubemap (32, diffuse).
+        let irradiance = self.ibl_render_cube(IRRADIANCE_FS, env, true, 32)?;
+        // 4) Prefilter-Cubemap (128 + Roughness-Mips, specular).
+        let prefilter = self.ibl_render_prefilter(env, 128)?;
+        // 5) BRDF-LUT (512, 2D).
+        let brdf = self.ibl_render_brdf(512)?;
+        // Equirect + env-Cubemap werden nicht mehr gebraucht -> freigeben.
+        unsafe { raylib::ffi::rlUnloadTexture(pano_id); raylib::ffi::rlUnloadTexture(env); }
+        self.ibl_irradiance = irradiance;
+        self.ibl_prefilter = prefilter;
+        self.ibl_brdf = brdf;
+        self.use_ibl_maps = true;
+        Ok(())
+    }
+
     pub fn light_ambient(&mut self, col_: i64, intensity: f64) {
         let v = col_ as u32;
         let f = intensity as f32;
@@ -798,6 +1315,10 @@ impl Graphics {
         let (loc_fog_color, loc_fog_density) = (self.loc_fog_color, self.loc_fog_density);
         let (env_sky, env_ground, env_int) = (self.env_sky, self.env_ground, self.env_intensity);
         let (loc_esky, loc_eground, loc_eint) = (self.loc_env_sky, self.loc_env_ground, self.loc_env_intensity);
+        // HDR-Cubemap-IBL: useIBLMaps-Gate + Sampler-Unit-Locs (Binden in render_scene).
+        let use_ibl = self.use_ibl_maps;
+        let (loc_use_ibl, loc_irr, loc_pre, loc_brdf) =
+            (self.loc_use_ibl, self.loc_irradiance, self.loc_prefilter, self.loc_brdf);
         // Licht-Daten lokal kopieren (Borrow-Trennung zum Shader).
         let lights: Vec<(i32,i32,i32,i32,i32, i32, i32, [f32;3], [f32;3], [f32;4])> =
             self.lights.iter().map(|l| (
@@ -811,6 +1332,15 @@ impl Graphics {
         if loc_esky >= 0 { sh.set_shader_value(loc_esky, env_sky); }
         if loc_eground >= 0 { sh.set_shader_value(loc_eground, env_ground); }
         if loc_eint >= 0 { sh.set_shader_value(loc_eint, env_int); }
+        // HDR-Cubemap-IBL: useIBLMaps-Gate + Sampler-Units setzen. Das eigentliche
+        // Binden der Maps (Slots 11/12/13) passiert in render_scene im Draw-Kontext
+        // (rlFramebufferAttach/begin_drawing wuerden eine fruehere Bindung loesen).
+        if loc_use_ibl >= 0 { sh.set_shader_value(loc_use_ibl, if use_ibl { 1i32 } else { 0i32 }); }
+        if use_ibl {
+            if loc_irr >= 0 { sh.set_shader_value(loc_irr, 11i32); }
+            if loc_pre >= 0 { sh.set_shader_value(loc_pre, 12i32); }
+            if loc_brdf >= 0 { sh.set_shader_value(loc_brdf, 13i32); }
+        }
         for (le, lt, lp, ltg, lc, en, kind, pos, target, color) in lights {
             if le >= 0 { sh.set_shader_value(le, en); }
             if lt >= 0 { sh.set_shader_value(lt, kind); }
@@ -821,6 +1351,12 @@ impl Graphics {
     }
 
     pub fn cls(&mut self, color: i64) {
+        // Innerhalb eines Render-Targets: Clear-Cmd in dessen Buffer (der Buffer
+        // wird beim FLIP ohnehin transparent vorgecleart -> Clear setzt die Farbe).
+        if let Some(rt) = self.active_rt {
+            self.render_targets[rt].cmds.push(Cmd::Clear(col(color)));
+            return;
+        }
         // CLS setzt die Hintergrundfarbe (beim FLIP gecleart) und leert den
         // aktiven Layer (Wipe). Die Layer werden ohnehin pro FLIP geleert.
         self.clear_color = col(color);
@@ -859,6 +1395,61 @@ impl Graphics {
     pub fn box_fill(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64) { let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); self.emit(Cmd::BoxFill(x1, y1, x2, y2, col(c))); }
     pub fn rect(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64) { let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); self.emit(Cmd::RectLines(x1, y1, x2, y2, col(c))); }
     pub fn circle(&mut self, x: i32, y: i32, r: i32, c: i64) { let (x, y) = self.w2s(x, y); let r = self.ssize(r); self.emit(Cmd::Circle(x, y, r as f32, col(c))); }
+    // --- 2D-Extras (Batch 1) ---
+    #[allow(clippy::too_many_arguments)]
+    pub fn line_thick(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, w: f64, c: i64) {
+        let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::LineEx(x1, y1, x2, y2, (w * self.cam_zoom).max(1.0) as f32, col(c)));
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn round_rect(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, radius: i32, c: i64, filled: bool) {
+        let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::RoundRect(x1, y1, x2, y2, self.ssize(radius), col(c), filled));
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn gradient_rect(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c1: i64, c2: i64, vertical: bool) {
+        let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::GradientRect(x1, y1, x2, y2, col(c1), col(c2), vertical));
+    }
+    pub fn spline(&mut self, xs: &[i32], ys: &[i32], w: f64, c: i64) {
+        let pts: Vec<(i32, i32)> = xs.iter().zip(ys).map(|(&x, &y)| self.w2s(x, y)).collect();
+        self.emit(Cmd::Spline(pts, (w * self.cam_zoom).max(1.0) as f32, col(c)));
+    }
+
+    // --- Blend-Modes (Batch 2) ---
+    pub fn blend_mode(&mut self, mode: i32) { self.emit(Cmd::BlendMode(mode)); }
+
+    // --- Prozedurale Texturen (Batch 3): liefern ein IMAGE-Handle ---
+    pub fn gen_tex_perlin(&mut self, w: i32, h: i32, scale: f64) -> Result<i64, String> {
+        // gen_image_perlin_noise ist in raylib-rs als &self-Methode gebunden
+        // (self wird ignoriert) -> auf einem Wegwerf-Image aufrufen.
+        let scratch = Image::gen_image_color(1, 1, Color::BLACK);
+        let img = scratch.gen_image_perlin_noise(w.max(1), h.max(1), 0, 0, scale.max(0.1) as f32);
+        self.push_tex_from_image(img)
+    }
+    pub fn gen_tex_gradient(&mut self, w: i32, h: i32, c1: i64, c2: i64, vertical: bool) -> Result<i64, String> {
+        // direction in Grad: 0 = vertikal (oben->unten), 90 = horizontal.
+        let dir = if vertical { 0 } else { 90 };
+        let img = Image::gen_image_gradient_linear(w.max(1), h.max(1), dir, col(c1), col(c2));
+        self.push_tex_from_image(img)
+    }
+    pub fn gen_tex_checked(&mut self, w: i32, h: i32, cx: i32, cy: i32, c1: i64, c2: i64) -> Result<i64, String> {
+        let img = Image::gen_image_checked(w.max(1), h.max(1), cx.max(1), cy.max(1), col(c1), col(c2));
+        self.push_tex_from_image(img)
+    }
+    pub fn gen_tex_color(&mut self, w: i32, h: i32, c: i64) -> Result<i64, String> {
+        let img = Image::gen_image_color(w.max(1), h.max(1), col(c));
+        self.push_tex_from_image(img)
+    }
+
+    // --- Clipboard + Drag&Drop (Batch 5) ---
+    pub fn clipboard_get(&self) -> String { self.rl.get_clipboard_text().unwrap_or_default() }
+    pub fn clipboard_set(&mut self, s: &str) { let _ = self.rl.set_clipboard_text(s); }
+    pub fn files_dropped(&self) -> bool { self.rl.is_file_dropped() }
+    pub fn dropped_files(&self) -> Vec<String> {
+        if !self.rl.is_file_dropped() { return Vec::new(); }
+        self.rl.load_dropped_files().paths().iter().map(|s| s.to_string()).collect()
+    }
     pub fn triangle(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, x3: i32, y3: i32, c: i64) {
         let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); let (x3, y3) = self.w2s(x3, y3);
         self.emit(Cmd::Triangle(x1, y1, x2, y2, x3, y3, col(c)));
@@ -1369,13 +1960,34 @@ impl Graphics {
         order.sort_by_key(|&i| self.layers[i].z);
         // RT-Groesse = Fenstergroesse (bekannt, ohne mehrdeutigen Textur-Query).
         let (tw, th) = ((self.width * self.scale) as f32, (self.height * self.scale) as f32);
+        // HDR-IBL-Maps: im Draw-Kontext (binnen begin_drawing) an Slots 11/12/13
+        // binden, damit die Bindung sicher bis zum Modell-Draw steht.
+        let ibl = (self.use_ibl_maps, self.ibl_irradiance, self.ibl_prefilter, self.ibl_brdf);
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
-            scene_rt, shaders, post_shader_idx, .. } = self;
+            scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness);
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
         let cam = *cam3d;
+        // Render-Targets zuerst auf ihre Texturen rendern (nur die, in die dieser
+        // Frame gezeichnet wurde -- leere behalten ihren Inhalt). 2D-only: eigene
+        // synthetische Ein-Layer-Szene, transparent gecleart, kein 3D/Licht/RtDraw.
+        {
+            let empty_set = std::collections::HashSet::new();
+            let empty_map = std::collections::HashMap::new();
+            let clear_rt = Color::new(0, 0, 0, 0);
+            for i in 0..render_targets.len() {
+                if render_targets[i].cmds.is_empty() { continue; }
+                let cmds = std::mem::take(&mut render_targets[i].cmds);
+                let synth = [Layer { z: 0, cmds }];
+                let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
+                render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
+                    &[], cam, &[], None, (-1, -1, -1), &empty_set, &empty_map,
+                    (false, 0, 0, 0), &[]);
+            }
+        }
+        let rts: &[RenderTarget] = render_targets;
         // Post-FX aktiv? -> (Shader-Index, Render-Target). Sonst direkt zeichnen.
         let postfx = match *post_shader_idx {
             Some(i) if i < shaders.len() => scene_rt.as_mut().map(|rt| (i, rt)),
@@ -1385,7 +1997,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -1398,7 +2010,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -1424,6 +2036,8 @@ fn render_scene<D: RaylibDraw>(
     mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32),
     normal_mapped: &std::collections::HashSet<usize>,
     pbr_params: &std::collections::HashMap<usize, (f32, f32)>,
+    ibl: (bool, u32, u32, u32),
+    render_targets: &[RenderTarget],
 ) {
     let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
     // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
@@ -1438,7 +2052,22 @@ fn render_scene<D: RaylibDraw>(
         }
     };
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
+    let mut cur_blend = 0i32;   // aktiver Blend-Mode (0 = Default/alpha)
     d.clear_background(clear);
+            // HDR-IBL-Maps im Draw-Kontext an Slots 11/12/13 binden (Cubemaps via
+            // rlEnableTextureCubemap, BRDF-LUT 2D). Hier statt update_light_uniforms,
+            // damit die Bindung garantiert bis zum Modell-Draw steht.
+            if ibl.0 {
+                unsafe {
+                    raylib::ffi::rlActiveTextureSlot(11);
+                    raylib::ffi::rlEnableTextureCubemap(ibl.1);
+                    raylib::ffi::rlActiveTextureSlot(12);
+                    raylib::ffi::rlEnableTextureCubemap(ibl.2);
+                    raylib::ffi::rlActiveTextureSlot(13);
+                    raylib::ffi::rlEnableTexture(ibl.3);
+                    raylib::ffi::rlActiveTextureSlot(0);
+                }
+            }
             // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
             if !cmds3d.is_empty() {
                 let mut d3 = d.begin_mode3D(cam3d);
@@ -1586,6 +2215,59 @@ fn render_scene<D: RaylibDraw>(
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0,*tint);
                     }
+                    Cmd::LineEx(x1, y1, x2, y2, thick, col) => {
+                        d.draw_line_ex(Vector2::new((x1 * s) as f32, (y1 * s) as f32),
+                            Vector2::new((x2 * s) as f32, (y2 * s) as f32), thick * s as f32, *col);
+                    }
+                    Cmd::RoundRect(x1, y1, x2, y2, radius, col, filled) => {
+                        let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
+                        let w = ((x2 - x1).abs() + 1) * s; let h = ((y2 - y1).abs() + 1) * s;
+                        // raylib-roundness = Bruchteil der halben kuerzeren Seite (0..1).
+                        let half = (w.min(h) as f32) * 0.5;
+                        let roundness = if half > 0.0 { ((*radius * s) as f32 / half).clamp(0.0, 1.0) } else { 0.0 };
+                        let rec = Rectangle::new(x as f32, y as f32, w as f32, h as f32);
+                        if *filled { d.draw_rectangle_rounded(rec, roundness, 12, *col); }
+                        else { d.draw_rectangle_rounded_lines(rec, roundness, 12, *col); }
+                    }
+                    Cmd::GradientRect(x1, y1, x2, y2, c1, c2, vertical) => {
+                        let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;
+                        let w = ((x2 - x1).abs() + 1) * s; let h = ((y2 - y1).abs() + 1) * s;
+                        if *vertical { d.draw_rectangle_gradient_v(x, y, w, h, *c1, *c2); }
+                        else { d.draw_rectangle_gradient_h(x, y, w, h, *c1, *c2); }
+                    }
+                    Cmd::Spline(pts, thick, col) => {
+                        if pts.len() >= 2 {
+                            let v: Vec<Vector2> = pts.iter()
+                                .map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
+                            // Catmull-Rom braucht >= 4 Punkte; sonst dicke Linie.
+                            if v.len() >= 4 { d.draw_spline_catmull_rom(&v, thick * s as f32, *col); }
+                            else {
+                                for i in 0..v.len() - 1 {
+                                    d.draw_line_ex(v[i], v[i + 1], thick * s as f32, *col);
+                                }
+                            }
+                        }
+                    }
+                    Cmd::BlendMode(m) => {
+                        // Folgende Draws bis zum naechsten BlendMode/Frame-Ende.
+                        // m == 0 (alpha) => zurueck auf Default (EndBlendMode).
+                        unsafe {
+                            if *m == 0 { raylib::ffi::EndBlendMode(); }
+                            else { raylib::ffi::BeginBlendMode(*m); }
+                        }
+                        cur_blend = *m;
+                    }
+                    Cmd::RtDraw(i, x, y, scale, tint) => {
+                        if let Some(rtgt) = render_targets.get(*i) {
+                            let tex = rtgt.rt.texture();   // &WeakTexture2D
+                            let tw = tex.width as f32; let th = tex.height as f32;
+                            // RenderTexture ist y-gespiegelt -> negative Quell-Hoehe.
+                            let src = Rectangle::new(0.0, 0.0, tw, -th);
+                            let dst = Rectangle::new((x * s) as f32, (y * s) as f32,
+                                tw * scale * s as f32, th * scale * s as f32);
+                            d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, *tint);
+                        }
+                    }
                     Cmd::ScissorPush(x, y, w, h) => {
                         // Logische -> Screen-Pixel, dann mit aktuellem Clip schneiden.
                         let mut rx = x * s; let mut ry = y * s;
@@ -1608,10 +2290,129 @@ fn render_scene<D: RaylibDraw>(
                 }
               }
             }
-            // Sicherheit: unbalancierte Clips nicht in den naechsten Frame lecken.
+            // Sicherheit: unbalancierte Clips/Blend nicht in den naechsten Frame lecken.
             if !clip_stack.is_empty() { unsafe { raylib::ffi::EndScissorMode(); } }
+            if cur_blend != 0 { unsafe { raylib::ffi::EndBlendMode(); } }
 }
 
+
+// === Radiance-`.hdr`-(RGBE)-Loader ===
+// raylib-sys 5.5.1 ist ohne SUPPORT_FILEFORMAT_HDR gebaut, daher dekodieren wir
+// das equirectangulare HDR-Panorama selbst zu RGBA32F (row-major, A=1) fuer
+// LIGHT_ENV_HDR. Unterstuetzt die neue (2,2,..) und alte/flache RLE-Form.
+
+fn rgbe_to_float(r: u8, g: u8, b: u8, e: u8) -> (f32, f32, f32) {
+    if e == 0 { return (0.0, 0.0, 0.0); }
+    let f = (2.0f32).powi(e as i32 - (128 + 8));
+    (r as f32 * f, g as f32 * f, b as f32 * f)
+}
+
+/// Dekodiert eine Scanline (W Pixel RGBE) -> `scan` (W*4 Bytes).
+fn hdr_decode_scanline(b: &[u8], pos: &mut usize, w: usize, scan: &mut [u8]) -> Result<(), String> {
+    if *pos + 4 > b.len() { return Err("Scanline-Ende".into()); }
+    let (h0, h1, h2, h3) = (b[*pos], b[*pos + 1], b[*pos + 2], b[*pos + 3]);
+    let new_rle = h0 == 2 && h1 == 2 && (((h2 as usize) << 8) | h3 as usize) == w
+        && (8..=0x7fff).contains(&w);
+    if !new_rle {
+        // Flache RGBE-Pixel (mit optionaler alter RLE: (1,1,1,n) wiederholt vorigen).
+        let mut x = 0usize;
+        let mut prev = [0u8; 4];
+        let mut shift = 0u32;
+        while x < w {
+            if *pos + 4 > b.len() { return Err("vorzeitiges Ende (flat)".into()); }
+            let px = [b[*pos], b[*pos + 1], b[*pos + 2], b[*pos + 3]];
+            *pos += 4;
+            if px[0] == 1 && px[1] == 1 && px[2] == 1 {
+                let count = (px[3] as usize) << shift;
+                for _ in 0..count {
+                    if x >= w { break; }
+                    scan[x * 4..x * 4 + 4].copy_from_slice(&prev);
+                    x += 1;
+                }
+                shift += 8;
+            } else {
+                scan[x * 4..x * 4 + 4].copy_from_slice(&px);
+                prev = px;
+                x += 1;
+                shift = 0;
+            }
+        }
+        return Ok(());
+    }
+    *pos += 4; // RLE-Header ueberspringen
+    // Neue RLE: 4 Kanaele getrennt, je W Bytes (Run wenn count > 128).
+    for ch in 0..4 {
+        let mut x = 0usize;
+        while x < w {
+            if *pos >= b.len() { return Err("RLE-Ende".into()); }
+            let count = b[*pos];
+            *pos += 1;
+            if count > 128 {
+                let n = (count - 128) as usize;
+                if *pos >= b.len() { return Err("RLE-Run-Ende".into()); }
+                let val = b[*pos];
+                *pos += 1;
+                for _ in 0..n {
+                    if x >= w { return Err("RLE-Ueberlauf".into()); }
+                    scan[x * 4 + ch] = val;
+                    x += 1;
+                }
+            } else {
+                for _ in 0..count as usize {
+                    if x >= w || *pos >= b.len() { return Err("RLE-Literal-Ende".into()); }
+                    scan[x * 4 + ch] = b[*pos];
+                    *pos += 1;
+                    x += 1;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Laedt ein Radiance-`.hdr` -> (RGBA32F-Pixel, Breite, Hoehe).
+fn load_hdr_rgbe(path: &str) -> Result<(Vec<f32>, i32, i32), String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("nicht lesbar: {}", e))?;
+    let mut pos = 0usize;
+    let read_line = |b: &[u8], p: &mut usize| -> String {
+        let start = *p;
+        while *p < b.len() && b[*p] != b'\n' { *p += 1; }
+        let s = String::from_utf8_lossy(&b[start..*p]).to_string();
+        if *p < b.len() { *p += 1; }
+        s
+    };
+    let magic = read_line(&bytes, &mut pos);
+    if !magic.starts_with("#?") { return Err("kein Radiance-Header (#?RADIANCE)".into()); }
+    // Header-Zeilen bis Leerzeile.
+    loop {
+        if pos >= bytes.len() { return Err("unerwartetes Ende im Header".into()); }
+        let line = read_line(&bytes, &mut pos);
+        if line.is_empty() { break; }
+    }
+    // Aufloesungszeile, ueblich "-Y H +X W".
+    let res = read_line(&bytes, &mut pos);
+    let parts: Vec<&str> = res.split_whitespace().collect();
+    if parts.len() != 4 { return Err(format!("unerwartete Aufloesungszeile '{}'", res)); }
+    let height: i32 = parts[1].parse().map_err(|_| "Hoehe ungueltig".to_string())?;
+    let width: i32 = parts[3].parse().map_err(|_| "Breite ungueltig".to_string())?;
+    if width <= 0 || height <= 0 { return Err("ungueltige Dimension".into()); }
+    let top_down = parts[0] == "-Y"; // Standard: erste Scanline = oben
+    let (w, h) = (width as usize, height as usize);
+    let mut out = vec![0f32; w * h * 4];
+    let mut scan = vec![0u8; w * 4];
+    for y in 0..h {
+        hdr_decode_scanline(&bytes, &mut pos, w, &mut scan)?;
+        // GL-Texturen erwarten Zeile 0 = unten; raylib-Bilder Zeile 0 = oben.
+        // top_down (-Y): erste Scanline ist oben -> nach unten gespiegelt ablegen.
+        let row = if top_down { h - 1 - y } else { y };
+        for x in 0..w {
+            let (fr, fg, fb) = rgbe_to_float(scan[x*4], scan[x*4+1], scan[x*4+2], scan[x*4+3]);
+            let o = (row * w + x) * 4;
+            out[o] = fr; out[o+1] = fg; out[o+2] = fb; out[o+3] = 1.0;
+        }
+    }
+    Ok((out, width, height))
+}
 
 /// SDL/pygame-Keycode (Wert der GB-KEY_*-Konstanten) -> raylib KeyboardKey.
 fn map_key(code: i64) -> Option<KeyboardKey> {

@@ -325,6 +325,18 @@ def _light_env(g, *args):
     _native_only("LIGHT_ENV")
 
 
+@graphics_builtin("LIGHT_ENV_HDR", arity=(1, 2), types=None)
+def _light_env_hdr(g, *args):
+    """LIGHT_ENV_HDR(pfad$ [, intensitaet]) -- echtes HDR-Cubemap-IBL: laedt ein
+    equirectangulares .hdr-Panorama und berechnet einmalig Irradiance- (diffus)
+    + Prefilter- (spekular, Roughness-Mips) + BRDF-LUT-Maps. Aktiviert den
+    Cubemap-Pfad im PBR-Shader (useIBLMaps); Metalle spiegeln dann die echte
+    Umgebung statt der analytischen LIGHT_ENV-Naeherung. intensitaet Default 1.0
+    (= envIntensity, 0 = aus). NUR native Runtime (gbrt/F6); braucht ein
+    geladenes .hdr (z.B. examples/assets/ibl_env.hdr via download_hdri.py)."""
+    _native_only("LIGHT_ENV_HDR")
+
+
 @graphics_builtin("LIGHT_DIRECTIONAL", arity=4)
 def _light_directional(g, *args):
     """LIGHT_DIRECTIONAL(dx, dy, dz, farbe) -> INTEGER -- gerichtetes Licht
