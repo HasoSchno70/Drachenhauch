@@ -93,8 +93,32 @@ feature-gated (Standard-`.exe` bleibt schlank).
     nimmt sie dazu (`--full` = alles). Default-Dev-Build laesst Hardware weg
     (haelt die schweren Deps tokio/btleplug/windows aus dem Normal-Build).
 
-**Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 11 zuvor Python-only-
+**Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.
+
+### Geplant (nächster Schritt): echtes HDR-Cubemap-IBL
+
+Einziges noch offenes 3D-Feature. Ersetzt die analytische `LIGHT_ENV`-Näherung
+durch echte Environment-Maps aus einem `.hdr`. Im Kern ein Port von raylibs
+`shaders_basic_pbr`-Beispiel (die `GenTexture*`-Helfer sind nicht in raylib-core
+— via raylib-rs `ffi`/`rlgl` nachbauen, wie beim Shadow-Mapping schon gemacht):
+
+1. `.hdr` laden (equirect-Panorama-Textur, R32G32B32).
+2. equirect → Cubemap (FBO + Cubemap-Shader, 6 Faces).
+3. Irradiance-Cubemap (Convolution, ~32px) — diffuse IBL.
+4. Prefilter-Cubemap (GGX, Roughness-Mips) — specular IBL.
+5. BRDF-LUT (2D, 512²) — einmalig.
+6. Eingebetteten PBR-`LIGHT_FS` erweitern: `samplerCube irradianceMap/prefilterMap`
+   + `sampler2D brdfLUT` + `useIBLMaps`-Gate; Fallback = bestehender analytischer
+   Pfad (bleibt erhalten, kein `.hdr` nötig).
+7. Builtin `LIGHT_ENV_HDR(pfad$)` (native-only); `LIGHT_ENV` bleibt als billige
+   Alternative.
+
+Dateien: `graphics.rs` (Shader-Consts + 3 Map-Felder + `gen_ibl()` +
+`light_env_hdr()`), `vm.rs` (Dispatch), `g3d.py` (native-only Stub). Braucht ein
+CC0-`.hdr` (Download-Skript-Pattern wie Audio-Assets, gitignored) + Demo
+`examples/99_ibl_hdr.gb`. Verifikation: headless-Screenshot, Chrom-Kugel spiegelt
+die Umgebung. GPU-/ffi-lastig, visuell zu prüfen → eigene Session.
 
 ## Dev-Run-Loop: `gbrun.py --native`
 
