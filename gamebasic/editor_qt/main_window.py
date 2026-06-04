@@ -990,14 +990,16 @@ class GameBasicEditor(QMainWindow):
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
-        self.console.start_run(st.file_path)
+        if self.console.start_run(st.file_path):
+            self.tabs.set_running(st.file_path, "py")
 
     def _run_native_active(self) -> None:
         if not self._ensure_saved_for_run():
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
-        self.console.start_run_native(st.file_path)
+        if self.console.start_run_native(st.file_path):
+            self.tabs.set_running(st.file_path, "native")
 
     def _export_active(self) -> None:
         """Buendelt die aktive Datei zu einer standalone .exe (gbrt + Bytecode +
@@ -1093,7 +1095,8 @@ class GameBasicEditor(QMainWindow):
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
-        self.console.start_run(st.file_path, ["--bench"])
+        if self.console.start_run(st.file_path, ["--bench"]):
+            self.tabs.set_running(st.file_path, "py")
 
     def _ensure_saved_for_run(self) -> bool:
         if self.console.is_running():
@@ -1121,6 +1124,7 @@ class GameBasicEditor(QMainWindow):
         self.act_run_native.setEnabled(True)
         self.act_bench.setEnabled(True)
         self.act_stop.setEnabled(False)
+        self.tabs.set_running(None)        # Run-Markierung am Tab abraeumen
         self.statusBar().showMessage("Bereit", 3000)
 
     def _on_console_jump(self, file: object, line: int) -> None:

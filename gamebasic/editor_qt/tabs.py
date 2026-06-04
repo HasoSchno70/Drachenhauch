@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QAction, QMouseEvent
+from PySide6.QtGui import QAction, QColor, QMouseEvent
 from PySide6.QtWidgets import (
     QHBoxLayout, QMenu, QTabBar, QTabWidget, QToolButton, QWidget,
 )
@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from .code_editor import CodeEditor
 from .icons import icons
 from .minimap import Minimap
+from .theme import COLORS
 
 
 @dataclass
@@ -85,6 +86,10 @@ class TabbedEditorArea(QTabWidget):
         self.setMovable(True)
         self.setDocumentMode(True)
         self._states: list[TabState] = []
+        # Welche Datei laeuft gerade + in welchem Modus ("py"/"native").
+        # Treibt die Run-Markierung des zugehoerigen Tabs (Praefix + Farbe).
+        self._running_path: Path | None = None
+        self._running_mode: str = "py"
         self.tabCloseRequested.connect(self._on_close_clicked)
         self.currentChanged.connect(self._on_current_changed)
 
@@ -183,10 +188,31 @@ class TabbedEditorArea(QTabWidget):
             idx = self._states.index(st)
             self.setTabText(idx, self._tab_label(st))
 
+    def set_running(self, path: Path | None, mode: str = "py") -> None:
+        """Markiert den Tab der laufenden Datei (Praefix ▶/⚙ + Akzent-Farbe).
+
+        `path=None` raeumt die Markierung wieder ab. `mode` unterscheidet
+        Tree-Walker (F5, "py") von nativer Runtime (F6, "native"). Wird die
+        Datei in keinem Tab gehalten (z.B. ein Selection-Run aus einer
+        Temp-Datei), bleibt schlicht kein Tab markiert.
+        """
+        self._running_path = path
+        self._running_mode = mode
+        bar = self.tabBar()
+        for idx, st in enumerate(self._states):
+            self.setTabText(idx, self._tab_label(st))
+            is_running = path is not None and st.file_path == path
+            # Ungueltige QColor -> QTabBar nimmt die Default-Textfarbe.
+            bar.setTabTextColor(idx, QColor(COLORS["accent"]) if is_running else QColor())
+
     # -------------------------------------------------------- Internal
     def _tab_label(self, st: TabState) -> str:
         name = st.file_path.name if st.file_path else "(neu)"
-        prefix = "● " if st.editor.document().isModified() else "  "
+        if st.file_path is not None and st.file_path == self._running_path:
+            # Laufender Tab: ▶ Tree-Walker, ⚙ native Runtime.
+            prefix = "⚙ " if self._running_mode == "native" else "▶ "
+        else:
+            prefix = "● " if st.editor.document().isModified() else "  "
         return prefix + name
 
     def _on_dirty_changed(self, st: TabState) -> None:
