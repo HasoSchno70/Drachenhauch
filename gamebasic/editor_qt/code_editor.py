@@ -189,6 +189,13 @@ class CodeEditor(
         self._setup_completer()
         self._auto_complete_enabled = True
 
+        # Signature-Help (Parameter-Hints beim Tippen eines Aufrufs).
+        from .signature_help import SignaturePopup
+        self._sig_popup = SignaturePopup(self)
+        self.cursorPositionChanged.connect(self._update_signature_help)
+        self.verticalScrollBar().valueChanged.connect(
+            lambda _v: self._sig_popup.hide())
+
         theme_signals.changed.connect(self._on_theme_changed)
 
         self._update_viewport_margins(0)
@@ -697,12 +704,79 @@ class CodeEditor(
         cr.translate(self.viewportMargins().left(), self.viewportMargins().top())
         self._completer.complete(cr)
 
+    # ------------------------------------- Signature-Help
+    def _update_signature_help(self) -> None:
+        """Zeigt/aktualisiert das Parameter-Hint-Popup je nach Cursor-Kontext.
+
+        Laeuft bei jeder Cursor-Bewegung -- bewusst guenstig gehalten:
+        nur die letzten ~2000 Zeichen vor dem Cursor werden geparst, die
+        volle Quelle (fuer User-Funktionen) erst geholt, wenn ein Aufruf
+        erkannt wurde und kein Built-in passt."""
+        from .signature_help import (
+            find_active_call, render_signature_html,
+        )
+        # Completer-Popup hat Vorrang -- nicht ueberlagern.
+        if self._completer.popup().isVisible():
+            self._sig_popup.hide()
+            return
+        cur = self.textCursor()
+        if cur.hasSelection():
+            self._sig_popup.hide()
+            return
+        pos = cur.position()
+        c = self.textCursor()
+        c.setPosition(max(0, pos - 2000))
+        c.setPosition(pos, QTextCursor.MoveMode.KeepAnchor)
+        # selectedText nutzt U+2029 (Paragraph-Separator) als Zeilentrenner.
+        text_before = c.selectedText().replace("\u2029", "\n")
+        call = find_active_call(text_before)
+        if call is None:
+            self._sig_popup.hide()
+            return
+        name, arg_index = call
+        sig = self._builtin_signature(name)
+        if sig is None:
+            sig = self._user_signature(name)
+        if not sig:
+            self._sig_popup.hide()
+            return
+        html = render_signature_html(sig, arg_index)
+        rect = self.cursorRect()
+        top_left = self.viewport().mapToGlobal(rect.bottomLeft())
+        anchor_top = self.viewport().mapToGlobal(rect.topLeft())
+        self._sig_popup.show_html(html, top_left, anchor_top)
+
+    @staticmethod
+    def _builtin_signature(name: str) -> str | None:
+        # Kuratierte Doku-Signatur bevorzugen (benannte Params, z.B.
+        # "LINE(x1, y1, x2, y2[, farbe])") -- die Registry liefert bei
+        # variabler Arity nur "N Argumente".
+        from .builtin_docs import get_doc
+        doc = get_doc(name)
+        if doc and doc[0]:
+            return doc[0]
+        from ..builtins_registry import signature_text
+        return signature_text(name) or None
+
+    def _user_signature(self, name: str) -> str | None:
+        from .symbols import extract_user_doc
+        res = extract_user_doc(self.get_text(), name)
+        if res is None:
+            return None
+        sig, _doc = res
+        # Nur SUB/FUNCTION (haben eine Param-Klammer) -- kein DIM/CONST/CLASS.
+        return sig if "(" in sig else None
+
     # ------------------------------------- Multi-Cursor (Strg+D)
 
 
 
     # ------------------------------------- Tab / Auto-Indent / Snippet
     def keyPressEvent(self, event):  # noqa: N802
+        # Esc raeumt das Signature-Help-Popup ab (ohne den Event zu schlucken --
+        # weitere Esc-Handler wie Multi-Cursor laufen danach normal).
+        if event.key() == Qt.Key.Key_Escape:
+            self._sig_popup.hide()
         # Wenn das Completer-Popup sichtbar ist: Enter/Tab -> Auswahl uebernehmen,
         # Esc -> ausblenden, Up/Down -> Popup-Navigation (default-Forward).
         if self._completer.popup().isVisible():
@@ -990,6 +1064,12 @@ class CodeEditor(
             event.accept()
             return
         super().wheelEvent(event)
+
+    def focusOutEvent(self, event):  # noqa: N802
+        # Editor verliert Fokus -> Signature-Help-Popup wegblenden.
+        if hasattr(self, "_sig_popup"):
+            self._sig_popup.hide()
+        super().focusOutEvent(event)
 
     def mousePressEvent(self, event):  # noqa: N802
         ctrl = event.modifiers() & Qt.KeyboardModifier.ControlModifier
