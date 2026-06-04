@@ -42,6 +42,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[SFX-Generator](docs/sfx-generator.md)** — Retro-Soundeffekte (`gbsfx`, sfxr-Stil): Synth mit Pitch-Slide/Hüllkurve/Vibrato, Export WAV/GB-Code
 - **[Tracker](docs/tracker.md)** — mehrspuriger Chiptune-Musik-Editor (`gbtracker`): 3 Ton-Kanäle + Drums, mehrere Patterns einstellbarer Länge + Song-Arrangement, Projekt-Speichern/Laden (`.json`), Export als frame-basierter GB-Player
 - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** — Tiles aufs Gitter malen (`gbtilemap`): mehrere Layer, Per-Tile-Properties (`solid`/`damage`), Stift/Füllen/Rechteck/Pipette, Speichern/Laden als Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer-Export
+- **[Language Server + VSCode-Extension](docs/lsp.md)** — GameBasic in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline (`py -m gamebasic.lsp`, `vscode-gamebasic/`)
 
 ## Beispiele
 

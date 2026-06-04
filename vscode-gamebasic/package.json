@@ -1,0 +1,52 @@
+{
+  "name": "gamebasic",
+  "displayName": "GameBasic",
+  "description": "Sprachunterstuetzung fuer GameBasic (.gb): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
+  "version": "1.0.0",
+  "publisher": "gamebasic",
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:gamebasic"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "gamebasic",
+        "aliases": ["GameBasic", "gamebasic", "gb"],
+        "extensions": [".gb"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "gamebasic",
+        "scopeName": "source.gamebasic",
+        "path": "./syntaxes/gamebasic.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "GameBasic",
+      "properties": {
+        "gamebasic.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Python-Interpreter, der den GameBasic-Language-Server startet (am besten der .venv-Python des Projekts)."
+        },
+        "gamebasic.serverModule": {
+          "type": "string",
+          "default": "gamebasic.lsp",
+          "description": "Python-Modul des Language-Servers (py -m <modul>)."
+        },
+        "gamebasic.enableLanguageServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "Language-Server aktivieren (Diagnostics/Completion/Hover/...). Bei false bleibt nur Syntax-Highlighting."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

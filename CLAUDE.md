@@ -1590,6 +1590,25 @@ Export (Atlas-PNG als Tileset).
 lext+parst+kompiliert. **Stolperstein:** `MAP` ist ein Keyword (MAP OF T) → im
 GB-Code-Export keine Variable `map` (heißt `lvl`).
 
+## Language Server (`gamebasic.lsp`) + VSCode-Extension
+
+Externe Editor-Unterstützung via **LSP**, mit derselben Sprach-Intelligenz wie
+der Qt-Editor. Start: `py -m gamebasic.lsp` (stdio, JSON-RPC). Aufbau bewusst
+zweigeteilt: [`gamebasic/lsp/features.py`](gamebasic/lsp/features.py) =
+**transport-freie** Feature-Logik (Text+Position → LSP-Daten: diagnostics/
+completions/hover/definition/references/document_symbols), headless testbar;
+[`gamebasic/lsp/server.py`](gamebasic/lsp/server.py) (`LspServer`) = nur
+JSON-RPC + Dokument-Store + Position/URI-Mapping. Beide bauen auf den schon
+vorhandenen Editor-Bausteinen auf (`editor_qt/symbols.py`, `error_check.py`,
+`builtin_docs.py`, `completer.py`) — **keine Logik-Duplizierung**. Tests:
+[`tests/test_lsp_features.py`](tests/test_lsp_features.py) (Feature-Logik) +
+[`tests/test_lsp_server.py`](tests/test_lsp_server.py) (Protokoll + echter
+stdio-Subprozess). VSCode-Extension in [`vscode-gamebasic/`](vscode-gamebasic/):
+`extension.js` startet den Server, die TextMate-Grammatik wird aus den echten
+Lexer-Keywords + Built-ins **generiert** (`build_grammar.py`). Doku
+[docs/lsp.md](docs/lsp.md). **Bei neuen Keywords/Built-ins:** Grammatik neu
+generieren (`python vscode-gamebasic/build_grammar.py`).
+
 ## Build und Test (mit Cython-Modulen)
 
 ```
