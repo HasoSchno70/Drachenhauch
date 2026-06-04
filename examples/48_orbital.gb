@@ -528,8 +528,11 @@ WHILE NOT QUITREQUESTED()
     ' --- Zeichnen ---------------------------------------------------
     CLS(&H05060F)
 
-    ' 1) Sterne im Screen-Space (Camera explizit zurueck)
+    ' 0) Tiefen-Verlauf als Weltraum-Hintergrund (Screen-Space).
     CAMERA_RESET()
+    GRADIENTV(0, 0, WIDTH - 1, HEIGHT - 1, &H100A24, &H04050C)
+
+    ' 1) Sterne im Screen-Space (Camera explizit zurueck)
     FOR i = 0 TO N_STARS - 1
         ' Tupel-Destructuring: jeder Stern liefert seine drei Werte
         ' direkt aus dem Tupel-of-Tupel.
@@ -603,6 +606,10 @@ WHILE NOT QUITREQUESTED()
     ' fuer einen weicheren Glow-Uebergang von Schwarz nach Innen-Weiss.
     DIM scale AS FLOAT
     scale = TWEEN_VALUE(sun_pulse)
+    ' Additives Blending laesst die Schichten zu einem weichen Bloom verschmelzen
+    ' (nativ; im pygame-Pfad No-Op -> normaler Glow).
+    BLEND_MODE("add")
+    CIRCLE(0, 0, 52 * scale, &H100A04)        ' weiter Halo-Schein
     CIRCLE(0, 0, 38 * scale, &H1A1009)
     CIRCLE(0, 0, 28 * scale, &H332211)
     CIRCLE(0, 0, 22 * scale, &H66441A)
@@ -610,6 +617,7 @@ WHILE NOT QUITREQUESTED()
     CIRCLE(0, 0, 10 * scale, &HFFCC44)
     CIRCLE(0, 0,  6 * scale, &HFFEE99)
     CIRCLE(0, 0,  3 * scale, &HFFFFFF)
+    BLEND_MODE("alpha")
 
     ' Planeten
     FOR i = 0 TO N_PLANETS - 1
@@ -634,7 +642,11 @@ WHILE NOT QUITREQUESTED()
     NEXT
     comet.DrawBody()
 
-    ' Komet-Glanz: heller Mittelpunkt
+    ' Komet-Glanz: heller Mittelpunkt + additiver Schein (nativ).
+    BLEND_MODE("add")
+    CIRCLE(comet.x, comet.y, 5.0, &H224466)
+    CIRCLE(comet.x, comet.y, 2.5, &H88AACC)
+    BLEND_MODE("alpha")
     CIRCLE(comet.x, comet.y, 1.5, &HFFFFFF)
 
     ' Fokus-Marker -- kleines Fadenkreuz EXAKT in der Bildschirmmitte.
