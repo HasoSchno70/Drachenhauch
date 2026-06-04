@@ -395,14 +395,15 @@ class CodeEditor(
 
     # ------------------------------------------ Color-Swatches
     @staticmethod
-    def _scan_color_swatches(text: str) -> list[tuple[int, QColor]]:
-        """Liefert `(end_col, color)` fuer alle erkannten Color-Literale
-        in einer Zeile.
+    def _scan_color_swatches(text: str) -> list[tuple[int, int, QColor, str]]:
+        """Liefert `(start_col, end_col, color, kind)` fuer alle erkannten
+        Color-Literale in einer Zeile.
 
-        end_col ist der 0-basierte Spalten-Index DIREKT nach dem
-        Literal -- dort soll der Swatch hin.
+        `end_col` ist der Spalten-Index DIREKT nach dem Literal (dort sitzt der
+        Swatch), `start_col` der Anfang (fuer das Ersetzen beim Color-Picker),
+        `kind` ist `"hex"` (`&HRRGGBB`) oder `"rgb"` (`RGB(r, g, b)`).
         """
-        out: list[tuple[int, QColor]] = []
+        out: list[tuple[int, int, QColor, str]] = []
         for m in _HEX_COLOR_RE.finditer(text):
             try:
                 v = int(m.group(1), 16)
@@ -411,7 +412,7 @@ class CodeEditor(
             r = (v >> 16) & 0xFF
             g = (v >> 8) & 0xFF
             b = v & 0xFF
-            out.append((m.end(), QColor(r, g, b)))
+            out.append((m.start(), m.end(), QColor(r, g, b), "hex"))
         for m in _RGB_CALL_RE.finditer(text):
             try:
                 r = int(m.group(1))
@@ -421,8 +422,53 @@ class CodeEditor(
                 continue
             if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
                 continue
-            out.append((m.end(), QColor(r, g, b)))
+            out.append((m.start(), m.end(), QColor(r, g, b), "rgb"))
         return out
+
+    def _swatch_rect(self, block, end_col: int) -> QRect:
+        """Bildschirm-Rect des Swatches hinter `end_col` in `block`."""
+        cur = QTextCursor(self.document())
+        cur.setPosition(block.position() + end_col)
+        r = self.cursorRect(cur)
+        sx = r.right() + SWATCH_GAP
+        sy = r.top() + max(0, (r.height() - SWATCH_SIZE) // 2)
+        return QRect(sx, sy, SWATCH_SIZE, SWATCH_SIZE)
+
+    def _swatch_at(self, pos) -> tuple | None:
+        """`(abs_start, abs_end, color, kind)` des Swatches unter `pos`
+        (Viewport-Koordinate) oder None."""
+        block = self.firstVisibleBlock()
+        offset = self.contentOffset()
+        vp_h = self.viewport().height()
+        while block.isValid():
+            br = self.blockBoundingGeometry(block).translated(offset)
+            if br.top() > vp_h:
+                break
+            text = block.text()
+            if block.isVisible() and br.bottom() >= 0 and (
+                    "&H" in text or "RGB" in text.upper()):
+                for start_col, end_col, color, kind in self._scan_color_swatches(text):
+                    if self._swatch_rect(block, end_col).contains(pos):
+                        return (block.position() + start_col,
+                                block.position() + end_col, color, kind)
+            block = block.next()
+        return None
+
+    def _edit_color_literal(self, abs_start: int, abs_end: int,
+                            color: QColor, kind: str) -> None:
+        """Oeffnet den Farbwaehler und ersetzt das Literal im selben Format."""
+        from PySide6.QtWidgets import QColorDialog
+        new = QColorDialog.getColor(color, self, "Farbe waehlen")
+        if not new.isValid():
+            return
+        if kind == "rgb":
+            repl = f"RGB({new.red()}, {new.green()}, {new.blue()})"
+        else:
+            repl = f"&H{new.red():02X}{new.green():02X}{new.blue():02X}"
+        cur = QTextCursor(self.document())
+        cur.setPosition(abs_start)
+        cur.setPosition(abs_end, QTextCursor.MoveMode.KeepAnchor)
+        cur.insertText(repl)
 
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
@@ -460,16 +506,11 @@ class CodeEditor(
                     painter.drawLine(x, top_y, x, bot_y)
             # --- Color-Swatches --------------------------------------
             if "&H" in text or "RGB" in text.upper():
-                for end_col, color in self._scan_color_swatches(text):
-                    abs_pos = block.position() + end_col
-                    cur = QTextCursor(self.document())
-                    cur.setPosition(abs_pos)
-                    r = self.cursorRect(cur)
-                    sx = r.right() + SWATCH_GAP
-                    sy = r.top() + max(0, (r.height() - SWATCH_SIZE) // 2)
-                    painter.fillRect(sx, sy, SWATCH_SIZE, SWATCH_SIZE, color)
+                for _start, end_col, color, _kind in self._scan_color_swatches(text):
+                    rect = self._swatch_rect(block, end_col)
+                    painter.fillRect(rect, color)
                     painter.setPen(border)
-                    painter.drawRect(sx, sy, SWATCH_SIZE, SWATCH_SIZE)
+                    painter.drawRect(rect)
             block = block.next()
 
     # ----------------------------------------------- Live-Errors
@@ -1168,6 +1209,12 @@ class CodeEditor(
             if sym:
                 self.goto_definition_requested.emit(sym)
             return
+        # Click auf einen Color-Swatch -> Farbwaehler oeffnen.
+        if event.button() == Qt.MouseButton.LeftButton and not ctrl:
+            hit = self._swatch_at(event.position().toPoint())
+            if hit is not None:
+                self._edit_color_literal(*hit)
+                return
         # Click ohne Modifier ausserhalb Multi-Selektion -> sekundaere
         # Cursor verwerfen.
         if event.button() == Qt.MouseButton.LeftButton and not ctrl:
