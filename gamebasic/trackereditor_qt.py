@@ -1,10 +1,15 @@
 """Chiptune-Tracker fuer GameBasic (`gbtracker` / `gbrun.py --tracker`).
 
 Mehrspuriger Pattern-Editor: 3 Ton-Kanaele (je eigene Waveform) + 1 Noise-
-Kanal (Drums), 16 Reihen pro Pattern. Noten per klickbarer Klaviatur in die
-Gitter-Zellen setzen, abspielen (nutzt den geteilten Synth `gamebasic.synth`),
-und als GB-Code exportieren -- ein frame-basierter Player (`TRACKER_UPDATE`),
-der mit `DELTA()` im Game-Loop laeuft.
+Kanal (Drums). **Mehrere Patterns mit einstellbarer Laenge + Song-Arrangement**
+(Order: Reihenfolge, in der Patterns abgespielt werden). Noten per klickbarer
+Klaviatur in die Gitter-Zellen setzen, Pattern ODER ganzen Song abspielen
+(nutzt den geteilten Synth `gamebasic.synth`), Projekt als `.json` speichern/
+laden und als GB-Code exportieren -- ein frame-basierter Player
+(`TRACKER_UPDATE`), der mit `DELTA()` im Game-Loop laeuft.
+
+Das Datenmodell + I/O + GB-Export liegen Qt-frei in `gamebasic.tracker`
+(headless getestet).
 """
 from __future__ import annotations
 
@@ -14,27 +19,17 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QMainWindow, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget,
-    QTableWidgetItem, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
+    QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .synth import synthesize
-
-_NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-_WAVEFORMS = ("square", "saw", "sine", "triangle")
-_ROWS = 16
-_TONAL = 3                 # Kanaele 0..2 tonal, Kanal 3 = Noise/Drum
-_CHANNELS = _TONAL + 1
-
-
-def midi_to_freq(m: int) -> float:
-    return 440.0 * (2.0 ** ((m - 69) / 12.0))
-
-
-def note_name(m: int) -> str:
-    return f"{_NOTE_NAMES[m % 12]}{m // 12 - 1}"
+from .tracker import (
+    CHANNELS, TONAL, WAVEFORMS, Song, midi_to_freq, note_name,
+)
 
 
 class _Piano(QWidget):
@@ -105,14 +100,15 @@ class _Piano(QWidget):
 class TrackerEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
-        self.project_root = project_root
+        self.project_root = Path(project_root)
         self.setWindowTitle("GameBasic Tracker")
-        self.resize(720, 660)
-        # Pattern: pro Kanal eine Liste von _ROWS (MIDI-Note oder None).
-        self.pattern = [[None] * _ROWS for _ in range(_CHANNELS)]
-        self.wave = ["square", "saw", "triangle"]      # Kanal 0..2
+        self.resize(760, 760)
+        self.song = Song()
+        self.cur = 0                   # aktueller Pattern-Index
         self._sound_cache: dict = {}
+        self._play_mode = None         # None | "pattern" | "song"
         self._play_row = 0
+        self._play_order_pos = 0
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -123,90 +119,173 @@ class TrackerEditor(QMainWindow):
         title.setFont(tf)
         root.addWidget(title)
 
-        # Transport
+        # --- Transport ---
         top = QHBoxLayout()
-        self.btn_play = QPushButton("▶ Abspielen")
+        self.btn_play = QPushButton("▶ Pattern")
         self.btn_play.setProperty("accent", True)
-        self.btn_play.clicked.connect(self._toggle_play)
+        self.btn_play.clicked.connect(lambda: self._toggle_play("pattern"))
         top.addWidget(self.btn_play)
+        self.btn_song = QPushButton("▶ Song")
+        self.btn_song.clicked.connect(lambda: self._toggle_play("song"))
+        top.addWidget(self.btn_song)
         top.addWidget(QLabel("BPM:"))
-        self.bpm = QSpinBox(); self.bpm.setRange(40, 300); self.bpm.setValue(120)
+        self.bpm = QSpinBox(); self.bpm.setRange(40, 300); self.bpm.setValue(self.song.bpm)
+        self.bpm.valueChanged.connect(self._on_bpm)
         top.addWidget(self.bpm)
-        # Waveform pro Ton-Kanal
         self.wave_combos = []
-        for ci in range(_TONAL):
+        for ci in range(TONAL):
             top.addWidget(QLabel(f"Ch{ci + 1}:"))
-            cb = QComboBox(); cb.addItems(_WAVEFORMS)
-            cb.setCurrentText(self.wave[ci])
+            cb = QComboBox(); cb.addItems(WAVEFORMS)
+            cb.setCurrentText(self.song.waves[ci])
             cb.currentTextChanged.connect(lambda v, i=ci: self._set_wave(i, v))
             top.addWidget(cb)
             self.wave_combos.append(cb)
         top.addStretch(1)
-        b_clear = QPushButton("Leeren"); b_clear.clicked.connect(self._clear)
-        top.addWidget(b_clear)
         b_code = QPushButton("GB-Code"); b_code.clicked.connect(self._export)
         top.addWidget(b_code)
         root.addLayout(top)
 
-        # Pattern-Gitter
-        self.grid = QTableWidget(_ROWS, _CHANNELS)
+        # --- Datei + Pattern-Verwaltung ---
+        prow = QHBoxLayout()
+        b_new = QPushButton("Neu"); b_new.clicked.connect(self._new_song)
+        b_open = QPushButton("Oeffnen"); b_open.clicked.connect(self._open)
+        b_save = QPushButton("Speichern"); b_save.clicked.connect(self._save)
+        for b in (b_new, b_open, b_save):
+            prow.addWidget(b)
+        prow.addSpacing(16)
+        prow.addWidget(QLabel("Pattern:"))
+        self.pattern_combo = QComboBox()
+        self.pattern_combo.currentIndexChanged.connect(self._on_pattern_select)
+        prow.addWidget(self.pattern_combo)
+        prow.addWidget(QLabel("Reihen:"))
+        self.rows_spin = QSpinBox(); self.rows_spin.setRange(1, 64)
+        self.rows_spin.valueChanged.connect(self._on_rows)
+        prow.addWidget(self.rows_spin)
+        b_padd = QPushButton("+ Pattern"); b_padd.clicked.connect(self._add_pattern)
+        b_pdup = QPushButton("Duplizieren"); b_pdup.clicked.connect(self._dup_pattern)
+        b_pdel = QPushButton("Loeschen"); b_pdel.clicked.connect(self._del_pattern)
+        b_clear = QPushButton("Leeren"); b_clear.clicked.connect(self._clear)
+        for b in (b_padd, b_pdup, b_pdel, b_clear):
+            prow.addWidget(b)
+        prow.addStretch(1)
+        root.addLayout(prow)
+
+        # --- Pattern-Gitter ---
+        self.grid = QTableWidget(self.song.patterns[0].rows, CHANNELS)
         self.grid.setHorizontalHeaderLabels(["Ch1", "Ch2", "Ch3", "Drum"])
         self.grid.verticalHeader().setDefaultSectionSize(22)
-        self.grid.setVerticalHeaderLabels([f"{r:02d}" for r in range(_ROWS)])
         self.grid.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
         self.grid.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.grid.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.grid.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.grid.setFont(QFont(EDITOR_FONT_FAMILY, 10))
-        for r in range(_ROWS):
-            for c in range(_CHANNELS):
-                it = QTableWidgetItem("···")
-                it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.grid.setItem(r, c, it)
         self.grid.itemSelectionChanged.connect(self._audition_selected)
         root.addWidget(self.grid, 1)
 
-        # Klaviatur + Oktave
-        prow = QHBoxLayout()
-        prow.addWidget(QLabel("Oktave:"))
+        # --- Song-Arrangement (Order) ---
+        arow = QHBoxLayout()
+        arow.addWidget(QLabel("Song:"))
+        self.order_list = QListWidget()
+        self.order_list.setFlow(QListWidget.Flow.LeftToRight)
+        self.order_list.setFixedHeight(40)
+        self.order_list.setWrapping(False)
+        self.order_list.itemDoubleClicked.connect(self._order_jump)
+        arow.addWidget(self.order_list, 1)
+        b_oadd = QPushButton("+ akt."); b_oadd.clicked.connect(self._order_add)
+        b_odel = QPushButton("entf."); b_odel.clicked.connect(self._order_remove)
+        b_ol = QPushButton("◀"); b_ol.setFixedWidth(32)
+        b_ol.clicked.connect(lambda: self._order_move(-1))
+        b_or = QPushButton("▶"); b_or.setFixedWidth(32)
+        b_or.clicked.connect(lambda: self._order_move(1))
+        for b in (b_oadd, b_odel, b_ol, b_or):
+            arow.addWidget(b)
+        root.addLayout(arow)
+
+        # --- Klaviatur ---
+        krow = QHBoxLayout()
+        krow.addWidget(QLabel("Oktave:"))
         self.octave = QSpinBox(); self.octave.setRange(2, 6); self.octave.setValue(4)
         self.octave.valueChanged.connect(
             lambda v: self.piano.set_base(12 * (v + 1)))
-        prow.addWidget(self.octave)
-        prow.addWidget(QLabel("  (Zelle waehlen, dann Taste klicken; Entf loescht)"))
-        prow.addStretch(1)
-        root.addLayout(prow)
+        krow.addWidget(self.octave)
+        krow.addWidget(QLabel("  (Zelle waehlen, dann Taste klicken; Entf loescht)"))
+        krow.addStretch(1)
+        root.addLayout(krow)
         self.piano = _Piano()
         self.piano.set_base(12 * (self.octave.value() + 1))
         self.piano.note_clicked.connect(self._on_piano)
         root.addWidget(self.piano)
 
-        # Playback-Timer
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
 
-    # ---------------------------------------------------- Bearbeiten
+        self._reload_all()
+
+    # ============================================== Song/Pattern-Sync
+    def _reload_all(self) -> None:
+        """Komplettes UI aus self.song neu aufbauen."""
+        self.bpm.blockSignals(True); self.bpm.setValue(self.song.bpm); self.bpm.blockSignals(False)
+        for ci, cb in enumerate(self.wave_combos):
+            cb.blockSignals(True); cb.setCurrentText(self.song.waves[ci]); cb.blockSignals(False)
+        self.cur = min(self.cur, len(self.song.patterns) - 1)
+        self._reload_pattern_combo()
+        self._reload_order()
+        self._load_pattern(self.cur)
+
+    def _reload_pattern_combo(self) -> None:
+        self.pattern_combo.blockSignals(True)
+        self.pattern_combo.clear()
+        for i, p in enumerate(self.song.patterns):
+            self.pattern_combo.addItem(f"{i}: {p.name}")
+        self.pattern_combo.setCurrentIndex(self.cur)
+        self.pattern_combo.blockSignals(False)
+
+    def _load_pattern(self, idx: int) -> None:
+        """Gitter + Reihen-Spinbox aus Pattern `idx` fuellen."""
+        self.cur = idx
+        pat = self.song.patterns[idx]
+        self.rows_spin.blockSignals(True); self.rows_spin.setValue(pat.rows); self.rows_spin.blockSignals(False)
+        self.grid.blockSignals(True)
+        self.grid.setRowCount(pat.rows)
+        self.grid.setVerticalHeaderLabels([f"{r:02d}" for r in range(pat.rows)])
+        for r in range(pat.rows):
+            for c in range(CHANNELS):
+                it = QTableWidgetItem(self._cell_text(c, pat.data[c][r]))
+                it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.grid.setItem(r, c, it)
+        self.grid.blockSignals(False)
+
+    def _reload_order(self) -> None:
+        self.order_list.clear()
+        for p in self.song.order:
+            name = self.song.patterns[p].name if p < len(self.song.patterns) else "?"
+            self.order_list.addItem(QListWidgetItem(f"{p}:{name}"))
+
+    # ============================================== Bearbeiten
+    def _on_bpm(self, v: int) -> None:
+        self.song.bpm = v
+
     def _set_wave(self, ci: int, v: str) -> None:
-        self.wave[ci] = v
+        self.song.waves[ci] = v
         self._sound_cache.clear()
 
     def _cell_text(self, ci: int, note) -> str:
         if note is None:
             return "···"
-        return "  X" if ci == _TONAL else note_name(note)
+        return "  X" if ci == TONAL else note_name(note)
 
     def _set_note(self, row: int, ci: int, note) -> None:
-        self.pattern[ci][row] = note
+        self.song.patterns[self.cur].set(ci, row, note)
         self.grid.item(row, ci).setText(self._cell_text(ci, note))
 
     def _on_piano(self, midi: int) -> None:
-        self._play_note(self._sel_channel() if self._has_sel() else 0, midi)
+        ch = self._sel_channel() if self._has_sel() else 0
+        self._play_note(ch, midi)
         if self._has_sel():
             r, c = self._sel()
             self._set_note(r, c, midi)
-            # automatisch eine Reihe weiter
-            if r + 1 < _ROWS:
+            if r + 1 < self.song.patterns[self.cur].rows:
                 self.grid.setCurrentCell(r + 1, c)
 
     def _has_sel(self) -> bool:
@@ -221,7 +300,7 @@ class TrackerEditor(QMainWindow):
     def _audition_selected(self) -> None:
         if self._has_sel():
             r, c = self._sel()
-            n = self.pattern[c][r]
+            n = self.song.patterns[self.cur].data[c][r]
             if n is not None:
                 self._play_note(c, n)
 
@@ -233,18 +312,73 @@ class TrackerEditor(QMainWindow):
         super().keyPressEvent(e)
 
     def _clear(self) -> None:
-        for c in range(_CHANNELS):
-            for r in range(_ROWS):
-                self._set_note(r, c, None)
+        self.song.patterns[self.cur].clear()
+        self._load_pattern(self.cur)
 
-    # ---------------------------------------------------- Sound
+    # ============================================== Pattern-Verwaltung
+    def _on_pattern_select(self, idx: int) -> None:
+        if 0 <= idx < len(self.song.patterns):
+            self._load_pattern(idx)
+
+    def _on_rows(self, v: int) -> None:
+        self.song.patterns[self.cur].set_rows(v)
+        self._load_pattern(self.cur)
+
+    def _add_pattern(self) -> None:
+        idx = self.song.add_pattern(rows=self.song.patterns[self.cur].rows)
+        self.cur = idx
+        self._reload_pattern_combo()
+        self._load_pattern(idx)
+
+    def _dup_pattern(self) -> None:
+        idx = self.song.duplicate_pattern(self.cur)
+        self.cur = idx
+        self._reload_pattern_combo()
+        self._load_pattern(idx)
+
+    def _del_pattern(self) -> None:
+        if len(self.song.patterns) <= 1:
+            return
+        self.song.remove_pattern(self.cur)
+        self.cur = min(self.cur, len(self.song.patterns) - 1)
+        self._reload_pattern_combo()
+        self._reload_order()
+        self._load_pattern(self.cur)
+
+    # ============================================== Order/Arrangement
+    def _order_add(self) -> None:
+        self.song.order_add(self.cur)
+        self._reload_order()
+
+    def _order_remove(self) -> None:
+        pos = self.order_list.currentRow()
+        if pos >= 0:
+            self.song.order_remove(pos)
+            self._reload_order()
+
+    def _order_move(self, delta: int) -> None:
+        pos = self.order_list.currentRow()
+        if pos >= 0:
+            new = self.song.order_move(pos, delta)
+            self._reload_order()
+            self.order_list.setCurrentRow(new)
+
+    def _order_jump(self, item: QListWidgetItem) -> None:
+        pos = self.order_list.row(item)
+        if 0 <= pos < len(self.song.order):
+            idx = self.song.order[pos]
+            self.cur = idx
+            self._reload_pattern_combo()
+            self._load_pattern(idx)
+
+    # ============================================== Sound
     def _sound(self, ci: int, midi: int):
-        wf = "noise" if ci == _TONAL else self.wave[ci]
+        wf = "noise" if ci == TONAL else self.song.waves[ci]
         key = (ci, wf, midi)
         snd = self._sound_cache.get(key)
         if snd is None:
-            freq = 220.0 if ci == _TONAL else midi_to_freq(midi)
-            dec = 120 if ci == _TONAL else 220
+            freq = 220.0 if ci == TONAL else midi_to_freq(midi)
+            dec = 120 if ci == TONAL else 220
             wave = synthesize(wf, freq, 0.0, 4, 40, dec)
             snd = self._make_sound(wave)
             self._sound_cache[key] = snd
@@ -273,77 +407,100 @@ class TrackerEditor(QMainWindow):
             except Exception:
                 pass
 
-    # ---------------------------------------------------- Playback
-    def _toggle_play(self) -> None:
+    # ============================================== Playback
+    def _toggle_play(self, mode: str) -> None:
         if self._timer.isActive():
-            self._timer.stop()
-            self.btn_play.setText("▶ Abspielen")
-            self.grid.setRangeSelected(
-                self.grid.selectedRanges()[0], False) if self.grid.selectedRanges() else None
-        else:
-            self._play_row = 0
-            self._timer.setInterval(int(60000 / self.bpm.value() / 4))
-            self._timer.start()
-            self.btn_play.setText("■ Stop")
+            self._stop_play()
+            if self._play_mode == mode:
+                self._play_mode = None
+                return
+        self._play_mode = mode
+        self._play_row = 0
+        self._play_order_pos = 0
+        if mode == "song" and self.song.order:
+            self._load_pattern(self.song.order[0])
+            self._reload_pattern_combo()
+        self._timer.setInterval(self.song.row_ms())
+        self._timer.start()
+        self.btn_play.setText("■ Stop" if mode == "pattern" else "▶ Pattern")
+        self.btn_song.setText("■ Stop" if mode == "song" else "▶ Song")
+
+    def _stop_play(self) -> None:
+        self._timer.stop()
+        self.btn_play.setText("▶ Pattern")
+        self.btn_song.setText("▶ Song")
 
     def _tick(self) -> None:
-        r = self._play_row
-        self.grid.selectRow(r)
-        for c in range(_CHANNELS):
-            n = self.pattern[c][r]
+        if self._play_mode == "pattern":
+            pat = self.song.patterns[self.cur]
+            self._play_row %= pat.rows
+            self.grid.selectRow(self._play_row)
+            self._play_columns(pat, self._play_row)
+            self._play_row = (self._play_row + 1) % pat.rows
+        elif self._play_mode == "song":
+            order = self.song.order or [0]
+            self._play_order_pos %= len(order)
+            p_idx = order[self._play_order_pos]
+            if p_idx != self.cur:
+                self.cur = p_idx
+                self._reload_pattern_combo()
+                self._load_pattern(p_idx)
+            pat = self.song.patterns[p_idx]
+            self._play_row %= pat.rows
+            self.grid.selectRow(self._play_row)
+            self._play_columns(pat, self._play_row)
+            self._play_row += 1
+            if self._play_row >= pat.rows:
+                self._play_row = 0
+                self._play_order_pos = (self._play_order_pos + 1) % len(order)
+
+    def _play_columns(self, pat, row: int) -> None:
+        for c in range(CHANNELS):
+            n = pat.data[c][row]
             if n is not None:
                 self._play_note(c, n)
-        self._play_row = (r + 1) % _ROWS
 
-    # ---------------------------------------------------- Export
+    # ============================================== Datei
+    def _new_song(self) -> None:
+        self.song = Song()
+        self.cur = 0
+        self._reload_all()
+        self.setWindowTitle("GameBasic Tracker")
+
+    def _open(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Tracker-Projekt oeffnen", str(self.project_root),
+            "Tracker-Projekt (*.json)")
+        if not path:
+            return
+        try:
+            self.song = Song.load_json(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
+            return
+        self.cur = 0
+        self._sound_cache.clear()
+        self._reload_all()
+        self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")
+
+    def _save(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Tracker-Projekt speichern", str(self.project_root),
+            "Tracker-Projekt (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        try:
+            self.song.save_json(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
+            return
+        self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")
+
+    # ============================================== Export
     def _export(self) -> None:
-        rowms = int(60000 / self.bpm.value() / 4)
-        lines = ['IMPORT "audio"', "",
-                 f"' === Tracker-Song (GameBasic-Tracker) -- {_CHANNELS} Kanaele, "
-                 f"{_ROWS} Reihen, BPM {self.bpm.value()} ===",
-                 f"CONST TRK_ROWS = {_ROWS}",
-                 f"CONST TRK_ROWMS = {rowms}", ""]
-        # Frequenz-Arrays pro Kanal: DIM mit Groesse (Default 0), dann nur die
-        # belegten Zellen setzen (Drum: 1 = Hit, Ton: Frequenz in Hz).
-        for c in range(_CHANNELS):
-            lines.append(f"DIM trk{c}[TRK_ROWS] AS INTEGER")
-            for r in range(_ROWS):
-                n = self.pattern[c][r]
-                if n is None:
-                    continue
-                val = 1 if c == _TONAL else int(round(midi_to_freq(n)))
-                lines.append(f"trk{c}[{r}] = {val}")
-        lines += [
-            "",
-            "' --- Player-Status + Update (im Game-Loop aufrufen) ---",
-            "DIM trkRow AS INTEGER",
-            "DIM trkAcc AS FLOAT",
-            "trkRow = 0",
-            "trkAcc = 0.0",
-            "",
-            "SUB TRACKER_PLAY_ROW(r AS INTEGER)",
-        ]
-        for c in range(_TONAL):
-            lines.append(
-                f"    IF trk{c}[r] > 0 THEN PLAYSOUND("
-                f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{self.wave[c]}", 0.5))')
-        lines.append(
-            f"    IF trk{_TONAL}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, 0.5))")
-        lines += [
-            "END SUB",
-            "",
-            "SUB TRACKER_UPDATE(dt_ms AS FLOAT)",
-            "    trkAcc = trkAcc + dt_ms",
-            "    WHILE trkAcc >= TRK_ROWMS",
-            "        trkAcc = trkAcc - TRK_ROWMS",
-            "        TRACKER_PLAY_ROW(trkRow)",
-            "        trkRow = (trkRow + 1) MOD TRK_ROWS",
-            "    WEND",
-            "END SUB",
-            "",
-            "' Im Game-Loop:  TRACKER_UPDATE(DELTA() * 1000.0)",
-        ]
-        self._show_code("\n".join(lines) + "\n")
+        self._show_code(self.song.gb_code())
 
     def _show_code(self, code: str) -> None:
         dlg = QFrame(self, Qt.WindowType.Window)
@@ -366,5 +523,12 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     app = QApplication.instance() or QApplication([])
     app.setStyleSheet(global_qss())
     win = TrackerEditor(project_root)
+    if initial_file and Path(initial_file).exists():
+        try:
+            win.song = Song.load_json(str(initial_file))
+            win.cur = 0
+            win._reload_all()
+        except Exception:
+            pass
     win.show()
     return app.exec()
