@@ -398,6 +398,12 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 **Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Wie der Debugger nur Tree-Walker, am besten für Konsolen-/Logik-Programme; ein laufender Profiler-Lauf lässt sich mit erneutem `Strg+Shift+Y` abbrechen (Endlos-Loops). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
 
+## Git-Blame
+
+`Strg+Shift+A` (oder `Ansicht → Git-Blame`) öffnet das **Blame**-Panel: pro Zeile der Datei, wer sie zuletzt geändert hat — Zeile, Commit (Kurz-Hash), Autor, Datum, Commit-Zusammenfassung. Die Tabelle **folgt dem Cursor** (die aktuelle Zeile wird markiert), **Doppelklick** springt im Editor zur Zeile. `Aktualisieren` lädt neu.
+
+Lokale, noch nicht committete Zeilen sind als `•••` / *(uncommitted)* ausgegraut. Bei ungespeicherten Änderungen zeigt das Panel den zuletzt gespeicherten Stand (Hinweis im Status). Ist die Datei nicht in einem Git-Repository oder `git` nicht installiert, erscheint eine entsprechende Meldung statt einer leeren Tabelle. Implementierung: `gamebasic/editor_qt/gitinfo.py` (Porcelain-Parser von der I/O getrennt, headless getestet: `tests/test_gitinfo.py`).
+
 ## Finden im Projekt
 
 `Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.

@@ -113,6 +113,7 @@ class GameBasicEditor(QMainWindow):
         self._wire_signals()
         self._setup_debugger()
         self._setup_profiler()
+        self._setup_blame_panel()
         self._setup_todo_panel()
         self.setAcceptDrops(True)
 
@@ -535,6 +536,12 @@ class GameBasicEditor(QMainWindow):
         self.act_toggle_todo.toggled.connect(
             lambda on: self.todo_dock.setVisible(on))
 
+        self.act_toggle_blame = QAction("Git-Blame", self)
+        self.act_toggle_blame.setCheckable(True)
+        self.act_toggle_blame.setShortcut(QKeySequence("Ctrl+Shift+A"))
+        self.act_toggle_blame.toggled.connect(
+            lambda on: self.blame_dock.setVisible(on))
+
         # Bookmarks
         self.act_bookmark_toggle = QAction("Bookmark setzen/entfernen", self)
         self.act_bookmark_toggle.setShortcut(QKeySequence("Ctrl+F2"))
@@ -638,6 +645,7 @@ class GameBasicEditor(QMainWindow):
         m_view.addAction(self.act_toggle_minimap)
         m_view.addAction(self.act_toggle_wrap)
         m_view.addAction(self.act_toggle_todo)
+        m_view.addAction(self.act_toggle_blame)
         m_view.addAction(self.act_fold)
         m_view.addAction(self.act_unfold_all)
         m_view.addAction(self.act_theme)
@@ -696,6 +704,7 @@ class GameBasicEditor(QMainWindow):
     def _on_tab_opened(self, st: TabState) -> None:
         st.editor.cursorPositionChanged.connect(self._update_cursor_label)
         st.editor.cursorPositionChanged.connect(self._update_breadcrumbs)
+        st.editor.cursorPositionChanged.connect(self._blame_sync_cursor)
         st.editor.set_auto_complete(self._auto_complete_default)
         # Outline triggert auf Inhalts-Aenderungen mit Debounce.
         self._outline_timer = getattr(self, "_outline_timer", None) or self._make_outline_timer()
@@ -1439,6 +1448,50 @@ class GameBasicEditor(QMainWindow):
         self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
         self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
 
+    def _setup_blame_panel(self) -> None:
+        from PySide6.QtWidgets import QDockWidget
+        from .blame_panel import BlamePanel
+        self.blame_panel = BlamePanel()
+        self.blame_dock = QDockWidget("Git-Blame", self)
+        self.blame_dock.setObjectName("BlameDock")
+        self.blame_dock.setWidget(self.blame_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.blame_dock)
+        self.blame_dock.hide()
+        self.blame_panel.jump_requested.connect(self._goto_line_in_active)
+        self.blame_panel.refresh_requested.connect(self._refresh_blame)
+        self.blame_dock.visibilityChanged.connect(self._on_blame_visibility)
+
+    def _on_blame_visibility(self, visible: bool) -> None:
+        self.act_toggle_blame.setChecked(visible)
+        if visible:
+            self._refresh_blame()
+
+    def _refresh_blame(self) -> None:
+        from .gitinfo import blame
+        st = self.tabs.active
+        if st is None or st.file_path is None:
+            self.blame_panel.show_message("Datei erst speichern (Blame braucht "
+                                          "eine Datei im Repository).")
+            return
+        if self.tabs.is_dirty(st):
+            self.blame_panel.set_status("ungespeicherte Aenderungen -- Blame zeigt "
+                                        "den zuletzt gespeicherten Stand")
+        res = blame(str(st.file_path))
+        if not res.ok:
+            self.blame_panel.show_message(res.error)
+            return
+        self.blame_panel.show_result(res)
+        self._blame_sync_cursor()
+
+    def _blame_sync_cursor(self) -> None:
+        if not self.blame_dock.isVisible():
+            return
+        st = self.tabs.active
+        if st is None:
+            return
+        line = st.editor.textCursor().blockNumber() + 1
+        self.blame_panel.set_current_line(line)
+
     def _setup_todo_panel(self) -> None:
         from PySide6.QtWidgets import QDockWidget
         from .todo_panel import TodoPanel
@@ -1780,7 +1833,8 @@ class GameBasicEditor(QMainWindow):
         ])
         add_action_group("Ansicht", [
             self.act_view_files, self.act_view_outline, self.act_view_builtins,
-            self.act_toggle_minimap, self.act_fold, self.act_unfold_all,
+            self.act_toggle_minimap, self.act_toggle_blame,
+            self.act_fold, self.act_unfold_all,
             self.act_theme,
         ])
         add_action_group("Ausfuehren", [
@@ -1863,7 +1917,8 @@ class GameBasicEditor(QMainWindow):
             self.act_run, self.act_run_native, self.act_stop, self.act_bench,
             self.act_profile,
             self.act_view_files, self.act_view_outline, self.act_view_builtins,
-            self.act_toggle_minimap, self.act_fold, self.act_unfold_all,
+            self.act_toggle_minimap, self.act_toggle_blame,
+            self.act_fold, self.act_unfold_all,
             self.act_theme, self.act_show_readme, self.act_about,
             self.act_quick_open, self.act_command_palette,
         ]
@@ -1912,6 +1967,8 @@ class GameBasicEditor(QMainWindow):
         self.file_browser.mark_active(st.file_path)
         self._update_status()
         self._refresh_outline()
+        if self.blame_dock.isVisible():
+            self._refresh_blame()
         # Statusbar fuer den neuen aktiven Tab aktualisieren -- der vorige
         # Tab kann eine veraltete Error-Message hinterlassen haben.
         problem = st.editor.current_error()
