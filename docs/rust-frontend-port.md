@@ -16,7 +16,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a fertig** (Kern) |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a+3b fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
@@ -72,18 +72,24 @@ wird per stdout-Vergleich `gbrt --runsrc` == Python-Tree-Walker
 dasselbe Korrektheits-Prinzip wie `test_gbrt_parity`. (Performance-Parität —
 Optimierungs-Opcodes — kann später nachgezogen werden, ohne Verhalten zu ändern.)
 
-**Stufe 3a (fertig):** main-only Konsolen-Programme — Skalar-Globals (Slot-
-basiert, `DECLARE_GLOBAL_SLOT`), CONST, Arithmetik/Vergleich/Logik (mit
-`and`/`or`-Short-Circuit)/Bitwise/Unär, PRINT, Builtin-Calls, IF/ELSEIF/ELSE,
-WHILE, BREAK/CONTINUE. **21 Tests grün.** Nicht-3a-Konstrukte liefern
-`Err("Stufe 3b: ...")` → der Sweep überspringt sie.
+**Stufe 3a (fertig):** main-only — Skalar-Globals (Slot-basiert), CONST,
+Arithmetik/Vergleich/Logik (`and`/`or`-Short-Circuit)/Bitwise/Unär, PRINT,
+Builtin-Calls, IF/ELSEIF/ELSE, WHILE, BREAK/CONTINUE.
+
+**Stufe 3b (fertig):** `FOR ... TO ... STEP` (konstante + Laufzeit-Richtung,
+Temp-Local-Slots in main), Arrays (`DIM x[n,m]` → `DECLARE_ARRAY_NAME`; `ARRAY
+OF`/`MAP OF` → `DECLARE_NAME`), Index-Zugriff/-Zuweisung (`LOAD/STORE_INDEX`),
+`INPUT`, `DATA`/`READ`/`RESTORE` (rekursive Werte-Sammlung). **31 Tests grün.**
+Local-Slots (`LOAD/STORE/DECLARE_LOCAL`) jetzt unterstützt. Nicht unterstützte
+Konstrukte liefern `Err("Stufe 3c/3d: ...")` → der Sweep überspringt sie.
+*Bekannte gbrt-Grenze (nicht 3b-spezifisch):* sizeless `DIM x AS ARRAY OF T`
+wird von gbrt nicht leer initialisiert (auch bei Python-kompiliertem `.gbc`).
 
 **Nächste Teil-Stufen** (je eigener Commit, Korpus wächst):
-3b Control-Flow-Rest + Arrays (`FOR`, `DECLARE_ARRAY_*`, `LOAD/STORE_INDEX`,
-member/index-Assign, `INPUT`, `DATA/READ`) · 3c User-`SUB`/`FUNCTION` (Locals,
-Params, Defaults, Variadic, `CALL_USER`, FUNCREF) · 3d Klassen/Structs (`NEW`,
-Member, `Self`, Properties, Operatoren, Statics, ENUM) · 3e Comprehensions,
-`SELECT`, Tupel, `WITH`, `TRY`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
+3c User-`SUB`/`FUNCTION` (Locals, Params, Defaults, Variadic, `CALL_USER`,
+FUNCREF) · 3d Klassen/Structs (`NEW`, Member, `Self`, Properties, Operatoren,
+Statics, ENUM, member/index-READ-Ziel) · 3e Comprehensions, `SELECT`, Tupel,
+`WITH`, `TRY`, `FOR EACH`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
 (Stufe 5) + Preprocess (Stufe 4).
 
 ## Prinzip

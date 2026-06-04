@@ -24,7 +24,11 @@ mod oc {
     pub const DUP: i64 = 3;
     pub const LOAD_NAME: i64 = 10;
     pub const STORE_NAME: i64 = 11;
+    pub const DECLARE_NAME: i64 = 12;
     pub const DECLARE_CONST: i64 = 13;
+    pub const LOAD_LOCAL: i64 = 14;
+    pub const STORE_LOCAL: i64 = 15;
+    pub const DECLARE_LOCAL: i64 = 16;
     pub const ADD: i64 = 20;
     pub const SUB: i64 = 21;
     pub const MUL: i64 = 22;
@@ -53,6 +57,13 @@ mod oc {
     pub const BNOT: i64 = 67;
     pub const IN_OP: i64 = 56;
     pub const PRINT: i64 = 70;
+    pub const INPUT_NAME: i64 = 71;
+    pub const INPUT_LOCAL: i64 = 72;
+    pub const PUSH_DATA: i64 = 75;
+    pub const RESET_DATA_PTR: i64 = 76;
+    pub const LOAD_INDEX: i64 = 90;
+    pub const STORE_INDEX: i64 = 91;
+    pub const DECLARE_ARRAY_NAME: i64 = 92;
     pub const LOAD_GLOBAL_SLOT: i64 = 111;
     pub const STORE_GLOBAL_SLOT: i64 = 112;
     pub const DECLARE_GLOBAL_SLOT: i64 = 113;
@@ -91,11 +102,32 @@ struct Ctx {
     consts: Vec<Value>,
     break_patches: Vec<Vec<usize>>,
     continue_patches: Vec<Vec<usize>>,
+    local_slots: HashMap<String, usize>,
+    local_types: Vec<String>,
+    local_defaults: Vec<CVal>,
 }
 
 impl Ctx {
     fn new() -> Self {
-        Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![] }
+        Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![],
+              local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![] }
+    }
+    fn alloc_temp(&mut self, type_name: &str) -> usize {
+        let slot = self.local_types.len();
+        self.local_slots.insert(format!("__tmp_{}", slot), slot);
+        self.local_types.push(type_name.to_string());
+        self.local_defaults.push(type_default(type_name));
+        let d = enc(&type_default(type_name));
+        self.emit(oc::DECLARE_LOCAL, json!([slot, type_name, d]));
+        slot
+    }
+    fn reserve_temp(&mut self, name: &str) -> usize {
+        if let Some(&s) = self.local_slots.get(name) { return s; }
+        let slot = self.local_types.len();
+        self.local_slots.insert(name.to_string(), slot);
+        self.local_types.push("any".to_string());
+        self.local_defaults.push(CVal::Nil);
+        slot
     }
     fn add_const(&mut self, v: Value) -> i64 {
         if let Some(i) = self.consts.iter().position(|c| *c == v) {
@@ -156,6 +188,10 @@ impl Compiler {
                     self.global_vars.insert(name.clone());
                     self.alloc_slot(name);
                 }
+                Node::For { var, .. } => {
+                    self.global_vars.insert(var.clone());
+                    self.alloc_slot(var);
+                }
                 _ => {}
             }
         }
@@ -190,26 +226,201 @@ impl Compiler {
             Node::If { condition, then_block, elseif_branches, else_block } =>
                 self.stmt_if(condition, then_block, elseif_branches, else_block),
             Node::While { condition, body } => self.stmt_while(condition, body),
+            Node::For { var, start, end, step, body } =>
+                self.stmt_for(var, start, end, step, body),
             Node::Break => self.emit_break(),
             Node::Continue => self.emit_continue(),
+            Node::IndexAssign { target, indices, value } => {
+                self.expr(target)?;
+                for ix in indices { self.expr(ix)?; }
+                self.expr(value)?;
+                self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
+                Ok(())
+            }
+            Node::Input { prompt, target } => self.stmt_input(prompt, target),
+            Node::Data { .. } => Ok(()),     // Werte werden separat eingesammelt
+            Node::Restore => { self.ctx.emit(oc::RESET_DATA_PTR, Value::Null); Ok(()) }
+            Node::Read { targets } => {
+                for t in targets {
+                    self.ctx.emit(oc::PUSH_DATA, Value::Null);
+                    self.emit_store_target(t)?;
+                }
+                Ok(())
+            }
             other => Err(format!("Stufe 3b: Statement {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
     }
 
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
-        if array_dims.is_some() {
-            return Err("Stufe 3b: Array-DIM noch nicht unterstuetzt".into());
+        // Sized-Array: `DIM x[10, 20] AS INTEGER` -- type_name = Element-Typ.
+        if let Some(dims) = array_dims {
+            if !is_simple_type(type_name) {
+                return Err(format!("Stufe 3d: Array-Element-Typ '{}' noch nicht unterstuetzt", type_name));
+            }
+            for de in dims { self.expr(de)?; }
+            let name_idx = self.ctx.add_const(json!(name));
+            self.ctx.emit(oc::DECLARE_ARRAY_NAME,
+                          json!([name_idx, type_name, dims.len()]));
+            return Ok(());
         }
+        // ARRAY OF T / MAP OF T (groessenlos) -- name-basiert, VM allokiert leer.
+        if type_name.starts_with("array:") || type_name.starts_with("map:") {
+            let elem = &type_name[type_name.find(':').unwrap() + 1..];
+            if !is_simple_type(elem) {
+                return Err(format!("Stufe 3d: Element-Typ '{}' noch nicht unterstuetzt", elem));
+            }
+            let name_idx = self.ctx.add_const(json!(name));
+            let type_idx = self.ctx.add_const(json!(type_name));
+            let default_idx = self.ctx.add_const(Value::Null);
+            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            return Ok(());
+        }
+        // Skalar (primitiv).
         if !is_simple_type(type_name) {
-            return Err(format!("Stufe 3b: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
+            return Err(format!("Stufe 3d: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
         }
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = self.ctx.add_const(json!(type_name));
         let default_idx = self.ctx.add_const(enc(&type_default(type_name)));
-        let slot = self.global_slots[name] as i64;
-        self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
-                      json!([slot, name_idx, type_idx, default_idx]));
+        if let Some(&slot) = self.global_slots.get(name) {
+            self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                          json!([slot as i64, name_idx, type_idx, default_idx]));
+        } else {
+            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+        }
+        Ok(())
+    }
+
+    fn stmt_input(&mut self, prompt: &Option<Box<Node>>, target: &str) -> CR {
+        let has_prompt = prompt.is_some();
+        if let Some(p) = prompt { self.expr(p)?; }
+        if let Some(&slot) = self.ctx.local_slots.get(target) {
+            self.ctx.emit(oc::INPUT_LOCAL, json!([slot, has_prompt]));
+        } else {
+            let name_idx = self.ctx.add_const(json!(target));
+            self.ctx.emit(oc::INPUT_NAME, json!([name_idx, has_prompt]));
+        }
+        Ok(())
+    }
+
+    /// Store-Code fuer ein READ-Ziel (Wert liegt oben auf dem Stack).
+    fn emit_store_target(&mut self, target: &Node) -> CR {
+        match target {
+            Node::Identifier(name) => {
+                if let Some(&slot) = self.ctx.local_slots.get(name) {
+                    self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+                } else {
+                    let idx = self.ctx.add_const(json!(name));
+                    self.ctx.emit(oc::STORE_NAME, json!(idx));
+                }
+                Ok(())
+            }
+            Node::IndexAccess { target: arr, indices } => {
+                let tmp = self.ctx.reserve_temp("__read_tmp");
+                self.ctx.emit(oc::STORE_LOCAL, json!(tmp));
+                self.expr(arr)?;
+                for ie in indices { self.expr(ie)?; }
+                self.ctx.emit(oc::LOAD_LOCAL, json!(tmp));
+                self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
+                Ok(())
+            }
+            _ => Err("Stufe 3d: READ-Ziel (MemberAccess) noch nicht unterstuetzt".into()),
+        }
+    }
+
+    fn stmt_for(&mut self, var: &str, start: &Node, end: &Node,
+                step: &Option<Box<Node>>, body: &[Node]) -> CR {
+        // Schleifenvariable deklarieren (main: Slot oder Name).
+        let name_idx = self.ctx.add_const(json!(var));
+        let type_idx = self.ctx.add_const(json!("integer"));
+        let default_idx = self.ctx.add_const(json!(0));
+        if let Some(&slot) = self.global_slots.get(var) {
+            self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                          json!([slot as i64, name_idx, type_idx, default_idx]));
+        } else {
+            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+        }
+        // Konstanten-STEP-Richtung bestimmen.
+        let step_num: Option<f64> = match step.as_deref() {
+            None => Some(1.0),
+            Some(Node::NumberLit(NumV::Int(i))) => Some(*i as f64),
+            Some(Node::NumberLit(NumV::Float(f))) => Some(*f),
+            _ => None,
+        };
+        let const_pos = step_num.map(|n| n > 0.0).unwrap_or(false);
+        let const_neg = step_num.map(|n| n < 0.0).unwrap_or(false);
+        // var = start
+        self.expr(start)?;
+        self.store_var(var);
+        // end -> Temp
+        let end_slot = self.ctx.alloc_temp("integer");
+        self.expr(end)?;
+        self.ctx.emit(oc::STORE_LOCAL, json!(end_slot));
+        // step -> Temp (nur wenn nicht-konstant)
+        let mut step_slot: i64 = -1;
+        let step_const_val: Option<CVal> = match step.as_deref() {
+            None => Some(CVal::Int(1)),
+            Some(Node::NumberLit(NumV::Int(i))) => Some(CVal::Int(*i)),
+            Some(Node::NumberLit(NumV::Float(f))) => Some(CVal::Float(*f)),
+            _ => None,
+        };
+        if step_const_val.is_none() {
+            let s = self.ctx.alloc_temp("integer");
+            step_slot = s as i64;
+            self.expr(step.as_deref().unwrap())?;
+            self.ctx.emit(oc::STORE_LOCAL, json!(s));
+        }
+        let loop_start = self.ctx.here();
+        self.break_continue_enter();
+        let mut exit_jumps: Vec<usize> = vec![];
+        if const_pos {
+            self.load_var(var);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(end_slot));
+            self.ctx.emit(oc::GT, Value::Null);
+            exit_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+        } else if const_neg {
+            self.load_var(var);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(end_slot));
+            self.ctx.emit(oc::LT, Value::Null);
+            exit_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+        } else {
+            // Laufzeit-Richtung: step < 0 ?
+            self.ctx.emit(oc::LOAD_LOCAL, json!(step_slot));
+            let z = self.ctx.add_const(json!(0));
+            self.ctx.emit(oc::LOAD_CONST, json!(z));
+            self.ctx.emit(oc::LT, Value::Null);
+            let neg_jump = self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null);
+            self.load_var(var);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(end_slot));
+            self.ctx.emit(oc::GT, Value::Null);
+            exit_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+            let body_jump = self.ctx.emit(oc::JUMP, Value::Null);
+            let t = self.ctx.here(); self.ctx.patch(neg_jump, t);
+            self.load_var(var);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(end_slot));
+            self.ctx.emit(oc::LT, Value::Null);
+            exit_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+            let t2 = self.ctx.here(); self.ctx.patch(body_jump, t2);
+        }
+        for st in body { self.stmt(st)?; }
+        // CONTINUE -> Inkrement
+        let inc_target = self.ctx.here();
+        let cont = self.ctx.continue_patches.pop().unwrap();
+        for ip in cont { self.ctx.patch(ip, inc_target); }
+        // var += step
+        self.load_var(var);
+        match step_const_val {
+            Some(cv) => { let c = self.ctx.add_const(enc(&cv)); self.ctx.emit(oc::LOAD_CONST, json!(c)); }
+            None => { self.ctx.emit(oc::LOAD_LOCAL, json!(step_slot)); }
+        }
+        self.ctx.emit(oc::ADD, Value::Null);
+        self.store_var(var);
+        self.ctx.emit(oc::JUMP, json!(loop_start));
+        let end_ip = self.ctx.here();
+        for ip in exit_jumps { self.ctx.patch(ip, end_ip); }
+        let brk = self.ctx.break_patches.pop().unwrap();
+        for ip in brk { self.ctx.patch(ip, end_ip); }
         Ok(())
     }
 
@@ -288,7 +499,9 @@ impl Compiler {
 
     // ---------------------------------------------------- Variablen
     fn load_var(&mut self, name: &str) {
-        if let Some(&slot) = self.global_slots.get(name) {
+        if let Some(&slot) = self.ctx.local_slots.get(name) {
+            self.ctx.emit(oc::LOAD_LOCAL, json!(slot));
+        } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::LOAD_GLOBAL_SLOT, json!(slot));
         } else {
             let idx = self.ctx.add_const(json!(name));
@@ -296,7 +509,9 @@ impl Compiler {
         }
     }
     fn store_var(&mut self, name: &str) {
-        if let Some(&slot) = self.global_slots.get(name) {
+        if let Some(&slot) = self.ctx.local_slots.get(name) {
+            self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+        } else if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::STORE_GLOBAL_SLOT, json!(slot));
         } else {
             let idx = self.ctx.add_const(json!(name));
@@ -323,7 +538,13 @@ impl Compiler {
             Node::UnaryOp { op, operand } => self.expr_unary(op, operand),
             Node::BinaryOp { op, left, right } => self.expr_binary(op, left, right),
             Node::Call { callee, args } => self.expr_call(callee, args),
-            other => Err(format!("Stufe 3b: Ausdruck {} noch nicht unterstuetzt",
+            Node::IndexAccess { target, indices } => {
+                self.expr(target)?;
+                for ix in indices { self.expr(ix)?; }
+                self.ctx.emit(oc::LOAD_INDEX, json!(indices.len()));
+                Ok(())
+            }
+            other => Err(format!("Stufe 3c: Ausdruck {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
     }
@@ -396,23 +617,59 @@ impl Compiler {
         Ok(())
     }
 
-    fn finish_main(self) -> Value {
+    fn finish_main(self, data: Vec<Value>) -> Value {
         let code: Vec<Value> = self.ctx.code.iter()
             .map(|(op, arg)| json!([op, arg])).collect();
         let lines: Vec<Value> = self.ctx.code.iter().map(|_| json!(0)).collect();
+        let local_defaults: Vec<Value> = self.ctx.local_defaults.iter().map(enc).collect();
         let main = json!({
             "name": "__main__", "n_params": 0, "n_required": 0,
             "is_variadic": false, "is_sub": true, "is_main": true,
             "is_coroutine": false, "return_type": "",
             "param_defaults": [], "param_names": [],
-            "local_types": [], "local_defaults": [],
+            "local_types": self.ctx.local_types, "local_defaults": local_defaults,
             "constants": self.ctx.consts, "code": code, "lines": lines,
         });
         json!({
             "format": "gbc", "version": 1,
             "n_globals": self.global_slots.len(),
-            "main": main, "functions": {}, "classes": {}, "data": [],
+            "main": main, "functions": {}, "classes": {}, "data": data,
         })
+    }
+}
+
+/// DATA-Literale rekursiv einsammeln (wie compiler._collect_data, 3b-Subset).
+fn collect_data(stmts: &[Node], out: &mut Vec<Value>) -> Result<(), String> {
+    for s in stmts {
+        match s {
+            Node::Data { values } => {
+                for lit in values { out.push(enc(&data_literal(lit)?)); }
+            }
+            Node::If { then_block, elseif_branches, else_block, .. } => {
+                collect_data(then_block, out)?;
+                for (_, b) in elseif_branches { collect_data(b, out)?; }
+                collect_data(else_block, out)?;
+            }
+            Node::While { body, .. } | Node::For { body, .. }
+            | Node::Repeat { body, .. } | Node::ForEach { body, .. } => collect_data(body, out)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+fn data_literal(lit: &Node) -> Result<CVal, String> {
+    match lit {
+        Node::NumberLit(NumV::Int(i)) => Ok(CVal::Int(*i)),
+        Node::NumberLit(NumV::Float(f)) => Ok(CVal::Float(*f)),
+        Node::StringLit(s) => Ok(CVal::Str(s.clone())),
+        Node::BoolLit(b) => Ok(CVal::Bool(*b)),
+        Node::UnaryOp { op, operand } if op == "-" => match data_literal(operand)? {
+            CVal::Int(i) => Ok(CVal::Int(-i)),
+            CVal::Float(f) => Ok(CVal::Float(-f)),
+            _ => Err("DATA: '-' nur auf Zahlen".into()),
+        },
+        _ => Err("DATA: ungueltiges Literal".into()),
     }
 }
 
@@ -457,5 +714,7 @@ pub fn compile_to_gbc(ast: &Node) -> Result<Value, String> {
     c.collect_globals(stmts)?;
     for s in stmts { c.stmt(s)?; }
     c.ctx.emit(oc::HALT, Value::Null);
-    Ok(c.finish_main())
+    let mut data = Vec::new();
+    collect_data(stmts, &mut data)?;
+    Ok(c.finish_main(data))
 }

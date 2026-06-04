@@ -77,6 +77,17 @@ _SNIPPETS = [
     "DIM n AS INTEGER\nn = 1\nn += 4\nn *= 3\nPRINT n\n",
     "PRINT STR$(123), VAL(\"456\"), LEFT$(\"hallo\", 3)\n",
     "DIM x AS INTEGER\nx = -5\nPRINT -x, ABS(x)\n",
+    # --- 3b: FOR / Arrays / Index / DATA / READ ---
+    "DIM i AS INTEGER\nFOR i = 1 TO 5\n  PRINT i\nNEXT\n",
+    "DIM i AS INTEGER\nFOR i = 10 TO 1 STEP -2\n  PRINT i\nNEXT\n",
+    "DIM s AS INTEGER\nDIM i AS INTEGER\ns = 0\nFOR i = 1 TO 100\n  s = s + i\nNEXT\nPRINT s\n",
+    "DIM a[5] AS INTEGER\nDIM i AS INTEGER\nFOR i = 0 TO 4\n  a[i] = i * 2\nNEXT\nFOR i = 0 TO 4\n  PRINT a[i]\nNEXT\n",
+    "DIM g[3, 3] AS INTEGER\ng[1, 2] = 7\nPRINT g[1, 2], g[0, 0]\n",
+    "DIM arr[8] AS INTEGER\nPRINT LEN(arr)\narr[3] = 5\nPRINT arr[3], arr[7]\n",
+    "DATA 5, 10, 15\nDIM a AS INTEGER\nDIM b AS INTEGER\nDIM c AS INTEGER\nREAD a, b, c\nPRINT a + b + c\n",
+    "DATA 1, 2, 3\nDIM a AS INTEGER\nDIM b AS INTEGER\nREAD a, b\nRESTORE\nREAD a\nPRINT a, b\n",
+    "DIM i AS INTEGER\nDIM j AS INTEGER\nFOR i = 1 TO 3\n  FOR j = 1 TO 3\n    PRINT i * 10 + j\n  NEXT\nNEXT\n",
+    "DIM f AS FLOAT\nFOR f = 0.0 TO 1.0 STEP 0.5\n  PRINT f\nNEXT\n",
 ]
 
 
@@ -97,9 +108,11 @@ def test_compiler_example_sweep():
     for path in sorted(_EXAMPLES.glob("*.gb")):
         src = path.read_text(encoding="utf-8")
         low = src.lower()
-        # Grafik/Interaktion/Module gar nicht erst ausfuehren (oeffnet sonst
-        # ein raylib-Fenster bzw. blockiert auf stdin).
-        if "screen(" in low or "input " in low or "import " in low:
+        # Grafik/Interaktion/Module/Nichtdeterminismus gar nicht erst ausfuehren
+        # (oeffnet sonst ein Fenster, blockiert auf stdin, oder weicht legitim ab).
+        skip = ("screen(", "input ", "import ", "rnd", "millis", "time$",
+                "randomize", "key", "mouse", "delta(", "fps", "flip(")
+        if any(tok in low for tok in skip):
             continue
         rc, rs_out = _runsrc(path)
         if rc != 0:
