@@ -602,6 +602,9 @@ class Interpreter:
         self.call_depth = 0
         self._graphics = None  # lazy
         self._current_line = 0
+        # Optionaler Debug-Hook: callable(line:int, interp) -> None. Wird vom
+        # Editor-Debugger gesetzt (siehe editor_qt/debugger.py); None = aus.
+        self._debug_hook = None
         # DATA / READ / RESTORE State.  Beim Programmstart sammelt
         # _collect_data_values alle DATA-Literale in self.data; READ
         # liest sequenziell, RESTORE setzt den Pointer zurueck. data_ptr bleibt
@@ -928,6 +931,11 @@ class Interpreter:
         line = getattr(stmt, "line", 0)
         if line:
             self._current_line = line
+            # Debug-Hook (Tree-Walker-Debugger). Im Normalbetrieb None ->
+            # praktisch kein Overhead. Wird er gesetzt, bekommt er vor jedem
+            # Statement (line, self) und kann den Worker-Thread pausieren.
+            if self._debug_hook is not None:
+                self._debug_hook(line, self)
         t = type(stmt)
         method = self._exec_cache.get(t)
         if method is None:
