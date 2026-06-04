@@ -38,6 +38,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Module](docs/README.md#module)** — `json`, `db`, `tween`, `imgfx`, `particles`, `physics`, `camera`, `sprite`, `ui`, `scene`, `save`, `astar`, `ecs`, `vec2`, `input`, `regex`, `audio`, `curves`, `net`
 - **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Debugger** (Breakpoints/Step/Variablen), Welcome-Showcase (Demo-Galerie mit Screenshots)
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`gbsprites`): Multi-Frame, Animation, Atlas-Export, Onion-Skin, Tile-Preview
+- **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`gbparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, GB-Code-Export
 
 ## Beispiele
 
