@@ -15,7 +15,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 | Stufe | Rust | Verifikation | Status |
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
-| 2. **Parser** (`ast_nodes`+`parser`) | `src/parser.rs` (geplant) | AST kanonisch serialisieren → vergleichen | offen |
+| 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
 | 3. **Compiler** (`compiler`) | `src/compiler.rs` (geplant) | **Bytecode-`Module`-Gleichheit** ggü. `serialize.py`-`.gbc` | offen |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
@@ -36,6 +36,25 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
   ausreichend; Spalten (`col`) werden in Stufe 1 nicht verglichen (nur Zeile),
   da f-String-Synthetik-Tokens die Spalte teilen. Kommt mit dem Parser, falls
   nötig.
+
+## Stufe 2 — Parser (fertig)
+
+- [`rust/gb_runtime/src/ast.rs`](../rust/gb_runtime/src/ast.rs): `Node`-Enum
+  (alle ~50 Knoten aus `ast_nodes.py`) + `Param`/`CaseMatch`, `to_json()`
+  emittiert exakt die Dataclass-Feld-Struktur (`{"_": NodeName, ...}`).
+- [`rust/gb_runtime/src/parser.rs`](../rust/gb_runtime/src/parser.rs):
+  Recursive-Descent-Port (gleiche Präzedenz + Disambiguierungen: Tupel-Assign-
+  Lookahead, `FOR EACH`, `IIF`, Slice-vs-Index, WITH-`.member`, List/Dict/Set-
+  Comprehensions, Operator-Overloading, Properties). Debug-Einstieg
+  `gbrt --ast <datei.gb>`.
+- Test [`tests/test_rust_parser_parity.py`](../tests/test_rust_parser_parity.py):
+  **96 grün** (alle parsbaren `examples/*.gb` + 41 Snippets).
+- Gotchas: (a) `.line` ist in Python KEIN Dataclass-Feld → fällt bei der
+  Serialisierung raus → reiner Struktur-Vergleich (Rust trackt `line` in Stufe 2
+  nicht). (b) `Param.by_ref` hält in Python das BYREF-**Token** (oder None) statt
+  eines bool — der Test normalisiert auf `bool` (Rust nutzt korrekt bool).
+  (c) `CASE IS <op>`: erstes `values`-Element ist ein roher Operator-String, kein
+  `StringLit` → eigener `CaseVal::Op`-Zweig.
 
 ## Prinzip
 

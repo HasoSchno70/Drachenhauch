@@ -10,10 +10,12 @@
 //! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `gbrun.py
 //! --native` reicht den Namen der `.gb`-Quelldatei durch.
 
+mod ast;
 mod astar;
 #[cfg(feature = "graphics")]
 mod audio;
 mod builtins;
+mod parser;
 mod controller;
 #[cfg(feature = "db")]
 mod db;
@@ -69,6 +71,9 @@ fn main() -> ExitCode {
         let raw: Vec<String> = std::env::args().collect();
         if raw.len() >= 3 && raw[1] == "--tokens" {
             return tokens_main(&raw[2]);
+        }
+        if raw.len() >= 3 && raw[1] == "--ast" {
+            return ast_main(&raw[2]);
         }
     }
 
@@ -132,6 +137,26 @@ fn tokens_main(path: &str) -> ExitCode {
             eprintln!("Lexer-Fehler {}:{}: {}", e.line, e.col, e.msg);
             ExitCode::from(2)
         }
+    }
+}
+
+/// `gbrt --ast <datei.gb>` -- lext + parst und gibt den AST als JSON aus
+/// (Parser-Parity gegen Python).
+fn ast_main(path: &str) -> ExitCode {
+    let source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    match parser::dump_ast_json(&source) {
+        Ok(json) => {
+            let stdout = std::io::stdout();
+            let mut h = stdout.lock();
+            let _ = h.write_all(json.as_bytes());
+            let _ = h.write_all(b"\n");
+            let _ = h.flush();
+            ExitCode::SUCCESS
+        }
+        Err(e) => { eprintln!("{}", e); ExitCode::from(2) }
     }
 }
 

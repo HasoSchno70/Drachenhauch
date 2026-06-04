@@ -1615,14 +1615,19 @@ generieren (`python vscode-gamebasic/build_grammar.py`).
 selbst aus Quelltext Bytecode erzeugen (heute macht das die Python-Toolchain).
 Die Front-End-Stufen werden **inkrementell** nach Rust portiert, **jede gegen
 Python verifiziert** (cargo+rustc vorhanden → hier beweisbar). **Stufe 1 (Lexer)
-fertig:** [`rust/gb_runtime/src/lexer.rs`](rust/gb_runtime/src/lexer.rs) (Port von
-`lexer.py`+`tokens.py`, inkl. f-Strings/`&H`/`&B`/Zeilenfortsetzung), Debug-
-Einstieg `gbrt --tokens <datei.gb>` (kanonischer JSON-Token-Dump), Parity-Test
-[`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py) (137 grün:
-alle Beispiele + Snippets, strukturell als `[TYP,wert,zeile]`). Plan + Stufen:
-[docs/rust-frontend-port.md](docs/rust-frontend-port.md). Nächste Stufen: Parser
-(AST-Gleichheit), Compiler (**Bytecode-`Module`-Gleichheit** ggü. `serialize.py`),
-Preprocess. Der Tree-Walker bleibt Referenz + `@builtin`-Host.
++ Stufe 2 (Parser) fertig.** Debug-Einstiege `gbrt --tokens` / `gbrt --ast`
+geben Token-Strom bzw. AST als kanonisches JSON aus → Parity gegen Python:
+[`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py) (137) +
+[`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96).
+Dateien: [`src/lexer.rs`](rust/gb_runtime/src/lexer.rs),
+[`src/ast.rs`](rust/gb_runtime/src/ast.rs),
+[`src/parser.rs`](rust/gb_runtime/src/parser.rs). Plan + Gotchas:
+[docs/rust-frontend-port.md](docs/rust-frontend-port.md). **Nächste Stufe:
+Compiler** (`compiler.py` → `src/compiler.rs`, Gate = **Bytecode-`Module`-
+Gleichheit** ggü. `serialize.py`-`.gbc`), dann Preprocess. Der Tree-Walker bleibt
+Referenz + `@builtin`-Host. Bei AST-Parity: `.line` ist kein Dataclass-Feld
+(Struktur-Vergleich), `Param.by_ref` ist in Python ein Token (Test normalisiert
+auf bool).
 
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 
