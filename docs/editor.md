@@ -158,6 +158,30 @@ Sobald du einen Funktionsaufruf öffnest — `LINE(` — erscheint über der Cur
 - Optionale Parameter werden als `[, farbe]` gezeigt; verschachtelte Aufrufe lösen auf den **innersten** Aufruf auf.
 - Blendet sich automatisch aus: außerhalb einer Argumentliste, in `"…"`-Strings / `'…`-Kommentaren, bei `Esc`, beim Scrollen oder Fokuswechsel. Das Vervollständigungs-Popup hat Vorrang.
 
+## Color-Picker (Swatch-Klick)
+
+Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) bekommen rechts daneben ein kleines Farbquadrat (Swatch). **Klick auf den Swatch** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
+
+## Bookmarks
+
+Schnell-Navigation in langen Dateien:
+
+| Aktion | Kürzel |
+|---|---|
+| Bookmark setzen / entfernen | `Ctrl+F2` |
+| Nächstes Bookmark | `F9` |
+| Vorheriges Bookmark | `Shift+F9` |
+
+Bookmarks werden als schmaler Mint-Balken am linken Gutter-Rand markiert; die Navigation läuft zyklisch (nach dem letzten geht's wieder zum ersten).
+
+## TODO / FIXME-Liste
+
+`Ctrl+Shift+M` (oder *Ansicht → TODO / FIXME-Liste*) blendet ein Panel rechts ein, das die aktuelle Datei nach Markern in Kommentaren durchsucht — `TODO`, `FIXME`, `HACK`, `XXX`, `BUG` (hinter `'` oder `REM`; Treffer in Strings werden ignoriert). Farbcodiert nach Typ; **Klick springt zur Zeile**. Aktualisiert sich beim Tippen und Tab-Wechsel.
+
+## Zeilenumbruch
+
+`Alt+Z` (oder *Ansicht → Zeilenumbruch*) schaltet weichen Zeilenumbruch um — lange Zeilen brechen am Fensterrand statt horizontal zu scrollen. Die Einstellung gilt für alle Tabs und bleibt erhalten.
+
 ## Smart-Outdent
 
 Sobald du eine Zeile schreibst, die genau einem block-schließenden oder
