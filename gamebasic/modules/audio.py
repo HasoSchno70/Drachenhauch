@@ -443,18 +443,23 @@ def _make_sound_from_wave(wave: np.ndarray, volume: float) -> _Sound:
     if init is None:
         raise GBRuntimeError("AUDIO_TONE: mixer nicht initialisiert")
     sample_rate, _size, n_channels = init
+    is_stereo_wave = wave.ndim == 2          # (n, 2) = bereits Stereo-Signal
     n_samples = wave.shape[0]
     fade = min(int(sample_rate * _FADE_SECS), max(0, n_samples // 4))
     if fade > 0:
         env = np.ones(n_samples)
         env[:fade] = np.linspace(0.0, 1.0, fade)
         env[-fade:] = np.linspace(1.0, 0.0, fade)
-        wave = wave * env
+        wave = wave * (env[:, None] if is_stereo_wave else env)
     samples = np.clip(wave * volume, -1.0, 1.0)
     samples_int = (samples * 32767.0).astype(np.int16)
-    if n_channels == 2:
+    if n_channels == 2 and not is_stereo_wave:
+        # Mono-Signal auf einen Stereo-Mixer duplizieren (mittig).
         samples_int = np.column_stack((samples_int, samples_int))
-    sound = pg.sndarray.make_sound(samples_int)
+    elif n_channels == 1 and is_stereo_wave:
+        # Stereo-Signal auf Mono-Mixer: Kanaele mischen.
+        samples_int = samples_int.mean(axis=1).astype(np.int16)
+    sound = pg.sndarray.make_sound(np.ascontiguousarray(samples_int))
     return _Sound(sound, "")
 
 
@@ -495,23 +500,31 @@ def _audio_noise(*args):
     return _make_sound_from_wave(wave, volume)
 
 
-@builtin("AUDIO_SFX", arity=9,
-         types=("str", "num", "num", "int", "int", "int", "num", "num", "num"))
-def _audio_sfx(waveform, freq, slide, attack_ms, sustain_ms, decay_ms,
-               vib_depth, vib_speed, volume):
+@builtin("AUDIO_SFX", arity=(9, 10))
+def _audio_sfx(*args):
     """AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
-                 vib_depth, vib_speed, volume) -> SOUND
+                 vib_depth, vib_speed, volume[, stereo_width]) -> SOUND
 
     Prozeduraler sfxr-Stil-Effekt: Waveform mit Pitch-Slide (Hz/s, negativ =
-    fallend), ADSR-Huellkurve und optionalem Vibrato. Komplementaer zu
-    AUDIO_TONE (das nur konstante Toene kann). Der GameBasic-SFX-Generator
-    (`gbsfx`) exportiert genau solche Aufrufe."""
+    fallend), ADSR-Huellkurve und optionalem Vibrato. `stereo_width` in (0,1]
+    erzeugt einen breiteren STEREO-Sound (Detune zwischen L/R; bei `noise`
+    dekorreliert). Komplementaer zu AUDIO_TONE (das nur konstante Toene kann).
+    Der GameBasic-SFX-Generator (`gbsfx`) exportiert genau solche Aufrufe."""
     from ..synth import synthesize, WAVEFORMS
-    wf = waveform.lower()
+    wf = _check_str_strict(args[0], "AUDIO_SFX", "waveform STRING").lower()
     if wf not in WAVEFORMS:
         raise GBRuntimeError(
-            f"AUDIO_SFX: unbekannte Waveform '{waveform}' "
+            f"AUDIO_SFX: unbekannte Waveform '{args[0]}' "
             f"(erlaubt: {', '.join(WAVEFORMS)})")
+    freq = _check_num(args[1], "AUDIO_SFX", "freq")
+    slide = _check_num(args[2], "AUDIO_SFX", "slide")
+    attack_ms = _check_int_strict(args[3], "AUDIO_SFX", "attack_ms INTEGER")
+    sustain_ms = _check_int_strict(args[4], "AUDIO_SFX", "sustain_ms INTEGER")
+    decay_ms = _check_int_strict(args[5], "AUDIO_SFX", "decay_ms INTEGER")
+    vib_depth = _check_num(args[6], "AUDIO_SFX", "vib_depth")
+    vib_speed = _check_num(args[7], "AUDIO_SFX", "vib_speed")
+    volume = _check_num(args[8], "AUDIO_SFX", "Lautstaerke")
+    stereo_width = _check_num(args[9], "AUDIO_SFX", "stereo_width") if len(args) >= 10 else 0.0
     if attack_ms < 0 or sustain_ms < 0 or decay_ms < 0:
         raise GBRuntimeError("AUDIO_SFX: Attack/Sustain/Decay muessen >= 0 sein")
     if attack_ms + sustain_ms + decay_ms <= 0:
@@ -520,7 +533,8 @@ def _audio_sfx(waveform, freq, slide, attack_ms, sustain_ms, decay_ms,
     sample_rate = pg.mixer.get_init()[0]
     wave = synthesize(wf, float(freq), float(slide),
                       attack_ms, sustain_ms, decay_ms,
-                      float(vib_depth), float(vib_speed), sr=sample_rate)
+                      float(vib_depth), float(vib_speed),
+                      float(stereo_width), sr=sample_rate)
     return _make_sound_from_wave(wave, _clamp01(volume))
 
 

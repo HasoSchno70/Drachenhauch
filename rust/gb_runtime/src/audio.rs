@@ -247,11 +247,12 @@ impl Audio {
 
     /// Prozeduraler sfxr-Stil-Effekt (siehe gamebasic/synth.py -- gleiche
     /// Mathematik): Waveform mit Pitch-Slide (Phasen-Integration) + Vibrato +
-    /// ADSR-Huellkurve.
+    /// ADSR-Huellkurve. `stereo_width` in (0,1] -> breiter Stereo-Sound.
     #[allow(clippy::too_many_arguments)]
     pub fn sfx(&mut self, waveform: &str, base_freq: f64, slide: f64,
                attack_ms: i64, sustain_ms: i64, decay_ms: i64,
-               vib_depth: f64, vib_speed: f64, volume: f64) -> Result<i64, String> {
+               vib_depth: f64, vib_speed: f64, volume: f64,
+               stereo_width: f64) -> Result<i64, String> {
         let wf = waveform.to_lowercase();
         if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
             return Err(format!(
@@ -266,31 +267,48 @@ impl Audio {
         if n == 0 { return Err("AUDIO_SFX: Gesamtdauer zu klein".into()); }
         let na = (n as f64 * attack_ms as f64 / total_ms as f64) as usize;
         let nd = (n as f64 * decay_ms as f64 / total_ms as f64) as usize;
-        let mut buf = vec![0.0f64; n];
-        let mut phase = 0.0f64;          // integrierte Phase fuer Pitch-Slide
-        for i in 0..n {
-            let t = i as f64 / sr as f64;
-            let mut freq = base_freq + slide * t;
-            if vib_depth > 0.0 && vib_speed > 0.0 {
-                freq *= 1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin();
-            }
-            freq = freq.clamp(20.0, sr as f64 / 2.0);
-            let v = if wf == "noise" {
-                rng_uniform()
-            } else {
-                phase += 2.0 * PI64 * freq / sr as f64;
-                phase_value(&wf, phase)
-            };
-            let env = if na > 0 && i < na {
-                i as f64 / na as f64
-            } else if nd > 0 && i >= n - nd {
-                (n - 1 - i) as f64 / nd as f64
-            } else {
-                1.0
-            };
-            buf[i] = (v * env).clamp(-1.0, 1.0);
+        let left = build_sfx_buffer(&wf, base_freq, slide, n, na, nd,
+                                    vib_depth, vib_speed, sr);
+        if stereo_width <= 0.0 {
+            return self.push_wave_sound(&left, volume, sr);
         }
-        self.push_wave_sound(&buf, volume, sr)
+        let w = stereo_width.min(1.0);
+        let right = if wf == "noise" {
+            build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr)
+        } else {
+            let detune = 1.0 + 0.04 * w;          // bis 4% = Chorus-Breite
+            build_sfx_buffer(&wf, base_freq * detune, slide * detune, n, na, nd,
+                             vib_depth, vib_speed, sr)
+        };
+        self.push_wave_sound_stereo(&left, &right, volume, sr)
+    }
+
+    /// Wie push_wave_sound, aber interleaved Stereo (L/R) -> Stereo-WAV.
+    fn push_wave_sound_stereo(&mut self, left: &[f64], right: &[f64],
+                              volume: f64, sr: u32) -> Result<i64, String> {
+        let n = left.len();
+        let vol = volume.clamp(0.0, 1.0);
+        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let mut samples = vec![0i16; n * 2];
+        for i in 0..n {
+            let mut e = 1.0;
+            if fade > 0 {
+                if i < fade { e = i as f64 / fade as f64; }
+                else if i >= n - fade { e = (n - 1 - i) as f64 / fade as f64; }
+            }
+            let l = (left[i] * e * vol).clamp(-1.0, 1.0);
+            let r = (right[i] * e * vol).clamp(-1.0, 1.0);
+            samples[i * 2] = (l * 32767.0) as i16;
+            samples[i * 2 + 1] = (r * 32767.0) as i16;
+        }
+        let wav = encode_wav16(&samples, 2, sr);
+        let wave = self.dev.new_wave_from_memory(".wav", &wav)
+            .map_err(|e| format!("AUDIO_SFX: {}", e))?;
+        let s = self.dev.new_sound_from_wave(&wave)
+            .map_err(|e| format!("AUDIO_SFX: {}", e))?;
+        self.sounds.push(s);
+        self.sound_vol.push(vol as f32);
+        Ok((self.sounds.len() - 1) as i64)
     }
 
     /// Float-Buffer [-1,1] -> Anti-Click-Envelope -> Volume -> i16-PCM -> WAV
@@ -436,6 +454,12 @@ fn rng_uniform() -> f64 {
 
 /// Minimaler PCM16-Mono-WAV-Encoder (RIFF/WAVE/fmt/data).
 fn encode_wav_mono16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
+    encode_wav16(samples, 1, sample_rate)
+}
+
+/// PCM16-WAV-Encoder fuer `channels` Kanaele (Samples interleaved).
+fn encode_wav16(samples: &[i16], channels: u16, sample_rate: u32) -> Vec<u8> {
+    let block_align = 2u16 * channels;
     let data_len = (samples.len() * 2) as u32;
     let mut v = Vec::with_capacity(44 + data_len as usize);
     v.extend_from_slice(b"RIFF");
@@ -444,13 +468,46 @@ fn encode_wav_mono16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
     v.extend_from_slice(b"fmt ");
     v.extend_from_slice(&16u32.to_le_bytes());
     v.extend_from_slice(&1u16.to_le_bytes());   // PCM
-    v.extend_from_slice(&1u16.to_le_bytes());   // mono
+    v.extend_from_slice(&channels.to_le_bytes());
     v.extend_from_slice(&sample_rate.to_le_bytes());
-    v.extend_from_slice(&(sample_rate * 2).to_le_bytes()); // byte rate
-    v.extend_from_slice(&2u16.to_le_bytes());   // block align
+    v.extend_from_slice(&(sample_rate * block_align as u32).to_le_bytes()); // byte rate
+    v.extend_from_slice(&block_align.to_le_bytes());
     v.extend_from_slice(&16u16.to_le_bytes());  // bits/sample
     v.extend_from_slice(b"data");
     v.extend_from_slice(&data_len.to_le_bytes());
     for s in samples { v.extend_from_slice(&s.to_le_bytes()); }
     v
+}
+
+/// Baut einen Mono-SFX-Float-Buffer (Pitch-Slide + Vibrato + ADSR), wie
+/// `gamebasic.synth._mono`. Ohne Volume.
+#[allow(clippy::too_many_arguments)]
+fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
+                    na: usize, nd: usize, vib_depth: f64, vib_speed: f64,
+                    sr: u32) -> Vec<f64> {
+    let mut buf = vec![0.0f64; n];
+    let mut phase = 0.0f64;
+    for i in 0..n {
+        let t = i as f64 / sr as f64;
+        let mut freq = base_freq + slide * t;
+        if vib_depth > 0.0 && vib_speed > 0.0 {
+            freq *= 1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin();
+        }
+        freq = freq.clamp(20.0, sr as f64 / 2.0);
+        let v = if wf == "noise" {
+            rng_uniform()
+        } else {
+            phase += 2.0 * PI64 * freq / sr as f64;
+            phase_value(wf, phase)
+        };
+        let env = if na > 0 && i < na {
+            i as f64 / na as f64
+        } else if nd > 0 && i >= n - nd {
+            (n - 1 - i) as f64 / nd as f64
+        } else {
+            1.0
+        };
+        buf[i] = (v * env).clamp(-1.0, 1.0);
+    }
+    buf
 }

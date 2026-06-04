@@ -2655,7 +2655,8 @@ impl<'p> Vm<'p> {
                 let vd = need_f(a, 6, "AUDIO_SFX")?;
                 let vs = need_f(a, 7, "AUDIO_SFX")?;
                 let vol = need_f(a, 8, "AUDIO_SFX")?;
-                Value::Int(self.audio_mut()?.sfx(&wf, freq, slide, atk, sus, dec, vd, vs, vol)?)
+                let width = if a.len() >= 10 { need_f(a, 9, "AUDIO_SFX")? } else { 0.0 };
+                Value::Int(self.audio_mut()?.sfx(&wf, freq, slide, atk, sus, dec, vd, vs, vol, width)?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => { self.audio_mut()?.music_play(); Value::Nil }

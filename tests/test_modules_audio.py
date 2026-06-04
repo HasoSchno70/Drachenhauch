@@ -157,6 +157,25 @@ def test_audio_sfx_zero_total_duration_raises(call_builtin):
         call_builtin("audio_sfx", ["saw", 440.0, 0.0, 0, 0, 0, 0.0, 0.0, 0.7])
 
 
+def test_audio_sfx_stereo_width_returns_sound(call_builtin):
+    from gamebasic.interpreter import _Sound
+    args = _sfx_args() + [0.6]          # 10. Arg = stereo_width
+    assert isinstance(call_builtin("audio_sfx", args), _Sound)
+
+
+def test_synth_stereo_shape_and_channels():
+    import numpy as np
+    from gamebasic.synth import synthesize
+    mono = synthesize("saw", 1000, -1400, 0, 30, 150)
+    st = synthesize("saw", 1000, -1400, 0, 30, 150, stereo_width=0.6)
+    assert mono.ndim == 1
+    assert st.ndim == 2 and st.shape[1] == 2
+    assert not np.allclose(st[:, 0], st[:, 1])      # Detune -> L != R
+    # Noise: L/R dekorreliert
+    nst = synthesize("noise", 200, 0, 0, 50, 100, stereo_width=0.5)
+    assert not np.allclose(nst[:, 0], nst[:, 1])
+
+
 def test_synth_matches_envelope_shape():
     # Der geteilte Synth liefert ein env-geformtes Signal in [-1, 1] (ohne Vol).
     import numpy as np

@@ -42,36 +42,38 @@ _PRESETS = {
 
 def synthesize(p: dict, sr: int = _SAMPLE_RATE) -> np.ndarray:
     """Float-Sample-Array [-1, 1] inkl. Lautstaerke -- nutzt den geteilten
-    Synth (`gamebasic.synth`), denselben Code wie der AUDIO_SFX-Builtin."""
+    Synth (`gamebasic.synth`), denselben Code wie der AUDIO_SFX-Builtin.
+    Bei stereo_width > 0 ist die Rueckgabe `(n, 2)`."""
     wave = _synth(p["waveform"], p["base_freq"], p["slide"],
                   p["attack"], p["sustain"], p["decay"],
-                  p["vib_depth"], p["vib_speed"], sr=sr)
+                  p["vib_depth"], p["vib_speed"], p.get("stereo_width", 0.0),
+                  sr=sr)
     return np.clip(wave * p["volume"], -1.0, 1.0)
 
 
 def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
+    channels = 2 if samples.ndim == 2 else 1
     int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
     with wave.open(str(path), "wb") as w:
-        w.setnchannels(1)
+        w.setnchannels(channels)
         w.setsampwidth(2)
         w.setframerate(sr)
-        w.writeframes(int16.tobytes())
+        w.writeframes(np.ascontiguousarray(int16).tobytes())
 
 
 def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
     """Spielt die Samples ueber pygame.mixer (best effort -- ohne Audio-
-    Geraet still)."""
+    Geraet still). Mono ODER Stereo `(n, 2)`."""
     try:
         import os
         os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
         import pygame
         if pygame.mixer.get_init() is None:
-            pygame.mixer.init(frequency=sr, size=-16, channels=1)
-        init = pygame.mixer.get_init()
+            pygame.mixer.init(frequency=sr, size=-16, channels=2)
         int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
-        if init and init[2] == 2:
-            int16 = np.column_stack((int16, int16))
-        snd = pygame.sndarray.make_sound(int16)
+        if int16.ndim == 1:
+            int16 = np.column_stack((int16, int16))     # Mono -> Stereo
+        snd = pygame.sndarray.make_sound(np.ascontiguousarray(int16))
         snd.play()
     except Exception:
         pass
@@ -86,7 +88,8 @@ class _WaveView(QWidget):
         self._samples = np.zeros(1)
 
     def set_samples(self, s: np.ndarray) -> None:
-        self._samples = s
+        # Bei Stereo den linken Kanal zeichnen.
+        self._samples = s[:, 0] if s.ndim == 2 else s
         self.update()
 
     def paintEvent(self, _e):  # noqa: N802
@@ -158,13 +161,15 @@ class SfxGenerator(QMainWindow):
         self.volume = self._dspin(c1, "Lautstaerke", 0.0, 1.0, 0.7, 0.05)
         params.addWidget(col1)
 
-        col2 = QGroupBox("Huellkurve & Vibrato")
+        col2 = QGroupBox("Huellkurve && Vibrato")
         c2 = QVBoxLayout(col2)
         self.attack = self._ispin(c2, "Attack (ms)", 0, 2000, 0)
         self.sustain = self._ispin(c2, "Sustain (ms)", 0, 4000, 40)
         self.decay = self._ispin(c2, "Decay (ms)", 0, 4000, 150)
         self.vib_depth = self._dspin(c2, "Vibrato-Tiefe", 0.0, 0.5, 0.0, 0.01)
         self.vib_speed = self._ispin(c2, "Vibrato-Speed (Hz)", 0, 60, 0)
+        self.stereo_width = self._dspin(c2, "Stereo-Breite", 0.0, 1.0, 0.0, 0.05)
+        self.pan = self._dspin(c2, "Pan (L -1 .. +1 R)", -1.0, 1.0, 0.0, 0.1)
         params.addWidget(col2)
         root.addLayout(params)
 
@@ -221,6 +226,8 @@ class SfxGenerator(QMainWindow):
             "decay": int(self.decay.value()),
             "vib_depth": float(self.vib_depth.value()),
             "vib_speed": float(self.vib_speed.value()),
+            "stereo_width": float(self.stereo_width.value()),
+            "pan": float(self.pan.value()),
         }
 
     def _on_change(self, *_a) -> None:
@@ -236,6 +243,8 @@ class SfxGenerator(QMainWindow):
         self.decay.setValue(dec)
         self.vib_depth.setValue(vd)
         self.vib_speed.setValue(vs)
+        self.stereo_width.setValue(0.0)   # Presets sind mono/zentriert
+        self.pan.setValue(0.0)
         self._on_change()
         self._play()
 
@@ -249,6 +258,7 @@ class SfxGenerator(QMainWindow):
         self.decay.setValue(random.randint(60, 400))
         self.vib_depth.setValue(round(random.choice([0, 0, 0.1, 0.2]), 2))
         self.vib_speed.setValue(random.choice([0, 0, 12, 24]))
+        self.stereo_width.setValue(round(random.choice([0, 0, 0.3, 0.6]), 2))
         self._on_change()
         self._play()
 
@@ -276,13 +286,27 @@ class SfxGenerator(QMainWindow):
         p = self._params()
         # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit -- laeuft in
         # BEIDEN Pfaden (Tree-Walker + nativer gbrt), kein WAV-Asset noetig.
-        code = (
-            'IMPORT "audio"\n\nDIM snd AS SOUND\n'
-            f'snd = AUDIO_SFX("{p["waveform"]}", {p["base_freq"]:g}, '
-            f'{p["slide"]:g}, {p["attack"]}, {p["sustain"]}, {p["decay"]}, '
-            f'{p["vib_depth"]:g}, {p["vib_speed"]:g}, {p["volume"]:g})\n'
-            'PLAYSOUND(snd)\n')
-        self._show_code(code, title="GB-Code (AUDIO_SFX)")
+        # stereo_width nur anhaengen, wenn > 0 (10. Arg ist optional).
+        sfx = (f'AUDIO_SFX("{p["waveform"]}", {p["base_freq"]:g}, '
+               f'{p["slide"]:g}, {p["attack"]}, {p["sustain"]}, {p["decay"]}, '
+               f'{p["vib_depth"]:g}, {p["vib_speed"]:g}, {p["volume"]:g}')
+        if p["stereo_width"] > 0:
+            sfx += f', {p["stereo_width"]:g}'
+        sfx += ")"
+        lines = ['IMPORT "audio"', "", "DIM snd AS SOUND", f"snd = {sfx}"]
+        pan = p["pan"]
+        if abs(pan) > 0.001:
+            # Pan zur Laufzeit ueber den Wiedergabe-Channel (AUDIO_PAN).
+            left = max(0.0, min(1.0, 1.0 - max(0.0, pan)))
+            right = max(0.0, min(1.0, 1.0 + min(0.0, pan)))
+            lines += [
+                "DIM ch AS AUDIO_CHANNEL",
+                "ch = AUDIO_PLAY(snd)",
+                f"AUDIO_PAN(ch, {left:g}, {right:g})",
+            ]
+        else:
+            lines.append("PLAYSOUND(snd)")
+        self._show_code("\n".join(lines) + "\n", title="GB-Code (AUDIO_SFX)")
 
     def _show_code(self, code: str, title: str) -> None:
         dlg = QFrame(self, Qt.WindowType.Window)
