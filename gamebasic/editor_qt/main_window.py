@@ -471,6 +471,20 @@ class GameBasicEditor(QMainWindow):
         self.act_toggle_todo.toggled.connect(
             lambda on: self.todo_dock.setVisible(on))
 
+        # Bookmarks
+        self.act_bookmark_toggle = QAction("Bookmark setzen/entfernen", self)
+        self.act_bookmark_toggle.setShortcut(QKeySequence("Ctrl+F2"))
+        self.act_bookmark_toggle.triggered.connect(
+            lambda: self._with_active_editor(lambda e: e.toggle_bookmark()))
+        self.act_bookmark_next = QAction("Nächstes Bookmark", self)
+        self.act_bookmark_next.setShortcut(QKeySequence("F9"))
+        self.act_bookmark_next.triggered.connect(
+            lambda: self._with_active_editor(lambda e: e.next_bookmark()))
+        self.act_bookmark_prev = QAction("Vorheriges Bookmark", self)
+        self.act_bookmark_prev.setShortcut(QKeySequence("Shift+F9"))
+        self.act_bookmark_prev.triggered.connect(
+            lambda: self._with_active_editor(lambda e: e.prev_bookmark()))
+
         self.act_fold = QAction(icons.get("fold"), "Block falten/auffalten", self)
         self.act_fold.setShortcut(QKeySequence("Ctrl+Shift+["))
         self.act_fold.triggered.connect(self._fold_at_cursor)
@@ -536,6 +550,10 @@ class GameBasicEditor(QMainWindow):
         m_edit.addAction(self.act_quick_open)
         m_edit.addAction(self.act_command_palette)
         m_edit.addAction(self.act_format_doc)
+        m_edit.addSeparator()
+        m_edit.addAction(self.act_bookmark_toggle)
+        m_edit.addAction(self.act_bookmark_next)
+        m_edit.addAction(self.act_bookmark_prev)
         m_edit.addSeparator()
         m_edit.addAction(self.act_settings)
 
@@ -674,6 +692,11 @@ class GameBasicEditor(QMainWindow):
         for st in self.tabs.states:
             st.editor.set_word_wrap(on)
         self.settings["word_wrap"] = bool(on)
+
+    def _with_active_editor(self, fn) -> None:
+        st = self.tabs.active
+        if st is not None:
+            fn(st.editor)
 
     def _make_outline_timer(self) -> QTimer:
         t = QTimer(self)

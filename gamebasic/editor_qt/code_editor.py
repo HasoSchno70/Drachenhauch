@@ -170,6 +170,9 @@ class CodeEditor(
         self._breakpoints: set[int] = set()
         self._debug_line: int | None = None
 
+        # Bookmarks (1-basierte Zeilen) -- Schnell-Navigation in langen Dateien.
+        self._bookmarks: set[int] = set()
+
         # Multi-Cursor (Strg+D Add-Next-Occurrence). Liste sekundaerer
         # Selektionen als (start, end). Primaere Cursor bleibt im
         # `textCursor()`. Bei jeder Tasten-Eingabe werden alle Sekundaer-
@@ -368,6 +371,11 @@ class CodeEditor(
                     painter.setBrush(col_err)
                     painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
                     painter.setBrush(Qt.BrushStyle.NoBrush)
+                # Bookmark: schmaler Mint-Balken am ganz linken Rand.
+                if line1b in self._bookmarks:
+                    line_h = self.fontMetrics().height()
+                    painter.fillRect(0, int(top) + 1, 3, line_h - 2,
+                                     QColor(COLORS["success"]))
                 # Breakpoint: roter gefuellter Kreis im linken Gutter-Band.
                 if line1b in self._breakpoints:
                     line_h = self.fontMetrics().height()
@@ -602,6 +610,35 @@ class CodeEditor(
             self._breakpoints.add(line)
         self._line_area.update()
         self.breakpoints_changed.emit()
+
+    # ----------------------------------------------- Bookmarks
+    def toggle_bookmark(self) -> None:
+        line = self.textCursor().blockNumber() + 1
+        if line in self._bookmarks:
+            self._bookmarks.discard(line)
+        else:
+            self._bookmarks.add(line)
+        self._line_area.update()
+
+    def _goto_bookmark(self, forward: bool) -> None:
+        if not self._bookmarks:
+            return
+        cur = self.textCursor().blockNumber() + 1
+        marks = sorted(self._bookmarks)
+        if forward:
+            nxt = next((m for m in marks if m > cur), marks[0])      # wrap
+        else:
+            nxt = next((m for m in reversed(marks) if m < cur), marks[-1])
+        blk = self.document().findBlockByNumber(nxt - 1)
+        if blk.isValid():
+            self.setTextCursor(QTextCursor(blk))
+            self.ensureCursorVisible()
+
+    def next_bookmark(self) -> None:
+        self._goto_bookmark(True)
+
+    def prev_bookmark(self) -> None:
+        self._goto_bookmark(False)
 
     def set_word_wrap(self, on: bool) -> None:
         self.setLineWrapMode(
