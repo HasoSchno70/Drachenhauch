@@ -113,3 +113,7 @@ END TRY
 ## Komplettes Beispiel
 
 Siehe [examples/37_usb.gb](../examples/37_usb.gb).
+
+## In der nativen Runtime (gbrt)
+
+`usb` laeuft nativ mit dem Cargo-Feature `usb` (Crate `hidapi`). Bytes ↔ STRING per latin-1 wie im Python-Pfad. Bauen: `python rust/build_runtime.py --hardware` (oder `--full`).

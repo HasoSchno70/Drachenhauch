@@ -153,3 +153,7 @@ Siehe [examples/25_db.gb](../examples/25_db.gb) — zeigt CREATE, INSERT mit Bin
   DB_EXEC(con, "CREATE INDEX IF NOT EXISTS idx_score ON scores(score)")
   ```
 - **Schema-Init** mit `IF NOT EXISTS` — dann ist mehrfaches Programm-Starten ungefährlich.
+
+## In der nativen Runtime (gbrt)
+
+`db` laeuft nativ mit dem Cargo-Feature `db` (SQLite via `rusqlite`, gebuendelt — kein System-SQLite noetig). Bit-identisch zu den Python-Pfaden fuer Standard-SQL (CRUD, `?`-Binding, Transaktionen, typisierte Getter). `DB_QUERY` laedt die Zeilen eager in den Speicher. Bauen: `python rust/build_runtime.py --full` (oder Cargo-Feature `db`). Fehlt das Feature, meldet der Builtin „nicht verfuegbar“.

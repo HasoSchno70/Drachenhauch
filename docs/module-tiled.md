@@ -210,3 +210,7 @@ Was **nicht** unterstuetzt wird:
 [examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) zeigt das volle Pattern: Tiled-Level laden, Tile-Layer batchen, Object-Layer fuer Player-Spawn nutzen, Tile-Properties als Collision-Source verwenden.
 
 Vollstaendiger Workflow inklusive Kollision: siehe [tile_collide-Modul](module-tile-collide.md).
+
+## In der nativen Runtime (gbrt)
+
+`tiled` laeuft nativ (immer dabei, JSON-Loader via serde_json) und ist **bit-identisch** zu den Python-Pfaden — inkl. External-Tilesets, Tile-/Object-Properties und Bulk-Ops (`TILED_FILL_RECT`/`REPLACE`/`COUNT_GID`/`FLOOD_FILL`).

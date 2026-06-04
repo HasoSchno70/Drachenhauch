@@ -20,6 +20,8 @@ GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgele
 
 Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle bereit.
 
+> **Alle Module laufen auch in der nativen Runtime (gbrt)** — die meisten sind dort immer dabei; `db`/`net`/`http` (= `html`) und Hardware (`serial`/`usb`/`wifi`/`bt`) sind feature-gated und kommen mit `python rust/build_runtime.py --full` (bzw. `--hardware`) dazu. Jede Modul-Doku hat unten einen Abschnitt **„In der nativen Runtime (gbrt)"** mit Feature-Flag und Eigenheiten; Überblick in [rust-runtime.md](rust-runtime.md).
+
 | Modul | Was es kann | Doku |
 |---|---|---|
 | `json` | JSON parsen, Werte über Pfad-Notation lesen | [module-json.md](module-json.md) |
@@ -42,8 +44,8 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `curves` | Animation-Kurven: Bezier, Catmull-Rom, Hermite, Smoothstep — pure Functions, kein State | [module-curves.md](module-curves.md) |
 | `net` | TCP + UDP via stdlib-Sockets, non-blocking by default, UTF-8-Encoding | [module-net.md](module-net.md) |
 | `html` | HTTP-GET/POST/DOWNLOAD und HTML-Parsing — pure stdlib, kein pip noetig | [module-html.md](module-html.md) |
-| `bt` | Bluetooth Low Energy (BLE) via `bleak` — Scan, Connect, Read/Write Characteristics | [module-bt.md](module-bt.md) |
-| `serial` | RS-232 / USB-COM via `pyserial` — Open, Read/Write, Available, Flush, Timeout | [module-serial.md](module-serial.md) |
+| `bt` | Bluetooth Low Energy (BLE) — Scan, Connect, Read/Write Characteristics (Python: `bleak`, nativ: `btleplug`) | [module-bt.md](module-bt.md) |
+| `serial` | RS-232 / USB-COM — Open, Read/Write, Available, Flush, Timeout (Python: `pyserial`, nativ: `serialport`) | [module-serial.md](module-serial.md) |
 | `usb` | USB-HID via `hidapi` — Custom-Controller, Maker-Boards, Programmer | [module-usb.md](module-usb.md) |
 | `wifi` | WiFi-Management (Windows-only via `netsh wlan`): Scan, Connect, Disconnect, Profile | [module-wifi.md](module-wifi.md) |
 | `tiled` | [Tiled](https://www.mapeditor.org/)-Map-Loader (JSON). Tile-Layer, Object-Layer, Tile- + Object-Properties | [module-tiled.md](module-tiled.md) |

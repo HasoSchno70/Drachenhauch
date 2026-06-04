@@ -187,3 +187,12 @@ END IF
 ## Beispiel
 
 [examples/68_audio.gb](../examples/68_audio.gb) demonstriert das volle Modul-API inklusive Tone-Generation, Pan, Music-Queue.
+
+## In der nativen Runtime (gbrt)
+
+Das `audio`-Modul laeuft nativ ueber raylib (mit dem `graphics`-Feature, das die native Grafik-Runtime ohnehin mitbringt). **Funktional, nicht bit-identisch** zur pygame-Version (anderer Mixer) — wie `RND`/`tween`. Hinweise:
+
+- `SOUND` und `AUDIO_CHANNEL` sind nativ ganzzahlige Handles; raylib kennt keine pygame-Channels, daher steuert ein „Channel“ die Wiedergabe genau seines Sounds.
+- `AUDIO_GET_VOLUME` liefert das zuletzt gesetzte Volume (raylib hat keinen Getter).
+- Fade-in/out und `loops = N` werden vereinfacht (raylib kann das nicht direkt); Pan ist eine Naeherung.
+- Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`) baut die Wellenform als In-RAM-WAV.

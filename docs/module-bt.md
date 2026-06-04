@@ -120,3 +120,7 @@ END TRY
 ## Komplettes Beispiel
 
 Siehe [examples/38_bt.gb](../examples/38_bt.gb).
+
+## In der nativen Runtime (gbrt)
+
+`bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug` statt `bleak`; async wird ueber eine interne tokio-Runtime synchron getrieben). Scan/Connect/Services/Characteristics/Read/Write wie im Python-Pfad; Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. Bauen: `python rust/build_runtime.py --hardware` (oder `--full`). Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.

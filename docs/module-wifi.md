@@ -108,3 +108,7 @@ WIFI_DELETE_PROFILE("AlteSchule_WLAN")  ' Profil entfernen
 ## Komplettes Beispiel
 
 Siehe [examples/36_wifi.gb](../examples/36_wifi.gb).
+
+## In der nativen Runtime (gbrt)
+
+`wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows-only via `netsh wlan`, keine Crate). Bauen: `python rust/build_runtime.py --hardware` (oder `--full`).

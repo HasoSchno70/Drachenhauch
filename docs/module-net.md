@@ -182,3 +182,7 @@ NET_SEND(sock, len_str + msg)
 ## Beispiel
 
 [examples/72_net_chat.gb](../examples/72_net_chat.gb) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/test_modules_net.py`) zu finden.
+
+## In der nativen Runtime (gbrt)
+
+`net` laeuft nativ mit dem Cargo-Feature `net` (reine `std::net`, keine zusaetzliche Crate). TCP-Listener/-Sockets + UDP, non-blocking per Default. Der Standard-Dev-Build (`python rust/build_runtime.py`) enthaelt `net` bereits.
