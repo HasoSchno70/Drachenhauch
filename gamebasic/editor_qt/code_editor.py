@@ -50,6 +50,8 @@ INDENT_SPACES = 4
 
 # Breite der Fold-Marker-Spalte am rechten Rand der Zeilennummern-Spalte.
 FOLD_MARGIN = 16
+# Breite des linken Gutter-Bands fuer Breakpoint-Klicks/-Marker.
+BP_ZONE = 16
 
 # Identifier-Pattern fuer GB: Buchstabe oder _ vorne, alphanum/_ in der Mitte,
 # optional ein Trailing-$ (Konvention fuer String-Variablen).
@@ -102,10 +104,16 @@ class _LineNumberArea(QWidget):
         self._editor.paint_line_numbers(event)
 
     def mousePressEvent(self, event):  # noqa: N802
-        # Click in der Fold-Margin-Spalte (rechte Spalte des Gutters)?
         if event.button() == Qt.MouseButton.LeftButton:
             x = int(event.position().x())
             w = self._editor.line_number_area_width()
+            # Linkes Band -> Breakpoint toggeln.
+            if x < BP_ZONE:
+                line = self._editor._line_at_y(int(event.position().y()))
+                if line is not None:
+                    self._editor.toggle_breakpoint(line)
+                    return
+            # Rechte Spalte -> Fold-Marker.
             if x >= w - FOLD_MARGIN:
                 handled = self._editor._handle_fold_click(int(event.position().y()))
                 if handled:
@@ -135,6 +143,7 @@ class CodeEditor(
     find_references_requested = Signal(str)
     rename_requested = Signal(str)
     run_selection_requested = Signal(str)     # selektierter Code-Snippet
+    breakpoints_changed = Signal()            # Gutter-Breakpoint getoggelt
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -156,6 +165,10 @@ class CodeEditor(
 
         # Find-Hits als ExtraSelections-Layer (separat von Current-Line).
         self._find_hits: list[tuple[int, int]] = []
+
+        # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
+        self._breakpoints: set[int] = set()
+        self._debug_line: int | None = None
 
         # Multi-Cursor (Strg+D Add-Next-Occurrence). Liste sekundaerer
         # Selektionen als (start, end). Primaere Cursor bleibt im
@@ -355,6 +368,26 @@ class CodeEditor(
                     painter.setBrush(col_err)
                     painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
                     painter.setBrush(Qt.BrushStyle.NoBrush)
+                # Breakpoint: roter gefuellter Kreis im linken Gutter-Band.
+                if line1b in self._breakpoints:
+                    line_h = self.fontMetrics().height()
+                    r = max(3, line_h // 3)
+                    cx = 8
+                    cy = int(top) + line_h // 2
+                    painter.setPen(Qt.PenStyle.NoPen)
+                    painter.setBrush(QColor(COLORS["danger"]))
+                    painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                # Debug-Stop-Zeile: gelber/accent Pfeil ueber dem Breakpoint.
+                if self._debug_line is not None and line1b == self._debug_line:
+                    line_h = self.fontMetrics().height()
+                    painter.setPen(QColor(COLORS["accent"]))
+                    painter.drawText(
+                        0, int(top), BP_ZONE, line_h,
+                        int(Qt.AlignmentFlag.AlignCenter
+                            | Qt.AlignmentFlag.AlignVCenter),
+                        "▶",
+                    )
             block = block.next()
             top = bottom
             bottom = top + self.blockBoundingRect(block).height()
@@ -506,6 +539,48 @@ class CodeEditor(
             bottom = top + self.blockBoundingRect(block).height()
         return False
 
+    def _line_at_y(self, y_pixel: int) -> int | None:
+        """1-basierte Zeile an einer Y-Pixel-Position im Gutter (oder None)."""
+        block = self.firstVisibleBlock()
+        offset = self.contentOffset()
+        top = self.blockBoundingGeometry(block).translated(offset).top()
+        bottom = top + self.blockBoundingRect(block).height()
+        while block.isValid():
+            if block.isVisible() and top <= y_pixel < bottom:
+                return block.blockNumber() + 1
+            block = block.next()
+            top = bottom
+            bottom = top + self.blockBoundingRect(block).height()
+        return None
+
+    # ----------------------------------------------- Breakpoints / Debug
+    def toggle_breakpoint(self, line: int) -> None:
+        if line in self._breakpoints:
+            self._breakpoints.discard(line)
+        else:
+            self._breakpoints.add(line)
+        self._line_area.update()
+        self.breakpoints_changed.emit()
+
+    def breakpoints(self) -> set[int]:
+        return set(self._breakpoints)
+
+    def set_breakpoints(self, lines) -> None:
+        self._breakpoints = set(int(x) for x in lines)
+        self._line_area.update()
+
+    def set_debug_line(self, line: int | None) -> None:
+        """Markiert die aktuelle Stop-Zeile (Pfeil + Zeilen-Highlight)."""
+        self._debug_line = line
+        self._refresh_extra_selections()
+        self._line_area.update()
+        if line is not None:
+            blk = self.document().findBlockByNumber(line - 1)
+            if blk.isValid():
+                cur = QTextCursor(blk)
+                self.setTextCursor(cur)
+                self.ensureCursorVisible()
+
     def _toggle_fold(self, start_line: int, end_line: int) -> None:
         """Schaltet die Sichtbarkeit von Bloecken (start, end] um."""
         folded_now = start_line in self._folded
@@ -584,6 +659,18 @@ class CodeEditor(
             cursor.clearSelection()
             sel.cursor = cursor
             selections.append(sel)
+        # Debug-Stop-Zeile: volle Zeile in gedaempftem Akzent hervorheben.
+        if self._debug_line is not None:
+            dbg_block = self.document().findBlockByNumber(self._debug_line - 1)
+            if dbg_block.isValid():
+                dbg_sel = QTextEdit.ExtraSelection()
+                dbg_sel.format.setBackground(QColor(COLORS["accent_soft"]))
+                dbg_sel.format.setProperty(
+                    QTextFormat.Property.FullWidthSelection, True)
+                dc = QTextCursor(dbg_block)
+                dc.clearSelection()
+                dbg_sel.cursor = dc
+                selections.append(dbg_sel)
         # Find-Hits in akzent-Farbe ueberlagern.
         for start, end in self._find_hits:
             hit_sel = QTextEdit.ExtraSelection()
