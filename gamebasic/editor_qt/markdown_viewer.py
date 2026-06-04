@@ -1,9 +1,16 @@
 """Markdown-Viewer fuer README/Doku-Dateien.
 
-Rendert Markdown ueber `setHtml()` (siehe `_markdown_to_html` -- Qt's
-`setMarkdown()` ignoriert unser Theme-Stylesheet). Zusaetzlich:
-  * **Inhaltsverzeichnis** (links) aus den Headings -- Klick springt zur
-    Stelle (via injizierte `<a name="tocN">`-Anker).
+Rendert Markdown ueber Qt's natives `setMarkdown()` (gute Formatierung:
+Tabellen, Listen, Code-Bloecke, vernuenftige Abstaende) und faerbt das
+Ergebnis danach **programmatisch** theme-treu ein -- `setDefaultStyleSheet()`
+greift bei `setMarkdown` naemlich NICHT (ein fruehrerer HTML-Umweg ueber
+`toHtml()` zog zwar Farben, buk aber gequetschte Inline-Margins ein). Statt
+CSS setzen wir also Palette (Text/Link) plus pro Block/Fragment die
+Akzent-/Code-Farben und etwas mehr Zeilen-/Absatz-Luft.
+
+Zusaetzlich:
+  * **Inhaltsverzeichnis** (links) aus den Headings -- Klick scrollt zur
+    Stelle (ueber die Block-Nummer + Dokument-Layout).
   * **Suche** (Strg+F) mit Weiter/Zurueck, Wrap-Around und Highlight aller
     Treffer.
 
@@ -12,14 +19,12 @@ ein Signal an MainWindow, das den Editor entsprechend wechselt.
 """
 from __future__ import annotations
 
-import re
-from html import unescape
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import (
-    QColor, QFont, QKeySequence, QShortcut, QTextCharFormat, QTextCursor,
-    QTextDocument,
+    QColor, QFont, QFontInfo, QKeySequence, QPalette, QShortcut,
+    QTextBlockFormat, QTextCharFormat, QTextCursor, QTextDocument,
 )
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
@@ -28,9 +33,7 @@ from PySide6.QtWidgets import (
 
 from .theme import COLORS, EDITOR_FONT_FAMILY, theme_signals
 
-# Heading-Tags im generierten HTML -- fuer Inhaltsverzeichnis + Anker-Injektion.
-_HEADING_RE = re.compile(r"(<h([1-6])\b[^>]*>)(.*?)(</h\2>)", re.DOTALL)
-_TAG_RE = re.compile(r"<[^>]+>")
+_PROPORTIONAL = QTextBlockFormat.LineHeightTypes.ProportionalHeight.value
 
 
 class MarkdownViewer(QWidget):
@@ -51,7 +54,7 @@ class MarkdownViewer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Header mit Titel + Inhalts-Toggle + Refresh-Button
+        # Header mit Titel + Inhalts-Toggle + Such-/Refresh-Button
         self._header = QWidget()
         hl = QHBoxLayout(self._header)
         hl.setContentsMargins(12, 8, 12, 8)
@@ -161,46 +164,7 @@ class MarkdownViewer(QWidget):
             }}
             """
         )
-        # Markdown-spezifisches Styling. Qt's QTextBrowser interpretiert
-        # nur ein begrenztes CSS-Subset, aber Foreground/Background +
-        # font-family + padding ziehen.
-        self.browser.document().setDefaultStyleSheet(
-            f"""
-            body {{ color: {c['fg']}; }}
-            h1 {{ color: {c['accent']}; padding-bottom: 4px; }}
-            h2 {{ color: {c['accent']}; padding-top: 8px; }}
-            h3, h4 {{ color: {c['accent_hover']}; }}
-            code {{
-                font-family: "{EDITOR_FONT_FAMILY}", monospace;
-                color: {c['builtin']};
-                background-color: {c['bg_alt']};
-            }}
-            pre {{
-                font-family: "{EDITOR_FONT_FAMILY}", monospace;
-                color: {c['fg']};
-                background-color: {c['bg_alt']};
-                padding: 8px;
-            }}
-            pre code {{
-                color: {c['fg']};
-                background-color: transparent;
-            }}
-            a {{ color: {c['link']}; }}
-            blockquote {{
-                color: {c['fg_muted']};
-                border-left: 3px solid {c['border']};
-                padding-left: 8px;
-            }}
-            table {{ border-collapse: collapse; }}
-            th, td {{
-                border: 1px solid {c['border']};
-                padding: 4px 8px;
-            }}
-            th {{ background-color: {c['bg_panel']}; color: {c['fg']}; }}
-            hr {{ border: 1px solid {c['border']}; }}
-            """
-        )
-        # Neu rendern, damit das aktualisierte Stylesheet wirkt.
+        # Theme-Wechsel: neu rendern + neu einfaerben.
         if self._current_path is not None:
             self._render(self._current_path)
 
@@ -233,76 +197,136 @@ class MarkdownViewer(QWidget):
         # `searchPaths` erlaubt relative Bilder/Links aufzuloesen.
         self.browser.setSearchPaths([str(path.parent)])
         if path.suffix.lower() in (".md", ".markdown"):
-            html = self._markdown_to_html(text)
-            html, toc = self._inject_toc(html)
-            self.browser.setHtml(html)
-            self._populate_toc(toc)
+            self.browser.setMarkdown(text)
+            self._style_document()
+            self._populate_toc(self._collect_headings())
         else:
             self.browser.setPlainText(text)
             self._populate_toc([])
         self._update_highlights()
 
-    def _markdown_to_html(self, text: str) -> str:
-        """Markdown -> HTML, damit unser Theme-Stylesheet greift.
+    # ----------------------------------------------------- Theming
+    def _style_document(self) -> None:
+        """Faerbt das gerenderte Markdown theme-treu ein und gibt den
+        Absaetzen etwas mehr Luft.
 
-        Qt's `QTextBrowser.setMarkdown()` ignoriert das via
-        `setDefaultStyleSheet()` gesetzte CSS komplett -- die Texte bekommen
-        keinerlei Foreground-Farbe und rendern im dunklen Default (auf dem
-        dunklen Editor-Hintergrund praktisch unlesbar). `setHtml()` dagegen
-        konsultiert das Default-Stylesheet und backt unsere Theme-Farben in
-        jedes Element. Also wandeln wir Markdown ueber ein Wegwerf-Dokument
-        zu HTML und rendern dieses HTML.
+        Qt's `setMarkdown` setzt keine Foreground-Farben (Default-Schwarz auf
+        dunklem Grund). Wir setzen daher die Palette (Text/Link) und ziehen pro
+        Block/Fragment die Akzent-Farbe (Headings), Code-Farbe + dezenten
+        Hintergrund (Inline-Code/Code-Bloecke) ein. Zusaetzlich mehr
+        Zeilenhoehe und Absatz-Abstand fuer bessere Lesbarkeit -- Code-Bloecke
+        bleiben eng.
         """
-        conv = QTextDocument()
-        conv.setDefaultFont(self.browser.font())   # Schriftgroesse beibehalten
-        conv.setMarkdown(text)
-        html = conv.toHtml()
-        # Qt backt fuer Links hart das Default-Blau `#0000ff` als Inline-Style
-        # ein -- das ueberstimmt unsere CSS-`a`-Regel und ist auf dunklem
-        # Grund kaum lesbar. Es ist die EINZIGE von conv eingebackte Farbe,
-        # daher koennen wir sie gefahrlos gegen die Theme-Link-Farbe tauschen.
-        html = html.replace("color:#0000ff", f"color:{COLORS['link']}")
-        return html
+        c = COLORS
+        pal = self.browser.palette()
+        pal.setColor(QPalette.ColorRole.Text, QColor(c["fg"]))
+        pal.setColor(QPalette.ColorRole.Link, QColor(c["link"]))
+        self.browser.setPalette(pal)
 
-    def _inject_toc(self, html: str) -> tuple[str, list[tuple[int, str]]]:
-        """Sammelt Headings fuers Inhaltsverzeichnis und injiziert pro Heading
-        einen `<a name="tocN">`-Anker, damit das TOC dorthin springen kann.
+        doc = self.browser.document()
+        code_fmt = QTextCharFormat()
+        code_fmt.setForeground(QColor(c["builtin"]))
+        code_fmt.setBackground(QColor(c["bg_alt"]))
 
-        Index-Alignment ist garantiert, weil TOC-Eintraege UND Anker aus
-        derselben sequentiellen Heading-Iteration stammen.
-        """
-        toc: list[tuple[int, str]] = []
+        blk = doc.firstBlock()
+        while blk.isValid():
+            level = blk.blockFormat().headingLevel()
+            empty = not blk.text().strip()
+            is_code = (not level) and not empty and self._block_is_code(blk)
 
-        def repl(m: re.Match) -> str:
-            open_tag, level, inner, close_tag = (
-                m.group(1), int(m.group(2)), m.group(3), m.group(4))
-            text = unescape(_TAG_RE.sub("", inner)).strip()
-            if not text:
-                return m.group(0)
-            idx = len(toc)
-            toc.append((level, text))
-            return f'{open_tag}<a name="toc{idx}"></a>{inner}{close_tag}'
+            # Block-Format: Zeilenhoehe + Abstand (kopiert vorhandenes Format,
+            # damit Listen-Einrueckung / Blockquote erhalten bleibt).
+            bf = QTextBlockFormat(blk.blockFormat())
+            if level:
+                bf.setLineHeight(124, _PROPORTIONAL)
+                bf.setTopMargin(16.0)
+                bf.setBottomMargin(6.0)
+            elif is_code or empty:
+                # Code-Zeile oder Blank-Line im Code-Block -> eng halten.
+                bf.setLineHeight(118, _PROPORTIONAL)
+                bf.setBottomMargin(0.0)
+            else:
+                bf.setLineHeight(134, _PROPORTIONAL)
+                bf.setBottomMargin(10.0)
+            bcur = QTextCursor(blk)
+            bcur.setBlockFormat(bf)
 
-        return _HEADING_RE.sub(repl, html), toc
+            if level:
+                col = c["accent"] if level <= 2 else c["accent_hover"]
+                ccur = QTextCursor(doc)
+                ccur.setPosition(blk.position())
+                ccur.setPosition(blk.position() + max(0, blk.length() - 1),
+                                 QTextCursor.MoveMode.KeepAnchor)
+                f = QTextCharFormat()
+                f.setForeground(QColor(col))
+                ccur.mergeCharFormat(f)
+            else:
+                # Code-Fragmente (Inline + Bloecke) einfaerben + Hintergrund.
+                it = blk.begin()
+                while not it.atEnd():
+                    frag = it.fragment()
+                    if frag.isValid() and self._is_mono(frag.charFormat()):
+                        fc = QTextCursor(doc)
+                        fc.setPosition(frag.position())
+                        fc.setPosition(frag.position() + frag.length(),
+                                       QTextCursor.MoveMode.KeepAnchor)
+                        fc.mergeCharFormat(code_fmt)
+                    it += 1
+            blk = blk.next()
 
-    def _populate_toc(self, toc: list[tuple[int, str]]) -> None:
+    @staticmethod
+    def _is_mono(char_fmt) -> bool:
+        """True, wenn das Fragment Monospace ist. Qt markiert Code ueber die
+        Font-Familie (`Courier New`), NICHT ueber `fontFixedPitch()` (das
+        bleibt False) -- daher loesen wir die echte Eigenschaft via QFontInfo
+        auf."""
+        return QFontInfo(char_fmt.font()).fixedPitch()
+
+    def _block_is_code(self, blk) -> bool:
+        """True, wenn das erste Fragment des Blocks Monospace ist -- bei einem
+        Fenced-Code-Block ist die ganze Zeile Monospace, bei Prosa mit
+        Inline-Code beginnt der Block mit normalem Text."""
+        it = blk.begin()
+        if it.atEnd():
+            return False
+        frag = it.fragment()
+        return frag.isValid() and self._is_mono(frag.charFormat())
+
+    # ---------------------------------------------------- Inhaltsverzeichnis
+    def _collect_headings(self) -> list[tuple[int, str, int]]:
+        """(level, text, block_number) je Heading-Block."""
+        toc: list[tuple[int, str, int]] = []
+        blk = self.browser.document().firstBlock()
+        while blk.isValid():
+            level = blk.blockFormat().headingLevel()
+            text = blk.text().strip()
+            if level and text:
+                toc.append((level, text, blk.blockNumber()))
+            blk = blk.next()
+        return toc
+
+    def _populate_toc(self, toc: list[tuple[int, str, int]]) -> None:
         self.toc.clear()
-        min_level = min((lv for lv, _ in toc), default=1)
-        for idx, (level, text) in enumerate(toc):
+        min_level = min((lv for lv, _, _ in toc), default=1)
+        for level, text, block_no in toc:
             indent = "    " * max(0, level - min_level)
             it = QListWidgetItem(f"{indent}{text}")
-            it.setData(Qt.ItemDataRole.UserRole, idx)
+            it.setData(Qt.ItemDataRole.UserRole, block_no)
             it.setToolTip(text)
             self.toc.addItem(it)
-        # TOC nur zeigen, wenn es Eintraege gibt UND der User es nicht
-        # ausgeblendet hat.
         self.toc.setVisible(bool(toc) and self._toc_btn.isChecked())
         self._toc_btn.setEnabled(bool(toc))
 
     def _on_toc_clicked(self, item: QListWidgetItem) -> None:
-        idx = item.data(Qt.ItemDataRole.UserRole)
-        if idx is not None:
-            self.browser.scrollToAnchor(f"toc{idx}")
+        block_no = item.data(Qt.ItemDataRole.UserRole)
+        if block_no is None:
+            return
+        doc = self.browser.document()
+        blk = doc.findBlockByNumber(int(block_no))
+        if not blk.isValid():
+            return
+        y = doc.documentLayout().blockBoundingRect(blk).top()
+        self.browser.verticalScrollBar().setValue(int(y) - 8)
 
     def _toggle_toc(self, on: bool) -> None:
         self.toc.setVisible(on and self.toc.count() > 0)
