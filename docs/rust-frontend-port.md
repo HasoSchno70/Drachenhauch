@@ -16,7 +16,7 @@ verifiziert** (cargo + rustc sind verfügbar, also hier beweisbar).
 |---|---|---|---|
 | 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
 | 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3d fertig** |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
 | 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` (geplant) | Merge-Ergebnis-Gleichheit | offen |
 | 5. **Verdrahtung** | `gbrt run datei.gb` / `--export` | Output-Parität (gbrt-self-compiled vs Python-TW) | offen |
 
@@ -101,10 +101,25 @@ MRO zur Laufzeit), Properties (GET/SET als `__get_`/`__set_`-Methoden + property
 set), Operatoren (`__op_*`), STRUCT (Auto-Init `DECLARE_STRUCT_NAME`), STATIC
 CONST + ENUM (als `{"ns":...}`-Namespace im const-Pool). **50 Tests grün.**
 
-**Nächste Teil-Stufen** (je eigener Commit, Korpus wächst):
-3e Comprehensions, `SELECT`, Tupel/`TupleAssign`, `WITH`, `TRY`/`THROW`,
-`FOR EACH`, `SliceAccess`, Coroutinen/`YIELD` · dann `gbrt run datei.gb`
-(Stufe 5) + Preprocess (Stufe 4).
+**Stufe 3e (fertig):** `SELECT CASE` (value/range/`IS`/Guard-`WHERE`/`ELSE`),
+`FOR EACH` (String/Tupel/Array/Map-Keys, Desugar zu Index-Loop über
+`__comp_iter`), `REPEAT…UNTIL`, Tupel-Literal (`BUILD_TUPLE`) +
+Destructuring (`UNPACK_TUPLE`, Identifier/Member/Index-Ziele), `WITH`
+(anonymer Slot + `.member`-Desugar), `TRY`/`CATCH`/`THROW`
+(`TRY_BEGIN`/`TRY_END`/`THROW` + `try_depth`-Tracking, damit BREAK/CONTINUE
+über Try-Blöcke korrekt `TRY_END` emittieren), `SliceAccess` (`SLICE`),
+List-/Set-/Dict-Comprehensions (Marker + `BUILD_TUPLE_DYN`, dann
+`__set_dedup`/`__dict_from_pairs`), `IIF` (`TernaryExpr`, lazy), Coroutinen
+(`YIELD`→`YIELD_VALUE`, `is_coroutine`-Flag aus `body_has_yield`). Dazu die
+Werttypen aus `_TYPE_DEFAULTS` erkannt (`TUPLE`/`COROUTINE`/`FUNCREF`/`IMAGE`/
+`SOUND`/`FILE`/`SPRITE_ATLAS`) als skalare DIM-Typen. **71 Tests grün.** Gotcha:
+`compiler._collect_data` rekursiert in `SELECT`/`TRY`, aber NICHT in
+`FOR EACH`/`WITH` — der Rust-Port spiegelt das exakt (sonst weichen die
+DATA-Arrays ab).
+
+**Nächste Teil-Stufen** (je eigener Commit): `gbrt run datei.gb`
+(Stufe 5) + Preprocess/`IMPORT` (Stufe 4). Damit liefe die Toolchain
+end-to-end ohne Python.
 
 ## Prinzip
 

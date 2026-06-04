@@ -109,6 +109,28 @@ _SNIPPETS = [
     "STRUCT Point\n  DIM x AS INTEGER\n  DIM y AS INTEGER\nEND STRUCT\nDIM p AS Point\np.x = 3\np.y = 4\nPRINT p.x + p.y\n",
     "CLASS Counter\n  DIM n AS INTEGER\n  SUB inc()\n    Self.n = Self.n + 1\n  END SUB\nEND CLASS\nDIM c AS Counter\nc = NEW Counter()\nc.inc()\nc.inc()\nc.inc()\nPRINT c.n\n",
     "CLASS Pt\n  DIM px AS INTEGER\n  SUB Init(v AS INTEGER)\n    Self.px = v\n  END SUB\nEND CLASS\nDIM p AS Pt\np = NEW Pt(v: 5)\nPRINT p.px\n",
+    # --- 3e: SELECT / FOR EACH / Tupel / WITH / TRY / Slicing / Comprehensions / IIF / REPEAT / Coroutinen ---
+    "DIM x AS INTEGER\nx = 13\nSELECT CASE x\n  CASE 1\n    PRINT \"eins\"\n  CASE 2, 3, 4\n    PRINT \"234\"\n  CASE 10 TO 20\n    PRINT \"range\"\n  CASE IS > 100\n    PRINT \"gross\"\n  CASE ELSE\n    PRINT \"else\"\nEND SELECT\n",
+    "DIM hp AS INTEGER\nDIM pot AS BOOLEAN\nhp = 25\npot = TRUE\nSELECT CASE hp\n  CASE IS <= 0\n    PRINT \"tot\"\n  CASE IS <= 30 WHERE pot\n    PRINT \"heilen\"\n  CASE IS <= 30\n    PRINT \"fliehen\"\n  CASE ELSE\n    PRINT \"ok\"\nEND SELECT\n",
+    "DIM a[3] AS INTEGER\na[0] = 10\na[1] = 20\na[2] = 30\nFOR EACH v IN a\n  PRINT v\nNEXT\n",
+    "FOR EACH ch IN \"abc\"\n  PRINT ch\nNEXT\n",
+    "FOR EACH n IN (5, 6, 7)\n  PRINT n\nNEXT\n",
+    "FOR EACH n IN (1, 2, 3, 4, 5)\n  IF n = 2 THEN CONTINUE\n  IF n = 4 THEN BREAK\n  PRINT n\nNEXT\n",
+    "DIM t AS TUPLE\nt = (1, 2, 3)\nPRINT t\n",
+    "FUNCTION minmax(a AS INTEGER, b AS INTEGER) AS TUPLE\n  IF a < b THEN RETURN (a, b)\n  RETURN (b, a)\nEND FUNCTION\nDIM lo AS INTEGER\nDIM hi AS INTEGER\n(lo, hi) = minmax(7, 3)\nPRINT lo, hi\n",
+    "CLASS P\n  DIM x AS INTEGER\n  DIM y AS INTEGER\nEND CLASS\nDIM p AS P\np = NEW P()\nWITH p\n  .x = 100\n  .y = 50\nEND WITH\nPRINT p.x + p.y\n",
+    "TRY\n  THROW \"boom\"\nCATCH msg\n  PRINT \"caught: \" + msg\nEND TRY\n",
+    "DIM i AS INTEGER\nFOR i = 1 TO 5\n  TRY\n    IF i = 3 THEN THROW \"x\"\n    PRINT i\n  CATCH e\n    PRINT \"skip \" + STR$(i)\n  END TRY\nNEXT\n",
+    "PRINT \"Hello World\"[6:11]\n",
+    "DIM a[5] AS INTEGER\nDIM i AS INTEGER\nFOR i = 0 TO 4\n  a[i] = i\nNEXT\nDIM b AS ARRAY OF INTEGER\nb = a[1:4]\nPRINT b[0], b[1], b[2], LEN(b)\n",
+    "DIM evens AS TUPLE\nevens = [n FOR n IN (1, 2, 3, 4, 5, 6) WHERE n MOD 2 = 0]\nPRINT evens\n",
+    "DIM sq AS TUPLE\nsq = [n * n FOR n IN (1, 2, 3, 4)]\nPRINT sq\n",
+    "DIM d AS TUPLE\nd = {x MOD 3 FOR x IN (0, 1, 2, 3, 4, 5, 6, 7, 8)}\nPRINT d\n",
+    "DIM m AS MAP OF INTEGER\nm = {STR$(x) + \"sq\": x * x FOR x IN (1, 2, 3)}\nPRINT MAPGET(m, \"2sq\")\n",
+    "DIM x AS INTEGER\nx = 0\nPRINT IIF(x <> 0, 100 \\ x, -1)\n",
+    "DIM i AS INTEGER\ni = 0\nREPEAT\n  i = i + 1\n  PRINT i\nUNTIL i >= 3\n",
+    "FUNCTION counter() AS INTEGER\n  YIELD 1\n  YIELD 2\n  RETURN 99\nEND FUNCTION\nDIM c AS COROUTINE\nc = counter()\nPRINT CORO_RESUME(c)\nPRINT CORO_RESUME(c)\nPRINT CORO_RESUME(c)\nPRINT CORO_DONE(c)\n",
+    "DIM m AS MAP OF INTEGER\nMAPPUT(m, \"a\", 1)\nMAPPUT(m, \"b\", 2)\nDIM total AS INTEGER\ntotal = 0\nFOR EACH k IN m\n  total = total + MAPGET(m, k)\nNEXT\nPRINT total\n",
 ]
 
 
@@ -132,7 +154,10 @@ def test_compiler_example_sweep():
         # Grafik/Interaktion/Module/Nichtdeterminismus gar nicht erst ausfuehren
         # (oeffnet sonst ein Fenster, blockiert auf stdin, oder weicht legitim ab).
         skip = ("screen(", "input ", "import ", "rnd", "millis", "time$",
-                "randomize", "key", "mouse", "delta(", "fps", "flip(")
+                "randomize", "key", "mouse", "delta(", "fps", "flip(",
+                # Datei-I/O hat Platten-Seiteneffekte (append) -> zwei
+                # sequentielle Laeufe (gbrt + TW) sehen verschiedenen State.
+                "openfile(")
         if any(tok in low for tok in skip):
             continue
         rc, rs_out = _runsrc(path)

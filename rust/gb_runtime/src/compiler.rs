@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use serde_json::{json, Map, Value};
 
-use crate::ast::{NumV, Node};
+use crate::ast::{CaseMatch, CaseVal, NumV, Node};
 
 // Opcodes (Teilmenge; Werte aus bytecode.py / model::op).
 mod oc {
@@ -61,6 +61,14 @@ mod oc {
     pub const SHR: i64 = 66;
     pub const BNOT: i64 = 67;
     pub const IN_OP: i64 = 56;
+    pub const BUILD_TUPLE: i64 = 68;
+    pub const UNPACK_TUPLE: i64 = 69;
+    pub const BUILD_TUPLE_DYN: i64 = 57;
+    pub const SLICE: i64 = 55;
+    pub const TRY_BEGIN: i64 = 95;
+    pub const TRY_END: i64 = 96;
+    pub const THROW: i64 = 97;
+    pub const YIELD_VALUE: i64 = 115;
     pub const PRINT: i64 = 70;
     pub const INPUT_NAME: i64 = 71;
     pub const INPUT_LOCAL: i64 = 72;
@@ -87,6 +95,8 @@ mod oc {
 #[derive(Clone)]
 enum CVal {
     Nil, Bool(bool), Int(i64), Float(f64), Str(String),
+    /// Tupel-Literal (z.B. der `()`-Default fuer `DIM x AS TUPLE`).
+    Tuple(Vec<CVal>),
     /// ENUM-/STATIC-CONST-Namespace im const-Pool (-> {"ns": {...}}).
     Ns { name: String, members: Vec<(String, CVal)> },
 }
@@ -98,6 +108,7 @@ fn enc(c: &CVal) -> Value {
         CVal::Int(i) => json!(i),
         CVal::Float(f) => json!({ "f": f }),
         CVal::Str(s) => json!(s),
+        CVal::Tuple(items) => Value::Array(items.iter().map(enc).collect()),
         CVal::Ns { name, members } => {
             let mut m = Map::new();
             for (k, v) in members { m.insert(k.clone(), enc(v)); }
@@ -112,7 +123,9 @@ fn type_default(t: &str) -> CVal {
         "float" => CVal::Float(0.0),
         "string" => CVal::Str(String::new()),
         "boolean" => CVal::Bool(false),
-        _ => CVal::Nil,        // Klassen/externe Typen
+        "tuple" => CVal::Tuple(vec![]),
+        // image/sound/file/sprite_atlas/funcref/coroutine + Klassen/externe Typen
+        _ => CVal::Nil,
     }
 }
 
@@ -121,8 +134,11 @@ type CR = Result<(), String>;
 struct Ctx {
     code: Vec<(i64, Value)>,
     consts: Vec<Value>,
-    break_patches: Vec<Vec<usize>>,
-    continue_patches: Vec<Vec<usize>>,
+    // Jeder Eintrag: (Patch-IPs, try_depth bei Schleifen-Eintritt). BREAK/
+    // CONTINUE muessen pro dazwischenliegendem TRY ein TRY_END emittieren.
+    break_patches: Vec<(Vec<usize>, i64)>,
+    continue_patches: Vec<(Vec<usize>, i64)>,
+    try_depth: i64,
     local_slots: HashMap<String, usize>,
     local_types: Vec<String>,
     local_defaults: Vec<CVal>,
@@ -134,8 +150,32 @@ struct Ctx {
 impl Ctx {
     fn new() -> Self {
         Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![],
+              try_depth: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               is_main: true, is_sub: true, current_class: None }
+    }
+    /// Anonymer Local-Slot fuer Compiler-Zwischenwerte (Comprehensions, WITH,
+    /// Tupel-Destructuring). KEIN DECLARE_LOCAL -- der Slot wird beim Frame-
+    /// Eintritt aus `local_types`/`local_defaults` vorab alloziert (wie
+    /// compiler._alloc_anon_slot).
+    fn alloc_anon_slot(&mut self, type_name: &str) -> usize {
+        let idx = self.local_types.len();
+        self.local_types.push(type_name.to_string());
+        self.local_defaults.push(CVal::Nil);
+        self.local_slots.insert(format!("__anon_{}", idx), idx);
+        idx
+    }
+    /// Benannter Local-Slot mit DECLARE_LOCAL (wie compiler._declare_local).
+    /// Idempotent bei gleichem Namen.
+    fn declare_local(&mut self, name: &str, type_name: &str) -> usize {
+        if let Some(&s) = self.local_slots.get(name) { return s; }
+        let slot = self.local_types.len();
+        self.local_slots.insert(name.to_string(), slot);
+        self.local_types.push(type_name.to_string());
+        self.local_defaults.push(type_default(type_name));
+        let d = enc(&type_default(type_name));
+        self.emit(oc::DECLARE_LOCAL, json!([slot, type_name, d]));
+        slot
     }
     fn alloc_temp(&mut self, type_name: &str) -> usize {
         let slot = self.local_types.len();
@@ -341,13 +381,26 @@ impl Compiler {
                 }
                 Ok(())
             }
-            other => Err(format!("Stufe 3b: Statement {} noch nicht unterstuetzt",
+            Node::Select { subject, cases, else_block } =>
+                self.stmt_select(subject, cases, else_block),
+            Node::ForEach { var, iterable, body } => self.stmt_foreach(var, iterable, body),
+            Node::Repeat { body, condition } => self.stmt_repeat(body, condition),
+            Node::Try { body, catch_var, catch_block } =>
+                self.stmt_try(body, catch_var, catch_block),
+            Node::Throw { value } => {
+                self.expr(value)?;
+                self.ctx.emit(oc::THROW, Value::Null);
+                Ok(())
+            }
+            Node::With { var_name, target, body } => self.stmt_with(var_name, target, body),
+            Node::TupleAssign { targets, value } => self.stmt_tuple_assign(targets, value),
+            other => Err(format!("Stufe 3e: Statement {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
     }
 
     fn known_elem(&self, t: &str) -> bool {
-        is_simple_type(t) || self.classes.contains_key(t)
+        is_value_type(t) || self.classes.contains_key(t)
     }
 
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
@@ -375,8 +428,8 @@ impl Compiler {
             self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
             return Ok(());
         }
-        // Skalar: primitiv (Default je Typ) oder Klasse (Default NIL).
-        if !is_simple_type(type_name) && !self.classes.contains_key(type_name) {
+        // Skalar: Werttyp (Default je Typ) oder Klasse (Default NIL).
+        if !is_value_type(type_name) && !self.classes.contains_key(type_name) {
             return Err(format!("Stufe 3e: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
         }
         let name_idx = self.ctx.add_const(json!(name));
@@ -571,7 +624,7 @@ impl Compiler {
         for st in body { self.stmt(st)?; }
         // CONTINUE -> Inkrement
         let inc_target = self.ctx.here();
-        let cont = self.ctx.continue_patches.pop().unwrap();
+        let cont = self.ctx.continue_patches.pop().unwrap().0;
         for ip in cont { self.ctx.patch(ip, inc_target); }
         // var += step
         self.load_var(var);
@@ -584,7 +637,7 @@ impl Compiler {
         self.ctx.emit(oc::JUMP, json!(loop_start));
         let end_ip = self.ctx.here();
         for ip in exit_jumps { self.ctx.patch(ip, end_ip); }
-        let brk = self.ctx.break_patches.pop().unwrap();
+        let brk = self.ctx.break_patches.pop().unwrap().0;
         for ip in brk { self.ctx.patch(ip, end_ip); }
         Ok(())
     }
@@ -631,34 +684,39 @@ impl Compiler {
         self.break_continue_enter();
         for st in body { self.stmt(st)?; }
         // CONTINUE springt zum Schleifen-Anfang (Bedingung neu pruefen).
-        let cont_patches = self.ctx.continue_patches.pop().unwrap();
+        let cont_patches = self.ctx.continue_patches.pop().unwrap().0;
         for ip in cont_patches { self.ctx.patch(ip, start); }
         self.ctx.emit(oc::JUMP, json!(start));
         let end = self.ctx.here();
         self.ctx.patch(exit, end);
-        let break_patches = self.ctx.break_patches.pop().unwrap();
+        let break_patches = self.ctx.break_patches.pop().unwrap().0;
         for ip in break_patches { self.ctx.patch(ip, end); }
         Ok(())
     }
 
     fn break_continue_enter(&mut self) {
-        self.ctx.break_patches.push(vec![]);
-        self.ctx.continue_patches.push(vec![]);
+        let d = self.ctx.try_depth;
+        self.ctx.break_patches.push((vec![], d));
+        self.ctx.continue_patches.push((vec![], d));
     }
     fn emit_break(&mut self) -> CR {
-        if self.ctx.break_patches.is_empty() {
-            return Err("BREAK ausserhalb einer Schleife".into());
-        }
+        let loop_depth = match self.ctx.break_patches.last() {
+            Some((_, d)) => *d,
+            None => return Err("BREAK ausserhalb einer Schleife".into()),
+        };
+        for _ in 0..(self.ctx.try_depth - loop_depth) { self.ctx.emit(oc::TRY_END, Value::Null); }
         let ip = self.ctx.emit(oc::JUMP, Value::Null);
-        self.ctx.break_patches.last_mut().unwrap().push(ip);
+        self.ctx.break_patches.last_mut().unwrap().0.push(ip);
         Ok(())
     }
     fn emit_continue(&mut self) -> CR {
-        if self.ctx.continue_patches.is_empty() {
-            return Err("CONTINUE ausserhalb einer Schleife".into());
-        }
+        let loop_depth = match self.ctx.continue_patches.last() {
+            Some((_, d)) => *d,
+            None => return Err("CONTINUE ausserhalb einer Schleife".into()),
+        };
+        for _ in 0..(self.ctx.try_depth - loop_depth) { self.ctx.emit(oc::TRY_END, Value::Null); }
         let ip = self.ctx.emit(oc::JUMP, Value::Null);
-        self.ctx.continue_patches.last_mut().unwrap().push(ip);
+        self.ctx.continue_patches.last_mut().unwrap().0.push(ip);
         Ok(())
     }
 
@@ -774,6 +832,49 @@ impl Compiler {
                 Ok(())
             }
             Node::New { class_name, args } => self.expr_new(class_name, args),
+            Node::TupleLit { elements } => {
+                for el in elements { self.expr(el)?; }
+                self.ctx.emit(oc::BUILD_TUPLE, json!(elements.len()));
+                Ok(())
+            }
+            Node::TernaryExpr { cond, then_expr, else_expr } => {
+                self.expr(cond)?;
+                let jf = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
+                self.expr(then_expr)?;
+                let jend = self.ctx.emit(oc::JUMP, Value::Null);
+                let t = self.ctx.here(); self.ctx.patch(jf, t);
+                self.expr(else_expr)?;
+                let e = self.ctx.here(); self.ctx.patch(jend, e);
+                Ok(())
+            }
+            Node::SliceAccess { target, lo, hi } => {
+                self.expr(target)?;
+                if let Some(l) = lo { self.expr(l)?; }
+                if let Some(h) = hi { self.expr(h)?; }
+                let arg = json!([enc(&CVal::Bool(lo.is_some())), enc(&CVal::Bool(hi.is_some()))]);
+                self.ctx.emit(oc::SLICE, arg);
+                Ok(())
+            }
+            Node::Yield(v) => {
+                if self.ctx.is_main {
+                    return Err("YIELD nur in SUB/FUNCTION erlaubt".into());
+                }
+                match v {
+                    Some(ex) => self.expr(ex)?,
+                    None => { let c = self.ctx.add_const(Value::Null); self.ctx.emit(oc::LOAD_CONST, json!(c)); }
+                }
+                self.ctx.emit(oc::YIELD_VALUE, Value::Null);
+                Ok(())
+            }
+            Node::ListComp { var, iterable, filter, transform } =>
+                self.expr_listcomp(var, iterable, filter, transform),
+            Node::SetComp { var, iterable, filter, transform } => {
+                self.expr_listcomp(var, iterable, filter, transform)?;
+                self.ctx.emit(oc::CALL_BUILTIN, json!(["__set_dedup", 1]));
+                Ok(())
+            }
+            Node::DictComp { var, iterable, filter, key, value } =>
+                self.expr_dictcomp(var, iterable, filter, key, value),
             other => Err(format!("Stufe 3e: Ausdruck {} noch nicht unterstuetzt",
                                  node_name(other))),
         }
@@ -889,6 +990,348 @@ impl Compiler {
             self.ctx.emit(oc::CALL_BUILTIN, json!([name, args.len()]));
         }
         Ok(())
+    }
+
+    // ---------------------------------------------------- 3e: Kontrollfluss
+    /// SELECT CASE -- Subject bleibt auf dem Stack, pro Match per DUP geklont.
+    /// Optionaler Guard (`WHERE`) springt bei FALSE zum naechsten Case.
+    fn stmt_select(&mut self, subject: &Node,
+                   cases: &[(Vec<CaseMatch>, Option<Node>, Vec<Node>)],
+                   else_block: &[Node]) -> CR {
+        self.expr(subject)?;                  // Stack: [subj]
+        let mut end_jumps: Vec<usize> = vec![];
+        for (matches, guard, block) in cases {
+            let mut block_jumps: Vec<usize> = vec![];
+            for m in matches { self.emit_case_match(m, &mut block_jumps)?; }
+            let skip_jump = self.ctx.emit(oc::JUMP, Value::Null);
+            let block_start = self.ctx.here();
+            for ip in block_jumps { self.ctx.patch(ip, block_start); }
+            let mut guard_skip: Option<usize> = None;
+            if let Some(g) = guard {
+                self.expr(g)?;                // Stack: [subj, guard_val]
+                guard_skip = Some(self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null));
+            }
+            self.ctx.emit(oc::POP, Value::Null);   // Stack: []
+            for st in block { self.stmt(st)?; }
+            end_jumps.push(self.ctx.emit(oc::JUMP, Value::Null));
+            let next_case = self.ctx.here();
+            self.ctx.patch(skip_jump, next_case);
+            if let Some(gs) = guard_skip { self.ctx.patch(gs, next_case); }
+        }
+        self.ctx.emit(oc::POP, Value::Null);       // kein Match -> subj poppen
+        for st in else_block { self.stmt(st)?; }
+        let end = self.ctx.here();
+        for ip in end_jumps { self.ctx.patch(ip, end); }
+        Ok(())
+    }
+
+    /// Ein CASE-Match. Stack vor/nach: [subj]. Bei Treffer wird ein
+    /// JUMP_IF_TRUE-IP fuer den spaeteren Sprung zum block_start gesammelt.
+    fn emit_case_match(&mut self, m: &CaseMatch, block_jumps: &mut Vec<usize>) -> CR {
+        match m.kind.as_str() {
+            "value" => {
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.case_expr(&m.values[0])?;
+                self.ctx.emit(oc::EQ, Value::Null);
+                block_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+            }
+            "range" => {
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.case_expr(&m.values[0])?;     // lo
+                self.ctx.emit(oc::GEQ, Value::Null);
+                let skip_to_next = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.case_expr(&m.values[1])?;     // hi
+                self.ctx.emit(oc::LEQ, Value::Null);
+                block_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+                let t = self.ctx.here();
+                self.ctx.patch(skip_to_next, t);
+            }
+            "is" => {
+                let op = match &m.values[0] {
+                    CaseVal::Op(s) => s.clone(),
+                    _ => return Err("CASE IS: Operator-String erwartet".into()),
+                };
+                let code = match op.as_str() {
+                    "=" => oc::EQ, "<>" => oc::NEQ, "<" => oc::LT, ">" => oc::GT,
+                    "<=" => oc::LEQ, ">=" => oc::GEQ,
+                    _ => return Err(format!("CASE IS: unbekannter Operator '{}'", op)),
+                };
+                self.ctx.emit(oc::DUP, Value::Null);
+                self.case_expr(&m.values[1])?;
+                self.ctx.emit(code, Value::Null);
+                block_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
+            }
+            other => return Err(format!("Interner Fehler: CASE-Match-Typ '{}'", other)),
+        }
+        Ok(())
+    }
+
+    fn case_expr(&mut self, v: &CaseVal) -> CR {
+        match v {
+            CaseVal::Expr(n) => self.expr(n),
+            CaseVal::Op(_) => Err("CASE: unerwarteter Operator-Wert".into()),
+        }
+    }
+
+    /// FOR EACH var IN iterable -- Desugar zu einem Index-Loop ueber
+    /// __comp_iter(iterable) (TUPLE), wie compiler._stmt_ForEach.
+    fn stmt_foreach(&mut self, var: &str, iterable: &Node, body: &[Node]) -> CR {
+        if self.ctx.is_main {
+            if !self.ctx.local_slots.contains_key(var) {
+                let name_idx = self.ctx.add_const(json!(var));
+                let type_idx = self.ctx.add_const(json!("any"));
+                let default_idx = self.ctx.add_const(Value::Null);
+                if let Some(&g) = self.global_slots.get(var) {
+                    self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                                  json!([g as i64, name_idx, type_idx, default_idx]));
+                } else {
+                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                }
+            }
+        } else if !self.ctx.local_slots.contains_key(var) {
+            self.ctx.declare_local(var, "any");
+        }
+        let it_slot = self.ctx.alloc_temp("tuple");
+        self.expr(iterable)?;
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__comp_iter", 1]));
+        self.ctx.emit(oc::STORE_LOCAL, json!(it_slot));
+        let idx_slot = self.ctx.alloc_temp("integer");
+        let z = self.ctx.add_const(json!(0));
+        self.ctx.emit(oc::LOAD_CONST, json!(z));
+        self.ctx.emit(oc::STORE_LOCAL, json!(idx_slot));
+        let len_slot = self.ctx.alloc_temp("integer");
+        self.ctx.emit(oc::LOAD_LOCAL, json!(it_slot));
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["len", 1]));
+        self.ctx.emit(oc::STORE_LOCAL, json!(len_slot));
+        let loop_start = self.ctx.here();
+        self.break_continue_enter();
+        self.ctx.emit(oc::LOAD_LOCAL, json!(idx_slot));
+        self.ctx.emit(oc::LOAD_LOCAL, json!(len_slot));
+        self.ctx.emit(oc::GEQ, Value::Null);
+        let exit_jump = self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null);
+        self.ctx.emit(oc::LOAD_LOCAL, json!(it_slot));
+        self.ctx.emit(oc::LOAD_LOCAL, json!(idx_slot));
+        self.ctx.emit(oc::LOAD_INDEX, json!(1));
+        self.store_var(var);
+        for st in body { self.stmt(st)?; }
+        let inc_target = self.ctx.here();
+        let cont = self.ctx.continue_patches.pop().unwrap().0;
+        for ip in cont { self.ctx.patch(ip, inc_target); }
+        self.ctx.emit(oc::LOAD_LOCAL, json!(idx_slot));
+        let one = self.ctx.add_const(json!(1));
+        self.ctx.emit(oc::LOAD_CONST, json!(one));
+        self.ctx.emit(oc::ADD, Value::Null);
+        self.ctx.emit(oc::STORE_LOCAL, json!(idx_slot));
+        self.ctx.emit(oc::JUMP, json!(loop_start));
+        let end = self.ctx.here();
+        self.ctx.patch(exit_jump, end);
+        let brk = self.ctx.break_patches.pop().unwrap().0;
+        for ip in brk { self.ctx.patch(ip, end); }
+        Ok(())
+    }
+
+    /// REPEAT body UNTIL cond -- Post-Test-Loop (laeuft mind. einmal).
+    fn stmt_repeat(&mut self, body: &[Node], condition: &Node) -> CR {
+        let loop_start = self.ctx.here();
+        self.break_continue_enter();
+        for st in body { self.stmt(st)?; }
+        let cond_pos = self.ctx.here();
+        let cont = self.ctx.continue_patches.pop().unwrap().0;
+        for ip in cont { self.ctx.patch(ip, cond_pos); }
+        self.expr(condition)?;
+        self.ctx.emit(oc::JUMP_IF_FALSE, json!(loop_start));   // TRUE = abbrechen
+        let end = self.ctx.here();
+        let brk = self.ctx.break_patches.pop().unwrap().0;
+        for ip in brk { self.ctx.patch(ip, end); }
+        Ok(())
+    }
+
+    /// TRY body CATCH [e] catch_block END TRY.
+    fn stmt_try(&mut self, body: &[Node], catch_var: &str, catch_block: &[Node]) -> CR {
+        let catch_jmp = self.ctx.emit(oc::TRY_BEGIN, Value::Null);
+        self.ctx.try_depth += 1;
+        for st in body { self.stmt(st)?; }
+        self.ctx.try_depth -= 1;
+        self.ctx.emit(oc::TRY_END, Value::Null);
+        let end_jmp = self.ctx.emit(oc::JUMP, Value::Null);
+        // Catch-Branch: der (String-)Exception-Wert liegt oben auf dem Stack.
+        let ct = self.ctx.here();
+        self.ctx.patch(catch_jmp, ct);
+        if !catch_var.is_empty() {
+            if self.ctx.is_main {
+                if !self.ctx.local_slots.contains_key(catch_var) {
+                    let name_idx = self.ctx.add_const(json!(catch_var));
+                    let type_idx = self.ctx.add_const(json!("string"));
+                    let default_idx = self.ctx.add_const(json!(""));
+                    self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+                }
+            } else if !self.ctx.local_slots.contains_key(catch_var) {
+                self.ctx.declare_local(catch_var, "string");
+            }
+            self.store_var(catch_var);
+        } else {
+            self.ctx.emit(oc::POP, Value::Null);
+        }
+        for st in catch_block { self.stmt(st)?; }
+        let e = self.ctx.here();
+        self.ctx.patch(end_jmp, e);
+        Ok(())
+    }
+
+    /// WITH expr / body / END WITH -- Ziel in anonymen Slot, `.member` im
+    /// Body wurde vom Parser zu `<var_name>.member` desugart.
+    fn stmt_with(&mut self, var_name: &str, target: &Node, body: &[Node]) -> CR {
+        let slot = self.ctx.alloc_anon_slot("any");
+        self.expr(target)?;
+        self.ctx.emit(oc::STORE_LOCAL, json!(slot));
+        self.ctx.local_slots.insert(var_name.to_string(), slot);
+        let r = (|| -> CR { for st in body { self.stmt(st)?; } Ok(()) })();
+        self.ctx.local_slots.remove(var_name);
+        r
+    }
+
+    /// (t1, ..., tn) = expr -- UNPACK_TUPLE + Store je Ziel.
+    fn stmt_tuple_assign(&mut self, targets: &[Node], value: &Node) -> CR {
+        self.expr(value)?;
+        self.ctx.emit(oc::UNPACK_TUPLE, json!(targets.len()));
+        for tgt in targets {
+            match tgt {
+                Node::Identifier(name) => self.store_var(name),
+                Node::MemberAccess { target, name } => {
+                    let tmp = self.ctx.alloc_anon_slot("any");
+                    self.ctx.emit(oc::STORE_LOCAL, json!(tmp));
+                    self.expr(target)?;
+                    self.ctx.emit(oc::LOAD_LOCAL, json!(tmp));
+                    let idx = self.ctx.add_const(json!(name));
+                    self.ctx.emit(oc::STORE_MEMBER, json!(idx));
+                }
+                Node::IndexAccess { target, indices } => {
+                    let tmp = self.ctx.alloc_anon_slot("any");
+                    self.ctx.emit(oc::STORE_LOCAL, json!(tmp));
+                    self.expr(target)?;
+                    for ix in indices { self.expr(ix)?; }
+                    self.ctx.emit(oc::LOAD_LOCAL, json!(tmp));
+                    self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
+                }
+                _ => return Err("Ungueltiges Tupel-Assignment-Ziel".into()),
+            }
+        }
+        Ok(())
+    }
+
+    /// List-Comprehension: Marker + Index-Loop + BUILD_TUPLE_DYN.
+    fn expr_listcomp(&mut self, var: &str, iterable: &Node,
+                     filter: &Option<Box<Node>>, transform: &Node) -> CR {
+        let m = self.ctx.add_const(json!({ "comp": true }));
+        self.ctx.emit(oc::LOAD_CONST, json!(m));
+        let iter_slot = self.ctx.alloc_anon_slot("any");
+        self.expr(iterable)?;
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__comp_iter", 1]));
+        self.ctx.emit(oc::STORE_LOCAL, json!(iter_slot));
+        self.ctx.emit(oc::LOAD_LOCAL, json!(iter_slot));
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["len", 1]));
+        let len_slot = self.ctx.alloc_anon_slot("integer");
+        self.ctx.emit(oc::STORE_LOCAL, json!(len_slot));
+        let cnt_slot = self.ctx.alloc_anon_slot("integer");
+        let z = self.ctx.add_const(json!(0));
+        self.ctx.emit(oc::LOAD_CONST, json!(z));
+        self.ctx.emit(oc::STORE_LOCAL, json!(cnt_slot));
+        let prev = self.ctx.local_slots.get(var).copied();
+        let var_slot = self.ctx.alloc_anon_slot("any");
+        self.ctx.local_slots.insert(var.to_string(), var_slot);
+        let r = (|| -> CR {
+            let loop_start = self.ctx.here();
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::LOAD_LOCAL, json!(len_slot));
+            self.ctx.emit(oc::LT, Value::Null);
+            let cond_jump = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(iter_slot));
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::LOAD_INDEX, json!(1));
+            self.ctx.emit(oc::STORE_LOCAL, json!(var_slot));
+            let mut skip_jump: Option<usize> = None;
+            if let Some(f) = filter {
+                self.expr(f)?;
+                skip_jump = Some(self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null));
+            }
+            self.expr(transform)?;
+            if let Some(sj) = skip_jump { let t = self.ctx.here(); self.ctx.patch(sj, t); }
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            let one = self.ctx.add_const(json!(1));
+            self.ctx.emit(oc::LOAD_CONST, json!(one));
+            self.ctx.emit(oc::ADD, Value::Null);
+            self.ctx.emit(oc::STORE_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::JUMP, json!(loop_start));
+            let end_pos = self.ctx.here();
+            self.ctx.patch(cond_jump, end_pos);
+            self.ctx.emit(oc::BUILD_TUPLE_DYN, Value::Null);
+            Ok(())
+        })();
+        match prev {
+            Some(p) => { self.ctx.local_slots.insert(var.to_string(), p); }
+            None => { self.ctx.local_slots.remove(var); }
+        }
+        r
+    }
+
+    /// Dict-Comprehension: pro Iteration ein 2-Tupel (key, value); am Ende
+    /// __dict_from_pairs.
+    fn expr_dictcomp(&mut self, var: &str, iterable: &Node,
+                     filter: &Option<Box<Node>>, key: &Node, value: &Node) -> CR {
+        let m = self.ctx.add_const(json!({ "comp": true }));
+        self.ctx.emit(oc::LOAD_CONST, json!(m));
+        let iter_slot = self.ctx.alloc_anon_slot("any");
+        self.expr(iterable)?;
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["__comp_iter", 1]));
+        self.ctx.emit(oc::STORE_LOCAL, json!(iter_slot));
+        self.ctx.emit(oc::LOAD_LOCAL, json!(iter_slot));
+        self.ctx.emit(oc::CALL_BUILTIN, json!(["len", 1]));
+        let len_slot = self.ctx.alloc_anon_slot("integer");
+        self.ctx.emit(oc::STORE_LOCAL, json!(len_slot));
+        let cnt_slot = self.ctx.alloc_anon_slot("integer");
+        let z = self.ctx.add_const(json!(0));
+        self.ctx.emit(oc::LOAD_CONST, json!(z));
+        self.ctx.emit(oc::STORE_LOCAL, json!(cnt_slot));
+        let prev = self.ctx.local_slots.get(var).copied();
+        let var_slot = self.ctx.alloc_anon_slot("any");
+        self.ctx.local_slots.insert(var.to_string(), var_slot);
+        let r = (|| -> CR {
+            let loop_start = self.ctx.here();
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::LOAD_LOCAL, json!(len_slot));
+            self.ctx.emit(oc::LT, Value::Null);
+            let cond_jump = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
+            self.ctx.emit(oc::LOAD_LOCAL, json!(iter_slot));
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::LOAD_INDEX, json!(1));
+            self.ctx.emit(oc::STORE_LOCAL, json!(var_slot));
+            let mut skip_jump: Option<usize> = None;
+            if let Some(f) = filter {
+                self.expr(f)?;
+                skip_jump = Some(self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null));
+            }
+            self.expr(key)?;
+            self.expr(value)?;
+            self.ctx.emit(oc::BUILD_TUPLE, json!(2));
+            if let Some(sj) = skip_jump { let t = self.ctx.here(); self.ctx.patch(sj, t); }
+            self.ctx.emit(oc::LOAD_LOCAL, json!(cnt_slot));
+            let one = self.ctx.add_const(json!(1));
+            self.ctx.emit(oc::LOAD_CONST, json!(one));
+            self.ctx.emit(oc::ADD, Value::Null);
+            self.ctx.emit(oc::STORE_LOCAL, json!(cnt_slot));
+            self.ctx.emit(oc::JUMP, json!(loop_start));
+            let end_pos = self.ctx.here();
+            self.ctx.patch(cond_jump, end_pos);
+            self.ctx.emit(oc::BUILD_TUPLE_DYN, Value::Null);
+            self.ctx.emit(oc::CALL_BUILTIN, json!(["__dict_from_pairs", 1]));
+            Ok(())
+        })();
+        match prev {
+            Some(p) => { self.ctx.local_slots.insert(var.to_string(), p); }
+            None => { self.ctx.local_slots.remove(var); }
+        }
+        r
     }
 
     fn finish(self, data: Vec<Value>) -> Value {
@@ -1252,10 +1695,20 @@ fn collect_data(stmts: &[Node], out: &mut Vec<Value>) -> Result<(), String> {
                 for (_, b) in elseif_branches { collect_data(b, out)?; }
                 collect_data(else_block, out)?;
             }
+            // Hinweis: 1:1 zu compiler._collect_data -- KEIN ForEach/With
+            // (Python sammelt dort kein DATA), aber Select + Try.
             Node::While { body, .. } | Node::For { body, .. }
-            | Node::Repeat { body, .. } | Node::ForEach { body, .. }
+            | Node::Repeat { body, .. }
             | Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } =>
                 collect_data(body, out)?,
+            Node::Select { cases, else_block, .. } => {
+                for (_, _, blk) in cases { collect_data(blk, out)?; }
+                collect_data(else_block, out)?;
+            }
+            Node::Try { body, catch_block, .. } => {
+                collect_data(body, out)?;
+                collect_data(catch_block, out)?;
+            }
             Node::ClassDecl { methods, .. } => {
                 for m in methods {
                     if let Node::SubDecl { body, .. } | Node::FunctionDecl { body, .. } = m {
@@ -1284,9 +1737,12 @@ fn data_literal(lit: &Node) -> Result<CVal, String> {
     }
 }
 
-fn is_simple_type(t: &str) -> bool {
-    !t.starts_with("array:") && !t.starts_with("map:")
-        && matches!(t, "integer" | "float" | "string" | "boolean")
+/// Bekannter skalarer Werttyp (= compiler._TYPE_DEFAULTS-Schluessel). Klassen
+/// und (kuenftig) externe Modul-Typen werden separat geprueft.
+fn is_value_type(t: &str) -> bool {
+    matches!(t, "integer" | "float" | "string" | "boolean"
+        | "image" | "sound" | "sprite_atlas" | "file"
+        | "tuple" | "funcref" | "coroutine")
 }
 
 fn node_name(n: &Node) -> &'static str {
