@@ -150,6 +150,14 @@ User-Identifier ranken vor gleichnamigen Built-ins. Pro Kategorie eine eigene Fa
 
 **Abschalten:** `Bearbeiten → Auto-Vervollst. beim Tippen umschalten` (oder Befehlspalette). Das Setting wird in `~/.gamebasic-editor/settings.json` gespeichert. `Strg+Leer` funktioniert weiterhin, auch wenn der Auto-Trigger aus ist.
 
+## Signature-Help / Parameter-Hints
+
+Sobald du einen Funktionsaufruf öffnest — `LINE(` — erscheint über der Cursor-Zeile ein dezentes Popup mit der **Signatur**. Der gerade aktive Parameter ist **fett + in Akzentfarbe** hervorgehoben und wandert mit, während du Argumente und Kommas tippst (`LINE(10, 20, ▮` → `x2` ist aktiv).
+
+- Funktioniert für **Built-ins** (benannte Signatur, z. B. `LINE(x1, y1, x2, y2[, farbe])`) **und** für eigene `SUB`/`FUNCTION` im Buffer (volle Signatur mit Param-Namen und Typen).
+- Optionale Parameter werden als `[, farbe]` gezeigt; verschachtelte Aufrufe lösen auf den **innersten** Aufruf auf.
+- Blendet sich automatisch aus: außerhalb einer Argumentliste, in `"…"`-Strings / `'…`-Kommentaren, bei `Esc`, beim Scrollen oder Fokuswechsel. Das Vervollständigungs-Popup hat Vorrang.
+
 ## Smart-Outdent
 
 Sobald du eine Zeile schreibst, die genau einem block-schließenden oder
