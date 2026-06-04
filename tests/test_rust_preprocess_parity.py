@@ -136,3 +136,16 @@ def test_e2e_runsrc_with_imports(tmp_path):
     rc, rs = _runsrc(main)
     assert rc == 0, f"runsrc Exit {rc}"
     assert rs == _tw_run(main)
+
+
+def test_e2e_runsrc_module_alias(tmp_path):
+    # IMPORT "..." AS x : aliasierte Builtins (J_PARSE->JSON_PARSE) + externe
+    # Typen (J_HANDLE / V) muessen in gbrt funktionieren wie im Tree-Walker.
+    main = _write(tmp_path, "main.gb",
+                  'IMPORT "json" AS j\nIMPORT "vec2" AS v\n'
+                  'DIM h AS J_HANDLE\nh = J_PARSE("[10, 20, 30]")\n'
+                  'PRINT J_GET_INT(h, "1")\n'
+                  'DIM p AS V\np = V_NEW(3.0, 4.0)\nPRINT V_LENGTH(p)\n')
+    rc, rs = _runsrc(main)
+    assert rc == 0, f"runsrc Exit {rc}"
+    assert rs == _tw_run(main)

@@ -248,24 +248,45 @@ pub struct Compiler {
     classes: HashMap<String, ClassInfo>,
     struct_names: std::collections::HashSet<String>,
     /// Externe Typen importierter Module (lowercase) -- gueltige DIM-Typen
-    /// (z.B. "vec2", "json_handle"). Aus preprocess::external_types.
+    /// (z.B. "vec2", "json_handle", aliasiert auch "j_handle"). Aus
+    /// preprocess::compile_env.
     external_types: std::collections::HashSet<String>,
+    /// `(alias, modul)`-Paare aus `IMPORT "<modul>" AS <alias>` -- damit
+    /// aliasierte Builtin-Aufrufe (`j_parse`) auf den kanonischen Namen
+    /// (`json_parse`) zurueckabgebildet werden, den gbrt nativ kennt.
+    builtin_aliases: Vec<(String, String)>,
     ctx: Ctx,
 }
 
 impl Compiler {
-    fn new(external_types: std::collections::HashSet<String>) -> Self {
+    fn new(external_types: std::collections::HashSet<String>,
+           builtin_aliases: Vec<(String, String)>) -> Self {
         Compiler { global_slots: HashMap::new(),
                    global_vars: std::collections::HashSet::new(),
                    fn_sigs: HashMap::new(), compiled_fns: vec![],
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
-                   external_types, ctx: Ctx::new() }
+                   external_types, builtin_aliases, ctx: Ctx::new() }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
     fn is_known_value_type(&self, t: &str) -> bool {
         is_value_type(t) || self.external_types.contains(t)
+    }
+
+    /// Bildet einen aliasierten Builtin-Namen auf den kanonischen zurueck
+    /// (`j_parse` -> `json_parse`, `v` -> `vec2`). Unveraendert, wenn kein
+    /// Alias passt. So sieht die VM nur native Builtin-Namen.
+    fn resolve_builtin_alias(&self, name: &str) -> String {
+        for (alias, module) in &self.builtin_aliases {
+            if name == alias {
+                return module.clone();
+            }
+            if let Some(rest) = name.strip_prefix(&format!("{}_", alias)) {
+                return format!("{}_{}", module, rest);
+            }
+        }
+        name.to_string()
     }
 
     fn alloc_slot(&mut self, name: &str) {
@@ -995,8 +1016,11 @@ impl Compiler {
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_VALUE, json!(args.len()));
         } else {
+            // Aliasierten Builtin-Namen auf den kanonischen zurueckabbilden
+            // (j_parse -> json_parse), damit gbrt ihn nativ findet.
+            let bname = self.resolve_builtin_alias(&name);
             for a in args { self.expr(a)?; }
-            self.ctx.emit(oc::CALL_BUILTIN, json!([name, args.len()]));
+            self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
         }
         Ok(())
     }
@@ -1775,10 +1799,12 @@ fn node_name(n: &Node) -> &'static str {
 }
 
 /// AST -> `.gbc`-JSON. `external_types` sind die von importierten Modulen
-/// registrierten Typ-Namen (lowercase, aus preprocess::external_types) --
-/// damit `DIM x AS VEC2` & Co. nach `IMPORT "vec2"` kompilieren.
-/// Fehler bei nicht unterstuetzten Konstrukten.
-pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>)
+/// registrierten Typ-Namen (lowercase) -- damit `DIM x AS VEC2` & Co. nach
+/// `IMPORT "vec2"` kompilieren. `builtin_aliases` sind `(alias, modul)`-Paare
+/// fuer `IMPORT "json" AS j` (Builtin-Namen-Rueckabbildung). Beide aus
+/// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
+pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
+                      builtin_aliases: &[(String, String)])
     -> Result<Value, String> {
     let stmts = match ast {
         Node::Program { statements } => statements,
@@ -1796,7 +1822,7 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
         }
     }
     let main_owned: Vec<Node> = main_stmts.iter().map(|s| (*s).clone()).collect();
-    let mut c = Compiler::new(external_types.clone());
+    let mut c = Compiler::new(external_types.clone(), builtin_aliases.to_vec());
     // Struct-Namen vor dem Slot-Pre-Pass kennen (Structs bekommen keinen Slot).
     for cd in &cls_decls {
         if let Node::ClassDecl { name, is_struct: true, .. } = cd {

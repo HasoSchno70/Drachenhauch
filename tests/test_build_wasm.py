@@ -40,6 +40,15 @@ def test_compile_program_produces_loadable_gbc(tmp_path):
     assert compile_gb_to_module(gb) is not None
 
 
+def test_copy_source_embeds_gb(tmp_path):
+    bw = _load_build_wasm()
+    gb = tmp_path / "hi.gb"
+    gb.write_text('PRINT "x"\n', encoding="utf-8")
+    out = bw.copy_source(gb, tmp_path)
+    assert out.name == "program.gb" and out.exists()
+    assert out.read_text(encoding="utf-8") == gb.read_text(encoding="utf-8")
+
+
 def test_build_skips_gracefully_without_toolchain(tmp_path, monkeypatch):
     bw = _load_build_wasm()
     gb = tmp_path / "hi.gb"
@@ -49,6 +58,8 @@ def test_build_skips_gracefully_without_toolchain(tmp_path, monkeypatch):
                         lambda: {"emcc": False, "cargo": False, "wasm_target": False})
     rc = bw.build(gb, tmp_path)
     assert rc == 0
+    # Quelle (fuer Browser-Kompilierung) UND Fallback-.gbc.
+    assert (tmp_path / "program.gb").exists()
     assert (tmp_path / "program.gbc").exists()
 
 
@@ -64,8 +75,10 @@ def test_web_harness_files_present():
 
 
 def test_main_rs_has_wasm_entry():
-    """main.rs liest im emscripten-Build /program.gbc."""
+    """main.rs kompiliert im emscripten-Build /program.gb (Quelle, Vorrang)
+    und faellt auf /program.gbc zurueck."""
     src = (ROOT / "rust" / "gb_runtime" / "src" / "main.rs").read_text(
         encoding="utf-8")
     assert 'target_os = "emscripten"' in src
+    assert "/program.gb" in src
     assert "/program.gbc" in src

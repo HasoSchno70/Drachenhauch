@@ -171,8 +171,29 @@ relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
 `gbrt <datei.gb>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
 Damit ist die Toolchain **end-to-end ohne Python** lauffähig — Ziel der
-Portierung erreicht. (Offen/optional, kein Blocker: `gbrt --export` aus Quelltext
-statt aus `.gbc`; aliasierte Modul-Builtins; Web-WASM-Build.)
+Portierung erreicht.
+
+### Anschluss-Features (erledigt)
+
+- **Selbst-Export** `gbrt --export datei.gb [out_dir]`: kompiliert die Quelle
+  selbst → `.gbc` und hängt den Payload (`<gbc><u64 len><GBRTPAY1>`) an eine
+  Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
+  ohne `gbrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
+  [`tests/test_rust_export.py`](../tests/test_rust_export.py) (exportiert,
+  startet die Exe, vergleicht stdout mit dem Tree-Walker).
+- **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`
+  liefert neben den externen Typen (inkl. aliasierter wie `j_handle`/`v`) eine
+  `(alias, modul)`-Liste; der Compiler bildet aliasierte Builtin-Namen
+  (`j_parse` → `json_parse`, `v_new` → `vec2_new`) auf den kanonischen zurück,
+  sodass gbrt sie nativ findet. Test in
+  [`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py)
+  (`test_e2e_runsrc_module_alias`).
+- **WASM-Quellkompilierung im Browser:** der emscripten-Einstieg in `main.rs`
+  kompiliert `/program.gb` selbst (Fallback `/program.gbc`), `build_wasm.py`
+  bettet die Quelle ein → der Web-Playground braucht **kein Pyodide** mehr.
+  **Bleibt toolchain-blockiert:** der eigentliche emscripten-Build ist hier nicht
+  baubar/verifizierbar (kein `emcc`/wasm-Target). Details:
+  [docs/web-playground.md](web-playground.md).
 
 ## Prinzip
 

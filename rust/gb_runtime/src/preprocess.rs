@@ -55,19 +55,46 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("vec2", &["vec2"]),
 ];
 
-/// Liefert die externen Typ-Namen (lowercase), die die angegebenen (bereits
-/// lowercase) Modul-Namen registrieren -- fuer den Compiler als zulaessige
-/// DIM-Typen.
-pub fn external_types(modules: &[String]) -> HashSet<String> {
-    let mut out = HashSet::new();
-    for m in modules {
-        if let Some((_, types)) = MODULE_TYPES.iter().find(|(name, _)| name == m) {
-            for t in *types {
-                out.insert((*t).to_string());
+/// Remap eines Namens unter einem Modul-Alias -- gleiche Konvention wie
+/// `modules._apply_alias_by_convention`: `<modul>` -> `<alias>`,
+/// `<modul>_rest` -> `<alias>_rest`. None, wenn der Name nicht aliasable ist.
+fn remap_name(name: &str, module: &str, alias: &str) -> Option<String> {
+    if name == module {
+        Some(alias.to_string())
+    } else {
+        name.strip_prefix(&format!("{}_", module))
+            .map(|rest| format!("{}_{}", alias, rest))
+    }
+}
+
+/// Aus den importierten Modulen (jeweils mit optionalem Alias) die Compile-
+/// Umgebung ableiten:
+///   - `external_types`: gueltige skalare DIM-Typen (kanonisch + aliasiert),
+///   - `builtin_aliases`: `(alias, modul)`-Paare, mit denen der Compiler
+///     aliasierte Builtin-Namen (`j_parse` -> `json_parse`) zurueckabbildet.
+/// Alles lowercase (wie der Lexer IDENTs liefert).
+pub fn compile_env(imports: &[(String, Option<String>)])
+    -> (HashSet<String>, Vec<(String, String)>) {
+    let mut types = HashSet::new();
+    let mut aliases: Vec<(String, String)> = Vec::new();
+    for (module, alias) in imports {
+        let mod_types: &[&str] = MODULE_TYPES.iter()
+            .find(|(n, _)| n == module).map(|(_, t)| *t).unwrap_or(&[]);
+        for t in mod_types {
+            types.insert((*t).to_string());
+        }
+        if let Some(a) = alias {
+            if !aliases.iter().any(|(x, y)| x == a && y == module) {
+                aliases.push((a.clone(), module.clone()));
+            }
+            for t in mod_types {
+                if let Some(at) = remap_name(t, module, a) {
+                    types.insert(at);
+                }
             }
         }
     }
-    out
+    (types, aliases)
 }
 
 #[derive(Debug)]
@@ -116,16 +143,17 @@ fn is_known_module(rel: &str) -> bool {
     MODULES.contains(&low.as_str())
 }
 
-/// Expandiert alle IMPORTs rekursiv. Liefert `(gemergte_quelle,
-/// importierte_modul_namen)`. Die Modul-Namen (lowercase, dedupliziert)
-/// dienen dem Compiler zum Erkennen externer DIM-Typen (siehe
-/// `external_types`). `base` ist das Verzeichnis fuer relative IMPORT-Pfade.
-pub fn process(source: &str, base: &Path) -> Result<(String, Vec<String>), PreprocessError> {
+/// Expandiert alle IMPORTs rekursiv. Liefert `(gemergte_quelle, imports)`,
+/// wobei `imports` die Built-in-Modul-IMPORTs als `(modul_lc, alias_lc?)`
+/// enthaelt -- Basis fuer `compile_env` (externe Typen + Builtin-Aliase).
+/// `base` ist das Verzeichnis fuer relative IMPORT-Pfade.
+pub fn process(source: &str, base: &Path)
+    -> Result<(String, Vec<(String, Option<String>)>), PreprocessError> {
     let mut seen: HashSet<PathBuf> = HashSet::new();
     let mut out: Vec<String> = Vec::new();
-    let mut mods: Vec<String> = Vec::new();
-    process_inner(source, base, &mut seen, &mut out, &mut mods)?;
-    Ok((out.join("\n"), mods))
+    let mut imports: Vec<(String, Option<String>)> = Vec::new();
+    process_inner(source, base, &mut seen, &mut out, &mut imports)?;
+    Ok((out.join("\n"), imports))
 }
 
 fn process_inner(
@@ -133,7 +161,7 @@ fn process_inner(
     base: &Path,
     seen: &mut HashSet<PathBuf>,
     out: &mut Vec<String>,
-    mods: &mut Vec<String>,
+    imports: &mut Vec<(String, Option<String>)>,
 ) -> Result<(), PreprocessError> {
     for (idx0, raw_line) in source.split('\n').enumerate() {
         let line_idx = idx0 + 1;
@@ -175,8 +203,10 @@ fn process_inner(
                 };
                 out.push(format!("' === IMPORT MODULE {}{} ===", rel, tag));
                 let low = rel.to_lowercase();
-                if !mods.contains(&low) {
-                    mods.push(low);
+                let alias_lc = alias.as_ref().map(|a| a.to_lowercase());
+                let entry = (low, alias_lc);
+                if !imports.contains(&entry) {
+                    imports.push(entry);
                 }
                 continue;
             }
@@ -197,7 +227,7 @@ fn process_inner(
         seen.insert(canon.clone());
         out.push(format!("' === IMPORT {} ===", rel));
         let inner_base = canon.parent().unwrap_or(base).to_path_buf();
-        process_inner(&content, &inner_base, seen, out, mods)?;
+        process_inner(&content, &inner_base, seen, out, imports)?;
         out.push(format!("' === END IMPORT {} ===", rel));
     }
     Ok(())

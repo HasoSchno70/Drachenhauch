@@ -6,11 +6,18 @@ Rust-Target `wasm32-unknown-emscripten`. Beides ist in dieser Umgebung nicht
 installiert -> das Skript kompiliert dann nur die `.gbc` und gibt eine
 Anleitung aus, statt zu scheitern.
 
+Seit dem Front-End-Port (Lexer..Compiler in Rust, alle Stufen) kann gbrt die
+`.gb`-QUELLE selbst kompilieren -> der Web-Build bettet jetzt die Quelle
+(`program.gb`) ein und kompiliert im Browser (KEIN Pyodide noetig). Die
+vorab-kompilierte `program.gbc` wird weiter erzeugt und als Fallback
+eingebettet (`main.rs` liest `/program.gb` zuerst, dann `/program.gbc`).
+
 Ablauf (mit vollstaendiger Toolchain):
-  1. `<datei.gb>` -> Compiler -> `web/program.gbc`
+  1. `<datei.gb>` -> `web/program.gb` (Quelle, kopiert) + `web/program.gbc`
+     (Fallback, via Python-Compiler -- nur Build-Zeit, nicht im Browser noetig)
   2. `cargo build --target wasm32-unknown-emscripten --features graphics --release`
      mit emscripten-Linker-Flags (ASYNCIFY fuer den blockierenden VM-Loop,
-     GLFW3 fuer raylib, `--embed-file program.gbc@/program.gbc`).
+     GLFW3 fuer raylib, `--embed-file program.gb@/program.gb` + `.gbc`).
   3. `gbrt.js` + `gbrt.wasm` nach `web/` kopieren.
 
 Aufruf:
@@ -41,6 +48,9 @@ EMCC_FLAGS = [
     "-s", "ALLOW_MEMORY_GROWTH=1",
     "-s", "ASSERTIONS=1",
     "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print']",
+    # Quelle einbetten -> gbrt kompiliert im Browser (kein Pyodide); .gbc als
+    # Fallback (main.rs liest /program.gb zuerst, dann /program.gbc).
+    "--embed-file", "program.gb@/program.gb",
     "--embed-file", "program.gbc@/program.gbc",
 ]
 
@@ -86,9 +96,21 @@ def _print_manual(info: dict) -> None:
     print("  -> target/wasm32-unknown-emscripten/release/gbrt.{js,wasm} nach web/ kopieren")
 
 
+def copy_source(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
+    """Kopiert die `.gb`-Quelle nach `<out_dir>/program.gb` -- gbrt kompiliert
+    sie im Browser selbst (Front-End-Port). Kein Python im Browser noetig."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dst = out_dir / "program.gb"
+    dst.write_text(Path(gb_path).read_text(encoding="utf-8"), encoding="utf-8")
+    return dst
+
+
 def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
-    gbc = compile_program(gb_path, out_dir)
-    print(f"kompiliert: {gbc}")
+    src = copy_source(gb_path, out_dir)
+    print(f"Quelle eingebettet: {src}")
+    gbc = compile_program(gb_path, out_dir)   # Fallback-Artefakt (Build-Zeit)
+    print(f"kompiliert (Fallback): {gbc}")
     info = check_toolchain()
     if not all(info.values()):
         _print_manual(info)

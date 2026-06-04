@@ -92,6 +92,11 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "run" {
             return run_main(&raw[2]);
         }
+        // Selbst-Export: `gbrt --export datei.gb [out_dir]` buendelt das
+        // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
+        if raw.len() >= 3 && raw[1] == "--export" {
+            return export_main(&raw[2], raw.get(3).map(|s| s.as_str()));
+        }
     }
 
     // Bundle-Modus: eingebettete .gbc am Ende der eigenen Exe?
@@ -107,11 +112,18 @@ fn main() -> ExitCode {
         return run_gbc_text(&text, &label);
     }
 
-    // WASM/Web (emscripten): die .gbc liegt unter einem festen Pfad im
-    // virtuellen FS (vom Build via --embed-file program.gbc eingebettet bzw.
-    // vom JS-Harness per FS.writeFile reingeschrieben). Siehe web/ + docs.
+    // WASM/Web (emscripten): Programm aus einem festen Pfad im virtuellen FS
+    // (vom Build via --embed-file eingebettet bzw. vom JS-Harness per
+    // FS.writeFile reingeschrieben). Seit dem Front-End-Port (Stufe 1-5) kann
+    // gbrt die `.gb`-QUELLE selbst kompilieren -> der Playground braucht KEIN
+    // vorab-kompiliertes .gbc (und kein Pyodide) mehr. `/program.gb` (Quelle)
+    // hat Vorrang; `/program.gbc` (vorkompiliert) bleibt als Fallback. Siehe
+    // web/ + docs/web-playground.md.
     #[cfg(target_os = "emscripten")]
     {
+        if let Ok(src) = std::fs::read_to_string("/program.gb") {
+            return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
+        }
         if let Ok(text) = std::fs::read_to_string("/program.gbc") {
             return run_gbc_text(&text, "playground");
         }
@@ -205,27 +217,35 @@ fn preprocess_main(path: &str) -> ExitCode {
 }
 
 /// Volle Front-End-Kette in Rust: Preprocess (IMPORT) -> Lexer -> Parser ->
-/// Compiler -> VM. `base` = Verzeichnis fuer relative IMPORT-Pfade, `label` =
-/// Quell-Label fuer Laufzeitfehler-Meldungen. Geteilt von `--runsrc` und `run`.
-fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str) -> ExitCode {
-    let (source, mods) = match preprocess::process(raw_source, base) {
+/// Compiler. `base` = Verzeichnis fuer relative IMPORT-Pfade. Liefert das
+/// `.gbc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
+/// Geteilt von `--runsrc`, `run` und `--export`.
+fn compile_source(raw_source: &str, base: &std::path::Path) -> Result<serde_json::Value, ExitCode> {
+    let (source, imports) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
-        Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); return ExitCode::from(2); }
+        Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); return Err(ExitCode::from(2)); }
     };
-    let ext_types = preprocess::external_types(&mods);
+    let (ext_types, aliases) = preprocess::compile_env(&imports);
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
-        Err(e) => { eprintln!("Lexer {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
+        Err(e) => { eprintln!("Lexer {}:{}: {}", e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     let ast = match parser::Parser::new(toks).parse() {
         Ok(a) => a,
-        Err(e) => { eprintln!("Parse {}:{}: {}", e.line, e.col, e.msg); return ExitCode::from(2); }
+        Err(e) => { eprintln!("Parse {}:{}: {}", e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
     };
-    let json = match compiler::compile_to_gbc(&ast, &ext_types) {
-        Ok(j) => j,
-        Err(e) => { eprintln!("Compile: {}", e); return ExitCode::from(3); }
-    };
-    run_program_value(json, label)
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
+        Ok(j) => Ok(j),
+        Err(e) => { eprintln!("Compile: {}", e); Err(ExitCode::from(3)) }
+    }
+}
+
+/// Front-End-Kette + Ausfuehrung. `label` = Quell-Label fuer Laufzeitfehler.
+fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str) -> ExitCode {
+    match compile_source(raw_source, base) {
+        Ok(json) => run_program_value(json, label),
+        Err(code) => code,
+    }
 }
 
 /// `gbrt --runsrc <datei.gb>` -- volle Front-End-Kette in Rust, OHNE chdir
@@ -259,6 +279,89 @@ fn run_main(path: &str) -> ExitCode {
     // Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)).
     let _ = std::env::set_current_dir(&base);
     compile_and_run_source(&raw_source, &base, &label)
+}
+
+/// Verzeichnis rekursiv kopieren (std hat keine Funktion dafuer).
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&from, &to)?;
+        } else {
+            std::fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// `gbrt --export <datei.gb> [out_dir]` -- buendelt das Programm zu einer
+/// eigenstaendigen Exe (Selbst-Export ohne Python): kompiliert Quelltext ->
+/// .gbc und haengt den Payload (gbc + Footer `[u64 len][GBRTPAY1]`) an eine
+/// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
+/// Pendant zu gamebasic/export.py.
+fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
+    let abs = std::fs::canonicalize(path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let base = abs.parent().map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let stem = abs.file_stem().map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "programm".into());
+    let raw_source = match std::fs::read_to_string(&abs) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    // 1) Quelltext -> .gbc-JSON (kompakt).
+    let json = match compile_source(&raw_source, &base) {
+        Ok(j) => j,
+        Err(code) => return code,
+    };
+    let gbc_bytes = serde_json::to_string(&json).unwrap_or_default().into_bytes();
+    // 2) Eigene Exe lesen + Payload anhaengen.
+    let exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => { eprintln!("current_exe: {}", e); return ExitCode::from(1); }
+    };
+    let mut bundle = match std::fs::read(&exe) {
+        Ok(b) => b,
+        Err(e) => { eprintln!("Kann Runtime '{}' nicht lesen: {}", exe.display(), e); return ExitCode::from(1); }
+    };
+    bundle.extend_from_slice(&gbc_bytes);
+    bundle.extend_from_slice(&(gbc_bytes.len() as u64).to_le_bytes());
+    bundle.extend_from_slice(PAYLOAD_MAGIC);
+    // 3) Zielordner + Exe-Name.
+    let out = match out_dir {
+        Some(d) => std::path::PathBuf::from(d),
+        None => base.join(format!("{}_dist", stem)),
+    };
+    if let Err(e) = std::fs::create_dir_all(&out) {
+        eprintln!("Kann Ausgabeverzeichnis '{}' nicht anlegen: {}", out.display(), e);
+        return ExitCode::from(1);
+    }
+    let exe_suffix = if exe.extension().map(|e| e == "exe").unwrap_or(false) || cfg!(windows) {
+        ".exe"
+    } else { "" };
+    let out_exe = out.join(format!("{}{}", stem, exe_suffix));
+    if let Err(e) = std::fs::write(&out_exe, &bundle) {
+        eprintln!("Kann '{}' nicht schreiben: {}", out_exe.display(), e);
+        return ExitCode::from(1);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&out_exe, std::fs::Permissions::from_mode(0o755));
+    }
+    // 4) assets/ neben der Quelle mitkopieren (Konvention).
+    let assets = base.join("assets");
+    if assets.is_dir() {
+        if let Err(e) = copy_dir_recursive(&assets, &out.join("assets")) {
+            eprintln!("Warnung: assets/ nicht vollstaendig kopiert: {}", e);
+        }
+    }
+    println!("Exportiert: {}", out_exe.display());
+    ExitCode::SUCCESS
 }
 
 /// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus

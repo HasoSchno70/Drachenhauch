@@ -1655,9 +1655,15 @@ Kette `compile_and_run_source` (geteilt mit `--runsrc`, das ohne chdir läuft).
 Tree-Walker bleibt Referenz + `@builtin`-Host. AST-Parity-Gotchas: `.line` kein
 Feld, `Param.by_ref` ist ein Token. 3e-Gotcha: `_collect_data` rekursiert in
 SELECT/TRY, aber NICHT FOR EACH/WITH. 4-Gotcha: `MODULES`/`MODULE_TYPES` hardcoded,
-mit `modules.discover_modules()` synchron halten; aliasierte Modul-Builtins
-(`J_PARSE`) laufen in gbrt nicht (Python-Registry-Trick). Offen/optional:
-`gbrt --export` aus Quelltext (heute `.gbc`), Web-WASM-Build.
+mit `modules.discover_modules()` synchron halten. **Anschluss-Features fertig:**
+(a) **Selbst-Export** `gbrt --export datei.gb [out]` — kompiliert Quelle → `.gbc`,
+hängt Payload an Kopie der eigenen Exe (wie `export.py`, aber ohne Python),
+kopiert `assets/`. (b) **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j` —
+`compile_env` liefert `(alias, modul)`-Paare, der Compiler bildet `j_parse`→
+`json_parse` / `v`→`vec2` zurück (gbrt findet sie nativ), aliasierte externe
+Typen (`j_handle`/`v`) sind gültige DIM-Typen. (c) **WASM** — emscripten-Einstieg
+kompiliert `/program.gb` selbst (kein Pyodide), `build_wasm.py` bettet Quelle ein;
+der emscripten-Build bleibt toolchain-blockiert (kein `emcc` hier).
 
 ## Web-Playground (gbrt → WASM) — experimentell/Gerüst
 

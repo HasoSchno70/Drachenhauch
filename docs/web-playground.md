@@ -10,12 +10,22 @@ Konsolen-Ausgabe daneben.
 > (emscripten + Rust-wasm-Target) und ist hier nicht beigelegt/verifiziert.
 > Siehe **Grenzen** unten.
 
+> **Kein Pyodide mehr nötig (seit Front-End-Port).** Früher musste die `.gb`
+> in Python zu `.gbc` vorkompiliert werden, bevor sie der Browser ausführen
+> konnte — Live-Editieren im Browser hätte Pyodide gebraucht. Jetzt enthält
+> `gbrt` die komplette Front-End-Kette (Preprocess → Lexer → Parser → Compiler,
+> alle Stufen in Rust), also kompiliert die WASM-Runtime die **Quelle direkt im
+> Browser**. Der Build bettet `program.gb` (Quelle) ein; `main.rs` liest
+> `/program.gb` zuerst und kompiliert es selbst, mit `/program.gbc` als Fallback.
+> Damit ist ein echtes Live-Playground (Quelle tippen → kompilieren → laufen)
+> rein in Rust-WASM möglich — ohne Python/Pyodide im Browser.
+
 ## Bestandteile
 
 | Datei | Rolle |
 |---|---|
-| `rust/build_wasm.py` | `.gb` → `web/program.gbc`, dann `cargo`+emscripten-Build → `web/gbrt.{js,wasm}` |
-| `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig liest `/program.gbc` aus dem virtuellen FS |
+| `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/gbrt.{js,wasm}` |
+| `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.gb` aus (Fallback `/program.gbc`) aus dem virtuellen FS |
 | `web/index.html` | Seite mit `<canvas id="canvas">` + Output-Bereich + Run-Button |
 | `web/playground.js` | emscripten-`Module`-Konfig: stdout→Div, Canvas binden, `callMain()` |
 
