@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GameBasic — Web-Playground (gbrt/WASM)</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; font-family: system-ui, sans-serif;
+           background: #0f1722; color: #d5edf0; }
+    header { padding: 10px 16px; background: #1a2738;
+             border-bottom: 1px solid #243a4d; }
+    header h1 { font-size: 16px; margin: 0; color: #2de0e0; }
+    header small { color: #7a8e96; }
+    #wrap { display: flex; gap: 12px; padding: 12px; flex-wrap: wrap; }
+    #stage { flex: 1 1 520px; min-width: 320px; }
+    canvas#canvas { width: 100%; background: #000; border: 1px solid #243a4d;
+                    display: block; }
+    #out { flex: 1 1 360px; min-width: 280px; }
+    pre#output { background: #0a121c; border: 1px solid #243a4d; color: #d5edf0;
+                 height: 360px; overflow: auto; padding: 8px; margin: 0;
+                 white-space: pre-wrap; font-family: ui-monospace, monospace; }
+    .bar { padding: 0 16px 12px; }
+    button { background: #2de0e0; color: #06222a; border: 0; border-radius: 4px;
+             padding: 6px 14px; font-weight: 600; cursor: pointer; }
+    .note { color: #7a8e96; font-size: 13px; padding: 0 16px 16px; }
+    code { color: #dcdcaa; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GameBasic — Web-Playground</h1>
+    <small>native Runtime <code>gbrt</code> als WebAssembly (experimentell)</small>
+  </header>
+
+  <div class="bar">
+    <button id="run" disabled>▶ Ausführen</button>
+    <span id="status" class="note" style="padding:0 8px;">lade …</span>
+  </div>
+
+  <div id="wrap">
+    <div id="stage">
+      <canvas id="canvas" width="800" height="450" tabindex="-1"
+              oncontextmenu="event.preventDefault()"></canvas>
+    </div>
+    <div id="out">
+      <pre id="output"></pre>
+    </div>
+  </div>
+
+  <p class="note">
+    Das vorab kompilierte Programm liegt als <code>program.gbc</code> daneben und
+    ist in <code>gbrt.wasm</code> eingebettet (Build via
+    <code>rust/build_wasm.py</code>). Konsolen-Ausgabe erscheint rechts,
+    Grafik im Canvas. Status &amp; Grenzen: siehe
+    <code>docs/web-playground.md</code>.
+  </p>
+
+  <script src="playground.js"></script>
+  <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief. -->
+  <script src="gbrt.js"></script>
+</body>
+</html>

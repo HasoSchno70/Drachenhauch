@@ -75,6 +75,16 @@ fn main() -> ExitCode {
         return run_gbc_text(&text, &label);
     }
 
+    // WASM/Web (emscripten): die .gbc liegt unter einem festen Pfad im
+    // virtuellen FS (vom Build via --embed-file program.gbc eingebettet bzw.
+    // vom JS-Harness per FS.writeFile reingeschrieben). Siehe web/ + docs.
+    #[cfg(target_os = "emscripten")]
+    {
+        if let Ok(text) = std::fs::read_to_string("/program.gbc") {
+            return run_gbc_text(&text, "playground");
+        }
+    }
+
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         eprintln!("Verwendung: {} <datei.gbc>", args[0]);

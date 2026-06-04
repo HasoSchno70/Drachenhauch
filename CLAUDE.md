@@ -1609,6 +1609,22 @@ Lexer-Keywords + Built-ins **generiert** (`build_grammar.py`). Doku
 [docs/lsp.md](docs/lsp.md). **Bei neuen Keywords/Built-ins:** Grammatik neu
 generieren (`python vscode-gamebasic/build_grammar.py`).
 
+## Web-Playground (gbrt → WASM) — experimentell/Gerüst
+
+`gbrt` als WebAssembly (emscripten) im Browser. **Status: Gerüst, nicht
+gebaut/verifiziert** (kein emscripten/raylib-web in der Dev-Umgebung). Teile:
+[`rust/build_wasm.py`](rust/build_wasm.py) (`.gb`→`web/program.gbc`, dann
+`cargo`+emscripten-Build, tolerant wenn Toolchain fehlt), cfg-gegateter
+WASM-Einstieg in [`rust/gb_runtime/src/main.rs`](rust/gb_runtime/src/main.rs)
+(`#[cfg(target_os = "emscripten")]` liest `/program.gbc`), Web-Harness
+[`web/`](web/) (`index.html` + `playground.js`, emscripten-`Module`-Konfig).
+**Kernhürde:** der VM-Render-Loop in `vm.run()` blockiert → Web braucht ASYNCIFY
+(gesetzt) oder Umbau auf `emscripten_set_main_loop`. **Compiler bleibt Python**
+→ Playground führt vorab kompilierte `.gbc` aus; Live-Kompilierung bräuchte
+Pyodide dazu. Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
+Tests [`tests/test_build_wasm.py`](tests/test_build_wasm.py) (Geruest/Harness,
+nicht der emscripten-Build).
+
 ## Build und Test (mit Cython-Modulen)
 
 ```
