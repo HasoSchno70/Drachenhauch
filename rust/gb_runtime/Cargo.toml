@@ -22,6 +22,12 @@ raylib = { version = "5.5", optional = true }
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 # html-Modul: blockierender HTTP-Client (rustls-TLS fuer https).
 ureq = { version = "2", optional = true }
+# Hardware/IoT-Module (Phase 4):
+serialport = { version = "4", optional = true }   # serial
+hidapi = { version = "2", optional = true }        # usb (HID)
+btleplug = { version = "0.11", optional = true }   # bt (BLE, async)
+tokio = { version = "1", features = ["rt-multi-thread", "time"], optional = true }
+futures = { version = "0.3", optional = true }
 
 [features]
 default = []
@@ -29,8 +35,12 @@ graphics = ["dep:raylib"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
-# Aggregate (Hardware kommt in Phase 4 dazu).
-full = ["graphics", "db", "net", "http"]
+serial = ["dep:serialport"]
+usb = ["dep:hidapi"]
+wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
+bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
+hardware = ["serial", "usb", "wifi", "bt"]
+full = ["graphics", "db", "net", "http", "hardware"]
 
 [profile.release]
 opt-level = 3

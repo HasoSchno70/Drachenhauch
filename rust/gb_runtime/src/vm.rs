@@ -85,8 +85,8 @@ fn expect_coro(v: &Value, fname: &str) -> R<Rc<RefCell<CoroState>>> {
     }
 }
 
-// Arg-Helfer fuer die Modul-Dispatcher (db/net/html).
-#[cfg(any(feature = "db", feature = "net", feature = "http"))]
+// Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt).
+#[allow(dead_code)]
 fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
     match a.get(i) {
         Some(Value::Int(n)) => Ok(*n),
@@ -94,11 +94,20 @@ fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
         None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
     }
 }
-#[cfg(any(feature = "db", feature = "net", feature = "http"))]
+#[allow(dead_code)]
 fn bi_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
     match a.get(i) {
         Some(Value::Str(s)) => Ok(s),
         Some(v) => Err(format!("{}: erwartet STRING, erhalten {}", fn_, v.type_name())),
+        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+    }
+}
+#[allow(dead_code)]
+fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> {
+    match a.get(i) {
+        Some(Value::Int(n)) => Ok(*n as f64),
+        Some(Value::Float(f)) => Ok(*f),
+        Some(v) => Err(format!("{}: erwartet Zahl, erhalten {}", fn_, v.type_name())),
         None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
     }
 }
@@ -281,6 +290,13 @@ pub struct Vm<'p> {
     http_status: i64,
     #[cfg(feature = "http")]
     http_headers: Vec<(String, String)>,
+    // Hardware/IoT-Handles (INTEGER-Index in VM-Vecs).
+    #[cfg(feature = "serial")]
+    serial_ports: Vec<Option<crate::serial::Port>>,
+    #[cfg(feature = "usb")]
+    usb_devs: Vec<Option<hidapi::HidDevice>>,
+    #[cfg(feature = "bt")]
+    bt_periphs: Vec<Option<btleplug::platform::Peripheral>>,
 }
 
 type R<T> = Result<T, String>;
@@ -335,6 +351,12 @@ impl<'p> Vm<'p> {
             http_status: 0,
             #[cfg(feature = "http")]
             http_headers: Vec::new(),
+            #[cfg(feature = "serial")]
+            serial_ports: Vec::new(),
+            #[cfg(feature = "usb")]
+            usb_devs: Vec::new(),
+            #[cfg(feature = "bt")]
+            bt_periphs: Vec::new(),
         };
         vm.register_default_globals();
         vm
@@ -924,6 +946,14 @@ impl<'p> Vm<'p> {
                         stack.push(v);
                     } else if let Some(v) = self.try_html(name, &bargs)? {
                         stack.push(v);
+                    } else if let Some(v) = self.try_serial(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_usb(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_wifi(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_bt(name, &bargs)? {
+                        stack.push(v);
                     } else if let Some(v) = self.try_gui(name, &bargs)? {
                         stack.push(v);
                     } else if let Some(v) = self.try_graphics(name, &bargs)? {
@@ -1480,6 +1510,130 @@ impl<'p> Vm<'p> {
                 for (i, s) in items.into_iter().enumerate() { arr.values[i] = Value::str_rc(&s); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul serial (Feature `serial`)
+    // ===================================================================
+    fn try_serial(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "serial")]
+        { return self.try_serial_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+    #[cfg(feature = "serial")]
+    fn ser_port(&mut self, idx: i64) -> R<&mut crate::serial::Port> {
+        self.serial_ports.get_mut(idx as usize).and_then(|o| o.as_mut())
+            .ok_or_else(|| format!("SERIAL: ungueltiges/geschlossenes SERIAL_HANDLE {}", idx))
+    }
+    #[cfg(feature = "serial")]
+    fn try_serial_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::serial;
+        let v = match name {
+            "serial_ports" => Value::str_rc(&serial::ports()),
+            "serial_open" => {
+                let p = serial::open(bi_str(a, 0, "SERIAL_OPEN")?, bi_int(a, 1, "SERIAL_OPEN")?)?;
+                self.serial_ports.push(Some(p));
+                Value::Int((self.serial_ports.len() - 1) as i64)
+            }
+            "serial_close" => { let i = bi_int(a, 0, "SERIAL_CLOSE")? as usize; if let Some(s) = self.serial_ports.get_mut(i) { *s = None; } Value::Nil }
+            "serial_is_open" => { let i = bi_int(a, 0, "SERIAL_IS_OPEN")?; Value::Bool(self.serial_ports.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
+            "serial_write" => { let i = bi_int(a, 0, "SERIAL_WRITE")?; let s = bi_str(a, 1, "SERIAL_WRITE")?.to_string(); Value::Int(serial::write(self.ser_port(i)?, &s)?) }
+            "serial_read" => { let i = bi_int(a, 0, "SERIAL_READ")?; let n = bi_int(a, 1, "SERIAL_READ")?; Value::str_rc(&serial::read(self.ser_port(i)?, n)?) }
+            "serial_readline" => { let i = bi_int(a, 0, "SERIAL_READLINE")?; Value::str_rc(&serial::readline(self.ser_port(i)?)?) }
+            "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i)?)?) }
+            "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i)?); Value::Nil }
+            "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i)?, s); Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul usb (Feature `usb`)
+    // ===================================================================
+    fn try_usb(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "usb")]
+        { return self.try_usb_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+    #[cfg(feature = "usb")]
+    fn usb_dev(&self, idx: i64) -> R<&hidapi::HidDevice> {
+        self.usb_devs.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("USB: ungueltiges/geschlossenes USB_HANDLE {}", idx))
+    }
+    #[cfg(feature = "usb")]
+    fn try_usb_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::usb;
+        let v = match name {
+            "usb_list" => Value::str_rc(&usb::list()?),
+            "usb_open" => { let d = usb::open(bi_int(a, 0, "USB_OPEN")?, bi_int(a, 1, "USB_OPEN")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
+            "usb_open_path" => { let d = usb::open_path(bi_str(a, 0, "USB_OPEN_PATH")?)?; self.usb_devs.push(Some(d)); Value::Int((self.usb_devs.len() - 1) as i64) }
+            "usb_close" => { let i = bi_int(a, 0, "USB_CLOSE")? as usize; if let Some(s) = self.usb_devs.get_mut(i) { *s = None; } Value::Nil }
+            "usb_write" => { let i = bi_int(a, 0, "USB_WRITE")?; let s = bi_str(a, 1, "USB_WRITE")?.to_string(); Value::Int(usb::write(self.usb_dev(i)?, &s)?) }
+            "usb_read" => { let i = bi_int(a, 0, "USB_READ")?; let n = bi_int(a, 1, "USB_READ")?; let t = bi_int(a, 2, "USB_READ")?; Value::str_rc(&usb::read(self.usb_dev(i)?, n, t)?) }
+            "usb_product" => Value::str_rc(&usb::product(self.usb_dev(bi_int(a, 0, "USB_PRODUCT")?)?)),
+            "usb_manufacturer" => Value::str_rc(&usb::manufacturer(self.usb_dev(bi_int(a, 0, "USB_MANUFACTURER")?)?)),
+            "usb_serial" => Value::str_rc(&usb::serial(self.usb_dev(bi_int(a, 0, "USB_SERIAL")?)?)),
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul wifi (Feature `wifi`, Windows-only)
+    // ===================================================================
+    fn try_wifi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "wifi")]
+        {
+            use crate::wifi;
+            let v = match name {
+                "wifi_available" => Value::Bool(wifi::available()),
+                "wifi_current" => Value::str_rc(&wifi::current()?),
+                "wifi_signal" => Value::Int(wifi::signal()?),
+                "wifi_scan" => Value::str_rc(&wifi::scan()?),
+                "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
+                "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
+                "wifi_profiles" => Value::str_rc(&wifi::profiles()?),
+                "wifi_delete_profile" => Value::Bool(wifi::delete_profile(bi_str(a, 0, "WIFI_DELETE_PROFILE")?)?),
+                _ => return Ok(None),
+            };
+            return Ok(Some(v));
+        }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    // ===================================================================
+    // Modul bt (Feature `bt`, BLE async)
+    // ===================================================================
+    fn try_bt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        #[cfg(feature = "bt")]
+        { return self.try_bt_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+    #[cfg(feature = "bt")]
+    fn bt_periph(&self, idx: i64) -> R<&btleplug::platform::Peripheral> {
+        self.bt_periphs.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("BT: ungueltiges/getrenntes BT_HANDLE {}", idx))
+    }
+    #[cfg(feature = "bt")]
+    fn try_bt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::bt;
+        let v = match name {
+            "bt_scan" => Value::str_rc(&bt::scan(bi_num(a, 0, "BT_SCAN")?)?),
+            "bt_connect" => { let p = bt::connect(bi_str(a, 0, "BT_CONNECT")?)?; self.bt_periphs.push(Some(p)); Value::Int((self.bt_periphs.len() - 1) as i64) }
+            "bt_disconnect" => { let i = bi_int(a, 0, "BT_DISCONNECT")?; bt::disconnect(self.bt_periph(i)?)?; if let Some(s) = self.bt_periphs.get_mut(i as usize) { *s = None; } Value::Nil }
+            "bt_is_connected" => { let i = bi_int(a, 0, "BT_IS_CONNECTED")?; Value::Bool(match self.bt_periphs.get(i as usize).and_then(|o| o.as_ref()) { Some(p) => bt::is_connected(p), None => false }) }
+            "bt_services" => { let i = bi_int(a, 0, "BT_SERVICES")?; Value::str_rc(&bt::services(self.bt_periph(i)?)?) }
+            "bt_characteristics" => { let i = bi_int(a, 0, "BT_CHARACTERISTICS")?; let s = bi_str(a, 1, "BT_CHARACTERISTICS")?.to_string(); Value::str_rc(&bt::characteristics(self.bt_periph(i)?, &s)?) }
+            "bt_read" => { let i = bi_int(a, 0, "BT_READ")?; let c = bi_str(a, 1, "BT_READ")?.to_string(); Value::str_rc(&bt::read(self.bt_periph(i)?, &c)?) }
+            "bt_write" => { let i = bi_int(a, 0, "BT_WRITE")?; let c = bi_str(a, 1, "BT_WRITE")?.to_string(); let d = bi_str(a, 2, "BT_WRITE")?.to_string(); bt::write(self.bt_periph(i)?, &c, &d)?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))

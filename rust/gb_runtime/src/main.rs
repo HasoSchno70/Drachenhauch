@@ -22,6 +22,14 @@ mod ecs;
 mod html;
 #[cfg(feature = "net")]
 mod net;
+#[cfg(feature = "bt")]
+mod bt;
+#[cfg(feature = "serial")]
+mod serial;
+#[cfg(feature = "usb")]
+mod usb;
+#[cfg(feature = "wifi")]
+mod wifi;
 #[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "graphics")]

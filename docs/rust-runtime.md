@@ -78,7 +78,23 @@ feature-gated (Standard-`.exe` bleibt schlank).
   - **Cargo-Features:** `db`/`net`/`http` + Aggregat `full`. `build_runtime.py`
     baut Standard-Dev `graphics db net http` (`--no-data` laesst sie weg).
     Wenn ein Feature fehlt, liefert der Builtin den „nicht verfuegbar"-Fehler.
-- **Phase 4 (geplant):** Hardware/IoT `serial`/`usb`/`wifi`/`bt` — feature-gated.
+- **Phase 4 — ERLEDIGT (Hardware/IoT, feature-gated):**
+  - `serial` (SERIAL_*, 10, Feature `serial` → `serialport`): RS-232/USB-COM.
+    Ports/Open/Read/Write/Readline/Available/Flush/Timeout. Nativ COM1 erkannt.
+  - `usb` (USB_*, 9, Feature `usb` → `hidapi`): HID. List/Open/Open_Path/Read/
+    Write/Product/Manufacturer/Serial. latin-1-Byte<->STRING. Geraete gelistet.
+  - `wifi` (WIFI_*, 8, Feature `wifi`, Windows-only via `netsh wlan`+Regex):
+    Available/Current/Signal/Scan/Connect/Disconnect/Profiles/Delete. Verifiziert.
+  - `bt` (BT_*, 8, Feature `bt` → `btleplug`+`tokio`): BLE, async->sync ueber
+    globale tokio-Runtime (block_on pro Aufruf). Scan/Connect/Services/
+    Characteristics/Read/Write, latin-1. **BT_SCAN fand reale BLE-Geraete** (mit
+    RSSI). Adresse->Peripheral aus letztem Scan fuer BT_CONNECT.
+  - Handles = INTEGER-Index in cfg-gated VM-Vecs. `build_runtime.py --hardware`
+    nimmt sie dazu (`--full` = alles). Default-Dev-Build laesst Hardware weg
+    (haelt die schweren Deps tokio/btleplug/windows aus dem Normal-Build).
+
+**Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 11 zuvor Python-only-
+Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.
 
 ## Dev-Run-Loop: `gbrun.py --native`
 
