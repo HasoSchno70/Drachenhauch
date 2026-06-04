@@ -1755,8 +1755,22 @@ impl Graphics {
     }
 
     pub fn key_down(&self, code: i64) -> bool {
+        use raylib::consts::KeyboardKey::*;
         // Negative Codes = Gamepad-Buttons/DPad (siehe DEFAULT_KEYS joy_*).
         if code < 0 { return self.joy_button_down(code); }
+        // "+"/"-" (ASCII 43/45): pygame liefert layout-aware Keysyms, raylib aber
+        // PHYSISCHE US-Positionen. Daher pro Code mehrere moegliche Tasten
+        // pruefen: US-Haupttaste, Ziffernblock und die dt.-Layout-Position
+        // (auf DE liegt "+" an US "]", "-" an US "/").
+        match code {
+            43 => return self.rl.is_key_down(KEY_EQUAL)
+                       || self.rl.is_key_down(KEY_KP_ADD)
+                       || self.rl.is_key_down(KEY_RIGHT_BRACKET),
+            45 => return self.rl.is_key_down(KEY_MINUS)
+                       || self.rl.is_key_down(KEY_KP_SUBTRACT)
+                       || self.rl.is_key_down(KEY_SLASH),
+            _ => {}
+        }
         match map_key(code) { Some(k) => self.rl.is_key_down(k), None => false }
     }
 

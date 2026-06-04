@@ -377,10 +377,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             RNG.with(|s| s.set(if seed == 0 { 1 } else { seed }));
             Ok(Value::Nil)
         }
-        "millis" | "timer" => {
+        "millis" => {
             use std::time::{SystemTime, UNIX_EPOCH};
             let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
             Ok(Value::Int(ms))
+        }
+        "timer" => {
+            // Sekunden seit erstem TIMER-Aufruf als FLOAT (wie der Tree-Walker --
+            // MILLIS bleibt ms-INT). Wichtig u.a. fuer FPS: elapsed >= 0.5 s.
+            use std::sync::OnceLock;
+            use std::time::Instant;
+            static TIMER_START: OnceLock<Instant> = OnceLock::new();
+            Ok(Value::Float(TIMER_START.get_or_init(Instant::now).elapsed().as_secs_f64()))
         }
         "range" => {
             for v in a {
