@@ -123,6 +123,61 @@ def test_keymap_dialog_builds_instrument(tmp_path):
     assert "▦" in ed.inst_combo.itemText(ed.inst_combo.count() - 1)
 
 
+def _build_min_sf2(tmp_path):
+    """Minimale gueltige SF2 (1 Preset -> 1 Zone -> 1 Sample)."""
+    import struct
+    def ck(tag, data):
+        out = tag + struct.pack("<I", len(data)) + data
+        return out + (b"\x00" if len(data) & 1 else b"")
+    def lst(lt, *subs):
+        body = lt + b"".join(subs)
+        return b"LIST" + struct.pack("<I", len(body)) + body
+    def nm(s):
+        return s.encode("latin-1")[:20].ljust(20, b"\x00")
+    samples = np.linspace(-20000, 20000, 200).astype("<i2").tobytes()
+    sdta = lst(b"sdta", ck(b"smpl", samples))
+    phdr = (nm("TestPiano") + struct.pack("<HHHIII", 0, 0, 0, 0, 0, 0)
+            + nm("EOP") + struct.pack("<HHHIII", 0, 0, 1, 0, 0, 0))
+    pbag = struct.pack("<HH", 0, 0) + struct.pack("<HH", 1, 0)
+    pgen = struct.pack("<HH", 41, 0) + struct.pack("<HH", 0, 0)
+    inst = (nm("TestInst") + struct.pack("<H", 0)
+            + nm("EOI") + struct.pack("<H", 1))
+    ibag = struct.pack("<HH", 0, 0) + struct.pack("<HH", 2, 0)
+    igen = (struct.pack("<H", 43) + bytes([0, 127])
+            + struct.pack("<H", 53) + struct.pack("<H", 0)
+            + struct.pack("<HH", 0, 0))
+    shdr = (nm("TestSample") + struct.pack("<IIIII", 0, 200, 50, 150, 22050)
+            + struct.pack("<BbHH", 60, 0, 0, 1)
+            + nm("EOS") + struct.pack("<IIIII", 0, 0, 0, 0, 0)
+            + struct.pack("<BbHH", 0, 0, 0, 0))
+    pdta = lst(b"pdta", ck(b"phdr", phdr), ck(b"pbag", pbag), ck(b"pgen", pgen),
+               ck(b"inst", inst), ck(b"ibag", ibag), ck(b"igen", igen),
+               ck(b"shdr", shdr))
+    body = b"sfbk" + sdta + pdta
+    p = tmp_path / "test.sf2"
+    p.write_bytes(b"RIFF" + struct.pack("<I", len(body)) + body)
+    return str(p)
+
+
+def test_load_soundfont_adds_instrument(tmp_path, monkeypatch):
+    """SF2 laden -> Preset-Dialog -> Keymap-Instrument im Pool."""
+    from PySide6.QtWidgets import QFileDialog, QDialog
+    from gamebasic.trackereditor_qt import _Sf2PresetDialog
+    path = _build_min_sf2(tmp_path)
+    ed = _editor()
+    n0 = len(ed.song.instruments)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName",
+                        staticmethod(lambda *a, **k: (path, "")))
+    # Dialog automatisch "akzeptieren" mit Preset (0,0)
+    monkeypatch.setattr(_Sf2PresetDialog, "exec",
+                        lambda self: QDialog.DialogCode.Accepted)
+    monkeypatch.setattr(_Sf2PresetDialog, "selected", lambda self: (0, 0))
+    ed._load_soundfont()
+    assert len(ed.song.instruments) == n0 + 1
+    inst = ed.song.instruments[-1]
+    assert inst.is_keymap() and inst.name == "TestPiano"
+
+
 def test_export_audio_renders_wav(tmp_path, monkeypatch):
     import wave
     from PySide6.QtWidgets import QFileDialog

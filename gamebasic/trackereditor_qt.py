@@ -21,9 +21,9 @@ from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit,
-    QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
-    QWidget,
+    QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
@@ -247,6 +247,46 @@ class _KeymapDialog(QDialog):
         return self._zones
 
 
+class _Sf2PresetDialog(QDialog):
+    """Waehlt ein Preset aus einer SoundFont-Datei (mit Suchfeld)."""
+
+    def __init__(self, presets, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("SoundFont-Preset waehlen")
+        self.resize(440, 500)
+        self._presets = presets
+        v = QVBoxLayout(self)
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Suchen (z. B. Piano, Strings, Bass)...")
+        self.search.textChanged.connect(self._fill)
+        v.addWidget(self.search)
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(lambda *_: self.accept())
+        v.addWidget(self.list, 1)
+        self._fill("")
+        box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        v.addWidget(box)
+
+    def _fill(self, flt: str) -> None:
+        flt = (flt or "").lower()
+        self.list.clear()
+        for bank, prog, name in self._presets:
+            label = f"{bank:03d}:{prog:03d}  {name}"
+            if flt in label.lower():
+                it = QListWidgetItem(label)
+                it.setData(Qt.ItemDataRole.UserRole, (bank, prog))
+                self.list.addItem(it)
+        if self.list.count():
+            self.list.setCurrentRow(0)
+
+    def selected(self):
+        it = self.list.currentItem()
+        return it.data(Qt.ItemDataRole.UserRole) if it else None
+
+
 class _Piano(QWidget):
     """Klickbare Klaviatur (2 Oktaven). Emittiert die MIDI-Note."""
 
@@ -400,6 +440,11 @@ class TrackerEditor(QMainWindow):
                             "(Multisample / Drumkit)")
         b_keymap.clicked.connect(self._edit_keymap)
         irow.addWidget(b_keymap)
+        b_sf2 = QPushButton("+ SoundFont (.sf2)...")
+        b_sf2.setToolTip("Echtes Instrument aus einer SoundFont-Datei laden "
+                         "(General MIDI / Hersteller-Sounds)")
+        b_sf2.clicked.connect(self._load_soundfont)
+        irow.addWidget(b_sf2)
         b_iedit = QPushButton("Bearbeiten...")
         b_iedit.setToolTip("Grundton, Loop-Punkte, ADSR-Huellkurve")
         b_iedit.clicked.connect(self._edit_instrument)
@@ -739,6 +784,52 @@ class TrackerEditor(QMainWindow):
             self._sound_cache.clear()
             self._refresh_instruments()
             self._mark()
+
+    def _load_soundfont(self) -> None:
+        """Laedt ein echtes Instrument aus einer SoundFont-(.sf2)-Datei
+        (General MIDI / Hersteller-Sounds) als Keymap-Instrument."""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "SoundFont laden (.sf2)", str(self.project_root),
+            "SoundFont (*.sf2)")
+        if not path:
+            return
+        try:
+            from .tracker.sf2 import SoundFont
+            sf = SoundFont(path)
+            presets = sf.presets()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler",
+                                f"SoundFont nicht lesbar:\n{exc}")
+            return
+        if not presets:
+            QMessageBox.information(self, "Leer", "Keine Presets gefunden.")
+            return
+        dlg = _Sf2PresetDialog(presets, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        sel = dlg.selected()
+        if sel is None:
+            return
+        bank, prog = sel
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                inst = sf.build_instrument(bank, prog)
+            finally:
+                QApplication.restoreOverrideCursor()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler",
+                                f"Preset nicht ladbar:\n{exc}")
+            return
+        if not inst.zones:
+            QMessageBox.information(
+                self, "Leer", "Dieses Preset hat keine spielbaren Zonen.")
+            return
+        self.song.add_instrument(inst)
+        self._sound_cache.clear()
+        self._refresh_instruments()
+        self.inst_combo.setCurrentIndex(len(self.song.instruments) - 1)
+        self._mark()
 
     def _edit_keymap(self) -> None:
         """Erstellt/bearbeitet ein Keymap-Instrument (Samples ueber die Tasten
