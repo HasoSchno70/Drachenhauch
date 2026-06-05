@@ -197,12 +197,6 @@ def global_qss() -> str:
             border: 1px solid {c['success']};
             color: {c['accent_text']};
         }}
-        /* Native-Run (gbrt): Akzent-Farbe zur Abgrenzung vom Python-Run. */
-        QToolBar QToolButton#RunNativeButton:hover {{
-            background-color: {c['accent']};
-            border: 1px solid {c['accent']};
-            color: {c['accent_text']};
-        }}
         QToolBar QToolButton#StopButton:hover {{
             background-color: {c['danger']};
             border: 1px solid {c['danger']};

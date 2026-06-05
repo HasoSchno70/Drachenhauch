@@ -320,12 +320,14 @@ class OutputConsole(QWidget):
     def is_running(self) -> bool:
         return self._proc is not None and self._proc.state() != QProcess.ProcessState.NotRunning
 
-    def start_run(self, file_path: Path, extra_args: list[str] | None = None) -> bool:
+    def start_run(self, file_path: Path, extra_args: list[str] | None = None,
+                  *, clear: bool = True) -> bool:
         if self.is_running():
             return False
         self._user_stopped = False
         self._current_run_file = file_path
-        self.clear()
+        if clear:
+            self.clear()
         if extra_args and "--bench" in extra_args:
             self.append(f"⚡ Benchmark: {file_path.name}\n\n", "info")
         else:
@@ -361,33 +363,51 @@ class OutputConsole(QWidget):
         self.process_started.emit()
         return True
 
-    def start_run_native(self, file_path: Path) -> bool:
+    def start_run_auto(self, file_path: Path) -> str | None:
+        """Einheitlicher Run: PRIMAER ueber die native Runtime `gbrt`, mit
+        AUTOMATISCHEM Fallback auf den Tree-Walker, wenn gbrt nicht ausfuehren
+        kann (Binary nicht gebaut, Compile-Fehler, oder Start fehlgeschlagen).
+        Liefert den genutzten Modus (`"native"` / `"py"`) oder `None`, wenn
+        gar nichts startete (z.B. weil schon ein Run laeuft).
+
+        So startet der User Code nur noch ueber EINEN Button (gbrt), bekommt
+        aber bei Problemen ohne Handgriff trotzdem ein Ergebnis."""
+        if self.is_running():
+            return None
+        self.clear()
+        gbrt = _find_gbrt(self.project_root)
+        if gbrt is not None:
+            if self._start_native(file_path, gbrt):
+                return "native"
+            # gbrt vorhanden, aber Compile/Start fehlgeschlagen -> Fallback.
+            self.append("\n↪ gbrt-Lauf fehlgeschlagen — Fallback auf den "
+                        "Tree-Walker …\n\n", "muted")
+        else:
+            self.append("ℹ gbrt nicht gebaut — nutze den Tree-Walker.  "
+                        "(Nativ bauen: .venv\\Scripts\\python.exe "
+                        "rust\\build_runtime.py)\n\n", "muted")
+        # Fallback ohne erneutes Clear, damit der Hinweis (und ein evtl.
+        # gbrt-Compile-Fehler) sichtbar bleibt.
+        if self.start_run(file_path, clear=False):
+            return "py"
+        return None
+
+    def _start_native(self, file_path: Path, gbrt: Path) -> bool:
         """Kompiliert die Datei nach `.gbc` (Python) und fuehrt sie mit der
         nativen Runtime `gbrt` aus -- direkt als QProcess, damit der Stop-Button
         gbrt selbst beendet (kein verwaister Prozess wie bei gbrun.py --native).
+        KEIN Clear / keine gbrt-Suche (macht der Aufrufer). False bei Compile-
+        oder Start-Fehler.
 
         Der Quell-Dateiname wird als 2. Arg an gbrt durchgereicht, sodass
         Laufzeitfehler `datei.gb:Zeile` zeigen. Arbeitsverzeichnis ist der
         Ordner der Quelldatei (relative Asset-Pfade)."""
-        if self.is_running():
-            return False
-
-        gbrt = _find_gbrt(self.project_root)
-        if gbrt is None:
-            self.clear()
-            self.append("Native Runtime 'gbrt' nicht gefunden.\n", "error")
-            self.append("Einmalig bauen mit:\n", "muted")
-            self.append("  .venv\\Scripts\\python.exe rust\\build_runtime.py\n",
-                        "muted")
-            return False
-
         # In temporaere .gbc kompilieren (Compile-Fehler sauber melden).
         import tempfile
         from gamebasic.errors import GameBasicError
         fd, tmp = tempfile.mkstemp(suffix=".gbc")
         os.close(fd)
         tmp_path = Path(tmp)
-        self.clear()
         # Schon vor dem Kompilieren setzen, damit der `[Zeile N]`-Link einer
         # Compile-Fehlermeldung auf diese Datei springt (statt ins Leere).
         self._current_run_file = file_path

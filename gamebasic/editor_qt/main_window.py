@@ -419,23 +419,20 @@ class GameBasicEditor(QMainWindow):
         self.act_format_doc.setShortcut(QKeySequence("Shift+Alt+F"))
         self.act_format_doc.triggered.connect(self._format_document)
 
-        # Run
+        # Run -- ein Button: primaer ueber die native Runtime gbrt, mit
+        # automatischem Fallback auf den Tree-Walker, wenn gbrt nicht ausfuehren
+        # kann (nicht gebaut / Compile- oder Start-Fehler).
         self.act_run = QAction(icons.get("run"), "Run", self)
         self.act_run.setShortcut(QKeySequence("F5"))
+        self.act_run.setToolTip(
+            "Ausfuehren (F5) -- native Runtime gbrt; faellt bei Fehler "
+            "automatisch auf den Tree-Walker zurueck.")
         self.act_run.triggered.connect(self._run_active)
 
         self.act_stop = QAction(icons.get("stop"), "Stop", self)
         self.act_stop.setShortcut(QKeySequence("Shift+F5"))
         self.act_stop.triggered.connect(self.console.stop_run)
         self.act_stop.setEnabled(False)
-
-        self.act_run_native = QAction(
-            icons.get("run_native"), "Run nativ (gbrt)", self)
-        self.act_run_native.setShortcut(QKeySequence("F6"))
-        self.act_run_native.setToolTip(
-            "Nativ ausfuehren via gbrt-Runtime (F6) -- kompiliert + startet die "
-            "native Rust-Runtime")
-        self.act_run_native.triggered.connect(self._run_native_active)
 
         self.act_export = QAction(
             icons.get("save"), "Export → standalone .exe", self)
@@ -574,7 +571,6 @@ class GameBasicEditor(QMainWindow):
             tb.addAction(a)
         tb.addSeparator()
         tb.addAction(self.act_run)
-        tb.addAction(self.act_run_native)
         tb.addAction(self.act_debug)
         tb.addAction(self.act_profile)
         tb.addAction(self.act_stop)
@@ -593,7 +589,6 @@ class GameBasicEditor(QMainWindow):
         # Objektnamen fuer farbige Hover-Akzente (siehe theme.global_qss):
         # Run gruen, Stop magenta.
         for act, obj_name in ((self.act_run, "RunButton"),
-                              (self.act_run_native, "RunNativeButton"),
                               (self.act_stop, "StopButton")):
             w = tb.widgetForAction(act)
             if w is not None:
@@ -652,7 +647,6 @@ class GameBasicEditor(QMainWindow):
 
         m_run = mb.addMenu("Aus&fuehren")
         m_run.addAction(self.act_run)
-        m_run.addAction(self.act_run_native)
         m_run.addAction(self.act_stop)
         m_run.addSeparator()
         m_run.addAction(self.act_bench)
@@ -1224,20 +1218,16 @@ class GameBasicEditor(QMainWindow):
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
-        if self.console.start_run(st.file_path):
-            self.tabs.set_running(st.file_path, "py")
-            self.statusBar().showMessage(
-                f"▶ Laeuft: {st.file_path.name} (Tree-Walker)")
-
-    def _run_native_active(self) -> None:
-        if not self._ensure_saved_for_run():
-            return
-        st = self.tabs.active
-        assert st is not None and st.file_path is not None
-        if self.console.start_run_native(st.file_path):
-            self.tabs.set_running(st.file_path, "native")
-            self.statusBar().showMessage(
-                f"⚙ Laeuft nativ: {st.file_path.name} (gbrt)")
+        # Einheitlicher Run: gbrt primaer, automatischer Tree-Walker-Fallback.
+        mode = self.console.start_run_auto(st.file_path)
+        if mode:
+            self.tabs.set_running(st.file_path, mode)
+            if mode == "native":
+                self.statusBar().showMessage(
+                    f"⚙ Laeuft nativ: {st.file_path.name} (gbrt)")
+            else:
+                self.statusBar().showMessage(
+                    f"▶ Laeuft: {st.file_path.name} (Tree-Walker, Fallback)")
 
     def _export_active(self) -> None:
         """Buendelt die aktive Datei zu einer standalone .exe (gbrt + Bytecode +
@@ -1326,7 +1316,8 @@ class GameBasicEditor(QMainWindow):
             except OSError:
                 pass
         self.console.process_finished.connect(_cleanup)
-        self.console.start_run(temp_path)
+        # Auch die Selektion laeuft ueber gbrt (mit Tree-Walker-Fallback).
+        self.console.start_run_auto(temp_path)
 
     def _bench_active(self) -> None:
         if not self._ensure_saved_for_run():
@@ -1342,7 +1333,7 @@ class GameBasicEditor(QMainWindow):
                 "und gbrt und braucht ein deterministisch terminierendes "
                 "Programm.\nDieses Programm nutzt SCREEN(...) (Grafik/3D) — der "
                 "Tree-Walker kann kein 3D, und Render-Loops enden nicht von "
-                "selbst.\nTipp: mit 'Run nativ' (F6) starten und FPS() im "
+                "selbst.\nTipp: mit Run (F5, gbrt) starten und FPS() im "
                 "Programm messen.\n", "muted")
             self.statusBar().showMessage(
                 "Benchmark nur fuer Konsolen-Programme", 4000)
@@ -1367,14 +1358,12 @@ class GameBasicEditor(QMainWindow):
 
     def _on_run_started(self) -> None:
         self.act_run.setEnabled(False)
-        self.act_run_native.setEnabled(False)
         self.act_bench.setEnabled(False)
         self.act_stop.setEnabled(True)
         self.statusBar().showMessage("Laeuft ...")
 
     def _on_run_finished(self, _rc: int) -> None:
         self.act_run.setEnabled(True)
-        self.act_run_native.setEnabled(True)
         self.act_bench.setEnabled(True)
         self.act_stop.setEnabled(False)
         self.tabs.set_running(None)        # Run-Markierung am Tab abraeumen
@@ -1536,7 +1525,7 @@ class GameBasicEditor(QMainWindow):
             return
         self._set_debug_controls(active=True, paused=False)
         self.act_debug.setEnabled(False)
-        for a in (self.act_run, self.act_run_native, self.act_bench):
+        for a in (self.act_run, self.act_bench):
             a.setEnabled(False)
         self.var_dock.show()
         self.variables_panel.set_status("läuft ...")
@@ -1560,7 +1549,7 @@ class GameBasicEditor(QMainWindow):
             self._debug_editor.set_debug_line(None)
         self._set_debug_controls(active=False, paused=False)
         self.act_debug.setEnabled(True)
-        for a in (self.act_run, self.act_run_native, self.act_bench):
+        for a in (self.act_run, self.act_bench):
             a.setEnabled(True)
         self.variables_panel.set_status(reason)
         self.variables_panel.clear()
@@ -1653,7 +1642,6 @@ class GameBasicEditor(QMainWindow):
             ("replace",  self.act_replace),
             ("settings", self.act_settings),
             ("run",      self.act_run),
-            ("run_native", self.act_run_native),
             ("debug",    self.act_debug),
             ("profiler", self.act_profile),
             ("stop",     self.act_stop),
@@ -1838,7 +1826,7 @@ class GameBasicEditor(QMainWindow):
             self.act_theme,
         ])
         add_action_group("Ausfuehren", [
-            self.act_run, self.act_run_native, self.act_stop, self.act_bench,
+            self.act_run, self.act_stop, self.act_bench,
             self.act_export, self.act_profile,
         ])
         add_action_group("Hilfe", [
@@ -1914,7 +1902,7 @@ class GameBasicEditor(QMainWindow):
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,
-            self.act_run, self.act_run_native, self.act_stop, self.act_bench,
+            self.act_run, self.act_stop, self.act_bench,
             self.act_profile,
             self.act_view_files, self.act_view_outline, self.act_view_builtins,
             self.act_toggle_minimap, self.act_toggle_blame,

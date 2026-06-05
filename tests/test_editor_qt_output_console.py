@@ -89,3 +89,60 @@ def test_file_line_finds_all_matches():
     assert len(matches) == 2
     assert matches[0].group(1) == "a.gb"
     assert matches[1].group(1) == "b.gb"
+
+
+# --- start_run_auto: gbrt-primaer + Tree-Walker-Fallback ----------------
+# Policy-Test ohne echten QProcess: wir mocken die gbrt-Suche und die
+# beiden Start-Pfade, und pruefen nur, WELCHEN Modus start_run_auto waehlt.
+
+import os  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pytest  # noqa: E402
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="module")
+def _qapp():
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:  # pragma: no cover - PySide6 fehlt
+        pytest.skip("PySide6 nicht verfuegbar")
+    app = QApplication.instance() or QApplication([])
+    yield app
+
+
+def _console(_qapp, tmp_path):
+    from gamebasic.editor_qt.output_console import OutputConsole
+    return OutputConsole(tmp_path)
+
+
+def test_run_auto_falls_back_when_gbrt_missing(_qapp, tmp_path, monkeypatch):
+    import gamebasic.editor_qt.output_console as oc
+    monkeypatch.setattr(oc, "_find_gbrt", lambda root: None)
+    con = _console(_qapp, tmp_path)
+    # start_run (Tree-Walker) starten wir nicht wirklich -> Stub.
+    monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
+    assert con.start_run_auto(tmp_path / "x.gb") == "py"
+    # Hinweis, dass auf den Tree-Walker zurueckgefallen wurde.
+    assert "Tree-Walker" in con.text.toPlainText()
+
+
+def test_run_auto_uses_native_when_available(_qapp, tmp_path, monkeypatch):
+    import gamebasic.editor_qt.output_console as oc
+    monkeypatch.setattr(oc, "_find_gbrt", lambda root: Path("gbrt"))
+    con = _console(_qapp, tmp_path)
+    monkeypatch.setattr(con, "_start_native", lambda fp, gbrt: True)
+    monkeypatch.setattr(con, "start_run", lambda *a, **k: pytest.fail("kein Fallback erwartet"))
+    assert con.start_run_auto(tmp_path / "x.gb") == "native"
+
+
+def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
+    import gamebasic.editor_qt.output_console as oc
+    monkeypatch.setattr(oc, "_find_gbrt", lambda root: Path("gbrt"))
+    con = _console(_qapp, tmp_path)
+    monkeypatch.setattr(con, "_start_native", lambda fp, gbrt: False)  # Compile/Start-Fehler
+    monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
+    assert con.start_run_auto(tmp_path / "x.gb") == "py"
+    assert "Fallback" in con.text.toPlainText()
