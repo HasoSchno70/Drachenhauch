@@ -211,6 +211,27 @@ PRINT "done"'''
     assert _run(src) == "seg=0 k=3\nseg=1 k=3\nseg=2 k=3\ndone"
 
 
+def test_function_local_shadows_global_loop_var():
+    """Ein funktions-lokales `i` (DIM/FOR) muss einen gleichnamigen Top-Level-
+    Global SHADOWEN. Frueher schrieb das Local faelschlich das GLOBAL -> die
+    aufrufende FOR-Schleife brach ab/hing (so hing 64_showcase.gb / Variadic-
+    Logger in einer FOR i-Schleife)."""
+    src = '''SUB inner()
+DIM i AS INTEGER
+FOR i = 0 TO 1
+NEXT
+END SUB
+DIM i AS INTEGER
+DIM tot AS INTEGER
+tot = 0
+FOR i = 0 TO 2
+inner()
+tot = tot + i
+NEXT
+PRINT tot'''
+    assert _run(src) == "3"
+
+
 def test_function_local_same_name_as_other_function():
     """Zwei Funktionen mit gleichnamigem Local duerfen sich nicht beeinflussen."""
     src = '''FUNCTION a() AS INTEGER

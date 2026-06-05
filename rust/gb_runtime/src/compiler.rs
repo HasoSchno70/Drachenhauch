@@ -490,18 +490,21 @@ impl Compiler {
         if !self.is_known_value_type(type_name) && !self.classes.contains_key(type_name) {
             return Err(format!("Stufe 3e: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
         }
+        // WICHTIG: in einer Funktion zuerst auf is_main pruefen -- ein lokales
+        // DIM SHADOWT einen gleichnamigen Top-Level-Global. Wuerde man zuerst
+        // global_slots pruefen, wuerde ein Funktions-Local mit dem Namen eines
+        // Globals (z.B. `i`) faelschlich das GLOBAL beschreiben (korrumpiert die
+        // aufrufende Schleife). Globaler Slot/Name nur im Hauptprogramm.
+        if !self.ctx.is_main {
+            self.ctx.declare_local(name, type_name);
+            return Ok(());
+        }
         let name_idx = self.ctx.add_const(json!(name));
         let type_idx = self.ctx.add_const(json!(type_name));
         let default_idx = self.ctx.add_const(enc(&type_default(type_name)));
         if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
                           json!([slot as i64, name_idx, type_idx, default_idx]));
-        } else if !self.ctx.is_main {
-            // Innerhalb einer Funktion: ein ECHTER funktions-lokaler Slot, kein
-            // globaler Name. Sonst kollidieren gleichnamige Locals verschiedener
-            // Funktionen in self.globals (ein Aufruf ueberschreibt die Variable
-            // -- z.B. eine FOR-Schleifenvariable -> Endlosschleife).
-            self.ctx.declare_local(name, type_name);
         } else {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }
@@ -613,20 +616,22 @@ impl Compiler {
 
     fn stmt_for(&mut self, var: &str, start: &Node, end: &Node,
                 step: &Option<Box<Node>>, body: &[Node]) -> CR {
-        // Schleifenvariable deklarieren (main: Slot oder Name).
-        let name_idx = self.ctx.add_const(json!(var));
-        let type_idx = self.ctx.add_const(json!("integer"));
-        let default_idx = self.ctx.add_const(json!(0));
-        if let Some(&slot) = self.global_slots.get(var) {
-            self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
-                          json!([slot as i64, name_idx, type_idx, default_idx]));
-        } else if !self.ctx.is_main {
-            // FOR-Variable in einer Funktion -> funktions-lokaler Slot (nicht
-            // globaler Name), sonst korrumpiert ein gleichnamiges Local einer
-            // aufgerufenen Funktion den Schleifenzaehler (Endlosschleife).
+        // Schleifenvariable deklarieren. In einer Funktion ZUERST is_main pruefen
+        // -> funktions-lokaler Slot (shadowt einen gleichnamigen Global). Sonst
+        // korrumpiert eine FOR-Variable, die einem Top-Level-Global gleicht (z.B.
+        // `i`), das GLOBAL -- eine aufrufende Schleife bricht ab/haengt.
+        if !self.ctx.is_main {
             self.ctx.declare_local(var, "integer");
         } else {
-            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            let name_idx = self.ctx.add_const(json!(var));
+            let type_idx = self.ctx.add_const(json!("integer"));
+            let default_idx = self.ctx.add_const(json!(0));
+            if let Some(&slot) = self.global_slots.get(var) {
+                self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
+                              json!([slot as i64, name_idx, type_idx, default_idx]));
+            } else {
+                self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            }
         }
         // Konstanten-STEP-Richtung bestimmen.
         let step_num: Option<f64> = match step.as_deref() {
