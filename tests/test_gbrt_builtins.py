@@ -228,6 +228,49 @@ PRINT b()'''
     assert _run(src) == "112"
 
 
+def test_function_local_array_isolated():
+    """Lokale Arrays gleichen Namens in zwei Funktionen duerfen sich nicht
+    teilen (frueher: DECLARE_ARRAY_NAME global statt DECLARE_ARRAY_LOCAL)."""
+    src = '''FUNCTION makeit() AS INTEGER
+DIM tmp[3] AS INTEGER
+tmp[0] = 99
+RETURN tmp[0]
+END FUNCTION
+SUB use()
+DIM tmp[3] AS INTEGER
+tmp[0] = 1 : tmp[1] = 2 : tmp[2] = 3
+DIM x AS INTEGER
+x = makeit()
+PRINT tmp[0], tmp[1], tmp[2]
+END SUB
+use()
+PRINT "done"'''
+    assert _run(src) == "1 2 3\ndone"
+
+
+def test_function_local_struct_isolated():
+    """Lokale STRUCT-Instanzen gleichen Namens in zwei Funktionen isoliert."""
+    src = '''STRUCT Pt
+DIM x AS INTEGER
+DIM y AS INTEGER
+END STRUCT
+FUNCTION other() AS INTEGER
+DIM p AS Pt
+p.x = 99
+RETURN p.x
+END FUNCTION
+SUB use()
+DIM p AS Pt
+p.x = 5 : p.y = 7
+DIM z AS INTEGER
+z = other()
+PRINT p.x, p.y
+END SUB
+use()
+PRINT "done"'''
+    assert _run(src) == "5 7\ndone"
+
+
 # --- WP3: Datei / Verzeichnis -----------------------------------------------
 
 def test_pathjoin():

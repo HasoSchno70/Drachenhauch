@@ -77,6 +77,8 @@ mod oc {
     pub const LOAD_INDEX: i64 = 90;
     pub const STORE_INDEX: i64 = 91;
     pub const DECLARE_ARRAY_NAME: i64 = 92;
+    pub const DECLARE_ARRAY_LOCAL: i64 = 93;
+    pub const DECLARE_STRUCT_LOCAL: i64 = 87;
     pub const NEW_INSTANCE: i64 = 80;
     pub const LOAD_FIELD: i64 = 81;
     pub const STORE_FIELD: i64 = 82;
@@ -439,23 +441,49 @@ impl Compiler {
             if !self.known_elem(type_name) {
                 return Err(format!("Stufe 3e: Array-Element-Typ '{}' nicht unterstuetzt", type_name));
             }
-            for de in dims { self.expr(de)?; }
-            let name_idx = self.ctx.add_const(json!(name));
-            self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
+            for de in dims { self.expr(de)?; }   // Dim-Werte auf den Stack
+            if self.ctx.is_main {
+                let name_idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::DECLARE_ARRAY_NAME, json!([name_idx, type_name, dims.len()]));
+            } else if self.ctx.local_slots.contains_key(name) {
+                // Idempotent (Schleifenkoerper): Dim-Werte wieder vom Stack poppen.
+                for _ in 0..dims.len() { self.ctx.emit(oc::POP, Value::Null); }
+            } else {
+                // Funktions-lokales Array (eigener Slot statt globaler Name).
+                let slot = self.ctx.local_types.len();
+                self.ctx.local_slots.insert(name.to_string(), slot);
+                self.ctx.local_types.push(format!("array:{}", type_name));
+                self.ctx.local_defaults.push(CVal::Nil);
+                self.ctx.emit(oc::DECLARE_ARRAY_LOCAL, json!([slot, type_name, dims.len()]));
+            }
             return Ok(());
         }
         // ARRAY OF T / MAP OF T (groessenlos).
         if type_name.starts_with("array:") || type_name.starts_with("map:") {
-            let name_idx = self.ctx.add_const(json!(name));
-            let type_idx = self.ctx.add_const(json!(type_name));
-            let default_idx = self.ctx.add_const(Value::Null);
-            self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            if self.ctx.is_main {
+                let name_idx = self.ctx.add_const(json!(name));
+                let type_idx = self.ctx.add_const(json!(type_name));
+                let default_idx = self.ctx.add_const(Value::Null);
+                self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
+            } else {
+                // Funktions-lokal: DECLARE_LOCAL erzeugt fuer map: eine leere Map,
+                // sizeless array: bleibt NIL bis zur Zuweisung.
+                self.ctx.declare_local(name, type_name);
+            }
             return Ok(());
         }
-        // STRUCT-Instanz -> Auto-Init via DECLARE_STRUCT_NAME.
+        // STRUCT-Instanz -> Auto-Init.
         if self.struct_names.contains(type_name) {
-            let name_idx = self.ctx.add_const(json!(name));
-            self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
+            if self.ctx.is_main {
+                let name_idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::DECLARE_STRUCT_NAME, json!([name_idx, type_name]));
+            } else if !self.ctx.local_slots.contains_key(name) {
+                let slot = self.ctx.local_types.len();
+                self.ctx.local_slots.insert(name.to_string(), slot);
+                self.ctx.local_types.push(type_name.to_string());
+                self.ctx.local_defaults.push(CVal::Nil);
+                self.ctx.emit(oc::DECLARE_STRUCT_LOCAL, json!([slot, type_name]));
+            }
             return Ok(());
         }
         // Skalar: Werttyp/externer Modul-Typ (Default je Typ) oder Klasse (NIL).
