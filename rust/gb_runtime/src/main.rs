@@ -90,6 +90,13 @@ fn main() -> ExitCode {
                 Err(code) => code,
             };
         }
+        // Editor/LSP-Diagnostik: kompiliert die Quelle und gibt gefundene
+        // Probleme als JSON-Array auf stdout aus (leer = sauber). Exit 0 auch
+        // bei Diagnosen -- so unterscheidet der Editor "Probleme gefunden" von
+        // "Tool-Fehler" (I/O -> Exit 1). Ersetzt die Python-Compiler-Pruefung.
+        if raw.len() >= 3 && raw[1] == "--check" {
+            return check_main(&raw[2]);
+        }
         // Stufe 4: IMPORT-Preprocessor -- gibt die gemergte Quelle aus
         // (Merge-Parity gegen preprocess.process()).
         if raw.len() >= 3 && raw[1] == "--preprocess" {
@@ -252,6 +259,56 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
         Ok(j) => Ok(j),
         Err(e) => { eprintln!("{}: Compile-Fehler: {}", label, e); Err(ExitCode::from(3)) }
+    }
+}
+
+/// `gbrt --check <datei.gb>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
+/// und LSP. Gibt ein JSON-Array `[{line,col,severity,phase,message}]` auf stdout
+/// aus (leer = fehlerfrei). Exit 0 auch bei gefundenen Problemen; nur ein
+/// I/O-Fehler liefert Exit 1. Zeilen beziehen sich auf die GEMERGTE Quelle
+/// (nach IMPORT-Expansion) -- der Editor mappt via origins zurueck.
+fn check_main(path: &str) -> ExitCode {
+    let raw_source = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let base = std::path::Path::new(path).parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let diags = check_source(&raw_source, &base);
+    println!("{}", serde_json::to_string(&diags).unwrap_or_else(|_| "[]".into()));
+    ExitCode::SUCCESS
+}
+
+/// Front-End-Kette (preprocess -> lex -> parse -> compile) als Diagnostik.
+/// MVP: bricht bei der ersten Fehlerstelle ab und liefert genau eine Diagnose
+/// (wie error_check.py einen ParseProblem liefert). Leeres Array = fehlerfrei.
+/// Compiler-Fehler tragen heute keine Zeile -> `line: 0` (spaetere Verfeinerung).
+fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Value> {
+    let (source, imports) = match preprocess::process(raw_source, base) {
+        Ok(r) => r,
+        Err(e) => return vec![serde_json::json!({
+            "line": e.line, "col": 0, "severity": "error",
+            "phase": "preprocess", "message": e.msg })],
+    };
+    let (ext_types, aliases) = preprocess::compile_env(&imports);
+    let toks = match lexer::Lexer::new(&source).tokenize() {
+        Ok(t) => t,
+        Err(e) => return vec![serde_json::json!({
+            "line": e.line, "col": e.col, "severity": "error",
+            "phase": "lex", "message": e.msg })],
+    };
+    let ast = match parser::Parser::new(toks).parse() {
+        Ok(a) => a,
+        Err(e) => return vec![serde_json::json!({
+            "line": e.line, "col": e.col, "severity": "error",
+            "phase": "parse", "message": e.msg })],
+    };
+    match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
+        Ok(_) => vec![],
+        Err(e) => vec![serde_json::json!({
+            "line": 0, "col": 0, "severity": "error",
+            "phase": "compile", "message": e })],
     }
 }
 
