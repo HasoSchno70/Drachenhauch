@@ -60,18 +60,24 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `ARRAY_FILL`/`ARRAY_COPY` (variadic MIN/MAX nehmen nur Skalare).
 - [ ] **`SORT(arr, comparator)`** mit FUNCREF + Descending-Flag.
 
-## WP2 — Spiel-Quickwins (billig, hoher Wert)
-- [ ] **`MOUSEWHEEL` exponieren** — Backend sammelt es schon
-      (`graphics.py:1380 pop_mouse_wheel`), nur kein Builtin. Nativ: raylib
-      `GetMouseWheelMove`.
-- [ ] **`SCREENWIDTH`/`SCREENHEIGHT`** (Setzen geht, Zurücklesen fehlt).
-- [ ] **Ranged Random:** `RANDINT(lo,hi)`, `RANDF(lo,hi)`, `CHOICE(arr)`,
-      `SHUFFLE(arr)` (PRNG ≠ Python → parity „erwartet unterschiedlich").
-- [ ] **Farb-Helfer** (kein Farb-Modul): `RGBA`, `HSV`→RGB, `COLOR_LERP`,
-      `RED`/`GREEN`/`BLUE`-Extraktion.
-- [ ] **Math:** `ASIN`/`ACOS`, `HYPOT`, `DEG`/`RAD`, `LERP`, `REMAP`, `FRAC`;
-      Konstanten `E`, `TAU`.
-- [ ] **`ROUND(x, decimals)`** (heute nur ganzzahlig).
+## WP2 — Spiel-Quickwins (✅ ERLEDIGT 2026-06-05, nativ in beiden Pfaden)
+- [x] **`MOUSEWHEEL` exponieren** — Builtin in beiden Pfaden (Backend war da:
+      `pop_mouse_wheel` / raylib `GetMouseWheelMove`). Graceful 0 ohne SCREEN.
+- [x] **`SCREENWIDTH`/`SCREENHEIGHT`** — Zurücklesen der logischen Fenstergröße
+      (0 vor SCREEN, wie TW `_buf_size`).
+- [x] **Ranged Random:** `RANDINT(lo,hi)`, `RANDF(lo,hi)`, `CHOICE(arr)`,
+      `SHUFFLE(arr)`. PRNG ≠ Python → Parity „erwartet unterschiedlich"
+      (Strukturtest prüft Bereich/Multiset-Invariante).
+- [x] **Farb-Helfer:** `HSV`→RGB, `COLOR_LERP`, `RED`/`GREEN`/`BLUE`-Extraktion.
+      `RGBA` **bewusst weggelassen** — der Draw-Pfad ist 24-Bit-RGB ohne
+      Alpha-Kanal (`col()` forciert 255, TW maskiert `&0xFFFFFF`), Alpha wäre
+      irreführend.
+- [x] **Math:** `ASIN`/`ACOS` (Domain-Check), `HYPOT`, `DEG`/`RAD`, `LERP`,
+      `REMAP`, `FRAC`; Konstante `TAU`. **`E` bewusst weggelassen** — `e` ist
+      ein häufiger `CATCH e`-Variablenname; eine gleichnamige Konstante würde
+      das brechen (nutze `EXP(1)`).
+- [x] **`ROUND(x, decimals)`** → FLOAT (Half-to-even via Decimal-Formatierung,
+      bit-identisch: Python `f"{x:.nf}"` == Rust `format!("{:.n}")`).
 
 ## WP3 — String + Datei
 - [ ] **String:** `LTRIM$`/`RTRIM$`, `REVERSE$`, `STARTSWITH`/`ENDSWITH`/
