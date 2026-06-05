@@ -983,6 +983,83 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Array(Rc::new(RefCell::new(new))))
             } else { err("ARRAY_COPY erwartet ARRAY".to_string()) }
         }
+        // --- Dynamische 1D-Arrays (wachsen/schrumpfen) ---
+        // Mutieren das Array IN PLACE: values + dims=[len] + strides=[1].
+        "array_push" => {
+            arity!(2);
+            if let Value::Array(arr) = &a[0] {
+                let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_PUSH: nur 1D-Arrays".to_string()); } b.element_type.clone() };
+                let v = coerce_elem(a[1].clone(), &et, "ARRAY_PUSH")?;
+                let mut b = arr.borrow_mut();
+                b.values.push(v);
+                let n = b.values.len() as i64;
+                b.dims = vec![n];
+                b.strides = vec![1];
+                Ok(Value::Int(n))
+            } else { err("ARRAY_PUSH erwartet ARRAY".to_string()) }
+        }
+        "array_pop" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let mut b = arr.borrow_mut();
+                if b.dims.len() != 1 { return err("ARRAY_POP: nur 1D-Arrays".to_string()); }
+                match b.values.pop() {
+                    Some(v) => { let n = b.values.len() as i64; b.dims = vec![n]; b.strides = vec![1]; Ok(v) }
+                    None => err("ARRAY_POP: Array ist leer".to_string()),
+                }
+            } else { err("ARRAY_POP erwartet ARRAY".to_string()) }
+        }
+        "array_insert" => {
+            arity!(3);
+            if let Value::Array(arr) = &a[0] {
+                let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_INSERT: nur 1D-Arrays".to_string()); } b.element_type.clone() };
+                let idx = need_int(&a[1], "ARRAY_INSERT")?;
+                let v = coerce_elem(a[2].clone(), &et, "ARRAY_INSERT")?;
+                let mut b = arr.borrow_mut();
+                let n = b.values.len() as i64;
+                if idx < 0 || idx > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [0..{}]", idx, n)); }
+                b.values.insert(idx as usize, v);
+                let nn = b.values.len() as i64;
+                b.dims = vec![nn];
+                b.strides = vec![1];
+                Ok(Value::Int(nn))
+            } else { err("ARRAY_INSERT erwartet ARRAY".to_string()) }
+        }
+        "array_remove_at" => {
+            arity!(2);
+            if let Value::Array(arr) = &a[0] {
+                { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_REMOVE_AT: nur 1D-Arrays".to_string()); } }
+                let idx = need_int(&a[1], "ARRAY_REMOVE_AT")?;
+                let mut b = arr.borrow_mut();
+                let n = b.values.len() as i64;
+                if idx < 0 || idx >= n { return err(format!("ARRAY_REMOVE_AT: Index {} ausserhalb [0..{}]", idx, n - 1)); }
+                let v = b.values.remove(idx as usize);
+                let nn = b.values.len() as i64;
+                b.dims = vec![nn];
+                b.strides = vec![1];
+                Ok(v)
+            } else { err("ARRAY_REMOVE_AT erwartet ARRAY".to_string()) }
+        }
+        "redim" => {
+            // REDIM(arr, neue_laenge): 1D-Array vergroessern (mit Typ-Default
+            // auffuellen) oder verkleinern (abschneiden), Bestand bleibt erhalten.
+            arity!(2);
+            if let Value::Array(arr) = &a[0] {
+                let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("REDIM: nur 1D-Arrays".to_string()); } b.element_type.clone() };
+                let new_len = need_int(&a[1], "REDIM")?;
+                if new_len < 0 { return err("REDIM: Groesse darf nicht negativ sein".to_string()); }
+                let mut b = arr.borrow_mut();
+                let cur = b.values.len() as i64;
+                if new_len < cur {
+                    b.values.truncate(new_len as usize);
+                } else {
+                    for _ in cur..new_len { b.values.push(type_default(&et)); }
+                }
+                b.dims = vec![new_len];
+                b.strides = vec![1];
+                Ok(Value::Nil)
+            } else { err("REDIM erwartet ARRAY".to_string()) }
+        }
         "collides" => {
             arity!(8);
             let mut n = [0f64; 8];

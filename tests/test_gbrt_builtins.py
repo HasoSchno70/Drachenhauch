@@ -104,3 +104,52 @@ DIM a[0] AS INTEGER
 PRINT ARRAY_AVG(a)
 PRINT "after"'''
     assert _run(src) == "before"
+
+
+# --- WP1: Dynamische Arrays -------------------------------------------------
+
+def test_array_push_pop():
+    src = '''DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+PRINT ARRAY_PUSH(a, 40), a[3], LEN(a)
+PRINT ARRAY_POP(a), LEN(a)'''
+    assert _run(src) == "4 40 4\n40 3"
+
+
+def test_array_insert_remove_at():
+    src = '''DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+PRINT ARRAY_INSERT(a, 1, 99)
+PRINT a[0], a[1], a[2], a[3]
+PRINT ARRAY_REMOVE_AT(a, 1)
+PRINT a[0], a[1], a[2], LEN(a)'''
+    assert _run(src) == "4\n10 99 20 30\n99\n10 20 30 3"
+
+
+def test_redim_grow_and_shrink():
+    src = '''DIM a[3] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30
+REDIM(a, 5)
+PRINT LEN(a), a[2], a[3], a[4]
+REDIM(a, 2)
+PRINT LEN(a), a[0], a[1]'''
+    # grow: Bestand bleibt, neue Slots = 0; shrink: abschneiden, Rest bleibt.
+    assert _run(src) == "5 30 0 0\n2 10 20"
+
+
+def test_array_push_string_and_index_in_new_range():
+    src = '''DIM s[1] AS STRING
+s[0] = "hi"
+ARRAY_PUSH(s, "there")
+PRINT s[0], s[1], LEN(s)'''
+    assert _run(src) == "hi there 2"
+
+
+def test_array_pop_empty_errors():
+    src = '''PRINT "before"
+DIM a[1] AS INTEGER
+PRINT ARRAY_POP(a)
+PRINT ARRAY_POP(a)
+PRINT "after"'''
+    # zweites POP auf leerem Array wirft -> "after" fehlt.
+    assert _run(src) == "before\n0"

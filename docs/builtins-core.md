@@ -182,6 +182,16 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `ARRAY_FILL(arr, wert)` | alle Elemente mit `wert` füllen (IN PLACE, jede Dimension) |
 | `ARRAY_COPY(arr)` → ARRAY | unabhängige Kopie (gleiche Form/Typ) |
 
+**Dynamische 1D-Arrays** (wachsen/schrumpfen IN PLACE):
+
+| Funktion | Zweck |
+|---|---|
+| `ARRAY_PUSH(arr, wert)` → INTEGER | Element ans Ende anhängen; liefert die neue Länge |
+| `ARRAY_POP(arr)` → T | letztes Element entfernen und zurückgeben (nicht leer) |
+| `ARRAY_INSERT(arr, idx, wert)` → INTEGER | an Index `idx` (`0..len`) einfügen; neue Länge |
+| `ARRAY_REMOVE_AT(arr, idx)` → T | Element an `idx` entfernen und zurückgeben |
+| `REDIM(arr, länge)` | auf `länge` bringen — wächst mit Typ-Default, schrumpft schneidet ab; vorhandene Werte bleiben |
+
 ```basic
 DIM matrix[3, 4] AS INTEGER
 
@@ -194,10 +204,17 @@ DIM werte[3] AS INTEGER
 werte[0] = 5 : werte[1] = 9 : werte[2] = 1
 PRINT ARRAY_SUM(werte), ARRAY_AVG(werte)   ' 15  5.0
 PRINT ARRAY_MIN(werte), ARRAY_MAX(werte)   ' 1  9
+
+' Dynamisch: als Stack/Liste verwenden
+DIM stack[0] AS INTEGER
+PRINT ARRAY_PUSH(stack, 1)       ' 1 (neue Länge)
+PRINT ARRAY_PUSH(stack, 2)       ' 2
+PRINT ARRAY_POP(stack)           ' 2
+PRINT LEN(stack)                 ' 1
 ```
 
-> **Nur native Runtime.** Die `ARRAY_*`-Aggregate (und die dynamischen Array-Ops
-> `ARRAY_PUSH`/`POP`/… — nächster Schritt) sind ausschließlich in `gbrt`
+> **Nur native Runtime.** Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
+> (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind ausschließlich in `gbrt`
 > implementiert, nicht im Python-Tree-Walker. Ausführen über gbrts eigenes
 > Rust-Frontend: `gbrt run datei.gb` (bzw. `gbrt --runsrc`), Standalone-Export
 > via `gbrt --export`. Die Python-Toolchain (Tree-Walker-F5 **und** der

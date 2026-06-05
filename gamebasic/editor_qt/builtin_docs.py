@@ -123,6 +123,12 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "array_max": ("ARRAY_MAX(arr) AS T", "Groesstes Element eines 1D-Zahl-Arrays."),
     "array_fill": ("ARRAY_FILL(arr, wert)", "Fuellt alle Elemente mit wert (IN PLACE)."),
     "array_copy": ("ARRAY_COPY(arr) AS ARRAY", "Liefert eine unabhaengige Kopie des Arrays."),
+    # Dynamische 1D-Arrays (gbrt-only)
+    "array_push": ("ARRAY_PUSH(arr, wert) AS INTEGER", "Element ans Ende; liefert die neue Laenge."),
+    "array_pop": ("ARRAY_POP(arr) AS T", "Entfernt letztes Element und liefert es (Array nicht leer)."),
+    "array_insert": ("ARRAY_INSERT(arr, idx, wert) AS INTEGER", "Element an Index einfuegen (0..len); neue Laenge."),
+    "array_remove_at": ("ARRAY_REMOVE_AT(arr, idx) AS T", "Element an Index entfernen und liefern."),
+    "redim": ("REDIM(arr, laenge)", "1D-Array auf laenge bringen (waechst mit Default, schrumpft schneidet ab; Bestand bleibt)."),
     # Strings extra
     "padl$":     ("PADL$(s, breite[, fueller]) AS STRING", "String linksbuendig auffuellen."),
     "padr$":     ("PADR$(s, breite[, fueller]) AS STRING", "String rechtsbuendig auffuellen."),
