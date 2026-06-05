@@ -12,11 +12,11 @@ def test_clean_source_returns_none():
     assert _check_source(src, None) is None
 
 
-def test_lex_error_phase_parse():
-    # Unterminierter String
+def test_lex_error_phase():
+    # Unterminierter String -- gbrt meldet Phase "lex" (Python lumpte lex+parse).
     p = _check_source('PRINT "no close', None)
     assert p is not None
-    assert p.phase == "parse"
+    assert p.phase in ("lex", "parse")
     assert p.severity == "error"
 
 
@@ -28,12 +28,12 @@ def test_parse_error_phase_parse():
 
 
 def test_compile_error_unknown_type():
-    # DIM mit unbekanntem Typ -> CompileError
+    # DIM mit unbekanntem Typ -> Compile-Fehler (gbrt nennt den Typnamen).
     src = "DIM p AS NoSuchClass\n"
     p = _check_source(src, None)
     assert p is not None
     assert p.phase == "compile"
-    assert "Unbekannt" in p.message or "notatype" in p.message.lower()
+    assert "nosuchclass" in p.message.lower()
 
 
 def test_compile_error_duplicate_function():
@@ -57,7 +57,7 @@ def test_lex_error_beats_compile_error():
     src = 'PRINT "broken\nDIM p AS NoSuch\n'
     p = _check_source(src, None)
     assert p is not None
-    assert p.phase == "parse"
+    assert p.phase in ("lex", "parse")    # frueher Fehler (Lexer), nicht compile
 
 
 def test_clean_compile_with_imports():

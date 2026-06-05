@@ -1,10 +1,12 @@
-"""Async-Parser-Check fuer Live-Error-Marker.
+"""Async-Diagnostik fuer Live-Error-Marker.
 
-Pipeline: Preprocess -> Lex -> Parse -> Compile, alles in einem
-`threading.Thread` (Daemon). Der Compile-Pass fuegt den semantischen
-Check (Scope, Type, undefinierte Variable, doppelte Deklaration) hinzu,
-den Lex+Parse alleine nicht haetten -- ein Quick-Win fuer den Editor.
+Diagnostik laeuft ueber die native Runtime: `gbrt --check datei.gb` liefert die
+gefundenen Probleme (preprocess/lex/parse/compile) als JSON mit Zeile. Damit
+haengt der Editor nicht mehr am Python-Compiler (Stufe B). Faellt gbrt (nicht
+gebaut), greift ein Lexer/Parser-Fallback (nur Syntax) -- der Editor bleibt
+nutzbar, ohne den Python-Compiler zu importieren.
 
+Alles in einem `threading.Thread` (Daemon).
 Ein Generation-Counter verwirft veraltete Resultate, sodass bei
 schnellem Tippen nur das neueste Ergebnis das Signal feuert. Bei
 typischen Datei-Groessen (<100 KB) dauert ein Check ~2ms; der Thread
@@ -42,71 +44,91 @@ class ParseProblem:
     phase: str = "parse"
 
 
-def _check_source(source: str, base_path: Path | None) -> Optional[ParseProblem]:
-    """Laeuft die volle Editor-Diagnostik-Pipeline und liefert das erste
-    gefundene Problem zurueck (oder None, wenn alles ok ist).
+def _find_gbrt():
+    """Pfad zur gebauten gbrt-Binary (release vor debug) oder None."""
+    import os
+    root = Path(__file__).resolve().parents[2]
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = root / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
 
-    Phasen, in Reihenfolge, kurzes Stop beim ersten Fehler:
-      1. Preprocess (IMPORT-Aufloesung)
-      2. Lex
-      3. Parse
-      4. Compile (semantischer Check via Bytecode-Compiler)
-    """
+
+def _check_source(source: str, base_path: Path | None) -> Optional[ParseProblem]:
+    """Liefert das erste Diagnostik-Problem (oder None). Bevorzugt `gbrt --check`
+    (volle preprocess/lex/parse/compile-Diagnostik mit Zeile); faellt gbrt, nur
+    Syntax (Lexer/Parser) ohne den Python-Compiler."""
+    gbrt = _find_gbrt()
+    if gbrt is not None:
+        return _check_via_gbrt(source, base_path, gbrt)
+    return _check_syntax_only(source, base_path)
+
+
+def _check_via_gbrt(source: str, base_path, gbrt) -> Optional[ParseProblem]:
+    """`gbrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> erstes
+    ParseProblem. Zeilen sind quell-relativ (bei `IMPORT "datei.gb"`-Inlining
+    moeglw. verschoben). Bei jedem gbrt-Fehler defensiv None (kein Editor-Crash)."""
+    import json
+    import os
+    import subprocess
+    import tempfile
+    base = base_path or Path.cwd()
+    tmp_dir = str(base) if Path(base).is_dir() else None
+    fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+    os.close(fd)
+    try:
+        Path(tmp).write_text(source, encoding="utf-8")
+        r = subprocess.run([str(gbrt), "--check", tmp],
+                           capture_output=True, text=True, timeout=15)
+        diags = json.loads(r.stdout or "[]")
+    except Exception:
+        return None
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    if not diags:
+        return None
+    d = diags[0]
+    return ParseProblem(
+        line=int(d.get("line", 0)) or 1,
+        message=str(d.get("message", "")),
+        severity=str(d.get("severity", "error")),
+        phase=str(d.get("phase", "compile")))
+
+
+def _check_syntax_only(source: str, base_path: Path | None) -> Optional[ParseProblem]:
+    """Fallback ohne gbrt: Preprocess + Lex + Parse (nur Syntax, kein Compiler)."""
     try:
         from ..lexer import Lexer
         from ..parser import Parser
-        from ..compiler import Compiler, CompileError
         from ..preprocess import process as _preprocess
         from ..errors import LexerError, ParseError
     except Exception as exc:
         return ParseProblem(line=1, message=f"Import-Fehler: {exc}")
 
-    # 1) Preprocessor -- IMPORTs werden aufgeloest, dabei kann selbst
-    #    schon ein LexerError fliegen (z.B. fehlende Datei).
     try:
         merged, origins = _preprocess(
-            source,
-            base_path or Path.cwd(),
-            file_label="<editor>",
-        )
+            source, base_path or Path.cwd(), file_label="<editor>")
     except LexerError as exc:
         return ParseProblem(line=getattr(exc, "line", 1) or 1,
-                            message=f"IMPORT: {exc}",
-                            phase="preprocess")
+                            message=f"IMPORT: {exc}", phase="preprocess")
     except Exception as exc:
         return ParseProblem(line=1,
                             message=f"Preprocess: {type(exc).__name__}: {exc}",
                             phase="preprocess")
-
-    # 2) Lex + Parse.
     try:
-        tokens = Lexer(merged).tokenize()
-        ast = Parser(tokens).parse()
+        Parser(Lexer(merged).tokenize()).parse()
     except (LexerError, ParseError) as exc:
         merged_line = getattr(exc, "line", 1) or 1
         line, msg = _map_back(origins, merged_line, str(exc))
         return ParseProblem(line=line, message=msg, phase="parse")
     except Exception as exc:
         return ParseProblem(line=1,
-                            message=f"{type(exc).__name__}: {exc}",
-                            phase="parse")
-
-    # 3) Compile -- semantischer Check. Faengt undeclared variables,
-    #    Type-Mismatch, doppelte Deklarationen, falsche AS-Annotations etc.
-    #    Compile-Errors haben in der Regel keine line-Info; im Editor
-    #    landet der Marker dann auf Zeile 1, was OK ist (User sieht das
-    #    Problem im Status, nicht zwingend im Gutter).
-    try:
-        Compiler().compile(ast)
-    except CompileError as exc:
-        merged_line = getattr(exc, "line", 0) or 1
-        line, msg = _map_back(origins, merged_line, str(exc))
-        return ParseProblem(line=line, message=msg, phase="compile")
-    except Exception as exc:
-        # Defensiv: ein Bug im Compiler soll den Editor nicht crashen.
-        return ParseProblem(line=1,
-                            message=f"Compile {type(exc).__name__}: {exc}",
-                            phase="compile")
+                            message=f"{type(exc).__name__}: {exc}", phase="parse")
     return None
 
 
