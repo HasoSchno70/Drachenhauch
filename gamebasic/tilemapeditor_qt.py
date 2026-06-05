@@ -38,7 +38,7 @@ from .tilemap.document import (
 )
 
 # Werkzeuge
-TOOL_PENCIL, TOOL_ERASER, TOOL_FILL, TOOL_RECT, TOOL_PICK = range(5)
+TOOL_PENCIL, TOOL_ERASER, TOOL_FILL, TOOL_RECT, TOOL_PICK, TOOL_SELECT = range(6)
 
 
 # ===================================================================
@@ -154,6 +154,12 @@ class _Canvas(QWidget):
         self._before: list | None = None
         self._rect_start: tuple | None = None
         self._rect_cur: tuple | None = None
+        # Select-Tool: rechteckige Tile-Auswahl + Clipboard (2D-GID-Block)
+        self._sel_start: tuple | None = None
+        self._sel_cur: tuple | None = None
+        self._sel_rect: tuple | None = None      # (x0,y0,x1,y1) inklusiv
+        self.tile_clipboard: list[list[int]] | None = None
+        self._hover: tuple = (0, 0)
         # Object-Layer-Interaktion
         self.selected_obj: MapObject | None = None
         self._obj_before: list | None = None   # Snapshot fuer Undo
@@ -287,7 +293,11 @@ class _Canvas(QWidget):
         self._obj_before = None
 
     def delete_selected(self) -> None:
-        """Loescht das selektierte Objekt (Entf-Taste vom Editor)."""
+        """Loescht das selektierte Objekt (Entf-Taste vom Editor) -- oder
+        leert die Tile-Auswahl, wenn das Select-Tool aktiv ist."""
+        if self._active_obj_layer() is None:
+            self.delete_selection()
+            return
         layer = self._active_obj_layer()
         if layer is None or self.selected_obj is None:
             return
@@ -322,6 +332,12 @@ class _Canvas(QWidget):
             if g > 0:
                 self.picked.emit(g - 1)
             return
+        if self.tool == TOOL_SELECT and not self._erase:
+            self._sel_start = (cx, cy)
+            self._sel_cur = (cx, cy)
+            self._sel_rect = None
+            self.update()
+            return
         self._before = list(layer.tiles)
         if self.tool == TOOL_FILL and not self._erase:
             self.doc.flood_fill(self.active_layer, cx, cy,
@@ -346,8 +362,12 @@ class _Canvas(QWidget):
             self._obj_move(e.position().toPoint())
             return
         cx, cy = self._cell(e.position().toPoint())
+        self._hover = (cx, cy)
         self.cell_hovered.emit(cx, cy)
-        if self._rect_start is not None:
+        if self._sel_start is not None:
+            self._sel_cur = (cx, cy)
+            self.update()
+        elif self._rect_start is not None:
             self._rect_cur = (cx, cy)
             self.update()
         elif self._painting:
@@ -361,6 +381,14 @@ class _Canvas(QWidget):
             self._obj_release()
             return
         layer = self.doc.layers[self.active_layer]
+        if self._sel_start is not None:
+            x0, y0 = self._sel_start
+            x1, y1 = self._sel_cur or self._sel_start
+            self._sel_rect = (min(x0, x1), min(y0, y1),
+                              max(x0, x1), max(y0, y1))
+            self._sel_start = self._sel_cur = None
+            self.update()
+            return
         if self._rect_start is not None:
             x0, y0 = self._rect_start
             x1, y1 = self._rect_cur or self._rect_start
@@ -385,6 +413,74 @@ class _Canvas(QWidget):
             self.committed.emit(self.active_layer, self._before, list(layer.tiles))
             self.doc.dirty = True
         self._before = None
+
+    # ---------------------------------------------------- Select-Clipboard
+    def _tile_layer(self):
+        """Aktiver Layer, falls Tile-Layer -- sonst None."""
+        if self.doc and 0 <= self.active_layer < len(self.doc.layers):
+            l = self.doc.layers[self.active_layer]
+            if isinstance(l, TileLayer):
+                return l
+        return None
+
+    def has_selection(self) -> bool:
+        return self._sel_rect is not None and self._tile_layer() is not None
+
+    def clear_selection(self) -> None:
+        if self._sel_rect is not None or self._sel_start is not None:
+            self._sel_rect = self._sel_start = self._sel_cur = None
+            self.update()
+
+    def copy_selection(self) -> bool:
+        """Kopiert die Auswahl als 2D-GID-Block ins Clipboard."""
+        if not self.has_selection():
+            return False
+        x0, y0, x1, y1 = self._sel_rect
+        self.tile_clipboard = self.doc.get_region(
+            self.active_layer, x0, y0, x1 - x0 + 1, y1 - y0 + 1)
+        return True
+
+    def cut_selection(self) -> bool:
+        """Kopiert + leert die Auswahl (eine Undo-Operation)."""
+        if not self.copy_selection():
+            return False
+        layer = self._tile_layer()
+        x0, y0, x1, y1 = self._sel_rect
+        self._before = list(layer.tiles)
+        self.doc.clear_region(self.active_layer, x0, y0,
+                              x1 - x0 + 1, y1 - y0 + 1)
+        self._commit(layer)
+        self.update()
+        return True
+
+    def delete_selection(self) -> bool:
+        """Leert die Auswahl (ohne ins Clipboard zu kopieren)."""
+        layer = self._tile_layer()
+        if not self.has_selection() or layer is None:
+            return False
+        x0, y0, x1, y1 = self._sel_rect
+        self._before = list(layer.tiles)
+        changed = self.doc.clear_region(self.active_layer, x0, y0,
+                                        x1 - x0 + 1, y1 - y0 + 1)
+        self._commit(layer)
+        self.update()
+        return changed
+
+    def paste_clipboard(self) -> bool:
+        """Stempelt das Clipboard mit der oberen-linken Ecke an der aktuellen
+        Hover-Zelle (bzw. Auswahl-Ursprung)."""
+        layer = self._tile_layer()
+        if not self.tile_clipboard or layer is None:
+            return False
+        if self._sel_rect is not None:
+            tx, ty = self._sel_rect[0], self._sel_rect[1]
+        else:
+            tx, ty = self._hover
+        self._before = list(layer.tiles)
+        self.doc.stamp_region(self.active_layer, tx, ty, self.tile_clipboard)
+        self._commit(layer)
+        self.update()
+        return True
 
     # ---------------------------------------------------- Zeichnen
     def paintEvent(self, _e):  # noqa: N802
@@ -422,6 +518,18 @@ class _Canvas(QWidget):
             r = QRect(min(x0, x1) * cw, min(y0, y1) * ch,
                       (abs(x1 - x0) + 1) * cw, (abs(y1 - y0) + 1) * ch)
             p.setPen(QPen(QColor(COLORS["accent"]), 2))
+            p.drawRect(r)
+        # Auswahl (Select-Tool): gestrichelter Rahmen, live beim Ziehen
+        sel = self._sel_rect
+        if self._sel_start is not None and self._sel_cur is not None:
+            sx0, sy0 = self._sel_start
+            sx1, sy1 = self._sel_cur
+            sel = (min(sx0, sx1), min(sy0, sy1), max(sx0, sx1), max(sy0, sy1))
+        if sel is not None:
+            x0, y0, x1, y1 = sel
+            r = QRect(x0 * cw, y0 * ch, (x1 - x0 + 1) * cw, (y1 - y0 + 1) * ch)
+            pen = QPen(QColor(COLORS["accent"]), 2, Qt.PenStyle.DashLine)
+            p.setPen(pen)
             p.drawRect(r)
         # Objekt-Aufzieh-Vorschau
         if self._obj_drag_start is not None and self._obj_drag_cur is not None:
@@ -750,10 +858,18 @@ class TileMapEditor(QMainWindow):
         rv.addWidget(self.obj_hint)
         self._dock("Layer", right, Qt.DockWidgetArea.RightDockWidgetArea)
 
-        # Entf loescht das selektierte Objekt (auf Object-Layern).
+        # Entf loescht das selektierte Objekt (Object-Layer) bzw. die
+        # Tile-Auswahl (Select-Tool).
         from PySide6.QtGui import QShortcut
         sc_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), self.canvas)
         sc_del.activated.connect(self.canvas.delete_selected)
+        # Auswahl-Clipboard (Select-Tool): Kopieren/Ausschneiden/Einfuegen.
+        for keyseq, fn in (
+            (QKeySequence.StandardKey.Copy, self.canvas.copy_selection),
+            (QKeySequence.StandardKey.Cut, self.canvas.cut_selection),
+            (QKeySequence.StandardKey.Paste, self.canvas.paste_clipboard),
+        ):
+            QShortcut(keyseq, self.canvas).activated.connect(fn)
 
         self.status = self.statusBar()
         self._update_status()
@@ -793,7 +909,7 @@ class TileMapEditor(QMainWindow):
         for tool, label, sc in (
             (TOOL_PENCIL, "Stift", "B"), (TOOL_ERASER, "Radierer", "E"),
             (TOOL_FILL, "Fuellen", "G"), (TOOL_RECT, "Rechteck", "R"),
-            (TOOL_PICK, "Pipette", "I"),
+            (TOOL_PICK, "Pipette", "I"), (TOOL_SELECT, "Auswahl", "S"),
         ):
             a = QAction(label, self); a.setCheckable(True)
             a.setShortcut(QKeySequence(sc))
@@ -947,6 +1063,8 @@ class TileMapEditor(QMainWindow):
     # ---------------------------------------------------- Werkzeuge/Ansicht
     def _set_tool(self, tool: int) -> None:
         self.canvas.tool = tool
+        if tool != TOOL_SELECT:
+            self.canvas.clear_selection()
 
     def _toggle_grid(self, on: bool) -> None:
         self.canvas.show_grid = on

@@ -292,6 +292,89 @@ def test_gb_code_compiles_with_object_layer(tmp_path):
 
 # --------------------------------------------------------------- Editor-UI
 
+# --------------------------------------------------------------- Regionen (Select)
+
+def test_get_stamp_clear_region():
+    doc = TileMapDoc(6, 6, 16, 16)
+    l = doc.layers[0]
+    for x in range(2):
+        for y in range(2):
+            l.set(x + 1, y + 1, 10 + y * 2 + x)
+    block = doc.get_region(0, 1, 1, 2, 2)
+    assert block == [[10, 11], [12, 13]]
+    # An anderer Stelle stempeln
+    assert doc.stamp_region(0, 3, 3, block) is True
+    assert doc.get_region(0, 3, 3, 2, 2) == [[10, 11], [12, 13]]
+    # Region leeren
+    assert doc.clear_region(0, 1, 1, 2, 2) is True
+    assert doc.get_region(0, 1, 1, 2, 2) == [[0, 0], [0, 0]]
+
+
+def test_stamp_region_clips_out_of_bounds():
+    doc = TileMapDoc(3, 3, 16, 16)
+    # 2x2-Block an der Ecke -> nur (2,2) liegt drin
+    doc.stamp_region(0, 2, 2, [[5, 6], [7, 8]])
+    assert doc.layers[0].get(2, 2) == 5
+    assert doc.layers[0].get(3, 2) == 0      # OOB ignoriert
+
+
+def test_region_ops_ignore_object_layer():
+    doc = TileMapDoc(4, 4, 16, 16)
+    doc.add_object_layer("Obj")
+    oi = len(doc.layers) - 1
+    assert doc.get_region(oi, 0, 0, 2, 2) == []
+    assert doc.stamp_region(oi, 0, 0, [[1]]) is False
+
+
+def test_editor_select_copy_paste(tmp_path, monkeypatch):
+    """Headless: Tile-Auswahl kopieren + woanders einfuegen, mit Undo."""
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+        from gamebasic.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
+    except Exception:
+        pytest.skip("PySide6 nicht verfuegbar")
+    QApplication.instance() or QApplication([])
+    ed = TileMapEditor(tmp_path)
+    c = ed.canvas
+    c.doc.layers[0].set(0, 0, 5)
+    c.doc.layers[0].set(1, 0, 6)
+    ed._set_tool(TOOL_SELECT)
+    # Auswahl (0,0)-(1,0) simulieren
+    c._sel_rect = (0, 0, 1, 0)
+    assert c.copy_selection() is True
+    assert c.tile_clipboard == [[5, 6]]
+    # Hover auf (0,2) -> dort einfuegen (Auswahl-Ursprung hat aber Vorrang)
+    c._sel_rect = None
+    c._hover = (0, 2)
+    assert c.paste_clipboard() is True
+    assert c.doc.layers[0].get(0, 2) == 5
+    assert c.doc.layers[0].get(1, 2) == 6
+    # Undo macht das Einfuegen rueckgaengig
+    ed._undo()
+    assert c.doc.layers[0].get(0, 2) == 0
+
+
+def test_editor_select_cut_and_delete(tmp_path, monkeypatch):
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+        from gamebasic.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
+    except Exception:
+        pytest.skip("PySide6 nicht verfuegbar")
+    QApplication.instance() or QApplication([])
+    ed = TileMapEditor(tmp_path)
+    c = ed.canvas
+    c.doc.layers[0].set(2, 2, 9)
+    ed._set_tool(TOOL_SELECT)
+    c._sel_rect = (2, 2, 2, 2)
+    assert c.cut_selection() is True
+    assert c.tile_clipboard == [[9]]
+    assert c.doc.layers[0].get(2, 2) == 0    # ausgeschnitten -> leer
+    ed._undo()
+    assert c.doc.layers[0].get(2, 2) == 9    # Cut rueckgaengig
+
+
 def test_editor_object_layer_undo_redo(tmp_path, monkeypatch):
     """Headless: Object-Layer im Editor anlegen, Objekt + Undo/Redo + Delete."""
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")

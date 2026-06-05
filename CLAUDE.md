@@ -1577,7 +1577,9 @@ PySide6-Tool [`gamebasic/tilemapeditor_qt.py`](gamebasic/tilemapeditor_qt.py)
 (UI) + Qt-freies Datenmodell [`gamebasic/tilemap/document.py`](gamebasic/tilemap/document.py)
 (`TileMapDoc`/`TileLayer`/`ObjectLayer`/`MapObject` + Tiled-JSON-Serialisierung,
 headless testbar). Tiles aus einem Tileset-PNG aufs Gitter malen (Stift/Radierer/
-Füllen/Rechteck/Pipette), mehrere Layer (Sichtbarkeit/Sortierung/umbenennen),
+Füllen/Rechteck/Pipette/**Auswahl** `S` mit Copy/Cut/Paste rechteckiger Tile-
+Regionen via Strg+C/X/V, `get_region`/`stamp_region`/`clear_region` im Modell),
+mehrere Layer (Sichtbarkeit/Sortierung/umbenennen),
 Per-Tile-Properties (`solid`/`damage`/...), Undo/Redo. **Object-Layer** (`+◇`):
 Spawn-Punkte/Trigger/Zonen als Objekte mit Name/Typ/Properties (Klick = Punkt,
 Ziehen = Rechteck, Doppelklick = bearbeiten, Entf/Rechtsklick = löschen) — der

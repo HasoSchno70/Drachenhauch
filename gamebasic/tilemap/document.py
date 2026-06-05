@@ -256,6 +256,39 @@ class TileMapDoc:
         self.width, self.height = width, height
         self.dirty = True
 
+    # ------------------------------------------------------ Regionen (Select)
+    def get_region(self, layer_idx: int, x0: int, y0: int,
+                   w: int, h: int) -> list[list[int]]:
+        """2D-Block (h Zeilen x w Spalten) von GIDs ab (x0,y0). Out-of-bounds
+        liefert 0 (TileLayer.get clamped)."""
+        layer = self.layers[layer_idx]
+        if not isinstance(layer, TileLayer):
+            return []
+        return [[layer.get(x0 + dx, y0 + dy) for dx in range(w)]
+                for dy in range(h)]
+
+    def stamp_region(self, layer_idx: int, x0: int, y0: int,
+                     block: list[list[int]]) -> bool:
+        """Stempelt einen 2D-GID-Block ab (x0,y0). Out-of-bounds-Zellen
+        werden ignoriert. Liefert True, wenn sich etwas geaendert hat."""
+        layer = self.layers[layer_idx]
+        if not isinstance(layer, TileLayer):
+            return False
+        changed = False
+        for dy, row in enumerate(block):
+            for dx, gid in enumerate(row):
+                if layer.set(x0 + dx, y0 + dy, int(gid)):
+                    changed = True
+        if changed:
+            self.dirty = True
+        return changed
+
+    def clear_region(self, layer_idx: int, x0: int, y0: int,
+                     w: int, h: int) -> bool:
+        """Setzt eine Region auf 0 (leer). Liefert True bei Aenderung."""
+        return self.stamp_region(layer_idx, x0, y0,
+                                 [[0] * w for _ in range(h)])
+
     # ------------------------------------------------------ Flood-Fill
     def flood_fill(self, layer_idx: int, x: int, y: int, gid: int) -> int:
         """Bucket-Fill der 4-verbundenen Region. Liefert Anzahl Tiles."""

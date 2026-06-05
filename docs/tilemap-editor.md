@@ -18,7 +18,8 @@ Aus dem **Code-Editor**: Toolbar-Button (Gitter-Symbol) oder
   Spalten/Tile-Anzahl ergeben sich aus Bildgröße ÷ Tile-Größe. Links erscheint
   die **Palette**: ein Tile anklicken wählt es zum Malen.
 - **Werkzeuge:** Stift (`B`), Radierer (`E`), Füllen/Bucket (`G`), Rechteck
-  (`R`), Pipette (`I`). **Rechtsklick** löscht immer (egal welches Werkzeug).
+  (`R`), Pipette (`I`), **Auswahl (`S`)**. **Rechtsklick** löscht immer (egal welches Werkzeug).
+- **Auswahl-Werkzeug (`S`):** Ziehe ein Rechteck über die Tiles (gestrichelter Rahmen). Dann **`Strg+C`** kopiert die Region, **`Strg+X`** schneidet sie aus (kopieren + leeren), **`Strg+V`** stempelt das Clipboard mit der oberen-linken Ecke an der aktuellen Maus-Zelle (bzw. am Auswahl-Ursprung), **`Entf`** leert die Auswahl. Alles ist undobar. Praktisch zum Duplizieren von Map-Bereichen (Räume, Plattform-Muster).
 - **Layer** (rechts, oben = vorne): `+` Tile-Layer, **`+◇` Object-Layer**, `−`
   löschen, `▲`/`▼` sortieren, Häkchen = Sichtbarkeit, Doppelklick = umbenennen.
   Die aktive Layer wird beim Malen verändert; die anderen werden (optional)
