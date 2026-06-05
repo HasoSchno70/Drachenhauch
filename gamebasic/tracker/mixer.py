@@ -58,14 +58,15 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800) -> np.ndarray:
     for c in range(CHANNELS):
         inst = song.instrument_for_channel(c)
         evs = events[c]
-        for k, (start_row, midi, volc, _slidec) in enumerate(evs):
+        for k, (start_row, midi, volc, slidec) in enumerate(evs):
             end_row = evs[k + 1][0] if k + 1 < len(evs) else total_rows
             n = (end_row - start_row) * row_samples
             if n <= 0:
                 continue
             # Sample/Loop darf bis zum Tail nachklingen.
             n_render = n + tail if k + 1 >= len(evs) else n
-            note = inst.render_note(midi, n_render, sr)
+            # Slide gilt nur fuer Synth (render_note ignoriert ihn sonst).
+            note = inst.render_note(midi, n_render, sr, slide=(slidec or 0))
             amp = (vol_to_pct(volc) / 100.0) if volc else (inst.default_vol / 15.0)
             start = start_row * row_samples
             seg = note[:max(0, mix.size - start)]

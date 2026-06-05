@@ -255,6 +255,53 @@ def test_keymap_dict_roundtrip():
     assert inst2.env_attack_ms == 5
 
 
+# --- Synth-Presets / Klangformung --------------------------------
+
+def test_factory_instruments_list():
+    from gamebasic.tracker.presets import factory_instruments, preset_names
+    insts = factory_instruments()
+    assert len(insts) == len(preset_names())
+    names = [i.name for i in insts]
+    assert "Fluegel (Piano)" in names and "Orgel" in names and "Kick" in names
+    assert all(i.kind == "synth" for i in insts)
+
+
+def test_preset_has_envelope_shaping():
+    from gamebasic.tracker.presets import factory_instruments
+    piano = next(i for i in factory_instruments() if i.name.startswith("Fluegel"))
+    # Piano dekayt (sustain 0) -> Ende leiser als Anfang
+    out = piano.render_note(60, 44100)
+    assert np.max(np.abs(out[:2000])) > np.max(np.abs(out[-2000:]))
+
+
+def test_organ_sustains():
+    from gamebasic.tracker.presets import factory_instruments
+    organ = next(i for i in factory_instruments() if i.name == "Orgel")
+    out = organ.render_note(60, 44100)
+    # Orgel haelt -> Mitte etwa so laut wie frueh
+    assert np.max(np.abs(out[20000:21000])) > 0.3
+
+
+def test_synth_slide_in_render():
+    inst = Instrument.synth("L", "saw")
+    base = inst.render_note(60, 8192)
+    slid = inst.render_note(60, 44100, slide=12)   # eine Oktave hoch ueber n
+    # Mit Slide steigt die Frequenz -> spaeterer Abschnitt hat hoehere Peak-Hz
+    def peak(seg):
+        return np.argmax(np.abs(np.fft.rfft(seg))) * 44100 / len(seg)
+    assert peak(slid[35000:43192]) > peak(slid[:8192]) + 30
+
+
+def test_synth_detune_vib_roundtrip():
+    inst = Instrument.synth("Pad", "saw")
+    inst.env_attack_ms = 100; inst.env_sustain = 0.8
+    inst.vib_depth = 0.05; inst.vib_speed = 5; inst.detune_cents = 14
+    inst2 = Instrument.from_dict(inst.to_dict())
+    assert inst2.waveform == "saw" and inst2.env_attack_ms == 100
+    assert abs(inst2.vib_depth - 0.05) < 1e-6 and inst2.vib_speed == 5
+    assert abs(inst2.detune_cents - 14) < 1e-6
+
+
 def test_loop_env_dict_roundtrip():
     inst = Instrument.from_array("S", _sine(220, 0.05), 44100, 60)
     inst.loop_mode = "pingpong"; inst.loop_start = 50; inst.loop_end = 900

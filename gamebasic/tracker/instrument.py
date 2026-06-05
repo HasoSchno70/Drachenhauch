@@ -143,6 +143,11 @@ class Instrument:
     env_decay_ms: int = 0
     env_sustain: float = 1.0        # 0..1 Pegel nach dem Decay
     env_release_ms: int = 0
+    # Synth-Klangformung (kind == "synth"): Vibrato + Detune-Layer machen die
+    # Wellenform "lebendiger" -> Instrument-Presets klingen unterschiedlich.
+    vib_depth: float = 0.0          # 0..0.5 Vibrato-Tiefe
+    vib_speed: float = 0.0          # Hz
+    detune_cents: float = 0.0       # zweite, leicht verstimmte Schicht (Chorus)
     # Keymap (kind == "keymap"): Samples ueber Tasten-Zonen verteilt
     # (Multisample / Drumkit). ADSR oben gilt fuer alle Zonen.
     zones: list = field(default_factory=list, repr=False)
@@ -194,11 +199,11 @@ class Instrument:
         return min(self.zones, key=lambda z: z.distance(midi))
 
     def render_note(self, midi: int, n_samples: int,
-                    sr: int = SAMPLE_RATE) -> np.ndarray:
+                    sr: int = SAMPLE_RATE, slide: int = 0) -> np.ndarray:
         """Liefert ein Mono-Float-Array [-1, 1] der Note `midi`, `n_samples`
-        lang. Synth: Wellenform; Sample: resampelt das Quell-Audio (mit Loop);
-        Keymap: waehlt die Tasten-Zone und resampelt deren Sample. ADSR +
-        Anti-Click werden in allen Faellen angewandt."""
+        lang. Synth: Wellenform (mit optionalem Pitch-Slide in Halbtoenen);
+        Sample: resampelt das Quell-Audio (mit Loop); Keymap: waehlt die
+        Tasten-Zone und resampelt deren Sample. ADSR + Anti-Click immer."""
         n_samples = max(0, int(n_samples))
         if self.is_keymap():
             z = self.zone_for(midi)
@@ -211,7 +216,7 @@ class Instrument:
                                 midi, n_samples, sr,
                                 lm, int(z.loop_start), int(z.loop_end))
         elif not self.is_sample():
-            out = _render_synth(self.waveform, midi, n_samples, sr)
+            out = _render_synth(self, midi, n_samples, sr, slide)
         else:
             lm = self.loop_mode if self.has_loop() else "none"
             out = _resample(self.samples, self.sample_rate, self.base_note,
@@ -264,6 +269,10 @@ class Instrument:
             d.update(self._env_dict())
         else:
             d["waveform"] = self.waveform
+            d.update(self._env_dict())       # ADSR fuer Synth-Presets
+            d["vib_depth"] = float(self.vib_depth)
+            d["vib_speed"] = float(self.vib_speed)
+            d["detune_cents"] = float(self.detune_cents)
         return d
 
     @classmethod
@@ -287,24 +296,48 @@ class Instrument:
             return inst
         inst = cls.synth(name, str(d.get("waveform", "square")))
         inst.default_vol = dv
+        inst._apply_env_from_dict(d)
+        inst.vib_depth = float(d.get("vib_depth", 0.0))
+        inst.vib_speed = float(d.get("vib_speed", 0.0))
+        inst.detune_cents = float(d.get("detune_cents", 0.0))
         return inst
 
 
-def _render_synth(waveform: str, midi: int, n_samples: int, sr: int) -> np.ndarray:
-    """Synth-Note ueber den geteilten Synth (kleine ADSR gegen Klicks)."""
+def _fit(out: np.ndarray, n: int) -> np.ndarray:
+    out = np.asarray(out, dtype=np.float32).reshape(-1)
+    if out.size >= n:
+        return out[:n]
+    return np.concatenate([out, np.zeros(n - out.size, np.float32)])
+
+
+def _render_synth(inst, midi: int, n_samples: int, sr: int,
+                  slide: int = 0) -> np.ndarray:
+    """Flacher Synth-Ton der Laenge n (Wellenform + Vibrato + optionaler
+    Detune-Schicht + Pitch-Slide). Die musikalische Lautstaerke-Form kommt
+    aus der Instrument-ADSR (`_apply_envelope`)."""
     if n_samples <= 0:
         return np.zeros(0, dtype=np.float32)
     from ..synth import synthesize
+    wf = inst.waveform
+    vd = float(getattr(inst, "vib_depth", 0.0))
+    vs = float(getattr(inst, "vib_speed", 0.0))
+    detune = float(getattr(inst, "detune_cents", 0.0))
     total_ms = max(1, int(round(n_samples / sr * 1000.0)))
-    atk = min(4, total_ms)
-    dec = min(8, max(0, total_ms - atk))
-    sus = max(0, total_ms - atk - dec)
-    wave_arr = synthesize(waveform, midi_to_freq(midi), 0.0,
-                          atk, sus, dec, sr=sr)
-    out = np.asarray(wave_arr, dtype=np.float32).reshape(-1)
-    if out.size >= n_samples:
-        return out[:n_samples]
-    return np.concatenate([out, np.zeros(n_samples - out.size, np.float32)])
+    freq = midi_to_freq(midi)
+    slide_hz = 0.0
+    if slide:
+        target = freq * (2.0 ** (slide / 12.0))
+        slide_hz = (target - freq) / max(1e-4, n_samples / sr)
+    # sustain=total -> flacher Ton ohne eigene Huellkurve (atk=dec=0)
+    out = _fit(synthesize(wf, freq, slide_hz, 0, total_ms, 0, vd, vs, sr=sr),
+               n_samples)
+    if detune > 0 and wf != "noise":
+        f2 = freq * (2.0 ** (detune / 1200.0))
+        s2 = slide_hz * (f2 / freq) if slide_hz else 0.0
+        out2 = _fit(synthesize(wf, f2, s2, 0, total_ms, 0, vd, vs, sr=sr),
+                    n_samples)
+        out = (0.5 * (out + out2)).astype(np.float32)
+    return out
 
 
 def _resample(samples: np.ndarray, src_sr: int, base_note: int,
