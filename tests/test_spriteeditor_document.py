@@ -294,6 +294,75 @@ def test_save_sheet_atlas_relative_image_path(tmp_path):
     assert "\\" not in data["image"]
 
 
+def test_save_sheet_atlas_uses_frame_names(tmp_path):
+    """Frames mit eigenem Namen liefern diesen als Sprite-ID, unbenannte
+    fallen auf <prefix>_<idx> zurueck."""
+    import json as _json
+    d = SpriteDoc(16, 16)
+    d.add_frame()
+    d.add_frame()        # 3 Frames
+    d.frames[0].name = "idle"
+    d.frames[2].name = "jump"
+    png = tmp_path / "hero.png"
+    j   = tmp_path / "hero.json"
+    d.save_sheet_atlas(png, j)
+    data = _json.loads(j.read_text(encoding="utf-8"))
+    assert set(data["sprites"].keys()) == {"idle", "hero_1", "jump"}
+    assert data["sprites"]["idle"] == [0, 0, 16, 16]
+    assert data["sprites"]["jump"] == [32, 0, 16, 16]
+
+
+def test_save_sheet_atlas_duplicate_names_disambiguated(tmp_path):
+    """Doppelte Frame-Namen werden nicht ueberschrieben, sondern eindeutig
+    gemacht (sonst gingen Frames im Manifest verloren)."""
+    import json as _json
+    d = SpriteDoc(8, 8)
+    d.add_frame()
+    d.frames[0].name = "dup"
+    d.frames[1].name = "dup"
+    png = tmp_path / "d.png"
+    j   = tmp_path / "d.json"
+    d.save_sheet_atlas(png, j)
+    data = _json.loads(j.read_text(encoding="utf-8"))
+    assert len(data["sprites"]) == 2     # beide Frames vertreten
+    assert "dup" in data["sprites"]
+    assert "dup_1" in data["sprites"]
+
+
+def test_native_roundtrip_preserves_frame_name(tmp_path):
+    """name-Feld ueberlebt save_native -> load_native (Version 3)."""
+    d = SpriteDoc(8, 8)
+    d.add_frame()
+    d.frames[0].name = "walk"
+    target = tmp_path / "named.gbsprite"
+    d.save_native(target)
+    loaded = SpriteDoc.load_native(target)
+    assert loaded.frames[0].name == "walk"
+    assert loaded.frames[1].name == ""
+
+
+def test_load_native_version2_defaults_empty_name(tmp_path):
+    """Aeltere Version-2-Dateien ohne name-Feld laden mit name=''."""
+    import json as _json
+    import base64 as _b64
+    buf = io.BytesIO()
+    Image.new("RGBA", (4, 4), (0, 0, 0, 0)).save(buf, format="PNG")
+    legacy = {
+        "version": 2,
+        "width": 4,
+        "height": 4,
+        "frames": [{
+            "data": _b64.b64encode(buf.getvalue()).decode("ascii"),
+            "duration_ms": 100,
+        }],
+    }
+    target = tmp_path / "legacy.gbsprite"
+    target.write_text(_json.dumps(legacy), encoding="utf-8")
+    loaded = SpriteDoc.load_native(target)
+    assert loaded.frames[0].name == ""
+    assert loaded.frames[0].duration_ms == 100
+
+
 def test_load_image_single_frame(tmp_path):
     img = Image.new("RGBA", (8, 8), (0, 0, 0, 255))
     img.putpixel((3, 3), (255, 0, 0, 255))

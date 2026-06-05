@@ -1553,10 +1553,13 @@ Farbe-Ersetzen, Flip/Rotate.
 - `save_animated_gif(path, fps, loop)` — GIF mit Transparenz
 - `save_sheet_atlas(png_path, json_path, name_prefix, layout)` — **PNG + JSON-Manifest** im Format, das `ATLAS_LOAD(...)` direkt versteht (siehe Sprite-Atlas-Section). Closed-Loop-Workflow: Editor schreibt, Engine liest.
 
-**Atlas-Export-Detail:** Sprite-Namen sind `<png_basename>_<idx>` (z.B. PNG `tiles.png`
-→ Sprites `tiles_0`, `tiles_1`, ...). Wer eigene Namen will, editiert die JSON
-nach dem Export — oder zukuenftig: per-Frame-Name im Editor (noch nicht
-implementiert, `Frame`-Class hat kein `name`-Feld).
+**Atlas-Export-Detail:** Sprite-Namen sind standardmaessig `<png_basename>_<idx>`
+(z.B. PNG `tiles.png` → Sprites `tiles_0`, `tiles_1`, ...). **Per-Frame-Namen:**
+`Frame` hat ein `name`-Feld (Rechtsklick → „Umbenennen..." in der Frame-Liste);
+benannte Frames nutzen ihren Namen direkt als Sprite-ID im Atlas, doppelte Namen
+werden beim Export per `_<idx>`-Suffix eindeutig gemacht. Der Name persistiert in
+`.gbsprite` (Format-Version 3, abwaerts-kompatibel — aeltere Dateien laden mit
+leerem Namen).
 
 **Tests:** `tests/test_spriteeditor_document.py` (Datenmodell, alle Export-Pfade,
 inkl. Atlas-Roundtrip durch `ATLAS_LOAD`), `tests/test_spriteeditor_tools.py` (Pixel-Ops,

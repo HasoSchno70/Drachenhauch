@@ -30,6 +30,7 @@ DEFAULT_FRAME_DURATION_MS = 125   # entspricht 8 fps -- typischer Sprite-Animati
 class Frame:
     pixels: Image.Image
     duration_ms: int = DEFAULT_FRAME_DURATION_MS
+    name: str = ""           # optionaler Name -> Sprite-ID im Atlas-Export
     history: deque = field(default_factory=lambda: deque(maxlen=80))
     redo_stack: list = field(default_factory=list)
 
@@ -114,7 +115,7 @@ class SpriteDoc:
 
     def save_native(self, path: Path):
         data = {
-            "version": 2,    # Version 2: pro Frame ein duration_ms-Feld
+            "version": 3,    # Version 3: pro Frame optional ein name-Feld
             "width": self.width,
             "height": self.height,
             "frames": [],
@@ -122,10 +123,13 @@ class SpriteDoc:
         for f in self.frames:
             buf = io.BytesIO()
             f.pixels.save(buf, format="PNG")
-            data["frames"].append({
+            fd = {
                 "data": base64.b64encode(buf.getvalue()).decode("ascii"),
                 "duration_ms": int(f.duration_ms),
-            })
+            }
+            if f.name:
+                fd["name"] = f.name
+            data["frames"].append(fd)
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         self.filepath = path
         self.dirty = False
@@ -138,9 +142,11 @@ class SpriteDoc:
         for fd in data["frames"]:
             raw = base64.b64decode(fd["data"])
             img = Image.open(io.BytesIO(raw)).convert("RGBA")
-            # Backward-compat: Version-1-Dateien hatten kein duration_ms
+            # Backward-compat: Version-1-Dateien hatten kein duration_ms,
+            # Version-1/2 hatten kein name-Feld
             duration_ms = int(fd.get("duration_ms", DEFAULT_FRAME_DURATION_MS))
-            doc.frames.append(Frame(pixels=img, duration_ms=duration_ms))
+            name = str(fd.get("name", ""))
+            doc.frames.append(Frame(pixels=img, duration_ms=duration_ms, name=name))
         if not doc.frames:
             doc.frames = [doc._blank_frame()]
         doc.current_index = 0
@@ -228,7 +234,8 @@ class SpriteDoc:
           relativ zum JSON-Verzeichnis gesetzt -- ATLAS_LOAD wertet das so
           aus, also liegen PNG und JSON idealerweise im selben Verzeichnis.
         - ``name_prefix``: Praefix fuer Sprite-Namen. Wenn None, wird der
-          PNG-Basename (ohne Endung) verwendet.
+          PNG-Basename (ohne Endung) verwendet. Frames mit eigenem ``name``
+          nutzen diesen statt ``<prefix>_<idx>`` als Sprite-ID.
         - ``layout``: ``"horizontal"`` (Default) oder ``"vertical"``.
 
         Liefert das geschriebene Manifest-Dict (fuer Tests/Logging).
@@ -244,7 +251,15 @@ class SpriteDoc:
                 rect = [0, i * self.height, self.width, self.height]
             else:
                 rect = [i * self.width, 0, self.width, self.height]
-            sprites[f"{name_prefix}_{i}"] = rect
+            # Benanntes Frame -> eigener Name; sonst <prefix>_<idx>.
+            key = (f.name or "").strip()
+            if not key:
+                key = f"{name_prefix}_{i}"
+            # Kollisionen (doppelte Namen / Ueberlapp mit <prefix>_<idx>)
+            # eindeutig machen, sonst ueberschreibt der spaetere Eintrag.
+            if key in sprites:
+                key = f"{key}_{i}"
+            sprites[key] = rect
         # image-Pfad ist relativ zum JSON -- nimm den png-Dateinamen wenn
         # beide im selben Verzeichnis liegen, sonst relativen Pfad.
         try:

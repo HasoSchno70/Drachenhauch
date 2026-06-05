@@ -1356,7 +1356,8 @@ class FramesPanel(QWidget):
         self.list_widget.clear()
         for i, frame in enumerate(self.app.doc.frames):
             icon = self._make_thumb_icon(frame.pixels)
-            item = QListWidgetItem(icon, f"#{i:02d}")
+            label = f"#{i:02d}  {frame.name}" if frame.name else f"#{i:02d}"
+            item = QListWidgetItem(icon, label)
             item.setData(Qt.UserRole, i)
             self.list_widget.addItem(item)
         self.list_widget.setCurrentRow(self.app.doc.current_index)
@@ -1399,11 +1400,12 @@ class FramesPanel(QWidget):
             new_cur = cur
         self.app.doc.current_index = new_cur
         self.app.doc.dirty = True
-        # Item-Texte (#00, #01...) neu nummerieren
+        # Item-Texte (#00, #01...) neu nummerieren -- Namen mitfuehren
         for i in range(self.list_widget.count()):
             it = self.list_widget.item(i)
             if it is not None:
-                it.setText(f"#{i:02d}")
+                nm = frames[i].name if i < len(frames) else ""
+                it.setText(f"#{i:02d}  {nm}" if nm else f"#{i:02d}")
         # Currently selected row syncen ohne erneut _on_list_select zu
         # triggern (sonst doppelter action_frame_select-Call).
         self.list_widget.blockSignals(True)
@@ -1423,6 +1425,10 @@ class FramesPanel(QWidget):
         jump.triggered.connect(lambda: self.app.action_frame_select(idx))
         menu.addAction(jump)
         menu.addSeparator()
+
+        rename = QAction("Umbenennen...", self)
+        rename.triggered.connect(lambda: self._rename_at(idx))
+        menu.addAction(rename)
 
         dup = QAction("Frame duplizieren", self)
         dup.triggered.connect(lambda: self._dup_at(idx))
@@ -1455,6 +1461,20 @@ class FramesPanel(QWidget):
         menu.addAction(del_act)
 
         menu.exec(self.list_widget.viewport().mapToGlobal(pos))
+
+    def _rename_at(self, idx: int):
+        """Setzt/loescht den Namen eines Frames -> wird im Atlas-Export als
+        Sprite-ID genutzt (statt <prefix>_<idx>)."""
+        cur = self.app.doc.frames[idx].name
+        val, ok = QInputDialog.getText(
+            self, "Frame umbenennen",
+            f"Frame {idx} -- Name (leer = nummeriert):", text=cur)
+        if not ok:
+            return
+        self.app.doc.frames[idx].name = val.strip()
+        self.app.doc.dirty = True
+        self.refresh()
+        self.app.update_status()
 
     def _set_duration_at(self, idx: int):
         cur = self.app.doc.frames[idx].duration_ms

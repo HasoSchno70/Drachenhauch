@@ -63,7 +63,9 @@ SPRITE_PLAY(sp, "idle")
 
 ### Sprite-Atlas (`Ctrl+Shift+E`) — neu
 
-Schreibt **PNG + JSON-Manifest** gemeinsam. Das JSON beschreibt jedes Frame mit Namen + Rect. Sprite-Namen sind `<dateiname>_<index>` (also bei `tiles.png`: `tiles_0`, `tiles_1`, ...).
+Schreibt **PNG + JSON-Manifest** gemeinsam. Das JSON beschreibt jedes Frame mit Namen + Rect. Sprite-Namen sind standardmaessig `<dateiname>_<index>` (also bei `tiles.png`: `tiles_0`, `tiles_1`, ...).
+
+**Frame-Namen:** Rechtsklick auf ein Frame in der Frame-Liste → **Umbenennen...** vergibt einen eigenen Namen. Benannte Frames nutzen diesen Namen direkt als Sprite-ID im Atlas (statt `<dateiname>_<index>`) — `ATLAS_DRAW(atlas, "idle", x, y)` statt `"hero_0"`. Doppelte Namen werden beim Export eindeutig gemacht (Suffix `_<index>`). Der Name wird in `.gbsprite`-Dateien mitgespeichert (Format-Version 3; aeltere Dateien laden mit leerem Namen).
 
 In GameBasic dann:
 
