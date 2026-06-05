@@ -309,3 +309,18 @@ def test_example_tw_eq_gbrt(name):
     tw = _tw(source, base=path.parent).replace("\r\n", "\n")
     nv = _gbrt(source, base=path.parent, cwd=path.parent)
     assert tw == nv, f"TW != gbrt fuer Beispiel '{name}'"
+
+
+# --- Uhr-Builtins (TIME$/DATE$): kein Exakt-Vergleich (Wert variiert), aber
+#     beide Pfade muessen dasselbe FORMAT liefern (HH:MM:SS / YYYY-MM-DD). -----
+
+def test_time_date_format_tw_and_gbrt():
+    import re
+    src = 'PRINT TIME$()\nPRINT DATE$()\n'
+    time_re = re.compile(r"^\d{2}:\d{2}:\d{2}$")
+    date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    for label, out in (("TW", _tw(src)), ("gbrt", _gbrt(src))):
+        lines = out.replace("\r\n", "\n").strip().split("\n")
+        assert len(lines) == 2, f"{label}: erwartet 2 Zeilen, erhalten {lines!r}"
+        assert time_re.match(lines[0]), f"{label}: TIME$ Format falsch: {lines[0]!r}"
+        assert date_re.match(lines[1]), f"{label}: DATE$ Format falsch: {lines[1]!r}"

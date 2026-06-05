@@ -25,8 +25,10 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `preprocess.rs:47`), aber `PHYSICS_BROAD_NEW()` crasht zur Laufzeit.
       → Uniform-Grid-Broadphase in Rust (Pendant zu `modules/physics.py`) oder
       external type entfernen (Fail beim Kompilieren statt still zur Laufzeit).
-- [ ] **`TIME$`/`DATE$` nativ** (fehlen in gbrt → Crash im Export; ungetestet,
-      da Parity Uhr-Programme skippt).
+- [x] **`TIME$`/`DATE$` nativ** — in `builtins.rs` (`local_datetime()`: Windows
+      `GetLocalTime`, sonst UTC-Fallback via civil-from-days). Format-Test in
+      `test_gbrt_parity.py::test_time_date_format_tw_and_gbrt` (kein Exakt-
+      Vergleich, da Wert variiert).
 - [ ] **`DRAWTILEMAP` nativ** (fehlt in gbrt — CLAUDE.md behauptet fälschlich es
       rendere nativ; korrigieren).
 - [ ] **`INKEY$`/`WAITKEY`/`SCROLL` + Core-`JOYSTICK_*` nativ** (oder sauber als

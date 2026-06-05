@@ -37,6 +37,50 @@ fn next_rand() -> u64 {
     })
 }
 
+/// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde).
+/// Pendant zu Pythons `time.strftime` (LOKALzeit) fuer TIME$/DATE$. Auf Windows
+/// liefert `GetLocalTime` die Felder direkt (inkl. Zeitzone); sonst Fallback auf
+/// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert ->
+/// Parity-Tests behandeln TIME$/DATE$ ohnehin als "erwartet unterschiedlich".
+#[cfg(windows)]
+fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
+    #[repr(C)]
+    struct SystemTimeW {
+        w_year: u16, w_month: u16, w_day_of_week: u16, w_day: u16,
+        w_hour: u16, w_minute: u16, w_second: u16, w_milliseconds: u16,
+    }
+    extern "system" {
+        fn GetLocalTime(lp_system_time: *mut SystemTimeW);
+    }
+    unsafe {
+        let mut st: SystemTimeW = std::mem::zeroed();
+        GetLocalTime(&mut st);
+        (st.w_year as i64, st.w_month as i64, st.w_day as i64,
+         st.w_hour as i64, st.w_minute as i64, st.w_second as i64)
+    }
+}
+
+#[cfg(not(windows))]
+fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let days = secs.div_euclid(86_400);
+    let rem = secs.rem_euclid(86_400);
+    let (h, mi, s) = (rem / 3600, (rem % 3600) / 60, rem % 60);
+    // Howard Hinnant's civil_from_days (UTC).
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let mo = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if mo <= 2 { y + 1 } else { y };
+    (y, mo, d, h, mi, s)
+}
+
 fn need_str<'a>(v: &'a Value, fn_: &str) -> Result<&'a str, String> {
     match v {
         Value::Str(s) => Ok(s),
@@ -389,6 +433,16 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             use std::time::Instant;
             static TIMER_START: OnceLock<Instant> = OnceLock::new();
             Ok(Value::Float(TIMER_START.get_or_init(Instant::now).elapsed().as_secs_f64()))
+        }
+        "time$" | "time" => {
+            arity!(0);
+            let (_, _, _, h, mi, s) = local_datetime();
+            Ok(Value::str_rc(&format!("{:02}:{:02}:{:02}", h, mi, s)))
+        }
+        "date$" | "date" => {
+            arity!(0);
+            let (y, mo, d, _, _, _) = local_datetime();
+            Ok(Value::str_rc(&format!("{:04}-{:02}-{:02}", y, mo, d)))
         }
         "range" => {
             for v in a {
