@@ -2715,6 +2715,36 @@ impl<'p> Vm<'p> {
                 let fh = gb(a, 3); let fv = gb(a, 4);
                 g!().draw_image_flipped(idx, gi(a,1,"DRAWIMAGEFLIPPED")? as i32, gi(a,2,"DRAWIMAGEFLIPPED")? as i32, fh, fv)?; Value::Nil
             }
+            "drawtilemap" => {
+                if a.len() != 6 { return Err(format!("DRAWTILEMAP: erwartet 6 Argument(e), erhalten {}", a.len())); }
+                let idx = gi(a, 0, "DRAWTILEMAP")?;
+                let (vals, rows, cols) = match &a[1] {
+                    Value::Array(arr) => {
+                        let arr = arr.borrow();
+                        if arr.element_type != "integer" {
+                            return Err("DRAWTILEMAP: map muss ARRAY OF INTEGER sein".into());
+                        }
+                        if arr.dims.len() != 2 {
+                            return Err("DRAWTILEMAP: map muss 2D sein (zeilen x spalten)".into());
+                        }
+                        let mut v = Vec::with_capacity(arr.values.len());
+                        for x in &arr.values {
+                            match x {
+                                Value::Int(n) => v.push(*n),
+                                _ => return Err("DRAWTILEMAP: map muss ARRAY OF INTEGER sein".into()),
+                            }
+                        }
+                        (v, arr.dims[0] as i32, arr.dims[1] as i32)
+                    }
+                    _ => return Err("DRAWTILEMAP: map muss ARRAY OF INTEGER sein".into()),
+                };
+                let tw = gi(a, 2, "DRAWTILEMAP")? as i32;
+                let th = gi(a, 3, "DRAWTILEMAP")? as i32;
+                let sx = gi(a, 4, "DRAWTILEMAP")? as i32;
+                let sy = gi(a, 5, "DRAWTILEMAP")? as i32;
+                g!().draw_tilemap(idx, &vals, rows, cols, tw, th, sx, sy)?;
+                Value::Nil
+            }
             "load_assets" => Value::Int(g!().load_assets(gs(a,0,"LOAD_ASSETS")?)?),
 
             // --- Z-Layer ---

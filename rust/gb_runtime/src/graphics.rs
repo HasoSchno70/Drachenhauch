@@ -1661,6 +1661,31 @@ impl Graphics {
         self.emit(Cmd::TextureFlipped(i, x, y, fh, fv));
         Ok(())
     }
+    /// Zeichnet eine 2D-Tilemap (flache row-major `values`; Tile < 0 =
+    /// transparent). Tileset wird als gerasterter Strip interpretiert
+    /// (tiles_per_row = tileset_breite / tw). Jedes Tile geht durch
+    /// `draw_image_part`, d.h. Camera (Translation + Zoom) wirkt korrekt --
+    /// identisch zum Tree-Walker-Pfad.
+    pub fn draw_tilemap(&mut self, idx: i64, values: &[i64], rows: i32, cols: i32,
+                        tw: i32, th: i32, sx: i32, sy: i32) -> Result<(), String> {
+        let i = idx as usize;
+        if i >= self.textures.len() { return Err("DRAWTILEMAP: ungueltiges IMAGE-Handle".into()); }
+        let tex_w = self.textures[i].tex.width as i32;
+        let tiles_per_row = (tex_w / tw.max(1)).max(1);
+        for r in 0..rows {
+            let base = (r * cols) as usize;
+            for c in 0..cols {
+                let tile = values[base + c as usize];
+                if tile < 0 { continue; }
+                let tile = tile as i32;
+                let sc = tile % tiles_per_row;
+                let sr = tile / tiles_per_row;
+                self.draw_image_part(idx, sc * tw, sr * th, tw, th, sx + c * tw, sy + r * th)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn image_width(&self, idx: i64) -> Result<i64, String> {
         self.textures.get(idx as usize).map(|t| t.tex.width as i64).ok_or_else(|| "IMAGEWIDTH: ungueltiges Handle".into())
     }

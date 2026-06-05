@@ -29,8 +29,10 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `GetLocalTime`, sonst UTC-Fallback via civil-from-days). Format-Test in
       `test_gbrt_parity.py::test_time_date_format_tw_and_gbrt` (kein Exakt-
       Vergleich, da Wert variiert).
-- [ ] **`DRAWTILEMAP` nativ** (fehlt in gbrt — CLAUDE.md behauptet fälschlich es
-      rendere nativ; korrigieren).
+- [x] **`DRAWTILEMAP` nativ** — `graphics.rs::draw_tilemap` (jedes Tile via
+      `draw_image_part`, Camera/Zoom korrekt) + Dispatch in `vm.rs`. Rendert jetzt
+      tatsaechlich nativ (CLAUDE.md-Aussage damit korrekt). Manuell verifiziert
+      (kein stdout fuer Parity).
 - [ ] **`INKEY$`/`WAITKEY`/`SCROLL` + Core-`JOYSTICK_*` nativ** (oder sauber als
       Tree-Walker-only dokumentieren). Gamepad geht nativ nur via `IMPORT
       "input"`.
