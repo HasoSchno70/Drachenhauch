@@ -1,122 +1,59 @@
-"""Tree-Walking-Debugger fuer GameBasic (Editor).
+"""Debugger fuer GameBasic (Editor) -- ueber die native Runtime `gbrt debug`.
 
-Fuehrt das Programm im **Tree-Walker** (Python-Interpreter) in einem Worker-
-Thread aus und installiert einen Debug-Hook (`Interpreter._debug_hook`), der
-vor jedem Statement aufgerufen wird. Der Hook pausiert den Worker an
-Breakpoints bzw. beim Schrittweisen Ausfuehren (Step Over/Into/Out), schickt
-einen Variablen-Snapshot per Qt-Signal an den UI-Thread und blockiert auf
-einem Event, bis der User fortsetzt.
+`DebugController` spawnt `gbrt debug datei.gb` und spricht dessen newline-JSON-
+Protokoll: ein Reader-Thread liest stdout-Events (paused/output/finished/error)
+und uebersetzt sie in Qt-Signale; Steuer-Kommandos (continue/step/stop/
+set-breakpoints) gehen als JSON-Zeilen an stdin. Die Pause-Logik (Breakpoints
+inkl. Bedingungen, Step over/into/out, Variablen-Snapshot) liegt in gbrt
+(vm.rs); hier nur noch das Protokoll <-> Qt-Glue.
 
-Nur Tree-Walker -- die native Runtime `gbrt` hat keinen Debug-Kanal. Am
-besten fuer Konsolen-/Logik-Programme; bei `INPUT` liefert der Debugger EOF
-(kein Hang), Grafik-Programme laufen best effort.
-
-Zeilen-Mapping: der Preprocessor merged IMPORT-Quelldateien -- `origins`
-bildet merged-Zeile -> (datei, original-Zeile) ab. Breakpoints/Highlights
-beziehen sich auf die Editor-Datei (`<editor>`).
+Die oeffentliche API (Signale + Methoden) ist unveraendert, damit main_window
+nicht angefasst werden muss. Zeilen sind quell-relativ; bei `IMPORT "datei.gb"`-
+Inlining koennen Breakpoint-/Pause-Zeilen verschoben sein.
 """
 from __future__ import annotations
 
+import json
+import os
+import re
+import subprocess
+import tempfile
 import threading
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 
 
-_EDITOR_LABEL = "<editor>"
-
-
-class _DebugStop(Exception):
-    """Intern -- bricht den Worker beim Stop sauber ab."""
-
-
-class _EmitWriter:
-    """Datei-artiges stdout-Surrogat: Writes aus dem **Worker-Thread** gehen
-    ans Qt-Signal (Programm-Ausgabe), alle anderen (z.B. UI-Thread-Prints
-    waehrend einer Pause) durch zum echten stdout -- der Redirect ist global,
-    soll aber nur die Programm-Ausgabe abfangen."""
-
-    def __init__(self, signal, passthrough, worker_ident):
-        self._signal = signal
-        self._passthrough = passthrough
-        self._worker_ident = worker_ident
-
-    def write(self, text):
-        if not text:
-            return 0
-        if threading.get_ident() == self._worker_ident:
-            self._signal.emit(text)
-        elif self._passthrough is not None:
-            self._passthrough.write(text)
-        return len(text)
-
-    def flush(self):
-        if self._passthrough is not None and \
-                threading.get_ident() != self._worker_ident:
-            self._passthrough.flush()
-
-
-class _EofReader:
-    """stdin-Ersatz: INPUT bekommt EOF statt zu blockieren."""
-
-    def readline(self, *a):
-        return ""
-
-    def read(self, *a):
-        return ""
-
-
-def _fmt_value(v) -> str:
-    """Kurze, sichere Darstellung eines Variablenwerts fuer das Panel."""
-    try:
-        from ..interpreter import _Instance, _GBArray  # type: ignore
-    except Exception:                                   # pragma: no cover
-        _Instance = _GBArray = ()                       # type: ignore
-    if isinstance(v, bool):
-        return "TRUE" if v else "FALSE"
-    if isinstance(v, str):
-        s = v if len(v) <= 120 else v[:117] + "..."
-        return '"' + s + '"'
-    if v is None:
-        return "NIL"
-    if _Instance and isinstance(v, _Instance):
-        cls = getattr(getattr(v, "cls", None), "name", "?")
-        return f"<{cls}>"
-    try:
-        s = str(v)
-    except Exception:
-        s = f"<{type(v).__name__}>"
-    return s if len(s) <= 200 else s[:197] + "..."
+def _find_gbrt():
+    """Pfad zur gebauten gbrt-Binary (release vor debug) oder None."""
+    root = Path(__file__).resolve().parents[2]
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = root / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
 
 
 class DebugController(QObject):
-    """Steuert eine Debug-Sitzung. Lebt im UI-Thread, fuehrt den Interpreter
-    in einem Worker-Thread aus."""
+    """Steuert eine Debug-Sitzung ueber einen `gbrt debug`-Subprozess.
+    Lebt im UI-Thread; ein Reader-Thread marshalt Events als Qt-Signale."""
 
-    paused = Signal(int, object)   # editor_line (-1 = nicht in Editor-Datei), frames
-    finished = Signal(str)         # Grund: "fertig" / "abgebrochen" / "fehler"
+    paused = Signal(int, object)   # editor_line, frames {locals,globals,depth}
+    finished = Signal(str)         # "fertig" / "abgebrochen" / "fehler"
     output = Signal(str)           # PRINT-Ausgabe
     failed = Signal(str, int)      # Fehlermeldung, editor_line (-1 unbekannt)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._breakpoints: set[int] = set()    # Editor-Zeilen (1-basiert)
-        self._merged_bps: set[int] = set()     # merged-Zeilen
-        # Conditional Breakpoints: Editor-Zeile -> GameBasic-Ausdruck (Quelle);
-        # merged-Zeile -> geparster Ausdruck-AST (oder None bei Parse-Fehler).
-        self._bp_conditions: dict[int, str] = {}
-        self._merged_bp_conditions: dict[int, object] = {}
-        self._in_condition = False             # Re-Entrancy-Guard (Hook)
-        self._origins = None
-        self._base_path = "."                  # Datei-Verzeichnis fuer Asset-Pfade
-        self._mode = "idle"                    # idle | running | paused
-        self._step: str | None = None          # None | over | into | out
-        self._step_depth = 0
-        self._paused_depth = 0
-        self._resume = threading.Event()
-        self._stop = False
-        self._thread: threading.Thread | None = None
-        self._interp = None
-        self._baseline_globals: set = set()
+        self._breakpoints: set[int] = set()
+        self._conditions: dict[int, str] = {}
+        self._proc: subprocess.Popen | None = None
+        self._reader: threading.Thread | None = None
+        self._tmp: str | None = None
+        self._mode = "idle"            # idle | running | paused
+        self._started = False          # erstes (Initial-)paused gesehen?
+        self._got_terminal = False     # finished/error-Event gesehen?
 
     # ----------------------------------------------------- Status
     def is_active(self) -> bool:
@@ -127,233 +64,163 @@ class DebugController(QObject):
 
     def set_breakpoints(self, lines, conditions=None) -> None:
         self._breakpoints = set(int(x) for x in lines)
-        # conditions: dict[editor_line, expr_src]. Nur Eintraege mit aktivem
-        # Breakpoint zaehlen.
         if conditions:
-            self._bp_conditions = {int(ln): str(c)
-                                   for ln, c in conditions.items()
-                                   if int(ln) in self._breakpoints and c}
+            self._conditions = {int(ln): str(c) for ln, c in conditions.items()
+                                if int(ln) in self._breakpoints and c}
         else:
-            self._bp_conditions = {}
-        self._recompute_merged_bps()
+            self._conditions = {}
+        # Laufende Sitzung: Breakpoints live aktualisieren.
+        if self._proc is not None and self._mode != "idle":
+            self._send_breakpoints()
 
     # ----------------------------------------------------- Start
     def start(self, source: str, base_path) -> bool:
-        """Parst die Quelle und startet die Debug-Sitzung. Liefert False bei
-        einem Parse-Fehler (per `failed` gemeldet)."""
-        from pathlib import Path
-        from ..preprocess import process
-        from ..lexer import Lexer
-        from ..parser import Parser
-        from ..interpreter import Interpreter
-        from ..errors import GameBasicError
+        """Startet die Debug-Sitzung (gbrt-Subprozess). Liefert True, wenn der
+        Prozess gestartet wurde; Parse-/Compile-Fehler kommen asynchron via
+        `failed`. False nur, wenn gbrt fehlt/nicht startbar."""
+        gbrt = _find_gbrt()
+        if gbrt is None:
+            self.failed.emit(
+                "Debugger benoetigt die native Runtime gbrt "
+                "(bauen: python rust/build_runtime.py).", -1)
+            return False
+        base = Path(base_path)
+        tmp_dir = str(base) if base.is_dir() else None
+        fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+        os.close(fd)
+        self._tmp = tmp
         try:
-            merged, origins = process(source, Path(base_path), file_label=_EDITOR_LABEL)
-            tokens = Lexer(merged).tokenize()
-            ast = Parser(tokens).parse()
-        except GameBasicError as exc:
-            self.failed.emit(str(exc), getattr(exc, "line", -1) or -1)
-            return False
+            Path(tmp).write_text(source, encoding="utf-8")
+            self._proc = subprocess.Popen(
+                [str(gbrt), "debug", tmp],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, text=True,
+                cwd=str(base) if base.is_dir() else None, bufsize=1)
         except Exception as exc:  # noqa: BLE001
-            self.failed.emit(f"{type(exc).__name__}: {exc}", -1)
+            self._cleanup_tmp()
+            self.failed.emit(f"gbrt-Start: {exc}", -1)
             return False
-
-        self._origins = origins
-        self._base_path = str(base_path)
-        self._recompute_merged_bps()
-        interp = Interpreter()
-        interp._debug_hook = self._hook
-        self._interp = interp
-        # Vorregistrierte Built-in-Konstanten (BLACK, KEY_*, PI, ...) merken,
-        # um sie aus der Globals-Anzeige rauszufiltern -- der User will nur
-        # seine eigenen Globals sehen.
-        self._baseline_globals = set(interp.global_env.vars.keys())
-        self._stop = False
         self._mode = "running"
-        # Mit Breakpoints: bis zum ersten BP laufen. Ohne: am ersten
-        # Statement anhalten (wie "Start & Halt").
-        self._step = None if self._merged_bps else "into"
-        self._thread = threading.Thread(
-            target=self._run, args=(ast,), daemon=True)
-        self._thread.start()
+        self._started = False
+        self._got_terminal = False
+        self._reader = threading.Thread(target=self._read_loop, daemon=True)
+        self._reader.start()
         return True
 
-    def _run(self, ast) -> None:
-        import os
-        import sys
-        from ..errors import GameBasicError
-        old_out, old_in = sys.stdout, sys.stdin
-        sys.stdout = _EmitWriter(self.output, old_out, threading.get_ident())
-        sys.stdin = _EofReader()
-        # Ins Datei-Verzeichnis wechseln (wie gbrun.py), damit relative
-        # Laufzeit-Pfade (LOADIMAGE("assets/...")) im Debugger funktionieren.
-        old_cwd = os.getcwd()
-        try:
-            os.chdir(self._base_path)
-        except OSError:
-            pass
-        reason = "fertig"
-        try:
-            self._interp.run(ast)
-        except _DebugStop:
-            reason = "abgebrochen"
-        except GameBasicError as exc:
-            reason = "fehler"
-            self.failed.emit(str(exc), self._to_editor_line(getattr(exc, "line", 0)))
-        except Exception as exc:  # noqa: BLE001
-            reason = "fehler"
-            self.failed.emit(f"{type(exc).__name__}: {exc}", -1)
-        finally:
-            sys.stdout, sys.stdin = old_out, old_in
-            os.chdir(old_cwd)
+    # ----------------------------------------------------- Protokoll
+    def _send(self, obj: dict) -> None:
+        if self._proc is not None and self._proc.stdin is not None:
+            try:
+                self._proc.stdin.write(json.dumps(obj) + "\n")
+                self._proc.stdin.flush()
+            except (OSError, ValueError):
+                pass
+
+    def _send_breakpoints(self) -> None:
+        self._send({
+            "cmd": "set-breakpoints",
+            "lines": sorted(self._breakpoints),
+            "conditions": {str(ln): c for ln, c in self._conditions.items()},
+        })
+
+    def _read_loop(self) -> None:
+        proc = self._proc
+        assert proc is not None and proc.stdout is not None
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            self._handle_event(ev)
+        proc.wait()
+        # stdout zu, aber kein finished/error gesehen -> Compile-/Parse-Fehler
+        # (gbrt debug bricht vor dem Lauf ab und schreibt nur stderr).
+        if not self._got_terminal:
+            err = ""
+            try:
+                err = (proc.stderr.read() or "").strip() if proc.stderr else ""
+            except Exception:  # noqa: BLE001
+                pass
             self._mode = "idle"
-            self._interp = None
+            if err:
+                self.failed.emit(err, self._err_line(err))
+                self.finished.emit("fehler")
+            else:
+                self.finished.emit("fertig")
+        self._cleanup_tmp()
+
+    def _handle_event(self, ev: dict) -> None:
+        kind = ev.get("event")
+        if kind == "output":
+            self.output.emit(ev.get("text", ""))
+        elif kind == "paused":
+            if not self._started:
+                # Initial-Pause an Zeile 1: Breakpoints setzen; mit Breakpoints
+                # bis zum ersten BP weiterlaufen (nicht an Zeile 1 halten),
+                # ohne: an Zeile 1 anhalten ("Start & Halt").
+                self._started = True
+                self._send_breakpoints()
+                if self._breakpoints:
+                    self._mode = "running"
+                    self._send({"cmd": "continue"})
+                    return
+            self._mode = "paused"
+            self.paused.emit(int(ev.get("line", -1)), self._frames(ev))
+        elif kind == "finished":
+            self._got_terminal = True
+            self._mode = "idle"
+            reason = {"done": "fertig", "stopped": "abgebrochen"}.get(
+                ev.get("reason"), "fertig")
             self.finished.emit(reason)
+        elif kind == "error":
+            self._got_terminal = True
+            self._mode = "idle"
+            self.failed.emit(str(ev.get("message", "")),
+                             int(ev.get("line", -1) or -1))
+            self.finished.emit("fehler")
+        # eval-result/eval-error: vom Editor aktuell ungenutzt.
 
-    # ----------------------------------------------------- Hook (Worker)
-    def _hook(self, line, interp) -> None:
-        if self._stop:
-            raise _DebugStop()
-        # Re-Entrancy: wird die Bedingung selbst ausgewertet und ruft dabei
-        # eine User-Funktion auf, feuert der Hook erneut -> hier ignorieren.
-        if self._in_condition:
-            return
-        depth = interp.call_depth
-        hit_bp = line in self._merged_bps
-        if hit_bp:
-            hit_bp = self._condition_holds(line, interp)
-        pause = (
-            hit_bp
-            or self._step == "into"
-            or (self._step == "over" and depth <= self._step_depth)
-            or (self._step == "out" and depth < self._step_depth)
-        )
-        if not pause:
-            return
-        self._paused_depth = depth
-        frames = self._snapshot(interp)
-        editor_line = self._to_editor_line(line)
-        self._mode = "paused"
-        self._step = None
-        self._resume.clear()
-        self.paused.emit(editor_line, frames)
-        self._resume.wait()
-        if self._stop:
-            raise _DebugStop()
-        self._mode = "running"
+    @staticmethod
+    def _frames(ev: dict) -> dict:
+        def conv(arr):
+            return [(d.get("name", ""), d.get("type", "?"), str(d.get("value", "")))
+                    for d in (arr or [])]
+        return {"locals": conv(ev.get("locals")),
+                "globals": conv(ev.get("globals")),
+                "depth": int(ev.get("depth", 0))}
 
-    def _condition_holds(self, merged_line, interp) -> bool:
-        """Wertet die (optionale) Bedingung des Breakpoints aus. Ohne
-        Bedingung: True. Bei Auswert-Fehler: True (fail-open) + Hinweis in
-        der Programm-Ausgabe."""
-        expr = self._merged_bp_conditions.get(merged_line)
-        if expr is None:
-            return True
-        self._in_condition = True
-        try:
-            val = interp._eval(expr)
-        except Exception as exc:  # noqa: BLE001
-            self.output.emit(
-                f"[Debugger] Breakpoint-Bedingung-Fehler: {exc}\n")
-            return True
-        finally:
-            self._in_condition = False
-        return bool(val)
+    @staticmethod
+    def _err_line(err: str) -> int:
+        m = re.search(r":(\d+):", err)
+        return int(m.group(1)) if m else -1
 
-    def _snapshot(self, interp) -> dict:
-        def collect(env, skip=None):
-            rows = []
-            for name, slot in env.vars.items():
-                if name.startswith("__"):
-                    continue
-                if skip is not None and name in skip:
-                    continue
-                rows.append((name, slot.get("type", "?"),
-                             _fmt_value(slot.get("value"))))
-            return rows
-
-        glob = collect(interp.global_env, skip=self._baseline_globals)
-        locs: list = []
-        env = interp.env
-        while env is not None and env is not interp.global_env:
-            locs.extend(collect(env))
-            env = env.parent
-        return {"locals": locs, "globals": glob, "depth": interp.call_depth}
+    def _cleanup_tmp(self) -> None:
+        if self._tmp:
+            try:
+                os.unlink(self._tmp)
+            except OSError:
+                pass
+            self._tmp = None
 
     # ----------------------------------------------------- Steuerung (UI)
     def cont(self) -> None:
-        self._step = None
-        self._resume.set()
+        self._mode = "running"
+        self._send({"cmd": "continue"})
 
     def step_over(self) -> None:
-        self._step = "over"
-        self._step_depth = self._paused_depth
-        self._resume.set()
+        self._mode = "running"
+        self._send({"cmd": "step-over"})
 
     def step_into(self) -> None:
-        self._step = "into"
-        self._resume.set()
+        self._mode = "running"
+        self._send({"cmd": "step-into"})
 
     def step_out(self) -> None:
-        self._step = "out"
-        self._step_depth = self._paused_depth
-        self._resume.set()
+        self._mode = "running"
+        self._send({"cmd": "step-out"})
 
     def stop(self) -> None:
-        self._stop = True
-        self._resume.set()
-
-    # ----------------------------------------------------- Zeilen-Mapping
-    def _recompute_merged_bps(self) -> None:
-        # Compile-Cache: Quelle -> AST (oder None), damit identische
-        # Bedingungen nicht doppelt geparst werden.
-        compiled: dict[str, object] = {}
-
-        def cond_ast(editor_line):
-            src = self._bp_conditions.get(editor_line)
-            if not src:
-                return None
-            if src not in compiled:
-                compiled[src] = self._compile_condition(src)
-            return compiled[src]
-
-        self._merged_bp_conditions = {}
-        if not self._origins:
-            self._merged_bps = set(self._breakpoints)
-            for ln in self._breakpoints:
-                ast = cond_ast(ln)
-                if ast is not None:
-                    self._merged_bp_conditions[ln] = ast
-            return
-        s = set()
-        for m in range(1, len(self._origins)):
-            o = self._origins[m]
-            if o and o[0] == _EDITOR_LABEL and o[1] in self._breakpoints:
-                s.add(m)
-                ast = cond_ast(o[1])
-                if ast is not None:
-                    self._merged_bp_conditions[m] = ast
-        self._merged_bps = s
-
-    @staticmethod
-    def _compile_condition(src: str):
-        """Parst eine Breakpoint-Bedingung zu einem Ausdrucks-AST.
-        Liefert None bei Parse-Fehler -> der BP haelt dann unbedingt
-        (fail-open: eine kaputte Bedingung darf keinen BP verschlucken)."""
-        from ..lexer import Lexer
-        from ..parser import Parser
-        try:
-            tokens = Lexer(src).tokenize()
-            return Parser(tokens)._expression()
-        except Exception:  # noqa: BLE001
-            return None
-
-    def _to_editor_line(self, merged_line: int) -> int:
-        if not merged_line:
-            return -1
-        if self._origins and 0 < merged_line < len(self._origins):
-            o = self._origins[merged_line]
-            if o and o[0] == _EDITOR_LABEL:
-                return o[1]
-            return -1
-        return merged_line
+        self._send({"cmd": "stop"})

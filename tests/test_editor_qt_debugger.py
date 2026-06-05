@@ -1,113 +1,103 @@
-"""Tests fuer Conditional Breakpoints im Editor-Debugger.
-
-Der Debugger laeuft sonst in einem Worker-Thread mit Qt-Signalen; hier
-testen wir die thread-freie Kernlogik headless: Bedingungs-Parsing,
-merged-Line-Mapping und die Auswertung gegen einen echten Interpreter.
+"""Tests fuer den Editor-Debugger (`DebugController`) -- Stufe B: laeuft jetzt
+ueber einen `gbrt debug`-Subprozess. Getestet end-to-end ueber die Qt-Signale
+(Reader-Thread -> queued signals, via processEvents zugestellt). Skippt ohne
+gbrt bzw. ohne PySide6.
 """
 import os
+import time
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
-from gamebasic.editor_qt.debugger import DebugController, _EDITOR_LABEL
-from gamebasic.interpreter import Interpreter
+pytest.importorskip("PySide6")
+from gamebasic.editor_qt.debugger import DebugController, _find_gbrt
+
+pytestmark = pytest.mark.skipif(_find_gbrt() is None, reason="gbrt nicht gebaut")
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _qapp():
+@pytest.fixture(scope="module")
+def app():
     from PySide6.QtWidgets import QApplication
-    app = QApplication.instance() or QApplication([])
-    yield app
+    return QApplication.instance() or QApplication([])
 
 
-def _interp_with(name, value, typ="int"):
-    interp = Interpreter()
-    interp.global_env.declare(name, typ, value)
-    return interp
+def _pump(app, pred, timeout=10.0):
+    """Qt-Eventloop pumpen, bis pred() True ist (oder Timeout)."""
+    end = time.time() + timeout
+    while time.time() < end:
+        app.processEvents()
+        if pred():
+            return True
+        time.sleep(0.01)
+    app.processEvents()
+    return pred()
 
 
-# --- _compile_condition --------------------------------------------
-
-def test_compile_condition_valid():
-    expr = DebugController._compile_condition("i > 5")
-    assert expr is not None
-
-
-def test_compile_condition_invalid_returns_none():
-    # Kaputter Ausdruck -> None (fail-open: BP haelt dann unbedingt).
-    assert DebugController._compile_condition("i > > 5") is None
+def _controller():
+    dc = DebugController()
+    ev = {"paused": [], "finished": [], "output": [], "failed": []}
+    dc.paused.connect(lambda line, fr: ev["paused"].append((line, fr)))
+    dc.finished.connect(lambda r: ev["finished"].append(r))
+    dc.output.connect(lambda t: ev["output"].append(t))
+    dc.failed.connect(lambda m, l: ev["failed"].append((m, l)))
+    return dc, ev
 
 
-# --- set_breakpoints / merged mapping (ohne origins) ---------------
-
-def test_set_breakpoints_keeps_only_active_conditions():
-    ctrl = DebugController()
-    ctrl.set_breakpoints([3, 5], {3: "i > 5", 9: "nope"})
-    assert ctrl._merged_bps == {3, 5}
-    # Zeile 3 hat aktiven BP + Bedingung -> in merged_bp_conditions
-    assert 3 in ctrl._merged_bp_conditions
-    # Zeile 5 hat BP aber keine Bedingung -> unbedingt
-    assert 5 not in ctrl._merged_bp_conditions
-    # Zeile 9 hat eine "Bedingung" ohne BP -> verworfen
-    assert 9 not in ctrl._merged_bps
-
-
-def test_set_breakpoints_no_conditions():
-    ctrl = DebugController()
-    ctrl.set_breakpoints([2])
-    assert ctrl._merged_bps == {2}
-    assert ctrl._merged_bp_conditions == {}
+def test_breakpoint_pause_globals_and_continue(app, tmp_path):
+    dc, ev = _controller()
+    src = 'DIM x AS INTEGER\nx = 5\nPRINT x\n'
+    dc.set_breakpoints([3])
+    assert dc.start(src, str(tmp_path)) is True
+    assert _pump(app, lambda: ev["paused"]), "kein paused-Event"
+    line, fr = ev["paused"][0]
+    assert line == 3
+    glob = {g[0]: g[2] for g in fr["globals"]}
+    assert glob.get("x") == "5"
+    assert dc.is_paused()
+    dc.cont()
+    assert _pump(app, lambda: ev["finished"]), "kein finished-Event"
+    assert ev["finished"][0] == "fertig"
+    assert "".join(ev["output"]).strip() == "5"
 
 
-# --- merged mapping mit origins ------------------------------------
-
-def test_merged_conditions_with_origins():
-    ctrl = DebugController()
-    # origins[m] = (datei, original-Zeile); Index 0 ungenutzt.
-    ctrl._origins = [None,
-                     (_EDITOR_LABEL, 1),
-                     (_EDITOR_LABEL, 2),
-                     (_EDITOR_LABEL, 3)]
-    ctrl.set_breakpoints([3], {3: "x = 1"})
-    assert ctrl._merged_bps == {3}
-    assert 3 in ctrl._merged_bp_conditions
-
-
-# --- _condition_holds ----------------------------------------------
-
-def test_condition_holds_true():
-    ctrl = DebugController()
-    ctrl._merged_bp_conditions = {3: ctrl._compile_condition("i > 5")}
-    interp = _interp_with("i", 7)
-    assert ctrl._condition_holds(3, interp) is True
+def test_start_and_halt_then_step_into(app, tmp_path):
+    dc, ev = _controller()
+    src = 'DIM x AS INTEGER\nx = 1\nx = 2\n'
+    dc.set_breakpoints([])                 # ohne BP -> an Zeile 1 anhalten
+    assert dc.start(src, str(tmp_path)) is True
+    assert _pump(app, lambda: ev["paused"])
+    assert ev["paused"][0][0] == 1
+    dc.step_into()
+    assert _pump(app, lambda: len(ev["paused"]) >= 2)
+    assert ev["paused"][1][0] == 2
+    dc.stop()
+    assert _pump(app, lambda: ev["finished"])
 
 
-def test_condition_holds_false():
-    ctrl = DebugController()
-    ctrl._merged_bp_conditions = {3: ctrl._compile_condition("i > 5")}
-    interp = _interp_with("i", 2)
-    assert ctrl._condition_holds(3, interp) is False
+def test_compile_error_reports_failed_with_line(app, tmp_path):
+    dc, ev = _controller()
+    src = 'PRINT 1\nBREAK\n'               # BREAK ausserhalb Schleife
+    dc.set_breakpoints([])
+    assert dc.start(src, str(tmp_path)) is True
+    assert _pump(app, lambda: ev["finished"]), "Sitzung endete nicht"
+    assert ev["failed"], "kein failed-Event bei Compile-Fehler"
+    msg, line = ev["failed"][0]
+    assert line == 2 or ":2:" in msg
 
 
-def test_condition_holds_no_condition_is_true():
-    ctrl = DebugController()
-    interp = _interp_with("i", 0)
-    # Keine Bedingung fuer Zeile 4 -> unbedingt halten.
-    assert ctrl._condition_holds(4, interp) is True
-
-
-def test_condition_holds_eval_error_fails_open():
-    ctrl = DebugController()
-    # Bedingung referenziert eine undefinierte Variable -> Eval-Fehler.
-    ctrl._merged_bp_conditions = {3: ctrl._compile_condition("unknown > 1")}
-    interp = Interpreter()
-    assert ctrl._condition_holds(3, interp) is True
-
-
-def test_condition_holds_resets_in_condition_flag():
-    ctrl = DebugController()
-    ctrl._merged_bp_conditions = {3: ctrl._compile_condition("i > 5")}
-    interp = _interp_with("i", 7)
-    ctrl._condition_holds(3, interp)
-    assert ctrl._in_condition is False
+def test_conditional_breakpoint(app, tmp_path):
+    dc, ev = _controller()
+    src = ('DIM i AS INTEGER\n'
+           'FOR i = 1 TO 5\n'
+           '    PRINT i\n'          # Zeile 3
+           'NEXT\n')
+    dc.set_breakpoints([3], conditions={3: "i = 3"})
+    assert dc.start(src, str(tmp_path)) is True
+    assert _pump(app, lambda: ev["paused"]), "bedingter BP hielt nicht"
+    line, fr = ev["paused"][0]
+    assert line == 3
+    glob = {g[0]: g[2] for g in fr["globals"]}
+    assert glob.get("i") == "3"          # nur bei i==3 angehalten
+    dc.stop()
+    assert _pump(app, lambda: ev["finished"])

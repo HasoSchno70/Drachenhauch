@@ -450,20 +450,20 @@ class GameBasicEditor(QMainWindow):
             "Nur fuer terminierende Konsolen-Programme (kein Grafik/3D).")
         self.act_bench.triggered.connect(self._bench_active)
 
-        # Debugger (Tree-Walker). Start via F7; Steuerung waehrend der Sitzung.
-        self.act_debug = QAction(icons.get("debug"), "Debuggen (Tree-Walker)", self)
+        # Debugger (native Runtime gbrt). Start via F7; Steuerung waehrend der Sitzung.
+        self.act_debug = QAction(icons.get("debug"), "Debuggen", self)
         self.act_debug.setShortcut(QKeySequence("F7"))
         self.act_debug.setToolTip(
-            "Debuggen mit Breakpoints + Step (F7) -- Tree-Walker. Klick links "
-            "im Gutter setzt Breakpoints.")
+            "Debuggen mit Breakpoints + Step (F7) -- native Runtime gbrt. Klick "
+            "links im Gutter setzt Breakpoints.")
         self.act_debug.triggered.connect(self._debug_start)
 
-        # Profiler (Tree-Walker). Laeuft das Programm durch und misst pro
+        # Profiler (native Runtime gbrt). Laeuft das Programm durch und misst pro
         # Zeile/Funktion Treffer + Zeit.
-        self.act_profile = QAction(icons.get("profiler"), "Profiler (Tree-Walker)", self)
+        self.act_profile = QAction(icons.get("profiler"), "Profiler", self)
         self.act_profile.setShortcut(QKeySequence("Ctrl+Shift+Y"))
         self.act_profile.setToolTip(
-            "Profiler -- misst Hotpath pro Zeile/Funktion (Tree-Walker). "
+            "Profiler -- misst Hotpath pro Zeile/Funktion (native Runtime gbrt). "
             "Am besten fuer Konsolen-/Logik-Programme.")
         self.act_profile.triggered.connect(self._profile_start)
 
