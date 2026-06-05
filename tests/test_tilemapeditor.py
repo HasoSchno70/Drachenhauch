@@ -165,6 +165,104 @@ def test_save_load_json_roundtrip(tmp_path):
     assert doc2.properties_of(3)["name"] == "coin"
 
 
+# --------------------------------------------------------------- Multi-Tileset
+
+def _build_multi(tmp_path):
+    doc = TileMapDoc(6, 4, 16, 16)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    b = tmp_path / "b.png"; b.write_bytes(b"\x89PNG\r\n")
+    doc.add_tileset(str(a), 64, 32)   # 8 Tiles, firstgid 1
+    doc.add_tileset(str(b), 32, 32)   # 4 Tiles, firstgid 9
+    return doc
+
+
+def test_add_tileset_assigns_firstgids(tmp_path):
+    doc = _build_multi(tmp_path)
+    assert [t.firstgid for t in doc.tilesets] == [1, 9]
+    assert [t.tile_count for t in doc.tilesets] == [8, 4]
+    assert doc.active_tileset == 1            # zuletzt hinzugefuegt
+    # gid-Aufloesung
+    assert doc.gid_to_tileset(1) == (0, 0)
+    assert doc.gid_to_tileset(8) == (0, 7)
+    assert doc.gid_to_tileset(9) == (1, 0)
+    assert doc.gid_to_tileset(12) == (1, 3)
+    assert doc.gid_to_tileset(99) == (-1, -1)
+    assert doc.local_to_gid(1, 2) == 11
+
+
+def test_facade_targets_active_tileset(tmp_path):
+    doc = _build_multi(tmp_path)
+    doc.active_tileset = 0
+    assert doc.columns == 4 and doc.tile_count == 8
+    doc.active_tileset = 1
+    assert doc.columns == 2 and doc.tile_count == 4
+    # Properties landen am aktiven Tileset
+    doc.set_property(0, "solid", "true", "bool")
+    assert doc.tilesets[1].tile_properties[0]["solid"] is True
+    assert 0 not in doc.tilesets[0].tile_properties
+
+
+def test_remove_tileset_reassigns_firstgids(tmp_path):
+    doc = _build_multi(tmp_path)
+    doc.add_tileset(str(tmp_path / "a.png"), 64, 32)   # 3. Tileset, firstgid 13
+    assert [t.firstgid for t in doc.tilesets] == [1, 9, 13]
+    assert doc.remove_tileset(1) is True
+    assert [t.firstgid for t in doc.tilesets] == [1, 9]   # neu vergeben
+
+
+def test_multi_tileset_roundtrip_through_loader(tmp_path):
+    """Zwei Tilesets + platzierte Tiles aus beiden -> TILED_LOAD liest beide."""
+    doc = _build_multi(tmp_path)
+    doc.active_tileset = 0
+    doc.layers[0].set(0, 0, 1)              # Tileset 0
+    doc.active_tileset = 1
+    doc.set_property(0, "solid", "true", "bool")   # ts1 local 0 = gid 9
+    doc.layers[0].set(1, 0, 9)              # Tileset 1, local 0
+    doc.layers[0].set(2, 0, 12)             # Tileset 1, local 3
+    path = str(tmp_path / "multi.json")
+    doc.save_json(path)
+
+    m = call(T._b_tiled_load, path)
+    assert call(T._b_ts_count, m) == 2
+    assert call(T._b_ts_firstgid, m, 0) == 1
+    assert call(T._b_ts_firstgid, m, 1) == 9
+    assert call(T._b_tile_at, m, 0, 0, 0) == 1
+    assert call(T._b_tile_at, m, 0, 1, 0) == 9
+    assert call(T._b_tile_at, m, 0, 2, 0) == 12
+    # Property an gid 9 (Tileset 1, local 0)
+    assert call(T._b_tile_prop_bool, m, 9, "solid") is True
+
+
+def test_multi_tileset_editor_load_select(tmp_path, monkeypatch):
+    """Headless: Map mit 2 Tilesets oeffnen, Tileset im Editor wechseln."""
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+        from gamebasic.tilemapeditor_qt import TileMapEditor
+    except Exception:
+        pytest.skip("PySide6 nicht verfuegbar")
+    QApplication.instance() or QApplication([])
+    doc = _build_multi(tmp_path)
+    doc.layers[0].set(0, 0, 9)
+    path = str(tmp_path / "m.json")
+    doc.save_json(path)
+
+    ed = TileMapEditor(tmp_path)
+    ed.doc = TileMapDoc.load_json(path)
+    ed._load_tileset_pixmaps()
+    ed._refresh_views()
+    assert len(ed.doc.tilesets) == 2
+    assert ed.ts_combo.count() == 2
+    # Tileset 0 aktiv -> Palette-gid = firstgid 1
+    ed.doc.active_tileset = 0
+    ed._on_palette_select(2)
+    assert ed.canvas.current_gid == 3
+    # Auf Tileset 1 wechseln -> gid = firstgid 9
+    ed._on_tileset_changed(1)
+    ed._on_palette_select(0)
+    assert ed.canvas.current_gid == 9
+
+
 # --------------------------------------------------------------- Object-Layer
 
 def _build_with_objects(tmp_path):

@@ -163,8 +163,55 @@ class ObjectLayer:
         return out
 
 
+class Tileset:
+    """Ein Tileset: Bild + Geometrie + `firstgid` + Per-Tile-Properties.
+
+    GIDs eines Tilesets liegen in `[firstgid, firstgid + tile_count)`. Die
+    lokale Tile-ID ist `gid - firstgid`.
+    """
+
+    __slots__ = ("name", "image", "image_abs", "image_w", "image_h",
+                 "tile_w", "tile_h", "columns", "tile_count", "firstgid",
+                 "tile_properties", "tile_property_types")
+
+    def __init__(self, name: str, tile_w: int, tile_h: int):
+        self.name = str(name)
+        self.image = ""            # Pfad wie gespeichert (relativ zur Map)
+        self.image_abs = ""        # absoluter Pfad zum Laden des Pixmaps
+        self.image_w = 0
+        self.image_h = 0
+        self.tile_w = int(tile_w)
+        self.tile_h = int(tile_h)
+        self.columns = 0
+        self.tile_count = 0
+        self.firstgid = 1
+        # lokale Tile-ID -> {key: typed value} / {key: ptype}
+        self.tile_properties: dict[int, dict] = {}
+        self.tile_property_types: dict[int, dict[str, str]] = {}
+
+    def set_image(self, abs_path: str, image_w: int, image_h: int) -> None:
+        self.image_abs = os.path.abspath(abs_path)
+        self.image = abs_path
+        self.image_w = int(image_w)
+        self.image_h = int(image_h)
+        self.columns = max(0, image_w // self.tile_w) if self.tile_w else 0
+        rows = max(0, image_h // self.tile_h) if self.tile_h else 0
+        self.tile_count = self.columns * rows
+
+    def tile_src_rect(self, local_id: int):
+        """Quell-Rechteck (sx, sy, w, h) eines lokalen Tiles im Bild."""
+        if self.columns <= 0:
+            return (0, 0, self.tile_w, self.tile_h)
+        cx = local_id % self.columns
+        cy = local_id // self.columns
+        return (cx * self.tile_w, cy * self.tile_h, self.tile_w, self.tile_h)
+
+    def contains_gid(self, gid: int) -> bool:
+        return self.firstgid <= gid < self.firstgid + max(0, self.tile_count)
+
+
 class TileMapDoc:
-    """Vollstaendige Tilemap: Geometrie, ein Tileset, N Tile-/Object-Layer."""
+    """Vollstaendige Tilemap: Geometrie, N Tilesets, N Tile-/Object-Layer."""
 
     def __init__(self, width: int = 20, height: int = 15,
                  tile_w: int = 16, tile_h: int = 16):
@@ -172,56 +219,146 @@ class TileMapDoc:
         self.height = int(height)
         self.tile_w = int(tile_w)
         self.tile_h = int(tile_h)
-        # Tileset (ein einzelnes, firstgid=1)
-        self.tileset_image = ""        # Pfad wie gespeichert (relativ zur Map)
-        self.tileset_image_abs = ""    # absoluter Pfad zum Laden des Pixmaps
-        self.tileset_image_w = 0
-        self.tileset_image_h = 0
-        self.columns = 0
-        self.tile_count = 0
-        # lokale Tile-ID (gid-1) -> {key: typed value}
-        self.tile_properties: dict[int, dict] = {}
-        # Property-Typen merken (Tiled braucht den Typ beim Export)
-        self.tile_property_types: dict[int, dict[str, str]] = {}
+        # Mehrere Tilesets (sortiert nach firstgid, erstes firstgid=1).
+        self.tilesets: list[Tileset] = []
+        self.active_tileset = 0
         self.layers: list[TileLayer] = [TileLayer("Boden", self.width, self.height)]
         self.path = ""                 # zuletzt gespeicherter Map-Pfad
         self.dirty = False
 
-    # ------------------------------------------------------ Tileset
+    # ------------------------------------------------------ Tileset-Geometrie
+    def recompute_firstgids(self) -> None:
+        """Vergibt firstgids fortlaufend (erstes = 1)."""
+        gid = 1
+        for ts in self.tilesets:
+            ts.firstgid = gid
+            gid += max(0, ts.tile_count)
+
+    @property
+    def active_ts(self) -> Tileset | None:
+        if 0 <= self.active_tileset < len(self.tilesets):
+            return self.tilesets[self.active_tileset]
+        return None
+
+    def add_tileset(self, abs_path: str, image_w: int, image_h: int,
+                    name: str | None = None) -> int:
+        ts = Tileset(name or Path(abs_path).stem or "tileset",
+                     self.tile_w, self.tile_h)
+        ts.set_image(abs_path, image_w, image_h)
+        self.tilesets.append(ts)
+        self.recompute_firstgids()
+        self.active_tileset = len(self.tilesets) - 1
+        self.dirty = True
+        return self.active_tileset
+
+    def remove_tileset(self, idx: int) -> bool:
+        """Entfernt ein Tileset. GIDs platzierter Tiles werden NICHT migriert
+        -- daher nur erlaubt/sinnvoll, solange noch nichts darauf gemalt ist
+        (UI prueft das). Liefert True bei Erfolg."""
+        if not (0 <= idx < len(self.tilesets)):
+            return False
+        del self.tilesets[idx]
+        self.recompute_firstgids()
+        self.active_tileset = min(self.active_tileset, len(self.tilesets) - 1)
+        self.active_tileset = max(0, self.active_tileset)
+        self.dirty = True
+        return True
+
     def set_tileset(self, abs_path: str, image_w: int, image_h: int) -> None:
-        """Setzt das Tileset aus einem geladenen Bild. Spalten/Tile-Anzahl
-        ergeben sich aus Bildgroesse / Tile-Groesse (margin/spacing = 0)."""
-        self.tileset_image_abs = os.path.abspath(abs_path)
-        self.tileset_image = abs_path
-        self.tileset_image_w = int(image_w)
-        self.tileset_image_h = int(image_h)
-        self.columns = max(0, image_w // self.tile_w) if self.tile_w else 0
-        rows = max(0, image_h // self.tile_h) if self.tile_h else 0
-        self.tile_count = self.columns * rows
+        """Backward-compat / Single-Tileset-Workflow: ersetzt das ERSTE
+        Tileset (oder legt es an)."""
+        if self.tilesets:
+            ts = self.tilesets[0]
+            ts.name = Path(abs_path).stem or ts.name
+            ts.set_image(abs_path, image_w, image_h)
+            self.recompute_firstgids()
+            self.active_tileset = 0
+            self.dirty = True
+        else:
+            self.add_tileset(abs_path, image_w, image_h)
+
+    def gid_to_tileset(self, gid: int) -> tuple[int, int]:
+        """gid -> (tileset_index, local_id). (-1, -1) wenn keiner passt."""
+        for i, ts in enumerate(self.tilesets):
+            if ts.contains_gid(gid):
+                return (i, gid - ts.firstgid)
+        return (-1, -1)
+
+    def local_to_gid(self, ts_index: int, local_id: int) -> int:
+        if 0 <= ts_index < len(self.tilesets):
+            return self.tilesets[ts_index].firstgid + local_id
+        return 0
+
+    # ------------------------------------------------------ Facade (aktiv)
+    # Aelterer Code (Palette/Canvas) spricht das AKTIVE Tileset an.
+    @property
+    def columns(self) -> int:
+        ts = self.active_ts
+        return ts.columns if ts else 0
+
+    @property
+    def tile_count(self) -> int:
+        ts = self.active_ts
+        return ts.tile_count if ts else 0
+
+    @property
+    def tileset_image(self) -> str:
+        ts = self.active_ts
+        return ts.image if ts else ""
+
+    @property
+    def tileset_image_abs(self) -> str:
+        ts = self.active_ts
+        return ts.image_abs if ts else ""
+
+    @property
+    def tileset_image_w(self) -> int:
+        ts = self.active_ts
+        return ts.image_w if ts else 0
+
+    @property
+    def tileset_image_h(self) -> int:
+        ts = self.active_ts
+        return ts.image_h if ts else 0
 
     def tile_src_rect(self, local_id: int):
-        """Quell-Rechteck (sx, sy, w, h) eines lokalen Tiles im Tileset-Bild."""
-        if self.columns <= 0:
+        ts = self.active_ts
+        if ts is None:
             return (0, 0, self.tile_w, self.tile_h)
-        cx = local_id % self.columns
-        cy = local_id // self.columns
-        return (cx * self.tile_w, cy * self.tile_h, self.tile_w, self.tile_h)
+        return ts.tile_src_rect(local_id)
 
-    # ------------------------------------------------------ Properties
+    @property
+    def tile_properties(self) -> dict[int, dict]:
+        ts = self.active_ts
+        return ts.tile_properties if ts else {}
+
+    @property
+    def tile_property_types(self) -> dict[int, dict]:
+        ts = self.active_ts
+        return ts.tile_property_types if ts else {}
+
+    # ------------------------------------------------------ Properties (aktiv)
     def set_property(self, local_id: int, key: str, value, ptype: str) -> None:
+        ts = self.active_ts
+        if ts is None:
+            return
         if ptype not in PROP_TYPES:
             ptype = "string"
-        self.tile_properties.setdefault(local_id, {})[key] = coerce_prop(value, ptype)
-        self.tile_property_types.setdefault(local_id, {})[key] = ptype
+        ts.tile_properties.setdefault(local_id, {})[key] = coerce_prop(value, ptype)
+        ts.tile_property_types.setdefault(local_id, {})[key] = ptype
         self.dirty = True
 
     def remove_property(self, local_id: int, key: str) -> None:
-        self.tile_properties.get(local_id, {}).pop(key, None)
-        self.tile_property_types.get(local_id, {}).pop(key, None)
+        ts = self.active_ts
+        if ts is None:
+            return
+        ts.tile_properties.get(local_id, {}).pop(key, None)
+        ts.tile_property_types.get(local_id, {}).pop(key, None)
         self.dirty = True
 
     def properties_of(self, local_id: int) -> dict:
-        return self.tile_properties.get(local_id, {})
+        ts = self.active_ts
+        return ts.tile_properties.get(local_id, {}) if ts else {}
 
     # ------------------------------------------------------ Layer-Ops
     def add_layer(self, name: str | None = None) -> int:
@@ -321,40 +458,43 @@ class TileMapDoc:
 
         Der Tileset-Bildpfad wird relativ zu `map_path` geschrieben (wenn
         gesetzt), sonst der gespeicherte Pfad unveraendert uebernommen."""
-        image_rel = self.tileset_image
-        if map_path and self.tileset_image_abs:
-            try:
-                image_rel = os.path.relpath(
-                    self.tileset_image_abs, Path(map_path).resolve().parent
-                ).replace("\\", "/")
-            except ValueError:
-                image_rel = self.tileset_image
+        def _rel(abs_path: str, fallback: str) -> str:
+            if map_path and abs_path:
+                try:
+                    return os.path.relpath(
+                        abs_path, Path(map_path).resolve().parent
+                    ).replace("\\", "/")
+                except ValueError:
+                    return fallback
+            return fallback
 
-        tiles_meta = []
-        for lid in sorted(self.tile_properties):
-            props = self.tile_properties[lid]
-            if not props:
-                continue
-            types = self.tile_property_types.get(lid, {})
-            plist = [{"name": k, "type": types.get(k, "string"), "value": v}
-                     for k, v in props.items()]
-            tiles_meta.append({"id": lid, "properties": plist})
-
-        tileset = {
-            "firstgid": 1,
-            "name": Path(self.tileset_image or "tileset").stem or "tileset",
-            "tilewidth": self.tile_w,
-            "tileheight": self.tile_h,
-            "tilecount": self.tile_count,
-            "columns": self.columns,
-            "margin": 0,
-            "spacing": 0,
-            "image": image_rel,
-            "imagewidth": self.tileset_image_w,
-            "imageheight": self.tileset_image_h,
-        }
-        if tiles_meta:
-            tileset["tiles"] = tiles_meta
+        tilesets_json = []
+        for ts in self.tilesets:
+            tiles_meta = []
+            for lid in sorted(ts.tile_properties):
+                props = ts.tile_properties[lid]
+                if not props:
+                    continue
+                types = ts.tile_property_types.get(lid, {})
+                plist = [{"name": k, "type": types.get(k, "string"), "value": v}
+                         for k, v in props.items()]
+                tiles_meta.append({"id": lid, "properties": plist})
+            ts_json = {
+                "firstgid": ts.firstgid,
+                "name": ts.name or Path(ts.image or "tileset").stem or "tileset",
+                "tilewidth": ts.tile_w,
+                "tileheight": ts.tile_h,
+                "tilecount": ts.tile_count,
+                "columns": ts.columns,
+                "margin": 0,
+                "spacing": 0,
+                "image": _rel(ts.image_abs, ts.image),
+                "imagewidth": ts.image_w,
+                "imageheight": ts.image_h,
+            }
+            if tiles_meta:
+                ts_json["tiles"] = tiles_meta
+            tilesets_json.append(ts_json)
 
         layers = []
         next_obj_id = 1
@@ -418,7 +558,7 @@ class TileMapDoc:
             "tileheight": self.tile_h,
             "nextlayerid": len(self.layers) + 1,
             "nextobjectid": next_obj_id,
-            "tilesets": [tileset],
+            "tilesets": tilesets_json,
             "layers": layers,
         }
 
@@ -434,19 +574,23 @@ class TileMapDoc:
             int(data.get("tilewidth", 16)),
             int(data.get("tileheight", 16)),
         )
-        tss = data.get("tilesets") or []
-        if tss:
-            ts = tss[0]
-            img = ts.get("image", "")
+        for tsd in data.get("tilesets") or []:
+            ts = Tileset(
+                str(tsd.get("name", "tileset")),
+                int(tsd.get("tilewidth", doc.tile_w)),
+                int(tsd.get("tileheight", doc.tile_h)),
+            )
+            img = tsd.get("image", "")
             if img:
                 abs_img = (base_dir / img).resolve()
-                doc.tileset_image = img.replace("\\", "/")
-                doc.tileset_image_abs = str(abs_img)
-            doc.tileset_image_w = int(ts.get("imagewidth", 0))
-            doc.tileset_image_h = int(ts.get("imageheight", 0))
-            doc.columns = int(ts.get("columns", 0))
-            doc.tile_count = int(ts.get("tilecount", 0))
-            for tile in ts.get("tiles", []):
+                ts.image = img.replace("\\", "/")
+                ts.image_abs = str(abs_img)
+            ts.image_w = int(tsd.get("imagewidth", 0))
+            ts.image_h = int(tsd.get("imageheight", 0))
+            ts.columns = int(tsd.get("columns", 0))
+            ts.tile_count = int(tsd.get("tilecount", 0))
+            ts.firstgid = int(tsd.get("firstgid", 1))
+            for tile in tsd.get("tiles", []):
                 lid = tile.get("id")
                 if not isinstance(lid, int):
                     continue
@@ -455,7 +599,16 @@ class TileMapDoc:
                     if not isinstance(name, str):
                         continue
                     ptype = p.get("type", "string")
-                    doc.set_property(lid, name, p.get("value"), ptype)
+                    if ptype not in PROP_TYPES:
+                        ptype = "string"
+                    ts.tile_properties.setdefault(lid, {})[name] = coerce_prop(
+                        p.get("value"), ptype)
+                    ts.tile_property_types.setdefault(lid, {})[name] = ptype
+            doc.tilesets.append(ts)
+        # firstgids aus der Datei beibehalten (externe Maps koennen Luecken
+        # haben) -- nur nach firstgid sortieren fuer die Resolver-Reihenfolge.
+        doc.tilesets.sort(key=lambda t: t.firstgid)
+        doc.active_tileset = 0
 
         doc.layers = []
         for layer in data.get("layers", []):
@@ -519,7 +672,32 @@ class TileMapDoc:
         map_rel = "level.json"
         if map_path:
             map_rel = Path(map_path).name
-        tileset_rel = self.tileset_image or "tileset.png"
+        # Tileset-Liste fuer den Renderer (mind. ein Eintrag, damit das
+        # erzeugte Programm immer kompiliert).
+        ts_render = [(ts.image or f"tileset{i}.png",
+                      max(1, ts.columns), ts.firstgid)
+                     for i, ts in enumerate(self.tilesets)]
+        if not ts_render:
+            ts_render = [("tileset.png", 1, 1)]
+        # Bild-DIMs
+        img_dims = "\n".join(
+            f'DIM ts{i} AS IMAGE\nts{i} = LOADIMAGE("{rel}")'
+            for i, (rel, _cols, _fg) in enumerate(ts_render))
+        # gid -> Tileset aufloesen (absteigend nach firstgid)
+        order = sorted(range(len(ts_render)),
+                       key=lambda i: ts_render[i][2], reverse=True)
+        chain_lines = []
+        for k, i in enumerate(order):
+            _rel, cols, fg = ts_render[i]
+            kw = "IF" if k == 0 else "ELSEIF"
+            chain_lines.append(f"                        {kw} g >= {fg} THEN")
+            chain_lines.append(f"                            lid = g - {fg}")
+            chain_lines.append(
+                f"                            DRAWIMAGEPART(ts{i}, "
+                f"(lid MOD {cols}) * TW, (lid \\ {cols}) * TH, TW, TH, "
+                f"tx * TW, ty * TH)")
+        chain_lines.append("                        END IF")
+        resolve_chain = "\n".join(chain_lines)
         sw = self.width * self.tile_w
         sh = self.height * self.tile_h
         scale = max(1, min(4, 960 // max(1, sw)))
@@ -546,13 +724,11 @@ IMPORT "tiled"
 
 SCREEN({sw}, {sh}, "Tilemap", {scale})
 
-DIM tileset AS IMAGE
-tileset = LOADIMAGE("{tileset_rel}")
+{img_dims}
 
 DIM lvl AS TILED_MAP
 lvl = TILED_LOAD("{map_rel}")
 
-CONST COLS = {self.columns}
 DIM TW AS INTEGER : TW = TILED_TILE_WIDTH(lvl)
 DIM TH AS INTEGER : TH = TILED_TILE_HEIGHT(lvl)
 DIM MW AS INTEGER : MW = TILED_WIDTH(lvl)
@@ -567,15 +743,15 @@ WHILE running
     DIM li AS INTEGER
     DIM tx AS INTEGER
     DIM ty AS INTEGER
+    DIM g AS INTEGER
+    DIM lid AS INTEGER
     FOR li = 0 TO NL - 1
         IF TILED_LAYER_TYPE(lvl, li) = "tile" THEN
             FOR ty = 0 TO MH - 1
                 FOR tx = 0 TO MW - 1
-                    DIM g AS INTEGER
                     g = TILED_TILE_AT(lvl, li, tx, ty)
                     IF g > 0 THEN
-                        DIM lid AS INTEGER : lid = g - 1
-                        DRAWIMAGEPART(tileset, (lid MOD COLS) * TW, (lid \\ COLS) * TH, TW, TH, tx * TW, ty * TH)
+{resolve_chain}
                     END IF
                 NEXT
             NEXT

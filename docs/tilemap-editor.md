@@ -14,9 +14,15 @@ Aus dem **Code-Editor**: Toolbar-Button (Gitter-Symbol) oder
 
 ## Bedienung
 
-- **Tileset laden** (Werkzeugleiste) — ein PNG (z. B. ein Sprite-Atlas-Sheet).
-  Spalten/Tile-Anzahl ergeben sich aus Bildgröße ÷ Tile-Größe. Links erscheint
-  die **Palette**: ein Tile anklicken wählt es zum Malen.
+- **Tileset laden** (Werkzeugleiste oder `+` über der Palette) — ein PNG (z. B.
+  ein Sprite-Atlas-Sheet). Spalten/Tile-Anzahl ergeben sich aus Bildgröße ÷
+  Tile-Größe. Links erscheint die **Palette**: ein Tile anklicken wählt es zum Malen.
+- **Mehrere Tilesets:** Über der Palette wählt eine Combo das **aktive Tileset**;
+  `+` fügt ein weiteres hinzu, `−` entfernt das aktive (nur wenn keine platzierten
+  Tiles es mehr nutzen). Jedes Tileset bekommt fortlaufende `firstgid`-Werte
+  (Tiled-Standard); platzierte Tiles merken sich ihr Tileset über die GID, und
+  die **Pipette** schaltet automatisch aufs richtige Tileset um. Export/Speichern
+  schreibt alle Tilesets ins Tiled-JSON — `TILED_LOAD` + `TILED_TILESET_*` lesen sie.
 - **Werkzeuge:** Stift (`B`), Radierer (`E`), Füllen/Bucket (`G`), Rechteck
   (`R`), Pipette (`I`), **Auswahl (`S`)**. **Rechtsklick** löscht immer (egal welches Werkzeug).
 - **Auswahl-Werkzeug (`S`):** Ziehe ein Rechteck über die Tiles (gestrichelter Rahmen). Dann **`Strg+C`** kopiert die Region, **`Strg+X`** schneidet sie aus (kopieren + leeren), **`Strg+V`** stempelt das Clipboard mit der oberen-linken Ecke an der aktuellen Maus-Zelle (bzw. am Auswahl-Ursprung), **`Entf`** leert die Auswahl. Alles ist undobar. Praktisch zum Duplizieren von Map-Bereichen (Räume, Plattform-Muster).

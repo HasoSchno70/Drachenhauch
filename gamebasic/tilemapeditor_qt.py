@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QDockWidget, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
     QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableWidget,
-    QTableWidgetItem, QToolBar, QVBoxLayout, QWidget,
+    QTableWidgetItem, QToolBar, QToolButton, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.icons import icons
@@ -142,7 +142,7 @@ class _Canvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.doc: TileMapDoc | None = None
-        self.pixmap: QPixmap | None = None
+        self.pixmaps: list = []            # QPixmap pro Tileset (parallel)
         self.zoom = 2
         self.tool = TOOL_PENCIL
         self.active_layer = 0
@@ -169,9 +169,16 @@ class _Canvas(QWidget):
         self._obj_drag_cur: tuple | None = None
         self.setMouseTracking(True)
 
-    def set_doc(self, doc: TileMapDoc, pixmap: QPixmap | None) -> None:
+    def set_doc(self, doc: TileMapDoc, pixmaps=None) -> None:
         self.doc = doc
-        self.pixmap = pixmap
+        # pixmaps: Liste (parallel zu doc.tilesets). Rueckwaerts-kompatibel:
+        # ein einzelnes QPixmap wird als Ein-Element-Liste behandelt.
+        if pixmaps is None:
+            self.pixmaps = []
+        elif isinstance(pixmaps, list):
+            self.pixmaps = pixmaps
+        else:
+            self.pixmaps = [pixmaps]
         self.active_layer = 0
         self._update_size()
         self.update()
@@ -496,7 +503,8 @@ class _Canvas(QWidget):
                 col = c1 if (tx + ty) % 2 == 0 else c2
                 p.fillRect(tx * cw, ty * ch, cw, ch, col)
         # Layer
-        have_ts = self.pixmap and not self.pixmap.isNull() and self.doc.columns > 0
+        have_ts = (any(px is not None and not px.isNull() for px in self.pixmaps)
+                   and len(self.doc.tilesets) > 0)
         for li, layer in enumerate(self.doc.layers):
             if not layer.visible:
                 continue
@@ -548,17 +556,21 @@ class _Canvas(QWidget):
                 p.drawLine(0, ty * ch, self.doc.width * cw, ty * ch)
 
     def _draw_layer_tiles(self, p, layer, cw, ch) -> None:
-        tw, th = self.doc.tile_w, self.doc.tile_h
-        cols = self.doc.columns
+        doc = self.doc
         for ty in range(layer.height):
             for tx in range(layer.width):
                 g = layer.tiles[ty * layer.width + tx]
                 if g <= 0:
                     continue
-                lid = g - 1
-                src = QRect((lid % cols) * tw, (lid // cols) * th, tw, th)
-                dst = QRect(tx * cw, ty * ch, cw, ch)
-                p.drawPixmap(dst, self.pixmap, src)
+                tsi, lid = doc.gid_to_tileset(g)
+                if tsi < 0 or tsi >= len(self.pixmaps):
+                    continue
+                pix = self.pixmaps[tsi]
+                if pix is None or pix.isNull():
+                    continue
+                sx, sy, sw, sh = doc.tilesets[tsi].tile_src_rect(lid)
+                p.drawPixmap(QRect(tx * cw, ty * ch, cw, ch),
+                             pix, QRect(sx, sy, sw, sh))
 
     def _draw_layer_ids(self, p, layer, cw, ch) -> None:
         """Fallback ohne Tileset-Bild: gid als Zahl + Farbflaeche."""
@@ -783,7 +795,7 @@ class TileMapEditor(QMainWindow):
         self.setWindowTitle("GameBasic Tilemap-Editor")
         self.resize(1080, 720)
         self.doc = TileMapDoc()
-        self.tileset_pix: QPixmap | None = None
+        self.tileset_pixmaps: list = []     # QPixmap pro Tileset (parallel)
         self.sel_local = 0
         self.undo_stack: list = []
         self.redo_stack: list = []
@@ -813,7 +825,21 @@ class TileMapEditor(QMainWindow):
         # Links: Palette
         left = QWidget(); lv = QVBoxLayout(left)
         lv.setContentsMargins(4, 4, 4, 4)
-        lv.addWidget(QLabel("Tileset"))
+        # Tileset-Auswahl (Multi-Tileset)
+        ts_row = QHBoxLayout()
+        ts_row.addWidget(QLabel("Tileset:"))
+        self.ts_combo = QComboBox()
+        self.ts_combo.currentIndexChanged.connect(self._on_tileset_changed)
+        ts_row.addWidget(self.ts_combo, 1)
+        b_ts_add = QToolButton(); b_ts_add.setText("+")
+        b_ts_add.setToolTip("Tileset hinzufuegen")
+        b_ts_add.clicked.connect(self._load_tileset)
+        ts_row.addWidget(b_ts_add)
+        b_ts_del = QToolButton(); b_ts_del.setText("−")
+        b_ts_del.setToolTip("Aktives Tileset entfernen (nur wenn unbenutzt)")
+        b_ts_del.clicked.connect(self._remove_tileset)
+        ts_row.addWidget(b_ts_del)
+        lv.addLayout(ts_row)
         self.palette = _Palette()
         self.palette.tile_selected.connect(self._on_palette_select)
         pscroll = QScrollArea(); pscroll.setWidget(self.palette)
@@ -974,10 +1000,48 @@ class TileMapEditor(QMainWindow):
         if pix.isNull():
             QMessageBox.warning(self, "Fehler", "Bild konnte nicht geladen werden.")
             return
-        self.doc.set_tileset(path, pix.width(), pix.height())
-        self.tileset_pix = pix
+        # Hinzufuegen als weiteres Tileset (das erste legt Tileset 0 an).
+        idx = self.doc.add_tileset(path, pix.width(), pix.height())
+        if idx >= len(self.tileset_pixmaps):
+            self.tileset_pixmaps.extend(
+                [None] * (idx + 1 - len(self.tileset_pixmaps)))
+        self.tileset_pixmaps[idx] = pix
+        self.sel_local = 0
         self._refresh_views()
         self._update_status()
+
+    def _remove_tileset(self) -> None:
+        idx = self.doc.active_tileset
+        ts = self.doc.active_ts
+        if ts is None:
+            return
+        # Nur entfernen, wenn keine platzierten Tiles dieses Tileset nutzen
+        # (sonst wuerden GIDs ungueltig).
+        lo, hi = ts.firstgid, ts.firstgid + max(0, ts.tile_count)
+        used = any(lo <= g < hi
+                   for l in self.doc.layers if isinstance(l, TileLayer)
+                   for g in l.tiles if g > 0)
+        if used:
+            QMessageBox.information(
+                self, "Tileset in Benutzung",
+                "Dieses Tileset wird noch von platzierten Tiles genutzt "
+                "und kann nicht entfernt werden.")
+            return
+        if len(self.doc.tilesets) <= 0:
+            return
+        self.doc.remove_tileset(idx)
+        if 0 <= idx < len(self.tileset_pixmaps):
+            del self.tileset_pixmaps[idx]
+        self.sel_local = 0
+        self._refresh_views()
+        self._update_status()
+
+    def _on_tileset_changed(self, idx: int) -> None:
+        if 0 <= idx < len(self.doc.tilesets) and idx != self.doc.active_tileset:
+            self.doc.active_tileset = idx
+            self.sel_local = 0
+            self._refresh_views()
+            self._update_status()
 
     # ---------------------------------------------------- Datei
     def _new_map(self) -> None:
@@ -987,12 +1051,23 @@ class TileMapEditor(QMainWindow):
             return
         w, h, tw, th = params
         self.doc = TileMapDoc(w, h, tw, th)
-        self.tileset_pix = None
+        self.tileset_pixmaps = []
         self.sel_local = 0
         self.undo_stack.clear(); self.redo_stack.clear()
         self._sync_layers()
         self._refresh_views()
         self._update_status()
+
+    def _load_tileset_pixmaps(self) -> None:
+        """Laedt fuer jedes Tileset des Dokuments das Bild (parallele Liste)."""
+        self.tileset_pixmaps = []
+        for ts in self.doc.tilesets:
+            pix = None
+            if ts.image_abs and os.path.exists(ts.image_abs):
+                p = QPixmap(ts.image_abs)
+                if not p.isNull():
+                    pix = p
+            self.tileset_pixmaps.append(pix)
 
     def _open(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -1005,12 +1080,8 @@ class TileMapEditor(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
             return
-        # Tileset-Bild laden, wenn vorhanden
-        self.tileset_pix = None
-        if self.doc.tileset_image_abs and os.path.exists(self.doc.tileset_image_abs):
-            pix = QPixmap(self.doc.tileset_image_abs)
-            if not pix.isNull():
-                self.tileset_pix = pix
+        # Tileset-Bilder laden (alle Tilesets)
+        self._load_tileset_pixmaps()
         self.sel_local = 0
         self.undo_stack.clear(); self.redo_stack.clear()
         self._sync_layers()
@@ -1080,13 +1151,22 @@ class TileMapEditor(QMainWindow):
     # ---------------------------------------------------- Palette/Auswahl
     def _on_palette_select(self, lid: int) -> None:
         self.sel_local = lid
-        self.canvas.current_gid = lid + 1
-        self.sel_label.setText(f"Tile: {lid} (gid {lid + 1})")
+        gid = self.doc.local_to_gid(self.doc.active_tileset, lid)
+        self.canvas.current_gid = gid
+        self.sel_label.setText(f"Tile: {lid} (gid {gid})")
 
     def _on_picked(self, lid: int) -> None:
-        self.palette.sel = lid
+        # Pipette liefert eine gid; aufs richtige Tileset umschalten.
+        gid = lid + 1
+        tsi, local = self.doc.gid_to_tileset(gid)
+        if tsi >= 0 and tsi != self.doc.active_tileset:
+            self.doc.active_tileset = tsi
+            self._refresh_views()
+        elif tsi < 0:
+            local = lid
+        self.palette.sel = local
         self.palette.update()
-        self._on_palette_select(lid)
+        self._on_palette_select(local)
 
     def _edit_props(self) -> None:
         if self.doc.columns <= 0:
@@ -1228,11 +1308,16 @@ class TileMapEditor(QMainWindow):
         retile = (tw != self.doc.tile_w or th != self.doc.tile_h)
         self.doc.tile_w, self.doc.tile_h = tw, th
         self.doc.resize(w, h)
-        if retile and self.tileset_pix:
-            # Spaltenzahl neu berechnen
-            self.doc.set_tileset(self.doc.tileset_image_abs,
-                                 self.tileset_pix.width(),
-                                 self.tileset_pix.height())
+        if retile:
+            # Tile-Groesse aller Tilesets angleichen + Spalten/Anzahl neu.
+            for i, ts in enumerate(self.doc.tilesets):
+                ts.tile_w, ts.tile_h = tw, th
+                pix = (self.tileset_pixmaps[i]
+                       if i < len(self.tileset_pixmaps) else None)
+                if pix is not None:
+                    ts.set_image(ts.image_abs or ts.image,
+                                 pix.width(), pix.height())
+            self.doc.recompute_firstgids()
         self.undo_stack.clear(); self.redo_stack.clear()
         self._refresh_views()
         self._update_status()
@@ -1278,22 +1363,43 @@ class TileMapEditor(QMainWindow):
 
     # ---------------------------------------------------- Views/Status
     def _refresh_views(self) -> None:
-        self.canvas.set_doc(self.doc, self.tileset_pix)
-        self.palette.set_doc(self.doc, self.tileset_pix)
-        self.canvas.current_gid = self.sel_local + 1
+        # Pixmap-Liste auf die Tileset-Liste laengen-angleichen.
+        while len(self.tileset_pixmaps) < len(self.doc.tilesets):
+            self.tileset_pixmaps.append(None)
+        del self.tileset_pixmaps[len(self.doc.tilesets):]
+        ai = self.doc.active_tileset
+        active_pix = (self.tileset_pixmaps[ai]
+                      if 0 <= ai < len(self.tileset_pixmaps) else None)
+        self.canvas.set_doc(self.doc, self.tileset_pixmaps)
+        self.palette.set_doc(self.doc, active_pix)
+        self.canvas.current_gid = self.doc.local_to_gid(ai, self.sel_local)
+        self._refresh_tileset_combo()
         self._sync_layers()
+
+    def _refresh_tileset_combo(self) -> None:
+        self.ts_combo.blockSignals(True)
+        self.ts_combo.clear()
+        for i, ts in enumerate(self.doc.tilesets):
+            self.ts_combo.addItem(f"{i}: {ts.name}")
+        if self.doc.tilesets:
+            self.ts_combo.setCurrentIndex(
+                min(self.doc.active_tileset, len(self.doc.tilesets) - 1))
+        self.ts_combo.blockSignals(False)
 
     def _on_hover(self, cx: int, cy: int) -> None:
         if 0 <= cx < self.doc.width and 0 <= cy < self.doc.height:
             self.status.showMessage(f"Tile ({cx}, {cy})")
 
     def _update_status(self) -> None:
-        ts = (f"{self.doc.columns}x"
-              f"{self.doc.tile_count // max(1, self.doc.columns)} Tiles"
-              if self.doc.columns else "kein Tileset")
+        n = len(self.doc.tilesets)
+        if n == 0:
+            ts = "kein Tileset"
+        else:
+            tiles = sum(t.tile_count for t in self.doc.tilesets)
+            ts = f"{n} Tileset(s), {tiles} Tiles"
         self.status.showMessage(
             f"Karte {self.doc.width}x{self.doc.height} @ "
-            f"{self.doc.tile_w}x{self.doc.tile_h}px  |  Tileset: {ts}")
+            f"{self.doc.tile_w}x{self.doc.tile_h}px  |  {ts}")
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
@@ -1303,10 +1409,7 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     if initial_file and Path(initial_file).exists():
         try:
             win.doc = TileMapDoc.load_json(str(initial_file))
-            if win.doc.tileset_image_abs and os.path.exists(win.doc.tileset_image_abs):
-                pix = QPixmap(win.doc.tileset_image_abs)
-                if not pix.isNull():
-                    win.tileset_pix = pix
+            win._load_tileset_pixmaps()
             win._refresh_views(); win._update_status()
         except Exception:
             pass

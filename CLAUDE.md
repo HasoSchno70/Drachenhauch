@@ -1584,14 +1584,20 @@ Per-Tile-Properties (`solid`/`damage`/...), Undo/Redo. **Object-Layer** (`+◇`)
 Spawn-Punkte/Trigger/Zonen als Objekte mit Name/Typ/Properties (Klick = Punkt,
 Ziehen = Rechteck, Doppelklick = bearbeiten, Entf/Rechtsklick = löschen) — der
 Layer-Typ steuert die Canvas-Interaktion; Undo umfasst Tile- UND Objekt-Ops
-(getaggte Stack-Einträge). **Speichern/Laden = Tiled-JSON** (genau das Format,
-das `gamebasic/modules/tiled.py` via `TILED_LOAD` liest: ein eingebettetes
-Tileset mit `firstgid=1`, CSV-Tile-Daten, Per-Tile-Props + `objectgroup` mit
-Objekten als `{name,type,value}`-Props; `TILED_OBJECT_*` liest sie). `GB-Code`
-exportiert einen selbstständigen Renderer (`LOADIMAGE` + `TILED_LOAD` +
-`DRAWIMAGEPART`, Quell-Rect aus `gid-1`; Object-Layer werden nicht gezeichnet,
-nur ein Auslese-Hinweis kommentiert). Schließt den Kreis mit dem Sprite-Atlas-
-Export (Atlas-PNG als Tileset).
+(getaggte Stack-Einträge). **Multi-Tileset:** `doc.tilesets` ist eine Liste von
+`Tileset`-Objekten mit fortlaufenden `firstgid`-Werten; `gid_to_tileset(gid)` /
+`local_to_gid(ts,lid)` lösen GIDs auf, die Facade-Properties (`columns`/
+`tile_count`/`tileset_image*`/`tile_src_rect`/`tile_properties` + `set_property`)
+zeigen aufs **aktive** Tileset (Palette/Canvas-Code unverändert). Tileset-Combo
+über der Palette wechselt/+/− Tilesets; Pipette schaltet aufs gid-Tileset um.
+**Speichern/Laden = Tiled-JSON** (genau das Format, das `gamebasic/modules/tiled.py`
+via `TILED_LOAD` liest: **N eingebettete Tilesets** mit eigenen `firstgid`s,
+CSV-Tile-Daten, Per-Tile-Props + `objectgroup` mit Objekten als
+`{name,type,value}`-Props; `TILED_OBJECT_*`/`TILED_TILESET_*` lesen sie). `GB-Code`
+exportiert einen selbstständigen Renderer (`LOADIMAGE` pro Tileset + `TILED_LOAD` +
+`DRAWIMAGEPART`, gid→Tileset per `firstgid`-Kette; Object-Layer werden nicht
+gezeichnet, nur ein Auslese-Hinweis kommentiert). Schließt den Kreis mit dem
+Sprite-Atlas-Export (Atlas-PNG als Tileset).
 
 **Start:** `gbtilemap [datei.json]` / `gbrun.py --tilemap` / im Editor Toolbar +
 `Datei`-Menü + `Strg+Shift+G` (in-process via `_open_tilemap_editor`, Icon
