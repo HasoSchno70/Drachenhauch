@@ -1,6 +1,6 @@
 ' Audio-Modul-Demo: Tone-Generation, Channels, Music.
-' Braucht: pygame.mixer (laeuft auch ohne Soundkarte mit dummy-Driver,
-' aber ohne Soundkarte hoert man halt nichts).
+' Braucht: native Runtime gbrt (Audio nur nativ; ohne Soundkarte hoert
+' man halt nichts).
 IMPORT "audio"
 
 PRINT "=== Audio-Demo ==="

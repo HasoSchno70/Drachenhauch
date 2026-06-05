@@ -1,9 +1,8 @@
 ' 87_ttf_fonts.gb -- TTF/OTF-Schriften (LOADFONT / SETFONT / TEXT_SPACING)
 '
 ' Nur die native Runtime (F6 / gbrun.py --native) rendert echte TTF-Glyphen
-' ueber raylibs LoadFontEx + DrawTextEx. Im pygame-Pfad (F5) funktioniert es
-' ebenfalls (pygame.font.Font) -- die Pixel/Metriken weichen leicht ab, das
-' Programm laeuft aber identisch.
+' ueber raylibs LoadFontEx + DrawTextEx. Der Tree-Walker (F5) ist konsolen-only
+' und kann keine Grafik/Schriften zeichnen.
 '
 ' Es gibt KEIN gebuendeltes Font-Asset im Repo. Die Demo sucht einen
 ' System-Font und faellt sonst sauber auf den Default-Font zurueck.
@@ -31,7 +30,7 @@ FOR frame = 0 TO 240
     ' Vergleich: immer der Default-Font oben.
     SETFONT(-1)
     TEXT_SIZE(20)
-    TEXT(20, 16, "Default-Font (raylib/pygame):", RGB(160, 160, 180))
+    TEXT(20, 16, "Default-Font (raylib):", RGB(160, 160, 180))
     TEXT(20, 40, "ABCabc 0123 - Hallo Welt!", WHITE)
 
     IF font >= 0 THEN

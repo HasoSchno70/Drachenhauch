@@ -1,5 +1,5 @@
-' Sprite-Modul: Logik-Test ohne SCREEN. LOADIMAGE initialisiert Pygame
-' selbst, FLIP/SPRITE_DRAW werden nicht aufgerufen.
+' Sprite-Modul: Logik-Test ohne SCREEN. FLIP/SPRITE_DRAW (Rendering, nur
+' nativ in gbrt) werden hier nicht aufgerufen -- nur die Sprite-Logik.
 IMPORT "sprite"
 
 DIM sheet AS IMAGE

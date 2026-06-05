@@ -6,7 +6,7 @@
 '   Bitwise-Operatoren, FUNCREF, WITH-Block, Static Class Members,
 '   Slicing, String-Multiplikation, ELIF, Regex.
 '
-' Einzig fehlt: input + Pygame-Loop (rein Console-Demo).
+' Einzig fehlt: input + Grafik-Loop (rein Console-Demo).
 
 IMPORT "vec2"
 IMPORT "regex"

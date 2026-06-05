@@ -1,5 +1,5 @@
-' 83_audio.gb -- Sound + Musik (Core-Audio), laeuft nativ (F6/--native) UND
-' im Python-Pfad (F5, pygame). Beide Pfade nutzen dieselben Builtins:
+' 83_audio.gb -- Sound + Musik (Core-Audio), laeuft nativ in gbrt (F6/--native;
+' Audio nur in der nativen Runtime). Builtins:
 '   LOADSOUND(pfad$) -> SOUND        PLAYSOUND(sound[, loops, lautstaerke])
 '   STOPSOUND(sound)                 PLAYMUSIC(pfad$[, loops, lautstaerke])
 '   STOPMUSIC()

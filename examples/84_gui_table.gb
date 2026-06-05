@@ -1,5 +1,5 @@
 ' 84_gui_table.gb -- Retained-Mode-Tabelle (GUI_TABLE) im Fenster.
-' Laeuft nativ (F6/--native) UND in pygame (F5) mit denselben Builtins.
+' Laeuft nativ in gbrt (F6/--native) -- Grafik nur in der nativen Runtime.
 '
 ' Fixierte Kopfzeile, scrollbarer Body (Mausrad + Scrollbalken-Drag),
 ' Hover-Highlight, persistente Zeilen-Selektion. Klick auf eine Zeile

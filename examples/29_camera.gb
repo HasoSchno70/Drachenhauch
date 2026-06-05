@@ -1,4 +1,4 @@
-' Camera/Viewport: Logik-Test ohne Pygame-Fenster.
+' Camera/Viewport: Logik-Test ohne Grafik-Fenster.
 ' Testet CAMERA_SET, CAMERA_RESET, CAMERA_FOLLOW, S2W-Konvertierung.
 IMPORT "camera"
 

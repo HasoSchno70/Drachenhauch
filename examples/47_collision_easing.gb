@@ -4,7 +4,7 @@
 '
 ' Steuerung: Pfeiltasten = bewegen, ESC = Ende.
 '
-' Voraussetzung: pygame; Sprite-/Tween-Module sind in GameBasic eingebaut.
+' Voraussetzung: Grafik laeuft nativ in gbrt; Sprite-/Tween-Module sind eingebaut.
 
 IMPORT "sprite"
 IMPORT "tween"

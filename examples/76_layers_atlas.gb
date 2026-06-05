@@ -4,7 +4,7 @@
 ' 1. ATLAS_LOAD laedt EIN Bild mit allen Sprites + benannte Rects.
 ' 2. LAYER_DEFINE setzt explizite Z-Reihenfolge (bg -> sprites -> ui).
 ' 3. BATCH_DRAW queued hunderte Tiles, ein BATCH_FLUSH rendert alle in
-'    EINEM pygame.Surface.blits()-Call -- spuerbar schneller bei vielen
+'    EINEM gebatchten Draw-Call -- spuerbar schneller bei vielen
 '    Sprites pro Frame.
 ' 4. UI-Layer ist Screen-Space (Camera reset bevor wir reinzeichnen).
 '

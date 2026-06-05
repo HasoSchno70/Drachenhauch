@@ -61,7 +61,7 @@ DIM con AS DB_CONN
 con = DB_OPEN(Cfg.DB_PATH)
 DB_EXEC(con, "CREATE TABLE IF NOT EXISTS scores (score INTEGER NOT NULL, datum TEXT NOT NULL)")
 
-' --- Pygame ---------------------------------------------------------
+' --- Grafik (gbrt) --------------------------------------------------
 SCREEN(Cfg.SCREEN_W, Cfg.SCREEN_H, "Coin Quest", 2)
 
 ' --- Input-Mapping (frueher: hardcoded Keycode-CONSTs) --------------

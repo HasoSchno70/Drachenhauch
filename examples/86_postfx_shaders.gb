@@ -5,7 +5,7 @@
 ' Effekt:  AUS -> CRT -> BLOOM -> VIGNETTE.
 '
 ' Ausfuehren:  gbrun.py --native examples\86_postfx_shaders.gb   (oder F6)
-' Im pygame-Pfad (F5) laeuft die Szene OHNE Effekt (SHADER_LOAD liefert -1).
+' Der Tree-Walker (F5) ist konsolen-only -- Shader/Grafik nur nativ in gbrt.
 ' ESC beendet.
 
 IMPORT "g3d"
