@@ -292,6 +292,104 @@ fn ui_lighten(color: i64, factor: f64) -> i64 {
     (r << 16) | (g << 8) | b
 }
 
+// --- Debugger (Stufe B, `gbrt debug`) ---------------------------------------
+#[derive(PartialEq, Clone, Copy)]
+enum StepMode { Run, Over, Into, Out }
+
+struct DebugState {
+    // Zeile -> optionale (bereits geparste) Bedingung.
+    breakpoints: HashMap<u32, Option<crate::ast::Node>>,
+    step: StepMode,
+    step_depth: u32,
+    out_sent: usize,   // wie viel von vm.out schon als output-Event gesendet wurde
+}
+
+impl DebugState {
+    fn new() -> Self {
+        // Beim Start an der ersten Zeile anhalten -> der Editor setzt dann
+        // Breakpoints und schickt `continue`.
+        DebugState { breakpoints: HashMap::new(), step: StepMode::Into,
+                     step_depth: 0, out_sent: 0 }
+    }
+}
+
+/// Eine Zeile JSON-Kommando von stdin lesen (blockierend). None bei EOF.
+fn dbg_read_cmd() -> Option<serde_json::Value> {
+    use std::io::BufRead;
+    let mut line = String::new();
+    if std::io::stdin().lock().read_line(&mut line).unwrap_or(0) == 0 {
+        return None;
+    }
+    serde_json::from_str(line.trim()).ok()
+}
+
+/// Ein JSON-Event als Zeile auf stdout schreiben + flushen.
+fn dbg_emit(ev: &serde_json::Value) {
+    use std::io::Write;
+    let stdout = std::io::stdout();
+    let mut h = stdout.lock();
+    let _ = writeln!(h, "{}", serde_json::to_string(ev).unwrap_or_default());
+    let _ = h.flush();
+}
+
+fn dbg_truthy(v: &Value) -> bool {
+    match v {
+        Value::Bool(b) => *b,
+        Value::Int(i) => *i != 0,
+        Value::Float(f) => *f != 0.0,
+        Value::Nil => false,
+        _ => true,
+    }
+}
+
+/// Wert fuer die Variablen-Anzeige formatieren (gekappt wie debugger._fmt_value).
+fn dbg_short(v: &Value) -> String {
+    let s = v.fmt();
+    if s.chars().count() > 200 {
+        let t: String = s.chars().take(200).collect();
+        format!("{}...", t)
+    } else { s }
+}
+
+fn dbg_arith(a: &Value, b: &Value, f: fn(f64, f64) -> f64) -> R<Value> {
+    if !is_num(a) || !is_num(b) {
+        return Err("eval: Operanden muessen Zahlen sein".into());
+    }
+    let r = f(as_f64(a), as_f64(b));
+    if matches!(a, Value::Int(_)) && matches!(b, Value::Int(_)) {
+        Ok(Value::Int(r as i64))
+    } else {
+        Ok(Value::Float(r))
+    }
+}
+
+/// Binaerer Operator fuer den Debugger-Mini-Evaluator (Subset).
+fn dbg_binop(op: &str, a: &Value, b: &Value) -> R<Value> {
+    match op {
+        "=" => Ok(Value::Bool(value_eq(a, b))),
+        "<>" => Ok(Value::Bool(!value_eq(a, b))),
+        "and" => Ok(Value::Bool(dbg_truthy(a) && dbg_truthy(b))),
+        "or" => Ok(Value::Bool(dbg_truthy(a) || dbg_truthy(b))),
+        "+" => {
+            if let (Value::Str(x), Value::Str(y)) = (a, b) {
+                return Ok(Value::str_rc(&format!("{}{}", x, y)));
+            }
+            dbg_arith(a, b, |x, y| x + y)
+        }
+        "-" => dbg_arith(a, b, |x, y| x - y),
+        "*" => dbg_arith(a, b, |x, y| x * y),
+        "/" => {
+            if as_f64(b) == 0.0 { return Err("eval: Division durch 0".into()); }
+            Ok(Value::Float(as_f64(a) / as_f64(b)))
+        }
+        "<" => Ok(Value::Bool(as_f64(a) < as_f64(b))),
+        ">" => Ok(Value::Bool(as_f64(a) > as_f64(b))),
+        "<=" => Ok(Value::Bool(as_f64(a) <= as_f64(b))),
+        ">=" => Ok(Value::Bool(as_f64(a) >= as_f64(b))),
+        _ => Err(format!("eval: Operator '{}' nicht unterstuetzt", op)),
+    }
+}
+
 pub struct Vm<'p> {
     prog: &'p Program,
     globals: HashMap<String, Rc<RefCell<Slot>>>,
@@ -308,6 +406,10 @@ pub struct Vm<'p> {
     cur_line: u32,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
+    // Debugger-State (Stufe B): None = kein Debug-Overhead. Call-Tiefe fuer
+    // Step over/into/out (inkrementiert pro `exec`).
+    dbg: Option<DebugState>,
+    depth: u32,
     #[cfg(feature = "graphics")]
     gfx: Option<crate::graphics::Graphics>,
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
@@ -375,6 +477,8 @@ impl<'p> Vm<'p> {
             scene_stack: Vec::new(),
             cur_line: 0,
             prof: None,
+            dbg: None,
+            depth: 0,
             #[cfg(feature = "graphics")]
             gfx: None,
             #[cfg(feature = "graphics")]
@@ -551,8 +655,183 @@ impl<'p> Vm<'p> {
         Ok(None)
     }
 
+    /// Debugging fuer den naechsten `run()` aktivieren (`gbrt debug`).
+    pub fn enable_debug(&mut self) {
+        self.dbg = Some(DebugState::new());
+    }
+
+    /// Restlichen (noch nicht gesendeten) Programm-Output als output-Event
+    /// schicken (live-Ausgabe waehrend des Debuggens). Auch am Ende aufrufen.
+    pub fn debug_flush_output(&mut self) {
+        if let Some(mut dbg) = self.dbg.take() {
+            if self.out.len() > dbg.out_sent {
+                let chunk = self.out[dbg.out_sent..].to_string();
+                dbg.out_sent = self.out.len();
+                dbg_emit(&serde_json::json!({"event":"output","text":chunk}));
+            }
+            self.dbg = Some(dbg);
+        }
+    }
+
+    /// Per-Zeile-Hook fuer den Debugger. take/restore von self.dbg vermeidet
+    /// Borrow-Konflikte mit self.globals/out beim Snapshot/eval.
+    fn debug_on_line(&mut self, fn_: &Func, locals: &[Value]) -> R<()> {
+        let mut dbg = match self.dbg.take() { Some(d) => d, None => return Ok(()) };
+        let r = self.debug_cycle(&mut dbg, fn_, locals);
+        self.dbg = Some(dbg);
+        r
+    }
+
+    fn debug_cycle(&mut self, dbg: &mut DebugState, fn_: &Func, locals: &[Value]) -> R<()> {
+        let line = self.cur_line;
+        let depth = self.depth;
+        // Neue Ausgabe live nachschieben.
+        if self.out.len() > dbg.out_sent {
+            let chunk = self.out[dbg.out_sent..].to_string();
+            dbg.out_sent = self.out.len();
+            dbg_emit(&serde_json::json!({"event":"output","text":chunk}));
+        }
+        // Pause noetig? (Step-Regel ODER Breakpoint mit erfuellter Bedingung)
+        let mut pause = match dbg.step {
+            StepMode::Into => true,
+            StepMode::Over => depth <= dbg.step_depth,
+            StepMode::Out  => depth <  dbg.step_depth,
+            StepMode::Run  => false,
+        };
+        if !pause {
+            if let Some(cond) = dbg.breakpoints.get(&line) {
+                pause = match cond {
+                    None => true,
+                    // Bedingung: fail-open (bei Eval-Fehler trotzdem anhalten).
+                    Some(expr) => self.eval_node(expr, fn_, locals)
+                        .map(|v| dbg_truthy(&v)).unwrap_or(true),
+                };
+            }
+        }
+        if !pause { return Ok(()); }
+        dbg_emit(&serde_json::json!({
+            "event": "paused", "line": line, "depth": depth,
+            "locals": self.dbg_locals_json(fn_, locals),
+            "globals": self.dbg_globals_json(),
+        }));
+        // Kommandos lesen bis continue/step/stop/EOF.
+        loop {
+            let cmd = match dbg_read_cmd() {
+                Some(c) => c,
+                None => return Err("__DEBUG_STOP__".into()),
+            };
+            match cmd.get("cmd").and_then(|v| v.as_str()).unwrap_or("") {
+                "continue"  => { dbg.step = StepMode::Run; return Ok(()); }
+                "step-over" => { dbg.step = StepMode::Over; dbg.step_depth = depth; return Ok(()); }
+                "step-into" => { dbg.step = StepMode::Into; return Ok(()); }
+                "step-out"  => { dbg.step = StepMode::Out; dbg.step_depth = depth; return Ok(()); }
+                "stop"      => return Err("__DEBUG_STOP__".into()),
+                "set-breakpoints" => self.dbg_set_breakpoints(dbg, &cmd),
+                "eval" => {
+                    let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
+                    match crate::parser::parse_expression(src)
+                        .and_then(|n| self.eval_node(&n, fn_, locals)) {
+                        Ok(v) => dbg_emit(&serde_json::json!({
+                            "event":"eval-result","value":v.fmt(),"type":v.type_name()})),
+                        Err(e) => dbg_emit(&serde_json::json!({"event":"eval-error","message":e})),
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn dbg_set_breakpoints(&self, dbg: &mut DebugState, cmd: &serde_json::Value) {
+        dbg.breakpoints.clear();
+        if let Some(lines) = cmd.get("lines").and_then(|v| v.as_array()) {
+            for l in lines {
+                if let Some(ln) = l.as_u64() { dbg.breakpoints.insert(ln as u32, None); }
+            }
+        }
+        if let Some(conds) = cmd.get("conditions").and_then(|v| v.as_object()) {
+            for (k, expr) in conds {
+                if let (Ok(ln), Some(src)) = (k.parse::<u32>(), expr.as_str()) {
+                    // Bedingung vorab parsen; bei Parse-Fehler unbedingter BP.
+                    let node = crate::parser::parse_expression(src).ok();
+                    dbg.breakpoints.insert(ln, node);
+                }
+            }
+        }
+    }
+
+    fn dbg_locals_json(&self, fn_: &Func, locals: &[Value]) -> serde_json::Value {
+        let mut out = Vec::new();
+        for (i, nm) in fn_.local_names.iter().enumerate() {
+            // Compiler-Zwischenwerte ueberspringen (namenlos oder __-Praefix).
+            if nm.is_empty() || nm.starts_with("__") { continue; }
+            if let Some(v) = locals.get(i) {
+                out.push(serde_json::json!({"name": nm, "type": v.type_name(), "value": dbg_short(v)}));
+            }
+        }
+        serde_json::Value::Array(out)
+    }
+
+    fn dbg_globals_json(&self) -> serde_json::Value {
+        let mut out = Vec::new();
+        for (name, slot) in &self.globals {
+            if name.starts_with("__") { continue; }
+            let s = slot.borrow();
+            if s.is_const { continue; }      // Baseline-Konstanten (Farben/Keys/PI) ausblenden
+            out.push(serde_json::json!({"name": name, "type": s.value.type_name(), "value": dbg_short(&s.value)}));
+        }
+        out.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+        serde_json::Value::Array(out)
+    }
+
+    /// Mini-Evaluator fuer Debugger-Bedingungen + `eval`: Identifier (Locals
+    /// per Name / Globals), Literale, unaere/binaere Operatoren. Bewusst ein
+    /// Subset (kein Member/Index/Call) -- deckt typische Breakpoint-Bedingungen.
+    fn eval_node(&self, n: &crate::ast::Node, fn_: &Func, locals: &[Value]) -> R<Value> {
+        use crate::ast::{Node, NumV};
+        match n {
+            Node::NumberLit(NumV::Int(i)) => Ok(Value::Int(*i)),
+            Node::NumberLit(NumV::Float(f)) => Ok(Value::Float(*f)),
+            Node::StringLit(s) => Ok(Value::str_rc(s)),
+            Node::BoolLit(b) => Ok(Value::Bool(*b)),
+            Node::Identifier(name) => {
+                let key = name.to_lowercase();
+                if let Some(i) = fn_.local_names.iter().position(|n| *n == key) {
+                    if let Some(v) = locals.get(i) { return Ok(v.clone()); }
+                }
+                if let Some(slot) = self.globals.get(&key) {
+                    return Ok(slot.borrow().value.clone());
+                }
+                Err(format!("eval: '{}' nicht gefunden", name))
+            }
+            Node::UnaryOp { op, operand } => {
+                let v = self.eval_node(operand, fn_, locals)?;
+                match op.as_str() {
+                    "-" => match v { Value::Int(i) => Ok(Value::Int(-i)),
+                                     _ => Ok(Value::Float(-as_f64(&v))) },
+                    "not" => Ok(Value::Bool(!dbg_truthy(&v))),
+                    _ => Err(format!("eval: unaerer Operator '{}' nicht unterstuetzt", op)),
+                }
+            }
+            Node::BinaryOp { op, left, right } => {
+                let a = self.eval_node(left, fn_, locals)?;
+                let b = self.eval_node(right, fn_, locals)?;
+                dbg_binop(op, &a, &b)
+            }
+            _ => Err("eval: Ausdruck nicht unterstuetzt (nur Vars/Literale/Operatoren)".into()),
+        }
+    }
+
     // ---------------------------------------------------------------- exec
     fn exec(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
+        // Call-Tiefe fuer den Debugger (Step over/into/out). Inkrement pro Frame;
+        // garantiert dekrementiert (auch bei Fehler/Return) via Wrapper.
+        self.depth += 1;
+        let r = self.exec_inner(fn_, args, self_obj);
+        self.depth -= 1;
+        r
+    }
+
+    fn exec_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
         let mut locals = bind_params(fn_, args)?;
         let mut stack: Vec<Value> = Vec::with_capacity(16);
         let mut ip: usize = 0;
@@ -579,6 +858,9 @@ impl<'p> Vm<'p> {
         loop {
             match self.dispatch(fn_, locals, stack, ip, try_handlers, self_obj) {
                 Ok(step) => return Ok(step),
+                // Debugger-Abbruch (`stop`) darf NICHT von TRY/CATCH gefangen
+                // werden -- unbedingt durchreichen.
+                Err(e) if e == "__DEBUG_STOP__" => return Err(e),
                 Err(e) => match try_handlers.pop() {
                     Some((target, depth)) => {
                         stack.truncate(depth);
@@ -784,6 +1066,9 @@ impl<'p> Vm<'p> {
                     if changed {
                         if let Some(p) = self.prof.as_mut() {
                             p.tick(self.cur_line);
+                        }
+                        if self.dbg.is_some() {
+                            self.debug_on_line(fn_, locals)?;
                         }
                     }
                 }

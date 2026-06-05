@@ -118,6 +118,12 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "profile" {
             return profile_main(&raw[2]);
         }
+        // Stufe B (Phase 3c): `gbrt debug datei.gb` -- interaktiver Debugger ueber
+        // ein newline-JSON-Protokoll (stdin: Kommandos, stdout: Events). Ersetzt
+        // den Tree-Walker-Debugger.
+        if raw.len() >= 3 && raw[1] == "debug" {
+            return debug_main(&raw[2]);
+        }
         // Selbst-Export: `gbrt --export datei.gb [out_dir]` buendelt das
         // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
         if raw.len() >= 3 && raw[1] == "--export" {
@@ -307,6 +313,43 @@ fn profile_main(path: &str) -> ExitCode {
         blob["error_line"] = serde_json::json!(err_line);
     }
     println!("{}", serde_json::to_string(&blob).unwrap_or_else(|_| "{}".into()));
+    ExitCode::SUCCESS
+}
+
+/// `gbrt debug <datei.gb>` -- interaktiver Debugger. Spricht ein
+/// newline-delimited JSON-Protokoll: stdin = Kommandos ({"cmd":"continue"|
+/// "step-over"|"step-into"|"step-out"|"stop"|"set-breakpoints"|"eval", ...}),
+/// stdout = Events ({"event":"paused|output|eval-result|eval-error|finished|
+/// error", ...}). Haelt initial an der ersten Zeile. chdir wie `run`.
+fn debug_main(path: &str) -> ExitCode {
+    let abs = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+    let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
+    let raw_source = match std::fs::read_to_string(&abs) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let _ = std::env::set_current_dir(&base);
+    let json = match compile_source(&raw_source, &base, &label) {
+        Ok(j) => j,
+        Err(code) => return code,
+    };
+    let prog = match model::load_program(&json) {
+        Ok(p) => p,
+        Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
+    };
+    let mut machine = vm::Vm::new(&prog);
+    machine.enable_debug();
+    let res = machine.run();
+    machine.debug_flush_output();
+    let ev = match &res {
+        Ok(()) => serde_json::json!({"event": "finished", "reason": "done"}),
+        Err(e) if e == "__DEBUG_STOP__" =>
+            serde_json::json!({"event": "finished", "reason": "stopped"}),
+        Err(e) => serde_json::json!({
+            "event": "error", "line": machine.error_line(), "message": e }),
+    };
+    println!("{}", serde_json::to_string(&ev).unwrap_or_default());
     ExitCode::SUCCESS
 }
 

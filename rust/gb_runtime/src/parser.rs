@@ -1249,6 +1249,17 @@ fn num_of(t: &Token) -> NumV {
 }
 
 /// AST als kanonisches JSON (`gbrt --ast`). Lext + parst die Quelle.
+/// Parst einen einzelnen Ausdruck (fuer Debugger-Bedingungen + `eval`, Stufe B).
+/// Lext die Quelle und parst genau eine Expression.
+pub fn parse_expression(source: &str) -> Result<Node, String> {
+    let toks = match crate::lexer::Lexer::new(source).tokenize() {
+        Ok(t) => t,
+        Err(e) => return Err(format!("Lexer {}:{}: {}", e.line, e.col, e.msg)),
+    };
+    let mut p = Parser::new(toks);
+    p.expression().map_err(|e| format!("{}:{}: {}", e.line, e.col, e.msg))
+}
+
 pub fn dump_ast_json(source: &str) -> Result<String, String> {
     let toks = match crate::lexer::Lexer::new(source).tokenize() {
         Ok(t) => t,

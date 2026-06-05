@@ -1767,6 +1767,12 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
         ctx.code.iter().map(|_| json!(0)).collect()
     };
     let local_defaults: Vec<Value> = ctx.local_defaults.iter().map(enc).collect();
+    // Debug-Namen pro Slot (Stufe B, 3a): local_slots invertieren; Slots ohne
+    // Namen (Compiler-Zwischenwerte) bleiben "". Nur fuer `gbrt debug`.
+    let mut local_names = vec![String::new(); ctx.local_types.len()];
+    for (nm, &slot) in &ctx.local_slots {
+        if slot < local_names.len() { local_names[slot] = nm.clone(); }
+    }
     let pdef: Vec<Value> = param_defaults.iter()
         .map(|d| match d { Some(cv) => enc(cv), None => Value::Null }).collect();
     json!({
@@ -1775,6 +1781,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
         "is_coroutine": is_coroutine, "return_type": return_type,
         "param_defaults": pdef, "param_names": param_names,
         "local_types": ctx.local_types.clone(), "local_defaults": local_defaults,
+        "local_names": local_names,
         "constants": ctx.consts.clone(), "code": code, "lines": lines,
     })
 }

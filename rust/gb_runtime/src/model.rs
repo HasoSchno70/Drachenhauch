@@ -184,6 +184,10 @@ pub struct Func {
     /// Compiler keine Zeilen getrackt hat -- dann faellt die Fehlermeldung auf
     /// "Zeile unbekannt" zurueck.
     pub lines: Vec<u32>,
+    /// Debug-Namen pro Local-Slot (parallel zu `local_types`); leer fuer
+    /// Compiler-Zwischenwerte. Nur fuer `gbrt debug` (Variablen-Inspektion);
+    /// leer wenn der Compiler keine Namen getrackt hat (alte .gbc).
+    pub local_names: Vec<String>,
 }
 
 pub struct FieldDecl {
@@ -311,6 +315,10 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_u64().unwrap_or(0) as u32).collect())
         .unwrap_or_default();
+    let local_names = get("local_names")
+        .as_array()
+        .map(|a| a.iter().map(|x| x.as_str().unwrap_or("").to_string()).collect())
+        .unwrap_or_default();
 
     Func {
         name: get("name").as_str().unwrap_or("").to_string(),
@@ -327,6 +335,7 @@ fn decode_func(j: &J) -> Func {
         constants,
         code,
         lines,
+        local_names,
     }
 }
 
