@@ -155,6 +155,33 @@ PRINT "after"'''
     assert _run(src) == "before\n0"
 
 
+# --- WP3: String-Erweiterungen ----------------------------------------------
+
+def test_string_trim_reverse():
+    src = '''PRINT "[" + LTRIM$("  hi  ") + "]"
+PRINT "[" + RTRIM$("  hi  ") + "]"
+PRINT REVERSE$("hello")'''
+    assert _run(src) == "[hi  ]\n[  hi]\nolleh"
+
+
+def test_string_predicates():
+    src = '''PRINT STARTSWITH("hello world", "hello"), STARTSWITH("hello", "x")
+PRINT ENDSWITH("hello world", "world"), ENDSWITH("hello", "x")
+PRINT CONTAINS("hello world", "o w"), CONTAINS("abc", "z")'''
+    assert _run(src) == "TRUE FALSE\nTRUE FALSE\nTRUE FALSE"
+
+
+def test_string_bin_oct():
+    src = 'PRINT BIN$(10), BIN$(-10), OCT$(64), OCT$(-64)'
+    assert _run(src) == "1010 -1010 100 -100"
+
+
+def test_string_isnumeric_tryval():
+    src = '''PRINT ISNUMERIC("42"), ISNUMERIC("3.14"), ISNUMERIC("1e5"), ISNUMERIC("abc"), ISNUMERIC("")
+PRINT TRYVAL("42", -1), TRYVAL("3.5", -1), TRYVAL("oops", -1), TRYVAL("  7  ", 0)'''
+    assert _run(src) == "TRUE TRUE TRUE FALSE FALSE\n42 3.5 -1 7"
+
+
 # --- WP1: SORT mit Descending-Flag + FUNCREF-Comparator ---------------------
 
 def test_sort_ascending_and_descending_flag():

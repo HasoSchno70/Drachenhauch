@@ -136,6 +136,17 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "repeat$":   ("REPEAT$(s, n) AS STRING", "String n-mal wiederholen."),
     "space$":    ("SPACE$(n) AS STRING",  "String aus n Leerzeichen."),
     "hex$":      ("HEX$(n) AS STRING",    'INTEGER als Hex ("FF", "1A2B", ...).'),
+    # String-Erweiterungen (gbrt-only)
+    "ltrim$":    ("LTRIM$(s) AS STRING",  "Fuehrende Leerzeichen entfernen."),
+    "rtrim$":    ("RTRIM$(s) AS STRING",  "Abschliessende Leerzeichen entfernen."),
+    "reverse$":  ("REVERSE$(s) AS STRING", "Zeichen umkehren."),
+    "startswith": ("STARTSWITH(s, praefix) AS BOOLEAN", "Beginnt s mit praefix?"),
+    "endswith":  ("ENDSWITH(s, suffix) AS BOOLEAN", "Endet s mit suffix?"),
+    "contains":  ("CONTAINS(s, teil) AS BOOLEAN", "Enthaelt s den Teilstring?"),
+    "bin$":      ("BIN$(n) AS STRING",    "INTEGER als Binaerstring (mit Vorzeichen)."),
+    "oct$":      ("OCT$(n) AS STRING",    "INTEGER als Oktalstring (mit Vorzeichen)."),
+    "isnumeric": ("ISNUMERIC(s) AS BOOLEAN", "Ist s als Zahl (INT/FLOAT) parsebar?"),
+    "tryval":    ("TRYVAL(s, default) AS INTEGER/FLOAT", "s zu Zahl parsen, sonst default (robustes VAL)."),
     # Maps
     "mapput":    ("MAPPUT(map, key$, value)", "Wert unter Schluessel speichern."),
     "mapget":    ("MAPGET(map, key$)", "Wert zum Schluessel - Fehler wenn nicht vorhanden."),

@@ -113,6 +113,17 @@ fn type_default(t: &str) -> Value {
     }
 }
 
+/// Parst einen String robust zu INTEGER (ganzzahlig, kein '.'/'e') oder FLOAT,
+/// sonst None. Basis fuer ISNUMERIC (.is_some()) und TRYVAL (.unwrap_or(default)).
+fn parse_number(s: &str) -> Option<Value> {
+    let t = s.trim();
+    if t.is_empty() { return None; }
+    if !t.contains('.') && !t.contains('e') && !t.contains('E') {
+        if let Ok(i) = t.parse::<i64>() { return Some(Value::Int(i)); }
+    }
+    t.parse::<f64>().ok().map(Value::Float)
+}
+
 /// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM).
 /// Identisch zur `coerce`-Logik der VM (vm.rs): INTEGER nimmt Int oder
 /// ganzzahligen Float, FLOAT nimmt Float/Int, beides lehnt Bool ab; Referenz-/
@@ -1151,6 +1162,30 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let parts: Vec<String> = arr.values.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
             } else { err("JOIN$ erwartet ARRAY OF STRING".to_string()) }
+        }
+        // --- String-Erweiterungen (WP3) ---
+        "ltrim$" | "ltrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "LTRIM$")?.trim_start())) }
+        "rtrim$" | "rtrim" => { arity!(1); Ok(Value::str_rc(need_str(&a[0], "RTRIM$")?.trim_end())) }
+        "reverse$" => { arity!(1); Ok(Value::str_rc(&need_str(&a[0], "REVERSE$")?.chars().rev().collect::<String>())) }
+        "startswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "STARTSWITH")?.starts_with(need_str(&a[1], "STARTSWITH")?))) }
+        "endswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "ENDSWITH")?.ends_with(need_str(&a[1], "ENDSWITH")?))) }
+        "contains" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "CONTAINS")?.contains(need_str(&a[1], "CONTAINS")?))) }
+        "bin$" | "bin" => {
+            arity!(1);
+            let n = need_int(&a[0], "BIN$")?;
+            Ok(Value::str_rc(&if n < 0 { format!("-{:b}", (n as i128).unsigned_abs()) } else { format!("{:b}", n) }))
+        }
+        "oct$" | "oct" => {
+            arity!(1);
+            let n = need_int(&a[0], "OCT$")?;
+            Ok(Value::str_rc(&if n < 0 { format!("-{:o}", (n as i128).unsigned_abs()) } else { format!("{:o}", n) }))
+        }
+        "isnumeric" => { arity!(1); Ok(Value::Bool(parse_number(need_str(&a[0], "ISNUMERIC")?).is_some())) }
+        "tryval" => {
+            arity!(2);
+            let s = need_str(&a[0], "TRYVAL")?;
+            if !is_num(&a[1]) { return err("TRYVAL: default muss eine Zahl sein".to_string()); }
+            Ok(parse_number(s).unwrap_or_else(|| a[1].clone()))
         }
         // ===== Modul: vec2 =====
         "vec2_new" => { arity!(2); Ok(Value::Vec2(need_num(&a[0], "VEC2_NEW")?, need_num(&a[1], "VEC2_NEW")?)) }

@@ -122,6 +122,18 @@ Funktionen mit `$`-Suffix gibt es auch ohne (`UPPER$` ≡ `UPPER`).
 | `HEX$(n)` | INT als Hex-String |
 | `FORMAT$(value, mask)` | printf-Stil. `FORMAT$(42, "%05d")` → `"00042"`. Mask folgt Python's `%`-Operator (`%d`, `%s`, `%.2f`, `%05X`, …) |
 
+Erweiterungen *(nur native Runtime)*:
+
+| Funktion | Zweck |
+|---|---|
+| `LTRIM$(s)`, `RTRIM$(s)` | Whitespace nur links / nur rechts entfernen |
+| `REVERSE$(s)` | Zeichen umkehren |
+| `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | Anfang/Ende prüfen |
+| `CONTAINS(s, teil)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `teil IN s`) |
+| `BIN$(n)`, `OCT$(n)` | INTEGER als Binär-/Oktalstring (mit Vorzeichen) |
+| `ISNUMERIC(s)` → BOOLEAN | als Zahl parsebar? |
+| `TRYVAL(s, default)` → INTEGER/FLOAT | robustes `VAL`: bei Parse-Fehler `default` statt still `0` |
+
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
 PRINT LEFT$("GameBasic", 4)     ' "Game"
@@ -136,6 +148,11 @@ PRINT JOIN$(teile, " | ")             ' "Anna | Bert | Cilly"
 PRINT PADL$("42", 6, "0")             ' "000042"
 PRINT REPEAT$("=*", 5)                ' "=*=*=*=*=*"
 PRINT HEX$(0xCAFE)                    ' "CAFE"
+
+PRINT REVERSE$("abc")                 ' "cba"
+PRINT STARTSWITH("hello", "he")       ' TRUE
+PRINT BIN$(10)                        ' "1010"
+PRINT TRYVAL("oops", -1)              ' -1  (statt 0 bei VAL)
 ```
 
 ## Bitwise
