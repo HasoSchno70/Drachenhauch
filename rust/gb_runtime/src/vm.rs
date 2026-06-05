@@ -2248,8 +2248,18 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: color muss INTEGER oder ARRAY sein", fn_)),
             }
         }
+        // Grafik-Builtins lazy-initialisieren ein verstecktes Fenster, wenn noch
+        // kein SCREEN aufgerufen wurde -- so funktionieren headless Bild-/Kamera-/
+        // Sprite-Ops (LOADIMAGE, imgfx, CAMERA_*, SPRITE_*) ohne sichtbares Fenster,
+        // wie das pygame-Lazy-Init im Tree-Walker. Ein spaeteres SCREEN macht das
+        // Fenster sichtbar (reconfigure), statt ein zweites zu erzeugen.
         macro_rules! g {
-            () => { self.gfx.as_mut().ok_or("Grafik-Builtin vor SCREEN aufgerufen")? };
+            () => {{
+                if self.gfx.is_none() {
+                    self.gfx = Some(crate::graphics::Graphics::new_headless());
+                }
+                self.gfx.as_mut().unwrap()
+            }};
         }
         let r = match name {
             "screen" => {
@@ -2258,7 +2268,10 @@ impl<'p> Vm<'p> {
                 let title = if a.len() >= 3 { gs(a, 2, "SCREEN")?.to_string() } else { "GameBasic".to_string() };
                 let scale = if a.len() >= 4 { gi(a, 3, "SCREEN")? as i32 } else { 1 };
                 if scale < 1 { return Err("SCREEN: skala muss >= 1 sein".into()); }
-                self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale));
+                match self.gfx.as_mut() {
+                    Some(gfx) => gfx.reconfigure(w, h, &title, scale),
+                    None => self.gfx = Some(crate::graphics::Graphics::new(w, h, &title, scale)),
+                }
                 Value::Nil
             }
             "cls" => { let c = if a.is_empty() { 0 } else { gi(a, 0, "CLS")? }; g!().cls(c); Value::Nil }

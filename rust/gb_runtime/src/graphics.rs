@@ -659,10 +659,32 @@ fn col(c: i64) -> Color {
 }
 
 impl Graphics {
+    /// Lazy-Init ohne SCREEN: ein verstecktes Fenster, nur fuer den GL-Kontext
+    /// (LOADIMAGE/imgfx-Texturen, Kamera-/Sprite-Logik ohne sichtbares Fenster).
+    /// Spiegelt das pygame-Lazy-Init des Tree-Walkers (LOADIMAGE etc. ohne SCREEN).
+    /// Ein spaeteres SCREEN macht das Fenster via `reconfigure` sichtbar.
+    pub fn new_headless() -> Graphics {
+        Graphics::new_impl(64, 64, "GameBasic", 1, true)
+    }
+
     pub fn new(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
+        Graphics::new_impl(width, height, title, scale, false)
+    }
+
+    fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool) -> Graphics {
         let win_w = width * scale;
         let win_h = height * scale;
-        let (mut rl, thread) = raylib::init().size(win_w, win_h).title(title).build();
+        // raylib loggt sonst seinen INFO-Startup-Spam auf stdout und verschmutzt
+        // die Konsolen-Ausgabe (TW ist sauber). WARNING zeigt weiter echte
+        // Warnungen/Fehler (z.B. fehlgeschlagenes Texture-Load).
+        let (mut rl, thread) = raylib::init()
+            .size(win_w, win_h)
+            .title(title)
+            .log_level(raylib::consts::TraceLogLevel::LOG_WARNING)
+            .build();
+        if hidden {
+            rl.set_window_state(WindowState::default().set_window_hidden(true));
+        }
         rl.set_target_fps(60);
         // Headless-Verifizierung: GBRT_FRAMES begrenzt die Frames, GBRT_SCREENSHOT
         // legt den PNG-Pfad fest (Screenshot beim letzten Frame).
@@ -746,6 +768,22 @@ impl Graphics {
             screenshot,
             shot_taken: false,
         }
+    }
+
+    /// SCREEN nach einem Lazy-Init (oder erneutes SCREEN): das bestehende Fenster
+    /// sichtbar machen und auf die gewuenschte Groesse/Titel umstellen, statt ein
+    /// zweites raylib-Fenster zu erzeugen (raylib paniced bei Doppel-Init).
+    pub fn reconfigure(&mut self, width: i32, height: i32, title: &str, scale: i32) {
+        self.width = width;
+        self.height = height;
+        self.scale = scale;
+        let win_w = width * scale;
+        let win_h = height * scale;
+        self.rl.clear_window_state(WindowState::default().set_window_hidden(true));
+        self.rl.set_window_size(win_w, win_h);
+        self.rl.set_window_title(&self.thread, title);
+        // Szene-Render-Target an die neue Groesse anpassen (Post-Processing).
+        self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
     }
 
     fn emit(&mut self, c: Cmd) {
