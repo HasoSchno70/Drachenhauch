@@ -65,19 +65,14 @@ def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
 
 
 def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
-    """Spielt die Samples ueber pygame.mixer (best effort -- ohne Audio-
-    Geraet still). Mono ODER Stereo `(n, 2)`."""
+    """Spielt die Samples ueber sounddevice (best effort -- ohne Audio-Geraet
+    oder ohne installiertes sounddevice still). Mono ODER Stereo `(n, 2)`.
+    sounddevice nimmt die float32-Arrays direkt (kein int16/pygame noetig)."""
     try:
-        import os
-        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
-        import pygame
-        if pygame.mixer.get_init() is None:
-            pygame.mixer.init(frequency=sr, size=-16, channels=2)
-        int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
-        if int16.ndim == 1:
-            int16 = np.column_stack((int16, int16))     # Mono -> Stereo
-        snd = pygame.sndarray.make_sound(np.ascontiguousarray(int16))
-        snd.play()
+        import sounddevice as sd
+        arr = np.ascontiguousarray(
+            np.clip(samples, -1.0, 1.0).astype(np.float32))
+        sd.play(arr, sr)
     except Exception:
         pass
 

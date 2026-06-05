@@ -745,25 +745,19 @@ class TrackerEditor(QMainWindow):
 
     def _load_samples_from_file(self, path: str):
         """(samples_float, sample_rate) aus einer Audiodatei -- erst stdlib-WAV
-        (headless), sonst pygame-Dekodierung (OGG/float-WAV/...). None bei
-        Fehler."""
+        (headless), sonst soundfile-Dekodierung (OGG/FLAC/float-WAV/...). None
+        bei Fehler."""
         from .tracker.instrument import load_wav_mono
         try:
             return load_wav_mono(path)
         except Exception:
             pass
         try:
-            import os
-            os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
-            import pygame
-            if pygame.mixer.get_init() is None:
-                pygame.mixer.init(frequency=44100, size=-16, channels=2)
-            snd = pygame.mixer.Sound(path)
-            arr = pygame.sndarray.array(snd)
-            if arr.ndim == 2:
-                arr = arr.mean(axis=1)
-            return (arr.astype(np.float32) / 32768.0,
-                    pygame.mixer.get_init()[0] or 44100)
+            import soundfile as sf
+            data, sr = sf.read(path, dtype="float32", always_2d=False)
+            if data.ndim == 2:
+                data = data.mean(axis=1)
+            return data.astype(np.float32), int(sr)
         except Exception:
             return None
 
@@ -1049,30 +1043,29 @@ class TrackerEditor(QMainWindow):
         return max(1, int(44100 * self.song.row_ms() / 1000.0))
 
     def _render_sound(self, inst, midi: int, n_samples: int, slide: int = 0):
-        """Pygame-Sound der Note ueber das Instrument (gecacht). n_samples =
-        Klanglaenge -> Noten klingen fuer ihre Dauer."""
+        """Float-Sample-Array der Note ueber das Instrument (gecacht). n_samples
+        = Klanglaenge -> Noten klingen fuer ihre Dauer. 0.6 vorgemischt (Headroom),
+        auf [-1, 1] geclippt; Wiedergabe via sounddevice in `_play_array`."""
         key = (id(inst), int(midi), int(n_samples), int(slide or 0))
-        snd = self._sound_cache.get(key)
-        if snd is None:
-            snd = self._make_sound(
-                inst.render_note(midi, n_samples, 44100, slide or 0))
-            self._sound_cache[key] = snd
-        return snd
+        arr = self._sound_cache.get(key)
+        if arr is None:
+            wave = inst.render_note(midi, n_samples, 44100, slide or 0)
+            arr = np.clip(wave, -1.0, 1.0).astype(np.float32) * 0.6
+            self._sound_cache[key] = arr
+        return arr
 
     @staticmethod
-    def _make_sound(wave: np.ndarray, sr: int = 44100):
+    def _play_array(arr: np.ndarray, sr: int = 44100, vol: int | None = None):
+        """Spielt ein float32-Array ueber sounddevice (best effort -- still ohne
+        Audio-Geraet/Lib). vol = Lautstaerke 1..15 wird beim Abspielen eingemischt."""
         try:
-            import os
-            os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
-            import pygame
-            if pygame.mixer.get_init() is None:
-                pygame.mixer.init(frequency=sr, size=-16, channels=2)
-            int16 = (np.clip(wave, -1, 1) * 0.6 * 32767).astype(np.int16)
-            if int16.ndim == 1:
-                int16 = np.column_stack((int16, int16))
-            return pygame.sndarray.make_sound(np.ascontiguousarray(int16))
+            import sounddevice as sd
+            out = arr
+            if vol:
+                out = arr * min(1.0, max(0.0, vol_to_pct(vol) / 100.0))
+            sd.play(np.ascontiguousarray(out.astype(np.float32)), sr)
         except Exception:
-            return None
+            pass
 
     def _play_note(self, ci: int, midi: int, vol: int | None = None,
                    slide: int = 0, n_rows: int | None = None) -> None:
@@ -1085,14 +1078,9 @@ class TrackerEditor(QMainWindow):
             n = max(int(44100 * 0.6), row_s * 2)      # Vorhoeren
         else:
             n = max(row_s, row_s * int(n_rows))
-        snd = self._render_sound(inst, midi, n, slide or 0)
-        if snd is not None:
-            try:
-                ch = snd.play()
-                if ch is not None and vol:   # vol = Lautstaerke 1..15
-                    ch.set_volume(min(1.0, max(0.0, vol_to_pct(vol) / 100.0)))
-            except Exception:
-                pass
+        arr = self._render_sound(inst, midi, n, slide or 0)
+        if arr is not None:
+            self._play_array(arr, 44100, vol)
 
     # ============================================== Playback
     def _toggle_play(self, mode: str) -> None:
