@@ -11,6 +11,7 @@ Standalone: `gbsfx` oder `.venv\Scripts\python.exe gbrun.py --sfx` (braucht `PyS
 ## Bedienung
 
 - **Presets** oben — `Pickup/Coin`, `Laser/Shoot`, `Explosion`, `Powerup`, `Hit/Hurt`, `Jump`, `Blip/Select`. Klick lädt + spielt.
+- **Preset-Bibliothek** (darunter) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.gamebasic/presets/sfx.json`) und lade sie über die Combo wieder. „Loeschen" entfernt das gewählte eigene Preset.
 - **Wellenform-Vorschau** zeigt das aktuelle Signal (Pitch-Sweep + Hüllkurve sichtbar).
 - **Ton** — Waveform (`square`/`saw`/`sine`/`triangle`/`noise`), Frequenz, **Pitch-Slide** (Hz/s, negativ = fallend), Lautstärke.
 - **Hüllkurve & Vibrato** — Attack / Sustain / Decay (ms), Vibrato-Tiefe + -Speed, **Stereo-Breite** (0 = mono, >0 = breiter per Detune; bei `noise` dekorreliert) und **Pan** (links −1 … +1 rechts).

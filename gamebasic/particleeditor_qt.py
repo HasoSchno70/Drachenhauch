@@ -23,9 +23,46 @@ from PySide6.QtWidgets import (
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
+from .editor_qt.preset_bar import PresetBar
+from .editor_qt.preset_library import PresetLibrary, default_dir
 from .modules.particles import _ParticleSystem
 
 _MODES = ("circle", "pixel", "square", "streak", "glow")
+
+# Werks-Presets (Parameter-Dicts wie _capture_state). Als Startbibliothek;
+# der Nutzer kann eigene dazu speichern.
+_FACTORY_PRESETS = {
+    "Feuer": {
+        "vx_min": -30, "vx_max": 30, "vy_min": -90, "vy_max": -40,
+        "gx": 0, "gy": -20, "mode": "glow", "size_min": 3, "size_max": 7,
+        "color": 0xFFAA00, "color_end_on": True, "color_end": 0xFF2000,
+        "fade": True, "life_min": 400, "life_max": 900, "rate": 8,
+    },
+    "Rauch": {
+        "vx_min": -10, "vx_max": 10, "vy_min": -40, "vy_max": -15,
+        "gx": 0, "gy": -5, "mode": "circle", "size_min": 6, "size_max": 14,
+        "color": 0x808088, "color_end_on": True, "color_end": 0x303038,
+        "fade": True, "life_min": 800, "life_max": 1800, "rate": 4,
+    },
+    "Funken": {
+        "vx_min": -120, "vx_max": 120, "vy_min": -150, "vy_max": -40,
+        "gx": 0, "gy": 300, "mode": "streak", "size_min": 1, "size_max": 3,
+        "color": 0xFFEE60, "color_end_on": False, "color_end": 0xFF3000,
+        "fade": True, "life_min": 300, "life_max": 700, "rate": 10,
+    },
+    "Explosion": {
+        "vx_min": -160, "vx_max": 160, "vy_min": -160, "vy_max": 160,
+        "gx": 0, "gy": 120, "mode": "pixel", "size_min": 2, "size_max": 5,
+        "color": 0xFF8020, "color_end_on": True, "color_end": 0x802000,
+        "fade": True, "life_min": 250, "life_max": 600, "rate": 40,
+    },
+    "Regen": {
+        "vx_min": -5, "vx_max": 5, "vy_min": 120, "vy_max": 200,
+        "gx": 0, "gy": 200, "mode": "streak", "size_min": 1, "size_max": 2,
+        "color": 0x4090E0, "color_end_on": False, "color_end": 0x102040,
+        "fade": False, "life_min": 600, "life_max": 1000, "rate": 12,
+    },
+}
 
 
 def _compute_colors(sys: _ParticleSystem):
@@ -228,6 +265,13 @@ class ParticleEditor(QMainWindow):
         tf = QFont(); tf.setBold(True); tf.setPointSize(13)
         title.setFont(tf)
         cl.addWidget(title)
+
+        # Preset-Bibliothek (Werks-Presets + eigene)
+        self.presets = PresetLibrary(
+            default_dir() / "particles.json", builtins=_FACTORY_PRESETS)
+        self.preset_bar = PresetBar(
+            self.presets, self._capture_state, self._apply_state)
+        cl.addWidget(self.preset_bar)
 
         # Bewegung
         g_move = QGroupBox("Bewegung")

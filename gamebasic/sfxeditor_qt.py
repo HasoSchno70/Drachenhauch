@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
+from .editor_qt.preset_bar import PresetBar
+from .editor_qt.preset_library import PresetLibrary, default_dir
 from .synth import SAMPLE_RATE as _SAMPLE_RATE, WAVEFORMS as _WAVEFORMS
 from .synth import synthesize as _synth
 
@@ -136,7 +138,7 @@ class SfxGenerator(QMainWindow):
         title.setFont(tf)
         root.addWidget(title)
 
-        # Presets
+        # Presets (Werks-Schnellzugriff)
         pre = QHBoxLayout()
         pre.addWidget(QLabel("Preset:"))
         for name in _PRESETS:
@@ -145,6 +147,12 @@ class SfxGenerator(QMainWindow):
             pre.addWidget(b)
         pre.addStretch(1)
         root.addLayout(pre)
+
+        # Preset-Bibliothek (eigene Sounds speichern/laden)
+        self.presets = PresetLibrary(default_dir() / "sfx.json")
+        self.preset_bar = PresetBar(
+            self.presets, self._params, self._apply_params)
+        root.addWidget(self.preset_bar)
 
         # Wellenform-Vorschau
         self.wave_view = _WaveView()
