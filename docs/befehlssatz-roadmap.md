@@ -44,11 +44,13 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       - `SCROLL`: gbrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
         persistenter Framebuffer) → graceful No-Op, **Tree-Walker-only**
         (Kommentar in `vm.rs`).
-- [ ] **Float-Koordinaten angleichen.** TW lehnt `LINE(10.5,…)` ab
-      (`_check_int`), gbrt akzeptiert + truncated. → TW-Zeichenprimitive
-      (LINE/BOX/RECT/CIRCLE/PLOT/GRADIENT*) auf `_check_intish` umstellen
-      (= dokumentierte „intish"-Konvention, matcht gbrt); falschen Kommentar in
-      `vm.rs` korrigieren.
+- [x] **Float-Koordinaten angleichen.** Befund: schon konsistent. Im
+      Tree-Walker ist `_check_int` ein Alias auf `_check_intish`
+      (`interpreter.py:3541`, seit dem Initial-Commit) → die Zeichenprimitive
+      (LINE/BOX/RECT/CIRCLE/PLOT/GRADIENT*) akzeptieren Floats und trunkieren
+      sie, genau wie gbrts `gi()`. Die Audit-Annahme „TW lehnt `LINE(10.5,…)`
+      ab" war falsch. Empirisch verifiziert (beide Pfade laufen identisch);
+      `vm.rs`-Kommentar praezisiert (verweist auf den Alias als Quelle).
 
 ## WP1 — Array-Power (größte praktische Lücke)
 - [ ] **Dynamische Arrays:** `ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`

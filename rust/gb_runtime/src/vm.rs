@@ -2138,9 +2138,12 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "graphics")]
     fn try_graphics(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
-        // Grafik-Args sind "intish" (wie _check_int == _check_intish im Tree-
-        // Walker): INTEGER direkt, FLOAT wird zu int trunkiert (Richtung 0).
-        // So sind F5 (Tree-Walker) und F6 (gbrt) bei Float-Koordinaten konsistent.
+        // Grafik-Koordinaten sind "intish": INTEGER direkt, FLOAT wird zu int
+        // trunkiert (Richtung 0, wie Pythons int()). Der Tree-Walker macht das
+        // gleiche -- seine Zeichenprimitive (PLOT/LINE/BOX/RECT/CIRCLE/GRADIENT*)
+        // pruefen via `_check_int`, das in interpreter.py ein Alias auf
+        // `_check_intish` ist (interpreter.py:3541). So sind F5 (Tree-Walker) und
+        // F6 (gbrt) bei Float-Koordinaten konsistent (z.B. LINE(10.5, ...)).
         fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
             match a.get(i) {
                 Some(Value::Int(n)) => Ok(*n),
