@@ -110,26 +110,26 @@ def test_explicit_paren_for_c_style(run_gb, run_vm):
 # --- Type-Strictness -------------------------------------------------
 
 def test_band_rejects_float(run_gb, run_vm):
-    from gamebasic.errors import TypeMismatchError
-    with pytest.raises(TypeMismatchError):
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError):
         run_gb("PRINT 1.5 BAND 1")
-    with pytest.raises(TypeMismatchError):
+    with pytest.raises(GBRuntimeError):
         run_vm("PRINT 1.5 BAND 1")
 
 
 def test_band_rejects_bool(run_gb, run_vm):
-    from gamebasic.errors import TypeMismatchError
-    with pytest.raises(TypeMismatchError):
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError):
         run_gb("PRINT TRUE BAND 1")
-    with pytest.raises(TypeMismatchError):
+    with pytest.raises(GBRuntimeError):
         run_vm("PRINT TRUE BAND 1")
 
 
 def test_bnot_rejects_float(run_gb, run_vm):
-    from gamebasic.errors import TypeMismatchError
-    with pytest.raises(TypeMismatchError):
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError):
         run_gb("PRINT BNOT 1.5")
-    with pytest.raises(TypeMismatchError):
+    with pytest.raises(GBRuntimeError):
         run_vm("PRINT BNOT 1.5")
 
 

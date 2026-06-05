@@ -41,8 +41,8 @@ PRINT MAPHAS(m, "1")
 
 def test_dict_comp_string_keys_required(run_gb):
     """Key muss STRING sein -- INTEGER-Keys werfen TypeMismatch."""
-    from gamebasic.errors import TypeMismatchError
-    with pytest.raises(TypeMismatchError, match="Key muss STRING"):
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError, match="erwartet STRING"):
         run_gb('''
 DIM m AS MAP OF INTEGER
 m = {x: x FOR x IN (1, 2, 3)}

@@ -164,12 +164,12 @@ PRINT a, b, c
 
 
 def test_comp_unsupported_iter_throws(run_gb, run_vm):
-    from gamebasic.errors import TypeMismatchError
+    from gamebasic.errors import GBRuntimeError
     src = '''
 DIM r AS TUPLE
 r = [x FOR x IN 42]
 '''
-    with pytest.raises(TypeMismatchError):
+    with pytest.raises(GBRuntimeError):
         run_gb(src)
-    with pytest.raises(TypeMismatchError):
+    with pytest.raises(GBRuntimeError):
         run_vm(src)

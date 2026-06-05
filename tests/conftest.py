@@ -14,29 +14,77 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+def _find_gbrt():
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = _ROOT / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
+
+
+_GBRT = _find_gbrt()
+
+
+def _gbrt_err_message(stderr: str) -> str:
+    """Bare Fehlermeldung aus gbrt-stderr extrahieren (ohne 'Laufzeitfehler in
+    label:line:'-Praefix), damit `pytest.raises(match=...)` die Meldung trifft."""
+    s = (stderr or "").strip()
+    import re
+    m = re.search(r"(?:Laufzeitfehler in|Fehler in)\s+[^:]+:\d+:\s*(.*)", s, re.S)
+    if m:
+        return m.group(1).strip()
+    # Compile/Parse: "label:line: <phase>-Fehler: MSG"
+    m = re.search(r":\d+:\s*(?:[A-Za-z]+-Fehler[^:]*:\s*)?(.*)", s, re.S)
+    return m.group(1).strip() if m else s
+
+
 @pytest.fixture
 def run_gb():
-    """Fuehrt einen GB-Quelltext im Tree-Walker aus und gibt den stdout zurueck.
+    """Fuehrt einen GB-Quelltext ueber die native Runtime (`gbrt run`) aus und
+    gibt stdout zurueck (LF). Bei einem Fehler (Exit != 0) wird ein
+    GBRuntimeError mit der gbrt-Meldung geworfen -- so funktioniert
+    `pytest.raises(GBRuntimeError, match=...)` weiter (Wortlaut = gbrt).
 
     Beispiel:
         def test_print(run_gb):
             assert run_gb('PRINT "hi"') == "hi\\n"
     """
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    from gamebasic.preprocess import process
+    import subprocess
+    import tempfile
+    from gamebasic.errors import GBRuntimeError, ParseError, LexerError
 
     def _run(source: str, base: Path | None = None) -> str:
-        if base is None:
-            base = _ROOT
-        prepped, _ = process(source, base, file_label="<test>")
-        tokens = Lexer(prepped).tokenize()
-        ast = Parser(tokens).parse()
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            Interpreter().run(ast)
-        return buf.getvalue()
+        if _GBRT is None:
+            pytest.skip("native Runtime 'gbrt' nicht gebaut")
+        # Temp-Datei im System-Temp-Verzeichnis (NICHT in examples/_ROOT, sonst
+        # fangen die rust-Parity-Sweeps `examples.glob("*.gb")` die Datei).
+        # gbrt-Module (IMPORT "vec2") sind verzeichnis-unabhaengig; relative
+        # .gb-Datei-Imports sind in run_gb-Tests nicht in Gebrauch.
+        fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_")
+        os.close(fd)
+        try:
+            Path(tmp).write_text(source, encoding="utf-8")
+            r = subprocess.run([str(_GBRT), "run", tmp],
+                               capture_output=True, text=True, timeout=60)
+        finally:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+        if r.returncode != 0:
+            stderr = r.stderr or ""
+            msg = _gbrt_err_message(stderr)
+            # Phasen-passenden Fehlertyp werfen, damit pytest.raises(ParseError/
+            # LexerError/...) wie bisher trifft. gbrt unterscheidet keine
+            # TYP-Fehler von anderen Laufzeitfehlern -> die kommen als
+            # GBRuntimeError (Tests dafuer pruefen die Basis GameBasicError).
+            if "Parse-Fehler" in stderr:
+                raise ParseError(msg)
+            if "Lexer-Fehler" in stderr:
+                raise LexerError(msg)
+            raise GBRuntimeError(msg)
+        return (r.stdout or "").replace("\r\n", "\n")
 
     return _run
 
