@@ -69,6 +69,9 @@ def _b64_to_samples(s: str) -> np.ndarray:
 
 # --------------------------------------------------------------- Instrument
 
+LOOP_MODES = ("none", "forward", "pingpong")
+
+
 @dataclass
 class Instrument:
     name: str = "Instrument"
@@ -79,6 +82,16 @@ class Instrument:
     sample_rate: int = SAMPLE_RATE
     base_note: int = DEFAULT_BASE_NOTE
     default_vol: int = 15           # 1..15 (Tracker-Lautstaerke-Skala)
+    # Loop (Sample-Indizes; loop_mode == "none" -> kein Loop):
+    loop_mode: str = "none"         # "none" | "forward" | "pingpong"
+    loop_start: int = 0
+    loop_end: int = 0
+    # ADSR-Lautstaerke-Huellkurve (ueber die Notendauer). Defaults =
+    # passthrough (formt nichts), damit Synth-Klang unveraendert bleibt.
+    env_attack_ms: int = 0
+    env_decay_ms: int = 0
+    env_sustain: float = 1.0        # 0..1 Pegel nach dem Decay
+    env_release_ms: int = 0
 
     # ---- Konstruktoren
     @classmethod
@@ -105,19 +118,47 @@ class Instrument:
         return self.kind == "sample" and self.samples is not None \
             and self.samples.size > 0
 
+    def has_loop(self) -> bool:
+        return (self.loop_mode in ("forward", "pingpong")
+                and self.loop_end > self.loop_start >= 0)
+
     def render_note(self, midi: int, n_samples: int,
                     sr: int = SAMPLE_RATE) -> np.ndarray:
-        """Liefert ein Mono-Float-Array [-1, 1] der Note `midi`, hoechstens
-        `n_samples` lang. Synth: erzeugt die Wellenform; Sample: resampelt das
-        Quell-Audio in die Zieltonhoehe (laeuft aus, wenn das Sample kuerzer
-        ist -- Loops kommen in einer spaeteren Stufe)."""
+        """Liefert ein Mono-Float-Array [-1, 1] der Note `midi`, `n_samples`
+        lang. Synth: erzeugt die Wellenform; Sample: resampelt das Quell-Audio
+        in die Zieltonhoehe (mit optionalem Loop) und wendet die ADSR-
+        Huellkurve an."""
         n_samples = max(0, int(n_samples))
         if not self.is_sample():
-            return _render_synth(self.waveform, midi, n_samples, sr)
-        return _resample(self.samples, self.sample_rate, self.base_note,
-                         midi, n_samples, sr)
+            out = _render_synth(self.waveform, midi, n_samples, sr)
+        else:
+            lm = self.loop_mode if self.has_loop() else "none"
+            out = _resample(self.samples, self.sample_rate, self.base_note,
+                            midi, n_samples, sr,
+                            lm, int(self.loop_start), int(self.loop_end))
+        out = self._apply_envelope(out, sr)
+        return _anti_click(out, sr)
+
+    def _apply_envelope(self, out: np.ndarray, sr: int) -> np.ndarray:
+        if out.size == 0:
+            return out
+        if (self.env_attack_ms <= 0 and self.env_decay_ms <= 0
+                and self.env_release_ms <= 0 and self.env_sustain >= 1.0):
+            return out                       # passthrough
+        env = _adsr_env(out.size, self.env_attack_ms, self.env_decay_ms,
+                        float(self.env_sustain), self.env_release_ms, sr)
+        return (out * env).astype(np.float32)
 
     # ---- Serialisierung
+    def _env_dict(self) -> dict:
+        return {"loop_mode": self.loop_mode,
+                "loop_start": int(self.loop_start),
+                "loop_end": int(self.loop_end),
+                "env_attack_ms": int(self.env_attack_ms),
+                "env_decay_ms": int(self.env_decay_ms),
+                "env_sustain": float(self.env_sustain),
+                "env_release_ms": int(self.env_release_ms)}
+
     def to_dict(self) -> dict:
         d = {"name": self.name, "kind": self.kind,
              "default_vol": int(self.default_vol)}
@@ -125,6 +166,7 @@ class Instrument:
             d["sample_rate"] = int(self.sample_rate)
             d["base_note"] = int(self.base_note)
             d["samples"] = _samples_to_b64(self.samples)
+            d.update(self._env_dict())
         else:
             d["waveform"] = self.waveform
         return d
@@ -140,6 +182,14 @@ class Instrument:
                 int(d.get("sample_rate", SAMPLE_RATE)),
                 int(d.get("base_note", DEFAULT_BASE_NOTE)))
             inst.default_vol = dv
+            lm = str(d.get("loop_mode", "none"))
+            inst.loop_mode = lm if lm in LOOP_MODES else "none"
+            inst.loop_start = int(d.get("loop_start", 0))
+            inst.loop_end = int(d.get("loop_end", 0))
+            inst.env_attack_ms = int(d.get("env_attack_ms", 0))
+            inst.env_decay_ms = int(d.get("env_decay_ms", 0))
+            inst.env_sustain = float(d.get("env_sustain", 1.0))
+            inst.env_release_ms = int(d.get("env_release_ms", 0))
             return inst
         inst = cls.synth(name, str(d.get("waveform", "square")))
         inst.default_vol = dv
@@ -164,8 +214,11 @@ def _render_synth(waveform: str, midi: int, n_samples: int, sr: int) -> np.ndarr
 
 
 def _resample(samples: np.ndarray, src_sr: int, base_note: int,
-              midi: int, n_samples: int, sr: int) -> np.ndarray:
-    """Lineares Resampling eines Samples auf die Zieltonhoehe.
+              midi: int, n_samples: int, sr: int,
+              loop_mode: str = "none",
+              loop_start: int = 0, loop_end: int = 0) -> np.ndarray:
+    """Lineares Resampling eines Samples auf die Zieltonhoehe, mit optionalem
+    Loop (forward / pingpong).
 
     Schrittweite pro Ausgabe-Sample durchs Quell-Audio:
         step = (src_sr / sr) * 2^((midi - base_note) / 12)
@@ -177,14 +230,64 @@ def _resample(samples: np.ndarray, src_sr: int, base_note: int,
     step = (src_sr / float(sr)) * (2.0 ** ((midi - base_note) / 12.0))
     if step <= 0:
         return np.zeros(n_samples, dtype=np.float32)
-    # Nur so viele Ausgabe-Samples, wie das Quell-Audio hergibt.
-    avail = int(np.floor((src.size - 1) / step)) + 1
-    out_len = min(n_samples, max(0, avail))
-    if out_len <= 0:
-        return np.zeros(n_samples, dtype=np.float32)
-    pos = np.arange(out_len, dtype=np.float64) * step
-    idx = np.arange(src.size, dtype=np.float64)
-    out = np.interp(pos, idx, src).astype(np.float32)
-    if out.size < n_samples:                 # Rest mit Stille (kein Loop)
-        out = np.concatenate([out, np.zeros(n_samples - out.size, np.float32)])
+    idx_axis = np.arange(src.size, dtype=np.float64)
+    loop_ok = (loop_mode in ("forward", "pingpong")
+               and 0 <= loop_start < loop_end <= src.size)
+    if not loop_ok:
+        # Einmal abspielen, Rest mit Stille (kein Loop).
+        avail = int(np.floor((src.size - 1) / step)) + 1
+        out_len = min(n_samples, max(0, avail))
+        pos = np.arange(out_len, dtype=np.float64) * step
+        out = np.interp(pos, idx_axis, src).astype(np.float32)
+        if out.size < n_samples:
+            out = np.concatenate(
+                [out, np.zeros(n_samples - out.size, np.float32)])
+        return out
+    # Mit Loop: virtueller, monoton steigender Playhead `pos`, in eine
+    # Quell-Position innerhalb des Loops zurueckgefaltet.
+    pos = np.arange(n_samples, dtype=np.float64) * step
+    le = float(loop_end)
+    ls = float(loop_start)
+    loop_len = le - ls
+    src_pos = pos.copy()
+    after = pos >= le
+    rel = pos[after] - le
+    if loop_mode == "forward":
+        src_pos[after] = ls + np.mod(rel, loop_len)
+    else:  # pingpong: Dreieck zwischen ls und le
+        tri = np.mod(rel, 2.0 * loop_len)
+        up = tri <= loop_len
+        folded = np.empty_like(tri)
+        folded[up] = le - tri[up]
+        folded[~up] = ls + (tri[~up] - loop_len)
+        src_pos[after] = folded
+    return np.interp(src_pos, idx_axis, src).astype(np.float32)
+
+
+def _adsr_env(n: int, attack_ms: int, decay_ms: int, sustain: float,
+              release_ms: int, sr: int) -> np.ndarray:
+    """ADSR-Huellkurve der Laenge n (Attack->Decay->Sustain->Release am Ende)."""
+    sustain = max(0.0, min(1.0, sustain))
+    env = np.full(n, sustain, dtype=np.float64)   # Sustain-Pegel als Basis
+    na = min(n, int(sr * max(0, attack_ms) / 1000))
+    nd = min(n - na, int(sr * max(0, decay_ms) / 1000))
+    nr = min(n, int(sr * max(0, release_ms) / 1000))
+    if na > 0:
+        env[:na] = np.linspace(0.0, 1.0, na)
+    if nd > 0:
+        env[na:na + nd] = np.linspace(1.0, sustain, nd)
+    if nr > 0:                                # Release ueberschreibt das Ende
+        start_lvl = float(env[-nr])
+        env[-nr:] = np.linspace(start_lvl, 0.0, nr)
+    return env
+
+
+def _anti_click(out: np.ndarray, sr: int, fade_ms: float = 2.0) -> np.ndarray:
+    """Kurze lineare Ausblendung am Ende gegen Klicks bei hartem Abschnitt."""
+    if out.size == 0:
+        return out
+    nf = min(out.size, int(sr * fade_ms / 1000))
+    if nf > 1:
+        out = out.copy()
+        out[-nf:] *= np.linspace(1.0, 0.0, nf).astype(np.float32)
     return out

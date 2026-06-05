@@ -72,3 +72,25 @@ def test_remove_instrument_updates_combo(tmp_path):
     ed._remove_instrument()
     assert ed.inst_combo.count() == 0
     assert len(ed.song.instruments) == 0
+
+
+def test_instrument_dialog_applies_loop_and_env(tmp_path):
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    ed = _editor()
+    p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
+    inst = ed._instrument_from_file(str(p))
+    dlg = _InstrumentDialog(inst)
+    dlg.base.setValue(72)
+    dlg.loop_mode.setCurrentText("pingpong")
+    dlg.loop_start.setValue(100)
+    dlg.loop_end.setValue(3000)
+    dlg.atk.setValue(20)
+    dlg.rel.setValue(40)
+    dlg.sus.setValue(0.7)
+    dlg.apply_to()
+    assert inst.base_note == 72
+    assert inst.loop_mode == "pingpong"
+    assert inst.loop_start == 100 and inst.loop_end == 3000
+    assert inst.has_loop() is True
+    assert inst.env_attack_ms == 20 and inst.env_release_ms == 40
+    assert abs(inst.env_sustain - 0.7) < 1e-6

@@ -19,10 +19,11 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
-    QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QApplication, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
+    QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QLabel,
+    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit,
+    QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
@@ -32,6 +33,71 @@ from .tracker import (
     CHANNELS, SLIDE_MAX, TONAL, VOL_MAX, WAVEFORMS, Song, midi_to_freq,
     note_name, vol_to_pct,
 )
+
+
+class _InstrumentDialog(QDialog):
+    """Bearbeitet ein Sample-Instrument: Grundton, Loop, ADSR-Huellkurve."""
+
+    def __init__(self, inst, parent=None):
+        super().__init__(parent)
+        self.inst = inst
+        self.setWindowTitle(f"Instrument: {inst.name}")
+        form = QFormLayout(self)
+        n = inst.samples.size if inst.samples is not None else 0
+        form.addRow(QLabel(f"Sample: {n} Samples @ {inst.sample_rate} Hz"))
+
+        self.base = QSpinBox(); self.base.setRange(0, 127)
+        self.base.setValue(int(inst.base_note))
+        self.base.valueChanged.connect(self._upd_base_label)
+        self.base_label = QLabel("")
+        brow = QHBoxLayout(); brow.addWidget(self.base); brow.addWidget(self.base_label)
+        bw = QWidget(); bw.setLayout(brow)
+        form.addRow("Grundton (MIDI):", bw)
+        self._upd_base_label()
+
+        self.loop_mode = QComboBox()
+        self.loop_mode.addItems(["none", "forward", "pingpong"])
+        self.loop_mode.setCurrentText(inst.loop_mode)
+        form.addRow("Loop-Modus:", self.loop_mode)
+        self.loop_start = QSpinBox(); self.loop_start.setRange(0, max(0, n))
+        self.loop_start.setValue(min(int(inst.loop_start), max(0, n)))
+        form.addRow("Loop-Start (Sample):", self.loop_start)
+        self.loop_end = QSpinBox(); self.loop_end.setRange(0, max(0, n))
+        self.loop_end.setValue(min(int(inst.loop_end) or n, max(0, n)))
+        form.addRow("Loop-Ende (Sample):", self.loop_end)
+
+        self.atk = QSpinBox(); self.atk.setRange(0, 5000)
+        self.atk.setValue(int(inst.env_attack_ms))
+        form.addRow("Attack (ms):", self.atk)
+        self.dec = QSpinBox(); self.dec.setRange(0, 5000)
+        self.dec.setValue(int(inst.env_decay_ms))
+        form.addRow("Decay (ms):", self.dec)
+        self.sus = QDoubleSpinBox(); self.sus.setRange(0.0, 1.0)
+        self.sus.setSingleStep(0.05); self.sus.setValue(float(inst.env_sustain))
+        form.addRow("Sustain (0..1):", self.sus)
+        self.rel = QSpinBox(); self.rel.setRange(0, 5000)
+        self.rel.setValue(int(inst.env_release_ms))
+        form.addRow("Release (ms):", self.rel)
+
+        box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        form.addRow(box)
+
+    def _upd_base_label(self) -> None:
+        self.base_label.setText(note_name(self.base.value()))
+
+    def apply_to(self) -> None:
+        i = self.inst
+        i.base_note = self.base.value()
+        i.loop_mode = self.loop_mode.currentText()
+        i.loop_start = self.loop_start.value()
+        i.loop_end = self.loop_end.value()
+        i.env_attack_ms = self.atk.value()
+        i.env_decay_ms = self.dec.value()
+        i.env_sustain = self.sus.value()
+        i.env_release_ms = self.rel.value()
 
 
 class _Piano(QWidget):
@@ -156,6 +222,10 @@ class TrackerEditor(QMainWindow):
         b_load = QPushButton("Sample laden...")
         b_load.clicked.connect(self._load_sample)
         irow.addWidget(b_load)
+        b_iedit = QPushButton("Bearbeiten...")
+        b_iedit.setToolTip("Grundton, Loop-Punkte, ADSR-Huellkurve")
+        b_iedit.clicked.connect(self._edit_instrument)
+        irow.addWidget(b_iedit)
         b_idel = QPushButton("Entfernen")
         b_idel.clicked.connect(self._remove_instrument)
         irow.addWidget(b_idel)
@@ -430,6 +500,22 @@ class TrackerEditor(QMainWindow):
             self.song.remove_instrument(idx)
             self._sound_cache.clear()
             self._refresh_instruments()
+            self._mark()
+
+    def _edit_instrument(self) -> None:
+        idx = self.inst_combo.currentIndex()
+        if not (0 <= idx < len(self.song.instruments)):
+            return
+        inst = self.song.instruments[idx]
+        if inst.kind != "sample":
+            QMessageBox.information(
+                self, "Synth-Instrument",
+                "Grundton/Loop/ADSR gibt es nur fuer Sample-Instrumente.")
+            return
+        dlg = _InstrumentDialog(inst, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.apply_to()
+            self._sound_cache.clear()
             self._mark()
 
     def _assign_instrument(self) -> None:

@@ -132,3 +132,76 @@ def test_from_wav(tmp_path):
     assert inst.kind == "sample"
     assert inst.name == "inst"
     assert inst.is_sample()
+
+
+# --- Loop ----------------------------------------------------------
+
+def test_no_loop_short_sample_has_trailing_silence():
+    src = _sine(440, 0.05)                    # 2205 samples
+    inst = Instrument.from_array("S", src, 44100, 69)
+    out = inst.render_note(69, 44100)         # 1s angefordert
+    assert out.shape == (44100,)
+    assert np.max(np.abs(out[-1000:])) < 1e-3  # Ende still (kein Loop)
+
+
+def test_forward_loop_fills_full_length():
+    src = _sine(440, 0.05)
+    inst = Instrument.from_array("S", src, 44100, 69)
+    inst.loop_mode = "forward"
+    inst.loop_start = 100
+    inst.loop_end = 2000
+    out = inst.render_note(69, 44100)
+    # Mit Loop ist auch das Ende noch laut (Sustain durch Schleife)
+    assert np.max(np.abs(out[20000:21000])) > 0.3
+
+
+def test_pingpong_loop_fills_full_length():
+    src = _sine(440, 0.05)
+    inst = Instrument.from_array("S", src, 44100, 69)
+    inst.loop_mode = "pingpong"
+    inst.loop_start = 100
+    inst.loop_end = 2000
+    out = inst.render_note(69, 44100)
+    assert np.max(np.abs(out[30000:31000])) > 0.3
+
+
+def test_has_loop_validation():
+    inst = Instrument.from_array("S", _sine(440, 0.05), 44100, 69)
+    assert inst.has_loop() is False           # mode none
+    inst.loop_mode = "forward"; inst.loop_start = 0; inst.loop_end = 0
+    assert inst.has_loop() is False           # end <= start
+    inst.loop_end = 1000
+    assert inst.has_loop() is True
+
+
+# --- Envelope ------------------------------------------------------
+
+def test_envelope_attack_starts_quiet_release_ends_quiet():
+    src = np.ones(44100, dtype=np.float32)    # DC -> Envelope direkt sichtbar
+    inst = Instrument.from_array("S", src, 44100, 69)
+    inst.env_attack_ms = 50
+    inst.env_release_ms = 50
+    out = inst.render_note(69, 44100)
+    assert abs(out[0]) < 0.05                  # Attack startet bei 0
+    assert abs(out[-1]) < 0.05                  # Release endet bei 0
+    assert out[22050] > 0.8                     # Mitte = Sustain (~1)
+
+
+def test_envelope_passthrough_default_unchanged():
+    src = np.full(1000, 0.5, np.float32)
+    inst = Instrument.from_array("S", src, 44100, 69)
+    out = inst.render_note(69, 1000)
+    # Default-Envelope formt nichts (bis auf den 2ms-Anti-Click am Ende)
+    assert np.allclose(out[:900], 0.5, atol=1e-3)
+
+
+def test_loop_env_dict_roundtrip():
+    inst = Instrument.from_array("S", _sine(220, 0.05), 44100, 60)
+    inst.loop_mode = "pingpong"; inst.loop_start = 50; inst.loop_end = 900
+    inst.env_attack_ms = 10; inst.env_decay_ms = 20
+    inst.env_sustain = 0.6; inst.env_release_ms = 30
+    inst2 = Instrument.from_dict(inst.to_dict())
+    assert inst2.loop_mode == "pingpong"
+    assert inst2.loop_start == 50 and inst2.loop_end == 900
+    assert inst2.env_attack_ms == 10 and inst2.env_decay_ms == 20
+    assert abs(inst2.env_sustain - 0.6) < 1e-6 and inst2.env_release_ms == 30
