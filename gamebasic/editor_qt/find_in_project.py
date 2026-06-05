@@ -16,8 +16,9 @@ from typing import Callable
 from PySide6.QtCore import QObject, Qt, QThread, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QDialog, QDialogButtonBox, QGridLayout, QHBoxLayout,
+    QLabel, QLineEdit, QMessageBox, QPushButton, QTreeWidget, QTreeWidgetItem,
+    QVBoxLayout, QWidget,
 )
 
 from .theme import COLORS
@@ -28,6 +29,57 @@ class _Hit:
     file: Path
     line: int
     text: str
+
+
+def build_pattern(query: str, *, case_sensitive: bool, whole_word: bool,
+                  regex: bool) -> "re.Pattern":
+    """Baut das Suchmuster (gemeinsam fuer Suche und Ersetzen). Wirft
+    `re.error` bei ungueltigem Regex."""
+    pat_str = query if regex else re.escape(query)
+    if whole_word:
+        pat_str = rf"\b{pat_str}\b"
+    flags = 0 if case_sensitive else re.IGNORECASE
+    return re.compile(pat_str, flags)
+
+
+def iter_gb_files(root: Path):
+    """Alle `.gb`-Dateien unter `root` (gleicher Filter wie die Suche:
+    `.venv` und `_`-Praefix-Dateien ausgenommen)."""
+    for path in sorted(root.rglob("*.gb")):
+        if ".venv" in path.parts or path.name.startswith("_"):
+            continue
+        yield path
+
+
+def replacement_string(repl: str, regex: bool) -> str:
+    """Im Nicht-Regex-Modus die Ersetzung literal machen (Backslashes
+    escapen), damit `re.sub` `\\1`/`\\g` nicht interpretiert."""
+    return repl if regex else repl.replace("\\", "\\\\")
+
+
+def plan_replacements(root: Path, pattern: "re.Pattern", repl_str: str,
+                      text_provider: "Callable[[Path], str | None] | None" = None):
+    """Sammelt die geplanten Ersetzungen ueber alle `.gb`-Dateien.
+
+    `text_provider(path)` liefert optional den (offenen) Live-Text einer Datei
+    -- so beruecksichtigt das Ersetzen ungespeicherte Editor-Aenderungen; gibt
+    es keinen, wird die Platte gelesen. Liefert `(plan, total)` mit
+    `plan = [(path, new_text, n), ...]` nur fuer wirklich geaenderte Dateien.
+    """
+    plan: list = []
+    total = 0
+    for path in iter_gb_files(root):
+        text = text_provider(path) if text_provider else None
+        if text is None:
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+        new_text, n = pattern.subn(repl_str, text)
+        if n and new_text != text:
+            plan.append((path, new_text, n))
+            total += n
+    return plan, total
 
 
 class _Worker(QObject):
@@ -49,21 +101,17 @@ class _Worker(QObject):
 
     def run(self) -> None:
         try:
-            pat_str = self.query if self.regex else re.escape(self.query)
-            if self.whole_word:
-                pat_str = rf"\b{pat_str}\b"
-            flags = 0 if self.case_sensitive else re.IGNORECASE
-            pattern = re.compile(pat_str, flags)
+            pattern = build_pattern(
+                self.query, case_sensitive=self.case_sensitive,
+                whole_word=self.whole_word, regex=self.regex)
         except re.error:
             self.finished.emit(0)
             return
 
         total = 0
-        for path in sorted(self.root.rglob("*.gb")):
+        for path in iter_gb_files(self.root):
             if self._abort:
                 break
-            if ".venv" in path.parts or path.name.startswith("_"):
-                continue
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
@@ -86,9 +134,15 @@ class FindInProjectDialog(QDialog):
         self._thread: QThread | None = None
         self._worker: _Worker | None = None
 
-        self.setWindowTitle("Im Projekt suchen")
+        self.setWindowTitle("Im Projekt suchen / ersetzen")
         self.setWindowFlag(Qt.WindowType.Tool, True)
         self.setModal(False)
+
+        # Optionale Hooks (vom Editor gesetzt), damit Ersetzen offene Tabs
+        # respektiert: text_provider(path)->live-Text|None (ungespeicherte Edits!)
+        # und apply_replacement(path, new_text) (schreibt Platte + Buffer).
+        self.text_provider: Callable[[Path], "str | None"] | None = None
+        self.apply_replacement: Callable[[Path, str], None] | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -108,6 +162,19 @@ class FindInProjectDialog(QDialog):
         self.btn_stop.setEnabled(False)
         row.addWidget(self.btn_stop)
         layout.addLayout(row)
+
+        # Ersetzen-Zeile
+        rrow = QHBoxLayout()
+        self.replace_entry = QLineEdit()
+        self.replace_entry.setPlaceholderText("Ersetzen durch ... (leer = loeschen)")
+        rrow.addWidget(self.replace_entry, 1)
+        self.btn_replace = QPushButton("Alle ersetzen")
+        self.btn_replace.setToolTip(
+            "Ersetzt alle Treffer projektweit (schreibt die Dateien; offene Tabs "
+            "werden mit ihren ungespeicherten Aenderungen beruecksichtigt).")
+        self.btn_replace.clicked.connect(self._replace_all)
+        rrow.addWidget(self.btn_replace)
+        layout.addLayout(rrow)
 
         opts = QHBoxLayout()
         opts.setSpacing(12)
@@ -179,6 +246,61 @@ class FindInProjectDialog(QDialog):
         self._worker.finished.connect(self._thread.quit)
         self._thread.finished.connect(self._cleanup_thread)
         self._thread.start()
+
+    # ---------------------------------------------------- Ersetzen
+    def _replace_all(self) -> None:
+        q = self.entry.text()
+        if not q:
+            return
+        regex = self.cb_regex.isChecked()
+        try:
+            pattern = build_pattern(
+                q, case_sensitive=self.cb_case.isChecked(),
+                whole_word=self.cb_word.isChecked(), regex=regex)
+        except re.error as exc:
+            self.status.setText(f"Regex-Fehler: {exc}")
+            return
+        repl = replacement_string(self.replace_entry.text(), regex)
+
+        # Plan bilden: pro Datei den (evtl. offenen) Text nehmen und ersetzen.
+        try:
+            plan, total = plan_replacements(
+                self.project_root, pattern, repl, self.text_provider)
+        except re.error as exc:
+            self.status.setText(f"Regex-Ersetzungsfehler: {exc}")
+            return
+
+        if not plan:
+            self.status.setText("Keine Treffer zum Ersetzen.")
+            return
+        shown = self.replace_entry.text()
+        ok = QMessageBox.question(
+            self, "Ersetzen bestaetigen",
+            f"{total} Vorkommen in {len(plan)} Datei(en) durch "
+            f"{shown!r} ersetzen?\n\nDas schreibt die Dateien auf die Platte "
+            f"(offene Tabs werden aktualisiert).",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        errs = 0
+        for path, new_text, _n in plan:
+            try:
+                if self.apply_replacement is not None:
+                    self.apply_replacement(path, new_text)
+                else:
+                    path.write_text(new_text, encoding="utf-8")
+            except OSError:
+                errs += 1
+        QApplication.restoreOverrideCursor()
+
+        msg = f"{total} Ersetzungen in {len(plan) - errs} Datei(en)."
+        if errs:
+            msg += f"  {errs} mit Schreibfehler."
+        self.status.setText(msg)
+        self._start()        # Treffer-Baum aktualisieren (zeigt Resttreffer)
 
     def _abort(self) -> None:
         if self._worker is not None:

@@ -392,7 +392,7 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 Lokale, noch nicht committete Zeilen sind als `•••` / *(uncommitted)* ausgegraut. Bei ungespeicherten Änderungen zeigt das Panel den zuletzt gespeicherten Stand (Hinweis im Status). Ist die Datei nicht in einem Git-Repository oder `git` nicht installiert, erscheint eine entsprechende Meldung statt einer leeren Tabelle. Implementierung: `gamebasic/editor_qt/gitinfo.py` (Porcelain-Parser von der I/O getrennt, headless getestet: `tests/test_gitinfo.py`).
 
-## Finden im Projekt
+## Finden & Ersetzen im Projekt
 
 `Strg+Shift+F` öffnet den Dialog. Tippe ein Pattern, `Enter` startet die Suche über alle `.gb`-Dateien rekursiv. Die Suche läuft im Hintergrund-Thread und liefert Treffer **inkrementell** in die Liste — der Editor friert auch bei großen Projekten nicht ein. Mit dem `Stop`-Button lässt sich die Suche jederzeit abbrechen.
 
@@ -402,6 +402,8 @@ Optionen:
 - **Regex** — Query als Python-Regex interpretieren; bei Syntaxfehler erscheint ein Hinweis im Status
 
 Treffer-Liste zeigt `pfad/datei.gb:42  code-snippet`. **Doppelklick** öffnet den Treffer.
+
+**Ersetzen:** Im Feld **Ersetzen durch** den Ersatztext eingeben (leer = löschen) und **Alle ersetzen** klicken. Ein Bestätigungsdialog nennt die Anzahl Vorkommen und betroffener Dateien, bevor geschrieben wird. Die Optionen (Gross/Klein, Ganzes Wort, Regex) gelten auch fürs Ersetzen; im Regex-Modus sind Rückverweise (`\1`, `\g<1>`) im Ersatztext erlaubt, sonst wird er literal eingesetzt. **Offene Tabs werden mit ihren ungespeicherten Änderungen berücksichtigt** — der Ersatz wird auf den Live-Buffer angewendet, auf die Platte geschrieben und der Tab synchron gehalten (kein Datenverlust). Implementierung/Tests: `gamebasic/editor_qt/find_in_project.py`, `tests/test_find_in_project.py`.
 
 `.venv/`, `build/`, `dist/`, `__pycache__/` werden ausgespart.
 

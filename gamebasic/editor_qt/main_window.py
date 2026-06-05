@@ -1040,6 +1040,9 @@ class GameBasicEditor(QMainWindow):
         if not hasattr(self, "_find_project_dialog"):
             self._find_project_dialog = FindInProjectDialog(self, self.project_root)
             self._find_project_dialog.open_requested.connect(self._on_project_jump)
+            # Ersetzen soll offene Tabs (inkl. ungespeicherter Edits) respektieren.
+            self._find_project_dialog.text_provider = self._project_text_for
+            self._find_project_dialog.apply_replacement = self._apply_project_replacement
         # Selektion als Default-Suchbegriff vorbelegen.
         st = self.tabs.active
         prefill = None
@@ -1054,6 +1057,23 @@ class GameBasicEditor(QMainWindow):
         st = self.tabs.active
         if st is not None and line > 0:
             st.editor.goto_line(line)
+
+    def _project_text_for(self, path: Path):
+        """Live-Text einer Datei, falls sie offen ist (sonst None -> der Dialog
+        liest die Platte). So beruecksichtigt das Ersetzen ungespeicherte Edits."""
+        st = self.tabs.find_tab_for(Path(path).resolve())
+        return st.editor.get_text() if st is not None else None
+
+    def _apply_project_replacement(self, path: Path, new_text: str) -> None:
+        """Schreibt die Ersetzung auf die Platte UND aktualisiert einen evtl.
+        offenen Tab (Buffer + sauber markieren), damit beide synchron sind."""
+        p = Path(path)
+        p.write_text(new_text, encoding="utf-8")
+        st = self.tabs.find_tab_for(p.resolve())
+        if st is not None:
+            st.editor.set_text(new_text)
+            self.tabs.mark_clean(st)
+            st.editor._kick_error_check()
             st.editor.setFocus()
 
     def _show_goto(self) -> None:
