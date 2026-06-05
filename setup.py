@@ -1,32 +1,23 @@
-"""Build-Skript fuer die nativen Cython-Beschleuniger.
+"""Cython-Beschleuniger ENTFERNT -- dieser Build-Schritt ist nicht mehr noetig.
 
-Verwendung:
-    .venv\\Scripts\\python.exe setup.py build_ext --inplace
+Frueher baute dieses Skript zwei cdef-Module (`array_native` = `_GBArray`,
+`ecs_native` = Native-ECS), die den Tree-Walker beschleunigten. Beide wurden
+entfernt: der Tree-Walker ist nur noch Editor-/Referenzpfad, die Performance
+liegt in der nativen Runtime `gbrt` (Rust). `_GBArray` (inline in
+`interpreter.py`) und die ECS-`_World`/`_Component` (`modules/ecs_py.py`) laufen
+jetzt als reine Python-Klassen.
 
-Baut die cdef-Klassen, die den Tree-Walker beschleunigen: `_GBArray`
-(typed memoryviews) und die native ECS-World. Beide haben Pure-Python-
-Fallbacks -- fehlt die `.pyd`, laeuft der Tree-Walker trotzdem (nur langsamer).
+(Die noch fruehere Cython-VM `vm_native.pyx` wurde bereits davor entfernt --
+`gbrt` hat sie als Produktionspfad abgeloest. pygame und die restlichen
+Cython-Reste fallen perspektivisch ebenfalls weg.)
 
-(Die fruehere Cython-VM `vm_native.pyx` wurde entfernt: die native Rust-Runtime
-`gbrt` hat sie als schnellen/Produktions-Pfad abgeloest.)
+Zum Bauen der nativen Runtime: `.venv\\Scripts\\python.exe rust\\build_runtime.py`.
 """
-from setuptools import setup
-from Cython.Build import cythonize
+import sys
 
-setup(
-    name="gamebasic-native",
-    ext_modules=cythonize(
-        [
-            "gamebasic/array_native.pyx",
-            "gamebasic/modules/ecs_native.pyx",
-        ],
-        language_level=3,
-        compiler_directives={
-            "boundscheck": False,
-            "wraparound": False,
-            "initializedcheck": False,
-            "cdivision": True,
-        },
-    ),
-    zip_safe=False,
-)
+if __name__ == "__main__":
+    sys.stderr.write(
+        "setup.py: Die Cython-Beschleuniger wurden entfernt -- kein Build noetig.\n"
+        "Native Runtime bauen: python rust/build_runtime.py\n"
+    )
+    sys.exit(0)

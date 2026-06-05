@@ -82,67 +82,65 @@ class _GBThrow(Exception):
         super().__init__(value)
 
 
-# Native cdef-class-Implementation. Drop-in-Ersatz fuer die alte Python-
-# Klasse; gleiche Public-API. Zusaetzlich liefert sie cpdef get_at/set_at,
-# die die VMs im Hot-Pfad statt arr.values[arr.flat_index(...)] rufen.
-# Wenn das gebaute .pyd fehlt (z.B. nach git clone vor setup.py), gibt es
-# einen Pure-Python-Fallback, damit der Tree-Walker noch laeuft.
-try:
-    from .array_native import _GBArray  # type: ignore
-except ImportError:
-    class _GBArray:  # pragma: no cover -- Fallback
-        """Pure-Python-Fallback. Identische Semantik zur cdef-Variante."""
-        __slots__ = ("element_type", "dims", "strides", "values")
+# Mehrdimensionales, homogen getyptes Array (Wert-Backing fuer GB-ARRAYs).
+# Die fruehere Cython-Variante (array_native.pyx, typed memoryviews) wurde
+# entfernt -- der Tree-Walker ist jetzt reiner Editor-/Referenzpfad, die
+# Performance liegt in der nativen Runtime gbrt (Rust). Reine Python-Klasse.
+# Public-API: element_type, dims, strides, values, total_size(), flat_index(),
+# get_at/set_at, len, repr.
+class _GBArray:
+    """Mehrdimensionales, homogen getyptes Array (Wert-Backing fuer GB-ARRAYs)."""
+    __slots__ = ("element_type", "dims", "strides", "values")
 
-        _TYPED_BACKING = {"integer": "q", "float": "d"}
+    _TYPED_BACKING = {"integer": "q", "float": "d"}
 
-        def __init__(self, element_type, dims, default_factory):
-            self.element_type = element_type
-            self.dims = tuple(int(d) for d in dims)
-            strides = []
-            acc = 1
-            for d in reversed(self.dims):
-                strides.append(acc)
-                acc *= d
-            strides.reverse()
-            self.strides = tuple(strides)
-            tc = _GBArray._TYPED_BACKING.get(element_type)
-            if tc is not None:
-                self.values = _array_mod.array(tc, [default_factory()] * acc)
-            else:
-                self.values = [default_factory() for _ in range(acc)]
+    def __init__(self, element_type, dims, default_factory):
+        self.element_type = element_type
+        self.dims = tuple(int(d) for d in dims)
+        strides = []
+        acc = 1
+        for d in reversed(self.dims):
+            strides.append(acc)
+            acc *= d
+        strides.reverse()
+        self.strides = tuple(strides)
+        tc = _GBArray._TYPED_BACKING.get(element_type)
+        if tc is not None:
+            self.values = _array_mod.array(tc, [default_factory()] * acc)
+        else:
+            self.values = [default_factory() for _ in range(acc)]
 
-        def total_size(self):
-            return len(self.values)
+    def total_size(self):
+        return len(self.values)
 
-        def flat_index(self, indices):
-            if len(indices) != len(self.dims):
+    def flat_index(self, indices):
+        if len(indices) != len(self.dims):
+            raise GBRuntimeError(
+                f"Array hat {len(self.dims)} Dimension(en), "
+                f"erhalten {len(indices)} Index/-e"
+            )
+        flat = 0
+        for k, idx in enumerate(indices):
+            if idx < 0 or idx >= self.dims[k]:
                 raise GBRuntimeError(
-                    f"Array hat {len(self.dims)} Dimension(en), "
-                    f"erhalten {len(indices)} Index/-e"
+                    f"Index {idx} ausserhalb "
+                    f"[0..{self.dims[k] - 1}] in Dimension {k}"
                 )
-            flat = 0
-            for k, idx in enumerate(indices):
-                if idx < 0 or idx >= self.dims[k]:
-                    raise GBRuntimeError(
-                        f"Index {idx} ausserhalb "
-                        f"[0..{self.dims[k] - 1}] in Dimension {k}"
-                    )
-                flat += idx * self.strides[k]
-            return flat
+            flat += idx * self.strides[k]
+        return flat
 
-        def get_at(self, indices):
-            return self.values[self.flat_index(indices)]
+    def get_at(self, indices):
+        return self.values[self.flat_index(indices)]
 
-        def set_at(self, indices, value):
-            self.values[self.flat_index(indices)] = value
+    def set_at(self, indices, value):
+        self.values[self.flat_index(indices)] = value
 
-        def __len__(self):
-            return self.dims[0] if self.dims else 0
+    def __len__(self):
+        return self.dims[0] if self.dims else 0
 
-        def __repr__(self):
-            shape = ",".join(str(d) for d in self.dims)
-            return f"<ARRAY[{shape}] OF {self.element_type.upper()}>"
+    def __repr__(self):
+        shape = ",".join(str(d) for d in self.dims)
+        return f"<ARRAY[{shape}] OF {self.element_type.upper()}>"
 
 
 class _Image:

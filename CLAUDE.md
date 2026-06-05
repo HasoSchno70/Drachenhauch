@@ -27,12 +27,11 @@ gamebasic/
   compiler.py            # AST -> Bytecode (mit Type-Inference + Constant Folding)
   bytecode.py            # Opcodes
   serialize.py           # Bytecode <-> .gbc (Python schreibt, gbrt liest)
-  array_native.pyx/.pyd  # cdef _GBArray mit typed memoryviews (Hot-Path, Tree-Walker)
   graphics.py            # Pygame-Wrapper, Camera, Z-Layer-System, Asset-Cache, Lazy-Init
   preprocess.py          # IMPORT-Auflösung (Source UND Built-in-Module)
   builtins_registry.py   # @builtin / @graphics_builtin Decorators
   modules/               # Built-in-Module (json, db, tween, imgfx, particles, camera, ecs, ...)
-  modules/ecs_native.pyx # cdef _World/_Component mit Bulk-System-Ops (Native-ECS)
+  modules/ecs_py.py      # reine Python _World/_Component (ECS-Kern + Bulk-System-Ops)
 rust/gb_runtime/         # native Runtime `gbrt` (Rust/raylib) -- führt .gbc aus
 gbrun.py                 # CLI mit Editor, --bench, --tokens, --ast, --native, --export
 gamebasic/export.py      # Standalone-.exe bundeln (gbrt + Bytecode + assets/)
@@ -156,7 +155,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | `audio` | Erweiterte Audio-API ueber pygame.mixer. Channels, Pause/Resume/Fade, Stereo-Pan, Music-Position. Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in `gamebasic/synth.py`, nativ in `rust/gb_runtime/src/audio.rs`; der SFX-Generator `gbsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). | `AUDIO_CHANNEL` |
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
-| `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Native cdef-Implementation in `ecs_native.pyx`. | `ECS_WORLD` |
+| `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Reine Python-Implementation in `modules/ecs_py.py` (Cython entfernt); Produktions-Performance via `gbrt`. | `ECS_WORLD` |
 | `html` | HTTP-GET/POST/DOWNLOAD + HTML-Parsing (pure stdlib). `HTTP_GET/POST/DOWNLOAD`, `HTTP_STATUS/HEADER`, `URL_ENCODE/DECODE`, `HTML_TEXT`, `HTML_FIND_ALL`. | — |
 | `bt` | Bluetooth Low Energy (BLE) via `bleak`. Scan, Connect, Service/Characteristic-Listing, Read/Write/Notify auf Characteristics. Externer Dep, IoT/Sensor-Targets. | `BT_HANDLE` |
 | `serial` | RS-232 / USB-COM via `pyserial`. `SERIAL_OPEN/READ/WRITE/READLINE/AVAILABLE/FLUSH/TIMEOUT`. | `SERIAL_HANDLE` |
@@ -225,13 +224,14 @@ Baut `rust/gb_runtime/` → `gbrt`. Nötig für `gbrun.py --native` / Editor-Run
 (F5, gbrt — sonst Tree-Walker-Fallback) / Standalone-Export / den
 `test_gbrt_parity.py`-Sweep. Details: docs/rust-runtime.md.
 
-**Cython-Beschleuniger bauen** (optional, beschleunigen den Tree-Walker):
-```
-.venv\Scripts\python.exe setup.py build_ext --inplace
-```
-Baut `array_native` (`_GBArray`) + `ecs_native` (Native-ECS). Beide haben
-Pure-Python-Fallbacks — fehlt die `.pyd`, läuft der Tree-Walker trotzdem (langsamer).
-(Die frühere Cython-VM `vm_native.pyx` wurde entfernt; gbrt hat sie abgelöst.)
+**Cython entfernt — kein Build-Schritt mehr.** Die früheren Cython-Beschleuniger
+(`array_native` = `_GBArray`, `ecs_native` = Native-ECS) wurden entfernt: der
+Tree-Walker ist nur noch Editor-/Referenzpfad, die Performance liegt in `gbrt`.
+`_GBArray` lebt jetzt als reine Python-Klasse inline in `interpreter.py`, die
+ECS-`_World`/`_Component` in `modules/ecs_py.py`. `setup.py` ist nur noch ein
+Hinweis-Stub. (Auch die frühere Cython-VM `vm_native.pyx` war schon entfernt;
+`gbrt` hat sie abgelöst. **pygame und alle Cython-Reste fallen perspektivisch
+komplett weg — kein neuer Cython-Code mehr.**)
 
 **Native Rust-Module bauen** (PyO3-Helfer `gb_native`, separate Toolchain — `cargo` nötig):
 ```
@@ -1388,11 +1388,12 @@ Loop, ohne Python-Dispatch-Overhead pro Entity:
 | `ECS_REMOVE_DEAD(w, name, threshold)` | Entities mit `value <= threshold` zerstoeren |
 | `ECS_COUNT_WITH(w, name)` | O(1) Halter-Zaehlung |
 
-**Implementation:** [gamebasic/modules/ecs_native.pyx](gamebasic/modules/ecs_native.pyx).
-`_World` und `_Component` sind cdef-Klassen. Sparse-Set-Ops als cpdef
-Methoden. Fast-Path-Methoden auf `_World` (`get_float`, `add_float`,
-...) wickeln die ehemals separaten `_check_*` + `_get_value` + `_b_*`-
-Funktionen in einem cpdef-Call ab.
+**Implementation:** [gamebasic/modules/ecs_py.py](gamebasic/modules/ecs_py.py)
+(reine Python; die frühere Cython-Variante `ecs_native.pyx` wurde entfernt).
+`_World` und `_Component` sind normale Python-Klassen. Sparse-Set-Ops als
+Methoden. Fast-Path-Methoden auf `_World` (`get_float`, `add_float`, ...)
+wickeln `_check_*` + `_get_value` + die Bulk-Loops in einem Call ab. Performance
+für ECS-Hot-Paths liefert die native Runtime `gbrt` (Rust, `src/ecs.rs`).
 
 **Beispiele:** [examples/bench_ecs_movement_v2.gb](examples/bench_ecs_movement_v2.gb)
 (Integrate-only), [examples/bench_ecs_systems.gb](examples/bench_ecs_systems.gb)
@@ -1401,29 +1402,24 @@ Funktionen in einem cpdef-Call ab.
 **Game-Pattern-Lesson:** Wer ein Spiel-Hot-Path-System hat, das ueber
 viele Entities laeuft, sollte es als Bulk-Op-Builtin schreiben statt
 als pro-Entity-BASIC-Loop. Boilerplate fuer einen neuen Bulk-Builtin:
-cpdef-Method auf `_World` in `ecs_native.pyx` + Python-Fallback in
-`ecs.py` + `@builtin`-Wrapper.
+Methode auf `_World` in `modules/ecs_py.py` + `@builtin`-Wrapper in `ecs.py` +
+(für Produktion) die entsprechende Logik in `rust/gb_runtime/src/ecs.rs`.
 
-## Native cdef-Klassen (Performance-Layer)
+## Tree-Walker-Kernklassen (`_GBArray`, ECS) — reine Python, kein Cython mehr
 
-Zwei Cython-Module mit cdef-Klassen, die Hot-Path-Code im **Tree-Walker** aus
-Python in C verschieben (gbrt hat seine eigenen Rust-Implementierungen):
+Früher gab es zwei Cython-Module (`array_native.pyx` = `_GBArray`,
+`ecs_native.pyx` = ECS-`_World`/`_Component`), die Hot-Path-Code im Tree-Walker
+nach C verschoben. **Beide wurden entfernt.** Der Tree-Walker ist nur noch
+Editor-/Referenzpfad — die Performance liegt vollständig in der nativen Runtime
+`gbrt` (Rust). Kein `setup.py build_ext` mehr, kein neuer Cython-Code.
 
-| Datei | cdef-Class | Wirkung |
+| Klasse | wohnt jetzt in | Hinweis |
 |---|---|---|
-| `gamebasic/array_native.pyx` | `_GBArray` | Typed-Memoryview (`long long[::1]` fuer INT, `double[::1]` fuer FLOAT) ueber `array.array`-Backing. `cdef inline _flat_c` fuer Bounds-Check + Stride-Arithmetik. `get_at`/`set_at` als Fast-Path. |
-| `gamebasic/modules/ecs_native.pyx` | `_World`, `_Component` | Sparse-Set in cdef. Fast-Path-Methoden auf `_World` (siehe ECS-Bulk-Ops). |
+| `_GBArray` | inline in `gamebasic/interpreter.py` | reine Python-Klasse (`array.array`-Backing für INTEGER/FLOAT, sonst Liste); Public-API unverändert (`element_type`/`dims`/`strides`/`values`/`total_size`/`flat_index`/`get_at`/`set_at`). |
+| `_World`, `_Component` | `gamebasic/modules/ecs_py.py` | reine Python (Sparse-Set + Bulk-System-Ops); `ecs.py` importiert von dort. |
 
-**Pure-Python-Fallbacks:** Wenn ein `.pyd` fehlt (z.B. nach `git clone`
-vor `setup.py build_ext`), greift in `interpreter.py` und `modules/ecs.py`
-ein Pure-Python-Fallback. Der Tree-Walker bleibt benutzbar, nur ohne Speed-Bonus.
-
-**Build:**
-```
-.venv\Scripts\python.exe setup.py build_ext --inplace
-```
-Setup.py kompiliert beide `.pyx`-Files. Nach Aenderungen an `array_native.pyx`
-oder `ecs_native.pyx` neu bauen. (Die frühere `vm_native.pyx`-VM wurde entfernt.)
+**pygame und alle Cython-Reste fallen perspektivisch komplett weg** — Python soll
+langfristig nur noch die Editoren bedienen, der Rest läuft in `gbrt`.
 
 ## Performance-Optimierungen im Compiler/VM
 
@@ -1521,9 +1517,9 @@ Box/Unbox bei jedem Zugriff. **64-bit-Limit fuer INTEGER-Arrays**
 (-9.2e18..9.2e18) — Skalar-`DIM x AS INTEGER` bleibt arbitrary-
 precision.
 
-`_GBArray` ist cdef-Class in `array_native.pyx` mit typed memoryviews.
-`get_at(indices)` / `set_at(indices, value)` sind die Fast-Path-API,
-die die VMs statt `arr.values[arr.flat_index(...)]` rufen.
+`_GBArray` ist eine reine Python-Klasse (inline in `interpreter.py`; die frühere
+Cython-Variante `array_native.pyx` mit typed memoryviews wurde entfernt).
+`get_at(indices)` / `set_at(indices, value)` bleiben die Zugriffs-API.
 
 ### Convert/Coerce-Fast-Path in der Python-VM
 
@@ -1702,18 +1698,16 @@ Pyodide dazu. Doku/Grenzen: [docs/web-playground.md](docs/web-playground.md).
 Tests [`tests/test_build_wasm.py`](tests/test_build_wasm.py) (Geruest/Harness,
 nicht der emscripten-Build).
 
-## Build und Test (mit Cython-Modulen)
+## Build und Test
 
 ```
-.venv\Scripts\python.exe setup.py build_ext --inplace
+.venv\Scripts\python.exe rust\build_runtime.py        # native Runtime gbrt
 .venv\Scripts\python.exe -m pytest tests/ -v
 .venv\Scripts\python.exe gbrun.py --bench examples/<file>.gb
 ```
 
-`build_ext` baut drei `.pyx`: `vm_native`, `array_native`,
-`modules/ecs_native`. Bei "Zugriff verweigert" auf .pyd-Copy:
-hung Python-Prozess killen (`Stop-Process -Name python`), erneut
-versuchen.
+Kein Cython-Build mehr nötig (`array_native`/`ecs_native` entfernt; Tree-Walker
+ist reines Python). Nur die native Runtime `gbrt` wird gebaut (Rust, siehe oben).
 
 ## Migration-Notizen
 
