@@ -102,18 +102,21 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       (rekursiv), `DELETEFILE`, `RENAME`, `WRITEALL`, `READLINES`, `FILESIZE`,
       `PATHJOIN` (mit `/`). Alle pfadbasiert via `std::fs`.
 
-## WP4 — Konsistenz / Aliase (geringes Risiko; NICHT umbenennen, nur Aliase + Doku)
-- [ ] BASIC-Aliase: `SGN`→`SIGN`, `SQRT`→`SQR`, `LTRIM$`/`RTRIM$`, `REVERSE$`,
-      `STARTSWITH`/`ENDSWITH`.
-- [ ] `AUDIO_SET_VOLUME`/`AUDIO_MUSIC_SET_VOLUME` als Alias (Asymmetrie zu
-      `AUDIO_GET_VOLUME`); alte Namen behalten.
-- [ ] Container-Methode `arr.join(sep)` ergänzen (`CONTAINER_METHODS`).
-- [ ] Doku-Korrekturen: CLAUDE.md (DRAWTILEMAP), `vm.rs`-Kommentar (intish).
-- [ ] Nur dokumentieren (Rename zu riskant): `$`-Suffix gilt nur im Core; doppelte
-      Audio-API (`PLAYSOUND` vs `AUDIO_PLAY`); Suffix-`2`-Mehrdeutigkeit
-      (squared/2D/vec2-Arität); `SPRITE_COLLIDE` vs `SPRITE_COLLIDES`; `CAMERA_X`
-      (2D) vs `CAMERA3D_X`.
+## WP4 — Konsistenz / Aliase (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
+- [x] BASIC-Aliase: `SGN`→`SIGN`, `SQRT`→`SQR` (Match-Arm erweitert). `LTRIM$`/
+      `RTRIM$`/`REVERSE$`/`STARTSWITH`/`ENDSWITH` existieren bereits als
+      Primärnamen (WP3) — kein Alias nötig.
+- [x] `AUDIO_SET_VOLUME`/`AUDIO_MUSIC_SET_VOLUME` als Alias (alte Namen bleiben).
+- [x] Container-Methode `arr.join(trenner)` → `JOIN$` (`container_method` in vm.rs).
+- [x] Doku-Korrekturen: CLAUDE.md (DRAWTILEMAP) + `vm.rs`-Kommentar (intish) waren
+      schon in WP0 erledigt.
+- [x] Nur dokumentiert (Rename zu riskant): `$`-Suffix nur Core, doppelte
+      Sound-API, Suffix-`2`-Mehrdeutigkeit, `SPRITE_COLLIDE`/`SPRITE_COLLIDES`,
+      `CAMERA_X`/`CAMERA3D_X` — Abschnitt „Aliase & Namenskonventionen" in
+      `docs/builtins-core.md`.
 
 ---
 
-**Empfohlene Reihenfolge:** WP0 → WP2 → WP1 → WP3 → WP4.
+**Empfohlene Reihenfolge:** WP0 → WP2 → WP1 → WP3 → WP4. **Alle WPs erledigt
+(2026-06-05).** WP1–WP4 wurden gbrt-only umgesetzt (neue Builtins nur in der
+nativen Runtime; Run-/Export-Pfad läuft über gbrts Rust-Frontend).
