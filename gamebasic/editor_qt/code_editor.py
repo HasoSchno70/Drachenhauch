@@ -20,10 +20,10 @@ from PySide6.QtCore import (
     QEvent, QPoint, QRect, QSize, Qt, QStringListModel, QTimer, Signal,
 )
 from PySide6.QtGui import (
-    QColor, QFont, QPainter, QTextCursor, QTextFormat,
+    QColor, QFont, QPainter, QPen, QTextCursor, QTextFormat,
 )
 from PySide6.QtWidgets import (
-    QCompleter, QPlainTextEdit, QTextEdit, QToolTip, QWidget,
+    QCompleter, QInputDialog, QPlainTextEdit, QTextEdit, QToolTip, QWidget,
 )
 
 from .builtin_docs import get_doc
@@ -118,6 +118,13 @@ class _LineNumberArea(QWidget):
                 handled = self._editor._handle_fold_click(int(event.position().y()))
                 if handled:
                     return
+        elif event.button() == Qt.MouseButton.RightButton:
+            # Rechtsklick im Breakpoint-Band -> Bedingung bearbeiten.
+            if int(event.position().x()) < BP_ZONE:
+                line = self._editor._line_at_y(int(event.position().y()))
+                if line is not None:
+                    self._editor.edit_breakpoint_condition(line)
+                    return
         super().mousePressEvent(event)
 
 
@@ -169,6 +176,9 @@ class CodeEditor(
 
         # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
         self._breakpoints: set[int] = set()
+        # Conditional Breakpoints: Zeile -> GameBasic-Ausdruck (nur Zeilen
+        # mit aktivem Breakpoint). Leer = unbedingter BP.
+        self._bp_conditions: dict[int, str] = {}
         self._debug_line: int | None = None
 
         # Bookmarks (1-basierte Zeilen) -- Schnell-Navigation in langen Dateien.
@@ -378,15 +388,23 @@ class CodeEditor(
                     painter.fillRect(0, int(top) + 1, 3, line_h - 2,
                                      QColor(COLORS["success"]))
                 # Breakpoint: roter gefuellter Kreis im linken Gutter-Band.
+                # Conditional Breakpoint: hohler Ring (Unterscheidung).
                 if line1b in self._breakpoints:
                     line_h = self.fontMetrics().height()
                     r = max(3, line_h // 3)
                     cx = 8
                     cy = int(top) + line_h // 2
-                    painter.setPen(Qt.PenStyle.NoPen)
-                    painter.setBrush(QColor(COLORS["danger"]))
-                    painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
-                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    if line1b in self._bp_conditions:
+                        pen = QPen(QColor(COLORS["danger"]))
+                        pen.setWidth(2)
+                        painter.setPen(pen)
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
+                        painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
+                    else:
+                        painter.setPen(Qt.PenStyle.NoPen)
+                        painter.setBrush(QColor(COLORS["danger"]))
+                        painter.drawEllipse(cx - r, cy - r, r * 2, r * 2)
+                        painter.setBrush(Qt.BrushStyle.NoBrush)
                 # Debug-Stop-Zeile: gelber/accent Pfeil ueber dem Breakpoint.
                 if self._debug_line is not None and line1b == self._debug_line:
                     line_h = self.fontMetrics().height()
@@ -607,10 +625,33 @@ class CodeEditor(
     def toggle_breakpoint(self, line: int) -> None:
         if line in self._breakpoints:
             self._breakpoints.discard(line)
+            self._bp_conditions.pop(line, None)   # Bedingung mit entfernen
         else:
             self._breakpoints.add(line)
         self._line_area.update()
         self.breakpoints_changed.emit()
+
+    def edit_breakpoint_condition(self, line: int) -> None:
+        """Fragt eine Bedingung (GameBasic-Ausdruck) fuer den Breakpoint auf
+        `line` ab. Setzt automatisch einen Breakpoint, falls noch keiner da
+        ist. Leere Eingabe -> unbedingter Breakpoint."""
+        cur = self._bp_conditions.get(line, "")
+        expr, ok = QInputDialog.getText(
+            self, f"Breakpoint-Bedingung (Zeile {line})",
+            "Anhalten, wenn Ausdruck wahr ist (leer = immer):", text=cur)
+        if not ok:
+            return
+        expr = expr.strip()
+        self._breakpoints.add(line)
+        if expr:
+            self._bp_conditions[line] = expr
+        else:
+            self._bp_conditions.pop(line, None)
+        self._line_area.update()
+        self.breakpoints_changed.emit()
+
+    def breakpoint_conditions(self) -> dict[int, str]:
+        return dict(self._bp_conditions)
 
     # ----------------------------------------------- Bookmarks
     def toggle_bookmark(self) -> None:
@@ -651,6 +692,9 @@ class CodeEditor(
 
     def set_breakpoints(self, lines) -> None:
         self._breakpoints = set(int(x) for x in lines)
+        # Bedingungen ohne zugehoerigen Breakpoint verwerfen.
+        self._bp_conditions = {ln: c for ln, c in self._bp_conditions.items()
+                               if ln in self._breakpoints}
         self._line_area.update()
 
     def set_debug_line(self, line: int | None) -> None:

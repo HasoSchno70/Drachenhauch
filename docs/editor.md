@@ -366,6 +366,7 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 | Aktion | Kürzel |
 |---|---|
 | Breakpoint setzen/entfernen | Klick im **linken Gutter-Band** (roter Punkt) |
+| Bedingten Breakpoint setzen | **Rechtsklick** im Gutter-Band → Ausdruck eingeben |
 | Debuggen starten | `F7` (Toolbar-Käfer / Menü *Debug*) |
 | Fortsetzen (bis nächster Breakpoint) | `F8` |
 | Step Over (Zeile, ohne in Aufrufe zu springen) | `F10` |
@@ -374,6 +375,8 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 | Debug stoppen | Menü *Debug → Debug stoppen* |
 
 **Ablauf:** Setz einen oder mehrere Breakpoints, drück `F7`. Das Programm läuft bis zum ersten Breakpoint (oder hält am ersten Statement, wenn keiner gesetzt ist). Die **aktuelle Zeile** wird mit einem ▶-Pfeil im Gutter und einem Zeilen-Highlight markiert; das Panel **Variablen** (rechts) zeigt die lokalen und globalen Variablen (Name / Wert / Typ) — nur deine eigenen, die eingebauten Konstanten (`BLACK`, `KEY_*`, `PI` …) sind ausgeblendet. `PRINT`-Ausgabe landet in der Konsole.
+
+**Conditional Breakpoints:** Per **Rechtsklick** im Gutter-Band lässt sich pro Breakpoint ein GameBasic-Ausdruck als Bedingung hinterlegen (z. B. `i > 100` oder `hp <= 0 AND NOT dead`). Der Debugger hält dort nur an, wenn der Ausdruck im aktuellen Kontext **wahr** ist — ideal, um in einer Schleife erst beim n-ten Durchlauf zu stoppen. Bedingte Breakpoints werden als **hohler Ring** dargestellt (unbedingte als gefüllter Punkt). Eine leere Eingabe macht den Breakpoint wieder unbedingt. Ein nicht parsebarer oder zur Laufzeit fehlerhafter Ausdruck hält fail-open an (mit Hinweis in der Konsole), damit kein Breakpoint stillschweigend verschluckt wird.
 
 **Grenzen:** `INPUT` liefert im Debugger EOF (kein Hängen). Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem. Während einer Debug-Sitzung sind Run/Bench deaktiviert.
 

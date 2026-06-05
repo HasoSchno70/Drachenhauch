@@ -1525,7 +1525,8 @@ class GameBasicEditor(QMainWindow):
         # Nur relevant, wenn dieser Editor gerade debuggt wird -- dann live an
         # den Controller weiterreichen.
         if self.debugger.is_active() and editor is self._debug_editor:
-            self.debugger.set_breakpoints(editor.breakpoints())
+            self.debugger.set_breakpoints(
+                editor.breakpoints(), editor.breakpoint_conditions())
 
     def _debug_start(self) -> None:
         if self.debugger.is_active():
@@ -1539,7 +1540,8 @@ class GameBasicEditor(QMainWindow):
         base = st.file_path.parent
         self.console.clear()
         self.console.append(f"🐞 Debug: {st.file_path.name}\n\n", "info")
-        self.debugger.set_breakpoints(st.editor.breakpoints())
+        self.debugger.set_breakpoints(
+            st.editor.breakpoints(), st.editor.breakpoint_conditions())
         if not self.debugger.start(st.editor.get_text(), base):
             self._debug_editor = None
             return

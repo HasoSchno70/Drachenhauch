@@ -101,6 +101,11 @@ class DebugController(QObject):
         super().__init__(parent)
         self._breakpoints: set[int] = set()    # Editor-Zeilen (1-basiert)
         self._merged_bps: set[int] = set()     # merged-Zeilen
+        # Conditional Breakpoints: Editor-Zeile -> GameBasic-Ausdruck (Quelle);
+        # merged-Zeile -> geparster Ausdruck-AST (oder None bei Parse-Fehler).
+        self._bp_conditions: dict[int, str] = {}
+        self._merged_bp_conditions: dict[int, object] = {}
+        self._in_condition = False             # Re-Entrancy-Guard (Hook)
         self._origins = None
         self._base_path = "."                  # Datei-Verzeichnis fuer Asset-Pfade
         self._mode = "idle"                    # idle | running | paused
@@ -120,8 +125,16 @@ class DebugController(QObject):
     def is_paused(self) -> bool:
         return self._mode == "paused"
 
-    def set_breakpoints(self, lines) -> None:
+    def set_breakpoints(self, lines, conditions=None) -> None:
         self._breakpoints = set(int(x) for x in lines)
+        # conditions: dict[editor_line, expr_src]. Nur Eintraege mit aktivem
+        # Breakpoint zaehlen.
+        if conditions:
+            self._bp_conditions = {int(ln): str(c)
+                                   for ln, c in conditions.items()
+                                   if int(ln) in self._breakpoints and c}
+        else:
+            self._bp_conditions = {}
         self._recompute_merged_bps()
 
     # ----------------------------------------------------- Start
@@ -201,9 +214,16 @@ class DebugController(QObject):
     def _hook(self, line, interp) -> None:
         if self._stop:
             raise _DebugStop()
+        # Re-Entrancy: wird die Bedingung selbst ausgewertet und ruft dabei
+        # eine User-Funktion auf, feuert der Hook erneut -> hier ignorieren.
+        if self._in_condition:
+            return
         depth = interp.call_depth
+        hit_bp = line in self._merged_bps
+        if hit_bp:
+            hit_bp = self._condition_holds(line, interp)
         pause = (
-            line in self._merged_bps
+            hit_bp
             or self._step == "into"
             or (self._step == "over" and depth <= self._step_depth)
             or (self._step == "out" and depth < self._step_depth)
@@ -221,6 +241,24 @@ class DebugController(QObject):
         if self._stop:
             raise _DebugStop()
         self._mode = "running"
+
+    def _condition_holds(self, merged_line, interp) -> bool:
+        """Wertet die (optionale) Bedingung des Breakpoints aus. Ohne
+        Bedingung: True. Bei Auswert-Fehler: True (fail-open) + Hinweis in
+        der Programm-Ausgabe."""
+        expr = self._merged_bp_conditions.get(merged_line)
+        if expr is None:
+            return True
+        self._in_condition = True
+        try:
+            val = interp._eval(expr)
+        except Exception as exc:  # noqa: BLE001
+            self.output.emit(
+                f"[Debugger] Breakpoint-Bedingung-Fehler: {exc}\n")
+            return True
+        finally:
+            self._in_condition = False
+        return bool(val)
 
     def _snapshot(self, interp) -> dict:
         def collect(env, skip=None):
@@ -267,15 +305,48 @@ class DebugController(QObject):
 
     # ----------------------------------------------------- Zeilen-Mapping
     def _recompute_merged_bps(self) -> None:
+        # Compile-Cache: Quelle -> AST (oder None), damit identische
+        # Bedingungen nicht doppelt geparst werden.
+        compiled: dict[str, object] = {}
+
+        def cond_ast(editor_line):
+            src = self._bp_conditions.get(editor_line)
+            if not src:
+                return None
+            if src not in compiled:
+                compiled[src] = self._compile_condition(src)
+            return compiled[src]
+
+        self._merged_bp_conditions = {}
         if not self._origins:
             self._merged_bps = set(self._breakpoints)
+            for ln in self._breakpoints:
+                ast = cond_ast(ln)
+                if ast is not None:
+                    self._merged_bp_conditions[ln] = ast
             return
         s = set()
         for m in range(1, len(self._origins)):
             o = self._origins[m]
             if o and o[0] == _EDITOR_LABEL and o[1] in self._breakpoints:
                 s.add(m)
+                ast = cond_ast(o[1])
+                if ast is not None:
+                    self._merged_bp_conditions[m] = ast
         self._merged_bps = s
+
+    @staticmethod
+    def _compile_condition(src: str):
+        """Parst eine Breakpoint-Bedingung zu einem Ausdrucks-AST.
+        Liefert None bei Parse-Fehler -> der BP haelt dann unbedingt
+        (fail-open: eine kaputte Bedingung darf keinen BP verschlucken)."""
+        from ..lexer import Lexer
+        from ..parser import Parser
+        try:
+            tokens = Lexer(src).tokenize()
+            return Parser(tokens)._expression()
+        except Exception:  # noqa: BLE001
+            return None
 
     def _to_editor_line(self, merged_line: int) -> int:
         if not merged_line:
