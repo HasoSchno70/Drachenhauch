@@ -34,6 +34,41 @@ from .tracker import (
     note_name, vol_to_pct,
 )
 
+# Styling fuer das Pattern-Gitter (Tracker-Look: Header-Chrome, Reihen-Nummern,
+# Selektion + Playhead). Beat-Hintergruende werden pro Zelle gesetzt.
+_TRACKER_GRID_QSS = f"""
+QTableWidget {{
+    background: {COLORS['bg']};
+    border: 1px solid {COLORS['border']};
+    selection-background-color: {COLORS['sel']};
+    selection-color: {COLORS['fg']};
+    outline: 0;
+}}
+QTableWidget::item {{ padding: 0px; }}
+QTableWidget::item:selected {{
+    background: {COLORS['sel']};
+    color: {COLORS['fg']};
+}}
+QHeaderView::section {{
+    background: {COLORS['bg_panel']};
+    color: {COLORS['fg']};
+    border: 0px;
+    border-right: 1px solid {COLORS['border_soft']};
+    border-bottom: 1px solid {COLORS['border']};
+    padding: 3px;
+    font-weight: bold;
+}}
+QHeaderView::section:vertical {{
+    color: {COLORS['line_no']};
+    font-weight: normal;
+    padding: 0 8px;
+}}
+QTableCornerButton::section {{
+    background: {COLORS['bg_panel']};
+    border: 0px;
+}}
+"""
+
 
 class _InstrumentDialog(QDialog):
     """Bearbeitet ein Sample-Instrument: Grundton, Loop, ADSR-Huellkurve."""
@@ -289,14 +324,18 @@ class TrackerEditor(QMainWindow):
         self._play_mode = None         # None | "pattern" | "song"
         self._play_row = 0
         self._play_order_pos = 0
+        self._playhead = -1            # aktuell hervorgehobene Wiedergabe-Reihe
 
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(7)
 
-        title = QLabel("Tracker")
+        title = QLabel("♪  GameBasic Tracker")
         tf = QFont(); tf.setBold(True); tf.setPointSize(13)
         title.setFont(tf)
+        title.setStyleSheet(f"color: {COLORS['accent']}; padding: 2px 0;")
         root.addWidget(title)
 
         # --- Transport ---
@@ -419,13 +458,19 @@ class TrackerEditor(QMainWindow):
         # --- Pattern-Gitter ---
         self.grid = QTableWidget(self.song.patterns[0].rows, CHANNELS)
         self.grid.setHorizontalHeaderLabels(["Ch1", "Ch2", "Ch3", "Drum"])
-        self.grid.verticalHeader().setDefaultSectionSize(22)
+        self.grid.verticalHeader().setDefaultSectionSize(26)
+        self.grid.verticalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Fixed)
         self.grid.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch)
+        self.grid.horizontalHeader().setFixedHeight(40)
         self.grid.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.grid.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.grid.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self.grid.setFont(QFont(EDITOR_FONT_FAMILY, 10))
+        self.grid.setShowGrid(False)
+        gfont = QFont(EDITOR_FONT_FAMILY, 12); gfont.setBold(True)
+        self.grid.setFont(gfont)
+        self.grid.setStyleSheet(_TRACKER_GRID_QSS)
         self.grid.itemSelectionChanged.connect(self._audition_selected)
         self.grid.itemSelectionChanged.connect(self._sync_vol_spin)
         root.addWidget(self.grid, 1)
@@ -536,8 +581,42 @@ class TrackerEditor(QMainWindow):
                                     pat.slide[c][r]))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.grid.setItem(r, c, it)
+                self._style_cell(it, c, r, pat.data[c][r])
         self.grid.blockSignals(False)
+        self._update_channel_headers()
         self._sync_vol_spin()
+
+    # Beat-Hintergruende (alle 4 Reihen heller, alle 16 betont) + Farb-Kodierung
+    # (Toene cyan, Drums magenta, leere Zellen gedaempft).
+    def _style_cell(self, item, c: int, r: int, note) -> None:
+        if r % 16 == 0:
+            bg = QColor(COLORS["bg_panel"])
+        elif r % 4 == 0:
+            bg = QColor(COLORS["bg_alt"])
+        else:
+            bg = QColor(COLORS["bg"])
+        item.setBackground(bg)
+        if note is None:
+            item.setForeground(QColor(COLORS["line_no"]))
+        elif c == TONAL:
+            item.setForeground(QColor(COLORS["danger"]))
+        else:
+            item.setForeground(QColor(COLORS["accent"]))
+
+    def _update_channel_headers(self) -> None:
+        """Spalten-Header zeigen Kanal + zugewiesenes Instrument/Wellenform."""
+        names = ["Ch1", "Ch2", "Ch3", "Drum"]
+        labels = []
+        for c in range(CHANNELS):
+            idx = self.song.channel_inst[c]
+            if idx is not None and 0 <= idx < len(self.song.instruments):
+                sub = self.song.instruments[idx].name
+            elif c == TONAL:
+                sub = "noise"
+            else:
+                sub = self.song.waves[c]
+            labels.append(f"{names[c]}\n{sub}")
+        self.grid.setHorizontalHeaderLabels(labels)
 
     def _reload_order(self) -> None:
         self.order_list.clear()
@@ -553,6 +632,7 @@ class TrackerEditor(QMainWindow):
     def _set_wave(self, ci: int, v: str) -> None:
         self.song.waves[ci] = v
         self._sound_cache.clear()
+        self._update_channel_headers()
         self._mark()
 
     # ============================================== Instrumente
@@ -572,6 +652,8 @@ class TrackerEditor(QMainWindow):
                 parts.append(f"{names[c]}={self.song.instruments[idx].name}")
         self.assign_label.setText(
             ("Zuweisung: " + ", ".join(parts)) if parts else "")
+        if hasattr(self, "grid"):
+            self._update_channel_headers()
 
     def _load_sample(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -711,9 +793,10 @@ class TrackerEditor(QMainWindow):
 
     def _cell_refresh(self, row: int, ci: int) -> None:
         pat = self.song.patterns[self.cur]
-        self.grid.item(row, ci).setText(
-            self._cell_text(ci, pat.data[ci][row], pat.vol[ci][row],
-                            pat.slide[ci][row]))
+        it = self.grid.item(row, ci)
+        it.setText(self._cell_text(ci, pat.data[ci][row], pat.vol[ci][row],
+                                   pat.slide[ci][row]))
+        self._style_cell(it, ci, row, pat.data[ci][row])
 
     def _set_note(self, row: int, ci: int, note) -> None:
         pat = self.song.patterns[self.cur]
@@ -937,6 +1020,7 @@ class TrackerEditor(QMainWindow):
 
     def _stop_play(self) -> None:
         self._timer.stop()
+        self._set_playhead(-1)         # Playhead-Highlight entfernen
         self.btn_play.setText("▶ Pattern")
         self.btn_song.setText("▶ Song")
 
@@ -944,7 +1028,7 @@ class TrackerEditor(QMainWindow):
         if self._play_mode == "pattern":
             pat = self.song.patterns[self.cur]
             self._play_row %= pat.rows
-            self.grid.selectRow(self._play_row)
+            self._set_playhead(self._play_row)
             self._play_columns(pat, self._play_row)
             self._play_row = (self._play_row + 1) % pat.rows
         elif self._play_mode == "song":
@@ -957,12 +1041,33 @@ class TrackerEditor(QMainWindow):
                 self._load_pattern(p_idx)
             pat = self.song.patterns[p_idx]
             self._play_row %= pat.rows
-            self.grid.selectRow(self._play_row)
+            self._set_playhead(self._play_row)
             self._play_columns(pat, self._play_row)
             self._play_row += 1
             if self._play_row >= pat.rows:
                 self._play_row = 0
                 self._play_order_pos = (self._play_order_pos + 1) % len(order)
+
+    def _set_playhead(self, row: int) -> None:
+        """Hebt die laufende Wiedergabe-Reihe hervor (ohne die User-Auswahl zu
+        veraendern). row < 0 = Highlight entfernen."""
+        old = self._playhead
+        self._playhead = row
+        pat = self.song.patterns[self.cur]
+        for rr in {old, row}:
+            if rr is None or not (0 <= rr < self.grid.rowCount()):
+                continue
+            for c in range(CHANNELS):
+                it = self.grid.item(rr, c)
+                if it is None:
+                    continue
+                if rr == row:
+                    it.setBackground(QColor(COLORS["accent_soft"]))
+                else:
+                    note = pat.data[c][rr] if rr < pat.rows else None
+                    self._style_cell(it, c, rr, note)
+        if 0 <= row < self.grid.rowCount():
+            self.grid.scrollToItem(self.grid.item(row, 0))
 
     def _play_columns(self, pat, row: int) -> None:
         for c in range(CHANNELS):
