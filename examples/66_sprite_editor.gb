@@ -46,7 +46,7 @@ DIM t AS INTEGER
 running = TRUE
 t = 0
 
-WHILE running
+WHILE running AND NOT QuitRequested()
     Cls(RGB(20, 20, 40))
 
     ' Hintergrund-Pattern fuer Kontrast (zeigt, dass Alpha funktioniert).

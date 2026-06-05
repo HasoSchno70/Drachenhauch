@@ -112,7 +112,7 @@ NEXT
 DIM running AS BOOLEAN
 running = TRUE
 
-WHILE running
+WHILE running AND NOT QuitRequested()
     INPUT_UPDATE()
     IF INPUT_PRESSED("quit") THEN running = FALSE
 
