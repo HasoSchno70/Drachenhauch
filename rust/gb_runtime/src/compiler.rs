@@ -468,6 +468,12 @@ impl Compiler {
         if let Some(&slot) = self.global_slots.get(name) {
             self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
                           json!([slot as i64, name_idx, type_idx, default_idx]));
+        } else if !self.ctx.is_main {
+            // Innerhalb einer Funktion: ein ECHTER funktions-lokaler Slot, kein
+            // globaler Name. Sonst kollidieren gleichnamige Locals verschiedener
+            // Funktionen in self.globals (ein Aufruf ueberschreibt die Variable
+            // -- z.B. eine FOR-Schleifenvariable -> Endlosschleife).
+            self.ctx.declare_local(name, type_name);
         } else {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }
@@ -586,6 +592,11 @@ impl Compiler {
         if let Some(&slot) = self.global_slots.get(var) {
             self.ctx.emit(oc::DECLARE_GLOBAL_SLOT,
                           json!([slot as i64, name_idx, type_idx, default_idx]));
+        } else if !self.ctx.is_main {
+            // FOR-Variable in einer Funktion -> funktions-lokaler Slot (nicht
+            // globaler Name), sonst korrumpiert ein gleichnamiges Local einer
+            // aufgerufenen Funktion den Schleifenzaehler (Endlosschleife).
+            self.ctx.declare_local(var, "integer");
         } else {
             self.ctx.emit(oc::DECLARE_NAME, json!([name_idx, type_idx, default_idx]));
         }

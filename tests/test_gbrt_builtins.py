@@ -182,6 +182,52 @@ PRINT TRYVAL("42", -1), TRYVAL("3.5", -1), TRYVAL("oops", -1), TRYVAL("  7  ", 0
     assert _run(src) == "TRUE TRUE TRUE FALSE FALSE\n42 3.5 -1 7"
 
 
+# --- Compiler-Regression: funktions-lokale Slots (kein globaler Name-Leak) ---
+
+def test_function_local_scope_no_global_leak():
+    """Frueher kompilierte gbrts Rust-Compiler skalare DIMs und FOR-Variablen in
+    Funktionen als GLOBALE Namen statt funktions-lokale Slots. Dann korrumpierte
+    ein gleichnamiges Local einer aufgerufenen Funktion die FOR-Schleifenvariable
+    -> Endlosschleife (z.B. die Cybermatic-3D-Demo hing). Hier: `fb` hat ein
+    lokales `k`, `scn` eine FOR-`k`-Schleife, die `fb` aufruft. Muss terminieren."""
+    src = '''FUNCTION fb(i AS INTEGER) AS INTEGER
+DIM k AS INTEGER
+k = i * 10
+RETURN k
+END FUNCTION
+SUB scn()
+DIM seg AS INTEGER
+FOR seg = 0 TO 2
+DIM k AS INTEGER
+FOR k = 0 TO 2
+DIM c AS INTEGER
+c = fb(seg)
+NEXT
+PRINT "seg=" + STR$(seg) + " k=" + STR$(k)
+NEXT
+END SUB
+scn()
+PRINT "done"'''
+    assert _run(src) == "seg=0 k=3\nseg=1 k=3\nseg=2 k=3\ndone"
+
+
+def test_function_local_same_name_as_other_function():
+    """Zwei Funktionen mit gleichnamigem Local duerfen sich nicht beeinflussen."""
+    src = '''FUNCTION a() AS INTEGER
+DIM x AS INTEGER
+x = 111
+RETURN x
+END FUNCTION
+FUNCTION b() AS INTEGER
+DIM x AS INTEGER
+x = a()
+x = x + 1
+RETURN x
+END FUNCTION
+PRINT b()'''
+    assert _run(src) == "112"
+
+
 # --- WP3: Datei / Verzeichnis -----------------------------------------------
 
 def test_pathjoin():

@@ -78,6 +78,18 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "--ast" {
             return ast_main(&raw[2]);
         }
+        // Debug: kompiliert die Quelle und gibt das .gbc-JSON aus (Bytecode-Dump).
+        if raw.len() >= 3 && raw[1] == "--dumpbc" {
+            let src = match std::fs::read_to_string(&raw[2]) {
+                Ok(t) => t,
+                Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", raw[2], e); return ExitCode::from(1); }
+            };
+            let base = std::path::Path::new(&raw[2]).parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+            return match compile_source(&src, &base, &raw[2]) {
+                Ok(j) => { println!("{}", serde_json::to_string_pretty(&j).unwrap_or_default()); ExitCode::SUCCESS }
+                Err(code) => code,
+            };
+        }
         // Stufe 4: IMPORT-Preprocessor -- gibt die gemergte Quelle aus
         // (Merge-Parity gegen preprocess.process()).
         if raw.len() >= 3 && raw[1] == "--preprocess" {
