@@ -332,7 +332,7 @@ INPUT "Wie heisst du? ", name
 PRINT "Hallo, " + name + "!"
 ```
 
-Auch wenn dein Programm parallel ein Pygame-Fenster (`SCREEN(...)`) öffnet, funktioniert INPUT weiter über die Editor-Konsole — nützlich für Debugging und einfache textuelle Programme ohne Grafik.
+Auch wenn dein Programm parallel ein Grafik-Fenster (`SCREEN(...)`) öffnet, funktioniert INPUT weiter über die Editor-Konsole — nützlich für Debugging und einfache textuelle Programme ohne Grafik.
 
 **Rechtsklick** in der Konsole öffnet ein Kontextmenü:
 - Kopieren (markierten Text in die Zwischenablage)
@@ -513,4 +513,4 @@ GameBasic-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), dar
 
 - **`step` ist Schlüsselwort** (FOR…STEP) — Variablen anders benennen (`i`, `tick`, `iter`).
 - **`gbrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Installation: `pip install PySide6`.
-- **Pygame-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Pygame-Fenster beendet das Programm.
+- **Grafik-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess (gbrt) ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Grafik-Fenster beendet das Programm.

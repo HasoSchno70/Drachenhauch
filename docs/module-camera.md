@@ -85,7 +85,7 @@ CAMERA_SET(0.0, 0.0, 0.5)        ' alles halb so groß (mehr Welt sichtbar)
 ```
 
 - Bei `zoom = 2.0` wird **jedes** Drawing — Linien, Boxen, **und Bilder** — verdoppelt gezeichnet.
-- Bei zoom != 1 werden Bilder per `pygame.transform.scale` jeden Frame neu skaliert; das kostet etwas Performance, ist aber meist OK.
+- Bei zoom != 1 werden Bilder jeden Frame neu skaliert gezeichnet; das kostet etwas Performance, ist aber meist OK.
 - **Text wird NICHT gezoomt** (nur translatiert). Sonst würde Text bei Zoom > 1 verschwommen werden. Wer großen Text will, nutzt entweder eine größere Schrift oder rendert vorab als Bild.
 
 ## HUD im Screen-Space
@@ -202,7 +202,7 @@ WEND
 
 ## Komplettes Beispiel
 
-- [examples/29_camera.gb](../examples/29_camera.gb) — Logik-Test ohne Pygame (S2W-Konvertierung, FOLLOW)
+- [examples/29_camera.gb](../examples/29_camera.gb) — Logik-Test ohne Grafik-Fenster (S2W-Konvertierung, FOLLOW)
 - [examples/29_camera_visual.gb](../examples/29_camera_visual.gb) — interaktiv mit Pfeilen + Zoom
 
 ## Tipp: Camera-Push/Pop fehlt

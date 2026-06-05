@@ -530,7 +530,7 @@ UI_METRIC_SET("win_title_h", 24)     ' Titelleiste der UI_WINDOW_BEGIN-Fenster
 
 - **Kein Dropdown / ListBox** — bisher mit Radio-Group + Panel oder einer Reihe Buttons gut substituierbar.
 - **Layout ist absolut** — keine automatischen Layouts à la "horizontal/vertical stack". Du legst Pixel selbst.
-- **Schriftart fix** — die System-SansSerif von Pygame. Du kannst die Größe global mit `TEXT_SIZE(n)` umstellen — das wirkt aber auf alle nachfolgenden TEXT/UI-Aufrufe.
+- **Schriftart fix** — die Standard-SansSerif der nativen Runtime. Du kannst die Größe global mit `TEXT_SIZE(n)` umstellen — das wirkt aber auf alle nachfolgenden TEXT/UI-Aufrufe.
 - **Kein Multi-Line-Textfeld** — `UI_TEXTFIELD` ist single-line. Enter wird nicht behandelt; du kannst's selbst per `KEYPRESSED(13)` als Submit-Trigger nutzen.
 
 Wenn du eines dieser Features brauchst, in einer späteren Iteration leicht zu ergänzen.

@@ -16,7 +16,7 @@ IMPORT "imgfx"
 | `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
 | `IMAGE_COPY(img)` | IMAGE (tiefer Klon) |
 
-Alle Funktionen brauchen Pygame — wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` automatisch initialisiert.
+Alle Funktionen laufen nur in der nativen Runtime (gbrt) — der Tree-Walker ist konsolen-only und wirft "nur in der nativen Runtime (gbrt)". Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
 
 ## Beispiel
 
@@ -55,7 +55,7 @@ kombi = IMAGE_ROTATE(IMAGE_TINT(IMAGE_SCALE(hero, 32, 32), RGB(255, 200, 0)), 30
 
 (Hero zuerst auf 32×32 skaliert, dann gelb getönt, dann um 30° gedreht.)
 
-**Bounding-Box bei ROTATE wächst:** Wenn man ein 16×16-Quadrat um 45° dreht, wird das resultierende Bild größer (die Ecken stoßen heraus). Bei 90° bleibt's quadratisch. Pygame-Standardverhalten — das Bild wird in eine "neue" Bounding-Box passend gerendert.
+**Bounding-Box bei ROTATE wächst:** Wenn man ein 16×16-Quadrat um 45° dreht, wird das resultierende Bild größer (die Ecken stoßen heraus). Bei 90° bleibt's quadratisch — das Bild wird in eine "neue" Bounding-Box passend gerendert.
 
 ```basic
 DIM r0 AS IMAGE
@@ -125,7 +125,7 @@ big = IMAGE_SCALE(mini, 64, 64)
 
 ## Performance
 
-`IMAGE_SCALE`, `IMAGE_ROTATE`, `IMAGE_FLIP`, `IMAGE_TINT` allokieren jedes Mal eine neue Pygame-Surface. Mache sie **einmal beim Laden**, nicht in jedem Frame. Wenn du dynamische Effekte willst (z.B. variabler Tint), nutze stattdessen das [Sprite-Modul](module-sprite.md) mit `SPRITE_TINT` — das kümmert sich pro Frame intelligent darum.
+`IMAGE_SCALE`, `IMAGE_ROTATE`, `IMAGE_FLIP`, `IMAGE_TINT` allokieren jedes Mal ein neues Bild. Mache sie **einmal beim Laden**, nicht in jedem Frame. Wenn du dynamische Effekte willst (z.B. variabler Tint), nutze stattdessen das [Sprite-Modul](module-sprite.md) mit `SPRITE_TINT` — das kümmert sich pro Frame intelligent darum.
 
 ## Komplettes Beispiel
 

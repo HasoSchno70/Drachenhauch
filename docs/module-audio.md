@@ -1,6 +1,6 @@
 # Modul `audio`
 
-Erweiterte Audio-API ueber `pygame.mixer`. Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
+Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber raylib; der Tree-Walker ist konsolen-only und wirft "nur in der nativen Runtime (gbrt)"). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
 
 Ergaenzt die Core-Builtins `LOADSOUND` / `PLAYSOUND` aus [Grafik-Built-ins](builtins-grafik.md) — die einfachen Calls reichen fuer "Sound abspielen", `audio` bringt das volle Audio-Mixing-Toolkit.
 
@@ -10,7 +10,7 @@ IMPORT "audio"
 
 ## Mixer-Lifecycle
 
-Pygame.mixer initialisiert sich automatisch beim ersten Sound-Call mit Defaults (44100 Hz, 16-bit, Stereo, 512-buffer). Wer das Audio-Format anpassen will:
+Der Audio-Mixer initialisiert sich automatisch beim ersten Sound-Call mit Defaults (44100 Hz, 16-bit, Stereo, 512-buffer). Wer das Audio-Format anpassen will:
 
 | Funktion | Wirkung |
 |---|---|
@@ -86,7 +86,7 @@ AUDIO_PAN(ch, pan_left, pan_right)
 
 ## Musik
 
-Pygame hat einen separaten Music-Channel fuer lange Tracks (laedt streaming statt vollstaendig in RAM). Eigenes API:
+Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt streaming statt vollstaendig in RAM). Eigenes API:
 
 | Funktion | Wirkung |
 |---|---|
@@ -190,9 +190,9 @@ END IF
 
 ## In der nativen Runtime (gbrt)
 
-Das `audio`-Modul laeuft nativ ueber raylib (mit dem `graphics`-Feature, das die native Grafik-Runtime ohnehin mitbringt). **Funktional, nicht bit-identisch** zur pygame-Version (anderer Mixer) — wie `RND`/`tween`. Hinweise:
+Das `audio`-Modul laeuft nativ ueber raylib (mit dem `graphics`-Feature, das die native Grafik-Runtime ohnehin mitbringt). Audio-Ausgabe gehoert **nicht** zur deterministischen bit-identischen Garantie — wie `RND`/`tween`. Hinweise:
 
-- `SOUND` und `AUDIO_CHANNEL` sind nativ ganzzahlige Handles; raylib kennt keine pygame-Channels, daher steuert ein „Channel“ die Wiedergabe genau seines Sounds.
+- `SOUND` und `AUDIO_CHANNEL` sind nativ ganzzahlige Handles; raylib kennt keine eigenstaendigen Mixer-Channels, daher steuert ein „Channel“ die Wiedergabe genau seines Sounds.
 - `AUDIO_GET_VOLUME` liefert das zuletzt gesetzte Volume (raylib hat keinen Getter).
 - Fade-in/out und `loops = N` werden vereinfacht (raylib kann das nicht direkt); Pan ist eine Naeherung.
 - Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`) baut die Wellenform als In-RAM-WAV.

@@ -1,6 +1,6 @@
 # Grafik-Built-ins
 
-Pygame-basierte Grafik, Sound und Eingabe. Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
+Grafik, Sound und Eingabe — nativ in der Runtime `gbrt` (raylib); der Tree-Walker ist konsolen-only und wirft bei diesen Befehlen "nur in der nativen Runtime (gbrt)". Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
 
 Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretieren alle Drawing-Befehle ihre Koordinaten als **World-Koordinaten** (siehe [Camera-Modul](module-camera.md)).
 
@@ -100,15 +100,15 @@ SLEEP(2000)
 | `TEXT_SIZE(px)` | Schriftgröße für folgende `TEXT`-Aufrufe (4–400) |
 | `TEXT_WIDTH(s$)` | Pixelbreite von `s$` in der aktiven Schrift/Größe |
 | `TEXT_HEIGHT()` | Zeilenhöhe der aktiven Schrift |
-| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | Fett/Kursiv (pygame-Pfad; nativ No-Op) |
+| `TEXT_BOLD(an)` / `TEXT_ITALIC(an)` | Fett/Kursiv (nativ No-Op — raylib ohne Fett/Kursiv) |
 | `LOADFONT(pfad$, groesse)` → FONT | TTF/OTF laden → FONT-Handle (INTEGER) |
 | `SETFONT(font)` | aktive Schrift setzen; `SETFONT(-1)` = Default-Font |
-| `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ; pygame ignoriert es) |
+| `TEXT_SPACING(px)` | Buchstabenabstand für TTF (nativ) |
 
 `LOADFONT` lädt eine eigene TrueType-/OpenType-Schrift; `TEXT_SIZE` skaliert sie
 anschließend frei. `TEXT_WIDTH` misst in der **aktiven** Schrift — damit lässt
 sich zentrieren/rechtsbündig setzen. Echte Glyphen rendert die native Runtime
-(raylib `LoadFontEx`/`DrawTextEx`); im pygame-Pfad über `pygame.font.Font`.
+(raylib `LoadFontEx`/`DrawTextEx`).
 
 ```basic
 DIM titlefont AS INTEGER
@@ -199,7 +199,7 @@ Vollständiges Beispiel: [examples/75_preloader.gb](examples/75_preloader.gb).
 
 ## Sprite-Atlas + Batch-Draw
 
-Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`). Statt 50 einzelner PNG-Dateien hat man ein Atlas-PNG + ein Manifest. Atlas-Sprites werden mit `pygame.Surface.blits()` gebatcht — Hunderte Sprites in einem einzigen C-Call statt N separater Python-Aufrufe.
+Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`). Statt 50 einzelner PNG-Dateien hat man ein Atlas-PNG + ein Manifest. Atlas-Sprites werden gebatcht — Hunderte Sprites in einem einzigen Draw-Call statt N separater Aufrufe.
 
 | Funktion | Zweck |
 |---|---|
@@ -207,7 +207,7 @@ Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`)
 | `ATLAS_DRAW(atlas, name$, x, y)` | einzelnes Sub-Sprite zeichnen (Camera-aware) |
 | `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y]])` | Sub-Sprite mit Spiegelung (klassisch für Lauf-Animation links/rechts) |
 | `BATCH_DRAW(atlas, name$, x, y)` | Sub-Sprite an Batch-Queue anhängen |
-| `BATCH_FLUSH()` | Queue jetzt rendern (`pygame.Surface.blits()`) |
+| `BATCH_FLUSH()` | Queue jetzt rendern (gebatchter Draw-Call) |
 
 **Manifest-Format:**
 
@@ -236,7 +236,7 @@ FOR row = 0 TO 19
         BATCH_DRAW(atlas, "tile_grass", col * 16, row * 16)
     NEXT
 NEXT
-BATCH_FLUSH()   ' ein pygame.Surface.blits()-Call fuer alle 600
+BATCH_FLUSH()   ' ein gebatchter Draw-Call fuer alle 600
 ```
 
 **Auto-Flush** an wichtigen Punkten — die Queue wird automatisch geleert vor:
@@ -244,7 +244,7 @@ BATCH_FLUSH()   ' ein pygame.Surface.blits()-Call fuer alle 600
 - `LAYER(...)` (damit der Batch zum richtigen Layer geht)
 - `ATLAS_DRAW(...)` (Direct-Call wahrt Reihenfolge)
 
-**Zoom-Caveat:** Bei `CAMERA_SET`-Zoom ≠ 1 fällt jeder `BATCH_DRAW` automatisch auf `DRAWIMAGEPART` zurück (pygame kann nicht batch-skalieren). Translation funktioniert mit Batch. Wer auf Zoom angewiesen ist und viele Sprites batchen will, bakt die Zoom-Stufe in den Atlas oder nutzt `ATLAS_DRAW` einzeln.
+**Zoom-Caveat:** Bei `CAMERA_SET`-Zoom ≠ 1 fällt jeder `BATCH_DRAW` automatisch auf `DRAWIMAGEPART` zurück (der Batch kann nicht skaliert zeichnen). Translation funktioniert mit Batch. Wer auf Zoom angewiesen ist und viele Sprites batchen will, bakt die Zoom-Stufe in den Atlas oder nutzt `ATLAS_DRAW` einzeln.
 
 **Flipping für Charakter-Sprites:** `ATLAS_DRAW_FLIPPED(atlas, name$, x, y, flip_x, flip_y)` spiegelt das Sub-Sprite an X- oder Y-Achse. Klassisches Pattern für Walk-Animationen: nur eine Richtung (rechts) im Atlas, links wird per Flip abgeleitet:
 
@@ -254,7 +254,7 @@ flip = CHAR_FACING(player) = -1     ' -1 = nach links
 ATLAS_DRAW_FLIPPED(mario, "walk_a", x, y, flip, FALSE)
 ```
 
-Flip macht pro Aufruf ein `pygame.transform.flip()` (frischer Surface). Für viele wiederholte Flips desselben Sprites lohnt es sich, die gespiegelte Variante einmal vorberechnet als IMAGE zu cachen — für einen einzelnen Player-Sprite pro Frame ist der Overhead aber vernachlässigbar.
+Flip erzeugt pro Aufruf ein frisch gespiegeltes Bild. Für viele wiederholte Flips desselben Sprites lohnt es sich, die gespiegelte Variante einmal vorberechnet als IMAGE zu cachen — für einen einzelnen Player-Sprite pro Frame ist der Overhead aber vernachlässigbar.
 
 Vollständiges Beispiel: [examples/76_layers_atlas.gb](examples/76_layers_atlas.gb).
 

@@ -153,11 +153,11 @@ IF stick_x < -0.3 THEN axis = -1
 IF stick_x >  0.3 THEN axis = 1
 ```
 
-**Trigger** (`lt` / `rt`) haben keine Deadzone -- pygame liefert sie je nach Pad als 0..1 oder -1..1. Wer Schiess-on-RT-Halten will: einfach `IF INPUT_JOY_AXIS(0, "rt") > 0.5 THEN Shoot() END IF`.
+**Trigger** (`lt` / `rt`) haben keine Deadzone -- je nach Pad liegen sie als 0..1 oder -1..1 an. Wer Schiess-on-RT-Halten will: einfach `IF INPUT_JOY_AXIS(0, "rt") > 0.5 THEN Shoot() END IF`.
 
 ## Multi-Player
 
-V1: alle angeschlossenen Pads schiessen in dieselbe Action. Wer Spieler-getrennt will, baut sich auf der Anwendungs-Ebene: pollt die Pads einzeln per `INPUT_JOY_AXIS` und liest Buttons direkt ueber pygame (oder per zusaetzliche `JOY_BUTTON_PAD_N`-Codes — ist eine Erweiterung fuer spaeter).
+V1: alle angeschlossenen Pads schiessen in dieselbe Action. Wer Spieler-getrennt will, baut sich auf der Anwendungs-Ebene: pollt die Pads einzeln per `INPUT_JOY_AXIS` und liest Buttons direkt (oder per zusaetzliche `JOY_BUTTON_PAD_N`-Codes — ist eine Erweiterung fuer spaeter).
 
 ## Beispiel
 

@@ -65,8 +65,8 @@ feature-gated (Standard-`.exe` bleibt schlank).
   Mixer-Lifecycle, Channel-Playback mit Volume/Pan/Pause/Resume/Stop,
   Music-Streaming mit Volume/Position/Queue, Ton-Generierung AUDIO_TONE/
   AUDIO_NOISE via In-RAM-WAV → `new_wave_from_memory`/`new_sound_from_wave`).
-  Funktional (nicht bit-identisch — anderer Mixer als pygame). SOUND/
-  AUDIO_CHANNEL = INTEGER-Handles; raylib hat keine pygame-Channels, daher
+  Funktional (Audio gehoert nicht zur bit-identischen Garantie). SOUND/
+  AUDIO_CHANNEL = INTEGER-Handles; raylib hat keine eigenstaendigen Mixer-Channels, daher
   steuert ein „Channel" die Wiedergabe genau seines Sounds (Volume per Handle
   getrackt, da raylib keinen Getter hat). Fade/loops=N werden vereinfacht
   (raylib kann das nicht direkt).
@@ -328,8 +328,8 @@ Grafik ist **feature-gated** (`graphics`, default aus): der pure VM-Kern baut
 ohne C-Toolchain. Mit Grafik wird [`raylib`](https://crates.io/crates/raylib)
 (raylib-rs 5.5) eingebunden.
 
-**Bit-Identität gilt NICHT für Pixel** (raylib ≠ pygame-Renderer) — nur
-`PRINT`/stdout bleibt bit-identisch. Grafik wird per Screenshot verifiziert.
+**Bit-Identität gilt NICHT für Pixel** (Grafik rendert nur die native Runtime) —
+nur `PRINT`/stdout bleibt bit-identisch. Grafik wird per Screenshot verifiziert.
 
 ### Build (mit Grafik)
 
@@ -354,7 +354,7 @@ cmake), LLVM für `libclang.dll` (`winget install LLVM.LLVM`). `cl.exe` findet d
 `IMAGEWIDTH`/`IMAGEHEIGHT`, `KEYPRESSED`, `MOUSEX`/`MOUSEY`/`MOUSEBUTTON`,
 `QUITREQUESTED`, `SLEEP`.
 
-**Game-Loop-Grundlagen** (in beiden Pfaden, pygame + raylib): `DELTA()`
+**Game-Loop-Grundlagen** (nativ in gbrt/raylib): `DELTA()`
 (Sekunden seit letztem FLIP, framerate-unabhaengige Bewegung), `FPS()`,
 `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt), `SET_FULLSCREEN(an)` (nativ
 echtes `ToggleFullscreen`, nicht mehr No-Op), `SETWINDOWTITLE(s)`,
@@ -375,7 +375,7 @@ präsentiert. So muss kein raylib-Draw-Handle über Builtin-Aufrufe gehalten
 werden. Farben sind `0xRRGGBB`-INTEGER → raylib `Color`.
 
 **Vordefinierte Globals:** Farben (`BLACK`/`WHITE`/`RED`/…), Tasten (`KEY_*` als
-SDL/pygame-Keycodes, in `KEYPRESSED` auf raylib-Keys gemappt) und `PI` werden
+SDL2-Keycodes, in `KEYPRESSED` auf raylib-Keys gemappt) und `PI` werden
 mit Python-identischen Werten vorregistriert (`register_default_globals`).
 
 ### Headless-Verifizierung
@@ -414,15 +414,15 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   (Broadphase mit externem Typ noch nicht.)
 - `input` — `INPUT_BIND/UNBIND/RESET/UPDATE/HELD/PRESSED/RELEASED/AXIS/BOUND`.
   Edge-Detection über prev/cur-Snapshots; Tastenstatus via raylib (`INPUT_UPDATE`
-  ohne Fenster = keine Tasten, wie pygame ohne Display → Konsolen-Demos
-  bit-identisch). **Gamepad** ist nun nativ: die `JOY_BUTTON_*`/`JOY_DPAD_*`-
+  ohne Fenster = keine Tasten → Konsolen-Demos bit-identisch). **Gamepad** ist
+  nun nativ: die `JOY_BUTTON_*`/`JOY_DPAD_*`-
   Bind-Codes (negativ) sind als Globals registriert und `key_down(negativer Code)`
   pollt über `IsGamepadButtonDown` **alle** verbundenen Pads (wie Pythons
   `_poll_joysticks_into`) — `INPUT_BIND("jump", JOY_BUTTON_A)` + `INPUT_HELD/
   PRESSED` funktionieren. `INPUT_JOY_COUNT` (zusammenhängend ab Slot 0),
   `INPUT_JOY_NAME(idx)`, `INPUT_JOY_AXIS(pad, "left_x"|…|"rt")` (Deadzone 0.15
   für Sticks) über raylibs Gamepad-API. Achsen-Namen → `GamepadAxis`-Indizes
-  wie pygame. Ohne Pad: Count 0, Achsen 0.0, Buttons false (kein Crash).
+  (Xbox-Layout). Ohne Pad: Count 0, Achsen 0.0, Buttons false (kein Crash).
 - `camera` — `CAMERA_SET/RESET/X/Y/ZOOM/FOLLOW/S2W_X/S2W_Y`. World→Screen-Transform
   (`w2s`/`ssize`) wird in allen Draw-Methoden angewandt; TEXT-Position transformiert,
   Font-Größe bleibt. 29_camera_visual rendert korrekt.
@@ -543,11 +543,11 @@ Audios. Dafür hängt `Audio::new` via `AttachAudioMixedProcessor` einen
 gemischte Mono-Signal in einen globalen Ringpuffer (`try_lock`, Audio-Thread
 blockiert nie). `fft_bands` fenstert (Hann), rechnet eine eigene Radix-2-FFT
 (1024), bündelt log-spaced, normalisiert per Auto-Gain und glättet per
-Peak-Hold. Im pygame-Pfad (kein Mix-Tap) füllt `AUDIO_FFT` Nullen. So tanzen
+Peak-Hold. (`AUDIO_FFT` ist nativ; ohne Mix-Tap füllt es Nullen.) So tanzen
 Spektrum **und** Geometrie der Demo wirklich zur Musik.
 
-WAV/OGG/MP3/FLAC je nach raylib-Build. Audio ist **nicht bit-identisch** zur
-pygame-Version (anderer Mixer) — wie `RND`/`MILLIS`/`tween` nur funktional.
+WAV/OGG/MP3/FLAC je nach raylib-Build. Audio gehoert **nicht** zur
+bit-identischen Garantie — wie `RND`/`MILLIS`/`tween` nur funktional.
 *Grenze:* `loops` wird nativ (noch) nicht ausgewertet — SFX spielen einmal,
 Musik loopt immer. Lifetime-Trick: das `RaylibAudio`-Gerät wird per `Box::leak`
 zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
@@ -555,7 +555,7 @@ zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
 
 ## Schritt 6: 3D-Grafik (Modul `g3d`)
 
-3D ist **native-only**: raylib hat eine echte 3D-Pipeline, pygame nicht. Das
+3D ist **native-only**: raylib hat eine echte 3D-Pipeline, der Tree-Walker nicht. Das
 Modul `g3d` registriert die Builtins (damit der Compiler `CALL_BUILTIN`
 emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 („… nur in der nativen Runtime … mit F6"). In `gbrt` rendern sie über raylibs
@@ -779,8 +779,8 @@ identisch auf den Screen *oder* in die RenderTexture — `RaylibDrawHandle` und
 `RaylibTextureMode` implementieren beide `RaylibDraw`. Shader-Handles liegen in
 `Graphics.shaders`, der aktive Index in `post_shader_idx`.
 
-Im pygame-Pfad sind die Builtins No-Ops (`SHADER_LOAD` → -1) — das Programm
-laeuft ohne Effekt statt zu craschen. Beispiel-Shader (GLSL 330):
+Auf dem Tree-Walker (konsolen-only) werfen die Shader-Builtins "nur in der
+nativen Runtime (gbrt)". Beispiel-Shader (GLSL 330):
 [examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
 `vignette.fs`), Demo [examples/86_postfx_shaders.gb](../examples/86_postfx_shaders.gb)
 (zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
@@ -788,28 +788,26 @@ laeuft ohne Effekt statt zu craschen. Beispiel-Shader (GLSL 330):
 ## TTF-Fonts (`LOADFONT` / `SETFONT` / `TEXT_SPACING`)
 
 Eigene TrueType-/OpenType-Schriften statt nur des eingebauten Default-Fonts.
-**Core-Builtins, kein `IMPORT` nötig** — in beiden Pfaden registriert:
+**Core-Builtins, kein `IMPORT` nötig** — nativ in gbrt (Tree-Walker konsolen-only):
 
 - `LOADFONT(pfad$, groesse) -> FONT` — lädt eine TTF/OTF in der Basis-Größe
   `groesse` (Glyph-Auflösung) und liefert ein **FONT-Handle (INTEGER)**.
 - `SETFONT(font)` — aktiviert den Font für nachfolgende `TEXT`-Aufrufe.
   `SETFONT(-1)` schaltet zurück auf den Default-Font.
 - `TEXT_SPACING(px)` — Buchstabenabstand für TTF-Text (wirkt nativ über
-  `DrawTextEx`; pygame ignoriert es als Näherung).
+  `DrawTextEx`).
 
 `TEXT_SIZE` skaliert den aktiven Font weiterhin frei (nativ skaliert raylib die
-einmal geladene Glyph-Textur; pygame baut pro Größe eine `pygame.font.Font`).
-`TEXT_WIDTH` misst in der **aktiven** Schrift (nativ `MeasureTextEx`) — damit
-funktioniert Zentrieren/Rechtsbündig auch mit TTF. `TEXT_BOLD`/`TEXT_ITALIC`
-wirken im pygame-Pfad (Synthese), nativ bleiben sie No-Op (raylib hat keine
-synthetische Variante — dafür eine fette/kursive Font-Datei laden).
+einmal geladene Glyph-Textur). `TEXT_WIDTH` misst in der **aktiven** Schrift
+(nativ `MeasureTextEx`) — damit funktioniert Zentrieren/Rechtsbündig auch mit
+TTF. `TEXT_BOLD`/`TEXT_ITALIC` sind nativ No-Op (raylib hat keine synthetische
+Variante — dafür eine fette/kursive Font-Datei laden).
 
 **Native Umsetzung** ([graphics.rs](../rust/gb_runtime/src/graphics.rs)): `fonts:
 Vec<Font>` (raylib `load_font_ex`), `active_font` (-1 = Default), `text_spacing`.
 `Cmd::Text` trägt jetzt Font-Index + Spacing; beim Replay zeichnet ein gültiger
-Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. **pygame-Pfad**
-([graphics.py](../gamebasic/graphics.py)): `_get_font()` baut bei aktivem TTF ein
-`pygame.font.Font(pfad, _font_size)` (pro Größe gecachet).
+Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. Der Tree-Walker
+([graphics.py](../gamebasic/graphics.py)) ist konsolen-only und rendert keinen Text.
 
 **Bit-Identität gilt nicht** (Renderer/Font-Metriken unterscheiden sich) — wie
 bei der übrigen Grafik nur funktional. Es liegt **kein Font-Asset im Repo**;

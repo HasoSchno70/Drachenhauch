@@ -75,7 +75,7 @@ Speichern als `hallo.gb`, dann:
 
 ## Erstes Spiel
 
-Ein minimaler Game-Loop mit Pygame:
+Ein minimaler Game-Loop (Grafik läuft in der nativen Runtime gbrt):
 
 ```basic
 SCREEN(320, 240, "Mein erstes Spiel", 2)

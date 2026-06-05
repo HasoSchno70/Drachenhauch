@@ -99,8 +99,8 @@ Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibwe
 | `STRING` | UTF-8-Text | `""` |
 | `BOOLEAN` | `TRUE` oder `FALSE` | `FALSE` |
 | `FILE` | Datei-Handle | `NIL` |
-| `IMAGE` | Pygame-Bild | `NIL` |
-| `SOUND` | Pygame-Sound | `NIL` |
+| `IMAGE` | Bild-Handle (nativ gbrt) | `NIL` |
+| `SOUND` | Sound-Handle (nativ gbrt) | `NIL` |
 | `ARRAY OF T` | mehrdim. Array | `NIL` (oder mit Größen-Init: gefüllt) |
 | `MAP OF T` | String→T-Map | leere Map |
 | `<Klassenname>` | Instanz | `NIL` |

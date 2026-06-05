@@ -38,8 +38,8 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       - `INKEY$` (raylib `get_char_pressed`), `WAITKEY` (blockt via
         `window_should_close`-Pump → raylib-Keycode, -1 bei Fensterschluss).
       - `JOYSTICK_COUNT/NAME/AXIS` exakt auf raylib-Gamepad; `BUTTON/HAT` als
-        Best-Effort (raylib-Standard-Layout; Roh-Index weicht von pygame ab →
-        fuer praezise Bindings `IMPORT "input"`). Ungueltiger Joystick-INDEX
+        Best-Effort (raylib-Standard-Layout; der Roh-Button-Index ist pad-
+        abhaengig → fuer praezise Bindings `IMPORT "input"`). Ungueltiger Joystick-INDEX
         wirft wie der TW (Sub-Index liefert 0/false).
       - `SCROLL`: gbrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
         persistenter Framebuffer) → graceful No-Op, **Tree-Walker-only**
