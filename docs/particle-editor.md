@@ -30,7 +30,7 @@ oder
 
 **Rechts** die Echtzeit-Vorschau. Sie treibt eine echte `_ParticleSystem`-Instanz — **dasselbe Simulationsmodell wie die Engine**, also entspricht die Vorschau exakt dem späteren Verhalten im Spiel (inkl. additivem `glow`).
 
-**Unten:** `Pause` friert die Simulation ein, `Leeren` entfernt alle Partikel, **`GB-Code exportieren`** öffnet ein Fenster mit dem fertigen `PARTICLE_*`-Setup-Snippet und kopiert es auf Wunsch in die Zwischenablage.
+**Unten:** **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Parameter-Änderungen rückgängig bzw. wieder her — ein Slider-Drag zählt als ein Schritt. `Pause` friert die Simulation ein, `Leeren` entfernt alle Partikel, **`GB-Code exportieren`** öffnet ein Fenster mit dem fertigen `PARTICLE_*`-Setup-Snippet und kopiert es auf Wunsch in die Zwischenablage.
 
 ## Beispiel-Export
 

@@ -15,6 +15,7 @@ Standalone: `gbsfx` oder `.venv\Scripts\python.exe gbrun.py --sfx` (braucht `PyS
 - **Ton** — Waveform (`square`/`saw`/`sine`/`triangle`/`noise`), Frequenz, **Pitch-Slide** (Hz/s, negativ = fallend), Lautstärke.
 - **Hüllkurve & Vibrato** — Attack / Sustain / Decay (ms), Vibrato-Tiefe + -Speed, **Stereo-Breite** (0 = mono, >0 = breiter per Detune; bei `noise` dekorreliert) und **Pan** (links −1 … +1 rechts).
 - **`▶ Abspielen`** spielt den aktuellen Effekt, **`Zufall`** würfelt neue Parameter (mit Abspielen).
+- **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — ein Preset-Laden, ein `Zufall` oder ein Slider-Drag zählt je als ein Schritt.
 
 ## Export
 

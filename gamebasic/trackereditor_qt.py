@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.undo_history import SnapshotUndo
 from .synth import synthesize
 from .tracker import (
     CHANNELS, TONAL, WAVEFORMS, Song, midi_to_freq, note_name,
@@ -152,6 +153,13 @@ class TrackerEditor(QMainWindow):
         b_save = QPushButton("Speichern"); b_save.clicked.connect(self._save)
         for b in (b_new, b_open, b_save):
             prow.addWidget(b)
+        prow.addSpacing(8)
+        self.btn_undo = QPushButton("↶"); self.btn_undo.setFixedWidth(34)
+        self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
+        self.btn_redo = QPushButton("↷"); self.btn_redo.setFixedWidth(34)
+        self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        prow.addWidget(self.btn_undo)
+        prow.addWidget(self.btn_redo)
         prow.addSpacing(16)
         prow.addWidget(QLabel("Pattern:"))
         self.pattern_combo = QComboBox()
@@ -222,6 +230,38 @@ class TrackerEditor(QMainWindow):
 
         self._reload_all()
 
+        # Undo/Redo ueber Snapshots des Song-Modells (to_dict/from_dict).
+        # capture als Lambda (self.song wird bei Restore neu zugewiesen) +
+        # deepcopy, weil Pattern.to_dict() die Live-`data`-Liste referenziert
+        # -- ohne Kopie wuerde der Snapshot mit dem Modell mutieren.
+        import copy as _copy
+        self.undo = SnapshotUndo(
+            lambda: _copy.deepcopy(self.song.to_dict()), self._restore_song,
+            debounce_ms=1)
+        self.undo.changed.connect(self._update_undo_buttons)
+        self.btn_undo.clicked.connect(self.undo.undo)
+        self.btn_redo.clicked.connect(self.undo.redo)
+        QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
+        QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
+        self._update_undo_buttons()
+
+    def _mark(self) -> None:
+        u = getattr(self, "undo", None)
+        if u is not None:
+            u.mark()
+
+    def _update_undo_buttons(self) -> None:
+        self.btn_undo.setEnabled(self.undo.can_undo())
+        self.btn_redo.setEnabled(self.undo.can_redo())
+
+    def _restore_song(self, snap: dict) -> None:
+        """Setzt das Song-Modell aus einem to_dict()-Snapshot (fuer Undo)."""
+        self.song = Song.from_dict(snap)
+        self._sound_cache.clear()
+        self.cur = min(self.cur, len(self.song.patterns) - 1)
+        self._reload_all()
+
     # ============================================== Song/Pattern-Sync
     def _reload_all(self) -> None:
         """Komplettes UI aus self.song neu aufbauen."""
@@ -265,10 +305,12 @@ class TrackerEditor(QMainWindow):
     # ============================================== Bearbeiten
     def _on_bpm(self, v: int) -> None:
         self.song.bpm = v
+        self._mark()
 
     def _set_wave(self, ci: int, v: str) -> None:
         self.song.waves[ci] = v
         self._sound_cache.clear()
+        self._mark()
 
     def _cell_text(self, ci: int, note) -> str:
         if note is None:
@@ -278,6 +320,7 @@ class TrackerEditor(QMainWindow):
     def _set_note(self, row: int, ci: int, note) -> None:
         self.song.patterns[self.cur].set(ci, row, note)
         self.grid.item(row, ci).setText(self._cell_text(ci, note))
+        self._mark()
 
     def _on_piano(self, midi: int) -> None:
         ch = self._sel_channel() if self._has_sel() else 0
@@ -314,6 +357,7 @@ class TrackerEditor(QMainWindow):
     def _clear(self) -> None:
         self.song.patterns[self.cur].clear()
         self._load_pattern(self.cur)
+        self._mark()
 
     # ============================================== Pattern-Verwaltung
     def _on_pattern_select(self, idx: int) -> None:
@@ -323,18 +367,21 @@ class TrackerEditor(QMainWindow):
     def _on_rows(self, v: int) -> None:
         self.song.patterns[self.cur].set_rows(v)
         self._load_pattern(self.cur)
+        self._mark()
 
     def _add_pattern(self) -> None:
         idx = self.song.add_pattern(rows=self.song.patterns[self.cur].rows)
         self.cur = idx
         self._reload_pattern_combo()
         self._load_pattern(idx)
+        self._mark()
 
     def _dup_pattern(self) -> None:
         idx = self.song.duplicate_pattern(self.cur)
         self.cur = idx
         self._reload_pattern_combo()
         self._load_pattern(idx)
+        self._mark()
 
     def _del_pattern(self) -> None:
         if len(self.song.patterns) <= 1:
@@ -344,17 +391,20 @@ class TrackerEditor(QMainWindow):
         self._reload_pattern_combo()
         self._reload_order()
         self._load_pattern(self.cur)
+        self._mark()
 
     # ============================================== Order/Arrangement
     def _order_add(self) -> None:
         self.song.order_add(self.cur)
         self._reload_order()
+        self._mark()
 
     def _order_remove(self) -> None:
         pos = self.order_list.currentRow()
         if pos >= 0:
             self.song.order_remove(pos)
             self._reload_order()
+            self._mark()
 
     def _order_move(self, delta: int) -> None:
         pos = self.order_list.currentRow()
@@ -362,6 +412,7 @@ class TrackerEditor(QMainWindow):
             new = self.song.order_move(pos, delta)
             self._reload_order()
             self.order_list.setCurrentRow(new)
+            self._mark()
 
     def _order_jump(self, item: QListWidgetItem) -> None:
         pos = self.order_list.row(item)
@@ -465,6 +516,7 @@ class TrackerEditor(QMainWindow):
         self.song = Song()
         self.cur = 0
         self._reload_all()
+        self.undo.reset()      # frisches Dokument -> Historie verwerfen
         self.setWindowTitle("GameBasic Tracker")
 
     def _open(self) -> None:
@@ -481,6 +533,7 @@ class TrackerEditor(QMainWindow):
         self.cur = 0
         self._sound_cache.clear()
         self._reload_all()
+        self.undo.reset()      # geladenes Dokument -> Historie verwerfen
         self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")
 
     def _save(self) -> None:

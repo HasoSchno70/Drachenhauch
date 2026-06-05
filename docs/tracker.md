@@ -12,6 +12,7 @@ Aus dem **Code-Editor**: Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (
 - **Note setzen:** Zelle anklicken (auswählen), dann auf der **Klaviatur** unten eine Taste klicken → die Note (z. B. `C4`) landet in der Zelle, der Cursor springt eine Reihe weiter. `Entf`/`Rücktaste` löscht die Zelle. Die Klaviatur spielt auch einzelne Töne zum Vorhören; **Oktave** wählt den Bereich.
 - **Wellenform pro Ton-Kanal** (`Ch1`–`Ch3`): square / saw / sine / triangle.
 - **BPM** stellt das Tempo (16tel-Schritte).
+- **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — Noten, Pattern-/Order-Operationen, BPM, Wellenform. `Neu`/`Öffnen` verwerfen die Historie.
 
 ### Patterns
 

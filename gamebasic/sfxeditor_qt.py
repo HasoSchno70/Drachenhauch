@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFrame, QGroupBox,
     QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QSpinBox,
@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.undo_history import SnapshotUndo
 from .synth import SAMPLE_RATE as _SAMPLE_RATE, WAVEFORMS as _WAVEFORMS
 from .synth import synthesize as _synth
 
@@ -175,6 +176,14 @@ class SfxGenerator(QMainWindow):
 
         # Buttons
         btns = QHBoxLayout()
+        self.btn_undo = QPushButton("↶")
+        self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
+        self.btn_undo.setFixedWidth(34)
+        btns.addWidget(self.btn_undo)
+        self.btn_redo = QPushButton("↷")
+        self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        self.btn_redo.setFixedWidth(34)
+        btns.addWidget(self.btn_redo)
         b_play = QPushButton("▶ Abspielen")
         b_play.setProperty("accent", True)
         b_play.clicked.connect(self._play)
@@ -193,6 +202,35 @@ class SfxGenerator(QMainWindow):
         root.addStretch(1)
 
         self._load_preset("Jump")
+
+        # Undo/Redo: Snapshot der Parameter (self._params <-> _apply_params).
+        self.undo = SnapshotUndo(self._params, self._apply_params, debounce_ms=250)
+        self.undo.changed.connect(self._update_undo_buttons)
+        self.btn_undo.clicked.connect(self.undo.undo)
+        self.btn_redo.clicked.connect(self.undo.redo)
+        QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
+        QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
+        self._update_undo_buttons()
+
+    def _update_undo_buttons(self) -> None:
+        self.btn_undo.setEnabled(self.undo.can_undo())
+        self.btn_redo.setEnabled(self.undo.can_redo())
+
+    def _apply_params(self, p: dict) -> None:
+        """Setzt alle Parameter-Widgets aus einem `_params()`-Dict (fuer Undo)."""
+        self.waveform.setCurrentText(p["waveform"])
+        self.base_freq.setValue(int(p["base_freq"]))
+        self.slide.setValue(int(p["slide"]))
+        self.volume.setValue(float(p["volume"]))
+        self.attack.setValue(int(p["attack"]))
+        self.sustain.setValue(int(p["sustain"]))
+        self.decay.setValue(int(p["decay"]))
+        self.vib_depth.setValue(float(p["vib_depth"]))
+        self.vib_speed.setValue(int(p["vib_speed"]))
+        self.stereo_width.setValue(float(p["stereo_width"]))
+        self.pan.setValue(float(p["pan"]))
+        self._on_change()
 
     # ---- Helfer
     def _row(self, layout, label, widget):
@@ -232,6 +270,9 @@ class SfxGenerator(QMainWindow):
 
     def _on_change(self, *_a) -> None:
         self.wave_view.set_samples(synthesize(self._params()))
+        u = getattr(self, "undo", None)
+        if u is not None:
+            u.mark()
 
     def _load_preset(self, name: str) -> None:
         wf, base, slide, atk, sus, dec, vd, vs = _PRESETS[name]

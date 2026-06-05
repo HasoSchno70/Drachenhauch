@@ -12,7 +12,9 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QRadialGradient
+from PySide6.QtGui import (
+    QColor, QFont, QKeySequence, QPainter, QPen, QRadialGradient, QShortcut,
+)
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFrame,
     QGroupBox, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
@@ -20,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.undo_history import SnapshotUndo
 from .modules.particles import _ParticleSystem
 
 _MODES = ("circle", "pixel", "square", "streak", "glow")
@@ -175,6 +178,50 @@ class ParticleEditor(QMainWindow):
         # --- Vorschau rechts ---------------------------------------
         root.addWidget(self.preview, 1)
 
+        # Undo/Redo ueber Snapshots aller Parameter-Widgets.
+        self.undo = SnapshotUndo(self._capture_state, self._apply_state,
+                                 debounce_ms=250)
+        self.undo.changed.connect(self._update_undo_buttons)
+        self.btn_undo.clicked.connect(self.undo.undo)
+        self.btn_redo.clicked.connect(self.undo.redo)
+        QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
+        QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
+        self._update_undo_buttons()
+
+    def _update_undo_buttons(self) -> None:
+        self.btn_undo.setEnabled(self.undo.can_undo())
+        self.btn_redo.setEnabled(self.undo.can_redo())
+
+    def _capture_state(self) -> dict:
+        return {
+            "vx_min": self.vx_min.value(), "vx_max": self.vx_max.value(),
+            "vy_min": self.vy_min.value(), "vy_max": self.vy_max.value(),
+            "gx": self.gx.value(), "gy": self.gy.value(),
+            "mode": self.mode.currentText(),
+            "size_min": self.size_min.value(), "size_max": self.size_max.value(),
+            "color": self.color.value(),
+            "color_end_on": self.color_end_on.isChecked(),
+            "color_end": self.color_end.value(),
+            "fade": self.fade.isChecked(),
+            "life_min": self.life_min.value(), "life_max": self.life_max.value(),
+            "rate": self.rate.value(),
+        }
+
+    def _apply_state(self, s: dict) -> None:
+        self.vx_min.setValue(s["vx_min"]); self.vx_max.setValue(s["vx_max"])
+        self.vy_min.setValue(s["vy_min"]); self.vy_max.setValue(s["vy_max"])
+        self.gx.setValue(s["gx"]); self.gy.setValue(s["gy"])
+        self.mode.setCurrentText(s["mode"])
+        self.size_min.setValue(s["size_min"]); self.size_max.setValue(s["size_max"])
+        self.color.set_value(s["color"])
+        self.color_end_on.setChecked(s["color_end_on"])
+        self.color_end.set_value(s["color_end"])
+        self.fade.setChecked(s["fade"])
+        self.life_min.setValue(s["life_min"]); self.life_max.setValue(s["life_max"])
+        self.rate.setValue(s["rate"])
+        self._on_change()
+
     # ------------------------------------------------- Controls
     def _build_controls(self, cl: QVBoxLayout) -> None:
         title = QLabel("Partikel-Editor")
@@ -231,6 +278,14 @@ class ParticleEditor(QMainWindow):
 
         # Buttons
         btns = QHBoxLayout()
+        self.btn_undo = QPushButton("↶")
+        self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
+        self.btn_undo.setFixedWidth(34)
+        btns.addWidget(self.btn_undo)
+        self.btn_redo = QPushButton("↷")
+        self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        self.btn_redo.setFixedWidth(34)
+        btns.addWidget(self.btn_redo)
         self.btn_pause = QPushButton("Pause")
         self.btn_pause.setCheckable(True)
         self.btn_pause.toggled.connect(
@@ -292,6 +347,9 @@ class ParticleEditor(QMainWindow):
         s.lifetime_min = self.life_min.value()
         s.lifetime_max = max(self.life_min.value(), self.life_max.value())
         self.preview.emit_rate = self.rate.value()
+        u = getattr(self, "undo", None)
+        if u is not None:
+            u.mark()
 
     # ------------------------------------------------- Export
     def _export(self) -> None:
