@@ -67,7 +67,7 @@ def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
 def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
     """Spielt die Samples ueber sounddevice (best effort -- ohne Audio-Geraet
     oder ohne installiertes sounddevice still). Mono ODER Stereo `(n, 2)`.
-    sounddevice nimmt die float32-Arrays direkt (kein int16/pygame noetig)."""
+    sounddevice nimmt die float32-Arrays direkt (keine int16-Konvertierung noetig)."""
     try:
         import sounddevice as sd
         arr = np.ascontiguousarray(

@@ -1,12 +1,13 @@
-"""Pygame-Backend fuer GameBasic-Grafik.
+"""Konsolen-only Grafik-Stub fuer GameBasic (pygame ENTFERNT, Stufe A).
+
+Grafik/Audio laufen nur noch in der nativen Runtime gbrt; dieser Tree-Walker-
+Stub liefert lediglich Farb-/Tastenkonstanten und die Kamera-Mathematik. Die
+eigentlichen Zeichen-/Audio-Methoden werfen "nur in der nativen Runtime (gbrt)".
 
 Faerben werden als 24-Bit-RGB-INTEGERs uebergeben (0xRRGGBB). Das Modul stellt
 benannte Konstanten (BLACK, WHITE, RED, ...) und eine RGB(r,g,b)-Funktion bereit;
 beide liefern denselben Encoding-Stil, der direkt von den Zeichenbefehlen verstanden
 wird.
-
-Pygame wird beim ersten SCREEN-Aufruf gestartet (Lazy-Init). Wer kein SCREEN
-benutzt, bezahlt keinen Pygame-Import.
 """
 from .errors import GBRuntimeError
 
@@ -33,7 +34,7 @@ COLORS = {
     "darkblue":   0x000080,
 }
 
-# --- Tastencodes (SDL2-Keycodes, kein pygame-Import noetig) -----------
+# --- Tastencodes (SDL2-Keycodes) --------------------------------------
 KEYS = {
     "key_escape":   27,
     "key_return":   13,
@@ -59,7 +60,7 @@ for _fn in range(1, 13):
 # Gamepad/Joystick-Konstanten. Negative Codes -- so kollidieren sie nicht
 # mit Tastatur-Keycodes (alle positiv). INPUT_BIND akzeptiert beide; das
 # input-Modul unterscheidet intern.
-# Buttons (Xbox-Layout, pygame.joystick standard mapping):
+# Buttons (Xbox-Layout, Standard-Gamepad-Mapping):
 KEYS["joy_button_a"]      = -100   # A (Xbox) / X (PS)
 KEYS["joy_button_b"]      = -101   # B (Xbox) / Circle (PS)
 KEYS["joy_button_x"]      = -102   # X (Xbox) / Square (PS)
@@ -70,7 +71,7 @@ KEYS["joy_button_back"]   = -106   # Back / Select / Share
 KEYS["joy_button_start"]  = -107   # Start / Options
 KEYS["joy_button_lstick"] = -108   # Linker Stick-Klick (L3)
 KEYS["joy_button_rstick"] = -109   # Rechter Stick-Klick (R3)
-# DPad (intern als "Hat" in pygame, hier als Buttons exponiert)
+# DPad (klassisch ein "Hat", hier als Buttons exponiert)
 KEYS["joy_dpad_up"]       = -200
 KEYS["joy_dpad_down"]     = -201
 KEYS["joy_dpad_left"]     = -202

@@ -106,7 +106,7 @@ def _g_update(g):
 
 # Joystick-Codes (parallel zur graphics.KEYS-Konvention):
 _JOY_BUTTON_BASE = -100
-_JOY_BUTTON_MAP = {     # pygame-button-index -> negativer Action-Code
+_JOY_BUTTON_MAP = {     # Gamepad-button-index -> negativer Action-Code
     0: -100,            # A
     1: -101,            # B
     2: -102,            # X
@@ -124,9 +124,10 @@ _JOY_DPAD_DOWN  = -201
 _JOY_DPAD_LEFT  = -202
 _JOY_DPAD_RIGHT = -203
 
-# Joystick-Instanz-Cache. pygame.joystick.Joystick(i) braucht .init(),
-# danach kann man buttons/achsen pollen. Cache pro Index.
-_JOYSTICKS: list = []      # list[pygame.joystick.Joystick] -- initialisiert lazily
+# Joystick-Instanz-Cache. Im konsolen-only Tree-Walker bleibt er leer
+# (echtes Gamepad-Polling gibt es nur nativ in gbrt/raylib); Tests
+# injizieren Stub-Pads mit get_button/get_hat/get_axis-Interface.
+_JOYSTICKS: list = []      # list[Joystick-Stub] -- initialisiert lazily
 
 
 def _ensure_joysticks():
@@ -166,7 +167,7 @@ def _poll_joysticks_into(out_set: set):
                     out_set.add(_JOY_DPAD_LEFT)
                 elif hx > 0:
                     out_set.add(_JOY_DPAD_RIGHT)
-                if hy > 0:                  # pygame: y > 0 = nach OBEN
+                if hy > 0:                  # Hat-Konvention: y > 0 = nach OBEN
                     out_set.add(_JOY_DPAD_UP)
                 elif hy < 0:
                     out_set.add(_JOY_DPAD_DOWN)
@@ -178,8 +179,8 @@ def _poll_joysticks_into(out_set: set):
 
 @builtin("INPUT_JOY_COUNT", arity=0)
 def _b_joy_count():
-    """Wie viele Pads sind aktuell angeschlossen? 0 wenn keiner oder
-    pygame-mixer nicht initialisiert."""
+    """Wie viele Pads sind aktuell angeschlossen? 0 wenn keiner (oder im
+    konsolen-only Tree-Walker, der kein Gamepad-Polling hat -- nur gbrt)."""
     _ensure_joysticks()
     return len(_JOYSTICKS)
 
@@ -208,7 +209,7 @@ def _b_joy_axis(pad_idx, axis_name):
         "right_x", "right_y"    Rechter Stick
         "lt", "rt"              Trigger (0..+1, in Ruhelage 0)
 
-    Mapping nach pygame-Achsen-Konvention (Xbox-Layout):
+    Mapping nach Standard-Achsen-Konvention (Xbox-Layout):
         0 = left_x,  1 = left_y,  2 = right_x bzw. lt (Controller-abhaengig),
         3 = right_y, 4 = lt, 5 = rt.
     """

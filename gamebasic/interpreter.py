@@ -144,7 +144,9 @@ class _GBArray:
 
 
 class _Image:
-    """Wrapper um pygame.Surface - opaque fuer GameBasic."""
+    """Opaques Bild-Handle (IMAGE-Typ). Grafik laeuft nur nativ in gbrt;
+    der konsolen-only Tree-Walker erzeugt es nicht (Bild-Builtins werfen
+    'nur in der nativen Runtime (gbrt)')."""
     __slots__ = ("surface", "path")
 
     def __init__(self, surface, path: str = ""):
@@ -156,7 +158,9 @@ class _Image:
 
 
 class _Sound:
-    """Wrapper um pygame.mixer.Sound."""
+    """Opaques Sound-Handle (SOUND-Typ). Audio laeuft nur nativ in gbrt;
+    der konsolen-only Tree-Walker erzeugt es nicht (Audio-Builtins werfen
+    'nur in der nativen Runtime (gbrt)')."""
     __slots__ = ("sound", "path")
 
     def __init__(self, sound, path: str = ""):
@@ -172,15 +176,16 @@ class _SpriteAtlas:
 
     Wird via ATLAS_LOAD aus einem JSON-Manifest geladen. Sub-Rects sind
     in der frames-Dict gespeichert (name -> (x, y, w, h)) und werden von
-    ATLAS_DRAW / BATCH_DRAW als Source-Rect fuer pygame-blits verwendet.
+    ATLAS_DRAW / BATCH_DRAW als Source-Rect verwendet (gezeichnet wird nur
+    nativ in gbrt).
 
-    Vorteil gegenueber N einzelnen LOADIMAGE: eine einzige Surface, eine
-    einzige Allokation, perfekt fuer pygame.Surface.blits() (Batch).
+    Vorteil gegenueber N einzelnen LOADIMAGE: eine einzige Textur, eine
+    einzige Allokation, perfekt fuer gebatchtes Rendern.
     """
     __slots__ = ("image", "frames", "path")
 
     def __init__(self, image, frames: dict, path: str = ""):
-        self.image = image          # _Image (haelt die pygame.Surface)
+        self.image = image          # _Image (haelt das Bild-Handle)
         self.frames = frames        # name -> (x, y, w, h)
         self.path = path
 
@@ -3764,7 +3769,7 @@ def _g_setwindowtitle(g, title):
 def _g_shader_load(g, src):
     """Laedt einen Fragment-Shader (GLSL): `src` ist ein Datei-Pfad oder direkt
     GLSL-Quelltext. Liefert ein SHADER-Handle (INTEGER) oder -1. **Nur native
-    Runtime** (raylib/GPU) -- im pygame-Pfad immer -1 (kein Effekt)."""
+    Runtime** (raylib/GPU) -- der konsolen-only Tree-Walker wirft 'nur gbrt'."""
     return int(g.load_shader(src))
 
 
@@ -4035,13 +4040,13 @@ def _g_spline(g, *args):
     return None
 
 
-# --- Blend-Modes (Batch 2) -- nativ; pygame No-Op ---
+# --- Blend-Modes (Batch 2) -- nativ; Tree-Walker wirft 'nur gbrt' ---
 
 @graphics_builtin("BLEND_MODE", arity=1, types=("str",))
 def _g_blend_mode(g, name):
     """BLEND_MODE(modus$) -- Blend-Modus fuer folgende Draws: "alpha" (Default),
     "add"/"additive" (Glow), "mult"/"multiply", "subtract". NUR native (gbrt);
-    im pygame-Pfad wirkungslos (Programm laeuft ohne Effekt)."""
+    der konsolen-only Tree-Walker wirft 'nur gbrt'."""
     g.blend_mode(name)
     return None
 
@@ -4089,19 +4094,19 @@ def _g_gentex_color(g, *args):
                            _check_int(args[2], "GENTEX_COLOR"))
 
 
-# --- Clipboard + Drag&Drop (Batch 5) -- nativ; pygame graceful ---
+# --- Clipboard + Drag&Drop (Batch 5) -- nativ; Tree-Walker wirft 'nur gbrt' ---
 
 @graphics_builtin("CLIPBOARD_GET", arity=0)
 def _g_clipboard_get(g, *args):
     """CLIPBOARD_GET() -> STRING -- Text aus der System-Zwischenablage (nativ;
-    pygame liefert "")."""
+    Tree-Walker konsolen-only -> wirft 'nur gbrt')."""
     return g.clipboard_get()
 
 
 @graphics_builtin("CLIPBOARD_SET", arity=1, types=("str",))
 def _g_clipboard_set(g, s):
     """CLIPBOARD_SET(text$) -- Text in die System-Zwischenablage legen (nativ;
-    pygame No-Op)."""
+    Tree-Walker konsolen-only -> wirft 'nur gbrt')."""
     g.clipboard_set(s)
     return None
 
@@ -4109,14 +4114,14 @@ def _g_clipboard_set(g, s):
 @graphics_builtin("FILES_DROPPED", arity=0)
 def _g_files_dropped(g, *args):
     """FILES_DROPPED() -> INTEGER -- Anzahl in diesem Frame per Drag&Drop
-    fallengelassener Dateien (nativ; pygame 0)."""
+    fallengelassener Dateien (nativ; Tree-Walker konsolen-only -> wirft 'nur gbrt')."""
     return g.files_dropped()
 
 
 @graphics_builtin("FILE_DROPPED", arity=1)
 def _g_file_dropped(g, *args):
     """FILE_DROPPED(index) -> STRING -- Pfad der i-ten fallengelassenen Datei
-    (nativ; pygame "")."""
+    (nativ; Tree-Walker konsolen-only -> wirft 'nur gbrt')."""
     return g.file_dropped(_check_int(args[0], "FILE_DROPPED"))
 
 
@@ -4479,9 +4484,9 @@ def _g_atlas_draw_flipped(g, *args):
 @graphics_builtin("BATCH_DRAW", arity=4, types=("any", "str", "intish", "intish"))
 def _g_batch_draw(g, atlas, name, x, y):
     """Haengt einen Atlas-Sub-Sprite an die Batch-Queue. Erst BATCH_FLUSH
-    (oder FLIP / Layer-Wechsel / Direct-Draw) rendert. Erwartet pygame.
-    Surface.blits() im Hot-Pfad -- spart Python-Overhead bei hunderten
-    von Sprites (Tilemap, Bullet-Hell)."""
+    (oder FLIP / Layer-Wechsel / Direct-Draw) rendert (gebatchter Draw-Call,
+    nativ in gbrt) -- spart Dispatch-Overhead bei hunderten von Sprites
+    (Tilemap, Bullet-Hell)."""
     if not isinstance(atlas, _SpriteAtlas):
         raise TypeMismatchError(
             "BATCH_DRAW: erstes Argument muss SPRITE_ATLAS sein"

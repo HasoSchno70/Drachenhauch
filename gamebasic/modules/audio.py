@@ -48,12 +48,13 @@ Kategorien:
 Konvention:
   loops = 0   -> einmal abspielen
   loops = -1  -> endlos
-  loops = N   -> 1 + N Wiederholungen (pygame-Konvention)
+  loops = N   -> 1 + N Wiederholungen (N+1-Konvention)
   volume in [0.0, 1.0]; out-of-range wird geklemmt.
 
 Implementierung:
-  Lazy pygame-Init (Banner unterdrueckt). Audio funktioniert ohne Display,
-  daher graphics-unabhaengig. Tone-Generation per numpy + pygame.sndarray.
+  Audio laeuft nur in der nativen Runtime (gbrt/raylib); der konsolen-only
+  Tree-Walker wirft "nur in der nativen Runtime (gbrt)". Die reine Synth-
+  Mathematik (gamebasic.synth, numpy) bleibt fuer Editoren/gbsfx nutzbar.
 """
 from __future__ import annotations
 
@@ -86,11 +87,11 @@ def _ensure_mixer():
 # --- Channel-Wrapper -------------------------------------------------
 
 class _AudioChannel:
-    """Wrapper um pygame.mixer.Channel.
+    """Opaques AUDIO_CHANNEL-Handle (Wiedergabe-Kanal).
 
-    Channels werden vom Mixer beim ersten AUDIO_PLAY allokiert. Wir cachen
-    die pygame-Channel-Referenz; sobald der Sound zu Ende ist, behandelt
-    pygame den Channel als 'frei' und kann ihn wieder vergeben.
+    Channels werden vom Mixer beim ersten AUDIO_PLAY allokiert; sobald der
+    Sound zu Ende ist, gilt der Channel als 'frei' und kann wieder vergeben
+    werden. Audio laeuft nur nativ in gbrt.
     """
     __slots__ = ("channel",)
 
@@ -150,8 +151,8 @@ def _clamp01(v: float) -> float:
 def _audio_init(*args):
     """AUDIO_INIT([freq[, channels[, buffer]]])
 
-    Initialisiert pygame.mixer mit gewaehlten Parametern. Wenn schon
-    initialisiert, wird er erst beendet und neu gestartet. Optional;
+    Initialisiert den nativen Mixer (gbrt) mit gewaehlten Parametern. Wenn
+    schon initialisiert, wird er erst beendet und neu gestartet. Optional;
     sonst nutzt der Mixer beim ersten Sound-Call seine Defaults
     (44100Hz, 16-bit, stereo, 512 buffer)."""
     freq = _check_int_strict(args[0], "AUDIO_INIT", "freq INTEGER") if len(args) >= 1 else 44100
@@ -215,7 +216,7 @@ def _audio_play(*args):
     """AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) -> AUDIO_CHANNEL.
 
     Liefert den vom Mixer ausgewaehlten Channel zurueck. Wenn alle
-    Channels belegt sind, wirft pygame keinen Fehler; wir liefern dann
+    Channels belegt sind, wirft der Mixer keinen Fehler; wir liefern dann
     ein AUDIO_CHANNEL-Wrapper mit None-Channel zurueck und AUDIO_IS_PLAYING
     liefert FALSE.
     """
@@ -372,7 +373,7 @@ def _audio_music_get_volume():
 def _audio_music_position():
     """Liefert die abgespielte Zeit in Sekunden seit dem letzten Play.
 
-    Wichtig: pygame meldet -1, wenn nichts laeuft. Wir clampen auf 0.0."""
+    Wichtig: der native Mixer meldet -1, wenn nichts laeuft. Wir clampen auf 0.0."""
     pg = _ensure_mixer()
     pos_ms = pg.mixer.music.get_pos()
     if pos_ms < 0:
@@ -429,7 +430,7 @@ def _generate_waveform(waveform: str, freq_hz: float, t: np.ndarray) -> np.ndarr
 
 
 def _make_sound_from_wave(wave: np.ndarray, volume: float) -> _Sound:
-    """Konvertiert ein float64-Array [-1, 1] zu einem pygame.mixer.Sound.
+    """Konvertiert ein float64-Array [-1, 1] zu einem nativen SOUND.
 
     Anti-Click-Envelope wird automatisch angewandt. Stereo wird vom
     aktuellen Mixer-Format abgeleitet."""
@@ -539,9 +540,9 @@ def _audio_fft(arr):
     (0..1) des aktuell hoerbaren Audios (echte FFT).
 
     NUR in der nativen Runtime (gbrt) liefert das echte Werte -- dort haengt
-    ein Mix-Processor an der Audio-Pipeline. Im Python/pygame-Pfad gibt es
-    keinen solchen Tap; die Funktion fuellt dann Nullen (kein Crash, keine
-    Reaktivitaet). Laenge des Arrays = Anzahl der Baender."""
+    ein Mix-Processor an der Audio-Pipeline. Ohne diesen Tap fuellt die
+    Funktion Nullen (kein Crash, keine Reaktivitaet). Laenge des Arrays =
+    Anzahl der Baender."""
     from ..interpreter import _GBArray
     if (not isinstance(arr, _GBArray) or arr.element_type != "float"
             or len(arr.dims) != 1):

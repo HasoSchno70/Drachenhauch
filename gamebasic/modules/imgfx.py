@@ -12,7 +12,8 @@ Fuer den Tint wird der Pixel-Wert mit (R/255, G/255, B/255) multipliziert.
 Weiss (0xFFFFFF) laesst das Bild unveraendert; Schwarz (0x000000) macht es
 komplett schwarz; Rot (0xFF0000) erhaelt nur den Rot-Kanal.
 
-Pygame muss verfuegbar sein - z.B. nach LOADIMAGE oder SCREEN.
+Bild-Verarbeitung laeuft nur in der nativen Runtime (gbrt); der konsolen-only
+Tree-Walker wirft "nur in der nativen Runtime (gbrt)".
 """
 from __future__ import annotations
 

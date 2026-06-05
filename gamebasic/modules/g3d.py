@@ -1,10 +1,10 @@
 """g3d-Modul fuer GameBasic -- 3D-Grafik ueber raylibs Mesh/Kamera-API.
 
 3D ist **nur in der nativen Runtime** (`gbrt`, via F6 / `gbrun.py --native`)
-verfuegbar -- der Python/pygame-Pfad (F5, Tree-Walker / Python-VM) kann kein
+verfuegbar -- der konsolen-only Tree-Walker (F5/Profiler/Debugger) kann kein
 3D rendern. Dieses Modul registriert die Builtins nur, damit der Compiler sie
 als `CALL_BUILTIN` erkennt; die eigentliche Umsetzung liegt in
-`rust/gb_runtime/src/graphics.rs` + `vm.rs`. Im Python-Pfad werfen die
+`rust/gb_runtime/src/graphics.rs` + `vm.rs`. Im Tree-Walker werfen die
 Funktionen eine klare Meldung.
 
 Modell (Recording, wie 2D): pro Frame
