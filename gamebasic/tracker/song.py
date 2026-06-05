@@ -29,6 +29,17 @@ MAX_ROWS = 64
 # Lautstaerke-Effekt pro Note: 1..15 (None = Standard-Lautstaerke).
 VOL_MAX = 15
 DEFAULT_AMP_PCT = 50       # Standard-Amplitude in Prozent (= bisherige 0.5)
+# Pitch-Slide-Effekt pro Note: -SLIDE_MAX..+SLIDE_MAX Halbtoene ueber die
+# Reihen-Dauer (0/None = kein Slide). Beim Export zu Hz/s vorberechnet.
+SLIDE_MAX = 12
+
+
+def slide_hz_per_s(freq: float, semitones: int, row_ms: int) -> int:
+    """Pitch-Slide (Halbtoene ueber eine Reihe) -> Hz/s fuer AUDIO_SFX."""
+    if not semitones or row_ms <= 0:
+        return 0
+    target = freq * (2.0 ** (semitones / 12.0))
+    return int(round((target - freq) * 1000.0 / row_ms))
 
 
 def vol_to_pct(v: int) -> int:
@@ -48,7 +59,7 @@ def note_name(m: int) -> str:
 class Pattern:
     """Ein Pattern: CHANNELS x rows Gitter aus MIDI-Noten (oder None)."""
 
-    __slots__ = ("name", "rows", "data", "vol")
+    __slots__ = ("name", "rows", "data", "vol", "slide")
 
     def __init__(self, name: str, rows: int = DEFAULT_ROWS):
         self.name = name
@@ -60,14 +71,18 @@ class Pattern:
         # Nur sinnvoll, wo auch eine Note steht.
         self.vol: list[list[int | None]] = [
             [None] * self.rows for _ in range(CHANNELS)]
+        # slide[channel][row] = Pitch-Slide in Halbtoenen (-12..12) oder None.
+        self.slide: list[list[int | None]] = [
+            [None] * self.rows for _ in range(CHANNELS)]
 
     def get(self, channel: int, row: int) -> int | None:
         return self.data[channel][row]
 
     def set(self, channel: int, row: int, note: int | None) -> None:
         self.data[channel][row] = note
-        if note is None:                     # Note geloescht -> Lautstaerke mit
+        if note is None:                     # Note geloescht -> Effekte mit
             self.vol[channel][row] = None
+            self.slide[channel][row] = None
 
     def get_vol(self, channel: int, row: int) -> int | None:
         return self.vol[channel][row]
@@ -82,10 +97,23 @@ class Pattern:
         else:
             self.vol[channel][row] = max(1, min(VOL_MAX, int(v)))
 
+    def get_slide(self, channel: int, row: int) -> int | None:
+        return self.slide[channel][row]
+
+    def set_slide(self, channel: int, row: int, s: int | None) -> None:
+        """Setzt den Pitch-Slide -12..12 Halbtoene (None/0 = kein Slide).
+        Wirkt nur, wenn an der Stelle eine Note steht."""
+        if self.data[channel][row] is None:
+            return
+        if s is None or int(s) == 0:
+            self.slide[channel][row] = None
+        else:
+            self.slide[channel][row] = max(-SLIDE_MAX, min(SLIDE_MAX, int(s)))
+
     def set_rows(self, rows: int) -> None:
         """Aendert die Reihenzahl; bestehende Noten oben bleiben erhalten."""
         rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
-        for grid in (self.data, self.vol):
+        for grid in (self.data, self.vol, self.slide):
             for c in range(CHANNELS):
                 col = grid[c]
                 if rows < len(col):
@@ -97,22 +125,29 @@ class Pattern:
     def clear(self) -> None:
         self.data = [[None] * self.rows for _ in range(CHANNELS)]
         self.vol = [[None] * self.rows for _ in range(CHANNELS)]
+        self.slide = [[None] * self.rows for _ in range(CHANNELS)]
 
     def copy(self, name: str | None = None) -> "Pattern":
         p = Pattern(name if name is not None else self.name, self.rows)
         p.data = [list(col) for col in self.data]
         p.vol = [list(col) for col in self.vol]
+        p.slide = [list(col) for col in self.slide]
         return p
 
     def _has_vol(self) -> bool:
         return any(v is not None for col in self.vol for v in col)
 
+    def _has_slide(self) -> bool:
+        return any(v is not None for col in self.slide for v in col)
+
     def to_dict(self) -> dict:
         d = {"name": self.name, "rows": self.rows, "data": self.data}
-        # vol nur schreiben, wenn gesetzt -> alte Dateien/leere Patterns bleiben
-        # schlank und abwaerts-kompatibel.
+        # Effekt-Spalten nur schreiben, wenn gesetzt -> alte Dateien/leere
+        # Patterns bleiben schlank und abwaerts-kompatibel.
         if self._has_vol():
             d["vol"] = self.vol
+        if self._has_slide():
+            d["slide"] = self.slide
         return d
 
     @classmethod
@@ -133,6 +168,14 @@ class Pattern:
                        for v in rawv[c]][:p.rows]
                 col += [None] * (p.rows - len(col))
                 p.vol[c] = col
+        raws = d.get("slide") or []
+        for c in range(CHANNELS):
+            if c < len(raws):
+                col = [max(-SLIDE_MAX, min(SLIDE_MAX, int(v)))
+                       if isinstance(v, (int, float)) and int(v) != 0 else None
+                       for v in raws[c]][:p.rows]
+                col += [None] * (p.rows - len(col))
+                p.slide[c] = col
         return p
 
 
@@ -197,17 +240,19 @@ class Song:
         return pos
 
     # ------------------------------------------------------ Flatten
-    def _flatten(self) -> tuple[int, list[list[int]], list[list[int]]]:
-        """Wie `flatten`, liefert zusaetzlich die Lautstaerke-Spuren `vols`:
-        `vols[c][i]` = Amplituden-Prozent (1..100) bei explizit gesetzter
-        Noten-Lautstaerke, sonst 0 (= Standard). Nur dort relevant, wo auch
-        `channels[c][i] != 0` ist."""
+    def _flatten(self):
+        """Wie `flatten`, liefert zusaetzlich die Effekt-Spuren:
+        `vols[c][i]` = Amplituden-Prozent (1..100) bei expliziter Lautstaerke,
+        sonst 0; `slides[c][i]` = Pitch-Slide in Hz/s (fuer AUDIO_SFX), sonst 0.
+        Beide nur relevant, wo `channels[c][i] != 0` ist."""
         order = self.order or [0]
         total = sum(self.patterns[p].rows for p in order
                     if 0 <= p < len(self.patterns))
         total = max(1, total)
+        rowms = self.row_ms()
         channels = [[0] * total for _ in range(CHANNELS)]
         vols = [[0] * total for _ in range(CHANNELS)]
+        slides = [[0] * total for _ in range(CHANNELS)]
         i = 0
         for p in order:
             if not (0 <= p < len(self.patterns)):
@@ -223,8 +268,12 @@ class Song:
                     v = pat.vol[c][r]
                     if v is not None:
                         vols[c][i + r] = vol_to_pct(v)
+                    s = pat.slide[c][r]
+                    if s is not None and c != TONAL:   # nur tonale Kanaele
+                        slides[c][i + r] = slide_hz_per_s(
+                            midi_to_freq(note), s, rowms)
             i += pat.rows
-        return total, channels, vols
+        return total, channels, vols, slides
 
     def flatten(self) -> tuple[int, list[list[int]]]:
         """Expandiert die Order zu einer flachen Timeline.
@@ -232,7 +281,7 @@ class Song:
         Liefert `(total_rows, channels)` mit `channels[c]` = Liste von
         Werten ueber den ganzen Song: 0 = nichts, sonst Frequenz in Hz
         (tonal) bzw. 1 (Drum-Hit)."""
-        total, channels, _ = self._flatten()
+        total, channels, _, _ = self._flatten()
         return total, channels
 
     # ------------------------------------------------------ JSON-I/O
@@ -279,10 +328,11 @@ class Song:
         """Selbststaendiger frame-basierter Player. Die Order wird zu einer
         flachen Timeline expandiert (wiederholte Patterns werden dupliziert)
         -- so bleibt der Player simpel und identisch zum bisherigen Schema."""
-        total, channels, vols = self._flatten()
+        total, channels, vols, slides = self._flatten()
         rowms = self.row_ms()
         n_patterns = len(self.patterns)
         has_vol = any(any(col) for col in vols)
+        has_slide = any(any(col) for col in slides)
         lines = [
             'IMPORT "audio"', "",
             f"' === Tracker-Song (gbtracker) -- {n_patterns} Pattern(s), "
@@ -304,6 +354,15 @@ class Song:
                 for r, val in enumerate(vols[c]):
                     if val:
                         lines.append(f"trkV{c}[{r}] = {val}")
+        if has_slide:
+            # Pitch-Slide-Spuren (Hz/s, vorberechnet; 0 = kein Slide).
+            for c in range(TONAL):
+                if not any(slides[c]):
+                    continue
+                lines.append(f"DIM trkSl{c}[TRK_ROWS] AS INTEGER")
+                for r, val in enumerate(slides[c]):
+                    if val:
+                        lines.append(f"trkSl{c}[{r}] = {val}")
         lines += [
             "",
             "' --- Player-Status + Update (im Game-Loop aufrufen) ---",
@@ -326,9 +385,23 @@ class Song:
         for c in range(TONAL):
             amp = (f"TRACKER_AMP(trkV{c}[r])"
                    if has_vol and any(vols[c]) else "0.5")
-            lines.append(
-                f"    IF trk{c}[r] > 0 THEN PLAYSOUND("
-                f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{self.waves[c]}", {amp}))')
+            wave = self.waves[c]
+            tone = (f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{wave}", {amp})')
+            if has_slide and any(slides[c]):
+                # Mit Slide -> AUDIO_SFX (Pitch-Bend ueber die Reihe), sonst Ton.
+                sfx = (f'AUDIO_SFX("{wave}", trk{c}[r], trkSl{c}[r], 4, '
+                       f'TRK_ROWMS, 40, 0.0, 0, {amp})')
+                lines += [
+                    f"    IF trk{c}[r] > 0 THEN",
+                    f"        IF trkSl{c}[r] <> 0 THEN",
+                    f"            PLAYSOUND({sfx})",
+                    "        ELSE",
+                    f"            PLAYSOUND({tone})",
+                    "        END IF",
+                    "    END IF",
+                ]
+            else:
+                lines.append(f"    IF trk{c}[r] > 0 THEN PLAYSOUND({tone})")
         damp = (f"TRACKER_AMP(trkV{TONAL}[r])"
                 if has_vol and any(vols[TONAL]) else "0.5")
         lines.append(

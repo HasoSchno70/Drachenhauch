@@ -285,3 +285,71 @@ def test_gb_code_without_volume_has_no_amp_helper():
     s.patterns[0].set(0, 0, 60)
     code = s.gb_code()
     assert "TRACKER_AMP" not in code     # ohne Lautstaerke kein Helfer/Overhead
+
+
+# --------------------------------------------------------------- Pitch-Slide
+
+def test_set_slide_requires_note():
+    from gamebasic.tracker import SLIDE_MAX
+    p = Pattern("P")
+    p.set_slide(0, 0, 3)
+    assert p.get_slide(0, 0) is None     # ohne Note ignoriert
+    p.set(0, 0, 60)
+    p.set_slide(0, 0, 3)
+    assert p.get_slide(0, 0) == 3
+    p.set_slide(0, 0, 99)                # Clamping
+    assert p.get_slide(0, 0) == SLIDE_MAX
+    p.set_slide(0, 0, -99)
+    assert p.get_slide(0, 0) == -SLIDE_MAX
+    p.set_slide(0, 0, 0)                 # 0 -> None
+    assert p.get_slide(0, 0) is None
+
+
+def test_clearing_note_clears_slide():
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_slide(0, 0, 4)
+    p.set(0, 0, None)
+    assert p.get_slide(0, 0) is None
+
+
+def test_slide_hz_per_s_direction():
+    from gamebasic.tracker import slide_hz_per_s, midi_to_freq
+    f = midi_to_freq(60)
+    assert slide_hz_per_s(f, 2, 125) > 0     # aufwaerts -> positiv
+    assert slide_hz_per_s(f, -2, 125) < 0    # abwaerts -> negativ
+    assert slide_hz_per_s(f, 0, 125) == 0
+
+
+def test_slide_json_roundtrip(tmp_path):
+    s = Song()
+    s.patterns[0].set(0, 1, 60)
+    s.patterns[0].set_slide(0, 1, -5)
+    path = str(tmp_path / "slide.json")
+    s.save_json(path)
+    s2 = Song.load_json(path)
+    assert s2.patterns[0].get_slide(0, 1) == -5
+
+
+def test_gb_code_with_slide_uses_sfx(tmp_path):
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler
+    from gamebasic.preprocess import process
+
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_slide(0, 0, 2)
+    s.patterns[0].set(0, 1, 62)          # ohne Slide -> AUDIO_TONE
+    code = s.gb_code()
+    assert "DIM trkSl0[TRK_ROWS]" in code
+    assert "AUDIO_SFX" in code
+    assert "AUDIO_TONE" in code          # Nicht-Slide-Note nutzt weiter TONE
+    prepped, _ = process(code, tmp_path, file_label="<tracker>")
+    Compiler().compile(Parser(Lexer(prepped).tokenize()).parse())
+
+
+def test_gb_code_without_slide_has_no_sfx():
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    assert "AUDIO_SFX" not in s.gb_code()

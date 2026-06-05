@@ -29,8 +29,8 @@ from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .synth import synthesize
 from .tracker import (
-    CHANNELS, TONAL, VOL_MAX, WAVEFORMS, Song, midi_to_freq, note_name,
-    vol_to_pct,
+    CHANNELS, SLIDE_MAX, TONAL, VOL_MAX, WAVEFORMS, Song, midi_to_freq,
+    note_name, vol_to_pct,
 )
 
 
@@ -177,6 +177,14 @@ class TrackerEditor(QMainWindow):
             "Lautstaerke der gewaehlten Note (1..15, – = Standard)")
         self.vol_spin.valueChanged.connect(self._on_vol_changed)
         prow.addWidget(self.vol_spin)
+        prow.addWidget(QLabel("Slide:"))
+        self.slide_spin = QSpinBox()
+        self.slide_spin.setRange(-SLIDE_MAX, SLIDE_MAX)
+        self.slide_spin.setToolTip(
+            "Pitch-Slide der gewaehlten Note in Halbtoenen ueber die Reihe "
+            "(0 = kein Slide); nur Ton-Kanaele")
+        self.slide_spin.valueChanged.connect(self._on_slide_changed)
+        prow.addWidget(self.slide_spin)
         b_padd = QPushButton("+ Pattern"); b_padd.clicked.connect(self._add_pattern)
         b_pdup = QPushButton("Duplizieren"); b_pdup.clicked.connect(self._dup_pattern)
         b_pdel = QPushButton("Loeschen"); b_pdel.clicked.connect(self._del_pattern)
@@ -301,7 +309,8 @@ class TrackerEditor(QMainWindow):
         for r in range(pat.rows):
             for c in range(CHANNELS):
                 it = QTableWidgetItem(
-                    self._cell_text(c, pat.data[c][r], pat.vol[c][r]))
+                    self._cell_text(c, pat.data[c][r], pat.vol[c][r],
+                                    pat.slide[c][r]))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.grid.setItem(r, c, it)
         self.grid.blockSignals(False)
@@ -323,17 +332,26 @@ class TrackerEditor(QMainWindow):
         self._sound_cache.clear()
         self._mark()
 
-    def _cell_text(self, ci: int, note, vol=None) -> str:
+    def _cell_text(self, ci: int, note, vol=None, slide=None) -> str:
         if note is None:
             return "···"
         base = "  X" if ci == TONAL else note_name(note)
-        return f"{base} v{vol}" if vol else base
+        if vol:
+            base += f" v{vol}"
+        if slide:
+            base += f" s{slide:+d}"
+        return base
+
+    def _cell_refresh(self, row: int, ci: int) -> None:
+        pat = self.song.patterns[self.cur]
+        self.grid.item(row, ci).setText(
+            self._cell_text(ci, pat.data[ci][row], pat.vol[ci][row],
+                            pat.slide[ci][row]))
 
     def _set_note(self, row: int, ci: int, note) -> None:
         pat = self.song.patterns[self.cur]
-        pat.set(ci, row, note)               # loescht ggf. auch die Lautstaerke
-        self.grid.item(row, ci).setText(
-            self._cell_text(ci, note, pat.vol[ci][row]))
+        pat.set(ci, row, note)               # loescht ggf. auch die Effekte
+        self._cell_refresh(row, ci)
         self._sync_vol_spin()
         self._mark()
 
@@ -345,19 +363,35 @@ class TrackerEditor(QMainWindow):
         if pat.data[c][r] is None:           # nur Noten haben Lautstaerke
             return
         pat.set_vol(c, r, v)                 # 0 -> None (Standard)
-        self.grid.item(r, c).setText(
-            self._cell_text(c, pat.data[c][r], pat.vol[c][r]))
+        self._cell_refresh(r, c)
+        self._mark()
+
+    def _on_slide_changed(self, s: int) -> None:
+        if not self._has_sel():
+            return
+        r, c = self._sel()
+        pat = self.song.patterns[self.cur]
+        if pat.data[c][r] is None or c == TONAL:   # nur tonale Noten
+            return
+        pat.set_slide(c, r, s)               # 0 -> None
+        self._cell_refresh(r, c)
         self._mark()
 
     def _sync_vol_spin(self) -> None:
-        """Spiegelt die Lautstaerke der gewaehlten Zelle in den Spinbox."""
+        """Spiegelt die Effekte der gewaehlten Zelle in die Spinboxen."""
         self.vol_spin.blockSignals(True)
+        self.slide_spin.blockSignals(True)
         if self._has_sel():
             r, c = self._sel()
-            self.vol_spin.setValue(self.song.patterns[self.cur].vol[c][r] or 0)
+            pat = self.song.patterns[self.cur]
+            self.vol_spin.setValue(pat.vol[c][r] or 0)
+            self.slide_spin.setValue(pat.slide[c][r] or 0)
+            self.slide_spin.setEnabled(c != TONAL)
         else:
             self.vol_spin.setValue(0)
+            self.slide_spin.setValue(0)
         self.vol_spin.blockSignals(False)
+        self.slide_spin.blockSignals(False)
 
     def _on_piano(self, midi: int) -> None:
         ch = self._sel_channel() if self._has_sel() else 0
@@ -383,7 +417,7 @@ class TrackerEditor(QMainWindow):
             pat = self.song.patterns[self.cur]
             n = pat.data[c][r]
             if n is not None:
-                self._play_note(c, n, pat.vol[c][r])
+                self._play_note(c, n, pat.vol[c][r], pat.slide[c][r] or 0)
 
     def keyPressEvent(self, e):  # noqa: N802
         if e.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self._has_sel():
@@ -461,14 +495,20 @@ class TrackerEditor(QMainWindow):
             self._load_pattern(idx)
 
     # ============================================== Sound
-    def _sound(self, ci: int, midi: int):
+    def _sound(self, ci: int, midi: int, slide: int = 0):
         wf = "noise" if ci == TONAL else self.song.waves[ci]
-        key = (ci, wf, midi)
+        key = (ci, wf, midi, slide)
         snd = self._sound_cache.get(key)
         if snd is None:
             freq = 220.0 if ci == TONAL else midi_to_freq(midi)
             dec = 120 if ci == TONAL else 220
-            wave = synthesize(wf, freq, 0.0, 4, 40, dec)
+            slide_hz = 0.0
+            if slide and ci != TONAL:
+                # Halbtoene -> Hz/s ueber die Reihen-Dauer (wie der Export).
+                target = freq * (2.0 ** (slide / 12.0))
+                row_s = max(0.001, self.song.row_ms() / 1000.0)
+                slide_hz = (target - freq) / row_s
+            wave = synthesize(wf, freq, slide_hz, 4, 40, dec)
             snd = self._make_sound(wave)
             self._sound_cache[key] = snd
         return snd
@@ -488,8 +528,9 @@ class TrackerEditor(QMainWindow):
         except Exception:
             return None
 
-    def _play_note(self, ci: int, midi: int, vol: int | None = None) -> None:
-        snd = self._sound(ci, midi)
+    def _play_note(self, ci: int, midi: int, vol: int | None = None,
+                   slide: int = 0) -> None:
+        snd = self._sound(ci, midi, slide or 0)
         if snd is not None:
             try:
                 ch = snd.play()
@@ -549,7 +590,7 @@ class TrackerEditor(QMainWindow):
         for c in range(CHANNELS):
             n = pat.data[c][row]
             if n is not None:
-                self._play_note(c, n, pat.vol[c][row])
+                self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0)
 
     # ============================================== Datei
     def _new_song(self) -> None:

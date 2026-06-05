@@ -179,3 +179,24 @@ def test_tracker_volume_column_ui(_qapp):
     # 0 = Standard -> Lautstaerke wieder None
     ed.vol_spin.setValue(0)
     assert ed.song.patterns[ed.cur].vol[0][0] is None
+
+
+def test_tracker_slide_column_ui(_qapp):
+    """Slide-Spinbox setzt den Pitch-Slide der gewaehlten Note (nur tonale
+    Kanaele), spiegelt zurueck und zeigt ihn im Zelltext."""
+    from gamebasic.trackereditor_qt import TrackerEditor
+    from gamebasic.tracker import TONAL
+    ed = _editor(_qapp, TrackerEditor)
+    ed.grid.setCurrentCell(0, 0)
+    ed._set_note(0, 0, 60)
+    ed.slide_spin.setValue(3)
+    assert ed.song.patterns[ed.cur].slide[0][0] == 3
+    assert "s+3" in ed.grid.item(0, 0).text()
+    # 0 -> kein Slide
+    ed.slide_spin.setValue(0)
+    assert ed.song.patterns[ed.cur].slide[0][0] is None
+    # Drum-Kanal (TONAL): Slide ist deaktiviert + wird nicht gesetzt
+    ed.grid.setCurrentCell(0, TONAL)
+    ed._set_note(0, TONAL, 60)
+    ed._sync_vol_spin()
+    assert ed.slide_spin.isEnabled() is False
