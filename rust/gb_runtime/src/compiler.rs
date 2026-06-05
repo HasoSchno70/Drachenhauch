@@ -135,6 +135,11 @@ type CR = Result<(), String>;
 
 struct Ctx {
     code: Vec<(i64, Value)>,
+    // Parallel zu `code`: Quell-Zeile pro Instruktion (Stufe B). `emit()` schreibt
+    // die aktuelle `cur_line` mit -> ergibt das `lines[]`-Array (Profiler/Debugger/
+    // Laufzeitfehler). 0 = unbekannt.
+    lines: Vec<u32>,
+    cur_line: u32,
     consts: Vec<Value>,
     // Jeder Eintrag: (Patch-IPs, try_depth bei Schleifen-Eintritt). BREAK/
     // CONTINUE muessen pro dazwischenliegendem TRY ein TRY_END emittieren.
@@ -151,7 +156,8 @@ struct Ctx {
 
 impl Ctx {
     fn new() -> Self {
-        Ctx { code: vec![], consts: vec![], break_patches: vec![], continue_patches: vec![],
+        Ctx { code: vec![], lines: vec![], cur_line: 0,
+              consts: vec![], break_patches: vec![], continue_patches: vec![],
               try_depth: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
               is_main: true, is_sub: true, current_class: None }
@@ -206,6 +212,7 @@ impl Ctx {
     fn emit(&mut self, op: i64, arg: Value) -> usize {
         let ip = self.code.len();
         self.code.push((op, arg));
+        self.lines.push(self.cur_line);   // Zeile dieser Instruktion (Stufe B)
         ip
     }
     fn here(&self) -> usize { self.code.len() }
@@ -307,7 +314,7 @@ impl Compiler {
     /// Pre-Pass: Top-Level-Globals (Skalar-DIM/CONST) -> Slot-Index.
     fn collect_globals(&mut self, stmts: &[Node]) -> CR {
         for s in stmts {
-            match s {
+            match unwrap_stmt(s) {
                 Node::Dim { name, type_name, array_dims } => {
                     self.global_vars.insert(name.clone());
                     if self.is_slot_dim(type_name, array_dims) { self.alloc_slot(name); }
@@ -336,6 +343,12 @@ impl Compiler {
     }
 
     fn stmt(&mut self, s: &Node) -> CR {
+        // Zeilen-Wrapper auspacken + aktuelle Quell-Zeile setzen (Stufe B);
+        // alle folgenden emit() erben sie.
+        if let Node::Stmt { line, body } = s {
+            self.ctx.cur_line = *line;
+            return self.stmt(body);
+        }
         match s {
             Node::Dim { name, type_name, array_dims } =>
                 self.stmt_dim(name, type_name, array_dims),
@@ -1723,7 +1736,7 @@ fn body_has_yield(stmts: &[Node]) -> bool {
         }
     }
     fn ns(s: &Node) -> bool {
-        match s {
+        match unwrap_stmt(s) {
             Node::ExprStmt { expr } | Node::Throw { value: expr } => ny(expr),
             Node::Assign { value, .. } | Node::Const { value, .. } => ny(value),
             Node::Return(Some(v)) => ny(v),
@@ -1746,7 +1759,13 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
               is_coroutine: bool, return_type: &str,
               param_defaults: &[Option<CVal>], param_names: &[String]) -> Value {
     let code: Vec<Value> = ctx.code.iter().map(|(op, arg)| json!([op, arg])).collect();
-    let lines: Vec<Value> = ctx.code.iter().map(|_| json!(0)).collect();
+    // Zeilen parallel zum Code (Stufe B). Defensive: bei (theoretischem)
+    // Laengen-Mismatch auf 0 zurueckfallen statt zu paniken.
+    let lines: Vec<Value> = if ctx.lines.len() == ctx.code.len() {
+        ctx.lines.iter().map(|&l| json!(l)).collect()
+    } else {
+        ctx.code.iter().map(|_| json!(0)).collect()
+    };
     let local_defaults: Vec<Value> = ctx.local_defaults.iter().map(enc).collect();
     let pdef: Vec<Value> = param_defaults.iter()
         .map(|d| match d { Some(cv) => enc(cv), None => Value::Null }).collect();
@@ -1763,7 +1782,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
 /// DATA-Literale rekursiv einsammeln (wie compiler._collect_data, 3b-Subset).
 fn collect_data(stmts: &[Node], out: &mut Vec<Value>) -> Result<(), String> {
     for s in stmts {
-        match s {
+        match unwrap_stmt(s) {
             Node::Data { values } => {
                 for lit in values { out.push(enc(&data_literal(lit)?)); }
             }
@@ -1822,6 +1841,16 @@ fn is_value_type(t: &str) -> bool {
         | "tuple" | "funcref" | "coroutine")
 }
 
+/// Statement-Zeilen-Wrapper auspacken (Stufe B). Stellen, die Statements per
+/// Variante introspizieren (Hoisting, DATA-Sammlung, Top-Level-Split), rufen das
+/// vor dem Match -- `stmt()` selbst packt separat aus und merkt sich die Zeile.
+fn unwrap_stmt(n: &Node) -> &Node {
+    match n {
+        Node::Stmt { body, .. } => body,
+        other => other,
+    }
+}
+
 fn node_name(n: &Node) -> &'static str {
     match n {
         Node::For { .. } => "For", Node::ForEach { .. } => "ForEach",
@@ -1859,9 +1888,12 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
     let mut cls_decls: Vec<&Node> = vec![];
     let mut main_stmts: Vec<&Node> = vec![];
     for s in stmts {
-        match s {
-            Node::SubDecl { .. } | Node::FunctionDecl { .. } => fn_decls.push(s),
-            Node::ClassDecl { .. } => cls_decls.push(s),
+        // Top-Level-Decls sind in Stmt gewrappt -> fuer fn/cls den inneren Knoten
+        // ablegen (downstream matcht Node::FunctionDecl/ClassDecl direkt). Main-
+        // Statements bleiben GEWRAPPT, damit stmt() die Quell-Zeile setzt.
+        match unwrap_stmt(s) {
+            Node::SubDecl { .. } | Node::FunctionDecl { .. } => fn_decls.push(unwrap_stmt(s)),
+            Node::ClassDecl { .. } => cls_decls.push(unwrap_stmt(s)),
             _ => main_stmts.push(s),
         }
     }

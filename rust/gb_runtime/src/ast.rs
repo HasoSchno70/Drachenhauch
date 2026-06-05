@@ -75,6 +75,11 @@ impl CaseMatch {
 
 #[derive(Clone, Debug)]
 pub enum Node {
+    // Statement-Wrapper mit Quell-Zeile (Stufe B): der Parser umhuellt JEDES
+    // Statement damit, der Compiler liest die Zeile fuer `lines[]` (Profiler/
+    // Debugger/Laufzeitfehler). In `to_json` TRANSPARENT (delegiert an `body`),
+    // damit die Parser-Parity gegen Python (ohne Zeilen-Feld) erhalten bleibt.
+    Stmt { line: u32, body: Box<Node> },
     // --- Ausdruecke ---
     NumberLit(NumV),
     StringLit(String),
@@ -156,6 +161,8 @@ impl Node {
     pub fn to_json(&self) -> Value {
         use Node::*;
         match self {
+            // Transparent: Zeilen-Wrapper verschwindet im JSON (Parity zu Python).
+            Stmt { body, .. } => body.to_json(),
             NumberLit(v) => obj("NumberLit", vec![("value", v.to_json())]),
             StringLit(s) => obj("StringLit", vec![("value", json!(s))]),
             BoolLit(b) => obj("BoolLit", vec![("value", json!(b))]),

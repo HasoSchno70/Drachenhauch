@@ -118,7 +118,13 @@ impl Parser {
         Ok(Node::Program { statements: stmts })
     }
 
-    fn statement(&mut self) -> R<Node> { self.statement_inner() }
+    fn statement(&mut self) -> R<Node> {
+        // Quell-Zeile des ersten Tokens merken und das Statement damit umhuellen
+        // (Stufe B: fuer lines[] -> Profiler/Debugger/Laufzeitfehler-Zeilen).
+        let line = self.peek(0).line as u32;
+        let body = self.statement_inner()?;
+        Ok(Node::Stmt { line, body: Box::new(body) })
+    }
 
     fn statement_inner(&mut self) -> R<Node> {
         match self.tt(0) {
