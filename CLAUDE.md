@@ -164,7 +164,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | `vec2` | 2D-Vektor mit Operator-Overloading (`+`, `-`, `*`, `/`, `=`, `<>`). `VEC2_NEW/X/Y/LENGTH/NORMALIZE/DOT/CROSS/DISTANCE/LERP/PERP/REFLECT/ANGLE/FROM_ANGLE`. Immutable. | `VEC2` |
 | `input` | Action-basiertes Input-Mapping mit Edge-Detection. `INPUT_BIND/UNBIND/UPDATE`, `INPUT_HELD/PRESSED/RELEASED/AXIS/BOUND`. Multi-Key-Bindings. **Gamepad-Support**: `JOY_BUTTON_A..Y`, `JOY_DPAD_*` als Bind-Codes, `INPUT_JOY_AXIS(slot, "left_x")` mit Deadzone. | — |
 | `regex` | Python-kompatible Pattern-Matching. `REGEX_MATCH/TEST/FIND/FIND_ALL/REPLACE/REPLACE_ONCE/SPLIT`. Pattern-Cache fuer wiederholte Aufrufe. | — |
-| `audio` | Erweiterte Audio-API ueber pygame.mixer. Channels, Pause/Resume/Fade, Stereo-Pan, Music-Position. Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in `gamebasic/synth.py`, nativ in `rust/gb_runtime/src/audio.rs`; der SFX-Generator `gbsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). | `AUDIO_CHANNEL` |
+| `audio` | Erweiterte Audio-API (nativ in gbrt/raylib; Tree-Walker konsolen-only -> wirft "nur gbrt"). Channels, Pause/Resume/Fade, Stereo-Pan, Music-Position. Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in `gamebasic/synth.py`, nativ in `rust/gb_runtime/src/audio.rs`; der SFX-Generator `gbsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). | `AUDIO_CHANNEL` |
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
 | `ecs` | Entity-Component-System. World mit Entity-IDs (INTEGER) und benannten typed Components (INT/FLOAT/STRING/BOOL/OBJ). Query 1/2/3-fach via Component-Intersection. `ECS_NEW_ENTITY`, `ECS_ADD_INT`, `ECS_QUERY2`, etc. Plus **Bulk-System-Ops** (`ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT`, `ECS_FILL_*`, `ECS_CLAMP_FLOAT`, `ECS_REMOVE_DEAD`, `ECS_COUNT_WITH`) — siehe eigener Abschnitt unten. Reine Python-Implementation in `modules/ecs_py.py` (Cython entfernt); Produktions-Performance via `gbrt`. | `ECS_WORLD` |
@@ -185,17 +185,17 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 |---|---|---|
 | Asset-Cache | `LOAD_ASSETS(manifest.json)` — bulk-Preload mit Alias-Cache. `LOADIMAGE` / `LOADSOUND` cachen automatisch (rohem + abs Pfad). | — |
 | Z-Layer | `LAYER_DEFINE(name, z)`, `LAYER(name)`, `LAYER_END()`, `LAYER_CLEAR(name)`. Layer-Surfaces mit SRCALPHA, FLIP composiert in z-Order und cleart. | — |
-| Sprite-Atlas | `ATLAS_LOAD(manifest.json)` -> `SPRITE_ATLAS`. `ATLAS_DRAW(atlas, name, x, y)`. `BATCH_DRAW(...)` + `BATCH_FLUSH()` ueber `pygame.Surface.blits()`. Auto-Flush bei FLIP / Layer-Switch / Direct-Draw. | `SPRITE_ATLAS` |
-| Bulk-Plot | `PLOTS(xs, ys, color)` — viele Pixel in EINEM Aufruf (vektorisiert via `pygame.surfarray`/numpy), `color` = INT (alle gleich) oder ARRAY OF INT (pro Pixel). Groessenordnungen schneller als `PLOT` in einer Schleife (Starfields, Punktwolken). | — |
-| Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; pygame-Draw bleibt pro Shape). `color` = INT oder ARRAY. | — |
+| Sprite-Atlas | `ATLAS_LOAD(manifest.json)` -> `SPRITE_ATLAS`. `ATLAS_DRAW(atlas, name, x, y)`. `BATCH_DRAW(...)` + `BATCH_FLUSH()` als gebatchter Sprite-Draw (nativ in gbrt). Auto-Flush bei FLIP / Layer-Switch / Direct-Draw. | `SPRITE_ATLAS` |
+| Bulk-Plot | `PLOTS(xs, ys, color)` — viele Pixel in EINEM Aufruf (vektorisiert), `color` = INT (alle gleich) oder ARRAY OF INT (pro Pixel). Groessenordnungen schneller als `PLOT` in einer Schleife (Starfields, Punktwolken). | — |
+| Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; gezeichnet wird pro Shape). `color` = INT oder ARRAY. | — |
 | Bulk-Tilemap | `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`) — siehe `tiled`-Modul. `DRAWTILEMAP` rendert intern via `blits()`-Batch (1 Call statt rows×cols). | — |
-| 2D-Extras | **Dual-Path:** `LINEW(x1,y1,x2,y2,breite[,c])` (dicke Linie), `BOXROUND`/`RECTROUND(x1,y1,x2,y2,radius[,c])` (runde Rechtecke gefuellt/Umriss), `GRADIENTV`/`GRADIENTH(x1,y1,x2,y2,c1,c2)` (Farbverlauf-Blocks), `SPLINE(xs,ys[,c[,breite]])` (Catmull-Rom durch Punkte). Demo `examples/100_2d_extras.gb`. | — |
-| Blend-Modes | `BLEND_MODE(modus$)` — `"alpha"`/`"add"`/`"mult"`/`"subtract"` fuer folgende Draws (Glow via additiv). **Nur native** (raylib `BeginBlendMode`); pygame-Pfad No-Op (Programm laeuft ohne Effekt). | — |
-| Prozedurale Texturen | **Nur native** (raylib `GenImage*`): `GENTEX_PERLIN(w,h,skala)`, `GENTEX_GRADIENT(w,h,c1,c2,vertikal)`, `GENTEX_CHECKED(w,h,fx,fy,c1,c2)`, `GENTEX_COLOR(w,h,c)` -> IMAGE-Handle (mit `DRAWIMAGE` nutzbar). pygame wirft „nur native". Demo `examples/101_blend_gentex.gb`. | — |
-| Clipboard / Drag&Drop | **Nur native** (graceful im pygame-Pfad): `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame) + `FILE_DROPPED(i)->STRING` (Pfad). pygame: ""/0. | — |
-| Render-Targets | **Dual-Path:** `RENDERTARGET_NEW(w,h)->INTEGER` (Off-Screen-Render-Ziel), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). gbrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); pygame: Off-Screen-Surface (Immediate). Demo `examples/102_render_target.gb`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op; pro Frame transparent gecleart (keine Trails). | — |
-| Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. Beide Pfade (pygame + native raylib). | — |
-| Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Im pygame-Pfad No-Op (Szene ohne Effekt). Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.gb`. | — |
+| 2D-Extras | **Nativ in gbrt:** `LINEW(x1,y1,x2,y2,breite[,c])` (dicke Linie), `BOXROUND`/`RECTROUND(x1,y1,x2,y2,radius[,c])` (runde Rechtecke gefuellt/Umriss), `GRADIENTV`/`GRADIENTH(x1,y1,x2,y2,c1,c2)` (Farbverlauf-Blocks), `SPLINE(xs,ys[,c[,breite]])` (Catmull-Rom durch Punkte). Demo `examples/100_2d_extras.gb`. | — |
+| Blend-Modes | `BLEND_MODE(modus$)` — `"alpha"`/`"add"`/`"mult"`/`"subtract"` fuer folgende Draws (Glow via additiv). **Nur native** (raylib `BeginBlendMode`); Tree-Walker konsolen-only -> wirft "nur gbrt". | — |
+| Prozedurale Texturen | **Nur native** (raylib `GenImage*`): `GENTEX_PERLIN(w,h,skala)`, `GENTEX_GRADIENT(w,h,c1,c2,vertikal)`, `GENTEX_CHECKED(w,h,fx,fy,c1,c2)`, `GENTEX_COLOR(w,h,c)` -> IMAGE-Handle (mit `DRAWIMAGE` nutzbar). Tree-Walker wirft "nur gbrt". Demo `examples/101_blend_gentex.gb`. | — |
+| Clipboard / Drag&Drop | **Nur native**: `CLIPBOARD_GET()->STRING` / `CLIPBOARD_SET(text$)` (System-Zwischenablage), `FILES_DROPPED()->INTEGER` (Anzahl gedroppter Dateien dieses Frame) + `FILE_DROPPED(i)->STRING` (Pfad). Tree-Walker konsolen-only -> wirft "nur gbrt". | — |
+| Render-Targets | **Nur native:** `RENDERTARGET_NEW(w,h)->INTEGER` (Off-Screen-Render-Ziel), `RENDERTARGET_BEGIN(rt)` / `RENDERTARGET_END()` (folgende Draws ins Ziel — pro Frame transparent gecleart), `RENDERTARGET_DRAW(rt,x,y[,skala[,tint]])` (Ziel als Bild stempeln). gbrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die RenderTexture gerendert (y-flip); Tree-Walker konsolen-only -> wirft "nur gbrt". Demo `examples/102_render_target.gb`. *Grenze:* RtDraw innerhalb eines anderen Targets = No-Op; pro Frame transparent gecleart (keine Trails). | — |
+| Game-Loop | `DELTA()` — Sekunden seit letztem `FLIP` (framerate-unabhaengige Bewegung: `x = x + speed * DELTA()`). `FPS()` / `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt). `SET_FULLSCREEN(an)`, `SETWINDOWTITLE(s$)`, `SAVESCREENSHOT(pfad$)`. Nativ in gbrt (raylib). | — |
+| Shader / Post-FX | **Nur native Runtime** (raylib/GPU): `SHADER_LOAD(pfad$_oder_glsl$)` -> SHADER-Handle (oder -1), `SHADER_SET(h, uniform$, f)` / `SHADER_SET2` (vec2) / `SHADER_SET3` (vec3), `POSTFX(h)` (Frame durch Fragment-Shader; -1 = aus). Szene -> RenderTexture -> Shader -> Screen. Tree-Walker konsolen-only -> wirft "nur gbrt". Beispiel-Shader `examples/assets/shaders/` (CRT/Bloom/Vignette), Demo `examples/86_postfx_shaders.gb`. | — |
 
 Module mit eigenem Typ registrieren ihn lowercase (`register_type("json_handle", _JSONHandle)`),
 GB-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).
@@ -1333,9 +1333,10 @@ der Compose-Pfad in FLIP ist ein No-Op und `_buffer` zeigt direkt auf
 ## Sprite-Atlas + Batch-Draw
 
 Sprite-Atlas: EIN grosses Image + Dict von `name -> (x, y, w, h)`-Rects.
-Mehrere Sub-Sprites teilen sich eine `pygame.Surface` -- ideal fuer
-`pygame.Surface.blits()`, das viele Sprites in einem C-Call rendert
-(Game-Engine-Pattern fuer Tilemaps, Bullet-Hell, Tile-Drawing).
+Mehrere Sub-Sprites teilen sich eine Textur -- ideal fuer gebatchtes
+Rendern (viele Sprites in einem Draw-Call; Game-Engine-Pattern fuer
+Tilemaps, Bullet-Hell, Tile-Drawing). Nativ in gbrt; Tree-Walker
+konsolen-only -> wirft "nur gbrt".
 
 ```basic
 DIM atlas AS SPRITE_ATLAS
@@ -1348,7 +1349,7 @@ ATLAS_DRAW(atlas, "tile_grass", 0, 0)
 FOR i = 0 TO 99
     BATCH_DRAW(atlas, "tile_grass", i * 16, 0)
 NEXT
-BATCH_FLUSH()   ' EIN pygame.Surface.blits()-Call fuer 100 Sprites
+BATCH_FLUSH()   ' EIN gebatchter Draw-Call fuer 100 Sprites
 ```
 
 **Manifest-Format:**
@@ -1367,7 +1368,7 @@ Rects sind `[x, y, w, h]`. Bild-Pfad relativ zum Manifest.
 - `ATLAS_LOAD(json)` -> `SPRITE_ATLAS`
 - `ATLAS_DRAW(atlas, name, x, y)` — einzeln, Camera-aware
 - `BATCH_DRAW(atlas, name, x, y)` — an Batch-Queue anhaengen
-- `BATCH_FLUSH()` — Queue jetzt rendern (pygame.Surface.blits)
+- `BATCH_FLUSH()` — Queue jetzt rendern (gebatchter Draw-Call)
 
 **Auto-Flush** an den richtigen Punkten:
 - vor FLIP (sonst geht die Queue verloren)
@@ -1375,8 +1376,8 @@ Rects sind `[x, y, w, h]`. Bild-Pfad relativ zum Manifest.
 - vor ATLAS_DRAW (Direct-Call) -- bewahrt Reihenfolge
 
 **Zoom-Caveat:** Bei `CAMERA_SET`-Zoom ≠ 1 faellt jeder `BATCH_DRAW`
-auf `draw_image_part` zurueck (kein Batch-Vorteil, weil pygame nicht
-batch-skalieren kann). Translation ist OK.
+auf einen Einzel-Draw zurueck (kein Batch-Vorteil, weil der Batch nicht
+skaliert zeichnen kann). Translation ist OK.
 
 **Externer Typ:** `SPRITE_ATLAS` ist in TYPE_DEFAULTS / _coerce in
 allen drei Pfaden (Tree-Walker, vm.py, vm_native.pyx) registriert.
