@@ -73,6 +73,57 @@ LOOP_MODES = ("none", "forward", "pingpong")
 
 
 @dataclass
+class Zone:
+    """Eine Tasten-Zone eines Keymap-Instruments: ein Sample fuer einen
+    MIDI-Notenbereich [lo_key, hi_key], unverschoben bei `root_note`.
+
+    Drumkit = je Zone eine einzelne Taste (lo==hi==root, kein Resampling);
+    Multisample = ein Sample pro Tastenbereich, innerhalb resampelt."""
+    samples: np.ndarray = field(default_factory=lambda: np.zeros(0, np.float32),
+                                repr=False)
+    sample_rate: int = SAMPLE_RATE
+    root_note: int = DEFAULT_BASE_NOTE
+    lo_key: int = 0
+    hi_key: int = 127
+    loop_mode: str = "none"
+    loop_start: int = 0
+    loop_end: int = 0
+    name: str = ""
+
+    def covers(self, midi: int) -> bool:
+        return self.lo_key <= midi <= self.hi_key
+
+    def distance(self, midi: int) -> int:
+        if midi < self.lo_key:
+            return self.lo_key - midi
+        if midi > self.hi_key:
+            return midi - self.hi_key
+        return 0
+
+    def to_dict(self) -> dict:
+        return {"name": self.name, "sample_rate": int(self.sample_rate),
+                "root_note": int(self.root_note),
+                "lo_key": int(self.lo_key), "hi_key": int(self.hi_key),
+                "loop_mode": self.loop_mode,
+                "loop_start": int(self.loop_start),
+                "loop_end": int(self.loop_end),
+                "samples": _samples_to_b64(self.samples)}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Zone":
+        lm = str(d.get("loop_mode", "none"))
+        return cls(
+            samples=_b64_to_samples(d.get("samples", "")),
+            sample_rate=int(d.get("sample_rate", SAMPLE_RATE)),
+            root_note=int(d.get("root_note", DEFAULT_BASE_NOTE)),
+            lo_key=int(d.get("lo_key", 0)), hi_key=int(d.get("hi_key", 127)),
+            loop_mode=lm if lm in LOOP_MODES else "none",
+            loop_start=int(d.get("loop_start", 0)),
+            loop_end=int(d.get("loop_end", 0)),
+            name=str(d.get("name", "")))
+
+
+@dataclass
 class Instrument:
     name: str = "Instrument"
     kind: str = "synth"              # "synth" | "sample"
@@ -92,11 +143,18 @@ class Instrument:
     env_decay_ms: int = 0
     env_sustain: float = 1.0        # 0..1 Pegel nach dem Decay
     env_release_ms: int = 0
+    # Keymap (kind == "keymap"): Samples ueber Tasten-Zonen verteilt
+    # (Multisample / Drumkit). ADSR oben gilt fuer alle Zonen.
+    zones: list = field(default_factory=list, repr=False)
 
     # ---- Konstruktoren
     @classmethod
     def synth(cls, name: str, waveform: str) -> "Instrument":
         return cls(name=name, kind="synth", waveform=waveform)
+
+    @classmethod
+    def keymap(cls, name: str, zones: list | None = None) -> "Instrument":
+        return cls(name=name, kind="keymap", zones=list(zones or []))
 
     @classmethod
     def from_array(cls, name: str, samples: np.ndarray, sample_rate: int,
@@ -118,18 +176,41 @@ class Instrument:
         return self.kind == "sample" and self.samples is not None \
             and self.samples.size > 0
 
+    def is_keymap(self) -> bool:
+        return self.kind == "keymap" and len(self.zones) > 0
+
     def has_loop(self) -> bool:
         return (self.loop_mode in ("forward", "pingpong")
                 and self.loop_end > self.loop_start >= 0)
 
+    def zone_for(self, midi: int):
+        """Die Zone, die `midi` abdeckt -- sonst die naechstgelegene (damit
+        Noten ausserhalb aller Bereiche trotzdem klingen). None ohne Zonen."""
+        if not self.zones:
+            return None
+        for z in self.zones:
+            if z.covers(midi):
+                return z
+        return min(self.zones, key=lambda z: z.distance(midi))
+
     def render_note(self, midi: int, n_samples: int,
                     sr: int = SAMPLE_RATE) -> np.ndarray:
         """Liefert ein Mono-Float-Array [-1, 1] der Note `midi`, `n_samples`
-        lang. Synth: erzeugt die Wellenform; Sample: resampelt das Quell-Audio
-        in die Zieltonhoehe (mit optionalem Loop) und wendet die ADSR-
-        Huellkurve an."""
+        lang. Synth: Wellenform; Sample: resampelt das Quell-Audio (mit Loop);
+        Keymap: waehlt die Tasten-Zone und resampelt deren Sample. ADSR +
+        Anti-Click werden in allen Faellen angewandt."""
         n_samples = max(0, int(n_samples))
-        if not self.is_sample():
+        if self.is_keymap():
+            z = self.zone_for(midi)
+            if z is None or z.samples.size == 0:
+                out = np.zeros(n_samples, dtype=np.float32)
+            else:
+                lm = (z.loop_mode if z.loop_mode in ("forward", "pingpong")
+                      and z.loop_end > z.loop_start >= 0 else "none")
+                out = _resample(z.samples, z.sample_rate, z.root_note,
+                                midi, n_samples, sr,
+                                lm, int(z.loop_start), int(z.loop_end))
+        elif not self.is_sample():
             out = _render_synth(self.waveform, midi, n_samples, sr)
         else:
             lm = self.loop_mode if self.has_loop() else "none"
@@ -159,10 +240,24 @@ class Instrument:
                 "env_sustain": float(self.env_sustain),
                 "env_release_ms": int(self.env_release_ms)}
 
+    def _apply_env_from_dict(self, d: dict) -> None:
+        lm = str(d.get("loop_mode", "none"))
+        self.loop_mode = lm if lm in LOOP_MODES else "none"
+        self.loop_start = int(d.get("loop_start", 0))
+        self.loop_end = int(d.get("loop_end", 0))
+        self.env_attack_ms = int(d.get("env_attack_ms", 0))
+        self.env_decay_ms = int(d.get("env_decay_ms", 0))
+        self.env_sustain = float(d.get("env_sustain", 1.0))
+        self.env_release_ms = int(d.get("env_release_ms", 0))
+
     def to_dict(self) -> dict:
         d = {"name": self.name, "kind": self.kind,
              "default_vol": int(self.default_vol)}
-        if self.kind == "sample" and self.samples is not None:
+        if self.kind == "keymap":
+            d["zones"] = [z.to_dict() for z in self.zones]
+            d.update(self._env_dict())       # ADSR gilt fuer alle Zonen
+            # Loop steckt pro Zone -> nur ADSR-Teil ist hier relevant
+        elif self.kind == "sample" and self.samples is not None:
             d["sample_rate"] = int(self.sample_rate)
             d["base_note"] = int(self.base_note)
             d["samples"] = _samples_to_b64(self.samples)
@@ -176,20 +271,19 @@ class Instrument:
         kind = str(d.get("kind", "synth"))
         name = str(d.get("name", "Instrument"))
         dv = int(d.get("default_vol", 15))
+        if kind == "keymap":
+            inst = cls.keymap(name, [Zone.from_dict(z)
+                                     for z in (d.get("zones") or [])])
+            inst.default_vol = dv
+            inst._apply_env_from_dict(d)
+            return inst
         if kind == "sample" and d.get("samples"):
             inst = cls.from_array(
                 name, _b64_to_samples(d["samples"]),
                 int(d.get("sample_rate", SAMPLE_RATE)),
                 int(d.get("base_note", DEFAULT_BASE_NOTE)))
             inst.default_vol = dv
-            lm = str(d.get("loop_mode", "none"))
-            inst.loop_mode = lm if lm in LOOP_MODES else "none"
-            inst.loop_start = int(d.get("loop_start", 0))
-            inst.loop_end = int(d.get("loop_end", 0))
-            inst.env_attack_ms = int(d.get("env_attack_ms", 0))
-            inst.env_decay_ms = int(d.get("env_decay_ms", 0))
-            inst.env_sustain = float(d.get("env_sustain", 1.0))
-            inst.env_release_ms = int(d.get("env_release_ms", 0))
+            inst._apply_env_from_dict(d)
             return inst
         inst = cls.synth(name, str(d.get("waveform", "square")))
         inst.default_vol = dv

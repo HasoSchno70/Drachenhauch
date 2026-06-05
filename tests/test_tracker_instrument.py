@@ -5,7 +5,7 @@ import wave
 import numpy as np
 
 from gamebasic.tracker.instrument import (
-    Instrument, load_wav_mono, _decode_pcm, midi_to_freq,
+    Instrument, Zone, load_wav_mono, _decode_pcm, midi_to_freq,
 )
 
 
@@ -193,6 +193,66 @@ def test_envelope_passthrough_default_unchanged():
     out = inst.render_note(69, 1000)
     # Default-Envelope formt nichts (bis auf den 2ms-Anti-Click am Ende)
     assert np.allclose(out[:900], 0.5, atol=1e-3)
+
+
+# --- Keymap (Multisample / Drumkit) --------------------------------
+
+def _zone(freq, lo, hi, root, secs=0.05, sr=44100):
+    t = np.arange(int(sr * secs)) / sr
+    return Zone(samples=np.sin(2 * np.pi * freq * t).astype(np.float32),
+                sample_rate=sr, root_note=root, lo_key=lo, hi_key=hi,
+                name=f"z{freq}")
+
+
+def test_zone_covers_and_distance():
+    z = _zone(440, 60, 67, 64)
+    assert z.covers(64) and z.covers(60) and z.covers(67)
+    assert not z.covers(59) and not z.covers(68)
+    assert z.distance(64) == 0
+    assert z.distance(57) == 3 and z.distance(70) == 3
+
+
+def test_keymap_picks_zone_by_key():
+    # Drumkit: drei verschiedene Frequenzen auf drei Tastenbereiche
+    inst = Instrument.keymap("Kit", [
+        _zone(200, 36, 47, 36),     # tiefer Bereich
+        _zone(800, 48, 59, 48),     # mittlerer Bereich
+        _zone(1500, 60, 71, 60),    # hoher Bereich
+    ])
+    assert inst.is_keymap()
+    # Note in jedem Bereich am ROOT -> ~ Frequenz der jeweiligen Zone
+    for note, freq in [(36, 200), (48, 800), (60, 1500)]:
+        out = inst.render_note(note, 44100)
+        seg = out[:8192]
+        peak = np.argmax(np.abs(np.fft.rfft(seg))) * 44100 / len(seg)
+        assert abs(peak - freq) < 40
+
+
+def test_keymap_resamples_within_zone():
+    inst = Instrument.keymap("M", [_zone(440, 60, 72, 60)])  # root 60
+    out = inst.render_note(72, 44100)      # +12 -> Oktave hoeher = ~880
+    seg = out[:8192]
+    peak = np.argmax(np.abs(np.fft.rfft(seg))) * 44100 / len(seg)
+    assert abs(peak - 880) < 40
+
+
+def test_keymap_out_of_range_uses_nearest():
+    inst = Instrument.keymap("M", [_zone(440, 60, 67, 64)])
+    out = inst.render_note(40, 1000)       # weit unterhalb -> naechste Zone
+    assert out.shape == (1000,)
+    assert np.max(np.abs(out)) > 0.0       # klingt trotzdem
+
+
+def test_keymap_dict_roundtrip():
+    inst = Instrument.keymap("Kit", [
+        _zone(200, 36, 47, 36), _zone(800, 48, 59, 48)])
+    inst.env_attack_ms = 5
+    d = inst.to_dict()
+    assert d["kind"] == "keymap" and len(d["zones"]) == 2
+    inst2 = Instrument.from_dict(d)
+    assert inst2.is_keymap() and len(inst2.zones) == 2
+    assert inst2.zones[0].lo_key == 36 and inst2.zones[1].root_note == 48
+    assert inst2.env_attack_ms == 5
 
 
 def test_loop_env_dict_roundtrip():

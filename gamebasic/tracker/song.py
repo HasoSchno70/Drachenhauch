@@ -216,7 +216,7 @@ class Song:
         idx = self.channel_inst[c] if c < len(self.channel_inst) else None
         if idx is not None and 0 <= idx < len(self.instruments):
             inst = self.instruments[idx]
-            if getattr(inst, "kind", "synth") == "sample":
+            if getattr(inst, "kind", "synth") in ("sample", "keymap"):
                 return None
             return inst.waveform
         return self.waves[c]

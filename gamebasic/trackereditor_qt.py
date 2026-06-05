@@ -100,6 +100,118 @@ class _InstrumentDialog(QDialog):
         i.env_release_ms = self.rel.value()
 
 
+class _KeymapDialog(QDialog):
+    """Verteilt Samples ueber die Klaviatur (Multisample / Drumkit). Jede Zone
+    = ein Sample fuer einen Tastenbereich [Lo, Hi], unverschoben bei Root."""
+
+    def __init__(self, name: str, zones, load_fn, parent=None):
+        super().__init__(parent)
+        from .tracker.instrument import Zone
+        self._Zone = Zone
+        self._load_fn = load_fn
+        self.setWindowTitle("Keymap-Instrument")
+        self.resize(560, 380)
+        v = QVBoxLayout(self)
+
+        nrow = QHBoxLayout()
+        nrow.addWidget(QLabel("Name:"))
+        self.name_edit = QComboBox(); self.name_edit.setEditable(True)
+        self.name_edit.setCurrentText(name or "Keymap")
+        nrow.addWidget(self.name_edit, 1)
+        v.addLayout(nrow)
+
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Sample", "Lo", "Hi", "Root"])
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch)
+        v.addWidget(self.table, 1)
+        # vorhandene Zonen uebernehmen (Kopien der Sample-Arrays)
+        self._zones = [self._Zone(
+            samples=np.array(z.samples, copy=True), sample_rate=z.sample_rate,
+            root_note=z.root_note, lo_key=z.lo_key, hi_key=z.hi_key,
+            loop_mode=z.loop_mode, loop_start=z.loop_start,
+            loop_end=z.loop_end, name=z.name) for z in (zones or [])]
+        self._rebuild_table()
+
+        brow = QHBoxLayout()
+        b_add = QPushButton("Sample hinzufuegen...")
+        b_add.clicked.connect(self._add_sample)
+        brow.addWidget(b_add)
+        b_del = QPushButton("Zone entfernen")
+        b_del.clicked.connect(self._remove_zone)
+        brow.addWidget(b_del)
+        b_drum = QPushButton("Auto-Drumkit (ab C2)")
+        b_drum.setToolTip("Jedem Sample EINE Taste zuweisen (ab MIDI 36)")
+        b_drum.clicked.connect(self._auto_drumkit)
+        brow.addWidget(b_drum)
+        brow.addStretch(1)
+        v.addLayout(brow)
+
+        box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        box.accepted.connect(self._commit_table)
+        box.accepted.connect(self.accept)
+        box.rejected.connect(self.reject)
+        v.addWidget(box)
+
+    def _rebuild_table(self) -> None:
+        self.table.setRowCount(len(self._zones))
+        for r, z in enumerate(self._zones):
+            it = QTableWidgetItem(f"{z.name} ({z.samples.size})")
+            it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            self.table.setItem(r, 0, it)
+            for col, val in ((1, z.lo_key), (2, z.hi_key), (3, z.root_note)):
+                sp = QSpinBox(); sp.setRange(0, 127); sp.setValue(int(val))
+                self.table.setCellWidget(r, col, sp)
+
+    def _commit_table(self) -> None:
+        for r, z in enumerate(self._zones):
+            z.lo_key = self.table.cellWidget(r, 1).value()
+            z.hi_key = self.table.cellWidget(r, 2).value()
+            z.root_note = self.table.cellWidget(r, 3).value()
+            if z.hi_key < z.lo_key:
+                z.hi_key = z.lo_key
+
+    def _add_sample(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Sample fuer Zone laden", "",
+            "Audio (*.wav *.ogg *.flac)")
+        if not path:
+            return
+        res = self._load_fn(path)
+        if res is None:
+            QMessageBox.warning(self, "Fehler", "Datei nicht ladbar.")
+            return
+        samples, sr = res
+        from pathlib import Path
+        self._commit_table()                 # aktuelle Edits sichern
+        self._zones.append(self._Zone(
+            samples=np.asarray(samples, dtype=np.float32), sample_rate=sr,
+            root_note=60, lo_key=0, hi_key=127,
+            name=Path(path).stem or "zone"))
+        self._rebuild_table()
+
+    def _remove_zone(self) -> None:
+        r = self.table.currentRow()
+        if 0 <= r < len(self._zones):
+            self._commit_table()
+            del self._zones[r]
+            self._rebuild_table()
+
+    def _auto_drumkit(self) -> None:
+        self._commit_table()
+        for i, z in enumerate(self._zones):
+            key = min(127, 36 + i)
+            z.lo_key = z.hi_key = z.root_note = key
+        self._rebuild_table()
+
+    def get_name(self) -> str:
+        return self.name_edit.currentText().strip() or "Keymap"
+
+    def get_zones(self):
+        return self._zones
+
+
 class _Piano(QWidget):
     """Klickbare Klaviatur (2 Oktaven). Emittiert die MIDI-Note."""
 
@@ -227,6 +339,11 @@ class TrackerEditor(QMainWindow):
         b_load = QPushButton("Sample laden...")
         b_load.clicked.connect(self._load_sample)
         irow.addWidget(b_load)
+        b_keymap = QPushButton("Keymap...")
+        b_keymap.setToolTip("Samples ueber die Klaviatur verteilen "
+                            "(Multisample / Drumkit)")
+        b_keymap.clicked.connect(self._edit_keymap)
+        irow.addWidget(b_keymap)
         b_iedit = QPushButton("Bearbeiten...")
         b_iedit.setToolTip("Grundton, Loop-Punkte, ADSR-Huellkurve")
         b_iedit.clicked.connect(self._edit_instrument)
@@ -443,7 +560,7 @@ class TrackerEditor(QMainWindow):
         self.inst_combo.blockSignals(True)
         self.inst_combo.clear()
         for i, ins in enumerate(self.song.instruments):
-            tag = "♪" if ins.kind == "sample" else "~"
+            tag = {"sample": "♪", "keymap": "▦"}.get(ins.kind, "~")
             self.inst_combo.addItem(f"{i}: {tag} {ins.name}")
         self.inst_combo.blockSignals(False)
         # Zuweisungs-Label (nur belegte Kanaele zeigen)
@@ -473,13 +590,13 @@ class TrackerEditor(QMainWindow):
         self.inst_combo.setCurrentIndex(len(self.song.instruments) - 1)
         self._mark()
 
-    def _instrument_from_file(self, path: str):
-        """Laedt eine Audiodatei als Sample-Instrument. Erst der stdlib-WAV-
-        Pfad (headless), sonst pygame-Dekodierung (OGG/float-WAV/...)."""
-        from .tracker.instrument import Instrument
-        from pathlib import Path
+    def _load_samples_from_file(self, path: str):
+        """(samples_float, sample_rate) aus einer Audiodatei -- erst stdlib-WAV
+        (headless), sonst pygame-Dekodierung (OGG/float-WAV/...). None bei
+        Fehler."""
+        from .tracker.instrument import load_wav_mono
         try:
-            return Instrument.from_wav(path)
+            return load_wav_mono(path)
         except Exception:
             pass
         try:
@@ -492,12 +609,20 @@ class TrackerEditor(QMainWindow):
             arr = pygame.sndarray.array(snd)
             if arr.ndim == 2:
                 arr = arr.mean(axis=1)
-            samples = (arr.astype(np.float32) / 32768.0)
-            sr = pygame.mixer.get_init()[0] or 44100
-            return Instrument.from_array(Path(path).stem or "Sample",
-                                         samples, sr, 60)
+            return (arr.astype(np.float32) / 32768.0,
+                    pygame.mixer.get_init()[0] or 44100)
         except Exception:
             return None
+
+    def _instrument_from_file(self, path: str):
+        """Laedt eine Audiodatei als (Einzel-)Sample-Instrument."""
+        from .tracker.instrument import Instrument
+        from pathlib import Path
+        res = self._load_samples_from_file(path)
+        if res is None:
+            return None
+        samples, sr = res
+        return Instrument.from_array(Path(path).stem or "Sample", samples, sr, 60)
 
     def _remove_instrument(self) -> None:
         idx = self.inst_combo.currentIndex()
@@ -506,6 +631,40 @@ class TrackerEditor(QMainWindow):
             self._sound_cache.clear()
             self._refresh_instruments()
             self._mark()
+
+    def _edit_keymap(self) -> None:
+        """Erstellt/bearbeitet ein Keymap-Instrument (Samples ueber die Tasten
+        verteilt). Ist das gewaehlte Instrument bereits ein Keymap, wird es
+        bearbeitet; sonst entsteht ein neues."""
+        from .tracker.instrument import Instrument
+        idx = self.inst_combo.currentIndex()
+        editing = (0 <= idx < len(self.song.instruments)
+                   and self.song.instruments[idx].kind == "keymap")
+        cur = self.song.instruments[idx] if editing else None
+        dlg = _KeymapDialog(cur.name if cur else "Keymap",
+                            cur.zones if cur else [],
+                            self._load_samples_from_file, self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        zones = dlg.get_zones()
+        if not zones:
+            QMessageBox.information(self, "Keymap leer",
+                                    "Mindestens ein Sample hinzufuegen.")
+            return
+        inst = Instrument.keymap(dlg.get_name(), zones)
+        if editing:
+            # ADSR/default_vol vom alten Instrument uebernehmen
+            inst.default_vol = cur.default_vol
+            inst.env_attack_ms = cur.env_attack_ms
+            inst.env_decay_ms = cur.env_decay_ms
+            inst.env_sustain = cur.env_sustain
+            inst.env_release_ms = cur.env_release_ms
+            self.song.instruments[idx] = inst
+        else:
+            self.song.add_instrument(inst)
+        self._sound_cache.clear()
+        self._refresh_instruments()
+        self._mark()
 
     def _edit_instrument(self) -> None:
         idx = self.inst_combo.currentIndex()

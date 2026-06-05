@@ -74,6 +74,37 @@ def test_remove_instrument_updates_combo(tmp_path):
     assert len(ed.song.instruments) == 0
 
 
+def test_keymap_dialog_builds_instrument(tmp_path):
+    from gamebasic.trackereditor_qt import _KeymapDialog
+    from gamebasic.tracker import Zone
+    ed = _editor()
+    # zwei Samples vorbereiten + per load_fn-Callback laden
+    a = tmp_path / "a.wav"; _write_wav(a, freq=200)
+    b = tmp_path / "b.wav"; _write_wav(b, freq=800)
+    dlg = _KeymapDialog("Kit", [], ed._load_samples_from_file)
+    # Zonen direkt einspeisen (statt File-Dialog) ueber das interne API
+    sa, sra = ed._load_samples_from_file(str(a))
+    sb, srb = ed._load_samples_from_file(str(b))
+    import numpy as np
+    dlg._zones.append(Zone(samples=np.asarray(sa, np.float32), sample_rate=sra,
+                           root_note=60, lo_key=0, hi_key=59, name="a"))
+    dlg._zones.append(Zone(samples=np.asarray(sb, np.float32), sample_rate=srb,
+                           root_note=60, lo_key=60, hi_key=127, name="b"))
+    dlg._rebuild_table()
+    dlg._auto_drumkit()                      # jede Zone -> 1 Taste ab 36
+    dlg._commit_table()
+    zones = dlg.get_zones()
+    assert zones[0].lo_key == 36 and zones[0].hi_key == 36
+    assert zones[1].lo_key == 37
+    # Im Editor anwenden
+    from gamebasic.tracker import Instrument
+    inst = Instrument.keymap(dlg.get_name(), zones)
+    ed.song.add_instrument(inst)
+    ed._refresh_instruments()
+    assert ed.song.instruments[-1].is_keymap()
+    assert "▦" in ed.inst_combo.itemText(ed.inst_combo.count() - 1)
+
+
 def test_export_audio_renders_wav(tmp_path, monkeypatch):
     import wave
     from PySide6.QtWidgets import QFileDialog
