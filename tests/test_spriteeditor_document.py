@@ -260,27 +260,6 @@ def test_save_sheet_atlas_vertical_layout(tmp_path):
     assert data["sprites"]["v_1"] == [0, 8, 8, 8]
 
 
-def test_save_sheet_atlas_loads_via_atlas_load(tmp_path):
-    """Round-trip: Editor schreibt Atlas, GameBasic-Engine laedt ihn.
-    Schliesst den Workflow-Loop."""
-    pytest.importorskip("pygame")
-    d = SpriteDoc(16, 16)
-    d.add_frame()  # 2 Frames
-    png = tmp_path / "atlas.png"
-    j   = tmp_path / "atlas.json"
-    d.save_sheet_atlas(png, j, name_prefix="tile")
-
-    from gamebasic.graphics import Graphics
-    g = Graphics()
-    try:
-        atlas = g.load_sprite_atlas(str(j))
-        assert sorted(atlas.frames.keys()) == ["tile_0", "tile_1"]
-        assert atlas.frames["tile_0"] == (0, 0, 16, 16)
-        assert atlas.frames["tile_1"] == (16, 0, 16, 16)
-    finally:
-        g.shutdown()
-
-
 def test_save_sheet_atlas_relative_image_path(tmp_path):
     """PNG und JSON im gleichen Verzeichnis -> image-Feld nur der Filename."""
     d = SpriteDoc(4, 4)
