@@ -94,12 +94,13 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 - [x] **`ROUND(x, decimals)`** → FLOAT (Half-to-even via Decimal-Formatierung,
       bit-identisch: Python `f"{x:.nf}"` == Rust `format!("{:.n}")`).
 
-## WP3 — String + Datei
-- [ ] **String:** `LTRIM$`/`RTRIM$`, `REVERSE$`, `STARTSWITH`/`ENDSWITH`/
-      `CONTAINS`, `BIN$`/`OCT$`, robustes Parsen (`ISNUMERIC`/`TRYVAL`; `VAL`
-      gibt still 0).
-- [ ] **Datei/Verzeichnis:** `DIRLIST`, `DIREXISTS`, `MKDIR`, `DELETEFILE`,
-      `RENAME`, `WRITEALL(path,text)`, `READLINES`, `FILESIZE`, `PATHJOIN`.
+## WP3 — String + Datei (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
+- [x] **String:** `LTRIM$`/`RTRIM$`, `REVERSE$`, `STARTSWITH`/`ENDSWITH`/
+      `CONTAINS`, `BIN$`/`OCT$` (mit Vorzeichen), `ISNUMERIC`/`TRYVAL` (robustes
+      Parsen via `parse_number`; `VAL` bleibt unverändert).
+- [x] **Datei/Verzeichnis:** `DIRLIST` (sortiert), `DIREXISTS`, `MKDIR`
+      (rekursiv), `DELETEFILE`, `RENAME`, `WRITEALL`, `READLINES`, `FILESIZE`,
+      `PATHJOIN` (mit `/`). Alle pfadbasiert via `std::fs`.
 
 ## WP4 — Konsistenz / Aliase (geringes Risiko; NICHT umbenennen, nur Aliase + Doku)
 - [ ] BASIC-Aliase: `SGN`→`SIGN`, `SQRT`→`SQR`, `LTRIM$`/`RTRIM$`, `REVERSE$`,
