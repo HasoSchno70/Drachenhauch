@@ -52,13 +52,27 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       ab" war falsch. Empirisch verifiziert (beide Pfade laufen identisch);
       `vm.rs`-Kommentar praezisiert (verweist auf den Alias als Quelle).
 
-## WP1 — Array-Power (größte praktische Lücke)
-- [ ] **Dynamische Arrays:** `ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`
-      (heute fix dimensioniert; `_GBArray` + Rust `Value::Array` growable machen).
-      Größerer Brocken — eigener Schritt.
-- [ ] **Aggregate:** `ARRAY_SUM`/`ARRAY_AVG`/`ARRAY_MIN`/`ARRAY_MAX`/
-      `ARRAY_FILL`/`ARRAY_COPY` (variadic MIN/MAX nehmen nur Skalare).
-- [ ] **`SORT(arr, comparator)`** mit FUNCREF + Descending-Flag.
+## WP1 — Array-Power (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
+> Ab dieser WP gilt die neue Direktive: neue Builtins NUR noch in gbrt (Rust),
+> der Python-Tree-Walker (`interpreter.py`) wird nicht mehr erweitert. Tests =
+> gbrt-Golden (`tests/test_gbrt_builtins.py`, läuft via `gbrt --runsrc`).
+> Editor-Metadaten (Completion/Grammar/Hover) via `BUILTIN_DOCS`.
+- [x] **Dynamische Arrays:** `ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`
+      (1D, mutieren IN PLACE: `values` + `dims=[len]` + `strides=[1]`).
+      `Value::Array` ist von Natur aus growable — die Cython-Hürde entfiel mit
+      der Ent-Cythonisierung des TW.
+- [x] **Aggregate:** `ARRAY_SUM`/`ARRAY_AVG`/`ARRAY_MIN`/`ARRAY_MAX`/
+      `ARRAY_FILL`/`ARRAY_COPY` (1D numerisch; FILL via `coerce_elem`, COPY
+      unabhängig).
+- [x] **`SORT(arr, …)`** mit Descending-`BOOL` (builtins.rs) + FUNCREF-Comparator
+      (vm.rs `sort_with_comparator`, stabil, cmp(a,b)→INT).
+
+> **⚠ Folge-Schritt (offen):** Diese gbrt-only-Builtins laufen NICHT über die
+> Python-Toolchain (`gbrun.py --native`/`--export`, Editor-F5/F6 nutzen
+> `compiler.py`, das sie als User-Calls fehlkompiliert) — nur über gbrts eigenes
+> Rust-Frontend (`gbrt run`/`--runsrc`/`gbrt --export`). Damit der Editor/`gbrun`
+> sie nutzen kann, muss der Run-/Export-Pfad auf gbrts Rust-Frontend umgestellt
+> werden.
 
 ## WP2 — Spiel-Quickwins (✅ ERLEDIGT 2026-06-05, nativ in beiden Pfaden)
 - [x] **`MOUSEWHEEL` exponieren** — Builtin in beiden Pfaden (Backend war da:
