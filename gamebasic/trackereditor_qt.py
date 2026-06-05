@@ -209,6 +209,11 @@ class TrackerEditor(QMainWindow):
             top.addWidget(cb)
             self.wave_combos.append(cb)
         top.addStretch(1)
+        b_wav = QPushButton("Audio (WAV)...")
+        b_wav.setToolTip("Song mit Sample-Instrumenten als WAV rendern "
+                         "(im Spiel via PLAYMUSIC)")
+        b_wav.clicked.connect(self._export_audio)
+        top.addWidget(b_wav)
         b_code = QPushButton("GB-Code"); b_code.clicked.connect(self._export)
         top.addWidget(b_code)
         root.addLayout(top)
@@ -849,6 +854,34 @@ class TrackerEditor(QMainWindow):
     # ============================================== Export
     def _export(self) -> None:
         self._show_code(self.song.gb_code())
+
+    def _export_audio(self) -> None:
+        """Rendert den ganzen Song (inkl. Sample-Instrumente/Loop/ADSR) offline
+        zu einer WAV-Datei -- im Spiel via PLAYMUSIC/LOADSOUND abspielbar."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Song als Audio rendern", str(self.project_root),
+            "WAV-Audio (*.wav)")
+        if not path:
+            return
+        if not path.lower().endswith(".wav"):
+            path += ".wav"
+        try:
+            from .tracker.mixer import render_song, save_wav
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            try:
+                mix = render_song(self.song)
+                save_wav(path, mix)
+            finally:
+                QApplication.restoreOverrideCursor()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler",
+                                f"Audio-Export fehlgeschlagen:\n{exc}")
+            return
+        secs = len(mix) / 44100.0
+        QMessageBox.information(
+            self, "Audio exportiert",
+            f"{Path(path).name} ({secs:.1f}s) gerendert.\n\n"
+            f"Im Spiel abspielen:  PLAYMUSIC(\"{Path(path).name}\")")
 
     def _show_code(self, code: str) -> None:
         dlg = QFrame(self, Qt.WindowType.Window)

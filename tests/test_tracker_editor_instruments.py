@@ -74,6 +74,24 @@ def test_remove_instrument_updates_combo(tmp_path):
     assert len(ed.song.instruments) == 0
 
 
+def test_export_audio_renders_wav(tmp_path, monkeypatch):
+    import wave
+    from PySide6.QtWidgets import QFileDialog
+    ed = _editor()
+    ed.song.patterns[0].set(0, 0, 60)
+    out = tmp_path / "song.wav"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    # Info-Dialog unterdruecken
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **k: None))
+    ed._export_audio()
+    assert out.exists()
+    with wave.open(str(out), "rb") as w:
+        assert w.getnframes() > 0
+
+
 def test_instrument_dialog_applies_loop_and_env(tmp_path):
     from gamebasic.trackereditor_qt import _InstrumentDialog
     ed = _editor()
