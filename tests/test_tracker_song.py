@@ -190,3 +190,98 @@ def test_gb_code_has_expanded_rows():
     s.order = [0, 1, 0]                    # 12 Reihen total
     code = s.gb_code()
     assert "CONST TRK_ROWS = 12" in code
+
+
+# --------------------------------------------------------------- Lautstaerke
+
+def test_set_vol_requires_note():
+    from gamebasic.tracker import VOL_MAX
+    p = Pattern("P")
+    # ohne Note ignoriert set_vol
+    p.set_vol(0, 0, 8)
+    assert p.get_vol(0, 0) is None
+    # mit Note wird gesetzt
+    p.set(0, 0, 60)
+    p.set_vol(0, 0, 8)
+    assert p.get_vol(0, 0) == 8
+    # Clamping
+    p.set_vol(0, 0, 999)
+    assert p.get_vol(0, 0) == VOL_MAX
+    # 0/None -> Standard (None)
+    p.set_vol(0, 0, 0)
+    assert p.get_vol(0, 0) is None
+
+
+def test_clearing_note_clears_vol():
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_vol(0, 0, 10)
+    p.set(0, 0, None)                     # Note loeschen
+    assert p.get_vol(0, 0) is None
+
+
+def test_set_rows_keeps_vol():
+    p = Pattern("P", 8)
+    p.set(0, 2, 60)
+    p.set_vol(0, 2, 5)
+    p.set_rows(4)                         # 2 < 4 -> bleibt
+    assert p.get_vol(0, 2) == 5
+    p.set_rows(2)                         # 2 >= 2 -> Reihe 2 faellt weg
+    assert p.rows == 2
+
+
+def test_to_dict_omits_empty_vol():
+    p = Pattern("P")
+    assert "vol" not in p.to_dict()
+    p.set(0, 0, 60)
+    p.set_vol(0, 0, 7)
+    assert "vol" in p.to_dict()
+
+
+def test_vol_json_roundtrip(tmp_path):
+    s = Song()
+    s.patterns[0].set(1, 3, 64)
+    s.patterns[0].set_vol(1, 3, 12)
+    path = str(tmp_path / "vol.json")
+    s.save_json(path)
+    s2 = Song.load_json(path)
+    assert s2.patterns[0].get_vol(1, 3) == 12
+
+
+def test_vol_copy_independent():
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_vol(0, 0, 9)
+    q = p.copy()
+    q.set_vol(0, 0, 3)
+    assert p.get_vol(0, 0) == 9          # Original unveraendert
+
+
+def test_vol_to_pct_mapping():
+    from gamebasic.tracker import VOL_MAX, vol_to_pct
+    assert vol_to_pct(VOL_MAX) == 100
+    assert vol_to_pct(1) >= 1            # nie 0 (reserviert fuer Standard)
+
+
+def test_gb_code_with_volume_compiles(tmp_path):
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler
+    from gamebasic.preprocess import process
+
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_vol(0, 0, 12)
+    code = s.gb_code()
+    assert "DIM trkV0[TRK_ROWS]" in code
+    assert "FUNCTION TRACKER_AMP" in code
+    prepped, _ = process(code, tmp_path, file_label="<tracker>")
+    ast = Parser(Lexer(prepped).tokenize()).parse()
+    Compiler().compile(ast)              # wirft bei Fehler
+
+
+def test_gb_code_without_volume_has_no_amp_helper():
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    code = s.gb_code()
+    assert "TRACKER_AMP" not in code     # ohne Lautstaerke kein Helfer/Overhead

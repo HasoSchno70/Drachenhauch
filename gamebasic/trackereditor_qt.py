@@ -29,7 +29,8 @@ from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .synth import synthesize
 from .tracker import (
-    CHANNELS, TONAL, WAVEFORMS, Song, midi_to_freq, note_name,
+    CHANNELS, TONAL, VOL_MAX, WAVEFORMS, Song, midi_to_freq, note_name,
+    vol_to_pct,
 )
 
 
@@ -169,6 +170,13 @@ class TrackerEditor(QMainWindow):
         self.rows_spin = QSpinBox(); self.rows_spin.setRange(1, 64)
         self.rows_spin.valueChanged.connect(self._on_rows)
         prow.addWidget(self.rows_spin)
+        prow.addWidget(QLabel("Vol:"))
+        self.vol_spin = QSpinBox(); self.vol_spin.setRange(0, VOL_MAX)
+        self.vol_spin.setSpecialValueText("–")   # 0 = Standard-Lautstaerke
+        self.vol_spin.setToolTip(
+            "Lautstaerke der gewaehlten Note (1..15, – = Standard)")
+        self.vol_spin.valueChanged.connect(self._on_vol_changed)
+        prow.addWidget(self.vol_spin)
         b_padd = QPushButton("+ Pattern"); b_padd.clicked.connect(self._add_pattern)
         b_pdup = QPushButton("Duplizieren"); b_pdup.clicked.connect(self._dup_pattern)
         b_pdel = QPushButton("Loeschen"); b_pdel.clicked.connect(self._del_pattern)
@@ -189,6 +197,7 @@ class TrackerEditor(QMainWindow):
         self.grid.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.grid.setFont(QFont(EDITOR_FONT_FAMILY, 10))
         self.grid.itemSelectionChanged.connect(self._audition_selected)
+        self.grid.itemSelectionChanged.connect(self._sync_vol_spin)
         root.addWidget(self.grid, 1)
 
         # --- Song-Arrangement (Order) ---
@@ -291,10 +300,12 @@ class TrackerEditor(QMainWindow):
         self.grid.setVerticalHeaderLabels([f"{r:02d}" for r in range(pat.rows)])
         for r in range(pat.rows):
             for c in range(CHANNELS):
-                it = QTableWidgetItem(self._cell_text(c, pat.data[c][r]))
+                it = QTableWidgetItem(
+                    self._cell_text(c, pat.data[c][r], pat.vol[c][r]))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.grid.setItem(r, c, it)
         self.grid.blockSignals(False)
+        self._sync_vol_spin()
 
     def _reload_order(self) -> None:
         self.order_list.clear()
@@ -312,15 +323,41 @@ class TrackerEditor(QMainWindow):
         self._sound_cache.clear()
         self._mark()
 
-    def _cell_text(self, ci: int, note) -> str:
+    def _cell_text(self, ci: int, note, vol=None) -> str:
         if note is None:
             return "···"
-        return "  X" if ci == TONAL else note_name(note)
+        base = "  X" if ci == TONAL else note_name(note)
+        return f"{base} v{vol}" if vol else base
 
     def _set_note(self, row: int, ci: int, note) -> None:
-        self.song.patterns[self.cur].set(ci, row, note)
-        self.grid.item(row, ci).setText(self._cell_text(ci, note))
+        pat = self.song.patterns[self.cur]
+        pat.set(ci, row, note)               # loescht ggf. auch die Lautstaerke
+        self.grid.item(row, ci).setText(
+            self._cell_text(ci, note, pat.vol[ci][row]))
+        self._sync_vol_spin()
         self._mark()
+
+    def _on_vol_changed(self, v: int) -> None:
+        if not self._has_sel():
+            return
+        r, c = self._sel()
+        pat = self.song.patterns[self.cur]
+        if pat.data[c][r] is None:           # nur Noten haben Lautstaerke
+            return
+        pat.set_vol(c, r, v)                 # 0 -> None (Standard)
+        self.grid.item(r, c).setText(
+            self._cell_text(c, pat.data[c][r], pat.vol[c][r]))
+        self._mark()
+
+    def _sync_vol_spin(self) -> None:
+        """Spiegelt die Lautstaerke der gewaehlten Zelle in den Spinbox."""
+        self.vol_spin.blockSignals(True)
+        if self._has_sel():
+            r, c = self._sel()
+            self.vol_spin.setValue(self.song.patterns[self.cur].vol[c][r] or 0)
+        else:
+            self.vol_spin.setValue(0)
+        self.vol_spin.blockSignals(False)
 
     def _on_piano(self, midi: int) -> None:
         ch = self._sel_channel() if self._has_sel() else 0
@@ -343,9 +380,10 @@ class TrackerEditor(QMainWindow):
     def _audition_selected(self) -> None:
         if self._has_sel():
             r, c = self._sel()
-            n = self.song.patterns[self.cur].data[c][r]
+            pat = self.song.patterns[self.cur]
+            n = pat.data[c][r]
             if n is not None:
-                self._play_note(c, n)
+                self._play_note(c, n, pat.vol[c][r])
 
     def keyPressEvent(self, e):  # noqa: N802
         if e.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self._has_sel():
@@ -450,11 +488,13 @@ class TrackerEditor(QMainWindow):
         except Exception:
             return None
 
-    def _play_note(self, ci: int, midi: int) -> None:
+    def _play_note(self, ci: int, midi: int, vol: int | None = None) -> None:
         snd = self._sound(ci, midi)
         if snd is not None:
             try:
-                snd.play()
+                ch = snd.play()
+                if ch is not None and vol:   # vol = Lautstaerke 1..15
+                    ch.set_volume(min(1.0, max(0.0, vol_to_pct(vol) / 100.0)))
             except Exception:
                 pass
 
@@ -509,7 +549,7 @@ class TrackerEditor(QMainWindow):
         for c in range(CHANNELS):
             n = pat.data[c][row]
             if n is not None:
-                self._play_note(c, n)
+                self._play_note(c, n, pat.vol[c][row])
 
     # ============================================== Datei
     def _new_song(self) -> None:

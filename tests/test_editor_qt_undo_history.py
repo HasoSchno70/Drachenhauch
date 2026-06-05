@@ -154,3 +154,28 @@ def test_tracker_editor_undo_redo(_qapp):
     assert ed.song.patterns[ed.cur].data[0][0] is None
     ed.undo.redo()
     assert ed.song.patterns[ed.cur].data[0][0] == 60
+
+
+def test_tracker_volume_column_ui(_qapp):
+    """Volume-Spinbox setzt die Noten-Lautstaerke der gewaehlten Zelle und
+    spiegelt sie beim Selektieren zurueck."""
+    from gamebasic.trackereditor_qt import TrackerEditor
+    ed = _editor(_qapp, TrackerEditor)
+    ed.grid.setCurrentCell(0, 0)
+    ed._set_note(0, 0, 60)
+    # Lautstaerke ueber den Spinbox setzen
+    ed.vol_spin.setValue(9)
+    assert ed.song.patterns[ed.cur].vol[0][0] == 9
+    # Zelltext zeigt die Lautstaerke
+    assert "v9" in ed.grid.item(0, 0).text()
+    # Auf leere Zelle wechseln -> Spinbox zeigt Standard (0)
+    ed.grid.setCurrentCell(1, 0)
+    ed._sync_vol_spin()
+    assert ed.vol_spin.value() == 0
+    # Zurueck zur Note -> Spinbox spiegelt 9
+    ed.grid.setCurrentCell(0, 0)
+    ed._sync_vol_spin()
+    assert ed.vol_spin.value() == 9
+    # 0 = Standard -> Lautstaerke wieder None
+    ed.vol_spin.setValue(0)
+    assert ed.song.patterns[ed.cur].vol[0][0] is None

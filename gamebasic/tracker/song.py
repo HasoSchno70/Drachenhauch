@@ -26,6 +26,16 @@ DEFAULT_ROWS = 16
 MIN_ROWS = 1
 MAX_ROWS = 64
 
+# Lautstaerke-Effekt pro Note: 1..15 (None = Standard-Lautstaerke).
+VOL_MAX = 15
+DEFAULT_AMP_PCT = 50       # Standard-Amplitude in Prozent (= bisherige 0.5)
+
+
+def vol_to_pct(v: int) -> int:
+    """Mappt eine Noten-Lautstaerke 1..15 auf einen Amplituden-Prozentwert
+    1..100 (nie 0 -- 0 ist im Export reserviert fuer „Standard")."""
+    return max(1, min(100, round(int(v) / VOL_MAX * 100)))
+
 
 def midi_to_freq(m: int) -> float:
     return 440.0 * (2.0 ** ((m - 69) / 12.0))
@@ -38,7 +48,7 @@ def note_name(m: int) -> str:
 class Pattern:
     """Ein Pattern: CHANNELS x rows Gitter aus MIDI-Noten (oder None)."""
 
-    __slots__ = ("name", "rows", "data")
+    __slots__ = ("name", "rows", "data", "vol")
 
     def __init__(self, name: str, rows: int = DEFAULT_ROWS):
         self.name = name
@@ -46,34 +56,64 @@ class Pattern:
         # data[channel][row] = MIDI-Note (int) oder None
         self.data: list[list[int | None]] = [
             [None] * self.rows for _ in range(CHANNELS)]
+        # vol[channel][row] = Lautstaerke 1..15 oder None (= Standard).
+        # Nur sinnvoll, wo auch eine Note steht.
+        self.vol: list[list[int | None]] = [
+            [None] * self.rows for _ in range(CHANNELS)]
 
     def get(self, channel: int, row: int) -> int | None:
         return self.data[channel][row]
 
     def set(self, channel: int, row: int, note: int | None) -> None:
         self.data[channel][row] = note
+        if note is None:                     # Note geloescht -> Lautstaerke mit
+            self.vol[channel][row] = None
+
+    def get_vol(self, channel: int, row: int) -> int | None:
+        return self.vol[channel][row]
+
+    def set_vol(self, channel: int, row: int, v: int | None) -> None:
+        """Setzt die Noten-Lautstaerke 1..15 (None/<=0 = Standard). Wirkt nur,
+        wenn an der Stelle eine Note steht."""
+        if self.data[channel][row] is None:
+            return
+        if v is None or int(v) <= 0:
+            self.vol[channel][row] = None
+        else:
+            self.vol[channel][row] = max(1, min(VOL_MAX, int(v)))
 
     def set_rows(self, rows: int) -> None:
         """Aendert die Reihenzahl; bestehende Noten oben bleiben erhalten."""
         rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
-        for c in range(CHANNELS):
-            col = self.data[c]
-            if rows < len(col):
-                del col[rows:]
-            else:
-                col.extend([None] * (rows - len(col)))
+        for grid in (self.data, self.vol):
+            for c in range(CHANNELS):
+                col = grid[c]
+                if rows < len(col):
+                    del col[rows:]
+                else:
+                    col.extend([None] * (rows - len(col)))
         self.rows = rows
 
     def clear(self) -> None:
         self.data = [[None] * self.rows for _ in range(CHANNELS)]
+        self.vol = [[None] * self.rows for _ in range(CHANNELS)]
 
     def copy(self, name: str | None = None) -> "Pattern":
         p = Pattern(name if name is not None else self.name, self.rows)
         p.data = [list(col) for col in self.data]
+        p.vol = [list(col) for col in self.vol]
         return p
 
+    def _has_vol(self) -> bool:
+        return any(v is not None for col in self.vol for v in col)
+
     def to_dict(self) -> dict:
-        return {"name": self.name, "rows": self.rows, "data": self.data}
+        d = {"name": self.name, "rows": self.rows, "data": self.data}
+        # vol nur schreiben, wenn gesetzt -> alte Dateien/leere Patterns bleiben
+        # schlank und abwaerts-kompatibel.
+        if self._has_vol():
+            d["vol"] = self.vol
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Pattern":
@@ -85,6 +125,14 @@ class Pattern:
                        for v in raw[c]][:p.rows]
                 col += [None] * (p.rows - len(col))
                 p.data[c] = col
+        rawv = d.get("vol") or []
+        for c in range(CHANNELS):
+            if c < len(rawv):
+                col = [max(1, min(VOL_MAX, int(v)))
+                       if isinstance(v, (int, float)) else None
+                       for v in rawv[c]][:p.rows]
+                col += [None] * (p.rows - len(col))
+                p.vol[c] = col
         return p
 
 
@@ -149,17 +197,17 @@ class Song:
         return pos
 
     # ------------------------------------------------------ Flatten
-    def flatten(self) -> tuple[int, list[list[int]]]:
-        """Expandiert die Order zu einer flachen Timeline.
-
-        Liefert `(total_rows, channels)` mit `channels[c]` = Liste von
-        Werten ueber den ganzen Song: 0 = nichts, sonst Frequenz in Hz
-        (tonal) bzw. 1 (Drum-Hit)."""
+    def _flatten(self) -> tuple[int, list[list[int]], list[list[int]]]:
+        """Wie `flatten`, liefert zusaetzlich die Lautstaerke-Spuren `vols`:
+        `vols[c][i]` = Amplituden-Prozent (1..100) bei explizit gesetzter
+        Noten-Lautstaerke, sonst 0 (= Standard). Nur dort relevant, wo auch
+        `channels[c][i] != 0` ist."""
         order = self.order or [0]
         total = sum(self.patterns[p].rows for p in order
                     if 0 <= p < len(self.patterns))
         total = max(1, total)
         channels = [[0] * total for _ in range(CHANNELS)]
+        vols = [[0] * total for _ in range(CHANNELS)]
         i = 0
         for p in order:
             if not (0 <= p < len(self.patterns)):
@@ -172,7 +220,19 @@ class Song:
                         continue
                     channels[c][i + r] = (
                         1 if c == TONAL else int(round(midi_to_freq(note))))
+                    v = pat.vol[c][r]
+                    if v is not None:
+                        vols[c][i + r] = vol_to_pct(v)
             i += pat.rows
+        return total, channels, vols
+
+    def flatten(self) -> tuple[int, list[list[int]]]:
+        """Expandiert die Order zu einer flachen Timeline.
+
+        Liefert `(total_rows, channels)` mit `channels[c]` = Liste von
+        Werten ueber den ganzen Song: 0 = nichts, sonst Frequenz in Hz
+        (tonal) bzw. 1 (Drum-Hit)."""
+        total, channels, _ = self._flatten()
         return total, channels
 
     # ------------------------------------------------------ JSON-I/O
@@ -219,9 +279,10 @@ class Song:
         """Selbststaendiger frame-basierter Player. Die Order wird zu einer
         flachen Timeline expandiert (wiederholte Patterns werden dupliziert)
         -- so bleibt der Player simpel und identisch zum bisherigen Schema."""
-        total, channels = self.flatten()
+        total, channels, vols = self._flatten()
         rowms = self.row_ms()
         n_patterns = len(self.patterns)
+        has_vol = any(any(col) for col in vols)
         lines = [
             'IMPORT "audio"', "",
             f"' === Tracker-Song (gbtracker) -- {n_patterns} Pattern(s), "
@@ -234,6 +295,15 @@ class Song:
             for r, val in enumerate(channels[c]):
                 if val:
                     lines.append(f"trk{c}[{r}] = {val}")
+        if has_vol:
+            # Lautstaerke-Spuren (Amplitude in Prozent, 0 = Standard).
+            for c in range(CHANNELS):
+                if not any(vols[c]):
+                    continue
+                lines.append(f"DIM trkV{c}[TRK_ROWS] AS INTEGER")
+                for r, val in enumerate(vols[c]):
+                    if val:
+                        lines.append(f"trkV{c}[{r}] = {val}")
         lines += [
             "",
             "' --- Player-Status + Update (im Game-Loop aufrufen) ---",
@@ -242,14 +312,27 @@ class Song:
             "trkRow = 0",
             "trkAcc = 0.0",
             "",
-            "SUB TRACKER_PLAY_ROW(r AS INTEGER)",
         ]
+        if has_vol:
+            lines += [
+                "' Lautstaerke-Spur -> Amplitude (0 = Standard 0.5)",
+                "FUNCTION TRACKER_AMP(pct AS INTEGER) AS FLOAT",
+                "    IF pct <= 0 THEN RETURN 0.5",
+                "    RETURN pct / 100.0",
+                "END FUNCTION",
+                "",
+            ]
+        lines.append("SUB TRACKER_PLAY_ROW(r AS INTEGER)")
         for c in range(TONAL):
+            amp = (f"TRACKER_AMP(trkV{c}[r])"
+                   if has_vol and any(vols[c]) else "0.5")
             lines.append(
                 f"    IF trk{c}[r] > 0 THEN PLAYSOUND("
-                f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{self.waves[c]}", 0.5))')
+                f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{self.waves[c]}", {amp}))')
+        damp = (f"TRACKER_AMP(trkV{TONAL}[r])"
+                if has_vol and any(vols[TONAL]) else "0.5")
         lines.append(
-            f"    IF trk{TONAL}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, 0.5))")
+            f"    IF trk{TONAL}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, {damp}))")
         lines += [
             "END SUB",
             "",
