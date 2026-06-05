@@ -1,34 +1,23 @@
-"""Tree-Walking-Profiler fuer GameBasic (Editor).
+"""Profiler fuer GameBasic (Editor) -- ueber die native Runtime `gbrt profile`.
 
-Nutzt denselben Hook-Mechanismus wie der Debugger (`Interpreter._debug_hook`,
-wird vor jedem Statement aufgerufen), misst aber statt zu pausieren pro Zeile
-Trefferzahl und Zeit. Aggregiert auf Editor-Zeilen (via Preprocessor-`origins`)
-und auf Funktionen/Subs (via `symbols.scan_scopes`).
+gbrt fuehrt das Programm instrumentiert aus (per-Zeile Count+Zeit) und liefert
+das Ergebnis als JSON; hier nur noch Aggregation pro Editor-Zeile und auf
+Funktionen/Subs (via `symbols.scan_scopes`). Der Qt-Wrapper (`Profiler`) laeuft
+in einem Worker-Thread und kann den Subprozess via Stop abbrechen.
 
-Nur Tree-Walker -- am besten fuer Konsolen-/Logik-Programme. Grafik-Programme
-mit Endlos-Loop laufen nicht durch (wie Bench/Debugger); die UI bietet Stop.
-
-**Naeherung:** Die gemessene Zeit pro Zeile enthaelt die in aufgerufenem Code
-(inkl. Built-ins/IMPORT) verbrachte Zeit, die der aufrufenden Editor-Zeile
-zugeschlagen wird, sowie den Hook-Overhead selbst. Fuer die *relative*
-Hotpath-Einordnung ist das aussagekraeftig, nicht als absolute Profiling-Zeit.
+Am besten fuer Konsolen-/Logik-Programme. **Naeherung:** Die Zeit pro Zeile
+enthaelt die in aufgerufenem Code (Built-ins/Funktionen) verbrachte Zeit, die
+der aufrufenden Zeile zugeschlagen wird -- aussagekraeftig fuer die *relative*
+Hotpath-Einordnung, nicht als absolute Profiling-Zeit. Zeilen beziehen sich auf
+die Quelle (bei `IMPORT "datei.gb"`-Inlining koennen sie verschoben sein).
 """
 from __future__ import annotations
 
-import contextlib
-import io
 import threading
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
-
-_EDITOR_LABEL = "<editor>"
-
-
-class _ProfileStop(Exception):
-    """Intern -- bricht den Worker beim Stop sauber ab."""
 
 
 @dataclass
@@ -57,82 +46,91 @@ class ProfileResult:
     stopped: bool = False
 
 
+def _find_gbrt():
+    """Pfad zur gebauten gbrt-Binary (release vor debug) oder None."""
+    import os
+    root = Path(__file__).resolve().parents[2]
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = root / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
+
+
 def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
-    """Fuehrt `source` im Tree-Walker mit Profiling-Hook aus.
+    """Profiliert `source` ueber die native Runtime (`gbrt profile`).
 
-    `should_stop` ist ein optionales Callable -> bool, mit dem ein UI-Thread
-    den Lauf abbrechen kann. stdin liefert EOF (INPUT haengt nicht)."""
-    from ..preprocess import process
-    from ..lexer import Lexer
-    from ..parser import Parser
-    from ..interpreter import Interpreter
+    gbrt fuehrt das Programm instrumentiert aus und liefert pro Zeile Count+Zeit
+    als JSON; hier nur noch Aggregation pro Editor-Zeile + Scope. `should_stop`
+    bricht den Subprozess ab (fuer Endlos-Loops). Zeilen beziehen sich auf die
+    Quelle; bei `IMPORT "datei.gb"` (Inlining) koennen sie verschoben sein.
+    """
+    import json
+    import os
+    import subprocess
+    import tempfile
     from . import symbols as gb_symbols
+    from ..errors import GameBasicError
 
-    merged, origins = process(source, Path(base_path), file_label=_EDITOR_LABEL)
-    ast = Parser(Lexer(merged).tokenize()).parse()
+    gbrt = _find_gbrt()
+    if gbrt is None:
+        raise GameBasicError(
+            "Profiler benoetigt die native Runtime gbrt "
+            "(bauen: python rust/build_runtime.py).")
 
-    def to_editor(merged_line: int) -> int:
-        if origins and 0 < merged_line < len(origins):
-            o = origins[merged_line]
-            if o and o[0] == _EDITOR_LABEL:
-                return o[1]
-            return -1
-        return merged_line
+    base = Path(base_path)
+    tmp_dir = str(base) if base.is_dir() else None
+    fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
+    os.close(fd)
+    result = ProfileResult()
+    out = ""
+    try:
+        Path(tmp).write_text(source, encoding="utf-8")
+        proc = subprocess.Popen(
+            [str(gbrt), "profile", tmp],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL, text=True)
+        while True:
+            try:
+                out, _ = proc.communicate(timeout=0.1)
+                break
+            except subprocess.TimeoutExpired:
+                if should_stop is not None and should_stop():
+                    proc.terminate()
+                    try:
+                        out, _ = proc.communicate(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                    result.stopped = True
+                    break
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+    data = {}
+    if out.strip():
+        try:
+            data = json.loads(out)
+        except json.JSONDecodeError:
+            data = {}
+    result.output = data.get("output", "")
+    result.total_time = float(data.get("total_time", 0.0))
+    result.stopped = result.stopped or bool(data.get("stopped", False))
 
     counts: dict[int, int] = {}
     times: dict[int, float] = {}
-    state = {"last_el": None, "last_t": None}
-    perf = time.perf_counter
+    for entry in data.get("lines", []):
+        ln = int(entry.get("line", 0))
+        if ln > 0:
+            counts[ln] = counts.get(ln, 0) + int(entry.get("count", 0))
+            times[ln] = times.get(ln, 0.0) + float(entry.get("time", 0.0))
 
-    def hook(line, _interp):
-        if should_stop is not None and should_stop():
-            raise _ProfileStop()
-        now = perf()
-        last_el = state["last_el"]
-        if last_el is not None and state["last_t"] is not None:
-            times[last_el] = times.get(last_el, 0.0) + (now - state["last_t"])
-        state["last_t"] = now
-        el = to_editor(line)
-        if el > 0:
-            counts[el] = counts.get(el, 0) + 1
-            state["last_el"] = el
-
-    interp = Interpreter()
-    interp._debug_hook = hook
-
-    result = ProfileResult()
-    buf = io.StringIO()
-
-    class _Eof:
-        def readline(self, *a): return ""
-        def read(self, *a): return ""
-
-    import os
-    import sys
-    old_in = sys.stdin
-    sys.stdin = _Eof()
-    # Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)),
-    # damit relative Laufzeit-Pfade wie LOADIMAGE("assets/...") funktionieren.
-    old_cwd = os.getcwd()
-    try:
-        os.chdir(str(base_path))
-    except OSError:
-        pass
-    t0 = perf()
-    try:
-        with contextlib.redirect_stdout(buf):
-            interp.run(ast)
-    except _ProfileStop:
-        result.stopped = True
-    finally:
-        sys.stdin = old_in
-        os.chdir(old_cwd)
-        # Letzte Zeit-Delta der zuletzt aktiven Zeile zuschlagen.
-        if state["last_el"] is not None and state["last_t"] is not None:
-            times[state["last_el"]] = times.get(state["last_el"], 0.0) + (
-                perf() - state["last_t"])
-    result.total_time = perf() - t0
-    result.output = buf.getvalue()
+    # Laufzeitfehler (gbrt): als GameBasicError mit Zeile melden (wie bisher).
+    if "error" in data:
+        raise GameBasicError(str(data["error"]), line=int(data.get("error_line", -1) or -1))
 
     # Zeilen-Stats + Quelltext.
     src_lines = source.split("\n")
@@ -152,8 +150,6 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         c = sum(counts.get(ln, 0) for ln in range(sc.line, sc.end + 1))
         t = sum(times.get(ln, 0.0) for ln in range(sc.line, sc.end + 1))
         if c or t:
-            # Aufrufzahl ~ Treffer der ersten ausgefuehrten Body-Zeile (die
-            # FUNCTION/SUB-Zeile selbst ist kein Laufzeit-Statement).
             calls = 0
             for ln in range(sc.line, sc.end + 1):
                 if counts.get(ln, 0) > 0:
