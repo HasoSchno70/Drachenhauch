@@ -33,7 +33,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 
 - **[Sprachreferenz](docs/sprache.md)** — Variablen, Typen, `ENUM`, `SELECT CASE`, Funktionen mit Defaults und Named Arguments, Klassen, Try/Catch, f-Strings, Coroutines (`YIELD` + `CORO_*`)
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
-- **[Grafik-Built-ins](docs/builtins-grafik.md)** — Pygame-Backend, Z-Layer, Sprite-Atlas, Asset-Preloader
+- **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (gbrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
 - **[Module](docs/README.md#module)** — `json`, `db`, `tween`, `imgfx`, `particles`, `physics`, `camera`, `sprite`, `ui`, `scene`, `save`, `astar`, `ecs`, `vec2`, `input`, `regex`, `audio`, `curves`, `net`
 - **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Split-View** (Strg+\\), **Debugger** (Breakpoints inkl. **bedingter** Breakpoints/Step/Variablen), **Profiler** (Hotpath pro Zeile/Funktion), **Git-Blame**-Panel, Welcome-Showcase (Demo-Galerie mit Screenshots)

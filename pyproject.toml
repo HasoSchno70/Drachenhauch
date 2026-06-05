@@ -16,7 +16,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-graphics = ["pygame>=2.5"]
+# Grafik/Audio laufen in der nativen Runtime (gbrt, Rust/raylib) -- pygame wurde
+# entfernt. Die optionalen Editoren (Code/Sprite/Tilemap/SFX/Tracker) sind
+# PySide6-basiert; die SFX-/Tracker-Audio-Vorschau nutzt sounddevice + soundfile.
+editors = ["PySide6>=6.5", "Pillow>=10", "numpy>=1.24", "sounddevice>=0.4", "soundfile>=0.12"]
 dev = ["pytest>=7"]
 # Hardware-Module (jeweils separat installierbar via `pip install gamebasic[serial]`)
 serial = ["pyserial>=3.5"]

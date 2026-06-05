@@ -2,7 +2,9 @@
 
 Erweitert die Basis-Sound-Built-ins (LOADSOUND/PLAYSOUND/STOPSOUND/PLAYMUSIC/
 STOPMUSIC) um Channel-Management, Pause/Resume/Fade, Music-Position und
-Tone-Generation. Nutzt pygame.mixer + numpy.
+Tone-Generation. Wiedergabe/Synthese laufen in der nativen Runtime (gbrt); im
+konsolen-only Tree-Walker werfen die Builtins eine klare "nur gbrt"-Meldung.
+Die reine Synth-Mathematik (gamebasic.synth, numpy) bleibt ueberall nutzbar.
 
 Kategorien:
 

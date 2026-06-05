@@ -27,7 +27,7 @@ gamebasic/
   compiler.py            # AST -> Bytecode (mit Type-Inference + Constant Folding)
   bytecode.py            # Opcodes
   serialize.py           # Bytecode <-> .gbc (Python schreibt, gbrt liest)
-  graphics.py            # Pygame-Wrapper, Camera, Z-Layer-System, Asset-Cache, Lazy-Init
+  graphics.py            # Konsolen-only Stub (pygame ENTFERNT): COLORS/KEYS + Kamera-Mathematik; Grafik/Audio nur nativ (gbrt)
   preprocess.py          # IMPORT-Auflösung (Source UND Built-in-Module)
   builtins_registry.py   # @builtin / @graphics_builtin Decorators
   modules/               # Built-in-Module (json, db, tween, imgfx, particles, camera, ecs, ...)
@@ -242,8 +242,8 @@ Tree-Walker ist nur noch Editor-/Referenzpfad, die Performance liegt in `gbrt`.
 `_GBArray` lebt jetzt als reine Python-Klasse inline in `interpreter.py`, die
 ECS-`_World`/`_Component` in `modules/ecs_py.py`. `setup.py` ist nur noch ein
 Hinweis-Stub. (Auch die frühere Cython-VM `vm_native.pyx` war schon entfernt;
-`gbrt` hat sie abgelöst. **pygame und alle Cython-Reste fallen perspektivisch
-komplett weg — kein neuer Cython-Code mehr.**)
+`gbrt` hat sie abgelöst. **pygame wurde ENTFERNT (Stufe A): Grafik/Audio laufen
+nur nativ in `gbrt`, der Tree-Walker ist konsolen-only. Kein neuer Cython-Code.**)
 
 **Native Rust-Module bauen** (PyO3-Helfer `gb_native`, separate Toolchain — `cargo` nötig):
 ```
@@ -282,9 +282,12 @@ skippt wenn `gbrt` nicht gebaut ist).
 
 ## Häufige Fallstricke
 
-- **Pygame-Banner:** unterdrückt via `PYGAME_HIDE_SUPPORT_PROMPT=hide` in
-  `graphics.py:_ensure_pygame`. Bei Tests die Pygame früh laden, ist das nötig
-  für `--bench`-Equivalence.
+- **pygame ENTFERNT (Stufe A):** Grafik/Audio laufen nur in der nativen Runtime
+  (gbrt). Der Tree-Walker (`interpreter.py`) ist konsolen-only — Grafik-/Audio-/
+  Bild-Builtins werfen eine klare „nur in der nativen Runtime (gbrt)"-Meldung
+  (`graphics.py`-Stub via `__getattr__`; Module imgfx/sprite/audio/particles via
+  `_native_only`). Konsolen-Programme + `CAMERA_*`-Mathematik laufen weiter. Die
+  Editoren (SFX/Tracker) nutzen `sounddevice`+`soundfile` statt pygame.mixer.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
 - **`_check_int` (strikt INTEGER) vs `_check_intish`** (akzeptiert num, konvertiert
@@ -1430,8 +1433,10 @@ Editor-/Referenzpfad — die Performance liegt vollständig in der nativen Runti
 | `_GBArray` | inline in `gamebasic/interpreter.py` | reine Python-Klasse (`array.array`-Backing für INTEGER/FLOAT, sonst Liste); Public-API unverändert (`element_type`/`dims`/`strides`/`values`/`total_size`/`flat_index`/`get_at`/`set_at`). |
 | `_World`, `_Component` | `gamebasic/modules/ecs_py.py` | reine Python (Sparse-Set + Bulk-System-Ops); `ecs.py` importiert von dort. |
 
-**pygame und alle Cython-Reste fallen perspektivisch komplett weg** — Python soll
-langfristig nur noch die Editoren bedienen, der Rest läuft in `gbrt`.
+**pygame ist ENTFERNT (Stufe A)** — Grafik/Audio laufen nur in `gbrt`, der
+Tree-Walker ist konsolen-only. Python bedient damit primär Editoren + Compiler/
+Toolchain; der Rest läuft in `gbrt`. (Tree-Walker + Python-Compiler selbst zu
+entfernen wäre eine separate „Stufe B".)
 
 ## Performance-Optimierungen im Compiler/VM
 

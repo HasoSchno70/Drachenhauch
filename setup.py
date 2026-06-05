@@ -8,8 +8,8 @@ liegt in der nativen Runtime `gbrt` (Rust). `_GBArray` (inline in
 jetzt als reine Python-Klassen.
 
 (Die noch fruehere Cython-VM `vm_native.pyx` wurde bereits davor entfernt --
-`gbrt` hat sie als Produktionspfad abgeloest. pygame und die restlichen
-Cython-Reste fallen perspektivisch ebenfalls weg.)
+`gbrt` hat sie als Produktionspfad abgeloest. pygame wurde ENTFERNT: Grafik/
+Audio laufen in der nativen Runtime `gbrt`; der Tree-Walker ist konsolen-only.)
 
 Zum Bauen der nativen Runtime: `.venv\\Scripts\\python.exe rust\\build_runtime.py`.
 """
