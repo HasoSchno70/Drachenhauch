@@ -13,6 +13,47 @@ use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
 use crate::value::{as_f64, is_num, value_eq, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
 
+/// Profiler-Sammler (Stufe B, Phase 3): pro Quell-Zeile Besuchs-Count +
+/// kumulierte Zeit. Spiegelt `editor_qt/profiler.py`: die Zeit zwischen zwei
+/// Zeilenwechseln wird der VORIGEN Zeile zugeschlagen (inkl. der von dort
+/// gerufenen Funktionen). Aggregation pro SUB/FUNCTION macht der Editor via
+/// `symbols.scan_scopes` -- gbrt liefert nur die rohen Zeilen-Daten.
+struct ProfileSink {
+    counts: HashMap<u32, u64>,
+    times: HashMap<u32, f64>,
+    last_line: u32,
+    last_t: std::time::Instant,
+    start: std::time::Instant,
+}
+
+impl ProfileSink {
+    fn new() -> Self {
+        let now = std::time::Instant::now();
+        ProfileSink { counts: HashMap::new(), times: HashMap::new(),
+                      last_line: 0, last_t: now, start: now }
+    }
+    /// Bei jedem Zeilenwechsel aufrufen (`line` = neue Zeile, != 0).
+    fn tick(&mut self, line: u32) {
+        let now = std::time::Instant::now();
+        if self.last_line != 0 {
+            *self.times.entry(self.last_line).or_insert(0.0) +=
+                now.duration_since(self.last_t).as_secs_f64();
+        }
+        *self.counts.entry(line).or_insert(0) += 1;
+        self.last_line = line;
+        self.last_t = now;
+    }
+    /// Restzeit der letzten Zeile verbuchen, Gesamtzeit liefern.
+    fn finalize(&mut self) -> f64 {
+        let now = std::time::Instant::now();
+        if self.last_line != 0 {
+            *self.times.entry(self.last_line).or_insert(0.0) +=
+                now.duration_since(self.last_t).as_secs_f64();
+        }
+        now.duration_since(self.start).as_secs_f64()
+    }
+}
+
 /// Ergebnis eines Frame-Laufs: entweder Rueckgabe (Funktion/Coroutine fertig)
 /// oder Suspendierung an einem YIELD (nur in Coroutinen).
 enum Step {
@@ -265,6 +306,8 @@ pub struct Vm<'p> {
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
     cur_line: u32,
+    // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
+    prof: Option<ProfileSink>,
     #[cfg(feature = "graphics")]
     gfx: Option<crate::graphics::Graphics>,
     // Audio-Geraet (lazy bei erstem LOADSOUND/PLAYSOUND/PLAYMUSIC initialisiert).
@@ -331,6 +374,7 @@ impl<'p> Vm<'p> {
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
             cur_line: 0,
+            prof: None,
             #[cfg(feature = "graphics")]
             gfx: None,
             #[cfg(feature = "graphics")]
@@ -385,6 +429,27 @@ impl<'p> Vm<'p> {
 
     pub fn take_output(self) -> String {
         self.out
+    }
+
+    /// Profiling fuer den naechsten `run()` aktivieren (Stufe B, `gbrt profile`).
+    pub fn enable_profiler(&mut self) {
+        self.prof = Some(ProfileSink::new());
+    }
+
+    /// Profiler-Ergebnis abholen: Gesamtzeit + pro Zeile (count, time_secs).
+    /// Leer, wenn kein Profiling aktiv war.
+    pub fn take_profile(&mut self) -> (f64, Vec<(u32, u64, f64)>) {
+        match self.prof.take() {
+            None => (0.0, Vec::new()),
+            Some(mut p) => {
+                let total = p.finalize();
+                let mut lines: Vec<(u32, u64, f64)> = p.counts.iter()
+                    .map(|(&ln, &c)| (ln, c, *p.times.get(&ln).unwrap_or(&0.0)))
+                    .collect();
+                lines.sort_by_key(|&(ln, _, _)| ln);
+                (total, lines)
+            }
+        }
     }
 
     // ---------------------------------------------------------------- OOP
@@ -712,7 +777,15 @@ impl<'p> Vm<'p> {
             // bleibt die innerste Zeile stehen (sie lief zuletzt).
             if let Some(ln) = fn_.lines.get(*ip) {
                 if *ln != 0 {
+                    let changed = self.cur_line != *ln;
                     self.cur_line = *ln;
+                    // Instrumentierungs-Hook (Stufe B): nur bei Zeilenwechsel und
+                    // nur wenn ein Sink installiert ist (sonst null Overhead).
+                    if changed {
+                        if let Some(p) = self.prof.as_mut() {
+                            p.tick(self.cur_line);
+                        }
+                    }
                 }
             }
             *ip += 1;

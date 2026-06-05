@@ -112,6 +112,12 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "run" {
             return run_main(&raw[2]);
         }
+        // Stufe B (Phase 3): `gbrt profile datei.gb` -- instrumentierter Lauf,
+        // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
+        // Scope via symbols.scan_scopes). Ersetzt den Tree-Walker-Profiler.
+        if raw.len() >= 3 && raw[1] == "profile" {
+            return profile_main(&raw[2]);
+        }
         // Selbst-Export: `gbrt --export datei.gb [out_dir]` buendelt das
         // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
         if raw.len() >= 3 && raw[1] == "--export" {
@@ -260,6 +266,48 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         Ok(j) => Ok(j),
         Err(e) => { eprintln!("{}: Compile-Fehler: {}", label, e); Err(ExitCode::from(3)) }
     }
+}
+
+/// `gbrt profile <datei.gb>` -- fuehrt das Programm instrumentiert aus und gibt
+/// einen JSON-Blob `{total_time, output, lines:[{line,count,time}], stopped}` auf
+/// stdout aus. Programm-Output landet im `output`-Feld (kein stdout-Konflikt);
+/// Laufzeitfehler kommen als `error`/`error_line` mit ins JSON. Exit 0 (der Editor
+/// parst das JSON). chdir ins Datei-Verzeichnis wie `run`.
+fn profile_main(path: &str) -> ExitCode {
+    let abs = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
+    let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
+    let raw_source = match std::fs::read_to_string(&abs) {
+        Ok(t) => t,
+        Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
+    };
+    let _ = std::env::set_current_dir(&base);
+    let json = match compile_source(&raw_source, &base, &label) {
+        Ok(j) => j,
+        Err(code) => return code,
+    };
+    let prog = match model::load_program(&json) {
+        Ok(p) => p,
+        Err(e) => { eprintln!("Lade-Fehler: {}", e); return ExitCode::from(1); }
+    };
+    let mut machine = vm::Vm::new(&prog);
+    machine.enable_profiler();
+    let run_res = machine.run();
+    let (total, lines) = machine.take_profile();
+    let err_line = machine.error_line();
+    let output = machine.take_output();
+    let lines_json: Vec<serde_json::Value> = lines.iter()
+        .map(|&(ln, c, t)| serde_json::json!({"line": ln, "count": c, "time": t}))
+        .collect();
+    let mut blob = serde_json::json!({
+        "total_time": total, "output": output, "lines": lines_json, "stopped": false
+    });
+    if let Err(e) = &run_res {
+        blob["error"] = serde_json::json!(e);
+        blob["error_line"] = serde_json::json!(err_line);
+    }
+    println!("{}", serde_json::to_string(&blob).unwrap_or_else(|_| "{}".into()));
+    ExitCode::SUCCESS
 }
 
 /// `gbrt --check <datei.gb>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
