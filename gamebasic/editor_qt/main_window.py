@@ -1264,9 +1264,8 @@ class GameBasicEditor(QMainWindow):
         st = self.tabs.active
         if st is None or st.file_path is None:
             return
+        import subprocess
         from .output_console import _find_gbrt
-        from gamebasic.export import export_standalone
-        from gamebasic.errors import GameBasicError
         from PySide6.QtGui import QGuiApplication, QDesktopServices
         from PySide6.QtCore import QUrl, Qt
 
@@ -1277,24 +1276,35 @@ class GameBasicEditor(QMainWindow):
                 "  .venv\\Scripts\\python.exe rust\\build_runtime.py\n", "error")
             self.statusBar().showMessage("Export: gbrt fehlt", 4000)
             return
+        # gbrts EIGENER Selbst-Export (Rust-Frontend kompiliert die Quelle, haengt
+        # den Payload an eine Kopie der Exe, kopiert assets/). KEIN Python-Compiler
+        # -> auch gbrt-only-Builtins exportieren.
         self.console.append(f"⚙ Exportiere {st.file_path.name} ...\n", "info")
         QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            exe = export_standalone(st.file_path, gbrt)
-        except GameBasicError as exc:
-            QGuiApplication.restoreOverrideCursor()
-            self.console.append(f"Compile-Fehler: {exc}\n", "error")
-            self.statusBar().showMessage("Export fehlgeschlagen", 4000)
-            return
-        except Exception as exc:  # noqa: BLE001 -- alle Fehler dem User zeigen
+            res = subprocess.run([str(gbrt), "--export", str(st.file_path)],
+                                 capture_output=True, text=True)
+        except OSError as exc:
             QGuiApplication.restoreOverrideCursor()
             self.console.append(f"Export-Fehler: {exc}\n", "error")
             self.statusBar().showMessage("Export fehlgeschlagen", 4000)
             return
         QGuiApplication.restoreOverrideCursor()
-        mb = exe.stat().st_size / (1024 * 1024)
+        out = (res.stdout or "") + (res.stderr or "")
+        if res.returncode != 0:
+            self.console.append(out.strip() + "\n", "error")
+            self.statusBar().showMessage("Export fehlgeschlagen", 4000)
+            return
+        # gbrt druckt "Exportiert: <pfad>"; sonst Default <stem>_dist/<stem>.exe.
+        exe = None
+        for line in out.splitlines():
+            if line.startswith("Exportiert:"):
+                exe = Path(line.split(":", 1)[1].strip())
+        if exe is None:
+            stem = st.file_path.stem
+            exe = st.file_path.parent / f"{stem}_dist" / f"{stem}.exe"
         self.console.append(
-            f"✓ Standalone-Export: {exe}  ({mb:.1f} MB)\n"
+            f"✓ Standalone-Export: {exe}\n"
             f"  Ordner '{exe.parent.name}' weitergeben -- laeuft ohne Python.\n", "info")
         self.statusBar().showMessage(f"Exportiert: {exe.name}", 5000)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(exe.parent)))

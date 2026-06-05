@@ -393,52 +393,32 @@ class OutputConsole(QWidget):
         return None
 
     def _start_native(self, file_path: Path, gbrt: Path) -> bool:
-        """Kompiliert die Datei nach `.gbc` (Python) und fuehrt sie mit der
-        nativen Runtime `gbrt` aus -- direkt als QProcess, damit der Stop-Button
-        gbrt selbst beendet (kein verwaister Prozess wie bei gbrun.py --native).
-        KEIN Clear / keine gbrt-Suche (macht der Aufrufer). False bei Compile-
-        oder Start-Fehler.
+        """Fuehrt die Datei mit `gbrt run` aus -- gbrts EIGENES Rust-Frontend
+        (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr. So laufen
+        auch gbrt-only-Builtins (die der Python-Compiler nicht kennt). Direkt als
+        QProcess, damit der Stop-Button gbrt selbst beendet. KEIN Clear / keine
+        gbrt-Suche (macht der Aufrufer). False bei Start-Fehler.
 
-        Der Quell-Dateiname wird als 2. Arg an gbrt durchgereicht, sodass
-        Laufzeitfehler `datei.gb:Zeile` zeigen. Arbeitsverzeichnis ist der
-        Ordner der Quelldatei (relative Asset-Pfade)."""
-        # In temporaere .gbc kompilieren (Compile-Fehler sauber melden).
-        import tempfile
-        from gamebasic.errors import GameBasicError
-        fd, tmp = tempfile.mkstemp(suffix=".gbc")
-        os.close(fd)
-        tmp_path = Path(tmp)
-        # Schon vor dem Kompilieren setzen, damit der `[Zeile N]`-Link einer
-        # Compile-Fehlermeldung auf diese Datei springt (statt ins Leere).
+        gbrt wechselt selbst ins Datei-Verzeichnis (relative Assets) und nutzt den
+        Dateinamen fuer Fehler-Labels -- Compile- UND Laufzeitfehler erscheinen als
+        `datei.gb:Zeile`, sodass der Editor sie klickbar macht."""
+        # Vor dem Start setzen, damit der `datei.gb:Zeile`-Link auf diese Datei
+        # springt (gilt auch fuer gbrt-Compile-Fehler).
         self._current_run_file = file_path
         self.append(f"▶ Nativ (gbrt): {file_path.name}\n\n", "info")
-        try:
-            from gamebasic.serialize import compile_file_to_gbc
-            compile_file_to_gbc(file_path, tmp_path)
-        except GameBasicError as exc:
-            self.append(f"Compile-Fehler in {file_path.name}:\n  {exc}\n", "error")
-            tmp_path.unlink(missing_ok=True)
-            return False
-        except Exception as exc:  # pragma: no cover - defensiv
-            self.append(f"Compile-Fehler in {file_path.name}:\n  {exc}\n", "error")
-            tmp_path.unlink(missing_ok=True)
-            return False
-
         self._user_stopped = False
-        self._native_gbc = tmp_path
+        self._native_gbc = None
 
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        # Arbeitsverzeichnis = Quell-Ordner, damit LOADIMAGE("assets/...") greift.
+        # Arbeitsverzeichnis = Quell-Ordner (gbrt chdir't ohnehin selbst dorthin).
         proc.setWorkingDirectory(str(file_path.parent))
         proc.readyReadStandardOutput.connect(self._on_stdout)
         proc.finished.connect(self._on_finished)
         proc.errorOccurred.connect(self._on_error)
-        proc.start(str(gbrt), [str(tmp_path), file_path.name])
+        proc.start(str(gbrt), ["run", str(file_path)])
         if not proc.waitForStarted(3000):
             self.append("Konnte gbrt nicht starten.\n", "error")
-            tmp_path.unlink(missing_ok=True)
-            self._native_gbc = None
             return False
         self._proc = proc
         self.input_entry.setEnabled(True)

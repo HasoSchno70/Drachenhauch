@@ -249,15 +249,15 @@ def _find_gbrt():
 
 
 def _run_native(abs_path, path):
-    """Kompiliert die `.gb`-Datei nach `.gbc` und fuehrt sie mit `gbrt` aus.
+    """Fuehrt die `.gb`-Datei mit `gbrt run` aus -- gbrts EIGENES Rust-Frontend
+    (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr.
 
-    Der Compiler laeuft weiter in Python (Lexer/Parser/Compiler bleiben dort);
-    `gbrt` uebernimmt nur die Ausfuehrung. stdout/stderr und ein etwaiges
-    Grafik-Fenster werden direkt durchgereicht. Rueckgabe = Exit-Code von gbrt
-    (bzw. 2 bei Compile-Fehler, 3 wenn gbrt fehlt)."""
+    So laufen auch gbrt-only-Builtins (die der Python-Compiler nicht kennt). gbrt
+    wechselt selbst ins Verzeichnis der Datei (relative Assets) und nutzt den
+    Dateinamen fuer Fehler-Labels (`datei.gb:Zeile`). stdout/stderr + ein etwaiges
+    Grafik-Fenster werden durchgereicht. Rueckgabe = Exit-Code von gbrt
+    (bzw. 3 wenn gbrt fehlt)."""
     import subprocess
-    import tempfile
-    from gamebasic.serialize import compile_file_to_gbc
 
     gbrt = _find_gbrt()
     if gbrt is None:
@@ -265,39 +265,23 @@ def _run_native(abs_path, path):
         print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
         print("(ohne Grafik: rust\\build_runtime.py --no-graphics)")
         return 3
-
-    # In eine temporaere .gbc kompilieren (neben der Quelle waere auch ok,
-    # aber temp haelt das Projektverzeichnis sauber).
-    fd, tmp = tempfile.mkstemp(suffix=".gbc")
-    os.close(fd)
     try:
-        try:
-            compile_file_to_gbc(abs_path, tmp)
-        except GameBasicError as e:
-            print(f"Compile-Fehler in {path.name}:")
-            print(f"  {e}")
-            return 2
-        # gbrt im Verzeichnis der Quelldatei ausfuehren (relative Assets),
-        # stdout/stderr erben -> Live-Ausgabe + Fenster. Der Quell-Dateiname
-        # wird als 2. Arg durchgereicht -> Laufzeitfehler zeigen datei.gb:Zeile.
-        try:
-            result = subprocess.run([str(gbrt), tmp, path.name],
-                                    cwd=str(abs_path.parent))
-        except OSError as e:
-            print(f"Konnte gbrt nicht starten: {e}")
-            return 3
-        return result.returncode
-    finally:
-        try:
-            os.unlink(tmp)
-        except OSError:
-            pass
+        result = subprocess.run([str(gbrt), "run", str(abs_path)])
+    except OSError as e:
+        print(f"Konnte gbrt nicht starten: {e}")
+        return 3
+    return result.returncode
 
 
 def _run_export(src, out_dir):
-    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe (gbrt + Bytecode + Assets).
+    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe via `gbrt --export` --
+    gbrts EIGENER Selbst-Export (kompiliert die Quelle mit dem Rust-Frontend,
+    haengt den Payload an eine Kopie der Exe, kopiert `assets/`). KEIN Python-
+    Compiler -> auch gbrt-only-Builtins exportieren.
 
-    Rueckgabe: 0 ok, 1 Quelle fehlt, 2 Compile-Fehler, 3 Runtime fehlt."""
+    Rueckgabe: 0 ok, 1 Quelle fehlt, 3 Runtime fehlt, sonst gbrt-Exit-Code."""
+    import subprocess
+
     src = Path(src)
     if not src.exists():
         print(f"Datei nicht gefunden: {src}")
@@ -307,18 +291,17 @@ def _run_export(src, out_dir):
         print("Native Runtime 'gbrt' nicht gefunden. Einmalig bauen mit:")
         print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
         return 3
-    from gamebasic.export import export_standalone
+    args = [str(gbrt), "--export", str(src.resolve())]
+    if out_dir:
+        args.append(str(out_dir))
     try:
-        exe = export_standalone(src, gbrt, out_dir=out_dir)
-    except GameBasicError as e:
-        print(f"Compile-Fehler in {src.name}:")
-        print(f"  {e}")
-        return 2
-    size_mb = exe.stat().st_size / (1024 * 1024)
-    print(f"Standalone-Export erstellt: {exe}  ({size_mb:.1f} MB)")
-    print(f"  -> laeuft ohne Python; Ordner '{exe.parent.name}' weitergeben.")
-    print("  Assets-Konvention: Dateien unter 'assets/' werden mitkopiert.")
-    return 0
+        result = subprocess.run(args)   # gbrt druckt "Exportiert: <pfad>"
+    except OSError as e:
+        print(f"Konnte gbrt nicht starten: {e}")
+        return 3
+    if result.returncode == 0:
+        print("  -> laeuft ohne Python. Assets-Konvention: 'assets/' wird mitkopiert.")
+    return result.returncode
 
 
 def _bench(ast, path):

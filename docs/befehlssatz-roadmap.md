@@ -67,12 +67,13 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 - [x] **`SORT(arr, …)`** mit Descending-`BOOL` (builtins.rs) + FUNCREF-Comparator
       (vm.rs `sort_with_comparator`, stabil, cmp(a,b)→INT).
 
-> **⚠ Folge-Schritt (offen):** Diese gbrt-only-Builtins laufen NICHT über die
-> Python-Toolchain (`gbrun.py --native`/`--export`, Editor-F5/F6 nutzen
-> `compiler.py`, das sie als User-Calls fehlkompiliert) — nur über gbrts eigenes
-> Rust-Frontend (`gbrt run`/`--runsrc`/`gbrt --export`). Damit der Editor/`gbrun`
-> sie nutzen kann, muss der Run-/Export-Pfad auf gbrts Rust-Frontend umgestellt
-> werden.
+> **✅ Folge-Schritt erledigt (2026-06-05):** Run-/Export-Pfad auf gbrts Rust-
+> Frontend umgestellt. `gbrun.py --native` → `gbrt run`, `gbrun.py --export` →
+> `gbrt --export`, Editor-Run (`output_console._start_native`) → `gbrt run`,
+> Editor-Export (`main_window._export_active`) → `gbrt --export`. Damit laufen die
+> gbrt-only-Builtins überall (verifiziert: `gbrun.py --native`/`--export` + die
+> exportierte .exe). gbrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
+> (Editor-klickbar). Python-Compiler nur noch für Bench/Tests.
 
 ## WP2 — Spiel-Quickwins (✅ ERLEDIGT 2026-06-05, nativ in beiden Pfaden)
 - [x] **`MOUSEWHEEL` exponieren** — Builtin in beiden Pfaden (Backend war da:

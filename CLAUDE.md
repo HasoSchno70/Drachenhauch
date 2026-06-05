@@ -62,6 +62,18 @@ Source.gb  →  preprocess.process()  →  Lexer  →  Parser  →  AST
 Asset-Pfade). `py -m gamebasic` funktioniert auch, wechselt aber nicht ins
 Datei-Verzeichnis — Programme mit `LOADIMAGE("assets/...")` brauchen `gbrun.py`.
 
+> **Run-/Export-Pfad läuft über gbrts EIGENES Rust-Frontend (seit 2026-06-05).**
+> `gbrun.py --native` ruft `gbrt run datei.gb`, `gbrun.py --export` ruft
+> `gbrt --export`, und der **Editor-Run/-Export** (output_console `_start_native`,
+> main_window `_export_active`) ebenso. Der **Python-Compiler** (`compiler.py`)
+> ist damit NICHT mehr auf dem Run-Pfad — nötig, weil **gbrt-only-Builtins**
+> (neue Builtins werden nur noch in gbrt implementiert, nicht im Tree-Walker) im
+> Python-Registry fehlen und der Python-Compiler sie als User-Calls
+> fehlkompilieren würde. Output-Parität deckt der Front-End-Port ab. Der
+> Tree-Walker (`interpreter.py`) bleibt Editor-Fallback (F5 ohne gebautes gbrt) +
+> Bench-Referenz, kennt aber keine gbrt-only-Builtins. `compile_file_to_gbc` /
+> `export.py` (Python) bleiben für Bench/Tests, sind aber nicht mehr der Run-Weg.
+
 ## Built-ins erweitern (innerhalb interpreter.py)
 
 ```python

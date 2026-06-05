@@ -221,29 +221,31 @@ fn preprocess_main(path: &str) -> ExitCode {
 /// Compiler. `base` = Verzeichnis fuer relative IMPORT-Pfade. Liefert das
 /// `.gbc`-JSON oder einen Exit-Code (Fehler bereits auf stderr gemeldet).
 /// Geteilt von `--runsrc`, `run` und `--export`.
-fn compile_source(raw_source: &str, base: &std::path::Path) -> Result<serde_json::Value, ExitCode> {
+fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Result<serde_json::Value, ExitCode> {
+    // Fehler-Format `<label>:<zeile>: <msg>` -- so erkennt der Editor (Pattern
+    // `(\S+\.gb):(\d+)`) die Zeile und macht sie klickbar (wie bei Laufzeitfehlern).
     let (source, imports) = match preprocess::process(raw_source, base) {
         Ok(r) => r,
-        Err(e) => { eprintln!("Preprocess {}: {}", e.line, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
     };
     let (ext_types, aliases) = preprocess::compile_env(&imports);
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
-        Err(e) => { eprintln!("Lexer {}:{}: {}", e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}:{}: Lexer-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     let ast = match parser::Parser::new(toks).parse() {
         Ok(a) => a,
-        Err(e) => { eprintln!("Parse {}:{}: {}", e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
+        Err(e) => { eprintln!("{}:{}: Parse-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
         Ok(j) => Ok(j),
-        Err(e) => { eprintln!("Compile: {}", e); Err(ExitCode::from(3)) }
+        Err(e) => { eprintln!("{}: Compile-Fehler: {}", label, e); Err(ExitCode::from(3)) }
     }
 }
 
 /// Front-End-Kette + Ausfuehrung. `label` = Quell-Label fuer Laufzeitfehler.
 fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str) -> ExitCode {
-    match compile_source(raw_source, base) {
+    match compile_source(raw_source, base, label) {
         Ok(json) => run_program_value(json, label),
         Err(code) => code,
     }
@@ -315,7 +317,9 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
     // 1) Quelltext -> .gbc-JSON (kompakt).
-    let json = match compile_source(&raw_source, &base) {
+    let label = abs.file_name().map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.to_string());
+    let json = match compile_source(&raw_source, &base, &label) {
         Ok(j) => j,
         Err(code) => return code,
     };
