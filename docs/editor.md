@@ -280,6 +280,10 @@ Bei sehr langen Dateien (> 8000 Zeilen) wird die Auflösung automatisch reduzier
 
 Per `CodeEditor.set_minimap_visible(False)` lässt sich die Minimap programmatisch ausblenden — sie wird komplett aus dem Layout entfernt, der Editor bekommt dann den freigewordenen Platz.
 
+## Split-Editor-View
+
+`Ansicht → Editor teilen` (**`Strg+\`**) öffnet einen **zweiten Editor-View neben dem aktuellen**, der dasselbe Dokument teilt: Edits und Syntax-Highlighting laufen synchron, aber jeder View hat **eigenen Cursor und eigene Scroll-Position**. Praktisch, um zwei weit auseinanderliegende Stellen derselben Datei gleichzeitig zu sehen (z. B. eine Funktionsdefinition oben und ihre Verwendung unten). Nochmal `Strg+\` schließt den zweiten View wieder. Der Split gehört zum jeweiligen Tab — beim Tab-Wechsel spiegelt der Menüeintrag den Zustand des aktiven Tabs.
+
 ## Multi-Cursor
 
 Mehrere Caret-Positionen gleichzeitig — für parallele Edits:

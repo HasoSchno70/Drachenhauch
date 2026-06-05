@@ -539,6 +539,12 @@ class GameBasicEditor(QMainWindow):
         self.act_toggle_blame.toggled.connect(
             lambda on: self.blame_dock.setVisible(on))
 
+        # Split-Editor-View (zweiter, synchronisierter Editor desselben Tabs)
+        self.act_split_editor = QAction("Editor teilen", self)
+        self.act_split_editor.setCheckable(True)
+        self.act_split_editor.setShortcut(QKeySequence("Ctrl+\\"))
+        self.act_split_editor.toggled.connect(self._on_toggle_split)
+
         # Bookmarks
         self.act_bookmark_toggle = QAction("Bookmark setzen/entfernen", self)
         self.act_bookmark_toggle.setShortcut(QKeySequence("Ctrl+F2"))
@@ -641,6 +647,7 @@ class GameBasicEditor(QMainWindow):
         m_view.addAction(self.act_toggle_wrap)
         m_view.addAction(self.act_toggle_todo)
         m_view.addAction(self.act_toggle_blame)
+        m_view.addAction(self.act_split_editor)
         m_view.addAction(self.act_fold)
         m_view.addAction(self.act_unfold_all)
         m_view.addAction(self.act_theme)
@@ -1965,6 +1972,19 @@ class GameBasicEditor(QMainWindow):
         self.sidebar_stack.setVisible(visible)
 
     # ----------------------------------------------------- Misc
+    def _on_toggle_split(self, _checked: bool = False) -> None:
+        st = self.tabs.active
+        if st is None:
+            self.act_split_editor.blockSignals(True)
+            self.act_split_editor.setChecked(False)
+            self.act_split_editor.blockSignals(False)
+            return
+        is_split = self.tabs.toggle_split(st)
+        # Checkbox an den tatsaechlichen Zustand angleichen (ohne Re-Trigger).
+        self.act_split_editor.blockSignals(True)
+        self.act_split_editor.setChecked(is_split)
+        self.act_split_editor.blockSignals(False)
+
     def _on_active_tab_changed(self, st: TabState | None) -> None:
         if st is None:
             self.setWindowTitle("GameBasic Editor")
@@ -1975,6 +1995,10 @@ class GameBasicEditor(QMainWindow):
         name = st.file_path.name if st.file_path else "(neu)"
         self.setWindowTitle(f"{name} -- GameBasic Editor")
         self.file_browser.mark_active(st.file_path)
+        # Split-Action an den Zustand des neuen Tabs angleichen.
+        self.act_split_editor.blockSignals(True)
+        self.act_split_editor.setChecked(st.split_editor is not None)
+        self.act_split_editor.blockSignals(False)
         self._update_status()
         self._refresh_outline()
         if self.blame_dock.isVisible():

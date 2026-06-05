@@ -13,7 +13,7 @@ from typing import Optional
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QAction, QColor, QMouseEvent
 from PySide6.QtWidgets import (
-    QHBoxLayout, QMenu, QTabBar, QTabWidget, QToolButton, QWidget,
+    QHBoxLayout, QMenu, QSplitter, QTabBar, QTabWidget, QToolButton, QWidget,
 )
 
 from .code_editor import CodeEditor
@@ -28,6 +28,9 @@ class TabState:
     editor: CodeEditor
     pane: QWidget        # Wrapper-Widget mit Editor + Minimap
     minimap: Minimap
+    # Split-View: ein zweiter Editor, der dasselbe QTextDocument teilt.
+    editor_split: Optional[QSplitter] = None     # haelt Primaer + ggf. Sekundaer
+    split_editor: Optional[CodeEditor] = None    # None = kein Split
 
 
 class _TabBarMiddleClose(QTabBar):
@@ -123,16 +126,20 @@ class TabbedEditorArea(QTabWidget):
         editor = CodeEditor()
         if content is not None:
             editor.set_text(content)
-        # Pane: Editor + Minimap nebeneinander.
+        # Pane: [Editor (+ optionaler Split-Editor)] + Minimap nebeneinander.
         pane = QWidget()
         pl = QHBoxLayout(pane)
         pl.setContentsMargins(0, 0, 0, 0)
         pl.setSpacing(0)
-        pl.addWidget(editor, 1)
+        editor_split = QSplitter(Qt.Orientation.Horizontal)
+        editor_split.setChildrenCollapsible(False)
+        editor_split.addWidget(editor)
+        pl.addWidget(editor_split, 1)
         minimap = Minimap(editor, pane)
         pl.addWidget(minimap, 0)
 
-        st = TabState(file_path=file_path, editor=editor, pane=pane, minimap=minimap)
+        st = TabState(file_path=file_path, editor=editor, pane=pane,
+                      minimap=minimap, editor_split=editor_split)
         self._states.append(st)
 
         editor.document().modificationChanged.connect(
@@ -171,6 +178,40 @@ class TabbedEditorArea(QTabWidget):
         idx = self._states.index(st)
         self._states.pop(idx)
         self.removeTab(idx)
+
+    def toggle_split(self, st: TabState | None = None) -> bool:
+        """Schaltet den Split-View des Tabs um: ein zweiter Editor, der dasselbe
+        `QTextDocument` teilt (Edits + Syntax-Highlighting synchron, eigene
+        Cursor/Scroll-Position). Liefert True, wenn danach gesplittet ist."""
+        if st is None:
+            st = self.active
+        if st is None or st.editor_split is None:
+            return False
+        if st.split_editor is not None:
+            st.split_editor.setParent(None)
+            st.split_editor.deleteLater()
+            st.split_editor = None
+            return False
+        ed2 = CodeEditor()
+        # Dasselbe Dokument teilen -> Inhalt synchron. Das Highlighting kommt
+        # vom Primaer-Highlighter (auf den Block-Formaten gespeichert), daher
+        # zeigt auch der zweite View es ohne eigenen Highlighter.
+        ed2.setDocument(st.editor.document())
+        # Sekundaer schlank halten (kein doppelter Completer/Error-Check).
+        ed2._auto_complete_enabled = False
+        try:
+            ed2._error_timer.stop()
+            ed2.textChanged.disconnect(ed2._error_timer.start)
+        except (RuntimeError, TypeError):
+            pass
+        # Run/Save-Signale des Split-Editors an dieselben Slots haengen.
+        ed2.save_requested.connect(self.save_requested)
+        ed2.run_requested.connect(self.run_requested)
+        st.split_editor = ed2
+        st.editor_split.addWidget(ed2)
+        st.editor_split.setSizes([10_000, 10_000])
+        ed2.setFocus()
+        return True
 
     def mark_clean(self, st: TabState) -> None:
         st.editor.document().setModified(False)
