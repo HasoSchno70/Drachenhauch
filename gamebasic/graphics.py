@@ -750,8 +750,9 @@ class Graphics:
     #     das pygame ohne echte Implementierung nicht erzeugen kann).
     def _native_gfx_only(self, name):
         raise GBRuntimeError(
-            f"{name}: nur in der nativen Runtime (gbrt) -- mit F6 bzw. "
-            f"'gbrun.py --native' ausfuehren (nicht F5/Tree-Walker)")
+            f"{name}: nur in der nativen Runtime (gbrt). Ueber den Run-Button "
+            f"(F5) bzw. 'gbrun.py --native' starten; Profiler/Debugger "
+            f"(Tree-Walker) unterstuetzen es nicht.")
 
     def gen_tex_perlin(self, *a):   self._native_gfx_only("GENTEX_PERLIN")
     def gen_tex_gradient(self, *a): self._native_gfx_only("GENTEX_GRADIENT")

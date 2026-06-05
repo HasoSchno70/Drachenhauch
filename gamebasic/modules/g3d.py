@@ -38,8 +38,9 @@ from ..errors import GBRuntimeError
 
 def _native_only(name: str):
     raise GBRuntimeError(
-        f"{name}: 3D wird nur von der nativen Runtime unterstuetzt -- mit F6 "
-        f"bzw. 'gbrun.py --native' ausfuehren (nicht F5/Tree-Walker)")
+        f"{name}: 3D laeuft nur in der nativen Runtime (gbrt). Ueber den "
+        f"Run-Button (F5) bzw. 'gbrun.py --native' starten -- der nutzt gbrt. "
+        f"Profiler/Debugger laufen im Tree-Walker (Python) und koennen kein 3D.")
 
 
 @graphics_builtin("CAMERA3D", arity=7)

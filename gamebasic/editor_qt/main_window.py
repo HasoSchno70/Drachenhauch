@@ -1469,10 +1469,24 @@ class GameBasicEditor(QMainWindow):
         self.statusBar().showMessage(f"Profiler fertig: {ms:.1f} ms", 5000)
 
     def _on_profile_failed(self, message: str, editor_line: int) -> None:
-        self.profile_panel.set_status("Fehler")
+        self.profile_panel.set_status("nicht messbar")
         loc = f" (Zeile {editor_line})" if editor_line and editor_line > 0 else ""
-        self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
-        self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
+        # Programme, die die native Runtime brauchen (3D / native-only Builtins),
+        # kann der Tree-Walker-Profiler nicht messen -> klare Erklaerung statt
+        # rohem Laufzeitfehler.
+        if "nativen Runtime" in message or "native Runtime" in message:
+            self.console.append(
+                f"\nⓘ Profiler{loc}: Dieses Programm braucht die native Runtime "
+                f"(gbrt) und kann nicht im Tree-Walker gemessen werden.\n"
+                f"   {message}\n"
+                f"   → Zum Ausfuehren den Run-Button (F5) nutzen; der Profiler "
+                f"misst nur Tree-Walker-faehige (Konsolen-/Logik-)Programme.\n",
+                "muted")
+            self.statusBar().showMessage(
+                "Profiler: Programm braucht die native Runtime (nicht messbar)", 6000)
+        else:
+            self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
+            self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
 
     def _setup_blame_panel(self) -> None:
         from PySide6.QtWidgets import QDockWidget
