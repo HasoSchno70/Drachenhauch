@@ -84,3 +84,20 @@ def test_error_propagates():
     # Laufzeitfehler (Division durch 0) soll als GameBasicError hochkommen.
     with pytest.raises(GameBasicError):
         run_profile("DIM x AS INTEGER\nx = 1 \\ 0\n", ".")
+
+
+def test_chdir_to_base_path_for_relative_assets(tmp_path):
+    """Der Profiler wechselt ins Datei-Verzeichnis (wie gbrun.py), damit
+    relative Laufzeit-Pfade funktionieren -- und stellt das cwd wieder her."""
+    import os
+    (tmp_path / "data.txt").write_text("hallo\n", encoding="utf-8")
+    src = (
+        'DIM f AS FILE\n'
+        'f = OpenFile("data.txt", "r")\n'
+        'PRINT ReadLine(f)\n'
+        'CloseFile(f)\n'
+    )
+    cwd_before = os.getcwd()
+    r = run_profile(src, tmp_path)            # base_path != cwd
+    assert r.output.strip() == "hallo"        # relativer Pfad gefunden
+    assert os.getcwd() == cwd_before          # cwd wiederhergestellt

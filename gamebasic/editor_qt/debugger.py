@@ -102,6 +102,7 @@ class DebugController(QObject):
         self._breakpoints: set[int] = set()    # Editor-Zeilen (1-basiert)
         self._merged_bps: set[int] = set()     # merged-Zeilen
         self._origins = None
+        self._base_path = "."                  # Datei-Verzeichnis fuer Asset-Pfade
         self._mode = "idle"                    # idle | running | paused
         self._step: str | None = None          # None | over | into | out
         self._step_depth = 0
@@ -145,6 +146,7 @@ class DebugController(QObject):
             return False
 
         self._origins = origins
+        self._base_path = str(base_path)
         self._recompute_merged_bps()
         interp = Interpreter()
         interp._debug_hook = self._hook
@@ -164,11 +166,19 @@ class DebugController(QObject):
         return True
 
     def _run(self, ast) -> None:
+        import os
         import sys
         from ..errors import GameBasicError
         old_out, old_in = sys.stdout, sys.stdin
         sys.stdout = _EmitWriter(self.output, old_out, threading.get_ident())
         sys.stdin = _EofReader()
+        # Ins Datei-Verzeichnis wechseln (wie gbrun.py), damit relative
+        # Laufzeit-Pfade (LOADIMAGE("assets/...")) im Debugger funktionieren.
+        old_cwd = os.getcwd()
+        try:
+            os.chdir(self._base_path)
+        except OSError:
+            pass
         reason = "fertig"
         try:
             self._interp.run(ast)
@@ -182,6 +192,7 @@ class DebugController(QObject):
             self.failed.emit(f"{type(exc).__name__}: {exc}", -1)
         finally:
             sys.stdout, sys.stdin = old_out, old_in
+            os.chdir(old_cwd)
             self._mode = "idle"
             self._interp = None
             self.finished.emit(reason)

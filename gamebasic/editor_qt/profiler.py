@@ -107,9 +107,17 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         def readline(self, *a): return ""
         def read(self, *a): return ""
 
+    import os
     import sys
     old_in = sys.stdin
     sys.stdin = _Eof()
+    # Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)),
+    # damit relative Laufzeit-Pfade wie LOADIMAGE("assets/...") funktionieren.
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(str(base_path))
+    except OSError:
+        pass
     t0 = perf()
     try:
         with contextlib.redirect_stdout(buf):
@@ -118,6 +126,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         result.stopped = True
     finally:
         sys.stdin = old_in
+        os.chdir(old_cwd)
         # Letzte Zeit-Delta der zuletzt aktiven Zeile zuschlagen.
         if state["last_el"] is not None and state["last_t"] is not None:
             times[state["last_el"]] = times.get(state["last_el"], 0.0) + (
