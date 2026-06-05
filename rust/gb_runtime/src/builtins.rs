@@ -920,6 +920,35 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "physics_ray_box" => { arity!(8); let v = nums(a, "PHYSICS_RAY_BOX")?; Ok(Value::Float(ray_box(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]))) }
         "physics_ray_circle" => { arity!(7); let v = nums(a, "PHYSICS_RAY_CIRCLE")?; Ok(Value::Float(ray_circle(v[0], v[1], v[2], v[3], v[4], v[5], v[6]))) }
 
+        // --- physics: Broadphase (PHYSICS_BROAD_*) ---
+        "physics_broad_new" => {
+            arity!(0);
+            Ok(Value::PhysicsBroad(Rc::new(RefCell::new(crate::physics::BroadPhase::new()))))
+        }
+        "physics_broad_clear" => { arity!(1); broad_h(&a[0], "PHYSICS_BROAD_CLEAR")?.borrow_mut().clear(); Ok(Value::Nil) }
+        "physics_broad_add" => {
+            arity!(4);
+            let b = broad_h(&a[0], "PHYSICS_BROAD_ADD")?;
+            let (x, y, r) = (need_num(&a[1], "PHYSICS_BROAD_ADD")?, need_num(&a[2], "PHYSICS_BROAD_ADD")?, need_num(&a[3], "PHYSICS_BROAD_ADD")?);
+            if r < 0.0 { return err("PHYSICS_BROAD_ADD: Radius muss >= 0 sein"); }
+            Ok(Value::Int(b.borrow_mut().add(x, y, r)))
+        }
+        "physics_broad_count" => { arity!(1); Ok(Value::Int(broad_h(&a[0], "PHYSICS_BROAD_COUNT")?.borrow().count())) }
+        "physics_broad_query" => { arity!(1); Ok(Value::Int(broad_h(&a[0], "PHYSICS_BROAD_QUERY")?.borrow_mut().query())) }
+        "physics_broad_pair_count" => { arity!(1); Ok(Value::Int(broad_h(&a[0], "PHYSICS_BROAD_PAIR_COUNT")?.borrow().pair_count())) }
+        "physics_broad_pair_a" | "physics_broad_pair_b" => {
+            arity!(2);
+            let fn_ = if name == "physics_broad_pair_a" { "PHYSICS_BROAD_PAIR_A" } else { "PHYSICS_BROAD_PAIR_B" };
+            let b = broad_h(&a[0], fn_)?;
+            let b = b.borrow();
+            let i = need_int(&a[1], fn_)?;
+            let pc = b.pair_count();
+            if i < 0 || i >= pc {
+                return err(format!("{}: Index {} ausserhalb [0..{}]", fn_, i, pc - 1));
+            }
+            Ok(Value::Int(if name == "physics_broad_pair_a" { b.pair_a(i as usize) } else { b.pair_b(i as usize) }))
+        }
+
         // ===== Modul: sprite (ohne SPRITE_DRAW -> das ist Grafik, in vm.rs) =====
         "sprite_new" => {
             arity!(3);
@@ -1768,6 +1797,10 @@ fn rng_randint(a: i32, b: i32) -> i32 {
 
 fn astar_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::astar::AStarGrid>>, String> {
     match v { Value::AStar(g) => Ok(g), _ => Err(format!("{} erwartet ASTAR_GRID", fn_)) }
+}
+
+fn broad_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics::BroadPhase>>, String> {
+    match v { Value::PhysicsBroad(b) => Ok(b), _ => Err(format!("{} erwartet PHYSICS_BROAD", fn_)) }
 }
 
 fn astar_xy(g: &crate::astar::AStarGrid, x: &Value, y: &Value, fn_: &str) -> Result<(), String> {

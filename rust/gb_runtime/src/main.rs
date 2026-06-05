@@ -39,6 +39,7 @@ mod graphics;
 mod gui;
 mod lexer;
 mod model;
+mod physics;
 mod preprocess;
 mod tiled;
 mod value;

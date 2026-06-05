@@ -20,11 +20,12 @@ umsetzen und per Parity-Test absichern.
 ## WP0 — Native Fallstricke (zuerst — Bugs, kein Komfort)
 Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 
-- [ ] **`PHYSICS_BROAD_*` nativ** (NEW/ADD/CLEAR/COUNT/QUERY/PAIR_A/PAIR_B/
-      PAIR_COUNT). `DIM b AS PHYSICS_BROAD` kompiliert in gbrt (external type in
-      `preprocess.rs:47`), aber `PHYSICS_BROAD_NEW()` crasht zur Laufzeit.
-      → Uniform-Grid-Broadphase in Rust (Pendant zu `modules/physics.py`) oder
-      external type entfernen (Fail beim Kompilieren statt still zur Laufzeit).
+- [x] **`PHYSICS_BROAD_*` nativ** (NEW/ADD/CLEAR/COUNT/QUERY/PAIR_A/PAIR_B/
+      PAIR_COUNT). Uniform-Grid-Broadphase in `rust/gb_runtime/src/physics.rs`
+      (portiert aus `gb_native/src/broadphase.rs` — selbe Paare/Reihenfolge),
+      `Value::PhysicsBroad`, Dispatch + Validierung (Radius>=0, Paar-Index-
+      Bounds) in `builtins.rs`. Parity-Snippet `physics_broad` (bit-identische
+      Paare TW==gbrt).
 - [x] **`TIME$`/`DATE$` nativ** — in `builtins.rs` (`local_datetime()`: Windows
       `GetLocalTime`, sonst UTC-Fallback via civil-from-days). Format-Test in
       `test_gbrt_parity.py::test_time_date_format_tw_and_gbrt` (kein Exakt-

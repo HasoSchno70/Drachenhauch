@@ -54,6 +54,8 @@ pub enum Value {
     Tiled(Rc<RefCell<crate::tiled::TiledMap>>),
     /// Modul `controller`: Character-Controller (Platformer-Physik).
     CharController(Rc<RefCell<crate::controller::CharController>>),
+    /// Modul `physics`: Broadphase-Kollision (PHYSICS_BROAD_*, Referenz-Typ).
+    PhysicsBroad(Rc<RefCell<crate::physics::BroadPhase>>),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -389,6 +391,10 @@ impl Value {
                     c.x, c.y, c.vx, c.vy, if c.on_ground { "True" } else { "False" }
                 )
             }
+            Value::PhysicsBroad(b) => {
+                let b = b.borrow();
+                format!("<BroadPhase {} entities, {} pairs>", b.count(), b.pair_count())
+            }
         }
     }
 
@@ -429,6 +435,7 @@ impl Value {
             Value::Coroutine(_) => "COROUTINE",
             Value::Tiled(_) => "TILED_MAP",
             Value::CharController(_) => "CHAR_CONTROLLER",
+            Value::PhysicsBroad(_) => "PHYSICS_BROAD",
         }
     }
 

@@ -104,6 +104,31 @@ PRINT ARRAY_INDEXOF(a, 2)''',
 MAPPUT(m, "x", 5)
 MAPPUT(m, "y", 9)
 PRINT MAPGET(m, "x"), MAPHAS(m, "x"), MAPHAS(m, "z")''',
+    "physics_broad": '''IMPORT "physics"
+DIM b AS PHYSICS_BROAD
+b = PHYSICS_BROAD_NEW()
+DIM xs[8] AS FLOAT
+DIM ys[8] AS FLOAT
+DIM rs[8] AS FLOAT
+xs[0]=10.0 : ys[0]=10.0 : rs[0]=6.0
+xs[1]=14.0 : ys[1]=11.0 : rs[1]=6.0
+xs[2]=50.0 : ys[2]=50.0 : rs[2]=5.0
+xs[3]=53.0 : ys[3]=52.0 : rs[3]=5.0
+xs[4]=200.0 : ys[4]=200.0 : rs[4]=4.0
+xs[5]=12.0 : ys[5]=9.0 : rs[5]=3.0
+xs[6]=51.0 : ys[6]=49.0 : rs[6]=2.0
+xs[7]=300.0 : ys[7]=10.0 : rs[7]=8.0
+DIM i AS INTEGER
+FOR i = 0 TO 7
+PHYSICS_BROAD_ADD(b, xs[i], ys[i], rs[i])
+NEXT
+DIM np AS INTEGER
+np = PHYSICS_BROAD_QUERY(b)
+PRINT PHYSICS_BROAD_COUNT(b), np
+DIM k AS INTEGER
+FOR k = 0 TO np - 1
+PRINT PHYSICS_BROAD_PAIR_A(b, k), PHYSICS_BROAD_PAIR_B(b, k)
+NEXT''',
     "tuples": '''FUNCTION mm(a AS INTEGER, b AS INTEGER) AS TUPLE
 IF a < b THEN RETURN (a, b)
 RETURN (b, a)
