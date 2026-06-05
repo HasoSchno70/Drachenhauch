@@ -187,10 +187,56 @@ class Song:
 
     def __init__(self):
         self.bpm = 120
-        self.waves = ["square", "saw", "triangle"]   # Kanal 0..2
+        self.waves = ["square", "saw", "triangle"]   # Kanal 0..2 (Synth-Fallback)
         self.patterns: list[Pattern] = [Pattern("P1")]
         self.order: list[int] = [0]                  # Indizes in patterns
+        # Instrument-Pool (Samples + benannte Synth-Klaenge). Optional --
+        # ein Kanal ohne zugewiesenes Instrument nutzt weiter seine Wellenform.
+        self.instruments: list = []                  # list[Instrument]
+        # channel_inst[c] = Index ins instruments-Pool oder None (= Synth/waves)
+        self.channel_inst: list[int | None] = [None] * CHANNELS
         self.path = ""
+
+    # ------------------------------------------------------ Instrumente
+    def instrument_for_channel(self, c: int):
+        """Liefert das effektive Instrument fuer Kanal `c`: das zugewiesene
+        Sample/Instrument -- oder ein fluechtiges Synth-Instrument aus der
+        Kanal-Wellenform (Kanal 3 = Noise)."""
+        from .instrument import Instrument
+        idx = self.channel_inst[c] if c < len(self.channel_inst) else None
+        if idx is not None and 0 <= idx < len(self.instruments):
+            return self.instruments[idx]
+        wf = "noise" if c == TONAL else self.waves[c]
+        return Instrument.synth(f"Ch{c}", wf)
+
+    def _channel_wave(self, c: int) -> str | None:
+        """Synth-Wellenform fuer Kanal `c` im Live-Export -- oder None, wenn
+        der Kanal ein Sample-Instrument nutzt (das der Synth-Export nicht
+        darstellen kann)."""
+        idx = self.channel_inst[c] if c < len(self.channel_inst) else None
+        if idx is not None and 0 <= idx < len(self.instruments):
+            inst = self.instruments[idx]
+            if getattr(inst, "kind", "synth") == "sample":
+                return None
+            return inst.waveform
+        return self.waves[c]
+
+    def add_instrument(self, inst) -> int:
+        self.instruments.append(inst)
+        return len(self.instruments) - 1
+
+    def remove_instrument(self, idx: int) -> bool:
+        """Entfernt ein Instrument; Kanal-Zuweisungen werden nachgezogen."""
+        if not (0 <= idx < len(self.instruments)):
+            return False
+        del self.instruments[idx]
+        for c in range(len(self.channel_inst)):
+            ci = self.channel_inst[c]
+            if ci == idx:
+                self.channel_inst[c] = None
+            elif ci is not None and ci > idx:
+                self.channel_inst[c] = ci - 1
+        return True
 
     # ------------------------------------------------------ Tempo
     def row_ms(self) -> int:
@@ -286,7 +332,7 @@ class Song:
 
     # ------------------------------------------------------ JSON-I/O
     def to_dict(self) -> dict:
-        return {
+        d = {
             "format": self.FORMAT,
             "version": self.VERSION,
             "bpm": self.bpm,
@@ -294,6 +340,11 @@ class Song:
             "patterns": [p.to_dict() for p in self.patterns],
             "order": list(self.order),
         }
+        # Instrumente nur schreiben, wenn vorhanden (abwaerts-kompatibel).
+        if self.instruments:
+            d["instruments"] = [ins.to_dict() for ins in self.instruments]
+            d["channel_inst"] = list(self.channel_inst)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Song":
@@ -308,6 +359,15 @@ class Song:
         order = [int(p) for p in (d.get("order") or [0])
                  if 0 <= int(p) < len(s.patterns)]
         s.order = order or [0]
+        insts = d.get("instruments") or []
+        if insts:
+            from .instrument import Instrument
+            s.instruments = [Instrument.from_dict(i) for i in insts]
+            ci = d.get("channel_inst") or []
+            s.channel_inst = [
+                (int(ci[c]) if c < len(ci) and ci[c] is not None
+                 and 0 <= int(ci[c]) < len(s.instruments) else None)
+                for c in range(CHANNELS)]
         return s
 
     def save_json(self, path: str) -> None:
@@ -383,9 +443,16 @@ class Song:
             ]
         lines.append("SUB TRACKER_PLAY_ROW(r AS INTEGER)")
         for c in range(TONAL):
+            wave = self._channel_wave(c)
+            if wave is None:
+                # Kanal nutzt ein Sample-Instrument -> der Live-Synth-Export
+                # kann das (noch) nicht. Render-to-File / Sampler-Export folgt.
+                lines.append(
+                    f"    ' Kanal {c}: Sample-Instrument -- via Audio-Datei "
+                    f"exportieren (Render-to-File)")
+                continue
             amp = (f"TRACKER_AMP(trkV{c}[r])"
                    if has_vol and any(vols[c]) else "0.5")
-            wave = self.waves[c]
             tone = (f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{wave}", {amp})')
             if has_slide and any(slides[c]):
                 # Mit Slide -> AUDIO_SFX (Pitch-Bend ueber die Reihe), sonst Ton.

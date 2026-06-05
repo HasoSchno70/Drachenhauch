@@ -353,3 +353,71 @@ def test_gb_code_without_slide_has_no_sfx():
     s = Song()
     s.patterns[0].set(0, 0, 60)
     assert "AUDIO_SFX" not in s.gb_code()
+
+
+# --------------------------------------------------------------- Instrumente
+
+def _sample_inst(name="Smp"):
+    import numpy as np
+    from gamebasic.tracker.instrument import Instrument
+    t = np.arange(2205) / 44100.0
+    return Instrument.from_array(name, np.sin(2 * np.pi * 440 * t), 44100, 69)
+
+
+def test_instrument_for_channel_default_is_synth():
+    s = Song()
+    inst = s.instrument_for_channel(0)
+    assert inst.kind == "synth" and inst.waveform == "square"
+    assert s.instrument_for_channel(TONAL).waveform == "noise"
+
+
+def test_assign_instrument_to_channel():
+    s = Song()
+    idx = s.add_instrument(_sample_inst("Kick"))
+    s.channel_inst[0] = idx
+    assert s.instrument_for_channel(0).kind == "sample"
+    assert s.instrument_for_channel(0).name == "Kick"
+
+
+def test_remove_instrument_fixes_assignments():
+    s = Song()
+    a = s.add_instrument(_sample_inst("A"))
+    b = s.add_instrument(_sample_inst("B"))
+    s.channel_inst[0] = a
+    s.channel_inst[1] = b
+    assert s.remove_instrument(a) is True
+    assert s.channel_inst[0] is None        # geloeschtes -> None
+    assert s.channel_inst[1] == 0           # nachgerueckt
+
+
+def test_instruments_json_roundtrip(tmp_path):
+    s = Song()
+    idx = s.add_instrument(_sample_inst("Lead"))
+    s.channel_inst[2] = idx
+    path = str(tmp_path / "inst.json")
+    s.save_json(path)
+    s2 = Song.load_json(path)
+    assert len(s2.instruments) == 1
+    assert s2.instruments[0].kind == "sample"
+    assert s2.channel_inst[2] == 0
+
+
+def test_song_without_instruments_omits_field():
+    s = Song()
+    assert "instruments" not in s.to_dict()
+
+
+def test_gb_code_sample_channel_commented(tmp_path):
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler
+    from gamebasic.preprocess import process
+    s = Song()
+    idx = s.add_instrument(_sample_inst("Smp"))
+    s.channel_inst[0] = idx
+    s.patterns[0].set(0, 0, 60)
+    code = s.gb_code()
+    assert "Sample-Instrument" in code      # Hinweis-Kommentar
+    # Synth-Kanaele + Drum bleiben gueltig -> kompiliert weiter
+    prepped, _ = process(code, tmp_path, file_label="<tracker>")
+    Compiler().compile(Parser(Lexer(prepped).tokenize()).parse())

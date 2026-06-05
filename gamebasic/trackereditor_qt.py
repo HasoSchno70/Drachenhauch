@@ -147,6 +147,36 @@ class TrackerEditor(QMainWindow):
         top.addWidget(b_code)
         root.addLayout(top)
 
+        # --- Instrument-Leiste (Samples laden + Kanal-Zuweisung) ---
+        irow = QHBoxLayout()
+        irow.addWidget(QLabel("Instrument:"))
+        self.inst_combo = QComboBox()
+        self.inst_combo.setMinimumWidth(150)
+        irow.addWidget(self.inst_combo)
+        b_load = QPushButton("Sample laden...")
+        b_load.clicked.connect(self._load_sample)
+        irow.addWidget(b_load)
+        b_idel = QPushButton("Entfernen")
+        b_idel.clicked.connect(self._remove_instrument)
+        irow.addWidget(b_idel)
+        irow.addSpacing(12)
+        irow.addWidget(QLabel("→ Kanal:"))
+        self.assign_combo = QComboBox()
+        self.assign_combo.addItems(["Ch1", "Ch2", "Ch3", "Drum"])
+        irow.addWidget(self.assign_combo)
+        b_assign = QPushButton("Zuweisen")
+        b_assign.clicked.connect(self._assign_instrument)
+        irow.addWidget(b_assign)
+        b_unassign = QPushButton("Synth")
+        b_unassign.setToolTip("Kanal auf Synth-Wellenform zuruecksetzen")
+        b_unassign.clicked.connect(self._unassign_channel)
+        irow.addWidget(b_unassign)
+        irow.addSpacing(12)
+        self.assign_label = QLabel("")
+        self.assign_label.setStyleSheet(f"color: {COLORS['fg_muted']};")
+        irow.addWidget(self.assign_label, 1)
+        root.addLayout(irow)
+
         # --- Datei + Pattern-Verwaltung ---
         prow = QHBoxLayout()
         b_new = QPushButton("Neu"); b_new.clicked.connect(self._new_song)
@@ -286,6 +316,7 @@ class TrackerEditor(QMainWindow):
         for ci, cb in enumerate(self.wave_combos):
             cb.blockSignals(True); cb.setCurrentText(self.song.waves[ci]); cb.blockSignals(False)
         self.cur = min(self.cur, len(self.song.patterns) - 1)
+        self._refresh_instruments()
         self._reload_pattern_combo()
         self._reload_order()
         self._load_pattern(self.cur)
@@ -331,6 +362,92 @@ class TrackerEditor(QMainWindow):
         self.song.waves[ci] = v
         self._sound_cache.clear()
         self._mark()
+
+    # ============================================== Instrumente
+    def _refresh_instruments(self) -> None:
+        self.inst_combo.blockSignals(True)
+        self.inst_combo.clear()
+        for i, ins in enumerate(self.song.instruments):
+            tag = "♪" if ins.kind == "sample" else "~"
+            self.inst_combo.addItem(f"{i}: {tag} {ins.name}")
+        self.inst_combo.blockSignals(False)
+        # Zuweisungs-Label (nur belegte Kanaele zeigen)
+        names = ["Ch1", "Ch2", "Ch3", "Drum"]
+        parts = []
+        for c in range(CHANNELS):
+            idx = self.song.channel_inst[c]
+            if idx is not None and 0 <= idx < len(self.song.instruments):
+                parts.append(f"{names[c]}={self.song.instruments[idx].name}")
+        self.assign_label.setText(
+            ("Zuweisung: " + ", ".join(parts)) if parts else "")
+
+    def _load_sample(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Sample laden (WAV/OGG)", str(self.project_root),
+            "Audio (*.wav *.ogg *.flac)")
+        if not path:
+            return
+        inst = self._instrument_from_file(path)
+        if inst is None:
+            QMessageBox.warning(self, "Fehler",
+                                "Audiodatei konnte nicht geladen werden.")
+            return
+        self.song.add_instrument(inst)
+        self._sound_cache.clear()
+        self._refresh_instruments()
+        self.inst_combo.setCurrentIndex(len(self.song.instruments) - 1)
+        self._mark()
+
+    def _instrument_from_file(self, path: str):
+        """Laedt eine Audiodatei als Sample-Instrument. Erst der stdlib-WAV-
+        Pfad (headless), sonst pygame-Dekodierung (OGG/float-WAV/...)."""
+        from .tracker.instrument import Instrument
+        from pathlib import Path
+        try:
+            return Instrument.from_wav(path)
+        except Exception:
+            pass
+        try:
+            import os
+            os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
+            import pygame
+            if pygame.mixer.get_init() is None:
+                pygame.mixer.init(frequency=44100, size=-16, channels=2)
+            snd = pygame.mixer.Sound(path)
+            arr = pygame.sndarray.array(snd)
+            if arr.ndim == 2:
+                arr = arr.mean(axis=1)
+            samples = (arr.astype(np.float32) / 32768.0)
+            sr = pygame.mixer.get_init()[0] or 44100
+            return Instrument.from_array(Path(path).stem or "Sample",
+                                         samples, sr, 60)
+        except Exception:
+            return None
+
+    def _remove_instrument(self) -> None:
+        idx = self.inst_combo.currentIndex()
+        if 0 <= idx < len(self.song.instruments):
+            self.song.remove_instrument(idx)
+            self._sound_cache.clear()
+            self._refresh_instruments()
+            self._mark()
+
+    def _assign_instrument(self) -> None:
+        idx = self.inst_combo.currentIndex()
+        c = self.assign_combo.currentIndex()
+        if 0 <= idx < len(self.song.instruments) and 0 <= c < CHANNELS:
+            self.song.channel_inst[c] = idx
+            self._sound_cache.clear()
+            self._refresh_instruments()
+            self._mark()
+
+    def _unassign_channel(self) -> None:
+        c = self.assign_combo.currentIndex()
+        if 0 <= c < CHANNELS:
+            self.song.channel_inst[c] = None
+            self._sound_cache.clear()
+            self._refresh_instruments()
+            self._mark()
 
     def _cell_text(self, ci: int, note, vol=None, slide=None) -> str:
         if note is None:
@@ -496,14 +613,25 @@ class TrackerEditor(QMainWindow):
 
     # ============================================== Sound
     def _sound(self, ci: int, midi: int, slide: int = 0):
-        wf = "noise" if ci == TONAL else self.song.waves[ci]
+        inst = self.song.instrument_for_channel(ci)
+        if inst.is_sample():
+            # Sample-Instrument -> resampeln (Slide bleibt einer spaeteren Stufe).
+            key = ("smp", id(inst), midi)
+            snd = self._sound_cache.get(key)
+            if snd is None:
+                sr = 44100
+                n = int(sr * max(self.song.row_ms(), 250) / 1000.0)
+                snd = self._make_sound(inst.render_note(midi, n, sr))
+                self._sound_cache[key] = snd
+            return snd
+        wf = inst.waveform
         key = (ci, wf, midi, slide)
         snd = self._sound_cache.get(key)
         if snd is None:
-            freq = 220.0 if ci == TONAL else midi_to_freq(midi)
-            dec = 120 if ci == TONAL else 220
+            freq = 220.0 if wf == "noise" else midi_to_freq(midi)
+            dec = 120 if wf == "noise" else 220
             slide_hz = 0.0
-            if slide and ci != TONAL:
+            if slide and wf != "noise":
                 # Halbtoene -> Hz/s ueber die Reihen-Dauer (wie der Export).
                 target = freq * (2.0 ** (slide / 12.0))
                 row_s = max(0.001, self.song.row_ms() / 1000.0)

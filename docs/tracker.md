@@ -1,6 +1,6 @@
 # Tracker (Musik-Editor)
 
-Mehrspuriger Chiptune-Tracker zum Komponieren von Melodien/Musik — 3 Ton-Kanäle (je eigene Wellenform) + 1 Noise-Kanal (Drums), mit **mehreren Patterns einstellbarer Länge** und **Song-Arrangement**. Komplementär zum [SFX-Generator](sfx-generator.md) (der einzelne Effekte macht).
+Mehrspuriger Tracker zum Komponieren von Melodien/Musik — 3 Ton-Kanäle (je eigene Wellenform **oder Sample-Instrument**) + 1 Noise-Kanal (Drums), mit **mehreren Patterns einstellbarer Länge** und **Song-Arrangement**. Über die reinen Chiptune-Wellenformen hinaus lassen sich **gesampelte Instrumente** (WAV/OGG) laden und über die Klaviatur spielen (Resampling). Komplementär zum [SFX-Generator](sfx-generator.md) (der einzelne Effekte macht).
 
 ## Starten
 
@@ -11,6 +11,7 @@ Aus dem **Code-Editor**: Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (
 - **Pattern-Gitter** — Reihen `00`…`N` (Zeit, von oben nach unten) × 4 Spalten (`Ch1`/`Ch2`/`Ch3` = Töne, `Drum` = Noise).
 - **Note setzen:** Zelle anklicken (auswählen), dann auf der **Klaviatur** unten eine Taste klicken → die Note (z. B. `C4`) landet in der Zelle, der Cursor springt eine Reihe weiter. `Entf`/`Rücktaste` löscht die Zelle. Die Klaviatur spielt auch einzelne Töne zum Vorhören; **Oktave** wählt den Bereich.
 - **Wellenform pro Ton-Kanal** (`Ch1`–`Ch3`): square / saw / sine / triangle.
+- **Sample-Instrumente** (Instrument-Leiste oben) — der Tracker wird vom reinen Chiptune-Synth zum **Sampler**: `Sample laden...` lädt eine WAV/OGG-Aufnahme als Instrument. Über `→ Kanal` + `Zuweisen` spielt ein Kanal dann dieses Sample statt der Wellenform; es wird beim Spielen **über die Klaviatur in der Tonhöhe verschoben** (Resampling, wie bei MOD/XM/IT — ein Sample über die ganze Tastatur). `Synth` setzt den Kanal auf seine Wellenform zurück, `Entfernen` löscht das gewählte Instrument. Samples werden im Projekt (`.json`) eingebettet (self-contained). *Hinweis (Stufe 1):* Vorhören/Pattern-Playback nutzen Sample-Instrumente bereits voll; der GB-Code-Export (Synth-Live-Player) kann Sample-Kanäle noch nicht — dafür kommen **Render-to-File** (Song → OGG/WAV) und ein **Live-Sampler-Export** in den nächsten Stufen.
 - **Effekt-Spalten pro Note:** Zelle mit Note auswählen, dann:
   - **`Vol`** (1–15, `–` = Standard) — Lautstärke; Suffix `v9` in der Zelle, wirkt auf Amplitude (Vorhören + Player).
   - **`Slide`** (−12…+12 Halbtöne, 0 = kein Slide; nur Ton-Kanäle) — **Pitch-Slide/Portamento**: die Note gleitet über die Reihen-Dauer um die angegebenen Halbtöne nach oben/unten. Suffix `s+2`/`s-3` in der Zelle. Im Export werden Slide-Noten als `AUDIO_SFX` (mit vorberechnetem Hz/s-Bend) gerendert, Noten ohne Slide bleiben `AUDIO_TONE`.
@@ -48,6 +49,8 @@ TRACKER_UPDATE(DELTA() * 1000.0)
 
 Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft in **beiden** Pfaden — Tree-Walker und native Runtime `gbrt`.
 
-Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py` (headless getestet: `tests/test_tracker_song.py`).
+Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `gamebasic/tracker/instrument.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`).
+
+> **Sampler-Ausbau (laufend):** Der Tracker wird schrittweise vom Chiptune-Synth zum vollwertigen Sampler ausgebaut. **Stufe 1 (fertig):** Sample-Instrumente laden + über die Klaviatur resampeln + im Editor vorhören. **Geplant:** Instrument-Envelopes (ADSR) + Loop-Punkte, echter Software-Mixer, **Render-to-File** (Song → OGG/WAV für `PLAYMUSIC`), **Live-Sampler-Export** (`SAMPLE_PLAY`-Builtin in beiden Pfaden), mehr Kanäle (Mute/Solo) und eine erweiterte Effekt-Spalte.
 
 > **Effekt-Spalten:** **Lautstärke** (`Vol`) und **Pitch-Slide/Portamento** (`Slide`) pro Note. Slide-Noten werden im Export über `AUDIO_SFX` mit einem pro Reihe vorberechneten Hz/s-Bend gerendert (kein kontinuierlicher Synth-Umbau nötig).
