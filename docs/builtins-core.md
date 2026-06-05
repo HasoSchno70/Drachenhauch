@@ -303,6 +303,19 @@ END FUNCTION
 | `WRITE(f, text$)` | schreibt ohne `\n` |
 | `FILEEXISTS(p$)` → BOOLEAN | Datei vorhanden? |
 
+Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
+
+| Funktion | Zweck |
+|---|---|
+| `WRITEALL(pfad$, text$)` | Text komplett schreiben (überschreibt/erzeugt) |
+| `READLINES(pfad$)` → ARRAY OF STRING | Datei als Zeilen-Array lesen |
+| `FILESIZE(pfad$)` → INTEGER | Größe in Bytes |
+| `DELETEFILE(pfad$)`, `RENAME(alt$, neu$)` | löschen / umbenennen·verschieben |
+| `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
+| `DIRLIST(pfad$)` → ARRAY OF STRING | Eintragsnamen (sortiert) |
+| `MKDIR(pfad$)` | Verzeichnis anlegen (inkl. Eltern) |
+| `PATHJOIN(a$, b$, …)` → STRING | Pfadteile mit `/` verbinden |
+
 ```basic
 ' Schreiben
 DIM out AS FILE
@@ -320,6 +333,13 @@ IF FILEEXISTS("scores.txt") THEN
     WEND
     CLOSEFILE(inp)
 END IF
+
+' Pfadbasiert (native Runtime)
+MKDIR(PATHJOIN("saves", "level1"))
+WRITEALL(PATHJOIN("saves/level1", "progress.txt"), "score=42")
+DIM zeilen AS ARRAY OF STRING
+zeilen = READLINES(PATHJOIN("saves/level1", "progress.txt"))
+PRINT FILESIZE(PATHJOIN("saves/level1", "progress.txt"))
 ```
 
 ## Zeit & Random

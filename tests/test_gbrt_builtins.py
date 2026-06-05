@@ -182,6 +182,44 @@ PRINT TRYVAL("42", -1), TRYVAL("3.5", -1), TRYVAL("oops", -1), TRYVAL("  7  ", 0
     assert _run(src) == "TRUE TRUE TRUE FALSE FALSE\n42 3.5 -1 7"
 
 
+# --- WP3: Datei / Verzeichnis -----------------------------------------------
+
+def test_pathjoin():
+    src = '''PRINT PATHJOIN("assets", "img", "x.png")
+PRINT PATHJOIN("a/", "b")
+PRINT PATHJOIN("", "sub", "data.txt")'''
+    assert _run(src) == "assets/img/x.png\na/b\nsub/data.txt"
+
+
+def test_file_and_dir_ops(tmp_path):
+    base = str(tmp_path).replace("\\", "/")
+    src = f'''DIM base AS STRING
+base = "{base}"
+MKDIR(PATHJOIN(base, "sub"))
+PRINT DIREXISTS(PATHJOIN(base, "sub"))
+WRITEALL(PATHJOIN(base, "sub/data.txt"), "line1" + CHR$(10) + "line2" + CHR$(10) + "line3")
+PRINT FILESIZE(PATHJOIN(base, "sub/data.txt"))
+DIM lines AS ARRAY OF STRING
+lines = READLINES(PATHJOIN(base, "sub/data.txt"))
+PRINT LEN(lines), lines[0], lines[2]
+WRITEALL(PATHJOIN(base, "sub/b.txt"), "x")
+DIM entries AS ARRAY OF STRING
+entries = DIRLIST(PATHJOIN(base, "sub"))
+PRINT LEN(entries), entries[0], entries[1]
+RENAME(PATHJOIN(base, "sub/b.txt"), PATHJOIN(base, "sub/c.txt"))
+PRINT FILEEXISTS(PATHJOIN(base, "sub/b.txt")), FILEEXISTS(PATHJOIN(base, "sub/c.txt"))
+DELETEFILE(PATHJOIN(base, "sub/c.txt"))
+PRINT FILEEXISTS(PATHJOIN(base, "sub/c.txt"))'''
+    assert _run(src) == (
+        "TRUE\n"
+        "17\n"
+        "3 line1 line3\n"
+        "2 b.txt data.txt\n"
+        "FALSE TRUE\n"
+        "FALSE"
+    )
+
+
 # --- WP1: SORT mit Descending-Flag + FUNCREF-Comparator ---------------------
 
 def test_sort_ascending_and_descending_flag():

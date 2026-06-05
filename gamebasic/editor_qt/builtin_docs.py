@@ -41,6 +41,16 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "writeline": ("WRITELINE(f, text)", "Schreibt eine Zeile mit Newline."),
     "write":     ("WRITE(f, text)", "Schreibt ohne Newline."),
     "fileexists": ("FILEEXISTS(pfad) AS BOOLEAN", "Existenz pruefen."),
+    # Datei/Verzeichnis pfadbasiert (gbrt-only)
+    "direxists": ("DIREXISTS(pfad) AS BOOLEAN", "Existiert das Verzeichnis?"),
+    "dirlist":   ("DIRLIST(pfad) AS ARRAY OF STRING", "Eintragsnamen eines Verzeichnisses (sortiert)."),
+    "mkdir":     ("MKDIR(pfad)", "Verzeichnis anlegen (inkl. Elternverzeichnisse)."),
+    "deletefile": ("DELETEFILE(pfad)", "Datei loeschen."),
+    "rename":    ("RENAME(alt, neu)", "Datei/Verzeichnis umbenennen oder verschieben."),
+    "writeall":  ("WRITEALL(pfad, text)", "Text in Datei schreiben (ueberschreibt)."),
+    "readlines": ("READLINES(pfad) AS ARRAY OF STRING", "Datei als Zeilen-Array lesen."),
+    "filesize":  ("FILESIZE(pfad) AS INTEGER", "Dateigroesse in Bytes."),
+    "pathjoin":  ("PATHJOIN(a, b, ...) AS STRING", "Pfadteile mit '/' verbinden."),
     # Grafik
     "screen":   ("SCREEN(w, h[, titel[, skala]])",
                  "Fenster oeffnen. skala>1 macht Pixel groesser (Retro-Look)."),

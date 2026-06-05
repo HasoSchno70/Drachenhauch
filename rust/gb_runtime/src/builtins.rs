@@ -1441,6 +1441,63 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => err("WRITE: Datei wurde nicht im Schreib-Modus geoeffnet"),
             }
         }
+        // --- Datei/Verzeichnis (WP3, pfadbasiert -- kein FILE-Handle) ---
+        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
+        "dirlist" => {
+            arity!(1);
+            let path = need_str(&a[0], "DIRLIST")?;
+            let rd = std::fs::read_dir(path).map_err(|e| format!("DIRLIST: {}", e))?;
+            let mut names: Vec<String> = Vec::new();
+            for entry in rd {
+                let entry = entry.map_err(|e| format!("DIRLIST: {}", e))?;
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+            names.sort();   // OS-Reihenfolge ist undefiniert -> deterministisch sortieren
+            Ok(new_str_array(names))
+        }
+        "mkdir" => {
+            arity!(1);
+            std::fs::create_dir_all(need_str(&a[0], "MKDIR")?).map_err(|e| format!("MKDIR: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "deletefile" => {
+            arity!(1);
+            std::fs::remove_file(need_str(&a[0], "DELETEFILE")?).map_err(|e| format!("DELETEFILE: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "rename" => {
+            arity!(2);
+            std::fs::rename(need_str(&a[0], "RENAME")?, need_str(&a[1], "RENAME")?).map_err(|e| format!("RENAME: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "writeall" => {
+            arity!(2);
+            std::fs::write(need_str(&a[0], "WRITEALL")?, need_str(&a[1], "WRITEALL")?).map_err(|e| format!("WRITEALL: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "readlines" => {
+            arity!(1);
+            let text = std::fs::read_to_string(need_str(&a[0], "READLINES")?).map_err(|e| format!("READLINES: {}", e))?;
+            Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
+        }
+        "filesize" => {
+            arity!(1);
+            let m = std::fs::metadata(need_str(&a[0], "FILESIZE")?).map_err(|e| format!("FILESIZE: {}", e))?;
+            Ok(Value::Int(m.len() as i64))
+        }
+        "pathjoin" => {
+            if a.len() < 2 { return err(format!("PATHJOIN: erwartet mind. 2 Argumente, erhalten {}", a.len())); }
+            // Mit '/' verbinden (deterministisch, plattformuebergreifend; raylib/
+            // std akzeptieren '/' auch auf Windows). Erstes Teil behaelt fuehrendes
+            // '/', folgende werden beidseitig getrimmt.
+            let mut cleaned: Vec<String> = Vec::new();
+            for (i, v) in a.iter().enumerate() {
+                let s = need_str(v, "PATHJOIN")?;
+                let t = if i == 0 { s.trim_end_matches('/') } else { s.trim_matches('/') };
+                if !t.is_empty() { cleaned.push(t.to_string()); }
+            }
+            Ok(Value::str_rc(&cleaned.join("/")))
+        }
 
         // ===== Modul: tween (zeitbasiert, NICHT bit-identisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {
