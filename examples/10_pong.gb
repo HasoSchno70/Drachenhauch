@@ -111,11 +111,11 @@ INPUT_BIND("quit",    KEY_ESCAPE)
 
 DIM links AS Paddle
 DIM rechts AS Paddle
-DIM ball AS Ball
+DIM kugel AS Ball
 
 links  = NEW Paddle(8, (Field.HEIGHT - Paddle.H) / 2)
 rechts = NEW Paddle(Field.WIDTH - 14, (Field.HEIGHT - Paddle.H) / 2)
-ball   = NEW Ball()
+kugel   = NEW Ball()
 
 DIM running AS BOOLEAN
 running = TRUE
@@ -131,22 +131,22 @@ WHILE running AND NOT QuitRequested()
     rechts.MoveBy(INPUT_AXIS("p2_up", "p2_down") * Paddle.SPEED)
 
     ' Ball bewegen
-    ball.Update()
+    kugel.Update()
 
     ' Paddle-Kollision
-    IF HitsPaddle(ball, links) THEN
-        ball.dx = ABS(ball.dx)
-    ELSEIF HitsPaddle(ball, rechts) THEN
-        ball.dx = -ABS(ball.dx)
+    IF HitsPaddle(kugel, links) THEN
+        kugel.dx = ABS(kugel.dx)
+    ELSEIF HitsPaddle(kugel, rechts) THEN
+        kugel.dx = -ABS(kugel.dx)
     END IF
 
     ' Tor?
-    IF ball.x < 0 THEN
+    IF kugel.x < 0 THEN
         rechts.score = rechts.score + 1
-        ball.Reset(1)
-    ELSEIF ball.x > Field.WIDTH THEN
+        kugel.Reset(1)
+    ELSEIF kugel.x > Field.WIDTH THEN
         links.score = links.score + 1
-        ball.Reset(-1)
+        kugel.Reset(-1)
     END IF
 
     ' Zeichnen
@@ -154,7 +154,7 @@ WHILE running AND NOT QuitRequested()
     Line(Field.WIDTH / 2, 0, Field.WIDTH / 2, Field.HEIGHT, DARKGRAY)
     links.Draw()
     rechts.Draw()
-    ball.Draw()
+    kugel.Draw()
     Text(40, 8, STR$(links.score), WHITE)
     Text(Field.WIDTH - 50, 8, STR$(rechts.score), WHITE)
     Text(80, Field.HEIGHT - 20, "W/S vs UP/DOWN  ESC=quit", GRAY)

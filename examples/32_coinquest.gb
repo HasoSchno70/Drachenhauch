@@ -43,16 +43,16 @@ time_limit_s = 30
 score_per_coin = 100
 
 IF FILEEXISTS("settings.json") THEN
-    DIM cfg AS JSON_HANDLE
-    cfg = JSON_LOAD("settings.json")
-    IF JSON_HAS(cfg, "max_coins") THEN
-        max_coins = JSON_GET_INT(cfg, "max_coins")
+    DIM conf AS JSON_HANDLE
+    conf = JSON_LOAD("settings.json")
+    IF JSON_HAS(conf, "max_coins") THEN
+        max_coins = JSON_GET_INT(conf, "max_coins")
     END IF
-    IF JSON_HAS(cfg, "time_limit_s") THEN
-        time_limit_s = JSON_GET_INT(cfg, "time_limit_s")
+    IF JSON_HAS(conf, "time_limit_s") THEN
+        time_limit_s = JSON_GET_INT(conf, "time_limit_s")
     END IF
-    IF JSON_HAS(cfg, "score_per_coin") THEN
-        score_per_coin = JSON_GET_INT(cfg, "score_per_coin")
+    IF JSON_HAS(conf, "score_per_coin") THEN
+        score_per_coin = JSON_GET_INT(conf, "score_per_coin")
     END IF
 END IF
 
