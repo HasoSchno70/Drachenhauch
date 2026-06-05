@@ -600,6 +600,54 @@ impl<'p> Vm<'p> {
     }
 
     /// CORO_*-Builtins (brauchen VM-State -> nicht in builtins.rs).
+    /// Array-Higher-Order-Funktionen, die die VM brauchen (User-FUNCREF rufen).
+    /// Aktuell nur `SORT(arr, comparator)`. Andere SORT-Formen macht builtins.rs.
+    fn try_array_hof(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if name == "sort" && a.len() == 2 {
+            if let Value::FuncRef(_) = &a[1] {
+                return Ok(Some(self.sort_with_comparator(&a[0], &a[1])?));
+            }
+        }
+        Ok(None)
+    }
+
+    /// SORT(arr, comparator-FUNCREF): stabil sortieren, wobei `comparator(x, y)`
+    /// eine User-Funktion ist, die <0/0/>0 liefert (wie ein C-qsort-Comparator).
+    fn sort_with_comparator(&mut self, arr_v: &Value, cmp: &Value) -> R<Value> {
+        use std::cmp::Ordering;
+        let arr = match arr_v {
+            Value::Array(x) => x.clone(),
+            _ => return Err("SORT erwartet ARRAY".to_string()),
+        };
+        let cmp_name = match cmp {
+            Value::FuncRef(n) => n.clone(),
+            _ => return Err("SORT: Comparator muss FUNCREF sein".to_string()),
+        };
+        if arr.borrow().dims.len() != 1 {
+            return Err("SORT: nur 1D-Arrays".to_string());
+        }
+        let func: &'p Func = self.prog.functions.get(cmp_name.as_ref())
+            .ok_or_else(|| format!("SORT: Funktion '{}' existiert nicht", cmp_name))?;
+        // Werte herausziehen -> kein Array-Borrow waehrend der Comparator laeuft.
+        let mut vals: Vec<Value> = arr.borrow().values.clone();
+        let mut error: Option<String> = None;
+        vals.sort_by(|x, y| {
+            if error.is_some() { return Ordering::Equal; }
+            match self.exec(func, vec![x.clone(), y.clone()], None) {
+                Ok(Value::Int(i)) => i.cmp(&0),
+                Ok(Value::Float(f)) => f.partial_cmp(&0.0).unwrap_or(Ordering::Equal),
+                Ok(other) => {
+                    error = Some(format!("SORT: Comparator muss INTEGER liefern, erhielt {}", other.type_name()));
+                    Ordering::Equal
+                }
+                Err(e) => { error = Some(e); Ordering::Equal }
+            }
+        });
+        if let Some(e) = error { return Err(e); }
+        arr.borrow_mut().values = vals;
+        Ok(Value::Nil)
+    }
+
     fn try_coro(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Builtin-Namen liegen im .gbc lowercase vor.
         match name {
@@ -936,8 +984,11 @@ impl<'p> Vm<'p> {
                     let argc = l[1].as_usize();
                     let split = stack.len() - argc;
                     let bargs = stack.split_off(split);
-                    // Reihenfolge: scene (VM-State) -> coro (VM-State) -> Grafik -> pure.
-                    if let Some(v) = self.try_scene(name, &bargs)? {
+                    // Reihenfolge: array-HOF (FUNCREF-Comparator) -> scene (VM-State)
+                    // -> coro (VM-State) -> Grafik -> pure.
+                    if let Some(v) = self.try_array_hof(name, &bargs)? {
+                        stack.push(v);
+                    } else if let Some(v) = self.try_scene(name, &bargs)? {
                         stack.push(v);
                     } else if let Some(v) = self.try_coro(name, &bargs)? {
                         stack.push(v);

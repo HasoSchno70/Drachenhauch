@@ -876,7 +876,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         // --- Array ---
         "sort" => {
-            arity!(1);
+            // SORT(arr) aufsteigend, SORT(arr, descending?) BOOL-Flag.
+            // SORT(arr, comparator-FUNCREF) wird vorher in vm.rs abgefangen
+            // (braucht die VM, um die User-Funktion zu rufen).
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("SORT: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()));
+            }
+            let desc = match a.get(1) {
+                None => false,
+                Some(Value::Bool(b)) => *b,
+                Some(_) => return err("SORT: 2. Argument muss BOOLEAN (absteigend) oder FUNCREF (Comparator) sein".to_string()),
+            };
             if let Value::Array(arr) = &a[0] {
                 let mut arr = arr.borrow_mut();
                 if !matches!(arr.element_type.as_str(), "integer" | "float" | "string") {
@@ -884,6 +894,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 if arr.dims.len() != 1 { return err("SORT: nur 1D-Arrays".to_string()); }
                 arr.values.sort_by(|x, y| cmp_value(x, y));
+                if desc { arr.values.reverse(); }
                 Ok(Value::Nil)
             } else { err("SORT erwartet ARRAY".to_string()) }
         }

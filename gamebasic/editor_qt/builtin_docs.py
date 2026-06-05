@@ -116,6 +116,7 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "shuffle":   ("SHUFFLE(array)", "Mischt ein 1D-Array IN PLACE (Fisher-Yates)."),
     "time$":     ("TIME$() AS STRING",   'Aktuelle Uhrzeit "HH:MM:SS".'),
     "date$":     ("DATE$() AS STRING",   'Aktuelles Datum "YYYY-MM-DD".'),
+    "sort": ("SORT(arr [, absteigend?-BOOL | comparator-FUNCREF])", "1D IN PLACE sortieren. BOOL-Flag fuer absteigend ODER FUNCREF-Comparator(a,b)->INT (<0/0/>0). Zweiarg-Formen: nur native Runtime."),
     # Array-Aggregate (gbrt-only -- nativ in der Runtime, nicht im Tree-Walker)
     "array_sum": ("ARRAY_SUM(arr) AS INTEGER/FLOAT", "Summe eines 1D-Zahl-Arrays."),
     "array_avg": ("ARRAY_AVG(arr) AS FLOAT", "Durchschnitt eines 1D-Zahl-Arrays (nicht leer)."),

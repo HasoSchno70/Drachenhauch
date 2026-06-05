@@ -153,3 +153,53 @@ PRINT ARRAY_POP(a)
 PRINT "after"'''
     # zweites POP auf leerem Array wirft -> "after" fehlt.
     assert _run(src) == "before\n0"
+
+
+# --- WP1: SORT mit Descending-Flag + FUNCREF-Comparator ---------------------
+
+def test_sort_ascending_and_descending_flag():
+    src = '''DIM x[5] AS INTEGER
+x[0]=3 : x[1]=1 : x[2]=9 : x[3]=2 : x[4]=7
+SORT(x)
+PRINT x[0], x[1], x[2], x[3], x[4]
+SORT(x, TRUE)
+PRINT x[0], x[1], x[2], x[3], x[4]'''
+    assert _run(src) == "1 2 3 7 9\n9 7 3 2 1"
+
+
+def test_sort_string_descending():
+    src = '''DIM s[3] AS STRING
+s[0]="banana" : s[1]="apple" : s[2]="cherry"
+SORT(s, TRUE)
+PRINT s[0], s[1], s[2]'''
+    assert _run(src) == "cherry banana apple"
+
+
+def test_sort_with_comparator_funcref():
+    # Comparator b-a -> absteigend; sowohl bare Name als auch via FUNCREF-Variable.
+    src = '''FUNCTION desc(a AS INTEGER, b AS INTEGER) AS INTEGER
+RETURN b - a
+END FUNCTION
+DIM x[5] AS INTEGER
+x[0]=3 : x[1]=1 : x[2]=9 : x[3]=2 : x[4]=7
+SORT(x, desc)
+PRINT x[0], x[1], x[2], x[3], x[4]
+DIM f AS FUNCREF
+f = desc
+DIM y[3] AS INTEGER
+y[0]=5 : y[1]=8 : y[2]=2
+SORT(y, f)
+PRINT y[0], y[1], y[2]'''
+    assert _run(src) == "9 7 3 2 1\n8 5 2"
+
+
+def test_sort_comparator_stable_by_distance():
+    # Stabilitaet: gleiche Schluessel behalten Eingabereihenfolge.
+    src = '''FUNCTION bydist(a AS INTEGER, b AS INTEGER) AS INTEGER
+RETURN ABS(a - 5) - ABS(b - 5)
+END FUNCTION
+DIM y[5] AS INTEGER
+y[0]=3 : y[1]=1 : y[2]=9 : y[3]=2 : y[4]=7
+SORT(y, bydist)
+PRINT y[0], y[1], y[2], y[3], y[4]'''
+    assert _run(src) == "3 7 2 1 9"
