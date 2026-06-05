@@ -265,6 +265,9 @@ pub struct Compiler {
     /// (`json_parse`) zurueckabgebildet werden, den gbrt nativ kennt.
     builtin_aliases: Vec<(String, String)>,
     ctx: Ctx,
+    // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
+    // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
+    err_line: u32,
 }
 
 impl Compiler {
@@ -275,7 +278,7 @@ impl Compiler {
                    fn_sigs: HashMap::new(), compiled_fns: vec![],
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
-                   external_types, builtin_aliases, ctx: Ctx::new() }
+                   external_types, builtin_aliases, ctx: Ctx::new(), err_line: 0 }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -347,7 +350,10 @@ impl Compiler {
         // alle folgenden emit() erben sie.
         if let Node::Stmt { line, body } = s {
             self.ctx.cur_line = *line;
-            return self.stmt(body);
+            let r = self.stmt(body);
+            // Erste fehlschlagende Statement-Zeile fuer die Fehlermeldung merken.
+            if r.is_err() && self.err_line == 0 { self.err_line = *line; }
+            return r;
         }
         match s {
             Node::Dim { name, type_name, array_dims } =>
@@ -1885,10 +1891,10 @@ fn node_name(n: &Node) -> &'static str {
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)])
-    -> Result<Value, String> {
+    -> Result<Value, (u32, String)> {
     let stmts = match ast {
         Node::Program { statements } => statements,
-        _ => return Err("Erwartet Program-Knoten".into()),
+        _ => return Err((0, "Erwartet Program-Knoten".into())),
     };
     // Funktionen / Klassen / Hauptprogramm trennen.
     let mut fn_decls: Vec<&Node> = vec![];
@@ -1912,25 +1918,34 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
             c.struct_names.insert(name.clone());
         }
     }
-    c.collect_globals(&main_owned)?;
-    // Klassen-Statics bekommen einen Slot.
-    for cd in &cls_decls {
-        if let Node::ClassDecl { name, statics, .. } = cd {
-            if !statics.is_empty() { c.alloc_slot(name); }
-        }
-    }
-    // Phase 1: Klassen registrieren (Felder/Methoden-Sigs/Properties).
-    for cd in &cls_decls { c.register_class(cd)?; }
-    // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
-    for d in &fn_decls { c.register_stub(d)?; }
-    for d in &fn_decls { c.compile_function(d)?; }
-    // Phase 4: Methoden kompilieren.
-    for cd in &cls_decls { c.compile_class_methods(cd)?; }
-    // Phase 5: Hauptprogramm (Klassen-Statics zuerst hoisten).
-    for cd in &cls_decls { c.emit_class_statics(cd)?; }
-    for s in &main_owned { c.stmt(s)?; }
-    c.ctx.emit(oc::HALT, Value::Null);
+    // Kompilier-Schritte in einer IIFE -- so koennen wir bei Err die in `stmt()`
+    // gemerkte Quell-Zeile (c.err_line) anhaengen. `finish` (konsumiert c) +
+    // collect_data laufen erst danach auf dem Ok-Pfad.
     let mut data = Vec::new();
-    collect_data(stmts, &mut data)?;
-    Ok(c.finish(data))
+    let outcome: Result<(), String> = (|| {
+        c.collect_globals(&main_owned)?;
+        // Klassen-Statics bekommen einen Slot.
+        for cd in &cls_decls {
+            if let Node::ClassDecl { name, statics, .. } = cd {
+                if !statics.is_empty() { c.alloc_slot(name); }
+            }
+        }
+        // Phase 1: Klassen registrieren (Felder/Methoden-Sigs/Properties).
+        for cd in &cls_decls { c.register_class(cd)?; }
+        // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
+        for d in &fn_decls { c.register_stub(d)?; }
+        for d in &fn_decls { c.compile_function(d)?; }
+        // Phase 4: Methoden kompilieren.
+        for cd in &cls_decls { c.compile_class_methods(cd)?; }
+        // Phase 5: Hauptprogramm (Klassen-Statics zuerst hoisten).
+        for cd in &cls_decls { c.emit_class_statics(cd)?; }
+        for s in &main_owned { c.stmt(s)?; }
+        c.ctx.emit(oc::HALT, Value::Null);
+        collect_data(stmts, &mut data)?;
+        Ok(())
+    })();
+    match outcome {
+        Ok(()) => Ok(c.finish(data)),
+        Err(msg) => Err((c.err_line, msg)),
+    }
 }

@@ -270,7 +270,11 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
         Ok(j) => Ok(j),
-        Err(e) => { eprintln!("{}: Compile-Fehler: {}", label, e); Err(ExitCode::from(3)) }
+        Err((line, msg)) => {
+            if line > 0 { eprintln!("{}:{}: Compile-Fehler: {}", label, line, msg); }
+            else { eprintln!("{}: Compile-Fehler: {}", label, msg); }
+            Err(ExitCode::from(3))
+        }
     }
 }
 
@@ -397,9 +401,9 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
         Ok(_) => vec![],
-        Err(e) => vec![serde_json::json!({
-            "line": 0, "col": 0, "severity": "error",
-            "phase": "compile", "message": e })],
+        Err((line, msg)) => vec![serde_json::json!({
+            "line": line, "col": 0, "severity": "error",
+            "phase": "compile", "message": msg })],
     }
 }
 
