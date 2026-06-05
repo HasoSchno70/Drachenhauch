@@ -1434,6 +1434,10 @@ class FramesPanel(QWidget):
         dup.triggered.connect(lambda: self._dup_at(idx))
         menu.addAction(dup)
 
+        paste_frame = QAction("Aus Zwischenablage als Frame", self)
+        paste_frame.triggered.connect(self.app.action_paste_as_frame)
+        menu.addAction(paste_frame)
+
         before = QAction("Davor leeres Frame einfuegen", self)
         before.triggered.connect(lambda: self._insert_blank(idx, after=False))
         menu.addAction(before)
@@ -1943,6 +1947,7 @@ class SpriteEditorWindow(QMainWindow):
         self.act_cut      = A("Auswahl ausschneiden", "Ctrl+X", self.action_cut, make_action_icon("cut"))
         self.act_copy     = A("Auswahl kopieren",     "Ctrl+C", self.action_copy, make_action_icon("copy"))
         self.act_paste    = A("Einfuegen",            "Ctrl+V", self.action_paste, make_action_icon("paste"))
+        self.act_paste_frame = A("Als neues Frame einfuegen", "Ctrl+Shift+V", self.action_paste_as_frame, make_action_icon("paste"))
         self.act_clear    = A("Frame leeren",        None, self.action_clear_frame)
         self.act_del_sel  = A("Auswahl loeschen",    "Delete", self.action_delete_selection)
         self.act_clear_sel= A("Auswahl aufheben",    "Escape", self.action_clear_selection)
@@ -2064,6 +2069,7 @@ class SpriteEditorWindow(QMainWindow):
         m_edit.addAction(self.act_cut)
         m_edit.addAction(self.act_copy)
         m_edit.addAction(self.act_paste)
+        m_edit.addAction(self.act_paste_frame)
         m_edit.addSeparator()
         m_edit.addAction(self.act_clear)
         m_edit.addAction(self.act_del_sel)
@@ -2444,6 +2450,47 @@ class SpriteEditorWindow(QMainWindow):
         self.canvas.invalidate_all()
         self.frames_panel.refresh()
         self.mark_dirty()
+
+    def _system_clipboard_pil(self) -> Optional[Image.Image]:
+        """Liefert das System-Clipboard-Bild als PIL.Image (oder None).
+        Best-effort -- erlaubt Paste-as-Frame von Bildern aus anderen
+        Programmen (Aseprite, Browser, ...)."""
+        try:
+            qimg = QApplication.clipboard().image()
+        except Exception:
+            return None
+        if qimg is None or qimg.isNull():
+            return None
+        try:
+            qimg = qimg.convertToFormat(QImage.Format_RGBA8888)
+            w, h = qimg.width(), qimg.height()
+            bpl = qimg.bytesPerLine()
+            raw = bytes(qimg.constBits())[:bpl * h]
+            if bpl == w * 4:
+                return Image.frombytes("RGBA", (w, h), raw)
+            # Zeilen-Padding entfernen
+            rows = [raw[r * bpl: r * bpl + w * 4] for r in range(h)]
+            return Image.frombytes("RGBA", (w, h), b"".join(rows))
+        except Exception:
+            return None
+
+    def action_paste_as_frame(self):
+        """Fuegt den Zwischenablage-Inhalt als NEUES Frame ein (nach dem
+        aktuellen) -- intern kopierte Auswahl bevorzugt, sonst System-
+        Clipboard-Bild."""
+        img = self._clipboard_pil or self._system_clipboard_pil()
+        if img is None:
+            self.statusBar().showMessage(
+                "Zwischenablage leer -- erst Strg+C oder Bild kopieren", 2000)
+            return
+        idx = self.doc.paste_as_frame(img)
+        self.canvas.invalidate_all()
+        self.canvas._render_onion()
+        self.frames_panel.refresh()
+        self.mark_dirty()
+        self.update_status()
+        self.statusBar().showMessage(
+            f"Als neues Frame #{idx:02d} eingefuegt", 1500)
 
     def action_test_sprite(self):
         """Generiert ein temporaeres GB-Test-Programm das das Sprite

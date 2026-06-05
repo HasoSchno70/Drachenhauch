@@ -363,6 +363,36 @@ def test_load_native_version2_defaults_empty_name(tmp_path):
     assert loaded.frames[0].duration_ms == 100
 
 
+def test_paste_as_frame_inserts_after_current():
+    d = SpriteDoc(16, 16)
+    d.add_frame()                     # 2 Frames, current = 1
+    img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
+    img.putpixel((3, 4), (10, 20, 30, 255))
+    idx = d.paste_as_frame(img)
+    assert idx == 2                   # nach dem aktuellen (1) eingefuegt
+    assert len(d.frames) == 3
+    assert d.current_index == 2
+    assert d.current.pixels.getpixel((3, 4)) == (10, 20, 30, 255)
+    assert d.dirty is True
+
+
+def test_paste_as_frame_crops_oversized():
+    d = SpriteDoc(8, 8)
+    big = Image.new("RGBA", (20, 20), (5, 5, 5, 255))
+    d.paste_as_frame(big)
+    # Auf Dokumentgroesse beschnitten
+    assert d.current.pixels.size == (8, 8)
+
+
+def test_paste_as_frame_pads_undersized():
+    d = SpriteDoc(16, 16)
+    small = Image.new("RGBA", (4, 4), (9, 9, 9, 255))
+    d.paste_as_frame(small)
+    assert d.current.pixels.size == (16, 16)
+    assert d.current.pixels.getpixel((0, 0)) == (9, 9, 9, 255)
+    assert d.current.pixels.getpixel((10, 10)) == (0, 0, 0, 0)   # transparent
+
+
 def test_load_image_single_frame(tmp_path):
     img = Image.new("RGBA", (8, 8), (0, 0, 0, 255))
     img.putpixel((3, 3), (255, 0, 0, 255))

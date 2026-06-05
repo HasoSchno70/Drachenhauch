@@ -99,6 +99,7 @@ Der Editor unterstuetzt von Anfang an Multi-Frame-Animationen. Frames-Panel rech
 |---|---|
 | Neues Frame | leeres Frame nach dem aktuellen |
 | Frame duplizieren | Kopie nach dem aktuellen (Basis fuer Tweens) |
+| Als neues Frame einfuegen (`Ctrl+Shift+V`) | Zwischenablage-Inhalt als neues Frame nach dem aktuellen — interne Auswahl (`Ctrl+C`) bevorzugt, sonst ein Bild aus dem System-Clipboard (Aseprite/Browser/...). Auf Dokumentgroesse eingepasst |
 | Frame loeschen | aktuelles Frame raus (mind. 1 Frame bleibt) |
 | `F2`..`F9` | Frame N direkt anspringen |
 | `Ctrl+P` | Animation-Preview-Fenster (Live-Loop) |
@@ -152,6 +153,7 @@ Ideal fuer Charakter-Sprites, Symbole, Logos.
 |---|---|
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` (oder `Ctrl+Shift+Z`) |
 | Ausschneiden / Kopieren / Einfuegen | `Ctrl+X` / `Ctrl+C` / `Ctrl+V` |
+| Als neues Frame einfuegen | `Ctrl+Shift+V` |
 | Auswahl loeschen | `Delete` |
 | Auswahl aufheben | `Escape` |
 | Horizontal spiegeln | `Ctrl+H` |

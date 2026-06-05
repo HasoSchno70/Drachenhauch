@@ -78,6 +78,22 @@ class SpriteDoc:
         self.dirty = True
         return self.current_index
 
+    def paste_as_frame(self, img: Image.Image) -> int:
+        """Fuegt nach dem aktuellen Frame ein neues ein, das `img` enthaelt
+        (auf Dokumentgroesse oben-links eingepasst -- groesseres wird
+        beschnitten, kleineres transparent aufgefuellt). Liefert den Index
+        des neuen Frames."""
+        canvas = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
+        src = img.convert("RGBA")
+        if src.width > self.width or src.height > self.height:
+            src = src.crop((0, 0, min(self.width, src.width),
+                            min(self.height, src.height)))
+        canvas.alpha_composite(src)
+        self.frames.insert(self.current_index + 1, Frame(pixels=canvas))
+        self.current_index += 1
+        self.dirty = True
+        return self.current_index
+
     def delete_frame(self) -> bool:
         if len(self.frames) <= 1:
             return False

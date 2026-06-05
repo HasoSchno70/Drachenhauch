@@ -121,3 +121,32 @@ def test_incomplete_mock_does_not_satisfy_protocol():
         # FEHLEND: in_bounds, mark_dirty, set_fg, set_bg, activate_tool, ...
 
     assert not isinstance(IncompleteApp(), ToolHost)
+
+
+# --- Paste-as-Frame (UI-Aktion) -------------------------------------
+
+def test_paste_as_frame_action_uses_internal_clipboard():
+    """action_paste_as_frame fuegt den internen Clipboard-Inhalt als neues
+    Frame ein."""
+    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from pathlib import Path
+    from PIL import Image
+    w = SpriteEditorWindow(Path("."))
+    n0 = len(w.doc.frames)
+    clip = Image.new("RGBA", (w.doc.width, w.doc.height), (0, 0, 0, 0))
+    clip.putpixel((1, 1), (1, 2, 3, 255))
+    w._clipboard_pil = clip
+    w.action_paste_as_frame()
+    assert len(w.doc.frames) == n0 + 1
+    assert w.doc.current.pixels.getpixel((1, 1)) == (1, 2, 3, 255)
+
+
+def test_paste_as_frame_action_empty_clipboard_noop():
+    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from pathlib import Path
+    w = SpriteEditorWindow(Path("."))
+    w._clipboard_pil = None
+    # Kein System-Clipboard-Bild im Offscreen-Test -> kein neues Frame.
+    n0 = len(w.doc.frames)
+    w.action_paste_as_frame()
+    assert len(w.doc.frames) == n0

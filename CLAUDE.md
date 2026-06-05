@@ -1544,7 +1544,8 @@ mit `document.py` (Datenmodell), `tools.py` (Pixel-Tools), `tool_context.py`
 **Tools:** Pencil, Eraser, Bucket, Line, Rect, Ellipse, Eyedropper, Select,
 Move, Magic Wand, Spray. Plus Multi-Frame-Animation, Onion-Skin, Symmetrie
 X/Y, Tile-Preview-3×3, Palette-Im-/Export (.gpl), Sheet-Import, Crop, Resize,
-Farbe-Ersetzen, Flip/Rotate.
+Farbe-Ersetzen, Flip/Rotate, Paste-as-new-Frame (`Ctrl+Shift+V`, intern oder
+System-Clipboard-Bild).
 
 **Export-Formate** (alle in `SpriteDoc.save_*`-Methoden):
 - `save_native(path)` — .gbsprite (JSON + base64-RGBA pro Frame, mit Frame-Dauern)
