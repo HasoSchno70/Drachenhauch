@@ -2366,6 +2366,20 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "keypressed" => Value::Bool(g!().key_down(gi(a,0,"KEYPRESSED")?)),
+            "inkey$" | "inkey" => Value::Str(g!().inkey().into()),
+            "waitkey" => Value::Int(g!().waitkey()),
+            // SCROLL verschiebt persistente Framebuffer-Pixel -- die native
+            // Runtime zeichnet jeden Frame neu aus dem Command-Buffer (Layer
+            // werden pro FLIP geleert), es gibt also keine persistenten Pixel
+            // zum Verschieben. Graceful No-Op (Programm laeuft); SCROLL ist
+            // Tree-Walker-only (siehe docs/befehlssatz-roadmap.md).
+            "scroll" => { let _ = (gi(a,0,"SCROLL")?, gi(a,1,"SCROLL")?); Value::Nil }
+            "joystick_count" => Value::Int(g!().joystick_count()),
+            "joystick_name" => Value::Str(g!().joystick_name(gi(a,0,"JOYSTICK_NAME")?)?.into()),
+            "joystick_axis" => Value::Float(g!().joystick_axis(gi(a,0,"JOYSTICK_AXIS")?, gi(a,1,"JOYSTICK_AXIS")?)?),
+            "joystick_button" => Value::Bool(g!().joystick_button(gi(a,0,"JOYSTICK_BUTTON")?, gi(a,1,"JOYSTICK_BUTTON")?)?),
+            "joystick_hat_x" => Value::Int(g!().joystick_hat_x(gi(a,0,"JOYSTICK_HAT_X")?, gi(a,1,"JOYSTICK_HAT_X")?)?),
+            "joystick_hat_y" => Value::Int(g!().joystick_hat_y(gi(a,0,"JOYSTICK_HAT_Y")?, gi(a,1,"JOYSTICK_HAT_Y")?)?),
             "quitrequested" => Value::Bool(g!().quit_requested()),
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),

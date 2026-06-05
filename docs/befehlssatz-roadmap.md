@@ -33,9 +33,16 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `draw_image_part`, Camera/Zoom korrekt) + Dispatch in `vm.rs`. Rendert jetzt
       tatsaechlich nativ (CLAUDE.md-Aussage damit korrekt). Manuell verifiziert
       (kein stdout fuer Parity).
-- [ ] **`INKEY$`/`WAITKEY`/`SCROLL` + Core-`JOYSTICK_*` nativ** (oder sauber als
-      Tree-Walker-only dokumentieren). Gamepad geht nativ nur via `IMPORT
-      "input"`.
+- [x] **`INKEY$`/`WAITKEY` + Core-`JOYSTICK_*` nativ; `SCROLL` TW-only.**
+      - `INKEY$` (raylib `get_char_pressed`), `WAITKEY` (blockt via
+        `window_should_close`-Pump → raylib-Keycode, -1 bei Fensterschluss).
+      - `JOYSTICK_COUNT/NAME/AXIS` exakt auf raylib-Gamepad; `BUTTON/HAT` als
+        Best-Effort (raylib-Standard-Layout; Roh-Index weicht von pygame ab →
+        fuer praezise Bindings `IMPORT "input"`). Ungueltiger Joystick-INDEX
+        wirft wie der TW (Sub-Index liefert 0/false).
+      - `SCROLL`: gbrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
+        persistenter Framebuffer) → graceful No-Op, **Tree-Walker-only**
+        (Kommentar in `vm.rs`).
 - [ ] **Float-Koordinaten angleichen.** TW lehnt `LINE(10.5,…)` ab
       (`_check_int`), gbrt akzeptiert + truncated. → TW-Zeichenprimitive
       (LINE/BOX/RECT/CIRCLE/PLOT/GRADIENT*) auf `_check_intish` umstellen

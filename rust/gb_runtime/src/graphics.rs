@@ -1850,6 +1850,102 @@ impl Graphics {
         }
         false
     }
+    // --- Core-Tastatur: INKEY$ / WAITKEY ---
+    /// INKEY$: naechstes getipptes (druckbares) Zeichen oder leerer String.
+    /// Non-blocking; liest aus raylibs Tipp-Queue (gefuellt beim letzten FLIP).
+    pub fn inkey(&mut self) -> String {
+        match self.rl.get_char_pressed() {
+            Some(c) => c.to_string(),
+            None => String::new(),
+        }
+    }
+    /// WAITKEY: blockiert bis eine Taste gedrueckt wird, liefert den raylib-
+    /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. (Der Code-Wert
+    /// folgt raylibs KeyboardKey-Enum, nicht SDL -- Eingabe ist ohnehin nicht
+    /// Parity-relevant.)
+    pub fn waitkey(&mut self) -> i64 {
+        loop {
+            // window_should_close() ruft intern PollInputEvents -> fuellt die
+            // Key-Queue, ohne dass ein FLIP noetig ist.
+            if self.rl.window_should_close() { return -1; }
+            if let Some(k) = self.rl.get_key_pressed() { return k as i64; }
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+    }
+
+    // --- Core-Joystick (JOYSTICK_*): direkte raylib-Gamepad-Abfrage ---
+    // Ein ungueltiger Joystick-INDEX wirft (wie der Tree-Walker), ein ungueltiger
+    // Achsen-/Button-/Hat-Unterindex liefert dagegen 0/false (kein Fehler).
+    pub fn joystick_count(&self) -> i64 { self.joy_count() }
+    fn joystick_check(&self, idx: i64, fn_: &str) -> Result<(), String> {
+        if idx < 0 || !self.rl.is_gamepad_available(idx as i32) {
+            let n = self.joy_count();
+            return Err(if n > 0 {
+                format!("{}: Joystick-Index {} ausserhalb [0..{}]", fn_, idx, n - 1)
+            } else {
+                format!("{}: Joystick-Index {} - kein Gamepad angeschlossen", fn_, idx)
+            });
+        }
+        Ok(())
+    }
+    pub fn joystick_name(&self, idx: i64) -> Result<String, String> {
+        self.joystick_check(idx, "JOYSTICK_NAME")?;
+        Ok(self.joy_name(idx))
+    }
+    /// JOYSTICK_AXIS(idx, axis): rohe Achse (-1..+1), Achs-Index 0..5.
+    pub fn joystick_axis(&self, idx: i64, axis: i64) -> Result<f64, String> {
+        self.joystick_check(idx, "JOYSTICK_AXIS")?;
+        Ok(self.joy_axis(idx, axis as i32))
+    }
+    /// JOYSTICK_BUTTON(idx, btn): btn folgt raylibs GamepadButton-Reihenfolge
+    /// (0..17). Best-effort -- die Roh-Index-Zuordnung weicht von pygame ab;
+    /// fuer praezise Bindings IMPORT "input" (JOY_BUTTON_*) nutzen.
+    pub fn joystick_button(&self, idx: i64, btn: i64) -> Result<bool, String> {
+        use raylib::consts::GamepadButton::*;
+        self.joystick_check(idx, "JOYSTICK_BUTTON")?;
+        let b = match btn {
+            0 => GAMEPAD_BUTTON_UNKNOWN,
+            1 => GAMEPAD_BUTTON_LEFT_FACE_UP,
+            2 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
+            3 => GAMEPAD_BUTTON_LEFT_FACE_DOWN,
+            4 => GAMEPAD_BUTTON_LEFT_FACE_LEFT,
+            5 => GAMEPAD_BUTTON_RIGHT_FACE_UP,
+            6 => GAMEPAD_BUTTON_RIGHT_FACE_RIGHT,
+            7 => GAMEPAD_BUTTON_RIGHT_FACE_DOWN,
+            8 => GAMEPAD_BUTTON_RIGHT_FACE_LEFT,
+            9 => GAMEPAD_BUTTON_LEFT_TRIGGER_1,
+            10 => GAMEPAD_BUTTON_LEFT_TRIGGER_2,
+            11 => GAMEPAD_BUTTON_RIGHT_TRIGGER_1,
+            12 => GAMEPAD_BUTTON_RIGHT_TRIGGER_2,
+            13 => GAMEPAD_BUTTON_MIDDLE_LEFT,
+            14 => GAMEPAD_BUTTON_MIDDLE,
+            15 => GAMEPAD_BUTTON_MIDDLE_RIGHT,
+            16 => GAMEPAD_BUTTON_LEFT_THUMB,
+            17 => GAMEPAD_BUTTON_RIGHT_THUMB,
+            _ => return Ok(false),
+        };
+        Ok(self.rl.is_gamepad_button_down(idx as i32, b))
+    }
+    /// JOYSTICK_HAT_X(idx, hat): nur hat 0 -- aus dem D-Pad abgeleitet
+    /// (raylib hat keine Hats). +1 rechts, -1 links, 0 sonst.
+    pub fn joystick_hat_x(&self, idx: i64, hat: i64) -> Result<i64, String> {
+        use raylib::consts::GamepadButton::*;
+        self.joystick_check(idx, "JOYSTICK_HAT_X")?;
+        if hat != 0 { return Ok(0); }
+        let r = self.rl.is_gamepad_button_down(idx as i32, GAMEPAD_BUTTON_LEFT_FACE_RIGHT);
+        let l = self.rl.is_gamepad_button_down(idx as i32, GAMEPAD_BUTTON_LEFT_FACE_LEFT);
+        Ok((r as i64) - (l as i64))
+    }
+    /// JOYSTICK_HAT_Y(idx, hat): +1 oben, -1 unten (D-Pad, hat 0).
+    pub fn joystick_hat_y(&self, idx: i64, hat: i64) -> Result<i64, String> {
+        use raylib::consts::GamepadButton::*;
+        self.joystick_check(idx, "JOYSTICK_HAT_Y")?;
+        if hat != 0 { return Ok(0); }
+        let u = self.rl.is_gamepad_button_down(idx as i32, GAMEPAD_BUTTON_LEFT_FACE_UP);
+        let d = self.rl.is_gamepad_button_down(idx as i32, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
+        Ok((u as i64) - (d as i64))
+    }
+
     /// Leert raylibs Tipp-Zeichen-Queue dieses Frames und liefert die getippten
     /// Zeichen als String (für UI_TEXTFIELD). Wie pygames Text-Input-Puffer.
     pub fn pop_text_input(&mut self) -> String {
