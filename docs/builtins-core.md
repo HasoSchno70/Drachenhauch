@@ -48,14 +48,24 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 |---|---|
 | `SIN(x)`, `COS(x)`, `TAN(x)` | Trigonometrie (x in Radiant) |
 | `ATAN(x)`, `ATAN2(y, x)` | Arcus-Tangens |
+| `ASIN(x)`, `ACOS(x)` | Arcus-Sinus/-Cosinus (x in `[-1, 1]`) |
 | `SQR(x)` | Quadratwurzel (x ≥ 0) |
+| `HYPOT(x, y)` | `SQR(x*x + y*y)` ohne Overflow |
 | `POW(b, e)` | b hoch e |
 | `EXP(x)` | e^x |
 | `LOG(x[, base])` | Logarithmus, default natürlich |
+| `DEG(rad)`, `RAD(grad)` | Radiant ↔ Grad |
 | `FLOOR(x)`, `CEIL(x)`, `ROUND(x)` | INT-Konvertierung |
+| `ROUND(x, dezimalstellen)` → FLOAT | auf N Nachkommastellen runden |
 | `MIN(a, b, ...)`, `MAX(a, b, ...)` | variadic |
 | `CLAMP(v, lo, hi)` | beschränkt v auf `[lo, hi]` |
+| `LERP(a, b, t)` | lineare Interpolation a..b (t nicht geklemmt) |
+| `REMAP(v, in_lo, in_hi, out_lo, out_hi)` | linear umskalieren |
+| `FRAC(x)` | Nachkommaanteil (vorzeichenbehaftet): `x - TRUNC(x)` |
 | `SIGN(x)` | -1, 0 oder 1 |
+
+Konstanten: `PI`, `TAU` (= 2·PI). (`E` ist absichtlich keine Konstante — `e`
+ist ein häufiger `CATCH e`-Variablenname; nutze `EXP(1)`.)
 
 ```basic
 PRINT SIN(PI / 2)            ' 1.0
@@ -64,12 +74,31 @@ PRINT MIN(5, 2, 9, 1, 7)     ' 1
 PRINT MAX(5, 2, 9, 1, 7)     ' 9
 PRINT CLAMP(150, 0, 100)     ' 100
 PRINT SIGN(-7)               ' -1
+PRINT ROUND(3.14159, 2)      ' 3.14
+PRINT DEG(PI)                ' 180.0
+PRINT LERP(0.0, 10.0, 0.25)  ' 2.5
+PRINT REMAP(5, 0, 10, 0, 100) ' 50.0
 
 ' Vektor-Länge und Winkel
 DIM laenge AS FLOAT
 DIM winkel_grad AS FLOAT
-laenge = SQR(3 * 3 + 4 * 4)            ' 5.0
-winkel_grad = ATAN2(4.0, 3.0) * 180.0 / PI
+laenge = HYPOT(3.0, 4.0)              ' 5.0
+winkel_grad = DEG(ATAN2(4.0, 3.0))
+```
+
+### Farb-Helfer
+
+| Funktion | Zweck |
+|---|---|
+| `RGB(r, g, b)` → INTEGER | siehe Konvertierung |
+| `RED(c)`, `GREEN(c)`, `BLUE(c)` → INTEGER | Kanal 0..255 aus `0xRRGGBB` |
+| `HSV(h, s, v)` → INTEGER | HSV (h in Grad, s/v in `[0,1]`) → `0xRRGGBB` |
+| `COLOR_LERP(c1, c2, t)` → INTEGER | zwei Farben kanalweise mischen (t 0..1) |
+
+```basic
+PRINT RED(0xFF8000)          ' 255
+PRINT HSV(120.0, 1.0, 1.0)   ' 65280 (= 0x00FF00, Grün)
+PRINT COLOR_LERP(0, 0xFFFFFF, 0.5)  ' 8421504 (= 0x808080)
 ```
 
 ## Strings
@@ -241,6 +270,10 @@ END IF
 | `DATE$()` → STRING | aktuelles Datum `"YYYY-MM-DD"` |
 | `RND()` → FLOAT | Zufallszahl in `[0, 1)` |
 | `RND(n)` → INTEGER | Zufalls-INT in `[0, n)` |
+| `RANDINT(lo, hi)` → INTEGER | Zufalls-INT in `[lo, hi]` (inklusiv) |
+| `RANDF(lo, hi)` → FLOAT | Zufalls-FLOAT in `[lo, hi)` |
+| `CHOICE(array)` → T | zufälliges Element eines 1D-Arrays |
+| `SHUFFLE(array)` | mischt ein 1D-Array IN PLACE (Fisher-Yates) |
 | `RANDOMIZE([seed])` | Zufalls-Seed setzen (ohne Arg: System-Seed) |
 
 ```basic

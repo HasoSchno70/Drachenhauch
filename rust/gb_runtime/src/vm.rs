@@ -375,6 +375,7 @@ impl<'p> Vm<'p> {
         for (n, v) in DEFAULT_COLORS { put(n, "integer", Value::Int(*v)); }
         for (n, v) in DEFAULT_KEYS { put(n, "integer", Value::Int(*v)); }
         put("pi", "float", Value::Float(std::f64::consts::PI));
+        put("tau", "float", Value::Float(std::f64::consts::TAU));
     }
 
     pub fn run(&mut self) -> R<()> {
@@ -2387,6 +2388,11 @@ impl<'p> Vm<'p> {
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),
             "mousebutton" => Value::Bool(g!().mouse_button(gi(a,0,"MOUSEBUTTON")?)),
+            // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
+            // pop_mouse_wheel ohne Fenster = 0).
+            "mousewheel" => Value::Int(self.gfx.as_ref().map(|g| g.pop_mouse_wheel()).unwrap_or(0)),
+            "screenwidth" => Value::Int(self.gfx.as_ref().map(|g| g.screen_width()).unwrap_or(0)),
+            "screenheight" => Value::Int(self.gfx.as_ref().map(|g| g.screen_height()).unwrap_or(0)),
             // raylib-Default-Font hat keine Bold/Italic-Variante -> No-Op
             // (visuelle Abweichung, Programm laeuft). Arg wird ignoriert.
             "text_bold" | "text_italic" => Value::Nil,

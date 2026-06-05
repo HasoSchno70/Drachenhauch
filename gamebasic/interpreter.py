@@ -674,10 +674,14 @@ class Interpreter:
             self.global_env.declare(name, "integer", value)
         for name, value in KEYS.items():
             self.global_env.declare(name, "integer", value)
-        # Math-Konstante (E wird absichtlich nicht registriert, weil 'e' ein
-        # haeufiger CATCH-Variable-Name ist; nutze EXP(1) wenn noetig).
+        # Math-Konstanten. E wird absichtlich NICHT registriert: 'e' ist ein
+        # haeufiger CATCH-Variable-Name (CATCH e bindet 'e' global) -- eine
+        # gleichnamige Konstante wuerde das brechen. Nutze EXP(1) wenn noetig.
+        # TAU (2*pi) ist unkritisch (kein haeufiger Variablenname).
         self.global_env.declare("pi", "float", math.pi)
         self.global_env.get_slot("pi")["const"] = True
+        self.global_env.declare("tau", "float", math.tau)
+        self.global_env.get_slot("tau")["const"] = True
 
     def _get_graphics(self):
         if self._graphics is None:
@@ -2960,6 +2964,65 @@ def _b_rgb(r, g, b):
     return (r << 16) | (g << 8) | b
 
 
+@builtin("RED", arity=1, types=("int",))
+def _b_red(c):
+    """Rot-Kanal (0..255) aus einer gepackten 0xRRGGBB-Farbe."""
+    return (c >> 16) & 0xFF
+
+
+@builtin("GREEN", arity=1, types=("int",))
+def _b_green(c):
+    """Gruen-Kanal (0..255)."""
+    return (c >> 8) & 0xFF
+
+
+@builtin("BLUE", arity=1, types=("int",))
+def _b_blue(c):
+    """Blau-Kanal (0..255)."""
+    return c & 0xFF
+
+
+def _round_u8(x):
+    """Half-up-Rundung auf 0..255 (identisch in beiden Pfaden -- nie negativ)."""
+    return int(math.floor(x + 0.5))
+
+
+@builtin("COLOR_LERP", arity=3, types=("int", "int", "num"))
+def _b_color_lerp(c1, c2, t):
+    """Mischt zwei Farben kanalweise; t (0..1 geklemmt)."""
+    if t < 0.0: t = 0.0
+    elif t > 1.0: t = 1.0
+    r1, g1, b1 = (c1 >> 16) & 0xFF, (c1 >> 8) & 0xFF, c1 & 0xFF
+    r2, g2, b2 = (c2 >> 16) & 0xFF, (c2 >> 8) & 0xFF, c2 & 0xFF
+    r = _round_u8(r1 + (r2 - r1) * t)
+    g = _round_u8(g1 + (g2 - g1) * t)
+    b = _round_u8(b1 + (b2 - b1) * t)
+    return (r << 16) | (g << 8) | b
+
+
+@builtin("HSV", arity=3, types=("num", "num", "num"))
+def _b_hsv(h, s, v):
+    """HSV -> gepackte 0xRRGGBB-Farbe. h in Grad (gewrappt), s/v in [0,1]."""
+    h = h % 360.0
+    if s < 0.0: s = 0.0
+    elif s > 1.0: s = 1.0
+    if v < 0.0: v = 0.0
+    elif v > 1.0: v = 1.0
+    c = v * s
+    x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
+    m = v - c
+    if h < 60.0:    r1, g1, b1 = c, x, 0.0
+    elif h < 120.0: r1, g1, b1 = x, c, 0.0
+    elif h < 180.0: r1, g1, b1 = 0.0, c, x
+    elif h < 240.0: r1, g1, b1 = 0.0, x, c
+    elif h < 300.0: r1, g1, b1 = x, 0.0, c
+    else:           r1, g1, b1 = c, 0.0, x
+    r = _round_u8((r1 + m) * 255.0)
+    g = _round_u8((g1 + m) * 255.0)
+    b = _round_u8((b1 + m) * 255.0)
+    return (r << 16) | (g << 8) | b
+
+
 # --- Math-Builtins -----------------------------------------------------
 
 def _check_num(v, fn: str):
@@ -3003,9 +3066,19 @@ def _b_ceil(x):
     return int(math.ceil(x))
 
 
-@builtin("ROUND", arity=1, types=("num",))
-def _b_round(x):
-    return int(round(x))
+@builtin("ROUND", arity=(1, 2))
+def _b_round(*args):
+    x = _check_num(args[0], "ROUND")
+    if len(args) == 1:
+        return int(round(x))
+    n = args[1]
+    if isinstance(n, bool) or not isinstance(n, int):
+        raise TypeMismatchError("ROUND: decimals muss INTEGER sein")
+    if n < 0:
+        raise GBRuntimeError("ROUND: decimals muss >= 0 sein")
+    # Auf n Nachkommastellen runden (Half-to-even via Decimal-Formatierung).
+    # Beide Pfade nutzen exakt diese Methode -> bit-identische Ausgabe.
+    return float(f"{x:.{n}f}")
 
 
 @builtin("LOG", arity=(1, 2))
@@ -3056,6 +3129,57 @@ def _b_sign(v):
     return 0
 
 
+@builtin("ASIN", arity=1, types=("num",))
+def _b_asin(x):
+    if x < -1.0 or x > 1.0:
+        raise GBRuntimeError("ASIN: Argument muss in [-1, 1] liegen")
+    return math.asin(x)
+
+
+@builtin("ACOS", arity=1, types=("num",))
+def _b_acos(x):
+    if x < -1.0 or x > 1.0:
+        raise GBRuntimeError("ACOS: Argument muss in [-1, 1] liegen")
+    return math.acos(x)
+
+
+@builtin("HYPOT", arity=2, types=("num", "num"))
+def _b_hypot(x, y):
+    return math.hypot(x, y)
+
+
+@builtin("DEG", arity=1, types=("num",))
+def _b_deg(rad):
+    """Radiant -> Grad."""
+    return rad * 180.0 / math.pi
+
+
+@builtin("RAD", arity=1, types=("num",))
+def _b_rad(deg):
+    """Grad -> Radiant."""
+    return deg * math.pi / 180.0
+
+
+@builtin("LERP", arity=3, types=("num", "num", "num"))
+def _b_lerp(a, b, t):
+    """Lineare Interpolation a..b bei Faktor t (t nicht geklemmt)."""
+    return a + (b - a) * t
+
+
+@builtin("REMAP", arity=5, types=("num", "num", "num", "num", "num"))
+def _b_remap(v, in_lo, in_hi, out_lo, out_hi):
+    """Bildet v aus [in_lo, in_hi] linear auf [out_lo, out_hi] ab."""
+    if in_hi == in_lo:
+        raise GBRuntimeError("REMAP: in_lo und in_hi duerfen nicht gleich sein")
+    return out_lo + (v - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)
+
+
+@builtin("FRAC", arity=1, types=("num",))
+def _b_frac(x):
+    """Nachkommaanteil (vorzeichenbehaftet): x - TRUNC(x)."""
+    return float(x) - math.trunc(x)
+
+
 # --- Zeit / Random ----------------------------------------------------
 
 import time as _time
@@ -3076,6 +3200,42 @@ def _b_randomize(*args):
         random.seed(seed)
     else:
         random.seed()
+    return None
+
+
+@builtin("RANDINT", arity=2, types=("int", "int"))
+def _b_randint(lo, hi):
+    """Zufaellige INTEGER in [lo, hi] (beide inklusiv)."""
+    if lo > hi:
+        raise GBRuntimeError("RANDINT: lo darf nicht groesser als hi sein")
+    return random.randint(lo, hi)
+
+
+@builtin("RANDF", arity=2, types=("num", "num"))
+def _b_randf(lo, hi):
+    """Zufaellige FLOAT in [lo, hi)."""
+    return lo + random.random() * (hi - lo)
+
+
+@builtin("CHOICE", arity=1)
+def _b_choice(arr):
+    """Zufaelliges Element eines 1D-Arrays."""
+    arr = _check_array_1d(arr, "CHOICE")
+    n = arr.total_size()
+    if n == 0:
+        raise GBRuntimeError("CHOICE: Array ist leer")
+    return arr.values[random.randint(0, n - 1)]
+
+
+@builtin("SHUFFLE", arity=1)
+def _b_shuffle(arr):
+    """Mischt ein 1D-Array IN PLACE (Fisher-Yates)."""
+    arr = _check_array_1d(arr, "SHUFFLE")
+    vals = arr.values
+    n = len(vals)
+    for i in range(n - 1, 0, -1):
+        j = random.randint(0, i)
+        vals[i], vals[j] = vals[j], vals[i]
     return None
 
 
@@ -4177,6 +4337,24 @@ def _g_mouse_y(g):
 @graphics_builtin("MOUSEBUTTON", arity=1, types=("intish",))
 def _g_mouse_button(g, n):
     return g.mouse_button(n)
+
+
+@graphics_builtin("MOUSEWHEEL", arity=0)
+def _g_mouse_wheel(g):
+    """Mausrad-Bewegung seit dem letzten Aufruf (+ hoch, - runter, 0 sonst)."""
+    return g.pop_mouse_wheel()
+
+
+@graphics_builtin("SCREENWIDTH", arity=0)
+def _g_screen_width(g):
+    """Logische Breite des Fensters (wie an SCREEN uebergeben); 0 vor SCREEN."""
+    return g._buf_size[0]
+
+
+@graphics_builtin("SCREENHEIGHT", arity=0)
+def _g_screen_height(g):
+    """Logische Hoehe des Fensters; 0 vor SCREEN."""
+    return g._buf_size[1]
 
 
 @graphics_builtin("LOADIMAGE", arity=1, types=("str",))

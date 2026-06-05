@@ -104,6 +104,16 @@ PRINT ARRAY_INDEXOF(a, 2)''',
 MAPPUT(m, "x", 5)
 MAPPUT(m, "y", 9)
 PRINT MAPGET(m, "x"), MAPHAS(m, "x"), MAPHAS(m, "z")''',
+    "math_wp2": '''PRINT ASIN(0.5), ACOS(0.5), HYPOT(5.0, 12.0)
+PRINT DEG(PI), RAD(90.0)
+PRINT LERP(10.0, 20.0, 0.3), REMAP(7.0, 0.0, 10.0, 100.0, 200.0)
+PRINT FRAC(3.25), FRAC(-3.25), TAU''',
+    "color_wp2": '''PRINT RED(16742144), GREEN(16742144), BLUE(16742144)
+PRINT HSV(0.0,1.0,1.0), HSV(60.0,1.0,1.0), HSV(180.0,0.5,0.8), HSV(270.0,1.0,0.5)
+PRINT COLOR_LERP(255, 16711680, 0.5), COLOR_LERP(0, 16777215, 0.333)''',
+    "round_decimals": '''PRINT ROUND(3.14159, 3), ROUND(2.675, 2), ROUND(0.5, 0)
+PRINT ROUND(1.5, 0), ROUND(2.5), ROUND(123.456, 1), ROUND(-2.675, 2)''',
+    "screen_dims_before": 'PRINT SCREENWIDTH(), SCREENHEIGHT()',
     "physics_broad": '''IMPORT "physics"
 DIM b AS PHYSICS_BROAD
 b = PHYSICS_BROAD_NEW()
@@ -338,6 +348,42 @@ def test_example_tw_eq_gbrt(name):
 
 # --- Uhr-Builtins (TIME$/DATE$): kein Exakt-Vergleich (Wert variiert), aber
 #     beide Pfade muessen dasselbe FORMAT liefern (HH:MM:SS / YYYY-MM-DD). -----
+
+def test_random_wp2_behaviour_tw_and_gbrt():
+    """RANDINT/RANDF/CHOICE/SHUFFLE: PRNG != Python -> Werte erwartet
+    unterschiedlich; geprueft wird nur Bereich/Invariante in BEIDEN Pfaden."""
+    src = '''RANDOMIZE(42)
+DIM i AS INTEGER
+DIM okint AS INTEGER
+okint = 1
+FOR i = 1 TO 500
+DIM r AS INTEGER
+r = RANDINT(5, 10)
+IF r < 5 OR r > 10 THEN okint = 0
+NEXT
+DIM okf AS INTEGER
+okf = 1
+FOR i = 1 TO 500
+DIM f AS FLOAT
+f = RANDF(2.0, 3.0)
+IF f < 2.0 OR f >= 3.0 THEN okf = 0
+NEXT
+DIM a[5] AS INTEGER
+a[0]=10 : a[1]=20 : a[2]=30 : a[3]=40 : a[4]=50
+DIM c AS INTEGER
+c = CHOICE(a)
+SHUFFLE(a)
+DIM total AS INTEGER
+total = 0
+FOR i = 0 TO 4
+total = total + a[i]
+NEXT
+PRINT okint, okf, total'''
+    expected = "1 1 150"
+    for label, out in (("TW", _tw(src)), ("gbrt", _gbrt(src))):
+        assert out.replace("\r\n", "\n").strip() == expected, \
+            f"{label}: erwartet {expected!r}, erhalten {out!r}"
+
 
 def test_time_date_format_tw_and_gbrt():
     import re

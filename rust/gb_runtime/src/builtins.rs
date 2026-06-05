@@ -421,6 +421,47 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             RNG.with(|s| s.set(if seed == 0 { 1 } else { seed }));
             Ok(Value::Nil)
         }
+        "randint" => {
+            // RANDINT(lo, hi) -> Int [lo, hi] (inklusiv). PRNG != Python ->
+            // erwartet unterschiedlich in der Parity.
+            arity!(2);
+            let lo = need_int(&a[0], "RANDINT")?;
+            let hi = need_int(&a[1], "RANDINT")?;
+            if lo > hi { return err("RANDINT: lo darf nicht groesser als hi sein".to_string()); }
+            let span = (hi - lo) as u64 + 1;
+            Ok(Value::Int(lo + (next_rand() % span) as i64))
+        }
+        "randf" => {
+            arity!(2);
+            let lo = need_num(&a[0], "RANDF")?;
+            let hi = need_num(&a[1], "RANDF")?;
+            let r = (next_rand() >> 11) as f64 / (1u64 << 53) as f64;
+            Ok(Value::Float(lo + r * (hi - lo)))
+        }
+        "choice" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let arr = arr.borrow();
+                if arr.dims.len() != 1 { return err("CHOICE: nur 1D-Arrays".to_string()); }
+                let n = arr.values.len();
+                if n == 0 { return err("CHOICE: Array ist leer".to_string()); }
+                Ok(arr.values[(next_rand() % n as u64) as usize].clone())
+            } else { err("CHOICE erwartet ARRAY".to_string()) }
+        }
+        "shuffle" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let mut arr = arr.borrow_mut();
+                if arr.dims.len() != 1 { return err("SHUFFLE: nur 1D-Arrays".to_string()); }
+                let n = arr.values.len();
+                // Fisher-Yates (selbe Schleifenrichtung wie der Tree-Walker).
+                for i in (1..n).rev() {
+                    let j = (next_rand() % (i as u64 + 1)) as usize;
+                    arr.values.swap(i, j);
+                }
+                Ok(Value::Nil)
+            } else { err("SHUFFLE erwartet ARRAY".to_string()) }
+        }
         "millis" => {
             use std::time::{SystemTime, UNIX_EPOCH};
             let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
@@ -580,7 +621,21 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "atan2" => { arity!(2); Ok(Value::Float(need_num(&a[0], "ATAN2")?.atan2(need_num(&a[1], "ATAN2")?))) }
         "floor" => { arity!(1); Ok(Value::Int(need_num(&a[0], "FLOOR")?.floor() as i64)) }
         "ceil" => { arity!(1); Ok(Value::Int(need_num(&a[0], "CEIL")?.ceil() as i64)) }
-        "round" => { arity!(1); Ok(Value::Int(round_half_even(need_num(&a[0], "ROUND")?))) }
+        "round" => {
+            if a.len() == 1 {
+                Ok(Value::Int(round_half_even(need_num(&a[0], "ROUND")?)))
+            } else if a.len() == 2 {
+                let x = need_num(&a[0], "ROUND")?;
+                let n = need_int(&a[1], "ROUND")?;
+                if n < 0 { return err("ROUND: decimals muss >= 0 sein".to_string()); }
+                // Auf n Nachkommastellen runden via Decimal-Formatierung
+                // (Half-to-even) -- exakt wie Python f"{x:.{n}f}".
+                let s = format!("{:.*}", n as usize, x);
+                Ok(Value::Float(s.parse::<f64>().unwrap_or(x)))
+            } else {
+                err(format!("ROUND: erwartet 1 oder 2 Argument(e), erhalten {}", a.len()))
+            }
+        }
         "log" => {
             let x = need_num(&a[0], "LOG")?;
             if x <= 0.0 { return err("LOG: Argument muss > 0 sein".to_string()); }
@@ -617,6 +672,73 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             arity!(1);
             let v = need_num(&a[0], "SIGN")?;
             Ok(Value::Int(if v > 0.0 { 1 } else if v < 0.0 { -1 } else { 0 }))
+        }
+        "asin" => {
+            arity!(1);
+            let x = need_num(&a[0], "ASIN")?;
+            if x < -1.0 || x > 1.0 { return err("ASIN: Argument muss in [-1, 1] liegen".to_string()); }
+            Ok(Value::Float(x.asin()))
+        }
+        "acos" => {
+            arity!(1);
+            let x = need_num(&a[0], "ACOS")?;
+            if x < -1.0 || x > 1.0 { return err("ACOS: Argument muss in [-1, 1] liegen".to_string()); }
+            Ok(Value::Float(x.acos()))
+        }
+        "hypot" => { arity!(2); Ok(Value::Float(need_num(&a[0], "HYPOT")?.hypot(need_num(&a[1], "HYPOT")?))) }
+        "deg" => { arity!(1); Ok(Value::Float(need_num(&a[0], "DEG")? * 180.0 / std::f64::consts::PI)) }
+        "rad" => { arity!(1); Ok(Value::Float(need_num(&a[0], "RAD")? * std::f64::consts::PI / 180.0)) }
+        "lerp" => {
+            arity!(3);
+            let (av, bv, t) = (need_num(&a[0], "LERP")?, need_num(&a[1], "LERP")?, need_num(&a[2], "LERP")?);
+            Ok(Value::Float(av + (bv - av) * t))
+        }
+        "remap" => {
+            arity!(5);
+            let v = need_num(&a[0], "REMAP")?;
+            let (in_lo, in_hi) = (need_num(&a[1], "REMAP")?, need_num(&a[2], "REMAP")?);
+            let (out_lo, out_hi) = (need_num(&a[3], "REMAP")?, need_num(&a[4], "REMAP")?);
+            if in_hi == in_lo { return err("REMAP: in_lo und in_hi duerfen nicht gleich sein".to_string()); }
+            Ok(Value::Float(out_lo + (v - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)))
+        }
+        "frac" => {
+            arity!(1);
+            let x = need_num(&a[0], "FRAC")?;
+            Ok(Value::Float(x - x.trunc()))
+        }
+        "red" => { arity!(1); Ok(Value::Int((need_int(&a[0], "RED")? >> 16) & 0xFF)) }
+        "green" => { arity!(1); Ok(Value::Int((need_int(&a[0], "GREEN")? >> 8) & 0xFF)) }
+        "blue" => { arity!(1); Ok(Value::Int(need_int(&a[0], "BLUE")? & 0xFF)) }
+        "color_lerp" => {
+            arity!(3);
+            let c1 = need_int(&a[0], "COLOR_LERP")?;
+            let c2 = need_int(&a[1], "COLOR_LERP")?;
+            let mut t = need_num(&a[2], "COLOR_LERP")?;
+            if t < 0.0 { t = 0.0; } else if t > 1.0 { t = 1.0; }
+            let lerp_ch = |x1: i64, x2: i64| -> i64 {
+                ((x1 as f64) + ((x2 - x1) as f64) * t + 0.5).floor() as i64
+            };
+            let r = lerp_ch((c1 >> 16) & 0xFF, (c2 >> 16) & 0xFF);
+            let g = lerp_ch((c1 >> 8) & 0xFF, (c2 >> 8) & 0xFF);
+            let b = lerp_ch(c1 & 0xFF, c2 & 0xFF);
+            Ok(Value::Int((r << 16) | (g << 8) | b))
+        }
+        "hsv" => {
+            arity!(3);
+            let h = need_num(&a[0], "HSV")?.rem_euclid(360.0);
+            let s = need_num(&a[1], "HSV")?.clamp(0.0, 1.0);
+            let v = need_num(&a[2], "HSV")?.clamp(0.0, 1.0);
+            let c = v * s;
+            let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+            let m = v - c;
+            let (r1, g1, b1) = if h < 60.0 { (c, x, 0.0) }
+                else if h < 120.0 { (x, c, 0.0) }
+                else if h < 180.0 { (0.0, c, x) }
+                else if h < 240.0 { (0.0, x, c) }
+                else if h < 300.0 { (x, 0.0, c) }
+                else { (c, 0.0, x) };
+            let u8c = |val: f64| -> i64 { ((val + m) * 255.0 + 0.5).floor() as i64 };
+            Ok(Value::Int((u8c(r1) << 16) | (u8c(g1) << 8) | u8c(b1)))
         }
         "padl$" | "padl" | "padr$" | "padr" => {
             let s = need_str(&a[0], "PAD")?;

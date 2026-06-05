@@ -373,6 +373,8 @@ PLAYSOUND(coin_snd)
 | `KEYPRESSED(code)` → BOOLEAN | TRUE solange die Taste mit SDL-Code `code` gehalten wird |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |
 | `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt (0=links, 1=mitte, 2=rechts) |
+| `MOUSEWHEEL()` → INTEGER | Mausrad-Delta seit dem letzten Aufruf (+ hoch / − runter / 0) |
+| `SCREENWIDTH()`, `SCREENHEIGHT()` → INTEGER | logische Fenstergröße (wie an `SCREEN` übergeben); 0 vor `SCREEN` |
 
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:
 

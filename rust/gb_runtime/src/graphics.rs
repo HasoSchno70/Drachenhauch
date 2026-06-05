@@ -1967,6 +1967,10 @@ impl Graphics {
     /// einmal lesen). Positiv = nach oben/vorn.
     pub fn pop_mouse_wheel(&self) -> i64 { self.rl.get_mouse_wheel_move() as i64 }
 
+    /// Logische Fenster-Breite/Hoehe (wie an SCREEN uebergeben).
+    pub fn screen_width(&self) -> i64 { self.width as i64 }
+    pub fn screen_height(&self) -> i64 { self.height as i64 }
+
     // --- Game-Loop-Grundlagen ---
     pub fn delta(&self) -> f64 { self.rl.get_frame_time() as f64 }
     pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
