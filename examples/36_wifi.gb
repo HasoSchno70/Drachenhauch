@@ -1,5 +1,6 @@
 ' WiFi-Management (Windows-only, nutzt netsh wlan)
 ' Keine externe Lib noetig.
+' Native Runtime (gbrt): mit 'python rust/build_runtime.py --hardware' bauen.
 '
 ' Zeigt aktuelles Netzwerk + scannt verfuegbare WiFi-Netze.
 

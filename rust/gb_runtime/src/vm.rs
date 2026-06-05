@@ -3342,6 +3342,21 @@ const DEFAULT_KEYS: &[(&str, i64)] = &[
 // ===========================================================================
 
 fn unknown_builtin_msg(name: &str) -> String {
+    // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
+    // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das
+    // Builtin EXISTIERT (in gbrt implementiert), es fehlt nur im aktuellen Build.
+    // Klare, handlungsleitende Meldung statt "noch nicht verfuegbar".
+    let hw_feature = if name.starts_with("serial_") { Some("serial") }
+        else if name.starts_with("usb_") { Some("usb") }
+        else if name.starts_with("bt_") { Some("bt") }
+        else if name.starts_with("wifi_") { Some("wifi") }
+        else { None };
+    if let Some(feat) = hw_feature {
+        return format!(
+            "Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem gbrt-Build \
+             fehlt. Neu bauen mit: python rust\\build_runtime.py --hardware",
+            name.to_uppercase(), feat);
+    }
     if builtins::is_graphics_builtin(name) {
         format!("Grafik-Builtin '{}' im Rust-Kern noch nicht verfuegbar (Schritt 4)", name.to_uppercase())
     } else {
