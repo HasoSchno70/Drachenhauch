@@ -395,3 +395,33 @@ END IF
 ```
 
 Für komplexere Sprite-Kollision siehe [Sprite-Modul](module-sprite.md) mit `SPRITE_COLLIDES`.
+
+## Aliase & Namenskonventionen
+
+**BASIC-Aliase** (gleiches Verhalten, klassische Schreibweise — nur native Runtime):
+
+| Alias | Kanonisch |
+|---|---|
+| `SGN(x)` | `SIGN(x)` |
+| `SQRT(x)` | `SQR(x)` |
+| `AUDIO_SET_VOLUME(ch, v)` | `AUDIO_VOLUME(ch, v)` |
+| `AUDIO_MUSIC_SET_VOLUME(v)` | `AUDIO_MUSIC_VOLUME(v)` |
+
+Container-Methode `arr.join(trenner)` ≡ `JOIN$(arr, trenner)` (Array OF STRING).
+
+**Konventionen / Stolpersteine** (bewusst NICHT umbenannt — nur zur Klarstellung):
+
+- **`$`-Suffix nur im Core.** String-Builtins der Kernsprache gibt es mit und
+  ohne `$` (`UPPER$` ≡ `UPPER`, `LEFT$` ≡ `LEFT`, …). **Modul-Builtins** führen
+  kein `$` (z.B. `JSON_GET_STRING`, nicht `JSON_GET_STRING$`).
+- **Zwei Sound-APIs.** `PLAYSOUND`/`STOPSOUND` (Core, einfach) und das
+  `audio`-Modul (`AUDIO_PLAY`/`AUDIO_STOP`/Channels/Fades). `AUDIO_*`-Objekte
+  sind mit `PLAYSOUND` kompatibel. Beide bleiben — `audio` ist die mächtigere.
+- **Suffix `2` ist mehrdeutig** und kontextabhängig: `PHYSICS_DISTANCE2` =
+  *quadrierte* Distanz (schneller), `LINE3D`/Vec2-Funktionen meinen *2D*, und
+  `VEC2_*` ist der Typname. Kein einheitliches Schema — am Funktionsnamen ablesen.
+- **`SPRITE_COLLIDE` vs `SPRITE_COLLIDES`.** Das `sprite`-Modul nutzt
+  `SPRITE_COLLIDES` (mit `S`). Auf den Core-`COLLIDES` (AABB von Rohwerten)
+  achten — anderer Anwendungsfall.
+- **`CAMERA_X` (2D) vs `CAMERA3D_X`.** Das 2D-`camera`-Modul und die native
+  3D-Kamera (`g3d`) haben getrennte Getter — nicht verwechseln.

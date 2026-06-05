@@ -2704,7 +2704,7 @@ impl<'p> Vm<'p> {
             "audio_resume" => { let i = gi(a, 0, "AUDIO_RESUME")?; self.audio_mut()?.ch_resume(i)?; Value::Nil }
             "audio_stop" => { let i = gi(a, 0, "AUDIO_STOP")?; self.audio_mut()?.ch_stop(i)?; Value::Nil }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
-            "audio_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
+            "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
             "audio_tone" => {
@@ -2737,7 +2737,7 @@ impl<'p> Vm<'p> {
             "audio_music_stop" => { self.audio_mut()?.music_stop(); Value::Nil }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
-            "audio_music_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
+            "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
             "audio_music_get_volume" => Value::Float(self.audio_mut()?.music_get_volume()),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
             "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
@@ -3376,7 +3376,7 @@ fn container_method(kind: &str, method: &str) -> Option<&'static str> {
         ("string", "padr") => "padr$",
         ("array", "length") | ("array", "len") => "len",
         ("array", "sort") => "sort", ("array", "reverse") => "reverse",
-        ("array", "indexof") => "array_indexof",
+        ("array", "indexof") => "array_indexof", ("array", "join") => "join$",
         ("map", "put") => "mapput", ("map", "get") => "mapget",
         ("map", "getor") => "mapgetor", ("map", "has") => "maphas",
         ("map", "keys") => "mapkeys",

@@ -644,7 +644,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let c = s.chars().next().ok_or("ASC erwartet nicht-leeren STRING")?;
             Ok(Value::Int(c as i64))
         }
-        "sqr" => {
+        "sqr" | "sqrt" => {   // SQRT = BASIC-Alias fuer SQR
             arity!(1);
             let x = need_num(&a[0], "SQR")?;
             if x < 0.0 { return err("SQR von negativer Zahl".to_string()); }
@@ -712,7 +712,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             for x in &a[..3] { if !is_num(x) { return err("CLAMP erwartet Zahlen".to_string()); } }
             if v < lo { Ok(a[1].clone()) } else if v > hi { Ok(a[2].clone()) } else { Ok(a[0].clone()) }
         }
-        "sign" => {
+        "sign" | "sgn" => {   // SGN = BASIC-Alias fuer SIGN
             arity!(1);
             let v = need_num(&a[0], "SIGN")?;
             Ok(Value::Int(if v > 0.0 { 1 } else if v < 0.0 { -1 } else { 0 }))

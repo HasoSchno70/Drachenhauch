@@ -220,6 +220,21 @@ PRINT FILEEXISTS(PATHJOIN(base, "sub/c.txt"))'''
     )
 
 
+# --- WP4: BASIC-Aliase + Container-Methode ----------------------------------
+
+def test_aliases_sgn_sqrt():
+    src = '''PRINT SGN(-5), SGN(0), SGN(3)
+PRINT SQRT(16.0), SQRT(2.0)'''
+    assert _run(src) == "-1 0 1\n4.0 1.4142135623730951"
+
+
+def test_array_join_method():
+    src = '''DIM names[3] AS STRING
+names[0]="Anna" : names[1]="Bert" : names[2]="Cilly"
+PRINT names.join(", ")'''
+    assert _run(src) == "Anna, Bert, Cilly"
+
+
 # --- WP1: SORT mit Descending-Flag + FUNCREF-Comparator ---------------------
 
 def test_sort_ascending_and_descending_flag():
