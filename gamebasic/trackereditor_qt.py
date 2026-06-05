@@ -317,7 +317,7 @@ class TrackerEditor(QMainWindow):
         super().__init__()
         self.project_root = Path(project_root)
         self.setWindowTitle("GameBasic Tracker")
-        self.resize(760, 760)
+        self.resize(1120, 840)
         self.song = Song()
         self.cur = 0                   # aktueller Pattern-Index
         self._sound_cache: dict = {}
@@ -338,6 +338,9 @@ class TrackerEditor(QMainWindow):
         title.setStyleSheet(f"color: {COLORS['accent']}; padding: 2px 0;")
         root.addWidget(title)
 
+        # Instrument-Pool mit Presets befuellen + sinnvolle Kanal-Sounds.
+        self._install_factory_presets()
+
         # --- Transport ---
         top = QHBoxLayout()
         self.btn_play = QPushButton("▶ Pattern")
@@ -347,21 +350,17 @@ class TrackerEditor(QMainWindow):
         self.btn_song = QPushButton("▶ Song")
         self.btn_song.clicked.connect(lambda: self._toggle_play("song"))
         top.addWidget(self.btn_song)
-        top.addWidget(QLabel("BPM:"))
+        self.btn_stop = QPushButton("■ Stop")
+        self.btn_stop.clicked.connect(self._stop_play)
+        top.addWidget(self.btn_stop)
+        top.addSpacing(12)
+        top.addWidget(QLabel("Tempo (BPM):"))
         self.bpm = QSpinBox(); self.bpm.setRange(40, 300); self.bpm.setValue(self.song.bpm)
         self.bpm.valueChanged.connect(self._on_bpm)
         top.addWidget(self.bpm)
-        self.wave_combos = []
-        for ci in range(TONAL):
-            top.addWidget(QLabel(f"Ch{ci + 1}:"))
-            cb = QComboBox(); cb.addItems(WAVEFORMS)
-            cb.setCurrentText(self.song.waves[ci])
-            cb.currentTextChanged.connect(lambda v, i=ci: self._set_wave(i, v))
-            top.addWidget(cb)
-            self.wave_combos.append(cb)
         top.addStretch(1)
-        b_wav = QPushButton("Audio (WAV)...")
-        b_wav.setToolTip("Song mit Sample-Instrumenten als WAV rendern "
+        b_wav = QPushButton("♪ Audio (WAV)...")
+        b_wav.setToolTip("Song mit allen Instrumenten als WAV rendern "
                          "(im Spiel via PLAYMUSIC)")
         b_wav.clicked.connect(self._export_audio)
         top.addWidget(b_wav)
@@ -369,17 +368,35 @@ class TrackerEditor(QMainWindow):
         top.addWidget(b_code)
         root.addLayout(top)
 
-        # --- Instrument-Leiste (Samples laden + Kanal-Zuweisung) ---
+        # --- Sound pro Spur (Keyboard-Klang je Kanal) ---
+        srow = QHBoxLayout()
+        lab = QLabel("Spur-Sounds:")
+        lab.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
+        srow.addWidget(lab)
+        self.sound_combos = []
+        ch_names = ["Ch1", "Ch2", "Ch3", "Drum"]
+        for c in range(CHANNELS):
+            srow.addWidget(QLabel(ch_names[c] + ":"))
+            cb = QComboBox(); cb.setMinimumWidth(150)
+            cb.currentIndexChanged.connect(
+                lambda idx, ch=c: self._on_sound_changed(ch, idx))
+            srow.addWidget(cb)
+            self.sound_combos.append(cb)
+        srow.addStretch(1)
+        root.addLayout(srow)
+
+        # --- Instrument-Bibliothek (eigene Sounds verwalten) ---
         irow = QHBoxLayout()
-        irow.addWidget(QLabel("Instrument:"))
+        irow.addWidget(QLabel("Bibliothek:"))
         self.inst_combo = QComboBox()
-        self.inst_combo.setMinimumWidth(150)
+        self.inst_combo.setMinimumWidth(170)
         irow.addWidget(self.inst_combo)
-        b_load = QPushButton("Sample laden...")
+        b_load = QPushButton("+ Sample (WAV)...")
+        b_load.setToolTip("Eigene Aufnahme als Instrument laden")
         b_load.clicked.connect(self._load_sample)
         irow.addWidget(b_load)
-        b_keymap = QPushButton("Keymap...")
-        b_keymap.setToolTip("Samples ueber die Klaviatur verteilen "
+        b_keymap = QPushButton("+ Keymap...")
+        b_keymap.setToolTip("Mehrere Samples ueber die Klaviatur verteilen "
                             "(Multisample / Drumkit)")
         b_keymap.clicked.connect(self._edit_keymap)
         irow.addWidget(b_keymap)
@@ -387,25 +404,10 @@ class TrackerEditor(QMainWindow):
         b_iedit.setToolTip("Grundton, Loop-Punkte, ADSR-Huellkurve")
         b_iedit.clicked.connect(self._edit_instrument)
         irow.addWidget(b_iedit)
-        b_idel = QPushButton("Entfernen")
+        b_idel = QPushButton("Loeschen")
         b_idel.clicked.connect(self._remove_instrument)
         irow.addWidget(b_idel)
-        irow.addSpacing(12)
-        irow.addWidget(QLabel("→ Kanal:"))
-        self.assign_combo = QComboBox()
-        self.assign_combo.addItems(["Ch1", "Ch2", "Ch3", "Drum"])
-        irow.addWidget(self.assign_combo)
-        b_assign = QPushButton("Zuweisen")
-        b_assign.clicked.connect(self._assign_instrument)
-        irow.addWidget(b_assign)
-        b_unassign = QPushButton("Synth")
-        b_unassign.setToolTip("Kanal auf Synth-Wellenform zuruecksetzen")
-        b_unassign.clicked.connect(self._unassign_channel)
-        irow.addWidget(b_unassign)
-        irow.addSpacing(12)
-        self.assign_label = QLabel("")
-        self.assign_label.setStyleSheet(f"color: {COLORS['fg_muted']};")
-        irow.addWidget(self.assign_label, 1)
+        irow.addStretch(1)
         root.addLayout(irow)
 
         # --- Datei + Pattern-Verwaltung ---
@@ -550,8 +552,6 @@ class TrackerEditor(QMainWindow):
     def _reload_all(self) -> None:
         """Komplettes UI aus self.song neu aufbauen."""
         self.bpm.blockSignals(True); self.bpm.setValue(self.song.bpm); self.bpm.blockSignals(False)
-        for ci, cb in enumerate(self.wave_combos):
-            cb.blockSignals(True); cb.setCurrentText(self.song.waves[ci]); cb.blockSignals(False)
         self.cur = min(self.cur, len(self.song.patterns) - 1)
         self._refresh_instruments()
         self._reload_pattern_combo()
@@ -643,17 +643,43 @@ class TrackerEditor(QMainWindow):
             tag = {"sample": "♪", "keymap": "▦"}.get(ins.kind, "~")
             self.inst_combo.addItem(f"{i}: {tag} {ins.name}")
         self.inst_combo.blockSignals(False)
-        # Zuweisungs-Label (nur belegte Kanaele zeigen)
-        names = ["Ch1", "Ch2", "Ch3", "Drum"]
-        parts = []
-        for c in range(CHANNELS):
-            idx = self.song.channel_inst[c]
-            if idx is not None and 0 <= idx < len(self.song.instruments):
-                parts.append(f"{names[c]}={self.song.instruments[idx].name}")
-        self.assign_label.setText(
-            ("Zuweisung: " + ", ".join(parts)) if parts else "")
+        self._rebuild_sound_combos()
         if hasattr(self, "grid"):
             self._update_channel_headers()
+
+    def _rebuild_sound_combos(self) -> None:
+        """Pro-Spur-Sound-Dropdowns aus dem Instrument-Pool fuellen + die
+        aktuelle Zuweisung spiegeln."""
+        for c in range(CHANNELS):
+            cb = self.sound_combos[c]
+            cb.blockSignals(True)
+            cb.clear()
+            for ins in self.song.instruments:
+                cb.addItem(ins.name)
+            idx = self.song.channel_inst[c]
+            if idx is not None and 0 <= idx < cb.count():
+                cb.setCurrentIndex(idx)
+            cb.blockSignals(False)
+
+    def _on_sound_changed(self, c: int, idx: int) -> None:
+        if 0 <= idx < len(self.song.instruments) and 0 <= c < CHANNELS:
+            self.song.channel_inst[c] = idx
+            self._sound_cache.clear()
+            self._update_channel_headers()
+            self._mark()
+
+    def _install_factory_presets(self) -> None:
+        """Befuellt einen leeren Pool mit den Instrument-Presets und weist
+        jedem Kanal einen sinnvollen Default-Sound zu."""
+        if self.song.instruments:
+            return
+        from .tracker.presets import factory_instruments
+        self.song.instruments = factory_instruments()
+        by_name = {ins.name: i for i, ins in enumerate(self.song.instruments)}
+        defaults = ["Fluegel (Piano)", "Streicher", "Synth-Bass", "Kick"]
+        for c, nm in enumerate(defaults):
+            if c < CHANNELS and nm in by_name:
+                self.song.channel_inst[c] = by_name[nm]
 
     def _load_sample(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -762,23 +788,6 @@ class TrackerEditor(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dlg.apply_to()
             self._sound_cache.clear()
-            self._mark()
-
-    def _assign_instrument(self) -> None:
-        idx = self.inst_combo.currentIndex()
-        c = self.assign_combo.currentIndex()
-        if 0 <= idx < len(self.song.instruments) and 0 <= c < CHANNELS:
-            self.song.channel_inst[c] = idx
-            self._sound_cache.clear()
-            self._refresh_instruments()
-            self._mark()
-
-    def _unassign_channel(self) -> None:
-        c = self.assign_combo.currentIndex()
-        if 0 <= c < CHANNELS:
-            self.song.channel_inst[c] = None
-            self._sound_cache.clear()
-            self._refresh_instruments()
             self._mark()
 
     def _cell_text(self, ci: int, note, vol=None, slide=None) -> str:
@@ -945,32 +954,17 @@ class TrackerEditor(QMainWindow):
             self._load_pattern(idx)
 
     # ============================================== Sound
-    def _sound(self, ci: int, midi: int, slide: int = 0):
-        inst = self.song.instrument_for_channel(ci)
-        if inst.is_sample():
-            # Sample-Instrument -> resampeln (Slide bleibt einer spaeteren Stufe).
-            key = ("smp", id(inst), midi)
-            snd = self._sound_cache.get(key)
-            if snd is None:
-                sr = 44100
-                n = int(sr * max(self.song.row_ms(), 250) / 1000.0)
-                snd = self._make_sound(inst.render_note(midi, n, sr))
-                self._sound_cache[key] = snd
-            return snd
-        wf = inst.waveform
-        key = (ci, wf, midi, slide)
+    def _row_samples(self) -> int:
+        return max(1, int(44100 * self.song.row_ms() / 1000.0))
+
+    def _render_sound(self, inst, midi: int, n_samples: int, slide: int = 0):
+        """Pygame-Sound der Note ueber das Instrument (gecacht). n_samples =
+        Klanglaenge -> Noten klingen fuer ihre Dauer."""
+        key = (id(inst), int(midi), int(n_samples), int(slide or 0))
         snd = self._sound_cache.get(key)
         if snd is None:
-            freq = 220.0 if wf == "noise" else midi_to_freq(midi)
-            dec = 120 if wf == "noise" else 220
-            slide_hz = 0.0
-            if slide and wf != "noise":
-                # Halbtoene -> Hz/s ueber die Reihen-Dauer (wie der Export).
-                target = freq * (2.0 ** (slide / 12.0))
-                row_s = max(0.001, self.song.row_ms() / 1000.0)
-                slide_hz = (target - freq) / row_s
-            wave = synthesize(wf, freq, slide_hz, 4, 40, dec)
-            snd = self._make_sound(wave)
+            snd = self._make_sound(
+                inst.render_note(midi, n_samples, 44100, slide or 0))
             self._sound_cache[key] = snd
         return snd
 
@@ -990,8 +984,17 @@ class TrackerEditor(QMainWindow):
             return None
 
     def _play_note(self, ci: int, midi: int, vol: int | None = None,
-                   slide: int = 0) -> None:
-        snd = self._sound(ci, midi, slide or 0)
+                   slide: int = 0, n_rows: int | None = None) -> None:
+        """Spielt eine Note. `n_rows` = Notenlaenge in Reihen (None = kurze
+        Vorhoer-Laenge); so klingen Noten waehrend der Wiedergabe so lange,
+        bis die naechste Note kommt."""
+        inst = self.song.instrument_for_channel(ci)
+        row_s = self._row_samples()
+        if n_rows is None:
+            n = max(int(44100 * 0.6), row_s * 2)      # Vorhoeren
+        else:
+            n = max(row_s, row_s * int(n_rows))
+        snd = self._render_sound(inst, midi, n, slide or 0)
         if snd is not None:
             try:
                 ch = snd.play()
@@ -1069,15 +1072,26 @@ class TrackerEditor(QMainWindow):
         if 0 <= row < self.grid.rowCount():
             self.grid.scrollToItem(self.grid.item(row, 0))
 
+    @staticmethod
+    def _note_len_rows(pat, c: int, r: int) -> int:
+        """Reihen, bis die naechste Note auf Kanal `c` kommt (sonst bis zum
+        Pattern-Ende) -> Klanglaenge dieser Note."""
+        for rr in range(r + 1, pat.rows):
+            if pat.data[c][rr] is not None:
+                return rr - r
+        return pat.rows - r
+
     def _play_columns(self, pat, row: int) -> None:
         for c in range(CHANNELS):
             n = pat.data[c][row]
             if n is not None:
-                self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0)
+                self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
+                                self._note_len_rows(pat, c, row))
 
     # ============================================== Datei
     def _new_song(self) -> None:
         self.song = Song()
+        self._install_factory_presets()
         self.cur = 0
         self._reload_all()
         self.undo.reset()      # frisches Dokument -> Historie verwerfen
@@ -1096,6 +1110,7 @@ class TrackerEditor(QMainWindow):
             return
         self.cur = 0
         self._sound_cache.clear()
+        self._install_factory_presets()    # alte Songs ohne Instrumente
         self._reload_all()
         self.undo.reset()      # geladenes Dokument -> Historie verwerfen
         self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")

@@ -42,36 +42,54 @@ def test_load_sample_file_creates_instrument(tmp_path):
     assert inst.name == "kick"
 
 
-def test_assign_instrument_to_channel_and_preview(tmp_path):
+def test_editor_has_factory_presets():
+    ed = _editor()
+    # Out of the box: Presets im Pool + jedem Kanal ein Sound zugewiesen
+    assert len(ed.song.instruments) >= 14
+    names = [i.name for i in ed.song.instruments]
+    assert "Fluegel (Piano)" in names and "Kick" in names
+    for c in range(4):
+        assert ed.song.channel_inst[c] is not None
+    assert ed.sound_combos[0].count() == len(ed.song.instruments)
+
+
+def test_assign_instrument_to_channel_via_sound_combo(tmp_path):
     ed = _editor()
     p = tmp_path / "lead.wav"
     _write_wav(p)
-    inst = ed._instrument_from_file(str(p))
-    ed.song.add_instrument(inst)
+    idx = ed.song.add_instrument(ed._instrument_from_file(str(p)))
     ed._refresh_instruments()
-    assert ed.inst_combo.count() == 1
-    # Auf Kanal 0 zuweisen
-    ed.inst_combo.setCurrentIndex(0)
-    ed.assign_combo.setCurrentIndex(0)
-    ed._assign_instrument()
-    assert ed.song.channel_inst[0] == 0
+    # Pro-Spur-Dropdown auf das neue Sample setzen -> zuweisen
+    ed._on_sound_changed(0, idx)
+    assert ed.song.channel_inst[0] == idx
     assert ed.song.instrument_for_channel(0).kind == "sample"
-    # Preview rendert ueber das Sample (kein Crash, Sound-Objekt oder None)
-    ed._sound(0, 60)            # darf nicht werfen
-    # Wieder auf Synth
-    ed._unassign_channel()
-    assert ed.song.channel_inst[0] is None
+    # Preview rendert ueber das Sample (kein Crash)
+    ed._play_note(0, 60)
 
 
 def test_remove_instrument_updates_combo(tmp_path):
     ed = _editor()
+    n0 = len(ed.song.instruments)
     p = tmp_path / "s.wav"; _write_wav(p)
     ed.song.add_instrument(ed._instrument_from_file(str(p)))
     ed._refresh_instruments()
-    ed.inst_combo.setCurrentIndex(0)
+    assert len(ed.song.instruments) == n0 + 1
+    ed.inst_combo.setCurrentIndex(n0)      # das neue (letzte) Instrument
     ed._remove_instrument()
-    assert ed.inst_combo.count() == 0
-    assert len(ed.song.instruments) == 0
+    assert len(ed.song.instruments) == n0
+
+
+def test_note_length_in_playback():
+    ed = _editor()
+    pat = ed.song.patterns[ed.cur]
+    pat.set_rows(8)
+    pat.set(0, 0, 60)            # Note in Reihe 0, naechste erst spaeter
+    # Laenge = Reihen bis naechste Note (oder Pattern-Ende)
+    assert ed._note_len_rows(pat, 0, 0) == 8
+    pat.set(0, 3, 64)
+    assert ed._note_len_rows(pat, 0, 0) == 3
+    # _play_columns nutzt die Laenge ohne Fehler
+    ed._play_columns(pat, 0)
 
 
 def test_keymap_dialog_builds_instrument(tmp_path):
