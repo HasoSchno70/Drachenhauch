@@ -29,12 +29,25 @@ KEYWORDS = sorted({
 
 
 def collect_builtins() -> list[str]:
-    """Sammelt alle registrierten Built-in-Namen (uppercase)."""
+    """Sammelt alle Built-in-Namen (uppercase) fuer Editor-Support.
+
+    Quellen:
+    - Python-Registry (`BUILTINS`/`GRAPHICS_BUILTINS`) -- die im Tree-Walker
+      implementierten Builtins.
+    - `BUILTIN_DOCS` -- enthaelt auch **gbrt-only**-Builtins (nur in der nativen
+      Runtime implementiert, nicht mehr im Tree-Walker). So bekommen Editor-
+      Highlighting/Completion sie trotzdem; die Ausfuehrung macht gbrt.
+    """
     names: set[str] = set()
     try:
         from ..interpreter import BUILTINS, GRAPHICS_BUILTINS
         names.update(BUILTINS.keys())
         names.update(GRAPHICS_BUILTINS.keys())
+    except Exception:
+        pass
+    try:
+        from .builtin_docs import BUILTIN_DOCS
+        names.update(BUILTIN_DOCS.keys())
     except Exception:
         pass
     return sorted(n.upper() for n in names)

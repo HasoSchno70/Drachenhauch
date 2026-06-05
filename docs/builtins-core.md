@@ -169,6 +169,18 @@ Siehe auch [Sprachreferenz → Arrays](sprache.md#arrays).
 | `LEN(arr)` → INTEGER | Anzahl Elemente (1. Dimension) |
 | `DIMCOUNT(arr)` → INTEGER | Anzahl Dimensionen |
 | `DIMSIZE(arr, n)` → INTEGER | Größe der n-ten Dimension (0-basiert) |
+| `SORT(arr)`, `REVERSE(arr)` | 1D IN PLACE sortieren / umkehren |
+| `ARRAY_INDEXOF(arr, v)` → INTEGER | erster Index von v, sonst -1 |
+
+**Aggregate** (1D `ARRAY OF INTEGER`/`FLOAT`) und Helfer:
+
+| Funktion | Zweck |
+|---|---|
+| `ARRAY_SUM(arr)` → INTEGER/FLOAT | Summe (INTEGER-Array → INTEGER, sonst FLOAT) |
+| `ARRAY_AVG(arr)` → FLOAT | Durchschnitt (Array darf nicht leer sein) |
+| `ARRAY_MIN(arr)`, `ARRAY_MAX(arr)` | kleinstes / größtes Element |
+| `ARRAY_FILL(arr, wert)` | alle Elemente mit `wert` füllen (IN PLACE, jede Dimension) |
+| `ARRAY_COPY(arr)` → ARRAY | unabhängige Kopie (gleiche Form/Typ) |
 
 ```basic
 DIM matrix[3, 4] AS INTEGER
@@ -177,7 +189,19 @@ PRINT DIMCOUNT(matrix)           ' 2
 PRINT DIMSIZE(matrix, 0)         ' 3
 PRINT DIMSIZE(matrix, 1)         ' 4
 PRINT LEN(matrix)                ' 3 (= DIMSIZE 0)
+
+DIM werte[3] AS INTEGER
+werte[0] = 5 : werte[1] = 9 : werte[2] = 1
+PRINT ARRAY_SUM(werte), ARRAY_AVG(werte)   ' 15  5.0
+PRINT ARRAY_MIN(werte), ARRAY_MAX(werte)   ' 1  9
 ```
+
+> **Nur native Runtime.** Die `ARRAY_*`-Aggregate (und die dynamischen Array-Ops
+> `ARRAY_PUSH`/`POP`/… — nächster Schritt) sind ausschließlich in `gbrt`
+> implementiert, nicht im Python-Tree-Walker. Ausführen über gbrts eigenes
+> Rust-Frontend: `gbrt run datei.gb` (bzw. `gbrt --runsrc`), Standalone-Export
+> via `gbrt --export`. Die Python-Toolchain (Tree-Walker-F5 **und** der
+> Python-Compiler in `gbrun.py --native`/`--export`) kennt diese Builtins nicht.
 
 ## Maps
 

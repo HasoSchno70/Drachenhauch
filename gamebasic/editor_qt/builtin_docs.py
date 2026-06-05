@@ -116,6 +116,13 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "shuffle":   ("SHUFFLE(array)", "Mischt ein 1D-Array IN PLACE (Fisher-Yates)."),
     "time$":     ("TIME$() AS STRING",   'Aktuelle Uhrzeit "HH:MM:SS".'),
     "date$":     ("DATE$() AS STRING",   'Aktuelles Datum "YYYY-MM-DD".'),
+    # Array-Aggregate (gbrt-only -- nativ in der Runtime, nicht im Tree-Walker)
+    "array_sum": ("ARRAY_SUM(arr) AS INTEGER/FLOAT", "Summe eines 1D-Zahl-Arrays."),
+    "array_avg": ("ARRAY_AVG(arr) AS FLOAT", "Durchschnitt eines 1D-Zahl-Arrays (nicht leer)."),
+    "array_min": ("ARRAY_MIN(arr) AS T", "Kleinstes Element eines 1D-Zahl-Arrays."),
+    "array_max": ("ARRAY_MAX(arr) AS T", "Groesstes Element eines 1D-Zahl-Arrays."),
+    "array_fill": ("ARRAY_FILL(arr, wert)", "Fuellt alle Elemente mit wert (IN PLACE)."),
+    "array_copy": ("ARRAY_COPY(arr) AS ARRAY", "Liefert eine unabhaengige Kopie des Arrays."),
     # Strings extra
     "padl$":     ("PADL$(s, breite[, fueller]) AS STRING", "String linksbuendig auffuellen."),
     "padr$":     ("PADR$(s, breite[, fueller]) AS STRING", "String rechtsbuendig auffuellen."),

@@ -113,6 +113,39 @@ fn type_default(t: &str) -> Value {
     }
 }
 
+/// Element-Coercion fuer Array-Schreibzugriffe (ARRAY_FILL/PUSH/INSERT/REDIM).
+/// Identisch zur `coerce`-Logik der VM (vm.rs): INTEGER nimmt Int oder
+/// ganzzahligen Float, FLOAT nimmt Float/Int, beides lehnt Bool ab; Referenz-/
+/// sonstige Typen werden durchgereicht.
+fn coerce_elem(value: Value, target: &str, ctx: &str) -> R {
+    match target {
+        "integer" => match value {
+            Value::Int(_) => Ok(value),
+            Value::Float(f) => {
+                if f.fract() == 0.0 { Ok(Value::Int(f as i64)) }
+                else { Err(format!("{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())", ctx, f)) }
+            }
+            Value::Bool(_) => Err(format!("{}: Erwartet INTEGER, erhalten BOOLEAN", ctx)),
+            _ => Err(format!("{}: Erwartet INTEGER, erhalten {}", ctx, value.type_name())),
+        },
+        "float" => match value {
+            Value::Float(_) => Ok(value),
+            Value::Int(i) => Ok(Value::Float(i as f64)),
+            Value::Bool(_) => Err(format!("{}: Erwartet FLOAT, erhalten BOOLEAN", ctx)),
+            _ => Err(format!("{}: Erwartet FLOAT, erhalten {}", ctx, value.type_name())),
+        },
+        "string" => match value {
+            Value::Str(_) => Ok(value),
+            _ => Err(format!("{}: Erwartet STRING, erhalten {}", ctx, value.type_name())),
+        },
+        "boolean" => match value {
+            Value::Bool(_) => Ok(value),
+            _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
+        },
+        _ => Ok(value),
+    }
+}
+
 /// STR$-Semantik (`_b_str`).
 fn str_of(v: &Value) -> String {
     match v {
@@ -873,6 +906,82 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 }
                 Ok(Value::Int(-1))
             } else { err("ARRAY_INDEXOF erwartet ARRAY".to_string()) }
+        }
+        // --- Array-Aggregate (1D) ---
+        "array_sum" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let arr = arr.borrow();
+                if arr.dims.len() != 1 { return err("ARRAY_SUM: nur 1D-Arrays".to_string()); }
+                match arr.element_type.as_str() {
+                    "integer" => {
+                        let mut s: i64 = 0;
+                        for v in &arr.values {
+                            match v { Value::Int(i) => s = s.wrapping_add(*i), _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()) }
+                        }
+                        Ok(Value::Int(s))
+                    }
+                    "float" => {
+                        let mut s = 0.0f64;
+                        for v in &arr.values { s += as_f64(v); }
+                        Ok(Value::Float(s))
+                    }
+                    _ => err("ARRAY_SUM: nur ARRAY OF INTEGER/FLOAT".to_string()),
+                }
+            } else { err("ARRAY_SUM erwartet ARRAY".to_string()) }
+        }
+        "array_avg" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let arr = arr.borrow();
+                if arr.dims.len() != 1 { return err("ARRAY_AVG: nur 1D-Arrays".to_string()); }
+                if !matches!(arr.element_type.as_str(), "integer" | "float") { return err("ARRAY_AVG: nur ARRAY OF INTEGER/FLOAT".to_string()); }
+                let n = arr.values.len();
+                if n == 0 { return err("ARRAY_AVG: Array ist leer".to_string()); }
+                let mut s = 0.0f64;
+                for v in &arr.values { s += as_f64(v); }
+                Ok(Value::Float(s / n as f64))
+            } else { err("ARRAY_AVG erwartet ARRAY".to_string()) }
+        }
+        "array_min" | "array_max" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let arr = arr.borrow();
+                let fn_ = name.to_uppercase();
+                if arr.dims.len() != 1 { return err(format!("{}: nur 1D-Arrays", fn_)); }
+                if !matches!(arr.element_type.as_str(), "integer" | "float") { return err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_)); }
+                if arr.values.is_empty() { return err(format!("{}: Array ist leer", fn_)); }
+                let want_min = name == "array_min";
+                let mut best = arr.values[0].clone();
+                for v in &arr.values[1..] {
+                    let take = if want_min { as_f64(v) < as_f64(&best) } else { as_f64(v) > as_f64(&best) };
+                    if take { best = v.clone(); }
+                }
+                Ok(best)
+            } else { err(format!("{} erwartet ARRAY", name.to_uppercase())) }
+        }
+        "array_fill" => {
+            arity!(2);
+            if let Value::Array(arr) = &a[0] {
+                let et = arr.borrow().element_type.clone();
+                let v = coerce_elem(a[1].clone(), &et, "ARRAY_FILL")?;
+                let mut arr = arr.borrow_mut();
+                for slot in arr.values.iter_mut() { *slot = v.clone(); }
+                Ok(Value::Nil)
+            } else { err("ARRAY_FILL erwartet ARRAY".to_string()) }
+        }
+        "array_copy" => {
+            arity!(1);
+            if let Value::Array(arr) = &a[0] {
+                let arr = arr.borrow();
+                let new = GbArray {
+                    element_type: arr.element_type.clone(),
+                    dims: arr.dims.clone(),
+                    strides: arr.strides.clone(),
+                    values: arr.values.clone(),
+                };
+                Ok(Value::Array(Rc::new(RefCell::new(new))))
+            } else { err("ARRAY_COPY erwartet ARRAY".to_string()) }
         }
         "collides" => {
             arity!(8);
