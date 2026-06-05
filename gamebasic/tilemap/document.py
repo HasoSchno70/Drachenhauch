@@ -7,7 +7,9 @@ Format-Konvention (passt 1:1 zu `gamebasic/modules/tiled.py`):
   - EIN eingebettetes Tileset, `firstgid` immer 1 -> lokale Tile-ID = gid - 1.
   - Tile-Daten als CSV-Liste von GIDs (kein base64), row-major, 0 = leer.
   - Per-Tile-Properties als Tiled-`{name,type,value}`-Liste am Tileset.
-  - Nur orthogonale Tile-Layer (Object-Layer kann spaeter dazukommen).
+  - Orthogonale **Tile-Layer** UND **Object-Layer** (`objectgroup`): Objekte mit
+    Name/Typ/Properties und Pixel-Koordinaten (Punkte = Spawn-Marker,
+    Rechtecke = Trigger/Zonen). `TILED_LOAD` liest sie via `TILED_OBJECT_*`.
 
 Der Editor speichert/laedt genau dieses Format (kein eigenes Projektformat),
 damit der Kreis Editor -> `TILED_LOAD` -> Spiel geschlossen ist und die Map
@@ -15,6 +17,7 @@ auch im echten Tiled weiterbearbeitet werden kann.
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 from pathlib import Path
@@ -85,8 +88,83 @@ class TileLayer:
         return out
 
 
+class MapObject:
+    """Ein Objekt eines Object-Layers (Spawn-Punkt / Trigger / Zone).
+
+    Koordinaten in **Pixeln** (wie Tiled). Ein Punkt-Objekt hat
+    `width == height == 0` (Tiled: `"point": true`), ein Rechteck eine Groesse.
+    """
+
+    __slots__ = ("name", "type", "x", "y", "width", "height",
+                 "properties", "property_types")
+
+    def __init__(self, x: float, y: float, width: float = 0.0,
+                 height: float = 0.0, name: str = "", otype: str = ""):
+        self.name = str(name)
+        self.type = str(otype)
+        self.x = float(x)
+        self.y = float(y)
+        self.width = float(width)
+        self.height = float(height)
+        self.properties: dict = {}        # key -> typed value
+        self.property_types: dict = {}    # key -> ptype
+
+    def is_point(self) -> bool:
+        return self.width == 0.0 and self.height == 0.0
+
+    def set_property(self, key: str, value, ptype: str) -> None:
+        if ptype not in PROP_TYPES:
+            ptype = "string"
+        self.properties[key] = coerce_prop(value, ptype)
+        self.property_types[key] = ptype
+
+    def remove_property(self, key: str) -> None:
+        self.properties.pop(key, None)
+        self.property_types.pop(key, None)
+
+
+class ObjectLayer:
+    """Eine Object-Schicht (`objectgroup`): geordnete Liste von `MapObject`."""
+
+    __slots__ = ("name", "visible", "opacity", "objects")
+
+    def __init__(self, name: str):
+        self.name = str(name)
+        self.visible = True
+        self.opacity = 1.0
+        self.objects: list[MapObject] = []
+
+    def add(self, obj: MapObject) -> int:
+        self.objects.append(obj)
+        return len(self.objects) - 1
+
+    def remove(self, obj: MapObject) -> None:
+        if obj in self.objects:
+            self.objects.remove(obj)
+
+    def object_at(self, px: float, py: float) -> MapObject | None:
+        """Oberstes Objekt, das den Pixel (px,py) enthaelt (Punkte mit
+        kleiner Trefferzone). Iteriert von oben (zuletzt hinzugefuegt)."""
+        for obj in reversed(self.objects):
+            if obj.is_point():
+                if abs(px - obj.x) <= 6 and abs(py - obj.y) <= 6:
+                    return obj
+            elif (obj.x <= px <= obj.x + obj.width
+                    and obj.y <= py <= obj.y + obj.height):
+                return obj
+        return None
+
+    def resized(self, _new_w: int, _new_h: int) -> "ObjectLayer":
+        """Bei Karten-Resize bleiben Objekte an ihren Pixel-Positionen."""
+        out = ObjectLayer(self.name)
+        out.visible = self.visible
+        out.opacity = self.opacity
+        out.objects = copy.deepcopy(self.objects)
+        return out
+
+
 class TileMapDoc:
-    """Vollstaendige Tilemap: Geometrie, ein Tileset, N Tile-Layer, Props."""
+    """Vollstaendige Tilemap: Geometrie, ein Tileset, N Tile-/Object-Layer."""
 
     def __init__(self, width: int = 20, height: int = 15,
                  tile_w: int = 16, tile_h: int = 16):
@@ -149,6 +227,12 @@ class TileMapDoc:
     def add_layer(self, name: str | None = None) -> int:
         n = name or f"Layer {len(self.layers) + 1}"
         self.layers.append(TileLayer(n, self.width, self.height))
+        self.dirty = True
+        return len(self.layers) - 1
+
+    def add_object_layer(self, name: str | None = None) -> int:
+        n = name or f"Objekte {len(self.layers) + 1}"
+        self.layers.append(ObjectLayer(n))
         self.dirty = True
         return len(self.layers) - 1
 
@@ -240,18 +324,53 @@ class TileMapDoc:
             tileset["tiles"] = tiles_meta
 
         layers = []
+        next_obj_id = 1
         for i, l in enumerate(self.layers):
-            layers.append({
-                "type": "tilelayer",
-                "id": i + 1,
-                "name": l.name,
-                "width": l.width,
-                "height": l.height,
-                "x": 0, "y": 0,
-                "opacity": l.opacity,
-                "visible": l.visible,
-                "data": list(l.tiles),
-            })
+            if isinstance(l, ObjectLayer):
+                objs = []
+                for obj in l.objects:
+                    od = {
+                        "id": next_obj_id,
+                        "name": obj.name,
+                        "type": obj.type,
+                        "x": obj.x, "y": obj.y,
+                        "width": obj.width, "height": obj.height,
+                        "rotation": 0,
+                        "visible": True,
+                    }
+                    if obj.is_point():
+                        od["point"] = True
+                    if obj.properties:
+                        od["properties"] = [
+                            {"name": k,
+                             "type": obj.property_types.get(k, "string"),
+                             "value": v}
+                            for k, v in obj.properties.items()
+                        ]
+                    objs.append(od)
+                    next_obj_id += 1
+                layers.append({
+                    "type": "objectgroup",
+                    "id": i + 1,
+                    "name": l.name,
+                    "x": 0, "y": 0,
+                    "opacity": l.opacity,
+                    "visible": l.visible,
+                    "draworder": "topdown",
+                    "objects": objs,
+                })
+            else:
+                layers.append({
+                    "type": "tilelayer",
+                    "id": i + 1,
+                    "name": l.name,
+                    "width": l.width,
+                    "height": l.height,
+                    "x": 0, "y": 0,
+                    "opacity": l.opacity,
+                    "visible": l.visible,
+                    "data": list(l.tiles),
+                })
 
         return {
             "type": "map",
@@ -265,7 +384,7 @@ class TileMapDoc:
             "tilewidth": self.tile_w,
             "tileheight": self.tile_h,
             "nextlayerid": len(self.layers) + 1,
-            "nextobjectid": 1,
+            "nextobjectid": next_obj_id,
             "tilesets": [tileset],
             "layers": layers,
         }
@@ -307,7 +426,28 @@ class TileMapDoc:
 
         doc.layers = []
         for layer in data.get("layers", []):
-            if layer.get("type") != "tilelayer":
+            ltype = layer.get("type")
+            if ltype == "objectgroup":
+                ol = ObjectLayer(str(layer.get("name", "Objekte")))
+                ol.visible = bool(layer.get("visible", True))
+                ol.opacity = float(layer.get("opacity", 1.0))
+                for o in layer.get("objects", []):
+                    mo = MapObject(
+                        float(o.get("x", 0.0)), float(o.get("y", 0.0)),
+                        float(o.get("width", 0.0)), float(o.get("height", 0.0)),
+                        str(o.get("name", "")),
+                        str(o.get("type") or o.get("class") or ""),
+                    )
+                    for p in o.get("properties", []):
+                        name = p.get("name")
+                        if not isinstance(name, str):
+                            continue
+                        mo.set_property(name, p.get("value"),
+                                        p.get("type", "string"))
+                    ol.objects.append(mo)
+                doc.layers.append(ol)
+                continue
+            if ltype != "tilelayer":
                 continue
             lw = int(layer.get("width", doc.width))
             lh = int(layer.get("height", doc.height))
@@ -350,8 +490,26 @@ class TileMapDoc:
         sw = self.width * self.tile_w
         sh = self.height * self.tile_h
         scale = max(1, min(4, 960 // max(1, sw)))
+        # Hinweis-Block fuer Object-Layer (werden nicht gerendert -- Spawn-/
+        # Trigger-Daten fuer die Spiel-Logik). Zeigt die TILED_OBJECT_*-API.
+        obj_layers = [l for l in self.layers if isinstance(l, ObjectLayer)]
+        obj_comment = ""
+        if obj_layers:
+            names = ", ".join(repr(l.name) for l in obj_layers)
+            obj_comment = (
+                f"' Object-Layer ({names}) auslesen, z.B. Spawns setzen:\n"
+                f"'   DIM n AS INTEGER : n = TILED_OBJECT_COUNT(lvl, "
+                f"{obj_layers[0].name!r})\n"
+                "'   FOR oi = 0 TO n - 1\n"
+                "'     px = TILED_OBJECT_X(lvl, " + repr(obj_layers[0].name)
+                + ", oi) : py = TILED_OBJECT_Y(lvl, " + repr(obj_layers[0].name)
+                + ", oi)\n"
+                "'     nm$ = TILED_OBJECT_NAME(lvl, " + repr(obj_layers[0].name)
+                + ", oi)\n"
+                "'   NEXT\n")
         return f'''' === Auto-generiert vom GameBasic-Tilemap-Editor ===
 IMPORT "tiled"
+{obj_comment}
 
 SCREEN({sw}, {sh}, "Tilemap", {scale})
 

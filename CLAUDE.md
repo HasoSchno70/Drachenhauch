@@ -1571,14 +1571,20 @@ Tool-Konvention im `tools.py`-Header dokumentiert.
 
 PySide6-Tool [`gamebasic/tilemapeditor_qt.py`](gamebasic/tilemapeditor_qt.py)
 (UI) + Qt-freies Datenmodell [`gamebasic/tilemap/document.py`](gamebasic/tilemap/document.py)
-(`TileMapDoc`/`TileLayer` + Tiled-JSON-Serialisierung, headless testbar).
-Tiles aus einem Tileset-PNG aufs Gitter malen (Stift/Radierer/Füllen/Rechteck/
-Pipette), mehrere Layer (Sichtbarkeit/Sortierung/umbenennen), Per-Tile-Properties
-(`solid`/`damage`/...), Undo/Redo. **Speichern/Laden = Tiled-JSON** (genau das
-Format, das `gamebasic/modules/tiled.py` via `TILED_LOAD` liest: ein eingebettetes
-Tileset mit `firstgid=1`, CSV-Tile-Daten, Per-Tile-Props als `{name,type,value}`).
-`GB-Code` exportiert einen selbstständigen Renderer (`LOADIMAGE` + `TILED_LOAD` +
-`DRAWIMAGEPART`, Quell-Rect aus `gid-1`). Schließt den Kreis mit dem Sprite-Atlas-
+(`TileMapDoc`/`TileLayer`/`ObjectLayer`/`MapObject` + Tiled-JSON-Serialisierung,
+headless testbar). Tiles aus einem Tileset-PNG aufs Gitter malen (Stift/Radierer/
+Füllen/Rechteck/Pipette), mehrere Layer (Sichtbarkeit/Sortierung/umbenennen),
+Per-Tile-Properties (`solid`/`damage`/...), Undo/Redo. **Object-Layer** (`+◇`):
+Spawn-Punkte/Trigger/Zonen als Objekte mit Name/Typ/Properties (Klick = Punkt,
+Ziehen = Rechteck, Doppelklick = bearbeiten, Entf/Rechtsklick = löschen) — der
+Layer-Typ steuert die Canvas-Interaktion; Undo umfasst Tile- UND Objekt-Ops
+(getaggte Stack-Einträge). **Speichern/Laden = Tiled-JSON** (genau das Format,
+das `gamebasic/modules/tiled.py` via `TILED_LOAD` liest: ein eingebettetes
+Tileset mit `firstgid=1`, CSV-Tile-Daten, Per-Tile-Props + `objectgroup` mit
+Objekten als `{name,type,value}`-Props; `TILED_OBJECT_*` liest sie). `GB-Code`
+exportiert einen selbstständigen Renderer (`LOADIMAGE` + `TILED_LOAD` +
+`DRAWIMAGEPART`, Quell-Rect aus `gid-1`; Object-Layer werden nicht gezeichnet,
+nur ein Auslese-Hinweis kommentiert). Schließt den Kreis mit dem Sprite-Atlas-
 Export (Atlas-PNG als Tileset).
 
 **Start:** `gbtilemap [datei.json]` / `gbrun.py --tilemap` / im Editor Toolbar +

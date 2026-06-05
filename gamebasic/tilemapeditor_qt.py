@@ -15,6 +15,7 @@ Das Datenmodell + die Tiled-JSON-Serialisierung liegen Qt-frei in
 """
 from __future__ import annotations
 
+import copy
 import os
 from pathlib import Path
 
@@ -25,14 +26,16 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
     QDockWidget, QFileDialog, QFormLayout, QHBoxLayout, QInputDialog, QLabel,
-    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPlainTextEdit,
-    QPushButton, QScrollArea, QSpinBox, QTableWidget, QTableWidgetItem,
-    QToolBar, QVBoxLayout, QWidget,
+    QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QPlainTextEdit, QPushButton, QScrollArea, QSpinBox, QTableWidget,
+    QTableWidgetItem, QToolBar, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.icons import icons
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
-from .tilemap.document import PROP_TYPES, TileMapDoc
+from .tilemap.document import (
+    PROP_TYPES, MapObject, ObjectLayer, TileLayer, TileMapDoc, coerce_prop,
+)
 
 # Werkzeuge
 TOOL_PENCIL, TOOL_ERASER, TOOL_FILL, TOOL_RECT, TOOL_PICK = range(5)
@@ -129,6 +132,10 @@ class _Canvas(QWidget):
 
     # (layer_idx, before_tiles, after_tiles) -- fuer Undo
     committed = Signal(int, object, object)
+    # (layer_idx, before_objects, after_objects) -- fuer Object-Layer-Undo
+    obj_committed = Signal(int, object, object)
+    obj_edit_requested = Signal(object)    # MapObject zum Bearbeiten
+    obj_selected = Signal(object)          # MapObject oder None
     cell_hovered = Signal(int, int)
     picked = Signal(int)                   # Pipette -> lokale Tile-ID
 
@@ -147,6 +154,13 @@ class _Canvas(QWidget):
         self._before: list | None = None
         self._rect_start: tuple | None = None
         self._rect_cur: tuple | None = None
+        # Object-Layer-Interaktion
+        self.selected_obj: MapObject | None = None
+        self._obj_before: list | None = None   # Snapshot fuer Undo
+        self._obj_moving = False
+        self._obj_move_off = (0.0, 0.0)
+        self._obj_drag_start: tuple | None = None   # (px,py) doc-Pixel
+        self._obj_drag_cur: tuple | None = None
         self.setMouseTracking(True)
 
     def set_doc(self, doc: TileMapDoc, pixmap: QPixmap | None) -> None:
@@ -174,8 +188,131 @@ class _Canvas(QWidget):
         ch = self.doc.tile_h * self.zoom
         return (pos.x() // cw, pos.y() // ch)
 
+    # ---------------------------------------------------- Object-Layer
+    def _active_obj_layer(self):
+        """Der aktive Layer, falls er ein Object-Layer ist -- sonst None."""
+        if self.doc and 0 <= self.active_layer < len(self.doc.layers):
+            l = self.doc.layers[self.active_layer]
+            if isinstance(l, ObjectLayer):
+                return l
+        return None
+
+    def _doc_px(self, pos: QPoint) -> tuple[float, float]:
+        """Bildschirm-Pixel -> Doc-Pixel (Tiled-Koordinaten)."""
+        return (pos.x() / self.zoom, pos.y() / self.zoom)
+
+    def _snap_point(self, px: float, py: float) -> tuple[float, float]:
+        """Punkt auf die Mitte der getroffenen Zelle snappen."""
+        tw, th = self.doc.tile_w, self.doc.tile_h
+        cx = int(px // tw); cy = int(py // th)
+        return (cx * tw + tw / 2.0, cy * th + th / 2.0)
+
+    def _select_obj(self, obj) -> None:
+        self.selected_obj = obj
+        self.obj_selected.emit(obj)
+        self.update()
+
+    def _obj_press(self, pos: QPoint, right: bool) -> None:
+        layer = self._active_obj_layer()
+        px, py = self._doc_px(pos)
+        hit = layer.object_at(px, py)
+        if right:                                  # Rechtsklick = loeschen
+            if hit is not None:
+                self._obj_before = copy.deepcopy(layer.objects)
+                layer.remove(hit)
+                self._select_obj(None)
+                self._obj_commit(layer)
+            return
+        if hit is not None:                        # bestehendes Objekt: waehlen + ziehen
+            self._select_obj(hit)
+            self._obj_before = copy.deepcopy(layer.objects)
+            self._obj_moving = True
+            self._obj_move_off = (px - hit.x, py - hit.y)
+            return
+        # leere Stelle: neues Objekt aufziehen
+        self._obj_drag_start = (px, py)
+        self._obj_drag_cur = (px, py)
+        self.update()
+
+    def _obj_move(self, pos: QPoint) -> None:
+        layer = self._active_obj_layer()
+        px, py = self._doc_px(pos)
+        if self._obj_moving and self.selected_obj is not None:
+            o = self.selected_obj
+            nx, ny = px - self._obj_move_off[0], py - self._obj_move_off[1]
+            if o.is_point():
+                o.x, o.y = self._snap_point(nx, ny)
+            else:
+                tw, th = self.doc.tile_w, self.doc.tile_h
+                o.x = round(nx / tw) * tw
+                o.y = round(ny / th) * th
+            self.update()
+        elif self._obj_drag_start is not None:
+            self._obj_drag_cur = (px, py)
+            self.update()
+
+    def _obj_release(self) -> None:
+        layer = self._active_obj_layer()
+        if self._obj_moving:
+            self._obj_moving = False
+            self._obj_commit(layer)
+            return
+        if self._obj_drag_start is None:
+            return
+        x0, y0 = self._obj_drag_start
+        x1, y1 = self._obj_drag_cur or self._obj_drag_start
+        self._obj_drag_start = self._obj_drag_cur = None
+        tw, th = self.doc.tile_w, self.doc.tile_h
+        self._obj_before = copy.deepcopy(layer.objects)
+        if abs(x1 - x0) < tw / 2 and abs(y1 - y0) < th / 2:
+            # Punkt-Objekt (Spawn-Marker)
+            sx, sy = self._snap_point(x0, y0)
+            obj = MapObject(sx, sy, name="", otype="")
+        else:
+            # Rechteck-Objekt (Zone/Trigger) -- auf Zellen gerundet
+            cx0, cx1 = sorted((int(x0 // tw), int(x1 // tw)))
+            cy0, cy1 = sorted((int(y0 // th), int(y1 // th)))
+            obj = MapObject(cx0 * tw, cy0 * th,
+                            (cx1 - cx0 + 1) * tw, (cy1 - cy0 + 1) * th)
+        layer.add(obj)
+        self._select_obj(obj)
+        self._obj_commit(layer)
+        self.obj_edit_requested.emit(obj)          # gleich benennen lassen
+
+    def _obj_commit(self, layer) -> None:
+        if self._obj_before is not None:
+            after = copy.deepcopy(layer.objects)
+            self.obj_committed.emit(self.active_layer, self._obj_before, after)
+            self.doc.dirty = True
+        self._obj_before = None
+
+    def delete_selected(self) -> None:
+        """Loescht das selektierte Objekt (Entf-Taste vom Editor)."""
+        layer = self._active_obj_layer()
+        if layer is None or self.selected_obj is None:
+            return
+        if self.selected_obj in layer.objects:
+            self._obj_before = copy.deepcopy(layer.objects)
+            layer.remove(self.selected_obj)
+            self._select_obj(None)
+            self._obj_commit(layer)
+
+    def mouseDoubleClickEvent(self, e):  # noqa: N802
+        if self._active_obj_layer() is None:
+            return
+        layer = self._active_obj_layer()
+        px, py = self._doc_px(e.position().toPoint())
+        hit = layer.object_at(px, py)
+        if hit is not None:
+            self._select_obj(hit)
+            self.obj_edit_requested.emit(hit)
+
     def mousePressEvent(self, e):  # noqa: N802
         if not self.doc:
+            return
+        if self._active_obj_layer() is not None:
+            self._obj_press(e.position().toPoint(),
+                            e.button() == Qt.MouseButton.RightButton)
             return
         cx, cy = self._cell(e.position().toPoint())
         self._erase = (e.button() == Qt.MouseButton.RightButton)
@@ -205,6 +342,9 @@ class _Canvas(QWidget):
     def mouseMoveEvent(self, e):  # noqa: N802
         if not self.doc:
             return
+        if self._active_obj_layer() is not None:
+            self._obj_move(e.position().toPoint())
+            return
         cx, cy = self._cell(e.position().toPoint())
         self.cell_hovered.emit(cx, cy)
         if self._rect_start is not None:
@@ -216,6 +356,9 @@ class _Canvas(QWidget):
 
     def mouseReleaseEvent(self, e):  # noqa: N802
         if not self.doc:
+            return
+        if self._active_obj_layer() is not None:
+            self._obj_release()
             return
         layer = self.doc.layers[self.active_layer]
         if self._rect_start is not None:
@@ -265,7 +408,9 @@ class _Canvas(QWidget):
                 p.setOpacity(0.40)
             else:
                 p.setOpacity(1.0)
-            if have_ts:
+            if isinstance(layer, ObjectLayer):
+                self._draw_objects(p, layer)
+            elif have_ts:
                 self._draw_layer_tiles(p, layer, cw, ch)
             else:
                 self._draw_layer_ids(p, layer, cw, ch)
@@ -277,6 +422,14 @@ class _Canvas(QWidget):
             r = QRect(min(x0, x1) * cw, min(y0, y1) * ch,
                       (abs(x1 - x0) + 1) * cw, (abs(y1 - y0) + 1) * ch)
             p.setPen(QPen(QColor(COLORS["accent"]), 2))
+            p.drawRect(r)
+        # Objekt-Aufzieh-Vorschau
+        if self._obj_drag_start is not None and self._obj_drag_cur is not None:
+            x0, y0 = self._obj_drag_start
+            x1, y1 = self._obj_drag_cur
+            r = QRect(int(min(x0, x1) * self.zoom), int(min(y0, y1) * self.zoom),
+                      int(abs(x1 - x0) * self.zoom), int(abs(y1 - y0) * self.zoom))
+            p.setPen(QPen(QColor(COLORS["accent"]), 1, Qt.PenStyle.DashLine))
             p.drawRect(r)
         # Gitter
         if self.show_grid:
@@ -314,6 +467,43 @@ class _Canvas(QWidget):
                            QColor.fromHsv(hue, 120, 150))
                 p.drawText(QRect(tx * cw, ty * ch, cw, ch),
                            Qt.AlignmentFlag.AlignCenter, str(g))
+
+    def _draw_objects(self, p, layer) -> None:
+        """Zeichnet die Objekte eines Object-Layers: Rechtecke als Rahmen,
+        Punkte als Marker, je mit Name/Typ-Label; Selektion hervorgehoben."""
+        z = self.zoom
+        accent = QColor(COLORS["accent"])
+        fill = QColor(accent.red(), accent.green(), accent.blue(), 50)
+        f = QFont(EDITOR_FONT_FAMILY, max(7, int(self.doc.tile_h * z / 3)))
+        p.setFont(f)
+        for obj in layer.objects:
+            sel = obj is self.selected_obj
+            pen = QPen(QColor("#ffd84d") if sel else accent, 2 if sel else 1)
+            if obj.is_point():
+                cx, cy = int(obj.x * z), int(obj.y * z)
+                rad = max(4, int(self.doc.tile_w * z / 5))
+                p.setPen(pen)
+                p.setBrush(fill)
+                p.drawEllipse(QPoint(cx, cy), rad, rad)
+                p.drawLine(cx - rad, cy, cx + rad, cy)
+                p.drawLine(cx, cy - rad, cx, cy + rad)
+                label = obj.name or obj.type
+                if label:
+                    p.setPen(QColor("#ffffff"))
+                    p.drawText(cx + rad + 2, cy + 4, label)
+            else:
+                r = QRect(int(obj.x * z), int(obj.y * z),
+                          int(obj.width * z), int(obj.height * z))
+                p.setPen(pen)
+                p.fillRect(r, fill)
+                p.drawRect(r)
+                label = obj.name or obj.type
+                if label:
+                    p.setPen(QColor("#ffffff"))
+                    p.drawText(r.adjusted(3, 1, -2, -2),
+                               Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                               label)
+        p.setBrush(Qt.BrushStyle.NoBrush)
 
 
 # ===================================================================
@@ -381,6 +571,77 @@ class _PropDialog(QDialog):
 
 
 # ===================================================================
+#  Objekt-Eigenschaften-Dialog (Object-Layer)
+# ===================================================================
+class _ObjectDialog(QDialog):
+    """Bearbeitet Name, Typ (Tiled `class`) und Properties eines Map-Objekts."""
+
+    def __init__(self, obj: MapObject, parent=None):
+        super().__init__(parent)
+        self.obj = obj
+        kind = "Punkt / Spawn" if obj.is_point() else "Rechteck / Zone"
+        self.setWindowTitle(f"Objekt bearbeiten ({kind})")
+        self.resize(420, 360)
+        lay = QVBoxLayout(self)
+        form = QFormLayout()
+        self.name_edit = QLineEdit(obj.name)
+        self.type_edit = QLineEdit(obj.type)
+        form.addRow("Name:", self.name_edit)
+        form.addRow("Typ (class):", self.type_edit)
+        lay.addLayout(form)
+        lay.addWidget(QLabel(
+            "Properties (z.B. hp=int, active=bool). Das Spiel liest sie via "
+            "TILED_OBJECT_PROP_*."))
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Name", "Typ", "Wert"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        lay.addWidget(self.table, 1)
+        for k, v in obj.properties.items():
+            self._add_row(k, obj.property_types.get(k, "string"), v)
+
+        row = QHBoxLayout()
+        b_add = QPushButton("+ Zeile"); b_add.clicked.connect(lambda: self._add_row())
+        b_del = QPushButton("- Zeile"); b_del.clicked.connect(self._del_row)
+        row.addWidget(b_add); row.addWidget(b_del); row.addStretch(1)
+        lay.addLayout(row)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
+                              QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(self.accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+        self.name_edit.setFocus()
+
+    def _add_row(self, name="", ptype="string", value="") -> None:
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        self.table.setItem(r, 0, QTableWidgetItem(str(name)))
+        cb = QComboBox(); cb.addItems(PROP_TYPES)
+        cb.setCurrentText(ptype if ptype in PROP_TYPES else "string")
+        self.table.setCellWidget(r, 1, cb)
+        self.table.setItem(r, 2, QTableWidgetItem("" if value is None else str(value)))
+
+    def _del_row(self) -> None:
+        r = self.table.currentRow()
+        if r >= 0:
+            self.table.removeRow(r)
+
+    def apply_to_obj(self) -> None:
+        self.obj.name = self.name_edit.text().strip()
+        self.obj.type = self.type_edit.text().strip()
+        self.obj.properties = {}
+        self.obj.property_types = {}
+        for r in range(self.table.rowCount()):
+            name_item = self.table.item(r, 0)
+            name = name_item.text().strip() if name_item else ""
+            if not name:
+                continue
+            ptype = self.table.cellWidget(r, 1).currentText()
+            val_item = self.table.item(r, 2)
+            val = val_item.text() if val_item else ""
+            self.obj.set_property(name, val, ptype)
+
+
+# ===================================================================
 #  Neue-Karte-Dialog
 # ===================================================================
 def _ask_map_params(parent, w=20, h=15, tw=16, th=16):
@@ -431,6 +692,9 @@ class TileMapEditor(QMainWindow):
         # Mitte: Canvas in ScrollArea
         self.canvas = _Canvas()
         self.canvas.committed.connect(self._on_committed)
+        self.canvas.obj_committed.connect(self._on_obj_committed)
+        self.canvas.obj_edit_requested.connect(self._edit_object)
+        self.canvas.obj_selected.connect(self._on_obj_selected)
         self.canvas.cell_hovered.connect(self._on_hover)
         self.canvas.picked.connect(self._on_picked)
         self.scroll = QScrollArea()
@@ -467,14 +731,29 @@ class TileMapEditor(QMainWindow):
         self.layer_list.itemDoubleClicked.connect(self._rename_layer)
         rv.addWidget(self.layer_list, 1)
         btns = QHBoxLayout()
-        for txt, fn in (("+", self._add_layer), ("-", self._del_layer),
-                        ("▲", lambda: self._move_layer(-1)),
-                        ("▼", lambda: self._move_layer(1))):
-            b = QPushButton(txt); b.setFixedWidth(36); b.clicked.connect(fn)
+        for txt, fn, tip in (
+            ("+", self._add_layer, "Tile-Layer hinzufuegen"),
+            ("+◇", self._add_object_layer, "Object-Layer hinzufuegen "
+                "(Spawn-Punkte / Trigger / Zonen)"),
+            ("-", self._del_layer, "Layer loeschen"),
+            ("▲", lambda: self._move_layer(-1), "nach vorne"),
+            ("▼", lambda: self._move_layer(1), "nach hinten"),
+        ):
+            b = QPushButton(txt); b.setFixedWidth(40); b.setToolTip(tip)
+            b.clicked.connect(fn)
             btns.addWidget(b)
         btns.addStretch(1)
         rv.addLayout(btns)
+        self.obj_hint = QLabel("")
+        self.obj_hint.setWordWrap(True)
+        self.obj_hint.setStyleSheet(f"color: {COLORS['fg_muted']};")
+        rv.addWidget(self.obj_hint)
         self._dock("Layer", right, Qt.DockWidgetArea.RightDockWidgetArea)
+
+        # Entf loescht das selektierte Objekt (auf Object-Layern).
+        from PySide6.QtGui import QShortcut
+        sc_del = QShortcut(QKeySequence(Qt.Key.Key_Delete), self.canvas)
+        sc_del.activated.connect(self.canvas.delete_selected)
 
         self.status = self.statusBar()
         self._update_status()
@@ -707,7 +986,8 @@ class TileMapEditor(QMainWindow):
         self.layer_list.clear()
         for li in reversed(range(len(self.doc.layers))):
             l = self.doc.layers[li]
-            it = QListWidgetItem(l.name)
+            label = f"◇ {l.name}" if isinstance(l, ObjectLayer) else l.name
+            it = QListWidgetItem(label)
             it.setData(Qt.ItemDataRole.UserRole, li)
             it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             it.setCheckState(Qt.CheckState.Checked if l.visible
@@ -728,7 +1008,20 @@ class TileMapEditor(QMainWindow):
             return
         li = self.layer_list.item(row).data(Qt.ItemDataRole.UserRole)
         self.canvas.active_layer = li
+        self._update_obj_hint()
         self.canvas.update()
+
+    def _update_obj_hint(self) -> None:
+        li = self.canvas.active_layer
+        is_obj = (0 <= li < len(self.doc.layers)
+                  and isinstance(self.doc.layers[li], ObjectLayer))
+        if is_obj:
+            self.obj_hint.setText(
+                "Object-Layer aktiv: Klick = Punkt (Spawn), Ziehen = Rechteck "
+                "(Zone); Klick auf Objekt = waehlen/ziehen, Doppelklick = "
+                "bearbeiten, Entf / Rechtsklick = loeschen.")
+        else:
+            self.obj_hint.setText("")
 
     def _on_layer_item_changed(self, item: QListWidgetItem) -> None:
         li = item.data(Qt.ItemDataRole.UserRole)
@@ -752,6 +1045,43 @@ class TileMapEditor(QMainWindow):
         self.canvas.active_layer = idx
         self._sync_layers()
         self.canvas.update()
+
+    def _add_object_layer(self) -> None:
+        idx = self.doc.add_object_layer()
+        self.canvas.active_layer = idx
+        self.canvas.selected_obj = None
+        # Layer-Struktur geaendert -> Undo (das tile-/objekt-Indizes haelt) leeren.
+        self.undo_stack.clear(); self.redo_stack.clear()
+        self._sync_layers()
+        self._update_obj_hint()
+        self.canvas.update()
+
+    # ---------------------------------------------------- Objekte
+    def _edit_object(self, obj) -> None:
+        """Bearbeitet Name/Typ/Properties eines Objekts (Doppelklick/Neuanlage)."""
+        if obj is None:
+            return
+        li = self.canvas.active_layer
+        layer = self.doc.layers[li] if 0 <= li < len(self.doc.layers) else None
+        if not isinstance(layer, ObjectLayer) or obj not in layer.objects:
+            return
+        before = copy.deepcopy(layer.objects)
+        dlg = _ObjectDialog(obj, self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            dlg.apply_to_obj()
+            self._on_obj_committed(li, before, copy.deepcopy(layer.objects))
+            self.doc.dirty = True
+            self.canvas.update()
+            self._on_obj_selected(obj)
+
+    def _on_obj_selected(self, obj) -> None:
+        if obj is None:
+            return
+        kind = "Punkt" if obj.is_point() else "Rechteck"
+        nm = obj.name or "(ohne Name)"
+        self.status.showMessage(
+            f"{kind}: {nm}  typ='{obj.type}'  @ ({obj.x:.0f}, {obj.y:.0f})"
+            + ("" if obj.is_point() else f"  {obj.width:.0f}x{obj.height:.0f}"))
 
     def _del_layer(self) -> None:
         if len(self.doc.layers) <= 1:
@@ -790,27 +1120,43 @@ class TileMapEditor(QMainWindow):
         self._update_status()
 
     # ---------------------------------------------------- Undo/Redo
+    # Eintraege: ("tiles", li, before, after) oder ("objects", li, before, after).
     def _on_committed(self, layer_idx, before, after) -> None:
-        self.undo_stack.append((layer_idx, before, after))
+        self.undo_stack.append(("tiles", layer_idx, before, after))
         self.redo_stack.clear()
+
+    def _on_obj_committed(self, layer_idx, before, after) -> None:
+        self.undo_stack.append(("objects", layer_idx, before, after))
+        self.redo_stack.clear()
+
+    def _restore_undo(self, entry, *, use_before: bool) -> None:
+        kind, li, before, after = entry
+        if li >= len(self.doc.layers):
+            return
+        snap = before if use_before else after
+        layer = self.doc.layers[li]
+        if kind == "tiles" and isinstance(layer, TileLayer):
+            layer.tiles = list(snap)
+        elif kind == "objects" and isinstance(layer, ObjectLayer):
+            layer.objects = copy.deepcopy(snap)
+            self.canvas.selected_obj = None
+            self.canvas.obj_selected.emit(None)
+        self.doc.dirty = True
+        self.canvas.update()
 
     def _undo(self) -> None:
         if not self.undo_stack:
             return
-        li, before, after = self.undo_stack.pop()
-        if li < len(self.doc.layers):
-            self.doc.layers[li].tiles = list(before)
-            self.redo_stack.append((li, before, after))
-            self.canvas.update()
+        entry = self.undo_stack.pop()
+        self._restore_undo(entry, use_before=True)
+        self.redo_stack.append(entry)
 
     def _redo(self) -> None:
         if not self.redo_stack:
             return
-        li, before, after = self.redo_stack.pop()
-        if li < len(self.doc.layers):
-            self.doc.layers[li].tiles = list(after)
-            self.undo_stack.append((li, before, after))
-            self.canvas.update()
+        entry = self.redo_stack.pop()
+        self._restore_undo(entry, use_before=False)
+        self.undo_stack.append(entry)
 
     # ---------------------------------------------------- Views/Status
     def _refresh_views(self) -> None:

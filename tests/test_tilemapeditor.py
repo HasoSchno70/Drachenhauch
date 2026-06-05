@@ -8,7 +8,7 @@ import json
 import pytest
 
 from gamebasic.tilemap import TileMapDoc, TileLayer
-from gamebasic.tilemap.document import coerce_prop
+from gamebasic.tilemap.document import coerce_prop, MapObject, ObjectLayer
 from gamebasic.modules import tiled as T
 
 
@@ -165,6 +165,103 @@ def test_save_load_json_roundtrip(tmp_path):
     assert doc2.properties_of(3)["name"] == "coin"
 
 
+# --------------------------------------------------------------- Object-Layer
+
+def _build_with_objects(tmp_path):
+    doc = TileMapDoc(6, 4, 16, 16)
+    img = tmp_path / "tiles.png"
+    img.write_bytes(b"\x89PNG\r\n")
+    doc.set_tileset(str(img), 64, 32)
+    doc.layers[0].set(0, 0, 1)
+    idx = doc.add_object_layer("Spawns")
+    ol = doc.layers[idx]
+    p = MapObject(48, 32, name="player", otype="spawn")   # Punkt (w=h=0)
+    p.set_property("hp", "100", "int")
+    ol.add(p)
+    r = MapObject(16, 0, 32, 48, name="zone", otype="trigger")  # Rechteck
+    r.set_property("active", "true", "bool")
+    ol.add(r)
+    return doc
+
+
+def test_object_layer_model_basics():
+    doc = TileMapDoc(4, 4, 16, 16)
+    i = doc.add_object_layer("Obj")
+    assert i == 1 and isinstance(doc.layers[1], ObjectLayer)
+    ol = doc.layers[1]
+    p = MapObject(10, 20)
+    assert p.is_point()
+    r = MapObject(0, 0, 16, 16)
+    assert not r.is_point()
+    ol.add(p); ol.add(r)
+    assert ol.object_at(10, 20) is p          # Punkt-Trefferzone
+    assert ol.object_at(8, 8) is r            # im Rechteck
+    assert ol.object_at(200, 200) is None
+
+
+def test_object_layer_resize_keeps_pixel_coords():
+    doc = TileMapDoc(8, 8, 16, 16)
+    doc.add_object_layer("Obj")
+    doc.layers[1].add(MapObject(100, 64, name="x"))
+    doc.resize(4, 4)                          # Karte schrumpft
+    assert isinstance(doc.layers[1], ObjectLayer)
+    o = doc.layers[1].objects[0]
+    assert o.x == 100 and o.y == 64 and o.name == "x"
+
+
+def test_object_layer_to_tiled_dict_shape(tmp_path):
+    doc = _build_with_objects(tmp_path)
+    d = doc.to_tiled_dict(str(tmp_path / "level.json"))
+    assert len(d["layers"]) == 2
+    og = d["layers"][1]
+    assert og["type"] == "objectgroup" and og["name"] == "Spawns"
+    assert len(og["objects"]) == 2
+    o0 = og["objects"][0]
+    assert o0["name"] == "player" and o0["type"] == "spawn"
+    assert o0["x"] == 48 and o0["y"] == 32 and o0.get("point") is True
+    assert {"name": "hp", "type": "int", "value": 100} in o0["properties"]
+    assert d["nextobjectid"] == 3            # 2 Objekte vergeben -> naechste 3
+
+
+def test_object_layer_roundtrip_through_tiled_loader(tmp_path):
+    """Editor-Export mit Object-Layer -> TILED_LOAD -> TILED_OBJECT_* lesbar."""
+    doc = _build_with_objects(tmp_path)
+    path = str(tmp_path / "level.json")
+    doc.save_json(path)
+
+    m = call(T._b_tiled_load, path)
+    assert call(T._b_layer_count, m) == 2
+    assert call(T._b_layer_type, m, 1) == "object"
+    assert call(T._b_obj_count, m, "Spawns") == 2
+    # Punkt-Objekt 0
+    assert call(T._b_obj_name, m, "Spawns", 0) == "player"
+    assert call(T._b_obj_type, m, "Spawns", 0) == "spawn"
+    assert call(T._b_obj_x, m, "Spawns", 0) == 48.0
+    assert call(T._b_obj_y, m, "Spawns", 0) == 32.0
+    assert call(T._b_obj_w, m, "Spawns", 0) == 0.0
+    assert call(T._b_obj_prop_int, m, "Spawns", 0, "hp") == 100
+    # Rechteck-Objekt 1
+    assert call(T._b_obj_name, m, "Spawns", 1) == "zone"
+    assert call(T._b_obj_w, m, "Spawns", 1) == 32.0
+    assert call(T._b_obj_h, m, "Spawns", 1) == 48.0
+    assert call(T._b_obj_prop_bool, m, "Spawns", 1, "active") is True
+
+
+def test_object_layer_save_load_json_roundtrip(tmp_path):
+    doc = _build_with_objects(tmp_path)
+    path = str(tmp_path / "level.json")
+    doc.save_json(path)
+    doc2 = TileMapDoc.load_json(path)
+    assert len(doc2.layers) == 2
+    assert isinstance(doc2.layers[1], ObjectLayer)
+    objs = doc2.layers[1].objects
+    assert [o.name for o in objs] == ["player", "zone"]
+    assert objs[0].is_point()
+    assert objs[0].properties["hp"] == 100
+    assert objs[1].width == 32 and objs[1].height == 48
+    assert objs[1].properties["active"] is True
+
+
 def test_gb_code_compiles(tmp_path):
     """Der exportierte GB-Code muss lexen+parsen+kompilieren."""
     from gamebasic.lexer import Lexer
@@ -177,3 +274,46 @@ def test_gb_code_compiles(tmp_path):
     prepped, _ = process(code, tmp_path, file_label="<tilemap>")
     ast = Parser(Lexer(prepped).tokenize()).parse()
     Compiler().compile(ast)                   # wirft bei Fehler
+
+
+def test_gb_code_compiles_with_object_layer(tmp_path):
+    """Auch mit Object-Layer bleibt der exportierte GB-Code kompilierbar."""
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.compiler import Compiler
+    from gamebasic.preprocess import process
+
+    doc = _build_with_objects(tmp_path)
+    code = doc.gb_code(str(tmp_path / "level.json"))
+    prepped, _ = process(code, tmp_path, file_label="<tilemap>")
+    ast = Parser(Lexer(prepped).tokenize()).parse()
+    Compiler().compile(ast)
+
+
+# --------------------------------------------------------------- Editor-UI
+
+def test_editor_object_layer_undo_redo(tmp_path, monkeypatch):
+    """Headless: Object-Layer im Editor anlegen, Objekt + Undo/Redo + Delete."""
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    try:
+        from PySide6.QtWidgets import QApplication
+        from gamebasic.tilemapeditor_qt import TileMapEditor
+    except Exception:
+        pytest.skip("PySide6 nicht verfuegbar")
+    QApplication.instance() or QApplication([])
+    ed = TileMapEditor(tmp_path)
+    ed._add_object_layer()
+    li = ed.canvas.active_layer
+    ol = ed.doc.layers[li]
+    assert isinstance(ol, ObjectLayer)
+    before = json.loads(json.dumps([]))      # leere Liste als Vorher-Snapshot
+    import copy as _c
+    ol.add(MapObject(24, 24, name="hero", otype="spawn"))
+    ed._on_obj_committed(li, before, _c.deepcopy(ol.objects))
+    assert len(ol.objects) == 1
+    ed._undo(); assert len(ed.doc.layers[li].objects) == 0
+    ed._redo(); assert len(ed.doc.layers[li].objects) == 1
+    ed.canvas.selected_obj = ed.doc.layers[li].objects[0]
+    ed.canvas.delete_selected()
+    assert len(ed.doc.layers[li].objects) == 0
+    ed._undo(); assert len(ed.doc.layers[li].objects) == 1
