@@ -146,13 +146,12 @@ def _check_int(v, fn: str, name: str) -> int:
 
 
 def _import_pygame():
-    try:
-        import pygame
-        return pygame
-    except ImportError as exc:
-        raise GBRuntimeError(
-            "sprite-Modul benoetigt pygame (wird mit LOADIMAGE bereits initialisiert)."
-        ) from exc
+    """SPRITE_DRAW (Rendering) laeuft nur in der nativen Runtime (gbrt). Die
+    Sprite-Logik (Position/Animation/Kollision) ist davon unabhaengig und
+    funktioniert auch im konsolen-only Tree-Walker."""
+    raise GBRuntimeError(
+        "SPRITE_DRAW (Sprite-Rendering) laeuft nur in der nativen Runtime "
+        "(gbrt) -- per F6 bzw. 'gbrun.py --native' starten.")
 
 
 # --- Lifecycle -------------------------------------------------------
@@ -311,40 +310,8 @@ def _update(sp, dt_ms):
 
 @graphics_builtin("SPRITE_DRAW", arity=1)
 def _draw(g, sp):
-    sp = _check_sprite(sp, "SPRITE_DRAW")
-    pygame = _import_pygame()
-    surf = sp.image.surface
-    sw = surf.get_width()
-    tiles_per_row = max(1, sw // sp.frame_w)
-    src_col = sp.current_frame % tiles_per_row
-    src_row = sp.current_frame // tiles_per_row
-    rect = (src_col * sp.frame_w, src_row * sp.frame_h, sp.frame_w, sp.frame_h)
-
-    needs_transform = (
-        sp.flip_x or sp.flip_y or sp.tinted
-        or sp.scale_x != 1.0 or sp.scale_y != 1.0
-    )
-
-    if not needs_transform:
-        # Schneller Pfad: direkt aus dem Sheet blitten.
-        g.draw_image_part(surf, *rect, int(sp.x), int(sp.y))
-        return None
-
-    # Slow path: Subsurface kopieren, dann transformieren.
-    sub = surf.subsurface(rect).copy()
-    if sp.scale_x != 1.0 or sp.scale_y != 1.0:
-        nw = max(1, int(sp.frame_w * sp.scale_x))
-        nh = max(1, int(sp.frame_h * sp.scale_y))
-        sub = pygame.transform.scale(sub, (nw, nh))
-    if sp.flip_x or sp.flip_y:
-        sub = pygame.transform.flip(sub, sp.flip_x, sp.flip_y)
-    if sp.tinted:
-        r = (sp.tint_color >> 16) & 0xFF
-        gc = (sp.tint_color >> 8) & 0xFF
-        b = sp.tint_color & 0xFF
-        sub.fill((r, gc, b, 255), special_flags=pygame.BLEND_RGBA_MULT)
-    g.draw_image(sub, int(sp.x), int(sp.y))
-    return None
+    _check_sprite(sp, "SPRITE_DRAW")
+    _import_pygame()   # native-only -> wirft im Tree-Walker
 
 
 # --- Kollision -------------------------------------------------------

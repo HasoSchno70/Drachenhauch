@@ -4,7 +4,6 @@ Wir bauen ein Sprite mit einer Pygame-Surface direkt (kein File-Loading,
 kein SCREEN). SPRITE_DRAW pruefen wir nicht hier - das wuerde Pygame-Display
 brauchen. Logik (Update, Animation, Kollision) ist davon unabhaengig.
 """
-import os
 import pytest
 
 from gamebasic.modules import load_module
@@ -19,12 +18,10 @@ def _load_sprite():
 
 @pytest.fixture(scope="module")
 def sheet_image():
-    """Ein synthetisches 64x16 Pygame-Surface als _Image-Wrapper."""
-    os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
-    import pygame
-    pygame.init()
-    surf = pygame.Surface((64, 16))
-    return _Image(surf, "<test-sheet>")
+    """_Image-Handle fuer die Sprite-Logik-Tests. Die Surface ist hier
+    irrelevant (nur SPRITE_DRAW liest sie, das wird nicht getestet -- es laeuft
+    nur in gbrt), daher ein leeres Handle ohne pygame."""
+    return _Image(None, "<test-sheet>")
 
 
 @pytest.fixture

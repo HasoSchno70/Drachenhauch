@@ -346,102 +346,11 @@ def _update(sys, dt_ms):
     return None
 
 
-# Cache fuer Glow-Sprites: (size, quantisierte_farbe) -> pygame.Surface.
-# Farbe auf 4 Bit/Kanal quantisiert, damit Farbverlaeufe nicht beliebig
-# viele Eintraege erzeugen. Gekappt, um Speicher zu begrenzen.
-_GLOW_CACHE: dict = {}
-
-
-def _glow_surface(g, size, color):
-    key = (size, color & 0xF0F0F0)
-    surf = _GLOW_CACHE.get(key)
-    if surf is None:
-        pg = g._pygame
-        d = size * 2 + 1
-        yy, xx = np.ogrid[-size:size + 1, -size:size + 1]
-        dist = np.sqrt(xx * xx + yy * yy) / max(size, 1)
-        fall = np.clip(1.0 - dist, 0.0, 1.0) ** 2          # weicher Abfall
-        r = (color >> 16) & 0xFF
-        gg = (color >> 8) & 0xFF
-        b = color & 0xFF
-        rgb = np.zeros((d, d, 3), dtype=np.uint8)
-        rgb[..., 0] = (r * fall).astype(np.uint8)
-        rgb[..., 1] = (gg * fall).astype(np.uint8)
-        rgb[..., 2] = (b * fall).astype(np.uint8)
-        surf = pg.surfarray.make_surface(rgb)
-        if len(_GLOW_CACHE) < 512:
-            _GLOW_CACHE[key] = surf
-    return surf
-
-
 @graphics_builtin("PARTICLE_DRAW", arity=1)
 def _draw(g, sys):
     sys = _check_sys(sys, "PARTICLE_DRAW")
-    n = sys.count()
-    if n == 0:
-        return None
-
-    # --- Farbe pro Partikel vektorisiert berechnen ---------------------
-    # life_t in [0,1]: 0 = gerade geboren, 1 = stirbt jetzt.
-    lifetimes = np.maximum(sys._lifetimes, 1).astype(np.float32)
-    life_t = np.clip(sys._ages.astype(np.float32) / lifetimes, 0.0, 1.0)
-
-    if not sys.has_color_end and not sys.fade:
-        final_colors = sys._colors
-    else:
-        sr = ((sys._colors >> 16) & 0xFF).astype(np.float32)
-        sg = ((sys._colors >> 8) & 0xFF).astype(np.float32)
-        sb = (sys._colors & 0xFF).astype(np.float32)
-        if sys.has_color_end:
-            er = (sys.color_end >> 16) & 0xFF
-            eg = (sys.color_end >> 8) & 0xFF
-            eb = sys.color_end & 0xFF
-            inv = 1.0 - life_t
-            sr = sr * inv + er * life_t
-            sg = sg * inv + eg * life_t
-            sb = sb * inv + eb * life_t
-        if sys.fade:
-            f = 1.0 - life_t
-            sr = sr * f
-            sg = sg * f
-            sb = sb * f
-        rr = np.clip(sr, 0, 255).astype(np.int32)
-        gg = np.clip(sg, 0, 255).astype(np.int32)
-        bb = np.clip(sb, 0, 255).astype(np.int32)
-        final_colors = (rr << 16) | (gg << 8) | bb
-
-    xs = sys._xs.astype(np.int32).tolist()
-    ys = sys._ys.astype(np.int32).tolist()
-    sizes = sys._sizes.tolist()
-    cols = final_colors.tolist()
-    mode = sys.mode
-
-    if mode == "pixel":
-        # Bulk-Plot: alle Pixel in EINEM Aufruf (vektorisiert).
-        g.plot_many(xs, ys, cols)
-    elif mode == "square":
-        for i in range(n):
-            s = sizes[i]
-            g.box(xs[i] - s, ys[i] - s, xs[i] + s, ys[i] + s, cols[i])
-    elif mode == "streak":
-        vxs = sys._vxs.tolist()
-        vys = sys._vys.tolist()
-        for i in range(n):
-            x = xs[i]
-            y = ys[i]
-            g.line(x, y, int(x - vxs[i] * 0.04), int(y - vys[i] * 0.04), cols[i])
-    elif mode == "glow":
-        pg = g._pygame
-        add = pg.BLEND_RGB_ADD
-        buf = g._buffer
-        for i in range(n):
-            s = sizes[i]
-            if s < 1:
-                s = 1
-            surf = _glow_surface(g, s, cols[i])
-            sx, sy = g._w2s(xs[i], ys[i])
-            buf.blit(surf, (sx - s, sy - s), special_flags=add)
-    else:  # "circle"
-        for i in range(n):
-            g.circle(xs[i], ys[i], sizes[i], cols[i])
-    return None
+    # Rendering laeuft nur in der nativen Runtime (gbrt). Partikel-Logik
+    # (EMIT/UPDATE/SET_*) bleibt im konsolen-only Tree-Walker nutzbar.
+    raise GBRuntimeError(
+        "PARTICLE_DRAW (Partikel-Rendering) laeuft nur in der nativen Runtime "
+        "(gbrt) -- per F6 bzw. 'gbrun.py --native' starten.")

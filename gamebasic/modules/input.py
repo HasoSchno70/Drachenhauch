@@ -130,25 +130,10 @@ _JOYSTICKS: list = []      # list[pygame.joystick.Joystick] -- initialisiert laz
 
 
 def _ensure_joysticks():
-    """Initialisiert das pygame-Joystick-Subsystem und sammelt alle aktuell
-    angeschlossenen Pads. Idempotent. Wird beim ersten Poll aufgerufen."""
-    try:
-        import pygame as _pg
-    except ImportError:
-        return
-    if not _pg.joystick.get_init():
-        _pg.joystick.init()
-    # Hot-Plug: bei jedem Aufruf neu vergleichen, ob ein Pad dazukam/wegging.
-    n = _pg.joystick.get_count()
-    if len(_JOYSTICKS) != n:
-        _JOYSTICKS.clear()
-        for i in range(n):
-            j = _pg.joystick.Joystick(i)
-            try:
-                j.init()
-            except Exception:
-                pass
-            _JOYSTICKS.append(j)
+    """No-op im konsolen-only Tree-Walker: echtes Gamepad-Polling gibt es nur in
+    der nativen Runtime (gbrt, raylib). `_JOYSTICKS` bleibt leer (Getter liefern
+    0/""/0.0). Tests injizieren Stub-Pads direkt in `_JOYSTICKS`."""
+    return
 
 
 def _poll_joysticks_into(out_set: set):

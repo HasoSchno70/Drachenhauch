@@ -36,14 +36,12 @@ def _check_int(v, fn: str, name: str) -> int:
 
 
 def _import_pygame():
-    try:
-        import pygame
-        return pygame
-    except ImportError as exc:
-        raise GBRuntimeError(
-            "imgfx benoetigt pygame. Mit LOADIMAGE oder SCREEN ist es bereits "
-            "initialisiert; sonst: 'py -m pip install pygame'."
-        ) from exc
+    """imgfx (Bild-Verarbeitung) laeuft nur in der nativen Runtime (gbrt) --
+    der Tree-Walker (F5/Profiler/Debugger) ist konsolen-only und kann keine
+    Bilder laden/transformieren."""
+    raise GBRuntimeError(
+        "imgfx (IMAGE_SCALE/ROTATE/FLIP/TINT/COPY) laeuft nur in der nativen "
+        "Runtime (gbrt) -- per F6 bzw. 'gbrun.py --native' starten.")
 
 
 @builtin("IMAGE_SCALE", arity=3)
@@ -53,44 +51,30 @@ def _scale(img, w, h):
     h = _check_int(h, "IMAGE_SCALE", "Hoehe")
     if w <= 0 or h <= 0:
         raise GBRuntimeError("IMAGE_SCALE: w und h muessen > 0 sein")
-    pygame = _import_pygame()
-    return _Image(pygame.transform.scale(img.surface, (w, h)),
-                  img.path + "@scaled")
+    _import_pygame()   # native-only -> wirft im Tree-Walker
 
 
 @builtin("IMAGE_ROTATE", arity=2, types=("any", "num"))
 def _rotate(img, degrees):
-    img = _check_image(img, "IMAGE_ROTATE")
-    pygame = _import_pygame()
-    return _Image(pygame.transform.rotate(img.surface, degrees),
-                  img.path + "@rotated")
+    _check_image(img, "IMAGE_ROTATE")
+    _import_pygame()
 
 
 @builtin("IMAGE_FLIP", arity=3, types=("any", "bool", "bool"))
 def _flip(img, flip_x, flip_y):
-    img = _check_image(img, "IMAGE_FLIP")
-    pygame = _import_pygame()
-    return _Image(pygame.transform.flip(img.surface, flip_x, flip_y),
-                  img.path + "@flipped")
+    _check_image(img, "IMAGE_FLIP")
+    _import_pygame()
 
 
 @builtin("IMAGE_TINT", arity=2, types=("any", "int"))
 def _tint(img, color):
-    img = _check_image(img, "IMAGE_TINT")
+    _check_image(img, "IMAGE_TINT")
     if color < 0 or color > 0xFFFFFF:
         raise GBRuntimeError("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein")
-    pygame = _import_pygame()
-    r = (color >> 16) & 0xFF
-    g = (color >> 8) & 0xFF
-    b = color & 0xFF
-    new_surf = img.surface.copy()
-    # BLEND_RGBA_MULT multipliziert Pixel kanalweise mit dem Fuell-Wert.
-    # Alpha 255 laesst den Alpha-Kanal des Originals unveraendert.
-    new_surf.fill((r, g, b, 255), special_flags=pygame.BLEND_RGBA_MULT)
-    return _Image(new_surf, img.path + "@tinted")
+    _import_pygame()
 
 
 @builtin("IMAGE_COPY", arity=1)
 def _copy(img):
-    img = _check_image(img, "IMAGE_COPY")
-    return _Image(img.surface.copy(), img.path + "@copy")
+    _check_image(img, "IMAGE_COPY")
+    _import_pygame()

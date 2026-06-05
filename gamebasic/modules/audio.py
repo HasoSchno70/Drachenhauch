@@ -67,25 +67,18 @@ from . import register_type
 
 # --- Lazy-Init -------------------------------------------------------
 
-_pygame = None  # cached pygame-Modul
-
-
 def _ensure_pygame():
-    """Importiert pygame mit unterdruecktem Support-Prompt. Idempotent."""
-    global _pygame
-    if _pygame is None:
-        os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
-        import pygame  # noqa: WPS433 - intentional lazy import
-        _pygame = pygame
-    return _pygame
+    """Audio-Wiedergabe/Synthese laeuft nur in der nativen Runtime (gbrt). Der
+    Tree-Walker (F5/Profiler/Debugger) ist konsolen-only. Reine Synth-Mathematik
+    (gamebasic.synth) bleibt nutzbar (gbsfx-Export, Editoren)."""
+    raise GBRuntimeError(
+        "Audio (AUDIO_TONE/NOISE/SFX/PLAY/MUSIC_*) laeuft nur in der nativen "
+        "Runtime (gbrt) -- per F6 bzw. 'gbrun.py --native' starten.")
 
 
 def _ensure_mixer():
-    """pygame.mixer.init() wenn noch nicht initialisiert."""
-    pg = _ensure_pygame()
-    if not pg.mixer.get_init():
-        pg.mixer.init()
-    return pg
+    """Mixer gibt es nur in der nativen Runtime (gbrt) -- wirft im Tree-Walker."""
+    return _ensure_pygame()
 
 
 # --- Channel-Wrapper -------------------------------------------------
