@@ -46,6 +46,29 @@ class ProfileResult:
     stopped: bool = False
 
 
+def _extract_profile_json(out: str) -> dict:
+    """Den JSON-Blob aus gbrt's stdout herausziehen -- tolerant gegen
+    raylib-Logging.
+
+    `gbrt profile` gibt das Ergebnis als EINE JSON-Zeile via `println!` aus, aber
+    raylib schreibt seine `WARNING`-TraceLogs (z.B. bei `MESH_SPHERE`:
+    "WARNING: MESH: vertexCount ...") ebenfalls auf stdout -- und beim
+    Fenster-Shutdown (Drop nach dem println) koennen weitere Zeilen folgen. Ein
+    naives `json.loads(out)` scheitert dann an den Nicht-JSON-Zeilen und die
+    Auswertung bleibt leer. Programm-Output (PRINT) liegt im `output`-Feld, NICHT
+    auf rohem stdout -- der einzige `{...}`-JSON ist daher unser Blob.
+    """
+    import json
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith("{") and line.endswith("}"):
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
+    return {}
+
+
 def _find_gbrt():
     """Pfad zur gebauten gbrt-Binary (release vor debug) oder None."""
     import os
@@ -66,7 +89,6 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
     bricht den Subprozess ab (fuer Endlos-Loops). Zeilen beziehen sich auf die
     Quelle; bei `IMPORT "datei.gb"` (Inlining) koennen sie verschoben sein.
     """
-    import json
     import os
     import subprocess
     import tempfile
@@ -110,12 +132,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         except OSError:
             pass
 
-    data = {}
-    if out.strip():
-        try:
-            data = json.loads(out)
-        except json.JSONDecodeError:
-            data = {}
+    data = _extract_profile_json(out)
     result.output = data.get("output", "")
     result.total_time = float(data.get("total_time", 0.0))
     result.stopped = result.stopped or bool(data.get("stopped", False))
