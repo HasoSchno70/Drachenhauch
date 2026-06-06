@@ -333,10 +333,11 @@ GUI_METRIC_GET(schluessel$)         ' -> aktueller Wert
 ```
 
 Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
-`slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand).
-**Hinweis:** Größen, die in die Widget-Maße einfließen (`check_size`,
+`slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand),
+`corner_radius` (runde Ecken für Buttons/TextInput/Dropdown/Progress/Panel; 0 =
+eckig). **Hinweis:** Größen, die in die Widget-Maße einfließen (`check_size`,
 `slider_h`), wirken nur auf **neu angelegte** Widgets — am besten vor dem
-UI-Aufbau setzen. `title_h`/`pad`/`caret_period` wirken sofort.
+UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius` wirken sofort.
 
 ### 4. Einzelnes Widget einfärben (überschreibt das Theme)
 
@@ -353,6 +354,28 @@ GUI_SET_COLOR(warn, "bg", RGB(160, 40, 40))   ' nur dieser Button ist rot
 
 `GUI_RESET()` setzt Theme **und** Metriken wieder auf die Defaults zurück
 (und löscht alle Fenster/Widgets).
+
+### 5. Zustand & Schrift pro Widget
+
+```basic
+GUI_SET_ENABLED(widget, FALSE)   ' deaktivieren: ausgegraut + nicht interaktiv
+GUI_ENABLED(widget)              ' -> BOOLEAN
+GUI_SET_FONT(widget, font)       ' eigener TTF-Font (Handle aus LOADFONT, -1 = Default)
+GUI_SET_FONT_SIZE(widget, px)    ' eigene Textgröße (0 = Standard)
+```
+
+Ein **deaktiviertes** Widget wird in `muted_fg` gezeichnet und nimmt keine
+Maus-/Tastatur-Eingaben an; im Editor bleibt es per `GUI_HIT_TEST` aber
+selektierbar. Eigene Fonts:
+
+```basic
+DIM fnt AS INTEGER
+fnt = LOADFONT("assets/Inter.ttf", 32)
+DIM titel AS GUI_WIDGET
+titel = GUI_LABEL(win, "Einstellungen", 20, 16)
+GUI_SET_FONT(titel, fnt)
+GUI_SET_FONT_SIZE(titel, 28)
+```
 
 ## Callbacks: GUI_ON_CLICK
 

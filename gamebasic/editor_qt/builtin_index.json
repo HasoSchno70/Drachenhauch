@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 886,
+ "count": 890,
  "builtins": [
   {
    "name": "ABS",
@@ -5316,6 +5316,30 @@
    "name": "GUI_SET_DROPDOWN",
    "kind": "core",
    "signature": "GUI_SET_DROPDOWN(dd, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_ENABLED",
+   "kind": "core",
+   "signature": "GUI_SET_ENABLED(wdg, on)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ENABLED",
+   "kind": "core",
+   "signature": "GUI_ENABLED(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_FONT",
+   "kind": "core",
+   "signature": "GUI_SET_FONT(wdg, font)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_FONT_SIZE",
+   "kind": "core",
+   "signature": "GUI_SET_FONT_SIZE(wdg, px)",
    "module": "gui"
   }
  ]

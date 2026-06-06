@@ -38,6 +38,7 @@ fn default_metrics() -> HashMap<String, i32> {
     [
         ("title_h", 22), ("slider_h", 14), ("check_size", 16),
         ("slider_handle_w", 10), ("caret_period", 16), ("pad", 6),
+        ("corner_radius", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
@@ -130,6 +131,11 @@ pub struct Widget {
     group: String,
     items: Vec<String>,
     sel: i32,
+    // Styling (Phase 4): `enabled` = interaktiv (sonst ausgegraut); `font` =
+    // FONT-Handle (-1 = Default); `font_size` = px (0 = Default-Textgroesse).
+    enabled: bool,
+    font: i64,
+    font_size: i32,
 }
 
 pub struct Window {
@@ -252,6 +258,7 @@ impl Gui {
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None,
             alive: true, visible: true,
             group: String::new(), items: Vec::new(), sel: -1,
+            enabled: true, font: -1, font_size: 0,
         }
     }
 
@@ -565,6 +572,24 @@ impl Gui {
         if color == -1 { w.ov.remove(&role); } else { w.ov.insert(role, color); }
         Ok(())
     }
+    // --- Styling (Phase 4): enabled-Zustand, per-Widget-Font/-Groesse ---
+    pub fn set_enabled(&mut self, h: i64, f: bool) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_ENABLED")?.enabled = f;
+        if !f {
+            let (wi, i) = Self::dec_widget(h);
+            if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
+            if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
+        }
+        Ok(())
+    }
+    pub fn enabled(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_ENABLED")?.enabled) }
+    pub fn set_font(&mut self, h: i64, font: i64) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_FONT")?.font = font; Ok(())
+    }
+    pub fn set_font_size(&mut self, h: i64, sz: i64) -> Result<(), String> {
+        if sz < 0 { return Err("GUI_SET_FONT_SIZE: Groesse muss >= 0 sein".into()); }
+        self.wdg_mut(h, "GUI_SET_FONT_SIZE")?.font_size = sz as i32; Ok(())
+    }
 
     // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
     // Basis fuer dynamische UIs und einen WYSIWYG-Editor. Widget-Koordinaten sind
@@ -676,6 +701,9 @@ impl Gui {
         if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
         if !w.group.is_empty() { o["group"] = serde_json::json!(w.group); }
         if !w.items.is_empty() { o["items"] = serde_json::json!(w.items); o["sel"] = serde_json::json!(w.sel); }
+        if !w.enabled { o["enabled"] = serde_json::json!(false); }
+        if w.font != -1 { o["font"] = serde_json::json!(w.font); }
+        if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
         if let Some(t) = &w.tbl {
             o["table"] = serde_json::json!({
                 "headers": t.headers, "rows": t.rows,
@@ -707,6 +735,9 @@ impl Gui {
             w.items = its.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
         }
         w.sel = wj["sel"].as_i64().unwrap_or(-1) as i32;
+        w.enabled = wj["enabled"].as_bool().unwrap_or(true);
+        w.font = wj["font"].as_i64().unwrap_or(-1);
+        w.font_size = wj["font_size"].as_i64().unwrap_or(0) as i32;
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -810,6 +841,34 @@ impl Gui {
     fn wcol(&self, w: &Widget, role: &str, theme_key: &str) -> i64 {
         if let Some(c) = w.ov.get(role) { *c } else { self.th(theme_key) }
     }
+    // Styling-aware Farb-/Text-Helfer (beruecksichtigen den enabled-Zustand).
+    fn txt_col(&self, w: &Widget) -> i64 {
+        if !w.enabled { self.th("muted_fg") } else { self.wcol(w, "fg", "text_fg") }
+    }
+    fn acc_col(&self, w: &Widget) -> i64 {
+        let a = self.wcol(w, "accent", "accent");
+        if !w.enabled { shade(a, -70) } else { a }
+    }
+    /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
+    fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
+        if w.font == -1 && w.font_size == 0 {
+            g.text(x, y, s, c);
+        } else {
+            let sz = if w.font_size > 0 { w.font_size } else { g.text_height() };
+            g.text_styled(x, y, s, c, w.font, sz);
+        }
+    }
+    /// Gefuellte Box + Rahmen, runde Ecken wenn Metrik `corner_radius` > 0.
+    fn fbox(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, fill: i64, border: i64) {
+        let rad = self.m("corner_radius");
+        if rad > 0 {
+            g.round_rect(x1, y1, x2, y2, rad, fill, true);
+            g.round_rect(x1, y1, x2, y2, rad, border, false);
+        } else {
+            g.box_fill(x1, y1, x2, y2, fill);
+            g.rect(x1, y1, x2, y2, border);
+        }
+    }
 
     // --- Update (ein Frame) ---
     pub fn update(&mut self, g: &mut Graphics) {
@@ -832,7 +891,7 @@ impl Gui {
             for i in 0..n {
                 let (r, is_table, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind == Kind::Table, w.alive && w.visible)
+                    (self.abs_rect(top, w), w.kind == Kind::Table, w.alive && w.visible && w.enabled)
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
@@ -986,7 +1045,7 @@ impl Gui {
         let mut hit = None;
         let n = self.windows[win].widgets.len();
         for i in 0..n {
-            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), w.alive && w.visible) };
+            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), w.alive && w.visible && w.enabled) };
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
@@ -1058,31 +1117,31 @@ impl Gui {
         let pad = self.m("pad");
         match wdg.kind {
             Kind::Label => {
-                let fg = wdg.ov.get("fg").copied().unwrap_or(wdg.color);
-                g.text(ax, ay, wdg.text.clone(), fg);
+                let fg = if !wdg.enabled { self.th("muted_fg") }
+                         else { wdg.ov.get("fg").copied().unwrap_or(wdg.color) };
+                self.wtext(g, wdg, ax, ay, wdg.text.clone(), fg);
             }
             Kind::Panel => {
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "widget_bg"));
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 if !wdg.text.is_empty() {
                     g.box_fill(ax, ay, ax + w - 1, ay + 17, self.th("win_border"));
-                    g.text(ax + 5, ay + 2, wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
+                    self.wtext(g, wdg, ax + 5, ay + 2, wdg.text.clone(), self.wcol(wdg, "fg", "title_fg"));
                 }
             }
             Kind::Button => {
                 let mut bg = self.wcol(wdg, "bg", "widget_bg");
                 if self.press_origin == Some((wi, idx)) { bg = shade(bg, -30); }
                 else if wdg.hovered { bg = shade(bg, 30); }
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
-                g.text(ax + pad, ay + (h - 14) / 2, wdg.text.clone(), self.wcol(wdg, "fg", "text_fg"));
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
+                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
             }
             Kind::Checkbox => {
-                let acc = self.wcol(wdg, "accent", "accent");
+                let acc = self.acc_col(wdg);
                 g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
                 if wdg.hovered { g.rect(ax - 1, ay - 1, ax + w, ay + h, acc); }
                 if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
-                g.text(ax + w + pad, ay, wdg.text.clone(), self.wcol(wdg, "fg", "text_fg"));
+                self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
             }
             Kind::Slider => {
                 let handle_w = self.m("slider_handle_w");
@@ -1091,18 +1150,17 @@ impl Gui {
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { (wdg.value - wdg.min) / span } else { 0.0 };
                 let hx = ax + (ratio * (w - handle_w) as f64) as i32;
-                g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, self.wcol(wdg, "accent", "accent"));
+                g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, self.acc_col(wdg));
             }
             Kind::TextInput => {
                 let focused = self.focus_widget == Some((wi, idx));
-                let fg = self.wcol(wdg, "fg", "text_fg");
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"));
+                let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, bcol);
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 if !wdg.text.is_empty() {
-                    g.text(ax + 5, ay + (h - 14) / 2, wdg.text.clone(), fg);
+                    self.wtext(g, wdg, ax + 5, ay + (h - 14) / 2, wdg.text.clone(), fg);
                 } else if !wdg.placeholder.is_empty() && !focused {
-                    g.text(ax + 5, ay + (h - 14) / 2, wdg.placeholder.clone(), self.th("muted_fg"));
+                    self.wtext(g, wdg, ax + 5, ay + (h - 14) / 2, wdg.placeholder.clone(), self.th("muted_fg"));
                 }
                 if focused && (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0 {
                     let cx = (ax + 5 + wdg.text.chars().count() as i32 * 8).min(ax + w - 3);
@@ -1110,36 +1168,34 @@ impl Gui {
                 }
             }
             Kind::Radio => {
-                let acc = self.wcol(wdg, "accent", "accent");
+                let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
                 g.circle(cx, cy, r, self.wcol(wdg, "border", "widget_border"));   // Ring
                 g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
                 if wdg.hovered { g.circle(cx, cy, r, acc); g.circle(cx, cy, (r - 1).max(1), self.th("win_bg")); }
                 if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
-                g.text(ax + w + pad, ay, wdg.text.clone(), self.wcol(wdg, "fg", "text_fg"));
+                self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
             }
             Kind::Progress => {
-                let bg = self.wcol(wdg, "bg", "widget_bg");
-                let acc = self.wcol(wdg, "accent", "accent");
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
+                let acc = self.acc_col(wdg);
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
                 let fw = (ratio * (w - 2) as f64) as i32;
                 if fw > 0 { g.box_fill(ax + 1, ay + 1, ax + fw, ay + h - 2, acc); }
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
                 let pct = format!("{}%", (ratio * 100.0).round() as i32);
-                g.text(ax + w / 2 - (pct.len() as i32 * 8) / 2, ay + (h - 14) / 2, pct, self.wcol(wdg, "fg", "text_fg"));
+                self.wtext(g, wdg, ax + w / 2 - (pct.len() as i32 * 8) / 2, ay + (h - 14) / 2, pct, self.txt_col(wdg));
             }
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");
                 let b = if wdg.hovered { shade(bg, 18) } else { bg };
-                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, b);
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
-                let fg = self.wcol(wdg, "fg", "text_fg");
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, b, self.wcol(wdg, "border", "widget_border"));
+                let fg = self.txt_col(wdg);
                 let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
                     wdg.items[wdg.sel as usize].clone()
                 } else { String::new() };
-                g.text(ax + pad, ay + (h - 14) / 2, txt, fg);
+                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, txt, fg);
                 let (axr, cy) = (ax + w - 14, ay + h / 2);   // ▼
                 g.line(axr, cy - 2, axr + 4, cy + 2, fg);
                 g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);

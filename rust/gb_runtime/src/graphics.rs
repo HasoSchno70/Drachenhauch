@@ -1781,6 +1781,13 @@ impl Graphics {
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
 
+    /// Text mit explizitem Font-Handle + Groesse (umgeht active_font/text_size).
+    /// `font` = -1 -> Default-Font. Fuer per-Widget-Styling (Modul `gui`).
+    pub fn text_styled(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32) {
+        let (x, y) = self.w2s(x, y);
+        self.emit(Cmd::Text(x, y, s, size.max(1), col(c), font, self.text_spacing));
+    }
+
     /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
