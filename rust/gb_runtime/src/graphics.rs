@@ -2041,7 +2041,25 @@ impl Graphics {
     pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
     pub fn set_target_fps(&mut self, n: i64) { self.rl.set_target_fps(n.max(0) as u32); }
     pub fn set_window_title(&mut self, title: &str) { self.rl.set_window_title(&self.thread, title); }
-    pub fn save_screenshot(&mut self, path: &str) { self.rl.take_screenshot(&self.thread, path); }
+    pub fn save_screenshot(&mut self, path: &str) { self.write_screenshot(path); }
+
+    /// Schreibt einen Screenshot robust unter `path` (relativ = zum cwd).
+    /// raylibs `take_screenshot` stellt intern `CORE.Storage.basePath` voran und
+    /// kann daher weder absolute Pfade noch (nach canonicalize) `\\?\`-cwd-Pfade
+    /// korrekt schreiben. Stattdessen lesen wir die Screen-Pixel selbst und
+    /// exportieren sie via `ExportImage` (das KEINEN Prefix voranstellt) unter
+    /// einem absoluten, vom `\\?\`-Prefix bereinigten Pfad.
+    fn write_screenshot(&mut self, path: &str) {
+        let p = std::path::Path::new(path);
+        let abs = if p.is_absolute() {
+            p.to_path_buf()
+        } else {
+            std::env::current_dir().map(|d| d.join(p)).unwrap_or_else(|_| p.to_path_buf())
+        };
+        let abs = crate::strip_extended_prefix(abs);
+        let img = self.rl.load_image_from_screen(&self.thread);
+        img.export_image(&abs.to_string_lossy());
+    }
     pub fn set_fullscreen(&mut self, fs: bool) {
         if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
     }
@@ -2283,7 +2301,7 @@ impl Graphics {
         // Headless-Screenshot beim Erreichen der Frame-Grenze.
         if let (Some(mx), Some(path), false) = (self.max_frames, self.screenshot.clone(), self.shot_taken) {
             if self.frame_count >= mx {
-                self.rl.take_screenshot(&self.thread, &path);
+                self.write_screenshot(&path);
                 self.shot_taken = true;
             }
         }
