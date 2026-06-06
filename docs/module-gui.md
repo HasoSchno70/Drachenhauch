@@ -597,6 +597,37 @@ GUI_ON_CLICK(GUI_WINDOW_WIDGET(win, 0), on_login)
 > Laden in einem anderen Programm muss die Funktion existieren. Für portable
 > Designs die Handler nach dem Laden per Enumeration (`GUI_WINDOW_WIDGET`) setzen.
 
+### Formular-Workflow (Xojo-Stil)
+
+Weil das `.gbform` pro Control den **Namen seines Event-Handlers** mitspeichert
+(`on_click` / `on_change`) und `GUI_UPDATE` ausgelöste Handler **automatisch per
+Name aufruft**, ergibt sich der Xojo-Ablauf von selbst: Formular laden, nur die
+Handler ausfüllen — kein manuelles Verdrahten.
+
+```basic
+IMPORT "gui"
+SCREEN(800, 480, "App", 1)
+
+DIM frm AS GUI_WINDOW
+frm = GUI_LOAD("forms/settings.gbform")   ' Controls + Handler-Namen
+
+SUB on_save()                              ' du schreibst NUR die Handler ...
+    PRINT "Speichern geklickt"
+END SUB
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()                           ' ... GUI_UPDATE ruft on_save automatisch
+    CLS(0) : GUI_DRAW() : FLIP()
+WEND
+```
+
+Vollständiges Beispiel (Formular `examples/forms/settings.gbform` +
+[examples/105_form_runner.gb](../examples/105_form_runner.gb)): ein
+Einstellungs-Dialog mit TextInput, Checkbox, Slider, Dropdown und zwei Buttons,
+dessen Handler die Control-Werte auslesen. Das `.gbform` lässt sich von Hand
+schreiben **oder** (künftig) von einem visuellen Designer erzeugen — beides
+ergibt dieselbe JSON.
+
 ## Vollständiges Beispiel
 
 Siehe [examples/45_gui.gb](../examples/45_gui.gb): Fenster mit Slider (live ins

@@ -1,0 +1,62 @@
+' 105_form_runner.gb -- Formular im Xojo-Stil laden + Event-Handler
+'
+' Das Layout "forms/settings.gbform" wurde visuell entworfen (JSON) und enthaelt
+' pro Control bereits den Namen seines Event-Handlers (on_click / on_change).
+' GUI_LOAD baut das Fenster, GUI_UPDATE ruft die passenden SUBs automatisch auf
+' -- genau wie in Xojo: Control hat ein Event, du fuellst nur den Handler.
+'
+' Native-only (gbrt / F6).
+
+IMPORT "gui"
+
+SCREEN(800, 480, "GameBasic -- Form-Runner", 1)
+
+' --- Formular aus der .gbform-Datei laden ------------------------------------
+DIM frm AS GUI_WINDOW
+frm = GUI_LOAD("forms/settings.gbform")
+
+' Control-Handles per Index merken (Reihenfolge wie im JSON), damit die Handler
+' ihre Werte lesen koennen. (Ein Designer wuerde das spaeter generieren.)
+DIM nameInput AS GUI_WIDGET
+DIM soundCb   AS GUI_WIDGET
+DIM volSlider AS GUI_WIDGET
+DIM diffDD    AS GUI_WIDGET
+nameInput = GUI_WINDOW_WIDGET(frm, 1)
+soundCb   = GUI_WINDOW_WIDGET(frm, 2)
+volSlider = GUI_WINDOW_WIDGET(frm, 4)
+diffDD    = GUI_WINDOW_WIDGET(frm, 6)
+
+DIM status AS STRING
+status = "Bereit -- aendere die Controls, klicke Speichern."
+
+' --- Event-Handler (per Name aus dem Layout verdrahtet) ----------------------
+SUB on_save()
+    status = "Gespeichert:  Name='" + GUI_TEXT(nameInput) + "'  Sound=" + STR$(GUI_CHECKED(soundCb)) + "  Vol=" + STR$(INT(GUI_VALUE(volSlider))) + "  Diff=" + GUI_DROPDOWN_TEXT(diffDD)
+END SUB
+
+SUB on_cancel()
+    status = "Abgebrochen."
+END SUB
+
+SUB on_sound()
+    status = "Sound: " + STR$(GUI_CHECKED(soundCb))
+END SUB
+
+SUB on_volume()
+    status = "Lautstaerke: " + STR$(INT(GUI_VALUE(volSlider)))
+END SUB
+
+SUB on_diff()
+    status = "Schwierigkeit: " + GUI_DROPDOWN_TEXT(diffDD)
+END SUB
+
+' --- Hauptschleife -----------------------------------------------------------
+DIM frame AS INTEGER
+FOR frame = 0 TO 1000000
+    IF QUITREQUESTED() THEN BREAK
+    GUI_UPDATE()                 ' liest Maus/Tastatur, feuert Handler per Name
+    CLS(&H0E1014)
+    GUI_DRAW()
+    TEXT(20, 450, status, &H88E0FF)
+    FLIP()
+NEXT

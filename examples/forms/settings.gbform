@@ -1,0 +1,21 @@
+{
+  "title": "Einstellungen",
+  "x": 230,
+  "y": 120,
+  "w": 360,
+  "h": 250,
+  "movable": true,
+  "closable": true,
+  "visible": true,
+  "widgets": [
+    { "kind": "label", "x": 20, "y": 40, "w": 70, "h": 16, "text": "Name:", "color": 16777215 },
+    { "kind": "textinput", "x": 95, "y": 36, "w": 225, "h": 26, "placeholder": "dein Name" },
+    { "kind": "checkbox", "x": 20, "y": 78, "w": 16, "h": 16, "text": "Sound an", "checked": true, "on_change": "on_sound" },
+    { "kind": "label", "x": 20, "y": 112, "w": 80, "h": 16, "text": "Lautstaerke", "color": 16777215 },
+    { "kind": "slider", "x": 120, "y": 112, "w": 200, "h": 14, "min": 0.0, "max": 100.0, "value": 70.0, "on_change": "on_volume" },
+    { "kind": "label", "x": 20, "y": 146, "w": 100, "h": 16, "text": "Schwierigkeit", "color": 16777215 },
+    { "kind": "dropdown", "x": 140, "y": 142, "w": 180, "h": 24, "items": ["Einfach", "Mittel", "Schwer"], "sel": 1, "on_change": "on_diff" },
+    { "kind": "button", "x": 20, "y": 196, "w": 145, "h": 32, "text": "Speichern", "on_click": "on_save" },
+    { "kind": "button", "x": 175, "y": 196, "w": 145, "h": 32, "text": "Abbrechen", "on_click": "on_cancel" }
+  ]
+}
