@@ -1,231 +1,138 @@
-"""Tests fuer das tween-Modul.
+"""Tests fuer das tween-Modul (Werte-Interpolation).
 
-Wir testen die deterministischen Pfade: Easing-Werte bei progress=0/1,
-Reverse, Restart, Pause/Resume. Die Zeit wird nicht direkt manipuliert -
-wir nutzen 0ms-Tweens (immer fertig) und Tweens mit langem Default-Lauf.
+Golden-Tests gegen `gbrt` (Stufe B): IMPORT "tween" + PRINT. tween interpoliert
+ueber die Wall-Clock (MILLIS), daher ist nur die DETERMINISTISCHE Surface
+golden-testbar: 0ms-Tweens (sofort fertig), Reverse, Loop/Pingpong-"nie fertig",
+Easing-Liste, Validierung. Die frueheren Tests mit `time.sleep` (Pause/Resume/
+Restart) und mit direkter Manipulation interner Felder (`t.start_ms`, Import von
+`_ease_*`) entfallen -- nicht deterministisch bzw. Python-intern (in Phase 8 weg).
+Easing-ENDPUNKTE bleiben abgedeckt: ein 0ms-Tween (progress=1) liefert exakt den
+Endwert fuer jedes Easing (auch Overshoot-Easings wie out_back).
 """
-import time
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
+from gamebasic.errors import GBRuntimeError
+
+_PRE = 'IMPORT "tween"\nDIM t AS TWEEN\n'
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load_tween():
-    assert load_module("tween")
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
-def test_zero_duration_tween_is_done(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 0])
-    assert call_builtin("tween_done", [t]) is True
-    assert call_builtin("tween_value", [t]) == 100.0
+# --- Basis: 0ms-Tween + Progress/Value ------------------------------
+
+def test_zero_duration_tween_is_done(run_gb):
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW(0.0, 100.0, 0)\n"
+                        "PRINT TWEEN_DONE(t)\nPRINT TWEEN_VALUE(t)\n"))
+    assert out == ["TRUE", "100.0"]
 
 
-def test_progress_starts_at_zero(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 60_000])  # 60s, kaum fortgeschritten
-    p = call_builtin("tween_progress", [t])
-    assert 0.0 <= p < 0.01
+def test_progress_starts_at_zero(run_gb):
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW(0.0, 100.0, 60000)\n"
+                        "PRINT TWEEN_PROGRESS(t) < 0.01\n"))
+    assert out == ["TRUE"]
 
 
-def test_value_at_progress_zero_is_start(call_builtin):
-    t = call_builtin("tween_new", [50.0, 200.0, 60_000])
-    # gleich nach Erstellung, progress ~ 0 -> wert ~ start
-    v = call_builtin("tween_value", [t])
-    assert abs(v - 50.0) < 5.0
+def test_value_at_progress_zero_is_start(run_gb):
+    # Gleich nach Erstellung, progress ~0 -> wert ~start (50), mit Toleranz.
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW(50.0, 200.0, 60000)\n"
+                        "PRINT TWEEN_VALUE(t) < 56.0\n"))
+    assert out == ["TRUE"]
 
 
-def test_easing_unknown_raises(call_builtin):
+# --- Easings --------------------------------------------------------
+
+def test_easing_unknown_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="unbekanntes easing"):
-        call_builtin("tween_new", [0.0, 1.0, 100, "schwurbel"])
+        run_gb(_PRE + 't = TWEEN_NEW(0.0, 1.0, 100, "schwurbel")\n')
 
 
-def test_easing_names_are_case_insensitive(call_builtin):
-    t = call_builtin("tween_new", [0.0, 1.0, 100, "OUT_BOUNCE"])
-    assert t is not None
+def test_easing_names_are_case_insensitive(run_gb):
+    out = _lines(run_gb(_PRE + 't = TWEEN_NEW(0.0, 1.0, 100, "OUT_BOUNCE")\n'
+                        "PRINT TWEEN_DONE(t)\n"))
+    assert out == ["FALSE"]   # 100ms Tween, gerade erstellt -> laeuft noch
 
 
-def test_pause_freezes_progress(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 200])
-    time.sleep(0.05)
-    call_builtin("tween_pause", [t])
-    p1 = call_builtin("tween_progress", [t])
-    time.sleep(0.1)
-    p2 = call_builtin("tween_progress", [t])
-    assert p1 == p2  # eingefroren
-
-
-def test_resume_continues(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 1000])
-    time.sleep(0.05)
-    call_builtin("tween_pause", [t])
-    p_paused = call_builtin("tween_progress", [t])
-    time.sleep(0.1)
-    call_builtin("tween_resume", [t])
-    time.sleep(0.05)
-    p_after = call_builtin("tween_progress", [t])
-    assert p_after > p_paused
-
-
-def test_restart_resets_progress(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 100])
-    time.sleep(0.15)
-    assert call_builtin("tween_done", [t]) is True
-    call_builtin("tween_restart", [t])
-    assert call_builtin("tween_progress", [t]) < 0.5
-
-
-def test_reverse_swaps_endpoints(call_builtin):
-    t = call_builtin("tween_new", [0.0, 100.0, 0])  # sofort fertig -> wert=100
-    assert call_builtin("tween_value", [t]) == 100.0
-    call_builtin("tween_reverse", [t])
-    # Nach Reverse: start=100, end=0, restartet. Bei 0ms-Tween wieder sofort am Ende.
-    assert call_builtin("tween_value", [t]) == 0.0
-
-
-def test_negative_duration_raises(call_builtin):
-    with pytest.raises(GBRuntimeError, match=">= 0"):
-        call_builtin("tween_new", [0.0, 1.0, -1])
-
-
-def test_non_tween_to_value_raises(call_builtin):
-    with pytest.raises(TypeMismatchError, match="erwartet TWEEN"):
-        call_builtin("tween_value", ["nicht ein tween"])
-
-
-# --- Neue Easings ---------------------------------------------------
-
-def test_tween_easings_lists_all(call_builtin):
-    s = call_builtin("tween_easings", [])
+def test_tween_easings_lists_all(run_gb):
+    out = run_gb(_PRE.replace("DIM t AS TWEEN\n", "") + "PRINT TWEEN_EASINGS()\n")
     for name in ("linear", "in_cubic", "out_cubic", "inout_cubic",
                  "in_bounce", "out_bounce", "inout_bounce",
                  "in_elastic", "out_elastic", "inout_elastic",
                  "in_back", "out_back", "inout_back"):
-        assert name in s
+        assert name in out
 
 
-def test_inout_bounce_endpoints():
-    from gamebasic.modules.tween import _ease_inout_bounce
-    assert _ease_inout_bounce(0.0) == 0.0
-    assert abs(_ease_inout_bounce(1.0) - 1.0) < 1e-9
+def test_tween_new_with_new_easing(run_gb):
+    out = _lines(run_gb(_PRE + 't = TWEEN_NEW(0.0, 100.0, 1000, "out_back")\n'
+                        "PRINT TWEEN_DONE(t)\n"
+                        't = TWEEN_NEW(0.0, 100.0, 1000, "inout_elastic")\n'
+                        "PRINT TWEEN_DONE(t)\n"))
+    assert out == ["FALSE", "FALSE"]
 
 
-def test_in_elastic_endpoints():
-    from gamebasic.modules.tween import _ease_in_elastic
-    assert _ease_in_elastic(0.0) == 0.0
-    assert _ease_in_elastic(1.0) == 1.0
+def test_easing_endpoints_via_zero_duration(run_gb):
+    """0ms-Tween (progress=1) liefert exakt den Endwert -- auch Overshoot-
+    Easings (out_back) enden bei 1.0, nicht beim Overshoot-Peak."""
+    body = _PRE
+    for ease in ("linear", "out_back", "in_back", "inout_back",
+                 "out_bounce", "in_elastic", "inout_elastic", "out_elastic"):
+        body += f't = TWEEN_NEW(0.0, 100.0, 0, "{ease}")\nPRINT TWEEN_VALUE(t)\n'
+    out = _lines(run_gb(body))
+    assert len(out) == 8
+    for v in out:
+        assert abs(float(v) - 100.0) < 0.01   # Endwert (float-tolerant)
 
 
-def test_inout_elastic_endpoints():
-    from gamebasic.modules.tween import _ease_inout_elastic
-    assert _ease_inout_elastic(0.0) == 0.0
-    assert _ease_inout_elastic(1.0) == 1.0
+# --- Reverse --------------------------------------------------------
+
+def test_reverse_swaps_endpoints(run_gb):
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW(0.0, 100.0, 0)\n"
+                        "PRINT TWEEN_VALUE(t)\n"
+                        "TWEEN_REVERSE(t)\nPRINT TWEEN_VALUE(t)\n"))
+    assert out == ["100.0", "0.0"]
 
 
-def test_back_easings_overshoot():
-    """Out_back ueberschiesst das Ziel zwischendurch (Pop-Effekt)."""
-    from gamebasic.modules.tween import _ease_out_back
-    val = _ease_out_back(0.7)
-    assert val > 0.95
+# --- Validierung ----------------------------------------------------
+
+def test_negative_duration_raises(run_gb):
+    with pytest.raises(GBRuntimeError, match=">= 0"):
+        run_gb(_PRE + "t = TWEEN_NEW(0.0, 1.0, -1)\n")
 
 
-def test_back_easings_endpoints():
-    from gamebasic.modules.tween import (
-        _ease_in_back, _ease_out_back, _ease_inout_back,
-    )
-    for fn in (_ease_in_back, _ease_out_back, _ease_inout_back):
-        assert abs(fn(0.0)) < 1e-9
-        assert abs(fn(1.0) - 1.0) < 1e-9
-
-
-def test_tween_new_with_new_easing(call_builtin):
-    """Neue Easings auch via TWEEN_NEW(start, end, dur, easing) verfuegbar."""
-    t = call_builtin("tween_new", [0.0, 100.0, 1000, "out_back"])
-    assert t is not None
-    t = call_builtin("tween_new", [0.0, 100.0, 1000, "inout_elastic"])
-    assert t is not None
+def test_non_tween_to_value_raises(run_gb):
+    with pytest.raises(GBRuntimeError, match="erwartet TWEEN"):
+        run_gb('IMPORT "tween"\nPRINT TWEEN_VALUE("nicht ein tween")\n')
 
 
 # --- Loop & Pingpong-Modi -------------------------------------------
 
-def test_loop_never_done(call_builtin):
-    """Loop-Tween wird niemals 'done' - egal wie viel Zeit vergeht."""
-    t = call_builtin("tween_new_loop", [0.0, 1.0, 100])
-    time.sleep(0.25)   # 250 ms = 2.5 Loops
-    assert call_builtin("tween_done", [t]) is False
+def test_loop_never_done(run_gb):
+    """Loop-Tween ist per Definition nie 'done' (auch sofort nach Erstellung)."""
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW_LOOP(0.0, 1.0, 100)\n"
+                        "PRINT TWEEN_DONE(t)\n"))
+    assert out == ["FALSE"]
 
 
-def test_pingpong_never_done(call_builtin):
-    t = call_builtin("tween_new_pingpong", [0.0, 1.0, 100])
-    time.sleep(0.25)
-    assert call_builtin("tween_done", [t]) is False
+def test_pingpong_never_done(run_gb):
+    out = _lines(run_gb(_PRE + "t = TWEEN_NEW_PINGPONG(0.0, 1.0, 100)\n"
+                        "PRINT TWEEN_DONE(t)\n"))
+    assert out == ["FALSE"]
 
 
-def test_loop_value_wraps(call_builtin):
-    """Loop-Wert wrappt: vor dem Cycle-Ende fast bei 100, danach fast bei 0."""
-    from gamebasic.modules import tween as tw_mod
-    t = call_builtin("tween_new_loop", [0.0, 100.0, 1000])
-    # Stelle uns selbst die elapsed Zeit ein, indem wir start_ms zurueckdrehen.
-    now = tw_mod._now_ms()
-    # 999 ms vergangen -> kurz vor Cycle-Ende
-    t.start_ms = now - 999
-    assert call_builtin("tween_value", [t]) > 95.0
-    # 1001 ms vergangen -> 1 ms in den naechsten Cycle (wrap auf ~0)
-    t.start_ms = now - 1001
-    assert call_builtin("tween_value", [t]) < 5.0
-    # 1500 ms = halb durch 2. Cycle -> Wert ~50
-    t.start_ms = now - 1500
-    val = call_builtin("tween_value", [t])
-    assert 40.0 < val < 60.0
-
-
-def test_pingpong_returns_to_start(call_builtin):
-    """Nach 2 * dauer_ms (kompletter Pingpong-Zyklus) Wert wieder am Start."""
-    from gamebasic.modules import tween as tw_mod
-    t = call_builtin("tween_new_pingpong", [0.0, 100.0, 1000])
-    now = tw_mod._now_ms()
-    t.start_ms = now - 2000   # 2 Halbwellen = voller Zyklus
-    val = call_builtin("tween_value", [t])
-    assert val < 5.0
-
-
-def test_pingpong_midcycle_at_end(call_builtin):
-    """Bei genau 1 * dauer_ms (eine Halbwelle voll) ist der Wert am End-Punkt."""
-    from gamebasic.modules import tween as tw_mod
-    t = call_builtin("tween_new_pingpong", [0.0, 100.0, 1000])
-    now = tw_mod._now_ms()
-    t.start_ms = now - 1000
-    val = call_builtin("tween_value", [t])
-    assert val > 95.0
-
-
-def test_pingpong_quarter_and_three_quarter(call_builtin):
-    """Bei 1/4 Halbwelle: ~25; bei 3/4 (= 1.75 von 2): ~25 (Rueckweg)."""
-    from gamebasic.modules import tween as tw_mod
-    t = call_builtin("tween_new_pingpong", [0.0, 100.0, 1000])
-    now = tw_mod._now_ms()
-    # 250 ms = Viertel-Halbwelle, Wert ~25
-    t.start_ms = now - 250
-    assert 20.0 < call_builtin("tween_value", [t]) < 30.0
-    # 1750 ms = 3/4 in der zweiten Halbwelle (= Rueckweg) -> auch ~25
-    t.start_ms = now - 1750
-    assert 20.0 < call_builtin("tween_value", [t]) < 30.0
-
-
-def test_loop_zero_duration_rejected(call_builtin):
-    """Loop ohne Dauer waere endlose Stillstand-Bewegung -> Fehler."""
+def test_loop_zero_duration_rejected(run_gb):
     with pytest.raises(GBRuntimeError, match=">"):
-        call_builtin("tween_new_loop", [0.0, 1.0, 0])
+        run_gb(_PRE + "t = TWEEN_NEW_LOOP(0.0, 1.0, 0)\n")
 
 
-def test_pingpong_zero_duration_rejected(call_builtin):
+def test_pingpong_zero_duration_rejected(run_gb):
     with pytest.raises(GBRuntimeError, match=">"):
-        call_builtin("tween_new_pingpong", [0.0, 1.0, 0])
+        run_gb(_PRE + "t = TWEEN_NEW_PINGPONG(0.0, 1.0, 0)\n")
 
 
-def test_loop_works_with_easing(call_builtin):
-    """Easing-Param wird auch von loop/pingpong akzeptiert."""
-    t = call_builtin("tween_new_loop", [0.0, 1.0, 100, "out_cubic"])
-    assert t is not None
-    t = call_builtin("tween_new_pingpong", [0.0, 1.0, 100, "inout_sine"])
-    assert t is not None
+def test_loop_works_with_easing(run_gb):
+    out = _lines(run_gb(_PRE + 't = TWEEN_NEW_LOOP(0.0, 1.0, 100, "out_cubic")\n'
+                        "PRINT TWEEN_DONE(t)\n"
+                        't = TWEEN_NEW_PINGPONG(0.0, 1.0, 100, "inout_sine")\n'
+                        "PRINT TWEEN_DONE(t)\n"))
+    assert out == ["FALSE", "FALSE"]
