@@ -298,7 +298,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
 /// Endlos-Loops (Grafik-Render-Loop, `WHILE TRUE`) profilieren, ohne dass ein
 /// harter Prozess-Kill die Auswertung verschluckt.
 fn profile_main(path: &str, stoppable: bool) -> ExitCode {
-    let abs = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let abs = std::fs::canonicalize(path).map(strip_extended_prefix).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
     let raw_source = match std::fs::read_to_string(&abs) {
@@ -358,7 +358,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
 /// stdout = Events ({"event":"paused|output|eval-result|eval-error|finished|
 /// error", ...}). Haelt initial an der ersten Zeile. chdir wie `run`.
 fn debug_main(path: &str) -> ExitCode {
-    let abs = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
+    let abs = std::fs::canonicalize(path).map(strip_extended_prefix).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
     let raw_source = match std::fs::read_to_string(&abs) {
@@ -465,7 +465,7 @@ fn runsrc_main(path: &str) -> ExitCode {
 /// damit relative Asset-Pfade (`LOADIMAGE("assets/...")`) stimmen; Label fuer
 /// Laufzeitfehler ist der Dateiname.
 fn run_main(path: &str) -> ExitCode {
-    let abs = std::fs::canonicalize(path)
+    let abs = std::fs::canonicalize(path).map(strip_extended_prefix)
         .unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
@@ -478,6 +478,27 @@ fn run_main(path: &str) -> ExitCode {
     // Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)).
     let _ = std::env::set_current_dir(&base);
     compile_and_run_source(&raw_source, &base, &label)
+}
+
+/// Entfernt den Windows-Extended-Length-Prefix (`\\?\` bzw. `\\?\UNC\`) von
+/// einem kanonisierten Pfad. `std::fs::canonicalize` liefert auf Windows immer
+/// einen `\\?\`-Pfad. Als `cwd` gesetzt vergiftet dieser Prefix raylibs
+/// `CORE.Storage.basePath` -> jede C-`fopen`/stb_image-FILEIO (Screenshots,
+/// ExportImage, relative Asset-Pfade) schlaegt fehl, weil `\\?\`-Pfade dort
+/// nicht geoeffnet werden koennen. Auf Nicht-Windows ein No-Op.
+pub(crate) fn strip_extended_prefix(p: std::path::PathBuf) -> std::path::PathBuf {
+    #[cfg(windows)]
+    {
+        if let Some(s) = p.to_str() {
+            if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+                return std::path::PathBuf::from(format!(r"\\{}", rest));
+            }
+            if let Some(rest) = s.strip_prefix(r"\\?\") {
+                return std::path::PathBuf::from(rest);
+            }
+        }
+    }
+    p
 }
 
 /// Verzeichnis rekursiv kopieren (std hat keine Funktion dafuer).
