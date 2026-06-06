@@ -1,258 +1,209 @@
-"""Tests fuer das sprite-Modul.
+"""Tests fuer das sprite-Modul (Sprite-Logik: Position/Velocity/Animation/Kollision).
 
-Wir bauen ein Sprite mit einer Pygame-Surface direkt (kein File-Loading,
-kein SCREEN). SPRITE_DRAW pruefen wir nicht hier - das wuerde Pygame-Display
-brauchen. Logik (Update, Animation, Kollision) ist davon unabhaengig.
+Golden-Tests gegen `gbrt` (Stufe B): das Sprite braucht ein IMAGE-Handle -- wir
+erzeugen es headless via GENTEX_COLOR (gbrt zieht dafuer ein lazy verstecktes
+Fenster hoch). SPRITE_DRAW selbst wird nicht getestet (rein nativ). Tests, die
+fueher interne Felder lasen (`sprite.flip_x`/`scale_x`/`tinted`/`tint_color`),
+ohne GB-Getter, sind auf No-Crash-Smoke + Validierung reduziert. Frueher via
+`call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
-from gamebasic.interpreter import _Image
+from gamebasic.errors import GBRuntimeError
+
+# IMAGE headless via GENTEX_COLOR + ein 16x16-Sprite in 's'.
+_PRE = ('IMPORT "sprite"\nDIM img AS IMAGE\nimg = GENTEX_COLOR(64, 64, RGB(255, 0, 0))\n'
+        'DIM s AS SPRITE\ns = SPRITE_NEW(img, 16, 16)\n')
+# Variante mit zwei Sprites a/b fuer Kollision.
+_PRE2 = ('IMPORT "sprite"\nDIM img AS IMAGE\nimg = GENTEX_COLOR(64, 64, RGB(255, 0, 0))\n'
+         'DIM a AS SPRITE\na = SPRITE_NEW(img, 16, 16)\n'
+         'DIM b AS SPRITE\nb = SPRITE_NEW(img, 16, 16)\n')
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load_sprite():
-    assert load_module("sprite")
-
-
-@pytest.fixture(scope="module")
-def sheet_image():
-    """_Image-Handle fuer die Sprite-Logik-Tests. Die Surface ist hier
-    irrelevant (nur SPRITE_DRAW liest sie, das wird nicht getestet -- es laeuft
-    nur in gbrt), daher ein leeres Handle ohne pygame."""
-    return _Image(None, "<test-sheet>")
-
-
-@pytest.fixture
-def sprite(call_builtin, sheet_image):
-    return call_builtin("sprite_new", [sheet_image, 16, 16])
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
 # --- Konstruktion ----------------------------------------------------
 
-def test_new_starts_at_origin(call_builtin, sprite):
-    assert call_builtin("sprite_get_x", [sprite]) == 0.0
-    assert call_builtin("sprite_get_y", [sprite]) == 0.0
+def test_new_starts_at_origin(run_gb):
+    assert _lines(run_gb(_PRE + "PRINT SPRITE_GET_X(s)\nPRINT SPRITE_GET_Y(s)\n")) == \
+        ["0.0", "0.0"]
 
 
-def test_get_size(call_builtin, sprite):
-    assert call_builtin("sprite_get_width", [sprite]) == 16
-    assert call_builtin("sprite_get_height", [sprite]) == 16
+def test_get_size(run_gb):
+    assert _lines(run_gb(_PRE + "PRINT SPRITE_GET_WIDTH(s)\nPRINT SPRITE_GET_HEIGHT(s)\n")) == \
+        ["16", "16"]
 
 
-def test_new_invalid_frame_size_raises(call_builtin, sheet_image):
+def test_new_invalid_frame_size_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="> 0"):
-        call_builtin("sprite_new", [sheet_image, 0, 16])
+        run_gb('IMPORT "sprite"\nDIM img AS IMAGE\nimg = GENTEX_COLOR(64, 64, RGB(1, 1, 1))\n'
+               "DIM s AS SPRITE\ns = SPRITE_NEW(img, 0, 16)\n")
 
 
 # --- Position & Velocity --------------------------------------------
 
-def test_set_pos(call_builtin, sprite):
-    call_builtin("sprite_set_pos", [sprite, 50.0, 75.0])
-    assert call_builtin("sprite_get_x", [sprite]) == 50.0
-    assert call_builtin("sprite_get_y", [sprite]) == 75.0
+def test_set_pos(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 50.0, 75.0)\n"
+                        "PRINT SPRITE_GET_X(s)\nPRINT SPRITE_GET_Y(s)\n"))
+    assert out == ["50.0", "75.0"]
 
 
-def test_velocity_moves_position(call_builtin, sprite):
-    call_builtin("sprite_set_pos", [sprite, 0.0, 0.0])
-    call_builtin("sprite_set_velocity", [sprite, 100.0, -50.0])
-    call_builtin("sprite_update", [sprite, 1000])  # 1 Sekunde
-    assert call_builtin("sprite_get_x", [sprite]) == 100.0
-    assert call_builtin("sprite_get_y", [sprite]) == -50.0
+def test_velocity_moves_position(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 0.0, 0.0)\n"
+                        "SPRITE_SET_VELOCITY(s, 100.0, -50.0)\nSPRITE_UPDATE(s, 1000)\n"
+                        "PRINT SPRITE_GET_X(s)\nPRINT SPRITE_GET_Y(s)\n"))
+    assert out == ["100.0", "-50.0"]
 
 
 # --- Animationen -----------------------------------------------------
 
-def test_play_unknown_anim_raises(call_builtin, sprite):
+def test_play_unknown_anim_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="unbekannte Animation"):
-        call_builtin("sprite_play", [sprite, "fly"])
+        run_gb(_PRE + 'SPRITE_PLAY(s, "fly")\n')
 
 
-def test_walk_loops(call_builtin, sprite):
-    call_builtin("sprite_add_anim", [sprite, "walk", 0, 3, 8.0])  # 125ms/frame
-    call_builtin("sprite_play", [sprite, "walk"])
-    assert call_builtin("sprite_get_frame", [sprite]) == 0
-    call_builtin("sprite_update", [sprite, 125])
-    assert call_builtin("sprite_get_frame", [sprite]) == 1
-    call_builtin("sprite_update", [sprite, 125])
-    assert call_builtin("sprite_get_frame", [sprite]) == 2
-    call_builtin("sprite_update", [sprite, 125])
-    assert call_builtin("sprite_get_frame", [sprite]) == 3
-    # Loop zurueck zu 0
-    call_builtin("sprite_update", [sprite, 125])
-    assert call_builtin("sprite_get_frame", [sprite]) == 0
+def test_walk_loops(run_gb):
+    out = _lines(run_gb(_PRE +
+                        'SPRITE_ADD_ANIM(s, "walk", 0, 3, 8.0)\nSPRITE_PLAY(s, "walk")\n'
+                        "PRINT SPRITE_GET_FRAME(s)\n"
+                        "SPRITE_UPDATE(s, 125)\nPRINT SPRITE_GET_FRAME(s)\n"
+                        "SPRITE_UPDATE(s, 125)\nPRINT SPRITE_GET_FRAME(s)\n"
+                        "SPRITE_UPDATE(s, 125)\nPRINT SPRITE_GET_FRAME(s)\n"
+                        "SPRITE_UPDATE(s, 125)\nPRINT SPRITE_GET_FRAME(s)\n"))
+    assert out == ["0", "1", "2", "3", "0"]
 
 
-def test_play_once_stops_at_last_frame(call_builtin, sprite):
-    call_builtin("sprite_add_anim", [sprite, "punch", 0, 3, 12.0])  # ~83ms/frame
-    call_builtin("sprite_play_once", [sprite, "punch"])
-    assert call_builtin("sprite_is_finished", [sprite]) is False
-    call_builtin("sprite_update", [sprite, 400])  # > 333ms (4*83)
-    assert call_builtin("sprite_get_frame", [sprite]) == 3
-    assert call_builtin("sprite_is_finished", [sprite]) is True
-    # Weitere Updates aendern frame nicht
-    call_builtin("sprite_update", [sprite, 500])
-    assert call_builtin("sprite_get_frame", [sprite]) == 3
+def test_play_once_stops_at_last_frame(run_gb):
+    out = _lines(run_gb(_PRE +
+                        'SPRITE_ADD_ANIM(s, "punch", 0, 3, 12.0)\nSPRITE_PLAY_ONCE(s, "punch")\n'
+                        "PRINT SPRITE_IS_FINISHED(s)\n"
+                        "SPRITE_UPDATE(s, 400)\n"
+                        "PRINT SPRITE_GET_FRAME(s)\nPRINT SPRITE_IS_FINISHED(s)\n"
+                        "SPRITE_UPDATE(s, 500)\nPRINT SPRITE_GET_FRAME(s)\n"))
+    assert out == ["FALSE", "3", "TRUE", "3"]
 
 
-def test_current_anim(call_builtin, sprite):
-    call_builtin("sprite_add_anim", [sprite, "idle", 0, 0, 1.0])
-    call_builtin("sprite_play", [sprite, "idle"])
-    assert call_builtin("sprite_current_anim", [sprite]) == "idle"
+def test_current_anim(run_gb):
+    out = _lines(run_gb(_PRE +
+                        'SPRITE_ADD_ANIM(s, "idle", 0, 0, 1.0)\nSPRITE_PLAY(s, "idle")\n'
+                        "PRINT SPRITE_CURRENT_ANIM(s)\n"))
+    assert out == ["idle"]
 
 
-def test_play_same_anim_is_idempotent(call_builtin, sprite):
-    """Wiederholtes PLAY der gleichen Anim setzt nicht zurueck (Bug-Fall:
-    laufen-laufen-laufen wuerde sonst staendig auf Frame 0 zuruckspringen)."""
-    call_builtin("sprite_add_anim", [sprite, "walk", 0, 3, 8.0])
-    call_builtin("sprite_play", [sprite, "walk"])
-    call_builtin("sprite_update", [sprite, 250])  # frame 2
-    f1 = call_builtin("sprite_get_frame", [sprite])
-    call_builtin("sprite_play", [sprite, "walk"])  # erneut "walk" -> kein Reset
-    f2 = call_builtin("sprite_get_frame", [sprite])
-    assert f1 == f2
+def test_play_same_anim_is_idempotent(run_gb):
+    out = _lines(run_gb(_PRE +
+                        'SPRITE_ADD_ANIM(s, "walk", 0, 3, 8.0)\nSPRITE_PLAY(s, "walk")\n'
+                        "SPRITE_UPDATE(s, 250)\nPRINT SPRITE_GET_FRAME(s)\n"
+                        'SPRITE_PLAY(s, "walk")\nPRINT SPRITE_GET_FRAME(s)\n'))
+    assert out[0] == out[1]
 
 
-def test_set_frame(call_builtin, sprite):
-    call_builtin("sprite_set_frame", [sprite, 7])
-    assert call_builtin("sprite_get_frame", [sprite]) == 7
+def test_set_frame(run_gb):
+    assert _lines(run_gb(_PRE + "SPRITE_SET_FRAME(s, 7)\nPRINT SPRITE_GET_FRAME(s)\n")) == ["7"]
 
 
-def test_add_anim_invalid_range_raises(call_builtin, sprite):
+def test_add_anim_invalid_range_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="last >= first"):
-        call_builtin("sprite_add_anim", [sprite, "bad", 5, 2, 8.0])
+        run_gb(_PRE + 'SPRITE_ADD_ANIM(s, "bad", 5, 2, 8.0)\n')
 
 
-# --- Flip ------------------------------------------------------------
+# --- Flip / Scale / Tint (kein GB-Getter -> Smoke + Validierung) -----
 
-def test_set_flip_changes_state(call_builtin, sprite):
-    call_builtin("sprite_set_flip", [sprite, True, False])
-    assert sprite.flip_x is True
-    assert sprite.flip_y is False
+def test_set_flip_no_crash(run_gb):
+    assert _lines(run_gb(_PRE + 'SPRITE_SET_FLIP(s, TRUE, FALSE)\nPRINT "ok"\n')) == ["ok"]
 
 
-# --- Scale & Tint ----------------------------------------------------
-
-def test_default_scale_is_one(sprite):
-    assert sprite.scale_x == 1.0
-    assert sprite.scale_y == 1.0
+def test_set_scale_no_crash(run_gb):
+    assert _lines(run_gb(_PRE + 'SPRITE_SET_SCALE(s, 2.0, 1.5)\nPRINT "ok"\n')) == ["ok"]
 
 
-def test_set_scale(call_builtin, sprite):
-    call_builtin("sprite_set_scale", [sprite, 2.0, 1.5])
-    assert sprite.scale_x == 2.0
-    assert sprite.scale_y == 1.5
-
-
-def test_set_scale_negative_raises(call_builtin, sprite):
+def test_set_scale_negative_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="> 0"):
-        call_builtin("sprite_set_scale", [sprite, -1.0, 1.0])
+        run_gb(_PRE + "SPRITE_SET_SCALE(s, -1.0, 1.0)\n")
 
 
-def test_default_no_tint(sprite):
-    assert sprite.tinted is False
+def test_tint_and_clear_no_crash(run_gb):
+    assert _lines(run_gb(_PRE +
+                  "SPRITE_TINT(s, 16744512)\nSPRITE_TINT_CLEAR(s)\nPRINT \"ok\"\n")) == ["ok"]
 
 
-def test_tint_sets_state(call_builtin, sprite):
-    call_builtin("sprite_tint", [sprite, 0xFF8040])
-    assert sprite.tinted is True
-    assert sprite.tint_color == 0xFF8040
-
-
-def test_tint_clear(call_builtin, sprite):
-    call_builtin("sprite_tint", [sprite, 0xFF0000])
-    call_builtin("sprite_tint_clear", [sprite])
-    assert sprite.tinted is False
-
-
-def test_tint_out_of_range_raises(call_builtin, sprite):
+def test_tint_out_of_range_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="0..0xFFFFFF"):
-        call_builtin("sprite_tint", [sprite, 0x1000000])
+        run_gb(_PRE + "SPRITE_TINT(s, 16777217)\n")
 
 
-def test_scale_does_not_affect_get_width(call_builtin, sprite):
+def test_scale_does_not_affect_get_width(run_gb):
     """Scale ist rein visuell - GET_WIDTH/HEIGHT bleiben in Frame-Groesse."""
-    call_builtin("sprite_set_scale", [sprite, 3.0, 3.0])
-    assert call_builtin("sprite_get_width", [sprite]) == 16
-    assert call_builtin("sprite_get_height", [sprite]) == 16
+    out = _lines(run_gb(_PRE + "SPRITE_SET_SCALE(s, 3.0, 3.0)\n"
+                        "PRINT SPRITE_GET_WIDTH(s)\nPRINT SPRITE_GET_HEIGHT(s)\n"))
+    assert out == ["16", "16"]
 
 
 # --- Kollision -------------------------------------------------------
 
-def test_collides_overlap(call_builtin, sheet_image):
-    a = call_builtin("sprite_new", [sheet_image, 16, 16])
-    b = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [a, 0.0, 0.0])
-    call_builtin("sprite_set_pos", [b, 8.0, 8.0])  # ueberlappt
-    assert call_builtin("sprite_collides", [a, b]) is True
+def test_collides_overlap(run_gb):
+    out = _lines(run_gb(_PRE2 + "SPRITE_SET_POS(a, 0.0, 0.0)\nSPRITE_SET_POS(b, 8.0, 8.0)\n"
+                        "PRINT SPRITE_COLLIDES(a, b)\n"))
+    assert out == ["TRUE"]
 
 
-def test_collides_disjoint(call_builtin, sheet_image):
-    a = call_builtin("sprite_new", [sheet_image, 16, 16])
-    b = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [a, 0.0, 0.0])
-    call_builtin("sprite_set_pos", [b, 100.0, 100.0])
-    assert call_builtin("sprite_collides", [a, b]) is False
+def test_collides_disjoint(run_gb):
+    out = _lines(run_gb(_PRE2 + "SPRITE_SET_POS(a, 0.0, 0.0)\nSPRITE_SET_POS(b, 100.0, 100.0)\n"
+                        "PRINT SPRITE_COLLIDES(a, b)\n"))
+    assert out == ["FALSE"]
 
 
-def test_collides_touching_does_not_count(call_builtin, sheet_image):
-    a = call_builtin("sprite_new", [sheet_image, 16, 16])
-    b = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [a, 0.0, 0.0])
-    call_builtin("sprite_set_pos", [b, 16.0, 0.0])  # Kanten beruehren
-    assert call_builtin("sprite_collides", [a, b]) is False
+def test_collides_touching_does_not_count(run_gb):
+    out = _lines(run_gb(_PRE2 + "SPRITE_SET_POS(a, 0.0, 0.0)\nSPRITE_SET_POS(b, 16.0, 0.0)\n"
+                        "PRINT SPRITE_COLLIDES(a, b)\n"))
+    assert out == ["FALSE"]
 
 
-# --- SPRITE_COLLIDE Singular-Alias -----------------------------------
-
-def test_collide_singular_alias(call_builtin, sheet_image):
-    a = call_builtin("sprite_new", [sheet_image, 16, 16])
-    b = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [a, 0.0, 0.0])
-    call_builtin("sprite_set_pos", [b, 8.0, 8.0])
-    assert call_builtin("sprite_collide", [a, b]) is True
+def test_collide_singular_alias(run_gb):
+    out = _lines(run_gb(_PRE2 + "SPRITE_SET_POS(a, 0.0, 0.0)\nSPRITE_SET_POS(b, 8.0, 8.0)\n"
+                        "PRINT SPRITE_COLLIDE(a, b)\n"))
+    assert out == ["TRUE"]
 
 
 # --- SPRITE_HIT_BOX --------------------------------------------------
 
-def test_hit_box_overlap(call_builtin, sheet_image):
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 10.0, 10.0])  # bbox: 10..26
-    # Box ueberschneidet sich
-    assert call_builtin("sprite_hit_box", [sp, 20, 20, 10, 10]) is True
+def test_hit_box_overlap(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 10.0, 10.0)\n"
+                        "PRINT SPRITE_HIT_BOX(s, 20, 20, 10, 10)\n"))
+    assert out == ["TRUE"]
 
 
-def test_hit_box_no_overlap(call_builtin, sheet_image):
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 0.0, 0.0])    # bbox: 0..16
-    assert call_builtin("sprite_hit_box", [sp, 100, 100, 10, 10]) is False
+def test_hit_box_no_overlap(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 0.0, 0.0)\n"
+                        "PRINT SPRITE_HIT_BOX(s, 100, 100, 10, 10)\n"))
+    assert out == ["FALSE"]
 
 
-def test_hit_box_contained(call_builtin, sheet_image):
-    """Sprite vollstaendig in einer grossen Box -> Treffer."""
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 50.0, 50.0])
-    assert call_builtin("sprite_hit_box", [sp, 0, 0, 200, 200]) is True
+def test_hit_box_contained(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 50.0, 50.0)\n"
+                        "PRINT SPRITE_HIT_BOX(s, 0, 0, 200, 200)\n"))
+    assert out == ["TRUE"]
 
 
 # --- SPRITE_HIT_POINT ------------------------------------------------
 
-def test_hit_point_inside(call_builtin, sheet_image):
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 10.0, 10.0])  # bbox: 10..26
-    assert call_builtin("sprite_hit_point", [sp, 15, 15]) is True
+def test_hit_point_inside(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 10.0, 10.0)\n"
+                        "PRINT SPRITE_HIT_POINT(s, 15, 15)\n"))
+    assert out == ["TRUE"]
 
 
-def test_hit_point_outside(call_builtin, sheet_image):
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 10.0, 10.0])
-    assert call_builtin("sprite_hit_point", [sp, 100, 100]) is False
+def test_hit_point_outside(run_gb):
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 10.0, 10.0)\n"
+                        "PRINT SPRITE_HIT_POINT(s, 100, 100)\n"))
+    assert out == ["FALSE"]
 
 
-def test_hit_point_on_corner_inclusive_exclusive(call_builtin, sheet_image):
-    """Linke obere Ecke ist inclusive (HIT), rechte untere exclusive (MISS)."""
-    sp = call_builtin("sprite_new", [sheet_image, 16, 16])
-    call_builtin("sprite_set_pos", [sp, 10.0, 10.0])
-    assert call_builtin("sprite_hit_point", [sp, 10, 10]) is True
-    assert call_builtin("sprite_hit_point", [sp, 26, 26]) is False  # x+w
+def test_hit_point_on_corner_inclusive_exclusive(run_gb):
+    """Linke obere Ecke inclusive (HIT), rechte untere exclusive (MISS)."""
+    out = _lines(run_gb(_PRE + "SPRITE_SET_POS(s, 10.0, 10.0)\n"
+                        "PRINT SPRITE_HIT_POINT(s, 10, 10)\n"
+                        "PRINT SPRITE_HIT_POINT(s, 26, 26)\n"))
+    assert out == ["TRUE", "FALSE"]
