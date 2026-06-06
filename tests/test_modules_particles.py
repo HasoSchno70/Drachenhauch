@@ -1,160 +1,95 @@
-"""Tests fuer das particles-Modul. Ohne Pygame - testet nur Logik.
+"""Tests fuer das particles-Modul (Emitter-Logik).
 
-Random-Seed gesetzt damit Aging deterministisch wird.
+Golden-Tests gegen `gbrt` (Stufe B): IMPORT "particles" + PARTICLE_COUNT/EMIT/
+UPDATE/CLEAR + PRINT. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8
+geloescht). Tests, die fueher die internen NumPy-Arrays (`sys._xs`/`_ys`) lasen
+(Gravity-/Pos-/Performance-Interna), entfallen -- die Partikel-Positionen sind in
+GB ohne Render-Pfad nicht beobachtbar; die beobachtbare Surface (Count, Aging,
+Validierung) ist hier abgedeckt.
 """
-import random
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
+from gamebasic.errors import GBRuntimeError
+
+_PRE = ('IMPORT "particles"\nDIM s AS PARTICLE_SYSTEM\n'
+        's = PARTICLE_SYSTEM_NEW(0.0, 0.0)\n')
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load_particles():
-    assert load_module("particles")
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
-def test_new_starts_empty(call_builtin):
-    sys = call_builtin("particle_system_new", [100.0, 200.0])
-    assert call_builtin("particle_count", [sys]) == 0
+def test_new_starts_empty(run_gb):
+    out = _lines(run_gb('IMPORT "particles"\nDIM s AS PARTICLE_SYSTEM\n'
+                        's = PARTICLE_SYSTEM_NEW(100.0, 200.0)\nPRINT PARTICLE_COUNT(s)\n'))
+    assert out == ["0"]
 
 
-def test_emit_increases_count(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_emit", [sys, 5])
-    assert call_builtin("particle_count", [sys]) == 5
-    call_builtin("particle_emit", [sys, 3])
-    assert call_builtin("particle_count", [sys]) == 8
+def test_emit_increases_count(run_gb):
+    out = _lines(run_gb(_PRE +
+                        "PARTICLE_EMIT(s, 5)\nPRINT PARTICLE_COUNT(s)\n"
+                        "PARTICLE_EMIT(s, 3)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["5", "8"]
 
 
-def test_clear(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_emit", [sys, 5])
-    call_builtin("particle_clear", [sys])
-    assert call_builtin("particle_count", [sys]) == 0
+def test_clear(run_gb):
+    out = _lines(run_gb(_PRE +
+                        "PARTICLE_EMIT(s, 5)\nPARTICLE_CLEAR(s)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["0"]
 
 
-def test_update_zero_dt_no_change(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_emit", [sys, 5])
-    call_builtin("particle_update", [sys, 0])
-    assert call_builtin("particle_count", [sys]) == 5
+def test_update_zero_dt_no_change(run_gb):
+    out = _lines(run_gb(_PRE +
+                        "PARTICLE_EMIT(s, 5)\nPARTICLE_UPDATE(s, 0)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["5"]
 
 
-def test_update_kills_old_particles(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_set_lifetime", [sys, 100, 100])  # exakt 100ms
-    call_builtin("particle_emit", [sys, 5])
-    # Nach 50ms: alle leben
-    call_builtin("particle_update", [sys, 50])
-    assert call_builtin("particle_count", [sys]) == 5
-    # Nach weiteren 100ms (gesamt 150ms): alle tot
-    call_builtin("particle_update", [sys, 100])
-    assert call_builtin("particle_count", [sys]) == 0
+def test_update_kills_old_particles(run_gb):
+    out = _lines(run_gb(_PRE +
+                        "PARTICLE_SET_LIFETIME(s, 100, 100)\nPARTICLE_EMIT(s, 5)\n"
+                        "PARTICLE_UPDATE(s, 50)\nPRINT PARTICLE_COUNT(s)\n"
+                        "PARTICLE_UPDATE(s, 100)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["5", "0"]
 
 
-def test_set_lifetime_invalid_raises(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
+def test_update_kills_aged_particles(run_gb):
+    out = _lines(run_gb(_PRE +
+                        "PARTICLE_SET_LIFETIME(s, 100, 100)\nPARTICLE_EMIT(s, 50)\n"
+                        "PRINT PARTICLE_COUNT(s)\n"
+                        "PARTICLE_UPDATE(s, 200)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["50", "0"]
+
+
+def test_emit_many(run_gb):
+    """Massen-Emit funktioniert (frueher numpy-Array-Shape-Check)."""
+    out = _lines(run_gb(_PRE + "PARTICLE_EMIT(s, 5000)\nPRINT PARTICLE_COUNT(s)\n"))
+    assert out == ["5000"]
+
+
+# --- Validierung ---------------------------------------------------
+
+def test_set_lifetime_invalid_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="ms_min >= 0"):
-        call_builtin("particle_set_lifetime", [sys, -1, 100])
+        run_gb(_PRE + "PARTICLE_SET_LIFETIME(s, -1, 100)\n")
     with pytest.raises(GBRuntimeError, match="ms_max >= ms_min"):
-        call_builtin("particle_set_lifetime", [sys, 200, 100])
+        run_gb(_PRE + "PARTICLE_SET_LIFETIME(s, 200, 100)\n")
 
 
-def test_set_velocity_invalid_raises(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
+def test_set_velocity_invalid_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="max muss >= min"):
-        call_builtin("particle_set_velocity", [sys, 100.0, 50.0, 0.0, 0.0])
+        run_gb(_PRE + "PARTICLE_SET_VELOCITY(s, 100.0, 50.0, 0.0, 0.0)\n")
 
 
-def test_set_color_out_of_range_raises(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
+def test_set_color_out_of_range_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="0..0xFFFFFF"):
-        call_builtin("particle_set_color", [sys, 0x1000000])
+        run_gb(_PRE + "PARTICLE_SET_COLOR(s, 16777217)\n")
 
 
-def test_set_size_invalid_raises(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
+def test_set_size_invalid_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="min >= 1"):
-        call_builtin("particle_set_size", [sys, 0, 5])
+        run_gb(_PRE + "PARTICLE_SET_SIZE(s, 0, 5)\n")
 
 
-def test_emit_negative_count_raises(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
+def test_emit_negative_count_raises(run_gb):
     with pytest.raises(GBRuntimeError, match=">= 0"):
-        call_builtin("particle_emit", [sys, -1])
-
-
-def test_emit_creates_numpy_arrays(call_builtin):
-    """Nach emit() sind die internen Arrays NumPy mit korrekter Laenge."""
-    import numpy as np
-    sys = call_builtin("particle_system_new", [10.0, 20.0])
-    call_builtin("particle_emit", [sys, 100])
-    assert isinstance(sys._xs, np.ndarray)
-    assert sys._xs.shape == (100,)
-    assert sys._xs.dtype == np.float32
-    # Alle starten an (10, 20)
-    assert (sys._xs == 10.0).all()
-    assert (sys._ys == 20.0).all()
-
-
-def test_update_kills_aged_particles(call_builtin):
-    """Nach Lifetime-Ablauf werden Partikel entfernt."""
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_set_lifetime", [sys, 100, 100])
-    call_builtin("particle_emit", [sys, 50])
-    assert call_builtin("particle_count", [sys]) == 50
-    # 200ms vergehen lassen -> alle tot
-    call_builtin("particle_update", [sys, 200])
-    assert call_builtin("particle_count", [sys]) == 0
-
-
-def test_update_applies_gravity_vectorized(call_builtin):
-    """Gravity wirkt vektorisiert auf alle Partikel."""
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_set_velocity", [sys, 0.0, 0.0, 0.0, 0.0])
-    call_builtin("particle_set_lifetime", [sys, 10000, 10000])
-    call_builtin("particle_set_gravity", [sys, 0.0, 100.0])  # 100 px/s^2
-    call_builtin("particle_emit", [sys, 5])
-    # 1 Sekunde update -> vy = 100, y = 100
-    call_builtin("particle_update", [sys, 1000])
-    # Alle 5 Partikel haben die gleiche y-Position
-    ys = sys._ys.tolist()
-    assert all(abs(y - 100.0) < 0.01 for y in ys), ys
-
-
-def test_clear_resets_arrays(call_builtin):
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_emit", [sys, 50])
-    assert call_builtin("particle_count", [sys]) == 50
-    call_builtin("particle_clear", [sys])
-    assert call_builtin("particle_count", [sys]) == 0
-    assert sys._xs.shape == (0,)
-
-
-def test_particles_performance_at_5000(call_builtin):
-    """Performance-Smoke: 5000 Partikel update in unter 50 ms."""
-    import time
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_set_lifetime", [sys, 10000, 10000])  # bleibt lange
-    call_builtin("particle_emit", [sys, 5000])
-    t0 = time.perf_counter()
-    for _ in range(10):
-        call_builtin("particle_update", [sys, 16])  # 16ms wie 60fps
-    elapsed = (time.perf_counter() - t0) * 1000  # ms
-    per_update = elapsed / 10
-    # Bei 5000 Partikeln sollte ein Update <5ms sein (NumPy-vektorisiert)
-    assert per_update < 50, f"5000-Partikel-update zu langsam: {per_update:.2f}ms"
-
-
-def test_set_pos_changes_emit_origin(call_builtin):
-    """Neue Partikel werden ab geänderter Pos emittiert (intern: sys.x/y)."""
-    sys = call_builtin("particle_system_new", [0.0, 0.0])
-    call_builtin("particle_set_velocity", [sys, 0.0, 0.0, 0.0, 0.0])  # keine Bewegung
-    call_builtin("particle_set_pos", [sys, 999.0, 888.0])
-    call_builtin("particle_emit", [sys, 1])
-    # Nach 0ms-Update keine Verschiebung
-    call_builtin("particle_update", [sys, 0])
-    # Internen Zustand pruefen ueber die NumPy-Arrays
-    assert float(sys._xs[0]) == 999.0
-    assert float(sys._ys[0]) == 888.0
+        run_gb(_PRE + "PARTICLE_EMIT(s, -1)\n")
