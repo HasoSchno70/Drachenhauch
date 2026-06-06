@@ -112,7 +112,7 @@ pub enum Node {
     Try { body: Vec<Node>, catch_var: String, catch_block: Vec<Node> },
     Throw { value: Box<Node> },
     Assign { name: String, value: Box<Node> },
-    Print { items: Vec<Node>, newline: bool },
+    Print { items: Vec<Node>, seps: Vec<String>, newline: bool },
     Input { prompt: Option<Box<Node>>, target: String },
     If { condition: Box<Node>, then_block: Vec<Node>,
          elseif_branches: Vec<(Node, Vec<Node>)>, else_block: Vec<Node> },
@@ -221,8 +221,8 @@ impl Node {
             Throw { value } => obj("Throw", vec![("value", value.to_json())]),
             Assign { name, value } => obj("Assign", vec![
                 ("name", json!(name)), ("value", value.to_json())]),
-            Print { items, newline } => obj("Print", vec![
-                ("items", vecj(items)), ("newline", json!(newline))]),
+            Print { items, seps, newline } => obj("Print", vec![
+                ("items", vecj(items)), ("seps", json!(seps)), ("newline", json!(newline))]),
             Input { prompt, target } => obj("Input", vec![
                 ("prompt", bopt(prompt)), ("target", json!(target))]),
             If { condition, then_block, elseif_branches, else_block } => {

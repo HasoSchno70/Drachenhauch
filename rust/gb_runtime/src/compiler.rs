@@ -382,9 +382,13 @@ impl Compiler {
                 self.store_var(name);
                 Ok(())
             }
-            Node::Print { items, .. } => {
+            Node::Print { items, seps, newline } => {
                 for it in items { self.expr(it)?; }
-                self.ctx.emit(oc::PRINT, json!(items.len()));
+                // Arg: [count, newline, sep0, sep1, ...] -- sep_i = Trenner ZWISCHEN
+                // item_i und item_{i+1} ("," -> Leerzeichen, ";" -> nichts).
+                let mut arg = vec![json!(items.len()), json!(newline)];
+                for s in seps { arg.push(json!(s)); }
+                self.ctx.emit(oc::PRINT, json!(arg));
                 Ok(())
             }
             Node::ExprStmt { expr } => {

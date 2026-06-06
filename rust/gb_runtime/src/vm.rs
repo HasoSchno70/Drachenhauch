@@ -1753,17 +1753,22 @@ impl<'p> Vm<'p> {
                 }
 
                 // --- I/O ---
+                // Arg: [count, newline, sep0, sep1, ...] -- sep_i = Trenner ZWISCHEN
+                // item_i und item_{i+1}: "," -> Leerzeichen, ";" -> kein Trennzeichen.
+                // Trailing-Trenner setzt newline=false (kein Zeilenumbruch).
                 op::PRINT => {
-                    let count = arg.as_usize();
-                    if count == 0 {
-                        self.out.push('\n');
-                    } else {
+                    let l = arg.list();
+                    let count = l[0].as_usize();
+                    let newline = arg_truthy(&l[1]);
+                    if count > 0 {
                         let split = stack.len() - count;
                         let items = stack.split_off(split);
-                        let parts: Vec<String> = items.iter().map(|x| x.fmt()).collect();
-                        self.out.push_str(&parts.join(" "));
-                        self.out.push('\n');
+                        for (i, it) in items.iter().enumerate() {
+                            if i > 0 && l[i + 1].str() != ";" { self.out.push(' '); }
+                            self.out.push_str(&it.fmt());
+                        }
                     }
+                    if newline { self.out.push('\n'); }
                 }
 
                 // --- INPUT (Konsolen-Eingabe) ---

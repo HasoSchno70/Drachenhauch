@@ -137,9 +137,29 @@ Zweiter Lücken-Sweep gegen die echte Builtin-Liste; alles pur in
       Generierung. (Ergänzt das texturbasierte `GENTEX_PERLIN`.)
 - [x] **Laufzeit-Typen:** `TYPEOF(x)`, `ISNUM/ISINT/ISSTR/ISBOOL(x)`.
 - [x] **Encoding/Hash:** `BASE64_ENCODE/DECODE`, `CRC32(s$)`, `HASH(s$)` (FNV-1a 64).
-- [x] **Datei/OS:** `LISTDIR(p$)→ARRAY OF STRING`, `DIREXISTS`, `MKDIR`,
-      `COPYFILE`, `RENAMEFILE`, `APPENDFILE`, `BASENAME`, `DIRNAME`, `JOINPATH`.
+- [x] **Datei/OS:** NEU `COPYFILE`, `APPENDFILE`, `BASENAME`, `DIRNAME`. Die
+      Verzeichnis-/Pfad-Basics gab es bereits aus WP3 (`DIRLIST`, `PATHJOIN`,
+      `RENAME`, `MKDIR`, `DIREXISTS`, `READLINES`, `WRITEALL`, `FILESIZE`) — daher
+      KEINE konkurrierenden `LISTDIR`/`JOINPATH`/`RENAMEFILE` einführen.
 
 Abgedeckt durch Bestehendes (nicht neu): `ARRAY_FIND`→`ARRAY_INDEXOF`,
 `ARRAY_CONTAINS`→`IN`, `ARRAY_MAP/FILTER`→Comprehensions, `ARRAY_SLICE`→`a[i:j]`,
-`ASC`=`ORD`, `SLEEP`, `DELETEFILE`, `URL_ENCODE/DECODE` (Modul `html`).
+`ASC`=`ORD`, `SLEEP`, `DELETEFILE`, `URL_ENCODE/DECODE` (Modul `html`),
+`LTRIM$/RTRIM$/STARTSWITH/ENDSWITH/CONTAINS/REVERSE$/BIN$/OCT$`.
+
+## Nachtrag 2 — PRINT-Trenner + Komfort-Aliase (2026-06-06)
+
+- [x] **PRINT mit `,` und `;`**: `,` → Leerzeichen, `;` → kein Zwischenraum,
+      abschließender Trenner → kein Newline. Sprach-Feature in BEIDEN Parsern
+      (`parser.rs` + `parser.py` `print_items`), AST `Print{items, seps, newline}`
+      (Parität gewahrt), Compiler emittiert `PRINT [count, newline, seps...]`, VM
+      rendert mit Trennern. Vorher: nur `,` (immer Leerzeichen), trailing `;`
+      wurde geparst aber ignoriert.
+- [x] **String:** `COUNT(s$, teil$)` (nicht-überlappende Vorkommen), `TITLE$(s$)`.
+- [x] **Random:** `WEIGHTED_CHOICE(werte, gewichte)` (Loot-Tabellen).
+- [n] `RANDRANGE` NICHT nötig — `RANDINT(lo,hi)` (inkl.) + `RANDF(lo,hi)` decken es ab.
+
+Tests: `tests/test_print_and_aliases.py`. Beleg, wie wichtig der Abgleich gegen
+`builtins.rs` (nicht den eingefrorenen `builtin_index.json`) ist — Nachtrag 1 hatte
+sonst beinahe `LISTDIR`/`JOINPATH`/`RENAMEFILE` als Dubletten zu `DIRLIST`/
+`PATHJOIN`/`RENAME` eingeführt (korrigiert).

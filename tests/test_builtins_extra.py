@@ -95,13 +95,13 @@ def test_base64_decode_invalid_raises(run_gb):
 
 
 # ----------------------------------------------------------- Datei / OS
-def test_listdir(run_gb, tmp_path):
+def test_dirlist(run_gb, tmp_path):
     (tmp_path / "b.txt").write_text("x", encoding="utf-8")
     (tmp_path / "a.txt").write_text("y", encoding="utf-8")
     (tmp_path / "sub").mkdir()
     # listet sortiert; der run_gb-Tempfile (_gbtest_*.gb) liegt auch in base.
     out = run_gb(
-        'DIM names AS ARRAY OF STRING\nnames = LISTDIR(".")\n'
+        'DIM names AS ARRAY OF STRING\nnames = DIRLIST(".")\n'
         "DIM i AS INTEGER\n"
         "FOR i = 0 TO LEN(names) - 1\n"
         '    IF names[i] = "a.txt" OR names[i] = "b.txt" OR names[i] = "sub" THEN PRINT names[i]\n'
@@ -122,13 +122,13 @@ def test_copy_rename_append(run_gb, tmp_path):
     out = run_gb(
         'COPYFILE("src.txt", "dst.txt")\n'
         'APPENDFILE("dst.txt", " welt")\n'
-        'RENAMEFILE("dst.txt", "final.txt")\n'
+        'RENAME("dst.txt", "final.txt")\n'
         'DIM f AS FILE\nf = OpenFile("final.txt", "r")\nPRINT ReadLine(f)\nCloseFile(f)\n'
         'PRINT FILEEXISTS("dst.txt")\nPRINT FILEEXISTS("final.txt")\n',
         base=tmp_path)
     assert out.splitlines() == ["hallo welt", "FALSE", "TRUE"]
 
 
-def test_listdir_missing_dir_raises(run_gb):
-    with pytest.raises(GameBasicError, match="LISTDIR"):
-        run_gb('PRINT LEN(LISTDIR("does_not_exist_xyz_123"))\n')
+def test_dirlist_missing_dir_raises(run_gb):
+    with pytest.raises(GameBasicError, match="DIRLIST"):
+        run_gb('PRINT LEN(DIRLIST("does_not_exist_xyz_123"))\n')

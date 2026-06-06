@@ -511,13 +511,29 @@ impl Parser {
         self.expect(Tt::Print, "")?;
         if self.check(Tt::Newline) || self.at_end() {
             self.consume_terminator()?;
-            return Ok(Node::Print { items: vec![], newline: true });
+            return Ok(Node::Print { items: vec![], seps: vec![], newline: true });
         }
-        let mut items = vec![self.expression()?];
-        while self.matches(Tt::Comma) { items.push(self.expression()?); }
-        self.matches(Tt::Semicolon);
+        let (items, seps, newline) = self.print_items()?;
         self.consume_terminator()?;
-        Ok(Node::Print { items, newline: true })
+        Ok(Node::Print { items, seps, newline })
+    }
+
+    /// PRINT-Liste: Ausdruecke getrennt durch ',' (Leerzeichen) oder ';' (kein
+    /// Leerzeichen). Ein trailing ',' / ';' unterdrueckt den Zeilenumbruch.
+    fn print_items(&mut self) -> R<(Vec<Node>, Vec<String>, bool)> {
+        let mut items = vec![self.expression()?];
+        let mut seps: Vec<String> = Vec::new();
+        let mut newline = true;
+        while self.checks(&[Tt::Comma, Tt::Semicolon]) {
+            let sep = if self.matches(Tt::Comma) { "," } else { self.matches(Tt::Semicolon); ";" };
+            if self.checks(&[Tt::Newline, Tt::Colon, Tt::Else]) || self.at_end() {
+                newline = false;           // trailing Trenner -> kein Newline
+                break;
+            }
+            seps.push(sep.to_string());
+            items.push(self.expression()?);
+        }
+        Ok((items, seps, newline))
     }
 
     fn input_stmt(&mut self) -> R<Node> {
@@ -636,13 +652,11 @@ impl Parser {
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;
-                let mut items = Vec::new();
-                if !(self.checks(&[Tt::Newline, Tt::Else]) || self.at_end()) {
-                    items.push(self.expression()?);
-                    while self.matches(Tt::Comma) { items.push(self.expression()?); }
-                    self.matches(Tt::Semicolon);
+                if self.checks(&[Tt::Newline, Tt::Else]) || self.at_end() {
+                    return Ok(Node::Print { items: vec![], seps: vec![], newline: true });
                 }
-                Ok(Node::Print { items, newline: true })
+                let (items, seps, newline) = self.print_items()?;
+                Ok(Node::Print { items, seps, newline })
             }
             Tt::Ident if self.is_assignment_lookahead() => self.assign_from_lvalue(),
             Tt::Return => {

@@ -4,6 +4,7 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 
 ## Inhalt
 
+- [Ausgabe (PRINT)](#ausgabe-print)
 - [Konvertierung](#konvertierung)
 - [Math](#math)
 - [Strings](#strings)
@@ -12,7 +13,26 @@ Alle eingebauten Befehle, die ohne `IMPORT` verfügbar sind. Grafik-Befehle (SCR
 - [Maps](#maps)
 - [Datei-I/O](#datei-io)
 - [Zeit & Random](#zeit--random)
+- [Typen & Encoding](#typen--encoding)
 - [Spiel-Helfer](#spiel-helfer)
+
+## Ausgabe (PRINT)
+
+`PRINT` gibt eine oder mehrere durch `,` oder `;` getrennte Werte aus:
+
+- **`,`** trennt mit einem **Leerzeichen**: `PRINT "x", 5` → `x 5`
+- **`;`** trennt **ohne** Zwischenraum: `PRINT "x"; 5` → `x5`
+- ein **abschließendes** `,` oder `;` **unterdrückt den Zeilenumbruch** (die nächste
+  Ausgabe schließt direkt an): `PRINT "Laden...";` dann `PRINT "fertig"` → `Laden...fertig`
+- `PRINT` ohne Argumente gibt eine Leerzeile aus.
+
+```basic
+PRINT "a", "b", "c"     ' a b c
+PRINT "a"; "b"; "c"     ' abc
+PRINT "Score: "; punkte ' Score: 42   (kein Leerzeichen nach dem Doppelpunkt-String)
+PRINT "x = ";           ' kein Newline
+PRINT x                 ' schließt an
+```
 
 ## Konvertierung
 
@@ -63,6 +83,25 @@ PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 | `REMAP(v, in_lo, in_hi, out_lo, out_hi)` | linear umskalieren |
 | `FRAC(x)` | Nachkommaanteil (vorzeichenbehaftet): `x - TRUNC(x)` |
 | `SIGN(x)` | -1, 0 oder 1 |
+| `LOG10(x)` | Zehnerlogarithmus |
+| `CLAMP01(v)` | auf `[0, 1]` beschränken |
+| `WRAP(v, lo, hi)` | v zyklisch in `[lo, hi)` falten (Winkel/Index-Umlauf) |
+| `PINGPONG(t, len)` | in `[0, len]` hin- und herpendeln (Dreieckswelle) |
+| `MOVETOWARD(cur, ziel, maxd)` | cur um max. `maxd` Richtung `ziel` bewegen |
+| `SMOOTHSTEP(e0, e1, x)` | weicher 0→1-Übergang (Hermite), geklemmt |
+| `APPROX(a, b[, eps])` → BOOLEAN | `\|a-b\| ≤ eps` (Default `1e-6`) |
+
+**Perlin-Noise** (deterministisch, Wert in ~`[-1, 1]`, gleiche Eingabe → gleicher
+Wert): `NOISE(x)`, `NOISE2(x, y)`, `NOISE3(x, y, z)` und fraktal `FBM(x, y, oktaven)`,
+`FBM3(x, y, z, oktaven)`. Für prozedurale Generierung (Terrain, Höhlen, organische
+Bewegung). An ganzzahligen Gitterpunkten ist Perlin definitionsgemäß 0.
+
+```basic
+PRINT WRAP(370, 0, 360)      ' 10.0
+PRINT PINGPONG(2.5, 2)       ' 1.5
+PRINT MOVETOWARD(0, 10, 3)   ' 3.0
+PRINT ROUND(NOISE2(1.5, 2.5), 3)  ' reproduzierbarer Rauschwert
+```
 
 Konstanten: `PI`, `TAU` (= 2·PI). (`E` ist absichtlich keine Konstante — `e`
 ist ein häufiger `CATCH e`-Variablenname; nutze `EXP(1)`.)
@@ -130,6 +169,8 @@ Erweiterungen *(nur native Runtime)*:
 | `REVERSE$(s)` | Zeichen umkehren |
 | `STARTSWITH(s, präfix)`, `ENDSWITH(s, suffix)` → BOOLEAN | Anfang/Ende prüfen |
 | `CONTAINS(s, teil)` → BOOLEAN | Teilstring enthalten? (Funktionsform von `teil IN s`) |
+| `COUNT(s, teil)` → INTEGER | Anzahl nicht-überlappender Vorkommen von `teil` |
+| `TITLE$(s)` | Anfangsbuchstabe jedes Wortes groß, Rest klein |
 | `BIN$(n)`, `OCT$(n)` | INTEGER als Binär-/Oktalstring (mit Vorzeichen) |
 | `ISNUMERIC(s)` → BOOLEAN | als Zahl parsebar? |
 | `TRYVAL(s, default)` → INTEGER/FLOAT | robustes `VAL`: bei Parse-Fehler `default` statt still `0` |
@@ -314,7 +355,11 @@ Pfadbasiert, ohne FILE-Handle *(nur native Runtime)*:
 | `DIREXISTS(pfad$)` → BOOLEAN | Verzeichnis vorhanden? |
 | `DIRLIST(pfad$)` → ARRAY OF STRING | Eintragsnamen (sortiert) |
 | `MKDIR(pfad$)` | Verzeichnis anlegen (inkl. Eltern) |
+| `COPYFILE(src$, dst$)` | Datei kopieren |
+| `APPENDFILE(pfad$, text$)` | Text ans Ende hängen (legt die Datei an) |
 | `PATHJOIN(a$, b$, …)` → STRING | Pfadteile mit `/` verbinden |
+| `BASENAME(pfad$)` → STRING | letzter Pfad-Bestandteil (Datei-/Ordnername) |
+| `DIRNAME(pfad$)` → STRING | Verzeichnis-Anteil (ohne letzten Bestandteil) |
 
 ```basic
 ' Schreiben
@@ -354,6 +399,7 @@ PRINT FILESIZE(PATHJOIN("saves/level1", "progress.txt"))
 | `RANDINT(lo, hi)` → INTEGER | Zufalls-INT in `[lo, hi]` (inklusiv) |
 | `RANDF(lo, hi)` → FLOAT | Zufalls-FLOAT in `[lo, hi)` |
 | `CHOICE(array)` → T | zufälliges Element eines 1D-Arrays |
+| `WEIGHTED_CHOICE(werte, gewichte)` → T | Element aus `werte`, gewählt proportional zu `gewichte` (1D-Arrays gleicher Länge, Gewichte ≥ 0). Loot-Tabellen. |
 | `SHUFFLE(array)` | mischt ein 1D-Array IN PLACE (Fisher-Yates) |
 | `RANDOMIZE([seed])` | Zufalls-Seed setzen (ohne Arg: System-Seed) |
 
@@ -375,6 +421,25 @@ RANDOMIZE(42)
 FOR i = 1 TO 5
     PRINT RND(6) + 1
 NEXT
+```
+
+## Typen & Encoding
+
+| Funktion | Zweck |
+|---|---|
+| `TYPEOF(x)` → STRING | Laufzeit-Typname, z.B. `"INTEGER"`, `"STRING"`, `"VEC3"`, `"MAT4"`, `"OBJECT"` |
+| `ISNUM(x)`, `ISINT(x)`, `ISSTR(x)`, `ISBOOL(x)` → BOOLEAN | Typ-Prädikate (Bool ist KEINE Zahl) |
+| `BASE64_ENCODE(s$)` → STRING | UTF-8-Text Base64-kodieren |
+| `BASE64_DECODE(s$)` → STRING | Base64 zu UTF-8-Text (wirft bei ungültiger Eingabe) |
+| `CRC32(s$)` → INTEGER | CRC-32-Prüfsumme der UTF-8-Bytes |
+| `HASH(s$)` → INTEGER | stabiler 64-Bit-Hash (FNV-1a) — Save-Integrität, Buckets |
+
+```basic
+PRINT TYPEOF(3.0)                       ' FLOAT
+PRINT ISINT(5), ISINT(3.0)              ' TRUE FALSE
+PRINT BASE64_ENCODE("Hi!")              ' "SGkh"
+PRINT BASE64_DECODE("SGkh")             ' "Hi!"
+PRINT CRC32("hello")                    ' 907060870
 ```
 
 ## Spiel-Helfer

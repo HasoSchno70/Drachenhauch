@@ -5091,21 +5091,9 @@
    "module": "interpreter"
   },
   {
-   "name": "LISTDIR",
-   "kind": "core",
-   "signature": "LISTDIR(p: STRING)",
-   "module": "interpreter"
-  },
-  {
    "name": "COPYFILE",
    "kind": "core",
    "signature": "COPYFILE(src, dst)",
-   "module": "interpreter"
-  },
-  {
-   "name": "RENAMEFILE",
-   "kind": "core",
-   "signature": "RENAMEFILE(src, dst)",
    "module": "interpreter"
   },
   {
@@ -5127,9 +5115,21 @@
    "module": "interpreter"
   },
   {
-   "name": "JOINPATH",
+   "name": "COUNT",
    "kind": "core",
-   "signature": "JOINPATH(a: STRING, b: STRING)",
+   "signature": "COUNT(text$, teil$)",
+   "module": "interpreter"
+  },
+  {
+   "name": "TITLE$",
+   "kind": "core",
+   "signature": "TITLE$(s$)",
+   "module": "interpreter"
+  },
+  {
+   "name": "WEIGHTED_CHOICE",
+   "kind": "core",
+   "signature": "WEIGHTED_CHOICE(werte, gewichte)",
    "module": "interpreter"
   }
  ]

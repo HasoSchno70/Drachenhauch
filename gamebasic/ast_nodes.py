@@ -238,7 +238,8 @@ class Assign(Stmt):
 @dataclass
 class Print(Stmt):
     items: list           # list[Expr]
-    newline: bool = True  # False wenn mit ; abgeschlossen
+    seps: list = field(default_factory=list)  # Trenner ZWISCHEN items: "," oder ";" (len = len(items)-1)
+    newline: bool = True  # False wenn mit trailing , oder ; abgeschlossen
 
 
 @dataclass

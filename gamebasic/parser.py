@@ -716,18 +716,29 @@ class Parser:
 
     def _print(self):
         self._expect(TokenType.PRINT)
-        items = []
         if self._check(TokenType.NEWLINE) or self._at_end():
             self._consume_terminator()
             return Print([])
-        items.append(self._expression())
-        while self._match(TokenType.COMMA):
-            # Erlaube nachgestelltes Komma vor NEWLINE? Nein, klassisch nicht.
-            items.append(self._expression())
-        # Optionaler ; am Ende -> kein Newline. (In Phase 1 nicht ausgewertet, aber akzeptiert.)
-        self._match(TokenType.SEMICOLON)
+        items, seps, newline = self._print_items()
         self._consume_terminator()
-        return Print(items)
+        return Print(items, seps, newline)
+
+    def _print_items(self):
+        """PRINT-Liste: Ausdruecke getrennt durch ',' (Leerzeichen) oder ';'
+        (kein Leerzeichen). Ein trailing ',' / ';' unterdrueckt den Zeilenumbruch.
+        Liefert (items, seps, newline)."""
+        items = [self._expression()]
+        seps = []
+        newline = True
+        while self._check(TokenType.COMMA, TokenType.SEMICOLON):
+            sep = "," if self._check(TokenType.COMMA) else ";"
+            self._match(TokenType.COMMA, TokenType.SEMICOLON)
+            if self._check(TokenType.NEWLINE, TokenType.COLON, TokenType.ELSE) or self._at_end():
+                newline = False           # trailing Trenner -> kein Newline
+                break
+            seps.append(sep)
+            items.append(self._expression())
+        return items, seps, newline
 
     def _input(self):
         self._expect(TokenType.INPUT)
@@ -880,13 +891,10 @@ class Parser:
         t = tok.type
         if t == TokenType.PRINT:
             self.pos += 1
-            items = []
-            if not (self._check(TokenType.NEWLINE, TokenType.ELSE) or self._at_end()):
-                items.append(self._expression())
-                while self._match(TokenType.COMMA):
-                    items.append(self._expression())
-                self._match(TokenType.SEMICOLON)
-            return Print(items)
+            if self._check(TokenType.NEWLINE, TokenType.ELSE) or self._at_end():
+                return Print([])
+            items, seps, newline = self._print_items()
+            return Print(items, seps, newline)
         if t == TokenType.IDENT and self._is_assignment_lookahead():
             return self._assign_from_lvalue()
         if t == TokenType.RETURN:

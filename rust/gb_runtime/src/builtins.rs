@@ -506,6 +506,33 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Nil)
             } else { err("SHUFFLE erwartet ARRAY".to_string()) }
         }
+        "weighted_choice" => {
+            // WEIGHTED_CHOICE(werte, gewichte) -> Element aus `werte`, gewaehlt
+            // proportional zu `gewichte` (beide 1D-Arrays gleicher Laenge). Loot-
+            // Tabellen etc. PRNG -> in der Parity erwartet unterschiedlich.
+            arity!(2);
+            let (vals, wts) = match (&a[0], &a[1]) {
+                (Value::Array(v), Value::Array(w)) => (v.borrow(), w.borrow()),
+                _ => return err("WEIGHTED_CHOICE erwartet zwei ARRAYs".to_string()),
+            };
+            if vals.dims.len() != 1 || wts.dims.len() != 1 { return err("WEIGHTED_CHOICE: nur 1D-Arrays".to_string()); }
+            if vals.values.len() != wts.values.len() { return err("WEIGHTED_CHOICE: werte und gewichte muessen gleich lang sein".to_string()); }
+            if vals.values.is_empty() { return err("WEIGHTED_CHOICE: Arrays sind leer".to_string()); }
+            let mut total = 0.0;
+            for w in &wts.values {
+                let x = as_f64(w);
+                if !is_num(w) || x < 0.0 { return err("WEIGHTED_CHOICE: Gewichte muessen Zahlen >= 0 sein".to_string()); }
+                total += x;
+            }
+            if total <= 0.0 { return err("WEIGHTED_CHOICE: Summe der Gewichte muss > 0 sein".to_string()); }
+            let r = (next_rand() >> 11) as f64 / (1u64 << 53) as f64 * total;
+            let mut acc = 0.0;
+            for (i, w) in wts.values.iter().enumerate() {
+                acc += as_f64(w);
+                if r < acc { return Ok(vals.values[i].clone()); }
+            }
+            Ok(vals.values[vals.values.len() - 1].clone())   // Rundungs-Fallback
+        }
         "millis" => {
             use std::time::{SystemTime, UNIX_EPOCH};
             let ms = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
@@ -1251,6 +1278,32 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "startswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "STARTSWITH")?.starts_with(need_str(&a[1], "STARTSWITH")?))) }
         "endswith" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "ENDSWITH")?.ends_with(need_str(&a[1], "ENDSWITH")?))) }
         "contains" => { arity!(2); Ok(Value::Bool(need_str(&a[0], "CONTAINS")?.contains(need_str(&a[1], "CONTAINS")?))) }
+        "count" => {
+            // COUNT(text$, teil$) -> Anzahl nicht-ueberlappender Vorkommen.
+            arity!(2);
+            let hay = need_str(&a[0], "COUNT")?;
+            let needle = need_str(&a[1], "COUNT")?;
+            Ok(Value::Int(if needle.is_empty() { 0 } else { hay.matches(needle).count() as i64 }))
+        }
+        "title$" | "title" => {
+            // TITLE$(s$) -> Anfangsbuchstabe jedes Wortes gross, Rest klein.
+            arity!(1);
+            let s = need_str(&a[0], "TITLE$")?;
+            let mut out = String::with_capacity(s.len());
+            let mut start = true;   // Wortanfang
+            for ch in s.chars() {
+                if ch.is_whitespace() {
+                    start = true;
+                    out.push(ch);
+                } else if start {
+                    out.extend(ch.to_uppercase());
+                    start = false;
+                } else {
+                    out.extend(ch.to_lowercase());
+                }
+            }
+            Ok(Value::str_rc(&out))
+        }
         "bin$" | "bin" => {
             arity!(1);
             let n = need_int(&a[0], "BIN$")?;
@@ -1525,33 +1578,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Core File-I/O =====
         "fileexists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "FILEEXISTS")?).is_file())) }
-        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
-        "listdir" => {
-            // LISTDIR(pfad$) -> ARRAY OF STRING (Dateien + Unterordner, ohne . / ..).
-            arity!(1);
-            let path = need_str(&a[0], "LISTDIR")?;
-            let rd = std::fs::read_dir(path).map_err(|e| format!("LISTDIR: {}", e))?;
-            let mut names: Vec<String> = Vec::new();
-            for e in rd {
-                let e = e.map_err(|e| format!("LISTDIR: {}", e))?;
-                names.push(e.file_name().to_string_lossy().into_owned());
-            }
-            names.sort();
-            Ok(new_str_array(names))
-        }
-        "mkdir" => {
-            arity!(1);
-            std::fs::create_dir_all(need_str(&a[0], "MKDIR")?).map_err(|e| format!("MKDIR: {}", e))?;
-            Ok(Value::Nil)
-        }
+        // Datei-Mgmt + Pfad-Zerlegung (ergaenzt die WP3-Pfad-API DIRLIST/RENAME/
+        // PATHJOIN/MKDIR/DIREXISTS weiter unten -- KEINE Duplikate anlegen!).
         "copyfile" => {
             arity!(2);
             std::fs::copy(need_str(&a[0], "COPYFILE")?, need_str(&a[1], "COPYFILE")?).map_err(|e| format!("COPYFILE: {}", e))?;
-            Ok(Value::Nil)
-        }
-        "renamefile" => {
-            arity!(2);
-            std::fs::rename(need_str(&a[0], "RENAMEFILE")?, need_str(&a[1], "RENAMEFILE")?).map_err(|e| format!("RENAMEFILE: {}", e))?;
             Ok(Value::Nil)
         }
         "appendfile" => {
@@ -1575,13 +1606,6 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let p = need_str(&a[0], "DIRNAME")?;
             let dir = std::path::Path::new(p).parent().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
             Ok(Value::str_rc(&dir))
-        }
-        "joinpath" => {
-            // JOINPATH(a$, b$) -> plattformkorrekt zusammengesetzter Pfad.
-            arity!(2);
-            let mut pb = std::path::PathBuf::from(need_str(&a[0], "JOINPATH")?);
-            pb.push(need_str(&a[1], "JOINPATH")?);
-            Ok(Value::str_rc(&pb.to_string_lossy()))
         }
         "openfile" => {
             arity!(2);
