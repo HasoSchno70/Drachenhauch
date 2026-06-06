@@ -81,6 +81,48 @@ def resize_rect(x: int, y: int, w: int, h: int, handle: str, nx: int, ny: int,
     return x, y, w, h
 
 
+# --- FormProject (Multi-Form-Manifest) --------------------------------------
+@dataclass
+class FormProject:
+    """Manifest eines Multi-Form-Projekts (`.gbproj`, JSON). Verweist auf die
+    einzelnen `.gbform`-Dateien (relativ zum Projekt-Verzeichnis) -- jede Form
+    bleibt ihre eigene Datei. `main` = Startformular (einer der `forms`-Pfade).
+    Qt-frei + headless testbar."""
+    forms: list = field(default_factory=list)   # list[str] relative .gbform-Pfade
+    main: str = ""
+
+    def add(self, rel: str) -> None:
+        if rel not in self.forms:
+            self.forms.append(rel)
+        if not self.main:
+            self.main = rel
+
+    def remove(self, rel: str) -> None:
+        if rel in self.forms:
+            self.forms.remove(rel)
+        if self.main == rel:
+            self.main = self.forms[0] if self.forms else ""
+
+    def to_dict(self) -> dict:
+        return {"forms": list(self.forms), "main": self.main}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "FormProject":
+        forms = [str(x) for x in d.get("forms", [])]
+        main = str(d.get("main", ""))
+        if main not in forms:                       # defensiv: main muss Mitglied sein
+            main = forms[0] if forms else ""
+        return cls(forms=forms, main=main)
+
+    def save(self, path: str) -> None:
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False),
+                              encoding="utf-8")
+
+    @classmethod
+    def load(cls, path: str) -> "FormProject":
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
 # --- Undo/Redo-Historie -----------------------------------------------------
 # Snapshot-basiert + Qt-frei (headless testbar). Ein Snapshot ist das
 # `FormDoc.to_dict()`-Dict; die UI stellt mit `FormDoc.from_dict()` wieder her.

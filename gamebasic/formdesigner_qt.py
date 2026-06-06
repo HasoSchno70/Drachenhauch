@@ -26,8 +26,8 @@ from PySide6.QtWidgets import (
 )
 
 from .formdesigner import (
-    FormDoc, Control, History, PALETTE, palette_spec, GRID, HANDLES, snap,
-    resize_rect,
+    FormDoc, FormProject, Control, History, PALETTE, palette_spec, GRID, HANDLES,
+    snap, resize_rect,
 )
 
 try:
@@ -511,17 +511,37 @@ class _CodePanel(QWidget):
         self.edited.emit()
 
 
+class _OpenForm:
+    """Ein im Designer geoeffnetes Formular mit eigenem Zustand: Dokument, Pfad,
+    Undo-Historie und Dirty-Flag. (Undo ist pro Formular -- nicht uebergreifend.)"""
+    def __init__(self, doc: FormDoc, path: Path | None = None):
+        self.doc = doc
+        self.path = path
+        self.history = History()
+        self.dirty = False
+
+
 class FormDesigner(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = Path(project_root)
-        self.path: Path | None = None
+        # Multi-Form-Zustand
+        self.forms: list[_OpenForm] = []
+        self.active_index: int = -1
+        self.project = FormProject()
+        self.project_path: Path | None = None
+        self._suppress_row = False
         self.setWindowTitle("GameBasic Form-Designer")
         self.resize(1100, 740)
 
         self.canvas = _Canvas()
         scroll = QScrollArea(); scroll.setWidget(self.canvas); scroll.setWidgetResizable(False)
         self.setCentralWidget(scroll)
+
+        # Formular-Liste (Multi-Form-Navigator)
+        self.form_list = QListWidget()
+        self.form_list.currentRowChanged.connect(self._on_form_row)
+        self._dock("Formulare", self.form_list, Qt.DockWidgetArea.LeftDockWidgetArea)
 
         # Palette
         self.palette = QListWidget()
@@ -539,13 +559,12 @@ class FormDesigner(QMainWindow):
         self.code_panel = _CodePanel()
         self.code_dock = self._dock("Code", self.code_panel, Qt.DockWidgetArea.BottomDockWidgetArea)
 
-        # Undo/Redo
-        self.history = History()
+        # Undo/Redo-Edit-Sessions (transient, pro Selektion/Handler)
         self.canvas.commit_history = self._commit_history
-        self._insp_baseline: dict | None = None   # Pre-Edit-Snapshot der Selektion
-        self._insp_dirty = False                  # Inspector-Edit-Session gesichert?
-        self._code_baseline: dict | None = None   # Pre-Edit-Snapshot des Handlers
-        self._code_dirty = False                  # Code-Edit-Session gesichert?
+        self._insp_baseline: dict | None = None
+        self._insp_dirty = False
+        self._code_baseline: dict | None = None
+        self._code_dirty = False
 
         self.canvas.selection_changed.connect(self.inspector.set_control)
         self.canvas.selection_changed.connect(self._on_selection_changed)
@@ -557,9 +576,7 @@ class FormDesigner(QMainWindow):
         self.code_panel.edited.connect(self._on_code_edited)
 
         self._build_menu()
-        self.canvas.set_doc(FormDoc())
-        self._update_title()
-        self._refresh_history_actions()
+        self._add_open_form(FormDoc())     # ein leeres Start-Formular
 
     def closeEvent(self, ev):
         self.code_panel.detach_highlighter()
@@ -578,10 +595,17 @@ class FormDesigner(QMainWindow):
             if shortcut:
                 a.setShortcut(QKeySequence(shortcut))
             a.triggered.connect(fn); menu.addAction(a); return a
-        act("Neu", "Ctrl+N", self.new_form)
-        act("Oeffnen...", "Ctrl+O", self.open_form)
+        act("Neues Formular", "Ctrl+N", self.new_form)
+        act("Formular oeffnen...", "Ctrl+O", self.open_form)
+        act("Formular schliessen", "Ctrl+W", self.close_form)
+        m.addSeparator()
         act("Speichern", "Ctrl+S", self.save_form)
         act("Speichern unter...", "Ctrl+Shift+S", self.save_form_as)
+        act("Alle speichern", "Ctrl+Alt+S", self.save_all)
+        m.addSeparator()
+        act("Projekt oeffnen...", None, self.open_project)
+        act("Projekt speichern...", None, self.save_project)
+        act("Als Startformular setzen", None, self.set_main_form)
         m.addSeparator()
         act("Ausfuehren (gbrt)", "F5", self.run_form)
 
@@ -604,6 +628,75 @@ class FormDesigner(QMainWindow):
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on
         self.canvas.update()
+
+    # -- Aktive Form + Navigator ------------------------------------------
+    @property
+    def active(self) -> _OpenForm:
+        return self.forms[self.active_index]
+
+    @property
+    def history(self) -> History:
+        return self.active.history
+
+    @property
+    def path(self) -> Path | None:
+        return self.active.path if 0 <= self.active_index < len(self.forms) else None
+
+    @path.setter
+    def path(self, v):
+        self.active.path = v
+
+    def _add_open_form(self, doc: FormDoc, path: Path | None = None, switch: bool = True):
+        of = _OpenForm(doc, path)
+        self.forms.append(of)
+        if switch:
+            self._switch_to(len(self.forms) - 1)
+        else:
+            self._refresh_form_list()
+        return of
+
+    def _switch_to(self, index: int):
+        if not (0 <= index < len(self.forms)):
+            return
+        self.active_index = index
+        self._insp_baseline = None; self._insp_dirty = False
+        self._code_baseline = None; self._code_dirty = False
+        self.canvas.set_doc(self.active.doc)   # doc_replaced -> Code-Panel
+        self._refresh_history_actions()
+        self._refresh_form_list()
+        self._update_title()
+
+    def _set_active_doc(self, doc: FormDoc):
+        """Aktives Dokument ersetzen (Undo/Redo) -- haelt forms + canvas synchron."""
+        self.active.doc = doc
+        self.canvas.set_doc(doc)
+
+    def _refresh_form_list(self):
+        self._suppress_row = True
+        self.form_list.clear()
+        for of in self.forms:
+            title = of.doc.title or "(Formular)"
+            star = " *" if of.dirty else ""
+            crown = "★ " if (of.path and self.project.main and
+                             self._rel(of.path) == self.project.main) else ""
+            self.form_list.addItem(f"{crown}{title}{star}")
+        if 0 <= self.active_index < len(self.forms):
+            self.form_list.setCurrentRow(self.active_index)
+        self._suppress_row = False
+
+    def _on_form_row(self, row: int):
+        if self._suppress_row or row < 0 or row == self.active_index:
+            return
+        self._switch_to(row)
+
+    def _rel(self, p: Path) -> str:
+        """Pfad relativ zum Projekt-Verzeichnis (fuer das `.gbproj`-Manifest)."""
+        if self.project_path is not None:
+            try:
+                return str(Path(p).relative_to(self.project_path.parent)).replace("\\", "/")
+            except ValueError:
+                pass
+        return Path(p).name
 
     # -- Undo/Redo --
     def _commit_history(self, snapshot: dict):
@@ -634,7 +727,7 @@ class FormDesigner(QMainWindow):
         if not self.history.can_undo:
             return
         prev = self.history.undo(self.canvas.doc.to_dict())
-        self.canvas.set_doc(FormDoc.from_dict(prev))
+        self._set_active_doc(FormDoc.from_dict(prev))
         self._refresh_history_actions()
         self._mark_dirty()
 
@@ -642,7 +735,7 @@ class FormDesigner(QMainWindow):
         if not self.history.can_redo:
             return
         nxt = self.history.redo(self.canvas.doc.to_dict())
-        self.canvas.set_doc(FormDoc.from_dict(nxt))
+        self._set_active_doc(FormDoc.from_dict(nxt))
         self._refresh_history_actions()
         self._mark_dirty()
 
@@ -678,18 +771,21 @@ class FormDesigner(QMainWindow):
 
     # -- Aktionen --
     def _mark_dirty(self):
-        self._update_title(dirty=True)
+        was = self.active.dirty
+        self.active.dirty = True
+        self._update_title()
+        if not was:
+            self._refresh_form_list()    # nur bei Uebergang -> Stern erscheint
 
-    def _update_title(self, dirty=False):
-        name = self.path.name if self.path else "(unbenannt)"
-        self.setWindowTitle(f"GameBasic Form-Designer  --  {name}{'*' if dirty else ''}")
+    def _update_title(self):
+        of = self.active
+        name = of.path.name if of.path else "(unbenannt)"
+        star = "*" if of.dirty else ""
+        proj = f"  [{self.project_path.name}]" if self.project_path else ""
+        self.setWindowTitle(f"GameBasic Form-Designer{proj}  --  {name}{star}")
 
     def new_form(self):
-        self.path = None
-        self.history.clear()
-        self.canvas.set_doc(FormDoc())
-        self._update_title()
-        self._refresh_history_actions()
+        self._add_open_form(FormDoc())
 
     def open_form(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Formular oeffnen", str(self.project_root),
@@ -697,29 +793,121 @@ class FormDesigner(QMainWindow):
         if not fn:
             return
         try:
-            self.history.clear()
-            self.canvas.set_doc(FormDoc.load(fn))
-            self.path = Path(fn); self._update_title()
-            self._refresh_history_actions()
+            self._add_open_form(FormDoc.load(fn), Path(fn))
         except Exception as e:  # noqa: BLE001
             QMessageBox.critical(self, "Fehler", f"Konnte nicht laden:\n{e}")
+
+    def close_form(self):
+        if self.active.dirty:
+            r = QMessageBox.question(self, "Schliessen",
+                                     "Ungespeicherte Aenderungen verwerfen?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if r != QMessageBox.StandardButton.Yes:
+                return
+        i = self.active_index
+        del self.forms[i]
+        if not self.forms:
+            self._add_open_form(FormDoc())        # nie ganz leer
+        else:
+            self._switch_to(min(i, len(self.forms) - 1))
 
     def save_form(self):
         if self.path is None:
             return self.save_form_as()
         self.canvas.doc.save(str(self.path))
-        self._update_title()
+        self.active.dirty = False
+        self._update_title(); self._refresh_form_list()
+        return True
 
     def save_form_as(self):
         fn, _ = QFileDialog.getSaveFileName(self, "Formular speichern", str(self.project_root),
                                             "GameBasic-Form (*.gbform)")
         if not fn:
-            return
+            return False
         if not fn.endswith(".gbform"):
             fn += ".gbform"
         self.path = Path(fn)
         self.canvas.doc.save(fn)
-        self._update_title()
+        self.active.dirty = False
+        self._update_title(); self._refresh_form_list()
+        return True
+
+    def save_all(self):
+        start = self.active_index
+        for i in range(len(self.forms)):
+            if self.forms[i].dirty or self.forms[i].path is None:
+                self._switch_to(i)
+                if not self.save_form():
+                    break                          # Abbruch im Speichern-Dialog
+        self._switch_to(min(start, len(self.forms) - 1))
+
+    def set_main_form(self):
+        if self.path is None:
+            self.statusBar().showMessage("Formular zuerst speichern.", 3000)
+            return
+        self.project.main = self._rel(self.path)
+        self._refresh_form_list()
+        self.statusBar().showMessage(f"Startformular: {self.project.main}", 3000)
+
+    # -- Projekt (.gbproj) --
+    def open_project(self):
+        fn, _ = QFileDialog.getOpenFileName(self, "Projekt oeffnen", str(self.project_root),
+                                            "GameBasic-Projekt (*.gbproj)")
+        if fn:
+            self.load_project_file(fn)
+
+    def load_project_file(self, fn: str):
+        try:
+            proj = FormProject.load(fn)
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.critical(self, "Fehler", f"Projekt nicht ladbar:\n{e}")
+            return
+        base = Path(fn).parent
+        self.project = proj
+        self.project_path = Path(fn)
+        self.forms = []
+        self.active_index = -1
+        main_idx = 0
+        for i, rel in enumerate(proj.forms):
+            try:
+                doc = FormDoc.load(str(base / rel))
+            except Exception:  # noqa: BLE001 -- fehlende Form ueberspringen
+                continue
+            self._add_open_form(doc, base / rel, switch=False)
+            if rel == proj.main:
+                main_idx = len(self.forms) - 1
+        if not self.forms:
+            self._add_open_form(FormDoc(), switch=False)
+        self._switch_to(min(main_idx, len(self.forms) - 1))
+
+    def save_project(self):
+        # Erst sicherstellen, dass jede Form einen Pfad hat (+ gespeichert ist).
+        start = self.active_index
+        for i in range(len(self.forms)):
+            if self.forms[i].path is None:
+                self._switch_to(i)
+                if not self.save_form_as():
+                    self._switch_to(start)
+                    return
+        if self.project_path is None:
+            fn, _ = QFileDialog.getSaveFileName(self, "Projekt speichern", str(self.project_root),
+                                                "GameBasic-Projekt (*.gbproj)")
+            if not fn:
+                self._switch_to(start)
+                return
+            if not fn.endswith(".gbproj"):
+                fn += ".gbproj"
+            self.project_path = Path(fn)
+        # Alle Forms speichern + Manifest aufbauen (relativ zum Projektpfad).
+        self.project.forms = []
+        for of in self.forms:
+            of.doc.save(str(of.path)); of.dirty = False
+            self.project.add(self._rel(of.path))
+        if self.project.main not in self.project.forms:
+            self.project.main = self.project.forms[0] if self.project.forms else ""
+        self.project.save(str(self.project_path))
+        self._switch_to(min(start, len(self.forms) - 1))
+        self.statusBar().showMessage(f"Projekt gespeichert: {self.project_path.name}", 3000)
 
     def run_form(self):
         gbrt = _find_gbrt()
@@ -746,9 +934,16 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     app.setStyleSheet(global_qss())
     win = FormDesigner(project_root)
     if initial_file and Path(initial_file).exists():
+        p = Path(initial_file)
         try:
-            win.canvas.set_doc(FormDoc.load(str(initial_file)))
-            win.path = Path(initial_file); win._update_title()
+            if p.suffix == ".gbproj":
+                win.load_project_file(str(p))
+            else:
+                # leeres Start-Formular durch die geladene Datei ersetzen
+                doc = FormDoc.load(str(p))
+                of = win.forms[0]
+                of.doc = doc; of.path = p
+                win._switch_to(0)
         except Exception:
             pass
     win.show()

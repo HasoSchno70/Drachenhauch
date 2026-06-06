@@ -4,15 +4,34 @@ Visueller GUI-Designer für GameBasic — Controls per Klick platzieren, im
 Inspector konfigurieren, als `.gbform` speichern und mit den `gui`-Builtins zur
 Laufzeit laden. Sprache der Logik bleibt GameBasic.
 
-**Start:** `gbform [datei.gbform]` (bzw. `gbrun.py --form`). Benötigt PySide6.
-Alternativ `gb` (oder `gbrun.py`) **ohne Argument** → Auswahl-Dialog
-*Code-Editor* / *Form-Designer*. `gbedit` öffnet direkt den Code-Editor.
+**Start:** `gbform [datei.gbform | projekt.gbproj]` (bzw. `gbrun.py --form`).
+Benötigt PySide6. Alternativ `gb` (oder `gbrun.py`) **ohne Argument** →
+Auswahl-Dialog *Code-Editor* / *Form-Designer*. `gbedit` öffnet direkt den
+Code-Editor.
+
+## Multi-Form-Projekte
+
+Der Designer hält **mehrere Formulare** gleichzeitig offen — jedes mit eigenem
+Pfad, eigener Undo-Historie und eigenem Dirty-Status (Undo läuft nie über
+Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
+
+- **Neues Formular** (`Strg+N`), **Formular öffnen…** (`Strg+O`, fügt ein
+  bestehendes `.gbform` zum Projekt hinzu), **Formular schließen** (`Strg+W`).
+- **Speichern** (`Strg+S`) / **Speichern unter…** (`Strg+Umschalt+S`) betrifft das
+  aktive Formular; **Alle speichern** (`Strg+Alt+S`) alle offenen.
+- **Projekt** = eine `.gbproj`-Manifestdatei, die die zugehörigen `.gbform`-Pfade
+  (relativ) und das **Startformular** auflistet. *Projekt speichern…* sichert alle
+  Formulare + das Manifest; *Projekt öffnen…* lädt den ganzen Satz. *Als
+  Startformular setzen* markiert das aktive Formular als `main`.
 
 ## Aufbau (wie Xojo)
 
-- **Links — Controls:** Palette aller Widget-Arten (Button, Label, Checkbox,
-  Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar, Image, Canvas,
-  Panel). Eintrag anklicken → „scharf", dann auf die Fläche klicken zum Platzieren.
+- **Links — Formulare + Controls:** oben der **Formular-Navigator** (alle im
+  Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
+  Startformular), darunter die Palette aller Widget-Arten (Button, Label,
+  Checkbox, Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar, Image,
+  Canvas, Panel). Palette-Eintrag anklicken → „scharf", dann auf die Fläche
+  klicken zum Platzieren.
 - **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
   verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
   Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein (Punkt-Raster sichtbar);
@@ -85,8 +104,15 @@ Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
 Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), **integrierter
 Code-Editor** (Doppelklick-auf-Control → Handler anlegen/anspringen),
-Speichern/Laden, Ausführen (F5). Geplant: Multi-Form-Projekte, GB-Code-Export
-(explizite `GUI_*`-Konstruktion statt `GUI_LOAD`).
+**Multi-Form-Projekte** (`.gbproj`), Speichern/Laden, Ausführen (F5). Geplant:
+GB-Code-Export (explizite `GUI_*`-Konstruktion statt `GUI_LOAD`).
+
+**Multi-Form-Architektur:** Qt-freies `FormProject` (in
+`formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede
+Form bleibt ihr eigenes `.gbform`. Im Fenster bündelt `_OpenForm` pro Formular
+Dokument + Pfad + `History` + Dirty; `FormDesigner.history`/`.path` sind
+Properties auf die aktive Form, `_switch_to` tauscht Canvas/Inspector/Code-Panel
+um.
 
 **Undo/Redo-Mechanik:** Snapshot-basiert — die Qt-freie `History` (in
 `formdesigner/document.py`) hält komplette `FormDoc`-Snapshots auf einem

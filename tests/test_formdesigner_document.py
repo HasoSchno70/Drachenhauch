@@ -3,8 +3,8 @@ nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
 
 from gamebasic.formdesigner import (
-    Control, FormDoc, History, PALETTE, palette_spec, GRID, HANDLES, snap,
-    resize_rect,
+    Control, FormDoc, FormProject, History, PALETTE, palette_spec, GRID,
+    HANDLES, snap, resize_rect,
 )
 
 
@@ -192,6 +192,45 @@ def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
         'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n',
         base=tmp_path)
     assert out.splitlines() == ["1"]
+
+
+# --------------------------------------------------------------- FormProject
+def test_project_add_sets_first_as_main():
+    p = FormProject()
+    p.add("main.gbform")
+    p.add("settings.gbform")
+    assert p.forms == ["main.gbform", "settings.gbform"]
+    assert p.main == "main.gbform"        # erstes wird Startformular
+
+
+def test_project_add_dedup():
+    p = FormProject()
+    p.add("a.gbform"); p.add("a.gbform")
+    assert p.forms == ["a.gbform"]
+
+
+def test_project_remove_repoints_main():
+    p = FormProject()
+    p.add("a.gbform"); p.add("b.gbform")
+    p.remove("a.gbform")                  # war main -> faellt auf b
+    assert p.forms == ["b.gbform"] and p.main == "b.gbform"
+    p.remove("b.gbform")
+    assert p.forms == [] and p.main == ""
+
+
+def test_project_roundtrip(tmp_path):
+    p = FormProject(forms=["a.gbform", "b.gbform"], main="b.gbform")
+    fp = tmp_path / "proj.gbproj"
+    p.save(str(fp))
+    q = FormProject.load(str(fp))
+    assert q.forms == ["a.gbform", "b.gbform"] and q.main == "b.gbform"
+
+
+def test_project_from_dict_fixes_dangling_main():
+    p = FormProject.from_dict({"forms": ["a.gbform"], "main": "ghost.gbform"})
+    assert p.main == "a.gbform"           # main muss Mitglied sein
+    empty = FormProject.from_dict({"forms": [], "main": "x"})
+    assert empty.main == ""
 
 
 # --------------------------------------------------------------- Handler/Code

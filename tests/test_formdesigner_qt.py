@@ -108,3 +108,65 @@ def test_double_click_eventless_no_handler(tmp_path):
     win.canvas.handler_requested.emit(lbl)
     assert lbl.on_click == "" and not win.canvas.doc.code
     win.close()
+
+
+# --------------------------------------------------------------- Multi-Form
+def test_add_and_switch_forms(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    assert len(win.forms) == 1                      # ein Start-Formular
+    win.active.doc.title = "Main"
+    from gamebasic.formdesigner import FormDoc
+    win._add_open_form(FormDoc(title="Second"))
+    assert len(win.forms) == 2 and win.active_index == 1
+    assert win.form_list.count() == 2
+    win._switch_to(0)
+    assert win.canvas.doc.title == "Main"
+    win.close()
+
+
+def test_per_form_undo_isolation(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    win._add_open_form(FormDoc(title="B"))          # Form 1, aktiv
+    pre = win.canvas.doc.to_dict()
+    win.canvas.doc.add("button", 0, 0)
+    win.canvas.commit_history(pre)
+    assert win.history.can_undo
+    win._switch_to(0)                               # andere Form
+    assert not win.history.can_undo                 # Undo leckt nicht
+    win.close()
+
+
+def test_close_form_keeps_at_least_one(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    win._add_open_form(FormDoc(title="B"))
+    win.close_form()                                # nicht dirty -> kein Dialog
+    assert len(win.forms) == 1
+    win.close_form()                                # letztes -> wird durch leeres ersetzt
+    assert len(win.forms) == 1
+    win.close()
+
+
+def test_project_save_load_roundtrip(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    win.active.doc.title = "Main"
+    win.active.path = tmp_path / "main.gbform"
+    win._add_open_form(FormDoc(title="Settings"), tmp_path / "settings.gbform")
+    win._switch_to(0)
+    win.set_main_form()
+    win.project_path = tmp_path / "app.gbproj"
+    win.save_project()
+    assert (tmp_path / "app.gbproj").exists()
+
+    win2 = FormDesigner(tmp_path)
+    win2.load_project_file(str(tmp_path / "app.gbproj"))
+    assert len(win2.forms) == 2
+    assert win2.active.doc.title == "Main"          # main-Formular aktiv
+    assert {f.doc.title for f in win2.forms} == {"Main", "Settings"}
+    win.close(); win2.close()
