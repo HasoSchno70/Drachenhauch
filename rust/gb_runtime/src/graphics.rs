@@ -582,6 +582,12 @@ pub struct Graphics {
     // FLIP geleert; cam3d wird von CAMERA3D gesetzt (sonst Default-Blick).
     cmds3d: Vec<Cmd3D>,
     cam3d: Camera3D,
+    // Modul m3d: optionale View-/Projektions-Matrix-Overrides (CAMERA3D_VIEW/
+    // _PROJECTION). Wenn gesetzt, ueberschreiben sie nach begin_mode3D die von
+    // raylib aus cam3d gebauten Matrizen (Ortho, Custom-Frustum, Shadow-Tricks).
+    // CAMERA3D(...) loescht beide -> zurueck zur Standard-Perspektive.
+    cam3d_view: Option<[f32; 16]>,
+    cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
     // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
@@ -761,6 +767,8 @@ impl Graphics {
                 Vector3::new(0.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
                 45.0),
+            cam3d_view: None,
+            cam3d_proj: None,
             text_size: 20,
             fonts: Vec::new(),
             active_font: -1,
@@ -855,7 +863,14 @@ impl Graphics {
             Vector3::new(tx, ty, tz),
             Vector3::new(0.0, 1.0, 0.0),
             fovy);
+        // Standard-Perspektive -> etwaige Matrix-Overrides verwerfen.
+        self.cam3d_view = None;
+        self.cam3d_proj = None;
     }
+    /// Modul m3d: View-Matrix-Override (CAMERA3D_VIEW). `mat` column-major.
+    pub fn set_camera3d_view(&mut self, mat: [f32; 16]) { self.cam3d_view = Some(mat); }
+    /// Modul m3d: Projektions-Matrix-Override (CAMERA3D_PROJECTION).
+    pub fn set_camera3d_projection(&mut self, mat: [f32; 16]) { self.cam3d_proj = Some(mat); }
     /// Kamera per raylib-Controller bewegen (liest Tastatur/Maus). mode:
     /// 1=free, 2=orbital, 3=first_person, 4=third_person (sonst custom/no-op).
     /// cam3d bleibt zwischen Frames erhalten -> CAMERA3D einmal initial setzen,
@@ -2209,6 +2224,9 @@ impl Graphics {
         let skybox = if self.skybox_enabled && self.ibl_env != 0 {
             self.skybox_shader.as_ref().map(|s| (s.id, self.skybox_loc_proj, self.skybox_loc_view, self.ibl_env))
         } else { None };
+        // m3d-Kamera-Overrides vor dem (borrowenden) Destructure kopieren (Copy).
+        let cam_view = self.cam3d_view;
+        let cam_proj = self.cam3d_proj;
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
@@ -2230,7 +2248,7 @@ impl Graphics {
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
                     &[], cam, &[], None, (-1, -1, -1), &empty_set, &empty_map,
-                    (false, 0, 0, 0), &[], None);
+                    (false, 0, 0, 0), &[], None, None, None);
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -2243,7 +2261,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -2256,7 +2274,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -2269,6 +2287,17 @@ impl Graphics {
                 self.shot_taken = true;
             }
         }
+    }
+}
+
+/// m3d-MAT4 ([f32;16] column-major / OpenGL-Float-Order) -> raylib::ffi::Matrix.
+/// Feld m{k} = arr[k] (arr ist die MatrixToFloatV-Reihenfolge m0..m15).
+fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
+    raylib::ffi::Matrix {
+        m0: a[0], m1: a[1], m2: a[2], m3: a[3],
+        m4: a[4], m5: a[5], m6: a[6], m7: a[7],
+        m8: a[8], m9: a[9], m10: a[10], m11: a[11],
+        m12: a[12], m13: a[13], m14: a[14], m15: a[15],
     }
 }
 
@@ -2285,6 +2314,8 @@ fn render_scene<D: RaylibDraw>(
     ibl: (bool, u32, u32, u32),
     render_targets: &[RenderTarget],
     skybox: Option<(u32, i32, i32, u32)>,   // (shader_id, loc_proj, loc_view, env_cubemap)
+    cam_view: Option<[f32; 16]>,            // m3d CAMERA3D_VIEW-Override (column-major)
+    cam_proj: Option<[f32; 16]>,            // m3d CAMERA3D_PROJECTION-Override
 ) {
     let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
     // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
@@ -2318,6 +2349,13 @@ fn render_scene<D: RaylibDraw>(
             // 3D-Pass zuerst (in einem begin_mode3D-Block), 2D-HUD danach obenauf.
             if !cmds3d.is_empty() || skybox.is_some() {
                 let mut d3 = d.begin_mode3D(cam3d);
+                // m3d-Overrides: begin_mode3D hat View/Projektion aus cam3d gesetzt;
+                // hier ggf. durch die benutzerdefinierten Matrizen ersetzen (Ortho,
+                // Custom-Frustum, Shadow-Tricks). Gilt fuer Skybox + alle 3D-Draws.
+                unsafe {
+                    if let Some(p) = &cam_proj { raylib::ffi::rlSetMatrixProjection(m3d_arr_to_ffi(p)); }
+                    if let Some(v) = &cam_view { raylib::ffi::rlSetMatrixModelview(m3d_arr_to_ffi(v)); }
+                }
                 // Skybox ganz zuerst (Hintergrund): env-Cubemap in Blickrichtung,
                 // ohne Depth-Write (Modelle zeichnen darueber), Cube von innen.
                 if let Some((sid, lproj, lview, env)) = skybox {

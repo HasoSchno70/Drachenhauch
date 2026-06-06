@@ -3131,6 +3131,16 @@ impl<'p> Vm<'p> {
 
             // --- Kamera-Modi (raylib UpdateCamera) ---
             "camera3d_update" => { g!().camera3d_update(gi(a,0,"CAMERA3D_UPDATE")?); Value::Nil }
+            // m3d: View-/Projektions-Matrix-Override (Ortho, Custom-Frustum, Gizmos).
+            // CAMERA3D(...) setzt beide zurueck auf Standard-Perspektive.
+            "camera3d_view" => {
+                let m = match a.first() { Some(Value::Mat4(m)) => **m, _ => return Err("CAMERA3D_VIEW: Arg 1 muss MAT4 sein".into()) };
+                g!().set_camera3d_view(m); Value::Nil
+            }
+            "camera3d_projection" => {
+                let m = match a.first() { Some(Value::Mat4(m)) => **m, _ => return Err("CAMERA3D_PROJECTION: Arg 1 muss MAT4 sein".into()) };
+                g!().set_camera3d_projection(m); Value::Nil
+            }
             "camera3d_x" => Value::Float(g!().cam3d_pos().0),
             "camera3d_y" => Value::Float(g!().cam3d_pos().1),
             "camera3d_z" => Value::Float(g!().cam3d_pos().2),
