@@ -1,261 +1,242 @@
-"""Tests fuer das save-Modul."""
+"""Tests fuer das save-Modul (persistente Save-Slots, JSON-Backend).
+
+Golden-Tests gegen `gbrt` (Stufe B): GB-Programm mit IMPORT "save"; Datei-I/O
+laeuft im `base=tmp_path`-Verzeichnis (run_gb legt die .gb dort ab, gbrt chdirt
+hin -> relative Save-Pfade landen in tmp_path). Frueher via `call_builtin` gegen
+die Python-Impl (in Phase 8 geloescht).
+"""
 import json
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
+from gamebasic.errors import GBRuntimeError
+
+_PRE = 'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_NEW()\n'
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load_save():
-    assert load_module("save")
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
-@pytest.fixture
-def save_handle(call_builtin):
-    return call_builtin("save_new", [])
+def _run(run_gb, tmp_path, body):
+    return _lines(run_gb(body, base=tmp_path))
 
 
 # --- Lifecycle -------------------------------------------------------
 
-def test_new_returns_handle(save_handle):
-    assert save_handle is not None
-    assert save_handle.version == 1
-    assert save_handle.data == {}
+def test_new_returns_handle(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'PRINT SAVE_VERSION(s)\nPRINT "[" + SAVE_KEYS(s) + "]"\n')
+    assert out == ["1", "[]"]
 
 
-def test_load_missing_file_raises(call_builtin, tmp_path):
-    path = str(tmp_path / "fehlt.save")
+def test_load_missing_file_raises(run_gb, tmp_path):
     with pytest.raises(GBRuntimeError, match="nicht gefunden"):
-        call_builtin("save_load", [path])
+        _run(run_gb, tmp_path,
+             'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("fehlt.save")\n')
 
 
-def test_load_or_new_missing_returns_empty(call_builtin, tmp_path):
-    path = str(tmp_path / "fehlt.save")
-    s = call_builtin("save_load_or_new", [path])
-    assert s.data == {}
-    assert s.version == 1
+def test_load_or_new_missing_returns_empty(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD_OR_NEW("fehlt.save")\n'
+               'PRINT SAVE_VERSION(s)\nPRINT "[" + SAVE_KEYS(s) + "]"\n')
+    assert out == ["1", "[]"]
 
 
-def test_load_or_new_invalid_json_still_raises(call_builtin, tmp_path):
-    """Wenn die Datei existiert, aber kaputt ist, lieber werfen als
-    leise mit leerem Save weiterzumachen - sonst ueberschreiben wir
-    den User-Save beim naechsten WRITE."""
-    path = tmp_path / "kaputt.save"
-    path.write_text("nicht echtes json", encoding="utf-8")
+def test_load_or_new_invalid_json_still_raises(run_gb, tmp_path):
+    (tmp_path / "kaputt.save").write_text("nicht echtes json", encoding="utf-8")
     with pytest.raises(GBRuntimeError, match="JSON"):
-        call_builtin("save_load_or_new", [str(path)])
+        _run(run_gb, tmp_path,
+             'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD_OR_NEW("kaputt.save")\n')
 
 
-def test_exists_true_for_real_file(call_builtin, tmp_path):
-    path = tmp_path / "x.save"
-    path.write_text("{}", encoding="utf-8")
-    assert call_builtin("save_exists", [str(path)]) is True
+def test_exists_true_for_real_file(run_gb, tmp_path):
+    (tmp_path / "x.save").write_text("{}", encoding="utf-8")
+    assert _run(run_gb, tmp_path,
+                'IMPORT "save"\nPRINT SAVE_EXISTS("x.save")\n') == ["TRUE"]
 
 
-def test_exists_false_for_missing(call_builtin, tmp_path):
-    assert call_builtin("save_exists", [str(tmp_path / "nope.save")]) is False
+def test_exists_false_for_missing(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path,
+                'IMPORT "save"\nPRINT SAVE_EXISTS("nope.save")\n') == ["FALSE"]
 
 
-def test_write_then_load_roundtrip(call_builtin, tmp_path):
-    path = str(tmp_path / "rt.save")
-    s = call_builtin("save_new", [])
-    call_builtin("save_set_int", [s, "score", 42])
-    call_builtin("save_set_string", [s, "name", "Anna"])
-    call_builtin("save_write", [s, path])
-
-    loaded = call_builtin("save_load", [path])
-    assert call_builtin("save_get_int", [loaded, "score"]) == 42
-    assert call_builtin("save_get_string", [loaded, "name"]) == "Anna"
+def test_write_then_load_roundtrip(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_INT(s, "score", 42)\nSAVE_SET_STRING(s, "name", "Anna")\n'
+               'SAVE_WRITE(s, "rt.save")\n'
+               'DIM l AS SAVE_HANDLE\nl = SAVE_LOAD("rt.save")\n'
+               'PRINT SAVE_GET_INT(l, "score")\nPRINT SAVE_GET_STRING(l, "name")\n')
+    assert out == ["42", "Anna"]
 
 
-def test_write_produces_readable_json(call_builtin, tmp_path):
-    """Save-Dateien sollen menschen-lesbar sein - sonst ist Debugging
-    schmerzhaft. Wir verifizieren dass die Datei valides indentiertes
-    JSON mit _version und data enthaelt."""
-    path = tmp_path / "p.save"
-    s = call_builtin("save_new", [])
-    call_builtin("save_set_int", [s, "x", 1])
-    call_builtin("save_write", [s, str(path)])
-
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    assert raw == {"_version": 1, "data": {"x": 1}}
-    # indent=2 -> Datei hat Zeilenumbrueche
-    assert "\n" in path.read_text(encoding="utf-8")
+def test_write_produces_readable_json(run_gb, tmp_path):
+    _run(run_gb, tmp_path, _PRE +
+         'SAVE_SET_INT(s, "x", 1)\nSAVE_WRITE(s, "p.save")\n')
+    text = (tmp_path / "p.save").read_text(encoding="utf-8")
+    assert json.loads(text) == {"_version": 1, "data": {"x": 1}}
+    assert "\n" in text
 
 
-def test_delete_file(call_builtin, tmp_path):
-    path = tmp_path / "del.save"
-    path.write_text("{}", encoding="utf-8")
-    assert path.exists()
-    call_builtin("save_delete_file", [str(path)])
-    assert not path.exists()
+def test_delete_file(run_gb, tmp_path):
+    (tmp_path / "del.save").write_text("{}", encoding="utf-8")
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nPRINT SAVE_EXISTS("del.save")\n'
+               'SAVE_DELETE_FILE("del.save")\nPRINT SAVE_EXISTS("del.save")\n')
+    assert out == ["TRUE", "FALSE"]
 
 
-def test_delete_file_missing_is_idempotent(call_builtin, tmp_path):
-    """Loeschen einer Datei, die schon weg ist, soll nicht werfen."""
-    call_builtin("save_delete_file", [str(tmp_path / "weg.save")])
+def test_delete_file_missing_is_idempotent(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nSAVE_DELETE_FILE("weg.save")\nPRINT "ok"\n')
+    assert out == ["ok"]
 
 
 # --- Setter / Getter -------------------------------------------------
 
-def test_set_get_int(call_builtin, save_handle):
-    call_builtin("save_set_int", [save_handle, "k", 5])
-    assert call_builtin("save_get_int", [save_handle, "k"]) == 5
+def test_set_get_int(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_INT(s, "k", 5)\nPRINT SAVE_GET_INT(s, "k")\n') == ["5"]
 
 
-def test_set_get_float(call_builtin, save_handle):
-    call_builtin("save_set_float", [save_handle, "k", 1.25])
-    assert call_builtin("save_get_float", [save_handle, "k"]) == 1.25
+def test_set_get_float(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_FLOAT(s, "k", 1.25)\nPRINT SAVE_GET_FLOAT(s, "k")\n') == ["1.25"]
 
 
-def test_set_get_string(call_builtin, save_handle):
-    call_builtin("save_set_string", [save_handle, "k", "hi"])
-    assert call_builtin("save_get_string", [save_handle, "k"]) == "hi"
+def test_set_get_string(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_STRING(s, "k", "hi")\nPRINT SAVE_GET_STRING(s, "k")\n') == ["hi"]
 
 
-def test_set_get_bool(call_builtin, save_handle):
-    call_builtin("save_set_bool", [save_handle, "k", True])
-    assert call_builtin("save_get_bool", [save_handle, "k"]) is True
+def test_set_get_bool(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_BOOL(s, "k", TRUE)\nPRINT SAVE_GET_BOOL(s, "k")\n') == ["TRUE"]
 
 
-def test_get_missing_key_raises(call_builtin, save_handle):
+def test_get_missing_key_raises(run_gb, tmp_path):
     with pytest.raises(GBRuntimeError, match="nicht im Save"):
-        call_builtin("save_get_int", [save_handle, "fehlt"])
+        _run(run_gb, tmp_path, _PRE + 'PRINT SAVE_GET_INT(s, "fehlt")\n')
 
 
-def test_get_wrong_type_raises(call_builtin, save_handle):
-    call_builtin("save_set_string", [save_handle, "k", "hi"])
-    with pytest.raises(TypeMismatchError, match="nicht INTEGER"):
-        call_builtin("save_get_int", [save_handle, "k"])
+def test_get_wrong_type_raises(run_gb, tmp_path):
+    # gbrt-Wortlaut: "kein INTEGER" (TW sagte "nicht INTEGER").
+    with pytest.raises(GBRuntimeError, match="kein INTEGER"):
+        _run(run_gb, tmp_path, _PRE +
+             'SAVE_SET_STRING(s, "k", "hi")\nPRINT SAVE_GET_INT(s, "k")\n')
 
 
-def test_int_from_integer_float_after_load(call_builtin, tmp_path):
-    """JSON unterscheidet 1 und 1.0 nicht zuverlaessig - ein als INT
-    gespeicherter Wert kann beim Laden als float zurueckkommen. Der
-    strict GET soll das tolerieren wenn der float ganzzahlig ist."""
-    path = tmp_path / "x.save"
-    # Datei manuell bauen mit float, der ganzzahlig ist
-    path.write_text(
-        json.dumps({"_version": 1, "data": {"x": 5.0}}),
-        encoding="utf-8",
-    )
-    s = call_builtin("save_load", [str(path)])
-    assert call_builtin("save_get_int", [s, "x"]) == 5
+def test_int_from_integer_float_after_load(run_gb, tmp_path):
+    """JSON-float 5.0 -> strict GET_INT toleriert ganzzahlige floats."""
+    (tmp_path / "x.save").write_text(
+        json.dumps({"_version": 1, "data": {"x": 5.0}}), encoding="utf-8")
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("x.save")\n'
+               'PRINT SAVE_GET_INT(s, "x")\n')
+    assert out == ["5"]
 
 
-def test_int_from_non_integer_float_rejects(call_builtin, save_handle):
-    """5.5 ist kein INTEGER - das soll werfen, nicht abrunden."""
-    save_handle.data["k"] = 5.5
-    with pytest.raises(TypeMismatchError, match="nicht INTEGER"):
-        call_builtin("save_get_int", [save_handle, "k"])
+def test_int_from_non_integer_float_rejects(run_gb, tmp_path):
+    with pytest.raises(GBRuntimeError, match="kein INTEGER"):
+        _run(run_gb, tmp_path, _PRE +
+             'SAVE_SET_FLOAT(s, "k", 5.5)\nPRINT SAVE_GET_INT(s, "k")\n')
 
 
 # --- Getter mit Default ---------------------------------------------
 
-def test_get_or_returns_default_when_missing(call_builtin, save_handle):
-    assert call_builtin("save_get_int_or", [save_handle, "x", 7]) == 7
-    assert call_builtin("save_get_string_or", [save_handle, "x", "fb"]) == "fb"
-    assert call_builtin("save_get_bool_or", [save_handle, "x", False]) is False
-    assert call_builtin("save_get_float_or", [save_handle, "x", 1.5]) == 1.5
+def test_get_or_returns_default_when_missing(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'PRINT SAVE_GET_INT_OR(s, "x", 7)\n'
+               'PRINT SAVE_GET_STRING_OR(s, "x", "fb")\n'
+               'PRINT SAVE_GET_BOOL_OR(s, "x", FALSE)\n'
+               'PRINT SAVE_GET_FLOAT_OR(s, "x", 1.5)\n')
+    assert out == ["7", "fb", "FALSE", "1.5"]
 
 
-def test_get_or_returns_default_on_type_mismatch(call_builtin, save_handle):
-    call_builtin("save_set_string", [save_handle, "k", "hi"])
-    assert call_builtin("save_get_int_or", [save_handle, "k", 99]) == 99
+def test_get_or_returns_default_on_type_mismatch(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_STRING(s, "k", "hi")\n'
+                'PRINT SAVE_GET_INT_OR(s, "k", 99)\n') == ["99"]
 
 
-def test_get_or_returns_value_when_present(call_builtin, save_handle):
-    call_builtin("save_set_int", [save_handle, "k", 5])
-    assert call_builtin("save_get_int_or", [save_handle, "k", 99]) == 5
+def test_get_or_returns_value_when_present(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_SET_INT(s, "k", 5)\n'
+                'PRINT SAVE_GET_INT_OR(s, "k", 99)\n') == ["5"]
 
 
 # --- Existenz / Loeschen --------------------------------------------
 
-def test_has_and_delete(call_builtin, save_handle):
-    call_builtin("save_set_int", [save_handle, "k", 1])
-    assert call_builtin("save_has", [save_handle, "k"]) is True
-    call_builtin("save_delete", [save_handle, "k"])
-    assert call_builtin("save_has", [save_handle, "k"]) is False
+def test_has_and_delete(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_INT(s, "k", 1)\nPRINT SAVE_HAS(s, "k")\n'
+               'SAVE_DELETE(s, "k")\nPRINT SAVE_HAS(s, "k")\n')
+    assert out == ["TRUE", "FALSE"]
 
 
-def test_delete_missing_is_idempotent(call_builtin, save_handle):
-    call_builtin("save_delete", [save_handle, "fehlt"])  # kein Fehler
+def test_delete_missing_is_idempotent(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE +
+                'SAVE_DELETE(s, "fehlt")\nPRINT "ok"\n') == ["ok"]
 
 
-def test_clear_removes_all_keys(call_builtin, save_handle):
-    call_builtin("save_set_int", [save_handle, "a", 1])
-    call_builtin("save_set_int", [save_handle, "b", 2])
-    call_builtin("save_clear", [save_handle])
-    assert call_builtin("save_has", [save_handle, "a"]) is False
-    assert call_builtin("save_has", [save_handle, "b"]) is False
+def test_clear_removes_all_keys(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_INT(s, "a", 1)\nSAVE_SET_INT(s, "b", 2)\nSAVE_CLEAR(s)\n'
+               'PRINT SAVE_HAS(s, "a")\nPRINT SAVE_HAS(s, "b")\n')
+    assert out == ["FALSE", "FALSE"]
 
 
-def test_clear_keeps_version(call_builtin, save_handle):
-    call_builtin("save_set_version", [save_handle, 7])
-    call_builtin("save_set_int", [save_handle, "a", 1])
-    call_builtin("save_clear", [save_handle])
-    assert call_builtin("save_version", [save_handle]) == 7
+def test_clear_keeps_version(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_VERSION(s, 7)\nSAVE_SET_INT(s, "a", 1)\nSAVE_CLEAR(s)\n'
+               'PRINT SAVE_VERSION(s)\n')
+    assert out == ["7"]
 
 
-def test_keys_lists_sorted(call_builtin, save_handle):
-    call_builtin("save_set_int", [save_handle, "z", 1])
-    call_builtin("save_set_int", [save_handle, "a", 1])
-    call_builtin("save_set_int", [save_handle, "m", 1])
-    assert call_builtin("save_keys", [save_handle]) == "a, m, z"
+def test_keys_lists_sorted(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_INT(s, "z", 1)\nSAVE_SET_INT(s, "a", 1)\nSAVE_SET_INT(s, "m", 1)\n'
+               'PRINT SAVE_KEYS(s)\n')
+    assert out == ["a, m, z"]
 
 
 # --- Versionierung ---------------------------------------------------
 
-def test_default_version_is_one(call_builtin, save_handle):
-    assert call_builtin("save_version", [save_handle]) == 1
+def test_default_version_is_one(run_gb, tmp_path):
+    assert _run(run_gb, tmp_path, _PRE + 'PRINT SAVE_VERSION(s)\n') == ["1"]
 
 
-def test_set_version_persists_in_file(call_builtin, tmp_path):
-    path = tmp_path / "v.save"
-    s = call_builtin("save_new", [])
-    call_builtin("save_set_version", [s, 3])
-    call_builtin("save_set_int", [s, "x", 1])
-    call_builtin("save_write", [s, str(path)])
-
-    loaded = call_builtin("save_load", [str(path)])
-    assert call_builtin("save_version", [loaded]) == 3
+def test_set_version_persists_in_file(run_gb, tmp_path):
+    out = _run(run_gb, tmp_path, _PRE +
+               'SAVE_SET_VERSION(s, 3)\nSAVE_SET_INT(s, "x", 1)\nSAVE_WRITE(s, "v.save")\n'
+               'DIM l AS SAVE_HANDLE\nl = SAVE_LOAD("v.save")\nPRINT SAVE_VERSION(l)\n')
+    assert out == ["3"]
 
 
-def test_load_tolerates_missing_version(call_builtin, tmp_path):
-    """Old-style JSON ohne _version-Feld -> Default 1."""
-    path = tmp_path / "old.save"
-    path.write_text(
-        json.dumps({"data": {"x": 1}}),
-        encoding="utf-8",
-    )
-    s = call_builtin("save_load", [str(path)])
-    assert call_builtin("save_version", [s]) == 1
-    assert call_builtin("save_get_int", [s, "x"]) == 1
+def test_load_tolerates_missing_version(run_gb, tmp_path):
+    (tmp_path / "old.save").write_text(json.dumps({"data": {"x": 1}}), encoding="utf-8")
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("old.save")\n'
+               'PRINT SAVE_VERSION(s)\nPRINT SAVE_GET_INT(s, "x")\n')
+    assert out == ["1", "1"]
 
 
-def test_load_tolerates_missing_data(call_builtin, tmp_path):
-    """JSON ohne data-Feld -> leerer Save."""
-    path = tmp_path / "old.save"
-    path.write_text(
-        json.dumps({"_version": 5}),
-        encoding="utf-8",
-    )
-    s = call_builtin("save_load", [str(path)])
-    assert call_builtin("save_version", [s]) == 5
-    assert call_builtin("save_keys", [s]) == ""
+def test_load_tolerates_missing_data(run_gb, tmp_path):
+    (tmp_path / "old.save").write_text(json.dumps({"_version": 5}), encoding="utf-8")
+    out = _run(run_gb, tmp_path,
+               'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("old.save")\n'
+               'PRINT SAVE_VERSION(s)\nPRINT "[" + SAVE_KEYS(s) + "]"\n')
+    assert out == ["5", "[]"]
 
 
-def test_load_rejects_non_object(call_builtin, tmp_path):
-    """Top-level muss ein Objekt sein, kein Array oder Null."""
-    path = tmp_path / "list.save"
-    path.write_text("[1, 2, 3]", encoding="utf-8")
+def test_load_rejects_non_object(run_gb, tmp_path):
+    (tmp_path / "list.save").write_text("[1, 2, 3]", encoding="utf-8")
     with pytest.raises(GBRuntimeError, match="JSON-Objekt"):
-        call_builtin("save_load", [str(path)])
+        _run(run_gb, tmp_path,
+             'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("list.save")\n')
 
 
 # --- Type-Checking ---------------------------------------------------
 
-def test_non_handle_raises(call_builtin):
-    with pytest.raises(TypeMismatchError, match="erwartet SAVE_HANDLE"):
-        call_builtin("save_get_int", ["nicht ein handle", "k"])
+def test_non_handle_raises(run_gb):
+    with pytest.raises(GBRuntimeError, match="erwartet SAVE_HANDLE"):
+        run_gb('IMPORT "save"\nPRINT SAVE_GET_INT("nicht ein handle", "k")\n')
