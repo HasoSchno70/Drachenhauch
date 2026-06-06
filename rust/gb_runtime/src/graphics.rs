@@ -73,6 +73,9 @@ enum Cmd3D {
     // idx, mat, tint. Gerendert via rl-Matrix-Stack (rlMultMatrixf) -> kein
     // mutabler Model-Borrow noetig; DrawMesh honoriert rlGetMatrixTransform().
     ModelMatrix(usize, Rc<[f32; 16]>, Color),
+    // Modul m3d: GPU-Instancing -- dasselbe Modell mit N Welt-Matrizen in EINEM
+    // Draw-Call (raylib DrawMeshInstanced). idx, Matrizen (column-major), tint.
+    ModelInstanced(usize, Rc<Vec<[f32; 16]>>, Color),
     // Billboard: Textur (Index), die immer zur Kamera zeigt. idx, x,y,z, size, tint
     Billboard(usize, f32, f32, f32, f32, Color),
 }
@@ -310,6 +313,83 @@ void main()
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
     finalColor = mix(fogColor, finalColor, fog);
+}
+"#;
+
+// === GPU-Instancing (MODEL_INSTANCED) ===
+// Eigener Shader-Pfad: derselbe Mesh wird via raylib `DrawMeshInstanced` mit N
+// Per-Instance-Welt-Matrizen in EINEM Draw-Call gerendert. Der Lighting-Shader
+// (LIGHT_VS/FS) taugt dafuer NICHT -- er liest die Welt-Transform aus dem
+// `matModel`-Uniform; Instancing liefert sie stattdessen als Vertex-Attribut
+// `instanceTransform` (4 vec4-Spalten, location = SHADER_LOC_MATRIX_MODEL).
+// raylib laedt `mvp` = view*projection ins MVP-Uniform und identitaet in
+// matModel/matNormal -> die Modell-Transform MUSS aus instanceTransform kommen,
+// inkl. der Normalen (matNormal ist bei Instancing unbrauchbar).
+const INST_VS: &str = r#"#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+in mat4 instanceTransform;       // per-Instanz (location = SHADER_LOC_MATRIX_MODEL)
+uniform mat4 mvp;                 // = view*projection (raylib setzt es bei Instancing)
+out vec3 fragPosition;
+out vec2 fragTexCoord;
+out vec4 fragColor;
+out vec3 fragNormal;
+void main()
+{
+    fragPosition = vec3(instanceTransform*vec4(vertexPosition, 1.0));
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+    // Normale aus der Instanz-Matrix ableiten (matNormal ist hier Identitaet);
+    // korrekt fuer Rotation + (uniforme) Skalierung.
+    fragNormal = normalize(mat3(instanceTransform)*vertexNormal);
+    gl_Position = mvp*instanceTransform*vec4(vertexPosition, 1.0);
+}
+"#;
+
+// Eigenstaendiger Instancing-Fragment-Shader: Ambient + bis MAX_LIGHTS
+// Blinn-Phong-Lichter (directional/point), Fallback auf flaches Albedo wenn kein
+// Licht aktiv (lightCount==0). Bewusst schlanker als LIGHT_FS -- ohne PBR/IBL/
+// Schatten/Normal-Maps (Grenze des Instancing-Pfades, siehe docs/module-m3d.md).
+const INST_FS: &str = r#"#version 330
+in vec3 fragPosition;
+in vec2 fragTexCoord;
+in vec4 fragColor;
+in vec3 fragNormal;
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+out vec4 finalColor;
+#define MAX_LIGHTS 4
+struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };
+uniform Light lights[MAX_LIGHTS];
+uniform vec4 ambient;
+uniform vec3 viewPos;
+uniform int lightCount;
+void main()
+{
+    vec3 albedo = colDiffuse.rgb*texture(texture0, fragTexCoord).rgb*fragColor.rgb;
+    if (lightCount == 0) { finalColor = vec4(albedo, 1.0); return; }
+    vec3 N = normalize(fragNormal);
+    vec3 V = normalize(viewPos - fragPosition);
+    vec3 lit = ambient.rgb*albedo;
+    for (int i = 0; i < MAX_LIGHTS; i++)
+    {
+        if (lights[i].enabled != 1) continue;
+        vec3 L; float atten = 1.0;
+        if (lights[i].type == 0) {
+            L = -normalize(lights[i].target - lights[i].position);
+        } else {
+            vec3 dd = lights[i].position - fragPosition;
+            L = normalize(dd); float dist = length(dd);
+            atten = 1.0/(1.0 + 0.09*dist + 0.032*dist*dist);
+        }
+        float NdotL = max(dot(N, L), 0.0);
+        vec3 H = normalize(V + L);
+        float spec = pow(max(dot(N, H), 0.0), 32.0)*0.3;
+        lit += (albedo*NdotL + vec3(spec))*lights[i].color.rgb*atten;
+    }
+    finalColor = vec4(lit, 1.0);
 }
 "#;
 
@@ -643,6 +723,15 @@ pub struct Graphics {
     loc_shadow_map: i32,
     loc_shadow_res: i32,
     loc_shadows_on: i32,
+    // GPU-Instancing (MODEL_INSTANCED): eigener Shader (INST_VS/FS), lazy geladen.
+    // inst_light_locs sind die pro-Licht-Uniform-Locations IN DIESEM Programm
+    // (parallel zu `lights`); werden bei Bedarf in update_inst_light_uniforms
+    // (re)aufgeloest, wenn sich die Lichter-Anzahl aendert.
+    inst_shader: Option<Shader>,
+    inst_loc_view: i32,
+    inst_loc_ambient: i32,
+    inst_loc_count: i32,
+    inst_light_locs: Vec<[i32; 5]>,
     text_size: i32,
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
@@ -761,6 +850,11 @@ impl Graphics {
             loc_shadow_map: -1,
             loc_shadow_res: -1,
             loc_shadows_on: -1,
+            inst_shader: None,
+            inst_loc_view: -1,
+            inst_loc_ambient: -1,
+            inst_loc_count: -1,
+            inst_light_locs: Vec::new(),
             // Default-Blick: schraeg von vorn-oben auf den Ursprung.
             cam3d: Camera3D::perspective(
                 Vector3::new(6.0, 5.0, 6.0),
@@ -1008,6 +1102,31 @@ impl Graphics {
     pub fn draw_model_matrix(&mut self, idx: i64, mat: Rc<[f32; 16]>, col_: i64) -> Result<(), String> {
         let i = self.check_model(idx, "MODEL_MATRIX")?;
         self.emit3d(Cmd3D::ModelMatrix(i, mat, col(col_)));
+        Ok(())
+    }
+    /// Laedt den Instancing-Shader (einmal). Das `instanceTransform`-Attribut wird
+    /// auf SHADER_LOC_MATRIX_MODEL gelegt (raylib bindet dort die Per-Instance-VBO);
+    /// view/ambient/lightCount-Locations werden gecacht.
+    fn ensure_inst_shader(&mut self) {
+        if self.inst_shader.is_some() { return; }
+        let mut sh = self.rl.load_shader_from_memory(&self.thread, Some(INST_VS), Some(INST_FS));
+        // instanceTransform-Attribut-Location -> SHADER_LOC_MATRIX_MODEL.
+        let cname = std::ffi::CString::new("instanceTransform").unwrap();
+        let attr = unsafe { raylib::ffi::rlGetLocationAttrib(sh.id, cname.as_ptr()) };
+        sh.locs_mut()[raylib::consts::ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as usize] = attr;
+        self.inst_loc_view = sh.get_shader_location("viewPos");
+        self.inst_loc_ambient = sh.get_shader_location("ambient");
+        self.inst_loc_count = sh.get_shader_location("lightCount");
+        self.inst_shader = Some(sh);
+        self.inst_light_locs.clear();   // wird in update_inst_light_uniforms gefuellt
+    }
+    /// Modul m3d: GPU-Instancing -- dasselbe Modell mit N Welt-Matrizen in EINEM
+    /// Draw-Call (raylib DrawMeshInstanced). `mats` column-major (OpenGL-Order).
+    pub fn draw_model_instanced(&mut self, idx: i64, mats: Vec<[f32; 16]>, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_INSTANCED")?;
+        if mats.is_empty() { return Ok(()); }   // nichts zu zeichnen
+        self.ensure_inst_shader();
+        self.emit3d(Cmd3D::ModelInstanced(i, Rc::new(mats), col(col_)));
         Ok(())
     }
     /// Legt eine via LOADIMAGE geladene Textur als Diffuse-/Albedo-Map an.
@@ -1465,6 +1584,45 @@ impl Graphics {
             if lp >= 0 { sh.set_shader_value(lp, pos); }
             if ltg >= 0 { sh.set_shader_value(ltg, target); }
             if lc >= 0 { sh.set_shader_value(lc, color); }
+        }
+    }
+
+    /// Wie update_light_uniforms, aber fuer den Instancing-Shader (INST_VS/FS).
+    /// Laedt viewPos/ambient/lightCount + alle Licht-Uniforms. Die pro-Licht-
+    /// Locations werden lazy (re)aufgeloest, wenn sich die Lichter-Anzahl aendert
+    /// (Lichter koennen nach dem Shader-Load via LIGHT_* hinzukommen).
+    fn update_inst_light_uniforms(&mut self) {
+        if self.inst_shader.is_none() { return; }
+        // Licht-Locations bei Bedarf (neu) aufloesen.
+        if self.inst_light_locs.len() != self.lights.len() {
+            let sh = self.inst_shader.as_mut().unwrap();
+            self.inst_light_locs = (0..self.lights.len()).map(|i| [
+                sh.get_shader_location(&format!("lights[{}].enabled", i)),
+                sh.get_shader_location(&format!("lights[{}].type", i)),
+                sh.get_shader_location(&format!("lights[{}].position", i)),
+                sh.get_shader_location(&format!("lights[{}].target", i)),
+                sh.get_shader_location(&format!("lights[{}].color", i)),
+            ]).collect();
+        }
+        let view = [self.cam3d.position.x, self.cam3d.position.y, self.cam3d.position.z];
+        let ambient = self.light_ambient;
+        let (loc_view, loc_ambient, loc_count) =
+            (self.inst_loc_view, self.inst_loc_ambient, self.inst_loc_count);
+        let active = self.lights.iter().filter(|l| l.enabled).count() as i32;
+        // Licht-Daten + ihre Instancing-Locations lokal kopieren (Borrow-Trennung).
+        let lights: Vec<([i32; 5], i32, i32, [f32; 3], [f32; 3], [f32; 4])> =
+            self.lights.iter().zip(self.inst_light_locs.iter()).map(|(l, locs)| (
+                *locs, if l.enabled {1} else {0}, l.kind, l.pos, l.target, l.color)).collect();
+        let sh = self.inst_shader.as_mut().unwrap();
+        if loc_view >= 0 { sh.set_shader_value(loc_view, view); }
+        if loc_ambient >= 0 { sh.set_shader_value(loc_ambient, ambient); }
+        if loc_count >= 0 { sh.set_shader_value(loc_count, active); }
+        for (locs, en, kind, pos, target, color) in lights {
+            if locs[0] >= 0 { sh.set_shader_value(locs[0], en); }
+            if locs[1] >= 0 { sh.set_shader_value(locs[1], kind); }
+            if locs[2] >= 0 { sh.set_shader_value(locs[2], pos); }
+            if locs[3] >= 0 { sh.set_shader_value(locs[3], target); }
+            if locs[4] >= 0 { sh.set_shader_value(locs[4], color); }
         }
     }
 
@@ -2228,6 +2386,7 @@ impl Graphics {
     pub fn flip(&mut self) {
         // Licht-Uniforms (viewPos/ambient/Lichter) vor dem 3D-Pass aktualisieren.
         self.update_light_uniforms();
+        self.update_inst_light_uniforms();
         self.render_shadow_map();
         let s = self.scale;
         let clear_color = self.clear_color;
@@ -2245,6 +2404,8 @@ impl Graphics {
         // m3d-Kamera-Overrides vor dem (borrowenden) Destructure kopieren (Copy).
         let cam_view = self.cam3d_view;
         let cam_proj = self.cam3d_proj;
+        // Instancing-Shader (ffi::Shader = Copy) fuer den DrawMeshInstanced-Pfad.
+        let inst_ffi = self.inst_shader.as_ref().map(|s| *s.as_ref());
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
@@ -2266,7 +2427,7 @@ impl Graphics {
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
                     &[], cam, &[], None, (-1, -1, -1), &empty_set, &empty_map,
-                    (false, 0, 0, 0), &[], None, None, None);
+                    (false, 0, 0, 0), &[], None, None, None, None);
             }
         }
         let rts: &[RenderTarget] = render_targets;
@@ -2279,7 +2440,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -2292,7 +2453,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -2334,6 +2495,7 @@ fn render_scene<D: RaylibDraw>(
     skybox: Option<(u32, i32, i32, u32)>,   // (shader_id, loc_proj, loc_view, env_cubemap)
     cam_view: Option<[f32; 16]>,            // m3d CAMERA3D_VIEW-Override (column-major)
     cam_proj: Option<[f32; 16]>,            // m3d CAMERA3D_PROJECTION-Override
+    inst_shader: Option<raylib::ffi::Shader>,   // m3d MODEL_INSTANCED (DrawMeshInstanced)
 ) {
     let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
     // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
@@ -2446,6 +2608,36 @@ fn render_scene<D: RaylibDraw>(
                                 }
                                 d3.draw_model(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
                                 unsafe { raylib::ffi::rlPopMatrix(); }
+                            }
+                        }
+                        Cmd3D::ModelInstanced(i, mats, col) => {
+                            // GPU-Instancing: dasselbe Mesh mit N Welt-Matrizen in
+                            // EINEM Draw-Call pro Mesh (raylib DrawMeshInstanced).
+                            // Material temporaer auf den Instancing-Shader + tint
+                            // umstellen, danach wiederherstellen (sonst broeche der
+                            // non-instanced Pfad mit demselben Modell).
+                            if let (Some(m), Some(sh)) = (models.get(*i), inst_shader) {
+                                let tr: Vec<raylib::ffi::Matrix> =
+                                    mats.iter().map(|a| m3d_arr_to_ffi(a)).collect();
+                                let fc = raylib::ffi::Color { r: col.r, g: col.g, b: col.b, a: col.a };
+                                unsafe {
+                                    let mdl: &raylib::ffi::Model = m.as_ref();
+                                    for mi in 0..mdl.meshCount as isize {
+                                        let mesh = *mdl.meshes.offset(mi);
+                                        let mat_idx = if mdl.meshMaterial.is_null() { 0 }
+                                            else { *mdl.meshMaterial.offset(mi) as isize };
+                                        let mat_ptr = mdl.materials.offset(mat_idx);
+                                        let map_ptr = (*mat_ptr).maps; // [0] = ALBEDO/DIFFUSE
+                                        let saved_shader = (*mat_ptr).shader;
+                                        let saved_col = (*map_ptr).color;
+                                        (*mat_ptr).shader = sh;
+                                        (*map_ptr).color = fc;
+                                        raylib::ffi::DrawMeshInstanced(
+                                            mesh, *mat_ptr, tr.as_ptr(), tr.len() as i32);
+                                        (*mat_ptr).shader = saved_shader;
+                                        (*map_ptr).color = saved_col;
+                                    }
+                                }
                             }
                         }
                         Cmd3D::Billboard(i, x, y, z, size, col) => {

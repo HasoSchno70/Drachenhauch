@@ -3095,6 +3095,37 @@ impl<'p> Vm<'p> {
                 g!().draw_model_matrix(gi(a, 0, "MODEL_MATRIX")?, mat, tint)?;
                 Value::Nil
             }
+            "model_instanced" => {
+                // MODEL_INSTANCED(handle, matrizen [, tint]) -- GPU-Instancing:
+                // dasselbe Modell mit N Welt-Matrizen (ARRAY OF MAT4 / TUPLE von
+                // MAT4) in EINEM Draw-Call. mat -> [f32;16] (column-major) sammeln.
+                let collect_mats = |els: &mut dyn Iterator<Item = &Value>| -> R<Vec<[f32; 16]>> {
+                    let mut v = Vec::new();
+                    for (k, el) in els.enumerate() {
+                        match el {
+                            Value::Mat4(m) => v.push(**m),
+                            other => return Err(format!(
+                                "MODEL_INSTANCED: Element {} ist kein MAT4 (sondern {})",
+                                k, other.type_name())),
+                        }
+                    }
+                    Ok(v)
+                };
+                let mats = match a.get(1) {
+                    Some(Value::Array(arr)) => {
+                        let b = arr.borrow();
+                        if b.dims.len() != 1 {
+                            return Err("MODEL_INSTANCED: Arg 2 muss ein 1D-ARRAY OF MAT4 sein".into());
+                        }
+                        collect_mats(&mut b.values.iter())?
+                    }
+                    Some(Value::Tuple(t)) => collect_mats(&mut t.iter())?,
+                    _ => return Err("MODEL_INSTANCED: Arg 2 muss ARRAY OF MAT4 oder TUPLE von MAT4 sein".into()),
+                };
+                let tint = if a.len() >= 3 { gi(a, 2, "MODEL_INSTANCED")? } else { 0xFF_FFFF };
+                g!().draw_model_instanced(gi(a, 0, "MODEL_INSTANCED")?, mats, tint)?;
+                Value::Nil
+            }
             "model_texture" => {
                 g!().model_set_texture(gi(a,0,"MODEL_TEXTURE")?, gi(a,1,"MODEL_TEXTURE")?)?;
                 Value::Nil
