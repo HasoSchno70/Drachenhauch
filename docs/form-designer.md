@@ -5,6 +5,8 @@ Inspector konfigurieren, als `.gbform` speichern und mit den `gui`-Builtins zur
 Laufzeit laden. Sprache der Logik bleibt GameBasic.
 
 **Start:** `gbform [datei.gbform]` (bzw. `gbrun.py --form`). Benötigt PySide6.
+Alternativ `gb` (oder `gbrun.py`) **ohne Argument** → Auswahl-Dialog
+*Code-Editor* / *Form-Designer*. `gbedit` öffnet direkt den Code-Editor.
 
 ## Aufbau (wie Xojo)
 

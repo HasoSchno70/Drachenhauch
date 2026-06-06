@@ -106,6 +106,56 @@ def _launch_form_designer(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_chooser(project_root):
+    """Start-Dialog ohne Argumente: Code-Editor oder WYSIWYG-Form-Designer.
+    Liefert None, wenn PySide6 fehlt (Aufrufer zeigt dann Text-Hilfe)."""
+    try:
+        from PySide6.QtWidgets import (
+            QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel)
+        from PySide6.QtCore import Qt
+    except ImportError:
+        return None
+    app = QApplication.instance() or QApplication([])
+    try:
+        from gamebasic.editor_qt.theme import global_qss
+        app.setStyleSheet(global_qss())
+    except Exception:
+        pass
+
+    dlg = QDialog()
+    dlg.setWindowTitle("GameBasic")
+    lay = QVBoxLayout(dlg)
+    title = QLabel("Was möchtest du öffnen?")
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    f = title.font(); f.setPointSize(f.pointSize() + 3); f.setBold(True); title.setFont(f)
+    lay.addWidget(title)
+
+    choice = {"v": None}
+
+    def pick(v):
+        choice["v"] = v
+        dlg.accept()
+
+    row = QHBoxLayout()
+    b_edit = QPushButton("📝  Code-Editor")
+    b_form = QPushButton("🧩  Form-Designer (WYSIWYG)")
+    for b in (b_edit, b_form):
+        b.setMinimumHeight(64)
+        b.setMinimumWidth(220)
+        row.addWidget(b)
+    b_edit.clicked.connect(lambda: pick("editor"))
+    b_form.clicked.connect(lambda: pick("form"))
+    lay.addLayout(row)
+
+    dlg.exec()
+    root = Path(project_root)
+    if choice["v"] == "editor":
+        return _launch_editor(root)
+    if choice["v"] == "form":
+        return _launch_form_designer(root)
+    return 0   # abgebrochen
+
+
 def main(argv):
     args = argv[1:]
     mode = "run"
@@ -201,9 +251,9 @@ def main(argv):
             return 1
         return _run_export(Path(args[0]), args[1] if len(args) > 1 else None)
 
-    # --- Ohne Argumente: Editor starten, sonst Hilfe ---
+    # --- Ohne Argumente: Auswahl Code-Editor / Form-Designer, sonst Hilfe ---
     if not args:
-        rc = _launch_editor(Path(__file__).resolve().parent)
+        rc = _launch_chooser(Path(__file__).resolve().parent)
         if rc is not None:
             return rc
         _print_help_and_examples()
