@@ -2,9 +2,44 @@
 
 Deckt Pattern/Order-Ops, JSON-Roundtrip und den GB-Code-Export ab
 (Flatten + Kompilierbarkeit des erzeugten Programms)."""
+import json
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+
 from gamebasic.tracker import (
     CHANNELS, TONAL, Pattern, Song, midi_to_freq, note_name,
 )
+
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _find_gbrt():
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for v in ("release", "debug"):
+        p = _ROOT / "rust" / "gb_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
+
+
+_GBRT = _find_gbrt()
+
+
+def _check_compiles(tmp_path, src):
+    """Der exportierte GB-Code muss in gbrt kompilieren (`gbrt --check`,
+    leere Fehlerliste). Frueher via Python-Compiler (in Phase 8 geloescht)."""
+    if _GBRT is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    fd = tmp_path / "_track.gb"
+    fd.write_text(src, encoding="utf-8")
+    r = subprocess.run([str(_GBRT), "--check", str(fd)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    diags = json.loads(r.stdout or "[]")
+    errs = [d for d in diags if d.get("severity") == "error"]
+    assert errs == [], f"GB-Code kompiliert nicht: {errs}"
 
 
 # --------------------------------------------------------------- Pattern
@@ -166,21 +201,13 @@ def test_from_dict_filters_bad_order_indices():
 # --------------------------------------------------------------- GB-Code
 
 def test_gb_code_compiles(tmp_path):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
-
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set(TONAL, 4, 50)
     s.add_pattern("P2", 8)
     s.patterns[1].set(1, 2, 64)
     s.order = [0, 1, 0]
-    code = s.gb_code()
-    prepped, _ = process(code, tmp_path, file_label="<tracker>")
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    Compiler().compile(ast)               # wirft bei Fehler
+    _check_compiles(tmp_path, s.gb_code())
 
 
 def test_gb_code_has_expanded_rows():
@@ -264,20 +291,13 @@ def test_vol_to_pct_mapping():
 
 
 def test_gb_code_with_volume_compiles(tmp_path):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
-
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_vol(0, 0, 12)
     code = s.gb_code()
     assert "DIM trkV0[TRK_ROWS]" in code
     assert "FUNCTION TRACKER_AMP" in code
-    prepped, _ = process(code, tmp_path, file_label="<tracker>")
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    Compiler().compile(ast)              # wirft bei Fehler
+    _check_compiles(tmp_path, code)
 
 
 def test_gb_code_without_volume_has_no_amp_helper():
@@ -332,11 +352,6 @@ def test_slide_json_roundtrip(tmp_path):
 
 
 def test_gb_code_with_slide_uses_sfx(tmp_path):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
-
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_slide(0, 0, 2)
@@ -345,8 +360,7 @@ def test_gb_code_with_slide_uses_sfx(tmp_path):
     assert "DIM trkSl0[TRK_ROWS]" in code
     assert "AUDIO_SFX" in code
     assert "AUDIO_TONE" in code          # Nicht-Slide-Note nutzt weiter TONE
-    prepped, _ = process(code, tmp_path, file_label="<tracker>")
-    Compiler().compile(Parser(Lexer(prepped).tokenize()).parse())
+    _check_compiles(tmp_path, code)
 
 
 def test_gb_code_without_slide_has_no_sfx():
@@ -408,10 +422,6 @@ def test_song_without_instruments_omits_field():
 
 
 def test_gb_code_sample_channel_commented(tmp_path):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
     s = Song()
     idx = s.add_instrument(_sample_inst("Smp"))
     s.channel_inst[0] = idx
@@ -419,5 +429,4 @@ def test_gb_code_sample_channel_commented(tmp_path):
     code = s.gb_code()
     assert "Sample-Instrument" in code      # Hinweis-Kommentar
     # Synth-Kanaele + Drum bleiben gueltig -> kompiliert weiter
-    prepped, _ = process(code, tmp_path, file_label="<tracker>")
-    Compiler().compile(Parser(Lexer(prepped).tokenize()).parse())
+    _check_compiles(tmp_path, code)

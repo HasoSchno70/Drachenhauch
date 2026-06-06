@@ -27,17 +27,8 @@ def test_check_toolchain_returns_bools():
     assert all(isinstance(v, bool) for v in info.values())
 
 
-def test_compile_program_produces_loadable_gbc(tmp_path):
-    bw = _load_build_wasm()
-    gb = tmp_path / "hi.gb"
-    gb.write_text('PRINT "hallo"\n', encoding="utf-8")
-    gbc = bw.compile_program(gb, tmp_path)
-    assert gbc.name == "program.gbc" and gbc.exists()
-    data = json.loads(gbc.read_text(encoding="utf-8"))
-    assert isinstance(data, dict)        # serialisiertes Module
-    # Vom selben Loader lesbar, den gbrt/Python nutzen.
-    from gamebasic.serialize import compile_gb_to_module
-    assert compile_gb_to_module(gb) is not None
+# (Der frühere Test compile_program (.gb -> program.gbc via Python-serialize) ist
+#  entfernt: Stufe B bettet nur noch die Quelle ein, gbrt kompiliert im Browser.)
 
 
 def test_copy_source_embeds_gb(tmp_path):
@@ -58,9 +49,8 @@ def test_build_skips_gracefully_without_toolchain(tmp_path, monkeypatch):
                         lambda: {"emcc": False, "cargo": False, "wasm_target": False})
     rc = bw.build(gb, tmp_path)
     assert rc == 0
-    # Quelle (fuer Browser-Kompilierung) UND Fallback-.gbc.
+    # Quelle wird eingebettet (gbrt kompiliert im Browser; kein Python-.gbc mehr).
     assert (tmp_path / "program.gb").exists()
-    assert (tmp_path / "program.gbc").exists()
 
 
 def test_web_harness_files_present():

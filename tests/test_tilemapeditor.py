@@ -1,20 +1,62 @@
 """Tests fuer das Tilemap-Editor-Datenmodell (Qt-frei).
 
-Kern-Garantie: was der Editor exportiert, liest das `tiled`-Modul
-(`TILED_LOAD` + Accessors) ohne Fehler und mit identischen Werten zurueck.
+Kern-Garantie: was der Editor exportiert, liest die native Runtime `gbrt`
+(`IMPORT "tiled"` + `TILED_LOAD` + Accessors) ohne Fehler und mit identischen
+Werten zurueck. Frueher gegen das Python-`tiled`-Modul (in Phase 8 geloescht).
 """
 import json
+import os
+import subprocess
+from pathlib import Path
 
 import pytest
 
 from gamebasic.tilemap import TileMapDoc, TileLayer
 from gamebasic.tilemap.document import coerce_prop, MapObject, ObjectLayer
-from gamebasic.modules import tiled as T
 
 
-def call(fn, *args):
-    """Ruft einen @builtin-gewrappten Loader/Accessor mit Positional-Args."""
-    return fn(list(args))
+_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _find_gbrt():
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for v in ("release", "debug"):
+        p = _ROOT / "rust" / "gb_runtime" / "target" / v / exe
+        if p.exists():
+            return p
+    return None
+
+
+_GBRT = _find_gbrt()
+
+
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
+
+
+def _run_in(tmp_path, body):
+    """GB-Programm im Verzeichnis `tmp_path` ueber gbrt ausfuehren (damit
+    relative TILED_LOAD-Pfade die dort gespeicherte JSON finden)."""
+    if _GBRT is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    fd = tmp_path / "_t.gb"
+    fd.write_text(body, encoding="utf-8")
+    r = subprocess.run([str(_GBRT), "run", str(fd)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, f"gbrt run Exit {r.returncode}: {r.stderr}"
+    return _lines(r.stdout.replace("\r\n", "\n"))
+
+
+def _check_compiles(tmp_path, src):
+    """`gbrt --check` auf `src`; gibt die Fehler-Diagnosen zurueck (leer = ok)."""
+    if _GBRT is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    fd = tmp_path / "_check.gb"
+    fd.write_text(src, encoding="utf-8")
+    r = subprocess.run([str(_GBRT), "--check", str(fd)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    diags = json.loads(r.stdout or "[]")
+    return [d for d in diags if d.get("severity") == "error"]
 
 
 # --------------------------------------------------------------- Basis
@@ -124,28 +166,21 @@ def test_to_tiled_dict_shape(tmp_path):
 def test_roundtrip_through_tiled_loader(tmp_path):
     """Editor-Export -> TILED_LOAD -> identische Werte."""
     doc = _build_sample(tmp_path)
-    path = str(tmp_path / "level.json")
-    doc.save_json(path)
+    doc.save_json(str(tmp_path / "level.json"))
 
-    m = call(T._b_tiled_load, path)
-    assert call(T._b_width, m) == 6
-    assert call(T._b_height, m) == 4
-    assert call(T._b_tile_w, m) == 16
-    assert call(T._b_layer_count, m) == 2
-    assert call(T._b_layer_name, m, 0) == "Boden"
-    assert call(T._b_layer_name, m, 1) == "Deko"
-    # Tile-Werte
-    assert call(T._b_tile_at, m, 0, 0, 0) == 1
-    assert call(T._b_tile_at, m, 0, 5, 3) == 4
-    assert call(T._b_tile_at, m, 1, 2, 1) == 3
-    assert call(T._b_tile_at, m, 0, 1, 1) == 0
-    # Per-Tile-Properties (gid 1 -> local id 0)
-    assert call(T._b_tile_prop_bool, m, 1, "solid") is True
-    assert call(T._b_tile_prop_int, m, 1, "damage") == 5
-    assert call(T._b_tile_prop_string, m, 4, "name") == "coin"
-    # Tileset
-    assert call(T._b_ts_count, m) == 1
-    assert call(T._b_ts_firstgid, m, 0) == 1
+    out = _run_in(tmp_path,
+        'IMPORT "tiled"\nDIM m AS TILED_MAP\nm = TILED_LOAD("level.json")\n'
+        "PRINT TILED_WIDTH(m)\nPRINT TILED_HEIGHT(m)\nPRINT TILED_TILE_WIDTH(m)\n"
+        "PRINT TILED_LAYER_COUNT(m)\n"
+        "PRINT TILED_LAYER_NAME(m, 0)\nPRINT TILED_LAYER_NAME(m, 1)\n"
+        "PRINT TILED_TILE_AT(m, 0, 0, 0)\nPRINT TILED_TILE_AT(m, 0, 5, 3)\n"
+        "PRINT TILED_TILE_AT(m, 1, 2, 1)\nPRINT TILED_TILE_AT(m, 0, 1, 1)\n"
+        'PRINT TILED_TILE_PROP_BOOL(m, 1, "solid")\n'
+        'PRINT TILED_TILE_PROP_INT(m, 1, "damage")\n'
+        'PRINT TILED_TILE_PROP_STRING(m, 4, "name")\n'
+        "PRINT TILED_TILESET_COUNT(m)\nPRINT TILED_TILESET_FIRSTGID(m, 0)\n")
+    assert out == ["6", "4", "16", "2", "Boden", "Deko",
+                   "1", "4", "3", "0", "TRUE", "5", "coin", "1", "1"]
 
 
 def test_save_load_json_roundtrip(tmp_path):
@@ -219,18 +254,16 @@ def test_multi_tileset_roundtrip_through_loader(tmp_path):
     doc.set_property(0, "solid", "true", "bool")   # ts1 local 0 = gid 9
     doc.layers[0].set(1, 0, 9)              # Tileset 1, local 0
     doc.layers[0].set(2, 0, 12)             # Tileset 1, local 3
-    path = str(tmp_path / "multi.json")
-    doc.save_json(path)
+    doc.save_json(str(tmp_path / "multi.json"))
 
-    m = call(T._b_tiled_load, path)
-    assert call(T._b_ts_count, m) == 2
-    assert call(T._b_ts_firstgid, m, 0) == 1
-    assert call(T._b_ts_firstgid, m, 1) == 9
-    assert call(T._b_tile_at, m, 0, 0, 0) == 1
-    assert call(T._b_tile_at, m, 0, 1, 0) == 9
-    assert call(T._b_tile_at, m, 0, 2, 0) == 12
-    # Property an gid 9 (Tileset 1, local 0)
-    assert call(T._b_tile_prop_bool, m, 9, "solid") is True
+    out = _run_in(tmp_path,
+        'IMPORT "tiled"\nDIM m AS TILED_MAP\nm = TILED_LOAD("multi.json")\n'
+        "PRINT TILED_TILESET_COUNT(m)\n"
+        "PRINT TILED_TILESET_FIRSTGID(m, 0)\nPRINT TILED_TILESET_FIRSTGID(m, 1)\n"
+        "PRINT TILED_TILE_AT(m, 0, 0, 0)\nPRINT TILED_TILE_AT(m, 0, 1, 0)\n"
+        "PRINT TILED_TILE_AT(m, 0, 2, 0)\n"
+        'PRINT TILED_TILE_PROP_BOOL(m, 9, "solid")\n')
+    assert out == ["2", "1", "9", "1", "9", "12", "TRUE"]
 
 
 def test_multi_tileset_editor_load_select(tmp_path, monkeypatch):
@@ -324,25 +357,21 @@ def test_object_layer_to_tiled_dict_shape(tmp_path):
 def test_object_layer_roundtrip_through_tiled_loader(tmp_path):
     """Editor-Export mit Object-Layer -> TILED_LOAD -> TILED_OBJECT_* lesbar."""
     doc = _build_with_objects(tmp_path)
-    path = str(tmp_path / "level.json")
-    doc.save_json(path)
+    doc.save_json(str(tmp_path / "level.json"))
 
-    m = call(T._b_tiled_load, path)
-    assert call(T._b_layer_count, m) == 2
-    assert call(T._b_layer_type, m, 1) == "object"
-    assert call(T._b_obj_count, m, "Spawns") == 2
-    # Punkt-Objekt 0
-    assert call(T._b_obj_name, m, "Spawns", 0) == "player"
-    assert call(T._b_obj_type, m, "Spawns", 0) == "spawn"
-    assert call(T._b_obj_x, m, "Spawns", 0) == 48.0
-    assert call(T._b_obj_y, m, "Spawns", 0) == 32.0
-    assert call(T._b_obj_w, m, "Spawns", 0) == 0.0
-    assert call(T._b_obj_prop_int, m, "Spawns", 0, "hp") == 100
-    # Rechteck-Objekt 1
-    assert call(T._b_obj_name, m, "Spawns", 1) == "zone"
-    assert call(T._b_obj_w, m, "Spawns", 1) == 32.0
-    assert call(T._b_obj_h, m, "Spawns", 1) == 48.0
-    assert call(T._b_obj_prop_bool, m, "Spawns", 1, "active") is True
+    out = _run_in(tmp_path,
+        'IMPORT "tiled"\nDIM m AS TILED_MAP\nm = TILED_LOAD("level.json")\n'
+        "PRINT TILED_LAYER_COUNT(m)\nPRINT TILED_LAYER_TYPE(m, 1)\n"
+        'PRINT TILED_OBJECT_COUNT(m, "Spawns")\n'
+        'PRINT TILED_OBJECT_NAME(m, "Spawns", 0)\nPRINT TILED_OBJECT_TYPE(m, "Spawns", 0)\n'
+        'PRINT TILED_OBJECT_X(m, "Spawns", 0)\nPRINT TILED_OBJECT_Y(m, "Spawns", 0)\n'
+        'PRINT TILED_OBJECT_WIDTH(m, "Spawns", 0)\n'
+        'PRINT TILED_OBJECT_PROP_INT(m, "Spawns", 0, "hp")\n'
+        'PRINT TILED_OBJECT_NAME(m, "Spawns", 1)\n'
+        'PRINT TILED_OBJECT_WIDTH(m, "Spawns", 1)\nPRINT TILED_OBJECT_HEIGHT(m, "Spawns", 1)\n'
+        'PRINT TILED_OBJECT_PROP_BOOL(m, "Spawns", 1, "active")\n')
+    assert out == ["2", "object", "2", "player", "spawn", "48.0", "32.0",
+                   "0.0", "100", "zone", "32.0", "48.0", "TRUE"]
 
 
 def test_object_layer_save_load_json_roundtrip(tmp_path):
@@ -361,31 +390,17 @@ def test_object_layer_save_load_json_roundtrip(tmp_path):
 
 
 def test_gb_code_compiles(tmp_path):
-    """Der exportierte GB-Code muss lexen+parsen+kompilieren."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
-
+    """Der exportierte GB-Code muss in gbrt lexen+parsen+kompilieren."""
     doc = _build_sample(tmp_path)
     code = doc.gb_code(str(tmp_path / "level.json"))
-    prepped, _ = process(code, tmp_path, file_label="<tilemap>")
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    Compiler().compile(ast)                   # wirft bei Fehler
+    assert _check_compiles(tmp_path, code) == []
 
 
 def test_gb_code_compiles_with_object_layer(tmp_path):
     """Auch mit Object-Layer bleibt der exportierte GB-Code kompilierbar."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    from gamebasic.preprocess import process
-
     doc = _build_with_objects(tmp_path)
     code = doc.gb_code(str(tmp_path / "level.json"))
-    prepped, _ = process(code, tmp_path, file_label="<tilemap>")
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    Compiler().compile(ast)
+    assert _check_compiles(tmp_path, code) == []
 
 
 # --------------------------------------------------------------- Editor-UI

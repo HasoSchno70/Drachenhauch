@@ -137,17 +137,16 @@ def emcc_flags(out_dir: str | Path) -> list:
     (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)"""
     out = Path(out_dir).resolve()
     gb = (out / "program.gb").as_posix()
-    gbc = (out / "program.gbc").as_posix()
     return [
         "-s", "USE_GLFW=3",
         "-s", "ASYNCIFY",
         "-s", "ALLOW_MEMORY_GROWTH=1",
         "-s", "ASSERTIONS=1",
         "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print']",
-        # Quelle einbetten -> gbrt kompiliert im Browser (kein Pyodide); .gbc als
-        # Fallback (main.rs liest /program.gb zuerst, dann /program.gbc).
+        # Quelle einbetten -> gbrt kompiliert sie im Browser selbst (Front-End-
+        # Port, kein Pyodide). Der frühere Python-.gbc-Fallback entfällt (Stufe B:
+        # Python-Compiler/serialize entfernt).
         "--embed-file", f"{gb}@/program.gb",
-        "--embed-file", f"{gbc}@/program.gbc",
     ]
 
 
@@ -166,16 +165,6 @@ def check_toolchain() -> dict:
     return info
 
 
-def compile_program(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
-    """`.gb` -> `<out_dir>/program.gbc` (nutzt den normalen Python-Compiler)."""
-    from gamebasic.serialize import compile_file_to_gbc
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    gbc = out_dir / "program.gbc"
-    compile_file_to_gbc(gb_path, gbc)
-    return gbc
-
-
 def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("\n--- WASM-Build uebersprungen (Toolchain unvollstaendig) ---")
     print(f"  emcc (emscripten):           {'OK' if info['emcc'] else 'FEHLT'}")
@@ -185,7 +174,7 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("  1. emscripten installieren (https://emscripten.org), `emcc` in PATH.")
     print(f"  2. rustup target add {TARGET}")
     print("  3. Dieses Skript erneut ausfuehren.")
-    print("\nQuelle/.gbc wurden bereits erzeugt. Manueller Build-Befehl:")
+    print("\nQuelle wurde bereits eingebettet. Manueller Build-Befehl:")
     print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
     print(f"    --target {TARGET} --features graphics --release")
@@ -205,8 +194,6 @@ def copy_source(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
 def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     src = copy_source(gb_path, out_dir)
     print(f"Quelle eingebettet: {src}")
-    gbc = compile_program(gb_path, out_dir)   # Fallback-Artefakt (Build-Zeit)
-    print(f"kompiliert (Fallback): {gbc}")
     # Windows: emscripten-Toolchain automatisch verdrahten (PATH + CC/CXX/AR/
     # Linker/bindgen-Includes), damit der Build ohne manuelles Env-Setup laeuft.
     if setup_emscripten_env():

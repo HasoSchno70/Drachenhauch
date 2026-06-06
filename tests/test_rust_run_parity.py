@@ -35,26 +35,6 @@ pytestmark = pytest.mark.skipif(
     _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
 
 
-def _tw_run_chdir(main: Path) -> str:
-    """Python-Tree-Walker mit chdir ins Datei-Verzeichnis (wie gbrun.py)."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    from gamebasic.preprocess import process
-    src = main.read_text(encoding="utf-8")
-    prepped, _ = process(src, main.parent, file_label=main.name)
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    prev = os.getcwd()
-    buf = io.StringIO()
-    try:
-        os.chdir(main.parent)
-        with contextlib.redirect_stdout(buf):
-            Interpreter().run(ast)
-    finally:
-        os.chdir(prev)
-    return buf.getvalue().replace("\r\n", "\n")
-
-
 def _gbrt(argv) -> tuple:
     out = subprocess.run([str(_GBRT), *argv],
                          capture_output=True, text=True, encoding="utf-8")
@@ -81,7 +61,8 @@ def test_run_with_relative_file_and_imports(tmp_path):
                   'PRINT tri(10)\nPRINT VEC2_LENGTH(v)\n')
     rc, out = _gbrt(["run", str(main)])
     assert rc == 0, f"gbrt run Exit {rc}"
-    assert out == _tw_run_chdir(main)
+    # Golden (Stufe B): ReadLine="hallo", tri(10)=55, VEC2_LENGTH(3,4)=5.0.
+    assert out == "hallo\n55\n5.0\n"
 
 
 def test_bare_gb_path_autodetect(tmp_path):
@@ -92,4 +73,5 @@ def test_bare_gb_path_autodetect(tmp_path):
                   'PRINT ReadLine(f)\nCloseFile(f)\nPRINT 6 * 7\n')
     rc, out = _gbrt([str(main)])
     assert rc == 0, f"gbrt <datei.gb> Exit {rc}"
-    assert out == _tw_run_chdir(main)
+    # Golden (Stufe B): ReadLine="zeile1", 6*7=42.
+    assert out == "zeile1\n42\n"

@@ -45,42 +45,36 @@ _INTERACTIVE_OR_ASSETS = [
 ]
 
 
+def _find_gbrt():
+    import os
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = _ROOT / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
+
+
+_GBRT = _find_gbrt()
+
+
 def _run_example(rel: str) -> str:
-    """Fuehrt ein Beispiel im Tree-Walker aus und gibt stdout zurueck.
-
-    CWD wird temporaer auf examples/ umgestellt, damit Programme mit
-    LOADIMAGE("assets/...") die Datei finden (gleiches Verhalten wie gbrun.py).
-    """
-    import io, contextlib, os
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    from gamebasic.preprocess import process
-    # preprocess laedt die Built-in-Module nicht mehr (Stufe B) -> der
-    # Tree-Walker braucht sie explizit. (TW + dieser Helper werden in Phase 8
-    # entfernt.)
-    from gamebasic.modules import load_all_modules
-    load_all_modules()
-
+    """Fuehrt ein Beispiel ueber die native Runtime (`gbrt run`) aus und gibt
+    stdout zurueck. gbrt chdirt selbst ins examples/-Verzeichnis (relative
+    Asset-/IMPORT-Pfade)."""
+    import subprocess
+    if _GBRT is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
     path = _EXAMPLES / f"{rel}.gb"
-    source = path.read_text(encoding="utf-8")
-    prepped, _ = process(source, path.parent, file_label=path.name)
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-
-    saved_cwd = os.getcwd()
-    try:
-        os.chdir(path.parent)
-        buf = io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            Interpreter().run(ast)
-    finally:
-        os.chdir(saved_cwd)
-    return buf.getvalue()
+    r = subprocess.run([str(_GBRT), "run", str(path)],
+                       capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, f"gbrt run {rel} Exit {r.returncode}: {r.stderr}"
+    return (r.stdout or "").replace("\r\n", "\n")
 
 
 @pytest.mark.parametrize("name", _DETERMINISTIC + _NON_DETERMINISTIC)
-def test_example_runs_treewalker(name):
-    """Smoke-Test: jedes (nicht-grafische) Beispiel laeuft im Tree-Walker durch
-    und produziert Output. Output-Identitaet gegen gbrt -> test_gbrt_parity.py."""
+def test_example_runs(name):
+    """Smoke-Test: jedes (nicht-grafische) Beispiel laeuft in gbrt durch und
+    produziert Output."""
     out = _run_example(name)
     assert out != "", f"Beispiel {name} hat keinen Output erzeugt"

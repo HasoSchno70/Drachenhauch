@@ -30,20 +30,6 @@ pytestmark = pytest.mark.skipif(
     _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
 
 
-def _tw_run(main: Path) -> str:
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    from gamebasic.preprocess import process
-    prepped, _ = process(main.read_text(encoding="utf-8"), main.parent,
-                         file_label=main.name)
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        Interpreter().run(ast)
-    return buf.getvalue().replace("\r\n", "\n")
-
-
 def test_export_runs_standalone(tmp_path):
     main = tmp_path / "prog.gb"
     main.write_text(
@@ -69,4 +55,5 @@ def test_export_runs_standalone(tmp_path):
     run = subprocess.run([str(out_exe)], capture_output=True, text=True,
                          encoding="utf-8")
     assert run.returncode == 0, f"Exe Exit {run.returncode}: {run.stderr}"
-    assert run.stdout.replace("\r\n", "\n") == _tw_run(main)
+    # Golden (Stufe B): fib(10)=55, dann i*i fuer i=1..3.
+    assert run.stdout.replace("\r\n", "\n") == "55\n1\n4\n9\n"
