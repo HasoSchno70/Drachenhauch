@@ -1,10 +1,15 @@
-"""Erlaubt 'py -m gamebasic <datei.gb>' von ueberall."""
+"""Erlaubt 'py -m gamebasic <datei.gb>' von ueberall.
+
+Stufe B: Der Tree-Walker ist entfernt -- Ausfuehrung laeuft ueber die native
+Runtime `gbrt` (gbrt chdirt selbst ins Datei-Verzeichnis, daher funktionieren
+relative Asset-Pfade jetzt auch hier). `--tokens`/`--ast` nutzen den behaltenen
+Python-Lexer/-Parser (Dev/Parity).
+"""
 import sys
 from pathlib import Path
 
 from .lexer import Lexer
 from .parser import Parser
-from .interpreter import Interpreter
 from .errors import GameBasicError
 
 
@@ -24,6 +29,12 @@ def main(argv=None):
         print(f"Datei nicht gefunden: {path}")
         return 1
 
+    # --- Ausfuehren: ueber die native Runtime (gbrt) ---
+    if mode == "run":
+        from gbrun import _run_native  # type: ignore
+        return _run_native(path.resolve(), path)
+
+    # --- Debug: --tokens / --ast ueber den Python-Lexer/-Parser ---
     source = path.read_text(encoding="utf-8")
     from .preprocess import process as _preprocess
     source, _origins = _preprocess(source, path.parent, file_label=path.name)
@@ -38,7 +49,6 @@ def main(argv=None):
             from gbrun import _print_ast  # type: ignore
             _print_ast(ast)
             return 0
-        Interpreter().run(ast)
         return 0
     except GameBasicError as e:
         print(f"Fehler in {path.name}:")

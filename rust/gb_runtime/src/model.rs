@@ -79,6 +79,8 @@ pub mod op {
     pub const YIELD_VALUE: u16 = 115;
 
     pub const PRINT: u16 = 70;
+    pub const INPUT_NAME: u16 = 71;
+    pub const INPUT_LOCAL: u16 = 72;
 
     // Aufrufe / Werte
     pub const CALL_BUILTIN: u16 = 51;

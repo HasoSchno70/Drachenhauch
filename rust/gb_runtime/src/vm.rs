@@ -546,6 +546,19 @@ impl<'p> Vm<'p> {
         self.out
     }
 
+    /// Fuer INPUT: gepufferten Output + Prompt SOFORT auf echtes stdout flushen
+    /// (sonst erscheint der Prompt erst nach der Eingabe) und `self.out` leeren,
+    /// damit der finale take_output() nichts doppelt schreibt.
+    fn flush_and_prompt(&mut self, prompt: &str) {
+        use std::io::Write;
+        let so = std::io::stdout();
+        let mut h = so.lock();
+        let _ = h.write_all(self.out.as_bytes());
+        self.out.clear();
+        let _ = h.write_all(prompt.as_bytes());
+        let _ = h.flush();
+    }
+
     /// Profiling fuer den naechsten `run()` aktivieren (Stufe B, `gbrt profile`).
     pub fn enable_profiler(&mut self) {
         self.prof = Some(ProfileSink::new());
@@ -1698,6 +1711,41 @@ impl<'p> Vm<'p> {
                         self.out.push_str(&parts.join(" "));
                         self.out.push('\n');
                     }
+                }
+
+                // --- INPUT (Konsolen-Eingabe) ---
+                // Semantik 1:1 aus interpreter._exec_Input: Prompt (Default "? ",
+                // sonst mit Leerzeichen-Suffix) live ausgeben, eine Zeile von
+                // stdin lesen, auf den Ziel-Typ coercen. Da PRINT in self.out
+                // puffert, wird der bisherige Output + Prompt VOR dem Lesen real
+                // geflusht (sonst erscheint der Prompt erst nach der Eingabe).
+                op::INPUT_NAME => {
+                    let l = arg.list();
+                    let name = constants[l[0].as_usize()].fmt();
+                    let prompt = if arg_truthy(&l[1]) {
+                        input_prompt(&stack.pop().unwrap().fmt())
+                    } else { "? ".to_string() };
+                    self.flush_and_prompt(&prompt);
+                    let raw = read_input_line();
+                    let slot = self.globals.get(&name)
+                        .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?)", name))?
+                        .clone();
+                    if slot.borrow().is_const {
+                        return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
+                    }
+                    let ty = slot.borrow().ty.clone();
+                    slot.borrow_mut().value = coerce_input(&raw, &ty)?;
+                }
+                op::INPUT_LOCAL => {
+                    let l = arg.list();
+                    let slot_idx = l[0].as_usize();
+                    let prompt = if arg_truthy(&l[1]) {
+                        input_prompt(&stack.pop().unwrap().fmt())
+                    } else { "? ".to_string() };
+                    self.flush_and_prompt(&prompt);
+                    let raw = read_input_line();
+                    let ty = fn_.local_types[slot_idx].clone();
+                    locals[slot_idx] = coerce_input(&raw, &ty)?;
                 }
 
                 op::HALT => return Ok(Step::Return(Value::Nil)),
@@ -4097,6 +4145,44 @@ fn cmp(a: &Value, b: &Value, op: char) -> R<bool> {
     let ord = ord.ok_or("Vergleich mit NaN")?;
     use std::cmp::Ordering::*;
     Ok(match op { '<' => ord == Less, '>' => ord == Greater, 'l' => ord != Greater, 'g' => ord != Less, _ => unreachable!() })
+}
+
+/// Prompt-Aufbereitung wie interpreter._exec_Input: leer -> "? ", sonst mit
+/// Leerzeichen-Suffix.
+fn input_prompt(p: &str) -> String {
+    if p.is_empty() {
+        "? ".to_string()
+    } else if p.ends_with(' ') {
+        p.to_string()
+    } else {
+        format!("{} ", p)
+    }
+}
+
+/// Eine Zeile von stdin lesen; Zeilenende entfernen (wie Python input()).
+/// EOF -> leerer String.
+fn read_input_line() -> String {
+    use std::io::BufRead;
+    let mut line = String::new();
+    let _ = std::io::stdin().lock().read_line(&mut line);
+    while line.ends_with('\n') || line.ends_with('\r') {
+        line.pop();
+    }
+    line
+}
+
+/// INPUT-Rohwert auf den Ziel-Typ coercen (Semantik 1:1 aus interpreter).
+fn coerce_input(raw: &str, ty: &str) -> R<Value> {
+    match ty {
+        "integer" => raw.trim().parse::<i64>().map(Value::Int)
+            .map_err(|_| format!("Eingabe '{}' passt nicht zu INTEGER", raw)),
+        "float" => raw.trim().parse::<f64>().map(Value::Float)
+            .map_err(|_| format!("Eingabe '{}' passt nicht zu FLOAT", raw)),
+        "string" => Ok(Value::str_rc(raw)),
+        "boolean" => Ok(Value::Bool(matches!(
+            raw.trim().to_lowercase().as_str(), "true" | "wahr" | "yes" | "ja" | "1"))),
+        _ => Err(format!("Unbekannter Typ: {}", ty)),
+    }
 }
 
 fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {

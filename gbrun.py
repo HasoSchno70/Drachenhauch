@@ -13,7 +13,6 @@ from pathlib import Path
 
 from gamebasic.lexer import Lexer
 from gamebasic.parser import Parser
-from gamebasic.interpreter import Interpreter
 from gamebasic.errors import GameBasicError
 
 
@@ -169,7 +168,7 @@ def main(argv):
             return 3
         return rc
 
-    if args and args[0] in ("--tokens", "--ast", "--bench", "--native", "--export"):
+    if args and args[0] in ("--tokens", "--ast", "--native", "--export"):
         mode = args.pop(0)[2:]
 
     # --- Export: standalone .exe buendeln (Schritt 7) ---
@@ -201,11 +200,13 @@ def main(argv):
     # funktioniert, ins Verzeichnis der Quelldatei wechseln.
     os.chdir(abs_path.parent)
 
-    # --- Native Runtime (gbrt): kompilieren -> .gbc -> ausfuehren ---
-    if mode == "native":
+    # --- Ausfuehren: immer ueber die native Runtime (gbrt) ---
+    # Stufe B: der Tree-Walker ist entfernt; sowohl der Default-Run als auch
+    # `--native` laufen ueber `gbrt run` (preprocess+lex+parse+compile+VM in Rust).
+    if mode in ("run", "native"):
         return _run_native(abs_path, path)
 
-    # IMPORT-Preprocessor: textuelle Inklusion vor dem Lexen.
+    # --- Debug: --tokens / --ast (Python-Lexer/-Parser, fuer Dev/Parity) ---
     from gamebasic.preprocess import process as _preprocess
     source, origins = _preprocess(source, abs_path.parent, file_label=path.name)
 
@@ -219,9 +220,6 @@ def main(argv):
         if mode == "ast":
             _print_ast(ast)
             return 0
-        if mode == "bench":
-            return _bench(ast, path)
-        Interpreter().run(ast)
         return 0
     except GameBasicError as e:
         # Origin der Fehler-Zeile (falls in einer eingebundenen Datei)
@@ -302,76 +300,6 @@ def _run_export(src, out_dir):
     if result.returncode == 0:
         print("  -> laeuft ohne Python. Assets-Konvention: 'assets/' wird mitkopiert.")
     return result.returncode
-
-
-def _bench(ast, path):
-    """Vergleicht Tree-Walker (in-process) und native Runtime `gbrt` (Subprozess)
-    auf demselben Programm -- Laufzeit + Output-Identitaet. `gbrt`-Zeit enthaelt
-    den Prozess-Start (kein reiner VM-Vergleich), zeigt aber die echte
-    Native-Laufzeit. Ist `gbrt` nicht gebaut, wird nur der Tree-Walker gemessen."""
-    import io
-    import os as _os
-    import time
-    import tempfile
-    import subprocess
-    import contextlib
-    from gamebasic.compiler import Compiler
-    from gamebasic.serialize import dump_gbc
-
-    print(f"=== Benchmark: {path.name} ===")
-
-    # Tree-Walker (in-process)
-    buf_tw = io.StringIO()
-    t0 = time.perf_counter()
-    with contextlib.redirect_stdout(buf_tw):
-        Interpreter().run(ast)
-    tw_time = time.perf_counter() - t0
-    tw_out = buf_tw.getvalue()
-
-    # Compile -> .gbc
-    t0 = time.perf_counter()
-    module = Compiler().compile(ast)
-    compile_time = time.perf_counter() - t0
-
-    # Native Runtime (gbrt, Subprozess mit erfasstem stdout)
-    gbrt = _find_gbrt()
-    nv_time = None
-    nv_out = None
-    if gbrt is not None:
-        fd, tmp = tempfile.mkstemp(suffix=".gbc")
-        _os.close(fd)
-        try:
-            dump_gbc(module, tmp)
-            t0 = time.perf_counter()
-            res = subprocess.run([str(gbrt), tmp, path.name],
-                                 capture_output=True, text=True)
-            nv_time = time.perf_counter() - t0
-            # gbrt schreibt LF, Python CRLF -> fuer den Vergleich angleichen.
-            nv_out = res.stdout.replace("\r\n", "\n")
-        finally:
-            try:
-                _os.unlink(tmp)
-            except OSError:
-                pass
-
-    print(f"Tree-Walker:    {tw_time * 1000:9.2f} ms")
-    print(f"Compile:        {compile_time * 1000:9.2f} ms")
-    if nv_time is not None:
-        print(f"gbrt (nativ):   {nv_time * 1000:9.2f} ms        Speedup vs TW: {tw_time / nv_time:5.2f}x   (inkl. Prozess-Start)")
-    else:
-        print("gbrt (nativ):   nicht gebaut (run 'rust\\build_runtime.py')")
-
-    if nv_out is not None:
-        tw_norm = tw_out.replace("\r\n", "\n")
-        if tw_norm == nv_out:
-            print("Output:         IDENTISCH (Tree-Walker == gbrt)")
-        else:
-            print("Output:         UNTERSCHIEDLICH (!)")
-            print("--- Tree-Walker ---")
-            print(tw_out)
-            print("--- gbrt ---")
-            print(nv_out)
-    return 0
 
 
 def _print_ast(node, indent=0):
