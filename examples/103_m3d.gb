@@ -1,0 +1,77 @@
+' 103_m3d.gb -- 3D-Mathe-Modul m3d (VEC3/VEC4/QUAT/MAT4) + MODEL_MATRIX
+'
+' Zeigt die volle Freiheit der Matrix-Pipeline:
+'   - HIERARCHISCHE Transforms: Hand haengt am Unterarm haengt am Koerper.
+'     Jede Ebene = lokale MAT4, per MAT4_MUL an die Eltern-Matrix gekettet.
+'   - QUATERNIONEN fuer gimbal-lock-freie Rotation (Gelenke).
+'   - Ein gemeinsames Wuerfel-Mesh, N-mal mit je eigener Welt-Matrix gezeichnet.
+'
+' Native-only (F6 / gbrt). Maus: nichts -- laeuft automatisch.
+
+IMPORT "g3d"
+IMPORT "m3d"
+
+SCREEN(800, 480, "m3d -- hierarchische Transforms", 1)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H202830, 0.4)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFAA7F)
+
+' Ein einziges Wuerfel-Mesh, das wir mehrfach mit verschiedenen Matrizen malen.
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+MODEL_LIT(box)
+
+DIM floor AS INTEGER
+floor = MESH_PLANE(16.0, 16.0, 1, 1)
+MODEL_LIT(floor)
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.02
+
+    CLS(&H0E1014)
+    CAMERA3D(SIN(t * 0.3) * 8.0, 4.5, COS(t * 0.3) * 8.0, 0, 1.2, 0, 45)
+
+    ' Boden.
+    MODEL_MATRIX(floor, MAT4_TRANSLATE(0, -1.0, 0), &H3A4250)
+
+    ' --- Hierarchie: Koerper -> Oberarm -> Unterarm -> Hand ---
+    ' Koerper: dreht sich langsam um die eigene Achse.
+    DIM body AS MAT4
+    body = MAT4_TRS(VEC3_NEW(0, 0.6, 0), QUAT_FROM_AXIS_ANGLE(0, 1, 0, t), VEC3_NEW(1.0, 1.6, 0.7))
+    MODEL_MATRIX(box, body, &HE08040)
+
+    ' Schulter-Gelenk (am Koerper, oben rechts) + pendelnde Oberarm-Drehung.
+    DIM shoulder AS MAT4
+    shoulder = MAT4_MUL(body, MAT4_TRANSLATE(0.9, 0.4, 0))
+    DIM upper AS MAT4
+    upper = MAT4_MUL(shoulder, QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 0, 1, SIN(t * 1.5) * 0.8 - 0.6)))
+    ' Oberarm-Geometrie: vom Gelenk nach aussen, schlank.
+    DIM upper_geo AS MAT4
+    upper_geo = MAT4_MUL(upper, MAT4_MUL(MAT4_TRANSLATE(0.7, 0, 0), MAT4_SCALE(1.4, 0.3, 0.3)))
+    MODEL_MATRIX(box, upper_geo, &H50C0FF)
+
+    ' Ellbogen am Ende des Oberarms + Unterarm-Drehung.
+    DIM elbow AS MAT4
+    elbow = MAT4_MUL(upper, MAT4_TRANSLATE(1.4, 0, 0))
+    DIM lower AS MAT4
+    lower = MAT4_MUL(elbow, QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 0, 1, SIN(t * 2.0) * 0.7 - 0.7)))
+    DIM lower_geo AS MAT4
+    lower_geo = MAT4_MUL(lower, MAT4_MUL(MAT4_TRANSLATE(0.6, 0, 0), MAT4_SCALE(1.2, 0.25, 0.25)))
+    MODEL_MATRIX(box, lower_geo, &H40FFA0)
+
+    ' Hand am Ende des Unterarms.
+    DIM hand AS MAT4
+    hand = MAT4_MUL(lower, MAT4_MUL(MAT4_TRANSLATE(1.2, 0, 0), MAT4_SCALE(0.35, 0.35, 0.35)))
+    MODEL_MATRIX(box, hand, &HFFE040)
+
+    TEXT(12, 10, "m3d: hierarchische Transforms (Koerper -> Oberarm -> Unterarm -> Hand)", WHITE)
+    TEXT(12, 34, "jede Ebene = MAT4_MUL(eltern, lokale_matrix); Gelenke via QUAT", &H88AACC)
+
+    FLIP()
+NEXT

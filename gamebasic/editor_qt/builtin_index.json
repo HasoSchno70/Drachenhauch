@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 764,
+ "count": 826,
  "builtins": [
   {
    "name": "ABS",
@@ -4585,6 +4585,378 @@
    "kind": "core",
    "signature": "__SET_DEDUP(v)",
    "module": "interpreter"
+  },
+  {
+   "name": "VEC3_NEW",
+   "kind": "core",
+   "signature": "VEC3_NEW(x, y, z)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_ZERO",
+   "kind": "core",
+   "signature": "VEC3_ZERO()",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_X",
+   "kind": "core",
+   "signature": "VEC3_X(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_Y",
+   "kind": "core",
+   "signature": "VEC3_Y(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_Z",
+   "kind": "core",
+   "signature": "VEC3_Z(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_LENGTH",
+   "kind": "core",
+   "signature": "VEC3_LENGTH(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_LENGTH_SQ",
+   "kind": "core",
+   "signature": "VEC3_LENGTH_SQ(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_NORMALIZE",
+   "kind": "core",
+   "signature": "VEC3_NORMALIZE(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_DOT",
+   "kind": "core",
+   "signature": "VEC3_DOT(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_CROSS",
+   "kind": "core",
+   "signature": "VEC3_CROSS(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_DISTANCE",
+   "kind": "core",
+   "signature": "VEC3_DISTANCE(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_LERP",
+   "kind": "core",
+   "signature": "VEC3_LERP(a, b, t)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_NEG",
+   "kind": "core",
+   "signature": "VEC3_NEG(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_SCALE",
+   "kind": "core",
+   "signature": "VEC3_SCALE(v, s)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_REFLECT",
+   "kind": "core",
+   "signature": "VEC3_REFLECT(v, n)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_TRANSFORM",
+   "kind": "core",
+   "signature": "VEC3_TRANSFORM(v, mat)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC3_TRANSFORM_DIR",
+   "kind": "core",
+   "signature": "VEC3_TRANSFORM_DIR(v, mat)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_NEW",
+   "kind": "core",
+   "signature": "VEC4_NEW(x, y, z, w)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_FROM_VEC3",
+   "kind": "core",
+   "signature": "VEC4_FROM_VEC3(v, w)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_X",
+   "kind": "core",
+   "signature": "VEC4_X(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_Y",
+   "kind": "core",
+   "signature": "VEC4_Y(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_Z",
+   "kind": "core",
+   "signature": "VEC4_Z(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_W",
+   "kind": "core",
+   "signature": "VEC4_W(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_DOT",
+   "kind": "core",
+   "signature": "VEC4_DOT(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_LENGTH",
+   "kind": "core",
+   "signature": "VEC4_LENGTH(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_NORMALIZE",
+   "kind": "core",
+   "signature": "VEC4_NORMALIZE(v)",
+   "module": "m3d"
+  },
+  {
+   "name": "VEC4_LERP",
+   "kind": "core",
+   "signature": "VEC4_LERP(a, b, t)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_IDENTITY",
+   "kind": "core",
+   "signature": "QUAT_IDENTITY()",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_NEW",
+   "kind": "core",
+   "signature": "QUAT_NEW(x, y, z, w)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_X",
+   "kind": "core",
+   "signature": "QUAT_X(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_Y",
+   "kind": "core",
+   "signature": "QUAT_Y(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_Z",
+   "kind": "core",
+   "signature": "QUAT_Z(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_W",
+   "kind": "core",
+   "signature": "QUAT_W(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_FROM_AXIS_ANGLE",
+   "kind": "core",
+   "signature": "QUAT_FROM_AXIS_ANGLE(ax, ay, az, winkel)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_FROM_EULER",
+   "kind": "core",
+   "signature": "QUAT_FROM_EULER(pitch, yaw, roll)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_MUL",
+   "kind": "core",
+   "signature": "QUAT_MUL(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_NORMALIZE",
+   "kind": "core",
+   "signature": "QUAT_NORMALIZE(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_CONJUGATE",
+   "kind": "core",
+   "signature": "QUAT_CONJUGATE(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_SLERP",
+   "kind": "core",
+   "signature": "QUAT_SLERP(a, b, t)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_TO_MAT4",
+   "kind": "core",
+   "signature": "QUAT_TO_MAT4(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "QUAT_ROTATE_VEC3",
+   "kind": "core",
+   "signature": "QUAT_ROTATE_VEC3(q, v)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_IDENTITY",
+   "kind": "core",
+   "signature": "MAT4_IDENTITY()",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_TRANSLATE",
+   "kind": "core",
+   "signature": "MAT4_TRANSLATE(x, y, z)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_SCALE",
+   "kind": "core",
+   "signature": "MAT4_SCALE(x, y, z)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_ROTATE_X",
+   "kind": "core",
+   "signature": "MAT4_ROTATE_X(winkel)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_ROTATE_Y",
+   "kind": "core",
+   "signature": "MAT4_ROTATE_Y(winkel)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_ROTATE_Z",
+   "kind": "core",
+   "signature": "MAT4_ROTATE_Z(winkel)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_ROTATE_AXIS",
+   "kind": "core",
+   "signature": "MAT4_ROTATE_AXIS(ax, ay, az, winkel)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_FROM_QUAT",
+   "kind": "core",
+   "signature": "MAT4_FROM_QUAT(q)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_TRS",
+   "kind": "core",
+   "signature": "MAT4_TRS(pos, rot, scale)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_MUL",
+   "kind": "core",
+   "signature": "MAT4_MUL(a, b)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_INVERT",
+   "kind": "core",
+   "signature": "MAT4_INVERT(m)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_TRANSPOSE",
+   "kind": "core",
+   "signature": "MAT4_TRANSPOSE(m)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_LOOKAT",
+   "kind": "core",
+   "signature": "MAT4_LOOKAT(eye, target, up)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_PERSPECTIVE",
+   "kind": "core",
+   "signature": "MAT4_PERSPECTIVE(fovy, aspect, near, far)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_ORTHO",
+   "kind": "core",
+   "signature": "MAT4_ORTHO(left, right, bottom, top, near, far)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_GET",
+   "kind": "core",
+   "signature": "MAT4_GET(m, row, col)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_TRANSFORM_VEC3",
+   "kind": "core",
+   "signature": "MAT4_TRANSFORM_VEC3(m, v)",
+   "module": "m3d"
+  },
+  {
+   "name": "MAT4_TRANSFORM_VEC4",
+   "kind": "core",
+   "signature": "MAT4_TRANSFORM_VEC4(m, v)",
+   "module": "m3d"
+  },
+  {
+   "name": "MODEL_MATRIX",
+   "kind": "graphics",
+   "signature": "MODEL_MATRIX(handle, mat [, tint])",
+   "module": "m3d"
+  },
+  {
+   "name": "CAMERA3D_VIEW",
+   "kind": "graphics",
+   "signature": "CAMERA3D_VIEW(mat)",
+   "module": "m3d"
+  },
+  {
+   "name": "CAMERA3D_PROJECTION",
+   "kind": "graphics",
+   "signature": "CAMERA3D_PROJECTION(mat)",
+   "module": "m3d"
   }
  ]
 }
