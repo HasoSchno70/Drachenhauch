@@ -1,19 +1,13 @@
-"""Tests fuer das camera-Modul.
+"""Tests fuer die Kamera-Mathematik (auf der behaltenen `Graphics`-Klasse).
 
-Kamera-Built-ins sind graphics_builtin - sie brauchen einen Graphics-Kontext.
-Wir testen direkt die Methoden auf der Graphics-Klasse, das umgeht den
-Pygame-Pfad und ist schnell.
+Die Kamera-Built-ins sind graphics_builtin (nativ in gbrt); die zugrunde liegende
+Mathematik (set/get/reset_camera, _w2s/_s2w/_scale_size) lebt in `graphics.py`
+(Stufe A behalten) und wird hier direkt getestet -- unabhaengig vom Builtin-Layer.
 """
 import pytest
 
 from gamebasic.graphics import Graphics
-from gamebasic.modules import load_module
 from gamebasic.errors import GBRuntimeError
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _load_camera():
-    assert load_module("camera")
 
 
 @pytest.fixture
