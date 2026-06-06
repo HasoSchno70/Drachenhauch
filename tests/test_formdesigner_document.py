@@ -2,7 +2,9 @@
 nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
 
-from gamebasic.formdesigner import Control, FormDoc, PALETTE, palette_spec
+from gamebasic.formdesigner import (
+    Control, FormDoc, PALETTE, palette_spec, GRID, HANDLES, snap, resize_rect,
+)
 
 
 # --------------------------------------------------------------- Modell
@@ -55,6 +57,44 @@ def test_handler_names_unique_in_order():
     doc.add("checkbox", 0, 30).on_change = "b"
     doc.add("button", 0, 60).on_click = "a"   # Duplikat
     assert doc.handler_names() == ["a", "b"]
+
+
+# --------------------------------------------------------------- Geometrie
+def test_snap_to_grid():
+    assert GRID == 8
+    assert snap(0) == 0
+    assert snap(3) == 0                  # naeher an 0
+    assert snap(4) == 8                  # Mittelpunkt -> auf (round-half-up)
+    assert snap(11) == 8 and snap(12) == 16
+    assert snap(100) == 104             # 12.5*8 -> 13*8
+    assert snap(5, grid=1) == 5         # grid<=1 -> passthrough
+
+
+def test_resize_east_grows_width_only():
+    # Ost-Griff: nur Breite, x fix.
+    assert resize_rect(10, 20, 100, 40, "e", 200, 999) == (10, 20, 190, 40)
+
+
+def test_resize_west_moves_x_keeps_right_edge():
+    # West-Griff: rechte Kante (x+w=110) bleibt fix.
+    x, y, w, h = resize_rect(10, 20, 100, 40, "w", 30, 999)
+    assert (x, w) == (30, 80) and x + w == 110
+    assert (y, h) == (20, 40)            # vertikal unberuehrt
+
+
+def test_resize_corner_se():
+    assert resize_rect(0, 0, 50, 50, "se", 80, 90) == (0, 0, 80, 90)
+
+
+def test_resize_respects_min_size():
+    # Ueber die gegenueberliegende Kante hinaus -> auf Mindestgroesse geklemmt.
+    x, y, w, h = resize_rect(10, 10, 100, 100, "nw", 999, 999, min_w=8, min_h=8)
+    assert w == 8 and h == 8
+    assert x == 110 - 8 and y == 110 - 8   # rechte/untere Kante bleiben fix
+
+
+def test_handles_cover_eight_directions():
+    assert set(HANDLES) == {"nw", "n", "ne", "e", "se", "s", "sw", "w"}
 
 
 # --------------------------------------------------------------- .gbform IO

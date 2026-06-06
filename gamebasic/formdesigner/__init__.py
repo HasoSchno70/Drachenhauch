@@ -8,6 +8,11 @@ GameBasic-Code (Harness + Event-Handler-Stubs).
 Die Qt-UI liegt in `gamebasic/formdesigner_qt.py`; dieses Paket bleibt Qt-frei
 und damit headless testbar.
 """
-from .document import Control, FormDoc, PALETTE, palette_spec
+from .document import (
+    Control, FormDoc, PALETTE, palette_spec, GRID, HANDLES, snap, resize_rect,
+)
 
-__all__ = ["Control", "FormDoc", "PALETTE", "palette_spec"]
+__all__ = [
+    "Control", "FormDoc", "PALETTE", "palette_spec",
+    "GRID", "HANDLES", "snap", "resize_rect",
+]

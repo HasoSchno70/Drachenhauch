@@ -6,6 +6,7 @@ nur der Designer braucht (`name`), ignoriert die Runtime beim Laden.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -43,6 +44,41 @@ _SPEC_BY_KIND = {p.kind: p for p in PALETTE}
 
 def palette_spec(kind: str) -> PaletteSpec | None:
     return _SPEC_BY_KIND.get(kind)
+
+
+# --- Geometrie: Snap-to-Grid + Resize -------------------------------------
+# Qt-frei, damit headless testbar (die Canvas ruft das nur auf).
+GRID = 8                                                  # Raster-Schrittweite (px)
+HANDLES = ("nw", "n", "ne", "e", "se", "s", "sw", "w")   # 8 Resize-Griffe
+
+
+def snap(v: int, grid: int = GRID) -> int:
+    """Rundet `v` auf das naechste Vielfache von `grid` (round-half-up, damit das
+    Ergebnis symmetrisch ist -- Pythons `round` waere banker's rounding)."""
+    if grid <= 1:
+        return int(v)
+    return int(math.floor(v / grid + 0.5)) * grid
+
+
+def resize_rect(x: int, y: int, w: int, h: int, handle: str, nx: int, ny: int,
+                min_w: int = 8, min_h: int = 8) -> tuple[int, int, int, int]:
+    """Neues (x, y, w, h), wenn am `handle` zur Zeiger-Position (nx, ny) gezogen
+    wird. Gegenueberliegende Kante bleibt fix; Mindestgroesse wird gewahrt.
+
+    `handle` ist einer von HANDLES; die Buchstaben n/s/e/w steuern, welche
+    Kanten der Zeiger bewegt (z.B. "ne" = Nord- + Ost-Kante)."""
+    right, bottom = x + w, y + h
+    if "e" in handle:
+        w = max(min_w, nx - x)
+    if "w" in handle:
+        nx = min(nx, right - min_w)
+        x, w = nx, right - nx
+    if "s" in handle:
+        h = max(min_h, ny - y)
+    if "n" in handle:
+        ny = min(ny, bottom - min_h)
+        y, h = ny, bottom - ny
+    return x, y, w, h
 
 
 # --- Control ----------------------------------------------------------------

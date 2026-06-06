@@ -14,7 +14,9 @@ Alternativ `gb` (oder `gbrun.py`) **ohne Argument** → Auswahl-Dialog
   Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar, Image, Canvas,
   Panel). Eintrag anklicken → „scharf", dann auf die Fläche klicken zum Platzieren.
 - **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
-  verschieben, `Entf` = löschen.
+  verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
+  Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein (Punkt-Raster sichtbar);
+  Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`).
 - **Rechts — Inspector:** Eigenschaften des gewählten Controls (Name, Text,
   Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert, aktiviert …).
 
@@ -64,8 +66,8 @@ erzeugen dieselbe Datei; beides ist austauschbar.
 
 ## Status / geplant
 
-Vorhanden: Platzieren, Auswählen, Verschieben, Löschen, Inspector
-(Kerneigenschaften + Events), Speichern/Laden, Ausführen (F5). Geplant:
-Resize-Handles + Snap-Grid, Undo/Redo, integrierter Code-Editor mit
-Doppelklick-auf-Control → Handler anlegen/anspringen, Multi-Form-Projekte,
-GB-Code-Export (explizite `GUI_*`-Konstruktion statt `GUI_LOAD`).
+Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
+Löschen, Inspector (Kerneigenschaften + Events), Speichern/Laden, Ausführen (F5).
+Geplant: Undo/Redo, integrierter Code-Editor mit Doppelklick-auf-Control →
+Handler anlegen/anspringen, Multi-Form-Projekte, GB-Code-Export (explizite
+`GUI_*`-Konstruktion statt `GUI_LOAD`).

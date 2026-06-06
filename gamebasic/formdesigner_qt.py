@@ -24,7 +24,9 @@ from PySide6.QtWidgets import (
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QDoubleSpinBox,
 )
 
-from .formdesigner import FormDoc, Control, PALETTE, palette_spec
+from .formdesigner import (
+    FormDoc, Control, PALETTE, palette_spec, GRID, HANDLES, snap, resize_rect,
+)
 
 try:
     from .editor_qt.theme import global_qss
@@ -34,6 +36,15 @@ except Exception:  # pragma: no cover - Theme optional
 
 PAD = 24          # Rand um das Fenster auf der Canvas
 TITLE_H = 22      # Titelleisten-Hoehe (wie im gui-Modul)
+HANDLE = 8        # Kantenlaenge eines Resize-Griffs (px)
+
+# Resize-Griff -> Maus-Cursor (diagonal/horizontal/vertikal)
+_HANDLE_CURSORS = {
+    "nw": Qt.CursorShape.SizeFDiagCursor, "se": Qt.CursorShape.SizeFDiagCursor,
+    "ne": Qt.CursorShape.SizeBDiagCursor, "sw": Qt.CursorShape.SizeBDiagCursor,
+    "n": Qt.CursorShape.SizeVerCursor, "s": Qt.CursorShape.SizeVerCursor,
+    "e": Qt.CursorShape.SizeHorCursor, "w": Qt.CursorShape.SizeHorCursor,
+}
 
 
 def _find_gbrt():
@@ -60,10 +71,13 @@ class _Canvas(QWidget):
         self.doc = FormDoc()
         self.selected: Control | None = None
         self.place_kind: str | None = None      # aus der Palette "scharf geschaltet"
+        self.snap_grid = True                    # Snap-to-Grid aktiv?
         self._drag = False
         self._drag_off = QPoint(0, 0)
+        self._resize_handle: str | None = None   # aktiver Resize-Griff beim Ziehen
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
 
     def set_doc(self, doc: FormDoc):
         self.doc = doc
@@ -79,6 +93,31 @@ class _Canvas(QWidget):
     def _to_ctrl(self, p: QPoint) -> tuple[int, int]:
         return (p.x() - PAD, p.y() - PAD - TITLE_H)
 
+    def _snap(self, v: int) -> int:
+        return snap(v) if self.snap_grid else int(v)
+
+    def _handle_points(self, c: Control) -> dict[str, QPoint]:
+        """Screen-Mittelpunkte der 8 Resize-Griffe des Controls."""
+        x = PAD + c.x
+        y = PAD + TITLE_H + c.y
+        mx, my = x + c.w // 2, y + c.h // 2
+        rx, by = x + c.w, y + c.h
+        return {
+            "nw": QPoint(x, y), "n": QPoint(mx, y), "ne": QPoint(rx, y),
+            "e": QPoint(rx, my), "se": QPoint(rx, by), "s": QPoint(mx, by),
+            "sw": QPoint(x, by), "w": QPoint(x, my),
+        }
+
+    def _handle_at(self, p: QPoint) -> str | None:
+        """Welcher Resize-Griff des selektierten Controls liegt unter `p`?"""
+        if self.selected is None:
+            return None
+        tol = HANDLE
+        for name, hp in self._handle_points(self.selected).items():
+            if abs(p.x() - hp.x()) <= tol and abs(p.y() - hp.y()) <= tol:
+                return name
+        return None
+
     def paintEvent(self, _ev):
         qp = QPainter(self)
         qp.fillRect(self.rect(), QColor(18, 22, 28))
@@ -87,6 +126,8 @@ class _Canvas(QWidget):
         qp.fillRect(win, QColor(24, 34, 46))
         qp.setPen(QPen(QColor(46, 88, 110), 1))
         qp.drawRect(win)
+        if self.snap_grid:
+            self._paint_grid(qp, d)
         # Titelleiste
         qp.fillRect(QRect(PAD, PAD, d.w, TITLE_H), QColor(18, 90, 120))
         qp.setPen(QColor(230, 247, 255))
@@ -96,6 +137,19 @@ class _Canvas(QWidget):
             self._paint_control(qp, c)
         if self.selected is not None:
             self._paint_handles(qp, self.selected)
+
+    def _paint_grid(self, qp: QPainter, d: FormDoc):
+        """Dezente Raster-Punkte im Fenster-Inhaltsbereich (unter der Titelleiste)."""
+        qp.setPen(QPen(QColor(60, 78, 96), 1))
+        x0 = PAD
+        y0 = PAD + TITLE_H
+        gx = GRID
+        while gx <= d.w:
+            gy = GRID
+            while gy <= d.h - TITLE_H:
+                qp.drawPoint(x0 + gx, y0 + gy)
+                gy += GRID
+            gx += GRID
 
     def _paint_control(self, qp: QPainter, c: Control):
         x = PAD + c.x
@@ -140,19 +194,32 @@ class _Canvas(QWidget):
     def _paint_handles(self, qp: QPainter, c: Control):
         x = PAD + c.x
         y = PAD + TITLE_H + c.y
-        qp.setPen(QPen(QColor(43, 196, 232), 2))
+        # Selektionsrahmen
+        qp.setPen(QPen(QColor(43, 196, 232), 1, Qt.PenStyle.DashLine))
         qp.setBrush(Qt.BrushStyle.NoBrush)
-        qp.drawRect(QRect(x - 2, y - 2, c.w + 4, c.h + 4))
+        qp.drawRect(QRect(x - 1, y - 1, c.w + 2, c.h + 2))
+        # 8 Resize-Griffe
+        qp.setPen(QPen(QColor(12, 18, 24), 1))
+        qp.setBrush(QBrush(QColor(43, 196, 232)))
+        s = HANDLE
+        for hp in self._handle_points(c).values():
+            qp.drawRect(QRect(hp.x() - s // 2, hp.y() - s // 2, s, s))
 
     # -- Maus --
     def mousePressEvent(self, ev):
-        cx, cy = self._to_ctrl(ev.position().toPoint())
+        p = ev.position().toPoint()
+        cx, cy = self._to_ctrl(p)
         if self.place_kind:
-            c = self.doc.add(self.place_kind, max(cx, 0), max(cy, 0))
+            c = self.doc.add(self.place_kind, max(self._snap(cx), 0), max(self._snap(cy), 0))
             self.place_kind = None
             self._select(c)
             self.doc_changed.emit()
             self.update()
+            return
+        # Resize-Griff des bereits selektierten Controls?
+        handle = self._handle_at(p)
+        if handle is not None:
+            self._resize_handle = handle
             return
         hit = self.doc.control_at(cx, cy)
         self._select(hit)
@@ -162,16 +229,31 @@ class _Canvas(QWidget):
         self.update()
 
     def mouseMoveEvent(self, ev):
+        p = ev.position().toPoint()
+        cx, cy = self._to_ctrl(p)
+        if self._resize_handle is not None and self.selected is not None:
+            c = self.selected
+            nx, ny = self._snap(cx), self._snap(cy)
+            c.x, c.y, c.w, c.h = resize_rect(c.x, c.y, c.w, c.h, self._resize_handle, nx, ny)
+            self.selection_changed.emit(c)               # Inspector live aktualisieren
+            self.doc_changed.emit()
+            self.update()
+            return
         if self._drag and self.selected is not None:
-            cx, cy = self._to_ctrl(ev.position().toPoint())
-            self.selected.x = max(0, cx - self._drag_off.x())
-            self.selected.y = max(0, cy - self._drag_off.y())
+            self.selected.x = max(0, self._snap(cx - self._drag_off.x()))
+            self.selected.y = max(0, self._snap(cy - self._drag_off.y()))
             self.selection_changed.emit(self.selected)   # Inspector live aktualisieren
             self.doc_changed.emit()
             self.update()
+            return
+        # Kein Knopf gedrueckt: Hover-Cursor ueber Resize-Griffen
+        if not (ev.buttons() & Qt.MouseButton.LeftButton):
+            handle = self._handle_at(p)
+            self.setCursor(_HANDLE_CURSORS[handle] if handle else Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, _ev):
         self._drag = False
+        self._resize_handle = None
 
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
@@ -340,6 +422,17 @@ class FormDesigner(QMainWindow):
         act("Speichern unter...", "Ctrl+Shift+S", self.save_form_as)
         m.addSeparator()
         act("Ausfuehren (gbrt)", "F5", self.run_form)
+
+        v = self.menuBar().addMenu("&Ansicht")
+        self.act_snap = QAction("Am Raster ausrichten", self, checkable=True)
+        self.act_snap.setChecked(self.canvas.snap_grid)
+        self.act_snap.setShortcut(QKeySequence("Ctrl+G"))
+        self.act_snap.toggled.connect(self._toggle_snap)
+        v.addAction(self.act_snap)
+
+    def _toggle_snap(self, on: bool):
+        self.canvas.snap_grid = on
+        self.canvas.update()
 
     # -- Aktionen --
     def _mark_dirty(self):
