@@ -1,0 +1,75 @@
+' 104_instancing.gb -- GPU-Instancing mit m3d (MODEL_INSTANCED)
+'
+' Echtes GPU-Instancing: 1024 Wuerfel (32x32-Gitter), JEDER mit eigener
+' Welt-Matrix (Position + Bob + Rotation + Skalierung), gerendert in EINEM
+' einzigen Draw-Call -- nicht 1024 Aufrufen.
+'
+'   - MODEL_INSTANCED(handle, mats[, tint]) nimmt ein ARRAY OF MAT4 (oder ein
+'     TUPLE von MAT4) und zeichnet das Mesh fuer jede Matrix per
+'     raylib::DrawMeshInstanced (ein Vertex-Attribut instanceTransform).
+'   - Zum Vergleich kann man dasselbe mit 1024x MODEL_MATRIX(...) zeichnen
+'     (1024 Draws). MODEL_INSTANCED ist dafuer die performante Variante.
+'
+' Native-only (F6 / gbrt). Beleuchtung optional -- ohne LIGHT_* zeigt der
+' Instancing-Shader flaches Albedo (die tint-Farbe).
+
+IMPORT "g3d"
+IMPORT "m3d"
+
+CONST GRID AS INTEGER = 32          ' 32x32 = 1024 Instanzen
+CONST COUNT AS INTEGER = GRID * GRID
+
+SCREEN(900, 540, "m3d -- GPU-Instancing (1024 Wuerfel, 1 Draw-Call)", 1)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H202830, 0.5)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+
+' EIN Wuerfel-Mesh, das wir COUNT-mal instanziert zeichnen.
+DIM box AS INTEGER
+box = MESH_CUBE(0.7, 0.7, 0.7)
+
+' Per-Instanz-Welt-Matrizen. Einmal allokiert, pro Frame neu befuellt.
+DIM mats[COUNT] AS MAT4
+
+DIM t AS FLOAT
+t = 0.0
+
+DIM frame AS INTEGER
+FOR frame = 0 TO 100000
+    IF QUITREQUESTED() THEN BREAK
+    t = t + 0.02
+
+    CLS(&H0E1014)
+    CAMERA3D(SIN(t * 0.15) * 38.0, 26.0, COS(t * 0.15) * 38.0, 0, 0, 0, 45)
+
+    ' Gitter aus Wuerfeln aufbauen -- jede Zelle eine eigene Matrix.
+    DIM gx AS INTEGER
+    DIM gz AS INTEGER
+    DIM idx AS INTEGER
+    idx = 0
+    FOR gx = 0 TO GRID - 1
+        FOR gz = 0 TO GRID - 1
+            DIM wx AS FLOAT
+            DIM wz AS FLOAT
+            wx = (gx - GRID / 2) * 1.4
+            wz = (gz - GRID / 2) * 1.4
+            ' Hoehen-Welle ueber das Gitter + Eigenrotation.
+            DIM bob AS FLOAT
+            bob = SIN(t * 2.0 + gx * 0.4 + gz * 0.4) * 1.6
+            DIM rot AS MAT4
+            rot = QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 1, 0, t + gx * 0.2))
+            mats[idx] = MAT4_MUL(MAT4_TRANSLATE(wx, bob, wz), rot)
+            idx = idx + 1
+        NEXT
+    NEXT
+
+    ' >>> 1 Draw-Call fuer alle COUNT Wuerfel. <<<
+    MODEL_INSTANCED(box, mats, &H50C0FF)
+
+    TEXT(12, 10, f"GPU-Instancing: {COUNT} Wuerfel in EINEM Draw-Call", WHITE)
+    TEXT(12, 34, "MODEL_INSTANCED(handle, ARRAY OF MAT4) -- raylib DrawMeshInstanced", &H88AACC)
+    TEXT(12, 58, f"FPS: {FPS()}", &H88FFAA)
+
+    FLIP()
+NEXT

@@ -175,3 +175,41 @@ def test_mat4_dim_type_accepted(run_gb):
     # DIM x AS MAT4 muss der Compiler akzeptieren (MODULE_TYPES).
     out = run_gb(_gb("DIM m AS MAT4\nm = MAT4_IDENTITY()\nPRINT MAT4_GET(m, 3, 3)\n"))
     assert out.strip() == "1.0"
+
+
+# --------------------------------------------------------- MODEL_INSTANCED
+# Die Argument-Validierung von MODEL_INSTANCED laeuft in vm.rs, BEVOR der
+# Grafik-Kontext angefasst wird -> diese Fehlerpfade brauchen kein Fenster.
+def test_model_instanced_arg2_wrong_type_raises(run_gb):
+    with pytest.raises(GameBasicError, match="ARRAY OF MAT4 oder TUPLE"):
+        run_gb(_gb("MODEL_INSTANCED(0, 5)\n"))
+
+
+def test_model_instanced_non_mat4_element_raises(run_gb):
+    # TUPLE mit gemischten Typen -> Element 1 ist kein MAT4.
+    with pytest.raises(GameBasicError, match="kein MAT4"):
+        run_gb(_gb("MODEL_INSTANCED(0, (MAT4_IDENTITY(), 5))\n"))
+
+
+def test_model_instanced_headless_render(tmp_path):
+    """Echter Render-Pfad: die Instancing-Demo laeuft headless (GBRT_FRAMES)
+    durch DrawMeshInstanced und schreibt einen Screenshot."""
+    import os
+    import subprocess
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    gbrt = next((root / "rust" / "gb_runtime" / "target" / v / exe
+                 for v in ("release", "debug")
+                 if (root / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+    if gbrt is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+
+    shot = tmp_path / "instanced.png"
+    env = dict(os.environ, GBRT_FRAMES="2", GBRT_SCREENSHOT=str(shot))
+    demo = root / "examples" / "104_instancing.gb"
+    r = subprocess.run([str(gbrt), "run", str(demo)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60, env=env)
+    assert r.returncode == 0, f"gbrt Exit {r.returncode}: {r.stderr}"
+    assert shot.exists() and shot.stat().st_size > 0, "kein Screenshot erzeugt"
