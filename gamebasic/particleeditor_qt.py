@@ -25,7 +25,7 @@ from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .editor_qt.preset_bar import PresetBar
 from .editor_qt.preset_library import PresetLibrary, default_dir
-from .modules.particles import _ParticleSystem
+from .particle_sim import _ParticleSystem
 
 _MODES = ("circle", "pixel", "square", "streak", "glow")
 
