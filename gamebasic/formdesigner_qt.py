@@ -183,6 +183,7 @@ class _Canvas(QWidget):
     doc_replaced = Signal(object)        # FormDoc (komplett ersetzt: set_doc/Undo)
     handler_requested = Signal(object)   # Control (Doppelklick -> Code-Editor)
     context_menu = Signal(object)        # QPoint (global) -- Rechtsklick auf Control
+    zoom_changed = Signal(float)         # neue Zoom-Stufe
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -198,6 +199,7 @@ class _Canvas(QWidget):
         self._resize_handle: str | None = None   # aktiver Resize-Griff beim Ziehen
         self._pending: dict | None = None        # Pre-Gesten-Snapshot (Drag/Resize)
         self._nudge_active = False               # laufende Pfeiltasten-Verschiebung?
+        self.zoom = 1.0                          # Zoom-Faktor der Design-Flaeche
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -213,9 +215,33 @@ class _Canvas(QWidget):
         self.update()
 
     def _resize_to_doc(self):
-        self.setMinimumSize(self.doc.w + 2 * PAD + 40, self.doc.h + 2 * PAD + 40)
+        z = self.zoom
+        self.setMinimumSize(int((self.doc.w + 2 * PAD + 40) * z),
+                            int((self.doc.h + 2 * PAD + 40) * z))
 
-    # -- Koordinaten: Canvas -> Control-relativ (Fenster-Inhalt) --
+    def set_zoom(self, z: float):
+        z = max(0.25, min(4.0, z))
+        if abs(z - self.zoom) < 1e-6:
+            return
+        self.zoom = z
+        self._resize_to_doc()
+        self.update()
+        self.zoom_changed.emit(z)
+
+    def wheelEvent(self, ev):
+        if ev.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.set_zoom(self.zoom * (1.1 if ev.angleDelta().y() > 0 else 1 / 1.1))
+            ev.accept()
+        else:
+            super().wheelEvent(ev)
+
+    # -- Koordinaten --
+    # Widget-Pixel -> Zeichen-Raum (durch den Zoom geteilt); Zeichen-Raum ->
+    # Control-relativ (Fenster-Inhalt). Mausereignisse erst durch _to_draw.
+    def _to_draw(self, pt) -> QPoint:
+        z = self.zoom or 1.0
+        return QPoint(int(pt.x() / z), int(pt.y() / z))
+
     def _to_ctrl(self, p: QPoint) -> tuple[int, int]:
         return (p.x() - PAD, p.y() - PAD - TITLE_H)
 
@@ -246,7 +272,8 @@ class _Canvas(QWidget):
 
     def paintEvent(self, _ev):
         qp = QPainter(self)
-        qp.fillRect(self.rect(), QColor(18, 22, 28))
+        qp.fillRect(self.rect(), QColor(18, 22, 28))   # Hintergrund (Widget-Raum)
+        qp.scale(self.zoom, self.zoom)                 # ab hier alles im Zeichen-Raum
         d = self.doc
         win = QRect(PAD, PAD, d.w, d.h)
         qp.fillRect(win, QColor(24, 34, 46))
@@ -397,7 +424,7 @@ class _Canvas(QWidget):
     # -- Maus --
     def mousePressEvent(self, ev):
         self._nudge_active = False
-        p = ev.position().toPoint()
+        p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
         if self.place_kind:
             self._place_control(self.place_kind, cx, cy)
@@ -418,7 +445,7 @@ class _Canvas(QWidget):
         self.update()
 
     def mouseMoveEvent(self, ev):
-        p = ev.position().toPoint()
+        p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
         if self._resize_handle is not None and self.selected is not None:
             c = self.selected
@@ -450,7 +477,7 @@ class _Canvas(QWidget):
         self._resize_handle = None
 
     def mouseDoubleClickEvent(self, ev):
-        cx, cy = self._to_ctrl(ev.position().toPoint())
+        cx, cy = self._to_ctrl(self._to_draw(ev.position()))
         hit = self.doc.control_at(cx, cy)
         if hit is not None:
             self._drag = False
@@ -485,7 +512,7 @@ class _Canvas(QWidget):
         if not md.hasFormat(_CONTROL_MIME):
             return
         kind = bytes(md.data(_CONTROL_MIME)).decode("utf-8")
-        cx, cy = self._to_ctrl(ev.position().toPoint())
+        cx, cy = self._to_ctrl(self._to_draw(ev.position()))
         self.place_kind = None
         self._place_control(kind, cx, cy)
         ev.acceptProposedAction()
@@ -526,7 +553,7 @@ class _Canvas(QWidget):
         self.update()
 
     def contextMenuEvent(self, ev):
-        cx, cy = self._to_ctrl(ev.pos())
+        cx, cy = self._to_ctrl(self._to_draw(ev.pos()))
         hit = self.doc.control_at(cx, cy)
         if hit is not None:
             self._select(hit)
@@ -815,6 +842,10 @@ class FormDesigner(QMainWindow):
 
         self._status = QLabel("")                 # Live-Anzeige der Selektion
         self.statusBar().addPermanentWidget(self._status)
+        self._zoom_lbl = QLabel("100 %")
+        self.statusBar().addPermanentWidget(self._zoom_lbl)
+        self.canvas.zoom_changed.connect(
+            lambda z: self._zoom_lbl.setText(f"{round(z * 100)} %"))
 
         self._build_menu()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
@@ -883,6 +914,10 @@ class FormDesigner(QMainWindow):
         self.act_snap.setShortcut(QKeySequence("Ctrl+G"))
         self.act_snap.toggled.connect(self._toggle_snap)
         v.addAction(self.act_snap)
+        v.addSeparator()
+        act("Vergroessern", "Ctrl+=", lambda: self.canvas.set_zoom(self.canvas.zoom * 1.25), menu=v)
+        act("Verkleinern", "Ctrl+-", lambda: self.canvas.set_zoom(self.canvas.zoom / 1.25), menu=v)
+        act("Zoom 100%", "Ctrl+0", lambda: self.canvas.set_zoom(1.0), menu=v)
 
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on

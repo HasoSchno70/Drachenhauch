@@ -246,6 +246,46 @@ def test_canvas_renders_all_kinds(tmp_path):
     win.close()
 
 
+# --------------------------------------------------------------- Zoom
+def test_zoom_levels_and_clamp(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.set_zoom(2.0)
+    assert cv.zoom == 2.0 and win._zoom_lbl.text() == "200 %"
+    cv.set_zoom(99.0); assert cv.zoom == 4.0       # max-Clamp
+    cv.set_zoom(0.01); assert cv.zoom == 0.25      # min-Clamp
+    win.close()
+
+
+def test_zoom_coordinate_mapping(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.set_zoom(2.0)
+    wx, wy = (PAD + 40) * 2, (PAD + TITLE_H + 40) * 2
+    assert cv._to_ctrl(cv._to_draw(QPointF(wx, wy))) == (40, 40)
+    # minimumSize waechst mit dem Zoom (Scrollbarkeit)
+    cv.set_zoom(1.0); m1 = cv.minimumWidth()
+    cv.set_zoom(2.0); assert cv.minimumWidth() > m1
+    win.close()
+
+
+def test_drop_under_zoom(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.set_zoom(2.0)
+    md = QMimeData(); md.setData(_CONTROL_MIME, b"button")
+    pos = QPointF((PAD + 40) * 2, (PAD + TITLE_H + 40) * 2)
+    ev = QDropEvent(pos, Qt.DropAction.CopyAction, md,
+                    Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    cv.dropEvent(ev)
+    c = cv.doc.controls[-1]
+    assert (c.x, c.y) == (40, 40)                  # Drop trotz Zoom korrekt platziert
+    win.close()
+
+
 # --------------------------------------------------------------- Edit-UX
 def _press(cv, key, mod=Qt.KeyboardModifier.NoModifier):
     cv.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, mod))
