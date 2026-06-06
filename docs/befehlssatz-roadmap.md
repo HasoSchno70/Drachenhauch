@@ -120,3 +120,26 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 **Empfohlene Reihenfolge:** WP0 → WP2 → WP1 → WP3 → WP4. **Alle WPs erledigt
 (2026-06-05).** WP1–WP4 wurden gbrt-only umgesetzt (neue Builtins nur in der
 nativen Runtime; Run-/Export-Pfad läuft über gbrts Rust-Frontend).
+
+---
+
+## Nachtrag „rund machen" (2026-06-06, gbrt-only)
+
+Zweiter Lücken-Sweep gegen die echte Builtin-Liste; alles pur in
+`rust/gb_runtime/src/builtins.rs` (+ Golden-Tests `tests/test_builtins_extra.py`,
+`builtin_index.json`). Vorher fehlten u.a. `vec2`-Verwandte → siehe Modul `m3d`.
+
+- [x] **Game-Math:** `WRAP(v,lo,hi)`, `PINGPONG(t,len)`, `MOVETOWARD(cur,ziel,maxd)`,
+      `SMOOTHSTEP(e0,e1,x)`, `CLAMP01(v)`, `APPROX(a,b[,eps])`, `LOG10(x)`.
+      (`CLAMP`/`LERP`/`REMAP`/`HYPOT`/`DEG`/`RAD` gab es schon.)
+- [x] **Perlin-Noise** (deterministisch, ~[-1,1]): `NOISE(x)`, `NOISE2(x,y)`,
+      `NOISE3(x,y,z)`, `FBM(x,y,octaves)`, `FBM3(x,y,z,octaves)` — prozedurale
+      Generierung. (Ergänzt das texturbasierte `GENTEX_PERLIN`.)
+- [x] **Laufzeit-Typen:** `TYPEOF(x)`, `ISNUM/ISINT/ISSTR/ISBOOL(x)`.
+- [x] **Encoding/Hash:** `BASE64_ENCODE/DECODE`, `CRC32(s$)`, `HASH(s$)` (FNV-1a 64).
+- [x] **Datei/OS:** `LISTDIR(p$)→ARRAY OF STRING`, `DIREXISTS`, `MKDIR`,
+      `COPYFILE`, `RENAMEFILE`, `APPENDFILE`, `BASENAME`, `DIRNAME`, `JOINPATH`.
+
+Abgedeckt durch Bestehendes (nicht neu): `ARRAY_FIND`→`ARRAY_INDEXOF`,
+`ARRAY_CONTAINS`→`IN`, `ARRAY_MAP/FILTER`→Comprehensions, `ARRAY_SLICE`→`a[i:j]`,
+`ASC`=`ORD`, `SLEEP`, `DELETEFILE`, `URL_ENCODE/DECODE` (Modul `html`).

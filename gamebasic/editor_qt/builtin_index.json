@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 827,
+ "count": 855,
  "builtins": [
   {
    "name": "ABS",
@@ -4963,6 +4963,174 @@
    "kind": "graphics",
    "signature": "CAMERA3D_PROJECTION(mat)",
    "module": "m3d"
+  },
+  {
+   "name": "WRAP",
+   "kind": "core",
+   "signature": "WRAP(v, lo, hi)",
+   "module": "interpreter"
+  },
+  {
+   "name": "PINGPONG",
+   "kind": "core",
+   "signature": "PINGPONG(t, len)",
+   "module": "interpreter"
+  },
+  {
+   "name": "MOVETOWARD",
+   "kind": "core",
+   "signature": "MOVETOWARD(cur, ziel, maxdelta)",
+   "module": "interpreter"
+  },
+  {
+   "name": "SMOOTHSTEP",
+   "kind": "core",
+   "signature": "SMOOTHSTEP(edge0, edge1, x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "CLAMP01",
+   "kind": "core",
+   "signature": "CLAMP01(v)",
+   "module": "interpreter"
+  },
+  {
+   "name": "APPROX",
+   "kind": "core",
+   "signature": "APPROX(a, b [, eps])",
+   "module": "interpreter"
+  },
+  {
+   "name": "LOG10",
+   "kind": "core",
+   "signature": "LOG10(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "NOISE",
+   "kind": "core",
+   "signature": "NOISE(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "NOISE2",
+   "kind": "core",
+   "signature": "NOISE2(x, y)",
+   "module": "interpreter"
+  },
+  {
+   "name": "NOISE3",
+   "kind": "core",
+   "signature": "NOISE3(x, y, z)",
+   "module": "interpreter"
+  },
+  {
+   "name": "FBM",
+   "kind": "core",
+   "signature": "FBM(x, y, octaves)",
+   "module": "interpreter"
+  },
+  {
+   "name": "FBM3",
+   "kind": "core",
+   "signature": "FBM3(x, y, z, octaves)",
+   "module": "interpreter"
+  },
+  {
+   "name": "TYPEOF",
+   "kind": "core",
+   "signature": "TYPEOF(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "ISNUM",
+   "kind": "core",
+   "signature": "ISNUM(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "ISINT",
+   "kind": "core",
+   "signature": "ISINT(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "ISSTR",
+   "kind": "core",
+   "signature": "ISSTR(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "ISBOOL",
+   "kind": "core",
+   "signature": "ISBOOL(x)",
+   "module": "interpreter"
+  },
+  {
+   "name": "BASE64_ENCODE",
+   "kind": "core",
+   "signature": "BASE64_ENCODE(s: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "BASE64_DECODE",
+   "kind": "core",
+   "signature": "BASE64_DECODE(s: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "CRC32",
+   "kind": "core",
+   "signature": "CRC32(s: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "HASH",
+   "kind": "core",
+   "signature": "HASH(s: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "LISTDIR",
+   "kind": "core",
+   "signature": "LISTDIR(p: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "COPYFILE",
+   "kind": "core",
+   "signature": "COPYFILE(src, dst)",
+   "module": "interpreter"
+  },
+  {
+   "name": "RENAMEFILE",
+   "kind": "core",
+   "signature": "RENAMEFILE(src, dst)",
+   "module": "interpreter"
+  },
+  {
+   "name": "APPENDFILE",
+   "kind": "core",
+   "signature": "APPENDFILE(p: STRING, text: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "BASENAME",
+   "kind": "core",
+   "signature": "BASENAME(p: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "DIRNAME",
+   "kind": "core",
+   "signature": "DIRNAME(p: STRING)",
+   "module": "interpreter"
+  },
+  {
+   "name": "JOINPATH",
+   "kind": "core",
+   "signature": "JOINPATH(a: STRING, b: STRING)",
+   "module": "interpreter"
   }
  ]
 }

@@ -750,6 +750,87 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let x = need_num(&a[0], "FRAC")?;
             Ok(Value::Float(x - x.trunc()))
         }
+        // --- Game-Math-Helfer ---
+        "wrap" => {
+            // WRAP(v, lo, hi): v zyklisch in [lo, hi) falten (Winkel/Index-Umlauf).
+            arity!(3);
+            let (v, lo, hi) = (need_num(&a[0], "WRAP")?, need_num(&a[1], "WRAP")?, need_num(&a[2], "WRAP")?);
+            let range = hi - lo;
+            if range == 0.0 { return Ok(Value::Float(lo)); }
+            let mut t = (v - lo) % range;
+            if t < 0.0 { t += range; }
+            Ok(Value::Float(lo + t))
+        }
+        "pingpong" => {
+            // PINGPONG(t, len): in [0, len] hin- und herpendeln (Dreieckswelle).
+            arity!(2);
+            let (t, len) = (need_num(&a[0], "PINGPONG")?, need_num(&a[1], "PINGPONG")?);
+            if len <= 0.0 { return Ok(Value::Float(0.0)); }
+            let m = ((t % (2.0 * len)) + 2.0 * len) % (2.0 * len);
+            Ok(Value::Float(if m <= len { m } else { 2.0 * len - m }))
+        }
+        "movetoward" => {
+            // MOVETOWARD(cur, ziel, maxdelta): cur um max. maxdelta Richtung ziel.
+            arity!(3);
+            let (cur, target, md) = (need_num(&a[0], "MOVETOWARD")?, need_num(&a[1], "MOVETOWARD")?, need_num(&a[2], "MOVETOWARD")?);
+            let d = target - cur;
+            Ok(Value::Float(if d.abs() <= md.abs() { target } else { cur + d.signum() * md.abs() }))
+        }
+        "smoothstep" => {
+            // SMOOTHSTEP(edge0, edge1, x): weicher 0->1-Uebergang (Hermite).
+            arity!(3);
+            let (e0, e1, x) = (need_num(&a[0], "SMOOTHSTEP")?, need_num(&a[1], "SMOOTHSTEP")?, need_num(&a[2], "SMOOTHSTEP")?);
+            if e1 == e0 { return Ok(Value::Float(0.0)); }
+            let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
+            Ok(Value::Float(t * t * (3.0 - 2.0 * t)))
+        }
+        "clamp01" => {
+            arity!(1);
+            Ok(Value::Float(need_num(&a[0], "CLAMP01")?.clamp(0.0, 1.0)))
+        }
+        "approx" => {
+            // APPROX(a, b [, eps]): True, wenn |a-b| <= eps (Default 1e-6).
+            if a.len() != 2 && a.len() != 3 { return err("APPROX: erwartet 2 oder 3 Argumente".to_string()); }
+            let (x, y) = (need_num(&a[0], "APPROX")?, need_num(&a[1], "APPROX")?);
+            let eps = if a.len() == 3 { need_num(&a[2], "APPROX")? } else { 1e-6 };
+            Ok(Value::Bool((x - y).abs() <= eps))
+        }
+        "log10" => { arity!(1); Ok(Value::Float(need_num(&a[0], "LOG10")?.log10())) }
+        // --- Perlin-Noise (deterministisch, Wert in ~[-1, 1]) ---
+        "noise" => { arity!(1); Ok(Value::Float(perlin3(need_num(&a[0], "NOISE")?, 0.0, 0.0))) }
+        "noise2" => { arity!(2); Ok(Value::Float(perlin3(need_num(&a[0], "NOISE2")?, need_num(&a[1], "NOISE2")?, 0.0))) }
+        "noise3" => { arity!(3); Ok(Value::Float(perlin3(need_num(&a[0], "NOISE3")?, need_num(&a[1], "NOISE3")?, need_num(&a[2], "NOISE3")?))) }
+        "fbm" => {
+            // FBM(x, y, octaves): fraktales 2D-Noise (Lacunarity 2.0, Gain 0.5).
+            arity!(3);
+            let (x, y) = (need_num(&a[0], "FBM")?, need_num(&a[1], "FBM")?);
+            let oct = need_int(&a[2], "FBM")?.clamp(1, 12);
+            Ok(Value::Float(fbm3(x, y, 0.0, oct)))
+        }
+        "fbm3" => {
+            arity!(4);
+            let (x, y, z) = (need_num(&a[0], "FBM3")?, need_num(&a[1], "FBM3")?, need_num(&a[2], "FBM3")?);
+            let oct = need_int(&a[3], "FBM3")?.clamp(1, 12);
+            Ok(Value::Float(fbm3(x, y, z, oct)))
+        }
+        // --- Laufzeit-Typen ---
+        "typeof" => { arity!(1); Ok(Value::str_rc(a[0].type_name())) }
+        "isnum" => { arity!(1); Ok(Value::Bool(is_num(&a[0]))) }
+        "isint" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Int(_)))) }
+        "isstr" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Str(_)))) }
+        "isbool" => { arity!(1); Ok(Value::Bool(matches!(a[0], Value::Bool(_)))) }
+        // --- Encoding / Hash ---
+        "base64_encode" => { arity!(1); Ok(Value::str_rc(&b64_encode(need_str(&a[0], "BASE64_ENCODE")?.as_bytes()))) }
+        "base64_decode" => {
+            arity!(1);
+            let bytes = b64_decode(need_str(&a[0], "BASE64_DECODE")?)?;
+            match String::from_utf8(bytes) {
+                Ok(s) => Ok(Value::str_rc(&s)),
+                Err(_) => err("BASE64_DECODE: dekodierte Bytes sind kein gueltiges UTF-8".to_string()),
+            }
+        }
+        "crc32" => { arity!(1); Ok(Value::Int(crc32(need_str(&a[0], "CRC32")?.as_bytes()) as i64)) }
+        "hash" => { arity!(1); Ok(Value::Int(fnv1a64(need_str(&a[0], "HASH")?.as_bytes()) as i64)) }
         "red" => { arity!(1); Ok(Value::Int((need_int(&a[0], "RED")? >> 16) & 0xFF)) }
         "green" => { arity!(1); Ok(Value::Int((need_int(&a[0], "GREEN")? >> 8) & 0xFF)) }
         "blue" => { arity!(1); Ok(Value::Int(need_int(&a[0], "BLUE")? & 0xFF)) }
@@ -1444,6 +1525,64 @@ fn call_inner(name: &str, a: &[Value]) -> R {
 
         // ===== Core File-I/O =====
         "fileexists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "FILEEXISTS")?).is_file())) }
+        "direxists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "DIREXISTS")?).is_dir())) }
+        "listdir" => {
+            // LISTDIR(pfad$) -> ARRAY OF STRING (Dateien + Unterordner, ohne . / ..).
+            arity!(1);
+            let path = need_str(&a[0], "LISTDIR")?;
+            let rd = std::fs::read_dir(path).map_err(|e| format!("LISTDIR: {}", e))?;
+            let mut names: Vec<String> = Vec::new();
+            for e in rd {
+                let e = e.map_err(|e| format!("LISTDIR: {}", e))?;
+                names.push(e.file_name().to_string_lossy().into_owned());
+            }
+            names.sort();
+            Ok(new_str_array(names))
+        }
+        "mkdir" => {
+            arity!(1);
+            std::fs::create_dir_all(need_str(&a[0], "MKDIR")?).map_err(|e| format!("MKDIR: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "copyfile" => {
+            arity!(2);
+            std::fs::copy(need_str(&a[0], "COPYFILE")?, need_str(&a[1], "COPYFILE")?).map_err(|e| format!("COPYFILE: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "renamefile" => {
+            arity!(2);
+            std::fs::rename(need_str(&a[0], "RENAMEFILE")?, need_str(&a[1], "RENAMEFILE")?).map_err(|e| format!("RENAMEFILE: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "appendfile" => {
+            // APPENDFILE(pfad$, text$) -- Text ans Dateiende haengen (legt sie an).
+            arity!(2);
+            let mut f = std::fs::OpenOptions::new().append(true).create(true)
+                .open(need_str(&a[0], "APPENDFILE")?).map_err(|e| format!("APPENDFILE: {}", e))?;
+            f.write_all(need_str(&a[1], "APPENDFILE")?.as_bytes()).map_err(|e| format!("APPENDFILE: {}", e))?;
+            Ok(Value::Nil)
+        }
+        "basename" => {
+            // BASENAME(pfad$) -> letzter Pfad-Bestandteil (Datei-/Ordnername).
+            arity!(1);
+            let p = need_str(&a[0], "BASENAME")?;
+            let name = std::path::Path::new(p).file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            Ok(Value::str_rc(&name))
+        }
+        "dirname" => {
+            // DIRNAME(pfad$) -> Verzeichnis-Anteil (ohne letzten Bestandteil).
+            arity!(1);
+            let p = need_str(&a[0], "DIRNAME")?;
+            let dir = std::path::Path::new(p).parent().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
+            Ok(Value::str_rc(&dir))
+        }
+        "joinpath" => {
+            // JOINPATH(a$, b$) -> plattformkorrekt zusammengesetzter Pfad.
+            arity!(2);
+            let mut pb = std::path::PathBuf::from(need_str(&a[0], "JOINPATH")?);
+            pb.push(need_str(&a[1], "JOINPATH")?);
+            Ok(Value::str_rc(&pb.to_string_lossy()))
+        }
         "openfile" => {
             arity!(2);
             let path = need_str(&a[0], "OPENFILE")?.to_string();
@@ -2258,6 +2397,119 @@ fn int_array(values: Vec<i64>) -> Value {
     let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
     for (i, v) in values.into_iter().enumerate() { arr.values[i] = Value::Int(v); }
     Value::Array(Rc::new(RefCell::new(arr)))
+}
+
+// ===================== Perlin-Noise (Ken Perlin "Improved Noise") =====================
+// Deterministische 256er-Permutation -> NOISE/FBM sind reproduzierbar (gleiche
+// Eingabe = gleicher Wert, ohne Seed-State). Rueckgabe ~[-1, 1].
+const PERLIN_PERM: [u8; 256] = [
+    151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+    8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+    35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+    134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,
+    55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,
+    169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,
+    250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,
+    189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,
+    172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,
+    228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,
+    107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,
+    138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180,
+];
+fn perlin_fade(t: f64) -> f64 { t * t * t * (t * (t * 6.0 - 15.0) + 10.0) }
+fn perlin_grad(hash: usize, x: f64, y: f64, z: f64) -> f64 {
+    let h = hash & 15;
+    let u = if h < 8 { x } else { y };
+    let v = if h < 4 { y } else if h == 12 || h == 14 { x } else { z };
+    (if h & 1 == 0 { u } else { -u }) + (if h & 2 == 0 { v } else { -v })
+}
+fn perlin3(x: f64, y: f64, z: f64) -> f64 {
+    let p = |i: usize| PERLIN_PERM[i & 255] as usize;
+    let lerp = |t: f64, a: f64, b: f64| a + t * (b - a);
+    let (xi, yi, zi) = (x.floor() as i64 as usize, y.floor() as i64 as usize, z.floor() as i64 as usize);
+    let (xf, yf, zf) = (x - x.floor(), y - y.floor(), z - z.floor());
+    let (u, v, w) = (perlin_fade(xf), perlin_fade(yf), perlin_fade(zf));
+    let aa = p(p(p(xi) + yi) + zi);
+    let ab = p(p(p(xi) + yi + 1) + zi);
+    let ba = p(p(p(xi + 1) + yi) + zi);
+    let bb = p(p(p(xi + 1) + yi + 1) + zi);
+    let aa1 = p(p(p(xi) + yi) + zi + 1);
+    let ab1 = p(p(p(xi) + yi + 1) + zi + 1);
+    let ba1 = p(p(p(xi + 1) + yi) + zi + 1);
+    let bb1 = p(p(p(xi + 1) + yi + 1) + zi + 1);
+    let x1 = lerp(u, perlin_grad(aa, xf, yf, zf), perlin_grad(ba, xf - 1.0, yf, zf));
+    let x2 = lerp(u, perlin_grad(ab, xf, yf - 1.0, zf), perlin_grad(bb, xf - 1.0, yf - 1.0, zf));
+    let y1 = lerp(v, x1, x2);
+    let x3 = lerp(u, perlin_grad(aa1, xf, yf, zf - 1.0), perlin_grad(ba1, xf - 1.0, yf, zf - 1.0));
+    let x4 = lerp(u, perlin_grad(ab1, xf, yf - 1.0, zf - 1.0), perlin_grad(bb1, xf - 1.0, yf - 1.0, zf - 1.0));
+    let y2 = lerp(v, x3, x4);
+    lerp(w, y1, y2)
+}
+fn fbm3(x: f64, y: f64, z: f64, octaves: i64) -> f64 {
+    let (mut freq, mut amp, mut sum, mut norm) = (1.0, 1.0, 0.0, 0.0);
+    for _ in 0..octaves {
+        sum += amp * perlin3(x * freq, y * freq, z * freq);
+        norm += amp;
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+    if norm > 0.0 { sum / norm } else { 0.0 }
+}
+
+// ===================== Encoding / Hash =====================
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+fn b64_encode(data: &[u8]) -> String {
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b = [chunk[0], *chunk.get(1).unwrap_or(&0), *chunk.get(2).unwrap_or(&0)];
+        let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | (b[2] as u32);
+        out.push(B64[((n >> 18) & 63) as usize] as char);
+        out.push(B64[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { B64[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { B64[(n & 63) as usize] as char } else { '=' });
+    }
+    out
+}
+fn b64_decode(s: &str) -> Result<Vec<u8>, String> {
+    let val = |c: u8| -> Result<u32, String> {
+        match c {
+            b'A'..=b'Z' => Ok((c - b'A') as u32),
+            b'a'..=b'z' => Ok((c - b'a' + 26) as u32),
+            b'0'..=b'9' => Ok((c - b'0' + 52) as u32),
+            b'+' => Ok(62), b'/' => Ok(63),
+            _ => Err("BASE64_DECODE: ungueltiges Zeichen".to_string()),
+        }
+    };
+    let clean: Vec<u8> = s.bytes().filter(|&c| !c.is_ascii_whitespace()).collect();
+    let body: Vec<u8> = clean.iter().copied().filter(|&c| c != b'=').collect();
+    let mut out = Vec::with_capacity(body.len() / 4 * 3);
+    for chunk in body.chunks(4) {
+        if chunk.len() == 1 { return Err("BASE64_DECODE: ungueltige Laenge".to_string()); }
+        let mut n = 0u32;
+        for (i, &c) in chunk.iter().enumerate() { n |= val(c)? << (18 - 6 * i); }
+        out.push((n >> 16) as u8);
+        if chunk.len() >= 3 { out.push((n >> 8) as u8); }
+        if chunk.len() >= 4 { out.push(n as u8); }
+    }
+    Ok(out)
+}
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xFFFF_FFFFu32;
+    for &b in data {
+        crc ^= b as u32;
+        for _ in 0..8 {
+            crc = if crc & 1 != 0 { (crc >> 1) ^ 0xEDB8_8320 } else { crc >> 1 };
+        }
+    }
+    !crc
+}
+fn fnv1a64(data: &[u8]) -> u64 {
+    let mut h = 0xcbf29ce484222325u64;
+    for &b in data {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    h
 }
 
 fn psys<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<ParticleSys>>, String> {
