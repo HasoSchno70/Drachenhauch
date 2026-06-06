@@ -78,8 +78,41 @@ arm = MAT4_MUL(body, MAT4_MUL(MAT4_TRANSLATE(1.2, 0.6, 0), MAT4_SCALE(1.2,0.3,0.
 MODEL_MATRIX(box, arm, &H50C0FF)
 ```
 
-Viele Instanzen = viele `MODEL_MATRIX`-Aufrufe (ein Draw pro Aufruf). Echtes
-GPU-Instancing (ein Draw-Call für N Meshes) ist als spätere Erweiterung geplant.
+Viele Instanzen = viele `MODEL_MATRIX`-Aufrufe (ein Draw pro Aufruf). Für sehr
+viele identische Meshes ist `MODEL_INSTANCED` die performante Variante (siehe
+unten).
+
+## GPU-Instancing: MODEL_INSTANCED (Core-Graphics-Builtin)
+
+`MODEL_INSTANCED(handle, mats [, tint])` rendert **dasselbe Mesh mit N
+Welt-Matrizen in EINEM Draw-Call** (raylib `DrawMeshInstanced`) — statt N
+einzelner `MODEL_MATRIX`-Aufrufe. `mats` ist ein `ARRAY OF MAT4` (oder ein
+`TUPLE` von `MAT4`). Ideal für Schwärme, Partikel-Würfel, Vegetation, Voxel-
+Felder — Größenordnungen schneller als ein `MODEL_MATRIX` pro Instanz.
+
+```basic
+IMPORT "g3d" : IMPORT "m3d"
+DIM box AS INTEGER
+box = MESH_CUBE(0.7, 0.7, 0.7)
+
+DIM mats[1024] AS MAT4
+DIM i AS INTEGER
+FOR i = 0 TO 1023
+    mats[i] = MAT4_TRANSLATE((i MOD 32) * 1.4, 0, (i \ 32) * 1.4)
+NEXT
+MODEL_INSTANCED(box, mats, &H50C0FF)   ' 1024 Wuerfel, 1 Draw-Call
+```
+
+Der Instancing-Pfad nutzt einen eigenen, schlanken Shader (Ambient + bis zu 4
+`LIGHT_*`-Lichter in Blinn-Phong; ohne aktives Licht flaches Albedo = `tint`).
+Die per-Instanz-Welt-Transform kommt als Vertex-Attribut `instanceTransform`
+(nicht als `matModel`-Uniform wie bei `MODEL_MATRIX`), die Normalen werden daraus
+abgeleitet (korrekt für Rotation + uniforme Skalierung).
+
+**Grenze:** Der Instancing-Shader unterstützt **kein** PBR/IBL
+(`MODEL_PBR`/`LIGHT_ENV*`), **keine** Schatten (`SHADOW_*`) und **keine**
+Normal-Maps (`MODEL_TEXTURE_NORMAL`) — dafür `MODEL_MATRIX`/`MODEL_LIT` nutzen.
+`MODEL_TEXTURE` (Diffuse-Map) wirkt, da es die Albedo-Textur des Materials setzt.
 
 ## Custom-Kamera: CAMERA3D_VIEW / CAMERA3D_PROJECTION
 
@@ -98,8 +131,9 @@ CAMERA3D_VIEW(MAT4_LOOKAT(VEC3_NEW(5,5,5), VEC3_ZERO(), VEC3_NEW(0,1,0)))
 
 - Intern f32 → bei nicht-exakten Werten kleine Rundungsabweichungen (zum
   Vergleichen `ROUND(...)` nutzen).
-- `MODEL_MATRIX` / `CAMERA3D_VIEW` / `CAMERA3D_PROJECTION` sind **native-only**
-  (gbrt / F6) — sie brauchen die raylib-3D-Pipeline.
+- `MODEL_MATRIX` / `MODEL_INSTANCED` / `CAMERA3D_VIEW` / `CAMERA3D_PROJECTION`
+  sind **native-only** (gbrt / F6) — sie brauchen die raylib-3D-Pipeline.
 
-Demo: [examples/103_m3d.gb](../examples/103_m3d.gb). Tests:
-[tests/test_m3d.py](../tests/test_m3d.py).
+Demos: [examples/103_m3d.gb](../examples/103_m3d.gb) (MODEL_MATRIX),
+[examples/104_instancing.gb](../examples/104_instancing.gb) (MODEL_INSTANCED).
+Tests: [tests/test_m3d.py](../tests/test_m3d.py).

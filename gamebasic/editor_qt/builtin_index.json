@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 826,
+ "count": 827,
  "builtins": [
   {
    "name": "ABS",
@@ -4944,6 +4944,12 @@
    "name": "MODEL_MATRIX",
    "kind": "graphics",
    "signature": "MODEL_MATRIX(handle, mat [, tint])",
+   "module": "m3d"
+  },
+  {
+   "name": "MODEL_INSTANCED",
+   "kind": "graphics",
+   "signature": "MODEL_INSTANCED(handle, mats [, tint])",
    "module": "m3d"
   },
   {
