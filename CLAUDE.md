@@ -1,42 +1,51 @@
 # GameBasic
 
 BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele.
-**Zwei Ausführungspfade:** der **Tree-Walking-Interpreter** (Python, Referenz +
-Host aller Built-ins) und die **native Runtime `gbrt`** (Rust/raylib, Produktion +
-Standalone-Export). Die Python-Toolchain (Lexer → Parser → Compiler) bleibt für
-beide gemeinsam; gbrt führt den kompilierten Bytecode aus. Beide liefern für
-deterministische Konsolen-Programme bit-identischen Output — siehe
-`gbrun.py --bench <datei.gb>` (TW vs gbrt).
+**Eine Runtime: `gbrt`** (Rust/raylib) — sie ist Lexer → Parser → Compiler → VM
+in einem (eigenes Rust-Frontend) und übernimmt Ausführung, Konsole, Grafik/Audio
+und Standalone-Export. Python ist nur noch **Editor-/Tooling-Schicht** (eigener
+Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merge).
 
-> **Architektur-Hinweis (Konsolidierung):** Früher gab es zwei zusätzliche
-> Bytecode-VMs in Python (`vm.py` Python-VM, `vm_native.pyx` Cython-VM). Beide
-> wurden **entfernt** — `gbrt` hat sie als schnellen/Produktions-Pfad abgelöst.
-> Ältere Feature-Abschnitte weiter unten erwähnen teils noch „vm.py /
-> vm_native.pyx / alle drei Pfade" — das sind **historische Implementierungs-
-> notizen**; gültig ist heute: Tree-Walker (`interpreter.py`) + Compiler
-> (`compiler.py` → Bytecode) + native Ausführung (`rust/gb_runtime`, `gbrt`).
+> ## ⚠️ STUFE B — Tree-Walker + Python-Toolchain ENTFERNT (2026-06-06)
+> Früher gab es zusätzlich einen Python-**Tree-Walker** (`interpreter.py`, Referenz
+> + Built-in-Host), einen Python-**Compiler** (`compiler.py`/`bytecode.py`/
+> `serialize.py` → `.gbc`) und zwei Bytecode-VMs (`vm.py`, `vm_native.pyx`). **Alle
+> entfernt** — `gbrt` hat sie abgelöst und ist die EINZIGE Runtime. Ebenfalls weg:
+> `builtins_registry.py`, alle `modules/*.py`-Implementierungen (gbrt
+> reimplementiert die Module nativ in Rust), `export.py`, `environment.py`, pygame.
+>
+> **Folgen für die Arbeit:** Neue Builtins/Sprach-Features kommen NUR in
+> `rust/gb_runtime/` (+ ein run_gb-Golden-Test). Es gibt KEIN „beide Pfade" /
+> „drei Pfade" / „Parität gegen Tree-Walker" mehr — Korrektheit sichern
+> run_gb-Golden-Tests (`assert run_gb(src) == expected`) + Rust-`#[test]`s.
+>
+> **WICHTIG:** Viele Feature-Abschnitte WEITER UNTEN erwähnen noch
+> `interpreter.py` / `compiler.py` / `vm.py` / `vm_native.pyx` / „Tree-Walker" /
+> „alle drei Pfade" / „in BEIDEN Pfaden umsetzen". Das sind **historische
+> Implementierungsnotizen** — die Dateien existieren nicht mehr; gültig ist heute
+> ausschließlich `gbrt` (`rust/gb_runtime/src/`: `lexer.rs`/`parser.rs`/
+> `compiler.rs`/`vm.rs`/`builtins.rs`/Modul-`.rs`).
 
 ## Verzeichnisstruktur
 
 ```
-gamebasic/
-  __main__.py            # py -m gamebasic <file> (mit Preprocessor)
-  lexer.py / tokens.py   # Tokenisierung
+gamebasic/             # Python = nur noch Editor-Tooling + Front-End
+  __main__.py            # py -m gamebasic <file> -> ruft `gbrt run`
+  lexer.py / tokens.py   # Tokenisierung (Highlighting/LSP/Dev)
   parser.py / ast_nodes.py
-  interpreter.py         # Tree-Walker + alle Built-ins (Referenz-Semantik)
-  compiler.py            # AST -> Bytecode (mit Type-Inference + Constant Folding)
-  bytecode.py            # Opcodes
-  serialize.py           # Bytecode <-> .gbc (Python schreibt, gbrt liest)
-  graphics.py            # Konsolen-only Stub (pygame ENTFERNT): COLORS/KEYS + Kamera-Mathematik; Grafik/Audio nur nativ (gbrt)
-  preprocess.py          # IMPORT-Auflösung (Source UND Built-in-Module)
-  builtins_registry.py   # @builtin / @graphics_builtin Decorators
-  modules/               # Built-in-Module (json, db, tween, imgfx, particles, camera, ecs, ...)
-  modules/ecs_py.py      # reine Python _World/_Component (ECS-Kern + Bulk-System-Ops)
-rust/gb_runtime/         # native Runtime `gbrt` (Rust/raylib) -- führt .gbc aus
-gbrun.py                 # CLI mit Editor, --bench, --tokens, --ast, --native, --export
-gamebasic/export.py      # Standalone-.exe bundeln (gbrt + Bytecode + assets/)
-examples/*.gb            # Demos -- 1-99+, inkl. bench_*.gb fuer Performance-Vergleiche
-tests/                   # pytest-Tests (1580+); test_gbrt_parity.py prüft TW == gbrt
+  preprocess.py          # IMPORT-Merge (.gb-Source) + Built-in-Modul-Namen erkennen
+  graphics.py            # nur COLORS/KEYS + Kamera-Mathematik (kein Render; pygame raus)
+  synth.py               # Synth-Mathematik (von SFX-/Tracker-Editor + gbsfx genutzt)
+  particle_sim.py        # pure numpy-Partikel-Sim (für den Partikel-Editor)
+  errors.py              # Fehlertypen
+  modules/__init__.py    # NUR Modul-NAMENSLISTE (KNOWN_MODULES) — keine Impls mehr
+  editor_qt/             # Qt-Editor + LSP-Bausteine; gbrt_meta.py = Builtin-Index
+  spriteeditor*/tilemap*/tracker*/sfxeditor*/particleeditor*  # Begleit-Editoren
+rust/gb_runtime/         # >>> die Runtime: gbrt (Rust/raylib)
+  src/lexer.rs parser.rs compiler.rs vm.rs builtins.rs + <modul>.rs  # alles in Rust
+gbrun.py                 # CLI: Editor-Launcher + run/--native/--export/--tokens/--ast (run -> gbrt)
+examples/*.gb            # Demos
+tests/                   # pytest (1561+): run_gb-Golden gegen gbrt + Rust-#[test]
 ```
 
 ## Architektur-Pipeline
@@ -62,46 +71,28 @@ Source.gb  →  preprocess.process()  →  Lexer  →  Parser  →  AST
 Asset-Pfade). `py -m gamebasic` funktioniert auch, wechselt aber nicht ins
 Datei-Verzeichnis — Programme mit `LOADIMAGE("assets/...")` brauchen `gbrun.py`.
 
-> **Run-/Export-Pfad läuft über gbrts EIGENES Rust-Frontend (seit 2026-06-05).**
-> `gbrun.py --native` ruft `gbrt run datei.gb`, `gbrun.py --export` ruft
-> `gbrt --export`, und der **Editor-Run/-Export** (output_console `_start_native`,
-> main_window `_export_active`) ebenso. Der **Python-Compiler** (`compiler.py`)
-> ist damit NICHT mehr auf dem Run-Pfad — nötig, weil **gbrt-only-Builtins**
-> (neue Builtins werden nur noch in gbrt implementiert, nicht im Tree-Walker) im
-> Python-Registry fehlen und der Python-Compiler sie als User-Calls
-> fehlkompilieren würde. Output-Parität deckt der Front-End-Port ab. Der
-> Tree-Walker (`interpreter.py`) bleibt Editor-Fallback (F5 ohne gebautes gbrt) +
-> Bench-Referenz, kennt aber keine gbrt-only-Builtins. `compile_file_to_gbc` /
-> `export.py` (Python) bleiben für Bench/Tests, sind aber nicht mehr der Run-Weg.
+> **Run/Export laufen über `gbrt` (Rust-Frontend).** `gbrun.py` (Default-Run +
+> `--native`) und der Editor-Run rufen `gbrt run datei.gb`; `gbrun.py --export` /
+> Editor-Export rufen `gbrt --export` (hängt den `.gbc`-Payload an eine Kopie der
+> Exe, kopiert `assets/`). gbrt chdirt selbst ins Datei-Verzeichnis (relative
+> Asset-/IMPORT-Pfade). Es gibt keinen Python-Run-/Export-Pfad mehr.
 
-## Built-ins erweitern (innerhalb interpreter.py)
+## Built-ins erweitern (in gbrt / Rust)
 
-```python
-from .builtins_registry import builtin, graphics_builtin
+Builtins leben in `rust/gb_runtime/src/builtins.rs` (pure) bzw. `vm.rs`
+(`try_graphics`/`try_*` — brauchen VM-/Fenster-State). Der Dispatch läuft über
+`CALL_BUILTIN` (vm.rs) → der große Match in `builtins.rs`. Neuer Builtin:
 
-@builtin("BEEP", arity=2, types=("num", "num"))
-def _b_beep(freq, ms):
-    ...
+1. In `builtins.rs` (oder dem passenden `try_*` in `vm.rs`) einen Match-Arm
+   ergänzen: Arity + Typen selbst prüfen (Validierung gehört in den Wrapper, nicht
+   ins Backend), Fehlermeldung im gewohnten Wortlaut (`"NAME: erwartet …"`).
+2. Für den Editor: `editor_qt/builtin_index.json` ergänzen (Name/kind/Signatur/
+   Modul) — Completion/Highlighting/LSP ziehen daraus (`editor_qt/gbrt_meta.py`).
+   Optional Prosa-Doku in `editor_qt/builtin_docs.py`.
+3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
+4. Bei neuem Keyword: `vscode-gamebasic/build_grammar.py` neu generieren.
 
-@graphics_builtin("FOO", arity=(1, 3), types=None)  # variable arity, eigene Validierung
-def _g_foo(g, *args):
-    ...
-```
-
-**type-Specs:**
-- `"num"` — int oder float, kein bool
-- `"int"` — strikt int
-- `"intish"` — akzeptiert num, gibt int zurück (Konvenienz für Grafik-Koordinaten)
-- `"str"`, `"bool"`, `"any"`
-
-**arity:** int (exakt), `(min, max)` (Range), `(min, None)` (kein Maximum), oder `None` (selbst prüfen).
-
-**Wichtig:** `types` ist nur bei fixer arity erlaubt. Bei variable arity selbst validieren.
-
-`@builtin` füllt das `BUILTINS`-Dict in `builtins_registry`, das der Tree-Walker
-(`interpreter.py`) und der Compiler (`compiler.py`, entscheidet `CALL_BUILTIN`)
-als Wahrheit konsumieren. Die native Runtime `gbrt` re-implementiert die Built-ins
-in Rust (`rust/gb_runtime/src/builtins.rs` + `vm.rs`). Niemand muss Imports ändern.
+(Es gibt KEINE Python-`@builtin`-Registry / kein `interpreter.py` mehr.)
 
 ## Built-in-Module schreiben
 
@@ -110,36 +101,18 @@ in Rust (`rust/gb_runtime/src/builtins.rs` + `vm.rs`). Niemand muss Imports änd
 Persistente Fenster/Widgets (externe Typen `GUI_WINDOW`/`GUI_WIDGET` via `register_type`). Aufbau einmalig, pro Frame `GUI_UPDATE()` + `GUI_DRAW()`; Events per Polling (`GUI_CLICKED`/`CHECKED`/`VALUE`/`TEXT`/`HOVERED`) **oder** FUNCREF-Callbacks (`GUI_ON_CLICK`/`GUI_ON_CHANGE`). Widgets: Button, Label, Checkbox, Slider, TextInput, Panel, **Table** (`GUI_TABLE` — fixierte Kopfzeile, V/H-Scroll via Mausrad+Scrollbalken, persistente Zeilen-Selektion; Daten via `GUI_TABLE_HEADERS/ROWS/COL_WIDTHS`, Polling via `GUI_TABLE_SELECTED/CLICKED/ROW_COUNT`; Layout aus einer Quelle `_table_geom` für Hit-Test + Zeichnen). Window-Drag an der Titelleiste, Z-Order (Klick bringt nach vorne), Fokus, Schliessen-Button, Cyan-Theme (programmierbar). Konstruktoren/Getter sind `@builtin`, nur `GUI_UPDATE`/`GUI_DRAW` sind `graphics_builtin`. Komplement zum Immediate-Mode-`ui`-Modul (dort `UI_WINDOW_BEGIN/END` + `UI_TABLE` mit `UI_TABLE_SELECTED`/`SET_SELECTED`/`HEADER_CLICK`). Doku `docs/module-gui.md`, Demos `examples/45_gui.gb` + `examples/81_table_select.gb`, Tests `tests/test_modules_gui.py`.
 
 
-Eine Datei in `gamebasic/modules/` reicht — keine Änderung an Lexer, Parser,
-Interpreter, VM, Compiler. Beim ersten `IMPORT "modulname"` zur Laufzeit geladen.
-
-```python
-# gamebasic/modules/foo.py
-from ..builtins_registry import builtin
-from ..errors import GBRuntimeError, TypeMismatchError
-from . import register_type
-
-class _FooHandle:
-    __slots__ = ("data",)
-    def __init__(self, data): self.data = data
-
-register_type("foo_handle", _FooHandle)   # erlaubt DIM x AS FOO_HANDLE in GB
-
-@builtin("FOO_NEW", arity=1, types=("str",))
-def _new(s):
-    return _FooHandle(s)
-```
-
-In GB:
-```basic
-IMPORT "foo"
-DIM x AS FOO_HANDLE
-x = FOO_NEW("hallo")
-```
+**Module sind in gbrt/Rust implementiert** (`rust/gb_runtime/src/<modul>.rs` +
+Dispatch in `vm.rs` `try_<modul>`; externe Typen + ihr Default in `vm.rs`/
+`value.rs`). Neues Modul: `.rs` schreiben, im `vm.rs`-`CALL_BUILTIN`-Dispatch
+einhängen, den Modul-Namen in `rust/gb_runtime/src/preprocess.rs` MODULES **und**
+in `gamebasic/modules/__init__.py` `KNOWN_MODULES` ergänzen (synchron halten —
+sonst erkennt der Preprocessor `IMPORT "modul"` nicht). Dann Golden-Test +
+`builtin_index.json`.
 
 **IMPORT-Auflösung in [preprocess.py](gamebasic/preprocess.py):**
 1. Existiert `<name>.gb` im aktuellen Verzeichnis? → textuelles Inkludieren (Quellcode-Modul).
-2. Sonst: ist `<name>` ein gültiger Modul-Name (alphanumerisch, kein Slash, keine `.gb`-Endung)? → `gamebasic.modules.<name>` laden.
+2. Sonst: ist `<name>` ein bekanntes Built-in-Modul (`KNOWN_MODULES`)? → die
+   `IMPORT`-Zeile wird zu einem Kommentar (gbrt kennt das Modul nativ).
 3. Sonst: Fehler.
 
 So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in hat
@@ -178,8 +151,8 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | `controller` | Character-Controller mit Coyote-Time, Jump-Buffer, Variable-Jump-Height. `CHAR_NEW/SET_INPUT/UPDATE`, `CHAR_X/Y/VX/VY`, `CHAR_ON_GROUND/WALL_LEFT/RIGHT`. Konfigurable Move-Speed, Jump-Velocity, Gravity, Coyote/Buffer-Frames, Variable-Jump-Cut. | `CHAR_CONTROLLER` |
 | `g3d` | **3D-Grafik, NUR native Runtime** (`gbrt` — Editor-Run F5 nutzt gbrt; der Tree-Walker-Fallback kann kein 3D und wirft eine klare Meldung). Immediate-Primitive: `CAMERA3D`, `CUBE`/`CUBE_WIRES`, `SPHERE`/`SPHERE_WIRES`, `CYLINDER` (Kegel via r_oben=0), `PLANE`, `LINE3D`, `POINT3D`, `GRID3D`. **3D-Modelle** (wiederverwendbare MODEL-Handles): `LOADMODEL` (OBJ/GLTF), prozedural `MESH_CUBE/SPHERE/CYLINDER/TORUS/KNOT/PLANE` + `MESH_HEIGHTMAP` (Terrain aus Graustufen-Image), zeichnen via `MODEL`/`MODEL_EX` (Achsen-Rotation)/`MODEL_WIRES`, `MODEL_TEXTURE` (Diffuse-Map aus LOADIMAGE). **Billboards** `BILLBOARD` (Textur zeigt zur Kamera) + **Ray-Kollision/Picking** `RAY_HIT_BOX`/`RAY_HIT_SPHERE` (Distanz oder -1) und `PICK_BOX`/`PICK_SPHERE` (Mausstrahl, Klick-Selektion). **Beleuchtung** (PBR/Cook-Torrance, bis 4 Lichter): `LIGHT_ENABLE`/`LIGHT_AMBIENT`/`LIGHT_DIRECTIONAL`/`LIGHT_POINT`/`LIGHT_SET_POS/COLOR/ENABLED` + `MODEL_LIT(modell)` + `MODEL_PBR(modell, metalness, roughness)` (eingebetteter GGX-Shader) + `LIGHT_FOG(farbe, dichte)` (Tiefen-Fog) + `LIGHT_ENV(himmel, boden, intensitaet)` (analytisches IBL — Metalle spiegeln die Umgebung) + `LIGHT_ENV_HDR(pfad$ [, intensitaet])` (**echtes HDR-Cubemap-IBL**: laedt ein equirect-.hdr, berechnet Irradiance/Prefilter/BRDF-LUT-Maps, `useIBLMaps`-Gate; analytischer `LIGHT_ENV`-Pfad bleibt Fallback) + `SKYBOX(an)` (zeichnet die HDR-Umgebung als sichtbaren 3D-Hintergrund — env-Cubemap auf einen kamerazentrierten Wuerfel, ohne Depth-Write). **Schatten** `SHADOW_ENABLE([res])`/`SHADOW_AREA(groesse,dist)`/`SHADOW_TARGET(x,y,z)` (Shadow-Mapping via Depth-FBO + PCF; erstes directional Light wirft Schatten, MODEL_LIT-Modelle werfen+empfangen). **Normal-Mapping** `MODEL_TEXTURE_NORMAL(modell,bild)` (TBN-basiert, MODEL_LIT erzeugt Tangenten; useNormalMap-Gate -> lit Modelle ohne Map unveraendert). **Kamera-Modi** `CAMERA3D_UPDATE(mode)` (1=free/2=orbital/3=first_person/4=third_person, raylib UpdateCamera) + Getter `CAMERA3D_X/Y/Z`/`CAMERA3D_TARGET_X/Y/Z`. Render via raylib `begin_mode3D` beim FLIP (3D zuerst, 2D-HUD obenauf). Doku `docs/rust-runtime.md` (Schritt 6), Demos `examples/82_3d_intro.gb`, `88_3d_models.gb`, `90_billboards_picking.gb`, `91_lighting.gb`, `92_fog.gb`, `93_shadows.gb`, `94_normalmap.gb`, `95_pbr.gb`, `96_ibl.gb`, `99_ibl_hdr.gb`. | — |
 
-**Zusätzlich als Core-Graphics-Built-ins** (kein IMPORT noetig, registriert in
-`interpreter.py` als `@graphics_builtin`):
+**Zusätzlich als Core-Graphics-Built-ins** (kein IMPORT noetig, in gbrt
+`vm.rs`/`try_graphics`):
 
 | Bereich | Funktionen | Externer Typ |
 |---|---|---|
@@ -228,80 +201,44 @@ core-Grafik-Built-ins (`PLOT`, `LINE`, `BOX`, `RECT`, `CIRCLE`, `TEXT`,
 
 ## Build und Test
 
-**Native Runtime `gbrt` bauen** (der Produktions-/Schnellpfad, raylib):
+**Die Runtime `gbrt` bauen** (raylib, der einzige Ausführungspfad):
 ```
 .venv\Scripts\python.exe rust\build_runtime.py
 ```
-Baut `rust/gb_runtime/` → `gbrt`. Nötig für `gbrun.py --native` / Editor-Run
-(F5, gbrt — sonst Tree-Walker-Fallback) / Standalone-Export / den
-`test_gbrt_parity.py`-Sweep. Details: docs/rust-runtime.md.
+Baut `rust/gb_runtime/` → `gbrt`. Nötig für Run/Export/Editor-Run + die Tests
+(run_gb spawnt `gbrt run`; skippen, wenn nicht gebaut). Details: docs/rust-runtime.md.
 
-**Cython entfernt — kein Build-Schritt mehr.** Die früheren Cython-Beschleuniger
-(`array_native` = `_GBArray`, `ecs_native` = Native-ECS) wurden entfernt: der
-Tree-Walker ist nur noch Editor-/Referenzpfad, die Performance liegt in `gbrt`.
-`_GBArray` lebt jetzt als reine Python-Klasse inline in `interpreter.py`, die
-ECS-`_World`/`_Component` in `modules/ecs_py.py`. `setup.py` ist nur noch ein
-Hinweis-Stub. (Auch die frühere Cython-VM `vm_native.pyx` war schon entfernt;
-`gbrt` hat sie abgelöst. **pygame wurde ENTFERNT (Stufe A): Grafik/Audio laufen
-nur nativ in `gbrt`, der Tree-Walker ist konsolen-only. Kein neuer Cython-Code.**)
-
-**Native Rust-Module bauen** (PyO3-Helfer `gb_native`, separate Toolchain — `cargo` nötig):
-```
-.venv\Scripts\python.exe rust\build.py
-```
-Baut den Crate `rust/gb_native/` (ein Extension-Modul, PyO3 kompiliert nur einmal)
-und legt `gamebasic/gb_native.pyd` neben die Cython-Module. Drei Beschleuniger-
-Klassen, jede mit Python-Fallback wenn die `.pyd` fehlt:
-
-| Klasse | GB-Modul | Fallback | Speedup | Parität |
-|---|---|---|---|---|
-| `AStarGrid` | `astar` | `_AStarGrid` | ~70x (grosse Karten) | bit-identische Pfade (counter-FIFO-Tie-Break repliziert) |
-| `BroadPhase` | `physics` (`PHYSICS_BROAD_*`) | `_BroadPhasePy` | O(n) statt O(n²), ~300x bei 2000 Entities | identische Paare/Reihenfolge |
-| `TileCollider` | `tile_collide` (`TILE_SWEEP_X/Y`) | `_sweep_axis` | ~7x pro Sweep | 0 Mismatches über 40k Fuzz-Fälle |
-| `tilemap_flood_fill` | `tiled` (`TILED_FLOOD_FILL`) | `_flood_fill_py` | ~15x (160k Tiles) | identische Tiles + Count |
-
-**Prinzip:** Validierung (Bounds, Typchecks, Fehlermeldungen) liegt immer in den
-`@builtin`-Wrappern, nie im nativen Backend — daher backend-unabhängig identisches
-Verhalten. Die nativen Klassen sind „dumme", schnelle Container + Kernels. Immutable
-Daten (A*-Walls, Tilemap-Solid-Maske) werden einmal nach Rust gespiegelt und gecacht.
+> Historisch: Es gab Python-Beschleuniger (Cython `array_native`/`ecs_native`,
+> PyO3 `gb_native`) für die alten Python-Modul-Impls. Mit dem Entfernen des
+> Tree-Walkers + der Module sind sie **obsolet** — die gesamte Performance liegt in
+> `gbrt` (Rust). Kein `rust/build.py`/Cython-Schritt mehr nötig.
 
 **Tests laufen lassen:**
 ```
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
-**Bench-Vergleich (Tree-Walker vs native `gbrt`):**
-```
-.venv\Scripts\python.exe gbrun.py --bench examples/<file>.gb
-```
-"Output: IDENTISCH (Tree-Walker == gbrt)" ist die Erwartung für deterministische
-Programme. Programme mit `MILLIS()`, `TIME$()`, `RND()` ohne Seed sind erwartet
-UNTERSCHIEDLICH (gbrt nutzt einen anderen PRNG/Clock als Python). Die Output-
-Parität deckt der Test `tests/test_gbrt_parity.py` ab (Snippets + Beispiele,
-skippt wenn `gbrt` nicht gebaut ist).
+**Programm ausführen:** `.venv\Scripts\python.exe gbrun.py examples/<file>.gb`
+(läuft über `gbrt run`). Direkt: `gbrt run datei.gb`. (Der frühere `--bench`-
+Tree-Walker-Vergleich ist entfernt — es gibt nur noch gbrt.)
 
 ## Häufige Fallstricke
 
-- **pygame ENTFERNT (Stufe A):** Grafik/Audio laufen nur in der nativen Runtime
-  (gbrt). Der Tree-Walker (`interpreter.py`) ist konsolen-only — Grafik-/Audio-/
-  Bild-Builtins werfen eine klare „nur in der nativen Runtime (gbrt)"-Meldung
-  (`graphics.py`-Stub via `__getattr__`; Module imgfx/sprite/audio/particles via
-  `_native_only`). Konsolen-Programme + `CAMERA_*`-Mathematik laufen weiter. Die
-  Editoren (SFX/Tracker) nutzen `sounddevice`+`soundfile` statt pygame.mixer.
+- **Grafik/Audio NUR in gbrt:** Konsolen-Programme (PRINT/INPUT/Logik) laufen voll;
+  Grafik/Audio rendert raylib (Fenster). pygame ist raus; `graphics.py` (Python)
+  hält nur noch `COLORS`/`KEYS` + Kamera-Mathematik fürs Editor-Tooling.
 - **`step` ist Schlüsselwort** (FOR…STEP). Variablen entsprechend benennen
   (`i`, `iter`, `tick` statt `step`).
-- **`_check_int` (strikt INTEGER) vs `_check_intish`** (akzeptiert num, konvertiert
-  zu int — entspricht der `"intish"`-type-Spec für Grafik-Koordinaten).
-- **Variable Arity ohne types** — Decorator entpackt args zu `*args`, Funktion muss
-  selbst prüfen.
-- **Neue Sprach-/Operator-Features: in BEIDEN Pfaden umsetzen + TW↔gbrt-Parität testen.**
-  Tree-Walker (`interpreter.py`) **und** Compiler+Rust-VM (`compiler.py` →
-  `rust/gb_runtime/src/vm.rs`). Ein Snippet in `tests/test_gbrt_parity.py` ergänzen
-  prüft, dass Tree-Walker == `gbrt` (sonst bleibt die native Runtime ungetestet).
-  Die `run_all`/`run_vm`/`run_native`-Fixtures sind seit dem Entfernen der
-  Bytecode-VMs **Aliase auf den Tree-Walker** (bestehende Tests laufen weiter).
-  Single-Source-Helfer (`_container_kind`, `infer_type`) vermeiden Drift; neue
-  solche Logik einmalig in interpreter.py halten und importieren.
+- **Neue Builtins/Sprach-Features NUR in gbrt** (`rust/gb_runtime/src/`):
+  Builtin → `builtins.rs`/`vm.rs`; Sprach-Feature → `lexer.rs`/`parser.rs`/
+  `ast.rs`/`compiler.rs`/`vm.rs`. Es gibt KEINE „beide Pfade"/Tree-Walker-Parität
+  mehr — Korrektheit per **run_gb-Golden-Test** (`assert run_gb(src) == expected`)
+  + ggf. Rust-`#[test]`. Bei neuem Keyword die VSCode-Grammatik regenerieren.
+- **`run_gb`/`run_vm`/`run_native`/`run_all`-Fixtures** sind alle Aliase auf
+  `gbrt run` (conftest); `run_gb(src, base=tmp_path)` legt die .gb in ein
+  Verzeichnis, damit relative Fixture-Pfade (TILED_LOAD etc.) gefunden werden.
+- **`IS NIL`/`IS NOT NIL` gibt es NICHT** als Parser-Konstrukt (Doku-Altlast) —
+  nil-Check via `IS_NIL(x)`-Builtin.
 
 ## Coroutines / YIELD
 
@@ -1719,19 +1656,10 @@ nicht der emscripten-Build).
 ## Build und Test
 
 ```
-.venv\Scripts\python.exe rust\build_runtime.py        # native Runtime gbrt
-.venv\Scripts\python.exe -m pytest tests/ -v
-.venv\Scripts\python.exe gbrun.py --bench examples/<file>.gb
+.venv\Scripts\python.exe rust\build_runtime.py        # Runtime gbrt (Rust)
+.venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen gbrt
+.venv\Scripts\python.exe gbrun.py examples/<file>.gb  # ausführen (-> gbrt run)
 ```
 
-Kein Cython-Build mehr nötig (`array_native`/`ecs_native` entfernt; Tree-Walker
-ist reines Python). Nur die native Runtime `gbrt` wird gebaut (Rust, siehe oben).
-
-## Migration-Notizen
-
-Alle Built-ins (~100+ core inkl. Array-/Map-Helfer + ~30 graphics inkl.
-Bulk-Plot/-Shapes + Modul-Built-ins) sind über den Decorator-Mechanismus
-registriert. Vorher gab es ~10 Zeilen Boilerplate pro
-Funktion (arity-Check, Type-Check, Dict-Eintrag); jetzt ist es eine Decorator-Zeile
-plus die eigentliche Logik. Migration-Detail-Status (was vor/nach dem Refactor
-existierte): aus `git log` nachvollziehbar.
+Nur `gbrt` wird gebaut (kein Cython/PyO3 mehr). Builtins/Module sind in Rust
+(`rust/gb_runtime/src/`); Korrektheit über run_gb-Golden-Tests + Rust-`#[test]`.

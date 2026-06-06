@@ -108,11 +108,11 @@ Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibwe
 
 **Strikte Typisierung:** Eine FLOAT-Variable nimmt keine STRINGs an. Ein FLOAT-zu-INTEGER-Cast verlangt eine ganzzahlige Zahl (`3.0` ja, `3.14` Fehler — nutze dann `INT()`).
 
-**`NIL`:** Klassenreferenzen, Bilder, Sounds und externe Handles sind initial `NIL`. Vergleiche mit `IS NIL` / `IS NOT NIL`:
+**`NIL`:** Klassenreferenzen, Bilder, Sounds und externe Handles sind initial `NIL`. Der nil-Check läuft über das Builtin **`IS_NIL(x)`** (es gibt KEIN `IS NIL`/`IS NOT NIL`-Sprachkonstrukt):
 
 ```basic
 DIM bild AS IMAGE
-IF bild IS NIL THEN
+IF IS_NIL(bild) THEN
     bild = LOADIMAGE("hero.png")
 END IF
 ```
