@@ -46,9 +46,9 @@ def _build_kw_set() -> None:
     except Exception:
         pass
     try:
-        from ..interpreter import BUILTINS, GRAPHICS_BUILTINS
-        out.update(BUILTINS.keys())
-        out.update(GRAPHICS_BUILTINS.keys())
+        # Builtin-Namen aus dem eingefrorenen gbrt-Metadaten-Index (Stufe B).
+        from .gbrt_meta import builtin_names_lower
+        out.update(builtin_names_lower())
     except Exception:
         pass
     try:

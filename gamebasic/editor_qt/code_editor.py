@@ -970,8 +970,8 @@ class CodeEditor(
         doc = get_doc(name)
         if doc and doc[0]:
             return doc[0]
-        from ..builtins_registry import signature_text
-        return signature_text(name) or None
+        from .gbrt_meta import signature
+        return signature(name) or None
 
     def _user_signature(self, name: str) -> str | None:
         from .symbols import extract_user_doc

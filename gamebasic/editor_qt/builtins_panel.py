@@ -100,35 +100,27 @@ class BuiltinsPanel(QWidget):
         groups: dict[str, list[tuple[str, str, str]]] = {}
         seen_ids: set[int] = set()
 
-        # 1) Funktions-Built-ins
+        # 1) Funktions-Built-ins -- aus dem eingefrorenen gbrt-Metadaten-Index
+        #    (Stufe B). Gruppierung: Modul-Builtins unter ihrem Modulnamen,
+        #    Core unter "standard" bzw. "grafik" (kind=graphics).
+        _ = seen_ids  # nicht mehr noetig, Index ist bereits dedupliziert
         try:
-            from ..interpreter import BUILTINS, GRAPHICS_BUILTINS
-            from ..builtins_registry import signature_text
+            from . import gbrt_meta
+            entries = gbrt_meta.builtin_index()
         except Exception:
-            BUILTINS = GRAPHICS_BUILTINS = {}
-            def signature_text(_n):  # type: ignore
-                return ""
-
-        for src_dict in (BUILTINS, GRAPHICS_BUILTINS):
-            for wrapper in src_dict.values():
-                wid = id(wrapper)
-                if wid in seen_ids:
-                    continue
-                seen_ids.add(wid)
-                primary = getattr(wrapper, "_gb_primary", None)
-                if primary is None:
-                    continue
-                inner = getattr(wrapper, "__wrapped__", None)
-                mod = getattr(inner, "__module__", "") if inner else ""
-                kind = getattr(wrapper, "_gb_kind", "core")
-                if mod.startswith("gamebasic.modules."):
-                    group = mod.rsplit(".", 1)[-1]
-                elif kind == "graphics":
-                    group = "grafik"
-                else:
-                    group = "standard"
-                sig = signature_text(primary) or primary
-                groups.setdefault(group, []).append((primary, sig, "builtin"))
+            entries = []
+        for e in entries:
+            name = e.get("name")
+            if not name:
+                continue
+            kind = e.get("kind", "core")
+            mod = e.get("module") or "core"
+            if mod in ("interpreter", "gbrt", "core", ""):
+                group = "grafik" if kind == "graphics" else "standard"
+            else:
+                group = mod
+            sig = e.get("signature") or name
+            groups.setdefault(group, []).append((name, sig, "builtin"))
 
         # 2) Sprachkonstrukte
         anweisungen = [

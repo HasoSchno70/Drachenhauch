@@ -40,17 +40,18 @@ def collect_builtins() -> list[str]:
     """
     names: set[str] = set()
     try:
-        from ..interpreter import BUILTINS, GRAPHICS_BUILTINS
-        names.update(BUILTINS.keys())
-        names.update(GRAPHICS_BUILTINS.keys())
+        # Builtin-Namen aus dem eingefrorenen gbrt-Metadaten-Index (Stufe B) --
+        # keine Laufzeit-Abhaengigkeit mehr von interpreter.py/Registry.
+        from .gbrt_meta import builtin_names_upper
+        names.update(builtin_names_upper())
     except Exception:
         pass
     try:
         from .builtin_docs import BUILTIN_DOCS
-        names.update(BUILTIN_DOCS.keys())
+        names.update(n.upper() for n in BUILTIN_DOCS)
     except Exception:
         pass
-    return sorted(n.upper() for n in names)
+    return sorted(names)
 
 
 def collect_constants() -> list[str]:
