@@ -1561,6 +1561,24 @@ Sprite-Atlas-Export (Atlas-PNG als Tileset).
 lext+parst+kompiliert. **Stolperstein:** `MAP` ist ein Keyword (MAP OF T) → im
 GB-Code-Export keine Variable `map` (heißt `lvl`).
 
+## Form-Designer / WYSIWYG (`gbform`)
+
+Eigenständiger PySide6-GUI-Designer im **Xojo-Stil** für das `gui`-Modul. Qt-frei
+das Datenmodell [`gamebasic/formdesigner/document.py`](gamebasic/formdesigner/document.py)
+(`FormDoc`/`Control`, `PALETTE`, `.gbform`-IO **exakt im Runtime-`gui`-JSON-Format**
++ Designer-Feld `name`, `generate_runner()`-Code-Gen), UI in
+[`gamebasic/formdesigner_qt.py`](gamebasic/formdesigner_qt.py) (Palette links /
+Canvas Mitte / Inspector rechts; Platzieren/Selektieren/Verschieben/Löschen,
+Speichern/Laden, F5 = Run via `gbrt`). Start: `gbform [datei.gbform]` /
+`gbrun.py --form`. **Xojo-Prinzip:** das `.gbform` speichert pro Control den
+Event-Handler-**Namen** (`on_click`/`on_change`); `GUI_LOAD` stellt sie wieder
+her und `GUI_UPDATE` ruft sie automatisch per Name auf — kein manuelles
+Verdrahten. Doku [docs/form-designer.md](docs/form-designer.md), Tests
+`tests/test_formdesigner_document.py` (Modell/Roundtrip/Codegen, headless) +
+`tests/test_formdesigner_qt.py` (Konstruktion offscreen). Neue Control-Art:
+Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. Geplant: Resize-Handles/Snap,
+Undo, integrierter Code-Editor (Doppelklick-Control → Handler), Multi-Form.
+
 ## Language Server (`gamebasic.lsp`) + VSCode-Extension
 
 Externe Editor-Unterstützung via **LSP**, mit derselben Sprach-Intelligenz wie
