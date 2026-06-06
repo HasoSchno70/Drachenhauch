@@ -162,27 +162,9 @@ END SUB
         Parser(Lexer(src).tokenize()).parse()
 
 
-# --- VM-Pfad: BYREF wirft CompileError -------------------------------
-
-def test_byref_compile_error_on_vm_path():
-    """Im VM-Pfad ist BYREF noch nicht unterstuetzt - klare Fehlermeldung."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler, CompileError
-    src = '''
-SUB swap(BYREF a AS INTEGER, BYREF b AS INTEGER)
-    DIM tmp AS INTEGER
-    tmp = a
-    a = b
-    b = tmp
-END SUB
-'''
-    ast = Parser(Lexer(src).tokenize()).parse()
-    with pytest.raises(CompileError) as exc:
-        Compiler().compile(ast)
-    msg = str(exc.value).lower()
-    assert "byref" in msg
-    assert "vm" in msg or "tree-walker" in msg
+# (Der frühere Test, dass der Python-Compiler BYREF ablehnt, ist entfernt:
+#  gbrt unterstützt BYREF jetzt nativ, und der Python-Compiler wird in Phase 8
+#  gelöscht.)
 
 
 # --- Default-Parameter (Sanity-Tests, da der Cython-Bug gefixt wurde) -

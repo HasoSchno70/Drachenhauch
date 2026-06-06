@@ -125,37 +125,23 @@ PRINT C.NONEXISTENT
         run_vm(src)
 
 
-def _compile(src):
-    """Kompiliert Quelltext zu Bytecode (der Pfad, den gbrt konsumiert)."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    return Compiler().compile(Parser(Lexer(src).tokenize()).parse())
+def test_duplicate_static_rejected_at_compile(run_gb):
+    """Doppelte STATIC CONST werden beim Compile (gbrt) abgelehnt."""
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError, match="doppelt"):
+        run_gb('CLASS C\n'
+               '    STATIC CONST X AS INTEGER = 1\n'
+               '    STATIC CONST X AS INTEGER = 2\n'
+               'END CLASS\n')
 
 
-def test_duplicate_static_rejected_at_compile():
-    """Doppelte STATIC CONST werden beim Compile (fuer gbrt) abgelehnt."""
-    from gamebasic.compiler import CompileError
-    src = '''
-CLASS C
-    STATIC CONST X AS INTEGER = 1
-    STATIC CONST X AS INTEGER = 2
-END CLASS
-'''
-    with pytest.raises(CompileError):
-        _compile(src)
-
-
-def test_static_non_literal_rejected():
-    """STATIC CONST mit Ausdruck statt Literal -> CompileError beim Compile."""
-    from gamebasic.compiler import CompileError
-    src = '''
-CLASS C
-    STATIC CONST X AS INTEGER = 1 + 1
-END CLASS
-'''
-    with pytest.raises(CompileError):
-        _compile(src)
+def test_static_non_literal_rejected(run_gb):
+    """STATIC CONST mit Ausdruck statt Literal -> Compile-Fehler (gbrt)."""
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError, match="Literal"):
+        run_gb('CLASS C\n'
+               '    STATIC CONST X AS INTEGER = 1 + 1\n'
+               'END CLASS\n')
 
 
 def test_class_with_no_statics_unaffected(run_gb, run_vm):

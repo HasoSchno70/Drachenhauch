@@ -7,7 +7,6 @@ in test_enum_native.py separat gepflegt.
 import pytest
 
 from gamebasic.errors import ParseError, GBRuntimeError, TypeMismatchError
-from gamebasic.compiler import CompileError
 
 
 # Beide Helper geben stdout zurueck, identisch verwendbar.
@@ -185,7 +184,7 @@ def test_no_members_raises(run_gb):
 def test_non_literal_value_raises(run_either):
     """ENUM-Member-Werte muessen Compile-Time-Integer-Literale sein - keine
     Variablen, keine Funktionsaufrufe."""
-    with pytest.raises((GBRuntimeError, CompileError), match="Literal"):
+    with pytest.raises(GBRuntimeError, match="Literal"):
         run_either(
             'CONST N AS INTEGER = 5\n'
             'ENUM E = A = N\n'

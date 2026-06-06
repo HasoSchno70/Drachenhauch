@@ -1707,7 +1707,14 @@ impl Compiler {
         let mut members: Vec<(String, CVal)> = Vec::new();
         for c in statics {
             if let Node::Const { name: cn, value, .. } = c {
-                members.push((cn.to_lowercase(), eval_literal_default(value)?));
+                let key = cn.to_lowercase();
+                // Pascal-Striktheit: doppelte STATIC CONST ablehnen (nicht
+                // still last-wins). Wie der Python-Compiler.
+                if members.iter().any(|(k, _)| *k == key) {
+                    return Err(format!(
+                        "STATIC CONST {}.{}: doppelt deklariert", name, cn));
+                }
+                members.push((key, eval_literal_default(value)?));
             }
         }
         let ns = CVal::Ns { name: name.clone(), members };

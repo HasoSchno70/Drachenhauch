@@ -126,46 +126,9 @@ PRINT s
 
 # --- Cross-VM-Identitaet --------------------------------------------
 
-def test_cython_dict_comp_matches():
-    """Direkter Cython-Pfad. Mit dem Bench-Tool wuerden wir ALLE-IDENTISCH
-    pruefen -- hier nur dass keine Crashes."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    try:
-        import gamebasic.vm_native as vm_native
-    except ImportError:
-        pytest.skip("vm_native nicht kompiliert")
-    src = '''
-DIM m AS MAP OF INTEGER
-m = {STR$(x): x * x FOR x IN (1, 2, 3)}
-PRINT MAPGET(m, "2")
-'''
-    mod = Compiler().compile(Parser(Lexer(src).tokenize()).parse())
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        vm_native.VM().run(mod)
-    assert "4" in buf.getvalue()
-
-
-def test_cython_set_comp_matches():
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler
-    try:
-        import gamebasic.vm_native as vm_native
-    except ImportError:
-        pytest.skip("vm_native nicht kompiliert")
-    src = '''
-DIM s AS TUPLE
-s = {x MOD 3 FOR x IN (0, 1, 2, 3, 4, 5)}
-PRINT s
-'''
-    mod = Compiler().compile(Parser(Lexer(src).tokenize()).parse())
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        vm_native.VM().run(mod)
-    assert "(0, 1, 2)" in buf.getvalue()
+# (Die früheren Cython-VM-Tests (vm_native) sind entfernt: die Cython-VM wurde
+#  längst durch gbrt abgelöst; das Dict/Set-Comp-Verhalten deckt der run_gb-
+#  Golden-Test oben + test_gbrt_parity ab.)
 
 
 # --- Parser-Edge-Cases ----------------------------------------------

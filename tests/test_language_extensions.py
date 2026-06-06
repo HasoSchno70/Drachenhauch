@@ -234,18 +234,18 @@ PRINT x
 # --- TIMER + Joystick: Registrierung ---------------------------------
 
 def test_timer_builtin_registered():
-    from gamebasic.interpreter import GRAPHICS_BUILTINS
-    assert "timer" in GRAPHICS_BUILTINS
+    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    assert "timer" in builtin_names_lower()
 
 
 def test_joystick_builtins_registered():
-    from gamebasic.interpreter import GRAPHICS_BUILTINS
+    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
     expected = {
         "joystick_count", "joystick_name",
         "joystick_axis", "joystick_button",
         "joystick_hat_x", "joystick_hat_y",
     }
-    assert expected <= set(GRAPHICS_BUILTINS.keys())
+    assert expected <= builtin_names_lower()
 
 
 # --- Regression: REPEAT$ funktioniert weiter -------------------------
@@ -320,9 +320,10 @@ def test_format_invalid_mask_errors(run_gb):
 # --- INKEY$ / WAITKEY: nur Registrierung -----------------------------
 
 def test_inkey_waitkey_registered():
-    from gamebasic.interpreter import GRAPHICS_BUILTINS
-    assert "inkey$" in GRAPHICS_BUILTINS
-    assert "waitkey" in GRAPHICS_BUILTINS
+    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    n = builtin_names_lower()
+    assert "inkey$" in n
+    assert "waitkey" in n
 
 
 # --- Default-Werte fuer Parameter -----------------------------------
@@ -505,18 +506,42 @@ def test_fstring_empty_expr_errors(run_gb):
 # --- REPEAT/DATA/READ/RESTORE/Defaults (frueher Python-VM, jetzt Tree-Walker) ---
 
 def _run_vm(src):
-    # Die Python-/Cython-Bytecode-VMs wurden entfernt; dieser Helfer laeuft jetzt
-    # ueber den Tree-Walker. Compiler-/gbrt-Abdeckung -> test_gbrt_parity.py.
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    import io as _io
-    import contextlib as _ctx
-    ast = Parser(Lexer(src).tokenize()).parse()
-    buf = _io.StringIO()
-    with _ctx.redirect_stdout(buf):
-        Interpreter().run(ast)
-    return buf.getvalue()
+    # Stufe B: laeuft jetzt ueber gbrt (frueher Tree-Walker/Python-VM).
+    # Eigenstaendiger Runner, damit die test_vm_*-Tests unveraendert bleiben.
+    import os as _os
+    import subprocess as _sp
+    import tempfile as _tf
+    from pathlib import Path as _P
+    from gamebasic.errors import GBRuntimeError, ParseError, LexerError
+    root = _P(__file__).resolve().parent.parent
+    exe = "gbrt.exe" if _os.name == "nt" else "gbrt"
+    gbrt = None
+    for v in ("release", "debug"):
+        p = root / "rust" / "gb_runtime" / "target" / v / exe
+        if p.exists():
+            gbrt = p
+            break
+    if gbrt is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    fd, tmp = _tf.mkstemp(suffix=".gb", prefix="_gbtest_")
+    _os.close(fd)
+    try:
+        _P(tmp).write_text(src, encoding="utf-8")
+        r = _sp.run([str(gbrt), "run", tmp], capture_output=True,
+                    text=True, encoding="utf-8", timeout=60)
+    finally:
+        try:
+            _os.unlink(tmp)
+        except OSError:
+            pass
+    if r.returncode != 0:
+        stderr = r.stderr or ""
+        if "Parse-Fehler" in stderr:
+            raise ParseError(stderr.strip())
+        if "Lexer-Fehler" in stderr:
+            raise LexerError(stderr.strip())
+        raise GBRuntimeError(stderr.strip())
+    return (r.stdout or "").replace("\r\n", "\n")
 
 
 def test_vm_repeat_until():
@@ -576,15 +601,9 @@ def test_vm_fstring():
     assert "hi Bob" in out
 
 
-def test_compiler_default_param_must_be_literal():
-    """Der Compiler (Bytecode fuer gbrt) verlangt Literal-Defaults; der
-    Tree-Walker ist hier nachsichtiger (Param-referenzierende Defaults ok)."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.compiler import Compiler, CompileError
-    ast = Parser(Lexer(
-        'SUB foo(a AS INTEGER, b AS INTEGER = a)\nEND SUB\n').tokenize()).parse()
-    with pytest.raises(CompileError, match="Literale"):
-        Compiler().compile(ast)
+# (Der frühere Test, dass der Compiler param-referenzierende Defaults ablehnt,
+#  ist entfernt: gbrt UNTERSTÜTZT sie jetzt (Callee-Prolog, Stufe-B-Härtung) --
+#  siehe test_default_can_reference_earlier_param. Der Python-Compiler wird in
+#  Phase 8 gelöscht.)
 
 
