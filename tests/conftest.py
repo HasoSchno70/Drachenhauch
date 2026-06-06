@@ -61,7 +61,13 @@ def run_gb():
         # fangen die rust-Parity-Sweeps `examples.glob("*.gb")` die Datei).
         # gbrt-Module (IMPORT "vec2") sind verzeichnis-unabhaengig; relative
         # .gb-Datei-Imports sind in run_gb-Tests nicht in Gebrauch.
-        fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_")
+        # `base`: wenn gesetzt, die .gb DORT ablegen -- gbrt chdirt ins Datei-
+        # Verzeichnis, also finden relative Pfade (TILED_LOAD, LOADIMAGE, ...)
+        # Fixture-Dateien, die der Test in `base` abgelegt hat.
+        if base is not None:
+            fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_", dir=str(base))
+        else:
+            fd, tmp = tempfile.mkstemp(suffix=".gb", prefix="_gbtest_")
         os.close(fd)
         try:
             Path(tmp).write_text(source, encoding="utf-8")
