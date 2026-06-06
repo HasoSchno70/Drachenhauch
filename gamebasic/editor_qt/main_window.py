@@ -1471,19 +1471,17 @@ class GameBasicEditor(QMainWindow):
     def _on_profile_failed(self, message: str, editor_line: int) -> None:
         self.profile_panel.set_status("nicht messbar")
         loc = f" (Zeile {editor_line})" if editor_line and editor_line > 0 else ""
-        # Programme, die die native Runtime brauchen (3D / native-only Builtins),
-        # kann der Tree-Walker-Profiler nicht messen -> klare Erklaerung statt
-        # rohem Laufzeitfehler.
-        if "nativen Runtime" in message or "native Runtime" in message:
+        # Der Profiler laeuft ueber die native Runtime (gbrt) und misst ALLES,
+        # auch 3D/native-only Builtins. Die einzige "native Runtime"-Meldung ist
+        # jetzt der Fall, dass gbrt nicht gebaut ist -> klare Bau-Anleitung.
+        if "native Runtime" in message or "nativen Runtime" in message:
             self.console.append(
-                f"\nⓘ Profiler{loc}: Dieses Programm braucht die native Runtime "
-                f"(gbrt) und kann nicht im Tree-Walker gemessen werden.\n"
+                f"\nⓘ Profiler: Die native Runtime gbrt ist nicht gebaut.\n"
                 f"   {message}\n"
-                f"   → Zum Ausfuehren den Run-Button (F5) nutzen; der Profiler "
-                f"misst nur Tree-Walker-faehige (Konsolen-/Logik-)Programme.\n",
+                f"   → Bauen mit:  python rust/build_runtime.py\n",
                 "muted")
             self.statusBar().showMessage(
-                "Profiler: Programm braucht die native Runtime (nicht messbar)", 6000)
+                "Profiler: native Runtime gbrt nicht gebaut", 6000)
         else:
             self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
             self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)

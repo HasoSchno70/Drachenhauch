@@ -386,12 +386,12 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 ## Profiler
 
-`Strg+Shift+Y` (oder Toolbar-Button / `Debug → Profiler`) führt das Programm im Tree-Walker durch und misst pro Statement **Trefferzahl** und **Zeit**. Das Ergebnis erscheint im **Profiler**-Panel (rechts):
+`Strg+Shift+Y` (oder Toolbar-Button / `Debug → Profiler`) führt das Programm über die native Runtime (`gbrt profile`) instrumentiert aus und misst pro Statement **Trefferzahl** und **Zeit**. Das Ergebnis erscheint im **Profiler**-Panel (rechts):
 
 - **Zeilen** — jede ausgeführte Zeile mit Treffern, Zeit (ms), Anteil (Balken + %) und Quelltext, nach Zeit sortiert (Hotspots oben). Doppelklick springt zur Zeile.
 - **Funktionen** — pro `SUB`/`FUNCTION` aggregiert: Aufrufzahl + Gesamtzeit.
 
-**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Wie der Debugger nur Tree-Walker, am besten für Konsolen-/Logik-Programme; ein laufender Profiler-Lauf lässt sich mit erneutem `Strg+Shift+Y` abbrechen (Endlos-Loops). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
+**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Am besten für Konsolen-/Logik-Programme, aber auch **Grafik-Programme mit Endlos-Render-Loop** lassen sich profilieren: erneutes `Strg+Shift+Y` (oder das Schliessen des Fensters via `QUITREQUESTED`) bricht den Lauf **sauber** ab — gbrt liefert dann die bis dahin gesammelten Daten (intern via Stop-Signal über stdin, `gbrt profile --stoppable`; ein harter Prozess-Kill würde die Auswertung verschlucken). `INPUT` liefert unter dem Profiler "" (kein Hängen). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
 
 ## Git-Blame
 

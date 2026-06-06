@@ -107,26 +107,67 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
     os.close(fd)
     result = ProfileResult()
     out = ""
+    proc = None
     try:
         Path(tmp).write_text(source, encoding="utf-8")
+        # `--stoppable`: gbrt liest stdin -> wir koennen einen Endlos-Loop
+        # (Grafik-Render-Loop, WHILE TRUE) per "stop"-Zeile SAUBER abbrechen,
+        # sodass gbrt die bis dahin gesammelten Profile-Daten noch ausgibt
+        # (ein harter terminate() wuerde den finalen JSON-println verschlucken).
         proc = subprocess.Popen(
-            [str(gbrt), "profile", tmp],
+            [str(gbrt), "profile", "--stoppable", tmp],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL, text=True)
+            stdin=subprocess.PIPE, text=True)
+
+        # stdout in einem Thread leeren: der JSON-Blob kommt am Ende in einem
+        # Rutsch, waehrend des Laufs schreibt gbrt (fast) nichts -> der Pipe-
+        # Puffer kann nicht blockieren und wir behalten stdin fuer das Stop-
+        # Signal in der Hand (communicate() wuerde stdin sofort schliessen ->
+        # gbrt saehe sofort EOF und braeche gleich am Anfang ab).
+        chunks: list[str] = []
+
+        def _drain():
+            try:
+                chunks.append(proc.stdout.read())
+            except (OSError, ValueError):
+                pass
+
+        drain = threading.Thread(target=_drain, daemon=True)
+        drain.start()
+
+        requested_stop = False
         while True:
             try:
-                out, _ = proc.communicate(timeout=0.1)
-                break
+                proc.wait(timeout=0.1)
+                break                                   # Programm regulaer fertig
             except subprocess.TimeoutExpired:
-                if should_stop is not None and should_stop():
-                    proc.terminate()
-                    try:
-                        out, _ = proc.communicate(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
+                if not requested_stop and should_stop is not None and should_stop():
+                    requested_stop = True
                     result.stopped = True
+                    try:
+                        proc.stdin.write("stop\n")      # sauberer Abbruch
+                        proc.stdin.flush()
+                    except (OSError, ValueError):
+                        pass
+                    try:
+                        proc.wait(timeout=5)            # JSON noch ausgeben lassen
+                    except subprocess.TimeoutExpired:
+                        proc.terminate()               # haengt doch -> hart beenden
+                        try:
+                            proc.wait(timeout=2)
+                        except subprocess.TimeoutExpired:
+                            proc.kill()
                     break
+        drain.join(timeout=5)
+        out = chunks[0] if chunks else ""
     finally:
+        if proc is not None:
+            for stream in (proc.stdin, proc.stdout):
+                try:
+                    if stream is not None:
+                        stream.close()
+                except OSError:
+                    pass
         try:
             os.unlink(tmp)
         except OSError:

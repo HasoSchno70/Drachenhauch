@@ -116,7 +116,14 @@ fn main() -> ExitCode {
         // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
         // Scope via symbols.scan_scopes). Ersetzt den Tree-Walker-Profiler.
         if raw.len() >= 3 && raw[1] == "profile" {
-            return profile_main(&raw[2]);
+            // `--stoppable`: Editor-Stop-Button via stdin-Zeile/EOF (haelt stdin
+            // belegt -> nur wenn der Aufrufer das will; ein direkter Terminal-Lauf
+            // ohne Flag laesst stdin fuer INPUT frei).
+            let stoppable = raw[2..].iter().any(|a| a == "--stoppable");
+            match raw[2..].iter().find(|a| !a.starts_with("--")) {
+                Some(p) => return profile_main(p, stoppable),
+                None => { eprintln!("profile: keine Datei angegeben"); return ExitCode::from(1); }
+            }
         }
         // Stufe B (Phase 3c): `gbrt debug datei.gb` -- interaktiver Debugger ueber
         // ein newline-JSON-Protokoll (stdin: Kommandos, stdout: Events). Ersetzt
@@ -283,7 +290,14 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
 /// stdout aus. Programm-Output landet im `output`-Feld (kein stdout-Konflikt);
 /// Laufzeitfehler kommen als `error`/`error_line` mit ins JSON. Exit 0 (der Editor
 /// parst das JSON). chdir ins Datei-Verzeichnis wie `run`.
-fn profile_main(path: &str) -> ExitCode {
+///
+/// `stoppable`: ein Hintergrund-Thread liest stdin; sobald eine Zeile kommt (der
+/// Editor schreibt `"stop"`) oder die Pipe EOF erreicht, wird das Programm beim
+/// naechsten Zeilenwechsel sauber abgebrochen und die bis dahin gesammelten
+/// Profile-Daten trotzdem ausgegeben (`stopped:true`). Damit lassen sich
+/// Endlos-Loops (Grafik-Render-Loop, `WHILE TRUE`) profilieren, ohne dass ein
+/// harter Prozess-Kill die Auswertung verschluckt.
+fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     let abs = std::fs::canonicalize(path).unwrap_or_else(|_| std::path::PathBuf::from(path));
     let base = abs.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| std::path::PathBuf::from("."));
     let label = abs.file_name().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| path.to_string());
@@ -302,7 +316,22 @@ fn profile_main(path: &str) -> ExitCode {
     };
     let mut machine = vm::Vm::new(&prog);
     machine.enable_profiler();
+    if stoppable {
+        // Stop-Signal: Hintergrund-Thread blockiert auf stdin; die erste Zeile
+        // (Editor schreibt "stop") oder EOF setzt das Flag -> sauberer Abbruch.
+        // Detached -- bei Programm-Ende beendet der Prozess-Exit den Thread.
+        use std::io::BufRead;
+        let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let reader = flag.clone();
+        std::thread::spawn(move || {
+            let mut line = String::new();
+            let _ = std::io::stdin().lock().read_line(&mut line);
+            reader.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+        machine.set_stop_flag(flag);
+    }
     let run_res = machine.run();
+    let stopped = matches!(&run_res, Err(e) if vm::Vm::was_stopped(e));
     let (total, lines) = machine.take_profile();
     let err_line = machine.error_line();
     let output = machine.take_output();
@@ -310,11 +339,14 @@ fn profile_main(path: &str) -> ExitCode {
         .map(|&(ln, c, t)| serde_json::json!({"line": ln, "count": c, "time": t}))
         .collect();
     let mut blob = serde_json::json!({
-        "total_time": total, "output": output, "lines": lines_json, "stopped": false
+        "total_time": total, "output": output, "lines": lines_json, "stopped": stopped
     });
+    // Echte Laufzeitfehler ins JSON -- der Stop-Sentinel ist KEIN Fehler.
     if let Err(e) = &run_res {
-        blob["error"] = serde_json::json!(e);
-        blob["error_line"] = serde_json::json!(err_line);
+        if !vm::Vm::was_stopped(e) {
+            blob["error"] = serde_json::json!(e);
+            blob["error_line"] = serde_json::json!(err_line);
+        }
     }
     println!("{}", serde_json::to_string(&blob).unwrap_or_else(|_| "{}".into()));
     ExitCode::SUCCESS

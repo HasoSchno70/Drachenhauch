@@ -8,6 +8,13 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+/// Sentinel-"Fehler", mit dem ein externes Stop-Signal (`gbrt profile`,
+/// Editor-Stop-Button) die Dispatch-Schleife sauber abwickelt -- darf wie
+/// `__DEBUG_STOP__` NICHT von TRY/CATCH gefangen werden.
+const PROFILE_STOP: &str = "__PROFILE_STOP__";
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
@@ -417,6 +424,11 @@ pub struct Vm<'p> {
     cur_line: u32,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
+    // Externes Stop-Signal (Editor-Stop-Button bei `gbrt profile --stoppable`):
+    // bei gesetztem Flag bricht die Dispatch-Schleife beim naechsten
+    // Zeilenwechsel sauber ab (PROFILE_STOP), damit die bis dahin gesammelten
+    // Profile-Daten noch ausgegeben werden (kein verlorener Prozess-Kill).
+    stop: Option<Arc<AtomicBool>>,
     // Debugger-State (Stufe B): None = kein Debug-Overhead. Call-Tiefe fuer
     // Step over/into/out (inkrementiert pro `exec`).
     dbg: Option<DebugState>,
@@ -488,6 +500,7 @@ impl<'p> Vm<'p> {
             scene_stack: Vec::new(),
             cur_line: 0,
             prof: None,
+            stop: None,
             dbg: None,
             depth: 0,
             #[cfg(feature = "graphics")]
@@ -550,6 +563,13 @@ impl<'p> Vm<'p> {
     /// (sonst erscheint der Prompt erst nach der Eingabe) und `self.out` leeren,
     /// damit der finale take_output() nichts doppelt schreibt.
     fn flush_and_prompt(&mut self, prompt: &str) {
+        // Unter dem Profiler gibt es keine interaktive Konsole -> Prompt in den
+        // Output-Puffer (landet im JSON-`output`-Feld), damit stdout sauber fuer
+        // den JSON-Blob bleibt (sonst klebt das prompt-Praefix am JSON).
+        if self.prof.is_some() {
+            self.out.push_str(prompt);
+            return;
+        }
         use std::io::Write;
         let so = std::io::stdout();
         let mut h = so.lock();
@@ -562,6 +582,32 @@ impl<'p> Vm<'p> {
     /// Profiling fuer den naechsten `run()` aktivieren (Stufe B, `gbrt profile`).
     pub fn enable_profiler(&mut self) {
         self.prof = Some(ProfileSink::new());
+    }
+
+    /// Externes Stop-Signal installieren (Editor-Stop-Button). Wird das `flag`
+    /// von aussen (z.B. einem stdin-Reader-Thread) auf `true` gesetzt, bricht
+    /// `run()` beim naechsten Zeilenwechsel mit PROFILE_STOP ab -- die bisher
+    /// gesammelten Profile-Daten bleiben so erhalten (statt durch Prozess-Kill
+    /// verloren zu gehen). Endlos-Loop-Programme (Grafik/`WHILE TRUE`) lassen
+    /// sich damit sauber profilieren.
+    pub fn set_stop_flag(&mut self, flag: Arc<AtomicBool>) {
+        self.stop = Some(flag);
+    }
+
+    /// Ob `run()` durch das externe Stop-Signal abgebrochen wurde.
+    pub fn was_stopped(err: &str) -> bool {
+        err == PROFILE_STOP
+    }
+
+    /// Eine INPUT-Zeile lesen. Bei aktivem Stop-Kanal (`gbrt profile
+    /// --stoppable`) gehoert stdin dem Stop-Reader-Thread -- INPUT liefert dann
+    /// "" (wie der frueher genutzte DEVNULL-stdin), statt zu blockieren oder mit
+    /// dem Stop-Reader um die Eingabe zu konkurrieren.
+    fn read_input_line(&self) -> String {
+        if self.stop.is_some() {
+            return String::new();
+        }
+        read_input_line()
     }
 
     /// Profiler-Ergebnis abholen: Gesamtzeit + pro Zeile (count, time_secs).
@@ -913,9 +959,9 @@ impl<'p> Vm<'p> {
         loop {
             match self.dispatch(fn_, locals, stack, ip, try_handlers, self_obj) {
                 Ok(step) => return Ok(step),
-                // Debugger-Abbruch (`stop`) darf NICHT von TRY/CATCH gefangen
-                // werden -- unbedingt durchreichen.
-                Err(e) if e == "__DEBUG_STOP__" => return Err(e),
+                // Debugger-Abbruch (`stop`) und Profiler-Stop-Signal duerfen
+                // NICHT von TRY/CATCH gefangen werden -- unbedingt durchreichen.
+                Err(e) if e == "__DEBUG_STOP__" || e == PROFILE_STOP => return Err(e),
                 Err(e) => match try_handlers.pop() {
                     Some((target, depth)) => {
                         stack.truncate(depth);
@@ -1121,6 +1167,13 @@ impl<'p> Vm<'p> {
                     if changed {
                         if let Some(p) = self.prof.as_mut() {
                             p.tick(self.cur_line);
+                        }
+                        // Externes Stop-Signal: sauber abwickeln, damit die
+                        // bisherigen Profile-Daten noch ausgegeben werden.
+                        if let Some(s) = self.stop.as_ref() {
+                            if s.load(Ordering::Relaxed) {
+                                return Err(PROFILE_STOP.into());
+                            }
                         }
                         if self.dbg.is_some() {
                             self.debug_on_line(fn_, locals)?;
@@ -1726,7 +1779,7 @@ impl<'p> Vm<'p> {
                         input_prompt(&stack.pop().unwrap().fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
-                    let raw = read_input_line();
+                    let raw = self.read_input_line();
                     let slot = self.globals.get(&name)
                         .ok_or_else(|| format!("Variable '{}' nicht deklariert (DIM fehlt?)", name))?
                         .clone();
@@ -1743,7 +1796,7 @@ impl<'p> Vm<'p> {
                         input_prompt(&stack.pop().unwrap().fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
-                    let raw = read_input_line();
+                    let raw = self.read_input_line();
                     let ty = fn_.local_types[slot_idx].clone();
                     locals[slot_idx] = coerce_input(&raw, &ty)?;
                 }
