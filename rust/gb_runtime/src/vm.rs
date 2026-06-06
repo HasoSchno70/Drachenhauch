@@ -2387,6 +2387,26 @@ impl<'p> Vm<'p> {
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_reset" => { self.gui.reset(); Value::Nil }
+            // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
+            "gui_set_bounds" => { self.gui.set_bounds(gi(a,0,"GUI_SET_BOUNDS")?, gi(a,1,"GUI_SET_BOUNDS")? as i32, gi(a,2,"GUI_SET_BOUNDS")? as i32, gi(a,3,"GUI_SET_BOUNDS")? as i32, gi(a,4,"GUI_SET_BOUNDS")? as i32)?; Value::Nil }
+            "gui_get_x" => Value::Int(self.gui.widget_bounds(gi(a,0,"GUI_GET_X")?, "GUI_GET_X")?.0 as i64),
+            "gui_get_y" => Value::Int(self.gui.widget_bounds(gi(a,0,"GUI_GET_Y")?, "GUI_GET_Y")?.1 as i64),
+            "gui_get_w" => Value::Int(self.gui.widget_bounds(gi(a,0,"GUI_GET_W")?, "GUI_GET_W")?.2 as i64),
+            "gui_get_h" => Value::Int(self.gui.widget_bounds(gi(a,0,"GUI_GET_H")?, "GUI_GET_H")?.3 as i64),
+            "gui_destroy" => { self.gui.destroy(gi(a,0,"GUI_DESTROY")?)?; Value::Nil }
+            "gui_set_visible" => { self.gui.set_widget_visible(gi(a,0,"GUI_SET_VISIBLE")?, gbool(a,1,"GUI_SET_VISIBLE")?)?; Value::Nil }
+            "gui_visible" => Value::Bool(self.gui.widget_visible(gi(a,0,"GUI_VISIBLE")?)?),
+            "gui_kind" => Value::str_rc(self.gui.kind_name(gi(a,0,"GUI_KIND")?)?),
+            "gui_focus" => { self.gui.focus(gi(a,0,"GUI_FOCUS")?)?; Value::Nil }
+            "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),
+            "gui_window_set_bounds" => { self.gui.window_set_bounds(gi(a,0,"GUI_WINDOW_SET_BOUNDS")?, gi(a,1,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,2,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,3,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,4,"GUI_WINDOW_SET_BOUNDS")? as i32)?; Value::Nil }
+            "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?)?.0 as i64),
+            "gui_window_get_y" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_Y")?)?.1 as i64),
+            "gui_window_get_w" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_W")?)?.2 as i64),
+            "gui_window_get_h" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_H")?)?.3 as i64),
+            "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
+            "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
+            "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),
             // --- Tabelle ---
             "gui_table" => {
                 let h = self.gui.table(gi(a,0,"GUI_TABLE")?, gi(a,1,"GUI_TABLE")? as i32, gi(a,2,"GUI_TABLE")? as i32,

@@ -390,6 +390,43 @@ Löscht alle Fenster und Widgets — sinnvoll beim Wechsel des Menü-Screens.
 Achtung: vorher geholte `GUI_WINDOW`/`GUI_WIDGET`-Referenzen zeigen danach auf
 nicht mehr verwaltete Objekte.
 
+## Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test)
+
+Widgets und Fenster lassen sich nach dem Anlegen zur Laufzeit verändern — die
+Basis für **dynamische UIs** und einen **WYSIWYG-Editor**. Handles bleiben dabei
+stabil (Löschen markiert nur als „tot", verschiebt keine Indizes).
+
+| Builtin | Wirkung |
+|---|---|
+| `GUI_SET_BOUNDS(wdg, x, y, w, h)` | Widget verschieben/skalieren (fenster-relativ) |
+| `GUI_GET_X/Y/W/H(wdg)` → INTEGER | aktuelle Maße lesen |
+| `GUI_SET_VISIBLE(wdg, an)` / `GUI_VISIBLE(wdg)` → BOOLEAN | ein-/ausblenden (unsichtbar = nicht gezeichnet, nicht interaktiv) |
+| `GUI_DESTROY(wdg)` | Widget entfernen (Handle wird ungültig, andere bleiben gültig) |
+| `GUI_KIND(wdg)` → STRING | `"button"`/`"label"`/`"checkbox"`/`"slider"`/`"textinput"`/`"panel"`/`"table"` |
+| `GUI_FOCUS(wdg)` | Tastatur-Fokus setzen (z.B. auf ein TextInput) |
+| `GUI_HIT_TEST(x, y)` → GUI_WIDGET | oberstes Widget am Bildschirmpunkt, oder `-1` (Selektion im Editor) |
+| `GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)` / `GUI_WINDOW_GET_X/Y/W/H(win)` | Fenster bewegen/skalieren/lesen |
+| `GUI_WINDOW_DESTROY(win)` | Fenster + Inhalt entfernen |
+| `GUI_WINDOW_WIDGET_COUNT(win)` → INTEGER | Anzahl lebender Widgets |
+| `GUI_WINDOW_WIDGET(win, n)` → GUI_WIDGET | n-tes lebendes Widget (Enumeration/Serialisierung), oder `-1` |
+
+```basic
+' Editor-Idee: Klick wählt das Widget unter der Maus aus, Ziehen verschiebt es.
+DIM sel AS GUI_WIDGET
+sel = GUI_HIT_TEST(MOUSEX(), MOUSEY())
+IF sel <> -1 THEN
+    GUI_SET_BOUNDS(sel, MOUSEX() - win_x, MOUSEY() - win_y - 22, GUI_GET_W(sel), GUI_GET_H(sel))
+END IF
+
+' Alle Widgets eines Fensters durchgehen (z.B. zum Speichern):
+DIM i AS INTEGER
+FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(win) - 1
+    DIM wdg AS GUI_WIDGET
+    wdg = GUI_WINDOW_WIDGET(win, i)
+    PRINT GUI_KIND(wdg), GUI_GET_X(wdg), GUI_GET_Y(wdg)
+NEXT
+```
+
 ## Vollständiges Beispiel
 
 Siehe [examples/45_gui.gb](../examples/45_gui.gb): Fenster mit Slider (live ins
@@ -404,6 +441,8 @@ schließbar.
 - **Immediate-Mode-Fenster** (`UI_WINDOW_BEGIN/END` im `ui`-Modul) sind die
   geplante Alternative (Phase 4).
 - **Absolute Koordinaten**, kein Auto-Layout.
+- **Laufzeit-Manipulation** (Verschieben/Skalieren/Löschen/Ein-/Ausblenden/
+  Hit-Test/Enumeration) wird unterstützt — siehe Abschnitt oben.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
-  `SCREEN`. State und Hit-Test sind headless getestet
-  (`tests/test_modules_gui.py`).
+  `SCREEN`. Konstruktion, State, Geometrie und Hit-Test sind headless getestet
+  (`tests/test_gui_runtime.py`).

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 855,
+ "count": 874,
  "builtins": [
   {
    "name": "ABS",
@@ -5131,6 +5131,120 @@
    "kind": "core",
    "signature": "WEIGHTED_CHOICE(werte, gewichte)",
    "module": "interpreter"
+  },
+  {
+   "name": "GUI_SET_BOUNDS",
+   "kind": "core",
+   "signature": "GUI_SET_BOUNDS(wdg, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_X",
+   "kind": "core",
+   "signature": "GUI_GET_X(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_Y",
+   "kind": "core",
+   "signature": "GUI_GET_Y(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_W",
+   "kind": "core",
+   "signature": "GUI_GET_W(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GET_H",
+   "kind": "core",
+   "signature": "GUI_GET_H(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DESTROY",
+   "kind": "core",
+   "signature": "GUI_DESTROY(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_VISIBLE",
+   "kind": "core",
+   "signature": "GUI_SET_VISIBLE(wdg, on)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_VISIBLE",
+   "kind": "core",
+   "signature": "GUI_VISIBLE(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_KIND",
+   "kind": "core",
+   "signature": "GUI_KIND(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FOCUS",
+   "kind": "core",
+   "signature": "GUI_FOCUS(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_HIT_TEST",
+   "kind": "core",
+   "signature": "GUI_HIT_TEST(x, y)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_SET_BOUNDS",
+   "kind": "core",
+   "signature": "GUI_WINDOW_SET_BOUNDS(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_X",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_X(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_Y",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_Y(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_W",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_W(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_GET_H",
+   "kind": "core",
+   "signature": "GUI_WINDOW_GET_H(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_DESTROY",
+   "kind": "core",
+   "signature": "GUI_WINDOW_DESTROY(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_WIDGET_COUNT",
+   "kind": "core",
+   "signature": "GUI_WINDOW_WIDGET_COUNT(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_WIDGET",
+   "kind": "core",
+   "signature": "GUI_WINDOW_WIDGET(win, n)",
+   "module": "gui"
   }
  ]
 }

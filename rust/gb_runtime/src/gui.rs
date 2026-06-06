@@ -100,6 +100,10 @@ pub struct Widget {
     on_change: Option<String>,
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
+    // Laufzeit-Lifecycle (Tombstone -- Indizes/Handles bleiben stabil): `alive`
+    // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
+    alive: bool,
+    visible: bool,
 }
 
 pub struct Window {
@@ -110,6 +114,7 @@ pub struct Window {
     closable: bool,
     visible: bool,
     close_clicked: bool,
+    alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
 }
 
 // Aufgeloestes Tabellen-Layout (einzige Wahrheit fuer Hit-Test + Zeichnen).
@@ -196,7 +201,7 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, close_clicked: false,
+            movable: true, closable: false, visible: true, close_clicked: false, alive: true,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -218,6 +223,7 @@ impl Gui {
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None,
+            alive: true, visible: true,
         }
     }
 
@@ -460,6 +466,104 @@ impl Gui {
         Ok(())
     }
 
+    // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
+    // Basis fuer dynamische UIs und einen WYSIWYG-Editor. Widget-Koordinaten sind
+    // fenster-relativ (wie bei der Konstruktion).
+    pub fn set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
+        let wd = self.wdg_mut(h, "GUI_SET_BOUNDS")?;
+        wd.x = x; wd.y = y; wd.w = w.max(0); wd.h = ht.max(0); Ok(())
+    }
+    pub fn widget_bounds(&self, h: i64, fn_: &str) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.wdg(h, fn_)?; Ok((w.x, w.y, w.w, w.h))
+    }
+    pub fn destroy(&mut self, h: i64) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        let wd = self.wdg_mut(h, "GUI_DESTROY")?;
+        wd.alive = false;
+        // Haengende Interaktions-Referenzen auf dieses Widget loesen.
+        if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
+        if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+        if self.press_origin == Some((wi, i)) { self.press_origin = None; }
+        Ok(())
+    }
+    pub fn set_widget_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_VISIBLE")?.visible = f; Ok(())
+    }
+    pub fn widget_visible(&self, h: i64) -> Result<bool, String> {
+        let w = self.wdg(h, "GUI_VISIBLE")?; Ok(w.alive && w.visible)
+    }
+    pub fn kind_name(&self, h: i64) -> Result<&'static str, String> {
+        Ok(match self.wdg(h, "GUI_KIND")?.kind {
+            Kind::Button => "button", Kind::Label => "label", Kind::Checkbox => "checkbox",
+            Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
+            Kind::Table => "table",
+        })
+    }
+    pub fn focus(&mut self, h: i64) -> Result<(), String> {
+        let (wi, i) = Self::dec_widget(h);
+        self.wdg(h, "GUI_FOCUS")?;          // Handle validieren
+        self.focus_widget = Some((wi, i));
+        self.focus_window = Some(wi);
+        self.bring_to_front(wi);
+        Ok(())
+    }
+    /// Oberstes lebendes+sichtbares Widget am Bildschirmpunkt (Z-Order), oder -1.
+    /// Liefert ein Widget-Handle (fuer Selektion im WYSIWYG-Editor).
+    pub fn hit_test(&self, mx: i32, my: i32) -> i64 {
+        for &wi in self.z_order.iter().rev() {
+            let win = &self.windows[wi];
+            if !win.alive || !win.visible { continue; }
+            if !Self::in_rect(mx, my, (win.x, win.y, win.w, win.h)) { continue; }
+            // innerhalb des Fensters: spaeter gezeichnete Widgets liegen oben.
+            for i in (0..win.widgets.len()).rev() {
+                let wd = &win.widgets[i];
+                if wd.alive && wd.visible && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
+                    return Self::enc_widget(wi, i);
+                }
+            }
+            return -1;   // Fenster getroffen, aber kein Widget
+        }
+        -1
+    }
+    // Window-Geometrie / Lifecycle / Enumeration.
+    pub fn window_set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
+        let win = self.win_mut(h, "GUI_WINDOW_SET_BOUNDS")?;
+        win.x = x; win.y = y; win.w = w.max(0); win.h = ht.max(0); Ok(())
+    }
+    pub fn window_bounds(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
+        let w = self.windows.get(h as usize)
+            .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
+        Ok((w.x, w.y, w.w, w.h))
+    }
+    pub fn window_destroy(&mut self, h: i64) -> Result<(), String> {
+        let win = self.win_mut(h, "GUI_WINDOW_DESTROY")?;
+        win.alive = false; win.visible = false;
+        let wi = h as usize;
+        self.z_order.retain(|&i| i != wi);
+        if self.focus_window == Some(wi) { self.focus_window = None; }
+        if self.drag_window == Some(wi) { self.drag_window = None; }
+        Ok(())
+    }
+    pub fn window_widget_count(&self, h: i64) -> Result<i64, String> {
+        let w = self.windows.get(h as usize)
+            .ok_or("GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle")?;
+        Ok(w.widgets.iter().filter(|wd| wd.alive).count() as i64)
+    }
+    /// Handle des `n`-ten LEBENDEN Widgets von Fenster `h` (Einfuege-Reihenfolge),
+    /// oder -1. Fuer Enumeration/Serialisierung.
+    pub fn window_widget(&self, h: i64, n: i64) -> Result<i64, String> {
+        let wi = h as usize;
+        let w = self.windows.get(wi)
+            .ok_or("GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle")?;
+        let mut k = 0i64;
+        for (i, wd) in w.widgets.iter().enumerate() {
+            if !wd.alive { continue; }
+            if k == n { return Ok(Self::enc_widget(wi, i)); }
+            k += 1;
+        }
+        Ok(-1)
+    }
+
     // --- Theme / Metriken ---
     pub fn theme_accent(&mut self, c: i64) { self.theme.insert("accent".into(), c); }
     pub fn theme_set(&mut self, key: String, c: i64) -> Result<(), String> {
@@ -495,7 +599,7 @@ impl Gui {
     fn topmost_at(&self, mx: i32, my: i32) -> Option<usize> {
         for &wi in self.z_order.iter().rev() {
             let w = &self.windows[wi];
-            if w.visible && Self::in_rect(mx, my, (w.x, w.y, w.w, w.h)) { return Some(wi); }
+            if w.alive && w.visible && Self::in_rect(mx, my, (w.x, w.y, w.w, w.h)) { return Some(wi); }
         }
         None
     }
@@ -528,11 +632,11 @@ impl Gui {
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
             for i in 0..n {
-                let (r, is_table) = {
+                let (r, is_table, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind == Kind::Table)
+                    (self.abs_rect(top, w), w.kind == Kind::Table, w.alive && w.visible)
                 };
-                if Self::in_rect(mx, my, r) {
+                if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
                     if is_table { self.table_hover(top, i, mx, my, g); }
                 }
@@ -649,8 +753,8 @@ impl Gui {
         let mut hit = None;
         let n = self.windows[win].widgets.len();
         for i in 0..n {
-            let r = { let w = &self.windows[win].widgets[i]; self.abs_rect(win, w) };
-            if Self::in_rect(mx, my, r) { hit = Some(i); break; }
+            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), w.alive && w.visible) };
+            if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
         match self.windows[win].widgets[i].kind {
@@ -673,7 +777,7 @@ impl Gui {
     // --- Draw ---
     pub fn draw(&self, g: &mut Graphics) {
         for &wi in &self.z_order {
-            if self.windows[wi].visible { self.draw_window(g, wi); }
+            if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
     }
 
@@ -693,7 +797,9 @@ impl Gui {
             g.line(cx + 6, cy + 6, cx + cw - 7, cy + ch - 7, self.th("title_fg"));
             g.line(cx + cw - 7, cy + 6, cx + 6, cy + ch - 7, self.th("title_fg"));
         }
-        for (i, wdg) in win.widgets.iter().enumerate() { self.draw_widget(g, wi, i, wdg); }
+        for (i, wdg) in win.widgets.iter().enumerate() {
+            if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
+        }
     }
 
     fn draw_widget(&self, g: &mut Graphics, wi: usize, idx: usize, wdg: &Widget) {
