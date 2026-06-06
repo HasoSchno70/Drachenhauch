@@ -1,163 +1,124 @@
 """Tests fuer das net-Modul (TCP/UDP-Sockets).
 
-Wir nutzen Loopback (127.0.0.1) und Port 0 (= OS-zugewiesener freier Port),
-damit die Tests nicht miteinander konkurrieren. Jeder Test schliesst seine
-Sockets explizit -- ohne das wuerden flapping Tests passieren wenn der OS
-sie nicht schnell genug freigibt.
+Golden-Tests gegen `gbrt` (Stufe B): jeder Test ist ein eigenstaendiges
+GB-Programm, das Server+Client im selben Prozess ueber Loopback (127.0.0.1,
+Port 0) verbindet. nil-Check via `IS_NIL()`-Builtin (nicht `IS NIL` -- das ist
+gar kein Parser-Konstrukt, weder TW noch gbrt; nur die Doku behauptet es).
+Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
-import time
-
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
+from gamebasic.errors import GBRuntimeError
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load_net():
-    assert load_module("net")
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
 # --- TCP -----------------------------------------------------------
 
-def test_tcp_listen_returns_listener(call_builtin):
-    lst = call_builtin("net_tcp_listen", [0])
-    from gamebasic.modules.net import _TCPListener
-    assert isinstance(lst, _TCPListener)
-    assert lst.port > 0
-    call_builtin("net_close_listener", [lst])
+def test_tcp_listen_returns_listener(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+                        "PRINT NET_LISTENER_PORT(l) > 0\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE"]
 
 
-def test_tcp_listen_invalid_port_raises(call_builtin):
+def test_tcp_listen_invalid_port_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="out of range"):
-        call_builtin("net_tcp_listen", [99999])
+        run_gb('IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(99999)\n')
 
 
-def test_tcp_accept_non_blocking_returns_nil(call_builtin):
-    """Ohne wartenden Client liefert ACCEPT NIL (None)."""
-    lst = call_builtin("net_tcp_listen", [0])
-    res = call_builtin("net_tcp_accept", [lst])
-    assert res is None
-    call_builtin("net_close_listener", [lst])
+def test_tcp_accept_non_blocking_returns_nil(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+                        "DIM s AS NET_SOCKET\ns = NET_TCP_ACCEPT(l)\n"
+                        "PRINT IS_NIL(s)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE"]
 
 
-def test_tcp_full_roundtrip(call_builtin):
-    """Server + Client: Connect, Send, Recv, Close."""
-    lst = call_builtin("net_tcp_listen", [0])
-    port = lst.port
-    client = call_builtin("net_tcp_connect", ["127.0.0.1", port])
-
-    # Kurze Schleife: ACCEPT bis es klappt (auch unter Last sollte das
-    # innerhalb 1s passen, das Loopback ist instant).
-    server_sock = None
-    for _ in range(50):
-        server_sock = call_builtin("net_tcp_accept", [lst])
-        if server_sock is not None:
-            break
-        time.sleep(0.01)
-    assert server_sock is not None
-
-    # Client schickt, Server liest
-    sent = call_builtin("net_send", [client, "hallo"])
-    assert sent == 5  # 5 Bytes
-
-    # ACCEPT in non-blocking -- recv koennte initial leer sein
-    received = ""
-    for _ in range(50):
-        received = call_builtin("net_recv", [server_sock, 1024])
-        if received:
-            break
-        time.sleep(0.01)
-    assert received == "hallo"
-
-    # Cleanup
-    call_builtin("net_close", [client])
-    call_builtin("net_close", [server_sock])
-    call_builtin("net_close_listener", [lst])
+def test_tcp_full_roundtrip(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        "PRINT IS_NIL(srv)\n"
+        'PRINT NET_SEND(client, "hallo")\n'
+        'DIM got AS STRING\nFOR i = 1 TO 50\n    got = NET_RECV(srv, 1024)\n'
+        '    IF got <> "" THEN BREAK\nNEXT\nPRINT got\n'
+        "NET_CLOSE(client)\nNET_CLOSE(srv)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["FALSE", "5", "hallo"]
 
 
-def test_tcp_peer_info(call_builtin):
-    lst = call_builtin("net_tcp_listen", [0])
-    client = call_builtin("net_tcp_connect", ["127.0.0.1", lst.port])
-    assert call_builtin("net_peer_addr", [client]) == "127.0.0.1"
-    assert call_builtin("net_peer_port", [client]) == lst.port
-    call_builtin("net_close", [client])
-    call_builtin("net_close_listener", [lst])
+def test_tcp_peer_info(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "PRINT NET_PEER_ADDR(client)\n"
+        "PRINT NET_PEER_PORT(client) = NET_LISTENER_PORT(l)\n"
+        "NET_CLOSE(client)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["127.0.0.1", "TRUE"]
 
 
-def test_tcp_send_validates_socket_type(call_builtin):
-    with pytest.raises(TypeMismatchError, match="NET_SOCKET"):
-        call_builtin("net_send", ["not a socket", "hi"])
+def test_tcp_send_validates_socket_type(run_gb):
+    # gbrt nutzt Integer-Handles -> Typfehler lautet "erwartet INTEGER".
+    with pytest.raises(GBRuntimeError, match="INTEGER"):
+        run_gb('IMPORT "net"\nPRINT NET_SEND("not a socket", "hi")\n')
 
 
-def test_tcp_set_timeout_no_crash(call_builtin):
-    lst = call_builtin("net_tcp_listen", [0])
-    client = call_builtin("net_tcp_connect", ["127.0.0.1", lst.port])
-    call_builtin("net_set_timeout", [client, 0])    # non-blocking
-    call_builtin("net_set_timeout", [client, 100])  # 100ms
-    call_builtin("net_set_timeout", [client, -1])   # blocking
-    call_builtin("net_close", [client])
-    call_builtin("net_close_listener", [lst])
+def test_tcp_set_timeout_no_crash(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "NET_SET_TIMEOUT(client, 0)\nNET_SET_TIMEOUT(client, 100)\nNET_SET_TIMEOUT(client, -1)\n"
+        'PRINT "ok"\nNET_CLOSE(client)\nNET_CLOSE_LISTENER(l)\n'))
+    assert out == ["ok"]
 
 
 # --- UDP -----------------------------------------------------------
 
-def test_udp_bind_returns_socket(call_builtin):
-    s = call_builtin("net_udp_bind", [0])
-    from gamebasic.modules.net import _UDPSocket
-    assert isinstance(s, _UDPSocket)
-    assert s.bound_port > 0
-    call_builtin("net_udp_close", [s])
+def test_udp_bind_returns_socket(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(0)\n'
+                        "PRINT NET_UDP_PORT(s) > 0\nNET_UDP_CLOSE(s)\n"))
+    assert out == ["TRUE"]
 
 
-def test_udp_open_unbound(call_builtin):
-    s = call_builtin("net_udp_open", [])
-    from gamebasic.modules.net import _UDPSocket
-    assert isinstance(s, _UDPSocket)
-    call_builtin("net_udp_close", [s])
+def test_udp_open_unbound(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_OPEN()\n'
+                        'PRINT "ok"\nNET_UDP_CLOSE(s)\n'))
+    assert out == ["ok"]
 
 
-def test_udp_send_recv(call_builtin):
-    """Client sendet via OPEN, Server empfaengt via BIND."""
-    server = call_builtin("net_udp_bind", [0])
-    server_port = server.bound_port
-    client = call_builtin("net_udp_open", [])
-    sent = call_builtin("net_udp_send",
-                        [client, "127.0.0.1", server_port, "ping"])
-    assert sent == 4
-
-    received = ""
-    for _ in range(50):
-        received = call_builtin("net_udp_recv", [server, 1024])
-        if received:
-            break
-        time.sleep(0.01)
-    assert received == "ping"
-
-    last = call_builtin("net_udp_last_from", [server])
-    assert last.startswith("127.0.0.1:")
-    call_builtin("net_udp_close", [client])
-    call_builtin("net_udp_close", [server])
+def test_udp_send_recv(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM srv AS NET_UDP\nsrv = NET_UDP_BIND(0)\n'
+        "DIM cl AS NET_UDP\ncl = NET_UDP_OPEN()\n"
+        'PRINT NET_UDP_SEND(cl, "127.0.0.1", NET_UDP_PORT(srv), "ping")\n'
+        'DIM got AS STRING\nDIM i AS INTEGER\n'
+        'FOR i = 1 TO 50\n    got = NET_UDP_RECV(srv, 1024)\n    IF got <> "" THEN BREAK\nNEXT\n'
+        "PRINT got\n"
+        'DIM last AS STRING\nlast = NET_UDP_LAST_FROM(srv)\n'
+        'PRINT LEFT$(last, 10)\n'
+        "NET_UDP_CLOSE(cl)\nNET_UDP_CLOSE(srv)\n"))
+    assert out == ["4", "ping", "127.0.0.1:"]   # NET_UDP_LAST_FROM = "ip:port"
 
 
-def test_udp_recv_empty_when_nothing_pending(call_builtin):
-    s = call_builtin("net_udp_bind", [0])
-    received = call_builtin("net_udp_recv", [s, 1024])
-    assert received == ""
-    call_builtin("net_udp_close", [s])
+def test_udp_recv_empty_when_nothing_pending(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(0)\n'
+                        'PRINT "[" + NET_UDP_RECV(s, 1024) + "]"\nNET_UDP_CLOSE(s)\n'))
+    assert out == ["[]"]
 
 
-def test_udp_invalid_port_raises(call_builtin):
+def test_udp_invalid_port_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="out of range"):
-        call_builtin("net_udp_bind", [70000])
+        run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(70000)\n')
 
 
-def test_udp_send_validates_socket(call_builtin):
-    with pytest.raises(TypeMismatchError, match="NET_UDP"):
-        call_builtin("net_udp_send", ["not a socket", "127.0.0.1", 1234, "hi"])
+def test_udp_send_validates_socket(run_gb):
+    with pytest.raises(GBRuntimeError, match="INTEGER"):
+        run_gb('IMPORT "net"\nPRINT NET_UDP_SEND("not a socket", "127.0.0.1", 1234, "hi")\n')
 
 
-def test_udp_last_from_empty_initially(call_builtin):
-    s = call_builtin("net_udp_bind", [0])
-    assert call_builtin("net_udp_last_from", [s]) == ""
-    call_builtin("net_udp_close", [s])
+def test_udp_last_from_empty_initially(run_gb):
+    out = _lines(run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(0)\n'
+                        'PRINT "[" + NET_UDP_LAST_FROM(s) + "]"\nNET_UDP_CLOSE(s)\n'))
+    assert out == ["[]"]
