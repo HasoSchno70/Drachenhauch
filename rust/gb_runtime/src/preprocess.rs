@@ -23,7 +23,7 @@ use regex::Regex;
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
-    "g3d", "gui", "html", "imgfx", "input", "json", "net", "particles",
+    "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
     "physics", "regex", "save", "scene", "serial", "sprite", "tile_collide",
     "tiled", "tween", "ui", "usb", "vec2", "wifi",
 ];
@@ -42,6 +42,7 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("ecs", &["ecs_world"]),
     ("gui", &["gui_widget", "gui_window"]),
     ("json", &["json_handle"]),
+    ("m3d", &["vec3", "vec4", "quat", "mat4"]),
     ("net", &["net_listener", "net_socket", "net_udp"]),
     ("particles", &["particle_system"]),
     ("physics", &["physics_broad"]),

@@ -1217,6 +1217,74 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "vec2_angle" => { arity!(1); let (x, y) = vec2(&a[0], "VEC2_ANGLE")?; Ok(Value::Float(y.atan2(x))) }
         "vec2_from_angle" => { arity!(2); let an = need_num(&a[0], "VEC2_FROM_ANGLE")?; let len = need_num(&a[1], "VEC2_FROM_ANGLE")?; Ok(Value::Vec2(an.cos() * len, an.sin() * len)) }
 
+        // ===== Modul: m3d (VEC3/VEC4/QUAT/MAT4) =====
+        // --- VEC3 ---
+        "vec3_new" => { arity!(3); Ok(Value::Vec3(need_num(&a[0],"VEC3_NEW")? as f32, need_num(&a[1],"VEC3_NEW")? as f32, need_num(&a[2],"VEC3_NEW")? as f32)) }
+        "vec3_zero" => { arity!(0); Ok(Value::Vec3(0.0,0.0,0.0)) }
+        "vec3_x" => { arity!(1); Ok(Value::Float(vec3(&a[0],"VEC3_X")?.0 as f64)) }
+        "vec3_y" => { arity!(1); Ok(Value::Float(vec3(&a[0],"VEC3_Y")?.1 as f64)) }
+        "vec3_z" => { arity!(1); Ok(Value::Float(vec3(&a[0],"VEC3_Z")?.2 as f64)) }
+        "vec3_length" => { arity!(1); let (x,y,z)=vec3(&a[0],"VEC3_LENGTH")?; Ok(Value::Float(((x*x+y*y+z*z).sqrt()) as f64)) }
+        "vec3_length_sq" => { arity!(1); let (x,y,z)=vec3(&a[0],"VEC3_LENGTH_SQ")?; Ok(Value::Float((x*x+y*y+z*z) as f64)) }
+        "vec3_normalize" => { arity!(1); let (x,y,z)=normalize3(vec3(&a[0],"VEC3_NORMALIZE")?); Ok(Value::Vec3(x,y,z)) }
+        "vec3_dot" => { arity!(2); Ok(Value::Float(dot3(vec3(&a[0],"VEC3_DOT")?, vec3(&a[1],"VEC3_DOT")?) as f64)) }
+        "vec3_cross" => { arity!(2); let (x,y,z)=cross3(vec3(&a[0],"VEC3_CROSS")?, vec3(&a[1],"VEC3_CROSS")?); Ok(Value::Vec3(x,y,z)) }
+        "vec3_distance" => { arity!(2); let d=sub3(vec3(&a[0],"VEC3_DISTANCE")?, vec3(&a[1],"VEC3_DISTANCE")?); Ok(Value::Float((d.0*d.0+d.1*d.1+d.2*d.2).sqrt() as f64)) }
+        "vec3_lerp" => { arity!(3); let (ax,ay,az)=vec3(&a[0],"VEC3_LERP")?; let (bx,by,bz)=vec3(&a[1],"VEC3_LERP")?; let t=need_num(&a[2],"VEC3_LERP")? as f32; Ok(Value::Vec3(ax+(bx-ax)*t, ay+(by-ay)*t, az+(bz-az)*t)) }
+        "vec3_neg" => { arity!(1); let (x,y,z)=vec3(&a[0],"VEC3_NEG")?; Ok(Value::Vec3(-x,-y,-z)) }
+        "vec3_scale" => { arity!(2); let (x,y,z)=vec3(&a[0],"VEC3_SCALE")?; let s=need_num(&a[1],"VEC3_SCALE")? as f32; Ok(Value::Vec3(x*s,y*s,z*s)) }
+        "vec3_reflect" => { arity!(2); let v=vec3(&a[0],"VEC3_REFLECT")?; let n=vec3(&a[1],"VEC3_REFLECT")?; let nl2=n.0*n.0+n.1*n.1+n.2*n.2; if nl2==0.0 { return Ok(Value::Vec3(v.0,v.1,v.2)); } let d=2.0*(v.0*n.0+v.1*n.1+v.2*n.2)/nl2; Ok(Value::Vec3(v.0-d*n.0, v.1-d*n.1, v.2-d*n.2)) }
+        "vec3_transform" => { arity!(2); let v=vec3(&a[0],"VEC3_TRANSFORM")?; let m=mat4_arr(&a[1],"VEC3_TRANSFORM")?; let (x,y,z)=m3_transform_point(&m, v.0,v.1,v.2); Ok(Value::Vec3(x,y,z)) }
+        "vec3_transform_dir" => { arity!(2); let v=vec3(&a[0],"VEC3_TRANSFORM_DIR")?; let m=mat4_arr(&a[1],"VEC3_TRANSFORM_DIR")?; let (x,y,z)=m3_transform_dir(&m, v.0,v.1,v.2); Ok(Value::Vec3(x,y,z)) }
+
+        // --- VEC4 ---
+        "vec4_new" => { arity!(4); Ok(Value::Vec4(need_num(&a[0],"VEC4_NEW")? as f32, need_num(&a[1],"VEC4_NEW")? as f32, need_num(&a[2],"VEC4_NEW")? as f32, need_num(&a[3],"VEC4_NEW")? as f32)) }
+        "vec4_from_vec3" => { arity!(2); let (x,y,z)=vec3(&a[0],"VEC4_FROM_VEC3")?; let w=need_num(&a[1],"VEC4_FROM_VEC3")? as f32; Ok(Value::Vec4(x,y,z,w)) }
+        "vec4_x" => { arity!(1); Ok(Value::Float(vec4(&a[0],"VEC4_X")?.0 as f64)) }
+        "vec4_y" => { arity!(1); Ok(Value::Float(vec4(&a[0],"VEC4_Y")?.1 as f64)) }
+        "vec4_z" => { arity!(1); Ok(Value::Float(vec4(&a[0],"VEC4_Z")?.2 as f64)) }
+        "vec4_w" => { arity!(1); Ok(Value::Float(vec4(&a[0],"VEC4_W")?.3 as f64)) }
+        "vec4_dot" => { arity!(2); let a4=vec4(&a[0],"VEC4_DOT")?; let b4=vec4(&a[1],"VEC4_DOT")?; Ok(Value::Float((a4.0*b4.0+a4.1*b4.1+a4.2*b4.2+a4.3*b4.3) as f64)) }
+        "vec4_length" => { arity!(1); let (x,y,z,w)=vec4(&a[0],"VEC4_LENGTH")?; Ok(Value::Float(((x*x+y*y+z*z+w*w).sqrt()) as f64)) }
+        "vec4_normalize" => { arity!(1); let (x,y,z,w)=vec4(&a[0],"VEC4_NORMALIZE")?; let l=(x*x+y*y+z*z+w*w).sqrt(); Ok(if l==0.0 { Value::Vec4(0.0,0.0,0.0,0.0) } else { Value::Vec4(x/l,y/l,z/l,w/l) }) }
+        "vec4_lerp" => { arity!(3); let (ax,ay,az,aw)=vec4(&a[0],"VEC4_LERP")?; let (bx,by,bz,bw)=vec4(&a[1],"VEC4_LERP")?; let t=need_num(&a[2],"VEC4_LERP")? as f32; Ok(Value::Vec4(ax+(bx-ax)*t, ay+(by-ay)*t, az+(bz-az)*t, aw+(bw-aw)*t)) }
+
+        // --- QUAT ---
+        "quat_identity" => { arity!(0); Ok(Value::Quat(0.0,0.0,0.0,1.0)) }
+        "quat_new" => { arity!(4); Ok(Value::Quat(need_num(&a[0],"QUAT_NEW")? as f32, need_num(&a[1],"QUAT_NEW")? as f32, need_num(&a[2],"QUAT_NEW")? as f32, need_num(&a[3],"QUAT_NEW")? as f32)) }
+        "quat_x" => { arity!(1); Ok(Value::Float(quat_arg(&a[0],"QUAT_X")?.0 as f64)) }
+        "quat_y" => { arity!(1); Ok(Value::Float(quat_arg(&a[0],"QUAT_Y")?.1 as f64)) }
+        "quat_z" => { arity!(1); Ok(Value::Float(quat_arg(&a[0],"QUAT_Z")?.2 as f64)) }
+        "quat_w" => { arity!(1); Ok(Value::Float(quat_arg(&a[0],"QUAT_W")?.3 as f64)) }
+        "quat_from_axis_angle" => { arity!(4); let (x,y,z,w)=m3_quat_from_axis_angle(need_num(&a[0],"QUAT_FROM_AXIS_ANGLE")? as f32, need_num(&a[1],"QUAT_FROM_AXIS_ANGLE")? as f32, need_num(&a[2],"QUAT_FROM_AXIS_ANGLE")? as f32, need_num(&a[3],"QUAT_FROM_AXIS_ANGLE")? as f32); Ok(Value::Quat(x,y,z,w)) }
+        "quat_from_euler" => { arity!(3); let (x,y,z,w)=m3_quat_from_euler(need_num(&a[0],"QUAT_FROM_EULER")? as f32, need_num(&a[1],"QUAT_FROM_EULER")? as f32, need_num(&a[2],"QUAT_FROM_EULER")? as f32); Ok(Value::Quat(x,y,z,w)) }
+        "quat_mul" => { arity!(2); let (x,y,z,w)=m3_quat_mul(quat_arg(&a[0],"QUAT_MUL")?, quat_arg(&a[1],"QUAT_MUL")?); Ok(Value::Quat(x,y,z,w)) }
+        "quat_normalize" => { arity!(1); let (x,y,z,w)=m3_quat_normalize(quat_arg(&a[0],"QUAT_NORMALIZE")?); Ok(Value::Quat(x,y,z,w)) }
+        "quat_conjugate" => { arity!(1); let (x,y,z,w)=quat_arg(&a[0],"QUAT_CONJUGATE")?; Ok(Value::Quat(-x,-y,-z,w)) }
+        "quat_slerp" => { arity!(3); let (x,y,z,w)=m3_quat_slerp(quat_arg(&a[0],"QUAT_SLERP")?, quat_arg(&a[1],"QUAT_SLERP")?, need_num(&a[2],"QUAT_SLERP")? as f32); Ok(Value::Quat(x,y,z,w)) }
+        "quat_to_mat4" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_quat_to_mat(quat_arg(&a[0],"QUAT_TO_MAT4")?)))) }
+        "quat_rotate_vec3" => { arity!(2); let (x,y,z)=m3_quat_rotate_vec3(quat_arg(&a[0],"QUAT_ROTATE_VEC3")?, vec3(&a[1],"QUAT_ROTATE_VEC3")?); Ok(Value::Vec3(x,y,z)) }
+
+        // --- MAT4 (column-major, raylib/OpenGL) ---
+        "mat4_identity" => { arity!(0); Ok(Value::Mat4(Rc::new(m3_identity()))) }
+        "mat4_translate" => { arity!(3); Ok(Value::Mat4(Rc::new(m3_translate(need_num(&a[0],"MAT4_TRANSLATE")? as f32, need_num(&a[1],"MAT4_TRANSLATE")? as f32, need_num(&a[2],"MAT4_TRANSLATE")? as f32)))) }
+        "mat4_scale" => { arity!(3); Ok(Value::Mat4(Rc::new(m3_scale(need_num(&a[0],"MAT4_SCALE")? as f32, need_num(&a[1],"MAT4_SCALE")? as f32, need_num(&a[2],"MAT4_SCALE")? as f32)))) }
+        "mat4_rotate_x" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_rot_x(need_num(&a[0],"MAT4_ROTATE_X")? as f32)))) }
+        "mat4_rotate_y" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_rot_y(need_num(&a[0],"MAT4_ROTATE_Y")? as f32)))) }
+        "mat4_rotate_z" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_rot_z(need_num(&a[0],"MAT4_ROTATE_Z")? as f32)))) }
+        "mat4_rotate_axis" => { arity!(4); Ok(Value::Mat4(Rc::new(m3_rot_axis(need_num(&a[0],"MAT4_ROTATE_AXIS")? as f32, need_num(&a[1],"MAT4_ROTATE_AXIS")? as f32, need_num(&a[2],"MAT4_ROTATE_AXIS")? as f32, need_num(&a[3],"MAT4_ROTATE_AXIS")? as f32)))) }
+        "mat4_from_quat" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_quat_to_mat(quat_arg(&a[0],"MAT4_FROM_QUAT")?)))) }
+        "mat4_trs" => { arity!(3); let (px,py,pz)=vec3(&a[0],"MAT4_TRS")?; let q=quat_arg(&a[1],"MAT4_TRS")?; let (sx,sy,sz)=vec3(&a[2],"MAT4_TRS")?; let m=m3_mul(&m3_mul(&m3_translate(px,py,pz), &m3_quat_to_mat(q)), &m3_scale(sx,sy,sz)); Ok(Value::Mat4(Rc::new(m))) }
+        "mat4_mul" => { arity!(2); let m=m3_mul(&*mat4_arr(&a[0],"MAT4_MUL")?, &*mat4_arr(&a[1],"MAT4_MUL")?); Ok(Value::Mat4(Rc::new(m))) }
+        "mat4_invert" => { arity!(1); match m3_invert(&*mat4_arr(&a[0],"MAT4_INVERT")?) { Some(m)=>Ok(Value::Mat4(Rc::new(m))), None=>err("MAT4_INVERT: Matrix nicht invertierbar (Determinante 0)".to_string()) } }
+        "mat4_transpose" => { arity!(1); Ok(Value::Mat4(Rc::new(m3_transpose(&*mat4_arr(&a[0],"MAT4_TRANSPOSE")?)))) }
+        "mat4_lookat" => { arity!(3); let m=m3_lookat(vec3(&a[0],"MAT4_LOOKAT")?, vec3(&a[1],"MAT4_LOOKAT")?, vec3(&a[2],"MAT4_LOOKAT")?); Ok(Value::Mat4(Rc::new(m))) }
+        "mat4_perspective" => { arity!(4); let m=m3_perspective(need_num(&a[0],"MAT4_PERSPECTIVE")? as f32, need_num(&a[1],"MAT4_PERSPECTIVE")? as f32, need_num(&a[2],"MAT4_PERSPECTIVE")? as f32, need_num(&a[3],"MAT4_PERSPECTIVE")? as f32); Ok(Value::Mat4(Rc::new(m))) }
+        "mat4_ortho" => { arity!(6); let m=m3_ortho(need_num(&a[0],"MAT4_ORTHO")? as f32, need_num(&a[1],"MAT4_ORTHO")? as f32, need_num(&a[2],"MAT4_ORTHO")? as f32, need_num(&a[3],"MAT4_ORTHO")? as f32, need_num(&a[4],"MAT4_ORTHO")? as f32, need_num(&a[5],"MAT4_ORTHO")? as f32); Ok(Value::Mat4(Rc::new(m))) }
+        "mat4_get" => { arity!(3); let m=mat4_arr(&a[0],"MAT4_GET")?; let row=need_int(&a[1],"MAT4_GET")?; let c=need_int(&a[2],"MAT4_GET")?; if !(0..4).contains(&row) || !(0..4).contains(&c) { return err("MAT4_GET: row/col muss 0..3 sein".to_string()); } Ok(Value::Float(m[(c*4+row) as usize] as f64)) }
+        "mat4_transform_vec3" => { arity!(2); let m=mat4_arr(&a[0],"MAT4_TRANSFORM_VEC3")?; let v=vec3(&a[1],"MAT4_TRANSFORM_VEC3")?; let (x,y,z)=m3_transform_point(&m, v.0,v.1,v.2); Ok(Value::Vec3(x,y,z)) }
+        "mat4_transform_vec4" => { arity!(2); let m=mat4_arr(&a[0],"MAT4_TRANSFORM_VEC4")?; let v=vec4(&a[1],"MAT4_TRANSFORM_VEC4")?; let (x,y,z,w)=m3_transform4(&m, v.0,v.1,v.2,v.3); Ok(Value::Vec4(x,y,z,w)) }
+
         // ===== Modul: curves =====
         "curve_lerp" => { arity!(3); let (av, bv, t) = (need_num(&a[0], "CURVE_LERP")?, need_num(&a[1], "CURVE_LERP")?, need_num(&a[2], "CURVE_LERP")?); Ok(Value::Float(av + (bv - av) * t)) }
         "curve_smoothstep" => {
@@ -2382,6 +2450,248 @@ fn vec2(v: &Value, fn_: &str) -> Result<(f64, f64), String> {
         Value::Vec2(x, y) => Ok((*x, *y)),
         _ => Err(format!("{}: Erwartet VEC2, erhalten {}", fn_, v.type_name())),
     }
+}
+
+// ===================== Modul m3d: Typ-Extraktoren =====================
+fn vec3(v: &Value, fn_: &str) -> Result<(f32, f32, f32), String> {
+    match v {
+        Value::Vec3(x, y, z) => Ok((*x, *y, *z)),
+        _ => Err(format!("{}: Erwartet VEC3, erhalten {}", fn_, v.type_name())),
+    }
+}
+fn vec4(v: &Value, fn_: &str) -> Result<(f32, f32, f32, f32), String> {
+    match v {
+        Value::Vec4(x, y, z, w) => Ok((*x, *y, *z, *w)),
+        _ => Err(format!("{}: Erwartet VEC4, erhalten {}", fn_, v.type_name())),
+    }
+}
+fn quat_arg(v: &Value, fn_: &str) -> Result<(f32, f32, f32, f32), String> {
+    match v {
+        Value::Quat(x, y, z, w) => Ok((*x, *y, *z, *w)),
+        _ => Err(format!("{}: Erwartet QUAT, erhalten {}", fn_, v.type_name())),
+    }
+}
+fn mat4_arr(v: &Value, fn_: &str) -> Result<Rc<[f32; 16]>, String> {
+    match v {
+        Value::Mat4(m) => Ok(m.clone()),
+        _ => Err(format!("{}: Erwartet MAT4, erhalten {}", fn_, v.type_name())),
+    }
+}
+
+// ===================== Modul m3d: pure Mathe =====================
+// VEC3-Helfer.
+fn sub3(a: (f32, f32, f32), b: (f32, f32, f32)) -> (f32, f32, f32) { (a.0 - b.0, a.1 - b.1, a.2 - b.2) }
+fn cross3(a: (f32, f32, f32), b: (f32, f32, f32)) -> (f32, f32, f32) {
+    (a.1 * b.2 - a.2 * b.1, a.2 * b.0 - a.0 * b.2, a.0 * b.1 - a.1 * b.0)
+}
+fn dot3(a: (f32, f32, f32), b: (f32, f32, f32)) -> f32 { a.0 * b.0 + a.1 * b.1 + a.2 * b.2 }
+fn normalize3(a: (f32, f32, f32)) -> (f32, f32, f32) {
+    let l = (a.0 * a.0 + a.1 * a.1 + a.2 * a.2).sqrt();
+    if l == 0.0 { (0.0, 0.0, 0.0) } else { (a.0 / l, a.1 / l, a.2 / l) }
+}
+
+// MAT4 = [f32;16] column-major: arr[col*4 + row] (= raylib::ffi::Matrix-Memory).
+fn m3_identity() -> [f32; 16] {
+    [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+}
+pub(crate) fn m3_mul(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
+    let mut r = [0f32; 16];
+    for c in 0..4 {
+        for row in 0..4 {
+            let mut s = 0f32;
+            for k in 0..4 { s += a[k * 4 + row] * b[c * 4 + k]; }
+            r[c * 4 + row] = s;
+        }
+    }
+    r
+}
+fn m3_translate(x: f32, y: f32, z: f32) -> [f32; 16] {
+    let mut m = m3_identity(); m[12] = x; m[13] = y; m[14] = z; m
+}
+fn m3_scale(x: f32, y: f32, z: f32) -> [f32; 16] {
+    let mut m = m3_identity(); m[0] = x; m[5] = y; m[10] = z; m
+}
+fn m3_rot_x(a: f32) -> [f32; 16] {
+    let (s, c) = a.sin_cos(); let mut m = m3_identity();
+    m[5] = c; m[6] = s; m[9] = -s; m[10] = c; m
+}
+fn m3_rot_y(a: f32) -> [f32; 16] {
+    let (s, c) = a.sin_cos(); let mut m = m3_identity();
+    m[0] = c; m[2] = -s; m[8] = s; m[10] = c; m
+}
+fn m3_rot_z(a: f32) -> [f32; 16] {
+    let (s, c) = a.sin_cos(); let mut m = m3_identity();
+    m[0] = c; m[1] = s; m[4] = -s; m[5] = c; m
+}
+fn m3_rot_axis(x: f32, y: f32, z: f32, a: f32) -> [f32; 16] {
+    let len = (x * x + y * y + z * z).sqrt();
+    if len == 0.0 { return m3_identity(); }
+    let (x, y, z) = (x / len, y / len, z / len);
+    let (s, c) = a.sin_cos(); let t = 1.0 - c;
+    let mut m = m3_identity();
+    m[0] = t * x * x + c;   m[1] = t * x * y + s * z; m[2] = t * x * z - s * y;
+    m[4] = t * x * y - s * z; m[5] = t * y * y + c;   m[6] = t * y * z + s * x;
+    m[8] = t * x * z + s * y; m[9] = t * y * z - s * x; m[10] = t * z * z + c;
+    m
+}
+pub(crate) fn m3_transform_point(m: &[f32; 16], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    (m[0] * x + m[4] * y + m[8] * z + m[12],
+     m[1] * x + m[5] * y + m[9] * z + m[13],
+     m[2] * x + m[6] * y + m[10] * z + m[14])
+}
+fn m3_transform_dir(m: &[f32; 16], x: f32, y: f32, z: f32) -> (f32, f32, f32) {
+    (m[0] * x + m[4] * y + m[8] * z,
+     m[1] * x + m[5] * y + m[9] * z,
+     m[2] * x + m[6] * y + m[10] * z)
+}
+pub(crate) fn m3_transform4(m: &[f32; 16], x: f32, y: f32, z: f32, w: f32) -> (f32, f32, f32, f32) {
+    (m[0] * x + m[4] * y + m[8] * z + m[12] * w,
+     m[1] * x + m[5] * y + m[9] * z + m[13] * w,
+     m[2] * x + m[6] * y + m[10] * z + m[14] * w,
+     m[3] * x + m[7] * y + m[11] * z + m[15] * w)
+}
+fn m3_transpose(m: &[f32; 16]) -> [f32; 16] {
+    let mut r = [0f32; 16];
+    for c in 0..4 { for row in 0..4 { r[row * 4 + c] = m[c * 4 + row]; } }
+    r
+}
+fn m3_invert(m: &[f32; 16]) -> Option<[f32; 16]> {
+    let (a00, a01, a02, a03) = (m[0], m[1], m[2], m[3]);
+    let (a10, a11, a12, a13) = (m[4], m[5], m[6], m[7]);
+    let (a20, a21, a22, a23) = (m[8], m[9], m[10], m[11]);
+    let (a30, a31, a32, a33) = (m[12], m[13], m[14], m[15]);
+    let b00 = a00 * a11 - a01 * a10;
+    let b01 = a00 * a12 - a02 * a10;
+    let b02 = a00 * a13 - a03 * a10;
+    let b03 = a01 * a12 - a02 * a11;
+    let b04 = a01 * a13 - a03 * a11;
+    let b05 = a02 * a13 - a03 * a12;
+    let b06 = a20 * a31 - a21 * a30;
+    let b07 = a20 * a32 - a22 * a30;
+    let b08 = a20 * a33 - a23 * a30;
+    let b09 = a21 * a32 - a22 * a31;
+    let b10 = a21 * a33 - a23 * a31;
+    let b11 = a22 * a33 - a23 * a32;
+    let det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+    if det == 0.0 { return None; }
+    let id = 1.0 / det;
+    Some([
+        (a11 * b11 - a12 * b10 + a13 * b09) * id,
+        (-a01 * b11 + a02 * b10 - a03 * b09) * id,
+        (a31 * b05 - a32 * b04 + a33 * b03) * id,
+        (-a21 * b05 + a22 * b04 - a23 * b03) * id,
+        (-a10 * b11 + a12 * b08 - a13 * b07) * id,
+        (a00 * b11 - a02 * b08 + a03 * b07) * id,
+        (-a30 * b05 + a32 * b02 - a33 * b01) * id,
+        (a20 * b05 - a22 * b02 + a23 * b01) * id,
+        (a10 * b10 - a11 * b08 + a13 * b06) * id,
+        (-a00 * b10 + a01 * b08 - a03 * b06) * id,
+        (a30 * b04 - a31 * b02 + a33 * b00) * id,
+        (-a20 * b04 + a21 * b02 - a23 * b00) * id,
+        (-a10 * b09 + a11 * b07 - a12 * b06) * id,
+        (a00 * b09 - a01 * b07 + a02 * b06) * id,
+        (-a30 * b03 + a31 * b01 - a32 * b00) * id,
+        (a20 * b03 - a21 * b01 + a22 * b00) * id,
+    ])
+}
+fn m3_lookat(eye: (f32, f32, f32), target: (f32, f32, f32), up: (f32, f32, f32)) -> [f32; 16] {
+    let vz = normalize3(sub3(eye, target));
+    let vx = normalize3(cross3(up, vz));
+    let vy = cross3(vz, vx);
+    [vx.0, vy.0, vz.0, 0.0,
+     vx.1, vy.1, vz.1, 0.0,
+     vx.2, vy.2, vz.2, 0.0,
+     -dot3(vx, eye), -dot3(vy, eye), -dot3(vz, eye), 1.0]
+}
+fn m3_frustum(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> [f32; 16] {
+    let rl = right - left; let tb = top - bottom; let fnn = far - near;
+    let mut m = [0f32; 16];
+    m[0] = (near * 2.0) / rl;
+    m[5] = (near * 2.0) / tb;
+    m[8] = (right + left) / rl;
+    m[9] = (top + bottom) / tb;
+    m[10] = -(far + near) / fnn;
+    m[11] = -1.0;
+    m[14] = -(far * near * 2.0) / fnn;
+    m
+}
+fn m3_perspective(fovy: f32, aspect: f32, near: f32, far: f32) -> [f32; 16] {
+    let top = near * (fovy * 0.5).tan();
+    let right = top * aspect;
+    m3_frustum(-right, right, -top, top, near, far)
+}
+fn m3_ortho(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> [f32; 16] {
+    let rl = right - left; let tb = top - bottom; let fnn = far - near;
+    let mut m = [0f32; 16];
+    m[0] = 2.0 / rl;
+    m[5] = 2.0 / tb;
+    m[10] = -2.0 / fnn;
+    m[12] = -(left + right) / rl;
+    m[13] = -(top + bottom) / tb;
+    m[14] = -(far + near) / fnn;
+    m[15] = 1.0;
+    m
+}
+// QUAT (x,y,z,w).
+fn m3_quat_from_axis_angle(x: f32, y: f32, z: f32, a: f32) -> (f32, f32, f32, f32) {
+    let len = (x * x + y * y + z * z).sqrt();
+    if len == 0.0 { return (0.0, 0.0, 0.0, 1.0); }
+    let (x, y, z) = (x / len, y / len, z / len);
+    let half = a * 0.5; let s = half.sin();
+    (x * s, y * s, z * s, half.cos())
+}
+fn m3_quat_from_euler(pitch: f32, yaw: f32, roll: f32) -> (f32, f32, f32, f32) {
+    let (x1, x0) = (pitch * 0.5).sin_cos();
+    let (y1, y0) = (yaw * 0.5).sin_cos();
+    let (z1, z0) = (roll * 0.5).sin_cos();
+    (x1 * y0 * z0 - x0 * y1 * z1,
+     x0 * y1 * z0 + x1 * y0 * z1,
+     x0 * y0 * z1 - x1 * y1 * z0,
+     x0 * y0 * z0 + x1 * y1 * z1)
+}
+pub(crate) fn m3_quat_mul(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> (f32, f32, f32, f32) {
+    let (ax, ay, az, aw) = a; let (bx, by, bz, bw) = b;
+    (aw * bx + ax * bw + ay * bz - az * by,
+     aw * by - ax * bz + ay * bw + az * bx,
+     aw * bz + ax * by - ay * bx + az * bw,
+     aw * bw - ax * bx - ay * by - az * bz)
+}
+fn m3_quat_normalize(q: (f32, f32, f32, f32)) -> (f32, f32, f32, f32) {
+    let (x, y, z, w) = q; let l = (x * x + y * y + z * z + w * w).sqrt();
+    if l == 0.0 { (0.0, 0.0, 0.0, 1.0) } else { (x / l, y / l, z / l, w / l) }
+}
+fn m3_quat_slerp(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32), t: f32) -> (f32, f32, f32, f32) {
+    let (ax, ay, az, aw) = a;
+    let (mut bx, mut by, mut bz, mut bw) = b;
+    let mut cos = ax * bx + ay * by + az * bz + aw * bw;
+    if cos < 0.0 { bx = -bx; by = -by; bz = -bz; bw = -bw; cos = -cos; }
+    if cos > 0.9995 {
+        return m3_quat_normalize((ax + (bx - ax) * t, ay + (by - ay) * t, az + (bz - az) * t, aw + (bw - aw) * t));
+    }
+    let theta0 = cos.clamp(-1.0, 1.0).acos();
+    let s0 = ((1.0 - t) * theta0).sin() / theta0.sin();
+    let s1 = (t * theta0).sin() / theta0.sin();
+    (ax * s0 + bx * s1, ay * s0 + by * s1, az * s0 + bz * s1, aw * s0 + bw * s1)
+}
+fn m3_quat_to_mat(q: (f32, f32, f32, f32)) -> [f32; 16] {
+    let (x, y, z, w) = m3_quat_normalize(q);
+    let (xx, yy, zz) = (x * x, y * y, z * z);
+    let (xy, xz, yz) = (x * y, x * z, y * z);
+    let (wx, wy, wz) = (w * x, w * y, w * z);
+    let mut m = m3_identity();
+    m[0] = 1.0 - 2.0 * (yy + zz); m[1] = 2.0 * (xy + wz);       m[2] = 2.0 * (xz - wy);
+    m[4] = 2.0 * (xy - wz);       m[5] = 1.0 - 2.0 * (xx + zz); m[6] = 2.0 * (yz + wx);
+    m[8] = 2.0 * (xz + wy);       m[9] = 2.0 * (yz - wx);       m[10] = 1.0 - 2.0 * (xx + yy);
+    m
+}
+fn m3_quat_rotate_vec3(q: (f32, f32, f32, f32), v: (f32, f32, f32)) -> (f32, f32, f32) {
+    let (qx, qy, qz, qw) = q; let (vx, vy, vz) = v;
+    let tx = 2.0 * (qy * vz - qz * vy);
+    let ty = 2.0 * (qz * vx - qx * vz);
+    let tz = 2.0 * (qx * vy - qy * vx);
+    (vx + qw * tx + (qy * tz - qz * ty),
+     vy + qw * ty + (qz * tx - qx * tz),
+     vz + qw * tz + (qx * ty - qy * tx))
 }
 
 fn nums(a: &[Value], fn_: &str) -> Result<Vec<f64>, String> {

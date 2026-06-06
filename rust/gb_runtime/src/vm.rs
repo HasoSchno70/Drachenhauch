@@ -4081,32 +4081,66 @@ fn particle_color(start: i64, end: i64, has_end: bool, fade: bool, age: i32, lif
     ((sr.clamp(0.0, 255.0) as i64) << 16) | ((sg.clamp(0.0, 255.0) as i64) << 8) | (sb.clamp(0.0, 255.0) as i64)
 }
 
-/// Modul-Operator-Dispatch (entspricht `modules.dispatch_binary_op`). Aktuell:
-/// vec2. Liefert None, wenn kein Operand ein Modul-Typ ist (Standard-Pfad).
+/// Modul-Operator-Dispatch (entspricht `modules.dispatch_binary_op`): vec2 +
+/// die m3d-Typen (VEC3/VEC4/QUAT/MAT4). Liefert None, wenn kein Operand ein
+/// Modul-Typ ist (Standard-Pfad). Mat4-/Quat-Mathe teilt sich die puren
+/// Helfer aus `builtins` (eine Quelle).
 fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
-    if !matches!(a, Value::Vec2(..)) && !matches!(b, Value::Vec2(..)) {
+    let is_mod = |v: &Value| matches!(v,
+        Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..) | Value::Mat4(_));
+    if !is_mod(a) && !is_mod(b) {
         return None;
     }
+    let sf = |n: &Value| as_f64(n) as f32;     // Skalar als f32
     Some(match op {
         '+' => match (a, b) {
             (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => Ok(Value::Vec2(ax + bx, ay + by)),
-            _ => Err("VEC2 + : beide Operanden muessen VEC2 sein".into()),
+            (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => Ok(Value::Vec3(ax + bx, ay + by, az + bz)),
+            (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) => Ok(Value::Vec4(ax + bx, ay + by, az + bz, aw + bw)),
+            _ => Err("+ : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)".into()),
         },
         '-' => match (a, b) {
             (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => Ok(Value::Vec2(ax - bx, ay - by)),
-            _ => Err("VEC2 - : beide Operanden muessen VEC2 sein".into()),
+            (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => Ok(Value::Vec3(ax - bx, ay - by, az - bz)),
+            (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) => Ok(Value::Vec4(ax - bx, ay - by, az - bz, aw - bw)),
+            _ => Err("- : inkompatible Vektor-Operanden (gleicher Vektor-Typ erwartet)".into()),
         },
         '*' => match (a, b) {
             (Value::Vec2(x, y), n) if is_num(n) => Ok(Value::Vec2(x * as_f64(n), y * as_f64(n))),
             (n, Value::Vec2(x, y)) if is_num(n) => Ok(Value::Vec2(x * as_f64(n), y * as_f64(n))),
-            _ => Err("VEC2 * : erwartet VEC2 * Zahl oder Zahl * VEC2".into()),
+            (Value::Vec3(x, y, z), n) if is_num(n) => Ok(Value::Vec3(x * sf(n), y * sf(n), z * sf(n))),
+            (n, Value::Vec3(x, y, z)) if is_num(n) => Ok(Value::Vec3(x * sf(n), y * sf(n), z * sf(n))),
+            (Value::Vec4(x, y, z, w), n) if is_num(n) => Ok(Value::Vec4(x * sf(n), y * sf(n), z * sf(n), w * sf(n))),
+            (n, Value::Vec4(x, y, z, w)) if is_num(n) => Ok(Value::Vec4(x * sf(n), y * sf(n), z * sf(n), w * sf(n))),
+            (Value::Quat(ax, ay, az, aw), Value::Quat(bx, by, bz, bw)) => {
+                let (x, y, z, w) = crate::builtins::m3_quat_mul((*ax, *ay, *az, *aw), (*bx, *by, *bz, *bw));
+                Ok(Value::Quat(x, y, z, w))
+            }
+            (Value::Mat4(m), Value::Mat4(n)) => Ok(Value::Mat4(Rc::new(crate::builtins::m3_mul(m, n)))),
+            (Value::Mat4(m), Value::Vec4(x, y, z, w)) => {
+                let (rx, ry, rz, rw) = crate::builtins::m3_transform4(m, *x, *y, *z, *w);
+                Ok(Value::Vec4(rx, ry, rz, rw))
+            }
+            (Value::Mat4(m), Value::Vec3(x, y, z)) => {
+                let (rx, ry, rz) = crate::builtins::m3_transform_point(m, *x, *y, *z);
+                Ok(Value::Vec3(rx, ry, rz))
+            }
+            _ => Err("* : nicht unterstuetzte Operanden (Vektor*Zahl, QUAT*QUAT, MAT4*MAT4/VEC4/VEC3)".into()),
         },
         '/' => match (a, b) {
             (Value::Vec2(x, y), n) if is_num(n) => {
                 let d = as_f64(n);
                 if d == 0.0 { Err("Division durch 0".into()) } else { Ok(Value::Vec2(x / d, y / d)) }
             }
-            _ => Err("VEC2 / : erwartet VEC2 / Zahl".into()),
+            (Value::Vec3(x, y, z), n) if is_num(n) => {
+                let d = sf(n);
+                if d == 0.0 { Err("Division durch 0".into()) } else { Ok(Value::Vec3(x / d, y / d, z / d)) }
+            }
+            (Value::Vec4(x, y, z, w), n) if is_num(n) => {
+                let d = sf(n);
+                if d == 0.0 { Err("Division durch 0".into()) } else { Ok(Value::Vec4(x / d, y / d, z / d, w / d)) }
+            }
+            _ => Err("/ : erwartet Vektor / Zahl".into()),
         },
         _ => return None,
     })

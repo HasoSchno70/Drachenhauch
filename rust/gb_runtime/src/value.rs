@@ -27,6 +27,14 @@ pub enum Value {
     Instance(Rc<RefCell<Instance>>),
     /// Modul `vec2`: immutabler 2D-Vektor (Wert-Semantik wie ein Skalar).
     Vec2(f64, f64),
+    /// Modul `m3d`: immutable 3D-Mathe-Typen. f32 hält `Value` kompakt
+    /// (Vec4/Quat = 16 B wie Vec2) und ist render-nativ; GB-FLOAT-Getter casten
+    /// zu f64. MAT4 ist geboxt (16 floats wären zu groß inline), column-major
+    /// (raylib/OpenGL) -> direkte Konversion zu raylib::ffi::Matrix.
+    Vec3(f32, f32, f32),
+    Vec4(f32, f32, f32, f32),
+    Quat(f32, f32, f32, f32),
+    Mat4(Rc<[f32; 16]>),
     /// ENUM- / STATIC-CONST-Namespace (`State.PLAYING`, `Player.MAX_HP`).
     /// Liegt als CONST-Wert im Programm; MemberAccess loest Member auf.
     Namespace(Rc<Namespace>),
@@ -363,6 +371,16 @@ impl Value {
             }
             Value::Instance(i) => format!("<{}>", i.borrow().class_name),
             Value::Vec2(x, y) => format!("Vec2({}, {})", fmt_float(*x), fmt_float(*y)),
+            Value::Vec3(x, y, z) =>
+                format!("Vec3({}, {}, {})", fmt_float(*x as f64), fmt_float(*y as f64), fmt_float(*z as f64)),
+            Value::Vec4(x, y, z, w) =>
+                format!("Vec4({}, {}, {}, {})", fmt_float(*x as f64), fmt_float(*y as f64), fmt_float(*z as f64), fmt_float(*w as f64)),
+            Value::Quat(x, y, z, w) =>
+                format!("Quat({}, {}, {}, {})", fmt_float(*x as f64), fmt_float(*y as f64), fmt_float(*z as f64), fmt_float(*w as f64)),
+            Value::Mat4(m) => {
+                let parts: Vec<String> = m.iter().map(|v| fmt_float(*v as f64)).collect();
+                format!("Mat4[{}]", parts.join(", "))
+            }
             Value::Namespace(ns) => format!("<NAMESPACE {}>", ns.name),
             Value::Sprite(s) => {
                 let s = s.borrow();
@@ -423,6 +441,10 @@ impl Value {
             Value::Map(_) => "MAP",
             Value::Instance(_) => "OBJECT",
             Value::Vec2(_, _) => "VEC2",
+            Value::Vec3(..) => "VEC3",
+            Value::Vec4(..) => "VEC4",
+            Value::Quat(..) => "QUAT",
+            Value::Mat4(_) => "MAT4",
             Value::Namespace(_) => "NAMESPACE",
             Value::Sprite(_) => "SPRITE",
             Value::File(_) => "FILE",
@@ -466,6 +488,12 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
             x.len() == y.len() && x.iter().zip(y.iter()).all(|(p, q)| value_eq(p, q))
         }
         (Value::Vec2(ax, ay), Value::Vec2(bx, by)) => ax == bx && ay == by,
+        (Value::Vec3(ax, ay, az), Value::Vec3(bx, by, bz)) => ax == bx && ay == by && az == bz,
+        (Value::Vec4(ax, ay, az, aw), Value::Vec4(bx, by, bz, bw)) =>
+            ax == bx && ay == by && az == bz && aw == bw,
+        (Value::Quat(ax, ay, az, aw), Value::Quat(bx, by, bz, bw)) =>
+            ax == bx && ay == by && az == bz && aw == bw,
+        (Value::Mat4(x), Value::Mat4(y)) => x.iter().zip(y.iter()).all(|(p, q)| p == q),
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,
     }
