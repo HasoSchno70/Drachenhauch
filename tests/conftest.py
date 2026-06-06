@@ -127,15 +127,7 @@ def run_all(run_gb):
     return run_gb
 
 
-@pytest.fixture
-def call_builtin():
-    """Ruft eine Built-in-Funktion direkt auf, mit args als Liste."""
-    from gamebasic.interpreter import BUILTINS
-
-    def _call(name: str, args: list):
-        fn = BUILTINS.get(name.lower())
-        if fn is None:
-            raise KeyError(f"Built-in '{name}' nicht registriert")
-        return fn(args)
-
-    return _call
+# Die fruehere `call_builtin`-Fixture (rief Python-Builtin-Impls direkt via
+# `interpreter.BUILTINS`) ist entfernt -- alle Modul-Tests laufen jetzt als
+# run_gb-Golden gegen gbrt (Stufe B, Phase 6/7-Teil2). Damit haengt kein Test
+# mehr an interpreter.py/modules (Phase-8-Entblocker erledigt).
