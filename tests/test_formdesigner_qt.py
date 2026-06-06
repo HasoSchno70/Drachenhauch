@@ -223,6 +223,29 @@ def test_drop_places_control(tmp_path):
     win.close()
 
 
+# --------------------------------------------------------------- Rendering
+def test_canvas_renders_all_kinds(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import PALETTE
+    d = win.canvas.doc
+    y = 5
+    for sp in PALETTE:
+        c = d.add(sp.kind, 5, y); y += 20
+        if sp.has_items:
+            c.items = ["a", "b", "c"]; c.sel = 1
+    # Sonderzustaende mit abdecken
+    d.add("checkbox", 5, y).checked = True
+    d.add("slider", 60, y).value = 50.0
+    p = d.add("progress", 120, y); p.value = 0.7
+    d.add("button", 5, y + 20).enabled = False
+    d.add("label", 60, y + 20).visible = False
+    win.canvas._select(d.controls[0])
+    pm = win.canvas.grab()                  # voller Paint-Zyklus, darf nicht crashen
+    assert not pm.isNull()
+    win.close()
+
+
 # --------------------------------------------------------------- Edit-UX
 def _press(cv, key, mod=Qt.KeyboardModifier.NoModifier):
     cv.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, mod))

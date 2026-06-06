@@ -278,44 +278,107 @@ class _Canvas(QWidget):
             gx += GRID
 
     def _paint_control(self, qp: QPainter, c: Control):
+        """Rendert ein Control moeglichst so, wie es zur Laufzeit (gui-Modul,
+        Cyan-Theme) aussieht: gefuellte Flaechen, Haken/Knopf/Fortschritt,
+        Dropdown-Pfeil, ListBox-Eintraege, disabled gedimmt, unsichtbar getoent."""
         x = PAD + c.x
         y = PAD + TITLE_H + c.y
-        r = QRect(x, y, max(c.w, 4), max(c.h, 4))
-        fill = {
-            "button": QColor(38, 50, 63), "textinput": QColor(20, 26, 34),
-            "dropdown": QColor(38, 50, 63), "listbox": QColor(30, 40, 52),
-            "panel": QColor(30, 40, 52), "progress": QColor(30, 40, 52),
-            "canvas": QColor(14, 20, 28), "image": QColor(40, 44, 52),
-        }.get(c.kind, QColor(30, 40, 52))
-        if c.kind in ("label", "checkbox", "radio"):
-            qp.setPen(QColor(230, 230, 230) if c.enabled else QColor(120, 130, 145))
-            label = c.text or c.kind
-            if c.kind == "checkbox":
-                qp.drawRect(QRect(x, y, c.h, c.h)); qp.drawText(x + c.h + 6, y + 13, label)
-            elif c.kind == "radio":
-                qp.drawEllipse(QRect(x, y, c.h, c.h)); qp.drawText(x + c.h + 6, y + 13, label)
+        w, h = max(c.w, 4), max(c.h, 4)
+        r = QRect(x, y, w, h)
+        k = c.kind
+        en = c.enabled
+        fg = QColor(228, 238, 246) if en else QColor(120, 132, 146)
+        accent = QColor(43, 196, 232) if en else QColor(74, 112, 128)
+        border = QColor(78, 104, 128)
+        al = Qt.AlignmentFlag
+        font = QFont("Segoe UI")
+        font.setPixelSize(max(7, c.font_size)) if c.font_size else font.setPointSize(8)
+        qp.setFont(font)
+        qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        if k == "button":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(46, 62, 80) if en else QColor(34, 44, 56))
+            qp.drawRoundedRect(r, 5, 5)
+            qp.setPen(fg); qp.drawText(r, al.AlignCenter, c.text or "Button")
+        elif k == "label":
+            col = _col(c.color) if (en and c.color != 0xFFFFFF) else fg
+            qp.setPen(col); qp.drawText(r, al.AlignVCenter | al.AlignLeft, c.text or "Label")
+        elif k in ("checkbox", "radio"):
+            bs = min(h, 16)
+            box = QRect(x, y + (h - bs) // 2, bs, bs)
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(22, 30, 40))
+            if k == "checkbox":
+                qp.drawRoundedRect(box, 3, 3)
+                if c.checked:
+                    qp.setPen(QPen(accent, 2))
+                    qp.drawLine(box.left() + 3, box.center().y(), box.center().x(), box.bottom() - 3)
+                    qp.drawLine(box.center().x(), box.bottom() - 3, box.right() - 2, box.top() + 2)
             else:
-                qp.drawText(x, y + 13, label)
-            return
-        qp.fillRect(r, fill)
-        qp.setPen(QPen(QColor(70, 88, 110), 1))
-        qp.drawRect(r)
-        qp.setPen(QColor(230, 230, 230) if c.enabled else QColor(120, 130, 145))
-        cap = c.text
-        if c.kind == "dropdown":
-            cap = (c.items[c.sel] if 0 <= c.sel < len(c.items) else "") + "  v"
-        elif c.kind == "textinput":
-            cap = c.text or c.placeholder
-        elif c.kind == "progress":
-            cap = f"{int(c.value)}%"
-        elif c.kind == "listbox":
-            cap = c.items[0] if c.items else ""
-        elif c.kind == "image":
-            cap = "[Bild]"
-        elif c.kind == "canvas":
-            cap = "Canvas"
-        if cap:
-            qp.drawText(x + 5, y + min(c.h - 4, 15), str(cap))
+                qp.drawEllipse(box)
+                if c.checked:
+                    qp.setBrush(accent); qp.setPen(Qt.PenStyle.NoPen)
+                    qp.drawEllipse(box.adjusted(4, 4, -4, -4))
+            qp.setPen(fg)
+            qp.drawText(QRect(box.right() + 6, y, w - bs - 6, h), al.AlignVCenter, c.text or k.capitalize())
+        elif k == "slider":
+            midy = y + h // 2
+            frac = (c.value - c.min) / (c.max - c.min) if c.max > c.min else 0.0
+            frac = min(1.0, max(0.0, frac))
+            kx = int(x + 5 + frac * (w - 10))
+            qp.setPen(QPen(border, 3)); qp.drawLine(x + 5, midy, x + w - 5, midy)
+            qp.setPen(QPen(accent, 3)); qp.drawLine(x + 5, midy, kx, midy)
+            qp.setBrush(accent); qp.setPen(Qt.PenStyle.NoPen)
+            qp.drawEllipse(QPoint(kx, midy), 6, 6)
+        elif k == "textinput":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(18, 24, 32)); qp.drawRect(r)
+            if c.text:
+                qp.setPen(fg); txt = c.text
+            else:
+                qp.setPen(QColor(120, 132, 146)); txt = c.placeholder or ""
+            qp.drawText(r.adjusted(6, 0, -4, 0), al.AlignVCenter, txt)
+        elif k == "dropdown":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(46, 62, 80) if en else QColor(34, 44, 56)); qp.drawRect(r)
+            sel = c.items[c.sel] if 0 <= c.sel < len(c.items) else ""
+            qp.setPen(fg); qp.drawText(r.adjusted(6, 0, -18, 0), al.AlignVCenter, sel)
+            qp.drawText(QRect(x + w - 16, y, 14, h), al.AlignCenter, "▾")
+        elif k == "listbox":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
+            qp.save(); qp.setClipRect(r)
+            lh = 15
+            for i, it in enumerate(c.items):
+                iy = y + 2 + i * lh
+                if iy >= y + h:
+                    break
+                if i == c.sel:
+                    qp.fillRect(QRect(x + 1, iy, w - 2, lh), QColor(28, 84, 112))
+                qp.setPen(fg); qp.drawText(QRect(x + 5, iy, w - 8, lh), al.AlignVCenter, str(it))
+            qp.restore()
+        elif k == "progress":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
+            frac = min(1.0, max(0.0, c.value))
+            fillw = int((w - 2) * frac)
+            if fillw > 0:
+                qp.fillRect(QRect(x + 1, y + 1, fillw, h - 2), accent)
+        elif k == "panel":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(28, 38, 50)); qp.drawRect(r)
+            qp.fillRect(QRect(x, y, w, 16), QColor(40, 56, 72))
+            qp.setPen(fg); qp.drawText(QRect(x + 5, y, w - 8, 16), al.AlignVCenter, c.text or "")
+        elif k == "image":
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(40, 44, 52)); qp.drawRect(r)
+            qp.setPen(QPen(accent, 1))
+            qp.drawLine(x + 4, y + h - 5, x + w // 2 - 2, y + h // 2)
+            qp.drawLine(x + w // 2 - 2, y + h // 2, x + w - 5, y + h - 5)
+            qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
+            qp.drawEllipse(QRect(x + w - 16, y + 6, 7, 7))
+        elif k == "canvas":
+            qp.setBrush(QColor(14, 20, 28)); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
+            qp.setPen(QColor(120, 134, 150)); qp.drawText(r, al.AlignCenter, "Canvas")
+        else:
+            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(40, 52, 66)); qp.drawRect(r)
+            qp.setPen(fg); qp.drawText(r, al.AlignCenter, c.text or k)
+
+        if not c.visible:                       # unsichtbares Control angedeutet toenen
+            qp.fillRect(r, QColor(18, 22, 28, 150))
 
     def _paint_handles(self, qp: QPainter, c: Control):
         x = PAD + c.x
