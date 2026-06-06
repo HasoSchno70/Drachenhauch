@@ -33,13 +33,18 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   Image, Canvas, Panel) — jeder Eintrag mit Mini-Vorschau-Icon. Platzieren auf
   zwei Wegen: **per Drag&Drop** auf die Fläche ziehen, **oder** Eintrag anklicken
   („scharf") und auf die Fläche klicken.
-- **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
+- **Mitte — Design-Fläche:** das Formular, mit **realistisch gerenderten Controls**
+  (Cyan-Theme, wie zur Laufzeit). Control anklicken = auswählen, ziehen =
   verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
-  **Pfeiltasten** verschieben pixelweise (`Umschalt`+Pfeil = ein Rasterschritt),
-  **Rechtsklick** öffnet ein Kontextmenü (Duplizieren/Kopieren/Löschen/Nach
-  vorne/hinten). Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein
-  (Punkt-Raster sichtbar); Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`).
-  Die **Statusleiste** zeigt Position + Größe der Selektion live.
+  **Mehrfach-Auswahl:** `Strg`+Klick togglet einzelne Controls, ein **Auswahlrahmen**
+  (Ziehen im leeren Bereich) fasst alle berührten zusammen; eine Gruppe lässt sich
+  gemeinsam ziehen, nudgen und löschen. **Pfeiltasten** verschieben pixelweise
+  (`Umschalt`+Pfeil = ein Rasterschritt), **Rechtsklick** öffnet ein Kontextmenü.
+  Beim Ziehen erscheinen **Ausrichtungs-Hilfslinien** (Snap an Kanten/Mitten anderer
+  Controls + Formularränder). Bewegen/Platzieren/Resizen rasten am **8-px-Raster**
+  ein (Toggle `Ansicht → Am Raster ausrichten`, `Strg+G`). **Zoom** über `Strg`+`=`/
+  `-`/`0` oder `Strg`+Mausrad (0,25×–4×). Die **Statusleiste** zeigt Position + Größe
+  (bzw. Anzahl) der Selektion sowie die Zoom-Stufe.
 - **Bearbeiten-Menü:** **Undo/Redo** (`Strg+Z` / `Strg+Y`, auch `Strg+Umschalt+Z`)
   — eine Geste (Platzieren, Ziehen, Resizen, Pfeil-Burst, Inspector-/Code-Sitzung)
   = ein Schritt. **Duplizieren** (`Strg+D`), **Kopieren/Einfügen** (`Strg+C` /

@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication   # noqa: E402
-from PySide6.QtGui import QDropEvent, QKeyEvent   # noqa: E402
+from PySide6.QtGui import QDropEvent, QKeyEvent, QMouseEvent   # noqa: E402
 from PySide6.QtCore import Qt, QPointF, QMimeData, QEvent   # noqa: E402
 
 from gamebasic.formdesigner_qt import (   # noqa: E402
@@ -243,6 +243,86 @@ def test_canvas_renders_all_kinds(tmp_path):
     win.canvas._select(d.controls[0])
     pm = win.canvas.grab()                  # voller Paint-Zyklus, darf nicht crashen
     assert not pm.isNull()
+    win.close()
+
+
+# --------------------------------------------------------------- Multi-Select
+_L = Qt.MouseButton.LeftButton
+_NB = Qt.MouseButton.NoButton
+_NO = Qt.KeyboardModifier.NoModifier
+_CTRL = Qt.KeyboardModifier.ControlModifier
+
+
+def _mpress(cv, cx, cy, ctrl=False):
+    cv.mousePressEvent(QMouseEvent(QEvent.Type.MouseButtonPress,
+        QPointF(PAD + cx, PAD + TITLE_H + cy), _L, _L, _CTRL if ctrl else _NO))
+
+
+def _mmove(cv, cx, cy):
+    cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + cx, PAD + TITLE_H + cy), _NB, _L, _NO))
+
+
+def _mrelease(cv):
+    cv.mouseReleaseEvent(QMouseEvent(QEvent.Type.MouseButtonRelease,
+        QPointF(0, 0), _L, _NB, _NO))
+
+
+def _has(cv, c):
+    return any(x is c for x in cv.selection)
+
+
+def test_ctrl_click_multi_select(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b1 = cv.doc.add("button", 16, 16)
+    b2 = cv.doc.add("button", 16, 64)
+    _mpress(cv, b1.x + 50, b1.y + 14, ctrl=True); _mrelease(cv)
+    _mpress(cv, b2.x + 50, b2.y + 14, ctrl=True); _mrelease(cv)
+    assert len(cv.selection) == 2 and _has(cv, b1) and _has(cv, b2)
+    assert "2 Controls" in win._status.text()
+    win.close()
+
+
+def test_group_drag_moves_all(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b1 = cv.doc.add("button", 16, 16)
+    b2 = cv.doc.add("button", 16, 64)
+    cv._select_many([b1, b2])
+    _mpress(cv, b1.x + 50, b1.y + 14)                # auf b1 -> Gruppen-Drag
+    _mmove(cv, b1.x + 50 + 10, b1.y + 14 + 10)       # Delta (10,10) -> Raster 8
+    _mrelease(cv)
+    assert (b1.x, b1.y) == (24, 24) and (b2.x, b2.y) == (24, 72)
+    assert win.history.can_undo
+    win.close()
+
+
+def test_multi_delete(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b1 = cv.doc.add("button", 16, 16)
+    b2 = cv.doc.add("button", 16, 64)
+    b3 = cv.doc.add("button", 16, 112)
+    cv._select_many([b1, b2])
+    cv.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Delete, _NO))
+    assert len(cv.doc.controls) == 1 and cv.doc.controls[0] is b3
+    win.close()
+
+
+def test_rubber_band_select(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b1 = cv.doc.add("button", 16, 16)
+    b2 = cv.doc.add("button", 16, 64)
+    _mpress(cv, 220, 220)           # leerer Bereich -> Band starten
+    _mmove(cv, 0, 0)                # Rahmen ueberdeckt beide Buttons
+    _mrelease(cv)
+    assert _has(cv, b1) and _has(cv, b2)
     win.close()
 
 

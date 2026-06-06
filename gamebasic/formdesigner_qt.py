@@ -188,7 +188,8 @@ class _Canvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.doc = FormDoc()
-        self.selected: Control | None = None
+        self.selected: Control | None = None     # primaeres Control (Inspector/Griffe)
+        self.selection: list[Control] = []       # vollstaendige Mehrfach-Selektion
         self.place_kind: str | None = None      # aus der Palette "scharf geschaltet"
         self.snap_grid = True                    # Snap-to-Grid aktiv?
         # commit_history(pre_snapshot): vom Fenster gesetzt, legt einen
@@ -202,6 +203,13 @@ class _Canvas(QWidget):
         self.zoom = 1.0                          # Zoom-Faktor der Design-Flaeche
         self._guides_v: list[int] = []           # aktive vertikale Ausrichtlinien (ctrl-x)
         self._guides_h: list[int] = []           # aktive horizontale Ausrichtlinien (ctrl-y)
+        self._multi = False                      # Gruppen-Drag (mehrere) aktiv?
+        self._drag_origin = (0, 0)               # Maus-Start (ctrl-Raum) fuer Gruppen-Drag
+        self._drag_starts: list = []             # [(control, x0, y0)] beim Gruppen-Drag
+        self._band = False                       # Auswahlrahmen (Rubber-Band) aktiv?
+        self._band_start = (0, 0)
+        self._band_now = (0, 0)
+        self._band_additive = False
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -210,7 +218,9 @@ class _Canvas(QWidget):
     def set_doc(self, doc: FormDoc):
         self.doc = doc
         self.selected = None
+        self.selection = []
         self._pending = None
+        self._band = False
         self._guides_v = []; self._guides_h = []
         self.selection_changed.emit(None)
         self.doc_replaced.emit(doc)
@@ -343,8 +353,29 @@ class _Canvas(QWidget):
         for c in d.controls:
             self._paint_control(qp, c)
         self._paint_guides(qp, d)
-        if self.selected is not None:
-            self._paint_handles(qp, self.selected)
+        self._paint_selection(qp)
+        if self._band:
+            self._paint_band(qp)
+
+    def _paint_selection(self, qp: QPainter):
+        """Mehrfach-Selektion: alle bekommen einen Rahmen, das primaere Control
+        zusaetzlich die 8 Resize-Griffe (Einzel-Resize)."""
+        if len(self.selection) == 1:
+            self._paint_handles(qp, self.selection[0])
+            return
+        qp.setPen(QPen(QColor(43, 196, 232), 1, Qt.PenStyle.DashLine))
+        qp.setBrush(Qt.BrushStyle.NoBrush)
+        for c in self.selection:
+            x = PAD + c.x; y = PAD + TITLE_H + c.y
+            qp.drawRect(QRect(x - 1, y - 1, c.w + 2, c.h + 2))
+
+    def _paint_band(self, qp: QPainter):
+        x0, y0 = self._band_start
+        x1, y1 = self._band_now
+        r = QRect(PAD + min(x0, x1), PAD + TITLE_H + min(y0, y1), abs(x1 - x0), abs(y1 - y0))
+        qp.setPen(QPen(QColor(43, 196, 232), 1, Qt.PenStyle.DashLine))
+        qp.setBrush(QColor(43, 196, 232, 40))
+        qp.drawRect(r)
 
     def _paint_guides(self, qp: QPainter, d: FormDoc):
         """Ausrichtungs-Hilfslinien waehrend des Ziehens (pink, ueber dem Form)."""
@@ -493,27 +524,64 @@ class _Canvas(QWidget):
         self._nudge_active = False
         p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
+        ctrl = bool(ev.modifiers() & Qt.KeyboardModifier.ControlModifier)
         if self.place_kind:
             self._place_control(self.place_kind, cx, cy)
             self.place_kind = None
             return
-        # Resize-Griff des bereits selektierten Controls?
-        handle = self._handle_at(p)
-        if handle is not None:
-            self._resize_handle = handle
-            self._pending = self.doc.to_dict()               # Pre-Resize-Snapshot
-            return
+        # Resize-Griff -- nur bei genau einem selektierten Control
+        if len(self.selection) == 1:
+            handle = self._handle_at(p)
+            if handle is not None:
+                self._resize_handle = handle
+                self._pending = self.doc.to_dict()           # Pre-Resize-Snapshot
+                return
         hit = self.doc.control_at(cx, cy)
-        self._select(hit)
-        if hit is not None:
-            self._drag = True
-            self._drag_off = QPoint(cx - hit.x, cy - hit.y)
-            self._pending = self.doc.to_dict()               # Pre-Drag-Snapshot
+        if hit is None:                                       # leerer Bereich -> Rubber-Band
+            if not ctrl:
+                self._select(None)
+            self._band = True
+            self._band_additive = ctrl
+            self._band_start = (cx, cy)
+            self._band_now = (cx, cy)
+            self.update()
+            return
+        if ctrl:                                              # Strg+Klick: Toggle
+            self._toggle_select(hit)
+            self.update()
+            return
+        if hit not in self.selection:                         # neues Einzel-Ziel
+            self._select(hit)
+        else:                                                 # Teil der Gruppe -> primary
+            self.selected = hit
+            self.selection_changed.emit(hit)
+        self._begin_drag(cx, cy)
         self.update()
+
+    def _begin_drag(self, cx: int, cy: int):
+        self._drag = True
+        self._pending = self.doc.to_dict()                   # Move = eine Geste = 1 Undo
+        if len(self.selection) > 1:
+            self._multi = True
+            self._drag_origin = (cx, cy)
+            self._drag_starts = [(c, c.x, c.y) for c in self.selection]
+        else:
+            self._multi = False
+            self._drag_off = QPoint(cx - self.selected.x, cy - self.selected.y)
+
+    def _multi_move(self, cx: int, cy: int):
+        dx = self._snap(cx - self._drag_origin[0])
+        dy = self._snap(cy - self._drag_origin[1])
+        for c, sx, sy in self._drag_starts:
+            c.x = max(0, sx + dx); c.y = max(0, sy + dy)
 
     def mouseMoveEvent(self, ev):
         p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
+        if self._band:
+            self._band_now = (cx, cy)
+            self.update()
+            return
         if self._resize_handle is not None and self.selected is not None:
             c = self.selected
             nx, ny = self._snap(cx), self._snap(cy)
@@ -523,25 +591,43 @@ class _Canvas(QWidget):
             self.update()
             return
         if self._drag and self.selected is not None:
-            self._move_to(cx - self._drag_off.x(), cy - self._drag_off.y())
+            if self._multi:
+                self._multi_move(cx, cy)
+            else:
+                self._move_to(cx - self._drag_off.x(), cy - self._drag_off.y())
             self.selection_changed.emit(self.selected)   # Inspector live aktualisieren
             self.doc_changed.emit()
             self.update()
             return
         # Kein Knopf gedrueckt: Hover-Cursor ueber Resize-Griffen
         if not (ev.buttons() & Qt.MouseButton.LeftButton):
-            handle = self._handle_at(p)
+            handle = self._handle_at(p) if len(self.selection) == 1 else None
             self.setCursor(_HANDLE_CURSORS[handle] if handle else Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, _ev):
+        if self._band:                                       # Rubber-Band auswerten
+            self._finish_band()
+            self._band = False
         # Gesten-Ende: nur einen Undo-Checkpoint, falls sich wirklich was aenderte.
         if self._pending is not None:
             if self.commit_history and self._pending != self.doc.to_dict():
                 self.commit_history(self._pending)
             self._pending = None
         self._drag = False
+        self._multi = False
         self._resize_handle = None
         self._clear_guides()                     # Hilfslinien nach dem Ziehen weg
+        self.update()
+
+    def _finish_band(self):
+        x0, y0 = self._band_start
+        x1, y1 = self._band_now
+        rx0, rx1 = sorted((x0, x1))
+        ry0, ry1 = sorted((y0, y1))
+        hits = [c for c in self.doc.controls
+                if c.x < rx1 and c.x + c.w > rx0 and c.y < ry1 and c.y + c.h > ry0]
+        if hits:
+            self._select_many(hits, additive=self._band_additive)
 
     def mouseDoubleClickEvent(self, ev):
         cx, cy = self._to_ctrl(self._to_draw(ev.position()))
@@ -591,15 +677,16 @@ class _Canvas(QWidget):
     }
 
     def keyPressEvent(self, ev):
-        if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
+        if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selection:
             pre = self.doc.to_dict()                         # Undo: Zustand vor dem Loeschen
-            self.doc.remove(self.selected)
+            for c in list(self.selection):
+                self.doc.remove(c)
             if self.commit_history:
                 self.commit_history(pre)
             self._select(None)
             self.doc_changed.emit()
             self.update()
-        elif ev.key() in self._ARROWS and self.selected is not None:
+        elif ev.key() in self._ARROWS and self.selection:
             dx, dy = self._ARROWS[ev.key()]
             step = GRID if (ev.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
             self._nudge(dx * step, dy * step)
@@ -607,14 +694,14 @@ class _Canvas(QWidget):
             super().keyPressEvent(ev)
 
     def _nudge(self, dx: int, dy: int):
-        """Selektiertes Control per Pfeiltaste verschieben. Eine Tastenfolge
-        (bis zum naechsten Klick/Selektionswechsel) = EIN Undo-Schritt."""
+        """Selektion per Pfeiltaste verschieben (alle selektierten Controls).
+        Eine Tastenfolge (bis Klick/Selektionswechsel) = EIN Undo-Schritt."""
         if not self._nudge_active:
             if self.commit_history:
                 self.commit_history(self.doc.to_dict())      # Pre-Nudge-Snapshot
             self._nudge_active = True
-        self.selected.x = max(0, self.selected.x + dx)
-        self.selected.y = max(0, self.selected.y + dy)
+        for c in self.selection:
+            c.x = max(0, c.x + dx); c.y = max(0, c.y + dy)
         self.selection_changed.emit(self.selected)
         self.doc_changed.emit()
         self.update()
@@ -629,8 +716,31 @@ class _Canvas(QWidget):
 
     def _select(self, c: Control | None):
         self.selected = c
+        self.selection = [c] if c is not None else []
         self._nudge_active = False           # neue Selektion beendet Nudge-Sitzung
         self.selection_changed.emit(c)
+
+    def _toggle_select(self, c: Control):
+        """Strg+Klick: Control zur Mehrfach-Selektion hinzu/heraus."""
+        if c in self.selection:
+            self.selection.remove(c)
+            self.selected = self.selection[-1] if self.selection else None
+        else:
+            self.selection.append(c)
+            self.selected = c
+        self._nudge_active = False
+        self.selection_changed.emit(self.selected)
+
+    def _select_many(self, controls: list, additive: bool = False):
+        if additive:
+            for c in controls:
+                if c not in self.selection:
+                    self.selection.append(c)
+        else:
+            self.selection = list(controls)
+        self.selected = self.selection[-1] if self.selection else None
+        self._nudge_active = False
+        self.selection_changed.emit(self.selected)
 
 
 class _Inspector(QWidget):
@@ -1121,7 +1231,16 @@ class FormDesigner(QMainWindow):
         self._control_op(lambda d, c: d.duplicate(c), select="result")
 
     def delete_selected(self):
-        self._control_op(lambda d, c: d.remove(c), select="none")
+        sel = list(self.canvas.selection)
+        if not sel:
+            return
+        pre = self.canvas.doc.to_dict()
+        for c in sel:
+            self.canvas.doc.remove(c)
+        self._commit_history(pre)
+        self.canvas._select(None)
+        self.canvas.update()
+        self._mark_dirty()
 
     def raise_selected(self):
         self._control_op(lambda d, c: d.to_front(c))
@@ -1158,10 +1277,13 @@ class FormDesigner(QMainWindow):
         menu.exec(gpos)
 
     def _update_status(self, c):
-        if c is None:
-            self._status.setText("")
-        else:
+        n = len(self.canvas.selection)
+        if n > 1:
+            self._status.setText(f"{n} Controls ausgewaehlt")
+        elif c is not None:
             self._status.setText(f"{c.name}    x={c.x} y={c.y}    {c.w}×{c.h}")
+        else:
+            self._status.setText("")
 
     # -- Code-Editor --
     def _open_handler(self, c: Control):
