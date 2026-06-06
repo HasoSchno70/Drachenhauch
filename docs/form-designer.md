@@ -51,12 +51,17 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 1. **Entwerfen:** Controls platzieren, im Inspector benennen und Events
    (Handler-Namen) eintragen, z.B. `on_save` für einen Button.
 2. **Speichern** (`Strg+S`) als `.gbform` — JSON im Runtime-Format.
-3. **Nutzen** — zwei Wege:
+3. **Nutzen** — drei Wege:
    - **Im eigenen Code:** `GUI_LOAD("meinform.gbform")` und die Handler-`SUB`s
      schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
    - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
      ein generiertes Programm-Gerüst (Handler-Stubs + GUI-Schleife) in einen
      Temp-Ordner und startet `gbrt`.
+   - **GB-Code exportieren:** *Datei → GB-Code exportieren…* schreibt ein
+     **eigenständiges** `.gb`, das das Formular mit den `GUI_*`-Konstruktoren
+     **explizit aufbaut** (`GUI_WINDOW`/`GUI_BUTTON`/… + Setter + `GUI_ON_CLICK`/
+     `GUI_ON_CHANGE`) statt `GUI_LOAD` — frei lesbar und weiter editierbar; die
+     im Code-Editor hinterlegten Handler-Körper sind als `SUB`s eingewebt.
 
 ```basic
 ' So nutzt du ein gespeichertes Formular im eigenen Programm:
@@ -104,8 +109,18 @@ Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
 Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), **integrierter
 Code-Editor** (Doppelklick-auf-Control → Handler anlegen/anspringen),
-**Multi-Form-Projekte** (`.gbproj`), Speichern/Laden, Ausführen (F5). Geplant:
-GB-Code-Export (explizite `GUI_*`-Konstruktion statt `GUI_LOAD`).
+**Multi-Form-Projekte** (`.gbproj`), **GB-Code-Export** (explizite
+`GUI_*`-Konstruktion statt `GUI_LOAD`), Speichern/Laden, Ausführen (F5). Damit
+ist der geplante Funktionsumfang komplett.
+
+**GB-Code-Export-Detail:** `FormDoc.generate_gb_code()` (Qt-frei) emittiert pro
+Control den passenden Konstruktor (`GUI_LABEL` ohne w/h, `GUI_SLIDER` mit
+min/max/value, Items als sized `DIM x[n] AS STRING` …) plus nur die abweichenden
+Setter (`GUI_SET_ENABLED/VISIBLE/VALUE/FONT_SIZE/COLOR`, `*_SET_SELECTED`).
+Handler werden per `GUI_ON_CLICK/CHANGE`-FUNCREF verdrahtet. **Grenze:**
+`image`-Controls werden übersprungen (das `.gbform` speichert keine Bildquelle —
+`GUI_IMAGE` bräuchte ein `LOADIMAGE`). Strings escapen `"`→`""`. Ein
+run_gb-Golden-Test führt die erzeugte Konstruktion real in gbrt aus.
 
 **Multi-Form-Architektur:** Qt-freies `FormProject` (in
 `formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede

@@ -298,6 +298,60 @@ def test_generate_runner_uses_stored_code():
     assert 'PRINT "stored"' in src and "SUB on_ok()" in src
 
 
+# --------------------------------------------------------------- GB-Code-Export
+def _parses(src):
+    from gamebasic.lexer import Lexer
+    from gamebasic.parser import Parser
+    from gamebasic.preprocess import process
+    merged = process(src)
+    if isinstance(merged, tuple):
+        merged = merged[0]
+    return Parser(Lexer(merged).tokenize()).parse()
+
+
+def test_gb_export_explicit_construction_parses():
+    doc = FormDoc(title="Login", w=320, h=220)
+    b = doc.add("button", 20, 160); b.text = 'Sag "Hi"'; b.on_click = "on_ok"
+    doc.code["on_ok"] = 'PRINT "ok"'
+    dd = doc.add("dropdown", 20, 40); dd.items = ["A", "B", "C"]; dd.sel = 2; dd.on_change = "on_pick"
+    doc.add("slider", 20, 80)
+    src = doc.generate_gb_code()
+    assert 'GUI_WINDOW("Login"' in src
+    assert 'GUI_BUTTON(frm, "Sag ""Hi"""' in src       # String-Escaping
+    assert "GUI_ON_CLICK(" in src and "GUI_DROPDOWN_SET_SELECTED(" in src
+    assert "GUI_LOAD(" not in src                       # explizit, kein Load-Call
+    assert _parses(src) is not None
+
+
+def test_gb_export_image_skipped():
+    doc = FormDoc()
+    doc.add("image", 10, 10)
+    src = doc.generate_gb_code()
+    assert "GUI_IMAGE(" not in src and "uebersprungen" in src
+
+
+def test_gb_export_runs_in_runtime(run_gb, tmp_path):
+    # Die explizite Konstruktion muss in gbrt laufen (alle Builtin-Signaturen ok).
+    doc = FormDoc(title="RT", w=300, h=220)
+    doc.add("button", 10, 10).text = "Go"
+    doc.add("label", 10, 40)
+    doc.add("checkbox", 10, 70).checked = True
+    doc.add("slider", 10, 100)
+    doc.add("textinput", 10, 130)
+    doc.add("radio", 10, 160).group = "g"
+    doc.add("progress", 10, 190).value = 0.5
+    dd = doc.add("dropdown", 150, 40); dd.items = ["Rot", "Gruen", "Blau"]; dd.sel = 1
+    lb = doc.add("listbox", 150, 80); lb.items = ["x", "y"]
+    doc.add("panel", 150, 140)
+    doc.add("canvas", 150, 180)
+    # Konstruktion ohne SCREEN/Loop -> headless ausfuehrbar; Ergebnis pruefen.
+    body = doc.generate_gb_code(with_screen=False, with_loop=False)
+    src = body + "\nPRINT GUI_WINDOW_WIDGET_COUNT(frm)\n" \
+                 "PRINT GUI_DROPDOWN_TEXT(GUI_WINDOW_WIDGET(frm, 7))\n"
+    out = run_gb(src, base=tmp_path)
+    assert out.splitlines() == ["11", "Gruen"]         # 11 Widgets, sel=1 angewandt
+
+
 # --------------------------------------------------------------- Codegen
 def test_generated_runner_parses():
     from gamebasic.lexer import Lexer

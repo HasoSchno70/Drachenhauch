@@ -607,6 +607,7 @@ class FormDesigner(QMainWindow):
         act("Projekt speichern...", None, self.save_project)
         act("Als Startformular setzen", None, self.set_main_form)
         m.addSeparator()
+        act("GB-Code exportieren...", None, self.export_gb_code)
         act("Ausfuehren (gbrt)", "F5", self.run_form)
 
         e = self.menuBar().addMenu("&Bearbeiten")
@@ -908,6 +909,20 @@ class FormDesigner(QMainWindow):
         self.project.save(str(self.project_path))
         self._switch_to(min(start, len(self.forms) - 1))
         self.statusBar().showMessage(f"Projekt gespeichert: {self.project_path.name}", 3000)
+
+    def export_gb_code(self):
+        """Aktives Formular als eigenstaendiges GameBasic-Programm (explizite
+        GUI_*-Konstruktion, kein GUI_LOAD) speichern."""
+        default = str(self.path.with_suffix(".gb")) if self.path else str(self.project_root)
+        fn, _ = QFileDialog.getSaveFileName(self, "GB-Code exportieren", default,
+                                            "GameBasic (*.gb)")
+        if not fn:
+            return
+        if not fn.endswith(".gb"):
+            fn += ".gb"
+        code = self.canvas.doc.generate_gb_code(screen_title=self.canvas.doc.title)
+        Path(fn).write_text(code, encoding="utf-8")
+        self.statusBar().showMessage(f"GB-Code exportiert: {Path(fn).name}", 4000)
 
     def run_form(self):
         gbrt = _find_gbrt()

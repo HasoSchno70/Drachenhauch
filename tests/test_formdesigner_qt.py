@@ -170,3 +170,18 @@ def test_project_save_load_roundtrip(tmp_path):
     assert win2.active.doc.title == "Main"          # main-Formular aktiv
     assert {f.doc.title for f in win2.forms} == {"Main", "Settings"}
     win.close(); win2.close()
+
+
+def test_export_gb_writes_file(tmp_path, monkeypatch):
+    _app()
+    win = FormDesigner(tmp_path)
+    win.active.doc.add("button", 10, 10).on_click = "go"
+    win.active.doc.code["go"] = 'PRINT "go"'
+    out = tmp_path / "out.gb"
+    monkeypatch.setattr("PySide6.QtWidgets.QFileDialog.getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    win.export_gb_code()
+    assert out.exists()
+    txt = out.read_text(encoding="utf-8")
+    assert "GUI_BUTTON(" in txt and "GUI_ON_CLICK(" in txt and "SUB go()" in txt
+    win.close()

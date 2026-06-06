@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -44,6 +45,34 @@ _SPEC_BY_KIND = {p.kind: p for p in PALETTE}
 
 def palette_spec(kind: str) -> PaletteSpec | None:
     return _SPEC_BY_KIND.get(kind)
+
+
+# --- GB-Code-Emit-Helfer (fuer generate_gb_code) ----------------------------
+def _gb_str(s: str) -> str:
+    """GameBasic-String-Literal: `"` wird zu `""` escaped, Zeilenumbrueche raus."""
+    t = str(s).replace("\r", " ").replace("\n", " ").replace('"', '""')
+    return f'"{t}"'
+
+
+def _gb_hex(i: int) -> str:
+    return f"&H{int(i) & 0xFFFFFF:06X}"
+
+
+def _gb_bool(b: bool) -> str:
+    return "TRUE" if b else "FALSE"
+
+
+def _gb_num(x) -> str:
+    """FLOAT-Literal mit Dezimalpunkt (GB-FLOAT erwartet z.B. `0.0`, nicht `0`)."""
+    return repr(float(x))
+
+
+def _gb_ident(s: str) -> str:
+    """Bezeichner aus einem Control-Namen: nur [A-Za-z0-9_], nicht mit Ziffer."""
+    t = re.sub(r"[^A-Za-z0-9_]", "_", str(s))
+    if not t or t[0].isdigit():
+        t = "_" + t
+    return t
 
 
 # --- Geometrie: Snap-to-Grid + Resize -------------------------------------
@@ -416,3 +445,130 @@ class FormDoc:
             "",
         ]
         return "\n".join(lines)
+
+    # ---- GB-Code-Export (explizite GUI_*-Konstruktion statt GUI_LOAD) ----
+    def generate_gb_code(self, screen_w: int = 800, screen_h: int = 480,
+                         screen_title: str | None = None,
+                         handler_bodies: dict | None = None,
+                         with_screen: bool = True, with_loop: bool = True) -> str:
+        """Eigenstaendiges GameBasic-Programm, das das Formular **explizit** mit
+        den `GUI_*`-Konstruktoren aufbaut (kein `GUI_LOAD`/`.gbform` zur Laufzeit).
+        Lesbar + frei editierbar. `with_screen`/`with_loop` schalten SCREEN bzw.
+        die GUI-Schleife ab (fuer Tests / Einbettung in eigenen Code)."""
+        bodies = handler_bodies if handler_bodies is not None else self.code
+        title = screen_title or self.title
+        L: list[str] = [
+            f"' Auto-generiert vom Form-Designer -- explizite GUI-Konstruktion (ohne GUI_LOAD)",
+            'IMPORT "gui"',
+        ]
+        if with_screen:
+            L.append(f'SCREEN({screen_w}, {screen_h}, {_gb_str(title)}, 1)')
+        L.append("")
+        # Event-Handler
+        for name in self.handler_names():
+            L.append(f"SUB {name}()")
+            body = bodies.get(name)
+            if body:
+                L.extend("    " + ln for ln in body.splitlines())
+            else:
+                L.append(f"    ' TODO: {name}")
+            L.append("END SUB")
+            L.append("")
+        # Fenster
+        L.append("DIM frm AS GUI_WINDOW")
+        L.append(f"frm = GUI_WINDOW({_gb_str(self.title)}, {self.x}, {self.y}, {self.w}, {self.h})")
+        if not self.movable:
+            L.append("GUI_WINDOW_MOVABLE(frm, FALSE)")
+        if not self.closable:
+            L.append("GUI_WINDOW_CLOSABLE(frm, FALSE)")
+        if not self.visible:
+            L.append("GUI_WINDOW_VISIBLE(frm, FALSE)")
+        L.append("")
+        # Controls
+        used = {"frm"} | set(self.handler_names())
+        for idx, c in enumerate(self.controls):
+            var = self._gb_var(c, idx, used)
+            block = self._gb_control(c, var)
+            if block:
+                L.extend(block)
+                L.append("")
+        # Hauptschleife
+        if with_loop:
+            L += [
+                "WHILE NOT QUITREQUESTED()",
+                "    GUI_UPDATE()",
+                "    CLS(&H0E1014)",
+                "    GUI_DRAW()",
+                "    FLIP()",
+                "WEND",
+                "",
+            ]
+        return "\n".join(L)
+
+    def _gb_var(self, c: Control, idx: int, used: set) -> str:
+        base = _gb_ident(c.name) if c.name else f"{c.kind}{idx + 1}"
+        name = base
+        i = 2
+        while name in used:
+            name = f"{base}{i}"; i += 1
+        used.add(name)
+        return name
+
+    def _gb_control(self, c: Control, var: str) -> list:
+        """GB-Zeilen, die ein Control aufbauen (DIM + Konstruktor + Setter)."""
+        k = c.kind
+        if k == "image":
+            return [f"' image '{var}' uebersprungen -- GUI_IMAGE braucht eine "
+                    f"Bildquelle (LOADIMAGE), die das .gbform nicht speichert"]
+        out = [f"DIM {var} AS GUI_WIDGET"]
+        if k == "button":
+            out.append(f"{var} = GUI_BUTTON(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {c.w}, {c.h})")
+        elif k == "label":
+            if c.color != 0xFFFFFF:
+                out.append(f"{var} = GUI_LABEL(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {_gb_hex(c.color)})")
+            else:
+                out.append(f"{var} = GUI_LABEL(frm, {_gb_str(c.text)}, {c.x}, {c.y})")
+        elif k == "checkbox":
+            out.append(f"{var} = GUI_CHECKBOX(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {_gb_bool(c.checked)})")
+        elif k == "radio":
+            out.append(f"{var} = GUI_RADIO(frm, {_gb_str(c.group)}, {_gb_str(c.text)}, {c.x}, {c.y})")
+        elif k == "slider":
+            out.append(f"{var} = GUI_SLIDER(frm, {c.x}, {c.y}, {c.w}, "
+                       f"{_gb_num(c.min)}, {_gb_num(c.max)}, {_gb_num(c.value)})")
+        elif k == "textinput":
+            out.append(f"{var} = GUI_TEXTINPUT(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.placeholder)})")
+        elif k == "panel":
+            out.append(f"{var} = GUI_PANEL(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.text)})")
+        elif k == "progress":
+            out.append(f"{var} = GUI_PROGRESS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+        elif k == "canvas":
+            out.append(f"{var} = GUI_CANVAS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+        elif k in ("dropdown", "listbox"):
+            iv = var + "_items"
+            out.append(f"DIM {iv}[{len(c.items)}] AS STRING")   # 1D ARRAY OF STRING
+            for j, it in enumerate(c.items):
+                out.append(f"{iv}[{j}] = {_gb_str(it)}")
+            ctor = "GUI_DROPDOWN" if k == "dropdown" else "GUI_LISTBOX"
+            out.append(f"{var} = {ctor}(frm, {c.x}, {c.y}, {c.w}, {c.h}, {iv})")
+        else:
+            return [f"' Control-Typ '{k}' uebersprungen (kein Konstruktor)"]
+        # Nachbearbeitung (nur abweichende Werte)
+        if k == "dropdown" and c.sel not in (-1, 0):
+            out.append(f"GUI_DROPDOWN_SET_SELECTED({var}, {c.sel})")
+        if k == "listbox" and c.sel >= 0:
+            out.append(f"GUI_LISTBOX_SET_SELECTED({var}, {c.sel})")
+        if k == "progress" and c.value != 0.0:
+            out.append(f"GUI_SET_VALUE({var}, {_gb_num(c.value)})")
+        if not c.enabled:
+            out.append(f"GUI_SET_ENABLED({var}, FALSE)")
+        if not c.visible:
+            out.append(f"GUI_SET_VISIBLE({var}, FALSE)")
+        if c.font_size:
+            out.append(f"GUI_SET_FONT_SIZE({var}, {c.font_size})")
+        for role, col in c.ov.items():
+            out.append(f"GUI_SET_COLOR({var}, {_gb_str(role)}, {_gb_hex(col)})")
+        if c.on_click:
+            out.append(f"GUI_ON_CLICK({var}, {c.on_click})")
+        if c.on_change:
+            out.append(f"GUI_ON_CHANGE({var}, {c.on_change})")
+        return out
