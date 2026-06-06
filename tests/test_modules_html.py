@@ -1,32 +1,30 @@
 """Tests fuer das html-Modul (HTTP-Client + URL-Helpers + HTML-Parser).
 
-HTTP-Pfade werden mit einem lokalen Mock-Server (ThreadingHTTPServer) auf
-einem freien Port getestet, damit wir keine Netzwerk-Abhaengigkeit haben.
-URL- und HTML-Parser-Pfade werden direkt aufgerufen.
+Golden-Tests gegen `gbrt` (Stufe B): HTTP-Pfade laufen gegen einen lokalen
+Mock-Server (ThreadingHTTPServer im pytest-Prozess); das GB-Programm laeuft im
+gbrt-Subprozess und macht echte localhost-Requests dorthin. URL-/HTML-Parser sind
+pure. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
-import threading
 import contextlib
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from gamebasic.modules import load_module
-from gamebasic.modules import html as html_mod
 from gamebasic.errors import GBRuntimeError
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _load():
-    assert load_module("html")
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
 
 
 # --- Lokaler Mock-HTTP-Server -----------------------------------------
 
 class _MockHandler(BaseHTTPRequestHandler):
-    routes: dict = {}  # set per-test in fixture
+    routes: dict = {}
 
     def log_message(self, *args, **kwargs):
-        pass  # stumm
+        pass
 
     def do_GET(self):
         spec = self.routes.get(("GET", self.path))
@@ -63,186 +61,152 @@ class _MockHandler(BaseHTTPRequestHandler):
 def _mock_server(routes: dict):
     _MockHandler.routes = routes
     server = ThreadingHTTPServer(("127.0.0.1", 0), _MockHandler)
-    port = server.server_port
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     try:
-        yield f"http://127.0.0.1:{port}"
+        yield f"http://127.0.0.1:{server.server_port}"
     finally:
         server.shutdown()
         server.server_close()
 
 
-# --- Registrierung ---------------------------------------------------
-
-def test_all_builtins_registered():
-    from gamebasic.interpreter import BUILTINS
-    expected = {
-        "http_get", "http_post", "http_download", "http_status", "http_header",
-        "url_encode", "url_decode",
-        "html_text", "html_find_all", "html_get_attr",
-    }
-    assert expected <= set(BUILTINS.keys())
-
-
 # --- HTTP_GET / HTTP_STATUS / HTTP_HEADER -----------------------------
 
-def test_http_get_returns_body(call_builtin):
+def test_http_get_returns_body(run_gb):
     routes = {("GET", "/hello"): (200, {"X-Demo": "yes"}, "Hello world")}
     with _mock_server(routes) as base:
-        body = call_builtin("http_get", [base + "/hello"])
-        assert body == "Hello world"
-        assert call_builtin("http_status", []) == 200
-        assert call_builtin("http_header", ["X-Demo"]) == "yes"
+        out = _lines(run_gb(
+            f'IMPORT "html"\nPRINT HTTP_GET("{base}/hello")\n'
+            'PRINT HTTP_STATUS()\nPRINT HTTP_HEADER("X-Demo")\n'))
+    assert out == ["Hello world", "200", "yes"]
 
 
-def test_http_get_404_raises_with_status_set(call_builtin):
-    routes = {}  # alles 404
-    with _mock_server(routes) as base:
-        with pytest.raises(GBRuntimeError, match="HTTP 404"):
-            call_builtin("http_get", [base + "/nope"])
-        # Nach dem Fehler ist HTTP_STATUS trotzdem lesbar
-        assert call_builtin("http_status", []) == 404
+def test_http_get_404_raises_with_status_set(run_gb):
+    with _mock_server({}) as base:
+        with pytest.raises(GBRuntimeError, match="404"):
+            run_gb(f'IMPORT "html"\nPRINT HTTP_GET("{base}/nope")\n')
 
 
-def test_http_post_sends_body(call_builtin):
+def test_http_post_sends_body(run_gb):
     routes = {("POST", "/echo"): (200, {}, "")}
     with _mock_server(routes) as base:
-        body = call_builtin("http_post", [base + "/echo", "name=Anna&age=30"])
-        assert body == "echo: name=Anna&age=30"
+        out = _lines(run_gb(
+            f'IMPORT "html"\nPRINT HTTP_POST("{base}/echo", "name=Anna&age=30")\n'))
+    assert out == ["echo: name=Anna&age=30"]
 
 
-def test_http_download_writes_file(tmp_path, call_builtin):
+def test_http_download_writes_file(run_gb, tmp_path):
     routes = {("GET", "/file"): (200, {}, b"\x00\x01\x02test")}
-    out = tmp_path / "downloaded.bin"
     with _mock_server(routes) as base:
-        n = call_builtin("http_download", [base + "/file", str(out)])
-        assert n == len(b"\x00\x01\x02test")
-        assert out.read_bytes() == b"\x00\x01\x02test"
+        out = _lines(run_gb(
+            f'IMPORT "html"\nPRINT HTTP_DOWNLOAD("{base}/file", "dl.bin")\n',
+            base=tmp_path))
+    assert out == [str(len(b"\x00\x01\x02test"))]
+    assert (tmp_path / "dl.bin").read_bytes() == b"\x00\x01\x02test"
 
 
-def test_http_get_invalid_url_raises(call_builtin):
+def test_http_get_invalid_url_raises(run_gb):
     with pytest.raises(GBRuntimeError):
-        # Ungueltiges Schema -> URLError
-        call_builtin("http_get", ["not-a-url"])
+        run_gb('IMPORT "html"\nPRINT HTTP_GET("not-a-url")\n')
 
 
 # --- URL-Helpers ----------------------------------------------------
 
-def test_url_encode_special_chars(call_builtin):
-    assert call_builtin("url_encode", ["Hallo Welt!"]) == "Hallo%20Welt%21"
+def test_url_encode_special_chars(run_gb):
+    assert _lines(run_gb('IMPORT "html"\nPRINT URL_ENCODE("Hallo Welt!")\n')) == \
+        ["Hallo%20Welt%21"]
 
 
-def test_url_encode_decode_roundtrip(call_builtin):
-    raw = "ä?&=#/+ space"
-    enc = call_builtin("url_encode", [raw])
-    assert call_builtin("url_decode", [enc]) == raw
+def test_url_encode_decode_roundtrip(run_gb):
+    raw = "ä?&=#/+ space"   # ae-Umlaut + URL-Sonderzeichen
+    out = run_gb(f'IMPORT "html"\nPRINT URL_DECODE(URL_ENCODE("{raw}"))\n')
+    assert _lines(out) == [raw]
 
 
 # --- HTML_TEXT ------------------------------------------------------
 
-def test_html_text_strips_tags(call_builtin):
-    out = call_builtin("html_text", ["<p>Hallo <b>Welt</b></p>"])
-    assert out == "Hallo Welt"
+def test_html_text_strips_tags(run_gb):
+    assert _lines(run_gb('IMPORT "html"\nPRINT HTML_TEXT("<p>Hallo <b>Welt</b></p>")\n')) == \
+        ["Hallo Welt"]
 
 
-def test_html_text_decodes_entities(call_builtin):
-    out = call_builtin("html_text", ["<p>5 &lt; 10 &amp; ok</p>"])
-    assert out == "5 < 10 & ok"
+def test_html_text_decodes_entities(run_gb):
+    assert _lines(run_gb('IMPORT "html"\nPRINT HTML_TEXT("<p>5 &lt; 10 &amp; ok</p>")\n')) == \
+        ["5 < 10 & ok"]
 
 
-def test_html_text_skips_script_and_style(call_builtin):
-    src = """
-    <html><head>
-    <style>body { color: red; }</style>
-    <script>alert('hi')</script>
-    </head><body>Sichtbarer Text</body></html>
-    """
-    out = call_builtin("html_text", [src])
+def test_html_text_skips_script_and_style(run_gb):
+    src = ("<html><head><style>body { color: red; }</style>"
+           "<script>alert('hi')</script></head><body>Sichtbarer Text</body></html>")
+    out = run_gb(f'IMPORT "html"\nPRINT HTML_TEXT("{src}")\n')
     assert "color" not in out
     assert "alert" not in out
     assert "Sichtbarer Text" in out
 
 
-def test_html_text_block_separators(call_builtin):
-    out = call_builtin("html_text", ["<p>Eins</p><p>Zwei</p>"])
-    # Zwischen den Absaetzen sollte ein Newline sein
-    assert "Eins" in out and "Zwei" in out
-    assert "\n" in out or " " in out  # Trennung vorhanden
-
-
 # --- HTML_FIND_ALL --------------------------------------------------
 
-def _arr_values(gb_arr):
-    """Helper: holt die Python-Liste aus einem _GBArray-Result."""
-    return list(gb_arr.values)
+def test_find_all_simple_tags(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "html"\nDIM a AS ARRAY OF STRING\n'
+        'a = HTML_FIND_ALL("<a href=""x"">eins</a> Filler <a>zwei</a>", "a")\n'
+        "PRINT LEN(a)\nPRINT a[0]\nPRINT a[1]\n"))
+    assert out == ["2", "eins", "zwei"]
 
 
-def test_find_all_simple_tags(call_builtin):
-    out = call_builtin(
-        "html_find_all",
-        ['<a href="x">eins</a> Filler <a>zwei</a>', "a"],
-    )
-    assert _arr_values(out) == ["eins", "zwei"]
+def test_find_all_no_matches_returns_empty(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "html"\nDIM a AS ARRAY OF STRING\n'
+        'a = HTML_FIND_ALL("<p>x</p>", "a")\nPRINT LEN(a)\n'))
+    assert out == ["0"]
 
 
-def test_find_all_no_matches_returns_empty(call_builtin):
-    out = call_builtin("html_find_all", ["<p>x</p>", "a"])
-    assert _arr_values(out) == []
+def test_find_all_preserves_inner_tags(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "html"\nDIM a AS ARRAY OF STRING\n'
+        'a = HTML_FIND_ALL("<li><b>bold</b> text</li>", "li")\n'
+        "PRINT LEN(a)\nPRINT a[0]\n"))
+    assert out[0] == "1"
+    assert "<b>bold</b>" in out[1]
 
 
-def test_find_all_preserves_inner_tags(call_builtin):
-    out = call_builtin(
-        "html_find_all",
-        ["<li><b>bold</b> text</li>", "li"],
-    )
-    vals = _arr_values(out)
-    assert len(vals) == 1
-    assert "<b>bold</b>" in vals[0]
-
-
-def test_find_all_nested_same_tag(call_builtin):
-    """Verschachtelte gleiche Tags: aeusserer Match enthaelt inneren."""
-    src = "<div><div>inner</div></div>"
-    out = call_builtin("html_find_all", [src, "div"])
-    vals = _arr_values(out)
-    assert len(vals) == 1
-    assert "<div>inner</div>" in vals[0]
+def test_find_all_nested_same_tag(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "html"\nDIM a AS ARRAY OF STRING\n'
+        'a = HTML_FIND_ALL("<div><div>inner</div></div>", "div")\n'
+        "PRINT LEN(a)\nPRINT a[0]\n"))
+    assert out[0] == "1"
+    assert "<div>inner</div>" in out[1]
 
 
 # --- HTML_GET_ATTR --------------------------------------------------
 
-def test_get_attr_double_quoted(call_builtin):
-    assert call_builtin(
-        "html_get_attr",
-        ['<a href="https://x.com" class="big">link</a>', "href"],
-    ) == "https://x.com"
+def test_get_attr_double_quoted(run_gb):
+    assert _lines(run_gb(
+        'IMPORT "html"\nPRINT HTML_GET_ATTR('
+        '"<a href=""https://x.com"" class=""big"">link</a>", "href")\n')) == \
+        ["https://x.com"]
 
 
-def test_get_attr_single_quoted(call_builtin):
-    assert call_builtin(
-        "html_get_attr",
-        ["<a href='https://x.com'>link</a>", "href"],
-    ) == "https://x.com"
+def test_get_attr_single_quoted(run_gb):
+    assert _lines(run_gb(
+        'IMPORT "html"\nPRINT HTML_GET_ATTR("<a href=\'https://x.com\'>link</a>", "href")\n')) == \
+        ["https://x.com"]
 
 
-def test_get_attr_unquoted(call_builtin):
-    assert call_builtin(
-        "html_get_attr",
-        ["<input value=42 type=hidden>", "value"],
-    ) == "42"
+def test_get_attr_unquoted(run_gb):
+    assert _lines(run_gb(
+        'IMPORT "html"\nPRINT HTML_GET_ATTR("<input value=42 type=hidden>", "value")\n')) == \
+        ["42"]
 
 
-def test_get_attr_missing_returns_empty(call_builtin):
-    assert call_builtin(
-        "html_get_attr",
-        ["<a href='x'>link</a>", "title"],
-    ) == ""
+def test_get_attr_missing_returns_empty(run_gb):
+    assert _lines(run_gb(
+        'IMPORT "html"\nPRINT "[" + HTML_GET_ATTR("<a href=\'x\'>link</a>", "title") + "]"\n')) == \
+        ["[]"]
 
 
-def test_get_attr_decodes_entities(call_builtin):
-    """Der Wert wird als HTML-Entity-dekodiert ausgegeben."""
-    assert call_builtin(
-        "html_get_attr",
-        ['<a title="A &amp; B">link</a>', "title"],
-    ) == "A & B"
+def test_get_attr_decodes_entities(run_gb):
+    assert _lines(run_gb(
+        'IMPORT "html"\nPRINT HTML_GET_ATTR("<a title=""A &amp; B"">link</a>", "title")\n')) == \
+        ["A & B"]

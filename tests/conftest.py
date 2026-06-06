@@ -71,8 +71,10 @@ def run_gb():
         os.close(fd)
         try:
             Path(tmp).write_text(source, encoding="utf-8")
-            r = subprocess.run([str(_GBRT), "run", tmp],
-                               capture_output=True, text=True, timeout=60)
+            # gbrt gibt UTF-8 aus -> explizit so dekodieren (sonst mis-decodet
+            # Windows mit dem Locale-Codec cp1252 bei Nicht-ASCII-Ausgabe).
+            r = subprocess.run([str(_GBRT), "run", tmp], capture_output=True,
+                               text=True, encoding="utf-8", timeout=60)
         finally:
             try:
                 os.unlink(tmp)
