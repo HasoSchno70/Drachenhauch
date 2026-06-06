@@ -60,3 +60,51 @@ def test_save_load_roundtrip(tmp_path):
     assert win2.canvas.doc.title == "MyForm"
     assert win2.canvas.doc.controls[0].items == ["a", "b"]
     win.close(); win2.close()
+
+
+def test_undo_redo_place(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    pre = win.canvas.doc.to_dict()
+    win.canvas.doc.add("button", 10, 10)
+    win.canvas.commit_history(pre)
+    assert len(win.canvas.doc.controls) == 1 and win.history.can_undo
+    win.undo()
+    assert len(win.canvas.doc.controls) == 0
+    win.redo()
+    assert len(win.canvas.doc.controls) == 1
+    win.close()
+
+
+def test_double_click_creates_handler_and_opens_code(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    b = win.canvas.doc.add("button", 10, 10)
+    win.canvas.handler_requested.emit(b)        # = Doppelklick
+    assert b.on_click == "btn1Click"
+    assert win.code_panel.current == "btn1Click"
+    assert "btn1Click" in win.canvas.doc.code
+    assert win.history.can_undo                 # Handler-Erzeugung undobar
+    win.close()
+
+
+def test_code_edit_stored_and_coalesced(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    b = win.canvas.doc.add("button", 10, 10)
+    win.canvas.handler_requested.emit(b)
+    win.code_panel.editor.setPlainText('PRINT "x"')
+    assert win.canvas.doc.code["btn1Click"] == 'PRINT "x"'
+    depth = len(win.history._undo)
+    win.code_panel.editor.setPlainText('PRINT "xy"')   # gleiche Sitzung
+    assert len(win.history._undo) == depth             # kein neuer Checkpoint
+    win.close()
+
+
+def test_double_click_eventless_no_handler(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    lbl = win.canvas.doc.add("label", 10, 10)
+    win.canvas.handler_requested.emit(lbl)
+    assert lbl.on_click == "" and not win.canvas.doc.code
+    win.close()

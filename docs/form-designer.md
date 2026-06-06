@@ -21,6 +21,11 @@ Alternativ `gb` (oder `gbrun.py`) **ohne Argument** → Auswahl-Dialog
   Resizen, Löschen, eine Inspector-Edit-Sitzung) = ein Schritt.
 - **Rechts — Inspector:** Eigenschaften des gewählten Controls (Name, Text,
   Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert, aktiviert …).
+- **Unten — Code:** integrierter GameBasic-Editor (syntax-gehighlightet). Eine
+  Combo listet die Event-Handler des Formulars, der Editor zeigt/ändert den Body
+  des gewählten. **Doppelklick auf ein Control** legt für sein Haupt-Event einen
+  Handler an (Name `<control>Click`/`Changed`) bzw. springt zu einem vorhandenen
+  und fokussiert den Editor.
 
 ## Workflow
 
@@ -53,9 +58,12 @@ WEND
 ## Dateiformat
 
 `.gbform` ist exakt das JSON, das `GUI_SAVE`/`GUI_LOAD` lesen/schreiben (siehe
-[module-gui.md](module-gui.md)) — plus ein Designer-Feld `name` pro Control (von
-der Runtime ignoriert). Der Designer und ein handgeschriebenes `GUI_SAVE`
-erzeugen dieselbe Datei; beides ist austauschbar.
+[module-gui.md](module-gui.md)) — plus zwei Designer-Felder, die die Runtime
+ignoriert: `name` pro Control und ein Top-Level-`code` (`{handler_name:
+gb-code}`) mit den Event-Handler-Körpern. Der Designer und ein handgeschriebenes
+`GUI_SAVE` erzeugen dieselbe Datei; beides ist austauschbar. Beim **Ausführen
+(F5)** webt der Designer die `code`-Körper als `SUB`-Rümpfe in das generierte
+Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 
 ## Architektur / Erweiterung
 
@@ -63,16 +71,22 @@ erzeugen dieselbe Datei; beides ist austauschbar.
   (`FormDoc`/`Control`, `.gbform`-IO, `PALETTE`, Code-Generierung) — headless
   getestet (`tests/test_formdesigner_document.py`).
 - UI in [`gamebasic/formdesigner_qt.py`](../gamebasic/formdesigner_qt.py)
-  (Palette/Canvas/Inspector). Neue Control-Arten: Eintrag in `PALETTE`
+  (Palette/Canvas/Inspector/Code-Panel). Neue Control-Arten: Eintrag in `PALETTE`
   ergänzen — Inspector/Canvas/Serialisierung ziehen daraus.
+- **Gotcha:** Das Code-Panel hängt einen `GBHighlighter` an sein Editor-Dokument.
+  Ein lebender `QSyntaxHighlighter` segfaultet beim Interpreter-Shutdown, wenn er
+  die Teardown-Race von Dokument + `QApplication` überlebt (im Test sichtbar als
+  Exit-Code 116, sobald vorher ein `gbrt`-Subprozess lief). Deshalb löst
+  `FormDesigner.closeEvent` ihn via `code_panel.detach_highlighter()`
+  (`setDocument(None)`); Qt-Tests müssen das Fenster mit `win.close()` schließen.
 
 ## Status / geplant
 
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
-Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), Speichern/Laden,
-Ausführen (F5). Geplant: integrierter Code-Editor mit Doppelklick-auf-Control →
-Handler anlegen/anspringen, Multi-Form-Projekte, GB-Code-Export (explizite
-`GUI_*`-Konstruktion statt `GUI_LOAD`).
+Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), **integrierter
+Code-Editor** (Doppelklick-auf-Control → Handler anlegen/anspringen),
+Speichern/Laden, Ausführen (F5). Geplant: Multi-Form-Projekte, GB-Code-Export
+(explizite `GUI_*`-Konstruktion statt `GUI_LOAD`).
 
 **Undo/Redo-Mechanik:** Snapshot-basiert — die Qt-freie `History` (in
 `formdesigner/document.py`) hält komplette `FormDoc`-Snapshots auf einem

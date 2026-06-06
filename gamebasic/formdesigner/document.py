@@ -222,6 +222,7 @@ class FormDoc:
     closable: bool = True
     visible: bool = True
     controls: list = field(default_factory=list)   # list[Control]
+    code: dict = field(default_factory=dict)       # Event-Handler-Koerper: name -> GB-Code
 
     # ---- Bearbeiten ----
     def add(self, kind: str, x: int, y: int) -> Control:
@@ -258,13 +259,51 @@ class FormDoc:
                 return c
         return None
 
+    # ---- Event-Handler (fuer den integrierten Code-Editor) ----
+    def primary_event(self, c: Control) -> str | None:
+        """Das Haupt-Event eines Controls (erstes in der Palette-Spec) oder None."""
+        sp = palette_spec(c.kind)
+        return sp.events[0] if sp and sp.events else None
+
+    def ensure_handler(self, c: Control) -> str | None:
+        """Stellt sicher, dass das Haupt-Event von `c` einen Handler-Namen hat
+        (legt ihn + einen leeren Code-Eintrag an, falls noetig). Liefert den
+        Namen oder None, wenn das Control kein Event unterstuetzt."""
+        ev = self.primary_event(c)
+        if ev is None:
+            return None
+        name = getattr(c, ev)
+        if not name:
+            suffix = {"on_click": "Click", "on_change": "Changed"}.get(ev, "Action")
+            name = self._unique_handler_name((c.name or c.kind) + suffix)
+            setattr(c, ev, name)
+        self.code.setdefault(name, "")
+        return name
+
+    def _unique_handler_name(self, base: str) -> str:
+        used = set(self.code.keys())
+        for c in self.controls:
+            for ev in ("on_click", "on_change"):
+                if getattr(c, ev):
+                    used.add(getattr(c, ev))
+        if base not in used:
+            return base
+        i = 2
+        while f"{base}{i}" in used:
+            i += 1
+        return f"{base}{i}"
+
     # ---- .gbform IO (Runtime-Format) ----
     def to_dict(self) -> dict:
-        return {
+        d: dict = {
             "title": self.title, "x": self.x, "y": self.y, "w": self.w, "h": self.h,
             "movable": self.movable, "closable": self.closable, "visible": self.visible,
             "widgets": [c.to_dict() for c in self.controls],
         }
+        if self.code:
+            # Designer-Metadaten (Handler-Koerper); die Runtime ignoriert `code`.
+            d["code"] = {str(k): str(v) for k, v in self.code.items()}
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "FormDoc":
@@ -275,6 +314,7 @@ class FormDoc:
             movable=bool(d.get("movable", True)),
             closable=bool(d.get("closable", True)),
             visible=bool(d.get("visible", True)),
+            code={str(k): str(v) for k, v in dict(d.get("code", {})).items()},
         )
         doc.controls = [Control.from_dict(w) for w in d.get("widgets", [])]
         return doc
@@ -302,8 +342,9 @@ class FormDoc:
                         handler_bodies: dict | None = None) -> str:
         """Lauffaehiges GameBasic-Programm: laedt das `.gbform`, definiert die
         Event-Handler (Stubs oder uebergebene Koerper) und treibt die GUI-Schleife
-        -- der Xojo-Lauf. `handler_bodies`: optional {name: code-zeilen}."""
-        bodies = handler_bodies or {}
+        -- der Xojo-Lauf. `handler_bodies`: optional {name: code-zeilen}; ohne
+        Angabe werden die im Formular gespeicherten `code`-Koerper genutzt."""
+        bodies = handler_bodies if handler_bodies is not None else self.code
         title = screen_title or self.title
         lines = [
             f"' Auto-generiert vom Form-Designer -- Layout: {form_filename}",

@@ -180,6 +180,85 @@ def test_gbform_loads_in_runtime(run_gb, tmp_path):
     assert out.splitlines() == ["3", "Gruen", "TRUE"]
 
 
+def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
+    # `code` (Handler-Koerper) ist Designer-Metadaten -- GUI_LOAD muss es ignorieren.
+    doc = FormDoc(title="C", w=200, h=120)
+    doc.add("button", 10, 10).on_click = "on_ok"
+    doc.code["on_ok"] = 'PRINT "x"'
+    doc.save(str(tmp_path / "c.gbform"))
+    out = run_gb(
+        'IMPORT "gui"\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("c.gbform")\n'
+        'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n',
+        base=tmp_path)
+    assert out.splitlines() == ["1"]
+
+
+# --------------------------------------------------------------- Handler/Code
+def test_primary_event():
+    doc = FormDoc()
+    assert doc.primary_event(doc.add("button", 0, 0)) == "on_click"
+    assert doc.primary_event(doc.add("slider", 0, 0)) == "on_change"
+    assert doc.primary_event(doc.add("label", 0, 0)) is None    # kein Event
+
+
+def test_ensure_handler_generates_name_and_code_entry():
+    doc = FormDoc()
+    b = doc.add("button", 0, 0)        # name btn1
+    name = doc.ensure_handler(b)
+    assert name == "btn1Click"
+    assert b.on_click == "btn1Click"
+    assert doc.code["btn1Click"] == ""   # leerer Koerper angelegt
+
+
+def test_ensure_handler_keeps_existing_name():
+    doc = FormDoc()
+    b = doc.add("button", 0, 0)
+    b.on_click = "on_save"
+    name = doc.ensure_handler(b)
+    assert name == "on_save" and "on_save" in doc.code
+
+
+def test_ensure_handler_unique_names():
+    doc = FormDoc()
+    a = doc.add("button", 0, 0)        # btn1 -> btn1Click
+    b = doc.add("button", 0, 30)       # btn2 -> btn2Click
+    assert doc.ensure_handler(a) == "btn1Click"
+    assert doc.ensure_handler(b) == "btn2Click"
+    # Kollision erzwingen: zweites Control bekommt denselben Basisnamen
+    c = doc.add("button", 0, 60)
+    c.name = "btn1"
+    assert doc.ensure_handler(c) == "btn1Click2"
+
+
+def test_ensure_handler_none_for_eventless():
+    doc = FormDoc()
+    assert doc.ensure_handler(doc.add("label", 0, 0)) is None
+
+
+def test_code_roundtrip():
+    doc = FormDoc()
+    b = doc.add("button", 0, 0); b.on_click = "on_ok"
+    doc.code["on_ok"] = 'PRINT "ok"'
+    d = doc.to_dict()
+    assert d["code"] == {"on_ok": 'PRINT "ok"'}
+    doc2 = FormDoc.from_dict(d)
+    assert doc2.code["on_ok"] == 'PRINT "ok"'
+
+
+def test_empty_code_not_serialized():
+    doc = FormDoc()
+    assert "code" not in doc.to_dict()
+
+
+def test_generate_runner_uses_stored_code():
+    doc = FormDoc()
+    doc.add("button", 0, 0).on_click = "on_ok"
+    doc.code["on_ok"] = 'PRINT "stored"'
+    src = doc.generate_runner("f.gbform")
+    assert 'PRINT "stored"' in src and "SUB on_ok()" in src
+
+
 # --------------------------------------------------------------- Codegen
 def test_generated_runner_parses():
     from gamebasic.lexer import Lexer

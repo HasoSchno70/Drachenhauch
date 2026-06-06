@@ -21,7 +21,8 @@ from PySide6.QtGui import QAction, QColor, QPainter, QPen, QBrush, QKeySequence,
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
-    QFileDialog, QMessageBox, QLabel, QVBoxLayout, QDoubleSpinBox,
+    QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
+    QComboBox,
 )
 
 from .formdesigner import (
@@ -34,6 +35,11 @@ try:
 except Exception:  # pragma: no cover - Theme optional
     def global_qss() -> str:
         return ""
+
+try:
+    from .editor_qt.highlighter import GBHighlighter
+except Exception:  # pragma: no cover - Highlighter optional
+    GBHighlighter = None
 
 PAD = 24          # Rand um das Fenster auf der Canvas
 TITLE_H = 22      # Titelleisten-Hoehe (wie im gui-Modul)
@@ -66,6 +72,8 @@ class _Canvas(QWidget):
     """Zeichnet das Formular + Controls und behandelt Platzieren/Selektieren/Ziehen."""
     selection_changed = Signal(object)   # Control | None
     doc_changed = Signal()
+    doc_replaced = Signal(object)        # FormDoc (komplett ersetzt: set_doc/Undo)
+    handler_requested = Signal(object)   # Control (Doppelklick -> Code-Editor)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -87,7 +95,9 @@ class _Canvas(QWidget):
     def set_doc(self, doc: FormDoc):
         self.doc = doc
         self.selected = None
+        self._pending = None
         self.selection_changed.emit(None)
+        self.doc_replaced.emit(doc)
         self._resize_to_doc()
         self.update()
 
@@ -270,6 +280,16 @@ class _Canvas(QWidget):
         self._drag = False
         self._resize_handle = None
 
+    def mouseDoubleClickEvent(self, ev):
+        cx, cy = self._to_ctrl(ev.position().toPoint())
+        hit = self.doc.control_at(cx, cy)
+        if hit is not None:
+            self._drag = False
+            self._pending = None        # kein Drag aus dem ersten Klick verschleppen
+            self._select(hit)
+            self.update()
+            self.handler_requested.emit(hit)
+
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
             pre = self.doc.to_dict()                         # Undo: Zustand vor dem Loeschen
@@ -389,6 +409,108 @@ class _Inspector(QWidget):
         self.changed.emit()
 
 
+class _CodePanel(QWidget):
+    """Integrierter Code-Editor: pro Event-Handler ein GameBasic-Body. Die
+    Combo listet die Handler des Formulars, der Editor zeigt/aendert den Body
+    des gewaehlten (gespeichert in `doc.code[name]`)."""
+    edited = Signal()             # Body geaendert
+    session_started = Signal()    # ein Handler wurde frisch geladen (Undo-Basis)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.doc: FormDoc | None = None
+        self.current: str | None = None
+        self._loading = False
+
+        lay = QVBoxLayout(self)
+        top = QHBoxLayout()
+        top.addWidget(QLabel("Handler:"))
+        self.combo = QComboBox(); self.combo.setMinimumWidth(200)
+        top.addWidget(self.combo, 1)
+        lay.addLayout(top)
+        self.sig = QLabel("")
+        self.sig.setStyleSheet("color:#5fb6d6;")
+        lay.addWidget(self.sig)
+        self.editor = QPlainTextEdit()
+        self.editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        f = QFont("Consolas"); f.setStyleHint(QFont.StyleHint.Monospace); f.setPointSize(10)
+        self.editor.setFont(f)
+        self.editor.setTabStopDistance(4 * self.editor.fontMetrics().horizontalAdvance(" "))
+        self._hl = None
+        if GBHighlighter is not None:
+            self._hl = GBHighlighter(self.editor.document())
+        lay.addWidget(self.editor, 1)
+
+        self.combo.currentIndexChanged.connect(self._on_combo)
+        self.editor.textChanged.connect(self._on_text)
+        self._show_empty()
+
+    def set_doc(self, doc: FormDoc):
+        self.doc = doc
+        self.current = None
+        self.refresh()
+
+    def refresh(self):
+        """Combo neu aus den Handler-Namen des Formulars fuellen (Auswahl halten)."""
+        names = self.doc.handler_names() if self.doc else []
+        self._loading = True
+        self.combo.clear()
+        self.combo.addItems(names)
+        self._loading = False
+        if self.current in names:
+            self.show_handler(self.current)
+        elif names:
+            self.show_handler(names[0])
+        else:
+            self._show_empty()
+
+    def show_handler(self, name: str):
+        if not self.doc or name not in self.doc.handler_names():
+            return
+        self._loading = True
+        idx = self.combo.findText(name)
+        if idx >= 0:
+            self.combo.setCurrentIndex(idx)
+        self.current = name
+        self.sig.setText(f"SUB {name}()      …      END SUB")
+        self.editor.setReadOnly(False)
+        self.editor.setPlainText(self.doc.code.get(name, ""))
+        self._loading = False
+        self.session_started.emit()
+
+    def focus_editor(self):
+        self.editor.setFocus()
+
+    def detach_highlighter(self):
+        """Highlighter vom Dokument loesen -- verhindert einen Use-after-free
+        beim Interpreter-Shutdown (QSyntaxHighlighter ueberlebt sonst die
+        Teardown-Race von Dokument + QApplication)."""
+        if self._hl is not None:
+            self._hl.setDocument(None)
+            self._hl = None
+
+    def _show_empty(self):
+        self._loading = True
+        self.current = None
+        self.editor.clear()
+        self.editor.setReadOnly(True)
+        self.sig.setText("(kein Handler — Doppelklick auf ein Control)")
+        self._loading = False
+
+    def _on_combo(self):
+        if self._loading or not self.doc:
+            return
+        name = self.combo.currentText()
+        if name:
+            self.show_handler(name)
+
+    def _on_text(self):
+        if self._loading or not self.doc or self.current is None:
+            return
+        self.doc.code[self.current] = self.editor.toPlainText()
+        self.edited.emit()
+
+
 class FormDesigner(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
@@ -413,21 +535,35 @@ class FormDesigner(QMainWindow):
         self.inspector = _Inspector()
         self._dock("Inspector", self.inspector, Qt.DockWidgetArea.RightDockWidgetArea)
 
+        # Code-Editor (integriert)
+        self.code_panel = _CodePanel()
+        self.code_dock = self._dock("Code", self.code_panel, Qt.DockWidgetArea.BottomDockWidgetArea)
+
         # Undo/Redo
         self.history = History()
         self.canvas.commit_history = self._commit_history
         self._insp_baseline: dict | None = None   # Pre-Edit-Snapshot der Selektion
-        self._insp_dirty = False                  # Edit-Session schon gesichert?
+        self._insp_dirty = False                  # Inspector-Edit-Session gesichert?
+        self._code_baseline: dict | None = None   # Pre-Edit-Snapshot des Handlers
+        self._code_dirty = False                  # Code-Edit-Session gesichert?
 
         self.canvas.selection_changed.connect(self.inspector.set_control)
         self.canvas.selection_changed.connect(self._on_selection_changed)
         self.canvas.doc_changed.connect(self._mark_dirty)
+        self.canvas.doc_replaced.connect(self.code_panel.set_doc)
+        self.canvas.handler_requested.connect(self._open_handler)
         self.inspector.changed.connect(self._on_inspector_changed)
+        self.code_panel.session_started.connect(self._on_code_session)
+        self.code_panel.edited.connect(self._on_code_edited)
 
         self._build_menu()
         self.canvas.set_doc(FormDoc())
         self._update_title()
         self._refresh_history_actions()
+
+    def closeEvent(self, ev):
+        self.code_panel.detach_highlighter()
+        super().closeEvent(ev)
 
     def _dock(self, title, widget, area):
         d = QDockWidget(title, self)
@@ -487,6 +623,7 @@ class FormDesigner(QMainWindow):
             self._insp_dirty = True
             self._refresh_history_actions()
         self.canvas.update()
+        self.code_panel.refresh()      # evtl. umbenannte Handler in die Combo uebernehmen
         self._mark_dirty()
 
     def _refresh_history_actions(self):
@@ -507,6 +644,36 @@ class FormDesigner(QMainWindow):
         nxt = self.history.redo(self.canvas.doc.to_dict())
         self.canvas.set_doc(FormDoc.from_dict(nxt))
         self._refresh_history_actions()
+        self._mark_dirty()
+
+    # -- Code-Editor --
+    def _open_handler(self, c: Control):
+        """Doppelklick auf ein Control: Handler anlegen/anspringen + fokussieren."""
+        if self.canvas.doc.primary_event(c) is None:
+            self.statusBar().showMessage(f"{c.kind}: kein Event-Handler moeglich.", 3000)
+            return
+        pre = self.canvas.doc.to_dict()
+        name = self.canvas.doc.ensure_handler(c)
+        if pre != self.canvas.doc.to_dict():
+            self._commit_history(pre)             # Handler-Erzeugung = Undo-Schritt
+        self.code_panel.refresh()
+        self.code_panel.show_handler(name)
+        self.inspector.set_control(c)             # neuer Handler-Name im Inspector
+        self.canvas.update()
+        self.code_dock.show(); self.code_dock.raise_()
+        self.code_panel.focus_editor()
+        self._mark_dirty()
+
+    def _on_code_session(self):
+        self._code_baseline = self.canvas.doc.to_dict()
+        self._code_dirty = False
+
+    def _on_code_edited(self):
+        """Code-Edits einer Handler-Sitzung = EIN Undo-Schritt."""
+        if not self._code_dirty and self._code_baseline is not None:
+            self.history.push(self._code_baseline)
+            self._code_dirty = True
+            self._refresh_history_actions()
         self._mark_dirty()
 
     # -- Aktionen --
