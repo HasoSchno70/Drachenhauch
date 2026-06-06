@@ -10,6 +10,7 @@
 //! nur `PRINT`/stdout bleibt bit-identisch. Verifikation per Screenshot.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use raylib::prelude::*;
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
@@ -68,6 +69,10 @@ enum Cmd3D {
     // idx, x,y,z, achse_x,achse_y,achse_z, winkel, scale, tint
     ModelEx(usize, f32, f32, f32, f32, f32, f32, f32, f32, Color),
     ModelWires(usize, f32, f32, f32, f32, Color),    // idx, x,y,z, scale, tint
+    // Modul m3d: Modell mit beliebiger Welt-Matrix (column-major, OpenGL-Order).
+    // idx, mat, tint. Gerendert via rl-Matrix-Stack (rlMultMatrixf) -> kein
+    // mutabler Model-Borrow noetig; DrawMesh honoriert rlGetMatrixTransform().
+    ModelMatrix(usize, Rc<[f32; 16]>, Color),
     // Billboard: Textur (Index), die immer zur Kamera zeigt. idx, x,y,z, size, tint
     Billboard(usize, f32, f32, f32, f32, Color),
 }
@@ -981,6 +986,13 @@ impl Graphics {
     pub fn draw_model_wires(&mut self, idx: i64, x: f32, y: f32, z: f32, scale: f32, col_: i64) -> Result<(), String> {
         let i = self.check_model(idx, "MODEL_WIRES")?;
         self.emit3d(Cmd3D::ModelWires(i, x, y, z, scale, col(col_)));
+        Ok(())
+    }
+    /// Modul m3d: Modell mit beliebiger Welt-Matrix zeichnen (MODEL_MATRIX).
+    /// `mat` ist column-major (OpenGL-Order, wie m3d MAT4 sie liefert).
+    pub fn draw_model_matrix(&mut self, idx: i64, mat: Rc<[f32; 16]>, col_: i64) -> Result<(), String> {
+        let i = self.check_model(idx, "MODEL_MATRIX")?;
+        self.emit3d(Cmd3D::ModelMatrix(i, mat, col(col_)));
         Ok(())
     }
     /// Legt eine via LOADIMAGE geladene Textur als Diffuse-/Albedo-Map an.
@@ -2364,6 +2376,20 @@ fn render_scene<D: RaylibDraw>(
                             if let Some(m) = models.get(*i) {
                                 set_material(&mut light_shader, *i);
                                 d3.draw_model_wires(m, Vector3::new(*x, *y, *z), *sc, *col);
+                            }
+                        }
+                        Cmd3D::ModelMatrix(i, mat, col) => {
+                            if let Some(m) = models.get(*i) {
+                                set_material(&mut light_shader, *i);
+                                // Welt-Matrix auf den rl-Transform-Stack; DrawModel mit
+                                // pos=0/scale=1 -> nur unsere Matrix wirkt (DrawMesh liest
+                                // rlGetMatrixTransform()). matModel-Uniform = unsere Matrix.
+                                unsafe {
+                                    raylib::ffi::rlPushMatrix();
+                                    raylib::ffi::rlMultMatrixf(mat.as_ptr());
+                                }
+                                d3.draw_model(m, Vector3::new(0.0, 0.0, 0.0), 1.0, *col);
+                                unsafe { raylib::ffi::rlPopMatrix(); }
                             }
                         }
                         Cmd3D::Billboard(i, x, y, z, size, col) => {

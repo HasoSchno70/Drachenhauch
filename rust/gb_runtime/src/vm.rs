@@ -3085,6 +3085,16 @@ impl<'p> Vm<'p> {
                                       need_f(a,3,"MODEL_WIRES")? as f32, need_f(a,4,"MODEL_WIRES")? as f32, gi(a,5,"MODEL_WIRES")?)?;
                 Value::Nil
             }
+            "model_matrix" => {
+                // MODEL_MATRIX(handle, mat [, tint]) -- Welt-Transform aus m3d MAT4.
+                let mat = match a.get(1) {
+                    Some(Value::Mat4(m)) => m.clone(),
+                    _ => return Err("MODEL_MATRIX: Arg 2 muss MAT4 sein".into()),
+                };
+                let tint = if a.len() >= 3 { gi(a, 2, "MODEL_MATRIX")? } else { 0xFF_FFFF };
+                g!().draw_model_matrix(gi(a, 0, "MODEL_MATRIX")?, mat, tint)?;
+                Value::Nil
+            }
             "model_texture" => {
                 g!().model_set_texture(gi(a,0,"MODEL_TEXTURE")?, gi(a,1,"MODEL_TEXTURE")?)?;
                 Value::Nil
