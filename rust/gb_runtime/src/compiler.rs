@@ -228,6 +228,9 @@ struct FnSig {
     param_names: Vec<String>,
     param_defaults: Vec<Option<CVal>>,
     param_types: Vec<String>,
+    /// Pro Parameter: ob BYREF (Copy-In/Copy-Out). Der Aufruf-Pfad emittiert
+    /// dann lvalue-Capture + Post-Call-Write-Back.
+    param_byref: Vec<bool>,
     is_variadic: bool,
     is_sub: bool,
     return_type: String,
@@ -1050,24 +1053,47 @@ impl Compiler {
         let is_global = self.global_vars.contains(&name);
         // User-Funktion (Variable gleichen Namens verschattet sie).
         if self.fn_sigs.contains_key(&name) && !is_local && !is_global {
+            let byref = self.fn_sigs[&name].param_byref.clone();
             if self.fn_sigs[&name].is_variadic {
                 if has_named { return Err(format!("{}: keine Named-Args bei variadic", name)); }
-                for a in args { self.expr(a)?; }
+                // BYREF + variadic: BYREF-Parameter liegen positional vor dem
+                // variadic-Rest, je Argument capturen/laden, der Rest normal.
+                let mut caps: Vec<ByrefCap> = Vec::new();
+                for (i, a) in args.iter().enumerate() {
+                    if byref.get(i).copied().unwrap_or(false) {
+                        caps.push(self.emit_byref_capture_and_load(a)?);
+                    } else {
+                        self.expr(a)?;
+                    }
+                }
                 self.ctx.emit(oc::CALL_USER, json!([name, args.len()]));
+                self.emit_byref_writeback(&caps);
                 return Ok(());
             }
             let actions = self.resolve_named_args(&name, args)?;
             let n = actions.len();
-            for act in actions {
-                match act {
-                    RArg::Expr(e) => self.expr(e)?,
-                    RArg::Default(cv) => {
-                        let c = self.ctx.add_const(enc(&cv));
-                        self.ctx.emit(oc::LOAD_CONST, json!(c));
+            let mut caps: Vec<ByrefCap> = Vec::new();
+            for (i, act) in actions.into_iter().enumerate() {
+                if byref.get(i).copied().unwrap_or(false) {
+                    match act {
+                        RArg::Expr(e) => caps.push(self.emit_byref_capture_and_load(e)?),
+                        RArg::Default(_) => return Err(format!(
+                            "{}: BYREF-Parameter '{}' braucht ein zuweisbares Argument",
+                            name, self.fn_sigs[&name].param_names.get(i)
+                                .cloned().unwrap_or_default())),
+                    }
+                } else {
+                    match act {
+                        RArg::Expr(e) => self.expr(e)?,
+                        RArg::Default(cv) => {
+                            let c = self.ctx.add_const(enc(&cv));
+                            self.ctx.emit(oc::LOAD_CONST, json!(c));
+                        }
                     }
                 }
             }
             self.ctx.emit(oc::CALL_USER, json!([name, n]));
+            self.emit_byref_writeback(&caps);   // No-Op ohne BYREF-Parameter
             return Ok(());
         }
         if has_named {
@@ -1086,6 +1112,92 @@ impl Compiler {
             self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
         }
         Ok(())
+    }
+
+    // ---------------------------------------------------- BYREF (Copy-In/Copy-Out)
+    /// Frischer anonymer Local-Slot (kein DECLARE_LOCAL noetig -- vorab aus
+    /// local_defaults alloziert). Name garantiert eindeutig via Slot-Index.
+    fn fresh_byref_temp(&mut self) -> usize {
+        self.ctx.reserve_temp(&format!("__byref_t{}", self.ctx.local_types.len()))
+    }
+
+    /// Erfasst die lvalue-Adresse eines BYREF-Arguments (vor dem Call) in Temps
+    /// UND laedt den aktuellen Wert als Argument auf den Stack. Liefert die
+    /// Capture-Info fuer das spaetere Write-Back. Fehler, wenn das Argument
+    /// keine zuweisbare Form (Identifier/Index/Member) ist.
+    fn emit_byref_capture_and_load(&mut self, arg: &Node) -> Result<ByrefCap, String> {
+        match arg {
+            Node::Identifier(n) => {
+                self.load_var(n);
+                Ok(ByrefCap::Var(n.clone()))
+            }
+            Node::IndexAccess { target, indices } => {
+                let arr_tmp = self.fresh_byref_temp();
+                self.expr(target)?;
+                self.ctx.emit(oc::STORE_LOCAL, json!(arr_tmp));
+                let mut ix_tmps = Vec::new();
+                for ix in indices {
+                    let t = self.fresh_byref_temp();
+                    self.expr(ix)?;
+                    self.ctx.emit(oc::STORE_LOCAL, json!(t));
+                    ix_tmps.push(t);
+                }
+                // aktuellen Wert laden: arr[ix..]
+                self.ctx.emit(oc::LOAD_LOCAL, json!(arr_tmp));
+                for t in &ix_tmps { self.ctx.emit(oc::LOAD_LOCAL, json!(*t)); }
+                self.ctx.emit(oc::LOAD_INDEX, json!(ix_tmps.len()));
+                Ok(ByrefCap::Index { arr_tmp, ix_tmps })
+            }
+            Node::MemberAccess { target, name } => {
+                let obj_tmp = self.fresh_byref_temp();
+                self.expr(target)?;
+                self.ctx.emit(oc::STORE_LOCAL, json!(obj_tmp));
+                self.ctx.emit(oc::LOAD_LOCAL, json!(obj_tmp));
+                let idx = self.ctx.add_const(json!(name));
+                self.ctx.emit(oc::LOAD_MEMBER, json!(idx));
+                Ok(ByrefCap::Member { obj_tmp, field: name.clone() })
+            }
+            _ => Err("BYREF-Parameter braucht eine zuweisbare Variable \
+                      (Identifier, Member oder Index-Access)".into()),
+        }
+    }
+
+    /// Schreibt nach CALL_USER die finalen BYREF-Param-Werte in die erfassten
+    /// lvalues zurueck. Stack-Layout direkt nach dem Call:
+    /// `[.., bv0, bv1, .., bv{m-1}, result]` (result oben). Wir stashen result,
+    /// schreiben die Werte in UMGEKEHRTER Reihenfolge zurueck (bv{m-1} liegt
+    /// oben) und legen result wieder oben ab. No-Op, wenn `caps` leer ist.
+    fn emit_byref_writeback(&mut self, caps: &[ByrefCap]) {
+        if caps.is_empty() { return; }
+        let res_tmp = self.ctx.reserve_temp("__byref_ret");
+        self.ctx.emit(oc::STORE_LOCAL, json!(res_tmp));   // result -> Temp
+        for cap in caps.iter().rev() {
+            self.emit_one_byref_store(cap);
+        }
+        self.ctx.emit(oc::LOAD_LOCAL, json!(res_tmp));    // result wieder oben
+    }
+
+    /// Schreibt den Wert oben auf dem Stack in das (vorab erfasste) lvalue.
+    fn emit_one_byref_store(&mut self, cap: &ByrefCap) {
+        match cap {
+            ByrefCap::Var(name) => self.store_var(name),
+            ByrefCap::Index { arr_tmp, ix_tmps } => {
+                let vtmp = self.fresh_byref_temp();
+                self.ctx.emit(oc::STORE_LOCAL, json!(vtmp));
+                self.ctx.emit(oc::LOAD_LOCAL, json!(*arr_tmp));
+                for t in ix_tmps { self.ctx.emit(oc::LOAD_LOCAL, json!(*t)); }
+                self.ctx.emit(oc::LOAD_LOCAL, json!(vtmp));
+                self.ctx.emit(oc::STORE_INDEX, json!(ix_tmps.len()));
+            }
+            ByrefCap::Member { obj_tmp, field } => {
+                let vtmp = self.fresh_byref_temp();
+                self.ctx.emit(oc::STORE_LOCAL, json!(vtmp));
+                self.ctx.emit(oc::LOAD_LOCAL, json!(*obj_tmp));
+                self.ctx.emit(oc::LOAD_LOCAL, json!(vtmp));
+                let idx = self.ctx.add_const(json!(field));
+                self.ctx.emit(oc::STORE_MEMBER, json!(idx));
+            }
+        }
     }
 
     // ---------------------------------------------------- 3e: Kontrollfluss
@@ -1432,7 +1544,7 @@ impl Compiler {
 
     fn finish(self, data: Vec<Value>) -> Value {
         let main = build_func(&self.ctx, "__main__", true, true, 0, 0,
-                              false, false, "", &[], &[]);
+                              false, false, "", &[], &[], &[]);
         let mut functions = Map::new();
         for (name, fnj) in self.compiled_fns {
             functions.insert(name, fnj);
@@ -1556,7 +1668,7 @@ impl Compiler {
             let sig = &self.classes[&cname].method_sigs[mname];
             let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
                                  sig.is_variadic, sig.is_coroutine, &sig.return_type,
-                                 &sig.param_defaults, &sig.param_names);
+                                 &sig.param_defaults, &sig.param_names, &sig.param_byref);
             self.classes.get_mut(&cname).unwrap().compiled.push((mname.to_string(), fnj));
         }
         Ok(())
@@ -1607,7 +1719,7 @@ impl Compiler {
         let sig = &self.fn_sigs[name];
         let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
                              sig.is_variadic, sig.is_coroutine, &sig.return_type,
-                             &sig.param_defaults, &sig.param_names);
+                             &sig.param_defaults, &sig.param_names, &sig.param_byref);
         self.compiled_fns.push((name.to_string(), fnj));
         Ok(())
     }
@@ -1619,6 +1731,16 @@ impl Compiler {
 }
 
 enum RArg<'a> { Expr(&'a Node), Default(CVal) }
+
+/// Erfasste lvalue-Adresse eines BYREF-Arguments fuer das Post-Call-Write-Back.
+enum ByrefCap {
+    /// Variable/Feld -- direkt via store_var schreibbar (kein Adress-Temp).
+    Var(String),
+    /// Array-Slot `arr[ix..]` -- Array-Ref + Index-Werte in Temps gespiegelt.
+    Index { arr_tmp: usize, ix_tmps: Vec<usize> },
+    /// Objekt-Feld `obj.field` -- Objekt-Ref in Temp gespiegelt.
+    Member { obj_tmp: usize, field: String },
+}
 
 /// Mappt (positional + named) Argumente auf die Param-Reihenfolge der Signatur,
 /// fuellt Defaults. Wie compiler._resolve_named_args.
@@ -1685,12 +1807,6 @@ fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
 /// FnSig aus einem SUB/FUNCTION/Methoden-Knoten.
 fn make_sig(decl: &Node) -> Result<FnSig, String> {
     let (name, params, body, is_sub, return_type) = fn_parts(decl);
-    for p in params {
-        if p.by_ref {
-            return Err(format!("{}: BYREF-Parameter '{}' im VM-Pfad nicht unterstuetzt",
-                               name, p.name));
-        }
-    }
     let mut param_defaults: Vec<Option<CVal>> = Vec::new();
     for p in params {
         param_defaults.push(match &p.default {
@@ -1706,6 +1822,7 @@ fn make_sig(decl: &Node) -> Result<FnSig, String> {
         param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
         param_defaults,
         param_types: params.iter().map(|p| p.type_name.clone()).collect(),
+        param_byref: params.iter().map(|p| p.by_ref).collect(),
         is_variadic,
         is_sub,
         return_type: if is_sub { String::new() } else { return_type.to_string() },
@@ -1763,7 +1880,8 @@ fn body_has_yield(stmts: &[Node]) -> bool {
 fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
               n_params: usize, n_required: usize, is_variadic: bool,
               is_coroutine: bool, return_type: &str,
-              param_defaults: &[Option<CVal>], param_names: &[String]) -> Value {
+              param_defaults: &[Option<CVal>], param_names: &[String],
+              param_byref: &[bool]) -> Value {
     let code: Vec<Value> = ctx.code.iter().map(|(op, arg)| json!([op, arg])).collect();
     // Zeilen parallel zum Code (Stufe B). Defensive: bei (theoretischem)
     // Laengen-Mismatch auf 0 zurueckfallen statt zu paniken.
@@ -1786,6 +1904,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
         "is_variadic": is_variadic, "is_sub": is_sub, "is_main": is_main,
         "is_coroutine": is_coroutine, "return_type": return_type,
         "param_defaults": pdef, "param_names": param_names,
+        "param_byref": param_byref,
         "local_types": ctx.local_types.clone(), "local_defaults": local_defaults,
         "local_names": local_names,
         "constants": ctx.consts.clone(), "code": code, "lines": lines,

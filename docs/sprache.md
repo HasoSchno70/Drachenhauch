@@ -602,7 +602,7 @@ PRINT q, r       ' "3 2"
 
 **Einschränkungen:**
 - `BYREF` darf **nicht** mit einem Default-Wert kombiniert werden (was würde es heißen, eine Default-Variable per Referenz zu übergeben?).
-- Im **VM-/Native-VM-Pfad** sind `BYREF`-Parameter aktuell nicht implementiert; der Compiler wirft einen klaren Fehler. Der Tree-Walker (`gbrun.py` ohne `--vm`) unterstützt sie vollständig.
+- `BYREF` wird in beiden Pfaden unterstützt: im Tree-Walker (Referenz) wie in der nativen Runtime `gbrt`. In `gbrt` setzt der Compiler an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
 
 **Rekursion** funktioniert:
 

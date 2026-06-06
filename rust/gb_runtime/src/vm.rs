@@ -844,6 +844,37 @@ impl<'p> Vm<'p> {
         }
     }
 
+    /// Wie `exec`, liefert aber zusaetzlich die finalen Werte der BYREF-Param-
+    /// Slots (in Param-Reihenfolge). Nur der direkte CALL_USER-Pfad nutzt das --
+    /// dort kennt der Compiler die Signatur statisch und emittiert das Write-Back.
+    fn exec_byref(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
+        -> R<(Value, Vec<Value>)> {
+        self.depth += 1;
+        let r = self.exec_byref_inner(fn_, args, self_obj);
+        self.depth -= 1;
+        r
+    }
+
+    fn exec_byref_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
+        -> R<(Value, Vec<Value>)> {
+        let mut locals = bind_params(fn_, args)?;
+        let mut stack: Vec<Value> = Vec::with_capacity(16);
+        let mut ip: usize = 0;
+        let mut try_handlers: Vec<(usize, usize)> = Vec::new();
+        let ret = match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref())? {
+            Step::Return(v) => v,
+            Step::Yield(_) => return Err("YIELD ausserhalb einer Coroutine".into()),
+        };
+        // Finale Werte der BYREF-Param-Slots (in Param-Reihenfolge) auslesen.
+        let mut byref_vals = Vec::new();
+        for (i, &is_br) in fn_.param_byref.iter().enumerate() {
+            if is_br {
+                byref_vals.push(locals.get(i).cloned().unwrap_or(Value::Nil));
+            }
+        }
+        Ok((ret, byref_vals))
+    }
+
     /// Treibt den Frame durch die Dispatch-Schleife inkl. TRY/CATCH-Unwinding,
     /// bis ein RETURN/HALT (Step::Return) oder ein YIELD (Step::Yield) faellt.
     fn run_frame(
@@ -1331,6 +1362,12 @@ impl<'p> Vm<'p> {
                     let call_args = stack.split_off(split);
                     if callee.is_coroutine {
                         stack.push(make_coro(callee, call_args, None));
+                    } else if callee.param_byref.iter().any(|&b| b) {
+                        // BYREF: finale Param-Werte mit zurueckgeben. Layout fuers
+                        // Write-Back: [.., bv0, bv1, .., bv{m-1}, result].
+                        let (ret, byref_vals) = self.exec_byref(callee, call_args, None)?;
+                        for v in byref_vals { stack.push(v); }
+                        if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                     } else {
                         let ret = self.exec(callee, call_args, None)?;
                         if !callee.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }

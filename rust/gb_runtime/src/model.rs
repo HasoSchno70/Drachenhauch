@@ -176,6 +176,11 @@ pub struct Func {
     pub is_coroutine: bool,
     pub return_type: String,
     pub param_defaults: Vec<Value>,
+    /// Pro Parameter: ob er BYREF ist (Copy-In/Copy-Out). Leer = keine BYREF-
+    /// Parameter (alte .gbc / Funktionen ohne BYREF). Nur die direkten
+    /// CALL_USER-Aufrufe (freie Funktionen) werten das aus -- der Compiler kennt
+    /// dort die Signatur statisch und emittiert das Write-Back.
+    pub param_byref: Vec<bool>,
     pub local_types: Vec<String>,
     pub local_defaults: Vec<Value>,
     pub constants: Vec<Value>,
@@ -289,6 +294,10 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
+    let param_byref = get("param_byref")
+        .as_array()
+        .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
+        .unwrap_or_default();
     let local_defaults = get("local_defaults")
         .as_array()
         .map(|a| a.iter().map(decode_value).collect())
@@ -330,6 +339,7 @@ fn decode_func(j: &J) -> Func {
         is_coroutine: get("is_coroutine").as_bool().unwrap_or(false),
         return_type: get("return_type").as_str().unwrap_or("").to_string(),
         param_defaults,
+        param_byref,
         local_types,
         local_defaults,
         constants,
