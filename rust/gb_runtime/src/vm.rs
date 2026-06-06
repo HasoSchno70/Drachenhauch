@@ -2369,6 +2369,19 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.textinput(gi(a,0,"GUI_TEXTINPUT")?, gi(a,1,"GUI_TEXTINPUT")? as i32, gi(a,2,"GUI_TEXTINPUT")? as i32,
                     gi(a,3,"GUI_TEXTINPUT")? as i32, gi(a,4,"GUI_TEXTINPUT")? as i32, ph)?)
             }
+            // --- Formular-Widgets (Phase 3) ---
+            "gui_radio" => Value::Int(self.gui.radio(gi(a,0,"GUI_RADIO")?, gs(a,1,"GUI_RADIO")?, gs(a,2,"GUI_RADIO")?,
+                gi(a,3,"GUI_RADIO")? as i32, gi(a,4,"GUI_RADIO")? as i32)?),
+            "gui_radio_selected" => Value::Int(self.gui.radio_selected(gi(a,0,"GUI_RADIO_SELECTED")?)?),
+            "gui_progress" => Value::Int(self.gui.progress(gi(a,0,"GUI_PROGRESS")?, gi(a,1,"GUI_PROGRESS")? as i32,
+                gi(a,2,"GUI_PROGRESS")? as i32, gi(a,3,"GUI_PROGRESS")? as i32, gi(a,4,"GUI_PROGRESS")? as i32)?),
+            "gui_dropdown" => Value::Int(self.gui.dropdown(gi(a,0,"GUI_DROPDOWN")?, gi(a,1,"GUI_DROPDOWN")? as i32,
+                gi(a,2,"GUI_DROPDOWN")? as i32, gi(a,3,"GUI_DROPDOWN")? as i32, gi(a,4,"GUI_DROPDOWN")? as i32,
+                gstrs(a,5,"GUI_DROPDOWN")?)?),
+            "gui_dropdown_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_DROPDOWN_SELECTED")?)?),
+            "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
+            "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
+            "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
             "gui_checked" => Value::Bool(self.gui.checked(gi(a,0,"GUI_CHECKED")?)?),

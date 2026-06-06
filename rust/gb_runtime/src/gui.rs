@@ -74,24 +74,28 @@ fn shade(color: i64, delta: i32) -> i64 {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel, Table }
+pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown, Progress }
 
 impl Kind {
     fn as_str(self) -> &'static str {
         match self {
             Kind::Button => "button", Kind::Label => "label", Kind::Checkbox => "checkbox",
             Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
-            Kind::Table => "table",
+            Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
+            Kind::Progress => "progress",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
         Some(match s {
             "button" => Kind::Button, "label" => Kind::Label, "checkbox" => Kind::Checkbox,
             "slider" => Kind::Slider, "textinput" => Kind::TextInput, "panel" => Kind::Panel,
-            "table" => Kind::Table, _ => return None,
+            "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
+            "progress" => Kind::Progress, _ => return None,
         })
     }
 }
+
+const DROPDOWN_ITEM_H: i32 = 22;
 
 #[derive(Default)]
 pub struct TableState {
@@ -121,6 +125,11 @@ pub struct Widget {
     // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
     alive: bool,
     visible: bool,
+    // Formular-Widgets: `group` = Radio-Gruppe; `items` = Dropdown-/ListBox-
+    // Eintraege; `sel` = ausgewaehlter Index (Dropdown), -1 = keiner.
+    group: String,
+    items: Vec<String>,
+    sel: i32,
 }
 
 pub struct Window {
@@ -151,6 +160,7 @@ pub struct Gui {
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
     active_slider: Option<(usize, usize)>,
+    open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
     active_table: Option<(usize, usize)>,
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
     press_origin: Option<(usize, usize)>,
@@ -174,7 +184,7 @@ impl Gui {
             windows: Vec::new(), z_order: Vec::new(),
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
-            active_slider: None, active_table: None, table_press: None, press_origin: None,
+            active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             was_mouse_down: false, prev_backspace: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             pending: Vec::new(),
@@ -241,6 +251,7 @@ impl Gui {
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None,
             alive: true, visible: true,
+            group: String::new(), items: Vec::new(), sel: -1,
         }
     }
 
@@ -291,6 +302,72 @@ impl Gui {
     pub fn textinput(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, placeholder: String) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::TextInput, x, y, w, h); wd.placeholder = placeholder;
         self.add_widget(win, "GUI_TEXTINPUT", wd)
+    }
+
+    // --- Formular-Widgets (Phase 3): Radio, Dropdown, ProgressBar ---
+    pub fn radio(&mut self, win: i64, group: String, label: String, x: i32, y: i32) -> Result<i64, String> {
+        let cs = self.m("check_size");
+        let mut wd = Self::blank(Kind::Radio, x, y, cs, cs);
+        wd.text = label; wd.group = group;
+        self.add_widget(win, "GUI_RADIO", wd)
+    }
+    pub fn progress(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Progress, x, y, w, h);
+        wd.min = 0.0; wd.max = 1.0; wd.value = 0.0;
+        self.add_widget(win, "GUI_PROGRESS", wd)
+    }
+    pub fn dropdown(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, items: Vec<String>) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Dropdown, x, y, w, h);
+        wd.sel = if items.is_empty() { -1 } else { 0 };
+        wd.items = items;
+        self.add_widget(win, "GUI_DROPDOWN", wd)
+    }
+    /// Alle Radios derselben Gruppe (Fenster `wi`) ausser `keep` deselektieren.
+    fn select_radio(&mut self, wi: usize, keep: usize) {
+        let group = self.windows[wi].widgets[keep].group.clone();
+        for (j, w) in self.windows[wi].widgets.iter_mut().enumerate() {
+            if w.kind == Kind::Radio && w.group == group && w.alive {
+                w.checked = j == keep;
+            }
+        }
+    }
+    /// Index (0-basiert in Erstellungsreihenfolge) des gewaehlten Radios der
+    /// Gruppe von `h`, oder -1. `h` darf ein beliebiges Radio der Gruppe sein.
+    pub fn radio_selected(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_RADIO_SELECTED")?;
+        if w.kind != Kind::Radio { return Err("GUI_RADIO_SELECTED: Widget ist kein radio".into()); }
+        let (wi, _) = Self::dec_widget(h);
+        let group = &w.group;
+        let mut idx = 0i64;
+        for wd in &self.windows[wi].widgets {
+            if wd.kind == Kind::Radio && &wd.group == group && wd.alive {
+                if wd.checked { return Ok(idx); }
+                idx += 1;
+            }
+        }
+        Ok(-1)
+    }
+    pub fn dropdown_selected(&self, h: i64) -> Result<i64, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_SELECTED")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SELECTED: Widget ist kein dropdown".into()); }
+        Ok(w.sel as i64)
+    }
+    pub fn dropdown_text(&self, h: i64) -> Result<String, String> {
+        let w = self.wdg(h, "GUI_DROPDOWN_TEXT")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_TEXT: Widget ist kein dropdown".into()); }
+        Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() })
+    }
+    pub fn dropdown_set_selected(&mut self, h: i64, idx: i64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_DROPDOWN_SET_SELECTED")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET_SELECTED: Widget ist kein dropdown".into()); }
+        w.sel = if idx >= 0 && (idx as usize) < w.items.len() { idx as i32 } else { -1 };
+        Ok(())
+    }
+    pub fn set_dropdown_items(&mut self, h: i64, items: Vec<String>) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_SET_DROPDOWN")?;
+        if w.kind != Kind::Dropdown { return Err("GUI_SET_DROPDOWN: Widget ist kein dropdown".into()); }
+        w.sel = if items.is_empty() { -1 } else { w.sel.min(items.len() as i32 - 1).max(0) };
+        w.items = items; Ok(())
     }
 
     // --- Tabelle ---
@@ -444,24 +521,30 @@ impl Gui {
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
-        if w.kind != Kind::Checkbox { return Err("GUI_CHECKED: Widget ist keine checkbox".into()); }
+        if !matches!(w.kind, Kind::Checkbox | Kind::Radio) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio".into()); }
         Ok(w.checked)
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
-        if w.kind != Kind::Slider { return Err("GUI_VALUE: Widget ist kein slider".into()); }
+        if !matches!(w.kind, Kind::Slider | Kind::Progress) { return Err("GUI_VALUE: Widget ist kein slider/progress".into()); }
         Ok(w.value)
     }
     pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
     pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> { self.wdg_mut(h, "GUI_SET_TEXT")?.text = t; Ok(()) }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
-        let w = self.wdg_mut(h, "GUI_SET_CHECKED")?;
-        if w.kind != Kind::Checkbox { return Err("GUI_SET_CHECKED: Widget ist keine checkbox".into()); }
-        w.checked = f; Ok(())
+        let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
+        if !matches!(kind, Kind::Checkbox | Kind::Radio) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio".into()); }
+        self.wdg_mut(h, "GUI_SET_CHECKED")?.checked = f;
+        // Radio: beim Setzen die Gruppen-Geschwister deselektieren.
+        if kind == Kind::Radio && f {
+            let (wi, i) = Self::dec_widget(h);
+            self.select_radio(wi, i);
+        }
+        Ok(())
     }
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
-        if w.kind != Kind::Slider { return Err("GUI_SET_VALUE: Widget ist kein slider".into()); }
+        if !matches!(w.kind, Kind::Slider | Kind::Progress) { return Err("GUI_SET_VALUE: Widget ist kein slider/progress".into()); }
         w.value = v.clamp(w.min, w.max); Ok(())
     }
     pub fn on_click(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
@@ -469,8 +552,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox oder table".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox, table, radio oder dropdown".into());
         }
         w.on_change = func; Ok(())
     }
@@ -501,6 +584,7 @@ impl Gui {
         if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
         if self.active_slider == Some((wi, i)) { self.active_slider = None; }
         if self.press_origin == Some((wi, i)) { self.press_origin = None; }
+        if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
         Ok(())
     }
     pub fn set_widget_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
@@ -555,6 +639,7 @@ impl Gui {
         self.z_order.retain(|&i| i != wi);
         if self.focus_window == Some(wi) { self.focus_window = None; }
         if self.drag_window == Some(wi) { self.drag_window = None; }
+        if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
         Ok(())
     }
     pub fn window_widget_count(&self, h: i64) -> Result<i64, String> {
@@ -589,6 +674,8 @@ impl Gui {
         if let Some(f) = &w.on_click { o["on_click"] = serde_json::json!(f); }
         if let Some(f) = &w.on_change { o["on_change"] = serde_json::json!(f); }
         if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
+        if !w.group.is_empty() { o["group"] = serde_json::json!(w.group); }
+        if !w.items.is_empty() { o["items"] = serde_json::json!(w.items); o["sel"] = serde_json::json!(w.sel); }
         if let Some(t) = &w.tbl {
             o["table"] = serde_json::json!({
                 "headers": t.headers, "rows": t.rows,
@@ -615,6 +702,11 @@ impl Gui {
         if let Some(ov) = wj["ov"].as_object() {
             for (k, val) in ov { if let Some(c) = val.as_i64() { w.ov.insert(k.clone(), c); } }
         }
+        w.group = wj["group"].as_str().unwrap_or("").to_string();
+        if let Some(its) = wj["items"].as_array() {
+            w.items = its.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+        }
+        w.sel = wj["sel"].as_i64().unwrap_or(-1) as i32;
         if kind == Kind::Table {
             let mut ts = TableState::default();
             if let Some(tj) = wj.get("table") {
@@ -831,7 +923,42 @@ impl Gui {
         }
     }
 
+    fn dropdown_popup_rect(&self, wi: usize, idx: usize) -> (i32, i32, i32, i32) {
+        let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
+        let n = self.windows[wi].widgets[idx].items.len() as i32;
+        (ax, ay + h, w, n * DROPDOWN_ITEM_H)
+    }
+
     fn handle_press(&mut self, mx: i32, my: i32) {
+        // Offenes Dropdown hat Vorrang: das Popup liegt ueber allem und reicht
+        // evtl. ueber den Fensterrand hinaus (topmost_at wuerde es verfehlen).
+        if let Some((dw, di)) = self.open_dropdown {
+            let valid = self.windows.get(dw).and_then(|w| w.widgets.get(di))
+                .map(|x| x.alive && x.visible && x.kind == Kind::Dropdown).unwrap_or(false);
+            if valid {
+                let (px, py, pw, ph) = self.dropdown_popup_rect(dw, di);
+                let (bx, by, bw, bh) = self.abs_rect(dw, &self.windows[dw].widgets[di]);
+                if Self::in_rect(mx, my, (px, py, pw, ph)) {
+                    let item = (my - py) / DROPDOWN_ITEM_H;
+                    let n = self.windows[dw].widgets[di].items.len() as i32;
+                    if item >= 0 && item < n {
+                        let changed = self.windows[dw].widgets[di].sel != item;
+                        self.windows[dw].widgets[di].sel = item;
+                        if changed {
+                            let f = self.windows[dw].widgets[di].on_change.clone();
+                            if let Some(f) = f { self.pending.push(f); }
+                        }
+                    }
+                    self.open_dropdown = None;
+                    return;
+                }
+                self.open_dropdown = None;
+                // Klick auf die zugeklappte Box selbst -> nur schliessen (kein Toggle-Reopen).
+                if Self::in_rect(mx, my, (bx, by, bw, bh)) { return; }
+            } else {
+                self.open_dropdown = None;
+            }
+        }
         let win = match self.topmost_at(mx, my) {
             Some(w) => w,
             None => { self.focus_widget = None; return; }
@@ -876,6 +1003,18 @@ impl Gui {
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
             Kind::TextInput => self.focus_widget = Some((win, i)),
             Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
+            Kind::Radio => {
+                self.focus_widget = None;
+                let was = self.windows[win].widgets[i].checked;
+                self.select_radio(win, i);
+                if !was {
+                    let w = &self.windows[win].widgets[i];
+                    let oc = w.on_click.clone(); let och = w.on_change.clone();
+                    if let Some(f) = oc { self.pending.push(f); }
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            }
+            Kind::Dropdown => { self.focus_widget = None; self.open_dropdown = Some((win, i)); }
             _ => self.focus_widget = None,
         }
     }
@@ -905,6 +1044,12 @@ impl Gui {
         }
         for (i, wdg) in win.widgets.iter().enumerate() {
             if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
+        }
+        // Aufgeklapptes Dropdown-Popup ueber allen Widgets dieses Fensters.
+        if let Some((dw, di)) = self.open_dropdown {
+            if dw == wi && win.widgets.get(di).map(|x| x.alive && x.visible).unwrap_or(false) {
+                self.draw_dropdown_popup(g, wi, di);
+            }
         }
     }
 
@@ -964,7 +1109,66 @@ impl Gui {
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
             }
+            Kind::Radio => {
+                let acc = self.wcol(wdg, "accent", "accent");
+                let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
+                g.circle(cx, cy, r, self.wcol(wdg, "border", "widget_border"));   // Ring
+                g.circle(cx, cy, (r - 1).max(1), self.th("win_bg"));
+                if wdg.hovered { g.circle(cx, cy, r, acc); g.circle(cx, cy, (r - 1).max(1), self.th("win_bg")); }
+                if wdg.checked { g.circle(cx, cy, (r - 4).max(1), acc); }   // Punkt
+                g.text(ax + w + pad, ay, wdg.text.clone(), self.wcol(wdg, "fg", "text_fg"));
+            }
+            Kind::Progress => {
+                let bg = self.wcol(wdg, "bg", "widget_bg");
+                let acc = self.wcol(wdg, "accent", "accent");
+                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
+                let span = wdg.max - wdg.min;
+                let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
+                let fw = (ratio * (w - 2) as f64) as i32;
+                if fw > 0 { g.box_fill(ax + 1, ay + 1, ax + fw, ay + h - 2, acc); }
+                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
+                let pct = format!("{}%", (ratio * 100.0).round() as i32);
+                g.text(ax + w / 2 - (pct.len() as i32 * 8) / 2, ay + (h - 14) / 2, pct, self.wcol(wdg, "fg", "text_fg"));
+            }
+            Kind::Dropdown => {
+                let bg = self.wcol(wdg, "bg", "widget_bg");
+                let b = if wdg.hovered { shade(bg, 18) } else { bg };
+                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, b);
+                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
+                let fg = self.wcol(wdg, "fg", "text_fg");
+                let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
+                    wdg.items[wdg.sel as usize].clone()
+                } else { String::new() };
+                g.text(ax + pad, ay + (h - 14) / 2, txt, fg);
+                let (axr, cy) = (ax + w - 14, ay + h / 2);   // ▼
+                g.line(axr, cy - 2, axr + 4, cy + 2, fg);
+                g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
+            }
             Kind::Table => self.draw_table(g, wi, idx),
+        }
+    }
+
+    fn draw_dropdown_popup(&self, g: &mut Graphics, wi: usize, idx: usize) {
+        let wdg = &self.windows[wi].widgets[idx];
+        if wdg.items.is_empty() { return; }
+        let (px, py, pw, ph) = self.dropdown_popup_rect(wi, idx);
+        let bg = self.wcol(wdg, "bg", "widget_bg");
+        let border = self.wcol(wdg, "border", "widget_border");
+        let fg = self.wcol(wdg, "fg", "text_fg");
+        let acc = self.wcol(wdg, "accent", "accent");
+        let pad = self.m("pad");
+        g.box_fill(px, py, px + pw - 1, py + ph - 1, bg);
+        g.rect(px, py, px + pw - 1, py + ph - 1, border);
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        for (k, it) in wdg.items.iter().enumerate() {
+            let iy = py + k as i32 * DROPDOWN_ITEM_H;
+            let hovered = mx >= px && mx < px + pw && my >= iy && my < iy + DROPDOWN_ITEM_H;
+            if k as i32 == wdg.sel {
+                g.box_fill(px + 1, iy, px + pw - 2, iy + DROPDOWN_ITEM_H - 1, shade(acc, -110));
+            } else if hovered {
+                g.box_fill(px + 1, iy, px + pw - 2, iy + DROPDOWN_ITEM_H - 1, shade(bg, 22));
+            }
+            g.text(px + pad, iy + (DROPDOWN_ITEM_H - 14) / 2, it.clone(), fg);
         }
     }
 

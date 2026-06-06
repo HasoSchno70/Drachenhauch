@@ -187,6 +187,49 @@ GUI_PANEL(win, x, y, w, h[, titel$]) -> GUI_WIDGET
 
 Rein dekorativer Container (Rahmen + optionale Titelzeile). Nicht interaktiv.
 
+## Formular-Widgets: Radio, Dropdown, ProgressBar
+
+### RadioButton (Gruppen, gegenseitiger Ausschluss)
+
+```basic
+DIM easy AS GUI_WIDGET
+easy = GUI_RADIO(win, "diff", "Einfach", 20, 60)   ' Gruppe "diff"
+DIM hard AS GUI_WIDGET
+hard = GUI_RADIO(win, "diff", "Schwer", 20, 90)    ' selbe Gruppe
+GUI_SET_CHECKED(easy, TRUE)                          ' waehlt easy, deselektiert die Gruppe
+```
+
+Radios mit derselben `group$` im selben Fenster schliessen sich gegenseitig aus.
+- `GUI_CHECKED(radio)` → ist dieser gewählt?
+- `GUI_RADIO_SELECTED(radio)` → Index (0-basiert, Erstellungsreihenfolge) des
+  gewählten Radios der Gruppe, oder `-1`. (`radio` darf ein beliebiges der Gruppe sein.)
+- `GUI_ON_CHANGE(radio, handler)` feuert bei Auswahl.
+
+### Dropdown / ComboBox
+
+```basic
+DIM farben[3] AS STRING
+farben[0]="Rot" : farben[1]="Grün" : farben[2]="Blau"
+DIM dd AS GUI_WIDGET
+dd = GUI_DROPDOWN(win, 20, 130, 160, 24, farben)   ' Klick klappt die Liste auf
+```
+
+- `GUI_DROPDOWN_SELECTED(dd)` → Index (oder `-1`), `GUI_DROPDOWN_TEXT(dd)` → gewählter Text.
+- `GUI_DROPDOWN_SET_SELECTED(dd, i)` setzt die Auswahl, `GUI_SET_DROPDOWN(dd, items)` ersetzt die Liste.
+- `GUI_ON_CHANGE(dd, handler)` feuert bei Auswahländerung. Das aufgeklappte Popup
+  wird über allen anderen Widgets gezeichnet; Klick daneben schliesst es.
+
+### ProgressBar
+
+```basic
+DIM bar AS GUI_WIDGET
+bar = GUI_PROGRESS(win, 20, 170, 200, 18)
+GUI_SET_VALUE(bar, 0.65)        ' 0.0 .. 1.0 (zeigt "65%")
+PRINT GUI_VALUE(bar)
+```
+
+Nicht interaktiv; Fortschritt via `GUI_SET_VALUE` (0..1, geklemmt).
+
 ## Tabelle
 
 ```basic

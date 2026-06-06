@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 878,
+ "count": 886,
  "builtins": [
   {
    "name": "ABS",
@@ -5268,6 +5268,54 @@
    "name": "GUI_FROM_JSON",
    "kind": "core",
    "signature": "GUI_FROM_JSON(json$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RADIO",
+   "kind": "core",
+   "signature": "GUI_RADIO(win, group$, text$, x, y)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_RADIO_SELECTED",
+   "kind": "core",
+   "signature": "GUI_RADIO_SELECTED(radio)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_PROGRESS",
+   "kind": "core",
+   "signature": "GUI_PROGRESS(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN(win, x, y, w, h, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_SELECTED",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_SELECTED(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_TEXT",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_TEXT(dd)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_DROPDOWN_SET_SELECTED",
+   "kind": "core",
+   "signature": "GUI_DROPDOWN_SET_SELECTED(dd, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_DROPDOWN",
+   "kind": "core",
+   "signature": "GUI_SET_DROPDOWN(dd, items)",
    "module": "gui"
   }
  ]
