@@ -200,6 +200,8 @@ class _Canvas(QWidget):
         self._pending: dict | None = None        # Pre-Gesten-Snapshot (Drag/Resize)
         self._nudge_active = False               # laufende Pfeiltasten-Verschiebung?
         self.zoom = 1.0                          # Zoom-Faktor der Design-Flaeche
+        self._guides_v: list[int] = []           # aktive vertikale Ausrichtlinien (ctrl-x)
+        self._guides_h: list[int] = []           # aktive horizontale Ausrichtlinien (ctrl-y)
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -209,6 +211,7 @@ class _Canvas(QWidget):
         self.doc = doc
         self.selected = None
         self._pending = None
+        self._guides_v = []; self._guides_h = []
         self.selection_changed.emit(None)
         self.doc_replaced.emit(doc)
         self._resize_to_doc()
@@ -247,6 +250,57 @@ class _Canvas(QWidget):
 
     def _snap(self, v: int) -> int:
         return snap(v) if self.snap_grid else int(v)
+
+    _ALIGN_THRESH = 6        # Fangabstand (Zeichen-Pixel) fuer Ausrichtlinien
+
+    def _align_axis(self, lo: float, size: float, targets: set) -> tuple:
+        """Eine Achse fangen: `lo`/`size` = Kante+Laenge des gezogenen Controls.
+        Liefert (neue_lo | None, guide-Linie | None) -- gefangen wird die Kante
+        (Anfang/Mitte/Ende) mit der kleinsten Distanz zu einem Ziel."""
+        best = None
+        for off in (0.0, size / 2.0, size):       # left/center/right bzw. top/mid/bottom
+            edge = lo + off
+            for t in targets:
+                d = t - edge
+                if abs(d) <= self._ALIGN_THRESH and (best is None or abs(d) < abs(best[0])):
+                    best = (d, t)
+        if best is None:
+            return None, None
+        return lo + best[0], best[1]
+
+    def _x_targets(self, c: Control) -> set:
+        xs = {0.0, self.doc.w / 2.0, float(self.doc.w)}
+        for o in self.doc.controls:
+            if o is not c:
+                xs.update((float(o.x), o.x + o.w / 2.0, float(o.x + o.w)))
+        return xs
+
+    def _y_targets(self, c: Control) -> set:
+        bottom = self.doc.h - TITLE_H
+        ys = {0.0, bottom / 2.0, float(bottom)}
+        for o in self.doc.controls:
+            if o is not c:
+                ys.update((float(o.y), o.y + o.h / 2.0, float(o.y + o.h)))
+        return ys
+
+    def _move_to(self, px: int, py: int):
+        """Selektiertes Control nach (px, py) (Ziel-Ecke) verschieben -- mit
+        Ausrichtungs-Fang an andere Controls/Formularraender, sonst Raster-Fang.
+        Setzt die aktiven Hilfslinien (`_guides_*`)."""
+        c = self.selected
+        px = max(0, px); py = max(0, py)
+        nx, gx = self._align_axis(px, c.w, self._x_targets(c))
+        ny, gy = self._align_axis(py, c.h, self._y_targets(c))
+        c.x = int(nx) if nx is not None else self._snap(px)
+        c.y = int(ny) if ny is not None else self._snap(py)
+        c.x = max(0, c.x); c.y = max(0, c.y)
+        self._guides_v = [int(gx)] if gx is not None else []
+        self._guides_h = [int(gy)] if gy is not None else []
+
+    def _clear_guides(self):
+        if self._guides_v or self._guides_h:
+            self._guides_v = []; self._guides_h = []
+            self.update()
 
     def _handle_points(self, c: Control) -> dict[str, QPoint]:
         """Screen-Mittelpunkte der 8 Resize-Griffe des Controls."""
@@ -288,8 +342,21 @@ class _Canvas(QWidget):
         # Controls
         for c in d.controls:
             self._paint_control(qp, c)
+        self._paint_guides(qp, d)
         if self.selected is not None:
             self._paint_handles(qp, self.selected)
+
+    def _paint_guides(self, qp: QPainter, d: FormDoc):
+        """Ausrichtungs-Hilfslinien waehrend des Ziehens (pink, ueber dem Form)."""
+        if not (self._guides_v or self._guides_h):
+            return
+        qp.setPen(QPen(QColor(255, 92, 162), 1, Qt.PenStyle.DashLine))
+        for gx in self._guides_v:
+            X = PAD + gx
+            qp.drawLine(X, PAD, X, PAD + d.h)
+        for gy in self._guides_h:
+            Y = PAD + TITLE_H + gy
+            qp.drawLine(PAD, Y, PAD + d.w, Y)
 
     def _paint_grid(self, qp: QPainter, d: FormDoc):
         """Dezente Raster-Punkte im Fenster-Inhaltsbereich (unter der Titelleiste)."""
@@ -456,8 +523,7 @@ class _Canvas(QWidget):
             self.update()
             return
         if self._drag and self.selected is not None:
-            self.selected.x = max(0, self._snap(cx - self._drag_off.x()))
-            self.selected.y = max(0, self._snap(cy - self._drag_off.y()))
+            self._move_to(cx - self._drag_off.x(), cy - self._drag_off.y())
             self.selection_changed.emit(self.selected)   # Inspector live aktualisieren
             self.doc_changed.emit()
             self.update()
@@ -475,6 +541,7 @@ class _Canvas(QWidget):
             self._pending = None
         self._drag = False
         self._resize_handle = None
+        self._clear_guides()                     # Hilfslinien nach dem Ziehen weg
 
     def mouseDoubleClickEvent(self, ev):
         cx, cy = self._to_ctrl(self._to_draw(ev.position()))

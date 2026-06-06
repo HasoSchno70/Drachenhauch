@@ -246,6 +246,49 @@ def test_canvas_renders_all_kinds(tmp_path):
     win.close()
 
 
+# --------------------------------------------------------------- Ausrichtung
+def test_align_snaps_left_edge_and_shows_guide(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 100, 20)            # linke Kante x=100
+    b = cv.doc.add("button", 0, 80)
+    cv._select(b)
+    cv._move_to(103, 80)                          # nah an a.x=100 (innerhalb 6)
+    assert b.x == 100                             # an a's linke Kante gefangen
+    assert 100 in cv._guides_v                    # Hilfslinie aktiv
+    assert a is not b
+    win.close()
+
+
+def test_align_center(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.doc.w = 500                               # /2 = 250, weit weg von 150
+    a = cv.doc.add("button", 100, 20)            # Mitte bei 150 (100+100/2)
+    b = cv.doc.add("button", 0, 80); b.w = 40    # nur die Mitte kann fangen
+    cv._select(b)
+    cv._move_to(132, 80)                          # Mitte=152, Ziel 150 -> snap
+    assert b.x + b.w // 2 == 150                  # an a's Mitte ausgerichtet
+    assert 150 in cv._guides_v
+    win.close()
+
+
+def test_guides_cleared_on_release(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.doc.add("button", 100, 20)
+    b = cv.doc.add("button", 0, 80)
+    cv._select(b)
+    cv._move_to(103, 80)
+    assert cv._guides_v
+    cv._clear_guides()
+    assert not cv._guides_v and not cv._guides_h
+    win.close()
+
+
 # --------------------------------------------------------------- Zoom
 def test_zoom_levels_and_clamp(tmp_path):
     _app()
