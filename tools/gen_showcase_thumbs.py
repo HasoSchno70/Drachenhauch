@@ -39,7 +39,6 @@ def _find_gbrt() -> Path | None:
 
 
 def _generate(entry: dict, gbrt: Path) -> bool:
-    from gamebasic.serialize import compile_file_to_gbc
     from PIL import Image
 
     src = ROOT / "examples" / entry["file"]
@@ -48,16 +47,6 @@ def _generate(entry: dict, gbrt: Path) -> bool:
         return False
     out = thumb_path(ROOT, entry)
     out.parent.mkdir(parents=True, exist_ok=True)
-
-    fd, tmp = tempfile.mkstemp(suffix=".gbc")
-    os.close(fd)
-    tmp_path = Path(tmp)
-    try:
-        compile_file_to_gbc(src, tmp_path)
-    except Exception as exc:  # noqa: BLE001
-        print(f"  ! Compile-Fehler {src.name}: {exc}")
-        tmp_path.unlink(missing_ok=True)
-        return False
 
     # raylib speichert den Basename ins Arbeitsverzeichnis (= examples/, noetig
     # fuer LOADIMAGE("assets/...")). Wir holen das Bild danach dort ab.
@@ -68,21 +57,17 @@ def _generate(entry: dict, gbrt: Path) -> bool:
         GBRT_FRAMES=str(entry.get("frames", 120)),
         GBRT_SCREENSHOT=str(raw),
     )
-    # Manche Demos laufen in einem `WHILE TRUE`/ESC-Loop und beenden sich
-    # NICHT ueber das Frame-Limit -- der Headless-Screenshot wird trotzdem
-    # beim Erreichen von GBRT_FRAMES gezogen. Wir geben dem Prozess genug
-    # Zeit, diesen Frame zu erreichen, killen ihn dann und verwenden das
-    # bereits geschriebene Bild. (Sauber beendende Demos kehren sofort zurueck.)
+    # `gbrt run`: kompiliert die Quelle selbst (Stufe B -- kein Python-Compiler
+    # mehr) und chdirt ins examples/-Verzeichnis. Manche Demos laufen in einem
+    # `WHILE TRUE`/ESC-Loop und beenden sich NICHT ueber das Frame-Limit -- der
+    # Headless-Screenshot wird trotzdem beim Erreichen von GBRT_FRAMES gezogen.
     try:
         subprocess.run(
-            [str(gbrt), str(tmp_path), src.name],
-            cwd=str(src.parent), env=env, timeout=30,
-            capture_output=True, text=True,
+            [str(gbrt), "run", str(src)],
+            env=env, timeout=30, capture_output=True, text=True,
         )
     except subprocess.TimeoutExpired:
         pass
-    finally:
-        tmp_path.unlink(missing_ok=True)
 
     if not raw.exists():
         print(f"  ! Kein Screenshot fuer {src.name}")

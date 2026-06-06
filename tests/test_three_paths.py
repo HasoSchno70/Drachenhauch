@@ -1,13 +1,10 @@
-"""Drei-Pfade-Aequivalenz: Tree-Walker == Python-VM == Native-VM.
+"""Golden-Tests fuer drift-anfaellige Kern-Semantik (gegen `gbrt`).
 
-Die `run_all`-Fixture fuehrt jeden Quelltext durch alle drei Ausfuehrungspfade
-und prueft INTERN, dass die Ausgaben bit-identisch sind (der Kern der
-GameBasic-Garantie). Zusaetzlich prueft jeder Test hier die erwartete Ausgabe
--- so faengt die Suite sowohl Divergenzen als auch Korrektheitsfehler.
-
-Schwerpunkt: drift-anfaellige Stellen, die in interpreter.py / vm.py /
-vm_native.pyx dreifach implementiert sind (Operatoren, _coerce, _infer_type,
-_fmt, _type_of, _eval_in, Slicing) und historisch auseinanderliefen.
+Stufe B: Es gibt nur noch EINE Runtime (gbrt) -- die `run_all`-Fixture ist ein
+Alias auf `gbrt run`. Diese Tests prueften historisch die Aequivalenz von
+Tree-Walker/Python-VM/Cython-VM; jetzt sind es schlicht gbrt-Golden-Tests fuer
+die frueher drift-anfaelligen Stellen (Operatoren, Coerce, Typ-Inferenz, _fmt,
+IN, Slicing). Jeder Test asserted die erwartete Ausgabe.
 """
 import pytest
 
