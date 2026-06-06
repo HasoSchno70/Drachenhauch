@@ -119,7 +119,6 @@ PRINT apply(mul2, add1, 5)
     assert run_vm(src) == expected
 
 
-@pytest.mark.xfail(reason="gbrt erzwingt FUNCREF-Typ bei Zuweisung nicht (TW-Divergenz; gbrt-Haertung offen)", strict=False)
 def test_funcref_rejects_non_funcref(run_gb, run_vm):
     from gamebasic.errors import GBRuntimeError
     src = '''

@@ -143,7 +143,6 @@ PRINT rx, ry
 
 # --- Tupel-Type-Check -----------------------------------------------
 
-@pytest.mark.xfail(reason="gbrt erzwingt TUPLE-Typ bei Zuweisung nicht (TW-Divergenz; gbrt-Haertung offen)", strict=False)
 def test_tuple_var_rejects_non_tuple(run_gb, run_vm):
     from gamebasic.errors import GBRuntimeError
     src = '''

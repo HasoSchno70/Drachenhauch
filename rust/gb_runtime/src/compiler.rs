@@ -227,6 +227,11 @@ struct FnSig {
     n_required: usize,
     param_names: Vec<String>,
     param_defaults: Vec<Option<CVal>>,
+    /// Pro Parameter: ob der Default ein NICHT-Literal-Ausdruck ist (z.B. ein
+    /// Verweis auf einen frueheren Parameter). Solche werden zur LAUFZEIT im
+    /// Callee-Prolog ausgewertet (bind_params setzt einen Nil-Sentinel), nicht
+    /// als Konstante gebacken. `param_defaults[i]` ist dann None.
+    param_default_is_expr: Vec<bool>,
     param_types: Vec<String>,
     /// Pro Parameter: ob BYREF (Copy-In/Copy-Out). Der Aufruf-Pfad emittiert
     /// dann lvalue-Capture + Post-Call-Write-Back.
@@ -267,6 +272,10 @@ pub struct Compiler {
     /// aliasierte Builtin-Aufrufe (`j_parse`) auf den kanonischen Namen
     /// (`json_parse`) zurueckabgebildet werden, den gbrt nativ kennt.
     builtin_aliases: Vec<(String, String)>,
+    /// Bereits deklarierte ENUMs (Name -> Member als (lower-name, wert)). Eine
+    /// zweite ENUM-Deklaration desselben Namens ist idempotent (identische
+    /// Member) oder ein Fehler (abweichende Member) -- wie der Tree-Walker.
+    enum_decls: HashMap<String, Vec<(String, i64)>>,
     ctx: Ctx,
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
@@ -281,7 +290,8 @@ impl Compiler {
                    fn_sigs: HashMap::new(), compiled_fns: vec![],
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
-                   external_types, builtin_aliases, ctx: Ctx::new(), err_line: 0 }
+                   external_types, builtin_aliases,
+                   enum_decls: HashMap::new(), ctx: Ctx::new(), err_line: 0 }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -575,6 +585,18 @@ impl Compiler {
             out.push((mname.to_lowercase(), CVal::Int(v)));
             next_auto = v + 1;
         }
+        // Redeklaration: identisch = idempotent (z.B. doppelter IMPORT),
+        // abweichende Member = Fehler (wie Tree-Walker, interpreter.py:1070).
+        let members_cmp: Vec<(String, i64)> = out.iter()
+            .map(|(n, v)| (n.clone(), if let CVal::Int(i) = v { *i } else { 0 }))
+            .collect();
+        if let Some(prev) = self.enum_decls.get(name) {
+            if *prev == members_cmp {
+                return Ok(());   // identische Re-Deklaration -> No-Op
+            }
+            return Err(format!("ENUM {}: Name ist bereits anderweitig vergeben", name));
+        }
+        self.enum_decls.insert(name.to_string(), members_cmp);
         let ns = CVal::Ns { name: name.to_string(), members: out };
         self.emit_namespace_const(name, ns);
         Ok(())
@@ -1544,7 +1566,7 @@ impl Compiler {
 
     fn finish(self, data: Vec<Value>) -> Value {
         let main = build_func(&self.ctx, "__main__", true, true, 0, 0,
-                              false, false, "", &[], &[], &[]);
+                              false, false, "", &[], &[], &[], &[]);
         let mut functions = Map::new();
         for (name, fnj) in self.compiled_fns {
             functions.insert(name, fnj);
@@ -1653,6 +1675,7 @@ impl Compiler {
             }
             let saved = std::mem::replace(&mut self.ctx, ctx);
             let r = (|| {
+                self.emit_default_prologue(params)?;
                 for s in body { self.stmt(s)?; }
                 if is_sub {
                     self.ctx.emit(oc::RETURN_VOID, Value::Null);
@@ -1668,7 +1691,8 @@ impl Compiler {
             let sig = &self.classes[&cname].method_sigs[mname];
             let fnj = build_func(&fn_ctx, mname, false, is_sub, sig.n_params, sig.n_required,
                                  sig.is_variadic, sig.is_coroutine, &sig.return_type,
-                                 &sig.param_defaults, &sig.param_names, &sig.param_byref);
+                                 &sig.param_defaults, &sig.param_names, &sig.param_byref,
+                                 &sig.param_default_is_expr);
             self.classes.get_mut(&cname).unwrap().compiled.push((mname.to_string(), fnj));
         }
         Ok(())
@@ -1691,6 +1715,30 @@ impl Compiler {
         Ok(())
     }
 
+    /// Callee-Prolog fuer Ausdruck-Defaults: pro Parameter mit Nicht-Literal-
+    /// Default `if param IS Nil (nicht uebergeben) THEN param = <default-expr>`.
+    /// Der Ausdruck wird im Funktions-Ctx kompiliert -> Verweise auf fruehere
+    /// Parameter loesen auf die bereits gesetzten Local-Slots auf. Muss VOR dem
+    /// Body und in PARAM-REIHENFOLGE laufen (Default i darf Param < i nutzen).
+    fn emit_default_prologue(&mut self, params: &[crate::ast::Param]) -> CR {
+        for (i, p) in params.iter().enumerate() {
+            let def = match &p.default {
+                Some(d) if eval_literal_default(d).is_err() => d,  // nur Nicht-Literale
+                _ => continue,
+            };
+            self.ctx.emit(oc::LOAD_LOCAL, json!(i));
+            let nilc = self.ctx.add_const(Value::Null);
+            self.ctx.emit(oc::LOAD_CONST, json!(nilc));
+            self.ctx.emit(oc::EQ, Value::Null);
+            let skip = self.ctx.emit(oc::JUMP_IF_FALSE, Value::Null);
+            self.expr(def)?;                       // default-Wert (Param-Refs = Locals)
+            self.ctx.emit(oc::STORE_LOCAL, json!(i));   // coerct auf Param-Typ
+            let here = self.ctx.here();
+            self.ctx.patch(skip, here);
+        }
+        Ok(())
+    }
+
     fn compile_function(&mut self, decl: &Node) -> Result<(), String> {
         let (name, params, body, is_sub, _rt) = fn_parts(decl);
         let mut ctx = Ctx::new();
@@ -1704,6 +1752,7 @@ impl Compiler {
         }
         let saved = std::mem::replace(&mut self.ctx, ctx);
         let r = (|| {
+            self.emit_default_prologue(params)?;
             for s in body { self.stmt(s)?; }
             if is_sub {
                 self.ctx.emit(oc::RETURN_VOID, Value::Null);
@@ -1719,7 +1768,8 @@ impl Compiler {
         let sig = &self.fn_sigs[name];
         let fnj = build_func(&fn_ctx, name, false, is_sub, sig.n_params, sig.n_required,
                              sig.is_variadic, sig.is_coroutine, &sig.return_type,
-                             &sig.param_defaults, &sig.param_names, &sig.param_byref);
+                             &sig.param_defaults, &sig.param_names, &sig.param_byref,
+                             &sig.param_default_is_expr);
         self.compiled_fns.push((name.to_string(), fnj));
         Ok(())
     }
@@ -1776,6 +1826,10 @@ fn resolve_args_with_sig<'a>(sig: &FnSig, name: &str, args: &'a [Node])
             Some(a) => actions.push(a),
             None => match sig.param_defaults.get(i).and_then(|d| d.clone()) {
                 Some(cv) => actions.push(RArg::Default(cv)),
+                // Ausdruck-Default: Nil-Sentinel pushen, der Callee-Prolog
+                // berechnet den Wert (kann auf frueher gesetzte Params zugreifen).
+                None if sig.param_default_is_expr.get(i).copied().unwrap_or(false) =>
+                    actions.push(RArg::Default(CVal::Nil)),
                 None => return Err(format!("{}: Parameter '{}' fehlt", name,
                     sig.param_names.get(i).cloned().unwrap_or_default())),
             },
@@ -1808,19 +1862,27 @@ fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
 fn make_sig(decl: &Node) -> Result<FnSig, String> {
     let (name, params, body, is_sub, return_type) = fn_parts(decl);
     let mut param_defaults: Vec<Option<CVal>> = Vec::new();
+    let mut param_default_is_expr: Vec<bool> = Vec::new();
     for p in params {
-        param_defaults.push(match &p.default {
-            Some(d) => Some(eval_literal_default(d)?),
-            None => None,
-        });
+        match &p.default {
+            // Literal-Default -> als Konstante backen. Nicht-Literal (z.B.
+            // Verweis auf frueheren Param) -> zur Laufzeit im Callee-Prolog.
+            Some(d) => match eval_literal_default(d) {
+                Ok(cv) => { param_defaults.push(Some(cv)); param_default_is_expr.push(false); }
+                Err(_)  => { param_defaults.push(None);     param_default_is_expr.push(true); }
+            },
+            None => { param_defaults.push(None); param_default_is_expr.push(false); }
+        }
     }
-    let n_required = param_defaults.iter().position(|d| d.is_some()).unwrap_or(params.len());
+    // n_required = erster Parameter MIT Default (Literal oder Ausdruck).
+    let n_required = params.iter().position(|p| p.default.is_some()).unwrap_or(params.len());
     let is_variadic = params.last().map(|p| p.is_variadic).unwrap_or(false);
     Ok(FnSig {
         n_params: params.len(),
         n_required,
         param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
         param_defaults,
+        param_default_is_expr,
         param_types: params.iter().map(|p| p.type_name.clone()).collect(),
         param_byref: params.iter().map(|p| p.by_ref).collect(),
         is_variadic,
@@ -1881,7 +1943,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
               n_params: usize, n_required: usize, is_variadic: bool,
               is_coroutine: bool, return_type: &str,
               param_defaults: &[Option<CVal>], param_names: &[String],
-              param_byref: &[bool]) -> Value {
+              param_byref: &[bool], param_default_is_expr: &[bool]) -> Value {
     let code: Vec<Value> = ctx.code.iter().map(|(op, arg)| json!([op, arg])).collect();
     // Zeilen parallel zum Code (Stufe B). Defensive: bei (theoretischem)
     // Laengen-Mismatch auf 0 zurueckfallen statt zu paniken.
@@ -1904,7 +1966,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
         "is_variadic": is_variadic, "is_sub": is_sub, "is_main": is_main,
         "is_coroutine": is_coroutine, "return_type": return_type,
         "param_defaults": pdef, "param_names": param_names,
-        "param_byref": param_byref,
+        "param_byref": param_byref, "param_default_is_expr": param_default_is_expr,
         "local_types": ctx.local_types.clone(), "local_defaults": local_defaults,
         "local_names": local_names,
         "constants": ctx.consts.clone(), "code": code, "lines": lines,

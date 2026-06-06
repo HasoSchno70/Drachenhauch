@@ -368,7 +368,6 @@ PRINT power(3.0, 4)
     assert "81" in out
 
 
-@pytest.mark.xfail(reason="gbrt: Default-Parameter nur Literale, kein Verweis auf fruehere Params (Feature-Luecke)", strict=False)
 def test_default_can_reference_earlier_param(run_gb):
     """h's Default ist w - das soll bei Aufruf-Zeit ausgewertet werden,
     nachdem w schon gesetzt ist. Quadrat-Pattern."""

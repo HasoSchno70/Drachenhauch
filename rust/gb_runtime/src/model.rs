@@ -181,6 +181,10 @@ pub struct Func {
     /// CALL_USER-Aufrufe (freie Funktionen) werten das aus -- der Compiler kennt
     /// dort die Signatur statisch und emittiert das Write-Back.
     pub param_byref: Vec<bool>,
+    /// Pro Parameter: ob der Default ein Nicht-Literal-Ausdruck ist (im Callee-
+    /// Prolog zur Laufzeit ausgewertet). bind_params laesst solche Slots beim
+    /// Nil-Sentinel statt zu coercen; der Prolog berechnet sie. Leer = keine.
+    pub param_default_is_expr: Vec<bool>,
     pub local_types: Vec<String>,
     pub local_defaults: Vec<Value>,
     pub constants: Vec<Value>,
@@ -298,6 +302,10 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
         .unwrap_or_default();
+    let param_default_is_expr = get("param_default_is_expr")
+        .as_array()
+        .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
+        .unwrap_or_default();
     let local_defaults = get("local_defaults")
         .as_array()
         .map(|a| a.iter().map(decode_value).collect())
@@ -340,6 +348,7 @@ fn decode_func(j: &J) -> Func {
         return_type: get("return_type").as_str().unwrap_or("").to_string(),
         param_defaults,
         param_byref,
+        param_default_is_expr,
         local_types,
         local_defaults,
         constants,

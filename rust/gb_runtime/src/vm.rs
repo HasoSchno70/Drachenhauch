@@ -90,11 +90,22 @@ fn bind_params(fn_: &Func, args: Vec<Value>) -> R<Vec<Value>> {
         }
         let argn = args.len();
         for (i, v) in args.into_iter().enumerate() {
-            locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+            // Ausdruck-Default + Nil-Sentinel (nicht uebergeben): NICHT coercen,
+            // der Callee-Prolog berechnet den Wert.
+            if fn_.param_default_is_expr.get(i).copied().unwrap_or(false)
+                && matches!(v, Value::Nil) {
+                locals[i] = Value::Nil;
+            } else {
+                locals[i] = coerce(v, &fn_.local_types[i], "Parameter")?;
+            }
         }
         for i in argn..fn_.n_params {
-            let default = fn_.param_defaults.get(i).cloned().unwrap_or(Value::Nil);
-            locals[i] = coerce(default, &fn_.local_types[i], "Default-Parameter")?;
+            if fn_.param_default_is_expr.get(i).copied().unwrap_or(false) {
+                locals[i] = Value::Nil;   // Sentinel -> Callee-Prolog
+            } else {
+                let default = fn_.param_defaults.get(i).cloned().unwrap_or(Value::Nil);
+                locals[i] = coerce(default, &fn_.local_types[i], "Default-Parameter")?;
+            }
         }
     }
     Ok(locals)
@@ -4113,6 +4124,17 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "boolean" => match value {
             Value::Bool(_) => Ok(value),
             _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
+        },
+        // Pascal-Striktheit (gbrt-Haertung): TUPLE/FUNCREF nur mit passendem
+        // Wert zuweisbar. Nil bleibt erlaubt (uninitialisierter DECLARE-Default
+        // umgeht coerce ohnehin, aber explizite Nil-Zuweisung soll nicht crashen).
+        "tuple" => match value {
+            Value::Tuple(_) | Value::Nil => Ok(value),
+            _ => Err(format!("{}: Erwartet TUPLE, erhalten {}", ctx, value.type_name())),
+        },
+        "funcref" => match value {
+            Value::FuncRef(_) | Value::Nil => Ok(value),
+            _ => Err(format!("{}: Erwartet FUNCREF, erhalten {}", ctx, value.type_name())),
         },
         // array:/map:/Klassen/sonstige -> Durchreichen (Referenz-Typen).
         _ => Ok(value),
