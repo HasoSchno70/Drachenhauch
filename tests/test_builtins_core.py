@@ -1,232 +1,224 @@
-"""Tests fuer Core-Built-ins (Math, Strings, Bitwise, Maps).
+"""Tests fuer Core-Built-ins (Math, Strings, Bitwise, Time, Collides).
 
-Built-ins werden direkt ueber das BUILTINS-Dict aufgerufen - kein Lexer/Parser
-in der Test-Schleife, damit die Tests schnell und punktuell sind.
+Golden-Tests gegen `gbrt` (Stufe B): PRINT <builtin-call> + Soll-Ausgabe.
+Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import math
 import pytest
 
-from gamebasic.errors import GBRuntimeError, TypeMismatchError
+from gamebasic.errors import GBRuntimeError
+
+
+def _lines(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
+
+
+def _p(run_gb, *exprs):
+    return _lines(run_gb("".join(f"PRINT {e}\n" for e in exprs)))
 
 
 # --- Math ----------------------------------------------------------
 
-def test_sin_cos_zero(call_builtin):
-    assert call_builtin("sin", [0.0]) == 0.0
-    assert call_builtin("cos", [0.0]) == 1.0
+def test_sin_cos_zero(run_gb):
+    assert _p(run_gb, "SIN(0.0)", "COS(0.0)") == ["0.0", "1.0"]
 
 
-def test_atan2_quadrants(call_builtin):
-    assert call_builtin("atan2", [1.0, 0.0]) == pytest.approx(math.pi / 2)
-    assert call_builtin("atan2", [0.0, 1.0]) == 0.0
+def test_atan2_quadrants(run_gb):
+    out = _p(run_gb, "ATAN2(1.0, 0.0)", "ATAN2(0.0, 1.0)")
+    assert float(out[0]) == pytest.approx(math.pi / 2)
+    assert out[1] == "0.0"
 
 
-def test_floor_ceil_round(call_builtin):
-    assert call_builtin("floor", [3.7]) == 3
-    assert call_builtin("ceil", [3.2]) == 4
-    assert call_builtin("round", [2.5]) == 2  # bankers' rounding (Python default)
+def test_floor_ceil_round(run_gb):
+    # round(2.5) == 2: bankers' rounding (wie Python)
+    assert _p(run_gb, "FLOOR(3.7)", "CEIL(3.2)", "ROUND(2.5)") == ["3", "4", "2"]
 
 
-def test_log_one_arg(call_builtin):
-    assert call_builtin("log", [math.e]) == pytest.approx(1.0)
+def test_log_one_arg(run_gb):
+    assert float(_p(run_gb, "LOG(2.718281828459045)")[0]) == pytest.approx(1.0)
 
 
-def test_log_with_base(call_builtin):
-    assert call_builtin("log", [8, 2]) == pytest.approx(3.0)
+def test_log_with_base(run_gb):
+    assert float(_p(run_gb, "LOG(8, 2)")[0]) == pytest.approx(3.0)
 
 
-def test_log_negative_raises(call_builtin):
+def test_log_negative_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="muss > 0"):
-        call_builtin("log", [-1])
+        run_gb("PRINT LOG(-1)\n")
 
 
-def test_min_max_variadic(call_builtin):
-    assert call_builtin("min", [5, 2, 9, 1, 7]) == 1
-    assert call_builtin("max", [5, 2, 9, 1, 7]) == 9
+def test_min_max_variadic(run_gb):
+    assert _p(run_gb, "MIN(5, 2, 9, 1, 7)", "MAX(5, 2, 9, 1, 7)") == ["1", "9"]
 
 
-def test_min_empty_raises(call_builtin):
-    with pytest.raises(GBRuntimeError, match=">= 1"):
-        call_builtin("min", [])
+def test_min_empty_raises(run_gb):
+    # gbrt-Wortlaut: "mind. 1 Argument" (TW sagte ">= 1").
+    with pytest.raises(GBRuntimeError, match="mind. 1"):
+        run_gb("PRINT MIN()\n")
 
 
-def test_clamp(call_builtin):
-    assert call_builtin("clamp", [-5, 0, 100]) == 0
-    assert call_builtin("clamp", [42, 0, 100]) == 42
-    assert call_builtin("clamp", [150, 0, 100]) == 100
+def test_clamp(run_gb):
+    assert _p(run_gb, "CLAMP(-5, 0, 100)", "CLAMP(42, 0, 100)",
+              "CLAMP(150, 0, 100)") == ["0", "42", "100"]
 
 
-def test_sign(call_builtin):
-    assert call_builtin("sign", [-3]) == -1
-    assert call_builtin("sign", [0]) == 0
-    assert call_builtin("sign", [7.5]) == 1
+def test_sign(run_gb):
+    assert _p(run_gb, "SIGN(-3)", "SIGN(0)", "SIGN(7.5)") == ["-1", "0", "1"]
 
 
-def test_sqr_negative_raises(call_builtin):
+def test_sqr_negative_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="negativer Zahl"):
-        call_builtin("sqr", [-1])
+        run_gb("PRINT SQR(-1)\n")
 
 
-def test_abs(call_builtin):
-    assert call_builtin("abs", [-7]) == 7
-    assert call_builtin("abs", [3.5]) == 3.5
+def test_abs(run_gb):
+    assert _p(run_gb, "ABS(-7)", "ABS(3.5)") == ["7", "3.5"]
 
 
-def test_int_truncates_to_floor(call_builtin):
-    assert call_builtin("int", [3.7]) == 3
-    assert call_builtin("int", [-1.5]) == -2  # math.floor
+def test_int_truncates_to_floor(run_gb):
+    assert _p(run_gb, "INT(3.7)", "INT(-1.5)") == ["3", "-2"]
 
 
-def test_rgb_packing(call_builtin):
-    assert call_builtin("rgb", [255, 128, 64]) == 0xFF8040
+def test_rgb_packing(run_gb):
+    assert _p(run_gb, "RGB(255, 128, 64)") == [str(0xFF8040)]
 
 
-def test_rgb_out_of_range_raises(call_builtin):
+def test_rgb_out_of_range_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="0..255"):
-        call_builtin("rgb", [300, 0, 0])
+        run_gb("PRINT RGB(300, 0, 0)\n")
 
 
 # --- Type-Errors ---------------------------------------------------
 
-def test_sin_string_raises(call_builtin):
-    with pytest.raises(TypeMismatchError, match="erwartet Zahl"):
-        call_builtin("sin", ["nope"])
+def test_sin_string_raises(run_gb):
+    with pytest.raises(GBRuntimeError, match="erwartet Zahl"):
+        run_gb('PRINT SIN("nope")\n')
 
 
-def test_sin_bool_raises_as_not_number(call_builtin):
-    # Bool ist semantisch keine Zahl in GB, auch wenn isinstance(True, int) True ist.
-    with pytest.raises(TypeMismatchError):
-        call_builtin("sin", [True])
+def test_sin_bool_raises_as_not_number(run_gb):
+    with pytest.raises(GBRuntimeError):
+        run_gb("PRINT SIN(TRUE)\n")
 
 
-def test_arity_error_message_includes_received_count(call_builtin):
+def test_arity_error_message_includes_received_count(run_gb):
     with pytest.raises(GBRuntimeError, match="erhalten 2"):
-        call_builtin("sin", [1.0, 2.0])
+        run_gb("PRINT SIN(1.0, 2.0)\n")
 
 
 # --- Strings -------------------------------------------------------
 
-def test_upper_lower_aliases(call_builtin):
-    assert call_builtin("upper$", ["hallo"]) == "HALLO"
-    assert call_builtin("upper", ["hallo"]) == "HALLO"
-    assert call_builtin("lower$", ["HALLO"]) == "hallo"
+def test_upper_lower_aliases(run_gb):
+    assert _p(run_gb, 'UPPER$("hallo")', 'UPPER("hallo")',
+              'LOWER$("HALLO")') == ["HALLO", "HALLO", "hallo"]
 
 
-def test_left_right_mid(call_builtin):
-    assert call_builtin("left$", ["GameBasic", 4]) == "Game"
-    assert call_builtin("right$", ["GameBasic", 5]) == "Basic"
-    assert call_builtin("mid$", ["GameBasic", 4, 5]) == "Basic"
-    assert call_builtin("mid$", ["GameBasic", 4]) == "Basic"  # ohne Anzahl: bis Ende
+def test_left_right_mid(run_gb):
+    assert _p(run_gb, 'LEFT$("GameBasic", 4)', 'RIGHT$("GameBasic", 5)',
+              'MID$("GameBasic", 4, 5)', 'MID$("GameBasic", 4)') == \
+        ["Game", "Basic", "Basic", "Basic"]
 
 
-def test_left_negative_clamped(call_builtin):
-    assert call_builtin("left$", ["abc", -3]) == ""
+def test_left_negative_clamped(run_gb):
+    assert _p(run_gb, '"[" + LEFT$("abc", -3) + "]"') == ["[]"]
 
 
-def test_instr_found_and_missing(call_builtin):
-    assert call_builtin("instr", ["hello world", "world"]) == 6
-    assert call_builtin("instr", ["hello", "xyz"]) == -1
+def test_instr_found_and_missing(run_gb):
+    assert _p(run_gb, 'INSTR("hello world", "world")', 'INSTR("hello", "xyz")') == ["6", "-1"]
 
 
-def test_replace(call_builtin):
-    assert call_builtin("replace$", ["a-b-c", "-", "_"]) == "a_b_c"
+def test_replace(run_gb):
+    assert _p(run_gb, 'REPLACE$("a-b-c", "-", "_")') == ["a_b_c"]
 
 
-def test_trim(call_builtin):
-    assert call_builtin("trim$", ["  hi  "]) == "hi"
+def test_trim(run_gb):
+    assert _p(run_gb, 'TRIM$("  hi  ")') == ["hi"]
 
 
-def test_padl_padr_with_default_filler(call_builtin):
-    assert call_builtin("padl$", ["x", 5]) == "    x"
-    assert call_builtin("padr$", ["x", 5]) == "x    "
+def test_padl_padr_with_default_filler(run_gb):
+    assert _p(run_gb, '"[" + PADL$("x", 5) + "]"',
+              '"[" + PADR$("x", 5) + "]"') == ["[    x]", "[x    ]"]
 
 
-def test_padl_with_custom_filler(call_builtin):
-    assert call_builtin("padl$", ["42", 6, "0"]) == "000042"
+def test_padl_with_custom_filler(run_gb):
+    assert _p(run_gb, 'PADL$("42", 6, "0")') == ["000042"]
 
 
-def test_repeat(call_builtin):
-    assert call_builtin("repeat$", ["ab", 3]) == "ababab"
+def test_repeat(run_gb):
+    assert _p(run_gb, 'REPEAT$("ab", 3)') == ["ababab"]
 
 
-def test_space(call_builtin):
-    assert call_builtin("space$", [4]) == "    "
+def test_space(run_gb):
+    assert _p(run_gb, '"[" + SPACE$(4) + "]"') == ["[    ]"]
 
 
-def test_hex(call_builtin):
-    assert call_builtin("hex$", [255]) == "FF"
-    assert call_builtin("hex$", [0xCAFE]) == "CAFE"
+def test_hex(run_gb):
+    assert _p(run_gb, "HEX$(255)", "HEX$(51966)") == ["FF", "CAFE"]
 
 
-def test_chr_asc_roundtrip(call_builtin):
-    assert call_builtin("chr$", [65]) == "A"
-    assert call_builtin("asc", ["A"]) == 65
-    assert call_builtin("asc", ["Abc"]) == 65  # nur erstes Zeichen
+def test_chr_asc_roundtrip(run_gb):
+    assert _p(run_gb, "CHR$(65)", 'ASC("A")', 'ASC("Abc")') == ["A", "65", "65"]
 
 
 # --- Conversions ---------------------------------------------------
 
-def test_str_int(call_builtin):
-    assert call_builtin("str$", [42]) == "42"
+def test_str_int(run_gb):
+    assert _p(run_gb, "STR$(42)") == ["42"]
 
 
-def test_str_float_keeps_decimal(call_builtin):
-    assert call_builtin("str$", [3.0]) == "3.0"
+def test_str_float_keeps_decimal(run_gb):
+    assert _p(run_gb, "STR$(3.0)") == ["3.0"]
 
 
-def test_str_bool(call_builtin):
-    assert call_builtin("str$", [True]) == "TRUE"
-    assert call_builtin("str$", [False]) == "FALSE"
+def test_str_bool(run_gb):
+    assert _p(run_gb, "STR$(TRUE)", "STR$(FALSE)") == ["TRUE", "FALSE"]
 
 
-def test_val(call_builtin):
-    assert call_builtin("val", ["42"]) == 42
-    assert call_builtin("val", ["3.14"]) == 3.14
-    assert call_builtin("val", ["xyz"]) == 0
+def test_val(run_gb):
+    assert _p(run_gb, 'VAL("42")', 'VAL("3.14")', 'VAL("xyz")') == ["42", "3.14", "0"]
 
 
 # --- Bitwise -------------------------------------------------------
-# Frueher gab es Built-in-Funktionen BITAND/BITOR/BITXOR/BITNOT/SHL/SHR.
-# Sie wurden durch native Operatoren ersetzt -- siehe tests/test_bitwise.py
-# fuer die Operator-Tests. Hier testen wir nur, dass die alten Built-ins
-# wirklich verschwunden sind (verhindert versehentliche Re-Registrierung).
+# Frueher gab es Built-in-Funktionen BITAND/BITOR/...; sie wurden durch native
+# Operatoren ersetzt (siehe tests/test_bitwise.py). Hier nur: die alten Namen
+# sind keine Built-ins mehr -> Aufruf wirft.
 
-def test_old_bitwise_builtins_are_gone(call_builtin):
-    import pytest
-    for name in ("bitand", "bitor", "bitxor", "bitnot", "shl", "shr"):
-        with pytest.raises(KeyError):
-            call_builtin(name, [0, 0])
+def test_old_bitwise_builtins_are_gone(run_gb):
+    # SHL/SHR sind heute Operator-Keywords -> Parse-Fehler; die uebrigen sind
+    # schlicht keine Built-ins mehr -> Laufzeitfehler. Beide leiten von
+    # GameBasicError ab.
+    from gamebasic.errors import GameBasicError
+    for name in ("BITAND", "BITOR", "BITXOR", "BITNOT", "SHL", "SHR"):
+        with pytest.raises(GameBasicError):
+            run_gb(f"PRINT {name}(0, 0)\n")
 
 
 # --- Time/Random ---------------------------------------------------
 
-def test_randomize_makes_rnd_deterministic(call_builtin):
-    call_builtin("randomize", [42])
-    seq1 = [call_builtin("rnd", [100]) for _ in range(5)]
-    call_builtin("randomize", [42])
-    seq2 = [call_builtin("rnd", [100]) for _ in range(5)]
-    assert seq1 == seq2
+def test_randomize_makes_rnd_deterministic(run_gb):
+    src = ("RANDOMIZE(42)\nDIM i AS INTEGER\n"
+           "FOR i = 0 TO 4\n    PRINT RND(100)\nNEXT\n"
+           "RANDOMIZE(42)\n"
+           "FOR i = 0 TO 4\n    PRINT RND(100)\nNEXT\n")
+    seq = _lines(run_gb(src))
+    assert seq[:5] == seq[5:10]
 
 
-def test_time_date_format(call_builtin):
-    t = call_builtin("time$", [])
-    d = call_builtin("date$", [])
-    # Form HH:MM:SS und YYYY-MM-DD
+def test_time_date_format(run_gb):
+    t = _p(run_gb, "TIME$()")[0]
+    d = _p(run_gb, "DATE$()")[0]
     assert len(t) == 8 and t[2] == ":" and t[5] == ":"
     assert len(d) == 10 and d[4] == "-" and d[7] == "-"
 
 
 # --- Collides ------------------------------------------------------
 
-def test_collides_overlapping(call_builtin):
-    # Zwei sich ueberlappende Rechtecke
-    assert call_builtin("collides", [0, 0, 10, 10, 5, 5, 10, 10]) is True
+def test_collides_overlapping(run_gb):
+    assert _p(run_gb, "COLLIDES(0, 0, 10, 10, 5, 5, 10, 10)") == ["TRUE"]
 
 
-def test_collides_disjoint(call_builtin):
-    assert call_builtin("collides", [0, 0, 10, 10, 100, 100, 10, 10]) is False
+def test_collides_disjoint(run_gb):
+    assert _p(run_gb, "COLLIDES(0, 0, 10, 10, 100, 100, 10, 10)") == ["FALSE"]
 
 
-def test_collides_touching_edges_dont_count(call_builtin):
-    # x1+w1 = x2 -> noch keine Ueberlappung
-    assert call_builtin("collides", [0, 0, 10, 10, 10, 0, 10, 10]) is False
+def test_collides_touching_edges_dont_count(run_gb):
+    assert _p(run_gb, "COLLIDES(0, 0, 10, 10, 10, 0, 10, 10)") == ["FALSE"]
