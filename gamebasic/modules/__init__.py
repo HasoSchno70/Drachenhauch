@@ -21,6 +21,24 @@ from typing import Set
 # Modul-Name akzeptiert werden.
 _MODULE_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
+# Statische Liste der Built-in-Modul-Namen (Stufe B). Maßgeblich ist gbrts
+# `rust/gb_runtime/src/preprocess.rs` MODULES -- gbrt implementiert die Module
+# nativ. preprocess.py braucht NUR die Namen, um `IMPORT "<modul>"` als Built-in
+# zu erkennen und zu einem Kommentar zu machen (kein Python-Impl-Laden mehr).
+# Bei neuen Modulen hier UND in preprocess.rs ergänzen (synchron halten).
+KNOWN_MODULES: frozenset = frozenset({
+    "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
+    "g3d", "gui", "html", "imgfx", "input", "json", "net", "particles",
+    "physics", "regex", "save", "scene", "serial", "sprite", "tile_collide",
+    "tiled", "tween", "ui", "usb", "vec2", "wifi",
+})
+
+
+def is_known_module(name: str) -> bool:
+    """True, wenn `name` ein Built-in-Modul ist (statische Liste, kein Import)."""
+    return name.lower() in KNOWN_MODULES
+
+
 _loaded: Set[str] = set()
 
 # Externe Typen, die Built-in-Module registrieren. Mappt den GB-Typ-Namen
@@ -157,18 +175,12 @@ def is_valid_module_name(name: str) -> bool:
 
 
 def discover_modules() -> list:
-    """Findet alle Built-in-Module (alle .py-Dateien hier ausser __init__.py)
-    und gibt deren Namen zurueck. Rein deklarativ - laedt nichts."""
-    from pathlib import Path
-    here = Path(__file__).parent
-    names = []
-    for p in here.glob("*.py"):
-        stem = p.stem
-        if stem == "__init__":
-            continue
-        if is_valid_module_name(stem):
-            names.append(stem)
-    return sorted(names)
+    """Namen aller Built-in-Module (statische Liste KNOWN_MODULES, Stufe B).
+
+    Früher per Dateisystem-Glob über modules/*.py -- die Impl-Dateien werden in
+    Phase 8 gelöscht, gbrt implementiert die Module nativ. Der Editor-File-
+    Browser nutzt das nur als deklarative Liste."""
+    return sorted(KNOWN_MODULES)
 
 
 def load_all_modules() -> list:

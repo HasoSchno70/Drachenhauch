@@ -47,20 +47,6 @@ def _rs_merge(main: Path):
     return out.returncode, out.stdout.replace("\r\n", "\n")
 
 
-def _tw_run(main: Path) -> str:
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.interpreter import Interpreter
-    from gamebasic.preprocess import process
-    src = main.read_text(encoding="utf-8")
-    prepped, _ = process(src, main.parent, file_label=main.name)
-    ast = Parser(Lexer(prepped).tokenize()).parse()
-    buf = io.StringIO()
-    with contextlib.redirect_stdout(buf):
-        Interpreter().run(ast)
-    return buf.getvalue().replace("\r\n", "\n")
-
-
 def _runsrc(main: Path):
     out = subprocess.run([str(_GBRT), "--runsrc", str(main)],
                          capture_output=True, text=True, encoding="utf-8")
@@ -135,7 +121,9 @@ def test_e2e_runsrc_with_imports(tmp_path):
                   'PRINT sq(9)\nPRINT VEC2_LENGTH(v)\n')
     rc, rs = _runsrc(main)
     assert rc == 0, f"runsrc Exit {rc}"
-    assert rs == _tw_run(main)
+    # Golden (Stufe B): sq(9)=81, VEC2_LENGTH(6,8)=10.0. (Frueher gegen den
+    # Tree-Walker verglichen -- der wird in Phase 8 entfernt.)
+    assert rs == "81\n10.0\n"
 
 
 def test_e2e_runsrc_module_alias(tmp_path):
@@ -148,4 +136,5 @@ def test_e2e_runsrc_module_alias(tmp_path):
                   'DIM p AS V\np = V_NEW(3.0, 4.0)\nPRINT V_LENGTH(p)\n')
     rc, rs = _runsrc(main)
     assert rc == 0, f"runsrc Exit {rc}"
-    assert rs == _tw_run(main)
+    # Golden (Stufe B): J_GET_INT([10,20,30],"1")=20, V_LENGTH(3,4)=5.0.
+    assert rs == "20\n5.0\n"

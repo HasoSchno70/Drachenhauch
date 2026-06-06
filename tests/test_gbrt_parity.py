@@ -51,6 +51,9 @@ def _tw(source: str, base: Path | None = None) -> str:
     from gamebasic.parser import Parser
     from gamebasic.interpreter import Interpreter
     from gamebasic.preprocess import process
+    # preprocess laedt Module nicht mehr (Stufe B) -> TW braucht sie explizit.
+    from gamebasic.modules import load_all_modules
+    load_all_modules()
     prepped, _ = process(source, base or _ROOT, file_label="<parity>")
     ast = Parser(Lexer(prepped).tokenize()).parse()
     buf = io.StringIO()

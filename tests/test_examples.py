@@ -56,6 +56,11 @@ def _run_example(rel: str) -> str:
     from gamebasic.parser import Parser
     from gamebasic.interpreter import Interpreter
     from gamebasic.preprocess import process
+    # preprocess laedt die Built-in-Module nicht mehr (Stufe B) -> der
+    # Tree-Walker braucht sie explizit. (TW + dieser Helper werden in Phase 8
+    # entfernt.)
+    from gamebasic.modules import load_all_modules
+    load_all_modules()
 
     path = _EXAMPLES / f"{rel}.gb"
     source = path.read_text(encoding="utf-8")
