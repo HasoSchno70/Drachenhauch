@@ -28,10 +28,11 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 
 - **Links — Formulare + Controls:** oben der **Formular-Navigator** (alle im
   Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
-  Startformular), darunter die Palette aller Widget-Arten (Button, Label,
-  Checkbox, Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar, Image,
-  Canvas, Panel). Palette-Eintrag anklicken → „scharf", dann auf die Fläche
-  klicken zum Platzieren.
+  Startformular), darunter die **grafische Palette** aller Widget-Arten (Button,
+  Label, Checkbox, Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar,
+  Image, Canvas, Panel) — jeder Eintrag mit Mini-Vorschau-Icon. Platzieren auf
+  zwei Wegen: **per Drag&Drop** auf die Fläche ziehen, **oder** Eintrag anklicken
+  („scharf") und auf die Fläche klicken.
 - **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
   verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
   Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein (Punkt-Raster sichtbar);

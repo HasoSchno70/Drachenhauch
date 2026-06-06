@@ -9,8 +9,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication   # noqa: E402
+from PySide6.QtGui import QDropEvent   # noqa: E402
+from PySide6.QtCore import Qt, QPointF, QMimeData   # noqa: E402
 
-from gamebasic.formdesigner_qt import FormDesigner   # noqa: E402
+from gamebasic.formdesigner_qt import (   # noqa: E402
+    FormDesigner, _palette_icon, _CONTROL_MIME, PAD, TITLE_H,
+)
 
 
 def _app():
@@ -170,6 +174,53 @@ def test_project_save_load_roundtrip(tmp_path):
     assert win2.active.doc.title == "Main"          # main-Formular aktiv
     assert {f.doc.title for f in win2.forms} == {"Main", "Settings"}
     win.close(); win2.close()
+
+
+# --------------------------------------------------------------- Palette + DnD
+def test_bigger_window(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    assert win.width() >= 1400 and win.height() >= 800
+    win.close()
+
+
+def test_palette_has_graphical_icons(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    assert win.palette.dragEnabled()
+    for i in range(win.palette.count()):
+        assert not win.palette.item(i).icon().isNull()
+    from gamebasic.formdesigner import PALETTE
+    for sp in PALETTE:
+        assert not _palette_icon(sp.kind).isNull()
+    win.close()
+
+
+def test_palette_mime_carries_kind(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    it = win.palette.item(0)
+    md = win.palette.mimeData([it])
+    assert md.hasFormat(_CONTROL_MIME)
+    assert bytes(md.data(_CONTROL_MIME)).decode() == it.data(Qt.ItemDataRole.UserRole)
+    win.close()
+
+
+def test_drop_places_control(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    n0 = len(cv.doc.controls)
+    md = QMimeData(); md.setData(_CONTROL_MIME, b"slider")
+    pos = QPointF(PAD + 40, PAD + TITLE_H + 40)        # -> Control (40, 40)
+    ev = QDropEvent(pos, Qt.DropAction.CopyAction, md,
+                    Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    cv.dropEvent(ev)
+    assert len(cv.doc.controls) == n0 + 1
+    c = cv.doc.controls[-1]
+    assert c.kind == "slider" and (c.x, c.y) == (40, 40)
+    assert win.history.can_undo and cv.selected is c   # undobar + selektiert
+    win.close()
 
 
 def test_export_gb_writes_file(tmp_path, monkeypatch):

@@ -16,13 +16,15 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QRect, QPoint, Signal
-from PySide6.QtGui import QAction, QColor, QPainter, QPen, QBrush, QKeySequence, QFont
+from PySide6.QtCore import Qt, QRect, QRectF, QPoint, QSize, QMimeData, Signal
+from PySide6.QtGui import (
+    QAction, QColor, QPainter, QPen, QBrush, QKeySequence, QFont, QPixmap, QIcon,
+)
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-    QComboBox,
+    QComboBox, QAbstractItemView,
 )
 
 from .formdesigner import (
@@ -68,6 +70,112 @@ def _col(i: int) -> QColor:
     return QColor((i >> 16) & 0xFF, (i >> 8) & 0xFF, i & 0xFF)
 
 
+# MIME-Typ fuer Drag&Drop eines Palette-Eintrags (Control-Art).
+_CONTROL_MIME = "application/x-gbcontrol-kind"
+
+_PAL_BG = QColor(34, 46, 58)
+_PAL_FG = QColor(222, 232, 240)
+_PAL_ACCENT = QColor(43, 196, 232)
+_PAL_BORDER = QColor(78, 100, 122)
+
+
+def _paint_glyph(qp: QPainter, kind: str, r: QRect):
+    """Mini-Vorschau eines Controls in `r` -- fuer Palette-Icon + Drag-Bild."""
+    qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    qp.setFont(QFont("Segoe UI", 7))
+    cy = r.center().y()
+    qp.setPen(QPen(_PAL_BORDER, 1))
+    if kind == "button":
+        qp.setBrush(QColor(52, 68, 86)); qp.drawRoundedRect(r, 4, 4)
+        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, "Button")
+    elif kind == "label":
+        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, "Label")
+    elif kind in ("checkbox", "radio"):
+        box = QRect(r.left() + 2, cy - 6, 12, 12)
+        qp.setBrush(QColor(24, 32, 42))
+        if kind == "checkbox":
+            qp.drawRect(box)
+            qp.setPen(QPen(_PAL_ACCENT, 2))
+            qp.drawLine(box.left() + 2, cy, box.center().x(), box.bottom() - 2)
+            qp.drawLine(box.center().x(), box.bottom() - 2, box.right() - 1, box.top() + 1)
+        else:
+            qp.drawEllipse(box)
+            qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
+            qp.drawEllipse(box.adjusted(3, 3, -3, -3))
+        qp.setPen(_PAL_FG)
+        qp.drawText(QRect(box.right() + 5, r.top(), r.right() - box.right() - 5, r.height()),
+                    Qt.AlignmentFlag.AlignVCenter, kind.capitalize())
+    elif kind == "slider":
+        qp.setPen(QPen(_PAL_BORDER, 2)); qp.drawLine(r.left() + 4, cy, r.right() - 4, cy)
+        qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawEllipse(QRect(r.center().x() - 5, cy - 5, 10, 10))
+    elif kind == "textinput":
+        qp.setBrush(QColor(20, 26, 34)); qp.drawRect(r)
+        qp.setPen(QPen(_PAL_ACCENT, 1)); qp.drawLine(r.left() + 5, r.top() + 4, r.left() + 5, r.bottom() - 4)
+        qp.setPen(QColor(150, 162, 176))
+        qp.drawText(r.adjusted(10, 0, 0, 0), Qt.AlignmentFlag.AlignVCenter, "Text…")
+    elif kind == "dropdown":
+        qp.setBrush(QColor(52, 68, 86)); qp.drawRect(r)
+        qp.setPen(_PAL_FG); qp.drawText(r.adjusted(5, 0, -16, 0), Qt.AlignmentFlag.AlignVCenter, "Auswahl")
+        qp.drawText(QRect(r.right() - 14, r.top(), 12, r.height()), Qt.AlignmentFlag.AlignCenter, "▾")
+    elif kind == "listbox":
+        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
+        qp.setPen(QColor(120, 134, 150))
+        for i in range(3):
+            yy = r.top() + 6 + i * 8
+            qp.drawLine(r.left() + 5, yy, r.right() - 6, yy)
+    elif kind == "progress":
+        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
+        qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawRect(QRect(r.left() + 1, r.top() + 1, int(r.width() * 0.6), r.height() - 2))
+    elif kind == "image":
+        qp.setBrush(QColor(40, 44, 52)); qp.drawRect(r)
+        qp.setPen(QPen(_PAL_ACCENT, 1))
+        qp.drawLine(r.left() + 3, r.bottom() - 4, r.center().x() - 2, cy)
+        qp.drawLine(r.center().x() - 2, cy, r.right() - 4, r.bottom() - 4)
+        qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawEllipse(QRect(r.right() - 14, r.top() + 4, 6, 6))
+    elif kind == "canvas":
+        qp.setBrush(QColor(14, 20, 28)); qp.drawRect(r)
+        qp.setPen(QPen(_PAL_BORDER, 1, Qt.PenStyle.DashLine))
+        qp.drawLine(r.topLeft(), r.bottomRight())
+    elif kind == "panel":
+        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
+        qp.fillRect(QRect(r.left(), r.top(), r.width(), 8), QColor(46, 60, 76))
+    else:
+        qp.setBrush(QColor(40, 52, 66)); qp.drawRect(r)
+        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, kind[:6])
+
+
+def _palette_icon(kind: str, w: int = 72, h: int = 40) -> QIcon:
+    pm = QPixmap(w, h)
+    pm.fill(QColor(0, 0, 0, 0))
+    qp = QPainter(pm)
+    _paint_glyph(qp, kind, QRect(3, 5, w - 6, h - 10))
+    qp.end()
+    return QIcon(pm)
+
+
+class _PaletteList(QListWidget):
+    """Palette mit grafischen Control-Icons; Eintraege sind per Drag&Drop auf die
+    Canvas ziehbar (MIME `_CONTROL_MIME` = Control-Art)."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setIconSize(QSize(72, 40))
+        self.setSpacing(3)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+    def mimeData(self, items):
+        md = QMimeData()
+        if items:
+            kind = items[0].data(Qt.ItemDataRole.UserRole)
+            md.setData(_CONTROL_MIME, str(kind).encode("utf-8"))
+            md.setText(str(kind))
+        return md
+
+
 class _Canvas(QWidget):
     """Zeichnet das Formular + Controls und behandelt Platzieren/Selektieren/Ziehen."""
     selection_changed = Signal(object)   # Control | None
@@ -91,6 +199,7 @@ class _Canvas(QWidget):
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
+        self.setAcceptDrops(True)                # Drag&Drop aus der Palette
 
     def set_doc(self, doc: FormDoc):
         self.doc = doc
@@ -225,14 +334,8 @@ class _Canvas(QWidget):
         p = ev.position().toPoint()
         cx, cy = self._to_ctrl(p)
         if self.place_kind:
-            pre = self.doc.to_dict()                         # Undo: Zustand vor dem Platzieren
-            c = self.doc.add(self.place_kind, max(self._snap(cx), 0), max(self._snap(cy), 0))
+            self._place_control(self.place_kind, cx, cy)
             self.place_kind = None
-            if self.commit_history:
-                self.commit_history(pre)
-            self._select(c)
-            self.doc_changed.emit()
-            self.update()
             return
         # Resize-Griff des bereits selektierten Controls?
         handle = self._handle_at(p)
@@ -289,6 +392,38 @@ class _Canvas(QWidget):
             self._select(hit)
             self.update()
             self.handler_requested.emit(hit)
+
+    def _place_control(self, kind: str, cx: int, cy: int):
+        """Ein neues Control an (cx, cy) platzieren (von Klick-Platzieren UND
+        Drag&Drop genutzt). Setzt einen Undo-Checkpoint + selektiert es."""
+        pre = self.doc.to_dict()
+        c = self.doc.add(kind, max(self._snap(cx), 0), max(self._snap(cy), 0))
+        if self.commit_history:
+            self.commit_history(pre)
+        self._select(c)
+        self.doc_changed.emit()
+        self.update()
+        return c
+
+    # -- Drag&Drop aus der Palette --
+    def dragEnterEvent(self, ev):
+        if ev.mimeData().hasFormat(_CONTROL_MIME):
+            ev.acceptProposedAction()
+
+    def dragMoveEvent(self, ev):
+        if ev.mimeData().hasFormat(_CONTROL_MIME):
+            ev.acceptProposedAction()
+
+    def dropEvent(self, ev):
+        md = ev.mimeData()
+        if not md.hasFormat(_CONTROL_MIME):
+            return
+        kind = bytes(md.data(_CONTROL_MIME)).decode("utf-8")
+        cx, cy = self._to_ctrl(ev.position().toPoint())
+        self.place_kind = None
+        self._place_control(kind, cx, cy)
+        ev.acceptProposedAction()
+        self.setFocus()
 
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
@@ -532,7 +667,7 @@ class FormDesigner(QMainWindow):
         self.project_path: Path | None = None
         self._suppress_row = False
         self.setWindowTitle("GameBasic Form-Designer")
-        self.resize(1100, 740)
+        self.resize(1500, 950)
 
         self.canvas = _Canvas()
         scroll = QScrollArea(); scroll.setWidget(self.canvas); scroll.setWidgetResizable(False)
@@ -543,13 +678,16 @@ class FormDesigner(QMainWindow):
         self.form_list.currentRowChanged.connect(self._on_form_row)
         self._dock("Formulare", self.form_list, Qt.DockWidgetArea.LeftDockWidgetArea)
 
-        # Palette
-        self.palette = QListWidget()
+        # Palette (grafische Icons + Drag&Drop)
+        self.palette = _PaletteList()
         for sp in PALETTE:
-            it = QListWidgetItem(sp.label); it.setData(Qt.ItemDataRole.UserRole, sp.kind)
+            it = QListWidgetItem(_palette_icon(sp.kind), sp.label)
+            it.setData(Qt.ItemDataRole.UserRole, sp.kind)
+            it.setToolTip(f"{sp.label} — ziehen oder klicken+platzieren")
             self.palette.addItem(it)
         self.palette.itemClicked.connect(self._arm_place)
-        self._dock("Controls", self.palette, Qt.DockWidgetArea.LeftDockWidgetArea)
+        pdock = self._dock("Controls", self.palette, Qt.DockWidgetArea.LeftDockWidgetArea)
+        pdock.setMinimumWidth(180)
 
         # Inspector
         self.inspector = _Inspector()
