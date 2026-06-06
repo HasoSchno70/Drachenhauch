@@ -75,7 +75,10 @@ fn shade(color: i64, delta: i32) -> i64 {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown, Progress }
+pub enum Kind {
+    Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
+    Progress, ListBox, Image, Canvas,
+}
 
 impl Kind {
     fn as_str(self) -> &'static str {
@@ -83,7 +86,8 @@ impl Kind {
             Kind::Button => "button", Kind::Label => "label", Kind::Checkbox => "checkbox",
             Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
             Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
-            Kind::Progress => "progress",
+            Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
+            Kind::Canvas => "canvas",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -91,7 +95,8 @@ impl Kind {
             "button" => Kind::Button, "label" => Kind::Label, "checkbox" => Kind::Checkbox,
             "slider" => Kind::Slider, "textinput" => Kind::TextInput, "panel" => Kind::Panel,
             "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
-            "progress" => Kind::Progress, _ => return None,
+            "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
+            "canvas" => Kind::Canvas, _ => return None,
         })
     }
 }
@@ -175,6 +180,10 @@ pub struct Gui {
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
+    // Benannte Styles (Stylesheet): Name -> {prop -> wert}. Props: bg/fg/border/
+    // accent (Farbe), font (Handle), font_size (px). Via GUI_APPLY_STYLE auf
+    // Widgets uebertragen (-> ov-Overrides + font/font_size).
+    styles: HashMap<String, HashMap<String, i64>>,
     // In diesem Frame ausgeloeste FUNCREF-Callbacks (Namen). Die VM leert die
     // Liste nach GUI_UPDATE und ruft sie auf -- so kann ein Callback nicht
     // mitten im State-Update die GUI re-entrant veraendern.
@@ -193,6 +202,7 @@ impl Gui {
             active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             was_mouse_down: false, prev_backspace: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
+            styles: HashMap::new(),
             pending: Vec::new(),
         }
     }
@@ -354,27 +364,60 @@ impl Gui {
         }
         Ok(-1)
     }
+    // ListBox: scrollbare, immer sichtbare Auswahlliste (teilt items/sel mit
+    // Dropdown; `value` haelt den vertikalen Scroll-Offset in Pixeln).
+    pub fn listbox(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, items: Vec<String>) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::ListBox, x, y, w, h);
+        wd.sel = -1; wd.items = items;
+        self.add_widget(win, "GUI_LISTBOX", wd)
+    }
+    pub fn image(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, tex: i64) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Image, x, y, w, h);
+        wd.sel = tex as i32;   // Textur-Handle (LOADIMAGE) im sel-Feld
+        self.add_widget(win, "GUI_IMAGE", wd)
+    }
+    pub fn set_image(&mut self, h: i64, tex: i64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_SET_IMAGE")?;
+        if w.kind != Kind::Image { return Err("GUI_SET_IMAGE: Widget ist kein image".into()); }
+        w.sel = tex as i32; Ok(())
+    }
+    pub fn canvas(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let wd = Self::blank(Kind::Canvas, x, y, w, h);
+        self.add_widget(win, "GUI_CANVAS", wd)
+    }
+    /// Absoluter Bildschirm-Bereich (Inhaltsflaeche) eines Canvas, in den der User
+    /// nach GUI_DRAW mit normalen Zeichenbefehlen malen kann (selbst clippen).
+    pub fn canvas_rect(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
+        let (wi, _) = Self::dec_widget(h);
+        let w = self.wdg(h, "GUI_CANVAS_*")?;
+        if w.kind != Kind::Canvas { return Err("GUI_CANVAS_*: Widget ist kein canvas".into()); }
+        let (ax, ay, ww, wh) = self.abs_rect(wi, w);
+        Ok((ax + 1, ay + 1, (ww - 2).max(0), (wh - 2).max(0)))   // Inhalt ohne Rahmen
+    }
+    // Item-Auswahl: Dropdown UND ListBox (beide nutzen items/sel).
+    fn item_widget(&self, h: i64, fn_: &str) -> Result<&Widget, String> {
+        let w = self.wdg(h, fn_)?;
+        if !matches!(w.kind, Kind::Dropdown | Kind::ListBox) { return Err(format!("{}: Widget ist kein dropdown/listbox", fn_)); }
+        Ok(w)
+    }
     pub fn dropdown_selected(&self, h: i64) -> Result<i64, String> {
-        let w = self.wdg(h, "GUI_DROPDOWN_SELECTED")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SELECTED: Widget ist kein dropdown".into()); }
-        Ok(w.sel as i64)
+        Ok(self.item_widget(h, "GUI_DROPDOWN_SELECTED")?.sel as i64)
     }
     pub fn dropdown_text(&self, h: i64) -> Result<String, String> {
-        let w = self.wdg(h, "GUI_DROPDOWN_TEXT")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_TEXT: Widget ist kein dropdown".into()); }
+        let w = self.item_widget(h, "GUI_DROPDOWN_TEXT")?;
         Ok(if w.sel >= 0 && (w.sel as usize) < w.items.len() { w.items[w.sel as usize].clone() } else { String::new() })
     }
     pub fn dropdown_set_selected(&mut self, h: i64, idx: i64) -> Result<(), String> {
+        self.item_widget(h, "GUI_DROPDOWN_SET_SELECTED")?;
         let w = self.wdg_mut(h, "GUI_DROPDOWN_SET_SELECTED")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_DROPDOWN_SET_SELECTED: Widget ist kein dropdown".into()); }
         w.sel = if idx >= 0 && (idx as usize) < w.items.len() { idx as i32 } else { -1 };
         Ok(())
     }
     pub fn set_dropdown_items(&mut self, h: i64, items: Vec<String>) -> Result<(), String> {
+        self.item_widget(h, "GUI_SET_DROPDOWN")?;
         let w = self.wdg_mut(h, "GUI_SET_DROPDOWN")?;
-        if w.kind != Kind::Dropdown { return Err("GUI_SET_DROPDOWN: Widget ist kein dropdown".into()); }
-        w.sel = if items.is_empty() { -1 } else { w.sel.min(items.len() as i32 - 1).max(0) };
-        w.items = items; Ok(())
+        w.sel = if items.is_empty() { -1 } else { w.sel.min(items.len() as i32 - 1) };
+        w.items = items; w.value = 0.0; Ok(())
     }
 
     // --- Tabelle ---
@@ -559,8 +602,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox, table, radio oder dropdown".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox, table, radio, dropdown oder listbox".into());
         }
         w.on_change = func; Ok(())
     }
@@ -589,6 +632,32 @@ impl Gui {
     pub fn set_font_size(&mut self, h: i64, sz: i64) -> Result<(), String> {
         if sz < 0 { return Err("GUI_SET_FONT_SIZE: Groesse muss >= 0 sein".into()); }
         self.wdg_mut(h, "GUI_SET_FONT_SIZE")?.font_size = sz as i32; Ok(())
+    }
+    /// Benannten Style anlegen/erweitern: `prop` in bg/fg/border/accent (Farbe),
+    /// font (Handle), font_size (px). Inkrementell aufrufbar.
+    pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {
+        if !matches!(prop.as_str(), "bg" | "fg" | "border" | "accent" | "font" | "font_size") {
+            return Err("GUI_STYLE_SET: prop muss bg/fg/border/accent/font/font_size sein".into());
+        }
+        if prop == "font_size" && value < 0 { return Err("GUI_STYLE_SET: font_size muss >= 0 sein".into()); }
+        self.styles.entry(name).or_default().insert(prop, value);
+        Ok(())
+    }
+    /// Einen benannten Style auf ein Widget anwenden (ueberschreibt dessen
+    /// Farb-Overrides/Font). Wirft, wenn der Style unbekannt ist.
+    pub fn apply_style(&mut self, h: i64, name: &str) -> Result<(), String> {
+        let props = self.styles.get(name)
+            .ok_or_else(|| format!("GUI_APPLY_STYLE: unbekannter Style '{}'", name))?
+            .clone();
+        let w = self.wdg_mut(h, "GUI_APPLY_STYLE")?;
+        for (k, v) in props {
+            match k.as_str() {
+                "font" => w.font = v,
+                "font_size" => w.font_size = v as i32,
+                _ => { w.ov.insert(k, v); }   // bg/fg/border/accent
+            }
+        }
+        Ok(())
     }
 
     // --- Laufzeit-Manipulation (Geometrie / Lifecycle / Hit-Test) ---
@@ -700,7 +769,8 @@ impl Gui {
         if let Some(f) = &w.on_change { o["on_change"] = serde_json::json!(f); }
         if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
         if !w.group.is_empty() { o["group"] = serde_json::json!(w.group); }
-        if !w.items.is_empty() { o["items"] = serde_json::json!(w.items); o["sel"] = serde_json::json!(w.sel); }
+        if !w.items.is_empty() { o["items"] = serde_json::json!(w.items); }
+        if w.sel != -1 { o["sel"] = serde_json::json!(w.sel); }   // Dropdown/ListBox-Index ODER Image-Textur
         if !w.enabled { o["enabled"] = serde_json::json!(false); }
         if w.font != -1 { o["font"] = serde_json::json!(w.font); }
         if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
@@ -889,13 +959,14 @@ impl Gui {
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
             for i in 0..n {
-                let (r, is_table, active) = {
+                let (r, kind, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind == Kind::Table, w.alive && w.visible && w.enabled)
+                    (self.abs_rect(top, w), w.kind, w.alive && w.visible && w.enabled)
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
-                    if is_table { self.table_hover(top, i, mx, my, g); }
+                    if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
+                    if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
                 }
             }
         }
@@ -968,6 +1039,15 @@ impl Gui {
         }
         self.was_mouse_down = is_down;
         self.frame_count += 1;
+    }
+
+    fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
+        let wheel = g.pop_mouse_wheel();
+        if wheel == 0 { return; }
+        let w = &mut self.windows[wi].widgets[i];
+        let max_scroll = (w.items.len() as i32 * DROPDOWN_ITEM_H - h).max(0);
+        let nv = (w.value as i32 - wheel as i32 * DROPDOWN_ITEM_H).clamp(0, max_scroll);
+        w.value = nv as f64;
     }
 
     fn drag_slider(&mut self, wi: usize, i: usize, mx: i32) {
@@ -1074,6 +1154,18 @@ impl Gui {
                 }
             }
             Kind::Dropdown => { self.focus_widget = None; self.open_dropdown = Some((win, i)); }
+            Kind::ListBox => {
+                self.focus_widget = None;
+                let ay = self.abs_rect(win, &self.windows[win].widgets[i]).1;
+                let scroll = self.windows[win].widgets[i].value as i32;
+                let row = (my - ay + scroll) / DROPDOWN_ITEM_H;
+                let n = self.windows[win].widgets[i].items.len() as i32;
+                if row >= 0 && row < n && self.windows[win].widgets[i].sel != row {
+                    self.windows[win].widgets[i].sel = row;
+                    let f = self.windows[win].widgets[i].on_change.clone();
+                    if let Some(f) = f { self.pending.push(f); }
+                }
+            }
             _ => self.focus_widget = None,
         }
     }
@@ -1199,6 +1291,35 @@ impl Gui {
                 let (axr, cy) = (ax + w - 14, ay + h / 2);   // ▼
                 g.line(axr, cy - 2, axr + 4, cy + 2, fg);
                 g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
+            }
+            Kind::ListBox => {
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+                let fg = self.txt_col(wdg);
+                let acc = self.acc_col(wdg);
+                let scroll = wdg.value as i32;
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
+                for (k, it) in wdg.items.iter().enumerate() {
+                    let iy = ay + k as i32 * DROPDOWN_ITEM_H - scroll;
+                    if iy + DROPDOWN_ITEM_H < ay || iy > ay + h { continue; }
+                    if k as i32 == wdg.sel {
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + DROPDOWN_ITEM_H - 1, shade(acc, -110));
+                    } else if wdg.enabled && mx >= ax && mx < ax + w && my >= iy && my < iy + DROPDOWN_ITEM_H {
+                        g.box_fill(ax + 1, iy, ax + w - 2, iy + DROPDOWN_ITEM_H - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 22));
+                    }
+                    self.wtext(g, wdg, ax + pad, iy + (DROPDOWN_ITEM_H - 14) / 2, it.clone(), fg);
+                }
+                g.pop_clip();
+            }
+            Kind::Image => {
+                if wdg.sel >= 0 { g.draw_image_rect(wdg.sel as i64, ax, ay, w, h); }
+            }
+            Kind::Canvas => {
+                // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
+                // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                    self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
             }
             Kind::Table => self.draw_table(g, wi, idx),
         }

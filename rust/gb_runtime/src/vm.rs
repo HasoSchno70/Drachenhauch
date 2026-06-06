@@ -2382,6 +2382,24 @@ impl<'p> Vm<'p> {
             "gui_dropdown_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_DROPDOWN_TEXT")?)?),
             "gui_dropdown_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_DROPDOWN_SET_SELECTED")?, gi(a,1,"GUI_DROPDOWN_SET_SELECTED")?)?; Value::Nil }
             "gui_set_dropdown" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_DROPDOWN")?, gstrs(a,1,"GUI_SET_DROPDOWN")?)?; Value::Nil }
+            // --- ListBox (teilt die item-Logik mit Dropdown) ---
+            "gui_listbox" => Value::Int(self.gui.listbox(gi(a,0,"GUI_LISTBOX")?, gi(a,1,"GUI_LISTBOX")? as i32,
+                gi(a,2,"GUI_LISTBOX")? as i32, gi(a,3,"GUI_LISTBOX")? as i32, gi(a,4,"GUI_LISTBOX")? as i32,
+                gstrs(a,5,"GUI_LISTBOX")?)?),
+            "gui_listbox_selected" => Value::Int(self.gui.dropdown_selected(gi(a,0,"GUI_LISTBOX_SELECTED")?)?),
+            "gui_listbox_text" => Value::str_rc(&self.gui.dropdown_text(gi(a,0,"GUI_LISTBOX_TEXT")?)?),
+            "gui_listbox_set_selected" => { self.gui.dropdown_set_selected(gi(a,0,"GUI_LISTBOX_SET_SELECTED")?, gi(a,1,"GUI_LISTBOX_SET_SELECTED")?)?; Value::Nil }
+            "gui_set_listbox" => { self.gui.set_dropdown_items(gi(a,0,"GUI_SET_LISTBOX")?, gstrs(a,1,"GUI_SET_LISTBOX")?)?; Value::Nil }
+            // --- Image + Canvas ---
+            "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
+                gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),
+            "gui_set_image" => { self.gui.set_image(gi(a,0,"GUI_SET_IMAGE")?, gi(a,1,"GUI_SET_IMAGE")?)?; Value::Nil }
+            "gui_canvas" => Value::Int(self.gui.canvas(gi(a,0,"GUI_CANVAS")?, gi(a,1,"GUI_CANVAS")? as i32,
+                gi(a,2,"GUI_CANVAS")? as i32, gi(a,3,"GUI_CANVAS")? as i32, gi(a,4,"GUI_CANVAS")? as i32)?),
+            "gui_canvas_x" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_X")?)?.0 as i64),
+            "gui_canvas_y" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_Y")?)?.1 as i64),
+            "gui_canvas_w" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_W")?)?.2 as i64),
+            "gui_canvas_h" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_H")?)?.3 as i64),
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
             "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
             "gui_checked" => Value::Bool(self.gui.checked(gi(a,0,"GUI_CHECKED")?)?),
@@ -2415,6 +2433,8 @@ impl<'p> Vm<'p> {
             "gui_enabled" => Value::Bool(self.gui.enabled(gi(a,0,"GUI_ENABLED")?)?),
             "gui_set_font" => { self.gui.set_font(gi(a,0,"GUI_SET_FONT")?, gi(a,1,"GUI_SET_FONT")?)?; Value::Nil }
             "gui_set_font_size" => { self.gui.set_font_size(gi(a,0,"GUI_SET_FONT_SIZE")?, gi(a,1,"GUI_SET_FONT_SIZE")?)?; Value::Nil }
+            "gui_style_set" => { self.gui.style_set(gs(a,0,"GUI_STYLE_SET")?, gs(a,1,"GUI_STYLE_SET")?, gi(a,2,"GUI_STYLE_SET")?)?; Value::Nil }
+            "gui_apply_style" => { self.gui.apply_style(gi(a,0,"GUI_APPLY_STYLE")?, &gs(a,1,"GUI_APPLY_STYLE")?)?; Value::Nil }
             "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),
             "gui_window_set_bounds" => { self.gui.window_set_bounds(gi(a,0,"GUI_WINDOW_SET_BOUNDS")?, gi(a,1,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,2,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,3,"GUI_WINDOW_SET_BOUNDS")? as i32, gi(a,4,"GUI_WINDOW_SET_BOUNDS")? as i32)?; Value::Nil }
             "gui_window_get_x" => Value::Int(self.gui.window_bounds(gi(a,0,"GUI_WINDOW_GET_X")?)?.0 as i64),

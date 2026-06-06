@@ -230,6 +230,60 @@ PRINT GUI_VALUE(bar)
 
 Nicht interaktiv; Fortschritt via `GUI_SET_VALUE` (0..1, geklemmt).
 
+## ListBox, Image, Canvas
+
+### ListBox — scrollbare Auswahlliste
+
+```basic
+DIM obst[3] AS STRING
+obst[0]="Apfel" : obst[1]="Birne" : obst[2]="Kirsche"
+DIM lb AS GUI_WIDGET
+lb = GUI_LISTBOX(win, 20, 40, 160, 100, obst)   ' Klick wählt, Mausrad scrollt
+```
+
+- `GUI_LISTBOX_SELECTED(lb)` → Index (oder `-1`), `GUI_LISTBOX_TEXT(lb)` → Text.
+- `GUI_LISTBOX_SET_SELECTED(lb, i)`, `GUI_SET_LISTBOX(lb, items)`.
+- `GUI_ON_CHANGE(lb, handler)` feuert bei Auswahl. (Teilt die Item-Logik mit
+  Dropdown — die `GUI_DROPDOWN_*`-Getter funktionieren auch auf ListBoxen.)
+
+### Image — Bild/Icon im UI
+
+```basic
+DIM logo AS INTEGER
+logo = LOADIMAGE("assets/logo.png")
+DIM iw AS GUI_WIDGET
+iw = GUI_IMAGE(win, 20, 20, 96, 96, logo)   ' skaliert ins Rechteck
+GUI_SET_IMAGE(iw, anderesBild)              ' Bild wechseln
+```
+
+Zeigt eine via `LOADIMAGE` geladene Textur, auf das Widget-Rechteck skaliert.
+
+### Canvas — freie Zeichenfläche („Mini-Screen" im Fenster)
+
+Ein Canvas reserviert einen Bereich, in den du mit den **normalen
+Zeichenbefehlen** (`PLOT`/`LINE`/`BOX`/`CIRCLE`/`DRAWIMAGE`/3D …) malst — ideal
+für ein eingebettetes Spiel, einen Diagramm- oder Vorschau-Bereich.
+
+```basic
+DIM cv AS GUI_WIDGET
+cv = GUI_CANVAS(win, 10, 30, 280, 180)
+
+' --- pro Frame ---
+GUI_UPDATE()
+GUI_DRAW()                       ' zeichnet das Fenster + den Canvas-Rahmen
+' Danach in den Canvas-Bereich malen (absolute Bildschirm-Koordinaten):
+DIM cx AS INTEGER : DIM cy AS INTEGER : DIM cw AS INTEGER : DIM ch AS INTEGER
+cx = GUI_CANVAS_X(cv) : cy = GUI_CANVAS_Y(cv)
+cw = GUI_CANVAS_W(cv) : ch = GUI_CANVAS_H(cv)
+BOX(cx, cy, cx + cw, cy + ch, &H101820)
+CIRCLE(cx + cw/2, cy + ch/2, 30, &H30FFA0)
+FLIP()
+```
+
+`GUI_CANVAS_X/Y/W/H` liefern den **absoluten** Inhaltsbereich (folgt dem Fenster
+beim Verschieben). Du zeichnest **nach** `GUI_DRAW` und clippst selbst auf den
+Bereich. (Für echte Fenster-Überlappung/Occlusion ein Render-Target nutzen.)
+
 ## Tabelle
 
 ```basic
@@ -376,6 +430,24 @@ titel = GUI_LABEL(win, "Einstellungen", 20, 16)
 GUI_SET_FONT(titel, fnt)
 GUI_SET_FONT_SIZE(titel, 28)
 ```
+
+### 6. Benannte Styles (Stylesheet)
+
+Einen Style einmal definieren und auf viele Widgets anwenden — spart das
+wiederholte `GUI_SET_COLOR`/`GUI_SET_FONT`:
+
+```basic
+GUI_STYLE_SET("primary", "bg", RGB(32, 80, 192))   ' props: bg/fg/border/accent
+GUI_STYLE_SET("primary", "fg", &HFFFFFF)            '        + font / font_size
+GUI_STYLE_SET("primary", "font_size", 18)
+
+GUI_APPLY_STYLE(okBtn, "primary")
+GUI_APPLY_STYLE(saveBtn, "primary")
+```
+
+`GUI_APPLY_STYLE` überträgt die Style-Properties als Per-Widget-Overrides
+(Farben) bzw. Font/Größe. Inkrementell erweiterbar; `GUI_RESET()` löscht auch
+die Styles.
 
 ## Callbacks: GUI_ON_CLICK
 

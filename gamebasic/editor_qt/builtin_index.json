@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 890,
+ "count": 904,
  "builtins": [
   {
    "name": "ABS",
@@ -5340,6 +5340,90 @@
    "name": "GUI_SET_FONT_SIZE",
    "kind": "core",
    "signature": "GUI_SET_FONT_SIZE(wdg, px)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_STYLE_SET",
+   "kind": "core",
+   "signature": "GUI_STYLE_SET(name$, prop$, wert)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_APPLY_STYLE",
+   "kind": "core",
+   "signature": "GUI_APPLY_STYLE(widget, name$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX",
+   "kind": "core",
+   "signature": "GUI_LISTBOX(win, x, y, w, h, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_SELECTED",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_SELECTED(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_TEXT",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_TEXT(lb)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LISTBOX_SET_SELECTED",
+   "kind": "core",
+   "signature": "GUI_LISTBOX_SET_SELECTED(lb, i)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_LISTBOX",
+   "kind": "core",
+   "signature": "GUI_SET_LISTBOX(lb, items)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_IMAGE",
+   "kind": "core",
+   "signature": "GUI_IMAGE(win, x, y, w, h, image)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_IMAGE",
+   "kind": "core",
+   "signature": "GUI_SET_IMAGE(widget, image)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS",
+   "kind": "core",
+   "signature": "GUI_CANVAS(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_X",
+   "kind": "core",
+   "signature": "GUI_CANVAS_X(canvas)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_Y",
+   "kind": "core",
+   "signature": "GUI_CANVAS_Y(canvas)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_W",
+   "kind": "core",
+   "signature": "GUI_CANVAS_W(canvas)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_CANVAS_H",
+   "kind": "core",
+   "signature": "GUI_CANVAS_H(canvas)",
    "module": "gui"
   }
  ]

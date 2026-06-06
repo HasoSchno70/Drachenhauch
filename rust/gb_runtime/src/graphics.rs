@@ -33,6 +33,7 @@ enum Cmd {
     Text(i32, i32, String, i32, Color, i64, f32),
     Texture(usize, i32, i32),
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
+    TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool), // tex, sx,sy,sw,sh, dx,dy, flip_h
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
@@ -1877,6 +1878,14 @@ impl Graphics {
         self.emit(Cmd::Texture(i, x, y));
         Ok(())
     }
+    /// Textur skaliert in ein Ziel-Rechteck (Modul `gui` Image-Widget).
+    /// Bounds-safe (ungueltiges Handle / idx<0 -> No-Op beim Rendern).
+    pub fn draw_image_rect(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32) {
+        if idx < 0 { return; }
+        let (x, y) = self.w2s(x, y);
+        let (w, h) = (self.ssize(w), self.ssize(h));
+        self.emit(Cmd::TextureRect(idx as usize, x, y, w, h));
+    }
     pub fn draw_image_part(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32, dx: i32, dy: i32) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEPART: ungueltiges IMAGE-Handle".into()); }
@@ -2730,6 +2739,13 @@ fn render_scene<D: RaylibDraw>(
                         let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                    }
+                    Cmd::TextureRect(i, dx, dy, dw, dh) => {
+                        if let Some(t) = textures.get(*i) {
+                            let src = Rectangle::new(0.0, 0.0, t.tex.width as f32, t.tex.height as f32);
+                            let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
+                            d.draw_texture_pro(&t.tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                        }
                     }
                     Cmd::TextureFlipped(i, x, y, fh, fv) => {
                         let t = &textures[*i].tex;
