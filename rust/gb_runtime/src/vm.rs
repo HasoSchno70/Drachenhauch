@@ -2407,6 +2407,18 @@ impl<'p> Vm<'p> {
             "gui_window_destroy" => { self.gui.window_destroy(gi(a,0,"GUI_WINDOW_DESTROY")?)?; Value::Nil }
             "gui_window_widget_count" => Value::Int(self.gui.window_widget_count(gi(a,0,"GUI_WINDOW_WIDGET_COUNT")?)?),
             "gui_window_widget" => Value::Int(self.gui.window_widget(gi(a,0,"GUI_WINDOW_WIDGET")?, gi(a,1,"GUI_WINDOW_WIDGET")?)?),
+            // --- Serialisierung (Layout als JSON) ---
+            "gui_to_json" => Value::str_rc(&self.gui.to_json(gi(a,0,"GUI_TO_JSON")?)?),
+            "gui_from_json" => Value::Int(self.gui.from_json(&gs(a,0,"GUI_FROM_JSON")?)?),
+            "gui_save" => {
+                let s = self.gui.to_json(gi(a,0,"GUI_SAVE")?)?;
+                std::fs::write(gs(a,1,"GUI_SAVE")?, s).map_err(|e| format!("GUI_SAVE: {}", e))?;
+                Value::Nil
+            }
+            "gui_load" => {
+                let s = std::fs::read_to_string(gs(a,0,"GUI_LOAD")?).map_err(|e| format!("GUI_LOAD: {}", e))?;
+                Value::Int(self.gui.from_json(&s)?)
+            }
             // --- Tabelle ---
             "gui_table" => {
                 let h = self.gui.table(gi(a,0,"GUI_TABLE")?, gi(a,1,"GUI_TABLE")? as i32, gi(a,2,"GUI_TABLE")? as i32,

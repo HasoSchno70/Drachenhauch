@@ -427,6 +427,38 @@ FOR i = 0 TO GUI_WINDOW_WIDGET_COUNT(win) - 1
 NEXT
 ```
 
+## Serialisierung (Layout als JSON)
+
+Ein Fenster lässt sich mitsamt seiner Widgets als JSON speichern und wieder
+laden — das **schließt den Kreis zwischen einem (WYSIWYG-)Editor und der
+Laufzeit**: der Editor schreibt JSON, die App lädt es (wie `ATLAS_LOAD`/
+`TILED_LOAD`). Erhalten bleiben Maße, Texte, Zustände (checked/value), Farb-
+Overrides, Fenster-Flags und Tabellen-Daten. Zerstörte Widgets werden nicht
+mitgespeichert.
+
+| Builtin | Wirkung |
+|---|---|
+| `GUI_SAVE(win, pfad$)` | Fenster als JSON-Datei speichern |
+| `GUI_LOAD(pfad$)` → GUI_WINDOW | JSON-Datei laden, neues Fenster, Handle zurück |
+| `GUI_TO_JSON(win)` → STRING | Fenster als JSON-String (für Netzwerk/Embedding/`json`-Modul) |
+| `GUI_FROM_JSON(json$)` → GUI_WINDOW | aus JSON-String ein Fenster bauen |
+
+```basic
+' Design speichern ...
+GUI_SAVE(win, "forms/login.json")
+
+' ... und in der App wieder aufbauen:
+DIM win AS GUI_WINDOW
+win = GUI_LOAD("forms/login.json")
+' Callbacks/Handler werden NICHT mitgeladen -> hier neu verdrahten
+' (FUNCREF = blanker Funktionsname):
+GUI_ON_CLICK(GUI_WINDOW_WIDGET(win, 0), on_login)
+```
+
+> Hinweis: `GUI_ON_CLICK`/`ON_CHANGE` speichern den Funktions**namen** mit; beim
+> Laden in einem anderen Programm muss die Funktion existieren. Für portable
+> Designs die Handler nach dem Laden per Enumeration (`GUI_WINDOW_WIDGET`) setzen.
+
 ## Vollständiges Beispiel
 
 Siehe [examples/45_gui.gb](../examples/45_gui.gb): Fenster mit Slider (live ins

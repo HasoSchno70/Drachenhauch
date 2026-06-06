@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 874,
+ "count": 878,
  "builtins": [
   {
    "name": "ABS",
@@ -5244,6 +5244,30 @@
    "name": "GUI_WINDOW_WIDGET",
    "kind": "core",
    "signature": "GUI_WINDOW_WIDGET(win, n)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SAVE",
+   "kind": "core",
+   "signature": "GUI_SAVE(win, pfad$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_LOAD",
+   "kind": "core",
+   "signature": "GUI_LOAD(pfad$)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TO_JSON",
+   "kind": "core",
+   "signature": "GUI_TO_JSON(win)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_FROM_JSON",
+   "kind": "core",
+   "signature": "GUI_FROM_JSON(json$)",
    "module": "gui"
   }
  ]

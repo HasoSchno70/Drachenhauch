@@ -76,6 +76,23 @@ fn shade(color: i64, delta: i32) -> i64 {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind { Button, Label, Checkbox, Slider, TextInput, Panel, Table }
 
+impl Kind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Kind::Button => "button", Kind::Label => "label", Kind::Checkbox => "checkbox",
+            Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
+            Kind::Table => "table",
+        }
+    }
+    fn from_str(s: &str) -> Option<Kind> {
+        Some(match s {
+            "button" => Kind::Button, "label" => Kind::Label, "checkbox" => Kind::Checkbox,
+            "slider" => Kind::Slider, "textinput" => Kind::TextInput, "panel" => Kind::Panel,
+            "table" => Kind::Table, _ => return None,
+        })
+    }
+}
+
 #[derive(Default)]
 pub struct TableState {
     headers: Vec<String>,
@@ -493,11 +510,7 @@ impl Gui {
         let w = self.wdg(h, "GUI_VISIBLE")?; Ok(w.alive && w.visible)
     }
     pub fn kind_name(&self, h: i64) -> Result<&'static str, String> {
-        Ok(match self.wdg(h, "GUI_KIND")?.kind {
-            Kind::Button => "button", Kind::Label => "label", Kind::Checkbox => "checkbox",
-            Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
-            Kind::Table => "table",
-        })
+        Ok(self.wdg(h, "GUI_KIND")?.kind.as_str())
     }
     pub fn focus(&mut self, h: i64) -> Result<(), String> {
         let (wi, i) = Self::dec_widget(h);
@@ -562,6 +575,99 @@ impl Gui {
             k += 1;
         }
         Ok(-1)
+    }
+
+    // --- Serialisierung (Layout als JSON; Editor<->Runtime-Kreis) ---
+    fn widget_json(w: &Widget) -> serde_json::Value {
+        let mut o = serde_json::json!({
+            "kind": w.kind.as_str(),
+            "x": w.x, "y": w.y, "w": w.w, "h": w.h,
+            "text": w.text, "color": w.color,
+            "value": w.value, "min": w.min, "max": w.max,
+            "checked": w.checked, "placeholder": w.placeholder, "visible": w.visible,
+        });
+        if let Some(f) = &w.on_click { o["on_click"] = serde_json::json!(f); }
+        if let Some(f) = &w.on_change { o["on_change"] = serde_json::json!(f); }
+        if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
+        if let Some(t) = &w.tbl {
+            o["table"] = serde_json::json!({
+                "headers": t.headers, "rows": t.rows,
+                "col_widths": t.col_widths, "selected": t.selected,
+            });
+        }
+        o
+    }
+    fn widget_from_json(wj: &serde_json::Value) -> Result<Widget, String> {
+        let ks = wj["kind"].as_str().ok_or("GUI_LOAD: Widget ohne 'kind'")?;
+        let kind = Kind::from_str(ks).ok_or_else(|| format!("GUI_LOAD: unbekannter Widget-Typ '{}'", ks))?;
+        let gi = |k: &str, d: i64| wj[k].as_i64().unwrap_or(d) as i32;
+        let mut w = Self::blank(kind, gi("x", 0), gi("y", 0), gi("w", 0), gi("h", 0));
+        w.text = wj["text"].as_str().unwrap_or("").to_string();
+        w.color = wj["color"].as_i64().unwrap_or(0xFFFFFF);
+        w.value = wj["value"].as_f64().unwrap_or(0.0);
+        w.min = wj["min"].as_f64().unwrap_or(0.0);
+        w.max = wj["max"].as_f64().unwrap_or(1.0);
+        w.checked = wj["checked"].as_bool().unwrap_or(false);
+        w.placeholder = wj["placeholder"].as_str().unwrap_or("").to_string();
+        w.visible = wj["visible"].as_bool().unwrap_or(true);
+        w.on_click = wj["on_click"].as_str().map(|s| s.to_string());
+        w.on_change = wj["on_change"].as_str().map(|s| s.to_string());
+        if let Some(ov) = wj["ov"].as_object() {
+            for (k, val) in ov { if let Some(c) = val.as_i64() { w.ov.insert(k.clone(), c); } }
+        }
+        if kind == Kind::Table {
+            let mut ts = TableState::default();
+            if let Some(tj) = wj.get("table") {
+                if let Some(hs) = tj["headers"].as_array() {
+                    ts.headers = hs.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+                }
+                if let Some(rs) = tj["rows"].as_array() {
+                    ts.rows = rs.iter().map(|row| row.as_array()
+                        .map(|r| r.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                        .unwrap_or_default()).collect();
+                }
+                if let Some(cw) = tj["col_widths"].as_array() {
+                    ts.col_widths = Some(cw.iter().filter_map(|x| x.as_i64().map(|n| n as i32)).collect());
+                }
+                ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
+            }
+            ts.hover_row = -1; ts.clicked_row = -1;
+            w.tbl = Some(Box::new(ts));
+        }
+        Ok(w)
+    }
+    /// Ein Fenster (inkl. lebender Widgets) als JSON-String (GUI_SAVE/TO_JSON).
+    pub fn to_json(&self, h: i64) -> Result<String, String> {
+        let win = self.windows.get(h as usize)
+            .filter(|w| w.alive)
+            .ok_or("GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle")?;
+        let widgets: Vec<serde_json::Value> =
+            win.widgets.iter().filter(|w| w.alive).map(Self::widget_json).collect();
+        let obj = serde_json::json!({
+            "title": win.title, "x": win.x, "y": win.y, "w": win.w, "h": win.h,
+            "movable": win.movable, "closable": win.closable, "visible": win.visible,
+            "widgets": widgets,
+        });
+        serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
+    }
+    /// Aus JSON ein neues Fenster bauen, Handle zurueck (GUI_LOAD/FROM_JSON).
+    pub fn from_json(&mut self, s: &str) -> Result<i64, String> {
+        let v: serde_json::Value = serde_json::from_str(s)
+            .map_err(|e| format!("GUI_LOAD: ungueltiges JSON: {}", e))?;
+        let gi = |k: &str, d: i64| v[k].as_i64().unwrap_or(d) as i32;
+        let title = v["title"].as_str().unwrap_or("").to_string();
+        let h = self.new_window(title, gi("x", 0), gi("y", 0), gi("w", 200), gi("h", 150));
+        let wi = h as usize;
+        self.windows[wi].movable = v["movable"].as_bool().unwrap_or(true);
+        self.windows[wi].closable = v["closable"].as_bool().unwrap_or(false);
+        self.windows[wi].visible = v["visible"].as_bool().unwrap_or(true);
+        if let Some(arr) = v["widgets"].as_array() {
+            for wj in arr {
+                let wdg = Self::widget_from_json(wj)?;
+                self.windows[wi].widgets.push(wdg);
+            }
+        }
+        Ok(h)
     }
 
     // --- Theme / Metriken ---
