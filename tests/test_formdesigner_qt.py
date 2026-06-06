@@ -9,8 +9,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication   # noqa: E402
-from PySide6.QtGui import QDropEvent   # noqa: E402
-from PySide6.QtCore import Qt, QPointF, QMimeData   # noqa: E402
+from PySide6.QtGui import QDropEvent, QKeyEvent   # noqa: E402
+from PySide6.QtCore import Qt, QPointF, QMimeData, QEvent   # noqa: E402
 
 from gamebasic.formdesigner_qt import (   # noqa: E402
     FormDesigner, _palette_icon, _CONTROL_MIME, PAD, TITLE_H,
@@ -220,6 +220,67 @@ def test_drop_places_control(tmp_path):
     c = cv.doc.controls[-1]
     assert c.kind == "slider" and (c.x, c.y) == (40, 40)
     assert win.history.can_undo and cv.selected is c   # undobar + selektiert
+    win.close()
+
+
+# --------------------------------------------------------------- Edit-UX
+def _press(cv, key, mod=Qt.KeyboardModifier.NoModifier):
+    cv.keyPressEvent(QKeyEvent(QEvent.Type.KeyPress, key, mod))
+
+
+def test_nudge_coalesces_to_one_undo(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b = cv.doc.add("button", 40, 40)
+    cv._select(b)
+    u0 = len(win.history._undo)
+    _press(cv, Qt.Key.Key_Right); _press(cv, Qt.Key.Key_Right); _press(cv, Qt.Key.Key_Down)
+    assert (b.x, b.y) == (42, 41)
+    assert len(win.history._undo) == u0 + 1          # ganzer Burst = 1 Schritt
+    _press(cv, Qt.Key.Key_Right, Qt.KeyboardModifier.ShiftModifier)
+    assert b.x == 50                                  # Shift = GRID-Schritt
+    win.undo()
+    assert (cv.doc.controls[0].x, cv.doc.controls[0].y) == (40, 40)
+    win.close()
+
+
+def test_duplicate_copy_paste(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv._select(cv.doc.add("button", 10, 10))
+    win.duplicate_selected()
+    assert len(cv.doc.controls) == 2 and cv.selected is cv.doc.controls[-1]
+    cv._select(cv.doc.controls[0])
+    win.copy_selected(); win.paste_clip()
+    assert len(cv.doc.controls) == 3
+    assert win.history.can_undo
+    win.close()
+
+
+def test_z_order_actions(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 0, 0)
+    b = cv.doc.add("button", 0, 0)           # ueberlappt, oben
+    cv._select(a)
+    win.raise_selected()
+    assert cv.doc.control_at(5, 5) is a
+    win.lower_selected()
+    assert cv.doc.control_at(5, 5) is b
+    win.close()
+
+
+def test_status_readout(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv._select(cv.doc.add("button", 12, 34))
+    assert "x=12" in win._status.text() and "100×28" in win._status.text()
+    cv._select(None)
+    assert win._status.text() == ""
     win.close()
 
 

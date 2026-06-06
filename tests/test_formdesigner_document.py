@@ -194,6 +194,35 @@ def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
     assert out.splitlines() == ["1"]
 
 
+# --------------------------------------------------------------- Edit-Ops
+def test_duplicate_offsets_and_unique_name():
+    doc = FormDoc()
+    b = doc.add("button", 10, 10)        # btn1
+    d = doc.duplicate(b)
+    assert d.kind == "button" and d.name == "btn2"
+    assert (d.x, d.y) == (10 + 8, 10 + 8)    # GRID-Versatz
+    assert len(doc.controls) == 2 and doc.controls[-1] is d
+
+
+def test_clone_from_dict():
+    doc = FormDoc()
+    b = doc.add("button", 5, 5); b.text = "Hi"; b.on_click = "go"
+    nc = doc.clone_from_dict(b.to_dict())
+    assert nc.text == "Hi" and nc.name != b.name
+    assert (nc.x, nc.y) == (13, 13)
+
+
+def test_z_order_front_back():
+    doc = FormDoc()
+    a = doc.add("button", 0, 0)           # 100x28
+    b = doc.add("button", 0, 0)           # ueberlappt, oben
+    assert doc.control_at(5, 5) is b
+    doc.to_front(a)
+    assert doc.control_at(5, 5) is a      # a jetzt oben
+    doc.to_back(a)
+    assert doc.control_at(5, 5) is b      # b wieder oben
+
+
 # --------------------------------------------------------------- FormProject
 def test_project_add_sets_first_as_main():
     p = FormProject()

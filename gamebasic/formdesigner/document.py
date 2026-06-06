@@ -313,6 +313,32 @@ class FormDoc:
         if c in self.controls:
             self.controls.remove(c)
 
+    def duplicate(self, c: Control, dx: int = GRID, dy: int = GRID) -> Control:
+        """Kopie von `c` (versetzt, frischer Name) ans Ende (= oben) anhaengen."""
+        nc = c.clone()
+        nc.x += dx; nc.y += dy
+        nc.name = self._unique_name(nc.kind)
+        self.controls.append(nc)
+        return nc
+
+    def clone_from_dict(self, d: dict, dx: int = GRID, dy: int = GRID) -> Control:
+        """Aus einem widget-Dict (Clipboard) ein neues Control bauen + anhaengen."""
+        nc = Control.from_dict(d)
+        nc.x += dx; nc.y += dy
+        nc.name = self._unique_name(nc.kind)
+        self.controls.append(nc)
+        return nc
+
+    def to_front(self, c: Control) -> None:
+        """Z-Reihenfolge: ans Ende (zuletzt gezeichnet = oben)."""
+        if c in self.controls:
+            self.controls.remove(c); self.controls.append(c)
+
+    def to_back(self, c: Control) -> None:
+        """Z-Reihenfolge: an den Anfang (zuerst gezeichnet = unten)."""
+        if c in self.controls:
+            self.controls.remove(c); self.controls.insert(0, c)
+
     def _unique_name(self, kind: str) -> str:
         base = {"textinput": "txt", "button": "btn", "checkbox": "chk", "radio": "rad",
                 "dropdown": "dd", "listbox": "lst", "slider": "sld", "label": "lbl",

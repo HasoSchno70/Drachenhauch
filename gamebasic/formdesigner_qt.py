@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-    QComboBox, QAbstractItemView,
+    QComboBox, QAbstractItemView, QMenu,
 )
 
 from .formdesigner import (
@@ -182,6 +182,7 @@ class _Canvas(QWidget):
     doc_changed = Signal()
     doc_replaced = Signal(object)        # FormDoc (komplett ersetzt: set_doc/Undo)
     handler_requested = Signal(object)   # Control (Doppelklick -> Code-Editor)
+    context_menu = Signal(object)        # QPoint (global) -- Rechtsklick auf Control
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -196,6 +197,7 @@ class _Canvas(QWidget):
         self._drag_off = QPoint(0, 0)
         self._resize_handle: str | None = None   # aktiver Resize-Griff beim Ziehen
         self._pending: dict | None = None        # Pre-Gesten-Snapshot (Drag/Resize)
+        self._nudge_active = False               # laufende Pfeiltasten-Verschiebung?
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -331,6 +333,7 @@ class _Canvas(QWidget):
 
     # -- Maus --
     def mousePressEvent(self, ev):
+        self._nudge_active = False
         p = ev.position().toPoint()
         cx, cy = self._to_ctrl(p)
         if self.place_kind:
@@ -425,6 +428,11 @@ class _Canvas(QWidget):
         ev.acceptProposedAction()
         self.setFocus()
 
+    _ARROWS = {
+        Qt.Key.Key_Left: (-1, 0), Qt.Key.Key_Right: (1, 0),
+        Qt.Key.Key_Up: (0, -1), Qt.Key.Key_Down: (0, 1),
+    }
+
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
             pre = self.doc.to_dict()                         # Undo: Zustand vor dem Loeschen
@@ -434,11 +442,37 @@ class _Canvas(QWidget):
             self._select(None)
             self.doc_changed.emit()
             self.update()
+        elif ev.key() in self._ARROWS and self.selected is not None:
+            dx, dy = self._ARROWS[ev.key()]
+            step = GRID if (ev.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
+            self._nudge(dx * step, dy * step)
         else:
             super().keyPressEvent(ev)
 
+    def _nudge(self, dx: int, dy: int):
+        """Selektiertes Control per Pfeiltaste verschieben. Eine Tastenfolge
+        (bis zum naechsten Klick/Selektionswechsel) = EIN Undo-Schritt."""
+        if not self._nudge_active:
+            if self.commit_history:
+                self.commit_history(self.doc.to_dict())      # Pre-Nudge-Snapshot
+            self._nudge_active = True
+        self.selected.x = max(0, self.selected.x + dx)
+        self.selected.y = max(0, self.selected.y + dy)
+        self.selection_changed.emit(self.selected)
+        self.doc_changed.emit()
+        self.update()
+
+    def contextMenuEvent(self, ev):
+        cx, cy = self._to_ctrl(ev.pos())
+        hit = self.doc.control_at(cx, cy)
+        if hit is not None:
+            self._select(hit)
+            self.update()
+            self.context_menu.emit(ev.globalPos())
+
     def _select(self, c: Control | None):
         self.selected = c
+        self._nudge_active = False           # neue Selektion beendet Nudge-Sitzung
         self.selection_changed.emit(c)
 
 
@@ -703,15 +737,21 @@ class FormDesigner(QMainWindow):
         self._insp_dirty = False
         self._code_baseline: dict | None = None
         self._code_dirty = False
+        self._clip: dict | None = None            # Clipboard fuer Kopieren/Einfuegen
 
         self.canvas.selection_changed.connect(self.inspector.set_control)
         self.canvas.selection_changed.connect(self._on_selection_changed)
+        self.canvas.selection_changed.connect(self._update_status)
         self.canvas.doc_changed.connect(self._mark_dirty)
         self.canvas.doc_replaced.connect(self.code_panel.set_doc)
         self.canvas.handler_requested.connect(self._open_handler)
+        self.canvas.context_menu.connect(self._show_context_menu)
         self.inspector.changed.connect(self._on_inspector_changed)
         self.code_panel.session_started.connect(self._on_code_session)
         self.code_panel.edited.connect(self._on_code_edited)
+
+        self._status = QLabel("")                 # Live-Anzeige der Selektion
+        self.statusBar().addPermanentWidget(self._status)
 
         self._build_menu()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
@@ -756,6 +796,23 @@ class FormDesigner(QMainWindow):
         redo2.setShortcut(QKeySequence("Ctrl+Shift+Z"))
         redo2.triggered.connect(self.redo)
         self.addAction(redo2)
+        e.addSeparator()
+        # Edit-Ops: Shortcut NUR wenn die Canvas fokussiert ist -- sonst wuerde
+        # z.B. Strg+C/V die Textbearbeitung im Code-/Inspector-Panel kapern.
+        def edit_act(label, key, fn):
+            a = QAction(label, self)
+            a.setShortcut(QKeySequence(key))
+            a.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+            a.triggered.connect(fn)
+            e.addAction(a); self.canvas.addAction(a)
+            return a
+        edit_act("Duplizieren", "Ctrl+D", self.duplicate_selected)
+        edit_act("Kopieren", "Ctrl+C", self.copy_selected)
+        edit_act("Einfuegen", "Ctrl+V", self.paste_clip)
+        act("Loeschen", None, self.delete_selected, menu=e)   # Del macht die Canvas
+        e.addSeparator()
+        edit_act("Nach vorne", "Ctrl+]", self.raise_selected)
+        edit_act("Nach hinten", "Ctrl+[", self.lower_selected)
 
         v = self.menuBar().addMenu("&Ansicht")
         self.act_snap = QAction("Am Raster ausrichten", self, checkable=True)
@@ -877,6 +934,69 @@ class FormDesigner(QMainWindow):
         self._set_active_doc(FormDoc.from_dict(nxt))
         self._refresh_history_actions()
         self._mark_dirty()
+
+    # -- Edit-Ops (Control-bezogen, je mit Undo-Checkpoint) --
+    def _control_op(self, mutate, select=None):
+        """`mutate(doc, c)` mit Undo-Checkpoint ausfuehren. `select`: None = nichts
+        aendern, 'result' = Rueckgabe selektieren, 'none' = abwaehlen."""
+        c = self.canvas.selected
+        if c is None:
+            return
+        pre = self.canvas.doc.to_dict()
+        res = mutate(self.canvas.doc, c)
+        self._commit_history(pre)
+        if select == "result":
+            self.canvas._select(res)
+        elif select == "none":
+            self.canvas._select(None)
+        self.canvas.update()
+        self._mark_dirty()
+
+    def duplicate_selected(self):
+        self._control_op(lambda d, c: d.duplicate(c), select="result")
+
+    def delete_selected(self):
+        self._control_op(lambda d, c: d.remove(c), select="none")
+
+    def raise_selected(self):
+        self._control_op(lambda d, c: d.to_front(c))
+
+    def lower_selected(self):
+        self._control_op(lambda d, c: d.to_back(c))
+
+    def copy_selected(self):
+        c = self.canvas.selected
+        if c is not None:
+            self._clip = c.to_dict()
+            self.statusBar().showMessage(f"Kopiert: {c.name}", 2000)
+
+    def paste_clip(self):
+        if not self._clip:
+            return
+        pre = self.canvas.doc.to_dict()
+        nc = self.canvas.doc.clone_from_dict(self._clip)
+        self._commit_history(pre)
+        self.canvas._select(nc)
+        self.canvas.update()
+        self._mark_dirty()
+
+    def _show_context_menu(self, gpos):
+        if self.canvas.selected is None:
+            return
+        menu = QMenu(self)
+        menu.addAction("Duplizieren", self.duplicate_selected)
+        menu.addAction("Kopieren", self.copy_selected)
+        menu.addAction("Loeschen", self.delete_selected)
+        menu.addSeparator()
+        menu.addAction("Nach vorne", self.raise_selected)
+        menu.addAction("Nach hinten", self.lower_selected)
+        menu.exec(gpos)
+
+    def _update_status(self, c):
+        if c is None:
+            self._status.setText("")
+        else:
+            self._status.setText(f"{c.name}    x={c.x} y={c.y}    {c.w}×{c.h}")
 
     # -- Code-Editor --
     def _open_handler(self, c: Control):

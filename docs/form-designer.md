@@ -35,10 +35,17 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   („scharf") und auf die Fläche klicken.
 - **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
   verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
-  Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein (Punkt-Raster sichtbar);
-  Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`). **Undo/Redo** über
-  `Strg+Z` / `Strg+Y` (auch `Strg+Umschalt+Z`) — eine Geste (Platzieren, Ziehen,
-  Resizen, Löschen, eine Inspector-Edit-Sitzung) = ein Schritt.
+  **Pfeiltasten** verschieben pixelweise (`Umschalt`+Pfeil = ein Rasterschritt),
+  **Rechtsklick** öffnet ein Kontextmenü (Duplizieren/Kopieren/Löschen/Nach
+  vorne/hinten). Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein
+  (Punkt-Raster sichtbar); Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`).
+  Die **Statusleiste** zeigt Position + Größe der Selektion live.
+- **Bearbeiten-Menü:** **Undo/Redo** (`Strg+Z` / `Strg+Y`, auch `Strg+Umschalt+Z`)
+  — eine Geste (Platzieren, Ziehen, Resizen, Pfeil-Burst, Inspector-/Code-Sitzung)
+  = ein Schritt. **Duplizieren** (`Strg+D`), **Kopieren/Einfügen** (`Strg+C` /
+  `Strg+V`), **Nach vorne/hinten** (`Strg+]` / `Strg+[`). Diese Kürzel wirken nur,
+  wenn die Design-Fläche fokussiert ist (kapern also nicht die Textbearbeitung im
+  Code-/Inspector-Panel).
 - **Rechts — Inspector:** Eigenschaften des gewählten Controls (Name, Text,
   Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert, aktiviert …).
 - **Unten — Code:** integrierter GameBasic-Editor (syntax-gehighlightet). Eine
