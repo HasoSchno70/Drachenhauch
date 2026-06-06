@@ -16,7 +16,9 @@ Alternativ `gb` (oder `gbrun.py`) **ohne Argument** → Auswahl-Dialog
 - **Mitte — Design-Fläche:** das Formular. Control anklicken = auswählen, ziehen =
   verschieben, an den 8 **Resize-Griffen** ziehen = Größe ändern, `Entf` = löschen.
   Bewegen/Platzieren/Resizen rasten am **8-px-Raster** ein (Punkt-Raster sichtbar);
-  Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`).
+  Toggle über `Ansicht → Am Raster ausrichten` (`Strg+G`). **Undo/Redo** über
+  `Strg+Z` / `Strg+Y` (auch `Strg+Umschalt+Z`) — eine Geste (Platzieren, Ziehen,
+  Resizen, Löschen, eine Inspector-Edit-Sitzung) = ein Schritt.
 - **Rechts — Inspector:** Eigenschaften des gewählten Controls (Name, Text,
   Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert, aktiviert …).
 
@@ -67,7 +69,13 @@ erzeugen dieselbe Datei; beides ist austauschbar.
 ## Status / geplant
 
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
-Löschen, Inspector (Kerneigenschaften + Events), Speichern/Laden, Ausführen (F5).
-Geplant: Undo/Redo, integrierter Code-Editor mit Doppelklick-auf-Control →
+Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), Speichern/Laden,
+Ausführen (F5). Geplant: integrierter Code-Editor mit Doppelklick-auf-Control →
 Handler anlegen/anspringen, Multi-Form-Projekte, GB-Code-Export (explizite
 `GUI_*`-Konstruktion statt `GUI_LOAD`).
+
+**Undo/Redo-Mechanik:** Snapshot-basiert — die Qt-freie `History` (in
+`formdesigner/document.py`) hält komplette `FormDoc`-Snapshots auf einem
+Undo-/Redo-Stack; die Canvas legt vor jeder Mutation einen Checkpoint an und
+fasst kontinuierliche Gesten (Drag/Resize) bzw. eine Inspector-Edit-Sitzung zu
+je einem Schritt zusammen.

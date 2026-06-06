@@ -81,6 +81,52 @@ def resize_rect(x: int, y: int, w: int, h: int, handle: str, nx: int, ny: int,
     return x, y, w, h
 
 
+# --- Undo/Redo-Historie -----------------------------------------------------
+# Snapshot-basiert + Qt-frei (headless testbar). Ein Snapshot ist das
+# `FormDoc.to_dict()`-Dict; die UI stellt mit `FormDoc.from_dict()` wieder her.
+class History:
+    """Zwei-Stack-Undo/Redo ueber komplette Doc-Snapshots.
+
+    Aufruf-Konvention: VOR einer Mutation den aktuellen Zustand via `push()`
+    sichern. `undo(current)`/`redo(current)` bekommen den jeweils aktuellen
+    Zustand (der auf den anderen Stack wandert) und liefern den wiederherzu-
+    stellenden Snapshot."""
+
+    def __init__(self, limit: int = 200):
+        self._undo: list[dict] = []
+        self._redo: list[dict] = []
+        self._limit = max(1, limit)
+
+    def clear(self) -> None:
+        self._undo.clear()
+        self._redo.clear()
+
+    def push(self, snapshot: dict) -> None:
+        """Pre-Mutations-Zustand ablegen; loescht den Redo-Stack."""
+        self._undo.append(snapshot)
+        if len(self._undo) > self._limit:
+            self._undo.pop(0)
+        self._redo.clear()
+
+    @property
+    def can_undo(self) -> bool:
+        return bool(self._undo)
+
+    @property
+    def can_redo(self) -> bool:
+        return bool(self._redo)
+
+    def undo(self, current: dict) -> dict:
+        prev = self._undo.pop()
+        self._redo.append(current)
+        return prev
+
+    def redo(self, current: dict) -> dict:
+        nxt = self._redo.pop()
+        self._undo.append(current)
+        return nxt
+
+
 # --- Control ----------------------------------------------------------------
 @dataclass
 class Control:

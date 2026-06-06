@@ -3,7 +3,8 @@ nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
 
 from gamebasic.formdesigner import (
-    Control, FormDoc, PALETTE, palette_spec, GRID, HANDLES, snap, resize_rect,
+    Control, FormDoc, History, PALETTE, palette_spec, GRID, HANDLES, snap,
+    resize_rect,
 )
 
 
@@ -95,6 +96,57 @@ def test_resize_respects_min_size():
 
 def test_handles_cover_eight_directions():
     assert set(HANDLES) == {"nw", "n", "ne", "e", "se", "s", "sw", "w"}
+
+
+# --------------------------------------------------------------- Undo/Redo
+def _snap_doc(*kinds):
+    d = FormDoc()
+    for k in kinds:
+        d.add(k, 0, 0)
+    return d
+
+
+def test_history_empty_state():
+    h = History()
+    assert not h.can_undo and not h.can_redo
+
+
+def test_history_undo_redo_roundtrip():
+    h = History()
+    s0 = FormDoc().to_dict()                       # leeres Formular
+    s1 = _snap_doc("button").to_dict()             # 1 Control
+    h.push(s0)                                      # Checkpoint vor dem Add
+    assert h.can_undo and not h.can_redo
+    # Undo: aktueller Zustand (s1) wandert auf Redo, s0 kommt zurueck.
+    restored = h.undo(s1)
+    assert restored == s0
+    assert not h.can_undo and h.can_redo
+    # Redo: s1 wieder her.
+    again = h.redo(s0)
+    assert again == s1
+    assert h.can_undo and not h.can_redo
+
+
+def test_history_push_clears_redo():
+    h = History()
+    h.push({"a": 1})
+    h.undo({"a": 2})                               # jetzt liegt was auf Redo
+    assert h.can_redo
+    h.push({"a": 3})                               # neue Mutation killt Redo
+    assert not h.can_redo
+
+
+def test_history_limit_drops_oldest():
+    h = History(limit=3)
+    for i in range(5):
+        h.push({"i": i})
+    # Nur die letzten 3 bleiben -> 3x Undo moeglich, danach leer.
+    cur = {"i": 99}
+    seen = []
+    while h.can_undo:
+        cur = h.undo(cur)
+        seen.append(cur["i"])
+    assert seen == [4, 3, 2]                        # 0 und 1 wurden verworfen
 
 
 # --------------------------------------------------------------- .gbform IO

@@ -25,7 +25,8 @@ from PySide6.QtWidgets import (
 )
 
 from .formdesigner import (
-    FormDoc, Control, PALETTE, palette_spec, GRID, HANDLES, snap, resize_rect,
+    FormDoc, Control, History, PALETTE, palette_spec, GRID, HANDLES, snap,
+    resize_rect,
 )
 
 try:
@@ -72,9 +73,13 @@ class _Canvas(QWidget):
         self.selected: Control | None = None
         self.place_kind: str | None = None      # aus der Palette "scharf geschaltet"
         self.snap_grid = True                    # Snap-to-Grid aktiv?
+        # commit_history(pre_snapshot): vom Fenster gesetzt, legt einen
+        # Undo-Checkpoint an. None = kein Undo (z.B. Standalone-Canvas).
+        self.commit_history = None
         self._drag = False
         self._drag_off = QPoint(0, 0)
         self._resize_handle: str | None = None   # aktiver Resize-Griff beim Ziehen
+        self._pending: dict | None = None        # Pre-Gesten-Snapshot (Drag/Resize)
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -210,8 +215,11 @@ class _Canvas(QWidget):
         p = ev.position().toPoint()
         cx, cy = self._to_ctrl(p)
         if self.place_kind:
+            pre = self.doc.to_dict()                         # Undo: Zustand vor dem Platzieren
             c = self.doc.add(self.place_kind, max(self._snap(cx), 0), max(self._snap(cy), 0))
             self.place_kind = None
+            if self.commit_history:
+                self.commit_history(pre)
             self._select(c)
             self.doc_changed.emit()
             self.update()
@@ -220,12 +228,14 @@ class _Canvas(QWidget):
         handle = self._handle_at(p)
         if handle is not None:
             self._resize_handle = handle
+            self._pending = self.doc.to_dict()               # Pre-Resize-Snapshot
             return
         hit = self.doc.control_at(cx, cy)
         self._select(hit)
         if hit is not None:
             self._drag = True
             self._drag_off = QPoint(cx - hit.x, cy - hit.y)
+            self._pending = self.doc.to_dict()               # Pre-Drag-Snapshot
         self.update()
 
     def mouseMoveEvent(self, ev):
@@ -252,12 +262,20 @@ class _Canvas(QWidget):
             self.setCursor(_HANDLE_CURSORS[handle] if handle else Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, _ev):
+        # Gesten-Ende: nur einen Undo-Checkpoint, falls sich wirklich was aenderte.
+        if self._pending is not None:
+            if self.commit_history and self._pending != self.doc.to_dict():
+                self.commit_history(self._pending)
+            self._pending = None
         self._drag = False
         self._resize_handle = None
 
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selected is not None:
+            pre = self.doc.to_dict()                         # Undo: Zustand vor dem Loeschen
             self.doc.remove(self.selected)
+            if self.commit_history:
+                self.commit_history(pre)
             self._select(None)
             self.doc_changed.emit()
             self.update()
@@ -395,13 +413,21 @@ class FormDesigner(QMainWindow):
         self.inspector = _Inspector()
         self._dock("Inspector", self.inspector, Qt.DockWidgetArea.RightDockWidgetArea)
 
+        # Undo/Redo
+        self.history = History()
+        self.canvas.commit_history = self._commit_history
+        self._insp_baseline: dict | None = None   # Pre-Edit-Snapshot der Selektion
+        self._insp_dirty = False                  # Edit-Session schon gesichert?
+
         self.canvas.selection_changed.connect(self.inspector.set_control)
+        self.canvas.selection_changed.connect(self._on_selection_changed)
         self.canvas.doc_changed.connect(self._mark_dirty)
-        self.inspector.changed.connect(self.canvas.update)
+        self.inspector.changed.connect(self._on_inspector_changed)
 
         self._build_menu()
         self.canvas.set_doc(FormDoc())
         self._update_title()
+        self._refresh_history_actions()
 
     def _dock(self, title, widget, area):
         d = QDockWidget(title, self)
@@ -411,17 +437,26 @@ class FormDesigner(QMainWindow):
 
     def _build_menu(self):
         m = self.menuBar().addMenu("&Datei")
-        def act(name, shortcut, fn):
+        def act(name, shortcut, fn, menu=m):
             a = QAction(name, self)
             if shortcut:
                 a.setShortcut(QKeySequence(shortcut))
-            a.triggered.connect(fn); m.addAction(a); return a
+            a.triggered.connect(fn); menu.addAction(a); return a
         act("Neu", "Ctrl+N", self.new_form)
         act("Oeffnen...", "Ctrl+O", self.open_form)
         act("Speichern", "Ctrl+S", self.save_form)
         act("Speichern unter...", "Ctrl+Shift+S", self.save_form_as)
         m.addSeparator()
         act("Ausfuehren (gbrt)", "F5", self.run_form)
+
+        e = self.menuBar().addMenu("&Bearbeiten")
+        self.act_undo = act("Rueckgaengig", "Ctrl+Z", self.undo, menu=e)
+        self.act_redo = act("Wiederholen", "Ctrl+Y", self.redo, menu=e)
+        # Zweites, uebliches Redo-Kuerzel (Strg+Umschalt+Z)
+        redo2 = QAction(self)
+        redo2.setShortcut(QKeySequence("Ctrl+Shift+Z"))
+        redo2.triggered.connect(self.redo)
+        self.addAction(redo2)
 
         v = self.menuBar().addMenu("&Ansicht")
         self.act_snap = QAction("Am Raster ausrichten", self, checkable=True)
@@ -434,6 +469,46 @@ class FormDesigner(QMainWindow):
         self.canvas.snap_grid = on
         self.canvas.update()
 
+    # -- Undo/Redo --
+    def _commit_history(self, snapshot: dict):
+        """Vom Canvas gerufen (Platzieren/Loeschen/Drag/Resize): Checkpoint setzen."""
+        self.history.push(snapshot)
+        self._refresh_history_actions()
+
+    def _on_selection_changed(self, _c):
+        """Neue Selektion -> Basis fuer eine evtl. folgende Inspector-Edit-Session."""
+        self._insp_baseline = self.canvas.doc.to_dict()
+        self._insp_dirty = False
+
+    def _on_inspector_changed(self):
+        """Inspector-Aenderung. Alle Edits einer Selektion = EIN Undo-Schritt."""
+        if not self._insp_dirty and self._insp_baseline is not None:
+            self.history.push(self._insp_baseline)
+            self._insp_dirty = True
+            self._refresh_history_actions()
+        self.canvas.update()
+        self._mark_dirty()
+
+    def _refresh_history_actions(self):
+        self.act_undo.setEnabled(self.history.can_undo)
+        self.act_redo.setEnabled(self.history.can_redo)
+
+    def undo(self):
+        if not self.history.can_undo:
+            return
+        prev = self.history.undo(self.canvas.doc.to_dict())
+        self.canvas.set_doc(FormDoc.from_dict(prev))
+        self._refresh_history_actions()
+        self._mark_dirty()
+
+    def redo(self):
+        if not self.history.can_redo:
+            return
+        nxt = self.history.redo(self.canvas.doc.to_dict())
+        self.canvas.set_doc(FormDoc.from_dict(nxt))
+        self._refresh_history_actions()
+        self._mark_dirty()
+
     # -- Aktionen --
     def _mark_dirty(self):
         self._update_title(dirty=True)
@@ -444,8 +519,10 @@ class FormDesigner(QMainWindow):
 
     def new_form(self):
         self.path = None
+        self.history.clear()
         self.canvas.set_doc(FormDoc())
         self._update_title()
+        self._refresh_history_actions()
 
     def open_form(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Formular oeffnen", str(self.project_root),
@@ -453,8 +530,10 @@ class FormDesigner(QMainWindow):
         if not fn:
             return
         try:
+            self.history.clear()
             self.canvas.set_doc(FormDoc.load(fn))
             self.path = Path(fn); self._update_title()
+            self._refresh_history_actions()
         except Exception as e:  # noqa: BLE001
             QMessageBox.critical(self, "Fehler", f"Konnte nicht laden:\n{e}")
 
