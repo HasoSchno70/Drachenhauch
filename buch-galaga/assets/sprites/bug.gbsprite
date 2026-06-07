@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "width": 16,
+  "height": 16,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAa0lEQVR4nGNgoCZ48+H/f4rVvMGjAJscE7EKcRnMSJLzoEBEgJERwwVvoJqjsraCMQyg89EtYmKgEDBiM5UUbzCRoxlZDxOMgRwwxNqO1+I3H/7/d4vaAsb4FDLhcx4hMbzgDZIGcsJoCAEAYGhYObv+Vn0AAAAASUVORK5CYII=",
+      "duration_ms": 125
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAdElEQVR4nGNgoCZ48+H/f4rVvMGjAJscE7EKcRnMSJLzoEBEgJERwwVvoJqjsraCMQyg89EtYmKgEDBiM5UUbzChC5CiGe6CNyTajmLQmw///+OKNreoLWCMSx6EGXGZjhwrILBsmjeG8/GCN0i2kuvFIQIAwpJbg3yKfewAAAAASUVORK5CYII=",
+      "duration_ms": 125
+    }
+  ]
+}

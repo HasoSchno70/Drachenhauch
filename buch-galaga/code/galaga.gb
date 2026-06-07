@@ -1,0 +1,356 @@
+' ============================================================================
+'  GALAGA -- Prototyp (Buch-Zielstand)
+'  Player unten, Gegner-Formation oben. Gegner fliegen mit Bezier-Schwuengen
+'  ein, sitzen in Formation (Sway) und stuerzen einzeln im Bogen herab und
+'  werfen Bomben ab, denen man ausweichen muss.
+' ============================================================================
+IMPORT "sprite"
+IMPORT "curves"
+
+CONST WIDTH    AS INTEGER = 224
+CONST HEIGHT   AS INTEGER = 288
+CONST COLS     AS INTEGER = 8
+CONST ROWS     AS INTEGER = 3
+CONST NBUGS    AS INTEGER = 24          ' COLS * ROWS
+CONST NBULLET  AS INTEGER = 3
+CONST NBOMB    AS INTEGER = 10
+CONST BG       AS INTEGER = &H070A14
+
+ENUM St = ENTER, FORM, DIVE
+
+' --- Ein Gegner: Position, Formations-Heimat, Zustand, Flugbahn ---
+CLASS Bug
+    DIM x AS FLOAT
+    DIM y AS FLOAT
+    DIM hx AS FLOAT                     ' Heimat in der Formation
+    DIM hy AS FLOAT
+    DIM row AS INTEGER
+    DIM alive AS BOOLEAN
+    DIM state AS INTEGER
+    DIM t AS FLOAT                      ' Bahn-Parameter 0..1
+    DIM ts AS FLOAT                     ' Bahn-Geschwindigkeit
+    DIM delay AS INTEGER               ' Start-Verzoegerung beim Einflug
+    DIM cx0 AS FLOAT : DIM cy0 AS FLOAT  ' Bezier-Kontrollpunkte
+    DIM cx1 AS FLOAT : DIM cy1 AS FLOAT
+    DIM cx2 AS FLOAT : DIM cy2 AS FLOAT
+    DIM cx3 AS FLOAT : DIM cy3 AS FLOAT
+    DIM dropAt AS FLOAT                 ' bei welchem t eine Bombe faellt (-1 = nie)
+    DIM dropped AS BOOLEAN
+
+    SUB Init(prow AS INTEGER, phx AS FLOAT, phy AS FLOAT, pdelay AS INTEGER)
+        Self.row = prow
+        Self.hx = phx
+        Self.hy = phy
+        Self.delay = pdelay
+        Self.alive = TRUE
+        Self.dropAt = -1.0
+        Self.dropped = FALSE
+        ' Einflug-Bahn von oben ausserhalb -> Heimat
+        DIM side AS INTEGER
+        side = IIF(prow MOD 2 = 0, -1, 1)
+        Self.SetPath(0.012, _
+            phx - side * 90.0, -30.0, _
+            WIDTH / 2.0 + side * 70.0, 70.0, _
+            phx + side * 40.0, 40.0, _
+            phx, phy)
+        Self.state = St.ENTER
+    END SUB
+
+    SUB SetPath(spd AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT, _
+                ccx AS FLOAT, ccy AS FLOAT, dx AS FLOAT, dy AS FLOAT)
+        Self.ts = spd : Self.t = 0.0 : Self.dropped = FALSE
+        Self.cx0 = ax : Self.cy0 = ay
+        Self.cx1 = bx : Self.cy1 = by
+        Self.cx2 = ccx : Self.cy2 = ccy
+        Self.cx3 = dx : Self.cy3 = dy
+        Self.x = ax : Self.y = ay
+    END SUB
+
+    ' Sturzangriff in Richtung Spielerspalte px starten
+    SUB Dive(px AS FLOAT)
+        DIM side AS INTEGER
+        side = IIF(Self.hx < WIDTH / 2.0, 1, -1)
+        Self.SetPath(0.010, _
+            Self.hx, Self.hy, _
+            Self.hx + side * 50.0, Self.hy + 80.0, _
+            px, HEIGHT - 70.0, _
+            px - side * 50.0, HEIGHT + 30.0)
+        Self.dropAt = 0.62
+        Self.state = St.DIVE
+    END SUB
+
+    ' Pro Frame fortbewegen. sway = Formations-Schwingung. Liefert TRUE, wenn
+    ' jetzt eine Bombe abgeworfen werden soll.
+    FUNCTION Update(sway AS FLOAT) AS BOOLEAN
+        IF Self.state = St.FORM THEN
+            Self.x = Self.hx + sway
+            Self.y = Self.hy
+            RETURN FALSE
+        END IF
+        IF Self.delay > 0 THEN
+            Self.delay = Self.delay - 1
+            RETURN FALSE
+        END IF
+        Self.t = Self.t + Self.ts
+        DIM bx AS FLOAT : DIM by AS FLOAT
+        (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), _
+            Self.cx0, Self.cy0, Self.cx1, Self.cy1, _
+            Self.cx2, Self.cy2, Self.cx3, Self.cy3)
+        Self.x = bx : Self.y = by
+        DIM drop AS BOOLEAN
+        drop = FALSE
+        IF Self.state = St.DIVE AND NOT Self.dropped AND Self.t >= Self.dropAt THEN
+            Self.dropped = TRUE
+            drop = TRUE
+        END IF
+        IF Self.t >= 1.0 THEN
+            IF Self.state = St.DIVE THEN
+                ' unten raus -> oben wieder einfliegen
+                Self.SetPath(0.014, _
+                    Self.hx, -30.0, Self.hx, 60.0, Self.hx, 30.0, Self.hx, Self.hy)
+                Self.state = St.ENTER
+            ELSE
+                Self.state = St.FORM      ' in Formation angekommen
+            END IF
+        END IF
+        RETURN drop
+    END FUNCTION
+END CLASS
+
+' ---------------------------------------------------------------------------
+SCREEN(WIDTH, HEIGHT, "Galaga", 2)
+
+' Bilder + Sprites (weisser Bug -> pro Reihe eingefaerbt)
+DIM shipImg AS IMAGE   : shipImg = LOADIMAGE("../assets/sprites/player.png")
+DIM bulletImg AS IMAGE : bulletImg = LOADIMAGE("../assets/sprites/bullet.png")
+DIM bugImg AS IMAGE    : bugImg = LOADIMAGE("../assets/sprites/bug.png")
+DIM bombImg AS IMAGE   : bombImg = LOADIMAGE("../assets/sprites/bomb.png")
+
+DIM rowTint[ROWS] AS INTEGER
+rowTint[0] = &HBE64F0   ' lila (Boss)
+rowTint[1] = &HE44040   ' rot
+rowTint[2] = &H46B4FF   ' blau
+
+' Ein animiertes Sprite pro Reihe (Flap synchron, Farbe pro Reihe)
+DIM rowSpr[ROWS] AS SPRITE
+DIM r AS INTEGER
+FOR r = 0 TO ROWS - 1
+    rowSpr[r] = SPRITE_NEW(bugImg, 16, 16)
+    SPRITE_ADD_ANIM(rowSpr[r], "fly", 0, 1, 4)
+    SPRITE_PLAY(rowSpr[r], "fly")
+    SPRITE_TINT(rowSpr[r], rowTint[r])
+NEXT r
+
+DIM bombSpr AS SPRITE
+bombSpr = SPRITE_NEW(bombImg, 6, 6)
+SPRITE_ADD_ANIM(bombSpr, "pulse", 0, 1, 8)
+SPRITE_PLAY(bombSpr, "pulse")
+
+' Spielobjekte
+DIM bugs[NBUGS] AS Bug
+DIM bx[NBULLET] AS FLOAT : DIM by[NBULLET] AS FLOAT : DIM bAlive[NBULLET] AS BOOLEAN
+DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT : DIM boAlive[NBOMB] AS BOOLEAN
+
+DIM playerX AS FLOAT
+DIM lives AS INTEGER
+DIM score AS INTEGER
+DIM frame AS INTEGER
+DIM prevShoot AS BOOLEAN
+DIM invuln AS INTEGER
+DIM diveTimer AS INTEGER
+
+SUB NewLevel()
+    DIM i AS INTEGER
+    DIM gapX AS FLOAT : gapX = 24.0
+    DIM startX AS FLOAT
+    startX = (WIDTH - (COLS - 1) * gapX) / 2.0 - 8.0
+    FOR i = 0 TO NBUGS - 1
+        DIM col AS INTEGER : col = i MOD COLS
+        DIM rw AS INTEGER  : rw = i \ COLS
+        DIM hx AS FLOAT : hx = startX + col * gapX
+        DIM hy AS FLOAT : hy = 40.0 + rw * 22.0
+        bugs[i] = NEW Bug(rw, hx, hy, i * 4)     ' gestaffelter Einflug
+    NEXT i
+    FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
+    FOR i = 0 TO NBOMB - 1 : boAlive[i] = FALSE : NEXT i
+    playerX = WIDTH / 2.0 - 8.0
+    diveTimer = 120
+END SUB
+
+SUB Shoot()
+    DIM i AS INTEGER
+    FOR i = 0 TO NBULLET - 1
+        IF NOT bAlive[i] THEN
+            bAlive[i] = TRUE : bx[i] = playerX + 5.0 : by[i] = HEIGHT - 34.0
+            RETURN
+        END IF
+    NEXT i
+END SUB
+
+SUB DropBomb(sx AS FLOAT, sy AS FLOAT)
+    DIM i AS INTEGER
+    FOR i = 0 TO NBOMB - 1
+        IF NOT boAlive[i] THEN
+            boAlive[i] = TRUE : bmx[i] = sx + 5.0 : bmy[i] = sy + 8.0
+            RETURN
+        END IF
+    NEXT i
+END SUB
+
+FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _
+                 cx AS FLOAT, cy AS FLOAT, cw AS FLOAT, ch AS FLOAT) AS BOOLEAN
+    RETURN ax < cx + cw AND ax + aw > cx AND ay < cy + ch AND ay + ah > cy
+END FUNCTION
+
+lives = 3 : score = 0 : frame = 0 : invuln = 0
+NewLevel()
+
+WHILE NOT QUITREQUESTED()
+    frame = frame + 1
+
+    ' ---- Eingabe ----
+    IF lives > 0 THEN
+        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 2.4
+        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 2.4
+        IF playerX < 2.0 THEN playerX = 2.0
+        IF playerX > WIDTH - 18.0 THEN playerX = WIDTH - 18.0
+        DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
+        IF firing AND NOT prevShoot THEN Shoot()
+        prevShoot = firing
+    ELSE
+        IF KEYPRESSED(KEY_SPACE) THEN
+            lives = 3 : score = 0 : NewLevel()
+        END IF
+    END IF
+    IF invuln > 0 THEN invuln = invuln - 1
+
+    ' ---- Sprites animieren ----
+    FOR r = 0 TO ROWS - 1 : SPRITE_UPDATE(rowSpr[r], 16) : NEXT r
+    SPRITE_UPDATE(bombSpr, 16)
+
+    ' ---- Sturzangriff ausloesen ----
+    DIM i AS INTEGER
+    IF lives > 0 THEN
+        diveTimer = diveTimer - 1
+        IF diveTimer <= 0 THEN
+            diveTimer = 70 + RANDINT(0, 60)
+            ' zufaelligen Gegner in Formation waehlen
+            DIM tries AS INTEGER
+            FOR tries = 0 TO 8
+                DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
+                IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
+                    bugs[pick].Dive(playerX)
+                    BREAK
+                END IF
+            NEXT tries
+        END IF
+    END IF
+
+    ' ---- Gegner updaten ----
+    DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
+    FOR i = 0 TO NBUGS - 1
+        IF bugs[i].alive THEN
+            IF bugs[i].Update(sway) THEN DropBomb(bugs[i].x, bugs[i].y)
+        END IF
+    NEXT i
+
+    ' ---- Bullets ----
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 5.0
+            IF by[i] < -8.0 THEN bAlive[i] = FALSE
+        END IF
+    NEXT i
+
+    ' ---- Bomben ----
+    FOR i = 0 TO NBOMB - 1
+        IF boAlive[i] THEN
+            bmy[i] = bmy[i] + 2.2
+            IF bmy[i] > HEIGHT THEN boAlive[i] = FALSE
+        END IF
+    NEXT i
+
+    ' ---- Kollisionen: Bullet vs Bug ----
+    DIM j AS INTEGER
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            FOR j = 0 TO NBUGS - 1
+                IF bugs[j].alive THEN
+                    IF Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
+                        bugs[j].alive = FALSE
+                        bAlive[i] = FALSE
+                        score = score + (ROWS - bugs[j].row) * 50
+                        BREAK
+                    END IF
+                END IF
+            NEXT j
+        END IF
+    NEXT i
+
+    ' ---- Kollisionen: Spieler vs Bombe / Sturz-Gegner ----
+    IF lives > 0 AND invuln = 0 THEN
+        DIM hit AS BOOLEAN : hit = FALSE
+        FOR i = 0 TO NBOMB - 1
+            IF boAlive[i] THEN
+                IF Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, HEIGHT - 30.0, 10, 12) THEN
+                    boAlive[i] = FALSE : hit = TRUE
+                END IF
+            END IF
+        NEXT i
+        FOR i = 0 TO NBUGS - 1
+            IF bugs[i].alive AND bugs[i].state = St.DIVE THEN
+                IF Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, HEIGHT - 30.0, 10, 12) THEN
+                    hit = TRUE
+                END IF
+            END IF
+        NEXT i
+        IF hit THEN
+            lives = lives - 1
+            invuln = 90
+        END IF
+    END IF
+
+    ' ---- Zeichnen ----
+    CLS(BG)
+    ' Sterne (einfaches Parallax)
+    FOR i = 0 TO 30
+        DIM sy AS INTEGER : sy = (i * 37 + frame * 2) MOD HEIGHT
+        PLOT((i * 53) MOD WIDTH, sy, &H30405A)
+    NEXT i
+
+    ' Gegner
+    FOR i = 0 TO NBUGS - 1
+        IF bugs[i].alive THEN
+            SPRITE_SET_POS(rowSpr[bugs[i].row], bugs[i].x, bugs[i].y)
+            SPRITE_DRAW(rowSpr[bugs[i].row])
+        END IF
+    NEXT i
+
+    ' Bomben
+    FOR i = 0 TO NBOMB - 1
+        IF boAlive[i] THEN
+            SPRITE_SET_POS(bombSpr, bmx[i], bmy[i])
+            SPRITE_DRAW(bombSpr)
+        END IF
+    NEXT i
+
+    ' Bullets
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN DRAWIMAGE(bulletImg, by[i] * 0 + bx[i], by[i])
+    NEXT i
+
+    ' Spieler (blinkt bei Unverwundbarkeit)
+    IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
+        DRAWIMAGE(shipImg, playerX, HEIGHT - 32.0)
+    END IF
+
+    ' HUD
+    TEXT(4, 4, f"SCORE {score}")
+    TEXT(WIDTH - 70, 4, f"SHIPS {lives}")
+    IF lives <= 0 THEN
+        TEXT(WIDTH / 2 - 36, HEIGHT / 2 - 4, "GAME OVER")
+        TEXT(WIDTH / 2 - 60, HEIGHT / 2 + 12, "[LEER] = neu starten")
+    END IF
+
+    FLIP()
+WEND

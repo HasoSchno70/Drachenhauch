@@ -1,0 +1,11 @@
+{
+  "version": 3,
+  "width": 16,
+  "height": 16,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAjUlEQVR4nGNgoCV48+H/fxDGp4YJn2ZsbKINAIGoIxCMDzAxUAiYsAliczKhsMBQ7Lbl//9fl9zAGMTGZQATKTZhk2PEpgBXwC2zgdAiAoyMGC54A9UMkoQpRNcM04jsEiZkRcgmz+txZMDGRlaDYoAImgQ+gKyWEZeiJw4OKAEmc+AA0RagGIJu0OADAAs8UN0h5a0jAAAAAElFTkSuQmCC",
+      "duration_ms": 125
+    }
+  ]
+}

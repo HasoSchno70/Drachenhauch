@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "width": 6,
+  "height": 6,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAO0lEQVR4nGNggIInDg7/QRjGhwv+uuQGxjBJRhBDbBIbw+8jb8CKWG1EGF7l/WJgQtGKDrAZhSKJLAgAGrInw+ihYKMAAAAASUVORK5CYII=",
+      "duration_ms": 125
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAYAAAAGCAYAAADgzO9IAAAAO0lEQVR4nGNggIKv04z+gzCMDxd88+E/GMMkWUCM71FnGfgeuYMVfYo6y/CVwfg/E4pWdIDNKBRJZEEAggMvoLCDsZ0AAAAASUVORK5CYII=",
+      "duration_ms": 125
+    }
+  ]
+}
