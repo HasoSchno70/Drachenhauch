@@ -153,6 +153,19 @@ DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 
 DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.66)
 DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.38)
 
+' --- Hintergrundmusik: dezente Arpeggio-Schleife (A-Moll), M schaltet um ---
+DIM musTones[8] AS INTEGER
+DIM musFreq[8] AS FLOAT
+musFreq[0] = 110.0  : musFreq[1] = 164.81 : musFreq[2] = 220.0  : musFreq[3] = 261.63
+musFreq[4] = 329.63 : musFreq[5] = 261.63 : musFreq[6] = 220.0  : musFreq[7] = 164.81
+DIM mi AS INTEGER
+FOR mi = 0 TO 7
+    musTones[mi] = AUDIO_TONE(musFreq[mi], 190, "triangle", 0.20)
+NEXT mi
+DIM musOn AS BOOLEAN : musOn = TRUE
+DIM musStep AS INTEGER : DIM musBeat AS INTEGER
+DIM prevM AS BOOLEAN
+
 ' --- Explosionen (ein gemeinsames Partikelsystem, additiver Glow) ---
 DIM explFx AS PARTICLE_SYSTEM
 explFx = PARTICLE_SYSTEM_NEW(0.0, 0.0)
@@ -341,11 +354,12 @@ END SUB
 ' Namens-Eingabe: hoch/runter wechselt den Buchstaben, links/rechts die Stelle,
 ' Leertaste bestaetigt. Alle mit Flankenerkennung (kein Dauer-Scrollen).
 SUB NameEntry()
-    DIM up AS BOOLEAN : up = KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W)
-    DIM dn AS BOOLEAN : dn = KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S)
-    DIM lf AS BOOLEAN : lf = KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A)
-    DIM rt AS BOOLEAN : rt = KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D)
-    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_SPACE)
+    DIM pad AS BOOLEAN : pad = (JOYSTICK_COUNT() > 0)
+    DIM up AS BOOLEAN : up = KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) OR (pad AND (JOYSTICK_AXIS(0, 1) < -0.35 OR JOYSTICK_BUTTON(0, 1)))
+    DIM dn AS BOOLEAN : dn = KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) OR (pad AND (JOYSTICK_AXIS(0, 1) > 0.35 OR JOYSTICK_BUTTON(0, 3)))
+    DIM lf AS BOOLEAN : lf = KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) OR (pad AND (JOYSTICK_AXIS(0, 0) < -0.35 OR JOYSTICK_BUTTON(0, 4)))
+    DIM rt AS BOOLEAN : rt = KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) OR (pad AND (JOYSTICK_AXIS(0, 0) > 0.35 OR JOYSTICK_BUTTON(0, 2)))
+    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_SPACE) OR (pad AND JOYSTICK_BUTTON(0, 7))
     IF up AND NOT peUp THEN entInit[entPos] = (entInit[entPos] + 1) MOD 26
     IF dn AND NOT peDn THEN entInit[entPos] = (entInit[entPos] + 25) MOD 26
     IF rt AND NOT peR AND entPos < 2 THEN entPos = entPos + 1
@@ -361,16 +375,19 @@ END SUB
 ' ===================== Spiel-Update (nur im Modus PLAY) =====================
 SUB UpdatePlay()
     DIM i AS INTEGER
-    ' Eingabe: bewegen + schiessen.
-    IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 3.0
-    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 3.0
-    IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.4
-    IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.4
+    ' Eingabe: bewegen + schiessen -- Tastatur ODER Gamepad (Stick/D-Pad + A).
+    ' `pad` kurzschliesst: ohne Controller werden die JOYSTICK_*-Aufrufe nie
+    ' ausgewertet (headless voellig inaktiv).
+    DIM pad AS BOOLEAN : pad = (JOYSTICK_COUNT() > 0)
+    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) OR (pad AND (JOYSTICK_AXIS(0, 0) < -0.35 OR JOYSTICK_BUTTON(0, 4))) THEN playerX = playerX - 3.0
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) OR (pad AND (JOYSTICK_AXIS(0, 0) >  0.35 OR JOYSTICK_BUTTON(0, 2))) THEN playerX = playerX + 3.0
+    IF KEYPRESSED(KEY_UP)    OR KEYPRESSED(KEY_W) OR (pad AND (JOYSTICK_AXIS(0, 1) < -0.35 OR JOYSTICK_BUTTON(0, 1))) THEN playerY = playerY - 2.4
+    IF KEYPRESSED(KEY_DOWN)  OR KEYPRESSED(KEY_S) OR (pad AND (JOYSTICK_AXIS(0, 1) >  0.35 OR JOYSTICK_BUTTON(0, 3))) THEN playerY = playerY + 2.4
     IF playerX < 2.0 THEN playerX = 2.0
     IF playerX > PW - 18.0 THEN playerX = PW - 18.0
     IF playerY < PY_HIGH THEN playerY = PY_HIGH
     IF playerY > PY_LOW THEN playerY = PY_LOW
-    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
+    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE) OR (pad AND JOYSTICK_BUTTON(0, 7))
     IF firing AND NOT prevShoot THEN Shoot()
     prevShoot = firing
 
@@ -480,6 +497,7 @@ END SUB
 SUB DrawTitle(cx AS INTEGER, sh AS INTEGER)
     TEXT(cx - 56, 64, "G A L A G A", &H8FE0FF)
     TEXT(cx - 104, 100, "Pfeile bewegen   -   Leer schiessen", &H8090A8)
+    TEXT(cx - 60, 118, "(auch Gamepad)", &H607088)
     TEXT(cx - 40, 146, "HIGHSCORES", &HFFE070)
     DIM k AS INTEGER
     FOR k = 0 TO NHS - 1
@@ -528,17 +546,20 @@ NEXT s
 WHILE NOT QUITREQUESTED()
     frame = frame + 1
 
-    ' ---- Retro-Look umschalten (F1, mit Flankenerkennung) ----
+    ' ---- Retro-Look (F1) und Musik (M) umschalten (Flankenerkennung) ----
     DIM f1 AS BOOLEAN : f1 = KEYPRESSED(KEY_F1)
     IF f1 AND NOT prevF1 AND crtShader >= 0 THEN crtOn = NOT crtOn
     prevF1 = f1
+    DIM mk AS BOOLEAN : mk = KEYPRESSED(KEY_M)
+    IF mk AND NOT prevM THEN musOn = NOT musOn
+    prevM = mk
 
     ' ---- Modus-Logik ----
     DIM i AS INTEGER
     IF mode = GS.PLAY THEN
         UpdatePlay()
     ELSEIF mode = GS.TITLE THEN
-        DIM sk AS BOOLEAN : sk = KEYPRESSED(KEY_SPACE)
+        DIM sk AS BOOLEAN : sk = KEYPRESSED(KEY_SPACE) OR (JOYSTICK_COUNT() > 0 AND (JOYSTICK_BUTTON(0, 7) OR JOYSTICK_BUTTON(0, 9)))
         IF sk AND NOT prevStart THEN StartGame()
         prevStart = sk
     ELSEIF mode = GS.ENTER THEN
@@ -557,6 +578,13 @@ WHILE NOT QUITREQUESTED()
     FOR p = 0 TO NPOP - 1
         IF popLife[p] > 0 THEN popY[p] = popY[p] - 0.6 : popLife[p] = popLife[p] - 1
     NEXT p
+    ' Hintergrundmusik: alle 22 Frames die naechste Note der Schleife.
+    IF musOn THEN
+        musBeat = musBeat + 1
+        IF musBeat >= 22 THEN
+            musBeat = 0 : PLAYSOUND(musTones[musStep]) : musStep = (musStep + 1) MOD 8
+        END IF
+    END IF
 
     ' ====================== ZEICHNEN ======================
     ' Vollbild: das Spielfeld per Kamera-Zoom auf die Bildschirmhoehe skalieren
@@ -648,8 +676,9 @@ WHILE NOT QUITREQUESTED()
             TEXT(cx - 28, INT(sh / 2) - 4, f"LEVEL {level}")
         END IF
     END IF
-    ' F1-Hinweis immer sichtbar (oben rechts im Spielfeld).
+    ' Umschalt-Hinweise immer sichtbar (oben rechts im Spielfeld).
     TEXT(INT(sw - offx) - 56, 6, IIF(crtOn, "F1:CRT*", "F1:CRT "), &H5C7088)
+    TEXT(INT(sw - offx) - 56, 22, IIF(musOn, "M:Mus*", "M:Mus "), &H5C7088)
 
     IF mode = GS.TITLE THEN
         DrawTitle(cx, sh)
