@@ -57,3 +57,12 @@ def test_qt_paragraph_separator_is_split():
 def test_empty_source_does_not_crash():
     html = build_listing_html("", color=True, line_numbers=True, title="leer.gb")
     assert "<pre" in html
+
+
+def test_font_size_is_applied():
+    small = build_listing_html("PRINT 1", color=True, line_numbers=False,
+                               title="t.gb", font_pt=8)
+    big = build_listing_html("PRINT 1", color=True, line_numbers=False,
+                             title="t.gb", font_pt=14)
+    assert "font-size:8pt" in small
+    assert "font-size:14pt" in big

@@ -59,6 +59,7 @@ Oder ohne Argumente:
 | `Strg+S` | Speichern |
 | `Strg+Shift+S` | Speichern unter |
 | `Strg+Alt+S` | **Alle Tabs speichern** (Skip für unbenannte) |
+| `Strg+Alt+P` | **Listing drucken** (Farbe oder Schwarz-Weiß) |
 | `Strg+W` | Tab schließen |
 | `Strg+Shift+T` | **Zuletzt geschlossenen Tab wiederherstellen** (LIFO-Stack) |
 
@@ -162,6 +163,17 @@ Sobald du einen Funktionsaufruf öffnest — `LINE(` — erscheint über der Cur
 ## Color-Picker (Swatch-Klick)
 
 Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) bekommen rechts daneben ein kleines Farbquadrat (Swatch). **Klick auf den Swatch** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
+
+## Listing drucken (`Strg+Alt+P`)
+
+Über *Datei → Listing drucken …*, `Strg+Alt+P` oder die Befehlspalette druckst du den Quelltext aus — sauber für Unterricht, Code-Reviews auf Papier oder den Ordner. Es öffnet sich zuerst ein kleiner Dialog:
+
+- **Darstellung:** *Farbe* (mit Syntax-Hervorhebung) oder *Schwarz-Weiß*. Die Druckfarben sind eine eigene, papierfreundliche Palette (dunkel auf weiß) — unabhängig vom Editor-Theme, damit ein dunkles Theme nicht hell-auf-weiß und unleserlich druckt. In Schwarz-Weiß bleiben Schlüsselwörter **fett** und Kommentare *kursiv*, die Struktur geht also nicht verloren.
+- **Zeilennummern:** ein-/ausblendbar.
+- **Schriftgröße:** Klein (8 pt) / Normal (10 pt) / Groß (12 pt).
+- **Umfang:** Hast du Text markiert, kannst du wählen zwischen *Nur markierter Bereich* und *Ganzes Listing* (ohne Markierung wird immer das ganze Listing gedruckt).
+
+Danach erscheint eine **Druckvorschau**, in der du Drucker und Seiten wählst. Jede Seite trägt oben den Dateinamen als Titel und unten eine Fußzeile mit Dateiname und *Seite X von Y*.
 
 ## Bookmarks
 

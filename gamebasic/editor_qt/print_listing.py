@@ -15,9 +15,11 @@ from __future__ import annotations
 
 from html import escape
 
-from PySide6.QtGui import QFont, QTextDocument
+from PySide6.QtCore import QRectF, QSizeF, Qt
+from PySide6.QtGui import QColor, QFont, QPainter, QTextDocument
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QDialogButtonBox, QLabel, QRadioButton, QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
+    QRadioButton, QVBoxLayout,
 )
 from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 
@@ -159,6 +161,17 @@ class PrintOptionsDialog(QDialog):
         self.cb_lines.setChecked(True)
         lay.addWidget(self.cb_lines)
 
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Schriftgrösse:"))
+        self.cmb_size = QComboBox()
+        # (Anzeigetext, Punktgrösse)
+        self._sizes = [("Klein", 8), ("Normal", 10), ("Gross", 12)]
+        for label, pt in self._sizes:
+            self.cmb_size.addItem(f"{label} ({pt} pt)", pt)
+        self.cmb_size.setCurrentIndex(1)   # Normal
+        size_row.addWidget(self.cmb_size, 1)
+        lay.addLayout(size_row)
+
         self.rb_all = None
         self.rb_sel = None
         if has_selection:
@@ -190,16 +203,83 @@ class PrintOptionsDialog(QDialog):
     def selection_only(self) -> bool:
         return self.rb_sel is not None and self.rb_sel.isChecked()
 
+    @property
+    def font_pt(self) -> int:
+        return int(self.cmb_size.currentData())
+
+
+def _render_with_footer(doc: QTextDocument, printer: QPrinter,
+                        footer_left: str) -> None:
+    """Druckt `doc` Seite fuer Seite und setzt unter jede Seite eine Fusszeile
+    (Dateiname links, ``Seite X von Y`` rechts).
+
+    Statt ``QTextDocument.print_`` (kann keine Kopf-/Fusszeilen) paginieren wir
+    selbst: Die Dokument-Seitenhoehe wird um die Fusszeile verkleinert, dann
+    zeichnen wir jede Seite per ``drawContents`` mit passendem Versatz.
+    """
+    painter = QPainter()
+    if not painter.begin(printer):
+        return
+    try:
+        # Das Dokument rechnet in 96-dpi-Logikpixeln; der Drucker hat eine viel
+        # hoehere Aufloesung. Wir skalieren den Painter (genau wie es
+        # QTextDocument.print_ intern tut) und arbeiten danach durchgehend in
+        # 96-dpi-Logikpixeln.
+        src_dpi = 96.0
+        sx = printer.logicalDpiX() / src_dpi
+        sy = printer.logicalDpiY() / src_dpi
+        painter.scale(sx, sy)
+
+        page = printer.pageRect(QPrinter.Unit.DevicePixel)
+        page_w = page.width() / sx
+        page_h = page.height() / sy
+
+        footer_font = QFont("Arial")
+        footer_font.setPixelSize(round(8 * src_dpi / 72.0))   # ~8 pt in Logikpixeln
+        painter.setFont(footer_font)
+        line_h = painter.fontMetrics().height()
+        gap = line_h * 0.6
+        footer_h = line_h + gap
+        body_h = max(1.0, page_h - footer_h)
+
+        doc.setPageSize(QSizeF(page_w, body_h))
+        pages = max(1, doc.pageCount())
+
+        for i in range(pages):
+            if i > 0:
+                printer.newPage()
+            # Seiteninhalt
+            painter.save()
+            painter.setClipRect(QRectF(0, 0, page_w, body_h))
+            painter.translate(0, -i * body_h)
+            doc.drawContents(painter, QRectF(0, i * body_h, page_w, body_h))
+            painter.restore()
+            # Fusszeile
+            painter.save()
+            painter.setFont(footer_font)
+            painter.setPen(QColor("#808080"))
+            frect = QRectF(0, body_h + gap * 0.5, page_w, line_h)
+            painter.drawText(frect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                             footer_left)
+            painter.drawText(frect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                             f"Seite {i + 1} von {pages}")
+            painter.restore()
+    finally:
+        painter.end()
+
 
 def print_code(parent, *, code: str, title: str, color: bool,
-               line_numbers: bool) -> None:
+               line_numbers: bool, font_pt: int = 10) -> None:
     """Oeffnet eine Druckvorschau fuer das gegebene Listing."""
-    html = build_listing_html(code, color=color, line_numbers=line_numbers, title=title)
+    html = build_listing_html(code, color=color, line_numbers=line_numbers,
+                              title=title, font_pt=font_pt)
     doc = QTextDocument()
-    mono = QFont("Consolas", 10)
+    mono = QFont("Consolas")
+    mono.setPointSize(font_pt)
     mono.setStyleHint(QFont.StyleHint.Monospace)   # saubere Ersatz-Schrift, falls Consolas fehlt
     mono.setFixedPitch(True)
     doc.setDefaultFont(mono)
+    doc.setDocumentMargin(0)
     doc.setHtml(html)
 
     printer = QPrinter(QPrinter.PrinterMode.HighResolution)
@@ -209,6 +289,7 @@ def print_code(parent, *, code: str, title: str, color: bool,
 
     preview = QPrintPreviewDialog(printer, parent)
     preview.setWindowTitle(f"Druckvorschau – {title}")
-    preview.paintRequested.connect(doc.print_)
+    preview.paintRequested.connect(
+        lambda pr: _render_with_footer(doc, pr, title))
     preview.resize(940, 720)
     preview.exec()

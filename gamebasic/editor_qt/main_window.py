@@ -930,7 +930,8 @@ class GameBasicEditor(QMainWindow):
             title = name
 
         print_code(self, code=code, title=title,
-                   color=dlg.color, line_numbers=dlg.line_numbers)
+                   color=dlg.color, line_numbers=dlg.line_numbers,
+                   font_pt=dlg.font_pt)
 
     def _write_tab(self, st: TabState, path: Path) -> bool:
         # Format-on-Save: wenn aktiviert, vor dem Schreiben den Buffer
