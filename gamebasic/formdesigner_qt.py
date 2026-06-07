@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-    QComboBox, QAbstractItemView, QMenu, QStackedWidget,
+    QComboBox, QAbstractItemView, QMenu, QStackedWidget, QToolBar,
 )
 
 from .formdesigner import (
@@ -152,6 +152,44 @@ def _palette_icon(kind: str, w: int = 72, h: int = 40) -> QIcon:
     pm.fill(QColor(0, 0, 0, 0))
     qp = QPainter(pm)
     _paint_glyph(qp, kind, QRect(3, 5, w - 6, h - 10))
+    qp.end()
+    return QIcon(pm)
+
+
+def _arrange_icon(kind: str, sz: int = 22) -> QIcon:
+    """Kleines Icon fuer einen Anordnen-Befehl (Balken + Hilfslinie)."""
+    pm = QPixmap(sz, sz); pm.fill(QColor(0, 0, 0, 0))
+    qp = QPainter(pm)
+    bar = QColor(150, 200, 220); guide = QColor(43, 196, 232)
+    qp.setPen(Qt.PenStyle.NoPen); qp.setBrush(bar)
+    def hbar(x, y, w): qp.drawRect(x, y, w, 3)
+    def vbar(x, y, h): qp.drawRect(x, y, 3, h)
+    def gv(x): qp.setPen(QPen(guide, 1)); qp.drawLine(x, 2, x, sz - 2); qp.setPen(Qt.PenStyle.NoPen)
+    def gh(y): qp.setPen(QPen(guide, 1)); qp.drawLine(2, y, sz - 2, y); qp.setPen(Qt.PenStyle.NoPen)
+    if kind == "left":
+        gv(3); hbar(4, 4, 14); hbar(4, 10, 8); hbar(4, 16, 12)
+    elif kind == "right":
+        gv(sz - 3); hbar(sz - 18, 4, 14); hbar(sz - 12, 10, 8); hbar(sz - 16, 16, 12)
+    elif kind == "center_h":
+        c = sz // 2; gv(c)
+        for w, y in ((14, 4), (8, 10), (12, 16)): hbar(c - w // 2, y, w)
+    elif kind == "top":
+        gh(3); vbar(4, 4, 14); vbar(10, 4, 8); vbar(16, 4, 12)
+    elif kind == "bottom":
+        gh(sz - 3); vbar(4, sz - 18, 14); vbar(10, sz - 12, 8); vbar(16, sz - 16, 12)
+    elif kind == "center_v":
+        c = sz // 2; gh(c)
+        for h, x in ((14, 4), (8, 10), (12, 16)): vbar(x, c - h // 2, h)
+    elif kind == "dist_h":
+        vbar(3, 5, 12); vbar(sz // 2 - 1, 5, 12); vbar(sz - 4, 5, 12)
+    elif kind == "dist_v":
+        hbar(5, 3, 12); hbar(5, sz // 2 - 1, 12); hbar(5, sz - 4, 12)
+    elif kind == "same_w":
+        qp.drawRect(4, 5, 14, 4); qp.drawRect(4, 13, 14, 4)
+    elif kind == "same_h":
+        qp.drawRect(5, 4, 4, 14); qp.drawRect(13, 4, 4, 14)
+    elif kind == "same_both":
+        qp.setBrush(Qt.BrushStyle.NoBrush); qp.setPen(QPen(bar, 2)); qp.drawRect(4, 4, 14, 14)
     qp.end()
     return QIcon(pm)
 
@@ -1176,6 +1214,7 @@ class FormDesigner(QMainWindow):
             lambda z: self._zoom_lbl.setText(f"{round(z * 100)} %"))
 
         self._build_menu()
+        self._build_arrange_toolbar()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
 
     def closeEvent(self, ev):
@@ -1261,6 +1300,34 @@ class FormDesigner(QMainWindow):
         ar.addSeparator()
         act("Horizontal verteilen", None, lambda: self._distribute("h"), menu=ar)
         act("Vertikal verteilen", None, lambda: self._distribute("v"), menu=ar)
+
+    def _build_arrange_toolbar(self):
+        """Anordnen-Befehle als grafische Toolbar (Xojo-Stil), schneller als das Menue."""
+        tb = QToolBar("Anordnen")
+        tb.setIconSize(QSize(22, 22))
+        self.addToolBar(tb)
+        self.arrange_bar = tb
+        groups = [
+            [("left", "Linksbuendig", lambda: self._align("left")),
+             ("center_h", "Zentriert horizontal", lambda: self._align("center_h")),
+             ("right", "Rechtsbuendig", lambda: self._align("right")),
+             ("top", "Oben buendig", lambda: self._align("top")),
+             ("center_v", "Zentriert vertikal", lambda: self._align("center_v")),
+             ("bottom", "Unten buendig", lambda: self._align("bottom"))],
+            [("same_w", "Gleiche Breite", lambda: self._same_size("w")),
+             ("same_h", "Gleiche Hoehe", lambda: self._same_size("h")),
+             ("same_both", "Gleiche Groesse", lambda: self._same_size("both"))],
+            [("dist_h", "Horizontal verteilen", lambda: self._distribute("h")),
+             ("dist_v", "Vertikal verteilen", lambda: self._distribute("v"))],
+        ]
+        for gi, group in enumerate(groups):
+            if gi:
+                tb.addSeparator()
+            for kind, tip, fn in group:
+                a = QAction(_arrange_icon(kind), tip, self)
+                a.setToolTip(tip)
+                a.triggered.connect(fn)
+                tb.addAction(a)
 
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on

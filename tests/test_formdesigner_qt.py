@@ -411,6 +411,23 @@ def test_arrange_same_size_uses_primary(tmp_path):
     win.close()
 
 
+def test_arrange_toolbar_icons_and_trigger(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    acts = win.arrange_bar.actions()
+    icon_acts = [a for a in acts if not a.isSeparator()]
+    assert len(icon_acts) == 11                  # 6 align + 3 same + 2 distribute
+    assert all(not a.icon().isNull() for a in icon_acts)
+    # Toolbar-Button feuert dieselbe Logik wie das Menue
+    cv = win.canvas
+    a = cv.doc.add("button", 10, 10)
+    b = cv.doc.add("button", 60, 70)
+    cv._select_many([a, b])
+    icon_acts[0].trigger()                       # Linksbuendig
+    assert a.x == b.x == 10
+    win.close()
+
+
 def test_arrange_needs_selection(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
