@@ -421,11 +421,37 @@ pub fn call_builtin(name: &str, args: &[Value]) -> Option<R> {
     Some(call_inner(name, args))
 }
 
+/// Aufruf-Signatur fuer Builtins, deren Argumentform man sonst raten muss --
+/// wird an die Aritaets-Fehlermeldung angehaengt ("... -- Aufruf: NAME(...)").
+/// Bewusst fokussiert auf Zufalls-/Kurven-/Game-Math; die Tabelle darf wachsen.
+/// Schluessel = der intern kleingeschriebene Builtin-Name (wie im match unten).
+fn builtin_signature(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "randint"            => "RANDINT(lo, hi)",
+        "randf"              => "RANDF(min, max)",
+        "choice"             => "CHOICE(array)",
+        "shuffle"           => "SHUFFLE(array)",
+        "curve_lerp"         => "CURVE_LERP(a, b, t)",
+        "curve_smoothstep"   => "CURVE_SMOOTHSTEP(edge0, edge1, x)",
+        "curve_smootherstep" => "CURVE_SMOOTHERSTEP(edge0, edge1, x)",
+        "curve_bezier"       => "CURVE_BEZIER(t, p0, p1, p2, p3)",
+        "curve_bezier2"      => "CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
+        "curve_catmull"      => "CURVE_CATMULL(t, p0, p1, p2, p3)",
+        "curve_catmull2"     => "CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
+        "curve_hermite"      => "CURVE_HERMITE(t, p0, p1, m0, m1)",
+        _ => return None,
+    })
+}
+
 fn call_inner(name: &str, a: &[Value]) -> R {
     macro_rules! arity {
         ($n:expr) => {
             if a.len() != $n {
-                return err(format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len()));
+                let base = format!("{}: erwartet {} Argument(e), erhalten {}", name.to_uppercase(), $n, a.len());
+                return err(match builtin_signature(name) {
+                    Some(sig) => format!("{} -- Aufruf: {}", base, sig),
+                    None => base,
+                });
             }
         };
     }
