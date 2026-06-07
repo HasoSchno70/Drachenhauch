@@ -3055,6 +3055,14 @@ impl<'p> Vm<'p> {
             "setfps" => { g!().set_target_fps(gi(a, 0, "SETFPS")?); Value::Nil }
             "setwindowtitle" => { g!().set_window_title(gs(a, 0, "SETWINDOWTITLE")?); Value::Nil }
             "savescreenshot" => { g!().save_screenshot(gs(a, 0, "SAVESCREENSHOT")?); Value::Nil }
+            // Natives OS-Fenster (das SCREEN-Fenster) steuern.
+            "window_resizable" => { g!().window_resizable(gb(a, 0)); Value::Nil }
+            "window_min_size" => { g!().window_min_size(gi(a,0,"WINDOW_MIN_SIZE")? as i32, gi(a,1,"WINDOW_MIN_SIZE")? as i32); Value::Nil }
+            "window_max_size" => { g!().window_max_size(gi(a,0,"WINDOW_MAX_SIZE")? as i32, gi(a,1,"WINDOW_MAX_SIZE")? as i32); Value::Nil }
+            "window_maximize" => { g!().window_maximize(); Value::Nil }
+            "window_minimize" => { g!().window_minimize(); Value::Nil }
+            "window_restore" => { g!().window_restore(); Value::Nil }
+            "window_resized" => Value::Bool(g!().window_resized()),
 
             // --- Shader / Post-Processing ---
             "shader_load" => {

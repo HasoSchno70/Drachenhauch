@@ -2207,8 +2207,11 @@ impl Graphics {
     pub fn pop_mouse_wheel(&self) -> i64 { self.rl.get_mouse_wheel_move() as i64 }
 
     /// Logische Fenster-Breite/Hoehe (wie an SCREEN uebergeben).
-    pub fn screen_width(&self) -> i64 { self.width as i64 }
-    pub fn screen_height(&self) -> i64 { self.height as i64 }
+    // Live-Fenstergroesse (logisch, d.h. ohne Scale) -- spiegelt eine evtl. vom
+    // Nutzer geaenderte Groesse bei resizeable Fenstern wider. Bei nicht-
+    // resizeable Fenstern == konfigurierte Groesse (kein Verhaltensbruch).
+    pub fn screen_width(&self) -> i64 { (self.rl.get_screen_width() / self.scale.max(1)) as i64 }
+    pub fn screen_height(&self) -> i64 { (self.rl.get_screen_height() / self.scale.max(1)) as i64 }
 
     // --- Game-Loop-Grundlagen ---
     pub fn delta(&self) -> f64 { self.rl.get_frame_time() as f64 }
@@ -2237,6 +2240,24 @@ impl Graphics {
     pub fn set_fullscreen(&mut self, fs: bool) {
         if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
     }
+
+    // --- Natives OS-Fenster (das SCREEN-Fenster selbst) ---
+    /// Das Programmfenster vom OS aus groessenveraenderbar machen (Default: aus).
+    pub fn window_resizable(&mut self, f: bool) {
+        let ws = WindowState::default().set_window_resizable(true);
+        if f { self.rl.set_window_state(ws); } else { self.rl.clear_window_state(ws); }
+    }
+    pub fn window_min_size(&mut self, w: i32, h: i32) {
+        self.rl.set_window_min_size(w * self.scale.max(1), h * self.scale.max(1));
+    }
+    pub fn window_max_size(&mut self, w: i32, h: i32) {
+        self.rl.set_window_max_size(w * self.scale.max(1), h * self.scale.max(1));
+    }
+    pub fn window_maximize(&mut self) { self.rl.maximize_window(); }
+    pub fn window_minimize(&mut self) { self.rl.minimize_window(); }
+    pub fn window_restore(&mut self) { self.rl.restore_window(); }
+    /// Wurde das Fenster seit dem letzten FLIP vom Nutzer/OS in der Groesse geaendert?
+    pub fn window_resized(&self) -> bool { self.rl.is_window_resized() }
 
     /// Clip-Rechteck auf den Stack legen (Scissor). Koordinaten werden wie bei
     /// allen Draws kamera-transformiert; der Screen-Scale kommt beim Replay.

@@ -3495,6 +3495,48 @@
    "module": "interpreter"
   },
   {
+   "name": "WINDOW_RESIZABLE",
+   "kind": "graphics",
+   "signature": "WINDOW_RESIZABLE(flag: BOOLEAN)",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_MIN_SIZE",
+   "kind": "graphics",
+   "signature": "WINDOW_MIN_SIZE(w, h)",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_MAX_SIZE",
+   "kind": "graphics",
+   "signature": "WINDOW_MAX_SIZE(w, h)",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_MAXIMIZE",
+   "kind": "graphics",
+   "signature": "WINDOW_MAXIMIZE()",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_MINIMIZE",
+   "kind": "graphics",
+   "signature": "WINDOW_MINIMIZE()",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_RESTORE",
+   "kind": "graphics",
+   "signature": "WINDOW_RESTORE()",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_RESIZED",
+   "kind": "graphics",
+   "signature": "WINDOW_RESIZED() AS BOOLEAN",
+   "module": "gbrt"
+  },
+  {
    "name": "SGN",
    "kind": "core",
    "signature": "SGN(zahl) AS INTEGER",
