@@ -56,3 +56,56 @@ text = "hallo"
 PRINT text
 '''
     assert run_gb(src) == "hallo\n"
+
+
+def test_var_vs_enum_is_clear_compile_error(run_gb):
+    """Variable kollidiert case-insensitiv mit einem ENUM -> klare Meldung beim
+    Kompilieren statt kryptischem "CONST kann nicht ueberschrieben werden"."""
+    src = '''
+DIM mode AS INTEGER
+ENUM Mode = A, B
+mode = 1
+'''
+    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*mode.*ENUM"):
+        run_gb(src)
+
+
+def test_enum_then_var_is_clear_compile_error(run_gb):
+    """Gleiche Kollision in umgekehrter Reihenfolge (ENUM zuerst)."""
+    src = '''
+ENUM Mode = A, B
+DIM mode AS INTEGER
+'''
+    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*mode"):
+        run_gb(src)
+
+
+def test_var_vs_const_is_clear_compile_error(run_gb):
+    src = '''
+CONST X AS INTEGER = 5
+DIM x AS INTEGER
+'''
+    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*'x'.*CONST"):
+        run_gb(src)
+
+
+def test_dim_and_for_same_name_still_allowed(run_gb):
+    """Variable-vs-Variable (DIM + FOR derselbe Name) ist erlaubt -- kein Fehler."""
+    src = '''
+DIM i AS INTEGER
+FOR i = 1 TO 3
+    PRINT i
+NEXT i
+'''
+    assert run_gb(src) == "1\n2\n3\n"
+
+
+def test_enum_with_distinct_variable_name_works(run_gb):
+    """Ein ENUM und eine ANDERS benannte Variable funktionieren normal."""
+    src = '''
+ENUM St = X, Y
+DIM s AS INTEGER
+s = St.Y
+PRINT s
+'''
+    assert run_gb(src) == "1\n"

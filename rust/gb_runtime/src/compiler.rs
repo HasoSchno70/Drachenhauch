@@ -328,8 +328,34 @@ impl Compiler {
     }
 
     /// Pre-Pass: Top-Level-Globals (Skalar-DIM/CONST) -> Slot-Index.
+    ///
+    /// Erkennt dabei Namens-Kollisionen: ein als CONST/ENUM belegter Name darf
+    /// NICHT zugleich eine Variable sein (und umgekehrt). Weil GameBasic
+    /// Gross-/Kleinschreibung ignoriert, kollidiert `DIM mode` mit `ENUM Mode` --
+    /// sonst gibt es erst zur Laufzeit das kryptische "CONST kann nicht
+    /// ueberschrieben werden". Variable-vs-Variable (z.B. `DIM i` + `FOR i`) ist
+    /// erlaubt und wird NICHT gemeldet.
     fn collect_globals(&mut self, stmts: &[Node]) -> CR {
+        let mut var_like: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut const_like: HashMap<String, &'static str> = HashMap::new();
         for s in stmts {
+            let line = if let Node::Stmt { line, .. } = s { *line } else { 0 };
+            // Hilfsausdruck: ein Variablen-Name darf nicht schon CONST/ENUM sein.
+            for (name, kind) in collect_global_names(unwrap_stmt(s)) {
+                if kind == "var" {
+                    if let Some(ck) = const_like.get(&name) {
+                        self.err_line = line;
+                        return Err(name_clash_msg(&name, "eine Variable", ck));
+                    }
+                    var_like.insert(name);
+                } else {
+                    if var_like.contains(&name) {
+                        self.err_line = line;
+                        return Err(name_clash_msg(&name, kind, "eine Variable"));
+                    }
+                    const_like.insert(name, kind);
+                }
+            }
             match unwrap_stmt(s) {
                 Node::Dim { name, type_name, array_dims } => {
                     self.global_vars.insert(name.clone());
@@ -2065,6 +2091,29 @@ fn unwrap_stmt(n: &Node) -> &Node {
         Node::Stmt { body, .. } => body,
         other => other,
     }
+}
+
+/// Top-Level-Namen eines Statements mit ihrer Art ("var" | "eine CONST" |
+/// "ein ENUM") -- fuer die Namens-Kollisionspruefung in collect_globals.
+fn collect_global_names(n: &Node) -> Vec<(String, &'static str)> {
+    match n {
+        Node::Dim { name, .. } => vec![(name.clone(), "var")],
+        Node::MultiDim { dims } => dims.iter().filter_map(|d| {
+            if let Node::Dim { name, .. } = d { Some((name.clone(), "var")) } else { None }
+        }).collect(),
+        Node::For { var, .. } => vec![(var.clone(), "var")],
+        Node::Const { name, .. } => vec![(name.clone(), "eine CONST")],
+        Node::EnumDecl { name, .. } => vec![(name.clone(), "ein ENUM")],
+        _ => vec![],
+    }
+}
+
+/// Einheitliche Meldung bei Namens-Kollision (mit Hinweis auf die
+/// Gross-/Kleinschreibungs-Unabhaengigkeit -- der nicht-offensichtliche Teil).
+fn name_clash_msg(name: &str, a: &str, b: &str) -> String {
+    format!("Namens-Kollision: '{}' ist zugleich {} und {} -- das geht nicht, \
+             weil GameBasic Gross-/Kleinschreibung ignoriert. Benenne eines um.",
+            name, a, b)
 }
 
 fn node_name(n: &Node) -> &'static str {
