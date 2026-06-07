@@ -1207,6 +1207,66 @@ children.push(bullet("Gib dem Spieler 5 statt 3 Leben."));
 children.push(bullet("Verlängere die Unverwundbarkeit (invuln = 90 → grösser)."));
 children.push(bullet("Zusatz: Zeige „LEVEL geschafft“, wenn alle Gegner abgeschossen sind."));
 
+// ===================== Kapitel 11 =====================
+children.push(chapter("Kapitel 11: Vollbild & Kamera"));
+children.push(tip("In diesem Kapitel",
+  "Dein Spiel wird Vollbild – und zwar ohne dass du eine einzige Spielkoordinate ändern musst. Der Trick: die Kamera skaliert dein festes Spielfeld auf jeden Bildschirm und zentriert es."));
+
+children.push(h2("Das Problem"));
+children.push(p("Bisher lief alles in einem festen 480×640-Fenster. Auf einem grossen, breiten Monitor wäre echtes Vollbild schöner. Aber alle Positionen (Schiff, Sterne, Formation) rechnen mit 480×640 – die wollen wir nicht alle umstellen."));
+
+children.push(h2("Die Kamera skaliert für dich"));
+children.push(p("Die Lösung: Das Spielfeld bleibt logisch 480×640. Wir öffnen ein grosses Fenster (oder Vollbild) und lassen die Kamera unser Spielfeld passend skalieren und zentrieren:"));
+children.push(codeBlock([
+  "CONST PW AS INTEGER = 480",
+  "CONST PH AS INTEGER = 640",
+  'SCREEN(960, 540, "Mein Galaga", 1)',
+  "SET_FULLSCREEN(TRUE)",
+  "' ... pro Frame, vor dem Zeichnen: ...",
+  "DIM sw AS INTEGER : sw = SCREENWIDTH()",
+  "DIM sh AS INTEGER : sh = SCREENHEIGHT()",
+  "DIM zoom AS FLOAT : zoom = sh / PH                 ' auf Bildhoehe skalieren",
+  "DIM offx AS FLOAT : offx = (sw - PW * zoom) / 2.0  ' zentrieren",
+  "CAMERA_SET(-offx / zoom, 0.0, zoom)",
+]));
+children.push(pmix([
+  ["Nach ", false], ["CAMERA_SET", true],
+  [" sind alle Zeichen-Befehle in deinen vertrauten Welt-Koordinaten (480×640) – die Kamera vergrössert und verschiebt automatisch. ", false],
+  ["SCREENWIDTH()", true], ["/", false], ["SCREENHEIGHT()", true],
+  [" liefern die echte (Vollbild-)Grösse, also passt sich alles jedem Monitor an.", false],
+]));
+
+children.push(h2("Letterbox & HUD"));
+children.push(p("Weil unser Spielfeld hochkant ist, ein breiter Bildschirm aber quer, bleiben links und rechts Ränder – die füllen wir schwarz (Letterbox). Den HUD-Text zeichnen wir nach CAMERA_RESET wieder in Bildschirm-Koordinaten, damit er gestochen scharf bleibt:"));
+children.push(codeBlock([
+  "CLS(&H000000)                          ' Raender schwarz",
+  "CAMERA_SET(-offx / zoom, 0.0, zoom)",
+  "BOX(0, 0, PW - 1, PH - 1, &H05060F)    ' Spielfeld-Hintergrund",
+  "' ... Sterne, Gegner, Schiff usw. zeichnen (Welt-Koordinaten) ...",
+  "CAMERA_RESET()                         ' zurueck zu Bildschirm-Koordinaten",
+  'TEXT(INT(offx) + 8, 6, "SCORE: " + STR$(score))',
+]));
+children.push(pmix([
+  ["", false],
+  ["CAMERA_RESET", true],
+  [" hebt den Zoom wieder auf. Den Score setzen wir um ", false],
+  ["offx", true],
+  [" versetzt, damit er am linken Spielfeldrand sitzt – nicht im schwarzen Rand. Das vollständige Programm liegt in ", false],
+  ["code/kap11/vollbild.gb", true], [".", false],
+]));
+figure("kap11_vollbild.png", "Vollbild: Das Spielfeld ist hochskaliert und zentriert, mit schwarzen Rändern.", 420, 240).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("Logische Koordinaten ", "(480×640) bleiben; die Kamera kümmert sich um die Anzeige."));
+children.push(bulletRich("CAMERA_SET / CAMERA_RESET ", "schalten den Zoom an und wieder aus."));
+children.push(bulletRich("zoom & offx ", "skalieren auf die Bildhöhe und zentrieren (Letterbox)."));
+children.push(bulletRich("HUD nach CAMERA_RESET ", "= scharfer Text in Bildschirm-Koordinaten."));
+
+children.push(h2("Übung"));
+children.push(bullet("Schalte FULL auf FALSE und spiele im Fenster – die Kamera funktioniert trotzdem."));
+children.push(bullet("Färbe die Letterbox-Ränder ein (statt Schwarz)."));
+children.push(bullet("Zentriere die GAME-OVER-Schrift genauer auf deinem Bildschirm."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
