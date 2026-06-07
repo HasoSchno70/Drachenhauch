@@ -1010,6 +1010,102 @@ children.push(bullet("Lass Gegner häufiger oder seltener stürzen (diveTimer-We
 children.push(bullet("Mach den Sturz schneller (die 0.013)."));
 children.push(bullet("Zusatz: Lass beim Sturz-Tiefpunkt etwas passieren (Vorschau auf die Bomben im nächsten Kapitel)."));
 
+// ===================== Kapitel 9 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 9: Bomben & Ausweichen"));
+children.push(tip("In diesem Kapitel",
+  "Jetzt wird zurückgeschossen: Stürzende Gegner werfen Bomben ab, denen du ausweichen musst. Du nutzt einen zweiten Pool – diesmal für fallende Bomben – und lernst, wie eine Methode mit FUNCTION ein Ergebnis zurückgibt."));
+
+children.push(h2("Update gibt Auskunft: FUNCTION"));
+children.push(pmix([
+  ["Bisher war ", false], ["Update", true],
+  [" eine SUB – sie tut etwas, gibt aber nichts zurück. Eine ", false],
+  ["FUNCTION", true],
+  [" ist dasselbe, liefert aber ein Ergebnis mit ", false], ["RETURN", true],
+  [". Wir machen daraus eine FUNCTION, die ", false], ["TRUE", true],
+  [" zurückgibt, wenn der Gegner gerade jetzt eine Bombe abwerfen soll:", false],
+]));
+children.push(codeBlock([
+  "FUNCTION Update(sway AS FLOAT) AS BOOLEAN",
+  "    ' ... bewegen wie bisher ...",
+  "    DIM drop AS BOOLEAN : drop = FALSE",
+  "    IF Self.state = St.DIVE AND NOT Self.dropped AND Self.t >= Self.dropAt THEN",
+  "        Self.dropped = TRUE : drop = TRUE",
+  "    END IF",
+  "    ' ... Zustandswechsel bei t >= 1 ...",
+  "    RETURN drop",
+  "END FUNCTION",
+]));
+children.push(pmix([
+  ["Das Feld ", false], ["dropped", true],
+  [" sorgt dafür, dass pro Sturz nur eine Bombe fällt: Einmal abgeworfen, bleibt es ", false],
+  ["TRUE", true], [", bis der nächste Sturz beginnt.", false],
+]));
+
+children.push(h2("Wann fällt eine Bombe?"));
+children.push(pmix([
+  ["Beim Start des Sturzes legen wir in ", false], ["Dive", true],
+  [" einen zufälligen Zeitpunkt fest – etwa in der Bahnmitte:", false],
+]));
+children.push(codeBlock([
+  "Self.dropAt = 0.45 + RANDF(0.0, 0.2)   ' irgendwo um die Mitte (t)",
+  "Self.dropped = FALSE",
+]));
+children.push(pmix([
+  ["Sobald ", false], ["Self.t", true], [" diesen ", false], ["dropAt", true],
+  [" überschreitet, gibt Update einmalig ", false], ["TRUE", true], [" zurück.", false],
+]));
+
+children.push(h2("Der Bomben-Pool"));
+children.push(p("Genau wie die Schüsse verwalten wir Bomben in einem Pool – nur dass sie nach unten fallen. Erst der Vorrat:"));
+children.push(codeBlock([
+  "DIM bombImg AS IMAGE",
+  'bombImg = LOADIMAGE("../../assets/sprites/bomb.png")',
+  "CONST NBOMB AS INTEGER = 8",
+  "DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT",
+  "DIM boAlive[NBOMB] AS BOOLEAN",
+  "FOR i = 0 TO NBOMB - 1 : boAlive[i] = FALSE : NEXT i",
+  "DIM bombSpeed AS FLOAT : bombSpeed = 3.0",
+]));
+children.push(p("Wenn Update TRUE meldet, suchen wir einen freien Bomben-Platz an der Gegnerposition:"));
+children.push(codeBlock([
+  "IF bugs[i].Update(sway) THEN",
+  "    DIM b AS INTEGER",
+  "    FOR b = 0 TO NBOMB - 1",
+  "        IF NOT boAlive[b] THEN",
+  "            boAlive[b] = TRUE : bmx[b] = bugs[i].x + 5.0 : bmy[b] = bugs[i].y + 8.0 : BREAK",
+  "        END IF",
+  "    NEXT b",
+  "END IF",
+]));
+children.push(p("Und jeden Frame fallen die Bomben nach unten – wer unten herausfällt, gibt seinen Platz frei:"));
+children.push(codeBlock([
+  "FOR i = 0 TO NBOMB - 1",
+  "    IF boAlive[i] THEN",
+  "        bmy[i] = bmy[i] + bombSpeed",
+  "        IF bmy[i] > 640.0 THEN boAlive[i] = FALSE",
+  "        DRAWIMAGEPART(bombImg, srcXb, 0, 6, 6, INT(bmx[i]), INT(bmy[i]))",
+  "    END IF",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["srcXb", true], [" wechselt wie beim Flügelschlag zwischen den zwei Bomben-Frames (Pulsieren). Das vollständige Programm liegt in ", false],
+  ["code/kap09/bomben.gb", true], [".", false],
+]));
+figure("kap09_bomben.png", "Ein Gegner stürzt und hat eine Bombe abgeworfen – sie fällt nun nach unten.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("FUNCTION ", "= wie SUB, gibt aber mit RETURN ein Ergebnis zurück (hier: „jetzt Bombe?“)."));
+children.push(bulletRich("dropped-Flag ", "verhindert, dass pro Sturz mehrere Bomben fallen."));
+children.push(bulletRich("Zweiter Pool ", "= Bomben funktionieren wie Schüsse, fallen aber nach unten."));
+children.push(bulletRich("Timing über t ", "= der Abwurf hängt am Fortschritt der Sturzbahn (dropAt)."));
+
+children.push(h2("Übung"));
+children.push(bullet("Mach die Bomben schneller oder langsamer (bombSpeed)."));
+children.push(bullet("Lass Gegner früher oder später abwerfen (dropAt)."));
+children.push(bullet("Erhöhe NBOMB, damit mehr Bomben gleichzeitig fallen können."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
