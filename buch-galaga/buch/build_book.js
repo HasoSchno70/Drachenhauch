@@ -659,6 +659,82 @@ children.push(bullet("Erlaube mehr Schüsse gleichzeitig (NBULLET erhöhen)."));
 children.push(bullet("Mach die Schüsse schneller oder langsamer (die 8)."));
 children.push(bullet("Entferne die Flankenerkennung (feuere bei gehaltener Taste) – wie fühlt sich das an?"));
 
+// ===================== Kapitel 5 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 5: Sternenhimmel mit Parallax"));
+children.push(tip("In diesem Kapitel",
+  "Aus dem schlichten Sternenhimmel von Kapitel 1 wird ein echter Weltraum: Sterne in mehreren Tiefen-Ebenen, die unterschiedlich schnell scrollen und sanft funkeln."));
+
+children.push(h2("Tiefe durch Tempo (Parallax)"));
+children.push(p("Schau aus einem fahrenden Auto: Nahe Dinge sausen vorbei, ferne Berge ziehen langsam dahin. Dieser Effekt heisst Parallax – und er lässt flache Sterne räumlich wirken. Wir teilen unsere Sterne in drei Ebenen: fern (dunkel, langsam), mittel und nah (hell, schnell)."));
+children.push(pmix([
+  ["Für sanfte, unterschiedliche Geschwindigkeiten brauchen wir Kommazahlen – den Typ ", false],
+  ["FLOAT", true], [". Jeder Stern bekommt Tempo, Helligkeit und eine zufällige „Funkel-Phase“:", false],
+]));
+children.push(codeBlock([
+  "CONST NSTARS AS INTEGER = 80",
+  "DIM starX[NSTARS]   AS FLOAT",
+  "DIM starY[NSTARS]   AS FLOAT",
+  "DIM starSpd[NSTARS] AS FLOAT        ' Tempo = Tiefe",
+  "DIM starBri[NSTARS] AS INTEGER      ' Grund-Helligkeit",
+  "DIM starPh[NSTARS]  AS FLOAT        ' Phase fuers Funkeln",
+  "DIM i AS INTEGER",
+  "FOR i = 0 TO NSTARS - 1",
+  "    starX[i] = RANDF(0.0, 479.0)",
+  "    starY[i] = RANDF(0.0, 639.0)",
+  "    starPh[i] = RANDF(0.0, 6.28)",
+  "    DIM layer AS INTEGER : layer = i MOD 3",
+  "    IF layer = 0 THEN starSpd[i] = 0.5 : starBri[i] = 80",
+  "    IF layer = 1 THEN starSpd[i] = 1.1 : starBri[i] = 150",
+  "    IF layer = 2 THEN starSpd[i] = 2.0 : starBri[i] = 240",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["RANDF(min, max)", true], [" liefert eine zufällige Kommazahl (anders als ", false],
+  ["RANDINT", true], [", das ganze Zahlen gibt). ", false],
+  ["i MOD 3", true], [" ist der Rest beim Teilen durch 3 – ergibt reihum 0, 1, 2 und verteilt die Sterne auf die drei Ebenen.", false],
+]));
+
+children.push(h2("Funkeln mit SIN"));
+children.push(p("Funkeln heisst: die Helligkeit eines Sterns schwankt sanft auf und ab. Eine weiche Wellenbewegung liefert der Sinus, SIN. Über die Zeit (unseren Frame-Zähler) plus die eigene Phase jedes Sterns funkelt jeder ein bisschen anders:"));
+children.push(codeBlock([
+  "FOR i = 0 TO NSTARS - 1",
+  "    starY[i] = starY[i] + starSpd[i]",
+  "    IF starY[i] > 639.0 THEN starY[i] = 0.0 : starX[i] = RANDF(0.0, 479.0)",
+  "    DIM tw AS FLOAT : tw = 0.55 + 0.45 * SIN(frame * 0.08 + starPh[i])",
+  "    DIM v AS INTEGER : v = INT(starBri[i] * tw)",
+  "    PLOT(INT(starX[i]), INT(starY[i]), RGB(v, v, v))",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["SIN(...)", true], [" pendelt weich zwischen -1 und 1. Mit ", false],
+  ["0.55 + 0.45 * SIN(...)", true], [" wird daraus ein Faktor zwischen 0,1 und 1,0 für die Helligkeit. ", false],
+  ["INT(...)", true], [" macht aus der Kommazahl wieder eine ganze Zahl (Farben und Pixel brauchen ganze Werte), und ", false],
+  ["RGB(v, v, v)", true], [" mischt aus gleichen Rot/Grün/Blau-Anteilen einen Grauton – mal heller, mal dunkler.", false],
+]));
+children.push(tip("Frame-Zähler nicht vergessen",
+  "Damit sich das Funkeln über die Zeit bewegt, brauchst du eine Variable frame, die in der Schleife jedes Bild um 1 hochzählt (DIM frame AS INTEGER vor der Schleife, frame = frame + 1 als erste Zeile darin)."));
+
+children.push(h2("Einbauen"));
+children.push(pmix([
+  ["Ersetze den einfachen Sternen-Teil aus Kapitel 1 durch diese beiden Blöcke. Schiff und Schüsse aus Kapitel 4 bleiben unverändert. Das vollständige Programm liegt fertig in ", false],
+  ["code/kap05/sternenhimmel.gb", true], [".", false],
+]));
+figure("kap05_sternenhimmel.png", "Ein tieferer Weltraum: Sterne in mehreren Helligkeiten, die funkeln und scrollen.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("FLOAT ", "speichert Kommazahlen – nötig für feine Geschwindigkeiten."));
+children.push(bulletRich("Parallax ", "= verschiedene Ebenen scrollen verschieden schnell → Raumgefühl."));
+children.push(bulletRich("SIN ", "liefert eine weiche Welle – ideal fürs Funkeln (mit eigener Phase pro Stern)."));
+children.push(bulletRich("INT und RGB ", "wandeln Kommazahlen in ganze Werte und mischen Farben."));
+
+children.push(h2("Übung"));
+children.push(bullet("Füge eine vierte, sehr helle und schnelle Ebene hinzu."));
+children.push(bullet("Gib den Sternen einen leichten Blaustich (etwas weniger Rot/Grün als Blau)."));
+children.push(bullet("Ändere die Funkel-Geschwindigkeit (die 0.08)."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
