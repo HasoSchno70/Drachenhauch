@@ -101,6 +101,11 @@ END CLASS
 SCREEN(960, 540, "Galaga", 1)
 IF FULL THEN SET_FULLSCREEN(TRUE)
 
+' Retro-Arcade-Look: CRT-Shader (Scanlines/Woelbung/Vignette) per F1 ein/aus.
+DIM crtShader AS INTEGER : crtShader = SHADER_LOAD("../assets/shaders/crt.fs")
+DIM crtOn AS BOOLEAN : crtOn = (crtShader >= 0)
+DIM prevF1 AS BOOLEAN
+
 DIM shipImg AS IMAGE   : shipImg = LOADIMAGE("../assets/sprites/player.png")
 DIM bulletImg AS IMAGE : bulletImg = LOADIMAGE("../assets/sprites/bullet.png")
 DIM bugImg AS IMAGE    : bugImg = LOADIMAGE("../assets/sprites/bug.png")
@@ -254,6 +259,11 @@ NEXT s
 WHILE NOT QUITREQUESTED()
     frame = frame + 1
 
+    ' ---- Retro-Look umschalten (F1, mit Flankenerkennung) ----
+    DIM f1 AS BOOLEAN : f1 = KEYPRESSED(KEY_F1)
+    IF f1 AND NOT prevF1 AND crtShader >= 0 THEN crtOn = NOT crtOn
+    prevF1 = f1
+
     ' ---- Eingabe ----
     IF lives > 0 THEN
         IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 3.0
@@ -383,6 +393,15 @@ WHILE NOT QUITREQUESTED()
     DIM zoom AS FLOAT : zoom = sh / PH
     DIM offx AS FLOAT : offx = (sw - PW * zoom) / 2.0
 
+    ' Retro-Look: ganze Szene durch den CRT-Shader praesentieren (oder aus).
+    IF crtShader >= 0 AND crtOn THEN
+        SHADER_SET2(crtShader, "resolution", sw, sh)
+        SHADER_SET(crtShader, "time", frame / 60.0)
+        POSTFX(crtShader)
+    ELSE
+        POSTFX(-1)
+    END IF
+
     CLS(&H000000)
     ' Screen-Shake: bei Treffern ruckelt das ganze Spielfeld kurz (Welt-Einheiten).
     DIM shx AS FLOAT : shx = 0.0
@@ -445,6 +464,7 @@ WHILE NOT QUITREQUESTED()
     DIM hx0 AS INTEGER : hx0 = INT(offx) + 4
     TEXT(hx0, 6, f"SCORE {score}")
     TEXT(INT(sw / 2) - 24, 6, f"LEVEL {level}")
+    TEXT(INT(sw - offx) - 56, 6, IIF(crtOn, "F1:CRT*", "F1:CRT "), &H5C7088)
     IF levelMsg > 0 THEN TEXT(INT(sw / 2) - 28, INT(sh / 2) - 4, f"LEVEL {level}")
     IF lives <= 0 THEN
         TEXT(INT(sw / 2) - 36, INT(sh / 2) - 8, "GAME OVER")
