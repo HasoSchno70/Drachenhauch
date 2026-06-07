@@ -158,6 +158,13 @@ DIM starSpd[NSTARS] AS FLOAT      ' Scroll-Tempo = Parallax-Tiefe
 DIM starInt[NSTARS] AS INTEGER    ' Grund-Helligkeit 0..255
 DIM starPh[NSTARS]  AS FLOAT      ' Phase fuers Funkeln (jeder Stern anders)
 
+' --- Juice: Score-Popups, Screen-Shake, Muendungsblitz ---
+CONST NPOP AS INTEGER = 12
+DIM popX[NPOP]   AS FLOAT : DIM popY[NPOP]   AS FLOAT
+DIM popVal[NPOP] AS INTEGER : DIM popLife[NPOP] AS INTEGER   ' Restframes, 0 = frei
+DIM shake AS FLOAT               ' Kamera-Wackel-Staerke (klingt ab)
+DIM muzzle AS INTEGER            ' Restframes Muendungsblitz
+
 CONST PY_LOW  AS FLOAT = 288.0          ' unterste Schiffsposition
 CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
 
@@ -187,11 +194,23 @@ SUB Explode(ex AS FLOAT, ey AS FLOAT, c AS INTEGER, n AS INTEGER)
     PARTICLE_EMIT(explFx, n)
 END SUB
 
+' Schwebende "+pts"-Punkteanzeige an (px,py) in einen freien Slot legen.
+SUB Popup(px AS FLOAT, py AS FLOAT, pts AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO NPOP - 1
+        IF popLife[k] <= 0 THEN
+            popX[k] = px : popY[k] = py : popVal[k] = pts : popLife[k] = 45
+            RETURN
+        END IF
+    NEXT k
+END SUB
+
 SUB Shoot()
     DIM i AS INTEGER
     FOR i = 0 TO NBULLET - 1
         IF NOT bAlive[i] THEN
             bAlive[i] = TRUE : bx[i] = playerX + 5.0 : by[i] = playerY - 2.0
+            muzzle = 5
             PLAYSOUND(sfxShoot)
             RETURN
         END IF
@@ -255,11 +274,18 @@ WHILE NOT QUITREQUESTED()
     END IF
     IF invuln > 0 THEN invuln = invuln - 1
     IF levelMsg > 0 THEN levelMsg = levelMsg - 1
+    IF muzzle > 0 THEN muzzle = muzzle - 1
+    IF shake > 0.3 THEN shake = shake * 0.86 ELSE shake = 0.0
 
     ' ---- Animation ----
     FOR r = 0 TO ROWS - 1 : SPRITE_UPDATE(rowSpr[r], 16) : NEXT r
     SPRITE_UPDATE(bombSpr, 16)
     PARTICLE_UPDATE(explFx, 16)
+    ' Score-Popups steigen auf und altern.
+    DIM p AS INTEGER
+    FOR p = 0 TO NPOP - 1
+        IF popLife[p] > 0 THEN popY[p] = popY[p] - 0.6 : popLife[p] = popLife[p] - 1
+    NEXT p
 
     ' ---- Sturzangriff ausloesen ----
     DIM i AS INTEGER
@@ -311,8 +337,10 @@ WHILE NOT QUITREQUESTED()
             FOR j = 0 TO NBUGS - 1
                 IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
                     bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
-                    score = score + (ROWS - bugs[j].row) * 50
+                    DIM gain AS INTEGER : gain = (ROWS - bugs[j].row) * 50
+                    score = score + gain
                     Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
+                    Popup(bugs[j].x + 2.0, bugs[j].y, gain)
                     PLAYSOUND(sfxBoom) : BREAK
                 END IF
             NEXT j
@@ -336,6 +364,7 @@ WHILE NOT QUITREQUESTED()
         IF hit THEN
             lives = lives - 1
             invuln = 90
+            shake = 7.0
             Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
             PLAYSOUND(sfxHit)
         END IF
@@ -355,7 +384,11 @@ WHILE NOT QUITREQUESTED()
     DIM offx AS FLOAT : offx = (sw - PW * zoom) / 2.0
 
     CLS(&H000000)
-    CAMERA_SET(-offx / zoom, 0.0, zoom)
+    ' Screen-Shake: bei Treffern ruckelt das ganze Spielfeld kurz (Welt-Einheiten).
+    DIM shx AS FLOAT : shx = 0.0
+    DIM shy AS FLOAT : shy = 0.0
+    IF shake > 0.3 THEN shx = RANDF(-shake, shake) : shy = RANDF(-shake, shake)
+    CAMERA_SET(-offx / zoom + shx, shy, zoom)
 
     BOX(0, 0, PW - 1, PH - 1, BG)                     ' Spielfeld-Hintergrund
     ' Parallax-Sternenhimmel: jede Ebene scrollt mit eigenem Tempo nach unten,
@@ -388,6 +421,10 @@ WHILE NOT QUITREQUESTED()
     IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
         DRAWIMAGE(shipImg, playerX, playerY)
     END IF
+    ' Muendungsblitz an der Schiffspitze (kurzes helles Aufleuchten beim Schuss).
+    IF lives > 0 AND muzzle > 0 THEN
+        CIRCLE(INT(playerX) + 8, INT(playerY) - 1, 1 + muzzle, &HFFF080)
+    END IF
     ' Lebens-Balken (im Spielfeld, unten links)
     DIM lifeMax AS INTEGER : lifeMax = MAX(lives, 3)
     FOR i = 0 TO lifeMax - 1
@@ -396,6 +433,14 @@ WHILE NOT QUITREQUESTED()
     NEXT i
 
     CAMERA_RESET()
+    ' Score-Popups: Welt-Koordinaten von Hand auf den Bildschirm umrechnen
+    ' (offx + x*zoom, y*zoom), damit der Text scharf bleibt (TEXT zoomt nicht).
+    FOR p = 0 TO NPOP - 1
+        IF popLife[p] > 0 THEN
+            DIM pcol AS INTEGER : pcol = IIF(popLife[p] > 12, &HFFE070, &H7A5C30)
+            TEXT(INT(offx + popX[p] * zoom), INT(popY[p] * zoom), f"+{popVal[p]}", pcol)
+        END IF
+    NEXT p
     ' HUD-Text (Bildschirm-Raum, nicht gezoomt)
     DIM hx0 AS INTEGER : hx0 = INT(offx) + 4
     TEXT(hx0, 6, f"SCORE {score}")
