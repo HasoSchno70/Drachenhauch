@@ -195,6 +195,19 @@ DIM bonus AS BOOLEAN              ' ist die aktuelle Welle eine Bonus-Welle?
 DIM bonusTimer AS INTEGER        ' Restdauer der Bonus-Welle (Frames)
 DIM bonusHits AS INTEGER         ' Treffer in der Bonus-Welle
 
+' --- Fangstrahl + Doppeljaeger (Boss faengt das Schiff, Befreiung = 2 Schiffe) ---
+ENUM CapSt = OFF, SEEK, BEAM, BACK
+DIM capState AS INTEGER          ' Phase der Fangsequenz
+DIM capTimer AS INTEGER          ' Restdauer der BEAM-Phase
+DIM capCool AS INTEGER           ' Frames bis zum naechsten Fang-Versuch
+DIM bossIdx AS INTEGER           ' welcher Gegner ist der Boss
+DIM bossHp AS INTEGER            ' Boss braucht 2 Treffer
+DIM hasCaptured AS BOOLEAN       ' Boss haelt ein gefangenes Schiff
+DIM dual AS BOOLEAN              ' Spieler hat den Doppeljaeger
+DIM bossHoverX AS FLOAT          ' anvisierte Hover-x beim Fangen
+DIM rescueOn AS BOOLEAN          ' befreites Schiff fliegt gerade herab
+DIM rescueX AS FLOAT : DIM rescueY AS FLOAT
+
 ' --- Parallax-Sternenhimmel (3 Tiefen-Ebenen, von oben nach unten scrollend) ---
 CONST NSTARS AS INTEGER = 90
 DIM starX[NSTARS]   AS FLOAT      ' x-Position (Spielfeld-Koordinaten)
@@ -245,6 +258,13 @@ SUB NewLevel()
     bombSpeed = 2.1 + level * 0.40
     bonusTimer = 540                 ' ~9 s Bonus-Welle
     bonusHits = 0
+    ' Boss = mittlerer Gegner der obersten Reihe; haelt 2 Treffer aus.
+    bossIdx = COLS \ 2
+    bossHp = 2
+    hasCaptured = FALSE
+    capState = CapSt.OFF
+    capCool = 360 + RANDINT(0, 240)
+    rescueOn = FALSE
     levelMsg = 110
     PLAYSOUND(sfxLevel)
 END SUB
@@ -267,16 +287,23 @@ SUB Popup(px AS FLOAT, py AS FLOAT, pts AS INTEGER)
     NEXT k
 END SUB
 
-SUB Shoot()
+' Eine Kugel an x-Position fx in einen freien Slot legen (TRUE, wenn Platz war).
+FUNCTION FireBullet(fx AS FLOAT) AS BOOLEAN
     DIM i AS INTEGER
     FOR i = 0 TO NBULLET - 1
         IF NOT bAlive[i] THEN
-            bAlive[i] = TRUE : bx[i] = playerX + 5.0 : by[i] = playerY - 2.0
-            muzzle = 5
-            PLAYSOUND(sfxShoot)
-            RETURN
+            bAlive[i] = TRUE : bx[i] = fx : by[i] = playerY - 2.0
+            RETURN TRUE
         END IF
     NEXT i
+    RETURN FALSE
+END FUNCTION
+
+SUB Shoot()
+    ' Doppeljaeger feuert aus beiden Schiffen gleichzeitig.
+    DIM ok AS BOOLEAN : ok = FireBullet(playerX + 5.0)
+    IF dual THEN ok = FireBullet(playerX + 19.0) OR ok
+    IF ok THEN muzzle = 5 : PLAYSOUND(sfxShoot)
 END SUB
 
 SUB DropBomb(sx AS FLOAT, sy AS FLOAT)
@@ -342,6 +369,7 @@ SUB StartGame()
     lives = 3 : score = 0 : level = 1
     playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
     invuln = 0
+    dual = FALSE              ' Doppeljaeger nur durch Rettung
     prevShoot = TRUE          ' der Start-Tastendruck soll nicht sofort schiessen
     NewLevel()
     mode = GS.PLAY
@@ -382,6 +410,54 @@ SUB NameEntry()
     peUp = up : peDn = dn : peL = lf : peR = rt : peFire = ok
 END SUB
 
+' ===================== Boss-Fangsequenz =====================
+' Treibt den Boss durch SEEK (zum Hover-Punkt) -> BEAM (Strahl + Fang-Kollision)
+' -> BACK (zurueck in die Formation). Laeuft nur, wenn capState <> OFF; der Boss
+' wird dann NICHT vom generischen Bug.Update bewegt.
+SUB UpdateCapture()
+    IF capState = CapSt.OFF THEN RETURN
+    DIM bx AS FLOAT : bx = bugs[bossIdx].x
+    DIM by AS FLOAT : by = bugs[bossIdx].y
+    IF capState = CapSt.SEEK THEN
+        DIM tx AS FLOAT : tx = MAX(16.0, MIN(PW - 32.0, bossHoverX - 8.0))
+        bugs[bossIdx].x = bx + (tx - bx) * 0.06
+        bugs[bossIdx].y = by + (120.0 - by) * 0.06
+        IF ABS(bugs[bossIdx].x - tx) < 2.0 AND ABS(bugs[bossIdx].y - 120.0) < 2.0 THEN
+            capState = CapSt.BEAM : capTimer = 150
+        END IF
+    ELSEIF capState = CapSt.BEAM THEN
+        capTimer = capTimer - 1
+        ' Fang-Kollision: Spielerschiff im (nach unten breiter werdenden) Strahl?
+        IF lives > 0 AND invuln = 0 AND NOT hasCaptured THEN
+            DIM beamCx AS FLOAT : beamCx = bx + 8.0
+            DIM halfW AS FLOAT : halfW = 6.0 + (playerY - (by + 14.0)) * 0.18
+            IF playerY > by AND ABS((playerX + 8.0) - beamCx) < halfW THEN
+                hasCaptured = TRUE
+                dual = FALSE                 ' ein evtl. Doppeljaeger geht dabei verloren
+                lives = lives - 1
+                shake = 7.0 : PLAYSOUND(sfxHit)
+                IF lives <= 0 THEN
+                    GameOver()
+                ELSE
+                    playerX = PW / 2.0 - 8.0 : playerY = PY_LOW : invuln = 120
+                END IF
+                capState = CapSt.BACK
+            END IF
+        END IF
+        IF capTimer <= 0 THEN capState = CapSt.BACK
+    ELSEIF capState = CapSt.BACK THEN
+        DIM hx AS FLOAT : hx = bugs[bossIdx].hx
+        DIM hy AS FLOAT : hy = bugs[bossIdx].hy
+        bugs[bossIdx].x = bx + (hx - bx) * 0.07
+        bugs[bossIdx].y = by + (hy - by) * 0.07
+        IF ABS(bugs[bossIdx].x - hx) < 2.0 AND ABS(bugs[bossIdx].y - hy) < 2.0 THEN
+            bugs[bossIdx].state = St.FORM
+            capState = CapSt.OFF
+            capCool = 360 + RANDINT(0, 300)
+        END IF
+    END IF
+END SUB
+
 ' ===================== Spiel-Update (nur im Modus PLAY) =====================
 SUB UpdatePlay()
     DIM i AS INTEGER
@@ -394,12 +470,23 @@ SUB UpdatePlay()
     IF KEYPRESSED(KEY_UP)    OR KEYPRESSED(KEY_W) OR (pad AND (JOYSTICK_AXIS(0, 1) < -0.35 OR JOYSTICK_BUTTON(0, 1))) THEN playerY = playerY - 2.4
     IF KEYPRESSED(KEY_DOWN)  OR KEYPRESSED(KEY_S) OR (pad AND (JOYSTICK_AXIS(0, 1) >  0.35 OR JOYSTICK_BUTTON(0, 3))) THEN playerY = playerY + 2.4
     IF playerX < 2.0 THEN playerX = 2.0
-    IF playerX > PW - 18.0 THEN playerX = PW - 18.0
+    DIM maxX AS FLOAT : maxX = IIF(dual, PW - 34.0, PW - 18.0)
+    IF playerX > maxX THEN playerX = maxX
     IF playerY < PY_HIGH THEN playerY = PY_HIGH
     IF playerY > PY_LOW THEN playerY = PY_LOW
     DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE) OR (pad AND JOYSTICK_BUTTON(0, 7))
     IF firing AND NOT prevShoot THEN Shoot()
     prevShoot = firing
+
+    ' --- Boss-Fangsequenz (nur ausserhalb der Bonus-Welle) ---
+    IF NOT bonus THEN
+        IF capState = CapSt.OFF AND NOT hasCaptured AND NOT dual AND lives > 0 _
+           AND bugs[bossIdx].alive AND bugs[bossIdx].state = St.FORM THEN
+            capCool = capCool - 1
+            IF capCool <= 0 THEN capState = CapSt.SEEK : bossHoverX = playerX
+        END IF
+        UpdateCapture()
+    END IF
 
     ' Sturzangriff ausloesen (in der Bonus-Welle gibt es keine Stuerze/Bomben).
     IF NOT bonus THEN
@@ -425,7 +512,12 @@ SUB UpdatePlay()
     DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
     FOR i = 0 TO NBUGS - 1
         IF bugs[i].alive THEN
-            IF bugs[i].Update(sway, bonus) THEN DropBomb(bugs[i].x, bugs[i].y)
+            ' Boss waehrend der Fangsequenz wird von UpdateCapture bewegt.
+            IF i = bossIdx AND capState <> CapSt.OFF THEN
+                ' uebersprungen
+            ELSE
+                IF bugs[i].Update(sway, bonus) THEN DropBomb(bugs[i].x, bugs[i].y)
+            END IF
         END IF
     NEXT i
 
@@ -450,6 +542,25 @@ SUB UpdatePlay()
             FOR j = 0 TO NBUGS - 1
                 IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
                     bAlive[i] = FALSE
+                    ' Boss: 2 Treffer. Erster Treffer nur Funken; zweiter zerstoert.
+                    IF (NOT bonus) AND j = bossIdx THEN
+                        bossHp = bossHp - 1
+                        Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, &HFFE070, 8)
+                        PLAYSOUND(sfxBoom)
+                        IF bossHp <= 0 THEN
+                            bugs[j].alive = FALSE : bugsAlive = bugsAlive - 1
+                            score = score + 200
+                            Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, &HFFC040, 28)
+                            Popup(bugs[j].x - 4.0, bugs[j].y, 200)
+                            ' Hielt der Boss ein Schiff? -> Rettung -> Doppeljaeger.
+                            IF hasCaptured THEN
+                                hasCaptured = FALSE
+                                rescueOn = TRUE : rescueX = bugs[j].x : rescueY = bugs[j].y
+                            END IF
+                            capState = CapSt.OFF
+                        END IF
+                        BREAK
+                    END IF
                     DIM gain AS INTEGER : gain = IIF(bonus, 150, (ROWS - bugs[j].row) * 50)
                     score = score + gain
                     Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
@@ -467,26 +578,44 @@ SUB UpdatePlay()
         END IF
     NEXT i
 
-    ' Spieler getroffen?
+    ' Spieler getroffen? (Doppeljaeger ist breiter; ein Treffer kostet dann erst
+    ' das zweite Schiff statt eines Lebens.)
     IF invuln = 0 THEN
         DIM hit AS BOOLEAN : hit = FALSE
+        DIM phx AS FLOAT : phx = playerX + 3.0
+        DIM phw AS FLOAT : phw = IIF(dual, 24.0, 10.0)
         FOR i = 0 TO NBOMB - 1
-            IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+            IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, phx, playerY + 2.0, phw, 12) THEN
                 boAlive[i] = FALSE : hit = TRUE
             END IF
         NEXT i
         FOR i = 0 TO NBUGS - 1
             IF bugs[i].alive AND bugs[i].state = St.DIVE AND _
-               Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+               Overlap(bugs[i].x, bugs[i].y, 14, 14, phx, playerY + 2.0, phw, 12) THEN
                 hit = TRUE
             END IF
         NEXT i
         IF hit THEN
-            lives = lives - 1
             invuln = 90 : shake = 7.0
-            Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
             PLAYSOUND(sfxHit)
-            IF lives <= 0 THEN GameOver()
+            IF dual THEN
+                dual = FALSE                                  ' zweites Schiff verloren
+                Explode(playerX + 19.0, playerY + 6.0, &HFFC040, 26)
+            ELSE
+                lives = lives - 1
+                Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
+                IF lives <= 0 THEN GameOver()
+            END IF
+        END IF
+    END IF
+
+    ' Befreites Schiff fliegt herab und dockt neben dem Spieler an -> Doppeljaeger.
+    IF rescueOn THEN
+        rescueY = rescueY + 3.0
+        rescueX = rescueX + (playerX - rescueX) * 0.05
+        IF rescueY >= playerY THEN
+            rescueOn = FALSE : dual = TRUE
+            PLAYSOUND(sfxLevel)
         END IF
     END IF
 
@@ -689,10 +818,31 @@ WHILE NOT QUITREQUESTED()
     NEXT i
     ' Spiel-Objekte nur im PLAY-Modus (im Titel/Eingabe nur Sterne als Kulisse).
     IF mode = GS.PLAY THEN
+        ' Tractor-Beam des Bosses (additiver Glow, nach unten breiter werdend).
+        IF capState = CapSt.BEAM THEN
+            BLEND_MODE("add")
+            DIM bcx AS FLOAT : bcx = bugs[bossIdx].x + 8.0
+            DIM bty AS INTEGER : bty = INT(bugs[bossIdx].y) + 14
+            DIM yb AS INTEGER
+            FOR yb = bty TO PH STEP 4
+                DIM hw AS FLOAT : hw = 5.0 + (yb - bty) * 0.18
+                DIM bcol AS INTEGER : bcol = RGB(24, 36 + (yb + frame * 4) MOD 60, 72)
+                BOX(INT(bcx - hw), yb, INT(bcx + hw), yb + 2, bcol)
+            NEXT yb
+            BLEND_MODE("alpha")
+        END IF
         FOR i = 0 TO NBUGS - 1
             IF bugs[i].alive THEN
+                IF i = bossIdx THEN
+                    ' Pulsierendes Halo macht den Boss als Ziel erkennbar.
+                    DIM hr AS INTEGER : hr = 11 + INT(2.0 * SIN(frame * 0.2))
+                    CIRCLE(INT(bugs[i].x) + 8, INT(bugs[i].y) + 8, hr, &H243A55)
+                END IF
                 SPRITE_SET_POS(rowSpr[bugs[i].row], bugs[i].x, bugs[i].y)
                 SPRITE_DRAW(rowSpr[bugs[i].row])
+                IF i = bossIdx AND hasCaptured THEN
+                    DRAWIMAGE(shipImg, bugs[i].x, bugs[i].y + 15)   ' gefangenes Schiff
+                END IF
             END IF
         NEXT i
         FOR i = 0 TO NBOMB - 1
@@ -708,9 +858,13 @@ WHILE NOT QUITREQUESTED()
     IF mode = GS.PLAY THEN
         IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
             DRAWIMAGE(shipImg, playerX, playerY)
+            IF dual THEN DRAWIMAGE(shipImg, playerX + 14.0, playerY)   ' Doppeljaeger
         END IF
-        ' Muendungsblitz an der Schiffspitze (kurzes Aufleuchten beim Schuss).
+        ' Befreites Schiff im Anflug.
+        IF rescueOn THEN DRAWIMAGE(shipImg, rescueX, rescueY)
+        ' Muendungsblitz an der/den Schiffspitze(n) beim Schuss.
         IF muzzle > 0 THEN CIRCLE(INT(playerX) + 8, INT(playerY) - 1, 1 + muzzle, &HFFF080)
+        IF muzzle > 0 AND dual THEN CIRCLE(INT(playerX) + 22, INT(playerY) - 1, 1 + muzzle, &HFFF080)
         ' Lebens-Balken (im Spielfeld, unten links).
         DIM lifeMax AS INTEGER : lifeMax = MAX(lives, 3)
         FOR i = 0 TO lifeMax - 1
