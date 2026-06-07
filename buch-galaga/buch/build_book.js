@@ -527,6 +527,138 @@ children.push(bullet("Öffne ein vorhandenes Sprite (z. B. player.png) in gbspri
 children.push(bullet("Zeichne deinen eigenen Gegner mit zwei Frames."));
 children.push(bullet("Exportiere ihn als PNG und tausche ihn testweise im Spiel ein."));
 
+// ===================== Kapitel 4 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 4: Schiessen"));
+children.push(tip("In diesem Kapitel",
+  "Dein Schiff bekommt Feuerkraft. Du lernst einen „Pool“ kennen – einen festen Vorrat an Schüssen, den wir clever wiederverwenden – und feuerst genau einen Schuss pro Tastendruck."));
+
+children.push(h2("Viele Schüsse verwalten: der Pool"));
+children.push(p("Ein Schuss hat eine Position und fliegt, oder er fliegt gerade nicht. Statt ständig neue Schüsse zu erzeugen und wegzuwerfen, legen wir einen festen Vorrat an – einen Pool. Drei Listen beschreiben alle Schüsse zugleich:"));
+children.push(codeBlock([
+  "DIM bulletImg AS IMAGE",
+  'bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")',
+  "CONST NBULLET AS INTEGER = 5",
+  "DIM bx[NBULLET] AS INTEGER          ' x-Position",
+  "DIM by[NBULLET] AS INTEGER          ' y-Position",
+  "DIM bAlive[NBULLET] AS BOOLEAN      ' fliegt dieser Schuss?",
+  "FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["bAlive", true], [" ist vom Typ ", false], ["BOOLEAN", true],
+  [" – das ist ein Ja/Nein-Wert (", false], ["TRUE", true], [" oder ", false], ["FALSE", true],
+  ["). So wissen wir für jeden der 5 Plätze, ob dort gerade ein Schuss unterwegs ist. Am Anfang fliegt keiner.", false],
+]));
+
+children.push(h2("Feuern auf Tastendruck"));
+children.push(p("Beim Feuern suchen wir einen freien Platz im Pool und starten dort einen Schuss. Wichtig: Wir wollen nicht bei gehaltener Taste pausenlos schiessen, sondern einen Schuss pro Druck. Dafür merken wir uns, ob die Taste schon im Bild davor gedrückt war:"));
+children.push(codeBlock([
+  "DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)",
+  "IF firing AND NOT prevShoot THEN",
+  "    DIM s AS INTEGER",
+  "    FOR s = 0 TO NBULLET - 1",
+  "        IF NOT bAlive[s] THEN",
+  "            bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4",
+  "            BREAK",
+  "        END IF",
+  "    NEXT s",
+  "END IF",
+  "prevShoot = firing",
+]));
+children.push(pmix([
+  ["", false],
+  ["firing AND NOT prevShoot", true],
+  [" ist nur im ersten Bild des Drückens wahr – das nennt man Flankenerkennung. Die ", false],
+  ["FOR", true], ["-Schleife sucht den ersten freien Platz; ", false],
+  ["BREAK", true], [" verlässt die Schleife sofort, sobald einer gefunden ist. Der Schuss startet knapp über dem Schiff.", false],
+]));
+
+children.push(h2("Schüsse bewegen und zeichnen"));
+children.push(p("Jeden Frame lassen wir alle fliegenden Schüsse nach oben wandern. Verlässt einer oben das Bild, wird sein Platz wieder frei:"));
+children.push(codeBlock([
+  "FOR i = 0 TO NBULLET - 1",
+  "    IF bAlive[i] THEN",
+  "        by[i] = by[i] - 8",
+  "        IF by[i] < -8 THEN bAlive[i] = FALSE",
+  "        DRAWIMAGE(bulletImg, bx[i], by[i])",
+  "    END IF",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["Kleiner ", false], ["by[i] - 8", true],
+  [" bedeutet weiter oben (in der Grafik wächst y nach unten). Sobald ", false],
+  ["by[i] < -8", true], [" ist der Schuss oben raus und sein Platz im Pool steht dem nächsten Schuss zur Verfügung.", false],
+]));
+
+children.push(h2("Das ganze Programm"));
+children.push(codeBlock([
+  'SCREEN(480, 640, "Mein Galaga - Kapitel 4")',
+  "CONST NSTARS AS INTEGER = 60",
+  "DIM starX[NSTARS] AS INTEGER : DIM starY[NSTARS] AS INTEGER",
+  "DIM i AS INTEGER",
+  "FOR i = 0 TO NSTARS - 1",
+  "    starX[i] = RANDINT(0, 479) : starY[i] = RANDINT(0, 639)",
+  "NEXT i",
+  "",
+  "DIM shipImg AS IMAGE",
+  'shipImg = LOADIMAGE("../../assets/sprites/player.png")',
+  "DIM shipX AS INTEGER : DIM shipY AS INTEGER",
+  "shipX = 232 : shipY = 560",
+  "",
+  "DIM bulletImg AS IMAGE",
+  'bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")',
+  "CONST NBULLET AS INTEGER = 5",
+  "DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER",
+  "DIM bAlive[NBULLET] AS BOOLEAN",
+  "FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i",
+  "DIM prevShoot AS BOOLEAN",
+  "",
+  "WHILE NOT QUITREQUESTED()",
+  "    CLS(&H05060F)",
+  "    FOR i = 0 TO NSTARS - 1",
+  "        starY[i] = starY[i] + 2",
+  "        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)",
+  "        PLOT(starX[i], starY[i], &HFFFFFF)",
+  "    NEXT i",
+  "    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4",
+  "    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4",
+  "    IF shipX < 0 THEN shipX = 0",
+  "    IF shipX > 464 THEN shipX = 464",
+  "    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)",
+  "    IF firing AND NOT prevShoot THEN",
+  "        DIM s AS INTEGER",
+  "        FOR s = 0 TO NBULLET - 1",
+  "            IF NOT bAlive[s] THEN",
+  "                bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4 : BREAK",
+  "            END IF",
+  "        NEXT s",
+  "    END IF",
+  "    prevShoot = firing",
+  "    FOR i = 0 TO NBULLET - 1",
+  "        IF bAlive[i] THEN",
+  "            by[i] = by[i] - 8",
+  "            IF by[i] < -8 THEN bAlive[i] = FALSE",
+  "            DRAWIMAGE(bulletImg, bx[i], by[i])",
+  "        END IF",
+  "    NEXT i",
+  "    DRAWIMAGE(shipImg, shipX, shipY)",
+  "    FLIP()",
+  "WEND",
+]));
+figure("kap04_schiessen.png", "Feuer frei: Die Schüsse steigen in einer Reihe nach oben.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("Pool ", "= fester Vorrat (hier 5 Schüsse), der wiederverwendet wird – mit bAlive merken wir, welche Plätze belegt sind."));
+children.push(bulletRich("BOOLEAN ", "speichert Ja/Nein (TRUE/FALSE)."));
+children.push(bulletRich("Flankenerkennung ", "(firing AND NOT prevShoot) = ein Schuss pro Tastendruck."));
+children.push(bulletRich("BREAK ", "verlässt eine Schleife vorzeitig."));
+
+children.push(h2("Übung"));
+children.push(bullet("Erlaube mehr Schüsse gleichzeitig (NBULLET erhöhen)."));
+children.push(bullet("Mach die Schüsse schneller oder langsamer (die 8)."));
+children.push(bullet("Entferne die Flankenerkennung (feuere bei gehaltener Taste) – wie fühlt sich das an?"));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",

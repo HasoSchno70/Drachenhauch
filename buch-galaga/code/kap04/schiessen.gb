@@ -1,0 +1,75 @@
+' ============================================================
+'  Kapitel 4 - Schiessen mit einem Bullet-Pool
+'  Start:  gbrun.py buch-galaga/code/kap04/schiessen.gb
+' ============================================================
+
+SCREEN(480, 640, "Mein Galaga - Kapitel 4")
+
+' --- Sternenhimmel ---
+CONST NSTARS AS INTEGER = 60
+DIM starX[NSTARS] AS INTEGER
+DIM starY[NSTARS] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDINT(0, 479)
+    starY[i] = RANDINT(0, 639)
+NEXT i
+
+' --- Schiff (wie Kapitel 2) ---
+DIM shipImg AS IMAGE
+shipImg = LOADIMAGE("../../assets/sprites/player.png")
+DIM shipX AS INTEGER : DIM shipY AS INTEGER
+shipX = 232 : shipY = 560
+
+' --- Schuesse: ein Pool aus festen Plaetzen ---
+DIM bulletImg AS IMAGE
+bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")
+CONST NBULLET AS INTEGER = 5
+DIM bx[NBULLET] AS INTEGER          ' x-Position jedes Schusses
+DIM by[NBULLET] AS INTEGER          ' y-Position
+DIM bAlive[NBULLET] AS BOOLEAN      ' fliegt dieser Schuss gerade?
+FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
+
+DIM prevShoot AS BOOLEAN            ' war die Feuertaste im letzten Frame gedrueckt?
+
+WHILE NOT QUITREQUESTED()
+    CLS(&H05060F)
+
+    ' Sterne
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + 2
+        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)
+        PLOT(starX[i], starY[i], &HFFFFFF)
+    NEXT i
+
+    ' Schiff bewegen
+    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4
+    IF shipX < 0 THEN shipX = 0
+    IF shipX > 464 THEN shipX = 464
+
+    ' --- Feuern: genau EIN Schuss pro Tastendruck (Flankenerkennung) ---
+    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
+    IF firing AND NOT prevShoot THEN
+        DIM s AS INTEGER
+        FOR s = 0 TO NBULLET - 1
+            IF NOT bAlive[s] THEN
+                bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4
+                BREAK                  ' freien Platz gefunden -> Schleife verlassen
+            END IF
+        NEXT s
+    END IF
+    prevShoot = firing
+
+    ' --- Schuesse bewegen + zeichnen ---
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 8                  ' nach oben fliegen
+            IF by[i] < -8 THEN bAlive[i] = FALSE   ' oben raus -> Platz frei
+            DRAWIMAGE(bulletImg, bx[i], by[i])
+        END IF
+    NEXT i
+
+    DRAWIMAGE(shipImg, shipX, shipY)
+    FLIP()
+WEND
