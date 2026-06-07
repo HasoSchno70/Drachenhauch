@@ -22,22 +22,26 @@ Reise geht:
 
 Steuerung: **←/→** (oder **A/D**) bewegen, **Leertaste** schießen.
 
-## Aufbau (schlank, ~10 Kapitel)
+## Aufbau (~12 Kapitel)
 
 | # | Kapitel | Was dazukommt | Sprach-Thema |
 |---|---|---|---|
-| 1 | Erstes Fenster | `SCREEN`, Spielschleife, Stern-Hintergrund | Programmstruktur, `WHILE`, `FLIP` |
+| 1 | Erstes Fenster | `SCREEN`, Spielschleife, ein paar Sterne als Hintergrund | Programmstruktur, `WHILE`, `FLIP` |
 | 2 | Das Schiff | Sprite laden + zeichnen, mit Tastatur bewegen | Variablen, `IF`, `LOADIMAGE`/`DRAWIMAGE` |
 | 3 | Sprites zeichnen | im `gbsprites`-Editor Pixel-Art + Animation | Werkzeuge, Frames, Export |
 | 4 | Schießen | Bullet-Pool, nach oben fliegen | Arrays, `FOR`, Pools |
-| 5 | Gegner & Formation | `Bug`-Klasse, Gitter, Reihen-Farben, Sway | Klassen, Methoden, `SIN`-Schwingung |
-| 6 | Einflug-Manöver | geschwungener Einflug mit Bézier-Kurven | `curves`-Modul, `CURVE_BEZIER2`, Tupel |
-| 7 | Sturzangriffe | Zustands-Automat: Formation → Sturz → zurück | `ENUM`, State-Machine |
-| 8 | Bomben & Ausweichen | Gegner werfen Bomben, Bomben-Pool | mehr Pools, Timing |
-| 9 | Treffer & Punkte | Kollisionen (AABB), Score, Leben, Game Over | Funktionen, `BOOLEAN`-Logik |
-| 10 | Politur & Ausblick | Sound (`gbsfx`), Wellen, Standalone-`.exe` | Module, Export |
+| 5 | Sternenhimmel mit Parallax | Stern-Arrays, Tiefen-Ebenen, Funkeln, Scrollen | Arrays von Daten, `SIN`, `RGB`, Parallax |
+| 6 | Gegner & Formation | `Bug`-Klasse, Gitter, Reihen-Farben, Sway | Klassen, Methoden, `SIN`-Schwingung |
+| 7 | Einflug-Manöver | geschwungener Einflug mit Bézier-Kurven | `curves`-Modul, `CURVE_BEZIER2`, Tupel |
+| 8 | Sturzangriffe | Zustands-Automat: Formation → Sturz → zurück | `ENUM`, State-Machine |
+| 9 | Bomben & Ausweichen | Gegner werfen Bomben, Bomben-Pool | mehr Pools, Timing |
+| 10 | Treffer & Punkte | Kollisionen (AABB), Score, Leben, Game Over | Funktionen, `BOOLEAN`-Logik |
+| 11 | Vollbild & Kamera | Spielfeld per Kamera-Zoom skalieren + zentrieren | `camera`-Modul, Letterbox, HUD-Trennung |
+| 12 | Politur & Ausblick | Sound (`gbsfx`), Wellen/Level, Standalone-`.exe` | Module, Export |
 
 Jedes Kapitel motiviert das nächste durch ein konkretes Bedürfnis im Spiel.
+Der Plan darf wachsen — taucht unterwegs ein lohnendes Thema auf, bekommt es
+ein eigenes Kapitel.
 
 ## Voraussetzungen
 
