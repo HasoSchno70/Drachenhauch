@@ -9,6 +9,7 @@ IMPORT "sprite"
 IMPORT "curves"
 IMPORT "audio"
 IMPORT "camera"
+IMPORT "particles"
 
 CONST PW       AS INTEGER = 240         ' Spielfeld-Breite (logisch)
 CONST PH       AS INTEGER = 320         ' Spielfeld-Hoehe
@@ -128,6 +129,17 @@ DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 
 DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.66)
 DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.38)
 
+' --- Explosionen (ein gemeinsames Partikelsystem, additiver Glow) ---
+DIM explFx AS PARTICLE_SYSTEM
+explFx = PARTICLE_SYSTEM_NEW(0.0, 0.0)
+PARTICLE_SET_VELOCITY(explFx, -120.0, 120.0, -120.0, 120.0)  ' radial nach allen Seiten
+PARTICLE_SET_LIFETIME(explFx, 220, 560)
+PARTICLE_SET_GRAVITY(explFx, 0.0, 40.0)
+PARTICLE_SET_SIZE(explFx, 2, 5)
+PARTICLE_SET_FADE(explFx, TRUE)
+PARTICLE_SET_MODE(explFx, "glow")                        ' additiv -> leuchtet
+PARTICLE_SET_COLOR_END(explFx, &H200804)                 ' verglueht ins Dunkelrot
+
 DIM bugs[NBUGS] AS Bug
 DIM bx[NBULLET] AS FLOAT : DIM by[NBULLET] AS FLOAT : DIM bAlive[NBULLET] AS BOOLEAN
 DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT : DIM bmvx[NBOMB] AS FLOAT : DIM boAlive[NBOMB] AS BOOLEAN
@@ -166,6 +178,13 @@ SUB NewLevel()
     bombSpeed = 2.1 + level * 0.40
     levelMsg = 110
     PLAYSOUND(sfxLevel)
+END SUB
+
+' Partikel-Explosion an (ex,ey) in Farbe c mit n Funken ausloesen.
+SUB Explode(ex AS FLOAT, ey AS FLOAT, c AS INTEGER, n AS INTEGER)
+    PARTICLE_SET_POS(explFx, ex, ey)
+    PARTICLE_SET_COLOR(explFx, c)
+    PARTICLE_EMIT(explFx, n)
 END SUB
 
 SUB Shoot()
@@ -240,6 +259,7 @@ WHILE NOT QUITREQUESTED()
     ' ---- Animation ----
     FOR r = 0 TO ROWS - 1 : SPRITE_UPDATE(rowSpr[r], 16) : NEXT r
     SPRITE_UPDATE(bombSpr, 16)
+    PARTICLE_UPDATE(explFx, 16)
 
     ' ---- Sturzangriff ausloesen ----
     DIM i AS INTEGER
@@ -292,6 +312,7 @@ WHILE NOT QUITREQUESTED()
                 IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
                     bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
                     score = score + (ROWS - bugs[j].row) * 50
+                    Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
                     PLAYSOUND(sfxBoom) : BREAK
                 END IF
             NEXT j
@@ -315,6 +336,7 @@ WHILE NOT QUITREQUESTED()
         IF hit THEN
             lives = lives - 1
             invuln = 90
+            Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
             PLAYSOUND(sfxHit)
         END IF
     END IF
@@ -362,6 +384,7 @@ WHILE NOT QUITREQUESTED()
     FOR i = 0 TO NBULLET - 1
         IF bAlive[i] THEN DRAWIMAGE(bulletImg, bx[i], by[i])
     NEXT i
+    PARTICLE_DRAW(explFx)                              ' Explosionen (folgt Kamera)
     IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
         DRAWIMAGE(shipImg, playerX, playerY)
     END IF
