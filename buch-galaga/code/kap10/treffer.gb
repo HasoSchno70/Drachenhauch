@@ -1,0 +1,275 @@
+' ============================================================
+'  Kapitel 10 - Treffer, Punkte, Leben & Game Over
+'  Start:  gbrun.py buch-galaga/code/kap10/treffer.gb
+' ============================================================
+IMPORT "curves"
+
+ENUM St = ENTER, FORM, DIVE
+
+CLASS Bug
+    DIM x AS FLOAT : DIM y AS FLOAT
+    DIM hx AS FLOAT : DIM hy AS FLOAT
+    DIM row AS INTEGER
+    DIM alive AS BOOLEAN
+    DIM state AS INTEGER
+    DIM t AS FLOAT : DIM ts AS FLOAT
+    DIM delay AS INTEGER
+    DIM dropAt AS FLOAT : DIM dropped AS BOOLEAN
+    DIM cx0 AS FLOAT : DIM cy0 AS FLOAT
+    DIM cx1 AS FLOAT : DIM cy1 AS FLOAT
+    DIM cx2 AS FLOAT : DIM cy2 AS FLOAT
+    DIM cx3 AS FLOAT : DIM cy3 AS FLOAT
+
+    SUB SetPath(spd AS FLOAT, sx AS FLOAT, sy AS FLOAT, c1x AS FLOAT, c1y AS FLOAT, _
+                c2x AS FLOAT, c2y AS FLOAT, ex AS FLOAT, ey AS FLOAT)
+        Self.ts = spd : Self.t = 0.0
+        Self.cx0 = sx : Self.cy0 = sy : Self.cx1 = c1x : Self.cy1 = c1y
+        Self.cx2 = c2x : Self.cy2 = c2y : Self.cx3 = ex : Self.cy3 = ey
+        Self.x = sx : Self.y = sy
+    END SUB
+
+    SUB Init(phx AS FLOAT, phy AS FLOAT, prow AS INTEGER, pdelay AS INTEGER)
+        Self.hx = phx : Self.hy = phy : Self.row = prow
+        Self.alive = TRUE : Self.delay = pdelay : Self.dropped = FALSE
+        DIM side AS INTEGER : side = IIF(prow MOD 2 = 0, -1, 1)
+        Self.SetPath(0.012, phx - side * 180.0, -30.0, 240.0 + side * 140.0, 120.0, _
+            phx + side * 80.0, 40.0, phx, phy)
+        Self.state = St.ENTER
+    END SUB
+
+    SUB Dive(px AS FLOAT, speed AS FLOAT)
+        DIM side AS INTEGER : side = IIF(Self.hx < 240.0, 1, -1)
+        Self.SetPath(speed, Self.hx, Self.hy, Self.hx + side * 100.0, Self.hy + 160.0, _
+            px, 460.0, px - side * 100.0, 700.0)
+        Self.dropAt = 0.45 + RANDF(0.0, 0.2) : Self.dropped = FALSE
+        Self.state = St.DIVE
+    END SUB
+
+    FUNCTION Update(sway AS FLOAT) AS BOOLEAN
+        IF Self.state = St.FORM THEN
+            Self.x = Self.hx + sway : Self.y = Self.hy : RETURN FALSE
+        END IF
+        IF Self.delay > 0 THEN Self.delay = Self.delay - 1 : RETURN FALSE
+        Self.t = Self.t + Self.ts
+        DIM bx AS FLOAT : DIM by AS FLOAT
+        (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), Self.cx0, Self.cy0, _
+            Self.cx1, Self.cy1, Self.cx2, Self.cy2, Self.cx3, Self.cy3)
+        Self.x = bx : Self.y = by
+        DIM drop AS BOOLEAN : drop = FALSE
+        IF Self.state = St.DIVE AND NOT Self.dropped AND Self.t >= Self.dropAt THEN
+            Self.dropped = TRUE : drop = TRUE
+        END IF
+        IF Self.t >= 1.0 THEN
+            IF Self.state = St.DIVE THEN
+                Self.SetPath(0.02, Self.hx, -30.0, Self.hx, 60.0, Self.hx, 30.0, Self.hx, Self.hy)
+                Self.state = St.ENTER
+            ELSE
+                Self.state = St.FORM
+            END IF
+        END IF
+        RETURN drop
+    END FUNCTION
+END CLASS
+
+' Ueberlappen sich zwei Rechtecke (a und c)? (AABB-Kollision)
+FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _
+                 cx AS FLOAT, cy AS FLOAT, cw AS FLOAT, ch AS FLOAT) AS BOOLEAN
+    RETURN ax < cx + cw AND ax + aw > cx AND ay < cy + ch AND ay + ah > cy
+END FUNCTION
+
+SCREEN(480, 640, "Mein Galaga - Kapitel 10")
+
+CONST NSTARS AS INTEGER = 80
+DIM starX[NSTARS] AS FLOAT : DIM starY[NSTARS] AS FLOAT
+DIM starSpd[NSTARS] AS FLOAT : DIM starBri[NSTARS] AS INTEGER
+DIM starPh[NSTARS] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDF(0.0, 479.0) : starY[i] = RANDF(0.0, 639.0)
+    starPh[i] = RANDF(0.0, 6.28)
+    DIM layer AS INTEGER : layer = i MOD 3
+    IF layer = 0 THEN starSpd[i] = 0.5 : starBri[i] = 80
+    IF layer = 1 THEN starSpd[i] = 1.1 : starBri[i] = 150
+    IF layer = 2 THEN starSpd[i] = 2.0 : starBri[i] = 240
+NEXT i
+
+DIM shipImg AS IMAGE
+shipImg = LOADIMAGE("../../assets/sprites/player.png")
+DIM shipX AS INTEGER : DIM shipY AS INTEGER
+shipX = 232 : shipY = 560
+DIM bulletImg AS IMAGE
+bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")
+CONST NBULLET AS INTEGER = 5
+DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER
+DIM bAlive[NBULLET] AS BOOLEAN
+DIM prevShoot AS BOOLEAN
+
+DIM bombImg AS IMAGE
+bombImg = LOADIMAGE("../../assets/sprites/bomb.png")
+CONST NBOMB AS INTEGER = 8
+DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT
+DIM boAlive[NBOMB] AS BOOLEAN
+DIM bombSpeed AS FLOAT : bombSpeed = 3.0
+
+CONST COLS AS INTEGER = 8
+CONST ROWS AS INTEGER = 3
+CONST NBUGS AS INTEGER = 24
+DIM rowImg[ROWS] AS IMAGE
+rowImg[0] = LOADIMAGE("../../assets/sprites/bug0.png")
+rowImg[1] = LOADIMAGE("../../assets/sprites/bug1.png")
+rowImg[2] = LOADIMAGE("../../assets/sprites/bug2.png")
+DIM bugs[NBUGS] AS Bug
+
+DIM frame AS INTEGER
+DIM diveTimer AS INTEGER
+DIM score AS INTEGER : DIM lives AS INTEGER : DIM invuln AS INTEGER
+
+' Ein neues Spiel aufsetzen (Formation bauen, alles zuruecksetzen).
+SUB NewGame()
+    DIM k AS INTEGER
+    DIM gapX AS INTEGER : gapX = 48
+    DIM startX AS INTEGER : startX = (480 - (COLS - 1) * gapX) \ 2 - 8
+    FOR k = 0 TO NBUGS - 1
+        DIM col AS INTEGER : col = k MOD COLS
+        DIM rw AS INTEGER  : rw = k \ COLS
+        bugs[k] = NEW Bug(startX + col * gapX, 60.0 + rw * 40.0, rw, k * 4)
+    NEXT k
+    FOR k = 0 TO NBULLET - 1 : bAlive[k] = FALSE : NEXT k
+    FOR k = 0 TO NBOMB - 1 : boAlive[k] = FALSE : NEXT k
+    score = 0 : lives = 3 : invuln = 0 : diveTimer = 120 : shipX = 232
+END SUB
+
+NewGame()
+
+WHILE NOT QUITREQUESTED()
+    frame = frame + 1
+    CLS(&H05060F)
+
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + starSpd[i]
+        IF starY[i] > 639.0 THEN starY[i] = 0.0 : starX[i] = RANDF(0.0, 479.0)
+        DIM tw AS FLOAT : tw = 0.55 + 0.45 * SIN(frame * 0.08 + starPh[i])
+        DIM v AS INTEGER : v = INT(starBri[i] * tw)
+        PLOT(INT(starX[i]), INT(starY[i]), RGB(v, v, v))
+    NEXT i
+
+    ' ===== Spiel-Logik nur solange wir leben =====
+    IF lives > 0 THEN
+        IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4
+        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4
+        IF shipX < 0 THEN shipX = 0
+        IF shipX > 464 THEN shipX = 464
+
+        DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
+        IF firing AND NOT prevShoot THEN
+            DIM s AS INTEGER
+            FOR s = 0 TO NBULLET - 1
+                IF NOT bAlive[s] THEN
+                    bAlive[s] = TRUE : bx[s] = shipX + 5 : by[s] = shipY - 4 : BREAK
+                END IF
+            NEXT s
+        END IF
+        prevShoot = firing
+
+        diveTimer = diveTimer - 1
+        IF diveTimer <= 0 THEN
+            diveTimer = 80 + RANDINT(0, 60)
+            DIM tries AS INTEGER
+            FOR tries = 0 TO 10
+                DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
+                IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
+                    bugs[pick].Dive(shipX, 0.013) : BREAK
+                END IF
+            NEXT tries
+        END IF
+        IF invuln > 0 THEN invuln = invuln - 1
+    ELSE
+        ' Game Over: Leertaste startet neu
+        IF KEYPRESSED(KEY_SPACE) THEN NewGame()
+    END IF
+
+    ' Schuesse bewegen
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 8
+            IF by[i] < -8 THEN bAlive[i] = FALSE
+            DRAWIMAGE(bulletImg, bx[i], by[i])
+        END IF
+    NEXT i
+
+    ' Gegner bewegen + Bomben abwerfen + zeichnen
+    DIM sway AS FLOAT : sway = SIN(frame * 0.04) * 12.0
+    DIM srcX AS INTEGER : srcX = IIF((frame \ 12) MOD 2 = 0, 0, 16)
+    FOR i = 0 TO NBUGS - 1
+        IF bugs[i].alive THEN
+            IF lives > 0 AND bugs[i].Update(sway) THEN
+                DIM b AS INTEGER
+                FOR b = 0 TO NBOMB - 1
+                    IF NOT boAlive[b] THEN
+                        boAlive[b] = TRUE : bmx[b] = bugs[i].x + 5.0 : bmy[b] = bugs[i].y + 8.0 : BREAK
+                    END IF
+                NEXT b
+            END IF
+            DRAWIMAGEPART(rowImg[bugs[i].row], srcX, 0, 16, 16, INT(bugs[i].x), INT(bugs[i].y))
+        END IF
+    NEXT i
+
+    ' Bomben fallen + zeichnen
+    DIM srcXb AS INTEGER : srcXb = IIF((frame \ 8) MOD 2 = 0, 0, 6)
+    FOR i = 0 TO NBOMB - 1
+        IF boAlive[i] THEN
+            bmy[i] = bmy[i] + bombSpeed
+            IF bmy[i] > 640.0 THEN boAlive[i] = FALSE
+            DRAWIMAGEPART(bombImg, srcXb, 0, 6, 6, INT(bmx[i]), INT(bmy[i]))
+        END IF
+    NEXT i
+
+    ' ===== Kollisionen (nur im Spiel) =====
+    IF lives > 0 THEN
+        ' Schuss trifft Gegner
+        DIM j AS INTEGER
+        FOR i = 0 TO NBULLET - 1
+            IF bAlive[i] THEN
+                FOR j = 0 TO NBUGS - 1
+                    IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
+                        bugs[j].alive = FALSE : bAlive[i] = FALSE
+                        score = score + (ROWS - bugs[j].row) * 10
+                        BREAK
+                    END IF
+                NEXT j
+            END IF
+        NEXT i
+
+        ' Spieler getroffen? (Bombe oder stuerzender Gegner)
+        IF invuln = 0 THEN
+            DIM hit AS BOOLEAN : hit = FALSE
+            FOR i = 0 TO NBOMB - 1
+                IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, shipX + 3.0, shipY + 2.0, 10, 12) THEN
+                    boAlive[i] = FALSE : hit = TRUE
+                END IF
+            NEXT i
+            FOR i = 0 TO NBUGS - 1
+                IF bugs[i].alive AND bugs[i].state = St.DIVE AND _
+                   Overlap(bugs[i].x, bugs[i].y, 14, 14, shipX + 3.0, shipY + 2.0, 10, 12) THEN
+                    hit = TRUE
+                END IF
+            NEXT i
+            IF hit THEN lives = lives - 1 : invuln = 90
+        END IF
+    END IF
+
+    ' Schiff (blinkt kurz nach einem Treffer)
+    IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
+        DRAWIMAGE(shipImg, shipX, shipY)
+    END IF
+
+    ' ===== HUD =====
+    TEXT(8, 6, "SCORE: " + STR$(score))
+    TEXT(360, 6, "LEBEN: " + STR$(lives))
+    IF lives <= 0 THEN
+        TEXT(196, 300, "GAME OVER")
+        TEXT(150, 322, "[LEER] = neu starten")
+    END IF
+
+    FLIP()
+WEND

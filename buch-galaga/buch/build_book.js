@@ -122,6 +122,17 @@ function h1(text) {
 function h2(text) {
   return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text })] });
 }
+// Kapitel-Ueberschrift: beginnt immer auf einer neuen Seite (pageBreakBefore
+// vermeidet Leerseiten, falls das vorige Kapitel genau am Seitenende endete).
+function chapter(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    pageBreakBefore: true,
+    spacing: { before: 0, after: 80 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
+    children: [new TextRun({ text })],
+  });
+}
 
 // ===================== Inhalt =====================
 const children = [];
@@ -225,8 +236,7 @@ children.push(bulletRich("Politur: ", "Sound, Effekte, Highscores, Export als .e
 children.push(tip("Alles in Farbe und zum Selbermachen", "Dieses Buch ist als Word-Dokument angelegt. Du kannst es nach Belieben ergänzen, umstellen, eigene Screenshots einfügen – und natürlich ausdrucken."));
 
 // ===================== Kapitel 1 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 1: Das erste Fenster"));
+children.push(chapter("Kapitel 1: Das erste Fenster"));
 children.push(tip("In diesem Kapitel",
   "Du öffnest dein allererstes GameBasic-Fenster, lernst die „Spielschleife“ kennen und zauberst einen scrollenden Sternenhimmel – die Bühne, auf der später unser Raumschiff kämpft."));
 
@@ -343,8 +353,7 @@ children.push(bullet("Erhöhe NSTARS auf 200 – ein dichteres Weltall."));
 children.push(bullet("Zusatz: Gib manchen Sternen mit einer zweiten Geschwindigkeit mehr Tiefe (Tipp: ein drittes Array für das Tempo)."));
 
 // ===================== Kapitel 2 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 2: Das Schiff"));
+children.push(chapter("Kapitel 2: Das Schiff"));
 children.push(tip("In diesem Kapitel",
   "Du holst dein Raumschiff auf den Bildschirm: ein fertiges Bild laden, an die richtige Stelle zeichnen und mit den Pfeiltasten nach links und rechts steuern."));
 
@@ -458,8 +467,7 @@ children.push(bullet("Erlaube auch Bewegung nach oben und unten (KEY_UP / KEY_DO
 children.push(bullet("Setze das Schiff an eine andere Startposition."));
 
 // ===================== Kapitel 3 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 3: Sprites selbst zeichnen"));
+children.push(chapter("Kapitel 3: Sprites selbst zeichnen"));
 children.push(tip("In diesem Kapitel",
   "Du lernst den mitgelieferten Pixel-Editor gbsprites kennen und zeichnest deine eigene Grafik: das Raumschiff und einen Gegner mit Flügelschlag-Animation. Wer lieber sofort weiterprogrammiert, nimmt einfach die fertigen Sprites aus dem assets-Ordner – beides funktioniert."));
 
@@ -528,8 +536,7 @@ children.push(bullet("Zeichne deinen eigenen Gegner mit zwei Frames."));
 children.push(bullet("Exportiere ihn als PNG und tausche ihn testweise im Spiel ein."));
 
 // ===================== Kapitel 4 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 4: Schiessen"));
+children.push(chapter("Kapitel 4: Schiessen"));
 children.push(tip("In diesem Kapitel",
   "Dein Schiff bekommt Feuerkraft. Du lernst einen „Pool“ kennen – einen festen Vorrat an Schüssen, den wir clever wiederverwenden – und feuerst genau einen Schuss pro Tastendruck."));
 
@@ -660,8 +667,7 @@ children.push(bullet("Mach die Schüsse schneller oder langsamer (die 8)."));
 children.push(bullet("Entferne die Flankenerkennung (feuere bei gehaltener Taste) – wie fühlt sich das an?"));
 
 // ===================== Kapitel 5 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 5: Sternenhimmel mit Parallax"));
+children.push(chapter("Kapitel 5: Sternenhimmel mit Parallax"));
 children.push(tip("In diesem Kapitel",
   "Aus dem schlichten Sternenhimmel von Kapitel 1 wird ein echter Weltraum: Sterne in mehreren Tiefen-Ebenen, die unterschiedlich schnell scrollen und sanft funkeln."));
 
@@ -736,8 +742,7 @@ children.push(bullet("Gib den Sternen einen leichten Blaustich (etwas weniger Ro
 children.push(bullet("Ändere die Funkel-Geschwindigkeit (die 0.08)."));
 
 // ===================== Kapitel 6 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 6: Gegner & Formation"));
+children.push(chapter("Kapitel 6: Gegner & Formation"));
 children.push(tip("In diesem Kapitel",
   "Jetzt kommt Leben ins Spiel: eine ganze Formation bunter Gegner. Dafür lernst du Klassen kennen – einen Bauplan für gleichartige Dinge – und ordnest 24 Gegner in einem Gitter an, das sanft schwebt."));
 
@@ -829,8 +834,7 @@ children.push(bullet("Lass die Formation stärker oder schneller schweben (die 1
 children.push(bullet("Verlangsame den Flügelschlag (die 12 in der Frame-Wahl)."));
 
 // ===================== Kapitel 7 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 7: Einflug-Manöver"));
+children.push(chapter("Kapitel 7: Einflug-Manöver"));
 children.push(tip("In diesem Kapitel",
   "Die Gegner stehen nicht mehr einfach da – sie fliegen in eleganten, geschwungenen Bögen ein und sammeln sich dann zur Formation. Das ist der Moment, in dem es sich richtig nach Galaga anfühlt."));
 
@@ -921,8 +925,7 @@ children.push(bullet("Verändere die Kontrollpunkte – wie ändert sich die Bah
 children.push(bullet("Lass die Gegner enger gestaffelt starten (kleinerer delay-Faktor als i * 4)."));
 
 // ===================== Kapitel 8 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 8: Sturzangriffe"));
+children.push(chapter("Kapitel 8: Sturzangriffe"));
 children.push(tip("In diesem Kapitel",
   "Die Gegner werden gefährlich: Einzelne lösen sich aus der Formation und stürzen im Bogen auf dich herab. Dafür bekommt jeder Gegner eine kleine Zustands-Maschine – gesteuert über ein ENUM."));
 
@@ -1011,8 +1014,7 @@ children.push(bullet("Mach den Sturz schneller (die 0.013)."));
 children.push(bullet("Zusatz: Lass beim Sturz-Tiefpunkt etwas passieren (Vorschau auf die Bomben im nächsten Kapitel)."));
 
 // ===================== Kapitel 9 =====================
-children.push(new Paragraph({ children: [new PageBreak()] }));
-children.push(h1("Kapitel 9: Bomben & Ausweichen"));
+children.push(chapter("Kapitel 9: Bomben & Ausweichen"));
 children.push(tip("In diesem Kapitel",
   "Jetzt wird zurückgeschossen: Stürzende Gegner werfen Bomben ab, denen du ausweichen musst. Du nutzt einen zweiten Pool – diesmal für fallende Bomben – und lernst, wie eine Methode mit FUNCTION ein Ergebnis zurückgibt."));
 
@@ -1105,6 +1107,105 @@ children.push(h2("Übung"));
 children.push(bullet("Mach die Bomben schneller oder langsamer (bombSpeed)."));
 children.push(bullet("Lass Gegner früher oder später abwerfen (dropAt)."));
 children.push(bullet("Erhöhe NBOMB, damit mehr Bomben gleichzeitig fallen können."));
+
+// ===================== Kapitel 10 =====================
+children.push(chapter("Kapitel 10: Treffer & Punkte"));
+children.push(tip("In diesem Kapitel",
+  "Jetzt wird es ein echtes Spiel: Schüsse zerstören Gegner und geben Punkte, Bomben und Stürze kosten dich Leben – und bei null Leben heisst es Game Over (mit Neustart). Dafür schreibst du deine erste eigene Funktion."));
+
+children.push(h2("Berühren sich zwei Rechtecke? Eine Funktion"));
+children.push(p("Eine Kollision prüfen wir oft – für Schüsse, Bomben, das Schiff. Solchen wiederkehrenden Code packt man in eine eigene Funktion und gibt ihr einen Namen. Unsere Funktion prüft, ob sich zwei Rechtecke überlappen (AABB-Test):"));
+children.push(codeBlock([
+  "FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _",
+  "                 cx AS FLOAT, cy AS FLOAT, cw AS FLOAT, ch AS FLOAT) AS BOOLEAN",
+  "    RETURN ax < cx + cw AND ax + aw > cx AND ay < cy + ch AND ay + ah > cy",
+  "END FUNCTION",
+]));
+children.push(pmix([
+  ["Zwei Rechtecke überlappen nur, wenn sie sich in beiden Richtungen überschneiden – das prüfen die vier mit ", false],
+  ["AND", true],
+  [" verknüpften Bedingungen. Jedes Rechteck wird durch Ecke (x, y) und Grösse (Breite, Höhe) beschrieben. Die Funktion gibt ", false],
+  ["TRUE", true], [" oder ", false], ["FALSE", true], [" zurück.", false],
+]));
+
+children.push(h2("Schuss trifft Gegner"));
+children.push(p("Für jeden fliegenden Schuss prüfen wir jeden lebenden Gegner. Bei einer Überlappung verschwinden beide, und es gibt Punkte (obere Reihen zählen mehr):"));
+children.push(codeBlock([
+  "FOR i = 0 TO NBULLET - 1",
+  "    IF bAlive[i] THEN",
+  "        FOR j = 0 TO NBUGS - 1",
+  "            IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN",
+  "                bugs[j].alive = FALSE : bAlive[i] = FALSE",
+  "                score = score + (ROWS - bugs[j].row) * 10",
+  "                BREAK",
+  "            END IF",
+  "        NEXT j",
+  "    END IF",
+  "NEXT i",
+]));
+
+children.push(h2("Spieler getroffen"));
+children.push(pmix([
+  ["Genauso prüfen wir Bomben und stürzende Gegner gegen das Schiff. Ein Treffer kostet ein Leben und macht dich kurz unverwundbar (", false],
+  ["invuln", true], ["), damit du nicht sofort mehrfach getroffen wirst:", false],
+]));
+children.push(codeBlock([
+  "IF invuln = 0 THEN",
+  "    DIM hit AS BOOLEAN : hit = FALSE",
+  "    FOR i = 0 TO NBOMB - 1",
+  "        IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, shipX+3.0, shipY+2.0, 10, 12) THEN",
+  "            boAlive[i] = FALSE : hit = TRUE",
+  "        END IF",
+  "    NEXT i",
+  "    ' ... ebenso stuerzende Gegner pruefen ...",
+  "    IF hit THEN lives = lives - 1 : invuln = 90",
+  "END IF",
+]));
+children.push(pmix([
+  ["Solange ", false], ["invuln", true],
+  [" grösser 0 ist, lassen wir das Schiff blinken (zeichnen es nur in jedem zweiten Moment) – ein klares Zeichen, dass du gerade geschützt bist.", false],
+]));
+
+children.push(h2("Punkte & Leben anzeigen (HUD)"));
+children.push(pmix([
+  ["Text schreibst du mit ", false], ["TEXT(x, y, text)", true],
+  [". Zahlen musst du dafür in Text verwandeln – das macht ", false],
+  ["STR$", true], [":", false],
+]));
+children.push(codeBlock([
+  'TEXT(8, 6, "SCORE: " + STR$(score))',
+  'TEXT(360, 6, "LEBEN: " + STR$(lives))',
+]));
+
+children.push(h2("Neustart: eine eigene SUB"));
+children.push(p("Den Aufbau eines frischen Spiels (Formation bauen, Punkte und Leben zurücksetzen) brauchen wir am Anfang und bei jedem Neustart. Deshalb steckt er in einer eigenen SUB, die wir einfach aufrufen:"));
+children.push(codeBlock([
+  "SUB NewGame()",
+  "    DIM k AS INTEGER",
+  "    ' ... Formation 3x8 bauen (wie in Kapitel 6) ...",
+  "    FOR k = 0 TO NBULLET - 1 : bAlive[k] = FALSE : NEXT k",
+  "    FOR k = 0 TO NBOMB - 1 : boAlive[k] = FALSE : NEXT k",
+  "    score = 0 : lives = 3 : invuln = 0 : diveTimer = 120 : shipX = 232",
+  "END SUB",
+]));
+children.push(pmix([
+  ["Wir rufen ", false], ["NewGame()", true],
+  [" einmal vor der Schleife auf – und bei Game Over erneut, sobald Leertaste gedrückt wird. Das vollständige Programm liegt in ", false],
+  ["code/kap10/treffer.gb", true], [".", false],
+]));
+figure("kap10_treffer.png", "Ein echtes Spiel: Punkte oben links, Leben oben rechts, ausgedünnte Formation.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("Eigene FUNCTION ", "(Overlap) bündelt wiederkehrenden Code und gibt ein Ergebnis zurück."));
+children.push(bulletRich("AABB-Kollision ", "= Rechteck-Überlappung mit vier AND-Bedingungen."));
+children.push(bulletRich("Score, Leben, Unverwundbarkeit ", "machen aus Bewegung ein Spiel."));
+children.push(bulletRich("SUB NewGame ", "+ TEXT/STR$ für Neustart und HUD."));
+
+children.push(h2("Übung"));
+children.push(bullet("Vergib mehr Punkte oder andere Werte pro Reihe."));
+children.push(bullet("Gib dem Spieler 5 statt 3 Leben."));
+children.push(bullet("Verlängere die Unverwundbarkeit (invuln = 90 → grösser)."));
+children.push(bullet("Zusatz: Zeige „LEVEL geschafft“, wenn alle Gegner abgeschossen sind."));
 
 // ===================== Dokument =====================
 const doc = new Document({
