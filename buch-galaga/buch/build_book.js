@@ -457,6 +457,76 @@ children.push(bullet("Mach das Schiff schneller oder langsamer (ändere die 4)."
 children.push(bullet("Erlaube auch Bewegung nach oben und unten (KEY_UP / KEY_DOWN, mit shipY) – und begrenze sie."));
 children.push(bullet("Setze das Schiff an eine andere Startposition."));
 
+// ===================== Kapitel 3 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 3: Sprites selbst zeichnen"));
+children.push(tip("In diesem Kapitel",
+  "Du lernst den mitgelieferten Pixel-Editor gbsprites kennen und zeichnest deine eigene Grafik: das Raumschiff und einen Gegner mit Flügelschlag-Animation. Wer lieber sofort weiterprogrammiert, nimmt einfach die fertigen Sprites aus dem assets-Ordner – beides funktioniert."));
+
+children.push(h2("Was ist ein Sprite?"));
+children.push(p("Ein Sprite ist ein kleines Bild aus einzelnen farbigen Pixeln – wie kariertes Papier, bei dem jedes Kästchen eine Farbe bekommt. Unser Schiff ist nur 16 × 16 Pixel gross. Stark vergrössert sieht man die einzelnen Pixel deutlich:"));
+figure("kap03_pixelraster.png", "Das Raumschiff als Pixel-Raster – jedes Kästchen ist ein Pixel.", 280, 280).forEach(e => children.push(e));
+
+children.push(h2("Der Sprite-Editor gbsprites"));
+children.push(pmix([
+  ["GameBasic bringt einen eigenen Pixel-Editor mit. Du startest ihn mit dem Befehl ", false],
+  ["gbsprites", true],
+  [" – entweder leer für ein neues Bild oder mit einer Datei: ", false],
+  ["gbsprites player.png", true], [".", false],
+]));
+children.push(p("Die wichtigsten Werkzeuge:"));
+children.push(bulletRich("Stift ", "setzt einzelne Pixel in der gewählten Farbe."));
+children.push(bulletRich("Radierer ", "löscht Pixel (macht sie durchsichtig)."));
+children.push(bulletRich("Füller (Eimer) ", "füllt eine zusammenhängende Fläche."));
+children.push(bulletRich("Pipette ", "übernimmt eine Farbe aus dem Bild."));
+children.push(bulletRich("Palette ", "deine Farbauswahl – Klick wählt die aktive Farbe."));
+children.push(bulletRich("Symmetrie X ", "spiegelt deine Striche links/rechts – ideal für ein symmetrisches Raumschiff: du zeichnest nur die Hälfte."));
+
+children.push(h2("Das Schiff zeichnen"));
+children.push(p("So gehst du vor:"));
+children.push(new Paragraph({ numbering: { reference: "num3", level: 0 }, spacing: { after: 60 }, children: [new TextRun({ text: "Neues Bild mit 16 × 16 Pixeln anlegen.", size: 22 })] }));
+children.push(new Paragraph({ numbering: { reference: "num3", level: 0 }, spacing: { after: 60 }, children: [new TextRun({ text: "Symmetrie X einschalten – dann genügt es, die linke Hälfte zu malen.", size: 22 })] }));
+children.push(new Paragraph({ numbering: { reference: "num3", level: 0 }, spacing: { after: 60 }, children: [new TextRun({ text: "Mit dem Stift die Umrisse (hell) setzen, dann den Rumpf (blau) füllen.", size: 22 })] }));
+children.push(new Paragraph({ numbering: { reference: "num3", level: 0 }, spacing: { after: 60 }, children: [new TextRun({ text: "Ein gelbes Cockpit in die Mitte, rote Triebwerke nach unten – fertig.", size: 22 })] }));
+children.push(tip("Tipp", "Weniger ist mehr: Bei 16 × 16 Pixeln zählt jedes Kästchen. Wenige klare Farben wirken besser als viele Details."));
+
+children.push(h2("Animation mit Frames"));
+children.push(p("Ein Gegner wirkt lebendig, wenn er mit den Flügeln schlägt. Dafür zeichnest du mehrere Einzelbilder, sogenannte Frames, und das Spiel zeigt sie schnell nacheinander. Unser Gegner braucht nur zwei Frames – Flügel oben, Flügel unten:"));
+figure("kap03_frames.png", "Zwei Frames ergeben den Flügelschlag – schnell abgewechselt wirkt es wie Bewegung.", 360, 200).forEach(e => children.push(e));
+children.push(pmix([
+  ["Im Editor legst du über die Frame-Liste ein zweites Bild an. Die ", false],
+  ["Zwiebelschalen-Ansicht", false],
+  [" (Onion-Skin) zeigt das vorige Frame blass im Hintergrund – so triffst du die Bewegung leichter.", false],
+]));
+
+children.push(h2("Speichern und exportieren"));
+children.push(pmix([
+  ["Speichere dein Werk als ", false], [".gbsprite", true],
+  [" – so kannst du es später weiter bearbeiten (mit allen Frames). Fürs Spiel exportierst du zusätzlich ein ", false],
+  ["PNG", true], [": ein einzelnes Bild beim Schiff, oder bei mehreren Frames ein ", false],
+  ["Sheet", false], [" (alle Frames nebeneinander in einem Bild).", false],
+]));
+children.push(p("Genau diese PNGs liegen schon fertig im Projekt – das sind die Sprites, die wir verwenden:"));
+figure("kap03_alle_sprites.png", "Unsere Sprites: Schiff, drei Gegner (je 2 Frames), Schuss und Bombe.", 460, 200).forEach(e => children.push(e));
+
+children.push(h2("Im Spiel verwenden"));
+children.push(pmix([
+  ["Im Spiel lädst du dein PNG genau wie in Kapitel 2 mit ", false],
+  ["LOADIMAGE", true], [" und zeichnest es mit ", false], ["DRAWIMAGE", true],
+  [". Zeichnest du das Schiff um, ändert sich sofort dein Spiel – ohne eine Zeile Code anzufassen.", false],
+]));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("Sprite ", "= kleines Bild aus einzelnen Pixeln (hier 16 × 16)."));
+children.push(bulletRich("gbsprites ", "= der Pixel-Editor mit Stift, Füller, Pipette und Symmetrie."));
+children.push(bulletRich("Frames ", "= mehrere Einzelbilder ergeben eine Animation (Onion-Skin hilft)."));
+children.push(bulletRich("Export ", "= .gbsprite zum Weiterbearbeiten, PNG/Sheet fürs Spiel."));
+
+children.push(h2("Übung"));
+children.push(bullet("Öffne ein vorhandenes Sprite (z. B. player.png) in gbsprites und färbe es um."));
+children.push(bullet("Zeichne deinen eigenen Gegner mit zwei Frames."));
+children.push(bullet("Exportiere ihn als PNG und tausche ihn testweise im Spiel ein."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
@@ -474,6 +544,8 @@ const doc = new Document({
   },
   numbering: { config: [
     { reference: "bul", levels: [{ level: 0, format: LevelFormat.BULLET, text: "•", alignment: AlignmentType.LEFT,
+      style: { paragraph: { indent: { left: 540, hanging: 280 } } } }] },
+    { reference: "num3", levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
       style: { paragraph: { indent: { left: 540, hanging: 280 } } } }] },
   ] },
   sections: [{
