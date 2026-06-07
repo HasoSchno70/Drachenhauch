@@ -68,7 +68,20 @@ CLASS Bug
         Self.state = St.DIVE
     END SUB
 
-    FUNCTION Update(sway AS FLOAT) AS BOOLEAN
+    ' Bonus-Welle: ein geschwungener Bogen quer durchs Bild (oben rein, unten
+    ' raus). seed staffelt Seite + Startverzoegerung, damit es lebendig wirkt.
+    SUB BonusPath(seed AS INTEGER)
+        DIM side AS INTEGER : side = IIF(seed MOD 2 = 0, -1, 1)
+        DIM sx AS FLOAT : sx = IIF(side < 0, -20.0, PW + 20.0)
+        Self.SetPath(0.010 + RANDF(0.0, 0.005), _
+            sx, -10.0, PW / 2.0 + side * 90.0, 70.0, _
+            PW / 2.0 - side * 90.0, 180.0, PW / 2.0 - side * 60.0, PH + 30.0)
+        Self.state = St.ENTER
+        Self.delay = seed MOD 50
+        Self.alive = TRUE
+    END SUB
+
+    FUNCTION Update(sway AS FLOAT, isBonus AS BOOLEAN) AS BOOLEAN
         IF Self.state = St.FORM THEN
             Self.x = Self.hx + sway : Self.y = Self.hy : RETURN FALSE
         END IF
@@ -86,7 +99,9 @@ CLASS Bug
             Self.dropped = TRUE : drop = TRUE
         END IF
         IF Self.t >= 1.0 THEN
-            IF Self.state = St.DIVE THEN
+            IF isBonus THEN
+                Self.BonusPath(INT(Self.x) + INT(Self.t * 100.0) + 1)   ' neuer Bogen
+            ELSEIF Self.state = St.DIVE THEN
                 Self.SetPath(0.014, Self.hx, -30.0, Self.hx, 60.0, _
                     Self.hx, 30.0, Self.hx, Self.hy)
                 Self.state = St.ENTER
@@ -158,6 +173,9 @@ DIM lives AS INTEGER : DIM score AS INTEGER : DIM level AS INTEGER
 DIM frame AS INTEGER : DIM prevShoot AS BOOLEAN : DIM invuln AS INTEGER
 DIM diveTimer AS INTEGER : DIM diveSpeed AS FLOAT : DIM bombSpeed AS FLOAT
 DIM levelMsg AS INTEGER : DIM bugsAlive AS INTEGER
+DIM bonus AS BOOLEAN              ' ist die aktuelle Welle eine Bonus-Welle?
+DIM bonusTimer AS INTEGER        ' Restdauer der Bonus-Welle (Frames)
+DIM bonusHits AS INTEGER         ' Treffer in der Bonus-Welle
 
 ' --- Parallax-Sternenhimmel (3 Tiefen-Ebenen, von oben nach unten scrollend) ---
 CONST NSTARS AS INTEGER = 90
@@ -192,12 +210,14 @@ CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
 
 SUB NewLevel()
     DIM i AS INTEGER
+    bonus = (level MOD 3 = 0)        ' jede 3. Welle ist eine Bonus-Welle
     DIM gapX AS FLOAT : gapX = 24.0
     DIM startX AS FLOAT : startX = (PW - (COLS - 1) * gapX) / 2.0 - 8.0
     FOR i = 0 TO NBUGS - 1
         DIM col AS INTEGER : col = i MOD COLS
         DIM rw AS INTEGER  : rw = i \ COLS
         bugs[i] = NEW Bug(rw, startX + col * gapX, 40.0 + rw * 22.0, i * 4)
+        IF bonus THEN bugs[i].BonusPath(i * 7 + level * 13)   ' quer durchfliegen
     NEXT i
     FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
     FOR i = 0 TO NBOMB - 1 : boAlive[i] = FALSE : NEXT i
@@ -205,6 +225,8 @@ SUB NewLevel()
     diveTimer = 110
     diveSpeed = 0.009 + level * 0.0016
     bombSpeed = 2.1 + level * 0.40
+    bonusTimer = 540                 ' ~9 s Bonus-Welle
+    bonusHits = 0
     levelMsg = 110
     PLAYSOUND(sfxLevel)
 END SUB
@@ -352,28 +374,31 @@ SUB UpdatePlay()
     IF firing AND NOT prevShoot THEN Shoot()
     prevShoot = firing
 
-    ' Sturzangriff ausloesen.
-    diveTimer = diveTimer - 1
-    IF diveTimer <= 0 THEN
-        diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
-        DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
-        DIM launched AS INTEGER : launched = 0
-        DIM tries AS INTEGER
-        FOR tries = 0 TO 20
-            IF launched >= nDive THEN BREAK
-            DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
-            IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
-                bugs[pick].Dive(playerX, diveSpeed)
-                launched = launched + 1
-            END IF
-        NEXT tries
+    ' Sturzangriff ausloesen (in der Bonus-Welle gibt es keine Stuerze/Bomben).
+    IF NOT bonus THEN
+        diveTimer = diveTimer - 1
+        IF diveTimer <= 0 THEN
+            diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
+            DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
+            DIM launched AS INTEGER : launched = 0
+            DIM tries AS INTEGER
+            FOR tries = 0 TO 20
+                IF launched >= nDive THEN BREAK
+                DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
+                IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
+                    bugs[pick].Dive(playerX, diveSpeed)
+                    launched = launched + 1
+                END IF
+            NEXT tries
+        END IF
     END IF
 
-    ' Gegner bewegen (Sturz wirft am Tiefpunkt eine Bombe).
+    ' Gegner bewegen (Sturz wirft am Tiefpunkt eine Bombe; in der Bonus-Welle
+    ' fliegen sie nur Boegen und werfen nichts).
     DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
     FOR i = 0 TO NBUGS - 1
         IF bugs[i].alive THEN
-            IF bugs[i].Update(sway) THEN DropBomb(bugs[i].x, bugs[i].y)
+            IF bugs[i].Update(sway, bonus) THEN DropBomb(bugs[i].x, bugs[i].y)
         END IF
     NEXT i
 
@@ -397,12 +422,19 @@ SUB UpdatePlay()
         IF bAlive[i] THEN
             FOR j = 0 TO NBUGS - 1
                 IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
-                    bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
-                    DIM gain AS INTEGER : gain = (ROWS - bugs[j].row) * 50
+                    bAlive[i] = FALSE
+                    DIM gain AS INTEGER : gain = IIF(bonus, 150, (ROWS - bugs[j].row) * 50)
                     score = score + gain
                     Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
                     Popup(bugs[j].x + 2.0, bugs[j].y, gain)
-                    PLAYSOUND(sfxBoom) : BREAK
+                    PLAYSOUND(sfxBoom)
+                    IF bonus THEN
+                        bonusHits = bonusHits + 1
+                        bugs[j].BonusPath(frame + j * 17 + 1)   ' sofort neu einfliegen
+                    ELSE
+                        bugs[j].alive = FALSE : bugsAlive = bugsAlive - 1
+                    END IF
+                    BREAK
                 END IF
             NEXT j
         END IF
@@ -431,8 +463,15 @@ SUB UpdatePlay()
         END IF
     END IF
 
-    ' Level geschafft?
-    IF lives > 0 AND bugsAlive <= 0 THEN
+    ' Level geschafft? (in der Bonus-Welle endet sie per Timer, nicht durch
+    ' Leerschiessen -- die Gegner fliegen immer wieder neu ein.)
+    IF bonus THEN
+        bonusTimer = bonusTimer - 1
+        IF bonusTimer <= 0 THEN
+            score = score + bonusHits * 20      ' kleiner Abschluss-Bonus
+            level = level + 1 : NewLevel()
+        END IF
+    ELSEIF lives > 0 AND bugsAlive <= 0 THEN
         level = level + 1 : NewLevel()
     END IF
 END SUB
@@ -602,7 +641,12 @@ WHILE NOT QUITREQUESTED()
         NEXT p
         TEXT(INT(offx) + 4, 6, f"SCORE {score}")
         TEXT(cx - 24, 6, f"LEVEL {level}")
-        IF levelMsg > 0 THEN TEXT(cx - 28, INT(sh / 2) - 4, f"LEVEL {level}")
+        IF bonus THEN
+            TEXT(cx - 32, 24, f"HITS {bonusHits}", &H80FFB0)
+            IF levelMsg > 0 THEN TEXT(cx - 56, INT(sh / 2) - 8, "BONUS STAGE!", &HFFE070)
+        ELSEIF levelMsg > 0 THEN
+            TEXT(cx - 28, INT(sh / 2) - 4, f"LEVEL {level}")
+        END IF
     END IF
     ' F1-Hinweis immer sichtbar (oben rechts im Spielfeld).
     TEXT(INT(sw - offx) - 56, 6, IIF(crtOn, "F1:CRT*", "F1:CRT "), &H5C7088)
