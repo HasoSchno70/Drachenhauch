@@ -524,7 +524,25 @@ SUB DrawMarquee(sh AS INTEGER)
     TEXT_SIZE(20)
 END SUB
 
+' Animierte Regenbogen-Streifen in den Letterbox-Raendern links/rechts vom
+' Spielfeld: vertikal fliessender HSV-Verlauf, der zum Spielfeld hin hell glueht.
+SUB DrawSideRainbows(sh AS INTEGER)
+    DIM sw AS INTEGER : sw = SCREENWIDTH()
+    DIM zoom AS FLOAT : zoom = sh / PH
+    DIM offx AS INTEGER : offx = INT((sw - PW * zoom) / 2.0)
+    IF offx <= 2 THEN RETURN                ' kein Rand (schmales Fenster) -> nichts
+    DIM y AS INTEGER
+    FOR y = 0 TO sh - 1 STEP 3
+        DIM hue AS INTEGER : hue = (y + frame * 2) MOD 360
+        DIM lite AS INTEGER : lite = HSV(hue, 0.95, 0.55)        ' Gluehen zum Spielfeld
+        DIM dark AS INTEGER : dark = HSV(hue, 0.85, 0.03)        ' fast schwarz am Rand
+        GRADIENTH(0, y, offx - 2, y + 2, dark, lite)             ' links: aussen->innen hell
+        GRADIENTH(sw - offx + 2, y, sw - 1, y + 2, lite, dark)   ' rechts: innen hell->aussen
+    NEXT y
+END SUB
+
 SUB DrawTitle(cx AS INTEGER, sh AS INTEGER)
+    DrawSideRainbows(sh)
     TEXT_SIZE(48)
     CenterText(64, "GALAGA", &H8FE0FF)
     TEXT_SIZE(18)
@@ -547,6 +565,7 @@ SUB DrawTitle(cx AS INTEGER, sh AS INTEGER)
 END SUB
 
 SUB DrawEntry(cx AS INTEGER, sh AS INTEGER)
+    DrawSideRainbows(sh)
     DIM letters AS STRING : letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     TEXT_SIZE(28)
     CenterText(108, "NEUER HIGHSCORE!", &HFFE070)
