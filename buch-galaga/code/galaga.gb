@@ -1,91 +1,74 @@
 ' ============================================================================
 '  GALAGA -- Prototyp (Buch-Zielstand)
-'  Player unten, Gegner-Formation oben. Gegner fliegen mit Bezier-Schwuengen
-'  ein, sitzen in Formation (Sway) und stuerzen einzeln im Bogen herab und
-'  werfen Bomben ab, denen man ausweichen muss.
+'  Vollbild (Spielfeld per Kamera-Zoom zentriert skaliert), Formation mit
+'  Einflug-Schwuengen, Sturzangriffe mit Bombenabwurf (auch weiter oben), das
+'  Schiff kann auch ein Stueck nach oben manoevrieren. Lebens-Balken, Sound,
+'  mehrere Level. Steuerung: Pfeile/WASD bewegen, Leertaste schiessen.
 ' ============================================================================
 IMPORT "sprite"
 IMPORT "curves"
+IMPORT "audio"
+IMPORT "camera"
 
-CONST WIDTH    AS INTEGER = 224
-CONST HEIGHT   AS INTEGER = 288
+CONST PW       AS INTEGER = 240         ' Spielfeld-Breite (logisch)
+CONST PH       AS INTEGER = 320         ' Spielfeld-Hoehe
 CONST COLS     AS INTEGER = 8
 CONST ROWS     AS INTEGER = 3
-CONST NBUGS    AS INTEGER = 24          ' COLS * ROWS
+CONST NBUGS    AS INTEGER = 24
 CONST NBULLET  AS INTEGER = 3
-CONST NBOMB    AS INTEGER = 10
+CONST NBOMB    AS INTEGER = 14
 CONST BG       AS INTEGER = &H070A14
+CONST FULL     AS BOOLEAN = TRUE        ' Vollbild? (zum Testen auf FALSE)
 
 ENUM St = ENTER, FORM, DIVE
 
-' --- Ein Gegner: Position, Formations-Heimat, Zustand, Flugbahn ---
 CLASS Bug
-    DIM x AS FLOAT
-    DIM y AS FLOAT
-    DIM hx AS FLOAT                     ' Heimat in der Formation
-    DIM hy AS FLOAT
+    DIM x AS FLOAT : DIM y AS FLOAT
+    DIM hx AS FLOAT : DIM hy AS FLOAT
     DIM row AS INTEGER
     DIM alive AS BOOLEAN
     DIM state AS INTEGER
-    DIM t AS FLOAT                      ' Bahn-Parameter 0..1
-    DIM ts AS FLOAT                     ' Bahn-Geschwindigkeit
-    DIM delay AS INTEGER               ' Start-Verzoegerung beim Einflug
-    DIM cx0 AS FLOAT : DIM cy0 AS FLOAT  ' Bezier-Kontrollpunkte
+    DIM t AS FLOAT : DIM ts AS FLOAT
+    DIM delay AS INTEGER
+    DIM cx0 AS FLOAT : DIM cy0 AS FLOAT
     DIM cx1 AS FLOAT : DIM cy1 AS FLOAT
     DIM cx2 AS FLOAT : DIM cy2 AS FLOAT
     DIM cx3 AS FLOAT : DIM cy3 AS FLOAT
-    DIM dropAt AS FLOAT                 ' bei welchem t eine Bombe faellt (-1 = nie)
+    DIM dropAt AS FLOAT
     DIM dropped AS BOOLEAN
 
     SUB Init(prow AS INTEGER, phx AS FLOAT, phy AS FLOAT, pdelay AS INTEGER)
-        Self.row = prow
-        Self.hx = phx
-        Self.hy = phy
-        Self.delay = pdelay
-        Self.alive = TRUE
-        Self.dropAt = -1.0
-        Self.dropped = FALSE
-        ' Einflug-Bahn von oben ausserhalb -> Heimat
-        DIM side AS INTEGER
-        side = IIF(prow MOD 2 = 0, -1, 1)
+        Self.row = prow : Self.hx = phx : Self.hy = phy : Self.delay = pdelay
+        Self.alive = TRUE : Self.dropAt = -1.0 : Self.dropped = FALSE
+        DIM side AS INTEGER : side = IIF(prow MOD 2 = 0, -1, 1)
         Self.SetPath(0.012, _
-            phx - side * 90.0, -30.0, _
-            WIDTH / 2.0 + side * 70.0, 70.0, _
-            phx + side * 40.0, 40.0, _
-            phx, phy)
+            phx - side * 90.0, -30.0, PW / 2.0 + side * 70.0, 80.0, _
+            phx + side * 40.0, 40.0, phx, phy)
         Self.state = St.ENTER
     END SUB
 
     SUB SetPath(spd AS FLOAT, ax AS FLOAT, ay AS FLOAT, bx AS FLOAT, by AS FLOAT, _
                 ccx AS FLOAT, ccy AS FLOAT, dx AS FLOAT, dy AS FLOAT)
         Self.ts = spd : Self.t = 0.0 : Self.dropped = FALSE
-        Self.cx0 = ax : Self.cy0 = ay
-        Self.cx1 = bx : Self.cy1 = by
-        Self.cx2 = ccx : Self.cy2 = ccy
-        Self.cx3 = dx : Self.cy3 = dy
+        Self.cx0 = ax : Self.cy0 = ay : Self.cx1 = bx : Self.cy1 = by
+        Self.cx2 = ccx : Self.cy2 = ccy : Self.cx3 = dx : Self.cy3 = dy
         Self.x = ax : Self.y = ay
     END SUB
 
-    ' Sturzangriff in Richtung Spielerspalte px starten
-    SUB Dive(px AS FLOAT)
-        DIM side AS INTEGER
-        side = IIF(Self.hx < WIDTH / 2.0, 1, -1)
-        Self.SetPath(0.010, _
-            Self.hx, Self.hy, _
-            Self.hx + side * 50.0, Self.hy + 80.0, _
-            px, HEIGHT - 70.0, _
-            px - side * 50.0, HEIGHT + 30.0)
-        Self.dropAt = 0.62
+    ' Sturzangriff Richtung Spielerspalte px starten; speed waechst pro Level.
+    SUB Dive(px AS FLOAT, speed AS FLOAT)
+        DIM side AS INTEGER : side = IIF(Self.hx < PW / 2.0, 1, -1)
+        Self.SetPath(speed, _
+            Self.hx, Self.hy, Self.hx + side * 50.0, Self.hy + 80.0, _
+            px, PH - 70.0, px - side * 50.0, PH + 30.0)
+        ' Bombe faellt an einem zufaelligen Punkt der Bahn -- auch weiter oben.
+        Self.dropAt = 0.28 + RANDF(0.0, 0.42)
         Self.state = St.DIVE
     END SUB
 
-    ' Pro Frame fortbewegen. sway = Formations-Schwingung. Liefert TRUE, wenn
-    ' jetzt eine Bombe abgeworfen werden soll.
     FUNCTION Update(sway AS FLOAT) AS BOOLEAN
         IF Self.state = St.FORM THEN
-            Self.x = Self.hx + sway
-            Self.y = Self.hy
-            RETURN FALSE
+            Self.x = Self.hx + sway : Self.y = Self.hy : RETURN FALSE
         END IF
         IF Self.delay > 0 THEN
             Self.delay = Self.delay - 1
@@ -93,24 +76,20 @@ CLASS Bug
         END IF
         Self.t = Self.t + Self.ts
         DIM bx AS FLOAT : DIM by AS FLOAT
-        (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), _
-            Self.cx0, Self.cy0, Self.cx1, Self.cy1, _
-            Self.cx2, Self.cy2, Self.cx3, Self.cy3)
+        (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), Self.cx0, Self.cy0, _
+            Self.cx1, Self.cy1, Self.cx2, Self.cy2, Self.cx3, Self.cy3)
         Self.x = bx : Self.y = by
-        DIM drop AS BOOLEAN
-        drop = FALSE
+        DIM drop AS BOOLEAN : drop = FALSE
         IF Self.state = St.DIVE AND NOT Self.dropped AND Self.t >= Self.dropAt THEN
-            Self.dropped = TRUE
-            drop = TRUE
+            Self.dropped = TRUE : drop = TRUE
         END IF
         IF Self.t >= 1.0 THEN
             IF Self.state = St.DIVE THEN
-                ' unten raus -> oben wieder einfliegen
-                Self.SetPath(0.014, _
-                    Self.hx, -30.0, Self.hx, 60.0, Self.hx, 30.0, Self.hx, Self.hy)
+                Self.SetPath(0.014, Self.hx, -30.0, Self.hx, 60.0, _
+                    Self.hx, 30.0, Self.hx, Self.hy)
                 Self.state = St.ENTER
             ELSE
-                Self.state = St.FORM      ' in Formation angekommen
+                Self.state = St.FORM
             END IF
         END IF
         RETURN drop
@@ -118,20 +97,17 @@ CLASS Bug
 END CLASS
 
 ' ---------------------------------------------------------------------------
-SCREEN(WIDTH, HEIGHT, "Galaga", 2)
+SCREEN(960, 540, "Galaga", 1)
+IF FULL THEN SET_FULLSCREEN(TRUE)
 
-' Bilder + Sprites (weisser Bug -> pro Reihe eingefaerbt)
 DIM shipImg AS IMAGE   : shipImg = LOADIMAGE("../assets/sprites/player.png")
 DIM bulletImg AS IMAGE : bulletImg = LOADIMAGE("../assets/sprites/bullet.png")
 DIM bugImg AS IMAGE    : bugImg = LOADIMAGE("../assets/sprites/bug.png")
 DIM bombImg AS IMAGE   : bombImg = LOADIMAGE("../assets/sprites/bomb.png")
 
+' Ein animiertes Gegner-Sprite pro Reihe (Farbe pro Reihe via SPRITE_TINT).
 DIM rowTint[ROWS] AS INTEGER
-rowTint[0] = &HBE64F0   ' lila (Boss)
-rowTint[1] = &HE44040   ' rot
-rowTint[2] = &H46B4FF   ' blau
-
-' Ein animiertes Sprite pro Reihe (Flap synchron, Farbe pro Reihe)
+rowTint[0] = &HBE64F0 : rowTint[1] = &HE44040 : rowTint[2] = &H46B4FF
 DIM rowSpr[ROWS] AS SPRITE
 DIM r AS INTEGER
 FOR r = 0 TO ROWS - 1
@@ -140,48 +116,56 @@ FOR r = 0 TO ROWS - 1
     SPRITE_PLAY(rowSpr[r], "fly")
     SPRITE_TINT(rowSpr[r], rowTint[r])
 NEXT r
-
 DIM bombSpr AS SPRITE
 bombSpr = SPRITE_NEW(bombImg, 6, 6)
 SPRITE_ADD_ANIM(bombSpr, "pulse", 0, 1, 8)
 SPRITE_PLAY(bombSpr, "pulse")
 
-' Spielobjekte
+' --- Sound (prozedural, sfxr-Stil) ---
+DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 820, -480, 0, 30, 70, 0, 0, 0.30)
+DIM sfxBoom  AS INTEGER : sfxBoom  = AUDIO_SFX("noise", 220, -120, 0, 60, 220, 0, 0, 0.45)
+DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 0, 0.28)
+DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.55)
+DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.30)
+
 DIM bugs[NBUGS] AS Bug
 DIM bx[NBULLET] AS FLOAT : DIM by[NBULLET] AS FLOAT : DIM bAlive[NBULLET] AS BOOLEAN
-DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT : DIM boAlive[NBOMB] AS BOOLEAN
+DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT : DIM bmvx[NBOMB] AS FLOAT : DIM boAlive[NBOMB] AS BOOLEAN
 
-DIM playerX AS FLOAT
-DIM lives AS INTEGER
-DIM score AS INTEGER
-DIM frame AS INTEGER
-DIM prevShoot AS BOOLEAN
-DIM invuln AS INTEGER
-DIM diveTimer AS INTEGER
+DIM playerX AS FLOAT : DIM playerY AS FLOAT
+DIM lives AS INTEGER : DIM score AS INTEGER : DIM level AS INTEGER
+DIM frame AS INTEGER : DIM prevShoot AS BOOLEAN : DIM invuln AS INTEGER
+DIM diveTimer AS INTEGER : DIM diveSpeed AS FLOAT : DIM bombSpeed AS FLOAT
+DIM levelMsg AS INTEGER : DIM bugsAlive AS INTEGER
+
+CONST PY_LOW  AS FLOAT = 288.0          ' unterste Schiffsposition
+CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
 
 SUB NewLevel()
     DIM i AS INTEGER
     DIM gapX AS FLOAT : gapX = 24.0
-    DIM startX AS FLOAT
-    startX = (WIDTH - (COLS - 1) * gapX) / 2.0 - 8.0
+    DIM startX AS FLOAT : startX = (PW - (COLS - 1) * gapX) / 2.0 - 8.0
     FOR i = 0 TO NBUGS - 1
         DIM col AS INTEGER : col = i MOD COLS
         DIM rw AS INTEGER  : rw = i \ COLS
-        DIM hx AS FLOAT : hx = startX + col * gapX
-        DIM hy AS FLOAT : hy = 40.0 + rw * 22.0
-        bugs[i] = NEW Bug(rw, hx, hy, i * 4)     ' gestaffelter Einflug
+        bugs[i] = NEW Bug(rw, startX + col * gapX, 40.0 + rw * 22.0, i * 4)
     NEXT i
     FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
     FOR i = 0 TO NBOMB - 1 : boAlive[i] = FALSE : NEXT i
-    playerX = WIDTH / 2.0 - 8.0
-    diveTimer = 120
+    bugsAlive = NBUGS
+    diveTimer = 110
+    diveSpeed = 0.009 + level * 0.0016
+    bombSpeed = 1.9 + level * 0.35
+    levelMsg = 110
+    PLAYSOUND(sfxLevel)
 END SUB
 
 SUB Shoot()
     DIM i AS INTEGER
     FOR i = 0 TO NBULLET - 1
         IF NOT bAlive[i] THEN
-            bAlive[i] = TRUE : bx[i] = playerX + 5.0 : by[i] = HEIGHT - 34.0
+            bAlive[i] = TRUE : bx[i] = playerX + 5.0 : by[i] = playerY - 2.0
+            PLAYSOUND(sfxShoot)
             RETURN
         END IF
     NEXT i
@@ -192,6 +176,8 @@ SUB DropBomb(sx AS FLOAT, sy AS FLOAT)
     FOR i = 0 TO NBOMB - 1
         IF NOT boAlive[i] THEN
             boAlive[i] = TRUE : bmx[i] = sx + 5.0 : bmy[i] = sy + 8.0
+            bmvx[i] = MAX(-0.9, MIN(0.9, (playerX - sx) * 0.018))
+            PLAYSOUND(sfxDrop)
             RETURN
         END IF
     NEXT i
@@ -202,7 +188,8 @@ FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _
     RETURN ax < cx + cw AND ax + aw > cx AND ay < cy + ch AND ay + ah > cy
 END FUNCTION
 
-lives = 3 : score = 0 : frame = 0 : invuln = 0
+lives = 3 : score = 0 : level = 1 : frame = 0 : invuln = 0
+playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
 NewLevel()
 
 WHILE NOT QUITREQUESTED()
@@ -210,21 +197,26 @@ WHILE NOT QUITREQUESTED()
 
     ' ---- Eingabe ----
     IF lives > 0 THEN
-        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 2.4
-        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 2.4
+        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 2.6
+        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 2.6
+        IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.2
+        IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.2
         IF playerX < 2.0 THEN playerX = 2.0
-        IF playerX > WIDTH - 18.0 THEN playerX = WIDTH - 18.0
+        IF playerX > PW - 18.0 THEN playerX = PW - 18.0
+        IF playerY < PY_HIGH THEN playerY = PY_HIGH
+        IF playerY > PY_LOW THEN playerY = PY_LOW
         DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
         IF firing AND NOT prevShoot THEN Shoot()
         prevShoot = firing
     ELSE
         IF KEYPRESSED(KEY_SPACE) THEN
-            lives = 3 : score = 0 : NewLevel()
+            lives = 3 : score = 0 : level = 1 : playerY = PY_LOW : NewLevel()
         END IF
     END IF
     IF invuln > 0 THEN invuln = invuln - 1
+    IF levelMsg > 0 THEN levelMsg = levelMsg - 1
 
-    ' ---- Sprites animieren ----
+    ' ---- Animation ----
     FOR r = 0 TO ROWS - 1 : SPRITE_UPDATE(rowSpr[r], 16) : NEXT r
     SPRITE_UPDATE(bombSpr, 16)
 
@@ -233,20 +225,19 @@ WHILE NOT QUITREQUESTED()
     IF lives > 0 THEN
         diveTimer = diveTimer - 1
         IF diveTimer <= 0 THEN
-            diveTimer = 70 + RANDINT(0, 60)
-            ' zufaelligen Gegner in Formation waehlen
+            diveTimer = MAX(28, 70 - level * 5) + RANDINT(0, 40)
             DIM tries AS INTEGER
             FOR tries = 0 TO 8
                 DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
                 IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
-                    bugs[pick].Dive(playerX)
+                    bugs[pick].Dive(playerX, diveSpeed)
                     BREAK
                 END IF
             NEXT tries
         END IF
     END IF
 
-    ' ---- Gegner updaten ----
+    ' ---- Gegner ----
     DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
     FOR i = 0 TO NBUGS - 1
         IF bugs[i].alive THEN
@@ -254,102 +245,108 @@ WHILE NOT QUITREQUESTED()
         END IF
     NEXT i
 
-    ' ---- Bullets ----
+    ' ---- Bullets / Bomben ----
     FOR i = 0 TO NBULLET - 1
         IF bAlive[i] THEN
             by[i] = by[i] - 5.0
             IF by[i] < -8.0 THEN bAlive[i] = FALSE
         END IF
     NEXT i
-
-    ' ---- Bomben ----
     FOR i = 0 TO NBOMB - 1
         IF boAlive[i] THEN
-            bmy[i] = bmy[i] + 2.2
-            IF bmy[i] > HEIGHT THEN boAlive[i] = FALSE
+            bmy[i] = bmy[i] + bombSpeed : bmx[i] = bmx[i] + bmvx[i]
+            IF bmy[i] > PH THEN boAlive[i] = FALSE
         END IF
     NEXT i
 
-    ' ---- Kollisionen: Bullet vs Bug ----
+    ' ---- Bullet vs Bug ----
     DIM j AS INTEGER
     FOR i = 0 TO NBULLET - 1
         IF bAlive[i] THEN
             FOR j = 0 TO NBUGS - 1
-                IF bugs[j].alive THEN
-                    IF Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
-                        bugs[j].alive = FALSE
-                        bAlive[i] = FALSE
-                        score = score + (ROWS - bugs[j].row) * 50
-                        BREAK
-                    END IF
+                IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
+                    bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
+                    score = score + (ROWS - bugs[j].row) * 50
+                    PLAYSOUND(sfxBoom) : BREAK
                 END IF
             NEXT j
         END IF
     NEXT i
 
-    ' ---- Kollisionen: Spieler vs Bombe / Sturz-Gegner ----
+    ' ---- Spieler getroffen? ----
     IF lives > 0 AND invuln = 0 THEN
         DIM hit AS BOOLEAN : hit = FALSE
         FOR i = 0 TO NBOMB - 1
-            IF boAlive[i] THEN
-                IF Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, HEIGHT - 30.0, 10, 12) THEN
-                    boAlive[i] = FALSE : hit = TRUE
-                END IF
+            IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+                boAlive[i] = FALSE : hit = TRUE
             END IF
         NEXT i
         FOR i = 0 TO NBUGS - 1
-            IF bugs[i].alive AND bugs[i].state = St.DIVE THEN
-                IF Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, HEIGHT - 30.0, 10, 12) THEN
-                    hit = TRUE
-                END IF
+            IF bugs[i].alive AND bugs[i].state = St.DIVE AND _
+               Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+                hit = TRUE
             END IF
         NEXT i
         IF hit THEN
             lives = lives - 1
             invuln = 90
+            PLAYSOUND(sfxHit)
         END IF
     END IF
 
-    ' ---- Zeichnen ----
-    CLS(BG)
-    ' Sterne (einfaches Parallax)
-    FOR i = 0 TO 30
-        DIM sy AS INTEGER : sy = (i * 37 + frame * 2) MOD HEIGHT
-        PLOT((i * 53) MOD WIDTH, sy, &H30405A)
-    NEXT i
+    ' ---- Level geschafft? ----
+    IF lives > 0 AND bugsAlive <= 0 THEN
+        level = level + 1 : NewLevel()
+    END IF
 
-    ' Gegner
+    ' ====================== ZEICHNEN ======================
+    ' Vollbild: das Spielfeld per Kamera-Zoom auf die Bildschirmhoehe skalieren
+    ' und horizontal zentrieren (alle Draws + SPRITE_DRAW folgen der Kamera).
+    DIM sw AS INTEGER : sw = SCREENWIDTH()
+    DIM sh AS INTEGER : sh = SCREENHEIGHT()
+    DIM zoom AS FLOAT : zoom = sh / PH
+    DIM offx AS FLOAT : offx = (sw - PW * zoom) / 2.0
+
+    CLS(&H000000)
+    CAMERA_SET(-offx / zoom, 0.0, zoom)
+
+    BOX(0, 0, PW - 1, PH - 1, BG)                     ' Spielfeld-Hintergrund
+    FOR i = 0 TO 34
+        PLOT((i * 53) MOD PW, (i * 37 + frame * 2) MOD PH, &H30405A)
+    NEXT i
     FOR i = 0 TO NBUGS - 1
         IF bugs[i].alive THEN
             SPRITE_SET_POS(rowSpr[bugs[i].row], bugs[i].x, bugs[i].y)
             SPRITE_DRAW(rowSpr[bugs[i].row])
         END IF
     NEXT i
-
-    ' Bomben
     FOR i = 0 TO NBOMB - 1
         IF boAlive[i] THEN
-            SPRITE_SET_POS(bombSpr, bmx[i], bmy[i])
-            SPRITE_DRAW(bombSpr)
+            SPRITE_SET_POS(bombSpr, bmx[i], bmy[i]) : SPRITE_DRAW(bombSpr)
         END IF
     NEXT i
-
-    ' Bullets
     FOR i = 0 TO NBULLET - 1
-        IF bAlive[i] THEN DRAWIMAGE(bulletImg, by[i] * 0 + bx[i], by[i])
+        IF bAlive[i] THEN DRAWIMAGE(bulletImg, bx[i], by[i])
+    NEXT i
+    IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
+        DRAWIMAGE(shipImg, playerX, playerY)
+    END IF
+    ' Lebens-Balken (im Spielfeld, unten links)
+    DIM lifeMax AS INTEGER : lifeMax = MAX(lives, 3)
+    FOR i = 0 TO lifeMax - 1
+        DIM lc AS INTEGER : lc = IIF(i < lives, &H44E06A, &H32323C)
+        BOX(6 + i * 14, PH - 12, 6 + i * 14 + 10, PH - 6, lc)
     NEXT i
 
-    ' Spieler (blinkt bei Unverwundbarkeit)
-    IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
-        DRAWIMAGE(shipImg, playerX, HEIGHT - 32.0)
-    END IF
-
-    ' HUD
-    TEXT(4, 4, f"SCORE {score}")
-    TEXT(WIDTH - 70, 4, f"SHIPS {lives}")
+    CAMERA_RESET()
+    ' HUD-Text (Bildschirm-Raum, nicht gezoomt)
+    DIM hx0 AS INTEGER : hx0 = INT(offx) + 4
+    TEXT(hx0, 6, f"SCORE {score}")
+    TEXT(INT(sw / 2) - 24, 6, f"LEVEL {level}")
+    IF levelMsg > 0 THEN TEXT(INT(sw / 2) - 28, INT(sh / 2) - 4, f"LEVEL {level}")
     IF lives <= 0 THEN
-        TEXT(WIDTH / 2 - 36, HEIGHT / 2 - 4, "GAME OVER")
-        TEXT(WIDTH / 2 - 60, HEIGHT / 2 + 12, "[LEER] = neu starten")
+        TEXT(INT(sw / 2) - 36, INT(sh / 2) - 8, "GAME OVER")
+        TEXT(INT(sw / 2) - 62, INT(sh / 2) + 8, "[LEER] = neu starten")
     END IF
 
     FLIP()
