@@ -236,6 +236,31 @@ def test_gb_export_emits_window_resizable():
     assert "GUI_WINDOW_SET_MIN_SIZE(frm, 200, 150)" in src
 
 
+def test_new_widgets_load_in_runtime(run_gb, tmp_path):
+    # Separator + GroupBox: neue Widget-Arten via .gbform -> GUI_LOAD.
+    doc = FormDoc(title="N", w=300, h=200)
+    doc.add("separator", 10, 40)
+    doc.add("groupbox", 10, 60).text = "Gruppe"
+    doc.save(str(tmp_path / "n.gbform"))
+    out = run_gb(
+        'IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("n.gbform")\n'
+        'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n'
+        'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 0))\n'
+        'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 1))\n', base=tmp_path)
+    assert out.splitlines() == ["2", "separator", "groupbox"]
+
+
+def test_new_widgets_in_palette_and_export():
+    kinds = {p.kind for p in PALETTE}
+    assert "separator" in kinds and "groupbox" in kinds
+    doc = FormDoc()
+    doc.add("separator", 5, 5)
+    doc.add("groupbox", 5, 30).text = "G"
+    src = doc.generate_gb_code(with_screen=False, with_loop=False)
+    assert "GUI_SEPARATOR(frm, 5, 5," in src
+    assert 'GUI_GROUPBOX(frm, 5, 30,' in src and '"G"' in src
+
+
 def test_gb_export_emits_anchor():
     doc = FormDoc()
     c = doc.add("button", 0, 0); c.anchor = "rb"

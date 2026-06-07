@@ -77,7 +77,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
-    Progress, ListBox, Image, Canvas,
+    Progress, ListBox, Image, Canvas, Separator, GroupBox,
 }
 
 impl Kind {
@@ -87,7 +87,7 @@ impl Kind {
             Kind::Slider => "slider", Kind::TextInput => "textinput", Kind::Panel => "panel",
             Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
-            Kind::Canvas => "canvas",
+            Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -96,7 +96,8 @@ impl Kind {
             "slider" => Kind::Slider, "textinput" => Kind::TextInput, "panel" => Kind::Panel,
             "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
-            "canvas" => Kind::Canvas, _ => return None,
+            "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
+            _ => return None,
         })
     }
 }
@@ -392,6 +393,16 @@ impl Gui {
     pub fn panel(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, title: String) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Panel, x, y, w, h); wd.text = title;
         self.add_widget(win, "GUI_PANEL", wd)
+    }
+    pub fn separator(&mut self, win: i64, x: i32, y: i32, w: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Separator, x, y, w.max(1), 8);
+        wd.enabled = false;                      // rein dekorativ, nicht interaktiv
+        self.add_widget(win, "GUI_SEPARATOR", wd)
+    }
+    pub fn groupbox(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, title: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::GroupBox, x, y, w, h); wd.text = title;
+        wd.enabled = false;
+        self.add_widget(win, "GUI_GROUPBOX", wd)
     }
     pub fn textinput(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, placeholder: String) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::TextInput, x, y, w, h); wd.placeholder = placeholder;
@@ -1459,6 +1470,19 @@ impl Gui {
                 // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.
                 self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
+            }
+            Kind::Separator => {
+                let my = ay + h / 2;
+                g.line(ax, my, ax + w - 1, my, self.th("widget_border"));
+            }
+            Kind::GroupBox => {
+                // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
+                g.rect(ax, ay + 7, ax + w - 1, ay + h - 1, self.th("widget_border"));
+                if !wdg.text.is_empty() {
+                    let tw = wdg.text.chars().count() as i32 * 8 + 8;
+                    g.box_fill(ax + 8, ay, ax + 8 + tw.min(w - 16), ay + 13, self.th("win_bg"));
+                    self.wtext(g, wdg, ax + 12, ay + 1, wdg.text.clone(), self.th("title_fg"));
+                }
             }
             Kind::Table => self.draw_table(g, wi, idx),
         }

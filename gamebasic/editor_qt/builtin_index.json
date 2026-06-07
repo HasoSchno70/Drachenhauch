@@ -5385,6 +5385,18 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SEPARATOR",
+   "kind": "core",
+   "signature": "GUI_SEPARATOR(win, x, y, w)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_GROUPBOX",
+   "kind": "core",
+   "signature": "GUI_GROUPBOX(win, x, y, w, h, title$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_ANCHOR",
    "kind": "core",
    "signature": "GUI_SET_ANCHOR(wdg, edges$)",

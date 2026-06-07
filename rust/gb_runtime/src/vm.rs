@@ -2368,6 +2368,13 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.panel(gi(a,0,"GUI_PANEL")?, gi(a,1,"GUI_PANEL")? as i32, gi(a,2,"GUI_PANEL")? as i32,
                     gi(a,3,"GUI_PANEL")? as i32, gi(a,4,"GUI_PANEL")? as i32, title)?)
             }
+            "gui_separator" => Value::Int(self.gui.separator(gi(a,0,"GUI_SEPARATOR")?,
+                gi(a,1,"GUI_SEPARATOR")? as i32, gi(a,2,"GUI_SEPARATOR")? as i32, gi(a,3,"GUI_SEPARATOR")? as i32)?),
+            "gui_groupbox" => {
+                let title = if a.len() >= 6 { gs(a,5,"GUI_GROUPBOX")? } else { String::new() };
+                Value::Int(self.gui.groupbox(gi(a,0,"GUI_GROUPBOX")?, gi(a,1,"GUI_GROUPBOX")? as i32, gi(a,2,"GUI_GROUPBOX")? as i32,
+                    gi(a,3,"GUI_GROUPBOX")? as i32, gi(a,4,"GUI_GROUPBOX")? as i32, title)?)
+            }
             "gui_textinput" => {
                 let ph = if a.len() >= 6 { gs(a,5,"GUI_TEXTINPUT")? } else { String::new() };
                 Value::Int(self.gui.textinput(gi(a,0,"GUI_TEXTINPUT")?, gi(a,1,"GUI_TEXTINPUT")? as i32, gi(a,2,"GUI_TEXTINPUT")? as i32,

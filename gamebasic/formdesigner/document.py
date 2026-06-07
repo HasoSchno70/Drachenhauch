@@ -38,6 +38,8 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("image",     "Image",         96, 96, ()),
     PaletteSpec("canvas",    "Canvas",       200, 150, ()),
     PaletteSpec("panel",     "Panel",        160, 100, (), has_text=True),
+    PaletteSpec("groupbox",  "GroupBox",     160, 100, (), has_text=True),
+    PaletteSpec("separator", "Separator",    160,  8, ()),
 ]
 
 _SPEC_BY_KIND = {p.kind: p for p in PALETTE}
@@ -660,6 +662,10 @@ class FormDoc:
             out.append(f"{var} = GUI_TEXTINPUT(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.placeholder)})")
         elif k == "panel":
             out.append(f"{var} = GUI_PANEL(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.text)})")
+        elif k == "groupbox":
+            out.append(f"{var} = GUI_GROUPBOX(frm, {c.x}, {c.y}, {c.w}, {c.h}, {_gb_str(c.text)})")
+        elif k == "separator":
+            out.append(f"{var} = GUI_SEPARATOR(frm, {c.x}, {c.y}, {c.w})")
         elif k == "progress":
             out.append(f"{var} = GUI_PROGRESS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
         elif k == "canvas":

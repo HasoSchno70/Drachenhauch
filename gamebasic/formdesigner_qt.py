@@ -144,6 +144,13 @@ def _paint_glyph(qp: QPainter, kind: str, r: QRect):
     elif kind == "panel":
         qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
         qp.fillRect(QRect(r.left(), r.top(), r.width(), 8), QColor(46, 60, 76))
+    elif kind == "separator":
+        qp.setPen(QPen(_PAL_BORDER, 2)); qp.drawLine(r.left() + 2, cy, r.right() - 2, cy)
+    elif kind == "groupbox":
+        qp.setBrush(Qt.BrushStyle.NoBrush); qp.setPen(QPen(_PAL_BORDER, 1))
+        qp.drawRect(QRect(r.left() + 2, r.top() + 4, r.width() - 4, r.height() - 6))
+        qp.fillRect(QRect(r.left() + 6, r.top() + 1, 22, 6), _PAL_BG)
+        qp.setPen(_PAL_FG); qp.drawText(QRect(r.left() + 7, r.top(), 24, 8), Qt.AlignmentFlag.AlignVCenter, "Grp")
     else:
         qp.setBrush(QColor(40, 52, 66)); qp.drawRect(r)
         qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, kind[:6])
@@ -624,6 +631,15 @@ class _Canvas(QWidget):
             qp.setPen(QPen(border, 1)); qp.setBrush(QColor(28, 38, 50)); qp.drawRect(r)
             qp.fillRect(QRect(x, y, w, 16), QColor(40, 56, 72))
             qp.setPen(fg); qp.drawText(QRect(x + 5, y, w - 8, 16), al.AlignVCenter, c.text or "")
+        elif k == "separator":
+            my = y + h // 2
+            qp.setPen(QPen(border, 1)); qp.drawLine(x, my, x + w - 1, my)
+        elif k == "groupbox":
+            qp.setPen(QPen(border, 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
+            qp.drawRect(QRect(x, y + 7, w - 1, h - 8))
+            if c.text:
+                qp.fillRect(QRect(x + 8, y, min(w - 16, len(c.text) * 7 + 8), 13), QColor(24, 34, 46))
+                qp.setPen(fg); qp.drawText(x + 12, y + 11, c.text)
         elif k == "image":
             qp.setPen(QPen(border, 1)); qp.setBrush(QColor(40, 44, 52)); qp.drawRect(r)
             qp.setPen(QPen(accent, 1))
