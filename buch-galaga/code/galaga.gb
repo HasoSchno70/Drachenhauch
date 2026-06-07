@@ -146,12 +146,17 @@ bombSpr = SPRITE_NEW(bombImg, 6, 6)
 SPRITE_ADD_ANIM(bombSpr, "pulse", 0, 1, 8)
 SPRITE_PLAY(bombSpr, "pulse")
 
-' --- Sound (prozedural, sfxr-Stil) ---
-DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 820, -480, 0, 30, 70, 0, 0, 0.36)
+' --- Sound (prozedural, sfxr-Stil; AUDIO_SFX = wf,freq,slide,atk,sus,dec,vibDepth,vibSpeed,vol) ---
+DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 1040, -700, 0, 8, 95, 0, 0, 0.30)    ' knackiger Laser
 DIM sfxBoom  AS INTEGER : sfxBoom  = AUDIO_SFX("noise", 220, -120, 0, 60, 220, 0, 0, 0.58)
 DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 0, 0.36)
 DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.66)
 DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.38)
+' Neu: warbelnder Traktorstrahl, Sturz-Swoosh, 2-Ton-Gegner-Flap (rhythmische Praesenz).
+DIM sfxBeam  AS INTEGER : sfxBeam  = AUDIO_SFX("sine", 300, 280, 20, 520, 240, 0.65, 15, 0.26)
+DIM sfxDive  AS INTEGER : sfxDive  = AUDIO_SFX("square", 700, -380, 4, 210, 150, 0.5, 20, 0.22)
+DIM sfxFlapA AS INTEGER : sfxFlapA = AUDIO_SFX("square", 150, 0, 2, 28, 26, 0, 0, 0.08)
+DIM sfxFlapB AS INTEGER : sfxFlapB = AUDIO_SFX("square", 108, 0, 2, 28, 26, 0, 0, 0.08)
 
 ' --- Hintergrundmusik ---
 ' Bevorzugt der CC0-Arcade-Track (assets/music/spaceshooter.mp3 -- HydroGene,
@@ -423,10 +428,11 @@ SUB UpdateCapture()
         bugs[bossIdx].x = bx + (tx - bx) * 0.06
         bugs[bossIdx].y = by + (120.0 - by) * 0.06
         IF ABS(bugs[bossIdx].x - tx) < 2.0 AND ABS(bugs[bossIdx].y - 120.0) < 2.0 THEN
-            capState = CapSt.BEAM : capTimer = 150
+            capState = CapSt.BEAM : capTimer = 150 : PLAYSOUND(sfxBeam)
         END IF
     ELSEIF capState = CapSt.BEAM THEN
         capTimer = capTimer - 1
+        IF capTimer = 75 THEN PLAYSOUND(sfxBeam)        ' Strahl klanglich halten
         ' Fang-Kollision: Spielerschiff im (nach unten breiter werdenden) Strahl?
         IF lives > 0 AND invuln = 0 AND NOT hasCaptured THEN
             DIM beamCx AS FLOAT : beamCx = bx + 8.0
@@ -501,6 +507,7 @@ SUB UpdatePlay()
                 DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
                 IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
                     bugs[pick].Dive(playerX, diveSpeed)
+                    PLAYSOUND(sfxDive)
                     launched = launched + 1
                 END IF
             NEXT tries
@@ -777,6 +784,10 @@ WHILE NOT QUITREQUESTED()
         IF musBeat >= 22 THEN
             musBeat = 0 : PLAYSOUND(musTones[musStep]) : musStep = (musStep + 1) MOD 8
         END IF
+    END IF
+    ' Gegner-Flap-Loop: dezente, rhythmische 2-Ton-Praesenz waehrend des Spiels.
+    IF mode = GS.PLAY AND frame MOD 22 = 0 THEN
+        PLAYSOUND(IIF((frame \ 22) MOD 2 = 0, sfxFlapA, sfxFlapB))
     END IF
 
     ' ====================== ZEICHNEN ======================
