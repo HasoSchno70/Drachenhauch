@@ -54,15 +54,17 @@ ein eigenes Kapitel.
 ## Die Sprites
 
 Die Start-Sprites liegen fertig in [`assets/sprites/`](assets/sprites): das
-Schiff (`player.png`), der Gegner (`bug.png`, 2 Frames Flügelschlag), der Schuss
-(`bullet.png`) und die Bombe (`bomb.png`, 2 Frames). Jedes gibt es zusätzlich als
-`.gbsprite` — **öffne sie in `gbsprites` und gestalte sie nach deinem Geschmack
-um.** Erzeugt werden sie reproduzierbar von
+Schiff (`player.png`), drei mehrfarbige Gegner (`bug0/1/2.png`, je 2 Frames
+Flügelschlag — eine Reihe pro Farbfamilie: violett-cyan, rot-gelb, blau-türkis),
+der Schuss (`bullet.png`) und die Bombe (`bomb.png`, 2 Frames). Jedes gibt es
+zusätzlich als `.gbsprite` — **öffne sie in `gbsprites` und gestalte sie nach
+deinem Geschmack um.** Erzeugt werden sie reproduzierbar von
 [`assets/make_sprites.py`](assets/make_sprites.py).
 
-> Der weiße Gegner wird im Spiel **pro Formationsreihe eingefärbt** (lila/rot/blau)
-> — ein Sprite, viele Farben. Das spart Arbeit und ist genau die Technik des
-> Originals.
+> Die drei Gegner teilen sich **dieselbe Form**, aber je eine eigene Farbfamilie
+> (Flügel/Körper/Augen) — so sind die Reihen klar unterscheidbar und trotzdem
+> jeder Gegner mehrfarbig. Eine Vorlage, drei Paletten: das spart Arbeit und ist
+> genau die Idee des Originals.
 
 ## Bauen (PDF/EPUB)
 

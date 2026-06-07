@@ -108,19 +108,22 @@ DIM prevF1 AS BOOLEAN
 
 DIM shipImg AS IMAGE   : shipImg = LOADIMAGE("../assets/sprites/player.png")
 DIM bulletImg AS IMAGE : bulletImg = LOADIMAGE("../assets/sprites/bullet.png")
-DIM bugImg AS IMAGE    : bugImg = LOADIMAGE("../assets/sprites/bug.png")
 DIM bombImg AS IMAGE   : bombImg = LOADIMAGE("../assets/sprites/bomb.png")
 
-' Ein animiertes Gegner-Sprite pro Reihe (Farbe pro Reihe via SPRITE_TINT).
+' Pro Reihe ein eigenes, mehrfarbiges Gegner-Sprite (kein TINT mehr noetig).
+DIM rowBugImg[ROWS] AS IMAGE
+rowBugImg[0] = LOADIMAGE("../assets/sprites/bug0.png")
+rowBugImg[1] = LOADIMAGE("../assets/sprites/bug1.png")
+rowBugImg[2] = LOADIMAGE("../assets/sprites/bug2.png")
+' rowTint = Themenfarbe der Reihe -- nur noch fuer Explosionen/Score-Popups.
 DIM rowTint[ROWS] AS INTEGER
 rowTint[0] = &HBE64F0 : rowTint[1] = &HE44040 : rowTint[2] = &H46B4FF
 DIM rowSpr[ROWS] AS SPRITE
 DIM r AS INTEGER
 FOR r = 0 TO ROWS - 1
-    rowSpr[r] = SPRITE_NEW(bugImg, 16, 16)
+    rowSpr[r] = SPRITE_NEW(rowBugImg[r], 16, 16)
     SPRITE_ADD_ANIM(rowSpr[r], "fly", 0, 1, 4)
     SPRITE_PLAY(rowSpr[r], "fly")
-    SPRITE_TINT(rowSpr[r], rowTint[r])
 NEXT r
 DIM bombSpr AS SPRITE
 bombSpr = SPRITE_NEW(bombImg, 6, 6)

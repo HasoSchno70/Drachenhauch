@@ -29,19 +29,45 @@ PLAYER = [
     "...WWCCCCCCWW...", "..WW.WCCCCW.WW..", "..W..WRCCRW..W..", ".....WRCCRW.....",
     "......RRRR......", ".......RR.......", "................", "................",
 ]
-# Generischer "Bug"-Gegner -- per Tint in verschiedenen Farben fuer die Reihen.
-BEE_A = [
-    "................", "...W........W...", "....W......W....", "....WW....WW....",
-    "...WWWWWWWWWW...", "..WWBBWWBBWWWW..", "..WWBBWWBBWWWW..", "..WWWWWWWWWWWW..",
-    ".WWWWWWWWWWWWWW.", "WW.WWWWWWWWWW.WW", "......WBBW......", ".....WWBBWW.....",
-    "......W..W......", "................", "................", "................",
+# Gegner-Vorlage: EINE Form, aber Regionen -- so wird derselbe Bug pro Reihe in
+# einer eigenen mehrfarbigen Familie eingefaerbt (Reihen klar unterscheidbar).
+#   w = Fluegel   b = Koerper   e = Auge   # = dunkle Kante   . = transparent
+BUG_A = [
+    "................", "...w........w...", "....w......w....", "....ww....ww....",
+    "...wwwwwwwwww...", "..wweewweewwww..", "..wweewweewwww..", "..wwwwbbbbwwww..",
+    ".wwwwwbbbbwwwww.", "ww.wwwbbbbwww.ww", "......wbbw......", ".....wwbbww.....",
+    "......#..#......", "................", "................", "................",
 ]
-BEE_B = [
-    "................", "...W........W...", "....W......W....", "....WW....WW....",
-    "...WWWWWWWWWW...", "..WWBBWWBBWWWW..", "..WWBBWWBBWWWW..", "..WWWWWWWWWWWW..",
-    "...WWWWWWWWWW...", ".WWWWWWWWWWWWWW.", "WW....WBBW....WW", "......WWBBWW....",
-    "......W..W......", "................", "................", "................",
+BUG_B = [
+    "................", "...w........w...", "....w......w....", "....ww....ww....",
+    "...wwwwwwwwww...", "..wweewweewwww..", "..wweewweewwww..", "..wwwwbbbbwwww..",
+    "...wwwbbbbwww...", ".wwwwwbbbbwwwww.", "ww....wbbw....ww", "......wwbbww....",
+    "......#..#......", "................", "................", "................",
 ]
+# Drei Farb-Familien (Fluegel / Koerper / Auge / Kante). Jeder Gegner mehrfarbig,
+# die Reihen klar verschieden: violett-cyan / rot-gelb / blau-tuerkis.
+BUG_THEMES = [
+    {"w": (190, 100, 240), "b": (236, 240, 255), "e": (70, 180, 255), "#": (60, 30, 90)},
+    {"w": (228, 64, 64),   "b": (250, 210, 70),  "e": (236, 240, 255), "#": (90, 24, 24)},
+    {"w": (70, 120, 210),  "b": (90, 220, 200),  "e": (236, 240, 255), "#": (24, 40, 80)},
+]
+
+
+def paint_regions(img, grid, theme):
+    for y, row in enumerate(grid):
+        assert len(row) == 16, f"Bug-Zeile {y}: Breite {len(row)} != 16"
+        for x, ch in enumerate(row):
+            img.putpixel((x, y), (0, 0, 0, 0) if ch == "." else (*theme[ch], 255))
+
+
+def make_bug(name, theme):
+    doc = SpriteDoc(16, 16)
+    paint_regions(doc.frames[0].pixels, BUG_A, theme)
+    doc.add_frame()
+    paint_regions(doc.frames[-1].pixels, BUG_B, theme)
+    doc.save_sheet_png(OUT / f"{name}.png")
+    doc.save_native(OUT / f"{name}.gbsprite")
+    return doc
 BULLET = [
     "..CC..", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", "..CC..",
 ]
@@ -76,7 +102,9 @@ def make(name, frames, w, h):
 
 docs = {
     "player": make("player", [PLAYER], 16, 16),
-    "bug": make("bug", [BEE_A, BEE_B], 16, 16),
+    "bug0": make_bug("bug0", BUG_THEMES[0]),
+    "bug1": make_bug("bug1", BUG_THEMES[1]),
+    "bug2": make_bug("bug2", BUG_THEMES[2]),
     "bullet": make("bullet", [BULLET], 6, 8),
     "bomb": make("bomb", [BOMB_A, BOMB_B], 6, 6),
 }
