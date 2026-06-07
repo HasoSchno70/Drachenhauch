@@ -198,6 +198,35 @@ def test_resizable_window_roundtrips_in_runtime(run_gb, tmp_path):
     assert out.splitlines() == ["TRUE", "TRUE", "TRUE"]
 
 
+def test_anchoring_reflows_in_runtime(run_gb, tmp_path):
+    # Anchoring: beim Vergroessern des Fensters wandern/wachsen Controls je
+    # nach Anker. Form 400x300 -> 500x400 (dx=100, dy=100).
+    doc = FormDoc(title="A", w=400, h=300)
+    doc.add("button", 10, 10)                       # idx0: Default "lt" -> bleibt
+    b = doc.add("button", 300, 10); b.anchor = "rt" # idx1: rechts -> x += dx
+    c = doc.add("button", 10, 260); c.w = 200; c.anchor = "lrtb"  # idx2: dehnt sich
+    doc.save(str(tmp_path / "a.gbform"))
+    out = run_gb(
+        'IMPORT "gui"\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("a.gbform")\n'
+        'GUI_WINDOW_SET_BOUNDS(frm, 0, 0, 500, 400)\n'
+        'PRINT GUI_GET_X(GUI_WINDOW_WIDGET(frm, 0))\n'   # lt: 10
+        'PRINT GUI_GET_X(GUI_WINDOW_WIDGET(frm, 1))\n'   # rt: 300+100 = 400
+        'PRINT GUI_GET_W(GUI_WINDOW_WIDGET(frm, 2))\n'   # lrtb breite: 200+100 = 300
+        'PRINT GUI_GET_H(GUI_WINDOW_WIDGET(frm, 2))\n',  # lrtb hoehe: 28+100 = 128
+        base=tmp_path)
+    assert out.splitlines() == ["10", "400", "300", "128"]
+
+
+def test_anchor_roundtrip_dict():
+    doc = FormDoc()
+    c = doc.add("button", 0, 0); c.anchor = "lrtb"
+    d = doc.to_dict()["widgets"][0]
+    assert d["anchor"] == "lrtb"
+    assert "anchor" not in FormDoc().add("button", 0, 0).to_dict()   # Default weggelassen
+    assert FormDoc.from_dict(doc.to_dict()).controls[0].anchor == "lrtb"
+
+
 def test_gb_export_emits_window_resizable():
     doc = FormDoc(title="W")
     doc.resizable = True

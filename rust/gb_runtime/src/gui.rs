@@ -141,6 +141,11 @@ pub struct Widget {
     enabled: bool,
     font: i64,
     font_size: i32,
+    // Anchoring (Reflow beim Fenster-Resize): Bitmaske L=1,R=2,T=4,B=8
+    // (Default L|T = 5 = oben-links fixiert). `bx/by/bw/bh` = Basis-Rechteck,
+    // gegen das relativ zur Basis-Fenstergroesse neu gelayoutet wird.
+    anchor: u8,
+    bx: i32, by: i32, bw: i32, bh: i32,
 }
 
 pub struct Window {
@@ -153,6 +158,7 @@ pub struct Window {
     resizable: bool,                 // am unteren-rechten Griff ziehbar?
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
     max_w: i32, max_h: i32,
+    base_w: i32, base_h: i32,        // Referenzgroesse fuer Anchoring (Layout-Basis)
     close_clicked: bool,
     alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
 }
@@ -252,6 +258,7 @@ impl Gui {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true,
             resizable: false, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            base_w: w, base_h: h,
             close_clicked: false, alive: true,
         });
         self.z_order.push(idx);
@@ -263,6 +270,7 @@ impl Gui {
         let wi = win as usize;
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
         wdg.color = *self.theme.get("text_fg").unwrap_or(&0xFFFFFF);
+        wdg.bx = wdg.x; wdg.by = wdg.y; wdg.bw = wdg.w; wdg.bh = wdg.h;  // Anchor-Basis
         let idx = w.widgets.len();
         w.widgets.push(wdg);
         Ok(Self::enc_widget(wi, idx))
@@ -277,6 +285,49 @@ impl Gui {
             alive: true, visible: true,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
+            anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
+        }
+    }
+
+    /// Anchor-Bitmaske -> Edge-String ("lt", "lrtb", ...).
+    fn anchor_str(a: u8) -> String {
+        let mut s = String::new();
+        if a & 1 != 0 { s.push('l'); }
+        if a & 2 != 0 { s.push('r'); }
+        if a & 4 != 0 { s.push('t'); }
+        if a & 8 != 0 { s.push('b'); }
+        s
+    }
+    /// Edge-String -> Bitmaske (leer/ungueltig -> Default L|T = 5).
+    fn anchor_mask(s: &str) -> u8 {
+        let mut a = 0u8;
+        for c in s.chars() {
+            match c { 'l' | 'L' => a |= 1, 'r' | 'R' => a |= 2,
+                      't' | 'T' => a |= 4, 'b' | 'B' => a |= 8, _ => {} }
+        }
+        if a == 0 { 5 } else { a }
+    }
+
+    /// Widgets eines Fensters relativ zur Basisgroesse neu anordnen (Anchoring).
+    fn relayout(&mut self, wi: usize) {
+        let (cw, ch, bw, bh) = {
+            let w = &self.windows[wi];
+            (w.w, w.h, w.base_w, w.base_h)
+        };
+        if bw <= 0 || bh <= 0 { return; }
+        let (dx, dy) = (cw - bw, ch - bh);
+        for wd in self.windows[wi].widgets.iter_mut() {
+            let a = wd.anchor;
+            let (l, r, t, b) = (a & 1 != 0, a & 2 != 0, a & 4 != 0, a & 8 != 0);
+            let (mut x, mut w) = (wd.bx, wd.bw);
+            if l && r { w = (wd.bw + dx).max(1); }       // beide -> dehnen
+            else if r { x = wd.bx + dx; }                // nur rechts -> mitwandern
+            else if !l { x = wd.bx + dx / 2; }           // keiner -> zentrieren
+            let (mut y, mut h) = (wd.by, wd.bh);
+            if t && b { h = (wd.bh + dy).max(1); }
+            else if b { y = wd.by + dy; }
+            else if !t { y = wd.by + dy / 2; }
+            wd.x = x; wd.y = y; wd.w = w; wd.h = h;
         }
     }
 
@@ -738,7 +789,13 @@ impl Gui {
     // Window-Geometrie / Lifecycle / Enumeration.
     pub fn window_set_bounds(&mut self, h: i64, x: i32, y: i32, w: i32, ht: i32) -> Result<(), String> {
         let win = self.win_mut(h, "GUI_WINDOW_SET_BOUNDS")?;
-        win.x = x; win.y = y; win.w = w.max(0); win.h = ht.max(0); Ok(())
+        let (ow, oh) = (win.w, win.h);
+        win.x = x; win.y = y; win.w = w.max(0); win.h = ht.max(0);
+        let wi = h as usize;
+        if self.windows[wi].w != ow || self.windows[wi].h != oh {
+            self.relayout(wi);                          // Anchoring nachziehen
+        }
+        Ok(())
     }
     pub fn window_bounds(&self, h: i64) -> Result<(i32, i32, i32, i32), String> {
         let w = self.windows.get(h as usize)
@@ -794,6 +851,7 @@ impl Gui {
         if !w.enabled { o["enabled"] = serde_json::json!(false); }
         if w.font != -1 { o["font"] = serde_json::json!(w.font); }
         if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
+        if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(t) = &w.tbl {
             o["table"] = serde_json::json!({
                 "headers": t.headers, "rows": t.rows,
@@ -847,6 +905,8 @@ impl Gui {
             ts.hover_row = -1; ts.clicked_row = -1;
             w.tbl = Some(Box::new(ts));
         }
+        w.anchor = wj["anchor"].as_str().map(Self::anchor_mask).unwrap_or(5);
+        w.bx = w.x; w.by = w.y; w.bw = w.w; w.bh = w.h;   // Anchor-Basis = Design-Rechteck
         Ok(w)
     }
     /// Ein Fenster (inkl. lebender Widgets) als JSON-String (GUI_SAVE/TO_JSON).
@@ -1012,7 +1072,9 @@ impl Gui {
                 if w.min_h > 0 { nh = nh.max(w.min_h); }
                 if w.max_w > 0 { nw = nw.min(w.max_w); }
                 if w.max_h > 0 { nh = nh.min(w.max_h); }
+                let changed = w.w != nw || w.h != nh;
                 w.w = nw; w.h = nh;
+                if changed { self.relayout(wi); }       // Anchoring nachziehen
             } else { self.resize_window = None; }
         }
         // Laufendes Slider-Drag.

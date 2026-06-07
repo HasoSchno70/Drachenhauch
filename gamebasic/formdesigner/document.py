@@ -220,6 +220,7 @@ class Control:
     enabled: bool = True
     visible: bool = True
     font_size: int = 0
+    anchor: str = "lt"                       # Verankerung: Teilmenge von "lrtb" (Default oben-links)
     on_click: str = ""
     on_change: str = ""
     ov: dict = field(default_factory=dict)   # Farb-Overrides: bg/fg/border/accent -> int
@@ -251,6 +252,8 @@ class Control:
             d["enabled"] = False
         if self.font_size:
             d["font_size"] = self.font_size
+        if self.anchor and self.anchor != "lt":
+            d["anchor"] = self.anchor
         return d
 
     @classmethod
@@ -272,6 +275,7 @@ class Control:
             enabled=bool(d.get("enabled", True)),
             visible=bool(d.get("visible", True)),
             font_size=int(d.get("font_size", 0)),
+            anchor=str(d.get("anchor", "lt")) or "lt",
             on_click=str(d.get("on_click", "")),
             on_change=str(d.get("on_change", "")),
             ov={str(k): int(v) for k, v in dict(d.get("ov", {})).items()},
