@@ -1267,6 +1267,62 @@ children.push(bullet("Schalte FULL auf FALSE und spiele im Fenster – die Kamer
 children.push(bullet("Färbe die Letterbox-Ränder ein (statt Schwarz)."));
 children.push(bullet("Zentriere die GAME-OVER-Schrift genauer auf deinem Bildschirm."));
 
+// ===================== Kapitel 12 =====================
+children.push(chapter("Kapitel 12: Politur & Ausblick"));
+children.push(tip("In diesem Kapitel",
+  "Der letzte Schliff: Sound, mehrere Level mit steigender Schwierigkeit – und wie du dein Spiel als fertiges Programm weitergibst. Zum Schluss ein Ausblick, wie aus diesem Grundgerüst das volle Galaga wird."));
+
+children.push(h2("Sound"));
+children.push(pmix([
+  ["Arcade-Sounds erzeugst du dir direkt im Code mit ", false], ["AUDIO_SFX", true],
+  [" (ein kleiner Synthesizer) und spielst sie mit ", false], ["PLAYSOUND", true], [":", false],
+]));
+children.push(codeBlock([
+  'IMPORT "audio"',
+  'DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 900, -600, 0, 8, 90, 0, 0, 0.30)',
+  'DIM sfxBoom  AS INTEGER : sfxBoom  = AUDIO_SFX("noise", 220, -120, 0, 60, 200, 0, 0, 0.50)',
+  "' ... beim Schiessen:  PLAYSOUND(sfxShoot)",
+  "' ... beim Treffer:    PLAYSOUND(sfxBoom)",
+]));
+children.push(pmix([
+  ["Die Zahlen steuern Wellenform, Tonhöhe, Tonhöhen-Verlauf, Hüllkurve und Lautstärke – einfach ausprobieren, bis es „pew“ und „bumm“ macht. Ein eigener Musik-Generator ", false],
+  ["gbsfx", true], [" hilft beim Tüfteln.", false],
+]));
+
+children.push(h2("Wellen & Level"));
+children.push(p("Ist die Formation leergeräumt, beginnt ein neues Level – mit etwas schnelleren Gegnern. Wir zählen die lebenden Gegner mit und bauen bei null eine neue Welle:"));
+children.push(codeBlock([
+  "' beim Abschuss:  bugsAlive = bugsAlive - 1",
+  "' nach den Kollisionen:",
+  "IF bugsAlive <= 0 THEN level = level + 1 : BuildWave()",
+]));
+children.push(pmix([
+  ["In ", false], ["BuildWave", true],
+  [" setzen wir die Formation neu auf und machen die Stürze pro Level ein wenig schneller – so steigt die Spannung. Punkte und Leben bleiben erhalten. Das vollständige Programm liegt in ", false],
+  ["code/kap12/politur.gb", true], [".", false],
+]));
+figure("kap12_politur.png", "Das fertige Grundspiel: Vollbild, Sound, Level, HUD.", 420, 240).forEach(e => children.push(e));
+
+children.push(h2("Als Programm weitergeben (Export)"));
+children.push(pmix([
+  ["Damit Freunde dein Spiel ohne GameBasic spielen können, exportierst du es als eigenständiges Programm:", false],
+]));
+children.push(codeBlock([
+  "gbrt --export  dein-spiel.gb",
+]));
+children.push(p("Das erzeugt eine startfertige Datei (mit den Bildern und Tönen darin). Doppelklick genügt – kein GameBasic nötig."));
+
+children.push(h2("Wie geht es weiter? (Ausblick)"));
+children.push(p("Du hast jetzt ein komplettes, spielbares Galaga-Grundgerüst gebaut. Im Beispielspiel code/galaga.gb findest du dieselben Bausteine – plus die grossen Extras, die du als Nächstes angehen kannst:"));
+children.push(bulletRich("Fangstrahl & Doppeljäger: ", "Ein Boss fängt dein Schiff – befreie es und fliege mit zwei Schiffen."));
+children.push(bulletRich("Bonus-Wellen: ", "Alle paar Level eine Runde nur für Punkte."));
+children.push(bulletRich("Highscore-Liste: ", "Namen eintragen, dauerhaft gespeichert (save-Modul)."));
+children.push(bulletRich("Effekte: ", "Explosionen (Partikel), Bildschirm-Wackeln, CRT-Retro-Look, Regenbogen-Titel, Laufschrift."));
+children.push(bulletRich("Musik & Gamepad: ", "Hintergrundmusik und Steuerung per Controller."));
+
+children.push(h2("Glückwunsch!"));
+children.push(p("Du hast Schritt für Schritt ein echtes Arcade-Spiel gebaut – vom leeren Fenster bis zu einfliegenden, stürzenden, bombenwerfenden Gegnern mit Punkten, Leben und mehreren Leveln. Und ganz nebenbei hast du Variablen, Schleifen, Arrays, Klassen, Funktionen, Module und Zustands-Maschinen gelernt. Jetzt bist du dran: Bau es um, mach es zu deinem Spiel – und zeig es her. Viel Spass!"));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
