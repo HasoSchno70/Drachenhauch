@@ -1,0 +1,20 @@
+{
+  "Vorwort": 3,
+  "Willkommen!": 3,
+  "Was ist GameBasic?": 4,
+  "Was kann GameBasic alles?": 5,
+  "Unser Projekt: ein Galaga-Clone": 7,
+  "Wie dieses Buch funktioniert": 9,
+  "Kapitel 1: Das erste Fenster": 10,
+  "Kapitel 2: Das Schiff": 14,
+  "Kapitel 3: Sprites selbst zeichnen": 17,
+  "Kapitel 4: Schiessen": 20,
+  "Kapitel 5: Sternenhimmel mit Parallax": 24,
+  "Kapitel 6: Gegner & Formation": 27,
+  "Kapitel 7: Einflug-Manöver": 30,
+  "Kapitel 8: Sturzangriffe": 33,
+  "Kapitel 9: Bomben & Ausweichen": 36,
+  "Kapitel 10: Treffer & Punkte": 39,
+  "Kapitel 11: Vollbild & Kamera": 42,
+  "Kapitel 12: Politur & Ausblick": 44
+}

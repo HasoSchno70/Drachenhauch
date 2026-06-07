@@ -6,6 +6,7 @@ const {
   Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel,
   BorderStyle, Table, TableRow, TableCell, WidthType, ShadingType, PageBreak,
   Header, Footer, PageNumber, LevelFormat,
+  Tab, TabStopType, LeaderType,
 } = require("docx");
 
 const IMG = path.join(__dirname, "images");
@@ -90,6 +91,25 @@ function tip(title, text) {
   });
 }
 
+// "Warum so?"-Kasten (Design-Begruendung) – amber statt blau, klar vom tip() unterscheidbar.
+function why(text, title = "Warum so?") {
+  const border = { style: BorderStyle.SINGLE, size: 6, color: "E0B96A" };
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [9360],
+    rows: [new TableRow({ children: [new TableCell({
+      width: { size: 9360, type: WidthType.DXA },
+      borders: { top: border, bottom: border, left: border, right: border },
+      shading: { fill: "FDF3E0", type: ShadingType.CLEAR },
+      margins: { top: 120, bottom: 120, left: 160, right: 160 },
+      children: [
+        new Paragraph({ spacing: { after: 40 }, children: [new TextRun({ text: title, bold: true, color: "9A6A1E", size: 22 })] }),
+        new Paragraph({ children: [new TextRun({ text, size: 22 })] }),
+      ],
+    })] })],
+  });
+}
+
 // Monospace-Code-Block (grauer Kasten mit blauer Leiste links).
 function codeBlock(lines) {
   const runs = lines.map((ln, i) => new TextRun({ text: ln, font: "Consolas", size: 19, break: i === 0 ? 0 : 1 }));
@@ -111,28 +131,29 @@ function pmix(parts) {
   });
 }
 
-function h1(text) {
+// Inhaltsverzeichnis: jede h1()/chapter()-Ueberschrift wird hier registriert
+// (Titel + eindeutiges Bookmark fuer den klickbaren Sprung). Die Seitenzahlen
+// liefert der Zwei-Pass-Build (make_book.py) ueber toc_pages.json.
+const tocEntries = [];
+let _bmCounter = 0;
+function _heading(text, isChapter) {
+  const bm = "toc_" + (_bmCounter++);
+  tocEntries.push({ title: text, bm });
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
-    spacing: { before: 320, after: 80 },
+    ...(isChapter ? { pageBreakBefore: true } : {}),
+    spacing: isChapter ? { before: 0, after: 80 } : { before: 320, after: 80 },
     border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
     children: [new TextRun({ text })],
   });
 }
+function h1(text) { return _heading(text, false); }
 function h2(text) {
   return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text })] });
 }
 // Kapitel-Ueberschrift: beginnt immer auf einer neuen Seite (pageBreakBefore
 // vermeidet Leerseiten, falls das vorige Kapitel genau am Seitenende endete).
-function chapter(text) {
-  return new Paragraph({
-    heading: HeadingLevel.HEADING_1,
-    pageBreakBefore: true,
-    spacing: { before: 0, after: 80 },
-    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
-    children: [new TextRun({ text })],
-  });
-}
+function chapter(text) { return _heading(text, true); }
 
 // ===================== Inhalt =====================
 const children = [];
@@ -161,6 +182,12 @@ children.push(
   }),
   new Paragraph({ children: [new PageBreak()] }),
 );
+
+// --- Inhaltsverzeichnis ---
+// Hier kommt das fertige Verzeichnis hin. Es wird erst NACH dem Aufbau aller
+// Kapitel zusammengesetzt (dann sind alle tocEntries bekannt) und an dieser
+// Stelle eingefuegt.
+const TOC_INSERT_AT = children.length;
 
 // --- Vorwort ---
 children.push(h1("Vorwort"));
@@ -590,6 +617,7 @@ children.push(pmix([
   [" – das ist ein Ja/Nein-Wert (", false], ["TRUE", true], [" oder ", false], ["FALSE", true],
   ["). So wissen wir für jeden der 5 Plätze, ob dort gerade ein Schuss unterwegs ist. Am Anfang fliegt keiner.", false],
 ]));
+children.push(why("Warum legen wir den Vorrat einmal fest, statt bei jedem Schuss einen neuen zu erschaffen und ihn danach wegzuwerfen? Zwei Gründe. Erstens kostet ständiges Erzeugen und Wegwerfen Rechenzeit und kann ausgerechnet im hitzigsten Gefecht zu winzigen Rucklern führen – dann also, wenn du sie am wenigsten gebrauchen kannst. Zweitens ist ein fester Vorrat vorhersehbar: Mehr als fünf Schüsse gleichzeitig kann es nie geben, nichts gerät außer Kontrolle. Profis nennen dieses Muster „Object Pooling“, und du findest es in praktisch jeder Spiel-Engine wieder."));
 
 children.push(h2("Feuern auf Tastendruck"));
 children.push(p("Beim Feuern suchen wir einen freien Platz im Köcher und starten dort einen Schuss. Klingt simpel, hat aber einen Haken, über den fast jeder einmal stolpert: Die Spielschleife läuft sechzig Mal pro Sekunde. Würden wir einfach „wenn Leertaste gedrückt, dann schieße“ schreiben, dann feuerte das Schiff bei gehaltener Taste sechzig Schüsse pro Sekunde – ein Wasserfall aus Geschossen, und der Köcher wäre im selben Wimpernschlag leer."));
@@ -829,6 +857,7 @@ children.push(pmix([
   ["NEW Bug(...)", true], [" erzeugt einen Gegner und ruft dessen ", false],
   ["Init", true], [" auf. So füllt sich das Gitter Zeile für Zeile.", false],
 ]));
+children.push(why("Bei den Sternen und Schüssen kamen wir noch mit nebeneinander laufenden Listen aus – starX, starY und so weiter. Warum jetzt der Aufwand mit einer Klasse? Weil ein Gegner bald viel mehr können wird, als nur herumzuliegen: Er bekommt eine eigene Flugbahn, einen Zustand und eine Update-Logik. Sobald ein Ding nicht nur aus Daten besteht, sondern auch aus Verhalten, lohnt sich eine Klasse – sie hält die Daten und die Funktionen, die mit ihnen arbeiten, an einem Ort zusammen. Mit einem Dutzend paralleler Listen würdest du dagegen früher oder später den Überblick verlieren – und garantiert genau eine davon beim Umbauen vergessen."));
 
 children.push(h2("Gegner zeichnen – mit Schweben und Flügelschlag"));
 children.push(pmix([
@@ -922,6 +951,7 @@ children.push(pmix([
   ["", false],
   ["side", true], [" ist je nach Reihe -1 oder 1 – so kommen die Gegner abwechselnd von links und rechts. Start (cx0/cy0) liegt oben ausserhalb des Bildes, Ziel (cx3/cy3) ist die Formationsposition.", false],
 ]));
+children.push(why("Warum speichert jeder Gegner seine vier Kontrollpunkte fest ab, statt die Bahn bei Bedarf neu auszurechnen? Weil sich die Bahn während des Einflugs gar nicht ändert – einmal festgelegt, wird sie nur noch abgefahren. Das Einzige, was sich bewegt, ist der Fortschritt t. Und warum die gestaffelte Startverzögerung? Würden alle vierundzwanzig Gegner im selben Augenblick losfliegen, sähe das aus wie ein Vogelschwarm, der geschlossen gegen eine Fensterscheibe klatscht. Erst die kleinen Verzögerungen erzeugen den eleganten, tröpfelnden Strom, den man aus dem Original kennt."));
 
 children.push(h2("Bewegen entlang der Kurve"));
 children.push(p("Die Update-Methode treibt den Gegner über die Bahn. Ist er angekommen (t ≥ 1), schwebt er ab da nur noch in der Formation:"));
@@ -1019,6 +1049,7 @@ children.push(pmix([
   ["ENTER", true], [" → ", false], ["FORM", true], [" → (Sturz) ", false],
   ["DIVE", true], [" → ", false], ["ENTER", true], [" → … Genau das ist eine Zustands-Maschine.", false],
 ]));
+children.push(why("Wir hätten die Zustände auch mit drei Ja/Nein-Flags lösen können: einfliegend, in Formation, stürzend. Klingt harmlos, ist aber eine Falle. Nichts würde verhindern, dass aus Versehen zwei davon gleichzeitig TRUE sind – und dann wäre ein Gegner laut Code im selben Moment am Einfliegen UND am Stürzen, was keinen Sinn ergibt und zu Fehlern führt, die man stundenlang sucht. Ein einzelnes state-Feld kann dagegen immer nur genau einen Wert haben. Es macht unmögliche Zustände schlicht unmöglich – und das ist eine der besten Eigenschaften, die Code überhaupt haben kann."));
 
 children.push(h2("Wann stürzt wer?"));
 children.push(p("Ein Zähler löst in Abständen einen Sturz aus. Wir suchen einen zufälligen Gegner, der gerade in Formation schwebt, und schicken ihn Richtung Schiff:"));
@@ -1087,6 +1118,7 @@ children.push(pmix([
   [" sorgt dafür, dass pro Sturz nur eine Bombe fällt: Einmal abgeworfen, bleibt es ", false],
   ["TRUE", true], [", bis der nächste Sturz beginnt.", false],
 ]));
+children.push(why("Warum wirft der Gegner die Bombe nicht einfach selbst ab? Weil er gar nicht wissen muss – und soll –, wo der Bomben-Vorrat überhaupt liegt. Jeder kümmert sich um das, was er am besten weiß: Der Gegner kennt den richtigen Moment, die Spielschleife kennt die Bomben. Update meldet nur „jetzt!“ und überlässt das Wie dem Aufrufer. Diese saubere Aufgabenteilung – jeder Teil weiß möglichst wenig über die anderen – ist der Grund, warum großer Code überschaubar und änderbar bleibt, statt zu einem unentwirrbaren Knäuel zu werden."));
 
 children.push(h2("Wann fällt eine Bombe?"));
 children.push(pmix([
@@ -1173,6 +1205,7 @@ children.push(pmix([
   [" verknüpften Bedingungen. Jedes Rechteck wird durch Ecke (x, y) und Grösse (Breite, Höhe) beschrieben. Die Funktion gibt ", false],
   ["TRUE", true], [" oder ", false], ["FALSE", true], [" zurück.", false],
 ]));
+children.push(why("Zwei Entscheidungen in diesem Kapitel lohnen einen zweiten Blick. Erstens: Warum die Überlappungs-Prüfung in eine eigene Funktion auslagern, statt sie an jeder der vielen Stellen frisch hinzuschreiben? Weil „einmal schreiben, überall benutzen“ heißt: ein möglicher Tippfehler statt fünf, eine Stelle zum Korrigieren statt fünf. Zweitens (gleich beim Spieler-Treffer zu sehen): Warum die kurze Unverwundbarkeit nach einem Treffer? Ohne sie könnte ein und dieselbe Bombe in mehreren aufeinanderfolgenden Frames immer wieder zählen und dir in einem Wimpernschlag alle Leben rauben – maximal unfair. invuln schenkt dir einen kurzen Moment zum Durchatmen."));
 
 children.push(h2("Schuss trifft Gegner"));
 children.push(p("Für jeden fliegenden Schuss prüfen wir jeden lebenden Gegner. Bei einer Überlappung verschwinden beide, und es gibt Punkte (obere Reihen zählen mehr):"));
@@ -1283,6 +1316,7 @@ children.push(pmix([
   ["SCREENWIDTH()", true], ["/", false], ["SCREENHEIGHT()", true],
   [" liefern die echte (Vollbild-)Grösse, also passt sich alles jedem Monitor an.", false],
 ]));
+children.push(why("Warum trennen wir so streng, wie groß das Spielfeld in unserem Kopf ist, von dem, was am Ende auf dem Bildschirm erscheint? Weil sich genau dieser zweite Teil ständig ändert: heute 480×640, morgen ein breiterer Monitor, übermorgen ein winziges Vorschaufenster. Solange dein Spiel intern immer mit denselben Zahlen rechnet, läuft es überall gleich zuverlässig – nur die Kamera passt die Darstellung an. Diese Trennung von „wie die Dinge sind“ und „wie sie gezeigt werden“ ist einer der wichtigsten Grundgedanken guter Software, weit über Spiele hinaus."));
 
 children.push(h2("Letterbox & HUD"));
 children.push(p("Weil unser Spielfeld hochkant ist, ein breiter Bildschirm aber quer, bleiben links und rechts Ränder – die füllen wir schwarz (Letterbox). Den HUD-Text zeichnen wir nach CAMERA_RESET wieder in Bildschirm-Koordinaten, damit er gestochen scharf bleibt:"));
@@ -1378,6 +1412,38 @@ children.push(new Paragraph({
   spacing: { before: 240 },
   children: [new TextRun({ text: "— Hans Schnorrenberger", italics: true, size: 22, color: C_CAP })],
 }));
+
+// ===================== Inhaltsverzeichnis =====================
+// Erst jetzt sind alle Ueberschriften (tocEntries) bekannt. Wir bauen das
+// Verzeichnis und fuegen es an der gemerkten Stelle (Seite 2) ein.
+let tocPages = {};
+try { tocPages = JSON.parse(fs.readFileSync(path.join(__dirname, "toc_pages.json"), "utf8")); } catch (e) {}
+// Titel in Lese-Reihenfolge fuer den Mess-Schritt (make_book.py) ablegen:
+fs.writeFileSync(path.join(__dirname, "toc_titles.json"),
+  JSON.stringify(tocEntries.map(e => e.title), null, 2));
+
+const tocBlock = [
+  new Paragraph({
+    spacing: { after: 220 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
+    children: [new TextRun({ text: "Inhalt", bold: true, color: C_TITLE, size: 36 })],
+  }),
+];
+for (const e of tocEntries) {
+  const pg = tocPages[e.title];
+  const isChap = e.title.startsWith("Kapitel");
+  tocBlock.push(new Paragraph({
+    spacing: { after: 90 },
+    tabStops: [{ type: TabStopType.RIGHT, position: 9360, leader: LeaderType.DOT }],
+    children: [
+      new TextRun({ text: e.title, size: 22, bold: isChap, color: isChap ? C_TITLE : "000000" }),
+      new TextRun({ children: [new Tab()] }),
+      new TextRun({ text: pg ? String(pg) : "", size: 22, bold: isChap }),
+    ],
+  }));
+}
+tocBlock.push(new Paragraph({ children: [new PageBreak()] }));
+children.splice(TOC_INSERT_AT, 0, ...tocBlock);
 
 // ===================== Dokument =====================
 const doc = new Document({
