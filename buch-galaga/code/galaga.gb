@@ -138,6 +138,14 @@ DIM frame AS INTEGER : DIM prevShoot AS BOOLEAN : DIM invuln AS INTEGER
 DIM diveTimer AS INTEGER : DIM diveSpeed AS FLOAT : DIM bombSpeed AS FLOAT
 DIM levelMsg AS INTEGER : DIM bugsAlive AS INTEGER
 
+' --- Parallax-Sternenhimmel (3 Tiefen-Ebenen, von oben nach unten scrollend) ---
+CONST NSTARS AS INTEGER = 90
+DIM starX[NSTARS]   AS FLOAT      ' x-Position (Spielfeld-Koordinaten)
+DIM starY[NSTARS]   AS FLOAT      ' y-Position (waechst -> nach unten)
+DIM starSpd[NSTARS] AS FLOAT      ' Scroll-Tempo = Parallax-Tiefe
+DIM starInt[NSTARS] AS INTEGER    ' Grund-Helligkeit 0..255
+DIM starPh[NSTARS]  AS FLOAT      ' Phase fuers Funkeln (jeder Stern anders)
+
 CONST PY_LOW  AS FLOAT = 288.0          ' unterste Schiffsposition
 CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
 
@@ -191,6 +199,19 @@ END FUNCTION
 lives = 3 : score = 0 : level = 1 : frame = 0 : invuln = 0
 playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
 NewLevel()
+
+' Sterne zufaellig verteilen und in drei Tiefen-Ebenen einteilen: ferne Sterne
+' sind dunkel und langsam, nahe hell und schnell -- das erzeugt den Parallax.
+DIM s AS INTEGER
+FOR s = 0 TO NSTARS - 1
+    starX[s] = RANDF(0.0, PW)
+    starY[s] = RANDF(0.0, PH)
+    starPh[s] = RANDF(0.0, 6.28)
+    DIM lyr AS INTEGER : lyr = s MOD 3
+    IF lyr = 0 THEN starSpd[s] = 0.35 : starInt[s] = 70     ' fern
+    IF lyr = 1 THEN starSpd[s] = 0.85 : starInt[s] = 150    ' mittel
+    IF lyr = 2 THEN starSpd[s] = 1.60 : starInt[s] = 235    ' nah
+NEXT s
 
 WHILE NOT QUITREQUESTED()
     frame = frame + 1
@@ -315,8 +336,17 @@ WHILE NOT QUITREQUESTED()
     CAMERA_SET(-offx / zoom, 0.0, zoom)
 
     BOX(0, 0, PW - 1, PH - 1, BG)                     ' Spielfeld-Hintergrund
-    FOR i = 0 TO 34
-        PLOT((i * 53) MOD PW, (i * 37 + frame * 2) MOD PH, &H30405A)
+    ' Parallax-Sternenhimmel: jede Ebene scrollt mit eigenem Tempo nach unten,
+    ' jeder Stern funkelt per SIN ueber seine eigene Phase.
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + starSpd[i]
+        IF starY[i] >= PH THEN starY[i] = starY[i] - PH : starX[i] = RANDF(0.0, PW)
+        DIM tw AS FLOAT : tw = 0.55 + 0.45 * SIN(frame * 0.08 + starPh[i])
+        DIM v AS INTEGER : v = INT(starInt[i] * tw)
+        DIM col AS INTEGER : col = RGB(INT(v * 0.85), INT(v * 0.92), v)
+        PLOT(INT(starX[i]), INT(starY[i]), col)
+        ' Nahe, hell funkelnde Sterne sind 2 Pixel breit -- wirken praesenter.
+        IF starSpd[i] > 1.2 AND tw > 0.85 THEN PLOT(INT(starX[i]) + 1, INT(starY[i]), col)
     NEXT i
     FOR i = 0 TO NBUGS - 1
         IF bugs[i].alive THEN
