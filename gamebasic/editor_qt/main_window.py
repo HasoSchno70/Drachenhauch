@@ -26,8 +26,8 @@ from PySide6.QtGui import (
     QPixmap,
 )
 from PySide6.QtWidgets import (
-    QFileDialog, QLabel, QMainWindow, QMessageBox, QSplitter, QStackedWidget,
-    QStatusBar, QToolBar, QWidget,
+    QDialog, QFileDialog, QLabel, QMainWindow, QMessageBox, QSplitter,
+    QStackedWidget, QStatusBar, QToolBar, QWidget,
 )
 
 from .activity_bar import ActivityBar
@@ -48,6 +48,7 @@ from .markdown_viewer import MarkdownViewer
 from .outline_panel import OutlinePanel
 from .output_console import OutputConsole
 from .palette import command_palette, quick_open
+from .print_listing import PrintOptionsDialog, print_code
 from .settings import (
     RECENT_FILES_MAX, load_recent, load_settings, save_recent, save_settings,
 )
@@ -336,6 +337,10 @@ class GameBasicEditor(QMainWindow):
         self.act_save_as.setShortcut(QKeySequence.StandardKey.SaveAs)
         self.act_save_as.triggered.connect(self._save_active_as)
 
+        self.act_print = QAction(icons.get("print"), "Listing drucken ...", self)
+        self.act_print.setShortcut(QKeySequence("Ctrl+Alt+P"))
+        self.act_print.triggered.connect(self._print_active_listing)
+
         self.act_close_tab = QAction("Tab schliessen", self)
         self.act_close_tab.setShortcut(QKeySequence("Ctrl+W"))
         self.act_close_tab.triggered.connect(self._close_active_tab)
@@ -608,6 +613,8 @@ class GameBasicEditor(QMainWindow):
         m_file.addSeparator()
         m_file.addAction(self.act_save)
         m_file.addAction(self.act_save_as)
+        m_file.addSeparator()
+        m_file.addAction(self.act_print)
         m_file.addSeparator()
         self.menu_recent = m_file.addMenu("Zuletzt geoeffnet")
         self._rebuild_recent_menu()
@@ -899,6 +906,31 @@ class GameBasicEditor(QMainWindow):
         st.editor.set_error_base_path(path.parent)
         st.editor._kick_error_check()
         return True
+
+    def _print_active_listing(self) -> None:
+        """Druckt das aktive Listing (oder die Markierung) -- farbig oder s/w."""
+        st = self.tabs.active
+        if st is None:
+            QMessageBox.information(
+                self, "Drucken", "Kein Listing geoeffnet.")
+            return
+        cursor = st.editor.textCursor()
+        has_sel = cursor.hasSelection()
+
+        dlg = PrintOptionsDialog(self, has_selection=has_sel)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        name = st.file_path.name if st.file_path else "Unbenannt.gb"
+        if has_sel and dlg.selection_only:
+            code = cursor.selectedText()
+            title = f"{name}  (Auswahl)"
+        else:
+            code = st.editor.get_text()
+            title = name
+
+        print_code(self, code=code, title=title,
+                   color=dlg.color, line_numbers=dlg.line_numbers)
 
     def _write_tab(self, st: TabState, path: Path) -> bool:
         # Format-on-Save: wenn aktiviert, vor dem Schreiben den Buffer
@@ -1861,6 +1893,7 @@ class GameBasicEditor(QMainWindow):
 
         add_action_group("Datei", [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
+            self.act_print,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
             self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
@@ -1948,6 +1981,7 @@ class GameBasicEditor(QMainWindow):
         """Liefert alle QActions, die der Command-Palette gezeigt werden."""
         return [
             self.act_new, self.act_open, self.act_save, self.act_save_as,
+            self.act_print,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
             self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,

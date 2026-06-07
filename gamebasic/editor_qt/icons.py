@@ -520,6 +520,26 @@ def _icon_settings() -> QPixmap:
     return pix
 
 
+def _icon_print() -> QPixmap:
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(_stroke(1.6))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    # Oberes Papier (das hineingeschobene Blatt)
+    p.drawRect(QRectF(7, 4, 10, 5))
+    # Drucker-Korpus
+    p.drawRoundedRect(QRectF(4, 9, 16, 8), 1.5, 1.5)
+    # Ausgabe-Blatt unten
+    p.setBrush(QBrush(QColor(COLORS["bg"])))
+    p.drawRect(QRectF(7, 15, 10, 6))
+    # Status-LED in Akzentfarbe
+    p.setPen(_stroke(1.6, "accent"))
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    p.drawEllipse(QPointF(17, 12), 1.0, 1.0)
+    p.end()
+    return pix
+
+
 _BUILDERS = {
     "new":      _icon_new,
     "open":     _icon_open,
@@ -548,6 +568,7 @@ _BUILDERS = {
     "tracker": _icon_tracker,
     "tilemap": _icon_tilemap,
     "profiler": _icon_profiler,
+    "print":    _icon_print,
 }
 
 

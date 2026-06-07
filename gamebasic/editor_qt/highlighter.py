@@ -66,6 +66,37 @@ BUILTIN_NAMES = frozenset({
 })
 
 
+def classify_token(tok) -> str | None:
+    """Ordnet einem Token eine Highlight-Klasse zu (oder None).
+
+    Klassen: ``"string" | "number" | "bool" | "ctrl" | "type" | "decl" |
+    "builtin" | "ident"``. Einzige Quelle der Token-Klassifikation -- sowohl
+    der Editor-Highlighter (Farb-`QTextCharFormat`s) als auch der
+    Listing-Druck (`print_listing`) bauen darauf auf, damit beide konsistent
+    bleiben.
+    """
+    t = tok.type
+    if t == TokenType.STRING:
+        return "string"
+    if t == TokenType.NUMBER:
+        return "number"
+    if t in (TokenType.TRUE, TokenType.FALSE):
+        return "bool"
+    if t in _CONTROL_KW:
+        return "ctrl"
+    if t in _TYPE_KW:
+        return "type"
+    if t in _DECL_KW:
+        return "decl"
+    if t == TokenType.IDENT:
+        v = tok.value if isinstance(tok.value, str) else ""
+        if v.lower() in BUILTIN_NAMES:
+            return "builtin"
+        return "ident"
+    # Operatoren / Punctuation -- kein eigenes Format.
+    return None
+
+
 def _make_format(color: str, *, bold: bool = False, italic: bool = False) -> QTextCharFormat:
     f = QTextCharFormat()
     f.setForeground(QColor(color))
@@ -100,6 +131,12 @@ class GBHighlighter(QSyntaxHighlighter):
         self.fmt_ident    = _make_format(COLORS["identifier"])
         self.fmt_operator = _make_format(COLORS["operator"])
         self.fmt_bool     = _make_format(COLORS["bool"], bold=True)
+        self._fmt_by_key = {
+            "ctrl": self.fmt_ctrl, "decl": self.fmt_decl, "type": self.fmt_type,
+            "string": self.fmt_string, "number": self.fmt_number,
+            "bool": self.fmt_bool, "builtin": self.fmt_builtin,
+            "ident": self.fmt_ident,
+        }
 
     def highlightBlock(self, text: str) -> None:  # noqa: N802 (Qt-API)
         self.setCurrentBlockState(self.STATE_NORMAL)
@@ -235,23 +272,4 @@ class GBHighlighter(QSyntaxHighlighter):
         return (start, end - start)
 
     def _format_for(self, tok):
-        t = tok.type
-        if t == TokenType.STRING:
-            return self.fmt_string
-        if t == TokenType.NUMBER:
-            return self.fmt_number
-        if t in (TokenType.TRUE, TokenType.FALSE):
-            return self.fmt_bool
-        if t in _CONTROL_KW:
-            return self.fmt_ctrl
-        if t in _TYPE_KW:
-            return self.fmt_type
-        if t in _DECL_KW:
-            return self.fmt_decl
-        if t == TokenType.IDENT:
-            v = tok.value if isinstance(tok.value, str) else ""
-            if v.lower() in BUILTIN_NAMES:
-                return self.fmt_builtin
-            return self.fmt_ident
-        # Operatoren / Punctuation -- in Editor-Default-Foreground belassen.
-        return None
+        return self._fmt_by_key.get(classify_token(tok))
