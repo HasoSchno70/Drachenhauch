@@ -77,8 +77,11 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
    - **Im eigenen Code:** `GUI_LOAD("meinform.gbform")` und die Handler-`SUB`s
      schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
    - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
-     ein generiertes Programm-Gerüst (Handler-Stubs + GUI-Schleife) in einen
-     Temp-Ordner und startet `gbrt`.
+     ein generiertes Programm-Gerüst in einen Temp-Ordner und startet `gbrt`.
+     Die Form läuft **randlos auf dem echten OS-Fenster** (Fenstergröße =
+     Formgröße, Titel = Formtitel); ist sie „größenveränderbar", ist das
+     **Programmfenster nativ resizebar** und die Form füllt es jeden Frame —
+     die verankerten Controls fließen dabei mit (Reflow).
    - **GB-Code exportieren:** *Datei → GB-Code exportieren…* schreibt ein
      **eigenständiges** `.gb`, das das Formular mit den `GUI_*`-Konstruktoren
      **explizit aufbaut** (`GUI_WINDOW`/`GUI_BUTTON`/… + Setter + `GUI_ON_CLICK`/

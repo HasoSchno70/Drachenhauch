@@ -1683,6 +1683,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_CHROME",
+   "kind": "core",
+   "signature": "GUI_WINDOW_CHROME(win, flag)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_WINDOW_SET_MIN_SIZE",
    "kind": "core",
    "signature": "GUI_WINDOW_SET_MIN_SIZE(win, w, h)",

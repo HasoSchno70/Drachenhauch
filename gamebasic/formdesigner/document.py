@@ -450,22 +450,36 @@ class FormDoc:
                     seen.append(h)
         return seen
 
-    def generate_runner(self, form_filename: str, screen_w: int = 800,
-                        screen_h: int = 480, screen_title: str | None = None,
+    def generate_runner(self, form_filename: str, screen_w: int | None = None,
+                        screen_h: int | None = None, screen_title: str | None = None,
                         handler_bodies: dict | None = None) -> str:
-        """Lauffaehiges GameBasic-Programm: laedt das `.gbform`, definiert die
-        Event-Handler (Stubs oder uebergebene Koerper) und treibt die GUI-Schleife
-        -- der Xojo-Lauf. `handler_bodies`: optional {name: code-zeilen}; ohne
-        Angabe werden die im Formular gespeicherten `code`-Koerper genutzt."""
+        """Lauffaehiges GameBasic-Programm: das Fenster wird auf Formulargroesse
+        gesetzt, das `.gbform` geladen und **randlos** (chromeless) auf das echte
+        OS-Fenster gelegt -- die Form IST das Fenster (Xojo-Lauf). Ist sie
+        `resizable`, wird das OS-Fenster nativ groessenveraenderbar und die Form
+        fuellt es jeden Frame (Anchoring reflowt). `handler_bodies`: optional
+        {name: code-zeilen}; sonst die gespeicherten `code`-Koerper."""
         bodies = handler_bodies if handler_bodies is not None else self.code
         title = screen_title or self.title
+        sw = screen_w if screen_w is not None else self.w
+        sh = screen_h if screen_h is not None else self.h
         lines = [
             f"' Auto-generiert vom Form-Designer -- Layout: {form_filename}",
             'IMPORT "gui"',
-            f'SCREEN({screen_w}, {screen_h}, "{title}", 1)',
+            f'SCREEN({sw}, {sh}, {_gb_str(title)}, 1)',
+        ]
+        if self.resizable:
+            lines.append("WINDOW_RESIZABLE(TRUE)")
+            if self.min_w or self.min_h:
+                lines.append(f"WINDOW_MIN_SIZE({self.min_w or 1}, {self.min_h or 1})")
+            if self.max_w or self.max_h:
+                lines.append(f"WINDOW_MAX_SIZE({self.max_w}, {self.max_h})")
+        lines += [
             "",
             "DIM frm AS GUI_WINDOW",
-            f'frm = GUI_LOAD("{form_filename}")',
+            f'frm = GUI_LOAD({_gb_str(form_filename)})',
+            "GUI_WINDOW_CHROME(frm, FALSE)        ' randlos -- das OS-Fenster liefert den Rahmen",
+            "GUI_WINDOW_RESIZABLE(frm, FALSE)     ' kein innerer Griff; das OS-Fenster resized",
             "",
         ]
         for name in self.handler_names():
@@ -479,6 +493,7 @@ class FormDoc:
             lines.append("")
         lines += [
             "WHILE NOT QUITREQUESTED()",
+            "    GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())   ' Form fuellt das Fenster",
             "    GUI_UPDATE()",
             "    CLS(&H0E1014)",
             "    GUI_DRAW()",

@@ -1,0 +1,56 @@
+' Fenster & GUI -- progressive Demo (mit [LEER] weiterblaettern).
+' Statt vieler Einzel-Demos waechst diese eine Datei Stueck fuer Stueck.
+'   Sektion 1: natives, resizebares OS-Fenster (Layout fuellt die Live-Groesse).
+'   Sektion 2: gui-Anchoring -- das innere Fenster am Eck ziehen -> Reflow.
+IMPORT "gui"
+SCREEN(720, 520, "Fenster & GUI", 1)
+WINDOW_RESIZABLE(TRUE)
+WINDOW_MIN_SIZE(440, 340)
+
+DIM sektion AS INTEGER : sektion = 0
+DIM prev AS INTEGER : prev = 0
+
+' --- gui-Fenster fuer Sektion 2 (einmal aufbauen, mit Ankern) ---
+DIM frm AS GUI_WINDOW
+frm = GUI_WINDOW("Anchoring -- am Eck ziehen", 40, 70, 400, 300)
+GUI_WINDOW_RESIZABLE(frm, TRUE)
+GUI_WINDOW_SET_MIN_SIZE(frm, 260, 200)
+DIM head AS GUI_WIDGET
+head = GUI_LABEL(frm, "Kopf dehnt sich (lrt)", 12, 8)
+GUI_SET_ANCHOR(head, "lrt")
+DIM body AS GUI_WIDGET
+body = GUI_PANEL(frm, 12, 30, 376, 218, "Inhalt waechst (lrtb)")
+GUI_SET_ANCHOR(body, "lrtb")
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(frm, "OK", 300, 258, 88, 28)
+GUI_SET_ANCHOR(ok, "rb")
+DIM cancel AS GUI_WIDGET
+cancel = GUI_BUTTON(frm, "Abbrechen", 12, 258, 100, 28)
+GUI_SET_ANCHOR(cancel, "lb")
+
+WHILE NOT QUITREQUESTED()
+    ' [LEER] schaltet die Sektion weiter (Flanken-Erkennung)
+    DIM sp AS INTEGER : sp = 0
+    IF KEYPRESSED(KEY_SPACE) THEN sp = 1
+    IF sp = 1 AND prev = 0 THEN sektion = (sektion + 1) MOD 2
+    prev = sp
+
+    DIM w AS INTEGER : DIM h AS INTEGER
+    w = SCREENWIDTH() : h = SCREENHEIGHT()
+    CLS(&H0E1014)
+    BOX(0, 0, w - 1, 24, RGB(18, 90, 120))
+    TEXT(8, 8, "Sektion " + STR$(sektion + 1) + "/2   [LEER] weiter   (Fenster ist resizebar)")
+
+    IF sektion = 0 THEN
+        ' Natives OS-Fenster: das Layout fuellt die Live-Fenstergroesse.
+        RECT(8, 34, w - 9, h - 9, RGB(43, 196, 232))
+        TEXT(w \ 2 - 80, h \ 2, "OS-Fenster live: " + STR$(w) + " x " + STR$(h))
+        BOX(w - 140, h - 42, w - 10, h - 12, RGB(46, 62, 80))
+        TEXT(w - 130, h - 34, "klebt unten rechts")
+    ELSE
+        ' gui-Anchoring: das innere Fenster am unteren-rechten Griff ziehen.
+        GUI_UPDATE()
+        GUI_DRAW()
+    END IF
+    FLIP()
+WEND

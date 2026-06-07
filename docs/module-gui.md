@@ -14,7 +14,8 @@ IMPORT "gui"
 > `gui` ist **Retained-Mode** mit echten Fenster-/Widget-Objekten, inklusive
 > Verschieben (Drag an der Titelleiste), Z-Order (Klick bringt ein Fenster
 > nach vorne), Fokus und Schließen-Button. Beide Module dürfen parallel
-> benutzt werden.
+> benutzt werden. Widgets werden auf den **Fenster-Innenbereich geclippt** —
+> wird ein Fenster kleiner gezogen, ragt nichts über Rand/Titelleiste hinaus.
 
 ## Übersicht
 
@@ -25,6 +26,7 @@ IMPORT "gui"
 | `GUI_WINDOW_CLOSABLE(win, an)` | — | Schließen-Button anzeigen (Default: aus) |
 | `GUI_WINDOW_VISIBLE(win, an)` | — | Sichtbarkeit setzen |
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | am unteren-rechten Griff größenveränderbar (Default: aus) |
+| `GUI_WINDOW_CHROME(win, an)` | — | Titelleiste/Rahmen/Buttons zeichnen? Aus = randlos, Inhalt ab oben (damit eine Form das OS-Fenster ausfüllen kann). Default: an |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | Mindestgröße beim Resizen (0 = keine) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |

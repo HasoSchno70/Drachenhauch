@@ -156,6 +156,8 @@ pub struct Window {
     closable: bool,
     visible: bool,
     resizable: bool,                 // am unteren-rechten Griff ziehbar?
+    chrome: bool,                    // Titelleiste + Rahmen + Buttons? (aus = randlos,
+                                     //   z.B. wenn die Form das OS-Fenster fuellt)
     min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
     max_w: i32, max_h: i32,
     base_w: i32, base_h: i32,        // Referenzgroesse fuer Anchoring (Layout-Basis)
@@ -257,7 +259,7 @@ impl Gui {
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
             movable: true, closable: false, visible: true,
-            resizable: false, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            resizable: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true,
         });
@@ -340,6 +342,11 @@ impl Gui {
     }
     pub fn window_resizable(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_RESIZABLE")?.resizable = f; Ok(())
+    }
+    /// Fenster-Chrome (Titelleiste/Rahmen/Buttons) an/aus. Aus = randlos, der
+    /// Inhalt beginnt oben; gedacht, damit eine Form das OS-Fenster ausfuellt.
+    pub fn window_chrome(&mut self, h: i64, f: bool) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_CHROME")?.chrome = f; Ok(())
     }
     pub fn window_min_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
         let win = self.win_mut(h, "GUI_WINDOW_SET_MIN_SIZE")?;
@@ -924,7 +931,7 @@ impl Gui {
         let obj = serde_json::json!({
             "title": win.title, "x": win.x, "y": win.y, "w": win.w, "h": win.h,
             "movable": win.movable, "closable": win.closable, "visible": win.visible,
-            "resizable": win.resizable,
+            "resizable": win.resizable, "chrome": win.chrome,
             "min_w": win.min_w, "min_h": win.min_h, "max_w": win.max_w, "max_h": win.max_h,
             "widgets": widgets,
         });
@@ -942,6 +949,7 @@ impl Gui {
         self.windows[wi].closable = v["closable"].as_bool().unwrap_or(false);
         self.windows[wi].visible = v["visible"].as_bool().unwrap_or(true);
         self.windows[wi].resizable = v["resizable"].as_bool().unwrap_or(false);
+        self.windows[wi].chrome = v["chrome"].as_bool().unwrap_or(true);
         self.windows[wi].min_w = gi("min_w", 0); self.windows[wi].min_h = gi("min_h", 0);
         self.windows[wi].max_w = gi("max_w", 0); self.windows[wi].max_h = gi("max_h", 0);
         if let Some(arr) = v["widgets"].as_array() {
@@ -979,8 +987,9 @@ impl Gui {
 
     // --- Geometrie ---
     fn abs_rect(&self, win: usize, w: &Widget) -> (i32, i32, i32, i32) {
+        let toff = if self.windows[win].chrome { self.m("title_h") } else { 0 };
         let win = &self.windows[win];
-        (win.x + w.x, win.y + self.m("title_h") + w.y, w.w, w.h)
+        (win.x + w.x, win.y + toff + w.y, w.w, w.h)
     }
     fn in_rect(mx: i32, my: i32, r: (i32, i32, i32, i32)) -> bool {
         mx >= r.0 && mx < r.0 + r.2 && my >= r.1 && my < r.1 + r.3
@@ -1213,22 +1222,24 @@ impl Gui {
         let (wx, wy, ww, wh) = (self.windows[win].x, self.windows[win].y,
                                 self.windows[win].w, self.windows[win].h);
         // Resize-Griff unten-rechts?
+        let has_chrome = self.windows[win].chrome;
         let grip = 14;
-        if self.windows[win].resizable
+        if has_chrome && self.windows[win].resizable
             && Self::in_rect(mx, my, (wx + ww - grip, wy + wh - grip, grip, grip)) {
             self.resize_window = Some(win);
             self.resize_dx = (wx + ww) - mx;
             self.resize_dy = (wy + wh) - my;
             return;
         }
-        // Schliess-Button?
-        if self.windows[win].closable && Self::in_rect(mx, my, (wx + ww - th, wy, th, th)) {
+        // Schliess-Button? (nur mit Chrome)
+        if has_chrome && self.windows[win].closable
+            && Self::in_rect(mx, my, (wx + ww - th, wy, th, th)) {
             self.windows[win].close_clicked = true;
             self.windows[win].visible = false;
             return;
         }
-        // Titelleiste -> Drag?
-        if Self::in_rect(mx, my, (wx, wy, ww, th)) {
+        // Titelleiste -> Drag? (nur mit Chrome)
+        if has_chrome && Self::in_rect(mx, my, (wx, wy, ww, th)) {
             if self.windows[win].movable {
                 self.drag_window = Some(win);
                 self.drag_dx = mx - wx;
@@ -1299,24 +1310,31 @@ impl Gui {
         let th = self.m("title_h");
         let pad = self.m("pad");
         g.box_fill(x, y, x + w - 1, y + h - 1, self.th("win_bg"));
-        g.rect(x, y, x + w - 1, y + h - 1, self.th("win_border"));
-        let title_bg = if focused { self.th("title_bg_focus") } else { self.th("title_bg") };
-        g.box_fill(x, y, x + w - 1, y + th - 1, title_bg);
-        g.text(x + pad, y + 4, win.title.clone(), self.th("title_fg"));
-        if win.closable {
-            let (cx, cy, cw, ch) = (x + w - th, y, th, th);
-            g.line(cx + 6, cy + 6, cx + cw - 7, cy + ch - 7, self.th("title_fg"));
-            g.line(cx + cw - 7, cy + 6, cx + 6, cy + ch - 7, self.th("title_fg"));
-        }
-        if win.resizable {                       // Resize-Griff unten-rechts (Diagonalen)
-            let c = self.th("win_border");
-            for o in [2, 6, 10] {
-                g.line(x + w - 2 - o, y + h - 2, x + w - 2, y + h - 2 - o, c);
+        let toff = if win.chrome { th } else { 0 };   // Inhalts-Oberkante
+        if win.chrome {
+            g.rect(x, y, x + w - 1, y + h - 1, self.th("win_border"));
+            let title_bg = if focused { self.th("title_bg_focus") } else { self.th("title_bg") };
+            g.box_fill(x, y, x + w - 1, y + th - 1, title_bg);
+            g.text(x + pad, y + 4, win.title.clone(), self.th("title_fg"));
+            if win.closable {
+                let (cx, cy, cw, ch) = (x + w - th, y, th, th);
+                g.line(cx + 6, cy + 6, cx + cw - 7, cy + ch - 7, self.th("title_fg"));
+                g.line(cx + cw - 7, cy + 6, cx + 6, cy + ch - 7, self.th("title_fg"));
+            }
+            if win.resizable {                   // Resize-Griff unten-rechts (Diagonalen)
+                let c = self.th("win_border");
+                for o in [2, 6, 10] {
+                    g.line(x + w - 2 - o, y + h - 2, x + w - 2, y + h - 2 - o, c);
+                }
             }
         }
+        // Widgets auf den Fenster-Innenbereich begrenzen: wird das Fenster kleiner
+        // gezogen, ragt nichts ueber den Rand/die Titelleiste hinaus.
+        g.push_clip(x + 1, y + toff, (w - 2).max(0), (h - toff - 1).max(0));
         for (i, wdg) in win.widgets.iter().enumerate() {
             if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
         }
+        g.pop_clip();
         // Aufgeklapptes Dropdown-Popup ueber allen Widgets dieses Fensters.
         if let Some((dw, di)) = self.open_dropdown {
             if dw == wi && win.widgets.get(di).map(|x| x.alive && x.visible).unwrap_or(false) {

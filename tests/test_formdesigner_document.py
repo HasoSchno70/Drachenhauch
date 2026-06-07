@@ -485,6 +485,26 @@ def test_generated_runner_parses():
     assert prog is not None
 
 
+def test_runner_form_fills_os_window():
+    # Die Form laeuft randlos auf dem OS-Fenster; resizable -> natives Resize.
+    doc = FormDoc(title="App", w=400, h=300)
+    doc.resizable = True
+    doc.min_w, doc.min_h = 200, 150
+    src = doc.generate_runner("f.gbform")
+    assert "SCREEN(400, 300" in src                       # Fenster = Formulargroesse
+    assert "WINDOW_RESIZABLE(TRUE)" in src                # OS-Fenster resizebar
+    assert "WINDOW_MIN_SIZE(200, 150)" in src
+    assert "GUI_WINDOW_CHROME(frm, FALSE)" in src         # randlos
+    assert "GUI_WINDOW_SET_BOUNDS(frm, 0, 0, SCREENWIDTH(), SCREENHEIGHT())" in src
+    assert _parses(src) is not None
+
+
+def test_runner_non_resizable_no_window_flags():
+    src = FormDoc(title="X").generate_runner("f.gbform")   # resizable=False
+    assert "WINDOW_RESIZABLE(TRUE)" not in src             # OS-Fenster NICHT resizebar
+    assert "GUI_WINDOW_CHROME(frm, FALSE)" in src          # randlos trotzdem
+
+
 def test_generated_runner_with_bodies():
     doc = FormDoc()
     doc.add("button", 0, 0).on_click = "on_ok"
