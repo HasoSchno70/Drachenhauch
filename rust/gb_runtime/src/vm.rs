@@ -2436,6 +2436,7 @@ impl<'p> Vm<'p> {
             "gui_enabled" => Value::Bool(self.gui.enabled(gi(a,0,"GUI_ENABLED")?)?),
             "gui_set_font" => { self.gui.set_font(gi(a,0,"GUI_SET_FONT")?, gi(a,1,"GUI_SET_FONT")?)?; Value::Nil }
             "gui_set_font_size" => { self.gui.set_font_size(gi(a,0,"GUI_SET_FONT_SIZE")?, gi(a,1,"GUI_SET_FONT_SIZE")?)?; Value::Nil }
+            "gui_set_anchor" => { self.gui.set_anchor(gi(a,0,"GUI_SET_ANCHOR")?, &gs(a,1,"GUI_SET_ANCHOR")?)?; Value::Nil }
             "gui_style_set" => { self.gui.style_set(gs(a,0,"GUI_STYLE_SET")?, gs(a,1,"GUI_STYLE_SET")?, gi(a,2,"GUI_STYLE_SET")?)?; Value::Nil }
             "gui_apply_style" => { self.gui.apply_style(gi(a,0,"GUI_APPLY_STYLE")?, &gs(a,1,"GUI_APPLY_STYLE")?)?; Value::Nil }
             "gui_hit_test" => Value::Int(self.gui.hit_test(gi(a,0,"GUI_HIT_TEST")? as i32, gi(a,1,"GUI_HIT_TEST")? as i32)),

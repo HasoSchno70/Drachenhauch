@@ -260,6 +260,19 @@ def test_window_inspector_shown_when_nothing_selected(tmp_path):
     win.close()
 
 
+def test_inspector_anchor_checkboxes(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    c = win.canvas.doc.add("button", 10, 10); c.anchor = "lrtb"
+    win.canvas._select(c)
+    ins = win.inspector
+    assert ins.a_l.isChecked() and ins.a_r.isChecked()
+    assert ins.a_t.isChecked() and ins.a_b.isChecked()
+    ins.a_r.setChecked(False)                 # Aenderung -> schreibt c.anchor
+    assert c.anchor == "ltb"
+    win.close()
+
+
 def test_window_inspector_edits_doc(tmp_path):
     _app()
     win = FormDesigner(tmp_path)

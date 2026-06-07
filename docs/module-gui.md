@@ -27,6 +27,7 @@ IMPORT "gui"
 | `GUI_WINDOW_RESIZABLE(win, an)` | — | am unteren-rechten Griff größenveränderbar (Default: aus) |
 | `GUI_WINDOW_SET_MIN_SIZE(win, w, h)` | — | Mindestgröße beim Resizen (0 = keine) |
 | `GUI_WINDOW_SET_MAX_SIZE(win, w, h)` | — | Maximalgröße beim Resizen (0 = keine) |
+| `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |

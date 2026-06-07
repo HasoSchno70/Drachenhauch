@@ -5379,6 +5379,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SET_ANCHOR",
+   "kind": "core",
+   "signature": "GUI_SET_ANCHOR(wdg, edges$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_ENABLED",
    "kind": "core",
    "signature": "GUI_SET_ENABLED(wdg, on)",

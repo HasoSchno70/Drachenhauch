@@ -831,11 +831,22 @@ class _Inspector(QWidget):
         self.vmin = QDoubleSpinBox(); self.vmax = QDoubleSpinBox(); self.vval = QDoubleSpinBox()
         for s in (self.vmin, self.vmax, self.vval):
             s.setRange(-1e6, 1e6)
+        # Anker (Reflow beim Fenster-Resize): an welchen Kanten klebt das Control?
+        self.a_l = QCheckBox("L"); self.a_r = QCheckBox("R")
+        self.a_t = QCheckBox("O"); self.a_b = QCheckBox("U")
+        for cb, tip in ((self.a_l, "Links"), (self.a_r, "Rechts"),
+                        (self.a_t, "Oben"), (self.a_b, "Unten")):
+            cb.setToolTip(f"Anker {tip}")
+        self._anchor_box = QWidget()
+        _ah = QHBoxLayout(self._anchor_box); _ah.setContentsMargins(0, 0, 0, 0)
+        for cb in (self.a_l, self.a_r, self.a_t, self.a_b):
+            _ah.addWidget(cb)
         self._rows = []
         self._add("Name", self.name)
         self._add("Text", self.text)
         self._add("X", self.sx); self._add("Y", self.sy)
         self._add("Breite", self.sw); self._add("Hoehe", self.sh)
+        self._add("Anker", self._anchor_box)
         self._add("on_click", self.on_click)
         self._add("on_change", self.on_change)
         self._add("Items (1/Zeile)", self.items)
@@ -852,6 +863,8 @@ class _Inspector(QWidget):
         self.items.textChanged.connect(self._apply)
         self.enabled.toggled.connect(self._apply)
         self.checked.toggled.connect(self._apply)
+        for cb in (self.a_l, self.a_r, self.a_t, self.a_b):
+            cb.toggled.connect(self._apply)
         self.set_control(None)
 
     def _add(self, label, widget):
@@ -879,12 +892,15 @@ class _Inspector(QWidget):
         self.items.setPlainText("\n".join(c.items))
         self.vmin.setValue(c.min); self.vmax.setValue(c.max); self.vval.setValue(c.value)
         self.enabled.setChecked(c.enabled); self.checked.setChecked(c.checked)
+        a = c.anchor or "lt"
+        self.a_l.setChecked("l" in a); self.a_r.setChecked("r" in a)
+        self.a_t.setChecked("t" in a); self.a_b.setChecked("b" in a)
         has_text = bool(sp and sp.has_text)
         has_items = bool(sp and sp.has_items)
         events = sp.events if sp else ()
         is_range = c.kind in ("slider", "progress")
         is_check = c.kind in ("checkbox", "radio")
-        for w in (self.name, self.sx, self.sy, self.sw, self.sh, self.enabled):
+        for w in (self.name, self.sx, self.sy, self.sw, self.sh, self._anchor_box, self.enabled):
             self._show(w, True)
         self._show(self.text, has_text)
         self._show(self.items, has_items)
@@ -910,6 +926,9 @@ class _Inspector(QWidget):
         c.min, c.max, c.value = self.vmin.value(), self.vmax.value(), self.vval.value()
         c.enabled = self.enabled.isChecked()
         c.checked = self.checked.isChecked()
+        a = ("l" if self.a_l.isChecked() else "") + ("r" if self.a_r.isChecked() else "") \
+            + ("t" if self.a_t.isChecked() else "") + ("b" if self.a_b.isChecked() else "")
+        c.anchor = a or "lt"
         self.changed.emit()
 
 

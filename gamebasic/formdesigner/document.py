@@ -613,6 +613,8 @@ class FormDoc:
             out.append(f"GUI_SET_VISIBLE({var}, FALSE)")
         if c.font_size:
             out.append(f"GUI_SET_FONT_SIZE({var}, {c.font_size})")
+        if c.anchor and c.anchor != "lt":
+            out.append(f"GUI_SET_ANCHOR({var}, {_gb_str(c.anchor)})")
         for role, col in c.ov.items():
             out.append(f"GUI_SET_COLOR({var}, {_gb_str(role)}, {_gb_hex(col)})")
         if c.on_click:

@@ -703,6 +703,11 @@ impl Gui {
         if sz < 0 { return Err("GUI_SET_FONT_SIZE: Groesse muss >= 0 sein".into()); }
         self.wdg_mut(h, "GUI_SET_FONT_SIZE")?.font_size = sz as i32; Ok(())
     }
+    /// Anchoring eines Widgets setzen (Edge-String aus "lrtb", z.B. "lrtb",
+    /// "rb"). Die Anchor-Basis ist das aktuelle Rechteck des Widgets.
+    pub fn set_anchor(&mut self, h: i64, s: &str) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_ANCHOR")?.anchor = Self::anchor_mask(s); Ok(())
+    }
     /// Benannten Style anlegen/erweitern: `prop` in bg/fg/border/accent (Farbe),
     /// font (Handle), font_size (px). Inkrementell aufrufbar.
     pub fn style_set(&mut self, name: String, prop: String, value: i64) -> Result<(), String> {

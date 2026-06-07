@@ -1,0 +1,36 @@
+' Control-Anchoring (Xojo-Reflow): zieh das Fenster am unteren-rechten Griff
+' groesser -- die Controls verankern sich an den Fensterkanten und fliessen mit.
+IMPORT "gui"
+SCREEN(700, 520, "Anchoring", 1)
+
+DIM frm AS GUI_WINDOW
+frm = GUI_WINDOW("Zieh mich am Eck groesser", 60, 40, 400, 300)
+GUI_WINDOW_RESIZABLE(frm, TRUE)
+GUI_WINDOW_SET_MIN_SIZE(frm, 260, 200)
+
+' Kopf-Label: oben + links + rechts -> dehnt sich ueber die ganze Breite
+DIM head AS GUI_WIDGET
+head = GUI_LABEL(frm, "Kopfzeile -- dehnt sich mit der Breite", 12, 8)
+GUI_SET_ANCHOR(head, "lrt")
+
+' Inhalts-Panel: alle vier Kanten -> waechst in beide Richtungen mit
+DIM body AS GUI_WIDGET
+body = GUI_PANEL(frm, 12, 30, 376, 218, "Inhalt")
+GUI_SET_ANCHOR(body, "lrtb")
+
+' OK-Button: unten + rechts -> klebt immer in der unteren-rechten Ecke
+DIM ok AS GUI_WIDGET
+ok = GUI_BUTTON(frm, "OK", 300, 258, 88, 28)
+GUI_SET_ANCHOR(ok, "rb")
+
+' Abbrechen: unten + links
+DIM cancel AS GUI_WIDGET
+cancel = GUI_BUTTON(frm, "Abbrechen", 12, 258, 100, 28)
+GUI_SET_ANCHOR(cancel, "lb")
+
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(&H0E1014)
+    GUI_DRAW()
+    FLIP()
+WEND

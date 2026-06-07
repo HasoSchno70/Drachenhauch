@@ -52,8 +52,11 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   wenn die Design-Fläche fokussiert ist (kapern also nicht die Textbearbeitung im
   Code-/Inspector-Panel).
 - **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
-  Text, Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert,
-  aktiviert …); ist **kein** Control gewählt, das **Formular selbst** (Xojo-Stil):
+  Text, Position/Größe, **Anker** L/R/O/U, `on_click`/`on_change`-Handler, Items,
+  Min/Max/Wert, aktiviert …). **Anker** = an welchen Fensterkanten das Control
+  klebt; beim Vergrößern des (resizeable) Formulars wandern/wachsen die Controls
+  entsprechend mit (Xojo-Reflow, `GUI_SET_ANCHOR` in der Runtime). Ist **kein**
+  Control gewählt, zeigt der Inspector das **Formular selbst** (Xojo-Stil):
   Titel, Breite/Höhe, Min/Max-Größe, beweglich/schließbar/**größenveränderbar**/
   sichtbar. Das Formular hat dann Resize-Griffe (rechts/unten/Ecke). Ist
   „größenveränderbar" gesetzt, ist das **gebaute Fenster zur Laufzeit** am

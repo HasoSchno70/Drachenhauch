@@ -236,6 +236,16 @@ def test_gb_export_emits_window_resizable():
     assert "GUI_WINDOW_SET_MIN_SIZE(frm, 200, 150)" in src
 
 
+def test_gb_export_emits_anchor():
+    doc = FormDoc()
+    c = doc.add("button", 0, 0); c.anchor = "rb"
+    src = doc.generate_gb_code(with_screen=False, with_loop=False)
+    assert 'GUI_SET_ANCHOR(' in src and '"rb"' in src
+    # Default "lt" wird NICHT emittiert
+    d2 = FormDoc(); d2.add("button", 0, 0)
+    assert "GUI_SET_ANCHOR" not in d2.generate_gb_code(with_screen=False, with_loop=False)
+
+
 def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
     # `code` (Handler-Koerper) ist Designer-Metadaten -- GUI_LOAD muss es ignorieren.
     doc = FormDoc(title="C", w=200, h=120)
