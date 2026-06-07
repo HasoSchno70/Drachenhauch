@@ -1,0 +1,15 @@
+Hintergrundmusik
+================
+
+Datei:    spaceshooter.mp3
+Titel:    8-bit Epic Space Shooter Music
+Autor:    HydroGene
+Quelle:   https://opengameart.org/content/8-bit-epic-space-shooter-music
+Lizenz:   CC0 1.0 (Public Domain Dedication) -- frei verwendbar, auch
+          kommerziell, Namensnennung NICHT erforderlich.
+
+Hinweis: Dies ist KEINE Original-Galaga-Musik (die ist urheberrechtlich
+geschuetzt). Es ist ein frei lizenzierter Arcade-Chiptune im selben Geist.
+Du kannst die Datei jederzeit durch eine eigene ersetzen -- gleicher Name,
+gleicher Ordner. Fehlt die Datei, spielt das Spiel eine kleine prozedurale
+Melodie als Fallback.

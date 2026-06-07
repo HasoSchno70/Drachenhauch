@@ -66,6 +66,18 @@ deinem Geschmack um.** Erzeugt werden sie reproduzierbar von
 > jeder Gegner mehrfarbig. Eine Vorlage, drei Paletten: das spart Arbeit und ist
 > genau die Idee des Originals.
 
+## Die Musik
+
+Der Hintergrund-Track [`assets/music/spaceshooter.mp3`](assets/music) ist ein
+**frei lizenzierter** Arcade-Chiptune (*8-bit Epic Space Shooter Music* von
+HydroGene, [OpenGameArt](https://opengameart.org/content/8-bit-epic-space-shooter-music),
+**CC0** — keine Namensnennung nötig). Das ist bewusst **nicht** die Original-
+Galaga-Musik (die ist urheberrechtlich geschützt), sondern ein Stück im selben
+Geist. Tausch es gegen deinen eigenen Track (gleicher Name/Ordner) — und fehlt
+die Datei, spielt das Spiel eine kleine **prozedurale** Melodie als Fallback.
+Mit **M** schaltest du die Musik im Spiel an/aus. Details:
+[`assets/music/CREDITS.txt`](assets/music/CREDITS.txt).
+
 ## Bauen (PDF/EPUB)
 
 Wie beim großen Buch via [Pandoc](https://pandoc.org); die Kapitel-Reihenfolge
