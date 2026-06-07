@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-    QComboBox, QAbstractItemView, QMenu,
+    QComboBox, QAbstractItemView, QMenu, QStackedWidget,
 )
 
 from .formdesigner import (
@@ -184,6 +184,7 @@ class _Canvas(QWidget):
     handler_requested = Signal(object)   # Control (Doppelklick -> Code-Editor)
     context_menu = Signal(object)        # QPoint (global) -- Rechtsklick auf Control
     zoom_changed = Signal(float)         # neue Zoom-Stufe
+    form_resized = Signal()              # Formular per Griff in der Groesse geaendert
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -210,6 +211,7 @@ class _Canvas(QWidget):
         self._band_start = (0, 0)
         self._band_now = (0, 0)
         self._band_additive = False
+        self._form_resize: str | None = None     # Formular-Resize-Griff (e/s/se)
         self.setMinimumSize(640, 480)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)              # Hover-Cursor ueber den Griffen
@@ -334,6 +336,40 @@ class _Canvas(QWidget):
                 return name
         return None
 
+    def _form_handle_points(self) -> dict[str, QPoint]:
+        """Resize-Griffe des Formulars (rechts/unten/Ecke), Zeichen-Raum."""
+        w, h = self.doc.w, self.doc.h
+        return {
+            "e": QPoint(PAD + w, PAD + h // 2),
+            "s": QPoint(PAD + w // 2, PAD + h),
+            "se": QPoint(PAD + w, PAD + h),
+        }
+
+    def _form_handle_at(self, p: QPoint) -> str | None:
+        if self.selection:                       # nur wenn das Fenster "selektiert" ist
+            return None
+        tol = HANDLE
+        for name, hp in self._form_handle_points().items():
+            if abs(p.x() - hp.x()) <= tol and abs(p.y() - hp.y()) <= tol:
+                return name
+        return None
+
+    def _clamp_fw(self, v: int) -> int:
+        v = max(120, int(v))
+        if self.doc.min_w:
+            v = max(v, self.doc.min_w)
+        if self.doc.max_w:
+            v = min(v, self.doc.max_w)
+        return v
+
+    def _clamp_fh(self, v: int) -> int:
+        v = max(80, int(v))
+        if self.doc.min_h:
+            v = max(v, self.doc.min_h)
+        if self.doc.max_h:
+            v = min(v, self.doc.max_h)
+        return v
+
     def paintEvent(self, _ev):
         qp = QPainter(self)
         qp.fillRect(self.rect(), QColor(18, 22, 28))   # Hintergrund (Widget-Raum)
@@ -353,9 +389,22 @@ class _Canvas(QWidget):
         for c in d.controls:
             self._paint_control(qp, c)
         self._paint_guides(qp, d)
+        if not self.selection:
+            self._paint_form_handles(qp, d)
         self._paint_selection(qp)
         if self._band:
             self._paint_band(qp)
+
+    def _paint_form_handles(self, qp: QPainter, d: FormDoc):
+        """Das Formular ist 'selektiert' (kein Control): Accent-Rahmen + 3 Griffe."""
+        qp.setPen(QPen(QColor(43, 196, 232), 1, Qt.PenStyle.DashLine))
+        qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawRect(QRect(PAD - 1, PAD - 1, d.w + 2, d.h + 2))
+        qp.setPen(QPen(QColor(12, 18, 24), 1))
+        qp.setBrush(QBrush(QColor(43, 196, 232)))
+        s = HANDLE
+        for hp in self._form_handle_points().values():
+            qp.drawRect(QRect(hp.x() - s // 2, hp.y() - s // 2, s, s))
 
     def _paint_selection(self, qp: QPainter):
         """Mehrfach-Selektion: alle bekommen einen Rahmen, das primaere Control
@@ -536,6 +585,12 @@ class _Canvas(QWidget):
                 self._resize_handle = handle
                 self._pending = self.doc.to_dict()           # Pre-Resize-Snapshot
                 return
+        # Formular-Resize-Griff (wenn nichts selektiert = Fenster aktiv)
+        fh = self._form_handle_at(p)
+        if fh is not None:
+            self._form_resize = fh
+            self._pending = self.doc.to_dict()
+            return
         hit = self.doc.control_at(cx, cy)
         if hit is None:                                       # leerer Bereich -> Rubber-Band
             if not ctrl:
@@ -582,6 +637,16 @@ class _Canvas(QWidget):
             self._band_now = (cx, cy)
             self.update()
             return
+        if self._form_resize is not None:
+            if "e" in self._form_resize:
+                self.doc.w = self._clamp_fw(self._snap(p.x() - PAD))
+            if "s" in self._form_resize:
+                self.doc.h = self._clamp_fh(self._snap(p.y() - PAD))
+            self._resize_to_doc()
+            self.form_resized.emit()
+            self.doc_changed.emit()
+            self.update()
+            return
         if self._resize_handle is not None and self.selected is not None:
             c = self.selected
             nx, ny = self._snap(cx), self._snap(cy)
@@ -602,6 +667,8 @@ class _Canvas(QWidget):
         # Kein Knopf gedrueckt: Hover-Cursor ueber Resize-Griffen
         if not (ev.buttons() & Qt.MouseButton.LeftButton):
             handle = self._handle_at(p) if len(self.selection) == 1 else None
+            if handle is None:
+                handle = self._form_handle_at(p)
             self.setCursor(_HANDLE_CURSORS[handle] if handle else Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, _ev):
@@ -616,6 +683,7 @@ class _Canvas(QWidget):
         self._drag = False
         self._multi = False
         self._resize_handle = None
+        self._form_resize = None
         self._clear_guides()                     # Hilfslinien nach dem Ziehen weg
         self.update()
 
@@ -845,6 +913,64 @@ class _Inspector(QWidget):
         self.changed.emit()
 
 
+class _WindowInspector(QWidget):
+    """Eigenschaften des Formulars selbst (wie Xojos Fenster-Inspector). Wird
+    angezeigt, wenn KEIN Control selektiert ist."""
+    changed = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.doc: FormDoc | None = None
+        self._loading = False
+        f = QFormLayout(self)
+        self.title = QLineEdit()
+        self.sw = QSpinBox(); self.sh = QSpinBox()
+        self.minw = QSpinBox(); self.minh = QSpinBox()
+        self.maxw = QSpinBox(); self.maxh = QSpinBox()
+        for s in (self.sw, self.sh, self.minw, self.minh, self.maxw, self.maxh):
+            s.setRange(0, 32000)
+        self.sw.setMinimum(40); self.sh.setMinimum(40)
+        self.movable = QCheckBox("beweglich")
+        self.closable = QCheckBox("schliessbar")
+        self.resizable = QCheckBox("groessenveraenderbar")
+        self.visible = QCheckBox("sichtbar")
+        f.addRow("Titel", self.title)
+        f.addRow("Breite", self.sw); f.addRow("Hoehe", self.sh)
+        f.addRow("Min. Breite", self.minw); f.addRow("Min. Hoehe", self.minh)
+        f.addRow("Max. Breite", self.maxw); f.addRow("Max. Hoehe", self.maxh)
+        f.addRow("", self.movable); f.addRow("", self.closable)
+        f.addRow("", self.resizable); f.addRow("", self.visible)
+        self.title.editingFinished.connect(self._apply)
+        for s in (self.sw, self.sh, self.minw, self.minh, self.maxw, self.maxh):
+            s.valueChanged.connect(self._apply)
+        for c in (self.movable, self.closable, self.resizable, self.visible):
+            c.toggled.connect(self._apply)
+
+    def set_doc(self, doc: FormDoc):
+        self.doc = doc
+        self._loading = True
+        if doc is not None:
+            self.title.setText(doc.title)
+            self.sw.setValue(doc.w); self.sh.setValue(doc.h)
+            self.minw.setValue(doc.min_w); self.minh.setValue(doc.min_h)
+            self.maxw.setValue(doc.max_w); self.maxh.setValue(doc.max_h)
+            self.movable.setChecked(doc.movable); self.closable.setChecked(doc.closable)
+            self.resizable.setChecked(doc.resizable); self.visible.setChecked(doc.visible)
+        self._loading = False
+
+    def _apply(self):
+        if self._loading or self.doc is None:
+            return
+        d = self.doc
+        d.title = self.title.text()
+        d.w, d.h = self.sw.value(), self.sh.value()
+        d.min_w, d.min_h = self.minw.value(), self.minh.value()
+        d.max_w, d.max_h = self.maxw.value(), self.maxh.value()
+        d.movable, d.closable = self.movable.isChecked(), self.closable.isChecked()
+        d.resizable, d.visible = self.resizable.isChecked(), self.visible.isChecked()
+        self.changed.emit()
+
+
 class _CodePanel(QWidget):
     """Integrierter Code-Editor: pro Event-Handler ein GameBasic-Body. Die
     Combo listet die Handler des Formulars, der Editor zeigt/aendert den Body
@@ -990,9 +1116,13 @@ class FormDesigner(QMainWindow):
         pdock = self._dock("Controls", self.palette, Qt.DockWidgetArea.LeftDockWidgetArea)
         pdock.setMinimumWidth(180)
 
-        # Inspector
+        # Inspector -- Stack: Control-Eigenschaften ODER Fenster-Eigenschaften
         self.inspector = _Inspector()
-        self._dock("Inspector", self.inspector, Qt.DockWidgetArea.RightDockWidgetArea)
+        self.win_inspector = _WindowInspector()
+        self._insp_stack = QStackedWidget()
+        self._insp_stack.addWidget(self.inspector)       # 0: Control selektiert
+        self._insp_stack.addWidget(self.win_inspector)   # 1: Fenster (nichts selektiert)
+        self._dock("Inspector", self._insp_stack, Qt.DockWidgetArea.RightDockWidgetArea)
 
         # Code-Editor (integriert)
         self.code_panel = _CodePanel()
@@ -1011,9 +1141,11 @@ class FormDesigner(QMainWindow):
         self.canvas.selection_changed.connect(self._update_status)
         self.canvas.doc_changed.connect(self._mark_dirty)
         self.canvas.doc_replaced.connect(self.code_panel.set_doc)
+        self.canvas.form_resized.connect(self._on_form_resized)
         self.canvas.handler_requested.connect(self._open_handler)
         self.canvas.context_menu.connect(self._show_context_menu)
         self.inspector.changed.connect(self._on_inspector_changed)
+        self.win_inspector.changed.connect(self._on_window_changed)
         self.code_panel.session_started.connect(self._on_code_session)
         self.code_panel.edited.connect(self._on_code_edited)
 
@@ -1175,10 +1307,32 @@ class FormDesigner(QMainWindow):
         self.history.push(snapshot)
         self._refresh_history_actions()
 
-    def _on_selection_changed(self, _c):
-        """Neue Selektion -> Basis fuer eine evtl. folgende Inspector-Edit-Session."""
+    def _on_selection_changed(self, c):
+        """Neue Selektion -> Inspector-Stack umschalten (Control vs. Fenster) +
+        Basis fuer eine evtl. folgende Inspector-Edit-Session."""
         self._insp_baseline = self.canvas.doc.to_dict()
         self._insp_dirty = False
+        if c is None:                       # nichts selektiert -> Fenster-Inspector
+            self.win_inspector.set_doc(self.canvas.doc)
+            self._insp_stack.setCurrentWidget(self.win_inspector)
+        else:
+            self._insp_stack.setCurrentWidget(self.inspector)
+
+    def _on_window_changed(self):
+        """Fenster-Inspector-Aenderung: Edits einer Sitzung = EIN Undo-Schritt."""
+        if not self._insp_dirty and self._insp_baseline is not None:
+            self.history.push(self._insp_baseline)
+            self._insp_dirty = True
+            self._refresh_history_actions()
+        self.canvas._resize_to_doc()
+        self.canvas.update()
+        self._refresh_form_list()           # Titel evtl. geaendert
+        self._mark_dirty()
+
+    def _on_form_resized(self):
+        """Formular per Griff vergroessert/verkleinert -> Fenster-Inspector live."""
+        self.win_inspector.set_doc(self.canvas.doc)
+        self._mark_dirty()
 
     def _on_inspector_changed(self):
         """Inspector-Aenderung. Alle Edits einer Selektion = EIN Undo-Schritt."""

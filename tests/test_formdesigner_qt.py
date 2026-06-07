@@ -246,6 +246,63 @@ def test_canvas_renders_all_kinds(tmp_path):
     win.close()
 
 
+# --------------------------------------------------------------- Fenster-Inspector
+def test_window_inspector_shown_when_nothing_selected(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    assert win._insp_stack.currentWidget() is win.win_inspector
+    assert win.win_inspector.doc is win.canvas.doc
+    b = win.canvas.doc.add("button", 10, 10)
+    win.canvas._select(b)
+    assert win._insp_stack.currentWidget() is win.inspector     # Control -> Control-Inspector
+    win.canvas._select(None)
+    assert win._insp_stack.currentWidget() is win.win_inspector # zurueck zum Fenster
+    win.close()
+
+
+def test_window_inspector_edits_doc(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    win.win_inspector.title.setText("Mein Fenster")
+    win.win_inspector.resizable.setChecked(True)
+    win.win_inspector.sw.setValue(420)
+    assert win.canvas.doc.title == "Mein Fenster"
+    assert win.canvas.doc.resizable and win.canvas.doc.w == 420
+    assert win.history.can_undo                                 # Fenster-Edit undobar
+    win.close()
+
+
+def test_form_resize_handle(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.doc.w, cv.doc.h = 360, 260
+    cv._select(None)
+    se = (PAD + cv.doc.w, PAD + cv.doc.h)
+    assert cv._form_handle_at(QPointF(*se).toPoint()) == "se"   # Griff-Treffer
+    cv._form_resize = "se"                        # Resize-Logik direkt treiben
+    cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + 440, PAD + 300), _NB, _L, _NO))
+    _mrelease(cv)
+    assert cv.doc.w > 360 and cv.doc.h > 260
+    assert win.win_inspector.sw.value() == cv.doc.w
+    win.close()
+
+
+def test_form_resize_respects_min(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.doc.w, cv.doc.h, cv.doc.min_w = 360, 260, 300
+    cv._select(None)
+    cv._form_resize = "e"
+    cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + 100, PAD + 130), _NB, _L, _NO))   # ganz klein ziehen
+    _mrelease(cv)
+    assert cv.doc.w >= 300                       # Min-Breite haelt
+    win.close()
+
+
 # --------------------------------------------------------------- Multi-Select
 _L = Qt.MouseButton.LeftButton
 _NB = Qt.MouseButton.NoButton

@@ -319,6 +319,24 @@ def test_empty_code_not_serialized():
     assert "code" not in doc.to_dict()
 
 
+def test_window_props_roundtrip():
+    doc = FormDoc(title="W", w=400, h=300)
+    doc.resizable = True
+    doc.min_w, doc.min_h = 200, 150
+    doc.max_w, doc.max_h = 800, 600
+    d = doc.to_dict()
+    assert d["resizable"] is True and d["min_w"] == 200 and d["max_h"] == 600
+    doc2 = FormDoc.from_dict(d)
+    assert doc2.resizable and (doc2.min_w, doc2.min_h) == (200, 150)
+    assert (doc2.max_w, doc2.max_h) == (800, 600)
+
+
+def test_window_min_max_omitted_when_zero():
+    d = FormDoc().to_dict()
+    assert "min_w" not in d and "max_h" not in d        # 0 = nicht serialisiert
+    assert d["resizable"] is False
+
+
 def test_generate_runner_uses_stored_code():
     doc = FormDoc()
     doc.add("button", 0, 0).on_click = "on_ok"

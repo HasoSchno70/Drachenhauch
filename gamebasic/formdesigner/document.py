@@ -292,6 +292,11 @@ class FormDoc:
     movable: bool = True
     closable: bool = True
     visible: bool = True
+    resizable: bool = False                        # Fenster zur Laufzeit groessenveraenderbar?
+    min_w: int = 0                                 # Mindest-/Maximalgroesse (0 = keine Grenze)
+    min_h: int = 0
+    max_w: int = 0
+    max_h: int = 0
     controls: list = field(default_factory=list)   # list[Control]
     code: dict = field(default_factory=dict)       # Event-Handler-Koerper: name -> GB-Code
 
@@ -395,8 +400,12 @@ class FormDoc:
         d: dict = {
             "title": self.title, "x": self.x, "y": self.y, "w": self.w, "h": self.h,
             "movable": self.movable, "closable": self.closable, "visible": self.visible,
+            "resizable": self.resizable,
             "widgets": [c.to_dict() for c in self.controls],
         }
+        for k in ("min_w", "min_h", "max_w", "max_h"):   # nur wenn gesetzt
+            if getattr(self, k):
+                d[k] = getattr(self, k)
         if self.code:
             # Designer-Metadaten (Handler-Koerper); die Runtime ignoriert `code`.
             d["code"] = {str(k): str(v) for k, v in self.code.items()}
@@ -411,6 +420,9 @@ class FormDoc:
             movable=bool(d.get("movable", True)),
             closable=bool(d.get("closable", True)),
             visible=bool(d.get("visible", True)),
+            resizable=bool(d.get("resizable", False)),
+            min_w=int(d.get("min_w", 0)), min_h=int(d.get("min_h", 0)),
+            max_w=int(d.get("max_w", 0)), max_h=int(d.get("max_h", 0)),
             code={str(k): str(v) for k, v in dict(d.get("code", {})).items()},
         )
         doc.controls = [Control.from_dict(w) for w in d.get("widgets", [])]
