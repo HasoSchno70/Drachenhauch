@@ -90,6 +90,27 @@ function tip(title, text) {
   });
 }
 
+// Monospace-Code-Block (grauer Kasten mit blauer Leiste links).
+function codeBlock(lines) {
+  const runs = lines.map((ln, i) => new TextRun({ text: ln, font: "Consolas", size: 19, break: i === 0 ? 0 : 1 }));
+  return new Paragraph({
+    shading: { fill: "F4F4F4", type: ShadingType.CLEAR },
+    border: { left: { style: BorderStyle.SINGLE, size: 18, color: C_ACCENT, space: 6 } },
+    spacing: { before: 80, after: 160 }, indent: { left: 120 },
+    children: runs,
+  });
+}
+
+// Absatz mit gemischtem Text + Inline-Code. parts: ["text"] oder ["code", true].
+function pmix(parts) {
+  return new Paragraph({
+    spacing: { after: 140 },
+    children: parts.map(([t, code]) => new TextRun(code
+      ? { text: t, font: "Consolas", size: 21 }
+      : { text: t, size: 22 })),
+  });
+}
+
 function h1(text) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_1,
@@ -202,6 +223,124 @@ children.push(bulletRich("Schiessen, Gegner, Formation: ", "Arrays, Klassen, Bew
 children.push(bulletRich("Einflug, Stürze, Bomben, Kollisionen: ", "das eigentliche Spielgefühl."));
 children.push(bulletRich("Politur: ", "Sound, Effekte, Highscores, Export als .exe."));
 children.push(tip("Alles in Farbe und zum Selbermachen", "Dieses Buch ist als Word-Dokument angelegt. Du kannst es nach Belieben ergänzen, umstellen, eigene Screenshots einfügen – und natürlich ausdrucken."));
+
+// ===================== Kapitel 1 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 1: Das erste Fenster"));
+children.push(tip("In diesem Kapitel",
+  "Du öffnest dein allererstes GameBasic-Fenster, lernst die „Spielschleife“ kennen und zauberst einen scrollenden Sternenhimmel – die Bühne, auf der später unser Raumschiff kämpft."));
+
+children.push(h2("Ein Fenster öffnen"));
+children.push(p("Jedes Spiel braucht ein Fenster. In GameBasic genügt dafür eine einzige Zeile:"));
+children.push(codeBlock(['SCREEN(480, 640, "Mein Galaga")']));
+children.push(pmix([
+  ["Der Befehl ", false], ["SCREEN", true],
+  [" öffnet ein Fenster: zuerst die Breite (480), dann die Höhe (640), dann der Titel in der Fensterleiste. Wir wählen ein ", false],
+  ["Hochformat", false], [" – schmal und hoch, wie ein Arcade-Automat.", false],
+]));
+
+children.push(h2("Die Spielschleife"));
+children.push(p("Ein Spiel steht nie still: viele Male pro Sekunde wird das Bild neu gezeichnet und angezeigt. Das erledigt eine Schleife, die so lange läuft, bis du das Fenster schliesst:"));
+children.push(codeBlock([
+  "WHILE NOT QUITREQUESTED()",
+  "    ' ... hier wird gezeichnet ...",
+  "    FLIP()",
+  "WEND",
+]));
+children.push(pmix([
+  ["", false],
+  ["WHILE", true], [" … ", false], ["WEND", true],
+  [" wiederholt alles dazwischen immer wieder. ", false],
+  ["QUITREQUESTED()", true],
+  [" wird erst wahr, wenn du auf das Schliessen-Kreuz klickst. Und ", false],
+  ["FLIP()", true],
+  [" zeigt das fertig gezeichnete Bild an – erst wird im Hintergrund gemalt, dann in einem Rutsch umgeschaltet. So flackert nichts.", false],
+]));
+
+children.push(h2("Das Bild löschen"));
+children.push(pmix([
+  ["Am Anfang jedes Durchlaufs wischen wir das alte Bild weg – mit ", false],
+  ["CLS", true], [" (engl. „clear screen“) und einer Farbe:", false],
+]));
+children.push(codeBlock(['CLS(&H05060F)        \' dunkles Weltraum-Blau']));
+children.push(pmix([
+  ["Farben schreibt man als ", false], ["&Hrrggbb", true],
+  [" – je zwei Stellen für Rot, Grün, Blau. ", false],
+  ["&H05060F", true], [" ist ein sehr dunkles Blau, perfekt fürs All.", false],
+]));
+
+children.push(h2("Ein Sternenhimmel"));
+children.push(p("Sterne sind einfach viele leuchtende Punkte. Wir merken uns ihre Positionen in zwei Listen (sogenannten Arrays) – eine für x, eine für y – und verteilen sie zu Beginn zufällig:"));
+children.push(codeBlock([
+  "CONST NSTARS AS INTEGER = 60",
+  "DIM starX[NSTARS] AS INTEGER",
+  "DIM starY[NSTARS] AS INTEGER",
+  "",
+  "DIM i AS INTEGER",
+  "FOR i = 0 TO NSTARS - 1",
+  "    starX[i] = RANDINT(0, 479)",
+  "    starY[i] = RANDINT(0, 639)",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["CONST", true], [" ist ein fester Wert, der sich nie ändert (hier: 60 Sterne). ", false],
+  ["DIM starX[NSTARS]", true], [" legt eine Liste mit 60 Plätzen an. Die ", false],
+  ["FOR", true], ["-Schleife läuft von 0 bis 59 und gibt jedem Stern mit ", false],
+  ["RANDINT(min, max)", true], [" eine zufällige Position.", false],
+]));
+children.push(p("In der Spielschleife lassen wir die Sterne nach unten fallen. Wer unten herausfällt, taucht oben neu auf:"));
+children.push(codeBlock([
+  "FOR i = 0 TO NSTARS - 1",
+  "    starY[i] = starY[i] + 2",
+  "    IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)",
+  "    PLOT(starX[i], starY[i], &HFFFFFF)",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["PLOT(x, y, farbe)", true], [" zeichnet einen einzelnen Punkt – hier in Weiss (", false],
+  ["&HFFFFFF", true], ["). Die Zeile mit ", false], ["IF", true],
+  [" setzt einen Stern zurück nach oben, sobald er unten austritt – und gibt ihm gleich eine neue x-Position.", false],
+]));
+
+children.push(h2("Das ganze Programm"));
+children.push(p("Setzt man alles zusammen, ergibt sich dein erstes vollständiges GameBasic-Programm. Tippe es ab und starte es:"));
+children.push(codeBlock([
+  'SCREEN(480, 640, "Mein Galaga - Kapitel 1")',
+  "",
+  "CONST NSTARS AS INTEGER = 60",
+  "DIM starX[NSTARS] AS INTEGER",
+  "DIM starY[NSTARS] AS INTEGER",
+  "DIM i AS INTEGER",
+  "FOR i = 0 TO NSTARS - 1",
+  "    starX[i] = RANDINT(0, 479)",
+  "    starY[i] = RANDINT(0, 639)",
+  "NEXT i",
+  "",
+  "WHILE NOT QUITREQUESTED()",
+  "    CLS(&H05060F)",
+  "    FOR i = 0 TO NSTARS - 1",
+  "        starY[i] = starY[i] + 2",
+  "        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)",
+  "        PLOT(starX[i], starY[i], &HFFFFFF)",
+  "    NEXT i",
+  "    FLIP()",
+  "WEND",
+]));
+figure("kap01_fenster.png", "Dein erstes Fenster: ein scrollender Sternenhimmel.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("SCREEN ", "öffnet ein Fenster (Breite, Höhe, Titel)."));
+children.push(bulletRich("WHILE … WEND + FLIP ", "bilden die Spielschleife, die das Bild immer wieder neu anzeigt."));
+children.push(bulletRich("CLS ", "löscht das Bild, PLOT zeichnet einen Punkt – Farben als &Hrrggbb."));
+children.push(bulletRich("CONST, DIM und FOR ", "speichern und verarbeiten viele Werte (hier: 60 Sterne)."));
+
+children.push(h2("Übung"));
+children.push(bullet("Ändere die Fenstergrösse und die Sternenfarbe. Was passiert?"));
+children.push(bullet("Lass die Sterne schneller fallen (grössere Zahl statt + 2)."));
+children.push(bullet("Erhöhe NSTARS auf 200 – ein dichteres Weltall."));
+children.push(bullet("Zusatz: Gib manchen Sternen mit einer zweiten Geschwindigkeit mehr Tiefe (Tipp: ein drittes Array für das Tempo)."));
 
 // ===================== Dokument =====================
 const doc = new Document({
