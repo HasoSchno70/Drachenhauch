@@ -51,6 +51,10 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   `Strg+V`), **Nach vorne/hinten** (`Strg+]` / `Strg+[`). Diese Kürzel wirken nur,
   wenn die Design-Fläche fokussiert ist (kapern also nicht die Textbearbeitung im
   Code-/Inspector-Panel).
+- **Anordnen-Menü** (für die Mehrfach-Auswahl): **Ausrichten** (links/rechts/oben/
+  unten/zentriert), **Gleiche Breite/Höhe/Größe** (an das zuletzt geklickte
+  „primäre" Control), **Horizontal/Vertikal verteilen** (gleiche Lücken, erstes +
+  letztes bleiben fix) — alles undobar.
 - **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
   Text, Position/Größe, **Anker** L/R/O/U, `on_click`/`on_change`-Handler, Items,
   Min/Max/Wert, aktiviert …). **Anker** = an welchen Fensterkanten das Control

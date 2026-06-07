@@ -338,6 +338,64 @@ class FormDoc:
         self.controls.append(nc)
         return nc
 
+    # ---- Anordnen (Mehrfach-Auswahl): Ausrichten / Gleiche Groesse / Verteilen ----
+    def align(self, controls: list, edge: str) -> None:
+        """Controls an einer Kante/Mitte des Gesamt-Begrenzungsrahmens ausrichten.
+        `edge`: left/right/top/bottom/center_h/center_v."""
+        if len(controls) < 2:
+            return
+        xs = [c.x for c in controls]; rights = [c.x + c.w for c in controls]
+        ys = [c.y for c in controls]; bottoms = [c.y + c.h for c in controls]
+        if edge == "left":
+            m = min(xs)
+            for c in controls: c.x = m
+        elif edge == "right":
+            m = max(rights)
+            for c in controls: c.x = max(0, m - c.w)
+        elif edge == "top":
+            m = min(ys)
+            for c in controls: c.y = m
+        elif edge == "bottom":
+            m = max(bottoms)
+            for c in controls: c.y = max(0, m - c.h)
+        elif edge == "center_h":
+            cx = (min(xs) + max(rights)) // 2
+            for c in controls: c.x = max(0, cx - c.w // 2)
+        elif edge == "center_v":
+            cy = (min(ys) + max(bottoms)) // 2
+            for c in controls: c.y = max(0, cy - c.h // 2)
+
+    def same_size(self, controls: list, ref, dim: str) -> None:
+        """Alle Controls auf die Groesse des Referenz-Controls `ref` bringen.
+        `dim`: w/h/both."""
+        if ref is None:
+            return
+        for c in controls:
+            if c is ref:
+                continue
+            if dim in ("w", "both"): c.w = ref.w
+            if dim in ("h", "both"): c.h = ref.h
+
+    def distribute(self, controls: list, axis: str) -> None:
+        """Controls entlang einer Achse gleichmaessig verteilen (gleiche Luecken;
+        erstes + letztes bleiben fix). `axis`: h/v. Braucht >= 3 Controls."""
+        if len(controls) < 3:
+            return
+        if axis == "h":
+            cs = sorted(controls, key=lambda c: c.x)
+            span = (cs[-1].x + cs[-1].w) - cs[0].x
+            gap = (span - sum(c.w for c in cs)) / (len(cs) - 1)
+            pos = float(cs[0].x)
+            for c in cs:
+                c.x = max(0, int(round(pos))); pos += c.w + gap
+        else:
+            cs = sorted(controls, key=lambda c: c.y)
+            span = (cs[-1].y + cs[-1].h) - cs[0].y
+            gap = (span - sum(c.h for c in cs)) / (len(cs) - 1)
+            pos = float(cs[0].y)
+            for c in cs:
+                c.y = max(0, int(round(pos))); pos += c.h + gap
+
     def to_front(self, c: Control) -> None:
         """Z-Reihenfolge: ans Ende (zuletzt gezeichnet = oben)."""
         if c in self.controls:

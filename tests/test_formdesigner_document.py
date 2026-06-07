@@ -278,6 +278,54 @@ def test_clone_from_dict():
     assert (nc.x, nc.y) == (13, 13)
 
 
+def test_align_edges():
+    doc = FormDoc()
+    a = doc.add("button", 10, 10); a.w, a.h = 100, 20
+    b = doc.add("button", 50, 80); b.w, b.h = 60, 30
+    doc.align([a, b], "left")
+    assert a.x == 10 and b.x == 10                 # an die linkeste Kante
+    doc.align([a, b], "right")
+    assert a.x + a.w == 110 and b.x + b.w == 110   # rechte Kanten buendig
+    doc.align([a, b], "top")
+    assert a.y == b.y == 10
+
+
+def test_align_center_h():
+    doc = FormDoc()
+    a = doc.add("button", 0, 0); a.w = 100          # bbox 0..200, Mitte 100
+    b = doc.add("button", 100, 40); b.w = 100
+    doc.align([a, b], "center_h")
+    assert a.x + a.w // 2 == 100 and b.x + b.w // 2 == 100
+
+
+def test_same_size_to_reference():
+    doc = FormDoc()
+    a = doc.add("button", 0, 0); a.w, a.h = 120, 40   # Referenz
+    b = doc.add("button", 0, 50); b.w, b.h = 60, 20
+    doc.same_size([a, b], ref=a, dim="both")
+    assert (b.w, b.h) == (120, 40) and (a.w, a.h) == (120, 40)
+    c = doc.add("button", 0, 100); c.w, c.h = 30, 30
+    doc.same_size([a, c], ref=a, dim="w")
+    assert c.w == 120 and c.h == 30                  # nur Breite
+
+
+def test_distribute_horizontal():
+    doc = FormDoc()
+    a = doc.add("button", 0, 0); a.w = 20
+    b = doc.add("button", 30, 0); b.w = 20
+    c = doc.add("button", 200, 0); c.w = 20         # span 0..220
+    doc.distribute([a, b, c], "h")
+    # span=220, sum(w)=60 -> gap=(220-60)/2=80; b.x = 0+20+80 = 100
+    assert a.x == 0 and c.x == 200 and b.x == 100
+
+
+def test_align_needs_two():
+    doc = FormDoc()
+    a = doc.add("button", 7, 7)
+    doc.align([a], "left")                           # no-op bei < 2
+    assert a.x == 7
+
+
 def test_z_order_front_back():
     doc = FormDoc()
     a = doc.add("button", 0, 0)           # 100x28

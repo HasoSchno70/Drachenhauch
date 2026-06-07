@@ -1247,9 +1247,46 @@ class FormDesigner(QMainWindow):
         act("Verkleinern", "Ctrl+-", lambda: self.canvas.set_zoom(self.canvas.zoom / 1.25), menu=v)
         act("Zoom 100%", "Ctrl+0", lambda: self.canvas.set_zoom(1.0), menu=v)
 
+        # Anordnen (Mehrfach-Auswahl): Ausrichten / Gleiche Groesse / Verteilen
+        ar = self.menuBar().addMenu("&Anordnen")
+        for label, edge in (("Linksbuendig", "left"), ("Rechtsbuendig", "right"),
+                            ("Oben buendig", "top"), ("Unten buendig", "bottom"),
+                            ("Zentriert horizontal", "center_h"),
+                            ("Zentriert vertikal", "center_v")):
+            act(label, None, (lambda e: lambda: self._align(e))(edge), menu=ar)
+        ar.addSeparator()
+        act("Gleiche Breite", None, lambda: self._same_size("w"), menu=ar)
+        act("Gleiche Hoehe", None, lambda: self._same_size("h"), menu=ar)
+        act("Gleiche Groesse", None, lambda: self._same_size("both"), menu=ar)
+        ar.addSeparator()
+        act("Horizontal verteilen", None, lambda: self._distribute("h"), menu=ar)
+        act("Vertikal verteilen", None, lambda: self._distribute("v"), menu=ar)
+
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on
         self.canvas.update()
+
+    # -- Anordnen (auf die Mehrfach-Auswahl, je mit Undo-Checkpoint) --
+    def _arrange(self, op, min_n: int = 2):
+        sel = list(self.canvas.selection)
+        if len(sel) < min_n:
+            self.statusBar().showMessage(f"Mindestens {min_n} Controls auswaehlen.", 2500)
+            return
+        pre = self.canvas.doc.to_dict()
+        op(sel)
+        self._commit_history(pre)
+        self.canvas.update()
+        self._mark_dirty()
+
+    def _align(self, edge: str):
+        self._arrange(lambda s: self.canvas.doc.align(s, edge))
+
+    def _same_size(self, dim: str):
+        # Referenz = primaeres (zuletzt geklicktes) Control
+        self._arrange(lambda s: self.canvas.doc.same_size(s, self.canvas.selected, dim))
+
+    def _distribute(self, axis: str):
+        self._arrange(lambda s: self.canvas.doc.distribute(s, axis), min_n=3)
 
     # -- Aktive Form + Navigator ------------------------------------------
     @property

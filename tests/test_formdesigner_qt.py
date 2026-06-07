@@ -383,6 +383,44 @@ def test_multi_delete(tmp_path):
     win.close()
 
 
+def test_arrange_align_and_undo(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 10, 10)
+    b = cv.doc.add("button", 50, 80)
+    cv._select_many([a, b])
+    win._align("left")
+    assert a.x == 10 and b.x == 10
+    assert win.history.can_undo
+    win.undo()                               # Undo ersetzt die Control-Objekte
+    assert cv.doc.controls[1].x == 50        # zurueck (via Doc, nicht alte Referenz)
+    win.close()
+
+
+def test_arrange_same_size_uses_primary(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 0, 0); a.w, a.h = 60, 20
+    b = cv.doc.add("button", 0, 40); b.w, b.h = 120, 40   # zuletzt -> primary
+    cv._select_many([a, b])
+    assert cv.selected is b
+    win._same_size("both")
+    assert (a.w, a.h) == (120, 40)           # an primary angeglichen
+    win.close()
+
+
+def test_arrange_needs_selection(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    a = win.canvas.doc.add("button", 7, 7)
+    win.canvas._select(a)
+    win._align("left")                       # nur 1 selektiert -> no-op
+    assert a.x == 7 and not win.history.can_undo
+    win.close()
+
+
 def test_rubber_band_select(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
