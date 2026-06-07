@@ -735,6 +735,99 @@ children.push(bullet("Füge eine vierte, sehr helle und schnelle Ebene hinzu."))
 children.push(bullet("Gib den Sternen einen leichten Blaustich (etwas weniger Rot/Grün als Blau)."));
 children.push(bullet("Ändere die Funkel-Geschwindigkeit (die 0.08)."));
 
+// ===================== Kapitel 6 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 6: Gegner & Formation"));
+children.push(tip("In diesem Kapitel",
+  "Jetzt kommt Leben ins Spiel: eine ganze Formation bunter Gegner. Dafür lernst du Klassen kennen – einen Bauplan für gleichartige Dinge – und ordnest 24 Gegner in einem Gitter an, das sanft schwebt."));
+
+children.push(h2("Eine Klasse für die Gegner"));
+children.push(p("Alle Gegner sind gleich aufgebaut: jeder hat eine Position, eine Reihe (sie bestimmt die Farbe) und einen Zustand (lebt er noch?). Statt für jeden einzelne Variablen zu schreiben, beschreiben wir einmal den Bauplan – eine Klasse:"));
+children.push(codeBlock([
+  "CLASS Bug",
+  "    DIM x AS INTEGER",
+  "    DIM y AS INTEGER",
+  "    DIM row AS INTEGER          ' Reihe 0/1/2 -> Farbe",
+  "    DIM alive AS BOOLEAN",
+  "",
+  "    SUB Init(px AS INTEGER, py AS INTEGER, prow AS INTEGER)",
+  "        Self.x = px : Self.y = py : Self.row = prow : Self.alive = TRUE",
+  "    END SUB",
+  "END CLASS",
+]));
+children.push(pmix([
+  ["Eine ", false], ["CLASS", true],
+  [" ist ein Bauplan; ein konkreter Gegner daraus heisst Objekt. Die Felder (", false],
+  ["x", true], [", ", false], ["y", true], [", …) gehören jedem Objekt einzeln. ", false],
+  ["Init", true], [" ist eine besondere Methode: Sie läuft automatisch, wenn wir mit ", false],
+  ["NEW", true], [" einen Gegner erzeugen, und füllt die Felder. ", false],
+  ["Self", true], [" meint dabei „dieses eine Objekt“.", false],
+]));
+
+children.push(h2("Die Formation aufbauen"));
+children.push(p("24 Gegner = 3 Reihen × 8 Spalten. Wir legen ein Array von Bug-Objekten an und erzeugen sie in einer Schleife. Aus der Laufnummer i berechnen wir Spalte und Reihe:"));
+children.push(codeBlock([
+  "CONST COLS AS INTEGER = 8",
+  "CONST ROWS AS INTEGER = 3",
+  "CONST NBUGS AS INTEGER = 24",
+  "DIM bugs[NBUGS] AS Bug",
+  "DIM gapX AS INTEGER : gapX = 48",
+  "DIM startX AS INTEGER : startX = (480 - (COLS - 1) * gapX) \\ 2 - 8",
+  "FOR i = 0 TO NBUGS - 1",
+  "    DIM col AS INTEGER : col = i MOD COLS",
+  "    DIM rw AS INTEGER  : rw = i \\ COLS",
+  "    bugs[i] = NEW Bug(startX + col * gapX, 60 + rw * 40, rw)",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["i MOD COLS", true], [" ist der Rest beim Teilen – die Spalte (0…7). ", false],
+  ["i \\ COLS", true], [" ist die Ganzzahl-Division – die Reihe (0…2). ", false],
+  ["NEW Bug(...)", true], [" erzeugt einen Gegner und ruft dessen ", false],
+  ["Init", true], [" auf. So füllt sich das Gitter Zeile für Zeile.", false],
+]));
+
+children.push(h2("Gegner zeichnen – mit Schweben und Flügelschlag"));
+children.push(pmix([
+  ["Jedes Gegner-Bild ist ein kleines Sheet mit zwei Frames (Flügel oben/unten). Mit ", false],
+  ["DRAWIMAGEPART", true],
+  [" schneiden wir genau ein 16×16-Stück heraus. Die ganze Formation schwebt per ", false],
+  ["SIN", true], [" hin und her, und der Flügelschlag wechselt im Takt:", false],
+]));
+children.push(codeBlock([
+  "DIM sway AS INTEGER : sway = INT(SIN(frame * 0.04) * 12.0)",
+  "DIM srcX AS INTEGER : srcX = IIF((frame \\ 12) MOD 2 = 0, 0, 16)",
+  "FOR i = 0 TO NBUGS - 1",
+  "    IF bugs[i].alive THEN",
+  "        DRAWIMAGEPART(rowImg[bugs[i].row], srcX, 0, 16, 16, bugs[i].x + sway, bugs[i].y)",
+  "    END IF",
+  "NEXT i",
+]));
+children.push(pmix([
+  ["", false],
+  ["DRAWIMAGEPART(bild, sx, sy, sw, sh, x, y)", true],
+  [" zeichnet nur den Ausschnitt ab (sx, sy) mit Grösse sw×sh. Mit ", false],
+  ["srcX", true], [" = 0 oder 16 wählen wir Frame 1 oder 2. ", false],
+  ["bugs[i].alive", true], [" liest das Feld eines Objekts – nur lebende Gegner werden gezeichnet. ", false],
+  ["rowImg", true], [" ist ein Array mit dem passenden Bild je Reihe (bug0/1/2.png).", false],
+]));
+children.push(pmix([
+  ["Das vollständige Programm (mit Sternen, Schiff und Schüssen) liegt in ", false],
+  ["code/kap06/gegner.gb", true], [".", false],
+]));
+figure("kap06_gegner.png", "Die Formation: 3 Reihen, 3 Farben, 24 Gegner – sie schweben und schlagen mit den Flügeln.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("CLASS ", "= Bauplan; ein Objekt daraus hat eigene Felder. NEW erzeugt es, Init füllt es, Self meint das Objekt selbst."));
+children.push(bulletRich("Array von Objekten ", "(DIM bugs[NBUGS] AS Bug) verwaltet viele Gegner auf einmal."));
+children.push(bulletRich("MOD und \\ ", "rechnen aus einer Laufnummer Spalte und Reihe – praktisch für Gitter."));
+children.push(bulletRich("DRAWIMAGEPART ", "zeichnet einen Bild-Ausschnitt – so nutzen wir einzelne Animations-Frames."));
+
+children.push(h2("Übung"));
+children.push(bullet("Ändere die Formationsgrösse (COLS/ROWS) und die Abstände (gapX)."));
+children.push(bullet("Lass die Formation stärker oder schneller schweben (die 12 bzw. 0.04)."));
+children.push(bullet("Verlangsame den Flügelschlag (die 12 in der Frame-Wahl)."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
