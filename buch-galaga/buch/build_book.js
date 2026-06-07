@@ -920,6 +920,96 @@ children.push(bullet("Mach den Einflug schneller oder langsamer (ts in Init)."))
 children.push(bullet("Verändere die Kontrollpunkte – wie ändert sich die Bahnform?"));
 children.push(bullet("Lass die Gegner enger gestaffelt starten (kleinerer delay-Faktor als i * 4)."));
 
+// ===================== Kapitel 8 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 8: Sturzangriffe"));
+children.push(tip("In diesem Kapitel",
+  "Die Gegner werden gefährlich: Einzelne lösen sich aus der Formation und stürzen im Bogen auf dich herab. Dafür bekommt jeder Gegner eine kleine Zustands-Maschine – gesteuert über ein ENUM."));
+
+children.push(h2("Zustände mit ENUM"));
+children.push(p("Ein Gegner ist immer in genau einem von drei Zuständen: Er fliegt ein (ENTER), schwebt in der Formation (FORM) oder stürzt gerade (DIVE). Statt unklarer Zahlen oder mehrerer Ja/Nein-Flags geben wir diesen Zuständen Namen – mit einem ENUM:"));
+children.push(codeBlock([
+  "ENUM St = ENTER, FORM, DIVE",
+]));
+children.push(pmix([
+  ["Ein ", false], ["ENUM", true],
+  [" ist eine Liste benannter Werte. Statt einer nichtssagenden 1 schreiben wir ", false],
+  ["St.FORM", true],
+  [" – das liest sich wie ein Satz. In der Bug-Klasse ersetzt ein Feld ", false],
+  ["state AS INTEGER", true], [" das frühere Ja/Nein-Flag.", false],
+]));
+children.push(tip("Namen klug wählen",
+  "Weil GameBasic Gross-/Kleinschreibung ignoriert, darf der ENUM-Name nicht gleich heissen wie eine deiner Variablen. Wir nennen ihn kurz St – das kollidiert mit nichts."));
+
+children.push(h2("Eine Bahn für den Sturz"));
+children.push(pmix([
+  ["Den Einflug- und den Sturz-Bogen setzen wir mit derselben Hilfsmethode ", false],
+  ["SetPath", true],
+  [" (Start, zwei Kontrollpunkte, Ziel + Tempo). Die Dive-Methode legt eine Bahn von der Formation hinunter an der Spielerspalte vorbei und unten aus dem Bild:", false],
+]));
+children.push(codeBlock([
+  "SUB Dive(px AS FLOAT, speed AS FLOAT)",
+  "    DIM side AS INTEGER : side = IIF(Self.hx < 240.0, 1, -1)",
+  "    Self.SetPath(speed, Self.hx, Self.hy, Self.hx + side * 100.0, Self.hy + 160.0, _",
+  "        px, 460.0, px - side * 100.0, 700.0)",
+  "    Self.state = St.DIVE",
+  "END SUB",
+]));
+
+children.push(h2("Die Zustands-Maschine"));
+children.push(p("Die Update-Methode reagiert auf den Zustand. Kommt ein Gegner am Ende seiner Bahn an (t ≥ 1), entscheidet sein Zustand, wie es weitergeht: Nach einem Sturz fliegt er von oben wieder in die Formation, sonst hat er die Formation erreicht:"));
+children.push(codeBlock([
+  "IF Self.t >= 1.0 THEN",
+  "    IF Self.state = St.DIVE THEN",
+  "        ' nach dem Sturz von oben zurueck in die Formation",
+  "        Self.SetPath(0.02, Self.hx, -30.0, Self.hx, 60.0, Self.hx, 30.0, Self.hx, Self.hy)",
+  "        Self.state = St.ENTER",
+  "    ELSE",
+  "        Self.state = St.FORM",
+  "    END IF",
+  "END IF",
+]));
+children.push(pmix([
+  ["So entsteht ein Kreislauf: ", false],
+  ["ENTER", true], [" → ", false], ["FORM", true], [" → (Sturz) ", false],
+  ["DIVE", true], [" → ", false], ["ENTER", true], [" → … Genau das ist eine Zustands-Maschine.", false],
+]));
+
+children.push(h2("Wann stürzt wer?"));
+children.push(p("Ein Zähler löst in Abständen einen Sturz aus. Wir suchen einen zufälligen Gegner, der gerade in Formation schwebt, und schicken ihn Richtung Schiff:"));
+children.push(codeBlock([
+  "diveTimer = diveTimer - 1",
+  "IF diveTimer <= 0 THEN",
+  "    diveTimer = 80 + RANDINT(0, 60)",
+  "    DIM tries AS INTEGER",
+  "    FOR tries = 0 TO 10",
+  "        DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)",
+  "        IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN",
+  "            bugs[pick].Dive(shipX, 0.013)",
+  "            BREAK",
+  "        END IF",
+  "    NEXT tries",
+  "END IF",
+]));
+children.push(pmix([
+  ["Wir probieren bis zu 11-mal einen zufälligen Gegner; der erste passende (lebt und ist in ", false],
+  ["FORM", true], [") stürzt los. ", false],
+  ["shipX", true], [" übergibt die Spielerposition als Ziel. Das vollständige Programm liegt in ", false],
+  ["code/kap08/sturz.gb", true], [".", false],
+]));
+figure("kap08_sturz.png", "Ein Gegner hat sich gelöst und stürzt im Bogen auf das Schiff herab.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("ENUM ", "gibt Zahlen verständliche Namen (St.ENTER/FORM/DIVE)."));
+children.push(bulletRich("Zustands-Maschine ", "= ein Objekt wechselt zwischen klaren Zuständen; die Update-Methode reagiert je nach Zustand."));
+children.push(bulletRich("Wiederverwenden ", "= dieselbe SetPath-Methode für Einflug und Sturz."));
+children.push(bulletRich("Zufalls-Auslöser ", "= ein Timer + RANDINT bestimmen, wann und wer stürzt."));
+
+children.push(h2("Übung"));
+children.push(bullet("Lass Gegner häufiger oder seltener stürzen (diveTimer-Werte)."));
+children.push(bullet("Mach den Sturz schneller (die 0.013)."));
+children.push(bullet("Zusatz: Lass beim Sturz-Tiefpunkt etwas passieren (Vorschau auf die Bomben im nächsten Kapitel)."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
