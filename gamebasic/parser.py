@@ -756,14 +756,24 @@ class Parser:
         cond = self._expression()
         self._expect(TokenType.THEN, "Erwartet THEN nach Bedingung")
 
-        # Single-Line: IF cond THEN stmt [ELSE stmt] NEWLINE
+        # Single-Line: IF cond THEN stmt [: stmt ...] [ELSE stmt [: stmt ...]] NEWLINE
+        # Alle ':'-getrennten Statements nach THEN gehoeren zum THEN-Zweig
+        # (klassisches BASIC, konsistent mit dem Block-IF), der ELSE-Zweig analog.
         if not self._check(TokenType.NEWLINE):
-            then_stmt = self._inline_statement()
+            then_block = [self._inline_statement()]
+            while self._match(TokenType.COLON):
+                if self._check(TokenType.NEWLINE, TokenType.ELSE) or self._at_end():
+                    break
+                then_block.append(self._inline_statement())
             else_stmts = []
             if self._match(TokenType.ELSE):
                 else_stmts.append(self._inline_statement())
+                while self._match(TokenType.COLON):
+                    if self._check(TokenType.NEWLINE) or self._at_end():
+                        break
+                    else_stmts.append(self._inline_statement())
             self._consume_terminator()
-            return If(cond, [then_stmt], [], else_stmts)
+            return If(cond, then_block, [], else_stmts)
 
         # Block: IF cond THEN \n ... [ELSEIF cond THEN \n ...] [ELSE \n ...] END IF
         self._consume_terminator()

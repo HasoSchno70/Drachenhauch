@@ -555,12 +555,25 @@ impl Parser {
         let cond = self.expression()?;
         self.expect(Tt::Then, "Erwartet THEN nach Bedingung")?;
         if !self.check(Tt::Newline) {
-            let then_stmt = self.inline_statement()?;
-            let mut else_stmts = Vec::new();
-            if self.matches(Tt::Else) { else_stmts.push(self.inline_statement()?); }
+            // Single-Line: alle ':'-getrennten Statements nach THEN gehoeren zum
+            // THEN-Zweig (klassisches BASIC, konsistent mit dem Block-IF) -- der
+            // ELSE-Zweig analog. Schluss jeweils bei NEWLINE / ELSE / EOF.
+            let mut then_block = vec![self.inline_statement()?];
+            while self.matches(Tt::Colon) {
+                if self.checks(&[Tt::Newline, Tt::Else]) || self.at_end() { break; }
+                then_block.push(self.inline_statement()?);
+            }
+            let mut else_block = Vec::new();
+            if self.matches(Tt::Else) {
+                else_block.push(self.inline_statement()?);
+                while self.matches(Tt::Colon) {
+                    if self.check(Tt::Newline) || self.at_end() { break; }
+                    else_block.push(self.inline_statement()?);
+                }
+            }
             self.consume_terminator()?;
-            return Ok(Node::If { condition: Box::new(cond), then_block: vec![then_stmt],
-                                 elseif_branches: vec![], else_block: else_stmts });
+            return Ok(Node::If { condition: Box::new(cond), then_block,
+                                 elseif_branches: vec![], else_block });
         }
         self.consume_terminator()?;
         let mut then_block = Vec::new();
