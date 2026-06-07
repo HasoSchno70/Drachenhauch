@@ -10,6 +10,7 @@ IMPORT "curves"
 IMPORT "audio"
 IMPORT "camera"
 IMPORT "particles"
+IMPORT "save"
 
 CONST PW       AS INTEGER = 240         ' Spielfeld-Breite (logisch)
 CONST PH       AS INTEGER = 320         ' Spielfeld-Hoehe
@@ -173,6 +174,19 @@ DIM popVal[NPOP] AS INTEGER : DIM popLife[NPOP] AS INTEGER   ' Restframes, 0 = f
 DIM shake AS FLOAT               ' Kamera-Wackel-Staerke (klingt ab)
 DIM muzzle AS INTEGER            ' Restframes Muendungsblitz
 
+' --- Spielzustand (Titel / Spiel / Namens-Eingabe) + Highscore-Liste ---
+ENUM GS = TITLE, PLAY, ENTER
+DIM mode AS INTEGER
+CONST NHS AS INTEGER = 8
+DIM hsName[NHS] AS STRING        ' Top-NHS Namen
+DIM hsScore[NHS] AS INTEGER      ' Top-NHS Punkte (absteigend)
+DIM hs AS SAVE_HANDLE            ' persistente Highscore-Datei
+DIM entInit[3] AS INTEGER        ' 3 Initialen als Buchstaben-Index 0..25
+DIM entPos AS INTEGER            ' aktive Initiale 0..2
+DIM prevStart AS BOOLEAN         ' Flanke fuer Start/Bestaetigen-Taste
+DIM peUp AS BOOLEAN : DIM peDn AS BOOLEAN
+DIM peL AS BOOLEAN : DIM peR AS BOOLEAN : DIM peFire AS BOOLEAN
+
 CONST PY_LOW  AS FLOAT = 288.0          ' unterste Schiffsposition
 CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
 
@@ -242,9 +256,222 @@ FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _
     RETURN ax < cx + cw AND ax + aw > cx AND ay < cy + ch AND ay + ah > cy
 END FUNCTION
 
-lives = 3 : score = 0 : level = 1 : frame = 0 : invuln = 0
-playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
-NewLevel()
+' ===================== Highscore-Liste (persistent) =====================
+SUB LoadScores()
+    hs = SAVE_LOAD_OR_NEW("galaga_hs.sav")
+    DIM k AS INTEGER
+    FOR k = 0 TO NHS - 1
+        hsName[k] = SAVE_GET_STRING_OR(hs, "name" + STR$(k), "---")
+        hsScore[k] = SAVE_GET_INT_OR(hs, "score" + STR$(k), 0)
+    NEXT k
+END SUB
+
+SUB SaveScores()
+    DIM k AS INTEGER
+    FOR k = 0 TO NHS - 1
+        SAVE_SET_STRING(hs, "name" + STR$(k), hsName[k])
+        SAVE_SET_INT(hs, "score" + STR$(k), hsScore[k])
+    NEXT k
+    SAVE_WRITE(hs, "galaga_hs.sav")
+END SUB
+
+' Reicht `sc` fuer die Liste (besser als der letzte Platz)?
+FUNCTION Qualifies(sc AS INTEGER) AS BOOLEAN
+    RETURN sc > hsScore[NHS - 1]
+END FUNCTION
+
+' Neuen Eintrag absteigend einsortieren (der letzte faellt heraus) und speichern.
+SUB InsertScore(nm AS STRING, sc AS INTEGER)
+    DIM k AS INTEGER : k = NHS - 1
+    WHILE k > 0 AND hsScore[k - 1] < sc
+        hsName[k] = hsName[k - 1] : hsScore[k] = hsScore[k - 1]
+        k = k - 1
+    WEND
+    hsName[k] = nm : hsScore[k] = sc
+    SaveScores()
+END SUB
+
+' Die drei gewaehlten Initialen als String ("ABC").
+FUNCTION EntryName() AS STRING
+    DIM letters AS STRING : letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    RETURN letters[entInit[0]] + letters[entInit[1]] + letters[entInit[2]]
+END FUNCTION
+
+' ===================== Modus-Wechsel =====================
+SUB StartGame()
+    lives = 3 : score = 0 : level = 1
+    playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
+    invuln = 0
+    prevShoot = TRUE          ' der Start-Tastendruck soll nicht sofort schiessen
+    NewLevel()
+    mode = GS.PLAY
+END SUB
+
+SUB GameOver()
+    IF Qualifies(score) THEN
+        entInit[0] = 0 : entInit[1] = 0 : entInit[2] = 0 : entPos = 0
+        mode = GS.ENTER
+    ELSE
+        mode = GS.TITLE
+    END IF
+END SUB
+
+' Namens-Eingabe: hoch/runter wechselt den Buchstaben, links/rechts die Stelle,
+' Leertaste bestaetigt. Alle mit Flankenerkennung (kein Dauer-Scrollen).
+SUB NameEntry()
+    DIM up AS BOOLEAN : up = KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W)
+    DIM dn AS BOOLEAN : dn = KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S)
+    DIM lf AS BOOLEAN : lf = KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A)
+    DIM rt AS BOOLEAN : rt = KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D)
+    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_SPACE)
+    IF up AND NOT peUp THEN entInit[entPos] = (entInit[entPos] + 1) MOD 26
+    IF dn AND NOT peDn THEN entInit[entPos] = (entInit[entPos] + 25) MOD 26
+    IF rt AND NOT peR AND entPos < 2 THEN entPos = entPos + 1
+    IF lf AND NOT peL AND entPos > 0 THEN entPos = entPos - 1
+    IF ok AND NOT peFire THEN
+        InsertScore(EntryName(), score)
+        mode = GS.TITLE
+        prevStart = TRUE      ' nicht mit derselben Taste sofort neu starten
+    END IF
+    peUp = up : peDn = dn : peL = lf : peR = rt : peFire = ok
+END SUB
+
+' ===================== Spiel-Update (nur im Modus PLAY) =====================
+SUB UpdatePlay()
+    DIM i AS INTEGER
+    ' Eingabe: bewegen + schiessen.
+    IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 3.0
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 3.0
+    IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.4
+    IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.4
+    IF playerX < 2.0 THEN playerX = 2.0
+    IF playerX > PW - 18.0 THEN playerX = PW - 18.0
+    IF playerY < PY_HIGH THEN playerY = PY_HIGH
+    IF playerY > PY_LOW THEN playerY = PY_LOW
+    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
+    IF firing AND NOT prevShoot THEN Shoot()
+    prevShoot = firing
+
+    ' Sturzangriff ausloesen.
+    diveTimer = diveTimer - 1
+    IF diveTimer <= 0 THEN
+        diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
+        DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
+        DIM launched AS INTEGER : launched = 0
+        DIM tries AS INTEGER
+        FOR tries = 0 TO 20
+            IF launched >= nDive THEN BREAK
+            DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
+            IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
+                bugs[pick].Dive(playerX, diveSpeed)
+                launched = launched + 1
+            END IF
+        NEXT tries
+    END IF
+
+    ' Gegner bewegen (Sturz wirft am Tiefpunkt eine Bombe).
+    DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
+    FOR i = 0 TO NBUGS - 1
+        IF bugs[i].alive THEN
+            IF bugs[i].Update(sway) THEN DropBomb(bugs[i].x, bugs[i].y)
+        END IF
+    NEXT i
+
+    ' Bullets + Bomben bewegen.
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            by[i] = by[i] - 5.0
+            IF by[i] < -8.0 THEN bAlive[i] = FALSE
+        END IF
+    NEXT i
+    FOR i = 0 TO NBOMB - 1
+        IF boAlive[i] THEN
+            bmy[i] = bmy[i] + bombSpeed : bmx[i] = bmx[i] + bmvx[i]
+            IF bmy[i] > PH THEN boAlive[i] = FALSE
+        END IF
+    NEXT i
+
+    ' Bullet trifft Gegner.
+    DIM j AS INTEGER
+    FOR i = 0 TO NBULLET - 1
+        IF bAlive[i] THEN
+            FOR j = 0 TO NBUGS - 1
+                IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
+                    bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
+                    DIM gain AS INTEGER : gain = (ROWS - bugs[j].row) * 50
+                    score = score + gain
+                    Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
+                    Popup(bugs[j].x + 2.0, bugs[j].y, gain)
+                    PLAYSOUND(sfxBoom) : BREAK
+                END IF
+            NEXT j
+        END IF
+    NEXT i
+
+    ' Spieler getroffen?
+    IF invuln = 0 THEN
+        DIM hit AS BOOLEAN : hit = FALSE
+        FOR i = 0 TO NBOMB - 1
+            IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+                boAlive[i] = FALSE : hit = TRUE
+            END IF
+        NEXT i
+        FOR i = 0 TO NBUGS - 1
+            IF bugs[i].alive AND bugs[i].state = St.DIVE AND _
+               Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, playerY + 2.0, 10, 12) THEN
+                hit = TRUE
+            END IF
+        NEXT i
+        IF hit THEN
+            lives = lives - 1
+            invuln = 90 : shake = 7.0
+            Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
+            PLAYSOUND(sfxHit)
+            IF lives <= 0 THEN GameOver()
+        END IF
+    END IF
+
+    ' Level geschafft?
+    IF lives > 0 AND bugsAlive <= 0 THEN
+        level = level + 1 : NewLevel()
+    END IF
+END SUB
+
+' ===================== Titel- und Eingabe-Screen =====================
+SUB DrawTitle(cx AS INTEGER, sh AS INTEGER)
+    TEXT(cx - 56, 64, "G A L A G A", &H8FE0FF)
+    TEXT(cx - 104, 100, "Pfeile bewegen   -   Leer schiessen", &H8090A8)
+    TEXT(cx - 40, 146, "HIGHSCORES", &HFFE070)
+    DIM k AS INTEGER
+    FOR k = 0 TO NHS - 1
+        DIM yy AS INTEGER : yy = 172 + k * 18
+        DIM cc AS INTEGER : cc = IIF(k = 0, &HFFF0B0, &HBFD0E0)
+        TEXT(cx - 60, yy, f"{k + 1}. {hsName[k]}", cc)
+        TEXT(cx + 28, yy, STR$(hsScore[k]), cc)
+    NEXT k
+    IF (frame \ 30) MOD 2 = 0 THEN
+        TEXT(cx - 96, sh - 56, "LEERTASTE  =  SPIEL STARTEN", &H80FFB0)
+    END IF
+END SUB
+
+SUB DrawEntry(cx AS INTEGER, sh AS INTEGER)
+    DIM letters AS STRING : letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    TEXT(cx - 66, 110, "NEUER HIGHSCORE!", &HFFE070)
+    TEXT(cx - 30, 140, STR$(score), &HFFFFFF)
+    DIM k AS INTEGER
+    FOR k = 0 TO 2
+        DIM cc AS INTEGER : cc = &H90A8C0
+        IF k = entPos THEN cc = IIF((frame \ 12) MOD 2 = 0, &HFFF080, &H6A5020)
+        TEXT(cx - 30 + k * 26, 178, letters[entInit[k]], cc)
+    NEXT k
+    TEXT(cx - 88, 222, "Hoch/Runter: Buchstabe", &H8090A8)
+    TEXT(cx - 84, 240, "Links/Rechts: Stelle", &H8090A8)
+    TEXT(cx - 88, 258, "Leertaste: bestaetigen", &H8090A8)
+END SUB
+
+frame = 0
+LoadScores()
+mode = GS.TITLE          ' wir starten im Titelbild (SPACE startet das Spiel)
 
 ' Sterne zufaellig verteilen und in drei Tiefen-Ebenen einteilen: ferne Sterne
 ' sind dunkel und langsam, nahe hell und schnell -- das erzeugt den Parallax.
@@ -267,126 +494,30 @@ WHILE NOT QUITREQUESTED()
     IF f1 AND NOT prevF1 AND crtShader >= 0 THEN crtOn = NOT crtOn
     prevF1 = f1
 
-    ' ---- Eingabe ----
-    IF lives > 0 THEN
-        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 3.0
-        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 3.0
-        IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.4
-        IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.4
-        IF playerX < 2.0 THEN playerX = 2.0
-        IF playerX > PW - 18.0 THEN playerX = PW - 18.0
-        IF playerY < PY_HIGH THEN playerY = PY_HIGH
-        IF playerY > PY_LOW THEN playerY = PY_LOW
-        DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
-        IF firing AND NOT prevShoot THEN Shoot()
-        prevShoot = firing
-    ELSE
-        IF KEYPRESSED(KEY_SPACE) THEN
-            lives = 3 : score = 0 : level = 1 : playerY = PY_LOW : NewLevel()
-        END IF
+    ' ---- Modus-Logik ----
+    DIM i AS INTEGER
+    IF mode = GS.PLAY THEN
+        UpdatePlay()
+    ELSEIF mode = GS.TITLE THEN
+        DIM sk AS BOOLEAN : sk = KEYPRESSED(KEY_SPACE)
+        IF sk AND NOT prevStart THEN StartGame()
+        prevStart = sk
+    ELSEIF mode = GS.ENTER THEN
+        NameEntry()
     END IF
+
+    ' ---- Timer + Animation (laufen immer, fuer fluessige Optik) ----
     IF invuln > 0 THEN invuln = invuln - 1
     IF levelMsg > 0 THEN levelMsg = levelMsg - 1
     IF muzzle > 0 THEN muzzle = muzzle - 1
     IF shake > 0.3 THEN shake = shake * 0.86 ELSE shake = 0.0
-
-    ' ---- Animation ----
     FOR r = 0 TO ROWS - 1 : SPRITE_UPDATE(rowSpr[r], 16) : NEXT r
     SPRITE_UPDATE(bombSpr, 16)
     PARTICLE_UPDATE(explFx, 16)
-    ' Score-Popups steigen auf und altern.
     DIM p AS INTEGER
     FOR p = 0 TO NPOP - 1
         IF popLife[p] > 0 THEN popY[p] = popY[p] - 0.6 : popLife[p] = popLife[p] - 1
     NEXT p
-
-    ' ---- Sturzangriff ausloesen ----
-    DIM i AS INTEGER
-    IF lives > 0 THEN
-        diveTimer = diveTimer - 1
-        IF diveTimer <= 0 THEN
-            diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
-            ' Ab hoeheren Levels stuerzen mehrere Gegner zugleich (max. 3).
-            DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
-            DIM launched AS INTEGER : launched = 0
-            DIM tries AS INTEGER
-            FOR tries = 0 TO 20
-                IF launched >= nDive THEN BREAK
-                DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
-                IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
-                    bugs[pick].Dive(playerX, diveSpeed)
-                    launched = launched + 1
-                END IF
-            NEXT tries
-        END IF
-    END IF
-
-    ' ---- Gegner ----
-    DIM sway AS FLOAT : sway = SIN(frame * 0.03) * 10.0
-    FOR i = 0 TO NBUGS - 1
-        IF bugs[i].alive THEN
-            IF bugs[i].Update(sway) THEN DropBomb(bugs[i].x, bugs[i].y)
-        END IF
-    NEXT i
-
-    ' ---- Bullets / Bomben ----
-    FOR i = 0 TO NBULLET - 1
-        IF bAlive[i] THEN
-            by[i] = by[i] - 5.0
-            IF by[i] < -8.0 THEN bAlive[i] = FALSE
-        END IF
-    NEXT i
-    FOR i = 0 TO NBOMB - 1
-        IF boAlive[i] THEN
-            bmy[i] = bmy[i] + bombSpeed : bmx[i] = bmx[i] + bmvx[i]
-            IF bmy[i] > PH THEN boAlive[i] = FALSE
-        END IF
-    NEXT i
-
-    ' ---- Bullet vs Bug ----
-    DIM j AS INTEGER
-    FOR i = 0 TO NBULLET - 1
-        IF bAlive[i] THEN
-            FOR j = 0 TO NBUGS - 1
-                IF bugs[j].alive AND Overlap(bx[i], by[i], 6, 8, bugs[j].x, bugs[j].y, 16, 16) THEN
-                    bugs[j].alive = FALSE : bAlive[i] = FALSE : bugsAlive = bugsAlive - 1
-                    DIM gain AS INTEGER : gain = (ROWS - bugs[j].row) * 50
-                    score = score + gain
-                    Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
-                    Popup(bugs[j].x + 2.0, bugs[j].y, gain)
-                    PLAYSOUND(sfxBoom) : BREAK
-                END IF
-            NEXT j
-        END IF
-    NEXT i
-
-    ' ---- Spieler getroffen? ----
-    IF lives > 0 AND invuln = 0 THEN
-        DIM hit AS BOOLEAN : hit = FALSE
-        FOR i = 0 TO NBOMB - 1
-            IF boAlive[i] AND Overlap(bmx[i], bmy[i], 6, 6, playerX + 3.0, playerY + 2.0, 10, 12) THEN
-                boAlive[i] = FALSE : hit = TRUE
-            END IF
-        NEXT i
-        FOR i = 0 TO NBUGS - 1
-            IF bugs[i].alive AND bugs[i].state = St.DIVE AND _
-               Overlap(bugs[i].x, bugs[i].y, 14, 14, playerX + 3.0, playerY + 2.0, 10, 12) THEN
-                hit = TRUE
-            END IF
-        NEXT i
-        IF hit THEN
-            lives = lives - 1
-            invuln = 90
-            shake = 7.0
-            Explode(playerX + 5.0, playerY + 6.0, &HFFC040, 30)
-            PLAYSOUND(sfxHit)
-        END IF
-    END IF
-
-    ' ---- Level geschafft? ----
-    IF lives > 0 AND bugsAlive <= 0 THEN
-        level = level + 1 : NewLevel()
-    END IF
 
     ' ====================== ZEICHNEN ======================
     ' Vollbild: das Spielfeld per Kamera-Zoom auf die Bildschirmhoehe skalieren
@@ -425,53 +556,61 @@ WHILE NOT QUITREQUESTED()
         ' Nahe, hell funkelnde Sterne sind 2 Pixel breit -- wirken praesenter.
         IF starSpd[i] > 1.2 AND tw > 0.85 THEN PLOT(INT(starX[i]) + 1, INT(starY[i]), col)
     NEXT i
-    FOR i = 0 TO NBUGS - 1
-        IF bugs[i].alive THEN
-            SPRITE_SET_POS(rowSpr[bugs[i].row], bugs[i].x, bugs[i].y)
-            SPRITE_DRAW(rowSpr[bugs[i].row])
-        END IF
-    NEXT i
-    FOR i = 0 TO NBOMB - 1
-        IF boAlive[i] THEN
-            SPRITE_SET_POS(bombSpr, bmx[i], bmy[i]) : SPRITE_DRAW(bombSpr)
-        END IF
-    NEXT i
-    FOR i = 0 TO NBULLET - 1
-        IF bAlive[i] THEN DRAWIMAGE(bulletImg, bx[i], by[i])
-    NEXT i
-    PARTICLE_DRAW(explFx)                              ' Explosionen (folgt Kamera)
-    IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
-        DRAWIMAGE(shipImg, playerX, playerY)
+    ' Spiel-Objekte nur im PLAY-Modus (im Titel/Eingabe nur Sterne als Kulisse).
+    IF mode = GS.PLAY THEN
+        FOR i = 0 TO NBUGS - 1
+            IF bugs[i].alive THEN
+                SPRITE_SET_POS(rowSpr[bugs[i].row], bugs[i].x, bugs[i].y)
+                SPRITE_DRAW(rowSpr[bugs[i].row])
+            END IF
+        NEXT i
+        FOR i = 0 TO NBOMB - 1
+            IF boAlive[i] THEN
+                SPRITE_SET_POS(bombSpr, bmx[i], bmy[i]) : SPRITE_DRAW(bombSpr)
+            END IF
+        NEXT i
+        FOR i = 0 TO NBULLET - 1
+            IF bAlive[i] THEN DRAWIMAGE(bulletImg, bx[i], by[i])
+        NEXT i
     END IF
-    ' Muendungsblitz an der Schiffspitze (kurzes helles Aufleuchten beim Schuss).
-    IF lives > 0 AND muzzle > 0 THEN
-        CIRCLE(INT(playerX) + 8, INT(playerY) - 1, 1 + muzzle, &HFFF080)
+    PARTICLE_DRAW(explFx)                  ' Explosionen (folgt Kamera, auch im Uebergang)
+    IF mode = GS.PLAY THEN
+        IF lives > 0 AND (invuln = 0 OR frame MOD 8 < 4) THEN
+            DRAWIMAGE(shipImg, playerX, playerY)
+        END IF
+        ' Muendungsblitz an der Schiffspitze (kurzes Aufleuchten beim Schuss).
+        IF muzzle > 0 THEN CIRCLE(INT(playerX) + 8, INT(playerY) - 1, 1 + muzzle, &HFFF080)
+        ' Lebens-Balken (im Spielfeld, unten links).
+        DIM lifeMax AS INTEGER : lifeMax = MAX(lives, 3)
+        FOR i = 0 TO lifeMax - 1
+            DIM lc AS INTEGER : lc = IIF(i < lives, &H44E06A, &H32323C)
+            BOX(6 + i * 14, PH - 12, 6 + i * 14 + 10, PH - 6, lc)
+        NEXT i
     END IF
-    ' Lebens-Balken (im Spielfeld, unten links)
-    DIM lifeMax AS INTEGER : lifeMax = MAX(lives, 3)
-    FOR i = 0 TO lifeMax - 1
-        DIM lc AS INTEGER : lc = IIF(i < lives, &H44E06A, &H32323C)
-        BOX(6 + i * 14, PH - 12, 6 + i * 14 + 10, PH - 6, lc)
-    NEXT i
 
     CAMERA_RESET()
-    ' Score-Popups: Welt-Koordinaten von Hand auf den Bildschirm umrechnen
-    ' (offx + x*zoom, y*zoom), damit der Text scharf bleibt (TEXT zoomt nicht).
-    FOR p = 0 TO NPOP - 1
-        IF popLife[p] > 0 THEN
-            DIM pcol AS INTEGER : pcol = IIF(popLife[p] > 12, &HFFE070, &H7A5C30)
-            TEXT(INT(offx + popX[p] * zoom), INT(popY[p] * zoom), f"+{popVal[p]}", pcol)
-        END IF
-    NEXT p
-    ' HUD-Text (Bildschirm-Raum, nicht gezoomt)
-    DIM hx0 AS INTEGER : hx0 = INT(offx) + 4
-    TEXT(hx0, 6, f"SCORE {score}")
-    TEXT(INT(sw / 2) - 24, 6, f"LEVEL {level}")
+    DIM cx AS INTEGER : cx = INT(sw / 2)
+    ' HUD nur im Spiel (Bildschirm-Raum, nicht gezoomt).
+    IF mode = GS.PLAY THEN
+        ' Score-Popups: Welt-Koordinaten von Hand auf den Bildschirm umrechnen
+        ' (offx + x*zoom, y*zoom), damit der Text scharf bleibt (TEXT zoomt nicht).
+        FOR p = 0 TO NPOP - 1
+            IF popLife[p] > 0 THEN
+                DIM pcol AS INTEGER : pcol = IIF(popLife[p] > 12, &HFFE070, &H7A5C30)
+                TEXT(INT(offx + popX[p] * zoom), INT(popY[p] * zoom), f"+{popVal[p]}", pcol)
+            END IF
+        NEXT p
+        TEXT(INT(offx) + 4, 6, f"SCORE {score}")
+        TEXT(cx - 24, 6, f"LEVEL {level}")
+        IF levelMsg > 0 THEN TEXT(cx - 28, INT(sh / 2) - 4, f"LEVEL {level}")
+    END IF
+    ' F1-Hinweis immer sichtbar (oben rechts im Spielfeld).
     TEXT(INT(sw - offx) - 56, 6, IIF(crtOn, "F1:CRT*", "F1:CRT "), &H5C7088)
-    IF levelMsg > 0 THEN TEXT(INT(sw / 2) - 28, INT(sh / 2) - 4, f"LEVEL {level}")
-    IF lives <= 0 THEN
-        TEXT(INT(sw / 2) - 36, INT(sh / 2) - 8, "GAME OVER")
-        TEXT(INT(sw / 2) - 62, INT(sh / 2) + 8, "[LEER] = neu starten")
+
+    IF mode = GS.TITLE THEN
+        DrawTitle(cx, sh)
+    ELSEIF mode = GS.ENTER THEN
+        DrawEntry(cx, sh)
     END IF
 
     FLIP()
