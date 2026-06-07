@@ -177,6 +177,19 @@ def test_project_save_load_roundtrip(tmp_path):
 
 
 # --------------------------------------------------------------- Palette + DnD
+def test_rulers_toggle_and_paint(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    assert win.canvas.show_rulers
+    c = win.canvas.doc.add("button", 10, 10)
+    win.canvas._select_many([c])
+    assert not win.canvas.grab().isNull()        # Paint mit Linealen + Highlight
+    win.act_rulers.setChecked(False)
+    assert not win.canvas.show_rulers
+    assert not win.canvas.grab().isNull()        # Paint ohne Lineale
+    win.close()
+
+
 def test_bigger_window(tmp_path):
     _app()
     win = FormDesigner(tmp_path)

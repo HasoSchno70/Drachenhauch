@@ -47,6 +47,7 @@ except Exception:  # pragma: no cover - Highlighter optional
 PAD = 24          # Rand um das Fenster auf der Canvas
 TITLE_H = 22      # Titelleisten-Hoehe (wie im gui-Modul)
 HANDLE = 8        # Kantenlaenge eines Resize-Griffs (px)
+RULER = 18        # Breite/Hoehe der Lineale am Rand
 
 # Resize-Griff -> Maus-Cursor (diagonal/horizontal/vertikal)
 _HANDLE_CURSORS = {
@@ -241,6 +242,7 @@ class _Canvas(QWidget):
         self._pending: dict | None = None        # Pre-Gesten-Snapshot (Drag/Resize)
         self._nudge_active = False               # laufende Pfeiltasten-Verschiebung?
         self.zoom = 1.0                          # Zoom-Faktor der Design-Flaeche
+        self.show_rulers = True                  # Lineale am Rand?
         self._guides_v: list[int] = []           # aktive vertikale Ausrichtlinien (ctrl-x)
         self._guides_h: list[int] = []           # aktive horizontale Ausrichtlinien (ctrl-y)
         self._multi = False                      # Gruppen-Drag (mehrere) aktiv?
@@ -412,6 +414,7 @@ class _Canvas(QWidget):
     def paintEvent(self, _ev):
         qp = QPainter(self)
         qp.fillRect(self.rect(), QColor(18, 22, 28))   # Hintergrund (Widget-Raum)
+        qp.save()
         qp.scale(self.zoom, self.zoom)                 # ab hier alles im Zeichen-Raum
         d = self.doc
         win = QRect(PAD, PAD, d.w, d.h)
@@ -433,6 +436,51 @@ class _Canvas(QWidget):
         self._paint_selection(qp)
         if self._band:
             self._paint_band(qp)
+        qp.restore()                                   # zurueck in den Widget-Raum
+        if self.show_rulers:
+            self._paint_rulers(qp)
+
+    def _paint_rulers(self, qp: QPainter):
+        """Lineale am oberen + linken Rand (Widget-Raum). Zeigen Formular-
+        Koordinaten (Inhalt: x ab Form-Links, y ab unter der Titelleiste),
+        skaliert mit dem Zoom; markieren den Bereich der Selektion cyan."""
+        z = self.zoom
+        R = RULER
+        bg = QColor(28, 34, 42); tickc = QColor(96, 112, 128); txt = QColor(150, 165, 180)
+        ox = PAD * z                       # Widget-x von Form-Inhalt-x = 0
+        oy = (PAD + TITLE_H) * z            # Widget-y von Form-Inhalt-y = 0
+        W, H = self.width(), self.height()
+        qp.fillRect(0, 0, W, R, bg)
+        qp.fillRect(0, 0, R, H, bg)
+        qp.fillRect(0, 0, R, R, QColor(20, 26, 32))
+        # Selektions-Bereich hervorheben
+        hi = QColor(43, 196, 232, 70)
+        for c in self.selection:
+            qp.fillRect(int(ox + c.x * z), 0, max(1, int(c.w * z)), R, hi)
+            qp.fillRect(0, int(oy + c.y * z), R, max(1, int(c.h * z)), hi)
+        step = 50
+        qp.setFont(QFont("Segoe UI", 6))
+        # Horizontal
+        i = 0
+        while True:
+            wx = ox + i * z
+            if wx > W:
+                break
+            if wx >= R:
+                qp.setPen(QPen(tickc, 1)); qp.drawLine(int(wx), R - 5, int(wx), R)
+                qp.setPen(txt); qp.drawText(int(wx) + 2, R - 6, str(i))
+            i += step
+        # Vertikal
+        j = 0
+        while True:
+            wy = oy + j * z
+            if wy > H:
+                break
+            if wy >= R:
+                qp.setPen(QPen(tickc, 1)); qp.drawLine(R - 5, int(wy), R, int(wy))
+                qp.save(); qp.translate(R - 6, int(wy) - 2); qp.rotate(-90)
+                qp.setPen(txt); qp.drawText(0, 0, str(j)); qp.restore()
+            j += step
 
     def _paint_form_handles(self, qp: QPainter, d: FormDoc):
         """Das Formular ist 'selektiert' (kein Control): Accent-Rahmen + 3 Griffe."""
@@ -1311,6 +1359,10 @@ class FormDesigner(QMainWindow):
         self.act_snap.setShortcut(QKeySequence("Ctrl+G"))
         self.act_snap.toggled.connect(self._toggle_snap)
         v.addAction(self.act_snap)
+        self.act_rulers = QAction("Lineale", self, checkable=True)
+        self.act_rulers.setChecked(self.canvas.show_rulers)
+        self.act_rulers.toggled.connect(self._toggle_rulers)
+        v.addAction(self.act_rulers)
         v.addSeparator()
         act("Vergroessern", "Ctrl+=", lambda: self.canvas.set_zoom(self.canvas.zoom * 1.25), menu=v)
         act("Verkleinern", "Ctrl+-", lambda: self.canvas.set_zoom(self.canvas.zoom / 1.25), menu=v)
@@ -1361,6 +1413,10 @@ class FormDesigner(QMainWindow):
 
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on
+        self.canvas.update()
+
+    def _toggle_rulers(self, on: bool):
+        self.canvas.show_rulers = on
         self.canvas.update()
 
     # -- Anordnen (auf die Mehrfach-Auswahl, je mit Undo-Checkpoint) --
