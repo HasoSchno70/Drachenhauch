@@ -348,6 +348,11 @@ SUB StartGame()
 END SUB
 
 SUB GameOver()
+    ' Beim Tod oft die Leertaste (Feuer) gedrueckt -> Flanken-Flags setzen, damit
+    ' der gehaltene Tastendruck NICHT sofort neu startet bzw. die Namens-Eingabe
+    ' bestaetigt. Der Score bleibt erhalten (wird erst beim naechsten Start = 0).
+    prevStart = TRUE
+    peFire = TRUE : peUp = TRUE : peDn = TRUE : peL = TRUE : peR = TRUE
     IF Qualifies(score) THEN
         entInit[0] = 0 : entInit[1] = 0 : entInit[2] = 0 : entPos = 0
         mode = GS.ENTER
@@ -364,7 +369,7 @@ SUB NameEntry()
     DIM dn AS BOOLEAN : dn = KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) OR (pad AND (JOYSTICK_AXIS(0, 1) > 0.35 OR JOYSTICK_BUTTON(0, 3)))
     DIM lf AS BOOLEAN : lf = KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) OR (pad AND (JOYSTICK_AXIS(0, 0) < -0.35 OR JOYSTICK_BUTTON(0, 4)))
     DIM rt AS BOOLEAN : rt = KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) OR (pad AND (JOYSTICK_AXIS(0, 0) > 0.35 OR JOYSTICK_BUTTON(0, 2)))
-    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_SPACE) OR (pad AND JOYSTICK_BUTTON(0, 7))
+    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_ENTER) OR KEYPRESSED(KEY_RETURN) OR (pad AND (JOYSTICK_BUTTON(0, 7) OR JOYSTICK_BUTTON(0, 9)))
     IF up AND NOT peUp THEN entInit[entPos] = (entInit[entPos] + 1) MOD 26
     IF dn AND NOT peDn THEN entInit[entPos] = (entInit[entPos] + 25) MOD 26
     IF rt AND NOT peR AND entPos < 2 THEN entPos = entPos + 1
@@ -499,36 +504,67 @@ SUB UpdatePlay()
 END SUB
 
 ' ===================== Titel- und Eingabe-Screen =====================
+' Zeichnet s horizontal zentriert auf dem Bildschirm (misst die Textbreite bei
+' der aktuellen TEXT_SIZE -- vorher TEXT_SIZE setzen).
+SUB CenterText(y AS INTEGER, s AS STRING, col AS INTEGER)
+    TEXT(INT(SCREENWIDTH() / 2) - INT(TEXT_WIDTH(s) / 2), y, s, col)
+END SUB
+
+' Endlos-Laufschrift am unteren Rand (rechts -> links, nahtlos durch zwei Kopien).
+SUB DrawMarquee(sh AS INTEGER)
+    DIM sw AS INTEGER : sw = SCREENWIDTH()
+    BOX(0, sh - 60, sw - 1, sh - 28, &H0A0E1A)        ' Banner-Band (volle Breite)
+    TEXT_SIZE(24)
+    DIM msg AS STRING
+    msg = "*** WILLKOMMEN BEI GALAGA ***   RETTE DIE GALAXIE   ***   EIN SPIEL VON HANS SCHNORRENBERGER   ***   "
+    DIM w AS INTEGER : w = TEXT_WIDTH(msg)
+    DIM x AS INTEGER : x = -((frame * 2) MOD w)
+    TEXT(x, sh - 53, msg, &H70C0FF)
+    TEXT(x + w, sh - 53, msg, &H70C0FF)
+    TEXT_SIZE(20)
+END SUB
+
 SUB DrawTitle(cx AS INTEGER, sh AS INTEGER)
-    TEXT(cx - 56, 64, "G A L A G A", &H8FE0FF)
-    TEXT(cx - 104, 100, "Pfeile bewegen   -   Leer schiessen", &H8090A8)
-    TEXT(cx - 60, 118, "(auch Gamepad)", &H607088)
-    TEXT(cx - 40, 146, "HIGHSCORES", &HFFE070)
+    TEXT_SIZE(48)
+    CenterText(64, "GALAGA", &H8FE0FF)
+    TEXT_SIZE(18)
+    CenterText(128, "Pfeile / WASD bewegen     Leertaste schiessen", &H8090A8)
+    CenterText(150, "(auch Gamepad)", &H607088)
+    TEXT_SIZE(24)
+    CenterText(186, "HIGHSCORES", &HFFE070)
+    TEXT_SIZE(20)
     DIM k AS INTEGER
     FOR k = 0 TO NHS - 1
-        DIM yy AS INTEGER : yy = 172 + k * 18
         DIM cc AS INTEGER : cc = IIF(k = 0, &HFFF0B0, &HBFD0E0)
-        TEXT(cx - 60, yy, f"{k + 1}. {hsName[k]}", cc)
-        TEXT(cx + 28, yy, STR$(hsScore[k]), cc)
+        ' Feste Spaltenbreiten (PADL$) -> alle Zeilen gleich breit -> sauber zentriert.
+        CenterText(214 + k * 24, STR$(k + 1) + ".  " + hsName[k] + "   " + PADL$(STR$(hsScore[k]), 6), cc)
     NEXT k
     IF (frame \ 30) MOD 2 = 0 THEN
-        TEXT(cx - 96, sh - 56, "LEERTASTE  =  SPIEL STARTEN", &H80FFB0)
+        TEXT_SIZE(22)
+        CenterText(sh - 96, "LEERTASTE = SPIEL STARTEN", &H80FFB0)
     END IF
+    DrawMarquee(sh)
 END SUB
 
 SUB DrawEntry(cx AS INTEGER, sh AS INTEGER)
     DIM letters AS STRING : letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    TEXT(cx - 66, 110, "NEUER HIGHSCORE!", &HFFE070)
-    TEXT(cx - 30, 140, STR$(score), &HFFFFFF)
+    TEXT_SIZE(28)
+    CenterText(108, "NEUER HIGHSCORE!", &HFFE070)
+    TEXT_SIZE(24)
+    CenterText(148, PADL$(STR$(score), 1), &HFFFFFF)
+    ' Die drei Initialen gross, aktive Stelle blinkt.
+    TEXT_SIZE(40)
+    DIM total AS INTEGER : total = 3 * 34
+    DIM x0 AS INTEGER : x0 = INT(SCREENWIDTH() / 2) - INT(total / 2)
     DIM k AS INTEGER
     FOR k = 0 TO 2
         DIM cc AS INTEGER : cc = &H90A8C0
         IF k = entPos THEN cc = IIF((frame \ 12) MOD 2 = 0, &HFFF080, &H6A5020)
-        TEXT(cx - 30 + k * 26, 178, letters[entInit[k]], cc)
+        TEXT(x0 + k * 34, 184, letters[entInit[k]], cc)
     NEXT k
-    TEXT(cx - 88, 222, "Hoch/Runter: Buchstabe", &H8090A8)
-    TEXT(cx - 84, 240, "Links/Rechts: Stelle", &H8090A8)
-    TEXT(cx - 88, 258, "Leertaste: bestaetigen", &H8090A8)
+    TEXT_SIZE(18)
+    CenterText(252, "Hoch/Runter: Buchstabe    Links/Rechts: Stelle", &H8090A8)
+    CenterText(274, "ENTER = bestaetigen", &H80FFB0)
 END SUB
 
 frame = 0
@@ -665,6 +701,7 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     CAMERA_RESET()
+    TEXT_SIZE(20)                 ' Basisgroesse setzen (Titel/Eingabe bumpen sie)
     DIM cx AS INTEGER : cx = INT(sw / 2)
     ' HUD nur im Spiel (Bildschirm-Raum, nicht gezoomt).
     IF mode = GS.PLAY THEN
