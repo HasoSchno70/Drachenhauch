@@ -180,6 +180,33 @@ def test_gbform_loads_in_runtime(run_gb, tmp_path):
     assert out.splitlines() == ["3", "Gruen", "TRUE"]
 
 
+def test_resizable_window_roundtrips_in_runtime(run_gb, tmp_path):
+    # FormDoc.resizable + min/max muessen durch GUI_LOAD -> GUI_TO_JSON ueberleben.
+    # (min_w/min_h sind eindeutige Zahlen -> kein Quote-Escaping noetig.)
+    doc = FormDoc(title="R", w=400, h=320)
+    doc.resizable = True
+    doc.min_w, doc.min_h = 211, 153
+    doc.save(str(tmp_path / "r.gbform"))
+    out = run_gb(
+        'IMPORT "gui"\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("r.gbform")\n'
+        'DIM j AS STRING\nj = GUI_TO_JSON(frm)\n'
+        'PRINT INSTR(j, "resizable") > 0\n'         # Feld vorhanden
+        'PRINT INSTR(j, "211") > 0\n'               # min_w
+        'PRINT INSTR(j, "153") > 0\n',              # min_h
+        base=tmp_path)
+    assert out.splitlines() == ["TRUE", "TRUE", "TRUE"]
+
+
+def test_gb_export_emits_window_resizable():
+    doc = FormDoc(title="W")
+    doc.resizable = True
+    doc.min_w, doc.min_h = 200, 150
+    src = doc.generate_gb_code(with_screen=False, with_loop=False)
+    assert "GUI_WINDOW_RESIZABLE(frm, TRUE)" in src
+    assert "GUI_WINDOW_SET_MIN_SIZE(frm, 200, 150)" in src
+
+
 def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
     # `code` (Handler-Koerper) ist Designer-Metadaten -- GUI_LOAD muss es ignorieren.
     doc = FormDoc(title="C", w=200, h=120)

@@ -150,6 +150,9 @@ pub struct Window {
     movable: bool,
     closable: bool,
     visible: bool,
+    resizable: bool,                 // am unteren-rechten Griff ziehbar?
+    min_w: i32, min_h: i32,          // Groessen-Grenzen (0 = keine)
+    max_w: i32, max_h: i32,
     close_clicked: bool,
     alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
 }
@@ -170,6 +173,8 @@ pub struct Gui {
     focus_widget: Option<(usize, usize)>,
     drag_window: Option<usize>,
     drag_dx: i32, drag_dy: i32,
+    resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
+    resize_dx: i32, resize_dy: i32,      // Ecke->Maus-Versatz
     active_slider: Option<(usize, usize)>,
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
     active_table: Option<(usize, usize)>,
@@ -199,6 +204,7 @@ impl Gui {
             windows: Vec::new(), z_order: Vec::new(),
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
+            resize_window: None, resize_dx: 0, resize_dy: 0,
             active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             was_mouse_down: false, prev_backspace: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
@@ -244,7 +250,9 @@ impl Gui {
         let idx = self.windows.len();
         self.windows.push(Window {
             title, x, y, w, h, widgets: Vec::new(),
-            movable: true, closable: false, visible: true, close_clicked: false, alive: true,
+            movable: true, closable: false, visible: true,
+            resizable: false, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
+            close_clicked: false, alive: true,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -278,6 +286,17 @@ impl Gui {
     }
     pub fn window_closable(&mut self, h: i64, f: bool) -> Result<(), String> {
         self.win_mut(h, "GUI_WINDOW_CLOSABLE")?.closable = f; Ok(())
+    }
+    pub fn window_resizable(&mut self, h: i64, f: bool) -> Result<(), String> {
+        self.win_mut(h, "GUI_WINDOW_RESIZABLE")?.resizable = f; Ok(())
+    }
+    pub fn window_min_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
+        let win = self.win_mut(h, "GUI_WINDOW_SET_MIN_SIZE")?;
+        win.min_w = w.max(0); win.min_h = ht.max(0); Ok(())
+    }
+    pub fn window_max_size(&mut self, h: i64, w: i32, ht: i32) -> Result<(), String> {
+        let win = self.win_mut(h, "GUI_WINDOW_SET_MAX_SIZE")?;
+        win.max_w = w.max(0); win.max_h = ht.max(0); Ok(())
     }
     pub fn window_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
         let w = self.win_mut(h, "GUI_WINDOW_VISIBLE")?;
@@ -733,6 +752,7 @@ impl Gui {
         self.z_order.retain(|&i| i != wi);
         if self.focus_window == Some(wi) { self.focus_window = None; }
         if self.drag_window == Some(wi) { self.drag_window = None; }
+        if self.resize_window == Some(wi) { self.resize_window = None; }
         if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
         Ok(())
     }
@@ -839,6 +859,8 @@ impl Gui {
         let obj = serde_json::json!({
             "title": win.title, "x": win.x, "y": win.y, "w": win.w, "h": win.h,
             "movable": win.movable, "closable": win.closable, "visible": win.visible,
+            "resizable": win.resizable,
+            "min_w": win.min_w, "min_h": win.min_h, "max_w": win.max_w, "max_h": win.max_h,
             "widgets": widgets,
         });
         serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
@@ -854,6 +876,9 @@ impl Gui {
         self.windows[wi].movable = v["movable"].as_bool().unwrap_or(true);
         self.windows[wi].closable = v["closable"].as_bool().unwrap_or(false);
         self.windows[wi].visible = v["visible"].as_bool().unwrap_or(true);
+        self.windows[wi].resizable = v["resizable"].as_bool().unwrap_or(false);
+        self.windows[wi].min_w = gi("min_w", 0); self.windows[wi].min_h = gi("min_h", 0);
+        self.windows[wi].max_w = gi("max_w", 0); self.windows[wi].max_h = gi("max_h", 0);
         if let Some(arr) = v["widgets"].as_array() {
             for wj in arr {
                 let wdg = Self::widget_from_json(wj)?;
@@ -977,6 +1002,19 @@ impl Gui {
                 self.windows[wi].y = my - self.drag_dy;
             } else { self.drag_window = None; }
         }
+        // Laufender Fenster-Resize (unten-rechts).
+        if let Some(wi) = self.resize_window {
+            if is_down {
+                let w = &mut self.windows[wi];
+                let mut nw = (mx - w.x + self.resize_dx).max(80);
+                let mut nh = (my - w.y + self.resize_dy).max(50);
+                if w.min_w > 0 { nw = nw.max(w.min_w); }
+                if w.min_h > 0 { nh = nh.max(w.min_h); }
+                if w.max_w > 0 { nw = nw.min(w.max_w); }
+                if w.max_h > 0 { nh = nh.min(w.max_h); }
+                w.w = nw; w.h = nh;
+            } else { self.resize_window = None; }
+        }
         // Laufendes Slider-Drag.
         if let Some((wi, i)) = self.active_slider {
             if is_down { self.drag_slider(wi, i, mx); } else { self.active_slider = None; }
@@ -991,8 +1029,8 @@ impl Gui {
             }
         }
         // Neuer Druck.
-        if just_pressed && self.drag_window.is_none() && self.active_slider.is_none()
-            && self.active_table.is_none() {
+        if just_pressed && self.drag_window.is_none() && self.resize_window.is_none()
+            && self.active_slider.is_none() && self.active_table.is_none() {
             self.handle_press(mx, my);
         }
         // Loslassen -> Button-Klick bestaetigen.
@@ -1105,7 +1143,17 @@ impl Gui {
         self.bring_to_front(win);
         self.focus_window = Some(win);
         let th = self.m("title_h");
-        let (wx, wy, ww) = (self.windows[win].x, self.windows[win].y, self.windows[win].w);
+        let (wx, wy, ww, wh) = (self.windows[win].x, self.windows[win].y,
+                                self.windows[win].w, self.windows[win].h);
+        // Resize-Griff unten-rechts?
+        let grip = 14;
+        if self.windows[win].resizable
+            && Self::in_rect(mx, my, (wx + ww - grip, wy + wh - grip, grip, grip)) {
+            self.resize_window = Some(win);
+            self.resize_dx = (wx + ww) - mx;
+            self.resize_dy = (wy + wh) - my;
+            return;
+        }
         // Schliess-Button?
         if self.windows[win].closable && Self::in_rect(mx, my, (wx + ww - th, wy, th, th)) {
             self.windows[win].close_clicked = true;
@@ -1192,6 +1240,12 @@ impl Gui {
             let (cx, cy, cw, ch) = (x + w - th, y, th, th);
             g.line(cx + 6, cy + 6, cx + cw - 7, cy + ch - 7, self.th("title_fg"));
             g.line(cx + cw - 7, cy + 6, cx + 6, cy + ch - 7, self.th("title_fg"));
+        }
+        if win.resizable {                       // Resize-Griff unten-rechts (Diagonalen)
+            let c = self.th("win_border");
+            for o in [2, 6, 10] {
+                g.line(x + w - 2 - o, y + h - 2, x + w - 2, y + h - 2 - o, c);
+            }
         }
         for (i, wdg) in win.widgets.iter().enumerate() {
             if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }

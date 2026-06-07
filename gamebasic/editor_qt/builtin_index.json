@@ -1677,6 +1677,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_WINDOW_RESIZABLE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_RESIZABLE(win, flag)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_SET_MIN_SIZE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_SET_MIN_SIZE(win, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_WINDOW_SET_MAX_SIZE",
+   "kind": "core",
+   "signature": "GUI_WINDOW_SET_MAX_SIZE(win, w, h)",
+   "module": "gui"
+  },
+  {
    "name": "HEX",
    "kind": "core",
    "signature": "HEX$(n: INTEGER)",

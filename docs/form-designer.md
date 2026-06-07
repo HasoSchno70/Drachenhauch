@@ -51,8 +51,14 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   `Strg+V`), **Nach vorne/hinten** (`Strg+]` / `Strg+[`). Diese Kürzel wirken nur,
   wenn die Design-Fläche fokussiert ist (kapern also nicht die Textbearbeitung im
   Code-/Inspector-Panel).
-- **Rechts — Inspector:** Eigenschaften des gewählten Controls (Name, Text,
-  Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert, aktiviert …).
+- **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
+  Text, Position/Größe, `on_click`/`on_change`-Handler, Items, Min/Max/Wert,
+  aktiviert …); ist **kein** Control gewählt, das **Formular selbst** (Xojo-Stil):
+  Titel, Breite/Höhe, Min/Max-Größe, beweglich/schließbar/**größenveränderbar**/
+  sichtbar. Das Formular hat dann Resize-Griffe (rechts/unten/Ecke). Ist
+  „größenveränderbar" gesetzt, ist das **gebaute Fenster zur Laufzeit** am
+  unteren-rechten Griff ziehbar (geklemmt an Min/Max) — `GUI_WINDOW_RESIZABLE` /
+  `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` in der `gui`-Runtime.
 - **Unten — Code:** integrierter GameBasic-Editor (syntax-gehighlightet). Eine
   Combo listet die Event-Handler des Formulars, der Editor zeigt/ändert den Body
   des gewählten. **Doppelklick auf ein Control** legt für sein Haupt-Event einen

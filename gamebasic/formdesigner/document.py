@@ -521,6 +521,12 @@ class FormDoc:
             L.append("GUI_WINDOW_CLOSABLE(frm, FALSE)")
         if not self.visible:
             L.append("GUI_WINDOW_VISIBLE(frm, FALSE)")
+        if self.resizable:
+            L.append("GUI_WINDOW_RESIZABLE(frm, TRUE)")
+        if self.min_w or self.min_h:
+            L.append(f"GUI_WINDOW_SET_MIN_SIZE(frm, {self.min_w}, {self.min_h})")
+        if self.max_w or self.max_h:
+            L.append(f"GUI_WINDOW_SET_MAX_SIZE(frm, {self.max_w}, {self.max_h})")
         L.append("")
         # Controls
         used = {"frm"} | set(self.handler_names())
