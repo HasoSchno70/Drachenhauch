@@ -342,6 +342,121 @@ children.push(bullet("Lass die Sterne schneller fallen (grössere Zahl statt + 2
 children.push(bullet("Erhöhe NSTARS auf 200 – ein dichteres Weltall."));
 children.push(bullet("Zusatz: Gib manchen Sternen mit einer zweiten Geschwindigkeit mehr Tiefe (Tipp: ein drittes Array für das Tempo)."));
 
+// ===================== Kapitel 2 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 2: Das Schiff"));
+children.push(tip("In diesem Kapitel",
+  "Du holst dein Raumschiff auf den Bildschirm: ein fertiges Bild laden, an die richtige Stelle zeichnen und mit den Pfeiltasten nach links und rechts steuern."));
+
+children.push(h2("Ein Bild laden"));
+children.push(p("Das Raumschiff ist ein kleines Bild (ein „Sprite“). Im nächsten Kapitel zeichnest du es selbst – fürs Erste nehmen wir das mitgelieferte. Ein Bild laden wir mit LOADIMAGE und merken es uns in einer Variablen vom Typ IMAGE:"));
+children.push(codeBlock([
+  "DIM shipImg AS IMAGE",
+  'shipImg = LOADIMAGE("../../assets/sprites/player.png")',
+]));
+children.push(pmix([
+  ["Der Pfad ist ", false], ["relativ zu deiner Programmdatei", false],
+  [". Liegt dein Code in ", false], ["code/kap02/", true],
+  [" und das Bild in ", false], ["assets/sprites/", true],
+  [", führen die zwei ", false], ["..", true],
+  [" zwei Ordner nach oben. ", false],
+  ["DIM", true], [" legt eine neue Variable an – hier vom Typ ", false],
+  ["IMAGE", true], [" (ein Bild).", false],
+]));
+
+children.push(h2("Das Schiff zeichnen"));
+children.push(p("Wo soll das Schiff stehen? Wir merken uns seine Position in zwei Variablen und starten unten in der Mitte. Gezeichnet wird mit DRAWIMAGE:"));
+children.push(codeBlock([
+  "DIM shipX AS INTEGER",
+  "DIM shipY AS INTEGER",
+  "shipX = 232",
+  "shipY = 560",
+  "",
+  "' ... in der Spielschleife: ...",
+  "DRAWIMAGE(shipImg, shipX, shipY)",
+]));
+children.push(pmix([
+  ["", false],
+  ["DRAWIMAGE(bild, x, y)", true],
+  [" malt das Bild an die Position (x, y) – gemessen von der oberen linken Ecke. Bei einem 480 Pixel breiten Fenster und einem 16 Pixel breiten Schiff liegt die Mitte bei ", false],
+  ["(480 - 16) / 2 = 232", true], [".", false],
+]));
+
+children.push(h2("Mit der Tastatur bewegen"));
+children.push(pmix([
+  ["Tasten fragen wir mit ", false], ["KEYPRESSED", true],
+  [" ab. Ist eine Taste gedrückt, verschieben wir das Schiff – nach links kleiner, nach rechts grösser:", false],
+]));
+children.push(codeBlock([
+  "IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4",
+  "IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4",
+]));
+children.push(pmix([
+  ["Mit ", false], ["OR", true],
+  [" akzeptieren wir zwei Tasten gleichzeitig: die Pfeiltasten ", false],
+  ["oder", false], [" A und D. Die ", false], ["4", true],
+  [" ist die Geschwindigkeit – grösser = schneller.", false],
+]));
+
+children.push(h2("Am Rand anhalten"));
+children.push(p("Ohne Grenzen würde das Schiff aus dem Bild fliegen. Zwei kurze Prüfungen halten es im Fenster:"));
+children.push(codeBlock([
+  "IF shipX < 0 THEN shipX = 0",
+  "IF shipX > 464 THEN shipX = 464",
+]));
+children.push(pmix([
+  ["", false],
+  ["464", true], [" ist ", false], ["480 - 16", true],
+  [" – so bleibt das ganze Schiff sichtbar, auch ganz rechts.", false],
+]));
+
+children.push(h2("Das ganze Programm"));
+children.push(p("Zusammengesetzt – auf dem Sternenhimmel aus Kapitel 1:"));
+children.push(codeBlock([
+  'SCREEN(480, 640, "Mein Galaga - Kapitel 2")',
+  "",
+  "CONST NSTARS AS INTEGER = 60",
+  "DIM starX[NSTARS] AS INTEGER",
+  "DIM starY[NSTARS] AS INTEGER",
+  "DIM i AS INTEGER",
+  "FOR i = 0 TO NSTARS - 1",
+  "    starX[i] = RANDINT(0, 479)",
+  "    starY[i] = RANDINT(0, 639)",
+  "NEXT i",
+  "",
+  "DIM shipImg AS IMAGE",
+  'shipImg = LOADIMAGE("../../assets/sprites/player.png")',
+  "DIM shipX AS INTEGER : DIM shipY AS INTEGER",
+  "shipX = 232 : shipY = 560",
+  "",
+  "WHILE NOT QUITREQUESTED()",
+  "    CLS(&H05060F)",
+  "    FOR i = 0 TO NSTARS - 1",
+  "        starY[i] = starY[i] + 2",
+  "        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)",
+  "        PLOT(starX[i], starY[i], &HFFFFFF)",
+  "    NEXT i",
+  "    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4",
+  "    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4",
+  "    IF shipX < 0 THEN shipX = 0",
+  "    IF shipX > 464 THEN shipX = 464",
+  "    DRAWIMAGE(shipImg, shipX, shipY)",
+  "    FLIP()",
+  "WEND",
+]));
+figure("kap02_schiff.png", "Dein Raumschiff steht startbereit – mit den Pfeiltasten fliegt es nach links und rechts.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("LOADIMAGE ", "lädt ein Bild in eine Variable vom Typ IMAGE (Pfad relativ zur Programmdatei)."));
+children.push(bulletRich("DRAWIMAGE ", "zeichnet das Bild an einer Position (x, y)."));
+children.push(bulletRich("KEYPRESSED ", "fragt Tasten ab; mit OR akzeptierst du mehrere Tasten."));
+children.push(bulletRich("Grenzen mit IF ", "halten das Schiff im sichtbaren Bereich."));
+
+children.push(h2("Übung"));
+children.push(bullet("Mach das Schiff schneller oder langsamer (ändere die 4)."));
+children.push(bullet("Erlaube auch Bewegung nach oben und unten (KEY_UP / KEY_DOWN, mit shipY) – und begrenze sie."));
+children.push(bullet("Setze das Schiff an eine andere Startposition."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",

@@ -1,0 +1,50 @@
+' ============================================================
+'  Kapitel 2 - Das Schiff laden, zeichnen und bewegen
+'  Start:  gbrun.py buch-galaga/code/kap02/schiff.gb
+' ============================================================
+
+SCREEN(480, 640, "Mein Galaga - Kapitel 2")
+
+' --- Sternenhimmel aus Kapitel 1 ---
+CONST NSTARS AS INTEGER = 60
+DIM starX[NSTARS] AS INTEGER
+DIM starY[NSTARS] AS INTEGER
+DIM i AS INTEGER
+FOR i = 0 TO NSTARS - 1
+    starX[i] = RANDINT(0, 479)
+    starY[i] = RANDINT(0, 639)
+NEXT i
+
+' --- Das Schiff laden (Pfad relativ zu dieser Datei) ---
+DIM shipImg AS IMAGE
+shipImg = LOADIMAGE("../../assets/sprites/player.png")
+
+' --- Position des Schiffs (unten in der Mitte) ---
+DIM shipX AS INTEGER
+DIM shipY AS INTEGER
+shipX = 232
+shipY = 560
+
+WHILE NOT QUITREQUESTED()
+    CLS(&H05060F)
+
+    ' Sterne scrollen
+    FOR i = 0 TO NSTARS - 1
+        starY[i] = starY[i] + 2
+        IF starY[i] > 639 THEN starY[i] = 0 : starX[i] = RANDINT(0, 479)
+        PLOT(starX[i], starY[i], &HFFFFFF)
+    NEXT i
+
+    ' --- Steuerung: nach links / rechts (Pfeiltasten oder A/D) ---
+    IF KEYPRESSED(KEY_LEFT)  OR KEYPRESSED(KEY_A) THEN shipX = shipX - 4
+    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4
+
+    ' am Bildschirmrand anhalten
+    IF shipX < 0 THEN shipX = 0
+    IF shipX > 464 THEN shipX = 464
+
+    ' --- Schiff zeichnen ---
+    DRAWIMAGE(shipImg, shipX, shipY)
+
+    FLIP()
+WEND
