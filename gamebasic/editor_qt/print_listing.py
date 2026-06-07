@@ -16,16 +16,17 @@ from __future__ import annotations
 from html import escape
 
 from PySide6.QtCore import QRectF, QSizeF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QTextDocument
+from PySide6.QtGui import QAction, QColor, QFont, QPainter, QTextDocument
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
-    QRadioButton, QVBoxLayout,
+    QRadioButton, QToolBar, QVBoxLayout,
 )
 from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 
 from ..lexer import Lexer
 from ..errors import LexerError
 from .highlighter import GBHighlighter, classify_token
+from .icons import icons
 
 
 # Papier-freundliche Farben (dunkel auf weiss), unabhaengig vom Editor-Theme.
@@ -268,6 +269,67 @@ def _render_with_footer(doc: QTextDocument, printer: QPrinter,
         painter.end()
 
 
+def _decorate_preview(preview: QPrintPreviewDialog) -> None:
+    """Macht die Vorschau-Werkzeugleiste lesbar.
+
+    `QPrintPreviewDialog` benutzt monochrome Theme-Icons -- im dunklen Editor-
+    Theme sind die kaum zu erkennen, und der Drucken-Knopf sitzt unscheinbar
+    ganz rechts. Wir (1) beschriften alle Knoepfe mit Text und (2) setzen einen
+    grossen, eindeutigen „Drucken"-Knopf mit eigenem (theme-faehigem) Icon an
+    den Anfang der Leiste.
+    """
+    bars = preview.findChildren(QToolBar)
+    if not bars:
+        return
+    tb = bars[0]
+    tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+
+    # Englische Standard-Labels eindeutschen (greift nur, wenn Qt nicht ohnehin
+    # schon lokalisiert ist -- sonst matcht der Key nicht und wir lassen es).
+    de = {
+        "Fit width": "Breite einpassen", "Fit page": "Seite einpassen",
+        "Zoom out": "Verkleinern", "Zoom in": "Vergrössern",
+        "Portrait": "Hochformat", "Landscape": "Querformat",
+        "First page": "Erste Seite", "Previous page": "Zurück",
+        "Next page": "Weiter", "Last page": "Letzte Seite",
+        "Show single page": "Einzelseite", "Show facing pages": "Doppelseite",
+        "Show overview of all pages": "Übersicht",
+        "Page setup": "Seite einrichten", "Print": "Drucken",
+    }
+    for act in tb.actions():
+        if act.text() in de:
+            act.setText(de[act.text()])
+            act.setToolTip(de[act.text()] if not act.toolTip() else act.toolTip())
+
+    # Native Print-Action finden (Text 'Print'/'Drucken'); sonst: konventionell
+    # die letzte echte Action.
+    print_act = None
+    for act in tb.actions():
+        t = (act.text() or "").lower()
+        if "print" in t or "druck" in t:
+            print_act = act
+            break
+    if print_act is None:
+        real = [a for a in tb.actions() if not a.isSeparator()]
+        print_act = real[-1] if real else None
+    if print_act is None:
+        return
+
+    print_act.setIcon(icons.get("print"))
+
+    # Eigener, prominenter Drucken-Knopf ganz vorne.
+    actions = tb.actions()
+    first = actions[0] if actions else None
+    my_print = QAction(icons.get("print"), "Drucken", preview)
+    my_print.setToolTip("Listing drucken")
+    my_print.triggered.connect(print_act.trigger)
+    if first is not None:
+        tb.insertAction(first, my_print)
+        tb.insertSeparator(first)
+    else:
+        tb.addAction(my_print)
+
+
 def print_code(parent, *, code: str, title: str, color: bool,
                line_numbers: bool, font_pt: int = 10) -> None:
     """Oeffnet eine Druckvorschau fuer das gegebene Listing."""
@@ -291,5 +353,6 @@ def print_code(parent, *, code: str, title: str, color: bool,
     preview.setWindowTitle(f"Druckvorschau – {title}")
     preview.paintRequested.connect(
         lambda pr: _render_with_footer(doc, pr, title))
-    preview.resize(940, 720)
+    _decorate_preview(preview)
+    preview.resize(1040, 760)
     preview.exec()

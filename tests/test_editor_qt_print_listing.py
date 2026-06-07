@@ -1,10 +1,18 @@
-"""Tests fuer den Listing-Druck (HTML-Aufbau).
+"""Tests fuer den Listing-Druck (HTML-Aufbau + Vorschau-Werkzeugleiste).
 
 `build_listing_html` ist reine Logik (Lexer + Token-Klassifikation + HTML),
 braucht also kein QApplication. Getestet werden Farb-vs-SW, Escaping,
 Zeilennummern, Kommentar-/String-Faerbung und die Qt-Zeilentrenner-
-Normalisierung (U+2029/U+2028), die bei Selektionen auftritt.
+Normalisierung (U+2029/U+2028), die bei Selektionen auftritt. Zusaetzlich die
+Vorschau-Dekoration (`_decorate_preview`): lesbare/beschriftete Knoepfe +
+prominenter „Drucken"-Knopf.
 """
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+import pytest
+
 from gamebasic.editor_qt.print_listing import build_listing_html
 
 SRC = 'SCREEN(480, 640, "Galaga")   \' Fenster\nDIM x AS INTEGER'
@@ -66,3 +74,31 @@ def test_font_size_is_applied():
                              title="t.gb", font_pt=14)
     assert "font-size:8pt" in small
     assert "font-size:14pt" in big
+
+
+@pytest.fixture(scope="module")
+def app():
+    from PySide6.QtWidgets import QApplication
+    return QApplication.instance() or QApplication([])
+
+
+def test_preview_toolbar_decorated(app):
+    """Vorschau-Leiste: Text-Labels an, eigener Drucken-Knopf vorne mit Icon."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QToolBar
+    from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
+    from gamebasic.editor_qt.print_listing import _decorate_preview
+
+    dlg = QPrintPreviewDialog(QPrinter())
+    _decorate_preview(dlg)
+    tb = dlg.findChildren(QToolBar)[0]
+    assert tb.toolButtonStyle() == Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+    labels = [a.text() for a in tb.actions() if not a.isSeparator() and a.text()]
+    # Erster Knopf ist unser prominenter Drucken-Knopf, mit Icon.
+    first = next(a for a in tb.actions() if not a.isSeparator())
+    assert first.text() == "Drucken"
+    assert not first.icon().isNull()
+    # Englische Standard-Labels wurden eingedeutscht.
+    assert "Breite einpassen" in labels and "Seite einrichten" in labels
+    assert "Fit width" not in labels
+    dlg.deleteLater()

@@ -173,7 +173,7 @@ Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) bekommen rechts daneben ein klei
 - **Schriftgröße:** Klein (8 pt) / Normal (10 pt) / Groß (12 pt).
 - **Umfang:** Hast du Text markiert, kannst du wählen zwischen *Nur markierter Bereich* und *Ganzes Listing* (ohne Markierung wird immer das ganze Listing gedruckt).
 
-Danach erscheint eine **Druckvorschau**, in der du Drucker und Seiten wählst. Jede Seite trägt oben den Dateinamen als Titel und unten eine Fußzeile mit Dateiname und *Seite X von Y*.
+Danach erscheint eine **Druckvorschau**. Ihre Werkzeugleiste ist beschriftet (alle Knöpfe mit Text, ganz vorne ein deutlicher **Drucken**-Knopf) — auch im dunklen Theme gut erkennbar. Jede Seite trägt oben den Dateinamen als Titel und unten eine Fußzeile mit Dateiname und *Seite X von Y*.
 
 ## Bookmarks
 
