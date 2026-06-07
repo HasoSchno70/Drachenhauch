@@ -15,7 +15,7 @@ CONST PH       AS INTEGER = 320         ' Spielfeld-Hoehe
 CONST COLS     AS INTEGER = 8
 CONST ROWS     AS INTEGER = 3
 CONST NBUGS    AS INTEGER = 24
-CONST NBULLET  AS INTEGER = 3
+CONST NBULLET  AS INTEGER = 4
 CONST NBOMB    AS INTEGER = 14
 CONST BG       AS INTEGER = &H070A14
 CONST FULL     AS BOOLEAN = TRUE        ' Vollbild? (zum Testen auf FALSE)
@@ -122,11 +122,11 @@ SPRITE_ADD_ANIM(bombSpr, "pulse", 0, 1, 8)
 SPRITE_PLAY(bombSpr, "pulse")
 
 ' --- Sound (prozedural, sfxr-Stil) ---
-DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 820, -480, 0, 30, 70, 0, 0, 0.30)
-DIM sfxBoom  AS INTEGER : sfxBoom  = AUDIO_SFX("noise", 220, -120, 0, 60, 220, 0, 0, 0.45)
-DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 0, 0.28)
-DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.55)
-DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.30)
+DIM sfxShoot AS INTEGER : sfxShoot = AUDIO_SFX("square", 820, -480, 0, 30, 70, 0, 0, 0.36)
+DIM sfxBoom  AS INTEGER : sfxBoom  = AUDIO_SFX("noise", 220, -120, 0, 60, 220, 0, 0, 0.58)
+DIM sfxDrop  AS INTEGER : sfxDrop  = AUDIO_SFX("saw", 360, -180, 0, 24, 120, 0, 0, 0.36)
+DIM sfxHit   AS INTEGER : sfxHit   = AUDIO_SFX("noise", 140, -70, 0, 120, 360, 0, 0, 0.66)
+DIM sfxLevel AS INTEGER : sfxLevel = AUDIO_SFX("square", 440, 520, 4, 60, 200, 0, 0, 0.38)
 
 DIM bugs[NBUGS] AS Bug
 DIM bx[NBULLET] AS FLOAT : DIM by[NBULLET] AS FLOAT : DIM bAlive[NBULLET] AS BOOLEAN
@@ -155,7 +155,7 @@ SUB NewLevel()
     bugsAlive = NBUGS
     diveTimer = 110
     diveSpeed = 0.009 + level * 0.0016
-    bombSpeed = 1.9 + level * 0.35
+    bombSpeed = 2.1 + level * 0.40
     levelMsg = 110
     PLAYSOUND(sfxLevel)
 END SUB
@@ -176,7 +176,7 @@ SUB DropBomb(sx AS FLOAT, sy AS FLOAT)
     FOR i = 0 TO NBOMB - 1
         IF NOT boAlive[i] THEN
             boAlive[i] = TRUE : bmx[i] = sx + 5.0 : bmy[i] = sy + 8.0
-            bmvx[i] = MAX(-0.9, MIN(0.9, (playerX - sx) * 0.018))
+            bmvx[i] = MAX(-1.1, MIN(1.1, (playerX - sx) * 0.022))
             PLAYSOUND(sfxDrop)
             RETURN
         END IF
@@ -197,10 +197,10 @@ WHILE NOT QUITREQUESTED()
 
     ' ---- Eingabe ----
     IF lives > 0 THEN
-        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 2.6
-        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 2.6
-        IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.2
-        IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.2
+        IF KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) THEN playerX = playerX - 3.0
+        IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN playerX = playerX + 3.0
+        IF KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) THEN playerY = playerY - 2.4
+        IF KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) THEN playerY = playerY + 2.4
         IF playerX < 2.0 THEN playerX = 2.0
         IF playerX > PW - 18.0 THEN playerX = PW - 18.0
         IF playerY < PY_HIGH THEN playerY = PY_HIGH
@@ -225,13 +225,17 @@ WHILE NOT QUITREQUESTED()
     IF lives > 0 THEN
         diveTimer = diveTimer - 1
         IF diveTimer <= 0 THEN
-            diveTimer = MAX(28, 70 - level * 5) + RANDINT(0, 40)
+            diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
+            ' Ab hoeheren Levels stuerzen mehrere Gegner zugleich (max. 3).
+            DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
+            DIM launched AS INTEGER : launched = 0
             DIM tries AS INTEGER
-            FOR tries = 0 TO 8
+            FOR tries = 0 TO 20
+                IF launched >= nDive THEN BREAK
                 DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
                 IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
                     bugs[pick].Dive(playerX, diveSpeed)
-                    BREAK
+                    launched = launched + 1
                 END IF
             NEXT tries
         END IF
