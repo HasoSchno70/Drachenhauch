@@ -24,7 +24,8 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
     QScrollArea, QFormLayout, QLineEdit, QSpinBox, QCheckBox, QPlainTextEdit,
     QFileDialog, QMessageBox, QLabel, QVBoxLayout, QHBoxLayout, QDoubleSpinBox,
-    QComboBox, QAbstractItemView, QMenu, QStackedWidget, QToolBar,
+    QComboBox, QAbstractItemView, QMenu, QStackedWidget, QToolBar, QPushButton,
+    QColorDialog,
 )
 
 from .formdesigner import (
@@ -869,6 +870,12 @@ class _Inspector(QWidget):
         self.vmin = QDoubleSpinBox(); self.vmax = QDoubleSpinBox(); self.vval = QDoubleSpinBox()
         for s in (self.vmin, self.vmax, self.vval):
             s.setRange(-1e6, 1e6)
+        # Farbe (Swatch-Button statt Hex) + Schriftgroesse
+        self.color_btn = QPushButton(); self.color_btn.setFixedHeight(22)
+        self.color_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.color_btn.clicked.connect(self._pick_color)
+        self.sfont = QSpinBox(); self.sfont.setRange(0, 96)
+        self.sfont.setToolTip("Schriftgroesse in px (0 = Standard)")
         # Anker (Reflow beim Fenster-Resize): an welchen Kanten klebt das Control?
         self.a_l = QCheckBox("L"); self.a_r = QCheckBox("R")
         self.a_t = QCheckBox("O"); self.a_b = QCheckBox("U")
@@ -882,6 +889,8 @@ class _Inspector(QWidget):
         self._rows = []
         self._add("Name", self.name)
         self._add("Text", self.text)
+        self._add("Farbe", self.color_btn)
+        self._add("Schriftgroesse", self.sfont)
         self._add("X", self.sx); self._add("Y", self.sy)
         self._add("Breite", self.sw); self._add("Hoehe", self.sh)
         self._add("Anker", self._anchor_box)
@@ -901,9 +910,27 @@ class _Inspector(QWidget):
         self.items.textChanged.connect(self._apply)
         self.enabled.toggled.connect(self._apply)
         self.checked.toggled.connect(self._apply)
+        self.sfont.valueChanged.connect(self._apply)
         for cb in (self.a_l, self.a_r, self.a_t, self.a_b):
             cb.toggled.connect(self._apply)
         self.set_control(None)
+
+    def _update_color_btn(self):
+        if self._c is not None:
+            c = _col(self._c.color)
+            self.color_btn.setText(f"#{self._c.color & 0xFFFFFF:06X}")
+            fg = "#000" if (c.red() + c.green() + c.blue()) > 360 else "#fff"
+            self.color_btn.setStyleSheet(
+                f"background:{c.name()}; color:{fg}; border:1px solid #555;")
+
+    def _pick_color(self):
+        if self._c is None:
+            return
+        col = QColorDialog.getColor(_col(self._c.color), self, "Farbe waehlen")
+        if col.isValid():
+            self._c.color = (col.red() << 16) | (col.green() << 8) | col.blue()
+            self._update_color_btn()
+            self.changed.emit()
 
     def _add(self, label, widget):
         self._form.addRow(label, widget)
@@ -930,6 +957,7 @@ class _Inspector(QWidget):
         self.items.setPlainText("\n".join(c.items))
         self.vmin.setValue(c.min); self.vmax.setValue(c.max); self.vval.setValue(c.value)
         self.enabled.setChecked(c.enabled); self.checked.setChecked(c.checked)
+        self.sfont.setValue(c.font_size); self._update_color_btn()
         a = c.anchor or "lt"
         self.a_l.setChecked("l" in a); self.a_r.setChecked("r" in a)
         self.a_t.setChecked("t" in a); self.a_b.setChecked("b" in a)
@@ -938,7 +966,8 @@ class _Inspector(QWidget):
         events = sp.events if sp else ()
         is_range = c.kind in ("slider", "progress")
         is_check = c.kind in ("checkbox", "radio")
-        for w in (self.name, self.sx, self.sy, self.sw, self.sh, self._anchor_box, self.enabled):
+        for w in (self.name, self.color_btn, self.sfont, self.sx, self.sy,
+                  self.sw, self.sh, self._anchor_box, self.enabled):
             self._show(w, True)
         self._show(self.text, has_text)
         self._show(self.items, has_items)
@@ -964,6 +993,7 @@ class _Inspector(QWidget):
         c.min, c.max, c.value = self.vmin.value(), self.vmax.value(), self.vval.value()
         c.enabled = self.enabled.isChecked()
         c.checked = self.checked.isChecked()
+        c.font_size = self.sfont.value()
         a = ("l" if self.a_l.isChecked() else "") + ("r" if self.a_r.isChecked() else "") \
             + ("t" if self.a_t.isChecked() else "") + ("b" if self.a_b.isChecked() else "")
         c.anchor = a or "lt"

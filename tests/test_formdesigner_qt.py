@@ -260,6 +260,22 @@ def test_window_inspector_shown_when_nothing_selected(tmp_path):
     win.close()
 
 
+def test_inspector_color_and_font(tmp_path, monkeypatch):
+    _app()
+    win = FormDesigner(tmp_path)
+    c = win.canvas.doc.add("label", 10, 10)
+    win.canvas._select(c)
+    ins = win.inspector
+    ins.sfont.setValue(20)                       # Schriftgroesse
+    assert c.font_size == 20
+    from PySide6.QtGui import QColor
+    monkeypatch.setattr("PySide6.QtWidgets.QColorDialog.getColor",
+                        staticmethod(lambda *a, **k: QColor(255, 0, 0)))
+    ins._pick_color()                            # Farb-Waehler
+    assert c.color == 0xFF0000
+    win.close()
+
+
 def test_inspector_anchor_checkboxes(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
