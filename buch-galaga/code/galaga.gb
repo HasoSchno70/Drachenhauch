@@ -415,6 +415,15 @@ SUB NameEntry()
     peUp = up : peDn = dn : peL = lf : peR = rt : peFire = ok
 END SUB
 
+' Ein Begleiter (Nachbar des Bosses) stuerzt mit, wenn er lebt + in Formation ist.
+SUB EscortDive(idx AS INTEGER)
+    IF idx >= 0 AND idx < NBUGS THEN
+        IF bugs[idx].alive AND bugs[idx].state = St.FORM THEN
+            bugs[idx].Dive(playerX, diveSpeed)
+        END IF
+    END IF
+END SUB
+
 ' ===================== Boss-Fangsequenz =====================
 ' Treibt den Boss durch SEEK (zum Hover-Punkt) -> BEAM (Strahl + Fang-Kollision)
 ' -> BACK (zurueck in die Formation). Laeuft nur, wenn capState <> OFF; der Boss
@@ -499,18 +508,26 @@ SUB UpdatePlay()
         diveTimer = diveTimer - 1
         IF diveTimer <= 0 THEN
             diveTimer = MAX(24, 64 - level * 5) + RANDINT(0, 30)
-            DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
-            DIM launched AS INTEGER : launched = 0
-            DIM tries AS INTEGER
-            FOR tries = 0 TO 20
-                IF launched >= nDive THEN BREAK
-                DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
-                IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
-                    bugs[pick].Dive(playerX, diveSpeed)
-                    PLAYSOUND(sfxDive)
-                    launched = launched + 1
-                END IF
-            NEXT tries
+            ' Manchmal ein Boss-gefuehrter Gruppensturz (Boss + 2 flankierende
+            ' Begleiter) -- das typische Galaga-Eskort-Manoever.
+            IF bugs[bossIdx].alive AND bugs[bossIdx].state = St.FORM AND capState = CapSt.OFF AND RANDINT(0, 2) = 0 THEN
+                bugs[bossIdx].Dive(playerX, diveSpeed) : PLAYSOUND(sfxDive)
+                EscortDive(bossIdx - 1)
+                EscortDive(bossIdx + 1)
+            ELSE
+                DIM nDive AS INTEGER : nDive = MIN(1 + level \ 2, 3)
+                DIM launched AS INTEGER : launched = 0
+                DIM tries AS INTEGER
+                FOR tries = 0 TO 20
+                    IF launched >= nDive THEN BREAK
+                    DIM pick AS INTEGER : pick = RANDINT(0, NBUGS - 1)
+                    IF bugs[pick].alive AND bugs[pick].state = St.FORM THEN
+                        bugs[pick].Dive(playerX, diveSpeed)
+                        PLAYSOUND(sfxDive)
+                        launched = launched + 1
+                    END IF
+                NEXT tries
+            END IF
         END IF
     END IF
 
@@ -556,9 +573,11 @@ SUB UpdatePlay()
                         PLAYSOUND(sfxBoom)
                         IF bossHp <= 0 THEN
                             bugs[j].alive = FALSE : bugsAlive = bugsAlive - 1
-                            score = score + 200
+                            ' Boss im Sturz erlegt = mehr Punkte (Galaga-Bonus).
+                            DIM bg AS INTEGER : bg = IIF(bugs[j].state = St.DIVE, 400, 150)
+                            score = score + bg
                             Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, &HFFC040, 28)
-                            Popup(bugs[j].x - 4.0, bugs[j].y, 200)
+                            Popup(bugs[j].x - 4.0, bugs[j].y, bg)
                             ' Hielt der Boss ein Schiff? -> Rettung -> Doppeljaeger.
                             IF hasCaptured THEN
                                 hasCaptured = FALSE
@@ -568,7 +587,13 @@ SUB UpdatePlay()
                         END IF
                         BREAK
                     END IF
-                    DIM gain AS INTEGER : gain = IIF(bonus, 150, (ROWS - bugs[j].row) * 50)
+                    ' Punkte je Typ: Biene(unten) 50, Schmetterling(Mitte) 80,
+                    ' obere Reihe 100; im Sturz das Doppelte (wie im Original).
+                    DIM base AS INTEGER : base = 50
+                    IF bugs[j].row = 0 THEN base = 100
+                    IF bugs[j].row = 1 THEN base = 80
+                    DIM gain AS INTEGER : gain = IIF(bonus, 150, base)
+                    IF (NOT bonus) AND bugs[j].state = St.DIVE THEN gain = gain * 2
                     score = score + gain
                     Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, rowTint[bugs[j].row], 18)
                     Popup(bugs[j].x + 2.0, bugs[j].y, gain)
