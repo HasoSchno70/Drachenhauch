@@ -1503,7 +1503,9 @@ impl<'p> Vm<'p> {
                     stack.push(Value::FuncRef(Rc::from(name.as_str())));
                 }
                 op::CALL_VALUE => {
-                    let argc = arg.as_usize();
+                    let l = arg.list();
+                    let cname = l[0].str();
+                    let argc = l[1].as_usize();
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
                     let callee = stack.pop().unwrap();
@@ -1518,7 +1520,11 @@ impl<'p> Vm<'p> {
                                 if !tgt.is_sub { stack.push(ret); } else { stack.push(Value::Nil); }
                             }
                         }
-                        other => return Err(format!("Wert vom Typ {} ist nicht aufrufbar", other.type_name())),
+                        other => return Err(format!(
+                            "'{}' ist eine Variable vom Typ {} und kann nicht wie eine Funktion \
+                             aufgerufen werden. Falls du den eingebauten Befehl '{}' meinst: \
+                             benenne die Variable um.",
+                            cname, other.type_name(), cname.to_uppercase())),
                     }
                 }
                 op::CALL_METHOD => {

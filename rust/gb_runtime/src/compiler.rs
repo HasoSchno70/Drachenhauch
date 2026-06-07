@@ -1077,6 +1077,15 @@ impl Compiler {
         }
         let is_local = self.ctx.local_slots.contains_key(&name);
         let is_global = self.global_vars.contains(&name);
+        // Namens-Kollision: eine Variable verdeckt eine gleichnamige SUB/FUNCTION
+        // (case-insensitiv). Beim Aufruf gewinnt die Variable -> sonst kryptisches
+        // "nicht aufrufbar" zur Laufzeit. Klare Meldung schon beim Kompilieren.
+        if self.fn_sigs.contains_key(&name) && (is_local || is_global) {
+            return Err(format!(
+                "Namens-Kollision: '{}' ist zugleich eine Variable und eine \
+                 SUB/FUNCTION -- beim Aufruf verdeckt die Variable die Funktion. \
+                 Benenne eines von beiden um.", name));
+        }
         // User-Funktion (Variable gleichen Namens verschattet sie).
         if self.fn_sigs.contains_key(&name) && !is_local && !is_global {
             let byref = self.fn_sigs[&name].param_byref.clone();
@@ -1129,7 +1138,9 @@ impl Compiler {
         if is_global || is_local {
             self.load_var(&name);
             for a in args { self.expr(a)?; }
-            self.ctx.emit(oc::CALL_VALUE, json!(args.len()));
+            // Name mitgeben, damit die VM bei nicht-aufrufbarem Wert (Variable
+            // verdeckt z.B. einen Builtin) eine klare Meldung geben kann.
+            self.ctx.emit(oc::CALL_VALUE, json!([name, args.len()]));
         } else {
             // Aliasierten Builtin-Namen auf den kanonischen zurueckabbilden
             // (j_parse -> json_parse), damit gbrt ihn nativ findet.
