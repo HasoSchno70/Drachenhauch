@@ -828,6 +828,98 @@ children.push(bullet("Ändere die Formationsgrösse (COLS/ROWS) und die Abständ
 children.push(bullet("Lass die Formation stärker oder schneller schweben (die 12 bzw. 0.04)."));
 children.push(bullet("Verlangsame den Flügelschlag (die 12 in der Frame-Wahl)."));
 
+// ===================== Kapitel 7 =====================
+children.push(new Paragraph({ children: [new PageBreak()] }));
+children.push(h1("Kapitel 7: Einflug-Manöver"));
+children.push(tip("In diesem Kapitel",
+  "Die Gegner stehen nicht mehr einfach da – sie fliegen in eleganten, geschwungenen Bögen ein und sammeln sich dann zur Formation. Das ist der Moment, in dem es sich richtig nach Galaga anfühlt."));
+
+children.push(h2("Geschwungene Bahnen mit Bézier-Kurven"));
+children.push(p("Eine gerade Linie ist langweilig. Schöne Kurven beschreibt man mit Bézier-Kurven: aus vier Punkten – Start, zwei „Zieh-Punkten“ für die Form und Ziel – entsteht eine weiche Bahn. GameBasic liefert sie fertig im curves-Modul:"));
+children.push(codeBlock([
+  'IMPORT "curves"',
+]));
+children.push(pmix([
+  ["", false],
+  ["IMPORT", true],
+  [" holt ein Zusatz-Modul dazu. ", false],
+  ["CURVE_BEZIER2(t, x0,y0, x1,y1, x2,y2, x3,y3)", true],
+  [" berechnet einen Punkt auf der Kurve. ", false],
+  ["t", true], [" läuft dabei von 0 (Start) bis 1 (Ziel) – bei 0,5 ist man in der Mitte der Bahn.", false],
+]));
+
+children.push(h2("Tupel: zwei Werte auf einmal"));
+children.push(p("Ein Punkt hat zwei Zahlen: x und y. CURVE_BEZIER2 gibt deshalb gleich beide zurück – als Tupel. Mit einer Klammer-Zuweisung holen wir sie in zwei Variablen:"));
+children.push(codeBlock([
+  "DIM bx AS FLOAT : DIM by AS FLOAT",
+  "(bx, by) = CURVE_BEZIER2(t, cx0, cy0, cx1, cy1, cx2, cy2, cx3, cy3)",
+]));
+children.push(pmix([
+  ["Die linke Seite ", false], ["(bx, by)", true],
+  [" verteilt die beiden Rückgabewerte auf zwei Variablen – praktisch, wenn etwas mehr als einen Wert liefert.", false],
+]));
+
+children.push(h2("Der Gegner bekommt eine Flugbahn"));
+children.push(p("Wir erweitern die Bug-Klasse um die vier Kontrollpunkte, einen Fortschritt t mit Tempo, einen Startverzögerung delay (damit nicht alle gleichzeitig losfliegen) und ein Flag inForm. In Init legen wir die Bahn fest – von ausserhalb des Bildes in einem Bogen zur Heimatposition:"));
+children.push(codeBlock([
+  "SUB Init(phx AS FLOAT, phy AS FLOAT, prow AS INTEGER, pdelay AS INTEGER)",
+  "    Self.hx = phx : Self.hy = phy : Self.row = prow",
+  "    Self.alive = TRUE : Self.inForm = FALSE",
+  "    Self.t = 0.0 : Self.ts = 0.012 : Self.delay = pdelay",
+  "    DIM side AS INTEGER : side = IIF(prow MOD 2 = 0, -1, 1)",
+  "    Self.cx0 = phx - side * 180.0 : Self.cy0 = -30.0",
+  "    Self.cx1 = 240.0 + side * 140.0 : Self.cy1 = 120.0",
+  "    Self.cx2 = phx + side * 80.0 : Self.cy2 = 40.0",
+  "    Self.cx3 = phx : Self.cy3 = phy",
+  "    Self.x = Self.cx0 : Self.y = Self.cy0",
+  "END SUB",
+]));
+children.push(pmix([
+  ["", false],
+  ["side", true], [" ist je nach Reihe -1 oder 1 – so kommen die Gegner abwechselnd von links und rechts. Start (cx0/cy0) liegt oben ausserhalb des Bildes, Ziel (cx3/cy3) ist die Formationsposition.", false],
+]));
+
+children.push(h2("Bewegen entlang der Kurve"));
+children.push(p("Die Update-Methode treibt den Gegner über die Bahn. Ist er angekommen (t ≥ 1), schwebt er ab da nur noch in der Formation:"));
+children.push(codeBlock([
+  "SUB Update(sway AS FLOAT)",
+  "    IF Self.inForm THEN",
+  "        Self.x = Self.hx + sway : Self.y = Self.hy : RETURN",
+  "    END IF",
+  "    IF Self.delay > 0 THEN Self.delay = Self.delay - 1 : RETURN",
+  "    Self.t = Self.t + Self.ts",
+  "    DIM bx AS FLOAT : DIM by AS FLOAT",
+  "    (bx, by) = CURVE_BEZIER2(MIN(Self.t, 1.0), Self.cx0, Self.cy0, _",
+  "        Self.cx1, Self.cy1, Self.cx2, Self.cy2, Self.cx3, Self.cy3)",
+  "    Self.x = bx : Self.y = by",
+  "    IF Self.t >= 1.0 THEN Self.inForm = TRUE",
+  "END SUB",
+]));
+children.push(pmix([
+  ["", false],
+  ["RETURN", true], [" in einer SUB bricht die Methode sofort ab. Der ", false],
+  ["delay", true], [" zählt zuerst herunter (gestaffelter Start). ", false],
+  ["MIN(Self.t, 1.0)", true], [" sorgt dafür, dass t nicht über 1 hinausläuft. Das Unterstrich-Zeichen ", false],
+  ["_", true], [" am Zeilenende setzt eine lange Zeile unten fort.", false],
+]));
+children.push(pmix([
+  ["In der Spielschleife rufst du pro Gegner ", false], ["bugs[i].Update(sway)", true],
+  [" auf und zeichnest ihn an ", false], ["INT(bugs[i].x), INT(bugs[i].y)", true],
+  [". Das vollständige Programm liegt in ", false], ["code/kap07/einflug.gb", true], [".", false],
+]));
+figure("kap07_einflug.png", "Einflug: Die obere Reihe steht schon, die nächste strömt im Bogen herein.", 300, 400).forEach(e => children.push(e));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("IMPORT ", "holt Zusatz-Module dazu (hier curves)."));
+children.push(bulletRich("Bézier-Kurve ", "= weiche Bahn aus 4 Punkten; CURVE_BEZIER2(t, …) liefert den Punkt bei t (0…1)."));
+children.push(bulletRich("Tupel ", "= mehrere Werte auf einmal: (bx, by) = ..."));
+children.push(bulletRich("Methode mit Zustand ", "(inForm, delay, t): jeder Gegner steuert seinen eigenen Einflug."));
+
+children.push(h2("Übung"));
+children.push(bullet("Mach den Einflug schneller oder langsamer (ts in Init)."));
+children.push(bullet("Verändere die Kontrollpunkte – wie ändert sich die Bahnform?"));
+children.push(bullet("Lass die Gegner enger gestaffelt starten (kleinerer delay-Faktor als i * 4)."));
+
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
