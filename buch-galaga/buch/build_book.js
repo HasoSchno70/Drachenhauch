@@ -162,21 +162,38 @@ children.push(
   new Paragraph({ children: [new PageBreak()] }),
 );
 
+// --- Vorwort ---
+children.push(h1("Vorwort"));
+children.push(p("Es gibt zwei Sorten von Menschen, die Computerspiele lieben: die einen wollen sie spielen, die anderen wollen wissen, wie zum Teufel das eigentlich funktioniert. Wenn du dieses Buch in der Hand hältst, gehörst du vermutlich zur zweiten Sorte – oder du bist gerade dabei, hinüberzuwechseln. Herzlich willkommen, hier ist genau dein Platz."));
+children.push(p("Ich heiße Hans Schnorrenberger, und ich habe GameBasic gebaut, weil ich es leid war, Anfängern erklären zu müssen, warum man für ein simples bewegtes Pixel auf dem Bildschirm erst einmal drei Bibliotheken installieren, ein halbes Dutzend Fehlermeldungen entschlüsseln und an einer Stelle „aus Gründen“ ein Semikolon setzen muss. Programmieren sollte sich nicht wie eine Mutprobe anfühlen. Es sollte sich anfühlen wie das, was es eigentlich ist: das Bauen kleiner Welten, in denen du die Regeln machst."));
+children.push(p("Deshalb ist GameBasic so geworden, wie es ist. Die Befehle heißen so, wie sie gemeint sind. Wenn etwas schiefgeht, sagt dir die Sprache in ganzen, lesbaren Sätzen, was los ist – und nicht in kryptischem Fachchinesisch, das man erst googeln muss, um zu verstehen, dass man es googeln muss. Und wenn dein Programm läuft, dann läuft es flott, weil im Hintergrund eine richtige Runtime werkelt und nicht bloß gute Laune."));
+children.push(p("Dieses Buch baut mit dir gemeinsam ein vollständiges Arcade-Spiel: einen Klon des unsterblichen Klassikers Galaga. Wir fangen ganz vorne an – mit einem leeren schwarzen Fenster, das tapfer darauf wartet, dass etwas passiert – und hören erst auf, wenn bunte Gegner in geschwungenen Bahnen einfliegen, herabstürzen, Bomben werfen und du sie mit einem selbstgezeichneten Raumschiff zu Pixelstaub schießt. Unterwegs lernst du, fast ohne es zu merken, alles Wichtige über das Programmieren."));
+children.push(p("Ein einziger Rat noch, bevor es losgeht: Tippe die Beispiele wirklich selbst ab. Ich weiß, Kopieren wäre schneller. Aber Programmieren lernt man in den Fingern, nicht in den Augen – ungefähr so, wie man Fahrradfahren nicht aus einem Buch über Fahrräder lernt. Mach Fehler, viele sogar. Jeder Fehler, den du selbst gefunden und behoben hast, ist eine Lektion, die sitzt."));
+children.push(p("Genug der Vorrede. Schnall dich an, der Hangar ist offen."));
+children.push(new Paragraph({
+  spacing: { before: 240 },
+  children: [new TextRun({ text: "— Hans Schnorrenberger", italics: true, size: 22, color: C_CAP })],
+}));
+
 // --- Einleitung ---
 children.push(h1("Willkommen!"));
-children.push(p("Dieses Buch nimmt dich an die Hand und baut mit dir gemeinsam ein komplettes Arcade-Spiel – einen Klon des Klassikers Galaga. Du brauchst keine Vorkenntnisse. Jedes Kapitel fügt ein kleines, sichtbares Stück hinzu: erst ein Fenster, dann ein Raumschiff, dann Schiessen, Gegner, Einflug-Manöver – bis am Ende ein richtiges Spiel mit Highscore-Liste, Sound und Effekten vor dir läuft."));
-children.push(p("Programmieren lernt man am besten, indem man etwas baut, das Spass macht. Genau das ist der Plan. Und das Beste: die Grafik – Raumschiff, Gegner, Schüsse – zeichnest du selbst im mitgelieferten Pixel-Editor."));
-children.push(tip("So liest du dieses Buch", "Tippe die Beispiele selbst ab und starte sie sofort. Jeder Codeschnipsel läuft für sich. Fehler sind normal – GameBasic sagt dir in klaren Worten, was los ist."));
+children.push(p("Dieses Buch nimmt dich an die Hand und baut mit dir gemeinsam ein komplettes Arcade-Spiel – einen Klon des Klassikers Galaga. Und mit „komplett“ meine ich komplett: kein abgespecktes Spielzeug-Beispiel, an dessen Ende du dich fragst, wo denn nun das eigentliche Spiel geblieben ist, sondern etwas, das man tatsächlich spielen, verlieren und genervt-aber-glücklich noch einmal von vorne starten will."));
+children.push(p("Du brauchst dafür keinerlei Vorkenntnisse. Wirklich keine. Wenn du weißt, wie man einen Computer einschaltet und Text eintippt, bist du qualifiziert. Alles andere bauen wir gemeinsam auf – Stein für Stein, oder besser gesagt: Pixel für Pixel."));
+children.push(p("Der Trick dabei ist, dass wir nie auf den großen Knall am Ende warten. Jedes Kapitel fügt ein kleines, sofort sichtbares Stück hinzu: erst ein Fenster, dann ein scrollender Sternenhimmel, dann ein Raumschiff, das auf deine Tasten hört, dann Schüsse, Gegner, geschwungene Einflug-Manöver, Sturzangriffe, Bomben. Am Ende hast du ein richtiges Spiel mit Highscore-Liste, Sound und Effekten – aber schon nach Kapitel 1 läuft etwas, das sich gut anfühlt."));
+children.push(p("Programmieren lernt man nämlich am besten, indem man etwas baut, das Spaß macht. Lehrbücher, die einem zur Begrüßung beibringen, wie man die Zahlen von 1 bis 10 untereinander ausdruckt, haben schon so manchen begeisterten Anfänger in einen gelangweilten Aussteiger verwandelt. Das passiert uns hier nicht."));
+children.push(p("Und das Beste kommt noch: Die Grafik – Raumschiff, Gegner, Schüsse, Bomben – zeichnest du selbst, mit einem Pixel-Editor, der gleich mitgeliefert wird. Dein Spiel wird also nicht irgendein Spiel sein, sondern ganz und gar deins. Wenn dein Raumschiff am Ende aussieht wie eine fliegende Bratwurst, dann ist das eine bewusste künstlerische Entscheidung, und niemand darf dir widersprechen."));
+children.push(tip("So liest du dieses Buch", "Tippe die Beispiele selbst ab und starte sie sofort – nicht erst am Ende des Kapitels, sondern zwischendurch immer wieder. Jeder Codeschnipsel läuft für sich. Und keine Sorge vor Fehlern: Die gehören dazu wie das Salz in die Suppe. GameBasic sagt dir in klaren, ganzen Sätzen, was es nicht verstanden hat – meistens hast du nur einen Buchstaben vertippt."));
 
 // --- Was ist GameBasic ---
 children.push(h1("Was ist GameBasic?"));
-children.push(p("GameBasic ist eine Programmiersprache aus der BASIC-Familie – also eine Sprache, die bewusst leicht lesbar ist und sich fast wie englische Sätze liest. Sie wurde von Grund auf für Spiele gemacht: Grafik, Sound, Eingabe und Spielablauf sind direkt eingebaut, ohne dass du erst komplizierte Bibliotheken zusammensuchen musst."));
+children.push(p("GameBasic ist eine Programmiersprache aus der ehrwürdigen BASIC-Familie. BASIC steht für „Beginner's All-purpose Symbolic Instruction Code“ – ein etwas sperriger Name für eine erstaunlich freundliche Idee: eine Sprache, die bewusst so leicht lesbar ist, dass sie sich fast wie englische Sätze liest. Generationen von Programmierern haben in den achtziger Jahren auf Heimcomputern mit BASIC angefangen, und viele von ihnen erinnern sich bis heute mit feuchten Augen daran."));
+children.push(p("GameBasic nimmt diese alte, gute Idee und schleppt sie ins 21. Jahrhundert. Es ist von Grund auf für Spiele gemacht: Grafik, Sound, Eingabe und Spielablauf sind direkt eingebaut. Du musst dir nicht erst aus dem halben Internet Bibliotheken zusammensuchen, von denen die Hälfte nicht zusammenpasst und die andere Hälfte seit drei Jahren nicht mehr gepflegt wird. Du schreibst SCREEN, und ein Fenster geht auf. So soll es sein."));
 children.push(h2("Was sie besonders macht"));
 children.push(bulletRich("Einfach zu lesen: ", "Befehle wie SCREEN, PLOT, DRAWIMAGE oder PLAYSOUND sagen, was sie tun."));
 children.push(bulletRich("Sicher durch Typen: ", "Jede Variable hat einen klaren Typ (INTEGER, FLOAT, STRING …). Das verhindert viele Anfängerfehler."));
 children.push(bulletRich("Modern: ", "Klassen und Objekte (OOP), Funktionen, Module – alles dabei, wenn du es brauchst, aber nie im Weg."));
 children.push(bulletRich("Eine Laufzeit: ", "Dein Programm läuft direkt über die schnelle Runtime „gbrt“ – flüssig und auf Wunsch als fertige .exe exportierbar."));
-children.push(p("Ein winziges Programm sieht zum Beispiel so aus:"));
+children.push(p("Genug der Theorie – schau dir an, wie wenig nötig ist, um etwas auf den Bildschirm zu bringen. Das hier ist ein vollständiges, lauffähiges GameBasic-Programm:"));
 children.push(new Paragraph({
   shading: { fill: "F4F4F4", type: ShadingType.CLEAR },
   border: { left: { style: BorderStyle.SINGLE, size: 18, color: C_ACCENT, space: 6 } },
@@ -188,10 +205,12 @@ children.push(new Paragraph({
     new TextRun({ text: "FLIP()", font: "Consolas", size: 20, break: 1 }),
   ],
 }));
+children.push(p("Drei Zeilen. Die erste öffnet ein Fenster, die zweite schreibt in leuchtendem Gelb „Hallo Welt!“ hinein, die dritte zeigt das Ergebnis an. Man muss kein Hellseher sein, um zu erraten, was hier passiert – und genau das ist der Punkt. In manch anderer Programmiersprache wäre dasselbe „Hallo Welt“ eine kleine Expedition mit Zwischenlager und Sherpa gewesen."));
 
 // --- Was kann GameBasic ---
 children.push(h1("Was kann GameBasic alles?"));
-children.push(p("Erstaunlich viel – weit mehr, als wir für unser Galaga-Spiel brauchen. Ein kleiner Vorgeschmack:"));
+children.push(p("Erstaunlich viel – ehrlich gesagt weit mehr, als wir für unser bescheidenes Galaga-Spiel jemals brauchen werden. Das ist ein bisschen so, als würde man den Führerschein in einem Sportwagen machen: Wir nutzen längst nicht jede Pferdestärke, aber es ist beruhigend zu wissen, dass sie da ist, falls dich später der Ehrgeiz packt."));
+children.push(p("Ein kleiner Vorgeschmack, was alles eingebaut ist:"));
 children.push(bulletRich("2D-Grafik: ", "Linien, Rechtecke, Kreise, Farbverläufe, Splines, dicke Linien, Bilder und Sprites."));
 children.push(bulletRich("3D-Grafik: ", "Würfel, Kugeln, geladene 3D-Modelle, Licht, Schatten und Kameras."));
 children.push(bulletRich("Fertige Fenster-Oberflächen (GUI): ", "Buttons, Schieberegler, Checkboxen, Textfelder – per Klick zusammengesetzt."));
@@ -209,7 +228,9 @@ figure("demo_gui.png", "Ein Einstellungs-Fenster mit Schieberegler, Checkbox, Te
 
 // --- Unser Projekt ---
 children.push(h1("Unser Projekt: ein Galaga-Clone"));
-children.push(p("Galaga ist einer der berühmtesten Arcade-Shooter: unten steuerst du ein Raumschiff, oben schwebt eine Formation bunter Gegner, die in geschwungenen Bahnen einfliegen, herabstürzen und Bomben werfen. Genau dieses Gefühl bauen wir nach – mit allem Drum und Dran."));
+children.push(p("Im Jahr 1981 stellte die Firma Namco einen Spielautomaten in die Hallen, der die Welt im Sturm eroberte: Galaga. Wer alt genug ist, hat dafür echte Münzen geopfert; wer es nicht ist, kennt es spätestens als das Spiel, das in Filmen immer dann im Hintergrund flimmert, wenn jemand cool sein soll. Es ist einer der berühmtesten Arcade-Shooter überhaupt – und das aus gutem Grund."));
+children.push(p("Das Prinzip ist herrlich einfach: Unten steuerst du ein einzelnes Raumschiff, das nur nach links und rechts darf. Oben schwebt eine Formation bunter Gegner. Sie bleiben aber nicht brav oben sitzen – sie fliegen in eleganten, geschwungenen Bahnen ein, lösen sich einzeln aus der Reihe, stürzen auf dich herab und werfen Bomben. Du wiederum schießt nach oben und versuchst, am Leben zu bleiben. Klingt nach wenig, ist aber genau die richtige Mischung aus „eigentlich schaffe ich das“ und „verflixt, noch ein Versuch“."));
+children.push(p("Genau dieses Gefühl bauen wir nach – mit allem Drum und Dran. Und keine Sorge: Wir verletzen dabei keine Urheberrechte. Wir kopieren nicht das Original, wir lernen aus seinem Aufbau und bauen unsere eigene Variante, mit unseren eigenen Grafiken und unseren eigenen Tönen."));
 figure("galaga_spiel.png", "Mitten im Gefecht: die Formation oben, Schüsse, Explosionen und Punkte-Einblendungen.").forEach(e => children.push(e));
 children.push(p("Und es bleibt nicht beim Standard. Unser Spiel bekommt die ikonischen Spezial-Manöver des Originals:"));
 children.push(bulletRich("Der Fangstrahl: ", "Ein Boss-Gegner spannt einen Traktorstrahl auf und kann dein Schiff einfangen – befreist du es, fliegst du mit einem Doppeljäger (zwei Schiffe) weiter!"));
@@ -226,7 +247,8 @@ children.push(bullet("Arcade-Sounds und Hintergrundmusik, Steuerung per Tastatur
 
 // --- Aufbau ---
 children.push(h1("Wie dieses Buch funktioniert"));
-children.push(p("Wir bauen das Spiel in kleinen, lauffähigen Schritten. Nach jedem Kapitel hast du etwas, das du sofort starten und ausprobieren kannst – und das Lust auf das nächste Kapitel macht."));
+children.push(p("Wir bauen das Spiel in kleinen, lauffähigen Schritten. Das ist Absicht und kein Zufall: Nichts ist demotivierender, als hundert Zeilen Code abzutippen, am Ende auf „Start“ zu drücken und dann nur eine Fehlermeldung zu ernten, ohne die geringste Ahnung, welche der hundert Zeilen die Schuldige ist."));
+children.push(p("Deshalb hat jedes Kapitel ein klares, sichtbares Ziel. Nach jedem Kapitel hast du etwas, das du sofort starten und ausprobieren kannst – und das dir Lust auf das nächste Kapitel macht. Der grobe Fahrplan sieht so aus:"));
 children.push(bulletRich("Erst das Fenster: ", "Spielschleife, Sternenhimmel."));
 children.push(bulletRich("Dann das Schiff: ", "laden, zeichnen, mit der Tastatur bewegen."));
 children.push(bulletRich("Sprites selbst zeichnen: ", "im Pixel-Editor gbsprites."));
@@ -241,7 +263,7 @@ children.push(tip("In diesem Kapitel",
   "Du öffnest dein allererstes GameBasic-Fenster, lernst die „Spielschleife“ kennen und zauberst einen scrollenden Sternenhimmel – die Bühne, auf der später unser Raumschiff kämpft."));
 
 children.push(h2("Ein Fenster öffnen"));
-children.push(p("Jedes Spiel braucht ein Fenster. In GameBasic genügt dafür eine einzige Zeile:"));
+children.push(p("Jedes Spiel braucht eine Bühne, und auf dem Computer ist diese Bühne ein Fenster. Bevor irgendetwas gezeichnet, bewegt oder abgeschossen werden kann, muss dieses Fenster da sein. In manchen Sprachen ist das der Moment, in dem Anfänger zum ersten Mal aufgeben. In GameBasic ist es eine einzige Zeile:"));
 children.push(codeBlock(['SCREEN(480, 640, "Mein Galaga")']));
 children.push(pmix([
   ["Der Befehl ", false], ["SCREEN", true],
@@ -250,7 +272,9 @@ children.push(pmix([
 ]));
 
 children.push(h2("Die Spielschleife"));
-children.push(p("Ein Spiel steht nie still: viele Male pro Sekunde wird das Bild neu gezeichnet und angezeigt. Das erledigt eine Schleife, die so lange läuft, bis du das Fenster schliesst:"));
+children.push(p("Jetzt kommt die wichtigste Idee in diesem ganzen Buch – wenn du nur eine Sache mitnimmst, dann diese. Ein Spiel steht nämlich nie still. Selbst wenn auf dem Bildschirm scheinbar nichts passiert, arbeitet das Spiel im Hintergrund pausenlos weiter: Es fragt die Tastatur ab, bewegt die Sterne, prüft auf Zusammenstöße und zeichnet alles neu. Und zwar viele Male pro Sekunde – flüssige 60 Mal sind das Ziel."));
+children.push(p("Ein Film besteht aus vielen Einzelbildern, die so schnell hintereinander gezeigt werden, dass unser Auge eine Bewegung sieht. Bei einem Spiel ist es genau dasselbe – nur dass jedes Einzelbild nicht vorher aufgenommen, sondern in dem Augenblick frisch berechnet wird. Ein solches Einzelbild nennt man auf Englisch einen Frame, und dieses Wort wird uns im ganzen Buch begleiten."));
+children.push(p("Das Herzstück, das diese Bilder am Fließband produziert, ist die sogenannte Spielschleife. „Schleife“ heißt: etwas wird immer und immer wieder gemacht. Unsere Schleife läuft so lange, bis du das Fenster schließt:"));
 children.push(codeBlock([
   "WHILE NOT QUITREQUESTED()",
   "    ' ... hier wird gezeichnet ...",
@@ -268,9 +292,10 @@ children.push(pmix([
 ]));
 
 children.push(h2("Das Bild löschen"));
+children.push(p("Bevor wir ein neues Bild malen, müssen wir das alte loswerden. Täten wir das nicht, würde sich jeder Frame über den vorigen legen, und nach einer Sekunde wäre der Bildschirm ein einziges Schmierbild aus übereinander gepinselten Sternen. Stell es dir vor wie eine Tafel: Bevor der Lehrer etwas Neues anschreibt, wischt er erst einmal das Alte weg."));
 children.push(pmix([
-  ["Am Anfang jedes Durchlaufs wischen wir das alte Bild weg – mit ", false],
-  ["CLS", true], [" (engl. „clear screen“) und einer Farbe:", false],
+  ["Genau das macht ", false],
+  ["CLS", true], [" – die Abkürzung steht für das englische „clear screen“. Wir übergeben gleich noch eine Farbe, mit der der ganze Bildschirm gefüllt wird:", false],
 ]));
 children.push(codeBlock(['CLS(&H05060F)        \' dunkles Weltraum-Blau']));
 children.push(pmix([
@@ -280,7 +305,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Ein Sternenhimmel"));
-children.push(p("Sterne sind einfach viele leuchtende Punkte. Wir merken uns ihre Positionen in zwei Listen (sogenannten Arrays) – eine für x, eine für y – und verteilen sie zu Beginn zufällig:"));
+children.push(p("Ein leeres dunkelblaues Fenster ist ein guter Anfang, aber niemand würde dafür eine Münze in den Automaten werfen. Geben wir dem All also ein paar Sterne. Das Schöne daran: Sterne sind das einfachste Spielelement überhaupt – einfach viele leuchtende Punkte. Wenn du Sterne hinbekommst, bekommst du später auch Schüsse, Bomben und Explosionen hin, denn im Grunde sind das alles nur Punkte, die sich bewegen und gelegentlich gegen etwas stoßen."));
+children.push(p("Wir wollen viele Sterne, sagen wir sechzig. Sechzig einzelne Variablen anzulegen wäre allerdings eine Strafarbeit. Stattdessen nehmen wir eine Liste – im Fachjargon ein Array. Ein Array ist wie ein Setzkasten mit nummerierten Fächern: Fach 0, Fach 1, Fach 2 und so weiter. Wir merken uns die Positionen der Sterne in zwei solchen Listen – eine für die x-Koordinate, eine für die y-Koordinate – und verteilen sie zu Beginn zufällig über den Himmel:"));
 children.push(codeBlock([
   "CONST NSTARS AS INTEGER = 60",
   "DIM starX[NSTARS] AS INTEGER",
@@ -358,7 +384,8 @@ children.push(tip("In diesem Kapitel",
   "Du holst dein Raumschiff auf den Bildschirm: ein fertiges Bild laden, an die richtige Stelle zeichnen und mit den Pfeiltasten nach links und rechts steuern."));
 
 children.push(h2("Ein Bild laden"));
-children.push(p("Das Raumschiff ist ein kleines Bild (ein „Sprite“). Im nächsten Kapitel zeichnest du es selbst – fürs Erste nehmen wir das mitgelieferte. Ein Bild laden wir mit LOADIMAGE und merken es uns in einer Variablen vom Typ IMAGE:"));
+children.push(p("Ein Weltraum ohne Held ist nur Tapete. Höchste Zeit für unser Raumschiff. Das Raumschiff ist ein kleines Bild – im Spielejargon ein „Sprite“. Das Wort stammt übrigens von den geisterhaften Lichtgestalten alter englischer Sagen; bei uns ist es schlicht eine kleine Grafik, die sich frei über den Bildschirm bewegt."));
+children.push(p("Im nächsten Kapitel zeichnest du dein Schiff höchstpersönlich. Fürs Erste nehmen wir aber das mitgelieferte – damit du dich ganz auf das Programmieren konzentrieren kannst und nicht gleichzeitig auch noch Künstler sein musst. Ein Bild laden wir mit dem Befehl LOADIMAGE und merken es uns in einer Variablen vom Typ IMAGE:"));
 children.push(codeBlock([
   "DIM shipImg AS IMAGE",
   'shipImg = LOADIMAGE("../../assets/sprites/player.png")',
@@ -374,7 +401,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Das Schiff zeichnen"));
-children.push(p("Wo soll das Schiff stehen? Wir merken uns seine Position in zwei Variablen und starten unten in der Mitte. Gezeichnet wird mit DRAWIMAGE:"));
+children.push(p("Ein geladenes Bild allein sieht man noch nicht – es liegt sozusagen im Hangar und wartet. Wir müssen GameBasic noch sagen, wo auf dem Bildschirm es erscheinen soll. Dafür braucht das Schiff eine Position, und eine Position sind schlicht zwei Zahlen: wie weit rechts (x) und wie weit unten (y)."));
+children.push(p("Ein kleiner, aber wichtiger Hinweis, der viele Anfänger anfangs stolpern lässt: Am Computer wächst die y-Achse nach unten. Oben ist klein, unten ist groß. Das fühlt sich verkehrt herum an, ist aber überall so. Unser Schiff gehört nach unten in die Mitte, also nehmen wir ein kleines x und ein großes y. Gezeichnet wird dann mit DRAWIMAGE:"));
 children.push(codeBlock([
   "DIM shipX AS INTEGER",
   "DIM shipY AS INTEGER",
@@ -408,7 +436,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Am Rand anhalten"));
-children.push(p("Ohne Grenzen würde das Schiff aus dem Bild fliegen. Zwei kurze Prüfungen halten es im Fenster:"));
+children.push(p("Probiere ruhig einmal aus, das Schiff ganz nach rechts zu fahren. Es verschwindet seelenruhig aus dem Fenster und denkt gar nicht daran, zurückzukommen – Computer nehmen Anweisungen eben wörtlich. Wir haben gesagt „bei jedem Tastendruck vier Pixel weiter“, und genau das tut es, bis in alle Ewigkeit."));
+children.push(p("Wir müssen dem Schiff also Grenzen setzen, so wie man einem übermütigen Hund einen Zaun spendiert. Zwei kurze Prüfungen genügen, und das Schiff bleibt brav im Fenster:"));
 children.push(codeBlock([
   "IF shipX < 0 THEN shipX = 0",
   "IF shipX > 464 THEN shipX = 464",
@@ -472,7 +501,8 @@ children.push(tip("In diesem Kapitel",
   "Du lernst den mitgelieferten Pixel-Editor gbsprites kennen und zeichnest deine eigene Grafik: das Raumschiff und einen Gegner mit Flügelschlag-Animation. Wer lieber sofort weiterprogrammiert, nimmt einfach die fertigen Sprites aus dem assets-Ordner – beides funktioniert."));
 
 children.push(h2("Was ist ein Sprite?"));
-children.push(p("Ein Sprite ist ein kleines Bild aus einzelnen farbigen Pixeln – wie kariertes Papier, bei dem jedes Kästchen eine Farbe bekommt. Unser Schiff ist nur 16 × 16 Pixel gross. Stark vergrössert sieht man die einzelnen Pixel deutlich:"));
+children.push(p("Dieses Kapitel ist eine kleine Verschnaufpause vom Programmieren – wir tauschen die Tastatur kurz gegen den Pinsel. Wer es eilig hat und sofort weiterprogrammieren will, darf das ganze Kapitel überspringen und einfach die fertigen Sprites aus dem Projekt benutzen. Aber unter uns: Selbst zu zeichnen macht riesigen Spaß, und es ist der Moment, in dem aus „irgendeinem Spiel“ dein Spiel wird."));
+children.push(p("Ein Sprite ist ein kleines Bild aus einzelnen farbigen Pixeln. Stell dir kariertes Papier vor, bei dem jedes Kästchen genau eine Farbe bekommt – mehr ist es nicht. Das klingt nach wenig, aber die gesamte goldene Ära der Videospiele wurde aus genau solchen Kästchen gebaut. Unser Schiff ist gerade einmal 16 × 16 Pixel groß; das sind 256 Kästchen, mit denen man erstaunlich viel anstellen kann. Stark vergrößert sieht man die einzelnen Pixel ganz deutlich:"));
 figure("kap03_pixelraster.png", "Das Raumschiff als Pixel-Raster – jedes Kästchen ist ein Pixel.", 280, 280).forEach(e => children.push(e));
 
 children.push(h2("Der Sprite-Editor gbsprites"));
@@ -499,7 +529,8 @@ children.push(new Paragraph({ numbering: { reference: "num3", level: 0 }, spacin
 children.push(tip("Tipp", "Weniger ist mehr: Bei 16 × 16 Pixeln zählt jedes Kästchen. Wenige klare Farben wirken besser als viele Details."));
 
 children.push(h2("Animation mit Frames"));
-children.push(p("Ein Gegner wirkt lebendig, wenn er mit den Flügeln schlägt. Dafür zeichnest du mehrere Einzelbilder, sogenannte Frames, und das Spiel zeigt sie schnell nacheinander. Unser Gegner braucht nur zwei Frames – Flügel oben, Flügel unten:"));
+children.push(p("Ein Gegner, der nur starr im Raum hängt, wirkt wie ein ausgestopftes Tier im Museum – korrekt, aber leblos. Lebendig wird er erst, wenn er mit den Flügeln schlägt. Und das Geheimnis hinter jeder Animation, vom Daumenkino bis zum Kinofilm, ist immer dasselbe: mehrere leicht unterschiedliche Einzelbilder, schnell hintereinander gezeigt."));
+children.push(p("Solche Einzelbilder heißen – du ahnst es bereits aus Kapitel 1 – Frames. Das Beruhigende: Unser Gegner braucht keine aufwändige Daumenkino-Sequenz, sondern nur zwei Frames. Flügel oben, Flügel unten. Im Wechsel gezeigt, ergibt das einen überzeugenden Flügelschlag, und dein Gehirn erledigt den Rest:"));
 figure("kap03_frames.png", "Zwei Frames ergeben den Flügelschlag – schnell abgewechselt wirkt es wie Bewegung.", 360, 200).forEach(e => children.push(e));
 children.push(pmix([
   ["Im Editor legst du über die Frame-Liste ein zweites Bild an. Die ", false],
@@ -541,7 +572,9 @@ children.push(tip("In diesem Kapitel",
   "Dein Schiff bekommt Feuerkraft. Du lernst einen „Pool“ kennen – einen festen Vorrat an Schüssen, den wir clever wiederverwenden – und feuerst genau einen Schuss pro Tastendruck."));
 
 children.push(h2("Viele Schüsse verwalten: der Pool"));
-children.push(p("Ein Schuss hat eine Position und fliegt, oder er fliegt gerade nicht. Statt ständig neue Schüsse zu erzeugen und wegzuwerfen, legen wir einen festen Vorrat an – einen Pool. Drei Listen beschreiben alle Schüsse zugleich:"));
+children.push(p("Ein Raumschiff, das nicht schießen kann, ist in einem Shooter ungefähr so nützlich wie ein Regenschirm aus Papier. Höchste Zeit, das zu ändern. Aber halt – bevor wir wild Schüsse erzeugen, lohnt sich ein kurzer Gedanke darüber, wie wir sie verwalten."));
+children.push(p("Ein Schuss hat eine Position, und er ist in genau einem von zwei Zuständen: Entweder er fliegt gerade nach oben, oder er fliegt nicht. Eine naheliegende Idee wäre, bei jedem Tastendruck einen neuen Schuss zu erzeugen und ihn wegzuwerfen, sobald er oben aus dem Bild fliegt. Das funktioniert, aber das ständige Erzeugen und Wegwerfen kostet auf Dauer Kraft – ein bisschen so, als würde man für jedes Glas Wasser einen neuen Becher kaufen und den alten wegschmeißen."));
+children.push(p("Profis machen das anders, und du machst es ab jetzt auch: Wir legen einen festen Vorrat an wiederverwendbaren Schüssen an, einen sogenannten Pool. Stell dir einen Köcher mit fünf Pfeilen vor – ist ein Pfeil verschossen und gelandet, wandert er zurück in den Köcher und kann erneut benutzt werden. Drei Listen beschreiben alle fünf Schüsse zugleich:"));
 children.push(codeBlock([
   "DIM bulletImg AS IMAGE",
   'bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")',
@@ -559,7 +592,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Feuern auf Tastendruck"));
-children.push(p("Beim Feuern suchen wir einen freien Platz im Pool und starten dort einen Schuss. Wichtig: Wir wollen nicht bei gehaltener Taste pausenlos schiessen, sondern einen Schuss pro Druck. Dafür merken wir uns, ob die Taste schon im Bild davor gedrückt war:"));
+children.push(p("Beim Feuern suchen wir einen freien Platz im Köcher und starten dort einen Schuss. Klingt simpel, hat aber einen Haken, über den fast jeder einmal stolpert: Die Spielschleife läuft sechzig Mal pro Sekunde. Würden wir einfach „wenn Leertaste gedrückt, dann schieße“ schreiben, dann feuerte das Schiff bei gehaltener Taste sechzig Schüsse pro Sekunde – ein Wasserfall aus Geschossen, und der Köcher wäre im selben Wimpernschlag leer."));
+children.push(p("Was wir wollen, ist ein Schuss pro Tastendruck. Dafür müssen wir den Moment erwischen, in dem die Taste gerade eben heruntergeht – nicht die ganze Zeit, in der sie unten bleibt. Der Trick: Wir merken uns von einem Frame zum nächsten, ob die Taste schon vorher gedrückt war. Nur wenn sie jetzt gedrückt ist, vorher aber nicht, ist das ein frischer Tastendruck:"));
 children.push(codeBlock([
   "DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)",
   "IF firing AND NOT prevShoot THEN",
@@ -582,7 +616,7 @@ children.push(pmix([
 ]));
 
 children.push(h2("Schüsse bewegen und zeichnen"));
-children.push(p("Jeden Frame lassen wir alle fliegenden Schüsse nach oben wandern. Verlässt einer oben das Bild, wird sein Platz wieder frei:"));
+children.push(p("Ein gestarteter Schuss soll natürlich nicht in der Luft hängen bleiben wie ein vergessener Luftballon. Jeden Frame lassen wir deshalb alle gerade fliegenden Schüsse ein Stück nach oben wandern. Und sobald einer oben aus dem Bild verschwindet, geben wir seinen Platz im Köcher wieder frei – damit er für den nächsten Schuss bereitsteht. Genau das macht den Pool so sparsam:"));
 children.push(codeBlock([
   "FOR i = 0 TO NBULLET - 1",
   "    IF bAlive[i] THEN",
@@ -672,7 +706,8 @@ children.push(tip("In diesem Kapitel",
   "Aus dem schlichten Sternenhimmel von Kapitel 1 wird ein echter Weltraum: Sterne in mehreren Tiefen-Ebenen, die unterschiedlich schnell scrollen und sanft funkeln."));
 
 children.push(h2("Tiefe durch Tempo (Parallax)"));
-children.push(p("Schau aus einem fahrenden Auto: Nahe Dinge sausen vorbei, ferne Berge ziehen langsam dahin. Dieser Effekt heisst Parallax – und er lässt flache Sterne räumlich wirken. Wir teilen unsere Sterne in drei Ebenen: fern (dunkel, langsam), mittel und nah (hell, schnell)."));
+children.push(p("Unser Sternenhimmel aus Kapitel 1 tut brav seinen Dienst, aber ehrlich gesagt sieht er ein bisschen aus wie weiße Konfetti, die jemand gleichmäßig nach unten rieseln lässt. Echtes Weltall hat Tiefe – manche Sterne stehen gefühlt zum Greifen nah, andere unendlich weit weg. Diese Tiefe bekommen wir mit einem alten, billigen und wunderbar wirkungsvollen Trick."));
+children.push(p("Schau einmal aus dem Fenster eines fahrenden Autos: Der Leitpfosten direkt am Straßenrand saust vorbei, dass dir schwindlig wird, während die Berge am Horizont sich kaum von der Stelle rühren. Genau dieser Effekt heißt Parallax – und er ist der ganze Zaubertrick. Dinge, die schneller vorbeiziehen, nimmt unser Gehirn als näher wahr. Wir teilen unsere Sterne deshalb in drei Ebenen: fern (dunkel, langsam), mittel und nah (hell, schnell). Flache Punkte, plötzlich räumlich."));
 children.push(pmix([
   ["Für sanfte, unterschiedliche Geschwindigkeiten brauchen wir Kommazahlen – den Typ ", false],
   ["FLOAT", true], [". Jeder Stern bekommt Tempo, Helligkeit und eine zufällige „Funkel-Phase“:", false],
@@ -746,8 +781,10 @@ children.push(chapter("Kapitel 6: Gegner & Formation"));
 children.push(tip("In diesem Kapitel",
   "Jetzt kommt Leben ins Spiel: eine ganze Formation bunter Gegner. Dafür lernst du Klassen kennen – einen Bauplan für gleichartige Dinge – und ordnest 24 Gegner in einem Gitter an, das sanft schwebt."));
 
+children.push(p("Bisher war unser Spiel eine recht einsame Angelegenheit: ein Schiff, ein paar Schüsse, viel leerer Raum. Das ändert sich jetzt schlagartig. Wir holen die Gegner ins Spiel – und nicht nur einen, sondern gleich vierundzwanzig auf einmal. Damit das nicht im Chaos endet, lernst du in diesem Kapitel ein Werkzeug kennen, das in der Programmierung allgegenwärtig ist: die Klasse."));
 children.push(h2("Eine Klasse für die Gegner"));
-children.push(p("Alle Gegner sind gleich aufgebaut: jeder hat eine Position, eine Reihe (sie bestimmt die Farbe) und einen Zustand (lebt er noch?). Statt für jeden einzelne Variablen zu schreiben, beschreiben wir einmal den Bauplan – eine Klasse:"));
+children.push(p("Schauen wir uns einen einzelnen Gegner an. Was muss er über sich wissen? Wo er steht (seine Position), in welcher Reihe er sitzt (das bestimmt seine Farbe) und ob er überhaupt noch lebt. Bei einem Gegner wären das drei, vier Variablen – kein Problem. Aber bei vierundzwanzig Gegnern bräuchten wir fast hundert einzeln benannte Variablen. Spätestens bei shipPositionVonGegnerNummerSiebzehn würde uns die Lust vergehen."));
+children.push(p("Viel klüger ist es, einmal den Bauplan eines Gegners zu beschreiben und GameBasic dann zu sagen: „Mach mir bitte vierundzwanzig davon.“ Genau das ist eine Klasse – ein Bauplan für gleichartige Dinge:"));
 children.push(codeBlock([
   "CLASS Bug",
   "    DIM x AS INTEGER",
@@ -770,7 +807,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Die Formation aufbauen"));
-children.push(p("24 Gegner = 3 Reihen × 8 Spalten. Wir legen ein Array von Bug-Objekten an und erzeugen sie in einer Schleife. Aus der Laufnummer i berechnen wir Spalte und Reihe:"));
+children.push(p("Vierundzwanzig Gegner ordnen wir nicht wild durcheinander an, sondern ordentlich im Raster: 3 Reihen mal 8 Spalten. Das sieht nicht nur militärisch-bedrohlich aus, es macht uns auch das Leben leichter. Wir legen ein Array von Bug-Objekten an und erzeugen die Gegner in einer einzigen Schleife."));
+children.push(p("Jetzt kommt ein kleiner Rechentrick, der dir noch oft begegnen wird. Die Schleife zählt schlicht von 0 bis 23 hoch – eine einzige Laufnummer. Daraus müssen wir für jeden Gegner Spalte und Reihe herausfischen. Zwei alte Bekannte aus dem Mathematikunterricht helfen dabei: der Rest beim Teilen und die Ganzzahl-Division."));
 children.push(codeBlock([
   "CONST COLS AS INTEGER = 8",
   "CONST ROWS AS INTEGER = 3",
@@ -839,7 +877,9 @@ children.push(tip("In diesem Kapitel",
   "Die Gegner stehen nicht mehr einfach da – sie fliegen in eleganten, geschwungenen Bögen ein und sammeln sich dann zur Formation. Das ist der Moment, in dem es sich richtig nach Galaga anfühlt."));
 
 children.push(h2("Geschwungene Bahnen mit Bézier-Kurven"));
-children.push(p("Eine gerade Linie ist langweilig. Schöne Kurven beschreibt man mit Bézier-Kurven: aus vier Punkten – Start, zwei „Zieh-Punkten“ für die Form und Ziel – entsteht eine weiche Bahn. GameBasic liefert sie fertig im curves-Modul:"));
+children.push(p("Jetzt kommt der Moment, auf den dieses Buch insgeheim die ganze Zeit hingearbeitet hat. Eine Formation, die einfach von oben hereinschwebt, ist nett – aber das unverwechselbare Galaga-Gefühl entsteht erst durch die eleganten, geschwungenen Bahnen, in denen die Gegner hereingleiten, als hätten sie an einer Ballettschule für Außerirdische studiert."));
+children.push(p("Eine gerade Linie kriegt jeder hin – aber sie ist eben auch sterbenslangweilig. Schöne, weiche Kurven sind kniffliger. Zum Glück hat sich darüber schon jemand den Kopf zerbrochen: der französische Ingenieur Pierre Bézier, der in den sechziger Jahren bei Renault Karosserien entwarf und eine Methode brauchte, um geschwungene Bleche mathematisch zu beschreiben. Heraus kam die Bézier-Kurve, und sie steckt heute in fast jedem Schriftzeichen, jedem Logo und – ab jetzt – in unseren Gegnern."));
+children.push(p("Das Prinzip ist überraschend anschaulich: Aus vier Punkten – einem Start, einem Ziel und zwei „Zieh-Punkten“ dazwischen, die die Kurve in ihre Form locken – entsteht eine weiche Bahn. Man muss die Mathematik dahinter nicht verstehen, denn GameBasic liefert sie fix und fertig im curves-Modul:"));
 children.push(codeBlock([
   'IMPORT "curves"',
 ]));
@@ -930,7 +970,9 @@ children.push(tip("In diesem Kapitel",
   "Die Gegner werden gefährlich: Einzelne lösen sich aus der Formation und stürzen im Bogen auf dich herab. Dafür bekommt jeder Gegner eine kleine Zustands-Maschine – gesteuert über ein ENUM."));
 
 children.push(h2("Zustände mit ENUM"));
-children.push(p("Ein Gegner ist immer in genau einem von drei Zuständen: Er fliegt ein (ENTER), schwebt in der Formation (FORM) oder stürzt gerade (DIVE). Statt unklarer Zahlen oder mehrerer Ja/Nein-Flags geben wir diesen Zuständen Namen – mit einem ENUM:"));
+children.push(p("Bisher waren unsere Gegner brave Zeitgenossen: einfliegen, sich einreihen, schweben. Charmant, aber als Gegner taugen sie damit ungefähr so viel wie ein Wachhund, der jeden Einbrecher freudig begrüßt. Das ändern wir jetzt. Einzelne Gegner sollen sich aus der Formation lösen und im Sturzflug auf dich herabstoßen – und plötzlich wird aus dem hübschen Bildschirmschoner ein Spiel, bei dem man besser aufpasst."));
+children.push(p("Damit ein Gegner zwischen „einfliegen“, „schweben“ und „stürzen“ unterscheiden kann, muss er sich merken, was er gerade tut. Er ist immer in genau einem von drei Zuständen: Er fliegt ein (ENTER), schwebt in der Formation (FORM) oder stürzt gerade (DIVE). Man könnte das mit Zahlen lösen – 0 für einfliegen, 1 für schweben, 2 für stürzen – aber dann sitzt man drei Wochen später vor seinem eigenen Code und rätselt, was zum Henker „state = 2“ wohl bedeuten sollte."));
+children.push(p("Viel freundlicher ist es, den Zuständen richtige Namen zu geben. Genau dafür gibt es das ENUM – eine kurze Liste benannter Werte:"));
 children.push(codeBlock([
   "ENUM St = ENTER, FORM, DIVE",
 ]));
@@ -1018,14 +1060,16 @@ children.push(chapter("Kapitel 9: Bomben & Ausweichen"));
 children.push(tip("In diesem Kapitel",
   "Jetzt wird zurückgeschossen: Stürzende Gegner werfen Bomben ab, denen du ausweichen musst. Du nutzt einen zweiten Pool – diesmal für fallende Bomben – und lernst, wie eine Methode mit FUNCTION ein Ergebnis zurückgibt."));
 
+children.push(p("Bisher konnten die Gegner zwar bedrohlich auf dich herabstürzen, aber mehr auch nicht – im schlimmsten Fall rempeln sie dich an. In diesem Kapitel lernen sie eine fiese neue Fähigkeit: Sie werfen im Sturzflug Bomben ab, denen du ausweichen musst. Damit wird das Spiel zum ersten Mal richtig fordernd."));
 children.push(h2("Update gibt Auskunft: FUNCTION"));
+children.push(p("Bevor die Bomben fallen können, brauchen wir eine Antwort auf eine simple Frage: Wann genau soll ein Gegner abwerfen? Und diese Antwort muss von ihm zur Spielschleife wandern, denn der Gegner weiß, wann der richtige Moment ist – aber die Bomben werden außerhalb verwaltet."));
 children.push(pmix([
-  ["Bisher war ", false], ["Update", true],
-  [" eine SUB – sie tut etwas, gibt aber nichts zurück. Eine ", false],
+  ["Hier kommt ein neues Werkzeug ins Spiel. Bisher war ", false], ["Update", true],
+  [" eine SUB – sie tut etwas, gibt aber nichts zurück, wie ein fleißiger Helfer, der seine Arbeit erledigt und wortlos wieder geht. Eine ", false],
   ["FUNCTION", true],
-  [" ist dasselbe, liefert aber ein Ergebnis mit ", false], ["RETURN", true],
-  [". Wir machen daraus eine FUNCTION, die ", false], ["TRUE", true],
-  [" zurückgibt, wenn der Gegner gerade jetzt eine Bombe abwerfen soll:", false],
+  [" ist im Grunde dasselbe, nur dass sie am Ende eine Antwort mitbringt – mit dem Schlüsselwort ", false], ["RETURN", true],
+  [". Wir machen aus Update also eine FUNCTION, die ", false], ["TRUE", true],
+  [" zurückmeldet, wenn der Gegner gerade jetzt eine Bombe abwerfen soll, und sonst ", false], ["FALSE", true], [":", false],
 ]));
 children.push(codeBlock([
   "FUNCTION Update(sway AS FLOAT) AS BOOLEAN",
@@ -1113,8 +1157,10 @@ children.push(chapter("Kapitel 10: Treffer & Punkte"));
 children.push(tip("In diesem Kapitel",
   "Jetzt wird es ein echtes Spiel: Schüsse zerstören Gegner und geben Punkte, Bomben und Stürze kosten dich Leben – und bei null Leben heisst es Game Over (mit Neustart). Dafür schreibst du deine erste eigene Funktion."));
 
+children.push(p("Wir haben jetzt fliegende Schüsse, einfliegende und stürzende Gegner, fallende Bomben – und bisher gleiten sie alle höflich aneinander vorbei, als wären sie auf einer sehr förmlichen Cocktailparty. Damit ist jetzt Schluss. In diesem Kapitel lernen die Dinge endlich, sich gegenseitig zu treffen. Das ist der Schritt, der aus einer hübschen Bewegung ein echtes Spiel macht."));
 children.push(h2("Berühren sich zwei Rechtecke? Eine Funktion"));
-children.push(p("Eine Kollision prüfen wir oft – für Schüsse, Bomben, das Schiff. Solchen wiederkehrenden Code packt man in eine eigene Funktion und gibt ihr einen Namen. Unsere Funktion prüft, ob sich zwei Rechtecke überlappen (AABB-Test):"));
+children.push(p("Die Frage „berühren sich diese beiden Dinge?“ stellen wir im Spiel ununterbrochen: Trifft der Schuss den Gegner? Trifft die Bombe das Schiff? Rammt ein stürzender Gegner uns? Es wäre eine Qual, diese Prüfung jedes Mal aufs Neue auszuschreiben – und eine wunderbare Gelegenheit, Tippfehler einzubauen."));
+children.push(p("Deshalb tun wir, was Programmierer immer tun, wenn sie etwas öfter als einmal brauchen: Wir geben dem wiederkehrenden Code einen Namen und packen ihn in eine eigene Funktion. Einmal sauber geschrieben, einmal getestet, danach für immer verlässlich. Unsere Funktion prüft, ob sich zwei Rechtecke überlappen. Fachleute nennen das einen AABB-Test (für „achsenausgerichtete Begrenzungsrechtecke“ – ein furchteinflößender Name für eine harmlose Idee):"));
 children.push(codeBlock([
   "FUNCTION Overlap(ax AS FLOAT, ay AS FLOAT, aw AS FLOAT, ah AS FLOAT, _",
   "                 cx AS FLOAT, cy AS FLOAT, cw AS FLOAT, ch AS FLOAT) AS BOOLEAN",
@@ -1213,10 +1259,12 @@ children.push(tip("In diesem Kapitel",
   "Dein Spiel wird Vollbild – und zwar ohne dass du eine einzige Spielkoordinate ändern musst. Der Trick: die Kamera skaliert dein festes Spielfeld auf jeden Bildschirm und zentriert es."));
 
 children.push(h2("Das Problem"));
-children.push(p("Bisher lief alles in einem festen 480×640-Fenster. Auf einem grossen, breiten Monitor wäre echtes Vollbild schöner. Aber alle Positionen (Schiff, Sterne, Formation) rechnen mit 480×640 – die wollen wir nicht alle umstellen."));
+children.push(p("Unser Spiel ist mittlerweile richtig gut – aber es hockt noch immer in einem kleinen Fensterchen mitten auf dem Bildschirm, wie ein Konzertpianist, der darauf besteht, auf einem Spielzeugklavier zu spielen. Auf einem großen, breiten Monitor schreit das geradezu nach echtem Vollbild."));
+children.push(p("Hier lauert allerdings eine Falle, in die schon viele getappt sind. Unser gesamter Code rechnet mit einem festen Spielfeld von 480 × 640 Pixeln. Das Schiff, die Sterne, die Formation, jede Flugbahn, jede Kollision – alles verlässt sich auf diese Maße. Würden wir jetzt einfach das Fenster vergrößern, müssten wir streng genommen jede einzelne Zahl im ganzen Programm umrechnen. Das wäre fehleranfällig, mühsam und etwa so erfreulich wie eine Steuererklärung. Es muss eleganter gehen – und das tut es."));
 
 children.push(h2("Die Kamera skaliert für dich"));
-children.push(p("Die Lösung: Das Spielfeld bleibt logisch 480×640. Wir öffnen ein grosses Fenster (oder Vollbild) und lassen die Kamera unser Spielfeld passend skalieren und zentrieren:"));
+children.push(p("Die Lösung ist ein Gedanke, der in der Spieleentwicklung Gold wert ist: Wir trennen, wie groß das Spielfeld in unserem Kopf ist, davon, wie groß es auf dem Bildschirm erscheint. Das Spielfeld bleibt für unseren Code in alle Ewigkeit logisch 480 × 640 – daran ändert sich keine einzige Zeile. Wir öffnen aber ein großes Fenster (oder gleich Vollbild) und stellen davor eine Kamera, die unser kleines Spielfeld passend vergrößert und hübsch in die Mitte rückt."));
+children.push(p("Stell dir einen Diaprojektor vor: Das Dia ist winzig und unveränderlich, aber je nachdem, wie weit die Wand entfernt ist, erscheint das Bild handtellergroß oder riesig. Genau diese Rolle übernimmt die Kamera:"));
 children.push(codeBlock([
   "CONST PW AS INTEGER = 480",
   "CONST PH AS INTEGER = 640",
@@ -1272,10 +1320,12 @@ children.push(chapter("Kapitel 12: Politur & Ausblick"));
 children.push(tip("In diesem Kapitel",
   "Der letzte Schliff: Sound, mehrere Level mit steigender Schwierigkeit – und wie du dein Spiel als fertiges Programm weitergibst. Zum Schluss ein Ausblick, wie aus diesem Grundgerüst das volle Galaga wird."));
 
+children.push(p("Unser Spiel ist vollständig spielbar – aber spiel es einmal mit geschlossenen Augen, und dir fällt sofort auf, was fehlt: Es ist mucksmäuschenstill. Ein Arcade-Spiel ohne Krach ist wie ein Gewitter ohne Donner. In diesem letzten Kapitel geben wir dem Spiel eine Stimme, mehrere Schwierigkeitsstufen und zeigen, wie du es an Freunde weitergibst."));
 children.push(h2("Sound"));
+children.push(p("Du könntest jetzt anfangen, im Internet nach Sounddateien zu jagen, dich durch Lizenzbedingungen zu wühlen und dir am Ende doch unsicher zu sein, ob du das „pew“ verwenden darfst. Musst du aber nicht. GameBasic hat einen kleinen Synthesizer eingebaut, der dir deine Arcade-Geräusche direkt aus Zahlen zaubert – ganz so, wie es die alten Spielautomaten auch gemacht haben."));
 children.push(pmix([
-  ["Arcade-Sounds erzeugst du dir direkt im Code mit ", false], ["AUDIO_SFX", true],
-  [" (ein kleiner Synthesizer) und spielst sie mit ", false], ["PLAYSOUND", true], [":", false],
+  ["Erzeugt werden diese Töne mit ", false], ["AUDIO_SFX", true],
+  [" – das ist der kleine Synthesizer – und abgespielt mit ", false], ["PLAYSOUND", true], [":", false],
 ]));
 children.push(codeBlock([
   'IMPORT "audio"',
@@ -1290,7 +1340,8 @@ children.push(pmix([
 ]));
 
 children.push(h2("Wellen & Level"));
-children.push(p("Ist die Formation leergeräumt, beginnt ein neues Level – mit etwas schnelleren Gegnern. Wir zählen die lebenden Gegner mit und bauen bei null eine neue Welle:"));
+children.push(p("Ein Spiel, das nach der ersten geräumten Formation einfach aufhört, lässt den Spieler etwas ratlos zurück – so als würde ein Achterbahnzug nach der ersten Kurve anhalten. Wir wollen, dass es weitergeht, und zwar fordernder. Ist die Formation also leergeräumt, beginnt sofort ein neues Level, mit etwas flotteren Gegnern."));
+children.push(p("Damit wir merken, wann eine Welle besiegt ist, führen wir einen schlichten Zähler mit: Bei jedem Abschuss eins runter, und sobald er null erreicht, bauen wir eine frische Welle auf. Diese kleine Idee – mitzählen und beim Nulldurchgang reagieren – ist das Rückgrat fast jedes Fortschrittssystems in Spielen:"));
 children.push(codeBlock([
   "' beim Abschuss:  bugsAlive = bugsAlive - 1",
   "' nach den Kollisionen:",
@@ -1304,9 +1355,7 @@ children.push(pmix([
 figure("kap12_politur.png", "Das fertige Grundspiel: Vollbild, Sound, Level, HUD.", 420, 240).forEach(e => children.push(e));
 
 children.push(h2("Als Programm weitergeben (Export)"));
-children.push(pmix([
-  ["Damit Freunde dein Spiel ohne GameBasic spielen können, exportierst du es als eigenständiges Programm:", false],
-]));
+children.push(p("Ein Spiel, das nur auf deinem eigenen Rechner und nur mit installiertem GameBasic läuft, ist ein bisschen wie ein selbstgebackener Kuchen, den man nicht aus der Küche tragen darf. Damit auch Freunde, Geschwister oder ahnungslose Verwandte dein Werk spielen können – ohne irgendetwas installieren zu müssen – exportierst du es als eigenständiges Programm:"));
 children.push(codeBlock([
   "gbrt --export  dein-spiel.gb",
 ]));
@@ -1321,7 +1370,14 @@ children.push(bulletRich("Effekte: ", "Explosionen (Partikel), Bildschirm-Wackel
 children.push(bulletRich("Musik & Gamepad: ", "Hintergrundmusik und Steuerung per Controller."));
 
 children.push(h2("Glückwunsch!"));
-children.push(p("Du hast Schritt für Schritt ein echtes Arcade-Spiel gebaut – vom leeren Fenster bis zu einfliegenden, stürzenden, bombenwerfenden Gegnern mit Punkten, Leben und mehreren Leveln. Und ganz nebenbei hast du Variablen, Schleifen, Arrays, Klassen, Funktionen, Module und Zustands-Maschinen gelernt. Jetzt bist du dran: Bau es um, mach es zu deinem Spiel – und zeig es her. Viel Spass!"));
+children.push(p("Halt einen Moment inne und sieh dir an, was du geschafft hast. Du hast bei einem komplett leeren schwarzen Fenster angefangen – und am Ende steht ein echtes Arcade-Spiel mit einfliegenden, stürzenden, bombenwerfenden Gegnern, mit Punkten, Leben, mehreren Leveln, Sound und Effekten. Das ist keine Kleinigkeit. Das ist genau das, was professionelle Spieleentwickler tun, nur eine Nummer kleiner."));
+children.push(p("Und das eigentlich Verblüffende: Ganz nebenbei, fast unbemerkt, hast du dabei das halbe Handwerk des Programmierens gelernt. Variablen und Schleifen, Arrays und Klassen, Funktionen und Module, Zustands-Maschinen und Kollisionsprüfungen – das sind keine Galaga-Spezialitäten, das sind die Bausteine, aus denen jede Software der Welt gebaut ist, vom Taschenrechner bis zur Raumfahrt. Du hast sie nicht auswendig gelernt, du hast sie benutzt. Das ist ein himmelweiter Unterschied."));
+children.push(p("Jetzt bist du dran. Verändere die Werte, bis sich das Spiel genau richtig anfühlt. Zeichne eigene Gegner. Erfinde eine neue Waffe, einen Endboss, ein zweites Spielfeld. Brich Dinge absichtlich, nur um zu sehen, was passiert – und repariere sie wieder. Genau so wird aus dem Spiel aus diesem Buch dein Spiel."));
+children.push(p("Es hat mir große Freude gemacht, dich auf diesem Weg zu begleiten. Wenn du dein fertiges Werk jemandem zeigst und derjenige fragt „Das hast du selbst gemacht?“, dann sag ruhig laut und deutlich: Ja. Habe ich. Viel Spaß beim Weiterbauen – und auf den nächsten Highscore."));
+children.push(new Paragraph({
+  spacing: { before: 240 },
+  children: [new TextRun({ text: "— Hans Schnorrenberger", italics: true, size: 22, color: C_CAP })],
+}));
 
 // ===================== Dokument =====================
 const doc = new Document({
