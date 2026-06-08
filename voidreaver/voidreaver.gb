@@ -181,8 +181,8 @@ WHILE NOT QUITREQUESTED()
     CLS(&H0A0E16)
     CAMERA3D(cam_x, 17.0, cam_z,  px, 0.0, pz,  45.0)
 
-    GRID3D(36, 1.0)
-    MODEL(ground, 0, 0, 0, 1.0, &H141B28)
+    MODEL(ground, 0, 0, 0, 1.0, &H22304A)      ' solider Boden (klar ueber der BG-Farbe)
+    GRID3D(36, 1.0)                              ' Neon-Gitter darueber
 
     ' Saeulen.
     FOR pk = 0 TO N_PILLARS - 1
