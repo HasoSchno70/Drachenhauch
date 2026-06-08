@@ -164,7 +164,7 @@ Sobald du einen Funktionsaufruf öffnest — `LINE(` — erscheint über der Cur
 
 ## Color-Picker (Swatch-Klick)
 
-Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) werden **mit ihrer eigenen Farbe hinterlegt** — der Hex-/RGB-Wert steht also auf einem farbigen Feld. Die Schriftfarbe passt sich automatisch an (helle Schrift auf dunklen Farben, dunkle auf hellen), damit der Wert immer gut lesbar bleibt. **Klick auf das farbige Feld** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
+Color-Literale (`&HRRGGBB`, `&HAARRGGBB`, `RGB(r, g, b)` oder `RGBA(r, g, b, a)`) werden **mit ihrer eigenen Farbe hinterlegt** — der Wert steht also auf einem farbigen Feld. Bei `RGBA`/`&HAARRGGBB` wird die Farbe **deckend** angezeigt (ohne Alpha), damit du die gewählte Farbe klar siehst; beim Bearbeiten lässt sich der Alpha-Wert aber mit einstellen (der Farbwähler zeigt dann einen Transparenz-Regler). Die Schriftfarbe passt sich automatisch an (helle Schrift auf dunklen Farben, dunkle auf hellen), damit der Wert immer gut lesbar bleibt. **Klick auf das farbige Feld** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
 
 Das farbige Feld liegt genau über dem Literal und ragt nie in benachbarten Code hinein (auch bei `&HFF0000 : ...` oder `RGB(...)` direkt vor der Klammer). Es **wächst beim Zoomen mit der Schrift mit**.
 

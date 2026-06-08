@@ -78,6 +78,45 @@ def test_cache_updates_on_edit(app):
     assert len(ed._color_literals) == 2
 
 
+def test_rgba_and_hexa_detected(app):
+    ed = _editor(app, "\n".join([
+        "a = RGBA(0, 128, 255, 64)",
+        "b = &H80FF8800",          # AARRGGBB
+        "c = RGB(10, 20, 30)",
+        "d = &HFF8800",
+    ]))
+    by_kind = {kind: (col, s, e) for s, e, col, kind in ed._color_literals}
+    assert set(by_kind) == {"rgba", "hexa", "rgb", "hex"}
+    # RGBA: RGB-Teil korrekt, Alpha im QColor erhalten (fuers Editieren).
+    col, _s, _e = by_kind["rgba"]
+    assert (col.red(), col.green(), col.blue(), col.alpha()) == (0, 128, 255, 64)
+    # &H80FF8800 -> alpha 0x80, rgb FF8800
+    colh, _s, _e = by_kind["hexa"]
+    assert (colh.red(), colh.green(), colh.blue(), colh.alpha()) == (255, 136, 0, 0x80)
+
+
+def test_rgba_swatch_background_is_opaque(app):
+    # Auch bei niedrigem Alpha soll der Editor die Farbe DECKEND zeigen.
+    from PySide6.QtWidgets import QTextEdit
+    ed = _editor(app, "x = RGBA(0, 128, 255, 20)")
+    found = None
+    for sel in ed.extraSelections():
+        bg = sel.format.background().color()
+        if (bg.red(), bg.green(), bg.blue()) == (0, 128, 255):
+            found = bg
+            break
+    assert found is not None, "kein Hintergrund fuer das RGBA-Literal"
+    assert found.alpha() == 255      # deckend gezeichnet
+
+
+def test_rgba_clickable_kind(app):
+    ed = _editor(app, "x = RGBA(0, 128, 255, 64)")
+    start, end, _c, _k = ed._color_literals[0]
+    cur = ed.textCursor(); cur.setPosition((start + end) // 2)
+    hit = ed._swatch_at(ed.cursorRect(cur).center())
+    assert hit is not None and hit[3] == "rgba"
+
+
 def test_clickable_opens_picker(app):
     # Klick mitten auf das Literal muss den Farbwaehler-Treffer liefern.
     ed = _editor(app, "col = &HFF8800")

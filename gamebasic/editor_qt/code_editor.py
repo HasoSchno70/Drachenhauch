@@ -59,13 +59,19 @@ _IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\$?")
 
 # Color-Swatch-Detection. Wir markieren:
 # 1. `&H` mit GENAU 6 Hex-Ziffern -- typische 24-bit-Color-Literal (RRGGBB).
-#    1-5 Ziffern sind meist Bitmaske/Konstante, 7+ ueberlaufen die 24-Bit-
-#    Color-Range -- in beiden Faellen kein Swatch.
-# 2. `RGB(r, g, b)`-Calls mit Integer-Literalen 0..255. Variablen-Argumente
-#    sind nicht statisch aufloesbar und werden uebersprungen.
+#    1-5 Ziffern sind meist Bitmaske/Konstante, 7+ (ausser 8) ueberlaufen die
+#    Range -- in beiden Faellen kein Swatch.
+# 2. `&H` mit GENAU 8 Hex-Ziffern -- AARRGGBB (Alpha + Farbe, neue RGBA-Form).
+# 3. `RGB(r, g, b)` und `RGBA(r, g, b, a)` mit Integer-Literalen 0..255.
+#    Bei RGBA wird fuer die ANZEIGE nur RGB genutzt (deckend) -- man soll die
+#    gewaehlte Farbe sehen; das Alpha bleibt aber fuers Editieren erhalten.
 _HEX_COLOR_RE = re.compile(r"&H([0-9A-Fa-f]{6})(?![0-9A-Fa-f])")
+_HEXA_COLOR_RE = re.compile(r"&H([0-9A-Fa-f]{8})(?![0-9A-Fa-f])")
 _RGB_CALL_RE = re.compile(
     r"\bRGB\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", re.IGNORECASE,
+)
+_RGBA_CALL_RE = re.compile(
+    r"\bRGBA\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", re.IGNORECASE,
 )
 
 
@@ -432,9 +438,10 @@ class CodeEditor(
         """Liefert `(start_col, end_col, color, kind)` fuer alle erkannten
         Color-Literale in einer Zeile.
 
-        `end_col` ist der Spalten-Index DIREKT nach dem Literal (dort sitzt der
-        Swatch), `start_col` der Anfang (fuer das Ersetzen beim Color-Picker),
-        `kind` ist `"hex"` (`&HRRGGBB`) oder `"rgb"` (`RGB(r, g, b)`).
+        `start_col`/`end_col` umschliessen das Literal, `color` traegt die
+        gewaehlte Farbe (bei RGBA inkl. Alpha im QColor -- fuers Editieren),
+        `kind` ist `"hex"` (`&HRRGGBB`), `"hexa"` (`&HAARRGGBB`), `"rgb"`
+        (`RGB(r,g,b)`) oder `"rgba"` (`RGBA(r,g,b,a)`).
         """
         out: list[tuple[int, int, QColor, str]] = []
         for m in _HEX_COLOR_RE.finditer(text):
@@ -442,20 +449,34 @@ class CodeEditor(
                 v = int(m.group(1), 16)
             except ValueError:
                 continue
-            r = (v >> 16) & 0xFF
-            g = (v >> 8) & 0xFF
-            b = v & 0xFF
-            out.append((m.start(), m.end(), QColor(r, g, b), "hex"))
+            out.append((m.start(), m.end(),
+                        QColor((v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF), "hex"))
+        for m in _HEXA_COLOR_RE.finditer(text):
+            try:
+                v = int(m.group(1), 16)
+            except ValueError:
+                continue
+            a = (v >> 24) & 0xFF
+            a = 255 if a == 0 else a          # 0 = deckend (wie zur Laufzeit)
+            out.append((m.start(), m.end(),
+                        QColor((v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF, a), "hexa"))
         for m in _RGB_CALL_RE.finditer(text):
             try:
-                r = int(m.group(1))
-                g = int(m.group(2))
-                b = int(m.group(3))
+                r, g, b = int(m.group(1)), int(m.group(2)), int(m.group(3))
             except ValueError:
                 continue
             if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
                 continue
             out.append((m.start(), m.end(), QColor(r, g, b), "rgb"))
+        for m in _RGBA_CALL_RE.finditer(text):
+            try:
+                r, g, b, a = (int(m.group(1)), int(m.group(2)),
+                              int(m.group(3)), int(m.group(4)))
+            except ValueError:
+                continue
+            if not all(0 <= v <= 255 for v in (r, g, b, a)):
+                continue
+            out.append((m.start(), m.end(), QColor(r, g, b, a), "rgba"))
         return out
 
     def _rescan_color_literals(self) -> None:
@@ -493,15 +514,26 @@ class CodeEditor(
 
     def _edit_color_literal(self, abs_start: int, abs_end: int,
                             color: QColor, kind: str) -> None:
-        """Oeffnet den Farbwaehler und ersetzt das Literal im selben Format."""
+        """Oeffnet den Farbwaehler und ersetzt das Literal im selben Format.
+
+        Bei `rgba`/`hexa` ist der Alpha-Kanal im Dialog editierbar (vorbelegt
+        mit dem Literal-Alpha); die anderen Formen bleiben rein RGB."""
         from PySide6.QtWidgets import QColorDialog
-        new = QColorDialog.getColor(color, self, "Farbe waehlen")
+        has_alpha = kind in ("rgba", "hexa")
+        opts = QColorDialog.ColorDialogOption.ShowAlphaChannel if has_alpha \
+            else QColorDialog.ColorDialogOption(0)
+        new = QColorDialog.getColor(color, self, "Farbe waehlen", opts)
         if not new.isValid():
             return
+        r, g, b, al = new.red(), new.green(), new.blue(), new.alpha()
         if kind == "rgb":
-            repl = f"RGB({new.red()}, {new.green()}, {new.blue()})"
-        else:
-            repl = f"&H{new.red():02X}{new.green():02X}{new.blue():02X}"
+            repl = f"RGB({r}, {g}, {b})"
+        elif kind == "rgba":
+            repl = f"RGBA({r}, {g}, {b}, {al})"
+        elif kind == "hexa":
+            repl = f"&H{al:02X}{r:02X}{g:02X}{b:02X}"
+        else:  # "hex"
+            repl = f"&H{r:02X}{g:02X}{b:02X}"
         cur = QTextCursor(self.document())
         cur.setPosition(abs_start)
         cur.setPosition(abs_end, QTextCursor.MoveMode.KeepAnchor)
@@ -874,8 +906,11 @@ class CodeEditor(
         # Renderings) -- ueberdeckt nie Nachbar-Code und flackert nicht.
         for start, end, color, _kind in self._color_literals:
             cl_sel = QTextEdit.ExtraSelection()
-            cl_sel.format.setBackground(color)
-            cl_sel.format.setForeground(self._swatch_text_color(color))
+            # Hintergrund IMMER deckend zeichnen -- man soll die gewaehlte Farbe
+            # klar sehen (auch bei RGBA mit niedrigem Alpha).
+            opaque = QColor(color.red(), color.green(), color.blue())
+            cl_sel.format.setBackground(opaque)
+            cl_sel.format.setForeground(self._swatch_text_color(opaque))
             c = QTextCursor(self.document())
             c.setPosition(start)
             c.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
