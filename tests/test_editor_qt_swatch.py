@@ -1,11 +1,13 @@
-"""Tests fuer die Color-Swatches im Code-Editor.
+"""Tests fuer die Color-Literal-Hervorhebung im Code-Editor.
 
 Darstellung: Das Color-Literal (`&HRRGGBB` / `RGB(r,g,b)`) wird mit SEINER Farbe
-hinterlegt, die Schrift darueber in lesbarem Kontrast. Geprueft:
-1. Der farbige Hintergrund liegt ueber dem Literal und ragt NICHT in
-   anschliessenden Code hinein (kein Ueberdecken mehr).
-2. Die Schriftfarbe passt sich an (hell auf dunkel, dunkel auf hell).
-3. Der Hintergrund waechst mit der Schrift (Hoehe = Zeilenhoehe).
+hinterlegt, die Schrift darueber im Kontrast -- umgesetzt als `ExtraSelection`
+(Teil des Text-Renderings, daher kein Flackern/Verschwinden bei Teil-Repaints).
+Geprueft:
+1. Alle Literale im Dokument werden erkannt und gecacht (`_color_literals`).
+2. Jedes Literal liefert eine ExtraSelection mit Hintergrund = Farbe und
+   passender (kontrastreicher) Schriftfarbe.
+3. Die Schriftfarbe passt sich an (hell auf dunkel, dunkel auf hell).
 4. Die Flaeche ist anklickbar (`_swatch_at` trifft -> Farbwaehler).
 """
 import os
@@ -27,27 +29,33 @@ def _editor(app, text):
     from gamebasic.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(text)
-    ed.resize(900, 400)
+    ed.resize(1000, 400)
     ed.show()
     app.processEvents()
     return ed
 
 
-def _rect(ed, line, occ=0):
-    blk = ed.document().findBlockByNumber(line)
-    s, e, _c, _k = ed._scan_color_swatches(blk.text())[occ]
-    return ed._swatch_rect(blk, s, e)
+def test_all_literals_detected(app):
+    # Mehrere Literale pro Zeile, in Klammern, vor ':' -- alle muessen rein.
+    ed = _editor(app, "\n".join([
+        "a = &HBE64F0 : b = &HE44040 : c = &H46B4FF",
+        "CLS(&H05060F)",
+        "col = &HFF8800",
+        "x = RGB(255, 128, 0)",
+    ]))
+    # 3 + 1 + 1 + 1 = 6 Literale
+    assert len(ed._color_literals) == 6
+    kinds = [k for *_x, k in ed._color_literals]
+    assert kinds.count("hex") == 5 and kinds.count("rgb") == 1
 
 
-def test_background_covers_literal_width(app):
+def test_extra_selections_have_color_background(app):
     ed = _editor(app, "col = &HFF8800")
-    blk = ed.document().findBlockByNumber(0)
-    s, e, _c, _k = ed._scan_color_swatches(blk.text())[0]
-    r = ed._swatch_rect(blk, s, e)
-    lit_w = ed.fontMetrics().horizontalAdvance("&HFF8800")
-    # Hintergrund ~ Literalbreite (plus kleiner Innenabstand), Hoehe ~ Zeilenhoehe
-    assert r.width() >= lit_w
-    assert r.height() >= ed.fontMetrics().height() - 4
+    # Es gibt genau ein Literal -> eine ExtraSelection mit dessen Farbe als BG.
+    bgs = [s.format.background().color() for s in ed.extraSelections()
+           if s.format.background().style() != 0]
+    assert any(c.red() == 0xFF and c.green() == 0x88 and c.blue() == 0x00
+               for c in bgs)
 
 
 def test_contrast_text_color(app):
@@ -55,47 +63,31 @@ def test_contrast_text_color(app):
     ed = _editor(app, "x = 1")
     dark_bg = ed._swatch_text_color(QColor(10, 10, 10))      # dunkler Hintergrund
     light_bg = ed._swatch_text_color(QColor(240, 240, 240))  # heller Hintergrund
-    # auf Dunkel -> helle Schrift, auf Hell -> dunkle Schrift
-    assert dark_bg.lightness() > 200
-    assert light_bg.lightness() < 80
+    assert dark_bg.lightness() > 200      # auf Dunkel -> helle Schrift
+    assert light_bg.lightness() < 80      # auf Hell -> dunkle Schrift
 
 
-def test_does_not_overlap_following_code(app):
-    # Literale direkt vor ')' bzw. ' : ' -- der Hintergrund darf nie ueber das
-    # naechste Nicht-Leerzeichen hinausragen.
-    ed = _editor(app, "CLS(&H05060F)\na = &HBE64F0 : b = &HE44040")
-    doc = ed.document()
-    for ln in (0, 1):
-        blk = doc.findBlockByNumber(ln)
-        line = blk.text()
-        for s, e, _c, _k in ed._scan_color_swatches(line):
-            r = ed._swatch_rect(blk, s, e)
-            j = e
-            while j < len(line) and line[j] in " \t":
-                j += 1
-            if j < len(line):
-                next_x = ed._col_rect(blk, j).left()
-                assert r.right() <= next_x, f"Hintergrund ueberdeckt Code @ {e}"
-
-
-def test_scales_with_font(app):
-    from PySide6.QtGui import QFont
+def test_cache_updates_on_edit(app):
     ed = _editor(app, "col = &HFF8800")
-    h_small = _rect(ed, 0).height()
-    f = ed.font()
-    f.setPointSize(f.pointSize() + 8)
-    ed.setFont(f)
+    assert len(ed._color_literals) == 1
+    ed.set_text("a = 1\nb = 2")          # keine Literale mehr
     app.processEvents()
-    h_big = _rect(ed, 0).height()
-    assert h_big > h_small
+    assert ed._color_literals == []
+    ed.set_text("p = &H102030 : q = &H405060")
+    app.processEvents()
+    assert len(ed._color_literals) == 2
 
 
-def test_clickable_opens_picker(app, monkeypatch):
-    # Klick mitten auf das hinterlegte Literal muss den Farbwaehler ausloesen.
+def test_clickable_opens_picker(app):
+    # Klick mitten auf das Literal muss den Farbwaehler-Treffer liefern.
     ed = _editor(app, "col = &HFF8800")
-    r = _rect(ed, 0)
-    hit = ed._swatch_at(r.center())
+    start, end, _c, _k = ed._color_literals[0]
+    mid = (start + end) // 2
+    cur = ed.textCursor()
+    cur.setPosition(mid)
+    pos = ed.cursorRect(cur).center()
+    hit = ed._swatch_at(pos)
     assert hit is not None
-    abs_start, abs_end, color, kind = hit
+    _s, _e, color, kind = hit
     assert kind == "hex"
     assert color.red() == 0xFF and color.green() == 0x88 and color.blue() == 0x00

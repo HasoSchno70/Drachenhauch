@@ -172,6 +172,13 @@ class CodeEditor(
         # Find-Hits als ExtraSelections-Layer (separat von Current-Line).
         self._find_hits: list[tuple[int, int]] = []
 
+        # Color-Literale (&HRRGGBB / RGB(r,g,b)) -- als ExtraSelections gerendert
+        # (Hintergrund = die Farbe, Schrift im Kontrast). Cache wird bei jeder
+        # Text-Aenderung neu aufgebaut; gerendert wird ueber die Text-Engine,
+        # damit nichts flackert/verschwindet (kein Overlay-Clipping).
+        self._color_literals: list[tuple[int, int, QColor, str]] = []
+        self.textChanged.connect(self._rescan_color_literals)
+
         # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
         self._breakpoints: set[int] = set()
         # Conditional Breakpoints: Zeile -> GameBasic-Ausdruck (nur Zeilen
@@ -224,6 +231,7 @@ class CodeEditor(
         theme_signals.changed.connect(self._on_theme_changed)
 
         self._update_viewport_margins(0)
+        self._rescan_color_literals()
         self._highlight_current_line()
         self._rescan_fold_regions()
 
@@ -450,37 +458,22 @@ class CodeEditor(
             out.append((m.start(), m.end(), QColor(r, g, b), "rgb"))
         return out
 
-    def _col_rect(self, block, col: int) -> QRect:
-        """cursorRect an Spalte `col` in `block` (Viewport-Koordinaten)."""
-        cur = QTextCursor(self.document())
-        cur.setPosition(block.position() + col)
-        return self.cursorRect(cur)
-
-    # Horizontaler Innenabstand des Farb-Hintergrunds um das Literal (Pixel).
-    _SWATCH_PAD = 2
-
-    def _swatch_rect(self, block, start_col: int, end_col: int) -> QRect:
-        """Bildschirm-Rect des farbigen Hintergrunds fuer das Literal
-        `[start_col, end_col)`.
-
-        Der Hintergrund liegt GENAU ueber dem Literal selbst (plus kleinem
-        Innenabstand) -- so ueberdeckt er nie Nachbar-Code und waechst mit der
-        Schrift mit (Hoehe = Zeilenhoehe). Diese Flaeche ist zugleich der
-        Klick-Bereich fuer den Farbwaehler."""
-        start_r = self._col_rect(block, start_col)
-        end_r = self._col_rect(block, end_col)
-        pad = self._SWATCH_PAD
-        line = block.text()
-        # Innenabstand nur dort, wo ein Leerzeichen/Zeilenrand ist -- sonst
-        # wuerde der Hintergrund den direkt anschliessenden Code (z.B. `)` oder
-        # `:`) ueberdecken.
-        left_room = start_col == 0 or line[start_col - 1] in " \t"
-        right_room = end_col >= len(line) or line[end_col] in " \t"
-        x0 = start_r.left() - (pad if left_room else 0)
-        x1 = end_r.left() + (pad if right_room else 0)
-        top = start_r.top() + 1
-        h = max(1, start_r.height() - 2)
-        return QRect(x0, top, max(3, x1 - x0), h)
+    def _rescan_color_literals(self) -> None:
+        """Baut den Cache aller Color-Literale im Dokument neu auf (absolute
+        Positionen) und aktualisiert die ExtraSelections. Billig genug fuer
+        jeden Text-Change (Regex ueber kurze Zeilen)."""
+        lits: list[tuple[int, int, QColor, str]] = []
+        doc = self.document()
+        block = doc.firstBlock()
+        while block.isValid():
+            text = block.text()
+            if "&H" in text or "RGB" in text.upper():
+                base = block.position()
+                for s, e, color, kind in self._scan_color_swatches(text):
+                    lits.append((base + s, base + e, color, kind))
+            block = block.next()
+        self._color_literals = lits
+        self._refresh_extra_selections()
 
     @staticmethod
     def _swatch_text_color(color: QColor) -> QColor:
@@ -490,23 +483,12 @@ class CodeEditor(
         return QColor(25, 25, 25) if lum > 140 else QColor(240, 240, 240)
 
     def _swatch_at(self, pos) -> tuple | None:
-        """`(abs_start, abs_end, color, kind)` des Swatches unter `pos`
-        (Viewport-Koordinate) oder None."""
-        block = self.firstVisibleBlock()
-        offset = self.contentOffset()
-        vp_h = self.viewport().height()
-        while block.isValid():
-            br = self.blockBoundingGeometry(block).translated(offset)
-            if br.top() > vp_h:
-                break
-            text = block.text()
-            if block.isVisible() and br.bottom() >= 0 and (
-                    "&H" in text or "RGB" in text.upper()):
-                for start_col, end_col, color, kind in self._scan_color_swatches(text):
-                    if self._swatch_rect(block, start_col, end_col).contains(pos):
-                        return (block.position() + start_col,
-                                block.position() + end_col, color, kind)
-            block = block.next()
+        """`(abs_start, abs_end, color, kind)` des Color-Literals unter `pos`
+        (Viewport-Koordinate) oder None. Klick-Bereich = das Literal selbst."""
+        abs_pos = self.cursorForPosition(pos).position()
+        for start, end, color, kind in self._color_literals:
+            if start <= abs_pos < end:
+                return (start, end, color, kind)
         return None
 
     def _edit_color_literal(self, abs_start: int, abs_end: int,
@@ -527,12 +509,12 @@ class CodeEditor(
 
     def paintEvent(self, event):  # noqa: N802
         super().paintEvent(event)
-        # Nach dem normalen Text-Render-Pass: Indent-Guides + Color-Swatches.
+        # Nach dem normalen Text-Render-Pass: Indent-Guides. (Color-Literale
+        # laufen ueber ExtraSelections, nicht ueber diesen Overlay.)
         painter = QPainter(self.viewport())
         block = self.firstVisibleBlock()
         offset = self.contentOffset()
         viewport_h = self.viewport().height()
-        border = QColor(COLORS["border"])
         guide_color = QColor(COLORS["indent_guide"])
         # Pixel-Breite eines Spaces -- fuer die Indent-Guide-Positionen.
         space_w = self.fontMetrics().horizontalAdvance(" ")
@@ -559,24 +541,9 @@ class CodeEditor(
                 for i in range(1, n_guides + 1):
                     x = int(block_rect.left()) + space_w * INDENT_SPACES * i
                     painter.drawLine(x, top_y, x, bot_y)
-            # --- Color-Swatches: Literal mit seiner Farbe hinterlegen ----
-            # Hintergrund = die Farbe selbst, Schrift in lesbarem Kontrast
-            # darueber neu gezeichnet. Die Flaeche ist der Klick-Bereich.
-            if "&H" in text or "RGB" in text.upper():
-                painter.save()
-                painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-                painter.setFont(self.font())
-                ascent = self.fontMetrics().ascent()
-                for start_col, end_col, color, _kind in self._scan_color_swatches(text):
-                    rect = self._swatch_rect(block, start_col, end_col)
-                    painter.setPen(QColor(border))
-                    painter.setBrush(color)
-                    painter.drawRoundedRect(rect, 3, 3)
-                    painter.setPen(self._swatch_text_color(color))
-                    start_r = self._col_rect(block, start_col)
-                    painter.drawText(start_r.left(), start_r.top() + ascent,
-                                     text[start_col:end_col])
-                painter.restore()
+            # Color-Literale werden NICHT hier gezeichnet, sondern als
+            # ExtraSelections (Hintergrund+Schriftfarbe) -- so flackert nichts
+            # und nichts verschwindet bei Teil-Repaints (Cursor-Blinken/Scroll).
             block = block.next()
 
     # ----------------------------------------------- Live-Errors
@@ -902,6 +869,18 @@ class CodeEditor(
             c.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
             br_sel.cursor = c
             selections.append(br_sel)
+        # Color-Literale: das Literal selbst mit seiner Farbe hinterlegen, die
+        # Schrift darueber im Kontrast. Als ExtraSelection (Teil des Text-
+        # Renderings) -- ueberdeckt nie Nachbar-Code und flackert nicht.
+        for start, end, color, _kind in self._color_literals:
+            cl_sel = QTextEdit.ExtraSelection()
+            cl_sel.format.setBackground(color)
+            cl_sel.format.setForeground(self._swatch_text_color(color))
+            c = QTextCursor(self.document())
+            c.setPosition(start)
+            c.setPosition(end, QTextCursor.MoveMode.KeepAnchor)
+            cl_sel.cursor = c
+            selections.append(cl_sel)
         self.setExtraSelections(selections)
 
 
