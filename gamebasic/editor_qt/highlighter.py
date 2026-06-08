@@ -97,6 +97,59 @@ def classify_token(tok) -> str | None:
     return None
 
 
+# Highlight-Klasse -> COLORS-Schluessel (gemeinsame Quelle fuer Editor-Format,
+# Druck und Minimap, damit die Farben ueberall uebereinstimmen).
+CLASS_COLOR_KEY = {
+    "ctrl": "kw_ctrl", "decl": "kw_decl", "type": "type", "string": "string",
+    "number": "number", "comment": "comment", "builtin": "builtin",
+    "ident": "identifier", "bool": "bool",
+}
+
+
+def line_color_spans(text: str) -> list[tuple[int, int, str | None]]:
+    """`(start, length, klasse|None)`-Spans einer Zeile -- exakt die
+    Klassifikation des Editor-Highlighters (inkl. Kommentar + f-String).
+    `klasse` ist ein `classify_token`-Schluessel oder None (Operator/Default).
+    Genutzt von Listing-Druck und Minimap, damit deren Farben mit dem Code
+    uebereinstimmen.
+    """
+    n = len(text)
+    if n == 0:
+        return []
+    keys: list[str | None] = [None] * n
+    comment_start = GBHighlighter._find_comment_start(text)
+    lex_target = text if comment_start < 0 else text[:comment_start]
+    try:
+        tokens = Lexer(lex_target).tokenize()
+    except LexerError:
+        tokens = []
+    for tok in tokens:
+        start, length = GBHighlighter._token_span(text, tok)
+        if length <= 0:
+            continue
+        key = classify_token(tok)
+        if key is None:
+            continue
+        for i in range(start, min(start + length, n)):
+            keys[i] = key
+    for fstart, flen in GBHighlighter._find_fstring_ranges(lex_target):
+        for i in range(fstart, min(fstart + flen, n)):
+            keys[i] = "string"
+    if comment_start >= 0:
+        for i in range(comment_start, n):
+            keys[i] = "comment"
+    spans: list[tuple[int, int, str | None]] = []
+    i = 0
+    while i < n:
+        k = keys[i]
+        j = i + 1
+        while j < n and keys[j] == k:
+            j += 1
+        spans.append((i, j - i, k))
+        i = j
+    return spans
+
+
 def _make_format(color: str, *, bold: bool = False, italic: bool = False) -> QTextCharFormat:
     f = QTextCharFormat()
     f.setForeground(QColor(color))

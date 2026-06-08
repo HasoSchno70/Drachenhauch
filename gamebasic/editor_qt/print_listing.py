@@ -25,9 +25,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 
-from ..lexer import Lexer
-from ..errors import LexerError
-from .highlighter import GBHighlighter, classify_token
+from .highlighter import line_color_spans
 from .icons import icons
 
 
@@ -48,52 +46,10 @@ _DEFAULT_COLOR = "#1A1A1A"
 
 
 def _line_spans(line: str) -> list[tuple[int, int, str | None]]:
-    """Zerlegt eine Zeile in (start, length, klasse)-Spans.
-
-    Spiegelt die Logik von :meth:`GBHighlighter.highlightBlock`: Kommentar
-    abtrennen, den Rest lexen, f-Strings als String uebermalen. Liefert eine
-    luecken-/ueberlappungsfreie Span-Liste in Reihenfolge.
-    """
-    n = len(line)
-    if n == 0:
-        return []
-    keys: list[str | None] = [None] * n
-
-    comment_start = GBHighlighter._find_comment_start(line)
-    lex_target = line if comment_start < 0 else line[:comment_start]
-
-    try:
-        tokens = Lexer(lex_target).tokenize()
-    except LexerError:
-        tokens = []
-    for tok in tokens:
-        start, length = GBHighlighter._token_span(line, tok)
-        if length <= 0:
-            continue
-        key = classify_token(tok)
-        if key is None:
-            continue
-        for i in range(start, min(start + length, n)):
-            keys[i] = key
-
-    for fstart, flen in GBHighlighter._find_fstring_ranges(lex_target):
-        for i in range(fstart, min(fstart + flen, n)):
-            keys[i] = "string"
-
-    if comment_start >= 0:
-        for i in range(comment_start, n):
-            keys[i] = "comment"
-
-    spans: list[tuple[int, int, str | None]] = []
-    i = 0
-    while i < n:
-        k = keys[i]
-        j = i + 1
-        while j < n and keys[j] == k:
-            j += 1
-        spans.append((i, j - i, k))
-        i = j
-    return spans
+    """(start, length, klasse)-Spans einer Zeile -- delegiert an die
+    gemeinsame Quelle `highlighter.line_color_spans` (gleiche Klassifikation
+    wie Editor + Minimap)."""
+    return line_color_spans(line)
 
 
 def build_listing_html(text: str, *, color: bool, line_numbers: bool,

@@ -18,11 +18,15 @@ from PySide6.QtCore import QRect, Qt, QTimer
 from PySide6.QtGui import QColor, QMouseEvent, QPainter, QPen
 from PySide6.QtWidgets import QPlainTextEdit, QWidget
 
+from .highlighter import CLASS_COLOR_KEY, line_color_spans
 from .theme import COLORS, theme_signals
 
 
 # Skalierung: 1 Buffer-Zeile = `LINE_HEIGHT_PX` Minimap-Pixel.
 LINE_HEIGHT_PX = 2
+# Ab dieser Zeilenzahl wird NICHT mehr pro Token gefaerbt (zu teuer beim
+# Lexen aller Zeilen) -> einfarbige Striche wie frueher.
+COLOR_MAX_LINES = 6000
 # Maximale Pixel-Breite eines Strichs (Code-Zeilen werden auf diese Breite
 # normalisiert).
 MAX_LINE_WIDTH = 90
@@ -39,7 +43,9 @@ class Minimap(QWidget):
         self.setMouseTracking(True)
         self.setCursor(Qt.CursorShape.OpenHandCursor)
 
-        self._lines: list[tuple[int, int]] = []  # (indent_chars, content_chars)
+        # Pro Zeile: Liste farbiger Segmente (start_col, len_chars, klasse|None).
+        # Leerzeichen-Runs sind bereits entfernt -> nur sichtbare Token.
+        self._segs: list[list[tuple[int, int, str | None]]] = []
         self._dragging = False
 
         # Debounce: bei textChanged 150 ms warten, dann re-render.
@@ -59,11 +65,24 @@ class Minimap(QWidget):
 
     def _rebuild_lines(self) -> None:
         text = self.editor.toPlainText()
-        self._lines = []
-        for raw in text.split("\n"):
-            indent = len(raw) - len(raw.lstrip(" \t"))
-            content = len(raw.rstrip())
-            self._lines.append((indent, content))
+        lines = text.split("\n")
+        self._segs = []
+        colorize = len(lines) <= COLOR_MAX_LINES
+        for raw in lines:
+            if not raw.strip():
+                self._segs.append([])
+                continue
+            if colorize:
+                segs = [
+                    (start, length, key)
+                    for (start, length, key) in line_color_spans(raw)
+                    if raw[start:start + length].strip()   # Whitespace-Runs weg
+                ]
+            else:
+                # Fallback (sehr grosse Datei): ein einziger neutraler Strich.
+                indent = len(raw) - len(raw.lstrip(" \t"))
+                segs = [(indent, len(raw.rstrip()) - indent, None)]
+            self._segs.append(segs)
         self.update()
 
     # ----------------------------------------------------- Painting
@@ -72,10 +91,10 @@ class Minimap(QWidget):
         c = COLORS
         painter.fillRect(self.rect(), QColor(c["bg_alt"]))
 
-        if not self._lines:
+        if not self._segs:
             return
 
-        total = len(self._lines)
+        total = len(self._segs)
         view_h = self.height()
         # Wie viel Buffer passt vertikal in die Minimap?
         max_lines_visible = max(1, view_h // LINE_HEIGHT_PX)
@@ -94,17 +113,27 @@ class Minimap(QWidget):
             offset_first = max(0, min(total - max_lines_visible, first_visible - max_lines_visible // 4))
             scale = 1.0
 
-        line_color = QColor(c["fg"])
-        line_color.setAlpha(140)
-        painter.setPen(line_color)
+        # Token-Klasse -> QColor (aus dem aktiven Theme; None = Default-Vordergrund).
+        col_cache: dict[str | None, QColor] = {}
 
+        def color_for(key: str | None) -> QColor:
+            if key not in col_cache:
+                qc = QColor(c.get(CLASS_COLOR_KEY.get(key, ""), c["fg"]))
+                qc.setAlpha(225)
+                col_cache[key] = qc
+            return col_cache[key]
+
+        left_pad = 3
+        x_max = MINIMAP_WIDTH - 3
         y = 0
         for i in range(offset_first, min(total, offset_first + max_lines_visible)):
-            indent, content = self._lines[i]
-            if content > 0:
-                # Linke Position: 4 px + indent-skaliert
-                x_start = 4 + min(indent, 40)
-                x_end = min(MINIMAP_WIDTH - 6, x_start + min(content - indent, MAX_LINE_WIDTH))
+            # 1 Pixel pro Zeichen; jedes Token als kurzer farbiger Strich.
+            for start, length, key in self._segs[i]:
+                x_start = left_pad + start
+                if x_start >= x_max:
+                    break
+                x_end = min(x_max, x_start + length)
+                painter.setPen(color_for(key))
                 painter.drawLine(x_start, y + 1, x_end, y + 1)
             y += int(LINE_HEIGHT_PX * scale)
 

@@ -287,11 +287,7 @@ Activity Bar 🧭. Zeigt alle `SUB`/`FUNCTION`/`CLASS`/`STRUCT`-Deklarationen de
 
 ## Minimap
 
-Rechts vom Code, vor der Scrollbar, blendet eine Vorschau der gesamten Datei ein. Pro Zeile eine kurze farbige Linie:
-
-- **Akzentfarbe** für Deklarations-Zeilen (`SUB`, `FUNCTION`, `CLASS`, `STRUCT`, `ENUM`, `IMPORT`, `CONST`)
-- **Comment-Farbe** für Kommentar-Zeilen (`'…` oder `REM`)
-- **Vordergrund-Farbe** für normalen Code
+Rechts vom Code, vor der Scrollbar, blendet eine Vorschau der gesamten Datei ein. Jede Zeile wird **pro Token syntaxfarbig** gezeichnet — in **denselben Farben wie der Code selbst** (Schlüsselwörter, Typen, Strings, Zahlen, Built-ins, Kommentare …, über dieselbe Klassifikation wie der Editor-Highlighter). So spiegelt die Übersicht die Code-Struktur inkl. Einrückung wider. (Sehr große Dateien ab ~6000 Zeilen fallen aus Performance-Gründen auf einfarbige Striche zurück.)
 
 Ein durchscheinendes Rechteck markiert den aktuellen Sichtbereich. Klick oder Drag in der Minimap scrollt den Editor zur entsprechenden Zeile (geklickte Zeile wird mittig ausgerichtet). Mausrad scrollt synchron zum Editor.
 
