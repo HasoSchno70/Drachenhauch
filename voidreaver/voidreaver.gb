@@ -1,0 +1,202 @@
+' =====================================================================
+'  VOIDREAVER -- Co-op 3D-Arena-Roguelite
+'  STUFE 1: Vertikale Scheibe -- 3D-Arena, Twin-Stick-Bewegung,
+'           verfolgende Kamera, Beleuchtung (PBR-Held + Schatten-Stimmung).
+'
+'  Steuerung:
+'    Bewegen : WASD / Pfeiltasten   (oder linker Gamepad-Stick)
+'    Zielen  : Maus-Richtung         (oder rechter Gamepad-Stick)
+'    Beenden : ESC
+'
+'  Native-only (3D): gbrun.py --native voidreaver\voidreaver.gb  (oder F6)
+' =====================================================================
+
+IMPORT "g3d"
+IMPORT "input"
+
+CONST SCR_W = 960
+CONST SCR_H = 600
+CONST ARENA = 18.0          ' halbe Arena-Kantenlaenge (Spielfeld -ARENA..+ARENA)
+CONST PLAYER_R = 0.6
+CONST MOVE_SPEED = 11.0     ' Welt-Einheiten pro Sekunde
+
+SCREEN(SCR_W, SCR_H, "VOIDREAVER -- Stufe 1", 1)
+SETFPS(60)
+
+' --- Input-Bindings ---------------------------------------------------
+INPUT_BIND("move_left",  KEY_LEFT,  KEY_A)
+INPUT_BIND("move_right", KEY_RIGHT, KEY_D)
+INPUT_BIND("move_up",    KEY_UP,    KEY_W)
+INPUT_BIND("move_down",  KEY_DOWN,  KEY_S)
+
+' --- Beleuchtung ------------------------------------------------------
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H2A3242, 1.0)                        ' kuehles blaues Umgebungslicht
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.35, &HFFE8C8)      ' warme "Sonne" von schraeg oben
+DIM glow AS INTEGER
+glow = LIGHT_POINT(0, 2.5, 0, &H30E0FF)             ' Spieler-Eigenleuchten (cyan)
+
+' --- Meshes (einmal erzeugen, oft zeichnen) ---------------------------
+DIM ground AS INTEGER
+DIM player AS INTEGER
+DIM pillar AS INTEGER
+DIM aimdot AS INTEGER
+
+ground = MESH_PLANE(ARENA * 2.0, ARENA * 2.0, 1, 1)
+MODEL_LIT(ground)
+
+player = MESH_SPHERE(PLAYER_R, 28, 28)
+MODEL_LIT(player)
+MODEL_PBR(player, 0.9, 0.22)                         ' glaenzendes Metall
+
+pillar = MESH_CUBE(2.0, 4.0, 2.0)
+MODEL_LIT(pillar)
+MODEL_PBR(pillar, 0.1, 0.8)                          ' matter Stein
+
+aimdot = MESH_SPHERE(0.18, 12, 12)
+MODEL_LIT(aimdot)
+
+' --- Saeulen als Hindernisse (feste Positionen) -----------------------
+CONST N_PILLARS = 5
+DIM pillar_x[5] AS FLOAT
+DIM pillar_z[5] AS FLOAT
+pillar_x[0] = -9.0 : pillar_z[0] = -7.0
+pillar_x[1] =  9.0 : pillar_z[1] = -7.0
+pillar_x[2] = -9.0 : pillar_z[2] =  7.0
+pillar_x[3] =  9.0 : pillar_z[3] =  7.0
+pillar_x[4] =  0.0 : pillar_z[4] =  0.0
+
+' --- Spieler-Zustand --------------------------------------------------
+DIM px AS FLOAT
+DIM pz AS FLOAT
+DIM facing_x AS FLOAT
+DIM facing_z AS FLOAT
+px = 0.0
+pz = 8.0
+facing_x = 0.0
+facing_z = -1.0
+
+' --- Kamera-Zustand (folgt dem Spieler weich) -------------------------
+DIM cam_x AS FLOAT
+DIM cam_z AS FLOAT
+cam_x = px
+cam_z = pz + 12.0
+
+DIM t AS FLOAT
+t = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+
+    DIM dt AS FLOAT
+    dt = DELTA()
+    IF dt > 0.05 THEN dt = 0.05      ' grosse Frame-Spikes daempfen
+    t = t + dt
+
+    ' --- Bewegung (Twin-Stick links: Tastatur ODER Gamepad) ----------
+    INPUT_UPDATE()
+    DIM mx AS FLOAT
+    DIM mz AS FLOAT
+    mx = INPUT_AXIS("move_left", "move_right")
+    mz = INPUT_AXIS("move_up", "move_down")          ' up = -z (nach hinten)
+
+    ' Gamepad-Stick ueberschreibt, falls ausgelenkt.
+    DIM jx AS FLOAT
+    DIM jy AS FLOAT
+    jx = INPUT_JOY_AXIS(0, "left_x")
+    jy = INPUT_JOY_AXIS(0, "left_y")
+    IF ABS(jx) > 0.2 OR ABS(jy) > 0.2 THEN
+        mx = jx
+        mz = jy
+    END IF
+
+    ' Diagonale normalisieren, damit schraeg nicht schneller ist.
+    DIM mlen AS FLOAT
+    mlen = SQR(mx * mx + mz * mz)
+    IF mlen > 1.0 THEN
+        mx = mx / mlen
+        mz = mz / mlen
+    END IF
+
+    px = px + mx * MOVE_SPEED * dt
+    pz = pz + mz * MOVE_SPEED * dt          ' move_up liefert +1 -> -z weiter unten gespiegelt
+
+    ' Bewegung "move_up" soll nach hinten (-z) gehen:
+    ' INPUT_AXIS(up,down) = -1 bei up, +1 bei down -> passt direkt zu +z=vorne.
+
+    ' In Arena-Grenzen halten.
+    IF px < -ARENA + PLAYER_R THEN px = -ARENA + PLAYER_R
+    IF px >  ARENA - PLAYER_R THEN px =  ARENA - PLAYER_R
+    IF pz < -ARENA + PLAYER_R THEN pz = -ARENA + PLAYER_R
+    IF pz >  ARENA - PLAYER_R THEN pz =  ARENA - PLAYER_R
+
+    ' --- Simple Saeulen-Kollision (wegschieben) ----------------------
+    DIM pk AS INTEGER
+    FOR pk = 0 TO N_PILLARS - 1
+        DIM dx AS FLOAT
+        DIM dz AS FLOAT
+        dx = px - pillar_x[pk]
+        dz = pz - pillar_z[pk]
+        DIM d AS FLOAT
+        d = SQR(dx * dx + dz * dz)
+        DIM mind AS FLOAT
+        mind = PLAYER_R + 1.2          ' Saeule halbe Breite ~1.0 + etwas Luft
+        IF d < mind AND d > 0.001 THEN
+            px = pillar_x[pk] + dx / d * mind
+            pz = pillar_z[pk] + dz / d * mind
+        END IF
+    NEXT
+
+    ' --- Zielen: Maus-Bildschirmposition relativ zur Mitte -----------
+    DIM ax AS FLOAT
+    DIM az AS FLOAT
+    ax = MOUSEX() - SCR_W / 2.0
+    az = MOUSEY() - SCR_H / 2.0
+    ' Rechter Stick ueberschreibt.
+    DIM rjx AS FLOAT
+    DIM rjy AS FLOAT
+    rjx = INPUT_JOY_AXIS(0, "right_x")
+    rjy = INPUT_JOY_AXIS(0, "right_y")
+    IF ABS(rjx) > 0.2 OR ABS(rjy) > 0.2 THEN
+        ax = rjx
+        az = rjy
+    END IF
+    DIM alen AS FLOAT
+    alen = SQR(ax * ax + az * az)
+    IF alen > 0.001 THEN
+        facing_x = ax / alen
+        facing_z = az / alen
+    END IF
+
+    ' --- Kamera folgt weich (exponentielles Lerp) --------------------
+    DIM follow AS FLOAT
+    follow = 1.0 - POW(0.0001, dt)        ' framerate-unabhaengiges Smoothing
+    cam_x = cam_x + (px - cam_x) * follow
+    cam_z = cam_z + ((pz + 12.0) - cam_z) * follow
+
+    ' --- Punktlicht an den Spieler heften ----------------------------
+    LIGHT_SET_POS(glow, px, 2.5, pz)
+
+    ' ================= ZEICHNEN ======================================
+    CLS(&H0A0E16)
+    CAMERA3D(cam_x, 17.0, cam_z,  px, 0.0, pz,  45.0)
+
+    GRID3D(36, 1.0)
+    MODEL(ground, 0, 0, 0, 1.0, &H141B28)
+
+    ' Saeulen.
+    FOR pk = 0 TO N_PILLARS - 1
+        MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
+    NEXT
+
+    ' Spieler + Ziel-Marker davor.
+    MODEL(player, px, PLAYER_R, pz, 1.0, &H30C0E0)
+    MODEL(aimdot, px + facing_x * 1.6, PLAYER_R, pz + facing_z * 1.6, 1.0, &HFFD040)
+
+    ' --- 2D-HUD obenauf ----------------------------------------------
+    TEXT(12, 10, "VOIDREAVER  -- Stufe 1: 3D-Arena + Twin-Stick", WHITE)
+    TEXT(12, 32, "WASD/Pfeile bewegen . Maus/Stick zielen . ESC beendet", &H88AACC)
+    TEXT(12, SCR_H - 26, f"pos ({px:.1f}, {pz:.1f})   fps {FPS()}", &H66FFCC)
+
+    FLIP()
+WEND
