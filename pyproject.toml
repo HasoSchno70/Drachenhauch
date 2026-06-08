@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gamebasic"
-version = "0.1.0"
+version = "2026.1"
 description = "GameBasic - eine BASIC-artige Sprache fuer die Spieleentwicklung"
 requires-python = ">=3.10"
-authors = [{ name = "Hans" }]
+authors = [{ name = "Hans Schnorrenberger" }]
 readme = { text = "GameBasic - BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, fuer Spiele.", content-type = "text/plain" }
 classifiers = [
     "Programming Language :: Python :: 3",
