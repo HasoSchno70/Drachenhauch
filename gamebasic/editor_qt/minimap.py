@@ -30,7 +30,7 @@ COLOR_MAX_LINES = 6000
 # Maximale Pixel-Breite eines Strichs (Code-Zeilen werden auf diese Breite
 # normalisiert).
 MAX_LINE_WIDTH = 90
-MINIMAP_WIDTH = 110
+MINIMAP_WIDTH = 168
 
 
 class Minimap(QWidget):
