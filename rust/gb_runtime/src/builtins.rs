@@ -18,6 +18,29 @@ fn err(msg: impl Into<String>) -> R {
     Err(msg.into())
 }
 
+/// Loest einen (relativen) Asset-Pfad auf. Existiert die Datei wie angegeben,
+/// bleibt der Pfad unveraendert. Sonst werden fuehrende `../` (bzw. `..\`)
+/// Schritt fuer Schritt abgestreift und erneut geprueft.
+///
+/// Hintergrund: Beim Standalone-Export werden Assets normalisiert ins Bundle
+/// kopiert (`../assets/x` -> `<bundle>/assets/x`), waehrend der gebuendelte
+/// Code weiterhin den Original-Pfad `../assets/x` verwendet und vom Exe-
+/// Verzeichnis aus laeuft. Diese Aufloesung findet die gebuendelte Kopie. Im
+/// Dev-Modus (Original existiert) bleibt alles unveraendert.
+pub fn resolve_asset_path(p: &str) -> String {
+    if p.is_empty() || std::path::Path::new(p).exists() {
+        return p.to_string();
+    }
+    let mut rest = p;
+    while let Some(t) = rest.strip_prefix("../").or_else(|| rest.strip_prefix("..\\")) {
+        if std::path::Path::new(t).exists() {
+            return t.to_string();
+        }
+        rest = t;
+    }
+    p.to_string()
+}
+
 // --- PRNG fuer RND/RANDOMIZE (nicht-deterministisch wie Python; NICHT
 // bit-identisch -- Programme mit RND ohne Seed sind erwartet unterschiedlich).
 thread_local! {
@@ -1603,7 +1626,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
 
         // ===== Core File-I/O =====
-        "fileexists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(need_str(&a[0], "FILEEXISTS")?).is_file())) }
+        "fileexists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "FILEEXISTS")?)).is_file())) }
         // Datei-Mgmt + Pfad-Zerlegung (ergaenzt die WP3-Pfad-API DIRLIST/RENAME/
         // PATHJOIN/MKDIR/DIREXISTS weiter unten -- KEINE Duplikate anlegen!).
         "copyfile" => {

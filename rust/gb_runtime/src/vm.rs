@@ -3083,7 +3083,8 @@ impl<'p> Vm<'p> {
             "shader_load" => {
                 // SHADER_LOAD(quelle$): Datei-Pfad ODER GLSL-Quelltext.
                 let arg = gs(a, 0, "SHADER_LOAD")?;
-                let code = match std::fs::read_to_string(arg) {
+                let resolved = crate::builtins::resolve_asset_path(arg);
+                let code = match std::fs::read_to_string(&resolved) {
                     Ok(text) => text,
                     Err(_) => arg.to_string(), // kein Pfad -> als Code behandeln
                 };

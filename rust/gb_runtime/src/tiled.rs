@@ -414,6 +414,8 @@ In Tiled: Edit -> Preferences -> 'Store tile layer data as: CSV' und Map neu spe
 
 /// Laedt eine Tiled-JSON-Map (Pfad relativ zum cwd).
 pub fn load(path: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
+    let resolved = crate::builtins::resolve_asset_path(path);
+    let path = resolved.as_str();
     let text = std::fs::read_to_string(path)
         .map_err(|e| {
             if e.kind() == std::io::ErrorKind::NotFound {

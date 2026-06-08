@@ -145,6 +145,8 @@ impl Audio {
     }
 
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         let s = self.dev.new_sound(path).map_err(|e| format!("LOADSOUND: {}", e))?;
         self.sounds.push(s);
         self.sound_vol.push(1.0);
@@ -171,6 +173,8 @@ impl Audio {
     /// Laedt + startet einen Musik-Stream. Ersetzt eine evtl. laufende Musik
     /// (es gibt genau einen Stream gleichzeitig). Musik loopt (raylib-Default).
     pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         if let Some(m) = self.music.take() { m.stop_stream(); }
         let m = self.dev.new_music(path).map_err(|e| format!("PLAYMUSIC: {}", e))?;
         let v = volume.clamp(0.0, 1.0) as f32;

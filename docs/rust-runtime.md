@@ -889,7 +889,19 @@ Argumente aus fremdem Verzeichnis** gestartet, lädt das mitkopierte
 `assets/heightmap.png` und rendert das Terrain (Screenshot). Dev-Modus
 (`--native`, Konsolen-Programme bit-identisch) bleibt unverändert.
 
-**Grenzen:** Assets müssen unter `assets/` liegen (werden sonst nicht kopiert).
+**Asset-Bündelung:** Der Export kopiert (a) einen `assets/`-Ordner neben der
+Quelle wie gehabt UND (b) **jede im Quelltext als String-Literal referenzierte
+Datei**, die relativ zur Quelle existiert — auch über `../` (z. B. ein Spiel in
+`code/` mit `LOADIMAGE("../assets/sprites/x.png")` und Assets in `../assets/`).
+Solche Pfade werden mit abgestreiftem `../` ins Bundle gelegt (`assets/sprites/x.png`).
+Zur Laufzeit findet `resolve_asset_path` (builtins.rs) die gebündelte Kopie:
+existiert der Original-Pfad nicht, werden führende `../` abgestreift und erneut
+gesucht — greift bei LOADIMAGE/LOADSOUND/PLAYMUSIC/SHADER_LOAD/LOADMODEL/
+TILED_LOAD/LOAD_ASSETS/ATLAS_LOAD/FILEEXISTS/LIGHT_ENV_HDR. Im Dev-Modus (Original
+existiert) ändert sich nichts. Absolute Pfade werden nicht gebündelt.
+
+**Grenzen:** Nur String-**Literale** werden erkannt (zur Laufzeit
+zusammengesetzte Pfade nicht — dann Assets manuell in den Ausgabeordner kopieren).
 Die `.gbc` ist unkomprimiert eingebettet (JSON); die Exe-Größe entspricht
 `gbrt` + Bytecode. Cross-Compiling ist nicht vorgesehen — der Export bündelt das
 `gbrt` der aktuellen Plattform.

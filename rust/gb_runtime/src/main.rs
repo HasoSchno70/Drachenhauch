@@ -582,8 +582,77 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
             eprintln!("Warnung: assets/ nicht vollstaendig kopiert: {}", e);
         }
     }
+    // 4b) Zusaetzlich alle im Quelltext referenzierten Dateien einsammeln --
+    // auch ueber `../` (z.B. LOADIMAGE("../assets/sprites/x.png")). Sie werden
+    // mit abgestreiftem `../` ins Bundle gelegt; zur Laufzeit findet die
+    // Pfad-Aufloesung (resolve_asset_path) sie dort wieder.
+    let n = bundle_referenced_assets(&raw_source, &base, &out);
+    if n > 0 {
+        println!("  {} referenzierte Asset-Datei(en) mitkopiert.", n);
+    }
     println!("Exportiert: {}", out_exe.display());
     ExitCode::SUCCESS
+}
+
+/// Streift fuehrende `../` / `./` (und `\`-Varianten) von einem relativen Pfad
+/// ab -> die Position INNERHALB des Bundles.
+fn strip_parent_prefix(p: &str) -> String {
+    let mut s = p.replace('\\', "/");
+    loop {
+        if let Some(t) = s.strip_prefix("../").map(str::to_string) { s = t; }
+        else if let Some(t) = s.strip_prefix("./").map(str::to_string) { s = t; }
+        else { break; }
+    }
+    s
+}
+
+/// Liefert alle String-Literale (Inhalt zwischen `"..."`, mit GB-Escape `""`).
+fn string_literals(src: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut chars = src.chars().peekable();
+    let mut cur = String::new();
+    let mut in_str = false;
+    while let Some(c) = chars.next() {
+        if in_str {
+            if c == '"' {
+                if chars.peek() == Some(&'"') { cur.push('"'); chars.next(); }
+                else { out.push(std::mem::take(&mut cur)); in_str = false; }
+            } else {
+                cur.push(c);
+            }
+        } else if c == '"' {
+            in_str = true;
+            cur.clear();
+        }
+    }
+    out
+}
+
+/// Kopiert alle im Quelltext als String-Literal referenzierten, relativ zu
+/// `base` existierenden Dateien/Ordner ins Bundle (`out`), mit abgestreiftem
+/// `../`. Liefert die Anzahl kopierter Dateien.
+fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::path::Path) -> usize {
+    let mut seen = std::collections::HashSet::new();
+    let mut count = 0usize;
+    for lit in string_literals(source) {
+        if lit.is_empty() || lit.len() > 400 { continue; }
+        // Absolute Pfade ueberspringen (nicht buendelbar): /... oder C:\...
+        if lit.starts_with('/') || lit.starts_with('\\') { continue; }
+        let b = lit.as_bytes();
+        if b.len() >= 2 && b[1] == b':' { continue; }   // C:\ / D:/
+        let src = base.join(&lit);
+        if !src.exists() { continue; }
+        let rel = strip_parent_prefix(&lit);
+        if rel.is_empty() || !seen.insert(rel.clone()) { continue; }
+        let dst = out.join(&rel);
+        if src.is_dir() {
+            if copy_dir_recursive(&src, &dst).is_ok() { count += 1; }
+        } else {
+            if let Some(p) = dst.parent() { let _ = std::fs::create_dir_all(p); }
+            if std::fs::copy(&src, &dst).is_ok() { count += 1; }
+        }
+    }
+    count
 }
 
 /// Laedt eine `.gbc` (JSON-Text) und fuehrt sie aus. Geteilt zwischen Dev-Modus

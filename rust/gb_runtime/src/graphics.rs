@@ -1022,6 +1022,8 @@ impl Graphics {
     // --- 3D-Modelle ---
     /// Laedt ein Modell von Datei (OBJ/GLTF/...) -> MODEL-Handle (Index).
     pub fn load_model(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         let m = self.rl.load_model(&self.thread, path)
             .map_err(|e| format!("LOADMODEL: '{}' nicht ladbar: {}", path, e))?;
         self.models.push(m);
@@ -1402,6 +1404,8 @@ impl Graphics {
     /// (= envIntensity; 0 = aus). Idempotent: weitere Aufrufe setzen nur die
     /// Intensitaet (kein Neu-Generieren).
     pub fn light_env_hdr(&mut self, path: &str, intensity: f64) -> Result<(), String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         if self.light_shader.is_none() { self.light_enable(); }
         self.env_intensity = intensity.max(0.0) as f32;
         if self.use_ibl_maps { return Ok(()); }
@@ -1818,6 +1822,8 @@ impl Graphics {
     pub fn text_height(&self) -> i32 { self.text_size }
 
     pub fn load_texture(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         if let Some(&h) = self.image_cache.get(path) { return Ok(h); }
         // CPU-Image laden (fuer imgfx) + GPU-Textur daraus.
         let img = Image::load_image(path).map_err(|e| format!("LOADIMAGE: {}", e))?;
@@ -1934,6 +1940,8 @@ impl Graphics {
 
     // --- LOAD_ASSETS: Bilder aus JSON-Manifest vorladen (Alias/Pfad-Cache) ---
     pub fn load_assets(&mut self, manifest_path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(manifest_path);
+        let manifest_path = resolved.as_str();
         let text = std::fs::read_to_string(manifest_path)
             .map_err(|_| format!("LOAD_ASSETS: Manifest nicht gefunden: {}", manifest_path))?;
         let json: serde_json::Value = serde_json::from_str(&text)
@@ -1964,6 +1972,8 @@ impl Graphics {
 
     // --- Sprite-Atlas ---
     pub fn atlas_load(&mut self, manifest_path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(manifest_path);
+        let manifest_path = resolved.as_str();
         let text = std::fs::read_to_string(manifest_path)
             .map_err(|_| format!("ATLAS_LOAD: Manifest nicht gefunden: {}", manifest_path))?;
         let json: serde_json::Value = serde_json::from_str(&text)
