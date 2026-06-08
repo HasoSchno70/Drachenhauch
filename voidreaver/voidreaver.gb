@@ -172,6 +172,42 @@ pillar_x[2] = -9.0 : pillar_z[2] =  7.0
 pillar_x[3] =  9.0 : pillar_z[3] =  7.0
 pillar_x[4] =  0.0 : pillar_z[4] =  0.0
 
+' --- Navigation: Flow-Field-Grid (BFS, Saeulen = Waende) --------------
+'   Alle Gegner teilen sich EIN Distanzfeld zum Spieler (per BFS), statt
+'   ASTAR_FIND pro Gegner. Sie folgen dem Gradienten -> laufen um Saeulen.
+CONST CELL = 1.5
+CONST GRID = 24                      ' 24 * 1.5 = 36 = 2 * ARENA
+CONST NCELLS = 576                   ' GRID * GRID
+DIM wallc[576] AS INTEGER            ' 1 = blockiert (Saeule)
+DIM distc[576] AS INTEGER            ' BFS-Distanz zum Spieler, -1 = unerreicht
+DIM bfsq[576] AS INTEGER            ' BFS-Queue
+
+DIM gz AS INTEGER
+DIM gx AS INTEGER
+FOR gz = 0 TO GRID - 1
+    FOR gx = 0 TO GRID - 1
+        DIM wcx AS FLOAT
+        DIM wcz AS FLOAT
+        wcx = -ARENA + (gx + 0.5) * CELL
+        wcz = -ARENA + (gz + 0.5) * CELL
+        DIM blocked AS INTEGER
+        blocked = 0
+        DIM wp AS INTEGER
+        FOR wp = 0 TO N_PILLARS - 1
+            DIM wdx AS FLOAT
+            DIM wdz AS FLOAT
+            wdx = wcx - pillar_x[wp]
+            wdz = wcz - pillar_z[wp]
+            IF SQR(wdx * wdx + wdz * wdz) < 1.7 THEN blocked = 1
+        NEXT
+        wallc[gz * GRID + gx] = blocked
+    NEXT
+NEXT
+
+DIM last_pcx AS INTEGER
+DIM last_pcz AS INTEGER
+last_pcx = -1 : last_pcz = -1
+
 ' --- Spieler / Kamera ---
 DIM px AS FLOAT
 DIM pz AS FLOAT
@@ -317,14 +353,127 @@ WHILE NOT QUITREQUESTED()
     DIM stepd AS FLOAT
     stepd = ENEMY_SPEED * dt
     DIM i AS INTEGER
+
+    ' --- Flow-Field neu berechnen, wenn der Spieler die Zelle wechselt ---
+    DIM pcx AS INTEGER
+    DIM pcz AS INTEGER
+    pcx = INT((px + ARENA) / CELL)
+    pcz = INT((pz + ARENA) / CELL)
+    IF pcx < 0 THEN pcx = 0
+    IF pcx > GRID - 1 THEN pcx = GRID - 1
+    IF pcz < 0 THEN pcz = 0
+    IF pcz > GRID - 1 THEN pcz = GRID - 1
+    IF pcx <> last_pcx OR pcz <> last_pcz THEN
+        last_pcx = pcx
+        last_pcz = pcz
+        FOR i = 0 TO NCELLS - 1
+            distc[i] = -1
+        NEXT
+        DIM head AS INTEGER
+        DIM tail AS INTEGER
+        head = 0 : tail = 0
+        DIM start AS INTEGER
+        start = pcz * GRID + pcx
+        distc[start] = 0
+        bfsq[tail] = start : tail = tail + 1
+        WHILE head < tail
+            DIM cur AS INTEGER
+            cur = bfsq[head] : head = head + 1
+            DIM ccx AS INTEGER
+            DIM ccz AS INTEGER
+            ccx = cur MOD GRID
+            ccz = cur \ GRID
+            DIM dnext AS INTEGER
+            dnext = distc[cur] + 1
+            IF ccx > 0 THEN
+                DIM nl AS INTEGER
+                nl = cur - 1
+                IF wallc[nl] = 0 AND distc[nl] < 0 THEN
+                    distc[nl] = dnext : bfsq[tail] = nl : tail = tail + 1
+                END IF
+            END IF
+            IF ccx < GRID - 1 THEN
+                DIM nr AS INTEGER
+                nr = cur + 1
+                IF wallc[nr] = 0 AND distc[nr] < 0 THEN
+                    distc[nr] = dnext : bfsq[tail] = nr : tail = tail + 1
+                END IF
+            END IF
+            IF ccz > 0 THEN
+                DIM nu AS INTEGER
+                nu = cur - GRID
+                IF wallc[nu] = 0 AND distc[nu] < 0 THEN
+                    distc[nu] = dnext : bfsq[tail] = nu : tail = tail + 1
+                END IF
+            END IF
+            IF ccz < GRID - 1 THEN
+                DIM nd AS INTEGER
+                nd = cur + GRID
+                IF wallc[nd] = 0 AND distc[nd] < 0 THEN
+                    distc[nd] = dnext : bfsq[tail] = nd : tail = tail + 1
+                END IF
+            END IF
+        WEND
+    END IF
+
+    ' --- Gegner folgen dem Gradienten (Flow-Field) -------------------
     IF alive THEN
         FOR i = 0 TO LEN(enemies) - 1
             DIM en AS INTEGER
             en = enemies[i]
+            DIM ex AS FLOAT
+            DIM ez AS FLOAT
+            ex = ECS_GET_FLOAT(world, en, "px")
+            ez = ECS_GET_FLOAT(world, en, "pz")
+
+            ' Standardziel: direkt der Spieler.
+            DIM tx AS FLOAT
+            DIM tz AS FLOAT
+            tx = px : tz = pz
+
+            ' Zelle des Gegners.
+            DIM ecx AS INTEGER
+            DIM ecz AS INTEGER
+            ecx = INT((ex + ARENA) / CELL)
+            ecz = INT((ez + ARENA) / CELL)
+            IF ecx < 0 THEN ecx = 0
+            IF ecx > GRID - 1 THEN ecx = GRID - 1
+            IF ecz < 0 THEN ecz = 0
+            IF ecz > GRID - 1 THEN ecz = GRID - 1
+
+            ' Besten 8er-Nachbarn (kleinste Distanz) als Zwischenziel waehlen.
+            DIM bestd AS INTEGER
+            bestd = distc[ecz * GRID + ecx]
+            IF bestd < 0 THEN bestd = 999999
+            DIM found AS INTEGER
+            found = 0
+            DIM ox AS INTEGER
+            DIM oz AS INTEGER
+            FOR oz = -1 TO 1
+                FOR ox = -1 TO 1
+                    IF (ox <> 0 OR oz <> 0) THEN
+                        DIM nx AS INTEGER
+                        DIM nz AS INTEGER
+                        nx = ecx + ox
+                        nz = ecz + oz
+                        IF nx >= 0 AND nx < GRID AND nz >= 0 AND nz < GRID THEN
+                            DIM nc AS INTEGER
+                            nc = nz * GRID + nx
+                            IF wallc[nc] = 0 AND distc[nc] >= 0 AND distc[nc] < bestd THEN
+                                bestd = distc[nc]
+                                tx = -ARENA + (nx + 0.5) * CELL
+                                tz = -ARENA + (nz + 0.5) * CELL
+                                found = 1
+                            END IF
+                        END IF
+                    END IF
+                NEXT
+            NEXT
+
             DIM ddx AS FLOAT
             DIM ddz AS FLOAT
-            ddx = px - ECS_GET_FLOAT(world, en, "px")
-            ddz = pz - ECS_GET_FLOAT(world, en, "pz")
+            ddx = tx - ex
+            ddz = tz - ez
             DIM dl AS FLOAT
             dl = SQR(ddx * ddx + ddz * ddz)
             IF dl > 0.001 THEN
@@ -375,6 +524,12 @@ WHILE NOT QUITREQUESTED()
                 ECS_GET_FLOAT(world, projs[i], "qx"),
                 ECS_GET_FLOAT(world, projs[i], "qz"), 0.18)] = projs[i]
     NEXT
+    ' Saeulen als statische Kreise -- hoechste Indizes (>= pil0).
+    DIM pil0 AS INTEGER
+    pil0 = 1 + ecount + LEN(projs)
+    FOR i = 0 TO N_PILLARS - 1
+        ent_of[PHYSICS_BROAD_ADD(broad, pillar_x[i], pillar_z[i], 1.15)] = -2
+    NEXT
 
     DIM npairs AS INTEGER
     npairs = PHYSICS_BROAD_QUERY(broad)
@@ -392,7 +547,32 @@ WHILE NOT QUITREQUESTED()
             lo = ib : hi = ia
         END IF
 
-        IF lo = 0 THEN
+        IF hi >= pil0 THEN
+            ' --- Saeule beteiligt (Saeulen haben die hoechsten Indizes) ---
+            IF lo < pil0 THEN
+                DIM pn AS INTEGER
+                pn = hi - pil0
+                IF lo = 0 THEN
+                    ' Spieler<->Saeule: ignorieren (Spieler korrigiert sich selbst)
+                ELSEIF lo <= ecount THEN
+                    DIM pe AS INTEGER
+                    pe = ent_of[lo]
+                    DIM rpx AS FLOAT
+                    DIM rpz AS FLOAT
+                    rpx = ECS_GET_FLOAT(world, pe, "px") - pillar_x[pn]
+                    rpz = ECS_GET_FLOAT(world, pe, "pz") - pillar_z[pn]
+                    DIM rpl AS FLOAT
+                    rpl = SQR(rpx * rpx + rpz * rpz)
+                    IF rpl < 0.001 THEN
+                        rpx = 1.0 : rpz = 0.0 : rpl = 1.0
+                    END IF
+                    ECS_ADD_FLOAT(world, pe, "px", pillar_x[pn] + rpx / rpl * (1.15 + ENEMY_R))
+                    ECS_ADD_FLOAT(world, pe, "pz", pillar_z[pn] + rpz / rpl * (1.15 + ENEMY_R))
+                ELSE
+                    ECS_ADD_FLOAT(world, ent_of[lo], "qlife", -1.0)
+                END IF
+            END IF
+        ELSEIF lo = 0 THEN
             ' Spieler + X
             IF hi <= ecount THEN
                 ' Gegner-Kontakt: Gegner rausschieben, Spieler nimmt Schaden.
