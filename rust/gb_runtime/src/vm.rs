@@ -287,6 +287,28 @@ fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
     Some(p)
 }
 
+/// Ruft ein reines Builtin auf und faengt einen evtl. Rust-Panic ab (z.B.
+/// Index-out-of-bounds bei zu wenigen Argumenten in variadischen Builtins),
+/// damit ein Tippfehler im GB-Programm NICHT die Runtime abstuerzen laesst,
+/// sondern einen klaren Laufzeitfehler liefert.
+fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>> {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    match catch_unwind(AssertUnwindSafe(|| crate::builtins::call_builtin(name, args))) {
+        Ok(r) => r,
+        Err(payload) => {
+            let msg = payload.downcast_ref::<String>().cloned()
+                .or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_else(|| "interner Fehler".to_string());
+            let friendly = if msg.contains("index out of bounds") {
+                format!("{}: zu wenige Argumente", name.to_uppercase())
+            } else {
+                format!("{}: interner Fehler ({})", name.to_uppercase(), msg)
+            };
+            Some(Err(friendly))
+        }
+    }
+}
+
 #[cfg(feature = "graphics")]
 fn ui_mouse(g: Option<&crate::graphics::Graphics>) -> R<(i32, i32, bool)> {
     let g = g.ok_or("UI-Builtin vor SCREEN aufgerufen")?;
@@ -1313,13 +1335,13 @@ impl<'p> Vm<'p> {
                     else if let Some(r) = self.user_op("__op_add__", &a, &b)? { stack.push(r); }
                     else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
                         stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
-                    } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)); }
+                    } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
                 }
                 op::SUB => {
                     let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
                     if let Some(r) = module_op('-', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_sub__", &a, &b)? { stack.push(r); }
-                    else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')); }
+                    else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')?); }
                 }
                 op::MUL => {
                     let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
@@ -1366,9 +1388,9 @@ impl<'p> Vm<'p> {
                 op::BNOT => { let v = stack.pop().unwrap(); match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
 
                 // --- _NN (numerisch garantiert) ---
-                op::ADD_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_add(a, b)); }
-                op::SUB_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '-')); }
-                op::MUL_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '*')); }
+                op::ADD_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_add(a, b)?); }
+                op::SUB_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '-')?); }
+                op::MUL_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '*')?); }
                 op::DIV_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(div(a, b)?); }
                 op::LT_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, '<')?)); }
                 op::GT_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, '>')?)); }
@@ -1483,7 +1505,7 @@ impl<'p> Vm<'p> {
                     } else if let Some(v) = self.try_graphics(name, &bargs)? {
                         stack.push(v);
                     } else {
-                        match builtins::call_builtin(name, &bargs) {
+                        match safe_call_builtin(name, &bargs) {
                             Some(Ok(v)) => stack.push(v),
                             Some(Err(e)) => {
                                 if e.starts_with("__UNKNOWN_BUILTIN__:") {
@@ -1555,7 +1577,7 @@ impl<'p> Vm<'p> {
                             let mut call_args = Vec::with_capacity(margs.len() + 1);
                             call_args.push(obj.clone());
                             call_args.extend(margs);
-                            match builtins::call_builtin(bi, &call_args) {
+                            match safe_call_builtin(bi, &call_args) {
                                 Some(Ok(v)) => stack.push(v),
                                 Some(Err(e)) => return Err(e),
                                 None => return Err(unknown_builtin_msg(bi)),
@@ -4298,17 +4320,25 @@ fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
     })
 }
 
-fn nn_add(a: Value, b: Value) -> Value {
+fn int_overflow_msg(op: &str) -> String {
+    format!("Ganzzahl-Ueberlauf bei '{}' (INTEGER ist 64-bit; Wertebereich ueberschritten)", op)
+}
+
+fn nn_add(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => Value::Int(x.wrapping_add(*y)),
-        _ => Value::Float(as_f64(&a) + as_f64(&b)),
+        (Value::Int(x), Value::Int(y)) =>
+            x.checked_add(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("+")),
+        _ => Ok(Value::Float(as_f64(&a) + as_f64(&b))),
     }
 }
 
-fn nn_arith(a: Value, b: Value, op: char) -> Value {
+fn nn_arith(a: Value, b: Value, op: char) -> R<Value> {
     match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) => Value::Int(match op { '-' => x.wrapping_sub(*y), '*' => x.wrapping_mul(*y), _ => unreachable!() }),
-        _ => { let (x, y) = (as_f64(&a), as_f64(&b)); Value::Float(match op { '-' => x - y, '*' => x * y, _ => unreachable!() }) }
+        (Value::Int(x), Value::Int(y)) => {
+            let r = match op { '-' => x.checked_sub(*y), '*' => x.checked_mul(*y), _ => unreachable!() };
+            r.map(Value::Int).ok_or_else(|| int_overflow_msg(&op.to_string()))
+        }
+        _ => { let (x, y) = (as_f64(&a), as_f64(&b)); Ok(Value::Float(match op { '-' => x - y, '*' => x * y, _ => unreachable!() })) }
     }
 }
 
@@ -4320,7 +4350,7 @@ fn mul(a: Value, b: Value) -> R<Value> {
         _ => {}
     }
     require_number(&a, &b, "*")?;
-    Ok(nn_arith(a, b, '*'))
+    nn_arith(a, b, '*')
 }
 
 fn div(a: Value, b: Value) -> R<Value> {
@@ -4360,14 +4390,17 @@ fn modulo(a: Value, b: Value) -> R<Value> {
 fn pow(a: Value, b: Value) -> R<Value> {
     require_number(&a, &b, "^")?;
     match (&a, &b) {
-        (Value::Int(x), Value::Int(y)) if *y >= 0 => Ok(Value::Int(x.pow(*y as u32))),
+        (Value::Int(x), Value::Int(y)) if *y >= 0 => {
+            if *y > u32::MAX as i64 { return Err(int_overflow_msg("^")); }
+            x.checked_pow(*y as u32).map(Value::Int).ok_or_else(|| int_overflow_msg("^"))
+        }
         _ => Ok(Value::Float(as_f64(&a).powf(as_f64(&b)))),
     }
 }
 
 fn neg(v: Value) -> R<Value> {
     match v {
-        Value::Int(i) => Ok(Value::Int(-i)),
+        Value::Int(i) => i.checked_neg().map(Value::Int).ok_or_else(|| int_overflow_msg("-")),
         Value::Float(f) => Ok(Value::Float(-f)),
         _ => Err("Unaeres '-' erwartet Zahl".into()),
     }

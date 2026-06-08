@@ -494,6 +494,13 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         (Value::Quat(ax, ay, az, aw), Value::Quat(bx, by, bz, bw)) =>
             ax == bx && ay == by && az == bz && aw == bw,
         (Value::Mat4(x), Value::Mat4(y)) => x.iter().zip(y.iter()).all(|(p, q)| p == q),
+        // Referenz-Typen (ARRAY/MAP/Instanz/Tiled) sind ueber Rc aliasbar
+        // (`b = a` teilt dasselbe Objekt) -> Gleichheit = Identitaet. Damit ist
+        // u.a. `a = a` TRUE (vorher fielen sie auf `=> false`).
+        (Value::Array(x), Value::Array(y)) => Rc::ptr_eq(x, y),
+        (Value::Map(x), Value::Map(y)) => Rc::ptr_eq(x, y),
+        (Value::Instance(x), Value::Instance(y)) => Rc::ptr_eq(x, y),
+        (Value::Tiled(x), Value::Tiled(y)) => Rc::ptr_eq(x, y),
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,
     }

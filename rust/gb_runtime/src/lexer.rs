@@ -249,7 +249,13 @@ impl Lexer {
         let val = if is_float {
             Val::Float(s.parse::<f64>().unwrap_or(0.0))
         } else {
-            Val::Int(s.parse::<i64>().unwrap_or(0))
+            // Zu grosse Ganzzahl-Literale NICHT still zu 0 machen, sondern als
+            // Fehler melden (INTEGER ist 64-bit).
+            match s.parse::<i64>() {
+                Ok(n) => Val::Int(n),
+                Err(_) => return Err(self.err(
+                    "Ganzzahl-Literal zu gross (INTEGER ist 64-bit)", line, col)),
+            }
         };
         self.push(Tt::Number, val, line, col);
         Ok(())
