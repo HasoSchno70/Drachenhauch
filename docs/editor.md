@@ -162,9 +162,9 @@ Sobald du einen Funktionsaufruf öffnest — `LINE(` — erscheint über der Cur
 
 ## Color-Picker (Swatch-Klick)
 
-Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) bekommen ein kleines Farbquadrat (Swatch). **Klick auf den Swatch** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
+Color-Literale (`&HRRGGBB` oder `RGB(r, g, b)`) werden **mit ihrer eigenen Farbe hinterlegt** — der Hex-/RGB-Wert steht also auf einem farbigen Feld. Die Schriftfarbe passt sich automatisch an (helle Schrift auf dunklen Farben, dunkle auf hellen), damit der Wert immer gut lesbar bleibt. **Klick auf das farbige Feld** öffnet den Farbwähler; die gewählte Farbe ersetzt das Literal im selben Format. So tunst du Farben visuell, ohne Hex-Werte im Kopf zu rechnen.
 
-Das Quadrat sitzt rechts neben dem Literal, sofern dort Platz ist. Folgt direkt Code (etwa `&HFF0000 : ...` oder `RGB(...)` vor der schließenden Klammer), würde ein Quadrat den Code überdecken — dann zeichnet der Editor stattdessen einen **farbigen Unterstrich unter dem Literal**, der nie Nachbartext verdeckt. Die Swatches **wachsen beim Zoomen mit der Schrift mit**.
+Das farbige Feld liegt genau über dem Literal und ragt nie in benachbarten Code hinein (auch bei `&HFF0000 : ...` oder `RGB(...)` direkt vor der Klammer). Es **wächst beim Zoomen mit der Schrift mit**.
 
 ## Listing drucken (`Strg+Alt+P`)
 

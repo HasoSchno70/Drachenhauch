@@ -1,12 +1,12 @@
 """Tests fuer die Color-Swatches im Code-Editor.
 
-Geprueft werden die beiden frueheren Macken:
-1. Swatches ueberdeckten den Code, wenn direkt hinter dem Color-Literal weiterer
-   Code stand (z.B. `&HFF0000 : ...` oder `RGB(...)` vor `)`). -> Bei fehlendem
-   Platz wird jetzt ein farbiger Unterstrich UNTER dem Literal gezeichnet, der
-   nie Nachbar-Text ueberlappt.
-2. Swatches wuchsen beim Vergroessern der Schrift nicht mit. -> Groesse haengt
-   jetzt an der Schrift-Hoehe.
+Darstellung: Das Color-Literal (`&HRRGGBB` / `RGB(r,g,b)`) wird mit SEINER Farbe
+hinterlegt, die Schrift darueber in lesbarem Kontrast. Geprueft:
+1. Der farbige Hintergrund liegt ueber dem Literal und ragt NICHT in
+   anschliessenden Code hinein (kein Ueberdecken mehr).
+2. Die Schriftfarbe passt sich an (hell auf dunkel, dunkel auf hell).
+3. Der Hintergrund waechst mit der Schrift (Hoehe = Zeilenhoehe).
+4. Die Flaeche ist anklickbar (`_swatch_at` trifft -> Farbwaehler).
 """
 import os
 
@@ -39,48 +39,63 @@ def _rect(ed, line, occ=0):
     return ed._swatch_rect(blk, s, e)
 
 
-def test_end_of_line_literal_is_square_box(app):
+def test_background_covers_literal_width(app):
     ed = _editor(app, "col = &HFF8800")
-    r = _rect(ed, 0)
-    size = ed._swatch_metrics()[0]
-    assert r.width() == size and r.height() == size      # quadratisches Kaestchen
-
-
-def test_literal_before_paren_uses_underline(app):
-    # &H05060F steht direkt vor ')' -> kein Platz -> Unterstrich (breit + duenn)
-    ed = _editor(app, "CLS(&H05060F)")
-    r = _rect(ed, 0)
-    size = ed._swatch_metrics()[0]
-    assert r.height() < size                  # duenn (kein volles Kaestchen)
-    assert r.width() > r.height()             # spannt das Literal -> breit
-
-
-def test_swatch_never_overlaps_following_code(app):
-    # Mehrere Literale mit ' : '-Trennern: das Kaestchen/der Unterstrich darf nie
-    # ueber das naechste Nicht-Leerzeichen hinausragen.
-    ed = _editor(app, "a = &HBE64F0 : b = &HE44040 : c = &H46B4FF")
     blk = ed.document().findBlockByNumber(0)
-    line = blk.text()
-    for s, e, _c, _k in ed._scan_color_swatches(line):
-        r = ed._swatch_rect(blk, s, e)
-        # naechstes Nicht-Leerzeichen hinter dem Literal
-        j = e
-        while j < len(line) and line[j] in " \t":
-            j += 1
-        if j < len(line):
-            next_x = ed._col_rect(blk, j).left()
-            # Box-Variante sitzt RECHTS vom Literal -> darf next_x nicht ueberdecken.
-            # Unterstrich-Variante endet am Literal-Ende (immer < next_x).
-            assert r.right() <= next_x, f"Swatch ueberdeckt Code bei Spalte {e}"
+    s, e, _c, _k = ed._scan_color_swatches(blk.text())[0]
+    r = ed._swatch_rect(blk, s, e)
+    lit_w = ed.fontMetrics().horizontalAdvance("&HFF8800")
+    # Hintergrund ~ Literalbreite (plus kleiner Innenabstand), Hoehe ~ Zeilenhoehe
+    assert r.width() >= lit_w
+    assert r.height() >= ed.fontMetrics().height() - 4
 
 
-def test_swatch_scales_with_font(app):
+def test_contrast_text_color(app):
+    from PySide6.QtGui import QColor
+    ed = _editor(app, "x = 1")
+    dark_bg = ed._swatch_text_color(QColor(10, 10, 10))      # dunkler Hintergrund
+    light_bg = ed._swatch_text_color(QColor(240, 240, 240))  # heller Hintergrund
+    # auf Dunkel -> helle Schrift, auf Hell -> dunkle Schrift
+    assert dark_bg.lightness() > 200
+    assert light_bg.lightness() < 80
+
+
+def test_does_not_overlap_following_code(app):
+    # Literale direkt vor ')' bzw. ' : ' -- der Hintergrund darf nie ueber das
+    # naechste Nicht-Leerzeichen hinausragen.
+    ed = _editor(app, "CLS(&H05060F)\na = &HBE64F0 : b = &HE44040")
+    doc = ed.document()
+    for ln in (0, 1):
+        blk = doc.findBlockByNumber(ln)
+        line = blk.text()
+        for s, e, _c, _k in ed._scan_color_swatches(line):
+            r = ed._swatch_rect(blk, s, e)
+            j = e
+            while j < len(line) and line[j] in " \t":
+                j += 1
+            if j < len(line):
+                next_x = ed._col_rect(blk, j).left()
+                assert r.right() <= next_x, f"Hintergrund ueberdeckt Code @ {e}"
+
+
+def test_scales_with_font(app):
     from PySide6.QtGui import QFont
     ed = _editor(app, "col = &HFF8800")
-    small = ed._swatch_metrics()[0]
+    h_small = _rect(ed, 0).height()
     f = ed.font()
     f.setPointSize(f.pointSize() + 8)
     ed.setFont(f)
     app.processEvents()
-    big = ed._swatch_metrics()[0]
-    assert big > small
+    h_big = _rect(ed, 0).height()
+    assert h_big > h_small
+
+
+def test_clickable_opens_picker(app, monkeypatch):
+    # Klick mitten auf das hinterlegte Literal muss den Farbwaehler ausloesen.
+    ed = _editor(app, "col = &HFF8800")
+    r = _rect(ed, 0)
+    hit = ed._swatch_at(r.center())
+    assert hit is not None
+    abs_start, abs_end, color, kind = hit
+    assert kind == "hex"
+    assert color.red() == 0xFF and color.green() == 0x88 and color.blue() == 0x00

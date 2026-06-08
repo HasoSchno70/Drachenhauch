@@ -456,47 +456,38 @@ class CodeEditor(
         cur.setPosition(block.position() + col)
         return self.cursorRect(cur)
 
-    def _swatch_metrics(self) -> tuple[int, int]:
-        """(Kaestchen-Groesse, Abstand) -- skalieren mit der aktuellen Schrift,
-        damit die Swatches beim Zoomen mitwachsen."""
-        h = self.fontMetrics().height()
-        size = max(8, round(h * 0.6))
-        gap = max(2, round(size * 0.3))
-        return size, gap
+    # Horizontaler Innenabstand des Farb-Hintergrunds um das Literal (Pixel).
+    _SWATCH_PAD = 2
 
     def _swatch_rect(self, block, start_col: int, end_col: int) -> QRect:
-        """Bildschirm-Rect des Swatches fuer das Literal `[start_col, end_col)`.
+        """Bildschirm-Rect des farbigen Hintergrunds fuer das Literal
+        `[start_col, end_col)`.
 
-        Ist hinter dem Literal genug Platz (Zeilenende oder Leerraum), sitzt das
-        farbige Kaestchen wie gewohnt rechts daneben. Folgt direkt Code (z.B.
-        `&HFF0000 : ...` oder `RGB(...)` in Klammern), wuerde ein Kaestchen den
-        Code ueberdecken -- dann zeichnen wir stattdessen einen farbigen
-        Unterstrich UNTER dem Literal (ueberlappt nie Nachbar-Text)."""
-        size, gap = self._swatch_metrics()
-        end_r = self._col_rect(block, end_col)
-        sx = end_r.right() + gap
-
-        # Platz bis zum naechsten Nicht-Leerzeichen hinter dem Literal messen.
-        line = block.text()
-        j = end_col
-        while j < len(line) and line[j] in " \t":
-            j += 1
-        if j < len(line):
-            avail = self._col_rect(block, j).left() - sx
-        else:
-            avail = size + gap + 1   # Zeilenende -> immer genug Platz
-
-        if avail >= size + 1:
-            sy = end_r.top() + max(0, (end_r.height() - size) // 2)
-            return QRect(sx, sy, size, size)
-
-        # Kein Platz: farbiger Unterstrich unter dem Literal.
+        Der Hintergrund liegt GENAU ueber dem Literal selbst (plus kleinem
+        Innenabstand) -- so ueberdeckt er nie Nachbar-Code und waechst mit der
+        Schrift mit (Hoehe = Zeilenhoehe). Diese Flaeche ist zugleich der
+        Klick-Bereich fuer den Farbwaehler."""
         start_r = self._col_rect(block, start_col)
-        bar_h = max(2, size // 4)
-        x0 = start_r.left()
-        x1 = end_r.right()
-        y = end_r.bottom() - bar_h - 1
-        return QRect(x0, y, max(3, x1 - x0), bar_h)
+        end_r = self._col_rect(block, end_col)
+        pad = self._SWATCH_PAD
+        line = block.text()
+        # Innenabstand nur dort, wo ein Leerzeichen/Zeilenrand ist -- sonst
+        # wuerde der Hintergrund den direkt anschliessenden Code (z.B. `)` oder
+        # `:`) ueberdecken.
+        left_room = start_col == 0 or line[start_col - 1] in " \t"
+        right_room = end_col >= len(line) or line[end_col] in " \t"
+        x0 = start_r.left() - (pad if left_room else 0)
+        x1 = end_r.left() + (pad if right_room else 0)
+        top = start_r.top() + 1
+        h = max(1, start_r.height() - 2)
+        return QRect(x0, top, max(3, x1 - x0), h)
+
+    @staticmethod
+    def _swatch_text_color(color: QColor) -> QColor:
+        """Gut lesbare Schriftfarbe auf `color` als Hintergrund: dunkel auf
+        hellen Farben, hell auf dunklen (Helligkeit nach ITU-R BT.601)."""
+        lum = 0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue()
+        return QColor(25, 25, 25) if lum > 140 else QColor(240, 240, 240)
 
     def _swatch_at(self, pos) -> tuple | None:
         """`(abs_start, abs_end, color, kind)` des Swatches unter `pos`
@@ -568,13 +559,24 @@ class CodeEditor(
                 for i in range(1, n_guides + 1):
                     x = int(block_rect.left()) + space_w * INDENT_SPACES * i
                     painter.drawLine(x, top_y, x, bot_y)
-            # --- Color-Swatches --------------------------------------
+            # --- Color-Swatches: Literal mit seiner Farbe hinterlegen ----
+            # Hintergrund = die Farbe selbst, Schrift in lesbarem Kontrast
+            # darueber neu gezeichnet. Die Flaeche ist der Klick-Bereich.
             if "&H" in text or "RGB" in text.upper():
+                painter.save()
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                painter.setFont(self.font())
+                ascent = self.fontMetrics().ascent()
                 for start_col, end_col, color, _kind in self._scan_color_swatches(text):
                     rect = self._swatch_rect(block, start_col, end_col)
-                    painter.fillRect(rect, color)
-                    painter.setPen(border)
-                    painter.drawRect(rect)
+                    painter.setPen(QColor(border))
+                    painter.setBrush(color)
+                    painter.drawRoundedRect(rect, 3, 3)
+                    painter.setPen(self._swatch_text_color(color))
+                    start_r = self._col_rect(block, start_col)
+                    painter.drawText(start_r.left(), start_r.top() + ascent,
+                                     text[start_col:end_col])
+                painter.restore()
             block = block.next()
 
     # ----------------------------------------------- Live-Errors
