@@ -310,7 +310,7 @@ class ShortcutsDialog(QDialog):
 
 
 class AboutDialog(QDialog):
-    """`Hilfe -> Ueber GameBasic` -- Logo + Autor + Version."""
+    """`Hilfe -> Ueber GameBasic` -- Logo + Version + Autor + Copyright."""
 
     def __init__(self, parent: QWidget):
         super().__init__(parent)
@@ -363,18 +363,24 @@ class AboutDialog(QDialog):
             layout.addWidget(ver_lbl)
 
         # Autor
-        author = QLabel("von HASOSCHNO SOFT")
+        author = QLabel("Hans Schnorrenberger")
         author_font = author.font()
         author_font.setItalic(True)
         author.setFont(author_font)
         author.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(author)
 
+        # Copyright
+        copyright_lbl = QLabel("(C) 2026 Hans Schnorrenberger")
+        copyright_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        copyright_lbl.setStyleSheet("color: gray;")
+        layout.addWidget(copyright_lbl)
+
         # Sprache + Beschreibung
         descr = QLabel(
-            "BASIC-Dialekt mit Pascal-strikter Typisierung und OOP,\n"
-            "ausgelegt fuer Spiele. Drei Ausfuehrungspfade:\n"
-            "Tree-Walker, Python-VM, Cython-VM."
+            "BASIC-Dialekt mit strikter Typisierung und OOP, gemacht fuer Spiele.\n"
+            "2D- & 3D-Grafik, Sound, GUI, Partikel, Module und mehr -- ausgefuehrt\n"
+            "von der nativen Runtime 'gbrt' (Rust/raylib), exportierbar als .exe."
         )
         descr.setAlignment(Qt.AlignmentFlag.AlignCenter)
         descr.setStyleSheet("color: gray;")
