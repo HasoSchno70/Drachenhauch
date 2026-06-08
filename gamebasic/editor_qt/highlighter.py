@@ -51,7 +51,7 @@ _TYPE_KW = {
 # Bekannte Built-in-Namen (lowercase) -- stark aus dem CTk-Editor uebernommen.
 BUILTIN_NAMES = frozenset({
     "str$", "str", "val", "int", "abs", "len", "chr$", "chr", "asc",
-    "sqr", "rnd", "upper$", "upper", "lower$", "lower", "rgb",
+    "sqr", "rnd", "upper$", "upper", "lower$", "lower", "rgb", "rgba", "alpha",
     "left$", "left", "right$", "right", "mid$", "mid", "instr",
     "replace$", "replace", "trim$", "trim", "split$", "split",
     "join$", "join", "dimsize", "dimcount",

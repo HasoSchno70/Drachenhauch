@@ -734,6 +734,20 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             for v in [r, g, b] { if v < 0 || v > 255 { return err("RGB-Werte muessen 0..255 sein".to_string()); } }
             Ok(Value::Int((r << 16) | (g << 8) | b))
         }
+        "rgba" => {
+            // Farbe mit Alpha (0..255). Wird beim Zeichnen ueber den
+            // Standard-Blendmodus "alpha" eingemischt. Alpha 0 (voll
+            // transparent) ist als Farb-Zahl nicht von "deckend" zu
+            // unterscheiden (oberes Byte 0 = deckend, Rueckwaerts-Kompat.)
+            // -> wird auf 1 angehoben (praktisch unsichtbar; fuer ganz
+            // transparent einfach nicht zeichnen).
+            arity!(4);
+            let (r, g, b, al) = (need_int(&a[0], "RGBA")?, need_int(&a[1], "RGBA")?,
+                                 need_int(&a[2], "RGBA")?, need_int(&a[3], "RGBA")?);
+            for v in [r, g, b, al] { if v < 0 || v > 255 { return err("RGBA-Werte muessen 0..255 sein".to_string()); } }
+            let al = if al == 0 { 1 } else { al };
+            Ok(Value::Int((al << 24) | (r << 16) | (g << 8) | b))
+        }
         "sin" => { arity!(1); Ok(Value::Float(need_num(&a[0], "SIN")?.sin())) }
         "cos" => { arity!(1); Ok(Value::Float(need_num(&a[0], "COS")?.cos())) }
         "tan" => { arity!(1); Ok(Value::Float(need_num(&a[0], "TAN")?.tan())) }
@@ -910,6 +924,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "red" => { arity!(1); Ok(Value::Int((need_int(&a[0], "RED")? >> 16) & 0xFF)) }
         "green" => { arity!(1); Ok(Value::Int((need_int(&a[0], "GREEN")? >> 8) & 0xFF)) }
         "blue" => { arity!(1); Ok(Value::Int(need_int(&a[0], "BLUE")? & 0xFF)) }
+        "alpha" => {
+            // Alpha-Anteil einer Farbe. Oberes Byte; 0 == deckend -> 255
+            // (passend zur Zeichen-Semantik, siehe col() in graphics.rs).
+            arity!(1);
+            let a0 = (need_int(&a[0], "ALPHA")? >> 24) & 0xFF;
+            Ok(Value::Int(if a0 == 0 { 255 } else { a0 }))
+        }
         "color_lerp" => {
             arity!(3);
             let c1 = need_int(&a[0], "COLOR_LERP")?;

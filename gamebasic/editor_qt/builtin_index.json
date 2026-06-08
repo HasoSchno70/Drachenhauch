@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 904,
+ "count": 920,
  "builtins": [
   {
    "name": "ABS",
@@ -13,6 +13,12 @@
    "kind": "core",
    "signature": "ACOS(x: Zahl)",
    "module": "interpreter"
+  },
+  {
+   "name": "ALPHA",
+   "kind": "core",
+   "signature": "ALPHA(farbe: INTEGER) AS INTEGER",
+   "module": "gbrt"
   },
   {
    "name": "ARC",
@@ -3085,6 +3091,12 @@
    "kind": "core",
    "signature": "RGB(r: INTEGER, g: INTEGER, b: INTEGER)",
    "module": "interpreter"
+  },
+  {
+   "name": "RGBA",
+   "kind": "core",
+   "signature": "RGBA(r: INTEGER, g: INTEGER, b: INTEGER, a: INTEGER)",
+   "module": "gbrt"
   },
   {
    "name": "RIGHT",

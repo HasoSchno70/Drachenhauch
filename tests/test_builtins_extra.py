@@ -5,6 +5,44 @@ import pytest
 from gamebasic.errors import GameBasicError
 
 
+# ----------------------------------------------------------- Farben / Alpha
+def test_rgba_packs_alpha_in_high_byte(run_gb):
+    # (a<<24)|(r<<16)|(g<<8)|b
+    expected = (200 << 24) | (255 << 16) | (128 << 8) | 64
+    assert run_gb("PRINT RGBA(255, 128, 64, 200)\n").strip() == str(expected)
+
+
+def test_alpha_extracts_and_defaults_opaque(run_gb):
+    out = run_gb(
+        "PRINT ALPHA(RGBA(10, 20, 30, 128))\n"
+        "PRINT ALPHA(RGB(10, 20, 30))\n"          # 24-bit -> deckend (255)
+    ).splitlines()
+    assert out == ["128", "255"]
+
+
+def test_rgb_channels_ignore_alpha_byte(run_gb):
+    out = run_gb(
+        "PRINT RED(RGBA(200, 100, 50, 128))\n"
+        "PRINT GREEN(RGBA(200, 100, 50, 128))\n"
+        "PRINT BLUE(RGBA(200, 100, 50, 128))\n"
+    ).splitlines()
+    assert out == ["200", "100", "50"]
+
+
+def test_rgba_alpha_zero_clamped_to_one(run_gb):
+    # Alpha 0 ist als Farb-Zahl nicht von "deckend" unterscheidbar -> auf 1.
+    assert run_gb("PRINT ALPHA(RGBA(1, 2, 3, 0))\n").strip() == "1"
+
+
+def test_rgba_out_of_range_errors(run_gb):
+    with pytest.raises(GameBasicError, match="RGBA"):
+        run_gb("PRINT RGBA(0, 0, 0, 300)\n")
+
+
+def test_rgb_still_24bit(run_gb):
+    assert run_gb("PRINT RGB(255, 128, 64)\n").strip() == str((255 << 16) | (128 << 8) | 64)
+
+
 # ----------------------------------------------------------- Game-Math
 def test_wrap(run_gb):
     assert run_gb("PRINT WRAP(370, 0, 360)\nPRINT WRAP(-10, 0, 360)\n").splitlines() == ["10.0", "350.0"]

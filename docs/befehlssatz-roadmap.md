@@ -84,9 +84,14 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `SHUFFLE(arr)`. PRNG ≠ Python → Parity „erwartet unterschiedlich"
       (Strukturtest prüft Bereich/Multiset-Invariante).
 - [x] **Farb-Helfer:** `HSV`→RGB, `COLOR_LERP`, `RED`/`GREEN`/`BLUE`-Extraktion.
-      `RGBA` **bewusst weggelassen** — der Draw-Pfad ist 24-Bit-RGB ohne
-      Alpha-Kanal (`col()` forciert 255, TW maskiert `&0xFFFFFF`), Alpha wäre
-      irreführend.
+- [x] **Alpha-Kanal (2026-06-08, gbrt):** `RGBA(r,g,b,a)` packt Alpha ins obere
+      Byte (`&Haarrggbb`); `ALPHA(farbe)` liest es. `col()` (graphics.rs) wertet
+      das obere Byte als Alpha aus — **0 = deckend** (Rückwärts-Kompatibilität:
+      alte `&Hrrggbb`/`RGB(...)` bleiben voll deckend). Damit zeichnen
+      `BOX/RECT/CIRCLE/LINE/TEXT/PLOT/…` sowie der Bild-/Sprite-Tint halb-
+      transparent (Standard-Blendmodus „alpha"). `RGBA(_,_,_,0)` → Alpha 1
+      (ganz transparent = einfach nicht zeichnen). Tests in
+      `tests/test_builtins_extra.py`.
 - [x] **Math:** `ASIN`/`ACOS` (Domain-Check), `HYPOT`, `DEG`/`RAD`, `LERP`,
       `REMAP`, `FRAC`; Konstante `TAU`. **`E` bewusst weggelassen** — `e` ist
       ein häufiger `CATCH e`-Variablenname; eine gleichnamige Konstante würde

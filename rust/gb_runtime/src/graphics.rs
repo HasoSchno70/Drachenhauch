@@ -756,7 +756,12 @@ pub struct Graphics {
 /// GB-Farbe (0xRRGGBB INTEGER) -> raylib Color.
 fn col(c: i64) -> Color {
     let v = c as u32;
-    Color::new(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, 255)
+    // Oberes Byte = Alpha. 0 bedeutet DECKEND (255) -- so bleiben die alten
+    // 24-bit-Farben `&Hrrggbb` / RGB(r,g,b) voll deckend, waehrend
+    // RGBA(r,g,b,a) bzw. `&Haarrggbb` mit a>0 echte Transparenz liefert.
+    let a = ((v >> 24) & 0xFF) as u8;
+    let a = if a == 0 { 255 } else { a };
+    Color::new(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, a)
 }
 
 impl Graphics {
