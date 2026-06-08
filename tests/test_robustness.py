@@ -106,3 +106,24 @@ def test_format_d_rejects_bool(run_gb):
 
 def test_format_d_int_still_ok(run_gb):
     assert run_gb('PRINT FORMAT$(42, "%05d")\n').strip() == "00042"
+
+
+# ------------------------------------------------ NIEDRIG: Feinschliff
+def test_instr_empty_needle_out_of_range(run_gb):
+    out = run_gb(
+        'PRINT INSTR("abc", "", 5)\n'   # Start ausserhalb -> -1
+        'PRINT INSTR("abc", "", 2)\n'   # in-range -> Start
+        'PRINT INSTR("abcdef", "cd")\n'
+    ).splitlines()
+    assert out == ["-1", "2", "2"]
+
+
+def test_array_sum_overflow_errors(run_gb):
+    with pytest.raises(GameBasicError, match="(?i)Ueberlauf"):
+        run_gb("DIM a[2] AS INTEGER\na[0]=9223372036854775807\na[1]=1\nPRINT ARRAY_SUM(a)\n")
+
+
+def test_curve_bezier2_type_error_names_builtin(run_gb):
+    # Fehlertext nennt CURVE_BEZIER2 (frueher Platzhalter "B").
+    with pytest.raises(GameBasicError, match="CURVE_BEZIER2"):
+        run_gb('IMPORT "curves"\nPRINT CURVE_BEZIER2(0.5,"x",0,0,0,0,0,0,0)\n')

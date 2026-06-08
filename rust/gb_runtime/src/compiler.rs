@@ -684,7 +684,9 @@ impl Compiler {
                 self.ctx.emit(oc::STORE_INDEX, json!(indices.len()));
                 Ok(())
             }
-            _ => Err("Stufe 3d: READ-Ziel (MemberAccess) noch nicht unterstuetzt".into()),
+            _ => Err("READ kann nur in eine Variable oder ein Array-Element lesen, \
+                      nicht direkt in ein Objekt-/Struct-Feld. Lies in eine Hilfsvariable \
+                      und weise sie dem Feld zu.".into()),
         }
     }
 

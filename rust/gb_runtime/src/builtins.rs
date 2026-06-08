@@ -1118,7 +1118,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     "integer" => {
                         let mut s: i64 = 0;
                         for v in &arr.values {
-                            match v { Value::Int(i) => s = s.wrapping_add(*i), _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()) }
+                            match v {
+                                // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik),
+                                // nicht still umwickeln.
+                                Value::Int(i) => s = s.checked_add(*i).ok_or_else(||
+                                    "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?,
+                                _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()),
+                            }
                         }
                         Ok(Value::Int(s))
                     }
@@ -1304,8 +1310,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             // ASCII; fuer Bit-Identitaet auf Zeichenebene rechnen.
             let hchars: Vec<char> = hay.chars().collect();
             let nchars: Vec<char> = needle.chars().collect();
-            if nchars.is_empty() { return Ok(Value::Int(start.min(hchars.len()) as i64)); }
+            // Start ausserhalb -> -1 (auch bei leerem Suchstring; wie Python
+            // str.find). Reihenfolge wichtig: erst Bereich pruefen.
             if start > hchars.len() { return Ok(Value::Int(-1)); }
+            if nchars.is_empty() { return Ok(Value::Int(start as i64)); }
             let mut i = start;
             while i + nchars.len() <= hchars.len() {
                 if hchars[i..i + nchars.len()] == nchars[..] { return Ok(Value::Int(i as i64)); }
@@ -1510,8 +1518,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "curve_bezier2" => {
             arity!(9); let t = need_num(&a[0], "CURVE_BEZIER2")?;
-            let x = bezier_1d(t, need_num(&a[1], "B")?, need_num(&a[3], "B")?, need_num(&a[5], "B")?, need_num(&a[7], "B")?);
-            let y = bezier_1d(t, need_num(&a[2], "B")?, need_num(&a[4], "B")?, need_num(&a[6], "B")?, need_num(&a[8], "B")?);
+            let x = bezier_1d(t, need_num(&a[1], "CURVE_BEZIER2")?, need_num(&a[3], "CURVE_BEZIER2")?, need_num(&a[5], "CURVE_BEZIER2")?, need_num(&a[7], "CURVE_BEZIER2")?);
+            let y = bezier_1d(t, need_num(&a[2], "CURVE_BEZIER2")?, need_num(&a[4], "CURVE_BEZIER2")?, need_num(&a[6], "CURVE_BEZIER2")?, need_num(&a[8], "CURVE_BEZIER2")?);
             Ok(Value::Tuple(Rc::new(vec![Value::Float(x), Value::Float(y)])))
         }
         "curve_catmull" => {
@@ -1520,8 +1528,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "curve_catmull2" => {
             arity!(9); let t = need_num(&a[0], "CURVE_CATMULL2")?;
-            let x = catmull_1d(t, need_num(&a[1], "C")?, need_num(&a[3], "C")?, need_num(&a[5], "C")?, need_num(&a[7], "C")?);
-            let y = catmull_1d(t, need_num(&a[2], "C")?, need_num(&a[4], "C")?, need_num(&a[6], "C")?, need_num(&a[8], "C")?);
+            let x = catmull_1d(t, need_num(&a[1], "CURVE_CATMULL2")?, need_num(&a[3], "CURVE_CATMULL2")?, need_num(&a[5], "CURVE_CATMULL2")?, need_num(&a[7], "CURVE_CATMULL2")?);
+            let y = catmull_1d(t, need_num(&a[2], "CURVE_CATMULL2")?, need_num(&a[4], "CURVE_CATMULL2")?, need_num(&a[6], "CURVE_CATMULL2")?, need_num(&a[8], "CURVE_CATMULL2")?);
             Ok(Value::Tuple(Rc::new(vec![Value::Float(x), Value::Float(y)])))
         }
         "curve_hermite" => {
@@ -1638,12 +1646,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "sprite_hit_box" => {
             arity!(5); let s = spr(&a[0], "SPRITE_HIT_BOX")?.borrow();
-            let (x, y, w, h) = (need_num(&a[1], "S")?, need_num(&a[2], "S")?, need_num(&a[3], "S")?, need_num(&a[4], "S")?);
+            let (x, y, w, h) = (need_num(&a[1], "SPRITE_HIT_BOX")?, need_num(&a[2], "SPRITE_HIT_BOX")?, need_num(&a[3], "SPRITE_HIT_BOX")?, need_num(&a[4], "SPRITE_HIT_BOX")?);
             Ok(Value::Bool(s.x < x + w && s.x + s.frame_w as f64 > x && s.y < y + h && s.y + s.frame_h as f64 > y))
         }
         "sprite_hit_point" => {
             arity!(3); let s = spr(&a[0], "SPRITE_HIT_POINT")?.borrow();
-            let (x, y) = (need_num(&a[1], "S")?, need_num(&a[2], "S")?);
+            let (x, y) = (need_num(&a[1], "SPRITE_HIT_POINT")?, need_num(&a[2], "SPRITE_HIT_POINT")?);
             Ok(Value::Bool(s.x <= x && x < s.x + s.frame_w as f64 && s.y <= y && y < s.y + s.frame_h as f64))
         }
 

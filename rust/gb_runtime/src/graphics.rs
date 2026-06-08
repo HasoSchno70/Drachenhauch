@@ -1645,7 +1645,12 @@ impl Graphics {
         }
         // CLS setzt die Hintergrundfarbe (beim FLIP gecleart) und leert den
         // aktiven Layer (Wipe). Die Layer werden ohnehin pro FLIP geleert.
-        self.clear_color = col(color);
+        // Der Szenen-Hintergrund ist IMMER deckend -- ein Alpha-Anteil (RGBA)
+        // wuerde sonst beim PostFX/RenderTexture-Compositing die ganze Szene
+        // durchscheinen lassen.
+        let mut bg = col(color);
+        bg.a = 255;
+        self.clear_color = bg;
         let a = self.active;
         self.layers[a].cmds.clear();
     }
@@ -1939,10 +1944,10 @@ impl Graphics {
     }
 
     pub fn image_width(&self, idx: i64) -> Result<i64, String> {
-        self.textures.get(idx as usize).map(|t| t.tex.width as i64).ok_or_else(|| "IMAGEWIDTH: ungueltiges Handle".into())
+        self.textures.get(idx as usize).map(|t| t.tex.width as i64).ok_or_else(|| "IMAGEWIDTH: ungueltiges IMAGE-Handle".into())
     }
     pub fn image_height(&self, idx: i64) -> Result<i64, String> {
-        self.textures.get(idx as usize).map(|t| t.tex.height as i64).ok_or_else(|| "IMAGEHEIGHT: ungueltiges Handle".into())
+        self.textures.get(idx as usize).map(|t| t.tex.height as i64).ok_or_else(|| "IMAGEHEIGHT: ungueltiges IMAGE-Handle".into())
     }
 
     // --- LOAD_ASSETS: Bilder aus JSON-Manifest vorladen (Alias/Pfad-Cache) ---
