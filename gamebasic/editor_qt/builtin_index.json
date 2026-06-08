@@ -215,7 +215,7 @@
   {
    "name": "ATLAS_DRAW",
    "kind": "graphics",
-   "signature": "ATLAS_DRAW(atlas: ?, name: STRING, x: Zahl, y: Zahl)",
+   "signature": "ATLAS_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",
    "module": "interpreter"
   },
   {
@@ -419,7 +419,7 @@
   {
    "name": "BATCH_DRAW",
    "kind": "graphics",
-   "signature": "BATCH_DRAW(atlas: ?, name: STRING, x: Zahl, y: Zahl)",
+   "signature": "BATCH_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",
    "module": "interpreter"
   },
   {

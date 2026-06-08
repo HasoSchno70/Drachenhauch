@@ -336,8 +336,9 @@ fn format_one(mask: &str, v: &Value) -> R {
             'd' | 'i' => {
                 let n = match v {
                     Value::Int(n) => *n,
-                    Value::Bool(b) => *b as i64,
                     Value::Float(f) => *f as i64,
+                    // BOOLEAN ist keine Zahl -- konsistent mit %f/%x und der
+                    // Arithmetik (vorher lieferte %d aus TRUE eine 1).
                     _ => return err(format!("FORMAT$: %{} erwartet Zahl", conv)),
                 };
                 n.to_string()
@@ -1682,7 +1683,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let path = need_str(&a[0], "OPENFILE")?.to_string();
             let mode = need_str(&a[1], "OPENFILE")?;
             let h = match mode {
-                "r" => FileH::Read(std::io::BufReader::new(std::fs::File::open(&path).map_err(|e| format!("OPENFILE: {}", e))?)),
+                "r" => FileH::Read(std::io::BufReader::new(std::fs::File::open(resolve_asset_path(&path)).map_err(|e| format!("OPENFILE: {}", e))?)),
                 "w" => FileH::Write(std::fs::File::create(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
@@ -1778,12 +1779,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "readlines" => {
             arity!(1);
-            let text = std::fs::read_to_string(need_str(&a[0], "READLINES")?).map_err(|e| format!("READLINES: {}", e))?;
+            let text = std::fs::read_to_string(resolve_asset_path(need_str(&a[0], "READLINES")?)).map_err(|e| format!("READLINES: {}", e))?;
             Ok(new_str_array(text.lines().map(|l| l.to_string()).collect()))
         }
         "filesize" => {
             arity!(1);
-            let m = std::fs::metadata(need_str(&a[0], "FILESIZE")?).map_err(|e| format!("FILESIZE: {}", e))?;
+            let m = std::fs::metadata(resolve_asset_path(need_str(&a[0], "FILESIZE")?)).map_err(|e| format!("FILESIZE: {}", e))?;
             Ok(Value::Int(m.len() as i64))
         }
         "pathjoin" => {
@@ -1832,7 +1833,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "json_load" => {
             arity!(1);
             let path = need_str(&a[0], "JSON_LOAD")?;
-            let text = std::fs::read_to_string(path).map_err(|e| format!("JSON_LOAD: {}", e))?;
+            let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| format!("JSON_LOAD: {}", e))?;
             let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("JSON_LOAD: {}: {}", path, e))?;
             Ok(Value::Json(Rc::new(v)))
         }
@@ -2664,7 +2665,7 @@ fn json_to_val(j: &serde_json::Value) -> Value {
 }
 
 fn save_load(path: &str) -> R {
-    let text = std::fs::read_to_string(path).map_err(|e| {
+    let text = std::fs::read_to_string(resolve_asset_path(path)).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound { format!("SAVE_LOAD: Datei '{}' nicht gefunden", path) } else { format!("SAVE_LOAD: {}", e) }
     })?;
     let raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("SAVE_LOAD: '{}' ist kein gueltiges JSON ({})", path, e))?;
@@ -3108,7 +3109,12 @@ fn ray_circle(rx: f64, ry: f64, dx: f64, dy: f64, cx: f64, cy: f64, cr: f64) -> 
 /// Map-Wert-Coercion (`_coerce_map_value`).
 fn coerce_map_value(v: &Value, vt: &str) -> R {
     match vt {
-        "integer" => match v { Value::Int(_) => Ok(v.clone()), _ => err(format!("Map-Wert: Erwartet INTEGER, erhalten {}", v.type_name())) },
+        "integer" => match v {
+            Value::Int(_) => Ok(v.clone()),
+            // Ganzzahliges FLOAT akzeptieren (wie ARRAY OF INTEGER / Skalar).
+            Value::Float(f) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)),
+            _ => err(format!("Map-Wert: Erwartet INTEGER, erhalten {}", v.type_name())),
+        },
         "float" => match v { Value::Float(_) => Ok(v.clone()), Value::Int(i) => Ok(Value::Float(*i as f64)), _ => err("Map-Wert: Erwartet FLOAT".to_string()) },
         "string" => match v { Value::Str(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet STRING".to_string()) },
         "boolean" => match v { Value::Bool(_) => Ok(v.clone()), _ => err("Map-Wert: Erwartet BOOLEAN".to_string()) },

@@ -81,3 +81,28 @@ def test_oversized_int_literal_errors(run_gb):
 def test_normal_math_unaffected(run_gb):
     out = run_gb("PRINT 2 + 3 * 4\nPRINT 2 ^ 10\nPRINT 100 - 250\n").splitlines()
     assert out == ["14", "1024", "-150"]
+
+
+# ------------------------------------------------ MITTEL: Konsistenz
+def test_map_of_integer_accepts_whole_float(run_gb):
+    # wie ARRAY OF INTEGER / Skalar: ganzzahliges FLOAT wird zu INTEGER.
+    out = run_gb(
+        'DIM m AS MAP OF INTEGER\n'
+        'MAPPUT(m, "k", 3.0)\n'
+        'PRINT MAPGET(m, "k")\n'
+    ).strip()
+    assert out == "3"
+
+
+def test_map_of_integer_rejects_fractional_float(run_gb):
+    with pytest.raises(GameBasicError, match="(?i)INTEGER"):
+        run_gb('DIM m AS MAP OF INTEGER\nMAPPUT(m, "k", 3.5)\n')
+
+
+def test_format_d_rejects_bool(run_gb):
+    with pytest.raises(GameBasicError, match="(?i)erwartet Zahl"):
+        run_gb('PRINT FORMAT$(TRUE, "%d")\n')
+
+
+def test_format_d_int_still_ok(run_gb):
+    assert run_gb('PRINT FORMAT$(42, "%05d")\n').strip() == "00042"

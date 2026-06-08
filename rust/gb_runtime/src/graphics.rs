@@ -35,7 +35,7 @@ enum Cmd {
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
-    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool), // tex, sx,sy,sw,sh, dx,dy, flip_h
+    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool, Color), // tex, sx,sy,sw,sh, dx,dy, flip_h, tint
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
     // Clip-Stack (Scissor): Push schneidet mit dem aktuellen Clip, Pop stellt
@@ -1800,6 +1800,8 @@ impl Graphics {
 
     /// Laedt einen TTF/OTF-Font in der gegebenen Basis-Groesse -> FONT-Handle.
     pub fn load_font(&mut self, path: &str, size: i32) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let path = resolved.as_str();
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
             .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
         self.fonts.push(f);
@@ -2000,7 +2002,8 @@ impl Graphics {
         self.atlases.push(Atlas { tex_idx, frames });
         Ok((self.atlases.len() - 1) as i64)
     }
-    pub fn atlas_draw(&mut self, atlas: i64, name: &str, x: i32, y: i32, flip_h: bool) -> Result<(), String> {
+    pub fn atlas_draw(&mut self, atlas: i64, name: &str, x: i32, y: i32, flip_h: bool,
+                      tint: Option<i64>) -> Result<(), String> {
         let (tex, sx, sy, sw, sh) = {
             let a = self.atlases.get(atlas as usize).ok_or("ATLAS_DRAW: ungueltiges Atlas-Handle")?;
             let &(sx, sy, sw, sh) = a.frames.get(name)
@@ -2008,7 +2011,8 @@ impl Graphics {
             (a.tex_idx, sx, sy, sw, sh)
         };
         let (x, y) = self.w2s(x, y);
-        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, flip_h));
+        let tcol = match tint { Some(c) => col(c), None => Color::WHITE };
+        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, flip_h, tcol));
         Ok(())
     }
 
@@ -2791,10 +2795,10 @@ fn render_scene<D: RaylibDraw>(
                         let dst = Rectangle::new((x * s) as f32, (y * s) as f32, (t.width * s) as f32, (t.height * s) as f32);
                         d.draw_texture_pro(t, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                     }
-                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh) => {
+                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh, tint) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32, if *fh { -(*sw as f32) } else { *sw as f32 }, *sh as f32);
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
-                        d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0,Color::WHITE);
+                        d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, *tint);
                     }
                     Cmd::SpriteDraw(i, sx, sy, sw, sh, dx, dy, dw, dh, fx, fy, tint) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32,

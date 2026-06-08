@@ -3526,13 +3526,15 @@ impl<'p> Vm<'p> {
             "atlas_draw" | "batch_draw" => {
                 let atlas = gi(a,0,"ATLAS_DRAW")?;
                 let name = gs(a,1,"ATLAS_DRAW")?.to_string();
-                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW")? as i32, gi(a,3,"ATLAS_DRAW")? as i32, false)?; Value::Nil
+                let tint = if a.len() > 4 { Some(gi(a,4,"ATLAS_DRAW")?) } else { None };
+                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW")? as i32, gi(a,3,"ATLAS_DRAW")? as i32, false, tint)?; Value::Nil
             }
             "atlas_draw_flipped" => {
                 let atlas = gi(a,0,"ATLAS_DRAW_FLIPPED")?;
                 let name = gs(a,1,"ATLAS_DRAW_FLIPPED")?.to_string();
                 let fh = gb(a, 4);
-                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW_FLIPPED")? as i32, gi(a,3,"ATLAS_DRAW_FLIPPED")? as i32, fh)?; Value::Nil
+                let tint = if a.len() > 5 { Some(gi(a,5,"ATLAS_DRAW_FLIPPED")?) } else { None };
+                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW_FLIPPED")? as i32, gi(a,3,"ATLAS_DRAW_FLIPPED")? as i32, fh, tint)?; Value::Nil
             }
             "batch_flush" => Value::Nil, // Recording-Modell: alles flusht beim FLIP
 
@@ -4251,8 +4253,15 @@ fn particle_color(start: i64, end: i64, has_end: bool, fade: bool, age: i32, lif
         let inv = 1.0 - life_t;
         sr = sr * inv + er * life_t; sg = sg * inv + eg * life_t; sb = sb * inv + eb * life_t;
     }
-    if fade { let f = 1.0 - life_t; sr *= f; sg *= f; sb *= f; }
-    ((sr.clamp(0.0, 255.0) as i64) << 16) | ((sg.clamp(0.0, 255.0) as i64) << 8) | (sb.clamp(0.0, 255.0) as i64)
+    // FADE senkt jetzt das ALPHA (statt RGB Richtung Schwarz zu verdunkeln) ->
+    // funktioniert auch im additiven Glow-Modus und auf hellem Hintergrund.
+    // col() liest das obere Byte als Alpha; 0 = deckend, daher min. 1 (so wird
+    // ein fast erloschener Partikel transparent, nicht ploetzlich deckend).
+    let alpha: i64 = if fade { (((1.0 - life_t) * 255.0).round().clamp(1.0, 255.0)) as i64 } else { 255 };
+    (alpha << 24)
+        | ((sr.clamp(0.0, 255.0) as i64) << 16)
+        | ((sg.clamp(0.0, 255.0) as i64) << 8)
+        | (sb.clamp(0.0, 255.0) as i64)
 }
 
 /// Modul-Operator-Dispatch (entspricht `modules.dispatch_binary_op`): vec2 +
