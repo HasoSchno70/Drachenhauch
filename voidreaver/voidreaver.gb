@@ -1,7 +1,10 @@
 ' =====================================================================
 '  VOIDREAVER -- Co-op 3D-Arena-Roguelite
-'  STUFE 1: Vertikale Scheibe -- 3D-Arena, Twin-Stick-Bewegung,
-'           verfolgende Kamera, Beleuchtung (PBR-Held + Schatten-Stimmung).
+'  STUFE 2: Gegner-Schwarm.
+'    * ECS als Daten-Store fuer hunderte Gegner (px/pz/vx/vz)
+'    * Steering Richtung Spieler + Bulk-Bewegung (ECS_INTEGRATE_FLOAT)
+'    * Broadphase-Kollision (Gegner<->Gegner-Separation + Spieler-Kontakt)
+'    * Rendern aller Gegner in EINEM Draw-Call (MODEL_INSTANCED)
 '
 '  Steuerung:
 '    Bewegen : WASD / Pfeiltasten   (oder linker Gamepad-Stick)
@@ -12,16 +15,24 @@
 ' =====================================================================
 
 IMPORT "g3d"
+IMPORT "m3d"
 IMPORT "input"
+IMPORT "ecs"
+IMPORT "physics"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
 CONST ARENA = 18.0          ' halbe Arena-Kantenlaenge (Spielfeld -ARENA..+ARENA)
 CONST PLAYER_R = 0.6
-CONST MOVE_SPEED = 11.0     ' Welt-Einheiten pro Sekunde
+CONST MOVE_SPEED = 11.0     ' Spieler: Welt-Einheiten pro Sekunde
 
-SCREEN(SCR_W, SCR_H, "VOIDREAVER -- Stufe 1", 1)
+CONST ENEMY_COUNT = 320     ' Gegner im Schwarm
+CONST ENEMY_R = 0.45
+CONST ENEMY_SPEED = 4.2     ' Gegner jagen langsamer als der Spieler
+
+SCREEN(SCR_W, SCR_H, "VOIDREAVER -- Stufe 2", 1)
 SETFPS(60)
+RANDOMIZE(MILLIS())
 
 ' --- Input-Bindings ---------------------------------------------------
 INPUT_BIND("move_left",  KEY_LEFT,  KEY_A)
@@ -41,6 +52,7 @@ DIM ground AS INTEGER
 DIM player AS INTEGER
 DIM pillar AS INTEGER
 DIM aimdot AS INTEGER
+DIM enemy_mesh AS INTEGER
 
 ground = MESH_PLANE(ARENA * 2.0, ARENA * 2.0, 1, 1)
 MODEL_LIT(ground)
@@ -55,6 +67,9 @@ MODEL_PBR(pillar, 0.1, 0.8)                          ' matter Stein
 
 aimdot = MESH_SPHERE(0.18, 12, 12)
 MODEL_LIT(aimdot)
+
+enemy_mesh = MESH_CUBE(ENEMY_R * 1.6, ENEMY_R * 1.6, ENEMY_R * 1.6)
+MODEL_LIT(enemy_mesh)                                ' Schwarm wird vom Instancing-Shader beleuchtet
 
 ' --- Saeulen als Hindernisse (feste Positionen) -----------------------
 CONST N_PILLARS = 5
@@ -82,8 +97,30 @@ DIM cam_z AS FLOAT
 cam_x = px
 cam_z = pz + 12.0
 
-DIM t AS FLOAT
-t = 0.0
+' --- ECS-Welt + Gegner-Schwarm aufbauen -------------------------------
+DIM world AS ECS_WORLD
+world = ECS_NEW_WORLD()
+
+DIM ei AS INTEGER
+FOR ei = 0 TO ENEMY_COUNT - 1
+    DIM e AS INTEGER
+    e = ECS_NEW_ENTITY(world)
+    ' Startposition: Ring am Arena-Rand, zufaelliger Winkel/Radius.
+    DIM ang AS FLOAT
+    DIM rad AS FLOAT
+    ang = RANDF(0.0, 6.2832)
+    rad = RANDF(ARENA * 0.55, ARENA * 0.95)
+    ECS_ADD_FLOAT(world, e, "px", COS(ang) * rad)
+    ECS_ADD_FLOAT(world, e, "pz", SIN(ang) * rad)
+    ECS_ADD_FLOAT(world, e, "vx", 0.0)
+    ECS_ADD_FLOAT(world, e, "vz", 0.0)
+NEXT
+
+' Broadphase + Per-Instanz-Matrizen + Broadphase-Index->Entity-Map.
+DIM broad AS PHYSICS_BROAD
+broad = PHYSICS_BROAD_NEW()
+DIM mats[320] AS MAT4
+DIM ent_of[321] AS INTEGER          ' [0] = Spieler (-1), [1..N] = Gegner-Entity
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
@@ -91,16 +128,16 @@ WHILE NOT QUITREQUESTED()
     DIM dt AS FLOAT
     dt = DELTA()
     IF dt > 0.05 THEN dt = 0.05      ' grosse Frame-Spikes daempfen
-    t = t + dt
 
-    ' --- Bewegung (Twin-Stick links: Tastatur ODER Gamepad) ----------
+    ' =================================================================
+    '  SPIELER-BEWEGUNG (Twin-Stick links: Tastatur ODER Gamepad)
+    ' =================================================================
     INPUT_UPDATE()
     DIM mx AS FLOAT
     DIM mz AS FLOAT
     mx = INPUT_AXIS("move_left", "move_right")
-    mz = INPUT_AXIS("move_up", "move_down")          ' up = -z (nach hinten)
+    mz = INPUT_AXIS("move_up", "move_down")
 
-    ' Gamepad-Stick ueberschreibt, falls ausgelenkt.
     DIM jx AS FLOAT
     DIM jy AS FLOAT
     jx = INPUT_JOY_AXIS(0, "left_x")
@@ -110,27 +147,21 @@ WHILE NOT QUITREQUESTED()
         mz = jy
     END IF
 
-    ' Diagonale normalisieren, damit schraeg nicht schneller ist.
     DIM mlen AS FLOAT
     mlen = SQR(mx * mx + mz * mz)
     IF mlen > 1.0 THEN
         mx = mx / mlen
         mz = mz / mlen
     END IF
-
     px = px + mx * MOVE_SPEED * dt
-    pz = pz + mz * MOVE_SPEED * dt          ' move_up liefert +1 -> -z weiter unten gespiegelt
+    pz = pz + mz * MOVE_SPEED * dt
 
-    ' Bewegung "move_up" soll nach hinten (-z) gehen:
-    ' INPUT_AXIS(up,down) = -1 bei up, +1 bei down -> passt direkt zu +z=vorne.
-
-    ' In Arena-Grenzen halten.
     IF px < -ARENA + PLAYER_R THEN px = -ARENA + PLAYER_R
     IF px >  ARENA - PLAYER_R THEN px =  ARENA - PLAYER_R
     IF pz < -ARENA + PLAYER_R THEN pz = -ARENA + PLAYER_R
     IF pz >  ARENA - PLAYER_R THEN pz =  ARENA - PLAYER_R
 
-    ' --- Simple Saeulen-Kollision (wegschieben) ----------------------
+    ' Saeulen-Kollision Spieler.
     DIM pk AS INTEGER
     FOR pk = 0 TO N_PILLARS - 1
         DIM dx AS FLOAT
@@ -140,19 +171,18 @@ WHILE NOT QUITREQUESTED()
         DIM d AS FLOAT
         d = SQR(dx * dx + dz * dz)
         DIM mind AS FLOAT
-        mind = PLAYER_R + 1.2          ' Saeule halbe Breite ~1.0 + etwas Luft
+        mind = PLAYER_R + 1.2
         IF d < mind AND d > 0.001 THEN
             px = pillar_x[pk] + dx / d * mind
             pz = pillar_z[pk] + dz / d * mind
         END IF
     NEXT
 
-    ' --- Zielen: Maus-Bildschirmposition relativ zur Mitte -----------
+    ' Zielen.
     DIM ax AS FLOAT
     DIM az AS FLOAT
     ax = MOUSEX() - SCR_W / 2.0
     az = MOUSEY() - SCR_H / 2.0
-    ' Rechter Stick ueberschreibt.
     DIM rjx AS FLOAT
     DIM rjy AS FLOAT
     rjx = INPUT_JOY_AXIS(0, "right_x")
@@ -168,35 +198,159 @@ WHILE NOT QUITREQUESTED()
         facing_z = az / alen
     END IF
 
-    ' --- Kamera folgt weich (exponentielles Lerp) --------------------
+    ' =================================================================
+    '  GEGNER-SYSTEME (ECS)
+    ' =================================================================
+    DIM enemies AS ARRAY OF INTEGER
+    enemies = ECS_QUERY2(world, "px", "pz")
+
+    ' --- Steering: jeder Gegner setzt seinen Verschiebungs-Vektor ----
+    DIM stepd AS FLOAT
+    stepd = ENEMY_SPEED * dt
+    FOR ei = 0 TO LEN(enemies) - 1
+        DIM en AS INTEGER
+        en = enemies[ei]
+        DIM ex AS FLOAT
+        DIM ez AS FLOAT
+        ex = ECS_GET_FLOAT(world, en, "px")
+        ez = ECS_GET_FLOAT(world, en, "pz")
+        DIM ddx AS FLOAT
+        DIM ddz AS FLOAT
+        ddx = px - ex
+        ddz = pz - ez
+        DIM dl AS FLOAT
+        dl = SQR(ddx * ddx + ddz * ddz)
+        IF dl > 0.001 THEN
+            ECS_ADD_FLOAT(world, en, "vx", ddx / dl * stepd)
+            ECS_ADD_FLOAT(world, en, "vz", ddz / dl * stepd)
+        END IF
+    NEXT
+
+    ' --- Bulk-Bewegung: px += vx / pz += vz nativ ueber alle Gegner --
+    ECS_INTEGRATE_FLOAT(world, "px", "vx")
+    ECS_INTEGRATE_FLOAT(world, "pz", "vz")
+
+    ' --- Broadphase: alle Kreise registrieren (Spieler @ Index 0) ----
+    PHYSICS_BROAD_CLEAR(broad)
+    ent_of[PHYSICS_BROAD_ADD(broad, px, pz, PLAYER_R)] = -1
+    FOR ei = 0 TO LEN(enemies) - 1
+        DIM e2 AS INTEGER
+        e2 = enemies[ei]
+        DIM bi AS INTEGER
+        bi = PHYSICS_BROAD_ADD(broad,
+                               ECS_GET_FLOAT(world, e2, "px"),
+                               ECS_GET_FLOAT(world, e2, "pz"), ENEMY_R)
+        ent_of[bi] = e2
+    NEXT
+
+    ' --- Kollisionspaare aufloesen -----------------------------------
+    DIM npairs AS INTEGER
+    npairs = PHYSICS_BROAD_QUERY(broad)
+    DIM contacts AS INTEGER
+    contacts = 0
+    DIM pp AS INTEGER
+    FOR pp = 0 TO npairs - 1
+        DIM ia AS INTEGER
+        DIM ib AS INTEGER
+        ia = PHYSICS_BROAD_PAIR_A(broad, pp)
+        ib = PHYSICS_BROAD_PAIR_B(broad, pp)
+
+        IF ia = 0 OR ib = 0 THEN
+            ' Spieler <-> Gegner: Gegner ganz aus dem Spielerradius schieben.
+            DIM hit AS INTEGER
+            IF ia = 0 THEN hit = ent_of[ib] ELSE hit = ent_of[ia]
+            contacts = contacts + 1
+            DIM hx AS FLOAT
+            DIM hz AS FLOAT
+            hx = ECS_GET_FLOAT(world, hit, "px") - px
+            hz = ECS_GET_FLOAT(world, hit, "pz") - pz
+            DIM hl AS FLOAT
+            hl = SQR(hx * hx + hz * hz)
+            IF hl < 0.001 THEN
+                hx = 1.0 : hz = 0.0 : hl = 1.0
+            END IF
+            DIM tgt AS FLOAT
+            tgt = PLAYER_R + ENEMY_R
+            ECS_ADD_FLOAT(world, hit, "px", px + hx / hl * tgt)
+            ECS_ADD_FLOAT(world, hit, "pz", pz + hz / hl * tgt)
+        ELSE
+            ' Gegner <-> Gegner: beide je halbe Ueberlappung auseinander.
+            DIM ga AS INTEGER
+            DIM gb AS INTEGER
+            ga = ent_of[ia]
+            gb = ent_of[ib]
+            DIM gax AS FLOAT
+            DIM gaz AS FLOAT
+            DIM gbx AS FLOAT
+            DIM gbz AS FLOAT
+            gax = ECS_GET_FLOAT(world, ga, "px")
+            gaz = ECS_GET_FLOAT(world, ga, "pz")
+            gbx = ECS_GET_FLOAT(world, gb, "px")
+            gbz = ECS_GET_FLOAT(world, gb, "pz")
+            DIM sx AS FLOAT
+            DIM sz AS FLOAT
+            sx = gax - gbx
+            sz = gaz - gbz
+            DIM sl AS FLOAT
+            sl = SQR(sx * sx + sz * sz)
+            IF sl < 0.001 THEN
+                sx = 1.0 : sz = 0.0 : sl = 1.0
+            END IF
+            DIM push AS FLOAT
+            push = (ENEMY_R * 2.0 - sl) * 0.5
+            IF push > 0.0 THEN
+                DIM nx AS FLOAT
+                DIM nz AS FLOAT
+                nx = sx / sl * push
+                nz = sz / sl * push
+                ECS_ADD_FLOAT(world, ga, "px", gax + nx)
+                ECS_ADD_FLOAT(world, ga, "pz", gaz + nz)
+                ECS_ADD_FLOAT(world, gb, "px", gbx - nx)
+                ECS_ADD_FLOAT(world, gb, "pz", gbz - nz)
+            END IF
+        END IF
+    NEXT
+
+    ' --- Per-Instanz-Matrizen fuer den Schwarm bauen -----------------
+    FOR ei = 0 TO LEN(enemies) - 1
+        DIM e3 AS INTEGER
+        e3 = enemies[ei]
+        mats[ei] = MAT4_TRANSLATE(ECS_GET_FLOAT(world, e3, "px"),
+                                  ENEMY_R,
+                                  ECS_GET_FLOAT(world, e3, "pz"))
+    NEXT
+
+    ' --- Kamera folgt weich ------------------------------------------
     DIM follow AS FLOAT
-    follow = 1.0 - POW(0.0001, dt)        ' framerate-unabhaengiges Smoothing
+    follow = 1.0 - POW(0.0001, dt)
     cam_x = cam_x + (px - cam_x) * follow
     cam_z = cam_z + ((pz + 12.0) - cam_z) * follow
-
-    ' --- Punktlicht an den Spieler heften ----------------------------
     LIGHT_SET_POS(glow, px, 2.5, pz)
 
-    ' ================= ZEICHNEN ======================================
+    ' =================================================================
+    '  ZEICHNEN
+    ' =================================================================
     CLS(&H0A0E16)
     CAMERA3D(cam_x, 17.0, cam_z,  px, 0.0, pz,  45.0)
 
-    MODEL(ground, 0, 0, 0, 1.0, &H22304A)      ' solider Boden (klar ueber der BG-Farbe)
-    GRID3D(36, 1.0)                              ' Neon-Gitter darueber
+    MODEL(ground, 0, 0, 0, 1.0, &H22304A)
+    GRID3D(36, 1.0)
 
-    ' Saeulen.
     FOR pk = 0 TO N_PILLARS - 1
         MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
     NEXT
 
-    ' Spieler + Ziel-Marker davor.
+    ' >>> Der ganze Schwarm in EINEM Draw-Call. <<<
+    MODEL_INSTANCED(enemy_mesh, mats, &HE0604C)
+
     MODEL(player, px, PLAYER_R, pz, 1.0, &H30C0E0)
     MODEL(aimdot, px + facing_x * 1.6, PLAYER_R, pz + facing_z * 1.6, 1.0, &HFFD040)
 
     ' --- 2D-HUD obenauf ----------------------------------------------
-    TEXT(12, 10, "VOIDREAVER  -- Stufe 1: 3D-Arena + Twin-Stick", WHITE)
+    TEXT(12, 10, "VOIDREAVER  -- Stufe 2: Gegner-Schwarm (ECS + Instancing)", WHITE)
     TEXT(12, 32, "WASD/Pfeile bewegen . Maus/Stick zielen . ESC beendet", &H88AACC)
-    TEXT(12, SCR_H - 26, f"pos ({px:.1f}, {pz:.1f})   fps {FPS()}", &H66FFCC)
+    IF contacts > 0 THEN TEXT(SCR_W / 2 - 40, 56, "!! KONTAKT !!", &HFF5050)
+    TEXT(12, SCR_H - 26, f"gegner {ENEMY_COUNT}   kontakte {contacts}   fps {FPS()}", &H66FFCC)
 
     FLIP()
 WEND
