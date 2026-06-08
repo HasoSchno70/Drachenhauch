@@ -1513,17 +1513,16 @@ impl Graphics {
         l.enabled = on;
         Ok(())
     }
-    /// Haengt den Lighting-Shader an alle Materialien eines Modells und erzeugt
-    /// die Tangenten (Voraussetzung fuer Normal-Mapping via MODEL_TEXTURE_NORMAL).
+    /// Haengt den Lighting-Shader an alle Materialien eines Modells.
+    /// Tangenten werden NICHT hier erzeugt -- raylibs `GenMeshTangents` setzt ein
+    /// nicht-indiziertes Mesh voraus und warnt sonst ("vertexCount expected to be
+    /// a multiple of 3"). Tangenten braucht nur Normal-Mapping, daher erzeugt sie
+    /// `MODEL_TEXTURE_NORMAL` (model_set_normal) erst bei Bedarf.
     pub fn model_lit(&mut self, model_idx: i64) -> Result<(), String> {
         if self.light_shader.is_none() {
             return Err("MODEL_LIT: zuerst LIGHT_ENABLE() / ein Licht hinzufuegen".into());
         }
         let mi = self.check_model(model_idx, "MODEL_LIT")?;
-        // Tangenten erzeugen (sonst ist die TBN-Basis im Shader degeneriert).
-        for m in self.models[mi].meshes_mut() {
-            m.gen_mesh_tangents(&self.thread);
-        }
         let sh_ffi = *self.light_shader.as_ref().unwrap().as_ref();   // ffi::Shader (Copy)
         for mat in self.models[mi].materials_mut() {
             mat.as_mut().shader = sh_ffi;
@@ -1537,6 +1536,12 @@ impl Graphics {
         let ti = tex_idx as usize;
         if tex_idx < 0 || ti >= self.textures.len() {
             return Err(format!("MODEL_TEXTURE_NORMAL: ungueltiges IMAGE-Handle {}", tex_idx));
+        }
+        // Tangenten erzeugen (TBN-Basis fuer Normal-Mapping). Nur hier noetig --
+        // nicht pauschal in MODEL_LIT, das spart die raylib-"vertexCount"-Warnung
+        // fuer indizierte Meshes (Plane/Cube/...) ohne Normal-Map.
+        for m in self.models[mi].meshes_mut() {
+            m.gen_mesh_tangents(&self.thread);
         }
         for mat in self.models[mi].materials_mut() {
             mat.set_material_texture(raylib::consts::MaterialMapIndex::MATERIAL_MAP_NORMAL, &self.textures[ti].tex);
