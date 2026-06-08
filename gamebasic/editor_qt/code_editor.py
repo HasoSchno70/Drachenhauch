@@ -67,8 +67,6 @@ _HEX_COLOR_RE = re.compile(r"&H([0-9A-Fa-f]{6})(?![0-9A-Fa-f])")
 _RGB_CALL_RE = re.compile(
     r"\bRGB\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)", re.IGNORECASE,
 )
-SWATCH_SIZE = 11
-SWATCH_GAP = 4
 
 
 
@@ -452,14 +450,53 @@ class CodeEditor(
             out.append((m.start(), m.end(), QColor(r, g, b), "rgb"))
         return out
 
-    def _swatch_rect(self, block, end_col: int) -> QRect:
-        """Bildschirm-Rect des Swatches hinter `end_col` in `block`."""
+    def _col_rect(self, block, col: int) -> QRect:
+        """cursorRect an Spalte `col` in `block` (Viewport-Koordinaten)."""
         cur = QTextCursor(self.document())
-        cur.setPosition(block.position() + end_col)
-        r = self.cursorRect(cur)
-        sx = r.right() + SWATCH_GAP
-        sy = r.top() + max(0, (r.height() - SWATCH_SIZE) // 2)
-        return QRect(sx, sy, SWATCH_SIZE, SWATCH_SIZE)
+        cur.setPosition(block.position() + col)
+        return self.cursorRect(cur)
+
+    def _swatch_metrics(self) -> tuple[int, int]:
+        """(Kaestchen-Groesse, Abstand) -- skalieren mit der aktuellen Schrift,
+        damit die Swatches beim Zoomen mitwachsen."""
+        h = self.fontMetrics().height()
+        size = max(8, round(h * 0.6))
+        gap = max(2, round(size * 0.3))
+        return size, gap
+
+    def _swatch_rect(self, block, start_col: int, end_col: int) -> QRect:
+        """Bildschirm-Rect des Swatches fuer das Literal `[start_col, end_col)`.
+
+        Ist hinter dem Literal genug Platz (Zeilenende oder Leerraum), sitzt das
+        farbige Kaestchen wie gewohnt rechts daneben. Folgt direkt Code (z.B.
+        `&HFF0000 : ...` oder `RGB(...)` in Klammern), wuerde ein Kaestchen den
+        Code ueberdecken -- dann zeichnen wir stattdessen einen farbigen
+        Unterstrich UNTER dem Literal (ueberlappt nie Nachbar-Text)."""
+        size, gap = self._swatch_metrics()
+        end_r = self._col_rect(block, end_col)
+        sx = end_r.right() + gap
+
+        # Platz bis zum naechsten Nicht-Leerzeichen hinter dem Literal messen.
+        line = block.text()
+        j = end_col
+        while j < len(line) and line[j] in " \t":
+            j += 1
+        if j < len(line):
+            avail = self._col_rect(block, j).left() - sx
+        else:
+            avail = size + gap + 1   # Zeilenende -> immer genug Platz
+
+        if avail >= size + 1:
+            sy = end_r.top() + max(0, (end_r.height() - size) // 2)
+            return QRect(sx, sy, size, size)
+
+        # Kein Platz: farbiger Unterstrich unter dem Literal.
+        start_r = self._col_rect(block, start_col)
+        bar_h = max(2, size // 4)
+        x0 = start_r.left()
+        x1 = end_r.right()
+        y = end_r.bottom() - bar_h - 1
+        return QRect(x0, y, max(3, x1 - x0), bar_h)
 
     def _swatch_at(self, pos) -> tuple | None:
         """`(abs_start, abs_end, color, kind)` des Swatches unter `pos`
@@ -475,7 +512,7 @@ class CodeEditor(
             if block.isVisible() and br.bottom() >= 0 and (
                     "&H" in text or "RGB" in text.upper()):
                 for start_col, end_col, color, kind in self._scan_color_swatches(text):
-                    if self._swatch_rect(block, end_col).contains(pos):
+                    if self._swatch_rect(block, start_col, end_col).contains(pos):
                         return (block.position() + start_col,
                                 block.position() + end_col, color, kind)
             block = block.next()
@@ -533,8 +570,8 @@ class CodeEditor(
                     painter.drawLine(x, top_y, x, bot_y)
             # --- Color-Swatches --------------------------------------
             if "&H" in text or "RGB" in text.upper():
-                for _start, end_col, color, _kind in self._scan_color_swatches(text):
-                    rect = self._swatch_rect(block, end_col)
+                for start_col, end_col, color, _kind in self._scan_color_swatches(text):
+                    rect = self._swatch_rect(block, start_col, end_col)
                     painter.fillRect(rect, color)
                     painter.setPen(border)
                     painter.drawRect(rect)
