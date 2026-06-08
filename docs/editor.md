@@ -40,6 +40,8 @@ Oder ohne Argumente:
 
 **Activity Bar** (links, 48 px): drei Icon-Buttons schalten den Inhalt der Sidebar um (📂 Dateien / 🧭 Struktur / 🔧 Built-ins). **Klick auf den aktiven Button** klappt die Sidebar komplett zu — gibt dem Editor die volle Breite.
 
+**Explorer (📂 Dateien)**: Oben rechts neben dem Titel „Explorer" sitzen zwei Knöpfe, die den ganzen Baum mit einem Klick **aufklappen** bzw. **einklappen** (Tooltips „Alles ausklappen" / „Alles einklappen") — praktisch bei vielen Ordnern.
+
 **Sidebar-Breite** ist per Maus über den Sash zwischen Sidebar und Editor ziehbar. Die zuletzt eingestellte Breite wird in `~/.gamebasic-editor/settings.json` (`sidebar_width`) gespeichert.
 
 **Statusleiste** zeigt rechts: `Zeile / Spalte / Zeichen-Anzahl`, Encoding (`UTF-8`), `N Tabs`, OK/Fehler-Status, Theme-Indikator. Links: aktive optionale Editor-Deps (`✓ Pillow  ✓ DnD`).

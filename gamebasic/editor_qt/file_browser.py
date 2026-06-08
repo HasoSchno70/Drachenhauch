@@ -21,10 +21,11 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
-    QFrame, QLabel, QLineEdit, QPushButton, QTreeWidget, QTreeWidgetItem,
-    QVBoxLayout, QWidget,
+    QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidget,
+    QTreeWidgetItem, QToolButton, QVBoxLayout, QWidget,
 )
 
+from .icons import icons
 from .theme import COLORS, theme_signals
 
 # Glyphen (Emoji) als leichte Icons -- kein Asset noetig.
@@ -119,8 +120,27 @@ class FileBrowser(QWidget):
         header_layout = QVBoxLayout(self.header)
         header_layout.setContentsMargins(10, 8, 10, 6)
         header_layout.setSpacing(5)
+        # Titelzeile: "Explorer" links, rechts zwei Knoepfe zum Alles
+        # aus-/einklappen des Baums.
+        title_row = QHBoxLayout()
+        title_row.setContentsMargins(0, 0, 0, 0)
+        title_row.setSpacing(2)
         self.title = QLabel("Explorer")
-        header_layout.addWidget(self.title)
+        title_row.addWidget(self.title)
+        title_row.addStretch(1)
+        self.expand_btn = QToolButton()
+        self.expand_btn.setIcon(icons.get("unfold"))
+        self.expand_btn.setAutoRaise(True)
+        self.expand_btn.setToolTip("Alles ausklappen")
+        self.expand_btn.clicked.connect(self.tree_expand_all)
+        title_row.addWidget(self.expand_btn)
+        self.collapse_btn = QToolButton()
+        self.collapse_btn.setIcon(icons.get("fold"))
+        self.collapse_btn.setAutoRaise(True)
+        self.collapse_btn.setToolTip("Alles einklappen")
+        self.collapse_btn.clicked.connect(self.tree_collapse_all)
+        title_row.addWidget(self.collapse_btn)
+        header_layout.addLayout(title_row)
         self.filter_entry = QLineEdit()
         self.filter_entry.setPlaceholderText("filtern (Datei oder Modul) ...")
         self.filter_entry.textChanged.connect(self._apply_filter)
@@ -148,6 +168,15 @@ class FileBrowser(QWidget):
         self._apply_style()
         theme_signals.changed.connect(self._on_theme_changed)
         self.refresh()
+
+    # --------------------------------------------------- Expand/Collapse
+    def tree_expand_all(self) -> None:
+        """Klappt den gesamten Explorer-Baum auf."""
+        self.tree.expandAll()
+
+    def tree_collapse_all(self) -> None:
+        """Klappt den gesamten Explorer-Baum zu (nur die Sektionen bleiben)."""
+        self.tree.collapseAll()
 
     # --------------------------------------------------- Styling
     def _apply_style(self) -> None:
@@ -180,6 +209,9 @@ class FileBrowser(QWidget):
 
     def _on_theme_changed(self, _name: str) -> None:
         self._apply_style()
+        # Icons sind theme-abhaengig -> neu setzen (Cache wurde geleert).
+        self.expand_btn.setIcon(icons.get("unfold"))
+        self.collapse_btn.setIcon(icons.get("fold"))
         self.refresh()
 
     # --------------------------------------------------- Daten
