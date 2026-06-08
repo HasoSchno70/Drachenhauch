@@ -82,6 +82,64 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
+def test_duplex_and_margin_options(app):
+    from gamebasic.editor_qt.print_listing import PrintOptionsDialog
+    dlg = PrintOptionsDialog(None, has_selection=False)
+    # Defaults
+    assert dlg.duplex == "none"
+    assert dlg.margin_mm == 12.0
+    assert dlg.binding_mm == 0.0
+    # Umstellen
+    dlg.cmb_duplex.setCurrentIndex(1)
+    dlg.sp_margin.setValue(8.0)
+    dlg.sp_binding.setValue(15.0)
+    assert dlg.duplex == "long"
+    assert dlg.margin_mm == 8.0
+    assert dlg.binding_mm == 15.0
+    dlg.deleteLater()
+
+
+def test_binding_margin_mirrors_on_duplex(app):
+    # Lochrand bei Doppelseitig (lange Kante): Vorderseite hat ihn links,
+    # Rueckseite rechts -> Text-Tinte auf S1 weiter rechts als auf S2.
+    fitz = pytest.importorskip("fitz")
+    np = pytest.importorskip("numpy")
+    import os
+    import tempfile
+    from PySide6.QtGui import QFont, QTextDocument, QPageLayout
+    from PySide6.QtCore import QMarginsF
+    from PySide6.QtPrintSupport import QPrinter
+    from gamebasic.editor_qt.print_listing import (
+        build_listing_html, _render_with_footer, _DUPLEX_MODES)
+
+    src = "\n".join(f"line_{i} = {i}" for i in range(120))   # > 1 Seite
+    doc = QTextDocument()
+    f = QFont("Consolas"); f.setStyleHint(QFont.StyleHint.Monospace); f.setFixedPitch(True)
+    doc.setDefaultFont(f); doc.setDocumentMargin(0)
+    doc.setHtml(build_listing_html(src, color=False, line_numbers=True, title="t.gb"))
+    out = os.path.join(tempfile.gettempdir(), "_gb_dup_test.pdf")
+    pr = QPrinter(QPrinter.PrinterMode.HighResolution)
+    pr.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+    pr.setOutputFileName(out)
+    pr.setDuplex(_DUPLEX_MODES["long"])
+    pr.setPageMargins(QMarginsF(12, 12, 12, 12), QPageLayout.Unit.Millimeter)
+    _render_with_footer(doc, pr, "t.gb", binding_mm=20.0, mirror_binding=True)
+
+    d = fitz.open(out)
+    assert d.page_count >= 2
+
+    def left_ink(pg):
+        pm = d[pg].get_pixmap(dpi=72)
+        arr = np.frombuffer(pm.samples, dtype=np.uint8).reshape(pm.height, pm.width, pm.n)
+        cols = (arr[:, :, :3] < 250).any(axis=2).any(axis=0).nonzero()[0]
+        return int(cols[0])
+
+    front, back = left_ink(0), left_ink(1)
+    d.close()
+    os.remove(out)
+    assert front > back, f"Lochrand nicht gespiegelt (S1={front}, S2={back})"
+
+
 def test_preview_toolbar_decorated(app):
     """Vorschau-Leiste: Text-Labels an, eigener Drucken-Knopf vorne mit Icon."""
     from PySide6.QtCore import Qt

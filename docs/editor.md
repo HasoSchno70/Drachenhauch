@@ -173,6 +173,9 @@ Das farbige Feld liegt genau über dem Literal und ragt nie in benachbarten Code
 - **Darstellung:** *Farbe* (mit Syntax-Hervorhebung) oder *Schwarz-Weiß*. Die Druckfarben sind eine eigene, papierfreundliche Palette (dunkel auf weiß) — unabhängig vom Editor-Theme, damit ein dunkles Theme nicht hell-auf-weiß und unleserlich druckt. In Schwarz-Weiß bleiben Schlüsselwörter **fett** und Kommentare *kursiv*, die Struktur geht also nicht verloren.
 - **Zeilennummern:** ein-/ausblendbar.
 - **Schriftgröße:** Klein (8 pt) / Normal (10 pt) / Groß (12 pt).
+- **Seiten:** *Einseitig* oder *Doppelseitig* (lange bzw. kurze Kante) — Duplexdruck, sofern der Drucker es unterstützt.
+- **Seitenrand** (mm): gleichmäßiger Rand rund um die Seite.
+- **Lochrand** (mm): zusätzlicher Rand auf der Bindeseite (links), damit du den Ausdruck **lochen/abheften** kannst, ohne Code zu zerschneiden. Bei *Doppelseitig (lange Kante)* wird er auf Rückseiten automatisch nach rechts gespiegelt, damit die Löcher fluchten.
 - **Umfang:** Hast du Text markiert, kannst du wählen zwischen *Nur markierter Bereich* und *Ganzes Listing* (ohne Markierung wird immer das ganze Listing gedruckt).
 
 Danach erscheint eine **Druckvorschau**. Ihre Werkzeugleiste ist beschriftet (alle Knöpfe mit Text, ganz vorne ein deutlicher **Drucken**-Knopf) — auch im dunklen Theme gut erkennbar. Jede Seite trägt oben den Dateinamen als Titel und unten eine Fußzeile mit Dateiname und *Seite X von Y*.

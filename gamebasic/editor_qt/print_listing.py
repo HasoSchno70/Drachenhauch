@@ -15,11 +15,13 @@ from __future__ import annotations
 
 from html import escape
 
-from PySide6.QtCore import QRectF, QSizeF, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPainter, QTextDocument
+from PySide6.QtCore import QMarginsF, QRectF, QSizeF, Qt
+from PySide6.QtGui import (
+    QAction, QColor, QFont, QPageLayout, QPainter, QTextDocument,
+)
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
-    QRadioButton, QToolBar, QVBoxLayout,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
+    QHBoxLayout, QLabel, QRadioButton, QToolBar, QVBoxLayout,
 )
 from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
 
@@ -173,6 +175,44 @@ class PrintOptionsDialog(QDialog):
         size_row.addWidget(self.cmb_size, 1)
         lay.addLayout(size_row)
 
+        # Beidseitig (Duplex)
+        duplex_row = QHBoxLayout()
+        duplex_row.addWidget(QLabel("Seiten:"))
+        self.cmb_duplex = QComboBox()
+        # (Anzeige, key)
+        self._duplex = [
+            ("Einseitig", "none"),
+            ("Doppelseitig (lange Kante)", "long"),
+            ("Doppelseitig (kurze Kante)", "short"),
+        ]
+        for label, key in self._duplex:
+            self.cmb_duplex.addItem(label, key)
+        duplex_row.addWidget(self.cmb_duplex, 1)
+        lay.addLayout(duplex_row)
+
+        # Raender (mm) + Lochrand fuer Lochung
+        margin_row = QHBoxLayout()
+        margin_row.addWidget(QLabel("Seitenrand:"))
+        self.sp_margin = QDoubleSpinBox()
+        self.sp_margin.setRange(0.0, 50.0)
+        self.sp_margin.setSingleStep(1.0)
+        self.sp_margin.setValue(12.0)
+        self.sp_margin.setSuffix(" mm")
+        margin_row.addWidget(self.sp_margin)
+        margin_row.addSpacing(12)
+        margin_row.addWidget(QLabel("Lochrand:"))
+        self.sp_binding = QDoubleSpinBox()
+        self.sp_binding.setRange(0.0, 40.0)
+        self.sp_binding.setSingleStep(1.0)
+        self.sp_binding.setValue(0.0)
+        self.sp_binding.setSuffix(" mm")
+        self.sp_binding.setToolTip(
+            "Zusaetzlicher Rand auf der Bindeseite (links) zum Lochen.\n"
+            "Bei „Doppelseitig (lange Kante)“ wird er auf Rueckseiten gespiegelt.")
+        margin_row.addWidget(self.sp_binding)
+        margin_row.addStretch(1)
+        lay.addLayout(margin_row)
+
         self.rb_all = None
         self.rb_sel = None
         if has_selection:
@@ -208,15 +248,33 @@ class PrintOptionsDialog(QDialog):
     def font_pt(self) -> int:
         return int(self.cmb_size.currentData())
 
+    @property
+    def duplex(self) -> str:
+        """'none' | 'long' | 'short'."""
+        return str(self.cmb_duplex.currentData())
 
-def _render_with_footer(doc: QTextDocument, printer: QPrinter,
-                        footer_left: str) -> None:
+    @property
+    def margin_mm(self) -> float:
+        return float(self.sp_margin.value())
+
+    @property
+    def binding_mm(self) -> float:
+        return float(self.sp_binding.value())
+
+
+def _render_with_footer(doc: QTextDocument, printer: QPrinter, footer_left: str,
+                        *, binding_mm: float = 0.0, mirror_binding: bool = False) -> None:
     """Druckt `doc` Seite fuer Seite und setzt unter jede Seite eine Fusszeile
     (Dateiname links, ``Seite X von Y`` rechts).
 
     Statt ``QTextDocument.print_`` (kann keine Kopf-/Fusszeilen) paginieren wir
     selbst: Die Dokument-Seitenhoehe wird um die Fusszeile verkleinert, dann
     zeichnen wir jede Seite per ``drawContents`` mit passendem Versatz.
+
+    Der normale Seitenrand kommt aus den Drucker-Margins (`pageRect`). `binding_mm`
+    ist ein ZUSAETZLICHER Lochrand auf der Bindeseite (links); bei
+    `mirror_binding` (Doppelseitig lange Kante) wandert er auf Rueckseiten nach
+    rechts, damit die Loecher beim Abheften fluchten.
     """
     painter = QPainter()
     if not painter.begin(printer):
@@ -235,6 +293,11 @@ def _render_with_footer(doc: QTextDocument, printer: QPrinter,
         page_w = page.width() / sx
         page_h = page.height() / sy
 
+        # mm -> Logikpixel (96 dpi): unabhaengig von der Druckeraufloesung.
+        bind = max(0.0, binding_mm) * src_dpi / 25.4
+        bind = min(bind, page_w * 0.5)            # nie mehr als halbe Seite
+        content_w = max(1.0, page_w - bind)
+
         footer_font = QFont("Arial")
         footer_font.setPixelSize(round(8 * src_dpi / 72.0))   # ~8 pt in Logikpixeln
         painter.setFont(footer_font)
@@ -243,23 +306,26 @@ def _render_with_footer(doc: QTextDocument, printer: QPrinter,
         footer_h = line_h + gap
         body_h = max(1.0, page_h - footer_h)
 
-        doc.setPageSize(QSizeF(page_w, body_h))
+        doc.setPageSize(QSizeF(content_w, body_h))
         pages = max(1, doc.pageCount())
 
         for i in range(pages):
             if i > 0:
                 printer.newPage()
+            # Lochrand: Vorderseiten links, bei Spiegelung Rueckseiten rechts.
+            binding_left = (not mirror_binding) or (i % 2 == 0)
+            cx = bind if binding_left else 0.0
             # Seiteninhalt
             painter.save()
-            painter.setClipRect(QRectF(0, 0, page_w, body_h))
-            painter.translate(0, -i * body_h)
-            doc.drawContents(painter, QRectF(0, i * body_h, page_w, body_h))
+            painter.setClipRect(QRectF(cx, 0, content_w, body_h))
+            painter.translate(cx, -i * body_h)
+            doc.drawContents(painter, QRectF(0, i * body_h, content_w, body_h))
             painter.restore()
-            # Fusszeile
+            # Fusszeile (folgt dem Lochrand)
             painter.save()
             painter.setFont(footer_font)
             painter.setPen(QColor("#808080"))
-            frect = QRectF(0, body_h + gap * 0.5, page_w, line_h)
+            frect = QRectF(cx, body_h + gap * 0.5, content_w, line_h)
             painter.drawText(frect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                              footer_left)
             painter.drawText(frect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
@@ -330,8 +396,16 @@ def _decorate_preview(preview: QPrintPreviewDialog) -> None:
         tb.addAction(my_print)
 
 
+_DUPLEX_MODES = {
+    "none": QPrinter.DuplexMode.DuplexNone,
+    "long": QPrinter.DuplexMode.DuplexLongSide,
+    "short": QPrinter.DuplexMode.DuplexShortSide,
+}
+
+
 def print_code(parent, *, code: str, title: str, color: bool,
-               line_numbers: bool, font_pt: int = 10) -> None:
+               line_numbers: bool, font_pt: int = 10, duplex: str = "none",
+               margin_mm: float = 12.0, binding_mm: float = 0.0) -> None:
     """Oeffnet eine Druckvorschau fuer das gegebene Listing."""
     html = build_listing_html(code, color=color, line_numbers=line_numbers,
                               title=title, font_pt=font_pt)
@@ -348,11 +422,18 @@ def print_code(parent, *, code: str, title: str, color: bool,
     printer.setDocName(title)
     if not color:
         printer.setColorMode(QPrinter.ColorMode.GrayScale)
+    printer.setDuplex(_DUPLEX_MODES.get(duplex, QPrinter.DuplexMode.DuplexNone))
+    # Gleichmaessiger Seitenrand (der Lochrand kommt zusaetzlich pro Seite dazu).
+    m = max(0.0, margin_mm)
+    printer.setPageMargins(QMarginsF(m, m, m, m), QPageLayout.Unit.Millimeter)
+
+    mirror = duplex == "long"
 
     preview = QPrintPreviewDialog(printer, parent)
     preview.setWindowTitle(f"Druckvorschau – {title}")
     preview.paintRequested.connect(
-        lambda pr: _render_with_footer(doc, pr, title))
+        lambda pr: _render_with_footer(doc, pr, title,
+                                       binding_mm=binding_mm, mirror_binding=mirror))
     _decorate_preview(preview)
     preview.resize(1040, 760)
     preview.exec()
