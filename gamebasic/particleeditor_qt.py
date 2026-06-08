@@ -161,6 +161,10 @@ class _ColorButton(QPushButton):
         super().__init__(parent)
         self._value = value & 0xFFFFFF
         self.setFixedSize(54, 24)
+        # Eindeutiger objectName -> die Farb-Stylesheet-Regel wird darauf
+        # eingeschraenkt und kann NICHT auf Kind-Widgets (z.B. einen vom Button
+        # geoeffneten Dialog) durchschlagen.
+        self.setObjectName("gbColorSwatch")
         self.clicked.connect(self._pick)
         self._refresh()
 
@@ -174,14 +178,18 @@ class _ColorButton(QPushButton):
     def _refresh(self) -> None:
         c = QColor((self._value >> 16) & 0xFF, (self._value >> 8) & 0xFF,
                    self._value & 0xFF)
+        # Auf diesen Button beschraenkte Regel (objectName) -- so faerbt sie
+        # NUR den Swatch, nie ein Kind-/Dialogfenster.
         self.setStyleSheet(
-            f"background-color: {c.name()}; border: 1px solid {COLORS['border']}; "
-            f"border-radius: 3px;")
+            f"QPushButton#gbColorSwatch {{ background-color: {c.name()}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 3px; }}")
 
     def _pick(self) -> None:
         c = QColor((self._value >> 16) & 0xFF, (self._value >> 8) & 0xFF,
                    self._value & 0xFF)
-        new = QColorDialog.getColor(c, self, "Farbe waehlen")
+        # Dialog an das TOP-LEVEL-Fenster haengen, nicht an diesen (gefaerbten)
+        # Button -- sonst erbt der Dialog dessen Hintergrundfarbe.
+        new = QColorDialog.getColor(c, self.window(), "Farbe waehlen")
         if new.isValid():
             self.set_value((new.red() << 16) | (new.green() << 8) | new.blue())
             self.colorChanged.emit(self._value)
