@@ -26,16 +26,19 @@ IMPORT "gui"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
-CONST ARENA = 18.0
+CONST ARENA = 30.0
 CONST PLAYER_R = 0.6
-CONST MOVE_SPEED = 11.0
+CONST MOVE_SPEED = 12.0
 CONST ENEMY_R = 0.45
-CONST ENEMY_SPEED = 4.2
+CONST ENEMY_SPEED = 4.0
 CONST ENEMY_HP = 24.0
-CONST MAX_ENEMIES = 340
-CONST CELL = 1.5
-CONST GRID = 24
-CONST NCELLS = 576
+CONST MAX_ENEMIES = 170
+CONST CELL = 2.0
+CONST GRID = 30
+CONST NCELLS = 900
+CONST CAM_HEIGHT = 24.0
+CONST CAM_BACK = 18.0
+CONST CAM_FOV = 50.0
 
 ' =====================================================================
 '  GLOBALER ZUSTAND
@@ -55,9 +58,9 @@ DIM pillar_x[8] AS FLOAT
 DIM pillar_z[8] AS FLOAT
 
 ' Navigation (Flow-Field).
-DIM wallc[576] AS INTEGER
-DIM distc[576] AS INTEGER
-DIM bfsq[576] AS INTEGER
+DIM wallc[900] AS INTEGER
+DIM distc[900] AS INTEGER
+DIM bfsq[900] AS INTEGER
 DIM last_pcx AS INTEGER
 DIM last_pcz AS INTEGER
 
@@ -66,6 +69,8 @@ DIM px AS FLOAT
 DIM pz AS FLOAT
 DIM facing_x AS FLOAT
 DIM facing_z AS FLOAT
+DIM aim_x AS FLOAT
+DIM aim_z AS FLOAT
 DIM php AS FLOAT
 DIM cam_x AS FLOAT
 DIM cam_z AS FLOAT
@@ -194,7 +199,7 @@ SUB rebuild_walls()
                 DIM wdz AS FLOAT
                 wdx = wcx - pillar_x[wp]
                 wdz = wcz - pillar_z[wp]
-                IF SQR(wdx * wdx + wdz * wdz) < 1.7 THEN blocked = 1
+                IF SQR(wdx * wdx + wdz * wdz) < 2.2 THEN blocked = 1
             NEXT
             wallc[gz * GRID + gx] = blocked
         NEXT
@@ -203,7 +208,7 @@ END SUB
 
 SUB start_run()
     ' Prozedurale Saeulen.
-    n_pillars = RANDINT(3, 6)
+    n_pillars = RANDINT(4, 7)
     DIM i AS INTEGER
     FOR i = 0 TO n_pillars - 1
         DIM placed AS INTEGER
@@ -247,7 +252,7 @@ SUB start_run()
     n_draw_e = 0 : n_draw_p = 0
 
     DIM si AS INTEGER
-    FOR si = 0 TO 59
+    FOR si = 0 TO 29
         spawn_enemy(world)
     NEXT
 END SUB
@@ -296,23 +301,36 @@ SUB update_play(dt AS FLOAT)
         END IF
     NEXT
 
-    DIM ax AS FLOAT
-    DIM az AS FLOAT
-    ax = MOUSEX() - SCR_W / 2.0
-    az = MOUSEY() - SCR_H / 2.0
+    ' --- Kamera JETZT setzen (damit das Maus-Zielen die aktuelle Kamera nutzt) ---
+    DIM follow AS FLOAT
+    follow = 1.0 - POW(0.0001, dt)
+    cam_x = cam_x + (px - cam_x) * follow
+    cam_z = cam_z + ((pz + CAM_BACK) - cam_z) * follow
+    CAMERA3D(cam_x, CAM_HEIGHT, cam_z,  px, 0.0, pz,  CAM_FOV)
+    LIGHT_SET_POS(glow, px, 2.5, pz)
+
+    ' --- Zielen: Weltpunkt unter dem Mauscursor (Bodenebene y=0) ---
+    aim_x = MOUSE_GROUND_X(0.0)
+    aim_z = MOUSE_GROUND_Z(0.0)
+    DIM adx AS FLOAT
+    DIM adz AS FLOAT
+    adx = aim_x - px
+    adz = aim_z - pz
     DIM rjx AS FLOAT
     DIM rjy AS FLOAT
     rjx = INPUT_JOY_AXIS(0, "right_x")
     rjy = INPUT_JOY_AXIS(0, "right_y")
     IF ABS(rjx) > 0.2 OR ABS(rjy) > 0.2 THEN
-        ax = rjx
-        az = rjy
+        adx = rjx
+        adz = rjy
+        aim_x = px + rjx * 6.0
+        aim_z = pz + rjy * 6.0
     END IF
     DIM alen AS FLOAT
-    alen = SQR(ax * ax + az * az)
+    alen = SQR(adx * adx + adz * adz)
     IF alen > 0.001 THEN
-        facing_x = ax / alen
-        facing_z = az / alen
+        facing_x = adx / alen
+        facing_z = adz / alen
     END IF
 
     ' --- Auto-Feuern via FUNCREF ---
@@ -324,11 +342,11 @@ SUB update_play(dt AS FLOAT)
 
     ' --- Wellen-Spawn ---
     spawn_timer = spawn_timer + dt
-    IF spawn_timer >= 0.5 THEN
-        spawn_timer = spawn_timer - 0.5
+    IF spawn_timer >= 0.8 THEN
+        spawn_timer = spawn_timer - 0.8
         IF ECS_COUNT_WITH(world, "hp") < MAX_ENEMIES THEN
             DIM sj AS INTEGER
-            FOR sj = 0 TO 5
+            FOR sj = 0 TO 3
                 spawn_enemy(world)
             NEXT
         END IF
@@ -613,21 +631,14 @@ SUB update_play(dt AS FLOAT)
     IF contacts > 0 THEN
         DIM cdmg AS INTEGER
         cdmg = contacts
-        IF cdmg > 6 THEN cdmg = 6
-        php = php - cdmg * 6.0 * dt
+        IF cdmg > 4 THEN cdmg = 4
+        php = php - cdmg * 4.0 * dt
         IF php <= 0.0 THEN
             php = 0.0
             IF score > best_score THEN best_score = score
             SCENE_SWITCH("gameover")
         END IF
     END IF
-
-    ' --- Kamera + Glow ---
-    DIM follow AS FLOAT
-    follow = 1.0 - POW(0.0001, dt)
-    cam_x = cam_x + (px - cam_x) * follow
-    cam_z = cam_z + ((pz + 12.0) - cam_z) * follow
-    LIGHT_SET_POS(glow, px, 2.5, pz)
 
     ' --- Instanz-Matrizen (live) ---
     DIM le AS ARRAY OF INTEGER
@@ -660,9 +671,9 @@ END SUB
 ' =====================================================================
 SUB draw_play()
     CLS(&H0A0E16)
-    CAMERA3D(cam_x, 17.0, cam_z,  px, 0.0, pz,  45.0)
+    CAMERA3D(cam_x, CAM_HEIGHT, cam_z,  px, 0.0, pz,  CAM_FOV)
     MODEL(ground, 0, 0, 0, 1.0, &H22304A)
-    GRID3D(36, 1.0)
+    GRID3D(60, 1.0)
     DIM pk AS INTEGER
     FOR pk = 0 TO n_pillars - 1
         MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
@@ -688,7 +699,11 @@ SUB draw_play()
     ECS_REMOVE_DEAD(world, "blife", 0.0)
 
     MODEL(player, px, PLAYER_R, pz, 1.0, &H30C0E0)
-    MODEL(aimdot, px + facing_x * 1.6, PLAYER_R, pz + facing_z * 1.6, 1.0, &HFFD040)
+
+    ' Ziel-Hilfe: Tracer-Linie vom Spieler in Schussrichtung + Marker am Cursor.
+    LINE3D(px, 0.12, pz, px + facing_x * 6.0, 0.12, pz + facing_z * 6.0, &HFFE040)
+    MODEL(aimdot, px + facing_x * 1.4, PLAYER_R, pz + facing_z * 1.4, 1.0, &HFFD040)
+    MODEL(aimdot, aim_x, 0.2, aim_z, 1.6, &HFF8030)
 
     ' HUD
     BOX(12, SCR_H - 40, 12 + 200, SCR_H - 28, &H203040)
@@ -696,6 +711,15 @@ SUB draw_play()
     TEXT(12, SCR_H - 56, f"HP {INT(php)}", &HBFE8C8)
     TEXT(12, 10, f"score {score}   kills {kills}   waffe lvl {weapon.wlevel}", &H88AACC)
     TEXT(SCR_W - 220, 10, f"gegner {n_draw_e}   fps {FPS()}", &H66FFCC)
+
+    ' Fadenkreuz am Mauscursor.
+    DIM mcx AS INTEGER
+    DIM mcy AS INTEGER
+    mcx = MOUSEX()
+    mcy = MOUSEY()
+    LINE(mcx - 10, mcy, mcx + 10, mcy, &HFFD040)
+    LINE(mcx, mcy - 10, mcx, mcy + 10, &HFFD040)
+    CIRCLE(mcx, mcy, 6, &HFFD040)
 END SUB
 
 ' =====================================================================
