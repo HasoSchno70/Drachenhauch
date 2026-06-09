@@ -3178,6 +3178,11 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "loadmodel" => Value::Int(g!().load_model(gs(a,0,"LOADMODEL")?)?),
+            "model_load_anims" => Value::Int(g!().load_model_anims(gs(a,0,"MODEL_LOAD_ANIMS")?)?),
+            "model_anim_count" => Value::Int(g!().anim_count(gi(a,0,"MODEL_ANIM_COUNT")?)?),
+            "model_anim_frames" => Value::Int(g!().anim_frames(gi(a,0,"MODEL_ANIM_FRAMES")?, gi(a,1,"MODEL_ANIM_FRAMES")?)?),
+            "model_anim_name" => Value::str_rc(&g!().anim_name(gi(a,0,"MODEL_ANIM_NAME")?, gi(a,1,"MODEL_ANIM_NAME")?)?),
+            "model_animate" => { g!().model_animate(gi(a,0,"MODEL_ANIMATE")?, gi(a,1,"MODEL_ANIMATE")?, gi(a,2,"MODEL_ANIMATE")?, gi(a,3,"MODEL_ANIMATE")? as i32)?; Value::Nil }
             "mesh_cube" => Value::Int(g!().mesh_cube(
                 need_f(a,0,"MESH_CUBE")? as f32, need_f(a,1,"MESH_CUBE")? as f32, need_f(a,2,"MESH_CUBE")? as f32)?),
             "mesh_sphere" => Value::Int(g!().mesh_sphere(

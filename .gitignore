@@ -33,4 +33,6 @@ examples/assets/cybermatic_pulse.ogg
 examples/assets/techno_messup.ogg
 # HDR-Environment fuer HDR-IBL-Demo (via download_hdri.py geladen)
 examples/assets/ibl_env.hdr
+# Geriggtes Modell fuer Skelett-Animations-Demo (via download_robot.py geladen)
+examples/assets/robot.glb
 examples/highscores.txt

@@ -639,6 +639,22 @@ void main()
 }
 "#;
 
+/// Besitzt das von raylib `LoadModelAnimations` allokierte Array roh. Wir nutzen
+/// die ffi direkt, weil der raylib-rs-Wrapper die Structs flach kopiert und dann
+/// `UnloadModelAnimations` ruft (gibt bones/framePoses frei) -> Use-after-free.
+/// Hier bleibt das Array am Leben und wird erst beim Drop sauber freigegeben.
+struct AnimSet {
+    ptr: *mut raylib::ffi::ModelAnimation,
+    count: i32,
+}
+impl Drop for AnimSet {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe { raylib::ffi::UnloadModelAnimations(self.ptr, self.count); }
+        }
+    }
+}
+
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -671,6 +687,8 @@ pub struct Graphics {
     cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
+    // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set ein rohes raylib-Array.
+    model_anims: Vec<AnimSet>,
     // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
     // ersten LIGHT_ENABLE geladen; lights[] sind bis zu MAX_LIGHTS Lichter.
     light_shader: Option<Shader>,
@@ -812,6 +830,7 @@ impl Graphics {
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
             cmds3d: Vec::new(),
             models: Vec::new(),
+            model_anims: Vec::new(),
             light_shader: None,
             normal_mapped: std::collections::HashSet::new(),
             loc_use_normal: -1,
@@ -1033,6 +1052,61 @@ impl Graphics {
             .map_err(|e| format!("LOADMODEL: '{}' nicht ladbar: {}", path, e))?;
         self.models.push(m);
         Ok((self.models.len() - 1) as i64)
+    }
+    /// Laedt Skelett-Animationen (GLTF/IQM/M3D) aus einer Datei -> ANIM_SET-Index.
+    pub fn load_model_anims(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let c = std::ffi::CString::new(resolved.as_str())
+            .map_err(|_| "MODEL_LOAD_ANIMS: ungueltiger Pfad".to_string())?;
+        let mut count: i32 = 0;
+        let ptr = unsafe { raylib::ffi::LoadModelAnimations(c.as_ptr(), &mut count) };
+        if ptr.is_null() || count <= 0 {
+            return Err(format!("MODEL_LOAD_ANIMS: '{}' enthaelt keine Animationen", path));
+        }
+        self.model_anims.push(AnimSet { ptr, count });
+        Ok((self.model_anims.len() - 1) as i64)
+    }
+    fn check_anim(&self, set: i64, idx: i64, fn_: &str) -> Result<(usize, isize), String> {
+        let s = set as usize;
+        if set < 0 || s >= self.model_anims.len() {
+            return Err(format!("{}: ungueltiges ANIM_SET-Handle {}", fn_, set));
+        }
+        let cnt = self.model_anims[s].count as i64;
+        if idx < 0 || idx >= cnt {
+            return Err(format!("{}: Animations-Index {} ausserhalb [0..{}]", fn_, idx, cnt - 1));
+        }
+        Ok((s, idx as isize))
+    }
+    /// Anzahl Animationen im Set.
+    pub fn anim_count(&self, set: i64) -> Result<i64, String> {
+        let s = set as usize;
+        if set < 0 || s >= self.model_anims.len() {
+            return Err(format!("MODEL_ANIM_COUNT: ungueltiges ANIM_SET-Handle {}", set));
+        }
+        Ok(self.model_anims[s].count as i64)
+    }
+    /// Frame-Anzahl einer Animation.
+    pub fn anim_frames(&self, set: i64, idx: i64) -> Result<i64, String> {
+        let (s, a) = self.check_anim(set, idx, "MODEL_ANIM_FRAMES")?;
+        Ok(unsafe { (*self.model_anims[s].ptr.offset(a)).frameCount } as i64)
+    }
+    /// Name einer Animation (leer falls keiner gesetzt).
+    pub fn anim_name(&self, set: i64, idx: i64) -> Result<String, String> {
+        let (s, a) = self.check_anim(set, idx, "MODEL_ANIM_NAME")?;
+        let raw = unsafe { (*self.model_anims[s].ptr.offset(a)).name };
+        let bytes: Vec<u8> = raw.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
+    /// Setzt das Modell auf Frame `frame` der Animation `anim_idx` aus `set`.
+    pub fn model_animate(&mut self, model_idx: i64, set: i64, anim_idx: i64, frame: i32) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_ANIMATE")?;
+        let (s, a) = self.check_anim(set, anim_idx, "MODEL_ANIMATE")?;
+        let anim = unsafe { *self.model_anims[s].ptr.offset(a) };   // ffi::ModelAnimation (Copy)
+        let frames = anim.frameCount.max(1);
+        let f = frame.rem_euclid(frames);                          // loopt automatisch
+        let model_ffi = *self.models[mi].as_mut();                 // ffi::Model (Copy)
+        unsafe { raylib::ffi::UpdateModelAnimation(model_ffi, anim, f); }
+        Ok(())
     }
     /// Baut aus einem generierten Mesh ein Modell und gibt das Handle zurueck.
     fn push_model_from_mesh(&mut self, mesh: Mesh, fn_: &str) -> Result<i64, String> {

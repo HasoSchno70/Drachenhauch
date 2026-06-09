@@ -1,0 +1,69 @@
+' 108_skeletal_anim.gb -- Skelett-Animation (GLTF) -- native-only (F6)
+'
+' raylib laedt geriggte Modelle (GLTF/IQM) inkl. ihrer Skelett-Animationen.
+' gbrt exponiert sie ueber:
+'
+'   MODEL_LOAD_ANIMS(pfad$)            -> ANIM_SET-Handle (Integer)
+'   MODEL_ANIM_COUNT(set)             -> Anzahl Animationen
+'   MODEL_ANIM_NAME(set, i)           -> Name (z.B. "Robot_Walking")
+'   MODEL_ANIM_FRAMES(set, i)         -> Frame-Anzahl
+'   MODEL_ANIMATE(model, set, i, frame)  ' setzt die Pose (frame loopt automatisch)
+'
+' Danach das Modell wie gewohnt mit MODEL/MODEL_EX zeichnen.
+'
+' Modell holen (einmalig, CC0):  py examples\assets\download_robot.py
+' SPACE = naechste Animation. ESC = beenden.
+
+IMPORT "g3d"
+
+SCREEN(800, 520, "Skelett-Animation (GLTF)", 1)
+SETFPS(60)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H303848, 0.7)
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.3, &HFFF0E0)
+DIM lamp AS INTEGER
+lamp = LIGHT_POINT(4, 6, 4, &H80C0FF)
+
+DIM robot AS INTEGER
+DIM anims AS INTEGER
+robot = LOADMODEL("assets/robot.glb")
+MODEL_LIT(robot)
+anims = MODEL_LOAD_ANIMS("assets/robot.glb")
+
+DIM cur AS INTEGER
+DIM frame AS FLOAT
+DIM total AS INTEGER
+cur = 10                         ' "Robot_Walking"
+frame = 0.0
+total = MODEL_ANIM_COUNT(anims)
+
+DIM t AS FLOAT
+t = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+    IF KEYPRESSED(KEY_SPACE) THEN
+        cur = (cur + 1) MOD total
+        frame = 0.0
+        SLEEP(150)               ' simple Entprellung
+    END IF
+
+    DIM dt AS FLOAT
+    dt = DELTA()
+    IF dt > 0.05 THEN dt = 0.05
+    t = t + dt
+    frame = frame + dt * 60.0     ' Animation abspielen (~60 fps)
+
+    ' Pose setzen + Modell zeichnen.
+    MODEL_ANIMATE(robot, anims, cur, INT(frame))
+
+    CLS(&H0A0E16)
+    CAMERA3D(SIN(t * 0.3) * 9.0, 7.0, COS(t * 0.3) * 9.0,  0.0, 4.0, 0.0,  50.0)
+    GRID3D(16, 1.0)
+    MODEL_EX(robot, 0, 0, 0,  0, 1, 0, 180.0,  1.0, WHITE)
+
+    TEXT(12, 10, "Skelett-Animation (GLTF) -- SPACE = naechste", WHITE)
+    TEXT(12, 34, f"[{cur}] {MODEL_ANIM_NAME(anims, cur)}   frame {INT(frame) MOD MODEL_ANIM_FRAMES(anims, cur)} / {MODEL_ANIM_FRAMES(anims, cur)}", &H88FFCC)
+    FLIP()
+WEND
