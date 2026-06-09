@@ -41,4 +41,5 @@ voidreaver/voidreaver.db*
 # Kaminfeuer-Demo: freie Assets (via fireplace/assets/download.py geladen)
 fireplace/assets/fireplace.jpg
 fireplace/assets/fire.ogg
+fireplace/assets/wind.mp3
 examples/highscores.txt

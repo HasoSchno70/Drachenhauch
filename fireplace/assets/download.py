@@ -27,7 +27,8 @@ ASSETS = [
      HERE / "fireplace.jpg", 50_000),
     ("https://upload.wikimedia.org/wikipedia/commons/b/b1/Campfire_sound_ambience.ogg",
      HERE / "fire.ogg", 50_000),
-    # (Wind wird im Demo synthetisch erzeugt -> kein Download noetig.)
+    # Wind (assets/wind.mp3) ist optional + selbst beizulegen (z.B. Pixabay).
+    # Fehlt die Datei, laeuft das Demo einfach ohne Wind.
 ]
 
 

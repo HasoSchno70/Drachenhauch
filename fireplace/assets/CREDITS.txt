@@ -15,6 +15,9 @@ Git-Repo. Ihre Lizenzen verlangen Namensnennung:
    Quelle:  https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg
             (urspruenglich Freesound.org)
 
-Der Wind (gedaempfte Boeen) wird synthetisch via AUDIO_SFX erzeugt -- kein
-externes Asset. Auch das Feuer (Partikel) + Flackerlicht ist eigener
-GameBasic-Code.
+3) wind.mp3  -- Winter-Wind in Boeen (optional, vom Nutzer beigelegt)
+   "dragon-studio-freezing-winter-wind" (Pixabay). Wird im Demo leise + in
+   sanft ein-/ausgeblendeten Boeen abgespielt. Fehlt die Datei, laeuft das
+   Demo ohne Wind. Lizenz/Quelle bitte selbst pruefen.
+
+Das Feuer (Partikel) + Flackerlicht ist eigener GameBasic-Code.

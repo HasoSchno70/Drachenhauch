@@ -26,6 +26,7 @@ CONST IMGX = 160
 CONST FIRE_CX = 620.0
 CONST FIRE_BASE = 516.0
 CONST FIRE_WIDTH = 44.0
+CONST WIND_PEAK = 0.34         ' max. Wind-Lautstaerke (leise -> Feuer dominiert)
 
 SCREEN(W, H, "Kaminfeuer")
 SET_FULLSCREEN(TRUE)
@@ -45,18 +46,18 @@ END IF
 ' --- Sound: knisterndes Feuer im Loop (volle Lautstaerke) ---
 IF FILEEXISTS("assets/fire.ogg") THEN PLAYMUSIC("assets/fire.ogg", 0, 1.0)
 
-' --- Wind: gedaempfte, leise Boeen (synthetisch) ---
-' Tiefes Rauschen mit langsamer Huellkurve = dumpfes Heulen wie durch dickes
-' Gemaeuer (kein greller Howl-Loop). AUDIO_SFX(wf, freq, slide, atk, sus, dec,
-' vibDepth, vibSpeed, vol) -> SOUND. Drei Varianten fuer Abwechslung.
-DIM wind0 AS SOUND
-DIM wind1 AS SOUND
-DIM wind2 AS SOUND
-wind0 = AUDIO_SFX("noise", 70.0,  -8.0, 1500, 1700, 2700, 11.0, 0.7, 0.16)
-wind1 = AUDIO_SFX("noise", 90.0, -12.0, 1300, 1500, 2400,  9.0, 0.9, 0.15)
-wind2 = AUDIO_SFX("noise", 55.0,  -6.0, 1700, 2000, 3000, 13.0, 0.5, 0.17)
-DIM wind_timer AS FLOAT
-wind_timer = RANDF(6.0, 12.0)
+' --- Wind: echtes Winter-Wind-Sample, leise + in Boeen (ein-/ausgeblendet) ---
+DIM has_wind AS BOOLEAN
+DIM wind_snd AS SOUND
+DIM wind_state AS INTEGER       ' 0=Pause 1=einblenden 2=halten 3=ausblenden
+DIM wind_t AS FLOAT
+has_wind = FALSE
+IF FILEEXISTS("assets/wind.mp3") THEN
+    wind_snd = LOADSOUND("assets/wind.mp3")
+    has_wind = TRUE
+END IF
+wind_state = 0
+wind_t = RANDF(8.0, 16.0)       ' erste Boe nach kurzer Pause
 
 ' --- Feuer-Schichten (kompakt + fein) ----------------------------------
 DIM ps_smoke AS PARTICLE_SYSTEM
@@ -121,16 +122,40 @@ WHILE NOT QUITREQUESTED()
     dts = dt * 0.001
     t = t + dts
 
-    ' Wind-Boeen: gelegentlich eine gedaempfte Boe anspielen (Huellkurve klingt
-    ' selbst aus -> kein hartes Stoppen).
-    wind_timer = wind_timer - dts
-    IF wind_timer <= 0.0 THEN
-        DIM wsel AS INTEGER
-        wsel = RANDINT(0, 2)
-        IF wsel = 0 THEN PLAYSOUND(wind0)
-        IF wsel = 1 THEN PLAYSOUND(wind1)
-        IF wsel = 2 THEN PLAYSOUND(wind2)
-        wind_timer = RANDF(11.0, 22.0)
+    ' Wind-Boeen: gelegentlich, sanft ein- und ausgeblendet (wie echter Wind).
+    IF has_wind THEN
+        IF wind_state = 0 THEN              ' Pause
+            wind_t = wind_t - dts
+            IF wind_t <= 0.0 THEN
+                PLAYSOUND(wind_snd)
+                AUDIO_SET_VOLUME(wind_snd, 0.0)
+                wind_state = 1 : wind_t = 0.0
+            END IF
+        ELSEIF wind_state = 1 THEN          ' einblenden (~2.5s)
+            wind_t = wind_t + dts
+            DIM lv AS FLOAT
+            lv = WIND_PEAK * (wind_t / 2.5)
+            IF lv > WIND_PEAK THEN lv = WIND_PEAK
+            AUDIO_SET_VOLUME(wind_snd, lv)
+            IF wind_t >= 2.5 THEN
+                wind_state = 2 : wind_t = RANDF(3.0, 7.0)
+            END IF
+        ELSEIF wind_state = 2 THEN          ' halten
+            wind_t = wind_t - dts
+            IF wind_t <= 0.0 THEN
+                wind_state = 3 : wind_t = 0.0
+            END IF
+        ELSE                                ' ausblenden (~3.5s)
+            wind_t = wind_t + dts
+            DIM lo AS FLOAT
+            lo = WIND_PEAK * (1.0 - wind_t / 3.5)
+            IF lo < 0.0 THEN lo = 0.0
+            AUDIO_SET_VOLUME(wind_snd, lo)
+            IF wind_t >= 3.5 THEN
+                STOPSOUND(wind_snd)
+                wind_state = 0 : wind_t = RANDF(15.0, 30.0)
+            END IF
+        END IF
     END IF
 
     DIM fl AS FLOAT
