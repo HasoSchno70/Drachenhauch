@@ -749,7 +749,7 @@ SUB update_levelup()
         weapon.wlevel = weapon.wlevel + 1
         php = php + 20.0
         IF php > 100.0 THEN php = 100.0
-        GUI_DESTROY(lvl_win)
+        GUI_WINDOW_DESTROY(lvl_win)
         SCENE_POP()
     END IF
 END SUB
