@@ -1,16 +1,22 @@
 ' =====================================================================
-'  Kaminfeuer -- gemuetliches Grafik-Demo (Vollbild)
+'  Kaminfeuer -- gemuetliches Grafik-Demo (Vollbild, interaktiv)
 '
 '  Ein prozedurales, geschichtetes Partikel-Feuer (Flammen + heisser Kern +
 '  Funken + Rauch) brennt vor einem echten Kaminbild, mit knisterndem
-'  Feuer-Sound und warm flackerndem Licht.
+'  Feuer-Sound, warm flackerndem Licht und gelegentlichen Wind-Boeen.
+'
+'  Steuerung:
+'    Linke Maustaste ziehen  -> Feuer an die gewuenschte Stelle setzen
+'    Mausrad                 -> Feuer groesser / kleiner
+'    ESC                     -> beenden
 '
 '  Assets (frei, einmalig holen):   py fireplace\assets\download.py
 '    fireplace.jpg  -- Steinkamin, Wikimedia Commons / CEllen (CC BY-SA 4.0)
 '    fire.ogg       -- Knistern, Wikimedia Commons / Glaneur de sons (CC BY 3.0)
+'    wind.mp3       -- optional, selbst beilegen (siehe CREDITS.txt)
 '  Laeuft auch OHNE die Dateien (prozeduraler Ersatz-Kamin, stumm).
 '
-'  ESC = beenden.   Native:  gbrun.py --native fireplace\fireplace.gb
+'  Native:  gbrun.py --native fireplace\fireplace.gb
 ' =====================================================================
 
 IMPORT "particles"
@@ -19,20 +25,24 @@ IMPORT "audio"
 
 CONST W = 1280
 CONST H = 720
-' Das 4:3-Kaminbild wird hoehenfuellend (960x720) zentriert -> Letterbox.
-CONST IMGW = 960
+CONST IMGW = 960          ' 4:3-Kaminbild hoehenfuellend, zentriert (Letterbox)
 CONST IMGX = 160
-' Lage der Feuerstelle (auf den Holzscheiten, in Bildschirm-Koordinaten).
-CONST FIRE_CX = 620.0
-CONST FIRE_BASE = 516.0
-CONST FIRE_WIDTH = 44.0
-CONST WIND_PEAK = 0.34         ' max. Wind-Lautstaerke (leise -> Feuer dominiert)
+CONST FIRE_W0 = 44.0      ' Basis-Breite der Feuerbasis (mal Skalierung)
+CONST WIND_PEAK = 0.22    ' max. Wind-Lautstaerke (leise -> Feuer dominiert klar)
 
 SCREEN(W, H, "Kaminfeuer")
 SET_FULLSCREEN(TRUE)
 RANDOMIZE(MILLIS())
 
-' --- Hintergrund: echtes Kaminbild (skaliert) oder prozeduraler Ersatz ---
+' Veraenderbare Feuer-Lage + -Groesse (per Maus steuerbar).
+DIM fire_x AS FLOAT
+DIM fire_y AS FLOAT
+DIM fire_scale AS FLOAT
+fire_x = 620.0
+fire_y = 516.0
+fire_scale = 1.0
+
+' --- Hintergrund ---
 DIM has_bg AS BOOLEAN
 DIM bg AS IMAGE
 has_bg = FALSE
@@ -43,13 +53,13 @@ IF FILEEXISTS("assets/fireplace.jpg") THEN
     has_bg = TRUE
 END IF
 
-' --- Sound: knisterndes Feuer im Loop (volle Lautstaerke) ---
+' --- Sound: knisterndes Feuer im Loop ---
 IF FILEEXISTS("assets/fire.ogg") THEN PLAYMUSIC("assets/fire.ogg", 0, 1.0)
 
-' --- Wind: echtes Winter-Wind-Sample, leise + in Boeen (ein-/ausgeblendet) ---
+' --- Wind: echtes Sample, leise + in sanft ein-/ausgeblendeten Boeen ---
 DIM has_wind AS BOOLEAN
 DIM wind_snd AS SOUND
-DIM wind_state AS INTEGER       ' 0=Pause 1=einblenden 2=halten 3=ausblenden
+DIM wind_state AS INTEGER
 DIM wind_t AS FLOAT
 has_wind = FALSE
 IF FILEEXISTS("assets/wind.mp3") THEN
@@ -57,52 +67,59 @@ IF FILEEXISTS("assets/wind.mp3") THEN
     has_wind = TRUE
 END IF
 wind_state = 0
-wind_t = RANDF(8.0, 16.0)       ' erste Boe nach kurzer Pause
+wind_t = RANDF(8.0, 16.0)
 
-' --- Feuer-Schichten (kompakt + fein) ----------------------------------
+' --- Feuer-Schichten (Farbe/Modus fest, Groesse/Tempo skaliert) ---
 DIM ps_smoke AS PARTICLE_SYSTEM
-ps_smoke = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE - 95.0)
-PARTICLE_SET_VELOCITY(ps_smoke, -14.0, 14.0, -55.0, -28.0)
-PARTICLE_SET_GRAVITY(ps_smoke, 0.0, -10.0)
+ps_smoke = PARTICLE_SYSTEM_NEW(fire_x, fire_y - 95.0)
 PARTICLE_SET_LIFETIME(ps_smoke, 900, 1700)
-PARTICLE_SET_SIZE(ps_smoke, 6, 14)
 PARTICLE_SET_COLOR(ps_smoke, &H141110)
 PARTICLE_SET_COLOR_END(ps_smoke, &H050405)
 PARTICLE_SET_FADE(ps_smoke, TRUE)
 PARTICLE_SET_MODE(ps_smoke, "glow")
 
 DIM ps_flame AS PARTICLE_SYSTEM
-ps_flame = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
-PARTICLE_SET_VELOCITY(ps_flame, -22.0, 22.0, -205.0, -130.0)
-PARTICLE_SET_GRAVITY(ps_flame, 0.0, -45.0)
+ps_flame = PARTICLE_SYSTEM_NEW(fire_x, fire_y)
 PARTICLE_SET_LIFETIME(ps_flame, 460, 850)
-PARTICLE_SET_SIZE(ps_flame, 5, 12)
 PARTICLE_SET_COLOR(ps_flame, &HFFD050)
 PARTICLE_SET_COLOR_END(ps_flame, &HC81400)
 PARTICLE_SET_FADE(ps_flame, TRUE)
 PARTICLE_SET_MODE(ps_flame, "glow")
 
 DIM ps_core AS PARTICLE_SYSTEM
-ps_core = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
-PARTICLE_SET_VELOCITY(ps_core, -12.0, 12.0, -150.0, -105.0)
-PARTICLE_SET_GRAVITY(ps_core, 0.0, -42.0)
+ps_core = PARTICLE_SYSTEM_NEW(fire_x, fire_y)
 PARTICLE_SET_LIFETIME(ps_core, 260, 460)
-PARTICLE_SET_SIZE(ps_core, 3, 6)
 PARTICLE_SET_COLOR(ps_core, &HFFF6C8)
 PARTICLE_SET_COLOR_END(ps_core, &HFF7000)
 PARTICLE_SET_FADE(ps_core, TRUE)
 PARTICLE_SET_MODE(ps_core, "glow")
 
 DIM ps_spark AS PARTICLE_SYSTEM
-ps_spark = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
-PARTICLE_SET_VELOCITY(ps_spark, -45.0, 45.0, -210.0, -110.0)
-PARTICLE_SET_GRAVITY(ps_spark, 0.0, 90.0)
+ps_spark = PARTICLE_SYSTEM_NEW(fire_x, fire_y)
 PARTICLE_SET_LIFETIME(ps_spark, 450, 1000)
-PARTICLE_SET_SIZE(ps_spark, 2, 2)
 PARTICLE_SET_COLOR(ps_spark, &HFFF0A0)
 PARTICLE_SET_COLOR_END(ps_spark, &HFF4000)
 PARTICLE_SET_FADE(ps_spark, TRUE)
 PARTICLE_SET_MODE(ps_spark, "streak")
+
+' Groessen-/Tempo-Parameter aus fire_scale ableiten (bei Aenderung neu setzen).
+SUB apply_scale()
+    DIM s AS FLOAT
+    s = fire_scale
+    PARTICLE_SET_VELOCITY(ps_flame, -22.0 * s, 22.0 * s, -205.0 * s, -130.0 * s)
+    PARTICLE_SET_GRAVITY(ps_flame, 0.0, -45.0 * s)
+    PARTICLE_SET_SIZE(ps_flame, INT(5.0 * s) + 1, INT(12.0 * s) + 1)
+    PARTICLE_SET_VELOCITY(ps_core, -12.0 * s, 12.0 * s, -150.0 * s, -105.0 * s)
+    PARTICLE_SET_GRAVITY(ps_core, 0.0, -42.0 * s)
+    PARTICLE_SET_SIZE(ps_core, INT(3.0 * s) + 1, INT(6.0 * s) + 1)
+    PARTICLE_SET_VELOCITY(ps_spark, -45.0 * s, 45.0 * s, -210.0 * s, -110.0 * s)
+    PARTICLE_SET_GRAVITY(ps_spark, 0.0, 90.0)
+    PARTICLE_SET_SIZE(ps_spark, 2, 2)
+    PARTICLE_SET_VELOCITY(ps_smoke, -14.0 * s, 14.0 * s, -55.0 * s, -28.0 * s)
+    PARTICLE_SET_GRAVITY(ps_smoke, 0.0, -10.0)
+    PARTICLE_SET_SIZE(ps_smoke, INT(6.0 * s) + 1, INT(14.0 * s) + 1)
+END SUB
+apply_scale()
 
 DIM t AS FLOAT
 t = 0.0
@@ -122,16 +139,30 @@ WHILE NOT QUITREQUESTED()
     dts = dt * 0.001
     t = t + dts
 
-    ' Wind-Boeen: gelegentlich, sanft ein- und ausgeblendet (wie echter Wind).
+    ' --- Interaktion: Feuer ziehen (linke Maustaste) + skalieren (Mausrad) ---
+    IF MOUSEBUTTON(0) THEN
+        fire_x = MOUSEX()
+        fire_y = MOUSEY()
+    END IF
+    DIM wheel AS INTEGER
+    wheel = MOUSEWHEEL()
+    IF wheel <> 0 THEN
+        fire_scale = fire_scale + wheel * 0.08
+        IF fire_scale < 0.35 THEN fire_scale = 0.35
+        IF fire_scale > 1.6 THEN fire_scale = 1.6
+        apply_scale()
+    END IF
+
+    ' --- Wind-Boeen (sanft ein-/ausgeblendet) ---
     IF has_wind THEN
-        IF wind_state = 0 THEN              ' Pause
+        IF wind_state = 0 THEN
             wind_t = wind_t - dts
             IF wind_t <= 0.0 THEN
                 PLAYSOUND(wind_snd)
                 AUDIO_SET_VOLUME(wind_snd, 0.0)
                 wind_state = 1 : wind_t = 0.0
             END IF
-        ELSEIF wind_state = 1 THEN          ' einblenden (~2.5s)
+        ELSEIF wind_state = 1 THEN
             wind_t = wind_t + dts
             DIM lv AS FLOAT
             lv = WIND_PEAK * (wind_t / 2.5)
@@ -140,12 +171,12 @@ WHILE NOT QUITREQUESTED()
             IF wind_t >= 2.5 THEN
                 wind_state = 2 : wind_t = RANDF(3.0, 7.0)
             END IF
-        ELSEIF wind_state = 2 THEN          ' halten
+        ELSEIF wind_state = 2 THEN
             wind_t = wind_t - dts
             IF wind_t <= 0.0 THEN
                 wind_state = 3 : wind_t = 0.0
             END IF
-        ELSE                                ' ausblenden (~3.5s)
+        ELSE
             wind_t = wind_t + dts
             DIM lo AS FLOAT
             lo = WIND_PEAK * (1.0 - wind_t / 3.5)
@@ -163,19 +194,21 @@ WHILE NOT QUITREQUESTED()
     IF fl < 0.4 THEN fl = 0.4
     IF fl > 1.2 THEN fl = 1.2
 
-    ' --- Emission (schmale Feuerbasis, fein) ---
+    ' --- Emission (Basisbreite skaliert mit) ---
+    DIM fw AS FLOAT
+    fw = FIRE_W0 * fire_scale
     DIM j AS INTEGER
     FOR j = 0 TO 3
         DIM jx AS FLOAT
-        jx = RANDF(-FIRE_WIDTH, FIRE_WIDTH)
-        PARTICLE_SET_POS(ps_flame, FIRE_CX + jx, FIRE_BASE - RANDF(0.0, 10.0))
+        jx = RANDF(-fw, fw)
+        PARTICLE_SET_POS(ps_flame, fire_x + jx, fire_y - RANDF(0.0, 10.0))
         PARTICLE_EMIT(ps_flame, INT(2.5 * fl) + 1)
-        PARTICLE_SET_POS(ps_core, FIRE_CX + jx * 0.5, FIRE_BASE)
+        PARTICLE_SET_POS(ps_core, fire_x + jx * 0.5, fire_y)
         PARTICLE_EMIT(ps_core, 2)
     NEXT
-    PARTICLE_SET_POS(ps_spark, FIRE_CX + RANDF(-32.0, 32.0), FIRE_BASE - RANDF(0.0, 40.0))
+    PARTICLE_SET_POS(ps_spark, fire_x + RANDF(-32.0, 32.0) * fire_scale, fire_y - RANDF(0.0, 40.0) * fire_scale)
     IF RANDF(0.0, 1.0) < 0.5 THEN PARTICLE_EMIT(ps_spark, 1)
-    PARTICLE_SET_POS(ps_smoke, FIRE_CX + RANDF(-18.0, 18.0), FIRE_BASE - 95.0)
+    PARTICLE_SET_POS(ps_smoke, fire_x + RANDF(-18.0, 18.0) * fire_scale, fire_y - 95.0 * fire_scale)
     IF RANDF(0.0, 1.0) < 0.4 THEN PARTICLE_EMIT(ps_smoke, 1)
 
     PARTICLE_UPDATE(ps_smoke, dt)
@@ -184,23 +217,23 @@ WHILE NOT QUITREQUESTED()
     PARTICLE_UPDATE(ps_spark, dt)
 
     ' ================= ZEICHNEN =================
-    CLS(&H000000)                                  ' Letterbox-Balken
+    CLS(&H000000)
     IF has_bg THEN
         DRAWIMAGE(bg, IMGX, 0)
     ELSE
-        BOX(FIRE_CX - 240, 150, FIRE_CX + 240, 660, &H3A302A)
-        BOX(FIRE_CX - 185, 230, FIRE_CX + 185, 640, &H040302)
+        BOX(fire_x - 240, 150, fire_x + 240, 660, &H3A302A)
+        BOX(fire_x - 185, 230, fire_x + 185, 640, &H040302)
     END IF
 
-    ' Warmes, kompaktes Flackerlicht (additiv).
+    ' Warmes, mitskalierendes Flackerlicht (additiv).
     BLEND_MODE("add")
     DIM ring AS INTEGER
     FOR ring = 0 TO 3
         DIM rr AS INTEGER
-        rr = INT((132 - ring * 26) * (0.85 + fl * 0.2))
+        rr = INT((132 - ring * 26) * (0.85 + fl * 0.2) * fire_scale)
         DIM rb AS INTEGER
         rb = INT((10 + ring * 6) * fl)
-        CIRCLE(INT(FIRE_CX), INT(FIRE_BASE - 45.0), rr, RGB(rb, INT(rb * 0.5), INT(rb * 0.15)))
+        CIRCLE(INT(fire_x), INT(fire_y - 45.0 * fire_scale), rr, RGB(rb, INT(rb * 0.5), INT(rb * 0.15)))
     NEXT
     BLEND_MODE("alpha")
 
@@ -209,6 +242,7 @@ WHILE NOT QUITREQUESTED()
     PARTICLE_DRAW(ps_core)
     PARTICLE_DRAW(ps_spark)
 
+    TEXT(10, H - 44, "Linke Maustaste ziehen = Feuer setzen   .   Mausrad = Groesse", &HC8B080)
     TEXT(10, H - 22, "Kamin: CEllen (CC BY-SA 4.0)  .  Feuer-Sound: Glaneur de sons (CC BY 3.0)  .  ESC", &H80706A)
 
     FLIP()
