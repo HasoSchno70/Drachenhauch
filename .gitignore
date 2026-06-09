@@ -35,4 +35,7 @@ examples/assets/techno_messup.ogg
 examples/assets/ibl_env.hdr
 # Geriggtes Modell fuer Skelett-Animations-Demo (via download_robot.py geladen)
 examples/assets/robot.glb
+# VOIDREAVER-Spielstand/Run-DB (zur Laufzeit erzeugt)
+voidreaver/voidreaver.save
+voidreaver/voidreaver.db*
 examples/highscores.txt

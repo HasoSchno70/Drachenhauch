@@ -25,6 +25,8 @@ IMPORT "scene"
 IMPORT "gui"
 IMPORT "physics3d"
 IMPORT "json"
+IMPORT "save"
+IMPORT "db"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
@@ -47,6 +49,9 @@ CONST HAZARD_DMG = 9.0
 CONST BOSS_AT0 = 25           ' erster Boss nach so vielen Kills
 CONST ROBOT_PATH = "../examples/assets/robot.glb"   ' optionales animiertes Boss-Modell
 CONST MAXDEB = 90             ' max. gleichzeitige Physik-Truemmer (Rapier3D)
+CONST SAVE_PATH = "voidreaver.save"
+CONST DB_PATH = "voidreaver.db"
+CONST UNLOCK_SPREAD_AT = 150  ' Lifetime-Kills fuer Spread-Start-Unlock
 
 ' =====================================================================
 '  GLOBALER ZUSTAND
@@ -131,6 +136,15 @@ DIM kills AS INTEGER
 DIM next_upgrade AS INTEGER
 DIM spawn_timer AS FLOAT
 DIM best_score AS INTEGER
+
+' Persistenz: save (Highscore + Lifetime-Kills + Unlock) + db (Run-Leaderboard).
+DIM savedata AS SAVE_HANDLE
+DIM dbcon AS DB_CONN
+DIM total_kills AS INTEGER
+DIM unlocked_spread AS BOOLEAN
+DIM top_score[3] AS INTEGER
+DIM top_kills[3] AS INTEGER
+DIM top_n AS INTEGER
 
 ' Broadphase + Instanz-Arrays.
 DIM broad AS PHYSICS_BROAD
@@ -238,6 +252,34 @@ SUB spawn_debris(x AS FLOAT, z AS FLOAT, n AS INTEGER)
         deb_life[deb_n] = 1.6
         deb_n = deb_n + 1
     NEXT
+END SUB
+
+' Top-3-Runs aus der SQLite-DB in die Anzeige-Arrays laden.
+SUB refresh_top()
+    top_n = 0
+    DIM r AS DB_RESULT
+    r = DB_QUERY(dbcon, "SELECT score, kills FROM runs ORDER BY score DESC LIMIT 3")
+    WHILE DB_NEXT(r)
+        top_score[top_n] = DB_GET_INT(r, 0)
+        top_kills[top_n] = DB_GET_INT(r, 1)
+        top_n = top_n + 1
+    WEND
+    DB_CLOSE_RESULT(r)
+END SUB
+
+' Run beim Tod festhalten: Highscore + Lifetime-Kills (save) + DB-Eintrag.
+' Guard gegen Doppel-Aufruf (Kontakt + Hazard im selben Frame).
+SUB record_run()
+    IF SCENE_CURRENT() <> "play" THEN RETURN
+    IF score > best_score THEN best_score = score
+    total_kills = total_kills + kills
+    SAVE_SET_INT(savedata, "best", best_score)
+    SAVE_SET_INT(savedata, "total_kills", total_kills)
+    SAVE_WRITE(savedata, SAVE_PATH)
+    DB_EXEC(dbcon, "INSERT INTO runs (score, kills) VALUES (?, ?)", score, kills)
+    refresh_top()
+    IF total_kills >= UNLOCK_SPREAD_AT THEN unlocked_spread = TRUE
+    SCENE_SWITCH("gameover")
 END SUB
 
 ' --- Boss-Hazards (Geschosse, die den SPIELER treffen) ----------------
@@ -438,6 +480,11 @@ SUB start_run()
     cam_x = px : cam_z = pz + 12.0
     weapon = NEW Weapon()
     firefn = fire_single
+    ' Meta-Unlock: ab UNLOCK_SPREAD_AT Lifetime-Kills startet man mit Spread-Feuer.
+    IF unlocked_spread THEN
+        firefn = fire_spread
+        weapon.wlevel = 2
+    END IF
     score = 0 : kills = 0 : next_upgrade = 10 : spawn_timer = 0.0
     last_pcx = -1 : last_pcz = -1
     n_draw_e = 0 : n_draw_p = 0 : n_draw_h = 0
@@ -847,8 +894,7 @@ SUB update_play(dt AS FLOAT)
         php = php - cdmg * 4.0 * dt
         IF php <= 0.0 THEN
             php = 0.0
-            IF score > best_score THEN best_score = score
-            SCENE_SWITCH("gameover")
+            record_run()
         END IF
     END IF
 
@@ -876,8 +922,7 @@ SUB update_play(dt AS FLOAT)
             php = php - HAZARD_DMG
             IF php <= 0.0 THEN
                 php = 0.0
-                IF score > best_score THEN best_score = score
-                SCENE_SWITCH("gameover")
+                record_run()
             END IF
         END IF
         ECS_ADD_FLOAT(world, he, "hlife", hlf)
@@ -1115,7 +1160,19 @@ SUB draw_menu()
     TEXT(SCR_W / 2 - 120, 280, "SPACE  =  Run starten", WHITE)
     TEXT(SCR_W / 2 - 160, 310, "WASD/Pfeile bewegen . Maus zielen . P Pause", &H88AACC)
     TEXT(SCR_W / 2 - 60, 340, "ESC  =  beenden", &H667788)
-    IF best_score > 0 THEN TEXT(SCR_W / 2 - 70, 400, f"bester score: {best_score}", &HFFD040)
+
+    ' Persistente Statistik + Top-3-Leaderboard (aus SQLite).
+    TEXT(SCR_W / 2 - 90, 392, f"bester score: {best_score}", &HFFD040)
+    TEXT(SCR_W / 2 - 90, 414, f"kills gesamt: {total_kills}", &H66FFCC)
+    IF unlocked_spread THEN
+        TEXT(SCR_W / 2 - 110, 436, "FREIGESCHALTET: Spread-Start", &HE040FF)
+    ELSE
+        TEXT(SCR_W / 2 - 130, 436, f"Spread-Start bei {UNLOCK_SPREAD_AT} kills (noch {UNLOCK_SPREAD_AT - total_kills})", &H66789A)
+    END IF
+    DIM li AS INTEGER
+    FOR li = 0 TO top_n - 1
+        TEXT(SCR_W / 2 - 90, 470 + li * 20, f"#{li + 1}  {top_score[li]} pkt  ({top_kills[li]} kills)", &H88AACC)
+    NEXT
 END SUB
 
 SUB draw_pause_overlay()
@@ -1134,7 +1191,11 @@ SUB draw_gameover()
     TEXT(SCR_W / 2 - 90, SCR_H / 2 - 40, "=== GAME OVER ===", &HFF5050)
     TEXT(SCR_W / 2 - 70, SCR_H / 2 - 6, f"score: {score}", &HFFD040)
     TEXT(SCR_W / 2 - 80, SCR_H / 2 + 18, f"bester: {best_score}", &H66FFCC)
-    TEXT(SCR_W / 2 - 150, SCR_H / 2 + 60, "SPACE = neuer Run . M = Menue . ESC = ende", &H88AACC)
+    DIM li AS INTEGER
+    FOR li = 0 TO top_n - 1
+        TEXT(SCR_W / 2 - 80, SCR_H / 2 + 48 + li * 20, f"#{li + 1}  {top_score[li]} pkt", &H88AACC)
+    NEXT
+    TEXT(SCR_W / 2 - 150, SCR_H / 2 + 130, "SPACE = neuer Run . M = Menue . ESC = ende", &H88AACC)
 END SUB
 
 ' =====================================================================
@@ -1209,7 +1270,15 @@ IF FILEEXISTS(ROBOT_PATH) THEN
 END IF
 
 broad = PHYSICS_BROAD_NEW()
-best_score = 0
+
+' --- Persistenz laden: Highscore + Lifetime-Kills (save) + Run-DB (SQLite) ---
+savedata = SAVE_LOAD_OR_NEW(SAVE_PATH)
+best_score = SAVE_GET_INT_OR(savedata, "best", 0)
+total_kills = SAVE_GET_INT_OR(savedata, "total_kills", 0)
+unlocked_spread = total_kills >= UNLOCK_SPREAD_AT
+dbcon = DB_OPEN(DB_PATH)
+DB_EXEC(dbcon, "CREATE TABLE IF NOT EXISTS runs (score INTEGER, kills INTEGER)")
+refresh_top()
 
 SCENE_SWITCH("menu")
 
