@@ -15,4 +15,9 @@ Git-Repo. Ihre Lizenzen verlangen Namensnennung:
    Quelle:  https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg
             (urspruenglich Freesound.org)
 
+3) wind.ogg  -- heulender Wind (gelegentliche Boeen)
+   Autor:   Tvabutzku1234
+   Lizenz:  CC0 1.0 (Public Domain -- keine Namensnennung noetig)
+   Quelle:  https://commons.wikimedia.org/wiki/File:Howling_wind.ogg
+
 Das prozedurale Feuer (Partikel) + Flackerlicht ist eigener GameBasic-Code.
