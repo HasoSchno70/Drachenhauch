@@ -1064,8 +1064,7 @@ SUB draw_play()
     shx = RANDF(-shake, shake)
     shz = RANDF(-shake, shake)
     CAMERA3D(cam_x + shx, CAM_HEIGHT + shx, cam_z + shz,  px, 0.0, pz,  CAM_FOV)
-    MODEL(ground, 0, 0, 0, 1.0, WHITE)         ' Textur sichtbar (kein Tint)
-    GRID3D(60, 1.0)
+    MODEL(ground, 0, 0, 0, 1.0, WHITE)         ' texturierter Boden (kein Gitter)
     DIM pk AS INTEGER
     FOR pk = 0 TO n_pillars - 1
         MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, WHITE)
