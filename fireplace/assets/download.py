@@ -27,9 +27,7 @@ ASSETS = [
      HERE / "fireplace.jpg", 50_000),
     ("https://upload.wikimedia.org/wikipedia/commons/b/b1/Campfire_sound_ambience.ogg",
      HERE / "fire.ogg", 50_000),
-    # Heulender Wind (Boeen ums Gemaeuer). Wikimedia Commons / Tvabutzku1234, CC0.
-    ("https://upload.wikimedia.org/wikipedia/commons/2/2d/Howling_wind.ogg",
-     HERE / "wind.ogg", 50_000),
+    # (Wind wird im Demo synthetisch erzeugt -> kein Download noetig.)
 ]
 
 

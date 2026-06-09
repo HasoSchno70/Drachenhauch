@@ -15,6 +15,7 @@
 
 IMPORT "particles"
 IMPORT "imgfx"
+IMPORT "audio"
 
 CONST W = 1280
 CONST H = 720
@@ -22,9 +23,9 @@ CONST H = 720
 CONST IMGW = 960
 CONST IMGX = 160
 ' Lage der Feuerstelle (auf den Holzscheiten, in Bildschirm-Koordinaten).
-CONST FIRE_CX = 600.0
+CONST FIRE_CX = 620.0
 CONST FIRE_BASE = 516.0
-CONST FIRE_WIDTH = 48.0
+CONST FIRE_WIDTH = 44.0
 
 SCREEN(W, H, "Kaminfeuer")
 SET_FULLSCREEN(TRUE)
@@ -44,30 +45,28 @@ END IF
 ' --- Sound: knisterndes Feuer im Loop (volle Lautstaerke) ---
 IF FILEEXISTS("assets/fire.ogg") THEN PLAYMUSIC("assets/fire.ogg", 0, 1.0)
 
-' --- Wind: heult gelegentlich in Boeen ums Gemaeuer (ueber dem Feuer) ---
-DIM has_wind AS BOOLEAN
-DIM wind_snd AS SOUND
+' --- Wind: gedaempfte, leise Boeen (synthetisch) ---
+' Tiefes Rauschen mit langsamer Huellkurve = dumpfes Heulen wie durch dickes
+' Gemaeuer (kein greller Howl-Loop). AUDIO_SFX(wf, freq, slide, atk, sus, dec,
+' vibDepth, vibSpeed, vol) -> SOUND. Drei Varianten fuer Abwechslung.
+DIM wind0 AS SOUND
+DIM wind1 AS SOUND
+DIM wind2 AS SOUND
+wind0 = AUDIO_SFX("noise", 70.0,  -8.0, 1500, 1700, 2700, 11.0, 0.7, 0.16)
+wind1 = AUDIO_SFX("noise", 90.0, -12.0, 1300, 1500, 2400,  9.0, 0.9, 0.15)
+wind2 = AUDIO_SFX("noise", 55.0,  -6.0, 1700, 2000, 3000, 13.0, 0.5, 0.17)
 DIM wind_timer AS FLOAT
-DIM wind_active AS BOOLEAN
-DIM wind_dur AS FLOAT
-has_wind = FALSE
-IF FILEEXISTS("assets/wind.ogg") THEN
-    wind_snd = LOADSOUND("assets/wind.ogg")
-    has_wind = TRUE
-END IF
-wind_timer = RANDF(5.0, 11.0)
-wind_active = FALSE
-wind_dur = 0.0
+wind_timer = RANDF(6.0, 12.0)
 
 ' --- Feuer-Schichten (kompakt + fein) ----------------------------------
 DIM ps_smoke AS PARTICLE_SYSTEM
-ps_smoke = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE - 130.0)
-PARTICLE_SET_VELOCITY(ps_smoke, -16.0, 16.0, -58.0, -30.0)
+ps_smoke = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE - 95.0)
+PARTICLE_SET_VELOCITY(ps_smoke, -14.0, 14.0, -55.0, -28.0)
 PARTICLE_SET_GRAVITY(ps_smoke, 0.0, -10.0)
-PARTICLE_SET_LIFETIME(ps_smoke, 1200, 2200)
-PARTICLE_SET_SIZE(ps_smoke, 10, 22)
-PARTICLE_SET_COLOR(ps_smoke, &H241F1D)
-PARTICLE_SET_COLOR_END(ps_smoke, &H070608)
+PARTICLE_SET_LIFETIME(ps_smoke, 900, 1700)
+PARTICLE_SET_SIZE(ps_smoke, 6, 14)
+PARTICLE_SET_COLOR(ps_smoke, &H141110)
+PARTICLE_SET_COLOR_END(ps_smoke, &H050405)
 PARTICLE_SET_FADE(ps_smoke, TRUE)
 PARTICLE_SET_MODE(ps_smoke, "glow")
 
@@ -122,23 +121,16 @@ WHILE NOT QUITREQUESTED()
     dts = dt * 0.001
     t = t + dts
 
-    ' Wind-Boeen: gelegentlich anspielen, nach einigen Sekunden wieder stoppen.
-    IF has_wind THEN
-        IF wind_active THEN
-            wind_dur = wind_dur - dts
-            IF wind_dur <= 0.0 THEN
-                STOPSOUND(wind_snd)
-                wind_active = FALSE
-                wind_timer = RANDF(12.0, 26.0)
-            END IF
-        ELSE
-            wind_timer = wind_timer - dts
-            IF wind_timer <= 0.0 THEN
-                PLAYSOUND(wind_snd, 0, RANDF(0.45, 0.8))
-                wind_active = TRUE
-                wind_dur = RANDF(7.0, 13.0)
-            END IF
-        END IF
+    ' Wind-Boeen: gelegentlich eine gedaempfte Boe anspielen (Huellkurve klingt
+    ' selbst aus -> kein hartes Stoppen).
+    wind_timer = wind_timer - dts
+    IF wind_timer <= 0.0 THEN
+        DIM wsel AS INTEGER
+        wsel = RANDINT(0, 2)
+        IF wsel = 0 THEN PLAYSOUND(wind0)
+        IF wsel = 1 THEN PLAYSOUND(wind1)
+        IF wsel = 2 THEN PLAYSOUND(wind2)
+        wind_timer = RANDF(11.0, 22.0)
     END IF
 
     DIM fl AS FLOAT
@@ -158,8 +150,8 @@ WHILE NOT QUITREQUESTED()
     NEXT
     PARTICLE_SET_POS(ps_spark, FIRE_CX + RANDF(-32.0, 32.0), FIRE_BASE - RANDF(0.0, 40.0))
     IF RANDF(0.0, 1.0) < 0.5 THEN PARTICLE_EMIT(ps_spark, 1)
-    PARTICLE_SET_POS(ps_smoke, FIRE_CX + RANDF(-22.0, 22.0), FIRE_BASE - 130.0)
-    IF RANDF(0.0, 1.0) < 0.7 THEN PARTICLE_EMIT(ps_smoke, 1)
+    PARTICLE_SET_POS(ps_smoke, FIRE_CX + RANDF(-18.0, 18.0), FIRE_BASE - 95.0)
+    IF RANDF(0.0, 1.0) < 0.4 THEN PARTICLE_EMIT(ps_smoke, 1)
 
     PARTICLE_UPDATE(ps_smoke, dt)
     PARTICLE_UPDATE(ps_flame, dt)
@@ -192,7 +184,7 @@ WHILE NOT QUITREQUESTED()
     PARTICLE_DRAW(ps_core)
     PARTICLE_DRAW(ps_spark)
 
-    TEXT(10, H - 22, "Kamin: CEllen (CC BY-SA 4.0) . Feuer: Glaneur de sons (CC BY 3.0) . Wind: Tvabutzku1234 (CC0) . ESC", &H80706A)
+    TEXT(10, H - 22, "Kamin: CEllen (CC BY-SA 4.0)  .  Feuer-Sound: Glaneur de sons (CC BY 3.0)  .  ESC", &H80706A)
 
     FLIP()
 WEND
