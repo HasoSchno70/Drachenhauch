@@ -24,6 +24,7 @@ IMPORT "physics"
 IMPORT "scene"
 IMPORT "gui"
 IMPORT "physics3d"
+IMPORT "json"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
@@ -88,10 +89,20 @@ DIM cs_co_h AS COROUTINE
 DIM cs_timer AS FLOAT
 DIM cs_text AS STRING
 
-' Arena (prozedural pro Run).
+' Arena (prozedural ODER aus einem Prefab-/Szenen-JSON pro Run).
 DIM n_pillars AS INTEGER
-DIM pillar_x[8] AS FLOAT
-DIM pillar_z[8] AS FLOAT
+DIM pillar_x[16] AS FLOAT
+DIM pillar_z[16] AS FLOAT
+
+' Dekorative Prefab-Objekte (glühende Kristalle) -- rein visuell, keine Kollision.
+CONST DECOR_MAX = 32
+DIM dec_x[32] AS FLOAT
+DIM dec_z[32] AS FLOAT
+DIM dec_ry[32] AS FLOAT
+DIM dec_scale[32] AS FLOAT
+DIM dec_kind[32] AS INTEGER       ' 0/1/2 -> Kristall-Mesh/Farbe
+DIM dec_n AS INTEGER
+DIM crystal_mesh[3] AS INTEGER    ' 3 vorgefärbte (emissive) Kristall-Meshes
 
 ' Navigation (Flow-Field).
 DIM wallc[900] AS INTEGER
@@ -337,8 +348,56 @@ SUB rebuild_walls()
     NEXT
 END SUB
 
+' Laedt eine Arena aus einem Prefab-/Szenen-JSON: "pillar" = kollidierbare
+' Saeule (Flow-Field-Wand), alles andere = dekorativer Kristall (rein visuell).
+SUB load_arena(path AS STRING)
+    DIM doc AS JSON_HANDLE
+    doc = JSON_LOAD(path)
+    DIM cnt AS INTEGER
+    cnt = JSON_LEN(doc, "objects")
+    DIM k AS INTEGER
+    FOR k = 0 TO cnt - 1
+        DIM base AS STRING
+        base = "objects." + STR$(k) + "."
+        DIM ox AS FLOAT
+        DIM oz AS FLOAT
+        ox = JSON_GET_FLOAT(doc, base + "x")
+        oz = JSON_GET_FLOAT(doc, base + "z")
+        IF JSON_GET_STRING(doc, base + "prefab") = "pillar" THEN
+            IF n_pillars < 16 THEN
+                pillar_x[n_pillars] = ox
+                pillar_z[n_pillars] = oz
+                n_pillars = n_pillars + 1
+            END IF
+        ELSE
+            IF dec_n < DECOR_MAX THEN
+                dec_x[dec_n] = ox
+                dec_z[dec_n] = oz
+                dec_ry[dec_n] = 0.0
+                IF JSON_HAS(doc, base + "ry") THEN dec_ry[dec_n] = JSON_GET_FLOAT(doc, base + "ry")
+                dec_scale[dec_n] = 1.0
+                IF JSON_HAS(doc, base + "scale") THEN dec_scale[dec_n] = JSON_GET_FLOAT(doc, base + "scale")
+                dec_kind[dec_n] = 0
+                IF JSON_HAS(doc, base + "tint") THEN dec_kind[dec_n] = JSON_GET_INT(doc, base + "tint")
+                IF dec_kind[dec_n] < 0 OR dec_kind[dec_n] > 2 THEN dec_kind[dec_n] = 0
+                dec_n = dec_n + 1
+            END IF
+        END IF
+    NEXT
+END SUB
+
 SUB start_run()
-    ' Prozedurale Saeulen.
+    n_pillars = 0
+    dec_n = 0
+    ' Arena waehlen: prozedural ODER ein Prefab-/Szenen-JSON (datengetrieben).
+    DIM choice AS INTEGER
+    choice = RANDINT(0, 2)
+    IF choice = 1 AND FILEEXISTS("arenas/arena1.json") THEN
+        load_arena("arenas/arena1.json")
+    ELSEIF choice = 2 AND FILEEXISTS("arenas/arena2.json") THEN
+        load_arena("arenas/arena2.json")
+    ELSE
+    ' --- Prozedurale Saeulen (Fallback / Variante) ---
     n_pillars = RANDINT(4, 7)
     DIM i AS INTEGER
     FOR i = 0 TO n_pillars - 1
@@ -369,6 +428,7 @@ SUB start_run()
             pillar_z[i] = RANDF(-ARENA + 3.0, ARENA - 3.0)
         END IF
     NEXT
+    END IF
     rebuild_walls()
 
     world = ECS_NEW_WORLD()
@@ -930,6 +990,13 @@ SUB draw_play()
     FOR pk = 0 TO n_pillars - 1
         MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
     NEXT
+
+    ' Dekorative Kristalle aus der Prefab-Arena (glühend, ohne Kollision).
+    DIM ck AS INTEGER
+    FOR ck = 0 TO dec_n - 1
+        MODEL_EX(crystal_mesh[dec_kind[ck]], dec_x[ck], 2.0 * dec_scale[ck], dec_z[ck],
+                 0, 1, 0, dec_ry[ck], dec_scale[ck], WHITE)
+    NEXT
     IF n_draw_e > 0 THEN MODEL_INSTANCED(enemy_mesh, emats, &HE0604C)
     IF n_draw_p > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
     IF n_draw_h > 0 THEN MODEL_INSTANCED(hazard_mesh, hmats, &HFF40C0)
@@ -1115,6 +1182,16 @@ MODEL_LIT(hazard_mesh)
 debris_mesh = MESH_CUBE(0.26, 0.26, 0.26)
 MODEL_LIT(debris_mesh)
 MODEL_EMISSIVE(debris_mesh, &HFF8030, 0.6)          ' Truemmer gluehen (Funken)
+
+' Dekorative Kristalle (3 Farben, glühend) -- Prefab-Loader-Dekor.
+DIM ci AS INTEGER
+DIM ccol[3] AS INTEGER
+ccol[0] = &H30E0FF : ccol[1] = &HE040FF : ccol[2] = &HFFD040
+FOR ci = 0 TO 2
+    crystal_mesh[ci] = MESH_CUBE(0.5, 4.0, 0.5)
+    MODEL_LIT(crystal_mesh[ci])
+    MODEL_EMISSIVE(crystal_mesh[ci], ccol[ci], 1.6)
+NEXT
 
 ' Bloom-Post-Shader (Neon-Glow). resolution-Uniform ist Pflicht.
 glow_fx = SHADER_LOAD("bloom.fs")

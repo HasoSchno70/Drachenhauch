@@ -1,0 +1,19 @@
+{
+  "name": "Diamanthalle",
+  "objects": [
+    { "prefab": "pillar", "x": -11, "z": -11 },
+    { "prefab": "pillar", "x":  11, "z": -11 },
+    { "prefab": "pillar", "x": -11, "z":  11 },
+    { "prefab": "pillar", "x":  11, "z":  11 },
+    { "prefab": "pillar", "x":   0, "z": -15 },
+    { "prefab": "pillar", "x":   0, "z":  15 },
+
+    { "prefab": "crystal", "x": -22, "z": -22, "tint": 0, "scale": 1.4 },
+    { "prefab": "crystal", "x":  22, "z": -22, "tint": 1, "scale": 1.4 },
+    { "prefab": "crystal", "x": -22, "z":  22, "tint": 2, "scale": 1.4 },
+    { "prefab": "crystal", "x":  22, "z":  22, "tint": 0, "scale": 1.4 },
+    { "prefab": "crystal", "x": -24, "z":   0, "tint": 2 },
+    { "prefab": "crystal", "x":  24, "z":   0, "tint": 2 },
+    { "prefab": "crystal", "x":   0, "z": -24, "tint": 1 }
+  ]
+}

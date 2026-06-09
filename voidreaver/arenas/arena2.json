@@ -1,0 +1,19 @@
+{
+  "name": "Korridor",
+  "objects": [
+    { "prefab": "pillar", "x": -7, "z": -16 },
+    { "prefab": "pillar", "x": -7, "z":  -6 },
+    { "prefab": "pillar", "x": -7, "z":   4 },
+    { "prefab": "pillar", "x": -7, "z":  14 },
+    { "prefab": "pillar", "x":  7, "z": -16 },
+    { "prefab": "pillar", "x":  7, "z":  -6 },
+    { "prefab": "pillar", "x":  7, "z":   4 },
+    { "prefab": "pillar", "x":  7, "z":  14 },
+
+    { "prefab": "crystal", "x": -20, "z": -10, "tint": 0, "scale": 1.5 },
+    { "prefab": "crystal", "x":  20, "z": -10, "tint": 1, "scale": 1.5 },
+    { "prefab": "crystal", "x": -20, "z":  10, "tint": 2, "scale": 1.5 },
+    { "prefab": "crystal", "x":  20, "z":  10, "tint": 0, "scale": 1.5 },
+    { "prefab": "crystal", "x":   0, "z": -24, "tint": 1, "scale": 1.2 }
+  ]
+}
