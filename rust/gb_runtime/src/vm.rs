@@ -3266,6 +3266,10 @@ impl<'p> Vm<'p> {
                 g!().model_pbr(gi(a,0,"MODEL_PBR")?, need_f(a,1,"MODEL_PBR")?, need_f(a,2,"MODEL_PBR")?)?;
                 Value::Nil
             }
+            "model_emissive" => {
+                g!().model_emissive(gi(a,0,"MODEL_EMISSIVE")?, gi(a,1,"MODEL_EMISSIVE")?, need_f(a,2,"MODEL_EMISSIVE")?)?;
+                Value::Nil
+            }
             "billboard" => {
                 g!().billboard(gi(a,0,"BILLBOARD")?, need_f(a,1,"BILLBOARD")? as f32, need_f(a,2,"BILLBOARD")? as f32,
                                need_f(a,3,"BILLBOARD")? as f32, need_f(a,4,"BILLBOARD")? as f32, gi(a,5,"BILLBOARD")?)?;

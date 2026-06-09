@@ -176,6 +176,7 @@ uniform vec4 ambient;
 uniform vec3 viewPos;
 uniform float metalness;   // 0 = Dielektrikum, 1 = Metall
 uniform float roughness;   // 0 = spiegelnd, 1 = matt
+uniform vec4 emissive;     // rgb = Eigenleucht-Farbe, a = Staerke (0 = aus)
 uniform vec4 fogColor;
 uniform float fogDensity;
 // Analytisches Environment-Lighting (IBL-Approximation). envIntensity 0 = aus.
@@ -314,6 +315,8 @@ void main()
     float fd = length(viewPos - fragPosition)*fogDensity;
     float fog = clamp(1.0/exp(fd*fd), 0.0, 1.0);
     finalColor = mix(fogColor, finalColor, fog);
+    // Eigenleuchten (durchschlaegt den Fog -> Neon/Glow, mit Bloom-POSTFX).
+    finalColor.rgb += emissive.rgb * emissive.a;
 }
 "#;
 
@@ -699,6 +702,9 @@ pub struct Graphics {
     pbr_params: std::collections::HashMap<usize, (f32, f32)>,
     loc_metalness: i32,
     loc_roughness: i32,
+    // Per-Modell Eigenleuchten (r, g, b, staerke); Default (0,0,0,0) = aus.
+    emissive: std::collections::HashMap<usize, (f32, f32, f32, f32)>,
+    loc_emissive: i32,
     lights: Vec<LightData>,
     light_ambient: [f32; 4],
     light_fog: [f32; 4],
@@ -837,6 +843,8 @@ impl Graphics {
             pbr_params: std::collections::HashMap::new(),
             loc_metalness: -1,
             loc_roughness: -1,
+            emissive: std::collections::HashMap::new(),
+            loc_emissive: -1,
             lights: Vec::new(),
             light_ambient: [0.1, 0.1, 0.1, 1.0],
             light_fog: [0.0, 0.0, 0.0, 1.0],
@@ -1306,6 +1314,7 @@ impl Graphics {
         self.loc_use_normal = sh.get_shader_location("useNormalMap");
         self.loc_metalness = sh.get_shader_location("metalness");
         self.loc_roughness = sh.get_shader_location("roughness");
+        self.loc_emissive = sh.get_shader_location("emissive");
         self.loc_env_sky = sh.get_shader_location("envSky");
         self.loc_env_ground = sh.get_shader_location("envGround");
         self.loc_env_intensity = sh.get_shader_location("envIntensity");
@@ -1642,6 +1651,16 @@ impl Graphics {
     pub fn model_pbr(&mut self, model_idx: i64, metalness: f64, roughness: f64) -> Result<(), String> {
         let mi = self.check_model(model_idx, "MODEL_PBR")?;
         self.pbr_params.insert(mi, (metalness.clamp(0.0, 1.0) as f32, roughness.clamp(0.0, 1.0) as f32));
+        Ok(())
+    }
+    /// Setzt Eigenleuchten eines Modells (Farbe 0xRRGGBB + Staerke; 0 = aus).
+    /// Wirkt auf MODEL_LIT-Modelle; mit Bloom-POSTFX entsteht echter Glow.
+    pub fn model_emissive(&mut self, model_idx: i64, color: i64, strength: f64) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_EMISSIVE")?;
+        let r = ((color >> 16) & 0xFF) as f32 / 255.0;
+        let g = ((color >> 8) & 0xFF) as f32 / 255.0;
+        let b = (color & 0xFF) as f32 / 255.0;
+        self.emissive.insert(mi, (r, g, b, strength.max(0.0) as f32));
         Ok(())
     }
     /// Setzt pro Frame viewPos + ambient + alle Licht-Uniforms. Wird in flip()
@@ -2563,10 +2582,12 @@ impl Graphics {
         let inst_ffi = self.inst_shader.as_ref().map(|s| *s.as_ref());
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
+            emissive, loc_emissive,
             scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
-        let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness);
+        let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
+        let emis_ref: &std::collections::HashMap<usize, (f32, f32, f32, f32)> = emissive;
         let cam = *cam3d;
         // Render-Targets zuerst auf ihre Texturen rendern (nur die, in die dieser
         // Frame gezeichnet wurde -- leere behalten ihren Inhalt). 2D-only: eigene
@@ -2574,6 +2595,7 @@ impl Graphics {
         {
             let empty_set = std::collections::HashSet::new();
             let empty_map = std::collections::HashMap::new();
+            let empty_emis = std::collections::HashMap::new();
             let clear_rt = Color::new(0, 0, 0, 0);
             for i in 0..render_targets.len() {
                 if render_targets[i].cmds.is_empty() { continue; }
@@ -2581,7 +2603,7 @@ impl Graphics {
                 let synth = [Layer { z: 0, cmds }];
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
-                    &[], cam, &[], None, (-1, -1, -1), &empty_set, &empty_map,
+                    &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
             }
         }
@@ -2595,7 +2617,7 @@ impl Graphics {
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -2608,7 +2630,7 @@ impl Graphics {
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -2642,9 +2664,10 @@ fn render_scene<D: RaylibDraw>(
     d: &mut D, s: i32, clear: Color,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
-    mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32),
+    mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32, i32),
     normal_mapped: &std::collections::HashSet<usize>,
     pbr_params: &std::collections::HashMap<usize, (f32, f32)>,
+    emissive_params: &std::collections::HashMap<usize, (f32, f32, f32, f32)>,
     ibl: (bool, u32, u32, u32),
     render_targets: &[RenderTarget],
     skybox: Option<(u32, i32, i32, u32)>,   // (shader_id, loc_proj, loc_view, env_cubemap)
@@ -2652,8 +2675,8 @@ fn render_scene<D: RaylibDraw>(
     cam_proj: Option<[f32; 16]>,            // m3d CAMERA3D_PROJECTION-Override
     inst_shader: Option<raylib::ffi::Shader>,   // m3d MODEL_INSTANCED (DrawMeshInstanced)
 ) {
-    let (loc_use_normal, loc_metalness, loc_roughness) = mat_locs;
-    // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness) vor dem Draw.
+    let (loc_use_normal, loc_metalness, loc_roughness, loc_emissive) = mat_locs;
+    // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness + emissive) vor dem Draw.
     let mut set_material = |ls: &mut Option<&mut Shader>, idx: usize| {
         if let Some(sh) = ls.as_mut() {
             if loc_use_normal >= 0 {
@@ -2662,6 +2685,10 @@ fn render_scene<D: RaylibDraw>(
             let (m, r) = pbr_params.get(&idx).copied().unwrap_or((0.0, 0.6));
             if loc_metalness >= 0 { sh.set_shader_value(loc_metalness, m); }
             if loc_roughness >= 0 { sh.set_shader_value(loc_roughness, r); }
+            if loc_emissive >= 0 {
+                let (er, eg, eb, es) = emissive_params.get(&idx).copied().unwrap_or((0.0, 0.0, 0.0, 0.0));
+                sh.set_shader_value(loc_emissive, [er, eg, eb, es]);
+            }
         }
     };
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();

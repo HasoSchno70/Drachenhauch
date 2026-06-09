@@ -2390,6 +2390,7 @@
    "signature": "MODEL_PBR(*args)",
    "module": "g3d"
   },
+  { "name": "MODEL_EMISSIVE", "kind": "graphics", "signature": "MODEL_EMISSIVE(model: INTEGER, color: INTEGER, strength: Zahl)", "module": "g3d" },
   {
    "name": "MODEL_TEXTURE",
    "kind": "graphics",
