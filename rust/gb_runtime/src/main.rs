@@ -40,6 +40,7 @@ mod gui;
 mod lexer;
 mod model;
 mod physics;
+mod physics3d;
 mod preprocess;
 mod tiled;
 mod value;

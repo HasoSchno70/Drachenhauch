@@ -24,8 +24,8 @@ use regex::Regex;
 const MODULES: &[&str] = &[
     "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
-    "physics", "regex", "save", "scene", "serial", "sprite", "tile_collide",
-    "tiled", "tween", "ui", "usb", "vec2", "wifi",
+    "physics", "physics3d", "regex", "save", "scene", "serial", "sprite",
+    "tile_collide", "tiled", "tween", "ui", "usb", "vec2", "wifi",
 ];
 
 /// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
@@ -46,6 +46,7 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("net", &["net_listener", "net_socket", "net_udp"]),
     ("particles", &["particle_system"]),
     ("physics", &["physics_broad"]),
+    ("physics3d", &["phys_world"]),
     ("save", &["save_handle"]),
     ("serial", &["serial_handle"]),
     ("sprite", &["sprite"]),

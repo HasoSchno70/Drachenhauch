@@ -64,6 +64,8 @@ pub enum Value {
     CharController(Rc<RefCell<crate::controller::CharController>>),
     /// Modul `physics`: Broadphase-Kollision (PHYSICS_BROAD_*, Referenz-Typ).
     PhysicsBroad(Rc<RefCell<crate::physics::BroadPhase>>),
+    /// Modul `physics3d`: Rapier3D-Starrkoerper-Welt (PHYS3D_*, Referenz-Typ).
+    Phys3d(Rc<RefCell<crate::physics3d::Phys3dWorld>>),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -413,6 +415,7 @@ impl Value {
                 let b = b.borrow();
                 format!("<BroadPhase {} entities, {} pairs>", b.count(), b.pair_count())
             }
+            Value::Phys3d(w) => format!("<PHYS_WORLD {} bodies>", w.borrow().count()),
         }
     }
 
@@ -458,6 +461,7 @@ impl Value {
             Value::Tiled(_) => "TILED_MAP",
             Value::CharController(_) => "CHAR_CONTROLLER",
             Value::PhysicsBroad(_) => "PHYSICS_BROAD",
+            Value::Phys3d(_) => "PHYS_WORLD",
         }
     }
 
