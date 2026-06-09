@@ -38,4 +38,7 @@ examples/assets/robot.glb
 # VOIDREAVER-Spielstand/Run-DB (zur Laufzeit erzeugt)
 voidreaver/voidreaver.save
 voidreaver/voidreaver.db*
+# Kaminfeuer-Demo: freie Assets (via fireplace/assets/download.py geladen)
+fireplace/assets/fireplace.jpg
+fireplace/assets/fire.ogg
 examples/highscores.txt

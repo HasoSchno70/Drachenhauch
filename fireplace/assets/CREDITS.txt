@@ -1,0 +1,18 @@
+Kaminfeuer-Demo -- Asset-Credits (Pflicht-Namensnennung)
+========================================================
+
+Beide Assets werden via assets/download.py geladen und liegen NICHT im
+Git-Repo. Ihre Lizenzen verlangen Namensnennung:
+
+1) fireplace.jpg  -- Hintergrundbild (Steinkamin, Schloss Chillon)
+   Autor:   CEllen
+   Lizenz:  CC BY-SA 4.0  (https://creativecommons.org/licenses/by-sa/4.0/)
+   Quelle:  https://commons.wikimedia.org/wiki/File:Chillon_Castle_interior_view_with_the_fireplace.jpg
+
+2) fire.ogg  -- knisterndes Feuer (Lagerfeuer-Ambiente)
+   Autor:   Glaneur de sons
+   Lizenz:  CC BY 3.0  (https://creativecommons.org/licenses/by/3.0/)
+   Quelle:  https://commons.wikimedia.org/wiki/File:Campfire_sound_ambience.ogg
+            (urspruenglich Freesound.org)
+
+Das prozedurale Feuer (Partikel) + Flackerlicht ist eigener GameBasic-Code.

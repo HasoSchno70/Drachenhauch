@@ -1,0 +1,165 @@
+' =====================================================================
+'  Kaminfeuer -- gemuetliches Grafik-Demo
+'
+'  Ein prozedurales, geschichtetes Partikel-Feuer (Flammen + heller Kern +
+'  Funken + Rauch) brennt vor einem echten Kaminbild, mit knisterndem
+'  Feuer-Sound und warm flackerndem Licht.
+'
+'  Assets (frei, einmalig holen):   py fireplace\assets\download.py
+'    fireplace.jpg  -- Steinkamin, Wikimedia Commons / CEllen (CC BY-SA 4.0)
+'    fire.ogg       -- Knistern, Wikimedia Commons / Glaneur de sons (CC BY 3.0)
+'  Laeuft auch OHNE die Dateien (prozeduraler Ersatz-Kamin, stumm).
+'
+'  ESC = beenden.   Native:  gbrun.py --native fireplace\fireplace.gb
+' =====================================================================
+
+IMPORT "particles"
+IMPORT "imgfx"
+
+CONST W = 1000
+CONST H = 750
+' Lage der Feuerstelle im skalierten Bild (auf den Holzscheiten).
+CONST FIRE_CX = 500.0
+CONST FIRE_BASE = 525.0
+CONST FIRE_WIDTH = 68.0
+
+SCREEN(W, H, "Kaminfeuer")
+RANDOMIZE(MILLIS())
+
+' --- Hintergrund: echtes Kaminbild (skaliert) oder prozeduraler Ersatz ---
+DIM has_bg AS BOOLEAN
+DIM bg AS IMAGE
+has_bg = FALSE
+IF FILEEXISTS("assets/fireplace.jpg") THEN
+    DIM raw AS IMAGE
+    raw = LOADIMAGE("assets/fireplace.jpg")
+    bg = IMAGE_SCALE(raw, W, H)
+    has_bg = TRUE
+END IF
+
+' --- Sound: knisterndes Feuer im Loop ---
+IF FILEEXISTS("assets/fire.ogg") THEN PLAYMUSIC("assets/fire.ogg", 0, 0.8)
+
+' --- Feuer-Schichten ---------------------------------------------------
+' Rauch (hinten): dunkle, langsam aufsteigende Schwaden im Kaminschlund.
+DIM ps_smoke AS PARTICLE_SYSTEM
+ps_smoke = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE - 150.0)
+PARTICLE_SET_VELOCITY(ps_smoke, -22.0, 22.0, -70.0, -35.0)
+PARTICLE_SET_GRAVITY(ps_smoke, 0.0, -12.0)
+PARTICLE_SET_LIFETIME(ps_smoke, 1300, 2400)
+PARTICLE_SET_SIZE(ps_smoke, 16, 34)
+PARTICLE_SET_COLOR(ps_smoke, &H2A2422)
+PARTICLE_SET_COLOR_END(ps_smoke, &H070608)
+PARTICLE_SET_FADE(ps_smoke, TRUE)
+PARTICLE_SET_MODE(ps_smoke, "glow")
+
+' Flammen (Mitte): gelb -> rot, steigen auf, additiver Glow.
+DIM ps_flame AS PARTICLE_SYSTEM
+ps_flame = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
+PARTICLE_SET_VELOCITY(ps_flame, -28.0, 28.0, -230.0, -150.0)
+PARTICLE_SET_GRAVITY(ps_flame, 0.0, -55.0)
+PARTICLE_SET_LIFETIME(ps_flame, 600, 1000)
+PARTICLE_SET_SIZE(ps_flame, 9, 20)
+PARTICLE_SET_COLOR(ps_flame, &HFFD050)
+PARTICLE_SET_COLOR_END(ps_flame, &HC81400)
+PARTICLE_SET_FADE(ps_flame, TRUE)
+PARTICLE_SET_MODE(ps_flame, "glow")
+
+' Heisser Kern (vorne): weiss-gelb -> orange, kleiner + kuerzer.
+DIM ps_core AS PARTICLE_SYSTEM
+ps_core = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
+PARTICLE_SET_VELOCITY(ps_core, -16.0, 16.0, -200.0, -130.0)
+PARTICLE_SET_GRAVITY(ps_core, 0.0, -50.0)
+PARTICLE_SET_LIFETIME(ps_core, 320, 560)
+PARTICLE_SET_SIZE(ps_core, 7, 14)
+PARTICLE_SET_COLOR(ps_core, &HFFF6C8)
+PARTICLE_SET_COLOR_END(ps_core, &HFF7000)
+PARTICLE_SET_FADE(ps_core, TRUE)
+PARTICLE_SET_MODE(ps_core, "glow")
+
+' Funken: kleine, schnelle Striche, manche fallen zurueck.
+DIM ps_spark AS PARTICLE_SYSTEM
+ps_spark = PARTICLE_SYSTEM_NEW(FIRE_CX, FIRE_BASE)
+PARTICLE_SET_VELOCITY(ps_spark, -55.0, 55.0, -260.0, -120.0)
+PARTICLE_SET_GRAVITY(ps_spark, 0.0, 80.0)
+PARTICLE_SET_LIFETIME(ps_spark, 500, 1200)
+PARTICLE_SET_SIZE(ps_spark, 2, 3)
+PARTICLE_SET_COLOR(ps_spark, &HFFF0A0)
+PARTICLE_SET_COLOR_END(ps_spark, &HFF4000)
+PARTICLE_SET_FADE(ps_spark, TRUE)
+PARTICLE_SET_MODE(ps_spark, "streak")
+
+DIM t AS FLOAT
+t = 0.0
+DIM last AS INTEGER
+last = MILLIS()
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+    DIM now AS INTEGER
+    now = MILLIS()
+    DIM dt AS INTEGER
+    dt = now - last
+    last = now
+    IF dt < 1 THEN dt = 1
+    IF dt > 80 THEN dt = 80
+    t = t + dt * 0.001
+
+    ' Flacker-Faktor (zwei ueberlagerte Schwingungen + etwas Zufall).
+    DIM fl AS FLOAT
+    fl = 0.72 + 0.18 * SIN(t * 8.0) + 0.10 * SIN(t * 19.0) + RANDF(-0.05, 0.05)
+    IF fl < 0.4 THEN fl = 0.4
+    IF fl > 1.2 THEN fl = 1.2
+
+    ' --- Emission (breite Feuerbasis ueber mehrere Punkte) ---
+    DIM j AS INTEGER
+    FOR j = 0 TO 5
+        DIM jx AS FLOAT
+        jx = RANDF(-FIRE_WIDTH, FIRE_WIDTH)
+        PARTICLE_SET_POS(ps_flame, FIRE_CX + jx, FIRE_BASE - RANDF(0.0, 12.0))
+        PARTICLE_EMIT(ps_flame, INT(3.0 * fl) + 1)
+        PARTICLE_SET_POS(ps_core, FIRE_CX + jx * 0.55, FIRE_BASE)
+        PARTICLE_EMIT(ps_core, 1)
+    NEXT
+    PARTICLE_SET_POS(ps_spark, FIRE_CX + RANDF(-55.0, 55.0), FIRE_BASE - RANDF(0.0, 50.0))
+    IF RANDF(0.0, 1.0) < 0.6 THEN PARTICLE_EMIT(ps_spark, 1)
+    PARTICLE_SET_POS(ps_smoke, FIRE_CX + RANDF(-28.0, 28.0), FIRE_BASE - 150.0)
+    PARTICLE_EMIT(ps_smoke, 1)
+
+    PARTICLE_UPDATE(ps_smoke, dt)
+    PARTICLE_UPDATE(ps_flame, dt)
+    PARTICLE_UPDATE(ps_core, dt)
+    PARTICLE_UPDATE(ps_spark, dt)
+
+    ' ================= ZEICHNEN =================
+    IF has_bg THEN
+        DRAWIMAGE(bg, 0, 0)
+    ELSE
+        ' Prozeduraler Ersatz-Kamin: dunkler Raum + Steinrahmen + schwarze Feuerstelle.
+        CLS(&H120C0A)
+        BOX(W / 2 - 230, 180, W / 2 + 230, 660, &H3A302A)      ' Steinrahmen
+        BOX(W / 2 - 180, 250, W / 2 + 180, 640, &H040302)      ' Feuerstelle (dunkel)
+    END IF
+
+    ' Warmes Flackerlicht (additiv, konzentrische Kreise -> weicher Schein).
+    BLEND_MODE("add")
+    DIM ring AS INTEGER
+    FOR ring = 0 TO 5
+        DIM rr AS INTEGER
+        rr = INT((230 - ring * 34) * (0.85 + fl * 0.22))
+        DIM rb AS INTEGER
+        rb = INT((11 + ring * 7) * fl)
+        CIRCLE(INT(FIRE_CX), INT(FIRE_BASE - 55.0), rr, RGB(rb, INT(rb * 0.5), INT(rb * 0.15)))
+    NEXT
+    BLEND_MODE("alpha")
+
+    ' Feuer-Schichten: Rauch hinten, dann Flammen, Kern, Funken obenauf.
+    PARTICLE_DRAW(ps_smoke)
+    PARTICLE_DRAW(ps_flame)
+    PARTICLE_DRAW(ps_core)
+    PARTICLE_DRAW(ps_spark)
+
+    TEXT(10, H - 22, "Kamin: CEllen (CC BY-SA 4.0)  .  Sound: Glaneur de sons (CC BY 3.0)  .  ESC", &H80706A)
+
+    FLIP()
+WEND
