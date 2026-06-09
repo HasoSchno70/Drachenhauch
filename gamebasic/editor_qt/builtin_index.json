@@ -2823,6 +2823,24 @@
    "module": "g3d"
   },
   {
+   "name": "MOUSE_GROUND_X",
+   "kind": "graphics",
+   "signature": "MOUSE_GROUND_X(plane_y: Zahl) AS FLOAT",
+   "module": "g3d"
+  },
+  {
+   "name": "MOUSE_GROUND_Z",
+   "kind": "graphics",
+   "signature": "MOUSE_GROUND_Z(plane_y: Zahl) AS FLOAT",
+   "module": "g3d"
+  },
+  {
+   "name": "MOUSE_GROUND_HIT",
+   "kind": "graphics",
+   "signature": "MOUSE_GROUND_HIT(plane_y: Zahl) AS BOOLEAN",
+   "module": "g3d"
+  },
+  {
    "name": "PLANE",
    "kind": "graphics",
    "signature": "PLANE(*args)",

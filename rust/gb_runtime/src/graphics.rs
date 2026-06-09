@@ -1190,6 +1190,21 @@ impl Graphics {
         let m = self.rl.get_mouse_position();
         self.rl.get_screen_to_world_ray(m, self.cam3d)
     }
+    /// Schnittpunkt des Mausstrahls mit der horizontalen Ebene y = plane_y.
+    /// Liefert (welt_x, welt_z, getroffen). Bei (fast) parallelem Strahl oder
+    /// Treffer "hinter" der Kamera: Ursprung-xz + getroffen=false.
+    pub fn mouse_ground(&self, plane_y: f32) -> (f32, f32, bool) {
+        let r = self.mouse_ray();
+        let dy = r.direction.y;
+        if dy.abs() < 1e-6 {
+            return (r.position.x, r.position.z, false);
+        }
+        let t = (plane_y - r.position.y) / dy;
+        if t < 0.0 {
+            return (r.position.x, r.position.z, false);
+        }
+        (r.position.x + t * r.direction.x, r.position.z + t * r.direction.z, true)
+    }
     pub fn pick_box(&self, cx: f32, cy: f32, cz: f32, sx: f32, sy: f32, sz: f32) -> f64 {
         let r = self.mouse_ray();
         self.ray_hit_box(r.position.x, r.position.y, r.position.z,
