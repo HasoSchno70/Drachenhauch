@@ -27,6 +27,7 @@ IMPORT "physics3d"
 IMPORT "json"
 IMPORT "save"
 IMPORT "db"
+IMPORT "audio"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
@@ -68,6 +69,17 @@ DIM hazard_mesh AS INTEGER
 DIM glow AS INTEGER
 DIM glow_fx AS INTEGER         ' Bloom-Post-Shader (Neon-Glow)
 DIM debris_mesh AS INTEGER
+DIM floor_tex AS INTEGER       ' prozedurale Boden-Textur
+
+' Politur: prozedurale SFX (audio-Modul) + Kamera-Shake.
+DIM snd_shoot AS INTEGER
+DIM snd_die AS INTEGER
+DIM snd_explode AS INTEGER
+DIM snd_hurt AS INTEGER
+DIM snd_level AS INTEGER
+DIM snd_boss AS INTEGER
+DIM shake AS FLOAT
+DIM hurt_cd AS FLOAT
 
 ' Physik-Truemmer (eigene Rapier3D-Welt, nur visuelle Juice bei Toden).
 DIM phys AS PHYS_WORLD
@@ -361,6 +373,7 @@ SUB spawn_boss()
     boss_co_h = boss_co()
     boss_timer = 0.0
     boss_frame = 0.0
+    PLAYSOUND(snd_boss)
 END SUB
 
 ' =====================================================================
@@ -506,6 +519,11 @@ END SUB
 '  PLAY -- Update
 ' =====================================================================
 SUB update_play(dt AS FLOAT)
+    ' Politur: Kamera-Shake + Hurt-Sound-Cooldown abklingen.
+    shake = shake - dt * 3.0
+    IF shake < 0.0 THEN shake = 0.0
+    IF hurt_cd > 0.0 THEN hurt_cd = hurt_cd - dt
+
     ' --- Spieler-Bewegung ---
     DIM mx AS FLOAT
     DIM mz AS FLOAT
@@ -583,6 +601,7 @@ SUB update_play(dt AS FLOAT)
         DIM nf AS INTEGER
         nf = firefn(world, px + facing_x * PLAYER_R, pz + facing_z * PLAYER_R,
                     facing_x, facing_z, weapon.proj_speed, weapon.damage)
+        PLAYSOUND(snd_shoot)
     END IF
 
     ' --- Wellen-Spawn ---
@@ -871,6 +890,8 @@ SUB update_play(dt AS FLOAT)
     NEXT
 
     ' --- Tode aufloesen (Burst + Score), dann Bulk-Remove ---
+    DIM died AS INTEGER
+    died = 0
     FOR i = 0 TO ecount - 1
         IF ECS_GET_OR_FLOAT(world, enemies[i], "hp", 1.0) <= 0.0 THEN
             DIM dex AS FLOAT
@@ -881,13 +902,21 @@ SUB update_play(dt AS FLOAT)
             spawn_debris(dex, dez, 2)
             kills = kills + 1
             score = score + 10
+            died = died + 1
         END IF
     NEXT
+    IF died > 0 THEN PLAYSOUND(snd_die)
     ECS_REMOVE_DEAD(world, "hp", 0.0)
     ECS_REMOVE_DEAD(world, "qlife", 0.0)
 
     ' --- Spieler-Schaden ---
     IF contacts > 0 THEN
+        IF hurt_cd <= 0.0 THEN
+            PLAYSOUND(snd_hurt)
+            hurt_cd = 0.3
+            shake = shake + 0.45
+            IF shake > 1.5 THEN shake = 1.5
+        END IF
         DIM cdmg AS INTEGER
         cdmg = contacts
         IF cdmg > 4 THEN cdmg = 4
@@ -957,6 +986,8 @@ SUB update_play(dt AS FLOAT)
                 spawn_burst(world, boss_x + RANDF(-1.8, 1.8), boss_z + RANDF(-1.8, 1.8))
             NEXT
             spawn_debris(boss_x, boss_z, 26)        ' grosse Truemmer-Explosion
+            PLAYSOUND(snd_explode)
+            shake = 1.4
             score = score + 500
             boss_active = FALSE
             boss_at = kills + 35
@@ -1028,12 +1059,16 @@ END SUB
 ' =====================================================================
 SUB draw_play()
     CLS(&H0A0E16)
-    CAMERA3D(cam_x, CAM_HEIGHT, cam_z,  px, 0.0, pz,  CAM_FOV)
-    MODEL(ground, 0, 0, 0, 1.0, &H22304A)
+    DIM shx AS FLOAT
+    DIM shz AS FLOAT
+    shx = RANDF(-shake, shake)
+    shz = RANDF(-shake, shake)
+    CAMERA3D(cam_x + shx, CAM_HEIGHT + shx, cam_z + shz,  px, 0.0, pz,  CAM_FOV)
+    MODEL(ground, 0, 0, 0, 1.0, WHITE)         ' Textur sichtbar (kein Tint)
     GRID3D(60, 1.0)
     DIM pk AS INTEGER
     FOR pk = 0 TO n_pillars - 1
-        MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
+        MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, WHITE)
     NEXT
 
     ' Dekorative Kristalle aus der Prefab-Arena (glühend, ohne Kollision).
@@ -1142,6 +1177,7 @@ SUB update_levelup()
             IF weapon.cooldown < 0.05 THEN weapon.cooldown = 0.05
         END IF
         IF pick = 2 THEN firefn = fire_spread
+        PLAYSOUND(snd_level)
         weapon.wlevel = weapon.wlevel + 1
         php = php + 20.0
         IF php > 100.0 THEN php = 100.0
@@ -1220,6 +1256,9 @@ glow = LIGHT_POINT(0, 2.5, 0, &H30E0FF)
 
 ground = MESH_PLANE(ARENA * 2.0, ARENA * 2.0, 1, 1)
 MODEL_LIT(ground)
+' Prozedurale Tech-Boden-Textur (dunkles Schachmuster).
+floor_tex = GENTEX_CHECKED(256, 256, 10, 10, &H0E1626, &H18283E)
+MODEL_TEXTURE(ground, floor_tex)
 player = MESH_SPHERE(PLAYER_R, 28, 28)
 MODEL_LIT(player)
 MODEL_PBR(player, 0.9, 0.22)
@@ -1227,6 +1266,7 @@ MODEL_EMISSIVE(player, &H30E0FF, 1.3)               ' cyan Eigenleuchten
 pillar = MESH_CUBE(2.0, 4.0, 2.0)
 MODEL_LIT(pillar)
 MODEL_PBR(pillar, 0.1, 0.8)
+MODEL_TEXTURE(pillar, GENTEX_GRADIENT(64, 256, &H222A3A, &H48566E, TRUE))   ' Panel-Verlauf
 aimdot = MESH_SPHERE(0.18, 12, 12)
 MODEL_LIT(aimdot)
 MODEL_EMISSIVE(aimdot, &HFFD040, 2.2)               ' Ziel-Marker leuchtet
@@ -1257,6 +1297,14 @@ NEXT
 ' Bloom-Post-Shader (Neon-Glow). resolution-Uniform ist Pflicht.
 glow_fx = SHADER_LOAD("bloom.fs")
 IF glow_fx >= 0 THEN SHADER_SET2(glow_fx, "resolution", SCR_W, SCR_H)
+
+' Prozedurale SFX (sfxr-Stil, ohne Asset-Dateien).
+snd_shoot   = AUDIO_SFX("square", 620.0, -260.0, 0, 22, 50, 0.0, 0.0, 0.18)
+snd_die     = AUDIO_SFX("noise",  380.0, -160.0, 0, 16, 70, 0.0, 0.0, 0.30)
+snd_explode = AUDIO_SFX("noise",  170.0,  -90.0, 0, 50, 250, 0.0, 0.0, 0.6)
+snd_hurt    = AUDIO_SFX("saw",    220.0, -140.0, 0, 40, 130, 0.0, 0.0, 0.45)
+snd_level   = AUDIO_SFX("square", 440.0,  520.0, 0, 70, 150, 0.0, 0.0, 0.30)
+snd_boss    = AUDIO_SFX("saw",     70.0,   60.0, 10, 320, 380, 8.0, 5.0, 0.55)
 
 ' Optionaler animierter Roboter-Boss (Skelett-Animation, GLTF). Faellt sauber
 ' auf die Glueh-Kugel zurueck, wenn das Modell fehlt (via download_robot.py holen).
