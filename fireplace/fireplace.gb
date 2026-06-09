@@ -28,7 +28,7 @@ CONST H = 720
 CONST IMGW = 960          ' 4:3-Kaminbild hoehenfuellend, zentriert (Letterbox)
 CONST IMGX = 160
 CONST FIRE_W0 = 44.0      ' Basis-Breite der Feuerbasis (mal Skalierung)
-CONST WIND_PEAK = 0.22    ' max. Wind-Lautstaerke (leise -> Feuer dominiert klar)
+CONST WIND_PEAK = 0.14    ' max. Wind-Lautstaerke (sehr leise -> Feuer dominiert klar)
 
 SCREEN(W, H, "Kaminfeuer")
 SET_FULLSCREEN(TRUE)
