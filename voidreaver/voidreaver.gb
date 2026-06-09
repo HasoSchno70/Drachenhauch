@@ -39,6 +39,10 @@ CONST NCELLS = 900
 CONST CAM_HEIGHT = 24.0
 CONST CAM_BACK = 18.0
 CONST CAM_FOV = 50.0
+CONST BOSS_MAX_HP = 1600.0
+CONST BOSS_R = 2.2
+CONST HAZARD_DMG = 9.0
+CONST BOSS_AT0 = 25           ' erster Boss nach so vielen Kills
 
 ' =====================================================================
 '  GLOBALER ZUSTAND
@@ -50,7 +54,24 @@ DIM pillar AS INTEGER
 DIM aimdot AS INTEGER
 DIM enemy_mesh AS INTEGER
 DIM proj_mesh AS INTEGER
+DIM boss_mesh AS INTEGER
+DIM hazard_mesh AS INTEGER
 DIM glow AS INTEGER
+
+' Boss / Hazards / Cutscene.
+DIM boss_active AS BOOLEAN
+DIM boss_pending AS BOOLEAN
+DIM boss_x AS FLOAT
+DIM boss_z AS FLOAT
+DIM boss_hp AS FLOAT
+DIM boss_at AS INTEGER
+DIM boss_co_h AS COROUTINE
+DIM boss_timer AS FLOAT
+DIM hmats[0] AS MAT4
+DIM n_draw_h AS INTEGER
+DIM cs_co_h AS COROUTINE
+DIM cs_timer AS FLOAT
+DIM cs_text AS STRING
 
 ' Arena (prozedural pro Run).
 DIM n_pillars AS INTEGER
@@ -179,6 +200,86 @@ SUB spawn_burst(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT)
     ECS_ADD_FLOAT(w, b, "blife", 0.4)
 END SUB
 
+' --- Boss-Hazards (Geschosse, die den SPIELER treffen) ----------------
+SUB hazard_spawn(x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT)
+    DIM h AS INTEGER
+    h = ECS_NEW_ENTITY(world)
+    ECS_ADD_FLOAT(world, h, "hx", x)
+    ECS_ADD_FLOAT(world, h, "hz", z)
+    ECS_ADD_FLOAT(world, h, "hvx", dx * spd)
+    ECS_ADD_FLOAT(world, h, "hvz", dz * spd)
+    ECS_ADD_FLOAT(world, h, "hlife", 5.0)
+END SUB
+
+SUB boss_fire_ring(cnt AS INTEGER, spd AS FLOAT)
+    DIM k AS INTEGER
+    FOR k = 0 TO cnt - 1
+        DIM a AS FLOAT
+        a = k * 6.2832 / cnt
+        hazard_spawn(boss_x, boss_z, COS(a), SIN(a), spd)
+    NEXT
+END SUB
+
+SUB boss_fire_aimed(cnt AS INTEGER, spread AS FLOAT, spd AS FLOAT)
+    DIM bx AS FLOAT
+    DIM bz AS FLOAT
+    bx = px - boss_x
+    bz = pz - boss_z
+    DIM base AS FLOAT
+    base = ATAN2(bz, bx)
+    DIM k AS INTEGER
+    FOR k = 0 TO cnt - 1
+        DIM a AS FLOAT
+        a = base + (k - (cnt - 1) / 2.0) * spread
+        hazard_spawn(boss_x, boss_z, COS(a), SIN(a), spd)
+    NEXT
+END SUB
+
+' Boss-Angriffsmuster als COROUTINE: YIELD = Wartezeit (s) bis zur naechsten
+' Salve. Die Feuer-Helfer enthalten kein YIELD -> normale Calls (zulaessig).
+FUNCTION boss_co() AS FLOAT
+    DIM r AS INTEGER
+    ' Phase 1: drei volle Ring-Salven.
+    FOR r = 0 TO 2
+        boss_fire_ring(20, 7.0)
+        YIELD 1.1
+    NEXT
+    ' Phase 2: gezielte Faecher auf den Spieler.
+    FOR r = 0 TO 5
+        boss_fire_aimed(5, 0.26, 9.5)
+        YIELD 0.6
+    NEXT
+    ' Phase 3: rotierende Spirale.
+    DIM a AS FLOAT
+    a = 0.0
+    FOR r = 0 TO 48
+        hazard_spawn(boss_x, boss_z, COS(a), SIN(a), 8.0)
+        a = a + 0.55
+        YIELD 0.07
+    NEXT
+    RETURN 0.8
+END FUNCTION
+
+' Intro-Cutscene als COROUTINE: setzt cs_text, YIELD = Anzeigedauer (s).
+FUNCTION cutscene_co() AS FLOAT
+    cs_text = "!!   WARNUNG   !!"
+    YIELD 0.9
+    cs_text = "EIN VOIDREAVER ERWACHT"
+    YIELD 1.4
+    cs_text = ""
+    RETURN 0.0
+END FUNCTION
+
+SUB spawn_boss()
+    boss_active = TRUE
+    boss_pending = FALSE
+    boss_x = 0.0
+    boss_z = -ARENA * 0.5
+    boss_hp = BOSS_MAX_HP
+    boss_co_h = boss_co()
+    boss_timer = 0.0
+END SUB
+
 ' =====================================================================
 '  Arena / Run-Reset
 ' =====================================================================
@@ -249,7 +350,9 @@ SUB start_run()
     firefn = fire_single
     score = 0 : kills = 0 : next_upgrade = 10 : spawn_timer = 0.0
     last_pcx = -1 : last_pcz = -1
-    n_draw_e = 0 : n_draw_p = 0
+    n_draw_e = 0 : n_draw_p = 0 : n_draw_h = 0
+    boss_active = FALSE : boss_pending = FALSE : boss_at = BOSS_AT0
+    cs_text = ""
 
     DIM si AS INTEGER
     FOR si = 0 TO 29
@@ -344,7 +447,7 @@ SUB update_play(dt AS FLOAT)
     spawn_timer = spawn_timer + dt
     IF spawn_timer >= 0.8 THEN
         spawn_timer = spawn_timer - 0.8
-        IF ECS_COUNT_WITH(world, "hp") < MAX_ENEMIES THEN
+        IF ECS_COUNT_WITH(world, "hp") < MAX_ENEMIES AND NOT boss_active THEN
             DIM sj AS INTEGER
             FOR sj = 0 TO 3
                 spawn_enemy(world)
@@ -491,6 +594,16 @@ SUB update_play(dt AS FLOAT)
         DIM ql AS FLOAT
         ql = ECS_GET_FLOAT(world, pr, "qlife") - dt
         IF nqx < -ARENA OR nqx > ARENA OR nqz < -ARENA OR nqz > ARENA THEN ql = -1.0
+        IF boss_active THEN
+            DIM bdx AS FLOAT
+            DIM bdz AS FLOAT
+            bdx = nqx - boss_x
+            bdz = nqz - boss_z
+            IF bdx * bdx + bdz * bdz < (BOSS_R + 0.2) * (BOSS_R + 0.2) THEN
+                boss_hp = boss_hp - ECS_GET_INT(world, pr, "qdmg")
+                ql = -1.0
+            END IF
+        END IF
         ECS_ADD_FLOAT(world, pr, "qlife", ql)
     NEXT
 
@@ -640,6 +753,71 @@ SUB update_play(dt AS FLOAT)
         END IF
     END IF
 
+    ' --- Hazards bewegen + Spieler treffen ---
+    DIM haz AS ARRAY OF INTEGER
+    haz = ECS_QUERY2(world, "hx", "hz")
+    FOR i = 0 TO LEN(haz) - 1
+        DIM he AS INTEGER
+        he = haz[i]
+        DIM hnx AS FLOAT
+        DIM hnz AS FLOAT
+        hnx = ECS_GET_FLOAT(world, he, "hx") + ECS_GET_FLOAT(world, he, "hvx") * dt
+        hnz = ECS_GET_FLOAT(world, he, "hz") + ECS_GET_FLOAT(world, he, "hvz") * dt
+        ECS_ADD_FLOAT(world, he, "hx", hnx)
+        ECS_ADD_FLOAT(world, he, "hz", hnz)
+        DIM hlf AS FLOAT
+        hlf = ECS_GET_FLOAT(world, he, "hlife") - dt
+        IF hnx < -ARENA OR hnx > ARENA OR hnz < -ARENA OR hnz > ARENA THEN hlf = -1.0
+        DIM tpx AS FLOAT
+        DIM tpz AS FLOAT
+        tpx = hnx - px
+        tpz = hnz - pz
+        IF tpx * tpx + tpz * tpz < (PLAYER_R + 0.25) * (PLAYER_R + 0.25) THEN
+            hlf = -1.0
+            php = php - HAZARD_DMG
+            IF php <= 0.0 THEN
+                php = 0.0
+                IF score > best_score THEN best_score = score
+                SCENE_SWITCH("gameover")
+            END IF
+        END IF
+        ECS_ADD_FLOAT(world, he, "hlife", hlf)
+    NEXT
+    ECS_REMOVE_DEAD(world, "hlife", 0.0)
+
+    ' --- Boss-Muster (Coroutine treibt die Salven) ---
+    IF boss_active THEN
+        ' Langsam dem Spieler naehern (bis Mindestabstand) -> bleibt im Bild.
+        DIM bmx AS FLOAT
+        DIM bmz AS FLOAT
+        bmx = px - boss_x
+        bmz = pz - boss_z
+        DIM bmd AS FLOAT
+        bmd = SQR(bmx * bmx + bmz * bmz)
+        IF bmd > 9.0 THEN
+            boss_x = boss_x + bmx / bmd * 3.0 * dt
+            boss_z = boss_z + bmz / bmd * 3.0 * dt
+        END IF
+
+        boss_timer = boss_timer - dt
+        IF boss_timer <= 0.0 THEN
+            IF CORO_DONE(boss_co_h) THEN
+                boss_co_h = boss_co()          ' Muster-Zyklus neu starten
+            END IF
+            boss_timer = CORO_RESUME(boss_co_h)
+        END IF
+        IF boss_hp <= 0.0 THEN
+            DIM bb AS INTEGER
+            FOR bb = 0 TO 6
+                spawn_burst(world, boss_x + RANDF(-1.8, 1.8), boss_z + RANDF(-1.8, 1.8))
+            NEXT
+            score = score + 500
+            boss_active = FALSE
+            boss_at = kills + 35
+            IF NOT CORO_DONE(boss_co_h) THEN CORO_CLOSE(boss_co_h)
+        END IF
+    END IF
+
     ' --- Instanz-Matrizen (live) ---
     DIM le AS ARRAY OF INTEGER
     le = ECS_QUERY2(world, "px", "pz")
@@ -657,6 +835,23 @@ SUB update_play(dt AS FLOAT)
         pmats[i] = MAT4_TRANSLATE(ECS_GET_FLOAT(world, lp[i], "qx"), 0.5,
                                   ECS_GET_FLOAT(world, lp[i], "qz"))
     NEXT
+    DIM lh AS ARRAY OF INTEGER
+    lh = ECS_QUERY2(world, "hx", "hz")
+    n_draw_h = LEN(lh)
+    REDIM(hmats, n_draw_h)
+    FOR i = 0 TO n_draw_h - 1
+        hmats[i] = MAT4_TRANSLATE(ECS_GET_FLOAT(world, lh[i], "hx"), 0.5,
+                                  ECS_GET_FLOAT(world, lh[i], "hz"))
+    NEXT
+
+    ' --- Boss-Cutscene ausloesen (Coroutine-Intro) ---
+    IF NOT boss_active AND NOT boss_pending AND kills >= boss_at THEN
+        boss_pending = TRUE
+        cs_co_h = cutscene_co()
+        cs_timer = 0.0
+        SCENE_PUSH("cutscene")
+        RETURN
+    END IF
 
     ' --- LevelUp ausloesen (Overlay) ---
     IF kills >= next_upgrade THEN
@@ -680,6 +875,11 @@ SUB draw_play()
     NEXT
     IF n_draw_e > 0 THEN MODEL_INSTANCED(enemy_mesh, emats, &HE0604C)
     IF n_draw_p > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
+    IF n_draw_h > 0 THEN MODEL_INSTANCED(hazard_mesh, hmats, &HFF40C0)
+    IF boss_active THEN
+        MODEL(boss_mesh, boss_x, BOSS_R, boss_z, 1.0, &HC03060)
+        MODEL_WIRES(boss_mesh, boss_x, BOSS_R, boss_z, 1.03, &HFF80A0)
+    END IF
 
     ' Burst-Ringe (eigene Alterung hier, da rein visuell).
     DIM bursts AS ARRAY OF INTEGER
@@ -711,6 +911,13 @@ SUB draw_play()
     TEXT(12, SCR_H - 56, f"HP {INT(php)}", &HBFE8C8)
     TEXT(12, 10, f"score {score}   kills {kills}   waffe lvl {weapon.wlevel}", &H88AACC)
     TEXT(SCR_W - 220, 10, f"gegner {n_draw_e}   fps {FPS()}", &H66FFCC)
+
+    ' Boss-HP-Leiste oben.
+    IF boss_active THEN
+        TEXT(SCR_W / 2 - 60, 26, "-- VOIDREAVER --", &HFF80A0)
+        BOX(SCR_W / 2 - 200, 44, SCR_W / 2 + 200, 56, &H301018)
+        BOX(SCR_W / 2 - 200, 44, SCR_W / 2 - 200 + INT(400.0 * boss_hp / BOSS_MAX_HP), 56, &HFF4080)
+    END IF
 
     ' Fadenkreuz am Mauscursor.
     DIM mcx AS INTEGER
@@ -773,6 +980,11 @@ SUB draw_pause_overlay()
     TEXT(SCR_W / 2 - 110, SCR_H / 2 + 8, "P/SPACE weiter . M Menue", &H88AACC)
 END SUB
 
+SUB draw_cutscene_overlay()
+    BOX(0, SCR_H / 2 - 34, SCR_W, SCR_H / 2 + 34, &H1A0810)
+    TEXT(SCR_W / 2 - LEN(cs_text) * 4, SCR_H / 2 - 8, cs_text, &HFF6060)
+END SUB
+
 SUB draw_gameover()
     CLS(&H0A0E16)
     TEXT(SCR_W / 2 - 90, SCR_H / 2 - 40, "=== GAME OVER ===", &HFF5050)
@@ -815,6 +1027,11 @@ enemy_mesh = MESH_CUBE(ENEMY_R * 1.6, ENEMY_R * 1.6, ENEMY_R * 1.6)
 MODEL_LIT(enemy_mesh)
 proj_mesh = MESH_SPHERE(0.16, 10, 10)
 MODEL_LIT(proj_mesh)
+boss_mesh = MESH_SPHERE(BOSS_R, 28, 28)
+MODEL_LIT(boss_mesh)
+MODEL_PBR(boss_mesh, 0.4, 0.35)
+hazard_mesh = MESH_SPHERE(0.22, 10, 10)
+MODEL_LIT(hazard_mesh)
 
 broad = PHYSICS_BROAD_NEW()
 best_score = 0
@@ -855,6 +1072,18 @@ WHILE NOT QUITREQUESTED()
             END IF
             draw_play()
             draw_pause_overlay()
+        CASE "cutscene"
+            cs_timer = cs_timer - dt
+            IF cs_timer <= 0.0 THEN
+                IF CORO_DONE(cs_co_h) THEN
+                    spawn_boss()
+                    SCENE_POP()
+                ELSE
+                    cs_timer = CORO_RESUME(cs_co_h)
+                END IF
+            END IF
+            draw_play()
+            draw_cutscene_overlay()
         CASE "levelup"
             update_levelup()
             draw_play()
