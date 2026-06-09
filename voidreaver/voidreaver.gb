@@ -57,6 +57,7 @@ DIM proj_mesh AS INTEGER
 DIM boss_mesh AS INTEGER
 DIM hazard_mesh AS INTEGER
 DIM glow AS INTEGER
+DIM glow_fx AS INTEGER         ' Bloom-Post-Shader (Neon-Glow)
 
 ' Boss / Hazards / Cutscene.
 DIM boss_active AS BOOLEAN
@@ -1018,11 +1019,13 @@ MODEL_LIT(ground)
 player = MESH_SPHERE(PLAYER_R, 28, 28)
 MODEL_LIT(player)
 MODEL_PBR(player, 0.9, 0.22)
+MODEL_EMISSIVE(player, &H30E0FF, 1.3)               ' cyan Eigenleuchten
 pillar = MESH_CUBE(2.0, 4.0, 2.0)
 MODEL_LIT(pillar)
 MODEL_PBR(pillar, 0.1, 0.8)
 aimdot = MESH_SPHERE(0.18, 12, 12)
 MODEL_LIT(aimdot)
+MODEL_EMISSIVE(aimdot, &HFFD040, 2.2)               ' Ziel-Marker leuchtet
 enemy_mesh = MESH_CUBE(ENEMY_R * 1.6, ENEMY_R * 1.6, ENEMY_R * 1.6)
 MODEL_LIT(enemy_mesh)
 proj_mesh = MESH_SPHERE(0.16, 10, 10)
@@ -1030,8 +1033,13 @@ MODEL_LIT(proj_mesh)
 boss_mesh = MESH_SPHERE(BOSS_R, 28, 28)
 MODEL_LIT(boss_mesh)
 MODEL_PBR(boss_mesh, 0.4, 0.35)
+MODEL_EMISSIVE(boss_mesh, &HFF3060, 1.2)            ' Boss glueht bedrohlich
 hazard_mesh = MESH_SPHERE(0.22, 10, 10)
 MODEL_LIT(hazard_mesh)
+
+' Bloom-Post-Shader (Neon-Glow). resolution-Uniform ist Pflicht.
+glow_fx = SHADER_LOAD("bloom.fs")
+IF glow_fx >= 0 THEN SHADER_SET2(glow_fx, "resolution", SCR_W, SCR_H)
 
 broad = PHYSICS_BROAD_NEW()
 best_score = 0
@@ -1049,6 +1057,15 @@ WHILE NOT QUITREQUESTED()
     IF dt > 0.05 THEN dt = 0.05
 
     INPUT_UPDATE()
+
+    ' Bloom-Glow nur waehrend der 3D-Action (nicht ueber GUI-LevelUp/Menue).
+    IF glow_fx >= 0 THEN
+        IF SCENE_CURRENT() = "play" OR SCENE_CURRENT() = "pause" THEN
+            POSTFX(glow_fx)
+        ELSE
+            POSTFX(-1)
+        END IF
+    END IF
 
     SELECT CASE SCENE_CURRENT()
         CASE "menu"
