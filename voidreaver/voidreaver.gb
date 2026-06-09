@@ -23,6 +23,7 @@ IMPORT "ecs"
 IMPORT "physics"
 IMPORT "scene"
 IMPORT "gui"
+IMPORT "physics3d"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
@@ -44,6 +45,7 @@ CONST BOSS_R = 2.2
 CONST HAZARD_DMG = 9.0
 CONST BOSS_AT0 = 25           ' erster Boss nach so vielen Kills
 CONST ROBOT_PATH = "../examples/assets/robot.glb"   ' optionales animiertes Boss-Modell
+CONST MAXDEB = 90             ' max. gleichzeitige Physik-Truemmer (Rapier3D)
 
 ' =====================================================================
 '  GLOBALER ZUSTAND
@@ -59,6 +61,13 @@ DIM boss_mesh AS INTEGER
 DIM hazard_mesh AS INTEGER
 DIM glow AS INTEGER
 DIM glow_fx AS INTEGER         ' Bloom-Post-Shader (Neon-Glow)
+DIM debris_mesh AS INTEGER
+
+' Physik-Truemmer (eigene Rapier3D-Welt, nur visuelle Juice bei Toden).
+DIM phys AS PHYS_WORLD
+DIM deb_body[90] AS INTEGER
+DIM deb_life[90] AS FLOAT
+DIM deb_n AS INTEGER
 
 ' Boss / Hazards / Cutscene.
 DIM boss_active AS BOOLEAN
@@ -204,6 +213,20 @@ SUB spawn_burst(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT)
     ECS_ADD_FLOAT(w, b, "bx", x)
     ECS_ADD_FLOAT(w, b, "bz", z)
     ECS_ADD_FLOAT(w, b, "blife", 0.4)
+END SUB
+
+' Echte Physik-Truemmer (Rapier3D): kleine Wuerfel fliegen hoch + tumbeln.
+SUB spawn_debris(x AS FLOAT, z AS FLOAT, n AS INTEGER)
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        IF deb_n >= MAXDEB THEN RETURN
+        DIM b AS INTEGER
+        b = PHYS3D_ADD_BOX(phys, x, 0.6, z, 0.13, 0.13, 0.13, 1, 0.4)
+        PHYS3D_SET_VEL(phys, b, RANDF(-3.5, 3.5), RANDF(4.0, 8.5), RANDF(-3.5, 3.5))
+        deb_body[deb_n] = b
+        deb_life[deb_n] = 1.6
+        deb_n = deb_n + 1
+    NEXT
 END SUB
 
 ' --- Boss-Hazards (Geschosse, die den SPIELER treffen) ----------------
@@ -360,6 +383,11 @@ SUB start_run()
     n_draw_e = 0 : n_draw_p = 0 : n_draw_h = 0
     boss_active = FALSE : boss_pending = FALSE : boss_at = BOSS_AT0
     cs_text = ""
+
+    ' Frische Physik-Welt fuer Truemmer (Schwerkraft + statischer Boden).
+    phys = PHYS3D_NEW()
+    PHYS3D_ADD_BOX(phys, 0.0, -0.5, 0.0, ARENA, 0.5, ARENA, 0, 0.3)
+    deb_n = 0
 
     DIM si AS INTEGER
     FOR si = 0 TO 29
@@ -738,8 +766,12 @@ SUB update_play(dt AS FLOAT)
     ' --- Tode aufloesen (Burst + Score), dann Bulk-Remove ---
     FOR i = 0 TO ecount - 1
         IF ECS_GET_OR_FLOAT(world, enemies[i], "hp", 1.0) <= 0.0 THEN
-            spawn_burst(world, ECS_GET_FLOAT(world, enemies[i], "px"),
-                               ECS_GET_FLOAT(world, enemies[i], "pz"))
+            DIM dex AS FLOAT
+            DIM dez AS FLOAT
+            dex = ECS_GET_FLOAT(world, enemies[i], "px")
+            dez = ECS_GET_FLOAT(world, enemies[i], "pz")
+            spawn_burst(world, dex, dez)
+            spawn_debris(dex, dez, 2)
             kills = kills + 1
             score = score + 10
         END IF
@@ -819,12 +851,29 @@ SUB update_play(dt AS FLOAT)
             FOR bb = 0 TO 6
                 spawn_burst(world, boss_x + RANDF(-1.8, 1.8), boss_z + RANDF(-1.8, 1.8))
             NEXT
+            spawn_debris(boss_x, boss_z, 26)        ' grosse Truemmer-Explosion
             score = score + 500
             boss_active = FALSE
             boss_at = kills + 35
             IF NOT CORO_DONE(boss_co_h) THEN CORO_CLOSE(boss_co_h)
         END IF
     END IF
+
+    ' --- Physik-Truemmer (Rapier3D) simulieren + altern ---
+    PHYS3D_STEP(phys, dt)
+    DIM di AS INTEGER
+    di = 0
+    WHILE di < deb_n
+        deb_life[di] = deb_life[di] - dt
+        IF deb_life[di] <= 0.0 THEN
+            PHYS3D_REMOVE(phys, deb_body[di])
+            deb_n = deb_n - 1
+            deb_body[di] = deb_body[deb_n]      ' swap-remove
+            deb_life[di] = deb_life[deb_n]
+        ELSE
+            di = di + 1
+        END IF
+    WEND
 
     ' --- Instanz-Matrizen (live) ---
     DIM le AS ARRAY OF INTEGER
@@ -884,6 +933,18 @@ SUB draw_play()
     IF n_draw_e > 0 THEN MODEL_INSTANCED(enemy_mesh, emats, &HE0604C)
     IF n_draw_p > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
     IF n_draw_h > 0 THEN MODEL_INSTANCED(hazard_mesh, hmats, &HFF40C0)
+
+    ' Physik-Truemmer mit ihrer simulierten Pose (Position + Rotation).
+    DIM dd AS INTEGER
+    FOR dd = 0 TO deb_n - 1
+        DIM dbody AS INTEGER
+        dbody = deb_body[dd]
+        DIM dm AS MAT4
+        dm = MAT4_TRS(VEC3_NEW(PHYS3D_BODY_X(phys, dbody), PHYS3D_BODY_Y(phys, dbody), PHYS3D_BODY_Z(phys, dbody)),
+                      QUAT_NEW(PHYS3D_BODY_QX(phys, dbody), PHYS3D_BODY_QY(phys, dbody), PHYS3D_BODY_QZ(phys, dbody), PHYS3D_BODY_QW(phys, dbody)),
+                      VEC3_NEW(1.0, 1.0, 1.0))
+        MODEL_MATRIX(debris_mesh, dm, &HFF8030)
+    NEXT
     IF boss_active THEN
         IF use_robot THEN
             ' Animierter GLTF-Boss (Skelett-Animation), dreht sich zum Spieler.
@@ -1051,6 +1112,9 @@ MODEL_PBR(boss_mesh, 0.4, 0.35)
 MODEL_EMISSIVE(boss_mesh, &HFF3060, 1.2)            ' Boss glueht bedrohlich
 hazard_mesh = MESH_SPHERE(0.22, 10, 10)
 MODEL_LIT(hazard_mesh)
+debris_mesh = MESH_CUBE(0.26, 0.26, 0.26)
+MODEL_LIT(debris_mesh)
+MODEL_EMISSIVE(debris_mesh, &HFF8030, 0.6)          ' Truemmer gluehen (Funken)
 
 ' Bloom-Post-Shader (Neon-Glow). resolution-Uniform ist Pflicht.
 glow_fx = SHADER_LOAD("bloom.fs")
