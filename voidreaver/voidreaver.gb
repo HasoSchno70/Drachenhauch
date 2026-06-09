@@ -43,6 +43,7 @@ CONST BOSS_MAX_HP = 1600.0
 CONST BOSS_R = 2.2
 CONST HAZARD_DMG = 9.0
 CONST BOSS_AT0 = 25           ' erster Boss nach so vielen Kills
+CONST ROBOT_PATH = "../examples/assets/robot.glb"   ' optionales animiertes Boss-Modell
 
 ' =====================================================================
 '  GLOBALER ZUSTAND
@@ -68,6 +69,10 @@ DIM boss_hp AS FLOAT
 DIM boss_at AS INTEGER
 DIM boss_co_h AS COROUTINE
 DIM boss_timer AS FLOAT
+DIM use_robot AS BOOLEAN        ' animiertes GLTF-Boss-Modell vorhanden?
+DIM boss_model AS INTEGER
+DIM boss_anims AS INTEGER
+DIM boss_frame AS FLOAT         ' Animations-Frame (laeuft)
 DIM hmats[0] AS MAT4
 DIM n_draw_h AS INTEGER
 DIM cs_co_h AS COROUTINE
@@ -279,6 +284,7 @@ SUB spawn_boss()
     boss_hp = BOSS_MAX_HP
     boss_co_h = boss_co()
     boss_timer = 0.0
+    boss_frame = 0.0
 END SUB
 
 ' =====================================================================
@@ -799,6 +805,7 @@ SUB update_play(dt AS FLOAT)
             boss_x = boss_x + bmx / bmd * 3.0 * dt
             boss_z = boss_z + bmz / bmd * 3.0 * dt
         END IF
+        boss_frame = boss_frame + dt * 60.0          ' Boss-Animation abspielen
 
         boss_timer = boss_timer - dt
         IF boss_timer <= 0.0 THEN
@@ -878,8 +885,16 @@ SUB draw_play()
     IF n_draw_p > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
     IF n_draw_h > 0 THEN MODEL_INSTANCED(hazard_mesh, hmats, &HFF40C0)
     IF boss_active THEN
-        MODEL(boss_mesh, boss_x, BOSS_R, boss_z, 1.0, &HC03060)
-        MODEL_WIRES(boss_mesh, boss_x, BOSS_R, boss_z, 1.03, &HFF80A0)
+        IF use_robot THEN
+            ' Animierter GLTF-Boss (Skelett-Animation), dreht sich zum Spieler.
+            MODEL_ANIMATE(boss_model, boss_anims, 5, INT(boss_frame))   ' Robot_Punch
+            DIM byaw AS FLOAT
+            byaw = ATAN2(px - boss_x, pz - boss_z) * 57.2958
+            MODEL_EX(boss_model, boss_x, 0.0, boss_z,  0, 1, 0, byaw,  BOSS_R * 1.3, WHITE)
+        ELSE
+            MODEL(boss_mesh, boss_x, BOSS_R, boss_z, 1.0, &HC03060)
+            MODEL_WIRES(boss_mesh, boss_x, BOSS_R, boss_z, 1.03, &HFF80A0)
+        END IF
     END IF
 
     ' Burst-Ringe (eigene Alterung hier, da rein visuell).
@@ -1040,6 +1055,17 @@ MODEL_LIT(hazard_mesh)
 ' Bloom-Post-Shader (Neon-Glow). resolution-Uniform ist Pflicht.
 glow_fx = SHADER_LOAD("bloom.fs")
 IF glow_fx >= 0 THEN SHADER_SET2(glow_fx, "resolution", SCR_W, SCR_H)
+
+' Optionaler animierter Roboter-Boss (Skelett-Animation, GLTF). Faellt sauber
+' auf die Glueh-Kugel zurueck, wenn das Modell fehlt (via download_robot.py holen).
+use_robot = FALSE
+IF FILEEXISTS(ROBOT_PATH) THEN
+    boss_model = LOADMODEL(ROBOT_PATH)
+    MODEL_LIT(boss_model)
+    MODEL_EMISSIVE(boss_model, &HFF3050, 0.7)
+    boss_anims = MODEL_LOAD_ANIMS(ROBOT_PATH)
+    use_robot = TRUE
+END IF
 
 broad = PHYSICS_BROAD_NEW()
 best_score = 0
