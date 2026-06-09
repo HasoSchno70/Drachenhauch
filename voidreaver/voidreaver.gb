@@ -1,19 +1,17 @@
 ' =====================================================================
 '  VOIDREAVER -- Co-op 3D-Arena-Roguelite
-'  STUFE 3: Kampf-Loop.
-'    * Waffe als Klasse (Weapon) -- Schaden/Cooldown/Tempo + Level-Up
-'    * Feuermuster als FUNCREF (single -> spread bei Level-Up)
-'    * Geschosse als ECS-Entities, eigenes MODEL_INSTANCED-Batch
-'    * Treffer: Broadphase klassifiziert Spieler/Gegner/Geschoss-Paare
-'    * Tod via ECS_REMOVE_DEAD (Gegner hp<=0, Geschosse qlife<=0)
-'    * 3D-Burst-FX bei Kills, Wellen-Spawns, Spieler-HP + Game-Over
-'    * dynamische Instanz-Arrays (Schwarm waechst/schrumpft)
+'  STUFE 4: Run-Struktur.
+'    * scene-Stack: menu -> play -> (pause/levelup als Overlay) -> gameover
+'    * LevelUp-Karten per gui-Modul (3 Upgrades zur Auswahl)
+'    * prozedural erzeugte Arena (zufaellige Saeulen-Layouts pro Run)
+'    * Neustart ohne Programm-Neustart (start_run setzt alles zurueck)
+'    + alle Stufe-1..3+A-Systeme (3D, ECS-Schwarm, Instancing, Broadphase,
+'      Waffe+FUNCREF, Flow-Field-Navigation, Kampf, Tod, Burst-FX)
 '
 '  Steuerung:
-'    Bewegen : WASD / Pfeiltasten   (oder linker Gamepad-Stick)
-'    Zielen  : Maus-Richtung         (oder rechter Gamepad-Stick)
-'    Feuern  : automatisch in Blickrichtung
-'    Beenden : ESC
+'    Menue/GameOver : SPACE = Start/Neuer Run, M = Menue, ESC = beenden
+'    Spiel          : WASD/Pfeile bewegen, Maus/Stick zielen, auto-Feuer, P = Pause
+'    LevelUp        : Upgrade-Karte anklicken
 '
 '  Native-only (3D): gbrun.py --native voidreaver\voidreaver.gb  (oder F6)
 ' =====================================================================
@@ -23,20 +21,81 @@ IMPORT "m3d"
 IMPORT "input"
 IMPORT "ecs"
 IMPORT "physics"
+IMPORT "scene"
+IMPORT "gui"
 
 CONST SCR_W = 960
 CONST SCR_H = 600
 CONST ARENA = 18.0
 CONST PLAYER_R = 0.6
 CONST MOVE_SPEED = 11.0
-
 CONST ENEMY_R = 0.45
 CONST ENEMY_SPEED = 4.2
 CONST ENEMY_HP = 24.0
 CONST MAX_ENEMIES = 340
+CONST CELL = 1.5
+CONST GRID = 24
+CONST NCELLS = 576
 
 ' =====================================================================
-'  Waffe + Feuermuster (Klasse + FUNCREF)
+'  GLOBALER ZUSTAND
+' =====================================================================
+' Mesh-Handles (einmal erzeugt).
+DIM ground AS INTEGER
+DIM player AS INTEGER
+DIM pillar AS INTEGER
+DIM aimdot AS INTEGER
+DIM enemy_mesh AS INTEGER
+DIM proj_mesh AS INTEGER
+DIM glow AS INTEGER
+
+' Arena (prozedural pro Run).
+DIM n_pillars AS INTEGER
+DIM pillar_x[8] AS FLOAT
+DIM pillar_z[8] AS FLOAT
+
+' Navigation (Flow-Field).
+DIM wallc[576] AS INTEGER
+DIM distc[576] AS INTEGER
+DIM bfsq[576] AS INTEGER
+DIM last_pcx AS INTEGER
+DIM last_pcz AS INTEGER
+
+' Spieler / Kamera.
+DIM px AS FLOAT
+DIM pz AS FLOAT
+DIM facing_x AS FLOAT
+DIM facing_z AS FLOAT
+DIM php AS FLOAT
+DIM cam_x AS FLOAT
+DIM cam_z AS FLOAT
+
+' Welt / Waffe / Run-Status.
+DIM world AS ECS_WORLD
+DIM weapon AS Weapon
+DIM firefn AS FUNCREF
+DIM score AS INTEGER
+DIM kills AS INTEGER
+DIM next_upgrade AS INTEGER
+DIM spawn_timer AS FLOAT
+DIM best_score AS INTEGER
+
+' Broadphase + Instanz-Arrays.
+DIM broad AS PHYSICS_BROAD
+DIM ent_of[700] AS INTEGER
+DIM emats[0] AS MAT4
+DIM pmats[0] AS MAT4
+DIM n_draw_e AS INTEGER
+DIM n_draw_p AS INTEGER
+
+' GUI-LevelUp.
+DIM lvl_win AS INTEGER
+DIM lvl_b0 AS INTEGER
+DIM lvl_b1 AS INTEGER
+DIM lvl_b2 AS INTEGER
+
+' =====================================================================
+'  Waffe + Feuermuster
 ' =====================================================================
 CLASS Weapon
     DIM damage AS INTEGER
@@ -53,7 +112,6 @@ CLASS Weapon
         Self.wlevel = 1
     END SUB
 
-    ' Cooldown runterzaehlen; TRUE wenn jetzt geschossen werden darf.
     FUNCTION ready(dt AS FLOAT) AS BOOLEAN
         Self.cd = Self.cd - dt
         IF Self.cd <= 0.0 THEN
@@ -62,32 +120,25 @@ CLASS Weapon
         END IF
         RETURN FALSE
     END FUNCTION
-
-    SUB upgrade()
-        Self.wlevel = Self.wlevel + 1
-        Self.damage = Self.damage + 7
-        IF Self.cooldown > 0.07 THEN Self.cooldown = Self.cooldown * 0.85
-    END SUB
 END CLASS
 
-SUB spawn_proj(world AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER)
+SUB spawn_proj(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER)
     DIM p AS INTEGER
-    p = ECS_NEW_ENTITY(world)
-    ECS_ADD_FLOAT(world, p, "qx", x)
-    ECS_ADD_FLOAT(world, p, "qz", z)
-    ECS_ADD_FLOAT(world, p, "qvx", dx * spd)
-    ECS_ADD_FLOAT(world, p, "qvz", dz * spd)
-    ECS_ADD_FLOAT(world, p, "qlife", 1.4)
-    ECS_ADD_INT(world, p, "qdmg", dmg)
+    p = ECS_NEW_ENTITY(w)
+    ECS_ADD_FLOAT(w, p, "qx", x)
+    ECS_ADD_FLOAT(w, p, "qz", z)
+    ECS_ADD_FLOAT(w, p, "qvx", dx * spd)
+    ECS_ADD_FLOAT(w, p, "qvz", dz * spd)
+    ECS_ADD_FLOAT(w, p, "qlife", 1.4)
+    ECS_ADD_INT(w, p, "qdmg", dmg)
 END SUB
 
-' Feuermuster: gleiche Signatur -> als FUNCREF austauschbar.
-FUNCTION fire_single(world AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER) AS INTEGER
-    spawn_proj(world, x, z, dx, dz, spd, dmg)
+FUNCTION fire_single(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER) AS INTEGER
+    spawn_proj(w, x, z, dx, dz, spd, dmg)
     RETURN 1
 END FUNCTION
 
-FUNCTION fire_spread(world AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER) AS INTEGER
+FUNCTION fire_spread(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz AS FLOAT, spd AS FLOAT, dmg AS INTEGER) AS INTEGER
     DIM k AS INTEGER
     FOR k = -1 TO 1
         DIM a AS FLOAT
@@ -96,246 +147,184 @@ FUNCTION fire_spread(world AS ECS_WORLD, x AS FLOAT, z AS FLOAT, dx AS FLOAT, dz
         DIM cz AS FLOAT
         cx = dx * COS(a) - dz * SIN(a)
         cz = dx * SIN(a) + dz * COS(a)
-        spawn_proj(world, x, z, cx, cz, spd, dmg)
+        spawn_proj(w, x, z, cx, cz, spd, dmg)
     NEXT
     RETURN 3
 END FUNCTION
 
-SUB spawn_enemy(world AS ECS_WORLD)
+SUB spawn_enemy(w AS ECS_WORLD)
     DIM e AS INTEGER
-    e = ECS_NEW_ENTITY(world)
+    e = ECS_NEW_ENTITY(w)
     DIM ang AS FLOAT
     DIM rad AS FLOAT
     ang = RANDF(0.0, 6.2832)
     rad = RANDF(ARENA * 0.6, ARENA * 0.95)
-    ECS_ADD_FLOAT(world, e, "px", COS(ang) * rad)
-    ECS_ADD_FLOAT(world, e, "pz", SIN(ang) * rad)
-    ECS_ADD_FLOAT(world, e, "vx", 0.0)
-    ECS_ADD_FLOAT(world, e, "vz", 0.0)
-    ECS_ADD_FLOAT(world, e, "hp", ENEMY_HP)
+    ECS_ADD_FLOAT(w, e, "px", COS(ang) * rad)
+    ECS_ADD_FLOAT(w, e, "pz", SIN(ang) * rad)
+    ECS_ADD_FLOAT(w, e, "vx", 0.0)
+    ECS_ADD_FLOAT(w, e, "vz", 0.0)
+    ECS_ADD_FLOAT(w, e, "hp", ENEMY_HP)
 END SUB
 
-SUB spawn_burst(world AS ECS_WORLD, x AS FLOAT, z AS FLOAT)
+SUB spawn_burst(w AS ECS_WORLD, x AS FLOAT, z AS FLOAT)
     DIM b AS INTEGER
-    b = ECS_NEW_ENTITY(world)
-    ECS_ADD_FLOAT(world, b, "bx", x)
-    ECS_ADD_FLOAT(world, b, "bz", z)
-    ECS_ADD_FLOAT(world, b, "blife", 0.4)
+    b = ECS_NEW_ENTITY(w)
+    ECS_ADD_FLOAT(w, b, "bx", x)
+    ECS_ADD_FLOAT(w, b, "bz", z)
+    ECS_ADD_FLOAT(w, b, "blife", 0.4)
 END SUB
 
 ' =====================================================================
-'  Setup
+'  Arena / Run-Reset
 ' =====================================================================
-SCREEN(SCR_W, SCR_H, "VOIDREAVER -- Stufe 3", 1)
-SETFPS(60)
-RANDOMIZE(MILLIS())
-
-INPUT_BIND("move_left",  KEY_LEFT,  KEY_A)
-INPUT_BIND("move_right", KEY_RIGHT, KEY_D)
-INPUT_BIND("move_up",    KEY_UP,    KEY_W)
-INPUT_BIND("move_down",  KEY_DOWN,  KEY_S)
-
-LIGHT_ENABLE()
-LIGHT_AMBIENT(&H2A3242, 1.0)
-LIGHT_DIRECTIONAL(-0.4, -1.0, -0.35, &HFFE8C8)
-DIM glow AS INTEGER
-glow = LIGHT_POINT(0, 2.5, 0, &H30E0FF)
-
-DIM ground AS INTEGER
-DIM player AS INTEGER
-DIM pillar AS INTEGER
-DIM aimdot AS INTEGER
-DIM enemy_mesh AS INTEGER
-DIM proj_mesh AS INTEGER
-
-ground = MESH_PLANE(ARENA * 2.0, ARENA * 2.0, 1, 1)
-MODEL_LIT(ground)
-player = MESH_SPHERE(PLAYER_R, 28, 28)
-MODEL_LIT(player)
-MODEL_PBR(player, 0.9, 0.22)
-pillar = MESH_CUBE(2.0, 4.0, 2.0)
-MODEL_LIT(pillar)
-MODEL_PBR(pillar, 0.1, 0.8)
-aimdot = MESH_SPHERE(0.18, 12, 12)
-MODEL_LIT(aimdot)
-enemy_mesh = MESH_CUBE(ENEMY_R * 1.6, ENEMY_R * 1.6, ENEMY_R * 1.6)
-MODEL_LIT(enemy_mesh)
-proj_mesh = MESH_SPHERE(0.16, 10, 10)
-MODEL_LIT(proj_mesh)
-
-CONST N_PILLARS = 5
-DIM pillar_x[5] AS FLOAT
-DIM pillar_z[5] AS FLOAT
-pillar_x[0] = -9.0 : pillar_z[0] = -7.0
-pillar_x[1] =  9.0 : pillar_z[1] = -7.0
-pillar_x[2] = -9.0 : pillar_z[2] =  7.0
-pillar_x[3] =  9.0 : pillar_z[3] =  7.0
-pillar_x[4] =  0.0 : pillar_z[4] =  0.0
-
-' --- Navigation: Flow-Field-Grid (BFS, Saeulen = Waende) --------------
-'   Alle Gegner teilen sich EIN Distanzfeld zum Spieler (per BFS), statt
-'   ASTAR_FIND pro Gegner. Sie folgen dem Gradienten -> laufen um Saeulen.
-CONST CELL = 1.5
-CONST GRID = 24                      ' 24 * 1.5 = 36 = 2 * ARENA
-CONST NCELLS = 576                   ' GRID * GRID
-DIM wallc[576] AS INTEGER            ' 1 = blockiert (Saeule)
-DIM distc[576] AS INTEGER            ' BFS-Distanz zum Spieler, -1 = unerreicht
-DIM bfsq[576] AS INTEGER            ' BFS-Queue
-
-DIM gz AS INTEGER
-DIM gx AS INTEGER
-FOR gz = 0 TO GRID - 1
-    FOR gx = 0 TO GRID - 1
-        DIM wcx AS FLOAT
-        DIM wcz AS FLOAT
-        wcx = -ARENA + (gx + 0.5) * CELL
-        wcz = -ARENA + (gz + 0.5) * CELL
-        DIM blocked AS INTEGER
-        blocked = 0
-        DIM wp AS INTEGER
-        FOR wp = 0 TO N_PILLARS - 1
-            DIM wdx AS FLOAT
-            DIM wdz AS FLOAT
-            wdx = wcx - pillar_x[wp]
-            wdz = wcz - pillar_z[wp]
-            IF SQR(wdx * wdx + wdz * wdz) < 1.7 THEN blocked = 1
+SUB rebuild_walls()
+    DIM gz AS INTEGER
+    DIM gx AS INTEGER
+    FOR gz = 0 TO GRID - 1
+        FOR gx = 0 TO GRID - 1
+            DIM wcx AS FLOAT
+            DIM wcz AS FLOAT
+            wcx = -ARENA + (gx + 0.5) * CELL
+            wcz = -ARENA + (gz + 0.5) * CELL
+            DIM blocked AS INTEGER
+            blocked = 0
+            DIM wp AS INTEGER
+            FOR wp = 0 TO n_pillars - 1
+                DIM wdx AS FLOAT
+                DIM wdz AS FLOAT
+                wdx = wcx - pillar_x[wp]
+                wdz = wcz - pillar_z[wp]
+                IF SQR(wdx * wdx + wdz * wdz) < 1.7 THEN blocked = 1
+            NEXT
+            wallc[gz * GRID + gx] = blocked
         NEXT
-        wallc[gz * GRID + gx] = blocked
     NEXT
-NEXT
+END SUB
 
-DIM last_pcx AS INTEGER
-DIM last_pcz AS INTEGER
-last_pcx = -1 : last_pcz = -1
-
-' --- Spieler / Kamera ---
-DIM px AS FLOAT
-DIM pz AS FLOAT
-DIM facing_x AS FLOAT
-DIM facing_z AS FLOAT
-DIM php AS FLOAT
-px = 0.0 : pz = 8.0
-facing_x = 0.0 : facing_z = -1.0
-php = 100.0
-
-DIM cam_x AS FLOAT
-DIM cam_z AS FLOAT
-cam_x = px : cam_z = pz + 12.0
-
-' --- Welt + Waffe ---
-DIM world AS ECS_WORLD
-world = ECS_NEW_WORLD()
-
-DIM weapon AS Weapon
-weapon = NEW Weapon()
-
-DIM firefn AS FUNCREF
-firefn = fire_single
-
-DIM score AS INTEGER
-DIM kills AS INTEGER
-DIM next_upgrade AS INTEGER
-DIM spawn_timer AS FLOAT
-DIM alive AS BOOLEAN
-score = 0 : kills = 0 : next_upgrade = 12 : spawn_timer = 0.0 : alive = TRUE
-
-' Start-Schwarm.
-DIM si AS INTEGER
-FOR si = 0 TO 79
-    spawn_enemy(world)
-NEXT
-
-' Broadphase + Index->Entity-Map + dynamische Instanz-Arrays.
-DIM broad AS PHYSICS_BROAD
-broad = PHYSICS_BROAD_NEW()
-DIM ent_of[700] AS INTEGER
-DIM emats[0] AS MAT4
-DIM pmats[0] AS MAT4
-
-WHILE NOT QUITREQUESTED()
-    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
-
-    DIM dt AS FLOAT
-    dt = DELTA()
-    IF dt > 0.05 THEN dt = 0.05
-
-    ' =================================================================
-    '  SPIELER-BEWEGUNG + ZIELEN
-    ' =================================================================
-    INPUT_UPDATE()
-    IF alive THEN
-        DIM mx AS FLOAT
-        DIM mz AS FLOAT
-        mx = INPUT_AXIS("move_left", "move_right")
-        mz = INPUT_AXIS("move_up", "move_down")
-        DIM jx AS FLOAT
-        DIM jy AS FLOAT
-        jx = INPUT_JOY_AXIS(0, "left_x")
-        jy = INPUT_JOY_AXIS(0, "left_y")
-        IF ABS(jx) > 0.2 OR ABS(jy) > 0.2 THEN
-            mx = jx
-            mz = jy
-        END IF
-        DIM mlen AS FLOAT
-        mlen = SQR(mx * mx + mz * mz)
-        IF mlen > 1.0 THEN
-            mx = mx / mlen
-            mz = mz / mlen
-        END IF
-        px = px + mx * MOVE_SPEED * dt
-        pz = pz + mz * MOVE_SPEED * dt
-
-        IF px < -ARENA + PLAYER_R THEN px = -ARENA + PLAYER_R
-        IF px >  ARENA - PLAYER_R THEN px =  ARENA - PLAYER_R
-        IF pz < -ARENA + PLAYER_R THEN pz = -ARENA + PLAYER_R
-        IF pz >  ARENA - PLAYER_R THEN pz =  ARENA - PLAYER_R
-
-        DIM pk AS INTEGER
-        FOR pk = 0 TO N_PILLARS - 1
-            DIM dx AS FLOAT
-            DIM dz AS FLOAT
-            dx = px - pillar_x[pk]
-            dz = pz - pillar_z[pk]
-            DIM d AS FLOAT
-            d = SQR(dx * dx + dz * dz)
-            IF d < PLAYER_R + 1.2 AND d > 0.001 THEN
-                px = pillar_x[pk] + dx / d * (PLAYER_R + 1.2)
-                pz = pillar_z[pk] + dz / d * (PLAYER_R + 1.2)
+SUB start_run()
+    ' Prozedurale Saeulen.
+    n_pillars = RANDINT(3, 6)
+    DIM i AS INTEGER
+    FOR i = 0 TO n_pillars - 1
+        DIM placed AS INTEGER
+        DIM tries AS INTEGER
+        placed = 0
+        tries = 0
+        WHILE placed = 0 AND tries < 30
+            tries = tries + 1
+            DIM cxp AS FLOAT
+            DIM czp AS FLOAT
+            cxp = RANDF(-ARENA + 3.0, ARENA - 3.0)
+            czp = RANDF(-ARENA + 3.0, ARENA - 3.0)
+            placed = 1
+            IF cxp * cxp + (czp - 8.0) * (czp - 8.0) < 25.0 THEN placed = 0
+            IF cxp * cxp + czp * czp < 9.0 THEN placed = 0
+            DIM j AS INTEGER
+            FOR j = 0 TO i - 1
+                IF (cxp - pillar_x[j]) * (cxp - pillar_x[j]) + (czp - pillar_z[j]) * (czp - pillar_z[j]) < 30.0 THEN placed = 0
+            NEXT
+            IF placed = 1 THEN
+                pillar_x[i] = cxp
+                pillar_z[i] = czp
             END IF
-        NEXT
+        WEND
+        IF placed = 0 THEN
+            pillar_x[i] = RANDF(-ARENA + 3.0, ARENA - 3.0)
+            pillar_z[i] = RANDF(-ARENA + 3.0, ARENA - 3.0)
+        END IF
+    NEXT
+    rebuild_walls()
 
-        DIM ax AS FLOAT
-        DIM az AS FLOAT
-        ax = MOUSEX() - SCR_W / 2.0
-        az = MOUSEY() - SCR_H / 2.0
-        DIM rjx AS FLOAT
-        DIM rjy AS FLOAT
-        rjx = INPUT_JOY_AXIS(0, "right_x")
-        rjy = INPUT_JOY_AXIS(0, "right_y")
-        IF ABS(rjx) > 0.2 OR ABS(rjy) > 0.2 THEN
-            ax = rjx
-            az = rjy
-        END IF
-        DIM alen AS FLOAT
-        alen = SQR(ax * ax + az * az)
-        IF alen > 0.001 THEN
-            facing_x = ax / alen
-            facing_z = az / alen
-        END IF
+    world = ECS_NEW_WORLD()
+    px = 0.0 : pz = 8.0
+    facing_x = 0.0 : facing_z = -1.0
+    php = 100.0
+    cam_x = px : cam_z = pz + 12.0
+    weapon = NEW Weapon()
+    firefn = fire_single
+    score = 0 : kills = 0 : next_upgrade = 10 : spawn_timer = 0.0
+    last_pcx = -1 : last_pcz = -1
+    n_draw_e = 0 : n_draw_p = 0
 
-        ' --- Auto-Feuern via FUNCREF-Muster ---
-        IF weapon.ready(dt) THEN
-            DIM nf AS INTEGER
-            nf = firefn(world, px + facing_x * PLAYER_R, pz + facing_z * PLAYER_R,
-                        facing_x, facing_z, weapon.proj_speed, weapon.damage)
+    DIM si AS INTEGER
+    FOR si = 0 TO 59
+        spawn_enemy(world)
+    NEXT
+END SUB
+
+' =====================================================================
+'  PLAY -- Update
+' =====================================================================
+SUB update_play(dt AS FLOAT)
+    ' --- Spieler-Bewegung ---
+    DIM mx AS FLOAT
+    DIM mz AS FLOAT
+    mx = INPUT_AXIS("move_left", "move_right")
+    mz = INPUT_AXIS("move_up", "move_down")
+    DIM jx AS FLOAT
+    DIM jy AS FLOAT
+    jx = INPUT_JOY_AXIS(0, "left_x")
+    jy = INPUT_JOY_AXIS(0, "left_y")
+    IF ABS(jx) > 0.2 OR ABS(jy) > 0.2 THEN
+        mx = jx
+        mz = jy
+    END IF
+    DIM mlen AS FLOAT
+    mlen = SQR(mx * mx + mz * mz)
+    IF mlen > 1.0 THEN
+        mx = mx / mlen
+        mz = mz / mlen
+    END IF
+    px = px + mx * MOVE_SPEED * dt
+    pz = pz + mz * MOVE_SPEED * dt
+    IF px < -ARENA + PLAYER_R THEN px = -ARENA + PLAYER_R
+    IF px >  ARENA - PLAYER_R THEN px =  ARENA - PLAYER_R
+    IF pz < -ARENA + PLAYER_R THEN pz = -ARENA + PLAYER_R
+    IF pz >  ARENA - PLAYER_R THEN pz =  ARENA - PLAYER_R
+
+    DIM pk AS INTEGER
+    FOR pk = 0 TO n_pillars - 1
+        DIM dx AS FLOAT
+        DIM dz AS FLOAT
+        dx = px - pillar_x[pk]
+        dz = pz - pillar_z[pk]
+        DIM d AS FLOAT
+        d = SQR(dx * dx + dz * dz)
+        IF d < PLAYER_R + 1.2 AND d > 0.001 THEN
+            px = pillar_x[pk] + dx / d * (PLAYER_R + 1.2)
+            pz = pillar_z[pk] + dz / d * (PLAYER_R + 1.2)
         END IF
+    NEXT
+
+    DIM ax AS FLOAT
+    DIM az AS FLOAT
+    ax = MOUSEX() - SCR_W / 2.0
+    az = MOUSEY() - SCR_H / 2.0
+    DIM rjx AS FLOAT
+    DIM rjy AS FLOAT
+    rjx = INPUT_JOY_AXIS(0, "right_x")
+    rjy = INPUT_JOY_AXIS(0, "right_y")
+    IF ABS(rjx) > 0.2 OR ABS(rjy) > 0.2 THEN
+        ax = rjx
+        az = rjy
+    END IF
+    DIM alen AS FLOAT
+    alen = SQR(ax * ax + az * az)
+    IF alen > 0.001 THEN
+        facing_x = ax / alen
+        facing_z = az / alen
     END IF
 
-    ' =================================================================
-    '  WELLEN-SPAWN
-    ' =================================================================
+    ' --- Auto-Feuern via FUNCREF ---
+    IF weapon.ready(dt) THEN
+        DIM nf AS INTEGER
+        nf = firefn(world, px + facing_x * PLAYER_R, pz + facing_z * PLAYER_R,
+                    facing_x, facing_z, weapon.proj_speed, weapon.damage)
+    END IF
+
+    ' --- Wellen-Spawn ---
     spawn_timer = spawn_timer + dt
-    IF alive AND spawn_timer >= 0.5 THEN
+    IF spawn_timer >= 0.5 THEN
         spawn_timer = spawn_timer - 0.5
         IF ECS_COUNT_WITH(world, "hp") < MAX_ENEMIES THEN
             DIM sj AS INTEGER
@@ -345,16 +334,8 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
 
-    ' =================================================================
-    '  GEGNER-STEERING + BULK-BEWEGUNG
-    ' =================================================================
-    DIM enemies AS ARRAY OF INTEGER
-    enemies = ECS_QUERY2(world, "px", "pz")
-    DIM stepd AS FLOAT
-    stepd = ENEMY_SPEED * dt
+    ' --- Flow-Field neu bei Spieler-Zellenwechsel ---
     DIM i AS INTEGER
-
-    ' --- Flow-Field neu berechnen, wenn der Spieler die Zelle wechselt ---
     DIM pcx AS INTEGER
     DIM pcz AS INTEGER
     pcx = INT((px + ARENA) / CELL)
@@ -372,10 +353,10 @@ WHILE NOT QUITREQUESTED()
         DIM head AS INTEGER
         DIM tail AS INTEGER
         head = 0 : tail = 0
-        DIM start AS INTEGER
-        start = pcz * GRID + pcx
-        distc[start] = 0
-        bfsq[tail] = start : tail = tail + 1
+        DIM startc AS INTEGER
+        startc = pcz * GRID + pcx
+        distc[startc] = 0
+        bfsq[tail] = startc : tail = tail + 1
         WHILE head < tail
             DIM cur AS INTEGER
             cur = bfsq[head] : head = head + 1
@@ -416,78 +397,68 @@ WHILE NOT QUITREQUESTED()
         WEND
     END IF
 
-    ' --- Gegner folgen dem Gradienten (Flow-Field) -------------------
-    IF alive THEN
-        FOR i = 0 TO LEN(enemies) - 1
-            DIM en AS INTEGER
-            en = enemies[i]
-            DIM ex AS FLOAT
-            DIM ez AS FLOAT
-            ex = ECS_GET_FLOAT(world, en, "px")
-            ez = ECS_GET_FLOAT(world, en, "pz")
-
-            ' Standardziel: direkt der Spieler.
-            DIM tx AS FLOAT
-            DIM tz AS FLOAT
-            tx = px : tz = pz
-
-            ' Zelle des Gegners.
-            DIM ecx AS INTEGER
-            DIM ecz AS INTEGER
-            ecx = INT((ex + ARENA) / CELL)
-            ecz = INT((ez + ARENA) / CELL)
-            IF ecx < 0 THEN ecx = 0
-            IF ecx > GRID - 1 THEN ecx = GRID - 1
-            IF ecz < 0 THEN ecz = 0
-            IF ecz > GRID - 1 THEN ecz = GRID - 1
-
-            ' Besten 8er-Nachbarn (kleinste Distanz) als Zwischenziel waehlen.
-            DIM bestd AS INTEGER
-            bestd = distc[ecz * GRID + ecx]
-            IF bestd < 0 THEN bestd = 999999
-            DIM found AS INTEGER
-            found = 0
-            DIM ox AS INTEGER
-            DIM oz AS INTEGER
-            FOR oz = -1 TO 1
-                FOR ox = -1 TO 1
-                    IF (ox <> 0 OR oz <> 0) THEN
-                        DIM nx AS INTEGER
-                        DIM nz AS INTEGER
-                        nx = ecx + ox
-                        nz = ecz + oz
-                        IF nx >= 0 AND nx < GRID AND nz >= 0 AND nz < GRID THEN
-                            DIM nc AS INTEGER
-                            nc = nz * GRID + nx
-                            IF wallc[nc] = 0 AND distc[nc] >= 0 AND distc[nc] < bestd THEN
-                                bestd = distc[nc]
-                                tx = -ARENA + (nx + 0.5) * CELL
-                                tz = -ARENA + (nz + 0.5) * CELL
-                                found = 1
-                            END IF
+    ' --- Gegner: Gradienten-Folgen ---
+    DIM enemies AS ARRAY OF INTEGER
+    enemies = ECS_QUERY2(world, "px", "pz")
+    DIM stepd AS FLOAT
+    stepd = ENEMY_SPEED * dt
+    FOR i = 0 TO LEN(enemies) - 1
+        DIM en AS INTEGER
+        en = enemies[i]
+        DIM ex AS FLOAT
+        DIM ez AS FLOAT
+        ex = ECS_GET_FLOAT(world, en, "px")
+        ez = ECS_GET_FLOAT(world, en, "pz")
+        DIM tx AS FLOAT
+        DIM tz AS FLOAT
+        tx = px : tz = pz
+        DIM ecx AS INTEGER
+        DIM ecz AS INTEGER
+        ecx = INT((ex + ARENA) / CELL)
+        ecz = INT((ez + ARENA) / CELL)
+        IF ecx < 0 THEN ecx = 0
+        IF ecx > GRID - 1 THEN ecx = GRID - 1
+        IF ecz < 0 THEN ecz = 0
+        IF ecz > GRID - 1 THEN ecz = GRID - 1
+        DIM bestd AS INTEGER
+        bestd = distc[ecz * GRID + ecx]
+        IF bestd < 0 THEN bestd = 999999
+        DIM ox AS INTEGER
+        DIM oz AS INTEGER
+        FOR oz = -1 TO 1
+            FOR ox = -1 TO 1
+                IF (ox <> 0 OR oz <> 0) THEN
+                    DIM nx AS INTEGER
+                    DIM nz AS INTEGER
+                    nx = ecx + ox
+                    nz = ecz + oz
+                    IF nx >= 0 AND nx < GRID AND nz >= 0 AND nz < GRID THEN
+                        DIM nc AS INTEGER
+                        nc = nz * GRID + nx
+                        IF wallc[nc] = 0 AND distc[nc] >= 0 AND distc[nc] < bestd THEN
+                            bestd = distc[nc]
+                            tx = -ARENA + (nx + 0.5) * CELL
+                            tz = -ARENA + (nz + 0.5) * CELL
                         END IF
                     END IF
-                NEXT
+                END IF
             NEXT
-
-            DIM ddx AS FLOAT
-            DIM ddz AS FLOAT
-            ddx = tx - ex
-            ddz = tz - ez
-            DIM dl AS FLOAT
-            dl = SQR(ddx * ddx + ddz * ddz)
-            IF dl > 0.001 THEN
-                ECS_ADD_FLOAT(world, en, "vx", ddx / dl * stepd)
-                ECS_ADD_FLOAT(world, en, "vz", ddz / dl * stepd)
-            END IF
         NEXT
-        ECS_INTEGRATE_FLOAT(world, "px", "vx")
-        ECS_INTEGRATE_FLOAT(world, "pz", "vz")
-    END IF
+        DIM ddx AS FLOAT
+        DIM ddz AS FLOAT
+        ddx = tx - ex
+        ddz = tz - ez
+        DIM dl AS FLOAT
+        dl = SQR(ddx * ddx + ddz * ddz)
+        IF dl > 0.001 THEN
+            ECS_ADD_FLOAT(world, en, "vx", ddx / dl * stepd)
+            ECS_ADD_FLOAT(world, en, "vz", ddz / dl * stepd)
+        END IF
+    NEXT
+    ECS_INTEGRATE_FLOAT(world, "px", "vx")
+    ECS_INTEGRATE_FLOAT(world, "pz", "vz")
 
-    ' =================================================================
-    '  GESCHOSSE BEWEGEN
-    ' =================================================================
+    ' --- Geschosse bewegen ---
     DIM projs AS ARRAY OF INTEGER
     projs = ECS_QUERY2(world, "qx", "qz")
     FOR i = 0 TO LEN(projs) - 1
@@ -505,9 +476,7 @@ WHILE NOT QUITREQUESTED()
         ECS_ADD_FLOAT(world, pr, "qlife", ql)
     NEXT
 
-    ' =================================================================
-    '  BROADPHASE: Spieler(0) + Gegner(1..E) + Geschosse(E+1..)
-    ' =================================================================
+    ' --- Broadphase: Spieler(0) + Gegner(1..E) + Geschosse + Saeulen ---
     DIM contacts AS INTEGER
     contacts = 0
     PHYSICS_BROAD_CLEAR(broad)
@@ -524,10 +493,9 @@ WHILE NOT QUITREQUESTED()
                 ECS_GET_FLOAT(world, projs[i], "qx"),
                 ECS_GET_FLOAT(world, projs[i], "qz"), 0.18)] = projs[i]
     NEXT
-    ' Saeulen als statische Kreise -- hoechste Indizes (>= pil0).
     DIM pil0 AS INTEGER
     pil0 = 1 + ecount + LEN(projs)
-    FOR i = 0 TO N_PILLARS - 1
+    FOR i = 0 TO n_pillars - 1
         ent_of[PHYSICS_BROAD_ADD(broad, pillar_x[i], pillar_z[i], 1.15)] = -2
     NEXT
 
@@ -548,12 +516,11 @@ WHILE NOT QUITREQUESTED()
         END IF
 
         IF hi >= pil0 THEN
-            ' --- Saeule beteiligt (Saeulen haben die hoechsten Indizes) ---
             IF lo < pil0 THEN
                 DIM pn AS INTEGER
                 pn = hi - pil0
                 IF lo = 0 THEN
-                    ' Spieler<->Saeule: ignorieren (Spieler korrigiert sich selbst)
+                    ' Spieler<->Saeule: ignorieren
                 ELSEIF lo <= ecount THEN
                     DIM pe AS INTEGER
                     pe = ent_of[lo]
@@ -573,9 +540,7 @@ WHILE NOT QUITREQUESTED()
                 END IF
             END IF
         ELSEIF lo = 0 THEN
-            ' Spieler + X
             IF hi <= ecount THEN
-                ' Gegner-Kontakt: Gegner rausschieben, Spieler nimmt Schaden.
                 contacts = contacts + 1
                 DIM ge AS INTEGER
                 ge = ent_of[hi]
@@ -592,7 +557,6 @@ WHILE NOT QUITREQUESTED()
                 ECS_ADD_FLOAT(world, ge, "pz", pz + hz / hl * (PLAYER_R + ENEMY_R))
             END IF
         ELSEIF hi <= ecount THEN
-            ' Gegner <-> Gegner: Separation.
             DIM ga AS INTEGER
             DIM gb AS INTEGER
             ga = ent_of[lo]
@@ -623,7 +587,6 @@ WHILE NOT QUITREQUESTED()
                 ECS_ADD_FLOAT(world, gb, "pz", gbz - sz / sl * push)
             END IF
         ELSEIF lo <= ecount THEN
-            ' Gegner(lo) + Geschoss(hi): Treffer.
             DIM tgt AS INTEGER
             DIM bul AS INTEGER
             tgt = ent_of[lo]
@@ -634,9 +597,7 @@ WHILE NOT QUITREQUESTED()
         END IF
     NEXT
 
-    ' =================================================================
-    '  TODE AUFLOESEN (Burst + Score), dann Bulk-Remove
-    ' =================================================================
+    ' --- Tode aufloesen (Burst + Score), dann Bulk-Remove ---
     FOR i = 0 TO ecount - 1
         IF ECS_GET_OR_FLOAT(world, enemies[i], "hp", 1.0) <= 0.0 THEN
             spawn_burst(world, ECS_GET_FLOAT(world, enemies[i], "px"),
@@ -648,22 +609,16 @@ WHILE NOT QUITREQUESTED()
     ECS_REMOVE_DEAD(world, "hp", 0.0)
     ECS_REMOVE_DEAD(world, "qlife", 0.0)
 
-    ' Level-Up: ab Level 2 Spread-Feuer.
-    IF kills >= next_upgrade THEN
-        weapon.upgrade()
-        next_upgrade = next_upgrade + 12
-        IF weapon.wlevel >= 2 THEN firefn = fire_spread
-    END IF
-
-    ' Spieler-Schaden durch Kontakt (mit i-frame-aehnlicher Daempfung).
-    IF alive AND contacts > 0 THEN
+    ' --- Spieler-Schaden ---
+    IF contacts > 0 THEN
         DIM cdmg AS INTEGER
         cdmg = contacts
         IF cdmg > 6 THEN cdmg = 6
         php = php - cdmg * 6.0 * dt
         IF php <= 0.0 THEN
             php = 0.0
-            alive = FALSE
+            IF score > best_score THEN best_score = score
+            SCENE_SWITCH("gameover")
         END IF
     END IF
 
@@ -674,49 +629,56 @@ WHILE NOT QUITREQUESTED()
     cam_z = cam_z + ((pz + 12.0) - cam_z) * follow
     LIGHT_SET_POS(glow, px, 2.5, pz)
 
-    ' =================================================================
-    '  INSTANZ-MATRIZEN (live neu abfragen -> dynamische Anzahl)
-    ' =================================================================
+    ' --- Instanz-Matrizen (live) ---
     DIM le AS ARRAY OF INTEGER
     le = ECS_QUERY2(world, "px", "pz")
-    REDIM(emats, LEN(le))
-    FOR i = 0 TO LEN(le) - 1
+    n_draw_e = LEN(le)
+    REDIM(emats, n_draw_e)
+    FOR i = 0 TO n_draw_e - 1
         emats[i] = MAT4_TRANSLATE(ECS_GET_FLOAT(world, le[i], "px"), ENEMY_R,
                                   ECS_GET_FLOAT(world, le[i], "pz"))
     NEXT
-
     DIM lp AS ARRAY OF INTEGER
     lp = ECS_QUERY2(world, "qx", "qz")
-    REDIM(pmats, LEN(lp))
-    FOR i = 0 TO LEN(lp) - 1
+    n_draw_p = LEN(lp)
+    REDIM(pmats, n_draw_p)
+    FOR i = 0 TO n_draw_p - 1
         pmats[i] = MAT4_TRANSLATE(ECS_GET_FLOAT(world, lp[i], "qx"), 0.5,
                                   ECS_GET_FLOAT(world, lp[i], "qz"))
     NEXT
 
-    ' =================================================================
-    '  ZEICHNEN
-    ' =================================================================
+    ' --- LevelUp ausloesen (Overlay) ---
+    IF kills >= next_upgrade THEN
+        next_upgrade = next_upgrade + 12
+        enter_levelup()
+        SCENE_PUSH("levelup")
+    END IF
+END SUB
+
+' =====================================================================
+'  PLAY -- Draw
+' =====================================================================
+SUB draw_play()
     CLS(&H0A0E16)
     CAMERA3D(cam_x, 17.0, cam_z,  px, 0.0, pz,  45.0)
-
     MODEL(ground, 0, 0, 0, 1.0, &H22304A)
     GRID3D(36, 1.0)
-
-    FOR pk = 0 TO N_PILLARS - 1
+    DIM pk AS INTEGER
+    FOR pk = 0 TO n_pillars - 1
         MODEL(pillar, pillar_x[pk], 2.0, pillar_z[pk], 1.0, &H4A5568)
     NEXT
+    IF n_draw_e > 0 THEN MODEL_INSTANCED(enemy_mesh, emats, &HE0604C)
+    IF n_draw_p > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
 
-    IF LEN(le) > 0 THEN MODEL_INSTANCED(enemy_mesh, emats, &HE0604C)
-    IF LEN(lp) > 0 THEN MODEL_INSTANCED(proj_mesh, pmats, &HFFE040)
-
-    ' Burst-Ringe (3D, expandierend + ausblendend).
+    ' Burst-Ringe (eigene Alterung hier, da rein visuell).
     DIM bursts AS ARRAY OF INTEGER
     bursts = ECS_QUERY2(world, "bx", "bz")
-    FOR i = 0 TO LEN(bursts) - 1
+    DIM bi AS INTEGER
+    FOR bi = 0 TO LEN(bursts) - 1
         DIM bo AS INTEGER
-        bo = bursts[i]
+        bo = bursts[bi]
         DIM bl AS FLOAT
-        bl = ECS_GET_FLOAT(world, bo, "blife") - dt
+        bl = ECS_GET_FLOAT(world, bo, "blife") - DELTA()
         ECS_ADD_FLOAT(world, bo, "blife", bl)
         DIM rr AS FLOAT
         rr = 0.3 + (0.4 - bl) * 5.0
@@ -725,27 +687,162 @@ WHILE NOT QUITREQUESTED()
     NEXT
     ECS_REMOVE_DEAD(world, "blife", 0.0)
 
-    IF alive THEN
-        MODEL(player, px, PLAYER_R, pz, 1.0, &H30C0E0)
-        MODEL(aimdot, px + facing_x * 1.6, PLAYER_R, pz + facing_z * 1.6, 1.0, &HFFD040)
-    END IF
+    MODEL(player, px, PLAYER_R, pz, 1.0, &H30C0E0)
+    MODEL(aimdot, px + facing_x * 1.6, PLAYER_R, pz + facing_z * 1.6, 1.0, &HFFD040)
 
-    ' =================================================================
-    '  2D-HUD
-    ' =================================================================
-    ' HP-Balken.
+    ' HUD
     BOX(12, SCR_H - 40, 12 + 200, SCR_H - 28, &H203040)
     BOX(12, SCR_H - 40, 12 + INT(php * 2.0), SCR_H - 28, &H40E060)
     TEXT(12, SCR_H - 56, f"HP {INT(php)}", &HBFE8C8)
+    TEXT(12, 10, f"score {score}   kills {kills}   waffe lvl {weapon.wlevel}", &H88AACC)
+    TEXT(SCR_W - 220, 10, f"gegner {n_draw_e}   fps {FPS()}", &H66FFCC)
+END SUB
 
-    TEXT(12, 10, "VOIDREAVER  -- Stufe 3: Kampf-Loop", WHITE)
-    TEXT(12, 32, f"score {score}   kills {kills}   waffe lvl {weapon.wlevel}", &H88AACC)
-    TEXT(SCR_W - 220, 10, f"gegner {LEN(le)}   fps {FPS()}", &H66FFCC)
-    IF contacts > 0 AND alive THEN TEXT(SCR_W / 2 - 40, 56, "!! KONTAKT !!", &HFF5050)
-    IF NOT alive THEN
-        TEXT(SCR_W / 2 - 70, SCR_H / 2 - 20, "=== GAME OVER ===", &HFF5050)
-        TEXT(SCR_W / 2 - 90, SCR_H / 2 + 4, f"finaler score: {score}", &HFFD040)
+' =====================================================================
+'  LEVELUP -- gui-Karten
+' =====================================================================
+SUB enter_levelup()
+    lvl_win = GUI_WINDOW("LEVEL UP  --  waehle ein Upgrade", SCR_W / 2 - 280, SCR_H / 2 - 90, 560, 180)
+    lvl_b0 = GUI_BUTTON(lvl_win, "Schaden +8", 20, 70, 160, 90)
+    lvl_b1 = GUI_BUTTON(lvl_win, "Feuerrate +", 200, 70, 160, 90)
+    lvl_b2 = GUI_BUTTON(lvl_win, "Mehrschuss", 380, 70, 160, 90)
+END SUB
+
+SUB update_levelup()
+    GUI_UPDATE()
+    DIM pick AS INTEGER
+    pick = -1
+    IF GUI_CLICKED(lvl_b0) THEN pick = 0
+    IF GUI_CLICKED(lvl_b1) THEN pick = 1
+    IF GUI_CLICKED(lvl_b2) THEN pick = 2
+    IF pick >= 0 THEN
+        IF pick = 0 THEN weapon.damage = weapon.damage + 8
+        IF pick = 1 THEN
+            weapon.cooldown = weapon.cooldown * 0.8
+            IF weapon.cooldown < 0.05 THEN weapon.cooldown = 0.05
+        END IF
+        IF pick = 2 THEN firefn = fire_spread
+        weapon.wlevel = weapon.wlevel + 1
+        php = php + 20.0
+        IF php > 100.0 THEN php = 100.0
+        GUI_DESTROY(lvl_win)
+        SCENE_POP()
     END IF
+END SUB
+
+' =====================================================================
+'  MENU / PAUSE / GAMEOVER
+' =====================================================================
+SUB draw_menu()
+    CLS(&H0A0E16)
+    TEXT(SCR_W / 2 - 140, 150, "V O I D R E A V E R", &H40E0FF)
+    TEXT(SCR_W / 2 - 150, 190, "Co-op 3D-Arena-Roguelite (Solo-Demo)", &H6688AA)
+    TEXT(SCR_W / 2 - 120, 280, "SPACE  =  Run starten", WHITE)
+    TEXT(SCR_W / 2 - 160, 310, "WASD/Pfeile bewegen . Maus zielen . P Pause", &H88AACC)
+    TEXT(SCR_W / 2 - 60, 340, "ESC  =  beenden", &H667788)
+    IF best_score > 0 THEN TEXT(SCR_W / 2 - 70, 400, f"bester score: {best_score}", &HFFD040)
+END SUB
+
+SUB draw_pause_overlay()
+    BOX(SCR_W / 2 - 140, SCR_H / 2 - 40, SCR_W / 2 + 140, SCR_H / 2 + 40, &H101826)
+    TEXT(SCR_W / 2 - 50, SCR_H / 2 - 16, "P A U S E", &H40E0FF)
+    TEXT(SCR_W / 2 - 110, SCR_H / 2 + 8, "P/SPACE weiter . M Menue", &H88AACC)
+END SUB
+
+SUB draw_gameover()
+    CLS(&H0A0E16)
+    TEXT(SCR_W / 2 - 90, SCR_H / 2 - 40, "=== GAME OVER ===", &HFF5050)
+    TEXT(SCR_W / 2 - 70, SCR_H / 2 - 6, f"score: {score}", &HFFD040)
+    TEXT(SCR_W / 2 - 80, SCR_H / 2 + 18, f"bester: {best_score}", &H66FFCC)
+    TEXT(SCR_W / 2 - 150, SCR_H / 2 + 60, "SPACE = neuer Run . M = Menue . ESC = ende", &H88AACC)
+END SUB
+
+' =====================================================================
+'  Setup (einmalig)
+' =====================================================================
+SCREEN(SCR_W, SCR_H, "VOIDREAVER -- Stufe 4", 1)
+SETFPS(60)
+RANDOMIZE(MILLIS())
+
+INPUT_BIND("move_left",  KEY_LEFT,  KEY_A)
+INPUT_BIND("move_right", KEY_RIGHT, KEY_D)
+INPUT_BIND("move_up",    KEY_UP,    KEY_W)
+INPUT_BIND("move_down",  KEY_DOWN,  KEY_S)
+INPUT_BIND("start",      KEY_SPACE)
+INPUT_BIND("pause",      KEY_P)
+INPUT_BIND("to_menu",    KEY_M)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H2A3242, 1.0)
+LIGHT_DIRECTIONAL(-0.4, -1.0, -0.35, &HFFE8C8)
+glow = LIGHT_POINT(0, 2.5, 0, &H30E0FF)
+
+ground = MESH_PLANE(ARENA * 2.0, ARENA * 2.0, 1, 1)
+MODEL_LIT(ground)
+player = MESH_SPHERE(PLAYER_R, 28, 28)
+MODEL_LIT(player)
+MODEL_PBR(player, 0.9, 0.22)
+pillar = MESH_CUBE(2.0, 4.0, 2.0)
+MODEL_LIT(pillar)
+MODEL_PBR(pillar, 0.1, 0.8)
+aimdot = MESH_SPHERE(0.18, 12, 12)
+MODEL_LIT(aimdot)
+enemy_mesh = MESH_CUBE(ENEMY_R * 1.6, ENEMY_R * 1.6, ENEMY_R * 1.6)
+MODEL_LIT(enemy_mesh)
+proj_mesh = MESH_SPHERE(0.16, 10, 10)
+MODEL_LIT(proj_mesh)
+
+broad = PHYSICS_BROAD_NEW()
+best_score = 0
+
+SCENE_SWITCH("menu")
+
+' =====================================================================
+'  Hauptschleife (Scene-Dispatch)
+' =====================================================================
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
+
+    DIM dt AS FLOAT
+    dt = DELTA()
+    IF dt > 0.05 THEN dt = 0.05
+
+    INPUT_UPDATE()
+
+    SELECT CASE SCENE_CURRENT()
+        CASE "menu"
+            IF INPUT_PRESSED("start") THEN
+                start_run()
+                SCENE_SWITCH("play")
+            END IF
+            draw_menu()
+        CASE "play"
+            IF INPUT_PRESSED("pause") THEN
+                SCENE_PUSH("pause")
+            ELSE
+                update_play(dt)
+            END IF
+            draw_play()
+        CASE "pause"
+            IF INPUT_PRESSED("pause") OR INPUT_PRESSED("start") THEN SCENE_POP()
+            IF INPUT_PRESSED("to_menu") THEN
+                SCENE_POP()
+                SCENE_SWITCH("menu")
+            END IF
+            draw_play()
+            draw_pause_overlay()
+        CASE "levelup"
+            update_levelup()
+            draw_play()
+            GUI_DRAW()
+        CASE "gameover"
+            IF INPUT_PRESSED("start") THEN
+                start_run()
+                SCENE_SWITCH("play")
+            END IF
+            IF INPUT_PRESSED("to_menu") THEN SCENE_SWITCH("menu")
+            draw_gameover()
+    END SELECT
 
     FLIP()
 WEND
