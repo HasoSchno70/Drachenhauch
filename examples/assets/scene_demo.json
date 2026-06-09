@@ -1,0 +1,27 @@
+{
+  "objects": [
+    { "prefab": "floor",  "x": -3, "y": 0,   "z": -3 },
+    { "prefab": "floor",  "x":  0, "y": 0,   "z": -3 },
+    { "prefab": "floor",  "x":  3, "y": 0,   "z": -3 },
+    { "prefab": "floor",  "x": -3, "y": 0,   "z":  0 },
+    { "prefab": "floor",  "x":  0, "y": 0,   "z":  0 },
+    { "prefab": "floor",  "x":  3, "y": 0,   "z":  0 },
+    { "prefab": "floor",  "x": -3, "y": 0,   "z":  3 },
+    { "prefab": "floor",  "x":  0, "y": 0,   "z":  3 },
+    { "prefab": "floor",  "x":  3, "y": 0,   "z":  3 },
+
+    { "prefab": "pillar", "x": -4, "y": 1.5, "z": -4 },
+    { "prefab": "pillar", "x":  4, "y": 1.5, "z": -4 },
+    { "prefab": "pillar", "x": -4, "y": 1.5, "z":  4 },
+    { "prefab": "pillar", "x":  4, "y": 1.5, "z":  4 },
+
+    { "prefab": "crate",  "x": -1, "y": 0.5, "z": -1, "ry": 20 },
+    { "prefab": "crate",  "x":  0, "y": 0.5, "z": -1, "ry": -10 },
+    { "prefab": "crate",  "x": -0.5, "y": 1.5, "z": -1, "ry": 35, "scale": 0.8 },
+    { "prefab": "crate",  "x":  1.5, "y": 0.5, "z":  1 },
+
+    { "prefab": "ball",   "x":  0,   "y": 1.0, "z":  1.5 },
+    { "prefab": "gem",    "x": -0.5, "y": 2.4, "z": -1, "scale": 1.0 },
+    { "prefab": "gem",    "x":  2.0, "y": 0.9, "z": -2 }
+  ]
+}
