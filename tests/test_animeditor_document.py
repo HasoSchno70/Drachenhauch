@@ -170,6 +170,40 @@ def test_to_dict_runtime_shape():
     assert d["transitions"][0]["conditions"][0]["value"] == 5.0
 
 
+# ----------------------------------------------------------------- Beispiel-Datei
+import pathlib
+
+_DEMO = pathlib.Path(__file__).resolve().parents[1] / "examples" / "anim_demo.gbanim"
+
+
+def test_shipped_demo_loads_in_editor():
+    doc = AnimDoc.load(str(_DEMO))
+    assert [s.name for s in doc.states] == ["idle", "run", "jump", "fall"]
+    assert doc.effective_default() == "idle"
+    assert {p.name for p in doc.params} == {"speed", "grounded", "jump"}
+    # alle Transitions zeigen auf existierende States
+    names = doc.state_names() | {ANY_STATE}
+    for t in doc.transitions:
+        assert t.from_state in names and t.to_state in doc.state_names()
+
+
+def test_shipped_demo_runtime_valid(run_gb, tmp_path):
+    """Die Demo muss vom animfsm-Runtime ladbar sein (kein Validierungsfehler)."""
+    import shutil
+    shutil.copy(str(_DEMO), str(tmp_path / "anim_demo.gbanim"))
+    src = (
+        'IMPORT "animfsm"\n'
+        'IMPORT "sprite"\n'
+        'DIM sp AS SPRITE\n'
+        'sp = SPRITE_NEW(0, 16, 16)\n'
+        'DIM fsm AS ANIM_FSM\n'
+        'fsm = ANIM_FSM_LOAD("anim_demo.gbanim")\n'
+        'ANIM_FSM_SETUP(fsm, sp)\n'
+        'PRINT ANIM_FSM_STATE(fsm)\n'
+    )
+    assert run_gb(src, base=tmp_path).strip() == "idle"
+
+
 # ----------------------------------------------------------------- Closed-Loop
 def test_editor_output_loads_in_runtime(run_gb, tmp_path):
     """Editor-Output -> `.gbanim` -> ANIM_FSM_LOAD: identischer Default-State."""

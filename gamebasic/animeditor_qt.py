@@ -1180,6 +1180,12 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     app = QApplication.instance() or QApplication([])
     app.setStyleSheet(global_qss())
     win = AnimEditor(project_root)
+    # Ohne Datei: die mitgelieferte Beispiel-FSM laden, damit man sofort sieht,
+    # wie ein fertiger Graph aussieht (Strg+N für ein leeres Projekt).
+    if initial_file is None:
+        demo = Path(project_root) / "examples" / "anim_demo.gbanim"
+        if demo.exists():
+            initial_file = demo
     if initial_file and Path(initial_file).exists():
         try:
             win.path = Path(initial_file)

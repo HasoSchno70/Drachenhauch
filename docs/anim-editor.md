@@ -17,6 +17,11 @@ gbanim hero.gbanim      # vorhandene FSM öffnen
 Alternativ `gbrun.py --anim [datei.gbanim]` oder über den Start-Dialog (`gb`
 ohne Argument → „Animation-Editor (FSM)"). Benötigt PySide6.
 
+**Ohne Datei startet der Editor mit einer fertigen Beispiel-FSM**
+(`examples/anim_demo.gbanim` — ein Platformer-Charakter mit idle/run/jump/fall,
+Parametern `speed`/`grounded`/`jump` und allen Übergangs-Arten), damit man sofort
+sieht, wie ein Graph aussieht. `Strg+N` leert das Projekt für einen Neuanfang.
+
 ## Oberfläche
 
 - **Mitte — Graph:** die States als Knoten, Transitions als Pfeile. Ein grüner

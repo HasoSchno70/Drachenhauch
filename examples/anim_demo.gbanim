@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "sheet": "examples/assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
+  "default": "idle",
+  "params": [
+    { "name": "speed", "type": "float", "default": 0.0 },
+    { "name": "grounded", "type": "bool", "default": true },
+    { "name": "jump", "type": "trigger" }
+  ],
+  "states": [
+    { "name": "idle", "anim": "idle", "loop": true,  "first": 0, "last": 0, "fps": 2.0,  "x": 120, "y": 176 },
+    { "name": "run",  "anim": "run",  "loop": true,  "first": 0, "last": 3, "fps": 10.0, "x": 432, "y": 176 },
+    { "name": "jump", "anim": "jump", "loop": false, "first": 2, "last": 3, "fps": 8.0,  "x": 272, "y": 40  },
+    { "name": "fall", "anim": "fall", "loop": true,  "first": 1, "last": 1, "fps": 1.0,  "x": 272, "y": 336 }
+  ],
+  "transitions": [
+    { "from": "idle", "to": "run",  "conditions": [ { "param": "speed", "op": "gt", "value": 5.0 } ] },
+    { "from": "run",  "to": "idle", "conditions": [ { "param": "speed", "op": "lt", "value": 5.0 } ] },
+    { "from": "*",    "to": "jump", "conditions": [ { "param": "jump", "op": "trigger" } ] },
+    { "from": "jump", "to": "fall", "wait_finished": true, "conditions": [] },
+    { "from": "fall", "to": "idle", "conditions": [ { "param": "grounded", "op": "is_true" } ] }
+  ]
+}
