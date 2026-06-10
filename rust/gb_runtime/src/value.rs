@@ -66,6 +66,8 @@ pub enum Value {
     PhysicsBroad(Rc<RefCell<crate::physics::BroadPhase>>),
     /// Modul `physics3d`: Rapier3D-Starrkoerper-Welt (PHYS3D_*, Referenz-Typ).
     Phys3d(Rc<RefCell<crate::physics3d::Phys3dWorld>>),
+    /// Modul `animfsm`: Animations-State-Machine (ANIM_FSM_*, Referenz-Typ).
+    AnimFsm(Rc<RefCell<crate::animfsm::AnimFsmObj>>),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -416,6 +418,10 @@ impl Value {
                 format!("<BroadPhase {} entities, {} pairs>", b.count(), b.pair_count())
             }
             Value::Phys3d(w) => format!("<PHYS_WORLD {} bodies>", w.borrow().count()),
+            Value::AnimFsm(f) => {
+                let f = f.borrow();
+                format!("<ANIM_FSM state='{}' ({} states)>", f.current, f.states.len())
+            }
         }
     }
 
@@ -462,6 +468,7 @@ impl Value {
             Value::CharController(_) => "CHAR_CONTROLLER",
             Value::PhysicsBroad(_) => "PHYSICS_BROAD",
             Value::Phys3d(_) => "PHYS_WORLD",
+            Value::AnimFsm(_) => "ANIM_FSM",
         }
     }
 

@@ -3722,6 +3722,78 @@
    "module": "interpreter"
   },
   {
+   "name": "ANIM_FSM_LOAD",
+   "kind": "core",
+   "signature": "ANIM_FSM_LOAD(path: STRING) AS ANIM_FSM",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_SETUP",
+   "kind": "core",
+   "signature": "ANIM_FSM_SETUP(fsm: ANIM_FSM, sp: SPRITE)",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_UPDATE",
+   "kind": "core",
+   "signature": "ANIM_FSM_UPDATE(fsm: ANIM_FSM, sp: SPRITE, dt_ms: INTEGER) AS BOOLEAN",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_FORCE",
+   "kind": "core",
+   "signature": "ANIM_FSM_FORCE(fsm: ANIM_FSM, sp: SPRITE, state: STRING) AS BOOLEAN",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_SET_BOOL",
+   "kind": "core",
+   "signature": "ANIM_FSM_SET_BOOL(fsm: ANIM_FSM, name: STRING, value: BOOLEAN)",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_SET_FLOAT",
+   "kind": "core",
+   "signature": "ANIM_FSM_SET_FLOAT(fsm: ANIM_FSM, name: STRING, value: FLOAT)",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_SET_INT",
+   "kind": "core",
+   "signature": "ANIM_FSM_SET_INT(fsm: ANIM_FSM, name: STRING, value: INTEGER)",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_TRIGGER",
+   "kind": "core",
+   "signature": "ANIM_FSM_TRIGGER(fsm: ANIM_FSM, name: STRING)",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_STATE",
+   "kind": "core",
+   "signature": "ANIM_FSM_STATE(fsm: ANIM_FSM) AS STRING",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_GET_FLOAT",
+   "kind": "core",
+   "signature": "ANIM_FSM_GET_FLOAT(fsm: ANIM_FSM, name: STRING) AS FLOAT",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_GET_INT",
+   "kind": "core",
+   "signature": "ANIM_FSM_GET_INT(fsm: ANIM_FSM, name: STRING) AS INTEGER",
+   "module": "animfsm"
+  },
+  {
+   "name": "ANIM_FSM_GET_BOOL",
+   "kind": "core",
+   "signature": "ANIM_FSM_GET_BOOL(fsm: ANIM_FSM, name: STRING) AS BOOLEAN",
+   "module": "animfsm"
+  },
+  {
    "name": "SPRITE_ADD_ANIM",
    "kind": "core",
    "signature": "SPRITE_ADD_ANIM(sp, name, first, last, fps)",

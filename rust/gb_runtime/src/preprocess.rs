@@ -22,7 +22,7 @@ use regex::Regex;
 /// Muss mit `modules.discover_modules()` synchron bleiben. gbrt implementiert
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
-    "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
+    "animfsm", "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
     "physics", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "tween", "ui", "usb", "vec2", "wifi",
@@ -34,6 +34,7 @@ const MODULES: &[&str] = &[
 /// importiert wurde (entspricht Pythons `EXTERNAL_TYPES` nach `load_module`).
 /// Module ohne eigenen Typ stehen nicht in der Tabelle.
 const MODULE_TYPES: &[(&str, &[&str])] = &[
+    ("animfsm", &["anim_fsm"]),
     ("astar", &["astar_grid"]),
     ("audio", &["audio_channel"]),
     ("bt", &["bt_handle"]),

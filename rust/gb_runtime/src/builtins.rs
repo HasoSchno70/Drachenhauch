@@ -1736,6 +1736,92 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Bool(s.x <= x && x < s.x + s.frame_w as f64 && s.y <= y && y < s.y + s.frame_h as f64))
         }
 
+        // ===== Modul: animfsm (Animations-State-Machine, datengetrieben) =====
+        "anim_fsm_load" => {
+            arity!(1);
+            let path = need_str(&a[0], "ANIM_FSM_LOAD")?;
+            let resolved = resolve_asset_path(path);
+            let text = std::fs::read_to_string(&resolved)
+                .map_err(|e| format!("ANIM_FSM_LOAD: Lesefehler '{}': {}", resolved, e))?;
+            let data: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|e| format!("ANIM_FSM_LOAD: Parse-Fehler '{}': {}", resolved, e))?;
+            let fsm = crate::animfsm::AnimFsmObj::from_json(&data)?;
+            Ok(Value::AnimFsm(std::rc::Rc::new(std::cell::RefCell::new(fsm))))
+        }
+        "anim_fsm_setup" => {
+            arity!(2);
+            let f = fsm_h(&a[0], "ANIM_FSM_SETUP")?;
+            let sp = spr(&a[1], "ANIM_FSM_SETUP")?;
+            f.borrow().setup(&mut sp.borrow_mut())?;
+            Ok(Value::Nil)
+        }
+        "anim_fsm_update" => {
+            arity!(3);
+            let dt = need_int(&a[2], "ANIM_FSM_UPDATE")?;
+            if dt < 0 { return err("ANIM_FSM_UPDATE: dt_ms muss >= 0 sein"); }
+            let f = fsm_h(&a[0], "ANIM_FSM_UPDATE")?;
+            let sp = spr(&a[1], "ANIM_FSM_UPDATE")?;
+            let changed = f.borrow_mut().update(&mut sp.borrow_mut(), dt)?;
+            Ok(Value::Bool(changed))
+        }
+        "anim_fsm_force" => {
+            arity!(3);
+            let state = need_str(&a[2], "ANIM_FSM_FORCE")?.to_string();
+            let f = fsm_h(&a[0], "ANIM_FSM_FORCE")?;
+            let sp = spr(&a[1], "ANIM_FSM_FORCE")?;
+            let changed = f.borrow_mut().force(&mut sp.borrow_mut(), &state)?;
+            Ok(Value::Bool(changed))
+        }
+        "anim_fsm_set_bool" => {
+            arity!(3);
+            let name = need_str(&a[1], "ANIM_FSM_SET_BOOL")?.to_string();
+            let v = match &a[2] {
+                Value::Bool(b) => *b,
+                _ => return err("ANIM_FSM_SET_BOOL: erwartet BOOLEAN als 3. Argument"),
+            };
+            fsm_h(&a[0], "ANIM_FSM_SET_BOOL")?.borrow_mut().set_bool(&name, v)?;
+            Ok(Value::Nil)
+        }
+        "anim_fsm_set_float" => {
+            arity!(3);
+            let name = need_str(&a[1], "ANIM_FSM_SET_FLOAT")?.to_string();
+            let v = need_num(&a[2], "ANIM_FSM_SET_FLOAT")?;
+            fsm_h(&a[0], "ANIM_FSM_SET_FLOAT")?.borrow_mut().set_float(&name, v)?;
+            Ok(Value::Nil)
+        }
+        "anim_fsm_set_int" => {
+            arity!(3);
+            let name = need_str(&a[1], "ANIM_FSM_SET_INT")?.to_string();
+            let v = need_int(&a[2], "ANIM_FSM_SET_INT")?;
+            fsm_h(&a[0], "ANIM_FSM_SET_INT")?.borrow_mut().set_int(&name, v)?;
+            Ok(Value::Nil)
+        }
+        "anim_fsm_trigger" => {
+            arity!(2);
+            let name = need_str(&a[1], "ANIM_FSM_TRIGGER")?.to_string();
+            fsm_h(&a[0], "ANIM_FSM_TRIGGER")?.borrow_mut().trigger(&name)?;
+            Ok(Value::Nil)
+        }
+        "anim_fsm_state" => {
+            arity!(1);
+            Ok(Value::str_rc(&fsm_h(&a[0], "ANIM_FSM_STATE")?.borrow().current))
+        }
+        "anim_fsm_get_float" => {
+            arity!(2);
+            let name = need_str(&a[1], "ANIM_FSM_GET_FLOAT")?;
+            Ok(Value::Float(fsm_h(&a[0], "ANIM_FSM_GET_FLOAT")?.borrow().get_num(name)?))
+        }
+        "anim_fsm_get_int" => {
+            arity!(2);
+            let name = need_str(&a[1], "ANIM_FSM_GET_INT")?;
+            Ok(Value::Int(fsm_h(&a[0], "ANIM_FSM_GET_INT")?.borrow().get_num(name)? as i64))
+        }
+        "anim_fsm_get_bool" => {
+            arity!(2);
+            let name = need_str(&a[1], "ANIM_FSM_GET_BOOL")?;
+            Ok(Value::Bool(fsm_h(&a[0], "ANIM_FSM_GET_BOOL")?.borrow().get_num(name)? != 0.0))
+        }
+
         // ===== Core File-I/O =====
         "fileexists" => { arity!(1); Ok(Value::Bool(std::path::Path::new(&resolve_asset_path(need_str(&a[0], "FILEEXISTS")?)).is_file())) }
         // Datei-Mgmt + Pfad-Zerlegung (ergaenzt die WP3-Pfad-API DIRLIST/RENAME/
@@ -2882,6 +2968,13 @@ fn spr<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<std::cell::RefCell
     match v {
         Value::Sprite(s) => Ok(s),
         _ => Err(format!("{} erwartet SPRITE, erhalten {}", fn_, v.type_name())),
+    }
+}
+
+fn fsm_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a std::rc::Rc<std::cell::RefCell<crate::animfsm::AnimFsmObj>>, String> {
+    match v {
+        Value::AnimFsm(f) => Ok(f),
+        _ => Err(format!("{} erwartet ANIM_FSM, erhalten {}", fn_, v.type_name())),
     }
 }
 

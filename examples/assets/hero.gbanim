@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "default": "idle",
+  "params": [
+    { "name": "speed", "type": "float", "default": 0.0 },
+    { "name": "jump", "type": "trigger" }
+  ],
+  "states": [
+    { "name": "idle", "anim": "idle", "loop": true,  "first": 0, "last": 0, "fps": 2.0,  "x": 80,  "y": 120 },
+    { "name": "run",  "anim": "run",  "loop": true,  "first": 0, "last": 3, "fps": 10.0, "x": 320, "y": 120 },
+    { "name": "jump", "anim": "jump", "loop": false, "first": 0, "last": 3, "fps": 14.0, "x": 200, "y": 30 }
+  ],
+  "transitions": [
+    { "from": "idle", "to": "run",  "conditions": [ { "param": "speed", "op": "gt", "value": 5.0 } ] },
+    { "from": "run",  "to": "idle", "conditions": [ { "param": "speed", "op": "lt", "value": 5.0 } ] },
+    { "from": "*",    "to": "jump", "conditions": [ { "param": "jump", "op": "trigger" } ] },
+    { "from": "jump", "to": "idle", "wait_finished": true, "conditions": [] }
+  ]
+}

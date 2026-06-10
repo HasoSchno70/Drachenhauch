@@ -10,6 +10,7 @@
 //! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `gbrun.py
 //! --native` reicht den Namen der `.gb`-Quelldatei durch.
 
+mod animfsm;
 mod ast;
 mod astar;
 #[cfg(feature = "graphics")]
