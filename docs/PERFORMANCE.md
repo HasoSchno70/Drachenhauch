@@ -1,8 +1,14 @@
 # Performance-Profile der drei VM-Pfade
 
-Snapshot der relativen Performance der drei Ausfuehrungspfade
-(Tree-Walker, Python-Bytecode-VM, Cython-Native-VM) bei spielnahen
-Workloads. Reproduzierbar via `gbrun.py --bench <datei.gb>`.
+> **⚠️ HISTORISCH (vor Stufe B).** Dieses Dokument vergleicht drei
+> Ausfuehrungspfade — Tree-Walker, Python-Bytecode-VM, Cython-Native-VM —, die
+> seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `gbrt`
+> (Rust/raylib). Auch `gbrun.py --bench` existiert nicht mehr. Die Zahlen unten
+> sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
+> `gbrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
+
+Snapshot der relativen Performance der drei (historischen) Ausfuehrungspfade
+(Tree-Walker, Python-Bytecode-VM, Cython-Native-VM) bei spielnahen Workloads.
 
 System: Windows 11, Python 3.12.10, MSVC 14.50 fuer Cython-Build.
 
@@ -169,11 +175,15 @@ mit ECS_GET/ADD: `ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT` etc. Statt
 einzelner `DRAWIMAGE`-Calls fuer Tiles: `BATCH_DRAW` + `BATCH_FLUSH`
 auf einem Sprite-Atlas.
 
-## Reproduktion
+## Reproduktion (historisch)
+
+> Nicht mehr lauffähig: `setup.py build_ext` und `gbrun.py --bench` sind mit den
+> Python-Pfaden entfernt. Heute misst man direkt gegen `gbrt`
+> (`gbrt run examples/bench_fib.gb`).
 
 ```
-python setup.py build_ext --inplace      # Cython-VMs bauen
-python gbrun.py --bench examples/bench_fib.gb
+python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)
+python gbrun.py --bench examples/bench_fib.gb                # (entfernt)
 ```
 
 ## Offene Pfade (mit ehrlicher Cost-Benefit-Einschaetzung)

@@ -1,6 +1,6 @@
 # Editor
 
-Der GameBasic-Editor (`gbrun.py --editor` oder einfach `gbrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Bench, Find in Project, klickbare Fehler.
+Der GameBasic-Editor (`gbrun.py --editor` oder einfach `gbrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Debug/Profile, Find in Project, klickbare Fehler.
 
 ## Starten
 
@@ -116,8 +116,7 @@ Oder ohne Argumente:
 
 | Kürzel | Aktion |
 |---|---|
-| `F5` | Programm starten — **native Runtime `gbrt`**, mit automatischem Fallback auf den Tree-Walker, wenn `gbrt` nicht ausführen kann (nicht gebaut / Compile- oder Start-Fehler) |
-| Toolbar `Bench` | Vergleicht Tree-Walker-Output mit gbrt-Output |
+| `F5` | Programm starten — **native Runtime `gbrt`** (bei Direkt-Startproblemen automatisch über den `gbrun.py`-Launcher, gleicher `gbrt` mit chdir) |
 | Toolbar `Stop` | Laufendes Programm abbrechen (auch den nativen `gbrt`-Prozess) |
 
 ## Befehlspalette (`Strg+Shift+P`)
@@ -368,13 +367,12 @@ Wenn ein Programm einen Fehler wirft, erkennt die Konsole automatisch:
 
 Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und springt zur Zeile.
 
-## Run / Bench / Stop
+## Run / Stop
 
-- **`Run` (F5)**: führt das Programm über **einen** Button aus — **primär die native Runtime `gbrt`** (kompiliert die Datei in eine temporäre `.gbc` und startet `gbrt` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Kann `gbrt` nicht ausführen — **nicht gebaut**, **Compile-Fehler** oder **Start-Fehler** —, fällt der Run **automatisch auf den Tree-Walker** zurück (ein Hinweis erscheint in der Konsole). So genügt ein Knopf, ohne dass man manuell zwischen Runtimes wählt. (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
-- **`Bench`** (Ctrl+F5): führt `gbrun.py --bench <datei>` aus — vergleicht den stdout-Output von Tree-Walker und `gbrt` (nur deterministische Konsolen-Programme).
+- **`Run` (F5)**: führt das Programm über die **native Runtime `gbrt`** aus (startet `gbrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `gbrun.py`-Launcher** (gleicher `gbrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
 - **`Stop`** (Shift+F5): bricht den laufenden Prozess ab (für Game-Loops, die nicht von selbst enden).
 
-**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (native Runtime `gbrt`) bzw. **▶** (Tree-Walker-Fallback) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
+**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `gbrt`) bzw. **▶** (über `gbrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
 
 ## Debugger
 

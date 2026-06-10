@@ -73,7 +73,8 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 > Editor-Export (`main_window._export_active`) → `gbrt --export`. Damit laufen die
 > gbrt-only-Builtins überall (verifiziert: `gbrun.py --native`/`--export` + die
 > exportierte .exe). gbrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
-> (Editor-klickbar). Python-Compiler nur noch für Bench/Tests.
+> (Editor-klickbar). (Hinweis: der Python-Compiler ist seit Stufe B entfernt —
+> gbrt kompiliert selbst; „beide Pfade" unten sind historisch.)
 
 ## WP2 — Spiel-Quickwins (✅ ERLEDIGT 2026-06-05, nativ in beiden Pfaden)
 - [x] **`MOUSEWHEEL` exponieren** — Builtin in beiden Pfaden (Backend war da:

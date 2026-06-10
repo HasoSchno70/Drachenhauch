@@ -10,7 +10,7 @@ Verwendung:
     btn.setIcon(icon_provider.get("save"))
 
 Verfuegbare Schluessel:
-    new, open, save, save_as, run, stop, bench, find, replace,
+    new, open, save, save_as, run, stop, find, replace,
     goto, settings, fold, unfold, info, theme, close, refresh.
 """
 from __future__ import annotations
@@ -178,21 +178,6 @@ def _icon_stop() -> QPixmap:
     p.setPen(Qt.PenStyle.NoPen)
     p.setBrush(QBrush(QColor(COLORS["danger"])))
     p.drawRoundedRect(QRectF(6, 6, 12, 12), 1.5, 1.5)
-    p.end()
-    return pix
-
-
-def _icon_bench() -> QPixmap:
-    pix = _new_pixmap()
-    p = _painter(pix)
-    p.setPen(_stroke(1.8, "accent"))
-    # Lightning Bolt
-    poly = QPolygonF([
-        QPointF(13, 3), QPointF(6, 13), QPointF(11, 13),
-        QPointF(9, 21), QPointF(18, 10), QPointF(13, 10),
-    ])
-    p.setBrush(QBrush(QColor(COLORS["accent"])))
-    p.drawPolygon(poly)
     p.end()
     return pix
 
@@ -549,7 +534,6 @@ _BUILDERS = {
     "run_native": _icon_run_native,
     "debug":    _icon_debug,
     "stop":     _icon_stop,
-    "bench":    _icon_bench,
     "find":     _icon_find,
     "replace":  _icon_replace,
     "close":    _icon_close,

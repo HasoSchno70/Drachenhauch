@@ -14,7 +14,7 @@ GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgele
 
 - **[Standard-Built-ins](builtins-core.md)** — Math, Strings, Bitwise, Maps, File-I/O, Konvertierung, Zeit/Random
 - **[Grafik-Built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, Sound, Tilemap, Eingabe, **`LOAD_ASSETS`** (Bulk-Preloader), **Sprite-Atlas + Batch-Draw**, **Z-Layer-Rendering**
-- **[Performance](PERFORMANCE.md)** — Bench-Zahlen aller drei Pfade + Liste umgesetzter Optimierungen
+- **[Performance](PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `gbrt`)
 
 ### Module
 
@@ -54,7 +54,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 
 ### Werkzeug
 
-- **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Bench, Find in Project
+- **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
 - **[Sprite-Editor (`gbsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
 
 ## Erstes Programm

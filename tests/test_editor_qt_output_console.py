@@ -91,7 +91,7 @@ def test_file_line_finds_all_matches():
     assert matches[1].group(1) == "b.gb"
 
 
-# --- start_run_auto: gbrt-primaer + Tree-Walker-Fallback ----------------
+# --- start_run_auto: gbrt direkt + gbrun.py-Launcher-Fallback -----------
 # Policy-Test ohne echten QProcess: wir mocken die gbrt-Suche und die
 # beiden Start-Pfade, und pruefen nur, WELCHEN Modus start_run_auto waehlt.
 
@@ -122,11 +122,11 @@ def test_run_auto_falls_back_when_gbrt_missing(_qapp, tmp_path, monkeypatch):
     import gamebasic.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_gbrt", lambda root: None)
     con = _console(_qapp, tmp_path)
-    # start_run (Tree-Walker) starten wir nicht wirklich -> Stub.
+    # start_run (via gbrun.py) starten wir nicht wirklich -> Stub.
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
     assert con.start_run_auto(tmp_path / "x.gb") == "py"
-    # Hinweis, dass auf den Tree-Walker zurueckgefallen wurde.
-    assert "Tree-Walker" in con.text.toPlainText()
+    # Hinweis, dass ueber den gbrun.py-Launcher gestartet wurde.
+    assert "gbrun.py" in con.text.toPlainText()
 
 
 def test_run_auto_uses_native_when_available(_qapp, tmp_path, monkeypatch):
@@ -142,7 +142,7 @@ def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
     import gamebasic.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_gbrt", lambda root: Path("gbrt"))
     con = _console(_qapp, tmp_path)
-    monkeypatch.setattr(con, "_start_native", lambda fp, gbrt: False)  # Compile/Start-Fehler
+    monkeypatch.setattr(con, "_start_native", lambda fp, gbrt: False)  # Direkt-Start-Fehler
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
     assert con.start_run_auto(tmp_path / "x.gb") == "py"
-    assert "Fallback" in con.text.toPlainText()
+    assert "gbrun.py" in con.text.toPlainText()

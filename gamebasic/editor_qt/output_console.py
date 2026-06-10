@@ -328,10 +328,7 @@ class OutputConsole(QWidget):
         self._current_run_file = file_path
         if clear:
             self.clear()
-        if extra_args and "--bench" in extra_args:
-            self.append(f"⚡ Benchmark: {file_path.name}\n\n", "info")
-        else:
-            self.append(f"▶ Wird ausgefuehrt: {file_path.name}\n\n", "info")
+        self.append(f"▶ Wird ausgefuehrt: {file_path.name}\n\n", "info")
 
         venv_python = (
             self.project_root / ".venv" / "Scripts" / "python.exe"
@@ -364,14 +361,14 @@ class OutputConsole(QWidget):
         return True
 
     def start_run_auto(self, file_path: Path) -> str | None:
-        """Einheitlicher Run: PRIMAER ueber die native Runtime `gbrt`, mit
-        AUTOMATISCHEM Fallback auf den Tree-Walker, wenn gbrt nicht ausfuehren
-        kann (Binary nicht gebaut, Compile-Fehler, oder Start fehlgeschlagen).
-        Liefert den genutzten Modus (`"native"` / `"py"`) oder `None`, wenn
-        gar nichts startete (z.B. weil schon ein Run laeuft).
+        """Run ueber die native Runtime `gbrt`: PRIMAER direkt (`gbrt run`), bei
+        Startproblemen ueber den `gbrun.py`-Launcher (gleicher gbrt, aber chdir
+        ins Datei-Verzeichnis -> relative Asset-Pfade stimmen auch dann).
+        Liefert den genutzten Modus (`"native"` = direkt / `"py"` = via Launcher)
+        oder `None`, wenn gar nichts startete (z.B. weil schon ein Run laeuft).
 
-        So startet der User Code nur noch ueber EINEN Button (gbrt), bekommt
-        aber bei Problemen ohne Handgriff trotzdem ein Ergebnis."""
+        So startet der User Code ueber EINEN Button, bekommt aber bei einem
+        Direkt-Startproblem ohne Handgriff trotzdem ein Ergebnis."""
         if self.is_running():
             return None
         self.clear()
@@ -379,11 +376,11 @@ class OutputConsole(QWidget):
         if gbrt is not None:
             if self._start_native(file_path, gbrt):
                 return "native"
-            # gbrt vorhanden, aber Compile/Start fehlgeschlagen -> Fallback.
-            self.append("\n↪ gbrt-Lauf fehlgeschlagen — Fallback auf den "
-                        "Tree-Walker …\n\n", "muted")
+            # gbrt vorhanden, aber Start fehlgeschlagen -> ueber gbrun.py.
+            self.append("\n↪ Direkter gbrt-Start fehlgeschlagen — versuche es "
+                        "ueber gbrun.py …\n\n", "muted")
         else:
-            self.append("ℹ gbrt nicht gebaut — nutze den Tree-Walker.  "
+            self.append("ℹ gbrt nicht gefunden — starte ueber gbrun.py.  "
                         "(Nativ bauen: .venv\\Scripts\\python.exe "
                         "rust\\build_runtime.py)\n\n", "muted")
         # Fallback ohne erneutes Clear, damit der Hinweis (und ein evtl.
