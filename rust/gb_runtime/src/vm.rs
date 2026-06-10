@@ -144,6 +144,24 @@ fn expect_coro(v: &Value, fname: &str) -> R<Rc<RefCell<CoroState>>> {
     }
 }
 
+/// Operanden-Stack-Pop mit sauberem Fehler statt Panic. Ein Stack-Underflow
+/// kann nur bei kaputtem/abgeschnittenem `.gbc` (oder einem Compiler-Bug)
+/// auftreten -- statt eines Rust-Panics liefert die VM dann eine Meldung.
+#[inline]
+fn vm_pop(stack: &mut Vec<Value>) -> R<Value> {
+    stack
+        .pop()
+        .ok_or_else(|| "VM: Stack underflow (kaputter/inkompatibler Bytecode?)".to_string())
+}
+
+/// Wie `vm_pop`, aber peekt das oberste Element (z.B. fuer DUP), ohne zu poppen.
+#[inline]
+fn vm_top(stack: &[Value]) -> R<&Value> {
+    stack
+        .last()
+        .ok_or_else(|| "VM: Stack underflow (kaputter/inkompatibler Bytecode?)".to_string())
+}
+
 // Arg-Helfer fuer die Modul-Dispatcher (db/net/html/serial/usb/wifi/bt).
 #[allow(dead_code)]
 fn bi_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
@@ -1208,13 +1226,13 @@ impl<'p> Vm<'p> {
             match instr.op {
                 op::LOAD_CONST => stack.push(constants[arg.as_usize()].clone()),
                 op::POP => { stack.pop(); }
-                op::DUP => stack.push(stack.last().unwrap().clone()),
+                op::DUP => { let v = vm_top(stack)?.clone(); stack.push(v); }
 
                 // --- Lokale ---
                 op::LOAD_LOCAL => stack.push(locals[arg.as_usize()].clone()),
                 op::STORE_LOCAL => {
                     let slot = arg.as_usize();
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     locals[slot] = coerce(v, &fn_.local_types[slot], "Lokale Variable")?;
                 }
                 op::DECLARE_LOCAL => {
@@ -1237,7 +1255,7 @@ impl<'p> Vm<'p> {
                 }
                 op::STORE_GLOBAL_SLOT => {
                     let idx = arg.as_usize();
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     let slot = self.global_slots[idx].as_ref().ok_or("Slot leer")?.clone();
                     if slot.borrow().is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
@@ -1265,7 +1283,7 @@ impl<'p> Vm<'p> {
                 op::DECLARE_GLOBAL_CONST_SLOT => {
                     let l = arg.list();
                     let slot_idx = l[0].as_usize();
-                    let value = stack.pop().unwrap();
+                    let value = vm_pop(stack)?;
                     let (ty, value) = match &l[1] {
                         Arg::None => (infer_type(&value).to_string(), value),
                         ti => {
@@ -1294,7 +1312,7 @@ impl<'p> Vm<'p> {
                     if slot.borrow().is_const {
                         return Err(format!("CONST '{}' kann nicht ueberschrieben werden", name));
                     }
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     let ty = slot.borrow().ty.clone();
                     slot.borrow_mut().value = coerce(v, &ty, &format!("Zuweisung an '{}'", name))?;
                 }
@@ -1314,7 +1332,7 @@ impl<'p> Vm<'p> {
                 op::DECLARE_CONST => {
                     let l = arg.list();
                     let name = constants[l[0].as_usize()].fmt();
-                    let value = stack.pop().unwrap();
+                    let value = vm_pop(stack)?;
                     let (ty, value) = match &l[1] {
                         Arg::None => (infer_type(&value).to_string(), value),
                         ti => {
@@ -1330,7 +1348,7 @@ impl<'p> Vm<'p> {
 
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
                 op::ADD => {
-                    let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if let Some(r) = module_op('+', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_add__", &a, &b)? { stack.push(r); }
                     else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
@@ -1338,46 +1356,46 @@ impl<'p> Vm<'p> {
                     } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
                 }
                 op::SUB => {
-                    let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if let Some(r) = module_op('-', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_sub__", &a, &b)? { stack.push(r); }
                     else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')?); }
                 }
                 op::MUL => {
-                    let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if let Some(r) = module_op('*', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_mul__", &a, &b)? { stack.push(r); }
                     else { stack.push(mul(a, b)?); }
                 }
                 op::DIV => {
-                    let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if let Some(r) = module_op('/', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_div__", &a, &b)? { stack.push(r); }
                     else { stack.push(div(a, b)?); }
                 }
                 op::MOD => {
-                    let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                    let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if let Some(r) = self.user_op("__op_mod__", &a, &b)? { stack.push(r); }
                     else { stack.push(modulo(a, b)?); }
                 }
-                op::POW => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(pow(a, b)?); }
-                op::INT_DIV => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(int_div(a, b)?); }
-                op::NEG => { let v = stack.pop().unwrap(); stack.push(neg(v)?); }
+                op::POW => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(pow(a, b)?); }
+                op::INT_DIV => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(int_div(a, b)?); }
+                op::NEG => { let v = vm_pop(stack)?; stack.push(neg(v)?); }
 
                 // --- Vergleich / Logik ---
-                op::EQ => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::EQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_eq__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(value_eq(&a, &b))) } }
-                op::NEQ => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::NEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_ne__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(!value_eq(&a, &b))) } }
-                op::LT => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::LT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_lt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '<')?)) } }
-                op::GT => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::GT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_gt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '>')?)) } }
-                op::LEQ => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::LEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_le__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'l')?)) } }
-                op::GEQ => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap();
+                op::GEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match self.user_op("__op_ge__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) } }
-                op::NOT => { let v = stack.pop().unwrap(); stack.push(Value::Bool(!v.truthy())); }
+                op::NOT => { let v = vm_pop(stack)?; stack.push(Value::Bool(!v.truthy())); }
 
                 // --- Bitwise ---
                 op::BAND => { let (x, y) = int_pair2(stack)?; stack.push(Value::Int(x & y)); }
@@ -1385,20 +1403,20 @@ impl<'p> Vm<'p> {
                 op::BXOR => { let (x, y) = int_pair2(stack)?; stack.push(Value::Int(x ^ y)); }
                 op::SHL => { let (x, y) = int_pair2(stack)?; if y < 0 { return Err("SHL: negativ".into()); } stack.push(Value::Int(x << y)); }
                 op::SHR => { let (x, y) = int_pair2(stack)?; if y < 0 { return Err("SHR: negativ".into()); } stack.push(Value::Int(x >> y)); }
-                op::BNOT => { let v = stack.pop().unwrap(); match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
+                op::BNOT => { let v = vm_pop(stack)?; match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
 
                 // --- _NN (numerisch garantiert) ---
-                op::ADD_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_add(a, b)?); }
-                op::SUB_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '-')?); }
-                op::MUL_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(nn_arith(a, b, '*')?); }
-                op::DIV_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(div(a, b)?); }
-                op::LT_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, '<')?)); }
-                op::GT_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, '>')?)); }
-                op::LEQ_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, 'l')?)); }
-                op::GEQ_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(cmp(&a, &b, 'g')?)); }
-                op::EQ_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(value_eq(&a, &b))); }
-                op::NEQ_NN => { let b = stack.pop().unwrap(); let a = stack.pop().unwrap(); stack.push(Value::Bool(!value_eq(&a, &b))); }
-                op::NEG_N => { let v = stack.pop().unwrap(); stack.push(neg(v)?); }
+                op::ADD_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_add(a, b)?); }
+                op::SUB_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_arith(a, b, '-')?); }
+                op::MUL_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_arith(a, b, '*')?); }
+                op::DIV_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(div(a, b)?); }
+                op::LT_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, '<')?)); }
+                op::GT_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, '>')?)); }
+                op::LEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, 'l')?)); }
+                op::GEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, 'g')?)); }
+                op::EQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(value_eq(&a, &b))); }
+                op::NEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(!value_eq(&a, &b))); }
+                op::NEG_N => { let v = vm_pop(stack)?; stack.push(neg(v)?); }
 
                 // --- Tupel ---
                 op::BUILD_TUPLE => {
@@ -1412,7 +1430,7 @@ impl<'p> Vm<'p> {
                 }
                 op::UNPACK_TUPLE => {
                     let len = arg.as_usize();
-                    let t = stack.pop().unwrap();
+                    let t = vm_pop(stack)?;
                     if let Value::Tuple(items) = t {
                         if items.len() != len {
                             return Err(format!("Tupel-Destructuring: {} Ziele, aber Tupel hat {} Element(e)", len, items.len()));
@@ -1431,24 +1449,24 @@ impl<'p> Vm<'p> {
                     stack.push(Value::Tuple(Rc::new(items)));
                 }
                 op::IN_OP => {
-                    let hay = stack.pop().unwrap();
-                    let needle = stack.pop().unwrap();
+                    let hay = vm_pop(stack)?;
+                    let needle = vm_pop(stack)?;
                     stack.push(Value::Bool(eval_in(&needle, &hay)?));
                 }
                 op::SLICE => {
                     let l = arg.list();
                     let has_lo = matches!(l[0], Arg::Val(Value::Bool(true)) | Arg::Int(1)) || arg_truthy(&l[0]);
                     let has_hi = arg_truthy(&l[1]);
-                    let hi = if has_hi { Some(stack.pop().unwrap()) } else { None };
-                    let lo = if has_lo { Some(stack.pop().unwrap()) } else { None };
-                    let target = stack.pop().unwrap();
+                    let hi = if has_hi { Some(vm_pop(stack)?) } else { None };
+                    let lo = if has_lo { Some(vm_pop(stack)?) } else { None };
+                    let target = vm_pop(stack)?;
                     stack.push(apply_slice(&target, lo.as_ref(), hi.as_ref())?);
                 }
 
                 // --- Kontrollfluss ---
                 op::JUMP => *ip = arg.as_usize(),
-                op::JUMP_IF_FALSE => { let v = stack.pop().unwrap(); if !v.truthy() { *ip = arg.as_usize(); } }
-                op::JUMP_IF_TRUE => { let v = stack.pop().unwrap(); if v.truthy() { *ip = arg.as_usize(); } }
+                op::JUMP_IF_FALSE => { let v = vm_pop(stack)?; if !v.truthy() { *ip = arg.as_usize(); } }
+                op::JUMP_IF_TRUE => { let v = vm_pop(stack)?; if v.truthy() { *ip = arg.as_usize(); } }
 
                 // --- Aufrufe ---
                 op::CALL_USER => {
@@ -1530,7 +1548,7 @@ impl<'p> Vm<'p> {
                     let argc = l[1].as_usize();
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
-                    let callee = stack.pop().unwrap();
+                    let callee = vm_pop(stack)?;
                     match callee {
                         Value::FuncRef(name) => {
                             let tgt = self.prog.functions.get(name.as_ref())
@@ -1555,7 +1573,7 @@ impl<'p> Vm<'p> {
                     let argc = l[1].as_usize();
                     let split = stack.len() - argc;
                     let margs = stack.split_off(split);
-                    let obj = stack.pop().unwrap();
+                    let obj = vm_pop(stack)?;
                     match &obj {
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
@@ -1623,7 +1641,7 @@ impl<'p> Vm<'p> {
                 op::STORE_FIELD => {
                     let name = constants[arg.as_usize()].fmt();
                     let s = self_obj.ok_or_else(|| format!("STORE_FIELD '{}' ausserhalb Methodenkontext", name))?;
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     if let Value::Instance(rc) = s {
                         let ty = rc.borrow().fields.get(&name)
                             .ok_or_else(|| format!("Feld '{}' existiert nicht", name))?.ty.clone();
@@ -1633,7 +1651,7 @@ impl<'p> Vm<'p> {
                 }
                 op::LOAD_MEMBER => {
                     let name = constants[arg.as_usize()].fmt();
-                    let obj = stack.pop().unwrap();
+                    let obj = vm_pop(stack)?;
                     match &obj {
                         Value::Nil => return Err(format!("Zugriff auf '.{}' bei NIL-Referenz", name)),
                         Value::Namespace(ns) => {
@@ -1660,8 +1678,8 @@ impl<'p> Vm<'p> {
                 }
                 op::STORE_MEMBER => {
                     let name = constants[arg.as_usize()].fmt();
-                    let v = stack.pop().unwrap();
-                    let obj = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
+                    let obj = vm_pop(stack)?;
                     match &obj {
                         Value::Nil => return Err(format!("Zuweisung an '.{}' bei NIL-Referenz", name)),
                         Value::Instance(rc) => {
@@ -1709,15 +1727,15 @@ impl<'p> Vm<'p> {
                     let num_dims = arg.as_usize();
                     let split = stack.len() - num_dims;
                     let idx_vals = stack.split_off(split);
-                    let arr = stack.pop().unwrap();
+                    let arr = vm_pop(stack)?;
                     stack.push(load_index(&arr, &idx_vals)?);
                 }
                 op::STORE_INDEX => {
                     let num_dims = arg.as_usize();
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     let split = stack.len() - num_dims;
                     let idx_vals = stack.split_off(split);
-                    let arr = stack.pop().unwrap();
+                    let arr = vm_pop(stack)?;
                     store_index(&arr, &idx_vals, v)?;
                 }
                 op::DECLARE_ARRAY_NAME => {
@@ -1749,7 +1767,7 @@ impl<'p> Vm<'p> {
                 op::TRY_BEGIN => try_handlers.push((arg.as_usize(), stack.len())),
                 op::TRY_END => { try_handlers.pop(); }
                 op::THROW => {
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     let msg = match v { Value::Str(s) => s.to_string(), other => other.fmt() };
                     return Err(msg);
                 }
@@ -1766,14 +1784,14 @@ impl<'p> Vm<'p> {
 
                 // --- Rueckgabe ---
                 op::RETURN => {
-                    let v = stack.pop().unwrap();
+                    let v = vm_pop(stack)?;
                     return Ok(Step::Return(coerce(v, &fn_.return_type, "RETURN")?));
                 }
                 op::RETURN_VOID => return Ok(Step::Return(Value::Nil)),
                 op::YIELD_VALUE => {
                     // Coroutine: Wert abgeben und suspendieren. Beim Resume legt
                     // coro_resume den Sende-Wert auf den Stack (Wert von `x = YIELD`).
-                    let mut yval = stack.pop().unwrap();
+                    let mut yval = vm_pop(stack)?;
                     if !fn_.return_type.is_empty() {
                         yval = coerce(yval, &fn_.return_type, "YIELD")?;
                     }
@@ -1809,7 +1827,7 @@ impl<'p> Vm<'p> {
                     let l = arg.list();
                     let name = constants[l[0].as_usize()].fmt();
                     let prompt = if arg_truthy(&l[1]) {
-                        input_prompt(&stack.pop().unwrap().fmt())
+                        input_prompt(&vm_pop(stack)?.fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
                     let raw = self.read_input_line();
@@ -1826,7 +1844,7 @@ impl<'p> Vm<'p> {
                     let l = arg.list();
                     let slot_idx = l[0].as_usize();
                     let prompt = if arg_truthy(&l[1]) {
-                        input_prompt(&stack.pop().unwrap().fmt())
+                        input_prompt(&vm_pop(stack)?.fmt())
                     } else { "? ".to_string() };
                     self.flush_and_prompt(&prompt);
                     let raw = self.read_input_line();
@@ -4254,8 +4272,8 @@ fn require_number(a: &Value, b: &Value, op: &str) -> R<()> {
 }
 
 fn int_pair2(stack: &mut Vec<Value>) -> R<(i64, i64)> {
-    let b = stack.pop().unwrap();
-    let a = stack.pop().unwrap();
+    let b = vm_pop(stack)?;
+    let a = vm_pop(stack)?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => Ok((*x, *y)),
         _ => Err("Bitwise erwartet INTEGER".into()),
