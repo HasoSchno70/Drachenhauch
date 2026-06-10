@@ -273,13 +273,10 @@ PRINT ARRAY_POP(stack)           ' 2
 PRINT LEN(stack)                 ' 1
 ```
 
-> **Nur native Runtime.** Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
-> (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind ausschließlich in `gbrt`
-> implementiert, nicht im Python-Tree-Walker. Sie laufen über gbrts eigenes
-> Rust-Frontend — und das nutzen jetzt **alle** Run-/Export-Wege: `gbrun.py
-> --native`/`--export`, der **Editor-Run/-Export** und `gbrt run`/`--runsrc`/
-> `gbrt --export` rufen `gbrt run`/`gbrt --export` (Rust-Compiler). Nur der
-> reine Tree-Walker-Fallback (F5 ohne gebautes gbrt) kennt sie nicht.
+> Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
+> (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind in `gbrt` implementiert
+> (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `gbrun.py`/Editor-Run,
+> `gbrt run`/`--runsrc` und den `gbrt --export`-Standalone-Build.
 
 ## Maps
 

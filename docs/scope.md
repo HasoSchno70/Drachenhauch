@@ -14,7 +14,7 @@ Globals (Top-Level)
     └─ SUB / FUNCTION lokal
 ```
 
-Implementierungs-Referenz: [environment.py](../gamebasic/environment.py), [interpreter.py:923](../gamebasic/interpreter.py).
+Implementierungs-Referenz: Scope-Auflösung in `gbrt` — [compiler.rs](../rust/gb_runtime/src/compiler.rs) (Slot-Allokation) + [vm.rs](../rust/gb_runtime/src/vm.rs) (Locals/Globals).
 
 | Ebene | Wann | Persistenz |
 |---|---|---|

@@ -2,7 +2,7 @@
 
 Vollständige Referenz für die Sprache GameBasic, alle eingebauten Befehle und alle Built-in-Module.
 
-GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen wahlweise im Tree-Walker, in der Python-VM oder in der Cython-Native-VM — alle drei produzieren identischen Output.
+GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`gbrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
 
 ## Inhalt
 

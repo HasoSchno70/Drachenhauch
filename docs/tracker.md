@@ -59,7 +59,7 @@ Die **Song**-Leiste unten ist die Abspiel-Reihenfolge der Patterns — ein Patte
 TRACKER_UPDATE(DELTA() * 1000.0)
 ```
 
-Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft in **beiden** Pfaden — Tree-Walker und native Runtime `gbrt`.
+Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft über die native Runtime `gbrt`.
 
 Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `gamebasic/tracker/instrument.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`).
 

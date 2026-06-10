@@ -1,9 +1,15 @@
 # Befehlssatz-Roadmap (Audit 2026-06-05)
 
+> **⚠️ Lesehinweis (Stufe B).** Diese Roadmap entstand, als es noch zwei Pfade
+> gab (Python-Tree-Walker + `gbrt`). Der Tree-Walker und die Python-Toolchain
+> sind inzwischen **entfernt** — neue/geänderte Befehle kommen **nur** in `gbrt`
+> (`builtins.rs`/`vm.rs`) + ein run_gb-Golden-Test. „BEIDE Pfade"/`interpreter.py`
+> unten sind historisch.
+
 Ergebnis eines Audits des GameBasic-Befehlssatzes (~710 Builtins): Lücken,
 Inkonsistenzen und echte Editor-↔-Export-Fallstricke. **Leitsatz: jeder neue/
-geänderte Befehl muss nativ in `gbrt` laufen** — also immer in BEIDEN Pfaden
-umsetzen und per Parity-Test absichern.
+geänderte Befehl muss nativ in `gbrt` laufen** — per run_gb-Golden-Test
+absichern.
 
 ## Umsetzungs-Checkliste pro Befehl
 - [ ] Tree-Walker: `@builtin`/`@graphics_builtin` in `gamebasic/interpreter.py`

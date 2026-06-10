@@ -16,7 +16,7 @@ IMPORT "imgfx"
 | `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
 | `IMAGE_COPY(img)` | IMAGE (tiefer Klon) |
 
-Alle Funktionen laufen nur in der nativen Runtime (gbrt) — der Tree-Walker ist konsolen-only und wirft "nur in der nativen Runtime (gbrt)". Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
+Alle Funktionen brauchen die native Grafik-Runtime (`gbrt` mit dem `graphics`-Feature). Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
 
 ## Beispiel
 

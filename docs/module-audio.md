@@ -1,6 +1,6 @@
 # Modul `audio`
 
-Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber raylib; der Tree-Walker ist konsolen-only und wirft "nur in der nativen Runtime (gbrt)"). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
+Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber raylib). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
 
 Ergaenzt die Core-Builtins `LOADSOUND` / `PLAYSOUND` aus [Grafik-Built-ins](builtins-grafik.md) — die einfachen Calls reichen fuer "Sound abspielen", `audio` bringt das volle Audio-Mixing-Toolkit.
 

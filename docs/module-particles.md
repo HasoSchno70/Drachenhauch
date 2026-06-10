@@ -173,7 +173,7 @@ Position, Velocity, Lifetime, Age, Size und Color werden intern als NumPy-Arrays
 
 `PARTICLE_EMIT` nutzt weiterhin Python-`random` (per-Partikel), damit die Resultate über `RANDOMIZE(seed)` deterministisch reproduzierbar bleiben — beim normalen Use-Case (5–50 emittierte Partikel pro Frame) ist das schnell genug, der Hot-Path ist `PARTICLE_UPDATE` der gleichzeitig mit allen aktiven Partikeln läuft.
 
-`PARTICLE_DRAW` berechnet beim Fade-Effekt die per-Partikel-Farben vorab in einer einzigen vektorisierten Operation und zeichnet dann pro Partikel einen Kreis. Gezeichnet wird nur in der nativen Runtime (gbrt) — der Tree-Walker ist konsolen-only.
+`PARTICLE_DRAW` berechnet beim Fade-Effekt die per-Partikel-Farben vorab in einer einzigen vektorisierten Operation und zeichnet dann pro Partikel einen Kreis (nativ in `gbrt`).
 
 Voraussetzung: `numpy` (wird über `pip install numpy` geholt).
 

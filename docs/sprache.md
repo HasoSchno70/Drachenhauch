@@ -179,7 +179,7 @@ END SELECT
 
 **Member-Namen dürfen Keywords sein**: `READ`, `FILE`, `DATA`, `NONE` etc. werden bei qualifiziertem Zugriff (`Name.Member`) eindeutig — die Sprache lässt es zu.
 
-**Werte müssen Compile-Time-Integer-Literale sein** (auch im Tree-Walker — beide Pfade verhalten sich gleich). Mehrgliedrige Ausdrücke wie `A + B` sind nicht erlaubt; nutze stattdessen `CONST` und schreibe konkrete Zahlen.
+**Werte müssen Compile-Time-Integer-Literale sein.** Mehrgliedrige Ausdrücke wie `A + B` sind nicht erlaubt; nutze stattdessen `CONST` und schreibe konkrete Zahlen.
 
 ## Compound-Assignment
 
@@ -556,8 +556,8 @@ Greet("Dora", 50, suffix: "?")
 
 **Nicht verfügbar bei**:
 
-- Built-ins (`ABS`, `CIRCLE`, `JSON_PARSE`, …) — die haben keine deklarierten Param-Namen auf Python-Seite
-- Methoden-Aufrufen `obj.method(name: ...)` im **VM-/Native-VM-Pfad** (Klasse erst zur Laufzeit bekannt). Der Tree-Walker kann es; im VM-Pfad wirft der Compiler.
+- Built-ins (`ABS`, `CIRCLE`, `JSON_PARSE`, …) — die haben keine deklarierten Param-Namen
+- Methoden-Aufrufen `obj.method(name: ...)` — die Klasse steht erst zur Laufzeit fest, daher wirft der `gbrt`-Compiler hier.
 
 ### BYREF-Parameter (Multi-Return)
 
@@ -602,7 +602,7 @@ PRINT q, r       ' "3 2"
 
 **Einschränkungen:**
 - `BYREF` darf **nicht** mit einem Default-Wert kombiniert werden (was würde es heißen, eine Default-Variable per Referenz zu übergeben?).
-- `BYREF` wird in beiden Pfaden unterstützt: im Tree-Walker (Referenz) wie in der nativen Runtime `gbrt`. In `gbrt` setzt der Compiler an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
+- `BYREF` wird von `gbrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
 
 **Rekursion** funktioniert:
 
@@ -675,11 +675,11 @@ NEXT
 Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 
 **Semantik & Einschränkungen:**
-- Jede Coroutine läuft auf einem eigenen Thread (striktes Ping-Pong — immer nur einer läuft), daher in allen drei Pfaden bit-identisch.
+- `gbrt` suspendiert eine Coroutine via **Frame-Snapshot** (ip/locals/stack werden beim `YIELD` abgelegt und beim Resume restauriert) — kein OS-Thread, deterministisch, raylib-Main-Thread-sicher.
 - **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
 - In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
-- Läuft in **allen vier Pfaden** bit-identisch — Tree-Walker, Python-VM, Cython-VM und die native Rust-Runtime (`gbrt`/`--native`, inkl. Standalone-`.exe`). Nativ via Frame-Snapshot statt Threads.
+- Funktioniert auch im Standalone-`.exe`-Export (gleiche `gbrt`-VM).
 
 Vollständiges Beispiel: [examples/98_coroutines.gb](../examples/98_coroutines.gb).
 

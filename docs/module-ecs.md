@@ -2,7 +2,7 @@
 
 Entity-Component-System mit Sparse-Set-Storage. Pragmatisch fuer Spiele: Entities sind INTEGER-IDs, Components sind benannte typed Werte. Architektur ist auf Iteration ueber Component-Halter optimiert (Cache-freundlich), nicht auf Reflection oder Type-Hierarchien.
 
-Native Implementation in [`ecs_native.pyx`](../gamebasic/modules/ecs_native.pyx) (cdef-Klassen + Bulk-System-Ops). Pure-Python-Fallback in `ecs.py` falls die `.pyd` nicht gebaut wurde.
+Native Implementation in [`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs) (Sparse-Set + Bulk-System-Ops).
 
 ```basic
 IMPORT "ecs"
@@ -219,21 +219,24 @@ Die Bulk-Ops nutzen die Sparse-Set-Struktur direkt: sie iterieren ueber den klei
 
 ## Eigene Bulk-Ops hinzufuegen
 
-Wenn du ein wiederkehrendes Pattern hast, das du gerne als Bulk-Op haettest, ist das Boilerplate-Pattern:
+ECS ist nativ in `gbrt` ([`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs)).
+Eine neue Bulk-Op fuegt man so hinzu:
 
-1. **cpdef-Method** auf `_World` in [`ecs_native.pyx`](../gamebasic/modules/ecs_native.pyx) — iteriert in einer cdef-Loop ueber die Sparse-Set-Storage.
-2. **Python-Fallback** in [`ecs.py`](../gamebasic/modules/ecs.py) im Pure-Python `_World` — funktional identisch fuer Dev ohne `.pyd`.
-3. **`@builtin`-Wrapper** in `ecs.py` — Type-Checks + Delegate.
+1. **Methode auf `World`** in `ecs.rs` — iteriert in einer Rust-Loop ueber die
+   Sparse-Set-Storage (iteriere ueber den kleineren der beiden Components, frage
+   den anderen ab).
+2. **Builtin-Arm** im ECS-Dispatch (`vm.rs` `try_ecs` bzw. `builtins.rs`) — Arity-
+   und Typ-Checks, dann Delegate an die `World`-Methode.
+3. **Golden-Test** in `tests/` + Eintrag in `editor_qt/builtin_index.json`.
 
 Beispiel-Skizze fuer ein hypothetisches `ECS_ADD_TO(w, target, source, scale)`:
 
-```cython
-cpdef Py_ssize_t add_to_scaled(self, str target, str source, double scale):
-    cdef _Component t = self.components.get(target)
-    cdef _Component s = self.components.get(source)
-    if t is None or s is None:
-        return 0
-    ' ... cdef-Loop ueber Schnittmenge ...
+```rust
+pub fn add_to_scaled(&mut self, target: &str, source: &str, scale: f64) {
+    let (Some(t), Some(s)) = (self.components.get(target), self.components.get(source))
+        else { return; };
+    // ... Loop ueber die Schnittmenge: t[e] += s[e] * scale ...
+}
 ```
 
 ## Externer Typ

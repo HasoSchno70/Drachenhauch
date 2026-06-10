@@ -1,6 +1,6 @@
 # Grafik-Built-ins
 
-Grafik, Sound und Eingabe — nativ in der Runtime `gbrt` (raylib); der Tree-Walker ist konsolen-only und wirft bei diesen Befehlen "nur in der nativen Runtime (gbrt)". Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
+Grafik, Sound und Eingabe — nativ in der Runtime `gbrt` (raylib). Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
 
 Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretieren alle Drawing-Befehle ihre Koordinaten als **World-Koordinaten** (siehe [Camera-Modul](module-camera.md)).
 

@@ -1,5 +1,14 @@
 # Native Rust-Runtime (raylib) — Migration
 
+> **⚠️ Lesehinweis (Stufe B).** Dieses Dokument beschreibt die Migration *und*
+> verweist vielfach auf die damalige Verifikation „bit-identisch zu den
+> Python-Pfaden" (Tree-Walker / Python-VM / Cython-VM) und auf
+> `interpreter.py`/`vm.py`/`serialize.py`. Diese Python-Pfade und -Dateien sind
+> **alle entfernt** — `gbrt` ist heute die **einzige** Runtime und kompiliert den
+> Quelltext selbst. Korrektheit sichern jetzt **run_gb-Golden-Tests** + Rust-
+> `#[test]`s. Die „bit-identisch"-Stellen unten sind also historische
+> Port-Verifikations-Notizen, kein aktueller Mehr-Pfad-Zustand.
+
 Ein vierter Ausführungspfad neben Tree-Walker, Python-VM und Cython-VM: eine
 **native Rust-Runtime**, die denselben Bytecode ausführt und (später) Grafik
 über **raylib** rendert. Die Python-Toolchain (Lexer → Parser → Compiler)

@@ -484,9 +484,8 @@ GUI_ON_CLICK(ok, on_start)        ' on_start ist eine FUNCREF
 - Polling und Callback schließen sich nicht aus; beides ist gleichzeitig nutzbar.
 - `GUI_ON_CLICK(widget, NIL)` entfernt den Callback wieder.
 
-Intern überbrückt `GUI_ON_CLICK` die Builtin→Interpreter/VM-Grenze (eine
-FUNCREF aus einem Built-in heraus aufrufen) — bit-identisch im Tree-Walker, in
-der Python-VM und in der nativen VM.
+Intern überbrückt `GUI_ON_CLICK` die Builtin→VM-Grenze (eine FUNCREF aus einem
+Built-in heraus aufrufen) — nativ in `gbrt`.
 
 ### GUI_ON_CHANGE (Wertänderung)
 
