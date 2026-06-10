@@ -121,6 +121,12 @@ SUB apply_scale()
 END SUB
 apply_scale()
 
+' --- Weicher Licht-Schein: EIN radialer Glow-Sprite (Mitte warm -> Rand
+'     schwarz), additiv + pulsierend gezeichnet. Ersetzt die frueheren
+'     gestapelten Kreise (deren harte Kanten als Ringe sichtbar waren). ---
+DIM glow AS IMAGE
+glow = GENTEX_RADIAL(256, 256, RGB(255, 150, 60), RGB(0, 0, 0), 0.16)
+
 DIM t AS FLOAT
 t = 0.0
 DIM last AS INTEGER
@@ -225,16 +231,32 @@ WHILE NOT QUITREQUESTED()
         BOX(fire_x - 185, 230, fire_x + 185, 640, &H040302)
     END IF
 
-    ' Warmes, mitskalierendes Flackerlicht (additiv).
+    ' Warmes, mitskalierendes Flackerlicht: weicher Glow-Sprite, additiv.
+    ' Zwei Lagen (grosser Hof + heisser Kern) + Flacker-Puls in Groesse/Helligkeit
+    ' ergeben einen lebendigen, kantenfreien Schein statt sichtbarer Ringe.
     BLEND_MODE("add")
-    DIM ring AS INTEGER
-    FOR ring = 0 TO 3
-        DIM rr AS INTEGER
-        rr = INT((132 - ring * 26) * (0.85 + fl * 0.2) * fire_scale)
-        DIM rb AS INTEGER
-        rb = INT((10 + ring * 6) * fl)
-        CIRCLE(INT(fire_x), INT(fire_y - 45.0 * fire_scale), rr, RGB(rb, INT(rb * 0.5), INT(rb * 0.15)))
-    NEXT
+    DIM gx AS INTEGER
+    gx = INT(fire_x)
+    DIM gy AS INTEGER
+    gy = INT(fire_y - 45.0 * fire_scale)
+    ' grosser, sehr weicher Raum-Schein: waermt die ganze Kaminnische + pulsiert
+    DIM amb AS FLOAT
+    amb = (3.2 + fl * 1.0) * fire_scale
+    DIM ab AS INTEGER
+    ab = INT(20 + fl * 34)
+    DRAWIMAGEROT(glow, gx, INT(fire_y - 70.0 * fire_scale), 0.0, amb, RGB(ab, INT(ab * 0.5), INT(ab * 0.18)))
+    ' mittlerer, weicher Lichthof
+    DIM halo AS FLOAT
+    halo = (1.55 + fl * 0.55) * fire_scale
+    DIM hb AS INTEGER
+    hb = INT(55 + fl * 80)
+    DRAWIMAGEROT(glow, gx, gy, 0.0, halo, RGB(hb, INT(hb * 0.55), INT(hb * 0.22)))
+    ' heisser, kleinerer Kern (heller, pulsiert staerker)
+    DIM core AS FLOAT
+    core = (0.70 + fl * 0.30) * fire_scale
+    DIM cb AS INTEGER
+    cb = INT(120 + fl * 120)
+    DRAWIMAGEROT(glow, gx, INT(fire_y - 28.0 * fire_scale), 0.0, core, RGB(cb, INT(cb * 0.62), INT(cb * 0.28)))
     BLEND_MODE("alpha")
 
     PARTICLE_DRAW(ps_smoke)

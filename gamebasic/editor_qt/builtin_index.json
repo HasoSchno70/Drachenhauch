@@ -1419,6 +1419,12 @@
    "module": "interpreter"
   },
   {
+   "name": "GENTEX_RADIAL",
+   "kind": "graphics",
+   "signature": "GENTEX_RADIAL(w, h, inner_color, outer_color [, density])",
+   "module": "interpreter"
+  },
+  {
    "name": "GENTEX_GRADIENT",
    "kind": "graphics",
    "signature": "GENTEX_GRADIENT(*args)",

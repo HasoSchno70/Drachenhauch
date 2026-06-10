@@ -2989,6 +2989,10 @@ impl<'p> Vm<'p> {
                 gi(a,4,"GENTEX_CHECKED")?, gi(a,5,"GENTEX_CHECKED")?)?),
             "gentex_color" => Value::Int(g!().gen_tex_color(
                 gi(a,0,"GENTEX_COLOR")? as i32, gi(a,1,"GENTEX_COLOR")? as i32, gi(a,2,"GENTEX_COLOR")?)?),
+            "gentex_radial" => Value::Int(g!().gen_tex_radial(
+                gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
+                gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
+                if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
             // --- Clipboard + Drag&Drop (Batch 5) ---
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
             "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }

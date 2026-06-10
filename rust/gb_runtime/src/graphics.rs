@@ -1855,6 +1855,15 @@ impl Graphics {
         let img = Image::gen_image_color(w.max(1), h.max(1), col(c));
         self.push_tex_from_image(img)
     }
+    /// Radialer Farbverlauf (Mitte `inner` -> Rand `outer`). `density` 0..1
+    /// steuert die Groesse des hellen Kerns (0 = nur im Zentrum). Perfekt fuer
+    /// weiche Glows/Lichter/Vignetten -- additiv gezeichnet ein sauberer Schein
+    /// ohne die harten Kanten gestapelter Kreise.
+    pub fn gen_tex_radial(&mut self, w: i32, h: i32, inner: i64, outer: i64, density: f64) -> Result<i64, String> {
+        let img = Image::gen_image_gradient_radial(
+            w.max(1), h.max(1), density.clamp(0.0, 1.0) as f32, col(inner), col(outer));
+        self.push_tex_from_image(img)
+    }
 
     // --- Clipboard + Drag&Drop (Batch 5) ---
     pub fn clipboard_get(&self) -> String { self.rl.get_clipboard_text().unwrap_or_default() }
