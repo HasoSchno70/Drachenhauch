@@ -51,22 +51,107 @@ def _find_gbrt():
     return None
 
 
+def _editor_qss() -> str:
+    """Tailored QSS fuer den gbanim-Editor: Buttons/Toolbuttons mit Rahmen +
+    Rundung, farbige Akzente (Cyan/Mint/Magenta aus dem Editor-Theme)."""
+    try:
+        from .editor_qt.theme import COLORS as C
+    except Exception:
+        C = {}
+
+    def g(k, d):
+        return C.get(k, d)
+
+    bg = g("bg", "#0B1421")
+    alt = g("bg_alt", "#121E2C")
+    panel = g("bg_panel", "#1A2738")
+    panel_hi = g("bg_panel_hi", "#22344A")
+    hover = g("bg_hover", "#243549")
+    fg = g("fg", "#D5EDF0")
+    muted = g("fg_muted", "#7A8E96")
+    border = g("border", "#243A4D")
+    accent = g("accent", "#2DE0E0")
+    accent_text = g("accent_text", "#0B1421")
+    accent_soft = g("accent_soft", "#16404C")
+    success = g("success", "#2DE89A")
+    success_h = g("success_hover", "#5EEDB2")
+    danger = g("danger", "#E55A8C")
+    return f"""
+    QMainWindow, QDockWidget, QScrollArea {{ background: {bg}; }}
+    QWidget {{ color: {fg}; }}
+    QPushButton {{
+        background: {panel_hi}; color: {fg};
+        border: 1px solid {border}; border-radius: 7px;
+        padding: 5px 12px; font-weight: 600;
+    }}
+    QPushButton:hover {{ background: {hover}; border: 1px solid {accent}; }}
+    QPushButton:pressed {{ background: {accent_soft}; }}
+    QToolBar {{ background: {panel}; border: 0; padding: 5px; spacing: 5px; }}
+    QToolButton {{
+        color: {fg}; background: {panel_hi};
+        border: 1px solid {border}; border-radius: 7px;
+        padding: 5px 11px; font-weight: 600;
+    }}
+    QToolButton:hover {{ background: {hover}; border: 1px solid {accent}; }}
+    QToolButton:pressed {{ background: {accent_soft}; }}
+    QToolButton:checked {{ background: {accent}; color: {accent_text}; border: 1px solid {accent}; }}
+    QToolButton#runBtn {{ background: {success}; color: {accent_text}; border: 1px solid {success}; }}
+    QToolButton#runBtn:hover {{ background: {success_h}; border: 1px solid {success_h}; }}
+    QToolButton#delBtn {{ color: {danger}; border: 1px solid {danger}; }}
+    QToolButton#delBtn:hover {{ background: {danger}; color: {accent_text}; }}
+    QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
+        background: {alt}; color: {fg};
+        border: 1px solid {border}; border-radius: 5px; padding: 3px 6px;
+        selection-background-color: {accent}; selection-color: {accent_text};
+    }}
+    QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+        border: 1px solid {accent};
+    }}
+    QComboBox::drop-down {{ border: 0; width: 18px; }}
+    QComboBox QAbstractItemView {{
+        background: {alt}; color: {fg};
+        selection-background-color: {accent}; selection-color: {accent_text};
+        border: 1px solid {border};
+    }}
+    QListWidget {{ background: {alt}; border: 1px solid {border}; border-radius: 6px; padding: 3px; }}
+    QListWidget::item {{ padding: 4px 6px; border-radius: 4px; }}
+    QListWidget::item:selected {{ background: {accent_soft}; color: {fg}; }}
+    QDockWidget {{ color: {fg}; font-weight: 700; }}
+    QDockWidget::title {{
+        background: {panel_hi}; padding: 6px 10px;
+        border-bottom: 2px solid {accent}; font-weight: 700;
+    }}
+    QCheckBox {{ color: {fg}; spacing: 6px; }}
+    QCheckBox::indicator {{
+        width: 16px; height: 16px; border: 1px solid {border};
+        border-radius: 4px; background: {alt};
+    }}
+    QCheckBox::indicator:checked {{ background: {accent}; border: 1px solid {accent}; }}
+    QLabel {{ color: {fg}; }}
+    QFrame[frameShape="4"] {{ color: {border}; }}
+    QStatusBar {{ background: {panel}; color: {muted}; }}
+    QMenu {{ background: {panel}; color: {fg}; border: 1px solid {border}; }}
+    QMenu::item:selected {{ background: {accent_soft}; }}
+    """
+
+
 # --- Farben / Geometrie -----------------------------------------------------
 NODE_W, NODE_H = 138, 50
 ANY_W, ANY_H = 120, 36
 HIT = 7.0           # Klick-Toleranz auf eine Transition (px)
 
-_BG = QColor(30, 33, 44)
-_GRID = QColor(40, 44, 58)
-_NODE = QColor(54, 62, 84)
-_NODE_SEL = QColor(74, 100, 150)
-_NODE_BORDER = QColor(110, 124, 160)
-_DEFAULT = QColor(90, 200, 130)
-_ANY = QColor(120, 92, 150)
-_TEXT = QColor(228, 234, 244)
-_SUB = QColor(170, 180, 200)
-_ARROW = QColor(150, 165, 195)
-_ARROW_SEL = QColor(120, 180, 250)
+_BG = QColor(15, 23, 36)            # tiefes Navy (Theme-BG)
+_GRID = QColor(28, 42, 58)
+_NODE_LOOP = QColor(38, 72, 104)    # loop-States: blau
+_NODE_ONCE = QColor(104, 76, 40)    # one-shot-States: bernstein
+_NODE_BORDER = QColor(96, 124, 156)
+_DEFAULT = QColor(45, 232, 154)     # Mint (Default-State + wait_finished)
+_ANY = QColor(150, 100, 190)        # Violett (Any State)
+_TEXT = QColor(224, 240, 244)
+_SUB = QColor(150, 178, 196)
+_ARROW = QColor(94, 200, 210)       # Cyan: bedingungsbasierte Transition
+_ARROW_TRIG = QColor(232, 184, 92)  # Amber: trigger-basierte Transition
+_ARROW_SEL = QColor(94, 234, 234)   # hell-cyan: ausgewaehlt
 
 
 class _GraphCanvas(QWidget):
@@ -357,22 +442,40 @@ class _GraphCanvas(QWidget):
         r = QRect(s.x, s.y, NODE_W, NODE_H)
         is_sel = self.selected is s
         is_def = (s.name == self.doc.effective_default())
-        qp.setBrush(QBrush(_NODE_SEL if is_sel else _NODE))
-        pen = QPen(_DEFAULT if is_def else (_ARROW_SEL if is_sel else _NODE_BORDER),
-                   2.5 if (is_def or is_sel) else 1.5)
-        qp.setPen(pen)
-        qp.drawRoundedRect(r, 8, 8)
+        base = _NODE_ONCE if not s.loop else _NODE_LOOP
+        if is_sel:
+            base = base.lighter(135)
+        # weicher Vertikal-Gradient fuer etwas Tiefe
+        from PySide6.QtGui import QLinearGradient
+        grad = QLinearGradient(r.topLeft(), r.bottomLeft())
+        grad.setColorAt(0.0, base.lighter(118))
+        grad.setColorAt(1.0, base.darker(112))
+        qp.setBrush(QBrush(grad))
+        border_col = _DEFAULT if is_def else (_ARROW_SEL if is_sel else _NODE_BORDER)
+        qp.setPen(QPen(border_col, 2.6 if (is_def or is_sel) else 1.5))
+        qp.drawRoundedRect(r, 9, 9)
+        # Farbiger Typ-Streifen links (loop = mint, one-shot = amber)
+        stripe = _DEFAULT if s.loop else _ARROW_TRIG
+        qp.setPen(Qt.PenStyle.NoPen)
+        qp.setBrush(QBrush(stripe))
+        qp.drawRoundedRect(QRect(s.x + 3, s.y + 6, 5, NODE_H - 12), 2, 2)
         # Name
         qp.setPen(_TEXT)
         f = qp.font(); f.setBold(True); f.setPointSize(10); qp.setFont(f)
-        qp.drawText(QRect(s.x + 8, s.y + 4, NODE_W - 16, 20),
+        qp.drawText(QRect(s.x + 16, s.y + 4, NODE_W - 22, 20),
                     Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, s.name)
+        # Default-Badge
+        if is_def:
+            qp.setPen(_DEFAULT)
+            f.setPointSize(7); qp.setFont(f)
+            qp.drawText(QRect(s.x + 8, s.y + 3, NODE_W - 14, 12),
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "DEFAULT")
         # Untertitel: anim + loop/once + frames
         qp.setPen(_SUB)
         f.setBold(False); f.setPointSize(8); qp.setFont(f)
         mode = "loop" if s.loop else "once"
         sub = f"{s.anim_name}  [{s.first}-{s.last}]  {mode}"
-        qp.drawText(QRect(s.x + 8, s.y + 24, NODE_W - 16, 18),
+        qp.drawText(QRect(s.x + 16, s.y + 24, NODE_W - 22, 18),
                     Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, sub)
 
     def _draw_transition(self, qp: QPainter, t: Transition):
@@ -381,8 +484,15 @@ class _GraphCanvas(QWidget):
             return
         p1, p2 = seg
         is_sel = self.selected is t
-        col = _ARROW_SEL if is_sel else _ARROW
-        qp.setPen(QPen(col, 2.5 if is_sel else 1.8))
+        if is_sel:
+            col = _ARROW_SEL
+        elif any(c.op == "trigger" for c in t.conditions):
+            col = _ARROW_TRIG                       # Amber: trigger-basiert
+        elif t.wait_finished and not t.conditions:
+            col = _DEFAULT                          # Mint: rein "wenn fertig"
+        else:
+            col = _ARROW                            # Cyan: bedingungsbasiert
+        qp.setPen(QPen(col, 2.6 if is_sel else 2.0))
         qp.drawLine(p1, p2)
         _arrow_head(qp, p1, p2, col)
         # Label
@@ -838,9 +948,12 @@ class AnimEditor(QMainWindow):
         ll.addWidget(self.doc_panel)
         ll.addWidget(_hline())
         ll.addWidget(self.param_panel, 1)
+        left.setMinimumWidth(230)
+        self.param_panel.list.setMaximumHeight(180)
         ldock = QDockWidget("Dokument", self)
         ldock.setWidget(left)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, ldock)
+        self._ldock = ldock
 
         # Rechts: Inspector (gestapelt)
         self.state_insp = _StateInspector()
@@ -855,14 +968,20 @@ class AnimEditor(QMainWindow):
         self.insp_stack.addWidget(self.empty_insp)   # 0
         self.insp_stack.addWidget(self.state_insp)   # 1
         self.insp_stack.addWidget(self.trans_insp)   # 2
+        self.insp_stack.setMinimumWidth(250)
         rdock = QDockWidget("Inspector", self)
         rdock.setWidget(self.insp_stack)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, rdock)
+        self._rdock = rdock
 
         self._build_toolbar()
         self._wire()
         self._set_doc(AnimDoc())
-        self.resize(1200, 760)
+        self.setStyleSheet(_editor_qss())
+        self.resize(1280, 780)
+        # Docks schmal halten, damit der Graph den Hauptplatz bekommt.
+        self.resizeDocks([self._ldock, self._rdock], [250, 290],
+                         Qt.Orientation.Horizontal)
         self._update_title()
 
     # ---- Verdrahtung ----
@@ -878,32 +997,39 @@ class AnimEditor(QMainWindow):
 
     def _build_toolbar(self):
         tb = QToolBar("Werkzeuge"); tb.setMovable(False)
+        from PySide6.QtCore import QSize
+        tb.setIconSize(QSize(18, 18))
         self.addToolBar(tb)
 
-        def act(text, slot, shortcut=None):
+        def act(text, slot, shortcut=None, obj=None):
             a = QAction(text, self)
             if shortcut:
                 a.setShortcut(QKeySequence(shortcut))
             a.triggered.connect(slot)
             tb.addAction(a)
+            if obj:
+                w = tb.widgetForAction(a)
+                if w is not None:
+                    w.setObjectName(obj)
             return a
 
-        act("Neu", self.new_doc, "Ctrl+N")
-        act("Oeffnen", self.open_doc, "Ctrl+O")
-        act("Speichern", self.save_doc, "Ctrl+S")
+        act("📄  Neu", self.new_doc, "Ctrl+N")
+        act("📂  Öffnen", self.open_doc, "Ctrl+O")
+        act("💾  Speichern", self.save_doc, "Ctrl+S")
         act("Speichern unter", self.save_doc_as, "Ctrl+Shift+S")
         tb.addSeparator()
-        act("+ State", self.add_state_center)
-        self.link_act = QAction("Link-Modus", self); self.link_act.setCheckable(True)
+        act("➕  State", self.add_state_center)
+        self.link_act = QAction("🔗  Link-Modus", self); self.link_act.setCheckable(True)
         self.link_act.setShortcut(QKeySequence("L"))
         self.link_act.toggled.connect(self._toggle_link)
+        self.link_act.setToolTip("Transition ziehen: von einem Knoten auf einen anderen (Taste L)")
         tb.addAction(self.link_act)
-        act("Loeschen", self.canvas.delete_selected, "Del")
+        act("🗑  Löschen", self.canvas.delete_selected, "Del", obj="delBtn")
         tb.addSeparator()
-        act("Undo", self.undo, "Ctrl+Z")
-        act("Redo", self.redo, "Ctrl+Y")
+        act("↶  Undo", self.undo, "Ctrl+Z")
+        act("↷  Redo", self.redo, "Ctrl+Y")
         tb.addSeparator()
-        act("▶ Vorschau (F5)", self.run_preview, "F5")
+        act("▶  Vorschau (F5)", self.run_preview, "F5", obj="runBtn")
 
     # ---- Doc-Lifecycle ----
     def _set_doc(self, doc: AnimDoc):
