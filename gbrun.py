@@ -106,6 +106,16 @@ def _launch_form_designer(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_anim_editor(project_root, initial_file=None):
+    try:
+        from gamebasic.animeditor_qt import launch
+    except SystemExit:
+        return None
+    except ImportError:
+        return None
+    return launch(project_root, initial_file)
+
+
 def _launch_chooser(project_root):
     """Start-Dialog ohne Argumente: Code-Editor oder WYSIWYG-Form-Designer.
     Liefert None, wenn PySide6 fehlt (Aufrufer zeigt dann Text-Hilfe)."""
@@ -139,12 +149,14 @@ def _launch_chooser(project_root):
     row = QHBoxLayout()
     b_edit = QPushButton("📝  Code-Editor")
     b_form = QPushButton("🧩  Form-Designer (WYSIWYG)")
-    for b in (b_edit, b_form):
+    b_anim = QPushButton("🎬  Animation-Editor (FSM)")
+    for b in (b_edit, b_form, b_anim):
         b.setMinimumHeight(64)
         b.setMinimumWidth(220)
         row.addWidget(b)
     b_edit.clicked.connect(lambda: pick("editor"))
     b_form.clicked.connect(lambda: pick("form"))
+    b_anim.clicked.connect(lambda: pick("anim"))
     lay.addLayout(row)
 
     dlg.exec()
@@ -153,6 +165,8 @@ def _launch_chooser(project_root):
         return _launch_editor(root)
     if choice["v"] == "form":
         return _launch_form_designer(root)
+    if choice["v"] == "anim":
+        return _launch_anim_editor(root)
     return 0   # abgebrochen
 
 
@@ -235,6 +249,18 @@ def main(argv):
         rc = _launch_form_designer(Path(__file__).resolve().parent, initial)
         if rc is None:
             print("Form-Designer benoetigt 'PySide6'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6")
+            return 3
+        return rc
+
+    # --- Animations-FSM-Editor (gbanim, Unity-Mecanim-Stil) explizit per Flag ---
+    if args and args[0] in ("--anim", "--anim-editor", "--fsm"):
+        args = args[1:]
+        initial = Path(args[0]) if args else None
+        rc = _launch_anim_editor(Path(__file__).resolve().parent, initial)
+        if rc is None:
+            print("Anim-FSM-Editor benoetigt 'PySide6'.")
             print("Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6")
             return 3

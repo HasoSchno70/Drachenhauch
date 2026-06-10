@@ -86,6 +86,21 @@ def test_param_unique_names():
     assert p2.name == "p2"
 
 
+def test_rename_param_updates_conditions():
+    doc = AnimDoc()
+    doc.add_state(0, 0, "idle")
+    doc.add_state(0, 0, "run")
+    doc.add_param("speed", "float")
+    t = doc.add_transition("idle", "run")
+    t.conditions.append(Condition("speed", "gt", 5.0))
+    assert doc.rename_param("speed", "velocity")
+    assert doc.param_by_name("velocity") is not None
+    assert t.conditions[0].param == "velocity"
+    # Kollision wird abgelehnt
+    doc.add_param("other")
+    assert not doc.rename_param("velocity", "other")
+
+
 # ----------------------------------------------------------------- Helper
 def test_snap():
     assert snap(0) == 0

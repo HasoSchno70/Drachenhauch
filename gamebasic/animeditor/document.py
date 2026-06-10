@@ -264,6 +264,20 @@ class AnimDoc:
         self.params.append(p)
         return p
 
+    def rename_param(self, old: str, new: str) -> bool:
+        new = new.strip()
+        if not new or new in {p.name for p in self.params} - {old}:
+            return False
+        p = self.param_by_name(old)
+        if p is None:
+            return False
+        p.name = new
+        for t in self.transitions:
+            for c in t.conditions:
+                if c.param == old:
+                    c.param = new
+        return True
+
     def remove_param(self, name: str) -> None:
         self.params = [p for p in self.params if p.name != name]
         # Conditions, die diesen Parameter nutzen, entfernen.

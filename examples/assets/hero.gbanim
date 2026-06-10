@@ -1,5 +1,9 @@
 {
   "version": 1,
+  "sheet": "assets/hero_walk.png",
+  "frame_w": 16,
+  "frame_h": 16,
+  "scale": 5.0,
   "default": "idle",
   "params": [
     { "name": "speed", "type": "float", "default": 0.0 },
