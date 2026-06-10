@@ -44,6 +44,7 @@ enum Cmd {
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
+    TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala, tint (um Zentrum)
     AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool, Color), // tex, sx,sy,sw,sh, dx,dy, flip_h, tint
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
@@ -2040,6 +2041,19 @@ impl Graphics {
         self.emit(Cmd::TextureFlipped(i, x, y, fh, fv));
         Ok(())
     }
+    /// Rotierter Sprite-Blit: zeichnet das Bild **zentriert** auf (x,y), gedreht
+    /// um `angle_deg` Grad (um das Zentrum), skaliert mit `scale`, getoent mit
+    /// `tint` (None = unveraendert). Ideal fuer physics2d (`x,y = BODY_X/Y`,
+    /// `angle = DEG(PHYS2D_BODY_ANGLE(...))`).
+    pub fn draw_image_rot(&mut self, idx: i64, x: i32, y: i32, angle_deg: f32,
+                          scale: f32, tint: Option<i64>) -> Result<(), String> {
+        let i = idx as usize;
+        if i >= self.textures.len() { return Err("DRAWIMAGEROT: ungueltiges IMAGE-Handle".into()); }
+        let (x, y) = self.w2s(x, y);
+        let c = tint.map(col).unwrap_or(Color::WHITE);
+        self.emit(Cmd::TextureRot(i, x, y, angle_deg, scale.max(0.0001), c));
+        Ok(())
+    }
     /// Zeichnet eine 2D-Tilemap (flache row-major `values`; Tile < 0 =
     /// transparent). Tileset wird als gerasterter Strip interpretiert
     /// (tiles_per_row = tileset_breite / tw). Jedes Tile geht durch
@@ -2936,6 +2950,15 @@ fn render_scene<D: RaylibDraw>(
                         let src = Rectangle::new(0.0, 0.0, sw, sh);
                         let dst = Rectangle::new((x * s) as f32, (y * s) as f32, (t.width * s) as f32, (t.height * s) as f32);
                         d.draw_texture_pro(t, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                    }
+                    Cmd::TextureRot(i, cx, cy, ang, scl, tint) => {
+                        let t = &textures[*i].tex;
+                        let w = t.width as f32 * scl * s as f32;
+                        let h = t.height as f32 * scl * s as f32;
+                        let src = Rectangle::new(0.0, 0.0, t.width as f32, t.height as f32);
+                        // dst-Position = Zentrum; origin = halbe Groesse -> Drehung um die Mitte.
+                        let dst = Rectangle::new((cx * s) as f32, (cy * s) as f32, w, h);
+                        d.draw_texture_pro(t, src, dst, Vector2::new(w / 2.0, h / 2.0), *ang, *tint);
                     }
                     Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh, tint) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32, if *fh { -(*sw as f32) } else { *sw as f32 }, *sh as f32);

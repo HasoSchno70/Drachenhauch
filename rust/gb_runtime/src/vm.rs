@@ -3046,6 +3046,16 @@ impl<'p> Vm<'p> {
                 let idx = gi(a, 0, "DRAWIMAGE")?;
                 g!().draw_image(idx, gi(a,1,"DRAWIMAGE")? as i32, gi(a,2,"DRAWIMAGE")? as i32)?; Value::Nil
             }
+            "drawimagerot" => {
+                // DRAWIMAGEROT(img, x, y, winkel_grad [, skala [, tint]]) -- zentriert + gedreht.
+                let idx = gi(a, 0, "DRAWIMAGEROT")?;
+                let x = gi(a, 1, "DRAWIMAGEROT")? as i32;
+                let y = gi(a, 2, "DRAWIMAGEROT")? as i32;
+                let ang = need_f(a, 3, "DRAWIMAGEROT")? as f32;
+                let scale = if a.len() >= 5 { need_f(a, 4, "DRAWIMAGEROT")? as f32 } else { 1.0 };
+                let tint = if a.len() >= 6 { Some(gi(a, 5, "DRAWIMAGEROT")?) } else { None };
+                g!().draw_image_rot(idx, x, y, ang, scale, tint)?; Value::Nil
+            }
             "imagewidth" => Value::Int(g!().image_width(gi(a,0,"IMAGEWIDTH")?)?),
             "imageheight" => Value::Int(g!().image_height(gi(a,0,"IMAGEHEIGHT")?)?),
             "flip" => {

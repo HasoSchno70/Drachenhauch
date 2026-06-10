@@ -132,6 +132,7 @@ Demo: [examples/87_ttf_fonts.gb](../examples/87_ttf_fonts.gb).
 | `DRAWIMAGE(img, x, y)` | Bild bei (x, y) zeichnen |
 | `DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)` | Sub-Rechteck aus Sheet zeichnen |
 | `DRAWIMAGEFLIPPED(img, x, y[, flipX[, flipY]])` | mit Spiegelung |
+| `DRAWIMAGEROT(img, x, y, winkel[, skala[, tint]])` | **zentriert** auf (x,y), um `winkel` **Grad** gedreht (um die Mitte), optional skaliert + getönt. Ideal für rotierte Sprites / `physics2d` (`winkel = DEG(PHYS2D_BODY_ANGLE(...))`). Camera-aware. |
 
 ```basic
 SCREEN(320, 240, "Bilder", 2)

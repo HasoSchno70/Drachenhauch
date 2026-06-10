@@ -1107,6 +1107,12 @@
    "module": "interpreter"
   },
   {
+   "name": "DRAWIMAGEROT",
+   "kind": "graphics",
+   "signature": "DRAWIMAGEROT(img, x, y, angle_deg [, scale [, tint]])",
+   "module": "interpreter"
+  },
+  {
    "name": "DRAWIMAGEFLIPPED",
    "kind": "graphics",
    "signature": "DRAWIMAGEFLIPPED(3..5 Argumente)",

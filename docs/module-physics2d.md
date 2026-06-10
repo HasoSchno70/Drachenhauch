@@ -60,26 +60,22 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 | `PHYS2D_REMOVE(w, idx)` | Körper entfernen |
 | `PHYS2D_COUNT(w) AS INTEGER` | Anzahl lebender Körper |
 
-## Muster: Körper zeichnen
+## Muster: Sprite an einen Körper koppeln
 
-Position folgt direkt aus `BODY_X`/`BODY_Y`, die Drehung aus `BODY_ANGLE`
-(Radiant). Kreise brauchen für die Drehung nur eine Radius-Linie; ein
-**rotiertes Rechteck** zeichnet man als vier Linien (Ecken aus dem Winkel),
-siehe [examples/112_physics2d.gb](../examples/112_physics2d.gb):
+Position folgt aus `BODY_X`/`BODY_Y`, die Drehung aus `BODY_ANGLE` (Radiant).
+Mit **`DRAWIMAGEROT`** (zentrierter, gedrehter Sprite-Blit) koppelt man ein Bild
+direkt an einen Körper — `BODY_ANGLE` ist Radiant, der Blit erwartet Grad, also
+`DEG(...)`:
 
 ```basic
-DIM ca AS FLOAT : ca = COS(ang)
-DIM sa AS FLOAT : sa = SIN(ang)
-' Ecke (-s,-s) der Box mit Halb-Seite s um (cx,cy) rotiert:
-DIM ex AS INTEGER : ex = INT(cx + (-s) * ca - (-s) * sa)
-DIM ey AS INTEGER : ey = INT(cy + (-s) * sa + (-s) * ca)
-' … die übrigen drei Ecken analog, dann mit LINEW verbinden.
+DRAWIMAGEROT(img, PHYS2D_BODY_X(world, id), PHYS2D_BODY_Y(world, id), _
+             DEG(PHYS2D_BODY_ANGLE(world, id)), 2.0)   ' zentriert, 2x skaliert
 ```
 
-> **Hinweis:** Ein direkter *rotierter Sprite-Blit* (`DRAWIMAGE` mit Winkel) ist
-> noch kein Core-Builtin — sinnvolle Folge-Erweiterung, um Sprites bequem an
-> `BODY_ANGLE` zu koppeln. Bis dahin: Box-Outlines wie oben, oder Sprite ohne
-> Rotation an `BODY_X/Y` setzen.
+Komplettes Beispiel: [examples/113_physics2d_sprites.gb](../examples/113_physics2d_sprites.gb)
+(purzelnde Sprites). Für reine Vektor-Optik zeichnet
+[examples/112_physics2d.gb](../examples/112_physics2d.gb) Boxen als rotierte
+Linien-Outlines und Kreise mit Spin-Linie.
 
 ## Platformer-Tipp
 
