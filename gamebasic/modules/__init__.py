@@ -24,7 +24,7 @@ KNOWN_MODULES: frozenset = frozenset({
     "animfsm",
     "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
-    "physics", "physics3d", "regex", "save", "scene", "serial", "sprite",
+    "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "tween", "ui", "usb", "vec2", "wifi",
 })
 

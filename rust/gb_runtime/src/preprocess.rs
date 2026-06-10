@@ -24,7 +24,7 @@ use regex::Regex;
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
-    "physics", "physics3d", "regex", "save", "scene", "serial", "sprite",
+    "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "tween", "ui", "usb", "vec2", "wifi",
 ];
 
@@ -47,6 +47,7 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("net", &["net_listener", "net_socket", "net_udp"]),
     ("particles", &["particle_system"]),
     ("physics", &["physics_broad"]),
+    ("physics2d", &["phys2d_world"]),
     ("physics3d", &["phys_world"]),
     ("save", &["save_handle"]),
     ("serial", &["serial_handle"]),

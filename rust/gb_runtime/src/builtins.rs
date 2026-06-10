@@ -434,6 +434,16 @@ fn need_bool(v: &Value, fn_: &str) -> Result<bool, String> {
     }
 }
 
+/// Ja/Nein-Flag, das BOOLEAN UND Zahl akzeptiert (`TRUE`/`FALSE` oder `1`/`0`).
+fn need_flag(v: &Value, fn_: &str) -> Result<bool, String> {
+    match v {
+        Value::Bool(b) => Ok(*b),
+        Value::Int(i) => Ok(*i != 0),
+        Value::Float(f) => Ok(*f != 0.0),
+        _ => Err(format!("{} erwartet BOOLEAN oder Zahl (Flag), erhalten {}", fn_, v.type_name())),
+    }
+}
+
 fn char_h(v: &Value, fn_: &str) -> Result<Rc<RefCell<crate::controller::CharController>>, String> {
     match v {
         Value::CharController(c) => Ok(c.clone()),
@@ -1665,6 +1675,92 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(phys3d_h(&a[0], "PHYS3D_COUNT")?.borrow().count()))
         }
 
+        // ===== Modul: physics2d (echte 2D-Starrkoerper-Physik via Rapier2D) =====
+        "phys2d_new" => {
+            arity!(0);
+            Ok(Value::Phys2d(Rc::new(RefCell::new(crate::physics2d::Phys2dWorld::new()))))
+        }
+        "phys2d_set_gravity" => {
+            arity!(3);
+            phys2d_h(&a[0], "PHYS2D_SET_GRAVITY")?.borrow_mut().set_gravity(
+                need_num(&a[1], "PHYS2D_SET_GRAVITY")? as f32,
+                need_num(&a[2], "PHYS2D_SET_GRAVITY")? as f32);
+            Ok(Value::Nil)
+        }
+        "phys2d_add_box" => {
+            arity!(7);
+            let idx = phys2d_h(&a[0], "PHYS2D_ADD_BOX")?.borrow_mut().add_box(
+                need_num(&a[1], "PHYS2D_ADD_BOX")? as f32, need_num(&a[2], "PHYS2D_ADD_BOX")? as f32,
+                need_num(&a[3], "PHYS2D_ADD_BOX")? as f32, need_num(&a[4], "PHYS2D_ADD_BOX")? as f32,
+                need_flag(&a[5], "PHYS2D_ADD_BOX")?, need_num(&a[6], "PHYS2D_ADD_BOX")? as f32);
+            Ok(Value::Int(idx))
+        }
+        "phys2d_add_circle" => {
+            arity!(6);
+            let idx = phys2d_h(&a[0], "PHYS2D_ADD_CIRCLE")?.borrow_mut().add_circle(
+                need_num(&a[1], "PHYS2D_ADD_CIRCLE")? as f32, need_num(&a[2], "PHYS2D_ADD_CIRCLE")? as f32,
+                need_num(&a[3], "PHYS2D_ADD_CIRCLE")? as f32,
+                need_flag(&a[4], "PHYS2D_ADD_CIRCLE")?, need_num(&a[5], "PHYS2D_ADD_CIRCLE")? as f32);
+            Ok(Value::Int(idx))
+        }
+        "phys2d_step" => {
+            arity!(2);
+            phys2d_h(&a[0], "PHYS2D_STEP")?.borrow_mut().step(need_num(&a[1], "PHYS2D_STEP")? as f32);
+            Ok(Value::Nil)
+        }
+        "phys2d_body_x" | "phys2d_body_y" => {
+            arity!(2);
+            let p = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().pos(need_int(&a[1], "PHYS2D_BODY")?);
+            Ok(Value::Float((if name == "phys2d_body_x" { p.0 } else { p.1 }) as f64))
+        }
+        "phys2d_body_angle" => {
+            arity!(2);
+            let ang = phys2d_h(&a[0], "PHYS2D_BODY_ANGLE")?.borrow().angle(need_int(&a[1], "PHYS2D_BODY_ANGLE")?);
+            Ok(Value::Float(ang as f64))
+        }
+        "phys2d_body_vx" | "phys2d_body_vy" => {
+            arity!(2);
+            let v = phys2d_h(&a[0], "PHYS2D_BODY")?.borrow().vel(need_int(&a[1], "PHYS2D_BODY")?);
+            Ok(Value::Float((if name == "phys2d_body_vx" { v.0 } else { v.1 }) as f64))
+        }
+        "phys2d_set_vel" => {
+            arity!(4);
+            phys2d_h(&a[0], "PHYS2D_SET_VEL")?.borrow_mut().set_vel(
+                need_int(&a[1], "PHYS2D_SET_VEL")?,
+                need_num(&a[2], "PHYS2D_SET_VEL")? as f32, need_num(&a[3], "PHYS2D_SET_VEL")? as f32);
+            Ok(Value::Nil)
+        }
+        "phys2d_apply_impulse" => {
+            arity!(4);
+            phys2d_h(&a[0], "PHYS2D_APPLY_IMPULSE")?.borrow_mut().apply_impulse(
+                need_int(&a[1], "PHYS2D_APPLY_IMPULSE")?,
+                need_num(&a[2], "PHYS2D_APPLY_IMPULSE")? as f32, need_num(&a[3], "PHYS2D_APPLY_IMPULSE")? as f32);
+            Ok(Value::Nil)
+        }
+        "phys2d_set_pos" => {
+            arity!(4);
+            phys2d_h(&a[0], "PHYS2D_SET_POS")?.borrow_mut().set_pos(
+                need_int(&a[1], "PHYS2D_SET_POS")?,
+                need_num(&a[2], "PHYS2D_SET_POS")? as f32, need_num(&a[3], "PHYS2D_SET_POS")? as f32);
+            Ok(Value::Nil)
+        }
+        "phys2d_lock_rotation" => {
+            arity!(3);
+            phys2d_h(&a[0], "PHYS2D_LOCK_ROTATION")?.borrow_mut().lock_rotation(
+                need_int(&a[1], "PHYS2D_LOCK_ROTATION")?,
+                need_flag(&a[2], "PHYS2D_LOCK_ROTATION")?);
+            Ok(Value::Nil)
+        }
+        "phys2d_remove" => {
+            arity!(2);
+            phys2d_h(&a[0], "PHYS2D_REMOVE")?.borrow_mut().remove(need_int(&a[1], "PHYS2D_REMOVE")?);
+            Ok(Value::Nil)
+        }
+        "phys2d_count" => {
+            arity!(1);
+            Ok(Value::Int(phys2d_h(&a[0], "PHYS2D_COUNT")?.borrow().count()))
+        }
+
         // ===== Modul: sprite (ohne SPRITE_DRAW -> das ist Grafik, in vm.rs) =====
         "sprite_new" => {
             arity!(3);
@@ -2806,6 +2902,10 @@ fn broad_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics:
 
 fn phys3d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics3d::Phys3dWorld>>, String> {
     match v { Value::Phys3d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS_WORLD", fn_)) }
+}
+
+fn phys2d_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::physics2d::Phys2dWorld>>, String> {
+    match v { Value::Phys2d(w) => Ok(w), _ => Err(format!("{} erwartet PHYS2D_WORLD", fn_)) }
 }
 
 fn astar_xy(g: &crate::astar::AStarGrid, x: &Value, y: &Value, fn_: &str) -> Result<(), String> {

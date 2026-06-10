@@ -1,0 +1,126 @@
+' ===========================================================================
+'  112_physics2d.gb  --  echte 2D-Starrkoerper-Physik (Modul "physics2d", Rapier2D)
+'
+'  Boxen + Kreise fallen unter Schwerkraft, kollidieren, kippen und stapeln sich
+'  in einem Kasten. Statische Waende/Boden, dynamische Koerper. Zeigt echte
+'  Rotation (Boxen liegen schraeg) -- kein blosses AABB-Toolkit.
+'
+'  Steuerung:  Klick / gedrueckt halten = Koerper spawnen   ·   ESC = Ende
+' ===========================================================================
+IMPORT "physics2d"
+
+CONST W AS INTEGER = 640
+CONST H AS INTEGER = 440
+SCREEN(W, H, "2D-Physik (Rapier2D) -- Klick = Koerper, ESC = Ende", 1)
+SETFPS(60)
+
+DIM world AS PHYS2D_WORLD
+world = PHYS2D_NEW()
+
+' --- statischer Kasten (Boden + zwei Waende) ---
+DIM ground AS INTEGER
+ground = PHYS2D_ADD_BOX(world, W / 2, H - 12, W / 2, 12, FALSE, 0.2)
+PHYS2D_ADD_BOX(world, 10, H / 2, 10, H / 2, FALSE, 0.2)
+PHYS2D_ADD_BOX(world, W - 10, H / 2, 10, H / 2, FALSE, 0.2)
+
+' --- parallele Listen pro dynamischem Koerper (leer, via ARRAY_PUSH wachsend) ---
+DIM ids[0] AS INTEGER
+DIM kinds[0] AS INTEGER            ' 0 = Box, 1 = Kreis
+DIM sizes[0] AS FLOAT             ' Halb-Breite bzw. Radius
+DIM cols[0] AS INTEGER
+
+DIM tick AS INTEGER
+tick = 0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    tick = tick + 1
+
+    ' --- spawnen: bei Klick an der Maus, sonst alle ~18 Ticks automatisch ---
+    DIM do_spawn AS BOOLEAN
+    do_spawn = FALSE
+    DIM sx AS FLOAT
+    sx = RANDF(60.0, W - 60.0)
+    DIM sy AS FLOAT
+    sy = 34.0
+    IF MOUSEBUTTON(0) = 1 THEN
+        do_spawn = TRUE
+        sx = FLT(MOUSEX())
+        sy = FLT(MOUSEY())
+    END IF
+    IF tick MOD 18 = 0 THEN do_spawn = TRUE
+
+    IF do_spawn AND LEN(ids) < 70 THEN
+        DIM sz AS FLOAT
+        sz = RANDF(10.0, 22.0)
+        DIM kind AS INTEGER
+        kind = RANDINT(0, 1)
+        DIM id AS INTEGER
+        IF kind = 0 THEN
+            id = PHYS2D_ADD_BOX(world, sx, sy, sz, sz, TRUE, 0.25)
+        ELSE
+            id = PHYS2D_ADD_CIRCLE(world, sx, sy, sz, TRUE, 0.5)
+        END IF
+        ARRAY_PUSH(ids, id)
+        ARRAY_PUSH(kinds, kind)
+        ARRAY_PUSH(sizes, sz)
+        ARRAY_PUSH(cols, HSV(RANDINT(0, 359), 0.65, 1.0))
+    END IF
+
+    ' --- Simulation ---
+    PHYS2D_STEP(world, DELTA())
+
+    ' --- zeichnen ---
+    CLS(RGB(18, 20, 32))
+    BOX(0, H - 24, W, H, RGB(40, 44, 62))
+    BOX(0, 0, 20, H, RGB(40, 44, 62))
+    BOX(W - 20, 0, W, H, RGB(40, 44, 62))
+
+    DIM j AS INTEGER
+    FOR j = 0 TO LEN(ids) - 1
+        DIM cx AS FLOAT
+        cx = PHYS2D_BODY_X(world, ids[j])
+        DIM cy AS FLOAT
+        cy = PHYS2D_BODY_Y(world, ids[j])
+        DIM ang AS FLOAT
+        ang = PHYS2D_BODY_ANGLE(world, ids[j])
+        DIM s AS FLOAT
+        s = sizes[j]
+        DIM col AS INTEGER
+        col = cols[j]
+        IF kinds[j] = 1 THEN
+            ' Kreis + Radius-Linie zeigt die Drehung
+            CIRCLE(INT(cx), INT(cy), INT(s), col)
+            LINE(INT(cx), INT(cy), INT(cx + s * COS(ang)), INT(cy + s * SIN(ang)), RGB(20, 20, 30))
+        ELSE
+            ' rotiertes Rechteck als vier Linien (Ecken aus Winkel berechnet)
+            DIM ca AS FLOAT
+            ca = COS(ang)
+            DIM sa AS FLOAT
+            sa = SIN(ang)
+            DIM x0 AS INTEGER
+            DIM y0 AS INTEGER
+            DIM x1 AS INTEGER
+            DIM y1 AS INTEGER
+            DIM x2 AS INTEGER
+            DIM y2 AS INTEGER
+            DIM x3 AS INTEGER
+            DIM y3 AS INTEGER
+            x0 = INT(cx + (-s) * ca - (-s) * sa)
+            y0 = INT(cy + (-s) * sa + (-s) * ca)
+            x1 = INT(cx + ( s) * ca - (-s) * sa)
+            y1 = INT(cy + ( s) * sa + (-s) * ca)
+            x2 = INT(cx + ( s) * ca - ( s) * sa)
+            y2 = INT(cy + ( s) * sa + ( s) * ca)
+            x3 = INT(cx + (-s) * ca - ( s) * sa)
+            y3 = INT(cy + (-s) * sa + ( s) * ca)
+            LINEW(x0, y0, x1, y1, 2, col)
+            LINEW(x1, y1, x2, y2, 2, col)
+            LINEW(x2, y2, x3, y3, 2, col)
+            LINEW(x3, y3, x0, y0, 2, col)
+        END IF
+    NEXT
+
+    TEXT(28, 10, "Koerper: " + STR$(PHYS2D_COUNT(world)) + "   Klick = mehr")
+    FLIP()
+WEND

@@ -17,6 +17,8 @@ regex = "1"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
 rapier3d = "0.22"
+# physics2d-Modul (PHYS2D_*): echte 2D-Starrkoerper-Physik. Ebenfalls pure-Rust.
+rapier2d = "0.22"
 # Grafik ist optional: der pure VM-Kern baut ohne C-Toolchain. Mit
 # `--features graphics` wird raylib eingebunden (braucht cmake + C-Compiler +
 # libclang fuer bindgen -- siehe rust/build_runtime.py).
