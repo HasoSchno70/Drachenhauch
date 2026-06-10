@@ -13,7 +13,24 @@
   const outEl = document.getElementById("output");
   const statusEl = document.getElementById("status");
   const runBtn = document.getElementById("run");
+  const shareBtn = document.getElementById("share");
   const srcEl = document.getElementById("src");
+
+  // --- Teilbare Links: Quelle base64url-kodiert im URL-Hash (#gb=...) ---
+  // Reine Client-Logik, kein Backend: ein Link reproduziert das Programm.
+  function encodeSrc(str) {
+    return btoa(unescape(encodeURIComponent(str)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function decodeSrc(b64) {
+    b64 = b64.replace(/-/g, "+").replace(/_/g, "/");
+    return decodeURIComponent(escape(atob(b64)));
+  }
+  function hashSrc() {
+    const m = location.hash.match(/^#gb=(.+)$/);
+    if (!m) return null;
+    try { return decodeSrc(m[1]); } catch (e) { return null; }
+  }
 
   const STORAGE_KEY = "gb_src";   // zuletzt editierte Quelle (bleibt erhalten)
   const RUN_FLAG = "gb_run";      // Einmal-Flag: nach Reload genau einen Lauf
@@ -60,11 +77,17 @@
   const saved = sessionStorage.getItem(STORAGE_KEY);
   const doRun = sessionStorage.getItem(RUN_FLAG) === "1";
   sessionStorage.removeItem(RUN_FLAG);
-  srcEl.value = saved !== null ? saved : DEFAULT_SRC;
+  // Quelle-Auswahl: bei einem Run-Reload das, was laeuft; sonst ein Share-Link
+  // (#gb=...) falls vorhanden; sonst die zuletzt editierte bzw. die Default-Quelle.
+  const shared = hashSrc();
+  const fromShare = !doRun && shared !== null;
+  srcEl.value = doRun ? (saved !== null ? saved : srcEl.value)
+              : (shared !== null ? shared : (saved !== null ? saved : DEFAULT_SRC));
+  if (fromShare) sessionStorage.setItem(STORAGE_KEY, srcEl.value);
 
   function runEmbedded() {
     setStatus("läuft …");
-    try { window.Module.FS.writeFile("/program.gb", saved || srcEl.value); }
+    try { window.Module.FS.writeFile("/program.gb", srcEl.value); }
     catch (e) { log("FS-Fehler: " + e); }
     try {
       window.Module.callMain([]);           // liest /program.gb, kompiliert, läuft
@@ -83,16 +106,33 @@
     printErr: log,
     onRuntimeInitialized: function () {
       runBtn.disabled = false;
-      if (doRun) runEmbedded();    // nach "Ausführen"-Reload: genau einen Lauf
+      // nach "Ausführen"-Reload genau ein Lauf; ein frisch geoeffneter Share-Link
+      // startet direkt (die Runtime ist nach dem Laden ohnehin frisch).
+      if (doRun || fromShare) runEmbedded();
       else setStatus("bereit — Code eingeben & Ausführen");
     },
   };
 
-  // "Ausführen": Quelle + Einmal-Run-Flag sichern, neu laden -> frische Runtime.
+  // "Ausführen": Quelle + Einmal-Run-Flag sichern, Hash aktuell halten, neu laden.
   runBtn.addEventListener("click", function () {
     sessionStorage.setItem(STORAGE_KEY, srcEl.value);
     sessionStorage.setItem(RUN_FLAG, "1");
+    location.hash = "gb=" + encodeSrc(srcEl.value);   // URL bleibt teilbar + konsistent
     location.reload();
+  });
+
+  // "Link teilen": aktuelle Quelle in den Hash packen + URL in die Zwischenablage.
+  shareBtn.addEventListener("click", function () {
+    location.hash = "gb=" + encodeSrc(srcEl.value);
+    const url = location.href;
+    const done = function () { setStatus("Link kopiert ✓"); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () {
+        setStatus("Link ist in der Adresszeile");
+      });
+    } else {
+      setStatus("Link ist in der Adresszeile");
+    }
   });
 
   // Strg+Enter als Shortcut.

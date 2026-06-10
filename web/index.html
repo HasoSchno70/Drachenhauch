@@ -39,6 +39,7 @@
 
   <div class="bar">
     <button id="run" disabled>▶ Ausführen</button>
+    <button id="share" style="background:#1a2738;color:#2de0e0;border:1px solid #2de0e0;margin-left:6px;">🔗 Link teilen</button>
     <span id="status" class="note" style="padding:0 8px;">lade …</span>
   </div>
 
@@ -58,11 +59,13 @@
     Tippe GameBasic-Quelltext links und klicke <b>Ausführen</b> — <code>gbrt.wasm</code>
     kompiliert die Quelle <i>im Browser</i> (kein Server, kein Pyodide) und führt
     sie aus: Konsolen-Ausgabe unter dem Canvas, Grafik im Canvas. Jeder Lauf
-    startet eine frische Runtime. Build via <code>rust/build_wasm.py</code>,
-    Status &amp; Grenzen: <code>docs/web-playground.md</code>.
+    startet eine frische Runtime. <b>Link teilen</b> packt die Quelle in die URL —
+    wer den Link öffnet, sieht (und startet) genau dein Programm. Build via
+    <code>rust/build_wasm.py</code>, Status &amp; Grenzen:
+    <code>docs/web-playground.md</code>.
   </p>
 
-  <script src="playground.js"></script>
+  <script src="playground.js?v=2"></script>
   <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief. -->
   <script src="gbrt.js"></script>
 </body>

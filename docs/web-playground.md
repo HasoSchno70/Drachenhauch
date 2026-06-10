@@ -4,14 +4,16 @@ GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
 Konsolen-Ausgabe daneben.
 
-> **Status: baut & läuft (verifiziert 2026-06-04).** Mit installierter Toolchain
-> (emscripten 6.0.0 + Rust-Target `wasm32-unknown-emscripten`) erzeugt
-> `rust/build_wasm.py` ein lauffähiges `web/gbrt.js` + `web/gbrt.wasm`. Verifiziert
-> mit `examples/01_hello.gb`: unter Node (`node web/gbrt.js`) **bit-identische
-> Ausgabe zum Python-Tree-Walker** — und zwar aus der eingebetteten **Quelle**
-> (gbrt kompiliert im WASM selbst, kein Pyodide). Die Build-Artefakte
-> (`gbrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored, nicht eingecheckt.
-> Grafik-Demos (Render-Loop) brauchen den Browser-Canvas — siehe **Grenzen**.
+> **Status: baut & läuft, inkl. Grafik (verifiziert 2026-06-10).** Mit
+> installierter Toolchain (emscripten 6.0.0 + Rust-Target
+> `wasm32-unknown-emscripten`) erzeugt `rust/build_wasm.py` ein lauffähiges
+> `web/gbrt.js` + `web/gbrt.wasm`. **Konsolen- UND Grafik-Programme laufen im
+> Browser** — animierte Demos im `<canvas>` ohne den Tab einzufrieren (im Browser
+> per Preview verifiziert: bewegtes Sprite + laufender Frame-Zähler). gbrt
+> kompiliert die eingebettete **Quelle** selbst im WASM (kein Pyodide). Die
+> Build-Artefakte (`gbrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored.
+> **Teilbare Links:** „Link teilen" packt die Quelle in den URL-Hash — wer den
+> Link öffnet, sieht und startet genau dieses Programm.
 
 > **Windows-Toolchain wird automatisch verdrahtet.** `build_wasm.py`
 > (`setup_emscripten_env`) findet ein emsdk (Env `EMSDK` oder `%USERPROFILE%\emsdk`)
@@ -40,8 +42,8 @@ Konsolen-Ausgabe daneben.
 |---|---|
 | `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/gbrt.{js,wasm}` |
 | `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.gb` aus (Fallback `/program.gbc`) aus dem virtuellen FS |
-| `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-Button |
-| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.gb`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. |
+| `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-/Teilen-Button |
+| `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.gb`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
 
 ## Bauen
 
@@ -71,33 +73,42 @@ py -m http.server -d web 8000
 
 Run klicken → `Module.callMain()` startet `gbrt`, das `/program.gbc` ausführt.
 
-## Architektur-Hinweis: der Render-Loop
+## Architektur-Hinweis: der Render-Loop (gelöst)
 
-Die VM treibt ihren Frame-/Render-Loop **blockierend** in `vm.run()` (erst am
-Programmende kehrt sie zurück, stdout wird gepuffert). Im Browser darf der
-Main-Thread aber nicht blockieren. Zwei Wege:
+Die VM treibt ihren Frame-/Render-Loop **blockierend**: das GB-Programm hat die
+Schleife (`WHILE NOT QUITREQUESTED() … FLIP() … WEND`), die VM kehrt erst am
+Programmende zurück. Im Browser darf der Main-Thread aber nicht blockieren, sonst
+hängt der Tab.
 
-- **ASYNCIFY** (gesetzt): `build_wasm.py` setzt `-s ASYNCIFY`. **Reicht für
-  Grafik aber NICHT aus**, weil raylib im `PLATFORM_WEB`-Modus auf
-  `emscripten_set_main_loop` ausgelegt ist und in einem blockierenden Loop
-  nicht ans Browser-Event-Loop yieldet — ein `WHILE TRUE … FLIP()` blockiert
-  daher den Main-Thread (Tab hängt). Zusätzlich kollidiert ASYNCIFY mit dem
-  von rustc emittierten `-fwasm-exceptions` (Linker-Warnung).
-- **Umbau auf `emscripten_set_main_loop`** (nötig für Grafik im Browser): die VM
-  müsste pro Frame zurückkehren statt selbst zu loopen — größerer Eingriff in
-  `vm.rs`/`graphics.rs` (cfg `target_os="emscripten"`). **Nicht umgesetzt.**
+**Lösung (umgesetzt): ASYNCIFY + ein Yield pro Frame.** `build_wasm.py` setzt
+`-s ASYNCIFY`; allein reicht das nicht, weil ohne einen Yield-Punkt der
+blockierende Loop nie ans Browser-Event-Loop zurückgibt. Deshalb ruft
+**`graphics.rs::flip()` unter `cfg(target_os="emscripten")` `emscripten_sleep(0)`**
+direkt nach dem Präsentieren (`EndDrawing`). ASYNCIFY wickelt dabei den gesamten
+Rust-Stack ab, gibt die Kontrolle an den Browser (Canvas compositet, Input-Events
+werden zugestellt) und setzt beim nächsten Tick genau dort fort. Damit kooperiert
+der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
+`emscripten_set_main_loop` nötig**, die VM-/Coroutinen-Logik bleibt unangetastet.
 
-## Stand & Grenzen (verifiziert 2026-06-04)
+> Der theoretisch sauberere Weg (`emscripten_set_main_loop`, VM kehrt pro Frame
+> zurück) wäre ein großer Eingriff in `vm.rs`; der ASYNCIFY-Yield ist ~3 Zeilen
+> und liefert dasselbe Ergebnis. Der befürchtete ASYNCIFY-vs-`-fwasm-exceptions`-
+> Konflikt erwies sich als bloße Linker-Warnung — der Build läuft.
 
-- **Konsolen-Programme: laufen im Browser ✅.** Im echten Browser geprüft (über
-  den Live-Editor): Quelle tippen → *Ausführen* → korrekte Ausgabe. gbrt
-  kompiliert die `.gb`-Quelle **selbst im WASM** (Front-End-Port) — **kein
-  Pyodide**, kein vorab kompiliertes `.gbc` nötig.
-- **Grafik-Programme: hängen aktuell ⚠️.** Der blockierende Render-Loop yieldet
-  nicht (siehe oben) → der Tab friert ein. Behebung = `emscripten_set_main_loop`-
-  Umbau (offen). Das Harness ist deshalb **hang-sicher**: *Ausführen* setzt ein
-  Einmal-Run-Flag (`gb_run`) in `sessionStorage`; ein simples Neuladen führt ein
-  hängendes Programm NICHT erneut aus (Editor-Inhalt bleibt in `gb_src` erhalten).
+## Stand & Grenzen (verifiziert 2026-06-10)
+
+- **Konsolen-Programme: laufen im Browser ✅.** Quelle tippen → *Ausführen* →
+  korrekte Ausgabe. gbrt kompiliert die `.gb`-Quelle **selbst im WASM**
+  (Front-End-Port) — kein Pyodide, kein vorab kompiliertes `.gbc`.
+- **Grafik-Programme: laufen im Browser ✅.** Der Render-Loop yieldet pro Frame
+  (ASYNCIFY-Yield in `flip()`, siehe oben) → animierte Demos im Canvas, der Tab
+  bleibt reaktionsfähig (im Browser per Preview geprüft: bewegtes Objekt +
+  hochzählender Frame-Counter, kein Einfrieren). Das Harness bleibt **hang-sicher**
+  (Einmal-Run-Flag `gb_run`), falls ein Programm doch eng-busy läuft.
+- **Teilbare Links ✅.** *Link teilen* base64url-kodiert die Quelle in den
+  URL-Hash (`#gb=…`, reine Client-JS, kein Backend). Ein geöffneter Link lädt die
+  Quelle in den Editor **und startet sie direkt** (frische Runtime). *Ausführen*
+  hält den Hash aktuell, sodass die URL jederzeit teilbar ist.
 - **Hardware-/Netz-Module** (`db/net/http/serial/usb/wifi/bt`) sind im
   Web-Build nicht verfügbar (nur `--features graphics`).
 - **Audio/Threads:** Web-Audio + Coroutinen-Threads brauchen ggf. zusätzliche
@@ -106,8 +117,7 @@ Main-Thread aber nicht blockieren. Zwei Wege:
 ## Nächste Schritte
 
 1. ~~Konsole im Browser~~ ✅ erledigt (Live-Editor, verifiziert).
-2. **Grafik:** gbrt unter `cfg(target_os="emscripten")` auf
-   `emscripten_set_main_loop` umbauen (pro Frame zurückkehren) statt
-   blockierendem Loop — dann animieren Grafik-Demos im Canvas, ohne den Tab zu
-   blockieren. Ggf. ASYNCIFY/`-fwasm-exceptions`-Konflikt auflösen
-   (`-C panic=abort` o. ä.).
+2. ~~Grafik im Browser~~ ✅ erledigt (ASYNCIFY-Yield in `flip()`, verifiziert).
+3. ~~Teilbare Links~~ ✅ erledigt (Quelle im URL-Hash).
+4. **Optional:** Web-Audio (`-s AUDIO_WORKLET`), Gamepad/Touch-Input fürs Handy,
+   eine kleine Beispiel-Galerie aus vorgefertigten Share-Links.

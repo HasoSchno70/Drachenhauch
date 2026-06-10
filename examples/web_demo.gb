@@ -1,0 +1,33 @@
+' web_demo.gb -- kleine animierte Grafik-Demo fuer den Web-Playground (WASM).
+' Zeigt, dass der Render-Loop im Browser laeuft (Bewegung + Farbe + Frame-Zaehler).
+SCREEN(480, 320, "GameBasic im Browser", 1)
+
+DIM x AS FLOAT
+DIM y AS FLOAT
+DIM vx AS FLOAT
+DIM vy AS FLOAT
+x = 240.0
+y = 160.0
+vx = 3.2
+vy = 2.4
+DIM t AS INTEGER
+t = 0
+
+WHILE NOT QUITREQUESTED()
+    x = x + vx
+    y = y + vy
+    IF x < 24.0 OR x > 456.0 THEN vx = -vx
+    IF y < 24.0 OR y > 296.0 THEN vy = -vy
+    t = t + 1
+
+    CLS(RGB(16, 18, 30))
+    ' regenbogenartiger Farbverlauf ueber die Zeit
+    DIM c AS INTEGER
+    c = RGB(128 + INT(120.0 * SIN(t / 30.0)), 90, 200)
+    BOX(INT(x) - 18, INT(y) - 18, INT(x) + 18, INT(y) + 18, c)
+    CIRCLE(INT(x), INT(y), 10, RGB(255, 255, 255))
+    TEXT(12, 12, "Frame " + STR$(t))
+    TEXT(12, 30, "GameBasic -> WebAssembly")
+    TEXT(12, 296, "laeuft im Browser, ohne den Tab einzufrieren")
+    FLIP()
+WEND

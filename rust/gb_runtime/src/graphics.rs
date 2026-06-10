@@ -13,6 +13,15 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use raylib::prelude::*;
+
+// Web (emscripten): yieldet ans Browser-Event-Loop. Mit `-s ASYNCIFY` (vom
+// build_wasm.py gesetzt) wickelt das den kompletten Rust-Stack ab und setzt ihn
+// beim naechsten Tick fort -- so kooperiert der blockierende GB-Render-Loop
+// (`WHILE ... FLIP() ... WEND`) mit dem Browser, statt den Tab einzufrieren.
+#[cfg(target_os = "emscripten")]
+extern "C" {
+    fn emscripten_sleep(ms: std::os::raw::c_uint);
+}
 use raylib::core::shaders::RaylibShader;   // get_shader_location auf Shader
 use raylib::core::texture::RaylibRenderTexture2D;   // .texture() auf RenderTexture2D
 
@@ -2632,6 +2641,13 @@ impl Graphics {
             let mut d = rl.begin_drawing(thread);
             render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
+        // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
+        // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
+        // GB-Render-Loop den Main-Thread und der Tab haengt. ASYNCIFY wickelt den
+        // Stack ab; beim naechsten Frame geht es hier weiter.
+        #[cfg(target_os = "emscripten")]
+        unsafe { emscripten_sleep(0); }
+
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
