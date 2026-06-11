@@ -3174,6 +3174,9 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "set_fullscreen" => { g!().set_fullscreen(gb(a, 0)); Value::Nil }
+            "mouse_visible" => { g!().mouse_visible(gb(a, 0)); Value::Nil }
+            "mouse_lock" => { g!().mouse_lock(gb(a, 0)); Value::Nil }
+            "mouse_hidden" => Value::Bool(g!().mouse_hidden()),
             "delta" => Value::Float(g!().delta()),
             "fps" => Value::Int(g!().fps()),
             "setfps" => { g!().set_target_fps(gi(a, 0, "SETFPS")?); Value::Nil }

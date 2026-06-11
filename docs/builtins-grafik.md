@@ -375,6 +375,9 @@ PLAYSOUND(coin_snd)
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |
 | `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt (0=links, 1=mitte, 2=rechts) |
 | `MOUSEWHEEL()` → INTEGER | Mausrad-Delta seit dem letzten Aufruf (+ hoch / − runter / 0) |
+| `MOUSE_VISIBLE(an)` | OS-Cursor zeigen/verstecken — verstecken, wenn das Spiel ein eigenes Fadenkreuz/Cursor-Sprite zeichnet |
+| `MOUSE_LOCK(an)` | Cursor **fangen**: verstecken + im Fenster einsperren (relative Bewegung) — für First-Person-/Kamera-Maussteuerung; `FALSE` gibt frei |
+| `MOUSE_HIDDEN()` → BOOLEAN | ist der Cursor gerade versteckt/gefangen? |
 | `SCREENWIDTH()`, `SCREENHEIGHT()` → INTEGER | logische Fenstergröße (wie an `SCREEN` übergeben); 0 vor `SCREEN` |
 
 **Tasten-Konstanten** (`KEY_*`) sind eingebaut:

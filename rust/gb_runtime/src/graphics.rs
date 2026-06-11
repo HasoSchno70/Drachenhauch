@@ -2410,6 +2410,21 @@ impl Graphics {
         if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
     }
 
+    /// MOUSE_VISIBLE(an) -- OS-Maus-Cursor zeigen/verstecken (Spiele mit
+    /// eigenem Fadenkreuz-/Cursor-Sprite verstecken ihn und zeichnen selbst).
+    pub fn mouse_visible(&mut self, v: bool) {
+        if v { self.rl.show_cursor(); } else { self.rl.hide_cursor(); }
+    }
+    /// MOUSE_LOCK(an) -- Cursor fangen: verstecken + im Fenster einsperren
+    /// (raylib DisableCursor, relative Bewegung). Fuer First-Person-/
+    /// Kamera-Maussteuerung; MOUSEX/Y laufen weiter mit. MOUSE_LOCK(FALSE)
+    /// gibt den Cursor frei und zeigt ihn wieder.
+    pub fn mouse_lock(&mut self, locked: bool) {
+        if locked { self.rl.disable_cursor(); } else { self.rl.enable_cursor(); }
+    }
+    /// MOUSE_HIDDEN() -- ist der Cursor gerade versteckt/gefangen?
+    pub fn mouse_hidden(&self) -> bool { self.rl.is_cursor_hidden() }
+
     // --- Natives OS-Fenster (das SCREEN-Fenster selbst) ---
     /// Das Programmfenster vom OS aus groessenveraenderbar machen (Default: aus).
     pub fn window_resizable(&mut self, f: bool) {

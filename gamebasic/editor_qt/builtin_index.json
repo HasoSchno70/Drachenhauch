@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 990,
+ "count": 993,
  "builtins": [
   {
    "name": "ABS",
@@ -2915,6 +2915,24 @@
    "kind": "graphics",
    "signature": "MOUSE_GROUND_Z(plane_y: Zahl) AS FLOAT",
    "module": "g3d"
+  },
+  {
+   "name": "MOUSE_HIDDEN",
+   "kind": "graphics",
+   "signature": "MOUSE_HIDDEN() AS BOOLEAN",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_LOCK",
+   "kind": "graphics",
+   "signature": "MOUSE_LOCK(an: BOOLEAN)",
+   "module": "core"
+  },
+  {
+   "name": "MOUSE_VISIBLE",
+   "kind": "graphics",
+   "signature": "MOUSE_VISIBLE(an: BOOLEAN)",
+   "module": "core"
   },
   {
    "name": "MOUSE_GROUND_HIT",

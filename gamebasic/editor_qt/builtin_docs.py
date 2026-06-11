@@ -70,6 +70,12 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "mousey":   ("MOUSEY() AS INTEGER", "Aktuelle Y-Position."),
     "mousebutton": ("MOUSEBUTTON(n) AS BOOLEAN", "n=0/1/2 (links/mitte/rechts)."),
     "mousewheel": ("MOUSEWHEEL() AS INTEGER", "Mausrad-Delta seit letztem Aufruf (+hoch/-runter)."),
+    "mouse_visible": ("MOUSE_VISIBLE(an)",
+                      "OS-Maus-Cursor zeigen/verstecken (fuer eigenes Fadenkreuz/Cursor-Sprite)."),
+    "mouse_lock": ("MOUSE_LOCK(an)",
+                   "Cursor fangen: verstecken + im Fenster einsperren (First-Person-Maussteuerung). "
+                   "FALSE gibt frei."),
+    "mouse_hidden": ("MOUSE_HIDDEN() AS BOOLEAN", "Ist der Cursor versteckt/gefangen?"),
     "screenwidth": ("SCREENWIDTH() AS INTEGER", "Logische Fensterbreite; 0 vor SCREEN."),
     "screenheight": ("SCREENHEIGHT() AS INTEGER", "Logische Fensterhoehe; 0 vor SCREEN."),
     "loadimage": ("LOADIMAGE(pfad) AS IMAGE", "Bild laden."),
