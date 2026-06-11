@@ -190,6 +190,13 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "audio_set_volume":         ("AUDIO_SET_VOLUME(ch, v)", "Channel-Lautstaerke setzen (Alias fuer AUDIO_VOLUME)."),
     "audio_get_volume":         ("AUDIO_GET_VOLUME(ch) AS FLOAT", "Aktuelle Lautstaerke."),
     "audio_pan":                ("AUDIO_PAN(ch, left, right)", "Stereo-Pan -- left/right je 0..1."),
+    "audio_pitch":              ("AUDIO_PITCH(ch, faktor)",
+                                  "Tonhoehe/Geschwindigkeit (1.0=normal, 2.0=Oktave hoeher). "
+                                  "Klassiker: pro Schuss leicht variieren (0.9 + RANDF()*0.2)."),
+    "audio_music_pitch":        ("AUDIO_MUSIC_PITCH(faktor)",
+                                  "Musik-Pitch (1.0=normal; ueberlebt LOAD/QUEUE). "
+                                  "Slow-Motion: zusammen mit der Spielzeit absenken."),
+    "audio_music_get_pitch":    ("AUDIO_MUSIC_GET_PITCH() AS FLOAT", "Aktueller Musik-Pitch."),
     "audio_pan_pos":            ("AUDIO_PAN_POS(ch, p)",
                                   "Stereo-Position direkt: 0=links, 0.5=Mitte, 1=rechts. "
                                   "Fasst nur das Pan an (Volume bleibt)."),

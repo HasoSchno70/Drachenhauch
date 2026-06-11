@@ -3510,6 +3510,18 @@ impl<'p> Vm<'p> {
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
+            "audio_pitch" => {
+                let i = gi(a, 0, "AUDIO_PITCH")?;
+                let f = need_f(a, 1, "AUDIO_PITCH")?;
+                if f <= 0.0 { return Err("AUDIO_PITCH: faktor muss > 0 sein".into()); }
+                self.audio_mut()?.ch_pitch(i, f)?; Value::Nil
+            }
+            "audio_music_pitch" => {
+                let f = need_f(a, 0, "AUDIO_MUSIC_PITCH")?;
+                if f <= 0.0 { return Err("AUDIO_MUSIC_PITCH: faktor muss > 0 sein".into()); }
+                self.audio_mut()?.music_set_pitch(f); Value::Nil
+            }
+            "audio_music_get_pitch" => Value::Float(self.audio_mut()?.music_get_pitch()),
             "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p)?; Value::Nil }
             "audio_pan_slide" => {
                 // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- Positionen 0=links..1=rechts

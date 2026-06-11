@@ -88,3 +88,23 @@ def test_pan_slide_validation(run_gb):
         'END TRY',
     ])
     assert "AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein" in run_gb(src)
+
+
+def test_pitch_validation(run_gb):
+    # faktor <= 0 wird im Wrapper (vor der Audio-Initialisierung) geprueft.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PITCH(0, 0.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_MUSIC_PITCH(-1.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_PITCH: faktor muss > 0 sein" in out
+    assert "AUDIO_MUSIC_PITCH: faktor muss > 0 sein" in out

@@ -42,6 +42,7 @@ Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man
 | `AUDIO_VOLUME(ch, vol)` | Lautstaerke 0..1 setzen |
 | `AUDIO_GET_VOLUME(ch)` → FLOAT | aktuelle Lautstaerke |
 | `AUDIO_PAN(ch, left_vol, right_vol)` | Stereo-Pan (beide 0..1) |
+| `AUDIO_PITCH(ch, faktor)` | Tonhoehe/Geschwindigkeit: 1.0 = normal, 2.0 = Oktave hoeher, 0.5 = tiefer |
 
 **Pause/Resume global:**
 
@@ -128,6 +129,8 @@ Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt st
 | `AUDIO_MUSIC_RESUME()` | weiter |
 | `AUDIO_MUSIC_VOLUME(vol)` | 0..1 |
 | `AUDIO_MUSIC_GET_VOLUME()` → FLOAT | aktuell |
+| `AUDIO_MUSIC_PITCH(faktor)` | Musik-Pitch (1.0 = normal; ueberlebt LOAD/QUEUE — Slow-Motion-Effekt) |
+| `AUDIO_MUSIC_GET_PITCH()` → FLOAT | aktueller Pitch |
 | `AUDIO_MUSIC_POSITION()` → FLOAT | Sekunden seit Start (von Position 0) |
 | `AUDIO_MUSIC_BUSY()` → BOOLEAN | Spielt gerade? |
 | `AUDIO_MUSIC_QUEUE(path$)` | naechster Track, sobald der aktuelle endet |
@@ -195,6 +198,14 @@ sfx_volume = 0.7
 SUB PlaySfx(s AS SOUND)
     AUDIO_PLAY(s, 0, sfx_volume)
 END SUB
+```
+
+**Pitch-Variation gegen Sound-Leiern** (derselbe Schuss klingt 100x anders):
+
+```basic
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(laser, 0, 0.7)
+AUDIO_PITCH(ch, 0.9 + RANDF() * 0.2)    ' +-10% Zufalls-Pitch
 ```
 
 **Sound-Cooldown gegen Spam:**

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 987,
+ "count": 990,
  "builtins": [
   {
    "name": "ABS",
@@ -273,6 +273,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_MUSIC_GET_PITCH",
+   "kind": "core",
+   "signature": "AUDIO_MUSIC_GET_PITCH() AS FLOAT",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_MUSIC_GET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_MUSIC_GET_VOLUME()",
@@ -288,6 +294,12 @@
    "name": "AUDIO_MUSIC_PAUSE",
    "kind": "core",
    "signature": "AUDIO_MUSIC_PAUSE()",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_MUSIC_PITCH",
+   "kind": "core",
+   "signature": "AUDIO_MUSIC_PITCH(faktor)",
    "module": "audio"
   },
   {
@@ -378,6 +390,12 @@
    "name": "AUDIO_PLAY",
    "kind": "core",
    "signature": "AUDIO_PLAY(1..4 Argumente)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PITCH",
+   "kind": "core",
+   "signature": "AUDIO_PITCH(ch, faktor)",
    "module": "audio"
   },
   {

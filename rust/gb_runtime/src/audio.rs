@@ -144,6 +144,7 @@ pub struct Audio {
     music_vol: f32,            // getracktes Music-Volume
     music_queue: Option<String>, // AUDIO_MUSIC_QUEUE -> bei Stream-Ende abspielen
     music_loops: i64,          // verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos (raylib-looping)
+    music_pitch: f32,          // getrackter Music-Pitch (ueberlebt LOAD/QUEUE)
     music_fade: Option<Fade>,
     music_paused: bool,        // AUDIO_MUSIC_PAUSE -- damit update() eine Pause nicht als Stream-Ende deutet
     ch_fade: Vec<Option<Fade>>, // pro Sound-Handle: laufender Fade (AUDIO_PLAY fade_in / AUDIO_STOP fade_out)
@@ -165,7 +166,7 @@ impl Audio {
         Ok(Audio {
             dev, sounds: Vec::new(), sound_vol: Vec::new(),
             music: None, music_vol: 1.0, music_queue: None,
-            music_loops: -1, music_fade: None, music_paused: false,
+            music_loops: -1, music_pitch: 1.0, music_fade: None, music_paused: false,
             ch_fade: Vec::new(), ch_loops: Vec::new(), ch_paused: Vec::new(),
             ch_pan_anim: Vec::new(),
             num_channels: 16,
@@ -275,6 +276,7 @@ impl Audio {
         let m = self.dev.new_music(path).map_err(|e| format!("PLAYMUSIC: {}", e))?;
         let v = volume.clamp(0.0, 1.0) as f32;
         m.set_volume(v);
+        m.set_pitch(self.music_pitch);
         m.play_stream();
         self.music = Some(m);
         self.music_vol = v;
@@ -358,6 +360,7 @@ impl Audio {
                 } else if let Some(path) = self.music_queue.take() {
                     if let Ok(nm) = self.dev.new_music(&path) {
                         nm.set_volume(self.music_vol);
+                        nm.set_pitch(self.music_pitch);
                         nm.play_stream();
                         self.music = Some(nm);
                         self.music_loops = -1;   // Queue-Track loopt (raylib-Default)
@@ -567,6 +570,14 @@ impl Audio {
         Ok(*self.sound_vol.get(idx as usize)
             .ok_or_else(|| format!("AUDIO_GET_VOLUME: ungueltiges Handle {}", idx))? as f64)
     }
+    /// AUDIO_PITCH(ch, faktor) -- Abspielgeschwindigkeit/Tonhoehe (1.0 =
+    /// normal, 2.0 = Oktave hoeher, 0.5 = Oktave tiefer). Wirkt sofort,
+    /// auch auf einen bereits spielenden Sound. Klassiker: pro Schuss
+    /// leicht variieren (0.9 + RANDF() * 0.2), damit nichts leiert.
+    pub fn ch_pitch(&self, idx: i64, factor: f64) -> Result<(), String> {
+        self.snd(idx, "AUDIO_PITCH")?.set_pitch(factor as f32);
+        Ok(())
+    }
     /// AUDIO_PAN(left,right) -> raylib hat nur (pan, volume). Naeherung:
     /// volume=max(l,r), pan=l-Anteil (raylib-Pan kann gespiegelt sein).
     pub fn ch_pan(&mut self, idx: i64, left: f64, right: f64) -> Result<(), String> {
@@ -642,6 +653,7 @@ impl Audio {
         if let Some(m) = self.music.take() { m.stop_stream(); }
         let m = self.dev.new_music(path).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
         m.set_volume(self.music_vol);
+        m.set_pitch(self.music_pitch);
         self.music = Some(m);
         self.music_queue = None;
         self.music_loops = -1;
@@ -710,6 +722,14 @@ impl Audio {
         if let Some(m) = &self.music { m.set_volume(vol); }
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
+    /// AUDIO_MUSIC_PITCH(faktor) -- Pitch des Musik-Streams (1.0 = normal).
+    /// Wird getrackt und ueberlebt AUDIO_MUSIC_LOAD/QUEUE (wie music_vol);
+    /// Slow-Motion-Effekt: Pitch zusammen mit der Spiel-Zeit absenken.
+    pub fn music_set_pitch(&mut self, factor: f64) {
+        self.music_pitch = factor as f32;
+        if let Some(m) = &self.music { m.set_pitch(self.music_pitch); }
+    }
+    pub fn music_get_pitch(&self) -> f64 { self.music_pitch as f64 }
     pub fn music_position(&self) -> f64 {
         match &self.music { Some(m) => m.get_time_played().max(0.0) as f64, None => 0.0 }
     }
