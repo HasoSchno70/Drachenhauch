@@ -1,7 +1,8 @@
-"""Konsolen-only Grafik-Stub fuer GameBasic (pygame ENTFERNT, Stufe A).
+"""Grafik-Daten-Stub fuer das Editor-Tooling (pygame ENTFERNT, Stufe A).
 
-Grafik/Audio laufen nur noch in der nativen Runtime gbrt; dieser Tree-Walker-
-Stub liefert lediglich Farb-/Tastenkonstanten und die Kamera-Mathematik. Die
+Grafik/Audio laufen ausschliesslich in der nativen Runtime gbrt (seit Stufe B
+der EINZIGE Ausfuehrungspfad). Dieses Modul liefert dem Python-Tooling
+(Editoren/LSP) nur noch Farb-/Tastenkonstanten und die Kamera-Mathematik. Die
 eigentlichen Zeichen-/Audio-Methoden werfen "nur in der nativen Runtime (gbrt)".
 
 Faerben werden als 24-Bit-RGB-INTEGERs uebergeben (0xRRGGBB). Das Modul stellt
@@ -84,35 +85,35 @@ def _rgb_tuple(color: int):
 
 
 # ---------------------------------------------------------------------------
-# Konsolen-only Stub. Die Grafik-/Audio-Engine lebt seit dem gbrt-Umstieg in
-# der nativen Runtime (Rust/raylib); der Tree-Walker (F5-Fallback, Profiler,
-# Debugger, --bench, Test-Referenz) ist nur noch Konsolen-/Referenzpfad. pygame
-# wurde entfernt. COLORS/KEYS (oben) bleiben reine Daten; die Graphics-Klasse
-# ist konstruierbar (Kamera-Mathematik), wirft aber bei jedem Draw-/Audio-/
-# Bild-/Font-Zugriff eine klare "nur in gbrt"-Meldung.
+# Daten-Stub. Die Grafik-/Audio-Engine lebt in der nativen Runtime gbrt
+# (Rust/raylib) -- Tree-Walker und Python-Toolchain wurden mit Stufe B
+# geloescht; Python ist nur noch Editor-/LSP-Tooling. COLORS/KEYS (oben)
+# bleiben reine Daten; die Graphics-Klasse ist konstruierbar (Kamera-
+# Mathematik fuers Tooling), wirft aber bei jedem Draw-/Audio-/Bild-/
+# Font-Zugriff eine klare "nur in gbrt"-Meldung.
 # ---------------------------------------------------------------------------
 
 
 def _native_only(op: str = "Grafik"):
     raise GBRuntimeError(
-        f"{op}: Grafik/Audio laeuft nur in der nativen Runtime (gbrt) -- per F6 "
-        f"bzw. 'gbrun.py --native' starten. Der Tree-Walker (F5/Profiler/Debugger) "
-        f"ist konsolen-only.")
+        f"{op}: Grafik/Audio laeuft nur in der nativen Runtime (gbrt) -- "
+        f"Programme per 'gbrun.py datei.gb' bzw. 'gbrt run datei.gb' starten. "
+        f"Dieser Python-Stub dient nur dem Editor-Tooling.")
 
 
 class Graphics:
-    """Konsolen-only Stub des frueheren pygame-Wrappers.
+    """Daten-Stub des frueheren pygame-Wrappers.
 
-    Konstruierbar, damit Konsolen-Programme + Kamera-Mathematik (CAMERA_*) ohne
-    Fenster laufen. Jeder andere Zugriff (Draw/Audio/Image/Font/Layer/...) wird
-    von __getattr__ als native-only abgewiesen.
+    Konstruierbar, damit das Editor-Tooling die Kamera-Mathematik (CAMERA_*)
+    ohne Fenster nutzen kann. Jeder andere Zugriff (Draw/Audio/Image/Font/
+    Layer/...) wird von __getattr__ als native-only abgewiesen.
     """
 
     def __init__(self):
         self._cam_x = 0.0
         self._cam_y = 0.0
         self._cam_zoom = 1.0
-        self._gb_engine = None      # vom Interpreter gesetzt
+        self._gb_engine = None      # historischer Slot (war vom Tree-Walker gesetzt)
 
     # ---- Kamera: reine Mathematik, kein Fenster noetig ----------------
     def set_camera(self, x, y, zoom=1.0):
