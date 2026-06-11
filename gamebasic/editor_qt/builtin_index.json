@@ -1,18 +1,18 @@
 {
- "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Generiert aus der Builtin-Registry-Union (Stufe B Phase 2); ersetzt den Laufzeit-Import von interpreter.py. Regenerieren solange interpreter.py + modules existieren; danach von Hand pflegen bzw. via gbrt --list-builtins.",
- "count": 920,
+ "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
+ "count": 976,
  "builtins": [
   {
    "name": "ABS",
    "kind": "core",
    "signature": "ABS(v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ACOS",
    "kind": "core",
    "signature": "ACOS(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ALPHA",
@@ -24,7 +24,7 @@
    "name": "ARC",
    "kind": "graphics",
    "signature": "ARC(6..8 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ARRAY_AVG",
@@ -48,7 +48,7 @@
    "name": "ARRAY_INDEXOF",
    "kind": "core",
    "signature": "ARRAY_INDEXOF(arr: ?, value: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ARRAY_INSERT",
@@ -96,13 +96,13 @@
    "name": "ASC",
    "kind": "core",
    "signature": "ASC(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ASIN",
    "kind": "core",
    "signature": "ASIN(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ASTAR_CLEAR",
@@ -204,31 +204,31 @@
    "name": "ATAN",
    "kind": "core",
    "signature": "ATAN(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ATAN2",
    "kind": "core",
    "signature": "ATAN2(y: Zahl, x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ATLAS_DRAW",
    "kind": "graphics",
    "signature": "ATLAS_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ATLAS_DRAW_FLIPPED",
    "kind": "graphics",
    "signature": "ATLAS_DRAW_FLIPPED(4..6 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ATLAS_LOAD",
    "kind": "graphics",
    "signature": "ATLAS_LOAD(path: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "AUDIO_BUSY_CHANNELS",
@@ -420,13 +420,13 @@
    "name": "BATCH_DRAW",
    "kind": "graphics",
    "signature": "BATCH_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BATCH_FLUSH",
    "kind": "graphics",
    "signature": "BATCH_FLUSH()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BILLBOARD",
@@ -444,31 +444,31 @@
    "name": "BLEND_MODE",
    "kind": "graphics",
    "signature": "BLEND_MODE(name: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BLUE",
    "kind": "core",
    "signature": "BLUE(c: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BOX",
    "kind": "graphics",
    "signature": "BOX(4..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BOXES",
    "kind": "graphics",
    "signature": "BOXES(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BOXROUND",
    "kind": "graphics",
    "signature": "BOXROUND(5..6 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BT_CHARACTERISTICS",
@@ -618,7 +618,7 @@
    "name": "CEIL",
    "kind": "core",
    "signature": "CEIL(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CHAR_FACING",
@@ -768,73 +768,73 @@
    "name": "CHOICE",
    "kind": "core",
    "signature": "CHOICE(arr)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CHR",
    "kind": "core",
    "signature": "CHR$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CHR$",
    "kind": "core",
    "signature": "CHR$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CIRCLE",
    "kind": "graphics",
    "signature": "CIRCLE(3..4 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CIRCLES",
    "kind": "graphics",
    "signature": "CIRCLES(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLAMP",
    "kind": "core",
    "signature": "CLAMP(v: Zahl, lo: Zahl, hi: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLIPBOARD_GET",
    "kind": "graphics",
    "signature": "CLIPBOARD_GET(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLIPBOARD_SET",
    "kind": "graphics",
    "signature": "CLIPBOARD_SET(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLOSEFILE",
    "kind": "core",
    "signature": "CLOSEFILE(f)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLS",
    "kind": "graphics",
    "signature": "CLS(0..1 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "COLLIDES",
    "kind": "core",
    "signature": "COLLIDES(x1: Zahl, y1: Zahl, w1: Zahl, h1: Zahl, x2: Zahl, y2: Zahl, w2: Zahl, h2: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "COLOR_LERP",
    "kind": "core",
    "signature": "COLOR_LERP(c1: INTEGER, c2: INTEGER, t: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CONTAINS",
@@ -846,37 +846,37 @@
    "name": "CORO_CLOSE",
    "kind": "core",
    "signature": "CORO_CLOSE(c: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CORO_DONE",
    "kind": "core",
    "signature": "CORO_DONE(c: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CORO_RESULT",
    "kind": "core",
    "signature": "CORO_RESULT(c: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CORO_RESUME",
    "kind": "core",
    "signature": "CORO_RESUME(c: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CORO_SEND",
    "kind": "core",
    "signature": "CORO_SEND(c: ?, value: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "COS",
    "kind": "core",
    "signature": "COS(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CUBE",
@@ -948,13 +948,13 @@
    "name": "DATE",
    "kind": "core",
    "signature": "DATE$()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DATE$",
    "kind": "core",
    "signature": "DATE$()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DB_BEGIN",
@@ -1062,7 +1062,7 @@
    "name": "DEG",
    "kind": "core",
    "signature": "DEG(rad: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DELETEFILE",
@@ -1074,19 +1074,19 @@
    "name": "DELTA",
    "kind": "graphics",
    "signature": "DELTA()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DIMCOUNT",
    "kind": "core",
    "signature": "DIMCOUNT(arr)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DIMSIZE",
    "kind": "core",
    "signature": "DIMSIZE(arr, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DIREXISTS",
@@ -1104,31 +1104,31 @@
    "name": "DRAWIMAGE",
    "kind": "graphics",
    "signature": "DRAWIMAGE(img, x, y)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DRAWIMAGEROT",
    "kind": "graphics",
    "signature": "DRAWIMAGEROT(img, x, y, angle_deg [, scale [, tint]])",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DRAWIMAGEFLIPPED",
    "kind": "graphics",
    "signature": "DRAWIMAGEFLIPPED(3..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DRAWIMAGEPART",
    "kind": "graphics",
    "signature": "DRAWIMAGEPART(img, sx, sy, sw, sh, x, y)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DRAWTILEMAP",
    "kind": "graphics",
    "signature": "DRAWTILEMAP(tileset, map_arr, tw, th, sx, sy)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ECS_ADD_BOOL",
@@ -1326,19 +1326,19 @@
    "name": "ELLIPSE",
    "kind": "graphics",
    "signature": "ELLIPSE(4..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ELLIPSEOUTLINE",
    "kind": "graphics",
    "signature": "ELLIPSEOUTLINE(4..6 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ENDOFFILE",
    "kind": "core",
    "signature": "ENDOFFILE(f)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ENDSWITH",
@@ -1350,13 +1350,13 @@
    "name": "EXP",
    "kind": "core",
    "signature": "EXP(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FILEEXISTS",
    "kind": "core",
    "signature": "FILEEXISTS(p: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FILESIZE",
@@ -1368,91 +1368,91 @@
    "name": "FILES_DROPPED",
    "kind": "graphics",
    "signature": "FILES_DROPPED(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FILE_DROPPED",
    "kind": "graphics",
    "signature": "FILE_DROPPED(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FLIP",
    "kind": "graphics",
    "signature": "FLIP()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FLOOR",
    "kind": "core",
    "signature": "FLOOR(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FORMAT$",
    "kind": "core",
    "signature": "FORMAT$(value, mask)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FPS",
    "kind": "graphics",
    "signature": "FPS()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FRAC",
    "kind": "core",
    "signature": "FRAC(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GENTEX_CHECKED",
    "kind": "graphics",
    "signature": "GENTEX_CHECKED(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GENTEX_COLOR",
    "kind": "graphics",
    "signature": "GENTEX_COLOR(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GENTEX_RADIAL",
    "kind": "graphics",
    "signature": "GENTEX_RADIAL(w, h, inner_color, outer_color [, density])",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GENTEX_GRADIENT",
    "kind": "graphics",
    "signature": "GENTEX_GRADIENT(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GENTEX_PERLIN",
    "kind": "graphics",
    "signature": "GENTEX_PERLIN(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GRADIENTH",
    "kind": "graphics",
    "signature": "GRADIENTH(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GRADIENTV",
    "kind": "graphics",
    "signature": "GRADIENTV(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GREEN",
    "kind": "core",
    "signature": "GREEN(c: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GRID3D",
@@ -1722,19 +1722,19 @@
    "name": "HEX",
    "kind": "core",
    "signature": "HEX$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "HEX$",
    "kind": "core",
    "signature": "HEX$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "HSV",
    "kind": "core",
    "signature": "HSV(h: Zahl, s: Zahl, v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "HTML_FIND_ALL",
@@ -1788,19 +1788,19 @@
    "name": "HYPOT",
    "kind": "core",
    "signature": "HYPOT(x: Zahl, y: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "IMAGEHEIGHT",
    "kind": "graphics",
    "signature": "IMAGEHEIGHT(img)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "IMAGEWIDTH",
    "kind": "graphics",
    "signature": "IMAGEWIDTH(img)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "IMAGE_COPY",
@@ -1836,7 +1836,7 @@
    "name": "INKEY$",
    "kind": "graphics",
    "signature": "INKEY$()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "INPUT_AXIS",
@@ -1914,13 +1914,13 @@
    "name": "INSTR",
    "kind": "core",
    "signature": "INSTR(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "INT",
    "kind": "core",
    "signature": "INT(v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ISNUMERIC",
@@ -1932,55 +1932,55 @@
    "name": "IS_NIL",
    "kind": "core",
    "signature": "IS_NIL(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOIN",
    "kind": "core",
    "signature": "JOIN$(arr, delim)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOIN$",
    "kind": "core",
    "signature": "JOIN$(arr, delim)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_AXIS",
    "kind": "graphics",
    "signature": "JOYSTICK_AXIS(idx: Zahl, axis: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_BUTTON",
    "kind": "graphics",
    "signature": "JOYSTICK_BUTTON(idx: Zahl, btn: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_COUNT",
    "kind": "graphics",
    "signature": "JOYSTICK_COUNT()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_HAT_X",
    "kind": "graphics",
    "signature": "JOYSTICK_HAT_X(idx: Zahl, hat: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_HAT_Y",
    "kind": "graphics",
    "signature": "JOYSTICK_HAT_Y(idx: Zahl, hat: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JOYSTICK_NAME",
    "kind": "graphics",
    "signature": "JOYSTICK_NAME(idx: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "JSON_GET_BOOL",
@@ -2052,55 +2052,55 @@
    "name": "KEYPRESSED",
    "kind": "graphics",
    "signature": "KEYPRESSED(code: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LAYER",
    "kind": "graphics",
    "signature": "LAYER(name: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LAYER_CLEAR",
    "kind": "graphics",
    "signature": "LAYER_CLEAR(name: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LAYER_DEFINE",
    "kind": "graphics",
    "signature": "LAYER_DEFINE(name: STRING, z: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LAYER_END",
    "kind": "graphics",
    "signature": "LAYER_END()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LEFT",
    "kind": "core",
    "signature": "LEFT$(s, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LEFT$",
    "kind": "core",
    "signature": "LEFT$(s, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LEN",
    "kind": "core",
    "signature": "LEN(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LERP",
    "kind": "core",
    "signature": "LERP(a: Zahl, b: Zahl, t: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LIGHT_AMBIENT",
@@ -2166,7 +2166,7 @@
    "name": "LINE",
    "kind": "graphics",
    "signature": "LINE(4..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LINE3D",
@@ -2178,25 +2178,25 @@
    "name": "LINES",
    "kind": "graphics",
    "signature": "LINES(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LINEW",
    "kind": "graphics",
    "signature": "LINEW(5..6 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOADFONT",
    "kind": "graphics",
    "signature": "LOADFONT(path: STRING, size: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOADIMAGE",
    "kind": "graphics",
    "signature": "LOADIMAGE(path: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOADMODEL",
@@ -2208,31 +2208,31 @@
    "name": "LOADSOUND",
    "kind": "graphics",
    "signature": "LOADSOUND(path: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOAD_ASSETS",
    "kind": "graphics",
    "signature": "LOAD_ASSETS(manifest_path: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOG",
    "kind": "core",
    "signature": "LOG(1..2 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOWER",
    "kind": "core",
    "signature": "LOWER$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOWER$",
    "kind": "core",
    "signature": "LOWER$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LTRIM$",
@@ -2244,67 +2244,67 @@
    "name": "MAPCLEAR",
    "kind": "core",
    "signature": "MAPCLEAR(m)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPGET",
    "kind": "core",
    "signature": "MAPGET(m, k)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPGETOR",
    "kind": "core",
    "signature": "MAPGETOR(m, k, default)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPHAS",
    "kind": "core",
    "signature": "MAPHAS(m, k)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPITEMS",
    "kind": "core",
    "signature": "MAPITEMS(m)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPKEYS",
    "kind": "core",
    "signature": "MAPKEYS(m)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPPUT",
    "kind": "core",
    "signature": "MAPPUT(m, k, v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPREMOVE",
    "kind": "core",
    "signature": "MAPREMOVE(m, k)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPSIZE",
    "kind": "core",
    "signature": "MAPSIZE(m)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAPVALUES",
    "kind": "core",
    "signature": "MAPVALUES(m)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MAX",
    "kind": "core",
    "signature": "MAX(1+ Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MESH_CUBE",
@@ -2352,25 +2352,25 @@
    "name": "MID",
    "kind": "core",
    "signature": "MID$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MID$",
    "kind": "core",
    "signature": "MID$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MILLIS",
    "kind": "core",
    "signature": "MILLIS()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MIN",
    "kind": "core",
    "signature": "MIN(1+ Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MKDIR",
@@ -2425,25 +2425,25 @@
    "name": "MOUSEBUTTON",
    "kind": "graphics",
    "signature": "MOUSEBUTTON(n: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MOUSEWHEEL",
    "kind": "graphics",
    "signature": "MOUSEWHEEL()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MOUSEX",
    "kind": "graphics",
    "signature": "MOUSEX()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MOUSEY",
    "kind": "graphics",
    "signature": "MOUSEY()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "NET_CLOSE",
@@ -2569,31 +2569,31 @@
    "name": "OPENFILE",
    "kind": "core",
    "signature": "OPENFILE(path: STRING, mode: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PADL",
    "kind": "core",
    "signature": "PADL$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PADL$",
    "kind": "core",
    "signature": "PADL$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PADR",
    "kind": "core",
    "signature": "PADR$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PADR$",
    "kind": "core",
    "signature": "PADR$(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PARTICLE_CLEAR",
@@ -2901,25 +2901,25 @@
    "name": "PLAYMUSIC",
    "kind": "graphics",
    "signature": "PLAYMUSIC(1..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PLAYSOUND",
    "kind": "graphics",
    "signature": "PLAYSOUND(1..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PLOT",
    "kind": "graphics",
    "signature": "PLOT(2..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PLOTS",
    "kind": "graphics",
    "signature": "PLOTS(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "POINT3D",
@@ -2931,61 +2931,61 @@
    "name": "POLYGON",
    "kind": "graphics",
    "signature": "POLYGON(1..2 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "POLYGONOUTLINE",
    "kind": "graphics",
    "signature": "POLYGONOUTLINE(1..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "POSTFX",
    "kind": "graphics",
    "signature": "POSTFX(h: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "POW",
    "kind": "core",
    "signature": "POW(base: Zahl, exponent: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "QUITREQUESTED",
    "kind": "graphics",
    "signature": "QUITREQUESTED()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RAD",
    "kind": "core",
    "signature": "RAD(deg: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RANDF",
    "kind": "core",
    "signature": "RANDF(lo: Zahl, hi: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RANDINT",
    "kind": "core",
    "signature": "RANDINT(lo: INTEGER, hi: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RANDOMIZE",
    "kind": "core",
    "signature": "RANDOMIZE(0..1 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RANGE",
    "kind": "core",
    "signature": "RANGE(1..3 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RAY_HIT_BOX",
@@ -3003,19 +3003,19 @@
    "name": "READALL",
    "kind": "core",
    "signature": "READALL$(f)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "READALL$",
    "kind": "core",
    "signature": "READALL$(f)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "READLINE",
    "kind": "core",
    "signature": "READLINE(f)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "READLINES",
@@ -3027,19 +3027,19 @@
    "name": "RECT",
    "kind": "graphics",
    "signature": "RECT(4..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RECTROUND",
    "kind": "graphics",
    "signature": "RECTROUND(5..6 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RED",
    "kind": "core",
    "signature": "RED(c: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REDIM",
@@ -3093,7 +3093,7 @@
    "name": "REMAP",
    "kind": "core",
    "signature": "REMAP(v: Zahl, in_lo: Zahl, in_hi: Zahl, out_lo: Zahl, out_hi: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RENAME",
@@ -3105,49 +3105,49 @@
    "name": "RENDERTARGET_BEGIN",
    "kind": "graphics",
    "signature": "RENDERTARGET_BEGIN(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RENDERTARGET_DRAW",
    "kind": "graphics",
    "signature": "RENDERTARGET_DRAW(3..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RENDERTARGET_END",
    "kind": "graphics",
    "signature": "RENDERTARGET_END(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RENDERTARGET_NEW",
    "kind": "graphics",
    "signature": "RENDERTARGET_NEW(*args)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REPEAT$",
    "kind": "core",
    "signature": "REPEAT$(s, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REPLACE",
    "kind": "core",
    "signature": "REPLACE$(s: STRING, old: STRING, new: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REPLACE$",
    "kind": "core",
    "signature": "REPLACE$(s: STRING, old: STRING, new: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REVERSE",
    "kind": "core",
    "signature": "REVERSE(arr)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "REVERSE$",
@@ -3159,7 +3159,7 @@
    "name": "RGB",
    "kind": "core",
    "signature": "RGB(r: INTEGER, g: INTEGER, b: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RGBA",
@@ -3171,25 +3171,25 @@
    "name": "RIGHT",
    "kind": "core",
    "signature": "RIGHT$(s, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RIGHT$",
    "kind": "core",
    "signature": "RIGHT$(s, n)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RND",
    "kind": "core",
    "signature": "RND(0..1 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ROUND",
    "kind": "core",
    "signature": "ROUND(1..2 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "RTRIM$",
@@ -3201,7 +3201,7 @@
    "name": "SAVESCREENSHOT",
    "kind": "graphics",
    "signature": "SAVESCREENSHOT(path: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SAVE_CLEAR",
@@ -3477,25 +3477,25 @@
    "name": "SCREEN",
    "kind": "graphics",
    "signature": "SCREEN(2..5 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SCREENHEIGHT",
    "kind": "graphics",
    "signature": "SCREENHEIGHT()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SCREENWIDTH",
    "kind": "graphics",
    "signature": "SCREENWIDTH()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SCROLL",
    "kind": "graphics",
    "signature": "SCROLL(dx: Zahl, dy: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SERIAL_AVAILABLE",
@@ -3561,25 +3561,25 @@
    "name": "SETFONT",
    "kind": "graphics",
    "signature": "SETFONT(handle: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SETFPS",
    "kind": "graphics",
    "signature": "SETFPS(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SETWINDOWTITLE",
    "kind": "graphics",
    "signature": "SETWINDOWTITLE(title: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SET_FULLSCREEN",
    "kind": "graphics",
    "signature": "SET_FULLSCREEN(fs: BOOLEAN)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "WINDOW_RESIZABLE",
@@ -3633,25 +3633,25 @@
    "name": "SHADER_LOAD",
    "kind": "graphics",
    "signature": "SHADER_LOAD(src: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SHADER_SET",
    "kind": "graphics",
    "signature": "SHADER_SET(h: INTEGER, name: STRING, v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SHADER_SET2",
    "kind": "graphics",
    "signature": "SHADER_SET2(h: INTEGER, name: STRING, x: Zahl, y: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SHADER_SET3",
    "kind": "graphics",
    "signature": "SHADER_SET3(h: INTEGER, name: STRING, x: Zahl, y: Zahl, z: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SHADOW_AREA",
@@ -3675,19 +3675,19 @@
    "name": "SHUFFLE",
    "kind": "core",
    "signature": "SHUFFLE(arr)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SIGN",
    "kind": "core",
    "signature": "SIGN(v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SIN",
    "kind": "core",
    "signature": "SIN(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SKYBOX",
@@ -3699,25 +3699,25 @@
    "name": "SLEEP",
    "kind": "graphics",
    "signature": "SLEEP(ms: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SORT",
    "kind": "core",
    "signature": "SORT(arr)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SPACE",
    "kind": "core",
    "signature": "SPACE$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SPACE$",
    "kind": "core",
    "signature": "SPACE$(n: INTEGER)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SPHERE",
@@ -3735,19 +3735,19 @@
    "name": "SPLINE",
    "kind": "graphics",
    "signature": "SPLINE(2..4 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SPLIT",
    "kind": "core",
    "signature": "SPLIT$(s: STRING, delim: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SPLIT$",
    "kind": "core",
    "signature": "SPLIT$(s: STRING, delim: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ANIM_FSM_LOAD",
@@ -3969,7 +3969,7 @@
    "name": "SQR",
    "kind": "core",
    "signature": "SQR(v: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SQRT",
@@ -3987,73 +3987,73 @@
    "name": "STOPMUSIC",
    "kind": "graphics",
    "signature": "STOPMUSIC()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "STOPSOUND",
    "kind": "graphics",
    "signature": "STOPSOUND(s)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "STR",
    "kind": "core",
    "signature": "STR$(v: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "STR$",
    "kind": "core",
    "signature": "STR$(v: ?)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TAN",
    "kind": "core",
    "signature": "TAN(x: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT",
    "kind": "graphics",
    "signature": "TEXT(3..4 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_BOLD",
    "kind": "graphics",
    "signature": "TEXT_BOLD(on: BOOLEAN)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_HEIGHT",
    "kind": "graphics",
    "signature": "TEXT_HEIGHT()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_ITALIC",
    "kind": "graphics",
    "signature": "TEXT_ITALIC(on: BOOLEAN)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_SIZE",
    "kind": "graphics",
    "signature": "TEXT_SIZE(size: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_SPACING",
    "kind": "graphics",
    "signature": "TEXT_SPACING(px: Zahl)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TEXT_WIDTH",
    "kind": "graphics",
    "signature": "TEXT_WIDTH(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TILED_COUNT_GID",
@@ -4299,43 +4299,43 @@
    "name": "TIME",
    "kind": "core",
    "signature": "TIME$()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TIME$",
    "kind": "core",
    "signature": "TIME$()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TIMER",
    "kind": "graphics",
    "signature": "TIMER()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TRIANGLE",
    "kind": "graphics",
    "signature": "TRIANGLE(6..7 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TRIANGLEOUTLINE",
    "kind": "graphics",
    "signature": "TRIANGLEOUTLINE(6..8 Argumente)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TRIM",
    "kind": "core",
    "signature": "TRIM$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TRIM$",
    "kind": "core",
    "signature": "TRIM$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TRYVAL",
@@ -4545,13 +4545,13 @@
    "name": "UPPER",
    "kind": "core",
    "signature": "UPPER$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "UPPER$",
    "kind": "core",
    "signature": "UPPER$(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "URL_DECODE",
@@ -4623,7 +4623,7 @@
    "name": "VAL",
    "kind": "core",
    "signature": "VAL(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "VEC2_ANGLE",
@@ -4719,7 +4719,7 @@
    "name": "WAITKEY",
    "kind": "graphics",
    "signature": "WAITKEY()",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "WIFI_AVAILABLE",
@@ -4773,7 +4773,7 @@
    "name": "WRITE",
    "kind": "core",
    "signature": "WRITE(f, text)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "WRITEALL",
@@ -4785,25 +4785,25 @@
    "name": "WRITELINE",
    "kind": "core",
    "signature": "WRITELINE(f, text)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "__COMP_ITER",
    "kind": "core",
    "signature": "__COMP_ITER(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "__DICT_FROM_PAIRS",
    "kind": "core",
    "signature": "__DICT_FROM_PAIRS(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "__SET_DEDUP",
    "kind": "core",
    "signature": "__SET_DEDUP(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "VEC3_NEW",
@@ -5187,169 +5187,169 @@
    "name": "WRAP",
    "kind": "core",
    "signature": "WRAP(v, lo, hi)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "PINGPONG",
    "kind": "core",
    "signature": "PINGPONG(t, len)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "MOVETOWARD",
    "kind": "core",
    "signature": "MOVETOWARD(cur, ziel, maxdelta)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "SMOOTHSTEP",
    "kind": "core",
    "signature": "SMOOTHSTEP(edge0, edge1, x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CLAMP01",
    "kind": "core",
    "signature": "CLAMP01(v)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "APPROX",
    "kind": "core",
    "signature": "APPROX(a, b [, eps])",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "LOG10",
    "kind": "core",
    "signature": "LOG10(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "NOISE",
    "kind": "core",
    "signature": "NOISE(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "NOISE2",
    "kind": "core",
    "signature": "NOISE2(x, y)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "NOISE3",
    "kind": "core",
    "signature": "NOISE3(x, y, z)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FBM",
    "kind": "core",
    "signature": "FBM(x, y, octaves)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "FBM3",
    "kind": "core",
    "signature": "FBM3(x, y, z, octaves)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TYPEOF",
    "kind": "core",
    "signature": "TYPEOF(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ISNUM",
    "kind": "core",
    "signature": "ISNUM(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ISINT",
    "kind": "core",
    "signature": "ISINT(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ISSTR",
    "kind": "core",
    "signature": "ISSTR(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "ISBOOL",
    "kind": "core",
    "signature": "ISBOOL(x)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BASE64_ENCODE",
    "kind": "core",
    "signature": "BASE64_ENCODE(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BASE64_DECODE",
    "kind": "core",
    "signature": "BASE64_DECODE(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "CRC32",
    "kind": "core",
    "signature": "CRC32(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "HASH",
    "kind": "core",
    "signature": "HASH(s: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "COPYFILE",
    "kind": "core",
    "signature": "COPYFILE(src, dst)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "APPENDFILE",
    "kind": "core",
    "signature": "APPENDFILE(p: STRING, text: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "BASENAME",
    "kind": "core",
    "signature": "BASENAME(p: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "DIRNAME",
    "kind": "core",
    "signature": "DIRNAME(p: STRING)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "COUNT",
    "kind": "core",
    "signature": "COUNT(text$, teil$)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "TITLE$",
    "kind": "core",
    "signature": "TITLE$(s$)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "WEIGHTED_CHOICE",
    "kind": "core",
    "signature": "WEIGHTED_CHOICE(werte, gewichte)",
-   "module": "interpreter"
+   "module": "core"
   },
   {
    "name": "GUI_SET_BOUNDS",

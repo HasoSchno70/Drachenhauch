@@ -115,7 +115,7 @@ class BuiltinsPanel(QWidget):
                 continue
             kind = e.get("kind", "core")
             mod = e.get("module") or "core"
-            if mod in ("interpreter", "gbrt", "core", ""):
+            if mod in ("gbrt", "core", ""):
                 group = "grafik" if kind == "graphics" else "standard"
             else:
                 group = mod

@@ -34,6 +34,6 @@ def test_signature_lookup():
 
 def test_by_module_grouping():
     groups = gbrt_meta.by_module()
-    assert "interpreter" in groups              # Core-Builtins
+    assert "core" in groups                     # Core-Builtins (kein IMPORT)
     # Modul-Builtins sind nach ihrem Modul gruppiert (z.B. g3d, json, vec2).
     assert any(m in groups for m in ("g3d", "json", "vec2"))
