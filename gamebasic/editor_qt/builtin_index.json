@@ -287,7 +287,7 @@
   {
    "name": "AUDIO_MUSIC_PLAY",
    "kind": "core",
-   "signature": "AUDIO_MUSIC_PLAY(0..2 Argumente)",
+   "signature": "AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])",
    "module": "audio"
   },
   {
@@ -317,7 +317,7 @@
   {
    "name": "AUDIO_MUSIC_STOP",
    "kind": "core",
-   "signature": "AUDIO_MUSIC_STOP(0..1 Argumente)",
+   "signature": "AUDIO_MUSIC_STOP([fade_out_ms])",
    "module": "audio"
   },
   {

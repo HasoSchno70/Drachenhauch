@@ -91,15 +91,15 @@ Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt st
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_MUSIC_LOAD(path$)` | Track laden (laeuft noch nicht) |
-| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])` | start (loops = -1 = endlos) |
-| `AUDIO_MUSIC_STOP([fade_out_ms])` | stoppen, optional fade |
+| `AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])` | start (loops = -1 = endlos = Default; loops = N → N+1 Durchlaeufe) |
+| `AUDIO_MUSIC_STOP([fade_out_ms])` | stoppen, optional ausfaden (nicht-blockierend) |
 | `AUDIO_MUSIC_PAUSE()` | pausieren |
 | `AUDIO_MUSIC_RESUME()` | weiter |
 | `AUDIO_MUSIC_VOLUME(vol)` | 0..1 |
 | `AUDIO_MUSIC_GET_VOLUME()` → FLOAT | aktuell |
 | `AUDIO_MUSIC_POSITION()` → FLOAT | Sekunden seit Start (von Position 0) |
 | `AUDIO_MUSIC_BUSY()` → BOOLEAN | Spielt gerade? |
-| `AUDIO_MUSIC_QUEUE(path$)` | naechster Track nach Ende (auto-fade) |
+| `AUDIO_MUSIC_QUEUE(path$)` | naechster Track, sobald der aktuelle endet |
 
 **Crossfade zwischen Tracks:**
 
@@ -107,8 +107,13 @@ Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt st
 AUDIO_MUSIC_LOAD("music/level1.ogg")
 AUDIO_MUSIC_PLAY(-1, 1000)              ' fade-in 1s, loop
 
-' Beim Boss-Eingang:
+' Beim Boss-Eingang: ausfaden lassen, dann wechseln. Der Fade laeuft
+' nicht-blockierend im Game-Loop (FLIP treibt ihn) -- ein sofortiges
+' AUDIO_MUSIC_LOAD wuerde ihn hart abschneiden.
 AUDIO_MUSIC_STOP(800)                   ' fade-out 800ms
+WHILE AUDIO_MUSIC_BUSY()
+    FLIP()                              ' Frames weiterlaufen lassen
+WEND
 AUDIO_MUSIC_LOAD("music/boss.ogg")
 AUDIO_MUSIC_PLAY(-1, 800)
 ```

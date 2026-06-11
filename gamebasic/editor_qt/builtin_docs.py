@@ -192,8 +192,11 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "audio_pan":                ("AUDIO_PAN(ch, left, right)", "Stereo-Pan -- left/right je 0..1."),
     "audio_music_load":         ("AUDIO_MUSIC_LOAD(path)", "Musik laden (streamt vom File)."),
     "audio_music_play":         ("AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])",
-                                  "Musik starten. loops=-1 bedeutet endlos."),
-    "audio_music_stop":         ("AUDIO_MUSIC_STOP([fade_out_ms])", "Musik stoppen."),
+                                  "Musik starten. loops=-1 bedeutet endlos (Default), "
+                                  "loops=N spielt N+1 Durchlaeufe; fade_in_ms blendet ein."),
+    "audio_music_stop":         ("AUDIO_MUSIC_STOP([fade_out_ms])",
+                                  "Musik stoppen, optional ausfaden (nicht-blockierend; "
+                                  "AUDIO_MUSIC_BUSY() bleibt bis zum Fade-Ende TRUE)."),
     "audio_music_pause":        ("AUDIO_MUSIC_PAUSE()", "Musik pausieren."),
     "audio_music_resume":       ("AUDIO_MUSIC_RESUME()", "Musik fortsetzen."),
     "audio_music_volume":       ("AUDIO_MUSIC_VOLUME(v)", "Musik-Lautstaerke (0..1)."),

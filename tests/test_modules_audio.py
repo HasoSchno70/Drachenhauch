@@ -30,3 +30,27 @@ def test_synth_matches_envelope_shape():
     # Mit Attack-Ramp startet das Signal bei ~0.
     wa = synthesize("square", 440.0, 0.0, 30, 30, 30, sr=44100)
     assert abs(wa[0]) < 0.1
+
+
+# --- AUDIO_MUSIC_PLAY/STOP: Argument-Validierung (gbrt-Golden) ---------------
+# Die Wiedergabe selbst braucht ein Audio-Geraet (nicht headless testbar);
+# die Wrapper-Validierung in vm.rs laeuft aber VOR der Audio-Initialisierung
+# und ist damit golden-testbar.
+
+def test_music_play_stop_fade_validation(run_gb):
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_MUSIC_PLAY(-1, -5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_MUSIC_STOP(-1)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_MUSIC_PLAY: fade_in_ms muss >= 0 sein" in out
+    assert "AUDIO_MUSIC_STOP: fade_out_ms muss >= 0 sein" in out

@@ -77,6 +77,33 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
     }
 }
 
+/// Laufender Musik-Fade (AUDIO_MUSIC_PLAY fade_in / AUDIO_MUSIC_STOP fade_out).
+/// Zeitbasiert -- `update()` (pro Frame aus dem FLIP-Pfad) schreibt das
+/// interpolierte Volume auf den Stream.
+struct MusicFade {
+    from: f32,
+    to: f32,
+    start: std::time::Instant,
+    dur_ms: f64,
+    stop_after: bool,   // Fade-out: am Ende Stream stoppen
+}
+
+/// Fade-Fortschritt 0..1 (pure, fuer #[test]).
+fn fade_progress(elapsed_ms: f64, dur_ms: f64) -> f32 {
+    if dur_ms <= 0.0 { return 1.0; }
+    (elapsed_ms / dur_ms).clamp(0.0, 1.0) as f32
+}
+
+impl MusicFade {
+    fn current_vol(&self) -> f32 {
+        let t = fade_progress(self.start.elapsed().as_secs_f64() * 1000.0, self.dur_ms);
+        self.from + (self.to - self.from) * t
+    }
+    fn done(&self) -> bool {
+        self.start.elapsed().as_secs_f64() * 1000.0 >= self.dur_ms
+    }
+}
+
 pub struct Audio {
     dev: &'static RaylibAudio,
     sounds: Vec<Sound<'static>>,
@@ -84,6 +111,9 @@ pub struct Audio {
     music: Option<Music<'static>>,
     music_vol: f32,            // getracktes Music-Volume
     music_queue: Option<String>, // AUDIO_MUSIC_QUEUE -> bei Stream-Ende abspielen
+    music_loops: i64,          // verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos (raylib-looping)
+    music_fade: Option<MusicFade>,
+    music_paused: bool,        // AUDIO_MUSIC_PAUSE -- damit update() eine Pause nicht als Stream-Ende deutet
     num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
     bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
@@ -98,7 +128,9 @@ impl Audio {
         unsafe { raylib::ffi::AttachAudioMixedProcessor(Some(mixed_proc)); }
         Ok(Audio {
             dev, sounds: Vec::new(), sound_vol: Vec::new(),
-            music: None, music_vol: 1.0, music_queue: None, num_channels: 16,
+            music: None, music_vol: 1.0, music_queue: None,
+            music_loops: -1, music_fade: None, music_paused: false,
+            num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
         })
     }
@@ -183,25 +215,61 @@ impl Audio {
         self.music = Some(m);
         self.music_vol = v;
         self.music_queue = None;
+        self.music_loops = -1;
+        self.music_fade = None;
+        self.music_paused = false;
         Ok(())
     }
 
     pub fn stop_music(&mut self) {
         if let Some(m) = self.music.take() { m.stop_stream(); }
+        self.music_fade = None;
+        self.music_paused = false;
     }
 
     /// Pro Frame aufrufen (aus dem FLIP-Pfad), damit der Musik-Stream
-    /// nachgefuettert wird -- sonst stockt die Wiedergabe. Spielt zudem einen
-    /// per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der aktuelle endet.
+    /// nachgefuettert wird -- sonst stockt die Wiedergabe. Treibt ausserdem
+    /// laufende Fades (AUDIO_MUSIC_PLAY/STOP), wiederholt endliche Loops und
+    /// spielt einen per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der
+    /// aktuelle endet.
     pub fn update(&mut self) {
+        if self.music.is_none() { return; }
+        // 1) Fade fortschreiben (waehrend Pause eingefroren -- zeitbasiert,
+        //    aber eine pausierte Musik soll nicht "unterm Eis" leiser werden).
+        if !self.music_paused {
+            if let (Some(f), Some(m)) = (&self.music_fade, &self.music) {
+                m.set_volume(f.current_vol());
+                if f.done() {
+                    let stop = f.stop_after;
+                    self.music_fade = None;
+                    if stop {
+                        if let Some(m) = &self.music {
+                            m.stop_stream();
+                            m.set_volume(self.music_vol);   // fuers naechste Play
+                        }
+                        self.music_loops = 0;
+                    }
+                }
+            }
+        }
+        // 2) Stream nachfuettern + endliche Loops + Queue. is_stream_playing()
+        //    ist auch bei Pause false -- music_paused unterscheidet das.
         if let Some(m) = &self.music {
             m.update_stream();
-            if !m.is_stream_playing() && self.music_queue.is_some() {
-                let path = self.music_queue.take().unwrap();
-                if let Ok(nm) = self.dev.new_music(&path) {
-                    nm.set_volume(self.music_vol);
-                    nm.play_stream();
-                    self.music = Some(nm);
+            if !m.is_stream_playing() && !self.music_paused {
+                if self.music_loops > 0 {
+                    // Endlicher Loop: raylib hat den beendeten Stream auf
+                    // Position 0 gestoppt -> einfach neu starten.
+                    self.music_loops -= 1;
+                    m.play_stream();
+                } else if let Some(path) = self.music_queue.take() {
+                    if let Ok(nm) = self.dev.new_music(&path) {
+                        nm.set_volume(self.music_vol);
+                        nm.play_stream();
+                        self.music = Some(nm);
+                        self.music_loops = -1;   // Queue-Track loopt (raylib-Default)
+                        self.music_fade = None;
+                    }
                 }
             }
         }
@@ -392,15 +460,69 @@ impl Audio {
         m.set_volume(self.music_vol);
         self.music = Some(m);
         self.music_queue = None;
+        self.music_loops = -1;
+        self.music_fade = None;
+        self.music_paused = false;
         Ok(())
     }
-    pub fn music_play(&self) { if let Some(m) = &self.music { m.play_stream(); } }
-    pub fn music_stop(&mut self) { if let Some(m) = &self.music { m.stop_stream(); } }
-    pub fn music_pause(&self) { if let Some(m) = &self.music { m.pause_stream(); } }
-    pub fn music_resume(&self) { if let Some(m) = &self.music { m.resume_stream(); } }
+    /// AUDIO_MUSIC_PLAY([loops[, fade_in_ms]]) -- pygame-Semantik:
+    /// loops=-1 endlos (Default), loops=N -> N+1 Durchlaeufe insgesamt.
+    /// Endlos macht raylib selbst (looping-Flag); endliche Wiederholungen
+    /// zaehlt update() und startet den beendeten Stream neu.
+    pub fn music_play(&mut self, loops: i64, fade_in_ms: i64) {
+        self.music_fade = None;
+        self.music_paused = false;
+        if let Some(m) = &mut self.music {
+            m.as_mut().looping = loops < 0;
+            self.music_loops = if loops < 0 { -1 } else { loops };
+            // Wie pygame: Play startet immer am Anfang (StopMusicStream
+            // setzt die Position zurueck, PlayMusicStream allein nicht).
+            m.stop_stream();
+            if fade_in_ms > 0 {
+                m.set_volume(0.0);
+                self.music_fade = Some(MusicFade {
+                    from: 0.0, to: self.music_vol,
+                    start: std::time::Instant::now(),
+                    dur_ms: fade_in_ms as f64, stop_after: false,
+                });
+            } else {
+                m.set_volume(self.music_vol);
+            }
+            m.play_stream();
+        }
+    }
+    /// AUDIO_MUSIC_STOP([fade_out_ms]) -- ohne Argument sofort, sonst
+    /// ausfaden und am Fade-Ende stoppen (update() treibt den Fade).
+    pub fn music_stop(&mut self, fade_out_ms: i64) {
+        if fade_out_ms <= 0 {
+            self.music_fade = None;
+            self.music_paused = false;
+            if let Some(m) = &self.music { m.stop_stream(); }
+            return;
+        }
+        if let Some(m) = &self.music {
+            if m.is_stream_playing() {
+                let from = self.music_fade.as_ref()
+                    .map(|f| f.current_vol()).unwrap_or(self.music_vol);
+                self.music_fade = Some(MusicFade {
+                    from, to: 0.0,
+                    start: std::time::Instant::now(),
+                    dur_ms: fade_out_ms as f64, stop_after: true,
+                });
+            }
+        }
+    }
+    pub fn music_pause(&mut self) {
+        if let Some(m) = &self.music { m.pause_stream(); self.music_paused = true; }
+    }
+    pub fn music_resume(&mut self) {
+        if let Some(m) = &self.music { m.resume_stream(); self.music_paused = false; }
+    }
     pub fn music_set_volume(&mut self, v: f64) {
         let vol = v.clamp(0.0, 1.0) as f32;
         self.music_vol = vol;
+        // Explizites Set-Volume gewinnt: laufenden Fade abbrechen.
+        self.music_fade = None;
         if let Some(m) = &self.music { m.set_volume(vol); }
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
@@ -514,4 +636,17 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
         buf[i] = (v * env).clamp(-1.0, 1.0);
     }
     buf
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fade_progress;
+
+    #[test]
+    fn fade_progress_clamps_and_interpolates() {
+        assert_eq!(fade_progress(0.0, 1000.0), 0.0);
+        assert!((fade_progress(500.0, 1000.0) - 0.5).abs() < 1e-6);
+        assert_eq!(fade_progress(1500.0, 1000.0), 1.0);   // ueber Ende -> geclampt
+        assert_eq!(fade_progress(10.0, 0.0), 1.0);        // dur=0 -> sofort fertig
+    }
 }

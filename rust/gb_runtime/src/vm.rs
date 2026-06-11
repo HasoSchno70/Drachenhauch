@@ -3471,8 +3471,19 @@ impl<'p> Vm<'p> {
                 Value::Int(self.audio_mut()?.sfx(&wf, freq, slide, atk, sus, dec, vd, vs, vol, width)?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
-            "audio_music_play" => { self.audio_mut()?.music_play(); Value::Nil }
-            "audio_music_stop" => { self.audio_mut()?.music_stop(); Value::Nil }
+            "audio_music_play" => {
+                // AUDIO_MUSIC_PLAY([loops[, fade_in_ms]]) -- loops=-1 endlos (Default)
+                let loops = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_PLAY")? } else { -1 };
+                let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_MUSIC_PLAY")? } else { 0 };
+                if fade < 0 { return Err("AUDIO_MUSIC_PLAY: fade_in_ms muss >= 0 sein".into()); }
+                self.audio_mut()?.music_play(loops, fade); Value::Nil
+            }
+            "audio_music_stop" => {
+                // AUDIO_MUSIC_STOP([fade_out_ms])
+                let fade = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_STOP")? } else { 0 };
+                if fade < 0 { return Err("AUDIO_MUSIC_STOP: fade_out_ms muss >= 0 sein".into()); }
+                self.audio_mut()?.music_stop(fade); Value::Nil
+            }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
             "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
