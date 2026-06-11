@@ -1408,18 +1408,6 @@ impl<'p> Vm<'p> {
                 op::SHR => { let (x, y) = int_pair2(stack)?; if y < 0 { return Err("SHR: negativ".into()); } stack.push(Value::Int(x >> y)); }
                 op::BNOT => { let v = vm_pop(stack)?; match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
 
-                // --- _NN (numerisch garantiert) ---
-                op::ADD_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_add(a, b)?); }
-                op::SUB_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_arith(a, b, '-')?); }
-                op::MUL_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(nn_arith(a, b, '*')?); }
-                op::DIV_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(div(a, b)?); }
-                op::LT_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, '<')?)); }
-                op::GT_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, '>')?)); }
-                op::LEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, 'l')?)); }
-                op::GEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(cmp(&a, &b, 'g')?)); }
-                op::EQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(value_eq(&a, &b))); }
-                op::NEQ_NN => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(Value::Bool(!value_eq(&a, &b))); }
-                op::NEG_N => { let v = vm_pop(stack)?; stack.push(neg(v)?); }
 
                 // --- Tupel ---
                 op::BUILD_TUPLE => {

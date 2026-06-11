@@ -57,18 +57,9 @@ pub mod op {
     pub const SHR: u16 = 66;
     pub const BNOT: u16 = 67;
 
-    // Spezialisierte Numeric-Numeric Ops.
-    pub const ADD_NN: u16 = 100;
-    pub const SUB_NN: u16 = 101;
-    pub const MUL_NN: u16 = 102;
-    pub const DIV_NN: u16 = 103;
-    pub const LT_NN: u16 = 104;
-    pub const GT_NN: u16 = 105;
-    pub const LEQ_NN: u16 = 106;
-    pub const GEQ_NN: u16 = 107;
-    pub const EQ_NN: u16 = 108;
-    pub const NEQ_NN: u16 = 109;
-    pub const NEG_N: u16 = 110;
+    // (100-110 waren spezialisierte _NN-Opcodes des geloeschten
+    // Python-Compilers -- der Rust-Compiler emittiert sie nie; entfernt.
+    // Die Nummern bleiben reserviert, damit Slot-Opcodes 111+ stabil sind.)
 
     pub const LOAD_GLOBAL_SLOT: u16 = 111;
     pub const STORE_GLOBAL_SLOT: u16 = 112;
