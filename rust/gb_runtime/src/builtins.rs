@@ -2185,7 +2185,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "save_set_int" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_INT")?.to_string(); let v = Value::Int(need_int(&a[2], "SAVE_SET_INT")?); save_h(&a[0], "SAVE_SET_INT")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_float" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_FLOAT")?.to_string(); let v = Value::Float(need_num(&a[2], "SAVE_SET_FLOAT")?); save_h(&a[0], "SAVE_SET_FLOAT")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_set_string" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_STRING")?.to_string(); let v = Value::str_rc(need_str(&a[2], "SAVE_SET_STRING")?); save_h(&a[0], "SAVE_SET_STRING")?.borrow_mut().set(k, v); Ok(Value::Nil) }
-        "save_set_bool" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_BOOL")?.to_string(); let v = match &a[2] { Value::Bool(b) => Value::Bool(*b), _ => return err("SAVE_SET_BOOL: BOOLEAN noetig") }; save_h(&a[0], "SAVE_SET_BOOL")?.borrow_mut().set(k, v); Ok(Value::Nil) }
+        "save_set_bool" => { arity!(3); let k = need_str(&a[1], "SAVE_SET_BOOL")?.to_string(); let v = Value::Bool(need_bool(&a[2], "SAVE_SET_BOOL")?); save_h(&a[0], "SAVE_SET_BOOL")?.borrow_mut().set(k, v); Ok(Value::Nil) }
         "save_get_int" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_INT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_INT")?; match s.get(k) { Some(Value::Int(i)) => Ok(Value::Int(*i)), Some(Value::Float(f)) if f.fract() == 0.0 => Ok(Value::Int(*f as i64)), Some(_) => err("SAVE_GET_INT: kein INTEGER"), None => err(format!("SAVE_GET_INT: Key '{}' nicht im Save", k)) } }
         "save_get_float" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_FLOAT")?.borrow(); let k = need_str(&a[1], "SAVE_GET_FLOAT")?; match s.get(k) { Some(v) if is_num(v) => Ok(Value::Float(as_f64(v))), Some(_) => err("SAVE_GET_FLOAT: keine Zahl"), None => err(format!("SAVE_GET_FLOAT: Key '{}' nicht im Save", k)) } }
         "save_get_string" => { arity!(2); let s = save_h(&a[0], "SAVE_GET_STRING")?.borrow(); let k = need_str(&a[1], "SAVE_GET_STRING")?; match s.get(k) { Some(Value::Str(st)) => Ok(Value::Str(st.clone())), Some(_) => err("SAVE_GET_STRING: kein STRING"), None => err(format!("SAVE_GET_STRING: Key '{}' nicht im Save", k)) } }
@@ -2287,9 +2287,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "ecs_alive" => { arity!(2); Ok(Value::Bool(ecs_h(&a[0], "ECS_ALIVE")?.borrow().alive(need_int(&a[1], "ECS_ALIVE")?))) }
         "ecs_count" => { arity!(1); Ok(Value::Int(ecs_h(&a[0], "ECS_COUNT")?.borrow().count() as i64)) }
         "ecs_add_int" => { arity!(4); let v = match &a[3] { Value::Int(i) => Value::Int(*i), _ => return err("ECS_ADD_INT erwartet value (INTEGER)") }; ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_INT") }
-        "ecs_add_float" => { arity!(4); if !is_num(&a[3]) { return err("ECS_ADD_FLOAT erwartet value (Zahl)"); } let v = Value::Float(as_f64(&a[3])); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_FLOAT") }
-        "ecs_add_string" => { arity!(4); let v = match &a[3] { Value::Str(s) => Value::Str(s.clone()), _ => return err("ECS_ADD_STRING erwartet value (STRING)") }; ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_STRING") }
-        "ecs_add_bool" => { arity!(4); let v = match &a[3] { Value::Bool(b) => Value::Bool(*b), _ => return err("ECS_ADD_BOOL erwartet value (BOOLEAN)") }; ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_BOOL") }
+        "ecs_add_float" => { arity!(4); let v = Value::Float(need_num(&a[3], "ECS_ADD_FLOAT")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_FLOAT") }
+        "ecs_add_string" => { arity!(4); let v = Value::str_rc(need_str(&a[3], "ECS_ADD_STRING")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_STRING") }
+        "ecs_add_bool" => { arity!(4); let v = Value::Bool(need_bool(&a[3], "ECS_ADD_BOOL")?); ecs_set(&a[0], &a[1], &a[2], v, "ECS_ADD_BOOL") }
         "ecs_add_obj" => { arity!(4); ecs_set(&a[0], &a[1], &a[2], a[3].clone(), "ECS_ADD_OBJ") }
         "ecs_has" => { arity!(3); Ok(Value::Bool(ecs_h(&a[0], "ECS_HAS")?.borrow().has_component(need_int(&a[1], "ECS_HAS")?, need_str(&a[2], "ECS_HAS")?))) }
         "ecs_remove" => { arity!(3); Ok(Value::Bool(ecs_h(&a[0], "ECS_REMOVE")?.borrow_mut().remove_component(need_int(&a[1], "ECS_REMOVE")?, need_str(&a[2], "ECS_REMOVE")?))) }

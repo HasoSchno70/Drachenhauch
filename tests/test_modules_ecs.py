@@ -253,3 +253,12 @@ PRINT ECS_GET_INT(w, e1, "pos")
 PRINT ECS_GET_INT(w, e2, "pos")
 '''
     assert _lines(run_gb(src)) == ["5", "97"]
+
+
+def test_add_bool_wrong_type_message(run_gb):
+    # Wortlaut-Konsistenz: Standard-Muster "NAME erwartet TYP, erhalten X"
+    # (frueher der Ausreisser "ECS_ADD_BOOL erwartet value (BOOLEAN)").
+    with pytest.raises(GBRuntimeError, match="ECS_ADD_BOOL erwartet BOOLEAN, erhalten"):
+        _run(run_gb,
+             "DIM e AS INTEGER\ne = ECS_NEW_ENTITY(w)\n"
+             'ECS_ADD_BOOL(w, e, "alive", 1)\n')

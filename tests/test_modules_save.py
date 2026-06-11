@@ -240,3 +240,10 @@ def test_load_rejects_non_object(run_gb, tmp_path):
 def test_non_handle_raises(run_gb):
     with pytest.raises(GBRuntimeError, match="erwartet SAVE_HANDLE"):
         run_gb('IMPORT "save"\nPRINT SAVE_GET_INT("nicht ein handle", "k")\n')
+
+
+def test_set_bool_wrong_type_message(run_gb, tmp_path):
+    # Wortlaut-Konsistenz: Standard-Muster "NAME erwartet TYP, erhalten X"
+    # (frueher der Ausreisser "SAVE_SET_BOOL: BOOLEAN noetig").
+    with pytest.raises(GBRuntimeError, match="SAVE_SET_BOOL erwartet BOOLEAN, erhalten"):
+        _run(run_gb, tmp_path, _PRE + 'SAVE_SET_BOOL(s, "k", 1)\n')
