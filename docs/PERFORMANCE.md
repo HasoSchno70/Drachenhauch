@@ -7,6 +7,43 @@
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
 > `gbrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
 
+## gbrt-Optimierung 2026-06-11 (aktuell)
+
+Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_gbrt.py`
+(best-of-5, Prozess-Wandzeit `gbrt run`, Windows 11):
+
+| Bench | vorher | nachher | Speedup |
+|---|---|---|---|
+| 5M-Iterationen-Loop (Arithmetik) | 664 ms | 212 ms | **3.1×** |
+| 6M Array-Lese/Schreib-Zugriffe | 1171 ms | 462 ms | **2.5×** |
+| 1M Methodenaufrufe + Self-Feld | 439 ms | 132 ms | **3.3×** |
+| 1M Builtin-Calls (ABS/SIN/MIN) | 276 ms | 133 ms | **2.1×** |
+| fib(28), ~630k Calls | 186 ms | 125 ms | 1.5× |
+| 200k String-Ops | 89 ms | 66 ms | 1.3× |
+
+Die Hebel (Commits `de1eed8`, `0a4c5c7`, `3ae32ec`, `e24c9c9`, `f965389`):
+
+- **Numerische Fast-Paths** in ADD/SUB/MUL/DIV/MOD + Vergleichen — Int/
+  Float-Paare rechnen direkt, Modul-/User-Operator-Checks nur im Sonderfall.
+  Int-Vergleiche dabei ohne f64-Umweg (korrekter ab 2^53).
+- **1D-Index-Fast-Path**: LOAD/STORE_INDEX ohne split_off-Vec (vorher eine
+  Allokation PRO Array-Zugriff), Coerce-Fast-Arm beim Element-Store.
+- **Allokationsfreie Member-Zugriffe**: Member-Name als &str aus dem
+  Const-Pool (statt fmt()-String pro Zugriff), is_property ohne
+  to_lowercase, und der format!-Fehlerkontext bei STORE_MEMBER entsteht
+  nur noch im Fehlerfall (vorher bei jedem erfolgreichen Store).
+- **Frame-Vec-Pooling**: locals/stack-Vecs werden ueber Funktionsaufrufe
+  hinweg wiederverwendet; Builtin-Args als Stack-Slice statt split_off.
+- **Fusionierter `FOR_NEXT`-Opcode** (116): Inkrement + Weiter-Test +
+  Ruecksprung in EINEM Dispatch statt ~9 Einzel-Instruktionen pro
+  Iteration; traegt die FOR-Quellzeile (Profiler/Debugger unveraendert).
+- **FxHashMap** (rustc-hash) fuer Funktions-/Klassen-/Methoden-/
+  Instanzfeld-Lookups (interne Compiler-Keys, kein DoS-Vektor).
+
+Semantik unveraendert (Sonderfaelle laufen die alten Pfade), 1910 Tests gruen.
+
+---
+
 Snapshot der relativen Performance der drei (historischen) Ausfuehrungspfade
 (Tree-Walker, Python-Bytecode-VM, Cython-Native-VM) bei spielnahen Workloads.
 
