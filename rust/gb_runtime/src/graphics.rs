@@ -6,8 +6,9 @@
 //! praesentiert. Das vermeidet, raylibs Draw-Handle ueber Builtin-Aufrufe
 //! hinweg zu halten (Borrow-Checker) und braucht keine Render-Texture.
 //!
-//! Bit-Identitaet gilt hier NICHT fuer Pixel (anderer Renderer als pygame) --
-//! nur `PRINT`/stdout bleibt bit-identisch. Verifikation per Screenshot.
+//! Pixel-Output ist renderer-abhaengig (raylib/GPU) und nicht golden-testbar
+//! -- verifiziert wird per Headless-Screenshot (GBRT_FRAMES/GBRT_SCREENSHOT);
+//! deterministisch testbar ist nur `PRINT`/stdout.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -810,7 +811,7 @@ fn col(c: i64) -> Color {
 impl Graphics {
     /// Lazy-Init ohne SCREEN: ein verstecktes Fenster, nur fuer den GL-Kontext
     /// (LOADIMAGE/imgfx-Texturen, Kamera-/Sprite-Logik ohne sichtbares Fenster).
-    /// Spiegelt das pygame-Lazy-Init des Tree-Walkers (LOADIMAGE etc. ohne SCREEN).
+    /// Damit funktionieren LOADIMAGE & Co. auch VOR (oder ganz ohne) SCREEN.
     /// Ein spaeteres SCREEN macht das Fenster via `reconfigure` sichtbar.
     pub fn new_headless() -> Graphics {
         Graphics::new_impl(64, 64, "GameBasic", 1, true)
@@ -2120,8 +2121,7 @@ impl Graphics {
     /// Zeichnet eine 2D-Tilemap (flache row-major `values`; Tile < 0 =
     /// transparent). Tileset wird als gerasterter Strip interpretiert
     /// (tiles_per_row = tileset_breite / tw). Jedes Tile geht durch
-    /// `draw_image_part`, d.h. Camera (Translation + Zoom) wirkt korrekt --
-    /// identisch zum Tree-Walker-Pfad.
+    /// `draw_image_part`, d.h. Camera (Translation + Zoom) wirkt korrekt.
     pub fn draw_tilemap(&mut self, idx: i64, values: &[i64], rows: i32, cols: i32,
                         tw: i32, th: i32, sx: i32, sy: i32) -> Result<(), String> {
         let i = idx as usize;
@@ -2323,8 +2323,8 @@ impl Graphics {
     }
     /// WAITKEY: blockiert bis eine Taste gedrueckt wird, liefert den raylib-
     /// Keycode (INTEGER). -1 wenn das Fenster geschlossen wird. (Der Code-Wert
-    /// folgt raylibs KeyboardKey-Enum, nicht SDL -- Eingabe ist ohnehin nicht
-    /// Parity-relevant.)
+    /// folgt raylibs KeyboardKey-Enum, nicht den SDL-Codes der KEY_*-
+    /// Konstanten -- historisch so gewachsen, dokumentiert.)
     pub fn waitkey(&mut self) -> i64 {
         loop {
             // window_should_close() ruft intern PollInputEvents -> fuellt die
@@ -2336,8 +2336,8 @@ impl Graphics {
     }
 
     // --- Core-Joystick (JOYSTICK_*): direkte raylib-Gamepad-Abfrage ---
-    // Ein ungueltiger Joystick-INDEX wirft (wie der Tree-Walker), ein ungueltiger
-    // Achsen-/Button-/Hat-Unterindex liefert dagegen 0/false (kein Fehler).
+    // Ein ungueltiger Joystick-INDEX wirft, ein ungueltiger Achsen-/Button-/
+    // Hat-Unterindex liefert dagegen 0/false (kein Fehler).
     pub fn joystick_count(&self) -> i64 { self.joy_count() }
     fn joystick_check(&self, idx: i64, fn_: &str) -> Result<(), String> {
         if idx < 0 || !self.rl.is_gamepad_available(idx as i32) {

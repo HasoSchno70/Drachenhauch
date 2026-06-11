@@ -1,13 +1,14 @@
-"""Parity-Test: `gbrt run <datei.gb>` (Stufe 5) == Python-Tree-Walker.
+"""End-to-End-Test: `gbrt run <datei.gb>` (Stufe 5, eigenstaendig ohne Python).
 
 Stufe 5 macht gbrt eigenstaendig: `gbrt run datei.gb` preprocesst (IMPORT),
 lext, parst, kompiliert und fuehrt aus -- ALLES in Rust, ohne Python. Wie
 `gbrun.py` wird ins Verzeichnis der Datei gewechselt (chdir), damit relative
 Pfade (IMPORT + Laufzeit-Asset/-Datei) stimmen.
 
-Verifikation: stdout von `gbrt run` == Python-Tree-Walker, der mit demselben
-chdir laeuft. Deckt explizit den chdir-Effekt ab (relativer Laufzeit-Datei-
-Zugriff) und den `gbrt <datei.gb>`-Auto-Detect (ohne `run`).
+Verifikation: stdout von `gbrt run` gegen erwartete Ausgaben. Deckt explizit
+den chdir-Effekt ab (relativer Laufzeit-Datei-Zugriff) und den
+`gbrt <datei.gb>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
+der Vergleichspartner Python-Tree-Walker ist seit Stufe B geloescht.)
 """
 import contextlib
 import io

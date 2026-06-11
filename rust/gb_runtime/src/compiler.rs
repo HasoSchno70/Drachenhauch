@@ -3,13 +3,14 @@
 //! **Stufe 3a:** main-only Konsolen-Programme (Skalar-Globals, Arithmetik/
 //! Vergleich/Logik/Bitwise/Unär, PRINT, Builtin-Calls, IF/WHILE/BREAK/
 //! CONTINUE, CONST). Emittiert die *generischen* Opcodes (kein Constant-
-//! Folding, keine `_NN`-Spezialisierung, keine Inline-Caches) -- gbrt's VM
-//! unterstützt beide, das Verhalten ist identisch. Verifiziert per Output-
-//! Parität: `gbrt --runsrc` == Python-Tree-Walker (tests/test_rust_compiler_parity.py).
+//! Folding, keine Inline-Caches -- die `_NN`-Spezialisierungen des frueheren
+//! Python-Compilers wurden aus der VM entfernt). Verifiziert per
+//! run_gb-Golden-Tests (tests/); die historische Output-Paritaet gegen den
+//! geloeschten Python-Tree-Walker ist Geschichte (Stufe B).
 //!
-//! Nicht-3a-Konstrukte (Funktionen, Klassen, Arrays, Comprehensions, SELECT,
-//! Tupel, WITH, TRY, FOR, DATA, ...) liefern `Err("Stufe 3b: ...")` -- der
-//! Parity-Test überspringt solche Programme. Spätere Stufen ergänzen sie.
+//! Nicht unterstuetzte Konstrukte liefern `Err("Stufe 3x: ...")` -- die
+//! Stufen-Labels stammen aus der inkrementellen Portierung (3a..3e, alle
+//! fertig) und dienen nur noch als Fehler-Kontext.
 
 use std::collections::HashMap;
 
@@ -274,7 +275,7 @@ pub struct Compiler {
     builtin_aliases: Vec<(String, String)>,
     /// Bereits deklarierte ENUMs (Name -> Member als (lower-name, wert)). Eine
     /// zweite ENUM-Deklaration desselben Namens ist idempotent (identische
-    /// Member) oder ein Fehler (abweichende Member) -- wie der Tree-Walker.
+    /// Member) oder ein Fehler (abweichende Member).
     enum_decls: HashMap<String, Vec<(String, i64)>>,
     ctx: Ctx,
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
@@ -616,7 +617,7 @@ impl Compiler {
             next_auto = v + 1;
         }
         // Redeklaration: identisch = idempotent (z.B. doppelter IMPORT),
-        // abweichende Member = Fehler (wie Tree-Walker, interpreter.py:1070).
+        // abweichende Member = Fehler.
         let members_cmp: Vec<(String, i64)> = out.iter()
             .map(|(n, v)| (n.clone(), if let CVal::Int(i) = v { *i } else { 0 }))
             .collect();

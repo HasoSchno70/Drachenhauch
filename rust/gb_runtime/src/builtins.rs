@@ -41,8 +41,8 @@ pub fn resolve_asset_path(p: &str) -> String {
     p.to_string()
 }
 
-// --- PRNG fuer RND/RANDOMIZE (nicht-deterministisch wie Python; NICHT
-// bit-identisch -- Programme mit RND ohne Seed sind erwartet unterschiedlich).
+// --- PRNG fuer RND/RANDOMIZE: xorshift64, ohne RANDOMIZE(seed) zeitbasiert
+// geseedet -- Laeufe sind dann bewusst nicht reproduzierbar.
 thread_local! {
     static RNG: std::cell::Cell<u64> = std::cell::Cell::new(seed_from_time());
 }
@@ -63,8 +63,8 @@ fn next_rand() -> u64 {
 /// Lokale Datum/Uhrzeit als (Jahr, Monat, Tag, Stunde, Minute, Sekunde).
 /// Pendant zu Pythons `time.strftime` (LOKALzeit) fuer TIME$/DATE$. Auf Windows
 /// liefert `GetLocalTime` die Felder direkt (inkl. Zeitzone); sonst Fallback auf
-/// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert ->
-/// Parity-Tests behandeln TIME$/DATE$ ohnehin als "erwartet unterschiedlich".
+/// UTC, berechnet aus dem Unix-Timestamp (civil-from-days). Clock-basiert,
+/// also naturgemaess nicht deterministisch testbar.
 #[cfg(windows)]
 fn local_datetime() -> (i64, i64, i64, i64, i64, i64) {
     #[repr(C)]
@@ -526,8 +526,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "randint" => {
-            // RANDINT(lo, hi) -> Int [lo, hi] (inklusiv). PRNG != Python ->
-            // erwartet unterschiedlich in der Parity.
+            // RANDINT(lo, hi) -> Int [lo, hi] (inklusiv).
             arity!(2);
             let lo = need_int(&a[0], "RANDINT")?;
             let hi = need_int(&a[1], "RANDINT")?;
@@ -558,7 +557,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let mut arr = arr.borrow_mut();
                 if arr.dims.len() != 1 { return err("SHUFFLE: nur 1D-Arrays".to_string()); }
                 let n = arr.values.len();
-                // Fisher-Yates (selbe Schleifenrichtung wie der Tree-Walker).
+                // Fisher-Yates, rueckwaerts (klassische Formulierung).
                 for i in (1..n).rev() {
                     let j = (next_rand() % (i as u64 + 1)) as usize;
                     arr.values.swap(i, j);
@@ -568,8 +567,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "weighted_choice" => {
             // WEIGHTED_CHOICE(werte, gewichte) -> Element aus `werte`, gewaehlt
-            // proportional zu `gewichte` (beide 1D-Arrays gleicher Laenge). Loot-
-            // Tabellen etc. PRNG -> in der Parity erwartet unterschiedlich.
+            // proportional zu `gewichte` (beide 1D-Arrays gleicher Laenge).
+            // Klassiker fuer Loot-Tabellen.
             arity!(2);
             let (vals, wts) = match (&a[0], &a[1]) {
                 (Value::Array(v), Value::Array(w)) => (v.borrow(), w.borrow()),
@@ -599,8 +598,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int(ms))
         }
         "timer" => {
-            // Sekunden seit erstem TIMER-Aufruf als FLOAT (wie der Tree-Walker --
-            // MILLIS bleibt ms-INT). Wichtig u.a. fuer FPS: elapsed >= 0.5 s.
+            // Sekunden seit erstem TIMER-Aufruf als FLOAT (MILLIS bleibt
+            // ms-INT). Wichtig u.a. fuer FPS-Messungen: elapsed >= 0.5 s.
             use std::sync::OnceLock;
             use std::time::Instant;
             static TIMER_START: OnceLock<Instant> = OnceLock::new();
@@ -2072,7 +2071,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&cleaned.join("/")))
         }
 
-        // ===== Modul: tween (zeitbasiert, NICHT bit-identisch) =====
+        // ===== Modul: tween (zeitbasiert -> nicht deterministisch) =====
         "tween_new" | "tween_new_loop" | "tween_new_pingpong" => {
             if a.len() < 3 || a.len() > 4 { return err(format!("{}: 3..4 Argumente", name.to_uppercase())); }
             let start = need_num(&a[0], "TWEEN")?;
@@ -2233,7 +2232,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_path_cost" => { arity!(1); Ok(Value::Float(astar_h(&a[0], "ASTAR_PATH_COST")?.borrow().path_cost())) }
         "astar_clear_path" => { arity!(1); astar_h(&a[0], "ASTAR_CLEAR_PATH")?.borrow_mut().clear_path(); Ok(Value::Nil) }
 
-        // ===== Modul: particles (RNG-Emit -> NICHT bit-identisch) =====
+        // ===== Modul: particles (RNG-Emit -> nicht deterministisch) =====
         "particle_system_new" => { arity!(2); Ok(Value::Particles(Rc::new(RefCell::new(ParticleSys::new(need_num(&a[0], "PARTICLE_SYSTEM_NEW")?, need_num(&a[1], "PARTICLE_SYSTEM_NEW")?))))) }
         "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "S")?; s.y = need_num(&a[2], "S")?; Ok(Value::Nil) }
         "particle_count" => { arity!(1); Ok(Value::Int(psys(&a[0], "PARTICLE_COUNT")?.borrow().particles.len() as i64)) }

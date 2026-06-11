@@ -2,8 +2,8 @@
 //! (SFX) sowie PLAYMUSIC/STOPMUSIC (Stream-Musik). Nur mit `--features
 //! graphics` (raylib bundelt Audio mit).
 //!
-//! Audio ist -- wie RND/MILLIS/Tween -- **nicht bit-identisch** zur Python-
-//! Version (anderer Mixer), nur funktional aequivalent.
+//! Audio-Output ist -- wie RND/MILLIS/Tween -- naturgemaess nicht
+//! deterministisch golden-testbar; getestet wird die Argument-Validierung.
 //!
 //! Lifetime-Trick: `Sound<'aud>`/`Music<'aud>` borgen das `RaylibAudio`-
 //! Geraet. Da das Geraet den ganzen Prozess lebt, wird es per `Box::leak`
@@ -372,7 +372,7 @@ impl Audio {
     }
 
     // ===================================================================
-    // Erweitertes audio-Modul (AUDIO_*) -- funktional (nicht bit-identisch).
+    // Erweitertes audio-Modul (AUDIO_*).
     // SOUND/AUDIO_CHANNEL sind beide INTEGER-Handles (Index in `sounds`);
     // ein "Channel" steuert die Wiedergabe genau dieses Sounds. raylib hat
     // keine pygame-Channels -> ein Sound = ein steuerbarer Slot.

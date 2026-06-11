@@ -1,9 +1,8 @@
 //! Broadphase-Kollision (PHYSICS_BROAD_*) fuer viele Kreis-Entities.
 //!
-//! Portiert aus `rust/gb_native/src/broadphase.rs` (PyO3-Helfer, den der
-//! Tree-Walker nutzt) -- SELBER Algorithmus, SELBE Paar-Reihenfolge, damit
-//! gbrt bit-identische Paare/Reihenfolge liefert wie der Tree-Walker (egal ob
-//! der dort das native `gb_native` oder den O(n^2)-Python-Fallback verwendet).
+//! (Urspruenglich portiert aus dem geloeschten PyO3-Helfer gb_native.)
+//! Die Paar-Reihenfolge ist deterministisch (pro i aufsteigende j, j > i) --
+//! GB-Programme sollten sich trotzdem nicht auf die Reihenfolge verlassen.
 //!
 //! Uniform-Grid mit Zellgroesse = 2 * max(radius): jede Entity liegt in genau
 //! EINER Zelle, ueberlappende Kreise sind in derselben oder einer Nachbarzelle

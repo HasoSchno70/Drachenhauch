@@ -1,6 +1,7 @@
 //! Entity-Component-System fuer das `ecs`-Modul. Sparse-Set pro Component,
-//! Query = Intersection (aufsteigend sortierte Entity-IDs, wie Python).
-//! Semantik 1:1 aus `gamebasic/modules/ecs.py` (Pure-Python-Fallback `_World`).
+//! Query = Intersection. Queries liefern aufsteigend sortierte Entity-IDs --
+//! dokumentiertes Verhalten (stammt aus der frueheren Python-Implementierung,
+//! GB-Programme duerfen sich darauf verlassen).
 
 use std::collections::{HashMap, HashSet};
 
@@ -114,7 +115,7 @@ impl World {
 
     pub fn integrate_float(&mut self, target: &str, delta: &str) -> i64 {
         if !self.components.contains_key(target) || !self.components.contains_key(delta) { return 0; }
-        // Ueber das kleinere Dense-Set iterieren (wie Python).
+        // Ueber das kleinere Dense-Set iterieren (weniger Lookups).
         let (t_len, d_len) = (self.components[target].dense.len(), self.components[delta].dense.len());
         let mut count = 0i64;
         // Paare (ent, delta_value) sammeln, dann auf target anwenden -- vermeidet

@@ -1,8 +1,10 @@
-//! `gbrt` -- native GameBasic-Runtime (Spike, Schritt 1+2).
+//! `gbrt` -- die native GameBasic-Runtime (und seit Stufe B die EINZIGE).
 //!
-//! Laedt eine `.gbc`-Datei (vom Python-Compiler erzeugt, siehe
-//! `gamebasic/serialize.py`) und fuehrt den VM-Kern aus. Ausgabe nach stdout
-//! soll bit-identisch zur Python-VM sein.
+//! Fuehrt `.gb`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
+//! compile -> VM, alles in Rust) oder eine fertige `.gbc`-Datei (JSON-
+//! Bytecode, vom eigenen Compiler bzw. via `--export` erzeugt). Korrektheit
+//! sichern die run_gb-Golden-Tests (tests/) -- die fruehere Python-Referenz
+//! (Tree-Walker) ist geloescht.
 //!
 //! Verwendung: gbrt <datei.gbc> [quell-label]
 //!
