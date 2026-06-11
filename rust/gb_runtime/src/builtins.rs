@@ -2882,7 +2882,7 @@ fn psys<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<ParticleSys>>, Str
     match v { Value::Particles(p) => Ok(p), _ => Err(format!("{} erwartet PARTICLE_SYSTEM", fn_)) }
 }
 
-fn rng_uniform(a: f64, b: f64) -> f64 {
+pub(crate) fn rng_uniform(a: f64, b: f64) -> f64 {
     let r = (next_rand() >> 11) as f64 / (1u64 << 53) as f64;
     a + (b - a) * r
 }

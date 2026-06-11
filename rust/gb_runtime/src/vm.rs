@@ -3769,6 +3769,14 @@ impl<'p> Vm<'p> {
                 g!().set_camera(x, y, zoom); Value::Nil
             }
             "camera_reset" => { g!().reset_camera(); Value::Nil }
+            "camera_shake" => {
+                // CAMERA_SHAKE(staerke[, dauer_ms]) -- staerke=0 stoppt sofort
+                let amp = need_f(a, 0, "CAMERA_SHAKE")?;
+                if amp < 0.0 { return Err("CAMERA_SHAKE: staerke muss >= 0 sein".into()); }
+                let dur = if a.len() >= 2 { gi(a, 1, "CAMERA_SHAKE")? } else { 300 };
+                if dur <= 0 { return Err("CAMERA_SHAKE: dauer_ms muss > 0 sein".into()); }
+                g!().camera_shake(amp, dur as f64); Value::Nil
+            }
             "camera_x" => Value::Float(g!().camera().0),
             "camera_y" => Value::Float(g!().camera().1),
             "camera_zoom" => Value::Float(g!().camera().2),

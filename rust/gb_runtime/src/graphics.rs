@@ -688,6 +688,13 @@ pub struct Graphics {
     cam_x: f64,
     cam_y: f64,
     cam_zoom: f64,
+    // CAMERA_SHAKE: zufaelliger Kamera-Offset, klingt linear ueber die Dauer
+    // ab. Pro Frame EIN Offset (in flip() fuer den naechsten Frame gewuerfelt).
+    shake_amp: f64,
+    shake_dur_ms: f64,
+    shake_start: Option<std::time::Instant>,
+    shake_x: f64,
+    shake_y: f64,
     // 3D (Modul `g3d`): Befehlsliste + Perspektiv-Kamera. cmds3d wird pro
     // FLIP geleert; cam3d wird von CAMERA3D gesetzt (sonst Default-Blick).
     cmds3d: Vec<Cmd3D>,
@@ -844,6 +851,8 @@ impl Graphics {
             active_rt: None,
             clear_color: Color::BLACK,
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
+            shake_amp: 0.0, shake_dur_ms: 0.0, shake_start: None,
+            shake_x: 0.0, shake_y: 0.0,
             cmds3d: Vec::new(),
             models: Vec::new(),
             model_anims: Vec::new(),
@@ -981,12 +990,45 @@ impl Graphics {
     // --- Kamera (Modul `camera`) ---
     // World->Screen: sx = int((x - cam_x) * zoom). Bei Identitaet (0,0,1) No-Op.
     fn w2s(&self, x: i32, y: i32) -> (i32, i32) {
-        (((x as f64 - self.cam_x) * self.cam_zoom) as i32,
-         ((y as f64 - self.cam_y) * self.cam_zoom) as i32)
+        (((x as f64 - self.cam_x + self.shake_x) * self.cam_zoom) as i32,
+         ((y as f64 - self.cam_y + self.shake_y) * self.cam_zoom) as i32)
     }
     fn ssize(&self, s: i32) -> i32 { ((s as f64 * self.cam_zoom) as i32).max(0) }
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) { self.cam_x = x; self.cam_y = y; self.cam_zoom = zoom; }
     pub fn reset_camera(&mut self) { self.cam_x = 0.0; self.cam_y = 0.0; self.cam_zoom = 1.0; }
+
+    /// CAMERA_SHAKE(staerke, dauer_ms) -- zufaelliger Kamera-Ruckel-Offset
+    /// (Welt-Pixel), klingt linear ueber dauer_ms ab. Liegt im selben
+    /// World->Screen-Pfad wie CAMERA_SET und wirkt damit auf ALLE 2D-Draws
+    /// (bewusst: der ganze Screen wackelt, inkl. HUD -- das ist der Effekt).
+    /// staerke=0 stoppt einen laufenden Shake sofort.
+    pub fn camera_shake(&mut self, amp: f64, dur_ms: f64) {
+        if amp <= 0.0 {
+            self.shake_start = None;
+            self.shake_x = 0.0;
+            self.shake_y = 0.0;
+            return;
+        }
+        self.shake_amp = amp;
+        self.shake_dur_ms = dur_ms;
+        self.shake_start = Some(std::time::Instant::now());
+        self.update_shake();              // wirkt schon im aktuellen Frame
+    }
+    /// Pro Frame (flip-Ende) den Offset fuer den naechsten Frame wuerfeln.
+    fn update_shake(&mut self) {
+        if let Some(start) = self.shake_start {
+            let rem = shake_remaining(start.elapsed().as_secs_f64() * 1000.0, self.shake_dur_ms);
+            if rem <= 0.0 {
+                self.shake_start = None;
+                self.shake_x = 0.0;
+                self.shake_y = 0.0;
+            } else {
+                let a = self.shake_amp * rem;
+                self.shake_x = crate::builtins::rng_uniform(-a, a);
+                self.shake_y = crate::builtins::rng_uniform(-a, a);
+            }
+        }
+    }
     pub fn camera(&self) -> (f64, f64, f64) { (self.cam_x, self.cam_y, self.cam_zoom) }
     pub fn s2w_x(&self, sx: f64) -> f64 { if self.cam_zoom == 0.0 { sx } else { sx / self.cam_zoom + self.cam_x } }
     pub fn s2w_y(&self, sy: f64) -> f64 { if self.cam_zoom == 0.0 { sy } else { sy / self.cam_zoom + self.cam_y } }
@@ -2690,6 +2732,8 @@ impl Graphics {
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
         self.frame_count += 1;
+        // CAMERA_SHAKE: Offset fuer den naechsten Frame wuerfeln/abklingen.
+        self.update_shake();
         // Headless-Screenshot beim Erreichen der Frame-Grenze.
         if let (Some(mx), Some(path), false) = (self.max_frames, self.screenshot.clone(), self.shot_taken) {
             if self.frame_count >= mx {
@@ -3235,4 +3279,25 @@ fn key_from_i32(v: i32) -> Option<KeyboardKey> {
         300 => KEY_F11, 301 => KEY_F12,
         _ => return None,
     })
+}
+
+/// Restanteil eines CAMERA_SHAKE 1..0 (pure, fuer #[test]): linearer Abfall
+/// ueber die Dauer, danach 0.
+fn shake_remaining(elapsed_ms: f64, dur_ms: f64) -> f64 {
+    if dur_ms <= 0.0 { return 0.0; }
+    (1.0 - elapsed_ms / dur_ms).clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod shake_tests {
+    use super::shake_remaining;
+
+    #[test]
+    fn shake_decays_linearly_and_clamps() {
+        assert_eq!(shake_remaining(0.0, 400.0), 1.0);
+        assert!((shake_remaining(200.0, 400.0) - 0.5).abs() < 1e-9);
+        assert_eq!(shake_remaining(400.0, 400.0), 0.0);
+        assert_eq!(shake_remaining(999.0, 400.0), 0.0);   // ueber Ende
+        assert_eq!(shake_remaining(10.0, 0.0), 0.0);      // dur=0 -> aus
+    }
 }

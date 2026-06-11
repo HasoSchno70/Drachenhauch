@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 993,
+ "count": 994,
  "builtins": [
   {
    "name": "ABS",
@@ -630,6 +630,12 @@
    "name": "CAMERA_SET",
    "kind": "graphics",
    "signature": "CAMERA_SET(2..3 Argumente)",
+   "module": "camera"
+  },
+  {
+   "name": "CAMERA_SHAKE",
+   "kind": "graphics",
+   "signature": "CAMERA_SHAKE(staerke[, dauer_ms])",
    "module": "camera"
   },
   {

@@ -15,6 +15,7 @@ IMPORT "camera"
 | `CAMERA_X()`, `CAMERA_Y()`, `CAMERA_ZOOM()` → FLOAT | aktuelle Werte lesen |
 | `CAMERA_FOLLOW(target_x, target_y, screen_w, screen_h)` | zentriert Camera auf target |
 | `CAMERA_S2W_X(sx)`, `CAMERA_S2W_Y(sy)` → FLOAT | Screen-Pixel zu Welt-Koordinate (z.B. für Maus-Klick) |
+| `CAMERA_SHAKE(staerke[, dauer_ms])` | Screen-Shake: zufälliger Kamera-Ruckel (Welt-Pixel), klingt linear über `dauer_ms` ab (Default 300) — läuft selbstständig, kein Pro-Frame-Code. `staerke = 0` stoppt sofort |
 
 ## Konzept
 

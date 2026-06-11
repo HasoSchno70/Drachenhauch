@@ -312,6 +312,10 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "ecs_query3":           ("ECS_QUERY3(world, n1, n2, n3) AS ARRAY OF INTEGER",
                               "Entities mit allen drei Components."),
     # Modul timer (geplante Aktionen + Cooldowns)
+    "camera_shake":         ("CAMERA_SHAKE(staerke[, dauer_ms])",
+                              "Screen-Shake: zufaelliger Kamera-Ruckel (Welt-Pixel), klingt "
+                              "linear ueber dauer_ms ab (Default 300). Laeuft selbststaendig; "
+                              "staerke=0 stoppt sofort. Der Juice-Klassiker bei Explosionen."),
     "timer_after":          ("TIMER_AFTER(ms, fn) AS INTEGER",
                               "Ruft die FUNCREF einmalig nach ms Millisekunden auf "
                               "(beim naechsten TIMER_UPDATE danach). Liefert eine Timer-ID."),
