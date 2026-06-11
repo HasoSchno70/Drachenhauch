@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 979,
+ "count": 987,
  "builtins": [
   {
    "name": "ABS",
@@ -5328,6 +5328,12 @@
    "module": "core"
   },
   {
+   "name": "COOLDOWN",
+   "kind": "core",
+   "signature": "COOLDOWN(id: STRING, ms: INTEGER) AS BOOLEAN",
+   "module": "timer"
+  },
+  {
    "name": "COPYFILE",
    "kind": "core",
    "signature": "COPYFILE(src, dst)",
@@ -5356,6 +5362,48 @@
    "kind": "core",
    "signature": "COUNT(text$, teil$)",
    "module": "core"
+  },
+  {
+   "name": "TIMER_ACTIVE",
+   "kind": "core",
+   "signature": "TIMER_ACTIVE(id: INTEGER) AS BOOLEAN",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_AFTER",
+   "kind": "core",
+   "signature": "TIMER_AFTER(ms: INTEGER, fn: FUNCREF) AS INTEGER",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_CANCEL",
+   "kind": "core",
+   "signature": "TIMER_CANCEL(id: INTEGER)",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_CLEAR",
+   "kind": "core",
+   "signature": "TIMER_CLEAR()",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_COUNT",
+   "kind": "core",
+   "signature": "TIMER_COUNT() AS INTEGER",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_EVERY",
+   "kind": "core",
+   "signature": "TIMER_EVERY(ms: INTEGER, fn: FUNCREF) AS INTEGER",
+   "module": "timer"
+  },
+  {
+   "name": "TIMER_UPDATE",
+   "kind": "core",
+   "signature": "TIMER_UPDATE()",
+   "module": "timer"
   },
   {
    "name": "TITLE$",

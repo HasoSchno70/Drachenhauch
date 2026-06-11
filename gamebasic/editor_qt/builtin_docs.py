@@ -298,6 +298,24 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
                               "Entities mit beiden Components (Intersection)."),
     "ecs_query3":           ("ECS_QUERY3(world, n1, n2, n3) AS ARRAY OF INTEGER",
                               "Entities mit allen drei Components."),
+    # Modul timer (geplante Aktionen + Cooldowns)
+    "timer_after":          ("TIMER_AFTER(ms, fn) AS INTEGER",
+                              "Ruft die FUNCREF einmalig nach ms Millisekunden auf "
+                              "(beim naechsten TIMER_UPDATE danach). Liefert eine Timer-ID."),
+    "timer_every":          ("TIMER_EVERY(ms, fn) AS INTEGER",
+                              "Ruft die FUNCREF alle ms Millisekunden auf (max. 1x pro "
+                              "TIMER_UPDATE). Liefert eine Timer-ID."),
+    "timer_cancel":         ("TIMER_CANCEL(id)",
+                              "Timer abbrechen. Bereits gefeuerte/unbekannte IDs sind ein No-Op."),
+    "timer_active":         ("TIMER_ACTIVE(id) AS BOOLEAN", "Laeuft der Timer noch?"),
+    "timer_count":          ("TIMER_COUNT() AS INTEGER", "Anzahl aktiver Timer."),
+    "timer_clear":          ("TIMER_CLEAR()", "Alle Timer und Cooldowns verwerfen (z.B. Scene-Wechsel)."),
+    "timer_update":         ("TIMER_UPDATE()",
+                              "Pro Frame aufrufen: feuert faellige TIMER_AFTER/EVERY-Callbacks "
+                              "(wie INPUT_UPDATE/GUI_UPDATE)."),
+    "cooldown":             ("COOLDOWN(id, ms) AS BOOLEAN",
+                              "TRUE wenn die String-ID frei ist -- startet dann die ms-Sperre. "
+                              "FALSE solange gesperrt. Ideal fuer Schuss-Raten."),
 }
 
 

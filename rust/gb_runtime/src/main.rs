@@ -45,6 +45,7 @@ mod physics2d;
 mod physics3d;
 mod preprocess;
 mod tiled;
+mod timer;
 mod value;
 mod vm;
 

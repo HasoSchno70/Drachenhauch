@@ -458,6 +458,8 @@ pub struct Vm<'p> {
     ui_state: UiState,
     // Modul `scene`: globaler Stack (name, daten). Daten = key->typisierter Wert.
     scene_stack: Vec<(String, HashMap<String, Value>)>,
+    // Modul `timer`: AFTER/EVERY-Callbacks + COOLDOWN-Sperren (timer.rs).
+    timers: crate::timer::Timers,
     // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
@@ -538,6 +540,7 @@ impl<'p> Vm<'p> {
             input_state: InputModule::default(),
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
+            timers: crate::timer::Timers::default(),
             cur_line: 0,
             prof: None,
             stop: None,
@@ -1504,6 +1507,8 @@ impl<'p> Vm<'p> {
                         stack.push(v);
                     } else if let Some(v) = self.try_coro(name, &bargs)? {
                         stack.push(v);
+                    } else if let Some(v) = self.try_timer(name, &bargs)? {
+                        stack.push(v);
                     } else if let Some(v) = self.try_db(name, &bargs)? {
                         stack.push(v);
                     } else if let Some(v) = self.try_net(name, &bargs)? {
@@ -2247,6 +2252,56 @@ impl<'p> Vm<'p> {
             _ => return Ok(None),
         };
         Ok(Some(v))
+    }
+
+    /// Modul `timer` (timer.rs): AFTER/EVERY/CANCEL/UPDATE + COOLDOWN.
+    /// Kein Grafik-Bezug -- laeuft auch konsolen-only. TIMER_UPDATE feuert
+    /// faellige FUNCREF-Callbacks nach dem gleichen Muster wie GUI_UPDATE.
+    fn try_timer(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        fn t_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
+            match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", fn_, i + 1)) }
+        }
+        fn t_str<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
+            match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING (Arg {})", fn_, i + 1)) }
+        }
+        fn t_func(a: &[Value], i: usize, fn_: &str) -> R<String> {
+            match a.get(i) { Some(Value::FuncRef(n)) => Ok(n.to_string()), _ => Err(format!("{}: erwartet FUNCREF (Arg {})", fn_, i + 1)) }
+        }
+        let r = match name {
+            "timer_after" => {
+                let ms = t_int(a, 0, "TIMER_AFTER")?;
+                if ms < 0 { return Err("TIMER_AFTER: ms muss >= 0 sein".into()); }
+                Value::Int(self.timers.after(ms, t_func(a, 1, "TIMER_AFTER")?))
+            }
+            "timer_every" => {
+                let ms = t_int(a, 0, "TIMER_EVERY")?;
+                if ms <= 0 { return Err("TIMER_EVERY: ms muss > 0 sein".into()); }
+                Value::Int(self.timers.every(ms, t_func(a, 1, "TIMER_EVERY")?))
+            }
+            "timer_cancel" => { self.timers.cancel(t_int(a, 0, "TIMER_CANCEL")?); Value::Nil }
+            "timer_active" => Value::Bool(self.timers.active(t_int(a, 0, "TIMER_ACTIVE")?)),
+            "timer_count" => Value::Int(self.timers.count()),
+            "timer_clear" => { self.timers.clear(); Value::Nil }
+            "timer_update" => {
+                // Faellige Callbacks NACH dem Einsammeln feuern -- ein Callback
+                // darf selbst Timer registrieren/canceln; neue Eintraege werden
+                // erst beim naechsten Update faellig geprueft.
+                for fname in self.timers.take_due() {
+                    let f = self.prog.functions.get(fname.as_str()).ok_or_else(||
+                        format!("TIMER-Callback: Funktion '{}' existiert nicht", fname))?;
+                    self.exec(f, Vec::new(), None)?;
+                }
+                Value::Nil
+            }
+            "cooldown" => {
+                let id = t_str(a, 0, "COOLDOWN")?.to_string();
+                let ms = t_int(a, 1, "COOLDOWN")?;
+                if ms < 0 { return Err("COOLDOWN: ms muss >= 0 sein".into()); }
+                Value::Bool(self.timers.cooldown(&id, ms))
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(r))
     }
 
     fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
