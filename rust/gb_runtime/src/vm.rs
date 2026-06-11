@@ -70,8 +70,11 @@ enum Step {
 
 /// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
 /// von normalem Aufruf (exec) und Coroutine-Erststart.
-fn bind_params(fn_: &Func, args: Vec<Value>) -> R<Vec<Value>> {
-    let mut locals: Vec<Value> = fn_.local_defaults.clone();
+fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Value>> {
+    // `locals` ist ein (ggf. gepoolter) Buffer -- Allokation wird
+    // wiederverwendet, Inhalt kommt frisch aus den local_defaults.
+    locals.clear();
+    locals.extend_from_slice(&fn_.local_defaults);
     let n_locals = fn_.local_types.len();
     if locals.len() < n_locals {
         locals.resize(n_locals, Value::Nil);
@@ -455,6 +458,10 @@ pub struct Vm<'p> {
     scene_stack: Vec<(String, HashMap<String, Value>)>,
     // Modul `timer`: AFTER/EVERY-Callbacks + COOLDOWN-Sperren (timer.rs).
     timers: crate::timer::Timers,
+    // Wiederverwendete Frame-Vecs (locals/stack) -- spart 2-3 Allokationen
+    // pro Funktionsaufruf in heissen Call-Pfaden (fib, Methoden-Loops).
+    pool_locals: Vec<Vec<Value>>,
+    pool_stacks: Vec<Vec<Value>>,
     // Quell-Zeile der zuletzt ausgefuehrten Instruktion (fuer Laufzeitfehler-
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
@@ -536,6 +543,8 @@ impl<'p> Vm<'p> {
             ui_state: UiState::new(),
             scene_stack: Vec::new(),
             timers: crate::timer::Timers::default(),
+            pool_locals: Vec::new(),
+            pool_stacks: Vec::new(),
             cur_line: 0,
             prof: None,
             stop: None,
@@ -666,10 +675,16 @@ impl<'p> Vm<'p> {
 
     // ---------------------------------------------------------------- OOP
     fn resolve_method(&self, class_name: &str, method: &str) -> Option<&'p Func> {
-        let key = method.to_lowercase();
+        // Methoden-Keys liegen lowercase vor (Compiler emittiert lowercase) --
+        // nur im seltenen gemischten Fall allozieren.
+        let lowered;
+        let key: &str = if method.bytes().any(|b| b.is_ascii_uppercase()) {
+            lowered = method.to_lowercase();
+            &lowered
+        } else { method };
         let mut cur = self.prog.classes.get(class_name);
         while let Some(ci) = cur {
-            if let Some(m) = ci.methods.get(&key) {
+            if let Some(m) = ci.methods.get(key) {
                 return Some(m);
             }
             if ci.parent_name.is_empty() {
@@ -940,11 +955,17 @@ impl<'p> Vm<'p> {
     }
 
     fn exec_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
-        let mut locals = bind_params(fn_, args)?;
-        let mut stack: Vec<Value> = Vec::with_capacity(16);
+        let lbuf = self.pool_locals.pop().unwrap_or_default();
+        let mut locals = bind_params(fn_, args, lbuf)?;
+        let mut stack: Vec<Value> = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
-        match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref())? {
+        let step = self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref());
+        locals.clear();
+        stack.clear();
+        if self.pool_locals.len() < 64 { self.pool_locals.push(locals); }
+        if self.pool_stacks.len() < 64 { self.pool_stacks.push(stack); }
+        match step? {
             Step::Return(v) => Ok(v),
             // Eine normale Funktion enthaelt kein YIELD (sonst waere sie eine
             // Coroutine und wuerde nicht via exec ausgefuehrt).
@@ -965,8 +986,9 @@ impl<'p> Vm<'p> {
 
     fn exec_byref_inner(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
         -> R<(Value, Vec<Value>)> {
-        let mut locals = bind_params(fn_, args)?;
-        let mut stack: Vec<Value> = Vec::with_capacity(16);
+        let lbuf = self.pool_locals.pop().unwrap_or_default();
+        let mut locals = bind_params(fn_, args, lbuf)?;
+        let mut stack: Vec<Value> = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
         let ret = match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref())? {
@@ -980,6 +1002,10 @@ impl<'p> Vm<'p> {
                 byref_vals.push(locals.get(i).cloned().unwrap_or(Value::Nil));
             }
         }
+        locals.clear();
+        stack.clear();
+        if self.pool_locals.len() < 64 { self.pool_locals.push(locals); }
+        if self.pool_stacks.len() < 64 { self.pool_stacks.push(stack); }
         Ok((ret, byref_vals))
     }
 
@@ -1030,7 +1056,7 @@ impl<'p> Vm<'p> {
         let mut try_handlers: Vec<(usize, usize)>;
         if !started {
             let args = std::mem::take(&mut co.borrow_mut().args);
-            locals = bind_params(fn_, args)?;
+            locals = bind_params(fn_, args, Vec::new())?;
             stack = Vec::with_capacity(16);
             ip = 0;
             try_handlers = Vec::new();
@@ -1136,6 +1162,7 @@ impl<'p> Vm<'p> {
 
     fn try_coro(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Builtin-Namen liegen im .gbc lowercase vor.
+        if !name.starts_with("coro_") && name != "__comp_iter" { return Ok(None); }
         match name {
             "coro_resume" => {
                 let co = expect_coro(&a[0], "CORO_RESUME")?;
@@ -1194,28 +1221,24 @@ impl<'p> Vm<'p> {
             let instr = &code[*ip];
             let arg = &instr.arg;
             // Quell-Zeile dieser Instruktion merken (fuer Laufzeitfehler).
-            // Bei einem Fehler in dieser oder einer von hier gerufenen Funktion
-            // bleibt die innerste Zeile stehen (sie lief zuletzt).
+            // Nur bei ZeilenWECHSEL wird geschrieben + die Hooks geprueft
+            // (Profiler/Stop/Debugger) -- der Normalfall ist ein Vergleich.
             if let Some(ln) = fn_.lines.get(*ip) {
-                if *ln != 0 {
-                    let changed = self.cur_line != *ln;
-                    self.cur_line = *ln;
-                    // Instrumentierungs-Hook (Stufe B): nur bei Zeilenwechsel und
-                    // nur wenn ein Sink installiert ist (sonst null Overhead).
-                    if changed {
-                        if let Some(p) = self.prof.as_mut() {
-                            p.tick(self.cur_line);
+                let ln = *ln;
+                if ln != 0 && ln != self.cur_line {
+                    self.cur_line = ln;
+                    if let Some(p) = self.prof.as_mut() {
+                        p.tick(ln);
+                    }
+                    // Externes Stop-Signal: sauber abwickeln, damit die
+                    // bisherigen Profile-Daten noch ausgegeben werden.
+                    if let Some(s) = self.stop.as_ref() {
+                        if s.load(Ordering::Relaxed) {
+                            return Err(PROFILE_STOP.into());
                         }
-                        // Externes Stop-Signal: sauber abwickeln, damit die
-                        // bisherigen Profile-Daten noch ausgegeben werden.
-                        if let Some(s) = self.stop.as_ref() {
-                            if s.load(Ordering::Relaxed) {
-                                return Err(PROFILE_STOP.into());
-                            }
-                        }
-                        if self.dbg.is_some() {
-                            self.debug_on_line(fn_, locals)?;
-                        }
+                    }
+                    if self.dbg.is_some() {
+                        self.debug_on_line(fn_, locals)?;
                     }
                 }
             }
@@ -1231,7 +1254,15 @@ impl<'p> Vm<'p> {
                 op::STORE_LOCAL => {
                     let slot = arg.as_usize();
                     let v = vm_pop(stack)?;
-                    locals[slot] = coerce(v, &fn_.local_types[slot], "Lokale Variable")?;
+                    // Fast-Arm: Wert hat schon den Zieltyp -> kein coerce-Call.
+                    let ty = &fn_.local_types[slot];
+                    locals[slot] = match (&v, ty.as_str()) {
+                        (Value::Int(_), "integer") | (Value::Float(_), "float")
+                        | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                        | (_, "any") | (_, "") => v,
+                        (Value::Int(n), "float") => Value::Float(*n as f64),
+                        _ => coerce(v, ty, "Lokale Variable")?,
+                    };
                 }
                 op::DECLARE_LOCAL => {
                     let l = arg.list();
@@ -1542,47 +1573,40 @@ impl<'p> Vm<'p> {
                     let name = l[0].str();
                     let argc = l[1].as_usize();
                     let split = stack.len() - argc;
-                    let bargs = stack.split_off(split);
+                    // Args als Slice direkt vom Stack (kein split_off-Vec pro
+                    // Call); Ergebnis erst nach dem Truncate pushen.
                     // Reihenfolge: array-HOF (FUNCREF-Comparator) -> scene (VM-State)
                     // -> coro (VM-State) -> Grafik -> pure.
-                    if let Some(v) = self.try_array_hof(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_scene(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_coro(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_timer(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_db(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_net(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_html(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_serial(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_usb(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_wifi(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_bt(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_gui(name, &bargs)? {
-                        stack.push(v);
-                    } else if let Some(v) = self.try_graphics(name, &bargs)? {
-                        stack.push(v);
-                    } else {
-                        match safe_call_builtin(name, &bargs) {
-                            Some(Ok(v)) => stack.push(v),
-                            Some(Err(e)) => {
-                                if e.starts_with("__UNKNOWN_BUILTIN__:") {
-                                    return Err(unknown_builtin_msg(name));
+                    let v = {
+                        let bargs: &[Value] = &stack[split..];
+                        if let Some(v) = self.try_array_hof(name, bargs)? { v }
+                        else if let Some(v) = self.try_scene(name, bargs)? { v }
+                        else if let Some(v) = self.try_coro(name, bargs)? { v }
+                        else if let Some(v) = self.try_timer(name, bargs)? { v }
+                        else if let Some(v) = self.try_db(name, bargs)? { v }
+                        else if let Some(v) = self.try_net(name, bargs)? { v }
+                        else if let Some(v) = self.try_html(name, bargs)? { v }
+                        else if let Some(v) = self.try_serial(name, bargs)? { v }
+                        else if let Some(v) = self.try_usb(name, bargs)? { v }
+                        else if let Some(v) = self.try_wifi(name, bargs)? { v }
+                        else if let Some(v) = self.try_bt(name, bargs)? { v }
+                        else if let Some(v) = self.try_gui(name, bargs)? { v }
+                        else if let Some(v) = self.try_graphics(name, bargs)? { v }
+                        else {
+                            match safe_call_builtin(name, bargs) {
+                                Some(Ok(v)) => v,
+                                Some(Err(e)) => {
+                                    if e.starts_with("__UNKNOWN_BUILTIN__:") {
+                                        return Err(unknown_builtin_msg(name));
+                                    }
+                                    return Err(e);
                                 }
-                                return Err(e);
+                                None => return Err(unknown_builtin_msg(name)),
                             }
-                            None => return Err(unknown_builtin_msg(name)),
                         }
-                    }
+                    };
+                    stack.truncate(split);
+                    stack.push(v);
                 }
                 op::LOAD_FUNCREF => {
                     let name = constants[arg.as_usize()].fmt();
@@ -1993,6 +2017,7 @@ impl<'p> Vm<'p> {
     // Modul db (SQLite, Feature `db`)
     // ===================================================================
     fn try_db(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("db_")) { return Ok(None); }
         #[cfg(feature = "db")]
         { return self.try_db_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2071,6 +2096,7 @@ impl<'p> Vm<'p> {
     // Modul net (std::net, Feature `net`)
     // ===================================================================
     fn try_net(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("net_")) { return Ok(None); }
         #[cfg(feature = "net")]
         { return self.try_net_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2160,6 +2186,7 @@ impl<'p> Vm<'p> {
     // Modul html (HTTP/HTML/URL, Feature `http`)
     // ===================================================================
     fn try_html(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("http_") || name.starts_with("html_") || name.starts_with("url_")) { return Ok(None); }
         #[cfg(feature = "http")]
         { return self.try_html_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2222,6 +2249,7 @@ impl<'p> Vm<'p> {
     // Modul serial (Feature `serial`)
     // ===================================================================
     fn try_serial(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("serial_")) { return Ok(None); }
         #[cfg(feature = "serial")]
         { return self.try_serial_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2259,6 +2287,7 @@ impl<'p> Vm<'p> {
     // Modul usb (Feature `usb`)
     // ===================================================================
     fn try_usb(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("usb_")) { return Ok(None); }
         #[cfg(feature = "usb")]
         { return self.try_usb_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2291,6 +2320,7 @@ impl<'p> Vm<'p> {
     // Modul wifi (Feature `wifi`, Windows-only)
     // ===================================================================
     fn try_wifi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("wifi_")) { return Ok(None); }
         #[cfg(feature = "wifi")]
         {
             use crate::wifi;
@@ -2315,6 +2345,7 @@ impl<'p> Vm<'p> {
     // Modul bt (Feature `bt`, BLE async)
     // ===================================================================
     fn try_bt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("bt_")) { return Ok(None); }
         #[cfg(feature = "bt")]
         { return self.try_bt_impl(name, a); }
         #[allow(unreachable_code)]
@@ -2346,6 +2377,7 @@ impl<'p> Vm<'p> {
     /// Kein Grafik-Bezug -- laeuft auch konsolen-only. TIMER_UPDATE feuert
     /// faellige FUNCREF-Callbacks nach dem gleichen Muster wie GUI_UPDATE.
     fn try_timer(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("timer_") || name == "cooldown") { return Ok(None); }
         fn t_int(a: &[Value], i: usize, fn_: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n), _ => Err(format!("{}: erwartet INTEGER (Arg {})", fn_, i + 1)) }
         }
@@ -2393,6 +2425,7 @@ impl<'p> Vm<'p> {
     }
 
     fn try_scene(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("scene_")) { return Ok(None); }
         fn sa<'x>(a: &'x [Value], i: usize, fn_: &str) -> R<&'x str> {
             match a.get(i) { Some(Value::Str(s)) => Ok(s), _ => Err(format!("{}: erwartet STRING", fn_)) }
         }
@@ -2448,6 +2481,7 @@ impl<'p> Vm<'p> {
     /// alles andere nur den GUI-State (self.gui).
     #[cfg(feature = "graphics")]
     fn try_gui(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !name.starts_with("gui_") { return Ok(None); }
         fn gi(a: &[Value], i: usize, f: &str) -> R<i64> {
             match a.get(i) { Some(Value::Int(n)) => Ok(*n),
                 _ => Err(format!("{}: erwartet INTEGER (Arg {})", f, i + 1)) }
