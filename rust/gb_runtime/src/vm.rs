@@ -696,10 +696,16 @@ impl<'p> Vm<'p> {
     }
 
     fn is_property(&self, class_name: &str, name: &str) -> bool {
-        let target = name.to_lowercase();
+        // Member-Namen liegen lowercase vor (Compiler) -- nur im seltenen
+        // gemischten Fall allozieren.
+        let lowered;
+        let target: &str = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+            lowered = name.to_lowercase();
+            &lowered
+        } else { name };
         let mut cur = self.prog.classes.get(class_name);
         while let Some(ci) = cur {
-            if ci.properties.contains(&target) {
+            if ci.properties.contains(target) {
                 return true;
             }
             if ci.parent_name.is_empty() {
@@ -1723,7 +1729,13 @@ impl<'p> Vm<'p> {
                     } else { return Err("STORE_FIELD: self ist keine Instanz".into()); }
                 }
                 op::LOAD_MEMBER => {
-                    let name = constants[arg.as_usize()].fmt();
+                    // Member-Name direkt aus dem Const-Pool (&str) -- fmt()
+                    // allozierte vorher einen String PRO Zugriff.
+                    let name_owned;
+                    let name: &str = match &constants[arg.as_usize()] {
+                        Value::Str(s) => s,
+                        v => { name_owned = v.fmt(); &name_owned }
+                    };
                     let obj = vm_pop(stack)?;
                     match &obj {
                         Value::Nil => return Err(format!("Zugriff auf '.{}' bei NIL-Referenz", name)),
@@ -1741,7 +1753,7 @@ impl<'p> Vm<'p> {
                                 let r = self.exec(getter, vec![], Some(obj.clone()))?;
                                 stack.push(r);
                             } else {
-                                let v = rc.borrow().fields.get(&name)
+                                let v = rc.borrow().fields.get(name)
                                     .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?.value.clone();
                                 stack.push(v);
                             }
@@ -1750,22 +1762,39 @@ impl<'p> Vm<'p> {
                     }
                 }
                 op::STORE_MEMBER => {
-                    let name = constants[arg.as_usize()].fmt();
+                    let name_owned;
+                    let name: &str = match &constants[arg.as_usize()] {
+                        Value::Str(s) => s,
+                        v => { name_owned = v.fmt(); &name_owned }
+                    };
                     let v = vm_pop(stack)?;
                     let obj = vm_pop(stack)?;
                     match &obj {
                         Value::Nil => return Err(format!("Zuweisung an '.{}' bei NIL-Referenz", name)),
                         Value::Instance(rc) => {
                             let cn = rc.borrow().class_name.clone();
-                            if self.is_property(&cn, &name) {
+                            if self.is_property(&cn, name) {
                                 let setter = self.resolve_method(&cn, &format!("__set_{}", name.to_lowercase()))
                                     .ok_or_else(|| format!("Property '{}' in {} hat keinen Setter (read-only)", name, cn))?;
                                 self.exec(setter, vec![v], Some(obj.clone()))?;
                             } else {
-                                let ty = rc.borrow().fields.get(&name)
-                                    .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?.ty.clone();
-                                let cv = coerce(v, &ty, &format!("Zuweisung an {}.{}", cn, name))?;
-                                rc.borrow_mut().fields.get_mut(&name).unwrap().value = cv;
+                                // Ein borrow_mut, Coerce-Fast-Arm; der
+                                // format!-Fehlerkontext entsteht nur noch im
+                                // Slow-Path (vorher bei JEDEM Store).
+                                let mut rcb = rc.borrow_mut();
+                                let f = rcb.fields.get_mut(name)
+                                    .ok_or_else(|| format!("Feld '{}' existiert nicht in {}", name, cn))?;
+                                let cv = match (&v, f.ty.as_str()) {
+                                    (Value::Int(_), "integer") | (Value::Float(_), "float")
+                                    | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                                    | (_, "any") | (_, "") => v,
+                                    (Value::Int(n), "float") => Value::Float(*n as f64),
+                                    _ => {
+                                        let ty = f.ty.clone();
+                                        coerce(v, &ty, &format!("Zuweisung an {}.{}", cn, name))?
+                                    }
+                                };
+                                f.value = cv;
                             }
                         }
                         _ => return Err(format!("Zuweisung an '.{}' bei nicht-Objekt ({})", name, obj.type_name())),
