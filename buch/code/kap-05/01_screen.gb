@@ -1,8 +1,0 @@
-' Star Pilot - Kap 5, Schritt 1: nur das Fenster.
-'
-' Oeffnet ein 320x240-Fenster mit Skalierungsfaktor 2 (auf dem Bildschirm
-' also 640x480). Das Programm endet sofort nach SCREEN, das Fenster ist
-' daher nur kurz sichtbar - das ist Absicht und in Schritt 2 kommt die
-' Schleife.
-
-SCREEN(320, 240, "Star Pilot", 2)

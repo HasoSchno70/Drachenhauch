@@ -1,6 +1,0 @@
-' Mein erstes GameBasic-Programm.
-' Gibt drei Zeilen Begruessung an die Konsole aus.
-
-PRINT "Hallo, Pilot!"
-PRINT "Bereit zum Start?"
-PRINT "Druecke Run und es geht los."
