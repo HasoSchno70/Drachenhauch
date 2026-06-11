@@ -87,6 +87,7 @@ mod oc {
     pub const STORE_MEMBER: i64 = 84;
     pub const DECLARE_STRUCT_NAME: i64 = 86;
     pub const LOAD_SELF: i64 = 88;
+    pub const FOR_NEXT: i64 = 116;
     pub const LOAD_GLOBAL_SLOT: i64 = 111;
     pub const STORE_GLOBAL_SLOT: i64 = 112;
     pub const DECLARE_GLOBAL_SLOT: i64 = 113;
@@ -738,6 +739,10 @@ impl Compiler {
             self.expr(step.as_deref().unwrap())?;
             self.ctx.emit(oc::STORE_LOCAL, json!(s));
         }
+        // Zeile des FOR-Statements merken: das fusionierte FOR_NEXT am
+        // Loop-Ende wird mit IHR getaggt, damit Profiler/Debugger die
+        // FOR-Zeile weiterhin pro Iteration sehen (wie der alte Kopf-Test).
+        let for_line = self.ctx.cur_line;
         let loop_start = self.ctx.here();
         self.break_continue_enter();
         let mut exit_jumps: Vec<usize> = vec![];
@@ -770,20 +775,47 @@ impl Compiler {
             exit_jumps.push(self.ctx.emit(oc::JUMP_IF_TRUE, Value::Null));
             let t2 = self.ctx.here(); self.ctx.patch(body_jump, t2);
         }
+        // Body-Beginn (Ruecksprung-Ziel des fusionierten FOR_NEXT): direkt
+        // hinter dem Eintritts-Test -- der laeuft damit nur noch EINMAL.
+        let body_start = self.ctx.here();
         for st in body { self.stmt(st)?; }
         // CONTINUE -> Inkrement
         let inc_target = self.ctx.here();
         let cont = self.ctx.continue_patches.pop().unwrap().0;
         for ip in cont { self.ctx.patch(ip, inc_target); }
-        // var += step
-        self.load_var(var);
-        match step_const_val {
-            Some(cv) => { let c = self.ctx.add_const(enc(&cv)); self.ctx.emit(oc::LOAD_CONST, json!(c)); }
-            None => { self.ctx.emit(oc::LOAD_LOCAL, json!(step_slot)); }
+        // Adressierbarkeit der Laufvariable fuer das fusionierte FOR_NEXT:
+        // lokaler Slot (Funktion) oder Global-Slot (main). Name-basierte
+        // Variablen (DECLARE_NAME-Fallback) nehmen den generischen Pfad.
+        let var_addr: Option<(i64, i64)> = if !self.ctx.is_main {
+            self.ctx.local_slots.get(var).map(|&s| (0i64, s as i64))
+        } else if let Some(&s) = self.ctx.local_slots.get(var) {
+            Some((0, s as i64))
+        } else {
+            self.global_slots.get(var).map(|&s| (1i64, s as i64))
+        };
+        if (const_pos || const_neg) && var_addr.is_some() {
+            // Fusioniert: Inkrement + Weiter-Test + Sprung in EINEM Opcode.
+            self.ctx.cur_line = for_line;
+            let (vg, vidx) = var_addr.unwrap();
+            let step_idx = match &step_const_val {
+                Some(cv) => self.ctx.add_const(enc(cv)) as i64,
+                None => unreachable!("const-Richtung impliziert konstanten STEP"),
+            };
+            self.ctx.emit(oc::FOR_NEXT, json!([
+                vg, vidx, end_slot as i64, 0i64, step_idx,
+                if const_neg { 1i64 } else { 0i64 }, body_start as i64,
+            ]));
+        } else {
+            // var += step
+            self.load_var(var);
+            match step_const_val {
+                Some(cv) => { let c = self.ctx.add_const(enc(&cv)); self.ctx.emit(oc::LOAD_CONST, json!(c)); }
+                None => { self.ctx.emit(oc::LOAD_LOCAL, json!(step_slot)); }
+            }
+            self.ctx.emit(oc::ADD, Value::Null);
+            self.store_var(var);
+            self.ctx.emit(oc::JUMP, json!(loop_start));
         }
-        self.ctx.emit(oc::ADD, Value::Null);
-        self.store_var(var);
-        self.ctx.emit(oc::JUMP, json!(loop_start));
         let end_ip = self.ctx.here();
         for ip in exit_jumps { self.ctx.patch(ip, end_ip); }
         let brk = self.ctx.break_patches.pop().unwrap().0;

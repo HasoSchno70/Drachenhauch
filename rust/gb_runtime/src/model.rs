@@ -61,6 +61,10 @@ pub mod op {
     // Python-Compilers -- der Rust-Compiler emittiert sie nie; entfernt.
     // Die Nummern bleiben reserviert, damit Slot-Opcodes 111+ stabil sind.)
 
+    /// Fusioniertes FOR-Ende (Inkrement + Weiter-Test + Ruecksprung in
+    /// EINEM Dispatch) -- emittiert fuer FOR mit konstantem STEP.
+    pub const FOR_NEXT: u16 = 116;
+
     pub const LOAD_GLOBAL_SLOT: u16 = 111;
     pub const STORE_GLOBAL_SLOT: u16 = 112;
     pub const DECLARE_GLOBAL_SLOT: u16 = 113;

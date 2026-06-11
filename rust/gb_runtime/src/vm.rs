@@ -1283,6 +1283,74 @@ impl<'p> Vm<'p> {
                     }
                 }
 
+                op::FOR_NEXT => {
+                    // Fusioniertes FOR-Ende: var += step, Weiter-Test, Sprung
+                    // zum Body. Arg: [var_global, var_idx, end_slot,
+                    // step_is_slot, step_idx, neg, body_target].
+                    let l = arg.list();
+                    let var_global = l[0].as_i64() == 1;
+                    let var_idx = l[1].as_usize();
+                    let end_slot = l[2].as_usize();
+                    let step_is_slot = l[3].as_i64() == 1;
+                    let step_idx = l[4].as_usize();
+                    let neg = l[5].as_i64() == 1;
+                    let target = l[6].as_usize();
+                    let step_int = if step_is_slot {
+                        match &locals[step_idx] { Value::Int(i) => Some(*i), _ => None }
+                    } else {
+                        match &constants[step_idx] { Value::Int(i) => Some(*i), _ => None }
+                    };
+                    let end_int = match &locals[end_slot] { Value::Int(i) => Some(*i), _ => None };
+                    // Int-Fast-Path (der Normalfall); alles andere geht den
+                    // generischen Weg mit exakt der Einzel-Opcode-Semantik.
+                    let mut exit: Option<bool> = None;
+                    if let (Some(st), Some(en)) = (step_int, end_int) {
+                        if !var_global {
+                            if let Value::Int(cur) = &locals[var_idx] {
+                                let next = cur.checked_add(st).ok_or_else(|| int_overflow_msg("+"))?;
+                                locals[var_idx] = Value::Int(next);
+                                exit = Some(if neg { next < en } else { next > en });
+                            }
+                        } else if let Some(slot) = self.global_slots[var_idx].as_ref() {
+                            let mut sb = slot.borrow_mut();
+                            if !sb.is_const {
+                                if let Value::Int(cur) = &sb.value {
+                                    let next = cur.checked_add(st).ok_or_else(|| int_overflow_msg("+"))?;
+                                    sb.value = Value::Int(next);
+                                    exit = Some(if neg { next < en } else { next > en });
+                                }
+                            }
+                        }
+                    }
+                    let exit = match exit {
+                        Some(e) => e,
+                        None => {
+                            // Generisch: ADD + Store-Coerce + Vergleich -- wie
+                            // die ehemalige Opcode-Folge.
+                            let cur = if var_global {
+                                let s = self.global_slots[var_idx].as_ref().ok_or("Global-Slot leer")?;
+                                s.borrow().value.clone()
+                            } else { locals[var_idx].clone() };
+                            let stepv = if step_is_slot { locals[step_idx].clone() } else { constants[step_idx].clone() };
+                            require_number(&cur, &stepv, "+")?;
+                            let next = nn_add(cur, stepv)?;
+                            if var_global {
+                                let slot = self.global_slots[var_idx].as_ref().ok_or("Slot leer")?.clone();
+                                if slot.borrow().is_const { return Err("CONST kann nicht ueberschrieben werden".into()); }
+                                let ty = slot.borrow().ty.clone();
+                                let cv = coerce(next.clone(), &ty, "Zuweisung an global")?;
+                                slot.borrow_mut().value = cv;
+                            } else {
+                                let ty = &fn_.local_types[var_idx];
+                                locals[var_idx] = coerce(next.clone(), ty, "Lokale Variable")?;
+                            }
+                            let endv = locals[end_slot].clone();
+                            cmp(&next, &endv, if neg { '<' } else { '>' })?
+                        }
+                    };
+                    if !exit { *ip = target; }
+                }
+
                 // --- Slot-Globals ---
                 op::LOAD_GLOBAL_SLOT => {
                     let s = self.global_slots[arg.as_usize()].as_ref().ok_or("Global-Slot leer")?;
@@ -1292,12 +1360,18 @@ impl<'p> Vm<'p> {
                     let idx = arg.as_usize();
                     let v = vm_pop(stack)?;
                     let slot = self.global_slots[idx].as_ref().ok_or("Slot leer")?.clone();
-                    if slot.borrow().is_const {
+                    let mut sb = slot.borrow_mut();
+                    if sb.is_const {
                         return Err("CONST kann nicht ueberschrieben werden".into());
                     }
-                    let ty = slot.borrow().ty.clone();
-                    let cv = coerce(v, &ty, "Zuweisung an global")?;
-                    slot.borrow_mut().value = cv;
+                    // Fast-Arm: Typ passt schon -> kein ty-Clone, kein coerce.
+                    sb.value = match (&v, sb.ty.as_str()) {
+                        (Value::Int(_), "integer") | (Value::Float(_), "float")
+                        | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                        | (_, "any") | (_, "") => v,
+                        (Value::Int(n), "float") => Value::Float(*n as f64),
+                        _ => { let ty = sb.ty.clone(); coerce(v, &ty, "Zuweisung an global")? }
+                    };
                 }
                 op::DECLARE_GLOBAL_SLOT => {
                     let l = arg.list();
