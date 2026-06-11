@@ -606,13 +606,12 @@ impl Parser {
         self.consume_terminator()?;
         let mut cases: Vec<(Vec<CaseMatch>, Option<Node>, Vec<Node>)> = Vec::new();
         let mut else_block = Vec::new();
-        let mut saw_else = false;
         while !self.check(Tt::End) {
             if self.at_end() { return self.err("END SELECT erwartet"); }
             self.expect(Tt::Case, "Erwartet CASE oder END SELECT")?;
             if self.matches(Tt::Else) {
-                if saw_else { return self.err("Mehr als ein CASE ELSE im SELECT-Block"); }
-                saw_else = true;
+                // Ein zweites CASE ELSE ist unerreichbar: der "CASE nach
+                // CASE ELSE"-Check unten erzwingt ELSE als letzten Fall.
                 self.consume_terminator()?;
                 while !self.check(Tt::End) {
                     if self.check(Tt::Case) {
@@ -800,12 +799,10 @@ impl Parser {
     fn params(&mut self) -> R<Vec<Param>> {
         self.expect(Tt::Lparen, "")?;
         let mut params = Vec::new();
-        let mut seen_default = false;
-        let mut seen_variadic = false;
         if !self.check(Tt::Rparen) {
             let p = self.param()?;
-            if p.is_variadic { seen_variadic = true; }
-            seen_default = p.default.is_some();
+            let mut seen_variadic = p.is_variadic;
+            let mut seen_default = p.default.is_some();
             params.push(p);
             while self.matches(Tt::Comma) {
                 if seen_variadic {

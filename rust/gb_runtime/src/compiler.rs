@@ -233,12 +233,10 @@ struct FnSig {
     /// Callee-Prolog ausgewertet (bind_params setzt einen Nil-Sentinel), nicht
     /// als Konstante gebacken. `param_defaults[i]` ist dann None.
     param_default_is_expr: Vec<bool>,
-    param_types: Vec<String>,
     /// Pro Parameter: ob BYREF (Copy-In/Copy-Out). Der Aufruf-Pfad emittiert
     /// dann lvalue-Capture + Post-Call-Write-Back.
     param_byref: Vec<bool>,
     is_variadic: bool,
-    is_sub: bool,
     return_type: String,
     is_coroutine: bool,
 }
@@ -1911,7 +1909,7 @@ fn fn_parts(decl: &Node) -> (&str, &[crate::ast::Param], &[Node], bool, &str) {
 
 /// FnSig aus einem SUB/FUNCTION/Methoden-Knoten.
 fn make_sig(decl: &Node) -> Result<FnSig, String> {
-    let (name, params, body, is_sub, return_type) = fn_parts(decl);
+    let (_, params, body, is_sub, return_type) = fn_parts(decl);
     let mut param_defaults: Vec<Option<CVal>> = Vec::new();
     let mut param_default_is_expr: Vec<bool> = Vec::new();
     for p in params {
@@ -1934,10 +1932,8 @@ fn make_sig(decl: &Node) -> Result<FnSig, String> {
         param_names: params.iter().map(|p| p.name.to_lowercase()).collect(),
         param_defaults,
         param_default_is_expr,
-        param_types: params.iter().map(|p| p.type_name.clone()).collect(),
         param_byref: params.iter().map(|p| p.by_ref).collect(),
         is_variadic,
-        is_sub,
         return_type: if is_sub { String::new() } else { return_type.to_string() },
         is_coroutine: body_has_yield(body),
     })

@@ -328,11 +328,6 @@ fn safe_call_builtin(name: &str, args: &[Value]) -> Option<Result<Value, String>
 }
 
 #[cfg(feature = "graphics")]
-fn ui_mouse(g: Option<&crate::graphics::Graphics>) -> R<(i32, i32, bool)> {
-    let g = g.ok_or("UI-Builtin vor SCREEN aufgerufen")?;
-    Ok((g.mouse_x() as i32, g.mouse_y() as i32, g.mouse_button(0)))
-}
-#[cfg(feature = "graphics")]
 fn ui_in_box(mx: i32, my: i32, x: i32, y: i32, w: i32, h: i32) -> bool {
     x <= mx && mx < x + w && y <= my && my < y + h
 }

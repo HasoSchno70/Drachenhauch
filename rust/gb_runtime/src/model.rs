@@ -163,7 +163,6 @@ pub struct Func {
     pub n_required: usize,
     pub is_variadic: bool,
     pub is_sub: bool,
-    pub is_main: bool,
     /// Coroutine gdw. der Body ein YIELD enthaelt -- Aufruf liefert dann ein
     /// COROUTINE-Handle statt die Funktion auszufuehren.
     pub is_coroutine: bool,
@@ -199,7 +198,6 @@ pub struct FieldDecl {
 }
 
 pub struct ClassInfo {
-    pub name: String,
     pub parent_name: String,
     pub is_struct: bool,
     pub fields: Vec<FieldDecl>,
@@ -336,7 +334,6 @@ fn decode_func(j: &J) -> Func {
         n_required: get("n_required").as_u64().unwrap_or(0) as usize,
         is_variadic: get("is_variadic").as_bool().unwrap_or(false),
         is_sub: get("is_sub").as_bool().unwrap_or(true),
-        is_main: get("is_main").as_bool().unwrap_or(false),
         is_coroutine: get("is_coroutine").as_bool().unwrap_or(false),
         return_type: get("return_type").as_str().unwrap_or("").to_string(),
         param_defaults,
@@ -383,7 +380,6 @@ fn decode_class(j: &J) -> ClassInfo {
         .map(|a| a.iter().filter_map(|x| x.as_str().map(|s| s.to_string())).collect())
         .unwrap_or_default();
     ClassInfo {
-        name: get("name").as_str().unwrap_or("").to_string(),
         parent_name: get("parent_name").as_str().unwrap_or("").to_string(),
         is_struct: get("is_struct").as_bool().unwrap_or(false),
         fields,

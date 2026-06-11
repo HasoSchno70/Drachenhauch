@@ -174,7 +174,6 @@ const BLOCK_TAGS: &[&str] = &["p", "br", "div", "li", "tr", "h1", "h2", "h3", "h
 const SKIP_TAGS: &[&str] = &["script", "style", "noscript"];
 
 struct Tag {
-    raw: String,   // Inhalt zwischen < und > (ohne Klammern)
     name: String,  // lowercase Tag-Name
     closing: bool,
 }
@@ -183,7 +182,7 @@ fn parse_tag(raw: &str) -> Tag {
     let closing = raw.starts_with('/');
     let body = raw.trim_start_matches('/');
     let name: String = body.chars().take_while(|c| c.is_ascii_alphanumeric()).collect::<String>().to_lowercase();
-    Tag { raw: raw.to_string(), name, closing }
+    Tag { name, closing }
 }
 
 /// HTML_TEXT: Tags raus, Entities dekodiert, script/style geskippt,

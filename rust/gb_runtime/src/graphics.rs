@@ -1913,7 +1913,6 @@ impl Graphics {
     // --- Clipboard + Drag&Drop (Batch 5) ---
     pub fn clipboard_get(&self) -> String { self.rl.get_clipboard_text().unwrap_or_default() }
     pub fn clipboard_set(&mut self, s: &str) { let _ = self.rl.set_clipboard_text(s); }
-    pub fn files_dropped(&self) -> bool { self.rl.is_file_dropped() }
     pub fn dropped_files(&self) -> Vec<String> {
         if !self.rl.is_file_dropped() { return Vec::new(); }
         self.rl.load_dropped_files().paths().iter().map(|s| s.to_string()).collect()
@@ -2423,7 +2422,6 @@ impl Graphics {
         let btn = match b { 0 => MouseButton::MOUSE_BUTTON_LEFT, 1 => MouseButton::MOUSE_BUTTON_RIGHT, 2 => MouseButton::MOUSE_BUTTON_MIDDLE, _ => return false };
         self.rl.is_mouse_button_down(btn)
     }
-    pub fn millis(&self) -> i64 { (self.rl.get_time() * 1000.0) as i64 }
 
     /// Mausrad-Delta dieses Frames (raylib liefert es pro Frame; "pop" =
     /// einmal lesen). Positiv = nach oben/vorn.
@@ -2787,7 +2785,7 @@ fn render_scene<D: RaylibDraw>(
 ) {
     let (loc_use_normal, loc_metalness, loc_roughness, loc_emissive) = mat_locs;
     // Per-Modell-Material-Uniforms (useNormalMap + metalness/roughness + emissive) vor dem Draw.
-    let mut set_material = |ls: &mut Option<&mut Shader>, idx: usize| {
+    let set_material = |ls: &mut Option<&mut Shader>, idx: usize| {
         if let Some(sh) = ls.as_mut() {
             if loc_use_normal >= 0 {
                 sh.set_shader_value(loc_use_normal, if normal_mapped.contains(&idx) { 1i32 } else { 0i32 });

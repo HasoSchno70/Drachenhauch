@@ -1958,8 +1958,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 "a" => FileH::Write(std::fs::OpenOptions::new().append(true).create(true).open(&path).map_err(|e| format!("OPENFILE: {}", e))?),
                 _ => return err(format!("OPENFILE: ungueltiger Modus '{}' (erlaubt: r, w, a)", mode)),
             };
-            let m = mode.chars().next().unwrap();
-            Ok(Value::File(Rc::new(RefCell::new(GbFile { path, mode: m, h }))))
+            Ok(Value::File(Rc::new(RefCell::new(GbFile { path, h }))))
         }
         "closefile" => {
             arity!(1);

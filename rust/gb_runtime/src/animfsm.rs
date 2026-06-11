@@ -96,7 +96,6 @@ pub struct AnimFsmObj {
     pub states: Vec<AnimState>,
     pub transitions: Vec<Transition>,
     pub current: String,
-    pub default: String,
 }
 
 impl AnimFsmObj {
@@ -277,8 +276,7 @@ impl AnimFsmObj {
             params,
             states,
             transitions,
-            current: default.clone(),
-            default,
+            current: default,
         })
     }
 

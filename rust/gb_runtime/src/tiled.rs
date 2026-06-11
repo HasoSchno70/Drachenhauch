@@ -57,13 +57,7 @@ impl PropVal {
 
 pub struct TiledTileset {
     pub first_gid: i64,
-    pub name: String,
-    pub tile_w: i64,
-    pub tile_h: i64,
-    pub columns: i64,
     pub image: String,
-    pub image_w: i64,
-    pub image_h: i64,
     /// local_tile_id (gid - first_gid) -> {key: value}
     pub tile_properties: HashMap<i64, HashMap<String, PropVal>>,
 }
@@ -75,8 +69,6 @@ pub struct TiledObject {
     pub y: f64,
     pub width: f64,
     pub height: f64,
-    pub rotation: f64,
-    pub gid: i64,
     pub properties: HashMap<String, PropVal>,
 }
 
@@ -94,7 +86,6 @@ pub struct TiledLayer {
 }
 
 pub struct TiledMap {
-    pub path: String,
     pub width: i64,
     pub height: i64,
     pub tile_w: i64,
@@ -308,13 +299,7 @@ fn normpath(p: &Path) -> String {
 fn parse_tileset(t: &J, base_dir: &Path) -> TiledTileset {
     let mut ts = TiledTileset {
         first_gid: jint(t, "firstgid", 1),
-        name: jstr(t, "name", ""),
-        tile_w: jint(t, "tilewidth", 0),
-        tile_h: jint(t, "tileheight", 0),
-        columns: jint(t, "columns", 0),
         image: String::new(),
-        image_w: jint(t, "imagewidth", 0),
-        image_h: jint(t, "imageheight", 0),
         tile_properties: HashMap::new(),
     };
     let img = jstr(t, "image", "");
@@ -352,8 +337,6 @@ fn parse_object(o: &J) -> TiledObject {
         y: jfloat(o, "y", 0.0),
         width: jfloat(o, "width", 0.0),
         height: jfloat(o, "height", 0.0),
-        rotation: jfloat(o, "rotation", 0.0),
-        gid: jint(o, "gid", 0),
         properties: parse_properties(o.get("properties")),
     }
 }
@@ -445,7 +428,6 @@ pub fn load(path: &str) -> Result<Rc<RefCell<TiledMap>>, String> {
     let base_dir = abs.parent().map(|p| p.to_path_buf()).unwrap_or_default();
 
     let mut m = TiledMap {
-        path: path.to_string(),
         width: jint(&data, "width", 0),
         height: jint(&data, "height", 0),
         tile_w: jint(&data, "tilewidth", 0),

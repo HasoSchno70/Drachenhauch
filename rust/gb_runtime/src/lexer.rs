@@ -106,8 +106,6 @@ pub struct Token {
     pub val: Val,
     pub line: usize,
     pub col: usize,
-    pub end_line: usize,
-    pub end_col: usize,
 }
 
 pub struct LexError {
@@ -156,8 +154,7 @@ impl Lexer {
     }
 
     fn push(&mut self, tt: Tt, val: Val, line: usize, col: usize) {
-        self.toks.push(Token { tt, val, line, col,
-                               end_line: self.line, end_col: self.col });
+        self.toks.push(Token { tt, val, line, col });
     }
 
     fn err(&self, msg: &str, line: usize, col: usize) -> LexError {

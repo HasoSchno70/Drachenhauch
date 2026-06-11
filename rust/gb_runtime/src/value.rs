@@ -167,7 +167,6 @@ pub enum FileH {
 
 pub struct GbFile {
     pub path: String,
-    pub mode: char,
     pub h: FileH,
 }
 
