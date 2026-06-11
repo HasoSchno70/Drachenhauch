@@ -14,6 +14,9 @@ path = "src/main.rs"
 serde_json = { version = "1", features = ["preserve_order"] }
 # regex-Modul (REGEX_*). Pure-Rust, klein -> immer dabei (kein Feature-Gate).
 regex = "1"
+# Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
+# Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
+rustc-hash = "2"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
 rapier3d = "0.22"

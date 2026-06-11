@@ -8,6 +8,7 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 use crate::model::Func;
@@ -266,7 +267,7 @@ impl SpriteObj {
 
 pub struct Namespace {
     pub name: String,
-    pub members: HashMap<String, Value>, // key = lower-case Member-Name
+    pub members: FxHashMap<String, Value>, // key = lower-case Member-Name
 }
 
 /// Mehrdimensionales, homogen getyptes Array (entspricht `_GBArray`).
@@ -343,7 +344,7 @@ impl GbMap {
 /// Instanz einer User-Klasse/Struct.
 pub struct Instance {
     pub class_name: Rc<str>,
-    pub fields: HashMap<String, FieldVal>,
+    pub fields: FxHashMap<String, FieldVal>,
 }
 
 pub struct FieldVal {

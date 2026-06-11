@@ -575,6 +575,7 @@ dependencies = [
  "raylib",
  "regex",
  "rusqlite",
+ "rustc-hash 2.1.2",
  "serde_json",
  "serialport",
  "tokio",

@@ -733,7 +733,7 @@ impl<'p> Vm<'p> {
     }
 
     fn allocate_instance(&self, class_name: &str) -> Value {
-        let mut fields: HashMap<String, FieldVal> = HashMap::new();
+        let mut fields: rustc_hash::FxHashMap<String, FieldVal> = rustc_hash::FxHashMap::default();
         // Kette parent-first sammeln.
         let mut chain: Vec<&ClassInfo> = Vec::new();
         let mut cur = self.prog.classes.get(class_name);

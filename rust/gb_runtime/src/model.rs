@@ -205,15 +205,15 @@ pub struct ClassInfo {
     pub parent_name: String,
     pub is_struct: bool,
     pub fields: Vec<FieldDecl>,
-    pub methods: std::collections::HashMap<String, Func>,
+    pub methods: rustc_hash::FxHashMap<String, Func>,
     pub properties: std::collections::HashSet<String>,
 }
 
 pub struct Program {
     pub n_globals: usize,
     pub main: Func,
-    pub functions: std::collections::HashMap<String, Func>,
-    pub classes: std::collections::HashMap<String, ClassInfo>,
+    pub functions: rustc_hash::FxHashMap<String, Func>,
+    pub classes: rustc_hash::FxHashMap<String, ClassInfo>,
     pub data: Vec<crate::value::Value>,
 }
 
@@ -247,7 +247,7 @@ fn decode_value(j: &J) -> Value {
             } else if let Some(ns) = map.get("ns") {
                 let obj = ns.as_object().expect("ns-Objekt");
                 let name = obj.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let mut members = std::collections::HashMap::new();
+                let mut members = rustc_hash::FxHashMap::default();
                 if let Some(m) = obj.get("members").and_then(|v| v.as_object()) {
                     for (k, mv) in m {
                         members.insert(k.clone(), decode_value(mv));
@@ -373,7 +373,7 @@ fn decode_class(j: &J) -> ClassInfo {
                 .collect()
         })
         .unwrap_or_default();
-    let mut methods = std::collections::HashMap::new();
+    let mut methods = rustc_hash::FxHashMap::default();
     if let Some(mo) = get("methods").as_object() {
         for (name, mj) in mo {
             methods.insert(name.clone(), decode_func(mj));
@@ -400,13 +400,13 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     }
     let n_globals = obj.get("n_globals").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
     let main = decode_func(obj.get("main").ok_or("kein main")?);
-    let mut functions = std::collections::HashMap::new();
+    let mut functions = rustc_hash::FxHashMap::default();
     if let Some(fobj) = obj.get("functions").and_then(|v| v.as_object()) {
         for (name, fj) in fobj {
             functions.insert(name.clone(), decode_func(fj));
         }
     }
-    let mut classes = std::collections::HashMap::new();
+    let mut classes = rustc_hash::FxHashMap::default();
     if let Some(cobj) = obj.get("classes").and_then(|v| v.as_object()) {
         for (name, cj) in cobj {
             classes.insert(name.clone(), decode_class(cj));
