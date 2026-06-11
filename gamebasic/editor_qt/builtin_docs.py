@@ -181,7 +181,7 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "audio_resume_all":         ("AUDIO_RESUME_ALL()", "Alle Channels fortsetzen."),
     "audio_stop_all":           ("AUDIO_STOP_ALL()", "Alle Channels stoppen."),
     "audio_play":               ("AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) AS AUDIO_CHANNEL",
-                                  "Sound abspielen, Channel-Handle zurueckgeben."),
+                                  "Sound abspielen, Channel-Handle zurueckgeben. loops=0 einmal, N -> N+1 Durchlaeufe, -1 endlos; fade_in_ms blendet ein."),
     "audio_pause":              ("AUDIO_PAUSE(ch)", "Channel pausieren."),
     "audio_resume":             ("AUDIO_RESUME(ch)", "Channel fortsetzen."),
     "audio_stop":               ("AUDIO_STOP(ch[, fade_out_ms])", "Channel stoppen, optional ausblenden."),

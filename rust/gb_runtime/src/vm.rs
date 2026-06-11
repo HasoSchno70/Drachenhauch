@@ -3434,13 +3434,23 @@ impl<'p> Vm<'p> {
             "audio_resume_all" => { self.audio_mut()?.resume_all(); Value::Nil }
             "audio_stop_all" => { self.audio_mut()?.stop_all(); Value::Nil }
             "audio_play" => {
+                // AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) -- loops=0 einmal (Default), -1 endlos
                 let idx = gi(a, 0, "AUDIO_PLAY")?;
+                let loops = if a.len() >= 2 { gi(a, 1, "AUDIO_PLAY")? } else { 0 };
                 let vol = if a.len() >= 3 { need_f(a, 2, "AUDIO_PLAY")? } else { 1.0 };
-                Value::Int(self.audio_mut()?.ch_play(idx, vol)?)
+                let fade = if a.len() >= 4 { gi(a, 3, "AUDIO_PLAY")? } else { 0 };
+                if fade < 0 { return Err("AUDIO_PLAY: fade_in_ms muss >= 0 sein".into()); }
+                Value::Int(self.audio_mut()?.ch_play(idx, loops, vol, fade)?)
             }
             "audio_pause" => { let i = gi(a, 0, "AUDIO_PAUSE")?; self.audio_mut()?.ch_pause(i)?; Value::Nil }
             "audio_resume" => { let i = gi(a, 0, "AUDIO_RESUME")?; self.audio_mut()?.ch_resume(i)?; Value::Nil }
-            "audio_stop" => { let i = gi(a, 0, "AUDIO_STOP")?; self.audio_mut()?.ch_stop(i)?; Value::Nil }
+            "audio_stop" => {
+                // AUDIO_STOP(ch[, fade_out_ms])
+                let i = gi(a, 0, "AUDIO_STOP")?;
+                let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_STOP")? } else { 0 };
+                if fade < 0 { return Err("AUDIO_STOP: fade_out_ms muss >= 0 sein".into()); }
+                self.audio_mut()?.ch_stop(i, fade)?; Value::Nil
+            }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }

@@ -30,6 +30,8 @@ AUDIO_SET_NUM_CHANNELS(32)        ' 32 Sounds gleichzeitig moeglich
 
 Spielt einen SOUND ab und liefert einen Channel-Handle zurueck. Mit dem kann man den Sound pausieren, stoppen, in der Lautstaerke aendern usw.
 
+`loops` folgt der pygame-Semantik: `0` spielt einmal (Default), `N` wiederholt N-mal (also N+1 Durchlaeufe), `-1` loopt endlos. `fade_in_ms` blendet von 0 auf `volume` ein; `AUDIO_STOP(ch, fade_out_ms)` blendet entsprechend aus und stoppt am Fade-Ende. Beide Fades laufen nicht-blockierend ueber den Frame-Update (FLIP).
+
 | Funktion | Wirkung |
 |---|---|
 | `AUDIO_PLAY(s, [loops, vol, fade_in_ms])` → AUDIO_CHANNEL | Sound starten |

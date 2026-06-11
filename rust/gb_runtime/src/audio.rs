@@ -77,15 +77,15 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
     }
 }
 
-/// Laufender Musik-Fade (AUDIO_MUSIC_PLAY fade_in / AUDIO_MUSIC_STOP fade_out).
-/// Zeitbasiert -- `update()` (pro Frame aus dem FLIP-Pfad) schreibt das
-/// interpolierte Volume auf den Stream.
-struct MusicFade {
+/// Laufender Fade (AUDIO_MUSIC_PLAY/AUDIO_PLAY fade_in, AUDIO_MUSIC_STOP/
+/// AUDIO_STOP fade_out). Zeitbasiert -- `update()` (pro Frame aus dem
+/// FLIP-Pfad) schreibt das interpolierte Volume auf Stream bzw. Sound.
+struct Fade {
     from: f32,
     to: f32,
     start: std::time::Instant,
     dur_ms: f64,
-    stop_after: bool,   // Fade-out: am Ende Stream stoppen
+    stop_after: bool,   // Fade-out: am Ende Stream/Sound stoppen
 }
 
 /// Fade-Fortschritt 0..1 (pure, fuer #[test]).
@@ -94,7 +94,7 @@ fn fade_progress(elapsed_ms: f64, dur_ms: f64) -> f32 {
     (elapsed_ms / dur_ms).clamp(0.0, 1.0) as f32
 }
 
-impl MusicFade {
+impl Fade {
     fn current_vol(&self) -> f32 {
         let t = fade_progress(self.start.elapsed().as_secs_f64() * 1000.0, self.dur_ms);
         self.from + (self.to - self.from) * t
@@ -112,8 +112,11 @@ pub struct Audio {
     music_vol: f32,            // getracktes Music-Volume
     music_queue: Option<String>, // AUDIO_MUSIC_QUEUE -> bei Stream-Ende abspielen
     music_loops: i64,          // verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos (raylib-looping)
-    music_fade: Option<MusicFade>,
+    music_fade: Option<Fade>,
     music_paused: bool,        // AUDIO_MUSIC_PAUSE -- damit update() eine Pause nicht als Stream-Ende deutet
+    ch_fade: Vec<Option<Fade>>, // pro Sound-Handle: laufender Fade (AUDIO_PLAY fade_in / AUDIO_STOP fade_out)
+    ch_loops: Vec<i64>,        // pro Sound-Handle: verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos, 0 = keine
+    ch_paused: Vec<bool>,      // AUDIO_PAUSE -- damit update() eine Pause nicht als Sound-Ende deutet
     num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
     bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
@@ -130,6 +133,7 @@ impl Audio {
             dev, sounds: Vec::new(), sound_vol: Vec::new(),
             music: None, music_vol: 1.0, music_queue: None,
             music_loops: -1, music_fade: None, music_paused: false,
+            ch_fade: Vec::new(), ch_loops: Vec::new(), ch_paused: Vec::new(),
             num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
         })
@@ -176,13 +180,21 @@ impl Audio {
         }
     }
 
+    /// Sound + parallelen Channel-State (Volume/Fade/Loops/Paused) registrieren.
+    fn push_sound(&mut self, s: Sound<'static>, vol: f32) -> i64 {
+        self.sounds.push(s);
+        self.sound_vol.push(vol);
+        self.ch_fade.push(None);
+        self.ch_loops.push(0);
+        self.ch_paused.push(false);
+        (self.sounds.len() - 1) as i64
+    }
+
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
         let s = self.dev.new_sound(path).map_err(|e| format!("LOADSOUND: {}", e))?;
-        self.sounds.push(s);
-        self.sound_vol.push(1.0);
-        Ok((self.sounds.len() - 1) as i64)
+        Ok(self.push_sound(s, 1.0))
     }
 
     fn sound(&self, idx: i64, fn_: &str) -> Result<&Sound<'static>, String> {
@@ -190,16 +202,32 @@ impl Audio {
             .ok_or_else(|| format!("{}: ungueltiges SOUND-Handle {}", fn_, idx))
     }
 
-    pub fn play_sound(&self, idx: i64, volume: f64) -> Result<(), String> {
-        let s = self.sound(idx, "PLAYSOUND")?;
-        s.set_volume(volume.clamp(0.0, 1.0) as f32);
-        s.play();
+    pub fn play_sound(&mut self, idx: i64, volume: f64) -> Result<(), String> {
+        let v = volume.clamp(0.0, 1.0) as f32;
+        {
+            let s = self.sound(idx, "PLAYSOUND")?;
+            s.set_volume(v);
+            s.play();
+        }
+        self.reset_channel_state(idx as usize, v);
         Ok(())
     }
 
-    pub fn stop_sound(&self, idx: i64) -> Result<(), String> {
+    pub fn stop_sound(&mut self, idx: i64) -> Result<(), String> {
         self.sound(idx, "STOPSOUND")?.stop();
+        let v = self.sound_vol[idx as usize];
+        self.reset_channel_state(idx as usize, v);
         Ok(())
+    }
+
+    /// Loop-/Fade-/Pause-Tracking eines Handles zuruecksetzen -- noetig bei
+    /// jedem Neu-Start/Stopp, damit update() einen gestoppten Sound nicht
+    /// per Rest-Loop wiederbelebt.
+    fn reset_channel_state(&mut self, i: usize, vol: f32) {
+        self.sound_vol[i] = vol;
+        self.ch_fade[i] = None;
+        self.ch_loops[i] = 0;
+        self.ch_paused[i] = false;
     }
 
     /// Laedt + startet einen Musik-Stream. Ersetzt eine evtl. laufende Musik
@@ -229,10 +257,33 @@ impl Audio {
 
     /// Pro Frame aufrufen (aus dem FLIP-Pfad), damit der Musik-Stream
     /// nachgefuettert wird -- sonst stockt die Wiedergabe. Treibt ausserdem
-    /// laufende Fades (AUDIO_MUSIC_PLAY/STOP), wiederholt endliche Loops und
-    /// spielt einen per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der
-    /// aktuelle endet.
+    /// laufende Fades (AUDIO_MUSIC_PLAY/STOP + AUDIO_PLAY/AUDIO_STOP),
+    /// wiederholt endliche Loops (Musik UND Sound-Channels) und spielt einen
+    /// per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der aktuelle endet.
     pub fn update(&mut self) {
+        // 0) Sound-Channels: Fades fortschreiben + Loops wiederholen.
+        //    raylib-Sounds koennen nicht nativ loopen -> beendete Sounds mit
+        //    Rest-Loops neu starten (pygame-Semantik: loops=N -> N+1
+        //    Durchlaeufe, -1 = endlos). Pause friert wie bei der Musik ein.
+        for i in 0..self.sounds.len() {
+            if self.ch_paused[i] { continue; }
+            if let Some(f) = &self.ch_fade[i] {
+                self.sounds[i].set_volume(f.current_vol());
+                if f.done() {
+                    let stop = f.stop_after;
+                    self.ch_fade[i] = None;
+                    if stop {
+                        self.sounds[i].stop();
+                        self.sounds[i].set_volume(self.sound_vol[i]);   // fuers naechste Play
+                        self.ch_loops[i] = 0;
+                    }
+                }
+            }
+            if self.ch_loops[i] != 0 && !self.sounds[i].is_playing() {
+                if self.ch_loops[i] > 0 { self.ch_loops[i] -= 1; }
+                self.sounds[i].play();
+            }
+        }
         if self.music.is_none() { return; }
         // 1) Fade fortschreiben (waehrend Pause eingefroren -- zeitbasiert,
         //    aber eine pausierte Musik soll nicht "unterm Eis" leiser werden).
@@ -378,9 +429,7 @@ impl Audio {
             .map_err(|e| format!("AUDIO_SFX: {}", e))?;
         let s = self.dev.new_sound_from_wave(&wave)
             .map_err(|e| format!("AUDIO_SFX: {}", e))?;
-        self.sounds.push(s);
-        self.sound_vol.push(vol as f32);
-        Ok((self.sounds.len() - 1) as i64)
+        Ok(self.push_sound(s, vol as f32))
     }
 
     /// Float-Buffer [-1,1] -> Anti-Click-Envelope -> Volume -> i16-PCM -> WAV
@@ -404,22 +453,67 @@ impl Audio {
             .map_err(|e| format!("AUDIO_TONE: {}", e))?;
         let s = self.dev.new_sound_from_wave(&wave)
             .map_err(|e| format!("AUDIO_TONE: {}", e))?;
-        self.sounds.push(s);
-        self.sound_vol.push(vol as f32);
-        Ok((self.sounds.len() - 1) as i64)
+        Ok(self.push_sound(s, vol as f32))
     }
 
     // -- Channel-Playback (Handle == Sound-Index) --
-    pub fn ch_play(&mut self, idx: i64, volume: f64) -> Result<i64, String> {
+    /// AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) -- pygame-Semantik:
+    /// loops=0 einmal (Default), loops=N -> N+1 Durchlaeufe, loops=-1 endlos.
+    /// raylib-Sounds loopen nicht nativ -> update() zaehlt und startet neu.
+    pub fn ch_play(&mut self, idx: i64, loops: i64, volume: f64, fade_in_ms: i64) -> Result<i64, String> {
         let v = volume.clamp(0.0, 1.0) as f32;
-        self.snd(idx, "AUDIO_PLAY")?.set_volume(v);
-        self.snd(idx, "AUDIO_PLAY")?.play();
-        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = v; }
+        {
+            let s = self.snd(idx, "AUDIO_PLAY")?;
+            s.set_volume(if fade_in_ms > 0 { 0.0 } else { v });
+            s.play();
+        }
+        let i = idx as usize;
+        self.reset_channel_state(i, v);
+        self.ch_loops[i] = if loops < 0 { -1 } else { loops };
+        if fade_in_ms > 0 {
+            self.ch_fade[i] = Some(Fade {
+                from: 0.0, to: v,
+                start: std::time::Instant::now(),
+                dur_ms: fade_in_ms as f64, stop_after: false,
+            });
+        }
         Ok(idx)
     }
-    pub fn ch_pause(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_PAUSE")?.pause(); Ok(()) }
-    pub fn ch_resume(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_RESUME")?.resume(); Ok(()) }
-    pub fn ch_stop(&self, idx: i64) -> Result<(), String> { self.snd(idx, "AUDIO_STOP")?.stop(); Ok(()) }
+    pub fn ch_pause(&mut self, idx: i64) -> Result<(), String> {
+        self.snd(idx, "AUDIO_PAUSE")?.pause();
+        self.ch_paused[idx as usize] = true;
+        Ok(())
+    }
+    pub fn ch_resume(&mut self, idx: i64) -> Result<(), String> {
+        self.snd(idx, "AUDIO_RESUME")?.resume();
+        self.ch_paused[idx as usize] = false;
+        Ok(())
+    }
+    /// AUDIO_STOP(ch[, fade_out_ms]) -- ohne fade sofort, sonst ausfaden und
+    /// am Fade-Ende stoppen (update() treibt den Fade).
+    pub fn ch_stop(&mut self, idx: i64, fade_out_ms: i64) -> Result<(), String> {
+        let playing = {
+            let s = self.snd(idx, "AUDIO_STOP")?;
+            if fade_out_ms <= 0 { s.stop(); }
+            s.is_playing()
+        };
+        let i = idx as usize;
+        if fade_out_ms <= 0 {
+            let v = self.sound_vol[i];
+            self.reset_channel_state(i, v);
+            return Ok(());
+        }
+        if playing || self.ch_paused[i] {
+            let from = self.ch_fade[i].as_ref()
+                .map(|f| f.current_vol()).unwrap_or(self.sound_vol[i]);
+            self.ch_fade[i] = Some(Fade {
+                from, to: 0.0,
+                start: std::time::Instant::now(),
+                dur_ms: fade_out_ms as f64, stop_after: true,
+            });
+        }
+        Ok(())
+    }
     pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> { Ok(self.snd(idx, "AUDIO_IS_PLAYING")?.is_playing()) }
     pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
         let vol = v.clamp(0.0, 1.0) as f32;
@@ -446,9 +540,20 @@ impl Audio {
     }
 
     // -- Mixer-weit --
-    pub fn pause_all(&self) { for s in &self.sounds { s.pause(); } }
-    pub fn resume_all(&self) { for s in &self.sounds { s.resume(); } }
-    pub fn stop_all(&self) { for s in &self.sounds { s.stop(); } }
+    pub fn pause_all(&mut self) {
+        for s in &self.sounds { s.pause(); }
+        for p in &mut self.ch_paused { *p = true; }
+    }
+    pub fn resume_all(&mut self) {
+        for s in &self.sounds { s.resume(); }
+        for p in &mut self.ch_paused { *p = false; }
+    }
+    pub fn stop_all(&mut self) {
+        for s in &self.sounds { s.stop(); }
+        for f in &mut self.ch_fade { *f = None; }
+        for l in &mut self.ch_loops { *l = 0; }
+        for p in &mut self.ch_paused { *p = false; }
+    }
     pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
     pub fn get_num_channels(&self) -> i64 { self.num_channels }
     pub fn busy_channels(&self) -> i64 { self.sounds.iter().filter(|s| s.is_playing()).count() as i64 }
@@ -480,7 +585,7 @@ impl Audio {
             m.stop_stream();
             if fade_in_ms > 0 {
                 m.set_volume(0.0);
-                self.music_fade = Some(MusicFade {
+                self.music_fade = Some(Fade {
                     from: 0.0, to: self.music_vol,
                     start: std::time::Instant::now(),
                     dur_ms: fade_in_ms as f64, stop_after: false,
@@ -504,7 +609,7 @@ impl Audio {
             if m.is_stream_playing() {
                 let from = self.music_fade.as_ref()
                     .map(|f| f.current_vol()).unwrap_or(self.music_vol);
-                self.music_fade = Some(MusicFade {
+                self.music_fade = Some(Fade {
                     from, to: 0.0,
                     start: std::time::Instant::now(),
                     dur_ms: fade_out_ms as f64, stop_after: true,
