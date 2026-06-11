@@ -190,6 +190,15 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "audio_set_volume":         ("AUDIO_SET_VOLUME(ch, v)", "Channel-Lautstaerke setzen (Alias fuer AUDIO_VOLUME)."),
     "audio_get_volume":         ("AUDIO_GET_VOLUME(ch) AS FLOAT", "Aktuelle Lautstaerke."),
     "audio_pan":                ("AUDIO_PAN(ch, left, right)", "Stereo-Pan -- left/right je 0..1."),
+    "audio_pan_pos":            ("AUDIO_PAN_POS(ch, p)",
+                                  "Stereo-Position direkt: 0=links, 0.5=Mitte, 1=rechts. "
+                                  "Fasst nur das Pan an (Volume bleibt)."),
+    "audio_pan_slide":          ("AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)",
+                                  "Einmalige Stereo-Wanderung von Position von nach nach "
+                                  "(je 0=links..1=rechts), nicht-blockierend; bleibt am Ziel."),
+    "audio_autopan":            ("AUDIO_AUTOPAN(ch, periode_s[, tiefe])",
+                                  "Endloses Pendeln links<->rechts (startet links). periode_s = "
+                                  "Dauer einer Runde, tiefe 0..1 = Auslenkung; periode_s <= 0 = aus."),
     "audio_music_load":         ("AUDIO_MUSIC_LOAD(path)", "Musik laden (streamt vom File)."),
     "audio_music_play":         ("AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])",
                                   "Musik starten. loops=-1 bedeutet endlos (Default), "

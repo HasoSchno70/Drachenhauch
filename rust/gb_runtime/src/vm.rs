@@ -3455,6 +3455,23 @@ impl<'p> Vm<'p> {
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
             "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
+            "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p)?; Value::Nil }
+            "audio_pan_slide" => {
+                // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- Positionen 0=links..1=rechts
+                let i = gi(a, 0, "AUDIO_PAN_SLIDE")?;
+                let von = need_f(a, 1, "AUDIO_PAN_SLIDE")?;
+                let nach = need_f(a, 2, "AUDIO_PAN_SLIDE")?;
+                let dauer = gi(a, 3, "AUDIO_PAN_SLIDE")?;
+                if dauer <= 0 { return Err("AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein".into()); }
+                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer)?; Value::Nil
+            }
+            "audio_autopan" => {
+                // AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- periode_s <= 0 = aus
+                let i = gi(a, 0, "AUDIO_AUTOPAN")?;
+                let periode = need_f(a, 1, "AUDIO_AUTOPAN")?;
+                let tiefe = if a.len() >= 3 { need_f(a, 2, "AUDIO_AUTOPAN")? } else { 1.0 };
+                self.audio_mut()?.ch_autopan(i, periode, tiefe)?; Value::Nil
+            }
             "audio_tone" => {
                 let freq = need_f(a, 0, "AUDIO_TONE")?;
                 let dur = gi(a, 1, "AUDIO_TONE")?;

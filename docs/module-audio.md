@@ -86,6 +86,35 @@ pan_right = enemy_x / screen_w
 AUDIO_PAN(ch, pan_left, pan_right)
 ```
 
+**Pan-Position + automatische Bewegung:** Fuer wandernde Sounds gibt es drei
+Komfort-Builtins, die mit einer einzigen Position arbeiten (0 = links,
+0.5 = Mitte, 1 = rechts) und nur das Pan anfassen -- das Volume (und damit
+laufende Fades) bleibt unberuehrt. Die Bewegung treibt die Runtime selbst
+pro Frame (FLIP), nicht-blockierend:
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_PAN_POS(ch, p)` | Position direkt setzen (beendet eine laufende Animation) |
+| `AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)` | einmalige Wanderung von → nach; bleibt am Ziel stehen |
+| `AUDIO_AUTOPAN(ch, periode_s[, tiefe])` | endloses Pendeln links↔rechts (startet links); `tiefe` 0..1 = Auslenkung um die Mitte, `periode_s <= 0` schaltet ab |
+
+```basic
+DIM ton AS SOUND
+ton = AUDIO_TONE(440, 2000)
+
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(ton, -1, 0.8)           ' endlos loopen
+
+AUDIO_AUTOPAN(ch, 6.0)                  ' pendelt alle 6s links<->rechts
+' ... irgendwann:
+AUDIO_PAN_SLIDE(ch, 0.0, 1.0, 2000)     ' einmal in 2s nach rechts wandern
+AUDIO_AUTOPAN(ch, 0)                    ' Pendeln aus (Position bleibt)
+```
+
+Manuelles `AUDIO_PAN`/`AUDIO_PAN_POS` gewinnt: es beendet eine laufende
+SLIDE-/AUTOPAN-Animation. Ein erneutes `AUDIO_PLAY`/`AUDIO_STOP` setzt die
+Animation ebenfalls zurueck.
+
 ## Musik
 
 Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt streaming statt vollstaendig in RAM). Eigenes API:

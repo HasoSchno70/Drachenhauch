@@ -74,3 +74,17 @@ def test_play_stop_fade_validation(run_gb):
     out = run_gb(src)
     assert "AUDIO_PLAY: fade_in_ms muss >= 0 sein" in out
     assert "AUDIO_STOP: fade_out_ms muss >= 0 sein" in out
+
+
+def test_pan_slide_validation(run_gb):
+    # AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- dauer_ms wird im Wrapper
+    # (vor der Audio-Initialisierung) geprueft -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    assert "AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein" in run_gb(src)

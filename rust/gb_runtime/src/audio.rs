@@ -104,6 +104,38 @@ impl Fade {
     }
 }
 
+/// Laufende Pan-Animation (AUDIO_PAN_SLIDE / AUDIO_AUTOPAN). Bewegt NUR das
+/// Stereo-Pan (Position 0=links .. 1=rechts), nie das Volume -- kollidiert
+/// dadurch nicht mit Fades. `update()` schreibt die Position pro Frame.
+enum PanAnim {
+    /// Einmalige Fahrt von -> nach ueber dur_ms; bleibt am Ziel stehen.
+    Slide { from: f64, to: f64, start: std::time::Instant, dur_ms: f64 },
+    /// Endloses Pendeln links<->rechts; eine volle Runde = period_s.
+    Pendulum { period_s: f64, depth: f64, start: std::time::Instant },
+}
+
+/// Pendel-Position 0..1 (pure, fuer #[test]). Kosinus-foermig: startet auf
+/// der linken Auslenkung (bei depth=1.0 ganz links), wandert nach rechts
+/// und zurueck; depth skaliert die Auslenkung um die Mitte 0.5.
+fn pendulum_pos(elapsed_s: f64, period_s: f64, depth: f64) -> f64 {
+    let d = depth.clamp(0.0, 1.0);
+    0.5 - 0.5 * d * (std::f64::consts::TAU * elapsed_s / period_s).cos()
+}
+
+impl PanAnim {
+    /// (aktuelle Position 0..1, Animation fertig?)
+    fn position(&self) -> (f64, bool) {
+        match self {
+            PanAnim::Slide { from, to, start, dur_ms } => {
+                let t = fade_progress(start.elapsed().as_secs_f64() * 1000.0, *dur_ms) as f64;
+                (from + (to - from) * t, t >= 1.0)
+            }
+            PanAnim::Pendulum { period_s, depth, start } =>
+                (pendulum_pos(start.elapsed().as_secs_f64(), *period_s, *depth), false),
+        }
+    }
+}
+
 pub struct Audio {
     dev: &'static RaylibAudio,
     sounds: Vec<Sound<'static>>,
@@ -117,6 +149,7 @@ pub struct Audio {
     ch_fade: Vec<Option<Fade>>, // pro Sound-Handle: laufender Fade (AUDIO_PLAY fade_in / AUDIO_STOP fade_out)
     ch_loops: Vec<i64>,        // pro Sound-Handle: verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos, 0 = keine
     ch_paused: Vec<bool>,      // AUDIO_PAUSE -- damit update() eine Pause nicht als Sound-Ende deutet
+    ch_pan_anim: Vec<Option<PanAnim>>, // pro Sound-Handle: laufende Pan-Animation (SLIDE/AUTOPAN)
     num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
     bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
@@ -134,6 +167,7 @@ impl Audio {
             music: None, music_vol: 1.0, music_queue: None,
             music_loops: -1, music_fade: None, music_paused: false,
             ch_fade: Vec::new(), ch_loops: Vec::new(), ch_paused: Vec::new(),
+            ch_pan_anim: Vec::new(),
             num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
         })
@@ -187,6 +221,7 @@ impl Audio {
         self.ch_fade.push(None);
         self.ch_loops.push(0);
         self.ch_paused.push(false);
+        self.ch_pan_anim.push(None);
         (self.sounds.len() - 1) as i64
     }
 
@@ -228,6 +263,7 @@ impl Audio {
         self.ch_fade[i] = None;
         self.ch_loops[i] = 0;
         self.ch_paused[i] = false;
+        self.ch_pan_anim[i] = None;
     }
 
     /// Laedt + startet einen Musik-Stream. Ersetzt eine evtl. laufende Musik
@@ -282,6 +318,12 @@ impl Audio {
             if self.ch_loops[i] != 0 && !self.sounds[i].is_playing() {
                 if self.ch_loops[i] > 0 { self.ch_loops[i] -= 1; }
                 self.sounds[i].play();
+            }
+            if let Some(anim) = &self.ch_pan_anim[i] {
+                let (p, done) = anim.position();
+                // Position 0=links..1=rechts -> raylib-Pan (gespiegelt, wie ch_pan).
+                self.sounds[i].set_pan((1.0 - p.clamp(0.0, 1.0)) as f32);
+                if done { self.ch_pan_anim[i] = None; }
             }
         }
         if self.music.is_none() { return; }
@@ -536,6 +578,43 @@ impl Audio {
         s.set_volume(vol as f32);
         s.set_pan(pan as f32);
         if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = vol as f32; }
+        self.ch_pan_anim[idx as usize] = None;   // manuelles Pan beendet die Animation
+        Ok(())
+    }
+
+    /// AUDIO_PAN_POS(ch, p) -- Stereo-Position direkt: 0=links, 0.5=Mitte,
+    /// 1=rechts. Fasst nur das Pan an (Volume bleibt unveraendert) und
+    /// beendet eine laufende Pan-Animation (manuell gewinnt).
+    pub fn ch_pan_pos(&mut self, idx: i64, p: f64) -> Result<(), String> {
+        self.snd(idx, "AUDIO_PAN_POS")?.set_pan((1.0 - p.clamp(0.0, 1.0)) as f32);
+        self.ch_pan_anim[idx as usize] = None;
+        Ok(())
+    }
+
+    /// AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- einmalige Stereo-
+    /// Wanderung (Positionen 0=links..1=rechts), bleibt am Ziel stehen.
+    /// Laeuft nicht-blockierend; update() treibt die Bewegung pro Frame.
+    pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64) -> Result<(), String> {
+        let (from, to) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
+        self.snd(idx, "AUDIO_PAN_SLIDE")?.set_pan((1.0 - from) as f32);
+        self.ch_pan_anim[idx as usize] = Some(PanAnim::Slide {
+            from, to, start: std::time::Instant::now(), dur_ms: dur_ms as f64,
+        });
+        Ok(())
+    }
+
+    /// AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- endloses Pendeln
+    /// links<->rechts (startet links). periode_s = Dauer einer vollen Runde;
+    /// tiefe 0..1 = Auslenkung um die Mitte (1.0 = ganz links bis ganz
+    /// rechts). periode_s <= 0 schaltet die Animation ab (Pan bleibt stehen).
+    pub fn ch_autopan(&mut self, idx: i64, period_s: f64, depth: f64) -> Result<(), String> {
+        self.snd(idx, "AUDIO_AUTOPAN")?;
+        self.ch_pan_anim[idx as usize] = if period_s <= 0.0 { None } else {
+            Some(PanAnim::Pendulum {
+                period_s, depth: depth.clamp(0.0, 1.0),
+                start: std::time::Instant::now(),
+            })
+        };
         Ok(())
     }
 
@@ -745,7 +824,7 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
 
 #[cfg(test)]
 mod tests {
-    use super::fade_progress;
+    use super::{fade_progress, pendulum_pos};
 
     #[test]
     fn fade_progress_clamps_and_interpolates() {
@@ -753,5 +832,16 @@ mod tests {
         assert!((fade_progress(500.0, 1000.0) - 0.5).abs() < 1e-6);
         assert_eq!(fade_progress(1500.0, 1000.0), 1.0);   // ueber Ende -> geclampt
         assert_eq!(fade_progress(10.0, 0.0), 1.0);        // dur=0 -> sofort fertig
+    }
+
+    #[test]
+    fn pendulum_starts_left_and_swings() {
+        assert!(pendulum_pos(0.0, 4.0, 1.0).abs() < 1e-9);          // Start: ganz links
+        assert!((pendulum_pos(2.0, 4.0, 1.0) - 1.0).abs() < 1e-9);  // halbe Runde: rechts
+        assert!(pendulum_pos(4.0, 4.0, 1.0).abs() < 1e-9);          // volle Runde: links
+        assert!((pendulum_pos(1.0, 4.0, 1.0) - 0.5).abs() < 1e-9);  // viertel: Mitte
+        // tiefe=0.5 -> pendelt nur 0.25..0.75; tiefe wird geclampt
+        assert!((pendulum_pos(0.0, 4.0, 0.5) - 0.25).abs() < 1e-9);
+        assert!(pendulum_pos(0.0, 4.0, 7.0).abs() < 1e-9);
     }
 }
