@@ -40,6 +40,8 @@ enum Cmd {
     FillPoly(Vec<(i32, i32)>, Color),
     // x, y, text, size, color, font_idx (-1 = Default), spacing
     Text(i32, i32, String, i32, Color, i64, f32),
+    // TEXTROT: (cx, cy, text, groesse, farbe, font, spacing, winkel_grad, skala)
+    TextRot(i32, i32, String, i32, Color, i64, f32, f32, f32),
     Texture(usize, i32, i32),
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
@@ -1970,6 +1972,16 @@ impl Graphics {
     }
     pub fn set_text_size(&mut self, sz: i32) { self.text_size = sz.max(1); }
 
+    /// TEXTROT(x, y, s$, winkel[, skala[, farbe]]) -- Text ZENTRIERT auf
+    /// (x, y), um das Zentrum gedreht (Grad, Konvention wie DRAWIMAGEROT)
+    /// und skaliert. Nutzt aktiven Font/Groesse/Spacing; Position laeuft
+    /// durch die Camera (w2s) wie TEXT.
+    pub fn text_rot(&mut self, x: i32, y: i32, s: String, angle_deg: f32, scale: f32, c: i64) {
+        let (x, y) = self.w2s(x, y);
+        self.emit(Cmd::TextRot(x, y, s, self.text_size, col(c), self.active_font,
+                               self.text_spacing, angle_deg, scale.max(0.0001)));
+    }
+
     /// Text mit explizitem Font-Handle + Groesse (umgeht active_font/text_size).
     /// `font` = -1 -> Default-Font. Fuer per-Widget-Styling (Modul `gui`).
     pub fn text_styled(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32) {
@@ -2993,6 +3005,36 @@ fn render_scene<D: RaylibDraw>(
                                 f, txt, Vector2::new((x * s) as f32, (y * s) as f32),
                                 (sz * s) as f32, spacing * s as f32, *col),
                             _ => d.draw_text(txt, x * s, y * s, sz * s, *col),
+                        }
+                    }
+                    Cmd::TextRot(cx, cy, txt, sz, col, font, spacing, ang, scl) => {
+                        // Zentriert auf (cx,cy), Rotation um das Text-Zentrum
+                        // (DrawTextPro: origin = halbe Textbox).
+                        let fsize = (sz * s) as f32 * scl;
+                        let pos = Vector2::new((cx * s) as f32, (cy * s) as f32);
+                        match fonts.get(*font as usize) {
+                            Some(f) if *font >= 0 => {
+                                let fspacing = spacing * s as f32 * scl;
+                                let m = f.measure_text(txt, fsize, fspacing);
+                                d.draw_text_pro(f, txt, pos, Vector2::new(m.x / 2.0, m.y / 2.0),
+                                                *ang, fsize, fspacing, *col);
+                            }
+                            _ => {
+                                // Default-Font: raylib-Spacing-Konvention = Groesse/10 (wie
+                                // DrawText). Via ffi, weil der generische Draw-Kontext kein
+                                // get_font_default hat.
+                                let fspacing = fsize / 10.0;
+                                let c_txt = std::ffi::CString::new(txt.as_str()).unwrap_or_default();
+                                unsafe {
+                                    let df = raylib::ffi::GetFontDefault();
+                                    let m = raylib::ffi::MeasureTextEx(df, c_txt.as_ptr(), fsize, fspacing);
+                                    raylib::ffi::DrawTextPro(
+                                        df, c_txt.as_ptr(),
+                                        raylib::ffi::Vector2 { x: pos.x, y: pos.y },
+                                        raylib::ffi::Vector2 { x: m.x / 2.0, y: m.y / 2.0 },
+                                        *ang, fsize, fspacing, (*col).into());
+                                }
+                            }
                         }
                     }
                     Cmd::Texture(i, x, y) => {

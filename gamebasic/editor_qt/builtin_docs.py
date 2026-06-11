@@ -62,6 +62,9 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "rect":     ("RECT(x1, y1, x2, y2[, farbe])", "Rechteck-Rahmen."),
     "circle":   ("CIRCLE(x, y, r[, farbe])", "Gefuellter Kreis."),
     "text":     ("TEXT(x, y, s[, farbe])", "Text rendern."),
+    "textrot":  ("TEXTROT(x, y, s, winkel[, skala[, farbe]])",
+                 "Text ZENTRIERT auf (x,y), um das Zentrum gedreht (Grad, wie "
+                 "DRAWIMAGEROT) und skaliert -- Score-Popups, schraege Labels."),
     "flip":     ("FLIP()", "Doppelpuffer-Swap (anzeigen)."),
     "sleep":    ("SLEEP(ms)", "Pausiert das Programm."),
     "keypressed":   ("KEYPRESSED(code) AS BOOLEAN", "Pruefe Taste (KEY_*)."),

@@ -3112,6 +3112,17 @@ impl<'p> Vm<'p> {
                 let s = match a.get(2) { Some(Value::Str(s)) => s.to_string(), Some(v) => v.fmt(), None => String::new() };
                 g!().text(gi(a,0,"TEXT")? as i32, gi(a,1,"TEXT")? as i32, s, c); Value::Nil
             }
+            "textrot" => {
+                // TEXTROT(x, y, s$, winkel[, skala[, farbe]]) -- zentriert auf (x,y)
+                let x = gi(a, 0, "TEXTROT")? as i32;
+                let y = gi(a, 1, "TEXTROT")? as i32;
+                let s = match a.get(2) { Some(Value::Str(s)) => s.to_string(), Some(v) => v.fmt(), None => String::new() };
+                let ang = need_f(a, 3, "TEXTROT")? as f32;
+                let scl = if a.len() >= 5 { need_f(a, 4, "TEXTROT")? } else { 1.0 };
+                if scl <= 0.0 { return Err("TEXTROT: skala muss > 0 sein".into()); }
+                let c = if a.len() >= 6 { gi(a, 5, "TEXTROT")? } else { 0xFFFFFF };
+                g!().text_rot(x, y, s, ang, scl as f32, c); Value::Nil
+            }
             "text_size" => { g!().set_text_size(gi(a,0,"TEXT_SIZE")? as i32); Value::Nil }
             "text_width" => Value::Int(g!().text_width(gs(a,0,"TEXT_WIDTH")?) as i64),
             "text_height" => Value::Int(g!().text_height() as i64),
