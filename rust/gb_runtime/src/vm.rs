@@ -4149,7 +4149,9 @@ impl<'p> Vm<'p> {
     }
 }
 
-// Vordefinierte Globals -- Werte IDENTISCH zu gamebasic/graphics.py (COLORS/KEYS).
+// Vordefinierte Globals -- Werte IDENTISCH zu gamebasic/graphics.py
+// (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
+// vergleicht jede Python-Konstante gegen PRINT-Output von gbrt.
 const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("black", 0), ("white", 16777215), ("gray", 8421504), ("lightgray", 12632256),
     ("darkgray", 4210752), ("red", 16711680), ("green", 65280), ("blue", 255),
