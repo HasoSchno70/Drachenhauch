@@ -1347,33 +1347,68 @@ impl<'p> Vm<'p> {
                 // --- Arithmetik (generisch, mit User-Operator-Overloading) ---
                 op::ADD => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    if let Some(r) = module_op('+', &a, &b) { stack.push(r?); }
-                    else if let Some(r) = self.user_op("__op_add__", &a, &b)? { stack.push(r); }
-                    else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
-                        stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
-                    } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
+                    // Numerischer Fast-Path zuerst: Int/Float-Paare sind der
+                    // Normalfall in heissen Schleifen -- Modul-/User-Operator-
+                    // Checks kosten dort nur (Semantik unveraendert: weder
+                    // Zahlen noch der Sonderfall-Pfad ueberlappen sich).
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(
+                            x.checked_add(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("+"))?),
+                        (Value::Float(x), Value::Float(y)) => stack.push(Value::Float(x + y)),
+                        (Value::Int(x), Value::Float(y)) => stack.push(Value::Float(*x as f64 + y)),
+                        (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x + *y as f64)),
+                        _ => {
+                            if let Some(r) = module_op('+', &a, &b) { stack.push(r?); }
+                            else if let Some(r) = self.user_op("__op_add__", &a, &b)? { stack.push(r); }
+                            else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
+                                stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
+                            } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
+                        }
+                    }
                 }
                 op::SUB => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    if let Some(r) = module_op('-', &a, &b) { stack.push(r?); }
-                    else if let Some(r) = self.user_op("__op_sub__", &a, &b)? { stack.push(r); }
-                    else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')?); }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(
+                            x.checked_sub(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("-"))?),
+                        (Value::Float(x), Value::Float(y)) => stack.push(Value::Float(x - y)),
+                        (Value::Int(x), Value::Float(y)) => stack.push(Value::Float(*x as f64 - y)),
+                        (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x - *y as f64)),
+                        _ => {
+                            if let Some(r) = module_op('-', &a, &b) { stack.push(r?); }
+                            else if let Some(r) = self.user_op("__op_sub__", &a, &b)? { stack.push(r); }
+                            else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')?); }
+                        }
+                    }
                 }
                 op::MUL => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    if let Some(r) = module_op('*', &a, &b) { stack.push(r?); }
-                    else if let Some(r) = self.user_op("__op_mul__", &a, &b)? { stack.push(r); }
-                    else { stack.push(mul(a, b)?); }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(
+                            x.checked_mul(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("*"))?),
+                        (Value::Float(x), Value::Float(y)) => stack.push(Value::Float(x * y)),
+                        (Value::Int(x), Value::Float(y)) => stack.push(Value::Float(*x as f64 * y)),
+                        (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x * *y as f64)),
+                        _ => {
+                            if let Some(r) = module_op('*', &a, &b) { stack.push(r?); }
+                            else if let Some(r) = self.user_op("__op_mul__", &a, &b)? { stack.push(r); }
+                            else { stack.push(mul(a, b)?); }
+                        }
+                    }
                 }
                 op::DIV => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    if let Some(r) = module_op('/', &a, &b) { stack.push(r?); }
+                    if matches!(&a, Value::Int(_) | Value::Float(_)) && matches!(&b, Value::Int(_) | Value::Float(_)) {
+                        stack.push(div(a, b)?);
+                    } else if let Some(r) = module_op('/', &a, &b) { stack.push(r?); }
                     else if let Some(r) = self.user_op("__op_div__", &a, &b)? { stack.push(r); }
                     else { stack.push(div(a, b)?); }
                 }
                 op::MOD => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    if let Some(r) = self.user_op("__op_mod__", &a, &b)? { stack.push(r); }
+                    if matches!(&a, Value::Int(_) | Value::Float(_)) && matches!(&b, Value::Int(_) | Value::Float(_)) {
+                        stack.push(modulo(a, b)?);
+                    } else if let Some(r) = self.user_op("__op_mod__", &a, &b)? { stack.push(r); }
                     else { stack.push(modulo(a, b)?); }
                 }
                 op::POW => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(pow(a, b)?); }
@@ -1382,17 +1417,43 @@ impl<'p> Vm<'p> {
 
                 // --- Vergleich / Logik ---
                 op::EQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_eq__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(value_eq(&a, &b))) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x == y)),
+                        _ => match self.user_op("__op_eq__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(value_eq(&a, &b))) }
+                    } }
                 op::NEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_ne__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(!value_eq(&a, &b))) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x != y)),
+                        _ => match self.user_op("__op_ne__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(!value_eq(&a, &b))) }
+                    } }
                 op::LT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_lt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '<')?)) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x < y)),
+                        (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
+                            stack.push(Value::Bool(cmp(&a, &b, '<')?)),
+                        _ => match self.user_op("__op_lt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '<')?)) }
+                    } }
                 op::GT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_gt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '>')?)) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x > y)),
+                        (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
+                            stack.push(Value::Bool(cmp(&a, &b, '>')?)),
+                        _ => match self.user_op("__op_gt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '>')?)) }
+                    } }
                 op::LEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_le__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'l')?)) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x <= y)),
+                        (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
+                            stack.push(Value::Bool(cmp(&a, &b, 'l')?)),
+                        _ => match self.user_op("__op_le__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'l')?)) }
+                    } }
                 op::GEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
-                    match self.user_op("__op_ge__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) } }
+                    match (&a, &b) {
+                        (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x >= y)),
+                        (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
+                            stack.push(Value::Bool(cmp(&a, &b, 'g')?)),
+                        _ => match self.user_op("__op_ge__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) }
+                    } }
                 op::NOT => { let v = vm_pop(stack)?; stack.push(Value::Bool(!v.truthy())); }
 
                 // --- Bitwise ---
@@ -1713,18 +1774,62 @@ impl<'p> Vm<'p> {
                 // --- Arrays ---
                 op::LOAD_INDEX => {
                     let num_dims = arg.as_usize();
-                    let split = stack.len() - num_dims;
-                    let idx_vals = stack.split_off(split);
-                    let arr = vm_pop(stack)?;
-                    stack.push(load_index(&arr, &idx_vals)?);
+                    if num_dims == 1 {
+                        // 1D (der Normalfall): kein split_off-Vec; direkter
+                        // Zugriff bei Int-Index in Bounds, sonst generisch
+                        // (identische Fehler via load_index).
+                        let ix = vm_pop(stack)?;
+                        let arr = vm_pop(stack)?;
+                        let mut fast = None;
+                        if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
+                            let ab = a.borrow();
+                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.values.len() {
+                                fast = Some(ab.values[*i as usize].clone());
+                            }
+                        }
+                        match fast {
+                            Some(v) => stack.push(v),
+                            None => stack.push(load_index(&arr, std::slice::from_ref(&ix))?),
+                        }
+                    } else {
+                        let split = stack.len() - num_dims;
+                        let idx_vals = stack.split_off(split);
+                        let arr = vm_pop(stack)?;
+                        stack.push(load_index(&arr, &idx_vals)?);
+                    }
                 }
                 op::STORE_INDEX => {
                     let num_dims = arg.as_usize();
-                    let v = vm_pop(stack)?;
-                    let split = stack.len() - num_dims;
-                    let idx_vals = stack.split_off(split);
-                    let arr = vm_pop(stack)?;
-                    store_index(&arr, &idx_vals, v)?;
+                    if num_dims == 1 {
+                        let v = vm_pop(stack)?;
+                        let ix = vm_pop(stack)?;
+                        let arr = vm_pop(stack)?;
+                        let mut rest = Some(v);
+                        if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
+                            let mut ab = a.borrow_mut();
+                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.values.len() {
+                                let val = rest.take().unwrap();
+                                // Coerce-Fast-Path: Typ passt schon -> kein
+                                // element_type-Clone, kein String-Match.
+                                let cv = match (&val, ab.element_type.as_str()) {
+                                    (Value::Int(_), "integer") | (Value::Float(_), "float")
+                                    | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                                    | (_, "any") => val,
+                                    (Value::Int(n), "float") => Value::Float(*n as f64),
+                                    _ => { let et = ab.element_type.clone(); coerce(val, &et, "Array-Element")? }
+                                };
+                                let iu = *i as usize;
+                                ab.values[iu] = cv;
+                            }
+                        }
+                        if let Some(val) = rest { store_index(&arr, std::slice::from_ref(&ix), val)?; }
+                    } else {
+                        let v = vm_pop(stack)?;
+                        let split = stack.len() - num_dims;
+                        let idx_vals = stack.split_off(split);
+                        let arr = vm_pop(stack)?;
+                        store_index(&arr, &idx_vals, v)?;
+                    }
                 }
                 op::DECLARE_ARRAY_NAME => {
                     let l = arg.list();
@@ -4297,8 +4402,8 @@ fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
                 match ix { Value::Int(i) => ints.push(*i), x => return Err(format!("Array-Index muss INTEGER sein, erhalten {}", x.type_name())) }
             }
             let flat = a.flat_index(&ints)?;
-            let et = a.element_type.clone();
-            a.values[flat] = coerce(v, &et, "Array-Element")?;
+            let cv = coerce(v, &a.element_type, "Array-Element")?;
+            a.values[flat] = cv;
             Ok(())
         }
         Value::Nil => Err("Index-Zuweisung an NIL".into()),
