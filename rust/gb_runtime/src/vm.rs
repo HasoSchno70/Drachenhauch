@@ -70,6 +70,20 @@ enum Step {
 
 /// Bindet Argumente an die Parameter-Slots (mit Variadic + Defaults). Geteilt
 /// von normalem Aufruf (exec) und Coroutine-Erststart.
+/// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
+/// faellt fuer rohe Listen (z.B. alte .gbc ohne specialize-Pass) zurueck.
+#[inline]
+fn call_parts(arg: &Arg) -> (&str, usize, i32) {
+    match arg {
+        Arg::Call(n, c, i) => (n, *c as usize, *i),
+        _ => {
+            let l = arg.list();
+            (l[0].str(), l[1].as_usize(),
+             l.get(2).map(|a| a.as_i64() as i32).unwrap_or(-1))
+        }
+    }
+}
+
 fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Value>> {
     // `locals` ist ein (ggf. gepoolter) Buffer -- Allokation wird
     // wiederverwendet, Inhalt kommt frisch aus den local_defaults.
@@ -466,6 +480,9 @@ pub struct Vm<'p> {
     // Meldungen). Bei einem propagierenden Fehler haelt es die Zeile der
     // innersten fehlschlagenden Instruktion (sie lief zuletzt). 0 = unbekannt.
     cur_line: u32,
+    // Lazy-Fehlerzeile: gesetzt vom INNERSTEN run_frame beim ersten Fehler,
+    // von TRY/CATCH beim Konsumieren geloescht (s. run_frame).
+    err_line_set: bool,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
     // Externes Stop-Signal (Editor-Stop-Button bei `gbrt profile --stoppable`):
@@ -546,6 +563,7 @@ impl<'p> Vm<'p> {
             pool_locals: Vec::new(),
             pool_stacks: Vec::new(),
             cur_line: 0,
+            err_line_set: false,
             prof: None,
             stop: None,
             dbg: None,
@@ -1032,14 +1050,27 @@ impl<'p> Vm<'p> {
                 // Debugger-Abbruch (`stop`) und Profiler-Stop-Signal duerfen
                 // NICHT von TRY/CATCH gefangen werden -- unbedingt durchreichen.
                 Err(e) if e == "__DEBUG_STOP__" || e == PROFILE_STOP => return Err(e),
-                Err(e) => match try_handlers.pop() {
-                    Some((target, depth)) => {
-                        stack.truncate(depth);
-                        stack.push(Value::str_rc(&e));
-                        *ip = target;
+                Err(e) => {
+                    // Quell-Zeile lazy ermitteln: ip zeigt HINTER die
+                    // fehlgeschlagene Instruktion. Nur der innerste Frame
+                    // (Fehler-Ursprung) setzt sie; aeussere Frames sehen das
+                    // Flag und lassen die innerste Zeile stehen.
+                    if !self.err_line_set {
+                        if let Some(&ln) = fn_.lines.get(ip.saturating_sub(1)) {
+                            if ln != 0 { self.cur_line = ln; }
+                        }
+                        self.err_line_set = true;
                     }
-                    None => return Err(e),
-                },
+                    match try_handlers.pop() {
+                        Some((target, depth)) => {
+                            self.err_line_set = false;   // Fehler konsumiert (CATCH)
+                            stack.truncate(depth);
+                            stack.push(Value::str_rc(&e));
+                            *ip = target;
+                        }
+                        None => return Err(e),
+                    }
+                }
             }
         }
     }
@@ -1225,29 +1256,32 @@ impl<'p> Vm<'p> {
         let code = &fn_.code;
         let constants = &fn_.constants;
         let n = code.len();
+        // Zeilen-Tracking nur, wenn jemand zusieht (Profiler/Stop/Debugger).
+        // Fuer Laufzeitfehler wird die Quell-Zeile LAZY im Fehlerfall
+        // ermittelt (run_frame) -- der Normalfall zahlt pro Instruktion nichts.
+        let track_lines = self.prof.is_some() || self.stop.is_some() || self.dbg.is_some();
 
         while *ip < n {
             let instr = &code[*ip];
             let arg = &instr.arg;
-            // Quell-Zeile dieser Instruktion merken (fuer Laufzeitfehler).
-            // Nur bei ZeilenWECHSEL wird geschrieben + die Hooks geprueft
-            // (Profiler/Stop/Debugger) -- der Normalfall ist ein Vergleich.
-            if let Some(ln) = fn_.lines.get(*ip) {
-                let ln = *ln;
-                if ln != 0 && ln != self.cur_line {
-                    self.cur_line = ln;
-                    if let Some(p) = self.prof.as_mut() {
-                        p.tick(ln);
-                    }
-                    // Externes Stop-Signal: sauber abwickeln, damit die
-                    // bisherigen Profile-Daten noch ausgegeben werden.
-                    if let Some(s) = self.stop.as_ref() {
-                        if s.load(Ordering::Relaxed) {
-                            return Err(PROFILE_STOP.into());
+            if track_lines {
+                if let Some(ln) = fn_.lines.get(*ip) {
+                    let ln = *ln;
+                    if ln != 0 && ln != self.cur_line {
+                        self.cur_line = ln;
+                        if let Some(p) = self.prof.as_mut() {
+                            p.tick(ln);
                         }
-                    }
-                    if self.dbg.is_some() {
-                        self.debug_on_line(fn_, locals)?;
+                        // Externes Stop-Signal: sauber abwickeln, damit die
+                        // bisherigen Profile-Daten noch ausgegeben werden.
+                        if let Some(s) = self.stop.as_ref() {
+                            if s.load(Ordering::Relaxed) {
+                                return Err(PROFILE_STOP.into());
+                            }
+                        }
+                        if self.dbg.is_some() {
+                            self.debug_on_line(fn_, locals)?;
+                        }
                     }
                 }
             }
@@ -1290,14 +1324,14 @@ impl<'p> Vm<'p> {
                     // Fusioniertes FOR-Ende: var += step, Weiter-Test, Sprung
                     // zum Body. Arg: [var_global, var_idx, end_slot,
                     // step_is_slot, step_idx, neg, body_target].
-                    let l = arg.list();
-                    let var_global = l[0].as_i64() == 1;
-                    let var_idx = l[1].as_usize();
-                    let end_slot = l[2].as_usize();
-                    let step_is_slot = l[3].as_i64() == 1;
-                    let step_idx = l[4].as_usize();
-                    let neg = l[5].as_i64() == 1;
-                    let target = l[6].as_usize();
+                    let l = arg.ints();
+                    let var_global = l[0] == 1;
+                    let var_idx = l[1] as usize;
+                    let end_slot = l[2] as usize;
+                    let step_is_slot = l[3] == 1;
+                    let step_idx = l[4] as usize;
+                    let neg = l[5] == 1;
+                    let target = l[6] as usize;
                     let step_int = if step_is_slot {
                         match &locals[step_idx] { Value::Int(i) => Some(*i), _ => None }
                     } else {
@@ -1631,15 +1665,14 @@ impl<'p> Vm<'p> {
 
                 // --- Aufrufe ---
                 op::CALL_USER => {
-                    let l = arg.list();
-                    let fn_name = l[0].str();
-                    let argc = l[1].as_usize();
-                    // Vorab aufgeloester Index (model::resolve_calls) -- kein
-                    // Hash-Lookup pro Aufruf; -1/fehlend -> Namens-Fallback.
-                    let callee: &'p Func = match l.get(2) {
-                        Some(Arg::Int(idx)) if *idx >= 0 => &self.prog.functions[*idx as usize],
-                        _ => self.prog.func(fn_name)
-                            .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?,
+                    let (fn_name, argc, idx) = call_parts(arg);
+                    // Vorab aufgeloester Index (model::specialize_args) -- kein
+                    // Hash-Lookup pro Aufruf; -1 -> Namens-Fallback.
+                    let callee: &'p Func = if idx >= 0 {
+                        &self.prog.functions[idx as usize]
+                    } else {
+                        self.prog.func(fn_name)
+                            .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?
                     };
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
@@ -1657,9 +1690,7 @@ impl<'p> Vm<'p> {
                     }
                 }
                 op::CALL_BUILTIN => {
-                    let l = arg.list();
-                    let name = l[0].str();
-                    let argc = l[1].as_usize();
+                    let (name, argc, _) = call_parts(arg);
                     let split = stack.len() - argc;
                     // Args als Slice direkt vom Stack (kein split_off-Vec pro
                     // Call); Ergebnis erst nach dem Truncate pushen.
@@ -1704,9 +1735,7 @@ impl<'p> Vm<'p> {
                     stack.push(Value::FuncRef(Rc::from(name.as_str())));
                 }
                 op::CALL_VALUE => {
-                    let l = arg.list();
-                    let cname = l[0].str();
-                    let argc = l[1].as_usize();
+                    let (cname, argc, _) = call_parts(arg);
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
                     let callee = vm_pop(stack)?;
@@ -1729,9 +1758,7 @@ impl<'p> Vm<'p> {
                     }
                 }
                 op::CALL_METHOD => {
-                    let l = arg.list();
-                    let method = l[0].str();
-                    let argc = l[1].as_usize();
+                    let (method, argc, _) = call_parts(arg);
                     let split = stack.len() - argc;
                     let margs = stack.split_off(split);
                     let obj = vm_pop(stack)?;
@@ -4484,7 +4511,7 @@ fn arg_value(a: &Arg) -> Value {
         Arg::Int(i) => Value::Int(*i),
         Arg::Str(s) => Value::Str(Rc::from(s.as_ref())),
         Arg::Val(v) => v.clone(),
-        Arg::List(_) => Value::Nil,
+        Arg::List(_) | Arg::Ints(_) | Arg::Call(..) => Value::Nil,
     }
 }
 

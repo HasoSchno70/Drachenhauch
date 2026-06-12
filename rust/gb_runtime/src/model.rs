@@ -130,6 +130,12 @@ pub enum Arg {
     List(Vec<Arg>),
     /// Eingebetteter Laufzeitwert (z.B. DECLARE_LOCAL-Default).
     Val(Value),
+    /// Beim Laden gepackte All-Int-Liste (FOR_NEXT) -- Zugriff ohne
+    /// per-Element-Enum-Match im heissesten Opcode.
+    Ints(Box<[i64]>),
+    /// Beim Laden zerlegtes Call-Argument: (name, argc, fn_idx).
+    /// fn_idx = vorab aufgeloester Funktions-Index (CALL_USER) oder -1.
+    Call(Rc<str>, u32, i32),
 }
 
 impl Arg {
@@ -141,6 +147,12 @@ impl Arg {
     }
     pub fn as_usize(&self) -> usize {
         self.as_i64() as usize
+    }
+    pub fn ints(&self) -> &[i64] {
+        match self {
+            Arg::Ints(v) => v,
+            _ => panic!("Arg: erwartet Ints"),
+        }
     }
     pub fn list(&self) -> &[Arg] {
         match self {
@@ -228,21 +240,34 @@ impl Program {
     }
 }
 
-/// CALL_USER-Argumente um den vorab aufgeloesten Funktions-Index ergaenzen:
-/// `[name, argc]` -> `[name, argc, idx]` (idx = -1 wenn unbekannt -- dann
-/// faellt die VM auf den Namens-Lookup samt gewohnter Fehlermeldung zurueck).
-fn resolve_calls(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, usize>) {
+/// Argumente der heissen Opcodes beim Laden vor-zerlegen:
+/// - CALL_*: `[name, argc]` -> `Arg::Call(name, argc, idx)`; idx = vorab
+///   aufgeloester Funktions-Index (nur CALL_USER, sonst/-unbekannt -1 --
+///   die VM faellt dann auf den Namens-Lookup samt gewohnter Meldung zurueck).
+/// - FOR_NEXT: All-Int-Liste -> `Arg::Ints` (kein per-Element-Match).
+fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, usize>) {
     for ins in code.iter_mut() {
-        if ins.op == op::CALL_USER {
-            if let Arg::List(l) = &mut ins.arg {
-                if l.len() == 2 {
-                    let idx = match &l[0] {
-                        Arg::Str(name) => fn_index.get(name.as_ref()).map(|&i| i as i64).unwrap_or(-1),
-                        _ => -1,
-                    };
-                    l.push(Arg::Int(idx));
+        match ins.op {
+            op::FOR_NEXT => {
+                if let Arg::List(l) = &ins.arg {
+                    if !l.is_empty() && l.iter().all(|a| matches!(a, Arg::Int(_))) {
+                        ins.arg = Arg::Ints(l.iter().map(|a| a.as_i64()).collect());
+                    }
                 }
             }
+            op::CALL_USER | op::CALL_BUILTIN | op::CALL_METHOD | op::CALL_VALUE => {
+                if let Arg::List(l) = &ins.arg {
+                    if l.len() == 2 {
+                        if let (Arg::Str(name), Arg::Int(argc)) = (&l[0], &l[1]) {
+                            let idx = if ins.op == op::CALL_USER {
+                                fn_index.get(name.as_ref()).map(|&i| i as i32).unwrap_or(-1)
+                            } else { -1 };
+                            ins.arg = Arg::Call(name.clone(), *argc as u32, idx);
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -448,12 +473,12 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         .and_then(|v| v.as_array())
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
-    // CALL_USER-Referenzen vorab aufloesen (main + Funktionen + Methoden).
+    // Heisse Opcode-Args vor-zerlegen (main + Funktionen + Methoden).
     let mut main = main;
-    resolve_calls(&mut main.code, &fn_index);
-    for f in functions.iter_mut() { resolve_calls(&mut f.code, &fn_index); }
+    specialize_args(&mut main.code, &fn_index);
+    for f in functions.iter_mut() { specialize_args(&mut f.code, &fn_index); }
     for c in classes.values_mut() {
-        for m in c.methods.values_mut() { resolve_calls(&mut m.code, &fn_index); }
+        for m in c.methods.values_mut() { specialize_args(&mut m.code, &fn_index); }
     }
     Ok(Program {
         n_globals,
