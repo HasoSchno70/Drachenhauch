@@ -1144,7 +1144,7 @@ impl<'p> Vm<'p> {
         if arr.borrow().dims.len() != 1 {
             return Err("SORT: nur 1D-Arrays".to_string());
         }
-        let func: &'p Func = self.prog.functions.get(cmp_name.as_ref())
+        let func: &'p Func = self.prog.func(cmp_name.as_ref())
             .ok_or_else(|| format!("SORT: Funktion '{}' existiert nicht", cmp_name))?;
         // Werte herausziehen -> kein Array-Borrow waehrend der Comparator laeuft.
         let mut vals: Vec<Value> = arr.borrow().cells.to_values();
@@ -1634,8 +1634,13 @@ impl<'p> Vm<'p> {
                     let l = arg.list();
                     let fn_name = l[0].str();
                     let argc = l[1].as_usize();
-                    let callee = self.prog.functions.get(fn_name)
-                        .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?;
+                    // Vorab aufgeloester Index (model::resolve_calls) -- kein
+                    // Hash-Lookup pro Aufruf; -1/fehlend -> Namens-Fallback.
+                    let callee: &'p Func = match l.get(2) {
+                        Some(Arg::Int(idx)) if *idx >= 0 => &self.prog.functions[*idx as usize],
+                        _ => self.prog.func(fn_name)
+                            .ok_or_else(|| format!("Unbekannte Funktion: {}", fn_name.to_uppercase()))?,
+                    };
                     let split = stack.len() - argc;
                     let call_args = stack.split_off(split);
                     if callee.is_coroutine {
@@ -1693,7 +1698,7 @@ impl<'p> Vm<'p> {
                 }
                 op::LOAD_FUNCREF => {
                     let name = constants[arg.as_usize()].fmt();
-                    if !self.prog.functions.contains_key(&name) {
+                    if !self.prog.fn_index.contains_key(&name) {
                         return Err(format!("FUNCREF: Funktion '{}' existiert nicht", name));
                     }
                     stack.push(Value::FuncRef(Rc::from(name.as_str())));
@@ -1707,7 +1712,7 @@ impl<'p> Vm<'p> {
                     let callee = vm_pop(stack)?;
                     match callee {
                         Value::FuncRef(name) => {
-                            let tgt = self.prog.functions.get(name.as_ref())
+                            let tgt = self.prog.func(name.as_ref())
                                 .ok_or_else(|| format!("FUNCREF: Funktion '{}' existiert nicht (mehr)", name))?;
                             if tgt.is_coroutine {
                                 stack.push(make_coro(tgt, call_args, None));
@@ -2518,7 +2523,7 @@ impl<'p> Vm<'p> {
                 // darf selbst Timer registrieren/canceln; neue Eintraege werden
                 // erst beim naechsten Update faellig geprueft.
                 for fname in self.timers.take_due() {
-                    let f = self.prog.functions.get(fname.as_str()).ok_or_else(||
+                    let f = self.prog.func(fname.as_str()).ok_or_else(||
                         format!("TIMER-Callback: Funktion '{}' existiert nicht", fname))?;
                     self.exec(f, Vec::new(), None)?;
                 }
@@ -2830,7 +2835,7 @@ impl<'p> Vm<'p> {
                 // der State-Update fertig ist -- so kann ein Callback die GUI
                 // sicher veraendern; neu ausgeloeste Events landen naechsten Frame.
                 for fname in self.gui.take_pending() {
-                    let f = self.prog.functions.get(fname.as_str()).ok_or_else(||
+                    let f = self.prog.func(fname.as_str()).ok_or_else(||
                         format!("GUI-Callback: Funktion '{}' existiert nicht", fname))?;
                     self.exec(f, Vec::new(), None)?;
                 }

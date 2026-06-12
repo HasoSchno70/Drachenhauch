@@ -212,9 +212,39 @@ pub struct ClassInfo {
 pub struct Program {
     pub n_globals: usize,
     pub main: Func,
-    pub functions: rustc_hash::FxHashMap<String, Func>,
+    /// Alle freien User-Funktionen; der Index ist die vorab aufgeloeste
+    /// CALL_USER-Referenz (siehe `resolve_calls` -- kein Hash-Lookup pro
+    /// Aufruf mehr). Nach dem Laden immutabel (Coroutine-fn_ptr zeigt rein).
+    pub functions: Vec<Func>,
+    pub fn_index: rustc_hash::FxHashMap<String, usize>,
     pub classes: rustc_hash::FxHashMap<String, ClassInfo>,
     pub data: Vec<crate::value::Value>,
+}
+
+impl Program {
+    /// Funktion per Name (LOAD_FUNCREF/CALL_VALUE/Callbacks -- kalte Pfade).
+    pub fn func(&self, name: &str) -> Option<&Func> {
+        self.fn_index.get(name).map(|&i| &self.functions[i])
+    }
+}
+
+/// CALL_USER-Argumente um den vorab aufgeloesten Funktions-Index ergaenzen:
+/// `[name, argc]` -> `[name, argc, idx]` (idx = -1 wenn unbekannt -- dann
+/// faellt die VM auf den Namens-Lookup samt gewohnter Fehlermeldung zurueck).
+fn resolve_calls(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, usize>) {
+    for ins in code.iter_mut() {
+        if ins.op == op::CALL_USER {
+            if let Arg::List(l) = &mut ins.arg {
+                if l.len() == 2 {
+                    let idx = match &l[0] {
+                        Arg::Str(name) => fn_index.get(name.as_ref()).map(|&i| i as i64).unwrap_or(-1),
+                        _ => -1,
+                    };
+                    l.push(Arg::Int(idx));
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -400,10 +430,12 @@ pub fn load_program(j: &J) -> Result<Program, String> {
     }
     let n_globals = obj.get("n_globals").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
     let main = decode_func(obj.get("main").ok_or("kein main")?);
-    let mut functions = rustc_hash::FxHashMap::default();
+    let mut functions: Vec<Func> = Vec::new();
+    let mut fn_index = rustc_hash::FxHashMap::default();
     if let Some(fobj) = obj.get("functions").and_then(|v| v.as_object()) {
         for (name, fj) in fobj {
-            functions.insert(name.clone(), decode_func(fj));
+            fn_index.insert(name.clone(), functions.len());
+            functions.push(decode_func(fj));
         }
     }
     let mut classes = rustc_hash::FxHashMap::default();
@@ -416,10 +448,18 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         .and_then(|v| v.as_array())
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
+    // CALL_USER-Referenzen vorab aufloesen (main + Funktionen + Methoden).
+    let mut main = main;
+    resolve_calls(&mut main.code, &fn_index);
+    for f in functions.iter_mut() { resolve_calls(&mut f.code, &fn_index); }
+    for c in classes.values_mut() {
+        for m in c.methods.values_mut() { resolve_calls(&mut m.code, &fn_index); }
+    }
     Ok(Program {
         n_globals,
         main,
         functions,
+        fn_index,
         classes,
         data,
     })
