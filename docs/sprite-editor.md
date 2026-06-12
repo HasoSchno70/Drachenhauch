@@ -43,7 +43,7 @@ Brush-Groesse mit Tasten **1**, **2**, **3**, **4**. **X** tauscht FG/BG-Farbe.
 **Datei-Formate:**
 
 - **`.png`** — Standard. Bei Multi-Frame wird ein horizontaler Sheet geschrieben.
-- **`.gbsprite`** — natives Format (JSON + base64-RGBA pro Frame). Erhaelt Frame-Dauern und Animation-Daten. Empfohlen fuer Work-in-Progress.
+- **`.gbsprite`** — natives Format (JSON + base64-RGBA pro Frame). Erhaelt Frame-Dauern, Animation-Daten und **Ebenen** (Format-Version 5; pro Frame steht zusaetzlich immer das geflattete Composite als `data`, damit aeltere Leser weiterhin ein korrektes Bild sehen). Empfohlen fuer Work-in-Progress.
 
 ## Export-Optionen
 
@@ -136,6 +136,25 @@ Der Editor unterstuetzt von Anfang an Multi-Frame-Animationen. Frames-Panel rech
 | Frames zusammenfuegen (Composite) | alle Frames uebereinander stempeln (Sandbox fuer Pixel-Art) |
 
 **Frame-Dauer** pro Frame einstellbar (Statusbar links). Fuer die Animation-Preview und den GIF-Export wird sie verwendet.
+
+## Ebenen (Layers)
+
+Jedes Frame hat einen **Ebenen-Stapel** (Dock "Ebenen", oben = oberste Ebene).
+Gezeichnet wird immer auf der **aktiven** Ebene; Canvas, Thumbnails und alle
+Exporte zeigen das **Composite** der sichtbaren Ebenen (unten → oben).
+
+- **+** neue leere Ebene ueber der aktiven, **⧉** duplizieren, **−** loeschen
+  (letzte Ebene bleibt), **▲/▼** verschieben, **⤓** Merge Down (aktive Ebene
+  mit ihrer Deckkraft auf die darunterliegende stempeln).
+- **Checkbox** = Sichtbarkeit, **Deckkraft-Slider** (0–100 %) wirkt auf die
+  aktive Ebene, **Doppelklick** = umbenennen.
+- Pixel-Undo (Strg+Z) trifft die Ebene, auf der gezeichnet wurde — auch nach
+  einem Ebenen-Wechsel. Ebenen-Struktur-Aenderungen (Neu/Loeschen/Verschieben/
+  Merge/Umbenennen) laufen ueber das Struktur-Undo.
+- Frame-weite Transformationen (Spiegeln, Rotieren, Crop, Resize) wirken auf
+  **alle** Ebenen; Auswahl-Operationen und Mal-Tools nur auf die aktive.
+- Ebenen persistieren in `.gbsprite` (v5). PNG/Sheet/GIF/Atlas exportieren
+  das geflattete Composite.
 
 ## Onion-Skinning
 

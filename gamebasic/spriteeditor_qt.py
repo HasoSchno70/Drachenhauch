@@ -369,6 +369,7 @@ from .spriteeditor.document import (  # noqa: E402,F401  -- intentional re-expor
     DEFAULT_FRAME_DURATION_MS,
     Anim,
     Frame,
+    Layer,
     SpriteDoc,
     onion_indices,
     onion_tinted,
@@ -652,7 +653,7 @@ class SpriteCanvas(QGraphicsView):
         entries = onion_indices(doc.current_index, len(doc.frames),
                                 self._onion_depth)
         for idx, mode, falloff in entries:
-            tinted = onion_tinted(doc.frames[idx].pixels, mode,
+            tinted = onion_tinted(doc.frames[idx].composite(), mode,
                                   self._onion_alpha * falloff)
             scaled = tinted.resize((doc.width * z, doc.height * z),
                                    Image.NEAREST)
@@ -662,7 +663,9 @@ class SpriteCanvas(QGraphicsView):
 
     def _render_frame_pixmap(self):
         doc = self.app.doc
-        shown = self._preview_pil if self._preview_pil is not None else doc.current.pixels
+        # Composite aller sichtbaren Ebenen; die Live-Preview eines Tool-
+        # Drags ersetzt dabei die aktive Ebene.
+        shown = doc.current.composite(active_override=self._preview_pil)
         z = self._zoom
         scaled = shown.resize((doc.width * z, doc.height * z), Image.NEAREST)
         pix = pil_to_qpixmap(scaled)
@@ -682,7 +685,7 @@ class SpriteCanvas(QGraphicsView):
         if not self._show_tile_preview:
             return
         doc = self.app.doc; z = self._zoom
-        shown = self._preview_pil if self._preview_pil is not None else doc.current.pixels
+        shown = doc.current.composite(active_override=self._preview_pil)
         scaled = shown.resize((doc.width * z, doc.height * z), Image.NEAREST)
         pix = pil_to_qpixmap(scaled)
         for ox in (-doc.width * z, 0, doc.width * z):
@@ -1298,7 +1301,7 @@ class AssetBrowser(QWidget):
         # Erstes Frame als Vorschau (.gbsprite hat mehrere Frames)
         if path.suffix.lower() == ".gbsprite":
             doc = SpriteDoc.load_native(path)
-            img = doc.frames[0].pixels
+            img = doc.frames[0].composite()
         else:
             img = Image.open(path).convert("RGBA")
         ts = self.THUMB
@@ -1412,11 +1415,15 @@ class FramesPanel(QWidget):
         # Anims-Panel mitziehen: Frame-Ops verschieben Bereiche (document.py).
         if hasattr(self.app, "anims_panel"):
             self.app.anims_panel.refresh()
+        # Ebenen-Panel zeigt den Stapel des AKTUELLEN Frames -- bei jedem
+        # Frame-/Pixel-Refresh mitziehen (guenstig, wenige Ebenen).
+        if hasattr(self.app, "layers_panel"):
+            self.app.layers_panel.refresh()
         # Komplettes Rebuild: bei <50 Frames vernachlaessigbar.
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
         for i, frame in enumerate(self.app.doc.frames):
-            icon = self._make_thumb_icon(frame.pixels)
+            icon = self._make_thumb_icon(frame.composite())
             label = f"#{i:02d}  {frame.name}" if frame.name else f"#{i:02d}"
             item = QListWidgetItem(icon, label)
             item.setData(Qt.UserRole, i)
@@ -1618,6 +1625,183 @@ class FramesPanel(QWidget):
                     d.rectangle([xx, yy, xx + 4, yy + 4], fill=(60, 60, 65, 255))
         bg.alpha_composite(small, ((ts - new_w) // 2, (ts - new_h) // 2))
         return QIcon(pil_to_qpixmap(bg))
+
+
+# ============================================================
+# Layers-Panel (Ebenen des aktuellen Frames)
+# ============================================================
+
+class LayersPanel(QWidget):
+    """Ebenen-Stapel des AKTUELLEN Frames: Liste (oben = oberste Ebene)
+    mit Sichtbarkeits-Checkbox + Thumbnail, Buttons fuer Neu/Duplizieren/
+    Loeschen/Verschieben/Merge-Down, Opacity-Slider fuer die aktive
+    Ebene, Doppelklick = umbenennen. Struktur-Aenderungen laufen ueber
+    das Struktur-Undo des Dokuments."""
+
+    THUMB = 28
+
+    def __init__(self, app: "SpriteEditorWindow"):
+        super().__init__()
+        self.app = app
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+
+        btn_row = QHBoxLayout()
+        for text, tip, slot in [
+            ("+",  "Neue Ebene (ueber der aktiven)", self._add),
+            ("⧉",  "Ebene duplizieren",              self._dup),
+            ("−",  "Ebene loeschen",                 self._del),
+            ("▲",  "Ebene nach oben",                lambda: self._move(+1)),
+            ("▼",  "Ebene nach unten",               lambda: self._move(-1)),
+            ("⤓",  "Mit darunterliegender Ebene vereinen (Merge Down)",
+                   self._merge_down),
+        ]:
+            b = QToolButton()
+            b.setText(text)
+            b.setToolTip(tip)
+            b.clicked.connect(slot)
+            btn_row.addWidget(b)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        self.list_widget = QListWidget()
+        self.list_widget.setIconSize(QSize(self.THUMB, self.THUMB))
+        self.list_widget.itemSelectionChanged.connect(self._on_select)
+        self.list_widget.itemChanged.connect(self._on_item_changed)
+        self.list_widget.itemDoubleClicked.connect(self._rename)
+        layout.addWidget(self.list_widget, 1)
+
+        op_row = QHBoxLayout()
+        op_row.addWidget(QLabel("Deckkraft:"))
+        self.opacity_slider = QSlider(Qt.Horizontal)
+        self.opacity_slider.setRange(0, 100)
+        self.opacity_slider.setValue(100)
+        self.opacity_slider.valueChanged.connect(self._on_opacity)
+        op_row.addWidget(self.opacity_slider, 1)
+        self.opacity_label = QLabel("100%")
+        op_row.addWidget(self.opacity_label)
+        layout.addLayout(op_row)
+
+    # Liste zeigt oben die OBERSTE Ebene -> row 0 = letzter Layer-Index.
+    def _row_to_idx(self, row: int) -> int:
+        return len(self.app.doc.current.layers) - 1 - row
+
+    def refresh(self):
+        f = self.app.doc.current
+        self.list_widget.blockSignals(True)
+        self.list_widget.clear()
+        for li in range(len(f.layers) - 1, -1, -1):
+            ly = f.layers[li]
+            item = QListWidgetItem(self._thumb_icon(ly.pixels), ly.name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if ly.visible else Qt.Unchecked)
+            item.setData(Qt.UserRole, li)
+            self.list_widget.addItem(item)
+        self.list_widget.setCurrentRow(
+            len(f.layers) - 1 - f.active_layer)
+        self.list_widget.blockSignals(False)
+        self.opacity_slider.blockSignals(True)
+        op = f.layers[f.active_layer].opacity
+        self.opacity_slider.setValue(round(op * 100))
+        self.opacity_label.setText(f"{round(op * 100)}%")
+        self.opacity_slider.blockSignals(False)
+
+    def _thumb_icon(self, src: Image.Image) -> QIcon:
+        ts = self.THUMB
+        ratio = min(ts / src.width, ts / src.height)
+        small = src.resize((max(1, int(src.width * ratio)),
+                            max(1, int(src.height * ratio))), Image.NEAREST)
+        bg = Image.new("RGBA", (ts, ts), (45, 45, 48, 255))
+        bg.alpha_composite(small, ((ts - small.width) // 2,
+                                   (ts - small.height) // 2))
+        return QIcon(pil_to_qpixmap(bg))
+
+    def _after_change(self, structural: bool = False):
+        self.refresh()
+        self.app.canvas.invalidate_all()
+        self.app.mark_dirty()
+
+    # --- Slots ----------------------------------------------------------
+
+    def _on_select(self):
+        row = self.list_widget.currentRow()
+        if row < 0:
+            return
+        idx = self._row_to_idx(row)
+        f = self.app.doc.current
+        if 0 <= idx < len(f.layers) and idx != f.active_layer:
+            f.active_layer = idx
+            self.refresh()
+            self.app.update_status()
+
+    def _on_item_changed(self, item):
+        # Sichtbarkeits-Checkbox (Eigenschaft, kein Undo-Schritt)
+        idx = item.data(Qt.UserRole)
+        f = self.app.doc.current
+        if idx is None or not (0 <= idx < len(f.layers)):
+            return
+        f.layers[idx].visible = item.checkState() == Qt.Checked
+        self.app.canvas.invalidate_all()
+        self.app.mark_dirty()
+
+    def _on_opacity(self, value: int):
+        f = self.app.doc.current
+        f.layers[f.active_layer].opacity = value / 100.0
+        self.opacity_label.setText(f"{value}%")
+        self.app.canvas.invalidate_all()
+        self.app.mark_dirty()
+
+    def _add(self):
+        self.app.doc.push_struct()
+        self.app.doc.current.add_layer()
+        self._after_change()
+
+    def _dup(self):
+        self.app.doc.push_struct()
+        self.app.doc.current.duplicate_layer()
+        self._after_change()
+
+    def _del(self):
+        f = self.app.doc.current
+        if len(f.layers) <= 1:
+            self.app.statusBar().showMessage(
+                "Letzte Ebene kann nicht geloescht werden", 2500)
+            return
+        self.app.doc.push_struct()
+        f.delete_layer()
+        self._after_change()
+
+    def _move(self, delta: int):
+        self.app.doc.push_struct()
+        if not self.app.doc.current.move_layer(delta):
+            # nichts passiert -> Struktur-Snapshot zuruecknehmen
+            self.app.doc._struct_undo.pop()
+            return
+        self._after_change()
+
+    def _merge_down(self):
+        f = self.app.doc.current
+        if f.active_layer == 0:
+            self.app.statusBar().showMessage(
+                "Unterste Ebene hat nichts darunter zum Vereinen", 2500)
+            return
+        self.app.doc.push_struct()
+        f.merge_down()
+        self._after_change()
+
+    def _rename(self, item):
+        idx = item.data(Qt.UserRole)
+        f = self.app.doc.current
+        if idx is None or not (0 <= idx < len(f.layers)):
+            return
+        new_name, ok = QInputDialog.getText(
+            self, "Ebene umbenennen", "Name:",
+            text=f.layers[idx].name)
+        if not ok or not new_name.strip():
+            return
+        self.app.doc.push_struct()
+        f.layers[idx].name = new_name.strip()
+        self._after_change()
 
 
 # ============================================================
@@ -1899,7 +2083,7 @@ class AnimationPreview(QDialog):
 
     def _render(self):
         frame = self._frames[self._idx]
-        scaled = frame.pixels.resize(
+        scaled = frame.composite().resize(
             (self._sw * self._scale, self._sh * self._scale), Image.NEAREST,
         )
         # Schachbrett-Hintergrund
@@ -2418,6 +2602,17 @@ class SpriteEditorWindow(QMainWindow):
                                  | QDockWidget.DockWidgetClosable)
         frames_dock.setMinimumWidth(220)
         self.addDockWidget(Qt.RightDockWidgetArea, frames_dock)
+
+        # Ebenen-Panel rechts (unter Frames)
+        self.layers_panel = LayersPanel(self)
+        layers_dock = QDockWidget("Ebenen", self)
+        layers_dock.setWidget(self.layers_panel)
+        layers_dock.setFeatures(QDockWidget.DockWidgetMovable
+                                 | QDockWidget.DockWidgetFloatable
+                                 | QDockWidget.DockWidgetClosable)
+        layers_dock.setMinimumWidth(220)
+        self.addDockWidget(Qt.RightDockWidgetArea, layers_dock)
+        self.layers_panel.refresh()
 
         # Animations-Panel rechts (unter Frames): benannte Bereiche
         self.anims_panel = AnimsPanel(self)
@@ -3246,7 +3441,7 @@ class SpriteEditorWindow(QMainWindow):
         try:
             # Bewusst NICHT save_png_single: das wuerde filepath/dirty
             # umsetzen -- ein Frame-Export ist kein "Speichern".
-            img = SpriteDoc._scaled(self.doc.current.pixels, scale)
+            img = SpriteDoc._scaled(self.doc.current.composite(), scale)
             img.save(path, format="PNG")
         except Exception as exc:
             QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
@@ -3606,7 +3801,7 @@ class SpriteEditorWindow(QMainWindow):
         min_x = self.doc.width; max_x = -1
         min_y = self.doc.height; max_y = -1
         for f in self.doc.frames:
-            bbox = f.pixels.getbbox()  # (x0, y0, x1_exc, y1_exc) oder None
+            bbox = f.composite().getbbox()  # (x0, y0, x1_exc, y1_exc) oder None
             if bbox is None:
                 continue
             x0, y0, x1, y1 = bbox
@@ -3635,7 +3830,9 @@ class SpriteEditorWindow(QMainWindow):
         if ans != QMessageBox.Yes:
             return
         for f in self.doc.frames:
-            f.pixels = f.pixels.crop((min_x, min_y, max_x + 1, max_y + 1)).copy()
+            for ly in f.layers:
+                ly.pixels = ly.pixels.crop(
+                    (min_x, min_y, max_x + 1, max_y + 1)).copy()
             f.history.clear()
             f.redo_stack.clear()
         self.doc.width = new_w
@@ -3659,21 +3856,27 @@ class SpriteEditorWindow(QMainWindow):
 
     # --- Transformationen ---
 
-    def action_flip_horizontal(self):
+    def _transform_current_frame(self, op):
+        """Frame-weite Transformation (Flip/Rotate-quadratisch): wirkt auf
+        ALLE Ebenen des aktuellen Frames. Einlagig laeuft das ueber das
+        leichte Pixel-Undo, mehrlagig ueber einen Struktur-Snapshot."""
         f = self.doc.current
-        f.snapshot()
-        f.pixels = f.pixels.transpose(Image.FLIP_LEFT_RIGHT)
+        if len(f.layers) > 1:
+            self.doc.push_struct()
+            for ly in f.layers:
+                ly.pixels = ly.pixels.transpose(op)
+        else:
+            f.snapshot()
+            f.pixels = f.pixels.transpose(op)
         self.canvas.invalidate_all()
         self.frames_panel.refresh()
         self.mark_dirty()
 
+    def action_flip_horizontal(self):
+        self._transform_current_frame(Image.FLIP_LEFT_RIGHT)
+
     def action_flip_vertical(self):
-        f = self.doc.current
-        f.snapshot()
-        f.pixels = f.pixels.transpose(Image.FLIP_TOP_BOTTOM)
-        self.canvas.invalidate_all()
-        self.frames_panel.refresh()
-        self.mark_dirty()
+        self._transform_current_frame(Image.FLIP_TOP_BOTTOM)
 
     def action_rotate_cw(self):
         if self.doc.width != self.doc.height:
@@ -3689,12 +3892,7 @@ class SpriteEditorWindow(QMainWindow):
             self.frames_panel.refresh()
             self.update_status()
         else:
-            f = self.doc.current
-            f.snapshot()
-            f.pixels = f.pixels.transpose(Image.ROTATE_270)
-            self.canvas.invalidate_all()
-            self.frames_panel.refresh()
-            self.mark_dirty()
+            self._transform_current_frame(Image.ROTATE_270)
 
     def action_rotate_ccw(self):
         if self.doc.width != self.doc.height:
@@ -3710,16 +3908,12 @@ class SpriteEditorWindow(QMainWindow):
             self.frames_panel.refresh()
             self.update_status()
         else:
-            f = self.doc.current
-            f.snapshot()
-            f.pixels = f.pixels.transpose(Image.ROTATE_90)
-            self.canvas.invalidate_all()
-            self.frames_panel.refresh()
-            self.mark_dirty()
+            self._transform_current_frame(Image.ROTATE_90)
 
     def _rotate_all(self, op):
         for f in self.doc.frames:
-            f.pixels = f.pixels.transpose(op)
+            for ly in f.layers:
+                ly.pixels = ly.pixels.transpose(op)
             f.history.clear()
             f.redo_stack.clear()
         self.doc.dirty = True
@@ -3811,7 +4005,7 @@ class SpriteEditorWindow(QMainWindow):
                             (self.doc.width, self.doc.height),
                             (0, 0, 0, 0))
         for f in self.doc.frames:
-            merged.alpha_composite(f.pixels)
+            merged.alpha_composite(f.composite())
         self.doc.frames = [Frame(pixels=merged)]
         self.doc.current_index = 0
         self.doc.dirty = True
@@ -3834,8 +4028,9 @@ class SpriteEditorWindow(QMainWindow):
         # (sonst wuerde Bearbeiten von 'B' auch das angehaengte 'B' aendern).
         new_tail = []
         for f in reversed(self.doc.frames[1:-1]):
-            new_tail.append(Frame(pixels=f.pixels.copy(),
-                                   duration_ms=f.duration_ms))
+            clone = f.clone()
+            clone.name = ""   # angehaengte Frames nicht doppelt benennen
+            new_tail.append(clone)
         self.doc.frames.extend(new_tail)
         self.doc.dirty = True
         self.frames_panel.refresh()
@@ -3864,7 +4059,7 @@ class SpriteEditorWindow(QMainWindow):
         all_colors = Counter()
         opaque_total = 0
         for f in self.doc.frames:
-            for col in f.pixels.getdata():
+            for col in f.composite().getdata():
                 all_colors[col] += 1
                 if col[3] >= 128:
                     opaque_total += 1
@@ -3882,7 +4077,7 @@ class SpriteEditorWindow(QMainWindow):
         # Pro Frame: Pixel-Anzahl + eindeutige Farben
         per_frame = []
         for i, f in enumerate(self.doc.frames):
-            colors = Counter(f.pixels.getdata())
+            colors = Counter(f.composite().getdata())
             opaque = sum(c for col, c in colors.items() if col[3] >= 128)
             per_frame.append((i, opaque, len([col for col in colors
                                                 if col[3] >= 128])))

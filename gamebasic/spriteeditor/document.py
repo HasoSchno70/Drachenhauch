@@ -16,7 +16,7 @@ import io
 import itertools
 import json
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -34,29 +34,182 @@ _UNDO_SEQ = itertools.count(1)
 
 
 @dataclass
-class Frame:
+class Layer:
+    """Eine Ebene eines Frames. Frames haben mindestens eine Ebene;
+    gezeichnet wird immer auf der aktiven, angezeigt/exportiert wird
+    das Composite aller sichtbaren Ebenen (unten -> oben)."""
     pixels: Image.Image
-    duration_ms: int = DEFAULT_FRAME_DURATION_MS
-    name: str = ""           # optionaler Name -> Sprite-ID im Atlas-Export
-    history: deque = field(default_factory=lambda: deque(maxlen=80))   # (seq, Image)
-    redo_stack: list = field(default_factory=list)                     # (seq, Image)
+    name: str = "Ebene 1"
+    visible: bool = True
+    opacity: float = 1.0     # 0..1, skaliert den Alpha-Kanal beim Composite
+
+
+def _with_opacity(img: Image.Image, opacity: float) -> Image.Image:
+    if opacity >= 1.0:
+        return img
+    opacity = max(0.0, opacity)
+    r, g, b, a = img.split()
+    a = a.point(lambda v: int(v * opacity))
+    return Image.merge("RGBA", (r, g, b, a))
+
+
+class Frame:
+    """Ein Animations-Frame: Ebenen-Stapel + Dauer + optionaler Name.
+
+    `frame.pixels` ist die **aktive Ebene** (Lesen UND Schreiben) -- so
+    arbeiten alle Pixel-Tools unveraendert auf der aktiven Ebene. Fuer
+    Anzeige/Export liefert `composite()` alle sichtbaren Ebenen
+    uebereinander. Bei einem einlagigen Frame ist beides dasselbe Bild.
+    """
+
+    def __init__(self, pixels: Optional[Image.Image] = None,
+                 duration_ms: int = DEFAULT_FRAME_DURATION_MS,
+                 name: str = "",
+                 layers: Optional[list[Layer]] = None,
+                 active_layer: int = 0):
+        if layers is None:
+            if pixels is None:
+                raise ValueError("Frame braucht pixels oder layers")
+            layers = [Layer(pixels=pixels)]
+        self.layers: list[Layer] = layers
+        self.active_layer = max(0, min(active_layer, len(layers) - 1))
+        self.duration_ms = duration_ms
+        self.name = name     # optionaler Name -> Sprite-ID im Atlas-Export
+        self.history: deque = deque(maxlen=80)   # (seq, layer_idx, Image)
+        self.redo_stack: list = []               # (seq, layer_idx, Image)
+
+    # --- aktive Ebene als pixels-Property (Tool-/Bestands-API) ---------
+
+    @property
+    def pixels(self) -> Image.Image:
+        return self.layers[self.active_layer].pixels
+
+    @pixels.setter
+    def pixels(self, img: Image.Image):
+        self.layers[self.active_layer].pixels = img
+
+    def composite(self, active_override: Optional[Image.Image] = None) -> Image.Image:
+        """Alle sichtbaren Ebenen uebereinander (unten -> oben), Opacity
+        angewendet. `active_override` ersetzt die aktive Ebene (fuer die
+        Live-Preview waehrend eines Tool-Drags). Das Ergebnis NICHT
+        mutieren -- im Ein-Ebenen-Fall ist es das Live-Bild."""
+        # Fast-Path: eine sichtbare Ebene ohne Opacity -> Live-Bild.
+        if len(self.layers) == 1:
+            ly = self.layers[0]
+            img = active_override if active_override is not None else ly.pixels
+            if ly.visible and ly.opacity >= 1.0:
+                return img
+            base = Image.new("RGBA", img.size, (0, 0, 0, 0))
+            if ly.visible:
+                base.alpha_composite(_with_opacity(img, ly.opacity))
+            return base
+        size = self.layers[0].pixels.size
+        base = Image.new("RGBA", size, (0, 0, 0, 0))
+        for i, ly in enumerate(self.layers):
+            if not ly.visible:
+                continue
+            img = (active_override
+                   if (active_override is not None and i == self.active_layer)
+                   else ly.pixels)
+            base.alpha_composite(_with_opacity(img, ly.opacity))
+        return base
+
+    def clone(self) -> "Frame":
+        """Tiefe Kopie (Ebenen-Bilder kopiert), ohne Undo-Historie."""
+        return Frame(
+            layers=[Layer(pixels=ly.pixels.copy(), name=ly.name,
+                          visible=ly.visible, opacity=ly.opacity)
+                    for ly in self.layers],
+            active_layer=self.active_layer,
+            duration_ms=self.duration_ms,
+            name=self.name,
+        )
+
+    # --- Ebenen-Operationen ---------------------------------------------
+    # Struktur-Undo dafuer macht der Aufrufer via doc.push_struct().
+
+    def add_layer(self, name: Optional[str] = None) -> int:
+        """Neue leere Ebene UEBER der aktiven; wird aktiv."""
+        size = self.layers[0].pixels.size
+        if name is None:
+            name = f"Ebene {len(self.layers) + 1}"
+        self.layers.insert(self.active_layer + 1,
+                           Layer(pixels=Image.new("RGBA", size, (0, 0, 0, 0)),
+                                 name=name))
+        self.active_layer += 1
+        return self.active_layer
+
+    def duplicate_layer(self) -> int:
+        src = self.layers[self.active_layer]
+        self.layers.insert(self.active_layer + 1,
+                           Layer(pixels=src.pixels.copy(),
+                                 name=src.name + " (Kopie)",
+                                 visible=src.visible, opacity=src.opacity))
+        self.active_layer += 1
+        return self.active_layer
+
+    def delete_layer(self) -> bool:
+        if len(self.layers) <= 1:
+            return False
+        del self.layers[self.active_layer]
+        self.active_layer = max(0, min(self.active_layer, len(self.layers) - 1))
+        # Undo-Eintraege zeigen auf Layer-Indizes -- nach Strukturwechsel
+        # waeren sie irrefuehrend (Struktur-Undo stellt den Stand wieder her).
+        self.history.clear()
+        self.redo_stack.clear()
+        return True
+
+    def move_layer(self, delta: int) -> bool:
+        new_idx = self.active_layer + delta
+        if not (0 <= new_idx < len(self.layers)):
+            return False
+        ly = self.layers.pop(self.active_layer)
+        self.layers.insert(new_idx, ly)
+        self.active_layer = new_idx
+        self.history.clear()
+        self.redo_stack.clear()
+        return True
+
+    def merge_down(self) -> bool:
+        """Aktive Ebene (mit ihrer Opacity) auf die darunterliegende
+        stempeln und entfernen. Die untere Ebene wird aktiv."""
+        if self.active_layer == 0:
+            return False
+        top = self.layers[self.active_layer]
+        below = self.layers[self.active_layer - 1]
+        if top.visible:
+            below.pixels.alpha_composite(_with_opacity(top.pixels, top.opacity))
+        del self.layers[self.active_layer]
+        self.active_layer -= 1
+        self.history.clear()
+        self.redo_stack.clear()
+        return True
+
+    # --- Pixel-Undo (pro Ebene) -------------------------------------------
 
     def snapshot(self):
-        self.history.append((next(_UNDO_SEQ), self.pixels.copy()))
+        self.history.append((next(_UNDO_SEQ), self.active_layer,
+                             self.pixels.copy()))
         self.redo_stack.clear()
 
     def undo(self) -> bool:
         if not self.history:
             return False
-        self.redo_stack.append((next(_UNDO_SEQ), self.pixels.copy()))
-        _, self.pixels = self.history.pop()
+        _, li, img = self.history.pop()
+        li = min(li, len(self.layers) - 1)
+        self.redo_stack.append((next(_UNDO_SEQ), li,
+                                self.layers[li].pixels.copy()))
+        self.layers[li].pixels = img
         return True
 
     def redo(self) -> bool:
         if not self.redo_stack:
             return False
-        self.history.append((next(_UNDO_SEQ), self.pixels.copy()))
-        _, self.pixels = self.redo_stack.pop()
+        _, li, img = self.redo_stack.pop()
+        li = min(li, len(self.layers) - 1)
+        self.history.append((next(_UNDO_SEQ), li,
+                             self.layers[li].pixels.copy()))
+        self.layers[li].pixels = img
         return True
 
     def last_undo_seq(self) -> int:
@@ -106,7 +259,7 @@ class SpriteDoc:
             "width": self.width,
             "height": self.height,
             "current_index": self.current_index,
-            "frames": [(f.pixels.copy(), f.duration_ms, f.name) for f in self.frames],
+            "frames": [f.clone() for f in self.frames],
             "anims": [Anim(a.name, a.first, a.last, a.fps) for a in self.anims],
         }
 
@@ -115,8 +268,9 @@ class SpriteDoc:
         self.height = st["height"]
         # Wiederhergestellte Frames starten mit leerer Pixel-History --
         # die Struktur-Snapshots sichern den Zustand, nicht die Historie.
-        self.frames = [Frame(pixels=img, duration_ms=dur, name=name)
-                       for (img, dur, name) in st["frames"]]
+        # Erneut klonen: derselbe Snapshot kann mehrfach restauriert
+        # werden (undo -> redo -> undo), darf also nicht aliasen.
+        self.frames = [f.clone() for f in st["frames"]]
         self.anims = list(st["anims"])
         self.current_index = max(0, min(st["current_index"], len(self.frames) - 1))
         self.dirty = True
@@ -295,9 +449,10 @@ class SpriteDoc:
     def resize(self, new_w: int, new_h: int):
         self.push_struct()
         for f in self.frames:
-            new_img = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
-            new_img.paste(f.pixels, (0, 0))
-            f.pixels = new_img
+            for ly in f.layers:
+                new_img = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
+                new_img.paste(ly.pixels, (0, 0))
+                ly.pixels = new_img
             f.history.clear()
             f.redo_stack.clear()
         self.width = new_w
@@ -306,9 +461,16 @@ class SpriteDoc:
 
     # --- Persistenz ---
 
+    @staticmethod
+    def _b64_png(img: Image.Image) -> str:
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+
     def save_native(self, path: Path):
         data = {
-            "version": 4,    # V3: Frame-name; V4: benannte Anim-Bereiche
+            # V3: Frame-name; V4: benannte Anim-Bereiche; V5: Ebenen
+            "version": 5,
             "width": self.width,
             "height": self.height,
             "frames": [],
@@ -319,14 +481,26 @@ class SpriteDoc:
                 for a in self.anims
             ]
         for f in self.frames:
-            buf = io.BytesIO()
-            f.pixels.save(buf, format="PNG")
+            # "data" ist IMMER das geflattete Composite -- aeltere Leser
+            # (und externe Tools) sehen damit weiterhin ein korrektes Bild.
             fd = {
-                "data": base64.b64encode(buf.getvalue()).decode("ascii"),
+                "data": self._b64_png(f.composite()),
                 "duration_ms": int(f.duration_ms),
             }
             if f.name:
                 fd["name"] = f.name
+            # Ebenen nur schreiben, wenn sie Information tragen (mehr als
+            # eine, oder Nicht-Default-Eigenschaften).
+            if (len(f.layers) > 1
+                    or not f.layers[0].visible
+                    or f.layers[0].opacity < 1.0
+                    or f.layers[0].name != "Ebene 1"):
+                fd["layers"] = [
+                    {"name": ly.name, "visible": ly.visible,
+                     "opacity": ly.opacity, "data": self._b64_png(ly.pixels)}
+                    for ly in f.layers
+                ]
+                fd["active_layer"] = f.active_layer
             data["frames"].append(fd)
         path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         self.filepath = path
@@ -338,13 +512,30 @@ class SpriteDoc:
         doc = cls(int(data["width"]), int(data["height"]))
         doc.frames = []
         for fd in data["frames"]:
-            raw = base64.b64decode(fd["data"])
-            img = Image.open(io.BytesIO(raw)).convert("RGBA")
             # Backward-compat: Version-1-Dateien hatten kein duration_ms,
-            # Version-1/2 hatten kein name-Feld
+            # Version-1/2 hatten kein name-Feld, vor V5 keine Ebenen.
             duration_ms = int(fd.get("duration_ms", DEFAULT_FRAME_DURATION_MS))
             name = str(fd.get("name", ""))
-            doc.frames.append(Frame(pixels=img, duration_ms=duration_ms, name=name))
+            if fd.get("layers"):
+                layers = []
+                for ld in fd["layers"]:
+                    raw = base64.b64decode(ld["data"])
+                    img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                    layers.append(Layer(
+                        pixels=img,
+                        name=str(ld.get("name", f"Ebene {len(layers) + 1}")),
+                        visible=bool(ld.get("visible", True)),
+                        opacity=float(ld.get("opacity", 1.0)),
+                    ))
+                doc.frames.append(Frame(
+                    layers=layers,
+                    active_layer=int(fd.get("active_layer", 0)),
+                    duration_ms=duration_ms, name=name))
+            else:
+                raw = base64.b64decode(fd["data"])
+                img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                doc.frames.append(Frame(pixels=img, duration_ms=duration_ms,
+                                        name=name))
         if not doc.frames:
             doc.frames = [doc._blank_frame()]
         # V4: benannte Anim-Bereiche (aeltere Dateien: leer)
@@ -370,7 +561,7 @@ class SpriteDoc:
                           Image.NEAREST)
 
     def save_png_single(self, path: Path, scale: int = 1):
-        self._scaled(self.current.pixels, scale).save(path, format="PNG")
+        self._scaled(self.current.composite(), scale).save(path, format="PNG")
         self.filepath = path
         self.dirty = False
 
@@ -397,7 +588,7 @@ class SpriteDoc:
 
         gif_frames = []
         for f in self.frames:
-            rgba = self._scaled(f.pixels, scale)
+            rgba = self._scaled(f.composite(), scale)
             p = rgba.convert("RGB").convert(
                 "P", palette=Image.Palette.ADAPTIVE, colors=255)
             alpha = rgba.split()[3]
@@ -422,11 +613,11 @@ class SpriteDoc:
         if layout == "vertical":
             sheet = Image.new("RGBA", (self.width, self.height * n), (0, 0, 0, 0))
             for i, f in enumerate(self.frames):
-                sheet.paste(f.pixels, (0, i * self.height))
+                sheet.paste(f.composite(), (0, i * self.height))
         else:
             sheet = Image.new("RGBA", (self.width * n, self.height), (0, 0, 0, 0))
             for i, f in enumerate(self.frames):
-                sheet.paste(f.pixels, (i * self.width, 0))
+                sheet.paste(f.composite(), (i * self.width, 0))
         self._scaled(sheet, scale).save(path, format="PNG")
 
     def save_sheet_atlas(self, png_path: Path, json_path: Path,

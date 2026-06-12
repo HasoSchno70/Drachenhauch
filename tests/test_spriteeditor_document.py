@@ -658,3 +658,178 @@ def test_export_scale_one_is_identity(tmp_path):
     manifest = doc.save_sheet_atlas(png, js, scale=1)
     assert Image.open(png).size == (8, 4)
     assert manifest["sprites"]["atlas_0"] == [0, 0, 4, 4]
+
+
+# --- Ebenen (Layers) ------------------------------------------------
+
+def _red():  return (255, 0, 0, 255)
+def _green(): return (0, 255, 0, 255)
+
+
+def test_frame_default_single_layer():
+    doc = SpriteDoc(8, 8)
+    f = doc.current
+    assert len(f.layers) == 1
+    assert f.active_layer == 0
+    # pixels-Property ist die aktive Ebene (Identitaet)
+    assert f.pixels is f.layers[0].pixels
+    # Einlagiges Composite = Live-Bild (Fast-Path)
+    assert f.composite() is f.pixels
+
+
+def test_layer_add_draw_composite():
+    doc = SpriteDoc(8, 8)
+    f = doc.current
+    f.pixels.putpixel((0, 0), _red())
+    f.add_layer()
+    assert len(f.layers) == 2 and f.active_layer == 1
+    f.pixels.putpixel((1, 1), _green())
+    comp = f.composite()
+    assert comp.getpixel((0, 0)) == _red()
+    assert comp.getpixel((1, 1)) == _green()
+    # untere Ebene unveraendert
+    assert f.layers[0].pixels.getpixel((1, 1)) == (0, 0, 0, 0)
+
+
+def test_layer_visibility_and_opacity():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.add_layer()
+    f.pixels.putpixel((2, 2), _green())
+    f.layers[1].visible = False
+    assert f.composite().getpixel((2, 2)) == (0, 0, 0, 0)
+    f.layers[1].visible = True
+    f.layers[1].opacity = 0.5
+    assert f.composite().getpixel((2, 2))[3] == 127
+
+
+def test_layer_top_obscures_bottom():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.pixels.putpixel((1, 1), _red())
+    f.add_layer()
+    f.pixels.putpixel((1, 1), _green())
+    assert f.composite().getpixel((1, 1)) == _green()
+
+
+def test_layer_merge_down():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.pixels.putpixel((0, 0), _red())
+    f.add_layer()
+    f.pixels.putpixel((1, 1), _green())
+    assert f.merge_down()
+    assert len(f.layers) == 1 and f.active_layer == 0
+    assert f.pixels.getpixel((0, 0)) == _red()
+    assert f.pixels.getpixel((1, 1)) == _green()
+    # unterste Ebene kann nicht weiter mergen
+    assert not f.merge_down()
+
+
+def test_layer_move_and_delete():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.layers[0].name = "unten"
+    f.add_layer(name="oben")
+    assert [ly.name for ly in f.layers] == ["unten", "oben"]
+    assert f.move_layer(-1)
+    assert [ly.name for ly in f.layers] == ["oben", "unten"]
+    assert f.active_layer == 0
+    assert f.delete_layer()
+    assert len(f.layers) == 1
+    assert not f.delete_layer()   # letzte Ebene bleibt
+
+
+def test_layer_pixel_undo_targets_recorded_layer():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.add_layer()
+    f.snapshot()                       # Snapshot der Ebene 1
+    f.pixels.putpixel((0, 0), _green())
+    f.active_layer = 0                 # Ebene wechseln
+    assert f.undo()                    # Undo trifft trotzdem Ebene 1
+    assert f.layers[1].pixels.getpixel((0, 0)) == (0, 0, 0, 0)
+    assert f.redo()
+    assert f.layers[1].pixels.getpixel((0, 0)) == _green()
+
+
+def test_layer_struct_undo_restores_stack():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    doc.push_struct()
+    f.add_layer()
+    f.pixels.putpixel((0, 0), _green())
+    assert doc.undo_struct()
+    assert len(doc.current.layers) == 1
+    assert doc.redo_struct()
+    assert len(doc.current.layers) == 2
+    assert doc.current.layers[1].pixels.getpixel((0, 0)) == _green()
+
+
+def test_layer_save_load_roundtrip_v5(tmp_path):
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.layers[0].name = "Hintergrund"
+    f.pixels.putpixel((0, 0), _red())
+    f.add_layer(name="Deko")
+    f.pixels.putpixel((1, 1), _green())
+    f.layers[1].opacity = 0.5
+    f.layers[1].visible = True
+    p = tmp_path / "layered.gbsprite"
+    doc.save_native(p)
+    import json
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["version"] == 5
+    # "data" bleibt das geflattete Composite (aeltere Leser sehen ein Bild)
+    assert "data" in data["frames"][0]
+    loaded = SpriteDoc.load_native(p)
+    f2 = loaded.frames[0]
+    assert [ly.name for ly in f2.layers] == ["Hintergrund", "Deko"]
+    assert f2.layers[1].opacity == 0.5
+    assert f2.active_layer == 1
+    assert f2.layers[0].pixels.getpixel((0, 0)) == _red()
+    assert f2.layers[1].pixels.getpixel((1, 1)) == _green()
+
+
+def test_single_layer_file_stays_compact(tmp_path):
+    # Ohne echte Ebenen-Info kein "layers"-Feld -> Datei bleibt schlank
+    doc = SpriteDoc(4, 4)
+    p = tmp_path / "flat.gbsprite"
+    doc.save_native(p)
+    import json
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert "layers" not in data["frames"][0]
+    loaded = SpriteDoc.load_native(p)
+    assert len(loaded.frames[0].layers) == 1
+
+
+def test_resize_resizes_all_layers():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.add_layer()
+    doc.resize(8, 8)
+    assert all(ly.pixels.size == (8, 8) for ly in f.layers)
+
+
+def test_exports_use_composite(tmp_path):
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.pixels.putpixel((0, 0), _red())
+    f.add_layer()
+    f.pixels.putpixel((1, 0), _green())
+    out = tmp_path / "sheet.png"
+    doc.save_sheet_png(out)
+    img = Image.open(out).convert("RGBA")
+    assert img.getpixel((0, 0)) == _red()
+    assert img.getpixel((1, 0)) == _green()
+
+
+def test_frame_clone_is_deep():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.add_layer()
+    f.name = "orig"
+    c = f.clone()
+    c.layers[1].pixels.putpixel((0, 0), _green())
+    assert f.layers[1].pixels.getpixel((0, 0)) == (0, 0, 0, 0)
+    assert c.name == "orig" and len(c.layers) == 2
