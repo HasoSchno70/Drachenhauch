@@ -81,6 +81,29 @@ BATCH_FLUSH()
 
 Vorteil ggue Sheet-PNG: **benannte Sub-Sprites** statt Index-Rechnerei, und die Engine-Batch-API (`BATCH_DRAW`/`BATCH_FLUSH`) profitiert vom Atlas-Format. Workflow-Loop ist geschlossen — der Editor schreibt, was die Engine direkt lesen kann.
 
+### Benannte Animations-Bereiche (Panel „Animationen")
+
+Im Dock **Animationen** (rechts, unter den Frames) definierst du benannte
+Frame-Bereiche — das Editor-Pendant zu `SPRITE_ADD_ANIM(name, first, last, fps)`:
+
+- **+** legt einen Bereich an (vorausgefuellt mit dem aktuellen Frame),
+  **✎**/Doppelklick bearbeitet, **−** loescht. Der FPS-Wert laesst sich per
+  **„aus Frame-Dauern"** aus den echten Dauern des Bereichs vorschlagen.
+- Bereiche wandern beim Einfuegen/Loeschen von Frames automatisch mit
+  (leerlaufende Bereiche werden entfernt) und werden in `.gbsprite`
+  mitgespeichert (Format-Version 4, aeltere Dateien laden ohne Bereiche).
+
+Die Bereiche speisen drei Exporte:
+
+1. **GB-Code kopieren**: erzeugt eine `SPRITE_ADD_ANIM`-Zeile **pro Bereich**
+   mit den echten FPS (ohne Bereiche: ein `"idle"` ueber alles, FPS aus den
+   Frame-Dauern statt einem hardcodierten Default).
+2. **Datei → Animations-FSM exportieren (.gbanim)**: schreibt eine direkt
+   `ANIM_FSM_LOAD`-ladbare Vorlage — ein State pro Bereich (`first`/`last`/
+   `fps`, erster Bereich = `default`). Transitions/Parameter ergaenzt du im
+   [gbanim-Editor](anim-editor.md).
+3. **Sprite-Test**: das Testprogramm spielt den ersten definierten Bereich.
+
 ### Animation-GIF (`Ctrl+G`)
 
 Schreibt alle Frames als animiertes GIF mit transparentem Hintergrund. Fuer Vorschau, Doku, Itch-Page-Screenshots.

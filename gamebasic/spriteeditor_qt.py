@@ -367,6 +367,7 @@ DEFAULT_ZOOM_INDEX = 7
 
 from .spriteeditor.document import (  # noqa: E402,F401  -- intentional re-export
     DEFAULT_FRAME_DURATION_MS,
+    Anim,
     Frame,
     SpriteDoc,
     pil_to_qpixmap,
@@ -1351,6 +1352,9 @@ class FramesPanel(QWidget):
         layout.addWidget(self.onion_check)
 
     def refresh(self):
+        # Anims-Panel mitziehen: Frame-Ops verschieben Bereiche (document.py).
+        if hasattr(self.app, "anims_panel"):
+            self.app.anims_panel.refresh()
         # Komplettes Rebuild: bei <50 Frames vernachlaessigbar.
         self.list_widget.blockSignals(True)
         self.list_widget.clear()
@@ -1557,6 +1561,145 @@ class FramesPanel(QWidget):
 # ============================================================
 # Animation-Preview
 # ============================================================
+
+class AnimRangeDialog(QDialog):
+    """Einen Anim-Bereich anlegen/bearbeiten: Name, first..last, FPS.
+    'FPS aus Dauern' uebernimmt den Vorschlag aus den echten Frame-Dauern."""
+
+    def __init__(self, parent, doc: SpriteDoc, anim: Anim):
+        super().__init__(parent)
+        self.setWindowTitle("Animations-Bereich")
+        self._doc = doc
+        n = len(doc.frames)
+        lay = QVBoxLayout(self)
+
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("Name:"))
+        self.name_edit = QLineEdit(anim.name)
+        self.name_edit.setPlaceholderText("z.B. walk")
+        row1.addWidget(self.name_edit, 1)
+        lay.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("Frames:"))
+        self.first_spin = QSpinBox(); self.first_spin.setRange(0, n - 1)
+        self.first_spin.setValue(max(0, min(anim.first, n - 1)))
+        row2.addWidget(self.first_spin)
+        row2.addWidget(QLabel("bis"))
+        self.last_spin = QSpinBox(); self.last_spin.setRange(0, n - 1)
+        self.last_spin.setValue(max(0, min(anim.last, n - 1)))
+        row2.addWidget(self.last_spin)
+        row2.addStretch()
+        lay.addLayout(row2)
+
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel("FPS:"))
+        self.fps_spin = QSpinBox(); self.fps_spin.setRange(1, 60)
+        self.fps_spin.setValue(max(1, min(60, anim.fps)))
+        row3.addWidget(self.fps_spin)
+        from_dur = QPushButton("aus Frame-Dauern")
+        from_dur.setToolTip("FPS-Vorschlag aus den Dauern der Frames im Bereich")
+        from_dur.clicked.connect(self._fps_from_durations)
+        row3.addWidget(from_dur)
+        row3.addStretch()
+        lay.addLayout(row3)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        lay.addWidget(buttons)
+
+    def _fps_from_durations(self):
+        self.fps_spin.setValue(self._doc.anim_fps_suggestion(
+            self.first_spin.value(), self.last_spin.value()))
+
+    @staticmethod
+    def edit(parent, doc: SpriteDoc, anim: Anim) -> Optional[Anim]:
+        dlg = AnimRangeDialog(parent, doc, anim)
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        name = dlg.name_edit.text().strip()
+        if not name:
+            return None
+        first = dlg.first_spin.value()
+        last = dlg.last_spin.value()
+        if last < first:
+            first, last = last, first
+        return Anim(name=name, first=first, last=last, fps=dlg.fps_spin.value())
+
+
+class AnimsPanel(QWidget):
+    """Benannte Animations-Bereiche (das SPRITE_ADD_ANIM-Aequivalent des
+    Editors). Die Bereiche leben in doc.anims (persistiert in .gbsprite v4)
+    und speisen GB-Code-Export, .gbanim-Export und den Sprite-Test."""
+
+    def __init__(self, app: "SpriteEditorWindow"):
+        super().__init__()
+        self.app = app
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 6, 6, 6)
+
+        btn_row = QHBoxLayout()
+        for text, tip, slot in (
+            ("+", "Animation hinzufuegen (Bereich = aktuelles Frame)", self._add),
+            ("✎", "Animation bearbeiten (auch Doppelklick)", self._edit),
+            ("−", "Animation loeschen", self._delete),
+        ):
+            b = QToolButton(); b.setText(text); b.setToolTip(tip)
+            b.clicked.connect(slot)
+            btn_row.addWidget(b)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        self.list_widget = QListWidget()
+        self.list_widget.itemDoubleClicked.connect(lambda _i: self._edit())
+        layout.addWidget(self.list_widget, 1)
+
+        hint = QLabel("Bereiche landen im GB-Code-\nund .gbanim-Export.")
+        hint.setStyleSheet("color: #7a8190; font-size: 8pt;")
+        layout.addWidget(hint)
+
+    def refresh(self):
+        self.list_widget.clear()
+        for a in self.app.doc.anims:
+            self.list_widget.addItem(f"{a.name}    {a.first}\u2013{a.last}    {a.fps} fps")
+
+    def _selected(self) -> int:
+        row = self.list_widget.currentRow()
+        return row if 0 <= row < len(self.app.doc.anims) else -1
+
+    def _add(self):
+        doc = self.app.doc
+        cur = doc.current_index
+        a = AnimRangeDialog.edit(self, doc,
+                                 Anim("", cur, cur, doc.anim_fps_suggestion(cur, cur)))
+        if a is not None:
+            doc.anims.append(a)
+            doc.dirty = True
+            self.refresh()
+            self.app.update_status()
+
+    def _edit(self):
+        i = self._selected()
+        if i < 0:
+            return
+        doc = self.app.doc
+        a = AnimRangeDialog.edit(self, doc, doc.anims[i])
+        if a is not None:
+            doc.anims[i] = a
+            doc.dirty = True
+            self.refresh()
+            self.app.update_status()
+
+    def _delete(self):
+        i = self._selected()
+        if i < 0:
+            return
+        del self.app.doc.anims[i]
+        self.app.doc.dirty = True
+        self.refresh()
+        self.app.update_status()
+
 
 class AnimationPreview(QDialog):
     def __init__(self, parent, frames: list[Frame], sprite_w: int, sprite_h: int):
@@ -1935,6 +2078,8 @@ class SpriteEditorWindow(QMainWindow):
         self.act_export   = A("Sheet-PNG exportieren", "Ctrl+E", self.action_export_sheet, make_action_icon("export"))
         self.act_export_atlas = A("Sprite-Atlas exportieren (PNG + JSON)...",
                                    "Ctrl+Shift+E", self.action_export_atlas)
+        self.act_export_gbanim = A("Animations-FSM exportieren (.gbanim)...",
+                                    None, self.action_export_gbanim)
         self.act_export_gif = A("Animation als GIF...", "Ctrl+G", self.action_export_gif)
         self.act_export_frame = A("Frame als PNG exportieren", None, self.action_export_frame_png)
         self.act_reload   = A("Von Disk neu laden", "F5", self.action_reload_from_disk)
@@ -2047,6 +2192,7 @@ class SpriteEditorWindow(QMainWindow):
         m_file.addAction(self.act_export)
         m_file.addAction(self.act_export_atlas)
         m_file.addAction(self.act_export_gif)
+        m_file.addAction(self.act_export_gbanim)
         m_file.addAction(self.act_export_frame)
         m_file.addSeparator()
         m_file.addAction(self.act_test_sprite)
@@ -2205,6 +2351,16 @@ class SpriteEditorWindow(QMainWindow):
                                  | QDockWidget.DockWidgetClosable)
         frames_dock.setMinimumWidth(220)
         self.addDockWidget(Qt.RightDockWidgetArea, frames_dock)
+
+        # Animations-Panel rechts (unter Frames): benannte Bereiche
+        self.anims_panel = AnimsPanel(self)
+        anims_dock = QDockWidget("Animationen", self)
+        anims_dock.setWidget(self.anims_panel)
+        anims_dock.setFeatures(QDockWidget.DockWidgetMovable
+                                | QDockWidget.DockWidgetFloatable
+                                | QDockWidget.DockWidgetClosable)
+        anims_dock.setMinimumWidth(220)
+        self.addDockWidget(Qt.RightDockWidgetArea, anims_dock)
 
         # Asset-Browser-Dock unten (default versteckt -- via Ansicht-Menue
         # einblenden). Zeigt PNGs/.gbsprite aus den Standard-Asset-
@@ -2559,6 +2715,7 @@ class SpriteEditorWindow(QMainWindow):
         w, h = self.doc.width, self.doc.height
         cx = max(160 - w // 2, 20)
         cy = max(120 - h // 2, 20)
+        a0 = self.doc._effective_anims()[0]
         if n_frames > 1:
             return (
                 f"' Auto-generiert vom Sprite-Editor.\n"
@@ -2572,19 +2729,19 @@ class SpriteEditorWindow(QMainWindow):
                 f'\n'
                 f'DIM sp AS SPRITE\n'
                 f'sp = SPRITE_NEW(sheet, {w}, {h})\n'
-                f'SPRITE_ADD_ANIM(sp, "anim", 0, {n_frames - 1}, 8)\n'
-                f'SPRITE_PLAY(sp, "anim")\n'
+                f'SPRITE_ADD_ANIM(sp, "{a0.name}", {a0.first}, {a0.last}, {a0.fps})\n'
+                f'SPRITE_PLAY(sp, "{a0.name}")\n'
                 f'SPRITE_SET_POS(sp, {cx}, {cy})\n'
                 f'\n'
                 f'DIM sp_l AS SPRITE\n'
                 f'sp_l = SPRITE_NEW(sheet, {w}, {h})\n'
-                f'SPRITE_ADD_ANIM(sp_l, "anim", 0, {n_frames - 1}, 6)\n'
-                f'SPRITE_PLAY(sp_l, "anim")\n'
+                f'SPRITE_ADD_ANIM(sp_l, "{a0.name}", {a0.first}, {a0.last}, {max(1, a0.fps - 2)})\n'
+                f'SPRITE_PLAY(sp_l, "{a0.name}")\n'
                 f'\n'
                 f'DIM sp_r AS SPRITE\n'
                 f'sp_r = SPRITE_NEW(sheet, {w}, {h})\n'
-                f'SPRITE_ADD_ANIM(sp_r, "anim", 0, {n_frames - 1}, 10)\n'
-                f'SPRITE_PLAY(sp_r, "anim")\n'
+                f'SPRITE_ADD_ANIM(sp_r, "{a0.name}", {a0.first}, {a0.last}, {min(60, a0.fps + 2)})\n'
+                f'SPRITE_PLAY(sp_r, "{a0.name}")\n'
                 f'\n'
                 f'DIM running AS BOOLEAN\n'
                 f'DIM t AS INTEGER\n'
@@ -2669,22 +2826,9 @@ class SpriteEditorWindow(QMainWindow):
             fname = "sprite.png"
 
         if n > 1:
-            snippet = (
-                f'IMPORT "sprite"\n'
-                f'\n'
-                f'DIM sheet AS IMAGE\n'
-                f'sheet = LoadImage("{fname}")\n'
-                f'\n'
-                f'DIM sp AS SPRITE\n'
-                f'sp = SPRITE_NEW(sheet, {self.doc.width}, {self.doc.height})\n'
-                f'SPRITE_ADD_ANIM(sp, "idle", 0, {n - 1}, 8)\n'
-                f'SPRITE_PLAY(sp, "idle")\n'
-                f'SPRITE_SET_POS(sp, 100, 100)\n'
-                f'\n'
-                f"' Im Game-Loop:\n"
-                f"' SPRITE_UPDATE(sp, 16)\n"
-                f"' SPRITE_DRAW(sp)\n"
-            )
+            # Echte Anim-Bereiche (oder \"idle\" ueber alles mit FPS aus den
+            # tatsaechlichen Frame-Dauern) -- generiert im Datenmodell.
+            snippet = self.doc.generate_gb_snippet(fname)
         else:
             snippet = (
                 f'DIM img AS IMAGE\n'
@@ -2923,6 +3067,29 @@ class SpriteEditorWindow(QMainWindow):
             f"GIF exportiert: {n} Frames ({scope}) -> {Path(path).name}",
             4000,
         )
+
+    def action_export_gbanim(self):
+        """Animations-FSM-Vorlage (.gbanim) aus den Anim-Bereichen schreiben:
+        ein State pro Bereich, erster = default. Direkt ANIM_FSM_LOAD-ladbar;
+        Transitions/Parameter ergaenzt man in gbanim."""
+        default_name = "sprite.gbanim"
+        if self.doc.filepath is not None:
+            default_name = self.doc.filepath.with_suffix(".gbanim").name
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Animations-FSM exportieren (.gbanim)", default_name,
+            "GameBasic-Animation (*.gbanim)")
+        if not path:
+            return
+        try:
+            Path(path).write_text(
+                json.dumps(self.doc.generate_gbanim(), indent=2),
+                encoding="utf-8")
+        except Exception as exc:
+            QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
+            return
+        n = len(self.doc.anims) or 1
+        self.statusBar().showMessage(
+            f".gbanim exportiert ({n} State{'s' if n != 1 else ''}): {path}", 3000)
 
     def action_export_frame_png(self):
         path, _ = QFileDialog.getSaveFileName(

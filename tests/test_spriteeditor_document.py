@@ -400,3 +400,93 @@ def test_pil_to_qpixmap_preserves_size():
     assert pix.width() == 12
     assert pix.height() == 8
     assert not pix.isNull()
+
+
+# --- Benannte Animations-Bereiche (V4) --------------------------------------
+
+def _doc_with_anims():
+    from gamebasic.spriteeditor.document import Anim
+    doc = SpriteDoc(8, 8)
+    for _ in range(5):
+        doc.add_frame()
+    doc.anims = [Anim("walk", 0, 3, 10), Anim("jump", 4, 5, 6)]
+    return doc
+
+
+def test_anims_roundtrip_native(tmp_path):
+    doc = _doc_with_anims()
+    p = tmp_path / "a.gbsprite"
+    doc.save_native(p)
+    loaded = SpriteDoc.load_native(p)
+    assert [(a.name, a.first, a.last, a.fps) for a in loaded.anims] == \
+        [("walk", 0, 3, 10), ("jump", 4, 5, 6)]
+
+
+def test_anims_backward_compat_v3(tmp_path):
+    # Datei ohne anims-Feld (V3) laedt mit leerer Bereichs-Liste.
+    doc = SpriteDoc(8, 8)
+    p = tmp_path / "old.gbsprite"
+    doc.save_native(p)
+    import json as _json
+    data = _json.loads(p.read_text(encoding="utf-8"))
+    data["version"] = 3
+    data.pop("anims", None)
+    p.write_text(_json.dumps(data), encoding="utf-8")
+    assert SpriteDoc.load_native(p).anims == []
+
+
+def test_anims_shift_on_frame_delete():
+    doc = _doc_with_anims()
+    doc.select(1)
+    doc.delete_frame()          # Frame 1 weg -> walk schrumpft, jump rueckt auf
+    assert [(a.name, a.first, a.last) for a in doc.anims] == \
+        [("walk", 0, 2), ("jump", 3, 4)]
+
+
+def test_anims_shift_on_frame_insert():
+    doc = _doc_with_anims()
+    doc.select(0)
+    doc.add_frame()             # Insert bei Index 1 -> alles ab 1 verschiebt
+    assert [(a.name, a.first, a.last) for a in doc.anims] == \
+        [("walk", 0, 4), ("jump", 5, 6)]
+
+
+def test_anim_fps_suggestion_from_durations():
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()
+    for f in doc.frames:
+        f.duration_ms = 100     # 10 fps
+    assert doc.anim_fps_suggestion(0, 1) == 10
+
+
+def test_generate_gb_snippet_uses_anims_and_compiles(run_gb):
+    doc = _doc_with_anims()
+    snippet = doc.generate_gb_snippet("hero.png")
+    assert 'SPRITE_ADD_ANIM(sp, "walk", 0, 3, 10)' in snippet
+    assert 'SPRITE_ADD_ANIM(sp, "jump", 4, 5, 6)' in snippet
+    assert 'SPRITE_PLAY(sp, "walk")' in snippet
+
+
+def test_generate_gb_snippet_fallback_idle_fps_from_durations():
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()
+    for f in doc.frames:
+        f.duration_ms = 50      # 20 fps statt hardcoded 8
+    snippet = doc.generate_gb_snippet("x.png")
+    assert 'SPRITE_ADD_ANIM(sp, "idle", 0, 1, 20)' in snippet
+
+
+def test_generate_gbanim_loads_in_runtime(run_gb, tmp_path):
+    # Integration: die exportierte .gbanim ist direkt ANIM_FSM_LOAD-ladbar.
+    import json as _json
+    doc = _doc_with_anims()
+    (tmp_path / "hero.gbanim").write_text(
+        _json.dumps(doc.generate_gbanim(), indent=2), encoding="utf-8")
+    src = "\n".join([
+        'IMPORT "animfsm"',
+        'DIM fsm AS ANIM_FSM',
+        'fsm = ANIM_FSM_LOAD("hero.gbanim")',
+        'PRINT ANIM_FSM_STATE(fsm)',
+    ])
+    out = run_gb(src, base=tmp_path)
+    assert "walk" in out

@@ -53,11 +53,22 @@ class Frame:
         return True
 
 
+@dataclass
+class Anim:
+    """Benannter Animations-Bereich (Frames first..last inklusiv) --
+    entspricht 1:1 SPRITE_ADD_ANIM(name, first, last, fps) der Engine."""
+    name: str
+    first: int
+    last: int
+    fps: int = 8
+
+
 class SpriteDoc:
     def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
         self.frames: list[Frame] = [self._blank_frame()]
+        self.anims: list[Anim] = []
         self.current_index = 0
         self.filepath: Optional[Path] = None
         self.dirty = False
@@ -74,6 +85,7 @@ class SpriteDoc:
         new_img = (self.current.pixels.copy() if copy_current
                    else Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0)))
         self.frames.insert(self.current_index + 1, Frame(pixels=new_img))
+        self._anims_after_insert(self.current_index + 1)
         self.current_index += 1
         self.dirty = True
         return self.current_index
@@ -90,6 +102,7 @@ class SpriteDoc:
                             min(self.height, src.height)))
         canvas.alpha_composite(src)
         self.frames.insert(self.current_index + 1, Frame(pixels=canvas))
+        self._anims_after_insert(self.current_index + 1)
         self.current_index += 1
         self.dirty = True
         return self.current_index
@@ -98,9 +111,100 @@ class SpriteDoc:
         if len(self.frames) <= 1:
             return False
         del self.frames[self.current_index]
+        self._anims_after_delete(self.current_index)
         self.current_index = max(0, min(self.current_index, len(self.frames) - 1))
         self.dirty = True
         return True
+
+    # --- Anim-Bereiche pflegen -------------------------------------------
+    # Anims referenzieren Frame-INDIZES (wie SPRITE_ADD_ANIM). Beim
+    # Einfuegen/Loeschen von Frames werden die Bereiche mitgezogen;
+    # leerlaufende Bereiche fliegen raus. Frame-UMORDNEN (move_frame)
+    # laesst die Indizes bewusst stehen -- welcher Bereich "mitwandern"
+    # soll, ist dort nicht entscheidbar.
+
+    def _anims_after_insert(self, at: int):
+        for a in self.anims:
+            if a.first >= at:
+                a.first += 1
+            if a.last >= at:
+                a.last += 1
+
+    def _anims_after_delete(self, at: int):
+        kept: list[Anim] = []
+        for a in self.anims:
+            if a.first > at:
+                a.first -= 1
+            elif a.first == at and a.first > a.last - 1:
+                pass   # Bereich war genau dieses Frame -> unten geprueft
+            if a.last >= at:
+                a.last -= 1
+            if a.last >= a.first and a.first >= 0:
+                a.last = min(a.last, len(self.frames) - 1)
+                kept.append(a)
+        self.anims = kept
+
+    def anim_fps_suggestion(self, first: int, last: int) -> int:
+        """FPS-Vorschlag aus den tatsaechlichen Frame-Dauern des Bereichs
+        (Mittelwert) -- statt eines hardcodierten Defaults."""
+        frames = self.frames[max(0, first):min(len(self.frames), last + 1)]
+        if not frames:
+            return 8
+        avg_ms = sum(max(1, f.duration_ms) for f in frames) / len(frames)
+        return max(1, min(60, round(1000.0 / avg_ms)))
+
+    # --- Engine-Export: GB-Code + .gbanim ---------------------------------
+
+    def _effective_anims(self) -> list[Anim]:
+        """Definierte Bereiche -- oder ein Default-Bereich "idle" ueber
+        alle Frames mit FPS aus den echten Frame-Dauern."""
+        if self.anims:
+            return self.anims
+        n = len(self.frames)
+        return [Anim("idle", 0, n - 1, self.anim_fps_suggestion(0, n - 1))]
+
+    def generate_gb_snippet(self, sheet_filename: str) -> str:
+        """GB-Code-Schnipsel zum Einbinden des Sprites: SPRITE_NEW +
+        eine SPRITE_ADD_ANIM-Zeile PRO definiertem Anim-Bereich (FPS aus
+        den Bereichen; ohne Bereiche: "idle" ueber alles)."""
+        anims = self._effective_anims()
+        lines = [
+            'IMPORT "sprite"',
+            "",
+            "DIM sheet AS IMAGE",
+            f'sheet = LoadImage("{sheet_filename}")',
+            "",
+            "DIM sp AS SPRITE",
+            f"sp = SPRITE_NEW(sheet, {self.width}, {self.height})",
+        ]
+        for a in anims:
+            lines.append(f'SPRITE_ADD_ANIM(sp, "{a.name}", {a.first}, {a.last}, {a.fps})')
+        lines += [
+            f'SPRITE_PLAY(sp, "{anims[0].name}")',
+            "SPRITE_SET_POS(sp, 100, 100)",
+            "",
+            "' Im Game-Loop:",
+            "' SPRITE_UPDATE(sp, 16)",
+            "' SPRITE_DRAW(sp)",
+        ]
+        return "\n".join(lines) + "\n"
+
+    def generate_gbanim(self) -> dict:
+        """Animations-FSM-Vorlage (.gbanim) aus den Anim-Bereichen:
+        ein State pro Bereich (name=anim, first/last/fps), erster Bereich
+        als default. Transitions/Parameter ergaenzt der User in gbanim --
+        die Datei ist direkt von ANIM_FSM_LOAD ladbar."""
+        anims = self._effective_anims()
+        return {
+            "default": anims[0].name,
+            "params": [],
+            "states": [
+                {"name": a.name, "first": a.first, "last": a.last,
+                 "fps": a.fps, "loop": True}
+                for a in anims
+            ],
+            "transitions": [],
+        }
 
     def move_frame(self, delta: int) -> bool:
         new_idx = self.current_index + delta
@@ -131,11 +235,16 @@ class SpriteDoc:
 
     def save_native(self, path: Path):
         data = {
-            "version": 3,    # Version 3: pro Frame optional ein name-Feld
+            "version": 4,    # V3: Frame-name; V4: benannte Anim-Bereiche
             "width": self.width,
             "height": self.height,
             "frames": [],
         }
+        if self.anims:
+            data["anims"] = [
+                {"name": a.name, "first": a.first, "last": a.last, "fps": a.fps}
+                for a in self.anims
+            ]
         for f in self.frames:
             buf = io.BytesIO()
             f.pixels.save(buf, format="PNG")
@@ -165,6 +274,13 @@ class SpriteDoc:
             doc.frames.append(Frame(pixels=img, duration_ms=duration_ms, name=name))
         if not doc.frames:
             doc.frames = [doc._blank_frame()]
+        # V4: benannte Anim-Bereiche (aeltere Dateien: leer)
+        doc.anims = [
+            Anim(name=str(a.get("name", "")), first=int(a.get("first", 0)),
+                 last=int(a.get("last", 0)), fps=int(a.get("fps", 8)))
+            for a in data.get("anims", [])
+            if str(a.get("name", "")).strip()
+        ]
         doc.current_index = 0
         doc.filepath = path
         doc.dirty = False
