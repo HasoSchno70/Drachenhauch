@@ -370,6 +370,8 @@ from .spriteeditor.document import (  # noqa: E402,F401  -- intentional re-expor
     Anim,
     Frame,
     SpriteDoc,
+    onion_indices,
+    onion_tinted,
     pil_to_qpixmap,
 )
 
@@ -441,8 +443,9 @@ class SpriteCanvas(QGraphicsView):
         self._zoom_index = DEFAULT_ZOOM_INDEX
 
         self._frame_item = None       # QGraphicsPixmapItem fuer Frame
-        self._onion_prev_item = None  # voriges Frame, blau-getoent
-        self._onion_next_item = None  # naechstes Frame, rot-getoent
+        self._onion_items: list = []  # getoente Nachbar-Frames (blau=vorher, rot=nachher)
+        self._onion_alpha = 0.45      # Deckkraft der Onion-Frames (0..1)
+        self._onion_depth = 1         # wie viele Frames vorher/nachher (1..3)
         self._preview_item = None
         self._checker_item = None
         self._selection_items: list = []   # zwei Items: schwarz + gelb (Marching-Ants)
@@ -537,6 +540,11 @@ class SpriteCanvas(QGraphicsView):
         self._show_onion = bool(on)
         self._render_onion()
 
+    def set_onion_settings(self, alpha: float, depth: int):
+        self._onion_alpha = max(0.05, min(0.95, float(alpha)))
+        self._onion_depth = max(1, min(3, int(depth)))
+        self._render_onion()
+
     def set_tile_preview(self, on: bool):
         """Toggle 3x3-Kachel-Vorschau. Im Tile-Modus wird das Sprite 9-mal
         (3 horizontal x 3 vertikal) gerendert, das mittlere Tile ist der
@@ -549,8 +557,7 @@ class SpriteCanvas(QGraphicsView):
     def rebuild_scene(self):
         self._scene.clear()
         self._frame_item = None
-        self._onion_prev_item = None
-        self._onion_next_item = None
+        self._onion_items = []
         self._preview_item = None
         self._checker_item = None
         self._selection_items = []
@@ -591,48 +598,28 @@ class SpriteCanvas(QGraphicsView):
             self._checker_item.setPixmap(pix)
 
     def _render_onion(self):
-        # Vorheriges + naechstes Frame als Onion-Skin -- klassische
-        # Animation-Hilfe. Vorher = blauer Stich, nachher = roter Stich,
-        # damit die Bewegungs-Richtung sofort klar ist.
-        for attr in ("_onion_prev_item", "_onion_next_item"):
-            it = getattr(self, attr, None)
-            if it is not None:
-                self._scene.removeItem(it)
-                setattr(self, attr, None)
-        if not self._show_onion or len(self.app.doc.frames) <= 1:
+        # Nachbar-Frames als Onion-Skin -- klassische Animation-Hilfe.
+        # Vorher = blauer Stich, nachher = roter Stich, damit die
+        # Bewegungs-Richtung sofort klar ist. Deckkraft + Reichweite
+        # (wie viele Frames in jede Richtung) sind einstellbar; weiter
+        # entfernte Frames werden blasser (falloff).
+        for it in self._onion_items:
+            self._scene.removeItem(it)
+        self._onion_items = []
+        if not self._show_onion:
             return
         doc = self.app.doc
         z = self._zoom
-        prev_idx = (doc.current_index - 1) % len(doc.frames)
-        next_idx = (doc.current_index + 1) % len(doc.frames)
-
-        def _tinted(idx, mode):
-            """Farbiges, halbtransparentes Onion-Bild. mode in {'blue','red'}."""
-            src = doc.frames[idx].pixels
-            r, g, b, a = src.split()
-            a = a.point(lambda v: int(v * 0.45))
-            if mode == "blue":
-                # Rot/Gruen zurueck, Blau bleibt -> kuehler Stich
-                r = r.point(lambda v: int(v * 0.5))
-                g = g.point(lambda v: int(v * 0.7))
-            else:  # red
-                b = b.point(lambda v: int(v * 0.5))
-                g = g.point(lambda v: int(v * 0.7))
-            tinted = Image.merge("RGBA", (r, g, b, a))
+        entries = onion_indices(doc.current_index, len(doc.frames),
+                                self._onion_depth)
+        for idx, mode, falloff in entries:
+            tinted = onion_tinted(doc.frames[idx].pixels, mode,
+                                  self._onion_alpha * falloff)
             scaled = tinted.resize((doc.width * z, doc.height * z),
-                                    Image.NEAREST)
-            return pil_to_qpixmap(scaled)
-
-        prev_pix = _tinted(prev_idx, "blue")
-        self._onion_prev_item = self._scene.addPixmap(prev_pix)
-        self._onion_prev_item.setZValue(1)
-
-        # Nur wenn das naechste Frame anders als das vorherige ist (bei
-        # 2 Frames sind sie identisch) -- sonst doppeltes Rendering vermeiden.
-        if next_idx != prev_idx:
-            next_pix = _tinted(next_idx, "red")
-            self._onion_next_item = self._scene.addPixmap(next_pix)
-            self._onion_next_item.setZValue(1)
+                                   Image.NEAREST)
+            item = self._scene.addPixmap(pil_to_qpixmap(scaled))
+            item.setZValue(1)
+            self._onion_items.append(item)
 
     def _render_frame_pixmap(self):
         doc = self.app.doc
@@ -1346,10 +1333,18 @@ class FramesPanel(QWidget):
             self._show_frame_context_menu)
         layout.addWidget(self.list_widget, 1)
 
-        # Onion-Skin
+        # Onion-Skin (Checkbox + Einstellungs-Button in einer Zeile)
+        onion_row = QHBoxLayout()
         self.onion_check = QCheckBox("Onion-Skin")
         self.onion_check.toggled.connect(self.app.set_onion)
-        layout.addWidget(self.onion_check)
+        onion_row.addWidget(self.onion_check)
+        gear = QToolButton()
+        gear.setText("⚙")
+        gear.setToolTip("Onion-Skin-Einstellungen (Deckkraft, Reichweite)")
+        gear.clicked.connect(self.app.action_onion_settings)
+        onion_row.addWidget(gear)
+        onion_row.addStretch()
+        layout.addLayout(onion_row)
 
     def refresh(self):
         # Anims-Panel mitziehen: Frame-Ops verschieben Bereiche (document.py).
@@ -2119,6 +2114,8 @@ class SpriteEditorWindow(QMainWindow):
                                  None,
                                  lambda: self.set_onion(not self.canvas._show_onion),
                                  checkable=True)
+        self.act_onion_settings = A("Onion-Skin-Einstellungen...",
+                                      None, self.action_onion_settings)
         self.act_reverse   = A("Frames umkehren", None, self.action_reverse_frames)
         self.act_pingpong  = A("Ping-Pong (anfuegen)", None, self.action_pingpong_frames)
         self.act_flatten_current = A("Auf aktuelles Frame reduzieren",
@@ -2251,6 +2248,7 @@ class SpriteEditorWindow(QMainWindow):
         m_frame.addSeparator()
         m_frame.addAction(self.act_play)
         m_frame.addAction(self.act_onion)
+        m_frame.addAction(self.act_onion_settings)
 
         m_view = bar.addMenu("&Ansicht")
         m_view.addAction(self.act_zoom_in)
@@ -2519,6 +2517,45 @@ class SpriteEditorWindow(QMainWindow):
         self.canvas.set_show_onion(on)
         self.frames_panel.onion_check.setChecked(on)
         self.act_onion.setChecked(on)
+
+    def action_onion_settings(self):
+        """Kleiner Einstellungs-Dialog fuer den Onion-Skin: Deckkraft +
+        Reichweite (Frames in jede Richtung). Wirkt live beim Verstellen;
+        Abbrechen stellt die alten Werte wieder her."""
+        from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QFormLayout,
+                                       QSlider, QSpinBox)
+        old_alpha = self.canvas._onion_alpha
+        old_depth = self.canvas._onion_depth
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Onion-Skin-Einstellungen")
+        form = QFormLayout(dlg)
+
+        alpha_slider = QSlider(Qt.Horizontal)
+        alpha_slider.setRange(5, 95)
+        alpha_slider.setValue(round(old_alpha * 100))
+        form.addRow("Deckkraft (%):", alpha_slider)
+
+        depth_spin = QSpinBox()
+        depth_spin.setRange(1, 3)
+        depth_spin.setValue(old_depth)
+        depth_spin.setToolTip("Wie viele Frames vorher/nachher angezeigt "
+                              "werden (entferntere blasser)")
+        form.addRow("Frames je Richtung:", depth_spin)
+
+        def _apply_live():
+            self.canvas.set_onion_settings(alpha_slider.value() / 100.0,
+                                           depth_spin.value())
+        alpha_slider.valueChanged.connect(_apply_live)
+        depth_spin.valueChanged.connect(_apply_live)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+
+        if dlg.exec() != QDialog.Accepted:
+            self.canvas.set_onion_settings(old_alpha, old_depth)
 
     # --- Symmetrie / Tile-Preview ---
 

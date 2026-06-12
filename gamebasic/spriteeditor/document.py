@@ -515,6 +515,53 @@ class SpriteDoc:
 
 
 # ============================================================
+# Onion-Skin-Helfer (pure, Qt-frei -- vom Canvas genutzt)
+# ============================================================
+
+def onion_indices(current: int, total: int, depth: int) -> list[tuple[int, str, float]]:
+    """Welche Frames als Onion-Skin gerendert werden.
+
+    Liefert (frame_index, mode, falloff)-Tupel: mode ist 'blue' (vorher)
+    bzw. 'red' (nachher), falloff ein Faktor <= 1.0, der mit der Distanz
+    abnimmt (weiter entfernte Frames werden blasser). Frames werden
+    dedupliziert (bei 2 Frames ist vorher == nachher -> nur einmal) und
+    das aktuelle Frame selbst ist nie enthalten.
+    """
+    if total <= 1 or depth <= 0:
+        return []
+    out: list[tuple[int, str, float]] = []
+    seen = {current}
+    for d in range(1, depth + 1):
+        falloff = 0.55 ** (d - 1)
+        for mode, idx in (("blue", (current - d) % total),
+                          ("red", (current + d) % total)):
+            if idx in seen:
+                continue
+            seen.add(idx)
+            out.append((idx, mode, falloff))
+    return out
+
+
+def onion_tinted(img: Image.Image, mode: str, alpha: float) -> Image.Image:
+    """Farbiges, halbtransparentes Onion-Bild (Original bleibt unberuehrt).
+
+    mode 'blue' = kuehler Stich (vorheriges Frame), 'red' = warmer Stich
+    (naechstes Frame). alpha 0..1 skaliert den Alpha-Kanal.
+    """
+    alpha = max(0.0, min(1.0, float(alpha)))
+    r, g, b, a = img.convert("RGBA").split()
+    a = a.point(lambda v: int(v * alpha))
+    if mode == "blue":
+        # Rot/Gruen zurueck, Blau bleibt -> kuehler Stich
+        r = r.point(lambda v: int(v * 0.5))
+        g = g.point(lambda v: int(v * 0.7))
+    else:  # red
+        b = b.point(lambda v: int(v * 0.5))
+        g = g.point(lambda v: int(v * 0.7))
+    return Image.merge("RGBA", (r, g, b, a))
+
+
+# ============================================================
 # PIL <-> Qt-Konversion
 # ============================================================
 

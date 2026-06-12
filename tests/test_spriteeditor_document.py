@@ -546,3 +546,59 @@ def test_unified_sequence_pixel_vs_struct():
     assert doc.last_struct_undo_seq() > doc.current.last_undo_seq()
     doc.current.snapshot()               # Pixel-Strich danach
     assert doc.current.last_undo_seq() > doc.last_struct_undo_seq()
+
+
+# --- Onion-Skin-Helfer ---------------------------------------------
+
+def test_onion_indices_single_frame_empty():
+    from gamebasic.spriteeditor.document import onion_indices
+    assert onion_indices(0, 1, 1) == []
+    assert onion_indices(0, 5, 0) == []
+
+
+def test_onion_indices_basic_prev_next():
+    from gamebasic.spriteeditor.document import onion_indices
+    out = onion_indices(2, 5, 1)
+    assert out == [(1, "blue", 1.0), (3, "red", 1.0)]
+
+
+def test_onion_indices_two_frames_dedup():
+    # Bei 2 Frames ist vorher == nachher -> nur EIN Eintrag (blau).
+    from gamebasic.spriteeditor.document import onion_indices
+    out = onion_indices(0, 2, 1)
+    assert out == [(1, "blue", 1.0)]
+
+
+def test_onion_indices_depth_falloff_and_no_current():
+    from gamebasic.spriteeditor.document import onion_indices
+    out = onion_indices(3, 8, 3)
+    idxs = [e[0] for e in out]
+    assert 3 not in idxs                      # aktuelles Frame nie dabei
+    assert set(idxs) == {0, 1, 2, 4, 5, 6}
+    # Distanz 2/3 blasser als Distanz 1
+    by_idx = {i: f for (i, _m, f) in out}
+    assert by_idx[2] == 1.0 and by_idx[4] == 1.0
+    assert by_idx[1] < 1.0 and by_idx[0] < by_idx[1]
+
+
+def test_onion_indices_depth_wraps_without_duplicates():
+    # depth groesser als Frame-Anzahl: jeder Frame hoechstens einmal.
+    from gamebasic.spriteeditor.document import onion_indices
+    out = onion_indices(0, 3, 3)
+    idxs = [e[0] for e in out]
+    assert sorted(idxs) == [1, 2]
+
+
+def test_onion_tinted_alpha_and_channels():
+    from gamebasic.spriteeditor.document import onion_tinted
+    img = Image.new("RGBA", (2, 2), (200, 100, 100, 255))
+    blue = onion_tinted(img, "blue", 0.5)
+    r, g, b, a = blue.getpixel((0, 0))
+    assert a == 127                  # Alpha halbiert
+    assert r == 100 and g == 70      # Rot/Gruen gedimmt
+    assert b == 100                  # Blau unveraendert
+    red = onion_tinted(img, "red", 0.5)
+    r2, g2, b2, a2 = red.getpixel((0, 0))
+    assert b2 == 50 and r2 == 200    # Blau gedimmt, Rot bleibt
+    # Original unveraendert
+    assert img.getpixel((0, 0)) == (200, 100, 100, 255)

@@ -137,6 +137,11 @@ Der Editor unterstuetzt von Anfang an Multi-Frame-Animationen. Frames-Panel rech
 
 Toggle ueber Aktion "Onion-Skin". Im aktiven Zustand sind vorherige Frames blau, naechste rot durchscheinend hinter dem aktuellen — klassisches Pattern fuer Animation-Konsistenz (z.B. Walk-Cycle).
 
+**Einstellungen** (⚙ neben der Checkbox im Frames-Panel oder Menue Frame →
+"Onion-Skin-Einstellungen..."): **Deckkraft** (5–95 %) und **Frames je
+Richtung** (1–3; weiter entfernte Frames werden automatisch blasser).
+Aenderungen wirken live, Abbrechen stellt die alten Werte wieder her.
+
 ## Symmetrie-Modus
 
 | Shortcut | Wirkung |
