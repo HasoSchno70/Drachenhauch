@@ -490,3 +490,59 @@ def test_generate_gbanim_loads_in_runtime(run_gb, tmp_path):
     ])
     out = run_gb(src, base=tmp_path)
     assert "walk" in out
+
+
+# --- Struktur-Undo (Frame-Ops, Resize) ---------------------------------------
+
+def test_struct_undo_restores_deleted_frame():
+    from gamebasic.spriteeditor.document import Anim
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()
+    doc.frames[1].pixels.putpixel((2, 2), (255, 0, 0, 255))
+    doc.frames[1].name = "kopf"
+    doc.anims = [Anim("a", 0, 1, 8)]
+    doc.select(1)
+    assert doc.delete_frame()
+    # Bereich schrumpft aufs verbleibende Frame (statt zu verschwinden)
+    assert len(doc.frames) == 1
+    assert [(a.name, a.first, a.last) for a in doc.anims] == [("a", 0, 0)]
+    assert doc.undo_struct()
+    assert len(doc.frames) == 2
+    assert doc.frames[1].pixels.getpixel((2, 2)) == (255, 0, 0, 255)
+    assert doc.frames[1].name == "kopf"
+    assert [(a.name, a.first, a.last) for a in doc.anims] == [("a", 0, 1)]
+    # Redo loescht wieder
+    assert doc.redo_struct()
+    assert len(doc.frames) == 1
+
+
+def test_struct_undo_restores_resize():
+    doc = SpriteDoc(8, 8)
+    doc.current.pixels.putpixel((7, 7), (0, 255, 0, 255))
+    doc.resize(16, 16)
+    assert (doc.width, doc.height) == (16, 16)
+    assert doc.undo_struct()
+    assert (doc.width, doc.height) == (8, 8)
+    assert doc.current.pixels.getpixel((7, 7)) == (0, 255, 0, 255)
+
+
+def test_struct_undo_restores_move():
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()
+    doc.frames[0].name = "a"
+    doc.frames[1].name = "b"
+    doc.select(0)
+    assert doc.move_frame(+1)
+    assert [f.name for f in doc.frames] == ["b", "a"]
+    assert doc.undo_struct()
+    assert [f.name for f in doc.frames] == ["a", "b"]
+
+
+def test_unified_sequence_pixel_vs_struct():
+    # Juengste Aktion gewinnt: nach Pixel-Strich ist dessen Sequenz hoeher
+    # als die des aelteren Struktur-Eintrags -- und umgekehrt.
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()                      # Struktur-Eintrag
+    assert doc.last_struct_undo_seq() > doc.current.last_undo_seq()
+    doc.current.snapshot()               # Pixel-Strich danach
+    assert doc.current.last_undo_seq() > doc.last_struct_undo_seq()

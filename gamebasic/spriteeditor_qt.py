@@ -1390,6 +1390,7 @@ class FramesPanel(QWidget):
         frames = self.app.doc.frames
         if not (0 <= src < len(frames) and 0 <= dst < len(frames)):
             return
+        self.app.doc.push_struct()
         f = frames.pop(src)
         frames.insert(dst, f)
         # current_index nachziehen
@@ -1479,6 +1480,7 @@ class FramesPanel(QWidget):
             f"Frame {idx} -- Name (leer = nummeriert):", text=cur)
         if not ok:
             return
+        self.app.doc.push_struct()
         self.app.doc.frames[idx].name = val.strip()
         self.app.doc.dirty = True
         self.refresh()
@@ -1491,6 +1493,7 @@ class FramesPanel(QWidget):
             f"Frame {idx} -- Dauer in ms:", cur, 20, 5000, 5)
         if not ok:
             return
+        self.app.doc.push_struct()
         self.app.doc.frames[idx].duration_ms = val
         self.app.doc.dirty = True
         self.app.update_status()
@@ -1504,6 +1507,7 @@ class FramesPanel(QWidget):
             cur, 20, 5000, 5)
         if not ok:
             return
+        self.app.doc.push_struct()
         for f in self.app.doc.frames:
             f.duration_ms = val
         self.app.doc.dirty = True
@@ -1519,6 +1523,7 @@ class FramesPanel(QWidget):
     def _insert_blank(self, idx: int, after: bool):
         """Fuegt ein leeres Frame vor/nach idx ein."""
         target = idx + 1 if after else idx
+        self.app.doc.push_struct()
         new_img = Image.new("RGBA",
                              (self.app.doc.width, self.app.doc.height),
                              (0, 0, 0, 0))
@@ -3107,16 +3112,35 @@ class SpriteEditorWindow(QMainWindow):
     # --- Edit ---
 
     def action_undo(self):
+        # Juengste Aktion gewinnt: Struktur-Op (Frame add/delete/move,
+        # Resize, Dauer/Name) oder Pixel-Strich im aktuellen Frame.
+        if self.doc.last_struct_undo_seq() > self.doc.current.last_undo_seq():
+            if self.doc.undo_struct():
+                self._refresh_after_struct_change()
+            return
         if self.doc.current.undo():
             self.canvas.invalidate_all()
             self.frames_panel.refresh()
             self.mark_dirty()
 
     def action_redo(self):
+        if self.doc.last_struct_redo_seq() > self.doc.current.last_redo_seq():
+            if self.doc.redo_struct():
+                self._refresh_after_struct_change()
+            return
         if self.doc.current.redo():
             self.canvas.invalidate_all()
             self.frames_panel.refresh()
             self.mark_dirty()
+
+    def _refresh_after_struct_change(self):
+        # Struktur-Undo kann auch die Canvas-Groesse aendern (Resize) ->
+        # Szene komplett neu aufbauen.
+        self.canvas.rebuild_scene()
+        self.canvas.invalidate_all()
+        self.frames_panel.refresh()
+        self.update_status()
+        self.mark_dirty()
 
     def action_clear_frame(self):
         f = self.doc.current

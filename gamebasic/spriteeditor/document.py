@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import io
+import itertools
 import json
 from collections import deque
 from dataclasses import dataclass, field
@@ -26,31 +27,43 @@ from PySide6.QtGui import QImage, QPixmap
 DEFAULT_FRAME_DURATION_MS = 125   # entspricht 8 fps -- typischer Sprite-Animations-Default
 
 
+# Globale, monoton steigende Sequenz fuer ALLE Undo-Eintraege (Pixel wie
+# Struktur). Damit entscheidet Ctrl+Z einfach: der Eintrag mit der hoechsten
+# Sequenz ist die juengste Aktion.
+_UNDO_SEQ = itertools.count(1)
+
+
 @dataclass
 class Frame:
     pixels: Image.Image
     duration_ms: int = DEFAULT_FRAME_DURATION_MS
     name: str = ""           # optionaler Name -> Sprite-ID im Atlas-Export
-    history: deque = field(default_factory=lambda: deque(maxlen=80))
-    redo_stack: list = field(default_factory=list)
+    history: deque = field(default_factory=lambda: deque(maxlen=80))   # (seq, Image)
+    redo_stack: list = field(default_factory=list)                     # (seq, Image)
 
     def snapshot(self):
-        self.history.append(self.pixels.copy())
+        self.history.append((next(_UNDO_SEQ), self.pixels.copy()))
         self.redo_stack.clear()
 
     def undo(self) -> bool:
         if not self.history:
             return False
-        self.redo_stack.append(self.pixels.copy())
-        self.pixels = self.history.pop()
+        self.redo_stack.append((next(_UNDO_SEQ), self.pixels.copy()))
+        _, self.pixels = self.history.pop()
         return True
 
     def redo(self) -> bool:
         if not self.redo_stack:
             return False
-        self.history.append(self.pixels.copy())
-        self.pixels = self.redo_stack.pop()
+        self.history.append((next(_UNDO_SEQ), self.pixels.copy()))
+        _, self.pixels = self.redo_stack.pop()
         return True
+
+    def last_undo_seq(self) -> int:
+        return self.history[-1][0] if self.history else 0
+
+    def last_redo_seq(self) -> int:
+        return self.redo_stack[-1][0] if self.redo_stack else 0
 
 
 @dataclass
@@ -72,6 +85,11 @@ class SpriteDoc:
         self.current_index = 0
         self.filepath: Optional[Path] = None
         self.dirty = False
+        # Struktur-Undo: Voll-Snapshots des Dokuments VOR jeder Struktur-
+        # Mutation (Frame add/delete/move, Resize, Dauern/Namen). Pixel-
+        # Striche laufen weiter ueber das leichte per-Frame-Undo.
+        self._struct_undo: deque = deque(maxlen=30)   # (seq, state)
+        self._struct_redo: list = []                  # (seq, state)
 
     def _blank_frame(self) -> Frame:
         return Frame(pixels=Image.new("RGBA", (self.width, self.height),
@@ -81,7 +99,58 @@ class SpriteDoc:
     def current(self) -> Frame:
         return self.frames[self.current_index]
 
+    # --- Struktur-Undo ----------------------------------------------------
+
+    def _capture_state(self) -> dict:
+        return {
+            "width": self.width,
+            "height": self.height,
+            "current_index": self.current_index,
+            "frames": [(f.pixels.copy(), f.duration_ms, f.name) for f in self.frames],
+            "anims": [Anim(a.name, a.first, a.last, a.fps) for a in self.anims],
+        }
+
+    def _restore_state(self, st: dict):
+        self.width = st["width"]
+        self.height = st["height"]
+        # Wiederhergestellte Frames starten mit leerer Pixel-History --
+        # die Struktur-Snapshots sichern den Zustand, nicht die Historie.
+        self.frames = [Frame(pixels=img, duration_ms=dur, name=name)
+                       for (img, dur, name) in st["frames"]]
+        self.anims = list(st["anims"])
+        self.current_index = max(0, min(st["current_index"], len(self.frames) - 1))
+        self.dirty = True
+
+    def push_struct(self):
+        """VOR einer Struktur-Mutation aufrufen (Frame-Ops machen das
+        selbst; UI-Ops wie Dauer/Name rufen es explizit)."""
+        self._struct_undo.append((next(_UNDO_SEQ), self._capture_state()))
+        self._struct_redo.clear()
+
+    def last_struct_undo_seq(self) -> int:
+        return self._struct_undo[-1][0] if self._struct_undo else 0
+
+    def last_struct_redo_seq(self) -> int:
+        return self._struct_redo[-1][0] if self._struct_redo else 0
+
+    def undo_struct(self) -> bool:
+        if not self._struct_undo:
+            return False
+        self._struct_redo.append((next(_UNDO_SEQ), self._capture_state()))
+        _, st = self._struct_undo.pop()
+        self._restore_state(st)
+        return True
+
+    def redo_struct(self) -> bool:
+        if not self._struct_redo:
+            return False
+        self._struct_undo.append((next(_UNDO_SEQ), self._capture_state()))
+        _, st = self._struct_redo.pop()
+        self._restore_state(st)
+        return True
+
     def add_frame(self, copy_current: bool = False) -> int:
+        self.push_struct()
         new_img = (self.current.pixels.copy() if copy_current
                    else Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0)))
         self.frames.insert(self.current_index + 1, Frame(pixels=new_img))
@@ -95,6 +164,7 @@ class SpriteDoc:
         (auf Dokumentgroesse oben-links eingepasst -- groesseres wird
         beschnitten, kleineres transparent aufgefuellt). Liefert den Index
         des neuen Frames."""
+        self.push_struct()
         canvas = Image.new("RGBA", (self.width, self.height), (0, 0, 0, 0))
         src = img.convert("RGBA")
         if src.width > self.width or src.height > self.height:
@@ -110,6 +180,7 @@ class SpriteDoc:
     def delete_frame(self) -> bool:
         if len(self.frames) <= 1:
             return False
+        self.push_struct()
         del self.frames[self.current_index]
         self._anims_after_delete(self.current_index)
         self.current_index = max(0, min(self.current_index, len(self.frames) - 1))
@@ -210,6 +281,7 @@ class SpriteDoc:
         new_idx = self.current_index + delta
         if not (0 <= new_idx < len(self.frames)):
             return False
+        self.push_struct()
         f = self.frames.pop(self.current_index)
         self.frames.insert(new_idx, f)
         self.current_index = new_idx
@@ -221,6 +293,7 @@ class SpriteDoc:
             self.current_index = idx
 
     def resize(self, new_w: int, new_h: int):
+        self.push_struct()
         for f in self.frames:
             new_img = Image.new("RGBA", (new_w, new_h), (0, 0, 0, 0))
             new_img.paste(f.pixels, (0, 0))
