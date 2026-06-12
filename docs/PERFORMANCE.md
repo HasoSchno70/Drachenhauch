@@ -14,12 +14,13 @@ Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_gbrt.py`
 
 | Bench | vorher | nachher | Speedup |
 |---|---|---|---|
-| 5M-Iterationen-Loop (Arithmetik) | 664 ms | 212 ms | **3.1×** |
+| 5M-Iterationen-Loop (Arithmetik) | 664 ms | 203 ms | **3.3×** |
 | 6M Array-Lese/Schreib-Zugriffe | 1171 ms | 462 ms | **2.5×** |
-| 1M Methodenaufrufe + Self-Feld | 439 ms | 132 ms | **3.3×** |
-| 1M Builtin-Calls (ABS/SIN/MIN) | 276 ms | 133 ms | **2.1×** |
-| fib(28), ~630k Calls | 186 ms | 125 ms | 1.5× |
-| 200k String-Ops | 89 ms | 66 ms | 1.3× |
+| 1M Methodenaufrufe + Self-Feld | 439 ms | 133 ms | **3.3×** |
+| 1M Builtin-Calls (ABS/SIN/MIN) | 276 ms | 126 ms | **2.2×** |
+| 100× ARRAY_SUM auf 1M-Array (+Fill) | 227 ms | 103 ms | **2.2×** |
+| fib(28), ~630k Calls | 186 ms | 123 ms | 1.5× |
+| 200k String-Ops | 89 ms | 62 ms | 1.4× |
 
 Die Hebel (Commits `de1eed8`, `0a4c5c7`, `3ae32ec`, `e24c9c9`, `f965389`):
 
@@ -39,6 +40,12 @@ Die Hebel (Commits `de1eed8`, `0a4c5c7`, `3ae32ec`, `e24c9c9`, `f965389`):
   Iteration; traegt die FOR-Quellzeile (Profiler/Debugger unveraendert).
 - **FxHashMap** (rustc-hash) fuer Funktions-/Klassen-/Methoden-/
   Instanzfeld-Lookups (interne Compiler-Keys, kein DoS-Vektor).
+- **Typisierte Array-Backings** (`Cells`): ARRAY OF INTEGER/FLOAT speichern
+  rohe `Vec<i64>`/`Vec<f64>` statt geboxter Values (8 statt ~24 Byte pro
+  Element) -- ARRAY_SUM/FILL/SORT/DRAWTILEMAP/PLOTS laufen ueber rohe
+  Slices (Commit `d831253`).
+- **Vorab aufgeloeste Funktions-Indizes**: CALL_USER indiziert direkt in
+  ein `Vec<Func>` statt pro Aufruf den Namen zu hashen (Commit `921fbf8`).
 
 Semantik unveraendert (Sonderfaelle laufen die alten Pfade), 1910 Tests gruen.
 
