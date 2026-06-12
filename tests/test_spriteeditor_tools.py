@@ -384,3 +384,99 @@ def test_all_tools_inherit_from_base():
         # MoveTool/RectTool/EllipseTool wollen einen Construktor-Arg haben
         # bei filled, also nicht direkt instanziieren -- nur Subclass-Check.
         assert issubclass(cls, Tool), f"{cls.__name__} ist keine Tool-Subclass"
+
+
+# --- SelectTool: Auswahl-Inhalt verschieben ---------------------------------
+
+def _select_host(w=8, h=8):
+    """Mock-App mit stateful Canvas (Selection + Preview) fuer Float-Move."""
+    from PIL import Image
+
+    class _Canvas:
+        def __init__(self):
+            self.selection = None
+            self.preview = None
+        def invalidate_all(self): pass
+        def set_preview(self, pil): self.preview = pil
+        def set_selection(self, x0, y0, x1, y1):
+            self.selection = (x0, y0, x1, y1)
+        def get_selection(self):
+            if not self.selection:
+                return None
+            x0, y0, x1, y1 = self.selection
+            return (min(x0, x1), min(y0, y1), max(x0, x1) + 1, max(y0, y1) + 1)
+
+    class _Frame:
+        def __init__(self):
+            self.pixels = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            self.snapshots = 0
+        def snapshot(self): self.snapshots += 1
+
+    class _Doc:
+        def __init__(self):
+            self.width, self.height = w, h
+            self.current = _Frame()
+
+    class _SB:
+        def showMessage(self, *a, **k): pass
+
+    class _App:
+        def __init__(self):
+            self.doc = _Doc()
+            self.canvas = _Canvas()
+        def mark_dirty(self): pass
+        def statusBar(self): return _SB()
+        def show_selection_context_menu(self, _p): pass
+
+    return _App()
+
+
+def test_select_drag_inside_moves_content():
+    from gamebasic.spriteeditor.tools import SelectTool
+    app = _select_host()
+    px = app.doc.current.pixels
+    px.putpixel((1, 1), (255, 0, 0, 255))
+    px.putpixel((2, 2), (0, 255, 0, 255))
+    app.canvas.set_selection(1, 1, 2, 2)     # Auswahl ueber beide Pixel
+
+    tool = SelectTool()
+    tool.begin(app, 1, 1, None)              # Klick IN die Auswahl -> greifen
+    assert app.doc.current.snapshots == 1    # undoable
+    tool.move(app, 4, 3)                     # um (+3, +2) ziehen
+    assert app.canvas.preview is not None    # Live-Float sichtbar
+    tool.end(app, 4, 3)
+
+    out = app.doc.current.pixels
+    assert out.getpixel((4, 3)) == (255, 0, 0, 255)
+    assert out.getpixel((5, 4)) == (0, 255, 0, 255)
+    assert out.getpixel((1, 1)) == (0, 0, 0, 0)      # Quelle geraeumt
+    assert app.canvas.preview is None                # Preview abgebaut
+    # Auswahl-Rechteck ist mitgewandert
+    assert app.canvas.get_selection() == (4, 3, 6, 5)
+
+
+def test_select_drag_outside_starts_new_selection():
+    from gamebasic.spriteeditor.tools import SelectTool
+    app = _select_host()
+    app.canvas.set_selection(1, 1, 2, 2)
+    tool = SelectTool()
+    tool.begin(app, 5, 5, None)              # Klick AUSSERHALB -> neue Auswahl
+    tool.move(app, 6, 6)
+    tool.end(app, 6, 6)
+    assert app.canvas.get_selection() == (5, 5, 7, 7)
+    assert app.doc.current.snapshots == 0    # kein Pixel-Edit
+
+
+def test_select_move_clips_at_canvas_edge():
+    from gamebasic.spriteeditor.tools import SelectTool
+    app = _select_host()
+    app.doc.current.pixels.putpixel((1, 1), (255, 0, 0, 255))
+    app.canvas.set_selection(1, 1, 1, 1)
+    tool = SelectTool()
+    tool.begin(app, 1, 1, None)
+    tool.move(app, -1, 1)                    # ueber den linken Rand schieben
+    tool.end(app, -1, 1)
+    out = app.doc.current.pixels
+    assert out.getpixel((1, 1)) == (0, 0, 0, 0)      # weg von der Quelle
+    # Pixel ist links rausgeschoben -> nirgendwo mehr sichtbar, kein Crash
+    assert all(out.getpixel((x, 1)) == (0, 0, 0, 0) for x in range(8))

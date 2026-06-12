@@ -390,8 +390,22 @@ class MagicWandTool(Tool):
 
 
 class SelectTool(Tool):
+    """Rechteck-Auswahl -- und Verschieben des Auswahl-INHALTS:
+    Klick IN eine bestehende Auswahl greift die Pixel (Float), Ziehen
+    verschiebt sie (Live-Preview), Loslassen setzt sie ab. Klick
+    ausserhalb zieht wie gehabt eine neue Auswahl auf. Das Greifen
+    macht einen Pixel-Snapshot -> die ganze Verschiebung ist EIN Undo."""
     name = "select"
     needs_snapshot = False
+
+    def __init__(self):
+        self._start = None
+        # Float-Move-Zustand (Klick in bestehende Auswahl)
+        self._moving = False
+        self._float_img = None    # ausgeschnittene Pixel (RGBA)
+        self._float_pos = (0, 0)  # aktuelle Top-Left-Position des Floats
+        self._grab_off = (0, 0)   # Cursor-Offset im Float
+        self._base_img = None     # Frame ohne den Ausschnitt
 
     @staticmethod
     def _clamp(app, x, y):
@@ -400,17 +414,63 @@ class SelectTool(Tool):
         return cx, cy
 
     def begin(self, app, x, y, button):
+        sel = app.canvas.get_selection()
+        if sel and sel[0] <= x < sel[2] and sel[1] <= y < sel[3]:
+            self._begin_move(app, sel, x, y)
+            return
         x, y = self._clamp(app, x, y)
         self._start = (x, y)
         app.canvas.set_selection(x, y, x, y)
 
+    def _begin_move(self, app, sel, x, y):
+        x0, y0, x1, y1 = sel
+        f = app.doc.current
+        f.snapshot()
+        self._float_img = f.pixels.crop((x0, y0, x1, y1)).copy()
+        base = f.pixels.copy()
+        clear = Image.new("RGBA", (x1 - x0, y1 - y0), (0, 0, 0, 0))
+        base.paste(clear, (x0, y0))
+        self._base_img = base
+        self._float_pos = (x0, y0)
+        self._grab_off = (x - x0, y - y0)
+        self._moving = True
+        self._show_float(app)
+
+    def _show_float(self, app):
+        prev = self._base_img.copy()
+        # paste mit Alpha-Maske: clippt automatisch an den Raendern
+        # (auch bei negativen Koordinaten).
+        prev.paste(self._float_img, self._float_pos, self._float_img)
+        app.canvas.set_preview(prev)
+        fx, fy = self._float_pos
+        fw, fh = self._float_img.width, self._float_img.height
+        # Auswahl-Rechteck mitfuehren (auf Canvas geclampt -- sichtbarer Teil).
+        cx0, cy0 = self._clamp(app, fx, fy)
+        cx1, cy1 = self._clamp(app, fx + fw - 1, fy + fh - 1)
+        app.canvas.set_selection(cx0, cy0, cx1, cy1)
+
     def move(self, app, x, y):
+        if self._moving:
+            self._float_pos = (x - self._grab_off[0], y - self._grab_off[1])
+            self._show_float(app)
+            return
         if self._start is None:
             return
         x, y = self._clamp(app, x, y)
         app.canvas.set_selection(self._start[0], self._start[1], x, y)
 
     def end(self, app, x, y):
+        if self._moving:
+            result = self._base_img
+            result.paste(self._float_img, self._float_pos, self._float_img)
+            app.doc.current.pixels = result
+            app.canvas.set_preview(None)
+            self._moving = False
+            self._float_img = None
+            self._base_img = None
+            app.canvas.invalidate_all()
+            app.mark_dirty()
+            return
         if self._start is None:
             return
         x, y = self._clamp(app, x, y)
@@ -428,7 +488,8 @@ class SelectTool(Tool):
         else:
             # Single-Pixel-Klick: nur ein dezenter Hinweis, kein Popup
             app.statusBar().showMessage(
-                "Auswahl 1x1 -- ziehen fuer einen Bereich, Esc zum Aufheben",
+                "Auswahl 1x1 -- ziehen fuer einen Bereich (in der Auswahl "
+                "ziehen = Inhalt verschieben), Esc zum Aufheben",
                 3000,
             )
 

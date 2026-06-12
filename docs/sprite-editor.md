@@ -22,7 +22,7 @@ Auf Windows ueber `gbsprites.cmd`. Aus dem Code-Editor heraus: Werkzeuge → Spr
 | **R** | Rect | Rechteck (gefuellt mit FG) |
 | **O** | Ellipse | Ellipse (gefuellt) |
 | **I** | Eyedropper | Farbe vom Pixel pickern |
-| **M** | Select | Rechteck-Auswahl (Cut/Copy/Paste) |
+| **M** | Select | Rechteck-Auswahl (Cut/Copy/Paste). **In die Auswahl klicken + ziehen verschiebt den Auswahl-Inhalt** (Live-Vorschau, ein Undo-Schritt; Quelle wird transparent) |
 | **V** | Move | Auswahl oder ganzes Frame verschieben |
 | **W** | Magic Wand | Auswahl per Flood (zusammenhaengende Pixel mit gleicher Farbe) |
 | **Y** | Spray | Pixel-Spray (zufaellige Verteilung im Brush-Radius) |
