@@ -270,12 +270,154 @@ pub struct Namespace {
     pub members: FxHashMap<String, Value>, // key = lower-case Member-Name
 }
 
+/// Element-Backing eines GbArray. ARRAY OF INTEGER/FLOAT speichern rohe
+/// i64/f64 (dicht, cache-freundlich, kein Enum-Tag pro Element) -- alle
+/// anderen Element-Typen generische Values. Entspricht dem
+/// array.array('q'/'d')-Backing der frueheren Python-Referenz (daher gilt
+/// weiter das dokumentierte 64-bit-Limit fuer INTEGER-Arrays).
+///
+/// `set`/`push`/`insert` erwarten bereits auf den Element-Typ gecoercte
+/// Werte; bei einem (eigentlich unmoeglichen) Backing-Mismatch wird das
+/// Backing defensiv zu `Val` promotet statt falsch zu speichern.
+#[derive(Clone)]
+pub enum Cells {
+    Int(Vec<i64>),
+    Float(Vec<f64>),
+    Val(Vec<Value>),
+}
+
+impl Cells {
+    pub fn len(&self) -> usize {
+        match self { Cells::Int(v) => v.len(), Cells::Float(v) => v.len(), Cells::Val(v) => v.len() }
+    }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+
+    /// Element als Value (Index muss gueltig sein -- wie frueher `values[i]`).
+    pub fn get(&self, i: usize) -> Value {
+        match self {
+            Cells::Int(v) => Value::Int(v[i]),
+            Cells::Float(v) => Value::Float(v[i]),
+            Cells::Val(v) => v[i].clone(),
+        }
+    }
+
+    /// Backing zu Val(Vec<Value>) umwandeln (defensiver Mismatch-Ausweg).
+    fn promote(&mut self) {
+        let vals: Vec<Value> = match self {
+            Cells::Int(v) => v.iter().map(|&x| Value::Int(x)).collect(),
+            Cells::Float(v) => v.iter().map(|&x| Value::Float(x)).collect(),
+            Cells::Val(_) => return,
+        };
+        *self = Cells::Val(vals);
+    }
+
+    pub fn set(&mut self, i: usize, v: Value) {
+        match (&mut *self, v) {
+            (Cells::Int(vec), Value::Int(x)) => vec[i] = x,
+            (Cells::Int(vec), Value::Float(x)) if x.fract() == 0.0 => vec[i] = x as i64,
+            (Cells::Float(vec), Value::Float(x)) => vec[i] = x,
+            (Cells::Float(vec), Value::Int(x)) => vec[i] = x as f64,
+            (Cells::Val(vec), v) => vec[i] = v,
+            (_, v) => { self.promote(); self.set(i, v); }
+        }
+    }
+
+    pub fn push(&mut self, v: Value) {
+        match (&mut *self, v) {
+            (Cells::Int(vec), Value::Int(x)) => vec.push(x),
+            (Cells::Int(vec), Value::Float(x)) if x.fract() == 0.0 => vec.push(x as i64),
+            (Cells::Float(vec), Value::Float(x)) => vec.push(x),
+            (Cells::Float(vec), Value::Int(x)) => vec.push(x as f64),
+            (Cells::Val(vec), v) => vec.push(v),
+            (_, v) => { self.promote(); self.push(v); }
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<Value> {
+        match self {
+            Cells::Int(v) => v.pop().map(Value::Int),
+            Cells::Float(v) => v.pop().map(Value::Float),
+            Cells::Val(v) => v.pop(),
+        }
+    }
+
+    pub fn insert(&mut self, i: usize, v: Value) {
+        match (&mut *self, v) {
+            (Cells::Int(vec), Value::Int(x)) => vec.insert(i, x),
+            (Cells::Int(vec), Value::Float(x)) if x.fract() == 0.0 => vec.insert(i, x as i64),
+            (Cells::Float(vec), Value::Float(x)) => vec.insert(i, x),
+            (Cells::Float(vec), Value::Int(x)) => vec.insert(i, x as f64),
+            (Cells::Val(vec), v) => vec.insert(i, v),
+            (_, v) => { self.promote(); self.insert(i, v); }
+        }
+    }
+
+    pub fn remove(&mut self, i: usize) -> Value {
+        match self {
+            Cells::Int(v) => Value::Int(v.remove(i)),
+            Cells::Float(v) => Value::Float(v.remove(i)),
+            Cells::Val(v) => v.remove(i),
+        }
+    }
+
+    pub fn truncate(&mut self, n: usize) {
+        match self { Cells::Int(v) => v.truncate(n), Cells::Float(v) => v.truncate(n), Cells::Val(v) => v.truncate(n) }
+    }
+    pub fn swap(&mut self, i: usize, j: usize) {
+        match self { Cells::Int(v) => v.swap(i, j), Cells::Float(v) => v.swap(i, j), Cells::Val(v) => v.swap(i, j) }
+    }
+    pub fn reverse(&mut self) {
+        match self { Cells::Int(v) => v.reverse(), Cells::Float(v) => v.reverse(), Cells::Val(v) => v.reverse() }
+    }
+
+    /// Teil-Kopie [a..b) als neues Backing (Slicing).
+    pub fn slice(&self, a: usize, b: usize) -> Cells {
+        match self {
+            Cells::Int(v) => Cells::Int(v[a..b].to_vec()),
+            Cells::Float(v) => Cells::Float(v[a..b].to_vec()),
+            Cells::Val(v) => Cells::Val(v[a..b].to_vec()),
+        }
+    }
+
+    /// Alle Elemente als Vec<Value> (fuer Tupel-Konversionen etc.).
+    pub fn to_values(&self) -> Vec<Value> {
+        match self {
+            Cells::Int(v) => v.iter().map(|&x| Value::Int(x)).collect(),
+            Cells::Float(v) => v.iter().map(|&x| Value::Float(x)).collect(),
+            Cells::Val(v) => v.clone(),
+        }
+    }
+
+    /// Iterator ueber Elemente als (konstruierte) Values.
+    pub fn iter(&self) -> CellsIter<'_> { CellsIter { cells: self, i: 0 } }
+
+    // Typisierte Direkt-Zugriffe fuer Bulk-Fast-Paths (weitere Varianten
+    // bei Bedarf ergaenzen -- Konsumenten matchen sonst direkt auf Cells).
+    pub fn as_ints(&self) -> Option<&[i64]> { if let Cells::Int(v) = self { Some(v) } else { None } }
+    pub fn as_vals(&self) -> Option<&[Value]> { if let Cells::Val(v) = self { Some(v) } else { None } }
+}
+
+pub struct CellsIter<'a> { cells: &'a Cells, i: usize }
+impl<'a> Iterator for CellsIter<'a> {
+    type Item = Value;
+    fn next(&mut self) -> Option<Value> {
+        if self.i >= self.cells.len() { return None; }
+        let v = self.cells.get(self.i);
+        self.i += 1;
+        Some(v)
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let rest = self.cells.len() - self.i;
+        (rest, Some(rest))
+    }
+}
+
 /// Mehrdimensionales, homogen getyptes Array (entspricht `_GBArray`).
 pub struct GbArray {
     pub element_type: String,
     pub dims: Vec<i64>,
     pub strides: Vec<i64>,
-    pub values: Vec<Value>,
+    pub cells: Cells,
 }
 
 impl GbArray {
@@ -286,9 +428,13 @@ impl GbArray {
             strides[k] = acc;
             acc *= dims[k];
         }
-        let total = if dims.is_empty() { 0 } else { acc };
-        let values = (0..total).map(|_| default()).collect();
-        GbArray { element_type, dims, strides, values }
+        let total = if dims.is_empty() { 0 } else { acc as usize };
+        let cells = match element_type.as_str() {
+            "integer" => Cells::Int(vec![0i64; total]),
+            "float" => Cells::Float(vec![0.0f64; total]),
+            _ => Cells::Val((0..total).map(|_| default()).collect()),
+        };
+        GbArray { element_type, dims, strides, cells }
     }
 
     /// Flacher Index mit Bounds-Check (entspricht `_GBArray.flat_index`).

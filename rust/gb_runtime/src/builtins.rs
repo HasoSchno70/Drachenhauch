@@ -10,7 +10,7 @@ use std::io::{BufRead, Read, Write};
 use std::rc::Rc;
 
 use crate::tiled::{TiledLayer, TiledMap, TiledObject};
-use crate::value::{as_f64, is_num, value_eq, FileH, GbArray, GbFile, GbMap, Particle, ParticleSys, SaveHandle, SpriteObj, TweenObj, Value};
+use crate::value::{as_f64, is_num, value_eq, Cells, FileH, GbArray, GbFile, GbMap, Particle, ParticleSys, SaveHandle, SpriteObj, TweenObj, Value};
 
 type R = Result<Value, String>;
 
@@ -266,7 +266,7 @@ fn new_str_array(items: Vec<String>) -> Value {
     let n = items.len() as i64;
     let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
     for (i, s) in items.into_iter().enumerate() {
-        arr.values[i] = Value::str_rc(&s);
+        arr.cells.set(i, Value::str_rc(&s));
     }
     Value::Array(Rc::new(RefCell::new(arr)))
 }
@@ -546,9 +546,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
                 if arr.dims.len() != 1 { return err("CHOICE: nur 1D-Arrays".to_string()); }
-                let n = arr.values.len();
+                let n = arr.cells.len();
                 if n == 0 { return err("CHOICE: Array ist leer".to_string()); }
-                Ok(arr.values[(next_rand() % n as u64) as usize].clone())
+                Ok(arr.cells.get((next_rand() % n as u64) as usize))
             } else { err("CHOICE erwartet ARRAY".to_string()) }
         }
         "shuffle" => {
@@ -556,11 +556,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let mut arr = arr.borrow_mut();
                 if arr.dims.len() != 1 { return err("SHUFFLE: nur 1D-Arrays".to_string()); }
-                let n = arr.values.len();
+                let n = arr.cells.len();
                 // Fisher-Yates, rueckwaerts (klassische Formulierung).
                 for i in (1..n).rev() {
                     let j = (next_rand() % (i as u64 + 1)) as usize;
-                    arr.values.swap(i, j);
+                    arr.cells.swap(i, j);
                 }
                 Ok(Value::Nil)
             } else { err("SHUFFLE erwartet ARRAY".to_string()) }
@@ -575,22 +575,22 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 _ => return err("WEIGHTED_CHOICE erwartet zwei ARRAYs".to_string()),
             };
             if vals.dims.len() != 1 || wts.dims.len() != 1 { return err("WEIGHTED_CHOICE: nur 1D-Arrays".to_string()); }
-            if vals.values.len() != wts.values.len() { return err("WEIGHTED_CHOICE: werte und gewichte muessen gleich lang sein".to_string()); }
-            if vals.values.is_empty() { return err("WEIGHTED_CHOICE: Arrays sind leer".to_string()); }
+            if vals.cells.len() != wts.cells.len() { return err("WEIGHTED_CHOICE: werte und gewichte muessen gleich lang sein".to_string()); }
+            if vals.cells.is_empty() { return err("WEIGHTED_CHOICE: Arrays sind leer".to_string()); }
             let mut total = 0.0;
-            for w in &wts.values {
-                let x = as_f64(w);
-                if !is_num(w) || x < 0.0 { return err("WEIGHTED_CHOICE: Gewichte muessen Zahlen >= 0 sein".to_string()); }
+            for w in wts.cells.iter() {
+                let x = as_f64(&w);
+                if !is_num(&w) || x < 0.0 { return err("WEIGHTED_CHOICE: Gewichte muessen Zahlen >= 0 sein".to_string()); }
                 total += x;
             }
             if total <= 0.0 { return err("WEIGHTED_CHOICE: Summe der Gewichte muss > 0 sein".to_string()); }
             let r = (next_rand() >> 11) as f64 / (1u64 << 53) as f64 * total;
             let mut acc = 0.0;
-            for (i, w) in wts.values.iter().enumerate() {
-                acc += as_f64(w);
-                if r < acc { return Ok(vals.values[i].clone()); }
+            for (i, w) in wts.cells.iter().enumerate() {
+                acc += as_f64(&w);
+                if r < acc { return Ok(vals.cells.get(i)); }
             }
-            Ok(vals.values[vals.values.len() - 1].clone())   // Rundungs-Fallback
+            Ok(vals.cells.get(vals.cells.len() - 1))   // Rundungs-Fallback
         }
         "millis" => {
             use std::time::{SystemTime, UNIX_EPOCH};
@@ -645,7 +645,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Value::Array(arr) => {
                     let arr = arr.borrow();
                     if arr.dims.len() != 1 { return err("Comprehension: nur 1D-Arrays".to_string()); }
-                    Ok(Value::Tuple(Rc::new(arr.values.clone())))
+                    Ok(Value::Tuple(Rc::new(arr.cells.to_values())))
                 }
                 Value::Map(m) => {
                     let m = m.borrow();
@@ -1057,7 +1057,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let vals: Vec<Value> = m.entries.iter().map(|(_, v)| v.clone()).collect();
                 let n = vals.len() as i64;
                 let mut arr = GbArray::new(m.value_type.clone(), vec![n], || type_default(&m.value_type));
-                for (i, v) in vals.into_iter().enumerate() { arr.values[i] = v; }
+                for (i, v) in vals.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
             } else { err("MAPVALUES erwartet MAP".to_string()) }
         }
@@ -1069,7 +1069,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     .map(|(k, v)| Value::Tuple(Rc::new(vec![Value::str_rc(k), v.clone()]))).collect();
                 let n = items.len() as i64;
                 let mut arr = GbArray::new("tuple".to_string(), vec![n], || Value::Tuple(Rc::new(vec![])));
-                for (i, v) in items.into_iter().enumerate() { arr.values[i] = v; }
+                for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Ok(Value::Array(Rc::new(RefCell::new(arr))))
             } else { err("MAPITEMS erwartet MAP".to_string()) }
         }
@@ -1092,8 +1092,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     return err("SORT: nur ARRAY OF INTEGER/FLOAT/STRING".to_string());
                 }
                 if arr.dims.len() != 1 { return err("SORT: nur 1D-Arrays".to_string()); }
-                arr.values.sort_by(|x, y| cmp_value(x, y));
-                if desc { arr.values.reverse(); }
+                match &mut arr.cells {
+                    Cells::Int(v) => v.sort_unstable(),
+                    Cells::Float(v) => v.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)),
+                    Cells::Val(v) => v.sort_by(|x, y| cmp_value(x, y)),
+                }
+                if desc { arr.cells.reverse(); }
                 Ok(Value::Nil)
             } else { err("SORT erwartet ARRAY".to_string()) }
         }
@@ -1102,7 +1106,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let mut arr = arr.borrow_mut();
                 if arr.dims.len() != 1 { return err("REVERSE: nur 1D-Arrays".to_string()); }
-                arr.values.reverse();
+                arr.cells.reverse();
                 Ok(Value::Nil)
             } else { err("REVERSE erwartet ARRAY".to_string()) }
         }
@@ -1111,8 +1115,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
                 if arr.dims.len() != 1 { return err("ARRAY_INDEXOF: nur 1D".to_string()); }
-                for (i, v) in arr.values.iter().enumerate() {
-                    if value_eq(v, &a[1]) { return Ok(Value::Int(i as i64)); }
+                for (i, v) in arr.cells.iter().enumerate() {
+                    if value_eq(&v, &a[1]) { return Ok(Value::Int(i as i64)); }
                 }
                 Ok(Value::Int(-1))
             } else { err("ARRAY_INDEXOF erwartet ARRAY".to_string()) }
@@ -1123,24 +1127,25 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let arr = arr.borrow();
                 if arr.dims.len() != 1 { return err("ARRAY_SUM: nur 1D-Arrays".to_string()); }
-                match arr.element_type.as_str() {
-                    "integer" => {
+                match &arr.cells {
+                    Cells::Int(v) => {
                         let mut s: i64 = 0;
-                        for v in &arr.values {
+                        // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik).
+                        for &x in v { s = s.checked_add(x).ok_or_else(||
+                            "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?; }
+                        Ok(Value::Int(s))
+                    }
+                    Cells::Float(v) => Ok(Value::Float(v.iter().sum())),
+                    Cells::Val(_) if arr.element_type == "integer" => {
+                        let mut s: i64 = 0;
+                        for v in arr.cells.iter() {
                             match v {
-                                // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik),
-                                // nicht still umwickeln.
-                                Value::Int(i) => s = s.checked_add(*i).ok_or_else(||
+                                Value::Int(i) => s = s.checked_add(i).ok_or_else(||
                                     "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?,
                                 _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()),
                             }
                         }
                         Ok(Value::Int(s))
-                    }
-                    "float" => {
-                        let mut s = 0.0f64;
-                        for v in &arr.values { s += as_f64(v); }
-                        Ok(Value::Float(s))
                     }
                     _ => err("ARRAY_SUM: nur ARRAY OF INTEGER/FLOAT".to_string()),
                 }
@@ -1152,10 +1157,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let arr = arr.borrow();
                 if arr.dims.len() != 1 { return err("ARRAY_AVG: nur 1D-Arrays".to_string()); }
                 if !matches!(arr.element_type.as_str(), "integer" | "float") { return err("ARRAY_AVG: nur ARRAY OF INTEGER/FLOAT".to_string()); }
-                let n = arr.values.len();
+                let n = arr.cells.len();
                 if n == 0 { return err("ARRAY_AVG: Array ist leer".to_string()); }
                 let mut s = 0.0f64;
-                for v in &arr.values { s += as_f64(v); }
+                for v in arr.cells.iter() { s += as_f64(&v); }
                 Ok(Value::Float(s / n as f64))
             } else { err("ARRAY_AVG erwartet ARRAY".to_string()) }
         }
@@ -1166,12 +1171,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let fn_ = name.to_uppercase();
                 if arr.dims.len() != 1 { return err(format!("{}: nur 1D-Arrays", fn_)); }
                 if !matches!(arr.element_type.as_str(), "integer" | "float") { return err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_)); }
-                if arr.values.is_empty() { return err(format!("{}: Array ist leer", fn_)); }
+                if arr.cells.is_empty() { return err(format!("{}: Array ist leer", fn_)); }
                 let want_min = name == "array_min";
-                let mut best = arr.values[0].clone();
-                for v in &arr.values[1..] {
-                    let take = if want_min { as_f64(v) < as_f64(&best) } else { as_f64(v) > as_f64(&best) };
-                    if take { best = v.clone(); }
+                let mut best = arr.cells.get(0);
+                for i in 1..arr.cells.len() {
+                    let v = arr.cells.get(i);
+                    let take = if want_min { as_f64(&v) < as_f64(&best) } else { as_f64(&v) > as_f64(&best) };
+                    if take { best = v; }
                 }
                 Ok(best)
             } else { err(format!("{} erwartet ARRAY", name.to_uppercase())) }
@@ -1182,7 +1188,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let et = arr.borrow().element_type.clone();
                 let v = coerce_elem(a[1].clone(), &et, "ARRAY_FILL")?;
                 let mut arr = arr.borrow_mut();
-                for slot in arr.values.iter_mut() { *slot = v.clone(); }
+                match (&mut arr.cells, &v) {
+                    (Cells::Int(vec), Value::Int(x)) => vec.fill(*x),
+                    (Cells::Float(vec), Value::Float(x)) => vec.fill(*x),
+                    (Cells::Float(vec), Value::Int(x)) => vec.fill(*x as f64),
+                    (cells, _) => { let n = cells.len(); for i in 0..n { cells.set(i, v.clone()); } }
+                }
                 Ok(Value::Nil)
             } else { err("ARRAY_FILL erwartet ARRAY".to_string()) }
         }
@@ -1194,7 +1205,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                     element_type: arr.element_type.clone(),
                     dims: arr.dims.clone(),
                     strides: arr.strides.clone(),
-                    values: arr.values.clone(),
+                    cells: arr.cells.clone(),
                 };
                 Ok(Value::Array(Rc::new(RefCell::new(new))))
             } else { err("ARRAY_COPY erwartet ARRAY".to_string()) }
@@ -1207,8 +1218,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let et = { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_PUSH: nur 1D-Arrays".to_string()); } b.element_type.clone() };
                 let v = coerce_elem(a[1].clone(), &et, "ARRAY_PUSH")?;
                 let mut b = arr.borrow_mut();
-                b.values.push(v);
-                let n = b.values.len() as i64;
+                b.cells.push(v);
+                let n = b.cells.len() as i64;
                 b.dims = vec![n];
                 b.strides = vec![1];
                 Ok(Value::Int(n))
@@ -1219,8 +1230,8 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             if let Value::Array(arr) = &a[0] {
                 let mut b = arr.borrow_mut();
                 if b.dims.len() != 1 { return err("ARRAY_POP: nur 1D-Arrays".to_string()); }
-                match b.values.pop() {
-                    Some(v) => { let n = b.values.len() as i64; b.dims = vec![n]; b.strides = vec![1]; Ok(v) }
+                match b.cells.pop() {
+                    Some(v) => { let n = b.cells.len() as i64; b.dims = vec![n]; b.strides = vec![1]; Ok(v) }
                     None => err("ARRAY_POP: Array ist leer".to_string()),
                 }
             } else { err("ARRAY_POP erwartet ARRAY".to_string()) }
@@ -1232,10 +1243,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let idx = need_int(&a[1], "ARRAY_INSERT")?;
                 let v = coerce_elem(a[2].clone(), &et, "ARRAY_INSERT")?;
                 let mut b = arr.borrow_mut();
-                let n = b.values.len() as i64;
+                let n = b.cells.len() as i64;
                 if idx < 0 || idx > n { return err(format!("ARRAY_INSERT: Index {} ausserhalb [0..{}]", idx, n)); }
-                b.values.insert(idx as usize, v);
-                let nn = b.values.len() as i64;
+                b.cells.insert(idx as usize, v);
+                let nn = b.cells.len() as i64;
                 b.dims = vec![nn];
                 b.strides = vec![1];
                 Ok(Value::Int(nn))
@@ -1247,10 +1258,10 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 { let b = arr.borrow(); if b.dims.len() != 1 { return err("ARRAY_REMOVE_AT: nur 1D-Arrays".to_string()); } }
                 let idx = need_int(&a[1], "ARRAY_REMOVE_AT")?;
                 let mut b = arr.borrow_mut();
-                let n = b.values.len() as i64;
+                let n = b.cells.len() as i64;
                 if idx < 0 || idx >= n { return err(format!("ARRAY_REMOVE_AT: Index {} ausserhalb [0..{}]", idx, n - 1)); }
-                let v = b.values.remove(idx as usize);
-                let nn = b.values.len() as i64;
+                let v = b.cells.remove(idx as usize);
+                let nn = b.cells.len() as i64;
                 b.dims = vec![nn];
                 b.strides = vec![1];
                 Ok(v)
@@ -1265,11 +1276,11 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let new_len = need_int(&a[1], "REDIM")?;
                 if new_len < 0 { return err("REDIM: Groesse darf nicht negativ sein".to_string()); }
                 let mut b = arr.borrow_mut();
-                let cur = b.values.len() as i64;
+                let cur = b.cells.len() as i64;
                 if new_len < cur {
-                    b.values.truncate(new_len as usize);
+                    b.cells.truncate(new_len as usize);
                 } else {
-                    for _ in cur..new_len { b.values.push(type_default(&et)); }
+                    for _ in cur..new_len { b.cells.push(type_default(&et)); }
                 }
                 b.dims = vec![new_len];
                 b.strides = vec![1];
@@ -1355,7 +1366,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 let arr = arr.borrow();
                 if arr.element_type != "string" { return err("JOIN$: ARRAY OF STRING noetig".to_string()); }
                 let delim = need_str(&a[1], "JOIN$")?;
-                let parts: Vec<String> = arr.values.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
+                let parts: Vec<String> = arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect();
                 Ok(Value::str_rc(&parts.join(delim)))
             } else { err("JOIN$ erwartet ARRAY OF STRING".to_string()) }
         }
@@ -2759,7 +2770,7 @@ fn ecs_or(a: &[Value]) -> Result<Option<Value>, String> {
 fn int_array(values: Vec<i64>) -> Value {
     let n = values.len() as i64;
     let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
-    for (i, v) in values.into_iter().enumerate() { arr.values[i] = Value::Int(v); }
+    for (i, v) in values.into_iter().enumerate() { arr.cells.set(i, Value::Int(v)); }
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 

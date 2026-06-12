@@ -18,7 +18,7 @@ const PROFILE_STOP: &str = "__PROFILE_STOP__";
 
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
-use crate::value::{as_f64, is_num, value_eq, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
+use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
 
 /// Profiler-Sammler (Stufe B, Phase 3): pro Quell-Zeile Besuchs-Count +
 /// kumulierte Zeit. Spiegelt `editor_qt/profiler.py`: die Zeit zwischen zwei
@@ -1147,7 +1147,7 @@ impl<'p> Vm<'p> {
         let func: &'p Func = self.prog.functions.get(cmp_name.as_ref())
             .ok_or_else(|| format!("SORT: Funktion '{}' existiert nicht", cmp_name))?;
         // Werte herausziehen -> kein Array-Borrow waehrend der Comparator laeuft.
-        let mut vals: Vec<Value> = arr.borrow().values.clone();
+        let mut vals: Vec<Value> = arr.borrow().cells.to_values();
         let mut error: Option<String> = None;
         vals.sort_by(|x, y| {
             if error.is_some() { return Ordering::Equal; }
@@ -1162,7 +1162,10 @@ impl<'p> Vm<'p> {
             }
         });
         if let Some(e) = error { return Err(e); }
-        arr.borrow_mut().values = vals;
+        {
+            let mut ab = arr.borrow_mut();
+            for (i, v) in vals.into_iter().enumerate() { ab.cells.set(i, v); }
+        }
         Ok(Value::Nil)
     }
 
@@ -1910,8 +1913,8 @@ impl<'p> Vm<'p> {
                         let mut fast = None;
                         if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
                             let ab = a.borrow();
-                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.values.len() {
-                                fast = Some(ab.values[*i as usize].clone());
+                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.cells.len() {
+                                fast = Some(ab.cells.get(*i as usize));
                             }
                         }
                         match fast {
@@ -1934,19 +1937,24 @@ impl<'p> Vm<'p> {
                         let mut rest = Some(v);
                         if let (Value::Array(a), Value::Int(i)) = (&arr, &ix) {
                             let mut ab = a.borrow_mut();
-                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.values.len() {
+                            if ab.dims.len() == 1 && *i >= 0 && (*i as usize) < ab.cells.len() {
                                 let val = rest.take().unwrap();
-                                // Coerce-Fast-Path: Typ passt schon -> kein
-                                // element_type-Clone, kein String-Match.
-                                let cv = match (&val, ab.element_type.as_str()) {
-                                    (Value::Int(_), "integer") | (Value::Float(_), "float")
-                                    | (Value::Str(_), "string") | (Value::Bool(_), "boolean")
-                                    | (_, "any") => val,
-                                    (Value::Int(n), "float") => Value::Float(*n as f64),
-                                    _ => { let et = ab.element_type.clone(); coerce(val, &et, "Array-Element")? }
-                                };
                                 let iu = *i as usize;
-                                ab.values[iu] = cv;
+                                // Typisiertes Backing zuerst: Int/Float-Stores
+                                // gehen ohne jeden String-Vergleich direkt rein.
+                                match (&mut ab.cells, val) {
+                                    (Cells::Int(vec), Value::Int(x)) => vec[iu] = x,
+                                    (Cells::Float(vec), Value::Float(x)) => vec[iu] = x,
+                                    (Cells::Float(vec), Value::Int(x)) => vec[iu] = x as f64,
+                                    (_, val) => {
+                                        let cv = match (&val, ab.element_type.as_str()) {
+                                            (Value::Str(_), "string") | (Value::Bool(_), "boolean")
+                                            | (_, "any") => val,
+                                            _ => { let et = ab.element_type.clone(); coerce(val, &et, "Array-Element")? }
+                                        };
+                                        ab.cells.set(iu, cv);
+                                    }
+                                }
                             }
                         }
                         if let Some(val) = rest { store_index(&arr, std::slice::from_ref(&ix), val)?; }
@@ -2340,7 +2348,7 @@ impl<'p> Vm<'p> {
                 let items = html::html_find_all(bi_str(a, 0, "HTML_FIND_ALL")?, bi_str(a, 1, "HTML_FIND_ALL")?);
                 let n = items.len() as i64;
                 let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
-                for (i, s) in items.into_iter().enumerate() { arr.values[i] = Value::str_rc(&s); }
+                for (i, s) in items.into_iter().enumerate() { arr.cells.set(i, Value::str_rc(&s)); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             _ => return Ok(None),
@@ -2617,7 +2625,7 @@ impl<'p> Vm<'p> {
                     if arr.element_type != "string" || arr.dims.len() != 1 {
                         return Err(format!("{}: erwartet 1D ARRAY OF STRING", f));
                     }
-                    Ok(arr.values.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect())
+                    Ok(arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect())
                 }
                 _ => Err(format!("{}: erwartet ARRAY OF STRING", f)),
             }
@@ -2635,7 +2643,7 @@ impl<'p> Vm<'p> {
                     for r in 0..rows {
                         let mut row = Vec::with_capacity(cols);
                         for c in 0..cols {
-                            row.push(match &arr.values[r * cols + c] { Value::Str(s) => s.to_string(), o => o.fmt() });
+                            row.push(match &arr.cells.get(r * cols + c) { Value::Str(s) => s.to_string(), o => o.fmt() });
                         }
                         out.push(row);
                     }
@@ -2653,7 +2661,7 @@ impl<'p> Vm<'p> {
                     if arr.element_type != "integer" || arr.dims.len() != 1 {
                         return Err(format!("{}: erwartet 1D ARRAY OF INTEGER", f));
                     }
-                    Ok(Some(arr.values.iter().map(|v| match v { Value::Int(n) => *n as i32, _ => 0 }).collect()))
+                    Ok(Some(arr.cells.iter().map(|v| match v { Value::Int(n) => n as i32, _ => 0 }).collect()))
                 }
                 _ => Err(format!("{}: erwartet ARRAY OF INTEGER oder NIL", f)),
             }
@@ -2863,7 +2871,7 @@ impl<'p> Vm<'p> {
         fn str1d(v: &Value, f: &str) -> R<Vec<String>> {
             match v { Value::Array(arr) => { let arr = arr.borrow();
                 if arr.element_type != "string" || arr.dims.len() != 1 { return Err(format!("{}: headers muss 1D ARRAY OF STRING sein", f)); }
-                Ok(arr.values.iter().map(|x| match x { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()) }
+                Ok(arr.cells.iter().map(|x| match x { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()) }
                 _ => Err(format!("{}: headers muss ARRAY OF STRING sein", f)) }
         }
         fn str2d(v: &Value, ncols: usize, f: &str) -> R<Vec<Vec<String>>> {
@@ -2871,7 +2879,7 @@ impl<'p> Vm<'p> {
                 if arr.element_type != "string" || arr.dims.len() != 2 { return Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)); }
                 let (r, c) = (arr.dims[0] as usize, arr.dims[1] as usize);
                 if c != ncols { return Err(format!("{}: cells hat {} Spalten, headers {}", f, c, ncols)); }
-                Ok((0..r).map(|ri| (0..c).map(|ci| match &arr.values[ri * c + ci] { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()).collect()) }
+                Ok((0..r).map(|ri| (0..c).map(|ci| match &arr.cells.get(ri * c + ci) { Value::Str(s) => s.to_string(), o => o.fmt() }).collect()).collect()) }
                 _ => Err(format!("{}: cells muss 2D ARRAY OF STRING sein", f)) }
         }
         // Optionales 2D INTEGER-Array -> flach (row-major), Validierung dims.
@@ -2880,7 +2888,7 @@ impl<'p> Vm<'p> {
                 Some(Value::Array(arr)) => { let arr = arr.borrow();
                     if arr.element_type != "integer" || arr.dims.len() != 2 || arr.dims[0] as usize != nr || arr.dims[1] as usize != nc {
                         return Err(format!("{}: erwartet 2D ARRAY OF INTEGER [{}, {}]", f, nr, nc)); }
-                    Ok(Some(arr.values.iter().map(|x| match x { Value::Int(n) => *n, _ => 0 }).collect())) }
+                    Ok(Some(arr.cells.iter().map(|x| match x { Value::Int(n) => n, _ => 0 }).collect())) }
                 _ => Err(format!("{}: erwartet 2D ARRAY OF INTEGER", f)) }
         }
         fn int1d_opt(a: &[Value], i: usize, n: usize, f: &str) -> R<Option<Vec<i32>>> {
@@ -2888,7 +2896,7 @@ impl<'p> Vm<'p> {
                 Some(Value::Array(arr)) => { let arr = arr.borrow();
                     if arr.element_type != "integer" || arr.dims.len() != 1 || arr.dims[0] as usize != n {
                         return Err(format!("{}: col_widths muss 1D ARRAY OF INTEGER ({}) sein", f, n)); }
-                    Ok(Some(arr.values.iter().map(|x| match x { Value::Int(v) => *v as i32, _ => 0 }).collect())) }
+                    Ok(Some(arr.cells.iter().map(|x| match x { Value::Int(v) => v as i32, _ => 0 }).collect())) }
                 _ => Err(format!("{}: col_widths muss ARRAY OF INTEGER sein", f)) }
         }
         let in_box = |mx: i32, my: i32, x: i32, y: i32, w: i32, h: i32| mx >= x && mx < x + w && my >= y && my < y + h;
@@ -3144,9 +3152,12 @@ impl<'p> Vm<'p> {
             match v {
                 Value::Array(a) => {
                     let a = a.borrow();
-                    let mut o = Vec::with_capacity(a.values.len());
-                    for x in &a.values {
-                        match x { Value::Int(i) => o.push(*i as i32), _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)) }
+                    if let Some(ints) = a.cells.as_ints() {
+                        return Ok(ints.iter().map(|&i| i as i32).collect());
+                    }
+                    let mut o = Vec::with_capacity(a.cells.len());
+                    for x in a.cells.iter() {
+                        match x { Value::Int(i) => o.push(i as i32), _ => return Err(format!("{}: ARRAY OF INTEGER noetig", fn_)) }
                     }
                     Ok(o)
                 }
@@ -3159,9 +3170,10 @@ impl<'p> Vm<'p> {
                 Value::Int(c) => Ok(vec![*c; n]),
                 Value::Array(a) => {
                     let a = a.borrow();
-                    if a.values.len() != n { return Err(format!("{}: colors-Array muss so lang wie Koordinaten sein", fn_)); }
+                    if a.cells.len() != n { return Err(format!("{}: colors-Array muss so lang wie Koordinaten sein", fn_)); }
                     let mut o = Vec::with_capacity(n);
-                    for x in &a.values { match x { Value::Int(i) => o.push(*i), _ => return Err(format!("{}: color-ARRAY OF INTEGER noetig", fn_)) } }
+                    if let Some(ints) = a.cells.as_ints() { return Ok(ints.to_vec()); }
+                    for x in a.cells.iter() { match x { Value::Int(i) => o.push(i), _ => return Err(format!("{}: color-ARRAY OF INTEGER noetig", fn_)) } }
                     Ok(o)
                 }
                 _ => Err(format!("{}: color muss INTEGER oder ARRAY sein", fn_)),
@@ -3323,8 +3335,8 @@ impl<'p> Vm<'p> {
                 let pts: Vec<i32> = match a.get(0) {
                     Some(Value::Array(arr)) => {
                         let arr = arr.borrow();
-                        let mut v = Vec::with_capacity(arr.values.len());
-                        for x in &arr.values { match x { Value::Int(i) => v.push(*i as i32), _ => return Err("POLYGON: Punkte muessen INTEGER sein".into()) } }
+                        let mut v = Vec::with_capacity(arr.cells.len());
+                        for x in arr.cells.iter() { match x { Value::Int(i) => v.push(i as i32), _ => return Err("POLYGON: Punkte muessen INTEGER sein".into()) } }
                         v
                     }
                     _ => return Err("POLYGON: Punkte muessen ein ARRAY OF INTEGER sein".into()),
@@ -3571,7 +3583,10 @@ impl<'p> Vm<'p> {
                         if b.dims.len() != 1 {
                             return Err("MODEL_INSTANCED: Arg 2 muss ein 1D-ARRAY OF MAT4 sein".into());
                         }
-                        collect_mats(&mut b.values.iter())?
+                        match b.cells.as_vals() {
+                            Some(vals) => collect_mats(&mut vals.iter())?,
+                            None => return Err("MODEL_INSTANCED: Arg 2 muss ein ARRAY OF MAT4 sein".into()),
+                        }
                     }
                     Some(Value::Tuple(t)) => collect_mats(&mut t.iter())?,
                     _ => return Err("MODEL_INSTANCED: Arg 2 muss ARRAY OF MAT4 oder TUPLE von MAT4 sein".into()),
@@ -3710,12 +3725,12 @@ impl<'p> Vm<'p> {
                     if b.element_type != "float" || b.dims.len() != 1 {
                         return Err("AUDIO_FFT: erwartet 1D ARRAY OF FLOAT".into());
                     }
-                    b.values.len()
+                    b.cells.len()
                 };
                 let mut tmp = vec![0.0f32; n];
                 self.audio_mut()?.fft_bands(&mut tmp);
                 let mut b = arr.borrow_mut();
-                for i in 0..n { b.values[i] = Value::Float(tmp[i] as f64); }
+                for i in 0..n { b.cells.set(i, Value::Float(tmp[i] as f64)); }
                 Value::Nil
             }
 
@@ -3883,11 +3898,15 @@ impl<'p> Vm<'p> {
                         if arr.dims.len() != 2 {
                             return Err("DRAWTILEMAP: map muss 2D sein (zeilen x spalten)".into());
                         }
-                        let mut v = Vec::with_capacity(arr.values.len());
-                        for x in &arr.values {
-                            match x {
-                                Value::Int(n) => v.push(*n),
-                                _ => return Err("DRAWTILEMAP: map muss ARRAY OF INTEGER sein".into()),
+                        let mut v = Vec::with_capacity(arr.cells.len());
+                        if let Some(ints) = arr.cells.as_ints() {
+                            v.extend_from_slice(ints);
+                        } else {
+                            for x in arr.cells.iter() {
+                                match x {
+                                    Value::Int(n) => v.push(n),
+                                    _ => return Err("DRAWTILEMAP: map muss ARRAY OF INTEGER sein".into()),
+                                }
                             }
                         }
                         (v, arr.dims[0] as i32, arr.dims[1] as i32)
@@ -4147,7 +4166,7 @@ impl<'p> Vm<'p> {
                 let opts: Vec<String> = match a.get(3) {
                     Some(Value::Array(arr)) => { let arr = arr.borrow();
                         if arr.element_type != "string" { return Err("UI_RADIO: options muss ARRAY OF STRING sein".into()); }
-                        arr.values.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect() }
+                        arr.cells.iter().map(|v| match v { Value::Str(s) => s.to_string(), o => o.fmt() }).collect() }
                     _ => return Err("UI_RADIO: options muss ARRAY OF STRING sein".into()),
                 };
                 let n = opts.len() as i64;
@@ -4506,7 +4525,7 @@ fn load_index(arr: &Value, idx_vals: &[Value]) -> R<Value> {
                 match ix { Value::Int(i) => ints.push(*i), v => return Err(format!("Array-Index muss INTEGER sein, erhalten {}", v.type_name())) }
             }
             let flat = a.flat_index(&ints)?;
-            Ok(a.values[flat].clone())
+            Ok(a.cells.get(flat))
         }
         Value::Str(s) => {
             if idx_vals.len() != 1 { return Err("String-Index braucht genau einen Wert".into()); }
@@ -4540,7 +4559,7 @@ fn store_index(arr: &Value, idx_vals: &[Value], v: Value) -> R<()> {
             }
             let flat = a.flat_index(&ints)?;
             let cv = coerce(v, &a.element_type, "Array-Element")?;
-            a.values[flat] = cv;
+            a.cells.set(flat, cv);
             Ok(())
         }
         Value::Nil => Err("Index-Zuweisung an NIL".into()),
@@ -4558,7 +4577,7 @@ fn eval_in(needle: &Value, hay: &Value) -> R<bool> {
         Value::Array(a) => {
             let a = a.borrow();
             if a.dims.len() != 1 { return Err("IN: nur 1D-Arrays".into()); }
-            Ok(a.values.iter().any(|x| value_eq(x, needle)))
+            Ok(a.cells.iter().any(|x| value_eq(&x, needle)))
         }
         Value::Map(m) => match needle {
             Value::Str(n) => Ok(m.borrow().get(n).is_some()),
@@ -4594,10 +4613,10 @@ fn apply_slice(target: &Value, lo: Option<&Value>, hi: Option<&Value>) -> R<Valu
             let n = arr.dims[0];
             let a = to_idx(lo, 0)?.min(n).max(0);
             let b = to_idx(hi, n)?.min(n).max(0);
-            let slice: Vec<Value> = if a >= b { vec![] } else { arr.values[a as usize..b as usize].to_vec() };
+            let slice = if a >= b { Cells::Val(vec![]) } else { arr.cells.slice(a as usize, b as usize) };
             let len = slice.len() as i64;
             let mut new = GbArray::new(arr.element_type.clone(), vec![len], || Value::Nil);
-            new.values = slice;
+            new.cells = slice;
             Ok(Value::Array(Rc::new(RefCell::new(new))))
         }
         v => Err(format!("Slice-Zugriff: Erwartet STRING oder ARRAY, erhalten {}", v.type_name())),
