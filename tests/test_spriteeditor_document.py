@@ -602,3 +602,59 @@ def test_onion_tinted_alpha_and_channels():
     assert b2 == 50 and r2 == 200    # Blau gedimmt, Rot bleibt
     # Original unveraendert
     assert img.getpixel((0, 0)) == (200, 100, 100, 255)
+
+
+# --- Export-Skalierung ---------------------------------------------
+
+def _make_two_frame_doc():
+    doc = SpriteDoc(4, 4)
+    doc.current.pixels.putpixel((0, 0), (255, 0, 0, 255))
+    doc.add_frame()
+    doc.current.pixels.putpixel((1, 1), (0, 255, 0, 255))
+    return doc
+
+def test_save_png_single_scaled(tmp_path):
+    doc = SpriteDoc(4, 4)
+    doc.current.pixels.putpixel((0, 0), (255, 0, 0, 255))
+    out = tmp_path / "f.png"
+    doc.save_png_single(out, scale=4)
+    img = Image.open(out)
+    assert img.size == (16, 16)
+    # Nearest-Neighbor: der rote Pixel wird zum 4x4-Block
+    assert img.convert("RGBA").getpixel((3, 3)) == (255, 0, 0, 255)
+    assert img.convert("RGBA").getpixel((4, 4)) == (0, 0, 0, 0)
+
+
+def test_save_sheet_png_scaled(tmp_path):
+    doc = _make_two_frame_doc()
+    out = tmp_path / "sheet.png"
+    doc.save_sheet_png(out, scale=2)
+    assert Image.open(out).size == (4 * 2 * 2, 4 * 2)
+
+
+def test_save_animated_gif_scaled(tmp_path):
+    doc = _make_two_frame_doc()
+    out = tmp_path / "anim.gif"
+    doc.save_animated_gif(out, fps=10, scale=3)
+    img = Image.open(out)
+    assert img.size == (12, 12)
+    assert getattr(img, "n_frames", 1) == 2
+
+
+def test_save_sheet_atlas_scaled_rects(tmp_path):
+    doc = _make_two_frame_doc()
+    png = tmp_path / "atlas.png"
+    js = tmp_path / "atlas.json"
+    manifest = doc.save_sheet_atlas(png, js, scale=2)
+    assert Image.open(png).size == (16, 8)
+    assert manifest["sprites"]["atlas_0"] == [0, 0, 8, 8]
+    assert manifest["sprites"]["atlas_1"] == [8, 0, 8, 8]
+
+
+def test_export_scale_one_is_identity(tmp_path):
+    doc = _make_two_frame_doc()
+    png = tmp_path / "atlas.png"
+    js = tmp_path / "atlas.json"
+    manifest = doc.save_sheet_atlas(png, js, scale=1)
+    assert Image.open(png).size == (8, 4)
+    assert manifest["sprites"]["atlas_0"] == [0, 0, 4, 4]

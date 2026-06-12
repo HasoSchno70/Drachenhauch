@@ -46,7 +46,10 @@ Brush-Groesse mit Tasten **1**, **2**, **3**, **4**. **X** tauscht FG/BG-Farbe.
 
 ## Export-Optionen
 
-Vier Export-Pfade, je nach Use-Case:
+Vier Export-Pfade, je nach Use-Case. Alle Bild-Exporte (Sheet, Atlas, GIF,
+Einzel-Frame) fragen eine **Export-Skalierung** ab (1x/2x/4x/8x,
+Nearest-Neighbor — pixelart-treu ohne Weichzeichnen). Beim Atlas werden
+die Manifest-Rects mitskaliert, `ATLAS_LOAD` passt also weiterhin.
 
 ### Sheet-PNG (`Ctrl+E`)
 

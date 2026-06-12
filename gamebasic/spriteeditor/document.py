@@ -359,13 +359,23 @@ class SpriteDoc:
         doc.dirty = False
         return doc
 
-    def save_png_single(self, path: Path):
-        self.current.pixels.save(path, format="PNG")
+    @staticmethod
+    def _scaled(img: Image.Image, scale: int) -> Image.Image:
+        """Integer-Hochskalierung (Nearest-Neighbor, pixelart-treu).
+        scale <= 1 liefert das Original unveraendert."""
+        scale = int(scale)
+        if scale <= 1:
+            return img
+        return img.resize((img.width * scale, img.height * scale),
+                          Image.NEAREST)
+
+    def save_png_single(self, path: Path, scale: int = 1):
+        self._scaled(self.current.pixels, scale).save(path, format="PNG")
         self.filepath = path
         self.dirty = False
 
     def save_animated_gif(self, path: Path, fps: Optional[int] = None,
-                          loop: int = 0):
+                          loop: int = 0, scale: int = 1):
         """Schreibt alle Frames als animiertes GIF.
 
         Args:
@@ -374,6 +384,7 @@ class SpriteDoc:
                  1000/fps. Wenn None, wird pro Frame die individuelle
                  duration_ms verwendet.
             loop: 0 = unendlich, sonst Anzahl Wiederholungen
+            scale: Integer-Hochskalierung (Nearest-Neighbor), 1 = Original
         """
         if not self.frames:
             raise ValueError("Keine Frames zum Exportieren")
@@ -386,7 +397,7 @@ class SpriteDoc:
 
         gif_frames = []
         for f in self.frames:
-            rgba = f.pixels
+            rgba = self._scaled(f.pixels, scale)
             p = rgba.convert("RGB").convert(
                 "P", palette=Image.Palette.ADAPTIVE, colors=255)
             alpha = rgba.split()[3]
@@ -405,7 +416,8 @@ class SpriteDoc:
             optimize=False,
         )
 
-    def save_sheet_png(self, path: Path, layout: str = "horizontal"):
+    def save_sheet_png(self, path: Path, layout: str = "horizontal",
+                       scale: int = 1):
         n = len(self.frames)
         if layout == "vertical":
             sheet = Image.new("RGBA", (self.width, self.height * n), (0, 0, 0, 0))
@@ -415,11 +427,12 @@ class SpriteDoc:
             sheet = Image.new("RGBA", (self.width * n, self.height), (0, 0, 0, 0))
             for i, f in enumerate(self.frames):
                 sheet.paste(f.pixels, (i * self.width, 0))
-        sheet.save(path, format="PNG")
+        self._scaled(sheet, scale).save(path, format="PNG")
 
     def save_sheet_atlas(self, png_path: Path, json_path: Path,
                          name_prefix: Optional[str] = None,
-                         layout: str = "horizontal") -> dict:
+                         layout: str = "horizontal",
+                         scale: int = 1) -> dict:
         """Schreibt einen Sprite-Atlas: PNG-Sheet + JSON-Manifest mit
         benannten Frame-Rects. Direkt von ATLAS_LOAD lesbar.
 
@@ -442,20 +455,25 @@ class SpriteDoc:
           PNG-Basename (ohne Endung) verwendet. Frames mit eigenem ``name``
           nutzen diesen statt ``<prefix>_<idx>`` als Sprite-ID.
         - ``layout``: ``"horizontal"`` (Default) oder ``"vertical"``.
+        - ``scale``: Integer-Hochskalierung (Nearest-Neighbor); die
+          Manifest-Rects werden mitskaliert, ATLAS_LOAD passt weiterhin.
 
         Liefert das geschriebene Manifest-Dict (fuer Tests/Logging).
         """
         if name_prefix is None:
             name_prefix = png_path.stem
+        scale = max(1, int(scale))
         # PNG schreiben (Re-Use der bestehenden Sheet-Logik)
-        self.save_sheet_png(png_path, layout=layout)
+        self.save_sheet_png(png_path, layout=layout, scale=scale)
         # Rects fuer das Manifest berechnen (gleiche Layout-Logik)
+        w = self.width * scale
+        h = self.height * scale
         sprites: dict = {}
         for i, f in enumerate(self.frames):
             if layout == "vertical":
-                rect = [0, i * self.height, self.width, self.height]
+                rect = [0, i * h, w, h]
             else:
-                rect = [i * self.width, 0, self.width, self.height]
+                rect = [i * w, 0, w, h]
             # Benanntes Frame -> eigener Name; sonst <prefix>_<idx>.
             key = (f.name or "").strip()
             if not key:

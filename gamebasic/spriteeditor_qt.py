@@ -2990,6 +2990,18 @@ class SpriteEditorWindow(QMainWindow):
         self.doc.filepath = Path(path)
         return self.action_save()
 
+    def _ask_export_scale(self) -> Optional[int]:
+        """Skalierungsfaktor fuer Exporte abfragen (Nearest-Neighbor).
+        Liefert 1/2/4/8 -- oder None bei Abbruch."""
+        items = ["1x (Original)", "2x", "4x", "8x"]
+        choice, ok = QInputDialog.getItem(
+            self, "Export-Skalierung",
+            "Hochskalieren (Nearest-Neighbor, pixelart-treu):",
+            items, 0, False)
+        if not ok:
+            return None
+        return int(choice.split("x")[0])
+
     def action_export_sheet(self):
         path, _ = QFileDialog.getSaveFileName(
             self, "Sheet als PNG exportieren",
@@ -2998,19 +3010,23 @@ class SpriteEditorWindow(QMainWindow):
         )
         if not path:
             return
+        scale = self._ask_export_scale()
+        if scale is None:
+            return
         try:
-            self.doc.save_sheet_png(Path(path), layout="horizontal")
+            self.doc.save_sheet_png(Path(path), layout="horizontal", scale=scale)
         except Exception as exc:
             QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
             return
         n = len(self.doc.frames)
+        scale_hint = f" ({scale}x skaliert)" if scale > 1 else ""
         QMessageBox.information(
             self, "Sheet exportiert",
-            f"{n} Frames als horizontaler Sheet gespeichert:\n{path}\n\n"
+            f"{n} Frames als horizontaler Sheet gespeichert{scale_hint}:\n{path}\n\n"
             f"In GameBasic laden:\n"
             f"   IMPORT \"sprite\"\n"
             f"   img = LOADIMAGE(\"{Path(path).name}\")\n"
-            f"   sp = SPRITE_NEW(img, {self.doc.width}, {self.doc.height})\n"
+            f"   sp = SPRITE_NEW(img, {self.doc.width * scale}, {self.doc.height * scale})\n"
             f"   SPRITE_ADD_ANIM(sp, \"idle\", 0, {n - 1}, 8)\n"
             f"   SPRITE_PLAY(sp, \"idle\")"
         )
@@ -3038,8 +3054,12 @@ class SpriteEditorWindow(QMainWindow):
             return
         png_path = Path(path)
         json_path = png_path.with_suffix(".json")
+        scale = self._ask_export_scale()
+        if scale is None:
+            return
         try:
-            self.doc.save_sheet_atlas(png_path, json_path, layout="horizontal")
+            self.doc.save_sheet_atlas(png_path, json_path,
+                                      layout="horizontal", scale=scale)
         except Exception as exc:
             QMessageBox.critical(self, "Atlas-Export fehlgeschlagen", str(exc))
             return
@@ -3099,8 +3119,11 @@ class SpriteEditorWindow(QMainWindow):
         )
         if not path:
             return
+        scale = self._ask_export_scale()
+        if scale is None:
+            return
         try:
-            self.doc.save_animated_gif(Path(path), fps=fps, loop=0)
+            self.doc.save_animated_gif(Path(path), fps=fps, loop=0, scale=scale)
         except Exception as exc:
             QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
             return
@@ -3141,8 +3164,14 @@ class SpriteEditorWindow(QMainWindow):
         )
         if not path:
             return
+        scale = self._ask_export_scale()
+        if scale is None:
+            return
         try:
-            self.doc.current.pixels.save(path, format="PNG")
+            # Bewusst NICHT save_png_single: das wuerde filepath/dirty
+            # umsetzen -- ein Frame-Export ist kein "Speichern".
+            img = SpriteDoc._scaled(self.doc.current.pixels, scale)
+            img.save(path, format="PNG")
         except Exception as exc:
             QMessageBox.critical(self, "Export fehlgeschlagen", str(exc))
 
