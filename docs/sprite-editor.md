@@ -23,6 +23,7 @@ Auf Windows ueber `gbsprites.cmd`. Aus dem Code-Editor heraus: Werkzeuge → Spr
 | **O** | Ellipse | Ellipse (gefuellt) |
 | **I** | Eyedropper | Farbe vom Pixel pickern |
 | **M** | Select | Rechteck-Auswahl (Cut/Copy/Paste). **In die Auswahl klicken + ziehen verschiebt den Auswahl-Inhalt** (Live-Vorschau, ein Undo-Schritt; Quelle wird transparent) |
+| **Shift+M** | Lasso | **Freiform-Auswahl mit echter Pixel-Maske**: Bereich umfahren (Live-Pfad), Loslassen schliesst das Polygon. Cut/Copy/Fuellen/Spiegeln/Loeschen wirken nur auf die maskierten Pixel; Klick in die Auswahl verschiebt nur diese (Maske wandert mit) |
 | **V** | Move | Auswahl oder ganzes Frame verschieben |
 | **W** | Magic Wand | Auswahl per Flood (zusammenhaengende Pixel mit gleicher Farbe) |
 | **Y** | Spray | Pixel-Spray (zufaellige Verteilung im Brush-Radius) |

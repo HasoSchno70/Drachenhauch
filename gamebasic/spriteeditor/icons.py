@@ -17,7 +17,8 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QPoint, QPointF, QRect, QRectF
 from PySide6.QtGui import (
-    QBrush, QColor, QIcon, QPainter, QPen, QPixmap, QPolygon, QPolygonF,
+    QBrush, QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap,
+    QPolygon, QPolygonF,
 )
 
 from .. spriteeditor_qt import COLORS  # Theme-Farben (zirkulaer-OK: dieses
@@ -246,6 +247,23 @@ def make_tool_icon(name: str, size: int = 28) -> QIcon:
         for cx, cy in [(0.16, 0.16), (0.84, 0.16),
                         (0.16, 0.84), (0.84, 0.84)]:
             p.drawEllipse(pt(cx, cy), 2.0, 2.0)
+
+    elif name == "lasso":
+        # Freiform-Schlinge (gestrichelt) + kleiner "Griff" unten rechts
+        p.setPen(QPen(fg, 1.6, Qt.DashLine, Qt.FlatCap))
+        p.setBrush(Qt.NoBrush)
+        path = QPainterPath()
+        path.moveTo(pt(0.50, 0.14))
+        path.cubicTo(pt(0.88, 0.10), pt(0.92, 0.52), pt(0.62, 0.62))
+        path.cubicTo(pt(0.40, 0.70), pt(0.10, 0.62), pt(0.16, 0.38))
+        path.cubicTo(pt(0.20, 0.18), pt(0.34, 0.16), pt(0.50, 0.14))
+        p.drawPath(path)
+        # Seil zum Griff
+        p.setPen(QPen(fg, 1.6, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(pt(0.62, 0.62), pt(0.78, 0.82))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(accent))
+        p.drawEllipse(pt(0.80, 0.84), 2.6, 2.6)
 
     elif name == "magic_wand":
         # Zauberstab: schraeger Stab + Stern an der Spitze

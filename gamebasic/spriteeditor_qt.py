@@ -401,7 +401,7 @@ from .spriteeditor.tools import (  # noqa: E402,F401  -- re-export
     Tool,
     PencilTool, EraserTool, SprayTool, BucketTool,
     LineTool, RectTool, EllipseTool,
-    EyedropperTool, MoveTool, MagicWandTool, SelectTool,
+    EyedropperTool, MoveTool, MagicWandTool, SelectTool, LassoTool,
     _bresenham, _brush_offsets, _symmetry_points,
 )
 
@@ -449,6 +449,8 @@ class SpriteCanvas(QGraphicsView):
         self._preview_item = None
         self._checker_item = None
         self._selection_items: list = []   # zwei Items: schwarz + gelb (Marching-Ants)
+        self._selection_mask: Optional[Image.Image] = None  # 'L', 255=selektiert (Lasso)
+        self._selection_mask_items: list = []
         self._grid_items: list = []
         self._tile_replica_items: list = []
         self._preview_pil: Optional[Image.Image] = None
@@ -506,13 +508,48 @@ class SpriteCanvas(QGraphicsView):
 
     def set_selection(self, x0, y0, x1, y1):
         self._selection = (x0, y0, x1, y1)
+        # Eine Rechteck-Auswahl ersetzt eine evtl. aktive Lasso-Maske.
+        if self._selection_mask is not None:
+            self._selection_mask = None
+            self._render_selection_mask()
         self._render_selection()
         if not self._marquee_timer.isActive():
             self._marquee_timer.start()
 
+    def set_selection_mask(self, mask: Image.Image):
+        """Freiform-Auswahl als Pixel-Maske ('L', 255 = selektiert,
+        Dokument-Groesse). Das Marquee-Rechteck wird auf die Bounding-Box
+        gesetzt; Auswahl-Operationen fragen die Maske via
+        get_selection_mask() ab."""
+        bbox = mask.getbbox()
+        if bbox is None:
+            self.clear_selection()
+            return
+        x0, y0, x1, y1 = bbox
+        self._selection_mask = mask
+        self._selection = (x0, y0, x1 - 1, y1 - 1)
+        self._render_selection_mask()
+        self._render_selection()
+        if not self._marquee_timer.isActive():
+            self._marquee_timer.start()
+
+    def get_selection_mask(self) -> Optional[Image.Image]:
+        """Aktive Lasso-Maske oder None (Rechteck-Auswahl/keine Auswahl).
+        Eine Maske, die nicht mehr zur Dokument-Groesse passt (Resize),
+        wird verworfen."""
+        m = self._selection_mask
+        if m is not None and m.size != (self.app.doc.width, self.app.doc.height):
+            self._selection_mask = None
+            self._render_selection_mask()
+            return None
+        return m
+
     def clear_selection(self):
         self._selection = None
         self._marquee_timer.stop()
+        if self._selection_mask is not None:
+            self._selection_mask = None
+            self._render_selection_mask()
         self._render_selection()
 
     def _advance_marquee(self):
@@ -561,6 +598,7 @@ class SpriteCanvas(QGraphicsView):
         self._preview_item = None
         self._checker_item = None
         self._selection_items = []
+        self._selection_mask_items = []
         self._tile_replica_items = []
         self._grid_items = []
         self._render_checker()
@@ -568,6 +606,7 @@ class SpriteCanvas(QGraphicsView):
         self._render_frame_pixmap()
         self._render_tile_replicas()
         self._render_grid()
+        self._render_selection_mask()
         self._render_selection()
         # Scene-Rect: im Tile-Preview 3x3, sonst 1x1 (mit dem Sprite bei (0,0))
         doc = self.app.doc; z = self._zoom
@@ -680,6 +719,29 @@ class SpriteCanvas(QGraphicsView):
             line = self._scene.addLine(0, y, doc.width * z, y, pen)
             line.setZValue(3)
             self._grid_items.append(line)
+
+    def _render_selection_mask(self):
+        """Overlay fuer die Freiform-Maske (Lasso): leichter Schimmer auf
+        den selektierten Pixeln + gelbe Kontur. Statisch -- die Bewegung
+        kommt vom Marching-Ants-Rechteck der Bounding-Box."""
+        for it in self._selection_mask_items:
+            self._scene.removeItem(it)
+        self._selection_mask_items = []
+        mask = self._selection_mask
+        if mask is None:
+            return
+        from PIL import ImageChops, ImageFilter
+        eroded = mask.filter(ImageFilter.MinFilter(3))
+        edge = ImageChops.subtract(mask, eroded)
+        overlay = Image.new("RGBA", mask.size, (0, 0, 0, 0))
+        overlay.paste((255, 255, 255, 60), (0, 0), mask)
+        overlay.paste((255, 216, 0, 230), (0, 0), edge)
+        z = self._zoom
+        scaled = overlay.resize((mask.width * z, mask.height * z),
+                                Image.NEAREST)
+        item = self._scene.addPixmap(pil_to_qpixmap(scaled))
+        item.setZValue(9)
+        self._selection_mask_items.append(item)
 
     def _render_selection(self):
         # Alte Marquee-Items entfernen
@@ -1875,6 +1937,7 @@ class SpriteEditorWindow(QMainWindow):
         ("ellipse_fill","Ellipse gefuellt (Shift+O)",  "Shift+O"),
         ("eyedrop",     "Pipette (I)",                 "I"),
         ("select",      "Auswahl (M)",                 "M"),
+        ("lasso",       "Lasso (Shift+M)",             "Shift+M"),
         ("magic_wand",  "Magic Wand (W)",              "W"),
         ("move",        "Verschieben (V)",             "V"),
     ]
@@ -1907,6 +1970,7 @@ class SpriteEditorWindow(QMainWindow):
             "ellipse_fill": EllipseTool(filled=True),
             "eyedrop":      EyedropperTool(),
             "select":       SelectTool(),
+            "lasso":        LassoTool(),
             "magic_wand":   MagicWandTool(),
             "move":         MoveTool(),
         }
@@ -2166,8 +2230,8 @@ class SpriteEditorWindow(QMainWindow):
             "pencil": "B", "eraser": "E", "spray": "Y", "bucket": "G",
             "line": "L", "rect": "R", "rect_fill": "Shift+R",
             "ellipse": "O", "ellipse_fill": "Shift+O",
-            "eyedrop": "I", "select": "M", "magic_wand": "W",
-            "move": "V",
+            "eyedrop": "I", "select": "M", "lasso": "Shift+M",
+            "magic_wand": "W", "move": "V",
         }
         for name, hk in tool_hotkeys.items():
             QShortcut(QKeySequence(hk), self,
@@ -2467,7 +2531,7 @@ class SpriteEditorWindow(QMainWindow):
         # kann der User Magic Wand klicken und mit Pfeiltasten oder
         # Cut/Copy weitermachen, oder mit Auswahl-Tool die Bbox
         # nachjustieren.
-        selection_tools = {"select", "magic_wand"}
+        selection_tools = {"select", "lasso", "magic_wand"}
         if (prev in selection_tools and name not in selection_tools
                 and not _silent):
             self.canvas.clear_selection()
@@ -2602,8 +2666,16 @@ class SpriteEditorWindow(QMainWindow):
                 "Keine Auswahl -- mit M (Auswahl-Tool) markieren", 2000)
             return
         x0, y0, x1, y1 = sel
-        self._clipboard_pil = self.doc.current.pixels.crop(
-            (x0, y0, x1, y1)).copy()
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            # Lasso: nur maskierte Pixel kopieren, Rest transparent.
+            region = self.doc.current.pixels.crop((x0, y0, x1, y1))
+            clip = Image.new("RGBA", region.size, (0, 0, 0, 0))
+            clip.paste(region, (0, 0), mask.crop((x0, y0, x1, y1)))
+            self._clipboard_pil = clip
+        else:
+            self._clipboard_pil = self.doc.current.pixels.crop(
+                (x0, y0, x1, y1)).copy()
         # Auch ins System-Clipboard, falls der User das Bild woanders
         # einfuegen will (Discord, Aseprite, ...).
         try:
@@ -2623,8 +2695,12 @@ class SpriteEditorWindow(QMainWindow):
         self.action_copy()
         self.doc.current.snapshot()
         x0, y0, x1, y1 = sel
-        d = ImageDraw.Draw(self.doc.current.pixels)
-        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            self.doc.current.pixels.paste((0, 0, 0, 0), (0, 0), mask)
+        else:
+            d = ImageDraw.Draw(self.doc.current.pixels)
+            d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
         # Auswahl nach Cut aufloesen -- die Pixel sind weg, der schwebende
         # Marquee waere irrefuehrend. Bei Copy bleibt sie bestehen.
         self.canvas.clear_selection()
@@ -3223,8 +3299,12 @@ class SpriteEditorWindow(QMainWindow):
             return
         self.doc.current.snapshot()
         x0, y0, x1, y1 = sel
-        d = ImageDraw.Draw(self.doc.current.pixels)
-        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            self.doc.current.pixels.paste((0, 0, 0, 0), (0, 0), mask)
+        else:
+            d = ImageDraw.Draw(self.doc.current.pixels)
+            d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
         # Auswahl nach Delete aufloesen
         self.canvas.clear_selection()
         self.canvas.invalidate_all()
@@ -3412,43 +3492,55 @@ class SpriteEditorWindow(QMainWindow):
             return
         self.doc.current.snapshot()
         x0, y0, x1, y1 = sel
-        d = ImageDraw.Draw(self.doc.current.pixels)
-        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=self.fg)
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            self.doc.current.pixels.paste(self.fg, (0, 0), mask)
+        else:
+            d = ImageDraw.Draw(self.doc.current.pixels)
+            d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=self.fg)
+        self.canvas.invalidate_all()
+        self.frames_panel.refresh()
+        self.mark_dirty()
+
+    def _flip_selection(self, transpose_op):
+        """Spiegelt nur den Inhalt der Auswahl (Rechteck oder Lasso-Maske).
+        Bei einer Maske werden nur die maskierten Pixel gespiegelt und die
+        Maske wird mitgespiegelt (Auswahl bleibt deckungsgleich)."""
+        sel = self.canvas.get_selection()
+        if not sel:
+            return
+        self.doc.current.snapshot()
+        x0, y0, x1, y1 = sel
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            mask_crop = mask.crop((x0, y0, x1, y1))
+            region = self.doc.current.pixels.crop((x0, y0, x1, y1))
+            content = Image.new("RGBA", region.size, (0, 0, 0, 0))
+            content.paste(region, (0, 0), mask_crop)
+            flipped = content.transpose(transpose_op)
+            flipped_mask = mask_crop.transpose(transpose_op)
+            self.doc.current.pixels.paste((0, 0, 0, 0), (0, 0), mask)
+            self.doc.current.pixels.alpha_composite(flipped, dest=(x0, y0))
+            new_mask = Image.new("L", mask.size, 0)
+            new_mask.paste(flipped_mask, (x0, y0))
+            self.canvas.set_selection_mask(new_mask)
+        else:
+            cropped = self.doc.current.pixels.crop((x0, y0, x1, y1))
+            flipped = cropped.transpose(transpose_op)
+            d = ImageDraw.Draw(self.doc.current.pixels)
+            d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
+            self.doc.current.pixels.alpha_composite(flipped, dest=(x0, y0))
         self.canvas.invalidate_all()
         self.frames_panel.refresh()
         self.mark_dirty()
 
     def action_flip_selection_h(self):
         """Spiegelt nur den Inhalt der Auswahl horizontal."""
-        sel = self.canvas.get_selection()
-        if not sel:
-            return
-        self.doc.current.snapshot()
-        x0, y0, x1, y1 = sel
-        cropped = self.doc.current.pixels.crop((x0, y0, x1, y1))
-        flipped = cropped.transpose(Image.FLIP_LEFT_RIGHT)
-        d = ImageDraw.Draw(self.doc.current.pixels)
-        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
-        self.doc.current.pixels.alpha_composite(flipped, dest=(x0, y0))
-        self.canvas.invalidate_all()
-        self.frames_panel.refresh()
-        self.mark_dirty()
+        self._flip_selection(Image.FLIP_LEFT_RIGHT)
 
     def action_flip_selection_v(self):
         """Spiegelt nur den Inhalt der Auswahl vertikal."""
-        sel = self.canvas.get_selection()
-        if not sel:
-            return
-        self.doc.current.snapshot()
-        x0, y0, x1, y1 = sel
-        cropped = self.doc.current.pixels.crop((x0, y0, x1, y1))
-        flipped = cropped.transpose(Image.FLIP_TOP_BOTTOM)
-        d = ImageDraw.Draw(self.doc.current.pixels)
-        d.rectangle([x0, y0, x1 - 1, y1 - 1], fill=(0, 0, 0, 0))
-        self.doc.current.pixels.alpha_composite(flipped, dest=(x0, y0))
-        self.canvas.invalidate_all()
-        self.frames_panel.refresh()
-        self.mark_dirty()
+        self._flip_selection(Image.FLIP_TOP_BOTTOM)
 
     def show_selection_context_menu(self, global_pos):
         """Oeffnet das Kontextmenue fuer den aktuellen Auswahl-Bereich.
@@ -3467,7 +3559,14 @@ class SpriteEditorWindow(QMainWindow):
 
         menu = QMenu(self)
         # Header (deaktiviert, nur als Info)
-        header = QAction(f"Auswahl  {w}x{h}  bei ({sel[0]}, {sel[1]})", self)
+        mask = self.canvas.get_selection_mask()
+        if mask is not None:
+            n_px = sum(1 for v in mask.getdata() if v)
+            header = QAction(
+                f"Lasso-Auswahl  {n_px} Px  (Box {w}x{h} bei "
+                f"({sel[0]}, {sel[1]}))", self)
+        else:
+            header = QAction(f"Auswahl  {w}x{h}  bei ({sel[0]}, {sel[1]})", self)
         header.setEnabled(False)
         menu.addAction(header)
         menu.addSeparator()

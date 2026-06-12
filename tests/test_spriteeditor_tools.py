@@ -31,6 +31,7 @@ class _MockCanvas:
         self.invalidate_count = 0
         self.preview = None
         self.selection = None
+        self.selection_mask = None
 
     def invalidate_all(self):
         self.invalidate_count += 1
@@ -40,12 +41,29 @@ class _MockCanvas:
 
     def set_selection(self, x0, y0, x1, y1):
         self.selection = (x0, y0, x1, y1)
+        self.selection_mask = None
 
     def get_selection(self):
         if self.selection is None:
             return None
         x0, y0, x1, y1 = self.selection
         return (min(x0, x1), min(y0, y1), max(x0, x1) + 1, max(y0, y1) + 1)
+
+    def set_selection_mask(self, mask):
+        bbox = mask.getbbox()
+        if bbox is None:
+            self.clear_selection()
+            return
+        x0, y0, x1, y1 = bbox
+        self.selection_mask = mask
+        self.selection = (x0, y0, x1 - 1, y1 - 1)
+
+    def get_selection_mask(self):
+        return self.selection_mask
+
+    def clear_selection(self):
+        self.selection = None
+        self.selection_mask = None
 
 
 class _MockFrame:
@@ -480,3 +498,81 @@ def test_select_move_clips_at_canvas_edge():
     assert out.getpixel((1, 1)) == (0, 0, 0, 0)      # weg von der Quelle
     # Pixel ist links rausgeschoben -> nirgendwo mehr sichtbar, kein Crash
     assert all(out.getpixel((x, 1)) == (0, 0, 0, 0) for x in range(8))
+
+
+# --- Lasso ----------------------------------------------------------
+
+def test_polygon_mask_triangle():
+    from gamebasic.spriteeditor.tools import polygon_mask
+    mask = polygon_mask((8, 8), [(0, 0), (7, 0), (0, 7)])
+    assert mask.getpixel((1, 1)) == 255       # innen
+    assert mask.getpixel((7, 7)) == 0         # ausserhalb des Dreiecks
+    assert mask.getbbox() is not None
+
+
+def test_polygon_mask_too_few_points_empty():
+    from gamebasic.spriteeditor.tools import polygon_mask
+    assert polygon_mask((8, 8), [(0, 0), (3, 3)]).getbbox() is None
+
+
+def test_lasso_drag_sets_mask_selection():
+    from gamebasic.spriteeditor.tools import LassoTool
+    from PySide6.QtCore import Qt
+    app = _MockApp()
+    tool = LassoTool()
+    tool.begin(app, 1, 1, Qt.LeftButton)
+    tool.move(app, 6, 1)
+    tool.move(app, 6, 6)
+    tool.move(app, 1, 6)
+    tool.end(app, 1, 6)
+    mask = app.canvas.get_selection_mask()
+    assert mask is not None
+    assert mask.getpixel((3, 3)) == 255
+    assert mask.getpixel((0, 0)) == 0
+    # Preview ist nach dem Loslassen weg
+    assert app.canvas.preview is None
+    # Bounding-Box als Rect-Selection gesetzt
+    assert app.canvas.get_selection() == (1, 1, 7, 7)
+
+
+def test_lasso_move_inside_moves_masked_pixels_only():
+    from gamebasic.spriteeditor.tools import LassoTool, polygon_mask
+    from PySide6.QtCore import Qt
+    app = _MockApp()
+    px = app.doc.current.pixels
+    # Inhalt: maskierter Pixel (2,2) rot, unmaskierter (0,0) gruen
+    px.putpixel((2, 2), (255, 0, 0, 255))
+    px.putpixel((0, 0), (0, 255, 0, 255))
+    app.canvas.set_selection_mask(polygon_mask((8, 8), [(1, 1), (4, 1), (4, 4), (1, 4)]))
+    tool = LassoTool()
+    # Klick auf maskierten Pixel -> Float-Move um (+2, +2)
+    tool.begin(app, 2, 2, Qt.LeftButton)
+    tool.move(app, 4, 4)
+    tool.end(app, 4, 4)
+    out = app.doc.current.pixels
+    assert out.getpixel((4, 4)) == (255, 0, 0, 255)   # mit verschoben
+    assert out.getpixel((2, 2)) == (0, 0, 0, 0)       # Quelle geraeumt
+    assert out.getpixel((0, 0)) == (0, 255, 0, 255)   # unmaskiert bleibt
+    # Maske ist mitgewandert
+    mask = app.canvas.get_selection_mask()
+    assert mask is not None
+    assert mask.getpixel((4, 4)) == 255
+    assert mask.getpixel((1, 1)) == 0
+    # Ein Undo-Schritt (Snapshot beim Greifen)
+    assert app.doc.current.snapshot_count == 1
+
+
+def test_lasso_click_outside_mask_starts_new_path():
+    from gamebasic.spriteeditor.tools import LassoTool, polygon_mask
+    from PySide6.QtCore import Qt
+    app = _MockApp()
+    app.canvas.set_selection_mask(polygon_mask((8, 8), [(5, 5), (7, 5), (7, 7), (5, 7)]))
+    tool = LassoTool()
+    tool.begin(app, 0, 0, Qt.LeftButton)       # ausserhalb der Maske
+    tool.move(app, 3, 0)
+    tool.move(app, 0, 3)
+    tool.end(app, 0, 3)
+    mask = app.canvas.get_selection_mask()
+    assert mask is not None
+    assert mask.getpixel((1, 1)) == 255        # neue Auswahl
+    assert mask.getpixel((6, 6)) == 0          # alte ist ersetzt

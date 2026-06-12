@@ -389,6 +389,146 @@ class MagicWandTool(Tool):
         return out
 
 
+def polygon_mask(size: tuple[int, int], points: list[tuple[int, int]]) -> Image.Image:
+    """Baut eine 'L'-Maske (255 = selektiert) aus einem Freiform-Polygon.
+
+    Punkte ausserhalb des Bildes sind erlaubt (werden geclippt). Bei
+    weniger als 3 Punkten ist die Maske leer.
+    """
+    mask = Image.new("L", size, 0)
+    if len(points) >= 3:
+        d = ImageDraw.Draw(mask)
+        d.polygon(points, fill=255, outline=255)
+    return mask
+
+
+class LassoTool(Tool):
+    """Freiform-Auswahl (Lasso) mit echter Pixel-Maske.
+
+    Ziehen zeichnet einen Freiform-Pfad (Live-Vorschau); beim Loslassen
+    wird er zum Polygon geschlossen und als Maske selektiert -- Auswahl-
+    Operationen (Cut/Copy/Fuellen/Spiegeln/Loeschen) wirken dann nur auf
+    die maskierten Pixel. Klick IN eine bestehende Lasso-Auswahl greift
+    nur die maskierten Pixel und verschiebt sie (Float-Move wie beim
+    Auswahl-Tool, ein Undo-Schritt); die Maske wandert mit.
+    """
+    name = "lasso"
+    needs_snapshot = False
+
+    PATH_COLOR = (255, 216, 0, 255)   # wie die Marquee-Farbe
+
+    def __init__(self):
+        self._pts: list[tuple[int, int]] | None = None
+        # Float-Move-Zustand
+        self._moving = False
+        self._float_img = None     # maskierte Pixel (RGBA, bbox-gross)
+        self._float_mask = None    # Masken-Ausschnitt (L, bbox-gross)
+        self._float_pos = (0, 0)
+        self._grab_off = (0, 0)
+        self._base_img = None      # Frame ohne die maskierten Pixel
+
+    def begin(self, app, x, y, button):
+        mask = app.canvas.get_selection_mask()
+        if (mask is not None and 0 <= x < mask.width and 0 <= y < mask.height
+                and mask.getpixel((x, y))):
+            self._begin_move(app, mask, x, y)
+            return
+        self._pts = [(x, y)]
+        self._preview_path(app)
+
+    def move(self, app, x, y):
+        if self._moving:
+            self._float_pos = (x - self._grab_off[0], y - self._grab_off[1])
+            self._show_float(app)
+            return
+        if self._pts is None:
+            return
+        if self._pts[-1] != (x, y):
+            self._pts.append((x, y))
+            self._preview_path(app)
+
+    def end(self, app, x, y):
+        if self._moving:
+            self._end_move(app)
+            return
+        if self._pts is None:
+            return
+        pts, self._pts = self._pts, None
+        app.canvas.set_preview(None)
+        mask = polygon_mask((app.doc.width, app.doc.height), pts)
+        if mask.getbbox() is None:
+            app.statusBar().showMessage(
+                "Lasso: Bereich umfahren (mind. 3 Punkte), "
+                "Loslassen schliesst das Polygon", 3000)
+            return
+        app.canvas.set_selection_mask(mask)
+        from PySide6.QtGui import QCursor
+        app.show_selection_context_menu(QCursor.pos())
+
+    # --- Pfad-Vorschau waehrend des Aufziehens --------------------------
+
+    def _preview_path(self, app):
+        prev = app.doc.current.pixels.copy()
+        px = prev.load()
+        w, h = prev.size
+        pts = self._pts
+        for i in range(len(pts) - 1):
+            for lx, ly in _bresenham(*pts[i], *pts[i + 1]):
+                if 0 <= lx < w and 0 <= ly < h:
+                    px[lx, ly] = self.PATH_COLOR
+        if pts:
+            lx, ly = pts[0]
+            if 0 <= lx < w and 0 <= ly < h:
+                px[lx, ly] = self.PATH_COLOR
+        app.canvas.set_preview(prev)
+
+    # --- Float-Move der maskierten Pixel --------------------------------
+
+    def _begin_move(self, app, mask, x, y):
+        x0, y0, x1, y1 = mask.getbbox()
+        f = app.doc.current
+        f.snapshot()
+        self._float_mask = mask.crop((x0, y0, x1, y1))
+        region = f.pixels.crop((x0, y0, x1, y1))
+        float_img = Image.new("RGBA", region.size, (0, 0, 0, 0))
+        float_img.paste(region, (0, 0), self._float_mask)
+        self._float_img = float_img
+        base = f.pixels.copy()
+        base.paste((0, 0, 0, 0), (0, 0), mask)
+        self._base_img = base
+        self._float_pos = (x0, y0)
+        self._grab_off = (x - x0, y - y0)
+        self._moving = True
+        self._show_float(app)
+
+    def _show_float(self, app):
+        prev = self._base_img.copy()
+        prev.paste(self._float_img, self._float_pos, self._float_img)
+        app.canvas.set_preview(prev)
+
+    def _moved_mask(self, app) -> Image.Image:
+        moved = Image.new("L", (app.doc.width, app.doc.height), 0)
+        moved.paste(self._float_mask, self._float_pos)
+        return moved
+
+    def _end_move(self, app):
+        result = self._base_img
+        result.paste(self._float_img, self._float_pos, self._float_img)
+        app.doc.current.pixels = result
+        moved = self._moved_mask(app)
+        app.canvas.set_preview(None)
+        self._moving = False
+        self._float_img = None
+        self._float_mask = None
+        self._base_img = None
+        if moved.getbbox() is not None:
+            app.canvas.set_selection_mask(moved)
+        else:
+            app.canvas.clear_selection()
+        app.canvas.invalidate_all()
+        app.mark_dirty()
+
+
 class SelectTool(Tool):
     """Rechteck-Auswahl -- und Verschieben des Auswahl-INHALTS:
     Klick IN eine bestehende Auswahl greift die Pixel (Float), Ziehen
