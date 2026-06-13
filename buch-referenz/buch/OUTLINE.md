@@ -43,7 +43,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 18 Maps  (content/18_maps.js)
 - [x] 19 Tupel & Destructuring  (content/19_tupel.js)
 - [x] 20 Klassen & Objekte  (content/20_klassen.js)
-- [ ] 21 Vererbung, Properties, Operatoren, Static
+- [x] 21 Vererbung, Properties, Operatoren, Static  (content/21_oop_fortgeschritten.js)
 - [ ] 22 ENUM
 - [ ] 23 Comprehensions (List/Dict/Set)
 - [ ] 24 Fehlerbehandlung (TRY/CATCH/THROW)
@@ -96,7 +96,8 @@ Alias-Hinweis) + Kap 19 (Tupel & Destructuring: Literal (a,b,...), Index/length,
 unveränderlich, Destructuring (a,b)=tupel, mehrere Rückgabewerte, Tausch-Trick,
 FOR EACH) + Kap 20 (Klassen & Objekte: Bauplan/Objekt-Modell, CLASS+DIM-Felder,
 NEW, SUB Init/Self, Methoden SUB/FUNCTION, impliziter Methodenaufruf, viele
-unabhängige Objekte, Verweis-Semantik). 65 Seiten, alle Ausgaben gegen gbrt
-verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige
-Themen ausführlicher.
-**Nächstes:** Kap 21 (Vererbung, Properties, Operatoren, Static).
+unabhängige Objekte, Verweis-Semantik) + Kap 21 (Vererbung EXTENDS/Überschreiben/
+Polymorphie, Properties GET/SET, Operator-Überladung OPERATOR, STATIC CONST).
+71 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert. Ab
+Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 22 (ENUM).
