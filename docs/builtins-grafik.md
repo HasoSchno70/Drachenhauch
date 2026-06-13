@@ -355,7 +355,7 @@ WEND
 | `LOADSOUND(path$)` → SOUND | Sample laden (kurze Effekte: WAV, OGG) |
 | `PLAYSOUND(s[, loops[, volume]])` | abspielen, default loops=0, volume=1.0 |
 | `STOPSOUND(s)` | stoppen |
-| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen, default loops=-1 (endlos) |
+| `PLAYMUSIC(path$[, loops[, volume]])` | längere Datei streamen (`.ogg`/`.mp3`/`.qoa` **+ Tracker-Module `.mod`/`.xm`** — echter Amiga-Sound), default loops=-1 (endlos) |
 | `STOPMUSIC()` | stoppen |
 
 ```basic

@@ -135,6 +135,18 @@ Die native Runtime hat einen separaten Music-Channel fuer lange Tracks (laedt st
 | `AUDIO_MUSIC_BUSY()` → BOOLEAN | Spielt gerade? |
 | `AUDIO_MUSIC_QUEUE(path$)` | naechster Track, sobald der aktuelle endet |
 
+**Formate:** `.ogg`, `.mp3`, `.qoa` — **und Tracker-Module `.mod` (ProTracker/Amiga) + `.xm` (FastTracker II)**. Module enthalten ihre eigenen Samples + Pattern-Daten und werden von raylib direkt dekodiert (kein Zusatzcode), klingen also **exakt wie das Original** auf dem Amiga (4+ Kanaele, Sample-basiert). Einfach ein `.mod`/`.xm` (z.B. von [modarchive.org](https://modarchive.org)) laden:
+
+```basic
+AUDIO_MUSIC_LOAD("song.mod")
+AUDIO_MUSIC_PLAY(-1)               ' loopt -- echter Amiga-Sound
+
+' oder per Core-Builtin:
+PLAYMUSIC("song.xm", -1, 1.0)
+```
+
+`AUDIO_FFT` greift auch bei Modulmusik den laufenden Mix ab — ideal fuer reaktive Visualizer. Demo: [examples/115_modplayer.gb](../examples/115_modplayer.gb) (Modul-Player mit Spektrum + Drag&Drop fuers eigene Modul).
+
 **Crossfade zwischen Tracks:**
 
 ```basic
@@ -236,6 +248,8 @@ END IF
 [examples/68_audio.gb](../examples/68_audio.gb) demonstriert das volle Modul-API inklusive Tone-Generation, Pan, Music-Queue.
 
 [examples/114_chiptune.gb](../examples/114_chiptune.gb) — **4-Kanal-Chiptune-Demo im C64/Amiga-Stil**: ein komplettes Musikstueck ohne Audio-Dateien. Lead (Square + Vibrato via `AUDIO_SFX`, rechts gepannt), Akkord-Arpeggio (links), Square-Bass und Drums (Kick = Sinus-Pitch-Drop, Snare/HiHat = `AUDIO_NOISE`) laufen parallel auf dem Mixer; ein frame-basierter Pattern-Player (wie der gbtracker-Export) spielt alle 125 ms eine Reihe. Dazu VU-Meter pro Kanal, echtes `AUDIO_FFT`-Spektrum und Sinus-Scroller.
+
+[examples/115_modplayer.gb](../examples/115_modplayer.gb) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
 
 ## In der nativen Runtime (gbrt)
 
