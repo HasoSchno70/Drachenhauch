@@ -37,7 +37,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 12 Ein-/Ausgabe: PRINT, INPUT, f-Strings  (content/12_ein_ausgabe.js)
 - [x] 13 Verzweigungen: IF/ELSEIF/ELSE, SELECT CASE, IIF  (content/13_verzweigungen.js)
 - [x] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE  (content/14_schleifen.js)
-- [ ] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)
+- [x] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)  (content/15_funktionen.js)
 - [ ] 16 Strings im Detail
 - [ ] 17 Arrays
 - [ ] 18 Maps
@@ -87,6 +87,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.
 Session 2 (2026-06-13): Teil II Kap 12 (Ein-/Ausgabe) + Kap 13 (Verzweigungen:
 IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF) +
-Kap 14 (Schleifen: FOR/STEP, WHILE/WEND, REPEAT/UNTIL, FOR EACH, BREAK/CONTINUE,
-Verschachtelung). 33 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert.
-**Nächstes:** Kap 15 (Funktionen & SUBs: Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion).
+Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs: FUNCTION/RETURN, SUB, mehrere
+Parameter, BYREF, Defaults, Named Args, Variadic ..., FUNCREF, Rekursion).
+38 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert.
+**Nächstes:** Kap 16 (Strings im Detail).
