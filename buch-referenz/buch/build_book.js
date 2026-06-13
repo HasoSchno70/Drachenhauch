@@ -8,8 +8,12 @@ const {
   Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, HeadingLevel,
   BorderStyle, Table, TableRow, TableCell, WidthType, ShadingType, PageBreak,
   Footer, PageNumber, LevelFormat, InternalHyperlink,
-  Tab, TabStopType, LeaderType,
+  Tab, TabStopType, LeaderType, LineRuleType,
 } = require("docx");
+
+// Zeilenabstand fuer Fliesstext (~1,3) -- luftiger, besser lesbar.
+const LINE = 312;
+const SP = (after, opt = {}) => ({ after, line: LINE, lineRule: LineRuleType.AUTO, ...opt });
 
 const IMG = path.join(__dirname, "images");
 
@@ -39,7 +43,7 @@ function figure(name, caption, maxW = 480, maxH = 320) {
   let W = maxW, H = Math.round((maxW * h) / w);
   if (H > maxH) { H = maxH; W = Math.round((maxH * w) / h); }
   return [
-    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 40 },
+    new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 160, after: 40 }, keepNext: true,
       children: [new ImageRun({ type: "png", data: fs.readFileSync(file),
         transformation: { width: W, height: H },
         altText: { title: caption, description: caption, name } })] }),
@@ -50,22 +54,22 @@ function figure(name, caption, maxW = 480, maxH = 320) {
 
 // ---------------------------------------------------------------- Text
 function p(text, opts = {}) {
-  return new Paragraph({ spacing: { after: 140 }, ...opts,
+  return new Paragraph({ spacing: SP(180), ...opts,
     children: [new TextRun({ text, size: 22 })] });
 }
 // Absatz mit gemischtem Text + Inline-Code: parts = ["text", ["code", true], ...]
 function pmix(parts) {
-  return new Paragraph({ spacing: { after: 140 },
+  return new Paragraph({ spacing: SP(180),
     children: parts.map((x) => Array.isArray(x)
       ? new TextRun({ text: x[0], font: "Consolas", size: 21, color: "335577" })
       : new TextRun({ text: x, size: 22 })) });
 }
 function bullet(text) {
-  return new Paragraph({ numbering: { reference: "bul", level: 0 }, spacing: { after: 60 },
+  return new Paragraph({ numbering: { reference: "bul", level: 0 }, spacing: SP(100),
     children: [new TextRun({ text, size: 22 })] });
 }
 function bulletRich(boldText, rest) {
-  return new Paragraph({ numbering: { reference: "bul", level: 0 }, spacing: { after: 60 },
+  return new Paragraph({ numbering: { reference: "bul", level: 0 }, spacing: SP(100),
     children: [new TextRun({ text: boldText, bold: true, size: 22 }),
                new TextRun({ text: rest, size: 22 })] });
 }
@@ -76,13 +80,17 @@ function _box(title, text, bg, bd, titleColor) {
   const kids = [new Paragraph({ spacing: { after: text ? 40 : 0 },
     children: [new TextRun({ text: title, bold: true, color: titleColor, size: 22 })] })];
   if (text) (Array.isArray(text) ? text : [text]).forEach((t) =>
-    kids.push(new Paragraph({ children: [new TextRun({ text: t, size: 22 })] })));
-  return new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [9360],
-    rows: [new TableRow({ children: [new TableCell({
+    kids.push(new Paragraph({ spacing: SP(0), children: [new TextRun({ text: t, size: 22 })] })));
+  const table = new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [9360],
+    rows: [new TableRow({ cantSplit: true, children: [new TableCell({
       width: { size: 9360, type: WidthType.DXA },
       borders: { top: border, bottom: border, left: border, right: border },
       shading: { fill: bg, type: ShadingType.CLEAR },
-      margins: { top: 120, bottom: 120, left: 160, right: 160 }, children: kids })] })] });
+      margins: { top: 140, bottom: 140, left: 180, right: 180 }, children: kids })] })] });
+  // Tabellen haben kein Nachher-Abstand -> kleiner Abstandshalter, damit der
+  // folgende Text nicht klebt.
+  return [new Paragraph({ spacing: { before: 60 }, children: [] }), table,
+          new Paragraph({ spacing: { after: 160 }, children: [] })];
 }
 function tip(title, text) { return _box(title, text, "E7F2FA", "9CC8E6", C_ACCENT); }
 function note(text, title = "Merke") { return _box(title, text, "FDF3E0", "E0B96A", "9A6A1E"); }
@@ -97,11 +105,12 @@ function codeBlock(lines, opts = {}) {
   return new Paragraph({
     shading: { fill: bg, type: ShadingType.CLEAR },
     border: { left: { style: BorderStyle.SINGLE, size: 18, color: bd, space: 6 } },
-    spacing: { before: 80, after: 160 }, indent: { left: 120 },
+    spacing: { before: 100, after: 200, line: 264, lineRule: LineRuleType.AUTO },
+    indent: { left: 140 },
     keepLines: true, children: runs });
 }
 function smallLabel(text) {
-  return new Paragraph({ spacing: { before: 40, after: 20 },
+  return new Paragraph({ spacing: { before: 120, after: 30 }, keepNext: true,
     children: [new TextRun({ text, italics: true, bold: true, color: C_CAP, size: 18 })] });
 }
 
@@ -109,10 +118,10 @@ function smallLabel(text) {
 // cmd(name, syntax, desc, codeLines, {out, fig, caption})
 function cmd(name, syntax, desc, codeLines, opts = {}) {
   const out = [];
-  out.push(new Paragraph({ spacing: { before: 220, after: 30 }, keepNext: true,
+  out.push(new Paragraph({ spacing: { before: 360, after: 40 }, keepNext: true, keepLines: true,
     border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "DDD0C0", space: 2 } },
     children: [new TextRun({ text: name, bold: true, font: "Consolas", size: 24, color: C_CMD })] }));
-  if (syntax) out.push(new Paragraph({ spacing: { after: 80 },
+  if (syntax) out.push(new Paragraph({ spacing: { after: 120 }, keepNext: true,
     children: [new TextRun({ text: "Syntax:  ", bold: true, size: 18, color: C_CAP }),
                new TextRun({ text: syntax, font: "Consolas", size: 19, color: "335577" })] }));
   if (desc) (Array.isArray(desc) ? desc : [desc]).forEach((d) => out.push(p(d)));
@@ -133,9 +142,9 @@ function _heading(text, kind) {
       spacing: { before: 2600, after: 200 },
       children: [new TextRun({ text, bold: true, size: 52, color: C_PART })] });
   }
-  return new Paragraph({ heading: HeadingLevel.HEADING_1,
+  return new Paragraph({ heading: HeadingLevel.HEADING_1, keepNext: true, keepLines: true,
     ...(kind === "chapter" ? { pageBreakBefore: true } : {}),
-    spacing: kind === "chapter" ? { before: 0, after: 80 } : { before: 320, after: 80 },
+    spacing: kind === "chapter" ? { before: 0, after: 160 } : { before: 400, after: 140 },
     border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: C_ACCENT, space: 4 } },
     children: [new TextRun({ text })] });
 }
@@ -143,7 +152,8 @@ function h1(t) { return _heading(t, "h1"); }
 function chapter(t) { return _heading(t, "chapter"); }
 function part(t) { return _heading(t, "part"); }
 function h2(t) {
-  return new Paragraph({ heading: HeadingLevel.HEADING_2, children: [new TextRun({ text: t })] });
+  return new Paragraph({ heading: HeadingLevel.HEADING_2, keepNext: true, keepLines: true,
+    spacing: { before: 280, after: 120 }, children: [new TextRun({ text: t })] });
 }
 
 const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBlock,
