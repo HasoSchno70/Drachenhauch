@@ -3723,6 +3723,32 @@ impl<'p> Vm<'p> {
                 let path = gs(a, 0, "LOADSOUND")?.to_string();
                 Value::Int(self.audio_mut()?.load_sound(&path)?)
             }
+            "sample_load" => {
+                // SAMPLE_LOAD(path$) -> SAMPLE (Amiga-Stil-Sampler)
+                let path = gs(a, 0, "SAMPLE_LOAD")?.to_string();
+                Value::Int(self.audio_mut()?.sample_load(&path)?)
+            }
+            "sample_set_loop" => {
+                // SAMPLE_SET_LOOP(sample, start, end) -- Loop-Region in Frames
+                let idx = gi(a, 0, "SAMPLE_SET_LOOP")?;
+                let start = gi(a, 1, "SAMPLE_SET_LOOP")?;
+                let end = gi(a, 2, "SAMPLE_SET_LOOP")?;
+                self.audio_mut()?.sample_set_loop(idx, start, end)?;
+                Value::Nil
+            }
+            "sample_len" => {
+                // SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe
+                let idx = gi(a, 0, "SAMPLE_LEN")?;
+                Value::Float(self.audio_mut()?.sample_len(idx)?)
+            }
+            "sample_play" => {
+                // SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms]) -> AUDIO_CHANNEL
+                let idx = gi(a, 0, "SAMPLE_PLAY")?;
+                let semis = need_f(a, 1, "SAMPLE_PLAY")?;
+                let vol = if a.len() >= 3 { need_f(a, 2, "SAMPLE_PLAY")? } else { 1.0 };
+                let dur = if a.len() >= 4 { gi(a, 3, "SAMPLE_PLAY")? } else { 0 };
+                Value::Int(self.audio_mut()?.sample_play(idx, semis, vol, dur)?)
+            }
             "playsound" => {
                 // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
                 // (raylib-Sounds loopen nicht) -- SFX spielen einmal.

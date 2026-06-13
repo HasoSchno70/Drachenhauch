@@ -1,0 +1,163 @@
+' 116_sampler.gb -- Amiga-Stil-Sampler: EIN Sample, die ganze Klaviatur
+'
+' SAMPLE_PLAY spielt ein geladenes PCM-Sample bei beliebiger Tonhoehe ab,
+' indem es resampled wird -- hoehere Note = schneller abgespielt, genau wie
+' Paula auf dem Amiga. Aus einem einzigen Zupf-Sample (pluck.wav, A3) wird
+' so eine ganze Melodie ueber mehrere Oktaven.
+'
+'   smp = SAMPLE_LOAD("pluck.wav")
+'   SAMPLE_PLAY(smp, halbtoene, vol)      ' halbtoene relativ zum Grundton
+'
+' Diese Demo spielt automatisch eine Melodie + Begleitung (zwei Stimmen aus
+' DEMSELBEN Sample) und zeigt eine Klaviatur, die die aktiven Noten
+' hervorhebt. Mit der Maus kannst du selbst auf die Tasten klicken.
+'
+' ESC beendet.
+
+IMPORT "audio"
+
+SCREEN(640, 320, "GameBasic Sampler -- ein Sample, ganze Klaviatur", 2)
+SETFPS(60)
+
+DIM pluck AS SAMPLE
+pluck = SAMPLE_LOAD("assets/pluck.wav")
+
+' --- Melodie (Halbtoene relativ zum Sample-Grundton A3) + Reihen-Dauer ----
+CONST STEPMS = 200.0          ' 150 BPM 8tel
+DIM melody[32] AS INTEGER
+' a-Moll-Laeufchen, zwei Takte
+melody[0]=0  : melody[1]=3  : melody[2]=7  : melody[3]=12
+melody[4]=7  : melody[5]=3  : melody[6]=0  : melody[7]=3
+melody[8]=5  : melody[9]=8  : melody[10]=12: melody[11]=8
+melody[12]=5 : melody[13]=3 : melody[14]=0 : melody[15]=-2
+melody[16]=0 : melody[17]=3 : melody[18]=7 : melody[19]=10
+melody[20]=7 : melody[21]=3 : melody[22]=0 : melody[23]=-5
+melody[24]=-2: melody[25]=2 : melody[26]=5 : melody[27]=2
+melody[28]=-2: melody[29]=-5: melody[30]=0 : melody[31]=0
+
+' Bass: nur alle 4 Reihen, zwei Oktaven unter der Melodie-Wurzel
+DIM bassNote[8] AS INTEGER
+bassNote[0]=-24 : bassNote[1]=-19 : bassNote[2]=-17 : bassNote[3]=-19
+bassNote[4]=-24 : bassNote[5]=-17 : bassNote[6]=-19 : bassNote[7]=-22
+
+DIM seqi AS INTEGER
+DIM acc AS FLOAT
+seqi = 0
+acc = 0.0
+
+DIM activeSemi AS INTEGER       ' zuletzt gespielter Melodie-Halbton (Anzeige)
+activeSemi = -999
+DIM flash AS FLOAT
+flash = 0.0
+
+' Klaviatur-Layout: 25 Tasten von -12 bis +12 Halbtoene
+CONST KEY0 = -12
+CONST NKEYS = 25
+DIM whitePat[12] AS INTEGER     ' 1 = weisse Taste in der Oktave
+whitePat[0]=1:whitePat[1]=0:whitePat[2]=1:whitePat[3]=0:whitePat[4]=1
+whitePat[5]=1:whitePat[6]=0:whitePat[7]=1:whitePat[8]=0:whitePat[9]=1
+whitePat[10]=0:whitePat[11]=1
+
+FUNCTION IsWhite(semi AS INTEGER) AS BOOLEAN
+    DIM m AS INTEGER
+    m = ((semi MOD 12) + 12) MOD 12
+    RETURN whitePat[m] = 1
+END FUNCTION
+
+DIM t AS FLOAT
+DIM i AS INTEGER
+DIM kx AS INTEGER
+DIM mxp AS INTEGER
+DIM myp AS INTEGER
+DIM mdownPrev AS BOOLEAN
+mdownPrev = FALSE
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+
+    ' --- Sequencer: alle STEPMS eine Reihe ---------------------------
+    acc = acc + DELTA() * 1000.0
+    WHILE acc >= STEPMS
+        acc = acc - STEPMS
+        DIM mnote AS INTEGER
+        mnote = melody[seqi MOD 32]
+        SAMPLE_PLAY(pluck, mnote, 0.7)            ' Melodie-Stimme
+        activeSemi = mnote
+        flash = 1.0
+        IF seqi MOD 4 = 0 THEN
+            SAMPLE_PLAY(pluck, bassNote[(seqi \ 4) MOD 8], 0.6)   ' Bass-Stimme
+        END IF
+        seqi = seqi + 1
+    WEND
+
+    ' --- Maus: auf Klaviatur klicken ---------------------------------
+    mxp = MOUSEX()
+    myp = MOUSEY()
+    DIM mdown AS BOOLEAN
+    mdown = MOUSEBUTTON(0)
+    IF mdown AND NOT mdownPrev AND myp >= 150 AND myp <= 300 THEN
+        kx = (mxp - 20) \ 24
+        IF kx >= 0 AND kx < NKEYS THEN
+            DIM clicked AS INTEGER
+            clicked = KEY0 + kx
+            SAMPLE_PLAY(pluck, clicked, 0.8)
+            activeSemi = clicked
+            flash = 1.0
+        END IF
+    END IF
+    mdownPrev = mdown
+
+    ' --- Zeichnen ----------------------------------------------------
+    CLS(&H0C0A1A)
+    TEXT_SIZE(22)
+    DIM w AS INTEGER
+    w = TEXT_WIDTH("EIN SAMPLE -- GANZE KLAVIATUR")
+    TEXT(320 - w \ 2, 16, "EIN SAMPLE -- GANZE KLAVIATUR", HSV(INT(t * 70.0) MOD 360, 0.55, 1.0))
+    TEXT_SIZE(12)
+    TEXT(20, 48, "pluck.wav (A3) wird per SAMPLE_PLAY resampled -- Amiga/Paula-Prinzip", &H90A0C0)
+    TEXT(20, 66, "Auto-Melodie + Bass aus demselben Sample. Klick auf die Tasten = selbst spielen.", &H7080A0)
+
+    ' Aktiver Ton gross
+    flash = flash - DELTA() * 2.5
+    IF flash < 0.0 THEN flash = 0.0
+    TEXT_SIZE(34)
+    DIM lbl AS STRING
+    IF activeSemi > -999 THEN
+        lbl = "Halbton " + STR$(activeSemi)
+        w = TEXT_WIDTH(lbl)
+        TEXT(320 - w \ 2, 92, lbl, HSV(40, 0.7, 0.4 + flash * 0.6))
+    END IF
+
+    ' --- Klaviatur (weisse zuerst, dann schwarze darueber) -----------
+    TEXT_SIZE(10)
+    ' weisse Tasten
+    FOR i = 0 TO NKEYS - 1
+        DIM semi AS INTEGER
+        semi = KEY0 + i
+        IF IsWhite(semi) THEN
+            kx = 20 + i * 24
+            DIM col AS INTEGER
+            col = &HE8E8F0
+            IF semi = activeSemi THEN col = HSV(40, 0.8, 1.0)
+            BOX(kx, 150, kx + 22, 300, col)
+            RECT(kx, 150, kx + 22, 300, &H202030)
+        END IF
+    NEXT
+    ' schwarze Tasten (schmaler, oben)
+    FOR i = 0 TO NKEYS - 1
+        semi = KEY0 + i
+        IF NOT IsWhite(semi) THEN
+            kx = 20 + i * 24
+            DIM bcol AS INTEGER
+            bcol = &H181820
+            IF semi = activeSemi THEN bcol = HSV(20, 0.9, 0.9)
+            BOX(kx + 4, 150, kx + 18, 245, bcol)
+        END IF
+    NEXT
+    ' Grundton-Marke (A3 = Halbton 0)
+    kx = 20 + (0 - KEY0) * 24
+    TEXT(kx, 304, "A3", &HFFC040)
+
+    FLIP()
+WEND

@@ -447,6 +447,30 @@
    "module": "audio"
   },
   {
+   "name": "SAMPLE_LOAD",
+   "kind": "core",
+   "signature": "SAMPLE_LOAD(pfad$)",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_PLAY",
+   "kind": "core",
+   "signature": "SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_SET_LOOP",
+   "kind": "core",
+   "signature": "SAMPLE_SET_LOOP(sample, start, end)",
+   "module": "audio"
+  },
+  {
+   "name": "SAMPLE_LEN",
+   "kind": "core",
+   "signature": "SAMPLE_LEN(sample)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_VOLUME",
    "kind": "core",
    "signature": "AUDIO_VOLUME(ch, v)",

@@ -36,7 +36,7 @@ const MODULES: &[&str] = &[
 const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("animfsm", &["anim_fsm"]),
     ("astar", &["astar_grid"]),
-    ("audio", &["audio_channel"]),
+    ("audio", &["audio_channel", "sample"]),
     ("bt", &["bt_handle"]),
     ("controller", &["char_controller", "tiled_map"]),
     ("db", &["db_conn", "db_result"]),

@@ -191,11 +191,60 @@ PLAYSOUND(explosion)
 
 Generierte Sounds haben automatisch ein kurzes Fade-in/out (5 ms) gegen Clicks am Anfang/Ende.
 
+## Sampler (Amiga-Stil): `SAMPLE_*`
+
+Ein geladenes PCM-Sample ueber die **ganze Klaviatur** spielen, indem es
+resampled wird -- hoehere Note = schneller abgespielt, genau wie **Paula** auf
+dem Amiga (und wie MOD/XM-Tracker es machen). Aus einem einzigen Zupf-/Bass-/
+Drum-Sample wird so ein ganzes Instrument.
+
+| Funktion | Wirkung |
+|---|---|
+| `SAMPLE_LOAD(pfad$)` → SAMPLE | WAV/OGG/QOA laden, auf Mono normalisiert |
+| `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])` → AUDIO_CHANNEL | bei relativer Tonhoehe abspielen |
+| `SAMPLE_SET_LOOP(sample, start, end)` | Loop-Region in Frames (fuer gehaltene Noten) |
+| `SAMPLE_LEN(sample)` → FLOAT | Laenge in Sekunden bei Originaltonhoehe |
+
+`halbtoene` ist relativ zur Originaltonhoehe des Samples: `0` = wie aufgenommen,
+`12` = eine Oktave hoeher, `-12` = eine Oktave tiefer (auch krumme/Float-Werte).
+`dur_ms <= 0` spielt das **ganze Sample einmal** (One-Shot -- ideal fuer Drums,
+Hits, Plucks). `dur_ms > 0` baut einen Klang fester Laenge: ist via
+`SAMPLE_SET_LOOP` eine Loop-Region gesetzt, wird sie wiederholt (gehaltene
+Note), sonst folgt nach dem Sample-Ende Stille.
+
+Resampelte Varianten werden **gecacht** (pro `sample`/`halbtoene`/`dur_ms`),
+ein wiederholter Ton ist also guenstig -- gut fuer Tracker-artige Player.
+Der Rueckgabewert ist ein `AUDIO_CHANNEL` -- damit gehen `AUDIO_PAN`,
+`AUDIO_VOLUME`, `AUDIO_STOP` usw. wie bei `AUDIO_PLAY`.
+
+```basic
+IMPORT "audio"
+DIM pluck AS SAMPLE
+pluck = SAMPLE_LOAD("assets/pluck.wav")     ' Grundton z.B. A3
+
+SAMPLE_PLAY(pluck, 0, 0.8)                  ' Originaltonhoehe
+SAMPLE_PLAY(pluck, 12, 0.8)                 ' eine Oktave hoeher
+SAMPLE_PLAY(pluck, -5, 0.6)                 ' eine Quarte tiefer
+
+' Gehaltener Ton mit Loop (z.B. Frames 2000..8000 der Quelle):
+SAMPLE_SET_LOOP(pluck, 2000, 8000)
+SAMPLE_PLAY(pluck, 0, 0.7, 1000)            ' 1 s, Loop-Region gehalten
+```
+
+Demo: [examples/116_sampler.gb](../examples/116_sampler.gb) — ein Zupf-Sample
+spielt eine Melodie + Bass ueber die ganze Klaviatur (anklickbar).
+
+> **Sample vs. Modul:** `SAMPLE_*` ist die Live-Primitive, um eigene Samples
+> tonhoehen-variabel zu triggern (Sequencer, Instrumente, SFX-Varianten). Wer
+> ein fertiges Tracker-Stueck will, spielt ein `.mod`/`.xm` ueber `PLAYMUSIC`
+> (siehe oben) -- das bringt seine Samples + Patterns selbst mit.
+
 ## Externer Typ
 
 | Typ | Wirkung |
 |---|---|
-| `AUDIO_CHANNEL` | Handle auf einen Mixer-Channel (Returnwert von `AUDIO_PLAY`) |
+| `AUDIO_CHANNEL` | Handle auf einen Mixer-Channel (Returnwert von `AUDIO_PLAY`/`SAMPLE_PLAY`) |
+| `SAMPLE` | Handle auf ein geladenes PCM-Sample (Returnwert von `SAMPLE_LOAD`) |
 
 `SOUND` kommt aus Core — `LOADSOUND` und `AUDIO_TONE`/`AUDIO_NOISE` liefern beide ein SOUND. Untereinander austauschbar.
 
@@ -250,6 +299,8 @@ END IF
 [examples/114_chiptune.gb](../examples/114_chiptune.gb) — **4-Kanal-Chiptune-Demo im C64/Amiga-Stil**: ein komplettes Musikstueck ohne Audio-Dateien. Lead (Square + Vibrato via `AUDIO_SFX`, rechts gepannt), Akkord-Arpeggio (links), Square-Bass und Drums (Kick = Sinus-Pitch-Drop, Snare/HiHat = `AUDIO_NOISE`) laufen parallel auf dem Mixer; ein frame-basierter Pattern-Player (wie der gbtracker-Export) spielt alle 125 ms eine Reihe. Dazu VU-Meter pro Kanal, echtes `AUDIO_FFT`-Spektrum und Sinus-Scroller.
 
 [examples/115_modplayer.gb](../examples/115_modplayer.gb) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
+
+[examples/116_sampler.gb](../examples/116_sampler.gb) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten.
 
 ## In der nativen Runtime (gbrt)
 

@@ -11,10 +11,21 @@
 //! halten, ohne ein self-referential struct zu bauen.
 #![cfg(feature = "graphics")]
 
+use std::collections::HashMap;
 use std::os::raw::{c_uint, c_void};
 use std::sync::Mutex;
 
 use raylib::core::audio::{Music, RaylibAudio, Sound};
+
+/// Ein geladenes PCM-Sample (mono, normalisiert [-1,1]) fuer den Amiga-Stil-
+/// Sampler `SAMPLE_*`. Wiedergabe erfolgt resampled (Tonhoehe = Geschwindigkeit,
+/// genau wie Paula): `SAMPLE_PLAY(sample, halbtoene, vol)`.
+struct Sample {
+    data: Vec<f32>,      // mono PCM, [-1,1]
+    sr: u32,             // Quell-Sample-Rate
+    loop_start: usize,   // Loop-Region (Frames); aktiv wenn loop_end > loop_start
+    loop_end: usize,
+}
 
 const TWO_PI: f32 = std::f32::consts::TAU;
 const RING: usize = 4096;     // Ringpuffer fuer Mono-Samples (vom Audio-Thread)
@@ -154,6 +165,8 @@ pub struct Audio {
     num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
     bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
+    samples: Vec<Sample>,                       // SAMPLE_LOAD-Pool
+    sample_cache: HashMap<(usize, i64, i64), i64>, // (sample, centi-halbtoene, dur_ms) -> Sound-Handle
 }
 
 impl Audio {
@@ -171,7 +184,102 @@ impl Audio {
             ch_pan_anim: Vec::new(),
             num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
+            samples: Vec::new(), sample_cache: HashMap::new(),
         })
+    }
+
+    // -- Amiga-Stil-Sampler (SAMPLE_LOAD / SAMPLE_PLAY) --
+    //
+    // Ein geladenes PCM-Sample wird ueber die ganze Klaviatur gespielt,
+    // indem es resampled wird (hoehere Note = schneller abgespielt = hoeher --
+    // genau wie Paula auf dem Amiga). Resampelte Varianten werden gecacht.
+
+    /// SAMPLE_LOAD(path$) -> SAMPLE: WAV/OGG/QOA laden, auf mono normalisieren.
+    pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let mut wave = self.dev.new_wave(&resolved)
+            .map_err(|e| format!("SAMPLE_LOAD: {}", e))?;
+        let sr = wave.sample_rate();
+        wave.format(sr as i32, 16, 1);          // mono, gleiche Rate behalten
+        let data: Vec<f32> = wave.load_samples().as_ref().to_vec();
+        if data.is_empty() {
+            return Err("SAMPLE_LOAD: Sample ist leer".into());
+        }
+        self.samples.push(Sample { data, sr, loop_start: 0, loop_end: 0 });
+        Ok((self.samples.len() - 1) as i64)
+    }
+
+    /// SAMPLE_SET_LOOP(sample, start, end): Loop-Region in Frames der Quelle.
+    /// Wirkt nur bei `SAMPLE_PLAY` mit Dauer (sustained note).
+    pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64) -> Result<(), String> {
+        let s = self.samples.get_mut(idx as usize)
+            .ok_or_else(|| format!("SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}", idx))?;
+        let n = s.data.len();
+        let start = start.max(0) as usize;
+        let end = (end.max(0) as usize).min(n);
+        if end <= start {
+            return Err("SAMPLE_SET_LOOP: end muss > start sein".into());
+        }
+        s.loop_start = start;
+        s.loop_end = end;
+        // Cache invalidieren -- Loop aendert gebaute Buffer.
+        self.sample_cache.retain(|k, _| k.0 != idx as usize);
+        Ok(())
+    }
+
+    /// SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe.
+    pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
+        let s = self.samples.get(idx as usize)
+            .ok_or_else(|| format!("SAMPLE_LEN: ungueltiges SAMPLE-Handle {}", idx))?;
+        Ok(s.data.len() as f64 / s.sr as f64)
+    }
+
+    /// SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms]) -> AUDIO_CHANNEL.
+    /// `halbtoene` verschiebt die Tonhoehe relativ zum Original (12 = Oktave
+    /// hoeher). `dur_ms<=0` = ganzes Sample einmal (One-Shot, fuer Drums/Hits);
+    /// `dur_ms>0` = auf diese Laenge gebaut (mit Loop-Region wird geloopt,
+    /// sonst danach Stille) -- fuer gehaltene Noten.
+    pub fn sample_play(&mut self, sidx: i64, semitones: f64, volume: f64,
+                       dur_ms: i64) -> Result<i64, String> {
+        let si = sidx as usize;
+        if si >= self.samples.len() {
+            return Err(format!("SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}", sidx));
+        }
+        let ratio = 2f64.powf(semitones / 12.0);
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err("SAMPLE_PLAY: ungueltige Tonhoehe".into());
+        }
+        let v = volume.clamp(0.0, 1.0) as f32;
+        let key = (si, (semitones * 100.0).round() as i64, dur_ms);
+        if let Some(&snd) = self.sample_cache.get(&key) {
+            let s = self.snd(snd, "SAMPLE_PLAY")?;
+            s.set_volume(v);
+            s.play();
+            self.reset_channel_state(snd as usize, v);
+            return Ok(snd);
+        }
+        let sr = self.samples[si].sr;
+        let buf = self.build_resampled(si, ratio, dur_ms);
+        if buf.is_empty() {
+            return Err("SAMPLE_PLAY: leeres Sample".into());
+        }
+        // vol=1.0 in den Buffer backen, Laufstaerke per set_volume -> Cache
+        // ist lautstaerke-unabhaengig.
+        let snd = self.push_wave_sound(&buf, 1.0, sr)?;
+        self.sample_cache.insert(key, snd);
+        let s = self.snd(snd, "SAMPLE_PLAY")?;
+        s.set_volume(v);
+        s.play();
+        self.reset_channel_state(snd as usize, v);
+        Ok(snd)
+    }
+
+    /// Resampling mit linearer Interpolation. One-Shot (dur_ms<=0) spielt das
+    /// ganze Sample bei `ratio`; mit Dauer wird ein Buffer fester Laenge
+    /// gebaut, der die Loop-Region wiederholt (falls gesetzt).
+    fn build_resampled(&self, si: usize, ratio: f64, dur_ms: i64) -> Vec<f64> {
+        let s = &self.samples[si];
+        resample(&s.data, s.sr, ratio, dur_ms, s.loop_start, s.loop_end)
     }
 
     /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1) aus dem
@@ -842,9 +950,118 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
     buf
 }
 
+/// Resampling eines Mono-Samples mit linearer Interpolation (pur -- ohne
+/// Audio-Geraet, daher unit-testbar). `ratio` = Schrittweite durch das
+/// Quell-Sample pro Ausgabe-Sample: >1 = hoehere Tonhoehe (schneller,
+/// kuerzer), <1 = tiefer. `dur_ms<=0` spielt das ganze Sample einmal;
+/// `dur_ms>0` baut eine feste Laenge, die die Loop-Region wiederholt
+/// (aktiv wenn loop_end>loop_start), sonst danach Stille.
+fn resample(data: &[f32], sr: u32, ratio: f64, dur_ms: i64,
+            loop_start: usize, loop_end: usize) -> Vec<f64> {
+    let n = data.len();
+    if n == 0 { return Vec::new(); }
+    let lerp = |pos: f64| -> f64 {
+        let i = pos.floor() as usize;
+        if i + 1 >= n {
+            return *data.get(i.min(n - 1)).unwrap_or(&0.0) as f64;
+        }
+        let frac = pos - i as f64;
+        (data[i] as f64) * (1.0 - frac) + (data[i + 1] as f64) * frac
+    };
+    if dur_ms <= 0 {
+        let out_len = ((n as f64) / ratio).floor() as usize;
+        let mut out = Vec::with_capacity(out_len);
+        let mut pos = 0.0;
+        for _ in 0..out_len { out.push(lerp(pos)); pos += ratio; }
+        out
+    } else {
+        let out_len = (sr as f64 * dur_ms as f64 / 1000.0) as usize;
+        let loop_on = loop_end > loop_start;
+        let (ls, le) = (loop_start as f64, loop_end as f64);
+        let mut out = Vec::with_capacity(out_len);
+        let mut pos = 0.0;
+        for _ in 0..out_len {
+            if loop_on && pos >= le {
+                let span = le - ls;
+                pos = ls + ((pos - ls) % span);
+            } else if !loop_on && pos >= n as f64 {
+                out.push(0.0);
+                continue;
+            }
+            out.push(lerp(pos));
+            pos += ratio;
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{fade_progress, pendulum_pos};
+    use super::{fade_progress, pendulum_pos, resample};
+
+    #[test]
+    fn resample_octave_up_halves_length() {
+        // 100 Samples, +1 Oktave (ratio 2) -> halbe Laenge (One-Shot).
+        let data: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
+        let out = resample(&data, 44100, 2.0, 0, 0, 0);
+        assert_eq!(out.len(), 50);
+        // lineare Rampe bei Schrittweite 2 -> jedes 2. Element
+        assert!((out[1] - 0.02).abs() < 1e-6);
+        assert!((out[10] - 0.20).abs() < 1e-6);
+    }
+
+    #[test]
+    fn resample_octave_down_doubles_length() {
+        let data: Vec<f32> = (0..50).map(|i| i as f32).collect();
+        let out = resample(&data, 44100, 0.5, 0, 0, 0);
+        assert_eq!(out.len(), 100);
+        // Schrittweite 0.5 -> Zwischenwerte interpoliert
+        assert!((out[2] - 1.0).abs() < 1e-6);   // pos=1.0
+        assert!((out[3] - 1.5).abs() < 1e-6);   // pos=1.5 interpoliert
+    }
+
+    #[test]
+    fn resample_unity_is_identity() {
+        let data: Vec<f32> = vec![0.1, -0.2, 0.3, -0.4];
+        let out = resample(&data, 8000, 1.0, 0, 0, 0);
+        assert_eq!(out.len(), 4);
+        for (a, b) in out.iter().zip(data.iter()) {
+            assert!((a - *b as f64).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn resample_duration_with_loop_repeats_region() {
+        // 4 Frames, Loop ueber [1,3) -> bei Dauer wiederholt sich {1,2}.
+        let data: Vec<f32> = vec![10.0, 20.0, 30.0, 40.0];
+        // sr=1000, dur=10ms -> 10 Output-Frames; ratio=1
+        let out = resample(&data, 1000, 1.0, 10, 1, 3);
+        assert_eq!(out.len(), 10);
+        // 0:10, 1:20, 2:30, dann Loop zurueck auf 1: 20,30,20,30,...
+        assert!((out[0] - 10.0).abs() < 1e-6);
+        assert!((out[1] - 20.0).abs() < 1e-6);
+        assert!((out[2] - 30.0).abs() < 1e-6);
+        assert!((out[3] - 20.0).abs() < 1e-6);   // gewrappt
+        assert!((out[4] - 30.0).abs() < 1e-6);
+        assert!((out[5] - 20.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn resample_duration_without_loop_pads_silence() {
+        let data: Vec<f32> = vec![0.5, 0.5];
+        // 2 Frames, kein Loop, Dauer fuer 6 Frames -> Rest Stille
+        let out = resample(&data, 1000, 1.0, 6, 0, 0);
+        assert_eq!(out.len(), 6);
+        assert!((out[0] - 0.5).abs() < 1e-6);
+        assert!((out[1] - 0.5).abs() < 1e-6);
+        assert_eq!(out[3], 0.0);
+        assert_eq!(out[5], 0.0);
+    }
+
+    #[test]
+    fn resample_empty_is_empty() {
+        assert!(resample(&[], 44100, 1.0, 0, 0, 0).is_empty());
+    }
 
     #[test]
     fn fade_progress_clamps_and_interpolates() {

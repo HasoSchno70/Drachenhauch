@@ -108,3 +108,15 @@ def test_pitch_validation(run_gb):
     out = run_gb(src)
     assert "AUDIO_PITCH: faktor muss > 0 sein" in out
     assert "AUDIO_MUSIC_PITCH: faktor muss > 0 sein" in out
+
+
+def test_sample_type_compiles(run_gb):
+    # SAMPLE ist ein externer Typ des audio-Moduls. DIM ... AS SAMPLE
+    # initialisiert KEIN Audio-Geraet -> headless golden-testbar (verifiziert
+    # die Typ-Verdrahtung preprocess MODULE_TYPES + Compiler).
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'DIM s AS SAMPLE',
+        'PRINT "sample-typ ok"',
+    ])
+    assert "sample-typ ok" in run_gb(src)
