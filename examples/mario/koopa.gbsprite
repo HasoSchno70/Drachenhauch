@@ -1,0 +1,25 @@
+{
+  "version": 5,
+  "width": 16,
+  "height": 16,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAtklEQVR4nGNkwAHe9Kj8h7FFSu4w4lLHiEszi4sNnP9nzxG8hmCADxcS/v/69eu/iIzAfxAbhBlwACZcEt+upTEQAxhx+R3ZCwIGC4gLA48NDhhO3RFwAK/fGdE1PzjwAi6p4CBB0CAmdM1v1kAwOsDmOrgByJphAMRGdg1RsSASIoHBJmQIC7J/QYqRDYGJkxSIuACh2GAAAfRURygVggDcCyAASvP4+NgAPBCRcx86wCdHMQAA55BjBOLrgasAAAAASUVORK5CYII=",
+      "duration_ms": 120,
+      "name": "walk0"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAs0lEQVR4nGNkwAHe9Kj8h7FFSu4w4lLHiEszi4sNnP9nzxG8hmCADxcS/v/69eu/iIzAfxAbhBlwACZcEt+upTEQAxhx+R3ZCwIGC4gLA48NDhhO3RFwAK/fGdE1PzjwAi6p4CBB0CAmdM1v1kAwOsDmOrgByJphAMRGdg1RsSASIoHBJmQIC7J/QYqRDYGJkxSIuACuQGREF0BPdfjSAAYAJSLkTITOxwbggYhPISFDKAIAtehf+QdggfwAAAAASUVORK5CYII=",
+      "duration_ms": 120,
+      "name": "walk1"
+    }
+  ],
+  "anims": [
+    {
+      "name": "walk",
+      "first": 0,
+      "last": 1,
+      "fps": 5
+    }
+  ]
+}

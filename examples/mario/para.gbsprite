@@ -1,0 +1,25 @@
+{
+  "version": 5,
+  "width": 16,
+  "height": 16,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAtklEQVR4nGNgoBb49evXfxAmVZ4JJomsEJtmXPIs2GzLsBD6rycnQJTLmUAEGxsbI0wgz06CAV0zSAwGkNWCACOxNl969IFhxol3KOpRDJgWpgT2W8qSGwxyYmIMdW5CYPGmXe8YHr16xTAnRgPMz1p1jxHDC5QARnQXwADIZhCAuQQG0F3AguxHZP+ja4SpwekCEHhypAdnQgIBGZsSjEBkYqA28NMR+A/CuPh4XYBPIT65gQUAhOZSRuS17dcAAAAASUVORK5CYII=",
+      "duration_ms": 120,
+      "name": "fly0"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAvklEQVR4nGNggIJfv379B2EGHICQPF5F+DSzIHPY2NgYQQozLIT+68kJMKDLYTOACd2mPDsJBnTNIDFcLmBE5mCzGQYuPfrAMOPEOwxXMMIY08KUwDakLLnBICcmxlDnJgQWb9r1juHRq1cMc2I0wPysVfcYcXqBHMCI7gIYANkMAjCXwAC6C1iQ/Yjsf3SNMDU4XQACT4704E0oMjYlGIHIxEAhYEQX8NMRwOqKTVc+YE1IDOiasRmAS3yYAABepF74f6LacAAAAABJRU5ErkJggg==",
+      "duration_ms": 120,
+      "name": "fly1"
+    }
+  ],
+  "anims": [
+    {
+      "name": "fly",
+      "first": 0,
+      "last": 1,
+      "fps": 7
+    }
+  ]
+}
