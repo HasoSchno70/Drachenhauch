@@ -25,6 +25,77 @@ use kira::{
     sound::FromFileError,
     track::MainTrackBuilder,
 };
+use xmrs::prelude::Module;
+use xmrsplayer::prelude::XmrsPlayer;
+
+/// Woher die aktuelle Musik kommt: Stream-Datei (ogg/mp3/wav/flac) oder ein
+/// zu PCM gerendertes Tracker-Modul (.mod/.xm/.s3m/.it). Beim (Neu-)Starten
+/// baut start_music daraus die passende Kira-Sound-Quelle.
+enum MusicSource {
+    Stream(String),          // Pfad -- bei jedem Play frisch geoeffnet (streamt von Platte)
+    Module(StaticSoundData), // ein gerenderter Loop-Durchlauf (im RAM, loopt via loop_region)
+}
+
+/// Laufende Musik-Instanz. Beide Handle-Typen teilen dieselbe Methoden-API
+/// (state/position/pause/resume/stop/set_volume/set_playback_rate) -> das
+/// `on_music!`-Makro ruft sie einheitlich.
+enum MusicHandle {
+    Stream(StreamingSoundHandle<FromFileError>),
+    Static(StaticSoundHandle),
+}
+
+/// Rendert ein Tracker-Modul zu einem Loop-Durchlauf (mono->stereo PCM bei
+/// 44100; Kira resampelt beim Abspielen aufs Geraet). Modul + Player sind
+/// lokal -> kein Lifetime-Leak. 5-Minuten-Sicherheitskappe.
+fn render_module(bytes: &[u8], fn_: &str) -> Result<StaticSoundData, String> {
+    let sr: u32 = 44100;
+    let module = Module::load(bytes).map_err(|e| format!("{}: {:?}", fn_, e))?;
+    let mut player = XmrsPlayer::new(&module, sr, 0);
+    player.set_max_loop_count(1);          // genau ein Durchlauf -> danach loopt Kira
+    let cap = (sr as usize) * 60 * 5;
+    let mut frames: Vec<Frame> = Vec::new();
+    {
+        let mut it = player.by_ref();
+        while frames.len() < cap {
+            match (it.next(), it.next()) {
+                (Some(l), Some(r)) => frames.push(Frame {
+                    left: l as f32 / 32768.0, right: r as f32 / 32768.0,
+                }),
+                _ => break,
+            }
+        }
+    }
+    if frames.is_empty() { return Err(format!("{}: Modul ergab kein Audio", fn_)); }
+    Ok(StaticSoundData {
+        sample_rate: sr, frames: frames.into(),
+        settings: StaticSoundSettings::new(), slice: None,
+    })
+}
+
+fn is_module_path(p: &str) -> bool {
+    let l = p.to_lowercase();
+    l.ends_with(".mod") || l.ends_with(".xm") || l.ends_with(".s3m") || l.ends_with(".it")
+}
+
+// Einheitliche Steuerung beider MusicHandle-Varianten (identische Methoden-API).
+fn mh_stop(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.stop(t), MusicHandle::Static(x) => x.stop(t) }
+}
+fn mh_pause(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.pause(t), MusicHandle::Static(x) => x.pause(t) }
+}
+fn mh_resume(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.resume(t), MusicHandle::Static(x) => x.resume(t) }
+}
+fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.set_volume(d, t), MusicHandle::Static(x) => x.set_volume(d, t) }
+}
+fn mh_set_rate(h: &mut MusicHandle, r: f64, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.set_playback_rate(r, t), MusicHandle::Static(x) => x.set_playback_rate(r, t) }
+}
+fn mh_state(h: &MusicHandle) -> PlaybackState {
+    match h { MusicHandle::Stream(x) => x.state(), MusicHandle::Static(x) => x.state() }
+}
 
 const TWO_PI: f32 = std::f32::consts::TAU;
 const PI64: f64 = std::f64::consts::PI;
@@ -149,9 +220,9 @@ pub struct Audio {
     lofi: bool,
     lofi_bits: u32,
     lofi_cutoff: f64,
-    // Musik (genau ein Stream gleichzeitig)
-    music_path: Option<String>,
-    music: Option<StreamingSoundHandle<FromFileError>>,
+    // Musik (genau eine gleichzeitig)
+    music_source: Option<MusicSource>,
+    music_handle: Option<MusicHandle>,
     music_vol: f32,
     music_pitch: f32,
     music_loops: i64,         // verbleibende Wiederholungen; -1 endlos
@@ -172,7 +243,7 @@ impl Audio {
             sample_cache: HashMap::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
-            music_path: None, music: None, music_vol: 1.0, music_pitch: 1.0,
+            music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
             music_loops: -1, music_queue: None, music_paused: false,
         })
     }
@@ -552,18 +623,26 @@ impl Audio {
     }
 
     // ================= Musik =================
+    // Stream-Formate (ogg/mp3/wav/flac) streamen von Platte; Tracker-Module
+    // (.mod/.xm/.s3m/.it) werden beim Laden EINMAL zu PCM gerendert (ein
+    // Loop-Durchlauf) und im RAM via loop_region nahtlos geloopt -> volle
+    // Steuerung (Volume/Pitch/Pause/Position) gratis ueber den Sound-Handle.
+
     pub fn music_load(&mut self, path: &str) -> Result<(), String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let lower = resolved.to_lowercase();
-        if lower.ends_with(".mod") || lower.ends_with(".xm") || lower.ends_with(".s3m") || lower.ends_with(".it") {
-            return Err("AUDIO_MUSIC_LOAD: Modul-Streaming (.mod/.xm) kommt im Kira-Backend in Etappe 2".into());
-        }
-        // Stream testweise oeffnen (Fehler frueh melden), Handle aber erst bei play.
-        StreamingSoundData::from_file(&resolved)
-            .map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
-        if let Some(h) = self.music.as_mut() { h.stop(tween_now()); }
-        self.music = None;
-        self.music_path = Some(resolved);
+        let source = if is_module_path(&resolved) {
+            let bytes = std::fs::read(&resolved)
+                .map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
+            MusicSource::Module(render_module(&bytes, "AUDIO_MUSIC_LOAD")?)
+        } else {
+            // Stream testweise oeffnen (Fehler frueh melden).
+            StreamingSoundData::from_file(&resolved)
+                .map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            MusicSource::Stream(resolved)
+        };
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        self.music_handle = None;
+        self.music_source = Some(source);
         self.music_queue = None;
         self.music_loops = -1;
         self.music_paused = false;
@@ -571,20 +650,31 @@ impl Audio {
     }
 
     fn start_music(&mut self, vol: f32, loops: i64, fade_in_ms: i64) -> Result<(), String> {
-        let path = match &self.music_path { Some(p) => p.clone(), None => return Ok(()) };
-        if let Some(h) = self.music.as_mut() { h.stop(tween_now()); }
-        let mut settings = StaticSoundSettings::new();  // streaming nutzt eigenes Settings-Builder-Muster
-        let _ = &mut settings;
-        let data = StreamingSoundData::from_file(&path)
-            .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
-        let data = if loops < 0 { data.loop_region(0.0..) } else { data };
-        let data = data.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol as f64) });
-        let data = data.playback_rate(self.music_pitch as f64);
-        let mut handle = self.manager.play(data)
-            .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
-        if fade_in_ms > 0 { handle.set_volume(db(vol as f64), tween_ms(fade_in_ms)); }
-        self.music = Some(handle);
-        self.music_loops = if loops < 0 { -1 } else { loops };
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        let vol_db = if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol as f64) };
+        let pitch = self.music_pitch as f64;
+        let endless = loops < 0;
+        let mut handle = match self.music_source.as_ref() {
+            None => return Ok(()),
+            Some(MusicSource::Stream(path)) => {
+                let mut data = StreamingSoundData::from_file(path)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
+                if endless { data = data.loop_region(0.0..); }
+                data = data.volume(vol_db).playback_rate(pitch);
+                MusicHandle::Stream(self.manager.play(data)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            }
+            Some(MusicSource::Module(rendered)) => {
+                let mut settings = StaticSoundSettings::new().volume(vol_db).playback_rate(pitch);
+                if endless { settings = settings.loop_region(0.0..); }
+                let data = rendered.clone().with_settings(settings);
+                MusicHandle::Static(self.manager.play(data)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            }
+        };
+        if fade_in_ms > 0 { mh_set_volume(&mut handle, db(vol as f64), tween_ms(fade_in_ms)); }
+        self.music_handle = Some(handle);
+        self.music_loops = if endless { -1 } else { loops };
         self.music_paused = false;
         Ok(())
     }
@@ -595,40 +685,51 @@ impl Audio {
         self.start_music(self.music_vol, -1, 0)
     }
     pub fn stop_music(&mut self) {
-        if let Some(h) = self.music.as_mut() { h.stop(tween_now()); }
-        self.music = None;
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        self.music_handle = None;
     }
     pub fn music_play(&mut self, loops: i64, fade_in_ms: i64) {
         let v = self.music_vol;
         let _ = self.start_music(v, loops, fade_in_ms);
     }
     pub fn music_stop(&mut self, fade_out_ms: i64) {
-        if let Some(h) = self.music.as_mut() {
-            h.stop(if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
+        if let Some(h) = self.music_handle.as_mut() {
+            mh_stop(h, if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
         }
-        if fade_out_ms <= 0 { self.music = None; }
+        if fade_out_ms <= 0 { self.music_handle = None; }
     }
     pub fn music_pause(&mut self) {
-        if let Some(h) = self.music.as_mut() { h.pause(tween_now()); self.music_paused = true; }
+        if let Some(h) = self.music_handle.as_mut() { mh_pause(h, tween_now()); self.music_paused = true; }
     }
     pub fn music_resume(&mut self) {
-        if let Some(h) = self.music.as_mut() { h.resume(tween_now()); self.music_paused = false; }
+        if let Some(h) = self.music_handle.as_mut() { mh_resume(h, tween_now()); self.music_paused = false; }
     }
     pub fn music_set_volume(&mut self, v: f64) {
         self.music_vol = v.clamp(0.0, 1.0) as f32;
-        if let Some(h) = self.music.as_mut() { h.set_volume(db(self.music_vol as f64), tween_now()); }
+        let d = db(self.music_vol as f64);
+        if let Some(h) = self.music_handle.as_mut() { mh_set_volume(h, d, tween_now()); }
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
     pub fn music_set_pitch(&mut self, factor: f64) {
         self.music_pitch = factor.max(0.0) as f32;
-        if let Some(h) = self.music.as_mut() { h.set_playback_rate(self.music_pitch as f64, tween_now()); }
+        let r = self.music_pitch as f64;
+        if let Some(h) = self.music_handle.as_mut() { mh_set_rate(h, r, tween_now()); }
     }
     pub fn music_get_pitch(&self) -> f64 { self.music_pitch as f64 }
     pub fn music_position(&self) -> f64 {
-        self.music.as_ref().map(|h| h.position()).unwrap_or(0.0)
+        match self.music_handle.as_ref() {
+            Some(MusicHandle::Stream(h)) => h.position(),
+            Some(MusicHandle::Static(h)) => h.position(),
+            None => 0.0,
+        }
     }
     pub fn music_busy(&self) -> bool {
-        matches!(self.music.as_ref().map(|h| h.state()), Some(PlaybackState::Playing))
+        let st = match self.music_handle.as_ref() {
+            Some(MusicHandle::Stream(h)) => Some(h.state()),
+            Some(MusicHandle::Static(h)) => Some(h.state()),
+            None => None,
+        };
+        matches!(st, Some(PlaybackState::Playing))
     }
     pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
 
@@ -655,7 +756,7 @@ impl Audio {
             }
         }
         // Musik: endliche Loops + Queue.
-        let music_ended = matches!(self.music.as_ref().map(|h| h.state()), Some(PlaybackState::Stopped))
+        let music_ended = matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Stopped))
             && !self.music_paused;
         if music_ended {
             if self.music_loops > 0 {
@@ -663,9 +764,9 @@ impl Audio {
                 let v = self.music_vol;
                 let _ = self.start_music(v, 0, 0);
             } else if let Some(path) = self.music_queue.take() {
-                self.music_path = Some(path);
                 let v = self.music_vol;
-                let _ = self.start_music(v, -1, 0);
+                // Queue-Track laden (Stream oder Modul) und endlos starten.
+                if self.music_load(&path).is_ok() { let _ = self.start_music(v, -1, 0); }
             }
         }
     }
