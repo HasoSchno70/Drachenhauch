@@ -1,0 +1,23 @@
+' Screenshot-Demo Kapitel 42: 2D-Extras
+SCREEN(480, 320, "2D-Extras")
+DIM xs[5] AS INTEGER
+DIM ys[5] AS INTEGER
+xs[0]=30  : ys[0]=270
+xs[1]=130 : ys[1]=210
+xs[2]=230 : ys[2]=290
+xs[3]=340 : ys[3]=200
+xs[4]=450 : ys[4]=260
+WHILE NOT QUITREQUESTED()
+    GRADIENTV(0, 0, 479, 319, &H101830, &H301020)   ' Hintergrund-Verlauf
+    GRADIENTV(20, 30, 150, 110, &HFF4040, &H401010)  ' vertikaler Block
+    GRADIENTH(170, 30, 300, 110, &H40A0FF, &H102040) ' horizontaler Block
+    BOXROUND(320, 30, 460, 110, 22, &H30D080)        ' rundes Rechteck gefuellt
+    RECTROUND(320, 30, 460, 110, 22, &HFFFFFF)       ' rundes Rechteck Umriss
+    DIM i AS INTEGER
+    FOR i = 0 TO 7                                   ' dicke Linien (Faecher)
+        LINEW(90, 170, 20 + i * 26, 135, 1 + i, &HFFCC00)
+    NEXT
+    SPLINE(xs, ys, &H00FFD0, 3.0)                    ' weiche Kurve
+    TEXT(14, 8, "Gradient / RoundRect / LINEW / SPLINE", &HCCDDEE)
+    FLIP()
+WEND

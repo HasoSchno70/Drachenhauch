@@ -64,7 +64,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 ### Teil IV — Grafik, Sound & Spiele
 - [x] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)  (content/40_fenster.js, images/40_fenster.png)
 - [x] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)  (content/41_zeichnen.js, images/41_formen.png)
-- [ ] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)
+- [x] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)  (content/42_extras.js, images/42_extras.png + 42_blend.png)
 - [ ] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)
 - [ ] 44 Farben (RGB/HSV/COLOR_LERP)
 - [ ] 45 Eingabe (Tastatur/Maus/Gamepad)
@@ -132,5 +132,6 @@ Screenshot-Workflow: figures/NN_*.gb (Quelle) → `GBRT_FRAMES=N GBRT_SCREENSHOT
 + Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/ELLIPSE/TRIANGLE/POLYGON/ARC/TEXT/
 TEXTROT) — mit Formen-Übersichts-Screenshot. GOTCHA dokumentiert: gefüllte TRIANGLE/
 POLYGON nur bei CCW-Wicklung sichtbar (raylib-Culling); Engine-Fix als Task gespawnt.
-135 Seiten, gegen gbrt verifiziert.
-**Nächstes:** Kap 42 (2D-Extras: LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets).
++ Kap 42 (2D-Extras: LINEW, BOXROUND/RECTROUND, GRADIENTV/H, SPLINE, BLEND_MODE,
+GENTEX_PERLIN/GRADIENT/CHECKED/COLOR/RADIAL, RENDERTARGET_*) — 2 Screenshots. 140 Seiten.
+**Nächstes:** Kap 43 (Bilder: LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...) mit Screenshots.

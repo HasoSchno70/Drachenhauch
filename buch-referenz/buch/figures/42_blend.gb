@@ -1,0 +1,23 @@
+' Screenshot-Demo Kapitel 42: prozedurale Texturen + additives Blending
+SCREEN(480, 320, "Blend + GenTex")
+DIM perlin AS IMAGE
+perlin = GENTEX_PERLIN(130, 110, 6.0)
+DIM grad AS IMAGE
+grad = GENTEX_GRADIENT(130, 110, &HFF6020, &H2040FF, TRUE)
+DIM checked AS IMAGE
+checked = GENTEX_CHECKED(130, 110, 8, 7, &H303838, &HD0D8D0)
+WHILE NOT QUITREQUESTED()
+    CLS(&H0A0A12)
+    DRAWIMAGE(perlin, 15, 40)
+    DRAWIMAGE(grad, 175, 40)
+    DRAWIMAGE(checked, 335, 40)
+    ' Additives Blending: ueberlappende Kreise leuchten heller (Glow)
+    BLEND_MODE("add")
+    CIRCLE(200, 250, 55, &H402000)
+    CIRCLE(255, 250, 55, &H104030)
+    CIRCLE(310, 250, 55, &H201050)
+    BLEND_MODE("alpha")
+    TEXT(14, 12, "GenTex: Perlin / Gradient / Checked", &HCCDDEE)
+    TEXT(14, 300, "unten: additives Blending (Glow)", &HCCDDEE)
+    FLIP()
+WEND
