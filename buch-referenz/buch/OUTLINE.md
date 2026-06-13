@@ -54,7 +54,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 30 Konsole & Ein-/Ausgabe  (content/30_konsole.js)
 - [x] 31 Mathematik  (content/31_mathematik.js)
 - [x] 32 Zufall  (content/32_zufall.js)
-- [ ] 33 Zeichenketten-Funktionen
+- [x] 33 Zeichenketten-Funktionen  (content/33_strings_ref.js)
 - [ ] 34 Typumwandlung & Prüfung
 - [ ] 35 Array-Helfer (SORT/PUSH/POP/...)
 - [ ] 36 Map-Helfer
@@ -111,6 +111,8 @@ gestartet:** Kap 30 (Konsole & Ein-/Ausgabe: PRINT/INPUT/FORMAT$, Verweise auf
 Teil II + Teil IV). + Kap 31 (Mathematik: ABS/SQR/POW/HYPOT/EXP/LOG, FLOOR/CEIL/ROUND, MIN/MAX/CLAMP/
 SIGN, LERP/REMAP, SIN/COS/TAN/ATAN2/DEG/RAD, WRAP/PINGPONG/MOVETOWARD, PI/TAU).
 + Kap 32 (Zufall: RND/RANDINT/RANDF, CHOICE/WEIGHTED_CHOICE, SHUFFLE, RANDOMIZE-Seed).
-98 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
-Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 33 (Zeichenketten-Funktionen) — Referenzteil.
++ Kap 33 (Zeichenketten-Funktionen: kompakte bulletRich-Referenz aller String-Fns,
+Verweis auf Kap 16 fürs Tutorial). 100 Seiten, alle Ausgaben gegen gbrt verifiziert.
+Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher; Referenzkapitel
+(33+) dürfen kompakt sein (Übersicht statt Wiederholung).
+**Nächstes:** Kap 34 (Typumwandlung & Prüfung) — Referenzteil.
