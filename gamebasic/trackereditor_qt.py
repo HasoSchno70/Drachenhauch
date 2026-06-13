@@ -19,9 +19,9 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDialog, QDialogButtonBox, QDoubleSpinBox,
-    QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
+    QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
     QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
     QVBoxLayout, QWidget,
 )
@@ -114,6 +114,12 @@ class _InstrumentDialog(QDialog):
         self.rel.setValue(int(inst.env_release_ms))
         form.addRow("Release (ms):", self.rel)
 
+        self.pan = QDoubleSpinBox(); self.pan.setRange(-1.0, 1.0)
+        self.pan.setSingleStep(0.1); self.pan.setValue(float(inst.pan))
+        self.pan.setToolTip("Stereo-Position fuer den WAV-Render "
+                            "(-1 links .. 0 Mitte .. +1 rechts)")
+        form.addRow("Pan (L .. R):", self.pan)
+
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         box.accepted.connect(self.accept)
@@ -133,6 +139,7 @@ class _InstrumentDialog(QDialog):
         i.env_decay_ms = self.dec.value()
         i.env_sustain = self.sus.value()
         i.env_release_ms = self.rel.value()
+        i.pan = self.pan.value()
 
 
 class _KeymapDialog(QDialog):
@@ -1214,8 +1221,12 @@ class TrackerEditor(QMainWindow):
         self._show_code(self.song.gb_code())
 
     def _export_audio(self) -> None:
-        """Rendert den ganzen Song (inkl. Sample-Instrumente/Loop/ADSR) offline
-        zu einer WAV-Datei -- im Spiel via PLAYMUSIC/LOADSOUND abspielbar."""
+        """Rendert den ganzen Song (inkl. Sample-Instrumente/Loop/ADSR/Pitch-
+        Slide) offline zu einer WAV-Datei -- im Spiel via PLAYMUSIC/LOADSOUND
+        abspielbar. Optional Stereo (Instrument-Pan) + Amiga-Hard-Panning."""
+        stereo, hard_pan = self._ask_render_options()
+        if stereo is None:
+            return
         path, _ = QFileDialog.getSaveFileName(
             self, "Song als Audio rendern", str(self.project_root),
             "WAV-Audio (*.wav)")
@@ -1227,7 +1238,7 @@ class TrackerEditor(QMainWindow):
             from .tracker.mixer import render_song, save_wav
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             try:
-                mix = render_song(self.song)
+                mix = render_song(self.song, stereo=stereo, hard_pan=hard_pan)
                 save_wav(path, mix)
             finally:
                 QApplication.restoreOverrideCursor()
@@ -1235,11 +1246,36 @@ class TrackerEditor(QMainWindow):
             QMessageBox.warning(self, "Fehler",
                                 f"Audio-Export fehlgeschlagen:\n{exc}")
             return
-        secs = len(mix) / 44100.0
+        secs = mix.shape[0] / 44100.0
+        kind = ("Stereo" + (" / Amiga-Hard-Pan" if hard_pan else "")) if stereo else "Mono"
         QMessageBox.information(
             self, "Audio exportiert",
-            f"{Path(path).name} ({secs:.1f}s) gerendert.\n\n"
+            f"{Path(path).name} ({secs:.1f}s, {kind}) gerendert.\n\n"
             f"Im Spiel abspielen:  PLAYMUSIC(\"{Path(path).name}\")")
+
+    def _ask_render_options(self):
+        """Kleiner Dialog vor dem WAV-Render: Stereo + Amiga-Hard-Pan.
+        Liefert (stereo, hard_pan) oder (None, None) bei Abbruch."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Audio-Render-Optionen")
+        lay = QVBoxLayout(dlg)
+        cb_stereo = QCheckBox("Stereo (Instrument-Pan auswerten)")
+        cb_stereo.setChecked(True)
+        cb_hard = QCheckBox("Amiga-Hard-Panning (Kanal 1+4 links, 2+3 rechts)")
+        cb_hard.setChecked(False)
+        cb_hard.setEnabled(True)
+        cb_stereo.toggled.connect(cb_hard.setEnabled)
+        lay.addWidget(cb_stereo)
+        lay.addWidget(cb_hard)
+        bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                              | QDialogButtonBox.StandardButton.Cancel)
+        bb.accepted.connect(dlg.accept)
+        bb.rejected.connect(dlg.reject)
+        lay.addWidget(bb)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None, None
+        stereo = cb_stereo.isChecked()
+        return stereo, (cb_hard.isChecked() and stereo)
 
     def _show_code(self, code: str) -> None:
         dlg = QFrame(self, Qt.WindowType.Window)

@@ -85,3 +85,60 @@ def test_save_wav_roundtrip(tmp_path):
         assert w.getsampwidth() == 2
         assert w.getframerate() == 44100
         assert w.getnframes() == len(out)
+
+
+def test_render_stereo_shape_and_panning():
+    # Instrument hart nach rechts gepannt -> rechter Kanal lauter als linker.
+    s = Song()
+    s.patterns[0].set_rows(4)
+    inst = _sample_inst()
+    inst.pan = 1.0
+    idx = s.add_instrument(inst)
+    s.channel_inst[0] = idx
+    s.patterns[0].set(0, 0, 69)
+    out = render_song(s, stereo=True)
+    assert out.ndim == 2 and out.shape[1] == 2
+    left = float(np.max(np.abs(out[:, 0])))
+    right = float(np.max(np.abs(out[:, 1])))
+    assert right > left * 4          # klar rechts
+
+
+def test_render_hard_pan_amiga_splits_channels():
+    # Amiga-Konvention: Kanal 0 sitzt links. Eine Note nur auf Kanal 0 mit
+    # hard_pan -> linker Kanal deutlich lauter als der rechte.
+    s = Song()
+    s.patterns[0].set_rows(4)
+    idx = s.add_instrument(_sample_inst())
+    s.channel_inst[0] = idx
+    s.patterns[0].set(0, 0, 69)
+    out = render_song(s, stereo=True, hard_pan=True)
+    left = float(np.max(np.abs(out[:, 0])))
+    right = float(np.max(np.abs(out[:, 1])))
+    assert left > right * 2          # Kanal 0 klar links
+
+
+def test_save_wav_stereo_roundtrip(tmp_path):
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    out = render_song(s, stereo=True)
+    p = tmp_path / "song_stereo.wav"
+    save_wav(str(p), out)
+    with wave.open(str(p), "rb") as w:
+        assert w.getnchannels() == 2
+        assert w.getnframes() == out.shape[0]
+
+
+def test_sample_slide_changes_pitch():
+    # Ein gleitendes Sample (slide > 0) endet hoeher als ohne Slide:
+    # die mittlere Nulldurchgangsrate steigt. Wir pruefen, dass Slide
+    # ueberhaupt eine andere Wellenform erzeugt (vorher fuer Samples ignoriert).
+    inst = _sample_inst(freq=200, secs=1.0)
+    n = 22050
+    flat = inst.render_note(69, n, 44100, slide=0)
+    glide = inst.render_note(69, n, 44100, slide=12)   # +1 Oktave ueber die Note
+    assert not np.allclose(flat, glide)
+    # Zweite Haelfte des Glides hat mehr Nulldurchgaenge (hoeher) als das Flat.
+    def zc(a):
+        h = a[len(a)//2:]
+        return int(np.sum(np.abs(np.diff(np.sign(h))) > 0))
+    assert zc(glide) > zc(flat)

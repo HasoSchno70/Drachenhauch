@@ -125,6 +125,19 @@ def test_sample_dict_roundtrip():
     assert np.allclose(inst2.samples, src, atol=1e-3)
 
 
+def test_pan_dict_roundtrip():
+    # Pan (-1..+1) ueberlebt to_dict/from_dict; Default 0.0; alte Dateien
+    # ohne "pan" laden zentriert.
+    for kind_inst in (Instrument.synth("L", "saw"),
+                      Instrument.from_array("S", _sine(220, 0.02), 44100)):
+        kind_inst.pan = -0.5
+        back = Instrument.from_dict(kind_inst.to_dict())
+        assert abs(back.pan - (-0.5)) < 1e-6
+    legacy = Instrument.synth("X", "square").to_dict()
+    legacy.pop("pan", None)
+    assert Instrument.from_dict(legacy).pan == 0.0
+
+
 def test_from_wav(tmp_path):
     p = tmp_path / "inst.wav"
     _write_wav(p, _sine(440, 0.1))

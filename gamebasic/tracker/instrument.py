@@ -133,6 +133,7 @@ class Instrument:
     sample_rate: int = SAMPLE_RATE
     base_note: int = DEFAULT_BASE_NOTE
     default_vol: int = 15           # 1..15 (Tracker-Lautstaerke-Skala)
+    pan: float = 0.0                # -1 (links) .. 0 (Mitte) .. +1 (rechts)
     # Loop (Sample-Indizes; loop_mode == "none" -> kein Loop):
     loop_mode: str = "none"         # "none" | "forward" | "pingpong"
     loop_start: int = 0
@@ -214,14 +215,16 @@ class Instrument:
                       and z.loop_end > z.loop_start >= 0 else "none")
                 out = _resample(z.samples, z.sample_rate, z.root_note,
                                 midi, n_samples, sr,
-                                lm, int(z.loop_start), int(z.loop_end))
+                                lm, int(z.loop_start), int(z.loop_end),
+                                slide=slide)
         elif not self.is_sample():
             out = _render_synth(self, midi, n_samples, sr, slide)
         else:
             lm = self.loop_mode if self.has_loop() else "none"
             out = _resample(self.samples, self.sample_rate, self.base_note,
                             midi, n_samples, sr,
-                            lm, int(self.loop_start), int(self.loop_end))
+                            lm, int(self.loop_start), int(self.loop_end),
+                            slide=slide)
         out = self._apply_envelope(out, sr)
         return _anti_click(out, sr)
 
@@ -257,7 +260,8 @@ class Instrument:
 
     def to_dict(self) -> dict:
         d = {"name": self.name, "kind": self.kind,
-             "default_vol": int(self.default_vol)}
+             "default_vol": int(self.default_vol),
+             "pan": float(self.pan)}
         if self.kind == "keymap":
             d["zones"] = [z.to_dict() for z in self.zones]
             d.update(self._env_dict())       # ADSR gilt fuer alle Zonen
@@ -284,6 +288,7 @@ class Instrument:
             inst = cls.keymap(name, [Zone.from_dict(z)
                                      for z in (d.get("zones") or [])])
             inst.default_vol = dv
+            inst.pan = float(d.get("pan", 0.0))
             inst._apply_env_from_dict(d)
             return inst
         if kind == "sample" and d.get("samples"):
@@ -292,10 +297,12 @@ class Instrument:
                 int(d.get("sample_rate", SAMPLE_RATE)),
                 int(d.get("base_note", DEFAULT_BASE_NOTE)))
             inst.default_vol = dv
+            inst.pan = float(d.get("pan", 0.0))
             inst._apply_env_from_dict(d)
             return inst
         inst = cls.synth(name, str(d.get("waveform", "square")))
         inst.default_vol = dv
+        inst.pan = float(d.get("pan", 0.0))
         inst._apply_env_from_dict(d)
         inst.vib_depth = float(d.get("vib_depth", 0.0))
         inst.vib_speed = float(d.get("vib_speed", 0.0))
@@ -343,36 +350,44 @@ def _render_synth(inst, midi: int, n_samples: int, sr: int,
 def _resample(samples: np.ndarray, src_sr: int, base_note: int,
               midi: int, n_samples: int, sr: int,
               loop_mode: str = "none",
-              loop_start: int = 0, loop_end: int = 0) -> np.ndarray:
+              loop_start: int = 0, loop_end: int = 0,
+              slide: float = 0.0) -> np.ndarray:
     """Lineares Resampling eines Samples auf die Zieltonhoehe, mit optionalem
-    Loop (forward / pingpong).
+    Loop (forward / pingpong) und optionalem **Pitch-Slide**.
 
     Schrittweite pro Ausgabe-Sample durchs Quell-Audio:
         step = (src_sr / sr) * 2^((midi - base_note) / 12)
     -> hoehere Note = groesserer Schritt = schnelleres/hoeheres Abspielen.
+    `slide` (Halbtoene ueber die ganze Note) rampt die Tonhoehe linear vom
+    Grundton zu `midi + slide` -- wie der Synth-Pfad, jetzt auch fuer Samples.
+    Der virtuelle Playhead `pos` ist dann das Integral der variierenden
+    Schrittweite (kumulative Summe).
     """
     src = np.asarray(samples, dtype=np.float32).reshape(-1)
     if src.size == 0 or n_samples <= 0:
         return np.zeros(max(0, n_samples), dtype=np.float32)
-    step = (src_sr / float(sr)) * (2.0 ** ((midi - base_note) / 12.0))
-    if step <= 0:
+    base_step = (src_sr / float(sr)) * (2.0 ** ((midi - base_note) / 12.0))
+    if base_step <= 0:
         return np.zeros(n_samples, dtype=np.float32)
+    if slide:
+        ramp = 2.0 ** ((float(slide)
+                        * np.arange(n_samples, dtype=np.float64)
+                        / max(1, n_samples - 1)) / 12.0)
+        step_arr = base_step * ramp
+    else:
+        step_arr = np.full(n_samples, base_step, dtype=np.float64)
+    # pos[i] = Summe der Schritte VOR Sample i (startet bei 0).
+    pos = np.concatenate(([0.0], np.cumsum(step_arr)[:-1]))
     idx_axis = np.arange(src.size, dtype=np.float64)
     loop_ok = (loop_mode in ("forward", "pingpong")
                and 0 <= loop_start < loop_end <= src.size)
     if not loop_ok:
-        # Einmal abspielen, Rest mit Stille (kein Loop).
-        avail = int(np.floor((src.size - 1) / step)) + 1
-        out_len = min(n_samples, max(0, avail))
-        pos = np.arange(out_len, dtype=np.float64) * step
+        # Einmal abspielen, nach dem Sample-Ende Stille.
         out = np.interp(pos, idx_axis, src).astype(np.float32)
-        if out.size < n_samples:
-            out = np.concatenate(
-                [out, np.zeros(n_samples - out.size, np.float32)])
+        out[pos > (src.size - 1)] = 0.0
         return out
-    # Mit Loop: virtueller, monoton steigender Playhead `pos`, in eine
-    # Quell-Position innerhalb des Loops zurueckgefaltet.
-    pos = np.arange(n_samples, dtype=np.float64) * step
+    # Mit Loop: monoton steigender Playhead `pos`, in eine Quell-Position
+    # innerhalb des Loops zurueckgefaltet.
     le = float(loop_end)
     ls = float(loop_start)
     loop_len = le - ls
