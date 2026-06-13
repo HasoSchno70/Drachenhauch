@@ -299,7 +299,11 @@ laufende/gestreamte Sounds erfasst und live steuerbar ist.
 | `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` | Tiefpass. `cutoff_hz` 20..20000 (≤0 oder ≥20000 = offen/aus), `resonance` 0..1 (Betonung am Cutoff — der „weeoow"-SID/Acid-Charakter) |
 | `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` | Hall. `mix` 0..1 (0 = aus), `feedback` 0..1 (Nachhall-Laenge, Default 0.9), `damping` 0..1 (Hoehen-Daempfung, Default 0.1) |
 | `AUDIO_DELAY(bus$, mix[, feedback])` | Echo (feste 300 ms). `mix` 0..1 (0 = aus), `feedback` 0..0.95 (Abfall pro Wiederholung, Default 0.5) |
+| `AUDIO_DISTORTION(bus$, amount[, mix])` | Overdrive/Fuzz. `amount` 0..1 (0 = aus, → 0..36 dB Drive), `mix` 0..1 (Default 1.0) |
+| `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` | Dynamik-Kompressor (Glue/Pump). `threshold_db` typ. −24..0, `ratio` ≥ 1 (1 = aus), `makeup_db` Pegel-Anhebung danach |
+| `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` | parametrischer Glocken-EQ (eine Band). `gain_db` 0 = transparent, >0 anheben / <0 absenken, `q` Bandbreite (Default 1) |
 
+Signalfluss je Bus: EQ → Filter → Distortion → Compressor → Reverb → Delay.
 Alle Effekte starten neutral (kein Klang-Einfluss); ein Mix/Cutoff aktiviert sie.
 Parameter wirken sofort und sind animierbar (z.B. Filter-Sweeps).
 
@@ -317,6 +321,11 @@ AUDIO_DELAY("sfx", 0.4, 0.55)
 
 ' Alles aus:
 AUDIO_FILTER("music", 0, 0) : AUDIO_REVERB("master", 0.0) : AUDIO_DELAY("sfx", 0.0)
+
+' Fuzz-Bass + Mastering-Glue + Bass-Boost:
+AUDIO_DISTORTION("sfx", 0.5)             ' Overdrive auf Effekten
+AUDIO_COMPRESSOR("master", -18, 4, 3)   ' Kompressor auf der Summe
+AUDIO_EQ("music", 100, 6, 1.0)          ' +6 dB Glocke bei 100 Hz
 ```
 
 Demo: [examples/117_audiofx.gb](../examples/117_audiofx.gb) — Filter-Cutoff per

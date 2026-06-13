@@ -20,6 +20,9 @@ use kira::{
     effect::filter::{FilterBuilder, FilterHandle},
     effect::reverb::{ReverbBuilder, ReverbHandle},
     effect::delay::{DelayBuilder, DelayHandle},
+    effect::distortion::{DistortionBuilder, DistortionHandle},
+    effect::compressor::{CompressorBuilder, CompressorHandle},
+    effect::eq_filter::{EqFilterBuilder, EqFilterHandle, EqFilterKind},
     info::Info,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
@@ -34,14 +37,22 @@ struct BusFx {
     filter: FilterHandle,
     reverb: ReverbHandle,
     delay: DelayHandle,
+    distortion: DistortionHandle,
+    compressor: CompressorHandle,
+    eq: EqFilterHandle,
 }
 
-/// Haengt Filter+Reverb+Delay (neutral) an einen Track-Builder und liefert die
+/// Haengt die Effektkette (neutral) an einen Track-Builder und liefert die
 /// Steuer-Handles. Als Makro, weil Sub- und Main-TrackBuilder verschiedene
-/// Typen sind (beide haben aber `add_effect`). Delay-Zeit ist fix (300 ms).
+/// Typen sind (beide haben aber `add_effect`). Reihenfolge = Signalfluss:
+/// EQ -> Filter -> Distortion -> Compressor -> Reverb -> Delay. Delay-Zeit fix
+/// (300 ms). Default ueberall neutral (Mix 0 bzw. 0 dB / Cutoff offen).
 macro_rules! attach_bus_fx {
     ($b:expr) => { BusFx {
+        eq: $b.add_effect(EqFilterBuilder::new(EqFilterKind::Bell, 1000.0, Decibels(0.0), 1.0)),
         filter: $b.add_effect(FilterBuilder::new().cutoff(20000.0).resonance(0.0)),
+        distortion: $b.add_effect(DistortionBuilder::new().drive(Decibels(0.0)).mix(Mix(0.0))),
+        compressor: $b.add_effect(CompressorBuilder::new().mix(Mix(0.0))),
         reverb: $b.add_effect(ReverbBuilder::new().mix(Mix(0.0))),
         delay: $b.add_effect(
             DelayBuilder::new().delay_time(Duration::from_millis(300)).mix(Mix(0.0))),
@@ -493,6 +504,43 @@ impl Audio {
         let fx = self.bus_fx(bus, "AUDIO_DELAY")?;
         fx.delay.set_mix(Mix(mix.clamp(0.0, 1.0) as f32), tween_now());
         fx.delay.set_feedback(db(fb), tween_now());
+        Ok(())
+    }
+
+    /// AUDIO_DISTORTION(bus$, amount[, mix]) -- Overdrive/Fuzz auf einem Bus.
+    /// amount 0..1 -> 0..36 dB Drive in den Clipper; amount<=0 = aus. mix
+    /// 0..1 (Default 1.0 = voll verzerrt).
+    pub fn set_distortion(&mut self, bus: &str, amount: f64, mix: f64) -> Result<(), String> {
+        let drive_db = (amount.clamp(0.0, 1.0) * 36.0) as f32;
+        let m = if amount <= 0.0 { 0.0 } else { mix.clamp(0.0, 1.0) as f32 };
+        let fx = self.bus_fx(bus, "AUDIO_DISTORTION")?;
+        fx.distortion.set_drive(Decibels(drive_db), tween_now());
+        fx.distortion.set_mix(Mix(m), tween_now());
+        Ok(())
+    }
+
+    /// AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db]) -- Dynamik-
+    /// Kompressor (Glue/Pump). threshold_db typ. -24..0, ratio >= 1 (1 = aus),
+    /// makeup_db hebt den Pegel danach an. ratio<=1 schaltet den Effekt aus.
+    pub fn set_compressor(&mut self, bus: &str, threshold_db: f64, ratio: f64, makeup_db: f64) -> Result<(), String> {
+        let active = ratio > 1.0;
+        let fx = self.bus_fx(bus, "AUDIO_COMPRESSOR")?;
+        fx.compressor.set_threshold(threshold_db, tween_now());
+        fx.compressor.set_ratio(ratio.max(1.0), tween_now());
+        fx.compressor.set_makeup_gain(Decibels(makeup_db as f32), tween_now());
+        fx.compressor.set_mix(Mix(if active { 1.0 } else { 0.0 }), tween_now());
+        Ok(())
+    }
+
+    /// AUDIO_EQ(bus$, freq_hz, gain_db[, q]) -- parametrischer Glocken-EQ
+    /// (eine Band) auf einem Bus. gain_db 0 = transparent (kein Effekt),
+    /// >0 anheben / <0 absenken; q = Bandbreite (hoeher = schmaler).
+    pub fn set_eq(&mut self, bus: &str, freq_hz: f64, gain_db: f64, q: f64) -> Result<(), String> {
+        let f = freq_hz.clamp(20.0, 20000.0);
+        let fx = self.bus_fx(bus, "AUDIO_EQ")?;
+        fx.eq.set_frequency(f, tween_now());
+        fx.eq.set_gain(Decibels(gain_db as f32), tween_now());
+        fx.eq.set_q(q.max(0.05), tween_now());
         Ok(())
     }
 

@@ -189,3 +189,30 @@ def test_bus_effects_validation(run_gb):
     assert "AUDIO_FILTER: unbekannter Bus 'nope' (sfx, music, master)" in out
     assert "AUDIO_REVERB: unbekannter Bus 'nope' (sfx, music, master)" in out
     assert "AUDIO_DELAY: unbekannter Bus 'nope' (sfx, music, master)" in out
+
+
+def test_bus_dynamics_eq_validation(run_gb):
+    # AUDIO_DISTORTION/COMPRESSOR/EQ: unbekannter Bus -> klare Meldung vor
+    # der Audio-Init (golden-testbar).
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_DISTORTION("nope", 0.5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_COMPRESSOR("nope", -18, 4)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_EQ("nope", 100, 3)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_DISTORTION: unbekannter Bus 'nope' (sfx, music, master)" in out
+    assert "AUDIO_COMPRESSOR: unbekannter Bus 'nope' (sfx, music, master)" in out
+    assert "AUDIO_EQ: unbekannter Bus 'nope' (sfx, music, master)" in out

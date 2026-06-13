@@ -507,6 +507,24 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_DISTORTION",
+   "kind": "core",
+   "signature": "AUDIO_DISTORTION(bus$, amount[, mix])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_COMPRESSOR",
+   "kind": "core",
+   "signature": "AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_EQ",
+   "kind": "core",
+   "signature": "AUDIO_EQ(bus$, freq_hz, gain_db[, q])",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_VOLUME",
    "kind": "core",
    "signature": "AUDIO_VOLUME(ch, v)",

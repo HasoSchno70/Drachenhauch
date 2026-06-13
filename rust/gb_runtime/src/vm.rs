@@ -3823,6 +3823,41 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.set_delay(&bus, mix, fb)?;
                 Value::Nil
             }
+            "audio_distortion" => {
+                // AUDIO_DISTORTION(bus$, amount[, mix]) -- Overdrive/Fuzz.
+                let bus = gs(a, 0, "AUDIO_DISTORTION")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_DISTORTION: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let amount = need_f(a, 1, "AUDIO_DISTORTION")?;
+                let mix = if a.len() >= 3 { need_f(a, 2, "AUDIO_DISTORTION")? } else { 1.0 };
+                self.audio_mut()?.set_distortion(&bus, amount, mix)?;
+                Value::Nil
+            }
+            "audio_compressor" => {
+                // AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db]).
+                let bus = gs(a, 0, "AUDIO_COMPRESSOR")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_COMPRESSOR: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let thresh = need_f(a, 1, "AUDIO_COMPRESSOR")?;
+                let ratio = need_f(a, 2, "AUDIO_COMPRESSOR")?;
+                let makeup = if a.len() >= 4 { need_f(a, 3, "AUDIO_COMPRESSOR")? } else { 0.0 };
+                self.audio_mut()?.set_compressor(&bus, thresh, ratio, makeup)?;
+                Value::Nil
+            }
+            "audio_eq" => {
+                // AUDIO_EQ(bus$, freq_hz, gain_db[, q]) -- parametrischer Bell-EQ.
+                let bus = gs(a, 0, "AUDIO_EQ")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_EQ: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let freq = need_f(a, 1, "AUDIO_EQ")?;
+                let gain = need_f(a, 2, "AUDIO_EQ")?;
+                let q = if a.len() >= 4 { need_f(a, 3, "AUDIO_EQ")? } else { 1.0 };
+                self.audio_mut()?.set_eq(&bus, freq, gain, q)?;
+                Value::Nil
+            }
             "playsound" => {
                 // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
                 // (raylib-Sounds loopen nicht) -- SFX spielen einmal.
