@@ -21,7 +21,7 @@ use kira::{
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
     sound::FromFileError,
-    track::MainTrackBuilder,
+    track::{MainTrackBuilder, TrackBuilder, TrackHandle},
 };
 use xmrs::prelude::Module;
 use xmrsplayer::prelude::XmrsPlayer;
@@ -209,6 +209,14 @@ fn pendulum_pos(elapsed_s: f64, period_s: f64, depth: f64) -> f64 {
 
 pub struct Audio {
     manager: AudioManager<DefaultBackend>,
+    // Mixer-Busse: SFX/Sampler/Tone laufen auf sfx_track, Musik auf
+    // music_track (beide routen in den Main-Track, wo der FFT-Tap haengt).
+    // Bus-Volume × Sound-Volume multiplizieren sich im Mixer -> echter Master.
+    sfx_track: TrackHandle,
+    music_track: TrackHandle,
+    sfx_bus: f32,
+    music_bus: f32,
+    master_bus: f32,
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
@@ -234,10 +242,16 @@ impl Audio {
             main_track_builder: MainTrackBuilder::new().with_effect(FftTapBuilder),
             ..Default::default()
         };
-        let manager = AudioManager::<DefaultBackend>::new(settings)
+        let mut manager = AudioManager::<DefaultBackend>::new(settings)
             .map_err(|e| format!("Audio-Geraet konnte nicht initialisiert werden: {e:?}"))?;
+        let sfx_track = manager.add_sub_track(TrackBuilder::new())
+            .map_err(|e| format!("SFX-Bus konnte nicht angelegt werden: {e:?}"))?;
+        let music_track = manager.add_sub_track(TrackBuilder::new())
+            .map_err(|e| format!("Musik-Bus konnte nicht angelegt werden: {e:?}"))?;
         Ok(Audio {
-            manager, sounds: Vec::new(), samples: Vec::new(),
+            manager, sfx_track, music_track,
+            sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
+            sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
@@ -319,7 +333,7 @@ impl Audio {
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
         let data = self.slot(idx, fn_)?.data.clone().with_settings(settings);
-        let mut handle = self.manager.play(data)
+        let mut handle = self.sfx_track.play(data)   // SFX-Bus
             .map_err(|e| format!("{}: {:?}", fn_, e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms(fade_in_ms)); }
         let s = self.slot_mut(idx, fn_)?;
@@ -377,6 +391,31 @@ impl Audio {
         self.lofi_bits = bits.clamp(1, 16);
         self.lofi_cutoff = cutoff.max(0.0);
         self.sample_cache.clear();
+    }
+
+    // ================= Mixer-Busse =================
+    /// AUDIO_BUS_VOLUME(bus$, vol) -- Master-Lautstaerke eines Busses
+    /// ("sfx", "music", "master"), 0..1. Multipliziert sich mit den
+    /// einzelnen Sound-/Musik-Volumes (Kira-Mixer).
+    pub fn set_bus_volume(&mut self, bus: &str, v: f64) -> Result<(), String> {
+        let vol = v.clamp(0.0, 1.0);
+        match bus.to_lowercase().as_str() {
+            "sfx" => { self.sfx_bus = vol as f32; self.sfx_track.set_volume(db(vol), tween_now()); }
+            "music" => { self.music_bus = vol as f32; self.music_track.set_volume(db(vol), tween_now()); }
+            "master" => { self.master_bus = vol as f32; self.manager.main_track().set_volume(db(vol), tween_now()); }
+            other => return Err(format!(
+                "AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master)", other)),
+        }
+        Ok(())
+    }
+    pub fn get_bus_volume(&self, bus: &str) -> Result<f64, String> {
+        Ok(match bus.to_lowercase().as_str() {
+            "sfx" => self.sfx_bus,
+            "music" => self.music_bus,
+            "master" => self.master_bus,
+            other => return Err(format!(
+                "AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", other)),
+        } as f64)
     }
 
     // ================= Core SFX =================
@@ -659,14 +698,14 @@ impl Audio {
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
                 if endless { data = data.loop_region(0.0..); }
                 data = data.volume(vol_db).playback_rate(pitch);
-                MusicHandle::Stream(self.manager.play(data)
+                MusicHandle::Stream(self.music_track.play(data)   // Musik-Bus
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
             }
             Some(MusicSource::Module(rendered)) => {
                 let mut settings = StaticSoundSettings::new().volume(vol_db).playback_rate(pitch);
                 if endless { settings = settings.loop_region(0.0..); }
                 let data = rendered.clone().with_settings(settings);
-                MusicHandle::Static(self.manager.play(data)
+                MusicHandle::Static(self.music_track.play(data)   // Musik-Bus
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
             }
         };

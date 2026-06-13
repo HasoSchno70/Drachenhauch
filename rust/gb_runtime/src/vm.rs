@@ -3771,6 +3771,24 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.set_lofi(on, bits, cutoff);
                 Value::Nil
             }
+            "audio_bus_volume" => {
+                // AUDIO_BUS_VOLUME(bus$, vol) -- Master pro Bus (sfx/music/master).
+                // Bus-Name VOR der Audio-Initialisierung pruefen (golden-testbar).
+                let bus = gs(a, 0, "AUDIO_BUS_VOLUME")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_BUS_VOLUME: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let v = need_f(a, 1, "AUDIO_BUS_VOLUME")?;
+                self.audio_mut()?.set_bus_volume(&bus, v)?;
+                Value::Nil
+            }
+            "audio_bus_get_volume" => {
+                let bus = gs(a, 0, "AUDIO_BUS_GET_VOLUME")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                Value::Float(self.audio_mut()?.get_bus_volume(&bus)?)
+            }
             "playsound" => {
                 // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
                 // (raylib-Sounds loopen nicht) -- SFX spielen einmal.

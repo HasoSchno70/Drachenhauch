@@ -477,6 +477,18 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_BUS_VOLUME",
+   "kind": "core",
+   "signature": "AUDIO_BUS_VOLUME(bus$, vol)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_BUS_GET_VOLUME",
+   "kind": "core",
+   "signature": "AUDIO_BUS_GET_VOLUME(bus$)",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_VOLUME",
    "kind": "core",
    "signature": "AUDIO_VOLUME(ch, v)",

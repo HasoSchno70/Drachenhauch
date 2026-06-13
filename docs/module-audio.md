@@ -264,6 +264,30 @@ AUDIO_LOFI(FALSE)                ' wieder Hi-Fi
 Demo: in [examples/116_sampler.gb](../examples/116_sampler.gb) mit `L`
 umschaltbar (A/B-Vergleich Hi-Fi vs. Paula).
 
+## Mixer-Busse (SFX-/Musik-Master)
+
+Dank Kiras Mixer-Tracks laufen alle SFX/Sampler/Synth-Sounds auf einem
+**SFX-Bus** und alle Musik auf einem **Musik-Bus** (beide muenden in den
+**Master**). So regelst du Effekte und Musik getrennt mit einem Master-Regler,
+unabhaengig von den Einzel-Lautstaerken (sie multiplizieren sich im Mixer).
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_BUS_VOLUME(bus$, vol)` | Master-Lautstaerke eines Busses (0..1) |
+| `AUDIO_BUS_GET_VOLUME(bus$)` → FLOAT | aktuelle Bus-Lautstaerke |
+
+`bus$` ist `"sfx"`, `"music"` oder `"master"` (case-insensitive). Typischer
+Einsatz: Optionsmenue mit getrennten Reglern.
+
+```basic
+AUDIO_BUS_VOLUME("music", 0.4)        ' Musik leiser
+AUDIO_BUS_VOLUME("sfx", 0.8)          ' Effekte etwas runter
+AUDIO_BUS_VOLUME("master", 0.0)       ' alles stumm (Pause-Menue)
+PRINT AUDIO_BUS_GET_VOLUME("music")   ' 0.4
+```
+
+Der `AUDIO_FFT`-Tap haengt am Master, erfasst also weiterhin den gesamten Mix.
+
 ## Externer Typ
 
 | Typ | Wirkung |

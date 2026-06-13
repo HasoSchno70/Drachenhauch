@@ -141,3 +141,24 @@ def test_lofi_validation(run_gb):
     out = run_gb(src)
     assert "AUDIO_LOFI: bits muss 1..16 sein" in out
     assert "AUDIO_LOFI: cutoff_hz muss >= 0 sein" in out
+
+
+def test_bus_volume_validation(run_gb):
+    # AUDIO_BUS_VOLUME/GET: unbekannter Bus wird VOR der Audio-Init geprueft
+    # -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_BUS_VOLUME("foo", 0.5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    PRINT STR$(AUDIO_BUS_GET_VOLUME("bar"))',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_BUS_VOLUME: unbekannter Bus 'foo' (sfx, music, master)" in out
+    assert "AUDIO_BUS_GET_VOLUME: unbekannter Bus 'bar' (sfx, music, master)" in out
