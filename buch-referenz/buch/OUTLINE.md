@@ -59,7 +59,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 35 Array-Helfer (SORT/PUSH/POP/...)  (content/35_array_helfer.js)
 - [x] 36 Map-Helfer  (content/36_map_helfer.js)
 - [x] 37 Zeit & Datum  (content/37_zeit.js)
-- [ ] 38 Dateien
+- [x] 38 Dateien  (content/38_dateien.js)
 
 ### Teil IV — Grafik, Sound & Spiele
 - [ ] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)
@@ -121,5 +121,8 @@ Code-Beispiel** — Kap 33 (Strings-Ref) + Kap 34-Encoding deshalb von kompakt a
 cmd+Beispiel nachgerüstet. + Kap 36 (Map-Helfer: MAPPUT/GET/GETOR/HAS/SIZE/REMOVE/
 CLEAR/KEYS/VALUES/ITEMS + Methoden-Syntax) + Kap 37 (Zeit & Datum: MILLIS, SLEEP,
 TIME$, DATE$; nicht-deterministische Werte als Kommentar statt Ausgabe-Kasten).
-118 Seiten, alle Ausgaben gegen gbrt verifiziert.
-**Nächstes:** Kap 38 (Dateien) — letztes Kapitel Teil III.
++ Kap 38 (Dateien: OPENFILE/CLOSEFILE/WRITELINE/WRITE/READLINE/ENDOFFILE/READALL$,
+WRITEALL/READLINES/APPENDFILE/FILESIZE, FILEEXISTS/COPYFILE/RENAME/DELETEFILE,
+MKDIR/DIREXISTS/DIRLIST, PATHJOIN/BASENAME/DIRNAME). **TEIL III KOMPLETT (Kap 30-38).**
+124 Seiten, alle Ausgaben gegen gbrt verifiziert.
+**Nächstes:** Teil IV (die GROSSEN Themen) — Kap 40 (Das Fenster: SCREEN/FLIP/DELTA/Game-Loop).
