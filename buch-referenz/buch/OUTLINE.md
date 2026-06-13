@@ -57,7 +57,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 33 Zeichenketten-Funktionen  (content/33_strings_ref.js)
 - [x] 34 Typumwandlung & Prüfung  (content/34_typen.js)
 - [x] 35 Array-Helfer (SORT/PUSH/POP/...)  (content/35_array_helfer.js)
-- [ ] 36 Map-Helfer
+- [x] 36 Map-Helfer  (content/36_map_helfer.js)
 - [ ] 37 Zeit & Datum
 - [ ] 38 Dateien
 
@@ -118,5 +118,6 @@ Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher; Referenzkapitel
 SORT/REVERSE/INDEXOF, SUM/AVG/MIN/MAX/FILL/COPY, PUSH/POP/INSERT/REMOVE_AT/REDIM).
 **NEUE VORGABE ab hier (User 2026-06-13): jeder Befehl bekommt mind. EIN eigenes
 Code-Beispiel** — Kap 33 (Strings-Ref) + Kap 34-Encoding deshalb von kompakt auf
-cmd+Beispiel nachgerüstet. 112 Seiten, alle Ausgaben gegen gbrt verifiziert.
-**Nächstes:** Kap 36 (Map-Helfer) — Referenzteil.
+cmd+Beispiel nachgerüstet. + Kap 36 (Map-Helfer: MAPPUT/GET/GETOR/HAS/SIZE/REMOVE/
+CLEAR/KEYS/VALUES/ITEMS + Methoden-Syntax). 116 Seiten, alle Ausgaben gegen gbrt verifiziert.
+**Nächstes:** Kap 37 (Zeit & Datum) — Referenzteil.
