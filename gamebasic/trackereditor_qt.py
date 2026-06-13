@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QStyle,
+    QStyledItemDelegate, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
@@ -481,8 +481,10 @@ class TrackerEditor(QMainWindow):
         self.sound_combos = []
         self.mute_btns = []
         self.solo_btns = []
+        self.vu_meters = []
         self._muted = [False] * CHANNELS
         self._solo = [False] * CHANNELS
+        self.vu_level = [0.0] * CHANNELS
         ch_names = ["Ch1", "Ch2", "Ch3", "Drum"]
         for c in range(CHANNELS):
             r = QHBoxLayout()
@@ -502,9 +504,18 @@ class TrackerEditor(QMainWindow):
                 lambda idx, ch=c: self._on_sound_changed(ch, idx))
             r.addWidget(cb, 1)
             side.addLayout(r)
+            vu = QProgressBar(); vu.setRange(0, 100); vu.setValue(0)
+            vu.setTextVisible(False); vu.setFixedHeight(5)
+            side.addWidget(vu)
             self.sound_combos.append(cb)
             self.mute_btns.append(mb)
             self.solo_btns.append(sb)
+            self.vu_meters.append(vu)
+
+        # VU-Decay: laeuft nur waehrend der Wiedergabe (40 ms).
+        self._vu_timer = QTimer(self)
+        self._vu_timer.setInterval(40)
+        self._vu_timer.timeout.connect(self._vu_decay)
 
         _sep = QFrame(); _sep.setFrameShape(QFrame.Shape.HLine)
         _sep.setStyleSheet(f"color: {COLORS['border']};")
@@ -1220,6 +1231,12 @@ class TrackerEditor(QMainWindow):
         arr = self._render_sound(inst, midi, n, slide or 0)
         if arr is not None:
             self._play_array(arr, 44100, vol)
+            # VU-Pegel der Spur setzen (Peak x Lautstaerke) -> Meter leuchtet auf.
+            if arr.size and 0 <= ci < len(self.vu_level):
+                vf = (vol_to_pct(vol) / 100.0) if vol else 1.0
+                peak = float(np.max(np.abs(arr))) * vf
+                self.vu_level[ci] = max(self.vu_level[ci], min(1.0, peak))
+                self.vu_meters[ci].setValue(int(self.vu_level[ci] * 100))
 
     # ============================================== Playback
     def _toggle_play(self, mode: str) -> None:
@@ -1236,11 +1253,14 @@ class TrackerEditor(QMainWindow):
             self._reload_pattern_combo()
         self._timer.setInterval(self.song.row_ms())
         self._timer.start()
+        self._vu_timer.start()
         self.btn_play.setText("■ Stop" if mode == "pattern" else "▶ Pattern")
         self.btn_song.setText("■ Stop" if mode == "song" else "▶ Song")
 
     def _stop_play(self) -> None:
         self._timer.stop()
+        self._vu_timer.stop()
+        self._reset_vu()
         self._set_playhead(-1)         # Playhead-Highlight entfernen
         self.btn_play.setText("▶ Pattern")
         self.btn_song.setText("▶ Song")
@@ -1301,6 +1321,17 @@ class TrackerEditor(QMainWindow):
         if any(self._solo):
             return self._solo[c]
         return True
+
+    def _vu_decay(self) -> None:
+        """Laesst die VU-Meter sanft abklingen (waehrend der Wiedergabe)."""
+        for c in range(CHANNELS):
+            self.vu_level[c] *= 0.82
+            self.vu_meters[c].setValue(int(self.vu_level[c] * 100))
+
+    def _reset_vu(self) -> None:
+        for c in range(CHANNELS):
+            self.vu_level[c] = 0.0
+            self.vu_meters[c].setValue(0)
 
     def _play_columns(self, pat, row: int) -> None:
         for c in range(CHANNELS):

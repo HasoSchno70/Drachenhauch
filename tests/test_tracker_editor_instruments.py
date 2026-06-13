@@ -211,6 +211,19 @@ def test_mute_solo_audibility():
     assert not ed._audible(2)
 
 
+def test_vu_meter_lights_and_decays():
+    ed = _editor()
+    ed._reset_vu()
+    assert ed.vu_level[0] == 0.0
+    ed._play_note(0, 60)                 # rendert + setzt VU-Pegel
+    assert ed.vu_level[0] > 0.0
+    before = ed.vu_level[0]
+    ed._vu_decay()
+    assert ed.vu_level[0] < before       # klingt ab
+    ed._reset_vu()
+    assert ed.vu_level[0] == 0.0 and ed.vu_meters[0].value() == 0
+
+
 def test_fx_column_sets_effect_on_cell():
     from gamebasic.tracker.song import FX_ARP, FX_CODES
     ed = _editor()
