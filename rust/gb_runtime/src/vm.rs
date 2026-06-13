@@ -3985,6 +3985,9 @@ impl<'p> Vm<'p> {
                 Value::Int(self.audio_mut()?.noise(dur, vol)?)
             }
             "audio_sfx" => {
+                // AUDIO_SFX(wf, freq, slide, atk, sus, dec, vib_d, vib_s, vol
+                //   [, stereo_width, duty, pwm_depth, pwm_speed,
+                //    flt_cutoff, flt_sweep, flt_res]) -- SID-Args optional.
                 let wf = gs(a, 0, "AUDIO_SFX")?.to_string();
                 let freq = need_f(a, 1, "AUDIO_SFX")?;
                 let slide = need_f(a, 2, "AUDIO_SFX")?;
@@ -3994,8 +3997,19 @@ impl<'p> Vm<'p> {
                 let vd = need_f(a, 6, "AUDIO_SFX")?;
                 let vs = need_f(a, 7, "AUDIO_SFX")?;
                 let vol = need_f(a, 8, "AUDIO_SFX")?;
-                let width = if a.len() >= 10 { need_f(a, 9, "AUDIO_SFX")? } else { 0.0 };
-                Value::Int(self.audio_mut()?.sfx(&wf, freq, slide, atk, sus, dec, vd, vs, vol, width)?)
+                let optf = |i: usize, d: f64| -> R<f64> {
+                    if a.len() > i { need_f(a, i, "AUDIO_SFX") } else { Ok(d) }
+                };
+                let width = optf(9, 0.0)?;
+                let duty = optf(10, 0.5)?;
+                let pwm_depth = optf(11, 0.0)?;
+                let pwm_speed = optf(12, 0.0)?;
+                let flt_cutoff = optf(13, 0.0)?;
+                let flt_sweep = optf(14, 0.0)?;
+                let flt_res = optf(15, 0.0)?;
+                Value::Int(self.audio_mut()?.sfx(
+                    &wf, freq, slide, atk, sus, dec, vd, vs, vol, width,
+                    duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res)?)
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {

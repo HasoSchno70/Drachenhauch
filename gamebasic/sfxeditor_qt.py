@@ -50,7 +50,13 @@ def synthesize(p: dict, sr: int = _SAMPLE_RATE) -> np.ndarray:
     wave = _synth(p["waveform"], p["base_freq"], p["slide"],
                   p["attack"], p["sustain"], p["decay"],
                   p["vib_depth"], p["vib_speed"], p.get("stereo_width", 0.0),
-                  sr=sr)
+                  sr=sr,
+                  duty=p.get("duty", 0.5),
+                  pwm_depth=p.get("pwm_depth", 0.0),
+                  pwm_speed=p.get("pwm_speed", 0.0),
+                  flt_cutoff=p.get("flt_cutoff", 0.0),
+                  flt_sweep=p.get("flt_sweep", 0.0),
+                  flt_res=p.get("flt_res", 0.0))
     return np.clip(wave * p["volume"], -1.0, 1.0)
 
 
@@ -175,6 +181,17 @@ class SfxGenerator(QMainWindow):
         self.stereo_width = self._dspin(c2, "Stereo-Breite", 0.0, 1.0, 0.0, 0.05)
         self.pan = self._dspin(c2, "Pan (L -1 .. +1 R)", -1.0, 1.0, 0.0, 0.1)
         params.addWidget(col2)
+
+        # SID-Stil: Pulsbreite/PWM (nur square) + resonanter Tiefpass-Sweep.
+        col3 = QGroupBox("SID / Filter")
+        c3 = QVBoxLayout(col3)
+        self.duty = self._dspin(c3, "Pulsbreite (square)", 0.05, 0.95, 0.5, 0.05)
+        self.pwm_depth = self._dspin(c3, "PWM-Tiefe", 0.0, 0.45, 0.0, 0.01)
+        self.pwm_speed = self._dspin(c3, "PWM-Speed (Hz)", 0.0, 30.0, 0.0, 0.5)
+        self.flt_cutoff = self._ispin(c3, "Filter-Cutoff (Hz, 0=aus)", 0, 12000, 0)
+        self.flt_sweep = self._ispin(c3, "Filter-Sweep (Hz/s)", -12000, 12000, 0)
+        self.flt_res = self._dspin(c3, "Resonanz", 0.0, 0.95, 0.0, 0.05)
+        params.addWidget(col3)
         root.addLayout(params)
 
         # Buttons
@@ -233,6 +250,12 @@ class SfxGenerator(QMainWindow):
         self.vib_speed.setValue(int(p["vib_speed"]))
         self.stereo_width.setValue(float(p["stereo_width"]))
         self.pan.setValue(float(p["pan"]))
+        self.duty.setValue(float(p.get("duty", 0.5)))
+        self.pwm_depth.setValue(float(p.get("pwm_depth", 0.0)))
+        self.pwm_speed.setValue(float(p.get("pwm_speed", 0.0)))
+        self.flt_cutoff.setValue(int(p.get("flt_cutoff", 0)))
+        self.flt_sweep.setValue(int(p.get("flt_sweep", 0)))
+        self.flt_res.setValue(float(p.get("flt_res", 0.0)))
         self._on_change()
 
     # ---- Helfer
@@ -269,6 +292,12 @@ class SfxGenerator(QMainWindow):
             "vib_speed": float(self.vib_speed.value()),
             "stereo_width": float(self.stereo_width.value()),
             "pan": float(self.pan.value()),
+            "duty": float(self.duty.value()),
+            "pwm_depth": float(self.pwm_depth.value()),
+            "pwm_speed": float(self.pwm_speed.value()),
+            "flt_cutoff": float(self.flt_cutoff.value()),
+            "flt_sweep": float(self.flt_sweep.value()),
+            "flt_res": float(self.flt_res.value()),
         }
 
     def _on_change(self, *_a) -> None:
@@ -289,6 +318,12 @@ class SfxGenerator(QMainWindow):
         self.vib_speed.setValue(vs)
         self.stereo_width.setValue(0.0)   # Presets sind mono/zentriert
         self.pan.setValue(0.0)
+        self.duty.setValue(0.5)           # SID-Parameter auf neutral
+        self.pwm_depth.setValue(0.0)
+        self.pwm_speed.setValue(0.0)
+        self.flt_cutoff.setValue(0)
+        self.flt_sweep.setValue(0)
+        self.flt_res.setValue(0.0)
         self._on_change()
         self._play()
 
@@ -328,14 +363,24 @@ class SfxGenerator(QMainWindow):
 
     def _export_code(self) -> None:
         p = self._params()
-        # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit -- laeuft in
-        # BEIDEN Pfaden (Tree-Walker + nativer gbrt), kein WAV-Asset noetig.
-        # stereo_width nur anhaengen, wenn > 0 (10. Arg ist optional).
+        # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit (nativ in gbrt),
+        # kein WAV-Asset noetig. Die optionalen Trailing-Args sind positionell
+        # -> alle bis zum letzten nicht-Default-Wert anhaengen.
         sfx = (f'AUDIO_SFX("{p["waveform"]}", {p["base_freq"]:g}, '
                f'{p["slide"]:g}, {p["attack"]}, {p["sustain"]}, {p["decay"]}, '
                f'{p["vib_depth"]:g}, {p["vib_speed"]:g}, {p["volume"]:g}')
-        if p["stereo_width"] > 0:
-            sfx += f', {p["stereo_width"]:g}'
+        # (Wert, Default) in AUDIO_SFX-Argument-Reihenfolge ab Index 9.
+        trailing = [
+            (p["stereo_width"], 0.0), (p["duty"], 0.5),
+            (p["pwm_depth"], 0.0), (p["pwm_speed"], 0.0),
+            (p["flt_cutoff"], 0.0), (p["flt_sweep"], 0.0), (p["flt_res"], 0.0),
+        ]
+        last = -1
+        for i, (v, d) in enumerate(trailing):
+            if abs(v - d) > 1e-9:
+                last = i
+        for v, _d in trailing[:last + 1]:
+            sfx += f', {v:g}'
         sfx += ")"
         lines = ['IMPORT "audio"', "", "DIM snd AS SOUND", f"snd = {sfx}"]
         pan = p["pan"]

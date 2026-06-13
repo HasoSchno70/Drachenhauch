@@ -8,7 +8,33 @@ numpy -- in Phase 8 behalten).
 """
 import numpy as np
 
-from gamebasic.synth import synthesize
+from gamebasic.synth import synthesize, svf_lowpass
+
+
+def test_synth_duty_default_unchanged():
+    # duty=0.5 (Default) muss bit-genau die alte sign(sin)-Rechteckwelle sein.
+    old = synthesize("square", 440.0, 0.0, 0, 100, 0, sr=44100)
+    new = synthesize("square", 440.0, 0.0, 0, 100, 0, sr=44100, duty=0.5)
+    assert np.array_equal(old, new)
+
+
+def test_synth_narrow_duty_changes_wave():
+    # Schmale Pulsbreite -> ueberwiegend bei -1 (anderer Klang).
+    w = synthesize("square", 220.0, 0.0, 0, 100, 0, sr=44100, duty=0.1)
+    assert float(np.mean(w)) < -0.3
+
+
+def test_synth_filter_attenuates_high_freq():
+    # 8 kHz durch tiefen Cutoff -> zweite Haelfte deutlich leiser.
+    raw = synthesize("saw", 8000.0, 0.0, 0, 100, 0, sr=44100)
+    flt = synthesize("saw", 8000.0, 0.0, 0, 100, 0, sr=44100, flt_cutoff=300.0)
+    h = len(raw) // 2
+    assert np.abs(flt[h:]).max() < np.abs(raw[h:]).max() * 0.6
+
+
+def test_svf_bypass_when_cutoff_zero():
+    sig = np.array([0.3, -0.7, 0.5, -0.2])
+    assert np.array_equal(svf_lowpass(sig, 0.0, 0.0, 0.0, 44100), sig)
 
 
 def test_synth_stereo_shape_and_channels():

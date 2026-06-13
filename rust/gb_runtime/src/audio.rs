@@ -859,7 +859,10 @@ impl Audio {
     pub fn sfx(&mut self, waveform: &str, base_freq: f64, slide: f64,
                attack_ms: i64, sustain_ms: i64, decay_ms: i64,
                vib_depth: f64, vib_speed: f64, volume: f64,
-               stereo_width: f64) -> Result<i64, String> {
+               stereo_width: f64,
+               duty: f64, pwm_depth: f64, pwm_speed: f64,
+               flt_cutoff: f64, flt_sweep: f64, flt_res: f64) -> Result<i64, String> {
+        let fx = SidFx { duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res };
         let wf = waveform.to_lowercase();
         if !matches!(wf.as_str(), "sine" | "square" | "saw" | "triangle" | "noise") {
             return Err(format!(
@@ -874,16 +877,16 @@ impl Audio {
         if n == 0 { return Err("AUDIO_SFX: Gesamtdauer zu klein".into()); }
         let na = (n as f64 * attack_ms as f64 / total_ms as f64) as usize;
         let nd = (n as f64 * decay_ms as f64 / total_ms as f64) as usize;
-        let left = build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr);
+        let left = build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr, fx);
         let data = if stereo_width <= 0.0 {
             self.make_data_mono(&left, volume, sr)
         } else {
             let w = stereo_width.min(1.0);
             let right = if wf == "noise" {
-                build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr)
+                build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr, fx)
             } else {
                 let detune = 1.0 + 0.04 * w;
-                build_sfx_buffer(&wf, base_freq * detune, slide * detune, n, na, nd, vib_depth, vib_speed, sr)
+                build_sfx_buffer(&wf, base_freq * detune, slide * detune, n, na, nd, vib_depth, vib_speed, sr, fx)
             };
             self.make_data_stereo(&left, &right, volume, sr)
         };
@@ -1263,10 +1266,42 @@ fn rng_uniform() -> f64 {
     })
 }
 
+/// Parameter der SID-Erweiterungen von AUDIO_SFX (Pulsbreite/PWM + resonanter
+/// Tiefpass-Sweep). Defaults reproduzieren exakt den bisherigen Klang.
+#[derive(Clone, Copy)]
+struct SidFx {
+    duty: f64, pwm_depth: f64, pwm_speed: f64,
+    flt_cutoff: f64, flt_sweep: f64, flt_res: f64,
+}
+impl Default for SidFx {
+    fn default() -> Self {
+        SidFx { duty: 0.5, pwm_depth: 0.0, pwm_speed: 0.0,
+                flt_cutoff: 0.0, flt_sweep: 0.0, flt_res: 0.0 }
+    }
+}
+
+/// Resonanter Tiefpass (Chamberlin SVF) mit ueber die Zeit gleitender
+/// Grenzfrequenz -- der SID/Acid-Sweep. Identisch zu `synth.svf_lowpass`
+/// (Editor-Vorschau), damit beide gleich klingen. Pure -> Rust-`#[test]`.
+fn svf_lowpass(wave: &mut [f64], cutoff: f64, sweep: f64, res: f64, sr: u32) {
+    if cutoff <= 0.0 || wave.is_empty() { return; }
+    let q = 1.0 - res.clamp(0.0, 0.95);
+    let nyq = sr as f64 * 0.5;
+    let (mut low, mut band) = (0.0f64, 0.0f64);
+    for i in 0..wave.len() {
+        let fc = (cutoff + sweep * (i as f64 / sr as f64)).clamp(10.0, nyq * 0.99);
+        let f = 2.0 * (PI64 * fc / sr as f64).sin();
+        low += f * band;
+        let high = wave[i] - low - q * band;
+        band += f * high;
+        wave[i] = low.clamp(-1.0, 1.0);
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
                     na: usize, nd: usize, vib_depth: f64, vib_speed: f64,
-                    sr: u32) -> Vec<f64> {
+                    sr: u32, fx: SidFx) -> Vec<f64> {
     let mut buf = vec![0.0f64; n];
     let mut phase = 0.0f64;
     for i in 0..n {
@@ -1276,18 +1311,33 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
             freq *= 1.0 + vib_depth * (2.0 * PI64 * vib_speed * t).sin();
         }
         freq = freq.clamp(20.0, sr as f64 / 2.0);
-        let v = if wf == "noise" {
+        buf[i] = if wf == "noise" {
             rng_uniform()
         } else {
             phase += 2.0 * PI64 * freq / sr as f64;
-            phase_value(wf, phase)
+            if wf == "square" {
+                // Pulsbreite (ph mod 1 < duty); duty=0.5 == sign(sin) (alt).
+                let ph = phase / (2.0 * PI64);
+                let frac = ph - ph.floor();
+                let duty_t = if fx.pwm_depth > 0.0 && fx.pwm_speed > 0.0 {
+                    fx.duty + fx.pwm_depth * (2.0 * PI64 * fx.pwm_speed * t).sin()
+                } else { fx.duty }.clamp(0.05, 0.95);
+                if frac < duty_t { 1.0 } else { -1.0 }
+            } else {
+                phase_value(wf, phase)
+            }
         };
+    }
+    if fx.flt_cutoff > 0.0 {
+        svf_lowpass(&mut buf, fx.flt_cutoff, fx.flt_sweep, fx.flt_res, sr);
+    }
+    for i in 0..n {
         let env = if na > 0 && i < na {
             i as f64 / na as f64
         } else if nd > 0 && i >= n - nd {
             (n - 1 - i) as f64 / nd as f64
         } else { 1.0 };
-        buf[i] = (v * env).clamp(-1.0, 1.0);
+        buf[i] = (buf[i] * env).clamp(-1.0, 1.0);
     }
     buf
 }
@@ -1351,7 +1401,8 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{lofi_chain, pendulum_pos, resample};
+    use super::{build_sfx_buffer, lofi_chain, pendulum_pos, resample,
+                svf_lowpass, SidFx};
 
     #[test]
     fn resample_octave_up_halves_length() {
@@ -1378,5 +1429,50 @@ mod tests {
     fn pendulum_starts_left() {
         assert!(pendulum_pos(0.0, 4.0, 1.0).abs() < 1e-9);
         assert!((pendulum_pos(2.0, 4.0, 1.0) - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn square_duty_default_matches_sign_of_sin() {
+        // duty=0.5 (Default) muss exakt die alte sign(sin)-Rechteckwelle sein.
+        let n = 441;
+        let buf = build_sfx_buffer("square", 440.0, 0.0, n, 0, 0, 0.0, 0.0,
+                                   44100, SidFx::default());
+        let mut phase = 0.0f64;
+        for v in buf.iter().take(n) {
+            phase += 2.0 * super::PI64 * 440.0 / 44100.0;
+            let expect = if phase.sin() >= 0.0 { 1.0 } else { -1.0 };
+            assert!((v - expect).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn square_duty_narrow_spends_less_time_high() {
+        // Schmale Pulsbreite (10%) -> Welle ist ueberwiegend bei -1.
+        let n = 4410;
+        let fx = SidFx { duty: 0.1, ..SidFx::default() };
+        let buf = build_sfx_buffer("square", 220.0, 0.0, n, 0, 0, 0.0, 0.0, 44100, fx);
+        let high = buf.iter().filter(|&&v| v > 0.0).count();
+        assert!(high < n / 3, "schmaler Puls sollte selten high sein, war {high}/{n}");
+    }
+
+    #[test]
+    fn svf_lowpass_attenuates_high_freq() {
+        // Hochfrequentes Signal durch einen tiefen Cutoff -> deutlich leiser.
+        let n = 4410;
+        let mut sig: Vec<f64> = (0..n)
+            .map(|i| (2.0 * super::PI64 * 8000.0 * i as f64 / 44100.0).sin())
+            .collect();
+        let before = sig.iter().map(|v| v.abs()).fold(0.0, f64::max);
+        svf_lowpass(&mut sig, 300.0, 0.0, 0.0, 44100);
+        let after = sig.iter().skip(n / 2).map(|v| v.abs()).fold(0.0, f64::max);
+        assert!(after < before * 0.5, "Tiefpass sollte 8kHz daempfen: {after} vs {before}");
+    }
+
+    #[test]
+    fn svf_cutoff_zero_is_bypass() {
+        let mut sig = vec![0.3, -0.7, 0.5, -0.2];
+        let copy = sig.clone();
+        svf_lowpass(&mut sig, 0.0, 0.0, 0.0, 44100);
+        assert_eq!(sig, copy);
     }
 }

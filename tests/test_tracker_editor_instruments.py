@@ -190,10 +190,29 @@ def test_export_audio_renders_wav(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     monkeypatch.setattr(QMessageBox, "information",
                         staticmethod(lambda *a, **k: None))
+    # Render-Optionen-Dialog (modal) ueberspringen -> Mono.
+    monkeypatch.setattr(ed, "_ask_render_options", lambda: (False, False))
     ed._export_audio()
     assert out.exists()
     with wave.open(str(out), "rb") as w:
         assert w.getnframes() > 0
+        assert w.getnchannels() == 1
+
+
+def test_export_audio_stereo_hard_pan(tmp_path, monkeypatch):
+    import wave
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+    ed = _editor()
+    ed.song.patterns[0].set(0, 0, 60)
+    out = tmp_path / "song_st.wav"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(ed, "_ask_render_options", lambda: (True, True))
+    ed._export_audio()
+    with wave.open(str(out), "rb") as w:
+        assert w.getnchannels() == 2
 
 
 def test_instrument_dialog_applies_loop_and_env(tmp_path):

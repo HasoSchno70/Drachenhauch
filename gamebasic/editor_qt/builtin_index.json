@@ -425,7 +425,7 @@
   {
    "name": "AUDIO_SFX",
    "kind": "core",
-   "signature": "AUDIO_SFX(9..10 Argumente)",
+   "signature": "AUDIO_SFX(wf, freq, slide, atk, sus, dec, vib_d, vib_s, vol [, stereo_width, duty, pwm_depth, pwm_speed, flt_cutoff, flt_sweep, flt_res])",
    "module": "audio"
   },
   {

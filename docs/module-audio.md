@@ -191,6 +191,37 @@ PLAYSOUND(explosion)
 
 Generierte Sounds haben automatisch ein kurzes Fade-in/out (5 ms) gegen Clicks am Anfang/Ende.
 
+### `AUDIO_SFX` (sfxr-Stil + SID-Charakter)
+
+Der prozedurale Effekt-Synth mit Pitch-Slide, ADSR, Vibrato, Stereo-Breite —
+und **SID-Erweiterungen** (Pulsbreite/PWM + resonanter Tiefpass-Sweep). Die
+SID-Argumente sind alle optional; weglassen reproduziert exakt den bisherigen
+Klang. Am bequemsten baut man `AUDIO_SFX`-Aufrufe im **Audio Studio** (SFX-Tab,
+`gbsound`) und kopiert den GB-Code.
+
+```
+AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
+          vib_depth, vib_speed, vol
+          [, stereo_width, duty, pwm_depth, pwm_speed,
+           flt_cutoff, flt_sweep, flt_res])
+```
+
+| Argument | Wirkung |
+|---|---|
+| `duty` | Pulsbreite der `square`-Welle (0.05..0.95; **0.5 = symmetrisch = wie bisher**). Schmaler = duenner/naeselnder SID-Puls. |
+| `pwm_depth` / `pwm_speed` | Pulsbreiten-**Modulation** (PWM): die Pulsbreite pendelt mit `pwm_speed` Hz um `duty` — der typische SID-Schimmer. |
+| `flt_cutoff` | Grenzfrequenz des resonanten Tiefpasses in Hz (**0 = aus**). |
+| `flt_sweep` | Cutoff-Verlauf in Hz/s ueber die Note (z. B. -8000 = Acid-Sweep nach unten). |
+| `flt_res` | Resonanz 0..0.95 — betont die Grenzfrequenz (SID/TB-303-Charakter). |
+
+```basic
+' SID-Pulsbass mit PWM + Filter-Sweep:
+DIM s AS SOUND
+s = AUDIO_SFX("square", 110, 0, 0, 600, 200, 0, 0, 0.8, _
+              0.0, 0.25, 0.15, 5.0, 4000, -7000, 0.7)
+PLAYSOUND(s)
+```
+
 ## Sampler (Amiga-Stil): `SAMPLE_*`
 
 Ein geladenes PCM-Sample ueber die **ganze Klaviatur** spielen, indem es
