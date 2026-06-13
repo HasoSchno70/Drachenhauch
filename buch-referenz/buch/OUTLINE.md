@@ -38,7 +38,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 13 Verzweigungen: IF/ELSEIF/ELSE, SELECT CASE, IIF  (content/13_verzweigungen.js)
 - [x] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE  (content/14_schleifen.js)
 - [x] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)  (content/15_funktionen.js)
-- [ ] 16 Strings im Detail
+- [x] 16 Strings im Detail  (content/16_strings.js)
 - [ ] 17 Arrays
 - [ ] 18 Maps
 - [ ] 19 Tupel & Destructuring
@@ -87,7 +87,8 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.
 Session 2 (2026-06-13): Teil II Kap 12 (Ein-/Ausgabe) + Kap 13 (Verzweigungen:
 IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF) +
-Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs: FUNCTION/RETURN, SUB, mehrere
-Parameter, BYREF, Defaults, Named Args, Variadic ..., FUNCREF, Rekursion).
-38 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert.
-**Nächstes:** Kap 16 (Strings im Detail).
+Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs) + Kap 16 (Strings im Detail:
+LEN/UPPER/LOWER/LEFT/RIGHT/MID 0-basiert/Index+Slicing/INSTR/CONTAINS/IN/REPLACE/
+TRIM/SPLIT/JOIN/PAD/REPEAT/STR/VAL/CHR/ASC/Methoden-Syntax). 44 Seiten, alle Ausgaben
+gegen gbrt verifiziert, per LibreOffice gerendert.
+**Nächstes:** Kap 17 (Arrays).
