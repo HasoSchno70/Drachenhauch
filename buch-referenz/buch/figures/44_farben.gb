@@ -1,0 +1,35 @@
+' Screenshot-Demo Kapitel 44: Farben
+SCREEN(480, 320, "Farben")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(28, 30, 44))
+    ' Farbkonstanten als Palette
+    TEXT(12, 8, "Farbkonstanten:", WHITE)
+    BOX(12,  30, 62,  70, RED)
+    BOX(72,  30, 122, 70, GREEN)
+    BOX(132, 30, 182, 70, BLUE)
+    BOX(192, 30, 242, 70, YELLOW)
+    BOX(252, 30, 302, 70, CYAN)
+    BOX(312, 30, 362, 70, MAGENTA)
+    BOX(372, 30, 422, 70, ORANGE)
+    ' HSV-Regenbogen (Farbton 0..360 ueber die Breite)
+    TEXT(12, 90, "HSV-Regenbogen (Farbton 0..360):", WHITE)
+    DIM x AS INTEGER
+    FOR x = 0 TO 455
+        DIM h AS FLOAT
+        h = x / 456.0 * 360.0
+        LINE(12 + x, 112, 12 + x, 162, HSV(h, 1.0, 1.0))
+    NEXT
+    ' COLOR_LERP zwischen zwei Farben
+    TEXT(12, 182, "COLOR_LERP (Blau -> Orange):", WHITE)
+    FOR x = 0 TO 455
+        DIM t AS FLOAT
+        t = x / 456.0
+        LINE(12 + x, 204, 12 + x, 254, COLOR_LERP(RGB(40,80,255), RGB(255,160,0), t))
+    NEXT
+    ' Helligkeit (HSV value 0..1)
+    TEXT(12, 274, "Helligkeit (HSV value):", WHITE)
+    FOR x = 0 TO 455
+        LINE(12 + x, 296, 12 + x, 314, HSV(200.0, 0.7, x / 456.0))
+    NEXT
+    FLIP()
+WEND

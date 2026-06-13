@@ -66,7 +66,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)  (content/41_zeichnen.js, images/41_formen.png)
 - [x] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)  (content/42_extras.js, images/42_extras.png + 42_blend.png)
 - [x] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)  (content/43_bilder.js, images/43_bilder.png)
-- [ ] 44 Farben (RGB/HSV/COLOR_LERP)
+- [x] 44 Farben (RGB/HSV/COLOR_LERP)  (content/44_farben.js, images/44_farben.png)
 - [ ] 45 Eingabe (Tastatur/Maus/Gamepad)
 - [ ] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)
 - [ ] 47 Layer, Sprite-Atlas, Bulk-Draws
@@ -137,4 +137,6 @@ GENTEX_PERLIN/GRADIENT/CHECKED/COLOR/RADIAL, RENDERTARGET_*) — 2 Screenshots.
 + Kap 43 (Bilder: LOADIMAGE/IMAGEWIDTH/HEIGHT/DRAWIMAGE/DRAWIMAGEPART/DRAWIMAGEROT +
 imgfx IMAGE_SCALE/FLIP/ROTATE/TINT) — Screenshot mit Spritesheet. 144 Seiten.
 figures/assets/ enthält hero.png+coin.png (aus examples/mario kopiert) + held1.png (Frame 0).
-**Nächstes:** Kap 44 (Farben: RGB/HSV/COLOR_LERP + Konstanten).
++ Kap 44 (Farben: RGB, RED/GREEN/BLUE-Extraktion, Konstanten, HSV, COLOR_LERP) — Screenshot
+mit Palette/HSV-Regenbogen/COLOR_LERP. 147 Seiten. WICHTIG: gbrt-Hex = `&H` (NICHT `0x`!).
+**Nächstes:** Kap 45 (Eingabe: Tastatur/Maus/Gamepad + input-Modul) mit Screenshots.
