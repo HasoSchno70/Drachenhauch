@@ -56,7 +56,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 32 Zufall  (content/32_zufall.js)
 - [x] 33 Zeichenketten-Funktionen  (content/33_strings_ref.js)
 - [x] 34 Typumwandlung & Prüfung  (content/34_typen.js)
-- [ ] 35 Array-Helfer (SORT/PUSH/POP/...)
+- [x] 35 Array-Helfer (SORT/PUSH/POP/...)  (content/35_array_helfer.js)
 - [ ] 36 Map-Helfer
 - [ ] 37 Zeit & Datum
 - [ ] 38 Dateien
@@ -114,7 +114,9 @@ SIGN, LERP/REMAP, SIN/COS/TAN/ATAN2/DEG/RAD, WRAP/PINGPONG/MOVETOWARD, PI/TAU).
 + Kap 33 (Zeichenketten-Funktionen: kompakte bulletRich-Referenz aller String-Fns,
 Verweis auf Kap 16 fürs Tutorial). 100 Seiten, alle Ausgaben gegen gbrt verifiziert.
 Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher; Referenzkapitel
-(33+) dürfen kompakt sein (Übersicht statt Wiederholung).
-+ Kap 34 (Typumwandlung & Prüfung: STR$/VAL/TRYVAL/INT, CHR$/ASC/HEX$/BIN$,
-TYPEOF/ISNUM/ISINT/ISSTR/ISBOOL, IS_NIL, BASE64/CRC32/HASH). 104 Seiten, verifiziert.
-**Nächstes:** Kap 35 (Array-Helfer) — Referenzteil.
++ Kap 34 (Typumwandlung & Prüfung) + Kap 35 (Array-Helfer: LEN/DIMCOUNT/DIMSIZE,
+SORT/REVERSE/INDEXOF, SUM/AVG/MIN/MAX/FILL/COPY, PUSH/POP/INSERT/REMOVE_AT/REDIM).
+**NEUE VORGABE ab hier (User 2026-06-13): jeder Befehl bekommt mind. EIN eigenes
+Code-Beispiel** — Kap 33 (Strings-Ref) + Kap 34-Encoding deshalb von kompakt auf
+cmd+Beispiel nachgerüstet. 112 Seiten, alle Ausgaben gegen gbrt verifiziert.
+**Nächstes:** Kap 36 (Map-Helfer) — Referenzteil.

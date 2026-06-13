@@ -68,12 +68,11 @@ module.exports = (H) => [
 
   H.h2("Kodierung & Prüfsummen"),
   H.p("Für Speicherstände und Datenaustausch gibt es ein paar weitere Helfer. Base64 verpackt beliebigen Text in ein kompaktes, transportables Format; Prüfsummen erkennen, ob Daten unverändert sind."),
-  H.bulletRich("BASE64_ENCODE(s$) · BASE64_DECODE(s$)  ", "→ Text nach Base64 und zurück."),
-  H.bulletRich("CRC32(s$) · HASH(s$)  ", "→ Prüfsumme bzw. stabiler Hash (z. B. zur Save-Integrität)."),
-  H.code([
-    'PRINT BASE64_ENCODE("Hi!")',
-    'PRINT BASE64_DECODE("SGkh")',
-  ]),
-  H.code(["SGkh", "Hi!"], { out: true }),
+  H.cmd("BASE64_ENCODE · BASE64_DECODE", "BASE64_ENCODE(s$)   BASE64_DECODE(s$)",
+    "Kodiert Text nach Base64 und wieder zurück. Praktisch, um beliebige Daten als reinen Text zu speichern oder zu verschicken.",
+    ['PRINT BASE64_ENCODE("Hi!")', 'PRINT BASE64_DECODE("SGkh")'], { out: ["SGkh", "Hi!"] }),
+  H.cmd("CRC32 · HASH", "CRC32(s$)   HASH(s$)",
+    "Liefern eine Prüfsumme (CRC32) bzw. einen stabilen 64-Bit-Hash (HASH) eines Strings – nützlich, um die Unversehrtheit von Speicherständen zu prüfen oder Werte in Fächer (Buckets) einzusortieren.",
+    ['PRINT CRC32("hello")'], { out: ["907060870"] }),
   H.tip("Verwandte Kapitel", "Das Zusammenbauen von Text aus Werten geht am bequemsten mit f-Strings (Kapitel „Ein- und Ausgabe“); feste Nachkommastellen oder führende Nullen liefert FORMAT$ (Kapitel „Konsole & Ein-/Ausgabe“)."),
 ];
