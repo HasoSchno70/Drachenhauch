@@ -18,12 +18,13 @@ import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QDoubleSpinBox, QFileDialog, QFrame, QGroupBox,
-    QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton, QSpinBox,
+    QApplication, QComboBox, QFileDialog, QFrame, QGridLayout, QGroupBox,
+    QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
     QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.fader import Fader
 from .editor_qt.undo_history import SnapshotUndo
 from .editor_qt.preset_bar import PresetBar
 from .editor_qt.preset_library import PresetLibrary, default_dir
@@ -127,75 +128,29 @@ class SfxGenerator(QMainWindow):
         super().__init__()
         self.project_root = project_root
         self.setWindowTitle("GameBasic SFX-Generator")
-        self.resize(720, 640)
+        self.resize(900, 680)
         self._counter = 0
 
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
 
-        title = QLabel("SFX-Generator")
-        tf = QFont(); tf.setBold(True); tf.setPointSize(13)
+        title = QLabel("⚡  SFX-Generator")
+        tf = QFont(); tf.setBold(True); tf.setPointSize(14)
         title.setFont(tf)
+        title.setStyleSheet(f"color:{COLORS['accent']}; padding:2px 0;")
         root.addWidget(title)
 
-        # Presets (Werks-Schnellzugriff)
-        pre = QHBoxLayout()
-        pre.addWidget(QLabel("Preset:"))
-        for name in _PRESETS:
-            b = QPushButton(name)
-            b.clicked.connect(lambda _=False, n=name: self._load_preset(n))
-            pre.addWidget(b)
-        pre.addStretch(1)
-        root.addLayout(pre)
-
-        # Preset-Bibliothek (eigene Sounds speichern/laden)
-        self.presets = PresetLibrary(default_dir() / "sfx.json")
-        self.preset_bar = PresetBar(
-            self.presets, self._params, self._apply_params)
-        root.addWidget(self.preset_bar)
-
-        # Wellenform-Vorschau
-        self.wave_view = _WaveView()
-        root.addWidget(self.wave_view)
-
-        # Parameter
-        params = QHBoxLayout()
-        col1 = QGroupBox("Ton")
-        c1 = QVBoxLayout(col1)
-        self.waveform = QComboBox(); self.waveform.addItems(_WAVEFORMS)
-        self.waveform.currentTextChanged.connect(self._on_change)
-        self._row(c1, "Waveform", self.waveform)
-        self.base_freq = self._ispin(c1, "Frequenz (Hz)", 50, 8000, 800)
-        self.slide = self._ispin(c1, "Pitch-Slide (Hz/s)", -8000, 8000, 0)
-        self.volume = self._dspin(c1, "Lautstaerke", 0.0, 1.0, 0.7, 0.05)
-        params.addWidget(col1)
-
-        col2 = QGroupBox("Huellkurve && Vibrato")
-        c2 = QVBoxLayout(col2)
-        self.attack = self._ispin(c2, "Attack (ms)", 0, 2000, 0)
-        self.sustain = self._ispin(c2, "Sustain (ms)", 0, 4000, 40)
-        self.decay = self._ispin(c2, "Decay (ms)", 0, 4000, 150)
-        self.vib_depth = self._dspin(c2, "Vibrato-Tiefe", 0.0, 0.5, 0.0, 0.01)
-        self.vib_speed = self._ispin(c2, "Vibrato-Speed (Hz)", 0, 60, 0)
-        self.stereo_width = self._dspin(c2, "Stereo-Breite", 0.0, 1.0, 0.0, 0.05)
-        self.pan = self._dspin(c2, "Pan (L -1 .. +1 R)", -1.0, 1.0, 0.0, 0.1)
-        params.addWidget(col2)
-
-        # SID-Stil: Pulsbreite/PWM (nur square) + resonanter Tiefpass-Sweep.
-        col3 = QGroupBox("SID / Filter")
-        c3 = QVBoxLayout(col3)
-        self.duty = self._dspin(c3, "Pulsbreite (square)", 0.05, 0.95, 0.5, 0.05)
-        self.pwm_depth = self._dspin(c3, "PWM-Tiefe", 0.0, 0.45, 0.0, 0.01)
-        self.pwm_speed = self._dspin(c3, "PWM-Speed (Hz)", 0.0, 30.0, 0.0, 0.5)
-        self.flt_cutoff = self._ispin(c3, "Filter-Cutoff (Hz, 0=aus)", 0, 12000, 0)
-        self.flt_sweep = self._ispin(c3, "Filter-Sweep (Hz/s)", -12000, 12000, 0)
-        self.flt_res = self._dspin(c3, "Resonanz", 0.0, 0.95, 0.0, 0.05)
-        params.addWidget(col3)
-        root.addLayout(params)
-
-        # Buttons
+        # --- Transport (Abspielen/Zufall/Export + Undo) ---
         btns = QHBoxLayout()
+        b_play = QPushButton("▶  Abspielen")
+        b_play.setProperty("accent", True)
+        b_play.clicked.connect(self._play)
+        btns.addWidget(b_play)
+        b_rand = QPushButton("🎲  Zufall")
+        b_rand.clicked.connect(self._randomize)
+        btns.addWidget(b_rand)
+        btns.addStretch(1)
         self.btn_undo = QPushButton("↶")
         self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
         self.btn_undo.setFixedWidth(34)
@@ -204,14 +159,6 @@ class SfxGenerator(QMainWindow):
         self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
         self.btn_redo.setFixedWidth(34)
         btns.addWidget(self.btn_redo)
-        b_play = QPushButton("▶ Abspielen")
-        b_play.setProperty("accent", True)
-        b_play.clicked.connect(self._play)
-        btns.addWidget(b_play)
-        b_rand = QPushButton("Zufall")
-        b_rand.clicked.connect(self._randomize)
-        btns.addWidget(b_rand)
-        btns.addStretch(1)
         b_wav = QPushButton("WAV exportieren ...")
         b_wav.clicked.connect(self._export_wav)
         btns.addWidget(b_wav)
@@ -219,7 +166,73 @@ class SfxGenerator(QMainWindow):
         b_code.clicked.connect(self._export_code)
         btns.addWidget(b_code)
         root.addLayout(btns)
-        root.addStretch(1)
+
+        # Preset-Bibliothek (eigene Sounds speichern/laden)
+        self.presets = PresetLibrary(default_dir() / "sfx.json")
+        self.preset_bar = PresetBar(
+            self.presets, self._params, self._apply_params)
+        root.addWidget(self.preset_bar)
+
+        # --- Hauptbereich: Preset-Leiste links | Wellenform + Fader-Bank ---
+        main = QHBoxLayout()
+        main.setSpacing(10)
+
+        rail = QVBoxLayout(); rail.setSpacing(5)
+        rl = QLabel("Presets"); rl.setStyleSheet(
+            f"color:{COLORS['fg_muted']}; font-size:11px;")
+        rail.addWidget(rl)
+        for name in _PRESETS:
+            b = QPushButton(name)
+            b.clicked.connect(lambda _=False, n=name: self._load_preset(n))
+            rail.addWidget(b)
+        rail.addStretch(1)
+        rail_w = QWidget(); rail_w.setLayout(rail); rail_w.setFixedWidth(132)
+        main.addWidget(rail_w)
+
+        right = QVBoxLayout(); right.setSpacing(8)
+        self.wave_view = _WaveView()
+        self.wave_view.setMinimumHeight(150)
+        right.addWidget(self.wave_view)
+
+        grid = QGridLayout(); grid.setSpacing(8)
+        cyan, mint = COLORS["accent"], COLORS["success"]
+        magenta, amber = COLORS["danger"], "#EF9F27"
+
+        gb1, c1 = self._group("Ton", cyan)
+        self.waveform = QComboBox(); self.waveform.addItems(_WAVEFORMS)
+        self.waveform.currentTextChanged.connect(self._on_change)
+        self._row(c1, "Waveform", self.waveform)
+        self.base_freq = self._fader(c1, "Frequenz", 50, 8000, 800, 1, 0, "Hz", cyan)
+        self.slide = self._fader(c1, "Pitch-Slide", -8000, 8000, 0, 1, 0, "Hz/s", cyan)
+        self.volume = self._fader(c1, "Lautstaerke", 0.0, 1.0, 0.7, 0.01, 2, "", cyan)
+        grid.addWidget(gb1, 0, 0)
+
+        gb2, c2 = self._group("Huellkurve", mint)
+        self.attack = self._fader(c2, "Attack", 0, 2000, 0, 1, 0, "ms", mint)
+        self.sustain = self._fader(c2, "Sustain", 0, 4000, 40, 1, 0, "ms", mint)
+        self.decay = self._fader(c2, "Decay", 0, 4000, 150, 1, 0, "ms", mint)
+        grid.addWidget(gb2, 0, 1)
+
+        gb3, c3 = self._group("SID / Filter", magenta)
+        self.duty = self._fader(c3, "Pulsbreite", 0.05, 0.95, 0.5, 0.01, 2, "", magenta)
+        self.pwm_depth = self._fader(c3, "PWM-Tiefe", 0.0, 0.45, 0.0, 0.01, 2, "", magenta)
+        self.pwm_speed = self._fader(c3, "PWM-Speed", 0.0, 30.0, 0.0, 0.5, 1, "Hz", magenta)
+        self.flt_cutoff = self._fader(c3, "Filter-Cutoff", 0, 12000, 0, 50, 0, "Hz", magenta)
+        self.flt_sweep = self._fader(c3, "Filter-Sweep", -12000, 12000, 0, 100, 0, "Hz/s", magenta)
+        self.flt_res = self._fader(c3, "Resonanz", 0.0, 0.95, 0.0, 0.05, 2, "", magenta)
+        grid.addWidget(gb3, 1, 0)
+
+        gb4, c4 = self._group("Vibrato / Stereo", amber)
+        self.vib_depth = self._fader(c4, "Vib-Tiefe", 0.0, 0.5, 0.0, 0.01, 2, "", amber)
+        self.vib_speed = self._fader(c4, "Vib-Speed", 0, 60, 0, 1, 0, "Hz", amber)
+        self.stereo_width = self._fader(c4, "Stereo-Breite", 0.0, 1.0, 0.0, 0.05, 2, "", amber)
+        self.pan = self._fader(c4, "Pan (L..R)", -1.0, 1.0, 0.0, 0.1, 1, "", amber)
+        grid.addWidget(gb4, 1, 1)
+
+        right.addLayout(grid)
+        right.addStretch(1)
+        main.addLayout(right, 1)
+        root.addLayout(main, 1)
 
         self._load_preset("Jump")
 
@@ -261,22 +274,27 @@ class SfxGenerator(QMainWindow):
     # ---- Helfer
     def _row(self, layout, label, widget):
         r = QHBoxLayout()
-        lab = QLabel(label); lab.setFixedWidth(140)
+        lab = QLabel(label)
+        lab.setStyleSheet(f"color:{COLORS['fg_muted']}; font-size:11px;")
+        lab.setFixedWidth(74)
         r.addWidget(lab); r.addWidget(widget, 1)
         layout.addLayout(r)
 
-    def _ispin(self, layout, label, lo, hi, val):
-        sp = QSpinBox(); sp.setRange(lo, hi); sp.setValue(int(val))
-        sp.valueChanged.connect(self._on_change)
-        self._row(layout, label, sp)
-        return sp
+    def _group(self, title: str, accent: str):
+        """Eine farbcodierte Parameter-Karte. Liefert (GroupBox, Layout)."""
+        gb = QGroupBox(title)
+        gb.setStyleSheet(
+            f"QGroupBox::title {{ color:{accent}; "
+            f"background-color:{COLORS['bg_alt']}; }}")
+        lay = QVBoxLayout(gb); lay.setSpacing(7)
+        return gb, lay
 
-    def _dspin(self, layout, label, lo, hi, val, step):
-        sp = QDoubleSpinBox(); sp.setRange(lo, hi); sp.setSingleStep(step)
-        sp.setValue(val)
-        sp.valueChanged.connect(self._on_change)
-        self._row(layout, label, sp)
-        return sp
+    def _fader(self, layout, label, lo, hi, val, step=1.0, decimals=0,
+               unit="", accent=None):
+        f = Fader(label, lo, hi, val, step, decimals, unit, accent)
+        f.valueChanged.connect(self._on_change)
+        layout.addWidget(f)
+        return f
 
     # ---- Parameter <-> UI
     def _params(self) -> dict:
