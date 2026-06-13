@@ -1,0 +1,72 @@
+module.exports = (H) => [
+  H.chapter("Eingabe"),
+  H.p("Ein Spiel wird erst lebendig, wenn der Spieler eingreifen kann. Im Grafikfenster fragst du Tastatur, Maus und Gamepad nicht mit INPUT ab (das ist nur für die Konsole), sondern Frame für Frame im Game-Loop. Dieses Kapitel zeigt die direkten Abfragen und das komfortable input-Modul, mit dem du Tasten an benannte Aktionen bindest."),
+  H.figure("45_eingabe.png", "Eine kleine Steuerungs-Demo: ein per Tastatur bewegter Spieler und eine Steuerungs-Legende."),
+
+  H.h2("Tastatur"),
+  H.cmd("KEYPRESSED", "KEYPRESSED(taste)",
+    "Liefert TRUE, solange die angegebene Taste gehalten wird. Die Taste gibst du als KEY_-Konstante an. Im Game-Loop abgefragt, ergibt das flüssige Bewegung.",
+    [
+      'IF KEYPRESSED(KEY_LEFT)  THEN px = px - 2',
+      'IF KEYPRESSED(KEY_RIGHT) THEN px = px + 2',
+      'IF KEYPRESSED(KEY_SPACE) THEN \' springen',
+    ]),
+  H.p("Eingebaute Tasten-Konstanten gibt es für alle wichtigen Tasten: KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN, KEY_SPACE, KEY_RETURN (= KEY_ENTER), KEY_ESCAPE, KEY_TAB, KEY_BACKSPACE, die Buchstaben KEY_A bis KEY_Z und die Ziffern KEY_0 bis KEY_9."),
+  H.note("KEYPRESSED ist „gehalten“ – es ist TRUE, solange die Taste unten ist. Für „genau einmal beim Drücken“ (z. B. Sprung, Menü-Auswahl) nimmst du die Edge-Erkennung des input-Moduls weiter unten (INPUT_PRESSED)."),
+
+  H.h2("Maus"),
+  H.cmd("MOUSEX · MOUSEY", "MOUSEX()   MOUSEY()",
+    "Liefern die aktuelle Mausposition im Fenster (in logischen Pixeln). Gut, um ein Fadenkreuz oder einen Cursor zu zeichnen oder zu prüfen, worüber die Maus steht.",
+    [
+      'CLS()',
+      'CIRCLE(MOUSEX(), MOUSEY(), 6, RGB(255, 255, 255))  \' Fadenkreuz',
+      'FLIP()',
+    ]),
+  H.cmd("MOUSEBUTTON", "MOUSEBUTTON(n)",
+    "Liefert TRUE, wenn die Maustaste n gedrückt ist: 0 = links, 1 = mitte, 2 = rechts.",
+    [
+      'IF MOUSEBUTTON(0) THEN \' Linksklick: schiessen',
+    ]),
+  H.cmd("MOUSEWHEEL", "MOUSEWHEEL()",
+    "Liefert die Drehung des Mausrads seit dem letzten Aufruf: positiv nach oben, negativ nach unten, 0 wenn nichts gedreht wurde. Gut zum Zoomen oder Blättern.",
+    [
+      'DIM zoom AS FLOAT',
+      'zoom = zoom + MOUSEWHEEL() * 0.1',
+    ]),
+  H.cmd("MOUSE_VISIBLE · MOUSE_LOCK", "MOUSE_VISIBLE(an)   MOUSE_LOCK(an)",
+    "MOUSE_VISIBLE zeigt/versteckt den System-Cursor (verstecken, wenn du ein eigenes Cursor-Sprite zeichnest). MOUSE_LOCK fängt den Cursor im Fenster ein – für Maus-Kamerasteuerung in 3D/Ego-Perspektive.",
+    [
+      'MOUSE_VISIBLE(FALSE)    \' eigenen Cursor zeichnen',
+    ]),
+
+  H.h2("Komfortabel: das input-Modul"),
+  H.p("Tasten direkt abzufragen funktioniert, hat aber zwei Schwächen: Die Steuerung ist fest verdrahtet (kein Umbelegen möglich), und „genau einmal beim Drücken“ musst du selbst basteln. Das Modul input löst beides: Du bindest Tasten an benannte Aktionen (\"springen\", \"links\") und fragst diese Aktionen ab. Mehrere Tasten pro Aktion sind erlaubt (Pfeiltaste UND WASD)."),
+  H.p("Wichtig: Einmal pro Frame ruft INPUT_UPDATE() auf – das macht die Edge-Erkennung (PRESSED/RELEASED) erst möglich."),
+  H.cmd("INPUT_BIND · INPUT_UPDATE", 'INPUT_BIND(aktion$, taste1[, taste2, ...])   INPUT_UPDATE()',
+    "INPUT_BIND verbindet eine Aktion mit einer oder mehreren Tasten (einmal beim Start). INPUT_UPDATE liest pro Frame den aktuellen Tastenzustand ein – Pflicht am Anfang des Game-Loops.",
+    [
+      'IMPORT "input"',
+      'INPUT_BIND("links",     KEY_LEFT,  KEY_A)',
+      'INPUT_BIND("springen",  KEY_SPACE, KEY_W)',
+      '',
+      'WHILE NOT QUITREQUESTED()',
+      '    INPUT_UPDATE()       \' jeden Frame zuerst',
+      '    \' ... abfragen ...',
+      '    FLIP()',
+      'WEND',
+    ]),
+  H.cmd("INPUT_HELD · INPUT_PRESSED · INPUT_RELEASED", 'INPUT_HELD(aktion$)   INPUT_PRESSED(aktion$)   INPUT_RELEASED(aktion$)',
+    "INPUT_HELD ist TRUE, solange eine gebundene Taste gehalten wird (für Bewegung). INPUT_PRESSED ist nur in dem einen Frame TRUE, in dem die Taste neu gedrückt wird (für Sprung, Menü). INPUT_RELEASED feuert beim Loslassen.",
+    [
+      'IF INPUT_HELD("links") THEN px = px - 2',
+      'IF INPUT_PRESSED("springen") THEN \' genau einmal',
+    ]),
+  H.cmd("INPUT_AXIS", 'INPUT_AXIS(negativ$, positiv$)',
+    "Fasst zwei gegensätzliche Aktionen zu einer Achse zusammen und liefert -1, 0 oder +1. Sehr praktisch für Links/Rechts- oder Hoch/Runter-Bewegung in einer Zeile.",
+    [
+      'DIM dx AS INTEGER',
+      'dx = INPUT_AXIS("links", "rechts")   \' -1, 0 oder +1',
+      'px = px + dx * 2',
+    ]),
+  H.tip("Gamepad", "Das input-Modul unterstützt auch Gamepads: Binde Aktionen an Knopf-Codes wie JOY_BUTTON_A oder JOY_DPAD_LEFT, oder lies einen Analogstick mit INPUT_JOY_AXIS(slot, \"left_x\"). So funktioniert dieselbe Spiellogik mit Tastatur UND Controller, ohne den Code zu ändern."),
+];

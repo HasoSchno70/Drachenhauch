@@ -67,7 +67,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)  (content/42_extras.js, images/42_extras.png + 42_blend.png)
 - [x] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)  (content/43_bilder.js, images/43_bilder.png)
 - [x] 44 Farben (RGB/HSV/COLOR_LERP)  (content/44_farben.js, images/44_farben.png)
-- [ ] 45 Eingabe (Tastatur/Maus/Gamepad)
+- [x] 45 Eingabe (Tastatur/Maus/Gamepad)  (content/45_eingabe.js, images/45_eingabe.png)
 - [ ] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)
 - [ ] 47 Layer, Sprite-Atlas, Bulk-Draws
 - [ ] 48 3D-Grafik (g3d)
@@ -138,5 +138,8 @@ GENTEX_PERLIN/GRADIENT/CHECKED/COLOR/RADIAL, RENDERTARGET_*) — 2 Screenshots.
 imgfx IMAGE_SCALE/FLIP/ROTATE/TINT) — Screenshot mit Spritesheet. 144 Seiten.
 figures/assets/ enthält hero.png+coin.png (aus examples/mario kopiert) + held1.png (Frame 0).
 + Kap 44 (Farben: RGB, RED/GREEN/BLUE-Extraktion, Konstanten, HSV, COLOR_LERP) — Screenshot
-mit Palette/HSV-Regenbogen/COLOR_LERP. 147 Seiten. WICHTIG: gbrt-Hex = `&H` (NICHT `0x`!).
-**Nächstes:** Kap 45 (Eingabe: Tastatur/Maus/Gamepad + input-Modul) mit Screenshots.
+mit Palette/HSV-Regenbogen/COLOR_LERP. WICHTIG: gbrt-Hex = `&H` (NICHT `0x`!).
++ Kap 45 (Eingabe: KEYPRESSED/KEY_*-Konstanten, MOUSEX/Y/BUTTON/WHEEL/MOUSE_VISIBLE/LOCK,
+input-Modul BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS, Gamepad-Tipp) — Steuerungs-Screenshot.
+151 Seiten.
+**Nächstes:** Kap 46 (Sound: LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*) — KERNTHEMA des Users.

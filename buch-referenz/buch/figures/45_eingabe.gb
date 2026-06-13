@@ -1,0 +1,24 @@
+' Screenshot-Demo Kapitel 45: Eingabe (Steuerung)
+SCREEN(480, 320, "Eingabe")
+DIM px AS FLOAT
+DIM py AS FLOAT
+px = 220.0
+py = 150.0
+WHILE NOT QUITREQUESTED()
+    ' Bewegung per Pfeiltasten (framerate-unabhaengig)
+    IF KEYPRESSED(KEY_LEFT)  THEN px = px - 120.0 * DELTA()
+    IF KEYPRESSED(KEY_RIGHT) THEN px = px + 120.0 * DELTA()
+    IF KEYPRESSED(KEY_UP)    THEN py = py - 120.0 * DELTA()
+    IF KEYPRESSED(KEY_DOWN)  THEN py = py + 120.0 * DELTA()
+    CLS(RGB(26, 30, 46))
+    ' Spielfeld
+    RECT(20, 20, 459, 230, RGB(70, 80, 110))
+    ' Spieler
+    BOX(INT(px), INT(py), INT(px) + 36, INT(py) + 36, RGB(255, 180, 40))
+    CIRCLE(INT(px) + 18, INT(py) + 14, 4, RGB(20, 20, 20))
+    ' Steuerungs-Legende
+    TEXT(30, 250, "Pfeiltasten / WASD:  bewegen", RGB(220, 230, 255))
+    TEXT(30, 272, "Leertaste:  springen", RGB(220, 230, 255))
+    TEXT(30, 294, "Maustaste links:  schiessen", RGB(220, 230, 255))
+    FLIP()
+WEND
