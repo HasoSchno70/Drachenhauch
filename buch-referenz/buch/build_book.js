@@ -121,9 +121,16 @@ function cmd(name, syntax, desc, codeLines, opts = {}) {
   out.push(new Paragraph({ spacing: { before: 360, after: 40 }, keepNext: true, keepLines: true,
     border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: "DDD0C0", space: 2 } },
     children: [new TextRun({ text: name, bold: true, font: "Consolas", size: 24, color: C_CMD })] }));
-  if (syntax) out.push(new Paragraph({ spacing: { after: 120 }, keepNext: true,
-    children: [new TextRun({ text: "Syntax:  ", bold: true, size: 18, color: C_CAP }),
-               new TextRun({ text: syntax, font: "Consolas", size: 19, color: "335577" })] }));
+  if (syntax) {
+    // Mehrzeilige Syntax (\n) wird zu echten Zeilenumbruechen; Folgezeilen
+    // unter "Syntax:" eingerueckt, damit die Formen klar getrennt stehen.
+    const synLines = String(syntax).split("\n");
+    const synRuns = [new TextRun({ text: "Syntax:  ", bold: true, size: 18, color: C_CAP })];
+    synLines.forEach((ln, i) => synRuns.push(new TextRun({
+      text: i === 0 ? ln : "         " + ln, font: "Consolas", size: 19,
+      color: "335577", break: i === 0 ? 0 : 1 })));
+    out.push(new Paragraph({ spacing: { after: 120 }, keepNext: true, children: synRuns }));
+  }
   if (desc) (Array.isArray(desc) ? desc : [desc]).forEach((d) => out.push(p(d)));
   if (codeLines && codeLines.length) { out.push(smallLabel("Beispiel")); out.push(codeBlock(codeLines)); }
   if (opts.out) { out.push(smallLabel("Ausgabe")); out.push(codeBlock(opts.out, { out: true })); }

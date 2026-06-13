@@ -51,7 +51,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 26 Module importieren (IMPORT)  (content/26_module.js)
 
 ### Teil III — Eingebaute Befehle (Referenz)
-- [ ] 30 Konsole & Ein-/Ausgabe
+- [x] 30 Konsole & Ein-/Ausgabe  (content/30_konsole.js)
 - [ ] 31 Mathematik
 - [ ] 32 Zufall
 - [ ] 33 Zeichenketten-Funktionen
@@ -104,6 +104,10 @@ Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE) + Kap 24 (Fehlerbehan
 TRY/CATCH[e]/END TRY, THROW, wann nutzen + TRYVAL-Hinweis) + Kap 25 (Coroutinen:
 YIELD, CORO_RESUME/DONE/RESULT, FOR EACH, CORO_SEND zweiweg, CORO_CLOSE) + Kap 26
 (Module: eingebaut IMPORT "x" OHNE Endung, eigene Datei IMPORT "x.gb" MIT Endung,
-IMPORT ... AS Alias). **TEIL II KOMPLETT (Kap 10-26).** 87 Seiten, alle Ausgaben gegen
-gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Teil III — Kap 30 (Konsole & Ein-/Ausgabe), Referenzteil.
+IMPORT ... AS Alias). **TEIL II KOMPLETT (Kap 10-26).** Danach: ToC-Seitenzahlen-Bug behoben
+(measure() erkennt Überschriften per Schriftgröße ≥15 + monotone Suche) und
+mehrzeilige cmd-Syntax (\n) rendert jetzt als echte Zeilenumbrüche. **Teil III
+gestartet:** Kap 30 (Konsole & Ein-/Ausgabe: PRINT/INPUT/FORMAT$, Verweise auf
+Teil II + Teil IV). 91 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
+Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 31 (Mathematik) — Referenzteil.
