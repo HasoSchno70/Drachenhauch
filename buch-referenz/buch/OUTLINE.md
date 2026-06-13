@@ -58,7 +58,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 34 Typumwandlung & Prüfung  (content/34_typen.js)
 - [x] 35 Array-Helfer (SORT/PUSH/POP/...)  (content/35_array_helfer.js)
 - [x] 36 Map-Helfer  (content/36_map_helfer.js)
-- [ ] 37 Zeit & Datum
+- [x] 37 Zeit & Datum  (content/37_zeit.js)
 - [ ] 38 Dateien
 
 ### Teil IV — Grafik, Sound & Spiele
@@ -119,5 +119,7 @@ SORT/REVERSE/INDEXOF, SUM/AVG/MIN/MAX/FILL/COPY, PUSH/POP/INSERT/REMOVE_AT/REDIM
 **NEUE VORGABE ab hier (User 2026-06-13): jeder Befehl bekommt mind. EIN eigenes
 Code-Beispiel** — Kap 33 (Strings-Ref) + Kap 34-Encoding deshalb von kompakt auf
 cmd+Beispiel nachgerüstet. + Kap 36 (Map-Helfer: MAPPUT/GET/GETOR/HAS/SIZE/REMOVE/
-CLEAR/KEYS/VALUES/ITEMS + Methoden-Syntax). 116 Seiten, alle Ausgaben gegen gbrt verifiziert.
-**Nächstes:** Kap 37 (Zeit & Datum) — Referenzteil.
+CLEAR/KEYS/VALUES/ITEMS + Methoden-Syntax) + Kap 37 (Zeit & Datum: MILLIS, SLEEP,
+TIME$, DATE$; nicht-deterministische Werte als Kommentar statt Ausgabe-Kasten).
+118 Seiten, alle Ausgaben gegen gbrt verifiziert.
+**Nächstes:** Kap 38 (Dateien) — letztes Kapitel Teil III.
