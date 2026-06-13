@@ -76,7 +76,7 @@ module.exports = (H) => [
       'POLYGON(p, RGB(0, 210, 210))',
       'FLIP()',
     ]),
-  H.warn("Gefüllte Dreiecke und Polygone erscheinen nur, wenn du die Eckpunkte GEGEN den Uhrzeigersinn angibst (auf dem Bildschirm, wo y nach unten zeigt). Gibst du sie im Uhrzeigersinn an, bleibt die Fläche unsichtbar. Bei Bedarf einfach die Reihenfolge der Punkte umdrehen. (Die Outline-Varianten sind davon nicht betroffen.)"),
+  H.note("Die Reihenfolge der Eckpunkte spielt bei gefüllten Dreiecken und Polygonen keine Rolle – ob im oder gegen den Uhrzeigersinn, die Fläche wird immer gefüllt."),
 
   H.h2("Bögen"),
   H.cmd("ARC", "ARC(x1, y1, x2, y2, start, ende[, farbe[, breite]])",
