@@ -41,7 +41,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 16 Strings im Detail  (content/16_strings.js)
 - [x] 17 Arrays  (content/17_arrays.js)
 - [x] 18 Maps  (content/18_maps.js)
-- [ ] 19 Tupel & Destructuring
+- [x] 19 Tupel & Destructuring  (content/19_tupel.js)
 - [ ] 20 Klassen & Objekte
 - [ ] 21 Vererbung, Properties, Operatoren, Static
 - [ ] 22 ENUM
@@ -92,7 +92,8 @@ DIM[n], 0-Index+Bounds, LEN/Iteration/FOR EACH, SORT/REVERSE/INDEXOF, Aggregate
 SUM/AVG/MIN/MAX/FILL, dynamisch PUSH/POP/INSERT/REMOVE_AT/REDIM, Slicing,
 **Alias-Stolperstein b=a kopiert NICHT → ARRAY_COPY**, mehrdimensional) + Kap 18 (Maps: MAPPUT/GET/GETOR/HAS/IN/SIZE/REMOVE/CLEAR,
 FOR EACH über Keys, MAPKEYS/VALUES/ITEMS, Methoden-Syntax, STR$-Keys/Cache,
-Alias-Hinweis). 56 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice
-gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher (mehr
-Hintergrund/mentale Modelle).
-**Nächstes:** Kap 19 (Tupel & Destructuring).
+Alias-Hinweis) + Kap 19 (Tupel & Destructuring: Literal (a,b,...), Index/length,
+unveränderlich, Destructuring (a,b)=tupel, mehrere Rückgabewerte, Tausch-Trick,
+FOR EACH). 60 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice
+gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 20 (Klassen & Objekte).

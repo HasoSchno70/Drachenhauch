@@ -1,0 +1,86 @@
+module.exports = (H) => [
+  H.chapter("Tupel & Destructuring"),
+  H.p("Ein Tupel ist ein festes Bündel aus mehreren Werten, die zusammengehören – etwa die x- und y-Koordinate eines Punktes, oder ein Name zusammen mit einem Alter. Du schreibst die Werte einfach durch Kommas getrennt in runde Klammern. Anders als ein Array darf ein Tupel Werte unterschiedlichen Typs enthalten, und es hat eine feste Größe, die sich nie ändert."),
+  H.p("Tupel glänzen vor allem in zwei Situationen: Sie lassen eine Funktion mehrere Ergebnisse auf einmal zurückgeben, und sie lassen sich beim Zuweisen elegant wieder in einzelne Variablen zerlegen. Diese Zerlegung heißt Destructuring – sie ist der eigentliche Star dieses Kapitels."),
+
+  H.h2("Ein Tupel bauen"),
+  H.p("Ein Tupel-Literal ist eine Liste von mindestens zwei Werten in runden Klammern. Du legst es in einer Variablen vom Typ TUPLE ab. Auf die einzelnen Werte greifst du wie bei einem Array über einen Index zu (auch hier ab 0 gezählt), und length() verrät dir die Anzahl."),
+  H.cmd("Tupel-Literal", "(wert1, wert2, ...)",
+    "Bündelt zwei oder mehr Werte – auch unterschiedlichen Typs – zu einem Tupel. Eine einzelne Klammer wie (5) ist KEIN Tupel, sondern nur eine eingeklammerte Zahl; ein Tupel braucht mindestens zwei Elemente.",
+    [
+      'DIM punkt AS TUPLE',
+      'punkt = (3, 4)',
+      'PRINT punkt',
+      'PRINT punkt[0]; " "; punkt[1]',
+      'PRINT punkt.length()',
+    ],
+    { out: ["(3, 4)", "3 4", "2"] }),
+  H.p("Dass verschiedene Typen erlaubt sind, macht Tupel ideal, um einen kleinen Datensatz zusammenzufassen – hier Name, Alter und ein Wahrheitswert in einem einzigen Wert:"),
+  H.code([
+    'DIM person AS TUPLE',
+    'person = ("Anna", 30, TRUE)',
+    'PRINT person[0]; " ist "; person[1]',
+  ]),
+  H.code(["Anna ist 30"], { out: true }),
+
+  H.h2("Tupel sind unveränderlich"),
+  H.p("Ein wichtiger Unterschied zum Array: Ein Tupel kannst du nach dem Erzeugen nicht mehr ändern. Es gibt keine einzelne Zuweisung an ein Fach – der Versuch wird abgelehnt. Ein Tupel ist eine feste Momentaufnahme. Willst du andere Werte, baust du ein neues Tupel."),
+  H.code([
+    'DIM t AS TUPLE',
+    't = (1, 2, 3)',
+    't[0] = 99      \' FEHLER: ein Tupel lässt sich nicht ändern',
+  ]),
+  H.code(["Laufzeitfehler: Index-Zuweisung an Nicht-Array (TUPLE)"], { out: true }),
+  H.note("Genau diese Unveränderlichkeit macht Tupel sicher und übersichtlich: Wenn du ein Tupel irgendwohin weitergibst, kann niemand es dir hinter dem Rücken verändern. Brauchst du eine veränderbare, gleichartige Sammlung, nimm ein Array (Kapitel „Arrays“)."),
+
+  H.h2("Zerlegen: Destructuring"),
+  H.p("Jetzt zum eigentlichen Trick. Statt die Einzelwerte mühsam über punkt[0], punkt[1] herauszuziehen, kannst du ein Tupel in einem Rutsch auf mehrere Variablen verteilen. Dazu schreibst du auf die linke Seite der Zuweisung selbst eine Klammer mit den Zielvariablen. GameBasic packt das Tupel aus und füllt sie der Reihe nach."),
+  H.cmd("Destructuring-Zuweisung", "(var1, var2, ...) = tupel",
+    "Verteilt die Elemente eines Tupels auf mehrere Variablen. Die Anzahl der Variablen links muss genau zur Anzahl der Tupel-Elemente rechts passen – sonst gibt es einen Fehler.",
+    [
+      'DIM lo AS INTEGER',
+      'DIM hi AS INTEGER',
+      '(lo, hi) = (7, 3)',
+      'PRINT "lo="; lo; "  hi="; hi',
+    ],
+    { out: ["lo=7  hi=3"] }),
+  H.warn("Links müssen genau so viele Variablen stehen, wie das Tupel Elemente hat. Schreibst du (a, b) = (1, 2, 3), bricht das Programm mit einer klaren Meldung ab: „2 Ziele, aber Tupel hat 3 Element(e)“."),
+
+  H.h2("Mehrere Ergebnisse zurückgeben"),
+  H.p("Hier zeigt sich die wahre Stärke. Eine Funktion kann mit RETURN normalerweise nur einen Wert liefern. Packst du mehrere Werte in ein Tupel, gibst du praktisch mehrere Ergebnisse zurück – und beim Aufruf zerlegst du sie sofort wieder. Das ist viel angenehmer als der Umweg über BYREF aus dem Funktionen-Kapitel."),
+  H.code([
+    'FUNCTION minmax(a AS INTEGER, b AS INTEGER) AS TUPLE',
+    '    IF a < b THEN RETURN (a, b)',
+    '    RETURN (b, a)',
+    'END FUNCTION',
+    '',
+    'DIM kleiner AS INTEGER',
+    'DIM groesser AS INTEGER',
+    '(kleiner, groesser) = minmax(9, 2)',
+    'PRINT "kleiner: "; kleiner',
+    'PRINT "größer:  "; groesser',
+  ]),
+  H.code(["kleiner: 2", "größer:  9"], { out: true }),
+
+  H.h2("Der elegante Tausch-Trick"),
+  H.p("Will man die Werte zweier Variablen vertauschen, braucht man klassisch eine dritte Hilfsvariable (merke dir x, überschreibe x mit y, schreibe das Gemerkte in y). Mit Destructuring geht das in einer einzigen Zeile – die rechte Seite wird komplett ausgewertet, bevor zugewiesen wird:"),
+  H.code([
+    'DIM x AS INTEGER',
+    'DIM y AS INTEGER',
+    'x = 1 : y = 2',
+    '(x, y) = (y, x)      \' tauschen ohne Hilfsvariable',
+    'PRINT "x="; x; "  y="; y',
+  ]),
+  H.code(["x=2  y=1"], { out: true }),
+
+  H.h2("Tupel durchlaufen"),
+  H.p("Wie Arrays und Maps lässt sich auch ein Tupel mit FOR EACH durchlaufen – praktisch für eine kurze, feste Aufzählung, die du nicht erst in ein Array packen willst:"),
+  H.code([
+    'FOR EACH wert IN (10, 20, 30)',
+    '    PRINT wert',
+    'NEXT',
+  ]),
+  H.code(["10", "20", "30"], { out: true }),
+
+  H.tip("Tupel oder Array?", "Nimm ein Tupel für ein kleines, festes Bündel zusammengehöriger Werte – besonders als Rückgabe mehrerer Ergebnisse oder für gemischte Typen. Nimm ein Array für eine größere, gleichartige Sammlung, die wachsen, schrumpfen und sich ändern soll."),
+];
