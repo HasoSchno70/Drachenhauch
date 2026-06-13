@@ -18,5 +18,6 @@
   "Maps": 7,
   "Tupel & Destructuring": 36,
   "Klassen & Objekte": 61,
-  "Vererbung, Properties, Operatoren & Static": 66
+  "Vererbung, Properties, Operatoren & Static": 66,
+  "ENUM": 21
 }

@@ -44,7 +44,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 19 Tupel & Destructuring  (content/19_tupel.js)
 - [x] 20 Klassen & Objekte  (content/20_klassen.js)
 - [x] 21 Vererbung, Properties, Operatoren, Static  (content/21_oop_fortgeschritten.js)
-- [ ] 22 ENUM
+- [x] 22 ENUM  (content/22_enum.js)
 - [ ] 23 Comprehensions (List/Dict/Set)
 - [ ] 24 Fehlerbehandlung (TRY/CATCH/THROW)
 - [ ] 25 Coroutinen (YIELD)
@@ -98,6 +98,7 @@ FOR EACH) + Kap 20 (Klassen & Objekte: Bauplan/Objekt-Modell, CLASS+DIM-Felder,
 NEW, SUB Init/Self, Methoden SUB/FUNCTION, impliziter Methodenaufruf, viele
 unabhängige Objekte, Verweis-Semantik) + Kap 21 (Vererbung EXTENDS/Überschreiben/
 Polymorphie, Properties GET/SET, Operator-Überladung OPERATOR, STATIC CONST).
-71 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert. Ab
-Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 22 (ENUM).
++ Kap 22 (ENUM: kompakt/Block, Auto-Nummerierung, eigene Werte, gemischt,
+SELECT CASE, Keyword-Member). 74 Seiten, alle Ausgaben gegen gbrt verifiziert,
+per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 23 (Comprehensions: List/Dict/Set).
