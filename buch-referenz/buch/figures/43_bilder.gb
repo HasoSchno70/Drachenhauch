@@ -1,0 +1,26 @@
+' Screenshot-Demo Kapitel 43: Bilder
+IMPORT "imgfx"
+SCREEN(480, 320, "Bilder")
+DIM sheet AS IMAGE
+sheet = LOADIMAGE("assets/hero.png")    ' 256x32 = 8 Frames a 32x32
+DIM held AS IMAGE
+held = LOADIMAGE("assets/held1.png")    ' ein einzelner 32x32-Held
+DIM gespiegelt AS IMAGE
+gespiegelt = IMAGE_FLIP(held, TRUE, FALSE)
+DIM getoent AS IMAGE
+getoent = IMAGE_TINT(held, RGB(120, 160, 255))
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(30, 34, 52))
+    TEXT(12, 8, "DRAWIMAGE (ganzes Sheet)", RGB(220, 230, 255))
+    DRAWIMAGE(sheet, 12, 26)
+    TEXT(12, 70, "DRAWIMAGEPART (ein Frame)", RGB(220, 230, 255))
+    DRAWIMAGE(held, 24, 88)
+    TEXT(12, 132, "DRAWIMAGEROT (skaliert x3, gedreht)", RGB(220, 230, 255))
+    DRAWIMAGEROT(held, 210, 185, 0.0, 3.0)    ' skaliert
+    DRAWIMAGEROT(held, 310, 185, 30.0, 3.0)   ' skaliert + gedreht
+    DRAWIMAGEROT(held, 410, 185, 90.0, 3.0)   ' 90 Grad
+    TEXT(12, 248, "imgfx: gespiegelt / getoent", RGB(220, 230, 255))
+    DRAWIMAGEROT(gespiegelt, 44, 290, 0.0, 2.0)
+    DRAWIMAGEROT(getoent, 114, 290, 0.0, 2.0)
+    FLIP()
+WEND
