@@ -52,7 +52,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ### Teil III — Eingebaute Befehle (Referenz)
 - [x] 30 Konsole & Ein-/Ausgabe  (content/30_konsole.js)
-- [ ] 31 Mathematik
+- [x] 31 Mathematik  (content/31_mathematik.js)
 - [ ] 32 Zufall
 - [ ] 33 Zeichenketten-Funktionen
 - [ ] 34 Typumwandlung & Prüfung
@@ -108,6 +108,8 @@ IMPORT ... AS Alias). **TEIL II KOMPLETT (Kap 10-26).** Danach: ToC-Seitenzahlen
 (measure() erkennt Überschriften per Schriftgröße ≥15 + monotone Suche) und
 mehrzeilige cmd-Syntax (\n) rendert jetzt als echte Zeilenumbrüche. **Teil III
 gestartet:** Kap 30 (Konsole & Ein-/Ausgabe: PRINT/INPUT/FORMAT$, Verweise auf
-Teil II + Teil IV). 91 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
+Teil II + Teil IV). + Kap 31 (Mathematik: ABS/SQR/POW/HYPOT/EXP/LOG, FLOOR/CEIL/ROUND, MIN/MAX/CLAMP/
+SIGN, LERP/REMAP, SIN/COS/TAN/ATAN2/DEG/RAD, WRAP/PINGPONG/MOVETOWARD, PI/TAU).
+95 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
 Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 31 (Mathematik) — Referenzteil.
+**Nächstes:** Kap 32 (Zufall) — Referenzteil.
