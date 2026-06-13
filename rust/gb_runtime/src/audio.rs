@@ -451,8 +451,10 @@ fn tween_now() -> Tween { Tween { duration: Duration::from_millis(4), ..Default:
 
 /// Ein "Channel" == ein geladener/gebauter Sound. `data` ist die (billig
 /// klonbare) Sample-Quelle, `handle` die zuletzt gestartete Instanz.
+/// `data == None` markiert einen via UNLOADSOUND freigegebenen Slot
+/// (Frame-Puffer freigegeben, Index bleibt als Tombstone stabil).
 struct SoundSlot {
-    data: StaticSoundData,
+    data: Option<StaticSoundData>,
     handle: Option<StaticSoundHandle>,
     vol: f32,                 // getrackte Lautstaerke (linear 0..1)
     loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
@@ -592,8 +594,29 @@ impl Audio {
     }
 
     fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
-        self.sounds.push(SoundSlot { data, handle: None, vol, loops: 0, pan_anim: None });
+        self.sounds.push(SoundSlot { data: Some(data), handle: None, vol, loops: 0, pan_anim: None });
         (self.sounds.len() - 1) as i64
+    }
+
+    /// UNLOADSOUND(sound) -- stoppt die laufende Instanz und gibt den
+    /// Frame-Puffer frei. Der Slot-Index bleibt als Tombstone gueltig
+    /// (kein Recycling -> alte Handles aliasen nie einen neuen Sound),
+    /// erneutes Abspielen wirft eine klare Meldung. SAMPLE_PLAY-Cache-
+    /// Eintraege, die auf diesen Slot zeigen, werden invalidiert.
+    pub fn unload_sound(&mut self, idx: i64) -> Result<(), String> {
+        let s = self.slot_mut(idx, "UNLOADSOUND")?;
+        if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+        s.handle = None;
+        s.data = None;
+        s.pan_anim = None;
+        self.sample_cache.retain(|_, &mut v| v != idx);
+        Ok(())
+    }
+
+    /// AUDIO_SOUND_COUNT() -- Anzahl lebender (nicht freigegebener) Sound-Slots.
+    /// Diagnose gegen Puffer-Akkumulation in langen Songs.
+    pub fn sound_count(&self) -> i64 {
+        self.sounds.iter().filter(|s| s.data.is_some()).count() as i64
     }
 
     fn slot(&self, idx: i64, fn_: &str) -> Result<&SoundSlot, String> {
@@ -614,7 +637,9 @@ impl Audio {
         let mut settings = StaticSoundSettings::new();
         if loops < 0 { settings = settings.loop_region(0.0..); }
         settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
-        let data = self.slot(idx, fn_)?.data.clone().with_settings(settings);
+        let data = self.slot(idx, fn_)?.data.as_ref()
+            .ok_or_else(|| format!("{}: Sound {} wurde freigegeben (UNLOADSOUND)", fn_, idx))?
+            .clone().with_settings(settings);
         let mut handle = self.sfx_track.play(data)   // SFX-Bus
             .map_err(|e| format!("{}: {:?}", fn_, e))?;
         if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms(fade_in_ms)); }

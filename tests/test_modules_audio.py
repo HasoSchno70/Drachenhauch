@@ -216,3 +216,17 @@ def test_bus_dynamics_eq_validation(run_gb):
     assert "AUDIO_DISTORTION: unbekannter Bus 'nope' (sfx, music, master)" in out
     assert "AUDIO_COMPRESSOR: unbekannter Bus 'nope' (sfx, music, master)" in out
     assert "AUDIO_EQ: unbekannter Bus 'nope' (sfx, music, master)" in out
+
+
+def test_unloadsound_is_wired(run_gb):
+    # UNLOADSOUND(s) gibt einen Sound-Puffer frei. Der Arg-Check (gi) laeuft
+    # VOR der Audio-Initialisierung -> headless golden-testbar und beweist,
+    # dass das Builtin verdrahtet ist (sonst "unbekannter Builtin").
+    src = '\n'.join([
+        'TRY',
+        '    UNLOADSOUND()',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    assert "UNLOADSOUND: fehlendes Argument 1" in run_gb(src)

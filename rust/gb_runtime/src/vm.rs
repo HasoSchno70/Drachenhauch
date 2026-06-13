@@ -3872,6 +3872,17 @@ impl<'p> Vm<'p> {
                 self.audio_mut()?.stop_sound(idx)?;
                 Value::Nil
             }
+            "unloadsound" => {
+                // UNLOADSOUND(sound) -- stoppt + gibt den Frame-Puffer frei.
+                // Index bleibt als Tombstone gueltig (kein Recycling).
+                let idx = gi(a, 0, "UNLOADSOUND")?;
+                self.audio_mut()?.unload_sound(idx)?;
+                Value::Nil
+            }
+            "audio_sound_count" => {
+                // AUDIO_SOUND_COUNT() -> Anzahl lebender Sound-Slots (Diagnose).
+                Value::Int(self.audio_mut()?.sound_count())
+            }
             "playmusic" => {
                 // PLAYMUSIC(pfad$[, loops, volume]). Musik loopt (raylib-Default);
                 // `loops` wird nativ nicht ausgewertet.

@@ -346,6 +346,31 @@ Kompressor + Bass-EQ, Live-Spektrum des fertigen Mix.
 
 `SOUND` kommt aus Core — `LOADSOUND` und `AUDIO_TONE`/`AUDIO_NOISE` liefern beide ein SOUND. Untereinander austauschbar.
 
+## Sound-Lebensdauer (`UNLOADSOUND` / `AUDIO_SOUND_COUNT`)
+
+`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX` bauen bei **jedem** Aufruf einen neuen
+`SOUND`-Puffer — ein frame-basierter Song-Player, der pro Note einen Ton
+synthetisiert, sammelt so über die Zeit Buffer an. Mit **`UNLOADSOUND(s)`**
+gibst du einen nicht mehr gebrauchten Sound frei (stoppt die laufende Instanz und
+gibt den Frame-Puffer frei). Der Handle bleibt als Tombstone gültig — er wird nie
+recycelt, ein alter Handle aliased also nie einen neuen Sound — aber ein erneutes
+`PLAYSOUND`/`AUDIO_PLAY` auf einen freigegebenen Handle wirft eine klare Meldung.
+**`AUDIO_SOUND_COUNT()`** liefert die Anzahl lebender (nicht freigegebener)
+Slots — praktisch, um Sound-Lecks aufzuspüren.
+
+```basic
+DIM t AS SOUND
+t = AUDIO_TONE(440, 100, "square", 0.5)
+PLAYSOUND(t)
+' ... wenn der Ton fertig ist und nicht wieder gebraucht wird:
+UNLOADSOUND(t)
+PRINT AUDIO_SOUND_COUNT()        ' lebende Slots (Diagnose)
+```
+
+Geladene Dateien (`LOADSOUND`) kannst du genauso freigeben; meist hält man die
+aber gecacht. Faustregel: nur **pro Note frisch synthetisierte** Einweg-Sounds
+nach Gebrauch entladen.
+
 ## Typische Game-Patterns
 
 **SFX-Manager mit Lautstaerke-Master:**

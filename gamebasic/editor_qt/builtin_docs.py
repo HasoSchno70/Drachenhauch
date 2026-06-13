@@ -93,6 +93,12 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "loadsound": ("LOADSOUND(pfad) AS SOUND", "Soundeffekt laden."),
     "playsound": ("PLAYSOUND(s[, loops, vol])", "Sound abspielen."),
     "stopsound": ("STOPSOUND(s)", "Sound stoppen."),
+    "unloadsound": ("UNLOADSOUND(s)",
+                    "Sound stoppen und seinen Puffer freigeben (gegen Puffer-"
+                    "Akkumulation in langen Songs). Index bleibt gueltig, erneutes "
+                    "Abspielen wirft."),
+    "audio_sound_count": ("AUDIO_SOUND_COUNT() AS INTEGER",
+                          "Anzahl lebender (nicht freigegebener) Sound-Slots -- Diagnose."),
     "playmusic": ("PLAYMUSIC(pfad[, loops, vol])", "Musik streamen."),
     "stopmusic": ("STOPMUSIC()", "Musik stoppen."),
     "drawtilemap": ("DRAWTILEMAP(tileset, map, tw, th, sx, sy)",

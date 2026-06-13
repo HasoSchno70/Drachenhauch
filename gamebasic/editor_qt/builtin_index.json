@@ -4134,6 +4134,18 @@
    "module": "core"
   },
   {
+   "name": "UNLOADSOUND",
+   "kind": "graphics",
+   "signature": "UNLOADSOUND(s)",
+   "module": "core"
+  },
+  {
+   "name": "AUDIO_SOUND_COUNT",
+   "kind": "graphics",
+   "signature": "AUDIO_SOUND_COUNT()",
+   "module": "core"
+  },
+  {
    "name": "STR",
    "kind": "core",
    "signature": "STR$(v: ?)",
