@@ -48,7 +48,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 23 Comprehensions (List/Dict/Set)  (content/23_comprehensions.js)
 - [x] 24 Fehlerbehandlung (TRY/CATCH/THROW)  (content/24_fehlerbehandlung.js)
 - [x] 25 Coroutinen (YIELD)  (content/25_coroutinen.js)
-- [ ] 26 Module importieren (IMPORT)
+- [x] 26 Module importieren (IMPORT)  (content/26_module.js)
 
 ### Teil III — Eingebaute Befehle (Referenz)
 - [ ] 30 Konsole & Ein-/Ausgabe
@@ -102,6 +102,8 @@ Polymorphie, Properties GET/SET, Operator-Überladung OPERATOR, STATIC CONST).
 SELECT CASE, Keyword-Member) + Kap 23 (Comprehensions: List `[e FOR v IN s]` +WHERE,
 Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE) + Kap 24 (Fehlerbehandlung:
 TRY/CATCH[e]/END TRY, THROW, wann nutzen + TRYVAL-Hinweis) + Kap 25 (Coroutinen:
-YIELD, CORO_RESUME/DONE/RESULT, FOR EACH, CORO_SEND zweiweg, CORO_CLOSE). 84 Seiten,
-alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 26 (Module importieren: IMPORT) — letztes Kapitel Teil II.
+YIELD, CORO_RESUME/DONE/RESULT, FOR EACH, CORO_SEND zweiweg, CORO_CLOSE) + Kap 26
+(Module: eingebaut IMPORT "x" OHNE Endung, eigene Datei IMPORT "x.gb" MIT Endung,
+IMPORT ... AS Alias). **TEIL II KOMPLETT (Kap 10-26).** 87 Seiten, alle Ausgaben gegen
+gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Teil III — Kap 30 (Konsole & Ein-/Ausgabe), Referenzteil.
