@@ -64,6 +64,10 @@ Farbe wird als 24-Bit-INTEGER (`0xRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) |
 | `TEXTROT(x, y, s$, winkel[, skala[, farbe]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
 
+> **Eckpunkt-Reihenfolge egal:** gefülltes `TRIANGLE` und `POLYGON` zeichnen
+> unabhängig von der Wicklung — ob die Punkte im oder gegen den Uhrzeigersinn
+> angegeben sind, die Fläche erscheint immer (gbrt dreht intern bei Bedarf um).
+
 ```basic
 SCREEN(320, 240, "Zeichnen-Demo", 2)
 

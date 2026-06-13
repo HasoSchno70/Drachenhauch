@@ -2959,7 +2959,18 @@ fn render_scene<D: RaylibDraw>(
                     }
                     Cmd::Circle(x, y, r, col) => d.draw_circle(x * s, y * s, r * s as f32, *col),
                     Cmd::Triangle(x1, y1, x2, y2, x3, y3, col) => {
-                        // raylib erwartet CCW; wir uebergeben wie angegeben.
+                        // raylib `DrawTriangle` cullt nach Wicklung (erwartet CCW
+                        // im y-down-Screen-Space). Damit TRIANGLE wicklungs-
+                        // unabhaengig ist: signed area pruefen, bei CW (>0) die
+                        // letzten beiden Vertices intern tauschen statt nichts
+                        // zu zeichnen.
+                        let (x1, y1, mut x2, mut y2, mut x3, mut y3) = (*x1, *y1, *x2, *y2, *x3, *y3);
+                        let area2 = (x2 - x1) as i64 * (y3 - y1) as i64
+                                  - (x3 - x1) as i64 * (y2 - y1) as i64;
+                        if area2 > 0 {
+                            std::mem::swap(&mut x2, &mut x3);
+                            std::mem::swap(&mut y2, &mut y3);
+                        }
                         d.draw_triangle(
                             Vector2::new((x1 * s) as f32, (y1 * s) as f32),
                             Vector2::new((x2 * s) as f32, (y2 * s) as f32),
@@ -2992,8 +3003,20 @@ fn render_scene<D: RaylibDraw>(
                     }
                     Cmd::FillPoly(pts, col) => {
                         // Triangle-Fan (korrekt fuer konvexe Polygone).
+                        // `DrawTriangleFan` cullt wie `DrawTriangle` nach Wicklung
+                        // -> bei CW-Eingabe (signed area >0) die Punkt-Reihenfolge
+                        // umdrehen, damit POLYGON wicklungsunabhaengig fuellt.
                         if pts.len() >= 3 {
-                            let v: Vec<Vector2> = pts.iter().map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
+                            let n = pts.len();
+                            let mut area2: i64 = 0;
+                            for i in 0..n {
+                                let (ax, ay) = pts[i];
+                                let (bx, by) = pts[(i + 1) % n];
+                                area2 += ax as i64 * by as i64 - bx as i64 * ay as i64;
+                            }
+                            let mut v: Vec<Vector2> = pts.iter()
+                                .map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
+                            if area2 > 0 { v.reverse(); }
                             d.draw_triangle_fan(&v, *col);
                         }
                     }
