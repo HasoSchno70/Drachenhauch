@@ -978,7 +978,7 @@ class AnimEditor(QMainWindow):
         self._wire()
         self._set_doc(AnimDoc())
         self.setStyleSheet(_editor_qss())
-        self.resize(1280, 780)
+        self.resize(1440, 900)
         # Docks schmal halten, damit der Graph den Hauptplatz bekommt.
         self.resizeDocks([self._ldock, self._rdock], [250, 290],
                          Qt.Orientation.Horizontal)

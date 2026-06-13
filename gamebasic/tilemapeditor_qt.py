@@ -793,7 +793,7 @@ class TileMapEditor(QMainWindow):
         super().__init__()
         self.project_root = Path(project_root)
         self.setWindowTitle("GameBasic Tilemap-Editor")
-        self.resize(1080, 720)
+        self.resize(1360, 880)
         self.doc = TileMapDoc()
         self.tileset_pixmaps: list = []     # QPixmap pro Tileset (parallel)
         self.sel_local = 0
