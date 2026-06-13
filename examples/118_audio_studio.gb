@@ -1,0 +1,189 @@
+' 118_audio_studio.gb -- "Audio-Studio": alle Audio-Features zusammen
+'
+' Bringt die ganze Kira-Audio-Pipeline auf einen Schirm:
+'   - MUSIK: ein ProTracker-Modul (.mod) wird in ECHTZEIT gestreamt (Musik-Bus)
+'   - SFX:   ein einziges Sample-Instrument spielt ein Auto-Arpeggio ueber die
+'            Klaviatur (SAMPLE_PLAY, resampled -- Amiga/Paula-Prinzip; SFX-Bus)
+'   - BUSSE: Musik / SFX getrennt stummschaltbar (AUDIO_BUS_VOLUME)
+'   - EFFEKTE in Echtzeit: Master-Tiefpass per Maus + Reverb/Delay/Distortion
+'            schaltbar; dezenter Mastering-Kompressor + Bass-EQ liegen dauerhaft
+'            auf dem Master.
+'   - Lo-Fi (Paula 8-bit) fuers Arpeggio
+'   - Live-FFT-Spektrum des fertigen Mix
+'
+' STEUERUNG:
+'   Maus L/R = Master-Filter-Cutoff (ganzer Mix; links = dumpf)
+'   1 Reverb   2 Delay   3 Distortion   L Lo-Fi
+'   M Musik stumm   N SFX stumm     ESC = Ende
+
+IMPORT "audio"
+
+SCREEN(700, 440, "GameBasic Audio-Studio", 2)
+SETFPS(60)
+
+' --- Dauerhaftes "Mastering" auf dem Master-Bus ---
+AUDIO_COMPRESSOR("master", -16, 3, 2)     ' sanfter Glue-Kompressor
+AUDIO_EQ("master", 90, 4, 1.0)            ' +4 dB Bass-Glocke
+
+' --- Musik: Modul streamen ---
+PLAYMUSIC("assets/demo.mod", -1, 0.85)
+
+' --- SFX-Sample fuers Arpeggio ---
+DIM pluck AS SAMPLE
+pluck = SAMPLE_LOAD("assets/pluck.wav")
+
+' Arpeggio-Pattern (Halbtoene relativ zum Sample-Grundton)
+DIM arp[8] AS INTEGER
+arp[0]=0 : arp[1]=7 : arp[2]=12 : arp[3]=16
+arp[4]=12 : arp[5]=7 : arp[6]=3 : arp[7]=10
+CONST STEPMS = 180.0
+DIM acc AS FLOAT
+DIM seqi AS INTEGER
+acc = 0.0 : seqi = 0
+
+' --- Zustand der schaltbaren Effekte / Busse ---
+DIM reverbOn AS BOOLEAN
+DIM delayOn AS BOOLEAN
+DIM distOn AS BOOLEAN
+DIM lofiOn AS BOOLEAN
+DIM musicMute AS BOOLEAN
+DIM sfxMute AS BOOLEAN
+reverbOn=FALSE : delayOn=FALSE : distOn=FALSE : lofiOn=FALSE
+musicMute=FALSE : sfxMute=FALSE
+
+' Edge-Detection-Speicher
+DIM p1 AS BOOLEAN
+DIM p2 AS BOOLEAN
+DIM p3 AS BOOLEAN
+DIM pL AS BOOLEAN
+DIM pM AS BOOLEAN
+DIM pN AS BOOLEAN
+p1=FALSE : p2=FALSE : p3=FALSE : pL=FALSE : pM=FALSE : pN=FALSE
+
+DIM fft[32] AS FLOAT
+DIM peak[32] AS FLOAT
+DIM i AS INTEGER
+FOR i = 0 TO 31
+    peak[i] = 0.0
+NEXT
+
+DIM t AS FLOAT
+DIM cutoff AS FLOAT
+cutoff = 18000.0
+DIM lastArp AS INTEGER
+lastArp = 0
+
+FUNCTION Edge(now AS BOOLEAN, BYREF prev AS BOOLEAN) AS BOOLEAN
+    DIM e AS BOOLEAN
+    e = now AND NOT prev
+    prev = now
+    RETURN e
+END FUNCTION
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+
+    ' --- Eingaben ---
+    IF Edge(KEYPRESSED(49), p1) THEN          ' '1'
+        reverbOn = NOT reverbOn
+        IF reverbOn THEN AUDIO_REVERB("master", 0.4, 0.85, 0.25) ELSE AUDIO_REVERB("master", 0.0)
+    END IF
+    IF Edge(KEYPRESSED(50), p2) THEN          ' '2'
+        delayOn = NOT delayOn
+        IF delayOn THEN AUDIO_DELAY("master", 0.4, 0.55, 350) ELSE AUDIO_DELAY("master", 0.0)
+    END IF
+    IF Edge(KEYPRESSED(51), p3) THEN          ' '3'
+        distOn = NOT distOn
+        IF distOn THEN AUDIO_DISTORTION("sfx", 0.5) ELSE AUDIO_DISTORTION("sfx", 0.0)
+    END IF
+    IF Edge(KEYPRESSED(108), pL) THEN         ' 'l'
+        lofiOn = NOT lofiOn
+        AUDIO_LOFI(lofiOn)
+    END IF
+    IF Edge(KEYPRESSED(109), pM) THEN         ' 'm'
+        musicMute = NOT musicMute
+        AUDIO_BUS_VOLUME("music", IIF(musicMute, 0.0, 1.0))
+    END IF
+    IF Edge(KEYPRESSED(110), pN) THEN         ' 'n'
+        sfxMute = NOT sfxMute
+        AUDIO_BUS_VOLUME("sfx", IIF(sfxMute, 0.0, 1.0))
+    END IF
+
+    ' Maus-X -> Master-Filter-Cutoff (exponentiell 120..18000 Hz)
+    DIM mx AS FLOAT
+    mx = MOUSEX() / 700.0
+    IF mx < 0.0 THEN mx = 0.0
+    IF mx > 1.0 THEN mx = 1.0
+    cutoff = 120.0 * 150.0 ^ mx
+    AUDIO_FILTER("master", cutoff, 0.4)
+
+    ' --- Arpeggio auf dem SFX-Bus ---
+    acc = acc + DELTA() * 1000.0
+    WHILE acc >= STEPMS
+        acc = acc - STEPMS
+        lastArp = arp[seqi MOD 8]
+        SAMPLE_PLAY(pluck, lastArp, 0.5)
+        seqi = seqi + 1
+    WEND
+
+    ' --- Zeichnen ---
+    CLS(&H08081A)
+    TEXT_SIZE(24)
+    TEXT(20, 14, "AUDIO-STUDIO", HSV(INT(t * 50.0) MOD 360, 0.5, 1.0))
+    TEXT_SIZE(11)
+    TEXT(250, 24, "Kira: Stream-Modul + Sampler + Busse + Echtzeit-Effekte", &H8090B0)
+
+    ' FFT-Spektrum (fertiger Master-Mix, post-FX)
+    AUDIO_FFT(fft)
+    FOR i = 0 TO 31
+        IF fft[i] > peak[i] THEN
+            peak[i] = fft[i]
+        ELSE
+            peak[i] = peak[i] - 0.012
+            IF peak[i] < 0.0 THEN peak[i] = 0.0
+        END IF
+        DIM h AS INTEGER
+        h = INT(fft[i] * 150.0)
+        DIM x AS INTEGER
+        x = 22 + i * 20
+        GRADIENTV(x, 210 - h, x + 16, 210, HSV((i * 8 + INT(t * 30.0)) MOD 360, 0.85, 1.0), HSV((i * 8) MOD 360, 0.85, 0.2))
+        DIM py AS INTEGER
+        py = 210 - INT(peak[i] * 150.0)
+        BOX(x, py, x + 16, py + 2, WHITE)
+    NEXT
+    RECT(20, 56, 662, 212, &H303050)
+    TEXT(24, 44, "MASTER-SPEKTRUM (post-FX)", &H708090)
+
+    ' Effekt-Status-Leiste
+    TEXT_SIZE(13)
+    DIM yy AS INTEGER
+    yy = 232
+    TEXT(20, yy, "FILTER " + STR$(INT(cutoff)) + "Hz", HSV(50, 0.7, 1.0))
+    TEXT(210, yy, "[1] Reverb", IIF(reverbOn, &H80FF80, &H50607A))
+    TEXT(330, yy, "[2] Delay", IIF(delayOn, &H80C0FF, &H50607A))
+    TEXT(440, yy, "[3] Distortion", IIF(distOn, &HFF9050, &H50607A))
+    TEXT(590, yy, "[L] Lo-Fi", IIF(lofiOn, &HFFC040, &H50607A))
+
+    ' Bus-Anzeige
+    yy = 262
+    TEXT(20, yy, "MUSIK-BUS (.mod stream)", IIF(musicMute, &H806070, &HA0C0E0))
+    TEXT(20, yy + 20, "  [M] " + IIF(musicMute, "STUMM", "an"), IIF(musicMute, &HFF6060, &H80A080))
+    TEXT(360, yy, "SFX-BUS (Sampler-Arpeggio)", IIF(sfxMute, &H806070, &HA0C0E0))
+    TEXT(360, yy + 20, "  [N] " + IIF(sfxMute, "STUMM", "an") + "   Note " + STR$(lastArp), IIF(sfxMute, &HFF6060, &H80A080))
+
+    ' Master-Kette (immer aktiv)
+    TEXT_SIZE(10)
+    TEXT(20, 322, "Master-Kette dauerhaft: Kompressor (Glue) + EQ (+4 dB Bass) + Maus-Filter", &H607090)
+
+    ' Steuerungs-Footer
+    TEXT_SIZE(12)
+    TEXT(20, 350, "Maus L/R = Master-Filter   1 Reverb  2 Delay  3 Distortion  L Lo-Fi", &H90A0C0)
+    TEXT(20, 372, "M = Musik stumm   N = SFX stumm   ESC = Ende", &H90A0C0)
+    TEXT_SIZE(10)
+    TEXT(20, 400, "POS " + STR$(INT(AUDIO_MUSIC_POSITION() * 10.0) / 10.0) + "s  --  alles laeuft auf dem Kira-Audio-Thread, entkoppelt vom Game-Loop", &H586080)
+
+    FLIP()
+WEND
+
+AUDIO_MUSIC_STOP(300)

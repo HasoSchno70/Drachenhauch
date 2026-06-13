@@ -331,6 +331,12 @@ AUDIO_EQ("music", 100, 6, 1.0)          ' +6 dB Glocke bei 100 Hz
 Demo: [examples/117_audiofx.gb](../examples/117_audiofx.gb) — Filter-Cutoff per
 Maus, Reverb/Delay per Taste, mit Live-Spektrum.
 
+**Gesamt-Showcase:** [examples/118_audio_studio.gb](../examples/118_audio_studio.gb)
+— „Audio-Studio", das die ganze Pipeline auf einen Schirm bringt: Modul-Streaming
+(Musik-Bus) + Sampler-Arpeggio (SFX-Bus), getrennt stummschaltbar, Master-Filter
+per Maus, Reverb/Delay/Distortion/Lo-Fi schaltbar, dauerhafter Mastering-
+Kompressor + Bass-EQ, Live-Spektrum des fertigen Mix.
+
 ## Externer Typ
 
 | Typ | Wirkung |
