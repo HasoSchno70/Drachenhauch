@@ -21,6 +21,8 @@ from PySide6.QtWidgets import (
     QSpinBox, QVBoxLayout, QWidget,
 )
 
+from .editor_qt.fader import Fader
+
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .editor_qt.preset_bar import PresetBar
@@ -200,7 +202,7 @@ class ParticleEditor(QMainWindow):
         super().__init__()
         self.project_root = project_root
         self.setWindowTitle("GameBasic Partikel-Editor")
-        self.resize(960, 660)
+        self.resize(1240, 820)
         self.sys = _ParticleSystem(0.0, 0.0)
 
         central = QWidget()
@@ -213,7 +215,7 @@ class ParticleEditor(QMainWindow):
 
         # --- Steuerung links ---------------------------------------
         controls = QWidget()
-        controls.setFixedWidth(380)
+        controls.setFixedWidth(440)
         cl = QVBoxLayout(controls)
         cl.setSpacing(8)
         self._build_controls(cl)
@@ -269,10 +271,12 @@ class ParticleEditor(QMainWindow):
 
     # ------------------------------------------------- Controls
     def _build_controls(self, cl: QVBoxLayout) -> None:
-        title = QLabel("Partikel-Editor")
-        tf = QFont(); tf.setBold(True); tf.setPointSize(13)
+        title = QLabel("✦  Partikel-Editor")
+        tf = QFont(); tf.setBold(True); tf.setPointSize(14)
         title.setFont(tf)
+        title.setStyleSheet(f"color:{COLORS['accent']}; padding:2px 0;")
         cl.addWidget(title)
+        cyan, mint, amber = COLORS["accent"], COLORS["success"], "#EF9F27"
 
         # Preset-Bibliothek (Werks-Presets + eigene)
         self.presets = PresetLibrary(
@@ -282,24 +286,22 @@ class ParticleEditor(QMainWindow):
         cl.addWidget(self.preset_bar)
 
         # Bewegung
-        g_move = QGroupBox("Bewegung")
-        ml = QVBoxLayout(g_move)
-        self.vx_min = self._dspin(ml, "vx min", -500, 500, self.sys.vx_min)
-        self.vx_max = self._dspin(ml, "vx max", -500, 500, self.sys.vx_max)
-        self.vy_min = self._dspin(ml, "vy min", -500, 500, self.sys.vy_min)
-        self.vy_max = self._dspin(ml, "vy max", -500, 500, self.sys.vy_max)
-        self.gx = self._dspin(ml, "Gravity x", -1000, 1000, self.sys.gravity_x)
-        self.gy = self._dspin(ml, "Gravity y", -1000, 1000, self.sys.gravity_y)
+        g_move, ml = self._group("Bewegung", cyan)
+        self.vx_min = self._dspin(ml, "vx min", -500, 500, self.sys.vx_min, cyan)
+        self.vx_max = self._dspin(ml, "vx max", -500, 500, self.sys.vx_max, cyan)
+        self.vy_min = self._dspin(ml, "vy min", -500, 500, self.sys.vy_min, cyan)
+        self.vy_max = self._dspin(ml, "vy max", -500, 500, self.sys.vy_max, cyan)
+        self.gx = self._dspin(ml, "Gravity x", -1000, 1000, self.sys.gravity_x, cyan)
+        self.gy = self._dspin(ml, "Gravity y", -1000, 1000, self.sys.gravity_y, cyan)
         cl.addWidget(g_move)
 
         # Aussehen
-        g_look = QGroupBox("Aussehen")
-        ll = QVBoxLayout(g_look)
+        g_look, ll = self._group("Aussehen", mint)
         self.mode = QComboBox(); self.mode.addItems(_MODES)
         self.mode.currentTextChanged.connect(self._on_change)
         self._row(ll, "Modus", self.mode)
-        self.size_min = self._ispin(ll, "Groesse min", 1, 64, self.sys.size_min)
-        self.size_max = self._ispin(ll, "Groesse max", 1, 64, self.sys.size_max)
+        self.size_min = self._ispin(ll, "Groesse min", 1, 64, self.sys.size_min, mint)
+        self.size_max = self._ispin(ll, "Groesse max", 1, 64, self.sys.size_max, mint)
         self.color = _ColorButton(self.sys.color)
         self.color.colorChanged.connect(self._on_change)
         self._row(ll, "Farbe", self.color)
@@ -319,13 +321,12 @@ class ParticleEditor(QMainWindow):
         cl.addWidget(g_look)
 
         # Lebenszeit & Emission
-        g_emit = QGroupBox("Lebenszeit & Emission")
-        el = QVBoxLayout(g_emit)
+        g_emit, el = self._group("Lebenszeit & Emission", amber)
         self.life_min = self._ispin(el, "Lebensdauer min (ms)", 50, 8000,
-                                    self.sys.lifetime_min)
+                                    self.sys.lifetime_min, amber, step=10)
         self.life_max = self._ispin(el, "Lebensdauer max (ms)", 50, 8000,
-                                    self.sys.lifetime_max)
-        self.rate = self._ispin(el, "Emission/Frame", 0, 200, 6)
+                                    self.sys.lifetime_max, amber, step=10)
+        self.rate = self._ispin(el, "Emission/Frame", 0, 200, 6, amber)
         cl.addWidget(g_emit)
 
         # Buttons
@@ -358,27 +359,32 @@ class ParticleEditor(QMainWindow):
     def _row(self, layout, label, widget) -> None:
         r = QHBoxLayout()
         lab = QLabel(label)
-        lab.setFixedWidth(130)
+        lab.setStyleSheet(f"color:{COLORS['fg_muted']}; font-size:11px;")
+        lab.setFixedWidth(96)
         r.addWidget(lab)
         r.addWidget(widget, 1)
         layout.addLayout(r)
 
-    def _dspin(self, layout, label, lo, hi, val) -> QDoubleSpinBox:
-        sp = QDoubleSpinBox()
-        sp.setRange(lo, hi)
-        sp.setValue(val)
-        sp.setSingleStep(5.0)
-        sp.valueChanged.connect(self._on_change)
-        self._row(layout, label, sp)
-        return sp
+    def _group(self, title: str, accent: str):
+        """Farbcodierte Parameter-Karte. Liefert (GroupBox, Layout)."""
+        gb = QGroupBox(title)
+        gb.setStyleSheet(
+            f"QGroupBox::title {{ color:{accent}; "
+            f"background-color:{COLORS['bg_alt']}; }}")
+        lay = QVBoxLayout(gb); lay.setSpacing(7)
+        return gb, lay
 
-    def _ispin(self, layout, label, lo, hi, val) -> QSpinBox:
-        sp = QSpinBox()
-        sp.setRange(lo, hi)
-        sp.setValue(int(val))
-        sp.valueChanged.connect(self._on_change)
-        self._row(layout, label, sp)
-        return sp
+    def _dspin(self, layout, label, lo, hi, val, accent=None, step=1) -> Fader:
+        f = Fader(label, lo, hi, val, step, 0, "", accent)
+        f.valueChanged.connect(self._on_change)
+        layout.addWidget(f)
+        return f
+
+    def _ispin(self, layout, label, lo, hi, val, accent=None, step=1) -> Fader:
+        f = Fader(label, lo, hi, int(val), step, 0, "", accent)
+        f.valueChanged.connect(self._on_change)
+        layout.addWidget(f)
+        return f
 
     # ------------------------------------------------- Sync
     def _on_change(self, *_a) -> None:
