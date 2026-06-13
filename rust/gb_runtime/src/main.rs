@@ -15,7 +15,13 @@
 mod animfsm;
 mod ast;
 mod astar;
-#[cfg(feature = "graphics")]
+// Audio-Backend: raylib (Default) ODER Kira (Feature `kira_audio`). Beide
+// liefern denselben `crate::audio::Audio`-Typ mit identischer Methoden-API,
+// damit vm.rs nichts wissen muss. `kira_audio` zieht `graphics` mit.
+#[cfg(all(feature = "graphics", not(feature = "kira_audio")))]
+mod audio;
+#[cfg(feature = "kira_audio")]
+#[path = "audio_kira.rs"]
 mod audio;
 mod builtins;
 mod compiler;

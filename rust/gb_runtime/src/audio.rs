@@ -735,7 +735,7 @@ impl Audio {
     /// normal, 2.0 = Oktave hoeher, 0.5 = Oktave tiefer). Wirkt sofort,
     /// auch auf einen bereits spielenden Sound. Klassiker: pro Schuss
     /// leicht variieren (0.9 + RANDF() * 0.2), damit nichts leiert.
-    pub fn ch_pitch(&self, idx: i64, factor: f64) -> Result<(), String> {
+    pub fn ch_pitch(&mut self, idx: i64, factor: f64) -> Result<(), String> {
         self.snd(idx, "AUDIO_PITCH")?.set_pitch(factor as f32);
         Ok(())
     }

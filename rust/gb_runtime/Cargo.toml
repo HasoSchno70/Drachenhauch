@@ -36,10 +36,20 @@ hidapi = { version = "2", optional = true }        # usb (HID)
 btleplug = { version = "0.11", optional = true }   # bt (BLE, async)
 tokio = { version = "1", features = ["rt-multi-thread", "time"], optional = true }
 futures = { version = "0.3", optional = true }
+# Audio-Backend Kira (cpal): entkoppelt vom Game-Loop, Busse/Echtzeit-Effekte.
+# Pure-Rust (keine C-Toolchain). MOD/XM via xmrs/xmrsplayer (ebenfalls pure-Rust).
+# Migrationsweg: hinter `kira_audio` entwickelt, raylib-Audio bleibt Default bis
+# der Umbau komplett ist (siehe src/audio_kira.rs). Beide teilen die `Audio`-API.
+kira = { version = "0.12", optional = true }
+xmrs = { version = "0.13", optional = true }
+xmrsplayer = { version = "0.13", optional = true }
 
 [features]
 default = []
 graphics = ["dep:raylib"]
+# Audio ueber Kira statt raylib. Setzt `graphics` voraus (Fenster/Input bleiben
+# raylib). Noch NICHT im Default-`graphics` -- bewusst opt-in waehrend der Migration.
+kira_audio = ["graphics", "dep:kira", "dep:xmrs", "dep:xmrsplayer"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
