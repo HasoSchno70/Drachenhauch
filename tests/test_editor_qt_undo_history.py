@@ -143,6 +143,24 @@ def test_sfx_editor_undo_redo(_qapp):
     assert ed.base_freq.value() == old + 123
 
 
+def test_sfx_autoplay_debounce_scheduling(_qapp):
+    # Bei aktivem Auto-Play startet ein Regler-Wechsel den (entprellten)
+    # Wiedergabe-Timer; ausgeschaltet bleibt er aus. Eine explizite Wiedergabe
+    # bricht ein ausstehendes Auto-Play ab.
+    from gamebasic.sfxeditor_qt import SfxGenerator
+    ed = _editor(_qapp, SfxGenerator)
+    ed.cb_autoplay.setChecked(True)
+    ed._autoplay_timer.stop()
+    ed.base_freq.setValue(ed.base_freq.value() + 100)
+    assert ed._autoplay_timer.isActive()
+    ed._play()                              # explizit -> bricht ab
+    assert not ed._autoplay_timer.isActive()
+    ed.cb_autoplay.setChecked(False)
+    ed._autoplay_timer.stop()
+    ed.base_freq.setValue(ed.base_freq.value() + 100)
+    assert not ed._autoplay_timer.isActive()
+
+
 def test_tracker_editor_undo_redo(_qapp):
     from gamebasic.trackereditor_qt import TrackerEditor
     ed = _editor(_qapp, TrackerEditor)

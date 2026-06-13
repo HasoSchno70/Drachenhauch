@@ -15,11 +15,11 @@ import wave
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QComboBox, QFileDialog, QFrame, QGridLayout, QGroupBox,
-    QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
+    QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout,
+    QGroupBox, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
     QVBoxLayout, QWidget,
 )
 
@@ -131,6 +131,13 @@ class SfxGenerator(QMainWindow):
         self.resize(900, 680)
         self._counter = 0
 
+        # Auto-Play: kurz entprellt nach der letzten Regler-Aenderung spielen,
+        # damit ein Drag genau einmal (beim Loslassen) hoerbar wird.
+        self._autoplay_timer = QTimer(self)
+        self._autoplay_timer.setSingleShot(True)
+        self._autoplay_timer.setInterval(160)
+        self._autoplay_timer.timeout.connect(self._play)
+
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
@@ -150,6 +157,12 @@ class SfxGenerator(QMainWindow):
         b_rand = QPushButton("🎲  Zufall")
         b_rand.clicked.connect(self._randomize)
         btns.addWidget(b_rand)
+        self.cb_autoplay = QCheckBox("Auto-Play")
+        self.cb_autoplay.setChecked(True)
+        self.cb_autoplay.setToolTip(
+            "Beim Verschieben eines Reglers den Ton automatisch abspielen "
+            "(kurz entprellt -- spielt, sobald du loslaesst).")
+        btns.addWidget(self.cb_autoplay)
         btns.addStretch(1)
         self.btn_undo = QPushButton("↶")
         self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
@@ -323,6 +336,10 @@ class SfxGenerator(QMainWindow):
         u = getattr(self, "undo", None)
         if u is not None:
             u.mark()
+        # Auto-Play (entprellt): startet/erneuert den Timer, solange gezogen wird.
+        cb = getattr(self, "cb_autoplay", None)
+        if cb is not None and cb.isChecked():
+            self._autoplay_timer.start()
 
     def _load_preset(self, name: str) -> None:
         wf, base, slide, atk, sus, dec, vd, vs = _PRESETS[name]
@@ -360,6 +377,9 @@ class SfxGenerator(QMainWindow):
         self._play()
 
     def _play(self) -> None:
+        # Jede explizite Wiedergabe (Button/Preset/Zufall) bricht ein
+        # ausstehendes Auto-Play ab -> kein Doppel-Ton.
+        self._autoplay_timer.stop()
         play(synthesize(self._params()))
 
     # ---- Export

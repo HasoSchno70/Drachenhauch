@@ -18,6 +18,7 @@ Die UI ist eine **Fader-Bank im sfxr-Stil**: links eine **Preset-Leiste**, oben 
 - **Preset-Leiste** links — `Pickup/Coin`, `Laser/Shoot`, `Explosion`, `Powerup`, `Hit/Hurt`, `Jump`, `Blip/Select`. Klick lädt + spielt.
 - **Preset-Bibliothek** (oben) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.gamebasic/presets/sfx.json`) und lade sie über die Combo wieder.
 - **`▶ Abspielen`** spielt den aktuellen Effekt, **`🎲 Zufall`** würfelt neue Parameter (mit Abspielen).
+- **`Auto-Play`** (Häkchen, standardmäßig an) — beim Verschieben eines Faders wird der Ton **automatisch abgespielt** (kurz entprellt, spielt also einmal, sobald du loslässt), damit du sofort hörst, ob der Wert passt. Eine explizite Wiedergabe bricht ein ausstehendes Auto-Play ab (kein Doppel-Ton).
 - **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — ein Preset-Laden, ein `Zufall` oder ein Fader-Drag zählt je als ein Schritt.
 
 ## Export
