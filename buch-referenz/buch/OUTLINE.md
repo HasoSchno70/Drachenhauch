@@ -68,7 +68,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)  (content/43_bilder.js, images/43_bilder.png)
 - [x] 44 Farben (RGB/HSV/COLOR_LERP)  (content/44_farben.js, images/44_farben.png)
 - [x] 45 Eingabe (Tastatur/Maus/Gamepad)  (content/45_eingabe.js, images/45_eingabe.png)
-- [ ] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)
+- [x] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)  (content/46_sound.js, images/46_sound.png)
 - [ ] 47 Layer, Sprite-Atlas, Bulk-Draws
 - [ ] 48 3D-Grafik (g3d)
 
@@ -142,4 +142,7 @@ mit Palette/HSV-Regenbogen/COLOR_LERP. WICHTIG: gbrt-Hex = `&H` (NICHT `0x`!).
 + Kap 45 (Eingabe: KEYPRESSED/KEY_*-Konstanten, MOUSEX/Y/BUTTON/WHEEL/MOUSE_VISIBLE/LOCK,
 input-Modul BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS, Gamepad-Tipp) — Steuerungs-Screenshot.
 151 Seiten.
-**Nächstes:** Kap 46 (Sound: LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*) — KERNTHEMA des Users.
++ Kap 46 (Sound: LOADSOUND/PLAYSOUND/STOPSOUND, PLAYMUSIC, audio-Modul AUDIO_TONE/NOISE/SFX,
+UNLOADSOUND, AUDIO_VOLUME/PAN/BUS_VOLUME erwähnt) — als GRAFISCHES Mini-Klavier-Demo gebaut
+(Tasten 1-8 = C-Dur), Screenshot zeigt die Klaviatur. 154 Seiten.
+**Nächstes:** Kap 47 (Layer, Sprite-Atlas, Bulk-Draws) mit Screenshots.

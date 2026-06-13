@@ -1,0 +1,29 @@
+' Screenshot-Demo Kapitel 46: ein kleines Klavier (Tasten 1-8 spielen Toene)
+IMPORT "audio"
+SCREEN(480, 320, "Mini-Klavier")
+' Frequenzen der C-Dur-Tonleiter (C D E F G A H C)
+DIM hz[8] AS INTEGER
+hz[0]=262 : hz[1]=294 : hz[2]=330 : hz[3]=349
+hz[4]=392 : hz[5]=440 : hz[6]=494 : hz[7]=523
+DIM namen AS ARRAY OF STRING
+namen = SPLIT$("C,D,E,F,G,A,H,C", ",")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(26, 28, 40))
+    TEXT(120, 18, "Mini-Klavier  -  Tasten 1 bis 8", RGB(220, 230, 255))
+    DIM i AS INTEGER
+    FOR i = 0 TO 7
+        DIM x AS INTEGER
+        x = 30 + i * 53
+        ' weisse Taste
+        BOX(x, 60, x + 46, 250, RGB(238, 240, 245))
+        RECT(x, 60, x + 46, 250, RGB(40, 40, 50))
+        TEXT(x + 18, 225, namen[i], RGB(40, 40, 50))
+        TEXT(x + 18, 268, STR$(i + 1), RGB(180, 190, 210))
+        ' Taste gedrueckt? -> Ton spielen + hervorheben
+        IF KEYPRESSED(KEY_1 + i) THEN
+            BOX(x + 2, 62, x + 44, 248, RGB(120, 200, 255))
+            PLAYSOUND(AUDIO_TONE(hz[i], 200, "square", 0.4))
+        END IF
+    NEXT
+    FLIP()
+WEND
