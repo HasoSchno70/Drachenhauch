@@ -199,6 +199,24 @@ def test_export_audio_renders_wav(tmp_path, monkeypatch):
         assert w.getnchannels() == 1
 
 
+def test_fx_column_sets_effect_on_cell():
+    from gamebasic.tracker.song import FX_ARP, FX_CODES
+    ed = _editor()
+    ed.grid.setCurrentCell(0, 0)
+    ed._set_note(0, 0, 60)
+    # Effekt + Parameter ueber die UI-Widgets setzen
+    ed.fx_combo.setCurrentIndex(FX_CODES.index(FX_ARP))
+    ed.fxp_spin.setValue(0x47)
+    assert ed.song.patterns[ed.cur].get_fx(0, 0) == (FX_ARP, 0x47)
+    # Zellentext zeigt den Effekt
+    assert "Arp" in ed.grid.item(0, 0).text()
+    # Re-Selektion spiegelt den Effekt zurueck in die Widgets
+    ed.grid.setCurrentCell(0, 1)
+    ed.grid.setCurrentCell(0, 0)
+    assert ed.fx_combo.currentData() == FX_ARP
+    assert ed.fxp_spin.value() == 0x47
+
+
 def test_export_audio_stereo_hard_pan(tmp_path, monkeypatch):
     import wave
     from PySide6.QtWidgets import QFileDialog, QMessageBox

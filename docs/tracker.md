@@ -2,9 +2,13 @@
 
 Mehrspuriger Tracker zum Komponieren von Melodien/Musik — 3 Ton-Kanäle (je eigene Wellenform **oder Sample-Instrument**) + 1 Noise-Kanal (Drums), mit **mehreren Patterns einstellbarer Länge** und **Song-Arrangement**. Über die reinen Chiptune-Wellenformen hinaus lassen sich **gesampelte Instrumente** (WAV/OGG) laden und über die Klaviatur spielen (Resampling). Komplementär zum [SFX-Generator](sfx-generator.md) (der einzelne Effekte macht).
 
+Der Tracker ist ein **Tab im [Audio Studio](#audio-studio)** (`gbsound`), das ihn mit dem SFX-Generator unter einem fullscreen Fenster vereint.
+
 ## Starten
 
-Aus dem **Code-Editor**: Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (Musik) öffnen ...` (`Strg+Shift+L`). Standalone: `gbtracker` oder `gbrun.py --tracker` (braucht `PySide6` + `numpy`).
+Am bequemsten als Tab im **Audio Studio**: `gbsound` (oder `gbrun.py --audio`) — fullscreen, Tracker + SFX-Generator zusammen.
+
+Auch einzeln: aus dem **Code-Editor** Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (Musik) öffnen ...` (`Strg+Shift+L`); standalone `gbtracker` oder `gbrun.py --tracker` (öffnen jetzt ebenfalls das Audio Studio auf dem Tracker-Tab). Braucht `PySide6` + `numpy`.
 
 ## Bedienung
 
@@ -22,11 +26,17 @@ Aus dem **Code-Editor**: Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (
   - **Grundton** (MIDI) — die Note, bei der das Sample 1:1 (unverschoben) klingt. Stimmt das Sample richtig ein.
   - **Loop** (`none`/`forward`/`pingpong` + Start/Ende in Samples) — lässt ein kurzes Sample **endlos sustainen**: beim Erreichen des Loop-Endes springt die Wiedergabe zum Loop-Start zurück (`forward`) bzw. läuft im Zickzack (`pingpong`). Ohne Loop verstummt das Sample nach einmaligem Durchlauf.
   - **ADSR-Hüllkurve** (Attack/Decay/Sustain/Release) — formt die Lautstärke über die Notendauer (weiches Ein-/Ausblenden, Sustain-Pegel). Ein kurzer Anti-Click-Fade am Ende ist immer aktiv.
-- **Audio rendern** (`Audio (WAV)...`) — **der Weg, Sample-Songs ins Spiel zu bringen:** der ganze Song wird offline zu einer WAV gemischt (alle Kanäle gleichzeitig, mit Resampling, Loop, ADSR und Noten-Lautstärke). Eine Note klingt bis zur nächsten Note desselben Kanals (Sustain über leere Reihen). Im Spiel dann einfach `PLAYMUSIC("song.wav")` — völlig unabhängig von den Engine-Audio-Grenzen (das Mischen passiert im Editor in numpy). Ideal für fertige Spielmusik mit echten Samples.
-  - *Hinweis:* Der `GB-Code`-Export erzeugt weiterhin den **Live-Synth-Player** (Chiptune, zur Laufzeit) und kann Sample-Kanäle noch nicht direkt; für Sample-Songs nimmt man den **Audio-Export** (oder später den Live-Sampler-Export). Pitch-Slide ist im Audio-Render derzeit noch nicht enthalten (kommt mit dem Effekt-Ausbau).
+- **Audio rendern** (`Audio (WAV)...`) — **der Weg, Sample-Songs ins Spiel zu bringen:** der ganze Song wird offline zu einer WAV gemischt (alle Kanäle gleichzeitig, mit Resampling, Loop, ADSR, Noten-Lautstärke, **Pitch-Slide und Effekt-Spalte**). Eine Note klingt bis zur nächsten Note desselben Kanals (Sustain über leere Reihen). Vor dem Render fragt ein Dialog **Stereo** (wertet den Instrument-Pan aus) und **Amiga-Hard-Panning** (Kanal 1+4 links, 2+3 rechts — der klassische Paula-Stereoeindruck) ab. Im Spiel dann einfach `PLAYMUSIC("song.wav")` — völlig unabhängig von den Engine-Audio-Grenzen (das Mischen passiert im Editor in numpy). Ideal für fertige Spielmusik mit echten Samples.
+  - *Hinweis:* Der `GB-Code`-Export erzeugt weiterhin den **Live-Synth-Player** (Chiptune, zur Laufzeit, inkl. Lautstärke + Slide via `AUDIO_SFX`) und kann Sample-Kanäle und die Effekt-Spalte (Arp/Vib/Ret/Off) nicht direkt; für Sample-Songs und Effekte nimmt man den **Audio-Export**.
 - **Effekt-Spalten pro Note:** Zelle mit Note auswählen, dann:
   - **`Vol`** (1–15, `–` = Standard) — Lautstärke; Suffix `v9` in der Zelle, wirkt auf Amplitude (Vorhören + Player).
-  - **`Slide`** (−12…+12 Halbtöne, 0 = kein Slide; nur Ton-Kanäle) — **Pitch-Slide/Portamento**: die Note gleitet über die Reihen-Dauer um die angegebenen Halbtöne nach oben/unten. Suffix `s+2`/`s-3` in der Zelle. Im Export werden Slide-Noten als `AUDIO_SFX` (mit vorberechnetem Hz/s-Bend) gerendert, Noten ohne Slide bleiben `AUDIO_TONE`.
+  - **`Slide`** (−12…+12 Halbtöne, 0 = kein Slide; nur Ton-Kanäle) — **Pitch-Slide/Portamento**: die Note gleitet über die Reihen-Dauer um die angegebenen Halbtöne nach oben/unten. Suffix `s+2`/`s-3` in der Zelle. Im WAV-Render gilt der Slide für **alle** Instrumente (Synth + Sample/Keymap); im GB-Code-Export werden Slide-Noten als `AUDIO_SFX` (vorberechneter Hz/s-Bend) gerendert, ohne Slide bleibt `AUDIO_TONE`.
+  - **`FX`** + **Parameter** — klassische Tracker-Effekte (wirken im **WAV-Render**, instrument-unabhängig):
+    - **`Arp`** (Arpeggio) — Parameter als zwei Hex-Nibbles `xy`: die Note springt im Tick-Takt zwischen Grundton, +`x` und +`y` Halbtönen (z. B. `71` = `0x47` → Dur-Akkord +4/+7). Der typische C64-Akkord aus einem Kanal.
+    - **`Vib`** (Vibrato) — `xy`: Speed `x` (Hz), Tiefe `y` (·0,125 Halbtöne); die Tonhöhe pendelt sinusförmig.
+    - **`Ret`** (Retrigger) — schlägt den Notenkopf alle *Parameter* Ticks neu an (Stotter-/Roll-Effekt).
+    - **`Off`** (Sample-Offset) — startet das Sample `Parameter`·512 Frames später.
+    - Anzeige in der Zelle als Suffix, z. B. `Arp47`.
   - Eine Note zu löschen entfernt auch ihre Effekte.
 - **BPM** stellt das Tempo (16tel-Schritte).
 - **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — Noten, Pattern-/Order-Operationen, BPM, Wellenform. `Neu`/`Öffnen` verwerfen die Historie.
@@ -61,8 +71,12 @@ TRACKER_UPDATE(DELTA() * 1000.0)
 
 Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft über die native Runtime `gbrt`.
 
-Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `gamebasic/tracker/instrument.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`).
+Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `gamebasic/tracker/instrument.py`, der **Mixer/Render** in `gamebasic/tracker/mixer.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`, `tests/test_tracker_mixer.py`).
 
-> **Sampler-Ausbau (laufend):** Der Tracker wird schrittweise vom Chiptune-Synth zum vollwertigen Sampler ausgebaut. **Stufe 1 (fertig):** Sample-Instrumente laden + über die Klaviatur resampeln + vorhören. **Stufe 2 (fertig):** Grundton, Loop-Punkte (forward/pingpong), ADSR-Hüllkurve. **Stufe 4+5 (fertig):** numpy-Software-Mixer (`tracker/mixer.py`) + **Render-to-File** (`Audio (WAV)...` → Song als WAV für `PLAYMUSIC`). **Stufe „Keymap" (fertig):** Multisample/Drumkit — Samples über Tasten-Zonen (`Keymap...`). **Geplant:** **Live-Sampler-Export** (`SAMPLE_PLAY`-Builtin in beiden Pfaden), mehr Kanäle (Mute/Solo), erweiterte Effekt-Spalte (inkl. Slide im Render) und ein grafischer Instrument-Editor.
+## Audio Studio
 
-> **Effekt-Spalten:** **Lautstärke** (`Vol`) und **Pitch-Slide/Portamento** (`Slide`) pro Note. Slide-Noten werden im Export über `AUDIO_SFX` mit einem pro Reihe vorberechneten Hz/s-Bend gerendert (kein kontinuierlicher Synth-Umbau nötig).
+Tracker und [SFX-Generator](sfx-generator.md) leben zusammen im **Audio Studio** — einem fullscreen Fenster mit zwei Reitern (`🎹 Tracker / Song` und `💥 SFX-Generator`). Start: `gbsound` / `gbrun.py --audio`, oder im Code-Editor die jeweiligen Menüpunkte (sie öffnen dasselbe Studio auf dem passenden Tab). `F11` schaltet echtes Vollbild, `Strg+1`/`Strg+2` wechseln die Tabs. Jeder Tab behält seinen eigenen Undo-Verlauf (`Strg+Z`/`Strg+Y` wirken auf den fokussierten Tab).
+
+> **Sampler-Ausbau (laufend):** Der Tracker wird schrittweise vom Chiptune-Synth zum vollwertigen Sampler ausgebaut. **Stufe 1 (fertig):** Sample-Instrumente laden + über die Klaviatur resampeln + vorhören. **Stufe 2 (fertig):** Grundton, Loop-Punkte (forward/pingpong), ADSR-Hüllkurve. **Stufe 4+5 (fertig):** numpy-Software-Mixer (`tracker/mixer.py`) + **Render-to-File** (`Audio (WAV)...` → Song als WAV für `PLAYMUSIC`), inkl. **Stereo + Amiga-Hard-Panning** und **Pitch-Slide für alle Instrumente**. **Stufe „Keymap" (fertig):** Multisample/Drumkit — Samples über Tasten-Zonen (`Keymap...`). **Effekt-Spalte (fertig):** Arpeggio/Vibrato/Retrigger/Sample-Offset im Render. **Geplant:** **Live-Sampler-Export** (`SAMPLE_PLAY`-basierter GB-Code), mehr Kanäle (Mute/Solo), grafischer Instrument-Editor.
+
+> **Effekt-Spalten:** **Lautstärke** (`Vol`), **Pitch-Slide/Portamento** (`Slide`) und die **Effekt-Spalte** (`FX`: Arp/Vib/Ret/Off) pro Note. Vol + Slide gehen in den GB-Code-Live-Player (Slide via `AUDIO_SFX`-Hz/s-Bend); die `FX`-Effekte wirken im **WAV-Render** (als instrument-unabhängiges Post-Processing der gerenderten Note in `mixer.apply_effect`).

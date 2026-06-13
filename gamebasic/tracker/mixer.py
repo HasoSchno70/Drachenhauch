@@ -16,7 +16,8 @@ import wave
 
 import numpy as np
 
-from .song import CHANNELS, vol_to_pct
+from .song import (CHANNELS, vol_to_pct, FX_NONE, FX_ARP, FX_VIB, FX_RET,
+                   FX_OFF, TICKS_PER_ROW)
 
 SAMPLE_RATE = 44100
 
@@ -40,8 +41,66 @@ def _channel_pan(c: int, inst, hard_pan: bool) -> float:
     return max(-1.0, min(1.0, base + float(getattr(inst, "pan", 0.0))))
 
 
+def _pitch_remap(buf: np.ndarray, ratio: np.ndarray) -> np.ndarray:
+    """Liest `buf` mit einer pro-Sample variierenden Lesegeschwindigkeit
+    `ratio` (kumuliert) -- Basis fuer Arpeggio/Vibrato als reines
+    Post-Processing der fertig gerenderten Note (instrument-unabhaengig)."""
+    n = buf.size
+    if n == 0:
+        return buf
+    pos = np.concatenate(([0.0], np.cumsum(ratio)[:-1]))
+    idx = np.arange(n, dtype=np.float64)
+    out = np.interp(pos, idx, buf).astype(np.float32)
+    out[pos > (n - 1)] = 0.0          # ueber das Ende hinaus = Stille
+    return out
+
+
+def apply_effect(buf: np.ndarray, fx: int, fxp: int, sr: int,
+                 row_ms: int) -> np.ndarray:
+    """Wendet einen Tracker-Effekt als Post-Processing auf die gerenderte
+    Mono-Note `buf` an (instrument-unabhaengig). Reine numpy-Funktion.
+
+    - FX_ARP: Tonhoehe springt im Tick-Takt zwischen Note / +x / +y Halbtoenen
+      (x,y = fxp-Nibbles) -- der klassische Akkord-Arpeggio.
+    - FX_VIB: Tonhoehe pendelt sinusfoermig (Speed = x Hz, Tiefe = y*0.125 HT).
+    - FX_RET: schlaegt den Notenkopf alle `ticks` Ticks neu an.
+    - FX_OFF: startet `fxp*512` Frames spaeter (Sample-Offset).
+    """
+    n = buf.size
+    if n == 0 or fx == FX_NONE:
+        return buf
+    tick = max(1, int(sr * row_ms / 1000.0 / TICKS_PER_ROW))
+    if fx == FX_ARP:
+        x, y = (fxp >> 4) & 0xF, fxp & 0xF
+        offsets = (0, x, y)
+        semis = np.empty(n, dtype=np.float64)
+        for i in range(0, n, tick):
+            semis[i:i + tick] = offsets[(i // tick) % 3]
+        return _pitch_remap(buf, 2.0 ** (semis / 12.0))
+    if fx == FX_VIB:
+        speed = float((fxp >> 4) & 0xF)               # Hz
+        depth = float(fxp & 0xF) * 0.125              # Halbtoene
+        if speed <= 0 or depth <= 0:
+            return buf
+        t = np.arange(n, dtype=np.float64) / sr
+        semis = depth * np.sin(2.0 * np.pi * speed * t)
+        return _pitch_remap(buf, 2.0 ** (semis / 12.0))
+    if fx == FX_RET:
+        ticks = max(1, fxp)
+        seg = max(1, ticks * tick)
+        head = buf[:seg]
+        reps = int(np.ceil(n / seg))
+        return np.tile(head, reps)[:n].astype(np.float32)
+    if fx == FX_OFF:
+        off = min(n, fxp * 512)
+        out = np.zeros(n, dtype=np.float32)
+        out[:n - off] = buf[off:]
+        return out
+    return buf
+
+
 def _note_events(song):
-    """Pro Kanal eine Liste von (global_row, midi, vol_cell, slide_cell) fuer
+    """Pro Kanal eine Liste von (global_row, midi, vol, slide, fx, fxp) fuer
     jede gesetzte Note -- die flache Timeline aus der Order."""
     events = {c: [] for c in range(CHANNELS)}
     i = 0
@@ -53,8 +112,10 @@ def _note_events(song):
             for c in range(CHANNELS):
                 note = pat.data[c][r]
                 if note is not None:
+                    fx, fxp = pat.get_fx(c, r)
                     events[c].append(
-                        (i + r, int(note), pat.vol[c][r], pat.slide[c][r]))
+                        (i + r, int(note), pat.vol[c][r], pat.slide[c][r],
+                         fx, fxp))
         i += pat.rows
     return events
 
@@ -85,7 +146,7 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
         inst = song.instrument_for_channel(c)
         gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
         evs = events[c]
-        for k, (start_row, midi, volc, slidec) in enumerate(evs):
+        for k, (start_row, midi, volc, slidec, fx, fxp) in enumerate(evs):
             end_row = evs[k + 1][0] if k + 1 < len(evs) else total_rows
             n = (end_row - start_row) * row_samples
             if n <= 0:
@@ -93,6 +154,8 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
             # Sample/Loop darf bis zum Tail nachklingen.
             n_render = n + tail if k + 1 >= len(evs) else n
             note = inst.render_note(midi, n_render, sr, slide=(slidec or 0))
+            if fx != FX_NONE:
+                note = apply_effect(note, fx, fxp, sr, song.row_ms())
             amp = (vol_to_pct(volc) / 100.0) if volc else (inst.default_vol / 15.0)
             start = start_row * row_samples
             seg = note[:max(0, total - start)]

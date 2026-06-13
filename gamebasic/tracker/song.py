@@ -33,6 +33,19 @@ DEFAULT_AMP_PCT = 50       # Standard-Amplitude in Prozent (= bisherige 0.5)
 # Reihen-Dauer (0/None = kein Slide). Beim Export zu Hz/s vorberechnet.
 SLIDE_MAX = 12
 
+# Effekt-Spalte pro Note (klassische Tracker-Effekte). `fx` = Code, `fxp` =
+# Parameter (ein Byte, 0..255 -- bei ARP/VIB als zwei Nibbles x/y gelesen).
+FX_NONE = 0
+FX_ARP = 1          # Arpeggio: Note, Note+x, Note+y (x,y = fxp-Nibbles, Halbtoene)
+FX_VIB = 2          # Vibrato: Speed x (Hz), Tiefe y (Nibble -> y*0.125 Halbtoene)
+FX_RET = 3          # Retrigger: Note alle fxp Ticks neu anschlagen
+FX_OFF = 4          # Sample-Offset: Start um fxp*512 Frames spaeter
+FX_CODES = (FX_NONE, FX_ARP, FX_VIB, FX_RET, FX_OFF)
+FX_NAMES = {FX_NONE: "—", FX_ARP: "Arp", FX_VIB: "Vib",
+            FX_RET: "Ret", FX_OFF: "Off"}
+# Ticks pro Reihe (Granularitaet von Arp/Vibrato/Retrigger im Render).
+TICKS_PER_ROW = 6
+
 
 def slide_hz_per_s(freq: float, semitones: int, row_ms: int) -> int:
     """Pitch-Slide (Halbtoene ueber eine Reihe) -> Hz/s fuer AUDIO_SFX."""
@@ -59,7 +72,7 @@ def note_name(m: int) -> str:
 class Pattern:
     """Ein Pattern: CHANNELS x rows Gitter aus MIDI-Noten (oder None)."""
 
-    __slots__ = ("name", "rows", "data", "vol", "slide")
+    __slots__ = ("name", "rows", "data", "vol", "slide", "fx", "fxp")
 
     def __init__(self, name: str, rows: int = DEFAULT_ROWS):
         self.name = name
@@ -74,6 +87,12 @@ class Pattern:
         # slide[channel][row] = Pitch-Slide in Halbtoenen (-12..12) oder None.
         self.slide: list[list[int | None]] = [
             [None] * self.rows for _ in range(CHANNELS)]
+        # fx[channel][row] = Effekt-Code (FX_*), fxp = Parameter-Byte. None =
+        # kein Effekt. Nur sinnvoll, wo auch eine Note steht.
+        self.fx: list[list[int | None]] = [
+            [None] * self.rows for _ in range(CHANNELS)]
+        self.fxp: list[list[int | None]] = [
+            [None] * self.rows for _ in range(CHANNELS)]
 
     def get(self, channel: int, row: int) -> int | None:
         return self.data[channel][row]
@@ -83,6 +102,8 @@ class Pattern:
         if note is None:                     # Note geloescht -> Effekte mit
             self.vol[channel][row] = None
             self.slide[channel][row] = None
+            self.fx[channel][row] = None
+            self.fxp[channel][row] = None
 
     def get_vol(self, channel: int, row: int) -> int | None:
         return self.vol[channel][row]
@@ -110,10 +131,30 @@ class Pattern:
         else:
             self.slide[channel][row] = max(-SLIDE_MAX, min(SLIDE_MAX, int(s)))
 
+    def get_fx(self, channel: int, row: int) -> tuple[int, int]:
+        """(Effekt-Code, Parameter) der Zelle; (FX_NONE, 0) wenn keiner."""
+        fx = self.fx[channel][row]
+        if fx is None:
+            return FX_NONE, 0
+        return int(fx), int(self.fxp[channel][row] or 0)
+
+    def set_fx(self, channel: int, row: int, fx: int | None,
+               param: int = 0) -> None:
+        """Setzt Effekt-Code + Parameter (0..255). FX_NONE/None loescht den
+        Effekt. Wirkt nur, wenn an der Stelle eine Note steht."""
+        if self.data[channel][row] is None:
+            return
+        if fx is None or int(fx) == FX_NONE or int(fx) not in FX_CODES:
+            self.fx[channel][row] = None
+            self.fxp[channel][row] = None
+        else:
+            self.fx[channel][row] = int(fx)
+            self.fxp[channel][row] = max(0, min(255, int(param)))
+
     def set_rows(self, rows: int) -> None:
         """Aendert die Reihenzahl; bestehende Noten oben bleiben erhalten."""
         rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
-        for grid in (self.data, self.vol, self.slide):
+        for grid in (self.data, self.vol, self.slide, self.fx, self.fxp):
             for c in range(CHANNELS):
                 col = grid[c]
                 if rows < len(col):
@@ -126,12 +167,16 @@ class Pattern:
         self.data = [[None] * self.rows for _ in range(CHANNELS)]
         self.vol = [[None] * self.rows for _ in range(CHANNELS)]
         self.slide = [[None] * self.rows for _ in range(CHANNELS)]
+        self.fx = [[None] * self.rows for _ in range(CHANNELS)]
+        self.fxp = [[None] * self.rows for _ in range(CHANNELS)]
 
     def copy(self, name: str | None = None) -> "Pattern":
         p = Pattern(name if name is not None else self.name, self.rows)
         p.data = [list(col) for col in self.data]
         p.vol = [list(col) for col in self.vol]
         p.slide = [list(col) for col in self.slide]
+        p.fx = [list(col) for col in self.fx]
+        p.fxp = [list(col) for col in self.fxp]
         return p
 
     def _has_vol(self) -> bool:
@@ -139,6 +184,9 @@ class Pattern:
 
     def _has_slide(self) -> bool:
         return any(v is not None for col in self.slide for v in col)
+
+    def _has_fx(self) -> bool:
+        return any(v is not None for col in self.fx for v in col)
 
     def to_dict(self) -> dict:
         d = {"name": self.name, "rows": self.rows, "data": self.data}
@@ -148,6 +196,9 @@ class Pattern:
             d["vol"] = self.vol
         if self._has_slide():
             d["slide"] = self.slide
+        if self._has_fx():
+            d["fx"] = self.fx
+            d["fxp"] = self.fxp
         return d
 
     @classmethod
@@ -176,6 +227,21 @@ class Pattern:
                        for v in raws[c]][:p.rows]
                 col += [None] * (p.rows - len(col))
                 p.slide[c] = col
+        rawfx = d.get("fx") or []
+        rawfp = d.get("fxp") or []
+        for c in range(CHANNELS):
+            if c < len(rawfx):
+                col = [int(v) if isinstance(v, (int, float))
+                       and int(v) in FX_CODES and int(v) != FX_NONE else None
+                       for v in rawfx[c]][:p.rows]
+                col += [None] * (p.rows - len(col))
+                p.fx[c] = col
+            if c < len(rawfp):
+                colp = [max(0, min(255, int(v)))
+                        if isinstance(v, (int, float)) else None
+                        for v in rawfp[c]][:p.rows]
+                colp += [None] * (p.rows - len(colp))
+                p.fxp[c] = colp
         return p
 
 

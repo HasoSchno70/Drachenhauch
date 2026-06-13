@@ -369,6 +369,67 @@ def test_gb_code_without_slide_has_no_sfx():
     assert "AUDIO_SFX" not in s.gb_code()
 
 
+# --------------------------------------------------------------- Effekt-Spalte
+
+def test_set_fx_requires_note():
+    from gamebasic.tracker.song import FX_ARP, FX_NONE
+    p = Pattern("P")
+    p.set_fx(0, 0, FX_ARP, 0x47)
+    assert p.get_fx(0, 0) == (FX_NONE, 0)    # ohne Note ignoriert
+    p.set(0, 0, 60)
+    p.set_fx(0, 0, FX_ARP, 0x47)
+    assert p.get_fx(0, 0) == (FX_ARP, 0x47)
+    p.set_fx(0, 0, FX_NONE)                  # loeschen
+    assert p.get_fx(0, 0) == (FX_NONE, 0)
+
+
+def test_set_fx_clamps_param():
+    from gamebasic.tracker.song import FX_RET
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_fx(0, 0, FX_RET, 999)
+    assert p.get_fx(0, 0) == (FX_RET, 255)
+
+
+def test_clearing_note_clears_fx():
+    from gamebasic.tracker.song import FX_VIB, FX_NONE
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_fx(0, 0, FX_VIB, 0x68)
+    p.set(0, 0, None)
+    assert p.get_fx(0, 0) == (FX_NONE, 0)
+
+
+def test_fx_json_roundtrip(tmp_path):
+    from gamebasic.tracker.song import FX_ARP
+    s = Song()
+    s.patterns[0].set(2, 5, 64)
+    s.patterns[0].set_fx(2, 5, FX_ARP, 0x37)
+    path = str(tmp_path / "fx.json")
+    s.save_json(path)
+    s2 = Song.load_json(path)
+    assert s2.patterns[0].get_fx(2, 5) == (FX_ARP, 0x37)
+
+
+def test_fx_copy_independent():
+    from gamebasic.tracker.song import FX_ARP, FX_RET
+    p = Pattern("P")
+    p.set(0, 0, 60)
+    p.set_fx(0, 0, FX_ARP, 0x47)
+    q = p.copy()
+    q.set_fx(0, 0, FX_RET, 3)
+    assert p.get_fx(0, 0) == (FX_ARP, 0x47)  # Original unveraendert
+
+
+def test_to_dict_omits_empty_fx():
+    from gamebasic.tracker.song import FX_ARP
+    p = Pattern("P")
+    assert "fx" not in p.to_dict()
+    p.set(0, 0, 60)
+    p.set_fx(0, 0, FX_ARP, 0x47)
+    assert "fx" in p.to_dict() and "fxp" in p.to_dict()
+
+
 # --------------------------------------------------------------- Instrumente
 
 def _sample_inst(name="Smp"):

@@ -4,7 +4,9 @@ import wave
 import numpy as np
 
 from gamebasic.tracker import Song, Instrument
-from gamebasic.tracker.mixer import render_song, save_wav, _note_events
+from gamebasic.tracker.mixer import (render_song, save_wav, _note_events,
+                                     apply_effect)
+from gamebasic.tracker.song import FX_ARP, FX_RET, FX_OFF, FX_VIB
 
 
 def _sample_inst(name="S", freq=440, secs=0.2, sr=44100, base=69):
@@ -19,8 +21,8 @@ def test_note_events_walks_order():
     s.patterns[0].set(0, 2, 64)
     s.patterns[0].set(1, 1, 67)
     ev = _note_events(s)
-    assert ev[0] == [(0, 60, None, None), (2, 64, None, None)]
-    assert ev[1] == [(1, 67, None, None)]
+    assert ev[0] == [(0, 60, None, None, 0, 0), (2, 64, None, None, 0, 0)]
+    assert ev[1] == [(1, 67, None, None, 0, 0)]
 
 
 def test_render_song_nonsilent_and_length():
@@ -142,3 +144,58 @@ def test_sample_slide_changes_pitch():
         h = a[len(a)//2:]
         return int(np.sum(np.abs(np.diff(np.sign(h))) > 0))
     assert zc(glide) > zc(flat)
+
+
+# --- Effekt-Spalte (Arpeggio/Vibrato/Retrigger/Sample-Offset) ---------------
+
+def _tone(freq=440, secs=0.5, sr=44100):
+    t = np.arange(int(sr * secs)) / sr
+    return np.sin(2 * np.pi * freq * t).astype(np.float32)
+
+
+def test_apply_effect_none_is_identity():
+    buf = _tone()
+    assert np.array_equal(apply_effect(buf, 0, 0, 44100, 125), buf)
+
+
+def test_arpeggio_raises_pitch_in_some_ticks():
+    # Arp +12/+7: spaetere Ticks lesen schneller -> mehr Nulldurchgaenge als
+    # das unbearbeitete Original ueber dasselbe Fenster.
+    buf = _tone(220, 0.6)
+    arp = apply_effect(buf, FX_ARP, (12 << 4) | 7, 44100, 125)
+    def zc(a):
+        return int(np.sum(np.abs(np.diff(np.sign(a))) > 0))
+    assert zc(arp) > zc(buf)
+    assert arp.shape == buf.shape
+
+
+def test_retrigger_tiles_head():
+    buf = _tone(440, 0.5)
+    ret = apply_effect(buf, FX_RET, 1, 44100, 125)   # alle 1 Tick neu
+    assert ret.shape == buf.shape
+    # Der Anfang wiederholt sich: 2. Tick-Block gleicht dem 1.
+    tick = int(44100 * 125 / 1000 / 6)
+    assert np.allclose(ret[:tick], ret[tick:2 * tick])
+
+
+def test_sample_offset_shifts_forward():
+    buf = _tone(440, 0.2)
+    off = apply_effect(buf, FX_OFF, 4, 44100, 125)   # 4*512 Frames spaeter
+    assert off.shape == buf.shape
+    assert np.allclose(off[:len(buf) - 4 * 512], buf[4 * 512:])
+
+
+def test_vibrato_modulates_but_keeps_length():
+    buf = _tone(440, 0.4)
+    vib = apply_effect(buf, FX_VIB, (6 << 4) | 8, 44100, 125)
+    assert vib.shape == buf.shape
+    assert not np.allclose(vib, buf)
+
+
+def test_render_song_with_arpeggio_nonsilent():
+    s = Song()
+    s.patterns[0].set_rows(4)
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_fx(0, 0, FX_ARP, (4 << 4) | 7)
+    out = render_song(s)
+    assert np.max(np.abs(out)) > 0.05
