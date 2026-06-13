@@ -10,7 +10,6 @@ Aufruf:
     .venv\\Scripts\\python.exe rust\\build_runtime.py            # release, mit Grafik
     .venv\\Scripts\\python.exe rust\\build_runtime.py --no-graphics
     .venv\\Scripts\\python.exe rust\\build_runtime.py --debug
-    .venv\\Scripts\\python.exe rust\\build_runtime.py --kira      # Audio via Kira (experimentell)
 
 Ohne Grafik (`--no-graphics`) baut der pure VM-Kern ganz ohne C-Toolchain.
 """
@@ -95,10 +94,8 @@ def main() -> int:
     # nimmt serial/usb/bt/wifi dazu (Phase 4).
     feats = []
     if graphics:
-        # `--kira` baut das experimentelle Kira-Audio-Backend (cpal) statt
-        # raylib-Audio (Fenster/Input bleiben raylib). Zum Anhoeren/Testen
-        # der Audio-Migration -- siehe docs/rust-runtime.md.
-        feats.append("kira_audio" if "--kira" in args else "graphics")
+        # `graphics` zieht raylib (Fenster/Input) + Kira (Audio, src/audio.rs).
+        feats.append("graphics")
     if "--no-data" not in args:
         feats += ["db", "net", "http"]
     if "--hardware" in args:

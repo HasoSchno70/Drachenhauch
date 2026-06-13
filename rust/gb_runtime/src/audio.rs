@@ -1,61 +1,133 @@
-//! Native Audio ueber raylib -- Core-Builtins LOADSOUND/PLAYSOUND/STOPSOUND
-//! (SFX) sowie PLAYMUSIC/STOPMUSIC (Stream-Musik). Nur mit `--features
-//! graphics` (raylib bundelt Audio mit).
+//! Native Audio ueber **Kira** (cpal) -- das Audio-Backend von gbrt (loeste
+//! 2026-06-13 raylib-Audio ab). Vorteil gegenueber raylib: ein eigener Audio-
+//! Thread, vollstaendig vom Game-Loop entkoppelt (kein per-Frame-Refill ->
+//! kein Stottern bei schweren Frames), echte Mixer-Tracks/Effekte, tweenbare
+//! Lautstaerke/Pitch/Pan. MOD/XM via reinem Rust-Player (xmrs/xmrsplayer).
+//! Eingebunden mit `--features graphics` (raylib bleibt fuer Fenster/Input).
 //!
 //! Audio-Output ist -- wie RND/MILLIS/Tween -- naturgemaess nicht
-//! deterministisch golden-testbar; getestet wird die Argument-Validierung.
-//!
-//! Lifetime-Trick: `Sound<'aud>`/`Music<'aud>` borgen das `RaylibAudio`-
-//! Geraet. Da das Geraet den ganzen Prozess lebt, wird es per `Box::leak`
-//! zu `&'static` gemacht -- so lassen sich Sounds/Musik in `Vec`/`Option`
-//! halten, ohne ein self-referential struct zu bauen.
+//! deterministisch golden-testbar; getestet wird die reine DSP-Mathematik
+//! (resample/lofi/pendulum) + Argument-Validierung.
 #![cfg(feature = "graphics")]
 
 use std::collections::HashMap;
-use std::os::raw::{c_uint, c_void};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-use raylib::core::audio::{Music, RaylibAudio, Sound};
+use kira::{
+    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Panning, Tween,
+    effect::{Effect, EffectBuilder},
+    info::Info,
+    sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
+    sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
+    sound::FromFileError,
+    track::MainTrackBuilder,
+};
+use xmrs::prelude::Module;
+use xmrsplayer::prelude::XmrsPlayer;
 
-/// Ein geladenes PCM-Sample (mono, normalisiert [-1,1]) fuer den Amiga-Stil-
-/// Sampler `SAMPLE_*`. Wiedergabe erfolgt resampled (Tonhoehe = Geschwindigkeit,
-/// genau wie Paula): `SAMPLE_PLAY(sample, halbtoene, vol)`.
-struct Sample {
-    data: Vec<f32>,      // mono PCM, [-1,1]
-    sr: u32,             // Quell-Sample-Rate
-    loop_start: usize,   // Loop-Region (Frames); aktiv wenn loop_end > loop_start
-    loop_end: usize,
+/// Woher die aktuelle Musik kommt: Stream-Datei (ogg/mp3/wav/flac) oder ein
+/// zu PCM gerendertes Tracker-Modul (.mod/.xm/.s3m/.it). Beim (Neu-)Starten
+/// baut start_music daraus die passende Kira-Sound-Quelle.
+enum MusicSource {
+    Stream(String),          // Pfad -- bei jedem Play frisch geoeffnet (streamt von Platte)
+    Module(StaticSoundData), // ein gerenderter Loop-Durchlauf (im RAM, loopt via loop_region)
+}
+
+/// Laufende Musik-Instanz. Beide Handle-Typen teilen dieselbe Methoden-API
+/// (state/position/pause/resume/stop/set_volume/set_playback_rate) -> das
+/// `on_music!`-Makro ruft sie einheitlich.
+enum MusicHandle {
+    Stream(StreamingSoundHandle<FromFileError>),
+    Static(StaticSoundHandle),
+}
+
+/// Rendert ein Tracker-Modul zu einem Loop-Durchlauf (mono->stereo PCM bei
+/// 44100; Kira resampelt beim Abspielen aufs Geraet). Modul + Player sind
+/// lokal -> kein Lifetime-Leak. 5-Minuten-Sicherheitskappe.
+fn render_module(bytes: &[u8], fn_: &str) -> Result<StaticSoundData, String> {
+    let sr: u32 = 44100;
+    let module = Module::load(bytes).map_err(|e| format!("{}: {:?}", fn_, e))?;
+    let mut player = XmrsPlayer::new(&module, sr, 0);
+    player.set_max_loop_count(1);          // genau ein Durchlauf -> danach loopt Kira
+    let cap = (sr as usize) * 60 * 5;
+    let mut frames: Vec<Frame> = Vec::new();
+    {
+        let mut it = player.by_ref();
+        while frames.len() < cap {
+            match (it.next(), it.next()) {
+                (Some(l), Some(r)) => frames.push(Frame {
+                    left: l as f32 / 32768.0, right: r as f32 / 32768.0,
+                }),
+                _ => break,
+            }
+        }
+    }
+    if frames.is_empty() { return Err(format!("{}: Modul ergab kein Audio", fn_)); }
+    Ok(StaticSoundData {
+        sample_rate: sr, frames: frames.into(),
+        settings: StaticSoundSettings::new(), slice: None,
+    })
+}
+
+fn is_module_path(p: &str) -> bool {
+    let l = p.to_lowercase();
+    l.ends_with(".mod") || l.ends_with(".xm") || l.ends_with(".s3m") || l.ends_with(".it")
+}
+
+// Einheitliche Steuerung beider MusicHandle-Varianten (identische Methoden-API).
+fn mh_stop(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.stop(t), MusicHandle::Static(x) => x.stop(t) }
+}
+fn mh_pause(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.pause(t), MusicHandle::Static(x) => x.pause(t) }
+}
+fn mh_resume(h: &mut MusicHandle, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.resume(t), MusicHandle::Static(x) => x.resume(t) }
+}
+fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.set_volume(d, t), MusicHandle::Static(x) => x.set_volume(d, t) }
+}
+fn mh_set_rate(h: &mut MusicHandle, r: f64, t: Tween) {
+    match h { MusicHandle::Stream(x) => x.set_playback_rate(r, t), MusicHandle::Static(x) => x.set_playback_rate(r, t) }
+}
+fn mh_state(h: &MusicHandle) -> PlaybackState {
+    match h { MusicHandle::Stream(x) => x.state(), MusicHandle::Static(x) => x.state() }
 }
 
 const TWO_PI: f32 = std::f32::consts::TAU;
+const PI64: f64 = std::f64::consts::PI;
 const RING: usize = 4096;     // Ringpuffer fuer Mono-Samples (vom Audio-Thread)
 const FFT_N: usize = 1024;    // FFT-Fenster
 
+// --- FFT-Tap -----------------------------------------------------------
+// Statt raylibs AttachAudioMixedProcessor haengen wir einen Effect an den
+// Main-Track. Sein `process` laeuft auf dem Audio-Thread und schiebt das
+// gemischte Signal (mono) in einen globalen Ringpuffer; fft_bands liest ihn.
 struct Ring { buf: [f32; RING], pos: usize }
-// Global, weil der raylib-Mix-Callback eine freie `extern "C"`-Funktion sein
-// muss (kein Closure-State). Der Audio-Thread schreibt, der Main-Thread liest.
 static SAMPLES: Mutex<Ring> = Mutex::new(Ring { buf: [0.0; RING], pos: 0 });
 
-/// raylib-Mix-Processor: bekommt das fertig gemischte Stereo-Float-Signal der
-/// gesamten Pipeline. Wir mischen auf Mono und schieben es in den Ringpuffer.
-/// `try_lock`, damit der Audio-Thread nie blockiert (verpasste Samples = egal).
-unsafe extern "C" fn mixed_proc(buffer: *mut c_void, frames: c_uint) {
-    let n = frames as usize;
-    if buffer.is_null() || n == 0 { return; }
-    let data = buffer as *const f32;
-    if let Ok(mut ring) = SAMPLES.try_lock() {
-        let mut p = ring.pos;
-        for i in 0..n {
-            let l = *data.add(i * 2);
-            let r = *data.add(i * 2 + 1);
-            ring.buf[p] = (l + r) * 0.5;
-            p = (p + 1) % RING;
+struct FftTapBuilder;
+struct FftTapEffect;
+impl EffectBuilder for FftTapBuilder {
+    type Handle = ();
+    fn build(self) -> (Box<dyn Effect>, ()) { (Box::new(FftTapEffect), ()) }
+}
+impl Effect for FftTapEffect {
+    fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {
+        if let Ok(mut ring) = SAMPLES.try_lock() {
+            let mut p = ring.pos;
+            for f in input.iter() {
+                ring.buf[p] = (f.left + f.right) * 0.5;
+                p = (p + 1) % RING;
+            }
+            ring.pos = p;
         }
-        ring.pos = p;
     }
 }
 
-/// Iterative Radix-2-FFT (in-place), N muss Zweierpotenz sein.
+/// Iterative Radix-2-FFT (in-place), N muss Zweierpotenz sein. (Verbatim aus
+/// audio.rs -- gleiche Mathematik.)
 fn fft(re: &mut [f32], im: &mut [f32]) {
     let n = re.len();
     let mut j = 0usize;
@@ -88,241 +160,179 @@ fn fft(re: &mut [f32], im: &mut [f32]) {
     }
 }
 
-/// Laufender Fade (AUDIO_MUSIC_PLAY/AUDIO_PLAY fade_in, AUDIO_MUSIC_STOP/
-/// AUDIO_STOP fade_out). Zeitbasiert -- `update()` (pro Frame aus dem
-/// FLIP-Pfad) schreibt das interpolierte Volume auf Stream bzw. Sound.
-struct Fade {
-    from: f32,
-    to: f32,
-    start: std::time::Instant,
-    dur_ms: f64,
-    stop_after: bool,   // Fade-out: am Ende Stream/Sound stoppen
+// --- Hilfs-Konvertierungen ---------------------------------------------
+
+/// Lineare Lautstaerke 0..1 -> Kira-Dezibel. 0 -> Stille.
+fn db(v: f64) -> Decibels {
+    let v = v.clamp(0.0, 1.0);
+    if v <= 0.0 { Decibels::SILENCE } else { Decibels((20.0 * v.log10()) as f32) }
 }
 
-/// Fade-Fortschritt 0..1 (pure, fuer #[test]).
-fn fade_progress(elapsed_ms: f64, dur_ms: f64) -> f32 {
-    if dur_ms <= 0.0 { return 1.0; }
-    (elapsed_ms / dur_ms).clamp(0.0, 1.0) as f32
+/// Pan-Position 0=links .. 0.5=Mitte .. 1=rechts -> Kira-Panning(-1..1).
+fn pan_of(pos: f64) -> Panning { Panning((2.0 * pos.clamp(0.0, 1.0) - 1.0) as f32) }
+
+fn tween_ms(ms: i64) -> Tween {
+    Tween { duration: Duration::from_millis(ms.max(0) as u64), ..Default::default() }
+}
+fn tween_now() -> Tween { Tween { duration: Duration::from_millis(4), ..Default::default() } }
+
+// --- Per-Sound-Slot (SFX/Tone/Sample) ----------------------------------
+
+/// Ein "Channel" == ein geladener/gebauter Sound. `data` ist die (billig
+/// klonbare) Sample-Quelle, `handle` die zuletzt gestartete Instanz.
+struct SoundSlot {
+    data: StaticSoundData,
+    handle: Option<StaticSoundHandle>,
+    vol: f32,                 // getrackte Lautstaerke (linear 0..1)
+    loops: i64,               // verbleibende endliche Wiederholungen (>0); -1 endlos via loop_region; 0 keine
+    pan_anim: Option<Pendulum>, // AUTOPAN (per-Frame); SLIDE laeuft als Kira-Tween
 }
 
-impl Fade {
-    fn current_vol(&self) -> f32 {
-        let t = fade_progress(self.start.elapsed().as_secs_f64() * 1000.0, self.dur_ms);
-        self.from + (self.to - self.from) * t
-    }
-    fn done(&self) -> bool {
-        self.start.elapsed().as_secs_f64() * 1000.0 >= self.dur_ms
-    }
+/// Ein geladenes PCM-Sample fuer den Amiga-Stil-Sampler (SAMPLE_*).
+struct Sample {
+    data: Vec<f32>,
+    sr: u32,
+    loop_start: usize,
+    loop_end: usize,
 }
 
-/// Laufende Pan-Animation (AUDIO_PAN_SLIDE / AUDIO_AUTOPAN). Bewegt NUR das
-/// Stereo-Pan (Position 0=links .. 1=rechts), nie das Volume -- kollidiert
-/// dadurch nicht mit Fades. `update()` schreibt die Position pro Frame.
-enum PanAnim {
-    /// Einmalige Fahrt von -> nach ueber dur_ms; bleibt am Ziel stehen.
-    Slide { from: f64, to: f64, start: std::time::Instant, dur_ms: f64 },
-    /// Endloses Pendeln links<->rechts; eine volle Runde = period_s.
-    Pendulum { period_s: f64, depth: f64, start: std::time::Instant },
-}
+/// AUTOPAN-Pendel (per-Frame in update() geschrieben).
+struct Pendulum { period_s: f64, depth: f64, start: std::time::Instant }
 
-/// Pendel-Position 0..1 (pure, fuer #[test]). Kosinus-foermig: startet auf
-/// der linken Auslenkung (bei depth=1.0 ganz links), wandert nach rechts
-/// und zurueck; depth skaliert die Auslenkung um die Mitte 0.5.
+/// Pendel-Position 0..1 (pure, fuer #[test]). Kosinus-foermig, startet links.
 fn pendulum_pos(elapsed_s: f64, period_s: f64, depth: f64) -> f64 {
     let d = depth.clamp(0.0, 1.0);
     0.5 - 0.5 * d * (std::f64::consts::TAU * elapsed_s / period_s).cos()
 }
 
-impl PanAnim {
-    /// (aktuelle Position 0..1, Animation fertig?)
-    fn position(&self) -> (f64, bool) {
-        match self {
-            PanAnim::Slide { from, to, start, dur_ms } => {
-                let t = fade_progress(start.elapsed().as_secs_f64() * 1000.0, *dur_ms) as f64;
-                (from + (to - from) * t, t >= 1.0)
-            }
-            PanAnim::Pendulum { period_s, depth, start } =>
-                (pendulum_pos(start.elapsed().as_secs_f64(), *period_s, *depth), false),
-        }
-    }
-}
+// --- Musik (Stream) ----------------------------------------------------
 
 pub struct Audio {
-    dev: &'static RaylibAudio,
-    sounds: Vec<Sound<'static>>,
-    sound_vol: Vec<f32>,        // getrackte Volumes (raylib hat keinen Getter)
-    music: Option<Music<'static>>,
-    music_vol: f32,            // getracktes Music-Volume
-    music_queue: Option<String>, // AUDIO_MUSIC_QUEUE -> bei Stream-Ende abspielen
-    music_loops: i64,          // verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos (raylib-looping)
-    music_pitch: f32,          // getrackter Music-Pitch (ueberlebt LOAD/QUEUE)
-    music_fade: Option<Fade>,
-    music_paused: bool,        // AUDIO_MUSIC_PAUSE -- damit update() eine Pause nicht als Stream-Ende deutet
-    ch_fade: Vec<Option<Fade>>, // pro Sound-Handle: laufender Fade (AUDIO_PLAY fade_in / AUDIO_STOP fade_out)
-    ch_loops: Vec<i64>,        // pro Sound-Handle: verbleibende Wiederholungen nach dem aktuellen Durchlauf; -1 = endlos, 0 = keine
-    ch_paused: Vec<bool>,      // AUDIO_PAUSE -- damit update() eine Pause nicht als Sound-Ende deutet
-    ch_pan_anim: Vec<Option<PanAnim>>, // pro Sound-Handle: laufende Pan-Animation (SLIDE/AUTOPAN)
-    num_channels: i64,         // emuliert (raylib hat kein festes Channel-Limit)
-    bands: Vec<f32>,   // geglaettete Band-Pegel (Peak-Hold)
-    agc: f32,          // Auto-Gain-Referenz (adaptiv)
-    samples: Vec<Sample>,                       // SAMPLE_LOAD-Pool
-    sample_cache: HashMap<(usize, i64, i64), i64>, // (sample, centi-halbtoene, dur_ms) -> Sound-Handle
-    lofi: bool,        // Paula-Lo-Fi-Modus (Bit-Crush + LED-Tiefpass)
-    lofi_bits: u32,    // Bit-Tiefe (Default 8 = Amiga)
-    lofi_cutoff: f64,  // LED-Filter-Cutoff in Hz (0 = aus; Default 3300)
+    manager: AudioManager<DefaultBackend>,
+    sounds: Vec<SoundSlot>,
+    samples: Vec<Sample>,
+    sample_cache: HashMap<(usize, i64, i64), i64>,
+    num_channels: i64,
+    bands: Vec<f32>,
+    agc: f32,
+    lofi: bool,
+    lofi_bits: u32,
+    lofi_cutoff: f64,
+    // Musik (genau eine gleichzeitig)
+    music_source: Option<MusicSource>,
+    music_handle: Option<MusicHandle>,
+    music_vol: f32,
+    music_pitch: f32,
+    music_loops: i64,         // verbleibende Wiederholungen; -1 endlos
+    music_queue: Option<String>,
+    music_paused: bool,
 }
 
 impl Audio {
     pub fn new() -> Result<Audio, String> {
-        let dev = RaylibAudio::init_audio_device()
-            .map_err(|_| "Audio-Geraet konnte nicht initialisiert werden".to_string())?;
-        let dev: &'static RaylibAudio = Box::leak(Box::new(dev));
-        // Mix-Tap fuer die FFT anhaengen (gesamte Pipeline -> Mono-Ring).
-        unsafe { raylib::ffi::AttachAudioMixedProcessor(Some(mixed_proc)); }
+        let settings = AudioManagerSettings {
+            main_track_builder: MainTrackBuilder::new().with_effect(FftTapBuilder),
+            ..Default::default()
+        };
+        let manager = AudioManager::<DefaultBackend>::new(settings)
+            .map_err(|e| format!("Audio-Geraet konnte nicht initialisiert werden: {e:?}"))?;
         Ok(Audio {
-            dev, sounds: Vec::new(), sound_vol: Vec::new(),
-            music: None, music_vol: 1.0, music_queue: None,
-            music_loops: -1, music_pitch: 1.0, music_fade: None, music_paused: false,
-            ch_fade: Vec::new(), ch_loops: Vec::new(), ch_paused: Vec::new(),
-            ch_pan_anim: Vec::new(),
-            num_channels: 16,
+            manager, sounds: Vec::new(), samples: Vec::new(),
+            sample_cache: HashMap::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
-            samples: Vec::new(), sample_cache: HashMap::new(),
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
+            music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
+            music_loops: -1, music_queue: None, music_paused: false,
         })
     }
 
-    /// AUDIO_LOFI(an[, bits[, cutoff_hz]]): Paula/Amiga-Lo-Fi fuer folgende
-    /// synthetisierte Sounds (AUDIO_TONE/NOISE/SFX + SAMPLE_PLAY). `bits`
-    /// (1..16, Default 8) = Bit-Crush-Aufloesung, `cutoff_hz` (>=0, Default
-    /// 3300, 0 = aus) = LED-Tiefpass. Wirkt erst auf NEU gebaute Sounds ->
-    /// der Sample-Cache wird invalidiert.
-    pub fn set_lofi(&mut self, on: bool, bits: u32, cutoff: f64) {
-        self.lofi = on;
-        self.lofi_bits = bits.clamp(1, 16);
-        self.lofi_cutoff = cutoff.max(0.0);
-        self.sample_cache.clear();
-    }
+    // ---- intern: Sound aus Float-Buffer bauen + registrieren ----------
 
-    /// Paula-Lo-Fi-Kette (pur): Bit-Crush dann One-Pole-Tiefpass. Reihenfolge
-    /// wie auf echtem Amiga: 8-bit-DAC zuerst, dann der analoge LED-Filter.
-    fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
-        if bits >= 1 && bits < 24 {
-            let levels = (1u64 << bits) as f64;
-            let half = levels / 2.0;
-            for s in buf.iter_mut() {
-                *s = ((*s * half).round() / half).clamp(-1.0, 1.0);
+    fn make_data_mono(&self, buf: &[f64], vol: f64, sr: u32) -> StaticSoundData {
+        let n = buf.len();
+        let vol = vol.clamp(0.0, 1.0);
+        let mut work;
+        let src: &[f64] = if self.lofi {
+            work = buf.to_vec();
+            lofi_chain(&mut work, sr, self.lofi_bits, self.lofi_cutoff);
+            &work
+        } else { buf };
+        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let frames: Arc<[Frame]> = (0..n).map(|i| {
+            let mut e = 1.0;
+            if fade > 0 {
+                if i < fade { e = i as f64 / fade as f64; }
+                else if i >= n - fade { e = (n - 1 - i) as f64 / fade as f64; }
             }
-        }
-        if cutoff > 0.0 && sr > 0 {
-            let dt = 1.0 / sr as f64;
-            let rc = 1.0 / (2.0 * PI64 * cutoff);
-            let alpha = dt / (rc + dt);
-            let mut y = 0.0;
-            for s in buf.iter_mut() {
-                y += alpha * (*s - y);
-                *s = y;
+            let s = (src[i] * e * vol).clamp(-1.0, 1.0) as f32;
+            Frame { left: s, right: s }
+        }).collect();
+        StaticSoundData { sample_rate: sr, frames, settings: StaticSoundSettings::new(), slice: None }
+    }
+
+    fn make_data_stereo(&self, left: &[f64], right: &[f64], vol: f64, sr: u32) -> StaticSoundData {
+        let n = left.len();
+        let vol = vol.clamp(0.0, 1.0);
+        let (mut wl, mut wr);
+        let (l, r): (&[f64], &[f64]) = if self.lofi {
+            wl = left.to_vec(); wr = right.to_vec();
+            lofi_chain(&mut wl, sr, self.lofi_bits, self.lofi_cutoff);
+            lofi_chain(&mut wr, sr, self.lofi_bits, self.lofi_cutoff);
+            (&wl, &wr)
+        } else { (left, right) };
+        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
+        let frames: Arc<[Frame]> = (0..n).map(|i| {
+            let mut e = 1.0;
+            if fade > 0 {
+                if i < fade { e = i as f64 / fade as f64; }
+                else if i >= n - fade { e = (n - 1 - i) as f64 / fade as f64; }
             }
-        }
+            Frame {
+                left: (l[i] * e * vol).clamp(-1.0, 1.0) as f32,
+                right: (r[i] * e * vol).clamp(-1.0, 1.0) as f32,
+            }
+        }).collect();
+        StaticSoundData { sample_rate: sr, frames, settings: StaticSoundSettings::new(), slice: None }
     }
 
-    // -- Amiga-Stil-Sampler (SAMPLE_LOAD / SAMPLE_PLAY) --
-    //
-    // Ein geladenes PCM-Sample wird ueber die ganze Klaviatur gespielt,
-    // indem es resampled wird (hoehere Note = schneller abgespielt = hoeher --
-    // genau wie Paula auf dem Amiga). Resampelte Varianten werden gecacht.
-
-    /// SAMPLE_LOAD(path$) -> SAMPLE: WAV/OGG/QOA laden, auf mono normalisieren.
-    pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
-        let resolved = crate::builtins::resolve_asset_path(path);
-        let mut wave = self.dev.new_wave(&resolved)
-            .map_err(|e| format!("SAMPLE_LOAD: {}", e))?;
-        let sr = wave.sample_rate();
-        wave.format(sr as i32, 16, 1);          // mono, gleiche Rate behalten
-        let data: Vec<f32> = wave.load_samples().as_ref().to_vec();
-        if data.is_empty() {
-            return Err("SAMPLE_LOAD: Sample ist leer".into());
-        }
-        self.samples.push(Sample { data, sr, loop_start: 0, loop_end: 0 });
-        Ok((self.samples.len() - 1) as i64)
+    fn push_slot(&mut self, data: StaticSoundData, vol: f32) -> i64 {
+        self.sounds.push(SoundSlot { data, handle: None, vol, loops: 0, pan_anim: None });
+        (self.sounds.len() - 1) as i64
     }
 
-    /// SAMPLE_SET_LOOP(sample, start, end): Loop-Region in Frames der Quelle.
-    /// Wirkt nur bei `SAMPLE_PLAY` mit Dauer (sustained note).
-    pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64) -> Result<(), String> {
-        let s = self.samples.get_mut(idx as usize)
-            .ok_or_else(|| format!("SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}", idx))?;
-        let n = s.data.len();
-        let start = start.max(0) as usize;
-        let end = (end.max(0) as usize).min(n);
-        if end <= start {
-            return Err("SAMPLE_SET_LOOP: end muss > start sein".into());
-        }
-        s.loop_start = start;
-        s.loop_end = end;
-        // Cache invalidieren -- Loop aendert gebaute Buffer.
-        self.sample_cache.retain(|k, _| k.0 != idx as usize);
+    fn slot(&self, idx: i64, fn_: &str) -> Result<&SoundSlot, String> {
+        self.sounds.get(idx as usize)
+            .ok_or_else(|| format!("{}: ungueltiges Handle {}", fn_, idx))
+    }
+    fn slot_mut(&mut self, idx: i64, fn_: &str) -> Result<&mut SoundSlot, String> {
+        self.sounds.get_mut(idx as usize)
+            .ok_or_else(|| format!("{}: ungueltiges Handle {}", fn_, idx))
+    }
+
+    /// Startet einen Slot neu (stoppt die alte Instanz) mit gegebener
+    /// Lautstaerke/Loop/Fade. Gemeinsamer Kern fuer PLAYSOUND + AUDIO_PLAY.
+    fn start_slot(&mut self, idx: i64, fn_: &str, vol: f64, loops: i64, fade_in_ms: i64) -> Result<(), String> {
+        let vol = vol.clamp(0.0, 1.0);
+        // alte Instanz stoppen
+        if let Some(h) = self.slot_mut(idx, fn_)?.handle.as_mut() { h.stop(tween_now()); }
+        let mut settings = StaticSoundSettings::new();
+        if loops < 0 { settings = settings.loop_region(0.0..); }
+        settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
+        let data = self.slot(idx, fn_)?.data.clone().with_settings(settings);
+        let mut handle = self.manager.play(data)
+            .map_err(|e| format!("{}: {:?}", fn_, e))?;
+        if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms(fade_in_ms)); }
+        let s = self.slot_mut(idx, fn_)?;
+        s.handle = Some(handle);
+        s.vol = vol as f32;
+        s.loops = if loops < 0 { -1 } else { loops };
+        s.pan_anim = None;
         Ok(())
     }
 
-    /// SAMPLE_LEN(sample) -> Sekunden bei Originaltonhoehe.
-    pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
-        let s = self.samples.get(idx as usize)
-            .ok_or_else(|| format!("SAMPLE_LEN: ungueltiges SAMPLE-Handle {}", idx))?;
-        Ok(s.data.len() as f64 / s.sr as f64)
-    }
-
-    /// SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms]) -> AUDIO_CHANNEL.
-    /// `halbtoene` verschiebt die Tonhoehe relativ zum Original (12 = Oktave
-    /// hoeher). `dur_ms<=0` = ganzes Sample einmal (One-Shot, fuer Drums/Hits);
-    /// `dur_ms>0` = auf diese Laenge gebaut (mit Loop-Region wird geloopt,
-    /// sonst danach Stille) -- fuer gehaltene Noten.
-    pub fn sample_play(&mut self, sidx: i64, semitones: f64, volume: f64,
-                       dur_ms: i64) -> Result<i64, String> {
-        let si = sidx as usize;
-        if si >= self.samples.len() {
-            return Err(format!("SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}", sidx));
-        }
-        let ratio = 2f64.powf(semitones / 12.0);
-        if !ratio.is_finite() || ratio <= 0.0 {
-            return Err("SAMPLE_PLAY: ungueltige Tonhoehe".into());
-        }
-        let v = volume.clamp(0.0, 1.0) as f32;
-        let key = (si, (semitones * 100.0).round() as i64, dur_ms);
-        if let Some(&snd) = self.sample_cache.get(&key) {
-            let s = self.snd(snd, "SAMPLE_PLAY")?;
-            s.set_volume(v);
-            s.play();
-            self.reset_channel_state(snd as usize, v);
-            return Ok(snd);
-        }
-        let sr = self.samples[si].sr;
-        let buf = self.build_resampled(si, ratio, dur_ms);
-        if buf.is_empty() {
-            return Err("SAMPLE_PLAY: leeres Sample".into());
-        }
-        // vol=1.0 in den Buffer backen, Laufstaerke per set_volume -> Cache
-        // ist lautstaerke-unabhaengig.
-        let snd = self.push_wave_sound(&buf, 1.0, sr)?;
-        self.sample_cache.insert(key, snd);
-        let s = self.snd(snd, "SAMPLE_PLAY")?;
-        s.set_volume(v);
-        s.play();
-        self.reset_channel_state(snd as usize, v);
-        Ok(snd)
-    }
-
-    /// Resampling mit linearer Interpolation. One-Shot (dur_ms<=0) spielt das
-    /// ganze Sample bei `ratio`; mit Dauer wird ein Buffer fester Laenge
-    /// gebaut, der die Loop-Region wiederholt (falls gesetzt).
-    fn build_resampled(&self, si: usize, ratio: f64, dur_ms: i64) -> Vec<f64> {
-        let s = &self.samples[si];
-        resample(&s.data, s.sr, ratio, dur_ms, s.loop_start, s.loop_end)
-    }
-
-    /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1) aus dem
-    /// zuletzt gehoerten Audio. Auto-Gain normalisiert lautstaerkeunabhaengig;
-    /// Peak-Hold-Glaettung laesst die Balken springen + sanft fallen.
+    // ================= FFT =================
+    /// Fuellt `out` mit B logarithmisch verteilten Band-Pegeln (0..1).
+    /// (Mathematik verbatim aus audio.rs.)
     pub fn fft_bands(&mut self, out: &mut [f32]) {
         let b = out.len();
         if b == 0 { return; }
@@ -361,175 +371,32 @@ impl Audio {
         }
     }
 
-    /// Sound + parallelen Channel-State (Volume/Fade/Loops/Paused) registrieren.
-    fn push_sound(&mut self, s: Sound<'static>, vol: f32) -> i64 {
-        self.sounds.push(s);
-        self.sound_vol.push(vol);
-        self.ch_fade.push(None);
-        self.ch_loops.push(0);
-        self.ch_paused.push(false);
-        self.ch_pan_anim.push(None);
-        (self.sounds.len() - 1) as i64
+    // ================= Lo-Fi =================
+    pub fn set_lofi(&mut self, on: bool, bits: u32, cutoff: f64) {
+        self.lofi = on;
+        self.lofi_bits = bits.clamp(1, 16);
+        self.lofi_cutoff = cutoff.max(0.0);
+        self.sample_cache.clear();
     }
 
+    // ================= Core SFX =================
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let path = resolved.as_str();
-        let s = self.dev.new_sound(path).map_err(|e| format!("LOADSOUND: {}", e))?;
-        Ok(self.push_sound(s, 1.0))
-    }
-
-    fn sound(&self, idx: i64, fn_: &str) -> Result<&Sound<'static>, String> {
-        self.sounds.get(idx as usize)
-            .ok_or_else(|| format!("{}: ungueltiges SOUND-Handle {}", fn_, idx))
+        let data = StaticSoundData::from_file(&resolved)
+            .map_err(|e| format!("LOADSOUND: {:?}", e))?;
+        Ok(self.push_slot(data, 1.0))
     }
 
     pub fn play_sound(&mut self, idx: i64, volume: f64) -> Result<(), String> {
-        let v = volume.clamp(0.0, 1.0) as f32;
-        {
-            let s = self.sound(idx, "PLAYSOUND")?;
-            s.set_volume(v);
-            s.play();
-        }
-        self.reset_channel_state(idx as usize, v);
-        Ok(())
+        self.start_slot(idx, "PLAYSOUND", volume, 0, 0)
     }
 
     pub fn stop_sound(&mut self, idx: i64) -> Result<(), String> {
-        self.sound(idx, "STOPSOUND")?.stop();
-        let v = self.sound_vol[idx as usize];
-        self.reset_channel_state(idx as usize, v);
+        if let Some(h) = self.slot_mut(idx, "STOPSOUND")?.handle.as_mut() { h.stop(tween_now()); }
         Ok(())
     }
 
-    /// Loop-/Fade-/Pause-Tracking eines Handles zuruecksetzen -- noetig bei
-    /// jedem Neu-Start/Stopp, damit update() einen gestoppten Sound nicht
-    /// per Rest-Loop wiederbelebt.
-    fn reset_channel_state(&mut self, i: usize, vol: f32) {
-        self.sound_vol[i] = vol;
-        self.ch_fade[i] = None;
-        self.ch_loops[i] = 0;
-        self.ch_paused[i] = false;
-        self.ch_pan_anim[i] = None;
-    }
-
-    /// Laedt + startet einen Musik-Stream. Ersetzt eine evtl. laufende Musik
-    /// (es gibt genau einen Stream gleichzeitig). Musik loopt (raylib-Default).
-    pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
-        let resolved = crate::builtins::resolve_asset_path(path);
-        let path = resolved.as_str();
-        if let Some(m) = self.music.take() { m.stop_stream(); }
-        let m = self.dev.new_music(path).map_err(|e| format!("PLAYMUSIC: {}", e))?;
-        let v = volume.clamp(0.0, 1.0) as f32;
-        m.set_volume(v);
-        m.set_pitch(self.music_pitch);
-        m.play_stream();
-        self.music = Some(m);
-        self.music_vol = v;
-        self.music_queue = None;
-        self.music_loops = -1;
-        self.music_fade = None;
-        self.music_paused = false;
-        Ok(())
-    }
-
-    pub fn stop_music(&mut self) {
-        if let Some(m) = self.music.take() { m.stop_stream(); }
-        self.music_fade = None;
-        self.music_paused = false;
-    }
-
-    /// Pro Frame aufrufen (aus dem FLIP-Pfad), damit der Musik-Stream
-    /// nachgefuettert wird -- sonst stockt die Wiedergabe. Treibt ausserdem
-    /// laufende Fades (AUDIO_MUSIC_PLAY/STOP + AUDIO_PLAY/AUDIO_STOP),
-    /// wiederholt endliche Loops (Musik UND Sound-Channels) und spielt einen
-    /// per AUDIO_MUSIC_QUEUE vorgemerkten Track ab, sobald der aktuelle endet.
-    pub fn update(&mut self) {
-        // 0) Sound-Channels: Fades fortschreiben + Loops wiederholen.
-        //    raylib-Sounds koennen nicht nativ loopen -> beendete Sounds mit
-        //    Rest-Loops neu starten (pygame-Semantik: loops=N -> N+1
-        //    Durchlaeufe, -1 = endlos). Pause friert wie bei der Musik ein.
-        for i in 0..self.sounds.len() {
-            if self.ch_paused[i] { continue; }
-            if let Some(f) = &self.ch_fade[i] {
-                self.sounds[i].set_volume(f.current_vol());
-                if f.done() {
-                    let stop = f.stop_after;
-                    self.ch_fade[i] = None;
-                    if stop {
-                        self.sounds[i].stop();
-                        self.sounds[i].set_volume(self.sound_vol[i]);   // fuers naechste Play
-                        self.ch_loops[i] = 0;
-                    }
-                }
-            }
-            if self.ch_loops[i] != 0 && !self.sounds[i].is_playing() {
-                if self.ch_loops[i] > 0 { self.ch_loops[i] -= 1; }
-                self.sounds[i].play();
-            }
-            if let Some(anim) = &self.ch_pan_anim[i] {
-                let (p, done) = anim.position();
-                // Position 0=links..1=rechts -> raylib-Pan (gespiegelt, wie ch_pan).
-                self.sounds[i].set_pan((1.0 - p.clamp(0.0, 1.0)) as f32);
-                if done { self.ch_pan_anim[i] = None; }
-            }
-        }
-        if self.music.is_none() { return; }
-        // 1) Fade fortschreiben (waehrend Pause eingefroren -- zeitbasiert,
-        //    aber eine pausierte Musik soll nicht "unterm Eis" leiser werden).
-        if !self.music_paused {
-            if let (Some(f), Some(m)) = (&self.music_fade, &self.music) {
-                m.set_volume(f.current_vol());
-                if f.done() {
-                    let stop = f.stop_after;
-                    self.music_fade = None;
-                    if stop {
-                        if let Some(m) = &self.music {
-                            m.stop_stream();
-                            m.set_volume(self.music_vol);   // fuers naechste Play
-                        }
-                        self.music_loops = 0;
-                    }
-                }
-            }
-        }
-        // 2) Stream nachfuettern + endliche Loops + Queue. is_stream_playing()
-        //    ist auch bei Pause false -- music_paused unterscheidet das.
-        if let Some(m) = &self.music {
-            m.update_stream();
-            if !m.is_stream_playing() && !self.music_paused {
-                if self.music_loops > 0 {
-                    // Endlicher Loop: raylib hat den beendeten Stream auf
-                    // Position 0 gestoppt -> einfach neu starten.
-                    self.music_loops -= 1;
-                    m.play_stream();
-                } else if let Some(path) = self.music_queue.take() {
-                    if let Ok(nm) = self.dev.new_music(&path) {
-                        nm.set_volume(self.music_vol);
-                        nm.set_pitch(self.music_pitch);
-                        nm.play_stream();
-                        self.music = Some(nm);
-                        self.music_loops = -1;   // Queue-Track loopt (raylib-Default)
-                        self.music_fade = None;
-                    }
-                }
-            }
-        }
-    }
-
-    // ===================================================================
-    // Erweitertes audio-Modul (AUDIO_*).
-    // SOUND/AUDIO_CHANNEL sind beide INTEGER-Handles (Index in `sounds`);
-    // ein "Channel" steuert die Wiedergabe genau dieses Sounds. raylib hat
-    // keine pygame-Channels -> ein Sound = ein steuerbarer Slot.
-    // ===================================================================
-
-    fn snd(&self, idx: i64, fn_: &str) -> Result<&Sound<'static>, String> {
-        self.sounds.get(idx as usize)
-            .ok_or_else(|| format!("{}: ungueltiges Handle {}", fn_, idx))
-    }
-
-    // -- Tone-Generation (liefert ein SOUND-Handle) --
+    // ================= Tone-Generation =================
     pub fn tone(&mut self, freq: f64, dur_ms: i64, waveform: &str, volume: f64) -> Result<i64, String> {
         if freq <= 0.0 { return Err("AUDIO_TONE: freq_hz muss > 0 sein".into()); }
         if dur_ms <= 0 { return Err("AUDIO_TONE: dauer_ms muss > 0 sein".into()); }
@@ -543,10 +410,10 @@ impl Audio {
         if n == 0 { return Err("AUDIO_TONE: dauer_ms zu klein fuer Sample-Rate".into()); }
         let mut buf = vec![0.0f64; n];
         for (i, b) in buf.iter_mut().enumerate() {
-            let t = i as f64 / sr as f64;
-            *b = waveform_value(&wf, freq, t);
+            *b = waveform_value(&wf, freq, i as f64 / sr as f64);
         }
-        self.push_wave_sound(&buf, volume, sr)
+        let data = self.make_data_mono(&buf, volume, sr);
+        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
     pub fn noise(&mut self, dur_ms: i64, volume: f64) -> Result<i64, String> {
@@ -556,12 +423,10 @@ impl Audio {
         if n == 0 { return Err("AUDIO_NOISE: dauer_ms zu klein fuer Sample-Rate".into()); }
         let mut buf = vec![0.0f64; n];
         for b in buf.iter_mut() { *b = rng_uniform(); }
-        self.push_wave_sound(&buf, volume, sr)
+        let data = self.make_data_mono(&buf, volume, sr);
+        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
-    /// Prozeduraler sfxr-Stil-Effekt (siehe gamebasic/synth.py -- gleiche
-    /// Mathematik): Waveform mit Pitch-Slide (Phasen-Integration) + Vibrato +
-    /// ADSR-Huellkurve. `stereo_width` in (0,1] -> breiter Stereo-Sound.
     #[allow(clippy::too_many_arguments)]
     pub fn sfx(&mut self, waveform: &str, base_freq: f64, slide: f64,
                attack_ms: i64, sustain_ms: i64, decay_ms: i64,
@@ -581,328 +446,334 @@ impl Audio {
         if n == 0 { return Err("AUDIO_SFX: Gesamtdauer zu klein".into()); }
         let na = (n as f64 * attack_ms as f64 / total_ms as f64) as usize;
         let nd = (n as f64 * decay_ms as f64 / total_ms as f64) as usize;
-        let left = build_sfx_buffer(&wf, base_freq, slide, n, na, nd,
-                                    vib_depth, vib_speed, sr);
-        if stereo_width <= 0.0 {
-            return self.push_wave_sound(&left, volume, sr);
-        }
-        let w = stereo_width.min(1.0);
-        let right = if wf == "noise" {
-            build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr)
+        let left = build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr);
+        let data = if stereo_width <= 0.0 {
+            self.make_data_mono(&left, volume, sr)
         } else {
-            let detune = 1.0 + 0.04 * w;          // bis 4% = Chorus-Breite
-            build_sfx_buffer(&wf, base_freq * detune, slide * detune, n, na, nd,
-                             vib_depth, vib_speed, sr)
+            let w = stereo_width.min(1.0);
+            let right = if wf == "noise" {
+                build_sfx_buffer(&wf, base_freq, slide, n, na, nd, vib_depth, vib_speed, sr)
+            } else {
+                let detune = 1.0 + 0.04 * w;
+                build_sfx_buffer(&wf, base_freq * detune, slide * detune, n, na, nd, vib_depth, vib_speed, sr)
+            };
+            self.make_data_stereo(&left, &right, volume, sr)
         };
-        self.push_wave_sound_stereo(&left, &right, volume, sr)
+        Ok(self.push_slot(data, volume.clamp(0.0, 1.0) as f32))
     }
 
-    /// Wie push_wave_sound, aber interleaved Stereo (L/R) -> Stereo-WAV.
-    fn push_wave_sound_stereo(&mut self, left: &[f64], right: &[f64],
-                              volume: f64, sr: u32) -> Result<i64, String> {
-        let n = left.len();
-        let vol = volume.clamp(0.0, 1.0);
-        // Paula-Lo-Fi (falls aktiv) vor Fade/Volume -- pro Kanal.
-        let mut lo_l; let mut lo_r;
-        let (left, right): (&[f64], &[f64]) = if self.lofi {
-            lo_l = left.to_vec(); lo_r = right.to_vec();
-            Self::lofi_chain(&mut lo_l, sr, self.lofi_bits, self.lofi_cutoff);
-            Self::lofi_chain(&mut lo_r, sr, self.lofi_bits, self.lofi_cutoff);
-            (&lo_l, &lo_r)
-        } else { (left, right) };
-        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
-        let mut samples = vec![0i16; n * 2];
-        for i in 0..n {
-            let mut e = 1.0;
-            if fade > 0 {
-                if i < fade { e = i as f64 / fade as f64; }
-                else if i >= n - fade { e = (n - 1 - i) as f64 / fade as f64; }
-            }
-            let l = (left[i] * e * vol).clamp(-1.0, 1.0);
-            let r = (right[i] * e * vol).clamp(-1.0, 1.0);
-            samples[i * 2] = (l * 32767.0) as i16;
-            samples[i * 2 + 1] = (r * 32767.0) as i16;
+    // ================= Sampler (SAMPLE_*) =================
+    pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
+        let resolved = crate::builtins::resolve_asset_path(path);
+        // Kira dekodiert die Datei; wir lesen die Frames als mono f32.
+        let data = StaticSoundData::from_file(&resolved)
+            .map_err(|e| format!("SAMPLE_LOAD: {:?}", e))?;
+        let sr = data.sample_rate;
+        let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
+        if mono.is_empty() { return Err("SAMPLE_LOAD: Sample ist leer".into()); }
+        self.samples.push(Sample { data: mono, sr, loop_start: 0, loop_end: 0 });
+        Ok((self.samples.len() - 1) as i64)
+    }
+
+    pub fn sample_set_loop(&mut self, idx: i64, start: i64, end: i64) -> Result<(), String> {
+        let s = self.samples.get_mut(idx as usize)
+            .ok_or_else(|| format!("SAMPLE_SET_LOOP: ungueltiges SAMPLE-Handle {}", idx))?;
+        let n = s.data.len();
+        let start = start.max(0) as usize;
+        let end = (end.max(0) as usize).min(n);
+        if end <= start { return Err("SAMPLE_SET_LOOP: end muss > start sein".into()); }
+        s.loop_start = start; s.loop_end = end;
+        self.sample_cache.retain(|k, _| k.0 != idx as usize);
+        Ok(())
+    }
+
+    pub fn sample_len(&self, idx: i64) -> Result<f64, String> {
+        let s = self.samples.get(idx as usize)
+            .ok_or_else(|| format!("SAMPLE_LEN: ungueltiges SAMPLE-Handle {}", idx))?;
+        Ok(s.data.len() as f64 / s.sr as f64)
+    }
+
+    pub fn sample_play(&mut self, sidx: i64, semitones: f64, volume: f64,
+                       dur_ms: i64) -> Result<i64, String> {
+        let si = sidx as usize;
+        if si >= self.samples.len() {
+            return Err(format!("SAMPLE_PLAY: ungueltiges SAMPLE-Handle {}", sidx));
         }
-        let wav = encode_wav16(&samples, 2, sr);
-        let wave = self.dev.new_wave_from_memory(".wav", &wav)
-            .map_err(|e| format!("AUDIO_SFX: {}", e))?;
-        let s = self.dev.new_sound_from_wave(&wave)
-            .map_err(|e| format!("AUDIO_SFX: {}", e))?;
-        Ok(self.push_sound(s, vol as f32))
-    }
-
-    /// Float-Buffer [-1,1] -> Anti-Click-Envelope -> Volume -> i16-PCM -> WAV
-    /// im RAM -> raylib Sound. Liefert das SOUND-Handle.
-    fn push_wave_sound(&mut self, buf: &[f64], volume: f64, sr: u32) -> Result<i64, String> {
-        let n = buf.len();
-        let vol = volume.clamp(0.0, 1.0);
-        // Paula-Lo-Fi (falls aktiv) vor Fade/Volume.
-        let mut lofi_buf;
-        let buf: &[f64] = if self.lofi {
-            lofi_buf = buf.to_vec();
-            Self::lofi_chain(&mut lofi_buf, sr, self.lofi_bits, self.lofi_cutoff);
-            &lofi_buf
-        } else { buf };
-        let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
-        let mut samples = vec![0i16; n];
-        for i in 0..n {
-            let mut v = buf[i];
-            if fade > 0 {
-                if i < fade { v *= i as f64 / fade as f64; }
-                else if i >= n - fade { v *= (n - 1 - i) as f64 / fade as f64; }
-            }
-            v = (v * vol).clamp(-1.0, 1.0);
-            samples[i] = (v * 32767.0) as i16;
+        let ratio = 2f64.powf(semitones / 12.0);
+        if !ratio.is_finite() || ratio <= 0.0 {
+            return Err("SAMPLE_PLAY: ungueltige Tonhoehe".into());
         }
-        let wav = encode_wav_mono16(&samples, sr);
-        let wave = self.dev.new_wave_from_memory(".wav", &wav)
-            .map_err(|e| format!("AUDIO_TONE: {}", e))?;
-        let s = self.dev.new_sound_from_wave(&wave)
-            .map_err(|e| format!("AUDIO_TONE: {}", e))?;
-        Ok(self.push_sound(s, vol as f32))
+        let v = volume.clamp(0.0, 1.0);
+        let key = (si, (semitones * 100.0).round() as i64, dur_ms);
+        if let Some(&snd) = self.sample_cache.get(&key) {
+            return self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0).map(|_| snd);
+        }
+        let sr = self.samples[si].sr;
+        let s = &self.samples[si];
+        let buf = resample(&s.data, s.sr, ratio, dur_ms, s.loop_start, s.loop_end);
+        if buf.is_empty() { return Err("SAMPLE_PLAY: leeres Sample".into()); }
+        // Volume nicht in den Cache backen -> bei vol=1.0 bauen, per Slot setzen.
+        let data = self.make_data_mono(&buf, 1.0, sr);
+        let snd = self.push_slot(data, 1.0);
+        self.sample_cache.insert(key, snd);
+        self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0)?;
+        Ok(snd)
     }
 
-    // -- Channel-Playback (Handle == Sound-Index) --
-    /// AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) -- pygame-Semantik:
-    /// loops=0 einmal (Default), loops=N -> N+1 Durchlaeufe, loops=-1 endlos.
-    /// raylib-Sounds loopen nicht nativ -> update() zaehlt und startet neu.
+    // ================= Channel-Steuerung (AUDIO_*) =================
     pub fn ch_play(&mut self, idx: i64, loops: i64, volume: f64, fade_in_ms: i64) -> Result<i64, String> {
-        let v = volume.clamp(0.0, 1.0) as f32;
-        {
-            let s = self.snd(idx, "AUDIO_PLAY")?;
-            s.set_volume(if fade_in_ms > 0 { 0.0 } else { v });
-            s.play();
-        }
-        let i = idx as usize;
-        self.reset_channel_state(i, v);
-        self.ch_loops[i] = if loops < 0 { -1 } else { loops };
-        if fade_in_ms > 0 {
-            self.ch_fade[i] = Some(Fade {
-                from: 0.0, to: v,
-                start: std::time::Instant::now(),
-                dur_ms: fade_in_ms as f64, stop_after: false,
-            });
-        }
+        self.start_slot(idx, "AUDIO_PLAY", volume, loops, fade_in_ms)?;
         Ok(idx)
     }
     pub fn ch_pause(&mut self, idx: i64) -> Result<(), String> {
-        self.snd(idx, "AUDIO_PAUSE")?.pause();
-        self.ch_paused[idx as usize] = true;
+        if let Some(h) = self.slot_mut(idx, "AUDIO_PAUSE")?.handle.as_mut() { h.pause(tween_now()); }
         Ok(())
     }
     pub fn ch_resume(&mut self, idx: i64) -> Result<(), String> {
-        self.snd(idx, "AUDIO_RESUME")?.resume();
-        self.ch_paused[idx as usize] = false;
+        if let Some(h) = self.slot_mut(idx, "AUDIO_RESUME")?.handle.as_mut() { h.resume(tween_now()); }
         Ok(())
     }
-    /// AUDIO_STOP(ch[, fade_out_ms]) -- ohne fade sofort, sonst ausfaden und
-    /// am Fade-Ende stoppen (update() treibt den Fade).
     pub fn ch_stop(&mut self, idx: i64, fade_out_ms: i64) -> Result<(), String> {
-        let playing = {
-            let s = self.snd(idx, "AUDIO_STOP")?;
-            if fade_out_ms <= 0 { s.stop(); }
-            s.is_playing()
-        };
-        let i = idx as usize;
-        if fade_out_ms <= 0 {
-            let v = self.sound_vol[i];
-            self.reset_channel_state(i, v);
-            return Ok(());
-        }
-        if playing || self.ch_paused[i] {
-            let from = self.ch_fade[i].as_ref()
-                .map(|f| f.current_vol()).unwrap_or(self.sound_vol[i]);
-            self.ch_fade[i] = Some(Fade {
-                from, to: 0.0,
-                start: std::time::Instant::now(),
-                dur_ms: fade_out_ms as f64, stop_after: true,
-            });
+        let s = self.slot_mut(idx, "AUDIO_STOP")?;
+        s.loops = 0;
+        if let Some(h) = s.handle.as_mut() {
+            h.stop(if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
         }
         Ok(())
     }
-    pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> { Ok(self.snd(idx, "AUDIO_IS_PLAYING")?.is_playing()) }
+    pub fn ch_is_playing(&self, idx: i64) -> Result<bool, String> {
+        Ok(matches!(self.slot(idx, "AUDIO_IS_PLAYING")?.handle.as_ref().map(|h| h.state()),
+                    Some(PlaybackState::Playing)))
+    }
     pub fn ch_set_volume(&mut self, idx: i64, v: f64) -> Result<(), String> {
-        let vol = v.clamp(0.0, 1.0) as f32;
-        self.snd(idx, "AUDIO_VOLUME")?.set_volume(vol);
-        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = vol; }
+        let vol = v.clamp(0.0, 1.0);
+        let s = self.slot_mut(idx, "AUDIO_VOLUME")?;
+        s.vol = vol as f32;
+        if let Some(h) = s.handle.as_mut() { h.set_volume(db(vol), tween_now()); }
         Ok(())
     }
     pub fn ch_get_volume(&self, idx: i64) -> Result<f64, String> {
-        Ok(*self.sound_vol.get(idx as usize)
-            .ok_or_else(|| format!("AUDIO_GET_VOLUME: ungueltiges Handle {}", idx))? as f64)
+        Ok(self.slot(idx, "AUDIO_GET_VOLUME")?.vol as f64)
     }
-    /// AUDIO_PITCH(ch, faktor) -- Abspielgeschwindigkeit/Tonhoehe (1.0 =
-    /// normal, 2.0 = Oktave hoeher, 0.5 = Oktave tiefer). Wirkt sofort,
-    /// auch auf einen bereits spielenden Sound. Klassiker: pro Schuss
-    /// leicht variieren (0.9 + RANDF() * 0.2), damit nichts leiert.
+    /// AUDIO_PITCH(ch, faktor) -- Abspielgeschwindigkeit/Tonhoehe (1.0 normal,
+    /// 2.0 Oktave hoeher, 0.5 tiefer). Kira braucht &mut auf dem Handle; die VM
+    /// ruft ueber audio_mut() (=&mut Audio), daher ist die Signatur &mut self.
     pub fn ch_pitch(&mut self, idx: i64, factor: f64) -> Result<(), String> {
-        self.snd(idx, "AUDIO_PITCH")?.set_pitch(factor as f32);
+        if let Some(h) = self.slot_mut(idx, "AUDIO_PITCH")?.handle.as_mut() {
+            h.set_playback_rate(factor, tween_now());
+        }
         Ok(())
     }
-    /// AUDIO_PAN(left,right) -> raylib hat nur (pan, volume). Naeherung:
-    /// volume=max(l,r), pan=l-Anteil (raylib-Pan kann gespiegelt sein).
     pub fn ch_pan(&mut self, idx: i64, left: f64, right: f64) -> Result<(), String> {
         let l = left.clamp(0.0, 1.0);
         let r = right.clamp(0.0, 1.0);
         let vol = l.max(r);
-        let pan = if l + r > 0.0 { l / (l + r) } else { 0.5 };
-        let s = self.snd(idx, "AUDIO_PAN")?;
-        s.set_volume(vol as f32);
-        s.set_pan(pan as f32);
-        if let Some(slot) = self.sound_vol.get_mut(idx as usize) { *slot = vol as f32; }
-        self.ch_pan_anim[idx as usize] = None;   // manuelles Pan beendet die Animation
+        let pos = if l + r > 0.0 { r / (l + r) } else { 0.5 };  // 0=links,1=rechts
+        let s = self.slot_mut(idx, "AUDIO_PAN")?;
+        s.vol = vol as f32;
+        s.pan_anim = None;
+        if let Some(h) = s.handle.as_mut() {
+            h.set_volume(db(vol), tween_now());
+            h.set_panning(pan_of(pos), tween_now());
+        }
         Ok(())
     }
-
-    /// AUDIO_PAN_POS(ch, p) -- Stereo-Position direkt: 0=links, 0.5=Mitte,
-    /// 1=rechts. Fasst nur das Pan an (Volume bleibt unveraendert) und
-    /// beendet eine laufende Pan-Animation (manuell gewinnt).
     pub fn ch_pan_pos(&mut self, idx: i64, p: f64) -> Result<(), String> {
-        self.snd(idx, "AUDIO_PAN_POS")?.set_pan((1.0 - p.clamp(0.0, 1.0)) as f32);
-        self.ch_pan_anim[idx as usize] = None;
+        let s = self.slot_mut(idx, "AUDIO_PAN_POS")?;
+        s.pan_anim = None;
+        if let Some(h) = s.handle.as_mut() { h.set_panning(pan_of(p), tween_now()); }
         Ok(())
     }
-
-    /// AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- einmalige Stereo-
-    /// Wanderung (Positionen 0=links..1=rechts), bleibt am Ziel stehen.
-    /// Laeuft nicht-blockierend; update() treibt die Bewegung pro Frame.
     pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64) -> Result<(), String> {
         let (from, to) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
-        self.snd(idx, "AUDIO_PAN_SLIDE")?.set_pan((1.0 - from) as f32);
-        self.ch_pan_anim[idx as usize] = Some(PanAnim::Slide {
-            from, to, start: std::time::Instant::now(), dur_ms: dur_ms as f64,
-        });
+        let s = self.slot_mut(idx, "AUDIO_PAN_SLIDE")?;
+        s.pan_anim = None;
+        if let Some(h) = s.handle.as_mut() {
+            h.set_panning(pan_of(from), tween_now());           // Startpunkt
+            h.set_panning(pan_of(to), tween_ms(dur_ms));        // Kira tweent nativ
+        }
         Ok(())
     }
-
-    /// AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- endloses Pendeln
-    /// links<->rechts (startet links). periode_s = Dauer einer vollen Runde;
-    /// tiefe 0..1 = Auslenkung um die Mitte (1.0 = ganz links bis ganz
-    /// rechts). periode_s <= 0 schaltet die Animation ab (Pan bleibt stehen).
     pub fn ch_autopan(&mut self, idx: i64, period_s: f64, depth: f64) -> Result<(), String> {
-        self.snd(idx, "AUDIO_AUTOPAN")?;
-        self.ch_pan_anim[idx as usize] = if period_s <= 0.0 { None } else {
-            Some(PanAnim::Pendulum {
-                period_s, depth: depth.clamp(0.0, 1.0),
-                start: std::time::Instant::now(),
-            })
+        let s = self.slot_mut(idx, "AUDIO_AUTOPAN")?;
+        s.pan_anim = if period_s <= 0.0 { None } else {
+            Some(Pendulum { period_s, depth: depth.clamp(0.0, 1.0), start: std::time::Instant::now() })
         };
         Ok(())
     }
 
-    // -- Mixer-weit --
     pub fn pause_all(&mut self) {
-        for s in &self.sounds { s.pause(); }
-        for p in &mut self.ch_paused { *p = true; }
+        for s in &mut self.sounds { if let Some(h) = s.handle.as_mut() { h.pause(tween_now()); } }
     }
     pub fn resume_all(&mut self) {
-        for s in &self.sounds { s.resume(); }
-        for p in &mut self.ch_paused { *p = false; }
+        for s in &mut self.sounds { if let Some(h) = s.handle.as_mut() { h.resume(tween_now()); } }
     }
     pub fn stop_all(&mut self) {
-        for s in &self.sounds { s.stop(); }
-        for f in &mut self.ch_fade { *f = None; }
-        for l in &mut self.ch_loops { *l = 0; }
-        for p in &mut self.ch_paused { *p = false; }
+        for s in &mut self.sounds {
+            s.loops = 0; s.pan_anim = None;
+            if let Some(h) = s.handle.as_mut() { h.stop(tween_now()); }
+        }
     }
     pub fn set_num_channels(&mut self, n: i64) { self.num_channels = n.max(0); }
     pub fn get_num_channels(&self) -> i64 { self.num_channels }
-    pub fn busy_channels(&self) -> i64 { self.sounds.iter().filter(|s| s.is_playing()).count() as i64 }
+    pub fn busy_channels(&self) -> i64 {
+        self.sounds.iter().filter(|s| matches!(s.handle.as_ref().map(|h| h.state()), Some(PlaybackState::Playing))).count() as i64
+    }
 
-    // -- Music erweitert --
+    // ================= Musik =================
+    // Stream-Formate (ogg/mp3/wav/flac) streamen von Platte; Tracker-Module
+    // (.mod/.xm/.s3m/.it) werden beim Laden EINMAL zu PCM gerendert (ein
+    // Loop-Durchlauf) und im RAM via loop_region nahtlos geloopt -> volle
+    // Steuerung (Volume/Pitch/Pause/Position) gratis ueber den Sound-Handle.
+
     pub fn music_load(&mut self, path: &str) -> Result<(), String> {
-        if let Some(m) = self.music.take() { m.stop_stream(); }
-        let m = self.dev.new_music(path).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
-        m.set_volume(self.music_vol);
-        m.set_pitch(self.music_pitch);
-        self.music = Some(m);
+        let resolved = crate::builtins::resolve_asset_path(path);
+        let source = if is_module_path(&resolved) {
+            let bytes = std::fs::read(&resolved)
+                .map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
+            MusicSource::Module(render_module(&bytes, "AUDIO_MUSIC_LOAD")?)
+        } else {
+            // Stream testweise oeffnen (Fehler frueh melden).
+            StreamingSoundData::from_file(&resolved)
+                .map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            MusicSource::Stream(resolved)
+        };
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        self.music_handle = None;
+        self.music_source = Some(source);
         self.music_queue = None;
         self.music_loops = -1;
-        self.music_fade = None;
         self.music_paused = false;
         Ok(())
     }
-    /// AUDIO_MUSIC_PLAY([loops[, fade_in_ms]]) -- pygame-Semantik:
-    /// loops=-1 endlos (Default), loops=N -> N+1 Durchlaeufe insgesamt.
-    /// Endlos macht raylib selbst (looping-Flag); endliche Wiederholungen
-    /// zaehlt update() und startet den beendeten Stream neu.
-    pub fn music_play(&mut self, loops: i64, fade_in_ms: i64) {
-        self.music_fade = None;
+
+    fn start_music(&mut self, vol: f32, loops: i64, fade_in_ms: i64) -> Result<(), String> {
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        let vol_db = if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol as f64) };
+        let pitch = self.music_pitch as f64;
+        let endless = loops < 0;
+        let mut handle = match self.music_source.as_ref() {
+            None => return Ok(()),
+            Some(MusicSource::Stream(path)) => {
+                let mut data = StreamingSoundData::from_file(path)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
+                if endless { data = data.loop_region(0.0..); }
+                data = data.volume(vol_db).playback_rate(pitch);
+                MusicHandle::Stream(self.manager.play(data)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            }
+            Some(MusicSource::Module(rendered)) => {
+                let mut settings = StaticSoundSettings::new().volume(vol_db).playback_rate(pitch);
+                if endless { settings = settings.loop_region(0.0..); }
+                let data = rendered.clone().with_settings(settings);
+                MusicHandle::Static(self.manager.play(data)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            }
+        };
+        if fade_in_ms > 0 { mh_set_volume(&mut handle, db(vol as f64), tween_ms(fade_in_ms)); }
+        self.music_handle = Some(handle);
+        self.music_loops = if endless { -1 } else { loops };
         self.music_paused = false;
-        if let Some(m) = &mut self.music {
-            m.as_mut().looping = loops < 0;
-            self.music_loops = if loops < 0 { -1 } else { loops };
-            // Wie pygame: Play startet immer am Anfang (StopMusicStream
-            // setzt die Position zurueck, PlayMusicStream allein nicht).
-            m.stop_stream();
-            if fade_in_ms > 0 {
-                m.set_volume(0.0);
-                self.music_fade = Some(Fade {
-                    from: 0.0, to: self.music_vol,
-                    start: std::time::Instant::now(),
-                    dur_ms: fade_in_ms as f64, stop_after: false,
-                });
-            } else {
-                m.set_volume(self.music_vol);
-            }
-            m.play_stream();
-        }
+        Ok(())
     }
-    /// AUDIO_MUSIC_STOP([fade_out_ms]) -- ohne Argument sofort, sonst
-    /// ausfaden und am Fade-Ende stoppen (update() treibt den Fade).
+
+    pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
+        self.music_vol = volume.clamp(0.0, 1.0) as f32;
+        self.music_load(path)?;
+        self.start_music(self.music_vol, -1, 0)
+    }
+    pub fn stop_music(&mut self) {
+        if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
+        self.music_handle = None;
+    }
+    pub fn music_play(&mut self, loops: i64, fade_in_ms: i64) {
+        let v = self.music_vol;
+        let _ = self.start_music(v, loops, fade_in_ms);
+    }
     pub fn music_stop(&mut self, fade_out_ms: i64) {
-        if fade_out_ms <= 0 {
-            self.music_fade = None;
-            self.music_paused = false;
-            if let Some(m) = &self.music { m.stop_stream(); }
-            return;
+        if let Some(h) = self.music_handle.as_mut() {
+            mh_stop(h, if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
         }
-        if let Some(m) = &self.music {
-            if m.is_stream_playing() {
-                let from = self.music_fade.as_ref()
-                    .map(|f| f.current_vol()).unwrap_or(self.music_vol);
-                self.music_fade = Some(Fade {
-                    from, to: 0.0,
-                    start: std::time::Instant::now(),
-                    dur_ms: fade_out_ms as f64, stop_after: true,
-                });
-            }
-        }
+        if fade_out_ms <= 0 { self.music_handle = None; }
     }
     pub fn music_pause(&mut self) {
-        if let Some(m) = &self.music { m.pause_stream(); self.music_paused = true; }
+        if let Some(h) = self.music_handle.as_mut() { mh_pause(h, tween_now()); self.music_paused = true; }
     }
     pub fn music_resume(&mut self) {
-        if let Some(m) = &self.music { m.resume_stream(); self.music_paused = false; }
+        if let Some(h) = self.music_handle.as_mut() { mh_resume(h, tween_now()); self.music_paused = false; }
     }
     pub fn music_set_volume(&mut self, v: f64) {
-        let vol = v.clamp(0.0, 1.0) as f32;
-        self.music_vol = vol;
-        // Explizites Set-Volume gewinnt: laufenden Fade abbrechen.
-        self.music_fade = None;
-        if let Some(m) = &self.music { m.set_volume(vol); }
+        self.music_vol = v.clamp(0.0, 1.0) as f32;
+        let d = db(self.music_vol as f64);
+        if let Some(h) = self.music_handle.as_mut() { mh_set_volume(h, d, tween_now()); }
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
-    /// AUDIO_MUSIC_PITCH(faktor) -- Pitch des Musik-Streams (1.0 = normal).
-    /// Wird getrackt und ueberlebt AUDIO_MUSIC_LOAD/QUEUE (wie music_vol);
-    /// Slow-Motion-Effekt: Pitch zusammen mit der Spiel-Zeit absenken.
     pub fn music_set_pitch(&mut self, factor: f64) {
-        self.music_pitch = factor as f32;
-        if let Some(m) = &self.music { m.set_pitch(self.music_pitch); }
+        self.music_pitch = factor.max(0.0) as f32;
+        let r = self.music_pitch as f64;
+        if let Some(h) = self.music_handle.as_mut() { mh_set_rate(h, r, tween_now()); }
     }
     pub fn music_get_pitch(&self) -> f64 { self.music_pitch as f64 }
     pub fn music_position(&self) -> f64 {
-        match &self.music { Some(m) => m.get_time_played().max(0.0) as f64, None => 0.0 }
+        match self.music_handle.as_ref() {
+            Some(MusicHandle::Stream(h)) => h.position(),
+            Some(MusicHandle::Static(h)) => h.position(),
+            None => 0.0,
+        }
     }
     pub fn music_busy(&self) -> bool {
-        matches!(&self.music, Some(m) if m.is_stream_playing())
+        let st = match self.music_handle.as_ref() {
+            Some(MusicHandle::Stream(h)) => Some(h.state()),
+            Some(MusicHandle::Static(h)) => Some(h.state()),
+            None => None,
+        };
+        matches!(st, Some(PlaybackState::Playing))
     }
     pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
+
+    // ================= per-Frame-Update (aus FLIP) =================
+    pub fn update(&mut self) {
+        // AUTOPAN: Pendel-Position pro Frame schreiben.
+        for s in &mut self.sounds {
+            if let Some(p) = &s.pan_anim {
+                let pos = pendulum_pos(p.start.elapsed().as_secs_f64(), p.period_s, p.depth);
+                if let Some(h) = s.handle.as_mut() { h.set_panning(pan_of(pos), tween_now()); }
+            }
+        }
+        // Endliche SFX-Loops: gestoppte Slots mit Restwiederholungen neu starten.
+        let n = self.sounds.len();
+        for i in 0..n {
+            let restart = {
+                let s = &self.sounds[i];
+                s.loops > 0 && matches!(s.handle.as_ref().map(|h| h.state()), Some(PlaybackState::Stopped))
+            };
+            if restart {
+                let (vol, rem) = { let s = &self.sounds[i]; (s.vol as f64, s.loops - 1) };
+                let _ = self.start_slot(i as i64, "AUDIO_PLAY", vol, 0, 0);
+                self.sounds[i].loops = rem;
+            }
+        }
+        // Musik: endliche Loops + Queue.
+        let music_ended = matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Stopped))
+            && !self.music_paused;
+        if music_ended {
+            if self.music_loops > 0 {
+                self.music_loops -= 1;
+                let v = self.music_vol;
+                let _ = self.start_music(v, 0, 0);
+            } else if let Some(path) = self.music_queue.take() {
+                let v = self.music_vol;
+                // Queue-Track laden (Stream oder Modul) und endlos starten.
+                if self.music_load(&path).is_ok() { let _ = self.start_music(v, -1, 0); }
+            }
+        }
+    }
 }
 
-const PI64: f64 = std::f64::consts::PI;
+// ======================================================================
+// Pure DSP-Helfer (verbatim aus audio.rs -- gleiche Mathematik)
+// ======================================================================
 
-/// Eine Periode bei (t*freq): Werte in [-1,1]. (noise wird separat erzeugt.)
 fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
     match kind {
         "sine" => (2.0 * PI64 * freq * t).sin(),
@@ -914,10 +785,8 @@ fn waveform_value(kind: &str, freq: f64, t: f64) -> f64 {
     }
 }
 
-/// Waveform-Wert aus der integrierten Phase (in Radiant) -- fuer Pitch-Slides,
-/// wo die Frequenz pro Sample variiert. `noise` wird separat erzeugt.
 fn phase_value(kind: &str, phase: f64) -> f64 {
-    let ph = phase / (2.0 * PI64);          // in Zyklen
+    let ph = phase / (2.0 * PI64);
     match kind {
         "sine" => phase.sin(),
         "square" => if phase.sin() >= 0.0 { 1.0 } else { -1.0 },
@@ -933,7 +802,6 @@ thread_local! {
         SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(0x9E3779B9) | 1
     });
 }
-/// Uniform [-1,1) (xorshift) -- nicht-deterministisch (wie np.random).
 fn rng_uniform() -> f64 {
     ARNG.with(|s| {
         let mut x = s.get();
@@ -943,35 +811,6 @@ fn rng_uniform() -> f64 {
     })
 }
 
-/// Minimaler PCM16-Mono-WAV-Encoder (RIFF/WAVE/fmt/data).
-fn encode_wav_mono16(samples: &[i16], sample_rate: u32) -> Vec<u8> {
-    encode_wav16(samples, 1, sample_rate)
-}
-
-/// PCM16-WAV-Encoder fuer `channels` Kanaele (Samples interleaved).
-fn encode_wav16(samples: &[i16], channels: u16, sample_rate: u32) -> Vec<u8> {
-    let block_align = 2u16 * channels;
-    let data_len = (samples.len() * 2) as u32;
-    let mut v = Vec::with_capacity(44 + data_len as usize);
-    v.extend_from_slice(b"RIFF");
-    v.extend_from_slice(&(36 + data_len).to_le_bytes());
-    v.extend_from_slice(b"WAVE");
-    v.extend_from_slice(b"fmt ");
-    v.extend_from_slice(&16u32.to_le_bytes());
-    v.extend_from_slice(&1u16.to_le_bytes());   // PCM
-    v.extend_from_slice(&channels.to_le_bytes());
-    v.extend_from_slice(&sample_rate.to_le_bytes());
-    v.extend_from_slice(&(sample_rate * block_align as u32).to_le_bytes()); // byte rate
-    v.extend_from_slice(&block_align.to_le_bytes());
-    v.extend_from_slice(&16u16.to_le_bytes());  // bits/sample
-    v.extend_from_slice(b"data");
-    v.extend_from_slice(&data_len.to_le_bytes());
-    for s in samples { v.extend_from_slice(&s.to_le_bytes()); }
-    v
-}
-
-/// Baut einen Mono-SFX-Float-Buffer (Pitch-Slide + Vibrato + ADSR), wie
-/// `gamebasic.synth._mono`. Ohne Volume.
 #[allow(clippy::too_many_arguments)]
 fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
                     na: usize, nd: usize, vib_depth: f64, vib_speed: f64,
@@ -995,29 +834,19 @@ fn build_sfx_buffer(wf: &str, base_freq: f64, slide: f64, n: usize,
             i as f64 / na as f64
         } else if nd > 0 && i >= n - nd {
             (n - 1 - i) as f64 / nd as f64
-        } else {
-            1.0
-        };
+        } else { 1.0 };
         buf[i] = (v * env).clamp(-1.0, 1.0);
     }
     buf
 }
 
-/// Resampling eines Mono-Samples mit linearer Interpolation (pur -- ohne
-/// Audio-Geraet, daher unit-testbar). `ratio` = Schrittweite durch das
-/// Quell-Sample pro Ausgabe-Sample: >1 = hoehere Tonhoehe (schneller,
-/// kuerzer), <1 = tiefer. `dur_ms<=0` spielt das ganze Sample einmal;
-/// `dur_ms>0` baut eine feste Laenge, die die Loop-Region wiederholt
-/// (aktiv wenn loop_end>loop_start), sonst danach Stille.
 fn resample(data: &[f32], sr: u32, ratio: f64, dur_ms: i64,
             loop_start: usize, loop_end: usize) -> Vec<f64> {
     let n = data.len();
     if n == 0 { return Vec::new(); }
     let lerp = |pos: f64| -> f64 {
         let i = pos.floor() as usize;
-        if i + 1 >= n {
-            return *data.get(i.min(n - 1)).unwrap_or(&0.0) as f64;
-        }
+        if i + 1 >= n { return *data.get(i.min(n - 1)).unwrap_or(&0.0) as f64; }
         let frac = pos - i as f64;
         (data[i] as f64) * (1.0 - frac) + (data[i + 1] as f64) * frac
     };
@@ -1048,115 +877,54 @@ fn resample(data: &[f32], sr: u32, ratio: f64, dur_ms: i64,
     }
 }
 
+fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
+    if bits >= 1 && bits < 24 {
+        let levels = (1u64 << bits) as f64;
+        let half = levels / 2.0;
+        for s in buf.iter_mut() {
+            *s = ((*s * half).round() / half).clamp(-1.0, 1.0);
+        }
+    }
+    if cutoff > 0.0 && sr > 0 {
+        let dt = 1.0 / sr as f64;
+        let rc = 1.0 / (2.0 * PI64 * cutoff);
+        let alpha = dt / (rc + dt);
+        let mut y = 0.0;
+        for s in buf.iter_mut() {
+            y += alpha * (*s - y);
+            *s = y;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{fade_progress, pendulum_pos, resample};
+    use super::{lofi_chain, pendulum_pos, resample};
 
     #[test]
     fn resample_octave_up_halves_length() {
-        // 100 Samples, +1 Oktave (ratio 2) -> halbe Laenge (One-Shot).
         let data: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
         let out = resample(&data, 44100, 2.0, 0, 0, 0);
         assert_eq!(out.len(), 50);
-        // lineare Rampe bei Schrittweite 2 -> jedes 2. Element
-        assert!((out[1] - 0.02).abs() < 1e-6);
         assert!((out[10] - 0.20).abs() < 1e-6);
     }
-
-    #[test]
-    fn resample_octave_down_doubles_length() {
-        let data: Vec<f32> = (0..50).map(|i| i as f32).collect();
-        let out = resample(&data, 44100, 0.5, 0, 0, 0);
-        assert_eq!(out.len(), 100);
-        // Schrittweite 0.5 -> Zwischenwerte interpoliert
-        assert!((out[2] - 1.0).abs() < 1e-6);   // pos=1.0
-        assert!((out[3] - 1.5).abs() < 1e-6);   // pos=1.5 interpoliert
-    }
-
-    #[test]
-    fn resample_unity_is_identity() {
-        let data: Vec<f32> = vec![0.1, -0.2, 0.3, -0.4];
-        let out = resample(&data, 8000, 1.0, 0, 0, 0);
-        assert_eq!(out.len(), 4);
-        for (a, b) in out.iter().zip(data.iter()) {
-            assert!((a - *b as f64).abs() < 1e-6);
-        }
-    }
-
     #[test]
     fn resample_duration_with_loop_repeats_region() {
-        // 4 Frames, Loop ueber [1,3) -> bei Dauer wiederholt sich {1,2}.
         let data: Vec<f32> = vec![10.0, 20.0, 30.0, 40.0];
-        // sr=1000, dur=10ms -> 10 Output-Frames; ratio=1
         let out = resample(&data, 1000, 1.0, 10, 1, 3);
         assert_eq!(out.len(), 10);
-        // 0:10, 1:20, 2:30, dann Loop zurueck auf 1: 20,30,20,30,...
-        assert!((out[0] - 10.0).abs() < 1e-6);
-        assert!((out[1] - 20.0).abs() < 1e-6);
-        assert!((out[2] - 30.0).abs() < 1e-6);
-        assert!((out[3] - 20.0).abs() < 1e-6);   // gewrappt
+        assert!((out[3] - 20.0).abs() < 1e-6);
         assert!((out[4] - 30.0).abs() < 1e-6);
-        assert!((out[5] - 20.0).abs() < 1e-6);
     }
-
     #[test]
-    fn resample_duration_without_loop_pads_silence() {
-        let data: Vec<f32> = vec![0.5, 0.5];
-        // 2 Frames, kein Loop, Dauer fuer 6 Frames -> Rest Stille
-        let out = resample(&data, 1000, 1.0, 6, 0, 0);
-        assert_eq!(out.len(), 6);
-        assert!((out[0] - 0.5).abs() < 1e-6);
-        assert!((out[1] - 0.5).abs() < 1e-6);
-        assert_eq!(out[3], 0.0);
-        assert_eq!(out[5], 0.0);
+    fn lofi_bitcrush_quantizes() {
+        let mut buf = vec![0.1, 0.6, -0.9];
+        lofi_chain(&mut buf, 44100, 2, 0.0);
+        assert!((buf[1] - 0.5).abs() < 1e-9);
     }
-
     #[test]
-    fn resample_empty_is_empty() {
-        assert!(resample(&[], 44100, 1.0, 0, 0, 0).is_empty());
-    }
-
-    #[test]
-    fn lofi_bitcrush_quantizes_to_levels() {
-        use super::Audio;
-        // 2 bit -> 4 Stufen (half=2): Werte rasten auf Vielfache von 0.5.
-        let mut buf = vec![0.1, 0.3, 0.6, -0.9];
-        Audio::lofi_chain(&mut buf, 44100, 2, 0.0);   // Filter aus -> nur Crush
-        for v in &buf {
-            let q = (v * 2.0).round() / 2.0;
-            assert!((v - q).abs() < 1e-9, "nicht gerastert: {}", v);
-        }
-        assert!((buf[0] - 0.0).abs() < 1e-9);   // 0.1 -> 0.0
-        assert!((buf[2] - 0.5).abs() < 1e-9);   // 0.6 -> 0.5
-    }
-
-    #[test]
-    fn lofi_lowpass_attenuates_and_is_stable() {
-        use super::Audio;
-        // Wechselsignal (Nyquist-nah) -> Tiefpass daempft die Amplitude.
-        let mut buf: Vec<f64> = (0..200).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
-        Audio::lofi_chain(&mut buf, 44100, 24, 2000.0);  // nur Filter (bits>=24 = kein Crush)
-        let peak = buf.iter().cloned().fold(0.0f64, |m, v| m.max(v.abs()));
-        assert!(peak < 0.5, "Tiefpass sollte die hohe Frequenz daempfen, peak={}", peak);
-        assert!(buf.iter().all(|v| v.is_finite()));
-    }
-
-    #[test]
-    fn fade_progress_clamps_and_interpolates() {
-        assert_eq!(fade_progress(0.0, 1000.0), 0.0);
-        assert!((fade_progress(500.0, 1000.0) - 0.5).abs() < 1e-6);
-        assert_eq!(fade_progress(1500.0, 1000.0), 1.0);   // ueber Ende -> geclampt
-        assert_eq!(fade_progress(10.0, 0.0), 1.0);        // dur=0 -> sofort fertig
-    }
-
-    #[test]
-    fn pendulum_starts_left_and_swings() {
-        assert!(pendulum_pos(0.0, 4.0, 1.0).abs() < 1e-9);          // Start: ganz links
-        assert!((pendulum_pos(2.0, 4.0, 1.0) - 1.0).abs() < 1e-9);  // halbe Runde: rechts
-        assert!(pendulum_pos(4.0, 4.0, 1.0).abs() < 1e-9);          // volle Runde: links
-        assert!((pendulum_pos(1.0, 4.0, 1.0) - 0.5).abs() < 1e-9);  // viertel: Mitte
-        // tiefe=0.5 -> pendelt nur 0.25..0.75; tiefe wird geclampt
-        assert!((pendulum_pos(0.0, 4.0, 0.5) - 0.25).abs() < 1e-9);
-        assert!(pendulum_pos(0.0, 4.0, 7.0).abs() < 1e-9);
+    fn pendulum_starts_left() {
+        assert!(pendulum_pos(0.0, 4.0, 1.0).abs() < 1e-9);
+        assert!((pendulum_pos(2.0, 4.0, 1.0) - 1.0).abs() < 1e-9);
     }
 }

@@ -1,6 +1,6 @@
 # Modul `audio`
 
-Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber raylib). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
+Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber **Kira**/cpal — eigener Audio-Thread, vom Game-Loop entkoppelt). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
 
 Ergaenzt die Core-Builtins `LOADSOUND` / `PLAYSOUND` aus [Grafik-Built-ins](builtins-grafik.md) — die einfachen Calls reichen fuer "Sound abspielen", `audio` bringt das volle Audio-Mixing-Toolkit.
 
@@ -329,9 +329,10 @@ END IF
 
 ## In der nativen Runtime (gbrt)
 
-Das `audio`-Modul laeuft nativ ueber raylib (mit dem `graphics`-Feature, das die native Grafik-Runtime ohnehin mitbringt). Audio-Ausgabe gehoert **nicht** zur deterministischen bit-identischen Garantie — wie `RND`/`tween`. Hinweise:
+Das `audio`-Modul laeuft nativ ueber **Kira** (cpal) — ein eigener Audio-Thread, vom Game-Loop entkoppelt (loeste 2026-06-13 raylib-Audio ab; mit dem `graphics`-Feature eingebunden, raylib bleibt fuer Fenster/Input). Audio-Ausgabe gehoert **nicht** zur deterministischen bit-identischen Garantie — wie `RND`/`tween`. Hinweise:
 
-- `SOUND` und `AUDIO_CHANNEL` sind nativ ganzzahlige Handles; raylib kennt keine eigenstaendigen Mixer-Channels, daher steuert ein „Channel“ die Wiedergabe genau seines Sounds.
-- `AUDIO_GET_VOLUME` liefert das zuletzt gesetzte Volume (raylib hat keinen Getter).
-- Fade-in/out und `loops = N` werden vereinfacht (raylib kann das nicht direkt); Pan ist eine Naeherung.
-- Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`) baut die Wellenform als In-RAM-WAV.
+- `SOUND` und `AUDIO_CHANNEL` sind ganzzahlige Handles; ein „Channel“ ist die zuletzt gestartete Instanz eines geladenen/gebauten Sounds.
+- Fade-in/out, `AUDIO_STOP` mit Fade und `AUDIO_PAN_SLIDE` sind **native Kira-Tweens** (laufen auf dem Audio-Thread); `loops` via `loop_region` (endlos) bzw. Restart-Zaehlung (endlich). `AUDIO_FFT` zapft den Mixer-Haupttrack ueber einen Effect an.
+- Volume wird intern in Dezibel gefuehrt (Kira), die Builtins nehmen weiterhin linear 0..1.
+- Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX`) und der Sampler bauen die Wellenform als Float-Buffer direkt als Kira-`StaticSoundData`.
+- **Tracker-Module** (`.mod`/`.xm`) als Musik werden beim Laden via reinem Rust-Player (`xmrs`) zu einem Loop-Durchlauf gerendert und im RAM nahtlos geloopt; Stream-Formate (ogg/mp3/wav/flac) streamen von Platte.
