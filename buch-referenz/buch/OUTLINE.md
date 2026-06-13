@@ -46,7 +46,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 21 Vererbung, Properties, Operatoren, Static  (content/21_oop_fortgeschritten.js)
 - [x] 22 ENUM  (content/22_enum.js)
 - [x] 23 Comprehensions (List/Dict/Set)  (content/23_comprehensions.js)
-- [ ] 24 Fehlerbehandlung (TRY/CATCH/THROW)
+- [x] 24 Fehlerbehandlung (TRY/CATCH/THROW)  (content/24_fehlerbehandlung.js)
 - [ ] 25 Coroutinen (YIELD)
 - [ ] 26 Module importieren (IMPORT)
 
@@ -100,6 +100,7 @@ unabhängige Objekte, Verweis-Semantik) + Kap 21 (Vererbung EXTENDS/Überschreib
 Polymorphie, Properties GET/SET, Operator-Überladung OPERATOR, STATIC CONST).
 + Kap 22 (ENUM: kompakt/Block, Auto-Nummerierung, eigene Werte, gemischt,
 SELECT CASE, Keyword-Member) + Kap 23 (Comprehensions: List `[e FOR v IN s]` +WHERE,
-Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE). 77 Seiten, alle Ausgaben gegen
-gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 24 (Fehlerbehandlung: TRY/CATCH/THROW).
+Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE) + Kap 24 (Fehlerbehandlung:
+TRY/CATCH[e]/END TRY, THROW, wann nutzen + TRYVAL-Hinweis). 80 Seiten, alle Ausgaben
+gegen gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 25 (Coroutinen: YIELD).
