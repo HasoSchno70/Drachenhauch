@@ -1,0 +1,28 @@
+' Screenshot-Demo Kapitel 41: alle Grundformen
+SCREEN(480, 320, "Formen")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(22, 26, 44))
+    ' Pixel + Linie
+    PLOT(40, 30, RGB(255, 255, 255))
+    LINE(20, 40, 140, 40, RGB(255, 80, 80))
+    ' gefuelltes Rechteck + Rahmen
+    BOX(20, 60, 120, 110, RGB(0, 200, 120))
+    RECT(20, 120, 120, 170, RGB(0, 200, 120))
+    ' Kreis
+    CIRCLE(220, 90, 35, RGB(255, 200, 40))
+    ' Dreieck (Eckpunkte gegen den Uhrzeigersinn)
+    TRIANGLE(180, 150, 220, 200, 260, 150, RGB(255, 110, 255))
+    ' Ellipse
+    ELLIPSE(300, 60, 420, 120, RGB(80, 140, 255))
+    ' Polygon (Fuenfeck, gegen den Uhrzeigersinn)
+    DIM p[10] AS INTEGER
+    p[0]=360 : p[1]=160 : p[2]=375 : p[3]=205
+    p[4]=425 : p[5]=205 : p[6]=440 : p[7]=160
+    p[8]=400 : p[9]=140
+    POLYGON(p, RGB(0, 210, 210))
+    ' Bogen
+    ARC(150, 230, 250, 300, 0.0, 3.14, RGB(255, 255, 0), 3)
+    ' Text
+    TEXT(20, 260, "2D-Formen in GameBasic", RGB(220, 230, 255))
+    FLIP()
+WEND

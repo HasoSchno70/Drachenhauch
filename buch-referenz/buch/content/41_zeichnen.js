@@ -1,0 +1,106 @@
+module.exports = (H) => [
+  H.chapter("2D-Zeichnen"),
+  H.p("Mit dem Fenster aus dem letzten Kapitel kannst du jetzt zeichnen. GameBasic bietet alle Grundformen: Pixel, Linien, Rechtecke, Kreise, Dreiecke, Polygone, Ellipsen, Bögen und Text. Jeder Befehl wird zwischen CLS und FLIP aufgerufen (siehe Game-Loop). Das letzte Argument ist fast immer eine Farbe – als RGB(r, g, b) oder eine der Farbkonstanten (Kapitel „Farben“)."),
+  H.p("Das folgende Bild zeigt die wichtigsten Formen auf einen Blick; danach kommt jeder Befehl einzeln mit Beispiel."),
+  H.figure("41_formen.png", "Die 2D-Grundformen: Linie, gefülltes und umrandetes Rechteck, Kreis, Dreieck, Ellipse, Polygon, Bogen und Text."),
+
+  H.note("Koordinaten zählen ab der linken oberen Ecke: x nach rechts, y nach UNTEN. (0, 0) ist also oben links. Bei BOX und RECT gibst du zwei Eckpunkte (x1, y1, x2, y2) an – beide eingeschlossen."),
+
+  H.h2("Pixel & Linien"),
+  H.cmd("PLOT", "PLOT(x, y[, farbe])",
+    "Setzt ein einzelnes Pixel.",
+    [
+      'SCREEN(320, 240)',
+      'CLS()',
+      'PLOT(160, 120, RGB(255, 255, 255))',
+      'FLIP()',
+    ]),
+  H.cmd("LINE", "LINE(x1, y1, x2, y2[, farbe])",
+    "Zieht eine Linie von (x1, y1) nach (x2, y2).",
+    [
+      'CLS()',
+      'LINE(0, 0, 319, 239, RGB(255, 80, 80))',
+      'FLIP()',
+    ]),
+
+  H.h2("Rechtecke"),
+  H.cmd("BOX", "BOX(x1, y1, x2, y2[, farbe])",
+    "Zeichnet ein GEFÜLLTES Rechteck zwischen den beiden Eckpunkten.",
+    [
+      'CLS()',
+      'BOX(50, 50, 150, 100, RGB(0, 200, 120))',
+      'FLIP()',
+    ]),
+  H.cmd("RECT", "RECT(x1, y1, x2, y2[, farbe])",
+    "Zeichnet nur den RAHMEN eines Rechtecks (1 Pixel breit).",
+    [
+      'CLS()',
+      'RECT(50, 50, 150, 100, RGB(0, 200, 120))',
+      'FLIP()',
+    ]),
+
+  H.h2("Kreise & Ellipsen"),
+  H.cmd("CIRCLE", "CIRCLE(x, y, radius[, farbe])",
+    "Zeichnet einen gefüllten Kreis mit Mittelpunkt (x, y) und dem angegebenen Radius.",
+    [
+      'CLS()',
+      'CIRCLE(160, 120, 40, RGB(255, 200, 40))',
+      'FLIP()',
+    ]),
+  H.cmd("ELLIPSE · ELLIPSEOUTLINE", "ELLIPSE(x1, y1, x2, y2[, farbe])   ELLIPSEOUTLINE(...)",
+    "Zeichnet eine Ellipse, eingepasst in das Rechteck (x1, y1)–(x2, y2). ELLIPSE füllt, ELLIPSEOUTLINE zeichnet nur die Kontur (mit optionaler Breite).",
+    [
+      'CLS()',
+      'ELLIPSE(60, 80, 200, 160, RGB(80, 140, 255))',
+      'ELLIPSEOUTLINE(220, 80, 300, 160, RGB(80, 140, 255), 2)',
+      'FLIP()',
+    ]),
+
+  H.h2("Dreiecke & Polygone"),
+  H.cmd("TRIANGLE · TRIANGLEOUTLINE", "TRIANGLE(x1,y1, x2,y2, x3,y3[, farbe])   TRIANGLEOUTLINE(...)",
+    "Zeichnet ein Dreieck aus drei Eckpunkten – TRIANGLE gefüllt, TRIANGLEOUTLINE nur als Kontur.",
+    [
+      'CLS()',
+      'TRIANGLE(160, 80, 120, 160, 200, 160, RGB(255, 110, 255))',
+      'FLIP()',
+    ]),
+  H.cmd("POLYGON · POLYGONOUTLINE", "POLYGON(punkte[, farbe])   POLYGONOUTLINE(...)",
+    "Zeichnet ein Vieleck. punkte ist ein ARRAY OF INTEGER mit abwechselnd x- und y-Werten ([x1, y1, x2, y2, …], mindestens 3 Punkte). POLYGON füllt, POLYGONOUTLINE zeichnet nur die Kanten.",
+    [
+      'DIM p[8] AS INTEGER          \' 4 Punkte (Raute)',
+      'p[0]=160 : p[1]=60',
+      'p[2]=120 : p[3]=120',
+      'p[4]=160 : p[5]=180',
+      'p[6]=200 : p[7]=120',
+      'CLS()',
+      'POLYGON(p, RGB(0, 210, 210))',
+      'FLIP()',
+    ]),
+  H.warn("Gefüllte Dreiecke und Polygone erscheinen nur, wenn du die Eckpunkte GEGEN den Uhrzeigersinn angibst (auf dem Bildschirm, wo y nach unten zeigt). Gibst du sie im Uhrzeigersinn an, bleibt die Fläche unsichtbar. Bei Bedarf einfach die Reihenfolge der Punkte umdrehen. (Die Outline-Varianten sind davon nicht betroffen.)"),
+
+  H.h2("Bögen"),
+  H.cmd("ARC", "ARC(x1, y1, x2, y2, start, ende[, farbe[, breite]])",
+    "Zeichnet ein Bogensegment, eingepasst in das Rechteck (x1, y1)–(x2, y2). Die Winkel start und ende sind im Bogenmaß (0 bis 2·PI), gegen den Uhrzeigersinn.",
+    [
+      'CLS()',
+      'ARC(120, 80, 200, 160, 0.0, PI, RGB(255, 255, 0), 3)',
+      'FLIP()',
+    ]),
+
+  H.h2("Text"),
+  H.cmd("TEXT", "TEXT(x, y, text$[, farbe])",
+    "Schreibt Text an die Position (x, y) (linke obere Ecke des Textes). In der Konsole nutzt du PRINT, im Fenster TEXT.",
+    [
+      'CLS()',
+      'TEXT(20, 20, "Punkte: 1200", RGB(255, 255, 255))',
+      'FLIP()',
+    ]),
+  H.cmd("TEXTROT", "TEXTROT(x, y, text$, winkel[, skala[, farbe]])",
+    "Schreibt Text ZENTRIERT auf (x, y), um diesen Punkt gedreht (Winkel in Grad) und optional skaliert – gut für schräge Beschriftungen oder Punkte-Pop-ups.",
+    [
+      'CLS()',
+      'TEXTROT(160, 120, "+100", -20.0, 2.0, RGB(255, 220, 0))',
+      'FLIP()',
+    ]),
+  H.tip("Schriftart & Größe", "Standardmäßig zeichnet TEXT in einer eingebauten Schrift. Eigene TrueType-Schriften lädst du mit LOADFONT und aktivierst sie mit SETFONT – damit kannst du Überschriften groß und stilvoll setzen. Mehr dazu in der Doku zu Schriften."),
+];

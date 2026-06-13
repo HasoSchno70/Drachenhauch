@@ -63,7 +63,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ### Teil IV — Grafik, Sound & Spiele
 - [x] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)  (content/40_fenster.js, images/40_fenster.png)
-- [ ] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)
+- [x] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)  (content/41_zeichnen.js, images/41_formen.png)
 - [ ] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)
 - [ ] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)
 - [ ] 44 Farben (RGB/HSV/COLOR_LERP)
@@ -129,4 +129,8 @@ FLIP/QUITREQUESTED-Loop, DELTA, FPS/SETFPS, SCREENWIDTH/HEIGHT) — MIT echtem S
 (figures/40_fenster.gb → images/40_fenster.png). 130 Seiten, gegen gbrt verifiziert.
 Screenshot-Workflow: figures/NN_*.gb (Quelle) → `GBRT_FRAMES=N GBRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
 (absoluter Pfad nötig, gbrt chdirt ins figures/-Dir!) → H.figure("x.png", caption).
-**Nächstes:** Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/TEXT) — mit Screenshots.
++ Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/ELLIPSE/TRIANGLE/POLYGON/ARC/TEXT/
+TEXTROT) — mit Formen-Übersichts-Screenshot. GOTCHA dokumentiert: gefüllte TRIANGLE/
+POLYGON nur bei CCW-Wicklung sichtbar (raylib-Culling); Engine-Fix als Task gespawnt.
+135 Seiten, gegen gbrt verifiziert.
+**Nächstes:** Kap 42 (2D-Extras: LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets).
