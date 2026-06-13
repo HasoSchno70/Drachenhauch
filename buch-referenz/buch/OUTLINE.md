@@ -53,7 +53,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 ### Teil III — Eingebaute Befehle (Referenz)
 - [x] 30 Konsole & Ein-/Ausgabe  (content/30_konsole.js)
 - [x] 31 Mathematik  (content/31_mathematik.js)
-- [ ] 32 Zufall
+- [x] 32 Zufall  (content/32_zufall.js)
 - [ ] 33 Zeichenketten-Funktionen
 - [ ] 34 Typumwandlung & Prüfung
 - [ ] 35 Array-Helfer (SORT/PUSH/POP/...)
@@ -110,6 +110,7 @@ mehrzeilige cmd-Syntax (\n) rendert jetzt als echte Zeilenumbrüche. **Teil III
 gestartet:** Kap 30 (Konsole & Ein-/Ausgabe: PRINT/INPUT/FORMAT$, Verweise auf
 Teil II + Teil IV). + Kap 31 (Mathematik: ABS/SQR/POW/HYPOT/EXP/LOG, FLOOR/CEIL/ROUND, MIN/MAX/CLAMP/
 SIGN, LERP/REMAP, SIN/COS/TAN/ATAN2/DEG/RAD, WRAP/PINGPONG/MOVETOWARD, PI/TAU).
-95 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
++ Kap 32 (Zufall: RND/RANDINT/RANDF, CHOICE/WEIGHTED_CHOICE, SHUFFLE, RANDOMIZE-Seed).
+98 Seiten, alle Ausgaben gegen gbrt verifiziert, gerendert.
 Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 32 (Zufall) — Referenzteil.
+**Nächstes:** Kap 33 (Zeichenketten-Funktionen) — Referenzteil.
