@@ -3172,6 +3172,15 @@ impl<'p> Vm<'p> {
         fn gb(a: &[Value], i: usize) -> bool {
             matches!(a.get(i), Some(Value::Bool(true)))
         }
+        // Flag-Argument: akzeptiert TRUE/FALSE UND 1/0 (wie need_flag); fehlend = false.
+        fn gflag(a: &[Value], i: usize) -> bool {
+            match a.get(i) {
+                Some(Value::Bool(b)) => *b,
+                Some(Value::Int(n)) => *n != 0,
+                Some(Value::Float(f)) => *f != 0.0,
+                _ => false,
+            }
+        }
         fn need_f(a: &[Value], i: usize, fn_: &str) -> R<f64> {
             match a.get(i) {
                 Some(Value::Int(n)) => Ok(*n as f64),
@@ -4127,14 +4136,17 @@ impl<'p> Vm<'p> {
                 let atlas = gi(a,0,"ATLAS_DRAW")?;
                 let name = gs(a,1,"ATLAS_DRAW")?.to_string();
                 let tint = if a.len() > 4 { Some(gi(a,4,"ATLAS_DRAW")?) } else { None };
-                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW")? as i32, gi(a,3,"ATLAS_DRAW")? as i32, false, tint)?; Value::Nil
+                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW")? as i32, gi(a,3,"ATLAS_DRAW")? as i32, false, false, tint)?; Value::Nil
             }
             "atlas_draw_flipped" => {
+                // ATLAS_DRAW_FLIPPED(atlas, name, x, y[, flip_x[, flip_y[, tint]]])
+                // flip_x/flip_y akzeptieren TRUE/FALSE und 1/0; tint optional (7. Arg).
                 let atlas = gi(a,0,"ATLAS_DRAW_FLIPPED")?;
                 let name = gs(a,1,"ATLAS_DRAW_FLIPPED")?.to_string();
-                let fh = gb(a, 4);
-                let tint = if a.len() > 5 { Some(gi(a,5,"ATLAS_DRAW_FLIPPED")?) } else { None };
-                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW_FLIPPED")? as i32, gi(a,3,"ATLAS_DRAW_FLIPPED")? as i32, fh, tint)?; Value::Nil
+                let fx = gflag(a, 4);
+                let fy = gflag(a, 5);
+                let tint = if a.len() > 6 { Some(gi(a,6,"ATLAS_DRAW_FLIPPED")?) } else { None };
+                g!().atlas_draw(atlas, &name, gi(a,2,"ATLAS_DRAW_FLIPPED")? as i32, gi(a,3,"ATLAS_DRAW_FLIPPED")? as i32, fx, fy, tint)?; Value::Nil
             }
             "batch_flush" => Value::Nil, // Recording-Modell: alles flusht beim FLIP
 

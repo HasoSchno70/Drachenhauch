@@ -48,7 +48,7 @@ enum Cmd {
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
     TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala, tint (um Zentrum)
-    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool, Color), // tex, sx,sy,sw,sh, dx,dy, flip_h, tint
+    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, flip_h, flip_v, tint
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
     // Clip-Stack (Scissor): Push schneidet mit dem aktuellen Clip, Pop stellt
@@ -2206,7 +2206,7 @@ impl Graphics {
         Ok((self.atlases.len() - 1) as i64)
     }
     pub fn atlas_draw(&mut self, atlas: i64, name: &str, x: i32, y: i32, flip_h: bool,
-                      tint: Option<i64>) -> Result<(), String> {
+                      flip_v: bool, tint: Option<i64>) -> Result<(), String> {
         let (tex, sx, sy, sw, sh) = {
             let a = self.atlases.get(atlas as usize).ok_or("ATLAS_DRAW: ungueltiges Atlas-Handle")?;
             let &(sx, sy, sw, sh) = a.frames.get(name)
@@ -2215,7 +2215,7 @@ impl Graphics {
         };
         let (x, y) = self.w2s(x, y);
         let tcol = match tint { Some(c) => col(c), None => Color::WHITE };
-        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, flip_h, tcol));
+        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, flip_h, flip_v, tcol));
         Ok(())
     }
 
@@ -3091,8 +3091,10 @@ fn render_scene<D: RaylibDraw>(
                         let dst = Rectangle::new((cx * s) as f32, (cy * s) as f32, w, h);
                         d.draw_texture_pro(t, src, dst, Vector2::new(w / 2.0, h / 2.0), *ang, *tint);
                     }
-                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh, tint) => {
-                        let src = Rectangle::new(*sx as f32, *sy as f32, if *fh { -(*sw as f32) } else { *sw as f32 }, *sh as f32);
+                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh, fv, tint) => {
+                        let src = Rectangle::new(*sx as f32, *sy as f32,
+                            if *fh { -(*sw as f32) } else { *sw as f32 },
+                            if *fv { -(*sh as f32) } else { *sh as f32 });
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, *tint);
                     }

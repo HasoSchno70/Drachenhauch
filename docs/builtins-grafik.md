@@ -211,7 +211,7 @@ Ein **Sprite-Atlas** ist EIN großes Bild mit benannten Sub-Rects (`x, y, w, h`)
 |---|---|
 | `ATLAS_LOAD(manifest_path$)` → SPRITE_ATLAS | Atlas aus JSON-Manifest laden |
 | `ATLAS_DRAW(atlas, name$, x, y)` | einzelnes Sub-Sprite zeichnen (Camera-aware) |
-| `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y]])` | Sub-Sprite mit Spiegelung (klassisch für Lauf-Animation links/rechts) |
+| `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` | Sub-Sprite mit Spiegelung (X/Y, je `TRUE`/`FALSE` oder `1`/`0`); optional `tint` |
 | `BATCH_DRAW(atlas, name$, x, y)` | Sub-Sprite an Batch-Queue anhängen |
 | `BATCH_FLUSH()` | Queue jetzt rendern (gebatchter Draw-Call) |
 
@@ -252,7 +252,7 @@ BATCH_FLUSH()   ' ein gebatchter Draw-Call fuer alle 600
 
 **Zoom-Caveat:** Bei `CAMERA_SET`-Zoom ≠ 1 fällt jeder `BATCH_DRAW` automatisch auf `DRAWIMAGEPART` zurück (der Batch kann nicht skaliert zeichnen). Translation funktioniert mit Batch. Wer auf Zoom angewiesen ist und viele Sprites batchen will, bakt die Zoom-Stufe in den Atlas oder nutzt `ATLAS_DRAW` einzeln.
 
-**Flipping für Charakter-Sprites:** `ATLAS_DRAW_FLIPPED(atlas, name$, x, y, flip_x, flip_y)` spiegelt das Sub-Sprite an X- oder Y-Achse. Klassisches Pattern für Walk-Animationen: nur eine Richtung (rechts) im Atlas, links wird per Flip abgeleitet:
+**Flipping für Charakter-Sprites:** `ATLAS_DRAW_FLIPPED(atlas, name$, x, y[, flip_x[, flip_y[, tint]]])` spiegelt das Sub-Sprite an X- oder Y-Achse. `flip_x`/`flip_y` akzeptieren `TRUE`/`FALSE` **oder** `1`/`0` (fehlend = `FALSE`); `tint` ist ein optionaler 7. Farb-Parameter. Klassisches Pattern für Walk-Animationen: nur eine Richtung (rechts) im Atlas, links wird per Flip abgeleitet:
 
 ```basic
 DIM flip AS BOOLEAN
