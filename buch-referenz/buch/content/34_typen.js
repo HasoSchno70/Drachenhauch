@@ -1,0 +1,79 @@
+module.exports = (H) => [
+  H.chapter("Typumwandlung & Prüfung"),
+  H.p("Werte haben Typen – Zahl, Text, Wahrheitswert. Oft musst du zwischen ihnen umwandeln: eine Zahl in Text zum Ausgeben, getippten Text zurück in eine Zahl zum Rechnen. Dieses Kapitel sammelt die Umwandlungs-Funktionen sowie die Befehle, mit denen du den Typ eines Werts zur Laufzeit prüfst."),
+
+  H.h2("Zahl ↔ Text"),
+  H.cmd("STR$ · VAL · TRYVAL", "STR$(wert)   VAL(s$)   TRYVAL(s$, ersatz)",
+    "STR$ macht aus einem beliebigen Wert seinen Text (aus 3.14 wird \"3.14\", aus TRUE wird \"TRUE\"). VAL liest umgekehrt eine Zahl aus einem String – mit Punkt ergibt sich eine Kommazahl, sonst eine ganze Zahl; unleserlicher Text wird stillschweigend zu 0. TRYVAL macht dasselbe, liefert bei ungültiger Eingabe aber deinen Ersatzwert statt 0.",
+    [
+      'PRINT STR$(3.14)',
+      'PRINT VAL("42") + 1',
+      'PRINT TRYVAL("oops", -1)',
+    ],
+    { out: ["3.14", "43", "-1"] }),
+  H.cmd("INT", "INT(zahl)",
+    "Wandelt eine Kommazahl in eine ganze Zahl, indem abgerundet wird (in Richtung minus unendlich): INT(3.7) ist 3, INT(-1.5) ist -2.",
+    [
+      'PRINT INT(3.7); " "; INT(-1.5)',
+    ],
+    { out: ["3 -2"] }),
+
+  H.h2("Zeichen ↔ Code, Zahlensysteme"),
+  H.cmd("CHR$ · ASC", "CHR$(code)   ASC(s$)",
+    "CHR$ macht aus einer Zeichen-Nummer (Unicode-Codepoint) das Zeichen, ASC aus dem ersten Zeichen seine Nummer. A ist 65, B ist 66 …",
+    [
+      'PRINT CHR$(65); CHR$(66)',
+      'PRINT ASC("Anna")',
+    ],
+    { out: ["AB", "65"] }),
+  H.cmd("HEX$ · BIN$", "HEX$(n)   BIN$(n)",
+    "Stellen eine ganze Zahl als Text im Hexadezimal- (Basis 16) bzw. Binärsystem (Basis 2) dar – nützlich für Farben (HEX$) oder Bit-Masken (BIN$).",
+    [
+      'PRINT HEX$(255)',
+      'PRINT BIN$(10)',
+    ],
+    { out: ["FF", "1010"] }),
+
+  H.h2("Den Typ herausfinden"),
+  H.cmd("TYPEOF", "TYPEOF(x)",
+    "Liefert den Typnamen eines Werts als Text zur Laufzeit – etwa \"INTEGER\", \"FLOAT\", \"STRING\", \"BOOLEAN\" oder den Namen einer Klasse bzw. eines Modul-Typs.",
+    [
+      'PRINT TYPEOF(3.0)',
+      'PRINT TYPEOF("hi"); " "; TYPEOF(5); " "; TYPEOF(TRUE)',
+    ],
+    { out: ["FLOAT", "STRING INTEGER BOOLEAN"] }),
+  H.cmd("ISNUM · ISINT · ISSTR · ISBOOL", "ISNUM(x)   ISINT(x)   ISSTR(x)   ISBOOL(x)",
+    "Prüfen den Typ und liefern TRUE oder FALSE. Wichtig: Ein Wahrheitswert gilt NICHT als Zahl – ISNUM(TRUE) ist FALSE. Und ISINT(3.0) ist FALSE, weil 3.0 eine Kommazahl ist.",
+    [
+      'PRINT ISINT(5); " "; ISINT(3.0)',
+      'PRINT ISNUM(5); " "; ISNUM(TRUE)',
+    ],
+    { out: ["TRUE FALSE", "TRUE FALSE"] }),
+
+  H.h2("Auf „nichts“ prüfen: IS_NIL"),
+  H.p("Eine Objekt-Variable, die zwar mit DIM angelegt, aber noch nicht mit NEW befüllt wurde, enthält „nichts“ – einen besonderen Leerwert namens NIL. Mit IS_NIL prüfst du, ob eine Variable in diesem Zustand ist, bevor du versehentlich darauf zugreifst."),
+  H.cmd("IS_NIL", "IS_NIL(x)",
+    "Liefert TRUE, wenn der Wert NIL ist (also „noch nichts“), sonst FALSE. Typisch, um vor dem Benutzen eines Objekts zu prüfen, ob es überhaupt schon erzeugt wurde.",
+    [
+      'CLASS Gegner',
+      '    DIM hp AS INTEGER',
+      'END CLASS',
+      '',
+      'DIM boss AS Gegner',
+      'PRINT IS_NIL(boss)      \' noch kein NEW',
+      'boss = NEW Gegner()',
+      'PRINT IS_NIL(boss)      \' jetzt existiert es',
+    ],
+    { out: ["TRUE", "FALSE"] }),
+
+  H.h2("Kodierung & Prüfsummen"),
+  H.p("Für Speicherstände und Datenaustausch gibt es ein paar weitere Helfer. Base64 verpackt beliebigen Text in ein kompaktes, transportables Format; Prüfsummen erkennen, ob Daten unverändert sind."),
+  H.bulletRich("BASE64_ENCODE(s$) · BASE64_DECODE(s$)  ", "→ Text nach Base64 und zurück."),
+  H.bulletRich("CRC32(s$) · HASH(s$)  ", "→ Prüfsumme bzw. stabiler Hash (z. B. zur Save-Integrität)."),
+  H.code([
+    'PRINT BASE64_ENCODE("Hi!")',
+    'PRINT BASE64_DECODE("SGkh")',
+  ]),
+  H.code(["SGkh", "Hi!"], { out: true }),
+  H.tip("Verwandte Kapitel", "Das Zusammenbauen von Text aus Werten geht am bequemsten mit f-Strings (Kapitel „Ein- und Ausgabe“); feste Nachkommastellen oder führende Nullen liefert FORMAT$ (Kapitel „Konsole & Ein-/Ausgabe“)."),
+];
