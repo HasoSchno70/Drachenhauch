@@ -40,7 +40,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)  (content/15_funktionen.js)
 - [x] 16 Strings im Detail  (content/16_strings.js)
 - [x] 17 Arrays  (content/17_arrays.js)
-- [ ] 18 Maps
+- [x] 18 Maps  (content/18_maps.js)
 - [ ] 19 Tupel & Destructuring
 - [ ] 20 Klassen & Objekte
 - [ ] 21 Vererbung, Properties, Operatoren, Static
@@ -90,7 +90,9 @@ IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF) +
 Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs) + Kap 16 (Strings) + Kap 17 (Arrays:
 DIM[n], 0-Index+Bounds, LEN/Iteration/FOR EACH, SORT/REVERSE/INDEXOF, Aggregate
 SUM/AVG/MIN/MAX/FILL, dynamisch PUSH/POP/INSERT/REMOVE_AT/REDIM, Slicing,
-**Alias-Stolperstein b=a kopiert NICHT → ARRAY_COPY**, mehrdimensional). 51 Seiten,
-alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf
-User-Wunsch schwierige Themen ausführlicher (mehr Hintergrund/mentale Modelle).
-**Nächstes:** Kap 18 (Maps).
+**Alias-Stolperstein b=a kopiert NICHT → ARRAY_COPY**, mehrdimensional) + Kap 18 (Maps: MAPPUT/GET/GETOR/HAS/IN/SIZE/REMOVE/CLEAR,
+FOR EACH über Keys, MAPKEYS/VALUES/ITEMS, Methoden-Syntax, STR$-Keys/Cache,
+Alias-Hinweis). 56 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice
+gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher (mehr
+Hintergrund/mentale Modelle).
+**Nächstes:** Kap 19 (Tupel & Destructuring).
