@@ -1,0 +1,67 @@
+module.exports = (H) => [
+  H.chapter("Operatoren & Ausdrücke"),
+  H.p("Ein Ausdruck ist alles, was zu einem Wert wird: eine Zahl, eine Rechnung, ein Vergleich. Operatoren sind die kleinen Zeichen, die Werte verknüpfen. Du kennst schon +, -, * und / vom ersten Kapitel – hier kommt der ganze Werkzeugkasten."),
+
+  H.h2("Rechnen mit Zahlen"),
+  H.p("Die vier Grundrechenarten funktionieren wie erwartet. Dazu kommen zwei nützliche Spezialisten für ganze Zahlen:"),
+  H.cmd("+  -  *  /", "a + b   a - b   a * b   a / b",
+    "Addition, Subtraktion, Multiplikation, Division. Die Division mit / liefert eine Kommazahl, sobald die Rechnung nicht glatt aufgeht – etwa 9 / 2 = 4.5. Geht sie glatt auf, bekommst du eine ganze Zahl (8 / 2 = 4).",
+    ['PRINT 7 + 2', 'PRINT 7 - 2', 'PRINT 7 * 2', 'PRINT 9 / 2'],
+    { out: ["9", "5", "14", "4.5"] }),
+  H.cmd("\\  (Ganzzahl-Division)", "a \\ b",
+    "Teilt und wirft den Rest weg – das Ergebnis ist eine ganze Zahl. Praktisch, wenn dich Nachkommastellen nicht interessieren.",
+    ['PRINT 17 \\ 5', 'PRINT 8 \\ 2'],
+    { out: ["3", "4"] }),
+  H.cmd("MOD  (Rest)", "a MOD b",
+    "Liefert den Rest einer Division. 17 geteilt durch 5 ist 3 Rest 2 – also ist 17 MOD 5 gleich 2. Unentbehrlich, um zu prüfen, ob etwas „aufgeht“ (Rest 0) oder um Werte in einen Bereich zu zwingen.",
+    ['PRINT 17 MOD 5', 'PRINT 10 MOD 2'],
+    { out: ["2", "0"] }),
+
+  H.h2("Texte verketten"),
+  H.p("Bei Strings bedeutet + nicht „addieren“, sondern „aneinanderhängen“. So baust du aus Bausteinen einen Satz:"),
+  H.code([
+    'DIM name AS STRING',
+    'name = "Mario"',
+    'PRINT "Hallo, " + name + "!"',
+  ]),
+  H.code(["Hallo, Mario!"], { out: true }),
+
+  H.h2("Vergleichen"),
+  H.p("Vergleichs-Operatoren prüfen eine Behauptung und liefern einen Wahrheitswert (TRUE oder FALSE) zurück. Genau diese Werte steuern später die Entscheidungen deines Programms."),
+  H.bulletRich("=  ", "gleich"),
+  H.bulletRich("<>  ", "ungleich"),
+  H.bulletRich("<   >   <=   >=  ", "kleiner, größer, kleiner-gleich, größer-gleich"),
+  H.code([
+    'PRINT 5 > 3',
+    'PRINT 5 = 3',
+    'PRINT 5 <> 3',
+    'PRINT 4 <= 4',
+  ]),
+  H.code(["TRUE", "FALSE", "TRUE", "TRUE"], { out: true }),
+  H.note("Zum Vergleichen nimmst du ein einzelnes =. Dasselbe Zeichen wird auch zum Zuweisen benutzt (punkte = 100). GameBasic erkennt aus dem Zusammenhang, was gemeint ist – in einer Bedingung vergleicht =, in einer Zuweisung belegt es."),
+
+  H.h2("Logik verknüpfen: AND, OR, NOT"),
+  H.p("Mehrere Wahrheitswerte verknüpfst du mit AND (und), OR (oder) und NOT (nicht). AND ist nur wahr, wenn beide Seiten wahr sind; OR ist wahr, wenn mindestens eine Seite wahr ist; NOT dreht einen Wert um."),
+  H.code([
+    'PRINT TRUE AND FALSE',
+    'PRINT TRUE OR FALSE',
+    'PRINT NOT TRUE',
+    'PRINT (5 > 3) AND (2 < 4)',
+  ]),
+  H.code(["FALSE", "TRUE", "FALSE", "TRUE"], { out: true }),
+
+  H.h2("Punkt vor Strich – und Klammern"),
+  H.p("GameBasic hält sich an die gewohnten Vorrang-Regeln: Erst wird gerechnet (* und / vor + und -), dann verglichen, dann logisch verknüpft. Wenn du es anders willst – oder einfach sichergehen möchtest – setzt du Klammern. Klammern sind nie verkehrt und machen deine Absicht klar:"),
+  H.code([
+    'PRINT 2 + 3 * 4',
+    'PRINT (2 + 3) * 4',
+  ]),
+  H.code(["14", "20"], { out: true }),
+
+  H.h2("Bit-Operatoren (für Fortgeschrittene)"),
+  H.p("Wer auf der Ebene einzelner Bits arbeiten will (etwa für Flags oder Masken), findet sechs Operatoren: BAND (Bit-Und), BOR (Bit-Oder), BXOR (Bit-Exklusiv-Oder), SHL und SHR (nach links / rechts schieben) sowie BNOT (Bits umdrehen). Sie arbeiten strikt mit ganzen Zahlen. Wenn dir das jetzt nichts sagt – kein Problem, du brauchst sie selten."),
+  H.cmd("BAND  BOR  BXOR  SHL  SHR  BNOT", "a BAND b   a SHL n   BNOT a",
+    "Bitweise Verknüpfungen ganzer Zahlen. Beispiel: 6 ist binär 110, 3 ist 011; das bitweise Und ergibt 010, also 2. SHL schiebt die Bits nach links – jede Stelle verdoppelt den Wert.",
+    ['PRINT 6 BAND 3', 'PRINT 1 SHL 4'],
+    { out: ["2", "16"] }),
+];

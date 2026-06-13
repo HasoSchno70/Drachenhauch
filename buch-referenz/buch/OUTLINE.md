@@ -1,0 +1,87 @@
+# GameBasic – Das Lehrbuch  ·  Gliederung & Fortschritt
+
+Vollständiges Lehr- und Referenzbuch: lehrt Programmieren in GameBasic von Grund
+auf UND erklärt jeden Befehl mit kleinem Beispielprogramm. Ausgabe: editierbares
+`.docx` zum Drucken. Code wird durchgehend monospace im grauen Kasten mit blauer
+Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
+
+## Build
+- `node build_book.js` → `GameBasic-Lehrbuch.docx` (nutzt zuletzt gemessene ToC-Seiten).
+- `<venv>\python.exe make_book.py` → Zwei-Pass-Build mit korrekten ToC-Seitenzahlen
+  (LibreOffice→PDF→PyMuPDF misst Seiten). Vorschau-PNG: LibreOffice→PDF→fitz.
+
+## Architektur
+- `build_book.js` = fester Renderer + Bausteine `H` (h1/chapter/part/h2/p/pmix/
+  bullet/bulletRich/code/cmd/tip/note/warn/figure).
+- `content/NN_*.js` = je ein Kapitel, exportiert `(H) => [bloecke]`. Reihenfolge =
+  Dateiname-Sortierung. **Neue Kapitel: einfach content/NN_*.js anlegen.**
+- `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
+- Quellen fürs Befehlswissen: `gamebasic/editor_qt/builtin_index.json` (Signaturen),
+  `gamebasic/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
+  `examples/*.gb`. Beispiele möglichst mit `gbrt run` verifizieren (Konsolen-Ausgabe).
+- Screenshots für Grafik: `GBRT_FRAMES=N GBRT_SCREENSHOT=images/x.png gbrt run datei.gb`,
+  PNG nach `buch-referenz/buch/images/`.
+
+## Gliederung & Fortschritt
+Legende: [x] fertig · [~] angefangen · [ ] offen
+
+### Teil I — Erste Schritte
+- [x] 00 Vorwort + Willkommen  (content/00_vorwort.js)
+- [x] 01 Was ist GameBasic?  (content/01_was_ist.js)
+- [x] 02 Installation, Editor & Programme starten  (content/02_start.js)
+- [x] 03 Dein erstes Programm  (content/03_erstes_programm.js)
+
+### Teil II — Die Sprache
+- [x] 10 Variablen & Datentypen  (content/10_variablen.js)
+- [x] 11 Operatoren & Ausdrücke  (content/11_operatoren.js)
+- [ ] 12 Ein-/Ausgabe: PRINT, INPUT, f-Strings
+- [ ] 13 Verzweigungen: IF/ELSEIF/ELSE, SELECT CASE, IIF
+- [ ] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE
+- [ ] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)
+- [ ] 16 Strings im Detail
+- [ ] 17 Arrays
+- [ ] 18 Maps
+- [ ] 19 Tupel & Destructuring
+- [ ] 20 Klassen & Objekte
+- [ ] 21 Vererbung, Properties, Operatoren, Static
+- [ ] 22 ENUM
+- [ ] 23 Comprehensions (List/Dict/Set)
+- [ ] 24 Fehlerbehandlung (TRY/CATCH/THROW)
+- [ ] 25 Coroutinen (YIELD)
+- [ ] 26 Module importieren (IMPORT)
+
+### Teil III — Eingebaute Befehle (Referenz)
+- [ ] 30 Konsole & Ein-/Ausgabe
+- [ ] 31 Mathematik
+- [ ] 32 Zufall
+- [ ] 33 Zeichenketten-Funktionen
+- [ ] 34 Typumwandlung & Prüfung
+- [ ] 35 Array-Helfer (SORT/PUSH/POP/...)
+- [ ] 36 Map-Helfer
+- [ ] 37 Zeit & Datum
+- [ ] 38 Dateien
+
+### Teil IV — Grafik, Sound & Spiele
+- [ ] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)
+- [ ] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)
+- [ ] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)
+- [ ] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)
+- [ ] 44 Farben (RGB/HSV/COLOR_LERP)
+- [ ] 45 Eingabe (Tastatur/Maus/Gamepad)
+- [ ] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)
+- [ ] 47 Layer, Sprite-Atlas, Bulk-Draws
+- [ ] 48 3D-Grafik (g3d)
+
+### Teil V — Die Module
+- [ ] 50 sprite · 51 animfsm · 52 tween · 53 timer · 54 particles
+- [ ] 55 physics / physics2d / physics3d · 56 camera · 57 input · 58 ui · 59 gui
+- [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
+- [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
+- [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
+
+### Anhang
+- [ ] A Befehls-Index (alphabetisch) · B Tastencodes · C Farb-Konstanten
+- [ ] D Fehlermeldungen verstehen
+
+## Status
+Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.

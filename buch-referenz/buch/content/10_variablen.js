@@ -1,0 +1,55 @@
+module.exports = (H) => [
+  H.part("Teil II — Die Sprache"),
+
+  H.chapter("Variablen & Datentypen"),
+  H.p("Ein Programm, das immer dasselbe tut, ist langweilig. Damit es rechnen, sich Dinge merken und reagieren kann, braucht es Variablen – benannte Schubladen, in denen Werte liegen. Du gibst der Schublade einen Namen, legst etwas hinein, und später holst du es über den Namen wieder heraus."),
+
+  H.h2("Eine Variable anlegen: DIM"),
+  H.p("In GameBasic meldest du jede Variable zuerst an. Das macht der Befehl DIM (von englisch „dimension“, „Maß festlegen“). Du sagst dabei zwei Dinge: wie die Variable heißt und welchen Typ sie hat – also welche Art Wert hineinpasst."),
+  H.code([
+    'DIM punkte AS INTEGER     \' eine ganze Zahl',
+    'punkte = 100              \' Wert hineinlegen',
+    'PRINT punkte',
+  ]),
+  H.code(["100"], { out: true }),
+  H.p("Die erste Zeile legt die Schublade „punkte“ an, die nur ganze Zahlen aufnimmt. Die zweite legt die Zahl 100 hinein – das Gleichheitszeichen heißt hier „bekommt den Wert“, nicht „ist gleich“ im mathematischen Sinn. Die dritte holt den Wert heraus und gibt ihn aus."),
+  H.note("Anlegen (DIM) und Belegen (=) darfst du auch trennen oder zusammenziehen. Anlegen musst du eine Variable aber, bevor du sie benutzt – das schützt dich vor Tippfehlern: Schreibst du später versehentlich „punke“, merkt GameBasic, dass es diese Schublade gar nicht gibt."),
+
+  H.h2("Die vier Grundtypen"),
+  H.p("GameBasic kennt vier grundlegende Werttypen. Jede Variable hat genau einen davon – das ist die „Pascal-strenge Typisierung“, von der manchmal die Rede ist. Sie klingt streng, ist aber dein Freund: Sie fängt eine ganze Klasse von Fehlern ab, bevor sie passieren."),
+  H.cmd("INTEGER", "DIM name AS INTEGER",
+    "Eine ganze Zahl – positiv, negativ oder null, ohne Nachkommastellen. Für alles zum Zählen: Punkte, Leben, Positionen, Schleifenzähler.",
+    ['DIM leben AS INTEGER', 'leben = 3', 'leben = leben - 1', 'PRINT leben'],
+    { out: ["2"] }),
+  H.cmd("FLOAT", "DIM name AS FLOAT",
+    "Eine Kommazahl (Fließkommazahl). Für alles, was Bruchteile braucht: Geschwindigkeiten, Prozente, Physik. Das Komma schreibt man als Punkt.",
+    ['DIM tempo AS FLOAT', 'tempo = 2.5', 'PRINT tempo * 4.0'],
+    { out: ["10.0"] }),
+  H.cmd("STRING", "DIM name AS STRING",
+    "Eine Zeichenkette, also Text. Steht immer in doppelten Anführungszeichen. Zwei Strings lassen sich mit + aneinanderhängen (verketten).",
+    ['DIM gruss AS STRING', 'gruss = "Hallo"', 'PRINT gruss + ", Welt!"'],
+    { out: ['Hallo, Welt!'] }),
+  H.cmd("BOOLEAN", "DIM name AS BOOLEAN",
+    "Ein Wahrheitswert: entweder TRUE (wahr) oder FALSE (falsch). Für Ja/Nein-Zustände: Ist das Spiel vorbei? Ist die Tür offen? Wichtig für Entscheidungen (siehe Kapitel Verzweigungen).",
+    ['DIM fertig AS BOOLEAN', 'fertig = FALSE', 'PRINT fertig'],
+    { out: ["FALSE"] }),
+
+  H.h2("Typen passen aufeinander auf"),
+  H.p("Weil jede Variable ihren Typ hat, kann GameBasic Unsinn früh erkennen. Eine ganze Zahl in eine FLOAT-Schublade zu legen ist in Ordnung (aus 3 wird 3.0). Aber Text in eine Zahl-Schublade zu zwingen geht nicht – und das ist gut so, denn es wäre fast immer ein Versehen."),
+  H.pmix(["Ein wichtiger Sonderfall: Ein ", ["BOOLEAN", true], " ist KEINE Zahl. ", ["TRUE", true], " ist nicht dasselbe wie ", ["1", true], ". Wer das verwechselt, bekommt eine klare Fehlermeldung statt eines stillen Fehlers."]),
+
+  H.h2("Konstanten: CONST"),
+  H.p("Manche Werte ändern sich nie – die Breite des Fensters, die Erdbeschleunigung, der Name deines Spiels. Solche legst du als Konstante mit CONST an. Eine Konstante bekommt ihren Wert einmal und darf danach nicht mehr verändert werden; versuchst du es doch, meckert GameBasic. Das schützt vor versehentlichem Überschreiben und macht den Code lesbarer."),
+  H.code([
+    'CONST MAX_LEBEN AS INTEGER = 3',
+    'CONST TITEL AS STRING = "Mein Spiel"',
+    'PRINT TITEL',
+    'PRINT "Leben:", MAX_LEBEN',
+  ]),
+  H.code(["Mein Spiel", "Leben: 3"], { out: true }),
+  H.tip("Konstanten schreibt man oft in GROSSBUCHSTABEN", "Das ist nur Konvention, kein Zwang – aber es macht im Code sofort sichtbar, dass sich dieser Wert nicht ändert."),
+
+  H.h2("Gute Namen"),
+  H.p("Variablennamen beginnen mit einem Buchstaben und dürfen Buchstaben, Ziffern und Unterstriche enthalten. Groß-/Kleinschreibung wird unterschieden? In GameBasic sind Namen unkompliziert – wähle sie vor allem sprechend. „punkte“ sagt mehr als „p“, und „spieler_x“ mehr als „sx“. Dein zukünftiges Ich wird es dir danken."),
+  H.warn("„step“ ist ein reserviertes Wort (es gehört zur FOR-Schleife, siehe Kapitel Schleifen). Nenne deine Zählvariable also lieber i, schritt oder tick – nicht step."),
+];
