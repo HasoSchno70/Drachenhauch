@@ -36,7 +36,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 11 Operatoren & Ausdrücke  (content/11_operatoren.js)
 - [x] 12 Ein-/Ausgabe: PRINT, INPUT, f-Strings  (content/12_ein_ausgabe.js)
 - [x] 13 Verzweigungen: IF/ELSEIF/ELSE, SELECT CASE, IIF  (content/13_verzweigungen.js)
-- [ ] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE
+- [x] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE  (content/14_schleifen.js)
 - [ ] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)
 - [ ] 16 Strings im Detail
 - [ ] 17 Arrays
@@ -86,6 +86,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 ## Status
 Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.
 Session 2 (2026-06-13): Teil II Kap 12 (Ein-/Ausgabe) + Kap 13 (Verzweigungen:
-IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF).
-28 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert.
-**Nächstes:** Kap 14 (Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE).
+IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF) +
+Kap 14 (Schleifen: FOR/STEP, WHILE/WEND, REPEAT/UNTIL, FOR EACH, BREAK/CONTINUE,
+Verschachtelung). 33 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert.
+**Nächstes:** Kap 15 (Funktionen & SUBs: Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion).
