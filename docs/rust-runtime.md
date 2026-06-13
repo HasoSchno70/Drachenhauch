@@ -79,6 +79,31 @@ feature-gated (Standard-`.exe` bleibt schlank).
   steuert ein „Channel" die Wiedergabe genau seines Sounds (Volume per Handle
   getrackt, da raylib keinen Getter hat). Fade/loops=N werden vereinfacht
   (raylib kann das nicht direkt).
+
+### Alternatives Audio-Backend: Kira (Feature `kira_audio`, experimentell)
+
+raylib-Audio hat eine strukturelle Schwaeche: **Musik-Streaming wird per
+`UpdateMusicStream` aus dem Game-Loop (FLIP) nachgefuellt** — bei schweren
+Frames kann der Puffer unterlaufen → Knacken. SFX (separater miniaudio-Thread)
+sind unbetroffen.
+
+Deshalb gibt es ein zweites Audio-Backend auf **[Kira](https://crates.io/crates/kira)**
+(cpal) in [`src/audio_kira.rs`](../rust/gb_runtime/src/audio_kira.rs): eigener
+Audio-Thread, vollstaendig vom Game-Loop entkoppelt (kein Stottern), native
+Tweens fuer Fades/Pan, FFT-Tap als Effect am Main-Track, MOD/XM via reinem
+Rust-Player (`xmrs`/`xmrsplayer` — kein C). Es bietet **exakt dieselbe
+`Audio`-API** wie das raylib-Backend; [`main.rs`](../rust/gb_runtime/src/main.rs)
+aliasiert `crate::audio` per `cfg` auf das jeweilige Modul, sodass `vm.rs`
+nichts wissen muss.
+
+- Bauen/Anhoeren: `python rust/build_runtime.py --kira` (zieht `graphics` mit;
+  Fenster/Input bleiben raylib). Default ist weiterhin raylib-Audio.
+- Stand: SFX/Sampler/Synth/FFT/Lo-Fi + Musik (Stream-Formate + MOD/XM)
+  funktionieren. **Bewusste Grenze:** Tracker-Module werden beim Laden einmal
+  zu PCM gerendert (ein Loop-Durchlauf im RAM, via `loop_region` nahtlos
+  geloopt) statt in Echtzeit gestreamt — robust und schenkt die komplette
+  Handle-Steuerung (Volume/Pitch/Pause/Position). Der Default-Umschalter (raylib
+  ablösen) folgt, sobald das Backend am echten Gerät bestaetigt ist.
 - **Phase 3 — ERLEDIGT (Daten/Netz, feature-gated):**
   - `db` (DB_*, 17, Feature `db` → `rusqlite` bundled): SQLite, `?`-Binding,
     DB_QUERY laedt Zeilen eager (vermeidet self-referenzielle Cursor). DB_CONN/
