@@ -69,7 +69,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 44 Farben (RGB/HSV/COLOR_LERP)  (content/44_farben.js, images/44_farben.png)
 - [x] 45 Eingabe (Tastatur/Maus/Gamepad)  (content/45_eingabe.js, images/45_eingabe.png)
 - [x] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)  (content/46_sound.js, images/46_sound.png)
-- [ ] 47 Layer, Sprite-Atlas, Bulk-Draws
+- [x] 47 Layer, Sprite-Atlas, Bulk-Draws  (content/47_layer_atlas.js, images/47_layer.png)
 - [ ] 48 3D-Grafik (g3d)
 
 ### Teil V — Die Module
@@ -145,4 +145,7 @@ input-Modul BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS, Gamepad-Tipp) — Steuerungs
 + Kap 46 (Sound: LOADSOUND/PLAYSOUND/STOPSOUND, PLAYMUSIC, audio-Modul AUDIO_TONE/NOISE/SFX,
 UNLOADSOUND, AUDIO_VOLUME/PAN/BUS_VOLUME erwähnt) — als GRAFISCHES Mini-Klavier-Demo gebaut
 (Tasten 1-8 = C-Dur), Screenshot zeigt die Klaviatur. 154 Seiten.
-**Nächstes:** Kap 47 (Layer, Sprite-Atlas, Bulk-Draws) mit Screenshots.
++ Kap 47 (Layer LAYER_DEFINE/LAYER/END/CLEAR, Atlas ATLAS_LOAD/DRAW/DRAW_FLIPPED/BATCH_DRAW/
+FLUSH, Bulk PLOTS/CIRCLES/BOXES/LINES) — Layer+Bulk-Screenshot (Sternenfeld+Planeten+HUD).
+GOTCHA: ATLAS_DRAW_FLIPPED-Flips brauchen 1/0 (NICHT TRUE/FALSE → „erwartet Zahl"). 158 Seiten.
+**Nächstes:** Kap 48 (3D-Grafik g3d) mit Screenshots.

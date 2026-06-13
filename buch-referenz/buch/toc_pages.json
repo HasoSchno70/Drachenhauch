@@ -41,5 +41,6 @@
   "Bilder": 140,
   "Farben": 144,
   "Eingabe": 147,
-  "Sound": 151
+  "Sound": 151,
+  "Layer, Sprite-Atlas & Bulk-Draws": 155
 }

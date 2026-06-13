@@ -1,0 +1,38 @@
+' Screenshot-Demo Kapitel 47: Layer + Bulk-Draws
+SCREEN(480, 320, "Layer + Bulk")
+LAYER_DEFINE("hintergrund", 0)
+LAYER_DEFINE("planeten", 10)
+LAYER_DEFINE("hud", 100)
+
+' Sternenfeld einmal zufaellig erzeugen
+DIM sx[160] AS INTEGER
+DIM sy[160] AS INTEGER
+RANDOMIZE(7)
+DIM i AS INTEGER
+FOR i = 0 TO 159
+    sx[i] = RANDINT(0, 479)
+    sy[i] = RANDINT(0, 300)
+NEXT
+' Planeten (Bulk-Kreise)
+DIM px[3] AS INTEGER
+DIM py[3] AS INTEGER
+DIM pr[3] AS INTEGER
+px[0]=110 : py[0]=120 : pr[0]=34
+px[1]=300 : py[1]=90  : pr[1]=22
+px[2]=380 : py[2]=200 : pr[2]=48
+
+WHILE NOT QUITREQUESTED()
+    LAYER("hintergrund")
+    GRADIENTV(0, 0, 479, 319, RGB(8, 8, 24), RGB(30, 14, 40))
+    PLOTS(sx, sy, RGB(220, 225, 255))        ' alle Sterne in EINEM Aufruf
+
+    LAYER("planeten")
+    CIRCLES(px, py, pr, RGB(90, 140, 220))   ' alle Planeten in EINEM Aufruf
+
+    LAYER("hud")
+    BOX(0, 0, 479, 24, RGB(0, 0, 0))
+    TEXT(10, 6, "Layer: Hintergrund < Planeten < HUD", RGB(255, 230, 120))
+    TEXT(10, 296, "Bulk: PLOTS + CIRCLES (je 1 Aufruf)", RGB(200, 210, 230))
+
+    FLIP()
+WEND
