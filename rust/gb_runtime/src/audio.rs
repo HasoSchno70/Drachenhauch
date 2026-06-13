@@ -12,7 +12,10 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
 use std::time::Duration;
+
+use kira::sound::{Sound, SoundData};
 
 use kira::{
     AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Mix, Panning, Tween,
@@ -61,48 +64,21 @@ macro_rules! attach_bus_fx {
 use xmrs::prelude::Module;
 use xmrsplayer::prelude::XmrsPlayer;
 
-/// Woher die aktuelle Musik kommt: Stream-Datei (ogg/mp3/wav/flac) oder ein
-/// zu PCM gerendertes Tracker-Modul (.mod/.xm/.s3m/.it). Beim (Neu-)Starten
-/// baut start_music daraus die passende Kira-Sound-Quelle.
+/// Woher die aktuelle Musik kommt: Stream-Datei (ogg/mp3/wav/flac) oder die
+/// rohen Bytes eines Tracker-Moduls (.mod/.xm/.s3m/.it). Module werden in
+/// ECHTZEIT gestreamt (eigener Kira-Sound, kein Vorab-Render): instant geladen,
+/// exaktes Endlos-Loopen, wenig RAM. Bytes werden pro Play frisch geparst (ms).
 enum MusicSource {
-    Stream(String),          // Pfad -- bei jedem Play frisch geoeffnet (streamt von Platte)
-    Module(StaticSoundData), // ein gerenderter Loop-Durchlauf (im RAM, loopt via loop_region)
+    Stream(String),
+    Module(Vec<u8>),
 }
 
-/// Laufende Musik-Instanz. Beide Handle-Typen teilen dieselbe Methoden-API
-/// (state/position/pause/resume/stop/set_volume/set_playback_rate) -> das
-/// `on_music!`-Makro ruft sie einheitlich.
+/// Laufende Musik-Instanz. Stream/Static teilen die Kira-Handle-API; Module
+/// laufen ueber einen Custom-Sound, gesteuert per Atomics in `ModShared`.
 enum MusicHandle {
     Stream(StreamingSoundHandle<FromFileError>),
     Static(StaticSoundHandle),
-}
-
-/// Rendert ein Tracker-Modul zu einem Loop-Durchlauf (mono->stereo PCM bei
-/// 44100; Kira resampelt beim Abspielen aufs Geraet). Modul + Player sind
-/// lokal -> kein Lifetime-Leak. 5-Minuten-Sicherheitskappe.
-fn render_module(bytes: &[u8], fn_: &str) -> Result<StaticSoundData, String> {
-    let sr: u32 = 44100;
-    let module = Module::load(bytes).map_err(|e| format!("{}: {:?}", fn_, e))?;
-    let mut player = XmrsPlayer::new(&module, sr, 0);
-    player.set_max_loop_count(1);          // genau ein Durchlauf -> danach loopt Kira
-    let cap = (sr as usize) * 60 * 5;
-    let mut frames: Vec<Frame> = Vec::new();
-    {
-        let mut it = player.by_ref();
-        while frames.len() < cap {
-            match (it.next(), it.next()) {
-                (Some(l), Some(r)) => frames.push(Frame {
-                    left: l as f32 / 32768.0, right: r as f32 / 32768.0,
-                }),
-                _ => break,
-            }
-        }
-    }
-    if frames.is_empty() { return Err(format!("{}: Modul ergab kein Audio", fn_)); }
-    Ok(StaticSoundData {
-        sample_rate: sr, frames: frames.into(),
-        settings: StaticSoundSettings::new(), slice: None,
-    })
+    Module(Arc<ModShared>),
 }
 
 fn is_module_path(p: &str) -> bool {
@@ -110,24 +86,224 @@ fn is_module_path(p: &str) -> bool {
     l.ends_with(".mod") || l.ends_with(".xm") || l.ends_with(".s3m") || l.ends_with(".it")
 }
 
-// Einheitliche Steuerung beider MusicHandle-Varianten (identische Methoden-API).
+// ===================================================================
+// Echtzeit-Modul-Streaming: Custom-Kira-Sound, der den xmrs-Player auf dem
+// Audio-Thread pollt. Steuerung (Volume/Fade/Pitch/Pause/Stop/Position) ueber
+// `ModShared`-Atomics. Das Modul wird beim Laden geleakt (-> 'static Borrow
+// fuer den Player) und vom Sound im Drop wieder freigegeben.
+// ===================================================================
+
+/// Vom Handle (Main-Thread) beschrieben, vom Sound (Audio-Thread) gelesen.
+struct ModShared {
+    vol_target: AtomicU32,        // f32-Bits, linear 0..1
+    fade_ms: AtomicU32,           // Ramp-Dauer beim naechsten Volume-Wechsel
+    pitch: AtomicU32,             // f32-Bits, Abspielrate
+    paused: AtomicBool,
+    stop_now: AtomicBool,         // sofort beenden
+    finish_at_zero: AtomicBool,   // nach Fade-out auf 0 beenden
+    pos_frames: AtomicU64,        // Sound schreibt -> Position
+    finished: AtomicBool,
+    sr: AtomicU32,                // Geraete-Sample-Rate (Sound schreibt)
+}
+impl ModShared {
+    fn new(vol: f32, pitch: f32) -> Arc<Self> {
+        Arc::new(ModShared {
+            vol_target: AtomicU32::new(vol.to_bits()),
+            fade_ms: AtomicU32::new(5),
+            pitch: AtomicU32::new(pitch.to_bits()),
+            paused: AtomicBool::new(false),
+            stop_now: AtomicBool::new(false),
+            finish_at_zero: AtomicBool::new(false),
+            pos_frames: AtomicU64::new(0),
+            finished: AtomicBool::new(false),
+            sr: AtomicU32::new(0),
+        })
+    }
+}
+
+/// SoundData -> via `into_sound` in einen Sound + Handle (Arc<ModShared>).
+struct ModuleSoundData {
+    module_ptr: *mut Module,   // geleakt; ModuleSound gibt es im Drop frei
+    loop_max: usize,           // 0 = endlos
+    shared: Arc<ModShared>,
+}
+unsafe impl Send for ModuleSoundData {}
+
+impl SoundData for ModuleSoundData {
+    type Error = ();
+    type Handle = Arc<ModShared>;
+    fn into_sound(self) -> Result<(Box<dyn Sound>, Self::Handle), ()> {
+        let handle = self.shared.clone();
+        Ok((Box::new(ModuleSound {
+            player: None, module_ptr: self.module_ptr, loop_max: self.loop_max,
+            shared: self.shared, created: false,
+            prev: (0.0, 0.0), next: (0.0, 0.0), frac: 0.0, primed: false, ended: false,
+            vol_cur: 0.0, last_target: f32::NAN, ramp_total: 1, ramp_done: 1, ramp_start: 0.0,
+            pos: 0,
+        }), handle))
+    }
+}
+
+struct ModuleSound {
+    player: Option<XmrsPlayer<'static>>,
+    module_ptr: *mut Module,
+    loop_max: usize,
+    shared: Arc<ModShared>,
+    created: bool,
+    // Pitch-Resampler (fraktionale Leseposition + lineare Interpolation)
+    prev: (f32, f32),
+    next: (f32, f32),
+    frac: f64,
+    primed: bool,
+    ended: bool,
+    // Volume-Ramp (Fades, klickfrei)
+    vol_cur: f32,
+    last_target: f32,
+    ramp_total: u64,
+    ramp_done: u64,
+    ramp_start: f32,
+    pos: u64,
+}
+// module_ptr ist exklusiv im Besitz dieses Sounds; xmrs-Daten sind Send-fähig.
+unsafe impl Send for ModuleSound {}
+
+impl ModuleSound {
+    fn pull(&mut self) -> Option<(f32, f32)> {
+        let p = self.player.as_mut()?;
+        let l = p.next()?;
+        let r = p.next()?;
+        Some((l as f32 / 32768.0, r as f32 / 32768.0))
+    }
+}
+
+impl Sound for ModuleSound {
+    fn process(&mut self, out: &mut [Frame], dt: f64, _info: &Info) {
+        if !self.created {
+            let sr = (1.0 / dt).round().max(1.0) as u32;
+            self.shared.sr.store(sr, Relaxed);
+            let m: &'static Module = unsafe { &*self.module_ptr };
+            let mut p = XmrsPlayer::new(m, sr, 0);
+            p.set_max_loop_count(self.loop_max);
+            self.player = Some(p);
+            self.created = true;
+        }
+        if self.shared.stop_now.load(Relaxed) { self.ended = true; }
+        let sr = self.shared.sr.load(Relaxed).max(1) as f64;
+        let paused = self.shared.paused.load(Relaxed);
+        let pitch = f32::from_bits(self.shared.pitch.load(Relaxed)).max(0.0) as f64;
+        // Volume-Ziel/Ramp aktualisieren, wenn sich das Ziel geaendert hat.
+        let tgt = f32::from_bits(self.shared.vol_target.load(Relaxed));
+        if tgt.to_bits() != self.last_target.to_bits() {
+            self.ramp_start = self.vol_cur;
+            let fade_ms = self.shared.fade_ms.load(Relaxed) as f64;
+            self.ramp_total = ((fade_ms * sr / 1000.0) as u64).max(1);
+            self.ramp_done = 0;
+            self.last_target = tgt;
+        }
+        let finish_at_zero = self.shared.finish_at_zero.load(Relaxed);
+
+        for frame in out.iter_mut() {
+            if self.ended || paused {
+                *frame = Frame::ZERO;
+                continue;
+            }
+            if !self.primed {
+                self.prev = self.pull().unwrap_or((0.0, 0.0));
+                self.next = self.pull().unwrap_or((0.0, 0.0));
+                self.primed = true;
+            }
+            let f = self.frac as f32;
+            let s = (self.prev.0 + (self.next.0 - self.prev.0) * f,
+                     self.prev.1 + (self.next.1 - self.prev.1) * f);
+            self.frac += pitch.max(1e-6);
+            while self.frac >= 1.0 {
+                self.prev = self.next;
+                match self.pull() {
+                    Some(v) => self.next = v,
+                    None => { self.ended = true; break; }
+                }
+                self.frac -= 1.0;
+            }
+            // Volume-Ramp
+            if self.ramp_done < self.ramp_total {
+                let t = self.ramp_done as f32 / self.ramp_total as f32;
+                self.vol_cur = self.ramp_start + (tgt - self.ramp_start) * t;
+                self.ramp_done += 1;
+            } else {
+                self.vol_cur = tgt;
+                if finish_at_zero && tgt <= 0.0001 { self.ended = true; }
+            }
+            *frame = Frame { left: s.0 * self.vol_cur, right: s.1 * self.vol_cur };
+            self.pos += 1;
+        }
+        self.shared.pos_frames.store(self.pos, Relaxed);
+        if self.ended { self.shared.finished.store(true, Relaxed); }
+    }
+    fn finished(&self) -> bool { self.ended }
+}
+
+impl Drop for ModuleSound {
+    fn drop(&mut self) {
+        // Erst den Player fallen lassen (gibt den Borrow aufs Modul frei),
+        // dann das geleakte Modul freigeben.
+        self.player = None;
+        if !self.module_ptr.is_null() {
+            unsafe { drop(Box::from_raw(self.module_ptr)); }
+            self.module_ptr = std::ptr::null_mut();
+        }
+    }
+}
+
+// Einheitliche Steuerung der MusicHandle-Varianten. Module-Arme schreiben die
+// Atomics (Volume in Decibels -> linear via as_amplitude).
 fn mh_stop(h: &mut MusicHandle, t: Tween) {
-    match h { MusicHandle::Stream(x) => x.stop(t), MusicHandle::Static(x) => x.stop(t) }
+    match h {
+        MusicHandle::Stream(x) => x.stop(t),
+        MusicHandle::Static(x) => x.stop(t),
+        MusicHandle::Module(a) => a.stop_now.store(true, Relaxed),
+    }
 }
 fn mh_pause(h: &mut MusicHandle, t: Tween) {
-    match h { MusicHandle::Stream(x) => x.pause(t), MusicHandle::Static(x) => x.pause(t) }
+    match h {
+        MusicHandle::Stream(x) => x.pause(t),
+        MusicHandle::Static(x) => x.pause(t),
+        MusicHandle::Module(a) => a.paused.store(true, Relaxed),
+    }
 }
 fn mh_resume(h: &mut MusicHandle, t: Tween) {
-    match h { MusicHandle::Stream(x) => x.resume(t), MusicHandle::Static(x) => x.resume(t) }
+    match h {
+        MusicHandle::Stream(x) => x.resume(t),
+        MusicHandle::Static(x) => x.resume(t),
+        MusicHandle::Module(a) => a.paused.store(false, Relaxed),
+    }
 }
 fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
-    match h { MusicHandle::Stream(x) => x.set_volume(d, t), MusicHandle::Static(x) => x.set_volume(d, t) }
+    match h {
+        MusicHandle::Stream(x) => x.set_volume(d, t),
+        MusicHandle::Static(x) => x.set_volume(d, t),
+        MusicHandle::Module(a) => {
+            a.fade_ms.store(5, Relaxed);
+            a.vol_target.store(d.as_amplitude().to_bits(), Relaxed);
+        }
+    }
 }
 fn mh_set_rate(h: &mut MusicHandle, r: f64, t: Tween) {
-    match h { MusicHandle::Stream(x) => x.set_playback_rate(r, t), MusicHandle::Static(x) => x.set_playback_rate(r, t) }
+    match h {
+        MusicHandle::Stream(x) => x.set_playback_rate(r, t),
+        MusicHandle::Static(x) => x.set_playback_rate(r, t),
+        MusicHandle::Module(a) => a.pitch.store((r as f32).to_bits(), Relaxed),
+    }
 }
 fn mh_state(h: &MusicHandle) -> PlaybackState {
-    match h { MusicHandle::Stream(x) => x.state(), MusicHandle::Static(x) => x.state() }
+    match h {
+        MusicHandle::Stream(x) => x.state(),
+        MusicHandle::Static(x) => x.state(),
+        MusicHandle::Module(a) => if a.finished.load(Relaxed) {
+            PlaybackState::Stopped
+        } else {
+            PlaybackState::Playing
+        },
+    }
 }
 
 const TWO_PI: f32 = std::f32::consts::TAU;
@@ -796,7 +972,9 @@ impl Audio {
         let source = if is_module_path(&resolved) {
             let bytes = std::fs::read(&resolved)
                 .map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
-            MusicSource::Module(render_module(&bytes, "AUDIO_MUSIC_LOAD")?)
+            // Einmal parsen, um Fehler frueh zu melden; gespielt wird aus den Bytes.
+            Module::load(&bytes).map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            MusicSource::Module(bytes)
         } else {
             // Stream testweise oeffnen (Fehler frueh melden).
             StreamingSoundData::from_file(&resolved)
@@ -827,15 +1005,28 @@ impl Audio {
                 MusicHandle::Stream(self.music_track.play(data)   // Musik-Bus
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
             }
-            Some(MusicSource::Module(rendered)) => {
-                let mut settings = StaticSoundSettings::new().volume(vol_db).playback_rate(pitch);
-                if endless { settings = settings.loop_region(0.0..); }
-                let data = rendered.clone().with_settings(settings);
-                MusicHandle::Static(self.music_track.play(data)   // Musik-Bus
-                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            Some(MusicSource::Module(bytes)) => {
+                // Modul frisch parsen + leaken -> 'static-Borrow fuer den
+                // Player; der ModuleSound gibt das Modul im Drop frei.
+                let module = Module::load(bytes)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
+                let module_ptr = Box::into_raw(Box::new(module));
+                let loop_max = if endless { 0 } else { (loops as usize) + 1 };
+                // Fade-in: bei 0 starten und im Sound hochrampen.
+                let shared = ModShared::new(if fade_in_ms > 0 { 0.0 } else { vol }, self.music_pitch);
+                if fade_in_ms > 0 {
+                    shared.fade_ms.store(fade_in_ms as u32, Relaxed);
+                    shared.vol_target.store(vol.to_bits(), Relaxed);
+                }
+                let data = ModuleSoundData { module_ptr, loop_max, shared };
+                MusicHandle::Module(self.music_track.play(data)   // Musik-Bus
+                    .map_err(|_| "AUDIO_MUSIC_PLAY: Modul konnte nicht gestartet werden".to_string())?)
             }
         };
-        if fade_in_ms > 0 { mh_set_volume(&mut handle, db(vol as f64), tween_ms(fade_in_ms)); }
+        // Fade-in fuer Stream/Static (Module macht es selbst, s.o.).
+        if fade_in_ms > 0 && !matches!(handle, MusicHandle::Module(_)) {
+            mh_set_volume(&mut handle, db(vol as f64), tween_ms(fade_in_ms));
+        }
         self.music_handle = Some(handle);
         self.music_loops = if endless { -1 } else { loops };
         self.music_paused = false;
@@ -856,8 +1047,15 @@ impl Audio {
         let _ = self.start_music(v, loops, fade_in_ms);
     }
     pub fn music_stop(&mut self, fade_out_ms: i64) {
-        if let Some(h) = self.music_handle.as_mut() {
-            mh_stop(h, if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
+        match self.music_handle.as_mut() {
+            Some(MusicHandle::Module(a)) if fade_out_ms > 0 => {
+                // Ausfaden auf 0 und am Ende beenden (Sound raeumt sich selbst).
+                a.fade_ms.store(fade_out_ms as u32, Relaxed);
+                a.finish_at_zero.store(true, Relaxed);
+                a.vol_target.store(0.0f32.to_bits(), Relaxed);
+            }
+            Some(h) => mh_stop(h, if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() }),
+            None => {}
         }
         if fade_out_ms <= 0 { self.music_handle = None; }
     }
@@ -883,16 +1081,15 @@ impl Audio {
         match self.music_handle.as_ref() {
             Some(MusicHandle::Stream(h)) => h.position(),
             Some(MusicHandle::Static(h)) => h.position(),
+            Some(MusicHandle::Module(a)) => {
+                let sr = a.sr.load(Relaxed).max(1) as f64;
+                a.pos_frames.load(Relaxed) as f64 / sr
+            }
             None => 0.0,
         }
     }
     pub fn music_busy(&self) -> bool {
-        let st = match self.music_handle.as_ref() {
-            Some(MusicHandle::Stream(h)) => Some(h.state()),
-            Some(MusicHandle::Static(h)) => Some(h.state()),
-            None => None,
-        };
-        matches!(st, Some(PlaybackState::Playing))
+        matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Playing))
     }
     pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
 
@@ -922,7 +1119,10 @@ impl Audio {
         let music_ended = matches!(self.music_handle.as_ref().map(mh_state), Some(PlaybackState::Stopped))
             && !self.music_paused;
         if music_ended {
-            if self.music_loops > 0 {
+            // Module zaehlen ihre Loops selbst (loop_max im Player) -> nicht
+            // erneut neu starten; nur Stream/Static brauchen die Restart-Zaehlung.
+            let is_module = matches!(self.music_handle.as_ref(), Some(MusicHandle::Module(_)));
+            if self.music_loops > 0 && !is_module {
                 self.music_loops -= 1;
                 let v = self.music_vol;
                 let _ = self.start_music(v, 0, 0);

@@ -402,4 +402,4 @@ Das `audio`-Modul laeuft nativ ueber **Kira** (cpal) — ein eigener Audio-Threa
 - Fade-in/out, `AUDIO_STOP` mit Fade und `AUDIO_PAN_SLIDE` sind **native Kira-Tweens** (laufen auf dem Audio-Thread); `loops` via `loop_region` (endlos) bzw. Restart-Zaehlung (endlich). `AUDIO_FFT` zapft den Mixer-Haupttrack ueber einen Effect an.
 - Volume wird intern in Dezibel gefuehrt (Kira), die Builtins nehmen weiterhin linear 0..1.
 - Ton-Generierung (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX`) und der Sampler bauen die Wellenform als Float-Buffer direkt als Kira-`StaticSoundData`.
-- **Tracker-Module** (`.mod`/`.xm`) als Musik werden beim Laden via reinem Rust-Player (`xmrs`) zu einem Loop-Durchlauf gerendert und im RAM nahtlos geloopt; Stream-Formate (ogg/mp3/wav/flac) streamen von Platte.
+- **Tracker-Module** (`.mod`/`.xm`) als Musik werden in **Echtzeit gestreamt** (eigener Kira-Custom-Sound, der den reinen Rust-Player `xmrs` auf dem Audio-Thread pollt): sofort geladen (kein Vorab-Render), exaktes Endlos-Loopen, wenig RAM, mit Pitch-Resampler + klickfreien Volume-Fades. Stream-Formate (ogg/mp3/wav/flac) streamen von Platte.

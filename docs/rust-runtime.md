@@ -95,11 +95,16 @@ fuer Fades/Pan, FFT-Tap als Effect am Main-Track (ersetzt raylibs
 fuer Fenster/GL/Input). Volume ist bei Kira in Dezibel (`db()`-Helfer), Pan
 −1..1; `vm.rs` ruft die Audio-API unveraendert.
 
-**Tracker-Module** werden beim Laden einmal zu PCM gerendert (ein
-Loop-Durchlauf im RAM, via `loop_region` nahtlos geloopt) statt in Echtzeit
-gestreamt — robust und schenkt die komplette Handle-Steuerung (Volume/Pitch/
-Pause/Position). Stream-Formate (ogg/mp3/wav/flac) streamen via Kira von
-Platte.
+**Tracker-Module** werden in **Echtzeit gestreamt**: ein Kira-Custom-`Sound`
+(`ModuleSound`) pollt den reinen Rust-Player `xmrs` pro Audio-Block auf dem
+Audio-Thread. Sofort geladen (kein Vorab-Render), exaktes Endlos-Loopen (der
+Player zaehlt die Loops via `set_max_loop_count`), wenig RAM. Steuerung
+(Volume/Fade/Pitch/Pause/Stop/Position) ueber `Arc<ModShared>`-Atomics; ein
+Pitch-Resampler (fraktionale Leseposition + lineare Interpolation) und eine
+Volume-Ramp (klickfreie Fades) sitzen im Sound. Das Modul wird beim Start
+geleakt (`Box::into_raw` → `'static`-Borrow fuer den Player) und vom Sound im
+`Drop` wieder freigegeben (Player zuerst fallen lassen, dann `Box::from_raw`).
+Stream-Formate (ogg/mp3/wav/flac) streamen via Kira von Platte.
 
 Naheliegende Ausbauten dank Kira (Mixer-Tracks/Effekte): **Busse**
 (SFX-/Musik-Master getrennt) und **Echtzeit-Effekte** (Filter/Reverb/Delay als
