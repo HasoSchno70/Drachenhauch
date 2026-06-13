@@ -453,6 +453,104 @@ def global_qss() -> str:
                 stop:0 {c['accent']}, stop:1 {c['success']});
             border-radius: 4px;
         }}
+
+        /* --- SpinBox: getoente Flaeche, Akzent-Fokus, sichtbare Pfeile --- */
+        QSpinBox, QDoubleSpinBox {{
+            background-color: {c['bg_alt']};
+            color: {c['fg']};
+            border: 1px solid {c['border']};
+            border-radius: 5px;
+            padding: 4px 6px;
+            selection-background-color: {c['sel']};
+        }}
+        QSpinBox:hover, QDoubleSpinBox:hover {{
+            border: 1px solid {c['accent']};
+        }}
+        QSpinBox:focus, QDoubleSpinBox:focus {{
+            border: 1px solid {c['accent']};
+        }}
+        QSpinBox:disabled, QDoubleSpinBox:disabled {{
+            color: {c['fg_muted']};
+            border-color: {c['border_soft']};
+        }}
+        QSpinBox::up-button, QDoubleSpinBox::up-button {{
+            subcontrol-origin: border; subcontrol-position: top right;
+            width: 16px; border-left: 1px solid {c['border']};
+            border-top-right-radius: 5px; background-color: {c['bg_panel']};
+        }}
+        QSpinBox::down-button, QDoubleSpinBox::down-button {{
+            subcontrol-origin: border; subcontrol-position: bottom right;
+            width: 16px; border-left: 1px solid {c['border']};
+            border-bottom-right-radius: 5px; background-color: {c['bg_panel']};
+        }}
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+            background-color: {c['accent_soft']};
+        }}
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+            width: 0; height: 0;
+            border-left: 4px solid transparent; border-right: 4px solid transparent;
+            border-bottom: 5px solid {c['accent']};
+        }}
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+            width: 0; height: 0;
+            border-left: 4px solid transparent; border-right: 4px solid transparent;
+            border-top: 5px solid {c['accent']};
+        }}
+
+        /* --- Slider: dicker Groove, gefuellte Spur, runder Akzent-Griff --- */
+        QSlider::groove:horizontal {{
+            height: 6px; border-radius: 3px;
+            background-color: {c['bg_alt']};
+        }}
+        QSlider::sub-page:horizontal {{
+            height: 6px; border-radius: 3px;
+            background-color: {c['accent']};
+        }}
+        QSlider::add-page:horizontal {{
+            height: 6px; border-radius: 3px;
+            background-color: {c['bg_alt']};
+        }}
+        QSlider::handle:horizontal {{
+            background-color: {c['accent']};
+            border: 2px solid {c['bg']};
+            width: 14px; height: 14px; margin: -6px 0; border-radius: 9px;
+        }}
+        QSlider::handle:horizontal:hover {{
+            background-color: {c['accent_hover']};
+        }}
+        QSlider::groove:vertical {{
+            width: 6px; border-radius: 3px; background-color: {c['bg_alt']};
+        }}
+        QSlider::add-page:vertical {{
+            width: 6px; border-radius: 3px; background-color: {c['accent']};
+        }}
+        QSlider::sub-page:vertical {{
+            width: 6px; border-radius: 3px; background-color: {c['bg_alt']};
+        }}
+        QSlider::handle:vertical {{
+            background-color: {c['accent']};
+            border: 2px solid {c['bg']};
+            width: 14px; height: 14px; margin: 0 -6px; border-radius: 9px;
+        }}
+
+        /* --- GroupBox: Karte mit eingelassenem Titel --- */
+        QGroupBox {{
+            background-color: {c['bg_panel']};
+            border: 1px solid {c['border']};
+            border-radius: 8px;
+            margin-top: 16px;
+            padding: 10px 10px 8px 10px;
+            font-weight: 600;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px; padding: 1px 8px;
+            background-color: {c['accent_soft']};
+            color: {c['accent']};
+            border-radius: 5px;
+        }}
     """
 
 
