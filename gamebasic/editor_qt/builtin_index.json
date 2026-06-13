@@ -503,7 +503,7 @@
   {
    "name": "AUDIO_DELAY",
    "kind": "core",
-   "signature": "AUDIO_DELAY(bus$, mix[, feedback])",
+   "signature": "AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])",
    "module": "audio"
   },
   {

@@ -3820,7 +3820,8 @@ impl<'p> Vm<'p> {
                 }
                 let mix = need_f(a, 1, "AUDIO_DELAY")?;
                 let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_DELAY")? } else { 0.5 };
-                self.audio_mut()?.set_delay(&bus, mix, fb)?;
+                let time_ms = if a.len() >= 4 { gi(a, 3, "AUDIO_DELAY")? } else { 0 };
+                self.audio_mut()?.set_delay(&bus, mix, fb, time_ms)?;
                 Value::Nil
             }
             "audio_distortion" => {

@@ -22,7 +22,6 @@ use kira::{
     effect::{Effect, EffectBuilder},
     effect::filter::{FilterBuilder, FilterHandle},
     effect::reverb::{ReverbBuilder, ReverbHandle},
-    effect::delay::{DelayBuilder, DelayHandle},
     effect::distortion::{DistortionBuilder, DistortionHandle},
     effect::compressor::{CompressorBuilder, CompressorHandle},
     effect::eq_filter::{EqFilterBuilder, EqFilterHandle, EqFilterKind},
@@ -39,10 +38,72 @@ use kira::{
 struct BusFx {
     filter: FilterHandle,
     reverb: ReverbHandle,
-    delay: DelayHandle,
+    delay: Arc<DelayShared>,   // eigener Delay (Zeit zur Laufzeit aenderbar)
     distortion: DistortionHandle,
     compressor: CompressorHandle,
     eq: EqFilterHandle,
+}
+
+/// Maximale Delay-Zeit des eigenen Delay-Effekts (Ringpuffer-Groesse).
+const DELAY_MAX_S: f32 = 4.0;
+
+/// Vom Main-Thread beschrieben, vom Delay-Effekt (Audio-Thread) gelesen.
+struct DelayShared {
+    delay_ms: AtomicU32,
+    feedback: AtomicU32,   // f32-Bits, 0..0.95
+    mix: AtomicU32,        // f32-Bits, 0..1 (0 = aus)
+}
+
+/// Eigener Stereo-Delay (Ringpuffer) -- im Gegensatz zu Kiras DelayHandle ist
+/// die Delay-Zeit zur Laufzeit aenderbar (delay_ms-Atomic). Neutral = mix 0.
+struct DelayBuilderRT;
+struct DelayEffectRT {
+    shared: Arc<DelayShared>,
+    bl: Vec<f32>,
+    br: Vec<f32>,
+    pos: usize,
+    sr: u32,
+}
+impl EffectBuilder for DelayBuilderRT {
+    type Handle = Arc<DelayShared>;
+    fn build(self) -> (Box<dyn Effect>, Arc<DelayShared>) {
+        let shared = Arc::new(DelayShared {
+            delay_ms: AtomicU32::new(300),
+            feedback: AtomicU32::new(0.5f32.to_bits()),
+            mix: AtomicU32::new(0.0f32.to_bits()),
+        });
+        (Box::new(DelayEffectRT { shared: shared.clone(), bl: Vec::new(), br: Vec::new(), pos: 0, sr: 44100 }), shared)
+    }
+}
+impl DelayEffectRT {
+    fn alloc(&mut self, sr: u32) {
+        self.sr = sr.max(1);
+        let n = (DELAY_MAX_S * self.sr as f32) as usize + 1;
+        self.bl = vec![0.0; n];
+        self.br = vec![0.0; n];
+        self.pos = 0;
+    }
+}
+impl Effect for DelayEffectRT {
+    fn init(&mut self, sample_rate: u32, _buf: usize) { self.alloc(sample_rate); }
+    fn on_change_sample_rate(&mut self, sr: u32) { self.alloc(sr); }
+    fn process(&mut self, input: &mut [Frame], _dt: f64, _info: &Info) {
+        let n = self.bl.len();
+        if n == 0 { return; }
+        let mix = f32::from_bits(self.shared.mix.load(Relaxed)).clamp(0.0, 1.0);
+        let fb = f32::from_bits(self.shared.feedback.load(Relaxed)).clamp(0.0, 0.95);
+        let dms = self.shared.delay_ms.load(Relaxed) as u64;
+        let delay = (((dms * self.sr as u64) / 1000) as usize).clamp(1, n - 1);
+        for frame in input.iter_mut() {
+            let read = (self.pos + n - delay) % n;
+            let (wl, wr) = (self.bl[read], self.br[read]);
+            self.bl[self.pos] = frame.left + wl * fb;
+            self.br[self.pos] = frame.right + wr * fb;
+            self.pos = (self.pos + 1) % n;
+            frame.left = frame.left * (1.0 - mix) + wl * mix;
+            frame.right = frame.right * (1.0 - mix) + wr * mix;
+        }
+    }
 }
 
 /// Haengt die Effektkette (neutral) an einen Track-Builder und liefert die
@@ -57,8 +118,7 @@ macro_rules! attach_bus_fx {
         distortion: $b.add_effect(DistortionBuilder::new().drive(Decibels(0.0)).mix(Mix(0.0))),
         compressor: $b.add_effect(CompressorBuilder::new().mix(Mix(0.0))),
         reverb: $b.add_effect(ReverbBuilder::new().mix(Mix(0.0))),
-        delay: $b.add_effect(
-            DelayBuilder::new().delay_time(Duration::from_millis(300)).mix(Mix(0.0))),
+        delay: $b.add_effect(DelayBuilderRT),
     }};
 }
 use xmrs::prelude::Module;
@@ -672,14 +732,16 @@ impl Audio {
         Ok(())
     }
 
-    /// AUDIO_DELAY(bus$, mix[, feedback]) -- Echo (fixe 300 ms) auf einem Bus.
-    /// mix 0..1 (0 = aus), feedback 0..0.95 (Wiederholungs-Abfall, linear ->
-    /// dB pro Echo; >=1 wuerde aufschaukeln, daher gekappt).
-    pub fn set_delay(&mut self, bus: &str, mix: f64, feedback: f64) -> Result<(), String> {
-        let fb = feedback.clamp(0.0, 0.95);
-        let fx = self.bus_fx(bus, "AUDIO_DELAY")?;
-        fx.delay.set_mix(Mix(mix.clamp(0.0, 1.0) as f32), tween_now());
-        fx.delay.set_feedback(db(fb), tween_now());
+    /// AUDIO_DELAY(bus$, mix[, feedback[, time_ms]]) -- Echo auf einem Bus.
+    /// mix 0..1 (0 = aus), feedback 0..0.95 (Abfall pro Wiederholung), time_ms
+    /// = Echo-Zeit (zur Laufzeit aenderbar, 1..4000; <=0 = unveraendert lassen).
+    pub fn set_delay(&mut self, bus: &str, mix: f64, feedback: f64, time_ms: i64) -> Result<(), String> {
+        let d = &self.bus_fx(bus, "AUDIO_DELAY")?.delay;
+        d.mix.store((mix.clamp(0.0, 1.0) as f32).to_bits(), Relaxed);
+        d.feedback.store((feedback.clamp(0.0, 0.95) as f32).to_bits(), Relaxed);
+        if time_ms > 0 {
+            d.delay_ms.store((time_ms.clamp(1, (DELAY_MAX_S * 1000.0) as i64)) as u32, Relaxed);
+        }
         Ok(())
     }
 
