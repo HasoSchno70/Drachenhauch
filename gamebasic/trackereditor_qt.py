@@ -22,8 +22,8 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPlainTextEdit, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget,
+    QPlainTextEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
@@ -360,6 +360,63 @@ class _Piano(QWidget):
         self.note_clicked.emit(m)
 
 
+# Slide-Suffix-Farbe (Amber -- kein Theme-Key, bewusst warm gegen Cyan/Mint).
+_SLIDE_COLOR = "#EF9F27"
+
+
+class _CellDelegate(QStyledItemDelegate):
+    """Zeichnet die Pattern-Zellen im Renoise-Stil: Beat-Zeilen hinterlegt,
+    Wiedergabe-Reihe (playhead) betont, und der Zelltext farbcodiert nach
+    Feld -- Note=Cyan (Drum=Magenta), v=Mint, s=Amber, FX=Magenta."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.playhead = -1
+
+    def paint(self, painter, option, index):  # noqa: N802
+        row = index.row()
+        rect = option.rect
+        # --- Hintergrund: Auswahl > Playhead > Beat-Zeilen ---
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(rect, QColor(COLORS["sel"]))
+        elif row == self.playhead:
+            painter.fillRect(rect, QColor(COLORS["accent_soft"]))
+        elif row % 16 == 0:
+            painter.fillRect(rect, QColor(COLORS["bg_panel"]))
+        elif row % 4 == 0:
+            painter.fillRect(rect, QColor(COLORS["bg_alt"]))
+
+        text = (index.data() or "").strip()
+        painter.save()
+        painter.setFont(option.font)
+        fm = painter.fontMetrics()
+        if not text or text == "···":
+            painter.setPen(QColor(COLORS["line_no"]))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "···")
+            painter.restore()
+            return
+        tokens = text.split()
+        widths = [fm.horizontalAdvance(t + " ") for t in tokens]
+        total = sum(widths) - (fm.horizontalAdvance(" ") if tokens else 0)
+        cx = rect.x() + (rect.width() - total) / 2.0
+        base = rect.y() + rect.height() / 2.0 + fm.ascent() / 2.0 - 1
+        for i, t in enumerate(tokens):
+            painter.setPen(QColor(self._token_color(i, t)))
+            painter.drawText(int(cx), int(base), t)
+            cx += widths[i]
+        painter.restore()
+
+    @staticmethod
+    def _token_color(idx: int, tok: str) -> str:
+        if idx == 0:                       # Note bzw. Drum-Hit
+            return COLORS["danger"] if tok == "X" else COLORS["accent"]
+        if tok.startswith("v"):
+            return COLORS["success"]       # Lautstaerke
+        if tok.startswith("s"):
+            return _SLIDE_COLOR            # Slide
+        return COLORS["danger"]            # Effekt (Arp/Vib/Ret/Off)
+
+
 class TrackerEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
@@ -416,54 +473,62 @@ class TrackerEditor(QMainWindow):
         top.addWidget(b_code)
         root.addLayout(top)
 
-        # --- Sound pro Spur (Keyboard-Klang je Kanal) ---
-        srow = QHBoxLayout()
-        lab = QLabel("Spur-Sounds:")
-        lab.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
-        srow.addWidget(lab)
+        # --- Linkes Instrument-Panel (Spur-Sounds + Bibliothek, Renoise-Stil) ---
+        side = QVBoxLayout(); side.setSpacing(6)
+        sl = QLabel("Spur-Sounds")
+        sl.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
+        side.addWidget(sl)
         self.sound_combos = []
         ch_names = ["Ch1", "Ch2", "Ch3", "Drum"]
         for c in range(CHANNELS):
-            srow.addWidget(QLabel(ch_names[c] + ":"))
+            r = QHBoxLayout()
+            cl = QLabel(ch_names[c]); cl.setFixedWidth(40)
+            cl.setStyleSheet(f"color: {COLORS['fg_muted']};")
+            r.addWidget(cl)
             cb = QComboBox(); cb.setMinimumWidth(150)
             cb.currentIndexChanged.connect(
                 lambda idx, ch=c: self._on_sound_changed(ch, idx))
-            srow.addWidget(cb)
+            r.addWidget(cb, 1)
+            side.addLayout(r)
             self.sound_combos.append(cb)
-        srow.addStretch(1)
-        root.addLayout(srow)
 
-        # --- Instrument-Bibliothek (eigene Sounds verwalten) ---
-        irow = QHBoxLayout()
-        irow.addWidget(QLabel("Bibliothek:"))
+        _sep = QFrame(); _sep.setFrameShape(QFrame.Shape.HLine)
+        _sep.setStyleSheet(f"color: {COLORS['border']};")
+        side.addSpacing(4); side.addWidget(_sep); side.addSpacing(2)
+
+        bl = QLabel("Bibliothek")
+        bl.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
+        side.addWidget(bl)
         self.inst_combo = QComboBox()
-        self.inst_combo.setMinimumWidth(170)
-        irow.addWidget(self.inst_combo)
+        self.inst_combo.setMinimumWidth(150)
+        side.addWidget(self.inst_combo)
         b_load = QPushButton("+ Sample (WAV)...")
         b_load.setToolTip("Eigene Aufnahme als Instrument laden")
         b_load.clicked.connect(self._load_sample)
-        irow.addWidget(b_load)
+        side.addWidget(b_load)
         b_keymap = QPushButton("+ Keymap...")
         b_keymap.setToolTip("Mehrere Samples ueber die Klaviatur verteilen "
                             "(Multisample / Drumkit)")
         b_keymap.clicked.connect(self._edit_keymap)
-        irow.addWidget(b_keymap)
+        side.addWidget(b_keymap)
         b_sf2 = QPushButton("+ SoundFont (.sf2)...")
         b_sf2.setToolTip("Echtes Instrument aus einer SoundFont-Datei laden "
                          "(General MIDI / Hersteller-Sounds)")
         b_sf2.clicked.connect(self._load_soundfont)
-        irow.addWidget(b_sf2)
+        side.addWidget(b_sf2)
+        ibtns = QHBoxLayout()
         b_iedit = QPushButton("Bearbeiten...")
         b_iedit.setToolTip("Grundton, Loop-Punkte, ADSR-Huellkurve")
         b_iedit.clicked.connect(self._edit_instrument)
-        irow.addWidget(b_iedit)
+        ibtns.addWidget(b_iedit)
         b_idel = QPushButton("Loeschen")
         b_idel.clicked.connect(self._remove_instrument)
-        irow.addWidget(b_idel)
-        irow.addStretch(1)
-        root.addLayout(irow)
+        ibtns.addWidget(b_idel)
+        side.addLayout(ibtns)
+        side.addStretch(1)
+        side_w = QWidget(); side_w.setLayout(side); side_w.setFixedWidth(250)
 
-        # --- Datei + Pattern-Verwaltung ---
+        # --- Pattern-/Zellen-Steuerung (ueber dem Gitter) ---
         prow = QHBoxLayout()
         b_new = QPushButton("Neu"); b_new.clicked.connect(self._new_song)
         b_open = QPushButton("Oeffnen"); b_open.clicked.connect(self._open)
@@ -522,12 +587,11 @@ class TrackerEditor(QMainWindow):
         for b in (b_padd, b_pdup, b_pdel, b_clear):
             prow.addWidget(b)
         prow.addStretch(1)
-        root.addLayout(prow)
 
         # --- Pattern-Gitter ---
         self.grid = QTableWidget(self.song.patterns[0].rows, CHANNELS)
         self.grid.setHorizontalHeaderLabels(["Ch1", "Ch2", "Ch3", "Drum"])
-        self.grid.verticalHeader().setDefaultSectionSize(26)
+        self.grid.verticalHeader().setDefaultSectionSize(30)
         self.grid.verticalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Fixed)
         self.grid.horizontalHeader().setSectionResizeMode(
@@ -537,12 +601,23 @@ class TrackerEditor(QMainWindow):
         self.grid.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
         self.grid.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.grid.setShowGrid(False)
-        gfont = QFont(EDITOR_FONT_FAMILY, 12); gfont.setBold(True)
+        gfont = QFont(EDITOR_FONT_FAMILY, 13); gfont.setBold(True)
         self.grid.setFont(gfont)
         self.grid.setStyleSheet(_TRACKER_GRID_QSS)
+        self._delegate = _CellDelegate(self.grid)
+        self.grid.setItemDelegate(self._delegate)
         self.grid.itemSelectionChanged.connect(self._audition_selected)
         self.grid.itemSelectionChanged.connect(self._sync_vol_spin)
-        root.addWidget(self.grid, 1)
+
+        # Panel links, Steuerung + Gitter rechts (Renoise-Layout).
+        rightcol = QVBoxLayout(); rightcol.setSpacing(6)
+        rightcol.addLayout(prow)
+        rightcol.addWidget(self.grid, 1)
+        rightw = QWidget(); rightw.setLayout(rightcol)
+        main = QHBoxLayout(); main.setSpacing(10)
+        main.addWidget(side_w)
+        main.addWidget(rightw, 1)
+        root.addLayout(main, 1)
 
         # --- Song-Arrangement (Order) ---
         arow = QHBoxLayout()
@@ -654,22 +729,11 @@ class TrackerEditor(QMainWindow):
         self._update_channel_headers()
         self._sync_vol_spin()
 
-    # Beat-Hintergruende (alle 4 Reihen heller, alle 16 betont) + Farb-Kodierung
-    # (Toene cyan, Drums magenta, leere Zellen gedaempft).
+    # Visuelles (Beat-Zeilen, Playhead, Farb-Kodierung) uebernimmt jetzt der
+    # _CellDelegate beim Zeichnen -- diese Methode bleibt als No-op-Hook fuer
+    # die bestehenden Aufrufer (Zell-Refresh/Pattern-Laden).
     def _style_cell(self, item, c: int, r: int, note) -> None:
-        if r % 16 == 0:
-            bg = QColor(COLORS["bg_panel"])
-        elif r % 4 == 0:
-            bg = QColor(COLORS["bg_alt"])
-        else:
-            bg = QColor(COLORS["bg"])
-        item.setBackground(bg)
-        if note is None:
-            item.setForeground(QColor(COLORS["line_no"]))
-        elif c == TONAL:
-            item.setForeground(QColor(COLORS["danger"]))
-        else:
-            item.setForeground(QColor(COLORS["accent"]))
+        return
 
     def _update_channel_headers(self) -> None:
         """Spalten-Header zeigen Kanal + zugewiesenes Instrument/Wellenform."""
@@ -1193,22 +1257,11 @@ class TrackerEditor(QMainWindow):
 
     def _set_playhead(self, row: int) -> None:
         """Hebt die laufende Wiedergabe-Reihe hervor (ohne die User-Auswahl zu
-        veraendern). row < 0 = Highlight entfernen."""
-        old = self._playhead
+        veraendern). row < 0 = Highlight entfernen. Das Zeichnen uebernimmt der
+        Zell-Delegate -- hier nur den Wert setzen + neu zeichnen."""
         self._playhead = row
-        pat = self.song.patterns[self.cur]
-        for rr in {old, row}:
-            if rr is None or not (0 <= rr < self.grid.rowCount()):
-                continue
-            for c in range(CHANNELS):
-                it = self.grid.item(rr, c)
-                if it is None:
-                    continue
-                if rr == row:
-                    it.setBackground(QColor(COLORS["accent_soft"]))
-                else:
-                    note = pat.data[c][rr] if rr < pat.rows else None
-                    self._style_cell(it, c, rr, note)
+        self._delegate.playhead = row
+        self.grid.viewport().update()
         if 0 <= row < self.grid.rowCount():
             self.grid.scrollToItem(self.grid.item(row, 0))
 

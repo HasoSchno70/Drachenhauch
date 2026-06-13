@@ -1,22 +1,24 @@
 # SFX-Generator
 
-Standalone-Tool für Retro-Soundeffekte im sfxr-Stil: eigener Synthesizer mit Pitch-Slide, Hüllkurve und Vibrato, Live-Wellenform-Vorschau, Abspielen und Export als **WAV** (per `LOADSOUND` ladbar) oder GB-Code.
+Tool für Retro-Soundeffekte im sfxr-Stil: eigener Synthesizer mit Pitch-Slide, Hüllkurve, Vibrato und **SID-Charakter** (Pulsbreite/PWM + resonanter Filter-Sweep), Live-Wellenform-Vorschau, Abspielen und Export als **WAV** (per `LOADSOUND` ladbar) oder GB-Code. Ist der **SFX-Tab im [Audio Studio](tracker.md#audio-studio)** (`gbsound`).
 
 ## Starten
 
-Aus dem **Code-Editor**: Toolbar-Button (Lautsprecher-Symbol) oder `Datei → SFX-Generator öffnen ...` (`Strg+Shift+J`).
-
-Standalone: `gbsfx` oder `.venv\Scripts\python.exe gbrun.py --sfx` (braucht `PySide6` + `numpy`).
+Am bequemsten als Tab im **Audio Studio**: `gbsound` (oder `gbrun.py --audio`) → Reiter „SFX-Generator". Auch einzeln aus dem **Code-Editor** (Toolbar-Button / `Datei → SFX-Generator öffnen ...`, `Strg+Shift+J`) oder standalone `gbsfx` / `gbrun.py --sfx` (öffnen ebenfalls das Studio auf dem SFX-Tab). Braucht `PySide6` + `numpy`.
 
 ## Bedienung
 
-- **Presets** oben — `Pickup/Coin`, `Laser/Shoot`, `Explosion`, `Powerup`, `Hit/Hurt`, `Jump`, `Blip/Select`. Klick lädt + spielt.
-- **Preset-Bibliothek** (darunter) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.gamebasic/presets/sfx.json`) und lade sie über die Combo wieder. „Loeschen" entfernt das gewählte eigene Preset.
-- **Wellenform-Vorschau** zeigt das aktuelle Signal (Pitch-Sweep + Hüllkurve sichtbar).
-- **Ton** — Waveform (`square`/`saw`/`sine`/`triangle`/`noise`), Frequenz, **Pitch-Slide** (Hz/s, negativ = fallend), Lautstärke.
-- **Hüllkurve & Vibrato** — Attack / Sustain / Decay (ms), Vibrato-Tiefe + -Speed, **Stereo-Breite** (0 = mono, >0 = breiter per Detune; bei `noise` dekorreliert) und **Pan** (links −1 … +1 rechts).
-- **`▶ Abspielen`** spielt den aktuellen Effekt, **`Zufall`** würfelt neue Parameter (mit Abspielen).
-- **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — ein Preset-Laden, ein `Zufall` oder ein Slider-Drag zählt je als ein Schritt.
+Die UI ist eine **Fader-Bank im sfxr-Stil**: links eine **Preset-Leiste**, oben die große **Wellenform-Vorschau**, darunter vier farbcodierte **Parameter-Karten** mit beschrifteten Schiebereglern (Live-Wert rechts):
+
+- **Ton** (cyan) — Waveform (`square`/`saw`/`sine`/`triangle`/`noise`, als Dropdown), Frequenz, **Pitch-Slide** (Hz/s, negativ = fallend), Lautstärke.
+- **Hüllkurve** (mint) — Attack / Sustain / Decay (ms).
+- **SID / Filter** (magenta) — **Pulsbreite** + **PWM-Tiefe/-Speed** (für `square`) und ein **resonanter Tiefpass** (Cutoff / Sweep Hz/s / Resonanz). 0 = neutral.
+- **Vibrato / Stereo** (amber) — Vibrato-Tiefe + -Speed, **Stereo-Breite** (0 = mono, >0 = breiter per Detune; bei `noise` dekorreliert) und **Pan** (links −1 … +1 rechts).
+
+- **Preset-Leiste** links — `Pickup/Coin`, `Laser/Shoot`, `Explosion`, `Powerup`, `Hit/Hurt`, `Jump`, `Blip/Select`. Klick lädt + spielt.
+- **Preset-Bibliothek** (oben) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.gamebasic/presets/sfx.json`) und lade sie über die Combo wieder.
+- **`▶ Abspielen`** spielt den aktuellen Effekt, **`🎲 Zufall`** würfelt neue Parameter (mit Abspielen).
+- **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — ein Preset-Laden, ein `Zufall` oder ein Fader-Drag zählt je als ein Schritt.
 
 ## Export
 
