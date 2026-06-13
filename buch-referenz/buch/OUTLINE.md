@@ -39,7 +39,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 14 Schleifen: FOR, WHILE, REPEAT, FOR EACH, BREAK/CONTINUE  (content/14_schleifen.js)
 - [x] 15 Funktionen & SUBs (Parameter/BYREF/Defaults/Named/Variadic/FUNCREF/Rekursion)  (content/15_funktionen.js)
 - [x] 16 Strings im Detail  (content/16_strings.js)
-- [ ] 17 Arrays
+- [x] 17 Arrays  (content/17_arrays.js)
 - [ ] 18 Maps
 - [ ] 19 Tupel & Destructuring
 - [ ] 20 Klassen & Objekte
@@ -87,8 +87,10 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.
 Session 2 (2026-06-13): Teil II Kap 12 (Ein-/Ausgabe) + Kap 13 (Verzweigungen:
 IF/ELSEIF/ELSE inkl. einzeilig, SELECT CASE mit Liste/TO/IS/WHERE-Guard, IIF) +
-Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs) + Kap 16 (Strings im Detail:
-LEN/UPPER/LOWER/LEFT/RIGHT/MID 0-basiert/Index+Slicing/INSTR/CONTAINS/IN/REPLACE/
-TRIM/SPLIT/JOIN/PAD/REPEAT/STR/VAL/CHR/ASC/Methoden-Syntax). 44 Seiten, alle Ausgaben
-gegen gbrt verifiziert, per LibreOffice gerendert.
-**Nächstes:** Kap 17 (Arrays).
+Kap 14 (Schleifen) + Kap 15 (Funktionen & SUBs) + Kap 16 (Strings) + Kap 17 (Arrays:
+DIM[n], 0-Index+Bounds, LEN/Iteration/FOR EACH, SORT/REVERSE/INDEXOF, Aggregate
+SUM/AVG/MIN/MAX/FILL, dynamisch PUSH/POP/INSERT/REMOVE_AT/REDIM, Slicing,
+**Alias-Stolperstein b=a kopiert NICHT → ARRAY_COPY**, mehrdimensional). 51 Seiten,
+alle Ausgaben gegen gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf
+User-Wunsch schwierige Themen ausführlicher (mehr Hintergrund/mentale Modelle).
+**Nächstes:** Kap 18 (Maps).
