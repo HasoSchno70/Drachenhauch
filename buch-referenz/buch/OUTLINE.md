@@ -62,7 +62,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 38 Dateien  (content/38_dateien.js)
 
 ### Teil IV — Grafik, Sound & Spiele
-- [ ] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)
+- [x] 40 Das Fenster (SCREEN/FLIP/DELTA/FPS/Game-Loop)  (content/40_fenster.js, images/40_fenster.png)
 - [ ] 41 2D-Zeichnen (PLOT/LINE/BOX/RECT/CIRCLE/TEXT)
 - [ ] 42 2D-Extras (LINEW/BOXROUND/GRADIENT/SPLINE/BLEND/GenTex/Render-Targets)
 - [ ] 43 Bilder (LOADIMAGE/DRAWIMAGE/DRAWIMAGEPART/...)
@@ -124,5 +124,9 @@ TIME$, DATE$; nicht-deterministische Werte als Kommentar statt Ausgabe-Kasten).
 + Kap 38 (Dateien: OPENFILE/CLOSEFILE/WRITELINE/WRITE/READLINE/ENDOFFILE/READALL$,
 WRITEALL/READLINES/APPENDFILE/FILESIZE, FILEEXISTS/COPYFILE/RENAME/DELETEFILE,
 MKDIR/DIREXISTS/DIRLIST, PATHJOIN/BASENAME/DIRNAME). **TEIL III KOMPLETT (Kap 30-38).**
-124 Seiten, alle Ausgaben gegen gbrt verifiziert.
-**Nächstes:** Teil IV (die GROSSEN Themen) — Kap 40 (Das Fenster: SCREEN/FLIP/DELTA/Game-Loop).
+**Teil IV gestartet (Grafik/Sound/Spiele):** Kap 40 (Das Fenster & Game-Loop: SCREEN/CLS/
+FLIP/QUITREQUESTED-Loop, DELTA, FPS/SETFPS, SCREENWIDTH/HEIGHT) — MIT echtem Screenshot
+(figures/40_fenster.gb → images/40_fenster.png). 130 Seiten, gegen gbrt verifiziert.
+Screenshot-Workflow: figures/NN_*.gb (Quelle) → `GBRT_FRAMES=N GBRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
+(absoluter Pfad nötig, gbrt chdirt ins figures/-Dir!) → H.figure("x.png", caption).
+**Nächstes:** Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/TEXT) — mit Screenshots.

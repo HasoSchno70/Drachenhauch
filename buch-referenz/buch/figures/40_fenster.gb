@@ -1,0 +1,9 @@
+' Screenshot-Demo fuer Kapitel 40 (Das Fenster)
+SCREEN(480, 320, "Mein erstes Fenster")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(22, 26, 44))
+    TEXT(110, 120, "Mein erstes Fenster", RGB(120, 200, 255))
+    BOX(190, 165, 290, 215, RGB(255, 180, 40))
+    CIRCLE(240, 250, 18, RGB(90, 220, 140))
+    FLIP()
+WEND
