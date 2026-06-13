@@ -15,14 +15,38 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use kira::{
-    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Panning, Tween,
+    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Mix, Panning, Tween,
     effect::{Effect, EffectBuilder},
+    effect::filter::{FilterBuilder, FilterHandle},
+    effect::reverb::{ReverbBuilder, ReverbHandle},
+    effect::delay::{DelayBuilder, DelayHandle},
     info::Info,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
     sound::FromFileError,
     track::{MainTrackBuilder, TrackBuilder, TrackHandle},
 };
+
+/// Echtzeit-Effektkette eines Mixer-Busses (Filter/Reverb/Delay). Die Effekte
+/// haengen beim Bau am Track; die Handles steuern sie zur Laufzeit. Default =
+/// neutral (Filter offen, Reverb/Delay-Mix 0).
+struct BusFx {
+    filter: FilterHandle,
+    reverb: ReverbHandle,
+    delay: DelayHandle,
+}
+
+/// Haengt Filter+Reverb+Delay (neutral) an einen Track-Builder und liefert die
+/// Steuer-Handles. Als Makro, weil Sub- und Main-TrackBuilder verschiedene
+/// Typen sind (beide haben aber `add_effect`). Delay-Zeit ist fix (300 ms).
+macro_rules! attach_bus_fx {
+    ($b:expr) => { BusFx {
+        filter: $b.add_effect(FilterBuilder::new().cutoff(20000.0).resonance(0.0)),
+        reverb: $b.add_effect(ReverbBuilder::new().mix(Mix(0.0))),
+        delay: $b.add_effect(
+            DelayBuilder::new().delay_time(Duration::from_millis(300)).mix(Mix(0.0))),
+    }};
+}
 use xmrs::prelude::Module;
 use xmrsplayer::prelude::XmrsPlayer;
 
@@ -217,6 +241,10 @@ pub struct Audio {
     sfx_bus: f32,
     music_bus: f32,
     master_bus: f32,
+    // Echtzeit-Effektketten je Bus (Filter/Reverb/Delay).
+    sfx_fx: BusFx,
+    music_fx: BusFx,
+    master_fx: BusFx,
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
@@ -238,19 +266,26 @@ pub struct Audio {
 
 impl Audio {
     pub fn new() -> Result<Audio, String> {
-        let settings = AudioManagerSettings {
-            main_track_builder: MainTrackBuilder::new().with_effect(FftTapBuilder),
-            ..Default::default()
-        };
+        // Master-Track: erst die Effektkette, dann der FFT-Tap zuletzt ->
+        // die FFT erfasst den fertig prozessierten Mix.
+        let mut main = MainTrackBuilder::new();
+        let master_fx = attach_bus_fx!(main);
+        main.add_effect(FftTapBuilder);
+        let settings = AudioManagerSettings { main_track_builder: main, ..Default::default() };
         let mut manager = AudioManager::<DefaultBackend>::new(settings)
             .map_err(|e| format!("Audio-Geraet konnte nicht initialisiert werden: {e:?}"))?;
-        let sfx_track = manager.add_sub_track(TrackBuilder::new())
+        let mut sfx_b = TrackBuilder::new();
+        let sfx_fx = attach_bus_fx!(sfx_b);
+        let sfx_track = manager.add_sub_track(sfx_b)
             .map_err(|e| format!("SFX-Bus konnte nicht angelegt werden: {e:?}"))?;
-        let music_track = manager.add_sub_track(TrackBuilder::new())
+        let mut music_b = TrackBuilder::new();
+        let music_fx = attach_bus_fx!(music_b);
+        let music_track = manager.add_sub_track(music_b)
             .map_err(|e| format!("Musik-Bus konnte nicht angelegt werden: {e:?}"))?;
         Ok(Audio {
             manager, sfx_track, music_track,
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
+            sfx_fx, music_fx, master_fx,
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
@@ -416,6 +451,49 @@ impl Audio {
             other => return Err(format!(
                 "AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", other)),
         } as f64)
+    }
+
+    fn bus_fx(&mut self, bus: &str, fn_: &str) -> Result<&mut BusFx, String> {
+        match bus.to_lowercase().as_str() {
+            "sfx" => Ok(&mut self.sfx_fx),
+            "music" => Ok(&mut self.music_fx),
+            "master" => Ok(&mut self.master_fx),
+            other => Err(format!("{}: unbekannter Bus '{}' (sfx, music, master)", fn_, other)),
+        }
+    }
+
+    /// AUDIO_FILTER(bus$, cutoff_hz[, resonance]) -- Tiefpass auf einem Bus.
+    /// cutoff_hz <= 0 oder >= 20000 = offen (Effekt aus). resonance 0..1
+    /// (Betonung um den Cutoff -- der "weeoow"-SID/Acid-Charakter).
+    pub fn set_filter(&mut self, bus: &str, cutoff_hz: f64, resonance: f64) -> Result<(), String> {
+        let c = if cutoff_hz <= 0.0 { 20000.0 } else { cutoff_hz.clamp(20.0, 20000.0) };
+        let r = resonance.clamp(0.0, 1.0);
+        let fx = self.bus_fx(bus, "AUDIO_FILTER")?;
+        fx.filter.set_cutoff(c, tween_now());
+        fx.filter.set_resonance(r, tween_now());
+        Ok(())
+    }
+
+    /// AUDIO_REVERB(bus$, mix[, feedback[, damping]]) -- Hall auf einem Bus.
+    /// mix 0..1 (0 = aus), feedback 0..1 (Nachhall-Laenge), damping 0..1
+    /// (Hoehen-Daempfung). Fuer Hoehlen/Hallen.
+    pub fn set_reverb(&mut self, bus: &str, mix: f64, feedback: f64, damping: f64) -> Result<(), String> {
+        let fx = self.bus_fx(bus, "AUDIO_REVERB")?;
+        fx.reverb.set_mix(Mix(mix.clamp(0.0, 1.0) as f32), tween_now());
+        fx.reverb.set_feedback(feedback.clamp(0.0, 1.0), tween_now());
+        fx.reverb.set_damping(damping.clamp(0.0, 1.0), tween_now());
+        Ok(())
+    }
+
+    /// AUDIO_DELAY(bus$, mix[, feedback]) -- Echo (fixe 300 ms) auf einem Bus.
+    /// mix 0..1 (0 = aus), feedback 0..0.95 (Wiederholungs-Abfall, linear ->
+    /// dB pro Echo; >=1 wuerde aufschaukeln, daher gekappt).
+    pub fn set_delay(&mut self, bus: &str, mix: f64, feedback: f64) -> Result<(), String> {
+        let fb = feedback.clamp(0.0, 0.95);
+        let fx = self.bus_fx(bus, "AUDIO_DELAY")?;
+        fx.delay.set_mix(Mix(mix.clamp(0.0, 1.0) as f32), tween_now());
+        fx.delay.set_feedback(db(fb), tween_now());
+        Ok(())
     }
 
     // ================= Core SFX =================

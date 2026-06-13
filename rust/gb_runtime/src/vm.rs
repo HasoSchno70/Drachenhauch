@@ -3789,6 +3789,40 @@ impl<'p> Vm<'p> {
                 }
                 Value::Float(self.audio_mut()?.get_bus_volume(&bus)?)
             }
+            "audio_filter" => {
+                // AUDIO_FILTER(bus$, cutoff_hz[, resonance]) -- Tiefpass.
+                let bus = gs(a, 0, "AUDIO_FILTER")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_FILTER: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let cutoff = need_f(a, 1, "AUDIO_FILTER")?;
+                let res = if a.len() >= 3 { need_f(a, 2, "AUDIO_FILTER")? } else { 0.0 };
+                self.audio_mut()?.set_filter(&bus, cutoff, res)?;
+                Value::Nil
+            }
+            "audio_reverb" => {
+                // AUDIO_REVERB(bus$, mix[, feedback[, damping]]) -- Hall.
+                let bus = gs(a, 0, "AUDIO_REVERB")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_REVERB: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let mix = need_f(a, 1, "AUDIO_REVERB")?;
+                let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_REVERB")? } else { 0.9 };
+                let damp = if a.len() >= 4 { need_f(a, 3, "AUDIO_REVERB")? } else { 0.1 };
+                self.audio_mut()?.set_reverb(&bus, mix, fb, damp)?;
+                Value::Nil
+            }
+            "audio_delay" => {
+                // AUDIO_DELAY(bus$, mix[, feedback]) -- Echo (300 ms).
+                let bus = gs(a, 0, "AUDIO_DELAY")?.to_lowercase();
+                if !matches!(bus.as_str(), "sfx" | "music" | "master") {
+                    return Err(format!("AUDIO_DELAY: unbekannter Bus '{}' (sfx, music, master)", bus));
+                }
+                let mix = need_f(a, 1, "AUDIO_DELAY")?;
+                let fb = if a.len() >= 3 { need_f(a, 2, "AUDIO_DELAY")? } else { 0.5 };
+                self.audio_mut()?.set_delay(&bus, mix, fb)?;
+                Value::Nil
+            }
             "playsound" => {
                 // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
                 // (raylib-Sounds loopen nicht) -- SFX spielen einmal.

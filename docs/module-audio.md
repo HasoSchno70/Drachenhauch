@@ -288,6 +288,40 @@ PRINT AUDIO_BUS_GET_VOLUME("music")   ' 0.4
 
 Der `AUDIO_FFT`-Tap haengt am Master, erfasst also weiterhin den gesamten Mix.
 
+## Echtzeit-Effekte (Filter / Reverb / Delay)
+
+Jeder Bus (`sfx`, `music`, `master`) hat eine **Echtzeit-Effektkette** auf dem
+Audio-Thread — kein Buffer-Bake wie `AUDIO_LOFI`, sondern echte DSP, die auch
+laufende/gestreamte Sounds erfasst und live steuerbar ist.
+
+| Funktion | Wirkung |
+|---|---|
+| `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` | Tiefpass. `cutoff_hz` 20..20000 (≤0 oder ≥20000 = offen/aus), `resonance` 0..1 (Betonung am Cutoff — der „weeoow"-SID/Acid-Charakter) |
+| `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` | Hall. `mix` 0..1 (0 = aus), `feedback` 0..1 (Nachhall-Laenge, Default 0.9), `damping` 0..1 (Hoehen-Daempfung, Default 0.1) |
+| `AUDIO_DELAY(bus$, mix[, feedback])` | Echo (feste 300 ms). `mix` 0..1 (0 = aus), `feedback` 0..0.95 (Abfall pro Wiederholung, Default 0.5) |
+
+Alle Effekte starten neutral (kein Klang-Einfluss); ein Mix/Cutoff aktiviert sie.
+Parameter wirken sofort und sind animierbar (z.B. Filter-Sweeps).
+
+```basic
+' Cave-Level: Musik dumpf + Hall:
+AUDIO_FILTER("music", 1200, 0.3)       ' Tiefpass, leicht resonant
+AUDIO_REVERB("master", 0.5, 0.9, 0.2)  ' Hall ueber alles
+
+' Acid-Sweep auf der Musik (im Game-Loop):
+cutoff = 200 + 6000 * (0.5 + 0.5 * SIN(MILLIS() / 400.0))
+AUDIO_FILTER("music", cutoff, 0.8)
+
+' Echo nur auf Effekten:
+AUDIO_DELAY("sfx", 0.4, 0.55)
+
+' Alles aus:
+AUDIO_FILTER("music", 0, 0) : AUDIO_REVERB("master", 0.0) : AUDIO_DELAY("sfx", 0.0)
+```
+
+Demo: [examples/117_audiofx.gb](../examples/117_audiofx.gb) — Filter-Cutoff per
+Maus, Reverb/Delay per Taste, mit Live-Spektrum.
+
 ## Externer Typ
 
 | Typ | Wirkung |

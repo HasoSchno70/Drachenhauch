@@ -489,6 +489,24 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_FILTER",
+   "kind": "core",
+   "signature": "AUDIO_FILTER(bus$, cutoff_hz[, resonance])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_REVERB",
+   "kind": "core",
+   "signature": "AUDIO_REVERB(bus$, mix[, feedback[, damping]])",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_DELAY",
+   "kind": "core",
+   "signature": "AUDIO_DELAY(bus$, mix[, feedback])",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_VOLUME",
    "kind": "core",
    "signature": "AUDIO_VOLUME(ch, v)",

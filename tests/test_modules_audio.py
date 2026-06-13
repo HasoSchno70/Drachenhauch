@@ -162,3 +162,30 @@ def test_bus_volume_validation(run_gb):
     out = run_gb(src)
     assert "AUDIO_BUS_VOLUME: unbekannter Bus 'foo' (sfx, music, master)" in out
     assert "AUDIO_BUS_GET_VOLUME: unbekannter Bus 'bar' (sfx, music, master)" in out
+
+
+def test_bus_effects_validation(run_gb):
+    # AUDIO_FILTER/REVERB/DELAY: unbekannter Bus wird VOR der Audio-Init
+    # geprueft -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_FILTER("nope", 1000, 0.5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_REVERB("nope", 0.5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_DELAY("nope", 0.5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_FILTER: unbekannter Bus 'nope' (sfx, music, master)" in out
+    assert "AUDIO_REVERB: unbekannter Bus 'nope' (sfx, music, master)" in out
+    assert "AUDIO_DELAY: unbekannter Bus 'nope' (sfx, music, master)" in out
