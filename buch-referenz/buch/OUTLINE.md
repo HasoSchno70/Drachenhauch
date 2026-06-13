@@ -42,7 +42,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 17 Arrays  (content/17_arrays.js)
 - [x] 18 Maps  (content/18_maps.js)
 - [x] 19 Tupel & Destructuring  (content/19_tupel.js)
-- [ ] 20 Klassen & Objekte
+- [x] 20 Klassen & Objekte  (content/20_klassen.js)
 - [ ] 21 Vererbung, Properties, Operatoren, Static
 - [ ] 22 ENUM
 - [ ] 23 Comprehensions (List/Dict/Set)
@@ -94,6 +94,9 @@ SUM/AVG/MIN/MAX/FILL, dynamisch PUSH/POP/INSERT/REMOVE_AT/REDIM, Slicing,
 FOR EACH über Keys, MAPKEYS/VALUES/ITEMS, Methoden-Syntax, STR$-Keys/Cache,
 Alias-Hinweis) + Kap 19 (Tupel & Destructuring: Literal (a,b,...), Index/length,
 unveränderlich, Destructuring (a,b)=tupel, mehrere Rückgabewerte, Tausch-Trick,
-FOR EACH). 60 Seiten, alle Ausgaben gegen gbrt verifiziert, per LibreOffice
-gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 20 (Klassen & Objekte).
+FOR EACH) + Kap 20 (Klassen & Objekte: Bauplan/Objekt-Modell, CLASS+DIM-Felder,
+NEW, SUB Init/Self, Methoden SUB/FUNCTION, impliziter Methodenaufruf, viele
+unabhängige Objekte, Verweis-Semantik). 65 Seiten, alle Ausgaben gegen gbrt
+verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige
+Themen ausführlicher.
+**Nächstes:** Kap 21 (Vererbung, Properties, Operatoren, Static).
