@@ -199,6 +199,18 @@ def test_export_audio_renders_wav(tmp_path, monkeypatch):
         assert w.getnchannels() == 1
 
 
+def test_mute_solo_audibility():
+    ed = _editor()
+    assert all(ed._audible(c) for c in range(4))     # Default: alle hoerbar
+    ed.mute_btns[0].setChecked(True)
+    assert not ed._audible(0) and ed._audible(1)
+    ed.mute_btns[0].setChecked(False)
+    ed.solo_btns[2].setChecked(True)                 # Solo -> nur Kanal 2
+    assert ed._audible(2) and not ed._audible(0) and not ed._audible(1)
+    ed.mute_btns[2].setChecked(True)                 # Mute schlaegt Solo
+    assert not ed._audible(2)
+
+
 def test_fx_column_sets_effect_on_cell():
     from gamebasic.tracker.song import FX_ARP, FX_CODES
     ed = _editor()

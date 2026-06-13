@@ -479,18 +479,32 @@ class TrackerEditor(QMainWindow):
         sl.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
         side.addWidget(sl)
         self.sound_combos = []
+        self.mute_btns = []
+        self.solo_btns = []
+        self._muted = [False] * CHANNELS
+        self._solo = [False] * CHANNELS
         ch_names = ["Ch1", "Ch2", "Ch3", "Drum"]
         for c in range(CHANNELS):
             r = QHBoxLayout()
-            cl = QLabel(ch_names[c]); cl.setFixedWidth(40)
+            cl = QLabel(ch_names[c]); cl.setFixedWidth(34)
             cl.setStyleSheet(f"color: {COLORS['fg_muted']};")
             r.addWidget(cl)
-            cb = QComboBox(); cb.setMinimumWidth(150)
+            mb = QPushButton("M"); mb.setCheckable(True); mb.setFixedWidth(24)
+            mb.setToolTip("Spur stummschalten (nur Vorhoeren)")
+            mb.toggled.connect(lambda on, ch=c: self._on_mute(ch, on))
+            r.addWidget(mb)
+            sb = QPushButton("S"); sb.setCheckable(True); sb.setFixedWidth(24)
+            sb.setToolTip("Solo -- nur Solo-Spuren klingen (nur Vorhoeren)")
+            sb.toggled.connect(lambda on, ch=c: self._on_solo(ch, on))
+            r.addWidget(sb)
+            cb = QComboBox(); cb.setMinimumWidth(120)
             cb.currentIndexChanged.connect(
                 lambda idx, ch=c: self._on_sound_changed(ch, idx))
             r.addWidget(cb, 1)
             side.addLayout(r)
             self.sound_combos.append(cb)
+            self.mute_btns.append(mb)
+            self.solo_btns.append(sb)
 
         _sep = QFrame(); _sep.setFrameShape(QFrame.Shape.HLine)
         _sep.setStyleSheet(f"color: {COLORS['border']};")
@@ -1274,10 +1288,24 @@ class TrackerEditor(QMainWindow):
                 return rr - r
         return pat.rows - r
 
+    # ---- Mute / Solo (nur Live-Vorhoeren; WAV-Render rendert alle Spuren) ----
+    def _on_mute(self, c: int, on: bool) -> None:
+        self._muted[c] = bool(on)
+
+    def _on_solo(self, c: int, on: bool) -> None:
+        self._solo[c] = bool(on)
+
+    def _audible(self, c: int) -> bool:
+        if self._muted[c]:
+            return False
+        if any(self._solo):
+            return self._solo[c]
+        return True
+
     def _play_columns(self, pat, row: int) -> None:
         for c in range(CHANNELS):
             n = pat.data[c][row]
-            if n is not None:
+            if n is not None and self._audible(c):
                 self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
                                 self._note_len_rows(pat, c, row))
 
