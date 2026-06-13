@@ -120,3 +120,24 @@ def test_sample_type_compiles(run_gb):
         'PRINT "sample-typ ok"',
     ])
     assert "sample-typ ok" in run_gb(src)
+
+
+def test_lofi_validation(run_gb):
+    # AUDIO_LOFI(an[, bits[, cutoff_hz]]) -- Argument-Pruefung laeuft VOR der
+    # Audio-Initialisierung -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_LOFI(TRUE, 99)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_LOFI(TRUE, 8, -1.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_LOFI: bits muss 1..16 sein" in out
+    assert "AUDIO_LOFI: cutoff_hz muss >= 0 sein" in out

@@ -72,6 +72,12 @@ DIM myp AS INTEGER
 DIM mdownPrev AS BOOLEAN
 mdownPrev = FALSE
 
+' Paula-Lo-Fi-Modus (8-bit + LED-Tiefpass) -- mit L umschaltbar
+DIM lofi AS BOOLEAN
+lofi = FALSE
+DIM lPrev AS BOOLEAN
+lPrev = FALSE
+
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
     t = MILLIS() / 1000.0
@@ -90,6 +96,15 @@ WHILE NOT QUITREQUESTED()
         END IF
         seqi = seqi + 1
     WEND
+
+    ' --- L = Paula-Lo-Fi an/aus --------------------------------------
+    DIM lNow AS BOOLEAN
+    lNow = KEYPRESSED(108)        ' 'l'
+    IF lNow AND NOT lPrev THEN
+        lofi = NOT lofi
+        AUDIO_LOFI(lofi)          ' 8-bit + 3.3kHz LED-Filter (Default)
+    END IF
+    lPrev = lNow
 
     ' --- Maus: auf Klaviatur klicken ---------------------------------
     mxp = MOUSEX()
@@ -117,6 +132,7 @@ WHILE NOT QUITREQUESTED()
     TEXT_SIZE(12)
     TEXT(20, 48, "pluck.wav (A3) wird per SAMPLE_PLAY resampled -- Amiga/Paula-Prinzip", &H90A0C0)
     TEXT(20, 66, "Auto-Melodie + Bass aus demselben Sample. Klick auf die Tasten = selbst spielen.", &H7080A0)
+    TEXT(20, 84, "L = Paula-Lo-Fi (8-bit + LED-Filter): " + IIF(lofi, "AN", "aus"), IIF(lofi, &HFFC040, &H607090))
 
     ' Aktiver Ton gross
     flash = flash - DELTA() * 2.5

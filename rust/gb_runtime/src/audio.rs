@@ -167,6 +167,9 @@ pub struct Audio {
     agc: f32,          // Auto-Gain-Referenz (adaptiv)
     samples: Vec<Sample>,                       // SAMPLE_LOAD-Pool
     sample_cache: HashMap<(usize, i64, i64), i64>, // (sample, centi-halbtoene, dur_ms) -> Sound-Handle
+    lofi: bool,        // Paula-Lo-Fi-Modus (Bit-Crush + LED-Tiefpass)
+    lofi_bits: u32,    // Bit-Tiefe (Default 8 = Amiga)
+    lofi_cutoff: f64,  // LED-Filter-Cutoff in Hz (0 = aus; Default 3300)
 }
 
 impl Audio {
@@ -185,7 +188,42 @@ impl Audio {
             num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             samples: Vec::new(), sample_cache: HashMap::new(),
+            lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
         })
+    }
+
+    /// AUDIO_LOFI(an[, bits[, cutoff_hz]]): Paula/Amiga-Lo-Fi fuer folgende
+    /// synthetisierte Sounds (AUDIO_TONE/NOISE/SFX + SAMPLE_PLAY). `bits`
+    /// (1..16, Default 8) = Bit-Crush-Aufloesung, `cutoff_hz` (>=0, Default
+    /// 3300, 0 = aus) = LED-Tiefpass. Wirkt erst auf NEU gebaute Sounds ->
+    /// der Sample-Cache wird invalidiert.
+    pub fn set_lofi(&mut self, on: bool, bits: u32, cutoff: f64) {
+        self.lofi = on;
+        self.lofi_bits = bits.clamp(1, 16);
+        self.lofi_cutoff = cutoff.max(0.0);
+        self.sample_cache.clear();
+    }
+
+    /// Paula-Lo-Fi-Kette (pur): Bit-Crush dann One-Pole-Tiefpass. Reihenfolge
+    /// wie auf echtem Amiga: 8-bit-DAC zuerst, dann der analoge LED-Filter.
+    fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
+        if bits >= 1 && bits < 24 {
+            let levels = (1u64 << bits) as f64;
+            let half = levels / 2.0;
+            for s in buf.iter_mut() {
+                *s = ((*s * half).round() / half).clamp(-1.0, 1.0);
+            }
+        }
+        if cutoff > 0.0 && sr > 0 {
+            let dt = 1.0 / sr as f64;
+            let rc = 1.0 / (2.0 * PI64 * cutoff);
+            let alpha = dt / (rc + dt);
+            let mut y = 0.0;
+            for s in buf.iter_mut() {
+                y += alpha * (*s - y);
+                *s = y;
+            }
+        }
     }
 
     // -- Amiga-Stil-Sampler (SAMPLE_LOAD / SAMPLE_PLAY) --
@@ -564,6 +602,14 @@ impl Audio {
                               volume: f64, sr: u32) -> Result<i64, String> {
         let n = left.len();
         let vol = volume.clamp(0.0, 1.0);
+        // Paula-Lo-Fi (falls aktiv) vor Fade/Volume -- pro Kanal.
+        let mut lo_l; let mut lo_r;
+        let (left, right): (&[f64], &[f64]) = if self.lofi {
+            lo_l = left.to_vec(); lo_r = right.to_vec();
+            Self::lofi_chain(&mut lo_l, sr, self.lofi_bits, self.lofi_cutoff);
+            Self::lofi_chain(&mut lo_r, sr, self.lofi_bits, self.lofi_cutoff);
+            (&lo_l, &lo_r)
+        } else { (left, right) };
         let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
         let mut samples = vec![0i16; n * 2];
         for i in 0..n {
@@ -590,6 +636,13 @@ impl Audio {
     fn push_wave_sound(&mut self, buf: &[f64], volume: f64, sr: u32) -> Result<i64, String> {
         let n = buf.len();
         let vol = volume.clamp(0.0, 1.0);
+        // Paula-Lo-Fi (falls aktiv) vor Fade/Volume.
+        let mut lofi_buf;
+        let buf: &[f64] = if self.lofi {
+            lofi_buf = buf.to_vec();
+            Self::lofi_chain(&mut lofi_buf, sr, self.lofi_bits, self.lofi_cutoff);
+            &lofi_buf
+        } else { buf };
         let fade = ((sr as f64 * 0.005) as usize).min(n / 4);
         let mut samples = vec![0i16; n];
         for i in 0..n {
@@ -1061,6 +1114,31 @@ mod tests {
     #[test]
     fn resample_empty_is_empty() {
         assert!(resample(&[], 44100, 1.0, 0, 0, 0).is_empty());
+    }
+
+    #[test]
+    fn lofi_bitcrush_quantizes_to_levels() {
+        use super::Audio;
+        // 2 bit -> 4 Stufen (half=2): Werte rasten auf Vielfache von 0.5.
+        let mut buf = vec![0.1, 0.3, 0.6, -0.9];
+        Audio::lofi_chain(&mut buf, 44100, 2, 0.0);   // Filter aus -> nur Crush
+        for v in &buf {
+            let q = (v * 2.0).round() / 2.0;
+            assert!((v - q).abs() < 1e-9, "nicht gerastert: {}", v);
+        }
+        assert!((buf[0] - 0.0).abs() < 1e-9);   // 0.1 -> 0.0
+        assert!((buf[2] - 0.5).abs() < 1e-9);   // 0.6 -> 0.5
+    }
+
+    #[test]
+    fn lofi_lowpass_attenuates_and_is_stable() {
+        use super::Audio;
+        // Wechselsignal (Nyquist-nah) -> Tiefpass daempft die Amplitude.
+        let mut buf: Vec<f64> = (0..200).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+        Audio::lofi_chain(&mut buf, 44100, 24, 2000.0);  // nur Filter (bits>=24 = kein Crush)
+        let peak = buf.iter().cloned().fold(0.0f64, |m, v| m.max(v.abs()));
+        assert!(peak < 0.5, "Tiefpass sollte die hohe Frequenz daempfen, peak={}", peak);
+        assert!(buf.iter().all(|v| v.is_finite()));
     }
 
     #[test]

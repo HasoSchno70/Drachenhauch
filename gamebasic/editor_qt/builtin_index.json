@@ -471,6 +471,12 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_LOFI",
+   "kind": "core",
+   "signature": "AUDIO_LOFI(an[, bits[, cutoff_hz]])",
+   "module": "audio"
+  },
+  {
    "name": "AUDIO_VOLUME",
    "kind": "core",
    "signature": "AUDIO_VOLUME(ch, v)",

@@ -3749,6 +3749,28 @@ impl<'p> Vm<'p> {
                 let dur = if a.len() >= 4 { gi(a, 3, "SAMPLE_PLAY")? } else { 0 };
                 Value::Int(self.audio_mut()?.sample_play(idx, semis, vol, dur)?)
             }
+            "audio_lofi" => {
+                // AUDIO_LOFI(an[, bits[, cutoff_hz]]) -- Paula/Amiga-Lo-Fi.
+                // Argument-Pruefung VOR der Audio-Initialisierung (golden-testbar).
+                let on = match a.first() {
+                    Some(v) => v.truthy(),
+                    None => return Err("AUDIO_LOFI: erwartet (an[, bits[, cutoff_hz]])".into()),
+                };
+                let bits = if a.len() >= 2 {
+                    let b = gi(a, 1, "AUDIO_LOFI")?;
+                    if !(1..=16).contains(&b) {
+                        return Err("AUDIO_LOFI: bits muss 1..16 sein".into());
+                    }
+                    b as u32
+                } else { 8 };
+                let cutoff = if a.len() >= 3 {
+                    let c = need_f(a, 2, "AUDIO_LOFI")?;
+                    if c < 0.0 { return Err("AUDIO_LOFI: cutoff_hz muss >= 0 sein".into()); }
+                    c
+                } else { 3300.0 };
+                self.audio_mut()?.set_lofi(on, bits, cutoff);
+                Value::Nil
+            }
             "playsound" => {
                 // PLAYSOUND(sound[, loops, volume]). `loops` wird nativ ignoriert
                 // (raylib-Sounds loopen nicht) -- SFX spielen einmal.

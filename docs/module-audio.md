@@ -239,6 +239,31 @@ spielt eine Melodie + Bass ueber die ganze Klaviatur (anklickbar).
 > ein fertiges Tracker-Stueck will, spielt ein `.mod`/`.xm` ueber `PLAYMUSIC`
 > (siehe oben) -- das bringt seine Samples + Patterns selbst mit.
 
+## Paula-Lo-Fi (Amiga-Klang)
+
+`AUDIO_LOFI(an[, bits[, cutoff_hz]])` schaltet einen **Lo-Fi-Modus** fuer alle
+danach **synthetisierten** Sounds (`AUDIO_TONE`/`AUDIO_NOISE`/`AUDIO_SFX` +
+`SAMPLE_PLAY`) -- der knusprige Amiga/Paula-Charakter:
+
+- **Bit-Crush** auf `bits` Aufloesung (1..16, Default **8** = Amiga).
+- **LED-Tiefpass** bei `cutoff_hz` (Default **3300 Hz** -- der beruehmte
+  Amiga-500-Filter; `0` = aus).
+
+Die Kette laeuft in der Reihenfolge des echten Amiga: erst 8-bit-Quantisierung
+(DAC), dann der analoge Tiefpass. Sie wirkt nur auf **neu gebaute** Sounds --
+der Sample-Cache wird beim Umschalten geleert, geladene Dateien (`LOADSOUND`)
+und Musik bleiben unberuehrt.
+
+```basic
+AUDIO_LOFI(TRUE)                 ' 8-bit + 3.3 kHz -- klassischer Amiga-Klang
+AUDIO_LOFI(TRUE, 4)              ' noch crunchiger (4-bit)
+AUDIO_LOFI(TRUE, 8, 0.0)        ' 8-bit, Filter aus (roher Bit-Crush)
+AUDIO_LOFI(FALSE)                ' wieder Hi-Fi
+```
+
+Demo: in [examples/116_sampler.gb](../examples/116_sampler.gb) mit `L`
+umschaltbar (A/B-Vergleich Hi-Fi vs. Paula).
+
 ## Externer Typ
 
 | Typ | Wirkung |
@@ -300,7 +325,7 @@ END IF
 
 [examples/115_modplayer.gb](../examples/115_modplayer.gb) — **Amiga-Modul-Player**: spielt ProTracker-`.mod`/`.xm` direkt (`PLAYMUSIC`/`AUDIO_MUSIC_*`), mit echtem Spektrum (`AUDIO_FFT`) und Drag&Drop fuers eigene Modul. Liefert ein selbst generiertes, gemeinfreies Demo-Modul mit (`examples/assets/demo.mod`, Generator `examples/assets/make_demo_mod.py`).
 
-[examples/116_sampler.gb](../examples/116_sampler.gb) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten.
+[examples/116_sampler.gb](../examples/116_sampler.gb) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
 
 ## In der nativen Runtime (gbrt)
 
