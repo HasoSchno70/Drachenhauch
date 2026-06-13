@@ -66,24 +66,24 @@ def _launch_particle_editor(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
-def _launch_sfx_editor(project_root, initial_file=None):
+def _launch_audio_studio(project_root, initial_file=None, tab="tracker"):
+    # Vereintes Audio Studio (Tracker + SFX in Tabs). gbsfx/gbtracker oeffnen
+    # dasselbe Fenster auf dem passenden Tab.
     try:
-        from gamebasic.sfxeditor_qt import launch
+        from gamebasic.audiostudio_qt import launch
     except SystemExit:
         return None
     except ImportError:
         return None
-    return launch(project_root, initial_file)
+    return launch(project_root, initial_file, tab=tab)
+
+
+def _launch_sfx_editor(project_root, initial_file=None):
+    return _launch_audio_studio(project_root, initial_file, tab="sfx")
 
 
 def _launch_tracker_editor(project_root, initial_file=None):
-    try:
-        from gamebasic.trackereditor_qt import launch
-    except SystemExit:
-        return None
-    except ImportError:
-        return None
-    return launch(project_root, initial_file)
+    return _launch_audio_studio(project_root, initial_file, tab="tracker")
 
 
 def _launch_tilemap_editor(project_root, initial_file=None):
@@ -208,7 +208,19 @@ def main(argv):
             return 3
         return rc
 
-    # --- SFX-Generator explizit per Flag ---
+    # --- Audio Studio (vereint Tracker + SFX) explizit per Flag ---
+    if args and args[0] in ("--audio", "--studio", "--audio-studio"):
+        args = args[1:]
+        initial = Path(args[0]) if args else None
+        rc = _launch_audio_studio(Path(__file__).resolve().parent, initial, tab="tracker")
+        if rc is None:
+            print("Audio Studio benoetigt 'PySide6' und 'numpy'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
+            return 3
+        return rc
+
+    # --- SFX-Generator per Flag (oeffnet das Studio auf dem SFX-Tab) ---
     if args and args[0] in ("--sfx", "--sound", "--sfx-editor"):
         args = args[1:]
         rc = _launch_sfx_editor(Path(__file__).resolve().parent, None)
@@ -219,10 +231,11 @@ def main(argv):
             return 3
         return rc
 
-    # --- Tracker (Musik-Editor) explizit per Flag ---
+    # --- Tracker per Flag (oeffnet das Studio auf dem Tracker-Tab) ---
     if args and args[0] in ("--tracker", "--music"):
         args = args[1:]
-        rc = _launch_tracker_editor(Path(__file__).resolve().parent, None)
+        initial = Path(args[0]) if args else None
+        rc = _launch_tracker_editor(Path(__file__).resolve().parent, initial)
         if rc is None:
             print("Tracker benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")

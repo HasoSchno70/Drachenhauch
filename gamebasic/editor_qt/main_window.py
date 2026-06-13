@@ -1783,42 +1783,36 @@ class GameBasicEditor(QMainWindow):
         self._particle_editor_window.activateWindow()
 
     def _open_sfx_editor(self) -> None:
-        """Oeffnet den SFX-Generator als zweites Top-Level-Fenster (in-process)."""
-        try:
-            from .. import sfxeditor_qt as sfx
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(
-                self, "SFX-Generator-Fehler",
-                f"Konnte SFX-Generator nicht laden:\n"
-                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
-            return
-        self._sfx_editor_window = sfx.SfxGenerator(self.project_root)
-        self._sfx_editor_window.setAttribute(
-            Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self._sfx_editor_window.destroyed.connect(
-            lambda: setattr(self, "_sfx_editor_window", None))
-        self._sfx_editor_window.show()
-        self._sfx_editor_window.raise_()
-        self._sfx_editor_window.activateWindow()
+        """Oeffnet das Audio Studio auf dem SFX-Tab."""
+        self._open_audio_studio("sfx")
 
     def _open_tracker_editor(self) -> None:
-        """Oeffnet den Tracker (Musik-Editor) als zweites Top-Level-Fenster."""
-        try:
-            from .. import trackereditor_qt as trk
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(
-                self, "Tracker-Fehler",
-                f"Konnte Tracker nicht laden:\n"
-                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
-            return
-        self._tracker_editor_window = trk.TrackerEditor(self.project_root)
-        self._tracker_editor_window.setAttribute(
-            Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self._tracker_editor_window.destroyed.connect(
-            lambda: setattr(self, "_tracker_editor_window", None))
-        self._tracker_editor_window.show()
-        self._tracker_editor_window.raise_()
-        self._tracker_editor_window.activateWindow()
+        """Oeffnet das Audio Studio auf dem Tracker-Tab."""
+        self._open_audio_studio("tracker")
+
+    def _open_audio_studio(self, tab: str = "tracker") -> None:
+        """Oeffnet das vereinte Audio Studio (Tracker + SFX) als zweites
+        Top-Level-Fenster (in-process). Ein einziges Fenster wird
+        wiederverwendet -- ein erneuter Aufruf wechselt nur den Tab."""
+        win = getattr(self, "_audio_studio_window", None)
+        if win is None:
+            try:
+                from .. import audiostudio_qt as studio
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(
+                    self, "Audio-Studio-Fehler",
+                    f"Konnte Audio Studio nicht laden:\n"
+                    f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
+                return
+            win = studio.AudioStudio(self.project_root)
+            win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+            win.destroyed.connect(
+                lambda: setattr(self, "_audio_studio_window", None))
+            self._audio_studio_window = win
+            win.showMaximized()
+        win.select_tab(tab)
+        win.raise_()
+        win.activateWindow()
 
     def _open_tilemap_editor(self) -> None:
         """Oeffnet den Tilemap-/Level-Editor als zweites Top-Level-Fenster."""

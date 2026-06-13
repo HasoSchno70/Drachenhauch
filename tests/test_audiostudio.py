@@ -1,0 +1,64 @@
+"""Tests fuer das vereinte Audio Studio (Tracker + SFX als Tabs).
+
+Headless (offscreen). Prueft, dass beide Editoren eingebettet und ihre
+Undo-Shortcuts auf den Tab-Teilbaum beschraenkt sind (sonst "ambiguous
+shortcut" bei zwei Strg+Z im selben Fenster), und dass die Tab-Wahl klappt.
+"""
+import os
+
+import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "hide")
+
+
+@pytest.fixture(scope="module")
+def _qapp():
+    try:
+        from PySide6.QtWidgets import QApplication
+    except Exception:  # pragma: no cover - PySide6 fehlt
+        pytest.skip("PySide6 nicht verfuegbar")
+    app = QApplication.instance() or QApplication([])
+    yield app
+
+
+def _studio(_qapp):
+    from pathlib import Path
+    from gamebasic.audiostudio_qt import AudioStudio
+    return AudioStudio(Path("."))
+
+
+def test_studio_embeds_both_editors(_qapp):
+    from gamebasic.trackereditor_qt import TrackerEditor
+    from gamebasic.sfxeditor_qt import SfxGenerator
+    st = _studio(_qapp)
+    assert st.tabs.count() == 2
+    assert isinstance(st.tracker, TrackerEditor)
+    assert isinstance(st.sfx, SfxGenerator)
+    # beide Editoren sind als Tab-Seiten eingebettet
+    assert st.tabs.widget(0) is st.tracker
+    assert st.tabs.widget(1) is st.sfx
+
+
+def test_embedded_undo_shortcuts_are_tab_scoped(_qapp):
+    from PySide6.QtGui import QShortcut
+    from PySide6.QtCore import Qt
+    st = _studio(_qapp)
+    for ed in (st.tracker, st.sfx):
+        shortcuts = ed.findChildren(QShortcut)
+        assert shortcuts, "Editor sollte Undo/Redo-Shortcuts haben"
+        for sc in shortcuts:
+            assert sc.context() == Qt.ShortcutContext.WidgetWithChildrenShortcut
+
+
+def test_select_tab_by_name(_qapp):
+    st = _studio(_qapp)
+    st.select_tab("sfx")
+    assert st.tabs.currentIndex() == 1
+    st.select_tab("tracker")
+    assert st.tabs.currentIndex() == 0
+    st.select_tab("sound")          # Alias fuer SFX
+    assert st.tabs.currentIndex() == 1
+    st.select_tab("music")          # Alias fuer Tracker
+    assert st.tabs.currentIndex() == 0
