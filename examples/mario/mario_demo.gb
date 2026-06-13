@@ -1,79 +1,60 @@
-' Mario-Clone-Demo -- zeigt die mit examples/mario/make_sprites.py gebauten
-' Sprites in Aktion: Held laeuft (Pfeile), springt (Leertaste/Hoch), bremst,
-' duckt sich (Runter); Goombas patrouillieren und lassen sich draufspringen;
-' ein fliegender Para schwebt in einer Sinuswelle vorbei.
-'
-' Voraussetzung: erst `py examples/mario/make_sprites.py` ausfuehren, damit
-' hero.png / goomba.png / para.png neben dieser Datei liegen.
+' Mario-Clone-Demo (32x32) -- zeigt die mit examples/mario/make_sprites.py
+' gebauten Sprites + Tiles in Aktion:
+'   * Held (hero.png) laeuft (Pfeile), springt (Leer/Hoch), duckt (Runter), Flip
+'   * Goomba (goomba.png) patrouilliert und laesst sich per Stomp plattmachen
+'   * Level aus dem Master-Atlas sheet.json: Boden, Roehre, ?-Bloecke, Wasser,
+'     animierte Muenzen, Wolken/Busch/Huegel
+' Voraussetzung: erst `py examples/mario/make_sprites.py` ausfuehren.
 IMPORT "sprite"
 
-CONST W AS INTEGER = 256
-CONST H AS INTEGER = 224
-CONST GROUND AS FLOAT = 176.0          ' Boden-Oberkante (Sprite-Top der Figuren)
-SCREEN(W, H, "Mario-Clone (Pfeile/Leertaste, ESC = Ende)", 3)
+CONST TS AS INTEGER = 32
+CONST W AS INTEGER = 384
+CONST H AS INTEGER = 288
+CONST GROUND AS FLOAT = 192.0          ' Sprite-Oberkante der Figuren am Boden
+SCREEN(W, H, "Mario-Clone 32x32 (Pfeile/Leer, ESC)", 2)
 
-' --- Held ---------------------------------------------------------------
+' --- Level-Atlas (Master-Spritesheet) ---
+DIM atlas AS SPRITE_ATLAS
+atlas = ATLAS_LOAD("sheet.json")
+
+' --- Held ---
 DIM hsheet AS IMAGE
 hsheet = LOADIMAGE("hero.png")
 DIM hero AS SPRITE
-hero = SPRITE_NEW(hsheet, 16, 16)
+hero = SPRITE_NEW(hsheet, TS, TS)
 SPRITE_ADD_ANIM(hero, "idle", 0, 0, 1.0)
 SPRITE_ADD_ANIM(hero, "run",  1, 3, 12.0)
 SPRITE_ADD_ANIM(hero, "jump", 4, 4, 1.0)
-SPRITE_ADD_ANIM(hero, "skid", 5, 5, 1.0)
 SPRITE_ADD_ANIM(hero, "duck", 6, 6, 1.0)
 SPRITE_PLAY(hero, "idle")
-
 DIM hx AS FLOAT
 DIM hy AS FLOAT
-DIM hvx AS FLOAT
 DIM hvy AS FLOAT
 DIM on_ground AS BOOLEAN
 DIM face_left AS BOOLEAN
-hx = 60.0
+hx = 48.0
 hy = GROUND
-hvx = 0.0
 hvy = 0.0
 on_ground = TRUE
 face_left = FALSE
 
-' --- Goombas ------------------------------------------------------------
+' --- Goomba ---
 DIM gsheet AS IMAGE
 gsheet = LOADIMAGE("goomba.png")
-DIM gA AS SPRITE
-DIM gB AS SPRITE
-gA = SPRITE_NEW(gsheet, 16, 16)
-gB = SPRITE_NEW(gsheet, 16, 16)
-SPRITE_ADD_ANIM(gA, "walk", 0, 1, 6.0)
-SPRITE_ADD_ANIM(gA, "squash", 2, 2, 1.0)
-SPRITE_ADD_ANIM(gB, "walk", 0, 1, 6.0)
-SPRITE_ADD_ANIM(gB, "squash", 2, 2, 1.0)
-SPRITE_PLAY(gA, "walk")
-SPRITE_PLAY(gB, "walk")
+DIM goo AS SPRITE
+goo = SPRITE_NEW(gsheet, TS, TS)
+SPRITE_ADD_ANIM(goo, "walk", 0, 1, 6.0)
+SPRITE_ADD_ANIM(goo, "squash", 2, 2, 1.0)
+SPRITE_PLAY(goo, "walk")
+DIM gx AS FLOAT
+DIM gdir AS FLOAT
+DIM g_dead AS INTEGER
+gx = 220.0
+gdir = -1.0
+g_dead = 0
 
-DIM gAx AS FLOAT
-DIM gAdir AS FLOAT
-DIM gA_dead AS INTEGER          ' >0 = Squash-Timer (ms) laeuft
-DIM gBx AS FLOAT
-DIM gBdir AS FLOAT
-DIM gB_dead AS INTEGER
-gAx = 150.0
-gAdir = -1.0
-gA_dead = 0
-gBx = 210.0
-gBdir = 1.0
-gB_dead = 0
-
-' --- Para (fliegt) ------------------------------------------------------
-DIM psheet AS IMAGE
-psheet = LOADIMAGE("para.png")
-DIM para AS SPRITE
-para = SPRITE_NEW(psheet, 16, 16)
-SPRITE_ADD_ANIM(para, "fly", 0, 1, 7.0)
-SPRITE_PLAY(para, "fly")
-DIM px AS FLOAT
-px = 260.0
-
+DIM coinf AS INTEGER
+coinf = 0
 DIM t AS FLOAT
 t = 0.0
 DIM last_ms AS INTEGER
@@ -81,59 +62,54 @@ last_ms = MILLIS()
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
-
     DIM now_ms AS INTEGER
     now_ms = MILLIS()
     DIM dt AS INTEGER
     dt = now_ms - last_ms
     last_ms = now_ms
-    IF dt > 60 THEN dt = 60          ' grosse Spikes kappen
+    IF dt > 60 THEN dt = 60
     DIM dts AS FLOAT
     dts = dt / 1000.0
     t = t + dts
 
-    ' --- Eingabe ---
+    ' --- Eingabe + Physik Held ---
+    DIM vx AS FLOAT
     DIM ducking AS BOOLEAN
+    vx = 0.0
     ducking = FALSE
-    hvx = 0.0
-    IF KEYPRESSED(1073741904) THEN          ' LEFT
-        hvx = -90.0
+    IF KEYPRESSED(1073741904) THEN
+        vx = -100.0
         face_left = TRUE
     END IF
-    IF KEYPRESSED(1073741903) THEN          ' RIGHT
-        hvx = 90.0
+    IF KEYPRESSED(1073741903) THEN
+        vx = 100.0
         face_left = FALSE
     END IF
-    IF on_ground AND KEYPRESSED(1073741905) THEN   ' DOWN -> ducken
+    IF on_ground AND KEYPRESSED(1073741905) THEN
         ducking = TRUE
-        hvx = 0.0
+        vx = 0.0
     END IF
-    DIM jump AS BOOLEAN
-    jump = KEYPRESSED(32) OR KEYPRESSED(1073741906)   ' SPACE / UP
-    IF on_ground AND jump AND NOT ducking THEN
-        hvy = -260.0
+    IF on_ground AND (KEYPRESSED(32) OR KEYPRESSED(1073741906)) AND NOT ducking THEN
+        hvy = -300.0
         on_ground = FALSE
     END IF
-
-    ' --- Physik Held ---
-    hvy = hvy + 700.0 * dts          ' Schwerkraft
-    hx = hx + hvx * dts
+    hvy = hvy + 800.0 * dts
+    hx = hx + vx * dts
     hy = hy + hvy * dts
     IF hx < 0.0 THEN hx = 0.0
-    IF hx > W - 16.0 THEN hx = W - 16.0
+    IF hx > W - TS THEN hx = W - TS
     IF hy >= GROUND THEN
         hy = GROUND
         hvy = 0.0
         on_ground = TRUE
     END IF
 
-    ' --- Anim-Auswahl ---
     SPRITE_SET_FLIP(hero, face_left, FALSE)
     IF NOT on_ground THEN
         SPRITE_PLAY(hero, "jump")
     ELSEIF ducking THEN
         SPRITE_PLAY(hero, "duck")
-    ELSEIF hvx <> 0.0 THEN
+    ELSEIF vx <> 0.0 THEN
         SPRITE_PLAY(hero, "run")
     ELSE
         SPRITE_PLAY(hero, "idle")
@@ -141,61 +117,65 @@ WHILE NOT QUITREQUESTED()
     SPRITE_SET_POS(hero, hx, hy)
     SPRITE_UPDATE(hero, dt)
 
-    ' --- Goombas bewegen ---
-    IF gA_dead = 0 THEN
-        gAx = gAx + gAdir * 28.0 * dts
-        IF gAx < 96.0 THEN gAdir = 1.0
-        IF gAx > 176.0 THEN gAdir = -1.0
-        SPRITE_SET_FLIP(gA, gAdir > 0.0, FALSE)
+    ' --- Goomba ---
+    IF g_dead = 0 THEN
+        gx = gx + gdir * 36.0 * dts
+        IF gx < 96.0 THEN gdir = 1.0
+        IF gx > 300.0 THEN gdir = -1.0
+        SPRITE_SET_FLIP(goo, gdir > 0.0, FALSE)
+        IF hvy > 0.0 AND SPRITE_COLLIDES(hero, goo) THEN
+            SPRITE_PLAY(goo, "squash")
+            g_dead = 700
+            hvy = -220.0
+        END IF
     ELSE
-        gA_dead = gA_dead - dt
+        g_dead = g_dead - dt
     END IF
-    SPRITE_SET_POS(gA, gAx, GROUND)
-    SPRITE_UPDATE(gA, dt)
+    SPRITE_SET_POS(goo, gx, GROUND)
+    SPRITE_UPDATE(goo, dt)
 
-    IF gB_dead = 0 THEN
-        gBx = gBx + gBdir * 34.0 * dts
-        IF gBx < 188.0 THEN gBdir = 1.0
-        IF gBx > 236.0 THEN gBdir = -1.0
-        SPRITE_SET_FLIP(gB, gBdir > 0.0, FALSE)
-    ELSE
-        gB_dead = gB_dead - dt
-    END IF
-    SPRITE_SET_POS(gB, gBx, GROUND)
-    SPRITE_UPDATE(gB, dt)
+    ' --- Muenz-Animation ---
+    coinf = INT(t * 10.0) MOD 4
 
-    ' --- Stomp-Pruefung (Held faellt von oben auf einen Goomba) ---
-    IF gA_dead = 0 AND hvy > 0.0 AND SPRITE_COLLIDES(hero, gA) THEN
-        SPRITE_PLAY(gA, "squash")
-        gA_dead = 600
-        hvy = -200.0          ' Abprall
-    END IF
-    IF gB_dead = 0 AND hvy > 0.0 AND SPRITE_COLLIDES(hero, gB) THEN
-        SPRITE_PLAY(gB, "squash")
-        gB_dead = 600
-        hvy = -200.0
-    END IF
+    ' =================== Zeichnen ===================
+    CLS(RGB(104, 168, 252))                 ' Himmel
+    ' Deko-Hintergrund
+    ATLAS_DRAW(atlas, "cloud", 40, 30)
+    ATLAS_DRAW(atlas, "cloud", 250, 50)
+    ATLAS_DRAW(atlas, "hill", 150, GROUND - 8)
+    ATLAS_DRAW(atlas, "bush", 70, GROUND + 8)
+    ATLAS_DRAW(atlas, "bush", 300, GROUND + 8)
 
-    ' --- Para fliegt nach links, wickelt um, schwebt in Sinuswelle ---
-    px = px - 40.0 * dts
-    IF px < -16.0 THEN px = W * 1.0 + 8.0
-    SPRITE_SET_POS(para, px, 70.0 + SIN(t * 3.0) * 18.0)
-    SPRITE_UPDATE(para, dt)
-
-    ' --- Zeichnen ---
-    CLS(RGB(92, 148, 252))                 ' Himmelblau
-    BOX(0, INT(GROUND) + 14, W - 1, H - 1, RGB(196, 112, 48))   ' Erde
-    BOX(0, INT(GROUND) + 14, W - 1, INT(GROUND) + 18, RGB(96, 200, 72)) ' Gras
-    ' Ein paar Backstein-Bloecke zur Deko (gefuellt + dunkler Rand)
+    ' Boden (zwei Reihen)
     DIM bx AS INTEGER
-    FOR bx = 0 TO 3
-        BOX(40 + bx * 56, 96, 40 + bx * 56 + 15, 111, RGB(200, 96, 48))
-        RECT(40 + bx * 56, 96, 40 + bx * 56 + 15, 111, RGB(120, 52, 24))
+    FOR bx = 0 TO W STEP TS
+        ATLAS_DRAW(atlas, "ground", bx, 224)
+        ATLAS_DRAW(atlas, "ground", bx, 256)
     NEXT
 
-    IF gA_dead = 0 OR gA_dead > 0 THEN SPRITE_DRAW(gA)
-    IF gB_dead = 0 OR gB_dead > 0 THEN SPRITE_DRAW(gB)
-    SPRITE_DRAW(para)
+    ' Schwebende Bloecke: Brick, ?-Block, Brick
+    ATLAS_DRAW(atlas, "brick", 96, 120)
+    ATLAS_DRAW(atlas, "qblock_q0", 128, 120)
+    ATLAS_DRAW(atlas, "brick", 160, 120)
+
+    ' Roehre (2 Tiles breit, 2 hoch) bei x=256
+    ATLAS_DRAW(atlas, "pipe_tl", 256, 160)
+    ATLAS_DRAW(atlas, "pipe_tr", 288, 160)
+    ATLAS_DRAW(atlas, "pipe_bl", 256, 192)
+    ATLAS_DRAW(atlas, "pipe_br", 288, 192)
+
+    ' Wasserbecken rechts (auf Bodenhoehe)
+    ATLAS_DRAW(atlas, "water_w0", 352, 224)
+    ATLAS_DRAW(atlas, "water_body", 352, 256)
+
+    ' Animierte Muenzen ueber den Bloecken
+    DIM cname AS STRING
+    cname = "coin_c" + STR$(coinf)
+    ATLAS_DRAW(atlas, cname, 100, 80)
+    ATLAS_DRAW(atlas, cname, 196, 80)
+
+    ' Figuren
+    IF g_dead = 0 OR g_dead > 0 THEN SPRITE_DRAW(goo)
     SPRITE_DRAW(hero)
 
     TEXT(4, 4, "Pfeile / Leer", RGB(255, 255, 255))

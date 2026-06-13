@@ -1,0 +1,25 @@
+{
+  "version": 5,
+  "width": 32,
+  "height": 32,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAkElEQVR4nGNgGAUDDBinnfjzH8TIsmBhRJeEydFKHgSYsCmmBx/DAciKcCmmljwyYEEXsGn5glUzreSZGAYYMCFzlu35gUKjA2rJIwNGQkFGa8A0kJaPOmBQhAC8HIhy4SCYYmmhhnE0FzAMMGAadQDDaBQMMGAadQDDaBQMMGB5cefKgDqAaUBtZxh1AAMDACpMbALAowWbAAAAAElFTkSuQmCC",
+      "duration_ms": 120,
+      "name": "w0"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAhElEQVR4nGNgGAUDDBhhjGkn/vyHsbMsWODitJZnQpekN58JXRJdEa3lmRjwAJuWL/9pLc/EMMCAadmeH1glYOK0lmckFEy0BkwDafmoA0ZDYFCEAAuMEeXCgSKBLf/SQg3jaDnAMMCAadQBDKNRMMCAadQBDAMMWF7cuTKyQ4BpxDsAAIrZdQzPfzEPAAAAAElFTkSuQmCC",
+      "duration_ms": 120,
+      "name": "w1"
+    }
+  ],
+  "anims": [
+    {
+      "name": "wave",
+      "first": 0,
+      "last": 1,
+      "fps": 3
+    }
+  ]
+}

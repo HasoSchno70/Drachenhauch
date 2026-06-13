@@ -1,0 +1,25 @@
+{
+  "version": 5,
+  "width": 32,
+  "height": 32,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABsUlEQVR4nLWWMU7DMBSG7acKoQ4IecgQ5QBMCHXgCD0EYuoRGBgQI2LowBE6IQaO0AMwMDD0DBVDhgwMCGUJclQnr5Zjv2cnvxTFjmP/n+2XF0uRoFwVjSl/V3sZM4ZMMX06rbvnj38nIgZmxjXHpstM9Y1l1cOooqFCyBhzbJx97kR5fdnVtwcQvSIUCMkxP5rxwdwIQxgQCgRQzX2m2By36344ZlySVHM9e9+MXXCU7QDBkGvGnPZogCXa+9DguN2OGZZyVTSbPGuv/dVFU9d1W9Z3aln3M2MMxcKMA7X++RVr1c/KV95VfV5I3oItSjIcUfrBUIOOWpxeUzTaV3B/Nm+XVl+hMlUyOvczlt+3AjI0kA0RArH3PZSOZQhgCMIGcQUc5V8gKQA+iCFR/4ZAHZDzVVDNtVgnIpzN5qtz8fBWdm3Vx0q8LF47WOqYwDG/+7o9evZ8k4n3zaI1jz0bAtfchkgVcMyNxoSA0At6Sc3eGtl1W6FTEAvAhqCY6xWiQgDlJQwRCjIcKxQIoAIYCIo5rocgQIwoV6wkH8u5wrEyaioeO1YmAxBTpeKp9A/kqzg7Mh/KuAAAAABJRU5ErkJggg==",
+      "duration_ms": 120,
+      "name": "open"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABj0lEQVR4nMWWMU4DMRBFxyOEEBXaYotoC05AkYIj5BCIKkegRJSIkiNQIQqOkANQUFBwBpRii60RTZBRvJlYjv3H9opfZdeT+c/22DuGCjRruo37vR6+TE4OU2J6f/Izvr/7PqYcmCOtuTRdtM1usB92ME23QSFMjrk0bt8/qb+8GJ9XWxC7IgiE0ZjvzXhr7iQhHAgCwah5zFSay3H7P1kzIRnU3M4+NuMQHLIdTAqFZqwZzwZYiL1PJZfjfs2oAGbe3pcoVgusSST3uEacFXQRuWKi8w7LisZRxilACszFVT0Fq36Aq1uap8T0zzKpgNBpiB0vf+ap69gglIeOpAQJLTnyLTAIQAzikNCvIaMJbTLZdNQwt1J1RPI2O12e0e1LP44Nb0t6nD+PsGhO1pjffFzvvXu4aun1af5nntsbstbchygVa8ydakJwKsAuqdtbJ//ZV6oLUgH4EIi5XSEUgpEgCZEqMlkrCASjAA4CMZfPKQimigrVSnFbrpWslapXce1ambQfWE9xFU+lXwzJ7tnGZzf/AAAAAElFTkSuQmCC",
+      "duration_ms": 120,
+      "name": "closed"
+    }
+  ],
+  "anims": [
+    {
+      "name": "bite",
+      "first": 0,
+      "last": 1,
+      "fps": 3
+    }
+  ]
+}
