@@ -19,5 +19,6 @@
   "Tupel & Destructuring": 36,
   "Klassen & Objekte": 61,
   "Vererbung, Properties, Operatoren & Static": 66,
-  "ENUM": 21
+  "ENUM": 21,
+  "Comprehensions": 75
 }

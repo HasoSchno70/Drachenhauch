@@ -45,7 +45,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 20 Klassen & Objekte  (content/20_klassen.js)
 - [x] 21 Vererbung, Properties, Operatoren, Static  (content/21_oop_fortgeschritten.js)
 - [x] 22 ENUM  (content/22_enum.js)
-- [ ] 23 Comprehensions (List/Dict/Set)
+- [x] 23 Comprehensions (List/Dict/Set)  (content/23_comprehensions.js)
 - [ ] 24 Fehlerbehandlung (TRY/CATCH/THROW)
 - [ ] 25 Coroutinen (YIELD)
 - [ ] 26 Module importieren (IMPORT)
@@ -99,6 +99,7 @@ NEW, SUB Init/Self, Methoden SUB/FUNCTION, impliziter Methodenaufruf, viele
 unabhängige Objekte, Verweis-Semantik) + Kap 21 (Vererbung EXTENDS/Überschreiben/
 Polymorphie, Properties GET/SET, Operator-Überladung OPERATOR, STATIC CONST).
 + Kap 22 (ENUM: kompakt/Block, Auto-Nummerierung, eigene Werte, gemischt,
-SELECT CASE, Keyword-Member). 74 Seiten, alle Ausgaben gegen gbrt verifiziert,
-per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
-**Nächstes:** Kap 23 (Comprehensions: List/Dict/Set).
+SELECT CASE, Keyword-Member) + Kap 23 (Comprehensions: List `[e FOR v IN s]` +WHERE,
+Dict `{k:v FOR...}`→MAP, Set `{e FOR...}`→dedup-TUPLE). 77 Seiten, alle Ausgaben gegen
+gbrt verifiziert, per LibreOffice gerendert. Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher.
+**Nächstes:** Kap 24 (Fehlerbehandlung: TRY/CATCH/THROW).
