@@ -4,8 +4,8 @@ module.exports = (H) => [
   H.note("Netzwerk ist ein großes Thema; dieses Kapitel zeigt die Bausteine und ein lauffähiges Beispiel auf demselben Rechner (über die Adresse 127.0.0.1, „localhost“). Für echtes Spiel über mehrere Geräte kommen Firewall- und IP-Fragen dazu, die den Rahmen sprengen."),
 
   H.h2("TCP oder UDP?"),
-  H.bulletRich("TCP", "– verbindungsorientiert, zuverlässig: Alles kommt vollständig und in der richtigen Reihenfolge an. Richtig für Chat, rundenbasierte Spiele, Lobby-Anmeldung."),
-  H.bulletRich("UDP", "– verbindungslos, schnell: Einzelne Pakete können verloren gehen oder die Reihenfolge tauschen, dafür ist es flink. Richtig für ständige Positions-Updates in Action-Spielen, wo das nächste Paket den Verlust ohnehin überholt."),
+  H.bulletRich("TCP", " – verbindungsorientiert, zuverlässig: Alles kommt vollständig und in der richtigen Reihenfolge an. Richtig für Chat, rundenbasierte Spiele, Lobby-Anmeldung."),
+  H.bulletRich("UDP", " – verbindungslos, schnell: Einzelne Pakete können verloren gehen oder die Reihenfolge tauschen, dafür ist es flink. Richtig für ständige Positions-Updates in Action-Spielen, wo das nächste Paket den Verlust ohnehin überholt."),
 
   H.h2("TCP: Server und Client"),
   H.p("Ein TCP-Server lauscht mit NET_TCP_LISTEN auf einem Port. NET_TCP_ACCEPT holt eine wartende Verbindung ab – oder liefert NIL, wenn gerade niemand verbindet (das prüfst du mit IS_NIL). Ein Client baut die Verbindung mit NET_TCP_CONNECT auf. Über die fertige Verbindung schickst du Text mit NET_SEND und liest mit NET_RECV."),

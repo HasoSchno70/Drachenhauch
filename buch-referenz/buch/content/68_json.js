@@ -27,9 +27,9 @@ module.exports = (H) => [
 
   H.h2("Die Pfad-Notation"),
   H.p("Ein Pfad beschreibt den Weg zu einem Wert. Felder eines Objekts trennst du mit Punkt, Array-Einträge sprichst du über ihren Index an – ebenfalls mit Punkt. Ein leerer Pfad \"\" meint die Wurzel selbst."),
-  H.bulletRich("\"user.name\"", "– Feld name im Unter-Objekt user."),
-  H.bulletRich("\"hobbies.0\"", "– der erste Eintrag (Index 0) des Arrays hobbies."),
-  H.bulletRich("\"items.2.titel\"", "– Feld titel des dritten Array-Eintrags."),
+  H.bulletRich("\"user.name\"", " – Feld name im Unter-Objekt user."),
+  H.bulletRich("\"hobbies.0\"", " – der erste Eintrag (Index 0) des Arrays hobbies."),
+  H.bulletRich("\"items.2.titel\"", " – Feld titel des dritten Array-Eintrags."),
 
   H.h2("Werte lesen: die typsicheren Getter"),
   H.p("Für jeden Grundtyp gibt es einen eigenen Getter. Er liefert genau diesen Typ zurück – passt der Wert im Dokument nicht dazu, gibt es einen Fehler. So fällt ein Tippfehler in der Datenstruktur sofort auf, statt sich still durchzuschleichen."),
