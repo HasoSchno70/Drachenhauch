@@ -1,0 +1,62 @@
+' Abschlussprojekt: "Muenzfang" -- fange die fallenden Muenzen mit dem Korb.
+IMPORT "audio"
+SCREEN(480, 320, "Muenzfang")
+
+CONST ANZAHL AS INTEGER = 6
+DIM mx[ANZAHL] AS INTEGER      ' Muenz-x
+DIM my[ANZAHL] AS INTEGER      ' Muenz-y
+DIM ms[ANZAHL] AS INTEGER      ' Fallgeschwindigkeit
+
+RANDOMIZE(3)
+DIM i AS INTEGER
+FOR i = 0 TO ANZAHL - 1
+    mx[i] = RANDINT(20, 450)
+    my[i] = RANDINT(0, 240)
+    ms[i] = RANDINT(90, 170)
+NEXT
+
+DIM korbx AS FLOAT
+korbx = 210.0
+DIM punkte AS INTEGER
+punkte = 0
+
+WHILE NOT QUITREQUESTED()
+    ' --- Eingabe ---
+    IF KEYPRESSED(KEY_LEFT)  THEN korbx = korbx - 260.0 * DELTA()
+    IF KEYPRESSED(KEY_RIGHT) THEN korbx = korbx + 260.0 * DELTA()
+    IF korbx < 0.0 THEN korbx = 0.0
+    IF korbx > 420.0 THEN korbx = 420.0
+
+    ' --- Muenzen bewegen + fangen ---
+    FOR i = 0 TO ANZAHL - 1
+        my[i] = my[i] + INT(ms[i] * DELTA())
+        ' gefangen?
+        IF my[i] > 280 AND my[i] < 310 THEN
+            IF mx[i] > INT(korbx) - 10 AND mx[i] < INT(korbx) + 70 THEN
+                punkte = punkte + 1
+                PLAYSOUND(AUDIO_TONE(880, 90, "square", 0.4))
+                my[i] = RANDINT(-90, -10)
+                mx[i] = RANDINT(20, 450)
+            END IF
+        END IF
+        ' unten raus -> neu oben
+        IF my[i] > 330 THEN
+            my[i] = RANDINT(-90, -10)
+            mx[i] = RANDINT(20, 450)
+        END IF
+    NEXT
+
+    ' --- Zeichnen ---
+    CLS(RGB(20, 24, 40))
+    FOR i = 0 TO ANZAHL - 1
+        CIRCLE(mx[i], my[i], 10, RGB(255, 205, 40))
+        CIRCLE(mx[i] - 3, my[i] - 3, 3, RGB(255, 240, 180))
+    NEXT
+    ' Korb
+    BOXROUND(INT(korbx), 290, INT(korbx) + 60, 312, 8, RGB(180, 120, 60))
+    RECTROUND(INT(korbx), 290, INT(korbx) + 60, 312, 8, RGB(240, 200, 120))
+    ' HUD
+    TEXT(10, 8, "Punkte: " + STR$(punkte), WHITE)
+    TEXT(270, 8, "Pfeiltasten: Korb", RGB(150, 160, 190))
+    FLIP()
+WEND

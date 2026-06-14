@@ -71,6 +71,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)  (content/46_sound.js, images/46_sound.png)
 - [x] 47 Layer, Sprite-Atlas, Bulk-Draws  (content/47_layer_atlas.js, images/47_layer.png)
 - [x] 48 3D-Grafik (g3d)  (content/48_3d.js, images/48_3d.png)
+- [x] 49 Abschlussprojekt: Münzfang (Grafik+Sound-Spiel)  (content/49_projekt.js, images/49_catch.png)
 
 ### Teil V — Die Module
 - [ ] 50 sprite · 51 animfsm · 52 tween · 53 timer · 54 particles
@@ -153,4 +154,10 @@ flip_y, tint=Arg7; commit 8aa315f); Kap-47-Beispiel auf TRUE/FALSE umgestellt.
 + Kap 48 (3D-Grafik g3d: CAMERA3D, GRID3D, CUBE/_WIRES, SPHERE/_WIRES, CYLINDER/Kegel, PLANE/
 LINE3D/POINT3D + Ausblick Modelle/Licht/Picking) — 3D-Szenen-Screenshot. **TEIL IV KOMPLETT
 (Kap 40-48).** 163 Seiten.
-**Nächstes:** ABSCHLUSS-PROJEKT mit Grafik+Sound (User-Wunsch) — kleines spielbares Mini-Game.
++ Kap 49 ABSCHLUSSPROJEKT „Münzfang" (content/49_projekt.js, images/49_catch.png) — komplettes
+spielbares Arcade-Spiel (fallende Münzen mit Korb fangen) in 5 Schritten aufgebaut: Fenster+
+Steuerung, Arrays für Münzen, Fang-Kollision, AUDIO_TONE-Sound, Score-HUD; volles Listing +
+Erweiterungsideen. Führt Game-Loop/Input/DELTA/Zeichnen/Arrays/Kollision/Sound/HUD zusammen.
+168 Seiten. Spiel gegen gbrt verifiziert (läuft).
+**Nächstes:** Teil V (Module, Kap 50+) ODER Anhang (A Befehls-Index / B Tastencodes / C Farben /
+D Fehlermeldungen). Buch-Kerninhalt (Teile I-IV + Projekt) ist damit komplett.
