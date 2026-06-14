@@ -1,0 +1,18 @@
+' Screenshot-Demo Kapitel 58: ui (Immediate-Mode)
+IMPORT "ui"
+SCREEN(480, 320, "UI")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(28, 32, 48))
+    UI_PANEL(60, 40, 360, 230, "Einstellungen")
+    UI_LABEL(90, 80, "Optionen", RGB(255, 220, 120))
+    IF UI_BUTTON("start", 90, 110, 130, 34, "Spiel starten") THEN
+        ' start...
+    END IF
+    DIM klang AS BOOLEAN
+    klang = UI_CHECKBOX("snd", 90, 160, "Sound an", TRUE)
+    UI_LABEL(90, 195, "Lautstaerke:", RGB(210, 220, 240))
+    DIM vol AS FLOAT
+    vol = UI_SLIDER("vol", 90, 220, 250, 0.0, 1.0, 0.7)
+    UI_END_FRAME()
+    FLIP()
+WEND

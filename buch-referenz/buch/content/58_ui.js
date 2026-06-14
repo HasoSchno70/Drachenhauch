@@ -1,0 +1,61 @@
+module.exports = (H) => [
+  H.chapter("Modul: ui"),
+  H.p("Menüs, Knöpfe, Schalter und Schieberegler braucht fast jedes Spiel. Das ui-Modul bietet sie im sogenannten Immediate-Mode: Du erzeugst die Bedienelemente nicht vorab, sondern rufst sie einfach jeden Frame im Game-Loop auf. Ein Knopf-Aufruf zeichnet den Knopf UND liefert gleich zurück, ob er gerade geklickt wurde. Den Zustand (ist die Checkbox an? wo steht der Regler?) merkt sich das Modul anhand einer Text-ID, die du jedem Element gibst."),
+  H.figure("58_ui.png", "Ein Einstellungs-Panel aus Immediate-Mode-Widgets: Panel mit Titel, Label, Button, Checkbox und Slider."),
+  H.note("Pflicht: Rufe am Ende jedes Frames UI_END_FRAME() auf – noch vor FLIP(). Erst dadurch verarbeitet das Modul Klicks und Fokus korrekt. Vergisst du es, reagieren die Widgets nicht.", "Wichtig"),
+
+  H.h2("Text & Container"),
+  H.cmd("UI_LABEL · UI_PANEL", 'UI_LABEL(x, y, text$[, farbe])   UI_PANEL(x, y, w, h[, titel$[, bg]])',
+    "UI_LABEL zeichnet einen Text. UI_PANEL zeichnet einen rechteckigen Hintergrund-Container mit optionalem Titel – schön, um zusammengehörige Bedienelemente zu rahmen.",
+    [
+      'IMPORT "ui"',
+      'UI_PANEL(60, 40, 360, 230, "Einstellungen")',
+      'UI_LABEL(90, 80, "Optionen", RGB(255, 220, 120))',
+    ]),
+
+  H.h2("Knöpfe"),
+  H.cmd("UI_BUTTON", 'UI_BUTTON(id$, x, y, w, h, text$[, bg, fg])',
+    "Zeichnet einen Knopf und liefert TRUE genau in dem Frame, in dem er geklickt wird. Deshalb steht er meist direkt in einem IF. Jeder Knopf braucht eine eindeutige id$.",
+    [
+      'IF UI_BUTTON("start", 90, 110, 130, 34, "Spiel starten") THEN',
+      '    \' ... Spiel starten ...',
+      'END IF',
+    ]),
+
+  H.h2("Schalter & Regler"),
+  H.cmd("UI_CHECKBOX", 'UI_CHECKBOX(id$, x, y, label$[, default])',
+    "Zeichnet ein Häkchen-Kästchen mit Beschriftung und liefert seinen aktuellen Zustand (TRUE/FALSE) zurück. Beim ersten Mal startet es mit default. Klicks schalten es um – darum musst du den Zustand nicht selbst speichern.",
+    [
+      'DIM klang AS BOOLEAN',
+      'klang = UI_CHECKBOX("snd", 90, 160, "Sound an", TRUE)',
+    ]),
+  H.cmd("UI_SLIDER", 'UI_SLIDER(id$, x, y, w, min, max[, default])',
+    "Zeichnet einen Schieberegler von min bis max und liefert seinen aktuellen Wert (FLOAT). Ideal für Lautstärke, Schwierigkeit oder andere stufenlose Einstellungen.",
+    [
+      'DIM lautstaerke AS FLOAT',
+      'lautstaerke = UI_SLIDER("vol", 90, 220, 250, 0.0, 1.0, 0.7)',
+    ]),
+  H.note("Weitere Widgets nach demselben Muster: UI_PROGRESS (Fortschrittsbalken), UI_TEXTFIELD (Texteingabe mit Tastatur-Fokus), UI_RADIO (Auswahlgruppen) und UI_TABLE (Tabelle). Alle nutzen ebenfalls eine Text-ID für ihren Zustand."),
+
+  H.h2("Ein Einstellungs-Menü im Game-Loop"),
+  H.p("Alle Widgets werden jeden Frame neu aufgerufen – so entsteht das Panel aus dem Bild. Nicht UI_END_FRAME() vergessen:"),
+  H.code([
+    'IMPORT "ui"',
+    'SCREEN(480, 320)',
+    'WHILE NOT QUITREQUESTED()',
+    '    CLS(RGB(28, 32, 48))',
+    '    UI_PANEL(60, 40, 360, 230, "Einstellungen")',
+    '    IF UI_BUTTON("start", 90, 110, 130, 34, "Spiel starten") THEN',
+    '        PRINT "los geht\'s"',
+    '    END IF',
+    '    DIM klang AS BOOLEAN',
+    '    klang = UI_CHECKBOX("snd", 90, 160, "Sound an", TRUE)',
+    '    DIM vol AS FLOAT',
+    '    vol = UI_SLIDER("vol", 90, 220, 250, 0.0, 1.0, 0.7)',
+    '',
+    '    UI_END_FRAME()      \' Pflicht vor FLIP!',
+    '    FLIP()',
+    'WEND',
+  ]),
+  H.tip("ui oder gui?", "Das ui-Modul (Immediate-Mode) ist perfekt für schnelle Spiel-Menüs und Debug-Overlays: wenig Code, kein Vorab-Aufbau. Brauchst du dagegen persistente Fenster, die sich verschieben und überlappen lassen (wie auf einem Desktop), nimm das gui-Modul aus dem nächsten Kapitel."),
+];

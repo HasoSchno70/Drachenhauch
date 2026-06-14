@@ -75,7 +75,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ### Teil V — Die Module
 - [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [x] 54 particles  (content/54_particles.js, images/54_particles.png)
-- [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [x] 56 camera  (content/56_camera.js, images/56_camera.png) · [x] 57 input (Kurzref/Querverweis Kap 45)  (content/57_input.js) · [ ] 58 ui · 59 gui
+- [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [x] 56 camera  (content/56_camera.js, images/56_camera.png) · [x] 57 input (Kurzref/Querverweis Kap 45)  (content/57_input.js) · [x] 58 ui  (content/58_ui.js, images/58_ui.png) · [ ] 59 gui
 - [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
 - [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
@@ -178,4 +178,6 @@ PHYS2D_*/PHYS3D_NEW/ADD_BOX/ADD_SPHERE/STEP/BODY_*) — Bälle-Stapel-Screenshot
 RESET) — Kamera-folgt-Spieler-Screenshot. 195 Seiten.
 + Kap 57 input — KURZES Recap/Querverweis auf Kap 45 (war dort schon ausführlich), kompakte
 Referenz + Grundmuster, kein Screenshot. 196 Seiten.
-**Nächstes:** Kap 58 ui / 59 gui … (Teil V durch).
++ Kap 58 ui (Immediate-Mode: UI_PANEL/LABEL/BUTTON/CHECKBOX/SLIDER, UI_END_FRAME Pflicht vor FLIP)
+— Einstellungs-Panel-Screenshot. GOTCHA: Variable nicht `sound` nennen (Typ-Keyword SOUND). 197 S.
+**Nächstes:** Kap 59 gui … (Teil V durch).
