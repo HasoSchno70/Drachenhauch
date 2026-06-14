@@ -48,13 +48,15 @@ def prepare_images():
             im = bg
         else:
             im = im.convert("RGB")
-        if im.width < 1400:
+        upscaled = im.width < 1400
+        if upscaled:
             factor = -(-MIN_PRINT_W // im.width)         # ceil-Division
             im = im.resize((im.width * factor, im.height * factor), Image.NEAREST)
         im.save(f)
         changed += 1
     if changed:
-        print("Bilder druckfertig gemacht:", changed, "(RGB, hochskaliert)")
+        print("Bilder druckfertig gemacht:", changed,
+              "(Alpha flach -> RGB; kleine zusaetzlich hochskaliert)")
 
 
 def build():
