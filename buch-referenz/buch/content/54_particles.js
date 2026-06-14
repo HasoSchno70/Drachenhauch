@@ -1,0 +1,77 @@
+module.exports = (H) => [
+  H.chapter("Modul: particles"),
+  H.p("Funken, Feuer, Rauch, Explosionen, Regen – all das sind viele kleine Pünktchen, die sich nach einfachen Regeln bewegen und vergehen. Das particles-Modul übernimmt diese Buchführung: Ein Partikelsystem (der Emitter) erzeugt auf Knopfdruck viele Teilchen mit zufällig gestreuten Geschwindigkeiten und Lebensdauern, bewegt sie und blendet sie aus. Du stellst nur die Regeln ein und sagst „stoße N Teilchen aus“."),
+  H.figure("54_particles.png", "Eine Funken-Fontäne im Glow-Modus mit Farbverlauf von Gelb nach Rot – aus einem Emitter mit Schwerkraft."),
+
+  H.h2("Ein Partikelsystem anlegen"),
+  H.cmd("PARTICLE_SYSTEM_NEW", 'PARTICLE_SYSTEM_NEW(x, y)',
+    "Erzeugt einen Emitter an der Position (x, y) mit sinnvollen Voreinstellungen. Schon PARTICLE_SYSTEM_NEW + PARTICLE_EMIT reicht für sichtbare Funken; alle weiteren Einstellungen sind optional.",
+    [
+      'IMPORT "particles"',
+      'DIM funken AS PARTICLE_SYSTEM',
+      'funken = PARTICLE_SYSTEM_NEW(240.0, 160.0)',
+    ]),
+
+  H.h2("Das Aussehen einstellen"),
+  H.p("Mit den SET-Befehlen formst du den Effekt. Geschwindigkeit und Lebensdauer werden als Bereiche (min/max) angegeben – daraus würfelt das System pro Teilchen einen Zufallswert, was den Effekt natürlich wirken lässt."),
+  H.cmd("PARTICLE_SET_VELOCITY · PARTICLE_SET_GRAVITY", 'PARTICLE_SET_VELOCITY(sys, vx_min, vx_max, vy_min, vy_max)   PARTICLE_SET_GRAVITY(sys, gx, gy)',
+    "VELOCITY legt die Streuung der Start-Geschwindigkeiten fest (Pixel/Sekunde; negatives vy = nach oben). GRAVITY ist eine konstante Beschleunigung – ein positives gy zieht die Teilchen nach unten, sodass eine Fontäne entsteht.",
+    [
+      'PARTICLE_SET_VELOCITY(funken, -70.0, 70.0, -300.0, -200.0)  \' nach oben',
+      'PARTICLE_SET_GRAVITY(funken, 0.0, 320.0)                    \' fällt zurück',
+    ]),
+  H.cmd("PARTICLE_SET_LIFETIME · PARTICLE_SET_SIZE", 'PARTICLE_SET_LIFETIME(sys, ms_min, ms_max)   PARTICLE_SET_SIZE(sys, px_min, px_max)',
+    "LIFETIME bestimmt, wie lange (in ms) ein Teilchen lebt, SIZE seine Pixelgröße – beide als Bereich.",
+    [
+      'PARTICLE_SET_LIFETIME(funken, 700, 1300)',
+      'PARTICLE_SET_SIZE(funken, 3, 6)',
+    ]),
+  H.cmd("PARTICLE_SET_COLOR · PARTICLE_SET_COLOR_END", 'PARTICLE_SET_COLOR(sys, farbe)   PARTICLE_SET_COLOR_END(sys, farbe)',
+    "COLOR ist die Startfarbe. Setzt du zusätzlich COLOR_END, wechselt jedes Teilchen über seine Lebenszeit von der Start- zur Endfarbe – etwa Feuer von Gelb nach Rot.",
+    [
+      'PARTICLE_SET_COLOR(funken, RGB(255, 230, 120))     \' Start: gelb',
+      'PARTICLE_SET_COLOR_END(funken, RGB(255, 60, 0))    \' Ende: rot',
+    ]),
+  H.cmd("PARTICLE_SET_MODE · PARTICLE_SET_FADE", 'PARTICLE_SET_MODE(sys, modus$)   PARTICLE_SET_FADE(sys, an)',
+    "MODE wählt die Darstellung: \"circle\", \"pixel\", \"square\", \"streak\" oder \"glow\" (additiv – überlappende Teilchen leuchten heller, perfekt für Feuer und Magie). FADE = TRUE lässt Teilchen mit dem Alter ausblenden.",
+    [
+      'PARTICLE_SET_MODE(funken, "glow")',
+      'PARTICLE_SET_FADE(funken, TRUE)',
+    ]),
+
+  H.h2("Ausstoßen, aktualisieren, zeichnen"),
+  H.cmd("PARTICLE_EMIT", 'PARTICLE_EMIT(sys, anzahl)',
+    "Stößt sofort anzahl neue Teilchen aus. Einmalig aufgerufen ergibt das eine Explosion; jeden Frame ein paar ergibt einen Dauerstrom (Fontäne, Feuer).",
+    [
+      'PARTICLE_EMIT(funken, 25)     \' Explosion: 25 auf einmal',
+    ]),
+  H.cmd("PARTICLE_UPDATE · PARTICLE_DRAW · PARTICLE_COUNT", 'PARTICLE_UPDATE(sys, dt_ms)   PARTICLE_DRAW(sys)   PARTICLE_COUNT(sys)',
+    "PARTICLE_UPDATE schreibt die Physik um dt_ms (Millisekunden) fort und entfernt tote Teilchen, PARTICLE_DRAW zeichnet alle lebenden (camera-aware), PARTICLE_COUNT liefert ihre Anzahl.",
+    [
+      'PARTICLE_UPDATE(funken, INT(DELTA() * 1000.0))',
+      'PARTICLE_DRAW(funken)',
+    ]),
+
+  H.h2("Eine Fontäne im Game-Loop"),
+  H.p("So entsteht der Dauer-Effekt aus dem Bild oben – jeden Frame ein paar neue Teilchen ausstoßen, dann aktualisieren und zeichnen:"),
+  H.code([
+    'IMPORT "particles"',
+    'SCREEN(480, 320)',
+    'DIM f AS PARTICLE_SYSTEM',
+    'f = PARTICLE_SYSTEM_NEW(240.0, 280.0)',
+    'PARTICLE_SET_VELOCITY(f, -70.0, 70.0, -300.0, -200.0)',
+    'PARTICLE_SET_GRAVITY(f, 0.0, 320.0)',
+    'PARTICLE_SET_COLOR(f, RGB(255, 230, 120))',
+    'PARTICLE_SET_COLOR_END(f, RGB(255, 60, 0))',
+    'PARTICLE_SET_MODE(f, "glow")',
+    '',
+    'WHILE NOT QUITREQUESTED()',
+    '    PARTICLE_EMIT(f, 4)                       \' Dauerstrom',
+    '    PARTICLE_UPDATE(f, INT(DELTA() * 1000.0))',
+    '    CLS(RGB(12, 12, 20))',
+    '    PARTICLE_DRAW(f)',
+    '    FLIP()',
+    'WEND',
+  ]),
+  H.tip("Effekt-Rezepte", "Explosion: einmalig viele Teilchen mit Rundum-Streuung. Rauch: langsame, große, langlebige Teilchen ohne Schwerkraft mit FADE. Regen: schmaler x-Bereich, starkes positives gy, streak-Modus. Es gibt auch einen eigenen Partikel-Editor zum Ausprobieren der Werte."),
+];

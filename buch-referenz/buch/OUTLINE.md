@@ -74,7 +74,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 49 Abschlussprojekt: Münzfang (Grafik+Sound-Spiel)  (content/49_projekt.js, images/49_catch.png)
 
 ### Teil V — Die Module
-- [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [ ] 54 particles
+- [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [x] 54 particles  (content/54_particles.js, images/54_particles.png)
 - [ ] 55 physics / physics2d / physics3d · 56 camera · 57 input · 58 ui · 59 gui
 - [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
@@ -168,4 +168,6 @@ States/Params/Transitions) — Screenshot zeigt aktuellen Zustand. figures/asset
 Easing-Balken-Screenshot. zeitbasiert (kein UPDATE nötig). 180 Seiten.
 + Kap 53 timer (TIMER_AFTER/EVERY/UPDATE/CANCEL/ACTIVE/COUNT/CLEAR + COOLDOWN; FUNCREF-Callbacks)
 — konsolentauglich, kein Screenshot, Konsolen-Beispiele verifiziert. 183 Seiten.
-**Nächstes:** Kap 54 particles / 55 physics … (Teil V durch).
++ Kap 54 particles (PARTICLE_SYSTEM_NEW/SET_VELOCITY/GRAVITY/LIFETIME/SIZE/COLOR/COLOR_END/MODE/
+FADE/EMIT/UPDATE/DRAW/COUNT) — Funken-Fontäne-Screenshot (Glow, gelb→rot). 187 Seiten.
+**Nächstes:** Kap 55 physics/physics2d/physics3d / 56 camera … (Teil V durch).

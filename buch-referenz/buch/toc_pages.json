@@ -49,5 +49,6 @@
   "Modul: sprite": 170,
   "Modul: animfsm": 174,
   "Modul: tween": 178,
-  "Modul: timer": 181
+  "Modul: timer": 181,
+  "Modul: particles": 184
 }

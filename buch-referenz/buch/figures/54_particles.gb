@@ -1,0 +1,23 @@
+' Screenshot-Demo Kapitel 54: particles -- eine Funken-Fontaene
+IMPORT "particles"
+SCREEN(480, 320, "Partikel")
+DIM fontaene AS PARTICLE_SYSTEM
+fontaene = PARTICLE_SYSTEM_NEW(240.0, 280.0)
+PARTICLE_SET_VELOCITY(fontaene, -70.0, 70.0, -300.0, -200.0)  ' nach oben, gestreut
+PARTICLE_SET_GRAVITY(fontaene, 0.0, 320.0)                    ' faellt zurueck
+PARTICLE_SET_LIFETIME(fontaene, 700, 1300)
+PARTICLE_SET_SIZE(fontaene, 3, 6)
+PARTICLE_SET_COLOR(fontaene, RGB(255, 230, 120))             ' Start: gelb
+PARTICLE_SET_COLOR_END(fontaene, RGB(255, 60, 0))           ' Ende: rot
+PARTICLE_SET_MODE(fontaene, "glow")                         ' additives Leuchten
+PARTICLE_SET_FADE(fontaene, TRUE)
+WHILE NOT QUITREQUESTED()
+    DIM dt AS INTEGER
+    dt = INT(DELTA() * 1000.0)
+    PARTICLE_EMIT(fontaene, 4)
+    PARTICLE_UPDATE(fontaene, dt)
+    CLS(RGB(12, 12, 20))
+    PARTICLE_DRAW(fontaene)
+    TEXT(10, 8, "Partikel-Fontaene (Glow, gelb->rot): " + STR$(PARTICLE_COUNT(fontaene)), RGB(200, 210, 230))
+    FLIP()
+WEND
