@@ -57,5 +57,6 @@
   "Modul: ui": 198,
   "Modul: gui": 201,
   "Modul: scene": 205,
-  "Modul: save": 208
+  "Modul: save": 208,
+  "Modul: astar": 211
 }

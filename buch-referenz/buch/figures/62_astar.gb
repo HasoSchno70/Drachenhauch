@@ -1,0 +1,49 @@
+' Screenshot-Demo Kapitel 62: astar -- Pfad durch ein Gitter mit Waenden
+IMPORT "astar"
+SCREEN(480, 320, "A*")
+CONST W AS INTEGER = 15
+CONST H AS INTEGER = 10
+CONST CS AS INTEGER = 30          ' Zellengroesse
+DIM grid AS ASTAR_GRID
+grid = ASTAR_NEW(W, H)
+' eine L-foermige Wand
+DIM k AS INTEGER
+FOR k = 1 TO 7
+    ASTAR_SET_WALL(grid, 5, k)
+NEXT
+FOR k = 5 TO 11
+    ASTAR_SET_WALL(grid, k, 7)
+NEXT
+ASTAR_SET_DIAGONAL(grid, TRUE)
+DIM ok AS BOOLEAN
+ok = ASTAR_FIND(grid, 0, 0, 14, 9)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(20, 24, 38))
+    DIM gx AS INTEGER
+    DIM gy AS INTEGER
+    FOR gy = 0 TO H - 1
+        FOR gx = 0 TO W - 1
+            DIM x AS INTEGER
+            DIM y AS INTEGER
+            x = 15 + gx * CS
+            y = 12 + gy * CS
+            IF ASTAR_IS_WALL(grid, gx, gy) THEN
+                BOX(x, y, x + CS - 2, y + CS - 2, RGB(60, 70, 100))
+            ELSE
+                RECT(x, y, x + CS - 2, y + CS - 2, RGB(40, 48, 70))
+            END IF
+        NEXT
+    NEXT
+    ' Pfad einzeichnen
+    FOR k = 0 TO ASTAR_PATH_LEN(grid) - 1
+        DIM px AS INTEGER
+        DIM py AS INTEGER
+        px = 15 + ASTAR_PATH_X(grid, k) * CS + CS / 2
+        py = 12 + ASTAR_PATH_Y(grid, k) * CS + CS / 2
+        CIRCLE(px, py, 6, RGB(255, 200, 40))
+    NEXT
+    ' Start (gruen) + Ziel (rot)
+    CIRCLE(15 + CS / 2, 12 + CS / 2, 9, RGB(60, 220, 100))
+    CIRCLE(15 + 14 * CS + CS / 2, 12 + 9 * CS + CS / 2, 9, RGB(240, 70, 70))
+    FLIP()
+WEND
