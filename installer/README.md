@@ -36,11 +36,14 @@ Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
 
 ## Was der Installer einrichtet
 - Installation nach `C:\Program Files\GameBasic`.
-- **Beispiele** (142 `.gb` + Assets) nach `Öffentliche Dokumente\GameBasic\Beispiele`
-  – ein **beschreibbarer** Ort (Program Files wäre schreibgeschützt, dann scheitern
-  Demos, die Dateien schreiben). Der Doku-Ordner `screenshots/` wird weggelassen.
-- Startmenü-Einträge: **GameBasic** (Editor/Auswahl), Sprite-Editor, Tilemap-Editor,
-  Form-Designer, Audio-Studio, Beispiele.
+- **Beispiele** (142 `.gb` + Assets + Showcase-Thumbnails `screenshots/`) nach
+  `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der `project_root` der
+  installierten App (`gbrun._project_root()`), damit der Editor Beispiele **und**
+  Showcase-Vorschaubilder findet – und der Ort ist **beschreibbar** (Program Files
+  wäre schreibgeschützt). Beim Deinstallieren bleiben die Beispiele erhalten.
+- Startmenü-Einträge: **GameBasic** (öffnet direkt den **Code-Editor** – ohne
+  Auswahlfenster), Sprite-Editor, Tilemap-Editor, Form-Designer, Audio-Studio,
+  Beispiele.
 - Optional (im Setup abwählbar):
   - Desktop-Verknüpfung.
   - **PATH-Eintrag** → `gbrt` und `GameBasic` im Terminal nutzbar.

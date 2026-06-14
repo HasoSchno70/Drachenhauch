@@ -16,6 +16,21 @@ from gamebasic.parser import Parser
 from gamebasic.errors import GameBasicError
 
 
+def _project_root():
+    """Basisordner des Editors (Beispiele/Showcase + Default-Arbeitsverzeichnis).
+
+    - Eingefroren (per Installer): ein BESCHREIBBARER, fester Ort
+      ``%PUBLIC%\\Documents\\GameBasic``. Dort legt der Installer ``examples/``
+      (inkl. ``screenshots/``) ab; dort speichert „Neu" per Default. Das
+      PyInstaller-Bundle selbst ist schreibgeschuetzt und enthaelt keine Beispiele.
+    - Entwicklung: das Repo-Verzeichnis (neben gbrun.py).
+    """
+    if getattr(sys, "frozen", False):
+        public = os.environ.get("PUBLIC") or r"C:\Users\Public"
+        return Path(public) / "Documents" / "GameBasic"
+    return Path(__file__).resolve().parent
+
+
 def _print_help_and_examples():
     from gamebasic import __version__
     print(f"GameBasic v{__version__}")
@@ -23,7 +38,7 @@ def _print_help_and_examples():
     print("Verwendung:  python gbrun.py [--tokens|--ast] <datei.gb>")
     print("             gb.cmd                <datei.gb>     (Windows-Launcher mit .venv)")
     print()
-    project_root = Path(__file__).resolve().parent
+    project_root = _project_root()
     examples_dir = project_root / "examples"
     if examples_dir.is_dir():
         files = sorted(p.name for p in examples_dir.glob("*.gb") if not p.name.startswith("_"))
@@ -178,7 +193,7 @@ def main(argv):
     if args and args[0] in ("--editor", "-e"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_editor(Path(__file__).resolve().parent, initial)
+        rc = _launch_editor(_project_root(), initial)
         if rc is None:
             print("Editor benoetigt 'PySide6'. Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6")
@@ -189,7 +204,7 @@ def main(argv):
     if args and args[0] in ("--sprites", "--sprite-editor", "-S"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_sprite_editor(Path(__file__).resolve().parent, initial)
+        rc = _launch_sprite_editor(_project_root(), initial)
         if rc is None:
             print("Sprite-Editor benoetigt 'PySide6' und 'Pillow'.")
             print("Im .venv installieren:")
@@ -200,7 +215,7 @@ def main(argv):
     # --- Partikel-Editor explizit per Flag ---
     if args and args[0] in ("--particles", "--particle-editor", "-P"):
         args = args[1:]
-        rc = _launch_particle_editor(Path(__file__).resolve().parent, None)
+        rc = _launch_particle_editor(_project_root(), None)
         if rc is None:
             print("Partikel-Editor benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
@@ -212,7 +227,7 @@ def main(argv):
     if args and args[0] in ("--audio", "--studio", "--audio-studio"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_audio_studio(Path(__file__).resolve().parent, initial, tab="tracker")
+        rc = _launch_audio_studio(_project_root(), initial, tab="tracker")
         if rc is None:
             print("Audio Studio benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
@@ -223,7 +238,7 @@ def main(argv):
     # --- SFX-Generator per Flag (oeffnet das Studio auf dem SFX-Tab) ---
     if args and args[0] in ("--sfx", "--sound", "--sfx-editor"):
         args = args[1:]
-        rc = _launch_sfx_editor(Path(__file__).resolve().parent, None)
+        rc = _launch_sfx_editor(_project_root(), None)
         if rc is None:
             print("SFX-Generator benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
@@ -235,7 +250,7 @@ def main(argv):
     if args and args[0] in ("--tracker", "--music"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_tracker_editor(Path(__file__).resolve().parent, initial)
+        rc = _launch_tracker_editor(_project_root(), initial)
         if rc is None:
             print("Tracker benoetigt 'PySide6' und 'numpy'.")
             print("Im .venv installieren:")
@@ -247,7 +262,7 @@ def main(argv):
     if args and args[0] in ("--tilemap", "--level", "--map-editor"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_tilemap_editor(Path(__file__).resolve().parent, initial)
+        rc = _launch_tilemap_editor(_project_root(), initial)
         if rc is None:
             print("Tilemap-Editor benoetigt 'PySide6'.")
             print("Im .venv installieren:")
@@ -259,7 +274,7 @@ def main(argv):
     if args and args[0] in ("--form", "--form-designer", "--designer"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_form_designer(Path(__file__).resolve().parent, initial)
+        rc = _launch_form_designer(_project_root(), initial)
         if rc is None:
             print("Form-Designer benoetigt 'PySide6'.")
             print("Im .venv installieren:")
@@ -271,7 +286,7 @@ def main(argv):
     if args and args[0] in ("--anim", "--anim-editor", "--fsm"):
         args = args[1:]
         initial = Path(args[0]) if args else None
-        rc = _launch_anim_editor(Path(__file__).resolve().parent, initial)
+        rc = _launch_anim_editor(_project_root(), initial)
         if rc is None:
             print("Anim-FSM-Editor benoetigt 'PySide6'.")
             print("Im .venv installieren:")
@@ -290,9 +305,15 @@ def main(argv):
             return 1
         return _run_export(Path(args[0]), args[1] if len(args) > 1 else None)
 
-    # --- Ohne Argumente: Auswahl Code-Editor / Form-Designer, sonst Hilfe ---
+    # --- Ohne Argumente ---
     if not args:
-        rc = _launch_chooser(Path(__file__).resolve().parent)
+        # Installierte App: direkt den Code-Editor oeffnen (kein Auswahlfenster).
+        if getattr(sys, "frozen", False):
+            rc = _launch_editor(_project_root(), None)
+            if rc is not None:
+                return rc
+        # Entwicklung: Auswahl Code-Editor / Form-Designer, sonst Hilfe.
+        rc = _launch_chooser(_project_root())
         if rc is not None:
             return rc
         _print_help_and_examples()
@@ -358,7 +379,7 @@ def _find_gbrt():
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
             cands.append(Path(meipass) / exe)
-    base = Path(__file__).resolve().parent / "rust" / "gb_runtime" / "target"
+    base = _project_root() / "rust" / "gb_runtime" / "target"
     cands += [base / "release" / exe, base / "debug" / exe]
     for p in cands:
         if p.exists():

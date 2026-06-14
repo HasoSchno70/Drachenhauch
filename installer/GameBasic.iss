@@ -44,11 +44,15 @@ Source: "..\dist\GameBasic\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 ; Native Runtime neben die Exe -- die IDE findet sie (_find_gbrt) und sie liegt
 ; (bei aktivem PATH-Task) fuer das Terminal bereit.
 Source: "..\rust\gb_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: ignoreversion
-; Beispielprogramme in die OEFFENTLICHEN DOKUMENTE (beschreibbar -- Program Files
-; waere schreibgeschuetzt, dann scheitern Demos die Dateien schreiben). Ohne den
-; screenshots\-Referenzordner (nur Doku-PNGs, blaehen den Installer auf).
-Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\Beispiele"; \
-    Excludes: "screenshots\*"; Flags: recursesubdirs createallsubdirs uninsneveruninstall
+; Beispielprogramme + Showcase-Thumbnails (screenshots/) in die OEFFENTLICHEN
+; DOKUMENTE -> `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der
+; `project_root/examples` der eingefrorenen App (gbrun._project_root): so findet
+; der Editor Beispiele UND Showcase-Vorschaubilder, und der Ort ist BESCHREIBBAR
+; (Program Files waere schreibgeschuetzt -> Demos die Dateien schreiben + „Neu"
+; speichern wuerden scheitern). uninsneveruninstall: vom User editierte Beispiele
+; bleiben bei der Deinstallation erhalten.
+Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\examples"; \
+    Flags: recursesubdirs createallsubdirs uninsneveruninstall
 ; Lehrbuch (falls gebaut).
 Source: "..\buch-referenz\buch\GameBasic-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 
@@ -58,7 +62,7 @@ Name: "{group}\Sprite-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--sprit
 Name: "{group}\Tilemap-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--tilemap"
 Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
-Name: "{group}\Beispiele"; Filename: "{commondocs}\GameBasic\Beispiele"
+Name: "{group}\Beispiele"; Filename: "{commondocs}\GameBasic\examples"
 Name: "{group}\{cm:UninstallProgram,GameBasic}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\GameBasic"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
