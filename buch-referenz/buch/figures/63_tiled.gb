@@ -1,0 +1,33 @@
+' Screenshot-Demo Kapitel 63: tiled -- eine Tiled-Karte zeichnen
+IMPORT "tiled"
+SCREEN(480, 320, "Tiled")
+DIM lvl AS TILED_MAP
+lvl = TILED_LOAD("levels/level1.json")
+DIM ts AS IMAGE
+ts = LOADIMAGE("assets/tiles.png")        ' Tileset: 64x32, 4 Spalten, 16x16
+DIM MW AS INTEGER
+DIM MH AS INTEGER
+DIM TW AS INTEGER
+MW = TILED_WIDTH(lvl)
+MH = TILED_HEIGHT(lvl)
+TW = TILED_TILE_WIDTH(lvl)
+CONST YOFF AS INTEGER = 90
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(50, 80, 130))
+    DIM tx AS INTEGER
+    DIM ty AS INTEGER
+    FOR ty = 0 TO MH - 1
+        FOR tx = 0 TO MW - 1
+            DIM gid AS INTEGER
+            gid = TILED_TILE_AT(lvl, 0, tx, ty)
+            IF gid > 0 THEN
+                DIM idx AS INTEGER
+                idx = gid - 1                  ' firstgid = 1
+                DRAWIMAGEPART(ts, (idx MOD 4) * 16, (idx \ 4) * 16, 16, 16, _
+                              tx * TW, YOFF + ty * TW)
+            END IF
+        NEXT
+    NEXT
+    TEXT(10, 8, "TILED_LOAD + TILED_TILE_AT: " + STR$(MW) + "x" + STR$(MH) + " Tiles", WHITE)
+    FLIP()
+WEND

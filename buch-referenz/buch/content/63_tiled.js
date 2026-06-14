@@ -1,0 +1,68 @@
+module.exports = (H) => [
+  H.chapter("Modul: tiled"),
+  H.p("Größere Level malt man nicht im Code, sondern in einem Karten-Editor. Das tiled-Modul lädt Karten im verbreiteten Tiled-Format (als JSON) – egal ob du sie im Programm Tiled oder im mitgelieferten gbtilemap-Editor erstellt hast. Eine Karte besteht aus einem oder mehreren Ebenen (Layern) aus Kacheln, dazu optional Objekt-Ebenen für Spawn-Punkte und Zonen. Jede Kachel kann eigene Eigenschaften tragen (etwa „fest“ oder „Stachel“)."),
+  H.figure("63_tiled.png", "Eine geladene Tiled-Karte (30×10 Kacheln): Boden, schwebende Plattformen und Münzen – per TILED_TILE_AT gezeichnet."),
+
+  H.h2("Karte laden & Maße"),
+  H.cmd("TILED_LOAD", 'TILED_LOAD(pfad$)',
+    "Lädt eine Tiled-Karte (JSON) und liefert eine TILED_MAP. Die im Karten-Datei angegebenen Tileset-Bilder werden relativ zur Karte gefunden.",
+    [
+      'IMPORT "tiled"',
+      'DIM lvl AS TILED_MAP',
+      'lvl = TILED_LOAD("levels/level1.json")',
+    ]),
+  H.cmd("TILED_WIDTH/HEIGHT · TILED_TILE_WIDTH/HEIGHT", 'TILED_WIDTH(m)   TILED_HEIGHT(m)   TILED_TILE_WIDTH(m)   TILED_TILE_HEIGHT(m)',
+    "WIDTH/HEIGHT liefern die Kartengröße in Kacheln, TILE_WIDTH/HEIGHT die Pixelgröße einer Kachel. Damit rechnest du zwischen Kachel- und Pixelkoordinaten um.",
+    [
+      'PRINT TILED_WIDTH(lvl); " x "; TILED_HEIGHT(lvl)   \' z. B. 30 x 10',
+      'PRINT TILED_TILE_WIDTH(lvl)                         \' z. B. 16',
+    ]),
+
+  H.h2("Kacheln lesen & setzen"),
+  H.cmd("TILED_TILE_AT · TILED_TILE_SET", 'TILED_TILE_AT(m, layer, tx, ty)   TILED_TILE_SET(m, layer, tx, ty, gid)',
+    "TILED_TILE_AT liefert die GID (Kachelnummer) an Position (tx, ty) einer Ebene – 0 bedeutet „leer“. TILED_TILE_SET schreibt eine Kachel (gid 0 löscht sie) – nützlich, um z. B. eine eingesammelte Münze aus der Karte zu entfernen.",
+    [
+      'DIM gid AS INTEGER',
+      'gid = TILED_TILE_AT(lvl, 0, 5, 8)',
+      'IF gid > 0 THEN TILED_TILE_SET(lvl, 0, 5, 8, 0)   \' Kachel entfernen',
+    ]),
+  H.p("Zum Zeichnen läufst du über alle Kacheln, holst die GID und stempelst den passenden Ausschnitt des Tileset-Bildes – genau das ergibt das Bild oben:"),
+  H.code([
+    'DIM ts AS IMAGE',
+    'ts = LOADIMAGE("assets/tiles.png")   \' Tileset (4 Spalten, 16x16)',
+    'DIM tx AS INTEGER',
+    'DIM ty AS INTEGER',
+    'FOR ty = 0 TO TILED_HEIGHT(lvl) - 1',
+    '    FOR tx = 0 TO TILED_WIDTH(lvl) - 1',
+    '        DIM gid AS INTEGER',
+    '        gid = TILED_TILE_AT(lvl, 0, tx, ty)',
+    '        IF gid > 0 THEN',
+    '            DIM i AS INTEGER',
+    '            i = gid - 1                       \' GID -> Tileset-Index',
+    '            DRAWIMAGEPART(ts, (i MOD 4) * 16, (i \\ 4) * 16, 16, 16, tx * 16, ty * 16)',
+    '        END IF',
+    '    NEXT',
+    'NEXT',
+  ]),
+
+  H.h2("Kachel-Eigenschaften"),
+  H.cmd("TILED_TILE_PROP_… · TILED_TILE_HAS_PROP", 'TILED_TILE_PROP_BOOL(m, gid, key$)   (auch INT/FLOAT/STRING)   TILED_TILE_HAS_PROP(m, gid, key$)',
+    "Lesen eine im Editor gesetzte Eigenschaft einer Kachelart (über ihre GID). So markierst du etwa feste Kacheln mit „solid“ = TRUE oder Münzen mit „pickup“ = TRUE und fragst das im Spiel ab.",
+    [
+      'IF TILED_TILE_PROP_BOOL(lvl, gid, "solid") THEN',
+      '    \' diese Kachel blockt den Spieler',
+      'END IF',
+    ]),
+
+  H.h2("Objekt-Ebenen"),
+  H.p("Neben Kacheln können Karten Objekte enthalten – Punkte oder Rechtecke mit Namen, Typ und eigenen Eigenschaften, etwa Spawn-Punkte, Trigger oder Zonen. Sie liegen in Objekt-Ebenen und werden über ihren Ebenennamen abgefragt."),
+  H.cmd("TILED_OBJECT_COUNT · TILED_OBJECT_…", 'TILED_OBJECT_COUNT(m, ebene$)   TILED_OBJECT_X / _Y / _NAME(m, ebene$, idx) …',
+    "TILED_OBJECT_COUNT liefert die Anzahl der Objekte einer Objekt-Ebene; mit den weiteren TILED_OBJECT_-Funktionen liest du Position, Name, Typ und Eigenschaften jedes Objekts aus – etwa um Gegner an den im Editor gesetzten Stellen zu erzeugen.",
+    [
+      'DIM n AS INTEGER',
+      'n = TILED_OBJECT_COUNT(lvl, "spawns")',
+      '\' ... über die n Objekte laufen und Gegner platzieren ...',
+    ]),
+  H.note("Für Editor- oder Generierungs-Aufgaben gibt es Massen-Operationen: TILED_FILL_RECT (Rechteck füllen), TILED_REPLACE (eine GID gegen eine andere tauschen), TILED_COUNT_GID (zählen) und TILED_FLOOD_FILL (Eimer-Füllung) – sie ändern viele Kacheln in einem Aufruf."),
+  H.tip("Karten erstellen", "Du musst Tiled-Karten nicht von Hand als JSON schreiben: Der mitgelieferte Editor gbtilemap malt Kacheln, verwaltet Ebenen und Eigenschaften und speichert genau das Format, das TILED_LOAD liest. Zum Abprüfen von Boden und Wänden passt das tile_collide-Modul (nächstes Kapitel) perfekt dazu."),
+];
