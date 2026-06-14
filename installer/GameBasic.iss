@@ -44,8 +44,11 @@ Source: "..\dist\GameBasic\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 ; Native Runtime neben die Exe -- die IDE findet sie (_find_gbrt) und sie liegt
 ; (bei aktivem PATH-Task) fuer das Terminal bereit.
 Source: "..\rust\gb_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: ignoreversion
-; Beispielprogramme.
-Source: "..\examples\*"; DestDir: "{app}\examples"; Flags: recursesubdirs createallsubdirs
+; Beispielprogramme in die OEFFENTLICHEN DOKUMENTE (beschreibbar -- Program Files
+; waere schreibgeschuetzt, dann scheitern Demos die Dateien schreiben). Ohne den
+; screenshots\-Referenzordner (nur Doku-PNGs, blaehen den Installer auf).
+Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\Beispiele"; \
+    Excludes: "screenshots\*"; Flags: recursesubdirs createallsubdirs uninsneveruninstall
 ; Lehrbuch (falls gebaut).
 Source: "..\buch-referenz\buch\GameBasic-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 
@@ -55,7 +58,7 @@ Name: "{group}\Sprite-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--sprit
 Name: "{group}\Tilemap-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--tilemap"
 Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
-Name: "{group}\Beispiele"; Filename: "{app}\examples"
+Name: "{group}\Beispiele"; Filename: "{commondocs}\GameBasic\Beispiele"
 Name: "{group}\{cm:UninstallProgram,GameBasic}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\GameBasic"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 

@@ -36,6 +36,9 @@ Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
 
 ## Was der Installer einrichtet
 - Installation nach `C:\Program Files\GameBasic`.
+- **Beispiele** (142 `.gb` + Assets) nach `Öffentliche Dokumente\GameBasic\Beispiele`
+  – ein **beschreibbarer** Ort (Program Files wäre schreibgeschützt, dann scheitern
+  Demos, die Dateien schreiben). Der Doku-Ordner `screenshots/` wird weggelassen.
 - Startmenü-Einträge: **GameBasic** (Editor/Auswahl), Sprite-Editor, Tilemap-Editor,
   Form-Designer, Audio-Studio, Beispiele.
 - Optional (im Setup abwählbar):
