@@ -28,6 +28,28 @@ module.exports = (H) => [
   H.code(["42", "99"], { out: true }),
   H.warn("Greifst du auf ein Fach zu, das es nicht gibt – etwa punkte[5] bei nur 5 Fächern (gültig sind 0 bis 4) – bricht das Programm mit einem Fehler ab. Achte immer darauf, innerhalb der Grenzen zu bleiben. Die Grenze liefert dir LEN (siehe unten)."),
 
+  H.h2("Ein Array gleich mit Werten füllen: das Array-Literal"),
+  H.p("Jedes Fach einzeln zu beschreiben ist umständlich, wenn du die Werte schon kennst. Dafür gibt es das Array-Literal: eine Liste von Werten in eckigen Klammern, durch Komma getrennt. Damit legst du ein fertig gefülltes Array in einer einzigen Zeile an. Welchen Typ die Fächer haben, erkennt GameBasic an den Werten selbst."),
+  H.cmd("Array-Literal", "[wert1, wert2, ...]",
+    "Erzeugt ein fertig gefülltes Array. Nur Ganzzahlen ergeben ein INTEGER-Array, Kommazahlen ein FLOAT-Array, Texte ein STRING-Array. Die Länge ist die Anzahl der Werte.",
+    [
+      'DIM punkte AS ARRAY OF INTEGER',
+      'punkte = [42, 17, 99]',
+      'PRINT punkte[0]; " "; punkte[2]; "   Länge: "; LEN(punkte)',
+    ],
+    { out: ["42 99   Länge: 3"] }),
+  H.p("Ein Array-Literal kannst du überall einsetzen, wo ein Array erwartet wird – sogar direkt in einer Schleife, ohne es vorher einer Variablen zuzuweisen:"),
+  H.code([
+    'DIM summe AS INTEGER',
+    'summe = 0',
+    'FOR EACH n IN [10, 20, 30]',
+    '    summe = summe + n',
+    'NEXT',
+    'PRINT summe',
+  ]),
+  H.code(["60"], { out: true }),
+  H.note("Ein leeres Array-Literal [] ist nicht erlaubt – ohne Werte ließe sich der Typ nicht erkennen. Für ein leeres Array, das du erst nach und nach füllst, nimmst du DIM name[0] AS Typ (siehe „Arrays, die wachsen und schrumpfen“ weiter unten). Und Vorsicht: [x FOR x IN …] mit dem Schlüsselwort FOR ist KEIN Array-Literal, sondern eine „Comprehension“ – ein anderes Werkzeug, das du in einem späteren Kapitel kennenlernst."),
+
   H.h2("Wie viele Fächer? LEN"),
   H.p("LEN sagt dir, wie viele Elemente ein Array hat. Das brauchst du ständig – vor allem, um mit einer Schleife sicher über alle Fächer zu laufen. Weil die Indizes bei 0 beginnen, läuft die Schleife von 0 bis LEN minus 1."),
   H.cmd("LEN", "LEN(arr)",
