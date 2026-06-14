@@ -134,6 +134,14 @@ class TupleLit(Expr):
 
 
 @dataclass
+class ArrayLit(Expr):
+    """Array-Literal `[a, b, c]` (mind. 1 Element). Unterscheidet sich von der
+    List-Comprehension `[expr FOR ...]` durch das fehlende FOR nach dem ersten
+    Ausdruck. Liefert ein homogen getyptes ARRAY (Element-Typ aus den Werten)."""
+    elements: list   # list[Expr]
+
+
+@dataclass
 class TupleAssign(Stmt):
     """Destructuring-Zuweisung: `(x, y, z) = expr`.
 

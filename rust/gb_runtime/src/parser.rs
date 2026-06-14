@@ -1208,17 +1208,29 @@ impl Parser {
             Tt::New => self.new_expr(),
             Tt::Lbracket => {
                 self.pos += 1;
-                let transform = self.expression()?;
-                if !self.matches(Tt::For) {
-                    return self.err("Erwartet FOR in List-Comprehension `[expr FOR var IN ...]`");
+                // Leeres Array-Literal []: Typ nicht herleitbar -> klarer Hinweis.
+                if self.tt(0) == Tt::Rbracket {
+                    return self.err("Leeres Array-Literal [] -- Typ unbekannt; nutze DIM ... AS ARRAY OF T");
                 }
-                let var = sval(&self.expect(Tt::Ident, "Erwartet Iter-Variablenname nach FOR")?);
-                self.expect(Tt::In, "Erwartet IN nach Iter-Variable")?;
-                let iterable = self.expression()?;
-                let filter = if self.matches(Tt::Where) { Some(Box::new(self.expression()?)) } else { None };
-                self.expect(Tt::Rbracket, "Erwartet ']' am Ende der Comprehension")?;
-                Ok(Node::ListComp { var, iterable: Box::new(iterable), filter,
-                                    transform: Box::new(transform) })
+                let first = self.expression()?;
+                // Disambiguierung: `[expr FOR ...]` = List-Comprehension,
+                // sonst `[a, b, c]` = Array-Literal.
+                if self.matches(Tt::For) {
+                    let var = sval(&self.expect(Tt::Ident, "Erwartet Iter-Variablenname nach FOR")?);
+                    self.expect(Tt::In, "Erwartet IN nach Iter-Variable")?;
+                    let iterable = self.expression()?;
+                    let filter = if self.matches(Tt::Where) { Some(Box::new(self.expression()?)) } else { None };
+                    self.expect(Tt::Rbracket, "Erwartet ']' am Ende der Comprehension")?;
+                    return Ok(Node::ListComp { var, iterable: Box::new(iterable), filter,
+                                               transform: Box::new(first) });
+                }
+                let mut elements = vec![first];
+                while self.matches(Tt::Comma) {
+                    if self.tt(0) == Tt::Rbracket { break; }   // optionales Trailing-Komma
+                    elements.push(self.expression()?);
+                }
+                self.expect(Tt::Rbracket, "Erwartet ']' am Ende des Array-Literals")?;
+                Ok(Node::ArrayLit(elements))
             }
             Tt::Lbrace => {
                 self.pos += 1;

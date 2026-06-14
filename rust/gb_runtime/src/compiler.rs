@@ -92,6 +92,7 @@ mod oc {
     pub const STORE_GLOBAL_SLOT: i64 = 112;
     pub const DECLARE_GLOBAL_SLOT: i64 = 113;
     pub const DECLARE_GLOBAL_CONST_SLOT: i64 = 114;
+    pub const BUILD_ARRAY: i64 = 117;
     pub const HALT: i64 = 99;
 }
 
@@ -1019,6 +1020,14 @@ impl Compiler {
             Node::TupleLit { elements } => {
                 for el in elements { self.expr(el)?; }
                 self.ctx.emit(oc::BUILD_TUPLE, json!(elements.len()));
+                Ok(())
+            }
+            Node::ArrayLit(elements) => {
+                // Array-Literal `[a, b, c]`: Elemente auf den Stack, dann zur
+                // Laufzeit zu einem 1D-GbArray zusammensetzen (Element-Typ aus
+                // den Werten hergeleitet -- int/float/string/boolean/any).
+                for el in elements { self.expr(el)?; }
+                self.ctx.emit(oc::BUILD_ARRAY, json!(elements.len()));
                 Ok(())
             }
             Node::TernaryExpr { cond, then_expr, else_expr } => {
@@ -2175,7 +2184,8 @@ fn node_name(n: &Node) -> &'static str {
         Node::ClassDecl { .. } => "ClassDecl", Node::Select { .. } => "Select",
         Node::IndexAccess { .. } => "IndexAccess", Node::IndexAssign { .. } => "IndexAssign",
         Node::MemberAccess { .. } => "MemberAccess", Node::MemberAssign { .. } => "MemberAssign",
-        Node::TupleLit { .. } => "TupleLit", Node::TupleAssign { .. } => "TupleAssign",
+        Node::TupleLit { .. } => "TupleLit", Node::ArrayLit(..) => "ArrayLit",
+        Node::TupleAssign { .. } => "TupleAssign",
         Node::ListComp { .. } => "ListComp", Node::DictComp { .. } => "DictComp",
         Node::SetComp { .. } => "SetComp", Node::With { .. } => "With",
         Node::Try { .. } => "Try", Node::Throw { .. } => "Throw",

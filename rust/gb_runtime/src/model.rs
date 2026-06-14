@@ -90,6 +90,7 @@ pub mod op {
 
     pub const BUILD_TUPLE: u16 = 68;
     pub const UNPACK_TUPLE: u16 = 69;
+    pub const BUILD_ARRAY: u16 = 117;   // Array-Literal [a, b, c]
 
     // OOP / Member
     pub const NEW_INSTANCE: u16 = 80;

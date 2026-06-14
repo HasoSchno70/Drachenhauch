@@ -1623,6 +1623,12 @@ impl<'p> Vm<'p> {
                         stack.push(Value::Tuple(Rc::new(items)));
                     }
                 }
+                op::BUILD_ARRAY => {
+                    let len = arg.as_usize();
+                    let split = stack.len() - len;
+                    let items = stack.split_off(split);
+                    stack.push(array_literal(items));
+                }
                 op::UNPACK_TUPLE => {
                     let len = arg.as_usize();
                     let t = vm_pop(stack)?;
@@ -4982,6 +4988,34 @@ fn mul(a: Value, b: Value) -> R<Value> {
     }
     require_number(&a, &b, "*")?;
     nn_arith(a, b, '*')
+}
+
+/// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-GbArray.
+/// Element-Typ wird aus den Werten hergeleitet (wie ein homogenes GB-Array):
+/// nur Ganzzahlen -> integer; Zahlen mit mind. einem Float -> float (Ints
+/// werden hochgezogen); nur Strings -> string; nur Wahrheitswerte -> boolean;
+/// gemischt -> any (generisches Value-Backing).
+fn array_literal(vals: Vec<Value>) -> Value {
+    let n = vals.len() as i64;
+    let all_int = vals.iter().all(|v| matches!(v, Value::Int(_)));
+    let all_num = vals.iter().all(|v| matches!(v, Value::Int(_) | Value::Float(_)));
+    let all_str = vals.iter().all(|v| matches!(v, Value::Str(_)));
+    let all_bool = vals.iter().all(|v| matches!(v, Value::Bool(_)));
+    let (etype, cells) = if all_int {
+        ("integer", Cells::Int(vals.iter()
+            .map(|v| if let Value::Int(i) = v { *i } else { 0 }).collect()))
+    } else if all_num {
+        ("float", Cells::Float(vals.iter().map(|v| match v {
+            Value::Int(i) => *i as f64, Value::Float(f) => *f, _ => 0.0 }).collect()))
+    } else if all_str {
+        ("string", Cells::Val(vals))
+    } else if all_bool {
+        ("boolean", Cells::Val(vals))
+    } else {
+        ("any", Cells::Val(vals))
+    };
+    let arr = GbArray { element_type: etype.to_string(), dims: vec![n], strides: vec![1], cells };
+    Value::Array(Rc::new(RefCell::new(arr)))
 }
 
 fn div(a: Value, b: Value) -> R<Value> {

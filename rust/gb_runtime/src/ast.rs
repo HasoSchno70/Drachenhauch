@@ -94,6 +94,7 @@ pub enum Node {
     ListComp { var: String, iterable: Box<Node>, filter: Option<Box<Node>>, transform: Box<Node> },
     DictComp { var: String, iterable: Box<Node>, filter: Option<Box<Node>>, key: Box<Node>, value: Box<Node> },
     SetComp { var: String, iterable: Box<Node>, filter: Option<Box<Node>>, transform: Box<Node> },
+    ArrayLit(Vec<Node>),
     TupleLit { elements: Vec<Node> },
     NamedArg { name: String, value: Box<Node> },
     New { class_name: String, args: Option<Vec<Node>> },
@@ -189,6 +190,7 @@ impl Node {
                 ("var", json!(var)), ("iterable", iterable.to_json()),
                 ("filter", bopt(filter)), ("transform", transform.to_json())]),
             TupleLit { elements } => obj("TupleLit", vec![("elements", vecj(elements))]),
+            ArrayLit(elements) => obj("ArrayLit", vec![("elements", vecj(elements))]),
             NamedArg { name, value } => obj("NamedArg", vec![
                 ("name", json!(name)), ("value", value.to_json())]),
             New { class_name, args } => obj("New", vec![

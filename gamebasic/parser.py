@@ -35,7 +35,7 @@ from .ast_nodes import (
     Try, Throw, Select, CaseMatch,
     Repeat, Data, Read, Restore,
     EnumDecl, NamedArg, TupleLit, TupleAssign, With, SliceAccess,
-    PropertyDecl, ListComp, DictComp, SetComp, TernaryExpr, Yield,
+    PropertyDecl, ListComp, DictComp, SetComp, ArrayLit, TernaryExpr, Yield,
 )
 
 
@@ -1641,24 +1641,34 @@ class Parser:
         if t == TokenType.NEW:
             return self._new_expr()
         if t == TokenType.LBRACKET:
-            # List-Comprehension: `[expr FOR var IN iterable [WHERE filter]]`.
-            # GameBasic kennt sonst keine alleinstehenden `[...]`-Ausdruecke;
-            # daher reservieren wir LBRACKET in Primary-Position fuer Comp.
+            # `[...]` ist entweder eine List-Comprehension
+            # (`[expr FOR var IN iterable [WHERE filter]]`) ODER ein
+            # Array-Literal (`[a, b, c]`). Disambiguierung: FOR nach dem
+            # ersten Ausdruck -> Comprehension, sonst Array-Literal.
             self.pos += 1
-            transform = self._expression()
-            if not self._match(TokenType.FOR):
+            if self._peek().type == TokenType.RBRACKET:
                 raise ParseError(
-                    "Erwartet FOR in List-Comprehension `[expr FOR var IN ...]`",
+                    "Leeres Array-Literal [] -- Typ unbekannt; "
+                    "nutze DIM ... AS ARRAY OF T",
                     self._peek().line, self._peek().col,
                 )
-            var_tok = self._expect(TokenType.IDENT, "Erwartet Iter-Variablenname nach FOR")
-            self._expect(TokenType.IN, "Erwartet IN nach Iter-Variable")
-            iterable = self._expression()
-            filter_expr = None
-            if self._match(TokenType.WHERE):
-                filter_expr = self._expression()
-            self._expect(TokenType.RBRACKET, "Erwartet ']' am Ende der Comprehension")
-            return ListComp(var_tok.value, iterable, filter_expr, transform)
+            first = self._expression()
+            if self._match(TokenType.FOR):
+                var_tok = self._expect(TokenType.IDENT, "Erwartet Iter-Variablenname nach FOR")
+                self._expect(TokenType.IN, "Erwartet IN nach Iter-Variable")
+                iterable = self._expression()
+                filter_expr = None
+                if self._match(TokenType.WHERE):
+                    filter_expr = self._expression()
+                self._expect(TokenType.RBRACKET, "Erwartet ']' am Ende der Comprehension")
+                return ListComp(var_tok.value, iterable, filter_expr, first)
+            elements = [first]
+            while self._match(TokenType.COMMA):
+                if self._peek().type == TokenType.RBRACKET:
+                    break   # optionales Trailing-Komma
+                elements.append(self._expression())
+            self._expect(TokenType.RBRACKET, "Erwartet ']' am Ende des Array-Literals")
+            return ArrayLit(elements)
         if t == TokenType.LBRACE:
             # Dict- oder Set-Comprehension:
             #   `{key: val FOR var IN iterable [WHERE filter]}`  -> DictComp
