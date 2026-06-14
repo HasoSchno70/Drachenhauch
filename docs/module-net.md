@@ -33,7 +33,7 @@ IMPORT "net"
 | `NET_UDP_PORT(sock)` | INTEGER | gebundener Port (0 wenn OPEN) |
 | `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes |
 | `NET_UDP_RECV(sock, max_bytes)` | STRING | leer wenn nichts da |
-| `NET_UDP_LAST_FROM(sock)` | TUPLE (host, port) | Absender des letzten RECV |
+| `NET_UDP_LAST_FROM(sock)` | STRING `"host:port"` | Absender des letzten RECV (leer vor dem ersten RECV) |
 | `NET_UDP_SET_TIMEOUT(sock, ms)` | — | 0 = blocking |
 | `NET_UDP_CLOSE(sock)` | — | Socket schliessen |
 
@@ -115,9 +115,9 @@ WHILE running
     DIM msg AS STRING
     msg = NET_UDP_RECV(srv, 256)
     IF LEN(msg) > 0 THEN
-        DIM peer AS TUPLE
-        peer = NET_UDP_LAST_FROM(srv)
-        PRINT "Update von ", peer[0]; ":"; peer[1]; ": "; msg
+        DIM peer AS STRING
+        peer = NET_UDP_LAST_FROM(srv)      ' z.B. "127.0.0.1:63332"
+        PRINT "Update von "; peer; ": "; msg
     END IF
     SLEEP(16)
 WEND
