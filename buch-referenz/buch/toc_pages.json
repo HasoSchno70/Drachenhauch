@@ -55,5 +55,6 @@
   "Modul: camera": 193,
   "Modul: input": 196,
   "Modul: ui": 198,
-  "Modul: gui": 201
+  "Modul: gui": 201,
+  "Modul: scene": 205
 }
