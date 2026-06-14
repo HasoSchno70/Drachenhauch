@@ -1,0 +1,28 @@
+' Screenshot-Demo Kapitel 56: camera -- folgt dem Spieler in einer grossen Welt
+IMPORT "camera"
+SCREEN(480, 320, "Kamera")
+DIM px AS FLOAT
+DIM py AS FLOAT
+px = 400.0
+py = 300.0
+WHILE NOT QUITREQUESTED()
+    ' Kamera zentriert auf den Spieler (Welt 800x600)
+    CAMERA_FOLLOW(px, py, 480.0, 320.0)
+    CLS(RGB(18, 22, 36))
+    ' Welt-Raster (in Welt-Koordinaten gezeichnet)
+    DIM gx AS INTEGER
+    DIM gy AS INTEGER
+    FOR gy = 0 TO 600 STEP 80
+        FOR gx = 0 TO 800 STEP 80
+            RECT(gx, gy, gx + 80, gy + 80, RGB(50, 60, 90))
+            TEXT(gx + 6, gy + 6, STR$(gx) + "," + STR$(gy), RGB(80, 95, 130))
+        NEXT
+    NEXT
+    ' Spieler (Welt-Koordinaten)
+    CIRCLE(INT(px), INT(py), 16, RGB(255, 200, 40))
+    ' HUD ohne Kamera (fester Bildschirm-Text)
+    CAMERA_RESET()
+    BOX(0, 0, 479, 22, RGB(0, 0, 0))
+    TEXT(8, 6, "CAMERA_FOLLOW: Spieler bei Welt (400, 300)", WHITE)
+    FLIP()
+WEND
