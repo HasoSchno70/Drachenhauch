@@ -1,0 +1,46 @@
+' Screenshot-Demo Kapitel 72: curves -- Bezier- und Catmull-Rom-Kurve
+IMPORT "curves"
+SCREEN(480, 320, "Curves")
+
+' Bezier-Kontrollpunkte (P0..P3)
+CONST BX0 AS FLOAT = 40.0
+CONST BY0 AS FLOAT = 250.0
+CONST BX1 AS FLOAT = 130.0
+CONST BY1 AS FLOAT = 40.0
+CONST BX2 AS FLOAT = 230.0
+CONST BY2 AS FLOAT = 40.0
+CONST BX3 AS FLOAT = 300.0
+CONST BY3 AS FLOAT = 250.0
+
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(24, 28, 44))
+
+    ' --- Bezier (gelb): laeuft NICHT durch die Handles ---
+    ' Kontroll-Polygon (gestrichelt-grau)
+    LINE(INT(BX0), INT(BY0), INT(BX1), INT(BY1), RGB(70, 80, 110))
+    LINE(INT(BX2), INT(BY2), INT(BX3), INT(BY3), RGB(70, 80, 110))
+    DIM t AS FLOAT
+    DIM p AS TUPLE
+    FOR t = 0.0 TO 1.0 STEP 0.02
+        p = CURVE_BEZIER2(t, BX0, BY0, BX1, BY1, BX2, BY2, BX3, BY3)
+        CIRCLE(INT(p[0]), INT(p[1]), 2, RGB(255, 210, 60))
+    NEXT
+    ' Kontrollpunkte
+    CIRCLE(INT(BX0), INT(BY0), 4, WHITE)
+    CIRCLE(INT(BX1), INT(BY1), 4, RGB(120, 130, 160))
+    CIRCLE(INT(BX2), INT(BY2), 4, RGB(120, 130, 160))
+    CIRCLE(INT(BX3), INT(BY3), 4, WHITE)
+
+    ' --- Catmull-Rom (cyan): laeuft DURCH die mittleren Punkte ---
+    DIM q AS TUPLE
+    FOR t = 0.0 TO 1.0 STEP 0.02
+        q = CURVE_CATMULL2(t, 60.0, 300.0, 180.0, 290.0, 320.0, 200.0, 440.0, 280.0)
+        CIRCLE(INT(q[0]), INT(q[1]), 2, RGB(90, 220, 220))
+    NEXT
+    CIRCLE(180, 290, 4, RGB(90, 220, 220))
+    CIRCLE(320, 200, 4, RGB(90, 220, 220))
+
+    TEXT(10, 8, "Bezier (gelb) folgt den Handles,", WHITE)
+    TEXT(10, 26, "Catmull-Rom (cyan) laeuft durch die Punkte.", WHITE)
+    FLIP()
+WEND
