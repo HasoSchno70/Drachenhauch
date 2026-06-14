@@ -1,0 +1,25 @@
+' Screenshot-Demo Kapitel 51: animfsm
+IMPORT "sprite"
+IMPORT "animfsm"
+SCREEN(480, 320, "Anim-FSM")
+DIM held AS SPRITE
+held = SPRITE_NEW(LOADIMAGE("assets/hero.png"), 32, 32)
+SPRITE_SET_POS(held, 210.0, 150.0)
+SPRITE_SET_SCALE(held, 3.0, 3.0)
+
+DIM fsm AS ANIM_FSM
+fsm = ANIM_FSM_LOAD("assets/held.gbanim")
+ANIM_FSM_SETUP(fsm, held)
+
+WHILE NOT QUITREQUESTED()
+    ' Tempo bestimmt den Zustand (hier fest schnell -> "run")
+    ANIM_FSM_SET_FLOAT(fsm, "speed", 20.0)
+    DIM dt AS INTEGER
+    dt = INT(DELTA() * 1000.0)
+    ANIM_FSM_UPDATE(fsm, held, dt)
+    SPRITE_UPDATE(held, dt)
+    CLS(RGB(28, 32, 50))
+    TEXT(70, 70, "Zustand (ANIM_FSM_STATE): " + ANIM_FSM_STATE(fsm), RGB(220, 230, 255))
+    SPRITE_DRAW(held)
+    FLIP()
+WEND
