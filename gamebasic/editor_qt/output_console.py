@@ -42,16 +42,10 @@ _LINK_FILE_LINE = re.compile(r"(\S+\.gb):(\d+)")
 
 
 def _find_gbrt(project_root: Path) -> Path | None:
-    """Sucht das gebaute `gbrt`-Binary der nativen Runtime (Release bevorzugt).
-    Spiegelt `gbrun._find_gbrt` -- bewusst dupliziert, damit der Editor nicht
-    das Top-Level-Script `gbrun.py` importieren muss."""
-    base = project_root / "rust" / "gb_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    for variant in ("release", "debug"):
-        p = base / variant / exe
-        if p.exists():
-            return p
-    return None
+    """Sucht das `gbrt`-Binary (frozen-aware -- installiert neben GameBasic.exe,
+    sonst im Dev-Baum). Siehe gbrt_locate.find_gbrt."""
+    from .gbrt_locate import find_gbrt
+    return find_gbrt(project_root)
 
 
 class _LinkableText(QPlainTextEdit):
@@ -372,13 +366,24 @@ class OutputConsole(QWidget):
         if self.is_running():
             return None
         self.clear()
+        frozen = getattr(sys, "frozen", False)
         gbrt = _find_gbrt(self.project_root)
         if gbrt is not None:
             if self._start_native(file_path, gbrt):
                 return "native"
+            if frozen:
+                self.append("\n✖ Start der Runtime fehlgeschlagen.\n", "error")
+                return None
             # gbrt vorhanden, aber Start fehlgeschlagen -> ueber gbrun.py.
             self.append("\n↪ Direkter gbrt-Start fehlgeschlagen — versuche es "
                         "ueber gbrun.py …\n\n", "muted")
+        elif frozen:
+            # Installierte App: KEIN gbrun.py-Fallback (kein Python). gbrt.exe
+            # sollte neben GameBasic.exe liegen.
+            self.append("✖ gbrt.exe nicht gefunden — sie sollte neben "
+                        "GameBasic.exe liegen. Bitte GameBasic neu installieren.\n",
+                        "error")
+            return None
         else:
             self.append("ℹ gbrt nicht gefunden — starte ueber gbrun.py.  "
                         "(Nativ bauen: .venv\\Scripts\\python.exe "
