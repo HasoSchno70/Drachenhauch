@@ -501,7 +501,7 @@ impl Compiler {
         // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
             if !self.known_elem(type_name) {
-                return Err(format!("Stufe 3e: Array-Element-Typ '{}' nicht unterstuetzt", type_name));
+                return Err(unknown_dim_type_msg(type_name));
             }
             for de in dims { self.expr(de)?; }   // Dim-Werte auf den Stack
             if self.ctx.is_main {
@@ -550,7 +550,7 @@ impl Compiler {
         }
         // Skalar: Werttyp/externer Modul-Typ (Default je Typ) oder Klasse (NIL).
         if !self.is_known_value_type(type_name) && !self.classes.contains_key(type_name) {
-            return Err(format!("Stufe 3e: DIM-Typ '{}' noch nicht unterstuetzt", type_name));
+            return Err(unknown_dim_type_msg(type_name));
         }
         // WICHTIG: in einer Funktion zuerst auf is_main pruefen -- ein lokales
         // DIM SHADOWT einen gleichnamigen Top-Level-Global. Wuerde man zuerst
@@ -982,6 +982,9 @@ impl Compiler {
             }
             Node::BoolLit(b) => {
                 let c = self.ctx.add_const(json!({ "b": b })); self.ctx.emit(oc::LOAD_CONST, json!(c)); Ok(())
+            }
+            Node::NilLit => {
+                let c = self.ctx.add_const(Value::Null); self.ctx.emit(oc::LOAD_CONST, json!(c)); Ok(())
             }
             Node::Identifier(name) => {
                 // Bare User-Function -> FUNCREF (Variable/Feld verschattet sie).
@@ -1977,6 +1980,7 @@ fn eval_literal_default(e: &Node) -> Result<CVal, String> {
         Node::NumberLit(NumV::Float(f)) => Ok(CVal::Float(*f)),
         Node::StringLit(s) => Ok(CVal::Str(s.clone())),
         Node::BoolLit(b) => Ok(CVal::Bool(*b)),
+        Node::NilLit => Ok(CVal::Nil),
         Node::UnaryOp { op, operand } if op == "-" => match eval_literal_default(operand)? {
             CVal::Int(i) => Ok(CVal::Int(-i)),
             CVal::Float(f) => Ok(CVal::Float(-f)),
@@ -2112,6 +2116,23 @@ fn is_value_type(t: &str) -> bool {
     matches!(t, "integer" | "float" | "string" | "boolean"
         | "image" | "sound" | "sprite_atlas" | "file"
         | "tuple" | "funcref" | "coroutine")
+}
+
+/// Klartext-Fehler fuer ein `DIM x AS <type_name>`, dessen Typ unbekannt ist.
+/// Gehoert der Name zu einem Built-in-Modul (z.B. `vec2`, `json_handle`), fehlt
+/// in aller Regel nur das `IMPORT` -- darauf weist die Meldung gezielt hin
+/// (statt des frueheren, irrefuehrenden „Stufe 3e: ... noch nicht unterstuetzt").
+fn unknown_dim_type_msg(type_name: &str) -> String {
+    let mods = crate::preprocess::modules_for_type(type_name);
+    if mods.is_empty() {
+        format!("Unbekannter Typ '{}' (keine Klasse, kein Werttyp, kein importiertes Modul)",
+                type_name)
+    } else if mods.len() == 1 {
+        format!("Unbekannter Typ '{}' -- fehlt IMPORT \"{}\"?", type_name, mods[0])
+    } else {
+        let list = mods.iter().map(|m| format!("\"{}\"", m)).collect::<Vec<_>>().join(", ");
+        format!("Unbekannter Typ '{}' -- fehlt ein IMPORT? (z.B. {})", type_name, list)
+    }
 }
 
 /// Statement-Zeilen-Wrapper auspacken (Stufe B). Stellen, die Statements per

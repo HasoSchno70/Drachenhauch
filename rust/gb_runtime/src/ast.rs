@@ -84,6 +84,7 @@ pub enum Node {
     NumberLit(NumV),
     StringLit(String),
     BoolLit(bool),
+    NilLit,
     Identifier(String),
     BinaryOp { op: String, left: Box<Node>, right: Box<Node> },
     UnaryOp { op: String, operand: Box<Node> },
@@ -166,6 +167,7 @@ impl Node {
             NumberLit(v) => obj("NumberLit", vec![("value", v.to_json())]),
             StringLit(s) => obj("StringLit", vec![("value", json!(s))]),
             BoolLit(b) => obj("BoolLit", vec![("value", json!(b))]),
+            NilLit => obj("NilLit", vec![]),
             Identifier(n) => obj("Identifier", vec![("name", json!(n))]),
             BinaryOp { op, left, right } => obj("BinaryOp", vec![
                 ("op", json!(op)), ("left", left.to_json()), ("right", right.to_json())]),

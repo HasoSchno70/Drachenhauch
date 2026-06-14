@@ -1189,6 +1189,7 @@ impl Parser {
             Tt::Str => { self.pos += 1; Ok(Node::StringLit(sval(&tok))) }
             Tt::True => { self.pos += 1; Ok(Node::BoolLit(true)) }
             Tt::False => { self.pos += 1; Ok(Node::BoolLit(false)) }
+            Tt::Nil => { self.pos += 1; Ok(Node::NilLit) }
             Tt::Ident => {
                 if sval(&tok) == "iif" && self.tt(1) == Tt::Lparen {
                     self.pos += 2;

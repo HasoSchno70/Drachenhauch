@@ -59,6 +59,16 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("vec2", &["vec2"]),
 ];
 
+/// Alle Built-in-Module, die den externen Typ `t` (lowercase, kanonisch)
+/// bereitstellen. Fuer hilfreiche „IMPORT fehlt?"-Compiler-Fehlermeldungen,
+/// wenn ein `DIM x AS <Modul-Typ>` ohne das passende IMPORT auftaucht.
+pub fn modules_for_type(t: &str) -> Vec<&'static str> {
+    MODULE_TYPES.iter()
+        .filter(|(_, types)| types.contains(&t))
+        .map(|(m, _)| *m)
+        .collect()
+}
+
 /// Remap eines Namens unter einem Modul-Alias -- gleiche Konvention wie
 /// `modules._apply_alias_by_convention`: `<modul>` -> `<alias>`,
 /// `<modul>_rest` -> `<alias>_rest`. None, wenn der Name nicht aliasable ist.

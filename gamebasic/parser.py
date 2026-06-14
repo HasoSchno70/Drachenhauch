@@ -27,7 +27,7 @@ und macht `IF flags BAND MASK THEN` lesbar genug ohne Klammer-Wirrwarr.
 from .tokens import Token, TokenType
 from .errors import ParseError
 from .ast_nodes import (
-    NumberLit, StringLit, BoolLit, Identifier, BinaryOp, UnaryOp, Call,
+    NumberLit, StringLit, BoolLit, NilLit, Identifier, BinaryOp, UnaryOp, Call,
     Dim, MultiDim, Assign, Print, Input, If, While, For, ForEach, ExprStmt, Program,
     Param, SubDecl, FunctionDecl, Return,
     ClassDecl, New, MemberAccess, MemberAssign,
@@ -1620,6 +1620,9 @@ class Parser:
         if t == TokenType.FALSE:
             self.pos += 1
             return BoolLit(False)
+        if t == TokenType.NIL:
+            self.pos += 1
+            return NilLit()
         if t == TokenType.IDENT:
             # IIF(cond, a, b) -- lazy Ternary (nur EIN Zweig wird ausgewertet).
             # Kontextabhaengig: nur als `iif(` behandelt; `iif` als blosser

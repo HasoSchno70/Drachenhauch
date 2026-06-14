@@ -33,6 +33,11 @@ class BoolLit(Expr):
 
 
 @dataclass
+class NilLit(Expr):
+    """Das Literal NIL (der „leere"/uninitialisierte Wert)."""
+
+
+@dataclass
 class Identifier(Expr):
     name: str
 

@@ -37,6 +37,7 @@ class TokenType(Enum):
     EXTENDS = auto()
     TRUE = auto()
     FALSE = auto()
+    NIL = auto()
     AND = auto()
     OR = auto()
     NOT = auto()
@@ -163,6 +164,7 @@ KEYWORDS = {
     "extends": TokenType.EXTENDS,
     "true": TokenType.TRUE,
     "false": TokenType.FALSE,
+    "nil": TokenType.NIL,
     "and": TokenType.AND,
     "or": TokenType.OR,
     "not": TokenType.NOT,
