@@ -62,5 +62,6 @@
   "Modul: tiled": 214,
   "Modul: tile_collide": 217,
   "Modul: controller": 220,
-  "Modul: vec2": 224
+  "Modul: vec2": 224,
+  "Modul: m3d": 227
 }

@@ -1,0 +1,23 @@
+' Screenshot-Demo Kapitel 67: m3d -- Wuerfel via MAT4_TRS + Quaternion platzieren
+IMPORT "g3d"
+IMPORT "m3d"
+SCREEN(480, 320, "m3d")
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(16, 20, 32))
+    CAMERA3D(7.0, 5.0, 9.0,  0.0, 0.0, 0.0,  45.0)
+    GRID3D(14, 1.0)
+    DIM i AS INTEGER
+    FOR i = 0 TO 4
+        DIM pos AS VEC3
+        DIM rot AS QUAT
+        DIM m AS MAT4
+        pos = VEC3_NEW(i * 2.0 - 4.0, 0.8, 0.0)
+        rot = QUAT_FROM_AXIS_ANGLE(0.3, 1.0, 0.2, i * 0.5)
+        m = MAT4_TRS(pos, rot, VEC3_NEW(0.8, 0.8, 0.8))
+        MODEL_MATRIX(box, m, HSV(i * 50.0, 0.7, 1.0))
+    NEXT
+    TEXT(10, 10, "m3d: MAT4_TRS(pos, QUAT, scale) -> MODEL_MATRIX", WHITE)
+    FLIP()
+WEND

@@ -77,7 +77,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [x] 54 particles  (content/54_particles.js, images/54_particles.png)
 - [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [x] 56 camera  (content/56_camera.js, images/56_camera.png) · [x] 57 input (Kurzref/Querverweis Kap 45)  (content/57_input.js) · [x] 58 ui  (content/58_ui.js, images/58_ui.png) · [x] 59 gui  (content/59_gui.js, images/59_gui.png)
 - [x] 60 scene (content/60_scene.js) · [x] 61 save (content/61_save.js) · [x] 62 astar (content/62_astar.js, images/62_astar.png) · [x] 63 tiled (content/63_tiled.js, images/63_tiled.png) · [x] 64 tile_collide (content/64_tile_collide.js, images/64_tilecollide.png) · [x] 65 controller (content/65_controller.js, images/65_controller.png)
-- [x] 66 vec2 (content/66_vec2.js, images/66_vec2.png) · [ ] 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
+- [x] 66 vec2 (content/66_vec2.js, images/66_vec2.png) · [x] 67 m3d (content/67_m3d.js, images/67_m3d.png) · [ ] 68 json · 69 db · 70 regex · 71 audio (erweitert)
 - [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
 
 ### Anhang
@@ -198,4 +198,6 @@ JUMP_VELOCITY/GRAVITY/COYOTE_TIME/JUMP_BUFFER/VARIABLE_JUMP, SET_POS/VX/VY; Coyo
 — Character-auf-Tilemap-Screenshot. 220 S.
 + Kap 66 vec2 (VEC2_NEW/X/Y/LENGTH/NORMALIZE/DOT/DISTANCE/LERP/PERP/REFLECT/ANGLE, Operatoren
 +/-/*/=, immutable) — Vektor-Pfeil-Screenshot. 224 S.
-**Nächstes:** Kap 67 m3d / 68 json / 69 db … (Teil V durch).
++ Kap 67 m3d (VEC3/VEC4/QUAT/MAT4: VEC3_NEW/DOT/CROSS/NORMALIZE, QUAT_FROM_AXIS_ANGLE/MUL/SLERP,
+MAT4_TRS/MUL/IDENTITY, MODEL_MATRIX/INSTANCED) — rotierte-Würfel-Screenshot. 225 S.
+**Nächstes:** Kap 68 json / 69 db / 70 regex … (Teil V durch).
