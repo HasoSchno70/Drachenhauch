@@ -822,6 +822,10 @@ impl Graphics {
     }
 
     fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool) -> Graphics {
+        // GBRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
+        // (z.B. fuer scharfe Buch-Screenshots), ohne die .gb-Quelle zu aendern.
+        let scale = std::env::var("GBRT_SCALE").ok()
+            .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
         let win_w = width * scale;
         let win_h = height * scale;
         // raylib loggt sonst seinen INFO-Startup-Spam auf stdout und verschmutzt
@@ -844,7 +848,7 @@ impl Graphics {
         layer_names.insert(String::new(), 0usize); // Main-Layer
         // Szene-Render-Target (Fenstergroesse) fuer Post-Processing.
         let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
-        Graphics {
+        let mut g = Graphics {
             rl, thread, width, height, scale,
             shaders: Vec::new(), post_shader_idx: None, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
@@ -929,13 +933,27 @@ impl Graphics {
             max_frames,
             screenshot,
             shot_taken: false,
+        };
+        // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
+        // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
+        // an die Skala gekoppelt, damit Text bei sz*scale knackig bleibt.
+        if let Ok(fp) = std::env::var("GBRT_FONT") {
+            if !fp.is_empty() {
+                let bake = (32 * scale.max(1)).clamp(32, 256);
+                if let Ok(h) = g.load_font_ext(&fp, bake) {
+                    let _ = g.set_font(h);
+                }
+            }
         }
+        g
     }
 
     /// SCREEN nach einem Lazy-Init (oder erneutes SCREEN): das bestehende Fenster
     /// sichtbar machen und auf die gewuenschte Groesse/Titel umstellen, statt ein
     /// zweites raylib-Fenster zu erzeugen (raylib paniced bei Doppel-Init).
     pub fn reconfigure(&mut self, width: i32, height: i32, title: &str, scale: i32) {
+        let scale = std::env::var("GBRT_SCALE").ok()
+            .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
         self.width = width;
         self.height = height;
         self.scale = scale;
@@ -1995,6 +2013,21 @@ impl Graphics {
         let path = resolved.as_str();
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
             .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
+        self.fonts.push(f);
+        Ok((self.fonts.len() - 1) as i64)
+    }
+
+    /// Wie `load_font`, aber mit erweitertem Zeichensatz (ASCII + Latin-1 +
+    /// gaengige Typografie/Pfeile) statt nur den 95 ASCII-Glyphen. Fuer den
+    /// per `GBRT_FONT` gesetzten Default-Font, damit deutsche Umlaute (ä ö ü ß)
+    /// und Buch-Sonderzeichen („ " … – · → …) gerendert werden.
+    fn load_font_ext(&mut self, path: &str, size: i32) -> Result<i64, String> {
+        let mut chars = String::new();
+        for c in 0x20u32..=0x7Eu32 { chars.push(char::from_u32(c).unwrap()); }
+        for c in 0xA0u32..=0xFFu32 { chars.push(char::from_u32(c).unwrap()); }
+        chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
+        let f = self.rl.load_font_ex(&self.thread, path, size.max(4), Some(&chars))
+            .map_err(|e| format!("GBRT_FONT '{}' nicht ladbar: {}", path, e))?;
         self.fonts.push(f);
         Ok((self.fonts.len() - 1) as i64)
     }
