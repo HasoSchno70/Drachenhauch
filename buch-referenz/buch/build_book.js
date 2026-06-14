@@ -81,9 +81,9 @@ function _box(title, text, bg, bd, titleColor) {
     children: [new TextRun({ text: title, bold: true, color: titleColor, size: 22 })] })];
   if (text) (Array.isArray(text) ? text : [text]).forEach((t) =>
     kids.push(new Paragraph({ spacing: SP(0), children: [new TextRun({ text: t, size: 22 })] })));
-  const table = new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [9360],
+  const table = new Table({ width: { size: 9026, type: WidthType.DXA }, columnWidths: [9026],
     rows: [new TableRow({ cantSplit: true, children: [new TableCell({
-      width: { size: 9360, type: WidthType.DXA },
+      width: { size: 9026, type: WidthType.DXA },
       borders: { top: border, bottom: border, left: border, right: border },
       shading: { fill: bg, type: ShadingType.CLEAR },
       margins: { top: 140, bottom: 140, left: 180, right: 180 }, children: kids })] })] });
@@ -241,7 +241,7 @@ const doc = new Document({
       style: { paragraph: { indent: { left: 540, hanging: 280 } } } }] },
   ] },
   sections: [{
-    properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+    properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },  // A4 (210x297mm)
     footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER,
       children: [new TextRun({ text: "GameBasic – Das Lehrbuch  ·  ", size: 16, color: C_CAP }),
                  new TextRun({ children: [PageNumber.CURRENT], size: 16, color: C_CAP })] })] }) },
