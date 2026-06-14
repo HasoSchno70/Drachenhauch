@@ -81,8 +81,9 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 72 curves (content/72_curves.js, images/72_curves.png) · [x] 73 net (content/73_net.js) · [x] 74 html (content/74_html.js) · [x] 75 ecs (content/75_ecs.js) · [x] 76 serial/usb/wifi/bt (content/76_hardware.js) — **Teil V KOMPLETT**
 
 ### Anhang
-- [ ] A Befehls-Index (alphabetisch) · B Tastencodes · C Farb-Konstanten
-- [ ] D Fehlermeldungen verstehen
+- [x] A Befehls-Index (alphabetisch)  (content/90_anhang_a.js — auto-generiert aus builtin_index.json)
+- [x] B Tastencodes  (content/91_anhang_b.js) · [x] C Farb-Konstanten  (content/92_anhang_c.js)
+- [x] D Fehlermeldungen verstehen  (content/93_anhang_d.js)
 
 ## Status
 Session 1 (2026-06-13): Pipeline + Renderer + Teil I komplett + Teil II Kap 10–11.
@@ -230,5 +231,13 @@ EINEM Kapitel. **WICHTIG: brauchen Spezial-Build `python rust\\build_runtime.py 
 wirft klare Meldung) → nicht live verifizierbar, Code-Beispiele ohne out:.** serial (Arduino/COM), usb
 (HID), wifi (netsh, nur Windows), bt (BLE); Returns meist STRING-Listen (SPLIT), Roh-Bytes via ASC/CHR$.
 **>>> TEIL V (Module, Kap 50-76) KOMPLETT — 67 content-Module, 74 Überschriften. <<<**
-**Nächstes: Anhang A (Befehls-Index alphabetisch) / B (Tastencodes) / C (Farb-Konstanten) /
-D (Fehlermeldungen verstehen), dann TOC/Vorwort-Feinschliff + Korrekturlauf.**
++ **Anhang KOMPLETT** (neuer Renderer-Helfer `H.table(rows, {headers, widths, mono})` in build_book.js
+— über Seiten umbrechende Tabelle, optional Farb-`swatch` pro Zelle): A Befehls-Index (content/90_anhang_a.js,
+**auto-generiert: liest beim Build builtin_index.json → bleibt mit der Engine in Sync**, 1010 Befehle
+alphabetisch nach Buchstabe, Signatur + Modul-Spalte, Kern = „—") · B Tastencodes (content/91_anhang_b.js,
+KEY_*/JOY_* aus graphics.py, gegen gbrt verifiziert) · C Farb-Konstanten (content/92_anhang_c.js, 18 Farben
+mit Swatch/RGB/Hex, verifiziert) · D Fehlermeldungen (content/93_anhang_d.js, 9 häufige Meldungen mit
+exaktem gbrt-Wortlaut + Ursache/Lösung). Tabellen per LibreOffice-Render geprüft (Swatches/Header sauber).
+**>>> BUCH-GESAMTSTRUKTUR KOMPLETT: Teile I-V (Kap 0-76) + Anhang A-D, 71 content-Module, 79 Überschriften,
+289 PDF-Seiten. <<<** **Nächstes (optional, Politur): TOC/Vorwort-Feinschliff, kompletter Korrekturlauf
+(Tippfehler/Konsistenz), evtl. echte gbsprites-Screenshots wo noch Platzhalter.**

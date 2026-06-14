@@ -72,5 +72,10 @@
   "Modul: net": 242,
   "Modul: html": 246,
   "Modul: ecs": 250,
-  "Hardware: serial, usb, wifi, bt": 255
+  "Hardware: serial, usb, wifi, bt": 255,
+  "Anhang": 259,
+  "Anhang A — Befehls-Index": 260,
+  "Anhang B — Tastencodes": 285,
+  "Anhang C — Farb-Konstanten": 287,
+  "Anhang D — Fehlermeldungen verstehen": 288
 }
