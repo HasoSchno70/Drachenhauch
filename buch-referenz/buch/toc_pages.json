@@ -60,5 +60,6 @@
   "Modul: save": 208,
   "Modul: astar": 211,
   "Modul: tiled": 214,
-  "Modul: tile_collide": 217
+  "Modul: tile_collide": 217,
+  "Modul: controller": 220
 }

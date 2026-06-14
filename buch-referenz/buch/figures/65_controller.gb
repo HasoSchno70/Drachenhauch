@@ -1,0 +1,44 @@
+' Screenshot-Demo Kapitel 65: controller -- Character-Controller auf Tiled-Karte
+IMPORT "tiled"
+IMPORT "controller"
+SCREEN(480, 320, "Controller")
+DIM lvl AS TILED_MAP
+lvl = TILED_LOAD("levels/level1.json")
+DIM ts AS IMAGE
+ts = LOADIMAGE("assets/tiles.png")
+CONST YOFF AS INTEGER = 90
+DIM MW AS INTEGER
+DIM MH AS INTEGER
+MW = TILED_WIDTH(lvl)
+MH = TILED_HEIGHT(lvl)
+
+DIM held AS CHAR_CONTROLLER
+held = CHAR_NEW(360.0, 20.0, 12.0, 14.0)
+
+WHILE NOT QUITREQUESTED()
+    CHAR_SET_INPUT(held, 0, FALSE, FALSE)     ' (headless: keine Eingabe)
+    CHAR_UPDATE(held, lvl, 0)
+
+    CLS(RGB(50, 80, 130))
+    DIM tx AS INTEGER
+    DIM ty AS INTEGER
+    FOR ty = 0 TO MH - 1
+        FOR tx = 0 TO MW - 1
+            DIM gid AS INTEGER
+            gid = TILED_TILE_AT(lvl, 0, tx, ty)
+            IF gid > 0 THEN
+                DIM i AS INTEGER
+                i = gid - 1
+                DRAWIMAGEPART(ts, (i MOD 4) * 16, (i \ 4) * 16, 16, 16, tx * 16, YOFF + ty * 16)
+            END IF
+        NEXT
+    NEXT
+    DIM hx AS INTEGER
+    DIM hy AS INTEGER
+    hx = INT(CHAR_X(held))
+    hy = INT(CHAR_Y(held))
+    BOX(hx, YOFF + hy, hx + 12, YOFF + hy + 14, RGB(240, 60, 60))
+    RECT(hx, YOFF + hy, hx + 12, YOFF + hy + 14, WHITE)
+    TEXT(10, 8, "CHAR_CONTROLLER  am Boden: " + STR$(CHAR_ON_GROUND(held)), WHITE)
+    FLIP()
+WEND
