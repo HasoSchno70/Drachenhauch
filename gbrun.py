@@ -347,11 +347,20 @@ def main(argv):
 
 
 def _find_gbrt():
-    """Sucht das gebaute `gbrt`-Binary (Release bevorzugt, sonst Debug)."""
-    base = Path(__file__).resolve().parent / "rust" / "gb_runtime" / "target"
+    """Sucht das `gbrt`-Binary. Reihenfolge:
+    1. Eingefrorene Installation (PyInstaller): neben der Exe bzw. im Bundle
+       (_MEIPASS) -- so findet die installierte GameBasic-App ihre Runtime.
+    2. Dev-Baum: rust/gb_runtime/target/{release,debug}/gbrt[.exe]."""
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    for variant in ("release", "debug"):
-        p = base / variant / exe
+    cands = []
+    if getattr(sys, "frozen", False):
+        cands.append(Path(sys.executable).resolve().parent / exe)
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            cands.append(Path(meipass) / exe)
+    base = Path(__file__).resolve().parent / "rust" / "gb_runtime" / "target"
+    cands += [base / "release" / exe, base / "debug" / exe]
+    for p in cands:
         if p.exists():
             return p
     return None

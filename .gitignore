@@ -43,3 +43,8 @@ fireplace/assets/fireplace.jpg
 fireplace/assets/fire.ogg
 fireplace/assets/wind.mp3
 examples/highscores.txt
+
+# GameBasic-Installer: Quelle committen, Build-Artefakte ignorieren
+installer/output/
+installer/GameBasic.ico
+!installer/GameBasic.spec
