@@ -78,7 +78,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [x] 56 camera  (content/56_camera.js, images/56_camera.png) · [x] 57 input (Kurzref/Querverweis Kap 45)  (content/57_input.js) · [x] 58 ui  (content/58_ui.js, images/58_ui.png) · [x] 59 gui  (content/59_gui.js, images/59_gui.png)
 - [x] 60 scene (content/60_scene.js) · [x] 61 save (content/61_save.js) · [x] 62 astar (content/62_astar.js, images/62_astar.png) · [x] 63 tiled (content/63_tiled.js, images/63_tiled.png) · [x] 64 tile_collide (content/64_tile_collide.js, images/64_tilecollide.png) · [x] 65 controller (content/65_controller.js, images/65_controller.png)
 - [x] 66 vec2 (content/66_vec2.js, images/66_vec2.png) · [x] 67 m3d (content/67_m3d.js, images/67_m3d.png) · [x] 68 json (content/68_json.js) · [x] 69 db (content/69_db.js) · [x] 70 regex (content/70_regex.js) · [x] 71 audio erweitert (content/71_audio.js)
-- [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
+- [x] 72 curves (content/72_curves.js, images/72_curves.png) · [x] 73 net (content/73_net.js) · [x] 74 html (content/74_html.js) · [x] 75 ecs (content/75_ecs.js) · [x] 76 serial/usb/wifi/bt (content/76_hardware.js) — **Teil V KOMPLETT**
 
 ### Anhang
 - [ ] A Befehls-Index (alphabetisch) · B Tastencodes · C Farb-Konstanten
@@ -214,3 +214,21 @@ MUSIC_PAUSE/RESUME/STOP/POSITION/SET_VOLUME/PITCH, Busse BUS_VOLUME/GET_VOLUME s
 Effekte REVERB/DELAY/FILTER/DISTORTION/COMPRESSOR/EQ, FFT-Hinweis) — kein Screenshot (Klang nicht
 abdruckbar), Aufrufe gegen gbrt geprüft. **Nächstes:** Kap 72 curves / 73 net / 74 html / 75 ecs /
 76 serial-usb-wifi-bt, dann Anhang (A Befehls-Index / B Tastencodes / C Farben / D Fehlermeldungen).
++ Kap 72 curves (content/72_curves.js, images/72_curves.png) — CURVE_LERP/SMOOTHSTEP/SMOOTHERSTEP,
+BEZIER/BEZIER2 (Handles), CATMULL/CATMULL2 (durch die Punkte), HERMITE; LERP-Nachzieh-Muster.
+Screenshot: Bezier+Catmull-Vergleich. + Kap 73 net (content/73_net.js, Konsole) — TCP LISTEN/ACCEPT/
+CONNECT/SEND/RECV/PEER_ADDR/CLOSE, UDP BIND/OPEN/SEND/RECV/LAST_FROM; non-blocking by default.
+**STOLPERSTEINE: NET_TCP_ACCEPT-Leere via IS_NIL prüfen (NICHT <> NIL); NET_UDP_LAST_FROM gibt STRING
+"host:port" (NICHT Tupel — docs/module-net.md war veraltet, mit-korrigiert).** TCP+UDP-Loopback gegen
+gbrt verifiziert. + Kap 74 html (content/74_html.js) — HTTP_GET/POST/DOWNLOAD/STATUS/HEADER, URL_ENCODE/
+DECODE, HTML_TEXT/FIND_ALL/GET_ATTR; live gegen example.com verifiziert (Status 200, h1=Example Domain),
+URL/HTML-Parser offline verifiziert. + Kap 75 ecs (content/75_ecs.js, Konsole) — Mentales Modell
+(Entity=ID, Component=Daten, System=Query-Loop), NEW_WORLD/ENTITY/DESTROY/ALIVE/COUNT, ADD_*/GET_*/
+GET_OR_*/HAS/REMOVE, QUERY/2/3, Bulk INTEGRATE/SCALE/CLAMP/FILL/REMOVE_DEAD/COUNT_WITH (40× schneller).
+Alle Ausgaben verifiziert. + Kap 76 serial/usb/wifi/bt (content/76_hardware.js) — 4 Hardware-Module in
+EINEM Kapitel. **WICHTIG: brauchen Spezial-Build `python rust\\build_runtime.py --hardware` (Standard-gbrt
+wirft klare Meldung) → nicht live verifizierbar, Code-Beispiele ohne out:.** serial (Arduino/COM), usb
+(HID), wifi (netsh, nur Windows), bt (BLE); Returns meist STRING-Listen (SPLIT), Roh-Bytes via ASC/CHR$.
+**>>> TEIL V (Module, Kap 50-76) KOMPLETT — 67 content-Module, 74 Überschriften. <<<**
+**Nächstes: Anhang A (Befehls-Index alphabetisch) / B (Tastencodes) / C (Farb-Konstanten) /
+D (Fehlermeldungen verstehen), dann TOC/Vorwort-Feinschliff + Korrekturlauf.**

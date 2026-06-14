@@ -67,5 +67,10 @@
   "Modul: json": 220,
   "Modul: db": 224,
   "Modul: regex": 229,
-  "Modul: audio (fortgeschritten)": 233
+  "Modul: audio (fortgeschritten)": 233,
+  "Modul: curves": 238,
+  "Modul: net": 242,
+  "Modul: html": 246,
+  "Modul: ecs": 250,
+  "Hardware: serial, usb, wifi, bt": 255
 }
