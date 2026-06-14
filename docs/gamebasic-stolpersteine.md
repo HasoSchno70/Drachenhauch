@@ -86,12 +86,12 @@ verlangen. Aktuell konsistent, also kein Muss.
 
 (Vermutlich Absicht; hier nur dokumentiert, falls man sie je überdenken will.)
 
-### D1. `/` liefert mal INTEGER, mal FLOAT  —  ⚠️ ENTSCHEIDUNG NÖTIG (breaking)
-> Eine Umstellung auf „`/` immer FLOAT" (Python-3-Modell) wäre sauber/vorhersagbar,
-> ist aber ein **brechender** Eingriff: `8/2` druckt dann `4.0` statt `4`, der gerade
-> fertige Mathe-Kapitel im Buch + viele Beispiele/Tests müssten angepasst werden, und
-> für ein spiel-orientiertes BASIC sind glatte Ganzzahl-Ergebnisse oft erwünscht. Daher
-> NICHT einseitig geändert — siehe Optionen unten / Rückfrage an den Autor.
+### D1. `/` liefert mal INTEGER, mal FLOAT  —  ✅ ENTSCHIEDEN: nicht-brechend (commit 2492848)
+> Autor-Entscheidung (2026-06-14): **`/` bleibt wie es ist** (glatt → INTEGER, sonst FLOAT;
+> kein `4.0`-Bruch, Buch unverändert). Stattdessen weist die Fehlermeldung beim Zuweisen
+> eines FLOAT-`/`-Ergebnisses an eine INTEGER-Variable jetzt auf `\` (Ganzzahl-Division)
+> bzw. `INT()/ROUND()` hin — der eigentliche Schmerzpunkt ist damit adressiert, ohne
+> Kompatibilität zu brechen. Test: `tests/test_div_and_float_display.py`.
 ```basic
 PRINT 8 / 2     ' 4     (glatt -> INTEGER)
 PRINT 9 / 2     ' 4.5   (nicht glatt -> FLOAT)
@@ -102,7 +102,11 @@ Typ-Annahmen und überrascht. Konsistenter (und in vielen Sprachen üblich): `/`
 immer FLOAT, `\` für Integer-Division (existiert bereits). Bewusst so gewählt —
 aber ein echter Stolperstein.
 
-### D2. Float-Ausgabe zeigt volle f64-Präzision  —  ⚠️ GRÖSSTENTEILS „WORKS AS INTENDED"
+### D2. Float-Ausgabe zeigt volle f64-Präzision  —  ✅ TEILFIX (commit 2492848)
+> Allgemeine Float-Ausgabe ist korrekt (kürzeste round-trip-Form) und bleibt. Der einzige
+> echte Wart — f32-gestützte **Audio-Lautstärken** (`0.800000011920929`) — ist gefixt:
+> `AUDIO_BUS_GET_VOLUME`/`AUDIO_GET_VOLUME`/`AUDIO_MUSIC_GET_VOLUME` runden auf 6 Stellen
+> → `0.8`. Test: `tests/test_div_and_float_display.py`. (Analyse unten.)
 > **Befund nach Prüfung:** gbrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
 > Darstellung (Rust-Display ≈ Python-`repr`). `0.1+0.2 -> 0.30000000000000004` und
 > `CURVE_SMOOTHERSTEP -> 0.16308000000000003` sind die **kürzest mögliche exakte** Form —
