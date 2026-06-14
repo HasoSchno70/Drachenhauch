@@ -1,0 +1,16 @@
+' Screenshot-Demo Kapitel 48: 3D-Grundkoerper
+IMPORT "g3d"
+SCREEN(480, 320, "3D")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(16, 22, 34))
+    ' Kamera schraeg von vorn-oben auf den Ursprung
+    CAMERA3D(7.0, 5.5, 9.0,  0.0, 0.5, 0.0,  45.0)
+    GRID3D(16, 1.0)                                  ' Boden-Raster
+    CUBE(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  RED)        ' roter Wuerfel
+    CUBE_WIRES(0.0, 1.0, 0.0,  2.0, 2.0, 2.0,  BLACK)
+    SPHERE(4.0, 1.0, 0.0,  1.0,  BLUE)               ' blaue Kugel
+    CYLINDER(-4.0, 0.0, 0.0,  0.8, 0.8, 2.5,  GREEN) ' gruener Zylinder
+    CYLINDER(0.0, 0.0, -4.0,  0.0, 1.2, 2.2,  YELLOW)' gelber Kegel (r_oben=0)
+    TEXT(10, 10, "3D: CUBE / SPHERE / CYLINDER + GRID3D", WHITE)
+    FLIP()
+WEND

@@ -70,7 +70,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 45 Eingabe (Tastatur/Maus/Gamepad)  (content/45_eingabe.js, images/45_eingabe.png)
 - [x] 46 Sound (LOADSOUND/PLAYSOUND/PLAYMUSIC/AUDIO_*)  (content/46_sound.js, images/46_sound.png)
 - [x] 47 Layer, Sprite-Atlas, Bulk-Draws  (content/47_layer_atlas.js, images/47_layer.png)
-- [ ] 48 3D-Grafik (g3d)
+- [x] 48 3D-Grafik (g3d)  (content/48_3d.js, images/48_3d.png)
 
 ### Teil V — Die Module
 - [ ] 50 sprite · 51 animfsm · 52 tween · 53 timer · 54 particles
@@ -148,4 +148,9 @@ UNLOADSOUND, AUDIO_VOLUME/PAN/BUS_VOLUME erwähnt) — als GRAFISCHES Mini-Klavi
 + Kap 47 (Layer LAYER_DEFINE/LAYER/END/CLEAR, Atlas ATLAS_LOAD/DRAW/DRAW_FLIPPED/BATCH_DRAW/
 FLUSH, Bulk PLOTS/CIRCLES/BOXES/LINES) — Layer+Bulk-Screenshot (Sternenfeld+Planeten+HUD).
 GOTCHA: ATLAS_DRAW_FLIPPED-Flips brauchen 1/0 (NICHT TRUE/FALSE → „erwartet Zahl"). 158 Seiten.
-**Nächstes:** Kap 48 (3D-Grafik g3d) mit Screenshots.
+**ATLAS_DRAW_FLIPPED-Inkonsistenz danach in gbrt BEHOBEN** (flip_x/flip_y TRUE/FALSE+1/0, echtes
+flip_y, tint=Arg7; commit 8aa315f); Kap-47-Beispiel auf TRUE/FALSE umgestellt.
++ Kap 48 (3D-Grafik g3d: CAMERA3D, GRID3D, CUBE/_WIRES, SPHERE/_WIRES, CYLINDER/Kegel, PLANE/
+LINE3D/POINT3D + Ausblick Modelle/Licht/Picking) — 3D-Szenen-Screenshot. **TEIL IV KOMPLETT
+(Kap 40-48).** 163 Seiten.
+**Nächstes:** ABSCHLUSS-PROJEKT mit Grafik+Sound (User-Wunsch) — kleines spielbares Mini-Game.
