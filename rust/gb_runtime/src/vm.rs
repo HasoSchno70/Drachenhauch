@@ -3802,7 +3802,7 @@ impl<'p> Vm<'p> {
                 if !matches!(bus.as_str(), "sfx" | "music" | "master") {
                     return Err(format!("AUDIO_BUS_GET_VOLUME: unbekannter Bus '{}' (sfx, music, master)", bus));
                 }
-                Value::Float(self.audio_mut()?.get_bus_volume(&bus)?)
+                Value::Float(round_audio(self.audio_mut()?.get_bus_volume(&bus)?))
             }
             "audio_filter" => {
                 // AUDIO_FILTER(bus$, cutoff_hz[, resonance]) -- Tiefpass.
@@ -3956,7 +3956,7 @@ impl<'p> Vm<'p> {
             }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
-            "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(self.audio_mut()?.ch_get_volume(i)?) }
+            "audio_get_volume" => { let i = gi(a, 0, "AUDIO_GET_VOLUME")?; Value::Float(round_audio(self.audio_mut()?.ch_get_volume(i)?)) }
             "audio_pan" => { let i = gi(a, 0, "AUDIO_PAN")?; let l = need_f(a, 1, "AUDIO_PAN")?; let r = need_f(a, 2, "AUDIO_PAN")?; self.audio_mut()?.ch_pan(i, l, r)?; Value::Nil }
             "audio_pitch" => {
                 let i = gi(a, 0, "AUDIO_PITCH")?;
@@ -4043,7 +4043,7 @@ impl<'p> Vm<'p> {
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
             "audio_music_volume" | "audio_music_set_volume" => { let v = need_f(a, 0, "AUDIO_MUSIC_VOLUME")?; self.audio_mut()?.music_set_volume(v); Value::Nil }
-            "audio_music_get_volume" => Value::Float(self.audio_mut()?.music_get_volume()),
+            "audio_music_get_volume" => Value::Float(round_audio(self.audio_mut()?.music_get_volume())),
             "audio_music_position" => Value::Float(self.audio_mut()?.music_position()),
             "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
             "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
@@ -4990,6 +4990,11 @@ fn mul(a: Value, b: Value) -> R<Value> {
     nn_arith(a, b, '*')
 }
 
+/// Rundet f32-gestuetzte Audio-Werte (Lautstaerken 0..1) auf 6 Nachkommastellen,
+/// damit die f32->f64-Verbreiterung nicht als „0.800000011920929" durchschlaegt
+/// (siehe docs/gamebasic-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
+fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
+
 /// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-GbArray.
 /// Element-Typ wird aus den Werten hergeleitet (wie ein homogenes GB-Array):
 /// nur Ganzzahlen -> integer; Zahlen mit mind. einem Float -> float (Ints
@@ -5129,7 +5134,7 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             Value::Int(_) => Ok(value),
             Value::Float(f) => {
                 if f.fract() == 0.0 { Ok(Value::Int(f as i64)) }
-                else { Err(format!("{}: FLOAT {} kann nicht ohne Verlust nach INTEGER (nutze INT())", ctx, f)) }
+                else { Err(format!("{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \\ statt / nehmen, sonst mit INT()/ROUND() runden", ctx, f)) }
             }
             Value::Bool(_) => Err(format!("{}: Erwartet INTEGER, erhalten BOOLEAN", ctx)),
             _ => Err(format!("{}: Erwartet INTEGER, erhalten {}", ctx, value.type_name())),
