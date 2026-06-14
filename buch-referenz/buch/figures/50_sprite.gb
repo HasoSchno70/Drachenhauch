@@ -1,0 +1,32 @@
+' Screenshot-Demo Kapitel 50: sprite-Modul
+IMPORT "sprite"
+SCREEN(480, 320, "Sprite")
+DIM sheet AS IMAGE
+sheet = LOADIMAGE("assets/hero.png")     ' 256x32 = 8 Frames a 32x32
+
+DIM held AS SPRITE
+held = SPRITE_NEW(sheet, 32, 32)
+SPRITE_ADD_ANIM(held, "walk", 0, 7, 10.0)
+SPRITE_PLAY(held, "walk")
+SPRITE_SET_POS(held, 70.0, 150.0)
+SPRITE_SET_SCALE(held, 3.0, 3.0)
+
+DIM gegner AS SPRITE
+gegner = SPRITE_NEW(sheet, 32, 32)
+SPRITE_ADD_ANIM(gegner, "walk", 0, 7, 10.0)
+SPRITE_PLAY(gegner, "walk")
+SPRITE_SET_POS(gegner, 300.0, 150.0)
+SPRITE_SET_SCALE(gegner, 3.0, 3.0)
+SPRITE_SET_FLIP(gegner, TRUE, FALSE)     ' blickt nach links
+
+WHILE NOT QUITREQUESTED()
+    DIM dt AS INTEGER
+    dt = INT(DELTA() * 1000.0)
+    SPRITE_UPDATE(held, dt)
+    SPRITE_UPDATE(gegner, dt)
+    CLS(RGB(28, 32, 50))
+    TEXT(60, 60, "Animiertes Sprite (8 Frames, gespiegelt)", RGB(220, 230, 255))
+    SPRITE_DRAW(held)
+    SPRITE_DRAW(gegner)
+    FLIP()
+WEND

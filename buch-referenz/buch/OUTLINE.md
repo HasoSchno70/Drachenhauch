@@ -74,7 +74,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 49 Abschlussprojekt: Münzfang (Grafik+Sound-Spiel)  (content/49_projekt.js, images/49_catch.png)
 
 ### Teil V — Die Module
-- [ ] 50 sprite · 51 animfsm · 52 tween · 53 timer · 54 particles
+- [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [ ] 51 animfsm · 52 tween · 53 timer · 54 particles
 - [ ] 55 physics / physics2d / physics3d · 56 camera · 57 input · 58 ui · 59 gui
 - [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
@@ -159,5 +159,7 @@ spielbares Arcade-Spiel (fallende Münzen mit Korb fangen) in 5 Schritten aufgeb
 Steuerung, Arrays für Münzen, Fang-Kollision, AUDIO_TONE-Sound, Score-HUD; volles Listing +
 Erweiterungsideen. Führt Game-Loop/Input/DELTA/Zeichnen/Arrays/Kollision/Sound/HUD zusammen.
 168 Seiten. Spiel gegen gbrt verifiziert (läuft).
-**Nächstes:** Teil V (Module, Kap 50+) ODER Anhang (A Befehls-Index / B Tastencodes / C Farben /
-D Fehlermeldungen). Buch-Kerninhalt (Teile I-IV + Projekt) ist damit komplett.
+Buch-Kerninhalt (Teile I-IV + Projekt) komplett. **Teil V gestartet:** Kap 50 sprite
+(SPRITE_NEW/SET_POS/VELOCITY/ADD_ANIM/PLAY/PLAY_ONCE/SET_FLIP/SET_SCALE/UPDATE/DRAW/COLLIDES) mit
+animiertem Screenshot. 173 Seiten. GOTCHA: SPRITE_UPDATE will dt als INTEGER-ms (INT(DELTA()*1000)).
+**Nächstes:** Kap 51 animfsm, dann 52 tween / 53 timer / 54 particles / 55 physics … (Teil V durch).
