@@ -1,0 +1,68 @@
+module.exports = (H) => [
+  H.chapter("Modul: timer"),
+  H.p("Oft soll etwas nach einer Weile passieren („in 2 Sekunden explodieren“) oder regelmäßig („alle halbe Sekunde einen Gegner spawnen“). Das könntest du mit MILLIS und eigener Buchführung lösen – das timer-Modul nimmt dir das ab. Du gibst ihm eine Funktion und eine Zeit, und es ruft die Funktion zum richtigen Zeitpunkt auf. Dazu kommt COOLDOWN, ein einzeiliger Ratenbegrenzer. Das Modul ist rein logisch – es braucht kein Grafikfenster."),
+  H.p("Die Funktionen, die ein Timer aufruft, übergibst du als FUNCREF (Kapitel „Funktionen & SUBs“) – also einfach als Funktionsnamen ohne Klammern. Solche Callback-Funktionen haben keine Parameter."),
+
+  H.h2("Geplante Aufrufe"),
+  H.cmd("TIMER_AFTER · TIMER_EVERY", 'TIMER_AFTER(ms, fn)   TIMER_EVERY(ms, fn)',
+    "TIMER_AFTER ruft die Funktion fn einmalig nach ms Millisekunden auf. TIMER_EVERY ruft sie immer wieder alle ms. Beide liefern eine Timer-ID zurück, mit der du den Timer später abfragen oder abbrechen kannst.",
+    [
+      'IMPORT "timer"',
+      'SUB explodiere()',
+      '    PRINT "BOOM"',
+      'END SUB',
+      '',
+      'TIMER_AFTER(2000, explodiere)          \' einmal nach 2 s',
+      'DIM spawner AS INTEGER',
+      'spawner = TIMER_EVERY(500, spawne)     \' alle 0,5 s',
+    ]),
+
+  H.h2("Pro Frame fällige Timer feuern"),
+  H.cmd("TIMER_UPDATE", 'TIMER_UPDATE()',
+    "Muss einmal pro Frame (im Game-Loop) aufgerufen werden – erst dann werden fällige Callbacks tatsächlich ausgeführt. Dasselbe Muster wie INPUT_UPDATE() oder GUI_UPDATE(). Ohne TIMER_UPDATE feuert kein Timer.",
+    [
+      'WHILE NOT QUITREQUESTED()',
+      '    TIMER_UPDATE()        \' fällige Timer jetzt feuern',
+      '    \' ... Spiel ...',
+      '    FLIP()',
+      'WEND',
+    ]),
+  H.note("Ein TIMER_EVERY feuert pro TIMER_UPDATE höchstens einmal – es gibt also keinen „Aufhol-Stau“, wenn das Spiel mal kurz ruckelt. Außerhalb eines Grafik-Loops kannst du TIMER_UPDATE auch in einer eigenen Schleife (mit SLEEP) aufrufen.",
+    "Merke"),
+
+  H.h2("Timer verwalten"),
+  H.cmd("TIMER_CANCEL · TIMER_ACTIVE", 'TIMER_CANCEL(id)   TIMER_ACTIVE(id)',
+    "TIMER_CANCEL bricht einen Timer über seine ID ab (eine bereits gefeuerte oder unbekannte ID schadet nicht). TIMER_ACTIVE prüft, ob ein Timer noch läuft.",
+    [
+      'IF TIMER_ACTIVE(spawner) THEN TIMER_CANCEL(spawner)',
+    ]),
+  H.cmd("TIMER_COUNT · TIMER_CLEAR", 'TIMER_COUNT()   TIMER_CLEAR()',
+    "TIMER_COUNT liefert die Anzahl gerade laufender Timer. TIMER_CLEAR verwirft alle Timer (und Cooldowns) auf einmal – praktisch beim Szenenwechsel, damit keine Timer aus der alten Szene nachfeuern.",
+    [
+      'PRINT TIMER_COUNT()      \' z. B. 1',
+      'TIMER_CLEAR()            \' alles zurücksetzen',
+    ]),
+
+  H.h2("Ratenbegrenzer: COOLDOWN"),
+  H.p("COOLDOWN ist ein eigenständiges Mini-Werkzeug für „nicht öfter als alle X Millisekunden“. Es gibt TRUE zurück, wenn die Aktion gerade erlaubt ist (und startet dann die Sperre), sonst FALSE. Identifiziert wird jede Sperre über eine frei wählbare Text-ID. Anders als die Timer braucht COOLDOWN kein TIMER_UPDATE – die Prüfung passiert beim Aufruf."),
+  H.cmd("COOLDOWN", 'COOLDOWN(id$, ms)',
+    "Liefert TRUE, wenn seit dem letzten erlaubten Aufruf mit dieser id mindestens ms vergangen sind (und merkt sich dann den neuen Zeitpunkt), sonst FALSE. Ideal für Schussfrequenz, Trefferton-Spam-Schutz und Ähnliches.",
+    [
+      'IF INPUT_HELD("fire") AND COOLDOWN("schuss", 250) THEN',
+      '    \' höchstens alle 250 ms ein Schuss',
+      'END IF',
+    ]),
+  H.p("Im Schnelltest unten zeigt sich die Wirkung: Sechs schnelle Versuche, aber bei 1000 ms Sperre kommt nur der erste durch."),
+  H.code([
+    'IMPORT "timer"',
+    'DIM treffer AS INTEGER',
+    'DIM j AS INTEGER',
+    'treffer = 0',
+    'FOR j = 0 TO 5',
+    '    IF COOLDOWN("schuss", 1000) THEN treffer = treffer + 1',
+    'NEXT',
+    'PRINT "durchgekommen: "; treffer',
+  ]),
+  H.code(["durchgekommen: 1"], { out: true }),
+  H.tip("timer oder COOLDOWN?", "Nimm TIMER_AFTER/EVERY, wenn etwas zu einem Zeitpunkt von selbst passieren soll (Callback). Nimm COOLDOWN, wenn du eine Aktion, die du sowieso schon prüfst, nur seltener zulassen willst (Begrenzung). COOLDOWN ist die kürzere Lösung, wo sie passt."),
+];
