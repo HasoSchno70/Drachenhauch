@@ -11,6 +11,7 @@ Aufruf:  <venv>\\python.exe make_book.py
 (Reines `node build_book.js` nutzt die zuletzt gemessenen Seiten aus
 toc_pages.json.)
 """
+import glob
 import json
 import os
 import subprocess
@@ -23,13 +24,51 @@ PDF = os.path.join(HERE, "GameBasic-Lehrbuch.pdf")
 TITLES = os.path.join(HERE, "toc_titles.json")
 PAGES = os.path.join(HERE, "toc_pages.json")
 
+# Druckdienste (epubli & Co.) verlangen: KEINE Transparenz + Bilder ~300 dpi.
+# Die gbrt-Screenshots kommen als 480x320-RGBA (Alpha = Transparenz, und bei
+# Anzeige in ~12,7 cm Breite nur ~96 dpi). prepare_images() macht sie druckfertig:
+# Alpha auf Weiss flachklopfen (-> RGB) und ganzzahlig hochskalieren, bis die
+# native Breite >= MIN_PRINT_W ist (bei 480 px -> Faktor 4 = 1920 px -> ~384 dpi).
+# Idempotent: bereits aufbereitete Bilder (RGB, breit genug) werden uebersprungen.
+# LibreOffice exportiert dann OHNE Aufloesungs-Reduktion (Filter unten).
+MIN_PRINT_W = 1500
+
+
+def prepare_images():
+    from PIL import Image
+    changed = 0
+    for f in sorted(glob.glob(os.path.join(HERE, "images", "*.png"))):
+        im = Image.open(f)
+        if im.mode == "RGB" and im.width >= 1400:
+            continue                                    # schon druckfertig
+        if im.mode in ("RGBA", "LA", "PA") or "transparency" in im.info:
+            im = im.convert("RGBA")
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            bg.paste(im, mask=im.split()[-1])           # Alpha auf Weiss
+            im = bg
+        else:
+            im = im.convert("RGB")
+        if im.width < 1400:
+            factor = -(-MIN_PRINT_W // im.width)         # ceil-Division
+            im = im.resize((im.width * factor, im.height * factor), Image.NEAREST)
+        im.save(f)
+        changed += 1
+    if changed:
+        print("Bilder druckfertig gemacht:", changed, "(RGB, hochskaliert)")
+
 
 def build():
     subprocess.run("node build_book.js", cwd=HERE, shell=True, check=True)
 
 
+# PDF ohne Bild-Aufloesungs-Reduktion exportieren (volle 300+ dpi der Bilder
+# bleiben erhalten -> erfuellt die Druck-Qualitaetspruefung).
+_PDF_FILTER = ('pdf:writer_pdf_Export:'
+               '{"ReduceImageResolution":{"type":"boolean","value":false}}')
+
+
 def render():
-    subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf",
+    subprocess.run([SOFFICE, "--headless", "--convert-to", _PDF_FILTER,
                     "--outdir", HERE, DOCX], cwd=HERE, check=True,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return PDF
@@ -75,6 +114,7 @@ def measure(pdf_path, titles):
 
 
 def main():
+    prepare_images()
     build()
     titles = json.load(open(TITLES, encoding="utf-8"))
     render()
