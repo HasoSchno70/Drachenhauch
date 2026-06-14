@@ -12,7 +12,11 @@ Reihenfolge ≈ nach Nutzen/Aufwand. Erledigtes am Ende.
 
 ## A — Echte Lücken / häufige Stolpersteine (lohnt sich)
 
-### A1. Kein Array-Literal `[1, 2, 3]`
+### A1. Kein Array-Literal `[1, 2, 3]`  —  ✅ BEHOBEN (commit 5885dc0)
+> Parser disambiguiert jetzt: FOR nach dem ersten Ausdruck = List-Comprehension,
+> sonst Array-Literal. Opcode `BUILD_ARRAY` (117), Element-Typ aus den Werten
+> (int/float/string/boolean/any). Leeres `[]` -> Hinweis auf `DIM ... AS ARRAY OF T`.
+> Tests: `tests/test_array_literal.py`. (Historischer Text unten zur Doku.)
 ```basic
 DIM a AS ARRAY OF INTEGER
 a = [1, 2, 3]      ' -> Parse-Fehler (7): Erwartet FOR in List-Comprehension
@@ -82,7 +86,12 @@ verlangen. Aktuell konsistent, also kein Muss.
 
 (Vermutlich Absicht; hier nur dokumentiert, falls man sie je überdenken will.)
 
-### D1. `/` liefert mal INTEGER, mal FLOAT
+### D1. `/` liefert mal INTEGER, mal FLOAT  —  ⚠️ ENTSCHEIDUNG NÖTIG (breaking)
+> Eine Umstellung auf „`/` immer FLOAT" (Python-3-Modell) wäre sauber/vorhersagbar,
+> ist aber ein **brechender** Eingriff: `8/2` druckt dann `4.0` statt `4`, der gerade
+> fertige Mathe-Kapitel im Buch + viele Beispiele/Tests müssten angepasst werden, und
+> für ein spiel-orientiertes BASIC sind glatte Ganzzahl-Ergebnisse oft erwünscht. Daher
+> NICHT einseitig geändert — siehe Optionen unten / Rückfrage an den Autor.
 ```basic
 PRINT 8 / 2     ' 4     (glatt -> INTEGER)
 PRINT 9 / 2     ' 4.5   (nicht glatt -> FLOAT)
@@ -93,7 +102,17 @@ Typ-Annahmen und überrascht. Konsistenter (und in vielen Sprachen üblich): `/`
 immer FLOAT, `\` für Integer-Division (existiert bereits). Bewusst so gewählt —
 aber ein echter Stolperstein.
 
-### D2. Float-Ausgabe zeigt volle f64-Präzision
+### D2. Float-Ausgabe zeigt volle f64-Präzision  —  ⚠️ GRÖSSTENTEILS „WORKS AS INTENDED"
+> **Befund nach Prüfung:** gbrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
+> Darstellung (Rust-Display ≈ Python-`repr`). `0.1+0.2 -> 0.30000000000000004` und
+> `CURVE_SMOOTHERSTEP -> 0.16308000000000003` sind die **kürzest mögliche exakte** Form —
+> kürzer ginge nur falsch (würde auf einen anderen f64 runden). Also KEIN allgemeiner
+> Formatierungs-Bug. **Einziger echter Wart:** f32-gestützte Werte, die zu f64 verbreitert
+> werden (z.B. `AUDIO_BUS_GET_VOLUME(0.8) -> 0.800000011920929`). Falls gewünscht: nur dort
+> gezielt fixen (Bus-Volume als f64 halten oder beim Lesen runden). Der allgemeine Float-Druck
+> bleibt wie er ist.
+
+### D2-alt (historischer Text):
 ```basic
 PRINT 0.1 + 0.2                 ' 0.30000000000000004
 PRINT CURVE_SMOOTHERSTEP(0.0,1.0,0.3)  ' 0.16308000000000003
