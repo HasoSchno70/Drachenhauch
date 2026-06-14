@@ -1,0 +1,22 @@
+' Screenshot-Demo Kapitel 59: gui (Retained-Mode)
+IMPORT "gui"
+SCREEN(480, 320, "GUI")
+' Fenster + Widgets EINMAL anlegen
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Einstellungen", 90, 50, 300, 210)
+GUI_LABEL(win, "Optionen", 20, 16, RGB(255, 220, 120))
+DIM start AS GUI_WIDGET
+start = GUI_BUTTON(win, "Spiel starten", 20, 140, 130, 32)
+DIM snd AS GUI_WIDGET
+snd = GUI_CHECKBOX(win, "Sound an", 20, 60, TRUE)
+DIM vol AS GUI_WIDGET
+vol = GUI_SLIDER(win, 20, 100, 250, 0.0, 1.0, 0.7)
+WHILE NOT QUITREQUESTED()
+    GUI_UPDATE()
+    CLS(RGB(24, 28, 44))
+    GUI_DRAW()
+    IF GUI_CLICKED(start) THEN
+        ' starten...
+    END IF
+    FLIP()
+WEND
