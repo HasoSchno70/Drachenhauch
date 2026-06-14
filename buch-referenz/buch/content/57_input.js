@@ -1,0 +1,33 @@
+module.exports = (H) => [
+  H.chapter("Modul: input"),
+  H.p("Das Modul input hast du bereits kennengelernt – im Kapitel „Eingabe“ (Teil IV), wo es um Tastatur, Maus und Gamepad ging. Es bindet Tasten an benannte Aktionen, sodass deine Spiellogik unabhängig von konkreten Tasten bleibt und sich leicht umbelegen lässt. Hier folgt nur eine kompakte Übersicht zum Nachschlagen; die ausführliche Einführung mit Beispielen steht in jenem Kapitel."),
+
+  H.h2("Kurzreferenz"),
+  H.bulletRich("INPUT_BIND(aktion$, taste1[, taste2, …])  ", "– eine Aktion an eine oder mehrere Tasten binden (einmal beim Start)."),
+  H.bulletRich("INPUT_UPDATE()  ", "– einmal pro Frame; liest den Tastenzustand ein (Pflicht für PRESSED/RELEASED)."),
+  H.bulletRich("INPUT_HELD(aktion$)  ", "– TRUE, solange eine gebundene Taste gehalten wird (Bewegung)."),
+  H.bulletRich("INPUT_PRESSED(aktion$)  ", "– nur im Frame des Drückens TRUE (Sprung, Menü-Auswahl)."),
+  H.bulletRich("INPUT_RELEASED(aktion$)  ", "– TRUE im Frame des Loslassens."),
+  H.bulletRich("INPUT_AXIS(negativ$, positiv$)  ", "– fasst zwei Aktionen zu -1 / 0 / +1 zusammen."),
+  H.bulletRich("INPUT_JOY_AXIS(slot, achse$)  ", "– Analogstick-Wert eines Gamepads (mit Deadzone)."),
+
+  H.h2("Das Grundmuster"),
+  H.p("Aktionen einmal binden, dann pro Frame INPUT_UPDATE und abfragen:"),
+  H.code([
+    'IMPORT "input"',
+    'INPUT_BIND("links",    KEY_LEFT,  KEY_A)',
+    'INPUT_BIND("rechts",   KEY_RIGHT, KEY_D)',
+    'INPUT_BIND("springen", KEY_SPACE, KEY_W)',
+    '',
+    'WHILE NOT QUITREQUESTED()',
+    '    INPUT_UPDATE()                       \' zuerst!',
+    '    px = px + INPUT_AXIS("links", "rechts") * 2',
+    '    IF INPUT_PRESSED("springen") THEN     \' genau einmal',
+    '        \' ... springen ...',
+    '    END IF',
+    '    CLS()',
+    '    FLIP()',
+    'WEND',
+  ]),
+  H.tip("Querverweis", "Die ausführliche Erklärung von INPUT_BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS samt der direkten Tastatur- und Maus-Befehle (KEYPRESSED, MOUSEX/Y, MOUSEBUTTON …) findest du im Kapitel „Eingabe“ (Teil IV)."),
+];

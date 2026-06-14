@@ -52,5 +52,6 @@
   "Modul: timer": 181,
   "Modul: particles": 184,
   "Module: physics, physics2d & physics3d": 188,
-  "Modul: camera": 193
+  "Modul: camera": 193,
+  "Modul: input": 196
 }
