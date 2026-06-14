@@ -1,0 +1,27 @@
+' Screenshot-Demo Kapitel 66: vec2 -- Vektoren als Pfeile
+IMPORT "vec2"
+SCREEN(480, 320, "Vec2")
+CONST OX AS INTEGER = 70       ' Ursprung
+CONST OY AS INTEGER = 270
+CONST S AS INTEGER = 30        ' Pixel pro Einheit
+DIM v AS VEC2
+DIM w AS VEC2
+DIM sum AS VEC2
+v = VEC2_NEW(3.0, 4.0)
+w = VEC2_NEW(4.0, 1.0)
+sum = v + w                    ' Operator-Overloading
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(24, 28, 44))
+    ' Achsen
+    LINE(OX, 20, OX, OY, RGB(60, 70, 100))
+    LINE(OX, OY, 460, OY, RGB(60, 70, 100))
+    ' v (blau), w (gruen), v+w (gelb)  -- y zeigt nach oben, daher minus
+    LINEW(OX, OY, OX + INT(VEC2_X(sum) * S), OY - INT(VEC2_Y(sum) * S), 3, RGB(255, 210, 60))
+    LINEW(OX, OY, OX + INT(VEC2_X(v) * S),   OY - INT(VEC2_Y(v) * S),   3, RGB(90, 160, 255))
+    LINEW(OX, OY, OX + INT(VEC2_X(w) * S),   OY - INT(VEC2_Y(w) * S),   3, RGB(90, 220, 140))
+    TEXT(OX + INT(VEC2_X(v) * S) - 10, OY - INT(VEC2_Y(v) * S) - 16, "v", RGB(90, 160, 255))
+    TEXT(OX + INT(VEC2_X(w) * S) + 4, OY - INT(VEC2_Y(w) * S) - 8, "w", RGB(90, 220, 140))
+    TEXT(OX + INT(VEC2_X(sum) * S) + 4, OY - INT(VEC2_Y(sum) * S) - 8, "v + w", RGB(255, 210, 60))
+    TEXT(10, 8, "vec2: v + w mit Operator-Overloading", WHITE)
+    FLIP()
+WEND
