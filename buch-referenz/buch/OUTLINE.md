@@ -76,7 +76,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 ### Teil V — Die Module
 - [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [x] 54 particles  (content/54_particles.js, images/54_particles.png)
 - [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [x] 56 camera  (content/56_camera.js, images/56_camera.png) · [x] 57 input (Kurzref/Querverweis Kap 45)  (content/57_input.js) · [x] 58 ui  (content/58_ui.js, images/58_ui.png) · [x] 59 gui  (content/59_gui.js, images/59_gui.png)
-- [x] 60 scene (content/60_scene.js) · [x] 61 save (content/61_save.js) · [x] 62 astar (content/62_astar.js, images/62_astar.png) · [x] 63 tiled (content/63_tiled.js, images/63_tiled.png) · [ ] 64 tile_collide · 65 controller
+- [x] 60 scene (content/60_scene.js) · [x] 61 save (content/61_save.js) · [x] 62 astar (content/62_astar.js, images/62_astar.png) · [x] 63 tiled (content/63_tiled.js, images/63_tiled.png) · [x] 64 tile_collide (content/64_tile_collide.js, images/64_tilecollide.png) · [ ] 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
 - [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
 
@@ -191,4 +191,6 @@ Start+Ziel) — Gitter-mit-Pfad-Screenshot. 213 S.
 + Kap 63 tiled (TILED_LOAD/WIDTH/HEIGHT/TILE_WIDTH/AT/SET/TILE_PROP_*/OBJECT_*; Render per
 DRAWIMAGEPART gid→Tileset; Bulk FILL_RECT/REPLACE/FLOOD_FILL) — Tilemap-Screenshot.
 figures/levels/level1.json + figures/assets/tiles.png. 215 S.
-**Nächstes:** Kap 64 tile_collide / 65 controller … (Teil V durch).
++ Kap 64 tile_collide (TILE_SWEEP_X/Y → Tupel (neue_pos, hit), TILE_IS_SOLID; solid-Property
+oder GID>0; getrennt-Achsen-Sweep, Plattformer-Muster) — Spieler-landet-Screenshot. 217 S.
+**Nächstes:** Kap 65 controller / 66 vec2 / 67 m3d … (Teil V durch).

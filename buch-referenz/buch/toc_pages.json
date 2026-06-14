@@ -59,5 +59,6 @@
   "Modul: scene": 205,
   "Modul: save": 208,
   "Modul: astar": 211,
-  "Modul: tiled": 214
+  "Modul: tiled": 214,
+  "Modul: tile_collide": 217
 }

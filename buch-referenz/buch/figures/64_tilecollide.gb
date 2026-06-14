@@ -1,0 +1,53 @@
+' Screenshot-Demo Kapitel 64: tile_collide -- Spieler faellt und landet
+IMPORT "tiled"
+IMPORT "tile_collide"
+SCREEN(480, 320, "Tile-Kollision")
+DIM lvl AS TILED_MAP
+lvl = TILED_LOAD("levels/level1.json")
+DIM ts AS IMAGE
+ts = LOADIMAGE("assets/tiles.png")
+CONST YOFF AS INTEGER = 90      ' Karte vertikal verschieben (nur Anzeige)
+DIM MW AS INTEGER
+DIM MH AS INTEGER
+MW = TILED_WIDTH(lvl)
+MH = TILED_HEIGHT(lvl)
+
+' Spieler (Welt-Koordinaten der KARTE, ohne YOFF)
+DIM px AS FLOAT
+DIM py AS FLOAT
+DIM vy AS FLOAT
+CONST PW AS INTEGER = 12
+CONST PH AS INTEGER = 14
+px = 360.0
+py = 20.0
+vy = 0.0
+
+WHILE NOT QUITREQUESTED()
+    ' Schwerkraft + vertikaler Sweep gegen die Karte (Pixel pro Frame)
+    vy = vy + 0.4
+    IF vy > 6.0 THEN vy = 6.0       ' begrenzen, damit nichts durchtunnelt
+    DIM r AS TUPLE
+    r = TILE_SWEEP_Y(lvl, 0, px, py, PW, PH, vy)
+    py = r[0]
+    IF r[1] THEN vy = 0.0           ' gelandet -> Fallgeschwindigkeit zuruecksetzen
+
+    CLS(RGB(50, 80, 130))
+    DIM tx AS INTEGER
+    DIM ty AS INTEGER
+    FOR ty = 0 TO MH - 1
+        FOR tx = 0 TO MW - 1
+            DIM gid AS INTEGER
+            gid = TILED_TILE_AT(lvl, 0, tx, ty)
+            IF gid > 0 THEN
+                DIM i AS INTEGER
+                i = gid - 1
+                DRAWIMAGEPART(ts, (i MOD 4) * 16, (i \ 4) * 16, 16, 16, tx * 16, YOFF + ty * 16)
+            END IF
+        NEXT
+    NEXT
+    ' Spieler (mit YOFF nur fuer die Anzeige)
+    BOX(INT(px), YOFF + INT(py), INT(px) + PW, YOFF + INT(py) + PH, RGB(240, 60, 60))
+    RECT(INT(px), YOFF + INT(py), INT(px) + PW, YOFF + INT(py) + PH, WHITE)
+    TEXT(10, 8, "TILE_SWEEP_Y: Spieler landet auf dem Boden", WHITE)
+    FLIP()
+WEND
