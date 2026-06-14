@@ -9,7 +9,7 @@ module.exports = (H) => [
     children: [new (require("docx").TextRun)({ text: "— Hans Schnorrenberger", italics: true, size: 22, color: "6A6A6A" })] }),
 
   H.h1("Wie du dieses Buch liest"),
-  H.p("Das Buch ist in fünf Teile gegliedert. Teil I bringt dich zum Laufen: Was ist GameBasic, wie startest du ein Programm, und wie sieht das allererste aus. Teil II erklärt die Sprache selbst – Variablen, Schleifen, Funktionen, Klassen. Teil III ist die Referenz der eingebauten Befehle, nach Themen sortiert. Teil IV widmet sich Grafik, Sound und Spielen, Teil V den Modulen für Spezialaufgaben."),
+  H.p("Das Buch ist in fünf Teile gegliedert. Teil I bringt dich zum Laufen: Was ist GameBasic, wie startest du ein Programm, und wie sieht das allererste aus. Teil II erklärt die Sprache selbst – Variablen, Schleifen, Funktionen, Klassen. Teil III ist die Referenz der eingebauten Befehle, nach Themen sortiert. Teil IV widmet sich Grafik, Sound und Spielen, Teil V den Modulen für Spezialaufgaben. Den Abschluss bildet ein Anhang mit Nachschlage-Tabellen: ein alphabetischer Index aller Befehle, sämtliche Tastencodes und Farb-Konstanten sowie eine Erklärung der häufigsten Fehlermeldungen."),
   H.bulletRich("Normaler Text ", "erklärt, was passiert und warum."),
   H.bulletRich("Code sieht so aus: ", "in einem grauen Kasten mit blauer Leiste, in Schreibmaschinenschrift. Diesen Teil tippst du ab."),
   H.bulletRich("Programm-Ausgabe ", "steht im grünen Kasten – das, was dein Programm auf den Bildschirm schreibt."),
