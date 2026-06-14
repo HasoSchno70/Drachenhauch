@@ -74,7 +74,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 49 Abschlussprojekt: Münzfang (Grafik+Sound-Spiel)  (content/49_projekt.js, images/49_catch.png)
 
 ### Teil V — Die Module
-- [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [ ] 52 tween · 53 timer · 54 particles
+- [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [ ] 53 timer · 54 particles
 - [ ] 55 physics / physics2d / physics3d · 56 camera · 57 input · 58 ui · 59 gui
 - [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
@@ -164,4 +164,6 @@ Buch-Kerninhalt (Teile I-IV + Projekt) komplett. **Teil V gestartet:** Kap 50 sp
 animiertem Screenshot. 173 Seiten. GOTCHA: SPRITE_UPDATE will dt als INTEGER-ms (INT(DELTA()*1000)).
 + Kap 51 animfsm (ANIM_FSM_LOAD/SETUP/SET_FLOAT-BOOL-INT/TRIGGER/UPDATE/STATE/FORCE; .gbanim-JSON
 States/Params/Transitions) — Screenshot zeigt aktuellen Zustand. figures/assets/held.gbanim. 177 Seiten.
-**Nächstes:** Kap 52 tween / 53 timer / 54 particles / 55 physics … (Teil V durch).
++ Kap 52 tween (TWEEN_NEW/_LOOP/_PINGPONG, TWEEN_VALUE/DONE, PAUSE/RESUME/REVERSE, Easings) —
+Easing-Balken-Screenshot. zeitbasiert (kein UPDATE nötig). 180 Seiten.
+**Nächstes:** Kap 53 timer / 54 particles / 55 physics … (Teil V durch).

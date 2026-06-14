@@ -1,0 +1,65 @@
+module.exports = (H) => [
+  H.chapter("Modul: tween"),
+  H.p("Ein Tween (von engl. „in-between“) ist ein Wert, der sich von selbst über eine bestimmte Zeit von einem Start- zu einem Endwert bewegt – sanft statt ruckartig. Damit animierst du mühelos ein Pop-up, das einfliegt, eine Zahl, die hochzählt, oder eine Figur, die elastisch aufpoppt. Du erstellst den Tween einmal und fragst ihn dann jeden Frame nach seinem aktuellen Wert; um die Zeit kümmert sich das Modul selbst."),
+  H.figure("52_tween.png", "Sechs Tweens mit verschiedenen Easing-Kurven, zum selben Zeitpunkt abgefragt – jede ist unterschiedlich weit (out_elastic schießt sogar über das Ziel hinaus)."),
+
+  H.h2("Einen Tween erstellen"),
+  H.cmd("TWEEN_NEW", 'TWEEN_NEW(start, ende, dauer_ms[, easing$])',
+    "Erstellt einen einmaligen Tween, der in dauer_ms Millisekunden von start nach ende läuft und dann am Endwert stehen bleibt. easing bestimmt den Bewegungsverlauf (siehe unten; Standard: linear).",
+    [
+      'IMPORT "tween"',
+      'DIM t AS TWEEN',
+      't = TWEEN_NEW(0.0, 100.0, 2000, "out_quad")   \' 0 -> 100 in 2 s',
+    ]),
+  H.cmd("TWEEN_NEW_LOOP · TWEEN_NEW_PINGPONG", 'TWEEN_NEW_LOOP(start, ende, dauer_ms[, easing$])   TWEEN_NEW_PINGPONG(...)',
+    "Endlos laufende Tweens. LOOP springt am Ende zurück zum Start (start→ende, start→ende …) – gut für Spinner. PINGPONG pendelt hin und her (start→ende→start …) – gut für ein Auf-und-Ab-Wippen. Beide sind nie „fertig“.",
+    [
+      'DIM bob AS TWEEN',
+      'bob = TWEEN_NEW_PINGPONG(-4.0, 4.0, 800, "inout_sine")  \' sanftes Wippen',
+    ]),
+
+  H.h2("Den Wert abfragen"),
+  H.cmd("TWEEN_VALUE · TWEEN_DONE", 'TWEEN_VALUE(t)   TWEEN_DONE(t)',
+    "TWEEN_VALUE liefert den aktuellen Wert (jeden Frame abfragen). TWEEN_DONE ist TRUE, sobald ein einmaliger Tween sein Ende erreicht hat (bei LOOP/PINGPONG immer FALSE).",
+    [
+      'DIM y AS INTEGER',
+      'y = INT(TWEEN_VALUE(banner))    \' aktuelle Position',
+      'IF TWEEN_DONE(banner) THEN \' fertig eingeflogen',
+    ]),
+
+  H.h2("Steuern"),
+  H.cmd("TWEEN_PAUSE · TWEEN_RESUME · TWEEN_REVERSE", 'TWEEN_PAUSE(t)   TWEEN_RESUME(t)   TWEEN_REVERSE(t)',
+    "Hält einen Tween an, setzt ihn fort oder kehrt seine Richtung um (z. B. ein Menü, das wieder hinausfährt).",
+    [
+      'TWEEN_PAUSE(t)',
+      'TWEEN_RESUME(t)',
+      'TWEEN_REVERSE(banner)    \' fährt jetzt zurück',
+    ]),
+
+  H.h2("Easing-Kurven"),
+  H.p("Das Easing bestimmt, WIE sich der Wert zwischen Start und Ende bewegt. linear ist gleichmäßig; die out_-Varianten starten schnell und werden langsamer (gut für Einflüge); in_ ist umgekehrt; inout_ kombiniert beides. Spezialkurven sorgen für Charakter: out_bounce springt wie ein Ball aus, out_elastic schwingt federnd über das Ziel hinaus und zurück. Eine Auswahl:"),
+  H.bulletRich("linear  ", "– konstante Geschwindigkeit"),
+  H.bulletRich("out_quad · out_cubic  ", "– weiches Abbremsen am Ende"),
+  H.bulletRich("inout_sine  ", "– sanft an und ab (ideal für Wippen/Atmen)"),
+  H.bulletRich("out_bounce  ", "– hüpft am Ende aus wie ein Ball"),
+  H.bulletRich("out_elastic  ", "– federt über das Ziel hinaus und schwingt zurück"),
+
+  H.h2("Im Game-Loop"),
+  H.p("Ein typisches Beispiel: ein Banner, das von oben hereinfliegt und am Ziel weich abbremst:"),
+  H.code([
+    'IMPORT "tween"',
+    'SCREEN(480, 320)',
+    'DIM banner AS TWEEN',
+    'banner = TWEEN_NEW(-40.0, 80.0, 700, "out_quad")   \' y: -40 -> 80',
+    '',
+    'WHILE NOT QUITREQUESTED()',
+    '    DIM y AS INTEGER',
+    '    y = INT(TWEEN_VALUE(banner))',
+    '    CLS(RGB(24, 28, 44))',
+    '    BOXROUND(140, y, 340, y + 40, 10, RGB(255, 180, 40))',
+    '    TEXT(170, y + 14, "LEVEL 1", BLACK)',
+    '    FLIP()',
+    'WEND',
+  ]),
+  H.tip("tween oder curves?", "tween ist zeitbasiert: „bewege diesen Wert in 700 ms“. Brauchst du stattdessen eine Kurve, die du selbst über einen Parameter steuerst (etwa eine Flugbahn entlang von Stützpunkten), schau dir das Modul curves an – es liefert die reinen Kurven-Funktionen ohne eigene Zeitsteuerung."),
+];

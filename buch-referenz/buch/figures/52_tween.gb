@@ -1,0 +1,33 @@
+' Screenshot-Demo Kapitel 52: tween-Easings (Fortschritt nach gleicher Zeit)
+IMPORT "tween"
+SCREEN(480, 320, "Tween")
+DIM t0 AS TWEEN
+DIM t1 AS TWEEN
+DIM t2 AS TWEEN
+DIM t3 AS TWEEN
+DIM t4 AS TWEEN
+DIM t5 AS TWEEN
+t0 = TWEEN_NEW(0.0, 360.0, 1600, "linear")
+t1 = TWEEN_NEW(0.0, 360.0, 1600, "out_quad")
+t2 = TWEEN_NEW(0.0, 360.0, 1600, "out_cubic")
+t3 = TWEEN_NEW(0.0, 360.0, 1600, "out_bounce")
+t4 = TWEEN_NEW(0.0, 360.0, 1600, "out_elastic")
+t5 = TWEEN_NEW(0.0, 360.0, 1600, "inout_sine")
+WHILE NOT QUITREQUESTED()
+    CLS(RGB(24, 28, 44))
+    TEXT(14, 8, "Easings: gleiche Zeit, anderer Fortschritt", RGB(220, 230, 255))
+    DIM y AS INTEGER
+    y = 40
+    TEXT(14, y, "linear")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t0)), y + 16, RGB(120, 200, 255))
+    y = 80
+    TEXT(14, y, "out_quad")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t1)), y + 16, RGB(120, 220, 140))
+    y = 120
+    TEXT(14, y, "out_cubic")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t2)), y + 16, RGB(160, 220, 100))
+    y = 160
+    TEXT(14, y, "out_bounce")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t3)), y + 16, RGB(255, 200, 60))
+    y = 200
+    TEXT(14, y, "out_elastic")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t4)), y + 16, RGB(255, 140, 120))
+    y = 240
+    TEXT(14, y, "inout_sine")  : BOX(120, y, 120 + INT(TWEEN_VALUE(t5)), y + 16, RGB(200, 150, 255))
+    FLIP()
+WEND
