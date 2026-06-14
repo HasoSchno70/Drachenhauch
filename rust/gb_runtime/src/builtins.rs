@@ -1623,7 +1623,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[1], "PHYS3D_ADD_BOX")? as f32, need_num(&a[2], "PHYS3D_ADD_BOX")? as f32,
                 need_num(&a[3], "PHYS3D_ADD_BOX")? as f32, need_num(&a[4], "PHYS3D_ADD_BOX")? as f32,
                 need_num(&a[5], "PHYS3D_ADD_BOX")? as f32, need_num(&a[6], "PHYS3D_ADD_BOX")? as f32,
-                need_num(&a[7], "PHYS3D_ADD_BOX")? != 0.0, need_num(&a[8], "PHYS3D_ADD_BOX")? as f32);
+                need_flag(&a[7], "PHYS3D_ADD_BOX")?, need_num(&a[8], "PHYS3D_ADD_BOX")? as f32);
             Ok(Value::Int(idx))
         }
         "phys3d_add_sphere" => {
@@ -1631,7 +1631,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let idx = phys3d_h(&a[0], "PHYS3D_ADD_SPHERE")?.borrow_mut().add_sphere(
                 need_num(&a[1], "PHYS3D_ADD_SPHERE")? as f32, need_num(&a[2], "PHYS3D_ADD_SPHERE")? as f32,
                 need_num(&a[3], "PHYS3D_ADD_SPHERE")? as f32, need_num(&a[4], "PHYS3D_ADD_SPHERE")? as f32,
-                need_num(&a[5], "PHYS3D_ADD_SPHERE")? != 0.0, need_num(&a[6], "PHYS3D_ADD_SPHERE")? as f32);
+                need_flag(&a[5], "PHYS3D_ADD_SPHERE")?, need_num(&a[6], "PHYS3D_ADD_SPHERE")? as f32);
             Ok(Value::Int(idx))
         }
         "phys3d_step" => {

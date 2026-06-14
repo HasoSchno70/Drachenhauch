@@ -50,5 +50,6 @@
   "Modul: animfsm": 174,
   "Modul: tween": 178,
   "Modul: timer": 181,
-  "Modul: particles": 184
+  "Modul: particles": 184,
+  "Module: physics, physics2d & physics3d": 188
 }

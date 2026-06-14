@@ -1,0 +1,42 @@
+' Screenshot-Demo Kapitel 55: physics2d -- Baelle fallen und stapeln
+IMPORT "physics2d"
+SCREEN(480, 320, "Physik 2D")
+DIM welt AS PHYS2D_WORLD
+welt = PHYS2D_NEW()                                  ' Default-Schwerkraft (0, 980)
+
+' Boden + zwei schraege Waende als statische Koerper
+PHYS2D_ADD_BOX(welt, 240, 300, 220, 10, FALSE, 0.2)
+PHYS2D_ADD_BOX(welt, 60,  250, 12, 60, FALSE, 0.2)
+PHYS2D_ADD_BOX(welt, 420, 250, 12, 60, FALSE, 0.2)
+
+' Zehn fallende Baelle (dynamisch, federnd)
+CONST N AS INTEGER = 10
+DIM ball[N] AS INTEGER
+DIM rad[N] AS INTEGER
+DIM i AS INTEGER
+RANDOMIZE(5)
+FOR i = 0 TO N - 1
+    DIM r AS INTEGER
+    r = RANDINT(10, 18)
+    rad[i] = r
+    ball[i] = PHYS2D_ADD_CIRCLE(welt, RANDINT(90, 390), RANDINT(-40, 60), r, TRUE, 0.45)
+NEXT
+
+WHILE NOT QUITREQUESTED()
+    PHYS2D_STEP(welt, DELTA())
+    CLS(RGB(20, 24, 38))
+    ' Boden + Waende zeichnen (statische Positionen)
+    BOX(20, 290, 460, 310, RGB(80, 90, 120))
+    BOX(48, 190, 72, 310, RGB(80, 90, 120))
+    BOX(408, 190, 432, 310, RGB(80, 90, 120))
+    ' Baelle
+    FOR i = 0 TO N - 1
+        DIM x AS INTEGER
+        DIM y AS INTEGER
+        x = INT(PHYS2D_BODY_X(welt, ball[i]))
+        y = INT(PHYS2D_BODY_Y(welt, ball[i]))
+        CIRCLE(x, y, rad[i], HSV(i * 36.0, 0.7, 1.0))
+    NEXT
+    TEXT(10, 8, "physics2d: " + STR$(PHYS2D_COUNT(welt)) + " Koerper", WHITE)
+    FLIP()
+WEND

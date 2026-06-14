@@ -75,7 +75,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ### Teil V — Die Module
 - [x] 50 sprite  (content/50_sprite.js, images/50_sprite.png) · [x] 51 animfsm  (content/51_animfsm.js, images/51_animfsm.png) · [x] 52 tween  (content/52_tween.js, images/52_tween.png) · [x] 53 timer  (content/53_timer.js, konsolen-Demo) · [x] 54 particles  (content/54_particles.js, images/54_particles.png)
-- [ ] 55 physics / physics2d / physics3d · 56 camera · 57 input · 58 ui · 59 gui
+- [x] 55 physics / physics2d / physics3d  (content/55_physics.js, images/55_physics2d.png) · [ ] 56 camera · 57 input · 58 ui · 59 gui
 - [ ] 60 scene · 61 save · 62 astar · 63 tiled · 64 tile_collide · 65 controller
 - [ ] 66 vec2 · 67 m3d · 68 json · 69 db · 70 regex · 71 audio (erweitert)
 - [ ] 72 curves · 73 net · 74 html · 75 ecs · 76 serial/usb/wifi/bt
@@ -170,4 +170,8 @@ Easing-Balken-Screenshot. zeitbasiert (kein UPDATE nötig). 180 Seiten.
 — konsolentauglich, kein Screenshot, Konsolen-Beispiele verifiziert. 183 Seiten.
 + Kap 54 particles (PARTICLE_SYSTEM_NEW/SET_VELOCITY/GRAVITY/LIFETIME/SIZE/COLOR/COLOR_END/MODE/
 FADE/EMIT/UPDATE/DRAW/COUNT) — Funken-Fontäne-Screenshot (Glow, gelb→rot). 187 Seiten.
-**Nächstes:** Kap 55 physics/physics2d/physics3d / 56 camera … (Teil V durch).
++ Kap 55 physics/physics2d/physics3d (Kollisions-Mathe PHYSICS_*, echte 2D-/3D-Engine
+PHYS2D_*/PHYS3D_NEW/ADD_BOX/ADD_SPHERE/STEP/BODY_*) — Bälle-Stapel-Screenshot.
+**Engine-Fix nebenbei:** PHYS3D_ADD_BOX/ADD_SPHERE dynamic-Flag akzeptiert jetzt TRUE/FALSE
+(vorher nur 1/0; need_flag statt need_num — konsistent mit physics2d). 192 Seiten.
+**Nächstes:** Kap 56 camera / 57 input … (Teil V durch).
