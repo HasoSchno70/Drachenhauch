@@ -1,0 +1,121 @@
+module.exports = (H) => [
+  H.chapter("Modul: audio (fortgeschritten)"),
+  H.p("Kapitel 46 hat die Grundlagen gezeigt: Töne und Sounds laden und abspielen. Das audio-Modul kann aber noch viel mehr. Es ist eine vollständige Audio-Engine (auf Basis von Kira), die auf einem eigenen Thread läuft – dein Game-Loop kann also ruckeln, ohne dass der Klang stottert. Dieses Kapitel zeigt die fortgeschrittenen Werkzeuge: einzelne Kanäle steuern, Stereo-Panorama bewegen, Sounds als Samples in Tonhöhen spielen, und Echtzeit-Effekte wie Hall, Echo oder Filter auf ganze Bus-Gruppen legen."),
+  H.note("Klang lässt sich im Buch nicht abdrucken – probiere die Beispiele am besten selbst aus. Die meisten Befehle hier liefern keine Konsolen-Ausgabe; sie wirken auf das, was du hörst."),
+
+  H.h2("Kanäle: AUDIO_PLAY und seine Steuerung"),
+  H.p("Wenn du einen Sound mit AUDIO_PLAY startest, bekommst du eine Kanal-Nummer (INTEGER) zurück. Über diese Nummer steuerst du genau diese eine laufende Wiedergabe – anhalten, fortsetzen, lauter/leiser, Tonhöhe ändern – während andere Sounds unbeeinflusst weiterlaufen."),
+  H.cmd("AUDIO_PLAY · AUDIO_STOP · AUDIO_IS_PLAYING", 'AUDIO_PLAY(sound [, loops, vol, ...])   AUDIO_STOP(ch)   AUDIO_IS_PLAYING(ch)',
+    "AUDIO_PLAY startet einen Sound und liefert seine Kanal-Nummer. AUDIO_STOP beendet diesen Kanal, AUDIO_IS_PLAYING prüft, ob er noch klingt.",
+    [
+      'IMPORT "audio"',
+      'DIM s AS SOUND',
+      's = AUDIO_TONE(440.0, 400, "square", 0.5)',
+      'DIM ch AS INTEGER',
+      'ch = AUDIO_PLAY(s)',
+      'PRINT AUDIO_IS_PLAYING(ch)',
+      'AUDIO_STOP(ch)',
+    ], { out: ["TRUE"] }),
+  H.cmd("AUDIO_PAUSE · AUDIO_RESUME", 'AUDIO_PAUSE(ch)   AUDIO_RESUME(ch)   AUDIO_PAUSE_ALL()   AUDIO_RESUME_ALL()',
+    "Hält einen Kanal an, ohne ihn zu beenden, und setzt ihn später an derselben Stelle fort. Die _ALL-Varianten wirken auf alle Kanäle (gut für ein Pause-Menü).",
+    [
+      'AUDIO_PAUSE(ch)',
+      '\' ... Spiel pausiert ...',
+      'AUDIO_RESUME(ch)',
+    ]),
+  H.cmd("AUDIO_SET_VOLUME · AUDIO_GET_VOLUME · AUDIO_PITCH", 'AUDIO_SET_VOLUME(ch, v)   AUDIO_GET_VOLUME(ch)   AUDIO_PITCH(ch, faktor)',
+    "Lautstärke (0..1) eines Kanals setzen/lesen und die Tonhöhe live ändern: faktor 2.0 = eine Oktave höher und doppelt so schnell, 0.5 = eine Oktave tiefer. (AUDIO_VOLUME ist ein Alias für AUDIO_SET_VOLUME.)",
+    [
+      'AUDIO_SET_VOLUME(ch, 0.6)',
+      'AUDIO_PITCH(ch, 1.5)   \' höher und schneller',
+    ]),
+
+  H.h2("Stereo-Panorama"),
+  H.p("Mit dem Panorama legst du fest, ob ein Klang eher links oder rechts kommt – etwa damit ein Gegner von der Seite hörbar ist, aus der er angreift. Die Position reicht von -1 (ganz links) über 0 (Mitte) bis +1 (ganz rechts)."),
+  H.cmd("AUDIO_PAN_POS · AUDIO_PAN_SLIDE · AUDIO_AUTOPAN", 'AUDIO_PAN_POS(ch, p)   AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)   AUDIO_AUTOPAN(ch, periode_s [, tiefe])',
+    "PAN_POS setzt die Position sofort, PAN_SLIDE fährt sie über eine Zeitspanne von „von“ nach „nach“ (vorbeiziehendes Objekt), AUTOPAN lässt den Klang dauerhaft sanft hin- und herwandern.",
+    [
+      'AUDIO_PAN_POS(ch, -0.5)          \' halb links',
+      'AUDIO_PAN_SLIDE(ch, -1.0, 1.0, 800)  \' zieht von links nach rechts',
+    ]),
+
+  H.h2("Klang selbst erzeugen: AUDIO_SFX"),
+  H.p("AUDIO_SFX ist ein kleiner Synthesizer im Stil klassischer 8-Bit-Soundchips: aus einer Wellenform plus Hüllkurve, Tonhöhen-Verlauf und Vibrato baust du Lauf-, Sprung-, Treffer- oder Münz-Geräusche – ganz ohne Audiodatei. (Der Sound-Generator gbsfx exportiert genau solche Aufrufe.)"),
+  H.cmd("AUDIO_SFX", 'AUDIO_SFX(wellenform$, freq, slide, atk, sus, dec, vib_tiefe, vib_speed, vol [, ...])',
+    'Erzeugt einen SOUND. wellenform$ = "sine"/"square"/"saw"/"triangle"/"noise". freq = Start-Frequenz, slide = Tonhöhen-Drift, atk/sus/dec = Hüllkurve (Anstieg/Halten/Abklingen in Sekunden), vib_tiefe/vib_speed = Vibrato, vol = Lautstärke. Weitere optionale Argumente steuern Stereo-Breite, Pulsweite und Filter.',
+    [
+      'IMPORT "audio"',
+      'DIM muenze AS SOUND',
+      'muenze = AUDIO_SFX("square", 600.0, 800.0, 0.0, 0.05, 0.15, 0.0, 0.0, 0.5)',
+      'AUDIO_PLAY(muenze)',
+    ]),
+  H.cmd("AUDIO_LOFI", 'AUDIO_LOFI(sound [, bits [, cutoff_hz]])',
+    "Gibt einem frisch erzeugten Sound (TONE/NOISE/SFX/SAMPLE) einen körnigen Retro-Charakter: bit-crush (Standard 8 bit) plus ein weicher Tiefpass-Filter (Standard 3300 Hz) – der typische Amiga/Lo-Fi-Sound.",
+    [
+      'DIM s AS SOUND',
+      's = AUDIO_TONE(220.0, 400, "saw", 0.4)',
+      'AUDIO_LOFI(s, 8, 3300.0)',
+      'AUDIO_PLAY(s)',
+    ]),
+
+  H.h2("Samples: einen Klang in Tonhöhen spielen"),
+  H.p("Ein Sample ist eine kurze Aufnahme (z. B. ein einzelner Klavieranschlag), die du in beliebigen Tonhöhen abspielst – das Prinzip eines Samplers. SAMPLE_PLAY transponiert die Aufnahme um eine Anzahl Halbtöne. Kurze One-Shots eignen sich für Drums und Treffer, mit einer Loop-Region (SAMPLE_SET_LOOP) lassen sich gehaltene Töne erzeugen."),
+  H.cmd("SAMPLE_LOAD · SAMPLE_PLAY · SAMPLE_SET_LOOP · SAMPLE_LEN", 'SAMPLE_LOAD(pfad$)   SAMPLE_PLAY(sample, halbtoene, vol [, dur_ms])   SAMPLE_SET_LOOP(sample, start, ende)   SAMPLE_LEN(sample)',
+    "LOAD lädt eine Audiodatei als SAMPLE. PLAY spielt sie um halbtoene transponiert (0 = Originaltonhöhe, 12 = eine Oktave höher) und gibt eine Kanal-Nummer zurück. SET_LOOP markiert eine Schleifenregion, LEN liefert die Länge in Samples.",
+    [
+      'IMPORT "audio"',
+      'DIM piano AS SAMPLE',
+      'piano = SAMPLE_LOAD("assets/piano_c.wav")',
+      'SAMPLE_PLAY(piano, 0, 0.8)    \' Grundton C',
+      'SAMPLE_PLAY(piano, 7, 0.8)    \' eine Quinte höher (G)',
+    ]),
+
+  H.h2("Musik steuern"),
+  H.p("Über PLAYMUSIC (Kapitel 46) hinaus kannst du laufende Musik fein steuern: pausieren, fortsetzen, mit Ein-/Ausblendung stoppen, die Abspielposition abfragen oder die Tonhöhe verziehen. Auch Tracker-Module (.mod/.xm) werden in Echtzeit gestreamt."),
+  H.cmd("AUDIO_MUSIC_PAUSE/RESUME/STOP · _POSITION", 'AUDIO_MUSIC_PAUSE()   AUDIO_MUSIC_RESUME()   AUDIO_MUSIC_STOP([fade_out_ms])   AUDIO_MUSIC_POSITION()',
+    "Pausiert/setzt die Musik fort, stoppt sie (optional mit Ausblendung in Millisekunden) und liefert mit POSITION die aktuelle Abspielzeit in Sekunden (FLOAT) – z. B. um eine Lichtshow zur Musik zu synchronisieren.",
+    [
+      'PLAYMUSIC("level1.ogg", -1, 0.7)   \' aus Kap. 46',
+      'PRINT AUDIO_MUSIC_POSITION()        \' Sekunden seit Start',
+      'AUDIO_MUSIC_STOP(1000)              \' über 1 s ausblenden',
+    ]),
+  H.cmd("AUDIO_MUSIC_SET_VOLUME · AUDIO_MUSIC_PITCH", 'AUDIO_MUSIC_SET_VOLUME(v)   AUDIO_MUSIC_PITCH(faktor)',
+    "Lautstärke (0..1) und Tonhöhe/Tempo der Musik live anpassen – etwa Musik leiser drehen, während eine Stimme spricht, oder sie in Zeitlupe verlangsamen.",
+    [
+      'AUDIO_MUSIC_SET_VOLUME(0.4)',
+      'AUDIO_MUSIC_PITCH(0.8)   \' tiefer und langsamer',
+    ]),
+
+  H.h2("Mixer-Busse: ganze Gruppen regeln"),
+  H.p('Alle Klänge laufen über drei Busse: "sfx" (Effekte, Samples, Synth), "music" (Musik) und "master" (die Summe von beidem). Über den Bus regelst du eine ganze Gruppe auf einmal – klassisch getrennte Regler für „Effekte“ und „Musik“ im Optionsmenü.'),
+  H.cmd("AUDIO_BUS_VOLUME · AUDIO_BUS_GET_VOLUME", 'AUDIO_BUS_VOLUME(bus$, vol)   AUDIO_BUS_GET_VOLUME(bus$)',
+    'Setzt/liest die Lautstärke (0..1) eines Busses. bus$ = "sfx", "music" oder "master".',
+    [
+      'IMPORT "audio"',
+      'AUDIO_BUS_VOLUME("music", 0.5)',
+      'PRINT AUDIO_BUS_GET_VOLUME("music")',
+    ], { out: ["0.5"] }),
+
+  H.h2("Echtzeit-Effekte pro Bus"),
+  H.p("Auf jeden Bus lässt sich eine Kette von Effekten legen, die in Echtzeit rechnen – du kannst ihre Werte jederzeit ändern. Damit verleihst du einem Höhlen-Level Hall, einem Funkgerät einen Bandpass-Filter oder einem Bosskampf eine verzerrte Kante. Alle Effekte sind neutral, bis du sie aktivierst."),
+  H.cmd("AUDIO_REVERB · AUDIO_DELAY", 'AUDIO_REVERB(bus$, mix [, feedback [, damping]])   AUDIO_DELAY(bus$, mix [, feedback [, time_ms]])',
+    "REVERB legt einen Raum-/Hall-Effekt auf den Bus (mix = Anteil 0..1). DELAY ist ein Echo mit einstellbarer Verzögerungszeit – die Zeit ist zur Laufzeit veränderbar.",
+    [
+      'AUDIO_REVERB("sfx", 0.3)            \' etwas Hall',
+      'AUDIO_DELAY("sfx", 0.25, 0.4, 300.0) \' Echo, 300 ms',
+    ]),
+  H.cmd("AUDIO_FILTER · AUDIO_DISTORTION", 'AUDIO_FILTER(bus$, cutoff_hz [, resonance])   AUDIO_DISTORTION(bus$, amount [, mix])',
+    "FILTER ist ein Tiefpass (lässt nur Frequenzen unter cutoff_hz durch – dumpfer Klang, klassischer „Acid“-Sweep). DISTORTION fügt Übersteuerung/Fuzz hinzu.",
+    [
+      'AUDIO_FILTER("master", 1200.0)   \' alles wird dumpfer',
+      'AUDIO_DISTORTION("sfx", 0.5)     \' angeraut',
+    ]),
+  H.cmd("AUDIO_COMPRESSOR · AUDIO_EQ", 'AUDIO_COMPRESSOR(bus$, threshold_db, ratio [, makeup_db])   AUDIO_EQ(bus$, freq_hz, gain_db [, q])',
+    "COMPRESSOR drückt laute Spitzen zusammen und macht den Klang gleichmäßiger (ratio<=1 = aus). EQ hebt oder senkt einen Frequenzbereich an (gain_db: positiv = lauter, negativ = leiser, 0 = neutral).",
+    [
+      'AUDIO_COMPRESSOR("master", -12.0, 4.0)',
+      'AUDIO_EQ("sfx", 1000.0, 6.0)   \' Mitten anheben',
+    ]),
+
+  H.tip("Spektrum für Visualizer: AUDIO_FFT", "Mit AUDIO_FFT(array) füllst du ein ARRAY OF FLOAT mit den aktuellen Frequenz-Stärken der Gesamtausgabe. Daraus baust du Balken-Visualizer oder lässt Effekte „zur Musik tanzen“. Zusammen mit den Bus-Effekten und den Kira-Streaming-Funktionen deckt das audio-Modul alles ab, was ein Spiel klanglich braucht – von einem einzelnen Piepton bis zum dynamischen Soundtrack."),
+];

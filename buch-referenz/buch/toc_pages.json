@@ -63,5 +63,9 @@
   "Modul: tile_collide": 207,
   "Modul: controller": 210,
   "Modul: vec2": 214,
-  "Modul: m3d": 217
+  "Modul: m3d": 217,
+  "Modul: json": 220,
+  "Modul: db": 224,
+  "Modul: regex": 229,
+  "Modul: audio (fortgeschritten)": 233
 }
