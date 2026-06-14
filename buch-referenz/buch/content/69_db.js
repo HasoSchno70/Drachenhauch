@@ -19,7 +19,7 @@ module.exports = (H) => [
   H.h2("Schreiben: DB_EXEC mit Parameter-Binding"),
   H.p("DB_EXEC führt jedes SQL-Statement aus, das keine Zeilen zurückliefert – also CREATE, INSERT, UPDATE, DELETE. Werte setzt du niemals direkt in den SQL-String ein, sondern schreibst ein Fragezeichen ? als Platzhalter und übergibst den Wert als weiteres Argument. Das ist sicherer (kein „SQL-Injection“) und kümmert sich um Anführungszeichen und Sonderzeichen automatisch."),
   H.cmd("DB_EXEC", 'DB_EXEC(conn, sql$ [, wert1, wert2, ...])',
-    "Führt ein SQL-Statement aus; jedes ? im SQL wird der Reihe nach durch die folgenden Werte ersetzt. Rückgabe ist die Anzahl betroffener Zeilen. Erlaubte Wert-Typen: INTEGER, FLOAT, STRING, BOOLEAN (als 0/1).",
+    "Führt ein SQL-Statement aus; jedes ? im SQL wird der Reihe nach durch die folgenden Werte ersetzt. Rückgabe ist die Anzahl betroffener Zeilen. Erlaubte Wert-Typen: INTEGER, FLOAT, STRING, BOOLEAN (als 0/1) und NIL (wird zu SQL-NULL).",
     [
       'IMPORT "db"',
       'DIM con AS DB_CONN',

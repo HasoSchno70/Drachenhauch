@@ -10,7 +10,7 @@ module.exports = (H) => [
   H.h2("TCP: Server und Client"),
   H.p("Ein TCP-Server lauscht mit NET_TCP_LISTEN auf einem Port. NET_TCP_ACCEPT holt eine wartende Verbindung ab – oder liefert NIL, wenn gerade niemand verbindet (das prüfst du mit IS_NIL). Ein Client baut die Verbindung mit NET_TCP_CONNECT auf. Über die fertige Verbindung schickst du Text mit NET_SEND und liest mit NET_RECV."),
   H.cmd("NET_TCP_LISTEN · NET_TCP_ACCEPT · NET_LISTENER_PORT", 'NET_TCP_LISTEN(port)   NET_TCP_ACCEPT(lst)   NET_LISTENER_PORT(lst)',
-    "LISTEN öffnet einen Server-Socket (Port 0 = das Betriebssystem wählt einen freien, abfragbar mit NET_LISTENER_PORT). ACCEPT gibt eine neue NET_SOCKET-Verbindung zurück – oder NIL, wenn keine wartet (mit IS_NIL prüfen, NICHT mit <> NIL).",
+    "LISTEN öffnet einen Server-Socket (Port 0 = das Betriebssystem wählt einen freien, abfragbar mit NET_LISTENER_PORT). ACCEPT gibt eine neue NET_SOCKET-Verbindung zurück – oder NIL, wenn keine wartet (mit IS_NIL(x) oder x <> NIL prüfen).",
     [
       'IMPORT "net"',
       'DIM lst AS NET_LISTENER',
@@ -83,6 +83,6 @@ module.exports = (H) => [
 
   H.h2("Nicht-blockierend – der Schlüssel für Spiele"),
   H.p("Alle Lese- und Annahme-Befehle (RECV, ACCEPT, UDP_RECV) kehren sofort zurück: Ist nichts da, liefern sie leeren Text bzw. NIL. So fragst du das Netzwerk einmal pro Frame ab, ohne den Loop anzuhalten. Willst du ausnahmsweise warten, bis Daten kommen, setzt du mit NET_SET_TIMEOUT (bzw. NET_UDP_SET_TIMEOUT) ein Zeitlimit – Vorsicht im Game-Loop, denn das hält den Frame an."),
-  H.warn("NIL prüfen, nicht vergleichen", "NET_TCP_ACCEPT liefert NIL, wenn keine Verbindung wartet. Prüfe das mit IS_NIL(client) – ein direkter Vergleich wie client <> NIL funktioniert nicht, weil NIL in GameBasic kein schreibbarer Wert (kein Literal) ist."),
+  H.note("NET_TCP_ACCEPT liefert NIL, wenn gerade keine Verbindung wartet. NIL ist ein ganz normaler Wert (Literal), den du direkt schreiben und vergleichen kannst – prüfe also mit IF NOT IS_NIL(client) THEN … oder gleichbedeutend mit IF client <> NIL THEN …."),
   H.tip("Daten haben keine Grenzen", "TCP ist ein Strom, kein Paket-Versand: Zwei NET_SEND können beim Empfänger als ein NET_RECV ankommen – oder umgekehrt. Wenn du abgegrenzte Nachrichten brauchst, schick die Länge voraus (z. B. vierstellig) oder beende jede Nachricht mit einem Trennzeichen wie Zeilenumbruch und setze sie beim Empfänger wieder zusammen."),
 ];

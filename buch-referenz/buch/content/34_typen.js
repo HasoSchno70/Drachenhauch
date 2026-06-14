@@ -65,6 +65,7 @@ module.exports = (H) => [
       'PRINT IS_NIL(boss)      \' jetzt existiert es',
     ],
     { out: ["TRUE", "FALSE"] }),
+  H.note("NIL kannst du auch direkt hinschreiben und vergleichen: IF boss = NIL THEN … bzw. IF boss <> NIL THEN … sind gleichbedeutend zu IS_NIL. Und mit boss = NIL leerst du eine Objekt-Variable wieder (z. B. um ein besiegtes Gegner-Objekt freizugeben)."),
 
   H.h2("Kodierung & Prüfsummen"),
   H.p("Für Speicherstände und Datenaustausch gibt es ein paar weitere Helfer. Base64 verpackt beliebigen Text in ein kompaktes, transportables Format; Prüfsummen erkennen, ob Daten unverändert sind."),
