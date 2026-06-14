@@ -114,6 +114,44 @@ function smallLabel(text) {
     children: [new TextRun({ text, italics: true, bold: true, color: C_CAP, size: 18 })] });
 }
 
+// ---------------------------------------------------------------- Tabelle (Anhang/Referenz)
+// table(rows, {headers, widths, mono}) -- generische, ueber Seiten umbrechende Tabelle.
+//   rows/headers: Array von Zeilen; jede Zelle = String oder {text, mono, bold, color, swatch}.
+//   widths: Spaltenbreiten (Summe ~9026). mono: Array von Spalten-Indizes in Consolas.
+//   swatch: Hex-Farbe -> farbiger Block in der Zelle (fuer den Farb-Anhang).
+function table(rows, opts = {}) {
+  const total = 9026;
+  const ncol = opts.widths ? opts.widths.length
+    : (opts.headers ? opts.headers.length : (rows[0] ? rows[0].length : 1));
+  const colW = opts.widths || Array(ncol).fill(Math.floor(total / ncol));
+  const mono = opts.mono || [];
+  const thin = { style: BorderStyle.SINGLE, size: 4, color: "D0D0D0" };
+  const tblBorders = { top: thin, bottom: thin, left: thin, right: thin,
+                       insideHorizontal: thin, insideVertical: thin };
+  function mkCell(c, i, isHeader) {
+    const cfg = (c && typeof c === "object" && !Array.isArray(c)) ? c : { text: String(c) };
+    const runs = [];
+    if (cfg.swatch) runs.push(new TextRun({ text: "████", font: "Consolas", size: 22, color: cfg.swatch }));
+    const txt = (cfg.swatch && cfg.text ? "  " : "") + (cfg.text !== undefined ? cfg.text : "");
+    runs.push(new TextRun({ text: txt, size: cfg.size || 19,
+      bold: isHeader || cfg.bold,
+      font: (mono.includes(i) || cfg.mono) ? "Consolas" : "Arial",
+      color: isHeader ? "FFFFFF" : (cfg.color || "222222") }));
+    return new TableCell({ width: { size: colW[i], type: WidthType.DXA },
+      shading: isHeader ? { fill: C_ACCENT, type: ShadingType.CLEAR } : undefined,
+      margins: { top: 30, bottom: 30, left: 90, right: 90 },
+      children: [new Paragraph({ spacing: { after: 0, line: 240, lineRule: LineRuleType.AUTO }, children: runs })] });
+  }
+  const trs = [];
+  if (opts.headers) trs.push(new TableRow({ tableHeader: true, cantSplit: true,
+    children: opts.headers.map((h, i) => mkCell(h, i, true)) }));
+  for (const r of rows) trs.push(new TableRow({ cantSplit: true,
+    children: r.map((c, i) => mkCell(c, i, false)) }));
+  return [new Table({ width: { size: total, type: WidthType.DXA }, columnWidths: colW,
+    borders: tblBorders, rows: trs }),
+    new Paragraph({ spacing: { after: 160 }, children: [] })];
+}
+
 // Standardisierter Befehls-Eintrag.
 // cmd(name, syntax, desc, codeLines, {out, fig, caption})
 function cmd(name, syntax, desc, codeLines, opts = {}) {
@@ -164,7 +202,7 @@ function h2(t) {
 }
 
 const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBlock,
-            cmd, h1, h2, chapter, part, smallLabel, PageBreak };
+            cmd, table, h1, h2, chapter, part, smallLabel, PageBreak };
 
 // ===================== Inhalt zusammenstellen =====================
 const children = [];
