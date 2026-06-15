@@ -73,8 +73,31 @@ Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
   dürfen – wichtig, damit deine Nutzer ihre Spiele verkaufen können.
 - **Nicht `--onefile` bauen** (LGPL/Qt): die Qt-DLLs müssen als austauschbare Dateien
   vorliegen – die `onedir`-Spec erfüllt das.
-- Offen für den Verkauf (kein Code): Code-Signing-Zertifikat (sonst SmartScreen-Warnung),
-  Prüfung der Beispiel-Asset-Lizenzen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
+- Beispiel-Asset-Lizenzen sind geprüft + dokumentiert (`examples/ASSET-CREDITS.md`); der
+  frühere „Mario"-Satz wurde zu einem eigenständigen Plattformer-Satz umgebaut.
+
+## Code-Signing (gegen die SmartScreen-„Unbekannter Herausgeber"-Warnung)
+Der Build signiert **automatisch** `GameBasic.exe`, `gbrt.exe` und den fertigen
+Installer – **sobald** ein Zertifikat über Umgebungsvariablen konfiguriert ist.
+Ohne Konfiguration ist die Signierung ein No-Op (der Build läuft normal durch).
+
+```
+set GB_SIGN_CERT=C:\keys\meincert.pfx     REM .pfx-Datei ODER SHA1-Thumbprint im Zertspeicher
+set GB_SIGN_PASS=geheim                    REM nur bei .pfx
+set GB_SIGN_TS=http://timestamp.digicert.com   REM optional (Default gesetzt)
+.venv\Scripts\python.exe installer\build_installer.py
+```
+
+- Braucht **`signtool.exe`** (Windows SDK; wird automatisch unter
+  `Windows Kits\10\bin\*\x64\` gesucht, oder via `SIGNTOOL`/PATH).
+- Zertifikat: ein **Code-Signing-Zertifikat** von einer CA (OV günstiger, **EV**
+  baut sofort SmartScreen-Reputation auf). EV-Tokens liegen oft als Hardware-USB
+  vor – dann Thumbprint statt `.pfx` verwenden.
+- Den **Uninstaller** signiert der externe Weg nicht; dafür Inno-`SignTool`
+  aktivieren (auskommentiert in `GameBasic.iss`).
+
+Offen für den Verkauf (kein Code mehr): Zertifikat kaufen, EULA-`[PLATZHALTER]`
+ausfüllen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
 
 ## Wie die installierte App `gbrt` findet
 Der Installer legt `gbrt.exe` **neben** `GameBasic.exe`. `gbrun._find_gbrt()`

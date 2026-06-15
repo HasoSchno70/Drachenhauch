@@ -30,6 +30,50 @@ def log(msg):
     print(f"\n=== {msg} ===", flush=True)
 
 
+# --------------------------------------------------------------- Code-Signing
+# Inert, solange KEIN Zertifikat konfiguriert ist. Aktivieren ueber Umgebungs-
+# variablen (dann werden GameBasic.exe, gbrt.exe UND der Installer signiert):
+#   GB_SIGN_CERT  = Pfad zur .pfx-Datei  ODER  SHA1-Thumbprint im Windows-Zertspeicher
+#   GB_SIGN_PASS  = Passwort der .pfx    (nur bei .pfx noetig)
+#   GB_SIGN_TS    = RFC3161-Timestamp-URL (Default: DigiCert)
+# Beispiel:
+#   set GB_SIGN_CERT=C:\keys\meincert.pfx
+#   set GB_SIGN_PASS=geheim
+#   .venv\Scripts\python.exe installer\build_installer.py
+def _find_signtool():
+    if os.environ.get("SIGNTOOL") and Path(os.environ["SIGNTOOL"]).exists():
+        return os.environ["SIGNTOOL"]
+    found = shutil.which("signtool")
+    if found:
+        return found
+    # Windows-SDK: neueste signtool.exe (x64) suchen.
+    base = Path(r"C:\Program Files (x86)\Windows Kits\10\bin")
+    cands = sorted(base.glob("*/x64/signtool.exe"), reverse=True) if base.exists() else []
+    return str(cands[0]) if cands else None
+
+
+def sign(path: Path):
+    """Signiert eine Datei -- NUR wenn GB_SIGN_CERT gesetzt ist (sonst No-Op)."""
+    cert = os.environ.get("GB_SIGN_CERT")
+    if not cert:
+        return  # Signierung nicht konfiguriert -> still ueberspringen
+    st = _find_signtool()
+    if not st:
+        print("WARN: signtool.exe nicht gefunden (Windows SDK) -> nicht signiert:", path)
+        return
+    ts = os.environ.get("GB_SIGN_TS", "http://timestamp.digicert.com")
+    args = [st, "sign", "/fd", "SHA256", "/tr", ts, "/td", "SHA256"]
+    if Path(cert).exists():                 # .pfx-Datei
+        args += ["/f", cert]
+        if os.environ.get("GB_SIGN_PASS"):
+            args += ["/p", os.environ["GB_SIGN_PASS"]]
+    else:                                   # Thumbprint im Zertifikatsspeicher
+        args += ["/sha1", cert]
+    args.append(str(path))
+    log(f"Signiere {Path(path).name}")
+    subprocess.run(args, check=True)
+
+
 def version():
     sys.path.insert(0, str(ROOT))
     from gamebasic import __version__
@@ -88,6 +132,7 @@ def run_pyinstaller():
     if not exe.exists():
         sys.exit("FEHLER: PyInstaller-Ausgabe fehlt.")
     print("IDE:", exe)
+    sign(exe)            # die ausgelieferte App-Exe signieren (falls konfiguriert)
 
 
 def find_iscc():
@@ -106,10 +151,13 @@ def run_inno(ver):
         print("\nInno Setup (ISCC.exe) nicht gefunden. dist/GameBasic ist fertig.")
         print("Installer manuell bauen: ISCC.exe /DAppVersion=%s installer\\GameBasic.iss" % ver)
         return
+    sign(GBRT)           # gbrt.exe signieren, BEVOR Inno sie einpackt
     log("Inno Setup (Installer verpacken)")
     subprocess.run([iscc, f"/DAppVersion={ver}", str(INST / "GameBasic.iss")],
                    cwd=INST, check=True)
     out = INST / "output" / f"GameBasic-Setup-{ver}.exe"
+    if out.exists():
+        sign(out)        # zuletzt den fertigen Installer signieren
     print("\nFERTIG ->", out if out.exists() else (INST / "output"))
 
 

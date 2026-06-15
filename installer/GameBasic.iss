@@ -32,6 +32,16 @@ SetupIconFile=GameBasic.ico
 ; EULA-Zustimmungsseite im Setup-Assistenten.
 LicenseFile=EULA.txt
 
+; --- Code-Signing (optional) ---
+; build_installer.py signiert App-Exe, gbrt.exe UND den fertigen Installer extern
+; per signtool (gesteuert ueber GB_SIGN_CERT/GB_SIGN_PASS) -- das ist der
+; Standardweg. Wer ZUSAETZLICH den Uninstaller bei der Kompilierung signieren
+; lassen will, definiert beim ISCC-Aufruf ein SignTool und aktiviert die zwei
+; Zeilen unten:
+;   ISCC.exe "/Ssign=signtool sign /fd SHA256 /f C:\keys\cert.pfx /p PASS /tr http://timestamp.digicert.com /td SHA256 $f" /DAppVersion=2026.1 GameBasic.iss
+; SignTool=sign
+; SignedUninstaller=yes
+
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 
