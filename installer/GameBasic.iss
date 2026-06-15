@@ -29,6 +29,8 @@ ArchitecturesAllowed=x64compatible
 ChangesEnvironment=yes
 ChangesAssociations=yes
 SetupIconFile=GameBasic.ico
+; EULA-Zustimmungsseite im Setup-Assistenten.
+LicenseFile=EULA.txt
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"
@@ -55,6 +57,9 @@ Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
 ; Lehrbuch (falls gebaut).
 Source: "..\buch-referenz\buch\GameBasic-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+; Lizenz + Drittanbieter-Lizenzhinweise (Pflicht-Beilage fuer MIT/BSD/Apache/LGPL).
+Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\GameBasic"; Filename: "{app}\{#AppExe}"; Comment: "GameBasic-Editor / Auswahl"
@@ -63,6 +68,8 @@ Name: "{group}\Tilemap-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--tile
 Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\GameBasic\examples"
+Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
+Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES.txt"
 Name: "{group}\{cm:UninstallProgram,GameBasic}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\GameBasic"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 

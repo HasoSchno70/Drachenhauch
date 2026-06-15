@@ -1,0 +1,94 @@
+ENDBENUTZER-LIZENZVERTRAG (EULA) FUER GAMEBASIC
+================================================
+
+WICHTIG - BITTE SORGFAELTIG LESEN. Dies ist eine VORLAGE. Lass sie vor einem
+kommerziellen Vertrieb von einer juristisch fachkundigen Person pruefen und
+ersetze die [PLATZHALTER] (Anbietername, Jahr, Gerichtsstand, Preis-/Lizenzmodell).
+
+Stand: [JAHR]   Anbieter: [DEIN NAME / FIRMA], [ANSCHRIFT], [E-MAIL]
+
+
+1. GEGENSTAND
+GameBasic ("die Software") ist eine Entwicklungsumgebung samt Laufzeitumgebung
+("gbrt") zum Erstellen von Programmen und Spielen. Dieser Vertrag wird zwischen
+dir ("Lizenznehmer") und dem Anbieter geschlossen. Durch Installation oder
+Nutzung der Software stimmst du diesem Vertrag zu. Stimmst du nicht zu,
+installiere und nutze die Software nicht.
+
+2. LIZENZEINRAEUMUNG
+Der Anbieter raeumt dir ein einfaches, nicht ausschliessliches, nicht
+uebertragbares Recht ein, die Software gemaess dem erworbenen Lizenzmodell
+([z.B. pro Person / pro Geraet / Anzahl]) zu installieren und zu nutzen.
+
+3. DEINE PROGRAMME UND SPIELE GEHOEREN DIR
+Alle Programme, Spiele, Grafiken, Klaenge und sonstigen Inhalte, die du MIT
+GameBasic erstellst, gehoeren ausschliesslich dir. Der Anbieter erhebt darauf
+keinerlei Rechte und keine Lizenzgebuehren.
+
+4. WEITERGABE DEINER WERKE (RUNTIME-REDISTRIBUTION)
+Du darfst die mit "gbrt --export" erzeugten eigenstaendigen Programme - einschliesslich
+der darin enthaltenen GameBasic-Laufzeitumgebung (gbrt) und der mitgelieferten
+Open-Source-Bestandteile - frei weitergeben und auch KOMMERZIELL verkaufen, ohne
+weitere Gebuehren an den Anbieter. Du musst dabei lediglich die Lizenzhinweise der
+enthaltenen Drittkomponenten beachten (siehe THIRD-PARTY-NOTICES.txt; die dort
+genannten Open-Source-Lizenzen erlauben diese Weitergabe). Die GameBasic-
+ENTWICKLUNGSUMGEBUNG (Editor) selbst darfst du nicht als Teil deiner Werke
+weitergeben.
+
+5. EINSCHRAENKUNGEN
+Du darfst die Software nicht (a) als Entwicklungsumgebung weiterverkaufen,
+vermieten oder unterlizenzieren, (b) Urheberrechtsvermerke oder Lizenzhinweise
+entfernen, (c) zurueckentwickeln, dekompilieren oder disassemblieren, SOWEIT
+dies nicht durch zwingendes Recht oder durch die Lizenz einer enthaltenen
+Open-Source-Komponente ausdruecklich gestattet ist. Die Open-Source-Bestandteile
+unterliegen ihren jeweils eigenen Lizenzen (siehe Punkt 8).
+
+6. EIGENTUM
+Die Software (mit Ausnahme der Open-Source-Bestandteile und deiner eigenen Werke)
+ist Eigentum des Anbieters und durch Urheberrecht geschuetzt. Dieser Vertrag
+uebertraegt kein Eigentum an der Software, sondern nur das Nutzungsrecht aus
+Punkt 2.
+
+7. UPDATES
+Der Anbieter kann Updates bereitstellen, ist dazu aber nicht verpflichtet.
+Updates unterliegen diesem Vertrag, sofern sie nicht mit eigenen Bedingungen
+ausgeliefert werden.
+
+8. DRITTKOMPONENTEN / OPEN SOURCE
+GameBasic enthaelt Open-Source-Software (u.a. Qt/PySide6 unter LGPLv3, raylib,
+NumPy, Pillow sowie zahlreiche Rust-Crates unter MIT/BSD/Apache-2.0/Zlib/MPL-2.0).
+Diese Bestandteile unterliegen AUSSCHLIESSLICH ihren eigenen Lizenzen; soweit diese
+mit dem vorliegenden Vertrag kollidieren, gehen die jeweiligen Open-Source-Lizenzen
+fuer den betreffenden Bestandteil vor. Die vollstaendigen Lizenz- und Copyright-
+Texte liegen der Installation als THIRD-PARTY-NOTICES.txt bei. Insbesondere darfst
+du die als austauschbare Dateien vorliegenden Qt-Bibliotheken gemaess LGPLv3
+ersetzen.
+
+9. KEINE GEWAEHRLEISTUNG
+DIE SOFTWARE WIRD "WIE BESEHEN" OHNE JEGLICHE AUSDRUECKLICHE ODER STILLSCHWEIGENDE
+GEWAEHRLEISTUNG BEREITGESTELLT, SOWEIT GESETZLICH ZULAESSIG. Zwingende gesetzliche
+Gewaehrleistungsrechte von Verbrauchern bleiben unberuehrt.
+
+10. HAFTUNGSBESCHRAENKUNG
+Soweit gesetzlich zulaessig, haftet der Anbieter nicht fuer mittelbare Schaeden,
+Folgeschaeden, Datenverlust oder entgangenen Gewinn. Die Haftung fuer Vorsatz und
+grobe Fahrlaessigkeit sowie nach zwingendem Recht (z.B. Produkthaftung, Schaeden
+aus der Verletzung von Leben, Koerper, Gesundheit) bleibt unberuehrt.
+
+11. LAUFZEIT UND BEENDIGUNG
+Dieser Vertrag gilt, bis er beendet wird. Er endet automatisch, wenn du gegen
+wesentliche Bestimmungen verstoesst. Bei Beendigung hast du die Nutzung
+einzustellen und die Software zu deinstallieren. Bereits weitergegebene, mit
+GameBasic erstellte Werke (Punkt 3/4) bleiben davon unberuehrt.
+
+12. ANWENDBARES RECHT
+Es gilt das Recht der Bundesrepublik Deutschland unter Ausschluss des
+UN-Kaufrechts. Gerichtsstand ist - soweit zulaessig - [ORT]. Zwingende
+Verbraucherschutzvorschriften des Wohnsitzlandes des Lizenznehmers bleiben
+unberuehrt.
+
+13. SCHLUSSBESTIMMUNGEN
+Sollte eine Bestimmung unwirksam sein, bleibt der uebrige Vertrag wirksam.
+
+(c) [JAHR] [DEIN NAME / FIRMA]. Alle Rechte vorbehalten. "GameBasic" und das
+GameBasic-Logo sind Kennzeichen des Anbieters.

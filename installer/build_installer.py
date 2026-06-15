@@ -66,6 +66,14 @@ def make_icon():
     print("Icon:", ico)
 
 
+def gen_notices():
+    log("Drittanbieter-Lizenzen sammeln (THIRD-PARTY-NOTICES.txt)")
+    try:
+        subprocess.run([str(PY), str(INST / "gen_notices.py")], cwd=ROOT, check=True)
+    except subprocess.CalledProcessError as e:
+        print("WARN: Notices-Generierung fehlgeschlagen:", e)
+
+
 def run_pyinstaller():
     log("PyInstaller (eingefrorene IDE)")
     dist = ROOT / "dist"
@@ -112,6 +120,7 @@ def main():
     print(f"GameBasic {ver} -- Installer-Build")
     ensure_gbrt(rebuild)
     make_icon()
+    gen_notices()
     run_pyinstaller()
     if not no_inst:
         run_inno(ver)

@@ -48,3 +48,4 @@ examples/highscores.txt
 installer/output/
 installer/GameBasic.ico
 !installer/GameBasic.spec
+installer/THIRD-PARTY-NOTICES.txt

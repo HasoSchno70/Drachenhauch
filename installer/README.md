@@ -53,11 +53,28 @@ Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
 ## Aufbau
 | Datei | Zweck |
 |---|---|
-| `build_installer.py` | Orchestriert gbrt → Icon → PyInstaller → Inno. |
+| `build_installer.py` | Orchestriert gbrt → Icon → Notices → PyInstaller → Inno. |
 | `GameBasic.spec` | PyInstaller-Konfiguration (onedir, windowed, bündelt das Paket + Daten). |
-| `GameBasic.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung). |
-| `GameBasic.ico` | generiert (gitignored). |
-| `output/` | fertiger Installer (gitignored). |
+| `GameBasic.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung, EULA). |
+| `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). Wird im Setup als Zustimmungsseite gezeigt. |
+| `gen_notices.py` | Sammelt alle Drittanbieter-Lizenztexte → `THIRD-PARTY-NOTICES.txt`. |
+| `licenses/` | Kanonische Volltexte (LGPL-3.0, GPL-3.0, MPL-2.0) für `gen_notices.py`. |
+| `GameBasic.ico` · `THIRD-PARTY-NOTICES.txt` · `output/` | generiert (gitignored). |
+
+## Lizenz-Compliance (für den Verkauf)
+- **`THIRD-PARTY-NOTICES.txt`** wird bei jedem Build automatisch erzeugt (`gen_notices.py`):
+  sammelt die Lizenz-/Copyright-Texte aller gebündelten Python-Pakete (PySide6/Qt
+  unter LGPLv3, NumPy, Pillow) **und** aller ~250 Rust-Crates der gbrt-Runtime
+  (MIT/BSD/Apache-2.0/Zlib/MPL-2.0). MIT/BSD/Apache **verlangen** diese Beilage.
+  Liegt nach Installation unter `{app}\THIRD-PARTY-NOTICES.txt` + Startmenü.
+- **`EULA.txt`** ist eine Vorlage; ersetze die `[PLATZHALTER]` und lass sie vor einem
+  kommerziellen Vertrieb prüfen. Sie regelt u.a., dass **vom Nutzer erstellte Spiele
+  ihm gehören** und samt gbrt-Runtime **frei (auch kommerziell) weitergegeben** werden
+  dürfen – wichtig, damit deine Nutzer ihre Spiele verkaufen können.
+- **Nicht `--onefile` bauen** (LGPL/Qt): die Qt-DLLs müssen als austauschbare Dateien
+  vorliegen – die `onedir`-Spec erfüllt das.
+- Offen für den Verkauf (kein Code): Code-Signing-Zertifikat (sonst SmartScreen-Warnung),
+  Prüfung der Beispiel-Asset-Lizenzen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
 
 ## Wie die installierte App `gbrt` findet
 Der Installer legt `gbrt.exe` **neben** `GameBasic.exe`. `gbrun._find_gbrt()`
