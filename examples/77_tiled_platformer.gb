@@ -25,9 +25,9 @@ lvl = TILED_LOAD("levels/level1.json")
 DIM atlas AS SPRITE_ATLAS
 atlas = ATLAS_LOAD("assets/tiles_atlas.json")
 
-' Mario-Sprite-Atlas (5 Frames: idle, walk_a, walk_b, jump, hit)
-DIM mario AS SPRITE_ATLAS
-mario = ATLAS_LOAD("assets/mario_atlas.json")
+' Spieler-Sprite-Atlas (5 Frames: idle, walk_a, walk_b, jump, hit)
+DIM psprites AS SPRITE_ATLAS
+psprites = ATLAS_LOAD("assets/player_atlas.json")
 
 ' Z-Layer
 LAYER_DEFINE("bg",      0)
@@ -194,26 +194,26 @@ WHILE running AND NOT QuitRequested()
 
     DIM sprite_name AS STRING
     IF hit_timer > 0 THEN
-        sprite_name = "mario_hit"
+        sprite_name = "player_hit"
     ELSEIF NOT CHAR_ON_GROUND(player) THEN
-        sprite_name = "mario_jump"
+        sprite_name = "player_jump"
     ELSEIF axis_x <> 0 THEN
         ' Walk-Loop: 2 Frames, alle 8 Frames wechseln (= 7.5 fps)
         IF (anim_frame \ 8) MOD 2 = 0 THEN
-            sprite_name = "mario_walk_a"
+            sprite_name = "player_walk_a"
         ELSE
-            sprite_name = "mario_walk_b"
+            sprite_name = "player_walk_b"
         END IF
     ELSE
-        sprite_name = "mario_idle"
+        sprite_name = "player_idle"
     END IF
 
     LAYER("player")
-    ' Mario-Sprite (16x16) auf Box (12x14) zentriert: Offset (-2, -2).
+    ' Spieler-Sprite (16x16) auf Box (12x14) zentriert: Offset (-2, -2).
     ' Spiegeln, wenn der Charakter nach links schaut (CHAR_FACING = -1).
     DIM flip AS BOOLEAN
     flip = CHAR_FACING(player) = -1
-    ATLAS_DRAW_FLIPPED(mario, sprite_name, INT(px) - 2, INT(py) - 2, flip, FALSE)
+    ATLAS_DRAW_FLIPPED(psprites, sprite_name, INT(px) - 2, INT(py) - 2, flip, FALSE)
 
     LAYER("ui")
     IF has_pad THEN

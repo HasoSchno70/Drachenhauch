@@ -1,6 +1,10 @@
-"""Sprite-Generator fuer einen Mario-Clone -- 32x32, detailreich, prozedural.
+"""Sprite-Generator fuer einen generischen Plattformer-Satz -- 32x32, prozedural.
 
-Zeichnet Held, Gegner, Tiles, Items und Deko mit einer kleinen Pixel-Canvas
+Eigenstaendiges "Twilight"-Thema (violetter Held, schiefer-violette Gegner,
+Stahl-Cyan-Roehren, Kristall-Item-Boxen) -- bewusst NICHT an Nintendo-Marken/
+-Figuren angelehnt, damit der Satz kommerziell nutzbar ist.
+
+Zeichnet Spieler, Gegner, Tiles, Items und Deko mit einer kleinen Pixel-Canvas
 (harte Kanten, begrenzte Palette = Pixelart-Look) und exportiert:
 - pro animierter Figur eine `.gbsprite` (im Editor `gbsprites` bearbeitbar)
   + `.gif`-Vorschau,
@@ -31,17 +35,27 @@ S = 32  # Sprite-Kantenlaenge
 # ----------------------------------------------------------------- Farben
 T = (0, 0, 0, 0)
 OL = (26, 18, 28, 255)
-RED = (228, 48, 40, 255)
-RED_D = (158, 26, 22, 255)
-RED_H = (250, 120, 110, 255)
-SKIN = (252, 196, 148, 255)
-SKIN_D = (210, 140, 96, 255)
-BLUE = (48, 84, 212, 255)
-BLUE_D = (28, 48, 140, 255)
-BLUE_H = (96, 140, 248, 255)
-BROWN = (124, 72, 30, 255)
-BROWN_D = (78, 44, 16, 255)
-BROWN_L = (170, 110, 60, 255)
+# Eigenstaendige "Twilight"-Palette (bewusst NICHT die Mario-Farben):
+# Held = violette Kapuze + tuerkise Montur, Gegner = schiefer-violett,
+# Panzer/Roehre = Stahl-Cyan, Item-Box = Kristall. Umbau fuer kommerzielle
+# Nutzung -- siehe examples/ASSET-CREDITS.md.
+RED = (150, 72, 200, 255)        # frueher Rot -> Violett (Kapuze/Arme/Pflanze)
+RED_D = (98, 44, 138, 255)
+RED_H = (196, 138, 234, 255)
+SKIN = (252, 206, 168, 255)
+SKIN_D = (212, 156, 116, 255)
+BLUE = (34, 162, 156, 255)        # frueher Blau -> Tuerkis (Montur)
+BLUE_D = (18, 108, 104, 255)
+BLUE_H = (104, 212, 202, 255)
+BROWN = (108, 94, 132, 255)       # frueher Braun -> Schiefer-Violett (Gegner/Haar)
+BROWN_D = (66, 56, 90, 255)
+BROWN_L = (152, 138, 178, 255)
+STEEL = (74, 172, 178, 255)       # Panzer/Roehre (statt Gruen)
+STEEL_D = (38, 112, 120, 255)
+STEEL_H = (148, 224, 220, 255)
+CRYST = (96, 196, 230, 255)       # Item-Box-Kristall (statt Gelb)
+CRYST_D = (44, 126, 170, 255)
+CRYST_H = (190, 238, 252, 255)
 YEL = (250, 208, 72, 255)
 YEL_D = (196, 150, 40, 255)
 WHITE = (250, 250, 250, 255)
@@ -161,9 +175,8 @@ def _hero_head(c, cx, y, dead=False):
         c.rect(cx, y + 5, cx + 1, y + 7, WHITE)
         c.vline(cx + 1, y + 5, y + 7, OL)
     c.disc(cx + 4, y + 8, 2, SKIN); c.disc(cx + 5, y + 8, 1, SKIN_D)
-    c.rect(cx - 3, y + 9, cx + 3, y + 10, BROWN)
-    c.rect(cx - 4, y + 10, cx + 2, y + 11, BROWN)
-    c.set(cx - 4, y + 9, BROWN_D)
+    # Kein Schnurrbart (Differenzierung): nur ein kleiner, neutraler Mund.
+    c.hline(cx - 2, cx + 1, y + 10, SKIN_D)
 
 
 def _hero_body(c, cx, y, duck=False):
@@ -238,12 +251,12 @@ def draw_goomba(step=0, squash=False):
 def draw_koopa(step=0, shell_only=False):
     c = Canvas()
     if shell_only:
-        c.disc(16, 18, 12, GREEN)
-        c.disc(16, 18, 12, GREEN_D)
-        c.disc(16, 19, 9, GREEN)
+        c.disc(16, 18, 12, STEEL)
+        c.disc(16, 18, 12, STEEL_D)
+        c.disc(16, 19, 9, STEEL)
         c.rect(4, 18, 28, 24, YEL); c.rect(4, 22, 28, 25, YEL_D)
         for sx in (10, 16, 22):
-            c.disc(sx, 16, 2, GREEN_D)
+            c.disc(sx, 16, 2, STEEL_D)
         c.outline()
         return c.im
     # Kopf
@@ -252,11 +265,11 @@ def draw_koopa(step=0, shell_only=False):
     c.rect(23, 6, 24, 8, WHITE); c.vline(24, 6, 8, OL)   # Auge
     c.rect(26, 9, 28, 11, ORANGE)                        # Schnabel
     # Panzer
-    c.disc(13, 17, 10, GREEN)
-    c.disc(13, 17, 10, GREEN_D)
-    c.disc(13, 18, 7, GREEN)
+    c.disc(13, 17, 10, STEEL)
+    c.disc(13, 17, 10, STEEL_D)
+    c.disc(13, 18, 7, STEEL)
     for sx, sy in ((9, 14), (16, 14), (12, 19)):
-        c.disc(sx, sy, 2, GREEN_H)
+        c.disc(sx, sy, 2, STEEL_H)
     c.rect(4, 20, 22, 25, YEL); c.rect(4, 23, 22, 26, YEL_D)   # Bauchrand
     # Fuesse
     if step == 0:
@@ -340,20 +353,23 @@ def tile_brick():
 
 
 def tile_question(frame=0):
+    # Kristall-Item-Box (kein gelber "?"-Block): Cyan-Kristall + Diamant-Symbol.
     c = Canvas()
-    shades = [YEL, (252, 224, 120, 255), YEL]
+    shades = [CRYST, CRYST_H, CRYST]
     base = shades[frame % len(shades)]
-    c.bevel(0, 0, 31, 31, base, (255, 240, 160, 255), ORANGE_D)
+    c.bevel(0, 0, 31, 31, base, CRYST_H, CRYST_D)
     c.rect(2, 2, 29, 29, base)
-    c.bevel(1, 1, 30, 30, base, (255, 240, 160, 255), ORANGE_D)
+    c.bevel(1, 1, 30, 30, base, CRYST_H, CRYST_D)
     for rx, ry in ((3, 3), (28, 3), (3, 28), (28, 28)):
-        c.disc(rx, ry, 1, ORANGE_D)          # Nieten
-    # "?"
-    q = OL
-    c.rect(12, 8, 20, 10, q); c.rect(18, 10, 20, 14, q)
-    c.rect(14, 14, 20, 16, q); c.rect(14, 16, 16, 19, q)
-    c.rect(14, 22, 16, 24, q)                # Punkt
-    c.rect(13, 9, 19, 11, (255, 248, 200, 255))   # Glanzkante im ?
+        c.disc(rx, ry, 1, CRYST_D)           # Nieten
+    # Diamant-Symbol (Raute) statt "?"
+    for i in range(8):
+        c.hline(16 - i, 16 + i, 8 + i, WHITE)
+        c.hline(16 - i, 16 + i, 24 - i, WHITE)
+    for i in range(6):
+        c.hline(16 - i, 16 + i, 10 + i, CRYST_D)
+        c.hline(16 - i, 16 + i, 22 - i, CRYST_D)
+    c.vline(15, 13, 19, CRYST_H)             # Glanz
     return c.im
 
 
@@ -377,24 +393,24 @@ def tile_solid():
 
 
 def _pipe(c, x0, x1, lip):
-    body = GREEN
+    body = STEEL
     c.rect(x0, 0, x1, 31, body)
-    c.rect(x0, 0, x0 + 1, 31, GREEN_H)
-    c.rect(x1 - 1, 0, x1, 31, GREEN_D)
-    c.rect(x0 + 4, 0, x0 + 5, 31, GREEN_H)
+    c.rect(x0, 0, x0 + 1, 31, STEEL_H)
+    c.rect(x1 - 1, 0, x1, 31, STEEL_D)
+    c.rect(x0 + 4, 0, x0 + 5, 31, STEEL_H)
     if lip:
         c.rect(x0, 0, x1, 7, body)
-        c.rect(x0, 0, x1, 1, GREEN_H)
-        c.rect(x0, 6, x1, 7, GREEN_D)
+        c.rect(x0, 0, x1, 1, STEEL_H)
+        c.rect(x0, 6, x1, 7, STEEL_D)
         c.rect(x0, 7, x1, 8, OL)
 
 
 def pipe_top_l():
-    c = Canvas(); _pipe(c, 2, 31, True); c.rect(0, 0, 1, 7, GREEN_H); return c.im
+    c = Canvas(); _pipe(c, 2, 31, True); c.rect(0, 0, 1, 7, STEEL_H); return c.im
 
 
 def pipe_top_r():
-    c = Canvas(); _pipe(c, 0, 29, True); c.rect(30, 0, 31, 7, GREEN_D); return c.im
+    c = Canvas(); _pipe(c, 0, 29, True); c.rect(30, 0, 31, 7, STEEL_D); return c.im
 
 
 def pipe_body_l():
@@ -468,13 +484,17 @@ def star():
 
 
 def oneup():
+    # "Leben"-Item: Herz (statt gruener 1-Up-Pilz -> klar eigenstaendig).
     c = Canvas()
-    c.disc(16, 13, 12, GREEN)
-    c.rect(4, 13, 28, 17, GREEN); c.rect(4, 16, 28, 18, GREEN_D)
-    for (x, y, r) in ((9, 9, 3), (22, 10, 3), (16, 16, 2)):
-        c.disc(x, y, r, WHITE)
-    c.rect(9, 18, 23, 29, SKIN); c.rect(9, 18, 11, 29, SKIN_D)
-    c.rect(13, 22, 15, 26, OL); c.rect(18, 22, 20, 26, OL)
+    PINK = (236, 96, 140, 255); PINK_D = (176, 52, 96, 255)
+    PINK_H = (252, 168, 196, 255)
+    c.disc(11, 12, 6, PINK); c.disc(21, 12, 6, PINK)
+    for y in range(10, 28):
+        hw = int((27 - y) * 0.95)
+        if hw > 0:
+            c.hline(16 - hw, 16 + hw, y, PINK)
+    c.disc(10, 11, 2, PINK_H); c.disc(20, 11, 2, PINK_H)   # Glanz
+    c.vline(9, 13, 16, PINK_D); c.vline(23, 13, 16, PINK_D)
     c.outline()
     return c.im
 
@@ -550,7 +570,7 @@ def flag():
 def anim_specs():
     """name -> (frames[(framename, img)], anims[Anim])."""
     return {
-        "hero": ([
+        "player": ([
             ("idle", draw_hero("idle")), ("run0", draw_hero("stride_l")),
             ("run1", draw_hero("tuck")), ("run2", draw_hero("stride_r")),
             ("jump", draw_hero("tuck", arm_up=True)),
@@ -558,19 +578,19 @@ def anim_specs():
             ("duck", draw_hero(duck=True)), ("dead", draw_hero("idle", dead=True)),
         ], [Anim("idle", 0, 0, 1), Anim("run", 1, 3, 12), Anim("jump", 4, 4, 1),
             Anim("skid", 5, 5, 1), Anim("duck", 6, 6, 1), Anim("dead", 7, 7, 1)]),
-        "goomba": ([("walk0", draw_goomba(0)), ("walk1", draw_goomba(1)),
+        "walker": ([("walk0", draw_goomba(0)), ("walk1", draw_goomba(1)),
                     ("squash", draw_goomba(squash=True))],
                    [Anim("walk", 0, 1, 6), Anim("squash", 2, 2, 1)]),
-        "koopa": ([("walk0", draw_koopa(0)), ("walk1", draw_koopa(1)),
+        "guard": ([("walk0", draw_koopa(0)), ("walk1", draw_koopa(1)),
                    ("shell", draw_koopa(shell_only=True))],
                   [Anim("walk", 0, 1, 5), Anim("shell", 2, 2, 1)]),
-        "piranha": ([("open", draw_piranha(True)), ("closed", draw_piranha(False))],
+        "snapper": ([("open", draw_piranha(True)), ("closed", draw_piranha(False))],
                     [Anim("bite", 0, 1, 3)]),
-        "para": ([("fly0", draw_para(0)), ("fly1", draw_para(1))],
+        "glider": ([("fly0", draw_para(0)), ("fly1", draw_para(1))],
                  [Anim("fly", 0, 1, 7)]),
         "coin": ([("c0", coin(0)), ("c1", coin(1)), ("c2", coin(2)), ("c3", coin(3))],
                  [Anim("spin", 0, 3, 10)]),
-        "qblock": ([("q0", tile_question(0)), ("q1", tile_question(1)),
+        "itembox": ([("q0", tile_question(0)), ("q1", tile_question(1)),
                     ("q2", tile_question(0))],
                    [Anim("idle", 0, 2, 4)]),
         "water": ([("w0", water_top(0)), ("w1", water_top(1))],
@@ -583,13 +603,13 @@ def static_tiles():
     return {
         "ground": tile_ground(),
         "brick": tile_brick(),
-        "qused": tile_question_used(),
+        "itembox_used": tile_question_used(),
         "solid": tile_solid(),
-        "pipe_tl": pipe_top_l(), "pipe_tr": pipe_top_r(),
-        "pipe_bl": pipe_body_l(), "pipe_br": pipe_body_r(),
+        "tube_tl": pipe_top_l(), "tube_tr": pipe_top_r(),
+        "tube_bl": pipe_body_l(), "tube_br": pipe_body_r(),
         "water_body": water_body(),
-        "mushroom": mushroom(), "fireflower": fireflower(),
-        "star": star(), "oneup": oneup(),
+        "grow": mushroom(), "bolt": fireflower(),
+        "shard": star(), "life": oneup(),
         "cloud": cloud(), "bush": bush(), "hill": hill(), "flag": flag(),
     }
 
@@ -626,6 +646,26 @@ def export():
     sheet.save(OUT / "sheet.png")
     (OUT / "sheet.json").write_text(json.dumps(
         {"image": "sheet.png", "sprites": sprites}, indent=2), encoding="utf-8")
+
+    # 2b) Standalone-Spieler-Atlas fuer examples/77_tiled_platformer.gb
+    #     (5 Frames: idle/walk_a/walk_b/jump/hit), generisch benannt. Dort ist die
+    #     Welt 16er-gerastert -> Frames auf 16x16 herunterskalieren (Nearest).
+    PS = 16
+    pframes = dict(specs["player"][0])
+    pmap = [("player_idle", "idle"), ("player_walk_a", "run0"),
+            ("player_walk_b", "run2"), ("player_jump", "jump"),
+            ("player_hit", "skid")]
+    psheet = Image.new("RGBA", (len(pmap) * PS, PS), T)
+    pspr = {}
+    for i, (out_nm, src_nm) in enumerate(pmap):
+        small = pframes[src_nm].resize((PS, PS), Image.NEAREST)
+        psheet.alpha_composite(small, (i * PS, 0))
+        pspr[out_nm] = [i * PS, 0, PS, PS]
+    assets = OUT.parent / "assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    psheet.save(assets / "player.png")
+    (assets / "player_atlas.json").write_text(json.dumps(
+        {"image": "player.png", "sprites": pspr}, indent=2), encoding="utf-8")
 
     # 3) Kontaktbogen (zum Begutachten)
     _contact(named, OUT / "_contact.png")

@@ -1,7 +1,6 @@
-# Mario-Clone Sprites (32×32)
+# Plattformer-Sprites (32x32, "Twilight"-Thema)
 
-Ein kompletter, detailreicher Sprite- und Tile-Satz für einen Mario-artigen
-Platformer, prozedural gebaut über das Datenmodell des Sprite-Editors
+Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Plattformer (eigenstaendiges "Twilight"-Thema, nicht an Nintendo angelehnt), prozedural gebaut über das Datenmodell des Sprite-Editors
 (`gamebasic.spriteeditor.document.SpriteDoc`). Alle Sprites sind **32×32 Pixel**.
 
 ## Master-Spritesheet
@@ -19,21 +18,21 @@ Im Master-Sheet heißen die Frames `<figur>_<frame>`.
 
 | Datei | Frames | Animationen |
 |---|---|---|
-| `hero` | idle, run0–2, jump, skid, duck, dead | `idle`, `run`, `jump`, `skid`, `duck`, `dead` |
-| `goomba` | walk0–1, squash | `walk`, `squash` |
-| `koopa` | walk0–1, shell | `walk`, `shell` |
-| `piranha` | open, closed | `bite` |
-| `para` | fly0–1 | `fly` (fliegender Gegner) |
+| `player` | idle, run0–2, jump, skid, duck, dead | `idle`, `run`, `jump`, `skid`, `duck`, `dead` |
+| `walker` | walk0–1, squash | `walk`, `squash` |
+| `guard` | walk0–1, shell | `walk`, `shell` |
+| `snapper` | open, closed | `bite` |
+| `glider` | fly0–1 | `fly` (fliegender Gegner) |
 | `coin` | c0–c3 | `spin` |
-| `qblock` | q0–q2 | `idle` (Schimmer) |
+| `itembox` | q0–q2 | `idle` (Schimmer) |
 | `water` | w0–w1 | `wave` |
 
 ## Tiles, Items & Deko (statisch, im Master-Sheet)
 
-- **Boden/Bausteine:** `ground`, `brick`, `solid` (Stein), `qused` (benutzter Block)
-- **Röhre** (2×2 zusammensetzbar): `pipe_tl`, `pipe_tr`, `pipe_bl`, `pipe_br`
+- **Boden/Bausteine:** `ground`, `brick`, `solid` (Stein), `itembox_used` (benutzter Block)
+- **Röhre** (2×2 zusammensetzbar): `tube_tl`, `tube_tr`, `tube_bl`, `tube_br`
 - **Wasser:** `water_body` (+ animierte Oberfläche `water_w0/w1`)
-- **Power-ups:** `mushroom`, `fireflower`, `star`, `oneup`
+- **Items:** `grow`, `bolt`, `shard`, `life`
 - **Deko:** `cloud`, `bush`, `hill`, `flag`
 
 ## Neu generieren / anpassen
@@ -42,24 +41,24 @@ Alle Sprites werden in `make_sprites.py` mit einer kleinen Pixel-Canvas
 prozedural gezeichnet (harte Kanten, feste Palette). Ändern und neu bauen:
 
 ```
-py examples/mario/make_sprites.py
+py examples/platformer/make_sprites.py
 ```
 
 Oder eine `.gbsprite` direkt im Editor öffnen und pixeln:
 
 ```
-gbsprites examples/mario/hero.gbsprite
+gbsprites examples/platformer/hero.gbsprite
 ```
 
 ## Demo
 
-`mario_demo.gb` baut daraus ein kleines Level: Held läuft/springt/duckt sich
-(Flip), ein Goomba patrouilliert und lässt sich per Stomp plattmachen; das
+`platformer_demo.gb` baut daraus ein kleines Level: Held läuft/springt/duckt sich
+(Flip), ein Walker patrouilliert und lässt sich per Stomp plattmachen; das
 Level (Boden, Röhre, Brick/?-Block, Wasser, animierte Münzen, Wolken/Busch/
 Hügel) kommt aus dem Master-Atlas `sheet.json`.
 
 ```
-gbrun.py examples/mario/mario_demo.gb
+gbrun.py examples/platformer/platformer_demo.gb
 ```
 
 ## Im eigenen Spiel verwenden
@@ -68,7 +67,7 @@ gbrun.py examples/mario/mario_demo.gb
 IMPORT "sprite"
 ' Animierter Held aus dem Strip:
 DIM hero AS SPRITE
-hero = SPRITE_NEW(LOADIMAGE("hero.png"), 32, 32)
+hero = SPRITE_NEW(LOADIMAGE("player.png"), 32, 32)
 SPRITE_ADD_ANIM(hero, "run", 1, 3, 12)
 SPRITE_PLAY(hero, "run")
 

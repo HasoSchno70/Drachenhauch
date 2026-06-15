@@ -1,17 +1,17 @@
-' Mario-Clone-Demo (32x32) -- zeigt die mit examples/mario/make_sprites.py
+' Plattformer-Demo (Twilight-Sprites) (32x32) -- zeigt die mit examples/platformer/make_sprites.py
 ' gebauten Sprites + Tiles in Aktion:
-'   * Held (hero.png) laeuft (Pfeile), springt (Leer/Hoch), duckt (Runter), Flip
-'   * Goomba (goomba.png) patrouilliert und laesst sich per Stomp plattmachen
-'   * Level aus dem Master-Atlas sheet.json: Boden, Roehre, ?-Bloecke, Wasser,
+'   * Held (player.png) laeuft (Pfeile), springt (Leer/Hoch), duckt (Runter), Flip
+'   * Walker (walker.png) patrouilliert und laesst sich per Stomp plattmachen
+'   * Level aus dem Master-Atlas sheet.json: Boden, Roehre, Item-Boxen, Wasser,
 '     animierte Muenzen, Wolken/Busch/Huegel
-' Voraussetzung: erst `py examples/mario/make_sprites.py` ausfuehren.
+' Voraussetzung: erst `py examples/platformer/make_sprites.py` ausfuehren.
 IMPORT "sprite"
 
 CONST TS AS INTEGER = 32
 CONST W AS INTEGER = 384
 CONST H AS INTEGER = 288
 CONST GROUND AS FLOAT = 192.0          ' Sprite-Oberkante der Figuren am Boden
-SCREEN(W, H, "Mario-Clone 32x32 (Pfeile/Leer, ESC)", 2)
+SCREEN(W, H, "Plattformer 32x32 (Pfeile/Leer, ESC)", 2)
 
 ' --- Level-Atlas (Master-Spritesheet) ---
 DIM atlas AS SPRITE_ATLAS
@@ -19,7 +19,7 @@ atlas = ATLAS_LOAD("sheet.json")
 
 ' --- Held ---
 DIM hsheet AS IMAGE
-hsheet = LOADIMAGE("hero.png")
+hsheet = LOADIMAGE("player.png")
 DIM hero AS SPRITE
 hero = SPRITE_NEW(hsheet, TS, TS)
 SPRITE_ADD_ANIM(hero, "idle", 0, 0, 1.0)
@@ -38,9 +38,9 @@ hvy = 0.0
 on_ground = TRUE
 face_left = FALSE
 
-' --- Goomba ---
+' --- Walker ---
 DIM gsheet AS IMAGE
-gsheet = LOADIMAGE("goomba.png")
+gsheet = LOADIMAGE("walker.png")
 DIM goo AS SPRITE
 goo = SPRITE_NEW(gsheet, TS, TS)
 SPRITE_ADD_ANIM(goo, "walk", 0, 1, 6.0)
@@ -117,7 +117,7 @@ WHILE NOT QUITREQUESTED()
     SPRITE_SET_POS(hero, hx, hy)
     SPRITE_UPDATE(hero, dt)
 
-    ' --- Goomba ---
+    ' --- Walker ---
     IF g_dead = 0 THEN
         gx = gx + gdir * 36.0 * dts
         IF gx < 96.0 THEN gdir = 1.0
@@ -155,14 +155,14 @@ WHILE NOT QUITREQUESTED()
 
     ' Schwebende Bloecke: Brick, ?-Block, Brick
     ATLAS_DRAW(atlas, "brick", 96, 120)
-    ATLAS_DRAW(atlas, "qblock_q0", 128, 120)
+    ATLAS_DRAW(atlas, "itembox_q0", 128, 120)
     ATLAS_DRAW(atlas, "brick", 160, 120)
 
     ' Roehre (2 Tiles breit, 2 hoch) bei x=256
-    ATLAS_DRAW(atlas, "pipe_tl", 256, 160)
-    ATLAS_DRAW(atlas, "pipe_tr", 288, 160)
-    ATLAS_DRAW(atlas, "pipe_bl", 256, 192)
-    ATLAS_DRAW(atlas, "pipe_br", 288, 192)
+    ATLAS_DRAW(atlas, "tube_tl", 256, 160)
+    ATLAS_DRAW(atlas, "tube_tr", 288, 160)
+    ATLAS_DRAW(atlas, "tube_bl", 256, 192)
+    ATLAS_DRAW(atlas, "tube_br", 288, 192)
 
     ' Wasserbecken rechts (auf Bodenhoehe)
     ATLAS_DRAW(atlas, "water_w0", 352, 224)

@@ -9,7 +9,8 @@ Weitergabe bitte beibehalten.
 Selbst erstellt (mit den GameBasic-Tools `gbsprites`/`gbtracker`/`gbsfx` bzw.
 Generator-Skripten) und damit frei – auch kommerziell – verwendbar:
 - Alle Pixel-Grafiken/Sprites: `*.gbsprite`, `*.gif`, `*.png`, Atlanten/`*.json`
-  (Ausnahme „Mario", siehe unten).
+  – darunter der eigenständige Plattformer-Satz in `platformer/` und der Spieler
+  `assets/player.*` („Twilight"-Thema, bewusst nicht an Marken/Werke angelehnt).
 - Shader: `assets/shaders/*.fs` (bloom, crt, vignette).
 - Audio: `assets/demo.mod` (ProTracker-MOD, `make_demo_mod.py`),
   `assets/*.wav` (`make_pluck_sample.py` u. a.), `assets/sfx_*.ogg`,
@@ -34,11 +35,8 @@ CC0 erlaubt jede Nutzung inkl. kommerziell, ohne Namensnennung.
 > Autor genannt werden (z. B. in dieser Datei oder im Abspann). Keine Änderungen
 > an der Datei vorgenommen.
 
-## Hinweis „Mario"
-Die Sprites in `mario/` und `assets/mario.*` sind **eigene Pixel-Art** (prozedural
-über den Sprite-Editor erzeugt), stellen aber bewusst Mario-ähnliche Figuren dar
-(Held, „Goomba", „Koopa", Röhren, ?-Block u. a.). Diese Motive/Namen sind an
-Nintendo-Marken/-Werke angelehnt. Für den **freien, lernorientierten** Gebrauch
-sind sie als Beispiel gedacht; für einen **kommerziellen** Vertrieb sollten sie
-durch generische, eigenständige Motive ersetzt oder weggelassen werden
-(Marken-/Urheberrecht). Siehe `mario/README.md`.
+## Plattformer-Sprites (`platformer/`)
+Eigenständiger, prozedural erzeugter Sprite-/Tile-Satz im „Twilight"-Thema
+(violetter Spieler, schiefer-violette Gegner, Stahl-Cyan-Röhren, Kristall-Boxen),
+**bewusst nicht an Nintendo-Marken/-Figuren angelehnt** → frei, auch kommerziell,
+verwendbar. Generiert über `platformer/make_sprites.py`. Siehe `platformer/README.md`.

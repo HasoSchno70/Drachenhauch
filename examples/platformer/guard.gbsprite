@@ -1,0 +1,36 @@
+{
+  "version": 5,
+  "width": 32,
+  "height": 32,
+  "frames": [
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABu0lEQVR4nGNgGOmAkRaGSgnJ/Iexn717gtcOFlpY/GCfDlxMwYnhPz6HMFLTcmSL0YGC0xUGbA5hpLXlp449QOGH1XxBcQQLqRahi+GNY61NDGFOSgyrWnhwKmEhxWKeuBhMuUVL8AY9IcBCrsUwAJLTWcDAcCXhAlkOYMRnOT6LcQFcDvl24A6crdX0Ax51TNS0HAR0FhiQpJ6JVMtVbKzgmBqOYCFGUV5BCsO2M9ewOsbLRIth0oQ5BM0ABTu2nMNIyPcgy2EA3REgy5Hl7hw5hpEecBVAMMCEz9XIlqNbiMzGxgcBkOUgi/GVFYz4fA8LYmJDAARAoTBPbQPOko+kEEA2GFsawCaHbDkIgEpBbCUoQQeoIKVyZAvQgxpZrupVGVaz8DmCiYEEALMcW3yTC5hItRwXn1zASEqdTgxAr34JJUQmBioDMysFoi0HAao2ydAdASsH8KllISYIaQmY6GrbYHQACy6JD6deYBUXMJMgSQ0hwIguACuxZvl9waqhSCADzu77MAOrmrRNkEYooQQIAhghANKEr+z+smgJguOH22BiLAcBstIAsYZT3ChlIGA5MWoGPQAAcLXNCzb+skkAAAAASUVORK5CYII=",
+      "duration_ms": 120,
+      "name": "walk0"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABs0lEQVR4nGNgGOmAkRaGSgnJ/Iexn717gtcOFlpY/GCfDlxMwYnhPz6HMFLTcmSL0YGC0xUGbA5hpLXlp449QOGH1XxBcQQLqRahi+GNY61NDGFOSgyrWnhwKmEhxWKeuBhMuUVL8AY9IcBCrsUwAJLTWcDAcCXhAlkOYMRnOT6LcQFcDvl24A6crdX0Ax51TNS0HAR0FhiQpJ6JVMtVbKzgmBqOYCFGUV5BCsO2M9ewOsbLRIth0oQ5BM0ABTu2nMNIyPcgy2EA3REgy5Hl7hw5hpEecBVAMMCEz9XIlqNbiMzGxgcBkOUgi/GVFYz4fA8LYmJDAARAoTBPbQPOko+kEEA2GFsawCaHbDkIgEpBbCUoQQeoIKVyZAvQgxpZrupVGVaz8DmCiYEEALMcW3yTC5hItRwXn1zASEqdTgxAr34JJUQmBioDMysFoi0HAao2ydAdASsH8KllISYIaQmY6GrbYHQACyEFH069wCouYCZBlDwhwIgugF5izfL7glVjkUAGmO77MAOrfNomHoIJEAQwQgBZE74y/MuiJRCGH8PQTgOMhBTgCgVYSBGSH/QAAMlXx5niFK8tAAAAAElFTkSuQmCC",
+      "duration_ms": 120,
+      "name": "walk1"
+    },
+    {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABE0lEQVR4nO2XoQ7CMBCGe5dJFJIgEMgJNEHxHITwaITwHCgygUJMIiYIEoWHVLA05a696xZGMn6z7tbe/+2Sdjdj/vqrY0HqwtFw/PRjt/tVnQ9STQfr1cfzx26vhgGNOWXKycJIIEBibK8acxfCKgQCMfMUYwqEg4Am5tPFvB5fjkUSRBZcFTFNhXGFmrfnzCXzbD5q62Lb5loIlCbjyhqKS6BRY+6bSeIxCEjZdlxFQpXidgRKzKh7bVxcgeqQkxPz7cyUm3PjuNVkWdYVAClAm3IB0HQs7Bog8wOnoupXBbD3AKDp+zQfJP9E5PpFCCWhjmYJBGWu7ogkPWGsCWncE/5EV2w8iPf46/8FIRitqasXXYCqbM8+Z6sAAAAASUVORK5CYII=",
+      "duration_ms": 120,
+      "name": "shell"
+    }
+  ],
+  "anims": [
+    {
+      "name": "walk",
+      "first": 0,
+      "last": 1,
+      "fps": 5
+    },
+    {
+      "name": "shell",
+      "first": 2,
+      "last": 2,
+      "fps": 1
+    }
+  ]
+}

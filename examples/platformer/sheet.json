@@ -1,109 +1,109 @@
 {
   "image": "sheet.png",
   "sprites": {
-    "hero_idle": [
+    "player_idle": [
       0,
       0,
       32,
       32
     ],
-    "hero_run0": [
+    "player_run0": [
       32,
       0,
       32,
       32
     ],
-    "hero_run1": [
+    "player_run1": [
       64,
       0,
       32,
       32
     ],
-    "hero_run2": [
+    "player_run2": [
       96,
       0,
       32,
       32
     ],
-    "hero_jump": [
+    "player_jump": [
       128,
       0,
       32,
       32
     ],
-    "hero_skid": [
+    "player_skid": [
       160,
       0,
       32,
       32
     ],
-    "hero_duck": [
+    "player_duck": [
       192,
       0,
       32,
       32
     ],
-    "hero_dead": [
+    "player_dead": [
       224,
       0,
       32,
       32
     ],
-    "goomba_walk0": [
+    "walker_walk0": [
       256,
       0,
       32,
       32
     ],
-    "goomba_walk1": [
+    "walker_walk1": [
       288,
       0,
       32,
       32
     ],
-    "goomba_squash": [
+    "walker_squash": [
       0,
       32,
       32,
       32
     ],
-    "koopa_walk0": [
+    "guard_walk0": [
       32,
       32,
       32,
       32
     ],
-    "koopa_walk1": [
+    "guard_walk1": [
       64,
       32,
       32,
       32
     ],
-    "koopa_shell": [
+    "guard_shell": [
       96,
       32,
       32,
       32
     ],
-    "piranha_open": [
+    "snapper_open": [
       128,
       32,
       32,
       32
     ],
-    "piranha_closed": [
+    "snapper_closed": [
       160,
       32,
       32,
       32
     ],
-    "para_fly0": [
+    "glider_fly0": [
       192,
       32,
       32,
       32
     ],
-    "para_fly1": [
+    "glider_fly1": [
       224,
       32,
       32,
@@ -133,19 +133,19 @@
       32,
       32
     ],
-    "qblock_q0": [
+    "itembox_q0": [
       64,
       64,
       32,
       32
     ],
-    "qblock_q1": [
+    "itembox_q1": [
       96,
       64,
       32,
       32
     ],
-    "qblock_q2": [
+    "itembox_q2": [
       128,
       64,
       32,
@@ -175,7 +175,7 @@
       32,
       32
     ],
-    "qused": [
+    "itembox_used": [
       288,
       64,
       32,
@@ -187,25 +187,25 @@
       32,
       32
     ],
-    "pipe_tl": [
+    "tube_tl": [
       32,
       96,
       32,
       32
     ],
-    "pipe_tr": [
+    "tube_tr": [
       64,
       96,
       32,
       32
     ],
-    "pipe_bl": [
+    "tube_bl": [
       96,
       96,
       32,
       32
     ],
-    "pipe_br": [
+    "tube_br": [
       128,
       96,
       32,
@@ -217,25 +217,25 @@
       32,
       32
     ],
-    "mushroom": [
+    "grow": [
       192,
       96,
       32,
       32
     ],
-    "fireflower": [
+    "bolt": [
       224,
       96,
       32,
       32
     ],
-    "star": [
+    "shard": [
       256,
       96,
       32,
       32
     ],
-    "oneup": [
+    "life": [
       288,
       96,
       32,
