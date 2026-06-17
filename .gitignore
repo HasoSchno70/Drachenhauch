@@ -49,3 +49,6 @@ installer/output/
 installer/GameBasic.ico
 !installer/GameBasic.spec
 installer/THIRD-PARTY-NOTICES.txt
+
+# Rust build output
+target/
