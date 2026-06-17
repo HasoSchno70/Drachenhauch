@@ -20,7 +20,7 @@ dependencies = []
 # entfernt. Die optionalen Editoren (Code/Sprite/Tilemap/SFX/Tracker) sind
 # PySide6-basiert; die SFX-/Tracker-Audio-Vorschau nutzt sounddevice + soundfile.
 editors = ["PySide6>=6.5", "Pillow>=10", "numpy>=1.24", "sounddevice>=0.4", "soundfile>=0.12"]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "mypy>=1.8"]
 # Hardware-Module (jeweils separat installierbar via `pip install gamebasic[serial]`)
 serial = ["pyserial>=3.5"]
 usb = ["hidapi>=0.14"]
@@ -38,3 +38,14 @@ gbrun = "gamebasic.__main__:main"
 [tool.setuptools.packages.find]
 include = ["gamebasic*"]
 exclude = ["tests*", "examples*"]
+
+[tool.mypy]
+# Statische Typpruefung fuer den Qt-freien Kern (Interpreter, Runtime,
+# Sprache sowie die Tracker-/Synth-/Tilemap-Modelle). Die PySide6-Editoren
+# (*_qt.py, editor_qt/, spriteeditor/) sind ausgeklammert: die Qt-Stubs sind
+# unvollstaendig und wuerden nur Rauschen erzeugen. Scope spaeter erweiterbar.
+python_version = "3.10"
+ignore_missing_imports = true
+follow_imports = "silent"
+exclude = '(_qt\.py$|/editor_qt/|/spriteeditor/)'
+files = ["gamebasic"]

@@ -641,9 +641,10 @@ class Parser:
             # Enum-Typ: vom Parser zu INTEGER aufgeloest, damit Interpreter
             # und VM keinen besonderen Typ-Mechanismus brauchen. Member-Werte
             # sind sowieso Integer.
-            if type_tok.value.lower() in self._enum_names:
+            type_name = str(type_tok.value)
+            if type_name.lower() in self._enum_names:
                 return "integer"
-            return type_tok.value
+            return type_name
         raise ParseError(
             "Erwartet Typ (INTEGER, FLOAT, STRING, BOOLEAN, IMAGE, SOUND, "
             "FILE, ARRAY OF ..., MAP OF ..., oder Klassenname)",
@@ -1118,7 +1119,7 @@ class Parser:
         # Hat KEINEN expliziten AS-Type (immer TUPLE) und KEINEN Default.
         if self._match(TokenType.ELLIPSIS):
             name_tok = self._expect(TokenType.IDENT, "Erwartet Variadic-Parametername nach '...'")
-            return Param(name_tok.value, "tuple", default=None, by_ref=False, is_variadic=True)
+            return Param(str(name_tok.value), "tuple", default=None, by_ref=False, is_variadic=True)
         # Optionales BYREF vor dem Namen -> Parameter wird per Referenz
         # uebergeben (Caller-Variable wird modifiziert nach SUB/FUNCTION-
         # Return). Nur fuer einfache zuweisbare Argumente erlaubt.
@@ -1134,7 +1135,7 @@ class Parser:
                     name_tok.line, name_tok.col,
                 )
             default = self._expression()
-        return Param(name_tok.value, type_name, default, by_ref=by_ref)
+        return Param(str(name_tok.value), type_name, default, by_ref=by_ref)
 
     def _sub_decl(self):
         sub_tok = self._expect(TokenType.SUB)

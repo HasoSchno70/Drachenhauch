@@ -15,7 +15,7 @@ try:
     from PIL import Image
     _PIL_AVAILABLE = True
 except ImportError:  # pragma: no cover
-    Image = None
+    Image = None  # type: ignore[assignment]
     _PIL_AVAILABLE = False
 
 

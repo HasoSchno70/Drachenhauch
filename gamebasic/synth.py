@@ -72,7 +72,7 @@ def _mono(wf: str, base_freq: float, slide: float, n: int, na: int, nd: int,
         elif wf == "square":
             # Pulsbreite: ph mod 1 < duty. duty=0.5 == sign(sin) (alt).
             frac = ph - np.floor(ph)
-            duty_t = float(duty)
+            duty_t: float | np.ndarray = float(duty)
             if pwm_depth > 0 and pwm_speed > 0:
                 duty_t = duty + pwm_depth * np.sin(2.0 * np.pi * pwm_speed * t)
             duty_t = np.clip(duty_t, 0.05, 0.95)

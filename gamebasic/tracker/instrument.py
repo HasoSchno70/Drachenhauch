@@ -221,6 +221,7 @@ class Instrument:
             out = _render_synth(self, midi, n_samples, sr, slide)
         else:
             lm = self.loop_mode if self.has_loop() else "none"
+            assert self.samples is not None  # is_sample() => Samples vorhanden
             out = _resample(self.samples, self.sample_rate, self.base_note,
                             midi, n_samples, sr,
                             lm, int(self.loop_start), int(self.loop_end),

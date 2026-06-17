@@ -222,7 +222,9 @@ class TileMapDoc:
         # Mehrere Tilesets (sortiert nach firstgid, erstes firstgid=1).
         self.tilesets: list[Tileset] = []
         self.active_tileset = 0
-        self.layers: list[TileLayer] = [TileLayer("Boden", self.width, self.height)]
+        self.layers: list[TileLayer | ObjectLayer] = [
+            TileLayer("Boden", self.width, self.height)
+        ]
         self.path = ""                 # zuletzt gespeicherter Map-Pfad
         self.dirty = False
 
@@ -430,6 +432,8 @@ class TileMapDoc:
     def flood_fill(self, layer_idx: int, x: int, y: int, gid: int) -> int:
         """Bucket-Fill der 4-verbundenen Region. Liefert Anzahl Tiles."""
         layer = self.layers[layer_idx]
+        if not isinstance(layer, TileLayer):
+            return 0  # Flood-Fill nur auf Tile-Layern
         if x < 0 or y < 0 or x >= layer.width or y >= layer.height:
             return 0
         target = layer.get(x, y)
