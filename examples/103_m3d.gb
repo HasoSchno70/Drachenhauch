@@ -15,7 +15,7 @@ SCREEN(800, 480, "m3d -- hierarchische Transforms", 1)
 
 LIGHT_ENABLE()
 LIGHT_AMBIENT(&H202830, 0.4)
-LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFAA7F)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFFFFF)
 
 ' Ein einziges Wuerfel-Mesh, das wir mehrfach mit verschiedenen Matrizen malen.
 DIM box AS INTEGER
