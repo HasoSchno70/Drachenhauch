@@ -1,82 +1,69 @@
 ' ======================================================================
-'  SCHWARM  -  Schwarmverhalten von Voegeln / Fischen (Boids), 2D & 3D
+'  SCHWARM  -  Boids in echtem 3D (native g3d-Pipeline + CAMERA_ORBIT)
 ' ----------------------------------------------------------------------
-'  Drei Schwaerme (Arten) ziehen als eigene Gruppen umher. Jeder Vogel
-'  folgt drei einfachen Regeln gegenueber Nachbarn der GLEICHEN Art
+'  Drei Schwaerme (Arten) fliegen ueber einer Boden-Ebene (X-Z). Jeder
+'  Vogel folgt drei einfachen Regeln gegenueber Nachbarn der GLEICHEN Art
 '  (Craig Reynolds 1986):
 '     1. SEPARATION  - nicht zu nah ans Nachbartier   (gegen ALLE Arten)
 '     2. ALIGNMENT   - dieselbe Richtung wie die Nachbarn
 '     3. COHESION    - zur Mitte des eigenen Schwarms
 '
-'  Die Simulation laeuft IMMER in 3D (x, y, z). Mit TAB blendet die
-'  Kamera weich zwischen Aufsicht (2D) und Perspektive (3D):
-'     2D  -> z ist auf eine Ebene gesperrt. Die harte Kollision haelt
-'            die Koerper auseinander: nichts darf sich ueberlappen.
-'     3D  -> z ist frei. Die Tiere weichen sich auch in der Tiefe aus,
-'            koennen sich also im Bild ueberlappen (vorne/hinten).
+'  Gezeichnet wird mit der nativen 3D-Pipeline: jeder Boid ist eine Kugel
+'  mit Schweif, die Tiefe macht der z-Buffer (kein Sortieren von Hand).
+'  Die Kamera ist eine eingebaute Orbit-Kamera (CAMERA_ORBIT), der Maus-
+'  Cursor wird per MOUSE_GROUND auf die Boden-Ebene projiziert.
+'
+'     2D  -> die Tiere sind auf die Boden-Ebene (Y=0) gesperrt, Kamera von
+'            oben. Die harte Kollision haelt sie auseinander.
+'     3D  -> Y ist frei, die Tiere steigen/tauchen und ueberlappen sich
+'            im Bild (vorne/hinten) - die Kamera kreist schraeg.
 '
 '  STEUERUNG
-'     Maus HALTEN  -> der ganze Schwarm stuerzt zum Mauszeiger
-'     LOSLASSEN    -> jede Art findet zurueck zu IHREM Schwarm
-'     TAB          -> 2D / 3D umschalten
-'     B            -> Kollisions-Koerper (Modell-Footprint) zeigen
-'     F            -> Vollbild an/aus
-'     ESC          -> Ende
+'     Linke Maus HALTEN  -> Schwarm stuerzt zum Cursor (auf dem Boden)
+'     RECHTE Maus ziehen  -> Kamera drehen (Umlauf + Neigung)
+'     Scrollen            -> Zoom (Kamera-Abstand)
+'     TAB                 -> 2D / 3D umschalten
+'     F                   -> Vollbild    ESC = Ende
 ' ======================================================================
 
-' --- Welt (3D-Box) -----------------------------------------------------
-CONST W AS INTEGER = 1280
-CONST H AS INTEGER = 720
-CONST WX AS FLOAT = 1280.0
-CONST WY AS FLOAT = 720.0
-CONST WZ AS FLOAT = 760.0          ' Tiefe der Welt
-CONST ZC AS FLOAT = 380.0          ' Mittelebene (WZ/2) = 2D-Ebene
+IMPORT "g3d"
 
-CONST NUM AS INTEGER = 150         ' Anzahl Tiere insgesamt
-CONST SWARMS AS INTEGER = 3        ' Anzahl getrennter Schwaerme
+' --- Welt (Weltkoordinaten: X rechts, Y oben, Z Tiefe) -----------------
+CONST HF AS FLOAT = 20.0           ' halbe Feld-Ausdehnung (X und Z)
+CONST HV AS FLOAT = 9.0            ' halbe Hoehe (Y) im 3D-Modus
 
-' --- Kamera / Projektion ----------------------------------------------
-CONST FOCAL AS FLOAT = 720.0       ' Brennweite (Perspektive)
+CONST NUM AS INTEGER = 150
+CONST SWARMS AS INTEGER = 3
 
-' --- Flug-Parameter (Pixel/Sekunde) -----------------------------------
-CONST MAXS AS FLOAT = 168.0        ' Hoechstgeschwindigkeit
-CONST MINS AS FLOAT = 62.0         ' Mindesttempo
-CONST MAXF AS FLOAT = 250.0        ' max. Lenkkraft
+' --- Flug-Parameter (Welteinheiten/Sekunde) ----------------------------
+CONST MAXS AS FLOAT = 5.5
+CONST MINS AS FLOAT = 2.0
+CONST MAXF AS FLOAT = 8.0
 
-CONST PERCEPT AS FLOAT = 74.0      ' Sichtweite zu Nachbarn
-CONST SEP_DIST AS FLOAT = 34.0     ' weiche Ausweich-Distanz (ALLE Arten)
+CONST PERCEPT AS FLOAT = 2.4
+CONST SEP_DIST AS FLOAT = 1.1
+CONST PSQ AS FLOAT = 5.76          ' PERCEPT^2
+CONST SSQ AS FLOAT = 1.21          ' SEP_DIST^2
 
 CONST W_SEP AS FLOAT = 1.8
 CONST W_ALI AS FLOAT = 1.0
 CONST W_COH AS FLOAT = 0.9
-CONST W_HOME AS FLOAT = 0.45
-CONST W_HOME_Z AS FLOAT = 0.22     ' Tiefen-Bindung schwaecher -> Schwarm fuellt die Tiefe
+CONST W_HOME AS FLOAT = 0.45       ' Bindung an Heimat in X/Z
+CONST W_HOME_Y AS FLOAT = 0.22     ' Bindung in der Hoehe (schwaecher)
 CONST W_MOUSE AS FLOAT = 3.4
 
-CONST PSQ AS FLOAT = 5476.0        ' PERCEPT^2
-CONST SSQ AS FLOAT = 1156.0        ' SEP_DIST^2
-CONST MARG AS FLOAT = 14.0
-
-' --- Harte Kollision (Festkoerper) ------------------------------------
-CONST BODY_R AS FLOAT = 11.0       ' Radius des festen Koerpers (= halbe Modellgroesse)
+CONST BODY_R AS FLOAT = 0.42       ' Kollisions-Radius (Festkoerper)
 CONST COLL_PASSES AS INTEGER = 2
+CONST BSIZE AS FLOAT = 0.32        ' Kugel-Radius beim Zeichnen
 
 ' ======================================================================
-'  Wiederverwendbare 3D-Kollisions-Routine
-' ----------------------------------------------------------------------
-'  Behandelt jeden Agenten als Kugel mit Radius `r`. Pro ueberlappendem
-'  Paar: (1) Positionen entlang der Verbindungsachse auseinanderschieben,
-'  (2) Annaeherungs-Geschwindigkeit aufheben (gleiche Masse, plastisch).
-'  Generisch ueber p*/v*-Arrays -- fuer Voegel, Fische ODER ein Gefaehrt.
-'  Fuer reines 2D (z.B. Bodenfahrzeug) einfach alle pz/vz = 0 uebergeben,
-'  dann reduziert sich alles exakt auf die Ebene.
+'  Wiederverwendbare 3D-Kollisions-Routine (Kugeln, gleiche Masse)
 ' ======================================================================
 SUB ResolveCollisions(px AS ARRAY OF FLOAT, py AS ARRAY OF FLOAT, pz AS ARRAY OF FLOAT, vx AS ARRAY OF FLOAT, vy AS ARRAY OF FLOAT, vz AS ARRAY OF FLOAT, n AS INTEGER, r AS FLOAT, passes AS INTEGER)
     DIM minD AS FLOAT
     DIM minD2 AS FLOAT
     minD = r * 2.0
     minD2 = minD * minD
-
     DIM pass AS INTEGER
     DIM ci AS INTEGER
     DIM cj AS INTEGER
@@ -90,7 +77,6 @@ SUB ResolveCollisions(px AS ARRAY OF FLOAT, py AS ARRAY OF FLOAT, pz AS ARRAY OF
     DIM nz AS FLOAT
     DIM ov AS FLOAT
     DIM rvn AS FLOAT
-
     FOR pass = 0 TO passes - 1
         FOR ci = 0 TO n - 2
             FOR cj = ci + 1 TO n - 1
@@ -99,33 +85,19 @@ SUB ResolveCollisions(px AS ARRAY OF FLOAT, py AS ARRAY OF FLOAT, pz AS ARRAY OF
                 dz = pz[cj] - pz[ci]
                 dist2 = dx * dx + dy * dy + dz * dz
                 IF dist2 < minD2 THEN
-                    IF dist2 > 0.0001 THEN
+                    IF dist2 > 0.000001 THEN
                         dist = SQR(dist2)
-                        nx = dx / dist
-                        ny = dy / dist
-                        nz = dz / dist
+                        nx = dx / dist : ny = dy / dist : nz = dz / dist
                     ELSE
-                        dist = 0.0
-                        nx = 1.0
-                        ny = 0.0
-                        nz = 0.0
+                        dist = 0.0 : nx = 1.0 : ny = 0.0 : nz = 0.0
                     END IF
                     ov = (minD - dist) * 0.5
-                    px[ci] = px[ci] - nx * ov
-                    py[ci] = py[ci] - ny * ov
-                    pz[ci] = pz[ci] - nz * ov
-                    px[cj] = px[cj] + nx * ov
-                    py[cj] = py[cj] + ny * ov
-                    pz[cj] = pz[cj] + nz * ov
-
+                    px[ci] = px[ci] - nx * ov : py[ci] = py[ci] - ny * ov : pz[ci] = pz[ci] - nz * ov
+                    px[cj] = px[cj] + nx * ov : py[cj] = py[cj] + ny * ov : pz[cj] = pz[cj] + nz * ov
                     rvn = (vx[cj] - vx[ci]) * nx + (vy[cj] - vy[ci]) * ny + (vz[cj] - vz[ci]) * nz
                     IF rvn < 0.0 THEN
-                        vx[ci] = vx[ci] + nx * rvn * 0.5
-                        vy[ci] = vy[ci] + ny * rvn * 0.5
-                        vz[ci] = vz[ci] + nz * rvn * 0.5
-                        vx[cj] = vx[cj] - nx * rvn * 0.5
-                        vy[cj] = vy[cj] - ny * rvn * 0.5
-                        vz[cj] = vz[cj] - nz * rvn * 0.5
+                        vx[ci] = vx[ci] + nx * rvn * 0.5 : vy[ci] = vy[ci] + ny * rvn * 0.5 : vz[ci] = vz[ci] + nz * rvn * 0.5
+                        vx[cj] = vx[cj] - nx * rvn * 0.5 : vy[cj] = vy[cj] - ny * rvn * 0.5 : vz[cj] = vz[cj] - nz * rvn * 0.5
                     END IF
                 END IF
             NEXT
@@ -136,7 +108,7 @@ END SUB
 ' ======================================================================
 '  Setup
 ' ======================================================================
-SCREEN(W, H, "Schwarm - Boids 2D/3D", 1)
+SCREEN(1280, 720, "Schwarm 3D - CAMERA_ORBIT", 1)
 SET_FULLSCREEN(TRUE)
 MOUSE_VISIBLE(TRUE)
 RANDOMIZE(MILLIS())
@@ -145,37 +117,28 @@ DIM isFull AS BOOLEAN
 isFull = TRUE
 DIM fPrev AS BOOLEAN
 fPrev = FALSE
-DIM bPrev AS BOOLEAN
-bPrev = FALSE
 DIM tPrev AS BOOLEAN
 tPrev = FALSE
 
-DIM showBodies AS BOOLEAN
-showBodies = FALSE
-
-' Ansicht: mode3D = Zielmodus, camBlend = weicher Kamera-Uebergang 0..1
+' Ansicht 2D/3D
 DIM mode3D AS BOOLEAN
 mode3D = FALSE
-DIM camBlend AS FLOAT
-camBlend = 0.0
-DIM locked2D AS BOOLEAN
 
-' --- Frei bewegliche Orbit-Kamera (nur in 3D sichtbar) -----------------
-'   Mausrad GEDRUECKT + ziehen = drehen (Yaw/Pitch), Scrollen = Zoom.
+' Orbit-Kamera (Grad)
 DIM yaw AS FLOAT
 DIM pitch AS FLOAT
-DIM camDist AS FLOAT
+DIM camRadius AS FLOAT
 yaw = 0.0
-pitch = 0.50                        ' deutlich von oben -> Tiefe sofort sichtbar
-camDist = 1050.0
+pitch = 89.0                       ' Start: von oben (2D-Aufsicht)
+camRadius = 50.0
 DIM pmx AS INTEGER
 DIM pmy AS INTEGER
 pmx = 0
 pmy = 0
-DIM rmbPrev AS BOOLEAN              ' war die rechte Maustaste im Vorframe gedrueckt?
+DIM rmbPrev AS BOOLEAN
 rmbPrev = FALSE
 
-' --- Tiere als parallele Arrays ----------------------------------------
+' --- Tiere -------------------------------------------------------------
 DIM bx[150] AS FLOAT
 DIM by[150] AS FLOAT
 DIM bz[150] AS FLOAT
@@ -183,11 +146,6 @@ DIM bvx[150] AS FLOAT
 DIM bvy[150] AS FLOAT
 DIM bvz[150] AS FLOAT
 DIM bs[150] AS INTEGER
-DIM ordr[150] AS INTEGER             ' Zeichen-Reihenfolge (Tiefensortierung)
-DIM prX[150] AS FLOAT                ' projizierte Bildschirm-X
-DIM prY[150] AS FLOAT                ' projizierte Bildschirm-Y
-DIM prS[150] AS FLOAT               ' Perspektiv-Skala (Groesse)
-DIM prD[150] AS FLOAT               ' Kamera-Tiefe (fuer Sortierung)
 
 ' --- Farben pro Schwarm ------------------------------------------------
 DIM colDim[3] AS INTEGER
@@ -197,16 +155,13 @@ baseCol[0] = RGB(255, 120, 50)
 baseCol[1] = RGB(70, 200, 235)
 baseCol[2] = RGB(190, 120, 255)
 
-DIM FOG_COL AS INTEGER
-FOG_COL = RGB(20, 30, 60)           ' Tiefen-Dunst (= Hintergrund)
-
 DIM s AS INTEGER
 FOR s = 0 TO SWARMS - 1
-    colDim[s] = COLOR_LERP(RGB(12, 16, 30), baseCol[s], 0.55)
+    colDim[s] = COLOR_LERP(RGB(20, 26, 40), baseCol[s], 0.55)
     colHi[s]  = COLOR_LERP(baseCol[s], RGB(255, 255, 255), 0.30)
 NEXT
 
-' --- Schwarm-Heimatpunkte (driften in x/y, feste Tiefe) ----------------
+' --- Schwarm-Heimatpunkte (driften in X/Z, in 3D auch in Y) ------------
 DIM homeX[3] AS FLOAT
 DIM homeY[3] AS FLOAT
 DIM homeZ[3] AS FLOAT
@@ -214,26 +169,26 @@ DIM homeVX[3] AS FLOAT
 DIM homeVY[3] AS FLOAT
 DIM homeVZ[3] AS FLOAT
 FOR s = 0 TO SWARMS - 1
-    homeX[s] = (s + 0.5) * WX / SWARMS
-    homeY[s] = WY * 0.5
-    homeZ[s] = WZ * (0.28 + 0.44 * s / (SWARMS - 1))   ' Start-Tiefe je Schwarm
-    homeVX[s] = (RND(2) * 2 - 1) * (30.0 + RND(20))
-    homeVY[s] = (RND(2) * 2 - 1) * (20.0 + RND(15))
-    homeVZ[s] = (RND(2) * 2 - 1) * (35.0 + RND(25))    ' Schwarm reist durch die Tiefe
+    homeX[s] = (s - 1) * (HF * 0.6)
+    homeY[s] = 0.0
+    homeZ[s] = (RND(2) * 2 - 1) * (HF * 0.3)
+    homeVX[s] = (RND(2) * 2 - 1) * (1.2 + RND(10) * 0.1)
+    homeVZ[s] = (RND(2) * 2 - 1) * (1.0 + RND(10) * 0.1)
+    homeVY[s] = (RND(2) * 2 - 1) * (1.0 + RND(8) * 0.1)
 NEXT
 
 ' --- Tiere verteilen ---------------------------------------------------
 DIM i AS INTEGER
 FOR i = 0 TO NUM - 1
     bs[i]  = i MOD SWARMS
-    bx[i]  = homeX[bs[i]] + RND(160) - 80.0
-    by[i]  = homeY[bs[i]] + RND(160) - 80.0
-    bz[i]  = ZC                       ' Start in 2D auf der Mittelebene
+    bx[i]  = homeX[bs[i]] + RANDF(-3.0, 3.0)
+    by[i]  = 0.0
+    bz[i]  = homeZ[bs[i]] + RANDF(-3.0, 3.0)
     DIM a0 AS FLOAT
     a0 = RND(628) / 100.0
     bvx[i] = COS(a0) * MAXS
-    bvy[i] = SIN(a0) * MAXS
-    bvz[i] = 0.0
+    bvz[i] = SIN(a0) * MAXS
+    bvy[i] = 0.0
 NEXT
 
 ' --- Arbeitsvariablen --------------------------------------------------
@@ -269,8 +224,8 @@ DIM my AS INTEGER
 DIM held AS BOOLEAN
 DIM curMaxF AS FLOAT
 DIM tgx AS FLOAT
-DIM tgy AS FLOAT
 DIM tgz AS FLOAT
+DIM haveTarget AS BOOLEAN
 DIM last_ms AS INTEGER
 DIM now_ms AS INTEGER
 DIM dt_s AS FLOAT
@@ -284,7 +239,7 @@ WHILE NOT QUITREQUESTED()
         BREAK
     END IF
 
-    ' --- Tasten mit Flankenerkennung ---
+    ' --- Vollbild (Flanke) ---
     DIM fNow AS BOOLEAN
     fNow = KEYPRESSED(KEY_F)
     IF fNow AND NOT fPrev THEN
@@ -293,33 +248,22 @@ WHILE NOT QUITREQUESTED()
     END IF
     fPrev = fNow
 
-    DIM bNow AS BOOLEAN
-    bNow = KEYPRESSED(KEY_B)
-    IF bNow AND NOT bPrev THEN
-        showBodies = NOT showBodies
-    END IF
-    bPrev = bNow
-
+    ' --- 2D/3D umschalten (Flanke) ---
     DIM tNow AS BOOLEAN
     tNow = KEYPRESSED(KEY_TAB)
     IF tNow AND NOT tPrev THEN
         mode3D = NOT mode3D
         IF mode3D THEN
-            ' beim Wechsel nach 3D in die Tiefe streuen
+            pitch = 30.0                 ' schraeg -> Tiefe sichtbar
             FOR i = 0 TO NUM - 1
-                bz[i] = homeZ[bs[i]] + RANDF(-150.0, 150.0)
-                bvz[i] = RANDF(-60.0, 60.0)
+                by[i] = RANDF(-HV * 0.7, HV * 0.7)
+                bvy[i] = RANDF(-2.0, 2.0)
             NEXT
+        ELSE
+            pitch = 89.0                 ' von oben -> 2D-Aufsicht
         END IF
     END IF
     tPrev = tNow
-
-    ' --- Kamera-Uebergang weich nachfuehren ---
-    DIM camTarget AS FLOAT
-    camTarget = 0.0
-    IF mode3D THEN
-        camTarget = 1.0
-    END IF
 
     ' --- Zeitschritt ---
     now_ms = MILLIS()
@@ -331,28 +275,17 @@ WHILE NOT QUITREQUESTED()
     END IF
     dt_s = dms / 1000.0
 
-    camBlend = camBlend + (camTarget - camBlend) * CLAMP01(dt_s * 4.0)
-    IF camBlend < 0.0008 THEN
-        camBlend = 0.0
-    END IF
-    locked2D = (NOT mode3D) AND (camBlend < 0.02)
-
     ' --- Maus lesen ---
     mx = MOUSEX()
     my = MOUSEY()
     held = MOUSEBUTTON(0)
     curMaxF = MAXF
     IF held THEN
-        curMaxF = 720.0
+        curMaxF = 23.0
     END IF
 
-    ' --- Kamera steuern: RECHTE Maustaste halten + ziehen = drehen ---
-    ' (in der raylib-Runtime ist MOUSEBUTTON(1) die rechte Taste)
-    ' Robust gegen das "manchmal fehlerhaft"-Springen:
-    '   1. erst ab dem ZWEITEN gehaltenen Frame drehen (Press-Frame hat ein
-    '      veraltetes pmx/pmy -> sonst ein Ruck beim Anfassen)
-    '   2. das Pro-Frame-Delta kappen -> ein einzelner langsamer Frame oder
-    '      Koordinaten-Ausreisser reisst die Kamera nicht mehr herum
+    ' --- Kamera drehen: RECHTE Maustaste ziehen (raylib: Button 1) ---
+    '  Press-Frame ueberspringen + Delta kappen -> kein Springen.
     DIM rmb AS BOOLEAN
     rmb = MOUSEBUTTON(1)
     IF rmb AND rmbPrev THEN
@@ -360,93 +293,60 @@ WHILE NOT QUITREQUESTED()
         DIM ddy AS FLOAT
         ddx = CLAMP(mx - pmx, -55.0, 55.0)
         ddy = CLAMP(my - pmy, -55.0, 55.0)
-        yaw = yaw + ddx * 0.006
-        pitch = pitch - ddy * 0.006
-        pitch = CLAMP(pitch, -1.35, 1.35)
+        yaw = yaw + ddx * 0.3
+        pitch = CLAMP(pitch - ddy * 0.3, 6.0, 89.5)
     END IF
     rmbPrev = rmb
     pmx = mx
     pmy = my
-    ' Scrollrad = Zoom (Kameraabstand)
+
+    ' --- Scroll = Zoom ---
     DIM wheel AS INTEGER
     wheel = MOUSEWHEEL()
     IF wheel <> 0 THEN
-        camDist = CLAMP(camDist - wheel * 70.0, 520.0, 2400.0)
+        camRadius = CLAMP(camRadius - wheel * 4.0, 22.0, 95.0)
     END IF
 
-    ' Kamera-Trigonometrie fuer diesen Frame
-    DIM cyaw AS FLOAT
-    DIM syaw AS FLOAT
-    DIM cpit AS FLOAT
-    DIM spit AS FLOAT
-    cyaw = COS(yaw)
-    syaw = SIN(yaw)
-    cpit = COS(pitch)
-    spit = SIN(pitch)
+    ' --- Kamera setzen (Ziel = Feldmitte) ---
+    CAMERA_ORBIT(0.0, 0.0, 0.0, camRadius, yaw, pitch)
 
-    ' --- Weltziel des Cursors: Strahl durch den Cursor am Pivot-Abstand --
-    '  ROBUST fuer JEDE Kameraorientierung. Ein Schnitt mit der Mittel-
-    '  ebene geht bei gedrehter Kamera "edge-on" (Nenner -> 0, Ziel
-    '  schiesst ins Unendliche -> Schwarm fliegt davon). Stattdessen: den
-    '  Cursor in den Kameraraum am Abstand camDist setzen (Strahl, kein
-    '  Ebenenschnitt) und zurueck in Weltkoordinaten drehen -- trifft den
-    '  Cursor exakt, ohne jede Division durch eine kleine Determinante.
-    '  In 2D wird auf (Cursor = Weltkoordinate) zurueckgeblendet.
-    DIM uu AS FLOAT
-    DIM vv AS FLOAT
-    DIM ccx AS FLOAT
-    DIM ccy AS FLOAT
-    DIM rz1 AS FLOAT
-    DIM rxr AS FLOAT
-    DIM ryr AS FLOAT
-    DIM rzr AS FLOAT
-    DIM tg3x AS FLOAT
-    DIM tg3y AS FLOAT
-    DIM tg3z AS FLOAT
-    uu = mx - W * 0.5
-    vv = my - H * 0.5
-    ccx = uu / FOCAL * camDist          ' Kameraraum am Pivot-Abstand (cz=0)
-    ccy = vv / FOCAL * camDist
-    ' Kameraraum -> Welt: erst Pitch, dann Yaw zurueckdrehen
-    ryr = ccy * cpit
-    rz1 = -ccy * spit
-    rxr = ccx * cyaw - rz1 * syaw
-    rzr = ccx * syaw + rz1 * cyaw
-    tg3x = WX * 0.5 + rxr
-    tg3y = WY * 0.5 + ryr
-    tg3z = CLAMP(ZC + rzr, 0.0, WZ)
-    tgx = mx + (tg3x - mx) * camBlend
-    tgy = my + (tg3y - my) * camBlend
-    tgz = ZC + (tg3z - ZC) * camBlend
+    ' --- Cursor auf die Boden-Ebene (Y=0) projizieren ---
+    haveTarget = FALSE
+    IF held THEN
+        IF MOUSE_GROUND_HIT(0.0) THEN
+            tgx = MOUSE_GROUND_X(0.0)
+            tgz = MOUSE_GROUND_Z(0.0)
+            haveTarget = TRUE
+        END IF
+    END IF
 
     ' --- Heimatpunkte driften lassen ---
     FOR s = 0 TO SWARMS - 1
         homeX[s] = homeX[s] + homeVX[s] * dt_s
-        homeY[s] = homeY[s] + homeVY[s] * dt_s
-        IF homeX[s] < 180.0 OR homeX[s] > WX - 180.0 THEN
+        homeZ[s] = homeZ[s] + homeVZ[s] * dt_s
+        IF homeX[s] < -(HF - 3.0) OR homeX[s] > (HF - 3.0) THEN
             homeVX[s] = -homeVX[s]
-            homeX[s] = CLAMP(homeX[s], 180.0, WX - 180.0)
+            homeX[s] = CLAMP(homeX[s], -(HF - 3.0), HF - 3.0)
         END IF
-        IF homeY[s] < 150.0 OR homeY[s] > WY - 150.0 THEN
-            homeVY[s] = -homeVY[s]
-            homeY[s] = CLAMP(homeY[s], 150.0, WY - 150.0)
+        IF homeZ[s] < -(HF - 3.0) OR homeZ[s] > (HF - 3.0) THEN
+            homeVZ[s] = -homeVZ[s]
+            homeZ[s] = CLAMP(homeZ[s], -(HF - 3.0), HF - 3.0)
         END IF
-        ' Tiefe nur in 3D bewegen (in 2D ist z ohnehin eingefroren)
         IF mode3D THEN
-            homeZ[s] = homeZ[s] + homeVZ[s] * dt_s
-            IF homeZ[s] < 130.0 OR homeZ[s] > WZ - 130.0 THEN
-                homeVZ[s] = -homeVZ[s]
-                homeZ[s] = CLAMP(homeZ[s], 130.0, WZ - 130.0)
+            homeY[s] = homeY[s] + homeVY[s] * dt_s
+            IF homeY[s] < -(HV - 2.0) OR homeY[s] > (HV - 2.0) THEN
+                homeVY[s] = -homeVY[s]
+                homeY[s] = CLAMP(homeY[s], -(HV - 2.0), HV - 2.0)
             END IF
         END IF
     NEXT
 
     ' ==================================================================
-    '  Boids aktualisieren (immer in 3D gerechnet)
+    '  Boids aktualisieren (immer in 3D gerechnet; in 2D ist Y gesperrt)
     ' ==================================================================
     FOR i = 0 TO NUM - 1
-        IF locked2D THEN
-            bz[i] = ZC : bvz[i] = 0.0        ' in reinem 2D Tiefe einfrieren
+        IF NOT mode3D THEN
+            by[i] = 0.0 : bvy[i] = 0.0
         END IF
 
         cnt = 0
@@ -454,15 +354,13 @@ WHILE NOT QUITREQUESTED()
         sumpx = 0.0 : sumpy = 0.0 : sumpz = 0.0
         sepx = 0.0  : sepy = 0.0  : sepz = 0.0
 
-        ' Nachbarn absuchen: Alignment/Cohesion = eigene Art,
-        ' Separation = ALLE Arten (Ausweichen vor jedem).
         FOR j = 0 TO NUM - 1
             IF j <> i THEN
                 dx = bx[j] - bx[i]
                 dy = by[j] - by[i]
                 dz = bz[j] - bz[i]
                 d2 = dx * dx + dy * dy + dz * dz
-                IF d2 < PSQ AND d2 > 0.0001 THEN
+                IF d2 < PSQ AND d2 > 0.000001 THEN
                     IF bs[j] = bs[i] THEN
                         cnt = cnt + 1
                         sumvx = sumvx + bvx[j]
@@ -485,50 +383,39 @@ WHILE NOT QUITREQUESTED()
         ax = 0.0 : ay = 0.0 : az = 0.0
 
         IF cnt > 0 THEN
-            ' ALIGNMENT
-            sumvx = sumvx / cnt
-            sumvy = sumvy / cnt
-            sumvz = sumvz / cnt
+            sumvx = sumvx / cnt : sumvy = sumvy / cnt : sumvz = sumvz / cnt
             ax = ax + (sumvx - bvx[i]) * W_ALI
             ay = ay + (sumvy - bvy[i]) * W_ALI
             az = az + (sumvz - bvz[i]) * W_ALI
 
-            ' COHESION
             cdx = sumpx / cnt - bx[i]
             cdy = sumpy / cnt - by[i]
             cdz = sumpz / cnt - bz[i]
             cl = SQR(cdx * cdx + cdy * cdy + cdz * cdz)
-            IF cl > 0.001 THEN
-                cdx = cdx / cl * MAXS
-                cdy = cdy / cl * MAXS
-                cdz = cdz / cl * MAXS
+            IF cl > 0.0001 THEN
+                cdx = cdx / cl * MAXS : cdy = cdy / cl * MAXS : cdz = cdz / cl * MAXS
                 ax = ax + (cdx - bvx[i]) * W_COH
                 ay = ay + (cdy - bvy[i]) * W_COH
                 az = az + (cdz - bvz[i]) * W_COH
             END IF
         END IF
 
-        ' SEPARATION (auf Tempo normiert)
         cl = SQR(sepx * sepx + sepy * sepy + sepz * sepz)
-        IF cl > 0.001 THEN
-            sepx = sepx / cl * MAXS
-            sepy = sepy / cl * MAXS
-            sepz = sepz / cl * MAXS
+        IF cl > 0.0001 THEN
+            sepx = sepx / cl * MAXS : sepy = sepy / cl * MAXS : sepz = sepz / cl * MAXS
             ax = ax + (sepx - bvx[i]) * W_SEP
             ay = ay + (sepy - bvy[i]) * W_SEP
             az = az + (sepz - bvz[i]) * W_SEP
         END IF
 
-        ' ZIEL: Maus (gehalten) ODER Heimat des eigenen Schwarms
-        IF held THEN
+        ' ZIEL: Cursor auf dem Boden (gehalten) ODER Heimat
+        IF held AND haveTarget THEN
             cdx = tgx - bx[i]
-            cdy = tgy - by[i]
+            cdy = 0.0 - by[i]
             cdz = tgz - bz[i]
             cl = SQR(cdx * cdx + cdy * cdy + cdz * cdz)
-            IF cl > 0.001 THEN
-                cdx = cdx / cl * MAXS
-                cdy = cdy / cl * MAXS
-                cdz = cdz / cl * MAXS
+            IF cl > 0.0001 THEN
+                cdx = cdx / cl * MAXS : cdy = cdy / cl * MAXS : cdz = cdz / cl * MAXS
                 ax = ax + (cdx - bvx[i]) * W_MOUSE
                 ay = ay + (cdy - bvy[i]) * W_MOUSE
                 az = az + (cdz - bvz[i]) * W_MOUSE
@@ -538,13 +425,11 @@ WHILE NOT QUITREQUESTED()
             cdy = homeY[bs[i]] - by[i]
             cdz = homeZ[bs[i]] - bz[i]
             cl = SQR(cdx * cdx + cdy * cdy + cdz * cdz)
-            IF cl > 0.001 THEN
-                cdx = cdx / cl * MAXS
-                cdy = cdy / cl * MAXS
-                cdz = cdz / cl * MAXS
+            IF cl > 0.0001 THEN
+                cdx = cdx / cl * MAXS : cdy = cdy / cl * MAXS : cdz = cdz / cl * MAXS
                 ax = ax + (cdx - bvx[i]) * W_HOME
-                ay = ay + (cdy - bvy[i]) * W_HOME
-                az = az + (cdz - bvz[i]) * W_HOME_Z
+                ay = ay + (cdy - bvy[i]) * W_HOME_Y
+                az = az + (cdz - bvz[i]) * W_HOME
             END IF
         END IF
 
@@ -555,14 +440,13 @@ WHILE NOT QUITREQUESTED()
             ax = ax * sc : ay = ay * sc : az = az * sc
         END IF
 
-        ' Geschwindigkeit integrieren
         bvx[i] = bvx[i] + ax * dt_s
-        bvy[i] = bvy[i] + ay * dt_s
-        IF NOT locked2D THEN
-            bvz[i] = bvz[i] + az * dt_s
+        bvz[i] = bvz[i] + az * dt_s
+        IF mode3D THEN
+            bvy[i] = bvy[i] + ay * dt_s
         END IF
 
-        ' Tempo begrenzen (3D-Betrag)
+        ' Tempo begrenzen
         sp2 = bvx[i] * bvx[i] + bvy[i] * bvy[i] + bvz[i] * bvz[i]
         IF sp2 > MAXS * MAXS THEN
             sc = MAXS / SQR(sp2)
@@ -572,196 +456,82 @@ WHILE NOT QUITREQUESTED()
             bvx[i] = bvx[i] * sc : bvy[i] = bvy[i] * sc : bvz[i] = bvz[i] * sc
         END IF
 
-        ' Position integrieren
         bx[i] = bx[i] + bvx[i] * dt_s
-        by[i] = by[i] + bvy[i] * dt_s
+        bz[i] = bz[i] + bvz[i] * dt_s
         IF mode3D THEN
-            bz[i] = bz[i] + bvz[i] * dt_s
-        ELSEIF NOT locked2D THEN
-            ' Uebergang nach 2D: sanft auf die Ebene sinken
-            bz[i] = bz[i] + (ZC - bz[i]) * CLAMP01(dt_s * 6.0)
-            bvz[i] = bvz[i] * 0.85
-        END IF
-
-        ' Tiefe in der Box halten (an z-Waenden abprallen)
-        IF bz[i] < 0.0 THEN
-            bz[i] = 0.0 : bvz[i] = -bvz[i]
-        ELSEIF bz[i] > WZ THEN
-            bz[i] = WZ : bvz[i] = -bvz[i]
+            by[i] = by[i] + bvy[i] * dt_s
+            IF by[i] < -HV THEN
+                by[i] = -HV : bvy[i] = -bvy[i]
+            ELSEIF by[i] > HV THEN
+                by[i] = HV : bvy[i] = -bvy[i]
+            END IF
         END IF
     NEXT
 
-    ' --- Harte Kollision: kein Koerper durchdringt einen anderen ---
+    ' --- Harte Kollision ---
     ResolveCollisions(bx, by, bz, bvx, bvy, bvz, NUM, BODY_R, COLL_PASSES)
 
-    ' --- Wrap-around in x/y ---
+    ' --- Wrap-around im X-Z-Feld ---
     FOR i = 0 TO NUM - 1
-        IF bx[i] < -MARG THEN
-            bx[i] = WX + MARG
-        ELSEIF bx[i] > WX + MARG THEN
-            bx[i] = -MARG
+        IF bx[i] < -HF THEN
+            bx[i] = HF
+        ELSEIF bx[i] > HF THEN
+            bx[i] = -HF
         END IF
-        IF by[i] < -MARG THEN
-            by[i] = WY + MARG
-        ELSEIF by[i] > WY + MARG THEN
-            by[i] = -MARG
+        IF bz[i] < -HF THEN
+            bz[i] = HF
+        ELSEIF bz[i] > HF THEN
+            bz[i] = -HF
         END IF
-    NEXT
-
-    ' --- Projektion durch die gedrehte Orbit-Kamera --------------------
-    '   Weltpunkt um den Box-Mittelpunkt drehen (Yaw, dann Pitch),
-    '   perspektivisch projizieren und weich aus der 2D-Aufsicht blenden.
-    DIM rx AS FLOAT
-    DIM ry AS FLOAT
-    DIM rz AS FLOAT
-    DIM x1 AS FLOAT
-    DIM z1 AS FLOAT
-    DIM x2 AS FLOAT
-    DIM y2 AS FLOAT
-    DIM z2 AS FLOAT
-    DIM dep AS FLOAT
-    DIM pscl AS FLOAT
-    DIM pscreenx AS FLOAT
-    DIM pscreeny AS FLOAT
-    FOR i = 0 TO NUM - 1
-        rx = bx[i] - WX * 0.5
-        ry = by[i] - WY * 0.5
-        rz = bz[i] - ZC
-        ' Yaw um die senkrechte Achse
-        x1 = rx * cyaw + rz * syaw
-        z1 = -rx * syaw + rz * cyaw
-        ' Pitch um die waagerechte Achse
-        x2 = x1
-        y2 = ry * cpit - z1 * spit
-        z2 = ry * spit + z1 * cpit
-        dep = z2 + camDist
-        IF dep < 60.0 THEN
-            dep = 60.0
-        END IF
-        pscl = FOCAL / dep
-        pscreenx = W * 0.5 + x2 * pscl
-        pscreeny = H * 0.5 + y2 * pscl
-        ' Blend 2D (Aufsicht) <-> 3D (Perspektive)
-        prX[i] = bx[i] + (pscreenx - bx[i]) * camBlend
-        prY[i] = by[i] + (pscreeny - by[i]) * camBlend
-        prS[i] = 1.0 + (pscl - 1.0) * camBlend
-        prD[i] = z2
-    NEXT
-
-    ' --- Tiefensortierung (hinten -> vorne) per Insertionsort ----------
-    FOR i = 0 TO NUM - 1
-        ordr[i] = i
-    NEXT
-    DIM si AS INTEGER
-    DIM sj AS INTEGER
-    DIM okey AS INTEGER
-    DIM kz AS FLOAT
-    FOR si = 1 TO NUM - 1
-        okey = ordr[si]
-        kz = prD[okey]
-        sj = si - 1
-        WHILE sj >= 0 AND prD[ordr[sj]] < kz
-            ordr[sj + 1] = ordr[sj]
-            sj = sj - 1
-        WEND
-        ordr[sj + 1] = okey
     NEXT
 
     ' ==================================================================
-    '  Zeichnen
+    '  Zeichnen (native 3D-Pipeline)
     ' ==================================================================
-    CLS(RGB(6, 10, 26))
+    CLS(RGB(10, 14, 28))
 
-    DIM bnd AS INTEGER
-    DIM by0 AS INTEGER
-    DIM by1 AS INTEGER
-    FOR bnd = 0 TO 39
-        by0 = bnd * H \ 40
-        by1 = (bnd + 1) * H \ 40
-        BOX(0, by0, W - 1, by1, COLOR_LERP(RGB(7, 11, 28), RGB(20, 30, 60), bnd / 39.0))
-    NEXT
+    GRID3D(40, 1.0)                  ' Boden-Raster zur Orientierung
 
-    ' Zielring am Mauszeiger
-    IF held THEN
-        DIM pr AS FLOAT
-        pr = 30.0 + SIN(now_ms / 120.0) * 9.0
-        ELLIPSEOUTLINE(mx - pr, my - pr, mx + pr, my + pr, RGB(255, 255, 255), 2)
-        ELLIPSEOUTLINE(mx - pr * 0.5, my - pr * 0.5, mx + pr * 0.5, my + pr * 0.5, RGB(180, 210, 255), 1)
-        CIRCLE(mx, my, 3, RGB(255, 255, 255))
+    ' Ziel-Marker auf dem Boden
+    IF held AND haveTarget THEN
+        POINT3D(tgx, 0.0, tgz, RGB(255, 255, 255))
+        LINE3D(tgx, 0.0, tgz, tgx, 2.0, tgz, RGB(255, 255, 255))
     END IF
 
-    ' Tiere (in Tiefenreihenfolge)
-    DIM k AS INTEGER
-    DIM idx AS INTEGER
-    DIM escl AS FLOAT
-    DIM sx AS FLOAT
-    DIM sy AS FLOAT
-    DIM ang AS FLOAT
-    DIM ca AS FLOAT
-    DIM sa AS FLOAT
-    DIM fsz AS FLOAT
-    DIM fog AS FLOAT
-    DIM tcol AS INTEGER
+    ' Tiere
     DIM tr AS FLOAT
-    DIM nx AS FLOAT
-    DIM ny AS FLOAT
-    DIM blx AS FLOAT
-    DIM bly AS FLOAT
-    DIM brx AS FLOAT
-    DIM bry AS FLOAT
-    FOR k = 0 TO NUM - 1
-        idx = ordr[k]
-
-        ' Vorberechnete Projektion der Orbit-Kamera nutzen
-        escl = prS[idx]
-        sx = prX[idx]
-        sy = prY[idx]
-        fsz = 9.0 * escl
-
-        sp = HYPOT(bvx[idx], bvy[idx])
-        IF sp > 0.001 THEN
-            ang = ATAN2(bvy[idx], bvx[idx])
-        ELSE
-            ang = 0.0
-        END IF
-        ca = COS(ang)
-        sa = SIN(ang)
-
-        ' Farbe nach Tempo, dann Tiefen-Dunst (nur in 3D sichtbar)
+    DIM tcol AS INTEGER
+    DIM inv AS FLOAT
+    DIM tlx AS FLOAT
+    DIM tly AS FLOAT
+    DIM tlz AS FLOAT
+    FOR i = 0 TO NUM - 1
+        sp = SQR(bvx[i] * bvx[i] + bvy[i] * bvy[i] + bvz[i] * bvz[i])
         tr = CLAMP01((sp - MINS) / (MAXS - MINS))
-        tcol = COLOR_LERP(colDim[bs[idx]], colHi[bs[idx]], tr)
-        fog = CLAMP01(0.5 + prD[idx] / WZ) * camBlend
-        tcol = COLOR_LERP(tcol, FOG_COL, fog * 0.7)
+        tcol = COLOR_LERP(colDim[bs[i]], colHi[bs[i]], tr)
 
-        IF showBodies THEN
-            ELLIPSEOUTLINE(sx - BODY_R * escl, sy - BODY_R * escl, sx + BODY_R * escl, sy + BODY_R * escl, colDim[bs[idx]], 1)
+        ' Bewegungs-Schweif entgegen der Flugrichtung
+        IF sp > 0.0001 THEN
+            inv = 1.0 / sp
+            tlx = bx[i] - bvx[i] * inv * 1.1
+            tly = by[i] - bvy[i] * inv * 1.1
+            tlz = bz[i] - bvz[i] * inv * 1.1
+            LINE3D(bx[i], by[i], bz[i], tlx, tly, tlz, colDim[bs[i]])
         END IF
 
-        ' Bewegungs-Schweif
-        LINE(sx, sy, sx - ca * fsz * 1.9, sy - sa * fsz * 1.9, COLOR_LERP(colDim[bs[idx]], FOG_COL, fog * 0.7))
-
-        ' Koerper als gerichtetes Dreieck (Spitze = Flugrichtung)
-        nx = sx + ca * fsz
-        ny = sy + sa * fsz
-        blx = sx - ca * fsz * 0.7 - sa * fsz * 0.55
-        bly = sy - sa * fsz * 0.7 + ca * fsz * 0.55
-        brx = sx - ca * fsz * 0.7 + sa * fsz * 0.55
-        bry = sy - sa * fsz * 0.7 - ca * fsz * 0.55
-        TRIANGLE(nx, ny, blx, bly, brx, bry, tcol)
+        SPHERE(bx[i], by[i], bz[i], BSIZE, tcol)
     NEXT
 
-    ' HUD
+    ' --- 2D-HUD ueber der Szene ---
     DIM modeLbl AS STRING
     IF mode3D THEN
-        modeLbl = "Ansicht: 3D (Tiefe frei - Schwaerme duerfen sich ueberlappen)"
+        modeLbl = "Ansicht: 3D (Y frei - Schwaerme duerfen sich ueberlappen)"
     ELSE
-        modeLbl = "Ansicht: 2D (eine Ebene - keine Ueberlappung)"
+        modeLbl = "Ansicht: 2D (Boden-Ebene - keine Ueberlappung)"
     END IF
     TEXT(18, 16, modeLbl, RGB(210, 225, 255))
-    TEXT(18, 36, "Linke Maus HALTEN = folgen    TAB = 2D/3D    B = Koerper    F = Vollbild    ESC = Ende", RGB(140, 165, 205))
-    IF camBlend > 0.05 THEN
-        TEXT(18, 56, "Kamera: RECHTE Maustaste halten + ziehen = drehen    Scrollen = Zoom", RGB(150, 200, 170))
-    END IF
+    TEXT(18, 36, "Linke Maus = folgen   RECHTE Maus = drehen   Scrollen = Zoom   TAB = 2D/3D   F = Vollbild   ESC", RGB(140, 165, 205))
 
     FLIP()
+    SLEEP(16)
 WEND
