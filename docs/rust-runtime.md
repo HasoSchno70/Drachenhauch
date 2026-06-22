@@ -682,10 +682,37 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
   - `RAY_HIT_BOX(ox,oy,oz, dx,dy,dz, cx,cy,cz, sx,sy,sz)` — AABB (Mittelpunkt c,
     Vollgröße s) via `GetRayCollisionBox`.
   - `RAY_HIT_SPHERE(ox,oy,oz, dx,dy,dz, cx,cy,cz, r)` via `GetRayCollisionSphere`.
+  - `RAY_HIT_MODEL(modell, ox,oy,oz, dx,dy,dz, px,py,pz[, scale])` via
+    `GetRayCollisionMesh` über **alle Meshes** des bei `(px,py,pz)` mit
+    `scale` platzierten Modells (Default `scale=1`). Distanz zum nächsten
+    Treffer oder `-1`. So lassen sich auch geladene Meshes (`LOADMODEL`) und
+    Prozedural-Modelle (`MESH_*`) picken, nicht nur Box/Sphere-Proxys.
 - **Maus-Picking** (Strahl vom Cursor durch die aktuelle 3D-Kamera,
   `GetScreenToWorldRay` + Treffertest): `PICK_BOX(cx,cy,cz, sx,sy,sz)`,
-  `PICK_SPHERE(cx,cy,cz, r)` — ideal für Klick-Selektion. Nächstes Objekt =
-  kleinste nicht-negative Distanz.
+  `PICK_SPHERE(cx,cy,cz, r)`, `PICK_MODEL(modell, px,py,pz[, scale])` — ideal
+  für Klick-Selektion. Nächstes Objekt = kleinste nicht-negative Distanz.
+- **Projektion in beide Richtungen** (durch die aktuelle 3D-Kamera):
+  `WORLD_TO_SCREEN_X(wx,wy,wz)` / `WORLD_TO_SCREEN_Y(wx,wy,wz)` projizieren einen
+  3D-Weltpunkt auf Bildschirm-Pixel (z.B. ein 2D-Label über ein 3D-Objekt
+  setzen). Umgekehrt liefert `SCREEN_TO_WORLD_DIR_X/Y/Z(sx,sy)` die **Richtung**
+  des Strahls durch einen Screen-Punkt; der **Ursprung** des Strahls ist die
+  Kameraposition (`CAMERA3D_X/Y/Z`). Damit baut man eigene Treffertests, z.B.
+  zusammen mit `RAY_HIT_MODEL`.
+
+```basic
+' Selbst-gebautes Maus-Picking eines Modells:
+DIM ox AS FLOAT
+DIM oy AS FLOAT
+DIM oz AS FLOAT
+ox = CAMERA3D_X() : oy = CAMERA3D_Y() : oz = CAMERA3D_Z()
+DIM dist AS FLOAT
+dist = RAY_HIT_MODEL(held, ox, oy, oz, _
+        SCREEN_TO_WORLD_DIR_X(MOUSEX(), MOUSEY()), _
+        SCREEN_TO_WORLD_DIR_Y(MOUSEX(), MOUSEY()), _
+        SCREEN_TO_WORLD_DIR_Z(MOUSEX(), MOUSEY()), 0.0, 0.0, 0.0)
+IF dist >= 0.0 THEN PRINT "getroffen bei ", dist
+' (oder einfacher: PICK_MODEL(held, 0.0, 0.0, 0.0))
+```
 - **Cursor auf die Boden-Ebene projizieren** (Strahl vom Cursor → waagerechte
   Ebene bei Welt-Y `ebene_y`): `MOUSE_GROUND_X(ebene_y)` und
   `MOUSE_GROUND_Z(ebene_y)` liefern die Welt-X/Z des Treffpunkts,

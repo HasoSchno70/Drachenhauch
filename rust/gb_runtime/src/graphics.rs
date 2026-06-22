@@ -1387,6 +1387,53 @@ impl Graphics {
         self.ray_hit_sphere(r.position.x, r.position.y, r.position.z,
                             r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, radius)
     }
+    /// 3D-Weltpunkt -> Bildschirm-Pixel (durch die aktuelle 3D-Kamera).
+    pub fn world_to_screen(&self, wx: f32, wy: f32, wz: f32) -> (f32, f32) {
+        let v = self.rl.get_world_to_screen(Vector3::new(wx, wy, wz), self.cam3d);
+        (v.x, v.y)
+    }
+    /// Strahl-RICHTUNG vom Screen-Punkt durch die 3D-Kamera. Der Ursprung des
+    /// Strahls ist die Kameraposition (CAMERA3D_X/Y/Z).
+    pub fn screen_ray_dir(&self, sx: f32, sy: f32) -> (f32, f32, f32) {
+        let r = self.rl.get_screen_to_world_ray(Vector2::new(sx, sy), self.cam3d);
+        (r.direction.x, r.direction.y, r.direction.z)
+    }
+    /// Raycast gegen ein geladenes Modell (alle Meshes), platziert bei
+    /// (px,py,pz) mit uniformer Skalierung `scale`. Liefert die Distanz zum
+    /// naechsten Treffer oder -1 bei Verfehlen.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ray_hit_model(&self, idx: i64, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
+                         px: f32, py: f32, pz: f32, scale: f32) -> f64 {
+        if idx < 0 || idx as usize >= self.models.len() { return -1.0; }
+        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        // Gleiche Transform-Reihenfolge wie DrawModel: erst skalieren, dann verschieben.
+        let transform = Matrix::scale(scale, scale, scale) * Matrix::translate(px, py, pz);
+        let mut best = -1.0f64;
+        for mesh in self.models[idx as usize].meshes() {
+            // WeakMesh und Mesh sind beide #[repr(transparent)] ueber ffi::Mesh.
+            let m: &Mesh = unsafe { std::mem::transmute::<&WeakMesh, &Mesh>(mesh) };
+            let rc = get_ray_collision_model(ray, m, &transform);
+            if rc.hit {
+                let d = rc.distance as f64;
+                if best < 0.0 || d < best { best = d; }
+            }
+        }
+        best
+    }
+    /// Wie ray_hit_model, aber mit dem Mausstrahl (analog PICK_BOX/PICK_SPHERE).
+    pub fn pick_model(&self, idx: i64, px: f32, py: f32, pz: f32, scale: f32) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_model(idx, r.position.x, r.position.y, r.position.z,
+                           r.direction.x, r.direction.y, r.direction.z, px, py, pz, scale)
+    }
+    /// Pixelfarbe eines geladenen Bildes lesen -> 0xRRGGBB, -1 wenn ungueltig.
+    pub fn get_pixel(&mut self, idx: i64, x: i32, y: i32) -> i64 {
+        if idx < 0 || idx as usize >= self.textures.len() { return -1; }
+        let img = &mut self.textures[idx as usize].img;
+        if x < 0 || y < 0 || x >= img.width || y >= img.height { return -1; }
+        let c = img.get_color(x, y);
+        ((c.r as i64) << 16) | ((c.g as i64) << 8) | (c.b as i64)
+    }
 
     // --- Beleuchtung (Blinn-Phong via rlights-Shader) ---
     /// Laedt den Lighting-Shader (einmal) und aktiviert die Beleuchtung. Die

@@ -196,8 +196,11 @@ melden. (Gilt analog für `STEP`, `MOD`, …)
   neu in der Runtime — ersetzt die manuelle Orbit-Kugelkoordinaten-Trigonometrie
   (Pitch gegen Gimbal-Flip geklemmt, fovy optional). Math per `CAMERA3D_X/Y/Z`
   exakt verifiziert.
+- **3D-Projektion + Mesh-Picking + GETPIXEL ergänzt** (Rest des 3D-Backlogs):
+  `WORLD_TO_SCREEN_X/Y` (3D→2D) und `SCREEN_TO_WORLD_DIR_X/Y/Z` (Strahl-Richtung,
+  Ursprung = Kamera) für allgemeine Projektion; `RAY_HIT_MODEL` + `PICK_MODEL`
+  (Raycast/Picking gegen geladene Meshes, nicht nur Box/Sphere); `GETPIXEL`
+  (Pixel lesen — `PIXEL` war nur ein `PLOT`-Alias). Alle vier exakt verifiziert
+  (Würfel-Raycast → Distanz 4.0; Projektion Ursprung → Bildmitte; Gradient-Pixel).
 
-> **Offene 3D-Ergonomie-Punkte** (gefunden, noch nicht umgesetzt): kein
-> allgemeines `WORLD_TO_SCREEN`/`SCREEN_TO_WORLD` (nur Boden-Ebene via
-> `MOUSE_GROUND_*`); kein `RAY_HIT_MODEL` (Raycast nur gegen Box/Sphere, nicht
-> gegen geladene Meshes); kein `GETPIXEL` (`PIXEL` ist nur ein `PLOT`-Alias).
+> Damit ist der gefundene Grafik-Ergonomie-Backlog (2D wie 3D) abgearbeitet.

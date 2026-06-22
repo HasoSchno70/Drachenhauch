@@ -3691,6 +3691,29 @@ impl<'p> Vm<'p> {
             "pick_sphere" => Value::Float(g!().pick_sphere(
                 need_f(a,0,"PICK_SPHERE")? as f32, need_f(a,1,"PICK_SPHERE")? as f32, need_f(a,2,"PICK_SPHERE")? as f32,
                 need_f(a,3,"PICK_SPHERE")? as f32)),
+            "ray_hit_model" => {
+                let scale = if a.len() >= 11 { need_f(a,10,"RAY_HIT_MODEL")? as f32 } else { 1.0 };
+                Value::Float(g!().ray_hit_model(gi(a,0,"RAY_HIT_MODEL")?,
+                    need_f(a,1,"RAY_HIT_MODEL")? as f32, need_f(a,2,"RAY_HIT_MODEL")? as f32, need_f(a,3,"RAY_HIT_MODEL")? as f32,
+                    need_f(a,4,"RAY_HIT_MODEL")? as f32, need_f(a,5,"RAY_HIT_MODEL")? as f32, need_f(a,6,"RAY_HIT_MODEL")? as f32,
+                    need_f(a,7,"RAY_HIT_MODEL")? as f32, need_f(a,8,"RAY_HIT_MODEL")? as f32, need_f(a,9,"RAY_HIT_MODEL")? as f32, scale))
+            }
+            "pick_model" => {
+                let scale = if a.len() >= 5 { need_f(a,4,"PICK_MODEL")? as f32 } else { 1.0 };
+                Value::Float(g!().pick_model(gi(a,0,"PICK_MODEL")?,
+                    need_f(a,1,"PICK_MODEL")? as f32, need_f(a,2,"PICK_MODEL")? as f32, need_f(a,3,"PICK_MODEL")? as f32, scale))
+            }
+            "world_to_screen_x" => Value::Float(g!().world_to_screen(
+                need_f(a,0,"WORLD_TO_SCREEN_X")? as f32, need_f(a,1,"WORLD_TO_SCREEN_X")? as f32, need_f(a,2,"WORLD_TO_SCREEN_X")? as f32).0 as f64),
+            "world_to_screen_y" => Value::Float(g!().world_to_screen(
+                need_f(a,0,"WORLD_TO_SCREEN_Y")? as f32, need_f(a,1,"WORLD_TO_SCREEN_Y")? as f32, need_f(a,2,"WORLD_TO_SCREEN_Y")? as f32).1 as f64),
+            "screen_to_world_dir_x" => Value::Float(g!().screen_ray_dir(
+                need_f(a,0,"SCREEN_TO_WORLD_DIR_X")? as f32, need_f(a,1,"SCREEN_TO_WORLD_DIR_X")? as f32).0 as f64),
+            "screen_to_world_dir_y" => Value::Float(g!().screen_ray_dir(
+                need_f(a,0,"SCREEN_TO_WORLD_DIR_Y")? as f32, need_f(a,1,"SCREEN_TO_WORLD_DIR_Y")? as f32).1 as f64),
+            "screen_to_world_dir_z" => Value::Float(g!().screen_ray_dir(
+                need_f(a,0,"SCREEN_TO_WORLD_DIR_Z")? as f32, need_f(a,1,"SCREEN_TO_WORLD_DIR_Z")? as f32).2 as f64),
+            "getpixel" => Value::Int(g!().get_pixel(gi(a,0,"GETPIXEL")?, gi(a,1,"GETPIXEL")? as i32, gi(a,2,"GETPIXEL")? as i32)),
             "mouse_ground_x" => Value::Float(g!().mouse_ground(need_f(a,0,"MOUSE_GROUND_X")? as f32).0 as f64),
             "mouse_ground_z" => Value::Float(g!().mouse_ground(need_f(a,0,"MOUSE_GROUND_Z")? as f32).1 as f64),
             "mouse_ground_hit" => Value::Bool(g!().mouse_ground(need_f(a,0,"MOUSE_GROUND_HIT")? as f32).2),
