@@ -535,7 +535,7 @@ WHILE NOT QUITREQUESTED()
     ' ==================================================================
     '  Zeichnen (native 3D-Pipeline)
     ' ==================================================================
-    CLS(RGB(7, 10, 24))
+    CLS(RGB(13, 13, 30))
 
     ' Kamera-Position (fuer Hintergrund-Billboard + Tiefendunst)
     DIM camx AS FLOAT
@@ -545,10 +545,12 @@ WHILE NOT QUITREQUESTED()
 
     ' --- Hintergrund: Verlaufs-Billboard, jeden Frame hinter die Szene ---
     ' (entgegen der Kamerarichtung, weit draussen -> fuellt den Blick,
-    '  liegt dank z-Buffer hinter allem)
+    '  liegt dank z-Buffer hinter allem). NUR bei geneigter Kamera: bei
+    '  fast senkrechter Aufsicht (2D) geht ein DrawBillboard edge-on und
+    '  seine Kante wuerde Boids verschlucken -> dann nur Hintergrundfarbe.
     DIM clen AS FLOAT
     clen = SQR(camx * camx + camy * camy + camz * camz)
-    IF clen > 0.001 THEN
+    IF clen > 0.001 AND pitch < 78.0 THEN
         BILLBOARD(bgTex, -camx / clen * BG_DIST, -camy / clen * BG_DIST, -camz / clen * BG_DIST, BG_SIZE, RGB(255, 255, 255))
     END IF
 
