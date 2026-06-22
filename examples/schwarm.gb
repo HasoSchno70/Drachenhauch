@@ -56,6 +56,11 @@ CONST BODY_R AS FLOAT = 0.42       ' Kollisions-Radius (Festkoerper)
 CONST COLL_PASSES AS INTEGER = 2
 CONST BSIZE AS FLOAT = 0.32        ' Kugel-Radius beim Zeichnen
 
+' --- Hintergrund (Verlaufs-Billboard + Sternenfeld) --------------------
+CONST STARS AS INTEGER = 220
+CONST BG_DIST AS FLOAT = 200.0     ' Abstand des Hintergrund-Billboards vom Zentrum
+CONST BG_SIZE AS FLOAT = 900.0     ' Groesse (fuellt den Blick, auch beim Rauszoomen)
+
 ' ======================================================================
 '  Wiederverwendbare 3D-Kollisions-Routine (Kugeln, gleiche Masse)
 ' ======================================================================
@@ -159,6 +164,42 @@ DIM s AS INTEGER
 FOR s = 0 TO SWARMS - 1
     colDim[s] = COLOR_LERP(RGB(20, 26, 40), baseCol[s], 0.55)
     colHi[s]  = COLOR_LERP(baseCol[s], RGB(255, 255, 255), 0.30)
+NEXT
+
+' --- Hintergrund-Verlauf als Textur (oben violett -> unten dunkelblau) --
+DIM bgTex AS INTEGER
+bgTex = GENTEX_GRADIENT(256, 256, RGB(46, 30, 78), RGB(7, 10, 24), TRUE)
+
+' --- Sternenfeld: zufaellige Punkte auf einer grossen Kugel ------------
+DIM sx[220] AS FLOAT
+DIM sy[220] AS FLOAT
+DIM sz[220] AS FLOAT
+DIM scol[220] AS INTEGER
+DIM st AS INTEGER
+DIM rxx AS FLOAT
+DIM ryy AS FLOAT
+DIM rzz AS FLOAT
+DIM rln AS FLOAT
+DIM rr AS INTEGER
+FOR st = 0 TO STARS - 1
+    rxx = RANDF(-1.0, 1.0)
+    ryy = RANDF(-1.0, 1.0)
+    rzz = RANDF(-1.0, 1.0)
+    rln = SQR(rxx * rxx + ryy * ryy + rzz * rzz)
+    IF rln < 0.001 THEN
+        rln = 1.0
+    END IF
+    sx[st] = rxx / rln * 150.0
+    sy[st] = ryy / rln * 150.0
+    sz[st] = rzz / rln * 150.0
+    rr = RND(10)
+    IF rr < 6 THEN
+        scol[st] = RGB(205 + RND(50), 215 + RND(40), 255)      ' weiss-blau
+    ELSEIF rr < 8 THEN
+        scol[st] = RGB(255, 232 + RND(23), 185 + RND(40))      ' warm
+    ELSE
+        scol[st] = RGB(155 + RND(55), 205 + RND(50), 255)      ' kuehl
+    END IF
 NEXT
 
 ' --- Schwarm-Heimatpunkte (driften in X/Z, in 3D auch in Y) ------------
@@ -494,14 +535,29 @@ WHILE NOT QUITREQUESTED()
     ' ==================================================================
     '  Zeichnen (native 3D-Pipeline)
     ' ==================================================================
-    CLS(RGB(10, 14, 28))
+    CLS(RGB(7, 10, 24))
 
-    ' Tiere -- mit Tiefendunst (fernere Tiere verblassen Richtung Hintergrund,
-    ' ersetzt das Raster als Tiefen-Hinweis). Kamera-Position fuer den Abstand.
+    ' Kamera-Position (fuer Hintergrund-Billboard + Tiefendunst)
     DIM camx AS FLOAT
     DIM camy AS FLOAT
     DIM camz AS FLOAT
     camx = CAMERA3D_X() : camy = CAMERA3D_Y() : camz = CAMERA3D_Z()
+
+    ' --- Hintergrund: Verlaufs-Billboard, jeden Frame hinter die Szene ---
+    ' (entgegen der Kamerarichtung, weit draussen -> fuellt den Blick,
+    '  liegt dank z-Buffer hinter allem)
+    DIM clen AS FLOAT
+    clen = SQR(camx * camx + camy * camy + camz * camz)
+    IF clen > 0.001 THEN
+        BILLBOARD(bgTex, -camx / clen * BG_DIST, -camy / clen * BG_DIST, -camz / clen * BG_DIST, BG_SIZE, RGB(255, 255, 255))
+    END IF
+
+    ' --- Sternenfeld (hinter den Boids, vor dem Verlauf) ---
+    FOR st = 0 TO STARS - 1
+        POINT3D(sx[st], sy[st], sz[st], scol[st])
+    NEXT
+
+    ' Tiere -- mit Tiefendunst (fernere Tiere verblassen Richtung Hintergrund)
     DIM tr AS FLOAT
     DIM tcol AS INTEGER
     DIM inv AS FLOAT
