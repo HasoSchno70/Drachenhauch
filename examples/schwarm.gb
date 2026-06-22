@@ -490,8 +490,6 @@ WHILE NOT QUITREQUESTED()
     ' ==================================================================
     CLS(RGB(10, 14, 28))
 
-    GRID3D(40, 1.0)                  ' Boden-Raster zur Orientierung
-
     ' Ziel-Marker auf dem Boden
     IF held AND haveTarget THEN
         POINT3D(tgx, 0.0, tgz, RGB(255, 255, 255))
