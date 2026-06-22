@@ -192,6 +192,7 @@ FOR i = 0 TO NUM - 1
 NEXT
 
 ' --- Arbeitsvariablen --------------------------------------------------
+
 DIM j AS INTEGER
 DIM dx AS FLOAT
 DIM dy AS FLOAT
@@ -234,18 +235,23 @@ last_ms = MILLIS()
 ' ======================================================================
 '  Hauptschleife
 ' ======================================================================
+
 WHILE NOT QUITREQUESTED()
+    
     IF KEYPRESSED(KEY_ESCAPE) THEN
         BREAK
     END IF
 
     ' --- Vollbild (Flanke) ---
     DIM fNow AS BOOLEAN
+    
     fNow = KEYPRESSED(KEY_F)
+    
     IF fNow AND NOT fPrev THEN
         isFull = NOT isFull
         SET_FULLSCREEN(isFull)
     END IF
+    
     fPrev = fNow
 
     ' --- 2D/3D umschalten (Flanke) ---
