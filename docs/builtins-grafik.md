@@ -50,10 +50,17 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | Funktion | Zweck |
 |---|---|
 | `PLOT(x, y[, color])` | einzelnes Pixel |
-| `LINE(x1, y1, x2, y2[, color])` | Linie |
+| `LINE(x1, y1, x2, y2[, color])` | Linie (1px) |
+| `LINEW(x1, y1, x2, y2, breite[, color])` | Linie mit Strichbreite (Float) |
 | `BOX(x1, y1, x2, y2[, color])` | gefülltes Rechteck |
 | `RECT(x1, y1, x2, y2[, color])` | Rechteck-Rahmen (1px) |
+| `BOXROUND(x1, y1, x2, y2, radius[, color])` | gefülltes Rechteck mit runden Ecken |
+| `RECTROUND(x1, y1, x2, y2, radius[, color])` | Rechteck-Rahmen mit runden Ecken |
+| `GRADIENTV(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **vertikalem** Farbverlauf (oben→unten) |
+| `GRADIENTH(x1, y1, x2, y2, farbe1, farbe2)` | Rechteck mit **horizontalem** Farbverlauf (links→rechts) |
 | `CIRCLE(x, y, r[, color])` | gefüllter Kreis |
+| `CIRCLEOUTLINE(x, y, r[, color])` | Kreis nur als Kontur (Gegenstück zu `CIRCLE`) |
+| `SPLINE(xs, ys[, color[, breite]])` | weiche Catmull-Rom-Kurve durch die Punkte; `xs`/`ys` sind `ARRAY OF INTEGER` gleicher Länge |
 | `TRIANGLE(x1, y1, x2, y2, x3, y3[, color])` | gefülltes Dreieck |
 | `TRIANGLEOUTLINE(x1, y1, x2, y2, x3, y3[, color[, width]])` | Dreieck nur als Kontur |
 | `POLYGON(points[, color])` | gefülltes Polygon — `points` ist ein `ARRAY OF INTEGER` mit `[x1, y1, x2, y2, …]` (mind. 3 Punkte) |
@@ -96,6 +103,27 @@ SLEEP(2000)
 ```
 
 **Hinweis zu BOX/RECT:** beide nehmen `(x1, y1, x2, y2)` als Eckpunkte (inklusive). `BOX(0, 0, 9, 9)` zeichnet 10×10 Pixel.
+
+## Transparenz und Blend-Modi
+
+Farben können einen **Alpha-Kanal** tragen (`&Haarrggbb`, oberstes Byte = Deckkraft):
+
+| Funktion | Zweck |
+|---|---|
+| `RGBA(r, g, b, a)` → INTEGER | Farbe mit Alpha (`a` 0..255, 255 = voll deckend) |
+| `ALPHA(farbe)` → INTEGER | Alpha-Kanal (0..255) aus einer Farbe lesen |
+| `BLEND_MODE(modus$)` | Mischmodus für folgende Draws: `"alpha"` (Standard), `"add"` (additiv – Glow/Licht), `"mult"` (multiplikativ – Schatten/Tönung), `"subtract"` |
+
+`BLEND_MODE` gilt bis zum nächsten Aufruf — nach einem Effekt mit `BLEND_MODE("alpha")` zurückstellen.
+
+```basic
+' Glühende Funken: additiv überlagern -> helle Überlappungen
+BLEND_MODE("add")
+FOR i = 0 TO 20
+    CIRCLE(RND(320), RND(240), 8, RGBA(255, 180, 60, 120))
+NEXT
+BLEND_MODE("alpha")          ' zurück zum Normal-Modus
+```
 
 ## Schrift
 
@@ -380,7 +408,7 @@ PLAYSOUND(coin_snd)
 |---|---|
 | `KEYPRESSED(code)` → BOOLEAN | TRUE solange die Taste mit SDL-Code `code` gehalten wird |
 | `MOUSEX()`, `MOUSEY()` → INTEGER | aktuelle Mausposition (in logischen Pixeln) |
-| `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt (0=links, 1=mitte, 2=rechts) |
+| `MOUSEBUTTON(n)` → BOOLEAN | TRUE wenn Maustaste n gedrückt — **`0`=links, `1`=rechts, `2`=mitte** (raylib-Reihenfolge: rechts vor mitte!) |
 | `MOUSEWHEEL()` → INTEGER | Mausrad-Delta seit dem letzten Aufruf (+ hoch / − runter / 0) |
 | `MOUSE_VISIBLE(an)` | OS-Cursor zeigen/verstecken — verstecken, wenn das Spiel ein eigenes Fadenkreuz/Cursor-Sprite zeichnet |
 | `MOUSE_LOCK(an)` | Cursor **fangen**: verstecken + im Fenster einsperren (relative Bewegung) — für First-Person-/Kamera-Maussteuerung; `FALSE` gibt frei |

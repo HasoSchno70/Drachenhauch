@@ -675,6 +675,24 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
   `GetScreenToWorldRay` + Treffertest): `PICK_BOX(cx,cy,cz, sx,sy,sz)`,
   `PICK_SPHERE(cx,cy,cz, r)` — ideal für Klick-Selektion. Nächstes Objekt =
   kleinste nicht-negative Distanz.
+- **Cursor auf die Boden-Ebene projizieren** (Strahl vom Cursor → waagerechte
+  Ebene bei Welt-Y `ebene_y`): `MOUSE_GROUND_X(ebene_y)` und
+  `MOUSE_GROUND_Z(ebene_y)` liefern die Welt-X/Z des Treffpunkts,
+  `MOUSE_GROUND_HIT(ebene_y)` → BOOLEAN, ob der Strahl die Ebene **vor** der
+  Kamera trifft. Das ist der einfache „Wohin zeigt die Maus in der 3D-Welt?"-
+  Helfer (Einheiten platzieren, Bauen auf dem Grund, Cursor-Marker) — ohne dass
+  man selbst die Strahl-Ebenen-Mathematik aufstellen muss.
+
+```basic
+' Cursor-Marker auf dem Boden (y=0)
+IF MOUSE_GROUND_HIT(0.0) THEN
+    DIM wx AS FLOAT
+    DIM wz AS FLOAT
+    wx = MOUSE_GROUND_X(0.0)
+    wz = MOUSE_GROUND_Z(0.0)
+    MODEL(marker, wx, 0.0, wz, WHITE)
+END IF
+```
 
 `RAY_HIT_*` ist reine Geometrie und deterministisch (verifiziert: Kugel/Box bei
 `(5,0,0)` entlang +X → Distanz `4.0`, senkrechter Strahl → `-1.0`). `PICK_*`

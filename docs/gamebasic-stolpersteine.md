@@ -147,9 +147,20 @@ python rust\build_runtime.py --hardware". Der IMPORT gelingt, die Nutzung nicht.
 **Vorschlag:** entweder im Standard-Build mitliefern, oder schon beim IMPORT
 (statt erst beim ersten Call) warnen.
 
-### E2. `step` ist reserviert
-`FOR … STEP` macht `step` zum Keyword → Variablenname `step` verboten
-(„i"/„tick"/„iter" stattdessen). Klein, nur erwähnenswert.
+### E2. Reservierte Wörter als Variablennamen (über `step` hinaus)
+`FOR … STEP` macht `step` zum Keyword. Genauso reserviert und für Grafik-/
+Spiel-Coder überraschend: **`band`** (= Bitwise-AND `BAND`), sowie die Typ-/
+Operator-Wörter `image`, `sound`, `map`, `mod`. Ein `DIM band AS INTEGER`
+schlägt fehl. Klein, aber die **Fehlermeldung verrät den Grund nicht** (siehe
+E3). **Vorschlag:** im Tutorial/Anhang eine Liste „diese Namen nicht als
+Variable verwenden" führen.
+
+### E3. Irreführende Meldung bei reserviertem DIM-Namen
+`DIM band AS INTEGER` wirft „**Erwartet Variablenname nach DIM**" — sagt aber
+nicht, dass `band` ein reserviertes Wort ist. Der User rätselt, was am Namen
+falsch ist. **Vorschlag:** wenn nach `DIM` ein Keyword-Token kommt, gezielt
+„'band' ist ein reserviertes Wort (Operator BAND) — anderen Namen wählen"
+melden. (Gilt analog für `STEP`, `MOD`, …)
 
 ---
 
@@ -166,3 +177,23 @@ python rust\build_runtime.py --hardware". Der IMPORT gelingt, die Nutzung nicht.
 - **A2** (`NIL`-Literal) + **B1** (irreführender DIM-Typ-Fehler) — gefixt 2026-06-14,
   commit f4c8b78 (Details bei den jeweiligen Abschnitten oben). Buch-Stellen zu „NIL
   ist kein Literal" (Kap 34/69/73 + Anhang D) entsprechend korrigiert.
+- **`MOUSEBUTTON`-Doku falsch**: `builtins-grafik.md` sagte „1=mitte, 2=rechts",
+  die raylib-Runtime mappt aber `0=links, 1=rechts, 2=mitte` (`graphics.rs`
+  `mouse_button`). Stiller Fehlgriff bei jedem Maus-Spiel. **Doku korrigiert.**
+- **`CIRCLEOUTLINE` ergänzt**: `CIRCLE` war nur gefüllt (Inkonsistenz —
+  `TRIANGLE`/`POLYGON`/`ELLIPSE` haben Kontur-Varianten). `CIRCLEOUTLINE(x,y,r
+  [,color])` neu in der Runtime (nutzt die Ellipsen-Kontur, kein eigener Cmd).
+- **C-Stil Hex-/Binär-Literale** `0xFF` / `0b1010` zusätzlich zu `&H`/`&B`
+  (beide Lexer), siehe A1. Falsche `0x`-Doku-Beispiele lauffähig gemacht.
+- **Undokumentierte Grafik-Builtins dokumentiert**: `LINEW` (dicke Linie),
+  `BOXROUND`/`RECTROUND` (runde Ecken), `GRADIENTH`/`GRADIENTV` (Verläufe),
+  `SPLINE`, `BLEND_MODE`, `RGBA`/`ALPHA` (Transparenz) in `builtins-grafik.md`;
+  `MOUSE_GROUND_X/Z/HIT` (Cursor → Boden-Ebene, der „Wohin zeigt die Maus in
+  3D?"-Helfer) in `rust-runtime.md`. Waren in der Runtime vorhanden, aber für
+  den User nicht auffindbar.
+
+> **Offene 3D-Ergonomie-Punkte** (gefunden, noch nicht umgesetzt): kein
+> allgemeines `WORLD_TO_SCREEN`/`SCREEN_TO_WORLD` (nur Boden-Ebene via
+> `MOUSE_GROUND_*`); kein `RAY_HIT_MODEL` (Raycast nur gegen Box/Sphere, nicht
+> gegen geladene Meshes); kein `CAMERA_ORBIT`/`LOOK_AT`-Helfer (Orbit-Kamera =
+> manuelle Trigonometrie); kein `GETPIXEL` (`PIXEL` ist nur ein `PLOT`-Alias).

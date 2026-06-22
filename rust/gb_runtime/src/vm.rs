@@ -3273,6 +3273,10 @@ impl<'p> Vm<'p> {
                 let c = if a.len() == 4 { gi(a, 3, "CIRCLE")? } else { 0xFFFFFF };
                 g!().circle(gi(a,0,"CIRCLE")? as i32, gi(a,1,"CIRCLE")? as i32, gi(a,2,"CIRCLE")? as i32, c); Value::Nil
             }
+            "circleoutline" => {
+                let c = if a.len() >= 4 { gi(a, 3, "CIRCLEOUTLINE")? } else { 0xFFFFFF };
+                g!().circle_outline(gi(a,0,"CIRCLEOUTLINE")? as i32, gi(a,1,"CIRCLEOUTLINE")? as i32, gi(a,2,"CIRCLEOUTLINE")? as i32, c); Value::Nil
+            }
             "linew" => {
                 let c = if a.len() == 6 { gi(a, 5, "LINEW")? } else { 0xFFFFFF };
                 g!().line_thick(gi(a,0,"LINEW")? as i32, gi(a,1,"LINEW")? as i32, gi(a,2,"LINEW")? as i32,

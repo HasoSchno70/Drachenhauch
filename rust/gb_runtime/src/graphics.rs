@@ -1872,6 +1872,9 @@ impl Graphics {
     pub fn box_fill(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64) { let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); self.emit(Cmd::BoxFill(x1, y1, x2, y2, col(c))); }
     pub fn rect(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, c: i64) { let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2); self.emit(Cmd::RectLines(x1, y1, x2, y2, col(c))); }
     pub fn circle(&mut self, x: i32, y: i32, r: i32, c: i64) { let (x, y) = self.w2s(x, y); let r = self.ssize(r); self.emit(Cmd::Circle(x, y, r as f32, col(c))); }
+    /// Kreis-Kontur (Gegenstueck zum gefuellten CIRCLE). Nutzt die Ellipsen-
+    /// Kontur mit gleichen Radien -> kein eigener Cmd noetig.
+    pub fn circle_outline(&mut self, x: i32, y: i32, r: i32, c: i64) { let (x, y) = self.w2s(x, y); let r = self.ssize(r); self.emit(Cmd::Ellipse(x, y, r, r, col(c), false)); }
     // --- 2D-Extras (Batch 1) ---
     #[allow(clippy::too_many_arguments)]
     pub fn line_thick(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, w: f64, c: i64) {
