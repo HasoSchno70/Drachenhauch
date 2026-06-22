@@ -50,6 +50,7 @@ CONST W_SEP AS FLOAT = 1.8
 CONST W_ALI AS FLOAT = 1.0
 CONST W_COH AS FLOAT = 0.9
 CONST W_HOME AS FLOAT = 0.45
+CONST W_HOME_Z AS FLOAT = 0.22     ' Tiefen-Bindung schwaecher -> Schwarm fuellt die Tiefe
 CONST W_MOUSE AS FLOAT = 3.4
 
 CONST PSQ AS FLOAT = 5476.0        ' PERCEPT^2
@@ -165,7 +166,7 @@ DIM yaw AS FLOAT
 DIM pitch AS FLOAT
 DIM camDist AS FLOAT
 yaw = 0.0
-pitch = 0.32                        ' leicht von oben
+pitch = 0.50                        ' deutlich von oben -> Tiefe sofort sichtbar
 camDist = 1050.0
 DIM pmx AS INTEGER
 DIM pmy AS INTEGER
@@ -209,12 +210,14 @@ DIM homeY[3] AS FLOAT
 DIM homeZ[3] AS FLOAT
 DIM homeVX[3] AS FLOAT
 DIM homeVY[3] AS FLOAT
+DIM homeVZ[3] AS FLOAT
 FOR s = 0 TO SWARMS - 1
     homeX[s] = (s + 0.5) * WX / SWARMS
     homeY[s] = WY * 0.5
-    homeZ[s] = WZ * (0.28 + 0.44 * s / (SWARMS - 1))   ' je Schwarm eigene Tiefe
+    homeZ[s] = WZ * (0.28 + 0.44 * s / (SWARMS - 1))   ' Start-Tiefe je Schwarm
     homeVX[s] = (RND(2) * 2 - 1) * (30.0 + RND(20))
     homeVY[s] = (RND(2) * 2 - 1) * (20.0 + RND(15))
+    homeVZ[s] = (RND(2) * 2 - 1) * (35.0 + RND(25))    ' Schwarm reist durch die Tiefe
 NEXT
 
 ' --- Tiere verteilen ---------------------------------------------------
@@ -302,8 +305,8 @@ WHILE NOT QUITREQUESTED()
         IF mode3D THEN
             ' beim Wechsel nach 3D in die Tiefe streuen
             FOR i = 0 TO NUM - 1
-                bz[i] = homeZ[bs[i]] + RANDF(-90.0, 90.0)
-                bvz[i] = RANDF(-45.0, 45.0)
+                bz[i] = homeZ[bs[i]] + RANDF(-150.0, 150.0)
+                bvz[i] = RANDF(-60.0, 60.0)
             NEXT
         END IF
     END IF
@@ -414,6 +417,14 @@ WHILE NOT QUITREQUESTED()
             homeVY[s] = -homeVY[s]
             homeY[s] = CLAMP(homeY[s], 150.0, WY - 150.0)
         END IF
+        ' Tiefe nur in 3D bewegen (in 2D ist z ohnehin eingefroren)
+        IF mode3D THEN
+            homeZ[s] = homeZ[s] + homeVZ[s] * dt_s
+            IF homeZ[s] < 130.0 OR homeZ[s] > WZ - 130.0 THEN
+                homeVZ[s] = -homeVZ[s]
+                homeZ[s] = CLAMP(homeZ[s], 130.0, WZ - 130.0)
+            END IF
+        END IF
     NEXT
 
     ' ==================================================================
@@ -519,7 +530,7 @@ WHILE NOT QUITREQUESTED()
                 cdz = cdz / cl * MAXS
                 ax = ax + (cdx - bvx[i]) * W_HOME
                 ay = ay + (cdy - bvy[i]) * W_HOME
-                az = az + (cdz - bvz[i]) * W_HOME
+                az = az + (cdz - bvz[i]) * W_HOME_Z
             END IF
         END IF
 
