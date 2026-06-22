@@ -155,12 +155,15 @@ schlägt fehl. Klein, aber die **Fehlermeldung verrät den Grund nicht** (siehe
 E3). **Vorschlag:** im Tutorial/Anhang eine Liste „diese Namen nicht als
 Variable verwenden" führen.
 
-### E3. Irreführende Meldung bei reserviertem DIM-Namen
-`DIM band AS INTEGER` wirft „**Erwartet Variablenname nach DIM**" — sagt aber
-nicht, dass `band` ein reserviertes Wort ist. Der User rätselt, was am Namen
-falsch ist. **Vorschlag:** wenn nach `DIM` ein Keyword-Token kommt, gezielt
-„'band' ist ein reserviertes Wort (Operator BAND) — anderen Namen wählen"
-melden. (Gilt analog für `STEP`, `MOD`, …)
+### E3. Irreführende Meldung bei reserviertem DIM-Namen — ✅ BEHOBEN
+> `DIM band` (beide Parser) meldet jetzt: „**'BAND' ist ein reserviertes Wort und
+> kann kein Variablenname sein — waehle einen anderen Namen**" (statt
+> „Erwartet Variablenname nach DIM"). Gilt für jedes Keyword nach `DIM`
+> (`STEP`, `MOD`, `MAP`, `IMAGE`, …). `keyword()` im Rust-Lexer ist dafür
+> `pub(crate)`, der Python-Parser nutzt `KEYWORDS`.
+
+`DIM band AS INTEGER` warf früher „Erwartet Variablenname nach DIM" — sagte aber
+nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 
 ---
 

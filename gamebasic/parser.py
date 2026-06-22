@@ -24,7 +24,7 @@ Praezedenz-Ebene mit Links-Assoziativitaet. Wer C-aehnliche Reihenfolge
 will (BAND < BXOR < BOR), klammert explizit. Das spart 4 Parser-Funktionen
 und macht `IF flags BAND MASK THEN` lesbar genug ohne Klammer-Wirrwarr.
 """
-from .tokens import Token, TokenType
+from .tokens import Token, TokenType, KEYWORDS
 from .errors import ParseError
 from .ast_nodes import (
     NumberLit, StringLit, BoolLit, NilLit, Identifier, BinaryOp, UnaryOp, Call,
@@ -338,6 +338,13 @@ class Parser:
         # nachfolgendes COMMA leitet eine NEUE Variable ein.
         decls: list = []
         while True:
+            nxt = self._peek()
+            if (nxt.type != TokenType.IDENT and isinstance(nxt.value, str)
+                    and nxt.value in KEYWORDS):
+                raise ParseError(
+                    f"'{nxt.value.upper()}' ist ein reserviertes Wort und kann "
+                    f"kein Variablenname sein - waehle einen anderen Namen",
+                    nxt.line, nxt.col)
             name_tok = self._expect(TokenType.IDENT,
                                      "Erwartet Variablenname nach DIM")
             array_dims = None

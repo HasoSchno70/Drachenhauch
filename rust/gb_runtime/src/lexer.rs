@@ -65,7 +65,7 @@ impl Tt {
 }
 
 /// Keyword-Lookup (lowercase) -> Tt. Spiegelt `KEYWORDS` aus tokens.py.
-fn keyword(text: &str) -> Option<Tt> {
+pub(crate) fn keyword(text: &str) -> Option<Tt> {
     use Tt::*;
     Some(match text {
         "dim" => Dim, "as" => As, "integer" => Integer, "float" => Float,

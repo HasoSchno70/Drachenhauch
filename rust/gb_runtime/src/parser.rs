@@ -238,6 +238,21 @@ impl Parser {
         self.expect(Tt::Dim, "")?;
         let mut decls: Vec<(String, Option<Vec<Node>>)> = Vec::new();
         loop {
+            // Hilfreichere Meldung, wenn ein reserviertes Wort als Name kommt
+            // (z.B. DIM band -> band ist der BAND-Operator).
+            let reserved = {
+                let t = self.peek(0);
+                if t.tt != Tt::Ident && t.tt != Tt::Str {
+                    match &t.val {
+                        Val::Str(s) if crate::lexer::keyword(s).is_some() => Some(s.to_uppercase()),
+                        _ => None,
+                    }
+                } else { None }
+            };
+            if let Some(kw) = reserved {
+                return self.err(&format!(
+                    "'{}' ist ein reserviertes Wort und kann kein Variablenname sein - waehle einen anderen Namen", kw));
+            }
             let name = sval(&self.expect(Tt::Ident, "Erwartet Variablenname nach DIM")?);
             let mut array_dims = None;
             if self.matches(Tt::Lbracket) {
