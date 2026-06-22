@@ -3525,6 +3525,14 @@ impl<'p> Vm<'p> {
                     need_f(a,6,"CAMERA3D")? as f32);
                 Value::Nil
             }
+            "camera_orbit" => {
+                let fovy = if a.len() >= 7 { need_f(a, 6, "CAMERA_ORBIT")? as f32 } else { 0.0 };
+                g!().camera_orbit(
+                    need_f(a,0,"CAMERA_ORBIT")? as f32, need_f(a,1,"CAMERA_ORBIT")? as f32, need_f(a,2,"CAMERA_ORBIT")? as f32,
+                    need_f(a,3,"CAMERA_ORBIT")? as f32, need_f(a,4,"CAMERA_ORBIT")? as f32, need_f(a,5,"CAMERA_ORBIT")? as f32,
+                    fovy);
+                Value::Nil
+            }
             "cube" | "cube_wires" => {
                 let wires = name == "cube_wires";
                 let f = if wires { "CUBE_WIRES" } else { "CUBE" };

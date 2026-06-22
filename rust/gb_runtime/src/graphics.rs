@@ -1067,6 +1067,23 @@ impl Graphics {
         self.cam3d_view = None;
         self.cam3d_proj = None;
     }
+    /// Orbit-Kamera: blickt aus `radius` Abstand auf das Ziel, gesteuert ueber
+    /// `yaw`/`pitch` (Grad). Spart die manuelle Kugelkoordinaten-Trigonometrie.
+    /// `fovy <= 0` behaelt die aktuelle Brennweite (sonst 45).
+    pub fn camera_orbit(&mut self, tx: f32, ty: f32, tz: f32,
+                        radius: f32, yaw_deg: f32, pitch_deg: f32, fovy: f32) {
+        // Pitch knapp unter +-90 halten -> kein Gimbal-Flip am Pol.
+        let pitch = pitch_deg.clamp(-89.9, 89.9).to_radians();
+        let yaw = yaw_deg.to_radians();
+        let cp = pitch.cos();
+        let px = tx + radius * cp * yaw.sin();
+        let py = ty + radius * pitch.sin();
+        let pz = tz + radius * cp * yaw.cos();
+        let f = if fovy > 0.0 { fovy }
+                else if self.cam3d.fovy > 0.0 { self.cam3d.fovy }
+                else { 45.0 };
+        self.set_camera3d(px, py, pz, tx, ty, tz, f);
+    }
     /// Modul m3d: View-Matrix-Override (CAMERA3D_VIEW). `mat` column-major.
     pub fn set_camera3d_view(&mut self, mat: [f32; 16]) { self.cam3d_view = Some(mat); }
     /// Modul m3d: Projektions-Matrix-Override (CAMERA3D_PROJECTION).

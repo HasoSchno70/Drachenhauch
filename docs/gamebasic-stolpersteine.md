@@ -192,8 +192,12 @@ melden. (Gilt analog für `STEP`, `MOD`, …)
   3D?"-Helfer) in `rust-runtime.md`. Waren in der Runtime vorhanden, aber für
   den User nicht auffindbar.
 
+- **`CAMERA_ORBIT` ergänzt**: `CAMERA_ORBIT(tx,ty,tz, radius, yaw, pitch[, fovy])`
+  neu in der Runtime — ersetzt die manuelle Orbit-Kugelkoordinaten-Trigonometrie
+  (Pitch gegen Gimbal-Flip geklemmt, fovy optional). Math per `CAMERA3D_X/Y/Z`
+  exakt verifiziert.
+
 > **Offene 3D-Ergonomie-Punkte** (gefunden, noch nicht umgesetzt): kein
 > allgemeines `WORLD_TO_SCREEN`/`SCREEN_TO_WORLD` (nur Boden-Ebene via
 > `MOUSE_GROUND_*`); kein `RAY_HIT_MODEL` (Raycast nur gegen Box/Sphere, nicht
-> gegen geladene Meshes); kein `CAMERA_ORBIT`/`LOOK_AT`-Helfer (Orbit-Kamera =
-> manuelle Trigonometrie); kein `GETPIXEL` (`PIXEL` ist nur ein `PLOT`-Alias).
+> gegen geladene Meshes); kein `GETPIXEL` (`PIXEL` ist nur ein `PLOT`-Alias).

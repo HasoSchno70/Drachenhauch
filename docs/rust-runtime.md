@@ -603,6 +603,17 @@ emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 **Builtins** ([`g3d.py`](../gamebasic/modules/g3d.py), Rendering in
 `graphics.rs`/`vm.rs`):
 - `CAMERA3D(px,py,pz, tx,ty,tz, fovy)` — Perspektiv-Kamera (Up = +Y), pro Frame.
+- `CAMERA_ORBIT(tx,ty,tz, radius, yaw, pitch[, fovy])` — Orbit-Kamera: blickt aus
+  `radius` Abstand auf das Ziel `(tx,ty,tz)`, gesteuert über `yaw`/`pitch` in
+  **Grad**. Spart die manuelle Kugelkoordinaten-Trigonometrie
+  (`px = COS(pitch)*SIN(yaw)*r` …). `pitch` wird intern auf `±89.9°` geklemmt
+  (kein Gimbal-Flip am Pol). `fovy` weglassen = aktuelle Brennweite behalten
+  (sonst 45). Ideal für eine maus-/tastengesteuerte Umlauf-Kamera:
+
+  ```basic
+  ' yaw/pitch im Game-Loop aus der Maus aufaddieren, dann:
+  CAMERA_ORBIT(0.0, 1.0, 0.0, 12.0, yaw, pitch)
+  ```
 - `CUBE` / `CUBE_WIRES` `(x,y,z, w,h,d, farbe)` — gefüllter / Drahtgitter-Quader.
 - `SPHERE` / `SPHERE_WIRES` `(x,y,z, r, farbe)`.
 - `CYLINDER(x,y,z, r_oben, r_unten, h, farbe)` — `r_oben=0` ⇒ Kegel.
