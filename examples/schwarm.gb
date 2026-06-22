@@ -32,7 +32,7 @@ CONST WY AS FLOAT = 720.0
 CONST WZ AS FLOAT = 760.0          ' Tiefe der Welt
 CONST ZC AS FLOAT = 380.0          ' Mittelebene (WZ/2) = 2D-Ebene
 
-CONST NUM AS INTEGER = 72          ' Anzahl Tiere insgesamt
+CONST NUM AS INTEGER = 150         ' Anzahl Tiere insgesamt
 CONST SWARMS AS INTEGER = 3        ' Anzahl getrennter Schwaerme
 
 ' --- Kamera / Projektion ----------------------------------------------
@@ -172,20 +172,22 @@ DIM pmx AS INTEGER
 DIM pmy AS INTEGER
 pmx = 0
 pmy = 0
+DIM rmbPrev AS BOOLEAN              ' war die rechte Maustaste im Vorframe gedrueckt?
+rmbPrev = FALSE
 
 ' --- Tiere als parallele Arrays ----------------------------------------
-DIM bx[72] AS FLOAT
-DIM by[72] AS FLOAT
-DIM bz[72] AS FLOAT
-DIM bvx[72] AS FLOAT
-DIM bvy[72] AS FLOAT
-DIM bvz[72] AS FLOAT
-DIM bs[72] AS INTEGER
-DIM ordr[72] AS INTEGER             ' Zeichen-Reihenfolge (Tiefensortierung)
-DIM prX[72] AS FLOAT                ' projizierte Bildschirm-X
-DIM prY[72] AS FLOAT                ' projizierte Bildschirm-Y
-DIM prS[72] AS FLOAT               ' Perspektiv-Skala (Groesse)
-DIM prD[72] AS FLOAT               ' Kamera-Tiefe (fuer Sortierung)
+DIM bx[150] AS FLOAT
+DIM by[150] AS FLOAT
+DIM bz[150] AS FLOAT
+DIM bvx[150] AS FLOAT
+DIM bvy[150] AS FLOAT
+DIM bvz[150] AS FLOAT
+DIM bs[150] AS INTEGER
+DIM ordr[150] AS INTEGER             ' Zeichen-Reihenfolge (Tiefensortierung)
+DIM prX[150] AS FLOAT                ' projizierte Bildschirm-X
+DIM prY[150] AS FLOAT                ' projizierte Bildschirm-Y
+DIM prS[150] AS FLOAT               ' Perspektiv-Skala (Groesse)
+DIM prD[150] AS FLOAT               ' Kamera-Tiefe (fuer Sortierung)
 
 ' --- Farben pro Schwarm ------------------------------------------------
 DIM colDim[3] AS INTEGER
@@ -346,11 +348,23 @@ WHILE NOT QUITREQUESTED()
 
     ' --- Kamera steuern: RECHTE Maustaste halten + ziehen = drehen ---
     ' (in der raylib-Runtime ist MOUSEBUTTON(1) die rechte Taste)
-    IF MOUSEBUTTON(1) THEN
-        yaw = yaw + (mx - pmx) * 0.006
-        pitch = pitch - (my - pmy) * 0.006
+    ' Robust gegen das "manchmal fehlerhaft"-Springen:
+    '   1. erst ab dem ZWEITEN gehaltenen Frame drehen (Press-Frame hat ein
+    '      veraltetes pmx/pmy -> sonst ein Ruck beim Anfassen)
+    '   2. das Pro-Frame-Delta kappen -> ein einzelner langsamer Frame oder
+    '      Koordinaten-Ausreisser reisst die Kamera nicht mehr herum
+    DIM rmb AS BOOLEAN
+    rmb = MOUSEBUTTON(1)
+    IF rmb AND rmbPrev THEN
+        DIM ddx AS FLOAT
+        DIM ddy AS FLOAT
+        ddx = CLAMP(mx - pmx, -55.0, 55.0)
+        ddy = CLAMP(my - pmy, -55.0, 55.0)
+        yaw = yaw + ddx * 0.006
+        pitch = pitch - ddy * 0.006
         pitch = CLAMP(pitch, -1.35, 1.35)
     END IF
+    rmbPrev = rmb
     pmx = mx
     pmy = my
     ' Scrollrad = Zoom (Kameraabstand)
