@@ -490,23 +490,37 @@ WHILE NOT QUITREQUESTED()
     ' ==================================================================
     CLS(RGB(10, 14, 28))
 
-    ' Ziel-Marker auf dem Boden
-    IF held AND haveTarget THEN
-        POINT3D(tgx, 0.0, tgz, RGB(255, 255, 255))
-        LINE3D(tgx, 0.0, tgz, tgx, 2.0, tgz, RGB(255, 255, 255))
-    END IF
-
-    ' Tiere
+    ' Tiere -- mit Tiefendunst (fernere Tiere verblassen Richtung Hintergrund,
+    ' ersetzt das Raster als Tiefen-Hinweis). Kamera-Position fuer den Abstand.
+    DIM camx AS FLOAT
+    DIM camy AS FLOAT
+    DIM camz AS FLOAT
+    camx = CAMERA3D_X() : camy = CAMERA3D_Y() : camz = CAMERA3D_Z()
     DIM tr AS FLOAT
     DIM tcol AS INTEGER
     DIM inv AS FLOAT
     DIM tlx AS FLOAT
     DIM tly AS FLOAT
     DIM tlz AS FLOAT
+    DIM dcx AS FLOAT
+    DIM dcy AS FLOAT
+    DIM dcz AS FLOAT
+    DIM dcam AS FLOAT
+    DIM fog AS FLOAT
+    DIM dimc AS INTEGER
     FOR i = 0 TO NUM - 1
         sp = SQR(bvx[i] * bvx[i] + bvy[i] * bvy[i] + bvz[i] * bvz[i])
         tr = CLAMP01((sp - MINS) / (MAXS - MINS))
         tcol = COLOR_LERP(colDim[bs[i]], colHi[bs[i]], tr)
+
+        ' Tiefendunst: Abstand zur Kamera -> Richtung Hintergrund verblassen
+        dcx = bx[i] - camx
+        dcy = by[i] - camy
+        dcz = bz[i] - camz
+        dcam = SQR(dcx * dcx + dcy * dcy + dcz * dcz)
+        fog = CLAMP01((dcam - (camRadius - 18.0)) / 40.0)
+        tcol = COLOR_LERP(tcol, RGB(10, 14, 28), fog * 0.82)
+        dimc = COLOR_LERP(colDim[bs[i]], RGB(10, 14, 28), fog * 0.82)
 
         ' Bewegungs-Schweif entgegen der Flugrichtung
         IF sp > 0.0001 THEN
@@ -514,7 +528,7 @@ WHILE NOT QUITREQUESTED()
             tlx = bx[i] - bvx[i] * inv * 1.1
             tly = by[i] - bvy[i] * inv * 1.1
             tlz = bz[i] - bvz[i] * inv * 1.1
-            LINE3D(bx[i], by[i], bz[i], tlx, tly, tlz, colDim[bs[i]])
+            LINE3D(bx[i], by[i], bz[i], tlx, tly, tlz, dimc)
         END IF
 
         SPHERE(bx[i], by[i], bz[i], BSIZE, tcol)
