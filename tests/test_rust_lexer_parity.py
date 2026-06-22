@@ -72,7 +72,9 @@ _SNIPPETS = [
     'PRINT "hallo"\n',
     "DIM x AS INTEGER\nx = 5 + 3 * 2\n",
     "DIM s AS STRING\ns = \"a\"\"b\"\n",                 # "" -Escape
-    "DIM n AS INTEGER\nn = &HFF + &B1010\n",             # Hex/Binaer
+    "DIM n AS INTEGER\nn = &HFF + &B1010\n",             # Hex/Binaer (BASIC)
+    "DIM n AS INTEGER\nn = 0xFF + 0b1010 + 0xCAFE\n",    # Hex/Binaer (C-Stil)
+    "PRINT 0XfF, 0B1, 0, 0.5\n",                         # Gross/klein + Fallback 0 / 0.5
     "PRINT 3.14, 5.0, 100\n",                            # int vs float
     'PRINT f"x={x} y={y:.2f}"\n',                        # f-String + Spec
     'PRINT f"{{nicht}} aber {a+b}"\n',                   # f-String Escapes

@@ -70,11 +70,11 @@ r90 = IMAGE_ROTATE(hero, 90.0)               ' wieder 16x16
 
 | Tint-Farbe | Effekt |
 |---|---|
-| `0xFFFFFF` (Weiß) | unverändert |
-| `0x000000` (Schwarz) | komplett schwarz |
-| `0xFF0000` (Rot) | nur Rot-Kanal überlebt |
-| `0xFF8080` | rosa-getönt (Hell-Rot mit etwas Grün/Blau) |
-| `0x808080` | halb so hell |
+| `&HFFFFFF` (Weiß) | unverändert |
+| `&H000000` (Schwarz) | komplett schwarz |
+| `&HFF0000` (Rot) | nur Rot-Kanal überlebt |
+| `&HFF8080` | rosa-getönt (Hell-Rot mit etwas Grün/Blau) |
+| `&H808080` | halb so hell |
 
 **SCALE:** verlangt `w > 0` und `h > 0`. Negative oder Null wirft.
 

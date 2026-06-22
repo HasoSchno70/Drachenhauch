@@ -177,6 +177,32 @@ class Lexer:
         self._add(TokenType.STRING, "".join(chars), line, col)
 
     def _scan_number(self, line: int, col: int):
+        # C-Stil Hex-/Binaer-Literale: 0xFF, 0b1010 (zusaetzlich zu &H/&B).
+        # Nur wenn nach dem Praefix eine gueltige Ziffer folgt - sonst normal
+        # als Dezimalzahl weiterlexen (0, 0.5 bleiben unveraendert).
+        if self._peek() == "0" and self._peek(1) in ("x", "X", "b", "B"):
+            prefix = self._peek(1)
+            after = self._peek(2)
+            if prefix in ("x", "X") and after and (after.isdigit() or after.lower() in "abcdef"):
+                self._advance()              # 0
+                self._advance()              # x
+                hexchars: list[str] = []
+                while True:
+                    c = self._peek()
+                    if c and (c.isdigit() or c.lower() in "abcdef"):
+                        hexchars.append(self._advance())
+                    else:
+                        break
+                self._add(TokenType.NUMBER, int("".join(hexchars), 16), line, col)
+                return
+            if prefix in ("b", "B") and after in ("0", "1"):
+                self._advance()              # 0
+                self._advance()              # b
+                binchars: list[str] = []
+                while self._peek() in ("0", "1"):
+                    binchars.append(self._advance())
+                self._add(TokenType.NUMBER, int("".join(binchars), 2), line, col)
+                return
         chars: list[str] = []
         while self._peek().isdigit():
             chars.append(self._advance())

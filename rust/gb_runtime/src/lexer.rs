@@ -237,6 +237,39 @@ impl Lexer {
     }
 
     fn scan_number(&mut self, line: usize, col: usize) -> Result<(), LexError> {
+        // C-Stil Hex-/Binaer-Literale: 0xFF, 0b1010 (zusaetzlich zu &H/&B).
+        // Nur wenn nach dem Praefix eine gueltige Ziffer folgt - sonst normal
+        // als Dezimalzahl weiterlexen (0, 0.5 bleiben unveraendert).
+        if self.peek(0) == '0' {
+            let p1 = self.peek(1);
+            if p1 == 'x' || p1 == 'X' {
+                let p2 = self.peek(2);
+                if p2 != '\0'
+                    && (p2.is_ascii_digit() || matches!(p2.to_ascii_lowercase(), 'a'..='f'))
+                {
+                    self.advance(); self.advance();   // 0x
+                    let mut s = String::new();
+                    loop {
+                        let c = self.peek(0);
+                        if c != '\0'
+                            && (c.is_ascii_digit() || matches!(c.to_ascii_lowercase(), 'a'..='f'))
+                        {
+                            s.push(self.advance());
+                        } else { break; }
+                    }
+                    let value = i64::from_str_radix(&s, 16).unwrap_or(0);
+                    self.push(Tt::Number, Val::Int(value), line, col);
+                    return Ok(());
+                }
+            } else if (p1 == 'b' || p1 == 'B') && matches!(self.peek(2), '0' | '1') {
+                self.advance(); self.advance();       // 0b
+                let mut s = String::new();
+                while matches!(self.peek(0), '0' | '1') { s.push(self.advance()); }
+                let value = i64::from_str_radix(&s, 2).unwrap_or(0);
+                self.push(Tt::Number, Val::Int(value), line, col);
+                return Ok(());
+            }
+        }
         let mut s = String::new();
         while self.peek(0).is_ascii_digit() { s.push(self.advance()); }
         let mut is_float = false;

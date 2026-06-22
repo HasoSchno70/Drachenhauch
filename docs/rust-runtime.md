@@ -411,7 +411,7 @@ alle Layer aufsteigend nach z. **Sprite-Atlas:** `ATLAS_LOAD` (JSON-Manifest:
 **Modell:** Draw-Builtins hängen `Cmd`s an eine Liste; `CLS` leert sie + merkt
 die Clear-Farbe; `FLIP` rendert alle Cmds in einem `begin_drawing`-Block und
 präsentiert. So muss kein raylib-Draw-Handle über Builtin-Aufrufe gehalten
-werden. Farben sind `0xRRGGBB`-INTEGER → raylib `Color`.
+werden. Farben sind `&HRRGGBB`-INTEGER → raylib `Color`.
 
 **Vordefinierte Globals:** Farben (`BLACK`/`WHITE`/`RED`/…), Tasten (`KEY_*` als
 SDL2-Keycodes, in `KEYPRESSED` auf raylib-Keys gemappt) und `PI` werden
@@ -614,7 +614,7 @@ emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 Liste `cmds3d`; beim `FLIP` rendert `gbrt` **zuerst** alle 3D-Cmds in einem
 `begin_mode3D(cam3d)`-Block, **danach** die 2D-Layer obenauf — das 2D-HUD liegt
 also immer über der Szene. Koordinaten sind Welt-Einheiten (kein Screen-Scale),
-Farben `0xRRGGBB`. `cmds3d` wird pro Frame geleert; ohne `CAMERA3D` gilt ein
+Farben `&HRRGGBB`. `cmds3d` wird pro Frame geleert; ohne `CAMERA3D` gilt ein
 Default-Blick (schräg von vorn-oben auf den Ursprung).
 
 Demo: [examples/82_3d_intro.gb](../examples/82_3d_intro.gb) (Würfel, Kugel,

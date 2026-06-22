@@ -45,7 +45,7 @@ WEND
 
 ## Zeichnen
 
-Farbe wird als 24-Bit-INTEGER (`0xRRGGBB`) angegeben, am einfachsten via `RGB(r, g, b)` oder über die [Farb-Konstanten](sprache.md#built-in-konstanten) (`RED`, `GREEN`, …).
+Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r, g, b)` oder über die [Farb-Konstanten](sprache.md#built-in-konstanten) (`RED`, `GREEN`, …).
 
 | Funktion | Zweck |
 |---|---|

@@ -44,8 +44,8 @@ PRINT x                 ' schließt an
 | `ABS(v)` | Absolutbetrag. |
 | `CHR$(n)` → STRING | Unicode-Codepoint zu 1-Zeichen-String. `CHR$(65)` = `"A"`. |
 | `ASC(s$)` → INTEGER | Codepoint des ersten Zeichens. `ASC("Anna")` = 65. |
-| `RGB(r, g, b)` → INTEGER | 3 INTs (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `0xFF8000`. |
-| `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne `0x`). `HEX$(255)` = `"FF"`. |
+| `RGB(r, g, b)` → INTEGER | 3 INTs (0..255) zu 24-Bit-Farbe. `RGB(255, 128, 0)` = `&HFF8000`. |
+| `HEX$(n)` → STRING | INT zu Hex-Großbuchstaben (ohne Präfix). `HEX$(255)` = `"FF"`. |
 
 ```basic
 DIM s AS STRING
@@ -61,6 +61,11 @@ f = VAL("3.7")              ' 3.7
 PRINT CHR$(65) + CHR$(66)   ' "AB"
 PRINT HEX$(RGB(255, 0, 0))  ' "FF0000"
 ```
+
+> **Hex- und Binär-Literale** gehen in zwei Schreibweisen: klassisch BASIC mit
+> `&H`/`&B` **oder** im C-Stil mit `0x`/`0b`. `&HFF8000` = `0xFF8000` = 16744448,
+> `&B1010` = `0b1010` = 10. So lassen sich Farben direkt als Literal angeben:
+> `BOX(0, 0, 9, 9, 0xFF8000)`.
 
 ## Math
 
@@ -130,14 +135,14 @@ winkel_grad = DEG(ATAN2(4.0, 3.0))
 | Funktion | Zweck |
 |---|---|
 | `RGB(r, g, b)` → INTEGER | siehe Konvertierung |
-| `RED(c)`, `GREEN(c)`, `BLUE(c)` → INTEGER | Kanal 0..255 aus `0xRRGGBB` |
-| `HSV(h, s, v)` → INTEGER | HSV (h in Grad, s/v in `[0,1]`) → `0xRRGGBB` |
+| `RED(c)`, `GREEN(c)`, `BLUE(c)` → INTEGER | Kanal 0..255 aus `&HRRGGBB` |
+| `HSV(h, s, v)` → INTEGER | HSV (h in Grad, s/v in `[0,1]`) → `&HRRGGBB` |
 | `COLOR_LERP(c1, c2, t)` → INTEGER | zwei Farben kanalweise mischen (t 0..1) |
 
 ```basic
-PRINT RED(0xFF8000)          ' 255
-PRINT HSV(120.0, 1.0, 1.0)   ' 65280 (= 0x00FF00, Grün)
-PRINT COLOR_LERP(0, 0xFFFFFF, 0.5)  ' 8421504 (= 0x808080)
+PRINT RED(&HFF8000)          ' 255
+PRINT HSV(120.0, 1.0, 1.0)   ' 65280 (= &H00FF00, Grün)
+PRINT COLOR_LERP(0, &HFFFFFF, 0.5)  ' 8421504 (= &H808080)
 ```
 
 ## Strings
@@ -188,7 +193,7 @@ PRINT JOIN$(teile, " | ")             ' "Anna | Bert | Cilly"
 
 PRINT PADL$("42", 6, "0")             ' "000042"
 PRINT REPEAT$("=*", 5)                ' "=*=*=*=*=*"
-PRINT HEX$(0xCAFE)                    ' "CAFE"
+PRINT HEX$(&HCAFE)                    ' "CAFE"
 
 PRINT REVERSE$("abc")                 ' "cba"
 PRINT STARTSWITH("hello", "he")       ' TRUE
