@@ -26,20 +26,25 @@ class PresetBar(QWidget):
         self._get_state = get_state
         self._apply_state = apply_state
 
+        # Kompakt halten: die Combo absorbiert die Breite (stretch=1), die Buttons
+        # bleiben kurz -- so passt die Leiste auch in das schmale (440px)
+        # Steuer-Panel des Partikel-Editors, ohne dass sich Combo und Buttons
+        # ueberlappen.
         row = QHBoxLayout(self)
         row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(QLabel("Preset-Bibliothek:"))
+        row.setSpacing(6)
+        row.addWidget(QLabel("Preset:"))
         self.combo = QComboBox()
-        self.combo.setMinimumWidth(160)
+        self.combo.setMinimumWidth(110)
         self.combo.activated.connect(self._on_selected)
-        row.addWidget(self.combo)
-        self.btn_save = QPushButton("Speichern unter...")
+        row.addWidget(self.combo, 1)
+        self.btn_save = QPushButton("Speichern")
+        self.btn_save.setToolTip("Aktuellen Zustand als neues Preset speichern")
         self.btn_save.clicked.connect(self._on_save)
         row.addWidget(self.btn_save)
         self.btn_del = QPushButton("Loeschen")
         self.btn_del.clicked.connect(self._on_delete)
         row.addWidget(self.btn_del)
-        row.addStretch(1)
 
         self._refresh()
 
