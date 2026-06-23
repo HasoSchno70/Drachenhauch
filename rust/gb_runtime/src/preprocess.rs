@@ -28,6 +28,13 @@ const MODULES: &[&str] = &[
     "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "wifi",
 ];
 
+/// Hardware-/IoT-Module hinter Cargo-Features (= die `--hardware`-Features in
+/// `rust/build_runtime.py`). Importierbar (sie stehen in `MODULES`), aber im
+/// Default-Build NICHT einkompiliert -- jeder Funktionsaufruf schluege sonst
+/// erst zur Laufzeit fehl (vgl. `vm.rs::unknown_builtin_msg`). Darum wird beim
+/// IMPORT frueh gewarnt.
+const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi"];
+
 /// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
 /// Lexer IDENTs liefert). Spiegelt `register_type(...)` der Module -- damit
 /// der Rust-Compiler `DIM x AS VEC2` & Co. akzeptiert, sobald das Modul
@@ -155,6 +162,61 @@ fn looks_like_module_name(rel: &str) -> bool {
 fn is_known_module(rel: &str) -> bool {
     let low = rel.to_lowercase();
     MODULES.contains(&low.as_str())
+}
+
+/// Ist das Hardware-Modul `m` in DIESEM gbrt-Build einkompiliert? Fuer
+/// Nicht-Hardware-Module immer `true`. Spiegelt die Cargo-Features, die
+/// `vm.rs` zum Dispatch der `serial_`/`usb_`/`bt_`/`wifi_`-Builtins braucht.
+fn hardware_module_compiled(m: &str) -> bool {
+    match m {
+        "serial" => cfg!(feature = "serial"),
+        "usb" => cfg!(feature = "usb"),
+        "bt" => cfg!(feature = "bt"),
+        "wifi" => cfg!(feature = "wifi"),
+        _ => true,
+    }
+}
+
+/// Einheitliche „Hardware-Modul fehlt im Build"-Meldung -- gleiche
+/// Handlungsanweisung wie der spaetere Laufzeitfehler in
+/// `vm.rs::unknown_builtin_msg`, damit die fruehe IMPORT-Warnung denselben
+/// Wortlaut hat wie der Fehler beim ersten Aufruf.
+pub fn hardware_missing_msg(module: &str) -> String {
+    format!(
+        "Hardware-Modul '{}' ist in diesem gbrt-Build nicht enthalten -- \
+         Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: \
+         python rust\\build_runtime.py --hardware",
+        module)
+}
+
+/// Aus den importierten Modulen die Hardware-Module heraussuchen, die in diesem
+/// Build fehlen (importierbar, aber jeder Aufruf wuerde zur Laufzeit scheitern).
+/// Basis fuer eine Warnung schon beim IMPORT statt erst beim ersten Aufruf.
+pub fn missing_hardware_modules(imports: &[(String, Option<String>)]) -> Vec<&'static str> {
+    HARDWARE_MODULES.iter()
+        .filter(|&&m| !hardware_module_compiled(m)
+            && imports.iter().any(|(name, _)| name == m))
+        .copied()
+        .collect()
+}
+
+/// IMPORT-Zeilen fehlender Hardware-Module direkt in `source` (nur diese Quelle,
+/// keine inkludierten Dateien). Liefert `(zeile, modul)` -- so kann die Editor-
+/// Diagnostik die Warnung exakt auf die IMPORT-Zeile setzen.
+pub fn missing_hardware_imports_with_lines(source: &str) -> Vec<(usize, &'static str)> {
+    let mut out = Vec::new();
+    for (idx0, raw_line) in source.split('\n').enumerate() {
+        let raw = raw_line.strip_suffix('\r').unwrap_or(raw_line);
+        if let Some(caps) = import_re().captures(raw) {
+            let rel = caps.get(1).unwrap().as_str().to_lowercase();
+            if let Some(&m) = HARDWARE_MODULES.iter().find(|&&h| h == rel) {
+                if !hardware_module_compiled(m) {
+                    out.push((idx0 + 1, m));
+                }
+            }
+        }
+    }
+    out
 }
 
 /// Expandiert alle IMPORTs rekursiv. Liefert `(gemergte_quelle, imports)`,

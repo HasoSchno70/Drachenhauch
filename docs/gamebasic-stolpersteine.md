@@ -139,13 +139,26 @@ dokumentieren.)
 
 ## E — Kleinere Inkonsistenzen
 
-### E1. Hardware-Module sind importierbar, aber im Standard-Build tot
+### E1. Hardware-Module sind importierbar, aber im Standard-Build tot  —  ✅ BEHOBEN
+> gbrt warnt jetzt **schon beim IMPORT** statt erst beim ersten Funktionsaufruf.
+> Auf Hardware-Module (`serial`/`usb`/`bt`/`wifi`) ohne das passende Cargo-Feature
+> reagiert der Default-Build zweifach: (a) `gbrt --check` liefert eine
+> `severity:"warning"`-Diagnose auf der IMPORT-Zeile → der Editor markiert das live
+> beim Tippen; (b) `gbrt run` druckt die Warnung vor dem Lauf auf stderr. Der
+> spätere Laufzeitfehler beim tatsächlichen Aufruf bleibt (gleicher Wortlaut,
+> via `vm.rs::unknown_builtin_msg`) — die Nutzung schlägt also weiterhin fehl,
+> aber der User erfährt es sofort statt erst tief im Programm. Bewusst *nicht*
+> im Standard-Build mitgeliefert (zieht schwere Deps: tokio/btleplug/hidapi/
+> windows). `preprocess.rs`: `missing_hardware_modules` / `missing_hardware_imports_with_lines`
+> / `hardware_missing_msg`; verdrahtet in `main.rs` `compile_source` (run) +
+> `check_source` (Editor). Test: `tests/test_gbrt_check.py::test_hardware_import_warns_at_import`.
+
 `IMPORT "wifi"` (serial/usb/bt ebenso) wird vom Preprocessor akzeptiert (stehen
 in `KNOWN_MODULES`), aber **jeder** Funktionsaufruf wirft erst zur Laufzeit
 „… Hardware-Modul 'wifi', das in diesem gbrt-Build fehlt. Neu bauen mit:
 python rust\build_runtime.py --hardware". Der IMPORT gelingt, die Nutzung nicht.
-**Vorschlag:** entweder im Standard-Build mitliefern, oder schon beim IMPORT
-(statt erst beim ersten Call) warnen.
+(Historischer Text.) **Vorschlag:** entweder im Standard-Build mitliefern, oder
+schon beim IMPORT (statt erst beim ersten Call) warnen.
 
 ### E2. Reservierte Wörter als Variablennamen (über `step` hinaus)
 `FOR … STEP` macht `step` zum Keyword. Genauso reserviert und für Grafik-/

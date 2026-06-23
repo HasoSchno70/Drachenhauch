@@ -275,6 +275,13 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         Err(e) => { eprintln!("{}:{}: Preprocess-Fehler: {}", label, e.line, e.msg); return Err(ExitCode::from(2)); }
     };
     let (ext_types, aliases) = preprocess::compile_env(&imports);
+    // E1: Hardware-Module (serial/usb/bt/wifi) sind zwar importierbar, fehlen aber
+    // im Default-Build. Frueh (beim IMPORT) warnen statt erst beim ersten Aufruf --
+    // die Meldung ist nicht fatal, der Lauf geht weiter (der eigentliche Aufruf
+    // wirft dann wie gehabt, falls das Modul wirklich genutzt wird).
+    for m in preprocess::missing_hardware_modules(&imports) {
+        eprintln!("{}: Warnung: {}", label, preprocess::hardware_missing_msg(m));
+    }
     let toks = match lexer::Lexer::new(&source).tokenize() {
         Ok(t) => t,
         Err(e) => { eprintln!("{}:{}: Lexer-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
@@ -440,7 +447,15 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
             "phase": "parse", "message": e.msg })],
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
-        Ok(_) => vec![],
+        // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
+        // Hardware-Modulen ergaenzen, die in diesem gbrt-Build fehlen -- damit
+        // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
+        // Lauf). Leer, wenn kein solches Modul importiert wird.
+        Ok(_) => preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
+            .map(|(line, m)| serde_json::json!({
+                "line": line, "col": 0, "severity": "warning",
+                "phase": "preprocess", "message": preprocess::hardware_missing_msg(m) }))
+            .collect(),
         Err((line, msg)) => vec![serde_json::json!({
             "line": line, "col": 0, "severity": "error",
             "phase": "compile", "message": msg })],

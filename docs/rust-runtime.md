@@ -138,6 +138,12 @@ neue Builtins, z.B. fuer SID-Charakter ohne Buffer-Bake).
   - Handles = INTEGER-Index in cfg-gated VM-Vecs. `build_runtime.py --hardware`
     nimmt sie dazu (`--full` = alles). Default-Dev-Build laesst Hardware weg
     (haelt die schweren Deps tokio/btleplug/windows aus dem Normal-Build).
+  - **Frueh-Warnung beim IMPORT:** Importiert ein Programm ein Hardware-Modul,
+    das dem aktuellen Build fehlt, warnt gbrt schon beim IMPORT — `gbrt run`
+    auf stderr vor dem Lauf, `gbrt --check` als `severity:"warning"` auf der
+    IMPORT-Zeile (Editor-Marker). Der Laufzeitfehler beim ersten Aufruf bleibt
+    zusaetzlich (`vm.rs::unknown_builtin_msg`). Logik in `preprocess.rs`
+    (`missing_hardware_modules` / `missing_hardware_imports_with_lines`).
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.

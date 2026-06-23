@@ -60,13 +60,33 @@ def test_compile_error_return_outside_function_has_line(tmp_path):
 
 
 def test_all_examples_check_clean():
-    """Kein Fehlalarm: jedes gueltige Beispiel meldet [] (Null-False-Positive)."""
+    """Kein Fehlalarm: jedes gueltige Beispiel meldet keine *Errors*
+    (Null-False-Positive). Warnungen (z.B. fehlendes Hardware-Modul im
+    Default-Build, siehe Hardware-Beispiele 35-38) sind erlaubt -- sie sind
+    keine Fehler, sondern ein bewusster Hinweis."""
     bad = []
     for f in sorted(_EXAMPLES.glob("*.gb")):
         if "_smoketest" in f.name:
             continue
         r = subprocess.run([str(_GBRT), "--check", str(f)],
                            capture_output=True, text=True, timeout=30)
-        if r.stdout.strip() != "[]":
-            bad.append((f.name, r.stdout.strip()))
+        diags = json.loads(r.stdout or "[]")
+        errors = [d for d in diags if d.get("severity") != "warning"]
+        if errors:
+            bad.append((f.name, errors))
     assert not bad, f"Fehlalarme bei gueltigem Code: {bad}"
+
+
+def test_hardware_import_warns_at_import(tmp_path):
+    """E1: `IMPORT "wifi"` (serial/usb/bt analog) wird im Default-Build (ohne
+    --hardware) schon beim IMPORT als Warnung gemeldet -- nicht erst beim ersten
+    Funktionsaufruf zur Laufzeit. Ein Hardware-Build meldet stattdessen nichts;
+    beide Faelle sind gueltig."""
+    d = _check(tmp_path, 'IMPORT "wifi"\nPRINT 1\n')
+    if d:  # Default-Build: genau eine Warnung auf der IMPORT-Zeile
+        assert len(d) == 1, d
+        w = d[0]
+        assert w["severity"] == "warning"
+        assert w["line"] == 1
+        assert "wifi" in w["message"].lower()
+        assert "--hardware" in w["message"]
