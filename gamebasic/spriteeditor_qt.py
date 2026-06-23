@@ -104,6 +104,10 @@ COLORS = {
     "checker_b":    "#243549",
 }
 
+# Abgedunkelte Akzentfarbe als Startpunkt fuer Slider-Verlaeufe (dunkel -> cyan,
+# statt flaechig grell).
+_ACCENT_DARK = QColor(COLORS["accent"]).darker(300).name()
+
 GLOBAL_QSS = f"""
 QMainWindow, QDialog, QDockWidget {{
     background-color: {COLORS["bg"]};
@@ -226,7 +230,8 @@ QSlider::groove:horizontal {{
     border-radius: 3px;
 }}
 QSlider::sub-page:horizontal {{
-    background: {COLORS["accent"]};
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 {_ACCENT_DARK}, stop:1 {COLORS["accent"]});
     border-radius: 3px;
 }}
 QSlider::add-page:horizontal {{
