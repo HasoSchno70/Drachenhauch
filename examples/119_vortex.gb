@@ -1,0 +1,306 @@
+' ============================================================
+'  GAMEBASIC -- "VORTEX"   (AAA-Showcase-Demo)
+' ============================================================
+'  Voll animierter Doppel-Regenbogen-Wirbel im Vollbild zu fetziger
+'  Amiga-Musik. Zeigt, wozu GameBasic faehig ist:
+'    * ZWEI gegenlaeufige Spiral-Wirbel aus hunderten Triangles (Tiefe)
+'    * HSV-Regenbogen + rotierender Licht-Glanz = 3D-Ribbon-Look
+'    * additives Glow, gluehender Kern
+'    * Logo-Zoomer mit Funken-Partikeln (particles-Modul, Glow-Mode)
+'    * Orbit-Ring: rotierendes Text-Halo auf einem gekippten Reifen um
+'      den Wirbel (vorne gross/hell, hinten klein/dunkel = Pseudo-3D)
+'    * Perspektiv-Scroller mit ECHTER Boden-Spiegelung (Render-Target +
+'      vertikalem Flip): Buchstaben schwellen zur Mitte hin an ("auf dich zu")
+'    * fetter TTF-Zeichensatz (Arial Black / Impact), 60 fps
+'
+'  Eine GameBasic-Demo von Hans Schnorrenberger.
+'  ESC = Ende.   (Anderer Song? -> Pfad in PLAYMUSIC tauschen:
+'   assets/amiga_title.ogg, cybermatic_pulse.ogg, techno_messup.ogg)
+' ============================================================
+IMPORT "particles"
+
+CONST PI2 AS FLOAT = 6.28318530718
+CONST SEG AS INTEGER = 180          ' Winkel-Segmente je Wirbel
+CONST BANDS AS INTEGER = 4          ' radiale Baender (Tiefen-Schattierung)
+CONST PETALS AS FLOAT = 6.0         ' Bluetenblaetter
+
+SCREEN(1280, 720, "GameBasic - VORTEX (AAA Demo)", 1)
+SET_FULLSCREEN(TRUE)
+SETFPS(60)
+
+DIM SW AS INTEGER
+DIM SH AS INTEGER
+SW = SCREENWIDTH()
+SH = SCREENHEIGHT()
+
+DIM CX AS FLOAT
+DIM CY AS FLOAT
+CX = SW / 2.0
+CY = SH / 2.0
+
+DIM maxR AS FLOAT
+DIM innerR AS FLOAT
+maxR = SH * 0.44
+innerR = maxR * 0.10
+
+' ============================================================
+'  Ein Wirbel: gefuellte Spiral-Ribbons. Liest CX/CY/maxR/innerR/
+'  SEG/BANDS/PETALS/PI2 global; alles Bewegliche kommt als Parameter,
+'  damit wir IHN ZWEIMAL (vor/zurueck) zeichnen koennen.
+' ============================================================
+SUB DrawVortex(rot AS FLOAT, spin AS FLOAT, twist AS FLOAT, pulse AS FLOAT, t AS FLOAT, rscale AS FLOAT, bright AS FLOAT, sat AS FLOAT, hueOff AS FLOAT)
+    DIM i AS INTEGER
+    DIM b AS INTEGER
+    DIM ang0 AS FLOAT
+    DIM ang1 AS FLOAT
+    DIM lobe0 AS FLOAT
+    DIM lobe1 AS FLOAT
+    DIM rOut0 AS FLOAT
+    DIM rOut1 AS FLOAT
+    DIM hue AS INTEGER
+    DIM sheen AS FLOAT
+    DIM f0 AS FLOAT
+    DIM f1 AS FLOAT
+    DIM ra0 AS FLOAT
+    DIM ra1 AS FLOAT
+    DIM rb0 AS FLOAT
+    DIM rb1 AS FLOAT
+    DIM aA0 AS FLOAT
+    DIM aA1 AS FLOAT
+    DIM aB0 AS FLOAT
+    DIM aB1 AS FLOAT
+    DIM x00 AS FLOAT
+    DIM y00 AS FLOAT
+    DIM x01 AS FLOAT
+    DIM y01 AS FLOAT
+    DIM x10 AS FLOAT
+    DIM y10 AS FLOAT
+    DIM x11 AS FLOAT
+    DIM y11 AS FLOAT
+    DIM val AS FLOAT
+    DIM col AS INTEGER
+
+    FOR i = 0 TO SEG - 1
+        ang0 = i * 1.0 / SEG * PI2 + rot
+        ang1 = (i + 1) * 1.0 / SEG * PI2 + rot
+        lobe0 = 0.70 + 0.22 * SIN(PETALS * ang0 - spin)
+        lobe1 = 0.70 + 0.22 * SIN(PETALS * ang1 - spin)
+        rOut0 = maxR * lobe0 * pulse * rscale
+        rOut1 = maxR * lobe1 * pulse * rscale
+        hue = INT(ang0 / PI2 * 360.0 + t * 22.0 + hueOff + 3600.0) MOD 360
+        sheen = 0.72 + 0.28 * SIN(ang0 - t * 0.6)
+
+        FOR b = 0 TO BANDS - 1
+            f0 = b * 1.0 / BANDS
+            f1 = (b + 1) * 1.0 / BANDS
+            ra0 = innerR + (rOut0 - innerR) * f0
+            ra1 = innerR + (rOut0 - innerR) * f1
+            rb0 = innerR + (rOut1 - innerR) * f0
+            rb1 = innerR + (rOut1 - innerR) * f1
+            aA0 = ang0 + twist * f0
+            aA1 = ang0 + twist * f1
+            aB0 = ang1 + twist * f0
+            aB1 = ang1 + twist * f1
+            x00 = CX + COS(aA0) * ra0
+            y00 = CY + SIN(aA0) * ra0
+            x01 = CX + COS(aA1) * ra1
+            y01 = CY + SIN(aA1) * ra1
+            x10 = CX + COS(aB0) * rb0
+            y10 = CY + SIN(aB0) * rb0
+            x11 = CX + COS(aB1) * rb1
+            y11 = CY + SIN(aB1) * rb1
+            val = (0.22 + 0.74 * f1) * sheen * bright
+            col = HSV(hue, sat, val)
+            TRIANGLE(INT(x00), INT(y00), INT(x10), INT(y10), INT(x11), INT(y11), col)
+            TRIANGLE(INT(x00), INT(y00), INT(x11), INT(y11), INT(x01), INT(y01), col)
+        NEXT
+    NEXT
+END SUB
+
+' --- Schoenerer Zeichensatz (TTF) mit Fallback auf den Default-Font ---
+DIM uiFont AS INTEGER
+uiFont = -1
+DIM fpaths AS TUPLE
+fpaths = ("C:/Windows/Fonts/ariblk.ttf", "C:/Windows/Fonts/impact.ttf", "C:/Windows/Fonts/seguibl.ttf", "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/arialbd.ttf")
+DIM fp AS STRING
+FOR EACH fp IN fpaths
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN
+        uiFont = LOADFONT(fp, 128)
+    END IF
+NEXT
+IF uiFont >= 0 THEN
+    SETFONT(uiFont)
+END IF
+
+' --- Funken-Partikel fuer den Logo-Zoomer (Glow = additiv) ---
+DIM sparks AS PARTICLE_SYSTEM
+sparks = PARTICLE_SYSTEM_NEW(CX, CY)
+PARTICLE_SET_VELOCITY(sparks, -130.0, 130.0, -130.0, 130.0)
+PARTICLE_SET_LIFETIME(sparks, 300, 850)
+PARTICLE_SET_GRAVITY(sparks, 0.0, 0.0)
+PARTICLE_SET_SIZE(sparks, 1, 3)
+PARTICLE_SET_FADE(sparks, TRUE)
+PARTICLE_SET_MODE(sparks, "glow")
+
+' --- fetzige Amiga-Musik (OGG), endlos geloopt ---
+PLAYMUSIC("assets/amiga_action_level1.ogg", -1, 0.9)
+
+' --- Perspektiv-Scroller-Text (unten) ---
+DIM msg AS STRING
+msg = "GAMEBASIC  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS IM VOLLBILD  ***  JA, AUCH DAMIT KANN MAN DEMOS BAUEN  ***  GREETINGS AN DIE SZENE  ***    "
+DIM nmsg AS INTEGER
+nmsg = LEN(msg)
+DIM span AS FLOAT
+span = nmsg * 32.0
+
+' --- Orbit-Ring-Text (Halo rund um den Wirbel) ---
+DIM ringMsg AS STRING
+ringMsg = "GAMEBASIC  ***  VORTEX  ***  HANS SCHNORRENBERGER  ***  "
+DIM rn AS INTEGER
+rn = LEN(ringMsg)
+
+' --- Schleifen-Variablen ---
+DIM t AS FLOAT
+DIM i AS INTEGER
+DIM pulse AS FLOAT
+DIM twv AS FLOAT
+DIM zoom AS FLOAT
+DIM fs AS INTEGER
+DIM tw AS INTEGER
+DIM lx AS INTEGER
+DIM ly AS INTEGER
+DIM thue AS INTEGER
+DIM gr AS INTEGER
+DIM off AS FLOAT
+DIM chx AS FLOAT
+DIM chy AS FLOAT
+DIM ch AS STRING
+DIM ringRot AS FLOAT
+DIM th AS FLOAT
+DIM depth AS FLOAT
+DIM csz AS INTEGER
+DIM cw AS INTEGER
+DIM bri AS FLOAT
+DIM nx AS FLOAT
+DIM nearf AS FLOAT
+DIM hcol AS INTEGER
+DIM scrollRT AS INTEGER
+
+' Render-Target fuer den Scroller -> echte, vertikal gespiegelte Boden-
+' Reflexion via RENDERTARGET_DRAW(..., TRUE). Transparenter Hintergrund
+' (RTs werden pro Frame transparent vorgecleart -> kein CLS noetig).
+scrollRT = RENDERTARGET_NEW(SW, 130)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+
+    ' Sanfte, ruckelfreie Bewegung rein aus der Zeit (kein FFT).
+    pulse = 1.0 + 0.05 * SIN(t * 1.2)
+    twv = 0.85 + 0.15 * SIN(t * 0.40)
+
+    CLS(&H05030A)
+
+    ' --- weicher additiver Hintergrund-Halo ---
+    BLEND_MODE("add")
+    FOR i = 3 TO 1 STEP -1
+        gr = INT(maxR * (0.85 + i * 0.25))
+        CIRCLE(INT(CX), INT(CY), gr, HSV(INT(t * 24.0) MOD 360, 0.6, 0.018 + 0.006 * i))
+    NEXT
+    BLEND_MODE("alpha")
+
+    ' --- hinterer Wirbel: GEGENLAEUFIG, groesser, dunkler, leicht entsaettigt ---
+    DrawVortex(0.0 - t * 0.13, 0.0 - t * 0.30, 0.0 - twv, pulse, t, 1.16, 0.45, 0.85, 40.0)
+    ' --- vorderer Wirbel: hell, normal drehend ---
+    DrawVortex(t * 0.18, t * 0.30, twv, pulse, t, 1.0, 1.0, 1.0, 0.0)
+
+    ' --- gluehender Kern (additiv) ---
+    BLEND_MODE("add")
+    FOR i = 5 TO 1 STEP -1
+        gr = INT((10 + i * 10) * pulse)
+        CIRCLE(INT(CX), INT(CY), gr, HSV(INT(t * 90.0) MOD 360, 0.4, 0.10))
+    NEXT
+    CIRCLE(INT(CX), INT(CY), INT(7 * pulse), WHITE)
+    BLEND_MODE("alpha")
+
+    ' --- Funken-Partikel aus der Mitte (Regenbogen-Glow) ---
+    PARTICLE_SET_COLOR(sparks, HSV(INT(t * 120.0) MOD 360, 0.5, 1.0))
+    PARTICLE_SET_POS(sparks, CX, CY)
+    PARTICLE_EMIT(sparks, 4)
+    PARTICLE_UPDATE(sparks, 16)
+    PARTICLE_DRAW(sparks)
+    BLEND_MODE("alpha")
+
+    ' --- Orbit-Ring: Text-Halo, das (auf einem gekippten Reifen) um den
+    '     Wirbel rotiert. Vorne (unten) groesser & heller, hinten kleiner. ---
+    ringRot = t * 0.45
+    FOR i = 0 TO rn - 1
+        ch = MID$(ringMsg, i, 1)
+        ' Minus, damit der untere (groesste/auffaelligste) Bogen vorwaerts
+        ' liest. Auf einem Vollkreis liest die Gegenseite (oben, klein/dunkel)
+        ' zwangslaeufig rueckwaerts -- bewusst zugunsten des Vordergrunds.
+        th = ringRot - i * (PI2 / rn)
+        chx = CX + COS(th) * (maxR * 1.18)
+        chy = CY + SIN(th) * (maxR * 0.82)
+        depth = 0.5 + 0.5 * SIN(th)
+        csz = INT(16 + 32 * depth)
+        TEXT_SIZE(csz)
+        cw = TEXT_WIDTH(ch)
+        bri = 0.30 + 0.70 * depth
+        TEXT(INT(chx) - cw \ 2, INT(chy) - csz \ 2, ch, HSV((i * 14 + INT(t * 50.0)) MOD 360, 0.85, bri))
+    NEXT
+
+    ' --- Logo-Zoomer: GAMEBASIC zoomt zentriert ueber dem Wirbel ---
+    zoom = 0.55 + 0.55 * (0.5 + 0.5 * SIN(t * 1.1))
+    fs = INT(86.0 * zoom)
+    TEXT_SIZE(fs)
+    tw = TEXT_WIDTH("GAMEBASIC")
+    lx = INT(CX) - tw \ 2
+    ly = INT(CY) - fs \ 2
+    thue = INT(t * 50.0) MOD 360
+    BLEND_MODE("add")
+    TEXT(lx + 2, ly + 2, "GAMEBASIC", HSV(thue, 0.8, 0.30))
+    BLEND_MODE("alpha")
+    TEXT(lx, ly, "GAMEBASIC", HSV(thue, 0.85, 1.0))
+
+    ' --- Credit oben ---
+    TEXT_SIZE(24)
+    tw = TEXT_WIDTH("von Hans Schnorrenberger")
+    TEXT(INT(CX) - tw \ 2, 22, "von Hans Schnorrenberger", &HB0C0FF)
+
+    ' --- Perspektiv-Scroller + ECHTE Boden-Spiegelung ---
+    '     Der Scroller wird einmal in ein Render-Target gezeichnet, dann normal
+    '     gestempelt UND vertikal gespiegelt darunter (RENDERTARGET_DRAW ..., TRUE).
+    '     Genau dafuer war Stolperstein G2 da -- jetzt in der Engine gefixt.
+    off = t * 190.0
+    off = off - INT(off / span) * span
+    RENDERTARGET_BEGIN(scrollRT)
+        FOR i = 0 TO nmsg - 1
+            ch = MID$(msg, i, 1)
+            chx = i * 32.0 - off
+            IF chx < -48.0 THEN chx = chx + span
+            IF chx < SW + 20.0 THEN
+                nx = (chx - CX) / (SW * 0.5)
+                IF nx < -1.0 THEN nx = -1.0
+                IF nx > 1.0 THEN nx = 1.0
+                nearf = 1.0 - nx * nx            ' 1 = Mitte (nah), 0 = Rand (fern)
+                csz = INT(22 + 34 * nearf)
+                chy = 116.0 - csz - (1.0 - nearf) * 45.0   ' lokal im Render-Target
+                hcol = HSV((i * 7 + INT(t * 60.0)) MOD 360, 1.0, 0.5 + 0.5 * nearf)
+                TEXT_SIZE(csz)
+                TEXT(INT(chx), INT(chy), ch, hcol)
+            END IF
+        NEXT
+    RENDERTARGET_END()
+    ' Original (aufrecht) ...
+    RENDERTARGET_DRAW(scrollRT, 0, SH - 200, 1.0)
+    ' ... und die echte, gedimmte Spiegelung direkt unter der Bodenlinie.
+    RENDERTARGET_DRAW(scrollRT, 0, SH - 74, 1.0, &H4A4A5E, TRUE)
+
+    TEXT_SIZE(13)
+    TEXT(16, 8, "ESC = Ende   |   GameBasic VORTEX", &H7080B0)
+
+    FLIP()
+WEND
+
+AUDIO_MUSIC_STOP(0)
