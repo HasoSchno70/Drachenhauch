@@ -259,6 +259,61 @@ def test_rect_tool_filled():
     assert app.doc.current.pixels.getpixel((2, 2)) == (255, 0, 0, 255)
 
 
+def test_line_tool_respects_brush_size():
+    """Brush-Size 3 -> die Linie ist 3 Pixel dick (quadratischer Stempel)."""
+    from gamebasic.spriteeditor.tools import LineTool
+    from PySide6.QtCore import Qt
+    app = _MockApp(w=12, h=12)
+    app.brush_size = 3
+    tool = LineTool()
+    tool.begin(app, 3, 5, Qt.LeftButton)
+    tool.end(app, 7, 5)
+    px = app.doc.current.pixels
+    # Um die Mittel-Linie (y=5) herum sind y=4 und y=6 mitgefaerbt.
+    for y in (4, 5, 6):
+        assert px.getpixel((5, y)) == (255, 0, 0, 255)
+
+
+def test_rect_tool_outline_brush_width():
+    """Brush-Size 2 -> die Kontur ist 2 Pixel breit (nach innen gezeichnet)."""
+    from gamebasic.spriteeditor.tools import RectTool
+    from PySide6.QtCore import Qt
+    app = _MockApp(w=12, h=12)
+    app.brush_size = 2
+    tool = RectTool(filled=False)
+    tool.begin(app, 2, 2, Qt.LeftButton)
+    tool.end(app, 9, 9)
+    px = app.doc.current.pixels
+    # Aeusserer Rand + eine Stelle nach innen sind gesetzt (Breite 2).
+    assert px.getpixel((2, 2)) == (255, 0, 0, 255)
+    assert px.getpixel((3, 3)) == (255, 0, 0, 255)
+    # Tief im Inneren bleibt leer.
+    assert px.getpixel((5, 5)) == (0, 0, 0, 0)
+
+
+def test_spray_respects_symmetry():
+    """Im X-Symmetrie-Modus hat jedes gespruehte Pixel sein Spiegelbild."""
+    import random
+    from gamebasic.spriteeditor.tools import SprayTool
+    from PySide6.QtCore import Qt
+    random.seed(1234)
+    app = _MockApp(w=9, h=9)
+    app.symmetry_mode = "x"
+    app.brush_size = 4
+    tool = SprayTool()
+    tool.begin(app, 4, 4, Qt.LeftButton)
+    for _ in range(10):
+        tool.move(app, 4, 4)
+    tool.end(app, 4, 4)
+    px = app.doc.current.pixels
+    painted = [(x, y) for y in range(9) for x in range(9)
+               if px.getpixel((x, y))[3] != 0]
+    assert painted, "Spray hat nichts gemalt"
+    # Invariante: zu jedem Pixel ist das X-Spiegelbild ebenfalls gesetzt.
+    for x, y in painted:
+        assert px.getpixel((9 - 1 - x, y))[3] != 0
+
+
 def test_two_point_tool_preview_during_drag():
     """Live-Preview waehrend des Drags veraendert nicht den echten Buffer."""
     from gamebasic.spriteeditor.tools import LineTool

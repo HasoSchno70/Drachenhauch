@@ -174,8 +174,10 @@ class SprayTool(Tool):
                 if dx * dx + dy * dy <= r * r:
                     break
             xx, yy = cx + dx, cy + dy
-            if app.in_bounds(xx, yy):
-                pixels.putpixel((xx, yy), self._color)
+            # Symmetrie-Modus wie bei Stift/Radierer respektieren.
+            for sxx, syy in _symmetry_points(app, xx, yy):
+                if app.in_bounds(sxx, syy):
+                    pixels.putpixel((sxx, syy), self._color)
         app.canvas.invalidate_all()
 
 
@@ -219,6 +221,9 @@ class _TwoPointTool(Tool):
         app.doc.current.snapshot()
         self._start = (x, y)
         self._color = app.fg if button == Qt.LeftButton else app.bg
+        # Brush-Size 1..4 wie bei Stift/Radierer: Linien-/Konturbreite. VOR
+        # dem ersten _preview setzen (das _draw aufruft).
+        self._brush = max(1, getattr(app, "brush_size", 1))
         self._preview(app, x, y)
 
     def move(self, app, x, y):
@@ -245,9 +250,12 @@ class LineTool(_TwoPointTool):
 
     def _draw(self, img, x0, y0, x1, y1, color):
         px = img.load(); w, h = img.size
+        offsets = _brush_offsets(getattr(self, "_brush", 1))
         for x, y in _bresenham(x0, y0, x1, y1):
-            if 0 <= x < w and 0 <= y < h:
-                px[x, y] = color
+            for dx, dy in offsets:
+                xx, yy = x + dx, y + dy
+                if 0 <= xx < w and 0 <= yy < h:
+                    px[xx, yy] = color
 
 
 class RectTool(_TwoPointTool):
@@ -262,7 +270,8 @@ class RectTool(_TwoPointTool):
         if self.filled:
             d.rectangle([lo_x, lo_y, hi_x, hi_y], fill=color)
         else:
-            d.rectangle([lo_x, lo_y, hi_x, hi_y], outline=color)
+            d.rectangle([lo_x, lo_y, hi_x, hi_y], outline=color,
+                        width=getattr(self, "_brush", 1))
 
 
 class EllipseTool(_TwoPointTool):
@@ -277,7 +286,8 @@ class EllipseTool(_TwoPointTool):
         if self.filled:
             d.ellipse([lo_x, lo_y, hi_x, hi_y], fill=color)
         else:
-            d.ellipse([lo_x, lo_y, hi_x, hi_y], outline=color)
+            d.ellipse([lo_x, lo_y, hi_x, hi_y], outline=color,
+                      width=getattr(self, "_brush", 1))
 
 
 class EyedropperTool(Tool):

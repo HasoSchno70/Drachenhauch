@@ -287,6 +287,28 @@ class SpriteDoc:
     def last_struct_redo_seq(self) -> int:
         return self._struct_redo[-1][0] if self._struct_redo else 0
 
+    def frame_with_latest_undo(self) -> tuple[int, int]:
+        """`(frame_index, seq)` des Frames mit dem juengsten Pixel-Undo-Eintrag
+        ueber ALLE Frames -- Pixel-History liegt pro Frame, ein globales Ctrl+Z
+        muss aber das juengste Pixel-Undo finden, egal in welchem Frame es
+        passierte (sonst ist es nach einem Frame-Wechsel unerreichbar).
+        `seq=0`/`index=-1`, wenn nirgends ein Pixel-Undo vorliegt."""
+        best_idx, best_seq = -1, 0
+        for i, f in enumerate(self.frames):
+            s = f.last_undo_seq()
+            if s > best_seq:
+                best_idx, best_seq = i, s
+        return best_idx, best_seq
+
+    def frame_with_latest_redo(self) -> tuple[int, int]:
+        """Pendant zu `frame_with_latest_undo` fuer Redo."""
+        best_idx, best_seq = -1, 0
+        for i, f in enumerate(self.frames):
+            s = f.last_redo_seq()
+            if s > best_seq:
+                best_idx, best_seq = i, s
+        return best_idx, best_seq
+
     def undo_struct(self) -> bool:
         if not self._struct_undo:
             return False

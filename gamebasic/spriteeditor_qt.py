@@ -1120,6 +1120,10 @@ class ColorPanel(QWidget):
 
     def _on_hex(self):
         s = self.hex_edit.text().strip().lstrip("#")
+        # Kurzform #RGB / #RGBA auf die Langform aufblasen (jede Stelle
+        # verdoppelt: f -> ff), wie in CSS ueblich.
+        if len(s) in (3, 4):
+            s = "".join(c * 2 for c in s)
         if len(s) not in (6, 8):
             self.refresh(); return
         try:
@@ -3450,21 +3454,38 @@ class SpriteEditorWindow(QMainWindow):
 
     def action_undo(self):
         # Juengste Aktion gewinnt: Struktur-Op (Frame add/delete/move,
-        # Resize, Dauer/Name) oder Pixel-Strich im aktuellen Frame.
-        if self.doc.last_struct_undo_seq() > self.doc.current.last_undo_seq():
+        # Resize, Dauer/Name) oder Pixel-Strich. Der Pixel-Strich kann in
+        # EINEM BELIEBIGEN Frame liegen (History ist pro Frame) -- darum das
+        # global juengste Pixel-Undo suchen statt nur das aktuelle Frame, sonst
+        # waere ein Strich nach einem Frame-Wechsel per Hotkey unerreichbar.
+        struct_seq = self.doc.last_struct_undo_seq()
+        pix_idx, pix_seq = self.doc.frame_with_latest_undo()
+        if struct_seq > pix_seq:
             if self.doc.undo_struct():
                 self._refresh_after_struct_change()
             return
+        if pix_seq <= 0:
+            return
+        if pix_idx != self.doc.current_index:
+            # Zum Frame mit dem juengsten Strich springen, damit das
+            # rueckgaengig gemachte Pixel auch sichtbar ist.
+            self.action_frame_select(pix_idx)
         if self.doc.current.undo():
             self.canvas.invalidate_all()
             self.frames_panel.refresh()
             self.mark_dirty()
 
     def action_redo(self):
-        if self.doc.last_struct_redo_seq() > self.doc.current.last_redo_seq():
+        struct_seq = self.doc.last_struct_redo_seq()
+        pix_idx, pix_seq = self.doc.frame_with_latest_redo()
+        if struct_seq > pix_seq:
             if self.doc.redo_struct():
                 self._refresh_after_struct_change()
             return
+        if pix_seq <= 0:
+            return
+        if pix_idx != self.doc.current_index:
+            self.action_frame_select(pix_idx)
         if self.doc.current.redo():
             self.canvas.invalidate_all()
             self.frames_panel.refresh()

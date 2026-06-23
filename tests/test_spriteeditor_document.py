@@ -116,6 +116,37 @@ def test_snapshot_clears_redo(doc):
     assert not doc.current.redo_stack
 
 
+def test_frame_with_latest_undo_finds_other_frame(doc):
+    """Regression: ein Strich in Frame 0 muss auch dann als juengstes
+    Pixel-Undo gefunden werden, wenn Frame 1 aktiv ist (sonst ist Ctrl+Z
+    nach einem Frame-Wechsel wirkungslos)."""
+    doc.current.snapshot()                       # Strich in Frame 0
+    seq0 = doc.frames[0].last_undo_seq()
+    doc.add_frame()                              # wechselt auf Frame 1
+    assert doc.current_index == 1
+    assert doc.frames[1].last_undo_seq() == 0    # Frame 1 hat keine Pixel-History
+    idx, seq = doc.frame_with_latest_undo()
+    assert idx == 0 and seq == seq0
+
+
+def test_frame_with_latest_undo_empty_when_no_history(doc):
+    assert doc.frame_with_latest_undo() == (-1, 0)
+    assert doc.frame_with_latest_redo() == (-1, 0)
+
+
+def test_frame_with_latest_undo_picks_youngest(doc):
+    """Bei Strichen in mehreren Frames gewinnt der zeitlich juengste."""
+    doc.current.snapshot()                       # Frame 0
+    doc.add_frame()                              # -> Frame 1
+    doc.current.snapshot()                       # Frame 1 (juenger)
+    idx, _ = doc.frame_with_latest_undo()
+    assert idx == 1
+    # Redo-Pendant: nach einem Undo in Frame 1 liegt dort der juengste Redo
+    doc.frames[1].undo()
+    idx_r, _ = doc.frame_with_latest_redo()
+    assert idx_r == 1
+
+
 def test_history_max_length_is_80(doc):
     # 100 Snapshots -> nur 80 werden behalten
     for _ in range(100):
