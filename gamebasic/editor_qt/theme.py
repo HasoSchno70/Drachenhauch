@@ -12,6 +12,7 @@ Listener im MainWindow ueber `theme_signals.changed`.
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QColor
 
 
 COLORS_DARK: dict[str, str] = {
@@ -147,6 +148,14 @@ def global_qss() -> str:
     c = COLORS
     chrome = (f"qlineargradient(x1:0, y1:0, x2:0, y2:1, "
               f"stop:0 {c['bg_panel_hi']}, stop:1 {c['bg_alt']})")
+    # Ruhiger Akzent-Button: Verlauf dunkel -> Akzent statt greller Vollflaeche.
+    # Aus dem Akzent abgeleitet, damit es in Dark UND Light funktioniert; helle
+    # Schrift, weil beide Stops gedaempft/dunkel sind.
+    _acc = QColor(c["accent"])
+    acc_btn_top = _acc.darker(280).name()
+    acc_btn_bot = _acc.darker(150).name()
+    acc_btn_top_h = _acc.darker(230).name()
+    acc_btn_bot_h = _acc.darker(120).name()
     return f"""
         QWidget {{
             background-color: {c['bg']};
@@ -349,16 +358,18 @@ def global_qss() -> str:
         QPushButton:default {{
             border: 1px solid {c['accent']};
         }}
-        /* Primaer-Buttons: setProperty("accent", True) im Code. */
+        /* Primaer-Buttons: setProperty("accent", True) im Code. Ruhiger
+           Verlauf dunkel -> Akzent (statt greller Vollflaeche), helle Schrift. */
         QPushButton[accent="true"] {{
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {c['accent_hover']}, stop:1 {c['accent']});
-            color: {c['accent_text']};
+                stop:0 {acc_btn_top}, stop:1 {acc_btn_bot});
+            color: #EAFBFB;
             border: 0;
             font-weight: 600;
         }}
         QPushButton[accent="true"]:hover {{
-            background: {c['accent_hover']};
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 {acc_btn_top_h}, stop:1 {acc_btn_bot_h});
         }}
 
         /* --- Checkbox / Combo --- */

@@ -392,14 +392,14 @@ class ParticleEditor(QMainWindow):
         self.btn_burst = QPushButton("Burst")
         self.btn_burst.setObjectName("burstBtn")
         self.btn_burst.setToolTip("Einmalige Emission (fuer Explosion/Funken)")
-        # Warmer Explosions-Verlauf (Amber -> Orange).
+        # Dezenter, gedaempfter Orange-Verlauf (passt zum ruhigen Accent-Look).
         self.btn_burst.setStyleSheet(
             "QPushButton#burstBtn { background: qlineargradient("
-            "x1:0, y1:0, x2:0, y2:1, stop:0 #FFB347, stop:1 #E8590C); "
-            "color:#2A1500; border:0; border-radius:6px; padding:5px 16px; "
+            "x1:0, y1:0, x2:0, y2:1, stop:0 #B5651D, stop:1 #8A3B0A); "
+            "color:#FFEFE0; border:0; border-radius:6px; padding:5px 16px; "
             "font-weight:600; } "
             "QPushButton#burstBtn:hover { background: qlineargradient("
-            "x1:0, y1:0, x2:0, y2:1, stop:0 #FFC773, stop:1 #FB6A1A); }")
+            "x1:0, y1:0, x2:0, y2:1, stop:0 #C9762B, stop:1 #9C4A12); }")
         self.btn_burst.clicked.connect(
             lambda: self.preview.burst(max(40, self.rate.value() * 8)))
         prev_row.addWidget(self.btn_burst)
@@ -424,15 +424,8 @@ class ParticleEditor(QMainWindow):
         btn_clear.clicked.connect(self.sys.clear)
         btns.addWidget(btn_clear)
         btn_export = QPushButton("GB-Code exportieren")
-        btn_export.setObjectName("exportBtn")
-        # Ruhiger Verlauf dunkel-teal -> Cyan statt der grellen Vollflaeche.
-        btn_export.setStyleSheet(
-            "QPushButton#exportBtn { background: qlineargradient("
-            "x1:0, y1:0, x2:0, y2:1, stop:0 #186666, stop:1 #27A3A3); "
-            "color:#EAFBFB; border:0; border-radius:6px; padding:5px 14px; "
-            "font-weight:600; } "
-            "QPushButton#exportBtn:hover { background: qlineargradient("
-            "x1:0, y1:0, x2:0, y2:1, stop:0 #1E7E7E, stop:1 #2DC4C4); }")
+        # Nutzt den globalen (jetzt ruhigen) Accent-Button-Stil aus theme.py.
+        btn_export.setProperty("accent", True)
         btn_export.clicked.connect(self._export)
         btns.addWidget(btn_export)
         cl.addLayout(btns)
