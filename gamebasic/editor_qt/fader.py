@@ -12,6 +12,7 @@ farbcodierte Parameter-Gruppen).
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QSlider, QVBoxLayout, QWidget
 
 from .theme import COLORS
@@ -55,8 +56,12 @@ class Fader(QWidget):
         self._slider = QSlider(Qt.Orientation.Horizontal)
         self._slider.setRange(0, self._n)
         if accent:
+            # Gefuellte Spur als Verlauf dunkel -> Akzentfarbe (statt flaechig
+            # grell). Der Startpunkt ist eine abgedunkelte Variante des Akzents.
+            dark = QColor(accent).darker(300).name()
             self._slider.setStyleSheet(
-                f"QSlider::sub-page:horizontal {{ background-color:{accent}; "
+                f"QSlider::sub-page:horizontal {{ background: qlineargradient("
+                f"x1:0, y1:0, x2:1, y2:0, stop:0 {dark}, stop:1 {accent}); "
                 f"border-radius:3px; }}"
                 f"QSlider::handle:horizontal {{ background-color:{accent}; "
                 f"border:2px solid {COLORS['bg']}; width:14px; height:14px; "
