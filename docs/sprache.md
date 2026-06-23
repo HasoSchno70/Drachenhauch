@@ -57,6 +57,16 @@ DIM grid[10, 10], score, lives[3] AS INTEGER
 
 Alle Variablen einer Multi-DIM bekommen denselben Typ und ihren Typ-Default als Anfangswert.
 
+> **Reservierte Wörter nicht als Variablennamen.** Manche kurze Namen sind
+> Schlüsselwörter und können nicht als Bezeichner dienen — neben den
+> offensichtlichen (`to`, `step`, `mod`, `end`, `next`, `new`, `class`, `in`)
+> auch einige, die als Variablenname naheliegen: **`map`, `image`, `sound`,
+> `input`, `file`, `data`, `read`, `band`**. `DIM band AS INTEGER` meldet dann
+> „'BAND' ist ein reserviertes Wort …". Workaround: anders benennen (`img`,
+> `snd`, `karte`, `daten`, …). Unbedenklich sind dagegen gängige Namen wie
+> `value`, `key`, `count`, `index`, `name`, `type`, `result`, `size`, `pos`,
+> `state`, `item`, `text`, `color`.
+
 Konstanten mit `CONST`:
 
 ```basic
@@ -256,6 +266,11 @@ s = "Sie sagte ""Hallo""."     ' -> Sie sagte "Hallo".
 String-Funktionen siehe [Standard-Built-ins](builtins-core.md): `LEFT$`, `RIGHT$`, `MID$`, `INSTR`, `REPLACE$`, `TRIM$`, `SPLIT$`, `JOIN$`, `UPPER$`, `LOWER$`, `LEN`, `STR$`, `VAL`, `CHR$`, `ASC`, `PADL$`, `PADR$`, `REPEAT$`, `SPACE$`, `HEX$`.
 
 Konvention: String-Funktionen mit `$`-Suffix existieren auch ohne Suffix (`UPPER$` und `UPPER` sind dasselbe).
+
+> **`+` mit einem String wandelt die andere Seite automatisch um** (kein
+> Typfehler): `"Punkte: " + 42` ergibt `"Punkte: 42"`, `"ok=" + TRUE` ergibt
+> `"ok=TRUE"`. Bequem fürs Zusammenbauen von Ausgaben — aber wer strikte Typen
+> erwartet, wird überrascht. (`STR$(v)` macht die Umwandlung explizit.)
 
 ## Kontrollfluss: IF / ELSE
 
@@ -720,6 +735,17 @@ FOR i = 0 TO 4
     coins[i] = SPRITE_NEW(coin_img, 8, 8)
 NEXT
 ```
+
+> **Arrays werden per Referenz übergeben.** Übergibt man ein Array an eine
+> `SUB`/`FUNCTION`, teilen sich Aufrufer und Aufgerufener denselben Speicher —
+> Änderungen im Unterprogramm wirken auf das Original (genau das nutzen die
+> `ARRAY_PUSH`/`SORT`/… und eigene In-Place-Routinen). Wer eine **eigene Kopie**
+> braucht, ruft `ARRAY_COPY(arr)`.
+>
+> **Index-Zugriff ist streng, Slicing klemmt.** Ein direkter Index außerhalb der
+> Grenzen wirft einen Laufzeitfehler (`Index 5 ausserhalb [0..2]`). Ein **Slice**
+> dagegen wird still auf die gültigen Grenzen geklemmt: `arr[0:99]` auf ein
+> 3er-Array liefert ohne Fehler 3 Elemente. (Slicing gibt es nur für 1D-Arrays.)
 
 ## Maps
 

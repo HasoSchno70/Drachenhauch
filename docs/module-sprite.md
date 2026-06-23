@@ -28,7 +28,9 @@ IMPORT "sprite"
 | `SPRITE_TINT_CLEAR(sp)` | Tint zurück |
 | `SPRITE_UPDATE(sp, dt_ms)` | Position + Animation fortschreiben |
 | `SPRITE_DRAW(sp)` | zeichnen (camera-aware) |
-| `SPRITE_COLLIDES(sp1, sp2)` → BOOLEAN | AABB |
+| `SPRITE_COLLIDES(sp1, sp2)` → BOOLEAN | AABB zweier Sprites |
+| `SPRITE_HIT_BOX(sp, x, y, w, h)` → BOOLEAN | AABB-Test des Sprites gegen ein Rechteck `(x, y, w, h)` |
+| `SPRITE_HIT_POINT(sp, x, y)` → BOOLEAN | liegt der Punkt `(x, y)` im Sprite? (Maus-Klick-Test) |
 
 ## Sheet-Layout
 

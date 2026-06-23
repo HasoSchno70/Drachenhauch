@@ -13,8 +13,8 @@ IMPORT "tile_collide"
 
 | Funktion | Rueckgabe |
 |---|---|
-| `TILE_SWEEP_X(map, layer_idx, x, y, w, h, dx)` | TUPLE `(new_x, hit_bool)` |
-| `TILE_SWEEP_Y(map, layer_idx, x, y, w, h, dy)` | TUPLE `(new_y, hit_bool)` |
+| `TILE_SWEEP_X(map, layer_idx, x, y, w, h, dx)` | TUPLE `(new_x: FLOAT, hit: BOOL)` |
+| `TILE_SWEEP_Y(map, layer_idx, x, y, w, h, dy)` | TUPLE `(new_y: FLOAT, hit: BOOL)` |
 | `TILE_IS_SOLID(map, layer_idx, tx, ty)` | BOOLEAN (Tile-Koords) |
 | `TILE_AT_PIXEL(map, layer_idx, px, py)` | INTEGER (GID an Pixel-Pos) |
 

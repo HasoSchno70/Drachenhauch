@@ -167,6 +167,46 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 
 ---
 
+## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
+
+### F1. `physics3d` war komplett undokumentiert + toter Link — ✅ BEHOBEN
+> `docs/module-physics2d.md` verlinkte auf `module-physics3d.md`, die **nicht
+> existierte** — obwohl PHYS3D voll implementiert ist (`builtins.rs`, 44 Arme:
+> `PHYS3D_NEW/ADD_BOX/ADD_SPHERE/STEP/BODY_*/SET_*/…`) und in `examples/107`
+> genutzt wird. **`docs/module-physics3d.md` neu geschrieben** (Signaturen,
+> Quaternion-Render-Idiom über `QUAT_NEW`/`MAT4_TRS`) → Link jetzt gültig.
+
+### F2. `SPRITE_HIT_BOX` / `SPRITE_HIT_POINT` undokumentiert — ✅ BEHOBEN
+> Existieren in `builtins.rs`, standen in keiner Doku. In `module-sprite.md`
+> ergänzt: `SPRITE_HIT_BOX(sp, x, y, w, h)` (AABB gegen Rechteck),
+> `SPRITE_HIT_POINT(sp, x, y)` (Punkt-im-Sprite, Klick-Test).
+
+### F3. Mehr reservierte Wörter als naheliegende Variablennamen — ✅ DOKUMENTIERT
+> Verifiziert reserviert und überraschend: **`map`, `image`, `sound`, `input`,
+> `file`, `data`, `read`, `in`** (neben `band`, `step`, `mod`, …). Unbedenklich:
+> `value`, `key`, `count`, `index`, `name`, `type`, `result`, `size`, `pos`,
+> `state`, `item`, `text`, `color`. In `sprache.md` (Variablen) als Notiz.
+
+### F4. Array-Zugriff streng, Slicing klemmt still — ✅ DOKUMENTIERT
+> `arr[5]` außerhalb → Laufzeitfehler `Index 5 ausserhalb [0..2]`. `arr[0:99]`
+> auf ein 3er-Array → still auf Länge 3 geklemmt, kein Fehler. Asymmetrie jetzt
+> in `sprache.md` (Arrays) erklärt. Slicing nur für 1D.
+
+### F5. Arrays immer per Referenz — ✅ DOKUMENTIERT
+> An `SUB`/`FUNCTION` übergebene Arrays teilen den Speicher; Änderungen wirken
+> aufs Original (`ARRAY_COPY` für eine Kopie). In `sprache.md` (Arrays) vermerkt.
+
+### F6. `+` mit String koppelt still (Zahl/Bool → String) — ✅ DOKUMENTIERT
+> `"x=" + 42` → `"x=42"`, `"f=" + TRUE` → `"f=TRUE"`, kein Typfehler. In
+> `sprache.md` (Strings) vermerkt.
+
+### F7. `TILE_SWEEP_X/Y` geben FLOAT im Tupel — ✅ DOKUMENTIERT
+> `TILE_SWEEP_X(...)` → `(new_x, hit)`, wobei `new_x` ein **FLOAT** ist. Wer
+> direkt an eine INTEGER-Koordinate zuweist, braucht `INT()/ROUND()`. Rückgabe
+> in `module-tile-collide.md` jetzt als `(new_x: FLOAT, hit: BOOL)` ausgewiesen.
+
+---
+
 ## Bereits behoben (diese/letzte Sessions — nicht mehr offen)
 
 - `ATLAS_DRAW_FLIPPED`: flip_x/flip_y nehmen jetzt TRUE/FALSE **oder** 1/0; echtes
