@@ -267,8 +267,15 @@ QListWidget::item {{
     border-bottom: 1px solid {COLORS["border"]};
 }}
 QListWidget::item:selected {{
-    background-color: {COLORS["accent"]};
-    color: white;
+    /* Dezenter Verlauf: oben getoentes Tuerkis, nach unten in den
+       Listen-Hintergrund auslaufend -- statt einer grellen Vollflaeche. */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(45, 224, 224, 34%), stop:1 rgba(45, 224, 224, 7%));
+    color: {COLORS["fg"]};
+}}
+QListWidget::item:selected:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 rgba(45, 224, 224, 44%), stop:1 rgba(45, 224, 224, 12%));
 }}
 QCheckBox {{
     color: {COLORS["fg"]};
@@ -2663,10 +2670,23 @@ class SpriteEditorWindow(QMainWindow):
         self.status_pixel = QLabel("")
         self.status_pixel.setStyleSheet(f"color: {COLORS['fg_muted']}; "
                                          f"font-family: Consolas;")
+        # Canvas-Groesse als anklickbarer Button -- direkt dort, wo der User die
+        # aktuelle Groesse abliest, kann er sie auch aendern (oeffnet den
+        # Resize-Dialog; gleiche Aktion wie Bearbeiten -> Canvas-Groesse).
+        self.status_size = QToolButton()
+        self.status_size.setAutoRaise(True)
+        self.status_size.setCursor(Qt.PointingHandCursor)
+        self.status_size.setToolTip("Canvas-Groesse aendern")
+        self.status_size.setStyleSheet(
+            f"QToolButton {{ color: {COLORS['accent']}; font-family: Consolas; "
+            f"border: none; padding: 0 6px; }} "
+            f"QToolButton:hover {{ color: {COLORS['accent_hover']}; }}")
+        self.status_size.clicked.connect(self.action_resize_canvas)
         self.status_doc = QLabel("")
         self.status_doc.setStyleSheet(f"color: {COLORS['fg_muted']}; "
                                        f"font-family: Consolas;")
         sb.addWidget(self.status_pixel, 1)
+        sb.addPermanentWidget(self.status_size)
         sb.addPermanentWidget(self.status_doc)
 
     # --- Status / Tool / Color ---
@@ -2675,8 +2695,9 @@ class SpriteEditorWindow(QMainWindow):
         n = len(self.doc.frames)
         path = str(self.doc.filepath) if self.doc.filepath else "(ungespeichert)"
         sym_short = {"none": "-", "x": "X", "y": "Y", "both": "X+Y"}[self.symmetry_mode]
+        self.status_size.setText(f"{self.doc.width}x{self.doc.height}")
         self.status_doc.setText(
-            f"{self.doc.width}x{self.doc.height}  Frames: {n}  "
+            f"Frames: {n}  "
             f"#{self.doc.current_index:02d}  Brush: {self.brush_size}  "
             f"Sym: {sym_short}  {path}"
         )
