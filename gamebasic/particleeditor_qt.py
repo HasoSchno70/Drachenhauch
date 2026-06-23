@@ -16,9 +16,9 @@ from PySide6.QtGui import (
     QColor, QFont, QKeySequence, QPainter, QPen, QRadialGradient, QShortcut,
 )
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox, QFrame,
-    QGroupBox, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
-    QSpinBox, QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox,
+    QFileDialog, QFrame, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
+    QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.fader import Fader
@@ -93,16 +93,36 @@ def _compute_colors(sys: _ParticleSystem):
 class _Preview(QWidget):
     """Echtzeit-Partikel-Vorschau (QTimer-getrieben)."""
 
+    # Vorschau-Hintergruende -- damit sich Glow/Fade/helle Partikel gegen
+    # verschiedene Untergruende beurteilen lassen (nicht nur das dunkle Theme).
+    _BG = {
+        "dark":  QColor(COLORS["bg"]),
+        "black": QColor(0, 0, 0),
+        "light": QColor(200, 200, 200),
+    }
+
     def __init__(self, sys: _ParticleSystem, parent=None):
         super().__init__(parent)
         self.sys = sys
         self.emit_rate = 6
         self.paused = False
+        self.bg_mode = "dark"
         self.setMinimumSize(420, 420)
         self._timer = QTimer(self)
         self._timer.setInterval(16)            # ~60 fps
         self._timer.timeout.connect(self._tick)
         self._timer.start()
+
+    def set_bg_mode(self, mode: str) -> None:
+        self.bg_mode = mode
+        self.update()
+
+    def burst(self, n: int) -> None:
+        """Einmalige Emission von `n` Partikeln in der Mitte -- fuer
+        Explosion/Funken-Vorschau, die im Spiel ja auch einmalig feuern."""
+        self.sys.x = self.width() / 2.0
+        self.sys.y = self.height() / 2.0
+        self.sys.emit(max(1, n))
 
     def _tick(self) -> None:
         if not self.paused:
@@ -112,9 +132,22 @@ class _Preview(QWidget):
             self.sys.update(16)
         self.update()
 
+    def _paint_bg(self, p: QPainter) -> None:
+        if self.bg_mode == "checker":
+            tile = 16
+            a, b = QColor(58, 58, 58), QColor(38, 38, 38)
+            p.fillRect(self.rect(), b)
+            w, h = self.width(), self.height()
+            for ty in range(0, h, tile):
+                for tx in range(0, w, tile):
+                    if ((tx // tile) + (ty // tile)) % 2 == 0:
+                        p.fillRect(tx, ty, tile, tile, a)
+        else:
+            p.fillRect(self.rect(), self._BG.get(self.bg_mode, self._BG["dark"]))
+
     def paintEvent(self, _event):  # noqa: N802
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(COLORS["bg"]))
+        self._paint_bg(p)
         n = self.sys.count()
         if n == 0:
             return
@@ -329,6 +362,26 @@ class ParticleEditor(QMainWindow):
         self.rate = self._ispin(el, "Emission/Frame", 0, 200, 6, amber)
         cl.addWidget(g_emit)
 
+        # Vorschau-Optionen: Hintergrund + Burst
+        prev_row = QHBoxLayout()
+        bg_lab = QLabel("Hintergrund")
+        bg_lab.setStyleSheet(f"color:{COLORS['fg_muted']}; font-size:11px;")
+        prev_row.addWidget(bg_lab)
+        self.bg_combo = QComboBox()
+        # (Anzeige, Modus) -- Modus geht an _Preview.set_bg_mode.
+        for label, mode in (("Dunkel", "dark"), ("Schwarz", "black"),
+                            ("Hell", "light"), ("Schachbrett", "checker")):
+            self.bg_combo.addItem(label, mode)
+        self.bg_combo.currentIndexChanged.connect(
+            lambda _i: self.preview.set_bg_mode(self.bg_combo.currentData()))
+        prev_row.addWidget(self.bg_combo, 1)
+        self.btn_burst = QPushButton("Burst")
+        self.btn_burst.setToolTip("Einmalige Emission (fuer Explosion/Funken)")
+        self.btn_burst.clicked.connect(
+            lambda: self.preview.burst(max(40, self.rate.value() * 8)))
+        prev_row.addWidget(self.btn_burst)
+        cl.addLayout(prev_row)
+
         # Buttons
         btns = QHBoxLayout()
         self.btn_undo = QPushButton("↶")
@@ -387,7 +440,27 @@ class ParticleEditor(QMainWindow):
         return f
 
     # ------------------------------------------------- Sync
+    def _enforce_minmax(self) -> None:
+        """Haelt jedes max-Widget >= seinem min-Widget. Vorher nutzte die Sim
+        still `max(min,max)`, waehrend die Spinbox den ignorierten Wert zeigte
+        (Anzeige != Verhalten). Jetzt zieht das max-Widget sichtbar nach.
+        blockSignals verhindert Re-Entrancy ueber valueChanged -> _on_change."""
+        if getattr(self, "_syncing", False):
+            return
+        self._syncing = True
+        try:
+            for lo, hi in ((self.vx_min, self.vx_max), (self.vy_min, self.vy_max),
+                           (self.size_min, self.size_max),
+                           (self.life_min, self.life_max)):
+                if lo.value() > hi.value():
+                    hi.blockSignals(True)
+                    hi.setValue(lo.value())
+                    hi.blockSignals(False)
+        finally:
+            self._syncing = False
+
     def _on_change(self, *_a) -> None:
+        self._enforce_minmax()
         s = self.sys
         s.vx_min = self.vx_min.value()
         s.vx_max = max(self.vx_min.value(), self.vx_max.value())
@@ -448,6 +521,13 @@ class ParticleEditor(QMainWindow):
         dl.addWidget(edit)
         row = QHBoxLayout()
         row.addStretch(1)
+        btn_test = QPushButton("In GameBasic testen")
+        btn_test.setToolTip("Lauffaehige Demo (Maus = Emitter) im gbrt-Fenster starten")
+        btn_test.clicked.connect(self._run_in_gamebasic)
+        row.addWidget(btn_test)
+        btn_save = QPushButton("In .gb speichern...")
+        btn_save.clicked.connect(lambda: self._save_snippet(code))
+        row.addWidget(btn_save)
         btn_copy = QPushButton("In Zwischenablage")
         btn_copy.setProperty("accent", True)
         btn_copy.clicked.connect(
@@ -456,6 +536,97 @@ class ParticleEditor(QMainWindow):
         dl.addLayout(row)
         dlg.show()
         self._export_dlg = dlg          # Referenz halten
+
+    def _save_snippet(self, code: str) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "GB-Code speichern",
+            str(self.project_root / "partikel.gb"), "GameBasic (*.gb)")
+        if not path:
+            return
+        try:
+            Path(path).write_text(code, encoding="utf-8")
+        except Exception as exc:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", str(exc))
+
+    def _build_runnable_demo(self) -> str:
+        """Lauffaehiges Test-Programm (im Gegensatz zum Export-Snippet, dessen
+        Game-Loop auskommentiert ist): Fenster + Loop, Emitter folgt der Maus,
+        Klick = Eruption. Mirror von examples/28_particles_visual.gb."""
+        s = self.sys
+        rate = self.rate.value()
+        burst = max(40, rate * 8)
+        lines = [
+            "' Auto-generiert vom Partikel-Editor.",
+            "' Maus bewegen = Emitter, Klick = Eruption, ESC = Ende.",
+            'IMPORT "particles"',
+            "",
+            'SCREEN(640, 480, "Partikel-Test")',
+            "",
+            "DIM ps AS PARTICLE_SYSTEM",
+            "ps = PARTICLE_SYSTEM_NEW(320.0, 240.0)",
+            f"PARTICLE_SET_VELOCITY(ps, {s.vx_min:g}, {s.vx_max:g}, "
+            f"{s.vy_min:g}, {s.vy_max:g})",
+            f"PARTICLE_SET_LIFETIME(ps, {s.lifetime_min}, {s.lifetime_max})",
+            f"PARTICLE_SET_GRAVITY(ps, {s.gravity_x:g}, {s.gravity_y:g})",
+            f"PARTICLE_SET_SIZE(ps, {s.size_min}, {s.size_max})",
+            f"PARTICLE_SET_COLOR(ps, &H{s.color:06X})",
+        ]
+        if s.has_color_end:
+            lines.append(f"PARTICLE_SET_COLOR_END(ps, &H{s.color_end:06X})")
+        lines += [
+            f"PARTICLE_SET_FADE(ps, {'TRUE' if s.fade else 'FALSE'})",
+            f'PARTICLE_SET_MODE(ps, "{s.mode}")',
+            "",
+            "DIM last_ms AS INTEGER",
+            "last_ms = MILLIS()",
+            "",
+            "WHILE NOT QUITREQUESTED()",
+            "    IF KEYPRESSED(27) THEN",
+            "        BREAK",
+            "    END IF",
+            "    DIM now_ms AS INTEGER",
+            "    now_ms = MILLIS()",
+            "    DIM dt AS INTEGER",
+            "    dt = now_ms - last_ms",
+            "    last_ms = now_ms",
+            "    PARTICLE_SET_POS(ps, MOUSEX() * 1.0, MOUSEY() * 1.0)",
+            "    IF MOUSEBUTTON(0) THEN",
+            f"        PARTICLE_EMIT(ps, {burst})",
+            "    ELSE",
+            f"        PARTICLE_EMIT(ps, {rate})",
+            "    END IF",
+            "    PARTICLE_UPDATE(ps, dt)",
+            "    CLS(RGB(0, 0, 30))",
+            "    PARTICLE_DRAW(ps)",
+            '    TEXT(8, 8, "Maus = Emitter, Klick = Eruption, ESC = Ende", '
+            "RGB(200, 200, 200))",
+            "    FLIP()",
+            "    SLEEP(16)",
+            "WEND",
+        ]
+        return "\n".join(lines)
+
+    def _run_in_gamebasic(self) -> None:
+        import sys
+        import subprocess
+        import tempfile
+        gbrun = self.project_root / "gbrun.py"
+        if not gbrun.exists():
+            QMessageBox.warning(
+                self, "gbrun.py fehlt",
+                f"gbrun.py nicht gefunden in {self.project_root}.\n"
+                f"Der Partikel-Test braucht das CLI, um GB-Programme zu starten.")
+            return
+        # Temp-Dir bewusst NICHT loeschen -- der gbrun-Subprozess liest die
+        # Datei noch beim Start (OS-Cleanup nach Reboot ist OK).
+        tmpdir = Path(tempfile.mkdtemp(prefix="gb_particle_test_"))
+        gb_path = tmpdir / "_test.gb"
+        gb_path.write_text(self._build_runnable_demo(), encoding="utf-8")
+        try:
+            subprocess.Popen([sys.executable, str(gbrun), str(gb_path)],
+                             cwd=str(tmpdir))
+        except Exception as exc:
+            QMessageBox.critical(self, "Start fehlgeschlagen", str(exc))
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
