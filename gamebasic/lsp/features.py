@@ -80,21 +80,22 @@ def _prefix_at(text: str, line0: int, char0: int) -> tuple[str, int]:
 # --------------------------------------------------------------- Diagnostics
 
 def diagnostics(text: str, base_path) -> list[dict]:
-    """Erste Fehlerstelle der Pipeline als LSP-Diagnostic (oder leer)."""
+    """Alle Diagnosen der Pipeline als LSP-Diagnostics (Errors + Warnungen)."""
     from ..editor_qt.error_check import _check_source
     base = Path(base_path) if base_path else None
-    problem = _check_source(text, base)
-    if problem is None:
-        return []
-    line0 = max(0, problem.line - 1)
-    end_char = len(_line_text(text, line0)) or 1
-    return [{
-        "range": {"start": {"line": line0, "character": 0},
-                  "end": {"line": line0, "character": end_char}},
-        "severity": 1,                 # Error
-        "source": "gamebasic",
-        "message": problem.message,
-    }]
+    out: list[dict] = []
+    for problem in _check_source(text, base):
+        line0 = max(0, problem.line - 1)
+        end_char = len(_line_text(text, line0)) or 1
+        out.append({
+            "range": {"start": {"line": line0, "character": 0},
+                      "end": {"line": line0, "character": end_char}},
+            # LSP-Severity: 1=Error, 2=Warning.
+            "severity": 2 if problem.severity == "warning" else 1,
+            "source": "gamebasic",
+            "message": problem.message,
+        })
+    return out
 
 
 # --------------------------------------------------------------- Completion

@@ -14,8 +14,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDialogButtonBox, QGridLayout,
-    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout,
-    QWidget,
+    QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QSpinBox,
+    QVBoxLayout, QWidget,
 )
 
 
@@ -442,8 +442,8 @@ class RecoveryDialog(QDialog):
 
 
 class SettingsDialog(QDialog):
-    """Einstellungen: Theme + Auto-Trigger fuer Auto-Completion +
-    Format-on-Save."""
+    """Einstellungen: Theme, Schriftgroesse, Zeilenumbruch, Minimap,
+    Auto-Completion-Trigger, Format-on-Save."""
 
     def __init__(self, parent: QWidget, settings: dict):
         super().__init__(parent)
@@ -451,25 +451,51 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Einstellungen")
         self.setModal(True)
 
+        from .theme import EDITOR_FONT_SIZE
+
         layout = QGridLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(10)
+        row = 0
 
         # Theme
-        layout.addWidget(QLabel("Theme:"), 0, 0)
+        layout.addWidget(QLabel("Theme:"), row, 0)
         self.theme_combo = QComboBox()
         self.theme_combo.addItem("Dark (VSCode Dark+)", "dark")
         self.theme_combo.addItem("Light (VSCode Light+)", "light")
         current_theme = settings.get("theme", "dark")
         idx = self.theme_combo.findData(current_theme)
         self.theme_combo.setCurrentIndex(max(0, idx))
-        layout.addWidget(self.theme_combo, 0, 1)
+        layout.addWidget(self.theme_combo, row, 1)
+        row += 1
+
+        # Schriftgroesse
+        layout.addWidget(QLabel("Schriftgroesse:"), row, 0)
+        self.spin_font = QSpinBox()
+        self.spin_font.setRange(6, 36)
+        self.spin_font.setSuffix(" pt")
+        self.spin_font.setValue(int(settings.get("editor_font_size", EDITOR_FONT_SIZE)))
+        layout.addWidget(self.spin_font, row, 1)
+        row += 1
+
+        # Zeilenumbruch
+        self.cb_wrap = QCheckBox("Zeilenumbruch")
+        self.cb_wrap.setChecked(bool(settings.get("word_wrap", False)))
+        layout.addWidget(self.cb_wrap, row, 0, 1, 2)
+        row += 1
+
+        # Minimap
+        self.cb_minimap = QCheckBox("Minimap anzeigen")
+        self.cb_minimap.setChecked(bool(settings.get("minimap_visible", True)))
+        layout.addWidget(self.cb_minimap, row, 0, 1, 2)
+        row += 1
 
         # Auto-Trigger
         self.cb_auto = QCheckBox("Auto-Completion automatisch beim Tippen oeffnen")
         self.cb_auto.setChecked(bool(settings.get("autocomplete_auto", True)))
-        layout.addWidget(self.cb_auto, 1, 0, 1, 2)
+        layout.addWidget(self.cb_auto, row, 0, 1, 2)
+        row += 1
 
         # Format-on-Save
         self.cb_format_on_save = QCheckBox(
@@ -478,7 +504,8 @@ class SettingsDialog(QDialog):
         self.cb_format_on_save.setChecked(
             bool(settings.get("format_on_save", False))
         )
-        layout.addWidget(self.cb_format_on_save, 2, 0, 1, 2)
+        layout.addWidget(self.cb_format_on_save, row, 0, 1, 2)
+        row += 1
 
         # Buttons
         bb = QDialogButtonBox(
@@ -487,12 +514,21 @@ class SettingsDialog(QDialog):
         )
         bb.accepted.connect(self.accept)
         bb.rejected.connect(self.reject)
-        layout.addWidget(bb, 3, 0, 1, 2)
+        layout.addWidget(bb, row, 0, 1, 2)
 
-        self.resize(420, 200)
+        self.resize(440, 260)
 
     def selected_theme(self) -> str:
         return self.theme_combo.currentData() or "dark"
+
+    def font_size(self) -> int:
+        return int(self.spin_font.value())
+
+    def word_wrap_enabled(self) -> bool:
+        return self.cb_wrap.isChecked()
+
+    def minimap_enabled(self) -> bool:
+        return self.cb_minimap.isChecked()
 
     def auto_complete_enabled(self) -> bool:
         return self.cb_auto.isChecked()

@@ -34,9 +34,9 @@ from PySide6.QtCore import QObject, Signal
 class ParseProblem:
     line: int
     message: str
-    # Severity: "error" (default) oder "warning". Aktuell liefert die
-    # Pipeline nur Errors; Warnings sind ein nahe liegender naechster
-    # Schritt (unbenutzte Variable, geschattete Deklaration).
+    # Severity: "error" (default) oder "warning". gbrt --check liefert beide
+    # (z.B. Hardware-Modul-IMPORT ohne Build = Warning); der Editor rendert
+    # Warnungen mit gelber statt roter Wellenlinie.
     severity: str = "error"
     # Phase, in der das Problem erkannt wurde. Hilft bei Debugging und
     # erlaubt der UI, Compile-Errors anders zu rendern als Parse-Errors
@@ -51,20 +51,23 @@ def _find_gbrt():
     return find_gbrt()
 
 
-def _check_source(source: str, base_path: Path | None) -> Optional[ParseProblem]:
-    """Liefert das erste Diagnostik-Problem (oder None). Bevorzugt `gbrt --check`
-    (volle preprocess/lex/parse/compile-Diagnostik mit Zeile); faellt gbrt, nur
-    Syntax (Lexer/Parser) ohne den Python-Compiler."""
+def _check_source(source: str, base_path: Path | None) -> list[ParseProblem]:
+    """Liefert ALLE Diagnostik-Probleme (leer = sauber). Bevorzugt `gbrt --check`
+    (volle preprocess/lex/parse/compile-Diagnostik mit Zeile, inkl. Warnungen);
+    faellt gbrt, nur Syntax (Lexer/Parser) ohne den Python-Compiler -- dieser
+    Fallback findet nur das erste Syntaxproblem."""
     gbrt = _find_gbrt()
     if gbrt is not None:
         return _check_via_gbrt(source, base_path, gbrt)
-    return _check_syntax_only(source, base_path)
+    one = _check_syntax_only(source, base_path)
+    return [one] if one is not None else []
 
 
-def _check_via_gbrt(source: str, base_path, gbrt) -> Optional[ParseProblem]:
-    """`gbrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> erstes
-    ParseProblem. Zeilen sind quell-relativ (bei `IMPORT "datei.gb"`-Inlining
-    moeglw. verschoben). Bei jedem gbrt-Fehler defensiv None (kein Editor-Crash)."""
+def _check_via_gbrt(source: str, base_path, gbrt) -> list[ParseProblem]:
+    """`gbrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> Liste
+    aller ParseProblems (Errors UND Warnungen). Zeilen sind quell-relativ (bei
+    `IMPORT "datei.gb"`-Inlining moeglw. verschoben). Bei jedem gbrt-Fehler
+    defensiv leere Liste (kein Editor-Crash)."""
     import json
     import os
     import subprocess
@@ -79,20 +82,20 @@ def _check_via_gbrt(source: str, base_path, gbrt) -> Optional[ParseProblem]:
                            capture_output=True, text=True, timeout=15)
         diags = json.loads(r.stdout or "[]")
     except Exception:
-        return None
+        return []
     finally:
         try:
             os.unlink(tmp)
         except OSError:
             pass
-    if not diags:
-        return None
-    d = diags[0]
-    return ParseProblem(
-        line=int(d.get("line", 0)) or 1,
-        message=str(d.get("message", "")),
-        severity=str(d.get("severity", "error")),
-        phase=str(d.get("phase", "compile")))
+    out: list[ParseProblem] = []
+    for d in diags:
+        out.append(ParseProblem(
+            line=int(d.get("line", 0)) or 1,
+            message=str(d.get("message", "")),
+            severity=str(d.get("severity", "error")),
+            phase=str(d.get("phase", "compile"))))
+    return out
 
 
 def _check_syntax_only(source: str, base_path: Path | None) -> Optional[ParseProblem]:
@@ -154,7 +157,8 @@ class LiveErrorChecker(QObject):
     Signaling marshalt automatisch in die Receiver-Event-Loop).
     """
 
-    problem_changed = Signal(object)   # ParseProblem | None
+    problem_changed = Signal(object)    # ParseProblem | None (erstes Problem)
+    problems_changed = Signal(object)   # list[ParseProblem] (alle, evtl. leer)
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
@@ -172,9 +176,13 @@ class LiveErrorChecker(QObject):
         t.start()
 
     def _run(self, gen: int, source: str, base_path: Path | None) -> None:
-        problem = _check_source(source, base_path)
+        problems = _check_source(source, base_path)
         # Ist dieses Resultat noch das aktuelle? Sonst verwerfen.
         with self._lock:
             if gen != self._gen:
                 return
-        self.problem_changed.emit(problem)
+        # Erst die Voll-Liste (Editor-Underlines + Problems-Panel), dann das
+        # erste Problem (Statusbar) -- so ist `current_error()` schon frisch,
+        # wenn der Statusbar-Slot laeuft.
+        self.problems_changed.emit(problems)
+        self.problem_changed.emit(problems[0] if problems else None)

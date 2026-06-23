@@ -202,9 +202,10 @@ class CodeEditor(
         self._secondary: list[tuple[int, int]] = []
 
         # Live-Error-Check: laeuft async via QThread, debounced.
-        self._error_problem: ParseProblem | None = None
+        self._error_problem: ParseProblem | None = None   # erstes Problem (Gutter)
+        self._error_problems: list = []                   # alle (Underlines/Panel)
         self._error_checker = LiveErrorChecker(self)
-        self._error_checker.problem_changed.connect(self._on_error_problem)
+        self._error_checker.problems_changed.connect(self._on_error_problems)
         self._error_timer = QTimer(self)
         self._error_timer.setSingleShot(True)
         self._error_timer.setInterval(400)
@@ -593,13 +594,24 @@ class CodeEditor(
         """
         self._error_base = base
 
-    def _on_error_problem(self, problem) -> None:
-        self._error_problem = problem
+    def _on_error_problems(self, problems) -> None:
+        self._error_problems = list(problems or [])
+        # Erstes Problem fuer Gutter-Marker + Statusbar; Errors haben Vorrang
+        # vor Warnungen, damit die wichtigste Meldung gewinnt.
+        self._error_problem = None
+        for p in self._error_problems:
+            if self._error_problem is None or (
+                    self._error_problem.severity != "error"
+                    and p.severity == "error"):
+                self._error_problem = p
         self._refresh_extra_selections()
         self._line_area.update()
 
     def current_error(self) -> ParseProblem | None:
         return self._error_problem
+
+    def current_problems(self) -> list:
+        return self._error_problems
 
     # ----------------------------------------------- Code-Folding
     def _rescan_fold_regions(self) -> None:
@@ -871,24 +883,32 @@ class CodeEditor(
             tc.setPosition(e_, QTextCursor.MoveMode.KeepAnchor)
             wh_sel.cursor = tc
             selections.append(wh_sel)
-        # Live-Error-Underline: rote Wellenlinie auf der Fehler-Zeile.
-        if self._error_problem is not None:
-            err_line = max(1, self._error_problem.line)
-            err_block = self.document().findBlockByNumber(err_line - 1)
-            if err_block.isValid():
-                err_sel = QTextEdit.ExtraSelection()
-                fmt = err_sel.format
-                from PySide6.QtGui import QTextCharFormat
-                fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
-                fmt.setUnderlineColor(QColor(COLORS["error"]))
-                fmt.setProperty(
-                    QTextFormat.Property.FullWidthSelection, True
-                )
-                c = QTextCursor(err_block)
-                c.movePosition(QTextCursor.MoveOperation.EndOfBlock,
-                                QTextCursor.MoveMode.KeepAnchor)
-                err_sel.cursor = c
-                selections.append(err_sel)
+        # Live-Diagnostik-Underlines: Wellenlinie je Problem-Zeile. Errors rot,
+        # Warnungen gelb. Pro Zeile nur einmal (die hoechste Severity gewinnt),
+        # damit doppelte Selektionen auf einer Zeile nicht flackern.
+        from PySide6.QtGui import QTextCharFormat
+        seen_lines: dict[int, str] = {}
+        for p in self._error_problems:
+            ln = max(1, p.line)
+            prev = seen_lines.get(ln)
+            if prev == "error":
+                continue   # Error auf dieser Zeile schlaegt Warning
+            seen_lines[ln] = p.severity if p.severity == "error" else (prev or "warning")
+        for ln, sev in seen_lines.items():
+            blk = self.document().findBlockByNumber(ln - 1)
+            if not blk.isValid():
+                continue
+            sel = QTextEdit.ExtraSelection()
+            fmt = sel.format
+            fmt.setUnderlineStyle(QTextCharFormat.UnderlineStyle.WaveUnderline)
+            fmt.setUnderlineColor(QColor(COLORS["error"] if sev == "error"
+                                         else COLORS["warning"]))
+            fmt.setProperty(QTextFormat.Property.FullWidthSelection, True)
+            c = QTextCursor(blk)
+            c.movePosition(QTextCursor.MoveOperation.EndOfBlock,
+                           QTextCursor.MoveMode.KeepAnchor)
+            sel.cursor = c
+            selections.append(sel)
         # Bracket-Matching: zwei kleine Highlights wenn der Cursor auf
         # oder direkt rechts neben einer Klammer steht.
         for start, end in self._matching_bracket_positions():
@@ -923,7 +943,12 @@ class CodeEditor(
 
     # ------------------------------------------------- Completer
     def _setup_completer(self) -> None:
-        self._completion_model = QStringListModel(all_completions(), self)
+        # Statische Vorschlaege (Keywords/Builtins/Konstanten/Snippets) einmal
+        # cachen; lokale Buffer-Symbole kommen on-demand dazu (revisions-gecacht).
+        self._static_completions = all_completions()
+        self._static_completions_lower = {s.lower() for s in self._static_completions}
+        self._completion_pool_rev = -1
+        self._completion_model = QStringListModel(list(self._static_completions), self)
         self._completer = QCompleter(self._completion_model, self)
         self._completer.setWidget(self)
         self._completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
@@ -960,7 +985,27 @@ class CodeEditor(
             return
         self._show_completer(prefix)
 
+    def _rebuild_completion_pool(self) -> None:
+        """Wortliste = statische Vorschlaege + lokale Symbole (SUB/FUNCTION/
+        DIM/CLASS/...) des aktuellen Buffers. Vor dem Anzeigen aufgerufen, so
+        sind selbst frisch getippte Definitionen sofort vorschlagbar. Per
+        Dokument-Revision gecacht -- bei unveraendertem Text kostenfrei."""
+        rev = self.document().revision()
+        if rev == self._completion_pool_rev:
+            return
+        self._completion_pool_rev = rev
+        from .completer import local_definition_names
+        locals_ = [n for n in local_definition_names(self.toPlainText())
+                   if n.lower() not in self._static_completions_lower]
+        if locals_:
+            merged = sorted(set(self._static_completions) | set(locals_),
+                            key=lambda s: (s.lower(), s))
+            self._completion_model.setStringList(merged)
+        else:
+            self._completion_model.setStringList(list(self._static_completions))
+
     def _show_completer(self, prefix: str) -> None:
+        self._rebuild_completion_pool()
         self._completer.setCompletionPrefix(prefix)
         popup = self._completer.popup()
         popup.setCurrentIndex(self._completer.completionModel().index(0, 0))
@@ -1321,6 +1366,20 @@ class CodeEditor(
         self._line_area.update()
         self.viewport().update()
 
+    def set_font_point_size(self, size: int) -> None:
+        """Schriftgroesse absolut setzen (6..36). Quelle: Einstellungen-Dialog,
+        damit die Groesse persistierbar ist (Strg+Mausrad bleibt transient)."""
+        size = max(6, min(36, int(size)))
+        f = self.font()
+        if f.pointSize() == size:
+            return
+        f.setPointSize(size)
+        self.setFont(f)
+        fm = self.fontMetrics()
+        self.setTabStopDistance(fm.horizontalAdvance(" ") * INDENT_SPACES)
+        self._line_area.update()
+        self.viewport().update()
+
 
     # ----------------------------------------------- Maus
     def wheelEvent(self, event):  # noqa: N802
@@ -1419,6 +1478,10 @@ class CodeEditor(
         self._line_area.update()
 
     def refresh_completions(self) -> None:
-        """Wortliste neu einlesen (z.B. nach Buffer-Aenderungen, falls
-        wir spaeter lokale Identifier in den Pool aufnehmen)."""
-        self._completion_model.setStringList(all_completions())
+        """Statische Vorschlaege neu einlesen (z.B. nach einem Theme-/Builtin-
+        Reload) und den lokalen Symbol-Pool neu aufbauen. Lokale Symbole werden
+        sonst ohnehin lazy vor jedem Anzeigen ergaenzt (`_rebuild_completion_pool`)."""
+        self._static_completions = all_completions()
+        self._static_completions_lower = {s.lower() for s in self._static_completions}
+        self._completion_pool_rev = -1
+        self._rebuild_completion_pool()

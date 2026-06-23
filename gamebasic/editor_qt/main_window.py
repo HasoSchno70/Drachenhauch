@@ -109,6 +109,7 @@ class GameBasicEditor(QMainWindow):
         self._setup_profiler()
         self._setup_blame_panel()
         self._setup_todo_panel()
+        self._setup_problems_panel()
         self.setAcceptDrops(True)
 
         # Initial-Auto-Complete-Setting auf alle (zukuenftigen) Editoren.
@@ -522,6 +523,12 @@ class GameBasicEditor(QMainWindow):
         self.act_toggle_todo.toggled.connect(
             lambda on: self.todo_dock.setVisible(on))
 
+        self.act_toggle_problems = QAction("Probleme", self)
+        self.act_toggle_problems.setCheckable(True)
+        self.act_toggle_problems.setShortcut(QKeySequence("Ctrl+Shift+X"))
+        self.act_toggle_problems.toggled.connect(
+            lambda on: self.problems_dock.setVisible(on))
+
         self.act_toggle_blame = QAction("Git-Blame", self)
         self.act_toggle_blame.setCheckable(True)
         self.act_toggle_blame.setShortcut(QKeySequence("Ctrl+Shift+A"))
@@ -636,6 +643,7 @@ class GameBasicEditor(QMainWindow):
         m_view.addAction(self.act_toggle_minimap)
         m_view.addAction(self.act_toggle_wrap)
         m_view.addAction(self.act_toggle_todo)
+        m_view.addAction(self.act_toggle_problems)
         m_view.addAction(self.act_toggle_blame)
         m_view.addAction(self.act_split_editor)
         m_view.addAction(self.act_fold)
@@ -703,6 +711,10 @@ class GameBasicEditor(QMainWindow):
         st.minimap.setVisible(self.act_toggle_minimap.isChecked())
         # Zeilenumbruch gemaess globaler Toggle-Action.
         st.editor.set_word_wrap(self.act_toggle_wrap.isChecked())
+        # Persistierte Schriftgroesse (Einstellungen-Dialog) anwenden.
+        fs = self.settings.get("editor_font_size")
+        if fs:
+            st.editor.set_font_point_size(int(fs))
         # Breakpoints des Tabs -> Debugger (wenn dieser Tab debuggt wird).
         st.editor.breakpoints_changed.connect(
             lambda e=st.editor: self._on_breakpoints_changed(e))
@@ -713,8 +725,9 @@ class GameBasicEditor(QMainWindow):
         st.editor.rename_requested.connect(self._rename_symbol)
         # Run-Selection (Shift+F5)
         st.editor.run_selection_requested.connect(self._run_selection)
-        # Live-Error -> Statusbar
+        # Live-Error -> Statusbar (erstes Problem) + Probleme-Panel (alle).
         st.editor._error_checker.problem_changed.connect(self._on_live_error_changed)
+        st.editor._error_checker.problems_changed.connect(self._on_problems_changed)
         # IMPORT-Aufloesung: Datei-Verzeichnis (oder Project-Root, falls
         # noch ungespeichert).
         base = st.file_path.parent if st.file_path is not None else self.project_root
@@ -1112,13 +1125,20 @@ class GameBasicEditor(QMainWindow):
         self.settings["theme"] = new_theme
         self.settings["autocomplete_auto"] = bool(dlg.auto_complete_enabled())
         self.settings["format_on_save"] = bool(dlg.format_on_save_enabled())
-        save_settings(self.settings)
+        self.settings["editor_font_size"] = int(dlg.font_size())
         # Theme + Auto-Trigger live anwenden.
         if new_theme != COLORS_active_name():
             set_active_theme(new_theme)
         self._auto_complete_default = self.settings["autocomplete_auto"]
         for st in self.tabs.states:
             st.editor.set_auto_complete(self._auto_complete_default)
+            st.editor.set_font_point_size(self.settings["editor_font_size"])
+        # Zeilenumbruch + Minimap ueber die bestehenden Toggle-Actions anwenden
+        # (sie verteilen an alle Tabs und persistieren selbst). setChecked feuert
+        # `toggled` nur bei echter Aenderung -> kein doppeltes Anwenden.
+        self.act_toggle_wrap.setChecked(bool(dlg.word_wrap_enabled()))
+        self.act_toggle_minimap.setChecked(bool(dlg.minimap_enabled()))
+        save_settings(self.settings)
 
     def _active_editor(self):
         st = self.tabs.active
@@ -1542,6 +1562,38 @@ class GameBasicEditor(QMainWindow):
         if visible:
             st = self.tabs.active
             self.todo_panel.update_for(st.editor.get_text() if st else None)
+
+    def _setup_problems_panel(self) -> None:
+        from PySide6.QtWidgets import QDockWidget
+        from .problems_panel import ProblemsPanel
+        self.problems_panel = ProblemsPanel()
+        self.problems_dock = QDockWidget("Probleme", self)
+        self.problems_dock.setObjectName("ProblemsDock")
+        self.problems_dock.setWidget(self.problems_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.problems_dock)
+        self.problems_dock.hide()
+        self.problems_panel.jump_requested.connect(self._goto_line_in_active)
+        self.act_toggle_problems.setChecked(False)
+        self.problems_dock.visibilityChanged.connect(self._on_problems_visibility)
+
+    def _on_problems_visibility(self, visible: bool) -> None:
+        self.act_toggle_problems.setChecked(visible)
+        if visible:
+            st = self.tabs.active
+            self.problems_panel.set_problems(
+                st.editor.current_problems() if st else [])
+
+    def _on_problems_changed(self, problems) -> None:
+        # Nur Diagnosen des AKTIVEN Tabs zeigen -- Hintergrund-Tabs haben eigene
+        # Checker-Threads; ein verspaetetes Resultat darf das Panel nicht
+        # ueberschreiben (gleiche Stale-Guard-Logik wie _on_live_error_changed).
+        st = self.tabs.active
+        if st is None:
+            return
+        sender = self.sender()
+        if sender is not None and sender is not st.editor._error_checker:
+            return
+        self.problems_panel.set_problems(problems)
 
     def _on_breakpoints_changed(self, editor) -> None:
         # Nur relevant, wenn dieser Editor gerade debuggt wird -- dann live an
@@ -2020,6 +2072,8 @@ class GameBasicEditor(QMainWindow):
             self.statusBar().showMessage(
                 f"Zeile {problem.line}: {problem.message}", 0,
             )
+        # Probleme-Panel auf den neuen aktiven Tab umstellen.
+        self.problems_panel.set_problems(st.editor.current_problems())
 
     def _update_status(self) -> None:
         self._update_cursor_label()

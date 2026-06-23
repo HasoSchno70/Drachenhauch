@@ -54,6 +54,7 @@ COLORS_DARK: dict[str, str] = {
     "operator":      "#D4D4D4",
     "bool":          "#569CD6",
     "error":         "#F44747",
+    "warning":       "#CCA700",     # Amber -- Live-Diagnostik-Warnungen
     "info":          "#4EC9B0",
 }
 
@@ -97,6 +98,7 @@ COLORS_LIGHT: dict[str, str] = {
     "operator":      "#1F1F1F",
     "bool":          "#0000FF",
     "error":         "#A1260D",
+    "warning":       "#BF8803",     # Amber (dunkler fuer Light-Theme)
     "info":          "#1B6E1B",
 }
 

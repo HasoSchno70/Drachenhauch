@@ -75,3 +75,26 @@ def all_completions() -> list[str]:
     # uppercase-Keywords -- der User merkt am Casing, was es ist.
     pool.update(SNIPPETS.keys())
     return sorted(pool, key=lambda s: (s.lower(), s))
+
+
+def local_definition_names(source: str) -> list[str]:
+    """User-eigene Symbole des aktuellen Buffers fuer die Completion:
+    `SUB`/`FUNCTION`/`CLASS`/`STRUCT`/`ENUM`/`CONST`/`DIM` + Parameter.
+
+    Casing wird wie geschrieben erhalten (der eigene Funktionsname soll
+    so vorgeschlagen werden, wie man ihn definiert hat). Pro Name nur ein
+    Eintrag (erstes Vorkommen gewinnt). Bei Scan-Fehlern leere Liste --
+    Completion darf nie das Tippen stoeren."""
+    try:
+        from .symbols import scan_definitions
+    except Exception:
+        return []
+    seen: dict[str, str] = {}
+    try:
+        for d in scan_definitions(source):
+            key = d.name.lower()
+            if key not in seen:
+                seen[key] = d.name
+    except Exception:
+        return []
+    return list(seen.values())
