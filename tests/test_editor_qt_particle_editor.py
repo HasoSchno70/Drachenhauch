@@ -51,6 +51,24 @@ def test_burst_emits_once(editor):
     assert editor.sys.count() == 50
 
 
+def test_burst_suppresses_continuous_emission(editor):
+    """Waehrend ein Burst laeuft, darf die Dauer-Emission keinen Nachschub
+    liefern -- sonst ueberdeckt der Brunnen die Eruption (User-Report)."""
+    p = editor.preview
+    p.paused = False
+    p.emit_rate = 8
+    # Lange Lebensdauer -> in einem Tick stirbt kein Partikel.
+    editor.life_min.setValue(2000)
+    editor.life_max.setValue(2000)
+    editor._on_change()
+    p.burst(50)
+    assert p._burst_hold > 0
+    n_before = editor.sys.count()
+    p._tick()                      # ein Frame
+    # Kein Dauer-Nachschub: Anzahl bleibt (keine +emit_rate-Partikel).
+    assert editor.sys.count() == n_before
+
+
 def test_bg_modes_switch_without_error(editor):
     modes = [editor.bg_combo.itemData(i) for i in range(editor.bg_combo.count())]
     assert modes == ["dark", "black", "light", "checker"]

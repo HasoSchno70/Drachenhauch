@@ -107,6 +107,7 @@ class _Preview(QWidget):
         self.emit_rate = 6
         self.paused = False
         self.bg_mode = "dark"
+        self._burst_hold = 0      # Frames, in denen die Dauer-Emission aussetzt
         self.setMinimumSize(420, 420)
         self._timer = QTimer(self)
         self._timer.setInterval(16)            # ~60 fps
@@ -118,17 +119,24 @@ class _Preview(QWidget):
         self.update()
 
     def burst(self, n: int) -> None:
-        """Einmalige Emission von `n` Partikeln in der Mitte -- fuer
-        Explosion/Funken-Vorschau, die im Spiel ja auch einmalig feuern."""
+        """Solo-Burst: bestehende Partikel + Dauer-Emission raus, dann einmalig
+        `n` Partikel in der Mitte. Die Dauer-Emission setzt aus, bis der Burst
+        ausgelebt hat (Frames aus der max. Lebensdauer + Puffer) -- sonst
+        ueberdeckt der laufende Brunnen die Eruption und man sieht nichts."""
         self.sys.x = self.width() / 2.0
         self.sys.y = self.height() / 2.0
+        self.sys.clear()
         self.sys.emit(max(1, n))
+        self._burst_hold = int(self.sys.lifetime_max / 16) + 30
 
     def _tick(self) -> None:
         if not self.paused:
             self.sys.x = self.width() / 2.0
             self.sys.y = self.height() / 2.0
-            self.sys.emit(self.emit_rate)
+            if self._burst_hold > 0:
+                self._burst_hold -= 1     # waehrend des Bursts kein Dauer-Nachschub
+            else:
+                self.sys.emit(self.emit_rate)
             self.sys.update(16)
         self.update()
 
