@@ -61,7 +61,7 @@ enum Cmd {
     GradientRect(i32, i32, i32, i32, Color, Color, bool), // x1,y1,x2,y2, c1, c2, vertical
     Spline(Vec<(i32, i32)>, f32, Color),               // points, thick, color
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
-    RtDraw(usize, i32, i32, f32, Color),               // render-target idx, x, y, scale, tint
+    RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
 }
 
 /// 3D-Zeichenbefehle (Modul `g3d`). Werden beim FLIP in einem
@@ -1000,11 +1000,11 @@ impl Graphics {
     }
     pub fn rendertarget_end(&mut self) { self.active_rt = None; }
     /// Zeichnet das Target (seine Textur) an Position x,y, skaliert + getoent.
-    pub fn rendertarget_draw(&mut self, idx: i64, x: i32, y: i32, scale: f64, tint: Option<i64>) -> Result<(), String> {
+    pub fn rendertarget_draw(&mut self, idx: i64, x: i32, y: i32, scale: f64, tint: Option<i64>, flip_v: bool) -> Result<(), String> {
         let i = self.check_rt(idx, "RENDERTARGET_DRAW")?;
         let (x, y) = self.w2s(x, y);
         let tcol = match tint { Some(c) => col(c), None => Color::WHITE };
-        self.emit(Cmd::RtDraw(i, x, y, (scale * self.cam_zoom).max(0.0) as f32, tcol));
+        self.emit(Cmd::RtDraw(i, x, y, (scale * self.cam_zoom).max(0.0) as f32, tcol, flip_v));
         Ok(())
     }
 
@@ -3247,12 +3247,15 @@ fn render_scene<D: RaylibDraw>(
                         }
                         cur_blend = *m;
                     }
-                    Cmd::RtDraw(i, x, y, scale, tint) => {
+                    Cmd::RtDraw(i, x, y, scale, tint, flip_v) => {
                         if let Some(rtgt) = render_targets.get(*i) {
                             let tex = rtgt.rt.texture();   // &WeakTexture2D
                             let tw = tex.width as f32; let th = tex.height as f32;
-                            // RenderTexture ist y-gespiegelt -> negative Quell-Hoehe.
-                            let src = Rectangle::new(0.0, 0.0, tw, -th);
+                            // RenderTexture ist y-gespiegelt -> normalerweise negative
+                            // Quell-Hoehe (aufrecht). flip_v=true laesst die Spiegelung
+                            // stehen -> vertikal gespiegelte Ausgabe (Boden-Reflexion).
+                            let src_h = if *flip_v { th } else { -th };
+                            let src = Rectangle::new(0.0, 0.0, tw, src_h);
                             let dst = Rectangle::new((x * s) as f32, (y * s) as f32,
                                 tw * scale * s as f32, th * scale * s as f32);
                             d.draw_texture_pro(tex, src, dst, Vector2::zero(), 0.0, *tint);

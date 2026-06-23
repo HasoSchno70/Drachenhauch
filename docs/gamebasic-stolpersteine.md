@@ -180,6 +180,51 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 
 ---
 
+## G — Befunde beim Schreiben der „VORTEX"-Demo (examples/119, 2026-06-23)
+
+### G1. `FLT()` (Int→Float-Cast) fehlt in gbrt — nur im Tree-Walker — ✅ BEHOBEN (Builtin)
+> `FLT` ist jetzt im gbrt-Kern (`builtins.rs`: `"flt" => Value::Float(need_num(...))`,
+> direkt nach `INT`) und im `builtin_index.json` registriert. `FLT(7)/2 -> 3.5`
+> nativ verifiziert. **Offen bleibt der systemische Teil:** `gbrt --check` meldet
+> Aufrufe von Builtins, die NICHT im gbrt-Index stehen, weiterhin nicht (der
+> Compiler validiert Builtin-Namen nicht gegen den Index). Vorschlag dafür steht
+> unten — wäre der eigentliche „nie wieder solche Überraschung"-Fix.
+
+`FLT(x)` (z. B. `FLT(MOUSEX())`, in mehreren examples genutzt) läuft im Python-
+Tree-Walker, wirft in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT' im
+Rust-Kern noch nicht verfuegbar". **`gbrt --check` meldet es NICHT** — der Compile
+ist grün, der Fehler kommt erst beim Lauf. Workaround in GB: `x * 1.0`.
+**Zwei Probleme:** (1) Builtin-Parität Tree-Walker ↔ gbrt; (2) die Live-Diagnostik
+(`--check`) fängt „nur-im-Tree-Walker"-Builtins nicht ab → böse Laufzeit-
+Überraschung trotz grüner Editor-Anzeige. **Vorschlag:** `FLT` in gbrt nachrüsten
+(triviale Coercion) **und/oder** `--check` so erweitern, dass es Aufrufe von
+Builtins meldet, die nicht im gbrt-Builtin-Index stehen (fängt künftig ALLE
+solchen Lücken). Betrifft auch andere examples mit `FLT(...)`.
+
+### G2. Kein vertikales Spiegeln von Text / Render-Targets — ✅ BEHOBEN (RT-Flip)
+> `RENDERTARGET_DRAW(rt, x, y[, scale[, tint[, flip_v]]])` hat jetzt ein optionales
+> 6. Argument `flip_v`: `TRUE` zeichnet das Target vertikal gespiegelt
+> (`graphics.rs` `RtDraw` nutzt dann die positive statt negativer Quell-Höhe — die
+> raylib-RTs sind ohnehin y-gespiegelt, der Mirror-Fall ist also quasi gratis).
+> Damit gehen echte Boden-Reflexionen: Text einmal in ein (transparent
+> vorgecleartes) Render-Target zeichnen, dann normal + `..., TRUE` gespiegelt
+> darunter stempeln. Genutzt in `examples/119_vortex.gb` (Scroller-Reflexion).
+
+(Historischer Text:) Für einen Boden-Spiegel-Scroller braucht man eine vertikal
+gespiegelte Textkopie. In gbrt gibt es dafür **keinen Weg**: `TEXT` kann nicht
+flippen/rotieren; `RENDERTARGET_DRAW` clampt `scale` auf `≥ 0` (kein Flip über
+negative Skalierung); `DRAWIMAGEFLIPPED(img, x, y, fH, fV)` arbeitet nur auf
+**Images**, Render-Targets liegen aber in einem eigenen Handle-Raum (`graphics.rs`
+`render_targets` vs. Image-Vec) — ein RT-Handle als Image durchzureichen indexiert
+das falsche Objekt. **Workaround in der Demo:** gedimmte, leicht verkleinerte,
+*aufrechte* Kopie unter dem Text (sieht aus wie nasser Boden), keine echte
+Spiegelung. **Vorschlag:** einen Flip-Parameter an `RENDERTARGET_DRAW` (raylib
+zeichnet RT-Texturen ohnehin über eine negative Source-Höhe — der gespiegelte Fall
+ist quasi gratis) ODER ein `RENDERTARGET_DRAW_FLIPPED`. Dann gehen echte
+Reflexionen/Mirror-Effekte.
+
+---
+
 ## F — Doku-Lücken & Verhaltens-Fallen (Review 2026-06-23, alle verifiziert)
 
 ### F1. `physics3d` war komplett undokumentiert + toter Link — ✅ BEHOBEN

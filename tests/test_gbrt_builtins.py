@@ -393,3 +393,12 @@ y[0]=3 : y[1]=1 : y[2]=9 : y[3]=2 : y[4]=7
 SORT(y, bydist)
 PRINT y[0], y[1], y[2], y[3], y[4]'''
     assert _run(src) == "3 7 2 1 9"
+
+
+# --- G1: FLT (Int->Float-Cast) nativ in gbrt -------------------------------
+
+def test_flt_int_to_float():
+    """FLT lief frueher nur im Tree-Walker; jetzt auch nativ (Stolperstein G1)."""
+    assert _run("PRINT FLT(7)") == "7.0"
+    assert _run("PRINT FLT(7) / 2") == "3.5"
+    assert _run("PRINT FLT(2.5)") == "2.5"

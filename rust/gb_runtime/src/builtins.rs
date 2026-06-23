@@ -501,6 +501,9 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "int" => { arity!(1); Ok(Value::Int(need_num(&a[0], "INT")?.floor() as i64)) }
+        // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
+        // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
+        "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
         "abs" => {
             arity!(1);
             match &a[0] {

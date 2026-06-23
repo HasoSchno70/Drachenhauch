@@ -2043,6 +2043,12 @@
    "module": "core"
   },
   {
+   "name": "FLT",
+   "kind": "core",
+   "signature": "FLT(v: Zahl)",
+   "module": "core"
+  },
+  {
    "name": "ISNUMERIC",
    "kind": "core",
    "signature": "ISNUMERIC(s) AS BOOLEAN",

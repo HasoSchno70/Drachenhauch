@@ -3352,9 +3352,12 @@ impl<'p> Vm<'p> {
             "rendertarget_draw" => {
                 let scale = if a.len() >= 4 { need_f(a,3,"RENDERTARGET_DRAW")? } else { 1.0 };
                 let tint = if a.len() >= 5 { Some(gi(a,4,"RENDERTARGET_DRAW")?) } else { None };
+                // Optionales 6. Argument: flip_v (vertikal spiegeln, fuer Boden-
+                // Reflexionen). RENDERTARGET_DRAW(rt, x, y, scale, tint, TRUE).
+                let flip_v = if a.len() >= 6 { gb(a, 5) } else { false };
                 g!().rendertarget_draw(gi(a,0,"RENDERTARGET_DRAW")?,
                     gi(a,1,"RENDERTARGET_DRAW")? as i32, gi(a,2,"RENDERTARGET_DRAW")? as i32,
-                    scale, tint)?; Value::Nil
+                    scale, tint, flip_v)?; Value::Nil
             }
             "triangle" => {
                 let c = if a.len() == 7 { gi(a, 6, "TRIANGLE")? } else { 0xFFFFFF };
