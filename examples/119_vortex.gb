@@ -24,8 +24,11 @@ CONST SEG AS INTEGER = 180          ' Winkel-Segmente je Wirbel
 CONST BANDS AS INTEGER = 4          ' radiale Baender (Tiefen-Schattierung)
 CONST PETALS AS FLOAT = 6.0         ' Bluetenblaetter
 
-SCREEN(1280, 720, "GameBasic - VORTEX (AAA Demo)", 1)
-SET_FULLSCREEN(TRUE)
+' Echtes Vollbild in der NATIVEN Monitor-Aufloesung: der Wirbel rechnet komplett
+' ueber SCREENWIDTH()/HEIGHT() und skaliert automatisch mit -> gestochen scharf
+' statt 720p-Hochskalierung (SCREEN_NATIVE = randloses Vollbild, kein extra
+' SET_FULLSCREEN noetig).
+SCREEN_NATIVE("GameBasic - VORTEX (AAA Demo)")
 SETFPS(60)
 
 DIM SW AS INTEGER
@@ -117,6 +120,46 @@ SUB DrawVortex(rot AS FLOAT, spin AS FLOAT, twist AS FLOAT, pulse AS FLOAT, t AS
     NEXT
 END SUB
 
+' ============================================================
+'  Orbit-Ring-Text auf einem gekippten Reifen um den Wirbel. In ZWEI
+'  Durchgaengen aufrufen, damit echte Tiefen-Verdeckung entsteht:
+'    frontHalf=0 VOR dem Wirbel  -> hintere (obere) Buchstaben werden von
+'                                   den Bluetenblaettern verdeckt und
+'                                   blitzen durch die Luecken wieder durch
+'    frontHalf=1 NACH dem Wirbel -> vordere (untere) Buchstaben bleiben oben
+'  Naht liegt bei SIN(th)=0 (seitliche Raender) -> kein sichtbarer Sprung.
+'  Liest ringMsg/rn/CX/CY/maxR/PI2 global.
+' ============================================================
+SUB DrawRingArc(frontHalf AS INTEGER, ringRot AS FLOAT, t AS FLOAT)
+    DIM i AS INTEGER
+    DIM ch AS STRING
+    DIM th AS FLOAT
+    DIM chx AS FLOAT
+    DIM chy AS FLOAT
+    DIM depth AS FLOAT
+    DIM csz AS INTEGER
+    DIM cw AS INTEGER
+    DIM bri AS FLOAT
+    DIM isFront AS INTEGER
+    FOR i = 0 TO rn - 1
+        th = ringRot - i * (PI2 / rn)
+        ' Vorderer Bogen = untere Haelfte (SIN(th) >= 0): naeher, groesser, vor dem Wirbel.
+        isFront = 0
+        IF SIN(th) >= 0.0 THEN isFront = 1
+        IF isFront = frontHalf THEN
+            ch = MID$(ringMsg, i, 1)
+            chx = CX + COS(th) * (maxR * 1.18)
+            chy = CY + SIN(th) * (maxR * 0.82)
+            depth = 0.5 + 0.5 * SIN(th)
+            csz = INT(16 + 32 * depth)
+            TEXT_SIZE(csz)
+            cw = TEXT_WIDTH(ch)
+            bri = 0.30 + 0.70 * depth
+            TEXT(INT(chx) - cw \ 2, INT(chy) - csz \ 2, ch, HSV((i * 14 + INT(t * 50.0)) MOD 360, 0.85, bri))
+        END IF
+    NEXT
+END SUB
+
 ' --- Schoenerer Zeichensatz (TTF) mit Fallback auf den Default-Font ---
 DIM uiFont AS INTEGER
 uiFont = -1
@@ -176,11 +219,7 @@ DIM chx AS FLOAT
 DIM chy AS FLOAT
 DIM ch AS STRING
 DIM ringRot AS FLOAT
-DIM th AS FLOAT
-DIM depth AS FLOAT
 DIM csz AS INTEGER
-DIM cw AS INTEGER
-DIM bri AS FLOAT
 DIM nx AS FLOAT
 DIM nearf AS FLOAT
 DIM hcol AS INTEGER
@@ -209,6 +248,11 @@ WHILE NOT QUITREQUESTED()
     NEXT
     BLEND_MODE("alpha")
 
+    ' --- Orbit-Ring HINTEN: zuerst der hintere (obere) Bogen, damit die
+    '     Wirbel-Blaetter ihn gleich verdecken und er nur durch die Luecken blitzt ---
+    ringRot = t * 0.45
+    DrawRingArc(0, ringRot, t)
+
     ' --- hinterer Wirbel: GEGENLAEUFIG, groesser, dunkler, leicht entsaettigt ---
     DrawVortex(0.0 - t * 0.13, 0.0 - t * 0.30, 0.0 - twv, pulse, t, 1.16, 0.45, 0.85, 40.0)
     ' --- vorderer Wirbel: hell, normal drehend ---
@@ -231,24 +275,10 @@ WHILE NOT QUITREQUESTED()
     PARTICLE_DRAW(sparks)
     BLEND_MODE("alpha")
 
-    ' --- Orbit-Ring: Text-Halo, das (auf einem gekippten Reifen) um den
-    '     Wirbel rotiert. Vorne (unten) groesser & heller, hinten kleiner. ---
-    ringRot = t * 0.45
-    FOR i = 0 TO rn - 1
-        ch = MID$(ringMsg, i, 1)
-        ' Minus, damit der untere (groesste/auffaelligste) Bogen vorwaerts
-        ' liest. Auf einem Vollkreis liest die Gegenseite (oben, klein/dunkel)
-        ' zwangslaeufig rueckwaerts -- bewusst zugunsten des Vordergrunds.
-        th = ringRot - i * (PI2 / rn)
-        chx = CX + COS(th) * (maxR * 1.18)
-        chy = CY + SIN(th) * (maxR * 0.82)
-        depth = 0.5 + 0.5 * SIN(th)
-        csz = INT(16 + 32 * depth)
-        TEXT_SIZE(csz)
-        cw = TEXT_WIDTH(ch)
-        bri = 0.30 + 0.70 * depth
-        TEXT(INT(chx) - cw \ 2, INT(chy) - csz \ 2, ch, HSV((i * 14 + INT(t * 50.0)) MOD 360, 0.85, bri))
-    NEXT
+    ' --- Orbit-Ring VORN: der vordere (untere) Bogen, ueber dem Wirbel.
+    '     Vorne liest vorwaerts; die Gegenseite (oben) wurde schon hinter dem
+    '     Wirbel gezeichnet. Tiefen-Logik: siehe SUB DrawRingArc. ---
+    DrawRingArc(1, ringRot, t)
 
     ' --- Logo-Zoomer: GAMEBASIC zoomt zentriert ueber dem Wirbel ---
     zoom = 0.55 + 0.55 * (0.5 + 0.5 * SIN(t * 1.1))
