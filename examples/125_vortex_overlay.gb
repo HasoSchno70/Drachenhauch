@@ -1,21 +1,14 @@
 ' ============================================================
-'  GAMEBASIC -- "VORTEX"   (AAA-Showcase-Demo)
+'  GAMEBASIC -- "VORTEX" als DESKTOP-OVERLAY (transparent)
 ' ============================================================
-'  Voll animierter Doppel-Regenbogen-Wirbel im Vollbild zu fetziger
-'  Amiga-Musik. Zeigt, wozu GameBasic faehig ist:
-'    * ZWEI gegenlaeufige Spiral-Wirbel aus hunderten Triangles (Tiefe)
-'    * HSV-Regenbogen + rotierender Licht-Glanz = 3D-Ribbon-Look
-'    * additives Glow, gluehender Kern
-'    * Logo-Zoomer mit Funken-Partikeln (particles-Modul, Glow-Mode)
-'    * Orbit-Ring: rotierendes Text-Halo auf einem gekippten Reifen um
-'      den Wirbel (vorne gross/hell, hinten klein/dunkel = Pseudo-3D)
-'    * Perspektiv-Scroller mit ECHTER Boden-Spiegelung (Render-Target +
-'      vertikalem Flip): Buchstaben schwellen zur Mitte hin an ("auf dich zu")
-'    * fetter TTF-Zeichensatz (Arial Black / Impact), 60 fps
-'
-'  Eine GameBasic-Demo von Hans Schnorrenberger.
-'  ESC = Ende.   (Anderer Song? -> Pfad in PLAYMUSIC tauschen:
-'   assets/amiga_title.ogg, cybermatic_pulse.ogg, techno_messup.ogg)
+'  Dieselbe Wirbel-Demo wie examples/119_vortex.gb, aber als randloses,
+'  transparentes Overlay ueber dem ganzen Desktop:
+'    * SCREEN_TRANSPARENT(0,0,..) = ganzer Monitor, durchscheinend
+'    * WINDOW_UNDECORATED + WINDOW_TOPMOST = rahmenlos, immer im Vordergrund
+'    * CLS() loescht voll durchsichtig -> der Desktop scheint durch die Luecken
+'    * KEIN additiver Hintergrund-Halo (sieht ueber dem Desktop unruhig aus)
+'  Showcase-Variante (scharfes Vollbild, dunkler Hintergrund): 119_vortex.gb.
+'  Eine GameBasic-Demo von Hans Schnorrenberger.   ESC = Ende.
 ' ============================================================
 IMPORT "particles"
 
@@ -24,11 +17,12 @@ CONST SEG AS INTEGER = 180          ' Winkel-Segmente je Wirbel
 CONST BANDS AS INTEGER = 4          ' radiale Baender (Tiefen-Schattierung)
 CONST PETALS AS FLOAT = 6.0         ' Bluetenblaetter
 
-' Echtes Vollbild in der NATIVEN Monitor-Aufloesung: der Wirbel rechnet komplett
-' ueber SCREENWIDTH()/HEIGHT() und skaliert automatisch mit -> gestochen scharf
-' statt 720p-Hochskalierung (SCREEN_NATIVE = randloses Vollbild, kein extra
-' SET_FULLSCREEN noetig).
-SCREEN_NATIVE("GameBasic - VORTEX (AAA Demo)")
+' Transparentes Vollbild-Overlay. SCREEN_TRANSPARENT(0,0,..) deckt den ganzen
+' aktuellen Monitor ab und MUSS die erste Grafik-Anweisung sein (Transparenz ist
+' ein Fenster-Erzeugungs-Flag, nicht nachruestbar).
+SCREEN_TRANSPARENT(0, 0, "GameBasic - VORTEX Overlay")
+WINDOW_UNDECORATED(TRUE)
+WINDOW_TOPMOST(TRUE)
 SETFPS(60)
 
 DIM SW AS INTEGER
@@ -121,14 +115,9 @@ SUB DrawVortex(rot AS FLOAT, spin AS FLOAT, twist AS FLOAT, pulse AS FLOAT, t AS
 END SUB
 
 ' ============================================================
-'  Orbit-Ring-Text auf einem gekippten Reifen um den Wirbel. In ZWEI
-'  Durchgaengen aufrufen, damit echte Tiefen-Verdeckung entsteht:
-'    frontHalf=0 VOR dem Wirbel  -> hintere (obere) Buchstaben werden von
-'                                   den Bluetenblaettern verdeckt und
-'                                   blitzen durch die Luecken wieder durch
-'    frontHalf=1 NACH dem Wirbel -> vordere (untere) Buchstaben bleiben oben
-'  Naht liegt bei SIN(th)=0 (seitliche Raender) -> kein sichtbarer Sprung.
-'  Liest ringMsg/rn/CX/CY/maxR/PI2 global.
+'  Orbit-Ring-Text auf einem gekippten Reifen um den Wirbel (zwei Durchgaenge
+'  fuer echte Tiefen-Verdeckung -- siehe 119_vortex.gb). Liest ringMsg/rn/
+'  CX/CY/maxR/PI2 global.
 ' ============================================================
 SUB DrawRingArc(frontHalf AS INTEGER, ringRot AS FLOAT, t AS FLOAT)
     DIM i AS INTEGER
@@ -143,7 +132,6 @@ SUB DrawRingArc(frontHalf AS INTEGER, ringRot AS FLOAT, t AS FLOAT)
     DIM isFront AS INTEGER
     FOR i = 0 TO rn - 1
         th = ringRot - i * (PI2 / rn)
-        ' Vorderer Bogen = untere Haelfte (SIN(th) >= 0): naeher, groesser, vor dem Wirbel.
         isFront = 0
         IF SIN(th) >= 0.0 THEN isFront = 1
         IF isFront = frontHalf THEN
@@ -185,12 +173,12 @@ PARTICLE_SET_SIZE(sparks, 1, 3)
 PARTICLE_SET_FADE(sparks, TRUE)
 PARTICLE_SET_MODE(sparks, "glow")
 
-' --- fetzige Amiga-Musik (OGG), endlos geloopt ---
+' --- fetzige Amiga-Musik (OGG), endlos geloopt (zum stillen Overlay: Zeile loeschen) ---
 PLAYMUSIC("assets/amiga_action_level1.ogg", -1, 0.9)
 
 ' --- Perspektiv-Scroller-Text (unten) ---
 DIM msg AS STRING
-msg = "GAMEBASIC  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS IM VOLLBILD  ***  JA, AUCH DAMIT KANN MAN DEMOS BAUEN  ***  GREETINGS AN DIE SZENE  ***    "
+msg = "GAMEBASIC  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS  ***  JA, AUCH ALS DESKTOP-OVERLAY  ***  GREETINGS AN DIE SZENE  ***    "
 DIM nmsg AS INTEGER
 nmsg = LEN(msg)
 DIM span AS FLOAT
@@ -226,31 +214,20 @@ DIM hcol AS INTEGER
 DIM cwc AS INTEGER
 DIM scrollRT AS INTEGER
 
-' Render-Target fuer den Scroller -> echte, vertikal gespiegelte Boden-
-' Reflexion via RENDERTARGET_DRAW(..., TRUE). Transparenter Hintergrund
-' (RTs werden pro Frame transparent vorgecleart -> kein CLS noetig).
 scrollRT = RENDERTARGET_NEW(SW, 130)
 
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(27) THEN BREAK
     t = MILLIS() / 1000.0
 
-    ' Sanfte, ruckelfreie Bewegung rein aus der Zeit (kein FFT).
     pulse = 1.0 + 0.05 * SIN(t * 1.2)
     twv = 0.85 + 0.15 * SIN(t * 0.40)
 
-    CLS(&H05030A)
+    ' Overlay: voll durchsichtig loeschen -> der Desktop scheint durch die Luecken.
+    ' KEIN additiver Hintergrund-Halo (der wirkt ueber dem Desktop unruhig).
+    CLS()
 
-    ' --- weicher additiver Hintergrund-Halo ---
-    BLEND_MODE("add")
-    FOR i = 3 TO 1 STEP -1
-        gr = INT(maxR * (0.85 + i * 0.25))
-        CIRCLE(INT(CX), INT(CY), gr, HSV(INT(t * 24.0) MOD 360, 0.6, 0.018 + 0.006 * i))
-    NEXT
-    BLEND_MODE("alpha")
-
-    ' --- Orbit-Ring HINTEN: zuerst der hintere (obere) Bogen, damit die
-    '     Wirbel-Blaetter ihn gleich verdecken und er nur durch die Luecken blitzt ---
+    ' --- Orbit-Ring HINTEN: hinterer Bogen vor dem Wirbel (Verdeckung) ---
     ringRot = t * 0.45
     DrawRingArc(0, ringRot, t)
 
@@ -276,9 +253,7 @@ WHILE NOT QUITREQUESTED()
     PARTICLE_DRAW(sparks)
     BLEND_MODE("alpha")
 
-    ' --- Orbit-Ring VORN: der vordere (untere) Bogen, ueber dem Wirbel.
-    '     Vorne liest vorwaerts; die Gegenseite (oben) wurde schon hinter dem
-    '     Wirbel gezeichnet. Tiefen-Logik: siehe SUB DrawRingArc. ---
+    ' --- Orbit-Ring VORN: vorderer Bogen ueber dem Wirbel ---
     DrawRingArc(1, ringRot, t)
 
     ' --- Logo-Zoomer: GAMEBASIC zoomt zentriert ueber dem Wirbel ---
@@ -300,9 +275,6 @@ WHILE NOT QUITREQUESTED()
     TEXT(INT(CX) - tw \ 2, 22, "von Hans Schnorrenberger", &HB0C0FF)
 
     ' --- Perspektiv-Scroller + ECHTE Boden-Spiegelung ---
-    '     Der Scroller wird einmal in ein Render-Target gezeichnet, dann normal
-    '     gestempelt UND vertikal gespiegelt darunter (RENDERTARGET_DRAW ..., TRUE).
-    '     Genau dafuer war Stolperstein G2 da -- jetzt in der Engine gefixt.
     off = t * 190.0
     off = off - INT(off / span) * span
     RENDERTARGET_BEGIN(scrollRT)
@@ -314,9 +286,9 @@ WHILE NOT QUITREQUESTED()
                 nx = (chx - CX) / (SW * 0.5)
                 IF nx < -1.0 THEN nx = -1.0
                 IF nx > 1.0 THEN nx = 1.0
-                nearf = 1.0 - nx * nx            ' 1 = Mitte (nah), 0 = Rand (fern)
+                nearf = 1.0 - nx * nx
                 csz = INT(22 + 34 * nearf)
-                chy = 116.0 - csz - (1.0 - nearf) * 45.0   ' lokal im Render-Target
+                chy = 116.0 - csz - (1.0 - nearf) * 45.0
                 hcol = HSV((i * 7 + INT(t * 60.0)) MOD 360, 1.0, 0.5 + 0.5 * nearf)
                 TEXT_SIZE(csz)
                 ' Jeden Buchstaben in seiner 32px-Spalte zentrieren (schmale wie
@@ -326,13 +298,11 @@ WHILE NOT QUITREQUESTED()
             END IF
         NEXT
     RENDERTARGET_END()
-    ' Original (aufrecht) ...
     RENDERTARGET_DRAW(scrollRT, 0, SH - 200, 1.0)
-    ' ... und die echte, gedimmte Spiegelung direkt unter der Bodenlinie.
     RENDERTARGET_DRAW(scrollRT, 0, SH - 74, 1.0, &H4A4A5E, TRUE)
 
     TEXT_SIZE(13)
-    TEXT(16, 8, "ESC = Ende   |   GameBasic VORTEX", &H7080B0)
+    TEXT(16, 8, "ESC = Ende   |   GameBasic VORTEX Overlay", &H7080B0)
 
     FLIP()
 WEND

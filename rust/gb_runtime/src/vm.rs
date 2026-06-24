@@ -3267,7 +3267,13 @@ impl<'p> Vm<'p> {
                 if self.gfx.is_some() {
                     return Err("SCREEN_TRANSPARENT muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)".into());
                 }
-                self.gfx = Some(crate::graphics::Graphics::new_transparent(w, h, &title, scale));
+                // w/h <= 0 -> ganzer aktueller Monitor (Vollbild-Overlay). Der Monitor
+                // laesst sich erst nach der Fenster-Erzeugung abfragen, darum zuerst
+                // transparent erzeugen, dann auf Monitorgroesse abdecken.
+                let native = w <= 0 || h <= 0;
+                let mut g = crate::graphics::Graphics::new_transparent(if native { 100 } else { w }, if native { 100 } else { h }, &title, scale);
+                if native { g.cover_current_monitor(&title); }
+                self.gfx = Some(g);
                 Value::Nil
             }
             "cls" => { let c = if a.is_empty() { 0 } else { gi(a, 0, "CLS")? }; g!().cls(c); Value::Nil }

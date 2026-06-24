@@ -823,7 +823,23 @@ impl Graphics {
     /// Fenster mit transparentem Framebuffer (SCREEN_TRANSPARENT). Das Flag muss
     /// schon bei der Fenster-Erzeugung gesetzt sein -- nicht nachtraeglich machbar.
     pub fn new_transparent(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
-        Graphics::new_impl(width, height, title, scale, false, true)
+        Graphics::new_impl(width.max(1), height.max(1), title, scale, false, true)
+    }
+    /// Das (bereits erzeugte) Fenster den ganzen aktuellen Monitor abdecken lassen:
+    /// auf native Aufloesung umkonfigurieren und an die Monitor-Ecke setzen. Fuer
+    /// transparente Vollbild-Overlays (Monitor-Query braucht ein offenes Fenster,
+    /// darum NACH der Erzeugung). GBRT_SCALE wird wie bei SCREEN_NATIVE respektiert.
+    pub fn cover_current_monitor(&mut self, title: &str) {
+        let m = get_current_monitor();
+        let mw = get_monitor_width(m).max(1);
+        let mh = get_monitor_height(m).max(1);
+        let scale = std::env::var("GBRT_SCALE").ok()
+            .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(1);
+        let lw = (mw / scale).max(1);
+        let lh = (mh / scale).max(1);
+        self.reconfigure_raw(lw, lh, title, scale);
+        let pos = get_monitor_position(m);
+        self.rl.set_window_position(pos.x as i32, pos.y as i32);
     }
 
     pub fn new(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
