@@ -16,6 +16,32 @@ IMPORT "imgfx"
 | `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
 | `IMAGE_COPY(img)` | IMAGE (tiefer Klon) |
 
+### Weitere Filter (geben ebenfalls ein neues IMAGE zurück)
+
+| Funktion | Rückgabe / Wirkung |
+|---|---|
+| `IMAGE_CROP(img, x, y, w, h)` | IMAGE (neu, Ausschnitt `w × h` ab `x,y`) |
+| `IMAGE_RESIZE_CANVAS(img, w, h, offx, offy[, fill])` | IMAGE (neu): Bild auf Leinwand `w × h` ab Offset `offx,offy`; freie Fläche mit `fill` (Default schwarz) |
+| `IMAGE_BLUR(img, radius)` | IMAGE (neu, Gauß-Weichzeichner, `radius` in px) |
+| `IMAGE_BRIGHTNESS(img, n)` | IMAGE (neu): Helligkeit, `n` = `-255..255` |
+| `IMAGE_CONTRAST(img, n)` | IMAGE (neu): Kontrast, `n` = `-100..100` |
+| `IMAGE_GRAYSCALE(img)` | IMAGE (neu, in Graustufen) |
+| `IMAGE_INVERT(img)` | IMAGE (neu, Farben invertiert) |
+| `IMAGE_REPLACE_COLOR(img, from, to)` | IMAGE (neu): tauscht **exakt** die Farbe `from` gegen `to` |
+
+### In ein Image zeichnen (MUTIEREND — verändert das übergebene IMAGE)
+
+Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen direkt in das Image. Ideal, um zur Ladezeit eine Grafik zusammenzubauen (z. B. leere Leinwand via `GENTEX_COLOR(w, h, farbe)`, dann bemalen). Nach jeder Operation wird die GPU-Textur neu hochgeladen — daher **einmal beim Aufbauen** nutzen, nicht in jedem Frame.
+
+| Funktion | Wirkung |
+|---|---|
+| `IMAGE_DRAW_LINE(img, x1, y1, x2, y2, color)` | Linie ins Image |
+| `IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)` | gefüllter Kreis ins Image |
+| `IMAGE_DRAW_RECT(img, x, y, w, h, color)` | gefülltes Rechteck ins Image |
+| `IMAGE_DRAW_TEXT(img, x, y, text$, size, color)` | Text (Standard-Font) ins Image |
+
+Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.gb](../examples/122_imgfx.gb).
+
 Alle Funktionen brauchen die native Grafik-Runtime (`gbrt` mit dem `graphics`-Feature). Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
 
 ## Beispiel

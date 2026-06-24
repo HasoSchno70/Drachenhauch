@@ -4329,6 +4329,25 @@ impl<'p> Vm<'p> {
             "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
             "image_copy" => Value::Int(g!().image_copy(gi(a,0,"IMAGE_COPY")?)?),
+            "image_crop" => Value::Int(g!().image_crop(gi(a,0,"IMAGE_CROP")?, gi(a,1,"IMAGE_CROP")? as i32, gi(a,2,"IMAGE_CROP")? as i32, gi(a,3,"IMAGE_CROP")? as i32, gi(a,4,"IMAGE_CROP")? as i32)?),
+            "image_resize_canvas" => {
+                let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };
+                Value::Int(g!().image_resize_canvas(gi(a,0,"IMAGE_RESIZE_CANVAS")?, gi(a,1,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,2,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,3,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,4,"IMAGE_RESIZE_CANVAS")? as i32, fill)?)
+            }
+            "image_blur" => Value::Int(g!().image_blur(gi(a,0,"IMAGE_BLUR")?, gi(a,1,"IMAGE_BLUR")? as i32)?),
+            "image_brightness" => Value::Int(g!().image_brightness(gi(a,0,"IMAGE_BRIGHTNESS")?, gi(a,1,"IMAGE_BRIGHTNESS")? as i32)?),
+            "image_contrast" => Value::Int(g!().image_contrast(gi(a,0,"IMAGE_CONTRAST")?, need_f(a,1,"IMAGE_CONTRAST")? as f32)?),
+            "image_grayscale" => Value::Int(g!().image_grayscale(gi(a,0,"IMAGE_GRAYSCALE")?)?),
+            "image_invert" => Value::Int(g!().image_invert(gi(a,0,"IMAGE_INVERT")?)?),
+            "image_replace_color" => Value::Int(g!().image_replace_color(gi(a,0,"IMAGE_REPLACE_COLOR")?, gi(a,1,"IMAGE_REPLACE_COLOR")?, gi(a,2,"IMAGE_REPLACE_COLOR")?)?),
+            "image_draw_line" => { g!().image_draw_line(gi(a,0,"IMAGE_DRAW_LINE")?, gi(a,1,"IMAGE_DRAW_LINE")? as i32, gi(a,2,"IMAGE_DRAW_LINE")? as i32, gi(a,3,"IMAGE_DRAW_LINE")? as i32, gi(a,4,"IMAGE_DRAW_LINE")? as i32, gi(a,5,"IMAGE_DRAW_LINE")?)?; Value::Nil }
+            "image_draw_circle" => { g!().image_draw_circle(gi(a,0,"IMAGE_DRAW_CIRCLE")?, gi(a,1,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,2,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,3,"IMAGE_DRAW_CIRCLE")? as i32, gi(a,4,"IMAGE_DRAW_CIRCLE")?)?; Value::Nil }
+            "image_draw_rect" => { g!().image_draw_rect(gi(a,0,"IMAGE_DRAW_RECT")?, gi(a,1,"IMAGE_DRAW_RECT")? as i32, gi(a,2,"IMAGE_DRAW_RECT")? as i32, gi(a,3,"IMAGE_DRAW_RECT")? as i32, gi(a,4,"IMAGE_DRAW_RECT")? as i32, gi(a,5,"IMAGE_DRAW_RECT")?)?; Value::Nil }
+            "image_draw_text" => {
+                let txt = gs(a,3,"IMAGE_DRAW_TEXT")?.to_string();
+                g!().image_draw_text(gi(a,0,"IMAGE_DRAW_TEXT")?, gi(a,1,"IMAGE_DRAW_TEXT")? as i32, gi(a,2,"IMAGE_DRAW_TEXT")? as i32, &txt, gi(a,4,"IMAGE_DRAW_TEXT")? as i32, gi(a,5,"IMAGE_DRAW_TEXT")?)?;
+                Value::Nil
+            }
 
             // --- Modul: ui (Immediate-Mode) ---
             "ui_label" => {

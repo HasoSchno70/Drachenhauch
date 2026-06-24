@@ -2203,6 +2203,83 @@ impl Graphics {
         let img = self.src_image(idx, "IMAGE_COPY")?;
         self.push_tex_from_image(img)
     }
+    pub fn image_crop(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_CROP: w und h muessen > 0 sein".into()); }
+        let mut img = self.src_image(idx, "IMAGE_CROP")?;
+        img.crop(Rectangle::new(x as f32, y as f32, w as f32, h as f32));
+        self.push_tex_from_image(img)
+    }
+    pub fn image_resize_canvas(&mut self, idx: i64, w: i32, h: i32, offx: i32, offy: i32, fill: i64) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_RESIZE_CANVAS: w und h muessen > 0 sein".into()); }
+        let mut img = self.src_image(idx, "IMAGE_RESIZE_CANVAS")?;
+        img.resize_canvas(w, h, offx, offy, col(fill));
+        self.push_tex_from_image(img)
+    }
+    pub fn image_blur(&mut self, idx: i64, radius: i32) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_BLUR")?;
+        img.blur_gaussian(radius.max(0));
+        self.push_tex_from_image(img)
+    }
+    pub fn image_brightness(&mut self, idx: i64, n: i32) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_BRIGHTNESS")?;
+        img.color_brightness(n.clamp(-255, 255));
+        self.push_tex_from_image(img)
+    }
+    pub fn image_contrast(&mut self, idx: i64, n: f32) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_CONTRAST")?;
+        img.color_contrast(n.clamp(-100.0, 100.0));
+        self.push_tex_from_image(img)
+    }
+    pub fn image_grayscale(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_GRAYSCALE")?;
+        img.color_grayscale();
+        self.push_tex_from_image(img)
+    }
+    pub fn image_invert(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_INVERT")?;
+        img.color_invert();
+        self.push_tex_from_image(img)
+    }
+    pub fn image_replace_color(&mut self, idx: i64, from: i64, to: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_REPLACE_COLOR")?;
+        img.color_replace(col(from), col(to));
+        self.push_tex_from_image(img)
+    }
+
+    // --- imgfx In-Image-Zeichnen (MUTIEREND: veraendert das uebergebene Image
+    // direkt, anders als die immutablen Filter oben). Nach jeder Mutation wird
+    // die GPU-Textur neu hochgeladen, damit DRAWIMAGE das Ergebnis zeigt. Daher:
+    // zum Aufbauen eines Bildes (LOADIMAGE-Zeit), nicht pro Frame. ---
+    fn reupload_tex(&mut self, i: usize) -> Result<(), String> {
+        let tex = self.rl.load_texture_from_image(&self.thread, &self.textures[i].img)
+            .map_err(|e| format!("IMAGE_DRAW: {}", e))?;
+        self.textures[i].tex = tex;
+        Ok(())
+    }
+    pub fn image_draw_line(&mut self, idx: i64, x1: i32, y1: i32, x2: i32, y2: i32, color: i64) -> Result<(), String> {
+        let i = idx as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_LINE: ungueltiges IMAGE-Handle")?;
+        t.img.draw_line(x1, y1, x2, y2, col(color));
+        self.reupload_tex(i)
+    }
+    pub fn image_draw_circle(&mut self, idx: i64, cx: i32, cy: i32, r: i32, color: i64) -> Result<(), String> {
+        let i = idx as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_CIRCLE: ungueltiges IMAGE-Handle")?;
+        t.img.draw_circle(cx, cy, r.max(0), col(color));
+        self.reupload_tex(i)
+    }
+    pub fn image_draw_rect(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32, color: i64) -> Result<(), String> {
+        let i = idx as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_RECT: ungueltiges IMAGE-Handle")?;
+        t.img.draw_rectangle(x, y, w.max(0), h.max(0), col(color));
+        self.reupload_tex(i)
+    }
+    pub fn image_draw_text(&mut self, idx: i64, x: i32, y: i32, text: &str, size: i32, color: i64) -> Result<(), String> {
+        let i = idx as usize;
+        let t = self.textures.get_mut(i).ok_or("IMAGE_DRAW_TEXT: ungueltiges IMAGE-Handle")?;
+        t.img.draw_text(text, x, y, size.max(1), col(color));
+        self.reupload_tex(i)
+    }
     fn cache_image_alias(&mut self, alias: &str, handle: i64) {
         self.image_cache.insert(alias.to_string(), handle);
     }

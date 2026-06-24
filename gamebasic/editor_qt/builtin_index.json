@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1034,
+ "count": 1046,
  "builtins": [
   {
    "name": "ABS",
@@ -1926,6 +1926,78 @@
    "name": "IMAGE_COPY",
    "kind": "core",
    "signature": "IMAGE_COPY(img)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_CROP",
+   "kind": "core",
+   "signature": "IMAGE_CROP(img, x, y, w, h)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_RESIZE_CANVAS",
+   "kind": "core",
+   "signature": "IMAGE_RESIZE_CANVAS(img, w, h, offx, offy[, fill])",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_BLUR",
+   "kind": "core",
+   "signature": "IMAGE_BLUR(img, radius)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_BRIGHTNESS",
+   "kind": "core",
+   "signature": "IMAGE_BRIGHTNESS(img, n: -255..255)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_CONTRAST",
+   "kind": "core",
+   "signature": "IMAGE_CONTRAST(img, n: -100..100)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_GRAYSCALE",
+   "kind": "core",
+   "signature": "IMAGE_GRAYSCALE(img)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_INVERT",
+   "kind": "core",
+   "signature": "IMAGE_INVERT(img)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_REPLACE_COLOR",
+   "kind": "core",
+   "signature": "IMAGE_REPLACE_COLOR(img, from: INTEGER, to: INTEGER)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_DRAW_LINE",
+   "kind": "core",
+   "signature": "IMAGE_DRAW_LINE(img, x1, y1, x2, y2, color)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_DRAW_CIRCLE",
+   "kind": "core",
+   "signature": "IMAGE_DRAW_CIRCLE(img, cx, cy, r, color)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_DRAW_RECT",
+   "kind": "core",
+   "signature": "IMAGE_DRAW_RECT(img, x, y, w, h, color)",
+   "module": "imgfx"
+  },
+  {
+   "name": "IMAGE_DRAW_TEXT",
+   "kind": "core",
+   "signature": "IMAGE_DRAW_TEXT(img, x, y, text$, size, color)",
    "module": "imgfx"
   },
   {

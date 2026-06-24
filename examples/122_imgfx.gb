@@ -1,0 +1,63 @@
+' ============================================================
+'  GAMEBASIC -- imgfx-Erweiterungen
+' ============================================================
+'  Zeigt die neuen Bild-Builtins:
+'   * In ein Image zeichnen (MUTIEREND): IMAGE_DRAW_RECT/CIRCLE/LINE/TEXT
+'   * Filter (IMMUTABLE, neues Handle): IMAGE_GRAYSCALE, IMAGE_INVERT,
+'     IMAGE_BLUR, IMAGE_BRIGHTNESS, IMAGE_CONTRAST, IMAGE_CROP,
+'     IMAGE_REPLACE_COLOR
+'  Links das selbstgebaute Original, rechts daneben die Varianten.
+'  [ESC] Ende
+' ============================================================
+IMPORT "imgfx"
+SCREEN(680, 380, "GameBasic - imgfx", 1)
+
+' --- 1) Eine leere Leinwand und mit IMAGE_DRAW_* bemalen (mutierend) ---
+DIM canvas AS IMAGE
+canvas = GENTEX_COLOR(120, 120, RGB(28, 36, 52))
+IMAGE_DRAW_RECT(canvas, 8, 8, 104, 104, RGB(54, 74, 108))
+IMAGE_DRAW_CIRCLE(canvas, 60, 52, 30, RGB(255, 200, 60))
+IMAGE_DRAW_LINE(canvas, 8, 112, 112, 88, RGB(255, 90, 90))
+IMAGE_DRAW_TEXT(canvas, 16, 92, "GB", 28, RGB(255, 255, 255))
+
+' --- 2) Filter darauf anwenden (Original bleibt erhalten) ---
+DIM gray AS IMAGE     : gray = IMAGE_GRAYSCALE(canvas)
+DIM inv AS IMAGE      : inv = IMAGE_INVERT(canvas)
+DIM blur AS IMAGE     : blur = IMAGE_BLUR(canvas, 4)
+DIM bright AS IMAGE   : bright = IMAGE_BRIGHTNESS(canvas, 80)
+DIM contrast AS IMAGE : contrast = IMAGE_CONTRAST(canvas, 60.0)
+DIM crop AS IMAGE     : crop = IMAGE_CROP(canvas, 30, 22, 60, 60)
+' Exakter Farbtausch: das Gelb des Kreises -> Gruen.
+DIM repl AS IMAGE     : repl = IMAGE_REPLACE_COLOR(canvas, RGB(255, 200, 60), RGB(120, 255, 120))
+
+' --- Anzeige-Gitter ---
+DIM COLS AS INTEGER : COLS = 4
+DIM CELL AS INTEGER : CELL = 120
+DIM GAP AS INTEGER : GAP = 40
+
+WHILE NOT QUITREQUESTED()
+    CLS(&H0E1014)
+    TEXT(12, 8, "imgfx -- IMAGE_DRAW_* (mutierend) + Filter (immutable, neues Handle)   [ESC] Ende")
+
+    SHOWCELL(canvas,   0, "Original (DRAW_*)")
+    SHOWCELL(gray,     1, "GRAYSCALE")
+    SHOWCELL(inv,      2, "INVERT")
+    SHOWCELL(blur,     3, "BLUR 4")
+    SHOWCELL(bright,   4, "BRIGHTNESS +80")
+    SHOWCELL(contrast, 5, "CONTRAST +60")
+    SHOWCELL(crop,     6, "CROP 60x60")
+    SHOWCELL(repl,     7, "REPLACE_COLOR")
+
+    FLIP()
+WEND
+
+' Zeichnet ein Bild in Zelle `i` (row-major, COLS Spalten) mit Beschriftung.
+SUB SHOWCELL(img AS IMAGE, i AS INTEGER, label AS STRING)
+    DIM col AS INTEGER : col = i MOD COLS
+    DIM row AS INTEGER : row = i \ COLS
+    DIM x AS INTEGER : x = GAP + col * (CELL + GAP)
+    DIM y AS INTEGER : y = 36 + row * (CELL + 36)
+    DRAWIMAGE(img, x, y)
+    RECT(x - 1, y - 1, x + CELL, y + CELL, RGB(40, 54, 72))
+    TEXT(x, y + CELL + 4, label)
+END SUB
