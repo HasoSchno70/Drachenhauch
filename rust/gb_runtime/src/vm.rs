@@ -3252,6 +3252,11 @@ impl<'p> Vm<'p> {
                 }
                 Value::Nil
             }
+            "screen_native" => {
+                let title = if !a.is_empty() { gs(a, 0, "SCREEN_NATIVE")?.to_string() } else { "GameBasic".to_string() };
+                g!().screen_native(&title);
+                Value::Nil
+            }
             "cls" => { let c = if a.is_empty() { 0 } else { gi(a, 0, "CLS")? }; g!().cls(c); Value::Nil }
             "plot" => {
                 let c = if a.len() == 3 { gi(a, 2, "PLOT")? } else { 0xFFFFFF };

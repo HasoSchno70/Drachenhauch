@@ -61,7 +61,20 @@ Display-Infos und das Platzieren des Programmfensters auf dem Desktop. Monitor-I
 | `WINDOW_X()`, `WINDOW_Y()` → INTEGER | Position der linken oberen Fensterecke (px) |
 | `SET_WINDOW_POS(x, y)` | Fenster an die OS-Pixelposition `(x, y)` setzen |
 
-Natives Vollbild in der echten Monitor-Auflösung lässt sich daraus zusammensetzen: das `SCREEN` auf die Monitor-Maße öffnen und dann `SET_FULLSCREEN(TRUE)`:
+### Echtes natives Vollbild
+
+| Funktion | Zweck |
+|---|---|
+| `SCREEN_NATIVE([titel$])` | Vollbild in der **echten Auflösung** des aktuellen Monitors |
+
+`SCREEN_NATIVE()` ist der direkte Weg zu scharfem Vollbild und ersetzt `SCREEN(...)`:
+
+```basic
+SCREEN_NATIVE("Mein Spiel")
+' SCREENWIDTH()/SCREENHEIGHT() liefern jetzt die Monitor-Auflösung
+```
+
+Der Unterschied zur Zusammensetzung aus `SCREEN(w, h)` **+** `SET_FULLSCREEN(TRUE)`: bei letzterem wird ein kleines Backbuffer (z. B. 1280×720) auf den Monitor **hochskaliert** → unscharf. `SCREEN_NATIVE()` rendert dagegen 1:1 in nativen Pixeln (logisches Raster = Monitor-Auflösung). Wer die logische Auflösung selbst festlegen will, nutzt weiterhin die manuelle Variante:
 
 ```basic
 DIM m AS INTEGER : m = CURRENT_MONITOR()

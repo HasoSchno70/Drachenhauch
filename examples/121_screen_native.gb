@@ -1,0 +1,40 @@
+' ============================================================
+'  GAMEBASIC -- Natives Vollbild (SCREEN_NATIVE)
+' ============================================================
+'  SCREEN_NATIVE() oeffnet Vollbild in der ECHTEN Monitor-Aufloesung:
+'  die Szene wird 1:1 in nativen Pixeln gerendert (kein Hochskalieren
+'  eines kleinen Backbuffers). SCREENWIDTH()/HEIGHT() liefern danach
+'  die Monitor-Aufloesung. Ein bewegter Punkt am Rand zeigt, dass das
+'  Bild wirklich randscharf bis in die Ecken laeuft.   [ESC] Ende
+' ============================================================
+SCREEN_NATIVE("GameBasic - Natives Vollbild")
+SETFPS(60)
+
+DIM sw AS INTEGER : sw = SCREENWIDTH()
+DIM sh AS INTEGER : sh = SCREENHEIGHT()
+DIM t AS INTEGER : t = 0
+
+WHILE NOT QUITREQUESTED()
+    CLS(&H0E1014)
+
+    ' Rahmen exakt auf der Pixelkante -- scharf nur bei nativer Aufloesung.
+    RECT(0, 0, sw - 1, sh - 1, RGB(43, 196, 232))
+    RECT(1, 1, sw - 2, sh - 2, RGB(20, 110, 140))
+
+    ' Fadenkreuz in der Bildmitte.
+    LINE(sw \ 2, 0, sw \ 2, sh - 1, RGB(40, 60, 80))
+    LINE(0, sh \ 2, sw - 1, sh \ 2, RGB(40, 60, 80))
+
+    ' Infotext, zentriert.
+    DIM info AS STRING
+    info = "SCREEN_NATIVE -- " + STR$(sw) + " x " + STR$(sh) + " (nativ)   [ESC] Ende"
+    TEXT(sw \ 2 - 180, sh \ 2 - 10, info)
+
+    ' Umlaufender Punkt am oberen Rand -> sichtbar nur, wenn die Ecken
+    ' wirklich zum Bild gehoeren (kein Letterbox/Skalierungsrand).
+    DIM px AS INTEGER : px = t MOD sw
+    BOX(px, 0, px + 6, 6, RGB(255, 210, 60))
+
+    t = t + 8
+    FLIP()
+WEND

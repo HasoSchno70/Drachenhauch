@@ -954,6 +954,12 @@ impl Graphics {
     pub fn reconfigure(&mut self, width: i32, height: i32, title: &str, scale: i32) {
         let scale = std::env::var("GBRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
+        self.reconfigure_raw(width, height, title, scale);
+    }
+
+    /// Wie `reconfigure`, aber `scale` wird direkt uebernommen (kein GBRT_SCALE-
+    /// Override). Gemeinsame Basis fuer SCREEN und SCREEN_NATIVE.
+    fn reconfigure_raw(&mut self, width: i32, height: i32, title: &str, scale: i32) {
         self.width = width;
         self.height = height;
         self.scale = scale;
@@ -964,6 +970,31 @@ impl Graphics {
         self.rl.set_window_title(&self.thread, title);
         // Szene-Render-Target an die neue Groesse anpassen (Post-Processing).
         self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
+    }
+
+    /// SCREEN_NATIVE([titel$]) -- Vollbild in der ECHTEN Aufloesung des aktuellen
+    /// Monitors. Anders als `SCREEN(w,h)` + `SET_FULLSCREEN(TRUE)` (das ein kleines
+    /// Backbuffer auf den Monitor hochskaliert -> unscharf) rendert die Szene hier
+    /// 1:1 in nativen Pixeln: logisches Raster = Monitor-Aufloesung, scene_rt und
+    /// Replay-Viewport sind nativ gross. SCREENWIDTH()/HEIGHT() liefern dann die
+    /// Monitor-Aufloesung. GBRT_SCALE (Dev-Screenshot-Knopf) wird respektiert:
+    /// das logische Raster wird entsprechend geteilt, das Fenster bleibt nativ.
+    ///
+    /// Wir nutzen BORDERLESS-WINDOWED (randloses Fenster ueber den ganzen Monitor),
+    /// nicht exklusives Vollbild (`toggle_fullscreen`): letzteres macht auf manchen
+    /// Setups einen unsauberen Video-Mode-Wechsel (GLFW „failed to query video mode",
+    /// Hoehe landet z.B. bei 1421 statt 1440). Borderless wechselt KEINEN Video-Modus
+    /// und deckt den Monitor exakt nativ ab.
+    pub fn screen_native(&mut self, title: &str) {
+        let m = get_current_monitor();
+        let mw = get_monitor_width(m).max(1);
+        let mh = get_monitor_height(m).max(1);
+        let scale = std::env::var("GBRT_SCALE").ok()
+            .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(1);
+        let lw = (mw / scale).max(1);
+        let lh = (mh / scale).max(1);
+        self.reconfigure_raw(lw, lh, title, scale);
+        self.rl.toggle_borderless_windowed();
     }
 
     fn emit(&mut self, c: Cmd) {

@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1033,
+ "count": 1034,
  "builtins": [
   {
    "name": "ABS",
@@ -3621,6 +3621,12 @@
    "name": "SCREEN",
    "kind": "graphics",
    "signature": "SCREEN(2..5 Argumente)",
+   "module": "core"
+  },
+  {
+   "name": "SCREEN_NATIVE",
+   "kind": "graphics",
+   "signature": "SCREEN_NATIVE([titel$])",
    "module": "core"
   },
   {

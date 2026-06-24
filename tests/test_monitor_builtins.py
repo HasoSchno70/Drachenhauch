@@ -16,5 +16,6 @@ def test_monitor_builtins_registered():
     for name in ("monitor_count", "current_monitor", "monitor_width",
                  "monitor_height", "monitor_refresh", "monitor_name",
                  "monitor_x", "monitor_y", "set_window_monitor",
-                 "window_x", "window_y", "set_window_pos"):
+                 "window_x", "window_y", "set_window_pos",
+                 "screen_native"):
         assert name in n, name
