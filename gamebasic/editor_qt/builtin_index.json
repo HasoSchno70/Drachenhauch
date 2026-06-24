@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1046,
+ "count": 1049,
  "builtins": [
   {
    "name": "ABS",
@@ -3702,6 +3702,12 @@
    "module": "core"
   },
   {
+   "name": "SCREEN_TRANSPARENT",
+   "kind": "graphics",
+   "signature": "SCREEN_TRANSPARENT(w, h[, titel$[, scale]])",
+   "module": "core"
+  },
+  {
    "name": "SCREENHEIGHT",
    "kind": "graphics",
    "signature": "SCREENHEIGHT()",
@@ -3843,6 +3849,18 @@
    "name": "WINDOW_RESIZED",
    "kind": "graphics",
    "signature": "WINDOW_RESIZED() AS BOOLEAN",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_UNDECORATED",
+   "kind": "graphics",
+   "signature": "WINDOW_UNDECORATED(flag: BOOLEAN)",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_TOPMOST",
+   "kind": "graphics",
+   "signature": "WINDOW_TOPMOST(flag: BOOLEAN)",
    "module": "gbrt"
   },
   {

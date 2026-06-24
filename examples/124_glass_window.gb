@@ -1,0 +1,43 @@
+' ============================================================
+'  GAMEBASIC -- Glas-Fenster (durchscheinender Hintergrund)
+' ============================================================
+'  SCREEN_TRANSPARENT ohne UNDECORATED: ein normales Fenster (mit Rahmen
+'  und Titelleiste), dessen Hintergrund halbtransparent ist -> der Desktop
+'  schimmert gedimmt durch, der Inhalt liegt klar darueber.
+'  Der Clou steckt im CLS-Alpha: CLS(&Haarrggbb) mit a < 255.
+'  [ESC] Ende
+' ============================================================
+SCREEN_TRANSPARENT(520, 340, "GameBasic - Glas-Fenster")
+SETFPS(60)
+
+DIM w AS INTEGER : w = SCREENWIDTH()
+DIM h AS INTEGER : h = SCREENHEIGHT()
+DIM t AS FLOAT
+DIM bx AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    t = MILLIS() / 1000.0
+
+    ' Halbtransparenter, dunkler Hintergrund: Alpha 0xC0 (~75%) -> der Desktop
+    ' scheint gedimmt durch. Alpha kleiner = glasiger, groesser = deckender.
+    CLS(&HC0101826)
+
+    ' Kopfzeile (deckend)
+    BOX(0, 0, w - 1, 30, &HFF2A4A66)
+    TEXT_SIZE(16)
+    TEXT(10, 8, "Glas-Fenster -- der Desktop schimmert durch", &HFFFFFFFF)
+
+    ' etwas Inhalt
+    TEXT_SIZE(14)
+    TEXT(16, 56, "CLS(&HC0101826) = halbtransparenter Hintergrund (Alpha 0xC0).", &HFFD8E0F0)
+    TEXT(16, 80, "Inhalt (Text, Formen) bleibt voll deckend obenauf.", &HFFD8E0F0)
+
+    ' bewegter Akzent-Balken
+    bx = INT((0.5 + 0.5 * SIN(t * 1.5)) * (w - 160))
+    BOX(16 + bx, 130, 16 + bx + 130, 150, &HFF43C4E8)
+
+    TEXT_SIZE(13)
+    TEXT(16, h - 28, "[ESC] Ende -- Fenster verschieben zeigt den Effekt am besten.", &HFFC0D0FF)
+
+    FLIP()
+WEND

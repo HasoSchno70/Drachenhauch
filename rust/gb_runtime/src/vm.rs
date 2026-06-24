@@ -3257,6 +3257,19 @@ impl<'p> Vm<'p> {
                 g!().screen_native(&title);
                 Value::Nil
             }
+            "screen_transparent" => {
+                let w = gi(a, 0, "SCREEN_TRANSPARENT")? as i32;
+                let h = gi(a, 1, "SCREEN_TRANSPARENT")? as i32;
+                let title = if a.len() >= 3 { gs(a, 2, "SCREEN_TRANSPARENT")?.to_string() } else { "GameBasic".to_string() };
+                let scale = if a.len() >= 4 { gi(a, 3, "SCREEN_TRANSPARENT")? as i32 } else { 1 };
+                if scale < 1 { return Err("SCREEN_TRANSPARENT: skala muss >= 1 sein".into()); }
+                // Transparenz ist ein Fenster-Erzeugungs-Flag (GLFW) -- nicht nachruestbar.
+                if self.gfx.is_some() {
+                    return Err("SCREEN_TRANSPARENT muss die ERSTE Grafik-Anweisung sein (vor LOADIMAGE/SCREEN/... -- Transparenz kann nicht nachtraeglich gesetzt werden)".into());
+                }
+                self.gfx = Some(crate::graphics::Graphics::new_transparent(w, h, &title, scale));
+                Value::Nil
+            }
             "cls" => { let c = if a.is_empty() { 0 } else { gi(a, 0, "CLS")? }; g!().cls(c); Value::Nil }
             "plot" => {
                 let c = if a.len() == 3 { gi(a, 2, "PLOT")? } else { 0xFFFFFF };
@@ -3497,6 +3510,8 @@ impl<'p> Vm<'p> {
             "window_minimize" => { g!().window_minimize(); Value::Nil }
             "window_restore" => { g!().window_restore(); Value::Nil }
             "window_resized" => Value::Bool(g!().window_resized()),
+            "window_undecorated" => { g!().window_undecorated(gb(a, 0)); Value::Nil }
+            "window_topmost" => { g!().window_topmost(gb(a, 0)); Value::Nil }
 
             // --- Monitore / Display-Infos ---
             "monitor_count" => Value::Int(g!().monitor_count()),

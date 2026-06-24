@@ -84,6 +84,44 @@ SET_FULLSCREEN(TRUE)
 
 Komplettes Beispiel mit allen Monitoren, Live-Fensterposition und Monitor-Wechsel: [`examples/120_monitors.gb`](../examples/120_monitors.gb).
 
+### Transparente Fenster & Desktop-Overlay
+
+Der Fenster-Hintergrund kann durchscheinen, sodass der Desktop sichtbar bleibt — für schwebende Overlays (Visualizer, HUD, Effekt) oder Fenster mit „Glas"-Hintergrund.
+
+| Funktion | Zweck |
+|---|---|
+| `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund |
+| `WINDOW_UNDECORATED(flag)` | Fensterrahmen/Titelleiste aus (`TRUE`) / ein (`FALSE`) |
+| `WINDOW_TOPMOST(flag)` | Fenster immer im Vordergrund halten |
+
+**Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST` dagegen jederzeit.
+
+Im Transparent-Modus nimmt `CLS` das **Alpha-Byte wörtlich**:
+
+```basic
+CLS()              ' voll durchsichtig -> der Desktop scheint ueberall durch
+CLS(&HC0101826)    ' halbtransparenter Hintergrund (Alpha 0xC0) -> Desktop schimmert gedimmt durch
+```
+
+(Im normalen, nicht-transparenten Modus bleibt der Hintergrund wie gehabt immer deckend.)
+
+**Desktop-Overlay** (randlos, immer oben, voll durchsichtig):
+
+```basic
+SCREEN_TRANSPARENT(420, 420, "Overlay")
+WINDOW_UNDECORATED(TRUE)
+WINDOW_TOPMOST(TRUE)
+WHILE NOT QUITREQUESTED()
+    CLS()                       ' nur das Gezeichnete ist sichtbar
+    CIRCLE(210, 210, 100, RGB(60, 200, 255))
+    FLIP()
+WEND
+```
+
+Beispiele: [`examples/123_overlay.gb`](../examples/123_overlay.gb) (Overlay), [`examples/124_glass_window.gb`](../examples/124_glass_window.gb) (Glas-Fenster).
+
+> Hinweis: Transparenz wirkt im direkten Render-Pfad. Mit aktivem Post-Processing-Shader (`POSTFX`) wird der Bildschirm deckend präsentiert.
+
 ## Zeichnen
 
 Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r, g, b)` oder über die [Farb-Konstanten](sprache.md#built-in-konstanten) (`RED`, `GREEN`, …).

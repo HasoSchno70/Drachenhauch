@@ -1,0 +1,53 @@
+' ============================================================
+'  GAMEBASIC -- Desktop-Overlay (transparentes, randloses Fenster)
+' ============================================================
+'  SCREEN_TRANSPARENT + WINDOW_UNDECORATED + WINDOW_TOPMOST = ein Effekt,
+'  der frei ueber dem Desktop schwebt (kein Rahmen, immer im Vordergrund).
+'  CLS() loescht voll durchsichtig -> nur das Gezeichnete ist sichtbar,
+'  der Desktop scheint ueberall sonst durch.
+'  [ESC] Ende
+' ============================================================
+SCREEN_TRANSPARENT(420, 420, "GameBasic Overlay")
+WINDOW_UNDECORATED(TRUE)     ' kein Fensterrahmen
+WINDOW_TOPMOST(TRUE)         ' immer im Vordergrund
+SET_WINDOW_POS(80, 80)       ' oben links auf dem Desktop platzieren
+SETFPS(60)
+
+DIM cx AS INTEGER : cx = SCREENWIDTH() \ 2
+DIM cy AS INTEGER : cy = SCREENHEIGHT() \ 2
+DIM t AS FLOAT
+DIM i AS INTEGER
+DIM ang AS FLOAT
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM r AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    t = MILLIS() / 1000.0
+    CLS()                                  ' voll durchsichtig -> Desktop scheint durch
+
+    ' weicher, atmender Glow-Kern (additiv)
+    BLEND_MODE("add")
+    FOR i = 6 TO 1 STEP -1
+        r = INT((20 + i * 16) * (1.0 + 0.08 * SIN(t * 2.0)))
+        CIRCLE(cx, cy, r, HSV(INT(t * 60.0) MOD 360, 0.6, 0.08))
+    NEXT
+
+    ' kreisende Funken-Punkte
+    FOR i = 0 TO 11
+        ang = t * 1.4 + i * (6.2831853 / 12.0)
+        px = cx + INT(COS(ang) * 130.0)
+        py = cy + INT(SIN(ang) * 130.0)
+        CIRCLE(px, py, 7, HSV((i * 30 + INT(t * 80.0)) MOD 360, 0.8, 0.9))
+    NEXT
+    BLEND_MODE("alpha")
+
+    ' Ring-Kontur + Label (deckend -> klar sichtbar ueber dem Desktop)
+    CIRCLEOUTLINE(cx, cy, 150, &HFFFFFF)
+    TEXT_SIZE(20)
+    TEXT(cx - 86, cy - 10, "GameBasic Overlay", &HFFFFFF)
+    TEXT_SIZE(13)
+    TEXT(cx - 40, cy + 150, "[ESC] Ende", &HC0D0FF)
+
+    FLIP()
+WEND

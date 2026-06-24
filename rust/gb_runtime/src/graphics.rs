@@ -687,6 +687,10 @@ pub struct Graphics {
     render_targets: Vec<RenderTarget>,
     active_rt: Option<usize>,
     clear_color: Color,
+    // Transparenter Fenster-Framebuffer (SCREEN_TRANSPARENT): der Desktop scheint
+    // dort durch, wo mit Alpha < 255 gecleart/gezeichnet wird. Steuert, ob CLS das
+    // Alpha-Byte woertlich nimmt (statt es auf 255 zu zwingen).
+    transparent: bool,
     // Kamera (Modul `camera`): World->Screen-Transform fuer alle Draws.
     cam_x: f64,
     cam_y: f64,
@@ -814,14 +818,19 @@ impl Graphics {
     /// Damit funktionieren LOADIMAGE & Co. auch VOR (oder ganz ohne) SCREEN.
     /// Ein spaeteres SCREEN macht das Fenster via `reconfigure` sichtbar.
     pub fn new_headless() -> Graphics {
-        Graphics::new_impl(64, 64, "GameBasic", 1, true)
+        Graphics::new_impl(64, 64, "GameBasic", 1, true, false)
+    }
+    /// Fenster mit transparentem Framebuffer (SCREEN_TRANSPARENT). Das Flag muss
+    /// schon bei der Fenster-Erzeugung gesetzt sein -- nicht nachtraeglich machbar.
+    pub fn new_transparent(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
+        Graphics::new_impl(width, height, title, scale, false, true)
     }
 
     pub fn new(width: i32, height: i32, title: &str, scale: i32) -> Graphics {
-        Graphics::new_impl(width, height, title, scale, false)
+        Graphics::new_impl(width, height, title, scale, false, false)
     }
 
-    fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool) -> Graphics {
+    fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool, transparent: bool) -> Graphics {
         // GBRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
         // (z.B. fuer scharfe Buch-Screenshots), ohne die .gb-Quelle zu aendern.
         let scale = std::env::var("GBRT_SCALE").ok()
@@ -831,11 +840,13 @@ impl Graphics {
         // raylib loggt sonst seinen INFO-Startup-Spam auf stdout und verschmutzt
         // die Konsolen-Ausgabe (TW ist sauber). WARNING zeigt weiter echte
         // Warnungen/Fehler (z.B. fehlgeschlagenes Texture-Load).
-        let (mut rl, thread) = raylib::init()
-            .size(win_w, win_h)
+        let mut builder = raylib::init();
+        builder.size(win_w, win_h)
             .title(title)
-            .log_level(raylib::consts::TraceLogLevel::LOG_WARNING)
-            .build();
+            .log_level(raylib::consts::TraceLogLevel::LOG_WARNING);
+        // FLAG_WINDOW_TRANSPARENT MUSS vor build() gesetzt sein (GLFW-Hint).
+        if transparent { builder.transparent(); }
+        let (mut rl, thread) = builder.build();
         if hidden {
             rl.set_window_state(WindowState::default().set_window_hidden(true));
         }
@@ -856,7 +867,9 @@ impl Graphics {
             active: 0,
             render_targets: Vec::new(),
             active_rt: None,
-            clear_color: Color::BLACK,
+            // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
+            clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
+            transparent,
             cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
             shake_amp: 0.0, shake_dur_ms: 0.0, shake_start: None,
             shake_x: 0.0, shake_y: 0.0,
@@ -1926,11 +1939,19 @@ impl Graphics {
         }
         // CLS setzt die Hintergrundfarbe (beim FLIP gecleart) und leert den
         // aktiven Layer (Wipe). Die Layer werden ohnehin pro FLIP geleert.
-        // Der Szenen-Hintergrund ist IMMER deckend -- ein Alpha-Anteil (RGBA)
-        // wuerde sonst beim PostFX/RenderTexture-Compositing die ganze Szene
-        // durchscheinen lassen.
-        let mut bg = col(color);
-        bg.a = 255;
+        let bg = if self.transparent {
+            // Transparentes Fenster (SCREEN_TRANSPARENT): Alpha-Byte WOERTLICH nehmen
+            // -- `CLS()`/`CLS(0)` -> voll durchsichtig (Desktop scheint durch),
+            // `CLS(&Haarrggbb)` mit a<255 -> getoenter, durchscheinender Hintergrund.
+            let v = color as u32;
+            Color::new(((v >> 16) & 0xFF) as u8, ((v >> 8) & 0xFF) as u8, (v & 0xFF) as u8, ((v >> 24) & 0xFF) as u8)
+        } else {
+            // Normaler Szenen-Hintergrund ist IMMER deckend -- ein Alpha-Anteil
+            // wuerde sonst beim PostFX/RenderTexture-Compositing die Szene durchscheinen lassen.
+            let mut b = col(color);
+            b.a = 255;
+            b
+        };
         self.clear_color = bg;
         let a = self.active;
         self.layers[a].cmds.clear();
@@ -2689,6 +2710,16 @@ impl Graphics {
     /// Das Programmfenster vom OS aus groessenveraenderbar machen (Default: aus).
     pub fn window_resizable(&mut self, f: bool) {
         let ws = WindowState::default().set_window_resizable(true);
+        if f { self.rl.set_window_state(ws); } else { self.rl.clear_window_state(ws); }
+    }
+    /// Fensterrahmen/Titelleiste aus- oder einblenden (randloses Overlay).
+    pub fn window_undecorated(&mut self, f: bool) {
+        let ws = WindowState::default().set_window_undecorated(true);
+        if f { self.rl.set_window_state(ws); } else { self.rl.clear_window_state(ws); }
+    }
+    /// Fenster immer im Vordergrund halten (Topmost) -- fuer Desktop-Overlays.
+    pub fn window_topmost(&mut self, f: bool) {
+        let ws = WindowState::default().set_window_topmost(true);
         if f { self.rl.set_window_state(ws); } else { self.rl.clear_window_state(ws); }
     }
     pub fn window_min_size(&mut self, w: i32, h: i32) {
