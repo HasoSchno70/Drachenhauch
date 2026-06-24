@@ -90,11 +90,12 @@ Der Fenster-Hintergrund kann durchscheinen, sodass der Desktop sichtbar bleibt �
 
 | Funktion | Zweck |
 |---|---|
-| `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund |
+| `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund; `w`/`h` = 0 → ganzer aktueller Monitor (Vollbild-Overlay) |
 | `WINDOW_UNDECORATED(flag)` | Fensterrahmen/Titelleiste aus (`TRUE`) / ein (`FALSE`) |
 | `WINDOW_TOPMOST(flag)` | Fenster immer im Vordergrund halten |
+| `WINDOW_PASSTHROUGH(flag)` | Maus-Klicks zum Desktop **durchreichen** (klick-durchlässiges Widget) |
 
-**Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST` dagegen jederzeit.
+**Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST`/`WINDOW_PASSTHROUGH` dagegen jederzeit. `WINDOW_PASSTHROUGH(TRUE)` braucht ein randloses Fenster (`WINDOW_UNDECORATED(TRUE)`); die Tastatur (z. B. `ESC`) erreicht das Fenster dann nur, solange es den Fokus hat — nach einem Desktop-Klick zum Beenden Stop-Knopf im Editor bzw. `Alt+F4`.
 
 Im Transparent-Modus nimmt `CLS` das **Alpha-Byte wörtlich**:
 
@@ -118,7 +119,7 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-Beispiele: [`examples/123_overlay.gb`](../examples/123_overlay.gb) (Overlay), [`examples/124_glass_window.gb`](../examples/124_glass_window.gb) (Glas-Fenster).
+Beispiele: [`examples/123_overlay.gb`](../examples/123_overlay.gb) (Overlay), [`examples/124_glass_window.gb`](../examples/124_glass_window.gb) (Glas-Fenster), [`examples/125_vortex_overlay.gb`](../examples/125_vortex_overlay.gb) (Wirbel-Overlay), [`examples/126_audio_overlay.gb`](../examples/126_audio_overlay.gb) (klick-durchlässiger Musik-Visualizer via `AUDIO_FFT`).
 
 > Hinweis: Transparenz wirkt im direkten Render-Pfad. Mit aktivem Post-Processing-Shader (`POSTFX`) wird der Bildschirm deckend präsentiert.
 

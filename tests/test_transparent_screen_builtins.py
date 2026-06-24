@@ -12,5 +12,6 @@ from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
 
 def test_transparent_window_builtins_registered():
     n = builtin_names_lower()
-    for name in ("screen_transparent", "window_undecorated", "window_topmost"):
+    for name in ("screen_transparent", "window_undecorated", "window_topmost",
+                 "window_passthrough"):
         assert name in n, name

@@ -2738,6 +2738,18 @@ impl Graphics {
         let ws = WindowState::default().set_window_topmost(true);
         if f { self.rl.set_window_state(ws); } else { self.rl.clear_window_state(ws); }
     }
+    /// Maus-Klicks durch das Fenster zum Desktop DURCHREICHEN
+    /// (FLAG_WINDOW_MOUSE_PASSTHROUGH) -- fuer klick-durchlaessige Overlays/Widgets.
+    /// Braucht ein randloses Fenster (WINDOW_UNDECORATED). raylib-rs bietet dafuer
+    /// keinen WindowState-Setter, darum direkt per FFI. Hinweis: die Tastatur (ESC)
+    /// erreicht das Fenster nur, solange es den Fokus hat -- nach einem Desktop-Klick
+    /// zum Beenden Alt+F4.
+    pub fn window_passthrough(&mut self, f: bool) {
+        let flag = raylib::ffi::ConfigFlags::FLAG_WINDOW_MOUSE_PASSTHROUGH as u32;
+        unsafe {
+            if f { raylib::ffi::SetWindowState(flag); } else { raylib::ffi::ClearWindowState(flag); }
+        }
+    }
     pub fn window_min_size(&mut self, w: i32, h: i32) {
         self.rl.set_window_min_size(w * self.scale.max(1), h * self.scale.max(1));
     }

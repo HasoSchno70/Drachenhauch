@@ -3518,6 +3518,7 @@ impl<'p> Vm<'p> {
             "window_resized" => Value::Bool(g!().window_resized()),
             "window_undecorated" => { g!().window_undecorated(gb(a, 0)); Value::Nil }
             "window_topmost" => { g!().window_topmost(gb(a, 0)); Value::Nil }
+            "window_passthrough" => { g!().window_passthrough(gb(a, 0)); Value::Nil }
 
             // --- Monitore / Display-Infos ---
             "monitor_count" => Value::Int(g!().monitor_count()),

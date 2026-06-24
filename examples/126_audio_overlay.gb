@@ -1,0 +1,87 @@
+' ============================================================
+'  GAMEBASIC -- Musik-Visualizer als KLICK-DURCHLAESSIGES Desktop-Overlay
+' ============================================================
+'  Radiales Spektrum, das in Echtzeit zur laufenden Musik tanzt (AUDIO_FFT),
+'  transparent ueber dem ganzen Desktop -- und dank WINDOW_PASSTHROUGH klickst
+'  du HINDURCH, arbeitest also normal weiter, waehrend es im Hintergrund pulst.
+'
+'  Beenden: ESC (solange das Fenster den Fokus hat, also direkt nach dem Start)
+'           -- oder im GameBasic-Editor den Stop-Knopf, sonst Alt+F4.
+'  CLICKTHROUGH = FALSE setzen, wenn das Overlay den Mausfokus behalten soll.
+' ============================================================
+CONST PI2 AS FLOAT = 6.28318530718
+CONST BANDS AS INTEGER = 64          ' Spektral-Baender rundherum
+CONST CLICKTHROUGH AS INTEGER = TRUE
+
+' Transparentes Vollbild-Overlay (SCREEN_TRANSPARENT(0,0) = ganzer Monitor).
+SCREEN_TRANSPARENT(0, 0, "GameBasic - Audio Overlay")
+WINDOW_UNDECORATED(TRUE)
+WINDOW_TOPMOST(TRUE)
+IF CLICKTHROUGH THEN WINDOW_PASSTHROUGH(TRUE)
+SETFPS(60)
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+DIM CX AS FLOAT : CX = SW / 2.0
+DIM CY AS FLOAT : CY = SH / 2.0
+DIM baseR AS FLOAT : baseR = SH * 0.12
+DIM maxLen AS FLOAT : maxLen = SH * 0.30
+
+PLAYMUSIC("assets/amiga_action_level1.ogg", -1, 0.9)
+
+DIM fft[64] AS FLOAT
+DIM t AS FLOAT
+DIM i AS INTEGER
+DIM rot AS FLOAT
+DIM a AS FLOAT
+DIM v AS FLOAT
+DIM ln AS FLOAT
+DIM x1 AS FLOAT
+DIM y1 AS FLOAT
+DIM x2 AS FLOAT
+DIM y2 AS FLOAT
+DIM bass AS FLOAT
+DIM hue AS INTEGER
+DIM gr AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    t = MILLIS() / 1000.0
+    rot = t * 0.25
+
+    ' Echtes Spektrum der gerade hoerbaren Musik holen.
+    AUDIO_FFT(fft)
+    ' Bass = Mittel der untersten Baender -> treibt den Kern-Puls.
+    bass = (fft[0] + fft[1] + fft[2] + fft[3]) / 4.0
+
+    CLS()                                  ' voll durchsichtig -> Desktop bleibt sichtbar
+
+    ' --- Radiale Spektrum-Strahlen (additiv -> leuchtend) ---
+    BLEND_MODE("add")
+    FOR i = 0 TO BANDS - 1
+        a = i * 1.0 / BANDS * PI2 + rot
+        v = fft[i]
+        ln = baseR + v * maxLen
+        x1 = CX + COS(a) * baseR
+        y1 = CY + SIN(a) * baseR
+        x2 = CX + COS(a) * ln
+        y2 = CY + SIN(a) * ln
+        hue = INT(i * 1.0 / BANDS * 360.0 + t * 30.0) MOD 360
+        LINEW(INT(x1), INT(y1), INT(x2), INT(y2), 3.0 + 6.0 * v, HSV(hue, 0.85, 0.35 + 0.55 * v))
+    NEXT
+
+    ' --- pulsierender Kern (Bass) ---
+    FOR i = 5 TO 1 STEP -1
+        gr = INT((baseR * 0.5 + i * 8) * (1.0 + 0.9 * bass))
+        CIRCLE(INT(CX), INT(CY), gr, HSV(INT(t * 80.0) MOD 360, 0.5, 0.05 + 0.05 * bass))
+    NEXT
+    CIRCLE(INT(CX), INT(CY), INT(6 + 22 * bass), WHITE)
+
+    ' --- Beat-Ring, der mit dem Bass nach aussen schwingt ---
+    CIRCLEOUTLINE(INT(CX), INT(CY), INT(baseR + maxLen * bass), HSV(INT(t * 50.0) MOD 360, 0.7, 0.5 + 0.5 * bass))
+    BLEND_MODE("alpha")
+
+    FLIP()
+WEND
+
+AUDIO_MUSIC_STOP(0)
