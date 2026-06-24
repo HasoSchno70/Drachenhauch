@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 995,
+ "count": 1033,
  "builtins": [
   {
    "name": "ABS",
@@ -3765,6 +3765,78 @@
    "name": "WINDOW_RESIZED",
    "kind": "graphics",
    "signature": "WINDOW_RESIZED() AS BOOLEAN",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_COUNT",
+   "kind": "graphics",
+   "signature": "MONITOR_COUNT() AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "CURRENT_MONITOR",
+   "kind": "graphics",
+   "signature": "CURRENT_MONITOR() AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_WIDTH",
+   "kind": "graphics",
+   "signature": "MONITOR_WIDTH(i: INTEGER) AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_HEIGHT",
+   "kind": "graphics",
+   "signature": "MONITOR_HEIGHT(i: INTEGER) AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_REFRESH",
+   "kind": "graphics",
+   "signature": "MONITOR_REFRESH(i: INTEGER) AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_NAME",
+   "kind": "graphics",
+   "signature": "MONITOR_NAME(i: INTEGER) AS STRING",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_X",
+   "kind": "graphics",
+   "signature": "MONITOR_X(i: INTEGER) AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "MONITOR_Y",
+   "kind": "graphics",
+   "signature": "MONITOR_Y(i: INTEGER) AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "SET_WINDOW_MONITOR",
+   "kind": "graphics",
+   "signature": "SET_WINDOW_MONITOR(i: INTEGER)",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_X",
+   "kind": "graphics",
+   "signature": "WINDOW_X() AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "WINDOW_Y",
+   "kind": "graphics",
+   "signature": "WINDOW_Y() AS INTEGER",
+   "module": "gbrt"
+  },
+  {
+   "name": "SET_WINDOW_POS",
+   "kind": "graphics",
+   "signature": "SET_WINDOW_POS(x: INTEGER, y: INTEGER)",
    "module": "gbrt"
   },
   {

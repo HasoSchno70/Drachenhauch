@@ -1,0 +1,60 @@
+' ============================================================
+'  GAMEBASIC -- Monitor- & Display-Infos
+' ============================================================
+'  Zeigt das neue Display-Modul: alle angeschlossenen Monitore mit
+'  Aufloesung/Hz/Position, den aktuellen Monitor und die Live-Position
+'  des Fensters. Tasten:
+'    [LEER] Fenster auf den naechsten Monitor schieben (SET_WINDOW_MONITOR)
+'    [Pfeile] Fenster um 40 px verschieben (SET_WINDOW_POS)
+'    [ESC]   Ende
+' ============================================================
+SCREEN(640, 460, "GameBasic - Monitore", 1)
+
+DIM prevSpace AS INTEGER : prevSpace = 0
+
+WHILE NOT QUITREQUESTED()
+    ' --- Eingaben (Flanke fuer [LEER]) ---
+    DIM sp AS INTEGER : sp = 0
+    IF KEYPRESSED(KEY_SPACE) THEN sp = 1
+    IF sp = 1 AND prevSpace = 0 THEN
+        DIM nextMon AS INTEGER
+        nextMon = (CURRENT_MONITOR() + 1) MOD MONITOR_COUNT()
+        SET_WINDOW_MONITOR(nextMon)
+    END IF
+    prevSpace = sp
+
+    DIM wx AS INTEGER : DIM wy AS INTEGER
+    wx = WINDOW_X() : wy = WINDOW_Y()
+    IF KEYPRESSED(KEY_LEFT)  THEN SET_WINDOW_POS(wx - 40, wy)
+    IF KEYPRESSED(KEY_RIGHT) THEN SET_WINDOW_POS(wx + 40, wy)
+    IF KEYPRESSED(KEY_UP)    THEN SET_WINDOW_POS(wx, wy - 40)
+    IF KEYPRESSED(KEY_DOWN)  THEN SET_WINDOW_POS(wx, wy + 40)
+
+    ' --- Zeichnen ---
+    CLS(&H0E1014)
+    BOX(0, 0, 639, 26, RGB(18, 90, 120))
+    TEXT(8, 8, "Display-Modul -- " + STR$(MONITOR_COUNT()) + " Monitor(e)   [LEER] Fenster wandern  [Pfeile] verschieben")
+
+    DIM y AS INTEGER : y = 42
+    DIM cur AS INTEGER : cur = CURRENT_MONITOR()
+    DIM i AS INTEGER
+    FOR i = 0 TO MONITOR_COUNT() - 1
+        DIM mark AS STRING : mark = "  "
+        IF i = cur THEN mark = "> "
+        DIM line AS STRING
+        line = mark + "Monitor " + STR$(i) + ": " + MONITOR_NAME(i)
+        TEXT(16, y, line)
+        y = y + 22
+        line = "     " + STR$(MONITOR_WIDTH(i)) + " x " + STR$(MONITOR_HEIGHT(i))
+        line = line + " @ " + STR$(MONITOR_REFRESH(i)) + " Hz"
+        line = line + "   pos (" + STR$(MONITOR_X(i)) + ", " + STR$(MONITOR_Y(i)) + ")"
+        TEXT(16, y, line)
+        y = y + 30
+    NEXT i
+
+    BOX(8, y + 6, 631, y + 70, RGB(30, 42, 58))
+    TEXT(16, y + 14, "Aktueller Monitor: " + STR$(cur))
+    TEXT(16, y + 36, "Fensterposition:   (" + STR$(WINDOW_X()) + ", " + STR$(WINDOW_Y()) + ")")
+
+    FLIP()
+WEND

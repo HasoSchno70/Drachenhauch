@@ -7,6 +7,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 ## Inhalt
 
 - [Fenster und Frame](#fenster-und-frame)
+- [Monitore und Fensterposition](#monitore-und-fensterposition)
 - [Zeichnen](#zeichnen)
 - [Bilder](#bilder)
 - [Asset-Preloader (`LOAD_ASSETS`)](#asset-preloader)
@@ -42,6 +43,33 @@ WEND
 ```
 
 `scale=2` öffnet ein 640×480-Fenster, in dem aber alle Koordinaten weiterhin in 320×240 logischer Auflösung gerechnet werden — die Pixel werden hochskaliert.
+
+## Monitore und Fensterposition
+
+Display-Infos und das Platzieren des Programmfensters auf dem Desktop. Monitor-Index läuft von `0` bis `MONITOR_COUNT()-1`. Alle Maße hier sind **echte OS-Pixel** (kein `scale`), weil sie die Hardware bzw. die Lage auf dem Desktop beschreiben — nicht das logische `SCREEN`-Raster.
+
+| Funktion | Zweck |
+|---|---|
+| `MONITOR_COUNT()` → INTEGER | Anzahl angeschlossener Monitore |
+| `CURRENT_MONITOR()` → INTEGER | Index des Monitors, auf dem das Fenster gerade überwiegend liegt |
+| `MONITOR_WIDTH(i)` → INTEGER | native Breite von Monitor `i` (px) |
+| `MONITOR_HEIGHT(i)` → INTEGER | native Höhe von Monitor `i` (px) |
+| `MONITOR_REFRESH(i)` → INTEGER | Bildwiederholrate von Monitor `i` (Hz) |
+| `MONITOR_NAME(i)` → STRING | Anzeigename von Monitor `i` |
+| `MONITOR_X(i)`, `MONITOR_Y(i)` → INTEGER | Position von Monitor `i` im virtuellen Desktop (px) |
+| `SET_WINDOW_MONITOR(i)` | Fenster auf Monitor `i` schieben (ungültiger Index wird ignoriert) |
+| `WINDOW_X()`, `WINDOW_Y()` → INTEGER | Position der linken oberen Fensterecke (px) |
+| `SET_WINDOW_POS(x, y)` | Fenster an die OS-Pixelposition `(x, y)` setzen |
+
+Natives Vollbild in der echten Monitor-Auflösung lässt sich daraus zusammensetzen: das `SCREEN` auf die Monitor-Maße öffnen und dann `SET_FULLSCREEN(TRUE)`:
+
+```basic
+DIM m AS INTEGER : m = CURRENT_MONITOR()
+SCREEN(MONITOR_WIDTH(m), MONITOR_HEIGHT(m), "Vollbild", 1)
+SET_FULLSCREEN(TRUE)
+```
+
+Komplettes Beispiel mit allen Monitoren, Live-Fensterposition und Monitor-Wechsel: [`examples/120_monitors.gb`](../examples/120_monitors.gb).
 
 ## Zeichnen
 

@@ -2595,6 +2595,40 @@ impl Graphics {
     /// Wurde das Fenster seit dem letzten FLIP vom Nutzer/OS in der Groesse geaendert?
     pub fn window_resized(&self) -> bool { self.rl.is_window_resized() }
 
+    // --- Monitore / Display-Infos (raylib GetMonitor*) ---
+    // Alle Monitor-Masse sind ECHTE OS-Pixel (kein Screen-Scale), denn sie
+    // beschreiben die Hardware, nicht das logische SCREEN-Raster. Monitor-Index
+    // 0..MONITOR_COUNT()-1; raylibs Get-Funktionen klemmen ungueltige Indizes
+    // intern selbst ab und liefern dann 0 bzw. "".
+    /// Anzahl angeschlossener Monitore.
+    pub fn monitor_count(&self) -> i64 { get_monitor_count() as i64 }
+    /// Index des Monitors, auf dem das Fenster gerade ueberwiegend liegt.
+    pub fn current_monitor(&self) -> i64 { get_current_monitor() as i64 }
+    /// Native Breite des Monitors `i` in Pixeln.
+    pub fn monitor_width(&self, i: i64) -> i64 { get_monitor_width(i as i32) as i64 }
+    /// Native Hoehe des Monitors `i` in Pixeln.
+    pub fn monitor_height(&self, i: i64) -> i64 { get_monitor_height(i as i32) as i64 }
+    /// Bildwiederholrate (Hz) des Monitors `i`.
+    pub fn monitor_refresh(&self, i: i64) -> i64 { get_monitor_refresh_rate(i as i32) as i64 }
+    /// Anzeigename des Monitors `i` (leer, wenn nicht ermittelbar).
+    pub fn monitor_name(&self, i: i64) -> String { get_monitor_name(i as i32).unwrap_or_default() }
+    /// X-Position des Monitors `i` im virtuellen Desktop (OS-Pixel).
+    pub fn monitor_x(&self, i: i64) -> i64 { get_monitor_position(i as i32).x as i64 }
+    /// Y-Position des Monitors `i` im virtuellen Desktop (OS-Pixel).
+    pub fn monitor_y(&self, i: i64) -> i64 { get_monitor_position(i as i32).y as i64 }
+    /// Fenster auf Monitor `i` schieben (raylibs Vollbild-Zielmonitor). Out-of-range
+    /// wird ignoriert -- raylibs set_window_monitor hat ein debug_assert, das in
+    /// Debug-Builds sonst paniken wuerde.
+    pub fn set_window_monitor(&mut self, i: i64) {
+        if i >= 0 && i < get_monitor_count() as i64 { self.rl.set_window_monitor(i as i32); }
+    }
+    /// X-Position der linken oberen Fensterecke (OS-Pixel).
+    pub fn window_x(&self) -> i64 { self.rl.get_window_position().x as i64 }
+    /// Y-Position der linken oberen Fensterecke (OS-Pixel).
+    pub fn window_y(&self) -> i64 { self.rl.get_window_position().y as i64 }
+    /// Fenster an OS-Pixelposition (x, y) setzen.
+    pub fn set_window_pos(&mut self, x: i64, y: i64) { self.rl.set_window_position(x as i32, y as i32); }
+
     /// Clip-Rechteck auf den Stack legen (Scissor). Koordinaten werden wie bei
     /// allen Draws kamera-transformiert; der Screen-Scale kommt beim Replay.
     pub fn push_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {

@@ -3493,6 +3493,20 @@ impl<'p> Vm<'p> {
             "window_restore" => { g!().window_restore(); Value::Nil }
             "window_resized" => Value::Bool(g!().window_resized()),
 
+            // --- Monitore / Display-Infos ---
+            "monitor_count" => Value::Int(g!().monitor_count()),
+            "current_monitor" => Value::Int(g!().current_monitor()),
+            "monitor_width" => Value::Int(g!().monitor_width(gi(a, 0, "MONITOR_WIDTH")?)),
+            "monitor_height" => Value::Int(g!().monitor_height(gi(a, 0, "MONITOR_HEIGHT")?)),
+            "monitor_refresh" => Value::Int(g!().monitor_refresh(gi(a, 0, "MONITOR_REFRESH")?)),
+            "monitor_name" => { let s = g!().monitor_name(gi(a, 0, "MONITOR_NAME")?); Value::str_rc(&s) }
+            "monitor_x" => Value::Int(g!().monitor_x(gi(a, 0, "MONITOR_X")?)),
+            "monitor_y" => Value::Int(g!().monitor_y(gi(a, 0, "MONITOR_Y")?)),
+            "set_window_monitor" => { g!().set_window_monitor(gi(a, 0, "SET_WINDOW_MONITOR")?); Value::Nil }
+            "window_x" => Value::Int(g!().window_x()),
+            "window_y" => Value::Int(g!().window_y()),
+            "set_window_pos" => { g!().set_window_pos(gi(a, 0, "SET_WINDOW_POS")?, gi(a, 1, "SET_WINDOW_POS")?); Value::Nil }
+
             // --- Shader / Post-Processing ---
             "shader_load" => {
                 // SHADER_LOAD(quelle$): Datei-Pfad ODER GLSL-Quelltext.
