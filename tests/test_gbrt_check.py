@@ -77,6 +77,27 @@ def test_all_examples_check_clean():
     assert not bad, f"Fehlalarme bei gueltigem Code: {bad}"
 
 
+def test_examples_use_no_unknown_builtin():
+    """Drift-Schutz fuer builtin_index.json: KEIN Beispiel ruft ein Builtin auf,
+    das gbrt nicht kennt. Schlaegt fehl, sobald ein neues gbrt-Builtin benutzt,
+    aber nicht im Index ergaenzt wurde (-> der Index bleibt vollstaendig, sonst
+    wuerde gueltiger Code faelschlich die 'Unbekanntes Builtin'-Warnung kriegen).
+    Greift Hand in Hand mit compiler::is_known_builtin (G1, systemisch)."""
+    drift = []
+    for f in sorted(_EXAMPLES.rglob("*.gb")):
+        if "_smoketest" in f.name:
+            continue
+        r = subprocess.run([str(_GBRT), "--check", str(f)],
+                           capture_output=True, text=True, timeout=30)
+        diags = json.loads(r.stdout or "[]")
+        for d in diags:
+            if "Unbekanntes Builtin" in d.get("message", ""):
+                drift.append((f.name, d.get("line"), d.get("message")))
+    assert not drift, (
+        "Beispiele nutzen Builtins, die gbrt nicht (im builtin_index.json) "
+        f"kennt -> Index ergaenzen: {drift}")
+
+
 def test_hardware_import_warns_at_import(tmp_path):
     """E1: `IMPORT "wifi"` (serial/usb/bt analog) wird im Default-Build (ohne
     --hardware) schon beim IMPORT als Warnung gemeldet -- nicht erst beim ersten

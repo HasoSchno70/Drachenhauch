@@ -195,8 +195,15 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 > und keine False-Positives: Sweep über ALLE examples = 0 fälschlich gemeldete
 > Builtins (der Index ist vollständig). Interne `__`-Builtins ausgenommen.
 > Folge: ein neues gbrt-Builtin, das man im `builtin_index.json` zu ergänzen
-> vergisst, fällt ab sofort sofort auf. Tests: `test_gbrt_check.py::
-> test_unknown_builtin_warns` / `test_known_builtin_no_warning`.
+> vergisst, fällt ab sofort auf. **Drift-Schutz-Test** `test_gbrt_check.py::
+> test_examples_use_no_unknown_builtin` prüft, dass KEIN Beispiel ein Builtin
+> nutzt, das nicht im Index steht — er fand sofort **10 echte, aber unindizierte
+> Builtins** (`CAMERA_ORBIT`, `WORLD_TO_SCREEN_X/Y`, `SCREEN_TO_WORLD_DIR_X/Y/Z`,
+> `RAY_HIT_MODEL`, `PICK_MODEL`, `GETPIXEL`, `CIRCLEOUTLINE` — alle aus
+> „in-die-Runtime-ergänzt, Index vergessen"-Commits) und sie wurden nachgetragen
+> (Index: 1011 → 1021). **Hinweis:** der Index wird per `include_str!` zur
+> gbrt-BAU-Zeit eingebettet → nach Index-Änderung gbrt neu bauen. Weitere Tests:
+> `test_unknown_builtin_warns` / `test_known_builtin_no_warning`.
 
 `FLT(x)` (z. B. `FLT(MOUSEX())`, in mehreren examples genutzt) läuft im Python-
 Tree-Walker, wirft in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT' im

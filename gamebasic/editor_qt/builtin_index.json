@@ -5872,6 +5872,66 @@
    "kind": "core",
    "signature": "GUI_CANVAS_H(canvas)",
    "module": "gui"
+  },
+  {
+   "name": "CAMERA_ORBIT",
+   "kind": "graphics",
+   "signature": "CAMERA_ORBIT(tx, ty, tz, radius, yaw, pitch[, fovy])",
+   "module": "camera"
+  },
+  {
+   "name": "WORLD_TO_SCREEN_X",
+   "kind": "graphics",
+   "signature": "WORLD_TO_SCREEN_X(wx, wy, wz)",
+   "module": "g3d"
+  },
+  {
+   "name": "WORLD_TO_SCREEN_Y",
+   "kind": "graphics",
+   "signature": "WORLD_TO_SCREEN_Y(wx, wy, wz)",
+   "module": "g3d"
+  },
+  {
+   "name": "SCREEN_TO_WORLD_DIR_X",
+   "kind": "graphics",
+   "signature": "SCREEN_TO_WORLD_DIR_X(sx, sy)",
+   "module": "g3d"
+  },
+  {
+   "name": "SCREEN_TO_WORLD_DIR_Y",
+   "kind": "graphics",
+   "signature": "SCREEN_TO_WORLD_DIR_Y(sx, sy)",
+   "module": "g3d"
+  },
+  {
+   "name": "SCREEN_TO_WORLD_DIR_Z",
+   "kind": "graphics",
+   "signature": "SCREEN_TO_WORLD_DIR_Z(sx, sy)",
+   "module": "g3d"
+  },
+  {
+   "name": "RAY_HIT_MODEL",
+   "kind": "graphics",
+   "signature": "RAY_HIT_MODEL(modell, ox, oy, oz, dx, dy, dz, px, py, pz[, scale])",
+   "module": "g3d"
+  },
+  {
+   "name": "PICK_MODEL",
+   "kind": "graphics",
+   "signature": "PICK_MODEL(modell, px, py, pz[, scale])",
+   "module": "g3d"
+  },
+  {
+   "name": "GETPIXEL",
+   "kind": "graphics",
+   "signature": "GETPIXEL(img, x, y)",
+   "module": "core"
+  },
+  {
+   "name": "CIRCLEOUTLINE",
+   "kind": "graphics",
+   "signature": "CIRCLEOUTLINE(x, y, r[, color])",
+   "module": "core"
   }
  ]
 }
