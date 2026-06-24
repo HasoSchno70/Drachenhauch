@@ -1,0 +1,56 @@
+' ============================================================
+'  GAMEBASIC -- Native Datei-/Ordner-Dialoge
+' ============================================================
+'  Oeffnet die echten Windows-Dialoge und zeigt den gewaehlten Pfad.
+'  Tasten:  [O] Datei oeffnen   [S] Speichern unter   [F] Ordner waehlen
+'           [ESC] Ende
+'  Alle drei liefern einen STRING (Pfad), bei Abbruch einen leeren String.
+'  Endungs-Filter: kommagetrennt ohne Punkt, z.B. "png,jpg,gb".
+' ============================================================
+SCREEN(740, 300, "GameBasic - Datei-Dialoge", 1)
+SETFPS(60)
+
+DIM lastAction AS STRING : lastAction = "(noch nichts gewaehlt)"
+DIM lastPath AS STRING : lastPath = ""
+DIM shown AS STRING
+' Flankenerkennung (KEYPRESSED ist gehalten, nicht flankengetriggert)
+DIM pO AS INTEGER : pO = 0
+DIM pS AS INTEGER : pS = 0
+DIM pF AS INTEGER : pF = 0
+DIM dO AS INTEGER
+DIM dS AS INTEGER
+DIM dF AS INTEGER
+
+WHILE NOT QUITREQUESTED()
+    ' Hinweis: KEYPRESSED nutzt die (pygame-)Tastencodes -> KEY_*-Konstanten
+    ' verwenden, NICHT ASC("O") (Grossbuchstabe 79 wird nicht gemappt).
+    dO = 0 : IF KEYPRESSED(KEY_O) THEN dO = 1
+    dS = 0 : IF KEYPRESSED(KEY_S) THEN dS = 1
+    dF = 0 : IF KEYPRESSED(KEY_F) THEN dF = 1
+
+    IF dO = 1 AND pO = 0 THEN
+        lastPath = FILE_OPEN_DIALOG("Datei oeffnen", "png,jpg,gb,txt")
+        lastAction = "FILE_OPEN_DIALOG"
+    END IF
+    IF dS = 1 AND pS = 0 THEN
+        lastPath = FILE_SAVE_DIALOG("Speichern unter", "unbenannt.txt", "txt")
+        lastAction = "FILE_SAVE_DIALOG"
+    END IF
+    IF dF = 1 AND pF = 0 THEN
+        lastPath = FOLDER_DIALOG("Ordner waehlen")
+        lastAction = "FOLDER_DIALOG"
+    END IF
+    pO = dO : pS = dS : pF = dF
+
+    CLS(&H0E1014)
+    BOX(0, 0, 739, 30, RGB(18, 90, 120))
+    TEXT(10, 8, "Native Datei-Dialoge   [O] Oeffnen   [S] Speichern   [F] Ordner   [ESC] Ende")
+
+    TEXT(16, 70, "Letzte Aktion:  " + lastAction)
+    shown = lastPath
+    IF shown = "" THEN shown = "(abgebrochen / leer)"
+    TEXT(16, 110, "Ergebnis-Pfad:")
+    TEXT(16, 134, shown)
+
+    FLIP()
+WEND

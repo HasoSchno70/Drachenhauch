@@ -3520,6 +3520,23 @@ impl<'p> Vm<'p> {
             "window_topmost" => { g!().window_topmost(gb(a, 0)); Value::Nil }
             "window_passthrough" => { g!().window_passthrough(gb(a, 0)); Value::Nil }
 
+            // --- Native OS-Datei-/Ordner-Dialoge (rfd; liefern Pfad oder "") ---
+            "file_open_dialog" => {
+                let title = if !a.is_empty() { gs(a, 0, "FILE_OPEN_DIALOG")?.to_string() } else { String::new() };
+                let exts = if a.len() >= 2 { crate::filedialog::parse_exts(gs(a, 1, "FILE_OPEN_DIALOG")?) } else { vec![] };
+                Value::str_rc(&crate::filedialog::open(&title, &exts))
+            }
+            "file_save_dialog" => {
+                let title = if !a.is_empty() { gs(a, 0, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
+                let default_name = if a.len() >= 2 { gs(a, 1, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
+                let exts = if a.len() >= 3 { crate::filedialog::parse_exts(gs(a, 2, "FILE_SAVE_DIALOG")?) } else { vec![] };
+                Value::str_rc(&crate::filedialog::save(&title, &default_name, &exts))
+            }
+            "folder_dialog" => {
+                let title = if !a.is_empty() { gs(a, 0, "FOLDER_DIALOG")?.to_string() } else { String::new() };
+                Value::str_rc(&crate::filedialog::folder(&title))
+            }
+
             // --- Monitore / Display-Infos ---
             "monitor_count" => Value::Int(g!().monitor_count()),
             "current_monitor" => Value::Int(g!().current_monitor()),

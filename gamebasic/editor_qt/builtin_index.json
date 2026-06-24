@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1050,
+ "count": 1053,
  "builtins": [
   {
    "name": "ABS",
@@ -1494,6 +1494,24 @@
    "name": "FILE_DROPPED",
    "kind": "graphics",
    "signature": "FILE_DROPPED(*args)",
+   "module": "core"
+  },
+  {
+   "name": "FILE_OPEN_DIALOG",
+   "kind": "graphics",
+   "signature": "FILE_OPEN_DIALOG([titel$[, endungen$]]) AS STRING",
+   "module": "core"
+  },
+  {
+   "name": "FILE_SAVE_DIALOG",
+   "kind": "graphics",
+   "signature": "FILE_SAVE_DIALOG([titel$[, default$[, endungen$]]]) AS STRING",
+   "module": "core"
+  },
+  {
+   "name": "FOLDER_DIALOG",
+   "kind": "graphics",
+   "signature": "FOLDER_DIALOG([titel$]) AS STRING",
    "module": "core"
   },
   {

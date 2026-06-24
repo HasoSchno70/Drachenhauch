@@ -43,11 +43,15 @@ futures = { version = "0.3", optional = true }
 kira = { version = "0.12", optional = true }
 xmrs = { version = "0.13", optional = true }
 xmrsplayer = { version = "0.13", optional = true }
+# Native OS-Datei-/Ordner-Dialoge (FILE_OPEN_DIALOG/FILE_SAVE_DIALOG/FOLDER_DIALOG).
+# Desktop-GUI -> ans graphics-Feature gekoppelt. Auf Windows pure-Rust (windows-sys),
+# keine C-Toolchain.
+rfd = { version = "0.14", optional = true }
 
 [features]
 default = []
-# Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs).
-graphics = ["dep:raylib", "dep:kira", "dep:xmrs", "dep:xmrsplayer"]
+# Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
+graphics = ["dep:raylib", "dep:kira", "dep:xmrs", "dep:xmrsplayer", "dep:rfd"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]

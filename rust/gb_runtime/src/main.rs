@@ -39,6 +39,8 @@ mod usb;
 #[cfg(feature = "wifi")]
 mod wifi;
 #[cfg(feature = "graphics")]
+mod filedialog;
+#[cfg(feature = "graphics")]
 mod graphics;
 #[cfg(feature = "graphics")]
 mod gui;

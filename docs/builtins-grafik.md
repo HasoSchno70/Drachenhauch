@@ -123,6 +123,27 @@ Beispiele: [`examples/123_overlay.gb`](../examples/123_overlay.gb) (Overlay), [`
 
 > Hinweis: Transparenz wirkt im direkten Render-Pfad. Mit aktivem Post-Processing-Shader (`POSTFX`) wird der Bildschirm deckend präsentiert.
 
+## Native Datei-Dialoge
+
+Echte Windows-Dialoge zum Auswählen von Dateien/Ordnern. Alle drei sind **blockierend** (modaler Systemdialog) und geben den gewählten Pfad als STRING zurück — bei Abbruch einen **leeren String**. `endungen$` ist eine kommagetrennte Liste von Dateiendungen ohne Punkt (z. B. `"png,jpg,gb"`).
+
+| Funktion | Zweck |
+|---|---|
+| `FILE_OPEN_DIALOG([titel$[, endungen$]])` → STRING | Datei zum Öffnen wählen |
+| `FILE_SAVE_DIALOG([titel$[, default$[, endungen$]]])` → STRING | Datei zum Speichern wählen (`default$` = vorgeschlagener Dateiname) |
+| `FOLDER_DIALOG([titel$])` → STRING | Ordner wählen |
+
+```basic
+DIM pfad AS STRING
+pfad = FILE_OPEN_DIALOG("Bild laden", "png,jpg")
+IF pfad <> "" THEN
+    DIM bild AS IMAGE : bild = LOADIMAGE(pfad)
+    ' ...
+END IF
+```
+
+Komplettes Beispiel: [`examples/127_filedialog.gb`](../examples/127_filedialog.gb).
+
 ## Zeichnen
 
 Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r, g, b)` oder über die [Farb-Konstanten](sprache.md#built-in-konstanten) (`RED`, `GREEN`, …).
