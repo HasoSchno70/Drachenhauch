@@ -291,7 +291,15 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
         Err(e) => { eprintln!("{}:{}: Parse-Fehler ({}): {}", label, e.line, e.col, e.msg); return Err(ExitCode::from(2)); }
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
-        Ok(j) => Ok(j),
+        Ok((j, warns)) => {
+            // Nicht-fatale Compile-Warnungen (z.B. unbekanntes Builtin) vor dem
+            // Lauf auf stderr -- der Lauf geht weiter, schlaegt aber spaeter ggf.
+            // beim Aufruf fehl.
+            for (line, msg) in warns {
+                eprintln!("{}:{}: Warnung: {}", label, line, msg);
+            }
+            Ok(j)
+        }
         Err((line, msg)) => {
             if line > 0 { eprintln!("{}:{}: Compile-Fehler: {}", label, line, msg); }
             else { eprintln!("{}: Compile-Fehler: {}", label, msg); }
@@ -451,11 +459,22 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
         // Hardware-Modulen ergaenzen, die in diesem gbrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
         // Lauf). Leer, wenn kein solches Modul importiert wird.
-        Ok(_) => preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
-            .map(|(line, m)| serde_json::json!({
-                "line": line, "col": 0, "severity": "warning",
-                "phase": "preprocess", "message": preprocess::hardware_missing_msg(m) }))
-            .collect(),
+        Ok((_, warns)) => {
+            let mut diags: Vec<serde_json::Value> =
+                preprocess::missing_hardware_imports_with_lines(raw_source).into_iter()
+                    .map(|(line, m)| serde_json::json!({
+                        "line": line, "col": 0, "severity": "warning",
+                        "phase": "preprocess", "message": preprocess::hardware_missing_msg(m) }))
+                    .collect();
+            // G1 (systemisch): Aufrufe von Builtins, die gbrt nicht kennt, schon
+            // im Editor als Warnung zeigen -- statt erst zur Laufzeit zu crashen.
+            for (line, msg) in warns {
+                diags.push(serde_json::json!({
+                    "line": line, "col": 0, "severity": "warning",
+                    "phase": "compile", "message": msg }));
+            }
+            diags
+        }
         Err((line, msg)) => vec![serde_json::json!({
             "line": line, "col": 0, "severity": "error",
             "phase": "compile", "message": msg })],

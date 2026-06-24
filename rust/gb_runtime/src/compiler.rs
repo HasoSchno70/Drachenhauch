@@ -281,6 +281,40 @@ pub struct Compiler {
     // Quell-Zeile des Statements, dessen Kompilierung fehlschlug (Stufe B:
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
     err_line: u32,
+    // Nicht-fatale Compile-Warnungen `(zeile, text)` -- z.B. Aufruf eines
+    // Builtins, das gbrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
+    // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
+    warnings: Vec<(u32, String)>,
+}
+
+/// Namen aller gbrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
+/// `builtin_index.json`. Quelle der Wahrheit fuer „kennt gbrt diesen Builtin?".
+fn known_builtins() -> &'static std::collections::HashSet<String> {
+    use std::sync::OnceLock;
+    static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
+    SET.get_or_init(|| {
+        let raw = include_str!("../../../gamebasic/editor_qt/builtin_index.json");
+        let mut s = std::collections::HashSet::new();
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
+                for e in arr {
+                    if let Some(n) = e.get("name").and_then(|n| n.as_str()) {
+                        s.insert(n.to_lowercase());
+                    }
+                }
+            }
+        }
+        s
+    })
+}
+
+/// Ist `name` ein gbrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
+/// der Fall „Index konnte nicht geladen werden" (leeres Set) gelten als bekannt,
+/// damit nie faelschlich gewarnt wird.
+fn is_known_builtin(name: &str) -> bool {
+    if name.starts_with("__") { return true; }
+    let set = known_builtins();
+    set.is_empty() || set.contains(&name.to_lowercase())
 }
 
 impl Compiler {
@@ -292,7 +326,8 @@ impl Compiler {
                    classes: HashMap::new(),
                    struct_names: std::collections::HashSet::new(),
                    external_types, builtin_aliases,
-                   enum_decls: HashMap::new(), ctx: Ctx::new(), err_line: 0 }
+                   enum_decls: HashMap::new(), ctx: Ctx::new(), err_line: 0,
+                   warnings: vec![] }
     }
 
     /// Bekannter skalarer DIM-Typ: Werttyp ODER importierter externer Modul-Typ.
@@ -1216,6 +1251,16 @@ impl Compiler {
             // Aliasierten Builtin-Namen auf den kanonischen zurueckabbilden
             // (j_parse -> json_parse), damit gbrt ihn nativ findet.
             let bname = self.resolve_builtin_alias(&name);
+            // Systemischer G1-Fix: kennt gbrt diesen Builtin ueberhaupt? Wenn
+            // nicht, ist es ein Tippfehler ODER ein nur-im-Tree-Walker-Builtin
+            // (wie frueher FLT) -> es wuerde erst zur LAUFZEIT scheitern.
+            // Hier als nicht-fatale Warnung melden (--check zeigt es im Editor).
+            if !is_known_builtin(&bname) {
+                self.warnings.push((self.ctx.cur_line, format!(
+                    "Unbekanntes Builtin '{}' -- gbrt kennt es nicht (Tippfehler? \
+                     oder nur im Tree-Walker verfuegbar). Der Aufruf schlaegt sonst \
+                     erst zur Laufzeit fehl.", bname.to_uppercase())));
+            }
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
         }
@@ -2205,7 +2250,7 @@ fn node_name(n: &Node) -> &'static str {
 /// preprocess::compile_env. Fehler bei nicht unterstuetzten Konstrukten.
 pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<String>,
                       builtin_aliases: &[(String, String)])
-    -> Result<Value, (u32, String)> {
+    -> Result<(Value, Vec<(u32, String)>), (u32, String)> {
     let stmts = match ast {
         Node::Program { statements } => statements,
         _ => return Err((0, "Erwartet Program-Knoten".into())),
@@ -2259,7 +2304,10 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
         Ok(())
     })();
     match outcome {
-        Ok(()) => Ok(c.finish(data)),
+        Ok(()) => {
+            let warnings = std::mem::take(&mut c.warnings);
+            Ok((c.finish(data), warnings))
+        }
         Err(msg) => Err((c.err_line, msg)),
     }
 }

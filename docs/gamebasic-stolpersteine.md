@@ -182,13 +182,21 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 
 ## G — Befunde beim Schreiben der „VORTEX"-Demo (examples/119, 2026-06-23)
 
-### G1. `FLT()` (Int→Float-Cast) fehlt in gbrt — nur im Tree-Walker — ✅ BEHOBEN (Builtin)
-> `FLT` ist jetzt im gbrt-Kern (`builtins.rs`: `"flt" => Value::Float(need_num(...))`,
-> direkt nach `INT`) und im `builtin_index.json` registriert. `FLT(7)/2 -> 3.5`
-> nativ verifiziert. **Offen bleibt der systemische Teil:** `gbrt --check` meldet
-> Aufrufe von Builtins, die NICHT im gbrt-Index stehen, weiterhin nicht (der
-> Compiler validiert Builtin-Namen nicht gegen den Index). Vorschlag dafür steht
-> unten — wäre der eigentliche „nie wieder solche Überraschung"-Fix.
+### G1. `FLT()` fehlte in gbrt + `--check` schwieg — ✅ BEHOBEN (Builtin **und** systemisch)
+> **Teil 1 (Builtin):** `FLT` ist jetzt im gbrt-Kern (`builtins.rs`: `"flt" =>
+> Value::Float(need_num(...))`, nach `INT`) + im `builtin_index.json`. `FLT(7)/2
+> -> 3.5` nativ verifiziert.
+> **Teil 2 (systemisch — der eigentliche „nie wieder"-Fix):** Der Rust-Compiler
+> prüft jeden Builtin-Aufruf gegen den maßgeblichen `builtin_index.json` (per
+> `include_str!` eingebettet, `compiler::is_known_builtin`). Unbekannte Builtins
+> (Tippfehler ODER nur-Tree-Walker wie früher FLT) ergeben jetzt eine **nicht-
+> fatale Compile-Warnung mit Zeile** → `gbrt --check` zeigt sie im Editor (gelbe
+> Schlängellinie), `gbrt run` auf stderr. Kein Blockieren (Warning, kein Error)
+> und keine False-Positives: Sweep über ALLE examples = 0 fälschlich gemeldete
+> Builtins (der Index ist vollständig). Interne `__`-Builtins ausgenommen.
+> Folge: ein neues gbrt-Builtin, das man im `builtin_index.json` zu ergänzen
+> vergisst, fällt ab sofort sofort auf. Tests: `test_gbrt_check.py::
+> test_unknown_builtin_warns` / `test_known_builtin_no_warning`.
 
 `FLT(x)` (z. B. `FLT(MOUSEX())`, in mehreren examples genutzt) läuft im Python-
 Tree-Walker, wirft in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT' im

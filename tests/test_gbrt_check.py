@@ -90,3 +90,21 @@ def test_hardware_import_warns_at_import(tmp_path):
         assert w["line"] == 1
         assert "wifi" in w["message"].lower()
         assert "--hardware" in w["message"]
+
+
+def test_unknown_builtin_warns(tmp_path):
+    """G1 (systemisch): Aufruf eines Builtins, das gbrt nicht kennt (Tippfehler
+    oder nur-Tree-Walker wie frueher FLT), wird schon von --check als Warnung
+    gemeldet -- nicht erst zur Laufzeit."""
+    d = _check(tmp_path, 'DIM x AS INTEGER\nx = NOTAREALBUILTIN(5)\n')
+    assert len(d) == 1, d
+    w = d[0]
+    assert w["severity"] == "warning"
+    assert w["phase"] == "compile"
+    assert w["line"] == 2
+    assert "NOTAREALBUILTIN" in w["message"]
+
+
+def test_known_builtin_no_warning(tmp_path):
+    """Echte Builtins (inkl. FLT) loesen KEINE Warnung aus."""
+    assert _check(tmp_path, 'DIM x AS FLOAT\nx = FLT(3)\nPRINT INT(x)\n') == []
