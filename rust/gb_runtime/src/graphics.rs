@@ -2611,7 +2611,17 @@ impl Graphics {
     /// Bildwiederholrate (Hz) des Monitors `i`.
     pub fn monitor_refresh(&self, i: i64) -> i64 { get_monitor_refresh_rate(i as i32) as i64 }
     /// Anzeigename des Monitors `i` (leer, wenn nicht ermittelbar).
-    pub fn monitor_name(&self, i: i64) -> String { get_monitor_name(i as i32).unwrap_or_default() }
+    /// NICHT raylib-rs' `get_monitor_name` benutzen: das ruft `CString::from_raw`
+    /// auf den von `GetMonitorName` gelieferten Zeiger und GIBT IHN BEIM DROP FREI
+    /// -- der Speicher gehoert aber GLFW, nicht Rust -> Heap-Korruption (0xC0000374).
+    /// Wir leihen den Zeiger nur aus (CStr, kein free) und kopieren in einen String.
+    pub fn monitor_name(&self, i: i64) -> String {
+        unsafe {
+            let p = raylib::ffi::GetMonitorName(i as i32);
+            if p.is_null() { return String::new(); }
+            std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
+        }
+    }
     /// X-Position des Monitors `i` im virtuellen Desktop (OS-Pixel).
     pub fn monitor_x(&self, i: i64) -> i64 { get_monitor_position(i as i32).x as i64 }
     /// Y-Position des Monitors `i` im virtuellen Desktop (OS-Pixel).
