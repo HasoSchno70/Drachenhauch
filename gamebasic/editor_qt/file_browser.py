@@ -178,6 +178,44 @@ class FileBrowser(QWidget):
         """Klappt den gesamten Explorer-Baum zu (nur die Sektionen bleiben)."""
         self.tree.collapseAll()
 
+    # --------------------------------------------------- Expand-State erhalten
+    @staticmethod
+    def _expand_key(item: QTreeWidgetItem):
+        """Stabiler Schluessel (kind, id) eines aufklappbaren Knotens. Ueberlebt den
+        Rebuild in refresh() (Items werden dabei neu erzeugt) -- dir=Pfad,
+        section/catgroup=Name. Leaf-/Modul-Items liefern None."""
+        k = item.data(0, Qt.ItemDataRole.UserRole)
+        return k if isinstance(k, tuple) else None
+
+    def _collect_expanded(self) -> set:
+        """Schluessel aller aktuell aufgeklappten Knoten."""
+        keys: set = set()
+
+        def walk(item: QTreeWidgetItem) -> None:
+            for i in range(item.childCount()):
+                ch = item.child(i)
+                if ch.isExpanded():
+                    k = self._expand_key(ch)
+                    if k is not None:
+                        keys.add(k)
+                walk(ch)
+
+        walk(self.tree.invisibleRootItem())
+        return keys
+
+    def _restore_expanded(self, keys: set) -> None:
+        """Klappt genau die Knoten wieder auf, deren Schluessel in `keys` ist
+        (alle anderen bleiben zugeklappt -- so bleibt der Nutzer-Zustand erhalten)."""
+        def walk(item: QTreeWidgetItem) -> None:
+            for i in range(item.childCount()):
+                ch = item.child(i)
+                k = self._expand_key(ch)
+                if k is not None and k in keys:
+                    ch.setExpanded(True)
+                walk(ch)
+
+        walk(self.tree.invisibleRootItem())
+
     # --------------------------------------------------- Styling
     def _apply_style(self) -> None:
         c = COLORS
@@ -206,6 +244,33 @@ class FileBrowser(QWidget):
             """
         )
         self.refresh_row.setStyleSheet(f"background-color: {c['bg_alt']};")
+        # Aktualisieren-Button: expliziter Akzent-Verlauf (dunkel -> Akzent) wie die
+        # Primaer-Buttons der App. Direkt am Button (nicht ueber die globale
+        # accent-Property), damit es unabhaengig vom QSS-Timing/Parent-Stylesheet
+        # sicher greift -- und bei Theme-Wechsel ueber _apply_style neu gesetzt wird.
+        acc = QColor(c["accent"])
+        top, bot = acc.darker(280).name(), acc.darker(150).name()
+        top_h, bot_h = acc.darker(230).name(), acc.darker(120).name()
+        self.refresh_btn.setStyleSheet(
+            f"""
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {top}, stop:1 {bot});
+                color: #EAFBFB;
+                border: 0;
+                border-radius: 6px;
+                padding: 7px 14px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {top_h}, stop:1 {bot_h});
+            }}
+            QPushButton:pressed {{
+                background: {c['accent_soft']};
+            }}
+            """
+        )
 
     def _on_theme_changed(self, _name: str) -> None:
         self._apply_style()
@@ -216,6 +281,12 @@ class FileBrowser(QWidget):
 
     # --------------------------------------------------- Daten
     def refresh(self) -> None:
+        # Auf-/Zu-Zustand der Ordner/Sektionen ueber den Rebuild hinweg erhalten:
+        # was offen war, bleibt offen; was zu war, bleibt zu. Nur beim allerersten
+        # Aufbau (Baum noch leer) gibt es keinen Zustand -> Default unten.
+        had_state = self.tree.topLevelItemCount() > 0
+        prev_expanded = self._collect_expanded() if had_state else set()
+
         self.tree.clear()
         self._items_by_path.clear()
         root = self.tree.invisibleRootItem()
@@ -344,11 +415,16 @@ class FileBrowser(QWidget):
             for c in ordered:
                 ex_item.addChild(c)
 
-        # Default: beide Sektionen offen (Module sofort sichtbar), tiefere
-        # Ordner zugeklappt.
-        self.tree.collapseAll()
-        sec_mod.setExpanded(True)
-        sec_files.setExpanded(True)
+        if had_state:
+            # Vorherigen Auf-/Zu-Zustand wiederherstellen (neue Items sind per
+            # Default zugeklappt -> nur die zuvor offenen wieder aufklappen).
+            self._restore_expanded(prev_expanded)
+        else:
+            # Erststart: beide Sektionen offen (Module sofort sichtbar), tiefere
+            # Ordner zugeklappt.
+            self.tree.collapseAll()
+            sec_mod.setExpanded(True)
+            sec_files.setExpanded(True)
 
     # --------------------------------------------------- Filter
     def _apply_filter(self, _q: str = "") -> None:
