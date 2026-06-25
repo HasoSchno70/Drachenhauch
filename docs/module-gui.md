@@ -66,6 +66,26 @@ IMPORT "gui"
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
 
+### Menüs
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `GUI_MENU(win, label$)` | Menü-Handle | Top-Level-Menü in der **Menüleiste** (z. B. „Datei") |
+| `GUI_CONTEXT(win)` | Menü-Handle | **Kontextmenü** (per Rechtsklick im Fenster) |
+| `GUI_MENU_ITEM(menu, label$)` | Item-Handle | Eintrag anhängen — Handle für `GUI_CLICKED` |
+| `GUI_MENU_SEPARATOR(menu)` | — | Trennlinie anhängen |
+
+Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.gb`](../examples/129_gui_menu.gb).
+
+```basic
+DIM mFile AS INTEGER : mFile = GUI_MENU(win, "Datei")
+DIM miOpen AS INTEGER : miOpen = GUI_MENU_ITEM(mFile, "Öffnen ...")
+GUI_MENU_SEPARATOR(mFile)
+DIM miQuit AS INTEGER : miQuit = GUI_MENU_ITEM(mFile, "Beenden")
+' ... in der Schleife:
+IF GUI_CLICKED(miOpen) THEN ...
+```
+
 ## Externe Typen
 
 `gui` registriert zwei Typen, die du mit `DIM` deklarieren kannst:

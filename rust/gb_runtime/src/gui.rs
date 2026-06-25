@@ -209,6 +209,22 @@ pub struct Window {
     base_w: i32, base_h: i32,        // Referenzgroesse fuer Anchoring (Layout-Basis)
     close_clicked: bool,
     alive: bool,   // Tombstone -- Fenster-Index bleibt als Handle stabil
+    // Menues: `in_bar=true` erscheint in der Menueleiste, sonst Kontextmenue
+    // (per Rechtsklick im Fenster gezeigt).
+    menus: Vec<Menu>,
+}
+
+struct Menu {
+    label: String,
+    in_bar: bool,
+    items: Vec<MenuItem>,
+}
+
+struct MenuItem {
+    label: String,
+    separator: bool,
+    enabled: bool,
+    clicked: bool,     // gesetzt im Frame des Klicks (via GUI_CLICKED gelesen)
 }
 
 // Aufgeloestes Tabellen-Layout (einzige Wahrheit fuer Hit-Test + Zeichnen).
@@ -231,6 +247,9 @@ pub struct Gui {
     resize_dx: i32, resize_dy: i32,      // Ecke->Maus-Versatz
     active_slider: Option<(usize, usize)>,
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
+    open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
+    context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
+    was_right_down: bool,                    // Rechtsklick-Flankenerkennung
     active_table: Option<(usize, usize)>,
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
     press_origin: Option<(usize, usize)>,
@@ -251,6 +270,26 @@ pub struct Gui {
 const WIDGET_SHIFT: i64 = 20;
 const WIDGET_MASK: i64 = (1 << WIDGET_SHIFT) - 1;
 
+// Menue-Handles: getaggt oberhalb der Widget-Range, damit sie kollisionsfrei
+// von Widget-Handles unterscheidbar sind.
+const MENU_FLAG: i64 = 1 << 60;
+const ITEM_FLAG: i64 = 1 << 61;
+const MENUBAR_H: i32 = 26;        // Hoehe der Menueleiste (unter der Titelleiste)
+const MENU_ITEM_H: i32 = 24;      // Hoehe einer Dropdown-Zeile
+
+fn enc_menu(win: usize, m: usize) -> i64 { MENU_FLAG | ((win as i64) << WIDGET_SHIFT) | m as i64 }
+fn dec_menu(h: i64) -> (usize, usize) {
+    let x = h & !MENU_FLAG;
+    ((x >> WIDGET_SHIFT) as usize, (x & WIDGET_MASK) as usize)
+}
+fn enc_item(win: usize, m: usize, it: usize) -> i64 {
+    ITEM_FLAG | ((win as i64) << 40) | ((m as i64) << WIDGET_SHIFT) | it as i64
+}
+fn dec_item(h: i64) -> (usize, usize, usize) {
+    let x = h & !ITEM_FLAG;
+    ((x >> 40) as usize, ((x >> WIDGET_SHIFT) & WIDGET_MASK) as usize, (x & WIDGET_MASK) as usize)
+}
+
 impl Gui {
     pub fn new() -> Gui {
         Gui {
@@ -259,6 +298,7 @@ impl Gui {
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
+            open_menu: None, context_open: None, was_right_down: false,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
@@ -307,6 +347,7 @@ impl Gui {
             resizable: false, chrome: true, min_w: 0, min_h: 0, max_w: 0, max_h: 0,
             base_w: w, base_h: h,
             close_clicked: false, alive: true,
+            menus: Vec::new(),
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -700,7 +741,52 @@ impl Gui {
     }
 
     // --- Polling / Setter ---
-    pub fn clicked(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_CLICKED")?.clicked) }
+    pub fn clicked(&self, h: i64) -> Result<bool, String> {
+        // Menue-Item-Handle? -> dessen clicked-Flag.
+        if h & ITEM_FLAG != 0 {
+            let (wi, mi, ii) = dec_item(h);
+            return Ok(self.windows.get(wi).and_then(|w| w.menus.get(mi))
+                .and_then(|m| m.items.get(ii)).map(|it| it.clicked).unwrap_or(false));
+        }
+        Ok(self.wdg(h, "GUI_CLICKED")?.clicked)
+    }
+
+    // --- Menues -----------------------------------------------------------
+    fn add_menu_impl(&mut self, win: i64, in_bar: bool, label: String, fn_: &str) -> Result<i64, String> {
+        let wi = win as usize;
+        let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
+        let mi = w.menus.len();
+        w.menus.push(Menu { label, in_bar, items: Vec::new() });
+        Ok(enc_menu(wi, mi))
+    }
+    /// Top-Level-Menue in der Menueleiste (z.B. "Datei").
+    pub fn add_menu(&mut self, win: i64, label: String) -> Result<i64, String> {
+        self.add_menu_impl(win, true, label, "GUI_MENU")
+    }
+    /// Kontextmenue (per Rechtsklick im Fenster). Label wird nicht angezeigt.
+    pub fn add_context(&mut self, win: i64) -> Result<i64, String> {
+        self.add_menu_impl(win, false, String::new(), "GUI_CONTEXT")
+    }
+    fn menu_mut(&mut self, h: i64, fn_: &str) -> Result<&mut Menu, String> {
+        if h & MENU_FLAG == 0 || h & ITEM_FLAG != 0 { return Err(format!("{}: erwartet GUI_MENU/GUI_CONTEXT", fn_)); }
+        let (wi, mi) = dec_menu(h);
+        self.windows.get_mut(wi).and_then(|w| w.menus.get_mut(mi))
+            .ok_or_else(|| format!("{}: ungueltiges Menue-Handle", fn_))
+    }
+    /// Eintrag an ein Menue anhaengen -> Item-Handle (fuer GUI_CLICKED).
+    pub fn add_menu_item(&mut self, menu: i64, label: String) -> Result<i64, String> {
+        let (wi, mi) = dec_menu(menu);
+        let m = self.menu_mut(menu, "GUI_MENU_ITEM")?;
+        let ii = m.items.len();
+        m.items.push(MenuItem { label, separator: false, enabled: true, clicked: false });
+        Ok(enc_item(wi, mi, ii))
+    }
+    /// Trennlinie an ein Menue anhaengen.
+    pub fn add_menu_separator(&mut self, menu: i64) -> Result<(), String> {
+        let m = self.menu_mut(menu, "GUI_MENU_SEPARATOR")?;
+        m.items.push(MenuItem { label: String::new(), separator: true, enabled: false, clicked: false });
+        Ok(())
+    }
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
@@ -1062,9 +1148,13 @@ impl Gui {
 
     // --- Geometrie ---
     fn abs_rect(&self, win: usize, w: &Widget) -> (i32, i32, i32, i32) {
-        let toff = if self.windows[win].chrome { self.m("title_h") } else { 0 };
+        let toff = (if self.windows[win].chrome { self.m("title_h") } else { 0 }) + self.menubar_h(win);
         let win = &self.windows[win];
         (win.x + w.x, win.y + toff + w.y, w.w, w.h)
+    }
+    /// Hoehe der Menueleiste dieses Fensters (0, wenn keine Bar-Menues).
+    fn menubar_h(&self, win: usize) -> i32 {
+        if self.windows[win].menus.iter().any(|m| m.in_bar) { MENUBAR_H } else { 0 }
     }
     fn in_rect(mx: i32, my: i32, r: (i32, i32, i32, i32)) -> bool {
         mx >= r.0 && mx < r.0 + r.2 && my >= r.1 && my < r.1 + r.3
@@ -1121,6 +1211,8 @@ impl Gui {
         let is_down = g.mouse_button(0);
         let just_pressed = is_down && !self.was_mouse_down;
         let just_released = !is_down && self.was_mouse_down;
+        let right_down = g.mouse_button(1);
+        let right_just = right_down && !self.was_right_down;
 
         // Transiente Flags ruecksetzen.
         for win in self.windows.iter_mut() {
@@ -1128,7 +1220,13 @@ impl Gui {
                 wdg.clicked = false; wdg.hovered = false;
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
             }
+            for m in win.menus.iter_mut() {
+                for it in m.items.iter_mut() { it.clicked = false; }
+            }
         }
+        // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
+        // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
+        let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
         // Hover (nur oberstes Fenster); Tabellen aktualisieren Scroll/Hover/Wheel.
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
@@ -1179,8 +1277,8 @@ impl Gui {
                 self.active_table = None;
             }
         }
-        // Neuer Druck.
-        if just_pressed && self.drag_window.is_none() && self.resize_window.is_none()
+        // Neuer Druck (entfaellt, wenn ein Menue den Klick verarbeitet hat).
+        if just_pressed && !menu_consumed && self.drag_window.is_none() && self.resize_window.is_none()
             && self.active_slider.is_none() && self.active_table.is_none() {
             self.handle_press(mx, my);
         }
@@ -1213,7 +1311,96 @@ impl Gui {
             }
         }
         self.was_mouse_down = is_down;
+        self.was_right_down = right_down;
         self.frame_count += 1;
+    }
+
+    // --- Menue-Eingabe + Hit-Tests -----------------------------------------
+    fn popup_width(&self, g: &Graphics, wi: usize, mi: usize) -> i32 {
+        let pad = self.m("pad");
+        let mut wmax = 80;
+        if let Some(m) = self.windows.get(wi).and_then(|w| w.menus.get(mi)) {
+            for it in &m.items { if !it.separator { wmax = wmax.max(g.text_width(&it.label) + pad * 4); } }
+        }
+        wmax
+    }
+    fn popup_item_at(&self, g: &Graphics, wi: usize, mi: usize, px: i32, py: i32, mx: i32, my: i32) -> Option<usize> {
+        let m = self.windows.get(wi).and_then(|w| w.menus.get(mi))?;
+        let wmax = self.popup_width(g, wi, mi);
+        if mx < px || mx >= px + wmax { return None; }
+        for (ii, it) in m.items.iter().enumerate() {
+            let iy = py + 2 + ii as i32 * MENU_ITEM_H;
+            if my >= iy && my < iy + MENU_ITEM_H {
+                if it.separator || !it.enabled { return None; }
+                return Some(ii);
+            }
+        }
+        None
+    }
+    fn bar_menu_at(&self, g: &Graphics, wi: usize, mx: i32, my: i32) -> Option<usize> {
+        if self.menubar_h(wi) == 0 { return None; }
+        let by = self.windows[wi].y + if self.windows[wi].chrome { self.m("title_h") } else { 0 };
+        if my < by || my >= by + MENUBAR_H { return None; }
+        self.menubar_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1).map(|(mi, _, _)| mi)
+    }
+    fn fire_menu_item(&mut self, wi: usize, mi: usize, ii: usize) {
+        if let Some(it) = self.windows.get_mut(wi).and_then(|w| w.menus.get_mut(mi)).and_then(|m| m.items.get_mut(ii)) {
+            it.clicked = true;
+        }
+    }
+    /// Verarbeitet Menueleisten-/Dropdown-/Kontext-Klicks. Gibt true zurueck,
+    /// wenn der Klick konsumiert wurde (dann kein Widget-Press).
+    fn menu_input(&mut self, mx: i32, my: i32, left_just: bool, right_just: bool, g: &Graphics) -> bool {
+        // 1) Offenes Kontextmenue
+        if let Some((wi, mi, cx, cy)) = self.context_open {
+            if left_just || right_just {
+                let hit = self.popup_item_at(g, wi, mi, cx, cy, mx, my);
+                self.context_open = None;
+                if let Some(ii) = hit { self.fire_menu_item(wi, mi, ii); }
+                return true;
+            }
+            return false;
+        }
+        // 2) Offenes Menueleisten-Dropdown
+        if let Some((wi, mi)) = self.open_menu {
+            if left_just {
+                let toff = (if self.windows[wi].chrome { self.m("title_h") } else { 0 }) + MENUBAR_H;
+                let py = self.windows[wi].y + toff;
+                if let Some((_, x0, _)) = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi) {
+                    if let Some(ii) = self.popup_item_at(g, wi, mi, x0, py, mx, my) {
+                        self.open_menu = None;
+                        self.fire_menu_item(wi, mi, ii);
+                        return true;
+                    }
+                }
+                if let Some(nm) = self.bar_menu_at(g, wi, mx, my) {
+                    self.open_menu = Some((wi, nm));   // auf anderes Bar-Menue umschalten
+                    return true;
+                }
+                self.open_menu = None;                 // Klick ausserhalb -> schliessen
+                return true;
+            }
+            return false;
+        }
+        // 3) Kein Menue offen
+        if left_just {
+            for &wi in self.z_order.clone().iter().rev() {
+                if !self.windows[wi].alive || !self.windows[wi].visible { continue; }
+                if let Some(nm) = self.bar_menu_at(g, wi, mx, my) {
+                    self.open_menu = Some((wi, nm));
+                    return true;
+                }
+            }
+        }
+        if right_just {
+            if let Some(wi) = self.topmost_at(mx, my) {
+                if let Some(mi) = self.windows[wi].menus.iter().position(|m| !m.in_bar) {
+                    self.context_open = Some((wi, mi, mx, my));
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Zeichen-Index, dessen Caret-Position am naechsten an `target_px` liegt
@@ -1480,6 +1667,53 @@ impl Gui {
         for &wi in &self.z_order {
             if self.windows[wi].alive && self.windows[wi].visible { self.draw_window(g, wi); }
         }
+        // Kontextmenue ueber ALLEM (nach allen Fenstern).
+        if let Some((wi, mi, cx, cy)) = self.context_open {
+            if self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
+                self.draw_items_popup(g, wi, mi, cx, cy);
+            }
+        }
+    }
+
+    /// Layout der Menueleiste: (menu_idx, x_links_abs, x_rechts_abs) je Bar-Menue.
+    fn menubar_slots(&self, g: &Graphics, wi: usize) -> Vec<(usize, i32, i32)> {
+        let win = &self.windows[wi];
+        let pad = self.m("pad");
+        let mut x = win.x + pad;
+        let mut out = Vec::new();
+        for (mi, m) in win.menus.iter().enumerate() {
+            if !m.in_bar { continue; }
+            let wlbl = g.text_width(&m.label) + pad * 2;
+            out.push((mi, x, x + wlbl));
+            x += wlbl;
+        }
+        out
+    }
+
+    /// Zeichnet ein Menue-Popup (Dropdown/Kontext) mit Items ab (px, py).
+    fn draw_items_popup(&self, g: &mut Graphics, wi: usize, mi: usize, px: i32, py: i32) {
+        let m = match self.windows.get(wi).and_then(|w| w.menus.get(mi)) { Some(m) => m, None => return };
+        let pad = self.m("pad");
+        let mut wmax = 80;
+        for it in &m.items { if !it.separator { wmax = wmax.max(g.text_width(&it.label) + pad * 4); } }
+        let h = m.items.len() as i32 * MENU_ITEM_H + 4;
+        let rad = self.m("corner_radius").min(6);
+        // Schatten + Hintergrund + Rahmen.
+        g.round_rect(px + 3, py + 4, px + wmax - 1 + 3, py + h - 1 + 4, rad.max(2), (0x44i64 << 24) as i64, true);
+        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("widget_bg"), true);
+        g.round_rect(px, py, px + wmax - 1, py + h - 1, rad, self.th("win_border"), false);
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        for (ii, it) in m.items.iter().enumerate() {
+            let iy = py + 2 + ii as i32 * MENU_ITEM_H;
+            if it.separator {
+                g.line(px + 6, iy + MENU_ITEM_H / 2, px + wmax - 7, iy + MENU_ITEM_H / 2, self.th("win_border"));
+                continue;
+            }
+            let hov = it.enabled && mx >= px && mx < px + wmax && my >= iy && my < iy + MENU_ITEM_H;
+            if hov { g.box_fill(px + 2, iy, px + wmax - 3, iy + MENU_ITEM_H - 1, self.th("title_bg_focus")); }
+            let fg = if it.enabled { self.th("text_fg") } else { self.th("muted_fg") };
+            g.text(px + pad + 4, iy + (MENU_ITEM_H - 14) / 2, it.label.clone(), fg);
+        }
     }
 
     fn draw_window(&self, g: &mut Graphics, wi: usize) {
@@ -1533,13 +1767,36 @@ impl Gui {
                 }
             }
         }
+        // Menueleiste (unter der Titelleiste), falls Bar-Menues vorhanden.
+        let mboff = self.menubar_h(wi);
+        if mboff > 0 {
+            let by = y + toff;
+            g.box_fill(x + 1, by, x + w - 2, by + mboff - 1, self.th("title_bg"));
+            g.line(x + 1, by + mboff, x + w - 2, by + mboff, self.th("win_border"));
+            for (mi, x0, x1) in self.menubar_slots(g, wi) {
+                if self.open_menu == Some((wi, mi)) {
+                    g.box_fill(x0, by, x1 - 1, by + mboff - 1, self.th("title_bg_focus"));
+                }
+                g.text(x0 + pad, by + (mboff - 14) / 2, win.menus[mi].label.clone(), self.th("title_fg"));
+            }
+        }
+        let coff = toff + mboff;   // Inhalts-Oberkante inkl. Menueleiste
         // Widgets auf den Fenster-Innenbereich begrenzen: wird das Fenster kleiner
-        // gezogen, ragt nichts ueber den Rand/die Titelleiste hinaus.
-        g.push_clip(x + 1, y + toff, (w - 2).max(0), (h - toff - 1).max(0));
+        // gezogen, ragt nichts ueber den Rand/die Titelleiste/Menueleiste hinaus.
+        g.push_clip(x + 1, y + coff, (w - 2).max(0), (h - coff - 1).max(0));
         for (i, wdg) in win.widgets.iter().enumerate() {
             if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
         }
         g.pop_clip();
+        // Aufgeklapptes Menueleisten-Dropdown ueber den Widgets.
+        if let Some((mw, mi)) = self.open_menu {
+            if mw == wi {
+                let slot = self.menubar_slots(g, wi).into_iter().find(|(m, _, _)| *m == mi);
+                if let Some((_, x0, _)) = slot {
+                    self.draw_items_popup(g, wi, mi, x0, y + toff + mboff);
+                }
+            }
+        }
         // Aufgeklapptes Dropdown-Popup ueber allen Widgets dieses Fensters.
         if let Some((dw, di)) = self.open_dropdown {
             if dw == wi && win.widgets.get(di).map(|x| x.alive && x.visible).unwrap_or(false) {

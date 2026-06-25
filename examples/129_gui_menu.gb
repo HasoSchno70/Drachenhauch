@@ -1,0 +1,72 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Menueleiste + Kontextmenue
+' ============================================================
+'  GUI_MENU(win, "Datei") legt ein Menue in der Leiste an, GUI_MENU_ITEM
+'  fuegt Eintraege hinzu (-> Handle fuer GUI_CLICKED), GUI_MENU_SEPARATOR
+'  eine Trennlinie. GUI_CONTEXT(win) ist ein Kontextmenue (Rechtsklick im
+'  Fenster). Die Menueleiste schiebt den Fensterinhalt automatisch nach unten.
+'  [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(820, 520, "GameBasic - Menues", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Editor", 210, 120, 420, 300)
+
+' --- Menueleiste ---
+DIM mFile AS INTEGER : mFile = GUI_MENU(win, "Datei")
+DIM miNew AS INTEGER : miNew = GUI_MENU_ITEM(mFile, "Neu")
+DIM miOpen AS INTEGER : miOpen = GUI_MENU_ITEM(mFile, "Oeffnen ...")
+GUI_MENU_SEPARATOR(mFile)
+DIM miQuit AS INTEGER : miQuit = GUI_MENU_ITEM(mFile, "Beenden")
+
+DIM mEdit AS INTEGER : mEdit = GUI_MENU(win, "Bearbeiten")
+DIM miCopy AS INTEGER : miCopy = GUI_MENU_ITEM(mEdit, "Kopieren")
+DIM miPaste AS INTEGER : miPaste = GUI_MENU_ITEM(mEdit, "Einfuegen")
+
+DIM mHelp AS INTEGER : mHelp = GUI_MENU(win, "Hilfe")
+DIM miAbout AS INTEGER : miAbout = GUI_MENU_ITEM(mHelp, "Ueber ...")
+
+' --- Kontextmenue (Rechtsklick im Fenster) ---
+DIM ctx AS INTEGER : ctx = GUI_CONTEXT(win)
+DIM cCut AS INTEGER : cCut = GUI_MENU_ITEM(ctx, "Ausschneiden")
+DIM cCopy AS INTEGER : cCopy = GUI_MENU_ITEM(ctx, "Kopieren")
+GUI_MENU_SEPARATOR(ctx)
+DIM cAll AS INTEGER : cAll = GUI_MENU_ITEM(ctx, "Alles markieren")
+
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, "Menue oben oder Rechtsklick ins Fenster ...", 20, 30)
+DIM status AS STRING : status = "Menue oben oder Rechtsklick ins Fenster ..."
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    IF GUI_CLICKED(miNew) THEN status = "Datei > Neu"
+    IF GUI_CLICKED(miOpen) THEN status = "Datei > Oeffnen"
+    IF GUI_CLICKED(miQuit) THEN BREAK
+    IF GUI_CLICKED(miCopy) THEN status = "Bearbeiten > Kopieren"
+    IF GUI_CLICKED(miPaste) THEN status = "Bearbeiten > Einfuegen"
+    IF GUI_CLICKED(miAbout) THEN status = "Hilfe > Ueber GameBasic"
+    IF GUI_CLICKED(cCut) THEN status = "Kontext: Ausschneiden"
+    IF GUI_CLICKED(cCopy) THEN status = "Kontext: Kopieren"
+    IF GUI_CLICKED(cAll) THEN status = "Kontext: Alles markieren"
+    GUI_SET_TEXT(lbl, status)
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Menueleiste im Fenster | Rechtsklick = Kontextmenue | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND

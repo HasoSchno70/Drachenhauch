@@ -2784,6 +2784,10 @@ impl<'p> Vm<'p> {
             "gui_canvas_w" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_W")?)?.2 as i64),
             "gui_canvas_h" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_H")?)?.3 as i64),
             "gui_clicked" => Value::Bool(self.gui.clicked(gi(a,0,"GUI_CLICKED")?)?),
+            "gui_menu" => Value::Int(self.gui.add_menu(gi(a,0,"GUI_MENU")?, gs(a,1,"GUI_MENU")?.to_string())?),
+            "gui_context" => Value::Int(self.gui.add_context(gi(a,0,"GUI_CONTEXT")?)?),
+            "gui_menu_item" => Value::Int(self.gui.add_menu_item(gi(a,0,"GUI_MENU_ITEM")?, gs(a,1,"GUI_MENU_ITEM")?.to_string())?),
+            "gui_menu_separator" => { self.gui.add_menu_separator(gi(a,0,"GUI_MENU_SEPARATOR")?)?; Value::Nil }
             "gui_hovered" => Value::Bool(self.gui.hovered(gi(a,0,"GUI_HOVERED")?)?),
             "gui_checked" => Value::Bool(self.gui.checked(gi(a,0,"GUI_CHECKED")?)?),
             "gui_value" => Value::Float(self.gui.value(gi(a,0,"GUI_VALUE")?)?),
