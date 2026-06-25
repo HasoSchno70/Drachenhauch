@@ -22,8 +22,11 @@ const KEY_TAB: i64 = 9;
 const KEY_DELETE: i64 = 127;
 const KEY_LEFT: i64 = 1073741904;
 const KEY_RIGHT: i64 = 1073741903;
+const KEY_UP: i64 = 1073741906;
+const KEY_DOWN: i64 = 1073741905;
 const KEY_HOME: i64 = 1073741898;
 const KEY_END: i64 = 1073741901;
+const KEY_ENTER: i64 = 13;
 const K_A: i64 = 97;
 const K_C: i64 = 99;
 const K_V: i64 = 118;
@@ -117,7 +120,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
-    Progress, ListBox, Image, Canvas, Separator, GroupBox,
+    Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea,
 }
 
 impl Kind {
@@ -128,6 +131,7 @@ impl Kind {
             Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
+            Kind::TextArea => "textarea",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -137,6 +141,7 @@ impl Kind {
             "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
+            "textarea" => Kind::TextArea,
             _ => return None,
         })
     }
@@ -511,6 +516,11 @@ impl Gui {
         let mut wd = Self::blank(Kind::TextInput, x, y, w, h); wd.placeholder = placeholder;
         self.add_widget(win, "GUI_TEXTINPUT", wd)
     }
+    /// Mehrzeiliges Textfeld (TextArea): Enter = neue Zeile, vertikal scrollbar.
+    pub fn textarea(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, placeholder: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::TextArea, x, y, w, h); wd.placeholder = placeholder;
+        self.add_widget(win, "GUI_TEXTAREA", wd)
+    }
 
     // --- Formular-Widgets (Phase 3): Radio, Dropdown, ProgressBar ---
     pub fn radio(&mut self, win: i64, group: String, label: String, x: i32, y: i32) -> Result<i64, String> {
@@ -846,8 +856,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, checkbox, table, radio, dropdown oder listbox".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown oder listbox".into());
         }
         w.on_change = func; Ok(())
     }
@@ -1463,10 +1473,12 @@ impl Gui {
                 }
             }
         }
-        // Tastatur + Maus fuer das fokussierte TextInput (Caret/Selektion/Editieren).
+        // Tastatur + Maus fuer das fokussierte Textfeld (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
-            if self.windows[wi].widgets[i].kind == Kind::TextInput {
-                self.edit_textinput(wi, i, g);
+            match self.windows[wi].widgets[i].kind {
+                Kind::TextInput => self.edit_textinput(wi, i, g),
+                Kind::TextArea => self.edit_textarea(wi, i, g),
+                _ => {}
             }
         }
         // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen den
@@ -1477,7 +1489,7 @@ impl Gui {
                 let mut idxs: Vec<usize> = Vec::new();
                 for i in 0..n {
                     let w = &self.windows[top].widgets[i];
-                    if w.kind == Kind::TextInput && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
+                    if matches!(w.kind, Kind::TextInput | Kind::TextArea) && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
                 }
                 if !idxs.is_empty() {
                     let cur = self.focus_widget.filter(|(w, _)| *w == top).map(|(_, i)| i);
@@ -1706,6 +1718,104 @@ impl Gui {
         }
     }
 
+    /// Zeilenanfang-Indizes (Char-Position nach jedem '\n', plus 0).
+    fn line_starts(chars: &[char]) -> Vec<usize> {
+        let mut v = vec![0usize];
+        for (i, &c) in chars.iter().enumerate() { if c == '\n' { v.push(i + 1); } }
+        v
+    }
+    /// Zeilenhoehe der TextArea (Schriftgroesse + etwas Durchschuss).
+    fn ta_line_h(&self, g: &Graphics) -> i32 { (g.text_height() + 5).max(10) }
+
+    /// Mehrzeiliges Textfeld editieren: Tippen, Enter=Umbruch, Backspace/Delete,
+    /// Pfeile (auch hoch/runter), Home/End, Strg+C/V, Maus-Klick. Vertikal
+    /// scrollend, damit das Caret sichtbar bleibt. (v1: keine Selektion.)
+    fn edit_textarea(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let before = self.windows[wi].widgets[i].text.clone();
+        let mut chars: Vec<char> = before.chars().collect();
+        let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
+        let ctrl = g.key_ctrl();
+        let pad = 5;
+        let lh = self.ta_line_h(g);
+        let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let scroll = self.windows[wi].widgets[i].scroll;
+
+        // Maus-Klick -> Caret an die naechstgelegene Position.
+        if g.mouse_button(0) && !self.was_mouse_down {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            if Self::in_rect(mx, my, (ax, ay, fw, fh)) {
+                let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
+                let starts = Self::line_starts(&chars);
+                let r = (row as usize).min(starts.len().saturating_sub(1));
+                let lstart = starts[r];
+                let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
+                let target = mx - (ax + pad);
+                let sub: Vec<char> = chars[lstart..lend].to_vec();
+                let off = Self::caret_index_at(g, &sub, target) as usize;
+                caret = (lstart + off) as i32;
+            }
+        }
+
+        // Zeichen-Eingabe / Strg-Kombis.
+        if !ctrl {
+            let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
+            if !typed.is_empty() {
+                for (k, ch) in typed.chars().enumerate() { chars.insert(caret as usize + k, ch); }
+                caret += typed.chars().count() as i32;
+            }
+        } else {
+            if g.key_pressed(K_C) { g.clipboard_set(&chars.iter().collect::<String>()); }
+            if g.key_pressed(K_V) {
+                let ins: Vec<char> = g.clipboard_get().chars().filter(|c| *c == '\n' || !c.is_control()).collect();
+                for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
+                caret += ins.len() as i32;
+            }
+        }
+        if g.key_pressed(KEY_ENTER) { chars.insert(caret as usize, '\n'); caret += 1; }
+        if g.key_pressed(KEY_BACKSPACE) && caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
+        if g.key_pressed(KEY_DELETE) && (caret as usize) < chars.len() { chars.remove(caret as usize); }
+
+        // Navigation.
+        let len = chars.len() as i32;
+        caret = caret.clamp(0, len);
+        let starts = Self::line_starts(&chars);
+        let row = starts.iter().rposition(|&s| s as i32 <= caret).unwrap_or(0);
+        let col = caret - starts[row] as i32;
+        if g.key_pressed(KEY_LEFT) { caret = (caret - 1).max(0); }
+        if g.key_pressed(KEY_RIGHT) { caret = (caret + 1).min(len); }
+        if g.key_pressed(KEY_HOME) { caret = starts[row] as i32; }
+        if g.key_pressed(KEY_END) {
+            caret = if row + 1 < starts.len() { starts[row + 1] as i32 - 1 } else { len };
+        }
+        if g.key_pressed(KEY_UP) && row > 0 {
+            let ps = starts[row - 1] as i32;
+            let pe = starts[row] as i32 - 1;
+            caret = (ps + col).min(pe);
+        }
+        if g.key_pressed(KEY_DOWN) && row + 1 < starts.len() {
+            let ns = starts[row + 1] as i32;
+            let ne = if row + 2 < starts.len() { starts[row + 2] as i32 - 1 } else { len };
+            caret = (ns + col).min(ne);
+        }
+
+        // Vertikal scrollen, damit die Caret-Zeile sichtbar bleibt.
+        let starts2 = Self::line_starts(&chars);
+        let crow = starts2.iter().rposition(|&s| s as i32 <= caret).unwrap_or(0) as i32;
+        let view_lines = ((fh - 2 * pad) / lh).max(1);
+        let mut scroll = scroll;
+        if crow < scroll { scroll = crow; }
+        if crow >= scroll + view_lines { scroll = crow - view_lines + 1; }
+        let max_scroll = (starts2.len() as i32 - view_lines).max(0);
+        scroll = scroll.clamp(0, max_scroll);
+
+        let new_text: String = chars.iter().collect();
+        let w = &mut self.windows[wi].widgets[i];
+        w.text = new_text; w.caret = caret; w.scroll = scroll;
+        if w.text != before {
+            if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+        }
+    }
+
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
         let wheel = g.pop_mouse_wheel();
         if wheel == 0 { return; }
@@ -1818,6 +1928,7 @@ impl Gui {
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
             Kind::TextInput => self.focus_widget = Some((win, i)),
+            Kind::TextArea => self.focus_widget = Some((win, i)),
             Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
             Kind::Radio => {
                 self.focus_widget = None;
@@ -2103,6 +2214,39 @@ impl Gui {
                     let pre: String = wdg.text.chars().take(wdg.caret.max(0) as usize).collect();
                     let cx = tx + g.text_width(&pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
+                }
+                g.pop_clip();
+            }
+            Kind::TextArea => {
+                let focused = self.focus_widget == Some((wi, idx));
+                let fg = self.txt_col(wdg);
+                let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                let pad = 5;
+                let lh = self.ta_line_h(g);
+                let scroll = wdg.scroll;
+                g.push_clip(ax + 2, ay + 2, (w - 4).max(0), (h - 4).max(0));
+                if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
+                    self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.th("muted_fg"));
+                } else {
+                    let lines: Vec<&str> = wdg.text.split('\n').collect();
+                    let view_lines = ((h - 2 * pad) / lh).max(1);
+                    for r in 0..view_lines {
+                        let li = scroll + r;
+                        if li < 0 || li as usize >= lines.len() { continue; }
+                        self.wtext(g, wdg, ax + pad, ay + pad + r * lh, lines[li as usize].to_string(), fg);
+                    }
+                }
+                if focused && (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0 {
+                    let chars: Vec<char> = wdg.text.chars().collect();
+                    let starts = Self::line_starts(&chars);
+                    let crow = starts.iter().rposition(|&s| s as i32 <= wdg.caret).unwrap_or(0);
+                    let lstart = starts[crow];
+                    let cend = (lstart + (wdg.caret - lstart as i32).max(0) as usize).min(chars.len());
+                    let prefix: String = chars[lstart..cend].iter().collect();
+                    let cx = ax + pad + g.text_width(&prefix);
+                    let cy = ay + pad + (crow as i32 - scroll) * lh;
+                    if cy >= ay + 2 && cy + lh <= ay + h { g.line(cx, cy, cx, cy + lh - 2, fg); }
                 }
                 g.pop_clip();
             }

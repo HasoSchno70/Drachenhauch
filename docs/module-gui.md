@@ -39,7 +39,8 @@ IMPORT "gui"
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
-| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | Eingabefeld |
+| `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
+| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
@@ -87,7 +88,23 @@ Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schi
 | `GUI_ACTIVE_TAB(win)` | INTEGER | aktiver Reiter-Index |
 | `GUI_SET_ACTIVE_TAB(win, i)` | — | Reiter umschalten |
 
-Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.gb`](../examples/131_gui_tabs.gb).
+Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern (TextInput **und** TextArea) des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.gb`](../examples/131_gui_tabs.gb).
+
+### Modale Dialoge
+
+Native, blockierende Standarddialoge (kein IMPORT nötig — wie die Datei-Dialoge):
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `GUI_MESSAGE(titel$, text$)` | — | Info-Box mit OK |
+| `GUI_CONFIRM(titel$, text$)` | BOOLEAN | OK/Abbrechen → `TRUE` bei OK |
+
+```basic
+IF GUI_CONFIRM("Löschen?", "Wirklich alles löschen?") THEN GUI_SET_TEXT(ta, "")
+GUI_MESSAGE("Fertig", "Gespeichert.")
+```
+
+Beispiel mit TextArea + Dialogen: [`examples/132_gui_textarea.gb`](../examples/132_gui_textarea.gb).
 
 `labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
 

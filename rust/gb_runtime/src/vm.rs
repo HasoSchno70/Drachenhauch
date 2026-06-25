@@ -2757,6 +2757,11 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.textinput(gi(a,0,"GUI_TEXTINPUT")?, gi(a,1,"GUI_TEXTINPUT")? as i32, gi(a,2,"GUI_TEXTINPUT")? as i32,
                     gi(a,3,"GUI_TEXTINPUT")? as i32, gi(a,4,"GUI_TEXTINPUT")? as i32, ph)?)
             }
+            "gui_textarea" => {
+                let ph = if a.len() >= 6 { gs(a,5,"GUI_TEXTAREA")? } else { String::new() };
+                Value::Int(self.gui.textarea(gi(a,0,"GUI_TEXTAREA")?, gi(a,1,"GUI_TEXTAREA")? as i32, gi(a,2,"GUI_TEXTAREA")? as i32,
+                    gi(a,3,"GUI_TEXTAREA")? as i32, gi(a,4,"GUI_TEXTAREA")? as i32, ph)?)
+            }
             // --- Formular-Widgets (Phase 3) ---
             "gui_radio" => Value::Int(self.gui.radio(gi(a,0,"GUI_RADIO")?, gs(a,1,"GUI_RADIO")?, gs(a,2,"GUI_RADIO")?,
                 gi(a,3,"GUI_RADIO")? as i32, gi(a,4,"GUI_RADIO")? as i32)?),
@@ -3544,6 +3549,13 @@ impl<'p> Vm<'p> {
             "folder_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FOLDER_DIALOG")?.to_string() } else { String::new() };
                 Value::str_rc(&crate::filedialog::folder(&title))
+            }
+            "gui_message" => {
+                crate::filedialog::message(gs(a, 0, "GUI_MESSAGE")?, gs(a, 1, "GUI_MESSAGE")?);
+                Value::Nil
+            }
+            "gui_confirm" => {
+                Value::Bool(crate::filedialog::confirm(gs(a, 0, "GUI_CONFIRM")?, gs(a, 1, "GUI_CONFIRM")?))
             }
 
             // --- Monitore / Display-Infos ---

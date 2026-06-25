@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1062,
+ "count": 1065,
  "builtins": [
   {
    "name": "ABS",
@@ -1765,6 +1765,24 @@
    "kind": "core",
    "signature": "GUI_TEXTINPUT(5..6 Argumente)",
    "module": "gui"
+  },
+  {
+   "name": "GUI_TEXTAREA",
+   "kind": "core",
+   "signature": "GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_MESSAGE",
+   "kind": "graphics",
+   "signature": "GUI_MESSAGE(titel$, text$)",
+   "module": "core"
+  },
+  {
+   "name": "GUI_CONFIRM",
+   "kind": "graphics",
+   "signature": "GUI_CONFIRM(titel$, text$) AS BOOLEAN",
+   "module": "core"
   },
   {
    "name": "GUI_THEME",

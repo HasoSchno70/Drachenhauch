@@ -52,3 +52,26 @@ pub fn folder(title: &str) -> String {
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default()
 }
+
+/// Modale Info-MessageBox (nur OK).
+pub fn message(title: &str, text: &str) {
+    rfd::MessageDialog::new()
+        .set_title(title)
+        .set_description(text)
+        .set_level(rfd::MessageLevel::Info)
+        .set_buttons(rfd::MessageButtons::Ok)
+        .show();
+}
+
+/// Modaler Bestaetigen-Dialog (OK/Abbrechen) -> true bei OK.
+pub fn confirm(title: &str, text: &str) -> bool {
+    matches!(
+        rfd::MessageDialog::new()
+            .set_title(title)
+            .set_description(text)
+            .set_level(rfd::MessageLevel::Warning)
+            .set_buttons(rfd::MessageButtons::OkCancel)
+            .show(),
+        rfd::MessageDialogResult::Ok
+    )
+}
