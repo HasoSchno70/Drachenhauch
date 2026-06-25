@@ -2148,6 +2148,9 @@ impl Graphics {
         let path = resolved.as_str();
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), None)
             .map_err(|e| format!("LOADFONT: Font '{}' nicht ladbar: {}", path, e))?;
+        // Bilinear filtern -> skalierter Text bleibt glatt statt pixelig/jaggy
+        // (Default ist Nearest; sichtbar v.a. bei kleiner UI-Schrift).
+        unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
         Ok((self.fonts.len() - 1) as i64)
     }
@@ -2163,6 +2166,7 @@ impl Graphics {
         chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), Some(&chars))
             .map_err(|e| format!("GBRT_FONT '{}' nicht ladbar: {}", path, e))?;
+        unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
         Ok((self.fonts.len() - 1) as i64)
     }
@@ -2503,6 +2507,23 @@ impl Graphics {
             _ => {}
         }
         match map_key(code) { Some(k) => self.rl.is_key_down(k), None => false }
+    }
+
+    /// Flankengetriggert: ist die Taste in DIESEM Frame neu gedrueckt worden?
+    /// (raylib is_key_pressed). Fuer Caret-Bewegung u.ae., damit ein Tastendruck
+    /// nicht jeden Frame ausloest.
+    pub fn key_pressed(&self, code: i64) -> bool {
+        match map_key(code) { Some(k) => self.rl.is_key_pressed(k), None => false }
+    }
+    /// Ist eine Shift-Taste gedrueckt? (fuer Text-Selektion via Shift+Pfeil)
+    pub fn key_shift(&self) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        self.rl.is_key_down(KEY_LEFT_SHIFT) || self.rl.is_key_down(KEY_RIGHT_SHIFT)
+    }
+    /// Ist eine Strg/Ctrl-Taste gedrueckt? (fuer Strg+A/C/V/X im Textfeld)
+    pub fn key_ctrl(&self) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        self.rl.is_key_down(KEY_LEFT_CONTROL) || self.rl.is_key_down(KEY_RIGHT_CONTROL)
     }
 
     // --- Gamepad (Modul input: INPUT_JOY_*) ---
@@ -3627,10 +3648,13 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         32 => KEY_SPACE,
         9 => KEY_TAB,
         8 => KEY_BACKSPACE,
+        127 => KEY_DELETE,
         1073741904 => KEY_LEFT,
         1073741903 => KEY_RIGHT,
         1073741906 => KEY_UP,
         1073741905 => KEY_DOWN,
+        1073741898 => KEY_HOME,
+        1073741901 => KEY_END,
         // Buchstaben: pygame 97..122 (lowercase ascii) -> raylib 65..90.
         97..=122 => return key_from_i32((code - 32) as i32),
         // Ziffern: pygame 48..57 == raylib KEY_ZERO..KEY_NINE.

@@ -13,6 +13,16 @@ IMPORT "gui"
 SCREEN(880, 560, "GameBasic - GUI Styles", 1)
 SETFPS(60)
 
+' Sauberer TTF-Font fuer ein professionelles Schriftbild (statt Pixel-Font).
+' Das gui-Modul rendert mit dem aktiven Font -> einmal SETFONT genuegt.
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+
 DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 

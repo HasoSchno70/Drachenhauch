@@ -17,6 +17,16 @@ use std::collections::HashMap;
 use crate::graphics::Graphics;
 
 const KEY_BACKSPACE: i64 = 8;
+// Tastencodes (pygame/SDL) fuer die TextInput-Editierung.
+const KEY_DELETE: i64 = 127;
+const KEY_LEFT: i64 = 1073741904;
+const KEY_RIGHT: i64 = 1073741903;
+const KEY_HOME: i64 = 1073741898;
+const KEY_END: i64 = 1073741901;
+const K_A: i64 = 97;
+const K_C: i64 = 99;
+const K_V: i64 = 118;
+const K_X: i64 = 120;
 
 // Tabellen-Layout (analog zum Immediate-Mode-UI_TABLE).
 const TBL_HEADER_H: i32 = 22;
@@ -176,6 +186,12 @@ pub struct Widget {
     // gegen das relativ zur Basis-Fenstergroesse neu gelayoutet wird.
     anchor: u8,
     bx: i32, by: i32, bw: i32, bh: i32,
+    // TextInput-Editierzustand (transient, nicht serialisiert): `caret` = Cursor
+    // als Zeichen-Index 0..=len; `sel_anchor` = Anker der Selektion (== caret =>
+    // keine Auswahl). `scroll` = horizontaler Pixel-Offset (Text laenger als Feld).
+    caret: i32,
+    sel_anchor: i32,
+    scroll: i32,
 }
 
 pub struct Window {
@@ -219,7 +235,6 @@ pub struct Gui {
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
     press_origin: Option<(usize, usize)>,
     was_mouse_down: bool,
-    prev_backspace: bool,
     frame_count: i64,
     theme: HashMap<String, i64>,
     metrics: HashMap<String, i32>,
@@ -244,7 +259,7 @@ impl Gui {
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
             active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
-            was_mouse_down: false, prev_backspace: false, frame_count: 0,
+            was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
@@ -318,6 +333,7 @@ impl Gui {
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
+            caret: 0, sel_anchor: 0, scroll: 0,
         }
     }
 
@@ -697,7 +713,15 @@ impl Gui {
         Ok(w.value)
     }
     pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
-    pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> { self.wdg_mut(h, "GUI_SET_TEXT")?.text = t; Ok(()) }
+    pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_SET_TEXT")?;
+        let n = t.chars().count() as i32;
+        w.text = t;
+        // Caret ans Ende, Selektion/Scroll zuruecksetzen (sonst zeigt das Caret
+        // hinter das Ende des nun kuerzeren Textes).
+        w.caret = n; w.sel_anchor = n; w.scroll = 0;
+        Ok(())
+    }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
         if !matches!(kind, Kind::Checkbox | Kind::Radio) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio".into()); }
@@ -1182,28 +1206,132 @@ impl Gui {
                 }
             }
         }
-        // Tastatur fuer fokussiertes TextInput (nur Backspace + Zeichen).
+        // Tastatur + Maus fuer das fokussierte TextInput (Caret/Selektion/Editieren).
         if let Some((wi, i)) = self.focus_widget {
             if self.windows[wi].widgets[i].kind == Kind::TextInput {
-                let before = self.windows[wi].widgets[i].text.clone();
-                let typed = g.pop_text_input();
-                if !typed.is_empty() {
-                    let t: String = typed.chars().filter(|c| *c != '\t').collect();
-                    self.windows[wi].widgets[i].text.push_str(&t);
-                }
-                let bs = g.key_down(KEY_BACKSPACE);
-                if bs && !self.prev_backspace {
-                    self.windows[wi].widgets[i].text.pop();
-                }
-                self.prev_backspace = bs;
-                if self.windows[wi].widgets[i].text != before {
-                    let f = self.windows[wi].widgets[i].on_change.clone();
-                    if let Some(f) = f { self.pending.push(f); }
-                }
+                self.edit_textinput(wi, i, g);
             }
         }
         self.was_mouse_down = is_down;
         self.frame_count += 1;
+    }
+
+    /// Zeichen-Index, dessen Caret-Position am naechsten an `target_px` liegt
+    /// (Pixel ab Textanfang). Misst echte Textbreiten -> funktioniert mit jedem Font.
+    fn caret_index_at(g: &Graphics, chars: &[char], target_px: i32) -> i32 {
+        if target_px <= 0 { return 0; }
+        for n in 1..=chars.len() {
+            let prev: String = chars[..n - 1].iter().collect();
+            let cur: String = chars[..n].iter().collect();
+            let mid = (g.text_width(&prev) + g.text_width(&cur)) / 2;
+            if target_px < mid { return (n - 1) as i32; }
+        }
+        chars.len() as i32
+    }
+
+    /// Volles Editieren des fokussierten TextInputs: Zeichen einfuegen, Backspace/
+    /// Delete, Pfeile/Home/End (Shift = Selektion), Strg+A/C/V/X, Maus-Klick/-Drag
+    /// zum Setzen/Aufziehen der Selektion. Caret/Selektion/Scroll werden mit
+    /// GEMESSENEN Textbreiten gefuehrt (passt zu jedem Font).
+    fn edit_textinput(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let before = self.windows[wi].widgets[i].text.clone();
+        let (ax, _ay, fw, _fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+        let mut chars: Vec<char> = before.chars().collect();
+        let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
+        let mut anchor = self.windows[wi].widgets[i].sel_anchor.clamp(0, chars.len() as i32);
+        let scroll = self.windows[wi].widgets[i].scroll;
+        let shift = g.key_shift();
+        let ctrl = g.key_ctrl();
+
+        // --- Maus: Klick setzt Caret (rising edge), Ziehen erweitert Selektion ---
+        if g.mouse_button(0) {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            let target = mx - (ax + 5) + scroll;
+            let idx = Self::caret_index_at(g, &chars, target);
+            if !self.was_mouse_down {
+                let r = self.abs_rect(wi, &self.windows[wi].widgets[i]);
+                if Self::in_rect(mx, my, r) { caret = idx; anchor = idx; }
+            } else {
+                caret = idx;   // Drag -> Selektion bis hierher
+            }
+        }
+
+        // --- Zeichen-Eingabe (nicht bei gedruecktem Strg) ---
+        if !ctrl {
+            let typed: String = g.pop_text_input().chars()
+                .filter(|c| !c.is_control() && *c != '\t').collect();
+            if !typed.is_empty() {
+                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+                for (k, ch) in typed.chars().enumerate() { chars.insert(caret as usize + k, ch); }
+                caret += typed.chars().count() as i32; anchor = caret;
+            }
+        } else {
+            // Strg+A: alles markieren
+            if g.key_pressed(K_A) { anchor = 0; caret = chars.len() as i32; }
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if g.key_pressed(K_C) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+            }
+            if g.key_pressed(K_X) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+                chars.drain(lo as usize..hi as usize); caret = lo; anchor = lo;
+            }
+            if g.key_pressed(K_V) {
+                let ins: Vec<char> = g.clipboard_get().chars().filter(|c| !c.is_control()).collect();
+                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+                for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
+                caret += ins.len() as i32; anchor = caret;
+            }
+        }
+
+        // --- Backspace / Delete ---
+        if g.key_pressed(KEY_BACKSPACE) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            else if caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
+            anchor = caret;
+        }
+        if g.key_pressed(KEY_DELETE) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            else if (caret as usize) < chars.len() { chars.remove(caret as usize); }
+            anchor = caret;
+        }
+
+        // --- Navigation (Shift = Selektion erweitern) ---
+        let len = chars.len() as i32;
+        caret = caret.clamp(0, len); anchor = anchor.clamp(0, len);
+        if g.key_pressed(KEY_LEFT) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if !shift && lo != hi { caret = lo; } else { caret = (caret - 1).max(0); }
+            if !shift { anchor = caret; }
+        }
+        if g.key_pressed(KEY_RIGHT) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if !shift && lo != hi { caret = hi; } else { caret = (caret + 1).min(len); }
+            if !shift { anchor = caret; }
+        }
+        if g.key_pressed(KEY_HOME) { caret = 0; if !shift { anchor = 0; } }
+        if g.key_pressed(KEY_END) { caret = len; if !shift { anchor = len; } }
+
+        // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
+        let caret_px = g.text_width(&chars[..caret as usize].iter().collect::<String>());
+        let inner = (fw - 10).max(1);
+        let mut scroll = scroll;
+        if caret_px - scroll > inner { scroll = caret_px - inner; }
+        if caret_px - scroll < 0 { scroll = caret_px; }
+        if scroll < 0 { scroll = 0; }
+
+        // --- Zurueckschreiben ---
+        let new_text: String = chars.iter().collect();
+        let w = &mut self.windows[wi].widgets[i];
+        w.text = new_text;
+        w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
+        if w.text != before {
+            if let Some(f) = w.on_change.clone() { self.pending.push(f); }
+        }
     }
 
     fn listbox_wheel(&mut self, wi: usize, i: usize, h: i32, g: &mut Graphics) {
@@ -1482,15 +1610,38 @@ impl Gui {
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
                 self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
-                if !wdg.text.is_empty() {
-                    self.wtext(g, wdg, ax + 5, ay + (h - 14) / 2, wdg.text.clone(), fg);
-                } else if !wdg.placeholder.is_empty() && !focused {
-                    self.wtext(g, wdg, ax + 5, ay + (h - 14) / 2, wdg.placeholder.clone(), self.th("muted_fg"));
+                let tx = ax + 5;
+                let ty = ay + (h - 14) / 2;
+                let scroll = wdg.scroll;
+                // Inhalt auf das Feld-Innere clippen (langer Text laeuft nicht raus).
+                g.push_clip(ax + 2, ay + 1, (w - 4).max(0), (h - 2).max(0));
+                if wdg.text.is_empty() {
+                    if !wdg.placeholder.is_empty() && !focused {
+                        self.wtext(g, wdg, tx, ty, wdg.placeholder.clone(), self.th("muted_fg"));
+                    }
+                } else {
+                    let chars: Vec<char> = wdg.text.chars().collect();
+                    // Selektion-Highlight (halbtransparenter Akzent hinter dem Text).
+                    if focused {
+                        let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                        let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                        if lo != hi {
+                            let x0 = tx + g.text_width(&chars[..lo as usize].iter().collect::<String>()) - scroll;
+                            let x1 = tx + g.text_width(&chars[..hi as usize].iter().collect::<String>()) - scroll;
+                            let acc = self.wcol(wdg, "accent", "accent");
+                            let selbg = ((0x66i64) << 24) | (acc & 0xFFFFFF);   // ARGB, halbtransparent
+                            g.box_fill(x0, ay + 2, x1, ay + h - 3, selbg);
+                        }
+                    }
+                    self.wtext(g, wdg, tx - scroll, ty, wdg.text.clone(), fg);
                 }
+                // Caret (blinkend) an der gemessenen Position.
                 if focused && (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0 {
-                    let cx = (ax + 5 + wdg.text.chars().count() as i32 * 8).min(ax + w - 3);
+                    let pre: String = wdg.text.chars().take(wdg.caret.max(0) as usize).collect();
+                    let cx = tx + g.text_width(&pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
                 }
+                g.pop_clip();
             }
             Kind::Radio => {
                 let acc = self.acc_col(wdg);
