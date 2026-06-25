@@ -1728,74 +1728,120 @@ impl Gui {
     fn ta_line_h(&self, g: &Graphics) -> i32 { (g.text_height() + 5).max(10) }
 
     /// Mehrzeiliges Textfeld editieren: Tippen, Enter=Umbruch, Backspace/Delete,
-    /// Pfeile (auch hoch/runter), Home/End, Strg+C/V, Maus-Klick. Vertikal
-    /// scrollend, damit das Caret sichtbar bleibt. (v1: keine Selektion.)
+    /// Pfeile (auch hoch/runter), Home/End, Strg+A/C/V/X, Maus-Klick + Ziehen.
+    /// Selektion: Maus-Drag, Shift+Navigation, Strg+A. Vertikal scrollend, damit
+    /// das Caret sichtbar bleibt.
     fn edit_textarea(&mut self, wi: usize, i: usize, g: &mut Graphics) {
         let before = self.windows[wi].widgets[i].text.clone();
         let mut chars: Vec<char> = before.chars().collect();
         let mut caret = self.windows[wi].widgets[i].caret.clamp(0, chars.len() as i32);
+        let mut anchor = self.windows[wi].widgets[i].sel_anchor.clamp(0, chars.len() as i32);
         let ctrl = g.key_ctrl();
+        let shift = g.key_shift();
         let pad = 5;
         let lh = self.ta_line_h(g);
         let (ax, ay, fw, fh) = self.abs_rect(wi, &self.windows[wi].widgets[i]);
         let scroll = self.windows[wi].widgets[i].scroll;
 
-        // Maus-Klick -> Caret an die naechstgelegene Position.
-        if g.mouse_button(0) && !self.was_mouse_down {
+        // Maus: Klick (steigende Flanke) setzt Caret+Anker, Ziehen erweitert die
+        // Selektion bis zur aktuellen Position.
+        if g.mouse_button(0) {
             let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
-            if Self::in_rect(mx, my, (ax, ay, fw, fh)) {
-                let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
-                let starts = Self::line_starts(&chars);
-                let r = (row as usize).min(starts.len().saturating_sub(1));
-                let lstart = starts[r];
-                let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
-                let target = mx - (ax + pad);
-                let sub: Vec<char> = chars[lstart..lend].to_vec();
-                let off = Self::caret_index_at(g, &sub, target) as usize;
-                caret = (lstart + off) as i32;
+            let row = (scroll + ((my - ay - pad).max(0) / lh)).max(0);
+            let starts = Self::line_starts(&chars);
+            let r = (row as usize).min(starts.len().saturating_sub(1));
+            let lstart = starts[r];
+            let lend = if r + 1 < starts.len() { starts[r + 1] - 1 } else { chars.len() };
+            let target = mx - (ax + pad);
+            let sub: Vec<char> = chars[lstart..lend].to_vec();
+            let off = Self::caret_index_at(g, &sub, target) as usize;
+            let idx = (lstart + off) as i32;
+            if !self.was_mouse_down {
+                if Self::in_rect(mx, my, (ax, ay, fw, fh)) { caret = idx; anchor = idx; }
+            } else {
+                caret = idx;   // Ziehen -> Selektion bis hierher
             }
         }
 
-        // Zeichen-Eingabe / Strg-Kombis.
+        // Zeichen-Eingabe / Strg-Kombis (Selektion wird jeweils ersetzt).
         if !ctrl {
             let typed: String = g.pop_text_input().chars().filter(|c| !c.is_control()).collect();
             if !typed.is_empty() {
+                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
                 for (k, ch) in typed.chars().enumerate() { chars.insert(caret as usize + k, ch); }
-                caret += typed.chars().count() as i32;
+                caret += typed.chars().count() as i32; anchor = caret;
             }
         } else {
-            if g.key_pressed(K_C) { g.clipboard_set(&chars.iter().collect::<String>()); }
+            if g.key_pressed(K_A) { anchor = 0; caret = chars.len() as i32; }
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if g.key_pressed(K_C) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+            }
+            if g.key_pressed(K_X) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+                chars.drain(lo as usize..hi as usize); caret = lo; anchor = lo;
+            }
             if g.key_pressed(K_V) {
                 let ins: Vec<char> = g.clipboard_get().chars().filter(|c| *c == '\n' || !c.is_control()).collect();
+                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
                 for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
-                caret += ins.len() as i32;
+                caret += ins.len() as i32; anchor = caret;
             }
         }
-        if g.key_pressed(KEY_ENTER) { chars.insert(caret as usize, '\n'); caret += 1; }
-        if g.key_pressed(KEY_BACKSPACE) && caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
-        if g.key_pressed(KEY_DELETE) && (caret as usize) < chars.len() { chars.remove(caret as usize); }
+        // Enter = Umbruch (ersetzt evtl. Selektion).
+        if g.key_pressed(KEY_ENTER) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            chars.insert(caret as usize, '\n'); caret += 1; anchor = caret;
+        }
+        // Backspace / Delete (Selektion hat Vorrang).
+        if g.key_pressed(KEY_BACKSPACE) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            else if caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
+            anchor = caret;
+        }
+        if g.key_pressed(KEY_DELETE) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
+            else if (caret as usize) < chars.len() { chars.remove(caret as usize); }
+            anchor = caret;
+        }
 
-        // Navigation.
+        // Navigation (Shift = Selektion erweitern, sonst Anker = Caret).
         let len = chars.len() as i32;
-        caret = caret.clamp(0, len);
+        caret = caret.clamp(0, len); anchor = anchor.clamp(0, len);
         let starts = Self::line_starts(&chars);
         let row = starts.iter().rposition(|&s| s as i32 <= caret).unwrap_or(0);
         let col = caret - starts[row] as i32;
-        if g.key_pressed(KEY_LEFT) { caret = (caret - 1).max(0); }
-        if g.key_pressed(KEY_RIGHT) { caret = (caret + 1).min(len); }
-        if g.key_pressed(KEY_HOME) { caret = starts[row] as i32; }
+        if g.key_pressed(KEY_LEFT) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if !shift && lo != hi { caret = lo; } else { caret = (caret - 1).max(0); }
+            if !shift { anchor = caret; }
+        }
+        if g.key_pressed(KEY_RIGHT) {
+            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
+            if !shift && lo != hi { caret = hi; } else { caret = (caret + 1).min(len); }
+            if !shift { anchor = caret; }
+        }
+        if g.key_pressed(KEY_HOME) { caret = starts[row] as i32; if !shift { anchor = caret; } }
         if g.key_pressed(KEY_END) {
             caret = if row + 1 < starts.len() { starts[row + 1] as i32 - 1 } else { len };
+            if !shift { anchor = caret; }
         }
         if g.key_pressed(KEY_UP) && row > 0 {
             let ps = starts[row - 1] as i32;
             let pe = starts[row] as i32 - 1;
             caret = (ps + col).min(pe);
+            if !shift { anchor = caret; }
         }
         if g.key_pressed(KEY_DOWN) && row + 1 < starts.len() {
             let ns = starts[row + 1] as i32;
             let ne = if row + 2 < starts.len() { starts[row + 2] as i32 - 1 } else { len };
             caret = (ns + col).min(ne);
+            if !shift { anchor = caret; }
         }
 
         // Vertikal scrollen, damit die Caret-Zeile sichtbar bleibt.
@@ -1810,7 +1856,7 @@ impl Gui {
 
         let new_text: String = chars.iter().collect();
         let w = &mut self.windows[wi].widgets[i];
-        w.text = new_text; w.caret = caret; w.scroll = scroll;
+        w.text = new_text; w.caret = caret; w.sel_anchor = anchor; w.scroll = scroll;
         if w.text != before {
             if let Some(f) = w.on_change.clone() { self.pending.push(f); }
         }
@@ -2229,8 +2275,33 @@ impl Gui {
                 if wdg.text.is_empty() && !focused && !wdg.placeholder.is_empty() {
                     self.wtext(g, wdg, ax + pad, ay + pad, wdg.placeholder.clone(), self.th("muted_fg"));
                 } else {
+                    let chars: Vec<char> = wdg.text.chars().collect();
+                    let starts = Self::line_starts(&chars);
                     let lines: Vec<&str> = wdg.text.split('\n').collect();
                     let view_lines = ((h - 2 * pad) / lh).max(1);
+                    // Selektion-Highlight pro sichtbarer Zeile (halbtransparenter Akzent).
+                    let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                    let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
+                    if focused && lo != hi {
+                        let acc = self.wcol(wdg, "accent", "accent");
+                        let selbg = ((0x66i64) << 24) | (acc & 0xFFFFFF);   // ARGB, halbtransparent
+                        for r in 0..view_lines {
+                            let li = scroll + r;
+                            if li < 0 || li as usize >= starts.len() { continue; }
+                            let lstart = starts[li as usize] as i32;
+                            let lend = if (li as usize) + 1 < starts.len() {
+                                starts[li as usize + 1] as i32 - 1
+                            } else { chars.len() as i32 };
+                            let a = lo.max(lstart);
+                            let b = hi.min(lend);
+                            if b < a || (a == b && hi <= lend) { continue; }
+                            let x0 = ax + pad + g.text_width(&chars[lstart as usize..a as usize].iter().collect::<String>());
+                            let mut x1 = ax + pad + g.text_width(&chars[lstart as usize..b as usize].iter().collect::<String>());
+                            if hi > lend { x1 += g.text_width(" ").max(4); }   // Auswahl laeuft weiter
+                            let y = ay + pad + r * lh;
+                            g.box_fill(x0, y, x1, y + lh - 2, selbg);
+                        }
+                    }
                     for r in 0..view_lines {
                         let li = scroll + r;
                         if li < 0 || li as usize >= lines.len() { continue; }

@@ -3,8 +3,9 @@
 ' ============================================================
 '  GUI_TEXTAREA(win, x, y, w, h[, platzhalter$]) ist ein mehrzeiliges Textfeld:
 '  tippen, ENTER = neue Zeile, Pfeile (auch hoch/runter)/Home/End/Maus zum
-'  Navigieren, vertikal scrollend. GUI_MESSAGE/GUI_CONFIRM sind native modale
-'  Dialoge (Info bzw. OK/Abbrechen -> BOOLEAN).
+'  Navigieren, vertikal scrollend. Selektion: Maus ziehen oder SHIFT+Pfeil,
+'  STRG+A markiert alles, STRG+C/X/V kopiert/schneidet/fuegt ein. GUI_MESSAGE/
+'  GUI_CONFIRM sind native modale Dialoge (Info bzw. OK/Abbrechen -> BOOLEAN).
 '  TAB wechselt den Fokus zwischen den Feldern.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
@@ -30,7 +31,7 @@ win = GUI_WINDOW("Notiz", (SW - 620) \ 2, (SH - 480) \ 2, 620, 480)
 DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, "Beschreibung:", 24, 18)
 DIM titel AS GUI_WIDGET : titel = GUI_TEXTINPUT(win, 24, 44, 560, 32, "Titel ...")
 DIM ta AS GUI_WIDGET : ta = GUI_TEXTAREA(win, 24, 88, 560, 270, "Hier mehrzeilig tippen ...")
-GUI_SET_TEXT(ta, "Zeile eins." + NL + "Zeile zwei." + NL + "ENTER macht eine neue Zeile," + NL + "Pfeile/Maus zum Navigieren.")
+GUI_SET_TEXT(ta, "Zeile eins." + NL + "Zeile zwei." + NL + "ENTER macht eine neue Zeile," + NL + "Maus ziehen oder SHIFT+Pfeil markiert," + NL + "STRG+A/C/X/V wie gewohnt.")
 
 DIM save AS GUI_WIDGET : save = GUI_BUTTON(win, "Speichern", 24, 372, 200, 38)
 DIM del AS GUI_WIDGET : del = GUI_BUTTON(win, "Loeschen", 244, 372, 200, 38)
@@ -44,7 +45,7 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
-    TEXT(20, 12, "TextArea: tippen, ENTER=neue Zeile, Pfeile/Maus | Buttons = modale Dialoge | TAB wechselt Felder | [ESC] Ende", &HC0D0E0)
+    TEXT(20, 12, "TextArea: tippen, ENTER=Zeile, Maus-Drag/SHIFT markiert, STRG+A/C/X/V | Buttons = Dialoge | TAB wechselt Felder | [ESC]", &HC0D0E0)
     GUI_DRAW()
     FLIP()
 WEND

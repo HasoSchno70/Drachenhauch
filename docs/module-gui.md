@@ -40,7 +40,7 @@ IMPORT "gui"
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
-| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter) |
+| `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
