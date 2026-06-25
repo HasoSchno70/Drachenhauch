@@ -1,0 +1,69 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Reiter (Tabs) + Tastatur-Navigation
+' ============================================================
+'  GUI_TABS(win, labels) legt eine Reiter-Leiste an. Widgets werden mit
+'  GUI_SET_TAB(widget, seite) einer Seite zugeordnet (Seite 0,1,2 ...);
+'  ohne Zuordnung sind sie auf ALLEN Reitern sichtbar (z.B. Speichern/Abbrechen).
+'  GUI_ACTIVE_TAB / GUI_SET_ACTIVE_TAB lesen/setzen den aktiven Reiter.
+'  Tastatur: TAB / SHIFT+TAB wechselt den Fokus zwischen den Eingabefeldern.
+'  [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1180, 760, "GameBasic - Reiter", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Einstellungen", (SW - 560) \ 2, (SH - 420) \ 2, 560, 420)
+DIM tabLabels AS ARRAY OF STRING
+tabLabels = SPLIT$("Allgemein|Konto|Erweitert", "|")
+GUI_TABS(win, tabLabels)
+
+DIM tmp AS GUI_WIDGET
+' --- Seite 0: Allgemein ---
+tmp = GUI_LABEL(win, "Anzeigename", 24, 18)                       : GUI_SET_TAB(tmp, 0)
+tmp = GUI_TEXTINPUT(win, 24, 44, 500, 32, "Name ...")            : GUI_SET_TAB(tmp, 0)
+tmp = GUI_LABEL(win, "Spitzname", 24, 90)                        : GUI_SET_TAB(tmp, 0)
+tmp = GUI_TEXTINPUT(win, 24, 116, 500, 32, "Spitzname ...")      : GUI_SET_TAB(tmp, 0)
+tmp = GUI_CHECKBOX(win, "Benachrichtigungen", 24, 166, TRUE)     : GUI_SET_TAB(tmp, 0)
+
+' --- Seite 1: Konto ---
+tmp = GUI_LABEL(win, "E-Mail", 24, 18)                           : GUI_SET_TAB(tmp, 1)
+tmp = GUI_TEXTINPUT(win, 24, 44, 500, 32, "name@beispiel.de")    : GUI_SET_TAB(tmp, 1)
+tmp = GUI_LABEL(win, "Passwort", 24, 90)                         : GUI_SET_TAB(tmp, 1)
+tmp = GUI_TEXTINPUT(win, 24, 116, 500, 32, "")                   : GUI_SET_TAB(tmp, 1)
+
+' --- Seite 2: Erweitert ---
+tmp = GUI_LABEL(win, "Lautstaerke", 24, 18)                      : GUI_SET_TAB(tmp, 2)
+tmp = GUI_SLIDER(win, 24, 44, 500, 0.0, 1.0, 0.6)               : GUI_SET_TAB(tmp, 2)
+tmp = GUI_CHECKBOX(win, "Beta-Funktionen aktiv", 24, 86, FALSE)  : GUI_SET_TAB(tmp, 2)
+
+' --- auf allen Reitern sichtbar (kein GUI_SET_TAB) ---
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "Speichern", 24, 296, 240, 38)
+DIM cancel AS GUI_WIDGET : cancel = GUI_BUTTON(win, "Abbrechen", 284, 296, 240, 38)
+
+DIM status AS STRING : status = "Reiter klicken oder mit TAB durch die Felder ..."
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN status = "Gespeichert (aktiver Reiter: " + STR$(GUI_ACTIVE_TAB(win)) + ")"
+    IF GUI_CLICKED(cancel) THEN status = "Abgebrochen"
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Reiter oben klicken | TAB / SHIFT+TAB wechselt zwischen den Feldern | [ESC] Ende", &HC0D0E0)
+    TEXT(20, SH - 30, status, &HBFE6FF)
+    GUI_DRAW()
+    FLIP()
+WEND

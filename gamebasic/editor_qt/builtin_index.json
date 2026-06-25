@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1058,
+ "count": 1062,
  "builtins": [
   {
    "name": "ABS",
@@ -1842,6 +1842,30 @@
    "name": "GUI_WINDOW_SCROLLABLE",
    "kind": "core",
    "signature": "GUI_WINDOW_SCROLLABLE(win, flag)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABS",
+   "kind": "core",
+   "signature": "GUI_TABS(win, labels)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_TAB",
+   "kind": "core",
+   "signature": "GUI_SET_TAB(widget, page)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_ACTIVE_TAB",
+   "kind": "core",
+   "signature": "GUI_ACTIVE_TAB(win) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_ACTIVE_TAB",
+   "kind": "core",
+   "signature": "GUI_SET_ACTIVE_TAB(win, i)",
    "module": "gui"
   },
   {

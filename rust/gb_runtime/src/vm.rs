@@ -2713,6 +2713,10 @@ impl<'p> Vm<'p> {
             "gui_window_visible" => { self.gui.window_visible(gi(a,0,"GUI_WINDOW_VISIBLE")?, gbool(a,1,"GUI_WINDOW_VISIBLE")?)?; Value::Nil }
             "gui_window_resizable" => { self.gui.window_resizable(gi(a,0,"GUI_WINDOW_RESIZABLE")?, gbool(a,1,"GUI_WINDOW_RESIZABLE")?)?; Value::Nil }
             "gui_window_scrollable" => { self.gui.window_scrollable(gi(a,0,"GUI_WINDOW_SCROLLABLE")?, gbool(a,1,"GUI_WINDOW_SCROLLABLE")?)?; Value::Nil }
+            "gui_tabs" => { self.gui.set_tabs(gi(a,0,"GUI_TABS")?, gstrs(a,1,"GUI_TABS")?)?; Value::Nil }
+            "gui_set_tab" => { self.gui.set_widget_tab(gi(a,0,"GUI_SET_TAB")?, gi(a,1,"GUI_SET_TAB")? as i32)?; Value::Nil }
+            "gui_active_tab" => Value::Int(self.gui.active_tab(gi(a,0,"GUI_ACTIVE_TAB")?)?),
+            "gui_set_active_tab" => { self.gui.set_active_tab(gi(a,0,"GUI_SET_ACTIVE_TAB")?, gi(a,1,"GUI_SET_ACTIVE_TAB")? as i32)?; Value::Nil }
             "gui_window_chrome" => { self.gui.window_chrome(gi(a,0,"GUI_WINDOW_CHROME")?, gbool(a,1,"GUI_WINDOW_CHROME")?)?; Value::Nil }
             "gui_window_set_min_size" => { self.gui.window_min_size(gi(a,0,"GUI_WINDOW_SET_MIN_SIZE")?, gi(a,1,"GUI_WINDOW_SET_MIN_SIZE")? as i32, gi(a,2,"GUI_WINDOW_SET_MIN_SIZE")? as i32)?; Value::Nil }
             "gui_window_set_max_size" => { self.gui.window_max_size(gi(a,0,"GUI_WINDOW_SET_MAX_SIZE")?, gi(a,1,"GUI_WINDOW_SET_MAX_SIZE")? as i32, gi(a,2,"GUI_WINDOW_SET_MAX_SIZE")? as i32)?; Value::Nil }

@@ -78,6 +78,27 @@ IMPORT "gui"
 
 Klick-Auswertung wie bei Buttons über `GUI_CLICKED(item)`. Die Menüleiste schiebt den Fensterinhalt automatisch nach unten; Klick auf ein Menü öffnet das Dropdown, Klick daneben schließt es. Komplettes Beispiel: [`examples/129_gui_menu.gb`](../examples/129_gui_menu.gb).
 
+### Reiter (Tabs) + Tastatur-Navigation
+
+| Funktion | Rückgabe | Zweck |
+|---|---|---|
+| `GUI_TABS(win, labels)` | — | Reiter-Leiste anlegen (`labels` = ARRAY/TUPLE von Strings); aktiver Reiter → 0 |
+| `GUI_SET_TAB(widget, seite)` | — | Widget einem Reiter zuordnen (`-1` = auf allen Reitern sichtbar) |
+| `GUI_ACTIVE_TAB(win)` | INTEGER | aktiver Reiter-Index |
+| `GUI_SET_ACTIVE_TAB(win, i)` | — | Reiter umschalten |
+
+Nur die Widgets des aktiven Reiters (plus die mit `tab_page = -1`) werden gezeichnet und sind bedienbar. **Tastatur:** `TAB` / `SHIFT+TAB` wechselt den Fokus zwischen den Eingabefeldern des aktiven Fensters. Beispiel: [`examples/131_gui_tabs.gb`](../examples/131_gui_tabs.gb).
+
+`labels` ist ein `ARRAY OF STRING` — am einfachsten via `SPLIT$`:
+
+```basic
+DIM tabs AS ARRAY OF STRING : tabs = SPLIT$("Allgemein|Konto", "|")
+GUI_TABS(win, tabs)
+DIM nameI AS GUI_WIDGET : nameI = GUI_TEXTINPUT(win, 24, 44, 400, 32, "Name ...")
+GUI_SET_TAB(nameI, 0)                 ' nur auf Reiter "Allgemein"
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "OK", 24, 300, 200, 38)   ' ohne SET_TAB -> immer sichtbar
+```
+
 ```basic
 DIM mFile AS INTEGER : mFile = GUI_MENU(win, "Datei")
 DIM miOpen AS INTEGER : miOpen = GUI_MENU_ITEM(mFile, "Öffnen ...")

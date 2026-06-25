@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use crate::graphics::Graphics;
 
 const KEY_BACKSPACE: i64 = 8;
+const KEY_TAB: i64 = 9;
 // Tastencodes (pygame/SDL) fuer die TextInput-Editierung.
 const KEY_DELETE: i64 = 127;
 const KEY_LEFT: i64 = 1073741904;
@@ -192,6 +193,8 @@ pub struct Widget {
     caret: i32,
     sel_anchor: i32,
     scroll: i32,
+    // Reiter-Zuordnung: -1 = immer sichtbar, sonst Index des Tab-Pages.
+    tab_page: i32,
 }
 
 pub struct Window {
@@ -216,6 +219,10 @@ pub struct Window {
     // sichtbare Bereich, scrollt der Inhalt (Mausrad + Scrollbalken).
     scrollable: bool,
     scroll_y: i32,
+    // Reiter (Tabs): Labels + aktiver Reiter. Widgets mit `tab_page == active_tab`
+    // (oder tab_page == -1 = immer sichtbar) werden gezeigt/bedient.
+    tabs: Vec<String>,
+    active_tab: i32,
 }
 
 struct Menu {
@@ -281,6 +288,7 @@ const MENU_FLAG: i64 = 1 << 60;
 const ITEM_FLAG: i64 = 1 << 61;
 const MENUBAR_H: i32 = 26;        // Hoehe der Menueleiste (unter der Titelleiste)
 const MENU_ITEM_H: i32 = 24;      // Hoehe einer Dropdown-Zeile
+const TABBAR_H: i32 = 30;         // Hoehe der Reiter-Leiste
 
 fn enc_menu(win: usize, m: usize) -> i64 { MENU_FLAG | ((win as i64) << WIDGET_SHIFT) | m as i64 }
 fn dec_menu(h: i64) -> (usize, usize) {
@@ -355,6 +363,7 @@ impl Gui {
             close_clicked: false, alive: true,
             menus: Vec::new(),
             scrollable: false, scroll_y: 0,
+            tabs: Vec::new(), active_tab: 0,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -382,6 +391,7 @@ impl Gui {
             enabled: true, font: -1, font_size: 0,
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
             caret: 0, sel_anchor: 0, scroll: 0,
+            tab_page: -1,
         }
     }
 
@@ -1164,15 +1174,37 @@ impl Gui {
     fn menubar_h(&self, win: usize) -> i32 {
         if self.windows[win].menus.iter().any(|m| m.in_bar) { MENUBAR_H } else { 0 }
     }
-    /// Oberkante des Inhaltsbereichs (Titelleiste + Menueleiste).
+    /// Oberkante des Inhaltsbereichs (Titelleiste + Menueleiste + Reiter-Leiste).
     fn content_top(&self, win: usize) -> i32 {
-        (if self.windows[win].chrome { self.m("title_h") } else { 0 }) + self.menubar_h(win)
+        (if self.windows[win].chrome { self.m("title_h") } else { 0 })
+            + self.menubar_h(win) + self.tabbar_h(win)
+    }
+    /// Hoehe der Reiter-Leiste (0, wenn keine Tabs).
+    fn tabbar_h(&self, win: usize) -> i32 {
+        if self.windows[win].tabs.is_empty() { 0 } else { TABBAR_H }
+    }
+    /// Ist das Widget aktuell sichtbar/bedienbar? (Tab-Seite beruecksichtigt)
+    fn widget_shown(&self, win: usize, w: &Widget) -> bool {
+        w.alive && w.visible && (w.tab_page < 0 || w.tab_page == self.windows[win].active_tab)
+    }
+    /// Layout der Reiter: (page_idx, x_links_abs, x_rechts_abs).
+    fn tab_slots(&self, g: &Graphics, wi: usize) -> Vec<(usize, i32, i32)> {
+        let win = &self.windows[wi];
+        let pad = self.m("pad");
+        let mut x = win.x + pad;
+        let mut out = Vec::new();
+        for (ti, label) in win.tabs.iter().enumerate() {
+            let wl = g.text_width(label) + pad * 3;
+            out.push((ti, x, x + wl));
+            x += wl + 2;
+        }
+        out
     }
     /// Inhaltshoehe = unterster Widget-Rand (+Rand). Basis fuer den Scrollbereich.
     fn content_height(&self, win: usize) -> i32 {
         let pad = self.m("pad");
         self.windows[win].widgets.iter()
-            .filter(|w| w.alive && w.visible && w.kind != Kind::Canvas)
+            .filter(|w| self.widget_shown(win, w) && w.kind != Kind::Canvas)
             .map(|w| w.y + w.h).max().unwrap_or(0) + pad * 2
     }
     /// Sichtbare Inhaltshoehe (Fenster minus Titel/Menue/Rand).
@@ -1183,6 +1215,26 @@ impl Gui {
     fn max_scroll_y(&self, win: usize) -> i32 {
         if !self.windows[win].scrollable { return 0; }
         (self.content_height(win) - self.view_height(win)).max(0)
+    }
+    /// Reiter (Tabs) eines Fensters setzen (Labels). Aktiver Reiter -> 0.
+    pub fn set_tabs(&mut self, win: i64, labels: Vec<String>) -> Result<(), String> {
+        let w = self.windows.get_mut(win as usize).ok_or("GUI_TABS: erwartet GUI_WINDOW")?;
+        w.tabs = labels;
+        w.active_tab = 0;
+        Ok(())
+    }
+    /// Widget einem Reiter zuordnen (-1 = auf allen Reitern sichtbar).
+    pub fn set_widget_tab(&mut self, h: i64, page: i32) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_TAB")?.tab_page = page;
+        Ok(())
+    }
+    pub fn active_tab(&self, win: i64) -> Result<i64, String> {
+        self.windows.get(win as usize).map(|w| w.active_tab as i64).ok_or("GUI_ACTIVE_TAB: erwartet GUI_WINDOW".into())
+    }
+    pub fn set_active_tab(&mut self, win: i64, i: i32) -> Result<(), String> {
+        let w = self.windows.get_mut(win as usize).ok_or("GUI_SET_ACTIVE_TAB: erwartet GUI_WINDOW")?;
+        if i >= 0 && (i as usize) < w.tabs.len() { w.active_tab = i; }
+        Ok(())
     }
     /// Inhalt eines Fensters scrollbar machen (Mausrad + Scrollbalken).
     pub fn window_scrollable(&mut self, win: i64, flag: bool) -> Result<(), String> {
@@ -1318,13 +1370,29 @@ impl Gui {
                 }
             }
         }
+        // Klick auf einen Reiter (Tab) wechselt die Seite (konsumiert den Klick).
+        let mut tab_consumed = false;
+        if just_pressed && !menu_consumed && !scroll_consumed {
+            for &wi in self.z_order.clone().iter().rev() {
+                if !self.windows[wi].alive || !self.windows[wi].visible || self.tabbar_h(wi) == 0 { continue; }
+                let by = self.windows[wi].y
+                    + (if self.windows[wi].chrome { self.m("title_h") } else { 0 })
+                    + self.menubar_h(wi);
+                if my < by || my >= by + TABBAR_H { continue; }
+                if let Some((ti, _, _)) = self.tab_slots(g, wi).into_iter().find(|(_, x0, x1)| mx >= *x0 && mx < *x1) {
+                    self.windows[wi].active_tab = ti as i32;
+                    tab_consumed = true;
+                    break;
+                }
+            }
+        }
         // Hover (nur oberstes Fenster); Tabellen aktualisieren Scroll/Hover/Wheel.
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
             for i in 0..n {
                 let (r, kind, active) = {
                     let w = &self.windows[top].widgets[i];
-                    (self.abs_rect(top, w), w.kind, w.alive && w.visible && w.enabled)
+                    (self.abs_rect(top, w), w.kind, self.widget_shown(top, w) && w.enabled)
                 };
                 if active && Self::in_rect(mx, my, r) {
                     self.windows[top].widgets[i].hovered = true;
@@ -1369,7 +1437,7 @@ impl Gui {
             }
         }
         // Neuer Druck (entfaellt, wenn ein Menue den Klick verarbeitet hat).
-        if just_pressed && !menu_consumed && !scroll_consumed && self.drag_window.is_none() && self.resize_window.is_none()
+        if just_pressed && !menu_consumed && !scroll_consumed && !tab_consumed && self.drag_window.is_none() && self.resize_window.is_none()
             && self.active_slider.is_none() && self.active_table.is_none() {
             self.handle_press(mx, my);
         }
@@ -1399,6 +1467,32 @@ impl Gui {
         if let Some((wi, i)) = self.focus_widget {
             if self.windows[wi].widgets[i].kind == Kind::TextInput {
                 self.edit_textinput(wi, i, g);
+            }
+        }
+        // Tastatur-Navigation: Tab / Shift+Tab wechselt den Fokus zwischen den
+        // TextInputs des aktiven Fensters (in Anlege-Reihenfolge, nur sichtbare).
+        if g.key_pressed(KEY_TAB) {
+            if let Some(top) = self.focus_window {
+                let n = self.windows[top].widgets.len();
+                let mut idxs: Vec<usize> = Vec::new();
+                for i in 0..n {
+                    let w = &self.windows[top].widgets[i];
+                    if w.kind == Kind::TextInput && self.widget_shown(top, w) && w.enabled { idxs.push(i); }
+                }
+                if !idxs.is_empty() {
+                    let cur = self.focus_widget.filter(|(w, _)| *w == top).map(|(_, i)| i);
+                    let pos = cur.and_then(|c| idxs.iter().position(|&i| i == c));
+                    let fwd = !g.key_shift();
+                    let next = match pos {
+                        Some(p) => if fwd { (p + 1) % idxs.len() } else { (p + idxs.len() - 1) % idxs.len() },
+                        None => 0,
+                    };
+                    let ni = idxs[next];
+                    self.focus_widget = Some((top, ni));
+                    let len = self.windows[top].widgets[ni].text.chars().count() as i32;
+                    let w = &mut self.windows[top].widgets[ni];
+                    w.caret = len; w.sel_anchor = 0;   // Inhalt markiert (wie ueblich beim Tabben)
+                }
             }
         }
         self.was_mouse_down = is_down;
@@ -1708,7 +1802,7 @@ impl Gui {
         let mut hit = None;
         let n = self.windows[win].widgets.len();
         for i in 0..n {
-            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), w.alive && w.visible && w.enabled) };
+            let (r, active) = { let w = &self.windows[win].widgets[i]; (self.abs_rect(win, w), self.widget_shown(win, w) && w.enabled) };
             if active && Self::in_rect(mx, my, r) { hit = Some(i); break; }
         }
         let i = match hit { Some(i) => i, None => { self.focus_widget = None; return; } };
@@ -1871,12 +1965,28 @@ impl Gui {
                 g.text(x0 + pad, by + (mboff - 14) / 2, win.menus[mi].label.clone(), self.th("title_fg"));
             }
         }
-        let coff = toff + mboff;   // Inhalts-Oberkante inkl. Menueleiste
+        // Reiter-Leiste (unter Titel/Menue), falls Tabs vorhanden.
+        let tboff = self.tabbar_h(wi);
+        if tboff > 0 {
+            let by = y + toff + mboff;
+            g.box_fill(x + 1, by, x + w - 2, by + tboff - 1, self.th("win_bg"));
+            g.line(x + 1, by + tboff - 1, x + w - 2, by + tboff - 1, self.th("win_border"));
+            for (ti, x0, x1) in self.tab_slots(g, wi) {
+                let active = win.active_tab == ti as i32;
+                if active {
+                    g.box_fill(x0, by + 3, x1 - 1, by + tboff - 1, self.th("widget_bg"));
+                    g.box_fill(x0, by + tboff - 2, x1 - 1, by + tboff - 1, self.th("accent"));  // Akzent-Unterstrich
+                }
+                let fg = if active { self.th("text_fg") } else { self.th("muted_fg") };
+                g.text(x0 + pad, by + (tboff - 14) / 2, win.tabs[ti].clone(), fg);
+            }
+        }
+        let coff = toff + mboff + tboff;   // Inhalts-Oberkante inkl. Menue + Reiter
         // Widgets auf den Fenster-Innenbereich begrenzen: wird das Fenster kleiner
         // gezogen, ragt nichts ueber den Rand/die Titelleiste/Menueleiste hinaus.
         g.push_clip(x + 1, y + coff, (w - 2).max(0), (h - coff - 1).max(0));
         for (i, wdg) in win.widgets.iter().enumerate() {
-            if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
+            if self.widget_shown(wi, wdg) { self.draw_widget(g, wi, i, wdg); }
         }
         g.pop_clip();
         // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
