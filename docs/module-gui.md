@@ -61,7 +61,7 @@ IMPORT "gui"
 | `GUI_ON_CHANGE(widget, funcref)` | — | FUNCREF-Callback bei Wertänderung (Slider/TextInput/Checkbox/Table-Selektion) |
 | `GUI_THEME(accent)` | — | Akzentfarbe (RGB) umstellen (Kurzform) |
 | `GUI_THEME_SET(key$, farbe)` / `GUI_THEME_GET(key$)` | — / INT | einzelne Theme-Farbe setzen/lesen |
-| `GUI_THEME_PRESET(name$)` | — | Farbschema: dark/light/retro/contrast |
+| `GUI_THEME_PRESET(name$)` | — | Look: dark/light/retro/contrast + **modern_dark/modern_light** (rund + Schatten) |
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
@@ -364,11 +364,20 @@ Das Aussehen lässt sich auf drei Ebenen steuern:
 ### 1. Fertige Farbschemata
 
 ```basic
-GUI_THEME_PRESET("dark")      ' Default (Logo-Cyan)
-GUI_THEME_PRESET("light")     ' helles Schema
-GUI_THEME_PRESET("retro")     ' grün auf schwarz (Terminal)
-GUI_THEME_PRESET("contrast")  ' schwarz/gelb, maximaler Kontrast
+GUI_THEME_PRESET("dark")          ' Default (Logo-Cyan), flacher Look
+GUI_THEME_PRESET("light")         ' helles Schema, flach
+GUI_THEME_PRESET("retro")         ' grün auf schwarz (Terminal)
+GUI_THEME_PRESET("contrast")      ' schwarz/gelb, maximaler Kontrast
+GUI_THEME_PRESET("modern_dark")   ' PROFESSIONELL: Anthrazit + Cyan, runde Ecken + Schatten
+GUI_THEME_PRESET("modern_light")  ' PROFESSIONELL: hell, Windows-11-nah, runde Ecken + Schatten
 ```
+
+Die beiden **`modern_*`**-Presets sind ein *kompletter* Look: sie setzen nicht nur
+die Farben, sondern auch die Metriken (`corner_radius`, `title_h`, `pad`, `shadow`)
+— so bekommst du **runde Ecken, einen weichen Fenster-Schatten, eine höhere
+Titelleiste und Häkchen-Checkboxen**. Die klassischen Presets (`dark`/`light`/…)
+setzen die Metriken auf den flachen Default zurück. Komplettes Beispiel mit
+Live-Umschalter: [`examples/128_gui_modern.gb`](../examples/128_gui_modern.gb).
 
 ### 2. Einzelne Theme-Farben (global)
 
@@ -396,10 +405,12 @@ GUI_METRIC_GET(schluessel$)         ' -> aktueller Wert
 
 Schlüssel: `title_h` (Titelleisten-Höhe), `slider_h`, `check_size`,
 `slider_handle_w`, `caret_period` (Cursor-Blink), `pad` (Text-Innenabstand),
-`corner_radius` (runde Ecken für Buttons/TextInput/Dropdown/Progress/Panel; 0 =
-eckig). **Hinweis:** Größen, die in die Widget-Maße einfließen (`check_size`,
-`slider_h`), wirken nur auf **neu angelegte** Widgets — am besten vor dem
-UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius` wirken sofort.
+`corner_radius` (runde Ecken für Fenster/Titelleiste/Buttons/TextInput/Dropdown/
+Progress/Panel + Häkchen-Checkbox; 0 = eckig/flach), `shadow` (weicher
+Fenster-Schatten in Pixeln; 0 = aus). **Hinweis:** Größen, die in die Widget-Maße
+einfließen (`check_size`, `slider_h`), wirken nur auf **neu angelegte** Widgets —
+am besten vor dem UI-Aufbau setzen. `title_h`/`pad`/`caret_period`/`corner_radius`/
+`shadow` wirken sofort.
 
 ### 4. Einzelnes Widget einfärben (überschreibt das Theme)
 

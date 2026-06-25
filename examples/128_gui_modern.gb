@@ -1,0 +1,73 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: professionelle Fenster-Styles
+' ============================================================
+'  Zeigt die neuen Presets fuer das gui-Modul. Live umschalten:
+'    [1] modern_dark   -- Anthrazit + Cyan (passt zum Editor)
+'    [2] modern_light  -- hell, Windows-11-nah (Weiss/Grau + Blau)
+'    [3] dark          -- der bisherige flache Look (Vergleich)
+'  Die "modern_*"-Presets bringen runde Ecken, Fenster-Schatten,
+'  groessere Titelleiste und Haekchen-Checkboxen mit.
+'  Fenster ist verschiebbar/resizebar.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(880, 560, "GameBasic - GUI Styles", 1)
+SETFPS(60)
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM preset AS STRING : preset = "modern_dark"
+GUI_THEME_PRESET(preset)
+
+' --- Ein Fenster mit repraesentativen Widgets (einmal aufbauen) ---
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Einstellungen", 240, 130, 400, 330)
+GUI_WINDOW_RESIZABLE(win, TRUE)
+GUI_WINDOW_SET_MIN_SIZE(win, 320, 260)
+
+DIM lblN AS GUI_WIDGET : lblN = GUI_LABEL(win, "Profilname", 24, 14)
+DIM nameI AS GUI_WIDGET : nameI = GUI_TEXTINPUT(win, 24, 38, 350, 30, "Name eingeben ...")
+GUI_SET_TEXT(nameI, "Spieler 1")
+
+DIM lblV AS GUI_WIDGET : lblV = GUI_LABEL(win, "Lautstaerke", 24, 82)
+DIM vol AS GUI_WIDGET : vol = GUI_SLIDER(win, 24, 106, 350, 0.0, 1.0, 0.7)
+
+DIM snd AS GUI_WIDGET : snd = GUI_CHECKBOX(win, "Sound aktiv", 24, 144, TRUE)
+DIM full AS GUI_WIDGET : full = GUI_CHECKBOX(win, "Vollbild", 210, 144, FALSE)
+
+DIM lblP AS GUI_WIDGET : lblP = GUI_LABEL(win, "Download", 24, 182)
+DIM prog AS GUI_WIDGET : prog = GUI_PROGRESS(win, 24, 206, 350, 22)
+GUI_SET_VALUE(prog, 0.62)
+
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "Speichern", 24, 250, 165, 36)
+DIM cancel AS GUI_WIDGET : cancel = GUI_BUTTON(win, "Abbrechen", 210, 250, 164, 36)
+
+' --- Theme-Umschalter (Flankenerkennung, KEYPRESSED ist gehalten) ---
+DIM p1 AS INTEGER : DIM p2 AS INTEGER : DIM p3 AS INTEGER
+DIM d1 AS INTEGER : DIM d2 AS INTEGER : DIM d3 AS INTEGER
+DIM status AS STRING : status = "Klick auf Speichern ..."
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+
+    d1 = 0 : IF KEYPRESSED(KEY_1) THEN d1 = 1
+    d2 = 0 : IF KEYPRESSED(KEY_2) THEN d2 = 1
+    d3 = 0 : IF KEYPRESSED(KEY_3) THEN d3 = 1
+    IF d1 = 1 AND p1 = 0 THEN preset = "modern_dark"  : GUI_THEME_PRESET(preset)
+    IF d2 = 1 AND p2 = 0 THEN preset = "modern_light" : GUI_THEME_PRESET(preset)
+    IF d3 = 1 AND p3 = 0 THEN preset = "dark"         : GUI_THEME_PRESET(preset)
+    p1 = d1 : p2 = d2 : p3 = d3
+
+    GUI_UPDATE()
+    IF GUI_CLICKED(ok) THEN status = "Gespeichert: '" + GUI_TEXT(nameI) + "'  Vol=" + STR$(INT(GUI_VALUE(vol) * 100.0)) + "%"
+    IF GUI_CLICKED(cancel) THEN status = "Abgebrochen."
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT_SIZE(16)
+    TEXT(20, 16, "GUI-Styles:  [1] modern_dark   [2] modern_light   [3] dark (flach)", &HD8E2EE)
+    TEXT(20, 40, "aktuell: " + preset + "    -- Fenster verschiebbar/resizebar    [ESC] Ende", &H90A0B4)
+    TEXT(20, SH - 30, status, &HBFE6FF)
+
+    GUI_DRAW()
+    FLIP()
+WEND

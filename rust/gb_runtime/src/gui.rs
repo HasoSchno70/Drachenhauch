@@ -38,8 +38,24 @@ fn default_metrics() -> HashMap<String, i32> {
     [
         ("title_h", 22), ("slider_h", 14), ("check_size", 16),
         ("slider_handle_w", 10), ("caret_period", 16), ("pad", 6),
-        ("corner_radius", 0),
+        ("corner_radius", 0), ("shadow", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
+}
+
+/// Metrik-Profil eines Presets. Die "modern_*"-Presets aktivieren runde Ecken +
+/// Fenster-Schatten + groessere Titelleiste (-> der professionelle Look); alle
+/// anderen bleiben beim flachen Default. Wird in theme_preset() angewandt.
+fn preset_metrics(name: &str) -> Option<HashMap<String, i32>> {
+    if name.starts_with("modern") {
+        let mut m = default_metrics();
+        m.insert("corner_radius".into(), 7);
+        m.insert("title_h".into(), 30);
+        m.insert("pad".into(), 8);
+        m.insert("shadow".into(), 16);
+        Some(m)
+    } else {
+        None
+    }
 }
 
 fn preset(name: &str) -> Option<HashMap<String, i64>> {
@@ -63,6 +79,19 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("title_bg_focus", 0x4F4F00), ("title_fg", 0xFFFFFF), ("widget_bg", 0x000000),
             ("widget_border", 0xFFD400), ("text_fg", 0xFFFFFF), ("muted_fg", 0xAAAAAA),
             ("accent", 0xFFD400), ("close_hover", 0xFF4040)])),
+        // Professionelle Looks (runde Ecken + Schatten via preset_metrics):
+        // "modern_dark" passt zum GameBasic-Editor (Anthrazit + Cyan).
+        "modern_dark" => Some(m(&[
+            ("win_bg", 0x1E2630), ("win_border", 0x33414F), ("title_bg", 0x161D26),
+            ("title_bg_focus", 0x223140), ("title_fg", 0xEAF2F8), ("widget_bg", 0x2A3542),
+            ("widget_border", 0x3C4A5A), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8493A4),
+            ("accent", 0x2BC4E8), ("close_hover", 0xE03B3B)])),
+        // "modern_light" -- heller, Windows-11-naher Look (Weiss/Hellgrau + Blau).
+        "modern_light" => Some(m(&[
+            ("win_bg", 0xFAFBFC), ("win_border", 0xD8DEE6), ("title_bg", 0xEFF2F5),
+            ("title_bg_focus", 0xFFFFFF), ("title_fg", 0x1F2733), ("widget_bg", 0xFFFFFF),
+            ("widget_border", 0xCBD3DD), ("text_fg", 0x1F2733), ("muted_fg", 0x8A93A0),
+            ("accent", 0x2A7DE1), ("close_hover", 0xE03B3B)])),
         _ => None,
     }
 }
@@ -990,11 +1019,22 @@ impl Gui {
         self.metrics.get(key).copied().ok_or_else(|| format!("GUI_METRIC_GET: unbekannter Schluessel '{}'", key))
     }
     pub fn theme_preset(&mut self, name: &str) -> Result<(), String> {
-        match preset(&name.to_lowercase()) {
-            Some(p) => { for (k, v) in p { self.theme.insert(k, v); } Ok(()) }
+        let key = name.to_lowercase();
+        match preset(&key) {
+            Some(p) => {
+                for (k, v) in p { self.theme.insert(k, v); }
+                // Passendes Metrik-Profil mitziehen, damit ein Preset ein KOMPLETTER
+                // Look ist (modern_* -> runde Ecken + Schatten, klassische -> flach).
+                self.metrics = preset_metrics(&key).unwrap_or_else(default_metrics);
+                Ok(())
+            }
             None => Err(format!("GUI_THEME_PRESET: unbekanntes Preset '{}'", name)),
         }
     }
+
+    /// "Modern-Modus": runde Ecken aktiv -> Renderer zeichnet Schatten, gerundete
+    /// Titelleiste, Haekchen-Checkboxen usw. (statt des flachen Retro-Looks).
+    fn modern(&self) -> bool { self.m("corner_radius") > 0 }
 
     // --- Geometrie ---
     fn abs_rect(&self, win: usize, w: &Widget) -> (i32, i32, i32, i32) {
@@ -1320,17 +1360,43 @@ impl Gui {
         let (x, y, w, h) = (win.x, win.y, win.w, win.h);
         let th = self.m("title_h");
         let pad = self.m("pad");
-        g.box_fill(x, y, x + w - 1, y + h - 1, self.th("win_bg"));
+        let rad = self.m("corner_radius");
+        let shadow = self.m("shadow");
+        // Fenster-Schatten (modern): weiche, halbtransparente Lagen nach unten/rechts
+        // versetzt -> das Fenster "schwebt" ueberm Hintergrund statt aufgeklebt.
+        if shadow > 0 {
+            for k in 0..3 {
+                let off = 3 + k * 3;
+                let grow = k * 2;
+                let alpha = (0x3A - k * 0x14).max(0x10) as i64;
+                let scol = (alpha << 24) as i64;       // schwarz mit Alpha (ARGB)
+                g.round_rect(x - grow + off, y + off + 2,
+                             x + w - 1 + grow + off, y + h - 1 + grow + off,
+                             (rad + grow).max(0), scol, true);
+            }
+        }
+        // Fenster-Hintergrund (rund, wenn corner_radius > 0).
+        if rad > 0 { g.round_rect(x, y, x + w - 1, y + h - 1, rad, self.th("win_bg"), true); }
+        else { g.box_fill(x, y, x + w - 1, y + h - 1, self.th("win_bg")); }
         let toff = if win.chrome { th } else { 0 };   // Inhalts-Oberkante
         if win.chrome {
-            g.rect(x, y, x + w - 1, y + h - 1, self.th("win_border"));
             let title_bg = if focused { self.th("title_bg_focus") } else { self.th("title_bg") };
-            g.box_fill(x, y, x + w - 1, y + th - 1, title_bg);
-            g.text(x + pad, y + 4, win.title.clone(), self.th("title_fg"));
+            if rad > 0 {
+                // Titelleiste: oben gerundet (folgt der Fensterform), unten gerade.
+                g.round_rect(x, y, x + w - 1, y + th - 1, rad, title_bg, true);
+                g.box_fill(x, y + th - 1 - rad, x + w - 1, y + th - 1, title_bg);
+                g.line(x + 1, y + th, x + w - 2, y + th, self.th("win_border"));  // Trennlinie
+                g.round_rect(x, y, x + w - 1, y + h - 1, rad, self.th("win_border"), false);
+            } else {
+                g.box_fill(x, y, x + w - 1, y + th - 1, title_bg);
+                g.rect(x, y, x + w - 1, y + h - 1, self.th("win_border"));
+            }
+            g.text(x + pad, y + (th - 14) / 2, win.title.clone(), self.th("title_fg"));
             if win.closable {
                 let (cx, cy, cw, ch) = (x + w - th, y, th, th);
-                g.line(cx + 6, cy + 6, cx + cw - 7, cy + ch - 7, self.th("title_fg"));
-                g.line(cx + cw - 7, cy + 6, cx + 6, cy + ch - 7, self.th("title_fg"));
+                let m = (th / 3).clamp(5, 9);          // Rand des X (skaliert mit der Titelhoehe)
+                g.line(cx + m, cy + m, cx + cw - m - 1, cy + ch - m - 1, self.th("title_fg"));
+                g.line(cx + cw - m - 1, cy + m, cx + m, cy + ch - m - 1, self.th("title_fg"));
             }
             if win.resizable {                   // Resize-Griff unten-rechts (Diagonalen)
                 let c = self.th("win_border");
@@ -1380,9 +1446,26 @@ impl Gui {
             }
             Kind::Checkbox => {
                 let acc = self.acc_col(wdg);
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
-                if wdg.hovered { g.rect(ax - 1, ay - 1, ax + w, ay + h, acc); }
-                if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
+                let bordc = self.wcol(wdg, "border", "widget_border");
+                if self.modern() {
+                    // Gerundetes Kaestchen; gefuellt + Haekchen wenn aktiv.
+                    if wdg.checked {
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, acc, true);
+                        let ck = self.th("win_bg");   // Kontrast-Haekchen auf Akzentflaeche
+                        let (x1, y1) = (ax + w * 28 / 100, ay + h * 52 / 100);
+                        let (x2, y2) = (ax + w * 44 / 100, ay + h * 70 / 100);
+                        let (x3, y3) = (ax + w * 74 / 100, ay + h * 30 / 100);
+                        g.line(x1, y1, x2, y2, ck);
+                        g.line(x2, y2, x3, y3, ck);
+                    } else {
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, self.wcol(wdg, "bg", "widget_bg"), true);
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, if wdg.hovered { acc } else { bordc }, false);
+                    }
+                } else {
+                    g.rect(ax, ay, ax + w - 1, ay + h - 1, bordc);
+                    if wdg.hovered { g.rect(ax - 1, ay - 1, ax + w, ay + h, acc); }
+                    if wdg.checked { g.box_fill(ax + 3, ay + 3, ax + w - 4, ay + h - 4, acc); }
+                }
                 self.wtext(g, wdg, ax + w + pad, ay, wdg.text.clone(), self.txt_col(wdg));
             }
             Kind::Slider => {
