@@ -8,7 +8,7 @@
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(820, 520, "GameBasic - Menues", 1)
+SCREEN(1180, 760, "GameBasic - Menues", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1
@@ -24,7 +24,7 @@ DIM SW AS INTEGER : SW = SCREENWIDTH()
 DIM SH AS INTEGER : SH = SCREENHEIGHT()
 
 DIM win AS GUI_WINDOW
-win = GUI_WINDOW("Editor", 210, 120, 420, 300)
+win = GUI_WINDOW("Editor", (SW - 620) \ 2, (SH - 420) \ 2, 620, 420)
 
 ' --- Menueleiste ---
 DIM mFile AS INTEGER : mFile = GUI_MENU(win, "Datei")

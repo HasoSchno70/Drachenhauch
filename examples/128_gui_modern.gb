@@ -10,7 +10,7 @@
 '  Fenster ist verschiebbar/resizebar.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(880, 560, "GameBasic - GUI Styles", 1)
+SCREEN(1180, 760, "GameBasic - GUI Styles", 1)
 SETFPS(60)
 
 ' Sauberer TTF-Font fuer ein professionelles Schriftbild (statt Pixel-Font).
@@ -31,26 +31,26 @@ GUI_THEME_PRESET(preset)
 
 ' --- Ein Fenster mit repraesentativen Widgets (einmal aufbauen) ---
 DIM win AS GUI_WINDOW
-win = GUI_WINDOW("Einstellungen", 240, 130, 400, 330)
+win = GUI_WINDOW("Einstellungen", (SW - 620) \ 2, (SH - 440) \ 2, 620, 440)
 GUI_WINDOW_RESIZABLE(win, TRUE)
-GUI_WINDOW_SET_MIN_SIZE(win, 320, 260)
+GUI_WINDOW_SET_MIN_SIZE(win, 420, 320)
 
-DIM lblN AS GUI_WIDGET : lblN = GUI_LABEL(win, "Profilname", 24, 14)
-DIM nameI AS GUI_WIDGET : nameI = GUI_TEXTINPUT(win, 24, 38, 350, 30, "Name eingeben ...")
+DIM lblN AS GUI_WIDGET : lblN = GUI_LABEL(win, "Profilname", 30, 18)
+DIM nameI AS GUI_WIDGET : nameI = GUI_TEXTINPUT(win, 30, 46, 560, 34, "Name eingeben ...")
 GUI_SET_TEXT(nameI, "Spieler 1")
 
-DIM lblV AS GUI_WIDGET : lblV = GUI_LABEL(win, "Lautstaerke", 24, 82)
-DIM vol AS GUI_WIDGET : vol = GUI_SLIDER(win, 24, 106, 350, 0.0, 1.0, 0.7)
+DIM lblV AS GUI_WIDGET : lblV = GUI_LABEL(win, "Lautstaerke", 30, 100)
+DIM vol AS GUI_WIDGET : vol = GUI_SLIDER(win, 30, 126, 560, 0.0, 1.0, 0.7)
 
-DIM snd AS GUI_WIDGET : snd = GUI_CHECKBOX(win, "Sound aktiv", 24, 144, TRUE)
-DIM full AS GUI_WIDGET : full = GUI_CHECKBOX(win, "Vollbild", 210, 144, FALSE)
+DIM snd AS GUI_WIDGET : snd = GUI_CHECKBOX(win, "Sound aktiv", 30, 172, TRUE)
+DIM full AS GUI_WIDGET : full = GUI_CHECKBOX(win, "Vollbild", 320, 172, FALSE)
 
-DIM lblP AS GUI_WIDGET : lblP = GUI_LABEL(win, "Download", 24, 182)
-DIM prog AS GUI_WIDGET : prog = GUI_PROGRESS(win, 24, 206, 350, 22)
+DIM lblP AS GUI_WIDGET : lblP = GUI_LABEL(win, "Download", 30, 218)
+DIM prog AS GUI_WIDGET : prog = GUI_PROGRESS(win, 30, 244, 560, 26)
 GUI_SET_VALUE(prog, 0.62)
 
-DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "Speichern", 24, 250, 165, 36)
-DIM cancel AS GUI_WIDGET : cancel = GUI_BUTTON(win, "Abbrechen", 210, 250, 164, 36)
+DIM ok AS GUI_WIDGET : ok = GUI_BUTTON(win, "Speichern", 30, 296, 270, 40)
+DIM cancel AS GUI_WIDGET : cancel = GUI_BUTTON(win, "Abbrechen", 320, 296, 270, 40)
 
 ' --- Theme-Umschalter (Flankenerkennung, KEYPRESSED ist gehalten) ---
 DIM p1 AS INTEGER : DIM p2 AS INTEGER : DIM p3 AS INTEGER
