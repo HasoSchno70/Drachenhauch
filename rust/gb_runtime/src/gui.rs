@@ -212,6 +212,10 @@ pub struct Window {
     // Menues: `in_bar=true` erscheint in der Menueleiste, sonst Kontextmenue
     // (per Rechtsklick im Fenster gezeigt).
     menus: Vec<Menu>,
+    // Scrollbarer Inhalt: ist die Inhaltshoehe (aus den Widgets) groesser als der
+    // sichtbare Bereich, scrollt der Inhalt (Mausrad + Scrollbalken).
+    scrollable: bool,
+    scroll_y: i32,
 }
 
 struct Menu {
@@ -250,6 +254,7 @@ pub struct Gui {
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
     was_right_down: bool,                    // Rechtsklick-Flankenerkennung
+    scroll_drag: Option<usize>,              // Fenster, dessen Inhalts-Scrollbar gezogen wird
     active_table: Option<(usize, usize)>,
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
     press_origin: Option<(usize, usize)>,
@@ -299,6 +304,7 @@ impl Gui {
             resize_window: None, resize_dx: 0, resize_dy: 0,
             active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             open_menu: None, context_open: None, was_right_down: false,
+            scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
@@ -348,6 +354,7 @@ impl Gui {
             base_w: w, base_h: h,
             close_clicked: false, alive: true,
             menus: Vec::new(),
+            scrollable: false, scroll_y: 0,
         });
         self.z_order.push(idx);
         self.focus_window = Some(idx);
@@ -1148,13 +1155,57 @@ impl Gui {
 
     // --- Geometrie ---
     fn abs_rect(&self, win: usize, w: &Widget) -> (i32, i32, i32, i32) {
-        let toff = (if self.windows[win].chrome { self.m("title_h") } else { 0 }) + self.menubar_h(win);
+        let toff = self.content_top(win);
+        let sy = if self.windows[win].scrollable { self.windows[win].scroll_y } else { 0 };
         let win = &self.windows[win];
-        (win.x + w.x, win.y + toff + w.y, w.w, w.h)
+        (win.x + w.x, win.y + toff + w.y - sy, w.w, w.h)
     }
     /// Hoehe der Menueleiste dieses Fensters (0, wenn keine Bar-Menues).
     fn menubar_h(&self, win: usize) -> i32 {
         if self.windows[win].menus.iter().any(|m| m.in_bar) { MENUBAR_H } else { 0 }
+    }
+    /// Oberkante des Inhaltsbereichs (Titelleiste + Menueleiste).
+    fn content_top(&self, win: usize) -> i32 {
+        (if self.windows[win].chrome { self.m("title_h") } else { 0 }) + self.menubar_h(win)
+    }
+    /// Inhaltshoehe = unterster Widget-Rand (+Rand). Basis fuer den Scrollbereich.
+    fn content_height(&self, win: usize) -> i32 {
+        let pad = self.m("pad");
+        self.windows[win].widgets.iter()
+            .filter(|w| w.alive && w.visible && w.kind != Kind::Canvas)
+            .map(|w| w.y + w.h).max().unwrap_or(0) + pad * 2
+    }
+    /// Sichtbare Inhaltshoehe (Fenster minus Titel/Menue/Rand).
+    fn view_height(&self, win: usize) -> i32 {
+        (self.windows[win].h - self.content_top(win) - 2).max(1)
+    }
+    /// Maximaler Scroll-Offset (0, wenn Inhalt passt).
+    fn max_scroll_y(&self, win: usize) -> i32 {
+        if !self.windows[win].scrollable { return 0; }
+        (self.content_height(win) - self.view_height(win)).max(0)
+    }
+    /// Inhalt eines Fensters scrollbar machen (Mausrad + Scrollbalken).
+    pub fn window_scrollable(&mut self, win: i64, flag: bool) -> Result<(), String> {
+        let w = self.windows.get_mut(win as usize).ok_or("GUI_WINDOW_SCROLLABLE: erwartet GUI_WINDOW")?;
+        w.scrollable = flag;
+        if !flag { w.scroll_y = 0; }
+        Ok(())
+    }
+    /// Geometrie des Inhalts-Scrollbalkens: (track_x, track_y, breite, track_h,
+    /// thumb_y, thumb_h) oder None, wenn nicht noetig/aus.
+    fn winscroll_geom(&self, wi: usize) -> Option<(i32, i32, i32, i32, i32, i32)> {
+        let content = self.content_height(wi);
+        let view = self.view_height(wi);
+        if !self.windows[wi].scrollable || content <= view { return None; }
+        let w = &self.windows[wi];
+        let bw = 10;
+        let tx = w.x + w.w - bw - 2;
+        let ty = w.y + self.content_top(wi) + 1;
+        let th = view - 2;
+        let max_s = content - view;
+        let thh = ((th * view) / content).clamp(24, th);
+        let thy = ty + if max_s > 0 { (w.scroll_y * (th - thh)) / max_s } else { 0 };
+        Some((tx, ty, bw, th, thy, thh))
     }
     fn in_rect(mx: i32, my: i32, r: (i32, i32, i32, i32)) -> bool {
         mx >= r.0 && mx < r.0 + r.2 && my >= r.1 && my < r.1 + r.3
@@ -1227,6 +1278,46 @@ impl Gui {
         // Menue-Eingabe (Menueleiste/Dropdown/Kontext) VOR den Widgets -- konsumiert
         // den Klick ggf., damit er nicht zusaetzlich ein Widget ausloest.
         let menu_consumed = self.menu_input(mx, my, just_pressed, right_just, g);
+
+        // Inhalts-Scroll: Mausrad ueber scrollbarem Fenster.
+        if let Some(top) = self.topmost_at(mx, my) {
+            if self.windows[top].scrollable {
+                let wheel = g.pop_mouse_wheel();
+                if wheel != 0 {
+                    let ms = self.max_scroll_y(top);
+                    self.windows[top].scroll_y = (self.windows[top].scroll_y - wheel as i32 * 40).clamp(0, ms);
+                }
+            }
+        }
+        // Scroll-Offsets klemmen (Inhalt kann durch Resize/Aenderung schrumpfen).
+        for wi in 0..self.windows.len() {
+            if self.windows[wi].scrollable {
+                let ms = self.max_scroll_y(wi);
+                self.windows[wi].scroll_y = self.windows[wi].scroll_y.clamp(0, ms);
+            }
+        }
+        // Laufendes Scrollbalken-Drag.
+        if let Some(wi) = self.scroll_drag {
+            if is_down {
+                if let Some((_tx, ty, _bw, th, _thy, thh)) = self.winscroll_geom(wi) {
+                    let ms = self.max_scroll_y(wi);
+                    let rel = ((my - ty - thh / 2) as f32 / (th - thh).max(1) as f32).clamp(0.0, 1.0);
+                    self.windows[wi].scroll_y = (rel * ms as f32) as i32;
+                }
+            } else { self.scroll_drag = None; }
+        }
+        // Klick auf den Scrollbalken startet das Drag (konsumiert den Klick).
+        let mut scroll_consumed = false;
+        if just_pressed && !menu_consumed && self.scroll_drag.is_none() {
+            if let Some(top) = self.topmost_at(mx, my) {
+                if let Some((tx, ty, bw, th, _thy, _thh)) = self.winscroll_geom(top) {
+                    if mx >= tx && mx < tx + bw && my >= ty && my < ty + th {
+                        self.scroll_drag = Some(top);
+                        scroll_consumed = true;
+                    }
+                }
+            }
+        }
         // Hover (nur oberstes Fenster); Tabellen aktualisieren Scroll/Hover/Wheel.
         if let Some(top) = self.topmost_at(mx, my) {
             let n = self.windows[top].widgets.len();
@@ -1278,7 +1369,7 @@ impl Gui {
             }
         }
         // Neuer Druck (entfaellt, wenn ein Menue den Klick verarbeitet hat).
-        if just_pressed && !menu_consumed && self.drag_window.is_none() && self.resize_window.is_none()
+        if just_pressed && !menu_consumed && !scroll_consumed && self.drag_window.is_none() && self.resize_window.is_none()
             && self.active_slider.is_none() && self.active_table.is_none() {
             self.handle_press(mx, my);
         }
@@ -1788,6 +1879,11 @@ impl Gui {
             if wdg.alive && wdg.visible { self.draw_widget(g, wi, i, wdg); }
         }
         g.pop_clip();
+        // Inhalts-Scrollbalken (rechts), wenn der Inhalt hoeher als das Fenster ist.
+        if let Some((tx, ty, bw, th, thy, thh)) = self.winscroll_geom(wi) {
+            g.box_fill(tx, ty, tx + bw - 1, ty + th - 1, shade(self.th("win_bg"), -10));
+            g.round_rect(tx + 1, thy, tx + bw - 2, thy + thh - 1, 4, self.th("widget_border"), true);
+        }
         // Aufgeklapptes Menueleisten-Dropdown ueber den Widgets.
         if let Some((mw, mi)) = self.open_menu {
             if mw == wi {

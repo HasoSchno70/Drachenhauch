@@ -1,0 +1,50 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: scrollbarer Fensterinhalt
+' ============================================================
+'  GUI_WINDOW_SCROLLABLE(win, TRUE): ist der Inhalt (alle Widgets) hoeher als
+'  der sichtbare Fensterbereich, scrollt er -- per Mausrad ODER ueber den
+'  Scrollbalken rechts. Ideal fuer lange Formulare/Einstellungsseiten.
+'  Fenster ist verschieb-/resizebar.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1180, 760, "GameBasic - Scroll-Panel", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Langes Formular", (SW - 580) \ 2, (SH - 460) \ 2, 580, 460)
+GUI_WINDOW_RESIZABLE(win, TRUE)
+GUI_WINDOW_SCROLLABLE(win, TRUE)        ' <- Inhalt scrollt, wenn er nicht passt
+
+' Viele Felder -> Inhalt deutlich hoeher als das Fenster.
+DIM tmp AS GUI_WIDGET
+DIM i AS INTEGER
+DIM yy AS INTEGER : yy = 20
+FOR i = 1 TO 16
+    tmp = GUI_LABEL(win, "Feld " + STR$(i), 24, yy + 6)
+    tmp = GUI_TEXTINPUT(win, 150, yy, 380, 32, "Eingabe " + STR$(i) + " ...")
+    yy = yy + 48
+NEXT
+tmp = GUI_CHECKBOX(win, "Den AGB zustimmen", 24, yy, FALSE)
+yy = yy + 44
+tmp = GUI_BUTTON(win, "Speichern", 24, yy, 240, 38)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Scrollbares Fenster: Mausrad oder Scrollbalken rechts ziehen | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND
