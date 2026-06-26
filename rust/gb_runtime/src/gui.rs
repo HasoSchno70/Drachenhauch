@@ -120,7 +120,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
-    Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea,
+    Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner,
 }
 
 impl Kind {
@@ -131,7 +131,7 @@ impl Kind {
             Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
-            Kind::TextArea => "textarea",
+            Kind::TextArea => "textarea", Kind::Spinner => "spinner",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -141,7 +141,7 @@ impl Kind {
             "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
-            "textarea" => Kind::TextArea,
+            "textarea" => Kind::TextArea, "spinner" => Kind::Spinner,
             _ => return None,
         })
     }
@@ -202,6 +202,8 @@ pub struct Widget {
     tab_page: i32,
     // Hover-Hilfetext (Tooltip); leer = keiner. Erscheint nach kurzem Verweilen.
     tooltip: String,
+    // Schrittweite (nur Spinner): +/- / Pfeil / Mausrad aendert value um step.
+    step: f64,
 }
 
 pub struct Window {
@@ -408,6 +410,7 @@ impl Gui {
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
             tooltip: String::new(),
+            step: 1.0,
         }
     }
 
@@ -508,6 +511,17 @@ impl Gui {
         let mut wd = Self::blank(Kind::Slider, x, y, w, sh);
         wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
         self.add_widget(win, "GUI_SLIDER", wd)
+    }
+    /// Zahlenfeld mit +/- Tasten (Spinner). Wert via Pfeile/Mausrad/Klick auf die
+    /// Schaltflaechen, in Schritten von `step`, geklemmt auf [mn, mx].
+    pub fn spinner(&mut self, win: i64, x: i32, y: i32, w: i32, mn: f64, mx: f64,
+                   default: f64, step: f64) -> Result<i64, String> {
+        if mx <= mn { return Err("GUI_SPINNER: max muss > min sein".into()); }
+        let h = (self.m("title_h") + 2).max(26);
+        let mut wd = Self::blank(Kind::Spinner, x, y, w.max(48), h);
+        wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
+        wd.step = if step != 0.0 { step.abs() } else { 1.0 };
+        self.add_widget(win, "GUI_SPINNER", wd)
     }
     pub fn panel(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, title: String) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Panel, x, y, w, h); wd.text = title;
@@ -833,7 +847,7 @@ impl Gui {
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::Progress) { return Err("GUI_VALUE: Widget ist kein slider/progress".into()); }
+        if !matches!(w.kind, Kind::Slider | Kind::Progress | Kind::Spinner) { return Err("GUI_VALUE: Widget ist kein slider/progress/spinner".into()); }
         Ok(w.value)
     }
     pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
@@ -862,7 +876,7 @@ impl Gui {
     }
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::Progress) { return Err("GUI_SET_VALUE: Widget ist kein slider/progress".into()); }
+        if !matches!(w.kind, Kind::Slider | Kind::Progress | Kind::Spinner) { return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner".into()); }
         w.value = v.clamp(w.min, w.max); Ok(())
     }
     pub fn on_click(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
@@ -870,8 +884,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown oder listbox".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox oder spinner".into());
         }
         w.on_change = func; Ok(())
     }
@@ -1422,6 +1436,7 @@ impl Gui {
                     self.windows[top].widgets[i].hovered = true;
                     if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
                     if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
+                    if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
                 }
             }
         }
@@ -1508,6 +1523,7 @@ impl Gui {
             match self.windows[wi].widgets[i].kind {
                 Kind::TextInput => self.edit_textinput(wi, i, g),
                 Kind::TextArea => self.edit_textarea(wi, i, g),
+                Kind::Spinner => self.spinner_keys(wi, i, g),
                 _ => {}
             }
         }
@@ -1913,6 +1929,45 @@ impl Gui {
         }
     }
 
+    // --- Spinner (Zahlenfeld mit +/-) ---
+    /// Rechtecke der Auf-/Ab-Schaltflaechen (rechte Spalte) + deren linke Kante.
+    fn spinner_btn_rects(ax: i32, ay: i32, w: i32, h: i32)
+        -> ((i32, i32, i32, i32), (i32, i32, i32, i32), i32) {
+        let bw = 20;
+        let bx = ax + w - bw;
+        let mid = h / 2;
+        ((bx, ay, bw, mid), (bx, ay + mid, bw, h - mid), bx)
+    }
+
+    /// Wert um `steps` Schritte aendern (geklemmt); feuert on_change bei Aenderung.
+    fn spinner_step(&mut self, wi: usize, i: usize, steps: i32) {
+        let w = &mut self.windows[wi].widgets[i];
+        let nv = (w.value + steps as f64 * w.step).clamp(w.min, w.max);
+        if nv != w.value {
+            w.value = nv;
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
+    /// Mausrad ueber dem Spinner: hoch = +, runter = -.
+    fn spinner_wheel(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let wheel = g.pop_mouse_wheel();
+        if wheel != 0 { self.spinner_step(wi, i, wheel as i32); }
+    }
+
+    /// Tastatur am fokussierten Spinner: Pfeil hoch/runter aendert den Wert.
+    fn spinner_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        if g.key_pressed(KEY_UP) { self.spinner_step(wi, i, 1); }
+        if g.key_pressed(KEY_DOWN) { self.spinner_step(wi, i, -1); }
+    }
+
+    /// Zahl ohne ueberfluessige Nachkommastellen (ganze Zahl -> ohne Komma).
+    fn fmt_num(v: f64) -> String {
+        if (v.fract()).abs() < 1e-9 { format!("{}", v.round() as i64) }
+        else { format!("{:.2}", v) }
+    }
+
     fn dropdown_popup_rect(&self, wi: usize, idx: usize) -> (i32, i32, i32, i32) {
         let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let n = self.windows[wi].widgets[idx].items.len() as i32;
@@ -2003,6 +2058,13 @@ impl Gui {
                 if let Some(f) = och { self.pending.push(f); }
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
+            Kind::Spinner => {
+                self.focus_widget = Some((win, i));
+                let (ax, ay, ww, hh) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                let (up, down, _bx) = Self::spinner_btn_rects(ax, ay, ww, hh);
+                if Self::in_rect(mx, my, up) { self.spinner_step(win, i, 1); }
+                else if Self::in_rect(mx, my, down) { self.spinner_step(win, i, -1); }
+            }
             Kind::TextInput => self.focus_widget = Some((win, i)),
             Kind::TextArea => self.focus_widget = Some((win, i)),
             Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
@@ -2385,6 +2447,36 @@ impl Gui {
                 }
                 g.pop_clip();
             }
+            Kind::Spinner => {
+                let focused = self.focus_widget == Some((wi, idx));
+                let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
+                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                let (up, down, bx) = Self::spinner_btn_rects(ax, ay, w, h);
+                let bordc = self.wcol(wdg, "border", "widget_border");
+                // Trennlinien vor und in der Buttonspalte.
+                g.line(bx, ay + 1, bx, ay + h - 2, bordc);
+                g.line(bx, ay + h / 2, ax + w - 1, ay + h / 2, bordc);
+                // Zahlenwert links (auf das Feldinnere geclippt).
+                g.push_clip(ax + 2, ay + 1, (bx - ax - 3).max(0), (h - 2).max(0));
+                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, Self::fmt_num(wdg.value), self.txt_col(wdg));
+                g.pop_clip();
+                // Hover-Highlight + Pfeil-Dreiecke der beiden Schaltflaechen.
+                let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+                let fg = self.txt_col(wdg);
+                let hl = shade(self.wcol(wdg, "bg", "widget_bg"), 30);
+                if wdg.enabled && Self::in_rect(mx, my, up) {
+                    g.box_fill(up.0 + 1, up.1 + 1, up.0 + up.2 - 2, up.1 + up.3 - 1, hl);
+                }
+                let (ucx, ucy) = (up.0 + up.2 / 2, up.1 + up.3 / 2);
+                g.line(ucx - 4, ucy + 2, ucx, ucy - 2, fg);   // ^
+                g.line(ucx, ucy - 2, ucx + 4, ucy + 2, fg);
+                if wdg.enabled && Self::in_rect(mx, my, down) {
+                    g.box_fill(down.0 + 1, down.1, down.0 + down.2 - 2, down.1 + down.3 - 2, hl);
+                }
+                let (dcx, dcy) = (down.0 + down.2 / 2, down.1 + down.3 / 2);
+                g.line(dcx - 4, dcy - 2, dcx, dcy + 2, fg);   // v
+                g.line(dcx, dcy + 2, dcx + 4, dcy - 2, fg);
+            }
             Kind::Radio => {
                 let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
@@ -2616,6 +2708,29 @@ mod tests {
         g.set_tooltip(b, String::new()).unwrap();                // "" entfernt
         assert_eq!(g.windows[wi].widgets[i].tooltip, "");
         assert!(g.set_tooltip(999_999, "x".into()).is_err());    // ungueltiges Handle
+    }
+
+    // Spinner-Schrittlogik (ohne Graphics): klemmt auf [min,max], feuert
+    // on_change nur bei echter Aenderung; max<=min ist ein Fehler.
+    #[test]
+    fn spinner_step_clamps_and_fires_change() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 300, 200);
+        let sp = g.spinner(win, 10, 10, 120, 0.0, 10.0, 5.0, 2.0).unwrap();
+        let (wi, i) = Gui::dec_widget(sp);
+        g.on_change(sp, Some("changed".into())).unwrap();
+        assert_eq!(g.value(sp).unwrap(), 5.0);
+        g.spinner_step(wi, i, 1);                 // +2 -> 7
+        assert_eq!(g.value(sp).unwrap(), 7.0);
+        assert_eq!(g.take_pending(), vec!["changed".to_string()]);
+        g.spinner_step(wi, i, 5);                 // +10 -> klemmt auf 10
+        assert_eq!(g.value(sp).unwrap(), 10.0);
+        g.take_pending();                         // Queue leeren
+        g.spinner_step(wi, i, 0);                 // keine Aenderung -> kein Callback
+        assert!(g.take_pending().is_empty());
+        g.spinner_step(wi, i, -100);              // klemmt auf min 0
+        assert_eq!(g.value(sp).unwrap(), 0.0);
+        assert!(g.spinner(win, 0, 0, 100, 5.0, 5.0, 5.0, 1.0).is_err()); // max<=min
     }
 
     fn rows(n: usize) -> Vec<Vec<String>> {

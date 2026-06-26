@@ -2740,6 +2740,13 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.slider(gi(a,0,"GUI_SLIDER")?, gi(a,1,"GUI_SLIDER")? as i32,
                     gi(a,2,"GUI_SLIDER")? as i32, gi(a,3,"GUI_SLIDER")? as i32, mn, mx, def)?)
             }
+            "gui_spinner" => {
+                let mn = gnum(a,4,"GUI_SPINNER")?; let mx = gnum(a,5,"GUI_SPINNER")?;
+                let def = if a.len() >= 7 { gnum(a,6,"GUI_SPINNER")? } else { mn };
+                let step = if a.len() >= 8 { gnum(a,7,"GUI_SPINNER")? } else { 1.0 };
+                Value::Int(self.gui.spinner(gi(a,0,"GUI_SPINNER")?, gi(a,1,"GUI_SPINNER")? as i32,
+                    gi(a,2,"GUI_SPINNER")? as i32, gi(a,3,"GUI_SPINNER")? as i32, mn, mx, def, step)?)
+            }
             "gui_panel" => {
                 let title = if a.len() >= 6 { gs(a,5,"GUI_PANEL")? } else { String::new() };
                 Value::Int(self.gui.panel(gi(a,0,"GUI_PANEL")?, gi(a,1,"GUI_PANEL")? as i32, gi(a,2,"GUI_PANEL")? as i32,

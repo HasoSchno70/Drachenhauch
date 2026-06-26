@@ -1713,6 +1713,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SPINNER",
+   "kind": "core",
+   "signature": "GUI_SPINNER(6..8 Argumente)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE",
    "kind": "core",
    "signature": "GUI_TABLE(5..7 Argumente)",

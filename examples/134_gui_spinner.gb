@@ -1,0 +1,50 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Spinner (Zahlenfeld mit +/-)
+' ============================================================
+'  GUI_SPINNER(win, x, y, w, min, max[, default[, step]]) ist ein Zahlenfeld
+'  mit zwei Schaltflaechen (hoch/runter). Der Wert aendert sich um "step" per
+'  Klick auf die Buttons, Mausrad ueber dem Feld oder Pfeil hoch/runter (wenn
+'  das Feld den Fokus hat -- vorher hineinklicken). GUI_VALUE liest den Wert,
+'  GUI_ON_CHANGE feuert bei jeder Aenderung.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1080, 700, "GameBasic - Spinner", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Spielparameter", (SW - 520) \ 2, (SH - 360) \ 2, 520, 360)
+
+DIM l1 AS GUI_WIDGET : l1 = GUI_LABEL(win, "Anzahl Gegner (0-50):", 24, 30)
+DIM enemies AS GUI_WIDGET : enemies = GUI_SPINNER(win, 280, 24, 130, 0, 50, 8, 1)
+GUI_TOOLTIP(enemies, "Klick auf +/- , Mausrad" + CHR$(10) + "oder Pfeiltasten (nach Klick).")
+
+DIM l2 AS GUI_WIDGET : l2 = GUI_LABEL(win, "Lautstaerke (0-100, Schritt 5):", 24, 90)
+DIM volume AS GUI_WIDGET : volume = GUI_SPINNER(win, 280, 84, 130, 0, 100, 70, 5)
+
+DIM l3 AS GUI_WIDGET : l3 = GUI_LABEL(win, "Schwerkraft (0.0-5.0, Schritt 0.5):", 24, 150)
+DIM gravity AS GUI_WIDGET : gravity = GUI_SPINNER(win, 280, 144, 130, 0, 5, 1.5, 0.5)
+
+DIM out AS GUI_WIDGET : out = GUI_LABEL(win, "", 24, 230)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+    GUI_SET_TEXT(out, "Gegner: " + STR$(GUI_VALUE(enemies)) + "   Vol: " + STR$(GUI_VALUE(volume)) + "   G: " + STR$(GUI_VALUE(gravity)))
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Spinner: +/- klicken, Mausrad ueber dem Feld, oder Pfeiltasten (erst hineinklicken) | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND

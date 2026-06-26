@@ -38,6 +38,7 @@ IMPORT "gui"
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
+| `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V) |
@@ -299,6 +300,21 @@ PRINT GUI_VALUE(bar)
 ```
 
 Nicht interaktiv; Fortschritt via `GUI_SET_VALUE` (0..1, geklemmt).
+
+### Spinner — Zahlenfeld mit +/-
+
+```basic
+DIM sp AS GUI_WIDGET
+sp = GUI_SPINNER(win, 20, 200, 120, 0, 100, 50, 5)   ' min 0, max 100, Start 50, Schritt 5
+GUI_ON_CHANGE(sp, FUNCREF(wert_geaendert))
+PRINT GUI_VALUE(sp)                                   ' aktueller Wert (FLOAT)
+```
+
+Eingabefeld mit zwei Schaltflächen (▲/▼) rechts. Der Wert ändert sich um `step`
+(Default 1) per Klick auf die Buttons, **Mausrad** über dem Feld oder **Pfeil
+hoch/runter**, wenn das Feld den Fokus hat (Klick hinein). Immer auf `[min, max]`
+geklemmt. `GUI_VALUE`/`GUI_SET_VALUE` lesen/setzen den Wert, `GUI_ON_CHANGE`
+feuert bei jeder Änderung. Ganze Zahlen werden ohne Nachkommastellen angezeigt.
 
 ## ListBox, Image, Canvas
 
