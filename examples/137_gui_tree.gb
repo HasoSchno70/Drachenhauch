@@ -1,0 +1,66 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Tree-View (Baum-Ansicht)
+' ============================================================
+'  GUI_TREE(win, x, y, w, h) ist eine Baum-Ansicht. Knoten haengt man mit
+'  GUI_TREE_ADD(tree, parent, label$) an (parent = -1 fuer Wurzel, sonst die
+'  id eines vorhandenen Knotens). Auf-/Zuklappen per Klick auf das Dreieck
+'  (oder GUI_TREE_EXPAND), Auswahl per Klick auf die Zeile. GUI_TREE_SELECTED
+'  liefert die id des gewaehlten Knotens, GUI_TREE_LABEL dessen Text.
+'  Mausrad scrollt.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1080, 720, "GameBasic - Tree-View", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Projekt-Explorer", (SW - 520) \ 2, (SH - 460) \ 2, 520, 460)
+
+DIM tree AS GUI_WIDGET : tree = GUI_TREE(win, 20, 20, 300, 380)
+
+' --- Baum aufbauen ----------------------------------------------------------
+DIM proj AS INTEGER : proj = GUI_TREE_ADD(tree, -1, "Mein Spiel")
+DIM src AS INTEGER  : src  = GUI_TREE_ADD(tree, proj, "src")
+GUI_TREE_ADD(tree, src, "main.gb")
+GUI_TREE_ADD(tree, src, "player.gb")
+GUI_TREE_ADD(tree, src, "enemy.gb")
+DIM asset AS INTEGER : asset = GUI_TREE_ADD(tree, proj, "assets")
+DIM img AS INTEGER : img = GUI_TREE_ADD(tree, asset, "images")
+GUI_TREE_ADD(tree, img, "hero.png")
+GUI_TREE_ADD(tree, img, "tiles.png")
+GUI_TREE_ADD(tree, asset, "music.ogg")
+GUI_TREE_ADD(tree, proj, "README.md")
+
+' Wurzel + src gleich aufgeklappt zeigen.
+GUI_TREE_EXPAND(tree, proj, TRUE)
+GUI_TREE_EXPAND(tree, src, TRUE)
+
+DIM info AS GUI_WIDGET : info = GUI_LABEL(win, "Nichts ausgewaehlt", 340, 24)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(tree)
+    IF sel >= 0 THEN
+        GUI_SET_TEXT(info, "Gewaehlt: " + GUI_TREE_LABEL(tree, sel))
+    ELSE
+        GUI_SET_TEXT(info, "Nichts ausgewaehlt")
+    END IF
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Tree-View: Dreieck klickt auf/zu, Zeile waehlt aus, Mausrad scrollt | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND

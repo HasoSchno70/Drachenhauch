@@ -121,7 +121,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
     Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner, Splitter,
-    Toolbar,
+    Toolbar, Tree,
 }
 
 impl Kind {
@@ -133,7 +133,7 @@ impl Kind {
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
             Kind::TextArea => "textarea", Kind::Spinner => "spinner", Kind::Splitter => "splitter",
-            Kind::Toolbar => "toolbar",
+            Kind::Toolbar => "toolbar", Kind::Tree => "tree",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -144,13 +144,16 @@ impl Kind {
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
             "textarea" => Kind::TextArea, "spinner" => Kind::Spinner, "splitter" => Kind::Splitter,
-            "toolbar" => Kind::Toolbar,
+            "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
             _ => return None,
         })
     }
 }
 
 const DROPDOWN_ITEM_H: i32 = 22;
+const TREE_ROW_H: i32 = 22;       // Hoehe einer Baum-Zeile
+const TREE_INDENT: i32 = 16;      // Einrueckung pro Ebene
+const TREE_TOGGLE_W: i32 = 16;    // Breite der Auf-/Zuklapp-Flaeche
 
 #[derive(Default)]
 pub struct TableState {
@@ -160,6 +163,26 @@ pub struct TableState {
     scroll_x: i32, scroll_y: i32,
     drag_v: bool, drag_h: bool, drag_off: i32,
     selected: i32, hover_row: i32, clicked_row: i32,
+}
+
+// Baum-Zustand (Kind::Tree): flache Knotenliste, Knoten-id == Index (stabil bis
+// GUI_TREE_CLEAR). `parent` = -1 fuer Wurzelknoten. Sichtbarkeit ergibt sich aus
+// den `expanded`-Flags der Vorfahren (siehe tree_visible).
+#[derive(Default)]
+pub struct TreeState {
+    nodes: Vec<TreeNode>,
+    selected: i32,   // Knoten-id oder -1
+    hover: i32,      // gehoverte Knoten-id oder -1
+    scroll: i32,     // vertikaler Pixel-Offset
+}
+
+#[derive(Default)]
+struct TreeNode {
+    label: String,
+    parent: i32,
+    level: i32,
+    expanded: bool,
+    has_children: bool,
 }
 
 pub struct Widget {
@@ -176,6 +199,7 @@ pub struct Widget {
     on_change: Option<String>,
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
+    tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
     // Laufzeit-Lifecycle (Tombstone -- Indizes/Handles bleiben stabil): `alive`
     // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
     alive: bool,
@@ -408,7 +432,7 @@ impl Gui {
             kind, x, y, w, h, text: String::new(), color: 0xFFFFFF,
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
-            on_click: None, on_change: None, ov: HashMap::new(), tbl: None,
+            on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None,
             alive: true, visible: true,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
@@ -747,6 +771,118 @@ impl Gui {
     pub fn table_clicked(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED")?.clicked_row as i64) }
     pub fn table_row_count(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.rows.len() as i64) }
 
+    // --- Tree (Baum-Ansicht) ------------------------------------------------
+    fn tree_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
+        let w = self.wdg_mut(h, fn_)?;
+        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        Ok(w.tree.as_mut().unwrap())
+    }
+    fn tree_ref(&self, h: i64, fn_: &str) -> Result<&TreeState, String> {
+        let w = self.wdg(h, fn_)?;
+        if w.kind != Kind::Tree { return Err(format!("{}: Widget ist kein Baum", fn_)); }
+        Ok(w.tree.as_ref().unwrap())
+    }
+    pub fn tree(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Tree, x, y, w, h);
+        wd.tree = Some(Box::new(TreeState { selected: -1, hover: -1, ..Default::default() }));
+        self.add_widget(win, "GUI_TREE", wd)
+    }
+    /// Knoten anhaengen. parent = -1 (Wurzel) oder eine bestehende Knoten-id.
+    /// Liefert die neue Knoten-id (== Index, stabil bis GUI_TREE_CLEAR).
+    pub fn tree_add(&mut self, h: i64, parent: i64, label: String) -> Result<i64, String> {
+        let t = self.tree_mut(h, "GUI_TREE_ADD")?;
+        let n = t.nodes.len() as i64;
+        if parent < -1 || parent >= n {
+            return Err(format!("GUI_TREE_ADD: ungueltiger parent {}", parent));
+        }
+        let level = if parent < 0 { 0 } else { t.nodes[parent as usize].level + 1 };
+        if parent >= 0 { t.nodes[parent as usize].has_children = true; }
+        t.nodes.push(TreeNode { label, parent: parent as i32, level, expanded: false, has_children: false });
+        Ok((t.nodes.len() - 1) as i64)
+    }
+    pub fn tree_clear(&mut self, h: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_CLEAR")?;
+        t.nodes.clear(); t.selected = -1; t.hover = -1; t.scroll = 0; Ok(())
+    }
+    pub fn tree_selected(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tree_ref(h, "GUI_TREE_SELECTED")?.selected as i64)
+    }
+    pub fn tree_set_selected(&mut self, h: i64, node: i64) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_SET_SELECTED")?;
+        let n = t.nodes.len() as i64;
+        t.selected = if node >= 0 && node < n { node as i32 } else { -1 };
+        Ok(())
+    }
+    pub fn tree_label(&self, h: i64, node: i64) -> Result<String, String> {
+        let t = self.tree_ref(h, "GUI_TREE_LABEL")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_LABEL: ungueltige Knoten-id {}", node));
+        }
+        Ok(t.nodes[node as usize].label.clone())
+    }
+    pub fn tree_expand(&mut self, h: i64, node: i64, flag: bool) -> Result<(), String> {
+        let t = self.tree_mut(h, "GUI_TREE_EXPAND")?;
+        if node < 0 || node >= t.nodes.len() as i64 {
+            return Err(format!("GUI_TREE_EXPAND: ungueltige Knoten-id {}", node));
+        }
+        t.nodes[node as usize].expanded = flag; Ok(())
+    }
+
+    /// Sichtbare Knoten (id-Liste) in Anzeigereihenfolge: Vorfahren-expanded.
+    fn tree_visible(t: &TreeState) -> Vec<usize> {
+        let mut out = Vec::new();
+        Self::tree_collect(t, -1, &mut out);
+        out
+    }
+    fn tree_collect(t: &TreeState, parent: i32, out: &mut Vec<usize>) {
+        for i in 0..t.nodes.len() {
+            if t.nodes[i].parent == parent {
+                out.push(i);
+                if t.nodes[i].expanded && t.nodes[i].has_children {
+                    Self::tree_collect(t, i as i32, out);
+                }
+            }
+        }
+    }
+
+    fn tree_hover(&mut self, wi: usize, idx: usize, my: i32, g: &mut Graphics) {
+        let (_ax, ay, _w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
+        let vis = Self::tree_visible(self.windows[wi].widgets[idx].tree.as_ref().unwrap());
+        let max_scroll = (vis.len() as i32 * TREE_ROW_H - (h - 2)).max(0);
+        let wheel = g.pop_mouse_wheel();
+        let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+        t.scroll = t.scroll.clamp(0, max_scroll);
+        if wheel != 0 { t.scroll = (t.scroll - wheel as i32 * TREE_ROW_H).clamp(0, max_scroll); }
+        let row = (my - (ay + 1) + t.scroll) / TREE_ROW_H;
+        t.hover = if row >= 0 && (row as usize) < vis.len() { vis[row as usize] as i32 } else { -1 };
+    }
+
+    fn tree_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
+        let (ax, ay, _w, _h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
+        let t = self.windows[wi].widgets[idx].tree.as_ref().unwrap();
+        let vis = Self::tree_visible(t);
+        let row = (my - (ay + 1) + t.scroll) / TREE_ROW_H;
+        if row < 0 || row as usize >= vis.len() { return; }
+        let ni = vis[row as usize];
+        let level = t.nodes[ni].level;
+        let has_children = t.nodes[ni].has_children;
+        let toggle_x = ax + 4 + level * TREE_INDENT;
+        let on_toggle = has_children && mx >= toggle_x && mx < toggle_x + TREE_TOGGLE_W;
+        if on_toggle {
+            let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+            let e = t.nodes[ni].expanded; t.nodes[ni].expanded = !e;
+        } else {
+            let changed = {
+                let t = self.windows[wi].widgets[idx].tree.as_mut().unwrap();
+                if t.selected != ni as i32 { t.selected = ni as i32; true } else { false }
+            };
+            if changed {
+                let f = self.windows[wi].widgets[idx].on_change.clone();
+                if let Some(f) = f { self.pending.push(f); }
+            }
+        }
+    }
+
     fn table_geom(&self, wi: usize, idx: usize) -> TGeom {
         let w = &self.windows[wi].widgets[idx];
         let (ax, ay, ww, hh) = self.abs_rect(wi, w);
@@ -946,8 +1082,8 @@ impl Gui {
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner oder splitter".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
     }
@@ -1423,6 +1559,7 @@ impl Gui {
             for wdg in win.widgets.iter_mut() {
                 wdg.clicked = false; wdg.hovered = false;
                 if let Some(t) = wdg.tbl.as_mut() { t.hover_row = -1; t.clicked_row = -1; }
+                if let Some(t) = wdg.tree.as_mut() { t.hover = -1; }
             }
             for m in win.menus.iter_mut() {
                 for it in m.items.iter_mut() { it.clicked = false; }
@@ -1500,6 +1637,7 @@ impl Gui {
                     if kind == Kind::Table { self.table_hover(top, i, mx, my, g); }
                     if kind == Kind::ListBox { self.listbox_wheel(top, i, r.3, g); }
                     if kind == Kind::Spinner { self.spinner_wheel(top, i, g); }
+                    if kind == Kind::Tree { self.tree_hover(top, i, my, g); }
                 }
             }
         }
@@ -2159,6 +2297,7 @@ impl Gui {
             Kind::TextInput => self.focus_widget = Some((win, i)),
             Kind::TextArea => self.focus_widget = Some((win, i)),
             Kind::Table => { self.focus_widget = None; self.table_press(win, i, mx, my); }
+            Kind::Tree => { self.focus_widget = None; self.tree_press(win, i, mx, my); }
             Kind::Radio => {
                 self.focus_widget = None;
                 let was = self.windows[win].widgets[i].checked;
@@ -2688,7 +2827,48 @@ impl Gui {
                 }
             }
             Kind::Table => self.draw_table(g, wi, idx),
+            Kind::Tree => self.draw_tree(g, wi, idx),
         }
+    }
+
+    fn draw_tree(&self, g: &mut Graphics, wi: usize, idx: usize) {
+        let wdg = &self.windows[wi].widgets[idx];
+        let (ax, ay, w, h) = self.abs_rect(wi, wdg);
+        self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+            self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
+        let t = wdg.tree.as_ref().unwrap();
+        let vis = Self::tree_visible(t);
+        let fg = self.txt_col(wdg);
+        let acc = self.acc_col(wdg);
+        let scroll = t.scroll;
+        g.push_clip(ax + 1, ay + 1, w - 2, h - 2);
+        for (r, &ni) in vis.iter().enumerate() {
+            let ry = ay + 1 + r as i32 * TREE_ROW_H - scroll;
+            if ry + TREE_ROW_H < ay || ry > ay + h { continue; }
+            let node = &t.nodes[ni];
+            let indent = node.level * TREE_INDENT;
+            if ni as i32 == t.selected {
+                g.box_fill(ax + 1, ry, ax + w - 2, ry + TREE_ROW_H - 1, shade(acc, -110));
+            } else if ni as i32 == t.hover {
+                g.box_fill(ax + 1, ry, ax + w - 2, ry + TREE_ROW_H - 1, shade(self.wcol(wdg, "bg", "widget_bg"), 18));
+            }
+            // Auf-/Zuklapp-Dreieck (nur bei Kindknoten).
+            let tx = ax + 4 + indent;
+            let cy = ry + TREE_ROW_H / 2;
+            if node.has_children {
+                let cx = tx + TREE_TOGGLE_W / 2;
+                if node.expanded {
+                    g.line(cx - 4, cy - 2, cx, cy + 2, fg);    // v
+                    g.line(cx, cy + 2, cx + 4, cy - 2, fg);
+                } else {
+                    g.line(cx - 2, cy - 4, cx + 2, cy, fg);    // >
+                    g.line(cx + 2, cy, cx - 2, cy + 4, fg);
+                }
+            }
+            let lx = tx + TREE_TOGGLE_W + 2;
+            self.wtext(g, wdg, lx, ry + (TREE_ROW_H - 14) / 2, node.label.clone(), fg);
+        }
+        g.pop_clip();
     }
 
     fn draw_dropdown_popup(&self, g: &mut Graphics, wi: usize, idx: usize) {
@@ -2913,6 +3093,37 @@ mod tests {
         let (tw, ti) = Gui::dec_widget(tb);
         assert!(matches!(g.windows[tw].widgets[ti].kind, Kind::Toolbar));
         assert!(!g.windows[tw].widgets[ti].enabled);                     // dekorativ
+    }
+
+    // Tree-Modell (ohne Graphics): Knoten anlegen, Sichtbarkeit folgt expanded,
+    // Auswahl/Label, Fehlerfaelle, CLEAR.
+    #[test]
+    fn tree_model_and_visibility() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 300, 300);
+        let tr = g.tree(win, 0, 0, 200, 200).unwrap();
+        let root = g.tree_add(tr, -1, "Wurzel".into()).unwrap();
+        let a = g.tree_add(tr, root, "A".into()).unwrap();
+        let _b = g.tree_add(tr, root, "B".into()).unwrap();
+        let a1 = g.tree_add(tr, a, "A.1".into()).unwrap();
+        assert_eq!((root, a, a1), (0, 1, 3));
+        let vis = |g: &Gui| {
+            let (wi, i) = Gui::dec_widget(tr);
+            Gui::tree_visible(g.windows[wi].widgets[i].tree.as_ref().unwrap())
+        };
+        assert_eq!(vis(&g), vec![0]);                 // alles zu -> nur Wurzel
+        g.tree_expand(tr, root, true).unwrap();
+        assert_eq!(vis(&g), vec![0, 1, 2]);           // Wurzel, A, B (A noch zu)
+        g.tree_expand(tr, a, true).unwrap();
+        assert_eq!(vis(&g), vec![0, 1, 3, 2]);        // Wurzel, A, A.1, B
+        g.tree_set_selected(tr, a1).unwrap();
+        assert_eq!(g.tree_selected(tr).unwrap(), a1);
+        assert_eq!(g.tree_label(tr, a1).unwrap(), "A.1");
+        assert!(g.tree_add(tr, 99, "x".into()).is_err());   // ungueltiger parent
+        assert!(g.tree_label(tr, 99).is_err());
+        g.tree_clear(tr).unwrap();
+        assert_eq!(g.tree_selected(tr).unwrap(), -1);
+        assert_eq!(vis(&g), Vec::<usize>::new());
     }
 
     fn rows(n: usize) -> Vec<Vec<String>> {

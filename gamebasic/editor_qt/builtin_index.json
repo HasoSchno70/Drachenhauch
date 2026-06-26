@@ -1779,6 +1779,48 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TREE",
+   "kind": "core",
+   "signature": "GUI_TREE(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_ADD",
+   "kind": "core",
+   "signature": "GUI_TREE_ADD(tree, parent, label)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_CLEAR",
+   "kind": "core",
+   "signature": "GUI_TREE_CLEAR(tree)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SELECTED",
+   "kind": "core",
+   "signature": "GUI_TREE_SELECTED(tree)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_SET_SELECTED",
+   "kind": "core",
+   "signature": "GUI_TREE_SET_SELECTED(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_LABEL",
+   "kind": "core",
+   "signature": "GUI_TREE_LABEL(tree, node)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TREE_EXPAND",
+   "kind": "core",
+   "signature": "GUI_TREE_EXPAND(tree, node, flag)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_SELECTED",
    "kind": "core",
    "signature": "GUI_TABLE_SELECTED(wdg)",

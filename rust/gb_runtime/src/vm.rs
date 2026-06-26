@@ -2895,6 +2895,14 @@ impl<'p> Vm<'p> {
             "gui_table_set_selected" => { self.gui.table_set_selected(gi(a,0,"GUI_TABLE_SET_SELECTED")?, gi(a,1,"GUI_TABLE_SET_SELECTED")?)?; Value::Nil }
             "gui_table_clicked" => Value::Int(self.gui.table_clicked(gi(a,0,"GUI_TABLE_CLICKED")?)?),
             "gui_table_row_count" => Value::Int(self.gui.table_row_count(gi(a,0,"GUI_TABLE_ROW_COUNT")?)?),
+            "gui_tree" => Value::Int(self.gui.tree(gi(a,0,"GUI_TREE")?, gi(a,1,"GUI_TREE")? as i32,
+                gi(a,2,"GUI_TREE")? as i32, gi(a,3,"GUI_TREE")? as i32, gi(a,4,"GUI_TREE")? as i32)?),
+            "gui_tree_add" => Value::Int(self.gui.tree_add(gi(a,0,"GUI_TREE_ADD")?, gi(a,1,"GUI_TREE_ADD")?, gs(a,2,"GUI_TREE_ADD")?)?),
+            "gui_tree_clear" => { self.gui.tree_clear(gi(a,0,"GUI_TREE_CLEAR")?)?; Value::Nil }
+            "gui_tree_selected" => Value::Int(self.gui.tree_selected(gi(a,0,"GUI_TREE_SELECTED")?)?),
+            "gui_tree_set_selected" => { self.gui.tree_set_selected(gi(a,0,"GUI_TREE_SET_SELECTED")?, gi(a,1,"GUI_TREE_SET_SELECTED")?)?; Value::Nil }
+            "gui_tree_label" => Value::str_rc(&self.gui.tree_label(gi(a,0,"GUI_TREE_LABEL")?, gi(a,1,"GUI_TREE_LABEL")?)?),
+            "gui_tree_expand" => { self.gui.tree_expand(gi(a,0,"GUI_TREE_EXPAND")?, gi(a,1,"GUI_TREE_EXPAND")?, gbool(a,2,"GUI_TREE_EXPAND")?)?; Value::Nil }
             "gui_update" => {
                 {
                     let g = self.gfx.as_mut().ok_or("GUI_UPDATE: vor SCREEN aufgerufen")?;

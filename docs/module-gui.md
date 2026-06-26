@@ -47,6 +47,12 @@ IMPORT "gui"
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V) |
 | `GUI_TABLE(win, x, y, w, h[, headers, cells])` | GUI_WIDGET | scrollbare Tabelle (Header + Body) |
+| `GUI_TREE(win, x, y, w, h)` | GUI_WIDGET | Baum-Ansicht (auf-/zuklappbar, scrollbar) |
+| `GUI_TREE_ADD(tree, parent, label$)` | INT | Knoten anhängen (parent = -1 = Wurzel), liefert Knoten-id |
+| `GUI_TREE_CLEAR(tree)` | — | alle Knoten löschen |
+| `GUI_TREE_SELECTED(tree)` / `GUI_TREE_SET_SELECTED(tree, node)` | INT / — | gewählten Knoten lesen/setzen (-1 = keiner) |
+| `GUI_TREE_LABEL(tree, node)` | STRING | Text eines Knotens |
+| `GUI_TREE_EXPAND(tree, node, flag)` | — | Knoten auf-/zuklappen |
 | `GUI_TABLE_HEADERS(tbl, headers)` | — | Spaltentitel setzen (1D ARRAY OF STRING) |
 | `GUI_TABLE_ROWS(tbl, cells)` | — | Datenzeilen setzen (2D ARRAY OF STRING) |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | — | Spaltenbreiten (1D ARRAY OF INTEGER; NIL = Auto) |
@@ -475,6 +481,29 @@ END IF
 
 **Beispiel:** [examples/81_table_select.gb](../examples/81_table_select.gb) zeigt
 beide Tabellen (Retained `gui` + Immediate `ui`) nebeneinander.
+
+## Baum (Tree-View)
+
+```basic
+DIM tree AS GUI_WIDGET : tree = GUI_TREE(win, 20, 20, 300, 380)
+DIM proj AS INTEGER : proj = GUI_TREE_ADD(tree, -1, "Mein Spiel")   ' Wurzel
+DIM src  AS INTEGER : src  = GUI_TREE_ADD(tree, proj, "src")        ' Kind von proj
+GUI_TREE_ADD(tree, src, "main.gb")
+GUI_TREE_EXPAND(tree, proj, TRUE)                                   ' aufgeklappt starten
+
+' jeden Frame:
+DIM sel AS INTEGER : sel = GUI_TREE_SELECTED(tree)
+IF sel >= 0 THEN PRINT GUI_TREE_LABEL(tree, sel)
+```
+
+`GUI_TREE_ADD(tree, parent, label$)` hängt einen Knoten an und liefert seine
+**id** (eine ganze Zahl, stabil bis `GUI_TREE_CLEAR`). `parent` ist `-1` für einen
+Wurzelknoten, sonst die id eines vorhandenen Knotens — so entsteht die Hierarchie.
+Ein Klick auf das Dreieck links klappt einen Knoten auf/zu (oder per
+`GUI_TREE_EXPAND`), ein Klick auf die Zeile wählt ihn aus. `GUI_TREE_SELECTED`
+liefert die id des gewählten Knotens (`-1` = keiner), `GUI_TREE_LABEL` dessen
+Text. `GUI_ON_CHANGE(tree, …)` feuert bei Auswahländerung. Das Mausrad scrollt
+lange Bäume. Beispiel: [examples/137_gui_tree.gb](../examples/137_gui_tree.gb).
 
 ## Aussehen ändern (Theme, Metriken, Per-Widget)
 
