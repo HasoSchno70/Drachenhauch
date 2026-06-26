@@ -2799,6 +2799,15 @@ impl<'p> Vm<'p> {
             "gui_image" => Value::Int(self.gui.image(gi(a,0,"GUI_IMAGE")?, gi(a,1,"GUI_IMAGE")? as i32,
                 gi(a,2,"GUI_IMAGE")? as i32, gi(a,3,"GUI_IMAGE")? as i32, gi(a,4,"GUI_IMAGE")? as i32, gi(a,5,"GUI_IMAGE")?)?),
             "gui_set_image" => { self.gui.set_image(gi(a,0,"GUI_SET_IMAGE")?, gi(a,1,"GUI_SET_IMAGE")?)?; Value::Nil }
+            "gui_icon_button" => {
+                let text = if a.len() >= 7 { gs(a,6,"GUI_ICON_BUTTON")? } else { String::new() };
+                Value::Int(self.gui.icon_button(gi(a,0,"GUI_ICON_BUTTON")?, gi(a,1,"GUI_ICON_BUTTON")? as i32,
+                    gi(a,2,"GUI_ICON_BUTTON")? as i32, gi(a,3,"GUI_ICON_BUTTON")? as i32, gi(a,4,"GUI_ICON_BUTTON")? as i32,
+                    gi(a,5,"GUI_ICON_BUTTON")?, text)?)
+            }
+            "gui_set_icon" => { self.gui.set_icon(gi(a,0,"GUI_SET_ICON")?, gi(a,1,"GUI_SET_ICON")?)?; Value::Nil }
+            "gui_toolbar" => Value::Int(self.gui.toolbar(gi(a,0,"GUI_TOOLBAR")?, gi(a,1,"GUI_TOOLBAR")? as i32,
+                gi(a,2,"GUI_TOOLBAR")? as i32, gi(a,3,"GUI_TOOLBAR")? as i32, gi(a,4,"GUI_TOOLBAR")? as i32)?),
             "gui_canvas" => Value::Int(self.gui.canvas(gi(a,0,"GUI_CANVAS")?, gi(a,1,"GUI_CANVAS")? as i32,
                 gi(a,2,"GUI_CANVAS")? as i32, gi(a,3,"GUI_CANVAS")? as i32, gi(a,4,"GUI_CANVAS")? as i32)?),
             "gui_canvas_x" => Value::Int(self.gui.canvas_rect(gi(a,0,"GUI_CANVAS_X")?)?.0 as i64),

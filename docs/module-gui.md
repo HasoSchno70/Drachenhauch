@@ -35,6 +35,9 @@ IMPORT "gui"
 | `GUI_SET_ANCHOR(wdg, edges$)` | — | Anchoring: an welchen Kanten das Widget klebt (Teilmenge von `"lrtb"`, Default `"lt"` = oben-links). Beim Fenster-Resize fließen die Widgets mit: links+rechts → dehnen, nur rechts → mitwandern, keiner → zentrieren (analog oben/unten). |
 | `GUI_WINDOW_CLOSED(win)` | BOOLEAN | wurde das Fenster geschlossen? |
 | `GUI_BUTTON(win, text$, x, y, w, h)` | GUI_WIDGET | Knopf |
+| `GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$])` | GUI_WIDGET | Knopf mit Icon (Textur-Handle); ohne Text = flacher Toolbar-Button |
+| `GUI_SET_ICON(button, tex)` | — | Icon eines Buttons setzen/ersetzen (-1 entfernt) |
+| `GUI_TOOLBAR(win, x, y, w, h)` | GUI_WIDGET | flacher Werkzeugleisten-Streifen (Deko, für Icon-Button-Reihe) |
 | `GUI_LABEL(win, text$, x, y[, farbe])` | GUI_WIDGET | Text |
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
@@ -335,6 +338,24 @@ Balken, zieht senkrecht). Bei `"v"` ist `x` die Startposition (geklemmt auf
 `x`/`y` getauscht. Das GUI hat **kein** Layout-Parenting — die Trennlinie liefert
 nur ihre Position (`GUI_VALUE`, fenster-relativ); damit legst du selbst die zwei
 Bereiche per `GUI_SET_BOUNDS` fest. `GUI_ON_CHANGE` feuert beim Ziehen.
+
+### Icon-Buttons & Toolbar
+
+```basic
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, 600, 46)        ' Streifen
+DIM icSave AS INTEGER : icSave = GENTEX_COLOR(28, 28, &H4BE87A)    ' Icon = Textur-Handle
+DIM bSave AS GUI_WIDGET : bSave = GUI_ICON_BUTTON(win, 8, 7, 34, 32, icSave)        ' nur Icon
+DIM bRun  AS GUI_WIDGET : bRun  = GUI_ICON_BUTTON(win, 120, 7, 110, 32, icSave, "Start")  ' Icon + Text
+IF GUI_CLICKED(bSave) THEN ...
+GUI_SET_ICON(bRun, icOther)                                        ' Icon wechseln
+```
+
+`GUI_ICON_BUTTON` ist ein **ganz normaler Button** (`GUI_CLICKED`/`GUI_ON_CLICK`)
+mit einem Bild. `tex` ist ein Textur-Handle aus `LOADIMAGE` oder `GENTEX_*`.
+**Ohne** Text wird der Button flach gezeichnet (Fläche nur bei Hover/Klick) und
+das Icon mittig — der klassische Toolbar-Look; **mit** Text steht das Icon links,
+der Text rechts (normale Button-Optik). `GUI_TOOLBAR` ist nur ein dekorativer
+Streifen als Hintergrund — die Icon-Buttons legst du selbst darauf.
 
 ## ListBox, Image, Canvas
 

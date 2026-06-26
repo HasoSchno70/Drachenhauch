@@ -1,0 +1,68 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Icon-Buttons + Toolbar
+' ============================================================
+'  GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$]) ist ein normaler Button mit
+'  Bild. tex ist ein Textur-Handle (LOADIMAGE oder GENTEX_*). OHNE Text wird er
+'  flach gezeichnet (Toolbar-Look, Flaeche nur bei Hover/Klick), MIT Text steht
+'  das Icon links + Text rechts. GUI_TOOLBAR(win, x, y, w, h) ist der flache
+'  Streifen darunter. GUI_SET_ICON(button, tex) tauscht das Icon.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1080, 700, "GameBasic - Icon-Buttons", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+DIM INK AS INTEGER : INK = &H0C1118
+
+' --- Icons prozedural bauen (kleine 28x28-Texturen) -------------------------
+DIM icNew AS INTEGER : icNew = GENTEX_COLOR(28, 28, &H2BC4E8)
+IMAGE_DRAW_RECT(icNew, 8, 5, 12, 18, INK)
+
+DIM icOpen AS INTEGER : icOpen = GENTEX_COLOR(28, 28, &HE8B44B)
+IMAGE_DRAW_RECT(icOpen, 5, 10, 18, 11, INK)
+
+DIM icSave AS INTEGER : icSave = GENTEX_COLOR(28, 28, &H4BE87A)
+IMAGE_DRAW_CIRCLE(icSave, 14, 14, 7, INK)
+
+DIM icDel AS INTEGER : icDel = GENTEX_COLOR(28, 28, &HE85B5B)
+IMAGE_DRAW_LINE(icDel, 8, 8, 20, 20, INK)
+IMAGE_DRAW_LINE(icDel, 20, 8, 8, 20, INK)
+
+' --- Fenster + Toolbar ------------------------------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Editor", (SW - 600) \ 2, (SH - 440) \ 2, 600, 440)
+
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, 600, 46)
+DIM bNew  AS GUI_WIDGET : bNew  = GUI_ICON_BUTTON(win, 8,   7, 34, 32, icNew)
+DIM bOpen AS GUI_WIDGET : bOpen = GUI_ICON_BUTTON(win, 46,  7, 34, 32, icOpen)
+DIM bSave AS GUI_WIDGET : bSave = GUI_ICON_BUTTON(win, 84,  7, 34, 32, icSave)
+DIM bDel  AS GUI_WIDGET : bDel  = GUI_ICON_BUTTON(win, 122, 7, 34, 32, icDel)
+' Icon + Text (normale Button-Optik):
+DIM bRun  AS GUI_WIDGET : bRun  = GUI_ICON_BUTTON(win, 470, 7, 120, 32, icSave, "Start")
+
+DIM out AS GUI_WIDGET : out = GUI_LABEL(win, "Klicke auf ein Werkzeug ...", 20, 80)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+    IF GUI_CLICKED(bNew)  THEN GUI_SET_TEXT(out, "Neu")
+    IF GUI_CLICKED(bOpen) THEN GUI_SET_TEXT(out, "Oeffnen")
+    IF GUI_CLICKED(bSave) THEN GUI_SET_TEXT(out, "Speichern")
+    IF GUI_CLICKED(bDel)  THEN GUI_SET_TEXT(out, "Loeschen")
+    IF GUI_CLICKED(bRun)  THEN GUI_SET_TEXT(out, "Start gedrueckt")
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Icon-Buttons in einer Toolbar (flach) + ein Icon+Text-Button rechts | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND

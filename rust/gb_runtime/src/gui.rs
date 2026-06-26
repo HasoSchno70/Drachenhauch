@@ -121,6 +121,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
     Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner, Splitter,
+    Toolbar,
 }
 
 impl Kind {
@@ -132,6 +133,7 @@ impl Kind {
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
             Kind::TextArea => "textarea", Kind::Spinner => "spinner", Kind::Splitter => "splitter",
+            Kind::Toolbar => "toolbar",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -142,6 +144,7 @@ impl Kind {
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
             "textarea" => Kind::TextArea, "spinner" => Kind::Spinner, "splitter" => Kind::Splitter,
+            "toolbar" => Kind::Toolbar,
             _ => return None,
         })
     }
@@ -633,6 +636,28 @@ impl Gui {
         let w = self.wdg_mut(h, "GUI_SET_IMAGE")?;
         if w.kind != Kind::Image { return Err("GUI_SET_IMAGE: Widget ist kein image".into()); }
         w.sel = tex as i32; Ok(())
+    }
+    /// Button mit Icon (Textur-Handle aus LOADIMAGE/GENTEX im sel-Feld). Mit Text
+    /// = Icon links + Text rechts; ohne Text = flacher, mittiger Icon-Button (fuer
+    /// Toolbars). Ansonsten ein ganz normaler Button (GUI_CLICKED/ON_CLICK).
+    pub fn icon_button(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32,
+                       tex: i64, text: String) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Button, x, y, w, h);
+        wd.sel = tex as i32; wd.text = text;
+        self.add_widget(win, "GUI_ICON_BUTTON", wd)
+    }
+    /// Icon eines Buttons setzen/ersetzen (-1 entfernt es).
+    pub fn set_icon(&mut self, h: i64, tex: i64) -> Result<(), String> {
+        let w = self.wdg_mut(h, "GUI_SET_ICON")?;
+        if w.kind != Kind::Button { return Err("GUI_SET_ICON: Widget ist kein button".into()); }
+        w.sel = tex as i32; Ok(())
+    }
+    /// Werkzeugleiste: flacher Streifen als Hintergrund fuer eine Reihe Icon-
+    /// Buttons (dekorativ, nicht interaktiv -- Buttons liegen darueber).
+    pub fn toolbar(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
+        let mut wd = Self::blank(Kind::Toolbar, x, y, w, h);
+        wd.enabled = false;
+        self.add_widget(win, "GUI_TOOLBAR", wd)
     }
     pub fn canvas(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32) -> Result<i64, String> {
         let wd = Self::blank(Kind::Canvas, x, y, w, h);
@@ -2378,11 +2403,36 @@ impl Gui {
                 }
             }
             Kind::Button => {
-                let mut bg = self.wcol(wdg, "bg", "widget_bg");
-                if self.press_origin == Some((wi, idx)) { bg = shade(bg, -30); }
-                else if wdg.hovered { bg = shade(bg, 30); }
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
-                self.wtext(g, wdg, ax + pad, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
+                let has_icon = wdg.sel >= 0;
+                let icon_only = has_icon && wdg.text.is_empty();
+                let pressed = self.press_origin == Some((wi, idx));
+                if icon_only {
+                    // Flacher Toolbar-Look: Flaeche nur bei Hover/Press.
+                    let bgc = self.wcol(wdg, "bg", "widget_bg");
+                    let hl = if pressed { Some(shade(bgc, -20)) }
+                             else if wdg.hovered { Some(shade(bgc, 24)) } else { None };
+                    if let Some(c) = hl {
+                        let rad = self.m("corner_radius").min(6);
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, true);
+                    }
+                } else {
+                    let mut bg = self.wcol(wdg, "bg", "widget_bg");
+                    if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
+                    self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
+                }
+                // Icon + optionaler Text.
+                let isz = if has_icon {
+                    if icon_only { (h - 8).min(w - 8).max(4) } else { (h - 10).max(4) }
+                } else { 0 };
+                if has_icon {
+                    let iy = ay + (h - isz) / 2;
+                    let ix = if icon_only { ax + (w - isz) / 2 } else { ax + pad };
+                    g.draw_image_rect(wdg.sel as i64, ix, iy, isz, isz);
+                }
+                if !wdg.text.is_empty() {
+                    let tx = if has_icon { ax + pad + isz + 4 } else { ax + pad };
+                    self.wtext(g, wdg, tx, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
+                }
             }
             Kind::Checkbox => {
                 let acc = self.acc_col(wdg);
@@ -2623,6 +2673,11 @@ impl Gui {
                 let my = ay + h / 2;
                 g.line(ax, my, ax + w - 1, my, self.th("widget_border"));
             }
+            Kind::Toolbar => {
+                // Flacher Streifen + dezente Unterkante.
+                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, shade(self.th("win_bg"), 8));
+                g.line(ax, ay + h - 1, ax + w - 1, ay + h - 1, self.th("win_border"));
+            }
             Kind::GroupBox => {
                 // Rahmen + eingelassener Titel oben-links (ueber dem Rahmen).
                 g.rect(ax, ay + 7, ax + w - 1, ay + h - 1, self.th("widget_border"));
@@ -2836,6 +2891,28 @@ mod tests {
         assert_eq!(g.value(sp).unwrap(), 150.0);
         assert!(g.splitter(win, 0, 0, 100, "x".into(), 0, 100).is_err());   // Orientierung
         assert!(g.splitter(win, 0, 0, 100, "v".into(), 100, 100).is_err()); // max<=min
+    }
+
+    // Icon-Button = echter Button mit Textur-Handle in sel; set_icon nur auf
+    // Buttons; Toolbar ist dekorativ (nicht interaktiv).
+    #[test]
+    fn icon_button_and_toolbar() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 200, 200);
+        let b = g.icon_button(win, 10, 10, 40, 40, 7, String::new()).unwrap();
+        let (wi, i) = Gui::dec_widget(b);
+        assert!(matches!(g.windows[wi].widgets[i].kind, Kind::Button));   // echter Button
+        assert_eq!(g.windows[wi].widgets[i].sel, 7);                     // Icon-Handle
+        g.set_icon(b, 3).unwrap();
+        assert_eq!(g.windows[wi].widgets[i].sel, 3);
+        g.set_icon(b, -1).unwrap();                                      // entfernt
+        assert_eq!(g.windows[wi].widgets[i].sel, -1);
+        let sl = g.slider(win, 0, 60, 100, 0.0, 10.0, 5.0).unwrap();
+        assert!(g.set_icon(sl, 1).is_err());                            // nur Buttons
+        let tb = g.toolbar(win, 0, 0, 200, 32).unwrap();
+        let (tw, ti) = Gui::dec_widget(tb);
+        assert!(matches!(g.windows[tw].widgets[ti].kind, Kind::Toolbar));
+        assert!(!g.windows[tw].widgets[ti].enabled);                     // dekorativ
     }
 
     fn rows(n: usize) -> Vec<Vec<String>> {

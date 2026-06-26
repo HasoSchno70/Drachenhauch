@@ -1605,6 +1605,24 @@
    "module": "gui"
   },
   {
+   "name": "GUI_ICON_BUTTON",
+   "kind": "core",
+   "signature": "GUI_ICON_BUTTON(6..7 Argumente)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_SET_ICON",
+   "kind": "core",
+   "signature": "GUI_SET_ICON(button, tex)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TOOLBAR",
+   "kind": "core",
+   "signature": "GUI_TOOLBAR(win, x, y, w, h)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_CHECKBOX",
    "kind": "core",
    "signature": "GUI_CHECKBOX(4..5 Argumente)",
