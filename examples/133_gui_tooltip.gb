@@ -1,0 +1,57 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Tooltips (Hover-Hilfetexte)
+' ============================================================
+'  GUI_TOOLTIP(widget, text$) haengt einem beliebigen Widget einen Hilfetext an.
+'  Er erscheint, sobald die Maus ~0,5 s ruhig ueber dem Widget verweilt, und
+'  folgt dem Cursor (am Bildschirmrand abgeklemmt). CHR$(10) macht mehrere
+'  Zeilen, "" entfernt den Tooltip wieder.
+'  Einfach mit der Maus ueber die Widgets fahren und kurz verweilen.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1100, 720, "GameBasic - Tooltips", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+DIM NL AS STRING : NL = CHR$(10)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Einstellungen", (SW - 560) \ 2, (SH - 380) \ 2, 560, 380)
+
+DIM lbl AS GUI_WIDGET : lbl = GUI_LABEL(win, "Fahre mit der Maus ueber die Felder:", 24, 20)
+
+DIM save AS GUI_WIDGET : save = GUI_BUTTON(win, "Speichern", 24, 60, 200, 40)
+GUI_TOOLTIP(save, "Speichert die aktuellen" + NL + "Einstellungen auf die Platte.")
+
+DIM reset AS GUI_WIDGET : reset = GUI_BUTTON(win, "Zuruecksetzen", 244, 60, 200, 40)
+GUI_TOOLTIP(reset, "Setzt ALLE Werte auf" + NL + "die Standardvorgaben zurueck.")
+
+DIM nameIn AS GUI_WIDGET : nameIn = GUI_TEXTINPUT(win, 24, 130, 420, 34, "Spielername ...")
+GUI_TOOLTIP(nameIn, "Wird in der Bestenliste angezeigt.")
+
+DIM vol AS GUI_WIDGET : vol = GUI_SLIDER(win, 24, 200, 420, 0, 100, 70)
+GUI_TOOLTIP(vol, "Lautstaerke (0-100).")
+
+DIM full AS GUI_WIDGET : full = GUI_CHECKBOX(win, "Vollbild", 24, 250, FALSE)
+GUI_TOOLTIP(full, "Startet das Spiel im Vollbildmodus.")
+
+DIM info AS GUI_WIDGET : info = GUI_LABEL(win, "(Dieses Label hat keinen Tooltip)", 24, 300)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Tooltips: Maus ueber ein Widget halten und kurz verweilen | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND

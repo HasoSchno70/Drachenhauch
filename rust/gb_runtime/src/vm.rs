@@ -2803,6 +2803,7 @@ impl<'p> Vm<'p> {
             "gui_value" => Value::Float(self.gui.value(gi(a,0,"GUI_VALUE")?)?),
             "gui_text" => Value::str_rc(&self.gui.text(gi(a,0,"GUI_TEXT")?)?),
             "gui_set_text" => { self.gui.set_text(gi(a,0,"GUI_SET_TEXT")?, gs(a,1,"GUI_SET_TEXT")?)?; Value::Nil }
+            "gui_tooltip" => { self.gui.set_tooltip(gi(a,0,"GUI_TOOLTIP")?, gs(a,1,"GUI_TOOLTIP")?)?; Value::Nil }
             "gui_set_checked" => { self.gui.set_checked(gi(a,0,"GUI_SET_CHECKED")?, gbool(a,1,"GUI_SET_CHECKED")?)?; Value::Nil }
             "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
             "gui_on_click" => { self.gui.on_click(gi(a,0,"GUI_ON_CLICK")?, gfunc(a,1,"GUI_ON_CLICK")?)?; Value::Nil }

@@ -57,6 +57,7 @@ IMPORT "gui"
 | `GUI_TEXT(widget)` | STRING | Text (Label/Button/TextInput) |
 | `GUI_HOVERED(widget)` | BOOLEAN | Maus über dem Widget? |
 | `GUI_SET_TEXT(widget, text$)` | — | Text setzen |
+| `GUI_TOOLTIP(widget, text$)` | — | Hover-Hilfetext (mehrzeilig via `\n`; "" entfernt ihn) |
 | `GUI_SET_CHECKED(widget, an)` | — | Checkbox setzen |
 | `GUI_SET_VALUE(widget, wert)` | — | Slider-Wert setzen (wird geclamped) |
 | `GUI_ON_CLICK(widget, funcref)` | — | FUNCREF-Callback bei Klick (Button/Checkbox) |
@@ -67,6 +68,8 @@ IMPORT "gui"
 | `GUI_METRIC_SET(key$, wert)` / `GUI_METRIC_GET(key$)` | — / INT | Layout-Größe setzen/lesen |
 | `GUI_SET_COLOR(widget, rolle$, farbe)` | — | eine Farbe pro Widget (bg/fg/border/accent; -1 entfernt) |
 | `GUI_RESET()` | — | Fenster/Widgets löschen + Theme/Metriken zurücksetzen |
+
+**Tooltips:** `GUI_TOOLTIP(widget, text$)` hängt einem beliebigen Widget einen Hilfetext an. Er erscheint automatisch, sobald die Maus ~0,5 s ruhig über dem Widget verweilt (nur im obersten Fenster), und folgt dem Cursor am Bildschirmrand abgeklemmt. `\n` macht mehrere Zeilen; `""` entfernt den Tooltip wieder. Bewegung oder ein Mausklick setzt die Verweilzeit zurück.
 
 ### Menüs
 

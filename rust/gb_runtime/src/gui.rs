@@ -200,6 +200,8 @@ pub struct Widget {
     scroll: i32,
     // Reiter-Zuordnung: -1 = immer sichtbar, sonst Index des Tab-Pages.
     tab_page: i32,
+    // Hover-Hilfetext (Tooltip); leer = keiner. Erscheint nach kurzem Verweilen.
+    tooltip: String,
 }
 
 pub struct Window {
@@ -282,6 +284,12 @@ pub struct Gui {
     // Liste nach GUI_UPDATE und ruft sie auf -- so kann ein Callback nicht
     // mitten im State-Update die GUI re-entrant veraendern.
     pending: Vec<String>,
+    // Tooltip-Dwell: ueber welchem Widget (Fenster, Widget) ruht die Maus und seit
+    // welchem frame_count? Mausbewegung/Klick setzt den Timer zurueck; nach
+    // TOOLTIP_DELAY ruhenden Frames zeigt draw() den Hilfetext.
+    hover_w: Option<(usize, usize)>,
+    hover_frame: i64,
+    hover_x: i32, hover_y: i32,
 }
 
 const WIDGET_SHIFT: i64 = 20;
@@ -294,6 +302,7 @@ const ITEM_FLAG: i64 = 1 << 61;
 const MENUBAR_H: i32 = 26;        // Hoehe der Menueleiste (unter der Titelleiste)
 const MENU_ITEM_H: i32 = 24;      // Hoehe einer Dropdown-Zeile
 const TABBAR_H: i32 = 30;         // Hoehe der Reiter-Leiste
+const TOOLTIP_DELAY: i64 = 30;    // Ruhe-Frames bis ein Tooltip erscheint (~0.5s @60fps)
 
 fn enc_menu(win: usize, m: usize) -> i64 { MENU_FLAG | ((win as i64) << WIDGET_SHIFT) | m as i64 }
 fn dec_menu(h: i64) -> (usize, usize) {
@@ -322,6 +331,7 @@ impl Gui {
             theme: default_theme(), metrics: default_metrics(),
             styles: HashMap::new(),
             pending: Vec::new(),
+            hover_w: None, hover_frame: 0, hover_x: 0, hover_y: 0,
         }
     }
 
@@ -397,6 +407,7 @@ impl Gui {
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
             caret: 0, sel_anchor: 0, scroll: 0,
             tab_page: -1,
+            tooltip: String::new(),
         }
     }
 
@@ -834,6 +845,9 @@ impl Gui {
         // hinter das Ende des nun kuerzeren Textes).
         w.caret = n; w.sel_anchor = n; w.scroll = 0;
         Ok(())
+    }
+    pub fn set_tooltip(&mut self, h: i64, t: String) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_TOOLTIP")?.tooltip = t; Ok(())
     }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
@@ -1411,6 +1425,22 @@ impl Gui {
                 }
             }
         }
+        // Tooltip-Dwell: oberstes Widget mit Hilfetext unter der Maus bestimmen.
+        // Bei Wechsel/Bewegung/gedrueckter Maus startet der Verweil-Timer neu.
+        let tip_cur = self.topmost_at(mx, my).and_then(|top| {
+            let mut found = None;
+            for i in 0..self.windows[top].widgets.len() {
+                let w = &self.windows[top].widgets[i];
+                if w.hovered && !w.tooltip.is_empty() { found = Some((top, i)); }
+            }
+            found
+        });
+        if tip_cur != self.hover_w || mx != self.hover_x || my != self.hover_y || is_down {
+            self.hover_w = tip_cur;
+            self.hover_frame = self.frame_count;
+        }
+        self.hover_x = mx;
+        self.hover_y = my;
         // Laufendes Fenster-Drag.
         if let Some(wi) = self.drag_window {
             if is_down {
@@ -2015,6 +2045,40 @@ impl Gui {
                 self.draw_items_popup(g, wi, mi, cx, cy);
             }
         }
+        // Tooltip ganz zuletzt (ueber allem), wenn die Maus lange genug ruht.
+        self.draw_tooltip(g);
+    }
+
+    /// Zeichnet den Hilfetext des aktuell verweilten Widgets (nahe der Maus),
+    /// sobald TOOLTIP_DELAY ruhende Frames vergangen sind. Mehrzeilig (\n),
+    /// am Bildschirmrand zurueckgeklemmt.
+    fn draw_tooltip(&self, g: &mut Graphics) {
+        let (wi, i) = match self.hover_w { Some(p) => p, None => return };
+        if self.frame_count - self.hover_frame < TOOLTIP_DELAY { return; }
+        let text = match self.windows.get(wi).and_then(|w| w.widgets.get(i)) {
+            Some(w) if !w.tooltip.is_empty() => w.tooltip.clone(),
+            _ => return,
+        };
+        let pad = 6;
+        let lh = (g.text_height() + 3).max(12);
+        let lines: Vec<&str> = text.split('\n').collect();
+        let tw = lines.iter().map(|l| g.text_width(l)).max().unwrap_or(0);
+        let bw = tw + pad * 2;
+        let bh = lines.len() as i32 * lh + pad * 2 - 3;
+        // Position: rechts-unter dem Cursor, an den Bildschirmrand geklemmt.
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        let (sw, sh) = (g.screen_width() as i32, g.screen_height() as i32);
+        let mut bx = mx + 14;
+        let mut by = my + 18;
+        if bx + bw > sw { bx = (mx - bw - 6).max(0); }
+        if by + bh > sh { by = (my - bh - 6).max(0); }
+        let rad = self.m("corner_radius").min(6);
+        g.round_rect(bx + 2, by + 3, bx + bw - 1 + 2, by + bh - 1 + 3, rad.max(2), (0x55i64 << 24) as i64, true);
+        g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("widget_bg"), true);
+        g.round_rect(bx, by, bx + bw - 1, by + bh - 1, rad, self.th("accent"), false);
+        for (r, line) in lines.iter().enumerate() {
+            g.text(bx + pad, by + pad + r as i32 * lh, line.to_string(), self.th("text_fg"));
+        }
     }
 
     /// Layout der Menueleiste: (menu_idx, x_links_abs, x_rechts_abs) je Bar-Menue.
@@ -2536,6 +2600,22 @@ mod tests {
         let _b = g.button(win, "OK".into(), 10, 10, 50, 20).unwrap();
         g.handle_press(400, 400); // weit weg
         assert!(g.take_pending().is_empty());
+    }
+
+    // Tooltip-Setter (ohne Graphics): Default leer, setzen/loeschen, Fehler bei
+    // ungueltigem Handle.
+    #[test]
+    fn tooltip_set_clear_and_invalid() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 0, 0, 200, 200);
+        let b = g.button(win, "OK".into(), 10, 10, 60, 24).unwrap();
+        let (wi, i) = Gui::dec_widget(b);
+        assert_eq!(g.windows[wi].widgets[i].tooltip, "");        // Default leer
+        g.set_tooltip(b, "Hilfe".into()).unwrap();
+        assert_eq!(g.windows[wi].widgets[i].tooltip, "Hilfe");
+        g.set_tooltip(b, String::new()).unwrap();                // "" entfernt
+        assert_eq!(g.windows[wi].widgets[i].tooltip, "");
+        assert!(g.set_tooltip(999_999, "x".into()).is_err());    // ungueltiges Handle
     }
 
     fn rows(n: usize) -> Vec<Vec<String>> {

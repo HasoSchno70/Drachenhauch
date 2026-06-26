@@ -1695,6 +1695,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TOOLTIP",
+   "kind": "core",
+   "signature": "GUI_TOOLTIP(wdg, text)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_SET_VALUE",
    "kind": "core",
    "signature": "GUI_SET_VALUE(wdg, value)",
