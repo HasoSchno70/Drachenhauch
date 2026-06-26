@@ -1719,6 +1719,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_SPLITTER",
+   "kind": "core",
+   "signature": "GUI_SPLITTER(7 Argumente)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE",
    "kind": "core",
    "signature": "GUI_TABLE(5..7 Argumente)",

@@ -39,6 +39,7 @@ IMPORT "gui"
 | `GUI_CHECKBOX(win, label$, x, y[, default])` | GUI_WIDGET | Toggle |
 | `GUI_SLIDER(win, x, y, w, min, max[, default])` | GUI_WIDGET | Wert-Schieber |
 | `GUI_SPINNER(win, x, y, w, min, max[, default[, step]])` | GUI_WIDGET | Zahlenfeld mit +/- (Klick/Mausrad/Pfeiltasten; Wert via `GUI_VALUE`) |
+| `GUI_SPLITTER(win, x, y, length, orient$, min, max)` | GUI_WIDGET | verschiebbare Trennlinie (`"v"`/`"h"`); Position via `GUI_VALUE` |
 | `GUI_PANEL(win, x, y, w, h[, titel$])` | GUI_WIDGET | Container (Deko) |
 | `GUI_TEXTINPUT(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | einzeiliges Eingabefeld (Caret + Selektion) |
 | `GUI_TEXTAREA(win, x, y, w, h[, platzhalter$])` | GUI_WIDGET | **mehrzeiliges** Textfeld (ENTER = neue Zeile, vertikal scrollend, Pfeile hoch/runter, Selektion via Maus-Drag/Shift+Pfeil, Strg+A/C/X/V) |
@@ -315,6 +316,25 @@ Eingabefeld mit zwei Schaltflächen (▲/▼) rechts. Der Wert ändert sich um `
 hoch/runter**, wenn das Feld den Fokus hat (Klick hinein). Immer auf `[min, max]`
 geklemmt. `GUI_VALUE`/`GUI_SET_VALUE` lesen/setzen den Wert, `GUI_ON_CHANGE`
 feuert bei jeder Änderung. Ganze Zahlen werden ohne Nachkommastellen angezeigt.
+
+### Splitter — verschiebbare Trennlinie
+
+```basic
+DIM spl AS GUI_WIDGET
+spl = GUI_SPLITTER(win, 300, 70, 360, "v", 140, 440)   ' senkrechter Balken, x 140..440
+' ... jeden Frame: Position lesen und zwei Bereiche layouten:
+DIM sx AS INTEGER : sx = GUI_VALUE(spl)
+GUI_SET_BOUNDS(linksPanel,  20,   70, sx - 20,        360)
+GUI_SET_BOUNDS(rechtsPanel, sx+6, 70, 580 - (sx+6),   360)
+```
+
+Ein dünner Greif-Balken, den man mit der Maus zieht. `orient$` = `"v"`/`"vertical"`
+(senkrechter Balken, zieht waagerecht) oder `"h"`/`"horizontal"` (waagerechter
+Balken, zieht senkrecht). Bei `"v"` ist `x` die Startposition (geklemmt auf
+`[min, max]`) und der Balken läuft von `y` über `length` Pixel; bei `"h"` sind
+`x`/`y` getauscht. Das GUI hat **kein** Layout-Parenting — die Trennlinie liefert
+nur ihre Position (`GUI_VALUE`, fenster-relativ); damit legst du selbst die zwei
+Bereiche per `GUI_SET_BOUNDS` fest. `GUI_ON_CHANGE` feuert beim Ziehen.
 
 ## ListBox, Image, Canvas
 

@@ -2747,6 +2747,11 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.spinner(gi(a,0,"GUI_SPINNER")?, gi(a,1,"GUI_SPINNER")? as i32,
                     gi(a,2,"GUI_SPINNER")? as i32, gi(a,3,"GUI_SPINNER")? as i32, mn, mx, def, step)?)
             }
+            "gui_splitter" => {
+                Value::Int(self.gui.splitter(gi(a,0,"GUI_SPLITTER")?, gi(a,1,"GUI_SPLITTER")? as i32,
+                    gi(a,2,"GUI_SPLITTER")? as i32, gi(a,3,"GUI_SPLITTER")? as i32, gs(a,4,"GUI_SPLITTER")?,
+                    gi(a,5,"GUI_SPLITTER")? as i32, gi(a,6,"GUI_SPLITTER")? as i32)?)
+            }
             "gui_panel" => {
                 let title = if a.len() >= 6 { gs(a,5,"GUI_PANEL")? } else { String::new() };
                 Value::Int(self.gui.panel(gi(a,0,"GUI_PANEL")?, gi(a,1,"GUI_PANEL")? as i32, gi(a,2,"GUI_PANEL")? as i32,

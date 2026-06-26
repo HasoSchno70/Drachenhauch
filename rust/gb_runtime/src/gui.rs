@@ -120,7 +120,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 #[derive(Clone, Copy, PartialEq)]
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
-    Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner,
+    Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner, Splitter,
 }
 
 impl Kind {
@@ -131,7 +131,7 @@ impl Kind {
             Kind::Table => "table", Kind::Radio => "radio", Kind::Dropdown => "dropdown",
             Kind::Progress => "progress", Kind::ListBox => "listbox", Kind::Image => "image",
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
-            Kind::TextArea => "textarea", Kind::Spinner => "spinner",
+            Kind::TextArea => "textarea", Kind::Spinner => "spinner", Kind::Splitter => "splitter",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -141,7 +141,7 @@ impl Kind {
             "table" => Kind::Table, "radio" => Kind::Radio, "dropdown" => Kind::Dropdown,
             "progress" => Kind::Progress, "listbox" => Kind::ListBox, "image" => Kind::Image,
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
-            "textarea" => Kind::TextArea, "spinner" => Kind::Spinner,
+            "textarea" => Kind::TextArea, "spinner" => Kind::Spinner, "splitter" => Kind::Splitter,
             _ => return None,
         })
     }
@@ -266,6 +266,8 @@ pub struct Gui {
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
     resize_dx: i32, resize_dy: i32,      // Ecke->Maus-Versatz
     active_slider: Option<(usize, usize)>,
+    active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
+    split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
     open_menu: Option<(usize, usize)>,       // offenes Menueleisten-Dropdown (win, menu)
     context_open: Option<(usize, usize, i32, i32)>,  // Kontextmenue (win, menu, x, y)
@@ -326,7 +328,8 @@ impl Gui {
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
-            active_slider: None, open_dropdown: None, active_table: None, table_press: None, press_origin: None,
+            active_slider: None, active_split: None, split_off: 0,
+            open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             open_menu: None, context_open: None, was_right_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
@@ -522,6 +525,30 @@ impl Gui {
         wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
         wd.step = if step != 0.0 { step.abs() } else { 1.0 };
         self.add_widget(win, "GUI_SPINNER", wd)
+    }
+    /// Verschiebbare Trennlinie (Splitter). orient = "v"/"vertical" (senkrechter
+    /// Balken, zieht waagerecht) oder "h"/"horizontal" (waagerechter Balken, zieht
+    /// senkrecht). Bei "v" ist x die Startposition (geklemmt auf [mn,mx]) und der
+    /// Balken laeuft von y ueber `length` Pixel; bei "h" entsprechend y/x getauscht.
+    /// Position via GUI_VALUE lesen (fenster-relativ) und damit zwei Bereiche per
+    /// GUI_SET_BOUNDS layouten. group = Orientierung ("v"/"h").
+    pub fn splitter(&mut self, win: i64, x: i32, y: i32, length: i32, orient: String,
+                    mn: i32, mx: i32) -> Result<i64, String> {
+        let o = orient.to_lowercase();
+        let vert = matches!(o.as_str(), "v" | "vertical" | "vertikal");
+        let horiz = matches!(o.as_str(), "h" | "horizontal");
+        if !vert && !horiz {
+            return Err("GUI_SPLITTER: orientation muss \"v\"/\"vertical\" oder \"h\"/\"horizontal\" sein".into());
+        }
+        if mx <= mn { return Err("GUI_SPLITTER: max muss > min sein".into()); }
+        const THICK: i32 = 6;
+        let len = length.max(8);
+        let (rx, ry, rw, rh) = if vert { (x.clamp(mn, mx), y, THICK, len) }
+                               else { (x, y.clamp(mn, mx), len, THICK) };
+        let mut wd = Self::blank(Kind::Splitter, rx, ry, rw, rh);
+        wd.group = if vert { "v".into() } else { "h".into() };
+        wd.min = mn as f64; wd.max = mx as f64;
+        self.add_widget(win, "GUI_SPLITTER", wd)
     }
     pub fn panel(&mut self, win: i64, x: i32, y: i32, w: i32, h: i32, title: String) -> Result<i64, String> {
         let mut wd = Self::blank(Kind::Panel, x, y, w, h); wd.text = title;
@@ -847,8 +874,11 @@ impl Gui {
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::Progress | Kind::Spinner) { return Err("GUI_VALUE: Widget ist kein slider/progress/spinner".into()); }
-        Ok(w.value)
+        match w.kind {
+            Kind::Slider | Kind::Progress | Kind::Spinner => Ok(w.value),
+            Kind::Splitter => Ok(if w.group == "v" { w.x as f64 } else { w.y as f64 }),
+            _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),
+        }
     }
     pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
     pub fn set_text(&mut self, h: i64, t: String) -> Result<(), String> {
@@ -876,16 +906,23 @@ impl Gui {
     }
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::Progress | Kind::Spinner) { return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner".into()); }
-        w.value = v.clamp(w.min, w.max); Ok(())
+        match w.kind {
+            Kind::Slider | Kind::Progress | Kind::Spinner => { w.value = v.clamp(w.min, w.max); }
+            Kind::Splitter => {
+                let c = (v.round() as i32).clamp(w.min as i32, w.max as i32);
+                if w.group == "v" { w.x = c; } else { w.y = c; }
+            }
+            _ => return Err("GUI_SET_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),
+        }
+        Ok(())
     }
     pub fn on_click(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_CLICK")?.on_click = func; Ok(())
     }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
-        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner) {
-            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox oder spinner".into());
+        if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter) {
+            return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner oder splitter".into());
         }
         w.on_change = func; Ok(())
     }
@@ -964,6 +1001,7 @@ impl Gui {
         // Haengende Interaktions-Referenzen auf dieses Widget loesen.
         if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
         if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+        if self.active_split == Some((wi, i)) { self.active_split = None; }
         if self.press_origin == Some((wi, i)) { self.press_origin = None; }
         if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
         Ok(())
@@ -1482,6 +1520,10 @@ impl Gui {
         if let Some((wi, i)) = self.active_slider {
             if is_down { self.drag_slider(wi, i, mx); } else { self.active_slider = None; }
         }
+        // Laufendes Splitter-Drag.
+        if let Some((wi, i)) = self.active_split {
+            if is_down { self.drag_split(wi, i, mx, my); } else { self.active_split = None; }
+        }
         // Laufendes Tabellen-Scrollbar-Drag.
         if let Some((wi, i)) = self.active_table {
             if is_down {
@@ -1493,7 +1535,7 @@ impl Gui {
         }
         // Neuer Druck (entfaellt, wenn ein Menue den Klick verarbeitet hat).
         if just_pressed && !menu_consumed && !scroll_consumed && !tab_consumed && self.drag_window.is_none() && self.resize_window.is_none()
-            && self.active_slider.is_none() && self.active_table.is_none() {
+            && self.active_slider.is_none() && self.active_table.is_none() && self.active_split.is_none() {
             self.handle_press(mx, my);
         }
         // Loslassen -> Button-Klick bestaetigen.
@@ -1968,6 +2010,24 @@ impl Gui {
         else { format!("{:.2}", v) }
     }
 
+    /// Splitter ziehen: neue fenster-relative Position (geklemmt auf [min,max]),
+    /// feuert on_change bei Aenderung.
+    fn drag_split(&mut self, wi: usize, i: usize, mx: i32, my: i32) {
+        let off = self.split_off;
+        let (winx, winy) = (self.windows[wi].x, self.windows[wi].y);
+        let vert = self.windows[wi].widgets[i].group == "v";
+        let w = &mut self.windows[wi].widgets[i];
+        let (lo, hi) = (w.min as i32, w.max as i32);
+        let nv = if vert { (mx - winx - off).clamp(lo, hi) }
+                 else { (my - winy - off).clamp(lo, hi) };
+        let cur = if vert { w.x } else { w.y };
+        if nv != cur {
+            if vert { w.x = nv; } else { w.y = nv; }
+            let f = w.on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
     fn dropdown_popup_rect(&self, wi: usize, idx: usize) -> (i32, i32, i32, i32) {
         let (ax, ay, w, h) = self.abs_rect(wi, &self.windows[wi].widgets[idx]);
         let n = self.windows[wi].widgets[idx].items.len() as i32;
@@ -2058,6 +2118,12 @@ impl Gui {
                 if let Some(f) = och { self.pending.push(f); }
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
+            Kind::Splitter => {
+                self.active_split = Some((win, i));
+                let vert = self.windows[win].widgets[i].group == "v";
+                let (ax, ay, _w, _h) = self.abs_rect(win, &self.windows[win].widgets[i]);
+                self.split_off = if vert { mx - ax } else { my - ay };
+            }
             Kind::Spinner => {
                 self.focus_widget = Some((win, i));
                 let (ax, ay, ww, hh) = self.abs_rect(win, &self.windows[win].widgets[i]);
@@ -2477,6 +2543,20 @@ impl Gui {
                 g.line(dcx - 4, dcy - 2, dcx, dcy + 2, fg);   // v
                 g.line(dcx, dcy + 2, dcx + 4, dcy - 2, fg);
             }
+            Kind::Splitter => {
+                let vert = wdg.group == "v";
+                let active = self.active_split == Some((wi, idx));
+                let col = if active || wdg.hovered { self.acc_col(wdg) }
+                          else { self.wcol(wdg, "border", "widget_border") };
+                g.box_fill(ax, ay, ax + w - 1, ay + h - 1, col);
+                // Drei Griff-Punkte mittig laengs des Balkens.
+                let dot = self.th("win_bg");
+                let (cx, cy) = (ax + w / 2, ay + h / 2);
+                for k in -1..=1 {
+                    if vert { g.box_fill(cx - 1, cy + k * 5 - 1, cx + 1, cy + k * 5 + 1, dot); }
+                    else { g.box_fill(cx + k * 5 - 1, cy - 1, cx + k * 5 + 1, cy + 1, dot); }
+                }
+            }
             Kind::Radio => {
                 let acc = self.acc_col(wdg);
                 let (cx, cy, r) = (ax + w / 2, ay + h / 2, (w / 2).max(2));
@@ -2731,6 +2811,31 @@ mod tests {
         g.spinner_step(wi, i, -100);              // klemmt auf min 0
         assert_eq!(g.value(sp).unwrap(), 0.0);
         assert!(g.spinner(win, 0, 0, 100, 5.0, 5.0, 5.0, 1.0).is_err()); // max<=min
+    }
+
+    // Splitter-Drag (ohne Graphics): Position folgt der Maus (fenster-relativ,
+    // via split_off), klemmt auf [min,max], feuert on_change; Validierung.
+    #[test]
+    fn splitter_drag_clamps_and_fires() {
+        let mut g = Gui::new();
+        let win = g.new_window("T".into(), 100, 50, 400, 300);   // Fenster bei (100,50)
+        let sp = g.splitter(win, 200, 20, 200, "v".into(), 80, 360).unwrap();
+        let (wi, i) = Gui::dec_widget(sp);
+        g.on_change(sp, Some("moved".into())).unwrap();
+        assert_eq!(g.value(sp).unwrap(), 200.0);                 // Start-x
+        g.split_off = 0;
+        g.drag_split(wi, i, 350, 0);                             // x = 350-100-0 = 250
+        assert_eq!(g.value(sp).unwrap(), 250.0);
+        assert_eq!(g.take_pending(), vec!["moved".to_string()]);
+        g.drag_split(wi, i, 9999, 0);                            // klemmt auf max 360
+        assert_eq!(g.value(sp).unwrap(), 360.0);
+        g.take_pending();
+        g.drag_split(wi, i, 0, 0);                               // klemmt auf min 80
+        assert_eq!(g.value(sp).unwrap(), 80.0);
+        g.set_value(sp, 150.0).unwrap();                         // programmatisch
+        assert_eq!(g.value(sp).unwrap(), 150.0);
+        assert!(g.splitter(win, 0, 0, 100, "x".into(), 0, 100).is_err());   // Orientierung
+        assert!(g.splitter(win, 0, 0, 100, "v".into(), 100, 100).is_err()); // max<=min
     }
 
     fn rows(n: usize) -> Vec<Vec<String>> {

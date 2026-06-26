@@ -1,0 +1,53 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: Splitter (verschiebbare Trennlinie)
+' ============================================================
+'  GUI_SPLITTER(win, x, y, length, orient$, min, max) ist ein duenner Greif-
+'  Balken, den man mit der Maus zieht. orient$ = "v" (senkrecht, zieht
+'  waagerecht) oder "h" (waagerecht, zieht senkrecht). Das GUI hat KEIN
+'  Layout-Parenting: die Trennlinie liefert nur ihre Position (GUI_VALUE),
+'  damit legt man selbst zwei Bereiche per GUI_SET_BOUNDS fest.
+'  Einfach den Balken in der Mitte nach links/rechts ziehen.   [ESC] Ende
+' ============================================================
+IMPORT "gui"
+SCREEN(1080, 720, "GameBasic - Splitter", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("modern_dark")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+' Fenster 600 breit -> Innenbereich 20 .. 580
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Explorer", (SW - 600) \ 2, (SH - 470) \ 2, 600, 470)
+
+DIM left AS GUI_WIDGET  : left  = GUI_PANEL(win, 20, 70, 270, 360, "Navigation")
+DIM right AS GUI_WIDGET : right = GUI_PANEL(win, 306, 70, 274, 360, "Inhalt")
+
+' Senkrechter Splitter, Startposition x=300, darf zwischen 140 und 440 wandern.
+DIM spl AS GUI_WIDGET : spl = GUI_SPLITTER(win, 300, 70, 360, "v", 140, 440)
+
+DIM out AS GUI_WIDGET : out = GUI_LABEL(win, "", 20, 440)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    ' Position der Trennlinie lesen und die beiden Panels danach layouten.
+    DIM sx AS INTEGER : sx = GUI_VALUE(spl)
+    GUI_SET_BOUNDS(left,  20,     70, sx - 20,        360)
+    GUI_SET_BOUNDS(right, sx + 6, 70, 580 - (sx + 6), 360)
+    GUI_SET_TEXT(out, "Trennlinie bei x = " + STR$(sx) + "  (links " + STR$(sx - 20) + " px, rechts " + STR$(580 - (sx + 6)) + " px)")
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0C1118, &H1A2330)
+    TEXT(20, 12, "Splitter: den Balken zwischen den Panels nach links/rechts ziehen | [ESC] Ende", &HC0D0E0)
+    GUI_DRAW()
+    FLIP()
+WEND
