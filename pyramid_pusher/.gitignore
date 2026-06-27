@@ -1,0 +1,5 @@
+# Laufzeit-Artefakte (werden beim Spielen erzeugt)
+pyramid_pusher.save
+pyramid_pusher.db
+# Schutz-Backup der Spieldatei
+pyramid_pusher.gb.bak

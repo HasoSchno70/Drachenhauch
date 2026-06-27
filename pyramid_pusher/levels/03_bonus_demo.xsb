@@ -1,0 +1,28 @@
+; ============================================
+; Pyramid Pusher -- Bonus-Mechaniken (Demo)
+; Eigene Erweiterung des XSB-Formats:
+;   H = Sand-Loch (Spieler faellt nicht rein; Kiste hinein -> Loch gefuellt)
+;   I = Eisplatte (Spieler rutscht bis zur naechsten Wand/Kiste)
+;   B = Schalter   D = Tuer  (alle Schalter belegt -> alle Tueren offen)
+; Alle Level solver-/loesungsgeprueft (_test_bonus.gb).
+; ============================================
+
+; 1. Sand-Loch
+#######
+#@$H$.#
+#######
+
+; 2. Glatteis
+#########
+#@III $.#
+#########
+
+; 3. Schalter und Tuer
+#######
+#@$BD.#
+#######
+
+; 4. Doppelloch
+#########
+#@$H$H$.#
+#########

@@ -1,0 +1,363 @@
+' Headless-Test des Hinweis-Solvers: wiederholt Hinweis holen + ausfuehren
+' muss jedes (loesbare) Standard-Level loesen. Spiegelt die Solver-Logik.
+CONST GWMAX = 16
+CONST GHMAX = 16
+CONST SBMAX = 24
+CONST HINT_CAP = 60000
+CONST T_VOID = 0
+CONST T_FLOOR = 1
+CONST T_WALL = 2
+
+DIM smap[GWMAX * GHMAX] AS INTEGER
+DIM goalc[GWMAX * GHMAX] AS INTEGER
+DIM boxx[SBMAX] AS INTEGER
+DIM boxy[SBMAX] AS INTEGER
+DIM nbox AS INTEGER
+DIM ngoal AS INTEGER
+DIM gw AS INTEGER
+DIM gh AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM fstx[GWMAX * GHMAX] AS INTEGER
+DIM fsty[GWMAX * GHMAX] AS INTEGER
+DIM vis AS MAP OF INTEGER
+DIM qstate[HINT_CAP] AS STRING
+DIM qfb[HINT_CAP] AS INTEGER
+DIM qfd[HINT_CAP] AS INTEGER
+DIM sbx[SBMAX] AS INTEGER
+DIM snb AS INTEGER
+DIM g_normp AS INTEGER
+DIM nbx[SBMAX] AS INTEGER
+DIM rmark[GWMAX * GHMAX] AS INTEGER
+DIM rstk[GWMAX * GHMAX] AS INTEGER
+DIM reach_gen AS INTEGER
+DIM hdx[4] AS INTEGER
+DIM hdy[4] AS INTEGER
+DIM h_found AS BOOLEAN
+DIM h_boxcell AS INTEGER
+DIM h_dir AS INTEGER
+
+hdx[0] = 1 : hdy[0] = 0
+hdx[1] = -1 : hdy[1] = 0
+hdx[2] = 0 : hdy[2] = 1
+hdx[3] = 0 : hdy[3] = -1
+
+FUNCTION cidx(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN y * GWMAX + x
+END FUNCTION
+FUNCTION inb(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN x >= 0 AND y >= 0 AND x < gw AND y < gh
+END FUNCTION
+FUNCTION cellx(c AS INTEGER) AS INTEGER
+    RETURN c MOD GWMAX
+END FUNCTION
+FUNCTION celly(c AS INTEGER) AS INTEGER
+    RETURN c \ GWMAX
+END FUNCTION
+FUNCTION pad4(n AS INTEGER) AS STRING
+    DIM s AS STRING
+    s = STR$(n)
+    WHILE LEN(s) < 4
+        s = "0" + s
+    WEND
+    RETURN s
+END FUNCTION
+FUNCTION freefloor(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN inb(x, y) AND smap[cidx(x, y)] = T_FLOOR
+END FUNCTION
+FUNCTION boxat_s(c AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO snb - 1
+        IF sbx[i] = c THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+FUNCTION deadcell(c AS INTEGER) AS BOOLEAN
+    IF goalc[c] = 1 THEN RETURN FALSE
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    x = cellx(c) : y = celly(c)
+    DIM up AS BOOLEAN
+    DIM dn AS BOOLEAN
+    DIM lf AS BOOLEAN
+    DIM rt AS BOOLEAN
+    up = NOT freefloor(x, y - 1)
+    dn = NOT freefloor(x, y + 1)
+    lf = NOT freefloor(x - 1, y)
+    rt = NOT freefloor(x + 1, y)
+    RETURN (up AND lf) OR (up AND rt) OR (dn AND lf) OR (dn AND rt)
+END FUNCTION
+SUB reach_from(start AS INTEGER)
+    reach_gen = reach_gen + 1
+    DIM top AS INTEGER
+    top = 0
+    rstk[0] = start : top = 1
+    rmark[start] = reach_gen
+    WHILE top > 0
+        top = top - 1
+        DIM c AS INTEGER
+        c = rstk[top]
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        cx = cellx(c) : cy = celly(c)
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM nx AS INTEGER
+            DIM ny AS INTEGER
+            nx = cx + hdx[k] : ny = cy + hdy[k]
+            IF freefloor(nx, ny) THEN
+                DIM nc AS INTEGER
+                nc = cidx(nx, ny)
+                IF rmark[nc] <> reach_gen AND boxat_s(nc) < 0 THEN
+                    rmark[nc] = reach_gen
+                    rstk[top] = nc : top = top + 1
+                END IF
+            END IF
+        NEXT
+    WEND
+END SUB
+FUNCTION is_reach(c AS INTEGER) AS BOOLEAN
+    RETURN rmark[c] = reach_gen
+END FUNCTION
+FUNCTION encode_sbx(pc AS INTEGER) AS STRING
+    DIM s AS STRING
+    s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO snb - 1
+        s = s + pad4(sbx[i])
+    NEXT
+    RETURN s + "." + pad4(pc)
+END FUNCTION
+FUNCTION encode_nbx(pc AS INTEGER) AS STRING
+    DIM i AS INTEGER
+    FOR i = 1 TO snb - 1
+        DIM v AS INTEGER
+        v = nbx[i]
+        DIM j AS INTEGER
+        j = i - 1
+        WHILE j >= 0 AND nbx[j] > v
+            nbx[j + 1] = nbx[j] : j = j - 1
+        WEND
+        nbx[j + 1] = v
+    NEXT
+    DIM s AS STRING
+    s = ""
+    FOR i = 0 TO snb - 1
+        s = s + pad4(nbx[i])
+    NEXT
+    RETURN s + "." + pad4(pc)
+END FUNCTION
+SUB decode_state(s AS STRING)
+    snb = 0
+    DIM i AS INTEGER
+    i = 0
+    WHILE MID$(s, i, 1) <> "."
+        sbx[snb] = VAL(MID$(s, i, 4))
+        snb = snb + 1
+        i = i + 4
+    WEND
+    g_normp = VAL(MID$(s, i + 1, 4))
+END SUB
+FUNCTION allgoal_nbx() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO snb - 1
+        IF goalc[nbx[i]] = 0 THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+SUB sort_sbx()
+    DIM i AS INTEGER
+    FOR i = 1 TO snb - 1
+        DIM v AS INTEGER
+        v = sbx[i]
+        DIM j AS INTEGER
+        j = i - 1
+        WHILE j >= 0 AND sbx[j] > v
+            sbx[j + 1] = sbx[j] : j = j - 1
+        WEND
+        sbx[j + 1] = v
+    NEXT
+END SUB
+SUB find_hint()
+    h_found = FALSE
+    snb = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        sbx[snb] = cidx(boxx[i], boxy[i]) : snb = snb + 1
+    NEXT
+    sort_sbx()
+    MAPCLEAR(vis)
+    DIM startkey AS STRING
+    startkey = encode_sbx(cidx(px, py))
+    MAPPUT(vis, startkey, 1)
+    DIM qh AS INTEGER
+    DIM qt AS INTEGER
+    qstate[0] = startkey : qfb[0] = -1 : qfd[0] = -1 : qh = 0 : qt = 1
+    DIM cnt AS INTEGER
+    cnt = 0
+    WHILE qh < qt AND cnt < HINT_CAP
+        DIM st AS STRING
+        st = qstate[qh]
+        DIM fb AS INTEGER
+        DIM fd AS INTEGER
+        fb = qfb[qh] : fd = qfd[qh]
+        qh = qh + 1
+        cnt = cnt + 1
+        decode_state(st)
+        reach_from(g_normp)
+        DIM bi AS INTEGER
+        FOR bi = 0 TO snb - 1
+            DIM bc AS INTEGER
+            bc = sbx[bi]
+            DIM bx AS INTEGER
+            DIM by AS INTEGER
+            bx = cellx(bc) : by = celly(bc)
+            DIM dir AS INTEGER
+            FOR dir = 0 TO 3
+                DIM tx AS INTEGER
+                DIM ty AS INTEGER
+                DIM psx AS INTEGER
+                DIM psy AS INTEGER
+                tx = bx + hdx[dir] : ty = by + hdy[dir]
+                psx = bx - hdx[dir] : psy = by - hdy[dir]
+                IF freefloor(tx, ty) AND boxat_s(cidx(tx, ty)) < 0 AND inb(psx, psy) THEN
+                    IF is_reach(cidx(psx, psy)) THEN
+                        DIM tc AS INTEGER
+                        tc = cidx(tx, ty)
+                        IF NOT deadcell(tc) THEN
+                            DIM j AS INTEGER
+                            FOR j = 0 TO snb - 1
+                                nbx[j] = sbx[j]
+                            NEXT
+                            nbx[bi] = tc
+                            DIM ffb AS INTEGER
+                            DIM ffd AS INTEGER
+                            ffb = fb : ffd = fd
+                            IF fb < 0 THEN ffb = bc : ffd = dir
+                            IF allgoal_nbx() THEN
+                                h_boxcell = ffb : h_dir = ffd : h_found = TRUE
+                                RETURN
+                            END IF
+                            DIM nk AS STRING
+                            nk = encode_nbx(bc)
+                            IF NOT MAPHAS(vis, nk) THEN
+                                MAPPUT(vis, nk, 1)
+                                IF qt < HINT_CAP THEN
+                                    qstate[qt] = nk : qfb[qt] = ffb : qfd[qt] = ffd : qt = qt + 1
+                                END IF
+                            END IF
+                        END IF
+                    END IF
+                END IF
+            NEXT
+        NEXT
+    WEND
+END SUB
+
+SUB load_into(rows AS ARRAY OF STRING)
+    gh = LEN(rows)
+    gw = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GWMAX * GHMAX - 1
+        smap[i] = T_VOID : goalc[i] = 0
+    NEXT
+    nbox = 0 : ngoal = 0 : px = 0 : py = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO gh - 1
+        DIM row AS STRING
+        row = rows[y]
+        IF LEN(row) > gw THEN gw = LEN(row)
+        FOR x = 0 TO LEN(row) - 1
+            DIM c AS STRING
+            c = MID$(row, x, 1)
+            IF c = "#" THEN smap[cidx(x, y)] = T_WALL
+            IF c = "." OR c = "+" OR c = "*" THEN goalc[cidx(x, y)] = 1 : ngoal = ngoal + 1
+            IF c = "$" OR c = "*" THEN boxx[nbox] = x : boxy[nbox] = y : nbox = nbox + 1
+            IF c = "@" OR c = "+" THEN px = x : py = y
+        NEXT
+    NEXT
+    DIM top AS INTEGER
+    top = 0
+    fstx[0] = px : fsty[0] = py : top = 1
+    smap[cidx(px, py)] = T_FLOOR
+    WHILE top > 0
+        top = top - 1
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        cx = fstx[top] : cy = fsty[top]
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM nx AS INTEGER
+            DIM ny AS INTEGER
+            nx = cx + hdx[k] : ny = cy + hdy[k]
+            IF inb(nx, ny) THEN
+                DIM ix AS INTEGER
+                ix = cidx(nx, ny)
+                IF smap[ix] = T_VOID THEN
+                    smap[ix] = T_FLOOR
+                    fstx[top] = nx : fsty[top] = ny : top = top + 1
+                END IF
+            END IF
+        NEXT
+    WEND
+END SUB
+
+FUNCTION boxidx(c AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF cidx(boxx[i], boxy[i]) = c THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+FUNCTION is_solved() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF goalc[cidx(boxx[i], boxy[i])] = 0 THEN RETURN FALSE
+    NEXT
+    RETURN ngoal > 0
+END FUNCTION
+
+DIM fails AS INTEGER
+fails = 0
+SUB solve_check(label AS STRING, rows AS ARRAY OF STRING)
+    load_into(rows)
+    DIM steps AS INTEGER
+    steps = 0
+    WHILE NOT is_solved() AND steps < 200
+        find_hint()
+        IF NOT h_found THEN
+            PRINT "  FAIL " + label + " (kein Hinweis bei Schritt " + STR$(steps) + ")"
+            fails = fails + 1
+            RETURN
+        END IF
+        ' Hinweis ausfuehren: Kiste schieben, Spieler aufs alte Kistenfeld
+        DIM bi AS INTEGER
+        bi = boxidx(h_boxcell)
+        DIM ox AS INTEGER
+        DIM oy AS INTEGER
+        ox = boxx[bi] : oy = boxy[bi]
+        boxx[bi] = ox + hdx[h_dir] : boxy[bi] = oy + hdy[h_dir]
+        px = ox : py = oy
+        steps = steps + 1
+    WEND
+    IF is_solved() THEN
+        PRINT "  OK   " + label + " (in " + STR$(steps) + " Schueben)"
+    ELSE
+        PRINT "  FAIL " + label + " (nicht geloest)"
+        fails = fails + 1
+    END IF
+END SUB
+
+solve_check("L1 erste Kammer", SPLIT$("#######|#     #|# @$. #|#     #|#######", "|"))
+solve_check("L2 nach oben", SPLIT$("#####|#.  #|#$  #|#@  #|#####", "|"))
+solve_check("L3 Korridor", SPLIT$("#########|#. $ @  #|#########", "|"))
+solve_check("L4 Vier Ziele (4 Kisten)", SPLIT$("#######|#.   .#|# $ $ #|#  @  #|# $ $ #|#.   .#|#######", "|"))
+solve_check("L5 Um die Wand", SPLIT$("#######|#  @  #|# # # #|#.$ $.#|#######", "|"))
+
+PRINT ""
+IF fails = 0 THEN
+    PRINT "ALLE HINWEIS-TESTS GRUEN"
+ELSE
+    PRINT STR$(fails) + " TEST(S) FEHLGESCHLAGEN"
+END IF

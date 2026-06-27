@@ -1,0 +1,136 @@
+' Headless-Test: prueft Parser + Code-Generierung gegen die echte Level-Datei
+' (laeuft ohne Grafik via gbrt --runsrc / run).
+CONST MAXLEV = 400
+CONST GWMAX = 48
+
+DIM t_title[MAXLEV] AS STRING
+DIM t_code[MAXLEV] AS STRING
+DIM t_board[MAXLEV] AS STRING
+DIM t_w[MAXLEV] AS INTEGER
+DIM t_h[MAXLEV] AS INTEGER
+DIM ncat AS INTEGER
+
+DIM p_rows AS STRING
+DIM p_w AS INTEGER
+DIM p_h AS INTEGER
+DIM p_title AS STRING
+
+FUNCTION gencode(idx AS INTEGER) AS STRING
+    DIM cons AS STRING
+    DIM vow AS STRING
+    cons = "BDFGKLMNPRSTVZ"
+    vow = "AEIOU"
+    DIM n AS INTEGER
+    n = idx
+    DIM d0 AS INTEGER
+    DIM d1 AS INTEGER
+    DIM d2 AS INTEGER
+    DIM d3 AS INTEGER
+    d0 = n MOD 14 : n = n \ 14
+    d1 = n MOD 5  : n = n \ 5
+    d2 = n MOD 14 : n = n \ 14
+    d3 = n MOD 5
+    RETURN MID$(cons, d0, 1) + MID$(vow, d1, 1) + MID$(cons, d2, 1) + MID$(vow, d3, 1)
+END FUNCTION
+
+FUNCTION has_board_char(s AS STRING) AS BOOLEAN
+    IF INSTR(s, "#") >= 0 THEN RETURN TRUE
+    IF INSTR(s, "$") >= 0 THEN RETURN TRUE
+    IF INSTR(s, ".") >= 0 THEN RETURN TRUE
+    IF INSTR(s, "@") >= 0 THEN RETURN TRUE
+    IF INSTR(s, "*") >= 0 THEN RETURN TRUE
+    IF INSTR(s, "+") >= 0 THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+SUB flush_level()
+    IF p_h > 0 AND INSTR(p_rows, "#") >= 0 AND ncat < MAXLEV THEN
+        t_board[ncat] = p_rows
+        t_w[ncat] = p_w
+        t_h[ncat] = p_h
+        IF LEN(p_title) > 0 THEN
+            t_title[ncat] = p_title
+        ELSE
+            t_title[ncat] = "Kammer " + STR$(ncat + 1)
+        END IF
+        t_code[ncat] = gencode(ncat)
+        ncat = ncat + 1
+    END IF
+    p_rows = "" : p_w = 0 : p_h = 0 : p_title = ""
+END SUB
+
+SUB parse_one(path AS STRING)
+    DIM lines AS ARRAY OF STRING
+    lines = READLINES(path)
+    p_rows = "" : p_w = 0 : p_h = 0 : p_title = ""
+    DIM li AS INTEGER
+    FOR li = 0 TO LEN(lines) - 1
+        DIM raw AS STRING
+        raw = lines[li]
+        IF LEN(raw) > 0 AND RIGHT$(raw, 1) = CHR$(13) THEN raw = LEFT$(raw, LEN(raw) - 1)
+        DIM trimmed AS STRING
+        trimmed = TRIM$(raw)
+        DIM isComment AS BOOLEAN
+        isComment = LEN(trimmed) > 0 AND LEFT$(trimmed, 1) = ";"
+        IF (NOT isComment) AND has_board_char(raw) THEN
+            p_rows = p_rows + raw + "|"
+            IF LEN(raw) > p_w THEN p_w = LEN(raw)
+            p_h = p_h + 1
+        ELSEIF LEN(trimmed) = 0 THEN
+            flush_level()
+        ELSE
+            flush_level()
+            DIM tt AS STRING
+            tt = trimmed
+            IF isComment THEN tt = TRIM$(MID$(tt, 1))
+            IF LEN(tt) > 0 THEN p_title = tt
+        END IF
+    NEXT
+    flush_level()
+END SUB
+
+ncat = 0
+p_rows = "" : p_w = 0 : p_h = 0 : p_title = ""
+
+DIM files AS ARRAY OF STRING
+files = DIRLIST("levels")
+DIM fi AS INTEGER
+FOR fi = 0 TO LEN(files) - 1
+    DIM low AS STRING
+    low = LOWER$(files[fi])
+    IF RIGHT$(low, 4) = ".xsb" OR RIGHT$(low, 4) = ".sok" THEN
+        parse_one(PATHJOIN("levels", files[fi]))
+    END IF
+NEXT
+
+PRINT "Gefundene Level: " + STR$(ncat)
+DIM i AS INTEGER
+DIM maxw AS INTEGER
+DIM maxh AS INTEGER
+maxw = 0 : maxh = 0
+FOR i = 0 TO ncat - 1
+    IF t_w[i] > maxw THEN maxw = t_w[i]
+    IF t_h[i] > maxh THEN maxh = t_h[i]
+NEXT
+PRINT "Max Breite: " + STR$(maxw) + "  Max Hoehe: " + STR$(maxh)
+PRINT "Erste 3:  " + t_code[0] + " " + t_title[0] + "  |  " + t_code[1] + " " + t_title[1]
+PRINT "Letzte 2: " + t_code[ncat - 2] + " " + t_title[ncat - 2] + "  |  " + t_code[ncat - 1] + " " + t_title[ncat - 1]
+
+' Code-Eindeutigkeit pruefen
+DIM dup AS INTEGER
+dup = 0
+DIM j AS INTEGER
+FOR i = 0 TO ncat - 1
+    FOR j = i + 1 TO ncat - 1
+        IF t_code[i] = t_code[j] THEN dup = dup + 1
+    NEXT
+NEXT
+PRINT "Doppelte Codes: " + STR$(dup)
+
+' Level 1 ausgeben (Zeilen wieder aufsplitten)
+PRINT "Level 1 Rohbrett:"
+DIM rows AS ARRAY OF STRING
+rows = SPLIT$(t_board[0], "|")
+FOR i = 0 TO t_h[0] - 1
+    PRINT "  [" + rows[i] + "]"
+NEXT

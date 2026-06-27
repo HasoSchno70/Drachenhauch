@@ -1,0 +1,217 @@
+' Headless-Test der Spiel-Mechanik: Flood-Fill (Innenraum), Schieben, Undo,
+' Loesungserkennung. Keine Grafik -> laeuft via gbrun.py.
+CONST GWMAX = 16
+CONST GHMAX = 16
+CONST MAXBOX = 16
+CONST T_VOID = 0
+CONST T_FLOOR = 1
+CONST T_WALL = 2
+
+DIM smap[GWMAX * GHMAX] AS INTEGER
+DIM goalc[GWMAX * GHMAX] AS INTEGER
+DIM gw AS INTEGER
+DIM gh AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM boxx[MAXBOX] AS INTEGER
+DIM boxy[MAXBOX] AS INTEGER
+DIM nbox AS INTEGER
+DIM moves AS INTEGER
+DIM pushes AS INTEGER
+DIM fstx[GWMAX * GHMAX] AS INTEGER
+DIM fsty[GWMAX * GHMAX] AS INTEGER
+DIM u_dx[256] AS INTEGER
+DIM u_dy[256] AS INTEGER
+DIM u_push[256] AS INTEGER
+DIM utop AS INTEGER
+DIM floorcount AS INTEGER
+
+FUNCTION cidx(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN y * GWMAX + x
+END FUNCTION
+FUNCTION inb(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN x >= 0 AND y >= 0 AND x < gw AND y < gh
+END FUNCTION
+FUNCTION tile(x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF NOT inb(x, y) THEN RETURN T_VOID
+    RETURN smap[cidx(x, y)]
+END FUNCTION
+FUNCTION is_goal(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF NOT inb(x, y) THEN RETURN FALSE
+    RETURN goalc[cidx(x, y)] = 1
+END FUNCTION
+FUNCTION boxat(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF boxx[i] = x AND boxy[i] = y THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+FUNCTION is_solved() AS BOOLEAN
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF goalc[cidx(boxx[i], boxy[i])] = 0 THEN RETURN FALSE
+    NEXT
+    RETURN TRUE
+END FUNCTION
+
+SUB load_into(rows AS ARRAY OF STRING)
+    gh = LEN(rows)
+    gw = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GWMAX * GHMAX - 1
+        smap[i] = T_VOID : goalc[i] = 0
+    NEXT
+    nbox = 0 : px = 0 : py = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO gh - 1
+        DIM row AS STRING
+        row = rows[y]
+        IF LEN(row) > gw THEN gw = LEN(row)
+        FOR x = 0 TO LEN(row) - 1
+            DIM c AS STRING
+            c = MID$(row, x, 1)
+            IF c = "#" THEN smap[cidx(x, y)] = T_WALL
+            IF c = "." OR c = "+" OR c = "*" THEN goalc[cidx(x, y)] = 1
+            IF c = "$" OR c = "*" THEN
+                boxx[nbox] = x : boxy[nbox] = y : nbox = nbox + 1
+            END IF
+            IF c = "@" OR c = "+" THEN
+                px = x : py = y
+            END IF
+        NEXT
+    NEXT
+    ' Flood-Fill Innenraum
+    DIM top AS INTEGER
+    top = 0
+    fstx[0] = px : fsty[0] = py : top = 1
+    smap[cidx(px, py)] = T_FLOOR
+    WHILE top > 0
+        top = top - 1
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        cx = fstx[top] : cy = fsty[top]
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM nx AS INTEGER
+            DIM ny AS INTEGER
+            nx = cx : ny = cy
+            IF k = 0 THEN nx = cx + 1
+            IF k = 1 THEN nx = cx - 1
+            IF k = 2 THEN ny = cy + 1
+            IF k = 3 THEN ny = cy - 1
+            IF inb(nx, ny) THEN
+                DIM ix AS INTEGER
+                ix = cidx(nx, ny)
+                IF smap[ix] = T_VOID THEN
+                    smap[ix] = T_FLOOR
+                    fstx[top] = nx : fsty[top] = ny : top = top + 1
+                END IF
+            END IF
+        NEXT
+    WEND
+    moves = 0 : pushes = 0 : utop = 0
+    ' Bodenfelder zaehlen (mit korrektem cidx-Stride!)
+    floorcount = 0
+    FOR y = 0 TO gh - 1
+        FOR x = 0 TO gw - 1
+            IF smap[cidx(x, y)] = T_FLOOR THEN floorcount = floorcount + 1
+        NEXT
+    NEXT
+END SUB
+
+FUNCTION try_move(dx AS INTEGER, dy AS INTEGER) AS BOOLEAN
+    DIM nx AS INTEGER
+    DIM ny AS INTEGER
+    nx = px + dx : ny = py + dy
+    IF tile(nx, ny) <> T_FLOOR THEN RETURN FALSE
+    DIM bi AS INTEGER
+    DIM pushed AS INTEGER
+    pushed = 0
+    bi = boxat(nx, ny)
+    IF bi >= 0 THEN
+        DIM tx AS INTEGER
+        DIM ty AS INTEGER
+        tx = nx + dx : ty = ny + dy
+        IF tile(tx, ty) <> T_FLOOR OR boxat(tx, ty) >= 0 THEN RETURN FALSE
+        boxx[bi] = tx : boxy[bi] = ty
+        pushes = pushes + 1
+        pushed = 1
+    END IF
+    px = nx : py = ny
+    moves = moves + 1
+    u_dx[utop] = dx : u_dy[utop] = dy : u_push[utop] = pushed : utop = utop + 1
+    RETURN TRUE
+END FUNCTION
+
+SUB undo()
+    IF utop = 0 THEN RETURN
+    utop = utop - 1
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    DIM pf AS INTEGER
+    dx = u_dx[utop] : dy = u_dy[utop] : pf = u_push[utop]
+    IF pf = 1 THEN
+        DIM bi AS INTEGER
+        bi = boxat(px + dx, py + dy)
+        IF bi >= 0 THEN boxx[bi] = px : boxy[bi] = py
+        pushes = pushes - 1
+    END IF
+    px = px - dx : py = py - dy
+    moves = moves - 1
+END SUB
+
+DIM fails AS INTEGER
+fails = 0
+SUB expect(label AS STRING, cond AS BOOLEAN)
+    IF cond THEN
+        PRINT "  OK   " + label
+    ELSE
+        PRINT "  FAIL " + label
+        fails = fails + 1
+    END IF
+END SUB
+
+' --- Test 1: Level 1 (rechts schieben loest) ---
+DIM lv1 AS ARRAY OF STRING
+lv1 = SPLIT$("#######|#     #|# @$. #|#     #|#######", "|")
+load_into(lv1)
+expect("L1 Spieler @ (2,2)", px = 2 AND py = 2)
+expect("L1 1 Kiste", nbox = 1)
+expect("L1 Aussenraum bleibt VOID (floor=15)", floorcount = 15)
+expect("L1 nicht geloest am Start", NOT is_solved())
+expect("L1 Zug rechts ok", try_move(1, 0))
+expect("L1 geloest nach Schub", is_solved())
+expect("L1 1 Schub gezaehlt", pushes = 1)
+undo()
+expect("L1 Undo: Kiste zurueck (3,2)", boxx[0] = 3 AND boxy[0] = 2)
+expect("L1 Undo: Spieler zurueck (2,2)", px = 2 AND py = 2)
+expect("L1 Undo: nicht mehr geloest", NOT is_solved())
+expect("L1 Undo: Schub-Zaehler 0", pushes = 0)
+
+' --- Test 2: Level 2 (hoch schieben) ---
+DIM lv2 AS ARRAY OF STRING
+lv2 = SPLIT$("#####|#.  #|#$  #|#@  #|#####", "|")
+load_into(lv2)
+expect("L2 Schub hoch ok", try_move(0, -1))
+expect("L2 geloest", is_solved())
+
+' --- Test 3: blockiertes Schieben (Kiste gegen Wand) ---
+DIM lv3 AS ARRAY OF STRING
+lv3 = SPLIT$("#####|#@$#|#####", "|")
+load_into(lv3)
+expect("L3 Schub gegen Wand verboten", NOT try_move(1, 0))
+expect("L3 Spieler steht still", px = 1)
+
+' --- Test 4: in Wand laufen verboten ---
+load_into(lv3)
+expect("L4 links in Wand verboten", NOT try_move(-1, 0))
+expect("L4 Spieler steht still (x=1)", px = 1)
+
+PRINT ""
+IF fails = 0 THEN
+    PRINT "ALLE TESTS GRUEN"
+ELSE
+    PRINT STR$(fails) + " TEST(S) FEHLGESCHLAGEN"
+END IF

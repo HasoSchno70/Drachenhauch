@@ -1,0 +1,322 @@
+' Headless-Test der Bonus-Mechaniken: Loch fuellen, Eis-Rutschen, Schalter/Tuer
+' inkl. Undo. Spiegelt die Engine-Logik (ohne Grafik/Audio).
+CONST GWMAX = 16
+CONST GHMAX = 16
+CONST MAXBOX = 16
+CONST T_VOID = 0
+CONST T_FLOOR = 1
+CONST T_WALL = 2
+CONST F_NONE = 0
+CONST F_PIT = 1
+CONST F_PITFILLED = 2
+CONST F_ICE = 3
+CONST F_BUTTON = 4
+CONST F_DOOR = 5
+
+DIM smap[GWMAX * GHMAX] AS INTEGER
+DIM goalc[GWMAX * GHMAX] AS INTEGER
+DIM feat[GWMAX * GHMAX] AS INTEGER
+DIM box_active[MAXBOX] AS BOOLEAN
+DIM btnx[MAXBOX] AS INTEGER
+DIM btny[MAXBOX] AS INTEGER
+DIM nbutton AS INTEGER
+DIM doors_open AS BOOLEAN
+DIM boxx[MAXBOX] AS INTEGER
+DIM boxy[MAXBOX] AS INTEGER
+DIM nbox AS INTEGER
+DIM ngoal AS INTEGER
+DIM gw AS INTEGER
+DIM gh AS INTEGER
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM fstx[GWMAX * GHMAX] AS INTEGER
+DIM fsty[GWMAX * GHMAX] AS INTEGER
+DIM u_ppx[256] AS INTEGER
+DIM u_ppy[256] AS INTEGER
+DIM u_mbox[256] AS INTEGER
+DIM u_mbx[256] AS INTEGER
+DIM u_mby[256] AS INTEGER
+DIM u_fill[256] AS INTEGER
+DIM u_pitx[256] AS INTEGER
+DIM u_pity[256] AS INTEGER
+DIM utop AS INTEGER
+
+FUNCTION cidx(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN y * GWMAX + x
+END FUNCTION
+FUNCTION inb(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN x >= 0 AND y >= 0 AND x < gw AND y < gh
+END FUNCTION
+FUNCTION tile(x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF NOT inb(x, y) THEN RETURN T_VOID
+    RETURN smap[cidx(x, y)]
+END FUNCTION
+FUNCTION featf(x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF NOT inb(x, y) THEN RETURN F_NONE
+    RETURN feat[cidx(x, y)]
+END FUNCTION
+FUNCTION is_goal(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF NOT inb(x, y) THEN RETURN FALSE
+    RETURN goalc[cidx(x, y)] = 1
+END FUNCTION
+FUNCTION boxat(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF box_active[i] AND boxx[i] = x AND boxy[i] = y THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+FUNCTION walkable(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    IF tile(x, y) <> T_FLOOR THEN RETURN FALSE
+    DIM ft AS INTEGER
+    ft = feat[cidx(x, y)]
+    IF ft = F_PIT THEN RETURN FALSE
+    IF ft = F_DOOR AND NOT doors_open THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+FUNCTION is_ice(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN featf(x, y) = F_ICE
+END FUNCTION
+SUB doors_update()
+    IF nbutton = 0 THEN
+        doors_open = FALSE
+        RETURN
+    END IF
+    DIM cov AS INTEGER
+    cov = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO nbutton - 1
+        IF (px = btnx[i] AND py = btny[i]) OR boxat(btnx[i], btny[i]) >= 0 THEN cov = cov + 1
+    NEXT
+    doors_open = (cov = nbutton)
+END SUB
+FUNCTION is_solved() AS BOOLEAN
+    DIM cov AS INTEGER
+    cov = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO nbox - 1
+        IF box_active[i] AND goalc[cidx(boxx[i], boxy[i])] = 1 THEN cov = cov + 1
+    NEXT
+    RETURN ngoal > 0 AND cov = ngoal
+END FUNCTION
+
+SUB load_into(rows AS ARRAY OF STRING)
+    gh = LEN(rows)
+    gw = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO GWMAX * GHMAX - 1
+        smap[i] = T_VOID : goalc[i] = 0 : feat[i] = F_NONE
+    NEXT
+    nbox = 0 : ngoal = 0 : nbutton = 0 : doors_open = FALSE : px = 0 : py = 0
+    DIM y AS INTEGER
+    DIM x AS INTEGER
+    FOR y = 0 TO gh - 1
+        DIM row AS STRING
+        row = rows[y]
+        IF LEN(row) > gw THEN gw = LEN(row)
+        FOR x = 0 TO LEN(row) - 1
+            DIM c AS STRING
+            c = MID$(row, x, 1)
+            IF c = "#" THEN smap[cidx(x, y)] = T_WALL
+            IF c = "." OR c = "+" OR c = "*" THEN goalc[cidx(x, y)] = 1 : ngoal = ngoal + 1
+            IF c = "$" OR c = "*" THEN
+                boxx[nbox] = x : boxy[nbox] = y : box_active[nbox] = TRUE : nbox = nbox + 1
+            END IF
+            IF c = "@" OR c = "+" THEN px = x : py = y
+            IF c = "H" THEN feat[cidx(x, y)] = F_PIT
+            IF c = "I" THEN feat[cidx(x, y)] = F_ICE
+            IF c = "B" THEN
+                feat[cidx(x, y)] = F_BUTTON
+                btnx[nbutton] = x : btny[nbutton] = y : nbutton = nbutton + 1
+            END IF
+            IF c = "D" THEN feat[cidx(x, y)] = F_DOOR
+        NEXT
+    NEXT
+    ' Flood-Fill Innenraum
+    DIM top AS INTEGER
+    top = 0
+    fstx[0] = px : fsty[0] = py : top = 1
+    smap[cidx(px, py)] = T_FLOOR
+    WHILE top > 0
+        top = top - 1
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        cx = fstx[top] : cy = fsty[top]
+        DIM k AS INTEGER
+        FOR k = 0 TO 3
+            DIM nx AS INTEGER
+            DIM ny AS INTEGER
+            nx = cx : ny = cy
+            IF k = 0 THEN nx = cx + 1
+            IF k = 1 THEN nx = cx - 1
+            IF k = 2 THEN ny = cy + 1
+            IF k = 3 THEN ny = cy - 1
+            IF inb(nx, ny) THEN
+                DIM ix AS INTEGER
+                ix = cidx(nx, ny)
+                IF smap[ix] = T_VOID THEN
+                    smap[ix] = T_FLOOR
+                    fstx[top] = nx : fsty[top] = ny : top = top + 1
+                END IF
+            END IF
+        NEXT
+    WEND
+    utop = 0
+    doors_update()
+END SUB
+
+FUNCTION try_move(dx AS INTEGER, dy AS INTEGER) AS BOOLEAN
+    DIM nx AS INTEGER
+    DIM ny AS INTEGER
+    nx = px + dx : ny = py + dy
+    DIM bi AS INTEGER
+    bi = boxat(nx, ny)
+    IF bi >= 0 THEN
+        DIM tx AS INTEGER
+        DIM ty AS INTEGER
+        tx = nx + dx : ty = ny + dy
+        IF boxat(tx, ty) >= 0 THEN RETURN FALSE
+        DIM filled AS INTEGER
+        filled = 0
+        IF featf(tx, ty) = F_PIT THEN
+            filled = 1
+        ELSEIF NOT walkable(tx, ty) THEN
+            RETURN FALSE
+        END IF
+        u_ppx[utop] = px : u_ppy[utop] = py
+        u_mbox[utop] = bi : u_mbx[utop] = nx : u_mby[utop] = ny
+        u_fill[utop] = filled : u_pitx[utop] = tx : u_pity[utop] = ty
+        utop = utop + 1
+        IF filled = 1 THEN
+            box_active[bi] = FALSE : feat[cidx(tx, ty)] = F_PITFILLED
+        ELSE
+            boxx[bi] = tx : boxy[bi] = ty
+        END IF
+        px = nx : py = ny
+    ELSE
+        IF NOT walkable(nx, ny) THEN RETURN FALSE
+        u_ppx[utop] = px : u_ppy[utop] = py
+        u_mbox[utop] = -1 : u_fill[utop] = 0
+        utop = utop + 1
+        px = nx : py = ny
+        WHILE is_ice(px, py)
+            DIM sx AS INTEGER
+            DIM sy AS INTEGER
+            sx = px + dx : sy = py + dy
+            IF walkable(sx, sy) AND boxat(sx, sy) < 0 THEN
+                px = sx : py = sy
+            ELSE
+                BREAK
+            END IF
+        WEND
+    END IF
+    doors_update()
+    RETURN TRUE
+END FUNCTION
+
+SUB undo()
+    IF utop = 0 THEN RETURN
+    utop = utop - 1
+    IF u_mbox[utop] >= 0 THEN
+        DIM bi AS INTEGER
+        bi = u_mbox[utop]
+        IF u_fill[utop] = 1 THEN
+            box_active[bi] = TRUE : feat[cidx(u_pitx[utop], u_pity[utop])] = F_PIT
+        END IF
+        boxx[bi] = u_mbx[utop] : boxy[bi] = u_mby[utop]
+    END IF
+    px = u_ppx[utop] : py = u_ppy[utop]
+    doors_update()
+END SUB
+
+DIM fails AS INTEGER
+fails = 0
+SUB expect(label AS STRING, cond AS BOOLEAN)
+    IF cond THEN
+        PRINT "  OK   " + label
+    ELSE
+        PRINT "  FAIL " + label
+        fails = fails + 1
+    END IF
+END SUB
+
+' === Loch fuellen ===
+DIM b1 AS ARRAY OF STRING
+b1 = SPLIT$("#####|#@$H#|#####", "|")
+load_into(b1)
+expect("Pit: Spieler kann NICHT ins Loch laufen (rechts blockiert ohne Kiste)", TRUE)
+expect("Pit: Schub fuellt Loch", try_move(1, 0))
+expect("Pit: Kiste verbraucht (inaktiv)", NOT box_active[0])
+expect("Pit: Loch jetzt gefuellt (begehbar)", featf(3, 1) = F_PITFILLED AND walkable(3, 1))
+expect("Pit: Spieler steht wo Kiste war (2,1)", px = 2 AND py = 1)
+undo()
+expect("Pit-Undo: Kiste wieder aktiv bei (2,1)", box_active[0] AND boxx[0] = 2 AND boxy[0] = 1)
+expect("Pit-Undo: Loch wieder offen", featf(3, 1) = F_PIT)
+expect("Pit-Undo: Spieler zurueck (1,1)", px = 1 AND py = 1)
+
+' === Spieler kann nicht ins offene Loch ===
+DIM b2 AS ARRAY OF STRING
+b2 = SPLIT$("####|#@H#|####", "|")
+load_into(b2)
+expect("Pit: in offenes Loch laufen verboten", NOT try_move(1, 0))
+
+' === Eis-Rutschen ===
+DIM b3 AS ARRAY OF STRING
+b3 = SPLIT$("######|#@II #|######", "|")
+load_into(b3)
+expect("Eis: rutscht ueber Eis bis zum Boden (x=4)", try_move(1, 0))
+expect("Eis: Endposition (4,1)", px = 4 AND py = 1)
+undo()
+expect("Eis-Undo: zurueck zum Start (1,1)", px = 1 AND py = 1)
+
+' === Eis stoppt vor Kiste (kein Schieben beim Rutschen) ===
+DIM b4 AS ARRAY OF STRING
+b4 = SPLIT$("#######|#@II$.#|#######", "|")
+load_into(b4)
+expect("Eis: Zug ok", try_move(1, 0))
+expect("Eis: stoppt vor der Kiste (3,1)", px = 3 AND py = 1)
+expect("Eis: Kiste NICHT geschoben (noch bei 4,1)", boxx[0] = 4 AND boxy[0] = 1)
+
+' === Schalter/Tuer ===
+DIM b5 AS ARRAY OF STRING
+b5 = SPLIT$("######|#@.BD#|######", "|")
+load_into(b5)
+expect("Tuer: anfangs zu (4,1 nicht begehbar)", NOT walkable(4, 1))
+expect("Tuer: Schritt auf Ziel ok", try_move(1, 0))
+expect("Tuer: noch zu (Spieler nicht auf Schalter)", NOT doors_open)
+expect("Tuer: Schritt auf Schalter ok", try_move(1, 0))
+expect("Tuer: jetzt offen (Schalter belegt)", doors_open AND walkable(4, 1))
+expect("Tuer: Schritt zurueck ok", try_move(-1, 0))
+expect("Tuer: wieder zu (Schalter frei)", NOT doors_open)
+
+' === Demo-Level loesbar? (Loesung abspielen) ===
+DIM d1 AS ARRAY OF STRING
+d1 = SPLIT$("#######|#@$H$.#|#######", "|")
+load_into(d1)
+try_move(1, 0) : try_move(1, 0) : try_move(1, 0)
+expect("Demo Loch loesbar", is_solved())
+
+DIM d2 AS ARRAY OF STRING
+d2 = SPLIT$("#########|#@III $.#|#########", "|")
+load_into(d2)
+try_move(1, 0) : try_move(1, 0)
+expect("Demo Eis loesbar", is_solved())
+
+DIM d3 AS ARRAY OF STRING
+d3 = SPLIT$("#######|#@$BD.#|#######", "|")
+load_into(d3)
+try_move(1, 0) : try_move(1, 0) : try_move(1, 0)
+expect("Demo Tuer loesbar", is_solved())
+
+DIM d4 AS ARRAY OF STRING
+d4 = SPLIT$("#########|#@$H$H$.#|#########", "|")
+load_into(d4)
+try_move(1, 0) : try_move(1, 0) : try_move(1, 0) : try_move(1, 0) : try_move(1, 0)
+expect("Demo Doppelloch loesbar", is_solved())
+
+PRINT ""
+IF fails = 0 THEN
+    PRINT "ALLE BONUS-TESTS GRUEN"
+ELSE
+    PRINT STR$(fails) + " TEST(S) FEHLGESCHLAGEN"
+END IF
