@@ -25,7 +25,7 @@ Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretie
 | `FLIP()` | Frame an den Bildschirm ausgeben (synchronisiert auf 60 FPS) |
 | `CLS([color])` | Buffer mit `color` füllen (Default: schwarz) |
 | `SLEEP(ms)` | wartet ms Millisekunden, ohne dass das Fenster einfriert |
-| `QUITREQUESTED()` → BOOLEAN | TRUE wenn der User auf das Fenster-X geklickt hat |
+| `QUITREQUESTED()` → BOOLEAN | TRUE wenn der User das Fenster schliessen will: Fenster-X / Alt+F4 — **und per raylib-Default auch `ESC`**. Wer `ESC` im Spiel selbst nutzen will (Menü/Pause), schaltet das mit `WINDOW_ESC_QUIT(FALSE)` ab |
 
 Klassischer Game-Loop:
 
@@ -93,6 +93,7 @@ Der Fenster-Hintergrund kann durchscheinen, sodass der Desktop sichtbar bleibt �
 | `SCREEN_TRANSPARENT(w, h[, titel$[, scale]])` | öffnet ein Fenster mit **transparentem** Hintergrund; `w`/`h` = 0 → ganzer aktueller Monitor (Vollbild-Overlay) |
 | `WINDOW_UNDECORATED(flag)` | Fensterrahmen/Titelleiste aus (`TRUE`) / ein (`FALSE`) |
 | `WINDOW_TOPMOST(flag)` | Fenster immer im Vordergrund halten |
+| `WINDOW_ESC_QUIT(an)` | `ESC` als Fenster-Schliessen-Taste an/aus (raylib-Default: **an**). Mit `FALSE` ist `ESC` eine ganz normale Taste (`QUITREQUESTED` wird dann nur noch durch Fenster-X / Alt+F4 ausgelöst) — für Spiele, die `ESC` fürs Pause-/Hauptmenü nutzen |
 | `WINDOW_PASSTHROUGH(flag)` | Maus-Klicks zum Desktop **durchreichen** (klick-durchlässiges Widget) |
 
 **Wichtig:** `SCREEN_TRANSPARENT(...)` muss die **allererste** Grafik-Anweisung sein (vor `LOADIMAGE`/`SCREEN`/…). Transparenz ist ein Fenster-Erzeugungs-Flag und lässt sich nicht nachträglich setzen. `WINDOW_UNDECORATED`/`WINDOW_TOPMOST`/`WINDOW_PASSTHROUGH` dagegen jederzeit. `WINDOW_PASSTHROUGH(TRUE)` braucht ein randloses Fenster (`WINDOW_UNDECORATED(TRUE)`); die Tastatur (z. B. `ESC`) erreicht das Fenster dann nur, solange es den Fokus hat — nach einem Desktop-Klick zum Beenden Stop-Knopf im Editor bzw. `Alt+F4`.

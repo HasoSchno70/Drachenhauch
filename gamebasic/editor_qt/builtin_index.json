@@ -4008,6 +4008,12 @@
    "module": "gbrt"
   },
   {
+   "name": "WINDOW_ESC_QUIT",
+   "kind": "graphics",
+   "signature": "WINDOW_ESC_QUIT(an: BOOLEAN)",
+   "module": "gbrt"
+  },
+  {
    "name": "WINDOW_PASSTHROUGH",
    "kind": "graphics",
    "signature": "WINDOW_PASSTHROUGH(flag: BOOLEAN)",

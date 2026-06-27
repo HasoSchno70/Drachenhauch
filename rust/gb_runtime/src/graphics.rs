@@ -2728,6 +2728,15 @@ impl Graphics {
         if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
     }
 
+    /// WINDOW_ESC_QUIT(an) -- ESC als Fenster-Schliessen-Taste an/aus.
+    /// raylib-Default: ESC schliesst das Fenster (QUITREQUESTED wird true).
+    /// Mit `an=false` ist ESC eine GANZ NORMALE Taste -> nur noch das Fenster-X
+    /// bzw. Alt+F4 beenden. Fuer Spiele, die ESC fuers Pause-/Hauptmenue nutzen.
+    pub fn set_esc_quit(&mut self, on: bool) {
+        use raylib::consts::KeyboardKey::*;
+        self.rl.set_exit_key(if on { Some(KEY_ESCAPE) } else { None });
+    }
+
     /// MOUSE_VISIBLE(an) -- OS-Maus-Cursor zeigen/verstecken (Spiele mit
     /// eigenem Fadenkreuz-/Cursor-Sprite verstecken ihn und zeichnen selbst).
     pub fn mouse_visible(&mut self, v: bool) {
