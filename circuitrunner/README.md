@@ -54,16 +54,18 @@ abgelegt) — beim nächsten Start erscheint das Set im Menü.
 ### Eigene Level bauen
 
 `make_demo_levels.py` erzeugt die mitgelieferten Demo-Level aus ASCII-Karten —
-eine einfache Vorlage für eigene Sets:
+eine einfache Vorlage für eigene Sets. Jedes Level wird beim Bau **validiert**
+(Flood-Fill: alle Chips/Schlüssel erreichbar, Ausgang nur über den Sockel) —
+so können keine unlösbaren Level entstehen:
 
 ```
 py circuitrunner\make_demo_levels.py     # -> levels/circuit_runner.json
 ```
 
-## Grafik (23×23)
+## Grafik (32×32)
 
 Alle Kacheln werden **programmatisch** erzeugt (`make_tiles.py`, PIL) in ein
-Master-Sheet `assets/tiles.png` (16×8 Zellen à 23 px), in dem die **Zellen-
+Master-Sheet `assets/tiles.png` (16×8 Zellen à 32 px), in dem die **Zellen-
 Position dem Tile-Code entspricht** (0x00–0x7F). Die Engine zeichnet jede
 Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
 
@@ -71,8 +73,14 @@ Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
 py circuitrunner\make_tiles.py
 ```
 
-Zusätzlich wird `assets/tiles.gbsprite` exportiert — **im Sprite-Editor
-`gbsprites` zu öffnen und bearbeiten** (jede Kachel ist ein benannter Frame).
+Zusätzlich werden `assets/tiles.gbsprite` (**im Sprite-Editor `gbsprites` zu
+öffnen und bearbeiten** — jede Kachel ein benannter Frame) und einzelne
+`assets/icons/*.png` (scharfe HUD-Icons) exportiert.
+
+Gerendert wird zweischichtig: das Spielfeld kommt pixelgenau aus einem
+Render-Target (ganzzahlig hochskaliert), HUD/Menü-Text und Icons dagegen in
+**nativer Bildschirmauflösung** (TTF-Font `assets/font.ttf`, Skalierung via
+`TEXTROT`) — dadurch ist die Schrift gestochen scharf statt klobig.
 
 ## Levelformat (JSON-Set)
 

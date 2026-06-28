@@ -19,21 +19,18 @@
 IMPORT "json"
 IMPORT "input"
 IMPORT "audio"
+IMPORT "imgfx"
 
 CONST FULLSCREEN = TRUE
 
 CONST GW = 32
 CONST GH = 32
 CONST NCELL = 1024
-CONST TILE = 23
+CONST TILE = 32
 CONST VIEW = 9                 ' sichtbare Kacheln je Achse
-
-' Logisches Render-Layout (wird auf den Bildschirm hochskaliert)
-CONST LOGW = 420
-CONST LOGH = 248
-CONST BX = 12                  ' Spielfeld-Ursprung
-CONST BY = 14
-CONST HUDX = 231
+CONST BLOG = 288               ' Board-Render-Target = VIEW*TILE
+CONST BX = 0                   ' Board-Ursprung im Render-Target
+CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
 
@@ -162,7 +159,36 @@ DIM start_ms AS INTEGER
 
 DIM js AS JSON_HANDLE
 DIM tiles AS IMAGE
-DIM rt AS INTEGER
+DIM rtb AS INTEGER             ' Board-Render-Target (288x288, scharf hochskaliert)
+
+' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
+DIM SW AS INTEGER
+DIM SH AS INTEGER
+DIM bscale AS INTEGER          ' ganzzahlige Board-Vergroesserung
+DIM bsize AS INTEGER           ' BLOG * bscale
+DIM board_x AS INTEGER
+DIM board_y AS INTEGER
+DIM hud_x AS INTEGER
+DIM hud_w AS INTEGER
+
+' Font (eine TTF; Groesse via TEXTROT-Scale, da LOADFONT-Groesse fix ist)
+DIM gfont AS INTEGER
+DIM BASEH AS INTEGER
+DIM sc_big AS FLOAT
+DIM sc_med AS FLOAT
+DIM sc_sm AS FLOAT
+
+' HUD-Icons (vorskaliert, scharf)
+DIM ic_sz AS INTEGER
+DIM ic_chip AS IMAGE
+DIM ic_kb AS IMAGE
+DIM ic_kr AS IMAGE
+DIM ic_kg AS IMAGE
+DIM ic_ky AS IMAGE
+DIM ic_flip AS IMAGE
+DIM ic_fire AS IMAGE
+DIM ic_ice AS IMAGE
+DIM ic_suc AS IMAGE
 
 ' Level-Set-Auswahl (alle .json in levels/ + levels/_downloaded/)
 CONST MAXSETS = 64
@@ -1101,119 +1127,145 @@ SUB draw_board()
     draw_tile(pc, BX + (px - camx) * TILE, BY + (py - camy) * TILE)
 END SUB
 
+SUB ct(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
+    TEXTROT(cx, cy, s, 0, scale, col)
+END SUB
+
+SUB hud_key(x AS INTEGER, y AS INTEGER, icon AS IMAGE, n AS INTEGER)
+    DRAWIMAGE(icon, x, y)
+    ct(x + ic_sz + INT(ic_sz * 0.5), y + ic_sz \ 2, sc_sm, STR$(n), RGB(206, 214, 232))
+END SUB
+
 SUB draw_hud()
+    DIM pad AS INTEGER
+    pad = INT(SH * 0.024)
     DIM x AS INTEGER
-    x = HUDX
-    BOX(x - 6, BY, LOGW - 6, BY + VIEW * TILE, RGB(22, 28, 40))
-    RECT(x - 6, BY, LOGW - 6, BY + VIEW * TILE, RGB(60, 80, 110))
-    TEXT(x, BY + 6, "CIRCUIT", RGB(120, 240, 230))
-    TEXT(x, BY + 22, "RUNNER", RGB(120, 240, 230))
-
-    TEXT(x, BY + 46, "LEVEL " + STR$(cur_level + 1), RGB(220, 225, 235))
+    x = hud_x
+    DIM cxp AS INTEGER
+    cxp = hud_x + hud_w \ 2
+    BOX(x, board_y, x + hud_w, board_y + bsize, RGB(20, 26, 38))
+    RECT(x, board_y, x + hud_w, board_y + bsize, RGB(50, 66, 92))
     DIM ty AS INTEGER
-    ty = BY + 64
-    draw_tile(T_CHIP, x, ty)
-    TEXT(x + TILE + 4, ty + 5, STR$(chips_left), RGB(120, 240, 140))
-
-    ' Schluessel
-    ty = ty + TILE + 4
-    draw_tile(T_KEY_BLUE, x, ty)
-    TEXT(x + TILE + 2, ty + 5, STR$(keys_blue), RGB(200, 210, 230))
-    draw_tile(T_KEY_RED, x + 56, ty)
-    TEXT(x + 56 + TILE + 2, ty + 5, STR$(keys_red), RGB(200, 210, 230))
-    ty = ty + TILE + 2
-    draw_tile(T_KEY_GREEN, x, ty)
-    TEXT(x + TILE + 2, ty + 5, STR$(keys_green), RGB(200, 210, 230))
-    draw_tile(T_KEY_YELLOW, x + 56, ty)
-    TEXT(x + 56 + TILE + 2, ty + 5, STR$(keys_yellow), RGB(200, 210, 230))
-
-    ' Stiefel (nur wenn vorhanden)
-    ty = ty + TILE + 6
+    ty = board_y + pad + INT(BASEH * sc_med * 0.5)
+    ct(cxp, ty, sc_med, "CIRCUIT RUNNER", RGB(110, 238, 226))
+    ty = ty + INT(BASEH * sc_med) + INT(pad * 0.5)
+    ct(cxp, ty, sc_sm, "Level " + STR$(cur_level + 1) + " / " + STR$(nlevels), RGB(208, 216, 232))
+    ty = ty + INT(BASEH * sc_sm) + 2
+    ct(cxp, ty, sc_sm, lvl_title, RGB(150, 200, 240))
+    ty = ty + INT(BASEH * sc_sm) + pad
+    DIM ix AS INTEGER
+    ix = x + pad
+    DRAWIMAGE(ic_chip, ix, ty)
+    ct(ix + ic_sz + INT(ic_sz * 0.95), ty + ic_sz \ 2, sc_med, "x " + STR$(chips_left), RGB(120, 244, 150))
+    ty = ty + ic_sz + pad
+    DIM c0 AS INTEGER
+    DIM c1 AS INTEGER
+    c0 = x + pad
+    c1 = x + hud_w \ 2
+    hud_key(c0, ty, ic_kb, keys_blue)
+    hud_key(c1, ty, ic_kr, keys_red)
+    ty = ty + ic_sz + INT(pad * 0.4)
+    hud_key(c0, ty, ic_kg, keys_green)
+    hud_key(c1, ty, ic_ky, keys_yellow)
+    ty = ty + ic_sz + pad
     DIM bx AS INTEGER
-    bx = x
+    bx = x + pad
     IF has_flippers THEN
-        draw_tile(T_FLIPPERS, bx, ty)
-        bx = bx + TILE + 2
+        DRAWIMAGE(ic_flip, bx, ty)
+        bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_fireboots THEN
-        draw_tile(T_FIREBOOTS, bx, ty)
-        bx = bx + TILE + 2
+        DRAWIMAGE(ic_fire, bx, ty)
+        bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_iceskates THEN
-        draw_tile(T_ICESKATES, bx, ty)
-        bx = bx + TILE + 2
+        DRAWIMAGE(ic_ice, bx, ty)
+        bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_suction THEN
-        draw_tile(T_SUCTION, bx, ty)
-        bx = bx + TILE + 2
+        DRAWIMAGE(ic_suc, bx, ty)
+        bx = bx + ic_sz + INT(pad * 0.4)
     END IF
-
     IF lvl_time > 0 THEN
-        TEXT(x, BY + VIEW * TILE - 18, "ZEIT " + STR$(time_left), RGB(240, 220, 120))
+        ct(cxp, board_y + bsize - pad - INT(BASEH * sc_med * 0.5), sc_med, "Zeit " + STR$(time_left), RGB(244, 222, 120))
     END IF
 END SUB
 
-SUB ctext(cx AS INTEGER, y AS INTEGER, s AS STRING, col AS INTEGER)
-    DIM w AS INTEGER
-    w = TEXT_WIDTH(s)
-    TEXT(cx - w \ 2, y, s, col)
+SUB draw_menu()
+    DIM cx AS INTEGER
+    cx = SW \ 2
+    ct(cx, INT(SH * 0.13), sc_big, "CIRCUIT RUNNER", RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.22), sc_sm, "waehle ein Level-Set", RGB(150, 162, 184))
+    IF nsets = 0 THEN
+        ct(cx, SH \ 2, sc_med, "Keine Sets in levels/", RGB(245, 130, 130))
+        RETURN
+    END IF
+    DIM lo AS INTEGER
+    lo = sel_set - 3
+    IF lo < 0 THEN lo = 0
+    DIM hi AS INTEGER
+    hi = lo + 6
+    IF hi > nsets - 1 THEN hi = nsets - 1
+    DIM yy AS INTEGER
+    yy = INT(SH * 0.37)
+    DIM lh AS INTEGER
+    lh = INT(BASEH * sc_med * 1.5)
+    DIM si AS INTEGER
+    FOR si = lo TO hi
+        DIM lab AS STRING
+        lab = set_name[si] + "    " + STR$(set_count[si]) + " Level"
+        DIM col AS INTEGER
+        col = RGB(160, 172, 196)
+        IF si = sel_set THEN
+            lab = "> " + lab + " <"
+            col = RGB(120, 244, 160)
+        END IF
+        ct(cx, yy, sc_med, lab, col)
+        yy = yy + lh
+    NEXT
+    ct(cx, INT(SH * 0.90), sc_sm, "Pfeile waehlen      LEER = Start      ESC = Ende", RGB(170, 182, 206))
 END SUB
 
-SUB draw_scene()
-    CLS(RGB(14, 18, 26))
-    IF state = "menu" THEN
-        ctext(LOGW \ 2, 30, "CIRCUIT RUNNER", RGB(120, 240, 230))
-        ctext(LOGW \ 2, 54, "waehle ein Level-Set", RGB(150, 160, 180))
-        IF nsets = 0 THEN
-            ctext(LOGW \ 2, 120, "Keine Sets in levels/ gefunden", RGB(245, 130, 130))
-            ctext(LOGW \ 2, 144, "make_demo_levels.py ausfuehren", RGB(180, 190, 210))
-        ELSE
-            DIM lo AS INTEGER
-            lo = sel_set - 3
-            IF lo < 0 THEN lo = 0
-            DIM hi AS INTEGER
-            hi = lo + 6
-            IF hi > nsets - 1 THEN hi = nsets - 1
-            DIM yy AS INTEGER
-            yy = 82
-            DIM si AS INTEGER
-            FOR si = lo TO hi
-                DIM lab AS STRING
-                lab = set_name[si] + "  (" + STR$(set_count[si]) + ")"
-                DIM col AS INTEGER
-                col = RGB(150, 160, 180)
-                IF si = sel_set THEN
-                    lab = "> " + lab + " <"
-                    col = RGB(120, 240, 160)
-                END IF
-                ctext(LOGW \ 2, yy, lab, col)
-                yy = yy + 22
-            NEXT
-            ctext(LOGW \ 2, 220, "Pfeile waehlen   LEER = Start", RGB(180, 190, 210))
-        END IF
-    ELSEIF state = "intro" THEN
-        ctext(LOGW \ 2, 50, "LEVEL " + STR$(cur_level + 1), RGB(120, 240, 230))
-        ctext(LOGW \ 2, 80, lvl_title, RGB(230, 235, 245))
-        IF LEN(lvl_hint) > 0 THEN draw_wrapped(lvl_hint, 30, 120, LOGW - 30, RGB(180, 190, 210))
-        ctext(LOGW \ 2, 210, "LEER = los", RGB(200, 210, 230))
-    ELSEIF state = "play" OR state = "win" OR state = "dead" THEN
-        draw_board()
-        draw_hud()
-        IF state = "win" THEN
-            BOX(40, 96, LOGW - 40, 160, RGB(16, 30, 24))
-            RECT(40, 96, LOGW - 40, 160, RGB(80, 220, 140))
-            ctext(LOGW \ 2, 112, "LEVEL GESCHAFFT!", RGB(120, 240, 160))
-            ctext(LOGW \ 2, 136, "LEER = weiter", RGB(200, 220, 210))
-        ELSEIF state = "dead" THEN
-            BOX(40, 96, LOGW - 40, 160, RGB(34, 16, 16))
-            RECT(40, 96, LOGW - 40, 160, RGB(220, 90, 90))
-            ctext(LOGW \ 2, 112, death_msg, RGB(245, 130, 130))
-            ctext(LOGW \ 2, 136, "R / LEER = nochmal", RGB(230, 200, 200))
-        END IF
-    ELSEIF state = "done" THEN
-        ctext(LOGW \ 2, 90, "ALLE LEVEL GESCHAFFT!", RGB(120, 240, 160))
-        ctext(LOGW \ 2, 120, "Gut gemacht, Runner.", RGB(220, 225, 235))
-        ctext(LOGW \ 2, 160, "LEER = Menue", RGB(200, 210, 230))
+SUB draw_intro()
+    DIM cx AS INTEGER
+    cx = SW \ 2
+    ct(cx, INT(SH * 0.22), sc_med, "Level " + STR$(cur_level + 1), RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.34), sc_big, lvl_title, RGB(232, 238, 248))
+    IF LEN(lvl_hint) > 0 THEN
+        draw_wrapped(lvl_hint, INT(SW * 0.16), INT(SH * 0.52), INT(SW * 0.84), RGB(184, 196, 216))
+    END IF
+    ct(cx, INT(SH * 0.85), sc_med, "LEER = los", RGB(200, 214, 232))
+END SUB
+
+SUB draw_done()
+    DIM cx AS INTEGER
+    cx = SW \ 2
+    ct(cx, INT(SH * 0.34), sc_big, "ALLE LEVEL GESCHAFFT!", RGB(120, 244, 160))
+    ct(cx, INT(SH * 0.50), sc_med, "Gut gemacht, Runner.", RGB(224, 230, 240))
+    ct(cx, INT(SH * 0.64), sc_med, "LEER = Menue", RGB(200, 214, 232))
+END SUB
+
+SUB draw_overlay(kind AS STRING)
+    DIM cx AS INTEGER
+    cx = SW \ 2
+    DIM x0 AS INTEGER
+    DIM x1 AS INTEGER
+    DIM y0 AS INTEGER
+    DIM y1 AS INTEGER
+    x0 = INT(SW * 0.26)
+    x1 = INT(SW * 0.74)
+    y0 = INT(SH * 0.40)
+    y1 = INT(SH * 0.60)
+    IF kind = "win" THEN
+        BOX(x0, y0, x1, y1, RGB(14, 32, 24))
+        RECT(x0, y0, x1, y1, RGB(80, 222, 142))
+        ct(cx, INT(SH * 0.47), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
+        ct(cx, INT(SH * 0.55), sc_med, "LEER = weiter", RGB(204, 224, 214))
+    ELSE
+        BOX(x0, y0, x1, y1, RGB(34, 16, 16))
+        RECT(x0, y0, x1, y1, RGB(224, 92, 92))
+        ct(cx, INT(SH * 0.47), sc_med, death_msg, RGB(246, 134, 134))
+        ct(cx, INT(SH * 0.55), sc_sm, "R / LEER = nochmal", RGB(232, 204, 204))
     END IF
 END SUB
 
@@ -1224,8 +1276,12 @@ SUB draw_wrapped(s AS STRING, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, col A
     line = ""
     DIM yy AS INTEGER
     yy = y0
-    DIM maxw AS INTEGER
-    maxw = x1 - x0
+    DIM maxw AS FLOAT
+    maxw = (x1 - x0) * 1.0
+    DIM lh AS INTEGER
+    lh = INT(BASEH * sc_sm * 1.5)
+    DIM cxm AS INTEGER
+    cxm = (x0 + x1) \ 2
     DIM i AS INTEGER
     FOR i = 0 TO LEN(words) - 1
         DIM cand AS STRING
@@ -1234,15 +1290,15 @@ SUB draw_wrapped(s AS STRING, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, col A
         ELSE
             cand = line + " " + words[i]
         END IF
-        IF TEXT_WIDTH(cand) > maxw AND LEN(line) > 0 THEN
-            TEXT(x0, yy, line, col)
-            yy = yy + 18
+        IF TEXT_WIDTH(cand) * sc_sm > maxw AND LEN(line) > 0 THEN
+            ct(cxm, yy, sc_sm, line, col)
+            yy = yy + lh
             line = words[i]
         ELSE
             line = cand
         END IF
     NEXT
-    IF LEN(line) > 0 THEN TEXT(x0, yy, line, col)
+    IF LEN(line) > 0 THEN ct(cxm, yy, sc_sm, line, col)
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -1268,10 +1324,24 @@ END SUB
 IF FULLSCREEN THEN
     SCREEN_NATIVE("Circuit Runner")
 ELSE
-    SCREEN(LOGW * 3, LOGH * 3, "Circuit Runner")
+    SCREEN(1280, 800, "Circuit Runner")
 END IF
 SETFPS(60)
 WINDOW_ESC_QUIT(FALSE)
+
+SW = SCREENWIDTH()
+SH = SCREENHEIGHT()
+' Board so gross wie moeglich (ganzzahlige Vergroesserung), HUD rechts daneben
+bscale = (SH * 92) \ (100 * BLOG)
+IF bscale < 1 THEN bscale = 1
+WHILE BLOG * bscale > (SW * 58) \ 100 AND bscale > 1
+    bscale = bscale - 1
+WEND
+bsize = BLOG * bscale
+board_x = INT(SW * 0.04)
+board_y = (SH - bsize) \ 2
+hud_x = board_x + bsize + INT(SW * 0.03)
+hud_w = SW - hud_x - INT(SW * 0.04)
 
 dxv[0] = 0
 dyv[0] = -1
@@ -1282,8 +1352,28 @@ dyv[2] = 1
 dxv[3] = 1
 dyv[3] = 0
 
-rt = RENDERTARGET_NEW(LOGW, LOGH)
+rtb = RENDERTARGET_NEW(BLOG, BLOG)
 tiles = LOADIMAGE("assets/tiles.png")
+
+' Font (eine TTF; Skalierung via TEXTROT, da LOADFONT-Groesse fix)
+gfont = LOADFONT("assets/font.ttf", 64)
+SETFONT(gfont)
+BASEH = 26
+sc_big = SH / 470.0
+sc_med = SH / 760.0
+sc_sm = SH / 1040.0
+
+' HUD-Icons vorskalieren (scharf in nativer Aufloesung)
+ic_sz = INT(SH * 0.044)
+ic_chip = IMAGE_SCALE(LOADIMAGE("assets/icons/chip.png"), ic_sz, ic_sz)
+ic_kb = IMAGE_SCALE(LOADIMAGE("assets/icons/key_blue.png"), ic_sz, ic_sz)
+ic_kr = IMAGE_SCALE(LOADIMAGE("assets/icons/key_red.png"), ic_sz, ic_sz)
+ic_kg = IMAGE_SCALE(LOADIMAGE("assets/icons/key_green.png"), ic_sz, ic_sz)
+ic_ky = IMAGE_SCALE(LOADIMAGE("assets/icons/key_yellow.png"), ic_sz, ic_sz)
+ic_flip = IMAGE_SCALE(LOADIMAGE("assets/icons/flippers.png"), ic_sz, ic_sz)
+ic_fire = IMAGE_SCALE(LOADIMAGE("assets/icons/fireboots.png"), ic_sz, ic_sz)
+ic_ice = IMAGE_SCALE(LOADIMAGE("assets/icons/iceskates.png"), ic_sz, ic_sz)
+ic_suc = IMAGE_SCALE(LOADIMAGE("assets/icons/suction.png"), ic_sz, ic_sz)
 
 scan_sets()
 sel_set = 0
@@ -1364,25 +1454,24 @@ WHILE NOT QUITREQUESTED()
         IF INPUT_PRESSED("confirm") THEN state = "menu"
     END IF
 
-    RENDERTARGET_BEGIN(rt)
-    draw_scene()
-    RENDERTARGET_END()
-
-    DIM sc AS FLOAT
-    DIM scx AS FLOAT
-    DIM scy AS FLOAT
-    scx = SCREENWIDTH() * 1.0 / LOGW
-    scy = SCREENHEIGHT() * 1.0 / LOGH
-    IF scx < scy THEN
-        sc = scx
-    ELSE
-        sc = scy
+    ' --- Render ---
+    IF state = "play" OR state = "win" OR state = "dead" THEN
+        RENDERTARGET_BEGIN(rtb)
+        draw_board()
+        RENDERTARGET_END()
     END IF
-    DIM offx AS INTEGER
-    DIM offy AS INTEGER
-    offx = (SCREENWIDTH() - INT(LOGW * sc)) \ 2
-    offy = (SCREENHEIGHT() - INT(LOGH * sc)) \ 2
-    CLS(RGB(0, 0, 0))
-    RENDERTARGET_DRAW(rt, offx, offy, sc)
+    CLS(RGB(12, 16, 24))
+    IF state = "menu" THEN
+        draw_menu()
+    ELSEIF state = "intro" THEN
+        draw_intro()
+    ELSEIF state = "done" THEN
+        draw_done()
+    ELSE
+        RENDERTARGET_DRAW(rtb, board_x, board_y, bscale)
+        draw_hud()
+        IF state = "win" THEN draw_overlay("win")
+        IF state = "dead" THEN draw_overlay("dead")
+    END IF
     FLIP()
 WEND

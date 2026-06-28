@@ -1,6 +1,6 @@
 {
   "image": "tiles.png",
-  "tile": 23,
+  "tile": 32,
   "cols": 16,
   "codes": {
     "0x00": "floor",
@@ -29,10 +29,10 @@
     "0x17": "door_red",
     "0x18": "door_green",
     "0x19": "door_yellow",
-    "0x1A": "ice_SE",
-    "0x1B": "ice_SW",
-    "0x1C": "ice_NW",
-    "0x1D": "ice_NE",
+    "0x1A": "ice_NW",
+    "0x1B": "ice_NE",
+    "0x1C": "ice_SE",
+    "0x1D": "ice_SW",
     "0x1E": "blueblock_F",
     "0x1F": "blueblock_W",
     "0x21": "thief",
