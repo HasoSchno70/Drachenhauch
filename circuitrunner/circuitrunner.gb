@@ -1,0 +1,1312 @@
+' =====================================================================
+'  CIRCUIT RUNNER  --  ein Chip's-Challenge-artiges Kachel-Puzzle
+'  Sammle alle Daten-Chips, dann oeffnet der Sockel den Weg zum Ausgang.
+'  Weiche Wasser/Feuer/Monstern aus, nutze Schluessel, Stiefel und Bloecke.
+'
+'  Steuerung:
+'    Pfeile / WASD   bewegen
+'    R               Level neu starten
+'    N               Level ueberspringen (Entwicklung)
+'    ESC             zurueck / Menue
+'    LEER / ENTER    bestaetigen
+'
+'  Level liegen als JSON-Sets in  levels/ . Eigene Demos erzeugt
+'  make_demo_levels.py; echte Fansite-Sets (.dat/.ccl) wandelt
+'  convert_dat.py um. Tile-Codes 0x00..0x6F = Zellen in assets/tiles.png.
+'
+'  Start:  gbrun.py circuitrunner\circuitrunner.gb       (oder im Editor F5)
+' =====================================================================
+IMPORT "json"
+IMPORT "input"
+IMPORT "audio"
+
+CONST FULLSCREEN = TRUE
+
+CONST GW = 32
+CONST GH = 32
+CONST NCELL = 1024
+CONST TILE = 23
+CONST VIEW = 9                 ' sichtbare Kacheln je Achse
+
+' Logisches Render-Layout (wird auf den Bildschirm hochskaliert)
+CONST LOGW = 420
+CONST LOGH = 248
+CONST BX = 12                  ' Spielfeld-Ursprung
+CONST BY = 14
+CONST HUDX = 231
+
+CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
+
+' ----- Tile-Codes (= Tileset-Zellen) ---------------------------------
+CONST T_FLOOR = &H00
+CONST T_WALL = &H01
+CONST T_CHIP = &H02
+CONST T_WATER = &H03
+CONST T_FIRE = &H04
+CONST T_INVWALL = &H05
+CONST T_WALLN = &H06
+CONST T_WALLW = &H07
+CONST T_WALLS = &H08
+CONST T_WALLE = &H09
+CONST T_BLOCK = &H0A
+CONST T_DIRT = &H0B
+CONST T_ICE = &H0C
+CONST T_FORCE_S = &H0D
+CONST T_FORCE_N = &H12
+CONST T_FORCE_E = &H13
+CONST T_FORCE_W = &H14
+CONST T_EXIT = &H15
+CONST T_DOOR_BLUE = &H16
+CONST T_DOOR_RED = &H17
+CONST T_DOOR_GREEN = &H18
+CONST T_DOOR_YELLOW = &H19
+CONST T_ICE_NW2 = &H1A
+CONST T_ICE_NE2 = &H1B
+CONST T_ICE_SE2 = &H1C
+CONST T_ICE_SW2 = &H1D
+CONST T_BLUEBLOCK_F = &H1E
+CONST T_BLUEBLOCK_W = &H1F
+CONST T_THIEF = &H21
+CONST T_SOCKET = &H22
+CONST T_BTN_GREEN = &H23
+CONST T_BTN_RED = &H24
+CONST T_TOGGLE_C = &H25
+CONST T_TOGGLE_O = &H26
+CONST T_BTN_BROWN = &H27
+CONST T_BTN_BLUE = &H28
+CONST T_TELEPORT = &H29
+CONST T_BOMB = &H2A
+CONST T_TRAP = &H2B
+CONST T_HIDDEN = &H2C
+CONST T_GRAVEL = &H2D
+CONST T_PASSONCE = &H2E
+CONST T_HINT = &H2F
+CONST T_WALL_SE = &H30
+CONST T_CLONER = &H31
+CONST T_FORCE_RND = &H32
+CONST T_KEY_BLUE = &H64
+CONST T_KEY_RED = &H65
+CONST T_KEY_GREEN = &H66
+CONST T_KEY_YELLOW = &H67
+CONST T_FLIPPERS = &H68
+CONST T_FIREBOOTS = &H69
+CONST T_ICESKATES = &H6A
+CONST T_SUCTION = &H6B
+CONST T_CHIP_N = &H6C
+
+' Richtungen 0=N 1=W 2=S 3=E (= CC-Codierung)
+DIM dxv[4] AS INTEGER
+DIM dyv[4] AS INTEGER
+
+' ----- Weltzustand ---------------------------------------------------
+DIM terr[NCELL] AS INTEGER            ' Terrain/Items/Geraete
+
+CONST MAXMOB = 320
+DIM mob_x[MAXMOB] AS INTEGER
+DIM mob_y[MAXMOB] AS INTEGER
+DIM mob_dir[MAXMOB] AS INTEGER
+DIM mob_type[MAXMOB] AS INTEGER
+DIM mob_alive[MAXMOB] AS BOOLEAN
+DIM mob_trapped[MAXMOB] AS BOOLEAN
+DIM nmob AS INTEGER
+DIM mob_did AS BOOLEAN          ' Ergebnis des letzten mob_try
+
+CONST MAXBLK = 320
+DIM blk_x[MAXBLK] AS INTEGER
+DIM blk_y[MAXBLK] AS INTEGER
+DIM blk_alive[MAXBLK] AS BOOLEAN
+DIM nblk AS INTEGER
+
+' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
+CONST MAXWIRE = 256
+DIM trap_bx[MAXWIRE] AS INTEGER
+DIM trap_by[MAXWIRE] AS INTEGER
+DIM trap_tx[MAXWIRE] AS INTEGER
+DIM trap_ty[MAXWIRE] AS INTEGER
+DIM ntrap AS INTEGER
+DIM clone_bx[MAXWIRE] AS INTEGER
+DIM clone_by[MAXWIRE] AS INTEGER
+DIM clone_mx[MAXWIRE] AS INTEGER
+DIM clone_my[MAXWIRE] AS INTEGER
+DIM nclone AS INTEGER
+
+' Spieler
+DIM px AS INTEGER
+DIM py AS INTEGER
+DIM pdir AS INTEGER
+DIM chips_left AS INTEGER
+DIM keys_blue AS INTEGER
+DIM keys_red AS INTEGER
+DIM keys_green AS INTEGER
+DIM keys_yellow AS INTEGER
+DIM has_flippers AS BOOLEAN
+DIM has_fireboots AS BOOLEAN
+DIM has_iceskates AS BOOLEAN
+DIM has_suction AS BOOLEAN
+DIM slide_kind AS INTEGER             ' 0 keine, 1 Eis, 2 Force
+DIM slide_dir AS INTEGER
+DIM on_water AS BOOLEAN                ' fuer Schwimm-Sprite
+
+' Ablauf
+DIM state AS STRING                    ' menu intro play win dead done
+DIM cur_level AS INTEGER
+DIM nlevels AS INTEGER
+DIM lvl_title AS STRING
+DIM lvl_hint AS STRING
+DIM lvl_time AS INTEGER
+DIM death_msg AS STRING
+DIM acc AS FLOAT
+DIM tickcount AS INTEGER
+DIM time_left AS INTEGER
+DIM start_ms AS INTEGER
+
+DIM js AS JSON_HANDLE
+DIM tiles AS IMAGE
+DIM rt AS INTEGER
+
+' ----------------------------------------------------------------------
+'  HELFER
+' ----------------------------------------------------------------------
+FUNCTION cidx(x AS INTEGER, y AS INTEGER) AS INTEGER
+    RETURN y * GW + x
+END FUNCTION
+
+FUNCTION inb(x AS INTEGER, y AS INTEGER) AS BOOLEAN
+    RETURN x >= 0 AND y >= 0 AND x < GW AND y < GH
+END FUNCTION
+
+FUNCTION tat(x AS INTEGER, y AS INTEGER) AS INTEGER
+    IF NOT inb(x, y) THEN RETURN T_WALL
+    RETURN terr[cidx(x, y)]
+END FUNCTION
+
+FUNCTION hexnib(ch AS STRING) AS INTEGER
+    DIM a AS INTEGER
+    a = ASC(ch)
+    IF a >= 48 AND a <= 57 THEN RETURN a - 48
+    IF a >= 65 AND a <= 70 THEN RETURN a - 55
+    IF a >= 97 AND a <= 102 THEN RETURN a - 87
+    RETURN 0
+END FUNCTION
+
+FUNCTION turn_left(d AS INTEGER) AS INTEGER
+    RETURN (d + 1) MOD 4
+END FUNCTION
+FUNCTION turn_right(d AS INTEGER) AS INTEGER
+    RETURN (d + 3) MOD 4
+END FUNCTION
+FUNCTION turn_back(d AS INTEGER) AS INTEGER
+    RETURN (d + 2) MOD 4
+END FUNCTION
+
+FUNCTION mob_at(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nmob - 1
+        IF mob_alive[i] AND mob_x[i] = x AND mob_y[i] = y THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+FUNCTION block_at(x AS INTEGER, y AS INTEGER) AS INTEGER
+    DIM i AS INTEGER
+    FOR i = 0 TO nblk - 1
+        IF blk_alive[i] AND blk_x[i] = x AND blk_y[i] = y THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Blockiert eine duenne Wand die Bewegung von (x,y) in Richtung d?
+FUNCTION edge_blocked(x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
+    DIM here AS INTEGER
+    here = tat(x, y)
+    DIM nx AS INTEGER
+    DIM ny AS INTEGER
+    nx = x + dxv[d]
+    ny = y + dyv[d]
+    DIM there AS INTEGER
+    there = tat(nx, ny)
+    ' Wand auf der Austritts-Kante der Quelle
+    IF d = 0 AND (here = T_WALLN OR there = T_WALLS) THEN RETURN TRUE
+    IF d = 2 AND (here = T_WALLS OR there = T_WALLN) THEN RETURN TRUE
+    IF d = 1 AND (here = T_WALLW OR there = T_WALLE) THEN RETURN TRUE
+    IF d = 3 AND (here = T_WALLE OR there = T_WALLW) THEN RETURN TRUE
+    ' Eck-Wand SE (blockiert S und E)
+    IF here = T_WALL_SE AND (d = 2 OR d = 3) THEN RETURN TRUE
+    IF there = T_WALL_SE AND (d = 0 OR d = 1) THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+' Ist das Terrain bei (x,y) fuer ein Monster eine Wand?
+FUNCTION mob_solid(mt AS INTEGER, t AS INTEGER) AS BOOLEAN
+    IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN TRUE
+    IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN TRUE
+    IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN TRUE
+    IF t = T_TOGGLE_C THEN RETURN TRUE
+    IF t = T_SOCKET OR t = T_EXIT OR t = T_CLONER THEN RETURN TRUE
+    IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN TRUE
+    IF t = T_CHIP OR t = T_DIRT THEN RETURN TRUE
+    IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN TRUE
+    IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN TRUE
+    IF t = T_THIEF OR t = T_HINT THEN RETURN TRUE
+    ' Wasser ist Wand ausser fuer Gleiter(4); Feuer Wand ausser Feuerball(1)
+    IF t = T_WATER AND mt <> 4 THEN RETURN TRUE
+    IF t = T_FIRE AND mt <> 1 THEN RETURN TRUE
+    RETURN FALSE
+END FUNCTION
+
+FUNCTION mob_can_enter(idx AS INTEGER, x AS INTEGER, y AS INTEGER, d AS INTEGER) AS BOOLEAN
+    IF NOT inb(x, y) THEN RETURN FALSE
+    IF edge_blocked(mob_x[idx], mob_y[idx], d) THEN RETURN FALSE
+    IF mob_solid(mob_type[idx], terr[cidx(x, y)]) THEN RETURN FALSE
+    IF block_at(x, y) >= 0 THEN RETURN FALSE
+    IF mob_at(x, y) >= 0 THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' ----------------------------------------------------------------------
+'  LEVEL LADEN
+' ----------------------------------------------------------------------
+SUB load_level(idx AS INTEGER)
+    DIM base AS STRING
+    base = "levels." + STR$(idx) + "."
+    lvl_title = JSON_GET_STRING(js, base + "title")
+    lvl_hint = JSON_GET_STRING(js, base + "hint")
+    lvl_time = JSON_GET_INT(js, base + "time")
+    DIM want_chips AS INTEGER
+    want_chips = JSON_GET_INT(js, base + "chips")
+    DIM up AS STRING
+    DIM lo AS STRING
+    up = JSON_GET_STRING(js, base + "upper")
+    lo = JSON_GET_STRING(js, base + "lower")
+
+    nmob = 0
+    nblk = 0
+    chips_left = 0
+    px = 1
+    py = 1
+    pdir = 2
+
+    DIM i AS INTEGER
+    FOR i = 0 TO NCELL - 1
+        DIM uc AS INTEGER
+        DIM lc AS INTEGER
+        uc = hexnib(MID$(up, i * 2, 1)) * 16 + hexnib(MID$(up, i * 2 + 1, 1))
+        lc = hexnib(MID$(lo, i * 2, 1)) * 16 + hexnib(MID$(lo, i * 2 + 1, 1))
+        DIM cx AS INTEGER
+        DIM cy AS INTEGER
+        cx = i MOD GW
+        cy = i \ GW
+        IF uc >= &H40 AND uc <= &H63 THEN
+            ' Monster
+            IF nmob < MAXMOB THEN
+                mob_x[nmob] = cx
+                mob_y[nmob] = cy
+                mob_type[nmob] = (uc - &H40) \ 4
+                mob_dir[nmob] = (uc - &H40) MOD 4
+                mob_alive[nmob] = TRUE
+                mob_trapped[nmob] = FALSE
+                nmob = nmob + 1
+            END IF
+            terr[i] = lc
+        ELSEIF uc = T_BLOCK OR (uc >= &H0E AND uc <= &H11) THEN
+            ' Block (auch Clone-Block)
+            IF nblk < MAXBLK THEN
+                blk_x[nblk] = cx
+                blk_y[nblk] = cy
+                blk_alive[nblk] = TRUE
+                nblk = nblk + 1
+            END IF
+            terr[i] = lc
+        ELSEIF uc >= T_CHIP_N AND uc <= &H6F THEN
+            ' Spieler-Start
+            px = cx
+            py = cy
+            pdir = uc - T_CHIP_N
+            terr[i] = lc
+        ELSEIF uc >= &H3C AND uc <= &H3F THEN
+            ' Chip schwimmend = Spieler-Start im Wasser
+            px = cx
+            py = cy
+            pdir = uc - &H3C
+            terr[i] = T_WATER
+        ELSE
+            terr[i] = uc
+            IF uc = T_CHIP THEN chips_left = chips_left + 1
+        END IF
+    NEXT
+    IF want_chips > 0 THEN chips_left = want_chips
+
+    ' Verdrahtung laden
+    load_wires(idx)
+
+    keys_blue = 0
+    keys_red = 0
+    keys_green = 0
+    keys_yellow = 0
+    has_flippers = FALSE
+    has_fireboots = FALSE
+    has_iceskates = FALSE
+    has_suction = FALSE
+    slide_kind = 0
+    slide_dir = pdir
+    on_water = FALSE
+    tickcount = 0
+    acc = 0.0
+    time_left = lvl_time
+    start_ms = MILLIS()
+END SUB
+
+SUB load_wires(idx AS INTEGER)
+    ntrap = 0
+    nclone = 0
+    DIM base AS STRING
+    base = "levels." + STR$(idx) + "."
+    DIM ts AS STRING
+    ts = JSON_GET_STRING(js, base + "traps")
+    IF LEN(ts) > 0 THEN
+        DIM recs AS ARRAY OF STRING
+        recs = SPLIT$(ts, ";")
+        DIM r AS INTEGER
+        FOR r = 0 TO LEN(recs) - 1
+            DIM p AS ARRAY OF STRING
+            p = SPLIT$(recs[r], ",")
+            IF LEN(p) >= 4 AND ntrap < MAXWIRE THEN
+                trap_bx[ntrap] = VAL(p[0])
+                trap_by[ntrap] = VAL(p[1])
+                trap_tx[ntrap] = VAL(p[2])
+                trap_ty[ntrap] = VAL(p[3])
+                ntrap = ntrap + 1
+            END IF
+        NEXT
+    END IF
+    DIM cs AS STRING
+    cs = JSON_GET_STRING(js, base + "cloners")
+    IF LEN(cs) > 0 THEN
+        DIM recs2 AS ARRAY OF STRING
+        recs2 = SPLIT$(cs, ";")
+        DIM r2 AS INTEGER
+        FOR r2 = 0 TO LEN(recs2) - 1
+            DIM p2 AS ARRAY OF STRING
+            p2 = SPLIT$(recs2[r2], ",")
+            IF LEN(p2) >= 4 AND nclone < MAXWIRE THEN
+                clone_bx[nclone] = VAL(p2[0])
+                clone_by[nclone] = VAL(p2[1])
+                clone_mx[nclone] = VAL(p2[2])
+                clone_my[nclone] = VAL(p2[3])
+                nclone = nclone + 1
+            END IF
+        NEXT
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
+'  AUDIO
+' ----------------------------------------------------------------------
+SUB sfx_step()
+    AUDIO_PLAY(AUDIO_TONE(220.0, 25, "sine", 0.05))
+END SUB
+SUB sfx_chip()
+    AUDIO_PLAY(AUDIO_TONE(880.0, 70, "sine", 0.18))
+END SUB
+SUB sfx_door()
+    AUDIO_PLAY(AUDIO_SFX("square", 320.0, 460.0, 2, 60, 120, 0.0, 0.0, 0.2))
+END SUB
+SUB sfx_block()
+    AUDIO_PLAY(AUDIO_TONE(120.0, 50, "square", 0.12))
+END SUB
+SUB sfx_die()
+    AUDIO_PLAY(AUDIO_SFX("noise", 220.0, -200.0, 3, 120, 260, 0.0, 0.0, 0.3))
+END SUB
+SUB sfx_win()
+    AUDIO_PLAY(AUDIO_SFX("square", 440.0, 660.0, 4, 160, 240, 4.0, 4.0, 0.28))
+    AUDIO_PLAY(AUDIO_TONE(990.0, 240, "sine", 0.2))
+END SUB
+SUB sfx_blocked()
+    AUDIO_PLAY(AUDIO_TONE(90.0, 40, "square", 0.1))
+END SUB
+
+' ----------------------------------------------------------------------
+'  SPIELER-BEWEGUNG + MECHANIK
+' ----------------------------------------------------------------------
+SUB player_die(msg AS STRING)
+    state = "dead"
+    death_msg = msg
+    sfx_die()
+END SUB
+
+' Kann der Spieler von (px,py) nach (nx,ny) in Richtung d?
+' Behandelt Tueren/Sockel/Bloecke direkt (Seiteneffekte beim Betreten via land_on).
+FUNCTION player_can_enter(nx AS INTEGER, ny AS INTEGER, d AS INTEGER) AS BOOLEAN
+    IF NOT inb(nx, ny) THEN RETURN FALSE
+    IF edge_blocked(px, py, d) THEN RETURN FALSE
+    DIM t AS INTEGER
+    t = terr[cidx(nx, ny)]
+    IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN FALSE
+    IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN FALSE
+    IF t = T_BLUEBLOCK_W THEN RETURN FALSE
+    IF t = T_TOGGLE_C THEN RETURN FALSE
+    IF t = T_CLONER THEN RETURN FALSE
+    IF t = T_DOOR_BLUE AND keys_blue <= 0 THEN RETURN FALSE
+    IF t = T_DOOR_RED AND keys_red <= 0 THEN RETURN FALSE
+    IF t = T_DOOR_GREEN AND keys_green <= 0 THEN RETURN FALSE
+    IF t = T_DOOR_YELLOW AND keys_yellow <= 0 THEN RETURN FALSE
+    IF t = T_SOCKET AND chips_left > 0 THEN RETURN FALSE
+    ' Block davor -> nur wenn schiebbar
+    DIM bi AS INTEGER
+    bi = block_at(nx, ny)
+    IF bi >= 0 THEN
+        DIM tx AS INTEGER
+        DIM ty AS INTEGER
+        tx = nx + dxv[d]
+        ty = ny + dyv[d]
+        IF NOT block_can_move(nx, ny, tx, ty, d) THEN RETURN FALSE
+    END IF
+    RETURN TRUE
+END FUNCTION
+
+FUNCTION block_can_move(fx AS INTEGER, fy AS INTEGER, tx AS INTEGER, ty AS INTEGER, d AS INTEGER) AS BOOLEAN
+    IF NOT inb(tx, ty) THEN RETURN FALSE
+    IF edge_blocked(fx, fy, d) THEN RETURN FALSE
+    IF block_at(tx, ty) >= 0 THEN RETURN FALSE
+    IF mob_at(tx, ty) >= 0 THEN RETURN FALSE
+    DIM t AS INTEGER
+    t = terr[cidx(tx, ty)]
+    IF t = T_WALL OR t = T_INVWALL OR t = T_HIDDEN OR t = T_WALL_SE THEN RETURN FALSE
+    IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN FALSE
+    IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN FALSE
+    IF t = T_TOGGLE_C OR t = T_CLONER OR t = T_SOCKET OR t = T_EXIT THEN RETURN FALSE
+    IF t = T_CHIP OR t = T_DIRT THEN RETURN FALSE
+    IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN FALSE
+    IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN FALSE
+    IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN FALSE
+    RETURN TRUE
+END FUNCTION
+
+' Block von (fx,fy) nach (tx,ty) schieben (inkl. Wasser->Dreck, Bombe).
+SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
+    DIM t AS INTEGER
+    t = terr[cidx(tx, ty)]
+    IF t = T_WATER THEN
+        terr[cidx(tx, ty)] = T_DIRT
+        blk_alive[bi] = FALSE
+        sfx_block()
+        RETURN
+    END IF
+    IF t = T_BOMB THEN
+        terr[cidx(tx, ty)] = T_FLOOR
+        blk_alive[bi] = FALSE
+        sfx_die()
+        RETURN
+    END IF
+    blk_x[bi] = tx
+    blk_y[bi] = ty
+    sfx_block()
+    ' Block toggelt gruenen Knopf
+    IF t = T_BTN_GREEN THEN toggle_walls()
+END SUB
+
+' Effekte beim Betreten von (px,py)
+SUB land_on()
+    DIM t AS INTEGER
+    t = terr[cidx(px, py)]
+    on_water = FALSE
+    IF t = T_CHIP THEN
+        terr[cidx(px, py)] = T_FLOOR
+        IF chips_left > 0 THEN chips_left = chips_left - 1
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_KEY_BLUE THEN
+        keys_blue = keys_blue + 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_KEY_RED THEN
+        keys_red = keys_red + 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_KEY_GREEN THEN
+        keys_green = keys_green + 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_KEY_YELLOW THEN
+        keys_yellow = keys_yellow + 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_FLIPPERS THEN
+        has_flippers = TRUE
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_FIREBOOTS THEN
+        has_fireboots = TRUE
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_ICESKATES THEN
+        has_iceskates = TRUE
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_SUCTION THEN
+        has_suction = TRUE
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_chip()
+        RETURN
+    END IF
+    IF t = T_DOOR_BLUE THEN
+        keys_blue = keys_blue - 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_door()
+        RETURN
+    END IF
+    IF t = T_DOOR_RED THEN
+        keys_red = keys_red - 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_door()
+        RETURN
+    END IF
+    IF t = T_DOOR_GREEN THEN
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_door()
+        RETURN
+    END IF
+    IF t = T_DOOR_YELLOW THEN
+        keys_yellow = keys_yellow - 1
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_door()
+        RETURN
+    END IF
+    IF t = T_SOCKET THEN
+        terr[cidx(px, py)] = T_FLOOR
+        sfx_door()
+        RETURN
+    END IF
+    IF t = T_THIEF THEN
+        has_flippers = FALSE
+        has_fireboots = FALSE
+        has_iceskates = FALSE
+        has_suction = FALSE
+        sfx_blocked()
+        RETURN
+    END IF
+    IF t = T_BTN_GREEN THEN
+        toggle_walls()
+        RETURN
+    END IF
+    IF t = T_BTN_BLUE THEN
+        reverse_tanks()
+        RETURN
+    END IF
+    IF t = T_BTN_RED THEN
+        fire_cloners(px, py)
+        RETURN
+    END IF
+    IF t = T_EXIT THEN
+        state = "win"
+        sfx_win()
+        RETURN
+    END IF
+    IF t = T_WATER THEN
+        IF has_flippers THEN
+            on_water = TRUE
+        ELSE
+            player_die("Ertrunken!")
+        END IF
+        RETURN
+    END IF
+    IF t = T_FIRE THEN
+        IF NOT has_fireboots THEN player_die("Verbrannt!")
+        RETURN
+    END IF
+    IF t = T_BOMB THEN
+        terr[cidx(px, py)] = T_FLOOR
+        player_die("In die Luft gesprengt!")
+        RETURN
+    END IF
+    IF t = T_TELEPORT THEN
+        do_teleport()
+        RETURN
+    END IF
+    IF t = T_PASSONCE THEN
+        terr[cidx(px, py)] = T_WALL    ' wird hinter dir zur Wand
+        RETURN
+    END IF
+END SUB
+
+' Eis-/Force-Rutschzustand nach dem Landen bestimmen
+SUB update_slide()
+    DIM t AS INTEGER
+    t = terr[cidx(px, py)]
+    slide_kind = 0
+    IF t = T_ICE AND NOT has_iceskates THEN
+        slide_kind = 1
+        slide_dir = pdir
+    ELSEIF (t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2) AND NOT has_iceskates THEN
+        slide_kind = 1
+        slide_dir = corner_redirect(t, pdir)
+        pdir = slide_dir
+    ELSEIF t = T_FORCE_N AND NOT has_suction THEN
+        slide_kind = 2
+        slide_dir = 0
+    ELSEIF t = T_FORCE_W AND NOT has_suction THEN
+        slide_kind = 2
+        slide_dir = 1
+    ELSEIF t = T_FORCE_S AND NOT has_suction THEN
+        slide_kind = 2
+        slide_dir = 2
+    ELSEIF t = T_FORCE_E AND NOT has_suction THEN
+        slide_kind = 2
+        slide_dir = 3
+    ELSEIF t = T_FORCE_RND AND NOT has_suction THEN
+        slide_kind = 2
+        slide_dir = RANDINT(0, 3)
+    END IF
+END SUB
+
+FUNCTION corner_redirect(t AS INTEGER, m AS INTEGER) AS INTEGER
+    ' offene Richtungen je Eck-Tile
+    DIM oa AS INTEGER
+    DIM ob AS INTEGER
+    IF t = T_ICE_NW2 THEN
+        oa = 0
+        ob = 1
+    ELSEIF t = T_ICE_NE2 THEN
+        oa = 0
+        ob = 3
+    ELSEIF t = T_ICE_SE2 THEN
+        oa = 2
+        ob = 3
+    ELSE
+        oa = 2
+        ob = 1
+    END IF
+    IF m = turn_back(oa) THEN RETURN ob
+    IF m = turn_back(ob) THEN RETURN oa
+    RETURN m
+END FUNCTION
+
+SUB do_teleport()
+    ' naechsten Teleporter in Rueckwaerts-Lesereihenfolge suchen, von dem aus
+    ' in pdir ausgetreten werden kann
+    DIM start AS INTEGER
+    start = cidx(px, py)
+    DIM c AS INTEGER
+    c = start - 1
+    DIM guard AS INTEGER
+    guard = 0
+    WHILE guard < NCELL
+        IF c < 0 THEN c = NCELL - 1
+        IF terr[c] = T_TELEPORT AND c <> start THEN
+            DIM tx2 AS INTEGER
+            DIM ty2 AS INTEGER
+            tx2 = c MOD GW
+            ty2 = c \ GW
+            DIM ex AS INTEGER
+            DIM ey AS INTEGER
+            ex = tx2 + dxv[pdir]
+            ey = ty2 + dyv[pdir]
+            ' Spieler dorthin setzen (Austritt versucht der naechste Tick)
+            px = tx2
+            py = ty2
+            RETURN
+        END IF
+        c = c - 1
+        guard = guard + 1
+    WEND
+END SUB
+
+' Ein Schritt des Spielers in Richtung d
+SUB player_step(d AS INTEGER)
+    pdir = d
+    DIM nx AS INTEGER
+    DIM ny AS INTEGER
+    nx = px + dxv[d]
+    ny = py + dyv[d]
+    IF NOT player_can_enter(nx, ny, d) THEN
+        ' blockiert: blaue Schein-Bloecke aufdecken
+        DIM t0 AS INTEGER
+        t0 = tat(nx, ny)
+        IF t0 = T_BLUEBLOCK_F THEN terr[cidx(nx, ny)] = T_FLOOR
+        IF t0 = T_BLUEBLOCK_W THEN terr[cidx(nx, ny)] = T_WALL
+        IF t0 = T_HIDDEN THEN terr[cidx(nx, ny)] = T_WALL
+        slide_kind = 0
+        sfx_blocked()
+        RETURN
+    END IF
+    ' evtl. Block schieben
+    DIM bi AS INTEGER
+    bi = block_at(nx, ny)
+    IF bi >= 0 THEN
+        push_block(bi, nx + dxv[d], ny + dyv[d])
+    END IF
+    px = nx
+    py = ny
+    land_on()
+    IF state <> "play" THEN RETURN
+    ' Kollision mit Monster?
+    IF mob_at(px, py) >= 0 THEN
+        player_die("Von einem Roboter erwischt!")
+        RETURN
+    END IF
+    update_slide()
+    IF slide_kind = 0 THEN sfx_step()
+END SUB
+
+' ----------------------------------------------------------------------
+'  GERAETE
+' ----------------------------------------------------------------------
+SUB toggle_walls()
+    DIM i AS INTEGER
+    FOR i = 0 TO NCELL - 1
+        IF terr[i] = T_TOGGLE_C THEN
+            terr[i] = T_TOGGLE_O
+        ELSEIF terr[i] = T_TOGGLE_O THEN
+            terr[i] = T_TOGGLE_C
+        END IF
+    NEXT
+    sfx_door()
+END SUB
+
+SUB reverse_tanks()
+    DIM i AS INTEGER
+    FOR i = 0 TO nmob - 1
+        IF mob_alive[i] AND mob_type[i] = 3 THEN
+            mob_dir[i] = turn_back(mob_dir[i])
+        END IF
+    NEXT
+    sfx_door()
+END SUB
+
+SUB fire_cloners(bx AS INTEGER, by AS INTEGER)
+    DIM i AS INTEGER
+    FOR i = 0 TO nclone - 1
+        IF clone_bx[i] = bx AND clone_by[i] = by THEN
+            clone_one(clone_mx[i], clone_my[i])
+        END IF
+    NEXT
+END SUB
+
+SUB clone_one(mx AS INTEGER, my AS INTEGER)
+    DIM src AS INTEGER
+    src = mob_at(mx, my)
+    IF src < 0 THEN RETURN
+    DIM d AS INTEGER
+    d = mob_dir[src]
+    DIM nx AS INTEGER
+    DIM ny AS INTEGER
+    nx = mx + dxv[d]
+    ny = my + dyv[d]
+    IF nmob < MAXMOB AND mob_can_enter(src, nx, ny, d) THEN
+        mob_x[nmob] = nx
+        mob_y[nmob] = ny
+        mob_dir[nmob] = d
+        mob_type[nmob] = mob_type[src]
+        mob_alive[nmob] = TRUE
+        mob_trapped[nmob] = FALSE
+        nmob = nmob + 1
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
+'  MONSTER-KI
+' ----------------------------------------------------------------------
+SUB mob_try(idx AS INTEGER, d AS INTEGER)
+    ' versucht Bewegung; bei Erfolg world-update; setzt mob_did
+    mob_did = FALSE
+    IF mob_can_enter(idx, mob_x[idx] + dxv[d], mob_y[idx] + dyv[d], d) THEN
+        mob_x[idx] = mob_x[idx] + dxv[d]
+        mob_y[idx] = mob_y[idx] + dyv[d]
+        mob_dir[idx] = d
+        mob_did = TRUE
+    END IF
+END SUB
+
+SUB move_monsters()
+    DIM i AS INTEGER
+    FOR i = 0 TO nmob - 1
+        IF NOT mob_alive[i] THEN
+            ' skip
+        ELSEIF mob_trapped[i] THEN
+            ' in Falle gefangen
+        ELSE
+            DIM mt AS INTEGER
+            mt = mob_type[i]
+            ' langsame Typen (Teeth/Blob) nur jeden 2. Tick
+            DIM slow AS BOOLEAN
+            slow = (mt = 5 OR mt = 7)
+            IF slow AND (tickcount MOD 2) = 1 THEN
+                ' diesen Tick aussetzen
+            ELSE
+                ai_move(i, mt)
+                ' nach Bewegung: Terrain-Folgen fuer Monster
+                mob_terrain(i)
+            END IF
+        END IF
+    NEXT
+    ' Kollision Monster-auf-Spieler
+    IF mob_at(px, py) >= 0 AND state = "play" THEN
+        player_die("Von einem Roboter erwischt!")
+    END IF
+END SUB
+
+SUB ai_move(i AS INTEGER, mt AS INTEGER)
+    DIM d AS INTEGER
+    d = mob_dir[i]
+    IF mt = 0 THEN
+        ' Kaefer: linke Wand
+        mob_order4(i, turn_left(d), d, turn_right(d), turn_back(d))
+    ELSEIF mt = 8 THEN
+        ' Paramecium: rechte Wand
+        mob_order4(i, turn_right(d), d, turn_left(d), turn_back(d))
+    ELSEIF mt = 4 THEN
+        ' Gleiter: vor, links, rechts, zurueck
+        mob_order4(i, d, turn_left(d), turn_right(d), turn_back(d))
+    ELSEIF mt = 1 THEN
+        ' Feuerball: vor, rechts, links, zurueck
+        mob_order4(i, d, turn_right(d), turn_left(d), turn_back(d))
+    ELSEIF mt = 2 THEN
+        ' Ball: vor, sonst zurueck (prallt)
+        mob_try(i, d)
+        IF NOT mob_did THEN mob_try(i, turn_back(d))
+    ELSEIF mt = 3 THEN
+        ' Tank: nur vor; sonst stehen
+        mob_try(i, d)
+    ELSEIF mt = 6 THEN
+        ' Walker: vor; sonst zufaellige neue Richtung
+        mob_try(i, d)
+        IF NOT mob_did THEN
+            DIM tries AS INTEGER
+            tries = 0
+            WHILE tries < 6 AND NOT mob_did
+                mob_try(i, RANDINT(0, 3))
+                tries = tries + 1
+            WEND
+        END IF
+    ELSEIF mt = 7 THEN
+        ' Blob: zufaellig
+        mob_try(i, RANDINT(0, 3))
+    ELSEIF mt = 5 THEN
+        ' Teeth: verfolgt den Spieler
+        teeth_chase(i)
+    END IF
+END SUB
+
+SUB mob_order4(i AS INTEGER, a AS INTEGER, b AS INTEGER, c AS INTEGER, e AS INTEGER)
+    mob_try(i, a)
+    IF mob_did THEN RETURN
+    mob_try(i, b)
+    IF mob_did THEN RETURN
+    mob_try(i, c)
+    IF mob_did THEN RETURN
+    mob_try(i, e)
+END SUB
+
+SUB teeth_chase(i AS INTEGER)
+    DIM dx AS INTEGER
+    DIM dy AS INTEGER
+    dx = px - mob_x[i]
+    dy = py - mob_y[i]
+    DIM dh AS INTEGER
+    DIM dv AS INTEGER
+    dh = 3
+    IF dx < 0 THEN dh = 1
+    dv = 2
+    IF dy < 0 THEN dv = 0
+    ' groessere Achse zuerst
+    IF ABS(dx) >= ABS(dy) THEN
+        IF dx <> 0 THEN mob_try(i, dh)
+        IF NOT mob_did AND dy <> 0 THEN mob_try(i, dv)
+    ELSE
+        IF dy <> 0 THEN mob_try(i, dv)
+        IF NOT mob_did AND dx <> 0 THEN mob_try(i, dh)
+    END IF
+END SUB
+
+' Terrain-Folgen, wenn ein Monster eine Zelle betritt
+SUB mob_terrain(i AS INTEGER)
+    DIM t AS INTEGER
+    t = terr[cidx(mob_x[i], mob_y[i])]
+    IF t = T_BOMB THEN
+        terr[cidx(mob_x[i], mob_y[i])] = T_FLOOR
+        mob_alive[i] = FALSE
+    ELSEIF t = T_TRAP THEN
+        mob_trapped[i] = TRUE
+    ELSEIF t = T_BTN_GREEN THEN
+        toggle_walls()
+    ELSEIF t = T_BTN_BLUE THEN
+        reverse_tanks()
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
+'  WELT-TICK
+' ----------------------------------------------------------------------
+DIM want_dir AS INTEGER
+
+SUB world_tick()
+    tickcount = tickcount + 1
+    ' --- Spieler ---
+    IF slide_kind = 1 THEN
+        ' Eis: kein Steuern, weiter in slide_dir bis blockiert
+        IF player_can_enter(px + dxv[slide_dir], py + dyv[slide_dir], slide_dir) THEN
+            player_step(slide_dir)
+        ELSE
+            slide_kind = 0
+            IF want_dir >= 0 THEN player_step(want_dir)
+        END IF
+    ELSEIF slide_kind = 2 THEN
+        ' Force: per Eingabe ueberschreibbar
+        IF want_dir >= 0 AND player_can_enter(px + dxv[want_dir], py + dyv[want_dir], want_dir) THEN
+            player_step(want_dir)
+        ELSEIF player_can_enter(px + dxv[slide_dir], py + dyv[slide_dir], slide_dir) THEN
+            player_step(slide_dir)
+        ELSE
+            slide_kind = 0
+        END IF
+    ELSE
+        IF want_dir >= 0 THEN player_step(want_dir)
+    END IF
+    IF state <> "play" THEN RETURN
+    ' --- Monster ---
+    move_monsters()
+    ' --- Zeitlimit ---
+    IF lvl_time > 0 THEN
+        time_left = lvl_time - ((MILLIS() - start_ms) \ 1000)
+        IF time_left <= 0 THEN
+            time_left = 0
+            player_die("Zeit abgelaufen!")
+        END IF
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
+'  RENDERN
+' ----------------------------------------------------------------------
+SUB draw_tile(code AS INTEGER, sx AS INTEGER, sy AS INTEGER)
+    DIM srcx AS INTEGER
+    DIM srcy AS INTEGER
+    srcx = (code MOD 16) * TILE
+    srcy = (code \ 16) * TILE
+    DRAWIMAGEPART(tiles, srcx, srcy, TILE, TILE, sx, sy)
+END SUB
+
+DIM camx AS INTEGER
+DIM camy AS INTEGER
+
+SUB draw_board()
+    camx = px - VIEW \ 2
+    camy = py - VIEW \ 2
+    IF camx < 0 THEN camx = 0
+    IF camy < 0 THEN camy = 0
+    IF camx > GW - VIEW THEN camx = GW - VIEW
+    IF camy > GH - VIEW THEN camy = GH - VIEW
+
+    DIM vy AS INTEGER
+    DIM vx AS INTEGER
+    FOR vy = 0 TO VIEW - 1
+        FOR vx = 0 TO VIEW - 1
+            DIM cx AS INTEGER
+            DIM cy AS INTEGER
+            cx = camx + vx
+            cy = camy + vy
+            DIM sx AS INTEGER
+            DIM sy AS INTEGER
+            sx = BX + vx * TILE
+            sy = BY + vy * TILE
+            draw_tile(T_FLOOR, sx, sy)
+            DIM t AS INTEGER
+            t = terr[cidx(cx, cy)]
+            IF t <> T_FLOOR THEN draw_tile(t, sx, sy)
+        NEXT
+    NEXT
+    ' Bloecke
+    DIM i AS INTEGER
+    FOR i = 0 TO nblk - 1
+        IF blk_alive[i] AND blk_x[i] >= camx AND blk_x[i] < camx + VIEW AND blk_y[i] >= camy AND blk_y[i] < camy + VIEW THEN
+            draw_tile(T_BLOCK, BX + (blk_x[i] - camx) * TILE, BY + (blk_y[i] - camy) * TILE)
+        END IF
+    NEXT
+    ' Monster
+    FOR i = 0 TO nmob - 1
+        IF mob_alive[i] AND mob_x[i] >= camx AND mob_x[i] < camx + VIEW AND mob_y[i] >= camy AND mob_y[i] < camy + VIEW THEN
+            DIM mc AS INTEGER
+            mc = &H40 + mob_type[i] * 4 + mob_dir[i]
+            draw_tile(mc, BX + (mob_x[i] - camx) * TILE, BY + (mob_y[i] - camy) * TILE)
+        END IF
+    NEXT
+    ' Spieler
+    DIM pc AS INTEGER
+    pc = T_CHIP_N + pdir
+    IF on_water THEN pc = &H3C + pdir
+    draw_tile(pc, BX + (px - camx) * TILE, BY + (py - camy) * TILE)
+END SUB
+
+SUB draw_hud()
+    DIM x AS INTEGER
+    x = HUDX
+    BOX(x - 6, BY, LOGW - 6, BY + VIEW * TILE, RGB(22, 28, 40))
+    RECT(x - 6, BY, LOGW - 6, BY + VIEW * TILE, RGB(60, 80, 110))
+    TEXT(x, BY + 6, "CIRCUIT", RGB(120, 240, 230))
+    TEXT(x, BY + 22, "RUNNER", RGB(120, 240, 230))
+
+    TEXT(x, BY + 46, "LEVEL " + STR$(cur_level + 1), RGB(220, 225, 235))
+    DIM ty AS INTEGER
+    ty = BY + 64
+    draw_tile(T_CHIP, x, ty)
+    TEXT(x + TILE + 4, ty + 5, STR$(chips_left), RGB(120, 240, 140))
+
+    ' Schluessel
+    ty = ty + TILE + 4
+    draw_tile(T_KEY_BLUE, x, ty)
+    TEXT(x + TILE + 2, ty + 5, STR$(keys_blue), RGB(200, 210, 230))
+    draw_tile(T_KEY_RED, x + 56, ty)
+    TEXT(x + 56 + TILE + 2, ty + 5, STR$(keys_red), RGB(200, 210, 230))
+    ty = ty + TILE + 2
+    draw_tile(T_KEY_GREEN, x, ty)
+    TEXT(x + TILE + 2, ty + 5, STR$(keys_green), RGB(200, 210, 230))
+    draw_tile(T_KEY_YELLOW, x + 56, ty)
+    TEXT(x + 56 + TILE + 2, ty + 5, STR$(keys_yellow), RGB(200, 210, 230))
+
+    ' Stiefel (nur wenn vorhanden)
+    ty = ty + TILE + 6
+    DIM bx AS INTEGER
+    bx = x
+    IF has_flippers THEN
+        draw_tile(T_FLIPPERS, bx, ty)
+        bx = bx + TILE + 2
+    END IF
+    IF has_fireboots THEN
+        draw_tile(T_FIREBOOTS, bx, ty)
+        bx = bx + TILE + 2
+    END IF
+    IF has_iceskates THEN
+        draw_tile(T_ICESKATES, bx, ty)
+        bx = bx + TILE + 2
+    END IF
+    IF has_suction THEN
+        draw_tile(T_SUCTION, bx, ty)
+        bx = bx + TILE + 2
+    END IF
+
+    IF lvl_time > 0 THEN
+        TEXT(x, BY + VIEW * TILE - 18, "ZEIT " + STR$(time_left), RGB(240, 220, 120))
+    END IF
+END SUB
+
+SUB ctext(cx AS INTEGER, y AS INTEGER, s AS STRING, col AS INTEGER)
+    DIM w AS INTEGER
+    w = TEXT_WIDTH(s)
+    TEXT(cx - w \ 2, y, s, col)
+END SUB
+
+SUB draw_scene()
+    CLS(RGB(14, 18, 26))
+    IF state = "menu" THEN
+        ctext(LOGW \ 2, 60, "CIRCUIT RUNNER", RGB(120, 240, 230))
+        ctext(LOGW \ 2, 90, "ein Kachel-Puzzle", RGB(150, 160, 180))
+        ctext(LOGW \ 2, 138, "LEER / ENTER = Start", RGB(220, 225, 235))
+        ctext(LOGW \ 2, 164, "Pfeile oder WASD bewegen", RGB(150, 160, 180))
+        ctext(LOGW \ 2, 184, "R = neu    ESC = Menue", RGB(150, 160, 180))
+        ctext(LOGW \ 2, 214, STR$(nlevels) + " Level geladen", RGB(120, 200, 140))
+    ELSEIF state = "intro" THEN
+        ctext(LOGW \ 2, 50, "LEVEL " + STR$(cur_level + 1), RGB(120, 240, 230))
+        ctext(LOGW \ 2, 80, lvl_title, RGB(230, 235, 245))
+        IF LEN(lvl_hint) > 0 THEN draw_wrapped(lvl_hint, 30, 120, LOGW - 30, RGB(180, 190, 210))
+        ctext(LOGW \ 2, 210, "LEER = los", RGB(200, 210, 230))
+    ELSEIF state = "play" OR state = "win" OR state = "dead" THEN
+        draw_board()
+        draw_hud()
+        IF state = "win" THEN
+            BOX(40, 96, LOGW - 40, 160, RGB(16, 30, 24))
+            RECT(40, 96, LOGW - 40, 160, RGB(80, 220, 140))
+            ctext(LOGW \ 2, 112, "LEVEL GESCHAFFT!", RGB(120, 240, 160))
+            ctext(LOGW \ 2, 136, "LEER = weiter", RGB(200, 220, 210))
+        ELSEIF state = "dead" THEN
+            BOX(40, 96, LOGW - 40, 160, RGB(34, 16, 16))
+            RECT(40, 96, LOGW - 40, 160, RGB(220, 90, 90))
+            ctext(LOGW \ 2, 112, death_msg, RGB(245, 130, 130))
+            ctext(LOGW \ 2, 136, "R / LEER = nochmal", RGB(230, 200, 200))
+        END IF
+    ELSEIF state = "done" THEN
+        ctext(LOGW \ 2, 90, "ALLE LEVEL GESCHAFFT!", RGB(120, 240, 160))
+        ctext(LOGW \ 2, 120, "Gut gemacht, Runner.", RGB(220, 225, 235))
+        ctext(LOGW \ 2, 160, "LEER = Menue", RGB(200, 210, 230))
+    END IF
+END SUB
+
+SUB draw_wrapped(s AS STRING, x0 AS INTEGER, y0 AS INTEGER, x1 AS INTEGER, col AS INTEGER)
+    DIM words AS ARRAY OF STRING
+    words = SPLIT$(s, " ")
+    DIM line AS STRING
+    line = ""
+    DIM yy AS INTEGER
+    yy = y0
+    DIM maxw AS INTEGER
+    maxw = x1 - x0
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(words) - 1
+        DIM cand AS STRING
+        IF LEN(line) = 0 THEN
+            cand = words[i]
+        ELSE
+            cand = line + " " + words[i]
+        END IF
+        IF TEXT_WIDTH(cand) > maxw AND LEN(line) > 0 THEN
+            TEXT(x0, yy, line, col)
+            yy = yy + 18
+            line = words[i]
+        ELSE
+            line = cand
+        END IF
+    NEXT
+    IF LEN(line) > 0 THEN TEXT(x0, yy, line, col)
+END SUB
+
+' ----------------------------------------------------------------------
+'  EINGABE
+' ----------------------------------------------------------------------
+SUB read_intent()
+    want_dir = -1
+    IF INPUT_PRESSED("up") THEN want_dir = 0
+    IF INPUT_PRESSED("left") THEN want_dir = 1
+    IF INPUT_PRESSED("down") THEN want_dir = 2
+    IF INPUT_PRESSED("right") THEN want_dir = 3
+    IF want_dir < 0 THEN
+        IF INPUT_HELD("up") THEN want_dir = 0
+        IF INPUT_HELD("left") THEN want_dir = 1
+        IF INPUT_HELD("down") THEN want_dir = 2
+        IF INPUT_HELD("right") THEN want_dir = 3
+    END IF
+END SUB
+
+' ======================================================================
+'  INITIALISIERUNG
+' ======================================================================
+IF FULLSCREEN THEN
+    SCREEN_NATIVE("Circuit Runner")
+ELSE
+    SCREEN(LOGW * 3, LOGH * 3, "Circuit Runner")
+END IF
+SETFPS(60)
+WINDOW_ESC_QUIT(FALSE)
+
+dxv[0] = 0
+dyv[0] = -1
+dxv[1] = -1
+dyv[1] = 0
+dxv[2] = 0
+dyv[2] = 1
+dxv[3] = 1
+dyv[3] = 0
+
+rt = RENDERTARGET_NEW(LOGW, LOGH)
+tiles = LOADIMAGE("assets/tiles.png")
+
+js = JSON_LOAD("levels/circuit_runner.json")
+nlevels = JSON_LEN(js, "levels")
+
+INPUT_BIND("up", KEY_UP, KEY_W)
+INPUT_BIND("down", KEY_DOWN, KEY_S)
+INPUT_BIND("left", KEY_LEFT, KEY_A)
+INPUT_BIND("right", KEY_RIGHT, KEY_D)
+INPUT_BIND("confirm", KEY_SPACE, KEY_ENTER)
+INPUT_BIND("restart", KEY_R)
+INPUT_BIND("skip", KEY_N)
+INPUT_BIND("back", KEY_ESCAPE)
+
+state = "menu"
+cur_level = 0
+want_dir = -1
+
+' ======================================================================
+'  HAUPTSCHLEIFE
+' ======================================================================
+WHILE NOT QUITREQUESTED()
+    INPUT_UPDATE()
+
+    IF state = "menu" THEN
+        IF INPUT_PRESSED("back") THEN BREAK
+        IF INPUT_PRESSED("confirm") THEN
+            cur_level = 0
+            load_level(cur_level)
+            state = "intro"
+        END IF
+    ELSEIF state = "intro" THEN
+        IF INPUT_PRESSED("back") THEN state = "menu"
+        IF INPUT_PRESSED("confirm") THEN state = "play"
+    ELSEIF state = "play" THEN
+        IF INPUT_PRESSED("back") THEN state = "menu"
+        IF INPUT_PRESSED("restart") THEN load_level(cur_level)
+        IF INPUT_PRESSED("skip") THEN
+            cur_level = cur_level + 1
+            IF cur_level >= nlevels THEN
+                state = "done"
+            ELSE
+                load_level(cur_level)
+                state = "intro"
+            END IF
+        END IF
+        IF state = "play" THEN
+            read_intent()
+            acc = acc + DELTA() * 1000.0
+            DIM guard AS INTEGER
+            guard = 0
+            WHILE acc >= TICK_MS AND state = "play" AND guard < 8
+                acc = acc - TICK_MS
+                world_tick()
+                guard = guard + 1
+            WEND
+        END IF
+    ELSEIF state = "win" THEN
+        IF INPUT_PRESSED("confirm") THEN
+            cur_level = cur_level + 1
+            IF cur_level >= nlevels THEN
+                state = "done"
+            ELSE
+                load_level(cur_level)
+                state = "intro"
+            END IF
+        END IF
+    ELSEIF state = "dead" THEN
+        IF INPUT_PRESSED("confirm") OR INPUT_PRESSED("restart") THEN
+            load_level(cur_level)
+            state = "play"
+        END IF
+        IF INPUT_PRESSED("back") THEN state = "menu"
+    ELSEIF state = "done" THEN
+        IF INPUT_PRESSED("confirm") THEN state = "menu"
+    END IF
+
+    RENDERTARGET_BEGIN(rt)
+    draw_scene()
+    RENDERTARGET_END()
+
+    DIM sc AS FLOAT
+    DIM scx AS FLOAT
+    DIM scy AS FLOAT
+    scx = SCREENWIDTH() * 1.0 / LOGW
+    scy = SCREENHEIGHT() * 1.0 / LOGH
+    IF scx < scy THEN
+        sc = scx
+    ELSE
+        sc = scy
+    END IF
+    DIM offx AS INTEGER
+    DIM offy AS INTEGER
+    offx = (SCREENWIDTH() - INT(LOGW * sc)) \ 2
+    offy = (SCREENHEIGHT() - INT(LOGH * sc)) \ 2
+    CLS(RGB(0, 0, 0))
+    RENDERTARGET_DRAW(rt, offx, offy, sc)
+    FLIP()
+WEND
