@@ -264,18 +264,46 @@ def t_ice():
     return c.im
 
 
-def t_ice_corner(kind):
-    c = C(); c.im.alpha_composite(t_ice())
-    walls = {"SE": ("S", "E"), "SW": ("S", "W"), "NW": ("N", "W"), "NE": ("N", "E")}[kind]
-    for d in walls:
-        if d == "S":
-            c.vgrad(0, S - 5, S - 1, S - 1, WALL, WALL_D)
-        elif d == "N":
-            c.vgrad(0, 0, S - 1, 4, WALL_L, WALL)
-        elif d == "W":
-            c.rect(0, 0, 4, S - 1, WALL)
+def ice_corner(closed):
+    """Eis-Ecke. `closed` = Ecke, an der die zwei Waende zusammenstossen
+    (die offene/gekruemmte Seite liegt gegenueber). Zeigt eine deutliche
+    gekruemmte Eis-Rinne, die die zwei OFFENEN Kanten verbindet."""
+    c = C()
+    c.im.alpha_composite(t_ice())
+    tw = 7
+    edges = {"NW": ("N", "W"), "NE": ("N", "E"), "SE": ("S", "E"), "SW": ("S", "W")}[closed]
+    for e in edges:
+        if e == "N":
+            c.vgrad(0, 0, S - 1, tw - 1, WALL_L, WALL); c.hline(0, S - 1, tw - 1, WALL_DD)
+        elif e == "S":
+            c.vgrad(0, S - tw, S - 1, S - 1, WALL, WALL_D); c.hline(0, S - 1, S - tw, WALL_L)
+        elif e == "W":
+            c.rect(0, 0, tw - 1, S - 1, WALL); c.vline(tw - 1, 0, S - 1, WALL_DD)
         else:
-            c.rect(S - 5, 0, S - 1, S - 1, WALL_D)
+            c.rect(S - tw, 0, S - 1, S - 1, WALL); c.vline(S - tw, 0, S - 1, WALL_L)
+    # Nieten in der Wand-Ecke
+    corner_pt = {"NW": (3, 3), "NE": (S - 4, 3), "SE": (S - 4, S - 4), "SW": (3, S - 4)}[closed]
+    c.disc(corner_pt[0], corner_pt[1], 1.4, WALL_DD); c.set(corner_pt[0], corner_pt[1], WALL_L)
+    # gekruemmte Eis-Rinne = Viertelkreis um die geschlossene Ecke
+    cen = {"NW": (tw - 1, tw - 1), "NE": (S - tw, tw - 1),
+           "SE": (S - tw, S - tw), "SW": (tw - 1, S - tw)}[closed]
+    cx, cy = cen
+    a0, a1 = {"NW": (0, 90), "NE": (90, 180), "SE": (180, 270), "SW": (270, 360)}[closed]
+    r1, r2 = 12, 20
+    deg = a0 * 4
+    while deg <= a1 * 4:
+        a = math.radians(deg / 4.0)
+        ca, sa = math.cos(a), math.sin(a)
+        r = r1
+        while r <= r2:                                  # Rinne fuellen
+            c.set(cx + r * ca, cy + r * sa, ICE_D)
+            r += 0.5
+        c.set(cx + r1 * ca, cy + r1 * sa, ICE_DD)       # innere Kante
+        c.set(cx + r2 * ca, cy + r2 * sa, ICE_DD)       # aeussere Kante
+        rm = (r1 + r2) / 2.0
+        c.set(cx + rm * ca, cy + rm * sa, ICE_L)        # Glanz-Mittellinie
+        c.set(cx + (rm + 1) * ca, cy + (rm + 1) * sa, ICE_L)
+        deg += 1
     return c.im
 
 
@@ -809,8 +837,12 @@ def build():
     cells[0x17] = t_door(KEYRED, KEYRED_D, KEYRED_L)
     cells[0x18] = t_door(KEYGRN, KEYGRN_D, KEYGRN_L)
     cells[0x19] = t_door(KEYYEL, KEYYEL_D, KEYYEL_L)
-    cells[0x1A] = t_ice_corner("NW"); cells[0x1B] = t_ice_corner("NE")
-    cells[0x1C] = t_ice_corner("SE"); cells[0x1D] = t_ice_corner("SW")
+    # CC-Codes: 1A=offen SE, 1B=offen SW, 1C=offen NW, 1D=offen NE
+    # -> geschlossene (Wand-)Ecke ist jeweils gegenueber
+    cells[0x1A] = ice_corner("NW")   # offen SE
+    cells[0x1B] = ice_corner("NE")   # offen SW
+    cells[0x1C] = ice_corner("SE")   # offen NW
+    cells[0x1D] = ice_corner("SW")   # offen NE
     cells[0x1E] = t_blue_wall(); cells[0x1F] = t_blue_wall()
     cells[0x21] = t_thief(); cells[0x22] = t_socket()
     cells[0x23] = t_button(KEYGRN, KEYGRN_L); cells[0x24] = t_button(KEYRED, KEYRED_L)

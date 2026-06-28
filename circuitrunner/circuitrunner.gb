@@ -861,20 +861,21 @@ END FUNCTION
 
 FUNCTION corner_redirect(t AS INTEGER, m AS INTEGER) AS INTEGER
     ' offene Richtungen je Eck-Tile
+    ' offene Kanten je CC-Code (1A=SE,1B=SW,1C=NW,1D=NE); 0=N 1=W 2=S 3=E
     DIM oa AS INTEGER
     DIM ob AS INTEGER
     IF t = T_ICE_NW2 THEN
-        oa = 0
-        ob = 1
+        oa = 2
+        ob = 3
     ELSEIF t = T_ICE_NE2 THEN
-        oa = 0
-        ob = 3
-    ELSEIF t = T_ICE_SE2 THEN
-        oa = 2
-        ob = 3
-    ELSE
         oa = 2
         ob = 1
+    ELSEIF t = T_ICE_SE2 THEN
+        oa = 0
+        ob = 1
+    ELSE
+        oa = 0
+        ob = 3
     END IF
     IF m = turn_back(oa) THEN RETURN ob
     IF m = turn_back(ob) THEN RETURN oa
