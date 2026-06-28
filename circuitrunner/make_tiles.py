@@ -763,6 +763,18 @@ def build():
          "codes": {f"0x{c:02X}": names.get(c, "?") for c in sorted(cells)}},
         indent=2), encoding="utf-8")
 
+    # ---- .gbsprite (im Sprite-Editor `gbsprites` zu oeffnen/bearbeiten)
+    try:
+        from gamebasic.spriteeditor.document import SpriteDoc, Frame
+        doc = SpriteDoc(S, S)
+        doc.frames = [Frame(pixels=cells[c].convert("RGBA"),
+                            name=f"{c:02X}_{names.get(c, '?')}")
+                      for c in sorted(cells)]
+        doc.save_native(ASSETS / "tiles.gbsprite")
+        print("Editierbar:    assets/tiles.gbsprite (gbsprites)")
+    except Exception as e:  # SpriteDoc optional
+        print(f"(.gbsprite uebersprungen: {e})")
+
     _contact(cells, names, ASSETS / "_contact.png")
     print(f"tiles.png  ({cols}x{rows} Zellen a {S}px) -- {len(cells)} Kacheln")
     print("Kontaktbogen: assets/_contact.png")

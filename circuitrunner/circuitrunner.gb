@@ -164,6 +164,14 @@ DIM js AS JSON_HANDLE
 DIM tiles AS IMAGE
 DIM rt AS INTEGER
 
+' Level-Set-Auswahl (alle .json in levels/ + levels/_downloaded/)
+CONST MAXSETS = 64
+DIM set_path[MAXSETS] AS STRING
+DIM set_name[MAXSETS] AS STRING
+DIM set_count[MAXSETS] AS INTEGER
+DIM nsets AS INTEGER
+DIM sel_set AS INTEGER
+
 ' ----------------------------------------------------------------------
 '  HELFER
 ' ----------------------------------------------------------------------
@@ -262,6 +270,47 @@ FUNCTION mob_can_enter(idx AS INTEGER, x AS INTEGER, y AS INTEGER, d AS INTEGER)
     IF mob_at(x, y) >= 0 THEN RETURN FALSE
     RETURN TRUE
 END FUNCTION
+
+' ----------------------------------------------------------------------
+'  LEVEL-SETS FINDEN
+' ----------------------------------------------------------------------
+SUB scan_sets()
+    nsets = 0
+    add_sets_in("levels")
+    add_sets_in("levels/_downloaded")
+END SUB
+
+SUB add_sets_in(dir AS STRING)
+    IF NOT DIREXISTS(dir) THEN RETURN
+    DIM files AS ARRAY OF STRING
+    files = DIRLIST(dir)
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(files) - 1
+        DIM fn AS STRING
+        fn = files[i]
+        IF RIGHT$(LOWER$(fn), 5) = ".json" AND nsets < MAXSETS THEN
+            DIM path AS STRING
+            path = PATHJOIN(dir, fn)
+            TRY
+                DIM h AS JSON_HANDLE
+                h = JSON_LOAD(path)
+                DIM cnt AS INTEGER
+                cnt = JSON_LEN(h, "levels")
+                IF cnt > 0 THEN
+                    set_path[nsets] = path
+                    DIM nm AS STRING
+                    nm = JSON_GET_STRING(h, "name")
+                    IF LEN(nm) = 0 THEN nm = fn
+                    set_name[nsets] = nm
+                    set_count[nsets] = cnt
+                    nsets = nsets + 1
+                END IF
+            CATCH e
+                ' ungueltige JSON ueberspringen
+            END TRY
+        END IF
+    NEXT
+END SUB
 
 ' ----------------------------------------------------------------------
 '  LEVEL LADEN
@@ -1113,12 +1162,35 @@ END SUB
 SUB draw_scene()
     CLS(RGB(14, 18, 26))
     IF state = "menu" THEN
-        ctext(LOGW \ 2, 60, "CIRCUIT RUNNER", RGB(120, 240, 230))
-        ctext(LOGW \ 2, 90, "ein Kachel-Puzzle", RGB(150, 160, 180))
-        ctext(LOGW \ 2, 138, "LEER / ENTER = Start", RGB(220, 225, 235))
-        ctext(LOGW \ 2, 164, "Pfeile oder WASD bewegen", RGB(150, 160, 180))
-        ctext(LOGW \ 2, 184, "R = neu    ESC = Menue", RGB(150, 160, 180))
-        ctext(LOGW \ 2, 214, STR$(nlevels) + " Level geladen", RGB(120, 200, 140))
+        ctext(LOGW \ 2, 30, "CIRCUIT RUNNER", RGB(120, 240, 230))
+        ctext(LOGW \ 2, 54, "waehle ein Level-Set", RGB(150, 160, 180))
+        IF nsets = 0 THEN
+            ctext(LOGW \ 2, 120, "Keine Sets in levels/ gefunden", RGB(245, 130, 130))
+            ctext(LOGW \ 2, 144, "make_demo_levels.py ausfuehren", RGB(180, 190, 210))
+        ELSE
+            DIM lo AS INTEGER
+            lo = sel_set - 3
+            IF lo < 0 THEN lo = 0
+            DIM hi AS INTEGER
+            hi = lo + 6
+            IF hi > nsets - 1 THEN hi = nsets - 1
+            DIM yy AS INTEGER
+            yy = 82
+            DIM si AS INTEGER
+            FOR si = lo TO hi
+                DIM lab AS STRING
+                lab = set_name[si] + "  (" + STR$(set_count[si]) + ")"
+                DIM col AS INTEGER
+                col = RGB(150, 160, 180)
+                IF si = sel_set THEN
+                    lab = "> " + lab + " <"
+                    col = RGB(120, 240, 160)
+                END IF
+                ctext(LOGW \ 2, yy, lab, col)
+                yy = yy + 22
+            NEXT
+            ctext(LOGW \ 2, 220, "Pfeile waehlen   LEER = Start", RGB(180, 190, 210))
+        END IF
     ELSEIF state = "intro" THEN
         ctext(LOGW \ 2, 50, "LEVEL " + STR$(cur_level + 1), RGB(120, 240, 230))
         ctext(LOGW \ 2, 80, lvl_title, RGB(230, 235, 245))
@@ -1213,8 +1285,8 @@ dyv[3] = 0
 rt = RENDERTARGET_NEW(LOGW, LOGH)
 tiles = LOADIMAGE("assets/tiles.png")
 
-js = JSON_LOAD("levels/circuit_runner.json")
-nlevels = JSON_LEN(js, "levels")
+scan_sets()
+sel_set = 0
 
 INPUT_BIND("up", KEY_UP, KEY_W)
 INPUT_BIND("down", KEY_DOWN, KEY_S)
@@ -1237,7 +1309,11 @@ WHILE NOT QUITREQUESTED()
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK
-        IF INPUT_PRESSED("confirm") THEN
+        IF INPUT_PRESSED("up") AND sel_set > 0 THEN sel_set = sel_set - 1
+        IF INPUT_PRESSED("down") AND sel_set < nsets - 1 THEN sel_set = sel_set + 1
+        IF INPUT_PRESSED("confirm") AND nsets > 0 THEN
+            js = JSON_LOAD(set_path[sel_set])
+            nlevels = JSON_LEN(js, "levels")
             cur_level = 0
             load_level(cur_level)
             state = "intro"
