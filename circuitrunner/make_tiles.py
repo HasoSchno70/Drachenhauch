@@ -651,25 +651,81 @@ def b_paramecium():
     return c.im
 
 
-def b_player():
+PB = (84, 150, 230, 255)
+PB_D = (48, 96, 168, 255)
+PB_DD = (40, 84, 150, 255)
+PARM = (52, 100, 172, 255)
+PHELM = (210, 220, 234, 255)
+PHELM_D = (168, 180, 200, 255)
+PLEG = (44, 92, 160, 255)
+PFOOT = (30, 66, 120, 255)
+
+
+def _pbody(c):
+    c.vgrad(8, 11, 23, 26, PB, PB_D)
+    c.rect(8, 11, 9, 26, PB_DD)
+    c.rect(22, 11, 23, 26, PB_DD)
+    c.rect(4, 13, 7, 22, PARM)
+    c.rect(24, 13, 27, 22, PARM)
+
+
+def _plegs(c, step):
+    if step == 0:
+        c.rect(10, 24, 14, 30, PLEG); c.rect(18, 24, 22, 30, PLEG)
+        c.rect(10, 29, 14, 30, PFOOT); c.rect(18, 29, 22, 30, PFOOT)
+    else:
+        c.rect(8, 24, 12, 30, PLEG); c.rect(20, 24, 24, 30, PLEG)
+        c.rect(8, 29, 12, 30, PFOOT); c.rect(20, 29, 24, 30, PFOOT)
+
+
+def player_front(step):
     c = C()
-    # Beine/Schuhe
-    c.rect(10, 24, 14, 29, (44, 92, 160, 255)); c.rect(18, 24, 22, 29, (44, 92, 160, 255))
-    # Koerper
-    c.vgrad(8, 11, 23, 26, (84, 150, 230, 255), (48, 96, 168, 255))
-    c.rect(8, 11, 9, 26, (40, 84, 150, 255)); c.rect(22, 11, 23, 26, (40, 84, 150, 255))
-    # Arme
-    c.rect(4, 13, 7, 22, (52, 100, 172, 255)); c.rect(24, 13, 27, 22, (52, 100, 172, 255))
-    # Helm
-    c.disc(16, 9, 7, (206, 216, 230, 255))
-    c.rect(9, 7, 22, 12, (206, 216, 230, 255))
-    c.rect(9, 8, 22, 11, BLACK)            # Visier
+    _pbody(c)
+    _plegs(c, step)
+    c.disc(16, 9, 7, PHELM)
+    c.rect(9, 7, 22, 12, PHELM)
+    c.rect(9, 8, 22, 11, BLACK)             # Visier
     c.disc(12, 9, 1.4, NEON); c.disc(20, 9, 1.4, NEON)
     c.set(11, 8, (150, 255, 250, 255))
-    # Brustkern
-    c.disc(16, 18, 2.6, NEON); c.disc(16, 18, 1.2, WHITE)
+    c.disc(16, 18, 2.6, NEON); c.disc(16, 18, 1.2, WHITE)   # Brustkern
     c.outline()
     return c.im
+
+
+def player_back(step):
+    c = C()
+    _pbody(c)
+    _plegs(c, step)
+    c.disc(16, 9, 7, PHELM_D)
+    c.rect(9, 7, 22, 12, PHELM_D)
+    c.rect(14, 4, 18, 12, (150, 162, 184, 255))   # Naht hinten
+    c.disc(16, 4, 1.3, NEON)                        # Antenne
+    c.rect(11, 14, 21, 23, (60, 116, 196, 255))     # Rueckenpanel
+    c.rect(14, 15, 18, 22, PB_D)
+    c.outline()
+    return c.im
+
+
+def player_side(step, left):
+    c = C()
+    c.vgrad(11, 11, 21, 26, PB, PB_D)
+    c.rect(11, 11, 12, 26, PB_DD)
+    c.rect(20, 14, 24, 21, PARM)                    # vorderer Arm
+    if step == 0:
+        c.rect(14, 24, 18, 30, PLEG); c.rect(14, 29, 18, 30, PFOOT)
+    else:
+        c.rect(11, 24, 15, 30, PLEG); c.rect(19, 24, 23, 30, PLEG)
+        c.rect(11, 29, 15, 30, PFOOT); c.rect(19, 29, 23, 30, PFOOT)
+    c.disc(17, 9, 7, PHELM)
+    c.rect(11, 7, 23, 12, PHELM)
+    c.rect(18, 8, 23, 11, BLACK)                    # Visier vorne (rechts)
+    c.disc(21, 9, 1.4, NEON)
+    c.disc(16, 18, 2.2, NEON)
+    c.outline()
+    im = c.im
+    if left:
+        im = im.transpose(Image.FLIP_LEFT_RIGHT)
+    return im
 
 
 def rot4(base):
@@ -706,9 +762,14 @@ def build():
     cells[0x31] = t_cloner(); cells[0x32] = t_force_random()
     cells[0x39] = t_exit(); cells[0x3A] = t_exit(); cells[0x3B] = t_exit()
 
-    pl = rot4(b_player())
+    # Spieler: 4 echte Blickrichtungen (N=Ruecken, W=links, S=Gesicht, E=rechts)
+    # idle (Beine zusammen) bei 0x6C-0x6F + 0x3C-0x3F, Schritt (Beine auf) bei 0x70-0x73
+    idle = [player_back(0), player_side(0, True), player_front(0), player_side(0, False)]
+    walk = [player_back(1), player_side(1, True), player_front(1), player_side(1, False)]
     for i in range(4):
-        cells[0x3C + i] = pl[i]
+        cells[0x3C + i] = idle[i]
+        cells[0x6C + i] = idle[i]
+        cells[0x70 + i] = walk[i]
     for fn, base in ((b_bug, 0x40), (b_fireball, 0x44), (b_ball, 0x48), (b_tank, 0x4C),
                      (b_glider, 0x50), (b_teeth, 0x54), (b_walker, 0x58), (b_blob, 0x5C),
                      (b_paramecium, 0x60)):
@@ -723,8 +784,6 @@ def build():
     cells[0x69] = i_boot(FIRE, FIRE_D, FIRE_L, "fire")
     cells[0x6A] = i_boot(ICE_D, ICE_DD, ICE_L, "ice")
     cells[0x6B] = i_boot(PURP, PURP_D, PURP_L, "force")
-    for i in range(4):
-        cells[0x6C + i] = pl[i]
 
     cols, rows = 16, 8
     sheet = Image.new("RGBA", (cols * S, rows * S), T)

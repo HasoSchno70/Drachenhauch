@@ -105,6 +105,8 @@ DIM mob_dir[MAXMOB] AS INTEGER
 DIM mob_type[MAXMOB] AS INTEGER
 DIM mob_alive[MAXMOB] AS BOOLEAN
 DIM mob_trapped[MAXMOB] AS BOOLEAN
+DIM mob_ox[MAXMOB] AS INTEGER
+DIM mob_oy[MAXMOB] AS INTEGER
 DIM nmob AS INTEGER
 DIM mob_did AS BOOLEAN          ' Ergebnis des letzten mob_try
 
@@ -112,6 +114,8 @@ CONST MAXBLK = 320
 DIM blk_x[MAXBLK] AS INTEGER
 DIM blk_y[MAXBLK] AS INTEGER
 DIM blk_alive[MAXBLK] AS BOOLEAN
+DIM blk_ox[MAXBLK] AS INTEGER
+DIM blk_oy[MAXBLK] AS INTEGER
 DIM nblk AS INTEGER
 
 ' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
@@ -143,6 +147,11 @@ DIM has_suction AS BOOLEAN
 DIM slide_kind AS INTEGER             ' 0 keine, 1 Eis, 2 Force
 DIM slide_dir AS INTEGER
 DIM on_water AS BOOLEAN                ' fuer Schwimm-Sprite
+' Gleit-Animation
+DIM pox AS INTEGER
+DIM poy AS INTEGER
+DIM anim_t AS FLOAT
+DIM tick_timer AS FLOAT
 
 ' Ablauf
 DIM state AS STRING                    ' menu intro play win dead done
@@ -429,6 +438,19 @@ SUB load_level(idx AS INTEGER)
     acc = 0.0
     time_left = lvl_time
     start_ms = MILLIS()
+    pox = px
+    poy = py
+    anim_t = 1.0
+    tick_timer = 0.0
+    DIM gi AS INTEGER
+    FOR gi = 0 TO nmob - 1
+        mob_ox[gi] = mob_x[gi]
+        mob_oy[gi] = mob_y[gi]
+    NEXT
+    FOR gi = 0 TO nblk - 1
+        blk_ox[gi] = blk_x[gi]
+        blk_oy[gi] = blk_y[gi]
+    NEXT
 END SUB
 
 SUB load_wires(idx AS INTEGER)
@@ -794,6 +816,8 @@ SUB do_teleport()
             ' Spieler dorthin setzen (Austritt versucht der naechste Tick)
             px = tx2
             py = ty2
+            pox = tx2
+            poy = ty2
             RETURN
         END IF
         c = c - 1
@@ -889,6 +913,8 @@ SUB clone_one(mx AS INTEGER, my AS INTEGER)
         mob_type[nmob] = mob_type[src]
         mob_alive[nmob] = TRUE
         mob_trapped[nmob] = FALSE
+        mob_ox[nmob] = nx
+        mob_oy[nmob] = ny
         nmob = nmob + 1
     END IF
 END SUB
@@ -1031,6 +1057,17 @@ DIM want_dir AS INTEGER
 
 SUB world_tick()
     tickcount = tickcount + 1
+    pox = px
+    poy = py
+    DIM oi AS INTEGER
+    FOR oi = 0 TO nmob - 1
+        mob_ox[oi] = mob_x[oi]
+        mob_oy[oi] = mob_y[oi]
+    NEXT
+    FOR oi = 0 TO nblk - 1
+        blk_ox[oi] = blk_x[oi]
+        blk_oy[oi] = blk_y[oi]
+    NEXT
     ' --- Spieler ---
     IF slide_kind = 1 THEN
         ' Eis: kein Steuern, weiter in slide_dir bis blockiert
@@ -1080,51 +1117,81 @@ DIM camx AS INTEGER
 DIM camy AS INTEGER
 
 SUB draw_board()
-    camx = px - VIEW \ 2
-    camy = py - VIEW \ 2
-    IF camx < 0 THEN camx = 0
-    IF camy < 0 THEN camy = 0
-    IF camx > GW - VIEW THEN camx = GW - VIEW
-    IF camy > GH - VIEW THEN camy = GH - VIEW
+    DIM ease AS FLOAT
+    ease = anim_t
+    DIM pfx AS FLOAT
+    DIM pfy AS FLOAT
+    pfx = pox + (px - pox) * ease
+    pfy = poy + (py - poy) * ease
+    DIM camfx AS FLOAT
+    DIM camfy AS FLOAT
+    camfx = pfx - (VIEW - 1) / 2.0
+    camfy = pfy - (VIEW - 1) / 2.0
+    IF camfx < 0.0 THEN camfx = 0.0
+    IF camfy < 0.0 THEN camfy = 0.0
+    IF camfx > GW - VIEW THEN camfx = GW - VIEW
+    IF camfy > GH - VIEW THEN camfy = GH - VIEW
+    DIM bcx AS INTEGER
+    DIM bcy AS INTEGER
+    bcx = INT(camfx)
+    bcy = INT(camfy)
 
     DIM vy AS INTEGER
     DIM vx AS INTEGER
-    FOR vy = 0 TO VIEW - 1
-        FOR vx = 0 TO VIEW - 1
+    FOR vy = 0 TO VIEW
+        FOR vx = 0 TO VIEW
             DIM cx AS INTEGER
             DIM cy AS INTEGER
-            cx = camx + vx
-            cy = camy + vy
+            cx = bcx + vx
+            cy = bcy + vy
             DIM sx AS INTEGER
             DIM sy AS INTEGER
-            sx = BX + vx * TILE
-            sy = BY + vy * TILE
-            draw_tile(T_FLOOR, sx, sy)
-            DIM t AS INTEGER
-            t = terr[cidx(cx, cy)]
-            IF t <> T_FLOOR THEN draw_tile(t, sx, sy)
+            sx = INT((cx - camfx) * TILE)
+            sy = INT((cy - camfy) * TILE)
+            IF inb(cx, cy) THEN
+                draw_tile(T_FLOOR, sx, sy)
+                DIM t AS INTEGER
+                t = terr[cidx(cx, cy)]
+                IF t <> T_FLOOR THEN draw_tile(t, sx, sy)
+            ELSE
+                draw_tile(T_WALL, sx, sy)
+            END IF
         NEXT
     NEXT
-    ' Bloecke
+    ' Bloecke (interpoliert)
     DIM i AS INTEGER
     FOR i = 0 TO nblk - 1
-        IF blk_alive[i] AND blk_x[i] >= camx AND blk_x[i] < camx + VIEW AND blk_y[i] >= camy AND blk_y[i] < camy + VIEW THEN
-            draw_tile(T_BLOCK, BX + (blk_x[i] - camx) * TILE, BY + (blk_y[i] - camy) * TILE)
+        IF blk_alive[i] THEN
+            DIM bfx AS FLOAT
+            DIM bfy AS FLOAT
+            bfx = blk_ox[i] + (blk_x[i] - blk_ox[i]) * ease
+            bfy = blk_oy[i] + (blk_y[i] - blk_oy[i]) * ease
+            draw_tile(T_BLOCK, INT((bfx - camfx) * TILE), INT((bfy - camfy) * TILE))
         END IF
     NEXT
-    ' Monster
+    ' Monster (interpoliert)
     FOR i = 0 TO nmob - 1
-        IF mob_alive[i] AND mob_x[i] >= camx AND mob_x[i] < camx + VIEW AND mob_y[i] >= camy AND mob_y[i] < camy + VIEW THEN
+        IF mob_alive[i] THEN
+            DIM mfx AS FLOAT
+            DIM mfy AS FLOAT
+            mfx = mob_ox[i] + (mob_x[i] - mob_ox[i]) * ease
+            mfy = mob_oy[i] + (mob_y[i] - mob_oy[i]) * ease
             DIM mc AS INTEGER
             mc = &H40 + mob_type[i] * 4 + mob_dir[i]
-            draw_tile(mc, BX + (mob_x[i] - camx) * TILE, BY + (mob_y[i] - camy) * TILE)
+            draw_tile(mc, INT((mfx - camfx) * TILE), INT((mfy - camfy) * TILE))
         END IF
     NEXT
-    ' Spieler
+    ' Spieler (interpoliert, Geh-Frame wechselt pro Tick)
+    DIM moving AS BOOLEAN
+    moving = (pox <> px OR poy <> py)
     DIM pc AS INTEGER
     pc = T_CHIP_N + pdir
-    IF on_water THEN pc = &H3C + pdir
-    draw_tile(pc, BX + (px - camx) * TILE, BY + (py - camy) * TILE)
+    IF on_water THEN
+        pc = &H3C + pdir
+    ELSEIF moving AND (tickcount MOD 2) = 1 THEN
+        pc = &H70 + pdir
+    END IF
+    draw_tile(pc, INT((pfx - camfx) * TILE), INT((pfy - camfy) * TILE))
 END SUB
 
 SUB ct(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER)
@@ -1425,14 +1492,14 @@ WHILE NOT QUITREQUESTED()
         END IF
         IF state = "play" THEN
             read_intent()
-            acc = acc + DELTA() * 1000.0
-            DIM guard AS INTEGER
-            guard = 0
-            WHILE acc >= TICK_MS AND state = "play" AND guard < 8
-                acc = acc - TICK_MS
+            tick_timer = tick_timer + DELTA() * 1000.0
+            IF tick_timer > TICK_MS * 3.0 THEN tick_timer = TICK_MS
+            IF tick_timer >= TICK_MS AND state = "play" THEN
+                tick_timer = tick_timer - TICK_MS
                 world_tick()
-                guard = guard + 1
-            WEND
+            END IF
+            anim_t = tick_timer / TICK_MS
+            IF anim_t > 1.0 THEN anim_t = 1.0
         END IF
     ELSEIF state = "win" THEN
         IF INPUT_PRESSED("confirm") THEN
