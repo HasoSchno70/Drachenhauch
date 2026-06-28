@@ -117,7 +117,9 @@ DIM blk_y[MAXBLK] AS INTEGER
 DIM blk_alive[MAXBLK] AS BOOLEAN
 DIM blk_ox[MAXBLK] AS INTEGER
 DIM blk_oy[MAXBLK] AS INTEGER
+DIM blk_sdir[MAXBLK] AS INTEGER   ' Rutsch-Richtung (-1 = ruht)
 DIM nblk AS INTEGER
+DIM pushed_blk AS INTEGER          ' diesen Tick geschobener Block (kein Sofort-Rutsch)
 
 ' Geraete-Verdrahtung (Falle/Cloner): bx,by -> tx,ty
 CONST MAXWIRE = 256
@@ -451,7 +453,9 @@ SUB load_level(idx AS INTEGER)
     FOR gi = 0 TO nblk - 1
         blk_ox[gi] = blk_x[gi]
         blk_oy[gi] = blk_y[gi]
+        blk_sdir[gi] = -1
     NEXT
+    pushed_blk = -1
 END SUB
 
 SUB load_wires(idx AS INTEGER)
@@ -596,11 +600,85 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
         sfx_die()
         RETURN
     END IF
+    DIM d AS INTEGER
+    IF tx > blk_x[bi] THEN
+        d = 3
+    ELSEIF tx < blk_x[bi] THEN
+        d = 1
+    ELSEIF ty < blk_y[bi] THEN
+        d = 0
+    ELSE
+        d = 2
+    END IF
     blk_x[bi] = tx
     blk_y[bi] = ty
+    pushed_blk = bi
+    set_block_slide(bi, d)
     sfx_block()
     ' Block toggelt gruenen Knopf
     IF t = T_BTN_GREEN THEN toggle_walls()
+END SUB
+
+' Rutsch-Richtung eines Blocks aus seiner aktuellen Kachel bestimmen
+SUB set_block_slide(bi AS INTEGER, d AS INTEGER)
+    DIM t AS INTEGER
+    t = terr[cidx(blk_x[bi], blk_y[bi])]
+    DIM fdir AS INTEGER
+    fdir = force_dir(t)
+    IF t = T_ICE THEN
+        blk_sdir[bi] = d
+    ELSEIF t = T_ICE_NW2 OR t = T_ICE_NE2 OR t = T_ICE_SE2 OR t = T_ICE_SW2 THEN
+        blk_sdir[bi] = corner_redirect(t, d)
+    ELSEIF fdir >= 0 THEN
+        blk_sdir[bi] = fdir
+    ELSE
+        blk_sdir[bi] = -1
+    END IF
+END SUB
+
+' Rutschende Bloecke einen Schritt weiterbewegen (1 Zelle/Tick)
+SUB advance_blocks()
+    DIM i AS INTEGER
+    FOR i = 0 TO nblk - 1
+        IF blk_alive[i] AND blk_sdir[i] >= 0 AND i <> pushed_blk THEN
+            DIM d AS INTEGER
+            d = blk_sdir[i]
+            DIM here AS INTEGER
+            here = terr[cidx(blk_x[i], blk_y[i])]
+            IF here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
+                d = corner_redirect(here, d)
+            ELSE
+                DIM fd2 AS INTEGER
+                fd2 = force_dir(here)
+                IF fd2 >= 0 THEN d = fd2
+            END IF
+            blk_sdir[i] = d
+            DIM tx AS INTEGER
+            DIM ty AS INTEGER
+            tx = blk_x[i] + dxv[d]
+            ty = blk_y[i] + dyv[d]
+            DIM tt AS INTEGER
+            tt = tat(tx, ty)
+            IF tt = T_WATER THEN
+                terr[cidx(tx, ty)] = T_DIRT
+                blk_alive[i] = FALSE
+            ELSEIF tt = T_BOMB THEN
+                terr[cidx(tx, ty)] = T_FLOOR
+                blk_alive[i] = FALSE
+                sfx_die()
+            ELSEIF tx = px AND ty = py THEN
+                blk_x[i] = tx
+                blk_y[i] = ty
+                player_die("Von einem Block zerquetscht!")
+            ELSEIF block_can_move(blk_x[i], blk_y[i], tx, ty, d) THEN
+                blk_x[i] = tx
+                blk_y[i] = ty
+                set_block_slide(i, d)
+            ELSE
+                blk_sdir[i] = -1
+            END IF
+        END IF
+    NEXT
 END SUB
 
 ' Effekte beim Betreten von (px,py)
@@ -772,6 +850,15 @@ SUB update_slide()
     END IF
 END SUB
 
+FUNCTION force_dir(t AS INTEGER) AS INTEGER
+    IF t = T_FORCE_N THEN RETURN 0
+    IF t = T_FORCE_W THEN RETURN 1
+    IF t = T_FORCE_S THEN RETURN 2
+    IF t = T_FORCE_E THEN RETURN 3
+    IF t = T_FORCE_RND THEN RETURN RANDINT(0, 3)
+    RETURN -1
+END FUNCTION
+
 FUNCTION corner_redirect(t AS INTEGER, m AS INTEGER) AS INTEGER
     ' offene Richtungen je Eck-Tile
     DIM oa AS INTEGER
@@ -934,6 +1021,20 @@ SUB mob_try(idx AS INTEGER, d AS INTEGER)
     END IF
 END SUB
 
+SUB update_traps()
+    ' Falle offen, solange ihr brauner Knopf belegt ist (Spieler/Block/Monster)
+    DIM i AS INTEGER
+    FOR i = 0 TO ntrap - 1
+        DIM held AS BOOLEAN
+        held = (px = trap_bx[i] AND py = trap_by[i])
+        IF block_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
+        IF mob_at(trap_bx[i], trap_by[i]) >= 0 THEN held = TRUE
+        DIM m AS INTEGER
+        m = mob_at(trap_tx[i], trap_ty[i])
+        IF m >= 0 THEN mob_trapped[m] = NOT held
+    NEXT
+END SUB
+
 SUB move_monsters()
     DIM i AS INTEGER
     FOR i = 0 TO nmob - 1
@@ -962,6 +1063,28 @@ SUB move_monsters()
 END SUB
 
 SUB ai_move(i AS INTEGER, mt AS INTEGER)
+    DIM here AS INTEGER
+    here = terr[cidx(mob_x[i], mob_y[i])]
+    ' --- Force-Boden: Richtung erzwingen ---
+    DIM fdir AS INTEGER
+    fdir = force_dir(here)
+    IF fdir >= 0 THEN
+        mob_try(i, fdir)
+        RETURN
+    END IF
+    ' --- Eis: gleiten (Ecken lenken um, an Wand umkehren) ---
+    IF here = T_ICE OR here = T_ICE_NW2 OR here = T_ICE_NE2 OR here = T_ICE_SE2 OR here = T_ICE_SW2 THEN
+        DIM sd AS INTEGER
+        sd = mob_dir[i]
+        IF here <> T_ICE THEN sd = corner_redirect(here, sd)
+        mob_dir[i] = sd
+        mob_try(i, sd)
+        IF NOT mob_did THEN
+            mob_dir[i] = turn_back(sd)
+            mob_try(i, mob_dir[i])
+        END IF
+        RETURN
+    END IF
     DIM d AS INTEGER
     d = mob_dir[i]
     IF mt = 0 THEN
@@ -1057,6 +1180,7 @@ DIM want_dir AS INTEGER
 
 SUB world_tick()
     tickcount = tickcount + 1
+    pushed_blk = -1
     pox = px
     poy = py
     DIM oi AS INTEGER
@@ -1088,8 +1212,10 @@ SUB world_tick()
     ELSE
         IF want_dir >= 0 THEN player_step(want_dir)
     END IF
+    advance_blocks()
     IF state <> "play" THEN RETURN
     ' --- Monster ---
+    update_traps()
     move_monsters()
     ' --- Zeitlimit ---
     IF lvl_time > 0 THEN
