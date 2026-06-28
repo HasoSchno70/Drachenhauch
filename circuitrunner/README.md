@@ -129,9 +129,9 @@ Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema).
 
 ## Grenzen / Ideen
 
-- Monster & Blöcke rutschen (noch) nicht auf Eis/Force-Böden (nur der Spieler).
-- Monster-Bewegungsreihenfolge ist Lese-Reihenfolge statt der `monsters`-Liste.
+- Monster-Bewegungsreihenfolge ist Lese-Reihenfolge statt der `monsters`-Liste (kann bei sehr präzisen Puzzles abweichen).
 - Kein Passwort-Eingang / Level-Sprung per Passwort, kein Highscore/Save (Fortschritt nicht persistiert).
+- Monster bewegen sich mit halbem Tempo (`MON_EVERY=2`); Eis-/Force-Sliding läuft auf dieser Taktung statt voller CC-Geschwindigkeit.
 
 ## Lizenz / Hinweis
 
