@@ -1,0 +1,4 @@
+*.save
+*.db
+# heruntergeladene Levelsets (urheberrechtlich) hier ablegen:
+levels/_downloaded/
