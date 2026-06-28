@@ -1078,9 +1078,12 @@ SUB world_tick()
             IF want_dir >= 0 THEN player_step(want_dir)
         END IF
     ELSEIF slide_kind = 2 THEN
-        ' Force: per Eingabe ueberschreibbar
-        IF want_dir >= 0 AND player_can_enter(px + dxv[want_dir], py + dyv[want_dir], want_dir) THEN
-            player_step(want_dir)
+        ' Force: seitlich steuerbar, aber NICHT gegen die Kraftrichtung
+        DIM ov AS INTEGER
+        ov = want_dir
+        IF ov = turn_back(slide_dir) THEN ov = -1
+        IF ov >= 0 AND player_can_enter(px + dxv[ov], py + dyv[ov], ov) THEN
+            player_step(ov)
         ELSEIF player_can_enter(px + dxv[slide_dir], py + dyv[slide_dir], slide_dir) THEN
             player_step(slide_dir)
         ELSE

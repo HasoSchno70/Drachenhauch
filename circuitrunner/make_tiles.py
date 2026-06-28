@@ -518,17 +518,77 @@ def i_key(col, cold, coll):
     return c.im
 
 
-def i_boot(col, cold, coll, mark):
+def _boot_base(c, col, cold, coll):
+    """Seitenansicht-Stiefel (Zehe nach rechts) -- gemeinsame Basis."""
+    # Schaft / Stulpe
+    c.vgrad(10, 4, 19, 18, coll, col)
+    c.rect(10, 4, 11, 18, cold)
+    c.rect(18, 4, 19, 18, cold)
+    c.rect(10, 4, 19, 6, coll)
+    # Fuss nach rechts
+    c.vgrad(10, 18, 26, 26, col, cold)
+    c.rect(24, 19, 26, 26, cold)
+    # Sohle
+    c.rect(9, 26, 27, 28, cold)
+    c.rect(9, 28, 27, 29, OL)
+    # Schnuerung + Glanz
+    c.set(12, 6, coll)
+    for y in range(8, 17, 3):
+        c.hline(12, 17, y, coll)
+        c.set(12, y, col); c.set(17, y, col)
+
+
+def _fin(c, cx, col, cold, hl=None):
+    c.vgrad(cx - 4, 4, cx + 4, 12, hl or col, cold)
+    c.rect(cx - 4, 4, cx + 4, 6, hl or col)
+    c.rect(cx - 4, 9, cx + 4, 12, cold)         # Fuss-Oeffnung
+    k = 0
+    while k < 16:
+        yy = 12 + k
+        w = 4 + int(k * 0.5)
+        c.hline(cx - w, cx + w, yy, _mix(col, cold, k / 16))
+        k += 1
+    if hl:
+        c.vline(cx - 3, 13, 26, hl)
+
+
+def boot_flippers():
     c = C()
-    c.rect(9, 5, 16, 21, col)
-    c.rect(9, 21, 24, 27, col)
-    c.rect(9, 5, 11, 27, coll)
-    c.rect(9, 25, 24, 27, cold)
-    c.rect(22, 21, 24, 27, cold)
-    c.shade(11, 7, 1.5, coll)
-    mc = {"water": WATER_L, "fire": FIRE_L, "ice": ICE_L, "force": (200, 184, 255, 255)}[mark]
-    c.disc(14, 13, 2.4, mc)
-    c.outline(OL)
+    _fin(c, 20, WATER_D, WATER_DD)              # hintere Flosse
+    _fin(c, 12, WATER, WATER_D, hl=WATER_L)     # vordere Flosse
+    c.outline()
+    return c.im
+
+
+def boot_fire():
+    c = C()
+    _boot_base(c, (214, 72, 52, 255), (150, 40, 28, 255), (255, 150, 100, 255))
+    c.disc(14, 11, 2, FIRE_L); c.disc(14, 11, 1, WHITE)   # Flammen-Emblem
+    c.rect(9, 25, 27, 26, FIRE)                            # Glut-Sohle
+    for gx in (12, 17, 22):
+        c.disc(gx, 27, 1, FIRE_L)
+    c.outline()
+    return c.im
+
+
+def boot_ice():
+    c = C()
+    _boot_base(c, (188, 214, 236, 255), (120, 162, 200, 255), (232, 246, 255, 255))
+    c.disc(14, 10, 1.4, WHITE)                             # Eis-Glanz
+    c.rect(8, 28, 26, 29, (214, 234, 250, 255))            # Kufe
+    c.rect(8, 30, 26, 31, STEEL)
+    c.disc(9, 30, 1, (214, 234, 250, 255)); c.disc(25, 30, 1, (214, 234, 250, 255))
+    c.outline()
+    return c.im
+
+
+def boot_suction():
+    c = C()
+    _boot_base(c, (150, 124, 216, 255), (96, 72, 168, 255), (190, 168, 244, 255))
+    for sx in (12, 18, 24):                                # Saugnaepfe
+        c.disc(sx, 28, 2.2, (70, 54, 128, 255))
+        c.disc(sx, 28, 1, (38, 28, 78, 255))
+    c.outline()
     return c.im
 
 
@@ -780,10 +840,10 @@ def build():
     cells[0x65] = i_key(KEYRED, KEYRED_D, KEYRED_L)
     cells[0x66] = i_key(KEYGRN, KEYGRN_D, KEYGRN_L)
     cells[0x67] = i_key(KEYYEL, KEYYEL_D, KEYYEL_L)
-    cells[0x68] = i_boot(WATER, WATER_D, WATER_L, "water")
-    cells[0x69] = i_boot(FIRE, FIRE_D, FIRE_L, "fire")
-    cells[0x6A] = i_boot(ICE_D, ICE_DD, ICE_L, "ice")
-    cells[0x6B] = i_boot(PURP, PURP_D, PURP_L, "force")
+    cells[0x68] = boot_flippers()
+    cells[0x69] = boot_fire()
+    cells[0x6A] = boot_ice()
+    cells[0x6B] = boot_suction()
 
     cols, rows = 16, 8
     sheet = Image.new("RGBA", (cols * S, rows * S), T)
