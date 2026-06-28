@@ -33,6 +33,7 @@ CONST BX = 0                   ' Board-Ursprung im Render-Target
 CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
+CONST MON_EVERY = 2            ' Monster bewegen sich nur jeden N-ten Tick (langsamer als Spieler)
 
 ' ----- Tile-Codes (= Tileset-Zellen) ---------------------------------
 CONST T_FLOOR = &H00
@@ -943,14 +944,13 @@ SUB move_monsters()
         ELSE
             DIM mt AS INTEGER
             mt = mob_type[i]
-            ' langsame Typen (Teeth/Blob) nur jeden 2. Tick
-            DIM slow AS BOOLEAN
-            slow = (mt = 5 OR mt = 7)
-            IF slow AND (tickcount MOD 2) = 1 THEN
-                ' diesen Tick aussetzen
-            ELSE
+            DIM period AS INTEGER
+            period = MON_EVERY
+            IF mt = 5 OR mt = 7 THEN period = MON_EVERY * 2
+            IF (tickcount MOD period) = 0 THEN
+                mob_ox[i] = mob_x[i]
+                mob_oy[i] = mob_y[i]
                 ai_move(i, mt)
-                ' nach Bewegung: Terrain-Folgen fuer Monster
                 mob_terrain(i)
             END IF
         END IF
@@ -1060,10 +1060,6 @@ SUB world_tick()
     pox = px
     poy = py
     DIM oi AS INTEGER
-    FOR oi = 0 TO nmob - 1
-        mob_ox[oi] = mob_x[oi]
-        mob_oy[oi] = mob_y[oi]
-    NEXT
     FOR oi = 0 TO nblk - 1
         blk_ox[oi] = blk_x[oi]
         blk_oy[oi] = blk_y[oi]
@@ -1175,10 +1171,16 @@ SUB draw_board()
     ' Monster (interpoliert)
     FOR i = 0 TO nmob - 1
         IF mob_alive[i] THEN
+            DIM mp AS INTEGER
+            mp = MON_EVERY
+            IF mob_type[i] = 5 OR mob_type[i] = 7 THEN mp = MON_EVERY * 2
+            DIM mph AS FLOAT
+            mph = ((tickcount MOD mp) + ease) / mp
+            IF mph > 1.0 THEN mph = 1.0
             DIM mfx AS FLOAT
             DIM mfy AS FLOAT
-            mfx = mob_ox[i] + (mob_x[i] - mob_ox[i]) * ease
-            mfy = mob_oy[i] + (mob_y[i] - mob_oy[i]) * ease
+            mfx = mob_ox[i] + (mob_x[i] - mob_ox[i]) * mph
+            mfy = mob_oy[i] + (mob_y[i] - mob_oy[i]) * mph
             DIM mc AS INTEGER
             mc = &H40 + mob_type[i] * 4 + mob_dir[i]
             draw_tile(mc, INT((mfx - camfx) * TILE), INT((mfy - camfy) * TILE))
