@@ -1,17 +1,10 @@
-"""Tileset-Generator fuer CIRCUIT RUNNER -- 32x32, prozedural, detailliert.
+"""Tileset-Generator fuer CIRCUIT RUNNER -- 64x64, supersampled + geschattet.
 
-Erzeugt EIN Master-Sheet `assets/tiles.png` (16 Spalten x 8 Zeilen, je 32px),
-in dem die **Zellen-Position dem Chip's-Challenge-Tile-Code entspricht**
-(Code 0x00..0x7F). Die Engine zeichnet damit jede Kachel/Figur per
-`DRAWIMAGEPART(sheet, (code%16)*32, (code//16)*32, 32, 32, ...)`.
-
-Zusaetzlich: `assets/tiles.gbsprite` (im Editor `gbsprites` editierbar). HUD-
-Icons zeichnet die Engine direkt aus dem Sheet (DRAWIMAGEPARTEX) -- keine
-separaten Icon-Dateien noetig.
-
-Eigenstaendiges "Neon-Circuit"-Thema (Spielprinzip + Tile-Codes nachgebaut,
-keine Original-Grafik). Ruhige, dunkle Boeden (lesen NICHT als Pickups),
-klare leuchtende Items, schattierte Figuren.
+Erzeugt ein Master-Sheet `assets/tiles.png` (16 Spalten x 8 Zeilen, je 64px),
+Zellen-Position = Chip's-Challenge-Tile-Code (0x00..0x7F). Jede Kachel wird in
+hoher Aufloesung (SS-fach) mit weichen Formen/Verlaeufen gezeichnet und dann
+mit Kantenglaettung auf 64px herunterskaliert -> deutlich detaillierter und
+farbiger als reine 8-bit-Pixelart, aber weiter im klaren Sprite-Stil.
 
 Aufruf:  py circuitrunner/make_tiles.py
 """
@@ -22,7 +15,7 @@ import math
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFilter
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
@@ -30,798 +23,711 @@ if str(_ROOT) not in sys.path:
 
 OUT = Path(__file__).resolve().parent
 ASSETS = OUT / "assets"
-S = 32  # Kantenlaenge
-
-# ----------------------------------------------------------------- Palette
-T = (0, 0, 0, 0)
-OL = (8, 11, 16, 255)
-# Boden: ruhig, dunkel, klare Abgrenzung zur Wand
-FLOOR = (28, 35, 48, 255)
-FLOOR_D = (20, 26, 37, 255)
-FLOOR_L = (38, 47, 63, 255)
-# Wand: hell + plastisch (klarer Kontrast zum Boden)
-WALL = (104, 120, 146, 255)
-WALL_L = (150, 168, 198, 255)
-WALL_D = (60, 72, 96, 255)
-WALL_DD = (44, 54, 74, 255)
-STEEL = (126, 138, 160, 255)
-WATER = (44, 116, 222, 255)
-WATER_L = (120, 196, 255, 255)
-WATER_D = (24, 74, 168, 255)
-WATER_DD = (16, 52, 124, 255)
-FIRE = (252, 132, 36, 255)
-FIRE_L = (255, 224, 110, 255)
-FIRE_D = (206, 56, 20, 255)
-FIRE_DD = (150, 32, 14, 255)
-ICE = (182, 230, 248, 255)
-ICE_L = (230, 250, 255, 255)
-ICE_D = (124, 188, 222, 255)
-ICE_DD = (92, 154, 190, 255)
-DIRT = (134, 100, 64, 255)
-DIRT_L = (170, 130, 88, 255)
-DIRT_D = (96, 70, 44, 255)
-GRAVEL = (98, 100, 108, 255)
-GRAVEL_L = (138, 140, 148, 255)
-GRAVEL_D = (70, 72, 80, 255)
-CHIPG = (74, 236, 146, 255)
-CHIPG_D = (28, 156, 92, 255)
-CHIPG_DD = (16, 104, 62, 255)
-CHIPG_L = (180, 255, 214, 255)
-GOLD = (252, 208, 74, 255)
-GOLD_D = (196, 152, 38, 255)
-NEON = (96, 244, 234, 255)
-NEON_D = (34, 158, 158, 255)
-NEON_DD = (20, 96, 100, 255)
-MAGENTA = (238, 78, 206, 255)
-MAGENTA_D = (150, 36, 120, 255)
-WHITE = (242, 246, 252, 255)
-BLACK = (14, 16, 22, 255)
-PURP = (120, 96, 196, 255)
-PURP_L = (170, 148, 234, 255)
-PURP_D = (78, 60, 140, 255)
-# Schluessel/Tuer-Farben
-KEYBLUE = (74, 138, 252, 255); KEYBLUE_D = (40, 84, 188, 255); KEYBLUE_L = (150, 190, 255, 255)
-KEYRED = (238, 76, 76, 255);  KEYRED_D = (172, 42, 42, 255);  KEYRED_L = (255, 150, 150, 255)
-KEYGRN = (74, 214, 96, 255);  KEYGRN_D = (40, 150, 58, 255);  KEYGRN_L = (160, 246, 176, 255)
-KEYYEL = (248, 218, 64, 255); KEYYEL_D = (192, 162, 32, 255); KEYYEL_L = (255, 242, 158, 255)
+S = 64                 # finale Kantenlaenge
+SS = 4                 # Supersampling-Faktor (Arbeitsaufloesung)
+W = S * SS             # Arbeits-Kantenlaenge (256)
 
 
 def _mix(a, b, t):
+    t = max(0.0, min(1.0, t))
     return (int(a[0] + (b[0] - a[0]) * t), int(a[1] + (b[1] - a[1]) * t),
-            int(a[2] + (b[2] - a[2]) * t), 255)
+            int(a[2] + (b[2] - a[2]) * t),
+            int(a[3] + (b[3] - a[3]) * t) if len(a) > 3 and len(b) > 3 else 255)
 
 
-class C:
-    def __init__(self, w=S, h=S, bg=T):
-        self.im = Image.new("RGBA", (w, h), bg)
-        self.p = self.im.load()
-        self.w, self.h = w, h
+T = (0, 0, 0, 0)
 
-    def set(self, x, y, c):
-        x, y = int(x), int(y)
-        if 0 <= x < self.w and 0 <= y < self.h and c[3]:
-            if c[3] == 255:
-                self.p[x, y] = c
-            else:
-                bx = self.p[x, y]
-                a = c[3] / 255.0
-                self.p[x, y] = (int(c[0] * a + bx[0] * (1 - a)),
-                                int(c[1] * a + bx[1] * (1 - a)),
-                                int(c[2] * a + bx[2] * (1 - a)),
-                                max(bx[3], c[3]))
 
-    def rect(self, x0, y0, x1, y1, c):
-        for y in range(int(y0), int(y1) + 1):
-            for x in range(int(x0), int(x1) + 1):
-                self.set(x, y, c)
+class P:
+    """Arbeits-Canvas (W x W), gezeichnet via PIL; Koordinaten in 0..S
+    (werden *SS skaliert) -- man denkt also in 64er-Einheiten."""
 
-    def vgrad(self, x0, y0, x1, y1, top, bot):
-        y0, y1 = int(y0), int(y1)
+    def __init__(self, bg=T):
+        self.im = Image.new("RGBA", (W, W), bg)
+        self.d = ImageDraw.Draw(self.im)
+
+    def _s(self, v):
+        return v * SS
+
+    def gv(self, x0, y0, x1, y1, top, bot):
+        """vertikaler Verlauf (in 64er-Koords)."""
+        x0, y0, x1, y1 = self._s(x0), self._s(y0), self._s(x1), self._s(y1)
         h = max(1, y1 - y0)
-        for y in range(y0, y1 + 1):
-            col = _mix(top, bot, (y - y0) / h)
-            for x in range(int(x0), int(x1) + 1):
-                self.set(x, y, col)
-
-    def hline(self, x0, x1, y, c):
-        for x in range(int(x0), int(x1) + 1):
-            self.set(x, y, c)
-
-    def vline(self, x, y0, y1, c):
         for y in range(int(y0), int(y1) + 1):
-            self.set(x, y, c)
+            self.d.line([(x0, y), (x1, y)], fill=_mix(top, bot, (y - y0) / h))
 
-    def disc(self, cx, cy, r, c):
-        for y in range(int(cy - r), int(cy + r) + 1):
-            for x in range(int(cx - r), int(cx + r) + 1):
-                if (x - cx) ** 2 + (y - cy) ** 2 <= r * r + r * 0.4:
-                    self.set(x, y, c)
+    def gh(self, x0, y0, x1, y1, left, right):
+        x0, y0, x1, y1 = self._s(x0), self._s(y0), self._s(x1), self._s(y1)
+        wdt = max(1, x1 - x0)
+        for x in range(int(x0), int(x1) + 1):
+            self.d.line([(x, y0), (x, y1)], fill=_mix(left, right, (x - x0) / wdt))
 
-    def ring(self, cx, cy, r, c, t=1.4):
-        for y in range(int(cy - r), int(cy + r) + 1):
-            for x in range(int(cx - r), int(cx + r) + 1):
-                d = (x - cx) ** 2 + (y - cy) ** 2
-                if (r - t) ** 2 <= d <= r * r + r * 0.4:
-                    self.set(x, y, c)
+    def rect(self, x0, y0, x1, y1, col):
+        self.d.rectangle([self._s(x0), self._s(y0), self._s(x1), self._s(y1)], fill=col)
 
-    def frame(self, c, t=1):
-        for i in range(t):
-            self.hline(i, self.w - 1 - i, i, c)
-            self.hline(i, self.w - 1 - i, self.h - 1 - i, c)
-            self.vline(i, i, self.h - 1 - i, c)
-            self.vline(self.w - 1 - i, i, self.h - 1 - i, c)
+    def rrect(self, x0, y0, x1, y1, rad, col, outline=None, ow=0):
+        self.d.rounded_rectangle([self._s(x0), self._s(y0), self._s(x1), self._s(y1)],
+                                 radius=self._s(rad), fill=col,
+                                 outline=outline, width=int(self._s(ow)) if ow else 0)
 
-    def bevel_in(self, light, dark):
-        self.hline(0, self.w - 1, 0, light)
-        self.vline(0, 0, self.h - 1, light)
-        self.hline(0, self.w - 1, self.h - 1, dark)
-        self.vline(self.w - 1, 0, self.h - 1, dark)
+    def disc(self, cx, cy, r, col):
+        self.d.ellipse([self._s(cx - r), self._s(cy - r), self._s(cx + r), self._s(cy + r)], fill=col)
 
-    def outline(self, c=OL):
-        src = self.im.copy(); sp = src.load()
-        for y in range(self.h):
-            for x in range(self.w):
-                if sp[x, y][3] < 8:
-                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                        nx, ny = x + dx, y + dy
-                        if 0 <= nx < self.w and 0 <= ny < self.h and sp[nx, ny][3] > 180:
-                            self.p[x, y] = c
-                            break
+    def ellipse(self, cx, cy, rx, ry, col):
+        self.d.ellipse([self._s(cx - rx), self._s(cy - ry), self._s(cx + rx), self._s(cy + ry)], fill=col)
 
-    def shade(self, cx, cy, r, c):
-        """weicher Glanzpunkt"""
-        self.disc(cx, cy, r, c)
+    def ring(self, cx, cy, r, w, col):
+        self.d.ellipse([self._s(cx - r), self._s(cy - r), self._s(cx + r), self._s(cy + r)],
+                       outline=col, width=int(self._s(w)))
+
+    def line(self, pts, col, w):
+        self.d.line([(self._s(x), self._s(y)) for x, y in pts], fill=col, width=int(self._s(w)), joint="curve")
+
+    def poly(self, pts, col, outline=None, ow=0):
+        self.d.polygon([(self._s(x), self._s(y)) for x, y in pts], fill=col,
+                       outline=outline, width=int(self._s(ow)) if ow else 0)
+
+    def frame(self, x0, y0, x1, y1, col, w):
+        self.d.rectangle([self._s(x0), self._s(y0), self._s(x1), self._s(y1)],
+                         outline=col, width=int(self._s(w)))
+
+    def finish(self, glow=False):
+        im = self.im
+        if glow:
+            g = im.filter(ImageFilter.GaussianBlur(SS * 1.2))
+            im = Image.alpha_composite(g, im)
+        return im.resize((S, S), Image.LANCZOS)
 
 
-# ============================================================ TERRAIN
+# ------------------------------------------------------------------ Palette
+OL = (10, 13, 20, 255)
+# Boden (Platine)
+FLOOR_T = (44, 54, 74, 255)
+FLOOR = (32, 40, 56, 255)
+FLOOR_B = (22, 28, 40, 255)
+FLOOR_L = (60, 74, 98, 255)
+TRACE = (54, 120, 120, 110)
+# Wand (Metall)
+WALL_T = (150, 166, 196, 255)
+WALL = (104, 120, 150, 255)
+WALL_B = (62, 74, 100, 255)
+WALL_D = (40, 50, 70, 255)
+STEEL = (130, 142, 166, 255)
+# Materialien
+WATER_T = (96, 180, 255, 255); WATER = (44, 120, 226, 255); WATER_B = (20, 64, 158, 255); WATER_FOAM = (200, 236, 255, 255)
+FIRE_Y = (255, 234, 130, 255); FIRE_O = (255, 150, 40, 255); FIRE_R = (224, 64, 24, 255); FIRE_D = (150, 28, 16, 255)
+ICE_T = (236, 250, 255, 255); ICE = (176, 224, 248, 255); ICE_B = (108, 170, 214, 255); ICE_D = (74, 130, 176, 255)
+DIRT_T = (158, 120, 78, 255); DIRT = (124, 92, 58, 255); DIRT_B = (88, 64, 40, 255)
+GRAVEL = (110, 112, 122, 255); GRAVEL_T = (148, 150, 160, 255); GRAVEL_B = (78, 80, 90, 255)
+GOLD_T = (255, 232, 150, 255); GOLD = (242, 196, 70, 255); GOLD_B = (176, 130, 30, 255); GOLD_D = (120, 86, 18, 255)
+CHIPG_T = (150, 255, 198, 255); CHIPG = (60, 214, 130, 255); CHIPG_B = (24, 140, 84, 255); CHIPG_D = (14, 92, 58, 255)
+NEON = (110, 248, 240, 255); NEON_B = (24, 150, 156, 255); NEON_D = (16, 90, 100, 255)
+MAG_T = (255, 170, 240, 255); MAG = (236, 84, 206, 255); MAG_B = (150, 36, 124, 255)
+PURP_T = (190, 168, 255, 255); PURP = (132, 104, 214, 255); PURP_B = (78, 58, 150, 255)
+WHITE = (245, 248, 252, 255); BLACK = (16, 18, 26, 255); SHINE = (255, 255, 255, 235)
+
+# Schluessel-/Tuer-Farbsaetze: (hell, mittel, dunkel, tief)
+COL = {
+    "blue":   ((150, 196, 255, 255), (74, 138, 252, 255), (38, 86, 196, 255), (22, 52, 134, 255)),
+    "red":    ((255, 156, 150, 255), (236, 78, 76, 255), (176, 40, 40, 255), (118, 24, 26, 255)),
+    "green":  ((158, 248, 176, 255), (70, 210, 100, 255), (40, 150, 64, 255), (24, 100, 44, 255)),
+    "yellow": ((255, 240, 150, 255), (248, 212, 60, 255), (192, 158, 32, 255), (132, 104, 20, 255)),
+}
+
+
+# ====================================================== TERRAIN
 def t_floor():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, FLOOR_L, FLOOR_D)
-    c.rect(1, 1, S - 2, S - 2, FLOOR)
-    c.bevel_in(_mix(FLOOR, FLOOR_L, 0.5), FLOOR_D)
-    # extrem dezente Maserung (kein Pickup-Look)
-    c.set(7, 9, FLOOR_D); c.set(22, 14, FLOOR_D); c.set(13, 24, FLOOR_D)
-    c.set(26, 6, FLOOR_L); c.set(5, 20, FLOOR_L)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, FLOOR_T, FLOOR_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, FLOOR)
+    p.frame(2, 2, S - 3, S - 3, FLOOR_L, 1)
+    # dezente Leiterbahnen + Lötpunkte (subtil, kein Pickup-Look)
+    p.line([(10, 14), (10, 40), (28, 40)], TRACE, 1.4)
+    p.line([(50, 20), (40, 20), (40, 50)], TRACE, 1.4)
+    p.disc(10, 14, 1.8, NEON_D); p.disc(40, 50, 1.8, NEON_D); p.disc(28, 40, 1.6, NEON_D)
+    return p.finish()
 
 
 def t_wall():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, WALL_L, WALL_D)
-    c.rect(2, 2, S - 3, S - 3, WALL)
-    c.bevel_in(WALL_L, WALL_DD)
-    c.hline(2, S - 3, 2, WALL_L)
-    c.vline(2, 2, S - 3, WALL_L)
-    c.hline(2, S - 3, S - 3, WALL_DD)
-    c.vline(S - 3, 2, S - 3, WALL_DD)
-    # Nieten
-    for rx, ry in ((6, 6), (S - 7, 6), (6, S - 7), (S - 7, S - 7)):
-        c.disc(rx, ry, 1.6, WALL_DD); c.disc(rx, ry, 1, WALL_L)
-    # Kreuzfuge
-    c.rect(S // 2 - 1, 6, S // 2, S - 7, WALL_DD)
-    c.rect(6, S // 2 - 1, S - 7, S // 2, WALL_DD)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, WALL_T, WALL_B)
+    p.rrect(3, 3, S - 4, S - 4, 7, WALL)
+    p.gv(5, 5, S - 6, 30, _mix(WALL, WALL_T, 0.5), WALL)        # oberes Glanzfeld
+    p.frame(3, 3, S - 4, S - 4, WALL_T, 1.5)
+    p.line([(3, S - 5), (S - 4, S - 5)], WALL_D, 2)
+    # Mittelfuge (Kreuz)
+    p.rect(S // 2 - 1, 8, S // 2 + 1, S - 9, WALL_D)
+    p.rect(8, S // 2 - 1, S - 9, S // 2 + 1, WALL_D)
+    # Nieten mit Glanz
+    for rx, ry in ((12, 12), (S - 12, 12), (12, S - 12), (S - 12, S - 12)):
+        p.disc(rx, ry, 3.2, WALL_D); p.disc(rx, ry, 2.4, STEEL); p.disc(rx - 0.7, ry - 0.7, 1.0, WALL_T)
+    return p.finish()
 
 
 def t_chip():
-    c = C(); c.im.alpha_composite(t_floor())
-    # leuchtendes IC
-    c.disc(16, 16, 12, (10, 40, 28, 120))
-    c.rect(7, 7, 24, 24, CHIPG_DD)
-    c.vgrad(8, 8, 23, 23, CHIPG, CHIPG_D)
-    c.rect(11, 11, 20, 20, CHIPG_DD)
-    c.rect(12, 12, 19, 19, CHIPG_L)
-    c.rect(13, 13, 18, 18, CHIPG_D)
-    # Beinchen gold
-    for i in range(9, 24, 4):
-        c.rect(4, i, 6, i + 1, GOLD); c.rect(25, i, 27, i + 1, GOLD)
-        c.rect(i, 4, i + 1, 6, GOLD); c.rect(i, 25, i + 1, 27, GOLD)
-    c.set(14, 14, WHITE)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.disc(32, 32, 22, (16, 60, 44, 130))            # Glow
+    p.rrect(14, 14, 50, 50, 4, CHIPG_D)
+    p.gv(16, 16, 48, 48, CHIPG_T, CHIPG_B)
+    p.rrect(22, 22, 42, 42, 3, CHIPG_D)
+    p.rrect(24, 24, 40, 40, 2, _mix(CHIPG, CHIPG_T, 0.4))
+    p.rect(27, 27, 37, 37, CHIPG_B)
+    # Gold-Beinchen
+    for i in range(18, 47, 6):
+        p.rrect(8, i - 1, 14, i + 1, 1, GOLD); p.rrect(50, i - 1, 56, i + 1, 1, GOLD)
+        p.rrect(i - 1, 8, i + 1, 14, 1, GOLD); p.rrect(i - 1, 50, i + 1, 56, 1, GOLD)
+    p.disc(28, 28, 2, SHINE)
+    return p.finish()
 
 
 def t_water():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, WATER, WATER_DD)
-    for (x, y, r) in ((8, 9, 2), (20, 13, 2), (13, 22, 2), (25, 25, 1), (5, 26, 1)):
-        c.disc(x, y, r, WATER_L)
-    for x in range(0, S, 7):
-        c.hline(x, x + 4, 4, WATER_L)
-        c.hline(x + 3, x + 7, 18, _mix(WATER, WATER_L, 0.5))
-    c.rect(0, 0, S - 1, 1, WATER_D)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, WATER_T, WATER_B)
+    for k, yy in enumerate((10, 24, 40, 54)):
+        col = _mix(WATER_FOAM, WATER_T, 0.2 + k * 0.15)
+        p.line([(2, yy), (18, yy - 3), (34, yy + 2), (50, yy - 2), (62, yy + 1)], col, 1.6)
+    p.disc(16, 16, 3, WATER_FOAM); p.disc(44, 30, 2, WATER_FOAM); p.disc(28, 48, 2.4, WATER_FOAM)
+    p.gv(0, 0, S, 6, WATER_B, WATER_T)
+    return p.finish()
 
 
 def t_fire():
-    c = C(); c.im.alpha_composite(t_floor())
-    for fx, base, h, w, col in ((10, 27, 17, 5, FIRE_D), (21, 27, 14, 4, FIRE_D),
-                                (16, 28, 22, 6, FIRE)):
-        for y in range(base, base - h, -1):
-            t = (base - y) / h
-            sw = max(1, int(w * (1 - t)))
-            c.hline(fx - sw, fx + sw, y, col)
-    for fx, base, h in ((12, 27, 12), (16, 28, 16), (20, 27, 11)):
-        for y in range(base, base - h, -1):
-            t = (base - y) / h
-            sw = max(0, int(4 * (1 - t)))
-            c.hline(fx - sw, fx + sw, y, FIRE_L if t > 0.55 else FIRE)
-    c.disc(16, 22, 3, FIRE_L)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.disc(32, 40, 22, (120, 40, 12, 120))
+    def flame(cx, base_y, w, h, col):
+        pts = [(cx - w, base_y), (cx - w * 0.5, base_y - h * 0.55),
+               (cx - w * 0.2, base_y - h * 0.2), (cx, base_y - h),
+               (cx + w * 0.2, base_y - h * 0.2), (cx + w * 0.5, base_y - h * 0.55),
+               (cx + w, base_y)]
+        p.poly(pts, col)
+    flame(32, 54, 17, 40, FIRE_D)
+    flame(24, 54, 8, 26, FIRE_R); flame(40, 54, 9, 30, FIRE_R)
+    flame(32, 54, 11, 34, FIRE_O)
+    flame(32, 52, 6, 22, FIRE_Y)
+    p.disc(32, 46, 4, FIRE_Y)
+    return p.finish(glow=True)
 
 
 def t_ice():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, ICE_L, ICE_D)
-    c.rect(1, 1, S - 2, S - 2, ICE)
-    c.bevel_in(ICE_L, ICE_DD)
+    p = P()
+    p.gv(0, 0, S, S, ICE_T, ICE_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, ICE)
+    p.frame(2, 2, S - 3, S - 3, ICE_T, 1.5)
+    p.line([(3, S - 5), (S - 4, S - 5)], ICE_D, 2)
     # Risse
-    pts = [(6, 6), (12, 9), (15, 15), (22, 12), (26, 20), (18, 24), (9, 22)]
-    for i in range(len(pts) - 1):
-        (x0, y0), (x1, y1) = pts[i], pts[i + 1]
-        steps = max(abs(x1 - x0), abs(y1 - y0))
-        for s in range(steps + 1):
-            c.set(x0 + (x1 - x0) * s / steps, y0 + (y1 - y0) * s / steps, ICE_DD)
-    c.disc(23, 7, 2, ICE_L)
-    return c.im
+    p.line([(12, 12), (24, 18), (30, 30), (46, 24), (54, 40)], ICE_D, 1.4)
+    p.line([(18, 50), (30, 30)], ICE_D, 1.2)
+    # Glanz
+    p.poly([(40, 10), (50, 12), (44, 22)], (255, 255, 255, 120))
+    p.disc(48, 16, 2.4, WHITE)
+    return p.finish()
 
 
-def ice_corner(closed):
-    """Eis-Ecke. `closed` = Ecke, an der die zwei Waende zusammenstossen
-    (die offene/gekruemmte Seite liegt gegenueber). Zeigt eine deutliche
-    gekruemmte Eis-Rinne, die die zwei OFFENEN Kanten verbindet."""
-    c = C()
-    c.im.alpha_composite(t_ice())
-    tw = 7
+def t_ice_corner(closed):
+    p = P()
+    p.im.alpha_composite(t_ice().resize((W, W), Image.NEAREST))
+    tw = 13
     edges = {"NW": ("N", "W"), "NE": ("N", "E"), "SE": ("S", "E"), "SW": ("S", "W")}[closed]
     for e in edges:
-        if e == "N":
-            c.vgrad(0, 0, S - 1, tw - 1, WALL_L, WALL); c.hline(0, S - 1, tw - 1, WALL_DD)
-        elif e == "S":
-            c.vgrad(0, S - tw, S - 1, S - 1, WALL, WALL_D); c.hline(0, S - 1, S - tw, WALL_L)
-        elif e == "W":
-            c.rect(0, 0, tw - 1, S - 1, WALL); c.vline(tw - 1, 0, S - 1, WALL_DD)
-        else:
-            c.rect(S - tw, 0, S - 1, S - 1, WALL); c.vline(S - tw, 0, S - 1, WALL_L)
-    # Nieten in der Wand-Ecke
-    corner_pt = {"NW": (3, 3), "NE": (S - 4, 3), "SE": (S - 4, S - 4), "SW": (3, S - 4)}[closed]
-    c.disc(corner_pt[0], corner_pt[1], 1.4, WALL_DD); c.set(corner_pt[0], corner_pt[1], WALL_L)
-    # gekruemmte Eis-Rinne = Viertelkreis um die geschlossene Ecke
-    cen = {"NW": (tw - 1, tw - 1), "NE": (S - tw, tw - 1),
-           "SE": (S - tw, S - tw), "SW": (tw - 1, S - tw)}[closed]
-    cx, cy = cen
+        if e == "N": p.gv(0, 0, S, tw, WALL_T, WALL)
+        elif e == "S": p.gv(0, S - tw, S, S, WALL, WALL_B)
+        elif e == "W": p.gh(0, 0, tw, S, WALL_T, WALL)
+        else: p.gh(S - tw, 0, S, S, WALL, WALL_B)
+    cen = {"NW": (tw, tw), "NE": (S - tw, tw), "SE": (S - tw, S - tw), "SW": (tw, S - tw)}[closed]
     a0, a1 = {"NW": (0, 90), "NE": (90, 180), "SE": (180, 270), "SW": (270, 360)}[closed]
-    r1, r2 = 12, 20
-    deg = a0 * 4
-    while deg <= a1 * 4:
-        a = math.radians(deg / 4.0)
-        ca, sa = math.cos(a), math.sin(a)
-        r = r1
-        while r <= r2:                                  # Rinne fuellen
-            c.set(cx + r * ca, cy + r * sa, ICE_D)
-            r += 0.5
-        c.set(cx + r1 * ca, cy + r1 * sa, ICE_DD)       # innere Kante
-        c.set(cx + r2 * ca, cy + r2 * sa, ICE_DD)       # aeussere Kante
-        rm = (r1 + r2) / 2.0
-        c.set(cx + rm * ca, cy + rm * sa, ICE_L)        # Glanz-Mittellinie
-        c.set(cx + (rm + 1) * ca, cy + (rm + 1) * sa, ICE_L)
-        deg += 1
-    return c.im
+    cx, cy = cen
+    for r, col, wdt in ((34, ICE_D, 3), (28, ICE_T, 2), (31, WHITE, 1)):
+        pts = []
+        deg = a0
+        while deg <= a1:
+            a = math.radians(deg)
+            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+            deg += 4
+        if len(pts) > 1:
+            p.line(pts, col, wdt)
+    return p.finish()
 
 
 def t_dirt():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, DIRT_L, DIRT_D)
-    c.rect(1, 1, S - 2, S - 2, DIRT)
-    c.bevel_in(DIRT_L, DIRT_D)
-    for (x, y, r) in ((8, 9, 2), (20, 11, 2), (13, 20, 2), (24, 23, 2), (6, 24, 1), (17, 6, 1)):
-        c.disc(x, y, r, DIRT_D); c.disc(x - 1, y - 1, 1, DIRT_L)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, DIRT_T, DIRT_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, DIRT)
+    for x, y, r in ((14, 18, 4), (40, 22, 5), (26, 40, 4), (48, 46, 4), (12, 48, 3), (34, 12, 3)):
+        p.disc(x, y, r, DIRT_B); p.disc(x - 1, y - 1, r * 0.5, DIRT_T)
+    p.frame(2, 2, S - 3, S - 3, _mix(DIRT_T, WHITE, 0.2), 1)
+    return p.finish()
 
 
 def t_gravel():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, GRAVEL_L, GRAVEL_D)
-    c.rect(1, 1, S - 2, S - 2, GRAVEL)
-    for (x, y, r) in ((6, 7, 2), (15, 6, 2), (24, 10, 2), (9, 16, 2), (20, 18, 2),
-                      (27, 22, 2), (13, 25, 2), (5, 25, 1)):
-        c.disc(x, y, r, GRAVEL_L); c.disc(x + 1, y + 1, 1, GRAVEL_D)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, GRAVEL_T, GRAVEL_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, GRAVEL)
+    for x, y, r in ((12, 14, 4), (30, 12, 5), (48, 20, 4), (18, 32, 5), (40, 36, 5),
+                    (54, 44, 4), (26, 50, 5), (12, 48, 3)):
+        p.disc(x, y, r, _mix(GRAVEL, GRAVEL_B, 0.5)); p.disc(x - 1, y - 1, r * 0.55, GRAVEL_T)
+    return p.finish()
 
 
-def _arrow(c, dx, dy, col, cx, cy, ln=4):
-    if dx != 0:
-        sgn = 1 if dx > 0 else -1
-        for i in range(-ln, ln + 1):
-            c.set(cx + i, cy, col); c.set(cx + i, cy - 1, col); c.set(cx + i, cy + 1, col)
-        for k in range(5):
-            c.vline(cx + sgn * (ln - k), cy - k, cy + k, col)
+def _arrow(p, dx, dy, cx, cy, col, ln=9):
+    if dx:
+        s = 1 if dx > 0 else -1
+        p.line([(cx - s * ln, cy), (cx + s * ln * 0.3, cy)], col, 3)
+        p.poly([(cx + s * ln, cy), (cx + s * (ln - 7), cy - 6), (cx + s * (ln - 7), cy + 6)], col)
     else:
-        sgn = 1 if dy > 0 else -1
-        for i in range(-ln, ln + 1):
-            c.set(cx, cy + i, col); c.set(cx - 1, cy + i, col); c.set(cx + 1, cy + i, col)
-        for k in range(5):
-            c.hline(cx - k, cx + k, cy + sgn * (ln - k), col)
+        s = 1 if dy > 0 else -1
+        p.line([(cx, cy - s * ln), (cx, cy + s * ln * 0.3)], col, 3)
+        p.poly([(cx, cy + s * ln), (cx - 6, cy + s * (ln - 7)), (cx + 6, cy + s * (ln - 7))], col)
 
 
 def t_force(dx, dy):
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, PURP, PURP_D)
-    c.bevel_in(PURP_L, OL)
+    p = P()
+    p.gv(0, 0, S, S, PURP_T, PURP_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, PURP)
+    p.frame(2, 2, S - 3, S - 3, PURP_T, 1.5)
     for k in range(2):
-        cx = 16 if dy else (10 + k * 12)
-        cy = (8 + k * 14) if dy else 16
-        _arrow(c, dx, dy, PURP_L if k == 0 else (200, 184, 255, 255), cx, cy, 4)
-    return c.im
+        cx = 32 if dy else (20 + k * 24)
+        cy = (18 + k * 28) if dy else 32
+        _arrow(p, dx, dy, cx, cy, _mix(PURP_T, WHITE, 0.3 if k == 0 else 0.0))
+    return p.finish()
 
 
 def t_force_random():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, PURP, PURP_D)
-    c.bevel_in(PURP_L, OL)
-    _arrow(c, 1, 0, PURP_L, 16, 9, 4)
-    _arrow(c, -1, 0, PURP_L, 16, 23, 4)
-    c.disc(16, 16, 3, WHITE)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, PURP_T, PURP_B)
+    p.rrect(2, 2, S - 3, S - 3, 6, PURP)
+    _arrow(p, 1, 0, 34, 20, PURP_T, 8)
+    _arrow(p, 0, 1, 22, 38, PURP_T, 8)
+    _arrow(p, -1, 0, 30, 48, PURP_T, 8)
+    p.disc(32, 32, 3, WHITE)
+    return p.finish()
 
 
 def t_exit():
-    c = C(bg=BLACK)
-    for r in range(15, 0, -1):
-        col = NEON if (r // 2) % 2 == 0 else (16, 26, 36, 255)
-        c.ring(16, 16, r, col, 1.6)
-    c.disc(16, 16, 3, WHITE)
-    c.frame(NEON_D, 2)
-    c.bevel_in(NEON, NEON_DD)
-    return c.im
+    p = P(bg=BLACK)
+    for r in range(30, 2, -3):
+        t = r / 30.0
+        col = _mix(WHITE, NEON, 1 - t) if (r // 3) % 2 == 0 else (12, 24, 34, 255)
+        p.ring(32, 32, r, 2.4, col)
+    p.disc(32, 32, 4, WHITE)
+    p.frame(2, 2, S - 3, S - 3, NEON_B, 2)
+    return p.finish(glow=True)
 
 
 def t_socket():
-    c = C(); c.im.alpha_composite(t_floor())
-    c.rect(4, 4, 27, 27, (36, 42, 58, 255))
-    c.frame((26, 32, 46, 255), 2)
-    c.bevel_in((50, 58, 78, 255), (18, 22, 32, 255))
-    c.rect(11, 9, 20, 23, STEEL)
-    c.rect(12, 10, 19, 22, (58, 64, 84, 255))
-    for i in range(11, 22, 3):
-        c.rect(7, i, 9, i + 1, GOLD); c.rect(22, i, 24, i + 1, GOLD)
-    c.disc(16, 16, 3, CHIPG); c.disc(15, 15, 1, CHIPG_L)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.rrect(8, 8, S - 9, S - 9, 6, (34, 40, 56, 255))
+    p.frame(8, 8, S - 9, S - 9, (54, 64, 86, 255), 2)
+    p.rrect(22, 16, 42, 48, 3, STEEL)
+    p.gv(24, 18, 40, 46, _mix(STEEL, WHITE, 0.2), (70, 78, 98, 255))
+    for i in range(20, 47, 7):
+        p.rrect(14, i - 1, 20, i + 1, 1, GOLD); p.rrect(44, i - 1, 50, i + 1, 1, GOLD)
+    p.disc(32, 32, 4, CHIPG); p.disc(30, 30, 1.6, CHIPG_T)
+    return p.finish()
 
 
-def t_door(col, cold, coll):
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, coll, cold)
-    c.frame(col, 3)
-    c.rect(4, 4, S - 5, S - 5, col)
-    c.rect(6, 6, S - 7, S - 7, cold)
-    c.bevel_in(coll, OL)
-    # Schloss
-    c.disc(16, 14, 4, GOLD); c.disc(16, 14, 2, cold)
-    c.rect(15, 14, 17, 21, GOLD)
-    c.hline(2, S - 3, 16, _mix(cold, OL, 0.4))   # Tuerspalt
-    c.shade(10, 8, 2, coll)
-    return c.im
+def t_door(name):
+    lt, md, dk, dp = COL[name]
+    p = P()
+    p.gv(0, 0, S, S, lt, dk)
+    p.rrect(3, 3, S - 4, S - 4, 8, md)
+    p.frame(3, 3, S - 4, S - 4, lt, 2)
+    p.gv(6, 6, S - 7, 26, _mix(md, lt, 0.55), md)       # Glanz oben
+    p.rrect(10, 10, S - 11, S - 11, 5, dk)
+    p.rrect(12, 12, S - 13, S - 13, 4, md)
+    # Schloss / Reide-Platte
+    p.disc(32, 28, 7, GOLD_B); p.disc(32, 28, 5.4, GOLD); p.disc(30.5, 26.5, 2, GOLD_T)
+    p.rrect(30, 28, 34, 42, 1.5, GOLD); p.disc(32, 28, 2.2, dp)
+    p.line([(4, 32), (S - 5, 32)], _mix(dk, OL, 0.4), 1.4)   # Tuerspalt
+    return p.finish()
 
 
 def t_blue_wall():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, KEYBLUE, KEYBLUE_D)
-    c.rect(3, 3, S - 4, S - 4, KEYBLUE_D)
-    c.bevel_in(KEYBLUE_L, OL)
-    c.disc(16, 16, 6, KEYBLUE); c.disc(13, 13, 2, KEYBLUE_L)
-    return c.im
+    lt, md, dk, dp = COL["blue"]
+    p = P()
+    p.gv(0, 0, S, S, lt, dk)
+    p.rrect(4, 4, S - 5, S - 5, 7, dp)
+    p.frame(4, 4, S - 5, S - 5, lt, 2)
+    p.disc(32, 32, 10, md); p.disc(28, 28, 4, lt)
+    return p.finish()
 
 
 def t_block():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, DIRT_L, DIRT_D)
-    c.rect(2, 2, S - 3, S - 3, DIRT)
-    c.bevel_in(_mix(DIRT_L, WHITE, 0.3), DIRT_D)
-    c.frame(DIRT_D, 2)
-    # Metallband-Kreuz
-    for i in range(3, S - 3):
-        c.set(i, i, DIRT_D); c.set(i, i - 1, DIRT_L)
-        c.set(S - 1 - i, i, DIRT_D)
-    c.rect(13, 13, 18, 18, (150, 116, 76, 255))
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, (176, 138, 92, 255), DIRT_B)
+    p.rrect(3, 3, S - 4, S - 4, 6, DIRT)
+    p.frame(3, 3, S - 4, S - 4, (200, 162, 110, 255), 2)
+    p.line([(3, S - 5), (S - 4, S - 5)], DIRT_B, 2.5)
+    # Metallbeschlag (Diagonalen + Mittelplatte)
+    p.line([(8, 8), (S - 8, S - 8)], DIRT_B, 2); p.line([(S - 8, 8), (8, S - 8)], DIRT_B, 2)
+    p.rrect(24, 24, 40, 40, 3, (150, 116, 76, 255))
+    p.frame(24, 24, 40, 40, DIRT_B, 1)
+    for rx, ry in ((10, 10), (S - 10, 10), (10, S - 10), (S - 10, S - 10)):
+        p.disc(rx, ry, 2.4, DIRT_B); p.disc(rx - 0.6, ry - 0.6, 1, (210, 170, 120, 255))
+    return p.finish()
 
 
-def t_button(col, coll):
-    c = C(); c.im.alpha_composite(t_floor())
-    c.disc(16, 16, 10, (24, 28, 40, 255))
-    c.disc(16, 16, 8, _mix(col, OL, 0.3))
-    c.disc(16, 16, 7, col)
-    c.disc(13, 13, 2.5, coll)
-    return c.im
+def t_button(name, light):
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.disc(32, 33, 16, (20, 24, 36, 255))
+    p.disc(32, 32, 13, _mix(name, OL, 0.35))
+    p.disc(32, 32, 11, name)
+    p.disc(32, 31, 9, _mix(name, light, 0.4))
+    p.disc(27, 27, 3.5, light)
+    return p.finish()
 
 
 def t_toggle(open_):
     if open_:
-        c = C(); c.im.alpha_composite(t_floor())
-        c.frame((70, 214, 110, 150), 3)
-        c.disc(16, 16, 3, (70, 214, 110, 170))
-        return c.im
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, (70, 150, 100, 255), (40, 96, 64, 255))
-    c.rect(3, 3, S - 4, S - 4, (52, 124, 84, 255))
-    c.bevel_in((110, 200, 140, 255), OL)
-    for y in range(5, S - 4, 5):
-        c.hline(4, S - 5, y, (40, 96, 64, 255))
-    for x in range(5, S - 4, 5):
-        c.vline(x, 4, S - 5, (40, 96, 64, 255))
-    return c.im
+        base = t_floor()
+        p = P()
+        p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+        p.frame(4, 4, S - 5, S - 5, (90, 230, 130, 150), 3)
+        p.disc(32, 32, 4, (90, 230, 130, 160))
+        return p.finish()
+    p = P()
+    p.gv(0, 0, S, S, (96, 220, 140, 255), (44, 120, 78, 255))
+    p.rrect(3, 3, S - 4, S - 4, 6, (60, 150, 96, 255))
+    p.frame(3, 3, S - 4, S - 4, (130, 240, 160, 255), 2)
+    for y in range(10, S - 6, 10):
+        p.line([(5, y), (S - 6, y)], (44, 110, 72, 255), 1.4)
+    for x in range(10, S - 6, 10):
+        p.line([(x, 5), (x, S - 6)], (44, 110, 72, 255), 1.4)
+    return p.finish()
 
 
 def t_teleport():
-    c = C(bg=BLACK)
-    for r in range(14, 0, -1):
-        col = MAGENTA if (r // 2) % 2 == 0 else (34, 12, 34, 255)
-        c.ring(16, 16, r, col, 1.6)
-    c.disc(16, 16, 3, WHITE)
-    c.frame(MAGENTA_D, 2)
-    return c.im
+    p = P(bg=BLACK)
+    for r in range(28, 2, -3):
+        col = _mix(WHITE, MAG, r / 28.0) if (r // 3) % 2 == 0 else (30, 10, 30, 255)
+        p.ring(32, 32, r, 2.4, col)
+    p.disc(32, 32, 4, WHITE)
+    p.frame(2, 2, S - 3, S - 3, MAG_B, 2)
+    return p.finish(glow=True)
 
 
 def t_bomb():
-    c = C(); c.im.alpha_composite(t_floor())
-    c.disc(16, 19, 9, BLACK)
-    c.disc(16, 19, 9, (20, 22, 30, 255))
-    c.disc(12, 15, 3, (70, 76, 92, 255))
-    c.vline(18, 5, 9, (150, 120, 70, 255)); c.set(19, 6, (150, 120, 70, 255))
-    c.disc(19, 4, 1.5, FIRE_L); c.disc(19, 4, 2.4, FIRE)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.disc(31, 38, 17, (8, 10, 16, 255))
+    p.disc(31, 38, 15, (30, 34, 46, 255))
+    p.disc(31, 38, 14, BLACK)
+    p.disc(24, 31, 5, (78, 86, 104, 255)); p.disc(22, 29, 2, (140, 148, 166, 255))
+    p.line([(38, 22), (44, 14), (48, 16)], (160, 130, 80, 255), 2.4)
+    p.disc(48, 15, 3, FIRE_O); p.disc(48, 15, 1.6, FIRE_Y)
+    return p.finish(glow=True)
 
 
 def t_trap():
-    c = C(); c.im.alpha_composite(t_floor())
-    c.rect(3, 3, S - 4, S - 4, (22, 24, 32, 255))
-    c.frame((58, 64, 82, 255), 2)
-    for x in range(5, S - 4, 4):
-        c.vline(x, 5, 9, STEEL); c.vline(x + 1, 5, 8, WALL_D)
-        c.vline(x, S - 10, S - 6, STEEL)
-    c.rect(7, 13, S - 8, 19, BLACK)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.rrect(6, 6, S - 7, S - 7, 4, (22, 26, 36, 255))
+    p.frame(6, 6, S - 7, S - 7, (60, 68, 88, 255), 2)
+    for x in range(10, S - 8, 7):
+        p.poly([(x, 10), (x + 4, 10), (x + 2, 18)], STEEL)
+        p.poly([(x, S - 10), (x + 4, S - 10), (x + 2, S - 18)], STEEL)
+    p.rrect(12, 26, S - 13, 38, 2, BLACK)
+    return p.finish()
 
 
 def t_hint():
-    c = C(); c.im.alpha_composite(t_floor())
-    c.rect(5, 5, S - 6, S - 6, (38, 44, 60, 255))
-    c.frame((58, 66, 86, 255), 2)
-    c.bevel_in((70, 80, 104, 255), OL)
-    # "?" gross
-    c.rect(11, 8, 19, 11, NEON)
-    c.rect(17, 10, 20, 15, NEON)
-    c.rect(13, 14, 18, 17, NEON)
-    c.rect(13, 19, 16, 22, NEON)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.rrect(8, 8, S - 9, S - 9, 6, (40, 48, 66, 255))
+    p.frame(8, 8, S - 9, S - 9, (66, 78, 104, 255), 2)
+    # "?" geschwungen
+    p.line([(24, 22), (32, 18), (40, 24), (34, 32), (32, 38)], NEON, 4)
+    p.disc(32, 46, 2.6, NEON)
+    return p.finish(glow=True)
 
 
 def t_thief():
-    c = C(); c.im.alpha_composite(t_floor())
-    c.disc(16, 14, 8, (40, 46, 64, 255))
-    c.rect(6, 11, 25, 16, BLACK)
-    c.disc(11, 13, 1.5, NEON); c.disc(20, 13, 1.5, NEON)
-    c.rect(9, 20, 22, 28, (54, 60, 82, 255))
-    c.disc(16, 23, 2, MAGENTA)
-    c.outline(OL)
-    return c.im
+    base = t_floor()
+    p = P()
+    p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    p.disc(32, 26, 14, (44, 50, 70, 255))
+    p.disc(32, 22, 11, (60, 68, 92, 255))           # Kapuze
+    p.rrect(18, 24, 46, 32, 3, BLACK)               # Maske
+    p.disc(25, 28, 2.4, NEON); p.disc(39, 28, 2.4, NEON)
+    p.poly([(18, 40), (46, 40), (52, 58), (12, 58)], (54, 60, 82, 255))   # Umhang
+    p.disc(32, 48, 3, MAG)
+    return p.finish()
 
 
 def t_cloner():
-    c = C()
-    c.vgrad(0, 0, S - 1, S - 1, (54, 60, 82, 255), (34, 38, 54, 255))
-    c.rect(3, 3, S - 4, S - 4, (46, 52, 72, 255))
-    c.bevel_in(STEEL, OL)
-    c.rect(8, 8, 23, 23, (20, 22, 32, 255))
-    c.rect(11, 11, 20, 20, MAGENTA)
-    c.rect(12, 12, 19, 19, MAGENTA_D)
-    for x, y in ((6, 6), (25, 6), (6, 25), (25, 25)):
-        c.disc(x, y, 1.5, NEON)
-    return c.im
+    p = P()
+    p.gv(0, 0, S, S, (66, 74, 100, 255), (34, 38, 54, 255))
+    p.rrect(3, 3, S - 4, S - 4, 6, (50, 56, 78, 255))
+    p.frame(3, 3, S - 4, S - 4, STEEL, 2)
+    p.rrect(14, 14, S - 15, S - 15, 4, (18, 20, 30, 255))
+    p.rrect(22, 22, 42, 42, 3, MAG_B)
+    p.gv(24, 24, 40, 40, MAG_T, MAG)
+    for x, y in ((10, 10), (S - 10, 10), (10, S - 10), (S - 10, S - 10)):
+        p.disc(x, y, 2.4, NEON)
+    return p.finish(glow=True)
 
 
 def t_thin_wall(dirs):
-    c = C(); c.im.alpha_composite(t_floor())
+    p = P()
+    p.im.alpha_composite(t_floor().resize((W, W), Image.NEAREST))
     for d in dirs:
-        if d == "N":
-            c.vgrad(0, 0, S - 1, 4, WALL_L, WALL)
-        elif d == "S":
-            c.vgrad(0, S - 5, S - 1, S - 1, WALL, WALL_D)
-        elif d == "W":
-            c.rect(0, 0, 4, S - 1, WALL); c.vline(0, 0, S - 1, WALL_L)
-        elif d == "E":
-            c.rect(S - 5, 0, S - 1, S - 1, WALL); c.vline(S - 1, 0, S - 1, WALL_D)
-    return c.im
+        if d == "N": p.gv(0, 0, S, 9, WALL_T, WALL)
+        elif d == "S": p.gv(0, S - 9, S, S, WALL, WALL_B)
+        elif d == "W": p.gh(0, 0, 9, S, WALL_T, WALL)
+        elif d == "E": p.gh(S - 9, 0, S, S, WALL, WALL_B)
+    return p.finish()
 
 
-# ============================================================ ITEMS
-def i_key(col, cold, coll):
-    c = C()
-    c.ring(11, 11, 5, col, 2.2)
-    c.disc(9, 9, 1.5, coll)
-    c.rect(13, 13, 16, 27, col)
-    c.vline(13, 13, 27, coll)
-    c.rect(16, 22, 21, 24, col)
-    c.rect(16, 25, 19, 27, col)
-    c.outline(OL)
-    return c.im
+# ====================================================== ITEMS
+def i_key(name):
+    lt, md, dk, dp = COL[name]
+    p = P()
+    # Schaft
+    p.gh(28, 28, 36, 56, lt, dk)
+    p.rect(28, 28, 36, 56, md)
+    p.gh(28, 28, 30, 56, lt, lt)                     # Glanzkante links
+    p.rect(28, 28, 30, 56, lt)
+    p.rect(34, 28, 36, 56, dk)
+    # Reide (Bow) -- Ring oben
+    p.disc(32, 18, 14, dk); p.disc(32, 18, 12, md); p.disc(31, 16, 9, lt)
+    p.disc(32, 18, 7, T)                              # Loch (transparent stanzen)
+    p.ring(32, 18, 8.5, 2.2, dk)
+    p.disc(27, 13, 2.4, SHINE)                        # Glanzpunkt
+    # Bart (Bit) unten rechts
+    p.rect(36, 44, 44, 48, md); p.rect(36, 44, 44, 46, lt)
+    p.rect(36, 52, 41, 56, md); p.rect(36, 52, 41, 54, lt)
+    p.disc(32, 56, 4, md); p.disc(30, 55, 1.6, lt)   # abgerundete Spitze
+    return p.finish()
 
 
-def _boot_base(c, col, cold, coll):
-    """Seitenansicht-Stiefel (Zehe nach rechts) -- gemeinsame Basis."""
-    # Schaft / Stulpe
-    c.vgrad(10, 4, 19, 18, coll, col)
-    c.rect(10, 4, 11, 18, cold)
-    c.rect(18, 4, 19, 18, cold)
-    c.rect(10, 4, 19, 6, coll)
-    # Fuss nach rechts
-    c.vgrad(10, 18, 26, 26, col, cold)
-    c.rect(24, 19, 26, 26, cold)
-    # Sohle
-    c.rect(9, 26, 27, 28, cold)
-    c.rect(9, 28, 27, 29, OL)
-    # Schnuerung + Glanz
-    c.set(12, 6, coll)
-    for y in range(8, 17, 3):
-        c.hline(12, 17, y, coll)
-        c.set(12, y, col); c.set(17, y, col)
-
-
-def _fin(c, cx, col, cold, hl=None):
-    c.vgrad(cx - 4, 4, cx + 4, 12, hl or col, cold)
-    c.rect(cx - 4, 4, cx + 4, 6, hl or col)
-    c.rect(cx - 4, 9, cx + 4, 12, cold)         # Fuss-Oeffnung
-    k = 0
-    while k < 16:
-        yy = 12 + k
-        w = 4 + int(k * 0.5)
-        c.hline(cx - w, cx + w, yy, _mix(col, cold, k / 16))
-        k += 1
-    if hl:
-        c.vline(cx - 3, 13, 26, hl)
+def _boot_base(p, lt, md, dk):
+    # Seitenansicht-Stiefel, Zehe rechts
+    p.gv(18, 8, 36, 38, lt, md)                       # Schaft
+    p.rrect(18, 8, 36, 14, 3, lt)
+    p.rect(18, 8, 21, 38, dk)
+    p.gv(18, 36, 50, 52, md, dk)                      # Fuss
+    p.rrect(42, 38, 50, 52, 4, md)
+    p.rrect(16, 50, 52, 57, 3, dk)                    # Sohle
+    for y in range(16, 35, 5):
+        p.line([(22, y), (34, y)], lt, 1.4)           # Schnuerung
+    p.disc(23, 12, 2, SHINE)
 
 
 def boot_flippers():
-    c = C()
-    _fin(c, 20, WATER_D, WATER_DD)              # hintere Flosse
-    _fin(c, 12, WATER, WATER_D, hl=WATER_L)     # vordere Flosse
-    c.outline()
-    return c.im
+    lt, md, dk, dp = COL["blue"]
+    p = P()
+    for cx, sh in ((38, dk), (26, md)):
+        p.gv(cx - 8, 8, cx + 8, 24, lt if sh is md else md, sh)
+        p.rrect(cx - 8, 8, cx + 8, 24, 4, sh)
+        p.poly([(cx - 9, 24), (cx + 9, 24), (cx + 16, 56), (cx - 16, 56)], sh)
+        p.line([(cx, 26), (cx, 54)], lt if sh is md else _mix(sh, lt, 0.4), 2)
+    p.disc(22, 14, 2.4, SHINE)
+    return p.finish()
 
 
 def boot_fire():
-    c = C()
-    _boot_base(c, (214, 72, 52, 255), (150, 40, 28, 255), (255, 150, 100, 255))
-    c.disc(14, 11, 2, FIRE_L); c.disc(14, 11, 1, WHITE)   # Flammen-Emblem
-    c.rect(9, 25, 27, 26, FIRE)                            # Glut-Sohle
-    for gx in (12, 17, 22):
-        c.disc(gx, 27, 1, FIRE_L)
-    c.outline()
-    return c.im
+    p = P()
+    _boot_base(p, (255, 150, 110, 255), (214, 72, 52, 255), (150, 40, 28, 255))
+    p.disc(28, 22, 3.4, FIRE_Y); p.disc(28, 22, 1.6, WHITE)
+    p.gv(16, 50, 52, 53, FIRE_O, FIRE_R)
+    for gx in (24, 34, 44):
+        p.disc(gx, 54, 1.8, FIRE_Y)
+    return p.finish(glow=True)
 
 
 def boot_ice():
-    c = C()
-    _boot_base(c, (188, 214, 236, 255), (120, 162, 200, 255), (232, 246, 255, 255))
-    c.disc(14, 10, 1.4, WHITE)                             # Eis-Glanz
-    c.rect(8, 28, 26, 29, (214, 234, 250, 255))            # Kufe
-    c.rect(8, 30, 26, 31, STEEL)
-    c.disc(9, 30, 1, (214, 234, 250, 255)); c.disc(25, 30, 1, (214, 234, 250, 255))
-    c.outline()
-    return c.im
+    p = P()
+    _boot_base(p, ICE_T, (188, 220, 240, 255), (120, 162, 200, 255))
+    p.disc(28, 20, 2.6, WHITE)
+    p.rrect(14, 56, 52, 59, 1.5, (220, 238, 252, 255))   # Kufe
+    p.rect(14, 60, 52, 62, STEEL)
+    return p.finish()
 
 
 def boot_suction():
-    c = C()
-    _boot_base(c, (150, 124, 216, 255), (96, 72, 168, 255), (190, 168, 244, 255))
-    for sx in (12, 18, 24):                                # Saugnaepfe
-        c.disc(sx, 28, 2.2, (70, 54, 128, 255))
-        c.disc(sx, 28, 1, (38, 28, 78, 255))
-    c.outline()
-    return c.im
+    p = P()
+    _boot_base(p, PURP_T, (150, 124, 216, 255), (96, 72, 168, 255))
+    for sx in (24, 34, 44):
+        p.disc(sx, 55, 3.2, (70, 54, 128, 255)); p.disc(sx, 55, 1.6, (40, 30, 80, 255))
+    return p.finish()
 
 
-# ============================================================ FIGUREN (Blick N)
-def _eyes(c, cx, cy, sp=4, r=1.6):
-    c.disc(cx - sp, cy, r + 0.6, WHITE); c.disc(cx + sp, cy, r + 0.6, WHITE)
-    c.disc(cx - sp, cy, 1, OL); c.disc(cx + sp, cy, 1, OL)
+# ====================================================== FIGUREN
+def _shade_ball(p, cx, cy, r, lt, md, dk, eyes=True, eye_y=None):
+    p.disc(cx, cy, r, dk)
+    p.disc(cx, cy, r - 1.5, md)
+    p.disc(cx - r * 0.32, cy - r * 0.32, r * 0.55, _mix(md, lt, 0.55))
+    p.disc(cx - r * 0.42, cy - r * 0.42, r * 0.22, lt)
+    if eyes:
+        ey = eye_y if eye_y is not None else cy - r * 0.2
+        for ex in (cx - r * 0.42, cx + r * 0.42):
+            p.disc(ex, ey, r * 0.22, WHITE); p.disc(ex, ey + 0.5, r * 0.1, OL)
 
 
 def b_bug():
-    c = C()
-    c.disc(16, 17, 11, (188, 48, 48, 255))
-    c.disc(16, 16, 10, (224, 72, 72, 255))
-    c.disc(16, 13, 7, (244, 110, 110, 255))
-    c.vline(16, 6, 27, (130, 26, 26, 255))
-    for sx, sy in ((9, 12), (23, 12), (8, 19), (24, 19), (10, 24), (22, 24)):
-        c.disc(sx, sy, 1.4, (120, 24, 24, 255))
-    # Fuehler
-    c.set(11, 5, OL); c.set(10, 3, OL); c.set(9, 2, OL)
-    c.set(21, 5, OL); c.set(22, 3, OL); c.set(23, 2, OL)
-    _eyes(c, 16, 11, 4)
-    c.outline()
-    return c.im
+    p = P()
+    _shade_ball(p, 32, 34, 22, (255, 120, 120, 255), (224, 72, 72, 255), (150, 36, 36, 255), eyes=False)
+    p.line([(32, 12), (32, 56)], (130, 26, 26, 255), 2)
+    for sx, sy in ((18, 24), (46, 24), (16, 38), (48, 38), (20, 50), (44, 50)):
+        p.disc(sx, sy, 2, (120, 24, 24, 255))
+    p.line([(24, 12), (18, 4)], OL, 2); p.line([(40, 12), (46, 4)], OL, 2)   # Fuehler
+    p.disc(18, 4, 2, OL); p.disc(46, 4, 2, OL)
+    for ex in (24, 40):
+        p.disc(ex, 22, 3.4, WHITE); p.disc(ex, 23, 1.6, OL)
+    return p.finish()
 
 
 def b_fireball():
-    c = C()
-    c.disc(16, 17, 11, FIRE_DD)
-    c.disc(16, 17, 9, FIRE_D)
-    c.disc(16, 16, 7, FIRE)
-    c.disc(16, 14, 4, FIRE_L)
-    c.disc(13, 12, 1.5, WHITE)
-    c.disc(16, 5, 3, FIRE); c.disc(16, 4, 1.5, FIRE_L)
-    c.outline()
-    return c.im
+    p = P()
+    _shade_ball(p, 32, 34, 21, FIRE_Y, FIRE_O, FIRE_R, eyes=False)
+    p.disc(28, 30, 4, FIRE_Y); p.disc(26, 28, 1.6, WHITE)
+    p.poly([(32, 10), (28, 18), (36, 18)], FIRE_O); p.poly([(32, 8), (30, 14), (34, 14)], FIRE_Y)
+    return p.finish(glow=True)
 
 
 def b_ball():
-    c = C()
-    c.disc(16, 16, 11, MAGENTA_D)
-    c.disc(16, 16, 10, MAGENTA)
-    c.disc(12, 12, 3, (255, 186, 240, 255))
-    c.disc(16, 16, 1.5, WHITE)
-    c.outline()
-    return c.im
+    p = P()
+    _shade_ball(p, 32, 34, 21, MAG_T, MAG, MAG_B, eyes=False)
+    p.disc(25, 26, 4, (255, 200, 245, 255)); p.disc(24, 25, 1.8, WHITE)
+    return p.finish()
 
 
 def b_tank():
-    c = C()
-    c.vgrad(4, 9, 27, 26, (86, 108, 178, 255), (44, 62, 116, 255))
-    c.rect(4, 9, 5, 26, (40, 58, 110, 255)); c.rect(26, 9, 27, 26, (40, 58, 110, 255))
-    c.rect(9, 13, 22, 22, (34, 50, 96, 255))
-    c.disc(16, 17, 3.5, NEON); c.disc(16, 17, 2, (180, 255, 250, 255))
-    c.rect(14, 1, 18, 11, STEEL); c.vline(14, 1, 11, WALL_L)
-    for x in (6, 25):
-        for y in range(11, 25, 3):
-            c.set(x, y, (24, 36, 72, 255))
-    c.outline()
-    return c.im
+    p = P()
+    p.gv(8, 16, 56, 52, (120, 146, 210, 255), (44, 62, 116, 255))
+    p.rrect(8, 16, 56, 52, 6, (86, 108, 178, 255))
+    p.frame(8, 16, 56, 52, (140, 166, 224, 255), 2)
+    p.rrect(18, 26, 46, 44, 4, (40, 58, 110, 255))
+    p.disc(32, 35, 6, NEON); p.disc(30, 33, 2.4, WHITE)
+    p.rrect(28, 2, 36, 20, 2, STEEL)                  # Lauf
+    for x in (12, 52):
+        for y in range(22, 50, 6):
+            p.disc(x, y, 1.6, (28, 40, 80, 255))
+    return p.finish()
 
 
 def b_glider():
-    c = C()
-    for y in range(4, 27):
-        half = int((y - 4) * 0.52)
-        c.hline(16 - half, 16 + half, y, _mix((60, 200, 196, 255), NEON_D, (y - 4) / 23))
-    c.vline(16, 4, 26, NEON)
-    for y in range(10, 27):
-        half = int((y - 4) * 0.52)
-        c.set(16 - half, y, NEON_DD); c.set(16 + half, y, NEON_DD)
-    c.disc(16, 10, 1.6, WHITE)
-    c.outline()
-    return c.im
+    p = P()
+    p.poly([(32, 6), (50, 52), (32, 42), (14, 52)], (60, 200, 196, 255), outline=NEON_B, ow=1.5)
+    p.poly([(32, 10), (32, 40), (44, 48)], (40, 160, 160, 255))
+    p.line([(32, 8), (32, 42)], NEON, 2)
+    p.disc(32, 20, 3, WHITE)
+    return p.finish(glow=True)
 
 
 def b_teeth():
-    c = C()
-    c.disc(16, 16, 11, PURP_D)
-    c.disc(16, 15, 10, PURP)
-    c.disc(16, 12, 6, PURP_L)
-    _eyes(c, 16, 12, 4)
-    c.rect(8, 20, 24, 24, WHITE)
-    for x in range(9, 24, 3):
-        c.vline(x, 20, 24, PURP_D)
-    c.outline()
-    return c.im
+    p = P()
+    _shade_ball(p, 32, 30, 21, PURP_T, PURP, PURP_B, eyes=True, eye_y=24)
+    p.rrect(16, 40, 48, 50, 3, WHITE)                 # Maul
+    for x in range(18, 48, 6):
+        p.poly([(x, 40), (x + 5, 40), (x + 2, 50)], PURP_B)
+    return p.finish()
 
 
 def b_walker():
-    c = C()
-    c.disc(16, 8, 5, STEEL); c.disc(16, 24, 5, STEEL)
-    c.rect(13, 8, 18, 24, (96, 104, 124, 255))
-    c.disc(16, 8, 3.5, (158, 170, 192, 255)); c.disc(16, 24, 3.5, (158, 170, 192, 255))
-    c.disc(16, 8, 1.5, NEON); c.disc(16, 24, 1.5, NEON)
-    c.outline()
-    return c.im
+    p = P()
+    for cy in (16, 48):
+        p.disc(32, cy, 9, (96, 104, 124, 255)); p.disc(32, cy, 7.5, STEEL); p.disc(29, cy - 3, 3, (190, 200, 220, 255))
+        p.disc(32, cy, 2, NEON)
+    p.gv(26, 16, 38, 48, (150, 160, 182, 255), (88, 96, 116, 255))
+    p.rect(26, 16, 38, 48, (110, 120, 142, 255))
+    return p.finish()
 
 
 def b_blob():
-    c = C()
-    c.disc(16, 17, 11, (46, 140, 66, 255))
-    c.disc(16, 16, 10, (78, 200, 100, 255))
-    c.disc(11, 12, 3, (164, 244, 176, 255))
-    c.disc(21, 20, 2, (164, 244, 176, 255))
-    _eyes(c, 16, 15, 4)
-    c.outline()
-    return c.im
+    p = P()
+    _shade_ball(p, 32, 34, 22, (160, 248, 178, 255), (78, 204, 104, 255), (40, 140, 64, 255), eyes=True, eye_y=30)
+    p.disc(22, 22, 4, (180, 250, 190, 255)); p.disc(44, 44, 3, (180, 250, 190, 255))
+    return p.finish(glow=True)
 
 
 def b_paramecium():
-    c = C()
-    for i, y in enumerate(range(6, 27, 4)):
-        col = KEYYEL if i % 2 == 0 else KEYYEL_D
-        c.disc(16, y, 5, col)
-        c.set(9, y, OL); c.set(7, y - 1, OL)
-        c.set(23, y, OL); c.set(25, y - 1, OL)
-    c.disc(16, 6, 5, KEYYEL_L)
-    _eyes(c, 16, 5, 3, 1.2)
-    c.outline()
-    return c.im
+    p = P()
+    lt, md, dk = COL["yellow"][0], COL["yellow"][1], COL["yellow"][2]
+    for i, y in enumerate(range(12, 56, 9)):
+        col = md if i % 2 == 0 else dk
+        p.disc(32, y, 9, col); p.disc(29, y - 2, 3.5, _mix(col, lt, 0.6))
+        p.line([(20, y), (12, y - 2)], OL, 1.6); p.line([(44, y), (52, y - 2)], OL, 1.6)
+    p.disc(32, 12, 9, lt)
+    for ex in (28, 36):
+        p.disc(ex, 9, 2.4, WHITE); p.disc(ex, 10, 1, OL)
+    return p.finish()
 
 
-PB = (84, 150, 230, 255)
-PB_D = (48, 96, 168, 255)
-PB_DD = (40, 84, 150, 255)
-PARM = (52, 100, 172, 255)
-PHELM = (210, 220, 234, 255)
-PHELM_D = (168, 180, 200, 255)
-PLEG = (44, 92, 160, 255)
-PFOOT = (30, 66, 120, 255)
+# ---- Spieler (4 echte Richtungen + Geh-Frames)
+PB_T = (130, 188, 255, 255); PB = (74, 140, 222, 255); PB_D = (44, 92, 164, 255)
+PHE = (216, 226, 240, 255); PHE_D = (150, 162, 184, 255); PLEG = (48, 96, 168, 255); PFOOT = (30, 66, 120, 255)
 
 
-def _pbody(c):
-    c.vgrad(8, 11, 23, 26, PB, PB_D)
-    c.rect(8, 11, 9, 26, PB_DD)
-    c.rect(22, 11, 23, 26, PB_DD)
-    c.rect(4, 13, 7, 22, PARM)
-    c.rect(24, 13, 27, 22, PARM)
-
-
-def _plegs(c, step):
+def _legs(p, step):
     if step == 0:
-        c.rect(10, 24, 14, 30, PLEG); c.rect(18, 24, 22, 30, PLEG)
-        c.rect(10, 29, 14, 30, PFOOT); c.rect(18, 29, 22, 30, PFOOT)
+        p.rrect(20, 48, 28, 60, 2, PLEG); p.rrect(36, 48, 44, 60, 2, PLEG)
+        p.rrect(20, 57, 28, 60, 1, PFOOT); p.rrect(36, 57, 44, 60, 1, PFOOT)
     else:
-        c.rect(8, 24, 12, 30, PLEG); c.rect(20, 24, 24, 30, PLEG)
-        c.rect(8, 29, 12, 30, PFOOT); c.rect(20, 29, 24, 30, PFOOT)
+        p.rrect(16, 48, 24, 60, 2, PLEG); p.rrect(40, 48, 48, 60, 2, PLEG)
+        p.rrect(16, 57, 24, 60, 1, PFOOT); p.rrect(40, 57, 48, 60, 1, PFOOT)
+
+
+def _torso(p):
+    p.gv(16, 22, 48, 52, PB_T, PB_D)
+    p.rrect(16, 22, 48, 52, 6, PB)
+    p.rect(16, 22, 19, 52, PB_D)
+    p.rrect(8, 26, 16, 44, 3, PB_D); p.rrect(48, 26, 56, 44, 3, PB_D)   # Arme
 
 
 def player_front(step):
-    c = C()
-    _pbody(c)
-    _plegs(c, step)
-    c.disc(16, 9, 7, PHELM)
-    c.rect(9, 7, 22, 12, PHELM)
-    c.rect(9, 8, 22, 11, BLACK)             # Visier
-    c.disc(12, 9, 1.4, NEON); c.disc(20, 9, 1.4, NEON)
-    c.set(11, 8, (150, 255, 250, 255))
-    c.disc(16, 18, 2.6, NEON); c.disc(16, 18, 1.2, WHITE)   # Brustkern
-    c.outline()
-    return c.im
+    p = P(); _legs(p, step); _torso(p)
+    p.disc(32, 18, 14, PHE)
+    p.rrect(18, 14, 46, 24, 4, PHE); p.rrect(18, 16, 46, 22, 2, BLACK)   # Visier
+    p.disc(24, 19, 2.4, NEON); p.disc(40, 19, 2.4, NEON)
+    p.disc(22, 16, 1.6, SHINE)
+    p.disc(32, 36, 5, NEON); p.disc(30, 34, 2, WHITE)                    # Brustkern
+    return p.finish()
 
 
 def player_back(step):
-    c = C()
-    _pbody(c)
-    _plegs(c, step)
-    c.disc(16, 9, 7, PHELM_D)
-    c.rect(9, 7, 22, 12, PHELM_D)
-    c.rect(14, 4, 18, 12, (150, 162, 184, 255))   # Naht hinten
-    c.disc(16, 4, 1.3, NEON)                        # Antenne
-    c.rect(11, 14, 21, 23, (60, 116, 196, 255))     # Rueckenpanel
-    c.rect(14, 15, 18, 22, PB_D)
-    c.outline()
-    return c.im
+    p = P(); _legs(p, step); _torso(p)
+    p.disc(32, 18, 14, PHE_D)
+    p.rrect(28, 8, 36, 24, 3, (150, 162, 184, 255)); p.disc(32, 8, 2.4, NEON)   # Antenne
+    p.rrect(22, 28, 42, 46, 4, (62, 116, 196, 255)); p.rrect(28, 30, 36, 44, 2, PB_D)  # Rueckenpanel
+    return p.finish()
 
 
 def player_side(step, left):
-    c = C()
-    c.vgrad(11, 11, 21, 26, PB, PB_D)
-    c.rect(11, 11, 12, 26, PB_DD)
-    c.rect(20, 14, 24, 21, PARM)                    # vorderer Arm
+    p = P()
     if step == 0:
-        c.rect(14, 24, 18, 30, PLEG); c.rect(14, 29, 18, 30, PFOOT)
+        p.rrect(28, 48, 36, 60, 2, PLEG); p.rrect(28, 57, 36, 60, 1, PFOOT)
     else:
-        c.rect(11, 24, 15, 30, PLEG); c.rect(19, 24, 23, 30, PLEG)
-        c.rect(11, 29, 15, 30, PFOOT); c.rect(19, 29, 23, 30, PFOOT)
-    c.disc(17, 9, 7, PHELM)
-    c.rect(11, 7, 23, 12, PHELM)
-    c.rect(18, 8, 23, 11, BLACK)                    # Visier vorne (rechts)
-    c.disc(21, 9, 1.4, NEON)
-    c.disc(16, 18, 2.2, NEON)
-    c.outline()
-    im = c.im
+        p.rrect(22, 48, 30, 60, 2, PLEG); p.rrect(38, 48, 46, 60, 2, PLEG)
+        p.rrect(22, 57, 30, 60, 1, PFOOT); p.rrect(38, 57, 46, 60, 1, PFOOT)
+    p.gv(22, 22, 42, 52, PB_T, PB_D); p.rrect(22, 22, 42, 52, 5, PB); p.rect(22, 22, 25, 52, PB_D)
+    p.rrect(40, 28, 48, 42, 3, PB_D)                  # vorderer Arm
+    p.disc(34, 18, 14, PHE)
+    p.rrect(22, 14, 46, 24, 4, PHE); p.rrect(36, 16, 46, 22, 2, BLACK)  # Visier rechts
+    p.disc(42, 19, 2.4, NEON); p.disc(26, 16, 1.6, SHINE)
+    p.disc(32, 36, 4, NEON)
+    im = p.finish()
     if left:
         im = im.transpose(Image.FLIP_LEFT_RIGHT)
     return im
 
 
 def rot4(base):
-    return [base, base.rotate(90), base.rotate(180), base.rotate(270)]
+    b = base if isinstance(base, Image.Image) else base
+    return [b, b.rotate(90), b.rotate(180), b.rotate(270)]
 
 
-# ============================================================ ZUSAMMENBAU
+# ====================================================== ZUSAMMENBAU
 def build():
     ASSETS.mkdir(parents=True, exist_ok=True)
     cells = {}
@@ -834,49 +740,35 @@ def build():
     cells[0x0E] = t_block(); cells[0x0F] = t_block(); cells[0x10] = t_block(); cells[0x11] = t_block()
     cells[0x12] = t_force(0, -1); cells[0x13] = t_force(1, 0); cells[0x14] = t_force(-1, 0)
     cells[0x15] = t_exit()
-    cells[0x16] = t_door(KEYBLUE, KEYBLUE_D, KEYBLUE_L)
-    cells[0x17] = t_door(KEYRED, KEYRED_D, KEYRED_L)
-    cells[0x18] = t_door(KEYGRN, KEYGRN_D, KEYGRN_L)
-    cells[0x19] = t_door(KEYYEL, KEYYEL_D, KEYYEL_L)
-    # CC-Codes: 1A=offen SE, 1B=offen SW, 1C=offen NW, 1D=offen NE
-    # -> geschlossene (Wand-)Ecke ist jeweils gegenueber
-    cells[0x1A] = ice_corner("NW")   # offen SE
-    cells[0x1B] = ice_corner("NE")   # offen SW
-    cells[0x1C] = ice_corner("SE")   # offen NW
-    cells[0x1D] = ice_corner("SW")   # offen NE
+    cells[0x16] = t_door("blue"); cells[0x17] = t_door("red")
+    cells[0x18] = t_door("green"); cells[0x19] = t_door("yellow")
+    cells[0x1A] = t_ice_corner("NW"); cells[0x1B] = t_ice_corner("NE")
+    cells[0x1C] = t_ice_corner("SE"); cells[0x1D] = t_ice_corner("SW")
     cells[0x1E] = t_blue_wall(); cells[0x1F] = t_blue_wall()
     cells[0x21] = t_thief(); cells[0x22] = t_socket()
-    cells[0x23] = t_button(KEYGRN, KEYGRN_L); cells[0x24] = t_button(KEYRED, KEYRED_L)
+    cells[0x23] = t_button(COL["green"][1], COL["green"][0]); cells[0x24] = t_button(COL["red"][1], COL["red"][0])
     cells[0x25] = t_toggle(False); cells[0x26] = t_toggle(True)
-    cells[0x27] = t_button(DIRT, DIRT_L); cells[0x28] = t_button(KEYBLUE, KEYBLUE_L)
+    cells[0x27] = t_button(DIRT, DIRT_T); cells[0x28] = t_button(COL["blue"][1], COL["blue"][0])
     cells[0x29] = t_teleport(); cells[0x2A] = t_bomb(); cells[0x2B] = t_trap()
     cells[0x2C] = t_floor(); cells[0x2D] = t_gravel(); cells[0x2E] = t_floor()
     cells[0x2F] = t_hint(); cells[0x30] = t_thin_wall(["S", "E"])
     cells[0x31] = t_cloner(); cells[0x32] = t_force_random()
     cells[0x39] = t_exit(); cells[0x3A] = t_exit(); cells[0x3B] = t_exit()
 
-    # Spieler: 4 echte Blickrichtungen (N=Ruecken, W=links, S=Gesicht, E=rechts)
-    # idle (Beine zusammen) bei 0x6C-0x6F + 0x3C-0x3F, Schritt (Beine auf) bei 0x70-0x73
     idle = [player_back(0), player_side(0, True), player_front(0), player_side(0, False)]
     walk = [player_back(1), player_side(1, True), player_front(1), player_side(1, False)]
     for i in range(4):
-        cells[0x3C + i] = idle[i]
-        cells[0x6C + i] = idle[i]
-        cells[0x70 + i] = walk[i]
+        cells[0x3C + i] = idle[i]; cells[0x6C + i] = idle[i]; cells[0x70 + i] = walk[i]
     for fn, base in ((b_bug, 0x40), (b_fireball, 0x44), (b_ball, 0x48), (b_tank, 0x4C),
                      (b_glider, 0x50), (b_teeth, 0x54), (b_walker, 0x58), (b_blob, 0x5C),
                      (b_paramecium, 0x60)):
         dirs = rot4(fn())
         for i in range(4):
             cells[base + i] = dirs[i]
-    cells[0x64] = i_key(KEYBLUE, KEYBLUE_D, KEYBLUE_L)
-    cells[0x65] = i_key(KEYRED, KEYRED_D, KEYRED_L)
-    cells[0x66] = i_key(KEYGRN, KEYGRN_D, KEYGRN_L)
-    cells[0x67] = i_key(KEYYEL, KEYYEL_D, KEYYEL_L)
-    cells[0x68] = boot_flippers()
-    cells[0x69] = boot_fire()
-    cells[0x6A] = boot_ice()
-    cells[0x6B] = boot_suction()
+    cells[0x64] = i_key("blue"); cells[0x65] = i_key("red")
+    cells[0x66] = i_key("green"); cells[0x67] = i_key("yellow")
+    cells[0x68] = boot_flippers(); cells[0x69] = boot_fire()
+    cells[0x6A] = boot_ice(); cells[0x6B] = boot_suction()
 
     cols, rows = 16, 8
     sheet = Image.new("RGBA", (cols * S, rows * S), T)
@@ -889,7 +781,6 @@ def build():
         {"image": "tiles.png", "tile": S, "cols": cols,
          "codes": {f"0x{c:02X}": names.get(c, "?") for c in sorted(cells)}},
         indent=2), encoding="utf-8")
-
     try:
         from gamebasic.spriteeditor.document import SpriteDoc, Frame
         doc = SpriteDoc(S, S)
@@ -898,9 +789,8 @@ def build():
         doc.save_native(ASSETS / "tiles.gbsprite")
     except Exception as e:
         print(f"(.gbsprite uebersprungen: {e})")
-
     _contact(cells, ASSETS / "_contact.png")
-    print(f"tiles.png ({cols}x{rows} a {S}px) -- {len(cells)} Kacheln")
+    print(f"tiles.png ({cols}x{rows} a {S}px, SS={SS}) -- {len(cells)} Kacheln")
 
 
 def _names():
@@ -910,7 +800,7 @@ def _names():
          0x0E: "cblockN", 0x0F: "cblockW", 0x10: "cblockS", 0x11: "cblockE",
          0x12: "force_N", 0x13: "force_E", 0x14: "force_W", 0x15: "exit",
          0x16: "door_blue", 0x17: "door_red", 0x18: "door_green", 0x19: "door_yellow",
-         0x1A: "ice_NW", 0x1B: "ice_NE", 0x1C: "ice_SE", 0x1D: "ice_SW",
+         0x1A: "ice_SE", 0x1B: "ice_SW", 0x1C: "ice_NW", 0x1D: "ice_NE",
          0x1E: "blueblock_F", 0x1F: "blueblock_W", 0x21: "thief", 0x22: "socket",
          0x23: "btn_green", 0x24: "btn_red", 0x25: "toggle_closed", 0x26: "toggle_open",
          0x27: "btn_brown", 0x28: "btn_blue", 0x29: "teleport", 0x2A: "bomb",
@@ -921,21 +811,19 @@ def _names():
          0x68: "flippers", 0x69: "fireboots", 0x6A: "iceskates", 0x6B: "suction"}
     for base, nm in ((0x3C, "swim"), (0x40, "bug"), (0x44, "fireball"), (0x48, "ball"),
                      (0x4C, "tank"), (0x50, "glider"), (0x54, "teeth"), (0x58, "walker"),
-                     (0x5C, "blob"), (0x60, "paramecium"), (0x6C, "chip")):
+                     (0x5C, "blob"), (0x60, "paramecium"), (0x6C, "chip"), (0x70, "chipwalk")):
         for i, d in enumerate("NWSE"):
             n[base + i] = f"{nm}_{d}"
     return n
 
 
-def _contact(cells, path, scale=3):
-    from PIL import ImageDraw
+def _contact(cells, path, scale=2):
     cols, rows = 16, 8
     cell = S * scale; pad = 4; lab = 11
-    W = cols * (cell + pad) + pad
+    Wd = cols * (cell + pad) + pad
     Hh = rows * (cell + lab + pad) + pad
-    sheet = Image.new("RGBA", (W, Hh), (24, 28, 38, 255))
+    sheet = Image.new("RGBA", (Wd, Hh), (24, 28, 38, 255))
     d = ImageDraw.Draw(sheet)
-    names = _names()
     for code in range(128):
         cx = pad + (code % cols) * (cell + pad)
         cy = pad + (code // cols) * (cell + lab + pad)

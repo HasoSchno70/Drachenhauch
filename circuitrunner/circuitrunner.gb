@@ -25,9 +25,9 @@ CONST FULLSCREEN = TRUE
 CONST GW = 32
 CONST GH = 32
 CONST NCELL = 1024
-CONST TILE = 32
+CONST TILE = 64
 CONST VIEW = 9                 ' sichtbare Kacheln je Achse
-CONST BLOG = 288               ' Board-Render-Target = VIEW*TILE
+CONST BLOG = 576               ' Board-Render-Target = VIEW*TILE
 CONST BX = 0                   ' Board-Ursprung im Render-Target
 CONST BY = 0
 

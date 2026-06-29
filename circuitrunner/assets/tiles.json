@@ -1,6 +1,6 @@
 {
   "image": "tiles.png",
-  "tile": 32,
+  "tile": 64,
   "cols": 16,
   "codes": {
     "0x00": "floor",
@@ -29,10 +29,10 @@
     "0x17": "door_red",
     "0x18": "door_green",
     "0x19": "door_yellow",
-    "0x1A": "ice_NW",
-    "0x1B": "ice_NE",
-    "0x1C": "ice_SE",
-    "0x1D": "ice_SW",
+    "0x1A": "ice_SE",
+    "0x1B": "ice_SW",
+    "0x1C": "ice_NW",
+    "0x1D": "ice_NE",
     "0x1E": "blueblock_F",
     "0x1F": "blueblock_W",
     "0x21": "thief",
@@ -108,9 +108,9 @@
     "0x6D": "chip_W",
     "0x6E": "chip_S",
     "0x6F": "chip_E",
-    "0x70": "?",
-    "0x71": "?",
-    "0x72": "?",
-    "0x73": "?"
+    "0x70": "chipwalk_N",
+    "0x71": "chipwalk_W",
+    "0x72": "chipwalk_S",
+    "0x73": "chipwalk_E"
   }
 }
