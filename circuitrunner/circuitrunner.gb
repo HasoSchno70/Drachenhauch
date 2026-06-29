@@ -1168,6 +1168,8 @@ END SUB
 '  WELT-TICK
 ' ----------------------------------------------------------------------
 DIM want_dir AS INTEGER
+DIM buf_dir AS INTEGER          ' gepufferter Tap (geht zwischen Ticks nicht verloren)
+DIM held_dir AS INTEGER
 
 SUB world_tick()
     tickcount = tickcount + 1
@@ -1499,17 +1501,18 @@ END SUB
 '  EINGABE
 ' ----------------------------------------------------------------------
 SUB read_intent()
-    want_dir = -1
-    IF INPUT_PRESSED("up") THEN want_dir = 0
-    IF INPUT_PRESSED("left") THEN want_dir = 1
-    IF INPUT_PRESSED("down") THEN want_dir = 2
-    IF INPUT_PRESSED("right") THEN want_dir = 3
-    IF want_dir < 0 THEN
-        IF INPUT_HELD("up") THEN want_dir = 0
-        IF INPUT_HELD("left") THEN want_dir = 1
-        IF INPUT_HELD("down") THEN want_dir = 2
-        IF INPUT_HELD("right") THEN want_dir = 3
-    END IF
+    ' Tastendruck (Tap) puffern -- bleibt bis zum naechsten Tick erhalten,
+    ' damit einzelne Schritte/Kistenschuebe nicht zwischen den Ticks verloren gehen.
+    IF INPUT_PRESSED("up") THEN buf_dir = 0
+    IF INPUT_PRESSED("left") THEN buf_dir = 1
+    IF INPUT_PRESSED("down") THEN buf_dir = 2
+    IF INPUT_PRESSED("right") THEN buf_dir = 3
+    ' aktuell gehaltene Richtung (fuer Dauerlauf)
+    held_dir = -1
+    IF INPUT_HELD("up") THEN held_dir = 0
+    IF INPUT_HELD("left") THEN held_dir = 1
+    IF INPUT_HELD("down") THEN held_dir = 2
+    IF INPUT_HELD("right") THEN held_dir = 3
 END SUB
 
 ' ======================================================================
@@ -1576,6 +1579,8 @@ INPUT_BIND("back", KEY_ESCAPE)
 state = "menu"
 cur_level = 0
 want_dir = -1
+buf_dir = -1
+held_dir = -1
 
 ' ======================================================================
 '  HAUPTSCHLEIFE
@@ -1615,6 +1620,9 @@ WHILE NOT QUITREQUESTED()
             IF tick_timer > TICK_MS * 3.0 THEN tick_timer = TICK_MS
             IF tick_timer >= TICK_MS AND state = "play" THEN
                 tick_timer = tick_timer - TICK_MS
+                want_dir = buf_dir
+                IF want_dir < 0 THEN want_dir = held_dir
+                buf_dir = -1
                 world_tick()
             END IF
             anim_t = tick_timer / TICK_MS
