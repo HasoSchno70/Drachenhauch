@@ -31,6 +31,7 @@ def _find_gbrt():
 
 _GBRT = _find_gbrt()
 _FONT = _ROOT / "circuitrunner" / "assets" / "font.ttf"
+_TILES = _ROOT / "circuitrunner" / "assets" / "tiles.png"
 
 
 def _run(src: str, tmp_path: Path, env: dict | None = None) -> str:
@@ -69,6 +70,21 @@ def test_loadfont_size_applies_via_setfont(tmp_path):
     assert 1.7 * w30 <= w60 <= 2.3 * w30, (w30, w60)
     # TEXT_SIZE(30) uebersteuert die 60px-Font-Groesse wieder auf ~30px-Breite
     assert abs(w_override - w30) <= max(2, w30 * 0.1), (w30, w_override)
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(not _TILES.exists(), reason="Test-Tileset fehlt")
+def test_drawimagepartex_runs(tmp_path):
+    img = _TILES.as_posix()
+    src = (
+        'SCREEN(200, 200, "t")\n'
+        'DIM t AS IMAGE\n'
+        f't = LOADIMAGE("{img}")\n'
+        'DRAWIMAGEPARTEX(t, 64, 0, 32, 32, 10, 10, 128, 128)\n'
+        'PRINT "OK"\n'
+    )
+    out = _run(src, tmp_path)
+    assert "OK" in out, out   # fehlt das Builtin -> Fehler statt "OK"
 
 
 @pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")

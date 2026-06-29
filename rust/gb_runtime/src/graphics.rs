@@ -45,6 +45,7 @@ enum Cmd {
     TextRot(i32, i32, String, i32, Color, i64, f32, f32, f32),
     Texture(usize, i32, i32),
     TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
+    TexturePartEx(usize, i32, i32, i32, i32, i32, i32, i32, i32), // +dw,dh (skaliert)
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
     TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
     TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala, tint (um Zentrum)
@@ -2363,6 +2364,16 @@ impl Graphics {
         self.emit(Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy));
         Ok(())
     }
+    /// Wie draw_image_part, aber mit Ziel-Groesse (dw,dh) -> skaliertes Blitten
+    /// eines Sub-Rechtecks (z. B. Sprite-Sheet-Kachel gross zeichnen).
+    pub fn draw_image_part_ex(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32,
+                              dx: i32, dy: i32, dw: i32, dh: i32) -> Result<(), String> {
+        let i = idx as usize;
+        if i >= self.textures.len() { return Err("DRAWIMAGEPARTEX: ungueltiges IMAGE-Handle".into()); }
+        let (dx, dy) = self.w2s(dx, dy);
+        self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh));
+        Ok(())
+    }
     pub fn draw_image_flipped(&mut self, idx: i64, x: i32, y: i32, fh: bool, fv: bool) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEFLIPPED: ungueltiges IMAGE-Handle".into()); }
@@ -3428,6 +3439,11 @@ fn render_scene<D: RaylibDraw>(
                     Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
                         let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
+                        d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
+                    }
+                    Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh) => {
+                        let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
+                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                     }
                     Cmd::TextureRect(i, dx, dy, dw, dh) => {

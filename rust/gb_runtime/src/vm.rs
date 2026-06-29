@@ -4237,6 +4237,13 @@ impl<'p> Vm<'p> {
                     gi(a,3,"DRAWIMAGEPART")? as i32, gi(a,4,"DRAWIMAGEPART")? as i32,
                     gi(a,5,"DRAWIMAGEPART")? as i32, gi(a,6,"DRAWIMAGEPART")? as i32)?; Value::Nil
             }
+            "drawimagepartex" => {
+                let idx = gi(a,0,"DRAWIMAGEPARTEX")?;
+                g!().draw_image_part_ex(idx, gi(a,1,"DRAWIMAGEPARTEX")? as i32, gi(a,2,"DRAWIMAGEPARTEX")? as i32,
+                    gi(a,3,"DRAWIMAGEPARTEX")? as i32, gi(a,4,"DRAWIMAGEPARTEX")? as i32,
+                    gi(a,5,"DRAWIMAGEPARTEX")? as i32, gi(a,6,"DRAWIMAGEPARTEX")? as i32,
+                    gi(a,7,"DRAWIMAGEPARTEX")? as i32, gi(a,8,"DRAWIMAGEPARTEX")? as i32)?; Value::Nil
+            }
             "drawimageflipped" => {
                 let idx = gi(a,0,"DRAWIMAGEFLIPPED")?;
                 let fh = gb(a, 3); let fv = gb(a, 4);

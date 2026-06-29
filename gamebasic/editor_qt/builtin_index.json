@@ -1245,6 +1245,12 @@
    "module": "core"
   },
   {
+   "name": "DRAWIMAGEPARTEX",
+   "kind": "graphics",
+   "signature": "DRAWIMAGEPARTEX(img, sx, sy, sw, sh, x, y, w, h)",
+   "module": "core"
+  },
+  {
    "name": "DRAWTILEMAP",
    "kind": "graphics",
    "signature": "DRAWTILEMAP(tileset, map_arr, tw, th, sx, sy)",
