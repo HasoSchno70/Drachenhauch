@@ -785,6 +785,12 @@ pub struct Graphics {
     // TTF-Fonts (LOADFONT): via raylib load_font_ex geladen. active_font = -1
     // -> raylib-Default-Font; text_spacing = Buchstabenabstand fuer DrawTextEx.
     fonts: Vec<Font>,
+    // Render-Groesse je geladenem Font (parallel zu `fonts`). Von LOADFONT
+    // gesetzt -> SETFONT uebernimmt sie als text_size (ergonomisch: die in
+    // LOADFONT gewaehlte Groesse "wirkt" direkt). 0 = Sentinel (GBRT_FONT-
+    // Default): NICHT auto-anwenden, damit der hoch gebackene Default bei der
+    // programmweiten text_size bleibt.
+    font_sizes: Vec<i32>,
     active_font: i64,
     text_spacing: f32,
     textures: Vec<Tex>,
@@ -953,6 +959,7 @@ impl Graphics {
             cam3d_proj: None,
             text_size: 20,
             fonts: Vec::new(),
+            font_sizes: Vec::new(),
             active_font: -1,
             text_spacing: 0.0,
             textures: Vec::new(),
@@ -2152,6 +2159,7 @@ impl Graphics {
         // (Default ist Nearest; sichtbar v.a. bei kleiner UI-Schrift).
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
+        self.font_sizes.push(size.max(4));   // SETFONT uebernimmt diese Groesse
         Ok((self.fonts.len() - 1) as i64)
     }
 
@@ -2168,14 +2176,23 @@ impl Graphics {
             .map_err(|e| format!("GBRT_FONT '{}' nicht ladbar: {}", path, e))?;
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
+        self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
         Ok((self.fonts.len() - 1) as i64)
     }
     /// Aktiven Font setzen (-1 = Default). Ungueltige Handles -> Fehler.
+    /// Ein per LOADFONT geladener Font setzt zugleich text_size auf seine
+    /// Lade-Groesse (so "wirkt" die LOADFONT-Groesse direkt); TEXT_SIZE
+    /// danach uebersteuert weiterhin.
     pub fn set_font(&mut self, h: i64) -> Result<(), String> {
         if h < -1 || h >= self.fonts.len() as i64 {
             return Err(format!("SETFONT: ungueltiges FONT-Handle {}", h));
         }
         self.active_font = h;
+        if h >= 0 {
+            if let Some(&sz) = self.font_sizes.get(h as usize) {
+                if sz > 0 { self.text_size = sz; }
+            }
+        }
         Ok(())
     }
     pub fn set_text_spacing(&mut self, px: i32) { self.text_spacing = px as f32; }
@@ -2701,7 +2718,12 @@ impl Graphics {
     pub fn screen_height(&self) -> i64 { (self.rl.get_screen_height() / self.scale.max(1)) as i64 }
 
     // --- Game-Loop-Grundlagen ---
-    pub fn delta(&self) -> f64 { self.rl.get_frame_time() as f64 }
+    // Headless (GBRT_FRAMES gesetzt): fester Schritt 1/60 s -> zeitbasierte
+    // Spiele laufen deterministisch und sind per Screenshot/Frame testbar
+    // (echtes get_frame_time ist ohne Vsync ~0). Sonst echte Frame-Zeit.
+    pub fn delta(&self) -> f64 {
+        if self.max_frames.is_some() { 1.0 / 60.0 } else { self.rl.get_frame_time() as f64 }
+    }
     pub fn fps(&self) -> i64 { self.rl.get_fps() as i64 }
     pub fn set_target_fps(&mut self, n: i64) { self.rl.set_target_fps(n.max(0) as u32); }
     pub fn set_window_title(&mut self, title: &str) { self.rl.set_window_title(&self.thread, title); }

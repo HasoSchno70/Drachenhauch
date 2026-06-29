@@ -1557,6 +1557,7 @@ tiles = LOADIMAGE("assets/tiles.png")
 ' Font (eine TTF; Skalierung via TEXTROT, da LOADFONT-Groesse fix)
 gfont = LOADFONT("assets/font.ttf", 64)
 SETFONT(gfont)
+TEXT_SIZE(20)
 BASEH = 26
 sc_big = SH / 470.0
 sc_med = SH / 760.0
