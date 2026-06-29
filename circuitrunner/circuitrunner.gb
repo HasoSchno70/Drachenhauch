@@ -109,6 +109,13 @@ DIM mob_ox[MAXMOB] AS INTEGER
 DIM mob_oy[MAXMOB] AS INTEGER
 DIM nmob AS INTEGER
 DIM mob_did AS BOOLEAN          ' Ergebnis des letzten mob_try
+' Umsortier-Puffer fuer die MS-Bewegungsreihenfolge (0x0A-Monsterliste)
+DIM mord[MAXMOB] AS INTEGER
+DIM mplaced[MAXMOB] AS BOOLEAN
+DIM tmob_x[MAXMOB] AS INTEGER
+DIM tmob_y[MAXMOB] AS INTEGER
+DIM tmob_dir[MAXMOB] AS INTEGER
+DIM tmob_type[MAXMOB] AS INTEGER
 
 CONST MAXBLK = 320
 DIM blk_x[MAXBLK] AS INTEGER
@@ -415,6 +422,8 @@ SUB load_level(idx AS INTEGER)
 
     ' Verdrahtung laden
     load_wires(idx)
+    ' Monster in MS-Bewegungsreihenfolge bringen (CCLP1-Timing)
+    reorder_monsters(idx)
 
     keys_blue = 0
     keys_red = 0
@@ -489,6 +498,68 @@ SUB load_wires(idx AS INTEGER)
             END IF
         NEXT
     END IF
+END SUB
+
+' MS-Ruleset: Monster ziehen in der Reihenfolge der 0x0A-Bewegungsliste,
+' NICHT in Map-Lesereihenfolge. CCLP1-Puzzles sind darauf getimt.
+' Monster, die nicht in der Liste stehen, haengen wir in Lesereihenfolge an.
+SUB reorder_monsters(idx AS INTEGER)
+    IF nmob = 0 THEN RETURN
+    DIM base AS STRING
+    base = "levels." + STR$(idx) + "."
+    DIM ms AS STRING
+    ms = JSON_GET_STRING(js, base + "monsters")
+    IF LEN(ms) = 0 THEN RETURN
+    DIM k AS INTEGER
+    FOR k = 0 TO nmob - 1
+        mplaced[k] = FALSE
+    NEXT
+    DIM nord AS INTEGER
+    nord = 0
+    DIM recs AS ARRAY OF STRING
+    recs = SPLIT$(ms, ";")
+    DIM r AS INTEGER
+    FOR r = 0 TO LEN(recs) - 1
+        DIM p AS ARRAY OF STRING
+        p = SPLIT$(recs[r], ",")
+        IF LEN(p) >= 2 THEN
+            DIM mx AS INTEGER
+            DIM my AS INTEGER
+            mx = VAL(p[0])
+            my = VAL(p[1])
+            DIM j AS INTEGER
+            FOR j = 0 TO nmob - 1
+                IF NOT mplaced[j] AND mob_x[j] = mx AND mob_y[j] = my THEN
+                    mord[nord] = j
+                    nord = nord + 1
+                    mplaced[j] = TRUE
+                    BREAK
+                END IF
+            NEXT
+        END IF
+    NEXT
+    ' restliche Monster (nicht gelistet) in Lesereihenfolge
+    FOR k = 0 TO nmob - 1
+        IF NOT mplaced[k] THEN
+            mord[nord] = k
+            nord = nord + 1
+            mplaced[k] = TRUE
+        END IF
+    NEXT
+    ' Arrays gemaess Permutation neu aufbauen (alive=TRUE/trapped=FALSE bei Load,
+    ' ox/oy werden danach aus x/y gesetzt -- nur x/y/dir/type permutieren)
+    FOR k = 0 TO nmob - 1
+        tmob_x[k] = mob_x[k]
+        tmob_y[k] = mob_y[k]
+        tmob_dir[k] = mob_dir[k]
+        tmob_type[k] = mob_type[k]
+    NEXT
+    FOR k = 0 TO nmob - 1
+        mob_x[k] = tmob_x[mord[k]]
+        mob_y[k] = tmob_y[mord[k]]
+        mob_dir[k] = tmob_dir[mord[k]]
+        mob_type[k] = tmob_type[mord[k]]
+    NEXT
 END SUB
 
 ' ----------------------------------------------------------------------

@@ -7,10 +7,25 @@ Deckt das JSON-Levelformat ab, das die .gb-Engine laedt: convert_dat.py
 from __future__ import annotations
 
 import importlib.util
+import os
+import re
+import shutil
 import struct
+import subprocess
 from pathlib import Path
 
+import pytest
+
 _CR = Path(__file__).resolve().parent.parent / "circuitrunner"
+
+
+def _find_gbrt():
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    for variant in ("release", "debug"):
+        p = _CR.parent / "rust" / "gb_runtime" / "target" / variant / exe
+        if p.exists():
+            return p
+    return None
 
 
 def _load(name):
@@ -111,3 +126,75 @@ def test_demo_levels_schema():
         assert any(t in (0x15, 0x39, 0x3A, 0x3B) for t in u)
         # Chip-Zaehler stimmt mit Tiles ueberein
         assert lv["chips"] == sum(1 for t in u if t == 0x02)
+
+
+# ---------------------------------------------------------------------------
+#  Engine-Verhalten (gbrt-Headless-Harness): MS-Monster-Bewegungsreihenfolge
+# ---------------------------------------------------------------------------
+_GBRT = _find_gbrt()
+
+
+def _hexgrid(tiles):
+    return "".join(f"{t:02x}" for t in tiles)
+
+
+def _make_reorder_level():
+    """32x32-Level mit 4 Monstern; `monsters`-Liste in NICHT-Lesereihenfolge.
+
+    Reading-Order (Map-Scan) waere [(5,2),(3,5),(8,5),(10,10)]; die 0x0A-Liste
+    nennt nur (8,5),(5,2),(3,5) -> Engine muss in dieser Reihenfolge laden und
+    das ungelistete (10,10) in Lesereihenfolge anhaengen.
+    """
+    GW = 32
+    upper = [0x00] * 1024
+    lower = [0x00] * 1024
+    upper[1 * GW + 1] = 0x6C            # Spieler-Start
+    for (x, y) in [(5, 2), (3, 5), (8, 5), (10, 10)]:
+        upper[y * GW + x] = 0x42        # Kaefer (Typ 0), Richtung 2
+    upper[15 * GW + 15] = 0x15          # Exit
+    return {
+        "name": "ReorderTest", "ruleset": "ms",
+        "levels": [{
+            "title": "Reorder", "number": 1, "time": 0, "chips": 0,
+            "hint": "", "password": "ABCD", "width": 32, "height": 32,
+            "upper": _hexgrid(upper), "lower": _hexgrid(lower),
+            "traps": "", "cloners": "", "monsters": "8,5;5,2;3,5",
+        }],
+    }
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_monster_move_order_follows_list(tmp_path):
+    import json
+    assets = _CR / "assets"
+    if not (assets / "tiles.png").exists():
+        pytest.skip("circuitrunner/assets nicht vorhanden")
+
+    # Engine-Quelle bis VOR die Hauptschleife + Logik-Harness anhaengen
+    src = (_CR / "circuitrunner.gb").read_text(encoding="utf-8")
+    head = src.split("WHILE NOT QUITREQUESTED()")[0]
+    assert "SUB reorder_monsters" in head, "reorder_monsters fehlt in der Engine"
+    harness = (
+        '\njs = JSON_LOAD("synth.json")\n'
+        'nlevels = JSON_LEN(js, "levels")\n'
+        'load_level(0)\n'
+        'PRINT "NMOB=" + STR$(nmob)\n'
+        'DIM kk AS INTEGER\n'
+        'FOR kk = 0 TO nmob - 1\n'
+        '    PRINT "M " + STR$(mob_x[kk]) + " " + STR$(mob_y[kk])\n'
+        'NEXT\n'
+    )
+
+    shutil.copytree(assets, tmp_path / "assets")
+    (tmp_path / "synth.json").write_text(
+        json.dumps(_make_reorder_level()), encoding="utf-8")
+    gb = tmp_path / "harness.gb"
+    gb.write_text(head + harness, encoding="utf-8")
+
+    r = subprocess.run([str(_GBRT), "run", str(gb)],
+                       capture_output=True, timeout=120)
+    out = r.stdout.decode("utf-8", "replace")
+    assert "NMOB=4" in out, out
+    order = [(int(a), int(b))
+             for a, b in re.findall(r"M\s+(\d+)\s+(\d+)", out)]
+    assert order == [(8, 5), (5, 2), (3, 5), (10, 10)], (order, out)
