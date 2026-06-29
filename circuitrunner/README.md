@@ -62,20 +62,22 @@ so können keine unlösbaren Level entstehen:
 py circuitrunner\make_demo_levels.py     # -> levels/circuit_runner.json
 ```
 
-## Grafik (32×32)
+## Grafik (64×64, supersampled)
 
 Alle Kacheln werden **programmatisch** erzeugt (`make_tiles.py`, PIL) in ein
-Master-Sheet `assets/tiles.png` (16×8 Zellen à 32 px), in dem die **Zellen-
-Position dem Tile-Code entspricht** (0x00–0x7F). Die Engine zeichnet jede
-Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
+Master-Sheet `assets/tiles.png` (16×8 Zellen à 64 px; intern 4× supersampled
+und kantengeglättet gezeichnet — detailliert/farbig statt flach 8-bit), in dem
+die **Zellen-Position dem Tile-Code entspricht** (0x00–0x7F). Die Engine
+zeichnet jede Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
 
 ```
 py circuitrunner\make_tiles.py
 ```
 
-Zusätzlich werden `assets/tiles.gbsprite` (**im Sprite-Editor `gbsprites` zu
-öffnen und bearbeiten** — jede Kachel ein benannter Frame) und einzelne
-`assets/icons/*.png` (scharfe HUD-Icons) exportiert.
+Zusätzlich wird `assets/tiles.gbsprite` exportiert (**im Sprite-Editor
+`gbsprites` zu öffnen und bearbeiten** — jede Kachel ein benannter Frame). Die
+HUD-Icons zeichnet die Engine direkt aus dem Sheet (`DRAWIMAGEPARTEX`), skaliert
+in nativer Auflösung — keine separaten Icon-Dateien.
 
 Gerendert wird zweischichtig: das Spielfeld kommt pixelgenau aus einem
 Render-Target (ganzzahlig hochskaliert), HUD/Menü-Text und Icons dagegen in
