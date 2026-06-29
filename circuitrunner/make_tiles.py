@@ -5,8 +5,9 @@ in dem die **Zellen-Position dem Chip's-Challenge-Tile-Code entspricht**
 (Code 0x00..0x7F). Die Engine zeichnet damit jede Kachel/Figur per
 `DRAWIMAGEPART(sheet, (code%16)*32, (code//16)*32, 32, 32, ...)`.
 
-Zusaetzlich: `assets/tiles.gbsprite` (im Editor `gbsprites` editierbar) und
-`assets/icons/*.png` (HUD-Icons, in nativer Aufloesung scharf gezeichnet).
+Zusaetzlich: `assets/tiles.gbsprite` (im Editor `gbsprites` editierbar). HUD-
+Icons zeichnet die Engine direkt aus dem Sheet (DRAWIMAGEPARTEX) -- keine
+separaten Icon-Dateien noetig.
 
 Eigenstaendiges "Neon-Circuit"-Thema (Spielprinzip + Tile-Codes nachgebaut,
 keine Original-Grafik). Ruhige, dunkle Boeden (lesen NICHT als Pickups),
@@ -889,15 +890,6 @@ def build():
          "codes": {f"0x{c:02X}": names.get(c, "?") for c in sorted(cells)}},
         indent=2), encoding="utf-8")
 
-    # HUD-Icons einzeln (fuer scharfes Zeichnen in nativer Aufloesung)
-    icons = ASSETS / "icons"
-    icons.mkdir(exist_ok=True)
-    for code, nm in ((0x02, "chip"), (0x64, "key_blue"), (0x65, "key_red"),
-                     (0x66, "key_green"), (0x67, "key_yellow"), (0x68, "flippers"),
-                     (0x69, "fireboots"), (0x6A, "iceskates"), (0x6B, "suction"),
-                     (0x15, "exit")):
-        cells[code].save(icons / f"{nm}.png")
-
     try:
         from gamebasic.spriteeditor.document import SpriteDoc, Frame
         doc = SpriteDoc(S, S)
@@ -908,7 +900,7 @@ def build():
         print(f"(.gbsprite uebersprungen: {e})")
 
     _contact(cells, ASSETS / "_contact.png")
-    print(f"tiles.png ({cols}x{rows} a {S}px) -- {len(cells)} Kacheln + {10} HUD-Icons")
+    print(f"tiles.png ({cols}x{rows} a {S}px) -- {len(cells)} Kacheln")
 
 
 def _names():

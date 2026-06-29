@@ -19,7 +19,6 @@
 IMPORT "json"
 IMPORT "input"
 IMPORT "audio"
-IMPORT "imgfx"
 
 CONST FULLSCREEN = TRUE
 
@@ -191,16 +190,7 @@ DIM sc_med AS FLOAT
 DIM sc_sm AS FLOAT
 
 ' HUD-Icons (vorskaliert, scharf)
-DIM ic_sz AS INTEGER
-DIM ic_chip AS IMAGE
-DIM ic_kb AS IMAGE
-DIM ic_kr AS IMAGE
-DIM ic_kg AS IMAGE
-DIM ic_ky AS IMAGE
-DIM ic_flip AS IMAGE
-DIM ic_fire AS IMAGE
-DIM ic_ice AS IMAGE
-DIM ic_suc AS IMAGE
+DIM ic_sz AS INTEGER          ' HUD-Icon-Groesse (direkt aus dem Tileset via DRAWIMAGEPARTEX)
 
 ' Level-Set-Auswahl (alle .json in levels/ + levels/_downloaded/)
 CONST MAXSETS = 64
@@ -1330,8 +1320,13 @@ SUB ct(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT, s AS STRING, col AS INTEGER
     TEXTROT(cx, cy, s, 0, scale, col)
 END SUB
 
-SUB hud_key(x AS INTEGER, y AS INTEGER, icon AS IMAGE, n AS INTEGER)
-    DRAWIMAGE(icon, x, y)
+' HUD-Icon direkt aus dem Tileset skaliert zeichnen (nativ, scharf)
+SUB draw_icon(code AS INTEGER, x AS INTEGER, y AS INTEGER)
+    DRAWIMAGEPARTEX(tiles, (code MOD 16) * TILE, (code \ 16) * TILE, TILE, TILE, x, y, ic_sz, ic_sz)
+END SUB
+
+SUB hud_key(x AS INTEGER, y AS INTEGER, code AS INTEGER, n AS INTEGER)
+    draw_icon(code, x, y)
     ct(x + ic_sz + INT(ic_sz * 0.5), y + ic_sz \ 2, sc_sm, STR$(n), RGB(206, 214, 232))
 END SUB
 
@@ -1354,35 +1349,35 @@ SUB draw_hud()
     ty = ty + INT(BASEH * sc_sm) + pad
     DIM ix AS INTEGER
     ix = x + pad
-    DRAWIMAGE(ic_chip, ix, ty)
+    draw_icon(T_CHIP, ix, ty)
     ct(ix + ic_sz + INT(ic_sz * 0.95), ty + ic_sz \ 2, sc_med, "x " + STR$(chips_left), RGB(120, 244, 150))
     ty = ty + ic_sz + pad
     DIM c0 AS INTEGER
     DIM c1 AS INTEGER
     c0 = x + pad
     c1 = x + hud_w \ 2
-    hud_key(c0, ty, ic_kb, keys_blue)
-    hud_key(c1, ty, ic_kr, keys_red)
+    hud_key(c0, ty, T_KEY_BLUE, keys_blue)
+    hud_key(c1, ty, T_KEY_RED, keys_red)
     ty = ty + ic_sz + INT(pad * 0.4)
-    hud_key(c0, ty, ic_kg, keys_green)
-    hud_key(c1, ty, ic_ky, keys_yellow)
+    hud_key(c0, ty, T_KEY_GREEN, keys_green)
+    hud_key(c1, ty, T_KEY_YELLOW, keys_yellow)
     ty = ty + ic_sz + pad
     DIM bx AS INTEGER
     bx = x + pad
     IF has_flippers THEN
-        DRAWIMAGE(ic_flip, bx, ty)
+        draw_icon(T_FLIPPERS, bx, ty)
         bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_fireboots THEN
-        DRAWIMAGE(ic_fire, bx, ty)
+        draw_icon(T_FIREBOOTS, bx, ty)
         bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_iceskates THEN
-        DRAWIMAGE(ic_ice, bx, ty)
+        draw_icon(T_ICESKATES, bx, ty)
         bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF has_suction THEN
-        DRAWIMAGE(ic_suc, bx, ty)
+        draw_icon(T_SUCTION, bx, ty)
         bx = bx + ic_sz + INT(pad * 0.4)
     END IF
     IF lvl_time > 0 THEN
@@ -1565,15 +1560,6 @@ sc_sm = SH / 1040.0
 
 ' HUD-Icons vorskalieren (scharf in nativer Aufloesung)
 ic_sz = INT(SH * 0.044)
-ic_chip = IMAGE_SCALE(LOADIMAGE("assets/icons/chip.png"), ic_sz, ic_sz)
-ic_kb = IMAGE_SCALE(LOADIMAGE("assets/icons/key_blue.png"), ic_sz, ic_sz)
-ic_kr = IMAGE_SCALE(LOADIMAGE("assets/icons/key_red.png"), ic_sz, ic_sz)
-ic_kg = IMAGE_SCALE(LOADIMAGE("assets/icons/key_green.png"), ic_sz, ic_sz)
-ic_ky = IMAGE_SCALE(LOADIMAGE("assets/icons/key_yellow.png"), ic_sz, ic_sz)
-ic_flip = IMAGE_SCALE(LOADIMAGE("assets/icons/flippers.png"), ic_sz, ic_sz)
-ic_fire = IMAGE_SCALE(LOADIMAGE("assets/icons/fireboots.png"), ic_sz, ic_sz)
-ic_ice = IMAGE_SCALE(LOADIMAGE("assets/icons/iceskates.png"), ic_sz, ic_sz)
-ic_suc = IMAGE_SCALE(LOADIMAGE("assets/icons/suction.png"), ic_sz, ic_sz)
 
 scan_sets()
 sel_set = 0
