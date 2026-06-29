@@ -115,7 +115,9 @@ roter Knopf · Fallen.
 
 **9 Monstertypen** mit eigener KI: Käfer (linke Wand), Paramecium (rechte Wand),
 Gleiter, Feuerball, Ball (Bounce), Tank, Walker (Zufall bei Block), Blob
-(Zufall), Teeth (Verfolger). Teeth & Blob bewegen sich halb so schnell.
+(Zufall), Teeth (Verfolger). Monster ziehen mit Spielertempo und in der
+MS-Bewegungsreihenfolge der Levelliste (CCLP1-treues Timing); Teeth & Blob
+bewegen sich halb so schnell wie die übrigen Monster.
 
 ## Dateien
 
@@ -131,9 +133,8 @@ Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema).
 
 ## Grenzen / Ideen
 
-- Monster-Bewegungsreihenfolge ist Lese-Reihenfolge statt der `monsters`-Liste (kann bei sehr präzisen Puzzles abweichen).
 - Kein Passwort-Eingang / Level-Sprung per Passwort, kein Highscore/Save (Fortschritt nicht persistiert).
-- Monster bewegen sich mit halbem Tempo (`MON_EVERY=2`); Eis-/Force-Sliding läuft auf dieser Taktung statt voller CC-Geschwindigkeit.
+- Monster-Bewegungsreihenfolge innerhalb eines Ticks folgt der `monsters`-Liste; ungelistete Monster werden in Lese-Reihenfolge ergänzt (bei extrem timing-präzisen Puzzles möglich, dass Sonderfälle minimal abweichen).
 
 ## Lizenz / Hinweis
 

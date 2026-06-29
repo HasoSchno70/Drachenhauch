@@ -32,7 +32,7 @@ CONST BX = 0                   ' Board-Ursprung im Render-Target
 CONST BY = 0
 
 CONST TICK_MS = 120            ' eine Spielwelt-Stufe (Bewegung)
-CONST MON_EVERY = 2            ' Monster bewegen sich nur jeden N-ten Tick (langsamer als Spieler)
+CONST MON_EVERY = 1            ' Monster ziehen mit Spielertempo (CCLP1/MS-treu); Teeth/Blob via *2 halb
 
 ' ----- Tile-Codes (= Tileset-Zellen) ---------------------------------
 CONST T_FLOOR = &H00

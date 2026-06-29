@@ -163,17 +163,49 @@ def _make_reorder_level():
     }
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
-def test_monster_move_order_follows_list(tmp_path):
+def _make_corridor_level():
+    """Offenes 32x32-Floor-Feld; ein Feuerball (Typ 1) bei (3,5) Richtung rechts.
+
+    Spieler weit weg bei (1,1). In einem freien Korridor zieht der Feuerball
+    geradeaus -- so misst der Test pro world_tick einen Schritt (volles Tempo).
+    """
+    GW = 32
+    upper = [0x00] * 1024
+    lower = [0x00] * 1024
+    upper[1 * GW + 1] = 0x6C            # Spieler-Start
+    upper[5 * GW + 3] = 0x47            # Feuerball (Typ 1), Richtung 3 (rechts)
+    upper[1 * GW + 30] = 0x15           # Exit (weit weg)
+    return {
+        "name": "SpeedTest", "ruleset": "ms",
+        "levels": [{
+            "title": "Speed", "number": 1, "time": 0, "chips": 0,
+            "hint": "", "password": "ABCD", "width": 32, "height": 32,
+            "upper": _hexgrid(upper), "lower": _hexgrid(lower),
+            "traps": "", "cloners": "", "monsters": "",
+        }],
+    }
+
+
+def _run_engine_harness(tmp_path, level, harness):
+    """Engine-Quelle bis VOR die Hauptschleife + Harness headless via gbrt laufen
+    lassen; gibt stdout zurueck."""
     import json
     assets = _CR / "assets"
     if not (assets / "tiles.png").exists():
         pytest.skip("circuitrunner/assets nicht vorhanden")
-
-    # Engine-Quelle bis VOR die Hauptschleife + Logik-Harness anhaengen
     src = (_CR / "circuitrunner.gb").read_text(encoding="utf-8")
     head = src.split("WHILE NOT QUITREQUESTED()")[0]
-    assert "SUB reorder_monsters" in head, "reorder_monsters fehlt in der Engine"
+    shutil.copytree(assets, tmp_path / "assets")
+    (tmp_path / "synth.json").write_text(json.dumps(level), encoding="utf-8")
+    gb = tmp_path / "harness.gb"
+    gb.write_text(head + harness, encoding="utf-8")
+    r = subprocess.run([str(_GBRT), "run", str(gb)],
+                       capture_output=True, timeout=120)
+    return r.stdout.decode("utf-8", "replace")
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_monster_move_order_follows_list(tmp_path):
     harness = (
         '\njs = JSON_LOAD("synth.json")\n'
         'nlevels = JSON_LEN(js, "levels")\n'
@@ -184,17 +216,33 @@ def test_monster_move_order_follows_list(tmp_path):
         '    PRINT "M " + STR$(mob_x[kk]) + " " + STR$(mob_y[kk])\n'
         'NEXT\n'
     )
-
-    shutil.copytree(assets, tmp_path / "assets")
-    (tmp_path / "synth.json").write_text(
-        json.dumps(_make_reorder_level()), encoding="utf-8")
-    gb = tmp_path / "harness.gb"
-    gb.write_text(head + harness, encoding="utf-8")
-
-    r = subprocess.run([str(_GBRT), "run", str(gb)],
-                       capture_output=True, timeout=120)
-    out = r.stdout.decode("utf-8", "replace")
+    assert "SUB reorder_monsters" in (_CR / "circuitrunner.gb").read_text(
+        encoding="utf-8"), "reorder_monsters fehlt in der Engine"
+    out = _run_engine_harness(tmp_path, _make_reorder_level(), harness)
     assert "NMOB=4" in out, out
     order = [(int(a), int(b))
              for a, b in re.findall(r"M\s+(\d+)\s+(\d+)", out)]
     assert order == [(8, 5), (5, 2), (3, 5), (10, 10)], (order, out)
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_monster_moves_at_player_speed(tmp_path):
+    # MON_EVERY=1: normale Monster ziehen jeden Tick einen Schritt (CC-Tempo).
+    harness = (
+        '\njs = JSON_LOAD("synth.json")\n'
+        'nlevels = JSON_LEN(js, "levels")\n'
+        'load_level(0)\n'
+        'state = "play"\n'
+        'want_dir = -1\n'
+        'DIM tk AS INTEGER\n'
+        'FOR tk = 0 TO 2\n'
+        '    want_dir = -1\n'
+        '    world_tick()\n'
+        'NEXT\n'
+        'PRINT "POS " + STR$(mob_x[0]) + " " + STR$(mob_y[0])\n'
+    )
+    out = _run_engine_harness(tmp_path, _make_corridor_level(), harness)
+    m = re.search(r"POS\s+(\d+)\s+(\d+)", out)
+    assert m, out
+    # Start (3,5), 3 Ticks geradeaus rechts -> (6,5). Bei Halbtempo waere x<6.
+    assert (int(m.group(1)), int(m.group(2))) == (6, 5), out
