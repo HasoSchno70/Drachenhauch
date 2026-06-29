@@ -567,7 +567,7 @@ FUNCTION block_can_move(fx AS INTEGER, fy AS INTEGER, tx AS INTEGER, ty AS INTEG
     IF t = T_WALLN OR t = T_WALLW OR t = T_WALLS OR t = T_WALLE THEN RETURN FALSE
     IF t = T_BLUEBLOCK_W OR t = T_BLUEBLOCK_F THEN RETURN FALSE
     IF t = T_TOGGLE_C OR t = T_CLONER OR t = T_SOCKET OR t = T_EXIT THEN RETURN FALSE
-    IF t = T_CHIP OR t = T_DIRT THEN RETURN FALSE
+    IF t = T_CHIP THEN RETURN FALSE
     IF t = T_DOOR_BLUE OR t = T_DOOR_RED OR t = T_DOOR_GREEN OR t = T_DOOR_YELLOW THEN RETURN FALSE
     IF t = T_KEY_BLUE OR t = T_KEY_RED OR t = T_KEY_GREEN OR t = T_KEY_YELLOW THEN RETURN FALSE
     IF t = T_FLIPPERS OR t = T_FIREBOOTS OR t = T_ICESKATES OR t = T_SUCTION THEN RETURN FALSE
@@ -602,6 +602,7 @@ SUB push_block(bi AS INTEGER, tx AS INTEGER, ty AS INTEGER)
     END IF
     blk_x[bi] = tx
     blk_y[bi] = ty
+    IF t = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
     pushed_blk = bi
     set_block_slide(bi, d)
     sfx_block()
@@ -663,6 +664,7 @@ SUB advance_blocks()
             ELSEIF block_can_move(blk_x[i], blk_y[i], tx, ty, d) THEN
                 blk_x[i] = tx
                 blk_y[i] = ty
+                IF tt = T_DIRT THEN terr[cidx(tx, ty)] = T_FLOOR
                 set_block_slide(i, d)
             ELSE
                 blk_sdir[i] = -1
@@ -676,6 +678,10 @@ SUB land_on()
     DIM t AS INTEGER
     t = terr[cidx(px, py)]
     on_water = FALSE
+    IF t = T_DIRT THEN
+        terr[cidx(px, py)] = T_FLOOR
+        RETURN
+    END IF
     IF t = T_CHIP THEN
         terr[cidx(px, py)] = T_FLOOR
         IF chips_left > 0 THEN chips_left = chips_left - 1
