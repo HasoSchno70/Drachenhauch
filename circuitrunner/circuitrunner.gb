@@ -1174,6 +1174,8 @@ END SUB
 '  WELT-TICK
 ' ----------------------------------------------------------------------
 DIM want_dir AS INTEGER
+DIM anim_frame AS INTEGER       ' Tile-Animations-Frame 0..3
+DIM anim_ms AS FLOAT
 DIM buf_dir AS INTEGER          ' gepufferter Tap (geht zwischen Ticks nicht verloren)
 DIM held_dir AS INTEGER
 
@@ -1229,11 +1231,29 @@ END SUB
 ' ----------------------------------------------------------------------
 '  RENDERN
 ' ----------------------------------------------------------------------
+' Animierte Kacheln: Frame-0-Zelle (Sheet-Zeilen 8-9). -1 = statisch.
+FUNCTION anim_base(code AS INTEGER) AS INTEGER
+    IF code = T_WATER THEN RETURN 128
+    IF code = T_FIRE THEN RETURN 132
+    IF code = T_FORCE_S THEN RETURN 136
+    IF code = T_FORCE_N THEN RETURN 140
+    IF code = T_FORCE_E THEN RETURN 144
+    IF code = T_FORCE_W THEN RETURN 148
+    IF code = T_FORCE_RND THEN RETURN 152
+    IF code = T_EXIT THEN RETURN 156
+    RETURN -1
+END FUNCTION
+
 SUB draw_tile(code AS INTEGER, sx AS INTEGER, sy AS INTEGER)
+    DIM cell AS INTEGER
+    cell = code
+    DIM ab AS INTEGER
+    ab = anim_base(code)
+    IF ab >= 0 THEN cell = ab + (anim_frame MOD 4)
     DIM srcx AS INTEGER
     DIM srcy AS INTEGER
-    srcx = (code MOD 16) * TILE
-    srcy = (code \ 16) * TILE
+    srcx = (cell MOD 16) * TILE
+    srcy = (cell \ 16) * TILE
     DRAWIMAGEPART(tiles, srcx, srcy, TILE, TILE, sx, sy)
 END SUB
 
@@ -1587,12 +1607,17 @@ cur_level = 0
 want_dir = -1
 buf_dir = -1
 held_dir = -1
+anim_frame = 0
+anim_ms = 0.0
 
 ' ======================================================================
 '  HAUPTSCHLEIFE
 ' ======================================================================
 WHILE NOT QUITREQUESTED()
     INPUT_UPDATE()
+    anim_ms = anim_ms + DELTA() * 1000.0
+    IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
+    anim_frame = INT(anim_ms / 130.0) MOD 4
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK

@@ -182,33 +182,42 @@ def t_chip():
     return p.finish()
 
 
-def t_water():
+def t_water(frame=0):
     p = P()
     p.gv(0, 0, S, S, WATER_T, WATER_B)
     for k, yy in enumerate((10, 24, 40, 54)):
         col = _mix(WATER_FOAM, WATER_T, 0.2 + k * 0.15)
-        p.line([(2, yy), (18, yy - 3), (34, yy + 2), (50, yy - 2), (62, yy + 1)], col, 1.6)
-    p.disc(16, 16, 3, WATER_FOAM); p.disc(44, 30, 2, WATER_FOAM); p.disc(28, 48, 2.4, WATER_FOAM)
+        pts = []
+        x = -8.0
+        while x <= S + 8:
+            wy = yy + math.sin((x + frame * 8) * (2 * math.pi / 32) + k) * 3
+            pts.append((x, wy)); x += 5
+        p.line(pts, col, 1.8)
+    bob = math.sin(frame * 1.5708) * 2
+    p.disc(16, 16 + bob, 3, WATER_FOAM); p.disc(44, 30 - bob, 2, WATER_FOAM); p.disc(28, 48 + bob, 2.4, WATER_FOAM)
     p.gv(0, 0, S, 6, WATER_B, WATER_T)
     return p.finish()
 
 
-def t_fire():
+def t_fire(frame=0):
     base = t_floor()
     p = P()
     p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
     p.disc(32, 40, 22, (120, 40, 12, 120))
+    fl = [1.0, 0.84, 1.14, 0.92][frame % 4]
+    sx = [0, -2, 1, -1][frame % 4]
+    fw = [1.0, 0.9, 1.1, 0.95][frame % 4]
     def flame(cx, base_y, w, h, col):
         pts = [(cx - w, base_y), (cx - w * 0.5, base_y - h * 0.55),
                (cx - w * 0.2, base_y - h * 0.2), (cx, base_y - h),
                (cx + w * 0.2, base_y - h * 0.2), (cx + w * 0.5, base_y - h * 0.55),
                (cx + w, base_y)]
         p.poly(pts, col)
-    flame(32, 54, 17, 40, FIRE_D)
-    flame(24, 54, 8, 26, FIRE_R); flame(40, 54, 9, 30, FIRE_R)
-    flame(32, 54, 11, 34, FIRE_O)
-    flame(32, 52, 6, 22, FIRE_Y)
-    p.disc(32, 46, 4, FIRE_Y)
+    flame(32, 54, 17, 40 * fl, FIRE_D)
+    flame(24 + sx, 54, 8, 26 * fw, FIRE_R); flame(40 - sx, 54, 9, 30 * fl, FIRE_R)
+    flame(32 + sx, 54, 11, 34 * fl, FIRE_O)
+    flame(32 + sx, 52, 6, 22 * fw, FIRE_Y)
+    p.disc(32 + sx, 46, 4, FIRE_Y)
     return p.finish(glow=True)
 
 
@@ -283,34 +292,46 @@ def _arrow(p, dx, dy, cx, cy, col, ln=9):
         p.poly([(cx, cy + s * ln), (cx - 6, cy + s * (ln - 7)), (cx + 6, cy + s * (ln - 7))], col)
 
 
-def t_force(dx, dy):
+def t_force(dx, dy, frame=0):
     p = P()
     p.gv(0, 0, S, S, PURP_T, PURP_B)
     p.rrect(2, 2, S - 3, S - 3, 6, PURP)
     p.frame(2, 2, S - 3, S - 3, PURP_T, 1.5)
-    for k in range(2):
-        cx = 32 if dy else (20 + k * 24)
-        cy = (18 + k * 28) if dy else 32
-        _arrow(p, dx, dy, cx, cy, _mix(PURP_T, WHITE, 0.3 if k == 0 else 0.0))
+    sp = 20.0
+    off = (frame % 4) * sp / 4.0
+    bright = _mix(PURP_T, WHITE, 0.4)
+    i = -1
+    while i < 5:
+        pos = i * sp + off
+        if dy != 0:
+            sgn = 1 if dy > 0 else -1
+            cy = pos if dy > 0 else (S - pos)
+            p.line([(18, cy - sgn * 7), (32, cy + sgn * 7), (46, cy - sgn * 7)], bright, 3.5)
+        else:
+            sgn = 1 if dx > 0 else -1
+            cx = pos if dx > 0 else (S - pos)
+            p.line([(cx - sgn * 7, 18), (cx + sgn * 7, 32), (cx - sgn * 7, 46)], bright, 3.5)
+        i += 1
     return p.finish()
 
 
-def t_force_random():
+def t_force_random(frame=0):
     p = P()
     p.gv(0, 0, S, S, PURP_T, PURP_B)
     p.rrect(2, 2, S - 3, S - 3, 6, PURP)
-    _arrow(p, 1, 0, 34, 20, PURP_T, 8)
-    _arrow(p, 0, 1, 22, 38, PURP_T, 8)
-    _arrow(p, -1, 0, 30, 48, PURP_T, 8)
-    p.disc(32, 32, 3, WHITE)
+    p.frame(2, 2, S - 3, S - 3, PURP_T, 1.5)
+    dirs = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+    dx, dy = dirs[frame % 4]
+    _arrow(p, dx, dy, 32, 32, _mix(PURP_T, WHITE, 0.35), 11)
+    p.disc(32, 32, 3.4, WHITE)
     return p.finish()
 
 
-def t_exit():
+def t_exit(frame=0):
     p = P(bg=BLACK)
     for r in range(30, 2, -3):
         t = r / 30.0
-        col = _mix(WHITE, NEON, 1 - t) if (r // 3) % 2 == 0 else (12, 24, 34, 255)
+        col = _mix(WHITE, NEON, 1 - t) if ((r // 3) + frame) % 2 == 0 else (12, 24, 34, 255)
         p.ring(32, 32, r, 2.4, col)
     p.disc(32, 32, 4, WHITE)
     p.frame(2, 2, S - 3, S - 3, NEON_B, 2)
@@ -770,7 +791,25 @@ def build():
     cells[0x68] = boot_flippers(); cells[0x69] = boot_fire()
     cells[0x6A] = boot_ice(); cells[0x6B] = boot_suction()
 
-    cols, rows = 16, 8
+    # --- Animations-Frames (Wasser/Feuer/Rollbaender/Exit) in Zeilen 8-9 ---
+    # je animiertes Tile 4 Frames; Engine zeigt anim_base(code)+anim_frame.
+    anim = [
+        (0x03, 128, [t_water(f) for f in range(4)]),
+        (0x04, 132, [t_fire(f) for f in range(4)]),
+        (0x0D, 136, [t_force(0, 1, f) for f in range(4)]),
+        (0x12, 140, [t_force(0, -1, f) for f in range(4)]),
+        (0x13, 144, [t_force(1, 0, f) for f in range(4)]),
+        (0x14, 148, [t_force(-1, 0, f) for f in range(4)]),
+        (0x32, 152, [t_force_random(f) for f in range(4)]),
+        (0x15, 156, [t_exit(f) for f in range(4)]),
+    ]
+    for code, abase, frames in anim:
+        cells[code] = frames[0]
+        for f, img in enumerate(frames):
+            cells[abase + f] = img
+
+    cols = 16
+    rows = max(cells) // cols + 1
     sheet = Image.new("RGBA", (cols * S, rows * S), T)
     for code, img in cells.items():
         sheet.alpha_composite(img.convert("RGBA"), ((code % cols) * S, (code // cols) * S))
@@ -818,13 +857,13 @@ def _names():
 
 
 def _contact(cells, path, scale=2):
-    cols, rows = 16, 8
+    cols, rows = 16, 10
     cell = S * scale; pad = 4; lab = 11
     Wd = cols * (cell + pad) + pad
     Hh = rows * (cell + lab + pad) + pad
     sheet = Image.new("RGBA", (Wd, Hh), (24, 28, 38, 255))
     d = ImageDraw.Draw(sheet)
-    for code in range(128):
+    for code in range(160):
         cx = pad + (code % cols) * (cell + pad)
         cy = pad + (code // cols) * (cell + lab + pad)
         d.rectangle([cx, cy, cx + cell, cy + cell], outline=(46, 52, 68, 255))
