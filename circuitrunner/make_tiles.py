@@ -225,40 +225,49 @@ def t_fire(frame=0):
 def t_ice():
     p = P()
     p.gv(0, 0, S, S, ICE_T, ICE_B)
-    p.rrect(2, 2, S - 3, S - 3, 6, ICE)
-    p.frame(2, 2, S - 3, S - 3, ICE_T, 1.5)
-    p.line([(3, S - 5), (S - 4, S - 5)], ICE_D, 2)
-    # Risse
-    p.line([(12, 12), (24, 18), (30, 30), (46, 24), (54, 40)], ICE_D, 1.4)
-    p.line([(18, 50), (30, 30)], ICE_D, 1.2)
-    # Glanz
-    p.poly([(40, 10), (50, 12), (44, 22)], (255, 255, 255, 120))
-    p.disc(48, 16, 2.4, WHITE)
+    p.rrect(2, 2, S - 3, S - 3, 7, ICE)
+    p.gv(4, 4, S - 5, 28, _mix(ICE, ICE_T, 0.55), ICE)        # oberes Glanzfeld
+    p.frame(2, 2, S - 3, S - 3, ICE_T, 1.4)
+    p.line([(3, S - 5), (S - 4, S - 5)], ICE_D, 2)            # untere Schattenkante
+    # zarte Frost-Streifen (heller Eiston, diagonal) statt harter Risse
+    frost = _mix(ICE_T, WHITE, 0.55)
+    for x0 in (2, 20, 38):
+        p.line([(x0, 58), (x0 + 30, 6)], frost, 1.1)
+    # feine, weiche Haarrisse
+    crack = _mix(ICE_D, ICE, 0.5)
+    p.line([(18, 22), (27, 32), (23, 44)], crack, 1.0)
+    p.line([(42, 18), (49, 30)], crack, 1.0)
+    # Glanzlichter
+    p.poly([(40, 9), (52, 12), (44, 22)], SHINE)
+    p.disc(47, 14, 2.0, WHITE)
     return p.finish()
 
 
 def t_ice_corner(closed):
     p = P()
     p.im.alpha_composite(t_ice().resize((W, W), Image.NEAREST))
-    tw = 13
+    rail = _mix(ICE_B, ICE_D, 0.55)                          # Eis-Schiene (kein Metall)
+    railhi = ICE_T
+    rw = 7
     edges = {"NW": ("N", "W"), "NE": ("N", "E"), "SE": ("S", "E"), "SW": ("S", "W")}[closed]
     for e in edges:
-        if e == "N": p.gv(0, 0, S, tw, WALL_T, WALL)
-        elif e == "S": p.gv(0, S - tw, S, S, WALL, WALL_B)
-        elif e == "W": p.gh(0, 0, tw, S, WALL_T, WALL)
-        else: p.gh(S - tw, 0, S, S, WALL, WALL_B)
-    cen = {"NW": (tw, tw), "NE": (S - tw, tw), "SE": (S - tw, S - tw), "SW": (tw, S - tw)}[closed]
+        if e == "N": p.rect(0, 0, S, rw, rail); p.line([(0, rw), (S, rw)], railhi, 1.4)
+        elif e == "S": p.rect(0, S - rw, S, S, rail); p.line([(0, S - rw), (S, S - rw)], railhi, 1.4)
+        elif e == "W": p.rect(0, 0, rw, S, rail); p.line([(rw, 0), (rw, S)], railhi, 1.4)
+        else: p.rect(S - rw, 0, S, S, rail); p.line([(S - rw, 0), (S - rw, S)], railhi, 1.4)
+    # gerundeter Innen-Bumper am Eck mit glaenzender Slide-Kante
+    cx, cy = {"NW": (0, 0), "NE": (S, 0), "SE": (S, S), "SW": (0, S)}[closed]
+    p.disc(cx, cy, 31, rail)
+    p.disc(cx, cy, 27, _mix(ICE, ICE_T, 0.45))
     a0, a1 = {"NW": (0, 90), "NE": (90, 180), "SE": (180, 270), "SW": (270, 360)}[closed]
-    cx, cy = cen
-    for r, col, wdt in ((34, ICE_D, 3), (28, ICE_T, 2), (31, WHITE, 1)):
+    for rr, col, wdt in ((30, railhi, 2.2), (28, SHINE, 1.3)):
         pts = []
         deg = a0
         while deg <= a1:
             a = math.radians(deg)
-            pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
-            deg += 4
-        if len(pts) > 1:
-            p.line(pts, col, wdt)
+            pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+            deg += 3
+        p.line(pts, col, wdt)
     return p.finish()
 
 
