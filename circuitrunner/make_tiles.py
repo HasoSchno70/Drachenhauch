@@ -338,7 +338,7 @@ def t_exit(frame=0):
     return p.finish(glow=True)
 
 
-def t_socket():
+def t_socket(frame=0):
     base = t_floor()
     p = P()
     p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
@@ -348,6 +348,9 @@ def t_socket():
     p.gv(24, 18, 40, 46, _mix(STEEL, WHITE, 0.2), (70, 78, 98, 255))
     for i in range(20, 47, 7):
         p.rrect(14, i - 1, 20, i + 1, 1, GOLD); p.rrect(44, i - 1, 50, i + 1, 1, GOLD)
+    # pulsierender Energiekern
+    pulse = [0.0, 0.5, 1.0, 0.5][frame % 4]
+    p.disc(32, 32, 5 + pulse * 4, (60, 214, 130, int(60 + pulse * 90)))
     p.disc(32, 32, 4, CHIPG); p.disc(30, 30, 1.6, CHIPG_T)
     return p.finish()
 
@@ -405,36 +408,45 @@ def t_button(name, light):
     return p.finish()
 
 
-def t_toggle(open_):
+def t_toggle(open_, frame=0):
+    pulse = [0.0, 0.5, 1.0, 0.5][frame % 4]
     if open_:
         base = t_floor()
         p = P()
         p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
-        p.frame(4, 4, S - 5, S - 5, (90, 230, 130, 150), 3)
-        p.disc(32, 32, 4, (90, 230, 130, 160))
+        p.frame(4, 4, S - 5, S - 5, (90, 230, 130, int(70 + pulse * 120)), 3)
+        p.disc(32, 32, 3 + pulse * 2.5, (90, 230, 130, int(110 + pulse * 90)))
         return p.finish()
     p = P()
     p.gv(0, 0, S, S, (96, 220, 140, 255), (44, 120, 78, 255))
     p.rrect(3, 3, S - 4, S - 4, 6, (60, 150, 96, 255))
-    p.frame(3, 3, S - 4, S - 4, (130, 240, 160, 255), 2)
+    p.frame(3, 3, S - 4, S - 4, _mix((130, 240, 160, 255), WHITE, pulse * 0.5), 2)
+    grid = _mix((44, 110, 72, 255), (120, 240, 160, 255), pulse)
     for y in range(10, S - 6, 10):
-        p.line([(5, y), (S - 6, y)], (44, 110, 72, 255), 1.4)
+        p.line([(5, y), (S - 6, y)], grid, 1.4)
     for x in range(10, S - 6, 10):
-        p.line([(x, 5), (x, S - 6)], (44, 110, 72, 255), 1.4)
+        p.line([(x, 5), (x, S - 6)], grid, 1.4)
     return p.finish()
 
 
-def t_teleport():
+def t_teleport(frame=0):
     p = P(bg=BLACK)
+    # nach innen wandernde Ringe (Phase ueber frame) = Sog
     for r in range(28, 2, -3):
-        col = _mix(WHITE, MAG, r / 28.0) if (r // 3) % 2 == 0 else (30, 10, 30, 255)
+        col = _mix(WHITE, MAG, r / 28.0) if ((r // 3) + frame) % 2 == 0 else (30, 10, 30, 255)
         p.ring(32, 32, r, 2.4, col)
+    # rotierende Wirbel-Arme
+    for k in range(2):
+        a = (frame / 4.0 + k / 2.0) * 2 * math.pi
+        for rr in (10, 18, 25):
+            p.disc(32 + math.cos(a + rr * 0.16) * rr,
+                   32 + math.sin(a + rr * 0.16) * rr, 2.0, MAG_T)
     p.disc(32, 32, 4, WHITE)
     p.frame(2, 2, S - 3, S - 3, MAG_B, 2)
     return p.finish(glow=True)
 
 
-def t_bomb():
+def t_bomb(frame=0):
     base = t_floor()
     p = P()
     p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
@@ -443,7 +455,15 @@ def t_bomb():
     p.disc(31, 38, 14, BLACK)
     p.disc(24, 31, 5, (78, 86, 104, 255)); p.disc(22, 29, 2, (140, 148, 166, 255))
     p.line([(38, 22), (44, 14), (48, 16)], (160, 130, 80, 255), 2.4)
-    p.disc(48, 15, 3, FIRE_O); p.disc(48, 15, 1.6, FIRE_Y)
+    # zuckender, spritzender Funke
+    sr = [3.2, 2.4, 4.2, 2.8][frame % 4]
+    jx = [0, 1.5, -1, 1][frame % 4]
+    jy = [0, -1, 1.5, -1.5][frame % 4]
+    p.disc(48 + jx, 15 + jy, sr + 1.6, FIRE_R)
+    p.disc(48 + jx, 15 + jy, sr, FIRE_O)
+    p.disc(48 + jx, 15 + jy, sr * 0.5, FIRE_Y)
+    if frame % 2 == 0:
+        p.disc(52, 11, 1.3, FIRE_Y); p.disc(44, 9, 1.0, FIRE_O)
     return p.finish(glow=True)
 
 
@@ -485,16 +505,19 @@ def t_thief():
     return p.finish()
 
 
-def t_cloner():
+def t_cloner(frame=0):
+    pulse = [0.0, 0.5, 1.0, 0.5][frame % 4]
     p = P()
     p.gv(0, 0, S, S, (66, 74, 100, 255), (34, 38, 54, 255))
     p.rrect(3, 3, S - 4, S - 4, 6, (50, 56, 78, 255))
     p.frame(3, 3, S - 4, S - 4, STEEL, 2)
     p.rrect(14, 14, S - 15, S - 15, 4, (18, 20, 30, 255))
     p.rrect(22, 22, 42, 42, 3, MAG_B)
-    p.gv(24, 24, 40, 40, MAG_T, MAG)
-    for x, y in ((10, 10), (S - 10, 10), (10, S - 10), (S - 10, S - 10)):
-        p.disc(x, y, 2.4, NEON)
+    p.gv(24, 24, 40, 40, _mix(MAG_T, WHITE, pulse * 0.6), MAG)
+    # Eck-LEDs umlaufend blinken
+    leds = ((10, 10), (S - 10, 10), (S - 10, S - 10), (10, S - 10))
+    for j, (x, y) in enumerate(leds):
+        p.disc(x, y, 2.4, NEON if j == frame % 4 else NEON_D)
     return p.finish(glow=True)
 
 
@@ -802,6 +825,13 @@ def build():
         (0x14, 148, [t_force(-1, 0, f) for f in range(4)]),
         (0x32, 152, [t_force_random(f) for f in range(4)]),
         (0x15, 156, [t_exit(f) for f in range(4)]),
+        # Zeilen 10-11: Teleporter/Bombe/Toggle/Sockel/Cloner
+        (0x29, 160, [t_teleport(f) for f in range(4)]),
+        (0x2A, 164, [t_bomb(f) for f in range(4)]),
+        (0x25, 168, [t_toggle(False, f) for f in range(4)]),
+        (0x26, 172, [t_toggle(True, f) for f in range(4)]),
+        (0x22, 176, [t_socket(f) for f in range(4)]),
+        (0x31, 180, [t_cloner(f) for f in range(4)]),
     ]
     for code, abase, frames in anim:
         cells[code] = frames[0]
