@@ -492,17 +492,19 @@ def t_hint():
     return p.finish(glow=True)
 
 
-def t_thief():
+def t_thief(frame=0):
     base = t_floor()
     p = P()
     p.im.alpha_composite(base.resize((W, W), Image.NEAREST))
+    pulse = [0.0, 0.5, 1.0, 0.5][frame % 4]
     p.disc(32, 26, 14, (44, 50, 70, 255))
     p.disc(32, 22, 11, (60, 68, 92, 255))           # Kapuze
     p.rrect(18, 24, 46, 32, 3, BLACK)               # Maske
-    p.disc(25, 28, 2.4, NEON); p.disc(39, 28, 2.4, NEON)
+    eye = _mix(NEON_D, NEON, pulse)                  # flackernde Augen
+    p.disc(25, 28, 2.4 + pulse * 0.9, eye); p.disc(39, 28, 2.4 + pulse * 0.9, eye)
     p.poly([(18, 40), (46, 40), (52, 58), (12, 58)], (54, 60, 82, 255))   # Umhang
-    p.disc(32, 48, 3, MAG)
-    return p.finish()
+    p.disc(32, 48, 3 + pulse * 1.6, _mix(MAG_B, MAG, pulse))   # pulsierender Orb
+    return p.finish(glow=True)
 
 
 def t_cloner(frame=0):
@@ -533,9 +535,16 @@ def t_thin_wall(dirs):
 
 
 # ====================================================== ITEMS
-def i_key(name):
+# Pulsierender Glow-Halo HINTER einem Pickup (Sammel-Schimmer)
+def _glow_halo(p, col, frame, cx=32, cy=33, r0=15):
+    pulse = [0.0, 0.5, 1.0, 0.5][frame % 4]
+    p.disc(cx, cy, r0 + pulse * 4, (col[0], col[1], col[2], int(26 + pulse * 48)))
+
+
+def i_key(name, frame=0):
     lt, md, dk, dp = COL[name]
     p = P()
+    _glow_halo(p, lt, frame, cy=30, r0=14)           # Schimmer-Halo
     # Schaft
     p.gh(28, 28, 36, 56, lt, dk)
     p.rect(28, 28, 36, 56, md)
@@ -551,7 +560,10 @@ def i_key(name):
     p.rect(36, 44, 44, 48, md); p.rect(36, 44, 44, 46, lt)
     p.rect(36, 52, 41, 56, md); p.rect(36, 52, 41, 54, lt)
     p.disc(32, 56, 4, md); p.disc(30, 55, 1.6, lt)   # abgerundete Spitze
-    return p.finish()
+    # wanderndes Funkeln
+    tw = [(27, 13), (37, 18), (40, 50), (29, 44)][frame % 4]
+    p.disc(tw[0], tw[1], 1.8, SHINE)
+    return p.finish(glow=True)
 
 
 def _boot_base(p, lt, md, dk):
@@ -567,9 +579,10 @@ def _boot_base(p, lt, md, dk):
     p.disc(23, 12, 2, SHINE)
 
 
-def boot_flippers():
+def boot_flippers(frame=0):
     lt, md, dk, dp = COL["blue"]
     p = P()
+    _glow_halo(p, lt, frame)
     for cx, sh in ((38, dk), (26, md)):
         p.gv(cx - 8, 8, cx + 8, 24, lt if sh is md else md, sh)
         p.rrect(cx - 8, 8, cx + 8, 24, 4, sh)
@@ -579,8 +592,9 @@ def boot_flippers():
     return p.finish()
 
 
-def boot_fire():
+def boot_fire(frame=0):
     p = P()
+    _glow_halo(p, FIRE_O, frame)
     _boot_base(p, (255, 150, 110, 255), (214, 72, 52, 255), (150, 40, 28, 255))
     p.disc(28, 22, 3.4, FIRE_Y); p.disc(28, 22, 1.6, WHITE)
     p.gv(16, 50, 52, 53, FIRE_O, FIRE_R)
@@ -589,8 +603,9 @@ def boot_fire():
     return p.finish(glow=True)
 
 
-def boot_ice():
+def boot_ice(frame=0):
     p = P()
+    _glow_halo(p, ICE, frame)
     _boot_base(p, ICE_T, (188, 220, 240, 255), (120, 162, 200, 255))
     p.disc(28, 20, 2.6, WHITE)
     p.rrect(14, 56, 52, 59, 1.5, (220, 238, 252, 255))   # Kufe
@@ -598,8 +613,9 @@ def boot_ice():
     return p.finish()
 
 
-def boot_suction():
+def boot_suction(frame=0):
     p = P()
+    _glow_halo(p, PURP, frame)
     _boot_base(p, PURP_T, (150, 124, 216, 255), (96, 72, 168, 255))
     for sx in (24, 34, 44):
         p.disc(sx, 55, 3.2, (70, 54, 128, 255)); p.disc(sx, 55, 1.6, (40, 30, 80, 255))
@@ -832,6 +848,16 @@ def build():
         (0x26, 172, [t_toggle(True, f) for f in range(4)]),
         (0x22, 176, [t_socket(f) for f in range(4)]),
         (0x31, 180, [t_cloner(f) for f in range(4)]),
+        # Zeilen 11-13: Dieb + Schluessel + Stiefel (Schimmer/Funkeln)
+        (0x21, 184, [t_thief(f) for f in range(4)]),
+        (0x64, 188, [i_key("blue", f) for f in range(4)]),
+        (0x65, 192, [i_key("red", f) for f in range(4)]),
+        (0x66, 196, [i_key("green", f) for f in range(4)]),
+        (0x67, 200, [i_key("yellow", f) for f in range(4)]),
+        (0x68, 204, [boot_flippers(f) for f in range(4)]),
+        (0x69, 208, [boot_fire(f) for f in range(4)]),
+        (0x6A, 212, [boot_ice(f) for f in range(4)]),
+        (0x6B, 216, [boot_suction(f) for f in range(4)]),
     ]
     for code, abase, frames in anim:
         cells[code] = frames[0]

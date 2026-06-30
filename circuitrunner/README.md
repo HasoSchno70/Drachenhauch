@@ -126,12 +126,13 @@ Gleiter, Feuerball, Ball (Bounce), Tank, Walker (Zufall bei Block), Blob
 MS-Bewegungsreihenfolge der Levelliste (CCLP1-treues Timing); Teeth & Blob
 bewegen sich halb so schnell wie die übrigen Monster.
 
-**Animierte Kacheln** (HD-Tileset, 4 Frames je ~130 ms, Sheet-Zeilen 8–11):
-Wasser-Wellen, Feuer-Flackern, scrollende Force-Rollbänder, pulsierender Ausgang
-sowie **Teleporter-Wirbel, Bomben-Funke, energetische Toggle-Wände,
-Sockel-Energiekern und Cloner-Maschine**. Neue animierte Kachel: in
-`make_tiles.py` einen `frame`-Parameter ergänzen und in die `anim`-Liste
-aufnehmen (Frames ab Zelle 160), dann `anim_base()` in der Engine erweitern.
+**Animierte Kacheln** (HD-Tileset, 4 Frames je ~130 ms, Sheet-Zeilen 8–13):
+Wasser-Wellen, Feuer-Flackern, scrollende Force-Rollbänder, pulsierender Ausgang,
+Teleporter-Wirbel, Bomben-Funke, energetische Toggle-Wände, Sockel-Energiekern,
+Cloner-Maschine, **flackernder Dieb sowie schimmernde Schlüssel und Stiefel**
+(pulsierender Glow-Halo + Funkeln). Neue animierte Kachel: in `make_tiles.py`
+einen `frame`-Parameter ergänzen und in die `anim`-Liste aufnehmen (Frames ab
+Zelle 160), dann `anim_base()` in der Engine erweitern.
 
 ## Dateien
 
