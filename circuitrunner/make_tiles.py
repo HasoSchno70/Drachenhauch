@@ -724,58 +724,85 @@ def b_paramecium():
     return p.finish()
 
 
-# ---- Spieler (4 echte Richtungen + Geh-Frames)
-PB_T = (130, 188, 255, 255); PB = (74, 140, 222, 255); PB_D = (44, 92, 164, 255)
-PHE = (216, 226, 240, 255); PHE_D = (150, 162, 184, 255); PLEG = (48, 96, 168, 255); PFOOT = (30, 66, 120, 255)
+# ---- Spieler (4 echte Richtungen + Geh-Frames) -- Neon-Circuit-Android
+PB_T = (160, 208, 255, 255); PB = (88, 156, 238, 255); PB_M = (58, 118, 202, 255)
+PB_D = (40, 86, 158, 255); PB_OUT = (18, 44, 96, 255)
+PHE_T = (238, 246, 252, 255); PHE = (200, 216, 240, 255); PHE_D = (140, 154, 182, 255)
+PVIS = (14, 22, 38, 255); PLEG = (56, 106, 184, 255); PFOOT = (28, 62, 116, 255)
+PNE = (120, 244, 236, 255); PNE_D = (38, 150, 150, 255)
 
 
 def _legs(p, step):
-    if step == 0:
-        p.rrect(20, 48, 28, 60, 2, PLEG); p.rrect(36, 48, 44, 60, 2, PLEG)
-        p.rrect(20, 57, 28, 60, 1, PFOOT); p.rrect(36, 57, 44, 60, 1, PFOOT)
-    else:
-        p.rrect(16, 48, 24, 60, 2, PLEG); p.rrect(40, 48, 48, 60, 2, PLEG)
-        p.rrect(16, 57, 24, 60, 1, PFOOT); p.rrect(40, 57, 48, 60, 1, PFOOT)
+    pairs = ((20, 36) if step == 0 else (16, 40))
+    for lx in pairs:
+        p.rrect(lx, 47, lx + 8, 60, 3, PB_OUT)            # Outline
+        p.gv(lx + 1, 47, lx + 7, 58, PB, PB_D)
+        p.rrect(lx + 1, 47, lx + 7, 58, 2, PLEG)
+        p.rrect(lx, 56, lx + 8, 60, 1, PFOOT)             # Stiefel
+        p.disc(lx + 4, 51, 1.1, PNE_D)                    # Knie-LED
 
 
 def _torso(p):
-    p.gv(16, 22, 48, 52, PB_T, PB_D)
-    p.rrect(16, 22, 48, 52, 6, PB)
-    p.rect(16, 22, 19, 52, PB_D)
-    p.rrect(8, 26, 16, 44, 3, PB_D); p.rrect(48, 26, 56, 44, 3, PB_D)   # Arme
+    p.rrect(11, 20, 53, 54, 9, PB_OUT)                    # Outline-Silhouette
+    p.gv(14, 23, 50, 52, PB_T, PB_D)                      # Koerper-Verlauf
+    p.rrect(14, 23, 50, 52, 7, PB)
+    p.gv(18, 25, 46, 34, _mix(PB, PB_T, 0.6), PB)         # oberes Glanzfeld
+    p.rect(14, 23, 18, 52, PB_M)                          # Schattenkante links
+    # Schulterpolster
+    p.rrect(6, 24, 17, 46, 5, PB_OUT); p.rrect(7, 25, 16, 45, 4, PB_M)
+    p.rrect(47, 24, 58, 46, 5, PB_OUT); p.rrect(48, 25, 57, 45, 4, PB_M)
+    # Neon-Schaltbahnen
+    p.line([(32, 24), (32, 32)], PNE_D, 1.4)
+    p.line([(21, 45), (28, 45)], PNE_D, 1.2); p.line([(36, 45), (43, 45)], PNE_D, 1.2)
+
+
+def _helm(p, dome):
+    p.disc(32, 17, 15, PB_OUT)                            # Helm-Outline
+    p.disc(32, 17, 13.5, dome)
+    p.disc(27, 12, 4.5, _mix(dome, WHITE, 0.5))           # Glanz
 
 
 def player_front(step):
     p = P(); _legs(p, step); _torso(p)
-    p.disc(32, 18, 14, PHE)
-    p.rrect(18, 14, 46, 24, 4, PHE); p.rrect(18, 16, 46, 22, 2, BLACK)   # Visier
-    p.disc(24, 19, 2.4, NEON); p.disc(40, 19, 2.4, NEON)
-    p.disc(22, 16, 1.6, SHINE)
-    p.disc(32, 36, 5, NEON); p.disc(30, 34, 2, WHITE)                    # Brustkern
+    _helm(p, PHE)
+    p.rrect(18, 12, 46, 23, 5, PB_OUT)                    # Visier-Band
+    p.rrect(19, 13, 45, 22, 4, PVIS)
+    p.rrect(20, 14, 44, 17, 2, _mix(PVIS, PNE, 0.30))     # Visier-Schimmer
+    p.disc(25, 18, 2.7, PNE); p.disc(39, 18, 2.7, PNE)    # Augen
+    p.disc(24, 16, 1.3, WHITE)
+    p.disc(32, 38, 6, PB_OUT)                             # Brustkern
+    p.disc(32, 38, 4.6, PNE_D); p.disc(32, 38, 3, PNE); p.disc(30.5, 36.5, 1.4, WHITE)
     return p.finish()
 
 
 def player_back(step):
     p = P(); _legs(p, step); _torso(p)
-    p.disc(32, 18, 14, PHE_D)
-    p.rrect(28, 8, 36, 24, 3, (150, 162, 184, 255)); p.disc(32, 8, 2.4, NEON)   # Antenne
-    p.rrect(22, 28, 42, 46, 4, (62, 116, 196, 255)); p.rrect(28, 30, 36, 44, 2, PB_D)  # Rueckenpanel
+    _helm(p, PHE_D)
+    p.rrect(29, 3, 35, 15, 2, PB_OUT); p.disc(32, 4, 2.8, PNE)            # Antenne
+    p.rrect(22, 28, 42, 48, 4, PB_OUT); p.gv(24, 30, 40, 46, PB_M, PB_D)  # Rueckenpanel
+    p.rrect(24, 30, 40, 46, 3, PB_M)
+    p.line([(32, 31), (32, 45)], PNE_D, 1.4); p.disc(32, 38, 2.4, PNE_D)
     return p.finish()
 
 
 def player_side(step, left):
     p = P()
     if step == 0:
-        p.rrect(28, 48, 36, 60, 2, PLEG); p.rrect(28, 57, 36, 60, 1, PFOOT)
+        p.rrect(27, 47, 37, 60, 3, PB_OUT); p.gv(28, 47, 36, 58, PB, PB_D)
+        p.rrect(28, 47, 36, 58, 2, PLEG); p.rrect(27, 56, 37, 60, 1, PFOOT)
     else:
-        p.rrect(22, 48, 30, 60, 2, PLEG); p.rrect(38, 48, 46, 60, 2, PLEG)
-        p.rrect(22, 57, 30, 60, 1, PFOOT); p.rrect(38, 57, 46, 60, 1, PFOOT)
-    p.gv(22, 22, 42, 52, PB_T, PB_D); p.rrect(22, 22, 42, 52, 5, PB); p.rect(22, 22, 25, 52, PB_D)
-    p.rrect(40, 28, 48, 42, 3, PB_D)                  # vorderer Arm
-    p.disc(34, 18, 14, PHE)
-    p.rrect(22, 14, 46, 24, 4, PHE); p.rrect(36, 16, 46, 22, 2, BLACK)  # Visier rechts
-    p.disc(42, 19, 2.4, NEON); p.disc(26, 16, 1.6, SHINE)
-    p.disc(32, 36, 4, NEON)
+        for lx in (20, 37):
+            p.rrect(lx, 47, lx + 9, 60, 3, PB_OUT)
+            p.rrect(lx + 1, 47, lx + 8, 58, 2, PLEG); p.rrect(lx, 56, lx + 9, 60, 1, PFOOT)
+    p.rrect(19, 20, 45, 54, 8, PB_OUT)                   # Rumpf-Profil
+    p.gv(22, 23, 42, 52, PB_T, PB_D); p.rrect(22, 23, 42, 52, 6, PB)
+    p.rect(22, 23, 26, 52, PB_M)
+    p.rrect(39, 27, 50, 45, 5, PB_OUT); p.rrect(40, 28, 49, 44, 4, PB_M)  # vorderer Arm
+    _helm(p, PHE)
+    p.rrect(33, 12, 49, 23, 4, PB_OUT); p.rrect(34, 13, 48, 22, 3, PVIS)  # Visier rechts
+    p.rrect(35, 14, 47, 17, 2, _mix(PVIS, PNE, 0.30))
+    p.disc(43, 18, 2.7, PNE); p.disc(40, 15, 1.2, WHITE)
+    p.disc(31, 38, 5, PB_OUT); p.disc(31, 38, 3.4, PNE_D); p.disc(31, 38, 2, PNE)
     im = p.finish()
     if left:
         im = im.transpose(Image.FLIP_LEFT_RIGHT)
