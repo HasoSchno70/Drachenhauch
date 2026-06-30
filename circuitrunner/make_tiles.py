@@ -125,6 +125,7 @@ NEON = (110, 248, 240, 255); NEON_B = (24, 150, 156, 255); NEON_D = (16, 90, 100
 MAG_T = (255, 170, 240, 255); MAG = (236, 84, 206, 255); MAG_B = (150, 36, 124, 255)
 PURP_T = (190, 168, 255, 255); PURP = (132, 104, 214, 255); PURP_B = (78, 58, 150, 255)
 WHITE = (245, 248, 252, 255); BLACK = (16, 18, 26, 255); SHINE = (255, 255, 255, 235)
+OUTL = (10, 12, 20, 255)        # dunkle Outline-Silhouette fuer Figuren/Items
 
 # Schluessel-/Tuer-Farbsaetze: (hell, mittel, dunkel, tief)
 COL = {
@@ -567,16 +568,26 @@ def i_key(name, frame=0):
 
 
 def _boot_base(p, lt, md, dk):
-    # Seitenansicht-Stiefel, Zehe rechts
-    p.gv(18, 8, 36, 38, lt, md)                       # Schaft
-    p.rrect(18, 8, 36, 14, 3, lt)
-    p.rect(18, 8, 21, 38, dk)
-    p.gv(18, 36, 50, 52, md, dk)                      # Fuss
-    p.rrect(42, 38, 50, 52, 4, md)
-    p.rrect(16, 50, 52, 57, 3, dk)                    # Sohle
-    for y in range(16, 35, 5):
-        p.line([(22, y), (34, y)], lt, 1.4)           # Schnuerung
-    p.disc(23, 12, 2, SHINE)
+    # Seitenansicht-Stiefel, Zehe rechts -- mit Outline-Silhouette
+    p.rrect(16, 6, 38, 40, 5, OUTL)                   # Schaft-Outline
+    p.rrect(16, 35, 53, 53, 6, OUTL)                  # Fuss/Zehe-Outline
+    p.rrect(13, 49, 55, 59, 3, OUTL)                  # Sohle-Outline
+    # Schaft
+    p.gv(19, 9, 35, 38, lt, dk); p.rrect(19, 9, 35, 38, 4, md)
+    p.rrect(18, 7, 36, 16, 3, lt)                     # Stulpe oben
+    p.rect(19, 9, 22, 38, dk)                         # Schattenkante
+    # Fuss + Zehe
+    p.gv(19, 37, 51, 51, md, dk); p.rrect(19, 37, 51, 51, 5, md)
+    p.gv(20, 37, 50, 42, _mix(md, lt, 0.45), md)      # Spann-Glanz
+    # Sohle mit Profil
+    p.rrect(15, 51, 53, 58, 2, dk)
+    for sx in range(20, 51, 6):
+        p.rect(sx, 52, sx + 1, 57, OUTL)
+    # Schnuerung
+    for y in range(18, 35, 5):
+        p.line([(23, y), (33, y)], lt, 1.4)
+        p.disc(22, y, 1.1, OUTL); p.disc(34, y, 1.1, OUTL)
+    p.disc(25, 13, 2, SHINE)
 
 
 def boot_flippers(frame=0):
@@ -584,10 +595,12 @@ def boot_flippers(frame=0):
     p = P()
     _glow_halo(p, lt, frame)
     for cx, sh in ((38, dk), (26, md)):
-        p.gv(cx - 8, 8, cx + 8, 24, lt if sh is md else md, sh)
-        p.rrect(cx - 8, 8, cx + 8, 24, 4, sh)
-        p.poly([(cx - 9, 24), (cx + 9, 24), (cx + 16, 56), (cx - 16, 56)], sh)
-        p.line([(cx, 26), (cx, 54)], lt if sh is md else _mix(sh, lt, 0.4), 2)
+        p.poly([(cx - 10, 6), (cx + 10, 6), (cx + 18, 57), (cx - 18, 57)], OUTL)   # Outline
+        p.poly([(cx - 8, 8), (cx + 8, 8), (cx + 15, 54), (cx - 15, 54)], sh)        # Flosse
+        p.gv(cx - 7, 9, cx + 7, 22, lt if sh is md else md, sh)                     # Stiel-Glanz
+        p.line([(cx, 24), (cx, 52)], lt if sh is md else _mix(sh, lt, 0.4), 2)
+        for ry in (32, 40, 48):
+            p.line([(cx - 11, ry), (cx + 13, ry)], _mix(sh, OUTL, 0.4), 1.2)        # Rippen
     p.disc(22, 14, 2.4, SHINE)
     return p.finish()
 
@@ -596,10 +609,13 @@ def boot_fire(frame=0):
     p = P()
     _glow_halo(p, FIRE_O, frame)
     _boot_base(p, (255, 150, 110, 255), (214, 72, 52, 255), (150, 40, 28, 255))
-    p.disc(28, 22, 3.4, FIRE_Y); p.disc(28, 22, 1.6, WHITE)
-    p.gv(16, 50, 52, 53, FIRE_O, FIRE_R)
+    # Flammen-Emblem am Schaft
+    p.poly([(27, 14), (22, 24), (32, 24)], FIRE_O); p.poly([(27, 17), (24, 24), (30, 24)], FIRE_Y)
+    p.disc(27, 23, 1.4, WHITE)
+    # gluehende Sohle
+    p.gv(16, 51, 52, 54, FIRE_O, FIRE_R)
     for gx in (24, 34, 44):
-        p.disc(gx, 54, 1.8, FIRE_Y)
+        p.disc(gx, 55, 1.8, FIRE_Y)
     return p.finish(glow=True)
 
 
@@ -607,9 +623,11 @@ def boot_ice(frame=0):
     p = P()
     _glow_halo(p, ICE, frame)
     _boot_base(p, ICE_T, (188, 220, 240, 255), (120, 162, 200, 255))
-    p.disc(28, 20, 2.6, WHITE)
-    p.rrect(14, 56, 52, 59, 1.5, (220, 238, 252, 255))   # Kufe
-    p.rect(14, 60, 52, 62, STEEL)
+    p.disc(28, 20, 2.4, WHITE)
+    # Schlittschuh-Kufe
+    p.rrect(13, 56, 55, 60, 2, OUTL)
+    p.rrect(14, 57, 54, 60, 1.5, (224, 240, 252, 255))
+    p.poly([(50, 57), (55, 52), (55, 57)], STEEL)        # gebogene Spitze
     return p.finish()
 
 
@@ -618,109 +636,144 @@ def boot_suction(frame=0):
     _glow_halo(p, PURP, frame)
     _boot_base(p, PURP_T, (150, 124, 216, 255), (96, 72, 168, 255))
     for sx in (24, 34, 44):
-        p.disc(sx, 55, 3.2, (70, 54, 128, 255)); p.disc(sx, 55, 1.6, (40, 30, 80, 255))
+        p.disc(sx, 56, 3.6, OUTL); p.disc(sx, 55, 3.2, (84, 64, 150, 255))
+        p.disc(sx, 55, 1.6, (44, 32, 88, 255))
     return p.finish()
 
 
 # ====================================================== FIGUREN
-def _shade_ball(p, cx, cy, r, lt, md, dk, eyes=True, eye_y=None):
+def _shade_ball(p, cx, cy, r, lt, md, dk, eyes=True, eye_y=None, outline=True):
+    if outline:
+        p.disc(cx, cy, r + 1.5, OUTL)                                  # Outline
     p.disc(cx, cy, r, dk)
-    p.disc(cx, cy, r - 1.5, md)
-    p.disc(cx - r * 0.32, cy - r * 0.32, r * 0.55, _mix(md, lt, 0.55))
-    p.disc(cx - r * 0.42, cy - r * 0.42, r * 0.22, lt)
+    p.disc(cx, cy, r - 1.0, md)
+    p.disc(cx + r * 0.42, cy + r * 0.46, r * 0.5, _mix(dk, md, 0.45))  # Form-Schatten
+    p.disc(cx - r * 0.30, cy - r * 0.34, r * 0.55, _mix(md, lt, 0.6))  # Lichtseite
+    p.disc(cx - r * 0.42, cy - r * 0.44, r * 0.24, lt)
+    p.disc(cx - r * 0.5, cy - r * 0.52, r * 0.1, WHITE)                # Glanzpunkt
     if eyes:
         ey = eye_y if eye_y is not None else cy - r * 0.2
-        for ex in (cx - r * 0.42, cx + r * 0.42):
-            p.disc(ex, ey, r * 0.22, WHITE); p.disc(ex, ey + 0.5, r * 0.1, OL)
+        for ex in (cx - r * 0.4, cx + r * 0.4):
+            p.disc(ex, ey, r * 0.24, WHITE); p.disc(ex, ey + r * 0.06, r * 0.12, OL)
+            p.disc(ex - r * 0.07, ey - r * 0.07, r * 0.05, WHITE)      # Augen-Glanz
 
 
 def b_bug():
     p = P()
-    _shade_ball(p, 32, 34, 22, (255, 120, 120, 255), (224, 72, 72, 255), (150, 36, 36, 255), eyes=False)
-    p.line([(32, 12), (32, 56)], (130, 26, 26, 255), 2)
-    for sx, sy in ((18, 24), (46, 24), (16, 38), (48, 38), (20, 50), (44, 50)):
-        p.disc(sx, sy, 2, (120, 24, 24, 255))
-    p.line([(24, 12), (18, 4)], OL, 2); p.line([(40, 12), (46, 4)], OL, 2)   # Fuehler
-    p.disc(18, 4, 2, OL); p.disc(46, 4, 2, OL)
-    for ex in (24, 40):
-        p.disc(ex, 22, 3.4, WHITE); p.disc(ex, 23, 1.6, OL)
+    # Beine (hinter dem Panzer)
+    for ly in (26, 35, 45):
+        p.line([(13, ly + 3), (24, ly)], OUTL, 2); p.line([(51, ly + 3), (40, ly)], OUTL, 2)
+    _shade_ball(p, 32, 35, 20, (255, 120, 120, 255), (226, 70, 70, 255), (140, 32, 32, 255), eyes=False)
+    p.line([(32, 17), (32, 54)], (120, 24, 24, 255), 2)          # Panzer-Naht
+    for sx, sy in ((24, 30), (40, 30), (22, 42), (42, 42)):
+        p.disc(sx, sy, 2.2, (150, 30, 30, 255))                  # Punkte
+    p.line([(26, 18), (20, 7)], OUTL, 2); p.line([(38, 18), (44, 7)], OUTL, 2)   # Fuehler
+    p.disc(20, 7, 2.2, (226, 70, 70, 255)); p.disc(44, 7, 2.2, (226, 70, 70, 255))
+    for ex in (25, 39):
+        p.disc(ex, 27, 3, WHITE); p.disc(ex, 28, 1.5, OL); p.disc(ex - 1, 26, 0.8, WHITE)
     return p.finish()
 
 
 def b_fireball():
     p = P()
-    _shade_ball(p, 32, 34, 21, FIRE_Y, FIRE_O, FIRE_R, eyes=False)
-    p.disc(28, 30, 4, FIRE_Y); p.disc(26, 28, 1.6, WHITE)
-    p.poly([(32, 10), (28, 18), (36, 18)], FIRE_O); p.poly([(32, 8), (30, 14), (34, 14)], FIRE_Y)
+    p.disc(32, 35, 21, (96, 24, 10, 255))                        # gluehender Rand
+    _shade_ball(p, 32, 35, 18, FIRE_Y, FIRE_O, FIRE_R, eyes=False, outline=False)
+    for fx, h in ((32, 5), (21, 15), (43, 15)):                  # Flammenzungen
+        p.poly([(fx, h), (fx - 5, h + 13), (fx + 5, h + 13)], FIRE_O)
+        p.poly([(fx, h + 3), (fx - 2.5, h + 12), (fx + 2.5, h + 12)], FIRE_Y)
+    p.disc(28, 31, 4, FIRE_Y); p.disc(27, 30, 1.8, WHITE)
     return p.finish(glow=True)
 
 
 def b_ball():
     p = P()
     _shade_ball(p, 32, 34, 21, MAG_T, MAG, MAG_B, eyes=False)
-    p.disc(25, 26, 4, (255, 200, 245, 255)); p.disc(24, 25, 1.8, WHITE)
+    p.line([(18, 30), (30, 23)], (255, 200, 245, 200), 2)        # Glanzband
+    p.disc(24, 26, 4.5, (255, 210, 248, 255)); p.disc(23, 25, 2, WHITE)
     return p.finish()
 
 
 def b_tank():
     p = P()
-    p.gv(8, 16, 56, 52, (120, 146, 210, 255), (44, 62, 116, 255))
-    p.rrect(8, 16, 56, 52, 6, (86, 108, 178, 255))
-    p.frame(8, 16, 56, 52, (140, 166, 224, 255), 2)
-    p.rrect(18, 26, 46, 44, 4, (40, 58, 110, 255))
-    p.disc(32, 35, 6, NEON); p.disc(30, 33, 2.4, WHITE)
-    p.rrect(28, 2, 36, 20, 2, STEEL)                  # Lauf
-    for x in (12, 52):
-        for y in range(22, 50, 6):
-            p.disc(x, y, 1.6, (28, 40, 80, 255))
-    return p.finish()
+    p.rrect(7, 13, 57, 55, 7, OUTL)                              # Outline
+    p.gv(10, 16, 54, 52, (120, 146, 210, 255), (44, 62, 116, 255))
+    p.rrect(10, 16, 54, 52, 5, (86, 108, 178, 255))
+    p.gv(12, 18, 52, 28, (150, 172, 224, 255), (86, 108, 178, 255))   # Glanz oben
+    for tx in (11, 53):                                          # Ketten
+        p.rrect(tx - 4, 15, tx + 4, 53, 3, OUTL)
+        for ty in range(19, 51, 7):
+            p.rect(tx - 3, ty, tx + 3, ty + 3, STEEL)
+    p.rrect(20, 24, 44, 45, 5, (40, 58, 110, 255))               # Turm
+    p.rrect(29, 1, 35, 22, 2, OUTL); p.rrect(30, 2, 34, 21, 1, STEEL)   # Lauf
+    p.disc(32, 35, 6.5, OUTL); p.disc(32, 35, 5, NEON); p.disc(30, 33, 2, WHITE)   # Auge
+    return p.finish(glow=True)
 
 
 def b_glider():
     p = P()
-    p.poly([(32, 6), (50, 52), (32, 42), (14, 52)], (60, 200, 196, 255), outline=NEON_B, ow=1.5)
-    p.poly([(32, 10), (32, 40), (44, 48)], (40, 160, 160, 255))
-    p.line([(32, 8), (32, 42)], NEON, 2)
-    p.disc(32, 20, 3, WHITE)
+    p.poly([(32, 4), (52, 54), (32, 43), (12, 54)], OUTL)        # Outline
+    p.poly([(32, 8), (48, 51), (32, 41), (16, 51)], (60, 200, 196, 255))
+    p.poly([(32, 10), (32, 40), (45, 49)], (38, 156, 156, 255))  # Schattenhaelfte
+    p.line([(32, 9), (32, 41)], NEON, 2)
+    p.disc(32, 22, 3.6, WHITE); p.disc(32, 22, 1.8, NEON_B)
     return p.finish(glow=True)
 
 
 def b_teeth():
     p = P()
-    _shade_ball(p, 32, 30, 21, PURP_T, PURP, PURP_B, eyes=True, eye_y=24)
-    p.rrect(16, 40, 48, 50, 3, WHITE)                 # Maul
-    for x in range(18, 48, 6):
-        p.poly([(x, 40), (x + 5, 40), (x + 2, 50)], PURP_B)
+    _shade_ball(p, 32, 28, 21, PURP_T, PURP, PURP_B, eyes=False)
+    for ex, sgn in ((24, 1), (40, -1)):                          # boese Augen
+        p.disc(ex, 24, 3.4, WHITE); p.disc(ex + sgn, 25, 1.7, OL)
+        p.line([(ex - 4, 18), (ex + 4, 21)], PURP_B, 2)          # Augenbraue
+    p.rrect(15, 37, 49, 50, 3, OUTL)                             # Maul
+    p.rrect(16, 38, 48, 49, 2, (42, 22, 52, 255))
+    for x in range(18, 46, 6):
+        p.poly([(x, 38), (x + 5, 38), (x + 2.5, 45)], WHITE)     # obere Zaehne
+        p.poly([(x + 3, 49), (x + 8, 49), (x + 5, 42)], (220, 210, 230, 255))   # untere
     return p.finish()
 
 
 def b_walker():
     p = P()
-    for cy in (16, 48):
-        p.disc(32, cy, 9, (96, 104, 124, 255)); p.disc(32, cy, 7.5, STEEL); p.disc(29, cy - 3, 3, (190, 200, 220, 255))
-        p.disc(32, cy, 2, NEON)
-    p.gv(26, 16, 38, 48, (150, 160, 182, 255), (88, 96, 116, 255))
-    p.rect(26, 16, 38, 48, (110, 120, 142, 255))
-    return p.finish()
+    for a in range(0, 360, 45):                                  # Spikes
+        rad = a * math.pi / 180.0
+        tx = 32 + math.cos(rad) * 27; ty = 32 + math.sin(rad) * 27
+        ax = 32 + math.cos(rad + 0.32) * 17; ay = 32 + math.sin(rad + 0.32) * 17
+        bx = 32 + math.cos(rad - 0.32) * 17; by = 32 + math.sin(rad - 0.32) * 17
+        p.poly([(ax, ay), (bx, by), (tx, ty)], (74, 82, 104, 255))
+    p.disc(32, 32, 19, OUTL)
+    p.disc(32, 32, 17, (96, 104, 124, 255))
+    p.disc(32, 32, 14.5, STEEL)
+    p.disc(26, 26, 6, (200, 210, 228, 255))                      # Glanz
+    p.disc(32, 32, 6.5, OUTL); p.disc(32, 32, 5, NEON); p.disc(30, 30, 1.8, WHITE)   # Auge
+    return p.finish(glow=True)
 
 
 def b_blob():
     p = P()
-    _shade_ball(p, 32, 34, 22, (160, 248, 178, 255), (78, 204, 104, 255), (40, 140, 64, 255), eyes=True, eye_y=30)
-    p.disc(22, 22, 4, (180, 250, 190, 255)); p.disc(44, 44, 3, (180, 250, 190, 255))
+    p.disc(32, 37, 20, OUTL); p.disc(20, 32, 8, OUTL); p.disc(46, 33, 7, OUTL)       # Outline-Wabbel
+    p.disc(32, 37, 18, (78, 204, 104, 255))
+    p.disc(20, 32, 6.5, (78, 204, 104, 255)); p.disc(46, 33, 5.5, (78, 204, 104, 255))
+    p.disc(40, 44, 7, (40, 150, 70, 255))                        # Schatten
+    p.disc(28, 31, 9, (130, 236, 150, 255)); p.disc(24, 27, 4, (190, 252, 200, 255))  # Glanz
+    for ex in (26, 35):
+        p.disc(ex, 35, 3.2, WHITE); p.disc(ex, 36, 1.6, OL); p.disc(ex - 1, 34, 0.7, WHITE)
+    p.disc(32, 55, 2.4, (78, 204, 104, 255)); p.disc(32, 58, 1.3, (78, 204, 104, 255))  # Tropfen
     return p.finish(glow=True)
 
 
 def b_paramecium():
     p = P()
     lt, md, dk = COL["yellow"][0], COL["yellow"][1], COL["yellow"][2]
-    for i, y in enumerate(range(12, 56, 9)):
+    for y in range(13, 56, 5):                                   # Cilia
+        p.line([(20, y), (11, y - 2)], OUTL, 1.4); p.line([(44, y), (53, y - 2)], OUTL, 1.4)
+    p.rrect(20, 8, 44, 58, 11, OUTL)                             # Koerper-Outline
+    for i, y in enumerate(range(14, 56, 9)):
         col = md if i % 2 == 0 else dk
         p.disc(32, y, 9, col); p.disc(29, y - 2, 3.5, _mix(col, lt, 0.6))
-        p.line([(20, y), (12, y - 2)], OL, 1.6); p.line([(44, y), (52, y - 2)], OL, 1.6)
-    p.disc(32, 12, 9, lt)
+    p.disc(32, 13, 9, lt)
     for ex in (28, 36):
-        p.disc(ex, 9, 2.4, WHITE); p.disc(ex, 10, 1, OL)
+        p.disc(ex, 11, 2.6, WHITE); p.disc(ex, 12, 1.1, OL); p.disc(ex - 0.8, 10, 0.6, WHITE)
     return p.finish()
 
 
