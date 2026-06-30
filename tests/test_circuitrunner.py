@@ -297,6 +297,50 @@ def vals_rec(out, n):
     return int(m.group(1)) if m else None
 
 
+def _make_timed_level():
+    """1-Level-Set mit Zeitlimit 200 (fuer den CC-Zeitbonus)."""
+    GW = 32
+    upper = [0x00] * 1024
+    upper[1 * GW + 1] = 0x6C
+    upper[5 * GW + 5] = 0x15
+    return {"name": "Timed", "ruleset": "ms", "levels": [{
+        "title": "T", "number": 1, "time": 200, "chips": 0, "hint": "",
+        "password": "ABCD", "width": 32, "height": 32,
+        "upper": _hexgrid(upper), "lower": _hexgrid([0x00] * 1024),
+        "traps": "", "cloners": "", "monsters": ""}]}
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_save_timed_bonus(tmp_path):
+    # Getimtes Level: Bestwert = verbliebene Zeit (CC-Zeitbonus), hoeher = besser.
+    harness = (
+        '\njs = JSON_LOAD("synth.json")\n'
+        'nlevels = JSON_LEN(js, "levels")\n'
+        'cur_setkey = set_key("Timed")\n'
+        'cur_level = 0\n'
+        'load_level(0)\n'
+        'start_ms = MILLIS() - 30000\n'        # 30s gebraucht -> 170 uebrig
+        'record_win()\n'
+        'PRINT "BEST1 " + STR$(best_for(0)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+        'start_ms = MILLIS() - 50000\n'        # 50s -> 150 uebrig (schlechter)
+        'record_win()\n'
+        'PRINT "BEST2 " + STR$(best_for(0)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+        'start_ms = MILLIS() - 10000\n'        # 10s -> 190 uebrig (besser)
+        'record_win()\n'
+        'PRINT "BEST3 " + STR$(best_for(0)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+    )
+    out = _run_engine_harness(tmp_path, _make_timed_level(), harness)
+    b1 = int(re.search(r"BEST1\s+(-?\d+)", out).group(1))
+    b2 = int(re.search(r"BEST2\s+(-?\d+)", out).group(1))
+    b3 = int(re.search(r"BEST3\s+(-?\d+)", out).group(1))
+    assert 169 <= b1 <= 171, out               # 200 - 30 = 170 uebrig
+    assert vals_rec(out, 1) == 1, out
+    assert b2 == b1, out                        # 150 uebrig ist schlechter -> ignoriert
+    assert vals_rec(out, 2) == 0, out
+    assert 189 <= b3 <= 191, out                # 190 uebrig ist besser
+    assert vals_rec(out, 3) == 1, out
+
+
 @pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
 def test_monster_moves_at_player_speed(tmp_path):
     # MON_EVERY=1: normale Monster ziehen jeden Tick einen Schritt (CC-Tempo).

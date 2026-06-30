@@ -390,21 +390,40 @@ FUNCTION best_key(idx AS INTEGER) AS STRING
     RETURN cur_setkey + "/" + STR$(idx) + "/best"
 END FUNCTION
 
-' Bestzeit (Sek.) des Levels, oder -1 wenn noch nie geschafft
+' Bestwert des Levels, oder -1 wenn noch nie geschafft.
+' Getimte Level: hoechste verbliebene Zeit (CC-Zeitbonus). Ungetimte: kuerzeste
+' verbrauchte Zeit. Welche Lesart gilt, sagt lvl_time des Levels.
 FUNCTION best_for(idx AS INTEGER) AS INTEGER
     RETURN SAVE_GET_INT_OR(sav, best_key(idx), -1)
 END FUNCTION
 
-' Sieg verbuchen: Bestzeit aktualisieren, Fortschritt sichern, Datei schreiben
+' Bestwert/Sieg-Wert als Text -- getimt = "… übrig", ungetimt = verbrauchte Zeit
+FUNCTION score_label(v AS INTEGER) AS STRING
+    IF lvl_time > 0 THEN RETURN fmt_time(v) + " uebrig"
+    RETURN fmt_time(v)
+END FUNCTION
+
+' Sieg verbuchen: Bestwert aktualisieren, Fortschritt sichern, Datei schreiben
 SUB record_win()
-    win_secs = (MILLIS() - start_ms) \ 1000
+    DIM elapsed AS INTEGER
+    elapsed = (MILLIS() - start_ms) \ 1000
+    IF lvl_time > 0 THEN
+        win_secs = lvl_time - elapsed       ' CC-Zeitbonus: verbliebene Zeit
+        IF win_secs < 0 THEN win_secs = 0
+    ELSE
+        win_secs = elapsed                  ' ungetimt: verbrauchte Zeit
+    END IF
     new_record = FALSE
-    DIM k AS STRING
-    k = best_key(cur_level)
     DIM old AS INTEGER
     old = best_for(cur_level)
-    IF old < 0 OR win_secs < old THEN
-        SAVE_SET_INT(sav, k, win_secs)
+    DIM better AS BOOLEAN
+    IF lvl_time > 0 THEN
+        better = (old < 0 OR win_secs > old)   ' mehr Zeit uebrig = besser
+    ELSE
+        better = (old < 0 OR win_secs < old)   ' weniger verbraucht = besser
+    END IF
+    IF better THEN
+        SAVE_SET_INT(sav, best_key(cur_level), win_secs)
         new_record = TRUE
     END IF
     DIM mk AS STRING
@@ -1625,7 +1644,7 @@ SUB draw_hud()
         by = by - INT(BASEH * sc_sm) - INT(pad * 0.3)
     END IF
     IF lvl_best >= 0 THEN
-        ct(cxp, by, sc_sm, "Best " + fmt_time(lvl_best), RGB(180, 200, 214))
+        ct(cxp, by, sc_sm, "Best " + score_label(lvl_best), RGB(180, 200, 214))
     END IF
 END SUB
 
@@ -1681,7 +1700,7 @@ SUB draw_intro()
     ct(cx, INT(SH * 0.22), sc_med, "Level " + STR$(cur_level + 1), RGB(110, 238, 226))
     ct(cx, INT(SH * 0.34), sc_big, lvl_title, RGB(232, 238, 248))
     IF lvl_best >= 0 THEN
-        ct(cx, INT(SH * 0.43), sc_sm, "Bestzeit  " + fmt_time(lvl_best), RGB(244, 222, 120))
+        ct(cx, INT(SH * 0.43), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(244, 222, 120))
     END IF
     IF LEN(lvl_hint) > 0 THEN
         draw_wrapped(lvl_hint, INT(SW * 0.16), INT(SH * 0.52), INT(SW * 0.84), RGB(184, 196, 216))
@@ -1737,11 +1756,11 @@ SUB draw_overlay(kind AS STRING)
         BOX(x0, y0, x1, y1, RGB(14, 32, 24))
         RECT(x0, y0, x1, y1, RGB(80, 222, 142))
         ct(cx, INT(SH * 0.44), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
-        ct(cx, INT(SH * 0.52), sc_med, "Zeit  " + fmt_time(win_secs), RGB(224, 234, 228))
+        ct(cx, INT(SH * 0.52), sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
         IF new_record THEN
             ct(cx, INT(SH * 0.575), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
         ELSEIF lvl_best >= 0 THEN
-            ct(cx, INT(SH * 0.575), sc_sm, "Bestzeit  " + fmt_time(lvl_best), RGB(180, 200, 214))
+            ct(cx, INT(SH * 0.575), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
         END IF
         ct(cx, INT(SH * 0.61), sc_med, "LEER = weiter", RGB(204, 224, 214))
     ELSE
