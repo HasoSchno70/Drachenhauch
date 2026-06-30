@@ -1657,10 +1657,16 @@ SUB draw_menu()
     NEXT
     DIM mx AS INTEGER
     mx = SAVE_GET_INT_OR(sav, set_key(set_name[sel_set]) + "/max", 0)
+    DIM hint AS STRING
+    hint = "Pfeile waehlen   LEER = Start   P = Passwort   ESC = Ende"
     IF mx > 0 THEN
+        DIM nx AS INTEGER
+        nx = mx + 1
+        IF nx > set_count[sel_set] THEN nx = set_count[sel_set]
         ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(set_count[sel_set]), RGB(150, 200, 240))
+        hint = "LEER = Start   C = Weiter ab Level " + STR$(nx) + "   P = Passwort   ESC = Ende"
     END IF
-    ct(cx, INT(SH * 0.90), sc_sm, "Pfeile waehlen   LEER = Start   P = Passwort   ESC = Ende", RGB(170, 182, 206))
+    ct(cx, INT(SH * 0.90), sc_sm, hint, RGB(170, 182, 206))
 END SUB
 
 SUB draw_intro()
@@ -1858,6 +1864,7 @@ INPUT_BIND("skip", KEY_N)
 INPUT_BIND("back", KEY_ESCAPE)
 INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
+INPUT_BIND("continue", KEY_C)
 
 state = "menu"
 cur_level = 0
@@ -1895,6 +1902,18 @@ WHILE NOT QUITREQUESTED()
             pw_input = ""
             pw_msg = ""
             state = "password"
+        END IF
+        IF INPUT_PRESSED("continue") AND nsets > 0 THEN
+            cur_setkey = set_key(set_name[sel_set])
+            IF SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0) > 0 THEN
+                js = JSON_LOAD(set_path[sel_set])
+                nlevels = JSON_LEN(js, "levels")
+                cur_level = SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0)
+                IF cur_level > nlevels - 1 THEN cur_level = nlevels - 1
+                IF cur_level < 0 THEN cur_level = 0
+                load_level(cur_level)
+                state = "intro"
+            END IF
         END IF
     ELSEIF state = "password" THEN
         update_password()
