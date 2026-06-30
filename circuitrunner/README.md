@@ -29,6 +29,8 @@ wählen, mit LEER/ENTER starten.
 | N | Level überspringen (Entwicklung) |
 | P | Passwort eingeben → Level anspringen (Menü/Intro) |
 | M | Musik an/aus |
+| F1 / F2 | Musik leiser / lauter |
+| F3 / F4 | Effekte leiser / lauter |
 | ESC | zurück / Menü |
 
 **Fortschritt & Bestzeiten** werden in `circuitrunner.save` (neben dem Spiel)
@@ -169,9 +171,10 @@ ein Ending-Track, wenn alle Level geschafft sind. Mit **M** an/aus, Lautstärke
 `MUS_VOL` in der `.gb`. Fehlt der Ordner, läuft das Spiel still weiter.
 Aktualisieren: `python circuitrunner/download_music.py`.
 
-**Lautstärke:** im HUD (rechtes Panel) gibt es während des Spiels zwei
-Maus-Slider „Musik" und „Effekte" — getrennt regelbar über die Audio-Busse
-(`AUDIO_BUS_VOLUME`), live ohne Neustart. Mit **M** lässt sich die Musik ganz
+**Lautstärke:** im HUD (rechtes Panel) gibt es während des Spiels zwei Slider
+„Musik" und „Effekte" — getrennt regelbar über die Audio-Busse
+(`AUDIO_BUS_VOLUME`), live ohne Neustart, per **Maus** oder Tastatur (**F1/F2**
+Musik, **F3/F4** Effekte, je ±10 %). Mit **M** lässt sich die Musik ganz
 stummschalten.
 
 ## Lizenz / Hinweis

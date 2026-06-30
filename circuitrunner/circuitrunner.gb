@@ -819,6 +819,22 @@ SUB set_music(track AS STRING)
     cur_music = track
 END SUB
 
+' Lautstaerke per Tastatur aendern (F1/F2 Musik, F3/F4 Effekte)
+SUB adjust_music(d AS FLOAT)
+    music_vol = music_vol + d
+    IF music_vol < 0.0 THEN music_vol = 0.0
+    IF music_vol > 1.0 THEN music_vol = 1.0
+    AUDIO_BUS_VOLUME("music", music_vol)
+END SUB
+
+SUB adjust_sfx(d AS FLOAT)
+    sfx_vol = sfx_vol + d
+    IF sfx_vol < 0.0 THEN sfx_vol = 0.0
+    IF sfx_vol > 1.0 THEN sfx_vol = 1.0
+    AUDIO_BUS_VOLUME("sfx", sfx_vol)
+    sfx_chip()                ' kurzes Feedback auf dem neuen Effekt-Pegel
+END SUB
+
 ' Lautstaerke-Slider per Maus bedienen (nur wenn das HUD sichtbar ist)
 SUB update_volume()
     IF NOT MOUSEBUTTON(0) THEN RETURN
@@ -1839,11 +1855,12 @@ SUB draw_hud()
         ct(cxp, hb(0.700), sc_sm, "noch keine Bestzeit", RGB(108, 122, 148))
     END IF
 
-    ' --- Audio-Panel (Lautstaerke-Slider, per Maus) ---
-    hud_panel(ix0, hb(0.734), ix1, hb(0.892))
-    hud_label(cxp, hb(0.753), "LAUTSTAERKE")
+    ' --- Audio-Panel (Lautstaerke-Slider: Maus oder F1-F4) ---
+    hud_panel(ix0, hb(0.728), ix1, hb(0.900))
+    hud_label(cxp, hb(0.747), "LAUTSTAERKE")
     draw_slider(sl_my, "Musik", music_vol)
     draw_slider(sl_sy, "Effekte", sfx_vol)
+    ct(cxp, hb(0.886), sc_sm * 0.70, "Maus  -  F1/F2 Musik  -  F3/F4 Effekte", RGB(98, 112, 140))
 
     ' --- Footer (Steuerung) ---
     ct(cxp, hb(0.928), sc_sm * 0.78, "Pfeile / WASD bewegen", RGB(122, 136, 162))
@@ -2155,6 +2172,10 @@ INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
 INPUT_BIND("continue", KEY_C)
 INPUT_BIND("mute", KEY_M)
+INPUT_BIND("mus_down", KEY_F1)
+INPUT_BIND("mus_up", KEY_F2)
+INPUT_BIND("sfx_down", KEY_F3)
+INPUT_BIND("sfx_up", KEY_F4)
 
 state = "menu"
 cur_level = 0
@@ -2175,6 +2196,10 @@ WHILE NOT QUITREQUESTED()
 
     ' Hintergrundmusik: Titel im Menue, rotierende Level-Loops im Spiel, Ending am Ziel
     IF INPUT_PRESSED("mute") THEN toggle_music()
+    IF INPUT_PRESSED("mus_down") THEN adjust_music(-0.1)
+    IF INPUT_PRESSED("mus_up") THEN adjust_music(0.1)
+    IF INPUT_PRESSED("sfx_down") THEN adjust_sfx(-0.1)
+    IF INPUT_PRESSED("sfx_up") THEN adjust_sfx(0.1)
     IF state = "done" THEN
         set_music(MUS_ENDING)
     ELSEIF state = "intro" OR state = "play" OR state = "win" OR state = "dead" THEN
