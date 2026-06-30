@@ -28,6 +28,7 @@ wählen, mit LEER/ENTER starten.
 | R | Level neu starten |
 | N | Level überspringen (Entwicklung) |
 | P | Passwort eingeben → Level anspringen (Menü/Intro) |
+| M | Musik an/aus |
 | ESC | zurück / Menü |
 
 **Fortschritt & Bestzeiten** werden in `circuitrunner.save` (neben dem Spiel)
@@ -152,18 +153,25 @@ gbrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
 - Bestzeit: getimte Level werten die übrige Zeit (CC-Zeitbonus), ungetimte die kürzeste verbrauchte Zeit.
 - Monster-Bewegungsreihenfolge innerhalb eines Ticks folgt der `monsters`-Liste; ungelistete Monster werden in Lese-Reihenfolge ergänzt (bei extrem timing-präzisen Puzzles möglich, dass Sonderfälle minimal abweichen).
 
-## Soundeffekte
+## Sound & Musik
 
-Die Soundeffekte stammen aus **Kenney „Interface Sounds"**
+**Soundeffekte:** Kenney „Interface Sounds"
 ([kenney.nl](https://kenney.nl/assets/interface-sounds)), Lizenz **CC0 1.0**
 (Public Domain, keine Attribution nötig) — als WAV in `assets/sfx/` eingecheckt.
-Neu beziehen / aktualisieren: `python circuitrunner/download_sfx.py` (lädt vom
-CC0-Spiegel via jsDelivr). Fehlt der Ordner, fallen die Effekte automatisch auf
-prozedurale Synth-Töne zurück.
+Fehlt der Ordner, fallen die Effekte auf prozedurale Synth-Töne zurück.
+Aktualisieren: `python circuitrunner/download_sfx.py`.
+
+**Hintergrundmusik:** nahtlos loopende CC0-Chiptunes von **Juhani Junkala**
+([archive.org](https://archive.org/details/JuhaniJunkalafiveactionchiptunes),
+CC0 1.0) — ruhiger Titel-Loop in den Menüs, treibender Loop im Spiel, als OGG in
+`assets/music/`. Mit **M** an/aus, Lautstärke `MUS_VOL` in der `.gb`. Fehlt der
+Ordner, läuft das Spiel still weiter. Aktualisieren:
+`python circuitrunner/download_music.py`.
 
 ## Lizenz / Hinweis
 
 Grafik und Code sind eigenständig. „Chip's Challenge" ist eine eingetragene
 Marke der jeweiligen Rechteinhaber; dieses Projekt ist ein unabhängiger Klon
 und nicht damit verbunden. Heruntergeladene Levelsets gehören ihren Autoren.
-Soundeffekte: Kenney (CC0), siehe `assets/sfx/CREDITS.txt`.
+Soundeffekte: Kenney (CC0), siehe `assets/sfx/CREDITS.txt`. Musik: Juhani
+Junkala (CC0), siehe `assets/music/CREDITS.txt`.

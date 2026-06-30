@@ -195,6 +195,14 @@ DIM snd_win AS SOUND
 DIM snd_blocked AS SOUND
 DIM snd_ok AS BOOLEAN          ' TRUE wenn die WAVs geladen werden konnten
 
+' Hintergrundmusik (Juhani Junkala, CC0 -- siehe assets/music/CREDITS.txt)
+CONST MUS_TITLE = "assets/music/title.ogg"
+CONST MUS_LEVEL = "assets/music/level.ogg"
+CONST MUS_VOL = 0.5
+DIM music_ok AS BOOLEAN        ' TRUE wenn die OGGs vorhanden sind
+DIM music_on AS BOOLEAN        ' Musik an/aus (Taste M)
+DIM cur_music AS STRING        ' aktuell laufender Track
+
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
 DIM SH AS INTEGER
@@ -781,6 +789,25 @@ SUB sfx_blocked()
         PLAYSOUND(snd_blocked, 0, 0.45)
     ELSE
         AUDIO_PLAY(AUDIO_TONE(90.0, 40, "square", 0.1))
+    END IF
+END SUB
+
+' Gewuenschten Track abspielen -- wechselt nur, wenn er sich aendert
+SUB set_music(track AS STRING)
+    IF NOT music_ok OR NOT music_on THEN RETURN
+    IF track = cur_music THEN RETURN
+    PLAYMUSIC(track, 0, MUS_VOL)
+    cur_music = track
+END SUB
+
+' Musik an/aus schalten (Taste M)
+SUB toggle_music()
+    music_on = NOT music_on
+    IF music_on THEN
+        cur_music = ""          ' erzwingt Neustart des passenden Tracks
+    ELSE
+        STOPMUSIC()
+        cur_music = ""
     END IF
 END SUB
 
@@ -1763,6 +1790,10 @@ SUB draw_menu()
         hint = "LEER = Start   C = Weiter ab Level " + STR$(nx) + "   P = Passwort   ESC = Ende"
     END IF
     ct(cx, INT(SH * 0.90), sc_sm, hint, RGB(170, 182, 206))
+    DIM mhint AS STRING
+    mhint = "M = Musik an"
+    IF music_on THEN mhint = "M = Musik aus"
+    ct(cx, INT(SH * 0.95), sc_sm, mhint, RGB(120, 134, 160))
 END SUB
 
 SUB draw_intro()
@@ -1947,6 +1978,11 @@ CATCH e
     snd_ok = FALSE
 END TRY
 
+' Hintergrundmusik vorhanden? (streamt via PLAYMUSIC, kein Preload)
+music_ok = FILEEXISTS(MUS_LEVEL) AND FILEEXISTS(MUS_TITLE)
+music_on = TRUE
+cur_music = ""
+
 ' Font (eine TTF; Skalierung via TEXTROT, da LOADFONT-Groesse fix)
 gfont = LOADFONT("assets/font.ttf", 64)
 SETFONT(gfont)
@@ -1979,6 +2015,7 @@ INPUT_BIND("back", KEY_ESCAPE)
 INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
 INPUT_BIND("continue", KEY_C)
+INPUT_BIND("mute", KEY_M)
 
 state = "menu"
 cur_level = 0
@@ -1996,6 +2033,14 @@ WHILE NOT QUITREQUESTED()
     anim_ms = anim_ms + DELTA() * 1000.0
     IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
     anim_frame = INT(anim_ms / 130.0) MOD 4
+
+    ' Hintergrundmusik: ruhiger Titel-Loop in Menues, treibender Loop im Spiel
+    IF INPUT_PRESSED("mute") THEN toggle_music()
+    IF state = "play" OR state = "win" OR state = "dead" THEN
+        set_music(MUS_LEVEL)
+    ELSE
+        set_music(MUS_TITLE)
+    END IF
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK

@@ -1,0 +1,7 @@
+Hintergrundmusik: Juhani Junkala -- '5 action chiptunes' / Retro Game Music Pack
+Lizenz: CC0 1.0 (Public Domain). Keine Attribution noetig.
+Quelle: https://archive.org/details/JuhaniJunkalafiveactionchiptunes
+Autor:  https://juhanijunkala.com
+
+title.ogg  <-  Juhani Junkala [Retro Game Music Pack] Title Screen.ogg
+level.ogg  <-  Juhani Junkala [Retro Game Music Pack] Level 1.ogg
