@@ -342,6 +342,35 @@ def test_save_timed_bonus(tmp_path):
 
 
 @pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_hint_tile_under_player(tmp_path):
+    # Spieler-Start auf einem Hinweis-Stein (lower=0x2F) -> tat(px,py)=T_HINT,
+    # damit der Hinweis-Banner waehrend des Spielens erscheint.
+    GW = 32
+    upper = [0x00] * 1024
+    upper[1 * GW + 1] = 0x6C
+    upper[5 * GW + 5] = 0x15
+    lower = [0x00] * 1024
+    lower[1 * GW + 1] = 0x2F                      # Hinweis-Stein unter dem Spieler
+    level = {"name": "Hint", "ruleset": "ms", "levels": [{
+        "title": "H", "number": 1, "time": 0, "chips": 0,
+        "hint": "Pass auf das Wasser auf!", "password": "ABCD",
+        "width": 32, "height": 32,
+        "upper": _hexgrid(upper), "lower": _hexgrid(lower),
+        "traps": "", "cloners": "", "monsters": ""}]}
+    harness = (
+        '\njs = JSON_LOAD("synth.json")\n'
+        'nlevels = JSON_LEN(js, "levels")\n'
+        'cur_setkey = set_key("Hint")\n'
+        'load_level(0)\n'
+        'PRINT "TAT " + STR$(tat(px, py))\n'
+        'PRINT "HINTLEN " + STR$(LEN(lvl_hint))\n'
+    )
+    out = _run_engine_harness(tmp_path, level, harness)
+    assert int(re.search(r"TAT\s+(\d+)", out).group(1)) == 0x2F, out
+    assert int(re.search(r"HINTLEN\s+(\d+)", out).group(1)) > 0, out
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
 def test_monster_moves_at_player_speed(tmp_path):
     # MON_EVERY=1: normale Monster ziehen jeden Tick einen Schritt (CC-Tempo).
     harness = (

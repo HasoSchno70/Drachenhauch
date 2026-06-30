@@ -1663,6 +1663,23 @@ SUB draw_hud()
     END IF
 END SUB
 
+' Hinweis-Banner, wenn der Spieler auf einem Fragezeichen-Stein steht
+SUB draw_hint()
+    IF LEN(lvl_hint) = 0 THEN RETURN
+    DIM bx0 AS INTEGER
+    DIM bx1 AS INTEGER
+    DIM by0 AS INTEGER
+    DIM by1 AS INTEGER
+    bx0 = board_x
+    bx1 = board_x + bsize
+    by1 = board_y + bsize
+    by0 = by1 - INT(SH * 0.20)
+    BOX(bx0, by0, bx1, by1, RGB(16, 22, 32))
+    RECT(bx0, by0, bx1, by1, RGB(80, 200, 220))
+    ct((bx0 + bx1) \ 2, by0 + INT(SH * 0.035), sc_sm, "HINWEIS", RGB(110, 238, 226))
+    draw_wrapped(lvl_hint, bx0 + INT(SW * 0.02), by0 + INT(SH * 0.08), bx1 - INT(SW * 0.02), RGB(206, 220, 236))
+END SUB
+
 SUB draw_menu()
     DIM cx AS INTEGER
     cx = SW \ 2
@@ -2032,6 +2049,7 @@ WHILE NOT QUITREQUESTED()
     ELSE
         RENDERTARGET_DRAW(rtb, board_x, board_y, bscale)
         draw_hud()
+        IF state = "play" AND tat(px, py) = T_HINT THEN draw_hint()
         IF state = "win" THEN draw_overlay("win")
         IF state = "dead" THEN draw_overlay("dead")
     END IF
