@@ -1,0 +1,11 @@
+Soundeffekte: Kenney 'Interface Sounds' -- https://kenney.nl/assets/interface-sounds
+Lizenz: CC0 1.0 (Public Domain). Keine Attribution noetig.
+Spiegel: https://github.com/Calinou/kenney-interface-sounds
+
+step.wav  <-  tick_001.wav
+chip.wav  <-  confirmation_001.wav
+door.wav  <-  toggle_001.wav
+block.wav  <-  drop_001.wav
+die.wav  <-  glitch_002.wav
+win.wav  <-  maximize_009.wav
+blocked.wav  <-  back_002.wav

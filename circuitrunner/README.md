@@ -149,11 +149,21 @@ gbrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
 
 ## Grenzen / Ideen
 
-- Bestzeit = verstrichene Echtzeit-Sekunden (nicht der CC-Zeitbonus „Zeit übrig").
+- Bestzeit: getimte Level werten die übrige Zeit (CC-Zeitbonus), ungetimte die kürzeste verbrauchte Zeit.
 - Monster-Bewegungsreihenfolge innerhalb eines Ticks folgt der `monsters`-Liste; ungelistete Monster werden in Lese-Reihenfolge ergänzt (bei extrem timing-präzisen Puzzles möglich, dass Sonderfälle minimal abweichen).
+
+## Soundeffekte
+
+Die Soundeffekte stammen aus **Kenney „Interface Sounds"**
+([kenney.nl](https://kenney.nl/assets/interface-sounds)), Lizenz **CC0 1.0**
+(Public Domain, keine Attribution nötig) — als WAV in `assets/sfx/` eingecheckt.
+Neu beziehen / aktualisieren: `python circuitrunner/download_sfx.py` (lädt vom
+CC0-Spiegel via jsDelivr). Fehlt der Ordner, fallen die Effekte automatisch auf
+prozedurale Synth-Töne zurück.
 
 ## Lizenz / Hinweis
 
 Grafik und Code sind eigenständig. „Chip's Challenge" ist eine eingetragene
 Marke der jeweiligen Rechteinhaber; dieses Projekt ist ein unabhängiger Klon
 und nicht damit verbunden. Heruntergeladene Levelsets gehören ihren Autoren.
+Soundeffekte: Kenney (CC0), siehe `assets/sfx/CREDITS.txt`.

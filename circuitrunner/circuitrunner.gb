@@ -185,6 +185,16 @@ DIM js AS JSON_HANDLE
 DIM tiles AS IMAGE
 DIM rtb AS INTEGER             ' Board-Render-Target (288x288, scharf hochskaliert)
 
+' Soundeffekte (Kenney Interface Sounds, CC0 -- siehe assets/sfx/CREDITS.txt)
+DIM snd_step AS SOUND
+DIM snd_chip AS SOUND
+DIM snd_door AS SOUND
+DIM snd_block AS SOUND
+DIM snd_die AS SOUND
+DIM snd_win AS SOUND
+DIM snd_blocked AS SOUND
+DIM snd_ok AS BOOLEAN          ' TRUE wenn die WAVs geladen werden konnten
+
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
 DIM SH AS INTEGER
@@ -722,27 +732,56 @@ END SUB
 ' ----------------------------------------------------------------------
 '  AUDIO
 ' ----------------------------------------------------------------------
+' Kenney-WAVs mit angepasster Lautstaerke; ohne sie Synth-Toene als Fallback.
 SUB sfx_step()
-    AUDIO_PLAY(AUDIO_TONE(220.0, 25, "sine", 0.05))
+    IF snd_ok THEN
+        PLAYSOUND(snd_step, 0, 0.30)        ' leise -- spielt bei jedem Zug
+    ELSE
+        AUDIO_PLAY(AUDIO_TONE(220.0, 25, "sine", 0.05))
+    END IF
 END SUB
 SUB sfx_chip()
-    AUDIO_PLAY(AUDIO_TONE(880.0, 70, "sine", 0.18))
+    IF snd_ok THEN
+        PLAYSOUND(snd_chip, 0, 0.7)
+    ELSE
+        AUDIO_PLAY(AUDIO_TONE(880.0, 70, "sine", 0.18))
+    END IF
 END SUB
 SUB sfx_door()
-    AUDIO_PLAY(AUDIO_SFX("square", 320.0, 460.0, 2, 60, 120, 0.0, 0.0, 0.2))
+    IF snd_ok THEN
+        PLAYSOUND(snd_door, 0, 0.6)
+    ELSE
+        AUDIO_PLAY(AUDIO_SFX("square", 320.0, 460.0, 2, 60, 120, 0.0, 0.0, 0.2))
+    END IF
 END SUB
 SUB sfx_block()
-    AUDIO_PLAY(AUDIO_TONE(120.0, 50, "square", 0.12))
+    IF snd_ok THEN
+        PLAYSOUND(snd_block, 0, 0.6)
+    ELSE
+        AUDIO_PLAY(AUDIO_TONE(120.0, 50, "square", 0.12))
+    END IF
 END SUB
 SUB sfx_die()
-    AUDIO_PLAY(AUDIO_SFX("noise", 220.0, -200.0, 3, 120, 260, 0.0, 0.0, 0.3))
+    IF snd_ok THEN
+        PLAYSOUND(snd_die, 0, 0.85)
+    ELSE
+        AUDIO_PLAY(AUDIO_SFX("noise", 220.0, -200.0, 3, 120, 260, 0.0, 0.0, 0.3))
+    END IF
 END SUB
 SUB sfx_win()
-    AUDIO_PLAY(AUDIO_SFX("square", 440.0, 660.0, 4, 160, 240, 4.0, 4.0, 0.28))
-    AUDIO_PLAY(AUDIO_TONE(990.0, 240, "sine", 0.2))
+    IF snd_ok THEN
+        PLAYSOUND(snd_win, 0, 0.85)
+    ELSE
+        AUDIO_PLAY(AUDIO_SFX("square", 440.0, 660.0, 4, 160, 240, 4.0, 4.0, 0.28))
+        AUDIO_PLAY(AUDIO_TONE(990.0, 240, "sine", 0.2))
+    END IF
 END SUB
 SUB sfx_blocked()
-    AUDIO_PLAY(AUDIO_TONE(90.0, 40, "square", 0.1))
+    IF snd_ok THEN
+        PLAYSOUND(snd_blocked, 0, 0.45)
+    ELSE
+        AUDIO_PLAY(AUDIO_TONE(90.0, 40, "square", 0.1))
+    END IF
 END SUB
 
 ' ----------------------------------------------------------------------
@@ -1892,6 +1931,21 @@ dyv[3] = 0
 
 rtb = RENDERTARGET_NEW(BLOG, BLOG)
 tiles = LOADIMAGE("assets/tiles.png")
+
+' Soundeffekte laden (fehlt der Ordner, faellt sfx_* auf Synth-Toene zurueck)
+snd_ok = FALSE
+TRY
+    snd_step = LOADSOUND("assets/sfx/step.wav")
+    snd_chip = LOADSOUND("assets/sfx/chip.wav")
+    snd_door = LOADSOUND("assets/sfx/door.wav")
+    snd_block = LOADSOUND("assets/sfx/block.wav")
+    snd_die = LOADSOUND("assets/sfx/die.wav")
+    snd_win = LOADSOUND("assets/sfx/win.wav")
+    snd_blocked = LOADSOUND("assets/sfx/blocked.wav")
+    snd_ok = TRUE
+CATCH e
+    snd_ok = FALSE
+END TRY
 
 ' Font (eine TTF; Skalierung via TEXTROT, da LOADFONT-Groesse fix)
 gfont = LOADFONT("assets/font.ttf", 64)
