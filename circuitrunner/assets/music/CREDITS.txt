@@ -4,4 +4,7 @@ Quelle: https://archive.org/details/JuhaniJunkalafiveactionchiptunes
 Autor:  https://juhanijunkala.com
 
 title.ogg  <-  Juhani Junkala [Retro Game Music Pack] Title Screen.ogg
-level.ogg  <-  Juhani Junkala [Retro Game Music Pack] Level 1.ogg
+level1.ogg  <-  Juhani Junkala [Retro Game Music Pack] Level 1.ogg
+level2.ogg  <-  Juhani Junkala [Retro Game Music Pack] Level 2.ogg
+level3.ogg  <-  Juhani Junkala [Retro Game Music Pack] Level 3.ogg
+ending.ogg  <-  Juhani Junkala [Retro Game Music Pack] Ending.ogg

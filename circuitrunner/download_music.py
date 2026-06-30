@@ -19,10 +19,13 @@ from pathlib import Path
 ITEM = "JuhaniJunkalafiveactionchiptunes"
 BASE = f"https://archive.org/download/{ITEM}/"
 
-# Ziel-Name -> Quelldatei (CC0)
+# Ziel-Name -> Quelldatei (CC0). Die Engine rotiert level1..3 pro Level.
 TRACKS = {
-    "title": "Juhani Junkala [Retro Game Music Pack] Title Screen.ogg",  # Menue
-    "level": "Juhani Junkala [Retro Game Music Pack] Level 1.ogg",       # Spiel
+    "title":  "Juhani Junkala [Retro Game Music Pack] Title Screen.ogg",  # Menue
+    "level1": "Juhani Junkala [Retro Game Music Pack] Level 1.ogg",       # Spiel
+    "level2": "Juhani Junkala [Retro Game Music Pack] Level 2.ogg",       # Spiel
+    "level3": "Juhani Junkala [Retro Game Music Pack] Level 3.ogg",       # Spiel
+    "ending": "Juhani Junkala [Retro Game Music Pack] Ending.ogg",        # alle Level geschafft
 }
 
 OUT = Path(__file__).resolve().parent / "assets" / "music"

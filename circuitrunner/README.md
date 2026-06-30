@@ -163,10 +163,11 @@ Aktualisieren: `python circuitrunner/download_sfx.py`.
 
 **Hintergrundmusik:** nahtlos loopende CC0-Chiptunes von **Juhani Junkala**
 ([archive.org](https://archive.org/details/JuhaniJunkalafiveactionchiptunes),
-CC0 1.0) — ruhiger Titel-Loop in den Menüs, treibender Loop im Spiel, als OGG in
-`assets/music/`. Mit **M** an/aus, Lautstärke `MUS_VOL` in der `.gb`. Fehlt der
-Ordner, läuft das Spiel still weiter. Aktualisieren:
-`python circuitrunner/download_music.py`.
+CC0 1.0) als OGG in `assets/music/`: Titel-Loop in den Menüs, drei Level-Loops
+die **pro Level rotieren** (`level1..3`, `cur_level MOD 3`) für Abwechslung, und
+ein Ending-Track, wenn alle Level geschafft sind. Mit **M** an/aus, Lautstärke
+`MUS_VOL` in der `.gb`. Fehlt der Ordner, läuft das Spiel still weiter.
+Aktualisieren: `python circuitrunner/download_music.py`.
 
 ## Lizenz / Hinweis
 

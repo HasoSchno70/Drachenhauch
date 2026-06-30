@@ -197,8 +197,9 @@ DIM snd_blocked AS SOUND
 DIM snd_ok AS BOOLEAN          ' TRUE wenn die WAVs geladen werden konnten
 
 ' Hintergrundmusik (Juhani Junkala, CC0 -- siehe assets/music/CREDITS.txt)
+' Menue = title, Spiel = level1..3 (rotieren pro Level), alle geschafft = ending
 CONST MUS_TITLE = "assets/music/title.ogg"
-CONST MUS_LEVEL = "assets/music/level.ogg"
+CONST MUS_ENDING = "assets/music/ending.ogg"
 CONST MUS_VOL = 0.5
 DIM music_ok AS BOOLEAN        ' TRUE wenn die OGGs vorhanden sind
 DIM music_on AS BOOLEAN        ' Musik an/aus (Taste M)
@@ -793,6 +794,11 @@ SUB sfx_blocked()
         AUDIO_PLAY(AUDIO_TONE(90.0, 40, "square", 0.1))
     END IF
 END SUB
+
+' Spiel-Track fuer das aktuelle Level (level1..3 rotierend)
+FUNCTION music_for_level() AS STRING
+    RETURN "assets/music/level" + STR$((cur_level MOD 3) + 1) + ".ogg"
+END FUNCTION
 
 ' Gewuenschten Track abspielen -- wechselt nur, wenn er sich aendert
 SUB set_music(track AS STRING)
@@ -2045,7 +2051,7 @@ CATCH e
 END TRY
 
 ' Hintergrundmusik vorhanden? (streamt via PLAYMUSIC, kein Preload)
-music_ok = FILEEXISTS(MUS_LEVEL) AND FILEEXISTS(MUS_TITLE)
+music_ok = FILEEXISTS(MUS_TITLE) AND FILEEXISTS("assets/music/level1.ogg")
 music_on = TRUE
 cur_music = ""
 
@@ -2100,10 +2106,12 @@ WHILE NOT QUITREQUESTED()
     IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
     anim_frame = INT(anim_ms / 130.0) MOD 4
 
-    ' Hintergrundmusik: ruhiger Titel-Loop in Menues, treibender Loop im Spiel
+    ' Hintergrundmusik: Titel im Menue, rotierende Level-Loops im Spiel, Ending am Ziel
     IF INPUT_PRESSED("mute") THEN toggle_music()
-    IF state = "play" OR state = "win" OR state = "dead" THEN
-        set_music(MUS_LEVEL)
+    IF state = "done" THEN
+        set_music(MUS_ENDING)
+    ELSEIF state = "intro" OR state = "play" OR state = "win" OR state = "dead" THEN
+        set_music(music_for_level())
     ELSE
         set_music(MUS_TITLE)
     END IF
