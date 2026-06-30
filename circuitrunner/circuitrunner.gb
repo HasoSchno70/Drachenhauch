@@ -200,10 +200,20 @@ DIM snd_ok AS BOOLEAN          ' TRUE wenn die WAVs geladen werden konnten
 ' Menue = title, Spiel = level1..3 (rotieren pro Level), alle geschafft = ending
 CONST MUS_TITLE = "assets/music/title.ogg"
 CONST MUS_ENDING = "assets/music/ending.ogg"
-CONST MUS_VOL = 0.5
 DIM music_ok AS BOOLEAN        ' TRUE wenn die OGGs vorhanden sind
 DIM music_on AS BOOLEAN        ' Musik an/aus (Taste M)
 DIM cur_music AS STRING        ' aktuell laufender Track
+' Lautstaerken (Bus-Pegel 0..1, per HUD-Slider einstellbar)
+DIM music_vol AS FLOAT
+DIM sfx_vol AS FLOAT
+' Slider-Geometrie im HUD (in init berechnet, von draw + Maus genutzt)
+DIM sl_x0 AS INTEGER
+DIM sl_x1 AS INTEGER
+DIM sl_lblx AS INTEGER
+DIM sl_pctx AS INTEGER
+DIM sl_my AS INTEGER           ' Musik-Slider Mittel-Y
+DIM sl_sy AS INTEGER           ' Effekte-Slider Mittel-Y
+DIM sl_h AS INTEGER            ' Slider-Hoehe / Hit-Toleranz
 
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
@@ -800,12 +810,34 @@ FUNCTION music_for_level() AS STRING
     RETURN "assets/music/level" + STR$((cur_level MOD 3) + 1) + ".ogg"
 END FUNCTION
 
-' Gewuenschten Track abspielen -- wechselt nur, wenn er sich aendert
+' Gewuenschten Track abspielen -- wechselt nur, wenn er sich aendert.
+' Basis-Lautstaerke 1.0; der eigentliche Pegel kommt vom Musik-Bus (Slider).
 SUB set_music(track AS STRING)
     IF NOT music_ok OR NOT music_on THEN RETURN
     IF track = cur_music THEN RETURN
-    PLAYMUSIC(track, 0, MUS_VOL)
+    PLAYMUSIC(track, 0, 1.0)
     cur_music = track
+END SUB
+
+' Lautstaerke-Slider per Maus bedienen (nur wenn das HUD sichtbar ist)
+SUB update_volume()
+    IF NOT MOUSEBUTTON(0) THEN RETURN
+    DIM mx AS INTEGER
+    DIM my AS INTEGER
+    mx = MOUSEX()
+    my = MOUSEY()
+    IF mx < sl_x0 - sl_h OR mx > sl_x1 + sl_h THEN RETURN
+    DIM v AS FLOAT
+    v = (mx - sl_x0) * 1.0 / (sl_x1 - sl_x0)
+    IF v < 0.0 THEN v = 0.0
+    IF v > 1.0 THEN v = 1.0
+    IF ABS(my - sl_my) <= sl_h THEN
+        music_vol = v
+        AUDIO_BUS_VOLUME("music", music_vol)
+    ELSEIF ABS(my - sl_sy) <= sl_h THEN
+        sfx_vol = v
+        AUDIO_BUS_VOLUME("sfx", sfx_vol)
+    END IF
 END SUB
 
 ' Musik an/aus schalten (Taste M)
@@ -1709,6 +1741,17 @@ SUB hud_slot(cx AS INTEGER, y AS INTEGER, code AS INTEGER, have AS BOOLEAN)
     END IF
 END SUB
 
+' Lautstaerke-Slider: Label + Schiene + Fuellung + Knopf + Prozent
+SUB draw_slider(y AS INTEGER, label AS STRING, vol AS FLOAT)
+    ct(sl_lblx, y, sc_sm * 0.82, label, RGB(178, 192, 214))
+    BOXROUND(sl_x0, y - sl_h, sl_x1, y + sl_h, 4, RGB(22, 32, 48))
+    IF vol > 0.01 THEN BOXROUND(sl_x0, y - sl_h, sl_x0 + INT((sl_x1 - sl_x0) * vol), y + sl_h, 4, RGB(86, 210, 198))
+    DIM hx AS INTEGER
+    hx = sl_x0 + INT((sl_x1 - sl_x0) * vol)
+    BOXROUND(hx - sl_h \ 2, y - sl_h - 2, hx + sl_h \ 2, y + sl_h + 2, 3, RGB(190, 244, 238))
+    ct(sl_pctx, y, sc_sm * 0.76, STR$(INT(vol * 100 + 0.5)) + "%", RGB(160, 178, 206))
+END SUB
+
 SUB draw_hud()
     DIM pad AS INTEGER
     pad = INT(SH * 0.018)
@@ -1730,31 +1773,31 @@ SUB draw_hud()
     RECTROUND(x0, board_y, x1, board_y + bsize, 12, RGB(58, 112, 132))
 
     ' --- Header ---
-    GRADIENTV(ix0, hb(0.014), ix1, hb(0.078), RGB(16, 60, 66), RGB(13, 28, 40))
-    RECTROUND(ix0, hb(0.014), ix1, hb(0.078), 8, RGB(64, 158, 154))
-    ct(cxp, hb(0.047), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
+    GRADIENTV(ix0, hb(0.012), ix1, hb(0.068), RGB(16, 60, 66), RGB(13, 28, 40))
+    RECTROUND(ix0, hb(0.012), ix1, hb(0.068), 8, RGB(64, 158, 154))
+    ct(cxp, hb(0.040), sc_med, "CIRCUIT RUNNER", RGB(122, 246, 234))
 
     ' --- Level + Fortschrittsbalken ---
-    ct(cxp, hb(0.107), sc_sm, "LEVEL " + STR$(cur_level + 1) + " / " + STR$(nlevels), RGB(216, 224, 238))
+    ct(cxp, hb(0.090), sc_sm, "LEVEL " + STR$(cur_level + 1) + " / " + STR$(nlevels), RGB(216, 224, 238))
     DIM pb0 AS INTEGER
     DIM pbh AS INTEGER
-    pb0 = hb(0.138)
-    pbh = INT(SH * 0.013)
+    pb0 = hb(0.114)
+    pbh = INT(SH * 0.012)
     BOXROUND(ix0, pb0, ix1, pb0 + pbh, 4, RGB(24, 34, 50))
     DIM frac AS FLOAT
     frac = 0.0
     IF nlevels > 0 THEN frac = (cur_level + 1) * 1.0 / nlevels
     IF frac > 1.0 THEN frac = 1.0
     IF frac > 0.02 THEN BOXROUND(ix0, pb0, ix0 + INT((ix1 - ix0) * frac), pb0 + pbh, 4, RGB(92, 222, 162))
-    ct(cxp, hb(0.178), sc_sm, lvl_title, RGB(150, 200, 240))
+    ct(cxp, hb(0.150), sc_sm, lvl_title, RGB(150, 200, 240))
 
     ' --- Chips-Panel ---
-    hud_panel(ix0, hb(0.21), ix1, hb(0.33))
-    hud_label(cxp, hb(0.233), "DATEN-CHIPS")
-    draw_icon(T_CHIP, ix0 + pad, hb(0.256))
-    ct(ix0 + pad + ic_sz + INT(ic_sz * 1.2), hb(0.256) + ic_sz \ 2, sc_med, "x " + STR$(chips_left), RGB(122, 246, 152))
+    hud_panel(ix0, hb(0.172), ix1, hb(0.282))
+    hud_label(cxp, hb(0.192), "DATEN-CHIPS")
+    draw_icon(T_CHIP, ix0 + pad, hb(0.210))
+    ct(ix0 + pad + ic_sz + INT(ic_sz * 1.2), hb(0.210) + ic_sz \ 2, sc_med, "x " + STR$(chips_left), RGB(122, 246, 152))
     DIM cb0 AS INTEGER
-    cb0 = hb(0.307)
+    cb0 = hb(0.262)
     BOXROUND(ix0 + pad, cb0, ix1 - pad, cb0 + INT(SH * 0.010), 3, RGB(22, 32, 46))
     IF chips_total > 0 THEN
         DIM got AS FLOAT
@@ -1763,42 +1806,48 @@ SUB draw_hud()
     END IF
 
     ' --- Schluessel-Panel ---
-    hud_panel(ix0, hb(0.35), ix1, hb(0.50))
-    hud_label(cxp, hb(0.372), "SCHLUESSEL")
+    hud_panel(ix0, hb(0.298), ix1, hb(0.428))
+    hud_label(cxp, hb(0.317), "SCHLUESSEL")
     DIM ky AS INTEGER
-    ky = hb(0.40)
+    ky = hb(0.342)
     hud_keycell(ix0 + kw \ 2, ky, T_KEY_BLUE, keys_blue)
     hud_keycell(ix0 + kw \ 2 + kw, ky, T_KEY_RED, keys_red)
     hud_keycell(ix0 + kw \ 2 + kw * 2, ky, T_KEY_GREEN, keys_green)
     hud_keycell(ix0 + kw \ 2 + kw * 3, ky, T_KEY_YELLOW, keys_yellow)
 
     ' --- Ausruestung-Panel ---
-    hud_panel(ix0, hb(0.52), ix1, hb(0.67))
-    hud_label(cxp, hb(0.542), "AUSRUESTUNG")
+    hud_panel(ix0, hb(0.444), ix1, hb(0.574))
+    hud_label(cxp, hb(0.463), "AUSRUESTUNG")
     DIM sy AS INTEGER
-    sy = hb(0.575)
+    sy = hb(0.490)
     hud_slot(ix0 + kw \ 2, sy, T_FLIPPERS, has_flippers)
     hud_slot(ix0 + kw \ 2 + kw, sy, T_FIREBOOTS, has_fireboots)
     hud_slot(ix0 + kw \ 2 + kw * 2, sy, T_ICESKATES, has_iceskates)
     hud_slot(ix0 + kw \ 2 + kw * 3, sy, T_SUCTION, has_suction)
 
     ' --- Zeit/Best-Panel ---
-    hud_panel(ix0, hb(0.69), ix1, hb(0.86))
-    hud_label(cxp, hb(0.712), "ZEIT")
+    hud_panel(ix0, hb(0.590), ix1, hb(0.718))
+    hud_label(cxp, hb(0.608), "ZEIT")
     IF lvl_time > 0 THEN
-        ct(cxp, hb(0.762), sc_big, fmt_time(time_left), RGB(244, 222, 120))
+        ct(cxp, hb(0.652), sc_big, fmt_time(time_left), RGB(244, 222, 120))
     ELSE
-        ct(cxp, hb(0.762), sc_med, "frei", RGB(184, 194, 214))
+        ct(cxp, hb(0.652), sc_med, "frei", RGB(184, 194, 214))
     END IF
     IF lvl_best >= 0 THEN
-        ct(cxp, hb(0.822), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
+        ct(cxp, hb(0.700), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
     ELSE
-        ct(cxp, hb(0.822), sc_sm, "noch keine Bestzeit", RGB(108, 122, 148))
+        ct(cxp, hb(0.700), sc_sm, "noch keine Bestzeit", RGB(108, 122, 148))
     END IF
 
+    ' --- Audio-Panel (Lautstaerke-Slider, per Maus) ---
+    hud_panel(ix0, hb(0.734), ix1, hb(0.892))
+    hud_label(cxp, hb(0.753), "LAUTSTAERKE")
+    draw_slider(sl_my, "Musik", music_vol)
+    draw_slider(sl_sy, "Effekte", sfx_vol)
+
     ' --- Footer (Steuerung) ---
-    ct(cxp, hb(0.93), sc_sm * 0.80, "Pfeile / WASD bewegen", RGB(122, 136, 162))
-    ct(cxp, hb(0.965), sc_sm * 0.80, "R neu  -  P Passwort  -  M Musik  -  ESC Menue", RGB(110, 124, 150))
+    ct(cxp, hb(0.928), sc_sm * 0.78, "Pfeile / WASD bewegen", RGB(122, 136, 162))
+    ct(cxp, hb(0.962), sc_sm * 0.78, "R neu  -  P Passwort  -  M Musik  -  ESC Menue", RGB(110, 124, 150))
 END SUB
 
 ' Hinweis-Banner, wenn der Spieler auf einem Fragezeichen-Stein steht
@@ -2055,6 +2104,24 @@ music_ok = FILEEXISTS(MUS_TITLE) AND FILEEXISTS("assets/music/level1.ogg")
 music_on = TRUE
 cur_music = ""
 
+' Lautstaerken (Bus-Pegel) -- per HUD-Slider einstellbar
+music_vol = 0.5
+sfx_vol = 0.9
+AUDIO_BUS_VOLUME("music", music_vol)
+AUDIO_BUS_VOLUME("sfx", sfx_vol)
+' Slider-Geometrie im Audio-Panel (einmalig, Layout ist statisch)
+sl_h = INT(SH * 0.015)
+DIM sl_lw AS INTEGER
+DIM sl_pw AS INTEGER
+sl_lw = INT(hud_w * 0.24)
+sl_pw = INT(hud_w * 0.15)
+sl_lblx = hud_x + INT(SH * 0.018) + sl_lw \ 2
+sl_x0 = hud_x + INT(SH * 0.018) + sl_lw
+sl_x1 = hud_x + hud_w - INT(SH * 0.018) - sl_pw
+sl_pctx = hud_x + hud_w - INT(SH * 0.018) - sl_pw \ 2
+sl_my = hb(0.793)
+sl_sy = hb(0.850)
+
 ' Font (eine TTF; Skalierung via TEXTROT, da LOADFONT-Groesse fix)
 gfont = LOADFONT("assets/font.ttf", 64)
 SETFONT(gfont)
@@ -2115,6 +2182,8 @@ WHILE NOT QUITREQUESTED()
     ELSE
         set_music(MUS_TITLE)
     END IF
+    ' Lautstaerke-Slider sind nur sichtbar, wenn das HUD gezeichnet wird
+    IF state = "play" OR state = "win" OR state = "dead" THEN update_volume()
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK

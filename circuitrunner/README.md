@@ -169,6 +169,11 @@ ein Ending-Track, wenn alle Level geschafft sind. Mit **M** an/aus, Lautstärke
 `MUS_VOL` in der `.gb`. Fehlt der Ordner, läuft das Spiel still weiter.
 Aktualisieren: `python circuitrunner/download_music.py`.
 
+**Lautstärke:** im HUD (rechtes Panel) gibt es während des Spiels zwei
+Maus-Slider „Musik" und „Effekte" — getrennt regelbar über die Audio-Busse
+(`AUDIO_BUS_VOLUME`), live ohne Neustart. Mit **M** lässt sich die Musik ganz
+stummschalten.
+
 ## Lizenz / Hinweis
 
 Grafik und Code sind eigenständig. „Chip's Challenge" ist eine eingetragene
