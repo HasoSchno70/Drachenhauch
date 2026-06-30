@@ -221,6 +221,7 @@ DIM win_secs AS INTEGER         ' Sekunden fuer den letzten Sieg
 DIM new_record AS BOOLEAN
 DIM pw_input AS STRING          ' aktuell getipptes Passwort
 DIM pw_msg AS STRING            ' Rueckmeldung der Passwort-Eingabe
+DIM next_pw AS STRING           ' Passwort des naechsten Levels (im Sieg-Overlay)
 
 ' ----------------------------------------------------------------------
 '  HELFER
@@ -433,6 +434,11 @@ SUB record_win()
     END IF
     SAVE_WRITE(sav, SAVEPATH)
     lvl_best = best_for(cur_level)
+    ' Passwort des naechsten Levels merken (fuer das Sieg-Overlay)
+    next_pw = ""
+    IF cur_level + 1 < nlevels THEN
+        next_pw = JSON_GET_STRING(js, "levels." + STR$(cur_level + 1) + ".password")
+    END IF
 END SUB
 
 ' Sekunden -> "m:ss" bzw. "s" fuer kurze Zeiten
@@ -1759,19 +1765,22 @@ SUB draw_overlay(kind AS STRING)
     DIM y1 AS INTEGER
     x0 = INT(SW * 0.26)
     x1 = INT(SW * 0.74)
-    y0 = INT(SH * 0.38)
-    y1 = INT(SH * 0.64)
+    y0 = INT(SH * 0.36)
+    y1 = INT(SH * 0.66)
     IF kind = "win" THEN
         BOX(x0, y0, x1, y1, RGB(14, 32, 24))
         RECT(x0, y0, x1, y1, RGB(80, 222, 142))
-        ct(cx, INT(SH * 0.44), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
-        ct(cx, INT(SH * 0.52), sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
+        ct(cx, INT(SH * 0.42), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
+        ct(cx, INT(SH * 0.50), sc_med, "Zeit  " + score_label(win_secs), RGB(224, 234, 228))
         IF new_record THEN
-            ct(cx, INT(SH * 0.575), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
+            ct(cx, INT(SH * 0.555), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
         ELSEIF lvl_best >= 0 THEN
-            ct(cx, INT(SH * 0.575), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
+            ct(cx, INT(SH * 0.555), sc_sm, "Bestzeit  " + score_label(lvl_best), RGB(180, 200, 214))
         END IF
-        ct(cx, INT(SH * 0.61), sc_med, "LEER = weiter", RGB(204, 224, 214))
+        IF LEN(next_pw) > 0 THEN
+            ct(cx, INT(SH * 0.595), sc_sm, "Passwort Level " + STR$(cur_level + 2) + ":  " + next_pw, RGB(110, 238, 226))
+        END IF
+        ct(cx, INT(SH * 0.635), sc_med, "LEER = weiter", RGB(204, 224, 214))
     ELSE
         BOX(x0, y0, x1, y1, RGB(34, 16, 16))
         RECT(x0, y0, x1, y1, RGB(224, 92, 92))
