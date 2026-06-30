@@ -225,6 +225,78 @@ def test_monster_move_order_follows_list(tmp_path):
     assert order == [(8, 5), (5, 2), (3, 5), (10, 10)], (order, out)
 
 
+def _make_password_set():
+    """3-Level-Set mit Passwoertern (fuer find_password + Save-Tests)."""
+    GW = 32
+
+    def grid():
+        upper = [0x00] * 1024
+        upper[1 * GW + 1] = 0x6C        # Spieler
+        upper[5 * GW + 5] = 0x15        # Exit
+        return _hexgrid(upper)
+
+    lower = _hexgrid([0x00] * 1024)
+    pwords = ["WXYZ", "ABCD", "QWER"]
+    levels = []
+    for i, pw in enumerate(pwords):
+        levels.append({
+            "title": f"L{i}", "number": i + 1, "time": 0, "chips": 0,
+            "hint": "", "password": pw, "width": 32, "height": 32,
+            "upper": grid(), "lower": lower,
+            "traps": "", "cloners": "", "monsters": "",
+        })
+    return {"name": "Test Set!", "ruleset": "ms", "levels": levels}
+
+
+@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+def test_save_highscore_and_password(tmp_path):
+    # Bestzeit-Aufzeichnung (schneller ueberschreibt) + Passwort-Lookup + Set-Key.
+    harness = (
+        '\njs = JSON_LOAD("synth.json")\n'
+        'nlevels = JSON_LEN(js, "levels")\n'
+        'cur_setkey = set_key("Test Set!")\n'
+        'PRINT "SETKEY " + cur_setkey\n'
+        'cur_level = 1\n'
+        'load_level(1)\n'
+        'start_ms = MILLIS() - 30000\n'
+        'record_win()\n'
+        'PRINT "BEST1 " + STR$(best_for(1)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+        'start_ms = MILLIS() - 50000\n'
+        'record_win()\n'
+        'PRINT "BEST2 " + STR$(best_for(1)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+        'start_ms = MILLIS() - 10000\n'
+        'record_win()\n'
+        'PRINT "BEST3 " + STR$(best_for(1)) + " REC " + STR$(IIF(new_record, 1, 0))\n'
+        'PRINT "PW_ABCD " + STR$(find_password("abcd"))\n'
+        'PRINT "PW_BAD " + STR$(find_password("ZZZZ"))\n'
+        'PRINT "MAX " + STR$(SAVE_GET_INT_OR(sav, cur_setkey + "/max", 0))\n'
+    )
+    out = _run_engine_harness(tmp_path, _make_password_set(), harness)
+    vals = dict(re.findall(r"(\w+)\s+(-?\d+)", out))
+
+    assert "SETKEY test_set_" in out, out
+    # erste Aufzeichnung ~30s, neuer Rekord
+    b1, b2, b3 = int(vals["BEST1"]), int(vals["BEST2"]), int(vals["BEST3"])
+    assert 29 <= b1 <= 31, out
+    assert vals_rec(out, 1) == 1, out                 # REC nach 1. Sieg
+    assert b2 == b1, out                              # langsamer (50s) ignoriert
+    assert vals_rec(out, 2) == 0, out                 # kein Rekord
+    assert b3 <= 11, out                              # schneller (10s) ueberschreibt
+    assert vals_rec(out, 3) == 1, out
+    # Passwort case-insensitiv -> Level 1; unbekannt -> -1
+    assert int(vals["PW_ABCD"]) == 1, out
+    assert int(vals["PW_BAD"]) == -1, out
+    # Fortschritt = cur_level+1
+    assert int(vals["MAX"]) == 2, out
+    # Save-Datei wurde geschrieben
+    assert (tmp_path / "circuitrunner.save").exists(), list(tmp_path.iterdir())
+
+
+def vals_rec(out, n):
+    m = re.search(rf"BEST{n}\s+-?\d+\s+REC\s+(\d+)", out)
+    return int(m.group(1)) if m else None
+
+
 @pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
 def test_monster_moves_at_player_speed(tmp_path):
     # MON_EVERY=1: normale Monster ziehen jeden Tick einen Schritt (CC-Tempo).

@@ -27,7 +27,14 @@ wählen, mit LEER/ENTER starten.
 | LEER / ENTER | bestätigen / weiter |
 | R | Level neu starten |
 | N | Level überspringen (Entwicklung) |
+| P | Passwort eingeben → Level anspringen (Menü/Intro) |
 | ESC | zurück / Menü |
+
+**Fortschritt & Bestzeiten** werden in `circuitrunner.save` (neben dem Spiel)
+gesichert: pro Level die schnellste Lösungszeit (im HUD, Intro und Sieg-Overlay
+angezeigt, „NEUER REKORD!" bei Verbesserung), pro Set das höchste erreichte
+Level. Mit **P** ein 4-Buchstaben-Passwort eines Levels eintippen, um direkt
+dorthin zu springen (Fansite-Sets bringen Passwörter mit; Demo-Set nicht).
 
 ## Eigene & heruntergeladene Level
 
@@ -129,11 +136,12 @@ bewegen sich halb so schnell wie die übrigen Monster.
 | `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |
 | `levels/*.json` | Level-Sets (im Menü wählbar) |
 
-Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema).
+Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema +
+gbrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
 
 ## Grenzen / Ideen
 
-- Kein Passwort-Eingang / Level-Sprung per Passwort, kein Highscore/Save (Fortschritt nicht persistiert).
+- Bestzeit = verstrichene Echtzeit-Sekunden (nicht der CC-Zeitbonus „Zeit übrig").
 - Monster-Bewegungsreihenfolge innerhalb eines Ticks folgt der `monsters`-Liste; ungelistete Monster werden in Lese-Reihenfolge ergänzt (bei extrem timing-präzisen Puzzles möglich, dass Sonderfälle minimal abweichen).
 
 ## Lizenz / Hinweis

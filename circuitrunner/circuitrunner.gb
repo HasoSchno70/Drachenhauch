@@ -7,8 +7,11 @@
 '    Pfeile / WASD   bewegen
 '    R               Level neu starten
 '    N               Level ueberspringen (Entwicklung)
+'    P               Passwort eingeben (Level anspringen, im Menue/Intro)
 '    ESC             zurueck / Menue
 '    LEER / ENTER    bestaetigen
+'
+'  Fortschritt + Bestzeiten werden in  circuitrunner.save  gesichert.
 '
 '  Level liegen als JSON-Sets in  levels/ . Eigene Demos erzeugt
 '  make_demo_levels.py; echte Fansite-Sets (.dat/.ccl) wandelt
@@ -19,6 +22,9 @@
 IMPORT "json"
 IMPORT "input"
 IMPORT "audio"
+IMPORT "save"
+
+CONST SAVEPATH = "circuitrunner.save"
 
 CONST FULLSCREEN = TRUE
 
@@ -207,6 +213,15 @@ DIM set_count[MAXSETS] AS INTEGER
 DIM nsets AS INTEGER
 DIM sel_set AS INTEGER
 
+' Persistenz (Bestzeiten + Fortschritt) und Passwort-Eingabe
+DIM sav AS SAVE_HANDLE
+DIM cur_setkey AS STRING        ' Save-Key-Praefix des aktiven Sets
+DIM lvl_best AS INTEGER         ' Bestzeit (Sek.) des aktuellen Levels, -1 = keine
+DIM win_secs AS INTEGER         ' Sekunden fuer den letzten Sieg
+DIM new_record AS BOOLEAN
+DIM pw_input AS STRING          ' aktuell getipptes Passwort
+DIM pw_msg AS STRING            ' Rueckmeldung der Passwort-Eingabe
+
 ' ----------------------------------------------------------------------
 '  HELFER
 ' ----------------------------------------------------------------------
@@ -348,6 +363,122 @@ SUB add_sets_in(dir AS STRING)
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SAVE / FORTSCHRITT / PASSWORT
+' ----------------------------------------------------------------------
+' Set-Name -> stabiler Save-Key-Praefix (nur a-z0-9, Rest -> '_')
+FUNCTION set_key(nm AS STRING) AS STRING
+    DIM low AS STRING
+    low = LOWER$(nm)
+    DIM r AS STRING
+    r = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(low) - 1
+        DIM c AS STRING
+        c = MID$(low, i, 1)
+        DIM a AS INTEGER
+        a = ASC(c)
+        IF (a >= 97 AND a <= 122) OR (a >= 48 AND a <= 57) THEN
+            r = r + c
+        ELSE
+            r = r + "_"
+        END IF
+    NEXT
+    RETURN r
+END FUNCTION
+
+FUNCTION best_key(idx AS INTEGER) AS STRING
+    RETURN cur_setkey + "/" + STR$(idx) + "/best"
+END FUNCTION
+
+' Bestzeit (Sek.) des Levels, oder -1 wenn noch nie geschafft
+FUNCTION best_for(idx AS INTEGER) AS INTEGER
+    RETURN SAVE_GET_INT_OR(sav, best_key(idx), -1)
+END FUNCTION
+
+' Sieg verbuchen: Bestzeit aktualisieren, Fortschritt sichern, Datei schreiben
+SUB record_win()
+    win_secs = (MILLIS() - start_ms) \ 1000
+    new_record = FALSE
+    DIM k AS STRING
+    k = best_key(cur_level)
+    DIM old AS INTEGER
+    old = best_for(cur_level)
+    IF old < 0 OR win_secs < old THEN
+        SAVE_SET_INT(sav, k, win_secs)
+        new_record = TRUE
+    END IF
+    DIM mk AS STRING
+    mk = cur_setkey + "/max"
+    IF cur_level + 1 > SAVE_GET_INT_OR(sav, mk, 0) THEN
+        SAVE_SET_INT(sav, mk, cur_level + 1)
+    END IF
+    SAVE_WRITE(sav, SAVEPATH)
+    lvl_best = best_for(cur_level)
+END SUB
+
+' Sekunden -> "m:ss" bzw. "s" fuer kurze Zeiten
+FUNCTION fmt_time(s AS INTEGER) AS STRING
+    IF s < 60 THEN RETURN STR$(s) + "s"
+    DIM m AS INTEGER
+    m = s \ 60
+    DIM r AS INTEGER
+    r = s MOD 60
+    DIM rs AS STRING
+    rs = STR$(r)
+    IF r < 10 THEN rs = "0" + rs
+    RETURN STR$(m) + ":" + rs
+END FUNCTION
+
+' Passwort-Eingabe pro Frame verarbeiten (Tippen / Loeschen / Bestaetigen)
+SUB update_password()
+    IF INPUT_PRESSED("back") THEN
+        state = "menu"
+        RETURN
+    END IF
+    ' getippte Zeichen aus der Tipp-Queue holen (A-Z, 0-9)
+    DIM ch AS STRING
+    ch = INKEY$()
+    WHILE LEN(ch) > 0
+        DIM ca AS INTEGER
+        ca = ASC(UPPER$(ch))
+        IF ((ca >= 65 AND ca <= 90) OR (ca >= 48 AND ca <= 57)) AND LEN(pw_input) < 9 THEN
+            pw_input = pw_input + UPPER$(ch)
+            pw_msg = ""
+        END IF
+        ch = INKEY$()
+    WEND
+    IF INPUT_PRESSED("delchar") AND LEN(pw_input) > 0 THEN
+        pw_input = pw_input[0:LEN(pw_input) - 1]
+        pw_msg = ""
+    END IF
+    IF INPUT_PRESSED("confirm") AND LEN(pw_input) > 0 THEN
+        DIM hit AS INTEGER
+        hit = find_password(pw_input)
+        IF hit >= 0 THEN
+            cur_level = hit
+            load_level(cur_level)
+            state = "intro"
+        ELSE
+            pw_msg = "Unbekanntes Passwort"
+        END IF
+    END IF
+END SUB
+
+' Level-Index mit passendem Passwort (case-insensitiv), sonst -1
+FUNCTION find_password(pw AS STRING) AS INTEGER
+    DIM up AS STRING
+    up = UPPER$(pw)
+    IF LEN(up) = 0 THEN RETURN -1
+    DIM i AS INTEGER
+    FOR i = 0 TO nlevels - 1
+        DIM lp AS STRING
+        lp = UPPER$(JSON_GET_STRING(js, "levels." + STR$(i) + ".password"))
+        IF LEN(lp) > 0 AND lp = up THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' ----------------------------------------------------------------------
 '  LEVEL LADEN
 ' ----------------------------------------------------------------------
 SUB load_level(idx AS INTEGER)
@@ -455,6 +586,7 @@ SUB load_level(idx AS INTEGER)
         blk_sdir[gi] = -1
     NEXT
     pushed_blk = -1
+    lvl_best = best_for(idx)
 END SUB
 
 SUB load_wires(idx AS INTEGER)
@@ -857,6 +989,7 @@ SUB land_on()
     END IF
     IF t = T_EXIT THEN
         state = "win"
+        record_win()
         sfx_win()
         RETURN
     END IF
@@ -1479,8 +1612,14 @@ SUB draw_hud()
         draw_icon(T_SUCTION, bx, ty)
         bx = bx + ic_sz + INT(pad * 0.4)
     END IF
+    DIM by AS INTEGER
+    by = board_y + bsize - pad - INT(BASEH * sc_med * 0.5)
     IF lvl_time > 0 THEN
-        ct(cxp, board_y + bsize - pad - INT(BASEH * sc_med * 0.5), sc_med, "Zeit " + STR$(time_left), RGB(244, 222, 120))
+        ct(cxp, by, sc_med, "Zeit " + STR$(time_left), RGB(244, 222, 120))
+        by = by - INT(BASEH * sc_sm) - INT(pad * 0.3)
+    END IF
+    IF lvl_best >= 0 THEN
+        ct(cxp, by, sc_sm, "Best " + fmt_time(lvl_best), RGB(180, 200, 214))
     END IF
 END SUB
 
@@ -1516,7 +1655,12 @@ SUB draw_menu()
         ct(cx, yy, sc_med, lab, col)
         yy = yy + lh
     NEXT
-    ct(cx, INT(SH * 0.90), sc_sm, "Pfeile waehlen      LEER = Start      ESC = Ende", RGB(170, 182, 206))
+    DIM mx AS INTEGER
+    mx = SAVE_GET_INT_OR(sav, set_key(set_name[sel_set]) + "/max", 0)
+    IF mx > 0 THEN
+        ct(cx, INT(SH * 0.82), sc_sm, "Fortschritt: Level " + STR$(mx) + " / " + STR$(set_count[sel_set]), RGB(150, 200, 240))
+    END IF
+    ct(cx, INT(SH * 0.90), sc_sm, "Pfeile waehlen   LEER = Start   P = Passwort   ESC = Ende", RGB(170, 182, 206))
 END SUB
 
 SUB draw_intro()
@@ -1524,10 +1668,38 @@ SUB draw_intro()
     cx = SW \ 2
     ct(cx, INT(SH * 0.22), sc_med, "Level " + STR$(cur_level + 1), RGB(110, 238, 226))
     ct(cx, INT(SH * 0.34), sc_big, lvl_title, RGB(232, 238, 248))
+    IF lvl_best >= 0 THEN
+        ct(cx, INT(SH * 0.43), sc_sm, "Bestzeit  " + fmt_time(lvl_best), RGB(244, 222, 120))
+    END IF
     IF LEN(lvl_hint) > 0 THEN
         draw_wrapped(lvl_hint, INT(SW * 0.16), INT(SH * 0.52), INT(SW * 0.84), RGB(184, 196, 216))
     END IF
     ct(cx, INT(SH * 0.85), sc_med, "LEER = los", RGB(200, 214, 232))
+    ct(cx, INT(SH * 0.91), sc_sm, "P = Passwort      ESC = Menue", RGB(150, 162, 184))
+END SUB
+
+SUB draw_password()
+    DIM cx AS INTEGER
+    cx = SW \ 2
+    ct(cx, INT(SH * 0.22), sc_med, "PASSWORT", RGB(110, 238, 226))
+    ct(cx, INT(SH * 0.31), sc_sm, "Set: " + set_name[sel_set], RGB(150, 162, 184))
+    ' Eingabefeld
+    DIM disp AS STRING
+    disp = pw_input
+    ' blinkender Cursor
+    IF (INT(MILLIS() / 400) MOD 2) = 0 AND LEN(pw_input) < 9 THEN disp = disp + "_"
+    IF LEN(disp) = 0 THEN disp = " "
+    DIM by0 AS INTEGER
+    by0 = INT(SH * 0.40)
+    DIM bw AS INTEGER
+    bw = INT(SW * 0.30)
+    BOX(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(20, 26, 38))
+    RECT(cx - bw \ 2, by0, cx + bw \ 2, by0 + INT(SH * 0.10), RGB(80, 200, 220))
+    ct(cx, by0 + INT(SH * 0.05), sc_big, disp, RGB(232, 238, 248))
+    IF LEN(pw_msg) > 0 THEN
+        ct(cx, INT(SH * 0.60), sc_med, pw_msg, RGB(245, 130, 130))
+    END IF
+    ct(cx, INT(SH * 0.85), sc_sm, "tippen      ENTER = los      ESC = zurueck", RGB(170, 182, 206))
 END SUB
 
 SUB draw_done()
@@ -1547,13 +1719,19 @@ SUB draw_overlay(kind AS STRING)
     DIM y1 AS INTEGER
     x0 = INT(SW * 0.26)
     x1 = INT(SW * 0.74)
-    y0 = INT(SH * 0.40)
-    y1 = INT(SH * 0.60)
+    y0 = INT(SH * 0.38)
+    y1 = INT(SH * 0.64)
     IF kind = "win" THEN
         BOX(x0, y0, x1, y1, RGB(14, 32, 24))
         RECT(x0, y0, x1, y1, RGB(80, 222, 142))
-        ct(cx, INT(SH * 0.47), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
-        ct(cx, INT(SH * 0.55), sc_med, "LEER = weiter", RGB(204, 224, 214))
+        ct(cx, INT(SH * 0.44), sc_big, "GESCHAFFT!", RGB(120, 244, 160))
+        ct(cx, INT(SH * 0.52), sc_med, "Zeit  " + fmt_time(win_secs), RGB(224, 234, 228))
+        IF new_record THEN
+            ct(cx, INT(SH * 0.575), sc_sm, "NEUER REKORD!", RGB(244, 222, 120))
+        ELSEIF lvl_best >= 0 THEN
+            ct(cx, INT(SH * 0.575), sc_sm, "Bestzeit  " + fmt_time(lvl_best), RGB(180, 200, 214))
+        END IF
+        ct(cx, INT(SH * 0.61), sc_med, "LEER = weiter", RGB(204, 224, 214))
     ELSE
         BOX(x0, y0, x1, y1, RGB(34, 16, 16))
         RECT(x0, y0, x1, y1, RGB(224, 92, 92))
@@ -1663,6 +1841,12 @@ ic_sz = INT(SH * 0.044)
 
 scan_sets()
 sel_set = 0
+sav = SAVE_LOAD_OR_NEW(SAVEPATH)
+SAVE_SET_VERSION(sav, 1)
+cur_setkey = ""
+lvl_best = -1
+pw_input = ""
+pw_msg = ""
 
 INPUT_BIND("up", KEY_UP, KEY_W)
 INPUT_BIND("down", KEY_DOWN, KEY_S)
@@ -1672,6 +1856,8 @@ INPUT_BIND("confirm", KEY_SPACE, KEY_ENTER)
 INPUT_BIND("restart", KEY_R)
 INPUT_BIND("skip", KEY_N)
 INPUT_BIND("back", KEY_ESCAPE)
+INPUT_BIND("password", KEY_P)
+INPUT_BIND("delchar", KEY_BACKSPACE)
 
 state = "menu"
 cur_level = 0
@@ -1697,13 +1883,29 @@ WHILE NOT QUITREQUESTED()
         IF INPUT_PRESSED("confirm") AND nsets > 0 THEN
             js = JSON_LOAD(set_path[sel_set])
             nlevels = JSON_LEN(js, "levels")
+            cur_setkey = set_key(set_name[sel_set])
             cur_level = 0
             load_level(cur_level)
             state = "intro"
         END IF
+        IF INPUT_PRESSED("password") AND nsets > 0 THEN
+            js = JSON_LOAD(set_path[sel_set])
+            nlevels = JSON_LEN(js, "levels")
+            cur_setkey = set_key(set_name[sel_set])
+            pw_input = ""
+            pw_msg = ""
+            state = "password"
+        END IF
+    ELSEIF state = "password" THEN
+        update_password()
     ELSEIF state = "intro" THEN
         IF INPUT_PRESSED("back") THEN state = "menu"
         IF INPUT_PRESSED("confirm") THEN state = "play"
+        IF INPUT_PRESSED("password") THEN
+            pw_input = ""
+            pw_msg = ""
+            state = "password"
+        END IF
     ELSEIF state = "play" THEN
         IF INPUT_PRESSED("back") THEN state = "menu"
         IF INPUT_PRESSED("restart") THEN load_level(cur_level)
@@ -1759,6 +1961,8 @@ WHILE NOT QUITREQUESTED()
     CLS(RGB(12, 16, 24))
     IF state = "menu" THEN
         draw_menu()
+    ELSEIF state = "password" THEN
+        draw_password()
     ELSEIF state = "intro" THEN
         draw_intro()
     ELSEIF state = "done" THEN
