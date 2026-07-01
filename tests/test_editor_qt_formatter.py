@@ -198,3 +198,44 @@ def test_no_blank_line_already_present_stays_single():
     twice = format_source(once)
     assert once == twice
     assert "\n\n\n" not in once
+
+
+def test_blank_line_before_section_comment_after_plain_statement():
+    """Review-Fund: ein Sektions-Kommentar direkt nach einer DIM-Zeile
+    (kein Block-Ende) bekam bisher KEINE Leerzeile -- z.B. genau der Fall
+    aus circuitrunner.gb (DIM x .. ' naechste Sektion .. DIM y)."""
+    src = (
+        "DIM mob_did AS BOOLEAN\n"
+        "' Umsortier-Puffer fuer die naechste Sektion\n"
+        "DIM mord[10] AS INTEGER"
+    )
+    out = format_source(src).split("\n")
+    assert out[0] == "DIM mob_did AS BOOLEAN"
+    assert out[1] == ""
+    assert out[2] == "' Umsortier-Puffer fuer die naechste Sektion"
+    assert out[3] == "DIM mord[10] AS INTEGER"
+
+
+def test_no_blank_line_before_comment_that_opens_a_sub():
+    """Ein Kommentar als ERSTE Zeile im Funktions-Body (erklaert die
+    Funktion) soll NICHT vom SUB/FUNCTION-Header getrennt werden."""
+    src = "SUB foo()\n' erklaert foo\nPRINT 1\nEND SUB"
+    out = format_source(src).split("\n")
+    assert out[0] == "SUB foo()"
+    assert out[1] == "    ' erklaert foo"
+
+
+def test_no_blank_line_before_comment_after_mid_clause():
+    """Ein Kommentar direkt nach ELSE/CASE (erklaert den Zweig) bleibt
+    ebenfalls ohne Leerzeile davor."""
+    src = "IF x THEN\nA\nELSE\n' erklaert den Else-Zweig\nB\nEND IF"
+    out = format_source(src).split("\n")
+    idx = out.index("ELSE")
+    assert out[idx + 1] == "    ' erklaert den Else-Zweig"
+
+
+def test_multiline_comment_block_not_fragmented():
+    """Ein mehrzeiliger Kommentarblock (Header-Banner) wird nicht durch
+    Leerzeilen zwischen den einzelnen Kommentarzeilen auseinandergerissen."""
+    src = "' Zeile 1\n' Zeile 2\n' Zeile 3\nPRINT 1"
+    assert format_source(src) == src

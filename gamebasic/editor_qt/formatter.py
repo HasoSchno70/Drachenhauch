@@ -16,14 +16,21 @@ Subtilitaeten:
 Single-Line-IFs (`IF x THEN PRINT 1`) erhoehen den Indent NICHT --
 nur `IF ... THEN` ohne Statement nach THEN ist ein Block-Opener.
 
-Zusaetzlich: nach jedem Block-Ende (`END SUB`/`END FUNCTION`/`NEXT`/`WEND`/...)
-wird -- falls nicht schon vorhanden -- EINE Leerzeile eingefuegt, bevor der
-naechste Code/Kommentar folgt. Ohne diese Regel klebten aufeinanderfolgende
-SUB/FUNCTION-Definitionen (oder ein Block-Ende + der Kommentar der naechsten
-Sektion) ohne jede optische Trennung aneinander -- lesbarkeitsschaedlich bei
-langen Programmen. Kein Einfuegen, wenn direkt ein WEITERES Block-Ende oder
-eine Zwischen-Klausel (`ELSE`/`ELSEIF`/`CASE`/`CATCH`) folgt (verschachtelte
-END-Ketten wie `END SUB` direkt vor `END CLASS` bleiben zusammen).
+Zusaetzlich zwei Leerzeilen-Regeln (Sektions-Abstand), je -- falls nicht
+schon vorhanden -- EINE Leerzeile:
+1. Nach jedem Block-Ende (`END SUB`/`END FUNCTION`/`NEXT`/`WEND`/...), bevor
+   der naechste Code/Kommentar folgt. Ohne diese Regel klebten
+   aufeinanderfolgende SUB/FUNCTION-Definitionen aneinander.
+2. Vor jeder eigenstaendigen Kommentar-Zeile (`'`/`REM`), die eine neue
+   Sektion einleitet -- z.B. ein Kommentar direkt nach einer `DIM`-Zeile
+   ohne Trennung. Ohne diese Regel klebte Code direkt an den Kommentar der
+   naechsten Sektion.
+Beide Regeln greifen NICHT, wenn die vorherige Zeile selbst ein Block-
+Opener (`SUB`/`FUNCTION`/...) oder eine Zwischen-Klausel (`ELSE`/`CASE`/...)
+ist (dann ist der Kommentar der einleitende Block-/Klausel-Kommentar und
+soll direkt an seinem Code kleben) -- und nicht, wenn die vorherige Zeile
+selbst schon eine Kommentar-Zeile ist (ein mehrzeiliger Kommentarblock wird
+nicht auseinandergerissen).
 """
 from __future__ import annotations
 
@@ -123,24 +130,39 @@ def format_source(source: str) -> str:
             level += 1
             continue
         out.append(render(level, body))
-    return "\n".join(_ensure_blank_after_closers(out))
+    return "\n".join(_ensure_section_spacing(out))
 
 
-def _ensure_blank_after_closers(lines: list[str]) -> list[str]:
-    """Fuegt nach jeder Block-Ende-Zeile eine Leerzeile ein, falls dort noch
-    keine steht -- ausser die naechste Zeile ist selbst ein Block-Ende oder
-    eine Zwischen-Klausel (dann bleibt die END-Kette/Klausel zusammen)."""
+def _is_comment(stripped: str) -> bool:
+    upper = stripped.upper()
+    return stripped.startswith("'") or upper == "REM" or upper.startswith("REM ")
+
+
+def _ensure_section_spacing(lines: list[str]) -> list[str]:
+    """Fuegt eine Leerzeile ein (1) nach jeder Block-Ende-Zeile und (2) vor
+    jeder neuen Kommentar-Sektion -- siehe Modul-Docstring. Beide Faelle
+    werden PRO ZEILENUEBERGANG hoechstens einmal ausgeloest (kein doppeltes
+    Einfuegen, wenn ein Block-Ende direkt vor einem Sektions-Kommentar steht)."""
     out: list[str] = []
     for i, line in enumerate(lines):
         out.append(line)
-        stripped = line.strip()
-        if not stripped or _classify(stripped) != "close":
+        cur = line.strip()
+        if not cur:
             continue
         nxt = lines[i + 1] if i + 1 < len(lines) else None
         if nxt is None:
             continue
         nxt_stripped = nxt.strip()
-        if nxt_stripped == "" or _classify(nxt_stripped) in ("close", "mid"):
-            continue
-        out.append("")
+        if nxt_stripped == "":
+            continue   # schon eine Leerzeile vorhanden
+        cur_kind = _classify(cur)
+        need_blank = False
+        if cur_kind == "close":
+            if _classify(nxt_stripped) not in ("close", "mid"):
+                need_blank = True
+        elif _is_comment(nxt_stripped) and not _is_comment(cur):
+            if cur_kind not in ("open", "mid"):
+                need_blank = True
+        if need_blank:
+            out.append("")
     return out
