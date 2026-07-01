@@ -683,7 +683,11 @@ impl Compiler {
 
     fn resolve_method_named_args<'a>(&self, class_name: &str, m: &str, args: &'a [Node])
         -> Result<Vec<RArg<'a>>, String> {
-        let sig = self.find_method_sig(class_name, m).unwrap();
+        // Robust gegen zukuenftige Aufrufer: verlaesst sich NICHT auf einen
+        // vorgelagerten is_none()-Check des Aufrufers (der war frueher hier
+        // ein unwrap() und damit ein Panic-Risiko bei fehlendem Vor-Check).
+        let sig = self.find_method_sig(class_name, m)
+            .ok_or_else(|| format!("Klasse '{}' hat keine Methode '{}'", class_name, m))?;
         resolve_args_with_sig(sig, m, args)
     }
 
@@ -1252,13 +1256,13 @@ impl Compiler {
             // (j_parse -> json_parse), damit gbrt ihn nativ findet.
             let bname = self.resolve_builtin_alias(&name);
             // Systemischer G1-Fix: kennt gbrt diesen Builtin ueberhaupt? Wenn
-            // nicht, ist es ein Tippfehler ODER ein nur-im-Tree-Walker-Builtin
-            // (wie frueher FLT) -> es wuerde erst zur LAUFZEIT scheitern.
+            // nicht, ist es vermutlich ein Tippfehler (oder ein veralteter/
+            // entfernter Builtin) -> es wuerde erst zur LAUFZEIT scheitern.
             // Hier als nicht-fatale Warnung melden (--check zeigt es im Editor).
             if !is_known_builtin(&bname) {
                 self.warnings.push((self.ctx.cur_line, format!(
                     "Unbekanntes Builtin '{}' -- gbrt kennt es nicht (Tippfehler? \
-                     oder nur im Tree-Walker verfuegbar). Der Aufruf schlaegt sonst \
+                     oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.", bname.to_uppercase())));
             }
             for a in args { self.expr(a)?; }

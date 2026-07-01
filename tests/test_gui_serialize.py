@@ -78,6 +78,31 @@ def test_file_roundtrip(run_gb, tmp_path):
     assert (tmp_path / "layout.json").exists()
 
 
+def test_tree_menu_tabs_roundtrip(run_gb):
+    # Tree-Knoten, Menue und Tabs muessen den GUI_SAVE/LOAD-Kreis ueberleben
+    # (frueher stillschweigend verworfen -- siehe Review-Fund).
+    out = run_gb(
+        'IMPORT "gui"\n'
+        'DIM win AS GUI_WINDOW\nwin = GUI_WINDOW("T", 0, 0, 300, 200)\n'
+        'DIM tabs[2] AS STRING\ntabs[0]="Eins" : tabs[1]="Zwei"\n'
+        'GUI_TABS(win, tabs)\n'
+        'GUI_SET_ACTIVE_TAB(win, 1)\n'
+        'DIM m AS INTEGER\nm = GUI_MENU(win, "Datei")\n'
+        'DIM mi AS INTEGER\nmi = GUI_MENU_ITEM(m, "Oeffnen")\n'
+        'DIM t AS GUI_WIDGET\nt = GUI_TREE(win, 10, 10, 100, 100)\n'
+        'DIM root AS INTEGER\nroot = GUI_TREE_ADD(t, -1, "Wurzel")\n'
+        'DIM child AS INTEGER\nchild = GUI_TREE_ADD(t, root, "Kind")\n'
+        'GUI_TREE_SET_SELECTED(t, child)\n'
+        'GUI_SET_TAB(t, 1)\n'
+        'DIM w2 AS GUI_WINDOW\nw2 = GUI_FROM_JSON(GUI_TO_JSON(win))\n'
+        'PRINT GUI_ACTIVE_TAB(w2)\n'
+        'DIM t2 AS GUI_WIDGET\nt2 = GUI_WINDOW_WIDGET(w2, 0)\n'
+        'PRINT GUI_KIND(t2)\n'
+        'PRINT GUI_TREE_SELECTED(t2)\n'
+        'PRINT GUI_TREE_LABEL(t2, GUI_TREE_SELECTED(t2))\n')
+    assert out.splitlines() == ["1", "tree", str(1), "Kind"]
+
+
 def test_from_json_invalid_raises(run_gb):
     with pytest.raises(GameBasicError, match="ungueltiges JSON"):
         run_gb('IMPORT "gui"\nDIM w AS GUI_WINDOW\nw = GUI_FROM_JSON("{nope")\n')

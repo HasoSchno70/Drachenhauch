@@ -133,6 +133,7 @@ class GameBasicEditor(QMainWindow):
         self._autosave_timer.setInterval(AUTOSAVE_INTERVAL_MS)
         self._autosave_timer.timeout.connect(self._do_autosave)
         self._autosave_timer.start()
+        self._autosave_warned = False   # nur EINMAL pro Sitzung auf Fehlschlag hinweisen
 
         # Theme-Listener: bei Wechsel App-QSS neu setzen (QSS ist statisch
         # gerendert und liest seine Farben zur Build-Zeit).
@@ -987,8 +988,11 @@ class GameBasicEditor(QMainWindow):
         # "Verwerfen" geschlossener Tab im Manifest sichtbar, bis der
         # naechste 30s-Autosave-Tick es ueberschreibt. Crash dazwischen
         # = der Tab taucht beim Editor-Neustart als Recovery auf, obwohl
-        # der User ihn explizit verworfen hat.
-        self._do_autosave_impl()
+        # der User ihn explizit verworfen hat. Ueber _do_autosave() (nicht
+        # _do_autosave_impl() direkt), damit ein I/O-Fehler hier nicht aus
+        # dem Tab-Schliessen herausplatzt -- dieselbe Garantie wie der
+        # Timer-Pfad ("Autosave darf den Editor nie crashen lassen").
+        self._do_autosave()
         self._update_welcome_visibility()
 
     def _on_tab_reveal(self, st: TabState) -> None:
@@ -2148,14 +2152,24 @@ class GameBasicEditor(QMainWindow):
     def _do_autosave(self) -> None:
         """Schreibt Snapshots aller dirty Tabs in den Autosave-Ordner."""
         try:
-            self._do_autosave_impl()
+            ok = self._do_autosave_impl()
         except Exception:
             # Autosave darf den Editor nie crashen lassen.
-            pass
+            ok = False
+        if not ok and not self._autosave_warned:
+            # Frueher komplett stumm -- ein unschreibbarer/voller Autosave-
+            # Ordner liess das Sicherheitsnetz unbemerkt ausfallen. Nur
+            # EINMAL pro Sitzung hinweisen (der Timer tickt alle 30s).
+            self._autosave_warned = True
+            self.statusBar().showMessage(
+                "Autosave fehlgeschlagen (Ordner nicht beschreibbar?) -- "
+                "eigenes Speichern empfohlen.", 8000)
 
-    def _do_autosave_impl(self) -> None:
+    def _do_autosave_impl(self) -> bool:
+        """Liefert False, wenn mindestens ein Schreibvorgang fehlschlug."""
         folder = autosave_dir()
         entries: list[RecoveryEntry] = []
+        all_ok = True
         for idx, st in enumerate(self.tabs.states):
             if not self.tabs.is_dirty(st):
                 continue
@@ -2164,13 +2178,14 @@ class GameBasicEditor(QMainWindow):
             try:
                 (folder / slug).write_text(content, encoding="utf-8")
             except OSError:
+                all_ok = False
                 continue
             entries.append(RecoveryEntry(
                 autosave_file=slug,
                 original_path=str(st.file_path) if st.file_path else None,
                 label=(st.file_path.name if st.file_path else "(neu)"),
             ))
-        write_manifest(entries)
+        return write_manifest(entries) and all_ok
 
     def _maybe_recover_autosaves(self) -> bool:
         """Wenn Snapshots vorliegen, User-Dialog zeigen und auswaehlen.

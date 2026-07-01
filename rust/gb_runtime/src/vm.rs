@@ -2161,6 +2161,22 @@ impl<'p> Vm<'p> {
         self.scene_stack.last_mut().ok_or_else(|| "Scene-Stack ist leer - SCENE_PUSH oder SCENE_SWITCH zuerst".to_string())
     }
 
+    /// Gemeinsamer Handle-Lookup fuer die Netz-/Hardware-Module (db/net/serial/
+    /// usb/bt): `vec[idx]` als `Some(_)`, sonst ein einheitlich formatierter
+    /// Fehler `"{modul}: {was} {idx}"`. `was` traegt bewusst den vollen,
+    /// modulspezifischen Wortlaut (z.B. "getrenntes BT_HANDLE" vs.
+    /// "geschlossenes DB_CONN-Handle") -- nur das Lookup-Skelett war dupliziert.
+    #[cfg(any(feature = "db", feature = "net", feature = "serial", feature = "usb", feature = "bt"))]
+    fn handle_get<'a, T>(vec: &'a [Option<T>], idx: i64, modul: &str, was: &str) -> R<&'a T> {
+        vec.get(idx as usize).and_then(|o| o.as_ref())
+            .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
+    }
+    #[cfg(any(feature = "db", feature = "net", feature = "serial", feature = "usb", feature = "bt"))]
+    fn handle_get_mut<'a, T>(vec: &'a mut [Option<T>], idx: i64, modul: &str, was: &str) -> R<&'a mut T> {
+        vec.get_mut(idx as usize).and_then(|o| o.as_mut())
+            .ok_or_else(|| format!("{}: {} {}", modul, was, idx))
+    }
+
     /// Modul `scene` (globaler Stack-State, kein Grafik-Bezug).
     // ===================================================================
     // Modul db (SQLite, Feature `db`)
@@ -2175,8 +2191,7 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "db")]
     fn db_conn(&self, idx: i64) -> R<&rusqlite::Connection> {
-        self.db_conns.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("DB: ungueltiges/geschlossenes DB_CONN-Handle {}", idx))
+        Self::handle_get(&self.db_conns, idx, "DB", "ungueltiges/geschlossenes DB_CONN-Handle")
     }
     #[cfg(feature = "db")]
     fn db_res(&self, idx: i64) -> R<&crate::db::DbResult> {
@@ -2254,28 +2269,23 @@ impl<'p> Vm<'p> {
 
     #[cfg(feature = "net")]
     fn net_listener(&self, idx: i64) -> R<&(std::net::TcpListener, i64)> {
-        self.tcp_listeners.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_LISTENER-Handle {}", idx))
+        Self::handle_get(&self.tcp_listeners, idx, "NET", "ungueltiges/geschlossenes NET_LISTENER-Handle")
     }
     #[cfg(feature = "net")]
     fn net_sock(&self, idx: i64) -> R<&crate::net::NetSock> {
-        self.tcp_socks.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_SOCKET-Handle {}", idx))
+        Self::handle_get(&self.tcp_socks, idx, "NET", "ungueltiges/geschlossenes NET_SOCKET-Handle")
     }
     #[cfg(feature = "net")]
     fn net_sock_mut(&mut self, idx: i64) -> R<&mut crate::net::NetSock> {
-        self.tcp_socks.get_mut(idx as usize).and_then(|o| o.as_mut())
-            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_SOCKET-Handle {}", idx))
+        Self::handle_get_mut(&mut self.tcp_socks, idx, "NET", "ungueltiges/geschlossenes NET_SOCKET-Handle")
     }
     #[cfg(feature = "net")]
     fn net_udp(&self, idx: i64) -> R<&crate::net::UdpSock> {
-        self.udp_socks.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_UDP-Handle {}", idx))
+        Self::handle_get(&self.udp_socks, idx, "NET", "ungueltiges/geschlossenes NET_UDP-Handle")
     }
     #[cfg(feature = "net")]
     fn net_udp_mut(&mut self, idx: i64) -> R<&mut crate::net::UdpSock> {
-        self.udp_socks.get_mut(idx as usize).and_then(|o| o.as_mut())
-            .ok_or_else(|| format!("NET: ungueltiges/geschlossenes NET_UDP-Handle {}", idx))
+        Self::handle_get_mut(&mut self.udp_socks, idx, "NET", "ungueltiges/geschlossenes NET_UDP-Handle")
     }
 
     #[cfg(feature = "net")]
@@ -2406,8 +2416,7 @@ impl<'p> Vm<'p> {
     }
     #[cfg(feature = "serial")]
     fn ser_port(&mut self, idx: i64) -> R<&mut crate::serial::Port> {
-        self.serial_ports.get_mut(idx as usize).and_then(|o| o.as_mut())
-            .ok_or_else(|| format!("SERIAL: ungueltiges/geschlossenes SERIAL_HANDLE {}", idx))
+        Self::handle_get_mut(&mut self.serial_ports, idx, "SERIAL", "ungueltiges/geschlossenes SERIAL_HANDLE")
     }
     #[cfg(feature = "serial")]
     fn try_serial_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -2444,8 +2453,7 @@ impl<'p> Vm<'p> {
     }
     #[cfg(feature = "usb")]
     fn usb_dev(&self, idx: i64) -> R<&hidapi::HidDevice> {
-        self.usb_devs.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("USB: ungueltiges/geschlossenes USB_HANDLE {}", idx))
+        Self::handle_get(&self.usb_devs, idx, "USB", "ungueltiges/geschlossenes USB_HANDLE")
     }
     #[cfg(feature = "usb")]
     fn try_usb_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
@@ -2471,23 +2479,26 @@ impl<'p> Vm<'p> {
     fn try_wifi(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         if !(name.starts_with("wifi_")) { return Ok(None); }
         #[cfg(feature = "wifi")]
-        {
-            use crate::wifi;
-            let v = match name {
-                "wifi_available" => Value::Bool(wifi::available()),
-                "wifi_current" => Value::str_rc(&wifi::current()?),
-                "wifi_signal" => Value::Int(wifi::signal()?),
-                "wifi_scan" => Value::str_rc(&wifi::scan()?),
-                "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
-                "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
-                "wifi_profiles" => Value::str_rc(&wifi::profiles()?),
-                "wifi_delete_profile" => Value::Bool(wifi::delete_profile(bi_str(a, 0, "WIFI_DELETE_PROFILE")?)?),
-                _ => return Ok(None),
-            };
-            return Ok(Some(v));
-        }
+        { return self.try_wifi_impl(name, a); }
         #[allow(unreachable_code)]
         { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "wifi")]
+    fn try_wifi_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::wifi;
+        let v = match name {
+            "wifi_available" => Value::Bool(wifi::available()),
+            "wifi_current" => Value::str_rc(&wifi::current()?),
+            "wifi_signal" => Value::Int(wifi::signal()?),
+            "wifi_scan" => Value::str_rc(&wifi::scan()?),
+            "wifi_connect" => Value::Bool(wifi::connect(bi_str(a, 0, "WIFI_CONNECT")?, bi_str(a, 1, "WIFI_CONNECT")?)?),
+            "wifi_disconnect" => Value::Bool(wifi::disconnect()?),
+            "wifi_profiles" => Value::str_rc(&wifi::profiles()?),
+            "wifi_delete_profile" => Value::Bool(wifi::delete_profile(bi_str(a, 0, "WIFI_DELETE_PROFILE")?)?),
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
     }
 
     // ===================================================================
@@ -2502,8 +2513,7 @@ impl<'p> Vm<'p> {
     }
     #[cfg(feature = "bt")]
     fn bt_periph(&self, idx: i64) -> R<&btleplug::platform::Peripheral> {
-        self.bt_periphs.get(idx as usize).and_then(|o| o.as_ref())
-            .ok_or_else(|| format!("BT: ungueltiges/getrenntes BT_HANDLE {}", idx))
+        Self::handle_get(&self.bt_periphs, idx, "BT", "ungueltiges/getrenntes BT_HANDLE")
     }
     #[cfg(feature = "bt")]
     fn try_bt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {

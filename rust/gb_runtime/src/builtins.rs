@@ -126,6 +126,24 @@ fn need_num(v: &Value, fn_: &str) -> Result<f64, String> {
     }
 }
 
+/// Validiert + liefert ein 1D-ARRAY OF INTEGER/FLOAT fuer die Array-Aggregat-
+/// Builtins (ARRAY_SUM/AVG/MIN/MAX) -- eine gemeinsame Pruefung statt vier
+/// fast identischer Kopien, die frueher leicht divergierten (ARRAY_SUM prüfte
+/// z.B. ueber die Cells-Variante statt `element_type`). Leere Arrays werden
+/// hier NICHT abgelehnt -- ARRAY_SUM erlaubt sie (Summe 0), AVG/MIN/MAX prüfen
+/// das selbst mit ihrer je eigenen "Array ist leer"-Meldung.
+fn numeric_1d_array<'a>(v: &'a Value, fn_: &str) -> Result<std::cell::Ref<'a, GbArray>, String> {
+    let arr = match v {
+        Value::Array(arr) => arr.borrow(),
+        _ => return Err(format!("{} erwartet ARRAY", fn_)),
+    };
+    if arr.dims.len() != 1 { return Err(format!("{}: nur 1D-Arrays", fn_)); }
+    if !matches!(arr.element_type.as_str(), "integer" | "float") {
+        return Err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_));
+    }
+    Ok(arr)
+}
+
 fn type_default(t: &str) -> Value {
     match t {
         "integer" => Value::Int(0),
@@ -1127,63 +1145,43 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // --- Array-Aggregate (1D) ---
         "array_sum" => {
             arity!(1);
-            if let Value::Array(arr) = &a[0] {
-                let arr = arr.borrow();
-                if arr.dims.len() != 1 { return err("ARRAY_SUM: nur 1D-Arrays".to_string()); }
-                match &arr.cells {
-                    Cells::Int(v) => {
-                        let mut s: i64 = 0;
-                        // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik).
-                        for &x in v { s = s.checked_add(x).ok_or_else(||
-                            "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?; }
-                        Ok(Value::Int(s))
+            let arr = numeric_1d_array(&a[0], "ARRAY_SUM")?;
+            if arr.element_type == "integer" {
+                let mut s: i64 = 0;
+                // Ueberlauf -> Fehler (konsistent mit Skalar-Arithmetik).
+                for v in arr.cells.iter() {
+                    match v {
+                        Value::Int(i) => s = s.checked_add(i).ok_or_else(||
+                            "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?,
+                        _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()),
                     }
-                    Cells::Float(v) => Ok(Value::Float(v.iter().sum())),
-                    Cells::Val(_) if arr.element_type == "integer" => {
-                        let mut s: i64 = 0;
-                        for v in arr.cells.iter() {
-                            match v {
-                                Value::Int(i) => s = s.checked_add(i).ok_or_else(||
-                                    "ARRAY_SUM: Ganzzahl-Ueberlauf (INTEGER ist 64-bit)".to_string())?,
-                                _ => return err("ARRAY_SUM: nicht-INTEGER-Element".to_string()),
-                            }
-                        }
-                        Ok(Value::Int(s))
-                    }
-                    _ => err("ARRAY_SUM: nur ARRAY OF INTEGER/FLOAT".to_string()),
                 }
-            } else { err("ARRAY_SUM erwartet ARRAY".to_string()) }
+                Ok(Value::Int(s))
+            } else {
+                Ok(Value::Float(arr.cells.iter().map(|v| as_f64(&v)).sum()))
+            }
         }
         "array_avg" => {
             arity!(1);
-            if let Value::Array(arr) = &a[0] {
-                let arr = arr.borrow();
-                if arr.dims.len() != 1 { return err("ARRAY_AVG: nur 1D-Arrays".to_string()); }
-                if !matches!(arr.element_type.as_str(), "integer" | "float") { return err("ARRAY_AVG: nur ARRAY OF INTEGER/FLOAT".to_string()); }
-                let n = arr.cells.len();
-                if n == 0 { return err("ARRAY_AVG: Array ist leer".to_string()); }
-                let mut s = 0.0f64;
-                for v in arr.cells.iter() { s += as_f64(&v); }
-                Ok(Value::Float(s / n as f64))
-            } else { err("ARRAY_AVG erwartet ARRAY".to_string()) }
+            let arr = numeric_1d_array(&a[0], "ARRAY_AVG")?;
+            let n = arr.cells.len();
+            if n == 0 { return err("ARRAY_AVG: Array ist leer".to_string()); }
+            let s: f64 = arr.cells.iter().map(|v| as_f64(&v)).sum();
+            Ok(Value::Float(s / n as f64))
         }
         "array_min" | "array_max" => {
             arity!(1);
-            if let Value::Array(arr) = &a[0] {
-                let arr = arr.borrow();
-                let fn_ = name.to_uppercase();
-                if arr.dims.len() != 1 { return err(format!("{}: nur 1D-Arrays", fn_)); }
-                if !matches!(arr.element_type.as_str(), "integer" | "float") { return err(format!("{}: nur ARRAY OF INTEGER/FLOAT", fn_)); }
-                if arr.cells.is_empty() { return err(format!("{}: Array ist leer", fn_)); }
-                let want_min = name == "array_min";
-                let mut best = arr.cells.get(0);
-                for i in 1..arr.cells.len() {
-                    let v = arr.cells.get(i);
-                    let take = if want_min { as_f64(&v) < as_f64(&best) } else { as_f64(&v) > as_f64(&best) };
-                    if take { best = v; }
-                }
-                Ok(best)
-            } else { err(format!("{} erwartet ARRAY", name.to_uppercase())) }
+            let fn_ = name.to_uppercase();
+            let arr = numeric_1d_array(&a[0], &fn_)?;
+            if arr.cells.is_empty() { return err(format!("{}: Array ist leer", fn_)); }
+            let want_min = name == "array_min";
+            let mut best = arr.cells.get(0);
+            for i in 1..arr.cells.len() {
+                let v = arr.cells.get(i);
+                let take = if want_min { as_f64(&v) < as_f64(&best) } else { as_f64(&v) > as_f64(&best) };
+                if take { best = v; }
+            }
+            Ok(best)
         }
         "array_fill" => {
             arity!(2);
@@ -1313,6 +1311,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::str_rc(&chars[chars.len() - n..].iter().collect::<String>()))
         }
         "mid$" | "mid" => {
+            if a.len() < 2 || a.len() > 3 { return err(format!("MID$: erwartet 2..3 Argumente, erhalten {}", a.len())); }
             let s = need_str(&a[0], "MID$")?;
             let chars: Vec<char> = s.chars().collect();
             let start = need_int(&a[1], "MID$")?.max(0) as usize;
@@ -1326,6 +1325,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "instr" => {
+            if a.len() < 2 || a.len() > 3 { return err(format!("INSTR: erwartet 2..3 Argumente, erhalten {}", a.len())); }
             let hay = need_str(&a[0], "INSTR")?;
             let needle = need_str(&a[1], "INSTR")?;
             let start = if a.len() == 3 { need_int(&a[2], "INSTR")?.max(0) as usize } else { 0 };

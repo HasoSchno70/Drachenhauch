@@ -85,7 +85,12 @@ impl Parser {
         if self.tt(0) == t { let tok = self.peek(0).clone(); self.pos += 1; Ok(tok) }
         else {
             let a = self.peek(0);
-            Err(ParseError { msg: msg.to_string(), line: a.line, col: a.col })
+            // Leere `msg` (viele Call-Sites geben "" bei bereits per match/check
+            // abgesicherten Erwartungen) faellt auf eine generische, aber nie
+            // ganz leere Meldung zurueck -- verhindert stumme "zeile:spalte: "
+            // Fehler an tatsaechlich erreichbaren Stellen (z.B. fehlende ')'/'=').
+            let text = if msg.is_empty() { format!("Erwartet {:?}", t) } else { msg.to_string() };
+            Err(ParseError { msg: text, line: a.line, col: a.col })
         }
     }
 
@@ -362,15 +367,9 @@ impl Parser {
         let var_name = format!("__with_{}", self.with_counter);
         self.with_counter += 1;
         self.with_stack.push(var_name.clone());
-        let mut body = Vec::new();
-        while !self.check(Tt::End) {
-            if self.at_end() {
-                self.with_stack.pop();
-                return self.err("END WITH erwartet, Programmende erreicht");
-            }
-            body.push(self.statement()?);
-        }
-        self.with_stack.pop();
+        let body = self.block_until(&[Tt::End], "END WITH erwartet, Programmende erreicht");
+        self.with_stack.pop();   // in jedem Fall abbauen (Erfolg UND Fehlerpfad)
+        let body = body?;
         self.expect(Tt::End, "")?;
         self.expect(Tt::With, "Erwartet WITH nach END")?;
         self.consume_terminator()?;
@@ -414,20 +413,13 @@ impl Parser {
     fn try_stmt(&mut self) -> R<Node> {
         self.expect(Tt::Try, "")?;
         self.consume_terminator()?;
-        let mut body = Vec::new();
-        while !self.check(Tt::Catch) && !self.check(Tt::End) {
-            if self.at_end() { return self.err("CATCH oder END TRY erwartet"); }
-            body.push(self.statement()?);
-        }
+        let body = self.block_until(&[Tt::Catch, Tt::End], "CATCH oder END TRY erwartet")?;
         let mut catch_var = String::new();
         let mut catch_block = Vec::new();
         if self.matches(Tt::Catch) {
             if self.check(Tt::Ident) { catch_var = sval(self.peek(0)); self.pos += 1; }
             self.consume_terminator()?;
-            while !self.check(Tt::End) {
-                if self.at_end() { return self.err("END TRY erwartet"); }
-                catch_block.push(self.statement()?);
-            }
+            catch_block = self.block_until(&[Tt::End], "END TRY erwartet")?;
         }
         self.expect(Tt::End, "")?;
         self.expect(Tt::Try, "Erwartet TRY nach END")?;
@@ -591,21 +583,20 @@ impl Parser {
                                  elseif_branches: vec![], else_block });
         }
         self.consume_terminator()?;
-        let mut then_block = Vec::new();
-        while !self.checks(&[Tt::Elseif, Tt::Else, Tt::End]) { then_block.push(self.statement()?); }
+        let then_terms = [Tt::Elseif, Tt::Else, Tt::End];
+        let then_block = self.block_until(&then_terms, "END IF erwartet, Programmende erreicht")?;
         let mut elseif_branches = Vec::new();
         while self.matches(Tt::Elseif) {
             let ec = self.expression()?;
             self.expect(Tt::Then, "")?;
             self.consume_terminator()?;
-            let mut block = Vec::new();
-            while !self.checks(&[Tt::Elseif, Tt::Else, Tt::End]) { block.push(self.statement()?); }
+            let block = self.block_until(&then_terms, "END IF erwartet, Programmende erreicht")?;
             elseif_branches.push((ec, block));
         }
         let mut else_block = Vec::new();
         if self.matches(Tt::Else) {
             self.consume_terminator()?;
-            while !self.check(Tt::End) { else_block.push(self.statement()?); }
+            else_block = self.block_until(&[Tt::End], "END IF erwartet, Programmende erreicht")?;
         }
         self.expect(Tt::End, "Erwartet END IF")?;
         self.expect(Tt::If, "Erwartet IF nach END")?;
@@ -641,11 +632,7 @@ impl Parser {
             while self.matches(Tt::Comma) { matches.push(self.case_match()?); }
             let guard = if self.matches(Tt::Where) { Some(self.expression()?) } else { None };
             self.consume_terminator()?;
-            let mut block = Vec::new();
-            while !self.checks(&[Tt::Case, Tt::End]) {
-                if self.at_end() { return self.err("END SELECT erwartet"); }
-                block.push(self.statement()?);
-            }
+            let block = self.block_until(&[Tt::Case, Tt::End], "END SELECT erwartet")?;
             cases.push((matches, guard, block));
         }
         self.expect(Tt::End, "Erwartet END SELECT")?;
@@ -705,11 +692,7 @@ impl Parser {
         self.expect(Tt::While, "")?;
         let cond = self.expression()?;
         self.consume_terminator()?;
-        let mut body = Vec::new();
-        while !self.check(Tt::Wend) {
-            if self.at_end() { return self.err("WEND erwartet, Programmende erreicht"); }
-            body.push(self.statement()?);
-        }
+        let body = self.block_until(&[Tt::Wend], "WEND erwartet, Programmende erreicht")?;
         self.expect(Tt::Wend, "")?;
         self.consume_terminator()?;
         Ok(Node::While { condition: Box::new(cond), body })
@@ -718,11 +701,7 @@ impl Parser {
     fn repeat(&mut self) -> R<Node> {
         self.expect(Tt::Repeat, "")?;
         self.consume_terminator()?;
-        let mut body = Vec::new();
-        while !self.check(Tt::Until) {
-            if self.at_end() { return self.err("UNTIL erwartet, Programmende erreicht"); }
-            body.push(self.statement()?);
-        }
+        let body = self.block_until(&[Tt::Until], "UNTIL erwartet, Programmende erreicht")?;
         self.expect(Tt::Until, "")?;
         let cond = self.expression()?;
         self.consume_terminator()?;
@@ -782,11 +761,7 @@ impl Parser {
             self.expect(Tt::In, "Erwartet IN nach FOR EACH <var>")?;
             let iterable = self.expression()?;
             self.consume_terminator()?;
-            let mut body = Vec::new();
-            while !self.check(Tt::Next) {
-                if self.at_end() { return self.err("NEXT erwartet, Programmende erreicht"); }
-                body.push(self.statement()?);
-            }
+            let body = self.block_until(&[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
             self.expect(Tt::Next, "")?;
             if self.check(Tt::Ident) { self.pos += 1; }
             self.consume_terminator()?;
@@ -799,11 +774,7 @@ impl Parser {
         let end = self.expression()?;
         let step = if self.matches(Tt::Step) { Some(Box::new(self.expression()?)) } else { None };
         self.consume_terminator()?;
-        let mut body = Vec::new();
-        while !self.check(Tt::Next) {
-            if self.at_end() { return self.err("NEXT erwartet, Programmende erreicht"); }
-            body.push(self.statement()?);
-        }
+        let body = self.block_until(&[Tt::Next], "NEXT erwartet, Programmende erreicht")?;
         self.expect(Tt::Next, "")?;
         if self.check(Tt::Ident) { self.pos += 1; }
         self.consume_terminator()?;
@@ -854,13 +825,22 @@ impl Parser {
         Ok(Param { name, type_name, default, by_ref, is_variadic: false })
     }
 
-    fn block_until_end(&mut self, what: &str) -> R<Vec<Node>> {
+    /// Sammelt Statements, bis eines der `terminators`-Tokens erreicht ist
+    /// (oder EOF -> Fehler `what`). Ersetzt die frueher ~13x fast identisch
+    /// duplizierte "while !check(...) { if at_end() {err} push(statement()) }"
+    /// Schleife (WITH/TRY/IF/SELECT-CASE/WHILE/REPEAT/FOR/FOR EACH/SUB/
+    /// FUNCTION/OPERATOR/PROPERTY). Konsumiert den Terminator NICHT selbst --
+    /// der Aufrufer prueft/erwartet ihn danach.
+    fn block_until(&mut self, terminators: &[Tt], what: &str) -> R<Vec<Node>> {
         let mut body = Vec::new();
-        while !self.check(Tt::End) {
+        while !self.checks(terminators) {
             if self.at_end() { return self.err(what); }
             body.push(self.statement()?);
         }
         Ok(body)
+    }
+    fn block_until_end(&mut self, what: &str) -> R<Vec<Node>> {
+        self.block_until(&[Tt::End], what)
     }
 
     fn sub_decl(&mut self) -> R<Node> {

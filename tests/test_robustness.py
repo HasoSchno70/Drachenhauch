@@ -4,10 +4,13 @@
 2. Referenz-Typen (ARRAY/MAP) sind ueber Identitaet gleich -- u.a. `a = a` TRUE.
 3. Ganzzahl-Ueberlauf (+,-,*,^, zu grosses Literal) -> klarer Laufzeitfehler
    statt still falschem Wert.
+4. Abgeschnittener IF/ELSEIF/ELSE-Block (kein END IF vor EOF) -> klarer
+   Parse-Fehler "END IF erwartet" statt eines beliebigen Expression-Fehlers
+   (die THEN/ELSEIF/ELSE-Body-Schleifen hatten frueher keinen at_end()-Check).
 """
 import pytest
 
-from gamebasic.errors import GameBasicError
+from gamebasic.errors import GameBasicError, ParseError
 
 
 # ------------------------------------------------ 1) Arity -> kein Absturz
@@ -127,3 +130,14 @@ def test_curve_bezier2_type_error_names_builtin(run_gb):
     # Fehlertext nennt CURVE_BEZIER2 (frueher Platzhalter "B").
     with pytest.raises(GameBasicError, match="CURVE_BEZIER2"):
         run_gb('IMPORT "curves"\nPRINT CURVE_BEZIER2(0.5,"x",0,0,0,0,0,0,0)\n')
+
+
+# ------------------------------------------------ 4) Abgeschnittenes Block-IF
+@pytest.mark.parametrize("src", [
+    'IF 1 = 1 THEN\nPRINT "hi"',                              # kein END IF
+    'IF 1 = 1 THEN\nPRINT "a"\nELSEIF 2 = 2 THEN\nPRINT "b"',  # bricht im ELSEIF-Zweig ab
+    'IF 1 = 1 THEN\nPRINT "a"\nELSE\nPRINT "b"',               # bricht im ELSE-Zweig ab
+])
+def test_unterminated_if_is_clean_parse_error(run_gb, src):
+    with pytest.raises(ParseError, match="END IF erwartet"):
+        run_gb(src)

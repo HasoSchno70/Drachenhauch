@@ -1274,6 +1274,16 @@ impl Gui {
                 "col_widths": t.col_widths, "selected": t.selected,
             });
         }
+        if let Some(t) = &w.tree {
+            o["tree"] = serde_json::json!({
+                "nodes": t.nodes.iter().map(|n| serde_json::json!({
+                    "label": n.label, "parent": n.parent, "level": n.level,
+                    "expanded": n.expanded, "has_children": n.has_children,
+                })).collect::<Vec<_>>(),
+                "selected": t.selected,
+            });
+        }
+        if w.tab_page != -1 { o["tab_page"] = serde_json::json!(w.tab_page); }
         o
     }
     fn widget_from_json(wj: &serde_json::Value) -> Result<Widget, String> {
@@ -1321,6 +1331,24 @@ impl Gui {
             ts.hover_row = -1; ts.clicked_row = -1;
             w.tbl = Some(Box::new(ts));
         }
+        if kind == Kind::Tree {
+            let mut ts = TreeState::default();
+            if let Some(tj) = wj.get("tree") {
+                if let Some(ns) = tj["nodes"].as_array() {
+                    ts.nodes = ns.iter().map(|nj| TreeNode {
+                        label: nj["label"].as_str().unwrap_or("").to_string(),
+                        parent: nj["parent"].as_i64().unwrap_or(-1) as i32,
+                        level: nj["level"].as_i64().unwrap_or(0) as i32,
+                        expanded: nj["expanded"].as_bool().unwrap_or(false),
+                        has_children: nj["has_children"].as_bool().unwrap_or(false),
+                    }).collect();
+                }
+                ts.selected = tj["selected"].as_i64().unwrap_or(-1) as i32;
+            }
+            ts.hover = -1;
+            w.tree = Some(Box::new(ts));
+        }
+        w.tab_page = wj["tab_page"].as_i64().unwrap_or(-1) as i32;
         w.anchor = wj["anchor"].as_str().map(Self::anchor_mask).unwrap_or(5);
         w.bx = w.x; w.by = w.y; w.bw = w.w; w.bh = w.h;   // Anchor-Basis = Design-Rechteck
         Ok(w)
@@ -1332,12 +1360,19 @@ impl Gui {
             .ok_or("GUI_SAVE/GUI_TO_JSON: ungueltiges GUI_WINDOW-Handle")?;
         let widgets: Vec<serde_json::Value> =
             win.widgets.iter().filter(|w| w.alive).map(Self::widget_json).collect();
+        let menus: Vec<serde_json::Value> = win.menus.iter().map(|m| serde_json::json!({
+            "label": m.label, "in_bar": m.in_bar,
+            "items": m.items.iter().map(|it| serde_json::json!({
+                "label": it.label, "separator": it.separator, "enabled": it.enabled,
+            })).collect::<Vec<_>>(),
+        })).collect();
         let obj = serde_json::json!({
             "title": win.title, "x": win.x, "y": win.y, "w": win.w, "h": win.h,
             "movable": win.movable, "closable": win.closable, "visible": win.visible,
             "resizable": win.resizable, "chrome": win.chrome,
             "min_w": win.min_w, "min_h": win.min_h, "max_w": win.max_w, "max_h": win.max_h,
             "widgets": widgets,
+            "menus": menus, "tabs": win.tabs, "active_tab": win.active_tab,
         });
         serde_json::to_string_pretty(&obj).map_err(|e| format!("GUI_SAVE: {}", e))
     }
@@ -1362,6 +1397,22 @@ impl Gui {
                 self.windows[wi].widgets.push(wdg);
             }
         }
+        if let Some(ms) = v["menus"].as_array() {
+            self.windows[wi].menus = ms.iter().map(|mj| Menu {
+                label: mj["label"].as_str().unwrap_or("").to_string(),
+                in_bar: mj["in_bar"].as_bool().unwrap_or(true),
+                items: mj["items"].as_array().map(|its| its.iter().map(|itj| MenuItem {
+                    label: itj["label"].as_str().unwrap_or("").to_string(),
+                    separator: itj["separator"].as_bool().unwrap_or(false),
+                    enabled: itj["enabled"].as_bool().unwrap_or(true),
+                    clicked: false,
+                }).collect()).unwrap_or_default(),
+            }).collect();
+        }
+        if let Some(ts) = v["tabs"].as_array() {
+            self.windows[wi].tabs = ts.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+        }
+        self.windows[wi].active_tab = v["active_tab"].as_i64().unwrap_or(0) as i32;
         Ok(h)
     }
 
@@ -1522,6 +1573,18 @@ impl Gui {
     fn acc_col(&self, w: &Widget) -> i64 {
         let a = self.wcol(w, "accent", "accent");
         if !w.enabled { shade(a, -70) } else { a }
+    }
+    /// Halbtransparente Selektions-Hintergrundfarbe (ARGB) hinter markiertem
+    /// Text -- gemeinsam fuer TextInput/TextArea (frueher an beiden Stellen
+    /// dupliziert).
+    fn selection_bg(&self, wdg: &Widget) -> i64 {
+        let acc = self.wcol(wdg, "accent", "accent");
+        ((0x66i64) << 24) | (acc & 0xFFFFFF)
+    }
+    /// Ob der Text-Caret in diesem Frame sichtbar ist (Blink-Takt) --
+    /// gemeinsam fuer TextInput/TextArea.
+    fn caret_blink_on(&self) -> bool {
+        (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0
     }
     /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
@@ -2629,15 +2692,13 @@ impl Gui {
                         if lo != hi {
                             let x0 = tx + g.text_width(&chars[..lo as usize].iter().collect::<String>()) - scroll;
                             let x1 = tx + g.text_width(&chars[..hi as usize].iter().collect::<String>()) - scroll;
-                            let acc = self.wcol(wdg, "accent", "accent");
-                            let selbg = ((0x66i64) << 24) | (acc & 0xFFFFFF);   // ARGB, halbtransparent
-                            g.box_fill(x0, ay + 2, x1, ay + h - 3, selbg);
+                            g.box_fill(x0, ay + 2, x1, ay + h - 3, self.selection_bg(wdg));
                         }
                     }
                     self.wtext(g, wdg, tx - scroll, ty, wdg.text.clone(), fg);
                 }
                 // Caret (blinkend) an der gemessenen Position.
-                if focused && (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0 {
+                if focused && self.caret_blink_on() {
                     let pre: String = wdg.text.chars().take(wdg.caret.max(0) as usize).collect();
                     let cx = tx + g.text_width(&pre) - scroll;
                     g.line(cx, ay + 3, cx, ay + h - 4, fg);
@@ -2664,8 +2725,7 @@ impl Gui {
                     let lo = wdg.caret.min(wdg.sel_anchor).clamp(0, chars.len() as i32);
                     let hi = wdg.caret.max(wdg.sel_anchor).clamp(0, chars.len() as i32);
                     if focused && lo != hi {
-                        let acc = self.wcol(wdg, "accent", "accent");
-                        let selbg = ((0x66i64) << 24) | (acc & 0xFFFFFF);   // ARGB, halbtransparent
+                        let selbg = self.selection_bg(wdg);
                         for r in 0..view_lines {
                             let li = scroll + r;
                             if li < 0 || li as usize >= starts.len() { continue; }
@@ -2689,7 +2749,7 @@ impl Gui {
                         self.wtext(g, wdg, ax + pad, ay + pad + r * lh, lines[li as usize].to_string(), fg);
                     }
                 }
-                if focused && (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0 {
+                if focused && self.caret_blink_on() {
                     let chars: Vec<char> = wdg.text.chars().collect();
                     let starts = Self::line_starts(&chars);
                     let crow = starts.iter().rposition(|&s| s as i32 <= wdg.caret).unwrap_or(0);
