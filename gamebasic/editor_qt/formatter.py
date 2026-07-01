@@ -15,6 +15,15 @@ Subtilitaeten:
 
 Single-Line-IFs (`IF x THEN PRINT 1`) erhoehen den Indent NICHT --
 nur `IF ... THEN` ohne Statement nach THEN ist ein Block-Opener.
+
+Zusaetzlich: nach jedem Block-Ende (`END SUB`/`END FUNCTION`/`NEXT`/`WEND`/...)
+wird -- falls nicht schon vorhanden -- EINE Leerzeile eingefuegt, bevor der
+naechste Code/Kommentar folgt. Ohne diese Regel klebten aufeinanderfolgende
+SUB/FUNCTION-Definitionen (oder ein Block-Ende + der Kommentar der naechsten
+Sektion) ohne jede optische Trennung aneinander -- lesbarkeitsschaedlich bei
+langen Programmen. Kein Einfuegen, wenn direkt ein WEITERES Block-Ende oder
+eine Zwischen-Klausel (`ELSE`/`ELSEIF`/`CASE`/`CATCH`) folgt (verschachtelte
+END-Ketten wie `END SUB` direkt vor `END CLASS` bleiben zusammen).
 """
 from __future__ import annotations
 
@@ -114,4 +123,24 @@ def format_source(source: str) -> str:
             level += 1
             continue
         out.append(render(level, body))
-    return "\n".join(out)
+    return "\n".join(_ensure_blank_after_closers(out))
+
+
+def _ensure_blank_after_closers(lines: list[str]) -> list[str]:
+    """Fuegt nach jeder Block-Ende-Zeile eine Leerzeile ein, falls dort noch
+    keine steht -- ausser die naechste Zeile ist selbst ein Block-Ende oder
+    eine Zwischen-Klausel (dann bleibt die END-Kette/Klausel zusammen)."""
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        out.append(line)
+        stripped = line.strip()
+        if not stripped or _classify(stripped) != "close":
+            continue
+        nxt = lines[i + 1] if i + 1 < len(lines) else None
+        if nxt is None:
+            continue
+        nxt_stripped = nxt.strip()
+        if nxt_stripped == "" or _classify(nxt_stripped) in ("close", "mid"):
+            continue
+        out.append("")
+    return out

@@ -415,7 +415,7 @@ class GameBasicEditor(QMainWindow):
         self.act_command_palette.setShortcut(QKeySequence("Ctrl+Shift+P"))
         self.act_command_palette.triggered.connect(self._show_command_palette)
 
-        self.act_format_doc = QAction("Indent normalisieren (Dokument formatieren)", self)
+        self.act_format_doc = QAction("Dokument formatieren (Einrueckung + Leerzeilen)", self)
         self.act_format_doc.setShortcut(QKeySequence("Shift+Alt+F"))
         self.act_format_doc.triggered.connect(self._format_document)
 
@@ -947,7 +947,10 @@ class GameBasicEditor(QMainWindow):
                     st.editor.document().setModified(True)
                     st.editor.goto_line(cur_line)
             except Exception:
-                pass
+                # Frueher komplett stumm -- ein Format-Fehler mitten im Save
+                # (nach set_text() bereits angewendet) blieb unsichtbar.
+                self.statusBar().showMessage(
+                    "Format-on-Save fehlgeschlagen -- unformatiert gespeichert.", 5000)
         try:
             path.write_text(st.editor.get_text(), encoding="utf-8")
         except OSError as exc:

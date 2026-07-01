@@ -125,3 +125,76 @@ def test_idempotent():
     once = format_source(src)
     twice = format_source(once)
     assert once == twice
+
+
+# --------------------------------------------------- Leerzeilen nach Block-Ende
+# Review-Fund: aufeinanderfolgende SUB/FUNCTION-Definitionen (oder ein
+# Block-Ende direkt vor dem Kommentar der naechsten Sektion) klebten ohne
+# jede optische Trennung aneinander.
+
+def test_blank_line_inserted_between_adjacent_functions():
+    src = (
+        "FUNCTION a() AS INTEGER\n"
+        "    RETURN 1\n"
+        "END FUNCTION\n"
+        "FUNCTION b() AS INTEGER\n"
+        "    RETURN 2\n"
+        "END FUNCTION"
+    )
+    expected = (
+        "FUNCTION a() AS INTEGER\n"
+        "    RETURN 1\n"
+        "END FUNCTION\n"
+        "\n"
+        "FUNCTION b() AS INTEGER\n"
+        "    RETURN 2\n"
+        "END FUNCTION"
+    )
+    assert format_source(src) == expected
+
+
+def test_blank_line_inserted_before_next_section_comment():
+    src = (
+        "SUB a()\n"
+        "    PRINT 1\n"
+        "END SUB\n"
+        "' naechste Sektion\n"
+        "SUB b()\n"
+        "    PRINT 2\n"
+        "END SUB"
+    )
+    out = format_source(src).split("\n")
+    assert out[2] == "END SUB"
+    assert out[3] == ""
+    assert out[4] == "' naechste Sektion"
+
+
+def test_no_blank_line_between_nested_closers():
+    """END SUB direkt vor END CLASS bleibt zusammen -- keine Leerzeile
+    zwischen verschachtelten Block-Enden."""
+    src = (
+        "CLASS Player\n"
+        "SUB Init()\n"
+        "Self.hp = 0\n"
+        "END SUB\n"
+        "END CLASS"
+    )
+    out = format_source(src).split("\n")
+    assert out[-2] == "    END SUB"
+    assert out[-1] == "END CLASS"
+
+
+def test_no_blank_line_before_else_or_case():
+    """END IF/... direkt vor ELSE/CASE/CATCH bekommt KEINE Leerzeile
+    (das sind Klauseln DESSELBEN Blocks, keine neue Sektion)."""
+    src = "FOR i = 1 TO 3\nIF i = 1 THEN\nPRINT 1\nEND IF\nNEXT"
+    assert "\n\n" not in format_source(src)
+
+
+def test_no_blank_line_already_present_stays_single():
+    """Bereits vorhandene Leerzeile wird nicht verdoppelt (Idempotenz)."""
+    src = "SUB a()\nEND SUB\n\nSUB b()\nEND SUB"
+    once = format_source(src)
+    twice = format_source(once)
+    assert once == twice
+    assert "\n\n\n" not in once
