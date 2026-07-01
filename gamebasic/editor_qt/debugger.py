@@ -19,6 +19,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
@@ -109,8 +110,15 @@ class DebugController(QObject):
             try:
                 self._proc.stdin.write(json.dumps(obj) + "\n")
                 self._proc.stdin.flush()
-            except (OSError, ValueError):
-                pass
+            except (OSError, ValueError) as exc:
+                # Frueher hier still verschluckt: stirbt gbrt zwischen zwei
+                # Kommandos, wurde z.B. "Continue" zu einem No-Op ohne jede
+                # Rueckmeldung. Nur melden, wenn wir nicht ohnehin schon ein
+                # finished/error-Event gesehen haben (dann ist das Ende
+                # bereits erklaert, keine zusaetzliche Fehlermeldung noetig).
+                if not self._got_terminal:
+                    self._mode = "idle"
+                    self.failed.emit(f"Debugger-Verbindung verloren: {exc}", -1)
 
     def _send_breakpoints(self) -> None:
         self._send({
@@ -136,13 +144,21 @@ class DebugController(QObject):
         # (gbrt debug bricht vor dem Lauf ab und schreibt nur stderr).
         if not self._got_terminal:
             err = ""
+            stderr_read_failed = False
             try:
                 err = (proc.stderr.read() or "").strip() if proc.stderr else ""
-            except Exception:  # noqa: BLE001
-                pass
+            except (OSError, ValueError):
+                # Vorher wurde ein Lesefehler hier zu "fertig" verwaschen --
+                # ein echter Absturz sah dann wie ein Erfolg aus. Jetzt als
+                # Fehler melden statt stillschweigend auf "fertig" zu fallen.
+                stderr_read_failed = True
             self._mode = "idle"
             if err:
                 self.failed.emit(err, self._err_line(err))
+                self.finished.emit("fehler")
+            elif stderr_read_failed:
+                self.failed.emit(
+                    "gbrt-Prozess beendet, stderr nicht lesbar (moeglicher Absturz)", -1)
                 self.finished.emit("fehler")
             else:
                 self.finished.emit("fertig")
@@ -219,4 +235,35 @@ class DebugController(QObject):
         self._send({"cmd": "step-out"})
 
     def stop(self) -> None:
+        """Sendet das Stop-Kommando; reagiert gbrt binnen kurzer Frist nicht
+        (haengt/abgestuerzt), wird der Prozess hart beendet. Frueher gab es
+        hier gar keinen Fallback (anders als profiler.py/output_console.py),
+        wodurch Subprozess + Reader-Thread bei einem haengenden gbrt
+        unbegrenzt weiterliefen."""
         self._send({"cmd": "stop"})
+        proc = self._proc
+        if proc is not None:
+            threading.Thread(target=self._stop_watchdog, args=(proc,), daemon=True).start()
+
+    @staticmethod
+    def _stop_watchdog(proc: subprocess.Popen) -> None:
+        # Gestaffelt wie profiler.run_profile: erst Zeit zum sauberen Beenden
+        # geben, dann terminate(), zuletzt kill() -- nutzt proc.poll() statt
+        # proc.wait(), damit es sich nicht mit dem proc.wait() im Reader-
+        # Thread (_read_loop) ueberschneidet.
+        for _ in range(20):                       # ~2s in 0.1s-Schritten
+            if proc.poll() is not None:
+                return
+            time.sleep(0.1)
+        try:
+            proc.terminate()
+        except OSError:
+            pass
+        for _ in range(10):                       # ~1s
+            if proc.poll() is not None:
+                return
+            time.sleep(0.1)
+        try:
+            proc.kill()
+        except OSError:
+            pass

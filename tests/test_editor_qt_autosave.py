@@ -136,3 +136,20 @@ def test_read_corrupted_json_returns_empty(tmp_autosave):
 def test_read_missing_manifest_returns_empty(tmp_autosave):
     # Keine manifest.json existiert
     assert read_manifest() == []
+
+
+def test_write_manifest_reports_success(tmp_autosave):
+    assert write_manifest([]) is True
+
+
+def test_write_manifest_reports_failure_on_oserror(tmp_autosave, monkeypatch):
+    # Review-Fund: write_manifest scheiterte frueher komplett stumm (Ordner
+    # nicht beschreibbar/voll) -- der Aufrufer (main_window._do_autosave)
+    # braucht den Rueckgabewert, um den User einmalig zu warnen.
+    from pathlib import Path as _Path
+
+    def _boom(self, *a, **kw):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_Path, "write_text", _boom)
+    assert write_manifest([]) is False

@@ -70,15 +70,12 @@ def _extract_profile_json(out: str) -> dict:
 
 
 def _find_gbrt():
-    """Pfad zur gebauten gbrt-Binary (release vor debug) oder None."""
-    import os
-    root = Path(__file__).resolve().parents[2]
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    for variant in ("release", "debug"):
-        p = root / "rust" / "gb_runtime" / "target" / variant / exe
-        if p.exists():
-            return p
-    return None
+    """Pfad zur gbrt-Binary (frozen-aware: installiert neben GameBasic.exe,
+    sonst Dev-Baum) oder None. Frueher eine eigene, engere Suche (nur
+    Dev-Baum) -- fand gbrt.exe im installierten Setup nicht. Jetzt wie
+    debugger.py/output_console.py ueber die gemeinsame gbrt_locate-Quelle."""
+    from .gbrt_locate import find_gbrt
+    return find_gbrt()
 
 
 def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:

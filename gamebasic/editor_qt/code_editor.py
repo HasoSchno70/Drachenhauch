@@ -179,11 +179,17 @@ class CodeEditor(
         self._find_hits: list[tuple[int, int]] = []
 
         # Color-Literale (&HRRGGBB / RGB(r,g,b)) -- als ExtraSelections gerendert
-        # (Hintergrund = die Farbe, Schrift im Kontrast). Cache wird bei jeder
-        # Text-Aenderung neu aufgebaut; gerendert wird ueber die Text-Engine,
-        # damit nichts flackert/verschwindet (kein Overlay-Clipping).
+        # (Hintergrund = die Farbe, Schrift im Kontrast). Cache wird neu aufgebaut,
+        # gerendert wird ueber die Text-Engine, damit nichts flackert/verschwindet
+        # (kein Overlay-Clipping). Debounced wie der Fold-Scan (150ms) -- vorher
+        # lief der volle Dokument-Scan synchron bei JEDEM textChanged, was bei
+        # grossen Dateien beim Tippen spuerbare Latenz verursachen konnte.
         self._color_literals: list[tuple[int, int, QColor, str]] = []
-        self.textChanged.connect(self._rescan_color_literals)
+        self._color_scan_timer = QTimer(self)
+        self._color_scan_timer.setSingleShot(True)
+        self._color_scan_timer.setInterval(150)
+        self._color_scan_timer.timeout.connect(self._rescan_color_literals)
+        self.textChanged.connect(self._color_scan_timer.start)
 
         # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
         self._breakpoints: set[int] = set()
@@ -250,7 +256,11 @@ class CodeEditor(
         self.setPlainText(content)
         self.document().setModified(False)
         self._find_hits = []
-        self._refresh_extra_selections()
+        # Programmatischer Volltext-Ersatz (Datei laden/Recovery/...) --
+        # sofort rescannen statt den Tipp-Debounce abzuwarten. Ruft intern
+        # bereits _refresh_extra_selections() auf.
+        self._color_scan_timer.stop()
+        self._rescan_color_literals()
 
     def goto_line(self, line: int) -> None:
         line = max(1, line)

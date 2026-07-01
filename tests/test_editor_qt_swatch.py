@@ -130,3 +130,38 @@ def test_clickable_opens_picker(app):
     _s, _e, color, kind = hit
     assert kind == "hex"
     assert color.red() == 0xFF and color.green() == 0x88 and color.blue() == 0x00
+
+
+# --- Debounce beim Tippen (Review-Fund: vorher synchroner Voll-Scan) -----
+
+def test_typing_debounces_rescan(app):
+    # set_text() (Datei laden) scannt weiterhin SOFORT -- Tippen (insertText
+    # via QTextCursor, wie es echte Tastatureingabe ausloest) wird gedrosselt:
+    # direkt danach ist der Cache noch der ALTE, erst nach Ablauf des Timers
+    # aktuell.
+    ed = _editor(app, "col = &HFF8800")
+    assert len(ed._color_literals) == 1
+    assert not ed._color_scan_timer.isActive()
+
+    cur = ed.textCursor()
+    cur.movePosition(cur.MoveOperation.End)
+    cur.insertText(" : x = &H001122")
+    app.processEvents()
+    # Timer laeuft jetzt, hat aber (ohne echten Zeitablauf) noch nicht gefeuert.
+    assert ed._color_scan_timer.isActive()
+    assert len(ed._color_literals) == 1
+
+    from PySide6.QtTest import QTest
+    QTest.qWait(250)
+    app.processEvents()
+    assert len(ed._color_literals) == 2
+
+
+def test_set_text_rescans_synchronously(app):
+    # Programmatischer Volltext-Ersatz darf NICHT auf den Debounce warten
+    # (Caller/Tests erwarten sofort aktuelle _color_literals).
+    ed = _editor(app, "x = 1")
+    assert ed._color_literals == []
+    ed.set_text("col = &HFF8800")
+    assert len(ed._color_literals) == 1
+    assert not ed._color_scan_timer.isActive()

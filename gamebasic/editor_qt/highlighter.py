@@ -27,7 +27,7 @@ _CONTROL_KW = {
     TokenType.BREAK, TokenType.CONTINUE, TokenType.END,
     TokenType.TRY, TokenType.CATCH, TokenType.THROW,
     TokenType.SELECT, TokenType.CASE, TokenType.IS, TokenType.WHERE,
-    TokenType.REPEAT, TokenType.UNTIL,
+    TokenType.REPEAT, TokenType.UNTIL, TokenType.YIELD,
 }
 _DECL_KW = {
     TokenType.DIM, TokenType.AS, TokenType.SUB, TokenType.FUNCTION,
@@ -39,12 +39,12 @@ _DECL_KW = {
     TokenType.ARRAY, TokenType.OF, TokenType.MAP, TokenType.IMPORT,
     TokenType.BYREF, TokenType.ENUM, TokenType.WITH, TokenType.STATIC,
     TokenType.FUNCREF, TokenType.IN, TokenType.PROPERTY,
-    TokenType.DATA, TokenType.READ, TokenType.RESTORE,
+    TokenType.DATA, TokenType.READ, TokenType.RESTORE, TokenType.OPERATOR,
 }
 _TYPE_KW = {
     TokenType.INTEGER, TokenType.FLOAT, TokenType.STRING_TYPE,
     TokenType.BOOLEAN, TokenType.IMAGE, TokenType.SOUND, TokenType.FILE,
-    TokenType.TUPLE,
+    TokenType.TUPLE, TokenType.COROUTINE,
 }
 
 
@@ -80,7 +80,7 @@ def classify_token(tok) -> str | None:
         return "string"
     if t == TokenType.NUMBER:
         return "number"
-    if t in (TokenType.TRUE, TokenType.FALSE):
+    if t in (TokenType.TRUE, TokenType.FALSE, TokenType.NIL):
         return "bool"
     if t in _CONTROL_KW:
         return "ctrl"

@@ -60,7 +60,10 @@ class RecoveryEntry:
         return autosave_dir() / self.autosave_file
 
 
-def write_manifest(entries: list[RecoveryEntry]) -> None:
+def write_manifest(entries: list[RecoveryEntry]) -> bool:
+    """Liefert False bei Schreibfehler (z.B. Ordner nicht beschreibbar/voll)
+    -- der Aufrufer kann das nutzen, um dem User EINMALIG einen Hinweis zu
+    geben, statt dass das Autosave-Sicherheitsnetz unbemerkt ausfaellt."""
     try:
         manifest_path().write_text(
             json.dumps(
@@ -73,8 +76,9 @@ def write_manifest(entries: list[RecoveryEntry]) -> None:
             ),
             encoding="utf-8",
         )
+        return True
     except OSError:
-        pass
+        return False
 
 
 def read_manifest() -> list[RecoveryEntry]:
@@ -83,7 +87,7 @@ def read_manifest() -> list[RecoveryEntry]:
         return []
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return []
     if not isinstance(data, list):
         return []

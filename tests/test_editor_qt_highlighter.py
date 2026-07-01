@@ -60,3 +60,38 @@ def test_unterminated_fstring_extends_to_eol():
     # 'PRINT f"unterminiert' -- 6+14 = bis zum Zeilenende
     src = 'PRINT f"unterminiert'
     assert F(src) == [(6, 14)]
+
+
+# ------------------------------------------------ Keyword-Klassifikation
+# Review-Fund: OPERATOR/YIELD/COROUTINE/NIL sind fertige Sprach-Features,
+# wurden aber im Highlighter (und im Completer) wie normale Identifier
+# behandelt, weil sie bei ihrer Einfuehrung nicht in die Klassifikations-
+# Sets uebernommen wurden. Diese Tests sichern die Klassen ab, damit
+# zukuenftige neue Keywords nicht denselben Drift erzeugen.
+from gamebasic.editor_qt.highlighter import line_color_spans
+
+
+def test_coroutine_type_is_classified():
+    spans = line_color_spans("DIM c AS COROUTINE")
+    assert ("type" in [s[2] for s in spans])
+
+
+def test_yield_is_classified_as_ctrl():
+    spans = line_color_spans("YIELD 1")
+    assert spans[0][2] == "ctrl"
+
+
+def test_operator_is_classified_as_decl():
+    spans = line_color_spans("OPERATOR + (other AS Money) AS Money")
+    assert spans[0][2] == "decl"
+
+
+def test_nil_is_classified_as_bool():
+    spans = line_color_spans("PRINT x = NIL")
+    assert spans[-1][2] == "bool"
+
+
+def test_completer_keywords_include_new_features():
+    from gamebasic.editor_qt.completer import KEYWORDS
+    for kw in ("OPERATOR", "YIELD", "COROUTINE", "NIL"):
+        assert kw in KEYWORDS, kw

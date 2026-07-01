@@ -146,3 +146,36 @@ def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
     assert con.start_run_auto(tmp_path / "x.gb") == "py"
     assert "gbrun.py" in con.text.toPlainText()
+
+
+# --- _on_error: FailedToStart-Race nach erfolgreichem waitForStarted -----
+# Review-Fund: `errorOccurred` wurde komplett ignoriert -- bei einem
+# asynchronen FailedToStart NACH dem waitForStarted()-Check blieb die
+# Konsole im "laeuft"-Zustand haengen (kein finished, kein Fehlertext).
+
+def test_on_error_failed_to_start_resets_state(_qapp, tmp_path):
+    from PySide6.QtCore import QProcess
+    con = _console(_qapp, tmp_path)
+    con._proc = object()          # simuliert einen (vermeintlich) laufenden Prozess
+    con.input_entry.setEnabled(True)
+    got_finished = []
+    con.process_finished.connect(lambda code: got_finished.append(code))
+    con._on_error(QProcess.ProcessError.FailedToStart)
+    assert con._proc is None
+    assert not con.input_entry.isEnabled()
+    assert got_finished == [-1]
+    assert "nicht gestartet" in con.text.toPlainText()
+
+
+def test_on_error_other_kinds_are_noop(_qapp, tmp_path):
+    # Andere Fehlerarten schliessen regulaer ueber `finished` ab -- hier
+    # darf nichts passieren (kein doppeltes process_finished).
+    from PySide6.QtCore import QProcess
+    con = _console(_qapp, tmp_path)
+    sentinel = object()
+    con._proc = sentinel
+    got_finished = []
+    con.process_finished.connect(lambda code: got_finished.append(code))
+    con._on_error(QProcess.ProcessError.Crashed)
+    assert con._proc is sentinel
+    assert got_finished == []

@@ -86,6 +86,20 @@ def test_compile_error_reports_failed_with_line(app, tmp_path):
     assert line == 2 or ":2:" in msg
 
 
+def test_stop_terminates_infinite_loop(app, tmp_path):
+    # Review-Fund: stop() sendete frueher NUR das JSON-Kommando ohne
+    # Fallback -- haengt/ignoriert gbrt das Stop-Signal, blieben Subprozess
+    # + Reader-Thread unbegrenzt am Leben. Der Watchdog garantiert jetzt
+    # eine obere Zeitschranke (~3s) bis zum harten Beenden.
+    dc, ev = _controller()
+    src = 'WHILE TRUE\nWEND\n'
+    dc.set_breakpoints([])
+    assert dc.start(src, str(tmp_path)) is True
+    assert _pump(app, lambda: ev["paused"]), "Start & Halt an Zeile 1 ausgeblieben"
+    dc.stop()
+    assert _pump(app, lambda: ev["finished"], timeout=8.0), "stop() hat nie beendet"
+
+
 def test_conditional_breakpoint(app, tmp_path):
     dc, ev = _controller()
     src = ('DIM i AS INTEGER\n'

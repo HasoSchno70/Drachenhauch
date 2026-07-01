@@ -469,10 +469,24 @@ class OutputConsole(QWidget):
         self.input_entry.clear()
         self.process_finished.emit(exit_code)
 
-    def _on_error(self, _err) -> None:
-        # Kommt z.B. bei "Datei nicht gefunden". Abschluss kommt parallel
-        # ueber `finished` -- hier nichts zu tun.
-        return
+    def _on_error(self, err) -> None:
+        # `errorOccurred` kann VOR `finished` feuern. Bei den meisten
+        # Fehlerarten (Crashed/Timedout/Read-/WriteError) schliesst `finished`
+        # die Ausfuehrung trotzdem regulaer ab -- hier nichts zu tun. Bei
+        # `FailedToStart` kommt laut Qt-Doku aber NIE ein `finished` (der
+        # Prozess wurde nie gestartet); frueher wurde das hier komplett
+        # ignoriert, wodurch die Konsole im "laeuft"-Zustand haengen blieb
+        # (Eingabefeld aktiv, kein Fehlertext, kein process_finished-Signal).
+        # `waitForStarted()` beim Start faengt den Normalfall bereits ab --
+        # das hier deckt die seltene Race ab, in der der Start asynchron
+        # NACH dem `waitForStarted`-Timeout noch scheitert.
+        if err == QProcess.ProcessError.FailedToStart:
+            self.append("\n✗ Programm konnte nicht gestartet werden.\n", "error")
+            self._proc = None
+            self.input_entry.setEnabled(False)
+            self.input_entry.setPlaceholderText("(kein Programm aktiv)")
+            self.input_entry.clear()
+            self.process_finished.emit(-1)
 
     def _send_user_input(self) -> None:
         if not self.is_running():

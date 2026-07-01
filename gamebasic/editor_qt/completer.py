@@ -25,6 +25,7 @@ KEYWORDS = sorted({
     "BAND", "BOR", "BXOR", "BNOT", "SHL", "SHR",
     "TUPLE", "WITH", "STATIC", "FUNCREF", "IN", "WHERE", "PROPERTY",
     "ENUM", "SELECT", "CASE", "REPEAT", "UNTIL", "DATA", "READ", "RESTORE",
+    "OPERATOR", "YIELD", "COROUTINE", "NIL",
 })
 
 
@@ -41,7 +42,7 @@ def collect_builtins() -> list[str]:
     names: set[str] = set()
     try:
         # Builtin-Namen aus dem eingefrorenen gbrt-Metadaten-Index (Stufe B) --
-        # keine Laufzeit-Abhaengigkeit mehr von interpreter.py/Registry.
+        # keine Laufzeit-Abhaengigkeit vom (laengst entfernten) Tree-Walker.
         from .gbrt_meta import builtin_names_upper
         names.update(builtin_names_upper())
     except Exception:
