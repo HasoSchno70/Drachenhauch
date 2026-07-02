@@ -39,3 +39,25 @@ def test_is_available_with_logo_present():
     if not _logo_path().exists():
         pytest.skip("Logo-Datei nicht im Repo")
     assert is_available() is True
+
+
+def test_scaled_logo_image_scales_proportionally():
+    """Gemeinsamer Helfer fuer AboutDialog/WelcomePanel (Review-Fund: beide
+    duplizierten frueher identisches Laden+Skalieren mit nur abweichendem
+    target_w)."""
+    pytest.importorskip("PIL")
+    from gamebasic.branding import scaled_logo_image, is_available, _logo_path
+    if not _logo_path().exists():
+        pytest.skip("Logo-Datei nicht im Repo")
+    assert is_available()
+    img = scaled_logo_image(320)
+    assert img is not None
+    w, h = img.size
+    assert w == 320
+    assert h > 0
+
+
+def test_scaled_logo_image_none_when_unavailable(monkeypatch):
+    import gamebasic.branding as branding
+    monkeypatch.setattr(branding, "is_available", lambda: False)
+    assert branding.scaled_logo_image(480) is None

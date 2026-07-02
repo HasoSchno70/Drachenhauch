@@ -117,7 +117,10 @@ def _run_git(args, cwd) -> tuple[int, str, str]:
         return p.returncode, p.stdout, p.stderr
     except FileNotFoundError:
         return 127, "", "git nicht gefunden"
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, subprocess.SubprocessError) as exc:
+        # Nicht mehr blankes `except Exception` -- das haette auch echte
+        # Programmierfehler (z.B. TypeError bei falschem `args`) stumm als
+        # "Git-Fehler" maskiert statt sie als Bug sichtbar zu lassen.
         return 1, "", str(exc)
 
 

@@ -327,15 +327,10 @@ class AboutDialog(QDialog):
         logo_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         try:
             from .. import branding
-            from PIL import Image
             from PIL.ImageQt import ImageQt
             from PySide6.QtGui import QPixmap
-            if branding.is_available():
-                pil = Image.open(branding._logo_path()).convert("RGBA")
-                target_w = 320
-                ratio = target_w / pil.size[0]
-                target_h = max(1, int(pil.size[1] * ratio))
-                scaled = pil.resize((target_w, target_h), Image.LANCZOS)
+            scaled = branding.scaled_logo_image(320)
+            if scaled is not None:
                 qimg = ImageQt(scaled).copy()
                 self._logo_pixmap = QPixmap.fromImage(qimg)
                 logo_lbl.setPixmap(self._logo_pixmap)

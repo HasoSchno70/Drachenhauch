@@ -51,23 +51,35 @@ def _find_gbrt():
     return find_gbrt()
 
 
-def _check_source(source: str, base_path: Path | None) -> list[ParseProblem]:
+def _check_source(source: str, base_path: Path | None,
+                   checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
     """Liefert ALLE Diagnostik-Probleme (leer = sauber). Bevorzugt `gbrt --check`
     (volle preprocess/lex/parse/compile-Diagnostik mit Zeile, inkl. Warnungen);
     faellt gbrt, nur Syntax (Lexer/Parser) ohne den Python-Compiler -- dieser
-    Fallback findet nur das erste Syntaxproblem."""
+    Fallback findet nur das erste Syntaxproblem. `checker` (optional) registriert
+    den laufenden gbrt-Subprozess, damit ein neuerer `check()`-Aufruf ihn
+    abbrechen kann (siehe LiveErrorChecker.check)."""
     gbrt = _find_gbrt()
     if gbrt is not None:
-        return _check_via_gbrt(source, base_path, gbrt)
+        return _check_via_gbrt(source, base_path, gbrt, checker)
     one = _check_syntax_only(source, base_path)
     return [one] if one is not None else []
 
 
-def _check_via_gbrt(source: str, base_path, gbrt) -> list[ParseProblem]:
+_DIAG_FAILED_MSG = "Diagnose fehlgeschlagen -- moeglicherweise veraltete Fehleranzeige"
+
+
+def _check_via_gbrt(source: str, base_path, gbrt,
+                     checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
     """`gbrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> Liste
     aller ParseProblems (Errors UND Warnungen). Zeilen sind quell-relativ (bei
-    `IMPORT "datei.gb"`-Inlining moeglw. verschoben). Bei jedem gbrt-Fehler
-    defensiv leere Liste (kein Editor-Crash)."""
+    `IMPORT "datei.gb"`-Inlining moeglw. verschoben).
+
+    Frueher gab jeder gbrt-Fehler (Crash/Timeout/kaputtes JSON) eine leere
+    Liste zurueck -- der Editor zeigte dann "keine Fehler", obwohl der
+    Checker selbst kaputt war (irrefuehrender als gar keine Diagnose). Jetzt
+    wird ein einzelnes Warning-ParseProblem geliefert, das das transparent
+    macht, statt es zu verschweigen."""
     import json
     import os
     import subprocess
@@ -76,14 +88,27 @@ def _check_via_gbrt(source: str, base_path, gbrt) -> list[ParseProblem]:
     tmp_dir = str(base) if Path(base).is_dir() else None
     fd, tmp = tempfile.mkstemp(suffix=".gb", dir=tmp_dir)
     os.close(fd)
+    proc = None
     try:
         Path(tmp).write_text(source, encoding="utf-8")
-        r = subprocess.run([str(gbrt), "--check", tmp],
-                           capture_output=True, text=True, timeout=15)
-        diags = json.loads(r.stdout or "[]")
-    except Exception:
-        return []
+        proc = subprocess.Popen(
+            [str(gbrt), "--check", tmp],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        if checker is not None:
+            checker._set_active_proc(proc)
+        stdout, _ = proc.communicate(timeout=15)
+        diags = json.loads(stdout or "[]")
+    except subprocess.TimeoutExpired:
+        return [ParseProblem(line=1, message="Diagnose-Timeout (gbrt --check antwortete nicht)",
+                             severity="warning", phase="diagnostic")]
+    except (OSError, ValueError):
+        # ValueError deckt json.JSONDecodeError ab (kaputtes/leeres stdout,
+        # z.B. bei einem gbrt-Absturz oder abgebrochenem Prozess).
+        return [ParseProblem(line=1, message=_DIAG_FAILED_MSG,
+                             severity="warning", phase="diagnostic")]
     finally:
+        if checker is not None:
+            checker._set_active_proc(None)
         try:
             os.unlink(tmp)
         except OSError:
@@ -164,19 +189,35 @@ class LiveErrorChecker(QObject):
         super().__init__(parent)
         self._gen = 0
         self._lock = threading.Lock()
+        self._active_proc = None   # laufender `gbrt --check`-Subprozess (falls einer)
 
     def check(self, source: str, base_path: Path | None = None) -> None:
         with self._lock:
             self._gen += 1
             gen = self._gen
+            proc = self._active_proc
+        # Einen noch laufenden Check-Subprozess abbrechen -- frueher wurde
+        # bei schnellem Tippen nur das ERGEBNIS verworfen (Generation-
+        # Counter), der `gbrt --check`-Prozess lief aber unbeaufsichtigt
+        # bis zum Ende weiter. Bei sehr schnellem Tippen konnten sich so
+        # mehrere Prozesse gleichzeitig ansammeln.
+        if proc is not None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
         t = threading.Thread(
             target=self._run, args=(gen, source, base_path),
             name="LiveErrorCheck", daemon=True,
         )
         t.start()
 
+    def _set_active_proc(self, proc) -> None:
+        with self._lock:
+            self._active_proc = proc
+
     def _run(self, gen: int, source: str, base_path: Path | None) -> None:
-        problems = _check_source(source, base_path)
+        problems = _check_source(source, base_path, self)
         # Ist dieses Resultat noch das aktuelle? Sonst verwerfen.
         with self._lock:
             if gen != self._gen:

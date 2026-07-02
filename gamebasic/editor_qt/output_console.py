@@ -459,6 +459,12 @@ class OutputConsole(QWidget):
             self.append("\n✓ Fertig.\n", "info")
         else:
             self.append(f"\n✗ Programm beendet mit Fehler-Code {exit_code}.\n", "error")
+        # deleteLater() statt nur die Python-Referenz zu droppen: als Kind
+        # von `self` (QProcess(self)) haette das beendete Objekt sonst bis
+        # zum Schliessen der Konsole selbst weitergelebt -- ueber viele
+        # Run-Zyklen sammelten sich so tote QProcess-Objekte an.
+        if self._proc is not None:
+            self._proc.deleteLater()
         self._proc = None
         # Temporaere .gbc eines Native-Runs aufraeumen.
         if self._native_gbc is not None:
@@ -482,6 +488,8 @@ class OutputConsole(QWidget):
         # NACH dem `waitForStarted`-Timeout noch scheitert.
         if err == QProcess.ProcessError.FailedToStart:
             self.append("\n✗ Programm konnte nicht gestartet werden.\n", "error")
+            if self._proc is not None:
+                self._proc.deleteLater()
             self._proc = None
             self.input_entry.setEnabled(False)
             self.input_entry.setPlaceholderText("(kein Programm aktiv)")

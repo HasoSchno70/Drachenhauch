@@ -93,3 +93,66 @@ def test_hardware_import_is_warning():
     if warns:                             # Default-Build: Hardware-Modul-Warnung
         assert warns[0].line == 1
         assert "wifi" in warns[0].message.lower()
+
+
+# --------------------------------------------------- Checker-Crash sichtbar
+# Review-Fund: ein gbrt-Absturz/kaputtes JSON lieferte frueher eine leere
+# Liste -- der Editor zeigte "keine Fehler", obwohl die Diagnose selbst
+# fehlgeschlagen war. Jetzt kommt ein sichtbares Warning-ParseProblem.
+
+def test_gbrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
+    import subprocess
+    import gamebasic.editor_qt.error_check as ec
+
+    class _FakeProc:
+        def communicate(self, timeout=None):
+            return "not json {{{", ""
+
+    monkeypatch.setattr(ec, "_find_gbrt", lambda: "gbrt")
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc())
+    probs = ec._check_source("PRINT 1\n", tmp_path)
+    assert len(probs) == 1
+    assert probs[0].severity == "warning"
+    assert probs[0].phase == "diagnostic"
+    assert "fehlgeschlagen" in probs[0].message.lower()
+
+
+def test_gbrt_timeout_yields_diagnostic_warning(tmp_path, monkeypatch):
+    import subprocess
+    import gamebasic.editor_qt.error_check as ec
+
+    class _FakeProc:
+        def communicate(self, timeout=None):
+            raise subprocess.TimeoutExpired(cmd="gbrt", timeout=15)
+
+    monkeypatch.setattr(ec, "_find_gbrt", lambda: "gbrt")
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc())
+    probs = ec._check_source("PRINT 1\n", tmp_path)
+    assert len(probs) == 1
+    assert probs[0].severity == "warning"
+    assert "timeout" in probs[0].message.lower()
+
+
+# --------------------------------------------------- Vorherigen Check abbrechen
+
+def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
+    """Ein zweiter check()-Aufruf muss den noch laufenden gbrt-Subprozess
+    des ersten Aufrufs abbrechen (statt ihn im Hintergrund weiterlaufen zu
+    lassen und nur das Ergebnis zu verwerfen)."""
+    import threading
+    from gamebasic.editor_qt.error_check import LiveErrorChecker
+
+    checker = LiveErrorChecker()
+    terminated = threading.Event()
+
+    class _StubProc:
+        def terminate(self):
+            terminated.set()
+
+    checker._set_active_proc(_StubProc())
+    # _run() nicht wirklich starten (kein gbrt/Qt-Loop noetig) -- nur die
+    # Cancel-Logik von check() selbst pruefen.
+    monkeypatch.setattr(
+        "gamebasic.editor_qt.error_check.threading.Thread.start", lambda self: None)
+    checker.check("PRINT 1\n", tmp_path)
+    assert terminated.is_set()

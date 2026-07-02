@@ -118,6 +118,15 @@ def _console(_qapp, tmp_path):
     return OutputConsole(tmp_path)
 
 
+def _pump_delete_later(app):
+    """deleteLater() wirkt erst, wenn der Event-Loop DeferredDelete-Events
+    zustellt -- ein einzelnes processEvents() reicht dafuer oft nicht."""
+    from PySide6.QtCore import QEvent
+    for _ in range(5):
+        app.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        app.processEvents()
+
+
 def test_run_auto_falls_back_when_gbrt_missing(_qapp, tmp_path, monkeypatch):
     import gamebasic.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_gbrt", lambda root: None)
@@ -148,6 +157,35 @@ def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
     assert "gbrun.py" in con.text.toPlainText()
 
 
+# --- QProcess-Cleanup: kein Leak toter Prozess-Objekte ueber Run-Zyklen --
+# Review-Fund: der alte self._proc haing (als Kind von `self`) nur an der
+# Python-Referenz -- ohne deleteLater() lebte das beendete QProcess-Objekt
+# bis zum Schliessen der Konsole weiter.
+
+def test_on_finished_deletes_old_proc(_qapp, tmp_path):
+    from PySide6.QtCore import QProcess
+    con = _console(_qapp, tmp_path)
+    proc = QProcess(con)
+    con._proc = proc
+    destroyed = []
+    proc.destroyed.connect(lambda: destroyed.append(True))
+    con._on_finished(0, None)
+    _pump_delete_later(_qapp)
+    assert destroyed == [True]
+
+
+def test_on_error_failed_to_start_deletes_old_proc(_qapp, tmp_path):
+    from PySide6.QtCore import QProcess
+    con = _console(_qapp, tmp_path)
+    proc = QProcess(con)
+    con._proc = proc
+    destroyed = []
+    proc.destroyed.connect(lambda: destroyed.append(True))
+    con._on_error(QProcess.ProcessError.FailedToStart)
+    _pump_delete_later(_qapp)
+    assert destroyed == [True]
+
+
 # --- _on_error: FailedToStart-Race nach erfolgreichem waitForStarted -----
 # Review-Fund: `errorOccurred` wurde komplett ignoriert -- bei einem
 # asynchronen FailedToStart NACH dem waitForStarted()-Check blieb die
@@ -156,7 +194,7 @@ def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
 def test_on_error_failed_to_start_resets_state(_qapp, tmp_path):
     from PySide6.QtCore import QProcess
     con = _console(_qapp, tmp_path)
-    con._proc = object()          # simuliert einen (vermeintlich) laufenden Prozess
+    con._proc = QProcess(con)      # simuliert einen (vermeintlich) laufenden Prozess
     con.input_entry.setEnabled(True)
     got_finished = []
     con.process_finished.connect(lambda code: got_finished.append(code))

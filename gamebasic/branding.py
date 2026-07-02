@@ -55,3 +55,18 @@ def _smart_square_crop(img):
         # Hoch -> Crop W x W, vertikal zentriert
         top = (h - w) // 2
         return img.crop((0, top, w, top + w))
+
+
+def scaled_logo_image(target_w: int):
+    """Laedt das Master-Logo und skaliert es proportional auf `target_w`
+    Pixel Breite. `None` wenn Pillow fehlt oder das Logo nicht existiert
+    (`is_available()` False). Reiner PIL-Rueckgabewert -- der Aufrufer
+    wandelt ihn in sein UI-Toolkit-Format um (z.B. QPixmap via ImageQt).
+    Frueher duplizierte jeder Qt-Aufrufer (AboutDialog, WelcomePanel) das
+    Laden+Skalieren identisch, nur `target_w` unterschied sich."""
+    if not is_available():
+        return None
+    pil = Image.open(_logo_path()).convert("RGBA")
+    ratio = target_w / pil.size[0]
+    target_h = max(1, int(pil.size[1] * ratio))
+    return pil.resize((target_w, target_h), Image.LANCZOS)

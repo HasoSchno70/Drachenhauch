@@ -196,16 +196,11 @@ class WelcomePanel(QWidget):
     def _load_logo(self) -> None:
         try:
             from .. import branding
-            from PIL import Image
             from PIL.ImageQt import ImageQt
-            if not branding.is_available():
+            scaled = branding.scaled_logo_image(480)
+            if scaled is None:
                 self.logo_label.setText("GameBasic")
                 return
-            pil = Image.open(branding._logo_path()).convert("RGBA")
-            target_w = 480
-            ratio = target_w / pil.size[0]
-            target_h = max(1, int(pil.size[1] * ratio))
-            scaled = pil.resize((target_w, target_h), Image.LANCZOS)
             qimg = ImageQt(scaled).copy()
             self._logo_pixmap = QPixmap.fromImage(qimg)
             self.logo_label.setPixmap(self._logo_pixmap)
