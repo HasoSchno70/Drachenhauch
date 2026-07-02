@@ -63,23 +63,29 @@ def plan_replacements(root: Path, pattern: "re.Pattern", repl_str: str,
 
     `text_provider(path)` liefert optional den (offenen) Live-Text einer Datei
     -- so beruecksichtigt das Ersetzen ungespeicherte Editor-Aenderungen; gibt
-    es keinen, wird die Platte gelesen. Liefert `(plan, total)` mit
+    es keinen, wird die Platte gelesen. Liefert `(plan, total, skipped)` mit
     `plan = [(path, new_text, n), ...]` nur fuer wirklich geaenderte Dateien.
+    `skipped` = Anzahl Dateien, die wegen Lesefehler (Rechte/Sperre/verschwunden)
+    NICHT durchsucht werden konnten -- frueher wurden diese Dateien einfach
+    ohne jede Rueckmeldung ausgelassen, die "0 Treffer"-Anzeige war dann
+    irrefuehrend (sah aus wie "sauber durchsucht", war aber unvollstaendig).
     """
     plan: list = []
     total = 0
+    skipped = 0
     for path in iter_gb_files(root):
         text = text_provider(path) if text_provider else None
         if text is None:
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
+                skipped += 1
                 continue
         new_text, n = pattern.subn(repl_str, text)
         if n and new_text != text:
             plan.append((path, new_text, n))
             total += n
-    return plan, total
+    return plan, total, skipped
 
 
 class _Worker(QObject):
@@ -264,14 +270,17 @@ class FindInProjectDialog(QDialog):
 
         # Plan bilden: pro Datei den (evtl. offenen) Text nehmen und ersetzen.
         try:
-            plan, total = plan_replacements(
+            plan, total, skipped_read = plan_replacements(
                 self.project_root, pattern, repl, self.text_provider)
         except re.error as exc:
             self.status.setText(f"Regex-Ersetzungsfehler: {exc}")
             return
 
         if not plan:
-            self.status.setText("Keine Treffer zum Ersetzen.")
+            msg = "Keine Treffer zum Ersetzen."
+            if skipped_read:
+                msg += f"  ({skipped_read} Datei(en) nicht lesbar -- moeglicherweise unvollstaendig.)"
+            self.status.setText(msg)
             return
         shown = self.replace_entry.text()
         ok = QMessageBox.question(
@@ -299,6 +308,8 @@ class FindInProjectDialog(QDialog):
         msg = f"{total} Ersetzungen in {len(plan) - errs} Datei(en)."
         if errs:
             msg += f"  {errs} mit Schreibfehler."
+        if skipped_read:
+            msg += f"  {skipped_read} Datei(en) nicht lesbar (uebersprungen)."
         self.status.setText(msg)
         self._start()        # Treffer-Baum aktualisieren (zeigt Resttreffer)
 

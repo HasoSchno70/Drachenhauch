@@ -256,6 +256,10 @@ class FileBrowser(QWidget):
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {top}, stop:1 {bot});
+                /* Bewusst hartcodiert statt aus COLORS['fg'] -- der Verlauf
+                   oben (acc.darker(150..280)) ist IMMER dunkel, unabhaengig
+                   vom aktiven Theme; COLORS['fg'] ist im Light-Theme dunkel
+                   und waere hier falsch (schlechter Kontrast). */
                 color: #EAFBFB;
                 border: 0;
                 border-radius: 6px;

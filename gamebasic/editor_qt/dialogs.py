@@ -82,8 +82,9 @@ class FindReplaceDialog(QDialog):
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row, opt_row + 1, 0, 1, 4)
 
+        from .theme import COLORS
         self.status = QLabel("")
-        self.status.setStyleSheet("color: gray;")
+        self.status.setStyleSheet(f"color: {COLORS['fg_muted']};")
         layout.addWidget(self.status, opt_row + 2, 0, 1, 4)
 
         self.resize(520, 200)
@@ -366,9 +367,11 @@ class AboutDialog(QDialog):
         layout.addWidget(author)
 
         # Copyright
+        from .theme import COLORS
+        muted_style = f"color: {COLORS['fg_muted']};"
         copyright_lbl = QLabel("(C) 2026 Hans Schnorrenberger")
         copyright_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        copyright_lbl.setStyleSheet("color: gray;")
+        copyright_lbl.setStyleSheet(muted_style)
         layout.addWidget(copyright_lbl)
 
         # Sprache + Beschreibung
@@ -378,7 +381,7 @@ class AboutDialog(QDialog):
             "von der nativen Runtime 'gbrt' (Rust/raylib), exportierbar als .exe."
         )
         descr.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        descr.setStyleSheet("color: gray;")
+        descr.setStyleSheet(muted_style)
         layout.addWidget(descr)
 
         # OK

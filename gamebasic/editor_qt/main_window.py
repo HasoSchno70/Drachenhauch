@@ -1427,17 +1427,26 @@ class GameBasicEditor(QMainWindow):
         self.statusBar().showMessage("Bereit", 3000)
 
     # ----------------------------------------------------- Debugger
-    def _setup_debugger(self) -> None:
+    def _make_hidden_dock(self, title: str, object_name: str, widget) -> "QDockWidget":
+        """Gemeinsamer Aufbau fuer die rechten Seiten-Panels (Debugger/
+        Profiler/Blame/Todo/Problems): QDockWidget anlegen, rechts andocken,
+        initial verstecken. Signal-Verdrahtung bleibt beim Aufrufer -- die
+        unterscheidet sich je Panel."""
         from PySide6.QtWidgets import QDockWidget
+        dock = QDockWidget(title, self)
+        dock.setObjectName(object_name)
+        dock.setWidget(widget)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        dock.hide()
+        return dock
+
+    def _setup_debugger(self) -> None:
         from .debugger import DebugController
         from .debug_panel import VariablesPanel
         self.debugger = DebugController(self)
         self.variables_panel = VariablesPanel()
-        self.var_dock = QDockWidget("Variablen", self)
-        self.var_dock.setObjectName("VariablesDock")
-        self.var_dock.setWidget(self.variables_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.var_dock)
-        self.var_dock.hide()
+        self.var_dock = self._make_hidden_dock(
+            "Variablen", "VariablesDock", self.variables_panel)
         self._debug_editor = None          # Editor der laufenden Sitzung
         self.debugger.paused.connect(self._on_debug_paused)
         self.debugger.finished.connect(self._on_debug_finished)
@@ -1445,16 +1454,12 @@ class GameBasicEditor(QMainWindow):
         self.debugger.failed.connect(self._on_debug_failed)
 
     def _setup_profiler(self) -> None:
-        from PySide6.QtWidgets import QDockWidget
         from .profiler import Profiler
         from .profile_panel import ProfilePanel
         self.profiler = Profiler(self)
         self.profile_panel = ProfilePanel()
-        self.profile_dock = QDockWidget("Profiler", self)
-        self.profile_dock.setObjectName("ProfilerDock")
-        self.profile_dock.setWidget(self.profile_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.profile_dock)
-        self.profile_dock.hide()
+        self.profile_dock = self._make_hidden_dock(
+            "Profiler", "ProfilerDock", self.profile_panel)
         self.profile_panel.jump_requested.connect(self._goto_line_in_active)
         self.profiler.finished.connect(self._on_profile_finished)
         self.profiler.failed.connect(self._on_profile_failed)
@@ -1507,14 +1512,10 @@ class GameBasicEditor(QMainWindow):
             self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
 
     def _setup_blame_panel(self) -> None:
-        from PySide6.QtWidgets import QDockWidget
         from .blame_panel import BlamePanel
         self.blame_panel = BlamePanel()
-        self.blame_dock = QDockWidget("Git-Blame", self)
-        self.blame_dock.setObjectName("BlameDock")
-        self.blame_dock.setWidget(self.blame_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.blame_dock)
-        self.blame_dock.hide()
+        self.blame_dock = self._make_hidden_dock(
+            "Git-Blame", "BlameDock", self.blame_panel)
         self.blame_panel.jump_requested.connect(self._goto_line_in_active)
         self.blame_panel.refresh_requested.connect(self._refresh_blame)
         self.blame_dock.visibilityChanged.connect(self._on_blame_visibility)
@@ -1551,14 +1552,10 @@ class GameBasicEditor(QMainWindow):
         self.blame_panel.set_current_line(line)
 
     def _setup_todo_panel(self) -> None:
-        from PySide6.QtWidgets import QDockWidget
         from .todo_panel import TodoPanel
         self.todo_panel = TodoPanel()
-        self.todo_dock = QDockWidget("TODO / FIXME", self)
-        self.todo_dock.setObjectName("TodoDock")
-        self.todo_dock.setWidget(self.todo_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.todo_dock)
-        self.todo_dock.hide()
+        self.todo_dock = self._make_hidden_dock(
+            "TODO / FIXME", "TodoDock", self.todo_panel)
         self.todo_panel.jump_requested.connect(self._goto_line_in_active)
         # Sichtbarkeit togglet die View-Action; beim Einblenden frisch scannen.
         self.act_toggle_todo.setChecked(False)
@@ -1571,14 +1568,10 @@ class GameBasicEditor(QMainWindow):
             self.todo_panel.update_for(st.editor.get_text() if st else None)
 
     def _setup_problems_panel(self) -> None:
-        from PySide6.QtWidgets import QDockWidget
         from .problems_panel import ProblemsPanel
         self.problems_panel = ProblemsPanel()
-        self.problems_dock = QDockWidget("Probleme", self)
-        self.problems_dock.setObjectName("ProblemsDock")
-        self.problems_dock.setWidget(self.problems_panel)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.problems_dock)
-        self.problems_dock.hide()
+        self.problems_dock = self._make_hidden_dock(
+            "Probleme", "ProblemsDock", self.problems_panel)
         self.problems_panel.jump_requested.connect(self._goto_line_in_active)
         self.act_toggle_problems.setChecked(False)
         self.problems_dock.visibilityChanged.connect(self._on_problems_visibility)
@@ -1775,22 +1768,33 @@ class GameBasicEditor(QMainWindow):
     def _show_about(self) -> None:
         AboutDialog(self).exec()
 
+    def _show_companion_window(self, attr_name: str, win, *, maximized: bool = False) -> None:
+        """Gemeinsamer Tail fuer alle Begleit-Editor-Fenster (Sprite/
+        Partikel/Tilemap/Audio-Studio): WA_DeleteOnClose + Referenz-Cleanup
+        beim Schliessen (sonst kassiert Qt das Fenster per GC, waehrend es
+        noch offen ist) + Anzeigen. `raise_()`/`activateWindow()` bleiben
+        beim Aufrufer -- Audio-Studio ruft sie bei JEDEM Oeffnen erneut auf,
+        auch wenn das Fenster nur wiederverwendet (nicht neu erzeugt) wird."""
+        win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        win.destroyed.connect(lambda: setattr(self, attr_name, None))
+        setattr(self, attr_name, win)
+        if maximized:
+            win.showMaximized()
+        else:
+            win.show()
+
     def _open_sprite_editor(self) -> None:
         """Oeffnet den Sprite-Editor als zweites Top-Level-Fenster.
 
         Wir importieren spriteeditor_qt lazy (er bringt 5000+ Zeilen mit)
         und instanziieren `SpriteEditorWindow` direkt -- die `launch()`-
         Funktion wuerde `app.exec()` rufen und unseren laufenden
-        Event-Loop reentrieren. Reference auf das Fenster muss erhalten
-        bleiben, sonst kassiert Qt es per GC.
+        Event-Loop reentrieren.
         """
         try:
             from .. import spriteeditor_qt as se
         except SystemExit as exc:
-            QMessageBox.warning(
-                self, "Sprite-Editor nicht verfuegbar",
-                str(exc),
-            )
+            QMessageBox.warning(self, "Sprite-Editor nicht verfuegbar", str(exc))
             return
         except Exception as exc:
             QMessageBox.warning(
@@ -1798,48 +1802,40 @@ class GameBasicEditor(QMainWindow):
                 f"Konnte Sprite-Editor nicht laden:\n{type(exc).__name__}: {exc}",
             )
             return
-        # Reference halten + bei Close verwerfen. Stylesheet bekommt das
-        # Sprite-Window EXKLUSIV (per-Window) statt App-weit -- so bleibt
-        # unser Editor-Style fuer den Code-Editor unangetastet.
-        self._sprite_editor_window = se.SpriteEditorWindow(self.project_root)
+        win = se.SpriteEditorWindow(self.project_root)
+        # Stylesheet bekommt das Sprite-Window EXKLUSIV (per-Window) statt
+        # App-weit -- so bleibt unser Editor-Style fuer den Code-Editor
+        # unangetastet.
         try:
-            self._sprite_editor_window.setStyleSheet(se.GLOBAL_QSS)
+            win.setStyleSheet(se.GLOBAL_QSS)
         except Exception:
             pass
-        self._sprite_editor_window.setAttribute(
-            Qt.WidgetAttribute.WA_DeleteOnClose, True,
-        )
-        self._sprite_editor_window.destroyed.connect(
-            lambda: setattr(self, "_sprite_editor_window", None),
-        )
-        self._sprite_editor_window.show()
-        self._sprite_editor_window.raise_()
-        self._sprite_editor_window.activateWindow()
+        self._show_companion_window("_sprite_editor_window", win)
+        win.raise_()
+        win.activateWindow()
 
     def _open_particle_editor(self) -> None:
         """Oeffnet den Partikel-Editor als zweites Top-Level-Fenster.
 
         Direkt instanziiert (nicht `launch()`, das wuerde `app.exec()` rufen
         und den laufenden Event-Loop reentrieren). Das App-Stylesheet ist
-        bereits aktiv, der Partikel-Editor erbt also unser Theme. Reference
-        halten, sonst GC."""
+        bereits aktiv, der Partikel-Editor erbt also unser Theme."""
         try:
             from .. import particleeditor_qt as pe
-        except Exception as exc:  # noqa: BLE001
+        except SystemExit as exc:
+            QMessageBox.warning(self, "Partikel-Editor nicht verfuegbar", str(exc))
+            return
+        except Exception as exc:
             QMessageBox.warning(
                 self, "Partikel-Editor-Fehler",
                 f"Konnte Partikel-Editor nicht laden:\n"
                 f"{type(exc).__name__}: {exc}\n\n"
                 f"Braucht 'PySide6' und 'numpy'.")
             return
-        self._particle_editor_window = pe.ParticleEditor(self.project_root)
-        self._particle_editor_window.setAttribute(
-            Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self._particle_editor_window.destroyed.connect(
-            lambda: setattr(self, "_particle_editor_window", None))
-        self._particle_editor_window.show()
-        self._particle_editor_window.raise_()
-        self._particle_editor_window.activateWindow()
+        win = pe.ParticleEditor(self.project_root)
+        self._show_companion_window("_particle_editor_window", win)
+        win.raise_()
+        win.activateWindow()
 
     def _open_sfx_editor(self) -> None:
         """Oeffnet das Audio Studio auf dem SFX-Tab."""
@@ -1857,18 +1853,17 @@ class GameBasicEditor(QMainWindow):
         if win is None:
             try:
                 from .. import audiostudio_qt as studio
-            except Exception as exc:  # noqa: BLE001
+            except SystemExit as exc:
+                QMessageBox.warning(self, "Audio-Studio nicht verfuegbar", str(exc))
+                return
+            except Exception as exc:
                 QMessageBox.warning(
                     self, "Audio-Studio-Fehler",
                     f"Konnte Audio Studio nicht laden:\n"
                     f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
                 return
             win = studio.AudioStudio(self.project_root)
-            win.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-            win.destroyed.connect(
-                lambda: setattr(self, "_audio_studio_window", None))
-            self._audio_studio_window = win
-            win.showMaximized()
+            self._show_companion_window("_audio_studio_window", win, maximized=True)
         win.select_tab(tab)
         win.raise_()
         win.activateWindow()
@@ -1877,20 +1872,19 @@ class GameBasicEditor(QMainWindow):
         """Oeffnet den Tilemap-/Level-Editor als zweites Top-Level-Fenster."""
         try:
             from .. import tilemapeditor_qt as tm
-        except Exception as exc:  # noqa: BLE001
+        except SystemExit as exc:
+            QMessageBox.warning(self, "Tilemap-Editor nicht verfuegbar", str(exc))
+            return
+        except Exception as exc:
             QMessageBox.warning(
                 self, "Tilemap-Editor-Fehler",
                 f"Konnte Tilemap-Editor nicht laden:\n"
                 f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6'.")
             return
-        self._tilemap_editor_window = tm.TileMapEditor(self.project_root)
-        self._tilemap_editor_window.setAttribute(
-            Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        self._tilemap_editor_window.destroyed.connect(
-            lambda: setattr(self, "_tilemap_editor_window", None))
-        self._tilemap_editor_window.show()
-        self._tilemap_editor_window.raise_()
-        self._tilemap_editor_window.activateWindow()
+        win = tm.TileMapEditor(self.project_root)
+        self._show_companion_window("_tilemap_editor_window", win)
+        win.raise_()
+        win.activateWindow()
 
     def _show_shortcuts(self) -> None:
         """Sammelt alle QActions + Editor-interne Shortcuts und zeigt sie."""

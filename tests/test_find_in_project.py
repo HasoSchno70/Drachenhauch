@@ -69,8 +69,8 @@ def test_plan_replacements_from_disk(tmp_path):
     (tmp_path / "a.gb").write_text("PRINT foo\nPRINT foo\n", encoding="utf-8")
     (tmp_path / "b.gb").write_text("DIM x AS INTEGER\n", encoding="utf-8")
     pat = build_pattern("foo", case_sensitive=True, whole_word=False, regex=False)
-    plan, total = plan_replacements(tmp_path, pat, replacement_string("bar", False))
-    assert total == 2 and len(plan) == 1
+    plan, total, skipped = plan_replacements(tmp_path, pat, replacement_string("bar", False))
+    assert total == 2 and len(plan) == 1 and skipped == 0
     path, new_text, n = plan[0]
     assert path.name == "a.gb" and n == 2
     assert "bar" in new_text and "foo" not in new_text
@@ -80,7 +80,7 @@ def test_plan_replacements_regex_backref(tmp_path):
     (tmp_path / "a.gb").write_text("hp=10\nmp=5\n", encoding="utf-8")
     pat = build_pattern(r"(\w+)=(\d+)", case_sensitive=True,
                         whole_word=False, regex=True)
-    plan, total = plan_replacements(tmp_path, pat,
+    plan, total, _skipped = plan_replacements(tmp_path, pat,
                                     replacement_string(r"\1 := \2", True))
     assert total == 2
     _p, new_text, _n = plan[0]
@@ -96,7 +96,7 @@ def test_plan_replacements_prefers_open_buffer(tmp_path):
         return live.get(Path(p).resolve())
 
     pat = build_pattern("foo", case_sensitive=True, whole_word=False, regex=False)
-    plan, total = plan_replacements(tmp_path, pat, replacement_string("bar", False),
+    plan, total, _skipped = plan_replacements(tmp_path, pat, replacement_string("bar", False),
                                     provider)
     assert total == 3                  # Live-Text gewinnt ueber die Platte
     assert "bar bar bar" in plan[0][1]
@@ -105,8 +105,29 @@ def test_plan_replacements_prefers_open_buffer(tmp_path):
 def test_plan_replacements_no_match_empty_plan(tmp_path):
     (tmp_path / "a.gb").write_text("nothing here\n", encoding="utf-8")
     pat = build_pattern("zzz", case_sensitive=True, whole_word=False, regex=False)
-    plan, total = plan_replacements(tmp_path, pat, "x")
-    assert plan == [] and total == 0
+    plan, total, skipped = plan_replacements(tmp_path, pat, "x")
+    assert plan == [] and total == 0 and skipped == 0
+
+
+def test_plan_replacements_counts_unreadable_files(tmp_path, monkeypatch):
+    """Review-Fund: eine nicht lesbare Datei wurde bisher komplett
+    stillschweigend ausgelassen -- kein Hinweis, dass das Ergebnis
+    unvollstaendig sein koennte."""
+    (tmp_path / "a.gb").write_text("PRINT foo\n", encoding="utf-8")
+    (tmp_path / "b.gb").write_text("PRINT foo\n", encoding="utf-8")
+    pat = build_pattern("foo", case_sensitive=True, whole_word=False, regex=False)
+
+    orig_read_text = Path.read_text
+
+    def flaky_read_text(self, *a, **kw):
+        if self.name == "b.gb":
+            raise OSError("simulierter Lesefehler")
+        return orig_read_text(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "read_text", flaky_read_text)
+    plan, total, skipped = plan_replacements(tmp_path, pat, replacement_string("bar", False))
+    assert skipped == 1
+    assert total == 1 and len(plan) == 1   # a.gb weiterhin gefunden
 
 
 # ------------------------------------------------------------- Dialog (UI)
