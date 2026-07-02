@@ -569,6 +569,50 @@ def test_struct_undo_restores_move():
     assert [f.name for f in doc.frames] == ["a", "b"]
 
 
+def test_discard_last_struct_undo_removes_pending_snapshot():
+    """Review-Fund: LayersPanel._move griff frueher direkt auf das private
+    `doc._struct_undo` zu, um einen No-op-Snapshot zurueckzunehmen (z.B.
+    move_layer() an der Grenzposition scheitert). Jetzt ueber eine
+    oeffentliche Methode."""
+    doc = SpriteDoc(8, 8)
+    assert doc.last_struct_undo_seq() == 0
+    doc.push_struct()
+    seq = doc.last_struct_undo_seq()
+    assert seq != 0
+    doc.discard_last_struct_undo()
+    assert doc.last_struct_undo_seq() == 0
+    # Kein-Op wenn nichts mehr da ist -- darf nicht werfen.
+    doc.discard_last_struct_undo()
+
+
+def test_anim_range_starting_at_deleted_frame_shrinks_correctly():
+    """Review-Fund: `_anims_after_delete` hatte einen toten/verwirrenden
+    Zweig fuer den Fall, dass der geloeschte Frame genau der ERSTE Frame
+    eines mehrframigen Bereichs war. Bereich [2,5] (Frames 2,3,4,5), Frame
+    2 geloescht -> die frueheren Frames 3,4,5 ruecken auf 2,3,4 -> neuer
+    Bereich muss [2,4] sein (first bleibt stehen, last -1)."""
+    from gamebasic.spriteeditor.document import Anim
+    doc = SpriteDoc(8, 8)
+    for _ in range(5):
+        doc.add_frame()
+    assert len(doc.frames) == 6
+    doc.anims = [Anim("run", 2, 5, 8)]
+    doc.select(2)
+    assert doc.delete_frame()
+    assert len(doc.frames) == 5
+    assert [(a.name, a.first, a.last) for a in doc.anims] == [("run", 2, 4)]
+
+
+def test_anim_single_frame_range_dropped_on_delete():
+    from gamebasic.spriteeditor.document import Anim
+    doc = SpriteDoc(8, 8)
+    doc.add_frame()
+    doc.anims = [Anim("single", 1, 1, 8)]
+    doc.select(1)
+    assert doc.delete_frame()
+    assert doc.anims == []
+
+
 def test_unified_sequence_pixel_vs_struct():
     # Juengste Aktion gewinnt: nach Pixel-Strich ist dessen Sequenz hoeher
     # als die des aelteren Struktur-Eintrags -- und umgekehrt.
@@ -820,6 +864,26 @@ def test_layer_save_load_roundtrip_v5(tmp_path):
     assert f2.active_layer == 1
     assert f2.layers[0].pixels.getpixel((0, 0)) == _red()
     assert f2.layers[1].pixels.getpixel((1, 1)) == _green()
+
+
+def test_load_native_clamps_out_of_range_opacity(tmp_path):
+    """Review-Fund: eine korrupte/handbearbeitete .gbsprite mit einem
+    Opacity-Wert > 1.0 (z.B. "500%") wurde bisher unveraendert ins
+    Datenmodell uebernommen -- klemmt jetzt auf 0..1."""
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.add_layer(name="Deko")
+    p = tmp_path / "bad_opacity.gbsprite"
+    doc.save_native(p)
+    import json
+    data = json.loads(p.read_text(encoding="utf-8"))
+    data["frames"][0]["layers"][1]["opacity"] = 5.0
+    data["frames"][0]["layers"][0]["opacity"] = -2.0
+    p.write_text(json.dumps(data), encoding="utf-8")
+    loaded = SpriteDoc.load_native(p)
+    f2 = loaded.frames[0]
+    assert f2.layers[1].opacity == 1.0
+    assert f2.layers[0].opacity == 0.0
 
 
 def test_single_layer_file_stays_compact(tmp_path):

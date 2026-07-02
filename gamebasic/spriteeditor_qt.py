@@ -1791,7 +1791,7 @@ class LayersPanel(QWidget):
         self.app.doc.push_struct()
         if not self.app.doc.current.move_layer(delta):
             # nichts passiert -> Struktur-Snapshot zuruecknehmen
-            self.app.doc._struct_undo.pop()
+            self.app.doc.discard_last_struct_undo()
             return
         self._after_change()
 
@@ -3872,10 +3872,17 @@ class SpriteEditorWindow(QMainWindow):
             f"Sprite zuschneiden auf {new_w}x{new_h} "
             f"(von {self.doc.width}x{self.doc.height})?\n\n"
             f"Alle Frames werden um ({min_x}, {min_y}) verschoben "
-            f"und der Undo-Verlauf der Frames geht dabei verloren.",
+            f"und der Pixel-Undo-Verlauf der Frames geht dabei verloren "
+            f"(mit Strg+Z laesst sich der Crop selbst aber rueckgaengig machen).",
         )
         if ans != QMessageBox.Yes:
             return
+        # Struktur-Snapshot VOR der Mutation -- sonst war Crop-to-Content
+        # (anders als das gleichwertige action_resize_canvas -> doc.resize())
+        # ueberhaupt nicht rueckgaengig machbar: das Pixel-Undo wird unten
+        # geleert (falsche Groesse nach dem Crop) und ohne push_struct() gab
+        # es keinen anderen Undo-Pfad.
+        self.doc.push_struct()
         for f in self.doc.frames:
             for ly in f.layers:
                 ly.pixels = ly.pixels.crop(
@@ -3958,6 +3965,11 @@ class SpriteEditorWindow(QMainWindow):
             self._transform_current_frame(Image.ROTATE_90)
 
     def _rotate_all(self, op):
+        """Dreht ALLE Frames (nicht-quadratisches Sprite, Breite/Hoehe
+        tauschen anschliessend). Struktur-Snapshot davor -- sonst (wie
+        frueher bei Crop-to-Content) ueberhaupt nicht rueckgaengig machbar,
+        das Pixel-Undo wird unten geleert."""
+        self.doc.push_struct()
         for f in self.doc.frames:
             for ly in f.layers:
                 ly.pixels = ly.pixels.transpose(op)

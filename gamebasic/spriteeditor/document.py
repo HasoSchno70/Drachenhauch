@@ -281,6 +281,15 @@ class SpriteDoc:
         self._struct_undo.append((next(_UNDO_SEQ), self._capture_state()))
         self._struct_redo.clear()
 
+    def discard_last_struct_undo(self):
+        """Nimmt den zuletzt via `push_struct()` angelegten Snapshot wieder
+        zurueck -- fuer Aufrufer, die VOR einer moeglicherweise fehlschlagenden
+        Mutation pushen (z.B. `move_layer`, das bei einer Grenz-Position
+        nichts tut) und bei Fehlschlag keinen No-op-Undo-Schritt behalten
+        wollen. Kein-Op, wenn nichts zum Zuruecknehmen da ist."""
+        if self._struct_undo:
+            self._struct_undo.pop()
+
     def last_struct_undo_seq(self) -> int:
         return self._struct_undo[-1][0] if self._struct_undo else 0
 
@@ -378,12 +387,21 @@ class SpriteDoc:
                 a.last += 1
 
     def _anims_after_delete(self, at: int):
+        """Bereiche nach dem Loeschen von Frame `at` anpassen -- der Frame
+        ist zu diesem Zeitpunkt bereits aus `self.frames` entfernt.
+        `first` wird NUR verschoben, wenn der geloeschte Frame VOR dem
+        Bereich lag (`first > at`); liegt er GENAU auf `first` (Bereich
+        beginnt beim geloeschten Frame), bleibt `first` unveraendert -- der
+        bisherige zweite Frame des Bereichs ruecht an dessen Stelle nach.
+        Ein Bereich, der genau aus dem geloeschten Frame bestand, faellt
+        beim abschliessenden `last >= first`-Check automatisch raus.
+        (Frueher stand hier zusaetzlich ein `elif ... : pass`-Zweig fuer
+        genau diesen Fall -- der war ein reines No-Op und aenderte nichts
+        am Ergebnis, machte den Code aber irrefuehrend.)"""
         kept: list[Anim] = []
         for a in self.anims:
             if a.first > at:
                 a.first -= 1
-            elif a.first == at and a.first > a.last - 1:
-                pass   # Bereich war genau dieses Frame -> unten geprueft
             if a.last >= at:
                 a.last -= 1
             if a.last >= a.first and a.first >= 0:
@@ -543,11 +561,17 @@ class SpriteDoc:
                 for ld in fd["layers"]:
                     raw = base64.b64decode(ld["data"])
                     img = Image.open(io.BytesIO(raw)).convert("RGBA")
+                    # Auf 0..1 klemmen -- eine korrupte/handbearbeitete Datei
+                    # koennte sonst einen unsinnigen Wert (z.B. 5.0 = "500%")
+                    # unveraendert ins Datenmodell tragen (_with_opacity selbst
+                    # ist zwar bereits sicher dagegen, aber der Wert wuerde
+                    # z.B. in einem Opacity-Slider/Prozent-Text falsch anzeigen).
+                    opacity = max(0.0, min(1.0, float(ld.get("opacity", 1.0))))
                     layers.append(Layer(
                         pixels=img,
                         name=str(ld.get("name", f"Ebene {len(layers) + 1}")),
                         visible=bool(ld.get("visible", True)),
-                        opacity=float(ld.get("opacity", 1.0)),
+                        opacity=opacity,
                     ))
                 doc.frames.append(Frame(
                     layers=layers,
