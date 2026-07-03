@@ -1044,7 +1044,31 @@ class TileMapEditor(QMainWindow):
             self._update_status()
 
     # ---------------------------------------------------- Datei
+    def _confirm_discard_changes(self) -> bool:
+        """Fragt bei ungespeicherten Aenderungen nach, bevor sie verworfen
+        werden (Neu/Oeffnen/Schliessen). Frueher ersetzten _new_map()/_open()
+        self.doc kommentarlos -- ungespeicherte Arbeit ging stillschweigend
+        verloren, obwohl doc.dirty (von save_json/load_json korrekt
+        zurueckgesetzt) das bereits zuverlaessig haette verhindern koennen."""
+        if not self.doc.dirty:
+            return True
+        ans = QMessageBox.question(
+            self, "Ungespeicherte Aenderungen",
+            "Die aktuelle Map hat ungespeicherte Aenderungen.\n\n"
+            "Trotzdem fortfahren und verwerfen?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return ans == QMessageBox.StandardButton.Yes
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._confirm_discard_changes():
+            event.accept()
+        else:
+            event.ignore()
+
     def _new_map(self) -> None:
+        if not self._confirm_discard_changes():
+            return
         params = _ask_map_params(self, self.doc.width, self.doc.height,
                                  self.doc.tile_w, self.doc.tile_h)
         if not params:
@@ -1070,6 +1094,8 @@ class TileMapEditor(QMainWindow):
             self.tileset_pixmaps.append(pix)
 
     def _open(self) -> None:
+        if not self._confirm_discard_changes():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "Tiled-Map oeffnen", str(self.project_root),
             "Tiled-Map (*.json *.tmj)")
@@ -1239,17 +1265,19 @@ class TileMapEditor(QMainWindow):
             self._sync_layers()
 
     def _add_layer(self) -> None:
+        before = self._snapshot_doc()
         idx = self.doc.add_layer()
         self.canvas.active_layer = idx
+        self._push_doc_undo(before)
         self._sync_layers()
         self.canvas.update()
 
     def _add_object_layer(self) -> None:
+        before = self._snapshot_doc()
         idx = self.doc.add_object_layer()
         self.canvas.active_layer = idx
         self.canvas.selected_obj = None
-        # Layer-Struktur geaendert -> Undo (das tile-/objekt-Indizes haelt) leeren.
-        self.undo_stack.clear(); self.redo_stack.clear()
+        self._push_doc_undo(before)
         self._sync_layers()
         self._update_obj_hint()
         self.canvas.update()
@@ -1284,17 +1312,19 @@ class TileMapEditor(QMainWindow):
     def _del_layer(self) -> None:
         if len(self.doc.layers) <= 1:
             return
+        before = self._snapshot_doc()
         self.doc.remove_layer(self.canvas.active_layer)
         self.canvas.active_layer = min(self.canvas.active_layer,
                                        len(self.doc.layers) - 1)
-        self.undo_stack.clear(); self.redo_stack.clear()
+        self._push_doc_undo(before)
         self._sync_layers()
         self.canvas.update()
 
     def _move_layer(self, delta: int) -> None:
+        before = self._snapshot_doc()
         new = self.doc.move_layer(self.canvas.active_layer, delta)
         self.canvas.active_layer = new
-        self.undo_stack.clear(); self.redo_stack.clear()
+        self._push_doc_undo(before)
         self._sync_layers()
         self.canvas.update()
 
@@ -1305,6 +1335,7 @@ class TileMapEditor(QMainWindow):
         if not params:
             return
         w, h, tw, th = params
+        before = self._snapshot_doc()
         retile = (tw != self.doc.tile_w or th != self.doc.tile_h)
         self.doc.tile_w, self.doc.tile_h = tw, th
         self.doc.resize(w, h)
@@ -1318,12 +1349,35 @@ class TileMapEditor(QMainWindow):
                     ts.set_image(ts.image_abs or ts.image,
                                  pix.width(), pix.height())
             self.doc.recompute_firstgids()
-        self.undo_stack.clear(); self.redo_stack.clear()
+        self._push_doc_undo(before)
         self._refresh_views()
         self._update_status()
 
     # ---------------------------------------------------- Undo/Redo
-    # Eintraege: ("tiles", li, before, after) oder ("objects", li, before, after).
+    # Eintraege: ("tiles", li, before, after) / ("objects", li, before, after)
+    # / ("doc", None, before, after) -- letzteres ein voller Struktur-Snapshot
+    # (Layer-Liste + Geometrie + Tilesets) fuer Layer-Add/Del/Move und Resize.
+    # Frueher wurde bei diesen strukturellen Operationen die GESAMTE Undo-
+    # Historie verworfen (undo_stack.clear()) -- die Ops selbst waren dadurch
+    # NICHT rueckgaengig machbar (dieselbe Bug-Klasse wie zuvor im Sprite-
+    # Editor: Crop-to-Content/Rotate/Flatten waren dort ebenfalls nicht
+    # undoable). Der volle Snapshot macht sie undoable UND haelt die
+    # layer_idx-Referenzen aelterer Tiles/Objects-Eintraege gueltig, solange
+    # Undo/Redo strikt in Stack-Reihenfolge angewendet wird (das "doc"-Undo
+    # direkt davor stellt die Layer-Liste wieder in den Zustand her, in dem
+    # der aeltere Eintrag urspruenglich gueltig war).
+    def _snapshot_doc(self) -> dict:
+        return {
+            "width": self.doc.width, "height": self.doc.height,
+            "tile_w": self.doc.tile_w, "tile_h": self.doc.tile_h,
+            "layers": copy.deepcopy(self.doc.layers),
+            "tilesets": copy.deepcopy(self.doc.tilesets),
+        }
+
+    def _push_doc_undo(self, before: dict) -> None:
+        self.undo_stack.append(("doc", None, before, self._snapshot_doc()))
+        self.redo_stack.clear()
+
     def _on_committed(self, layer_idx, before, after) -> None:
         self.undo_stack.append(("tiles", layer_idx, before, after))
         self.redo_stack.clear()
@@ -1334,9 +1388,23 @@ class TileMapEditor(QMainWindow):
 
     def _restore_undo(self, entry, *, use_before: bool) -> None:
         kind, li, before, after = entry
+        snap = before if use_before else after
+        if kind == "doc":
+            self.doc.width = snap["width"]; self.doc.height = snap["height"]
+            self.doc.tile_w = snap["tile_w"]; self.doc.tile_h = snap["tile_h"]
+            self.doc.layers = copy.deepcopy(snap["layers"])
+            self.doc.tilesets = copy.deepcopy(snap["tilesets"])
+            self.canvas.active_layer = min(self.canvas.active_layer,
+                                           len(self.doc.layers) - 1)
+            self.canvas.selected_obj = None
+            self.canvas.obj_selected.emit(None)
+            self.doc.dirty = True
+            self._sync_layers()
+            self._refresh_views()
+            self.canvas.update()
+            return
         if li >= len(self.doc.layers):
             return
-        snap = before if use_before else after
         layer = self.doc.layers[li]
         if kind == "tiles" and isinstance(layer, TileLayer):
             layer.tiles = list(snap)
@@ -1411,7 +1479,13 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
             win.doc = TileMapDoc.load_json(str(initial_file))
             win._load_tileset_pixmaps()
             win._refresh_views(); win._update_status()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Frueher komplett stumm -- bei kaputtem/falsch formatiertem
+            # initial_file oeffnete sich das Fenster einfach mit einer
+            # leeren Map, ohne dass der User je erfuhr, dass sein File
+            # nicht geladen wurde.
+            QMessageBox.warning(
+                win, "Fehler",
+                f"Konnte '{initial_file}' nicht laden:\n{exc}")
     win.show()
     return app.exec()
