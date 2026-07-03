@@ -19,8 +19,8 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFrame, QGridLayout,
-    QGroupBox, QHBoxLayout, QLabel, QMainWindow, QPlainTextEdit, QPushButton,
-    QVBoxLayout, QWidget,
+    QGroupBox, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPlainTextEdit,
+    QPushButton, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
@@ -392,7 +392,11 @@ class SfxGenerator(QMainWindow):
             return
         if not path.lower().endswith(".wav"):
             path += ".wav"
-        save_wav(Path(path), synthesize(self._params()))
+        try:
+            save_wav(Path(path), synthesize(self._params()))
+        except Exception as exc:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", str(exc))
+            return
         name = Path(path).name
         self._show_code(
             f'DIM snd AS SOUND\n'
