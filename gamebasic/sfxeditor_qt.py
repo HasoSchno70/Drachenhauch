@@ -138,6 +138,16 @@ class SfxGenerator(QMainWindow):
         self._autoplay_timer.setInterval(160)
         self._autoplay_timer.timeout.connect(self._play)
 
+        # Wellenform-Vorschau ebenfalls entprellt: ein QSlider feuert
+        # valueChanged bei JEDEM Pixel-Tick eines Drags, und synthesize()
+        # ist bei aktivem Filter (svf_lowpass, reine Python-Sample-Schleife)
+        # teuer -- ohne Entprellung ruckelt die UI, sobald ein Filter aktiv
+        # ist. Coalesced auf max. ~25 Neuberechnungen/s.
+        self._preview_timer = QTimer(self)
+        self._preview_timer.setSingleShot(True)
+        self._preview_timer.setInterval(40)
+        self._preview_timer.timeout.connect(self._update_wave_view)
+
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
@@ -332,7 +342,7 @@ class SfxGenerator(QMainWindow):
         }
 
     def _on_change(self, *_a) -> None:
-        self.wave_view.set_samples(synthesize(self._params()))
+        self._preview_timer.start()
         u = getattr(self, "undo", None)
         if u is not None:
             u.mark()
@@ -340,6 +350,9 @@ class SfxGenerator(QMainWindow):
         cb = getattr(self, "cb_autoplay", None)
         if cb is not None and cb.isChecked():
             self._autoplay_timer.start()
+
+    def _update_wave_view(self) -> None:
+        self.wave_view.set_samples(synthesize(self._params()))
 
     def _load_preset(self, name: str) -> None:
         wf, base, slide, atk, sus, dec, vd, vs = _PRESETS[name]
