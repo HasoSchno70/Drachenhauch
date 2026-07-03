@@ -23,7 +23,7 @@ laufen in beide Richtungen via Re-Export.
 """
 from __future__ import annotations
 
-import random as _random
+import random
 from typing import TYPE_CHECKING, Iterable
 
 from PIL import Image, ImageDraw
@@ -161,7 +161,6 @@ class SprayTool(Tool):
         app.mark_dirty()
 
     def _spray(self, app, cx, cy):
-        import random
         r = self._radius
         # Anzahl gestreuter Pixel pro Tick: prop. zur Flaeche * Density
         n = max(1, int(r * r * self._density))
@@ -181,6 +180,35 @@ class SprayTool(Tool):
         app.canvas.invalidate_all()
 
 
+def _flood_fill(img: Image.Image, sx: int, sy: int, target: tuple, on_visit) -> None:
+    """Generischer 4-connectivity Flood-Fill: besucht jeden zusammenhaengenden
+    Pixel mit Farbe `target` ab (sx, sy) genau einmal und ruft `on_visit(x, y)`
+    auf. Bucket (ersetzt live waehrend des Besuchs) und Magic Wand (sammelt
+    die besuchten Koordinaten in eine Liste) teilten sich frueher zwei fast
+    identische eigene Implementierungen -- Drift-Risiko (z.B. bekaeme eine
+    diagonale Konnektivitaet, die andere nicht)."""
+    w, h = img.size
+    px = img.load()
+    if px[sx, sy] != target:
+        return
+    seen = set()
+    stack = [(sx, sy)]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen:
+            continue
+        if x < 0 or x >= w or y < 0 or y >= h:
+            continue
+        if px[x, y] != target:
+            continue
+        seen.add((x, y))
+        on_visit(x, y)
+        stack.append((x + 1, y))
+        stack.append((x - 1, y))
+        stack.append((x, y + 1))
+        stack.append((x, y - 1))
+
+
 class BucketTool(Tool):
     name = "bucket"
 
@@ -198,20 +226,8 @@ class BucketTool(Tool):
 
     @staticmethod
     def _flood(img, sx, sy, target, replacement):
-        w, h = img.size
-        stack = [(sx, sy)]
         px = img.load()
-        while stack:
-            x, y = stack.pop()
-            if x < 0 or x >= w or y < 0 or y >= h:
-                continue
-            if px[x, y] != target:
-                continue
-            px[x, y] = replacement
-            stack.append((x + 1, y))
-            stack.append((x - 1, y))
-            stack.append((x, y + 1))
-            stack.append((x, y - 1))
+        _flood_fill(img, sx, sy, target, lambda x, y: px.__setitem__((x, y), replacement))
 
 
 class _TwoPointTool(Tool):
@@ -248,6 +264,10 @@ class _TwoPointTool(Tool):
 class LineTool(_TwoPointTool):
     name = "line"
 
+    # Stempelt _brush_offsets() (Quadrat-Pinsel, wie Stift/Radierer) an
+    # jedem Bresenham-Punkt -- NICHT dasselbe wie RectTool/EllipseTool's
+    # `width=`-Parameter unten (siehe Kommentar dort: bewusst verschiedene
+    # Pinsel-Semantik zwischen Linie und Kontur-Formen).
     def _draw(self, img, x0, y0, x1, y1, color):
         px = img.load(); w, h = img.size
         offsets = _brush_offsets(getattr(self, "_brush", 1))
@@ -263,6 +283,14 @@ class RectTool(_TwoPointTool):
         self.filled = filled
         self.name = "rect_fill" if filled else "rect"
 
+    # Kontur-Breite laeuft ueber PIL's `width=`-Parameter, NICHT ueber
+    # _brush_offsets() (wie LineTool) -- PIL's Outline-Breite insetted
+    # anders (rundere Ecken statt Quadrat-Pinsel-Stempel), sieht bei
+    # gleicher Pinselgroesse also bewusst etwas anders aus als eine Linie.
+    # Eine Vereinheitlichung wuerde eine eigene Rect/Ellipse-Konturlogik
+    # Punkt-fuer-Punkt mit _brush_offsets() nachbauen -- nicht gemacht,
+    # weil das sichtbare Zeichenverhalten fuer bestehende Sprites aendern
+    # wuerde, ohne dass ein Bug vorliegt (nur eine Stil-Inkonsistenz).
     def _draw(self, img, x0, y0, x1, y1, color):
         d = ImageDraw.Draw(img)
         lo_x, hi_x = sorted((x0, x1))
@@ -279,6 +307,8 @@ class EllipseTool(_TwoPointTool):
         self.filled = filled
         self.name = "ellipse_fill" if filled else "ellipse"
 
+    # Siehe Kommentar bei RectTool._draw -- gleiche bewusste Abweichung
+    # von LineTool's Quadrat-Pinsel-Stempel.
     def _draw(self, img, x0, y0, x1, y1, color):
         d = ImageDraw.Draw(img)
         lo_x, hi_x = sorted((x0, x1))
@@ -375,27 +405,8 @@ class MagicWandTool(Tool):
     def _collect(img: Image.Image, sx: int, sy: int,
                  target: tuple) -> list[tuple[int, int]]:
         """4-connectivity Flood, sammelt alle gleichfarbigen Pixel."""
-        w, h = img.size
-        px = img.load()
-        if px[sx, sy] != target:
-            return []
-        seen = set()
-        stack = [(sx, sy)]
-        out = []
-        while stack:
-            x, y = stack.pop()
-            if (x, y) in seen:
-                continue
-            if x < 0 or x >= w or y < 0 or y >= h:
-                continue
-            if px[x, y] != target:
-                continue
-            seen.add((x, y))
-            out.append((x, y))
-            stack.append((x + 1, y))
-            stack.append((x - 1, y))
-            stack.append((x, y + 1))
-            stack.append((x, y - 1))
+        out: list[tuple[int, int]] = []
+        _flood_fill(img, sx, sy, target, lambda x, y: out.append((x, y)))
         return out
 
 

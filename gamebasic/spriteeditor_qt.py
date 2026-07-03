@@ -809,6 +809,11 @@ class SpriteCanvas(QGraphicsView):
         return (max(0, min(self.app.doc.width - 1, x)),
                 max(0, min(self.app.doc.height - 1, y)))
 
+    def _event_coord(self, event) -> Optional[tuple[int, int]]:
+        """`mapToScene` + `_scene_to_pixel` in einem -- dieselben zwei
+        Zeilen standen zuvor identisch in mousePress-/Move-/ReleaseEvent."""
+        return self._scene_to_pixel(self.mapToScene(event.pos()))
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MiddleButton:
             self._panning = True
@@ -816,8 +821,7 @@ class SpriteCanvas(QGraphicsView):
             self.viewport().setCursor(Qt.ClosedHandCursor)
             event.accept()
             return
-        scene_pos = self.mapToScene(event.pos())
-        coord = self._scene_to_pixel(scene_pos)
+        coord = self._event_coord(event)
 
         # Rechtsklick auf einen Pixel innerhalb der aktiven Auswahl ->
         # Kontextmenue. Das vermeidet das umstaendliche "M druecken,
@@ -854,8 +858,7 @@ class SpriteCanvas(QGraphicsView):
             v.setValue(v.value() - delta.y())
             event.accept()
             return
-        scene_pos = self.mapToScene(event.pos())
-        coord = self._scene_to_pixel(scene_pos)
+        coord = self._event_coord(event)
         # Statusleiste zeigt nur "echte" Hover-Pixel im Sprite-Bereich
         if coord is not None and self.app.in_bounds(coord[0], coord[1]):
             self.app.set_hover_pixel(coord)
@@ -878,8 +881,7 @@ class SpriteCanvas(QGraphicsView):
         if not getattr(self, "_dragging", False):
             return
         self._dragging = False
-        scene_pos = self.mapToScene(event.pos())
-        coord = self._scene_to_pixel(scene_pos)
+        coord = self._event_coord(event)
         if coord is None:
             return
         cx, cy = self._clamp_to_sprite(coord[0], coord[1])
@@ -2202,6 +2204,7 @@ class SpriteEditorWindow(QMainWindow):
         self._backup_timer.setInterval(60_000)
         self._backup_timer.timeout.connect(self._auto_backup)
         self._backup_timer.start()
+        self._backup_warned = False   # nur EINMAL pro Sitzung auf Fehlschlag hinweisen
         # Beim Start nach einem Auto-Backup ohne entsprechende Original-
         # Datei suchen -- z.B. nach einem Crash mit nicht-gespeichertem
         # Sprite. Falls vorhanden, dem User Restore anbieten.
@@ -2244,7 +2247,10 @@ class SpriteEditorWindow(QMainWindow):
             data = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(data, list):
                 return [str(x) for x in data][:cls._RECENT_MAX]
-        except Exception:
+        except (OSError, ValueError):
+            # ValueError deckt json.JSONDecodeError ab. Nicht mehr blankes
+            # `except Exception` -- das haette auch echte Programmierfehler
+            # stumm als "keine Recent-Liste" maskiert.
             pass
         return []
 
@@ -2253,7 +2259,7 @@ class SpriteEditorWindow(QMainWindow):
         try:
             cls._recent_path().write_text(
                 json.dumps(paths, indent=2), encoding="utf-8")
-        except Exception:
+        except OSError:
             pass
 
     def _add_recent(self, path: Path):
@@ -2584,9 +2590,9 @@ class SpriteEditorWindow(QMainWindow):
         self.addToolBar(Qt.LeftToolBarArea, tb)
 
         self._tool_actions = {}
-        self._tool_group = QActionGroup(self) if False else None
-        # Manuelle Mutex-Logik (QActionGroup setzt checked, aber wir wollen
-        # die Hotkeys auch ohne ActionGroup, daher separat)
+        # Keine QActionGroup: die setzt zwar automatisch "checked" um, aber
+        # wir wollen die Hotkeys auch ohne ActionGroup -- daher manuelle
+        # Mutex-Logik weiter unten (nur eine Tool-Action checked).
         for name, tip, hk in self.TOOLS:
             act = QAction(make_tool_icon(name, 28), tip, self)
             act.setCheckable(True)
@@ -3578,9 +3584,15 @@ class SpriteEditorWindow(QMainWindow):
                 continue
             try:
                 r, g, b = int(parts[0]), int(parts[1]), int(parts[2])
-                palette.append((r, g, b, 255))
             except ValueError:
                 continue
+            # Ausserhalb 0..255 ueberspringen statt unveraendert zu
+            # uebernehmen -- eine kaputte/handbearbeitete .gpl-Zeile
+            # (z.B. "300 300 300 Foo") wuerde sonst erst tief in PIL mit
+            # einem kryptischen Fehler auffliegen, weit weg vom Import.
+            if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
+                continue
+            palette.append((r, g, b, 255))
         return palette
 
     @staticmethod
@@ -4011,6 +4023,7 @@ class SpriteEditorWindow(QMainWindow):
         n = len(self.doc.frames)
         if n <= 1:
             return
+        self.doc.push_struct()
         self.doc.frames.reverse()
         # current_index nachpflegen
         self.doc.current_index = n - 1 - self.doc.current_index
@@ -4028,6 +4041,8 @@ class SpriteEditorWindow(QMainWindow):
         importiert, wollte aber nur einen.
         """
         if len(self.doc.frames) <= 1:
+            self.statusBar().showMessage(
+                "Nur ein Frame vorhanden -- nichts zu reduzieren", 2500)
             return
         ans = QMessageBox.question(
             self, "Auf aktuelles Frame reduzieren",
@@ -4037,6 +4052,7 @@ class SpriteEditorWindow(QMainWindow):
         )
         if ans != QMessageBox.Yes:
             return
+        self.doc.push_struct()
         kept = self.doc.frames[self.doc.current_index]
         self.doc.frames = [kept]
         self.doc.current_index = 0
@@ -4051,6 +4067,8 @@ class SpriteEditorWindow(QMainWindow):
         Pixeln uebereinandergelegt.
         """
         if len(self.doc.frames) <= 1:
+            self.statusBar().showMessage(
+                "Nur ein Frame vorhanden -- nichts zusammenzufuegen", 2500)
             return
         ans = QMessageBox.question(
             self, "Frames zusammenfuegen",
@@ -4060,6 +4078,7 @@ class SpriteEditorWindow(QMainWindow):
         )
         if ans != QMessageBox.Yes:
             return
+        self.doc.push_struct()
         merged = Image.new("RGBA",
                             (self.doc.width, self.doc.height),
                             (0, 0, 0, 0))
@@ -4090,6 +4109,7 @@ class SpriteEditorWindow(QMainWindow):
             clone = f.clone()
             clone.name = ""   # angehaengte Frames nicht doppelt benennen
             new_tail.append(clone)
+        self.doc.push_struct()
         self.doc.frames.extend(new_tail)
         self.doc.dirty = True
         self.frames_panel.refresh()
@@ -4115,13 +4135,21 @@ class SpriteEditorWindow(QMainWindow):
         n_frames = len(self.doc.frames)
         total_pixels = self.doc.width * self.doc.height * n_frames
 
+        # Ein Durchlauf pro Frame liefert BEIDES: den Pro-Frame-Counter
+        # (fuer die Pro-Frame-Zeile) UND den Beitrag zum Gesamt-Counter
+        # (per Counter.update gemergt) -- frueher wurde composite() +
+        # Counter-Aufbau pro Frame zweimal gemacht (einmal fuers Aggregat,
+        # einmal fuer die Pro-Frame-Stats).
         all_colors = Counter()
         opaque_total = 0
-        for f in self.doc.frames:
-            for col in f.composite().getdata():
-                all_colors[col] += 1
-                if col[3] >= 128:
-                    opaque_total += 1
+        per_frame = []
+        for i, f in enumerate(self.doc.frames):
+            colors = Counter(f.composite().getdata())
+            all_colors.update(colors)
+            opaque = sum(c for col, c in colors.items() if col[3] >= 128)
+            opaque_total += opaque
+            per_frame.append((i, opaque, len([col for col in colors
+                                                if col[3] >= 128])))
 
         unique_total = len(all_colors)
         # Dominanteste opake Farbe (transparente ignorieren)
@@ -4132,14 +4160,6 @@ class SpriteEditorWindow(QMainWindow):
                 dom_color = col
                 dom_count = cnt
                 break
-
-        # Pro Frame: Pixel-Anzahl + eindeutige Farben
-        per_frame = []
-        for i, f in enumerate(self.doc.frames):
-            colors = Counter(f.composite().getdata())
-            opaque = sum(c for col, c in colors.items() if col[3] >= 128)
-            per_frame.append((i, opaque, len([col for col in colors
-                                                if col[3] >= 128])))
 
         transparent_pct = 100.0 * (1.0 - opaque_total / max(1, total_pixels))
 
@@ -4378,6 +4398,17 @@ class SpriteEditorWindow(QMainWindow):
         try:
             self.doc.save_native(path)
         except Exception:
+            # Frueher komplett stumm -- ein dauerhaft scheiterndes Auto-
+            # Backup (z.B. Ordner voll/nicht beschreibbar) blieb unbemerkt,
+            # das Sicherheitsnetz fiel unbemerkt aus. Nur EINMAL pro
+            # Sitzung hinweisen (der Timer tickt alle 60s). Breit gefangen
+            # bewusst wie vorher -- der Timer-Slot darf nie eine Ausnahme
+            # durchlassen (koennte den Qt-Event-Loop stoeren).
+            if not self._backup_warned:
+                self._backup_warned = True
+                self.statusBar().showMessage(
+                    "Auto-Backup fehlgeschlagen (Ordner nicht beschreibbar?) -- "
+                    "eigenes Speichern empfohlen.", 8000)
             return
         finally:
             self.doc.filepath = orig_path
@@ -4483,6 +4514,32 @@ from PySide6.QtGui import QActionGroup  # noqa: E402
 # Sub-Dialoge
 # ============================================================
 
+def _add_confirm_row(layout, *, on_cancel, on_ok, ok_text: str = "OK",
+                     cancel_text: str = "Abbrechen",
+                     middle_text: str | None = None, on_middle=None) -> QPushButton:
+    """Baut die uebliche Abbrechen/[Mitte]/OK-Knopfreihe (rechtsbuendig,
+    OK primaer + Default) und haengt sie an `layout` an. Reduziert die
+    zuvor in ResizeCanvasDialog/SheetImportDialog/ColorReplaceDialog fast
+    identisch wiederholte Knopfreihen-Boilerplate. Liefert den OK-Button
+    zurueck, falls der Aufrufer noch etwas daran setzen will."""
+    row = QHBoxLayout()
+    row.addStretch()
+    cancel = QPushButton(cancel_text)
+    cancel.clicked.connect(on_cancel)
+    row.addWidget(cancel)
+    if middle_text is not None:
+        mid = QPushButton(middle_text)
+        mid.clicked.connect(on_middle)
+        row.addWidget(mid)
+    ok = QPushButton(ok_text)
+    ok.setObjectName("primary")
+    ok.setDefault(True)
+    ok.clicked.connect(on_ok)
+    row.addWidget(ok)
+    layout.addLayout(row)
+    return ok
+
+
 class ResizeCanvasDialog(QDialog):
     """Canvas-Resize mit Presets, Spinboxes und Vorschau-Hinweis.
     Ersetzt die alte Texteingabe -- wesentlich angenehmer fuer den
@@ -4563,17 +4620,8 @@ class ResizeCanvasDialog(QDialog):
 
         # OK/Cancel
         layout.addSpacing(8)
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        cancel = QPushButton("Abbrechen")
-        cancel.clicked.connect(self.reject)
-        btn_row.addWidget(cancel)
-        ok = QPushButton("Aendern")
-        ok.setObjectName("primary")
-        ok.setDefault(True)
-        ok.clicked.connect(self._accept)
-        btn_row.addWidget(ok)
-        layout.addLayout(btn_row)
+        _add_confirm_row(layout, on_cancel=self.reject, on_ok=self._accept,
+                         ok_text="Aendern")
 
     def _apply_preset(self, w: int, h: int):
         self.spin_w.setValue(w)
@@ -4681,20 +4729,10 @@ class SheetImportDialog(QDialog):
         layout.addWidget(self.preview, 1)
 
         # Buttons
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        cancel = QPushButton("Abbrechen")
-        cancel.clicked.connect(self.reject)
-        btn_row.addWidget(cancel)
-        single = QPushButton("Als Single-Frame laden")
-        single.clicked.connect(self._pick_single)
-        btn_row.addWidget(single)
-        ok = QPushButton("Als Sheet zerlegen")
-        ok.setObjectName("primary")
-        ok.setDefault(True)
-        ok.clicked.connect(self._pick_sheet)
-        btn_row.addWidget(ok)
-        layout.addLayout(btn_row)
+        _add_confirm_row(layout, on_cancel=self.reject, on_ok=self._pick_sheet,
+                         ok_text="Als Sheet zerlegen",
+                         middle_text="Als Single-Frame laden",
+                         on_middle=self._pick_single)
 
         self._update_preview()
 
@@ -4814,17 +4852,8 @@ class ColorReplaceDialog(QDialog):
 
         # OK / Cancel
         layout.addSpacing(8)
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-        cancel = QPushButton("Abbrechen")
-        cancel.clicked.connect(self.reject)
-        btn_row.addWidget(cancel)
-        ok = QPushButton("Ersetzen")
-        ok.setObjectName("primary")
-        ok.clicked.connect(self.accept)
-        ok.setDefault(True)
-        btn_row.addWidget(ok)
-        layout.addLayout(btn_row)
+        _add_confirm_row(layout, on_cancel=self.reject, on_ok=self.accept,
+                         ok_text="Ersetzen")
 
     def _pick_src(self):
         c = self._src
