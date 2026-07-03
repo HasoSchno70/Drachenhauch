@@ -478,6 +478,18 @@ class SpriteCanvas(QGraphicsView):
         self._panning = False
         self._pan_last = QPoint()
 
+        # Render-Buendelung: waehrend eines Drags (Stift/Pinsel-Bewegung)
+        # kann mouseMoveEvent schneller feuern, als ein voller
+        # composite()+resize()-Durchlauf (invalidate_all/set_preview)
+        # fertig wird -- v.a. bei grossen Sprites/hohem Zoom spuerbar
+        # laggy. Statt bei JEDEM Aufruf sofort zu rendern, wird ueber
+        # einen Zero-Timer auf den naechsten Event-Loop-Tick verschoben;
+        # mehrere Aufrufe VOR diesem Tick werden zu einem einzigen Render
+        # zusammengefasst (der letzte Zustand gewinnt). Rein visuelles
+        # Nachlaufen von <1 Frame, nirgends wird der Pixmap-Inhalt
+        # synchron zurueckgelesen.
+        self._render_pending = False
+
         self.rebuild_scene()
 
     # --- Zoom ---
@@ -507,17 +519,28 @@ class SpriteCanvas(QGraphicsView):
     # --- Public API fuer Tools ---
 
     def invalidate_all(self):
-        """Frame-Pixmap nach Pixel-Aenderung neu rendern."""
+        """Frame-Pixmap nach Pixel-Aenderung neu rendern (gebuendelt --
+        siehe Kommentar bei `_render_pending` in __init__)."""
+        self._schedule_render()
+
+    def set_preview(self, pil: Optional[Image.Image]):
+        self._preview_pil = pil
+        self._schedule_render()
+
+    def _schedule_render(self):
+        if self._render_pending:
+            return
+        self._render_pending = True
+        QTimer.singleShot(0, self._do_render)
+
+    def _do_render(self):
+        self._render_pending = False
         self._render_frame_pixmap()
         if self._show_tile_preview:
             for it in self._tile_replica_items:
                 self._scene.removeItem(it)
             self._tile_replica_items = []
             self._render_tile_replicas()
-
-    def set_preview(self, pil: Optional[Image.Image]):
-        self._preview_pil = pil
-        self._render_frame_pixmap()
 
     def set_selection(self, x0, y0, x1, y1):
         self._selection = (x0, y0, x1, y1)
