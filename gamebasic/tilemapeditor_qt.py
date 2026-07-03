@@ -1012,24 +1012,21 @@ class TileMapEditor(QMainWindow):
 
     def _remove_tileset(self) -> None:
         idx = self.doc.active_tileset
-        ts = self.doc.active_ts
-        if ts is None:
+        if self.doc.active_ts is None:
             return
         # Nur entfernen, wenn keine platzierten Tiles dieses Tileset nutzen
-        # (sonst wuerden GIDs ungueltig).
-        lo, hi = ts.firstgid, ts.firstgid + max(0, ts.tile_count)
-        used = any(lo <= g < hi
-                   for l in self.doc.layers if isinstance(l, TileLayer)
-                   for g in l.tiles if g > 0)
-        if used:
+        # (sonst wuerden GIDs ungueltig) -- `tileset_in_use` ist jetzt die
+        # EINE Quelle dieser Pruefung; remove_tileset() selbst wuerde bei
+        # Benutzung ohnehin ablehnen (frueher verliess sich das Modell
+        # allein auf diese UI-Pruefung).
+        if self.doc.tileset_in_use(idx):
             QMessageBox.information(
                 self, "Tileset in Benutzung",
                 "Dieses Tileset wird noch von platzierten Tiles genutzt "
                 "und kann nicht entfernt werden.")
             return
-        if len(self.doc.tilesets) <= 0:
+        if not self.doc.remove_tileset(idx):
             return
-        self.doc.remove_tileset(idx)
         if 0 <= idx < len(self.tileset_pixmaps):
             del self.tileset_pixmaps[idx]
         self.sel_local = 0

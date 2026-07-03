@@ -253,11 +253,31 @@ class TileMapDoc:
         self.dirty = True
         return self.active_tileset
 
+    def tileset_in_use(self, idx: int) -> bool:
+        """True, wenn irgendeine TileLayer noch einen GID aus dem Bereich
+        dieses Tilesets referenziert. Einzige Quelle dieser Pruefung --
+        frueher duplizierte tilemapeditor_qt.py dieselbe Bereichs-Suche
+        inline, statt das Modell zu fragen."""
+        if not (0 <= idx < len(self.tilesets)):
+            return False
+        ts = self.tilesets[idx]
+        lo, hi = ts.firstgid, ts.firstgid + max(0, ts.tile_count)
+        if lo >= hi:
+            return False
+        return any(lo <= g < hi
+                   for layer in self.layers if isinstance(layer, TileLayer)
+                   for g in layer.tiles if g > 0)
+
     def remove_tileset(self, idx: int) -> bool:
         """Entfernt ein Tileset. GIDs platzierter Tiles werden NICHT migriert
-        -- daher nur erlaubt/sinnvoll, solange noch nichts darauf gemalt ist
-        (UI prueft das). Liefert True bei Erfolg."""
+        -- daher nur erlaubt, solange kein Tile dieses Tilesets noch platziert
+        ist (siehe `tileset_in_use`; frueher verliess sich diese Methode
+        allein auf die UI, sich selbst daran zu halten). Liefert True bei
+        Erfolg, False wenn der Index ungueltig ist oder das Tileset noch
+        benutzt wird."""
         if not (0 <= idx < len(self.tilesets)):
+            return False
+        if self.tileset_in_use(idx):
             return False
         del self.tilesets[idx]
         self.recompute_firstgids()
@@ -280,11 +300,24 @@ class TileMapDoc:
             self.add_tileset(abs_path, image_w, image_h)
 
     def gid_to_tileset(self, gid: int) -> tuple[int, int]:
-        """gid -> (tileset_index, local_id). (-1, -1) wenn keiner passt."""
+        """gid -> (tileset_index, local_id). (-1, -1) wenn keiner passt.
+
+        Aufloesung wie im echten Tiled: das Tileset mit dem GROESSTEN
+        `firstgid <= gid` gewinnt -- nicht "erstes im Listen-Iterations-
+        order, dessen deklarierter tile_count-Bereich passt". Bei
+        wohlgeformten Dateien (firstgids fortlaufend, keine Ueberlappung)
+        liefern beide Verfahren dasselbe Ergebnis; bei einer hand-
+        bearbeiteten/fremden Datei mit falschem `tilecount` (ueberlappende
+        deklarierte Bereiche) waere sonst das falsche Tileset gewaehlt."""
+        best_i = -1
         for i, ts in enumerate(self.tilesets):
-            if ts.contains_gid(gid):
-                return (i, gid - ts.firstgid)
-        return (-1, -1)
+            if ts.firstgid <= gid and (
+                    best_i == -1 or ts.firstgid > self.tilesets[best_i].firstgid):
+                best_i = i
+        if best_i == -1 or not self.tilesets[best_i].contains_gid(gid):
+            return (-1, -1)
+        ts = self.tilesets[best_i]
+        return (best_i, gid - ts.firstgid)
 
     def local_to_gid(self, ts_index: int, local_id: int) -> int:
         if 0 <= ts_index < len(self.tilesets):
@@ -569,8 +602,10 @@ class TileMapDoc:
     @classmethod
     def from_tiled_dict(cls, data: dict, base_dir: str | Path) -> "TileMapDoc":
         """Liest eine Tiled-JSON-Map (wie vom Editor geschrieben) zurueck.
-        Toleriert das, was `TILED_LOAD` auch akzeptiert (embedded Tileset,
-        CSV-Tile-Daten). Mehrere Tilesets: nur das erste wird uebernommen."""
+        Toleriert das, was `TILED_LOAD` auch akzeptiert (embedded Tileset(s),
+        CSV-Tile-Daten). Alle Tilesets werden uebernommen (Multi-Tileset-
+        Support) -- die Liste wird danach nach `firstgid` sortiert, damit
+        `gid_to_tileset` in der richtigen Reihenfolge aufloest."""
         base_dir = Path(base_dir)
         doc = cls(
             int(data.get("width", 20)),

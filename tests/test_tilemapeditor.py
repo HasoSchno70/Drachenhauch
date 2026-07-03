@@ -245,6 +245,41 @@ def test_remove_tileset_reassigns_firstgids(tmp_path):
     assert [t.firstgid for t in doc.tilesets] == [1, 9]   # neu vergeben
 
 
+def test_tileset_in_use_detects_placed_tiles(tmp_path):
+    doc = _build_multi(tmp_path)
+    assert doc.tileset_in_use(0) is False
+    assert doc.tileset_in_use(1) is False
+    doc.layers[0].set(0, 0, 9)   # gid 9 = Tileset 1, local 0
+    assert doc.tileset_in_use(0) is False
+    assert doc.tileset_in_use(1) is True
+
+
+def test_remove_tileset_refuses_when_in_use(tmp_path):
+    """Review-Fund: remove_tileset() verliess sich frueher komplett auf die
+    UI, kein Tile eines noch benutzten Tilesets zu loeschen -- das Modell
+    selbst pruefte das nicht. Jetzt lehnt die Modell-Methode selbst ab."""
+    doc = _build_multi(tmp_path)
+    doc.layers[0].set(0, 0, 9)   # Tileset 1 (firstgid=9) in Benutzung
+    assert doc.remove_tileset(1) is False
+    assert len(doc.tilesets) == 2
+    # Unbenutztes Tileset laesst sich weiterhin entfernen.
+    assert doc.remove_tileset(0) is True
+    assert len(doc.tilesets) == 1
+
+
+def test_gid_to_tileset_prefers_largest_firstgid_on_overlap(tmp_path):
+    """Review-Fund: bei ueberlappenden (fehlerhaften) deklarierten
+    tile_count-Bereichen gewinnt jetzt das Tileset mit dem GROESSTEN
+    firstgid <= gid (echtes Tiled-Verhalten), nicht das erste im
+    Listen-Iterationsorder."""
+    doc = _build_multi(tmp_path)
+    # Tileset 0 (firstgid=1) faelschlich mit riesigem tile_count -- ueberlappt
+    # jetzt den Bereich von Tileset 1 (firstgid=9).
+    doc.tilesets[0].tile_count = 100
+    idx, local = doc.gid_to_tileset(9)
+    assert idx == 1 and local == 0   # nicht Tileset 0!
+
+
 def test_multi_tileset_roundtrip_through_loader(tmp_path):
     """Zwei Tilesets + platzierte Tiles aus beiden -> TILED_LOAD liest beide."""
     doc = _build_multi(tmp_path)

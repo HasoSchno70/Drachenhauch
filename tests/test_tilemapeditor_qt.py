@@ -179,3 +179,28 @@ def test_launch_reports_broken_initial_file(app, tmp_path, monkeypatch):
 
     tm.launch(tmp_path, initial_file=bad)
     assert warnings, "keine Warnung bei kaputtem initial_file gezeigt"
+
+
+# --------------------------------------------------- Tileset entfernen
+
+def test_remove_tileset_ui_refuses_when_in_use(app, tmp_path):
+    """Review-Fund: _remove_tileset() duplizierte frueher die
+    "in Benutzung"-Pruefung inline statt das Modell zu fragen -- jetzt
+    nutzt sie doc.tileset_in_use()/remove_tileset()'s eigene Ablehnung."""
+    win = _win(app, tmp_path)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    b = tmp_path / "b.png"; b.write_bytes(b"\x89PNG\r\n")
+    win.doc.add_tileset(str(a), 64, 32)
+    win.doc.add_tileset(str(b), 32, 32)
+    win.tileset_pixmaps = [None, None]
+    win.doc.active_tileset = 1
+    win.doc.layers[0].set(0, 0, win.doc.tilesets[1].firstgid)
+
+    with patch.object(QMessageBox, "information") as info:
+        win._remove_tileset()
+        assert info.called
+    assert len(win.doc.tilesets) == 2   # nicht entfernt
+
+    win.doc.layers[0].set(0, 0, 0)   # nicht mehr in Benutzung
+    win._remove_tileset()
+    assert len(win.doc.tilesets) == 1
