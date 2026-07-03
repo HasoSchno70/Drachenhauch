@@ -94,6 +94,48 @@ def test_resize_map_is_undoable(app, monkeypatch):
     assert (win.doc.width, win.doc.height) == (w0 + 3, h0 + 2)
 
 
+def test_load_tileset_is_undoable(app, tmp_path):
+    """Review-Fund: Tileset hinzufuegen/entfernen war -- wie zuvor Layer-
+    Add/Del/Move/Resize -- nicht ueber die Undo-Historie abgesichert."""
+    win = _win(app, tmp_path)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    from PySide6.QtGui import QPixmap
+    n0 = len(win.doc.tilesets)
+
+    before = win._snapshot_doc()
+    idx = win.doc.add_tileset(str(a), 32, 32)
+    win.tileset_pixmaps.append(QPixmap(2, 2))
+    win._push_doc_undo(before)
+    assert len(win.doc.tilesets) == n0 + 1
+    assert len(win.tileset_pixmaps) == n0 + 1
+
+    win._undo()
+    assert len(win.doc.tilesets) == n0
+    assert len(win.tileset_pixmaps) == n0   # parallele Liste bleibt synchron
+
+    win._redo()
+    assert len(win.doc.tilesets) == n0 + 1
+    assert len(win.tileset_pixmaps) == n0 + 1
+
+
+def test_remove_tileset_is_undoable(app, tmp_path):
+    win = _win(app, tmp_path)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    b = tmp_path / "b.png"; b.write_bytes(b"\x89PNG\r\n")
+    win.doc.add_tileset(str(a), 64, 32)
+    win.doc.add_tileset(str(b), 32, 32)
+    win.tileset_pixmaps = [None, None]
+    win.doc.active_tileset = 1
+
+    win._remove_tileset()
+    assert len(win.doc.tilesets) == 1
+    win._undo()
+    assert len(win.doc.tilesets) == 2
+    assert [t.firstgid for t in win.doc.tilesets] == [1, 9]
+    win._redo()
+    assert len(win.doc.tilesets) == 1
+
+
 def test_older_tile_edit_survives_layer_structural_undo(app):
     """Ein aelterer Tiles-Undo-Eintrag (layer_idx-basiert) bleibt gueltig,
     solange Undo strikt in Stack-Reihenfolge laeuft -- das strukturelle

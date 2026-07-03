@@ -1001,11 +1001,13 @@ class TileMapEditor(QMainWindow):
             QMessageBox.warning(self, "Fehler", "Bild konnte nicht geladen werden.")
             return
         # Hinzufuegen als weiteres Tileset (das erste legt Tileset 0 an).
+        before = self._snapshot_doc()
         idx = self.doc.add_tileset(path, pix.width(), pix.height())
         if idx >= len(self.tileset_pixmaps):
             self.tileset_pixmaps.extend(
                 [None] * (idx + 1 - len(self.tileset_pixmaps)))
         self.tileset_pixmaps[idx] = pix
+        self._push_doc_undo(before)
         self.sel_local = 0
         self._refresh_views()
         self._update_status()
@@ -1025,10 +1027,12 @@ class TileMapEditor(QMainWindow):
                 "Dieses Tileset wird noch von platzierten Tiles genutzt "
                 "und kann nicht entfernt werden.")
             return
+        before = self._snapshot_doc()
         if not self.doc.remove_tileset(idx):
             return
         if 0 <= idx < len(self.tileset_pixmaps):
             del self.tileset_pixmaps[idx]
+        self._push_doc_undo(before)
         self.sel_local = 0
         self._refresh_views()
         self._update_status()
@@ -1391,11 +1395,18 @@ class TileMapEditor(QMainWindow):
             self.doc.tile_w = snap["tile_w"]; self.doc.tile_h = snap["tile_h"]
             self.doc.layers = copy.deepcopy(snap["layers"])
             self.doc.tilesets = copy.deepcopy(snap["tilesets"])
+            self.doc.active_tileset = max(0, min(self.doc.active_tileset,
+                                                 len(self.doc.tilesets) - 1))
             self.canvas.active_layer = min(self.canvas.active_layer,
                                            len(self.doc.layers) - 1)
             self.canvas.selected_obj = None
             self.canvas.obj_selected.emit(None)
             self.doc.dirty = True
+            # Tileset-Bilder aus den (evtl. wiederhergestellten) Pfaden neu
+            # laden -- QPixmaps sind UI-seitig, nicht Teil des Doc-Snapshots.
+            # _refresh_views() allein wuerde neue/wiederhergestellte Slots
+            # nur mit None auffuellen statt das tatsaechliche Bild zu zeigen.
+            self._load_tileset_pixmaps()
             self._sync_layers()
             self._refresh_views()
             self.canvas.update()
