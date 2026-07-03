@@ -93,14 +93,21 @@ class ParticleSystem:
              for _ in range(count)],
             dtype=np.float32,
         )
+        # sorted(): random.randint(a, b) verlangt a <= b und wirft sonst
+        # ValueError. Der Editor haelt min<=max schon per UI-Sync ein, aber
+        # diese Klasse wird auch direkt genutzt (Tests/zukuenftige Aufrufer)
+        # -- ohne eigene Absicherung wuerde ein vertauschtes min/max hier
+        # abstuerzen statt einfach das Intervall andersrum zu lesen.
+        life_lo, life_hi = sorted((self.lifetime_min, self.lifetime_max))
         new_lifetimes = np.array(
-            [_random.randint(self.lifetime_min, self.lifetime_max)
+            [_random.randint(life_lo, life_hi)
              for _ in range(count)],
             dtype=np.int32,
         )
         new_ages = np.zeros(count, dtype=np.int32)
+        size_lo, size_hi = sorted((self.size_min, self.size_max))
         new_sizes = np.array(
-            [_random.randint(self.size_min, self.size_max)
+            [_random.randint(size_lo, size_hi)
              for _ in range(count)],
             dtype=np.int32,
         )

@@ -122,3 +122,17 @@ def test_export_snippet_is_valid_gb(editor, tmp_path):
     diags = json.loads(r.stdout or "[]")
     errors = [d for d in diags if d.get("severity") != "warning"]
     assert not errors, errors
+
+
+def test_export_dialog_deletes_on_close(editor, app):
+    """Review-Fund: das Export-Fenster bekam kein WA_DeleteOnClose -- als
+    Kind von `editor` haette es beim Schliessen nur versteckt (nicht
+    freigegeben) werden, wiederholtes Exportieren haette Fenster
+    angesammelt."""
+    editor._export()
+    dlg = editor._export_dlg
+    destroyed = []
+    dlg.destroyed.connect(lambda: destroyed.append(True))
+    dlg.close()
+    app.processEvents()
+    assert destroyed == [True]

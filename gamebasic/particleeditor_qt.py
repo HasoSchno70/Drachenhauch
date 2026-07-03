@@ -570,8 +570,14 @@ class ParticleEditor(QMainWindow):
             lambda: QApplication.clipboard().setText(code))
         row.addWidget(btn_copy)
         dl.addLayout(row)
+        # WA_DeleteOnClose: sonst haengt jedes per "GB-Code exportieren"
+        # erzeugte Fenster als verstecktes Kind von `self` weiter (Qt
+        # raeumt Kind-Widgets nur beim Schliessen des Eltern-Fensters auf)
+        # -- wiederholtes Exportieren in einer Sitzung haette so Fenster
+        # angesammelt, die nie wieder freigegeben werden.
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg.show()
-        self._export_dlg = dlg          # Referenz halten
+        self._export_dlg = dlg          # Referenz halten, solange offen
 
     def _save_snippet(self, code: str) -> None:
         path, _ = QFileDialog.getSaveFileName(
