@@ -386,6 +386,15 @@ class SfxGenerator(QMainWindow):
         self.vib_depth.setValue(round(random.choice([0, 0, 0.1, 0.2]), 2))
         self.vib_speed.setValue(random.choice([0, 0, 12, 24]))
         self.stereo_width.setValue(round(random.choice([0, 0, 0.3, 0.6]), 2))
+        # Wie bei _load_preset auf neutral zuruecksetzen -- sonst faerbt ein
+        # zuvor manuell gesetzter Filter/Pan jeden weiteren Zufalls-Sound ein.
+        self.pan.setValue(0.0)
+        self.duty.setValue(0.5)
+        self.pwm_depth.setValue(0.0)
+        self.pwm_speed.setValue(0.0)
+        self.flt_cutoff.setValue(0)
+        self.flt_sweep.setValue(0)
+        self.flt_res.setValue(0.0)
         self._on_change()
         self._play()
 
