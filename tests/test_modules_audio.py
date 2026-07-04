@@ -256,3 +256,62 @@ def test_unloadsound_is_wired(run_gb):
         'END TRY',
     ])
     assert "UNLOADSOUND: fehlendes Argument 1" in run_gb(src)
+
+
+def test_audio_clock_type_compiles(run_gb):
+    # AUDIO_CLOCK ist ein externer Typ des audio-Moduls (Kira-Uhr fuer
+    # sample-genaues Musik-/Rhythmus-Timing). DIM ... AS AUDIO_CLOCK
+    # initialisiert KEIN Audio-Geraet -> headless golden-testbar (verifiziert
+    # preprocess MODULE_TYPES + Compiler-Verdrahtung).
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'DIM c AS AUDIO_CLOCK',
+        'PRINT "audio-clock-typ ok"',
+    ])
+    assert "audio-clock-typ ok" in run_gb(src)
+
+
+def test_audio_clock_new_validation(run_gb):
+    # AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung laeuft VOR der
+    # Audio-Initialisierung -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_CLOCK_NEW(0.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_CLOCK_NEW(-2.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert out.count("AUDIO_CLOCK_NEW: ticks_per_second muss > 0 sein") == 2
+
+
+def test_audio_clock_set_speed_validation(run_gb):
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_CLOCK_SET_SPEED(0, -1.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    assert "AUDIO_CLOCK_SET_SPEED: ticks_per_second muss > 0 sein" in run_gb(src)
+
+
+def test_audio_play_at_validation(run_gb):
+    # AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -- ticks < 0 wird
+    # VOR der Audio-Initialisierung geprueft -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PLAY_AT(0, 0, -1)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    assert "AUDIO_PLAY_AT: ticks muss >= 0 sein" in run_gb(src)

@@ -531,6 +531,60 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_CLOCK_NEW",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_NEW(ticks_per_second) -> AUDIO_CLOCK",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_START",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_START(clock)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_PAUSE",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_PAUSE(clock)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_STOP",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_STOP(clock)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_TICKING",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_TICKING(clock) -> BOOLEAN",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_TICKS",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_TICKS(clock) -> INTEGER",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_SET_SPEED",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_SET_SPEED(clock, ticks_per_second)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_CLOCK_REMOVE",
+   "kind": "core",
+   "signature": "AUDIO_CLOCK_REMOVE(clock)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PLAY_AT",
+   "kind": "core",
+   "signature": "AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -> AUDIO_CHANNEL",
+   "module": "audio"
+  },
+  {
    "name": "BATCH_DRAW",
    "kind": "graphics",
    "signature": "BATCH_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",

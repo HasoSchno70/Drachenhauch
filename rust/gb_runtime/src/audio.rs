@@ -19,6 +19,7 @@ use kira::sound::{Sound, SoundData};
 
 use kira::{
     AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Mix, Panning, Tween,
+    clock::{ClockHandle, ClockSpeed, ClockTime},
     effect::{Effect, EffectBuilder},
     effect::filter::{FilterBuilder, FilterHandle},
     effect::reverb::{ReverbBuilder, ReverbHandle},
@@ -472,6 +473,14 @@ struct Sample {
 /// AUTOPAN-Pendel (per-Frame in update() geschrieben).
 struct Pendulum { period_s: f64, depth: f64, start: std::time::Instant }
 
+/// Eine Kira-Uhr + der zuletzt KOMMANDIERTE Ticking-Zustand. `ClockHandle::
+/// ticking()` spiegelt Kiras Audio-Thread nur asynchron (per Kommando-Queue,
+/// erst beim naechsten Audio-Callback aktualisiert) -- eine Abfrage direkt
+/// nach START/PAUSE/STOP koennte sonst kurzzeitig den alten Wert zeigen.
+/// Da GameBasic der einzige Aufrufer ist, ist der selbst mitgefuehrte Wert
+/// immer sofort korrekt (kein Audio-Thread-Race).
+struct ClockSlot { handle: ClockHandle, ticking: bool }
+
 /// Pendel-Position 0..1 (pure, fuer #[test]). Kosinus-foermig, startet links.
 fn pendulum_pos(elapsed_s: f64, period_s: f64, depth: f64) -> f64 {
     let d = depth.clamp(0.0, 1.0);
@@ -497,6 +506,10 @@ pub struct Audio {
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
+    // Kira-Uhren fuer sample-genaues Musik-/Rhythmus-Timing (AUDIO_CLOCK_*).
+    // `None` = per AUDIO_CLOCK_REMOVE entfernt (Tombstone, Index bleibt stabil;
+    // Kira kennt kein remove_clock() -- nur Handle-Drop gibt die Uhr frei).
+    clocks: Vec<Option<ClockSlot>>,
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
@@ -536,7 +549,7 @@ impl Audio {
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
             sfx_fx, music_fx, master_fx,
             sounds: Vec::new(), samples: Vec::new(),
-            sample_cache: HashMap::new(), num_channels: 16,
+            sample_cache: HashMap::new(), clocks: Vec::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
@@ -648,6 +661,100 @@ impl Audio {
         s.vol = vol as f32;
         s.loops = if loops < 0 { -1 } else { loops };
         s.pan_anim = None;
+        Ok(())
+    }
+
+    /// AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -- wie AUDIO_PLAY,
+    /// aber der Start wird an einen Clock-Tick gebunden statt sofort zu
+    /// erfolgen: sample-genau, weil Kira selbst auf dem Audio-Thread
+    /// vergleicht, wann die Uhr `ticks` erreicht (kein Polling/Update-Call
+    /// noetig -- anders als das frame-getriebene `timer`-Modul).
+    pub fn ch_play_at(&mut self, idx: i64, clock_idx: i64, ticks: i64,
+                       volume: f64, loops: i64) -> Result<i64, String> {
+        let clock_id = self.clock_slot(clock_idx, "AUDIO_PLAY_AT")?.handle.id();
+        let vol = volume.clamp(0.0, 1.0);
+        if let Some(h) = self.slot_mut(idx, "AUDIO_PLAY_AT")?.handle.as_mut() { h.stop(tween_now()); }
+        let mut settings = StaticSoundSettings::new()
+            .start_time(ClockTime { clock: clock_id, ticks: ticks as u64, fraction: 0.0 })
+            .volume(db(vol));
+        if loops < 0 { settings = settings.loop_region(0.0..); }
+        let data = self.slot(idx, "AUDIO_PLAY_AT")?.data.as_ref()
+            .ok_or_else(|| format!("AUDIO_PLAY_AT: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
+            .clone().with_settings(settings);
+        let handle = self.sfx_track.play(data)
+            .map_err(|e| format!("AUDIO_PLAY_AT: {:?}", e))?;
+        let s = self.slot_mut(idx, "AUDIO_PLAY_AT")?;
+        s.handle = Some(handle);
+        s.vol = vol as f32;
+        s.loops = if loops < 0 { -1 } else { loops };
+        s.pan_anim = None;
+        Ok(idx)
+    }
+
+    // ================= Clock (sample-genaues Musik-/Rhythmus-Timing) ======
+
+    fn clock_slot(&self, idx: i64, fn_: &str) -> Result<&ClockSlot, String> {
+        self.clocks.get(idx as usize).and_then(|c| c.as_ref())
+            .ok_or_else(|| format!("{}: ungueltiges oder entferntes Uhr-Handle {}", fn_, idx))
+    }
+    fn clock_slot_mut(&mut self, idx: i64, fn_: &str) -> Result<&mut ClockSlot, String> {
+        self.clocks.get_mut(idx as usize).and_then(|c| c.as_mut())
+            .ok_or_else(|| format!("{}: ungueltiges oder entferntes Uhr-Handle {}", fn_, idx))
+    }
+
+    /// AUDIO_CLOCK_NEW(ticks_per_second) -- neue Uhr, startet PAUSIERT (Kira-
+    /// Konvention -- explizit AUDIO_CLOCK_START noetig). `ticks_per_second`
+    /// ist die einzige Geschwindigkeits-Einheit; BPM rechnet der Aufrufer
+    /// selbst um (z.B. `bpm / 60.0 * subdivisions`).
+    pub fn clock_new(&mut self, ticks_per_second: f64) -> Result<i64, String> {
+        let handle = self.manager.add_clock(ClockSpeed::TicksPerSecond(ticks_per_second))
+            .map_err(|e| format!(
+                "AUDIO_CLOCK_NEW: Uhr konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+        self.clocks.push(Some(ClockSlot { handle, ticking: false }));
+        Ok((self.clocks.len() - 1) as i64)
+    }
+
+    pub fn clock_start(&mut self, idx: i64) -> Result<(), String> {
+        let s = self.clock_slot_mut(idx, "AUDIO_CLOCK_START")?;
+        s.handle.start();
+        s.ticking = true;
+        Ok(())
+    }
+    pub fn clock_pause(&mut self, idx: i64) -> Result<(), String> {
+        let s = self.clock_slot_mut(idx, "AUDIO_CLOCK_PAUSE")?;
+        s.handle.pause();
+        s.ticking = false;
+        Ok(())
+    }
+    /// Stoppt UND setzt auf Tick 0 zurueck (Kira-Semantik von `stop()` --
+    /// anders als AUDIO_CLOCK_PAUSE, das die Position haelt).
+    pub fn clock_stop(&mut self, idx: i64) -> Result<(), String> {
+        let s = self.clock_slot_mut(idx, "AUDIO_CLOCK_STOP")?;
+        s.handle.stop();
+        s.ticking = false;
+        Ok(())
+    }
+    pub fn clock_ticking(&self, idx: i64) -> Result<bool, String> {
+        Ok(self.clock_slot(idx, "AUDIO_CLOCK_TICKING")?.ticking)
+    }
+    pub fn clock_ticks(&self, idx: i64) -> Result<i64, String> {
+        Ok(self.clock_slot(idx, "AUDIO_CLOCK_TICKS")?.handle.time().ticks as i64)
+    }
+    pub fn clock_set_speed(&mut self, idx: i64, ticks_per_second: f64) -> Result<(), String> {
+        self.clock_slot_mut(idx, "AUDIO_CLOCK_SET_SPEED")?
+            .handle.set_speed(ClockSpeed::TicksPerSecond(ticks_per_second), tween_now());
+        Ok(())
+    }
+    /// AUDIO_CLOCK_REMOVE(clock) -- gibt die Uhr frei. Kira kennt keine
+    /// remove_clock()-Methode -- Entfernen laeuft ausschliesslich ueber
+    /// Handle-Drop, darum ersetzt das den Vec-Slot durch `None` (Tombstone,
+    /// wie UNLOADSOUND). Alles, was noch auf einen Tick DIESER Uhr wartet
+    /// (AUDIO_PLAY_AT), startet danach nie mehr (Kira: WhenToStart::Never) --
+    /// kein Crash, aber auch kein Nachtraeglich-Start.
+    pub fn clock_remove(&mut self, idx: i64) -> Result<(), String> {
+        let slot = self.clocks.get_mut(idx as usize)
+            .ok_or_else(|| format!("AUDIO_CLOCK_REMOVE: ungueltiges Uhr-Handle {}", idx))?;
+        *slot = None;
         Ok(())
     }
 

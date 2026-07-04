@@ -4206,6 +4206,38 @@ impl<'p> Vm<'p> {
             "audio_music_busy" => Value::Bool(self.audio_mut()?.music_busy()),
             "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
 
+            // --- Clock (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing) ---
+            "audio_clock_new" => {
+                // AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung VOR der
+                // Audio-Initialisierung (golden-testbar).
+                let tps = need_f(a, 0, "AUDIO_CLOCK_NEW")?;
+                if tps <= 0.0 { return Err("AUDIO_CLOCK_NEW: ticks_per_second muss > 0 sein".into()); }
+                Value::Int(self.audio_mut()?.clock_new(tps)?)
+            }
+            "audio_clock_start" => { let c = gi(a, 0, "AUDIO_CLOCK_START")?; self.audio_mut()?.clock_start(c)?; Value::Nil }
+            "audio_clock_pause" => { let c = gi(a, 0, "AUDIO_CLOCK_PAUSE")?; self.audio_mut()?.clock_pause(c)?; Value::Nil }
+            "audio_clock_stop" => { let c = gi(a, 0, "AUDIO_CLOCK_STOP")?; self.audio_mut()?.clock_stop(c)?; Value::Nil }
+            "audio_clock_ticking" => { let c = gi(a, 0, "AUDIO_CLOCK_TICKING")?; Value::Bool(self.audio_mut()?.clock_ticking(c)?) }
+            "audio_clock_ticks" => { let c = gi(a, 0, "AUDIO_CLOCK_TICKS")?; Value::Int(self.audio_mut()?.clock_ticks(c)?) }
+            "audio_clock_set_speed" => {
+                let c = gi(a, 0, "AUDIO_CLOCK_SET_SPEED")?;
+                let tps = need_f(a, 1, "AUDIO_CLOCK_SET_SPEED")?;
+                if tps <= 0.0 { return Err("AUDIO_CLOCK_SET_SPEED: ticks_per_second muss > 0 sein".into()); }
+                self.audio_mut()?.clock_set_speed(c, tps)?; Value::Nil
+            }
+            "audio_clock_remove" => { let c = gi(a, 0, "AUDIO_CLOCK_REMOVE")?; self.audio_mut()?.clock_remove(c)?; Value::Nil }
+            "audio_play_at" => {
+                // AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]]) -- Start
+                // exakt auf Tick `ticks` der Uhr `clock` statt sofort.
+                let idx = gi(a, 0, "AUDIO_PLAY_AT")?;
+                let clock = gi(a, 1, "AUDIO_PLAY_AT")?;
+                let ticks = gi(a, 2, "AUDIO_PLAY_AT")?;
+                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_PLAY_AT")? } else { 1.0 };
+                let loops = if a.len() >= 5 { gi(a, 4, "AUDIO_PLAY_AT")? } else { 0 };
+                if ticks < 0 { return Err("AUDIO_PLAY_AT: ticks muss >= 0 sein".into()); }
+                Value::Int(self.audio_mut()?.ch_play_at(idx, clock, ticks, vol, loops)?)
+            }
+
             // --- Bulk-Draws ---
             "plots" => {
                 let xs = arr_i32(&a[0], "PLOTS")?; let ys = arr_i32(&a[1], "PLOTS")?;
