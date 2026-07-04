@@ -31,6 +31,7 @@ from .editor_qt.preset_library import PresetLibrary, default_dir
 from .synth import SAMPLE_RATE as _SAMPLE_RATE, WAVEFORMS as _WAVEFORMS
 from .synth import synthesize as _synth
 
+
 def _preset(waveform, base_freq, slide, attack, sustain, decay,
             vib_depth=0.0, vib_speed=0.0) -> dict:
     """Baut ein vollstaendiges Werks-Preset-Dict (Format wie `_params()`) --
