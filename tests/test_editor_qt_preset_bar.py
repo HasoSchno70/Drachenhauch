@@ -74,3 +74,19 @@ def test_sfx_editor_has_preset_bar(_qapp):
     p["base_freq"] = 1234.0
     ed._apply_params(p)
     assert ed.base_freq.value() == 1234
+
+
+def test_sfx_editor_has_factory_presets(_qapp):
+    try:
+        from gamebasic.sfxeditor_qt import SfxGenerator, _FACTORY_PRESETS
+        ed = SfxGenerator(Path("."))
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"Editor nicht konstruierbar: {exc}")
+    # Werks-Presets sind -- wie beim Partikel-Editor -- in EINER Bibliothek
+    # mit den User-Presets vereint (keine separate Sidebar mehr).
+    for name in _FACTORY_PRESETS:
+        assert name in ed.presets.names()
+        assert ed.presets.is_builtin(name)
+    ed._apply_params(ed.presets.get("Laser/Shoot"))
+    assert ed.waveform.currentText() == "saw"
+    assert ed.base_freq.value() == 1000

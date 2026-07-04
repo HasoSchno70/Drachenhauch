@@ -31,16 +31,32 @@ from .editor_qt.preset_library import PresetLibrary, default_dir
 from .synth import SAMPLE_RATE as _SAMPLE_RATE, WAVEFORMS as _WAVEFORMS
 from .synth import synthesize as _synth
 
-# Presets: typische sfxr-Kategorien. Werte sind ein Startpunkt, "Zufall"
-# variiert sie. (waveform, base_freq, slide_hz_s, atk, sus, dec, vib_d, vib_s)
-_PRESETS = {
-    "Pickup/Coin":  ("square", 900,   600,  0,  40, 160, 0.0, 0),
-    "Laser/Shoot":  ("saw",    1000, -1400, 0,  30, 150, 0.0, 0),
-    "Explosion":    ("noise",  120,  -60,   0,  60, 420, 0.0, 0),
-    "Powerup":      ("square", 380,   700,  0,  90, 240, 0.15, 18),
-    "Hit/Hurt":     ("square", 500,  -500,  0,  20, 140, 0.0, 0),
-    "Jump":         ("square", 420,   560,  0,  50, 130, 0.0, 0),
-    "Blip/Select":  ("square", 820,   0,    0,  18, 70,  0.0, 0),
+def _preset(waveform, base_freq, slide, attack, sustain, decay,
+            vib_depth=0.0, vib_speed=0.0) -> dict:
+    """Baut ein vollstaendiges Werks-Preset-Dict (Format wie `_params()`) --
+    SID-/Filter-/Stereo-Parameter liegen bei Werks-Presets auf neutral."""
+    return {
+        "waveform": waveform, "base_freq": base_freq, "slide": slide,
+        "volume": 0.7, "attack": attack, "sustain": sustain, "decay": decay,
+        "vib_depth": vib_depth, "vib_speed": vib_speed,
+        "stereo_width": 0.0, "pan": 0.0, "duty": 0.5,
+        "pwm_depth": 0.0, "pwm_speed": 0.0,
+        "flt_cutoff": 0.0, "flt_sweep": 0.0, "flt_res": 0.0,
+    }
+
+
+# Werks-Presets: typische sfxr-Kategorien. Startpunkte, die der Nutzer per
+# "Zufall" variieren oder als eigenes Preset ueberschreiben kann -- vereint
+# mit den User-Presets in EINER PresetLibrary/PresetBar (wie im Partikel-
+# Editor, siehe `_FACTORY_PRESETS` in particleeditor_qt.py).
+_FACTORY_PRESETS = {
+    "Pickup/Coin":  _preset("square", 900,   600,  0,  40, 160),
+    "Laser/Shoot":  _preset("saw",    1000, -1400, 0,  30, 150),
+    "Explosion":    _preset("noise",  120,  -60,   0,  60, 420),
+    "Powerup":      _preset("square", 380,   700,  0,  90, 240, 0.15, 18),
+    "Hit/Hurt":     _preset("square", 500,  -500,  0,  20, 140),
+    "Jump":         _preset("square", 420,   560,  0,  50, 130),
+    "Blip/Select":  _preset("square", 820,   0,    0,  18, 70),
 }
 
 
@@ -190,28 +206,15 @@ class SfxGenerator(QMainWindow):
         btns.addWidget(b_code)
         root.addLayout(btns)
 
-        # Preset-Bibliothek (eigene Sounds speichern/laden)
-        self.presets = PresetLibrary(default_dir() / "sfx.json")
+        # Preset-Bibliothek (Werks-Presets + eigene, eine Bibliothek/Leiste --
+        # wie im Partikel-Editor).
+        self.presets = PresetLibrary(
+            default_dir() / "sfx.json", builtins=_FACTORY_PRESETS)
         self.preset_bar = PresetBar(
             self.presets, self._params, self._apply_params)
         root.addWidget(self.preset_bar)
 
-        # --- Hauptbereich: Preset-Leiste links | Wellenform + Fader-Bank ---
-        main = QHBoxLayout()
-        main.setSpacing(10)
-
-        rail = QVBoxLayout(); rail.setSpacing(5)
-        rl = QLabel("Presets"); rl.setStyleSheet(
-            f"color:{COLORS['fg_muted']}; font-size:11px;")
-        rail.addWidget(rl)
-        for name in _PRESETS:
-            b = QPushButton(name)
-            b.clicked.connect(lambda _=False, n=name: self._load_preset(n))
-            rail.addWidget(b)
-        rail.addStretch(1)
-        rail_w = QWidget(); rail_w.setLayout(rail); rail_w.setFixedWidth(132)
-        main.addWidget(rail_w)
-
+        # --- Hauptbereich: Wellenform + Fader-Bank ---
         right = QVBoxLayout(); right.setSpacing(8)
         self.wave_view = _WaveView()
         self.wave_view.setMinimumHeight(150)
@@ -254,10 +257,10 @@ class SfxGenerator(QMainWindow):
 
         right.addLayout(grid)
         right.addStretch(1)
-        main.addLayout(right, 1)
-        root.addLayout(main, 1)
+        root.addLayout(right, 1)
 
-        self._load_preset("Jump")
+        self._apply_params(self.presets.get("Jump"))
+        self._play()
 
         # Undo/Redo: Snapshot der Parameter (self._params <-> _apply_params).
         self.undo = SnapshotUndo(self._params, self._apply_params, debounce_ms=250)
@@ -354,27 +357,6 @@ class SfxGenerator(QMainWindow):
     def _update_wave_view(self) -> None:
         self.wave_view.set_samples(synthesize(self._params()))
 
-    def _load_preset(self, name: str) -> None:
-        wf, base, slide, atk, sus, dec, vd, vs = _PRESETS[name]
-        self.waveform.setCurrentText(wf)
-        self.base_freq.setValue(base)
-        self.slide.setValue(slide)
-        self.attack.setValue(atk)
-        self.sustain.setValue(sus)
-        self.decay.setValue(dec)
-        self.vib_depth.setValue(vd)
-        self.vib_speed.setValue(vs)
-        self.stereo_width.setValue(0.0)   # Presets sind mono/zentriert
-        self.pan.setValue(0.0)
-        self.duty.setValue(0.5)           # SID-Parameter auf neutral
-        self.pwm_depth.setValue(0.0)
-        self.pwm_speed.setValue(0.0)
-        self.flt_cutoff.setValue(0)
-        self.flt_sweep.setValue(0)
-        self.flt_res.setValue(0.0)
-        self._on_change()
-        self._play()
-
     def _randomize(self) -> None:
         import random
         self.waveform.setCurrentText(random.choice(_WAVEFORMS))
@@ -386,8 +368,9 @@ class SfxGenerator(QMainWindow):
         self.vib_depth.setValue(round(random.choice([0, 0, 0.1, 0.2]), 2))
         self.vib_speed.setValue(random.choice([0, 0, 12, 24]))
         self.stereo_width.setValue(round(random.choice([0, 0, 0.3, 0.6]), 2))
-        # Wie bei _load_preset auf neutral zuruecksetzen -- sonst faerbt ein
-        # zuvor manuell gesetzter Filter/Pan jeden weiteren Zufalls-Sound ein.
+        # Wie bei den Werks-Presets (_preset()) auf neutral zuruecksetzen --
+        # sonst faerbt ein zuvor manuell gesetzter Filter/Pan jeden weiteren
+        # Zufalls-Sound ein.
         self.pan.setValue(0.0)
         self.duty.setValue(0.5)
         self.pwm_depth.setValue(0.0)
