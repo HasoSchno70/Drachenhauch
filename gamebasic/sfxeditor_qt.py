@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QPushButton, QVBoxLayout, QWidget,
 )
 
-from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY
 from .editor_qt.fader import Fader
 from .editor_qt.undo_history import SnapshotUndo
 from .editor_qt.preset_bar import PresetBar
@@ -465,11 +465,3 @@ class SfxGenerator(QMainWindow):
         dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg.show()
         self._code_dlg = dlg
-
-
-def launch(project_root: Path, initial_file: Path | None = None) -> int:
-    app = QApplication.instance() or QApplication([])
-    app.setStyleSheet(global_qss())
-    win = SfxGenerator(project_root)
-    win.show()
-    return app.exec()
