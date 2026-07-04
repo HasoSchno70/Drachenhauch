@@ -78,14 +78,23 @@ def synthesize(p: dict, sr: int = _SAMPLE_RATE) -> np.ndarray:
     return np.clip(wave * p["volume"], -1.0, 1.0)
 
 
-def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
+def save_wav(path: Path, samples: np.ndarray, sr: int = _SAMPLE_RATE,
+             bit_depth: int = 16) -> None:
+    """Schreibt eine WAV-Datei. `bit_depth` 16 (signed PCM, Standard) oder
+    8 (unsigned PCM, WAV-Spezifikation -- Retro-Lo-Fi-Option, mehr Rauschen/
+    Crunch bei kleineren Dateien)."""
     channels = 2 if samples.ndim == 2 else 1
-    int16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2")
+    clipped = np.clip(samples, -1.0, 1.0)
     with wave.open(str(path), "wb") as w:
         w.setnchannels(channels)
-        w.setsampwidth(2)
+        if bit_depth == 8:
+            data = np.round(clipped * 127.0 + 128.0).astype(np.uint8)
+            w.setsampwidth(1)
+        else:
+            data = (clipped * 32767.0).astype("<i2")
+            w.setsampwidth(2)
         w.setframerate(sr)
-        w.writeframes(np.ascontiguousarray(int16).tobytes())
+        w.writeframes(np.ascontiguousarray(data).tobytes())
 
 
 def play(samples: np.ndarray, sr: int = _SAMPLE_RATE) -> None:
@@ -108,8 +117,14 @@ class _WaveView(QWidget):
         super().__init__(parent)
         self.setMinimumHeight(140)
         self._samples = np.zeros(1)
+        self._clipped = False
 
     def set_samples(self, s: np.ndarray) -> None:
+        # Clipping-Check auf ALLEN Kanaelen (auch bei Stereo der rechte,
+        # der beim Zeichnen ignoriert wird) -- np.clip() in synthesize()
+        # setzt geclippte Samples auf exakt +-1.0, unclipped Werte treffen
+        # diese Grenze praktisch nie exakt.
+        self._clipped = bool(np.any(np.abs(s) >= 1.0 - 1e-6))
         # Bei Stereo den linken Kanal zeichnen.
         self._samples = s[:, 0] if s.ndim == 2 else s
         self.update()
@@ -124,20 +139,22 @@ class _WaveView(QWidget):
         p.drawLine(0, int(mid), w, int(mid))
         s = self._samples
         n = s.shape[0]
-        if n < 2 or w < 2:
-            return
-        p.setPen(QPen(QColor(COLORS["accent"]), 1))
-        step = max(1, n // w)
-        prev_x = 0
-        prev_y = mid - float(s[0]) * mid * 0.95
-        for x in range(1, w):
-            idx = min(n - 1, int(x / w * n))
-            # Peak im Fenster fuer dichtere Wellen.
-            seg = s[idx:min(n, idx + step)]
-            v = seg[np.argmax(np.abs(seg))] if seg.size else s[idx]
-            y = mid - float(v) * mid * 0.95
-            p.drawLine(prev_x, int(prev_y), x, int(y))
-            prev_x, prev_y = x, y
+        if n >= 2 and w >= 2:
+            p.setPen(QPen(QColor(COLORS["accent"]), 1))
+            step = max(1, n // w)
+            prev_x = 0
+            prev_y = mid - float(s[0]) * mid * 0.95
+            for x in range(1, w):
+                idx = min(n - 1, int(x / w * n))
+                # Peak im Fenster fuer dichtere Wellen.
+                seg = s[idx:min(n, idx + step)]
+                v = seg[np.argmax(np.abs(seg))] if seg.size else s[idx]
+                y = mid - float(v) * mid * 0.95
+                p.drawLine(prev_x, int(prev_y), x, int(y))
+                prev_x, prev_y = x, y
+        if self._clipped:
+            p.setPen(QPen(QColor(COLORS["warning"]), 1))
+            p.drawText(w - 84, 16, "⚠ Clipping")
 
 
 class SfxGenerator(QMainWindow):
@@ -199,6 +216,17 @@ class SfxGenerator(QMainWindow):
         self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
         self.btn_redo.setFixedWidth(34)
         btns.addWidget(self.btn_redo)
+        self.export_sr = QComboBox()
+        self.export_sr.addItems(["44100 Hz", "22050 Hz", "11025 Hz", "8000 Hz"])
+        self.export_sr.setToolTip(
+            "Samplerate des exportierten WAVs (niedriger = lo-fi/kleiner).")
+        btns.addWidget(self.export_sr)
+        self.export_bits = QComboBox()
+        self.export_bits.addItems(["16-bit", "8-bit"])
+        self.export_bits.setToolTip(
+            "Bit-Tiefe des exportierten WAVs (8-bit = mehr Rauschen/Crunch, "
+            "kleinere Datei -- klassischer Lo-Fi-Retro-Sound).")
+        btns.addWidget(self.export_bits)
         b_wav = QPushButton("WAV exportieren ...")
         b_wav.clicked.connect(self._export_wav)
         btns.addWidget(b_wav)
@@ -398,8 +426,11 @@ class SfxGenerator(QMainWindow):
             return
         if not path.lower().endswith(".wav"):
             path += ".wav"
+        sr = int(self.export_sr.currentText().split()[0])
+        bits = 8 if self.export_bits.currentText().startswith("8") else 16
         try:
-            save_wav(Path(path), synthesize(self._params()))
+            save_wav(Path(path), synthesize(self._params(), sr=sr),
+                     sr=sr, bit_depth=bits)
         except Exception as exc:
             QMessageBox.critical(self, "Speichern fehlgeschlagen", str(exc))
             return
