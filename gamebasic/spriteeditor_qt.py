@@ -2082,7 +2082,14 @@ class AnimationPreview(QDialog):
         self._restart_timer()
         # Sicherstellen dass das Fenster nach vorn kommt -- ohne diesen
         # Tick erscheint der Dialog auf Windows oft hinter dem Editor.
-        QTimer.singleShot(50, self._raise_to_front)
+        # Self-geparentete QTimer-Instanz statt QTimer.singleShot() (statisch,
+        # unparented) -- sonst feuert er nach Zerstoerung des Dialogs noch in
+        # ein bereits geloeschtes C++-Objekt (Use-after-free/Absturz), siehe
+        # SpriteEditorWindow._render_timer weiter unten fuer das gleiche Muster.
+        self._raise_timer = QTimer(self)
+        self._raise_timer.setSingleShot(True)
+        self._raise_timer.timeout.connect(self._raise_to_front)
+        self._raise_timer.start(50)
 
     def _raise_to_front(self):
         try:
@@ -2241,8 +2248,16 @@ class SpriteEditorWindow(QMainWindow):
         self._backup_warned = False   # nur EINMAL pro Sitzung auf Fehlschlag hinweisen
         # Beim Start nach einem Auto-Backup ohne entsprechende Original-
         # Datei suchen -- z.B. nach einem Crash mit nicht-gespeichertem
-        # Sprite. Falls vorhanden, dem User Restore anbieten.
-        QTimer.singleShot(300, self._maybe_offer_restore)
+        # Sprite. Falls vorhanden, dem User Restore anbieten. Self-geparentete
+        # QTimer-Instanz statt QTimer.singleShot() (statisch, unparented) --
+        # sonst feuert er nach Zerstoerung des Fensters noch in ein bereits
+        # geloeschtes C++-Objekt (Use-after-free/Absturz). Genau dieses Muster
+        # verursachte den sporadischen Testsuite-Segfault in
+        # test_spriteeditor_qt_canvas.py (siehe reference_qt_timer_use_after_free).
+        self._restore_check_timer = QTimer(self)
+        self._restore_check_timer.setSingleShot(True)
+        self._restore_check_timer.timeout.connect(self._maybe_offer_restore)
+        self._restore_check_timer.start(300)
 
         if initial_file is not None and Path(initial_file).exists():
             self._load_path(Path(initial_file))
