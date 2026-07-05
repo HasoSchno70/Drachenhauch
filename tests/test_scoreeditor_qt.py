@@ -171,6 +171,93 @@ def test_save_and_load_roundtrip(tmp_path, monkeypatch):
     assert ed2.doc.tracks[0].notes[0].pitch == 60
 
 
+def test_octave_shift_for_clef_computes_whole_octaves():
+    from gamebasic.scoreeditor_qt import ScoreEditor
+
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    for p in (60, 62, 64, 65, 67, 69, 71):     # C4..B4, Mittel ~65.4
+        track.add_note(float(len(track.notes)), 1.0, p)
+
+    shift = ScoreEditor._octave_shift_for_clef(track, "bass")
+    assert shift % 12 == 0
+    assert shift == -12                          # eine Oktave tiefer
+
+
+def test_octave_shift_for_clef_zero_without_pitched_notes():
+    from gamebasic.scoreeditor_qt import ScoreEditor
+
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    track.add_note(0.0, 1.0, rest=True)
+    assert ScoreEditor._octave_shift_for_clef(track, "bass") == 0
+
+
+def test_clef_change_same_clef_is_noop(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    called = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: called.append(1) or QMessageBox.StandardButton.Yes)
+    combo = ed._track_rows[0]["clef_combo"]
+    combo.setCurrentIndex(0)                     # bereits treble (Default)
+    ed._on_clef_changed(0, combo)
+    assert not called
+    assert ed.doc.tracks[0].notes[0].pitch == 60
+
+
+def test_clef_change_without_notes_skips_dialog(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    called = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: called.append(1) or QMessageBox.StandardButton.Yes)
+    combo = ed._track_rows[0]["clef_combo"]
+    combo.setCurrentIndex(1)                     # -> bass, keine Noten vorhanden
+    ed._on_clef_changed(0, combo)
+    assert not called
+    assert ed.doc.tracks[0].clef == "bass"
+
+
+def test_clef_change_accepts_transpose(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    for p in (60, 62, 64, 65, 67, 69, 71):
+        track.add_note(float(len(track.notes)), 1.0, p)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+
+    combo = ed._track_rows[0]["clef_combo"]
+    combo.setCurrentIndex(1)                     # -> bass
+    ed._on_clef_changed(0, combo)
+
+    assert track.clef == "bass"
+    assert [n.pitch for n in track.notes] == [48, 50, 52, 53, 55, 57, 59]
+
+
+def test_clef_change_declines_transpose_keeps_pitches(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    for p in (60, 62, 64, 65, 67, 69, 71):
+        track.add_note(float(len(track.notes)), 1.0, p)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.No)
+
+    combo = ed._track_rows[0]["clef_combo"]
+    combo.setCurrentIndex(1)                     # -> bass
+    ed._on_clef_changed(0, combo)
+
+    assert track.clef == "bass"                  # Schluessel wechselt trotzdem
+    assert [n.pitch for n in track.notes] == [60, 62, 64, 65, 67, 69, 71]
+
+
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     from gamebasic.tracker.song import Song

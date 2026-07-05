@@ -30,6 +30,12 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
   (Violin-/Bassschlüssel) und Instrument (Werks-Presets aus dem Tracker,
   Flügel/Streicher/Bass/Glocke/…) einstellbar. `+ Spur` / `- Spur` fügen
   Spuren hinzu/entfernen die letzte (mindestens eine bleibt erhalten).
+- **Notenschlüssel-Wechsel transponiert NICHT automatisch** — wie in echter
+  Notationssoftware ändert sich nur die Darstellung, nicht die Tonhöhe. Hat
+  die Spur bereits Noten und würden sie beim neuen Schlüssel weit ab vom
+  System liegen (viele Hilfslinien), fragt ein Dialog, ob sie um ganze
+  Oktaven verschoben werden sollen — Melodie/Intervalle bleiben dabei exakt
+  erhalten, nur das Register ändert sich.
 - **Tempo (BPM)** — wirkt auf Wiedergabe-Geschwindigkeit und die spätere
   Tracker-Übernahme (`row_ms = 60000/bpm/4`).
 - **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten

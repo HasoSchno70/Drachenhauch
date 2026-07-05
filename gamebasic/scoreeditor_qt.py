@@ -41,6 +41,9 @@ from .score.document import ScoreDoc
 NATURAL_MIDI = (0, 2, 4, 5, 7, 9, 11)
 # MIDI-Ton der untersten Notenlinie (Linie 1) je Notenschluessel.
 CLEF_REF = {"treble": 64, "bass": 43}  # E4 / G2
+# MIDI-Ton der MITTLEREN Notenlinie (Linie 3) je Notenschluessel -- Ziel-
+# Zentrum fuer den optionalen Oktav-Transpose beim Schluesselwechsel.
+CLEF_CENTER = {"treble": 71, "bass": 50}  # B4 / D3
 
 DURATIONS = [
     ("Ganze", 4.0), ("Halbe", 2.0), ("Viertel", 1.0),
@@ -476,8 +479,42 @@ class ScoreEditor(QMainWindow):
         self._track_rows[idx]["box"].setTitle(name)
         self._mark_dirty()
 
+    @staticmethod
+    def _octave_shift_for_clef(track, new_clef: str) -> int:
+        """Oktav-Versatz (Vielfaches von 12 Halbtoenen), der den Notendurch-
+        schnitt der Spur moeglichst nah an die Mittellinie des NEUEN
+        Schluessels rueckt -- volle Oktaven, damit Melodie/Intervalle exakt
+        erhalten bleiben (nur das Register aendert sich)."""
+        pitched = [n.pitch for n in track.notes if not n.rest]
+        if not pitched:
+            return 0
+        avg = sum(pitched) / len(pitched)
+        center = CLEF_CENTER.get(new_clef, 71)
+        return int(round((center - avg) / 12) * 12)
+
     def _on_clef_changed(self, idx: int, combo: QComboBox) -> None:
-        self.doc.tracks[idx].clef = combo.currentData()
+        new_clef = combo.currentData()
+        track = self.doc.tracks[idx]
+        if new_clef == track.clef:
+            return
+        shift = self._octave_shift_for_clef(track, new_clef)
+        track.clef = new_clef
+        if shift != 0:
+            n_oct = shift // 12
+            reply = QMessageBox.question(
+                self, "Noten transponieren?",
+                f"Die vorhandenen Noten dieser Spur liegen beim neuen "
+                f"Notenschluessel weit ab vom System.\n\n"
+                f"Um {n_oct:+d} Oktave(n) verschieben, damit sie wieder "
+                f"nahe am System liegen? (Melodie/Intervalle bleiben exakt "
+                f"erhalten, nur das Register aendert sich.)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes)
+            if reply == QMessageBox.StandardButton.Yes:
+                for n in track.notes:
+                    if not n.rest:
+                        n.pitch += shift
+                self._sound_cache.clear()
         self._track_rows[idx]["staff"].update()
         self._mark_dirty()
 
