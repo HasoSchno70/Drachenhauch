@@ -1605,7 +1605,15 @@ gleichzeitig das Snap-Raster, Vorzeichen-Toggle ♮/♯/♭, Pause-Toggle,
 **Balken-Gruppierung** für zusammenhängende Achtel-/Sechzehntel-Läufe
 gleicher Dauer im selben Beat via `_beam_groups()` — Läufe mit gemischten
 Dauern bekommen weiterhin Einzel-Fähnchen statt Partial-Balken, siehe
-Limitationen). Jede Spur hat GENAU EIN Instrument (Presets aus
+Limitationen. **Noten per Ziehen verschieben** statt Löschen+Neu-Setzen:
+`mousePressEvent` auf einer bestehenden Note startet einen Drag (die
+`NoteEvent`-Instanz wird in `mouseMoveEvent` live mutiert -- kein Ghost-
+Overlay nötig, `paintEvent` zeichnet sie einfach an ihrer aktuellen
+Position), `mouseReleaseEvent` unterscheidet Klick-ohne-Bewegung (=
+entfernen, wie bisher) von echtem Drag (= Kollision am Zielort auflösen +
+Liste neu sortieren); eine Pause bleibt beim Ziehen eine Pause (nur
+`start_beat` ändert sich, `pitch` bleibt `None`)). Jede Spur hat GENAU EIN
+Instrument (Presets aus
 `tracker.presets`) und beim Schlüsselwechsel (Violin-/Bassschlüssel) einen
 optionalen Oktav-Transpose-Dialog (`_octave_shift_for_clef` rückt den
 Notendurchschnitt der Spur ans neue System, wenn er sonst weit ab läge —

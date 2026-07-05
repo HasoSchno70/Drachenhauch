@@ -24,12 +24,36 @@ def _editor():
 
 
 def _click(staff, x, y, button="left"):
+    """Simuliert einen echten Klick (Press + Release ohne Bewegung) --
+    ein reiner Press wuerde bei einer bestehenden Note nur einen Drag
+    starten, siehe _StaffView.mousePressEvent/mouseReleaseEvent."""
     from PySide6.QtCore import Qt, QPointF
     from PySide6.QtGui import QMouseEvent
     btn = Qt.MouseButton.LeftButton if button == "left" else Qt.MouseButton.RightButton
-    ev = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x, y),
-                     btn, btn, Qt.KeyboardModifier.NoModifier)
-    staff.mousePressEvent(ev)
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x, y),
+                        btn, btn, Qt.KeyboardModifier.NoModifier)
+    staff.mousePressEvent(press)
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x, y),
+                          btn, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    staff.mouseReleaseEvent(release)
+
+
+def _drag(staff, x0, y0, x1, y1):
+    """Simuliert ein Ziehen: Press an (x0,y0), Move zu (x1,y1), Release."""
+    from PySide6.QtCore import Qt, QPointF
+    from PySide6.QtGui import QMouseEvent
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(x0, y0),
+                        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                        Qt.KeyboardModifier.NoModifier)
+    staff.mousePressEvent(press)
+    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x1, y1),
+                       Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
+                       Qt.KeyboardModifier.NoModifier)
+    staff.mouseMoveEvent(move)
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(x1, y1),
+                          Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
+                          Qt.KeyboardModifier.NoModifier)
+    staff.mouseReleaseEvent(release)
 
 
 def _move(staff, x, y):
@@ -128,6 +152,80 @@ def test_right_click_removes_note():
     assert len(ed.doc.tracks[0].notes) == 1
     _click(staff, x, y, button="right")
     assert len(ed.doc.tracks[0].notes) == 0
+
+
+def test_drag_moves_note_to_new_beat_and_pitch():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert len(ed.doc.tracks[0].notes) == 1
+
+    _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
+         staff._x_for_beat(2.0), staff._y_for_pitch(67))
+
+    notes = ed.doc.tracks[0].notes
+    assert len(notes) == 1                          # verschoben, nicht dupliziert
+    assert abs(notes[0].start_beat - 2.0) < 1e-6
+    assert notes[0].pitch == 67
+
+
+def test_drag_without_movement_still_removes_note():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    x, y = staff._x_for_beat(0.0), staff._y_for_pitch(60)
+    _click(staff, x, y)
+    assert len(ed.doc.tracks[0].notes) == 1
+    _drag(staff, x, y, x, y)                         # Press+Release ohne Bewegung
+    assert len(ed.doc.tracks[0].notes) == 0
+
+
+def test_drag_onto_existing_note_replaces_it():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(2.0), staff._y_for_pitch(64))
+    assert len(ed.doc.tracks[0].notes) == 2
+
+    _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
+         staff._x_for_beat(2.0), staff._y_for_pitch(67))
+
+    notes = ed.doc.tracks[0].notes
+    assert len(notes) == 1                           # Zielnote wurde ersetzt
+    assert abs(notes[0].start_beat - 2.0) < 1e-6
+    assert notes[0].pitch == 67
+
+
+def test_drag_rest_only_changes_beat_not_pitch():
+    ed = _editor()
+    ed.rest_check.setChecked(True)
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert ed.doc.tracks[0].notes[0].rest is True
+
+    ed.rest_check.setChecked(False)                  # Ziehen soll trotzdem Pause bleiben
+    _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
+         staff._x_for_beat(3.0), staff._y_for_pitch(72))
+
+    note = ed.doc.tracks[0].notes[0]
+    assert note.rest is True
+    assert note.pitch is None
+    assert abs(note.start_beat - 3.0) < 1e-6
+
+
+def test_drag_marks_dirty_and_is_undoable():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed.undo.flush()
+
+    _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
+         staff._x_for_beat(1.0), staff._y_for_pitch(62))
+    ed.undo.flush()
+    assert abs(ed.doc.tracks[0].notes[0].start_beat - 1.0) < 1e-6
+
+    ed.undo.undo()
+    assert abs(ed.doc.tracks[0].notes[0].start_beat - 0.0) < 1e-6
+    assert ed.doc.tracks[0].notes[0].pitch == 60
 
 
 def test_rest_toggle_places_rest_instead_of_note():

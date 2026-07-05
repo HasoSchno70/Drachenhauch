@@ -99,6 +99,12 @@ class _StaffView(QWidget):
         # damit man vor dem Klick sieht, wo/welche Note gesetzt wuerde --
         # sonst aendert man leicht versehentlich eine bestehende Note.
         self.hover_pos: tuple[float, int | None] | None = None
+        # Verschieben einer bestehenden Note per Ziehen (statt Loeschen +
+        # Neu-Setzen): _drag_note ist die live mutierte NoteEvent-Instanz,
+        # _drag_moved unterscheidet Klick-ohne-Bewegung (= entfernen, wie
+        # bisher) von einem echten Drag (= verschieben).
+        self._drag_note = None
+        self._drag_moved = False
         self.setMouseTracking(True)
         self.setMinimumHeight(250)
 
@@ -369,12 +375,21 @@ class _StaffView(QWidget):
 
     def mousePressEvent(self, e) -> None:  # noqa: N802
         beat = self._snap_beat(self._beat_for_x(e.position().x()))
+        self.hover_pos = None
         if e.button() == Qt.MouseButton.RightButton:
             existing = self._existing_at(beat)
             if existing is not None:
                 self.track.remove_note(existing)
                 self.editor._mark_dirty()
                 self.update()
+            return
+        existing = self._existing_at(beat)
+        if existing is not None:
+            # Ziehen starten statt sofort zu togglen -- ob es beim Loslassen
+            # ein Verschieben oder ein Entfernen war, entscheidet sich in
+            # mouseReleaseEvent (Klick ohne Bewegung = wie bisher entfernen).
+            self._drag_note = existing
+            self._drag_moved = False
             return
         if self.editor.entry_rest:
             self._place(beat, rest=True)
@@ -385,12 +400,49 @@ class _StaffView(QWidget):
 
     def mouseMoveEvent(self, e) -> None:  # noqa: N802
         beat = self._snap_beat(self._beat_for_x(e.position().x()))
+        if self._drag_note is not None:
+            note = self._drag_note
+            if abs(beat - note.start_beat) > 1e-6:
+                self._drag_moved = True
+                note.start_beat = beat
+            if not note.rest:
+                # Gleiche Vorzeichen-Einstellung wie beim Neu-Setzen (Toolbar-
+                # Toggle) -- ein Konsistenzpunkt statt zweier Regeln.
+                pitch = self._pitch_for_y(e.position().y(),
+                                          self.editor.entry_accidental)
+                if pitch != note.pitch:
+                    self._drag_moved = True
+                    note.pitch = pitch
+            self.update()
+            return
         if self.editor.entry_rest:
             self.hover_pos = (beat, None)
         else:
             pitch = self._pitch_for_y(e.position().y(),
                                       self.editor.entry_accidental)
             self.hover_pos = (beat, pitch)
+        self.update()
+
+    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
+        if e.button() != Qt.MouseButton.LeftButton or self._drag_note is None:
+            return
+        note = self._drag_note
+        moved = self._drag_moved
+        self._drag_note = None
+        self._drag_moved = False
+        if moved:
+            # Kollision am Zielort aufloesen -- eine ANDERE Note an
+            # derselben Stelle wird ersetzt (gleiches Verhalten wie beim
+            # Neu-Setzen ueber _place()).
+            for other in list(self.track.notes):
+                if other is not note and abs(other.start_beat - note.start_beat) < 1e-6:
+                    self.track.remove_note(other)
+            self.track.notes.sort(key=lambda n: n.start_beat)
+        else:
+            # Klick ohne Bewegung -- wie bisher: Note entfernen (Toggle).
+            self.track.remove_note(note)
+        self.editor._mark_dirty()
+        self.updateGeometry()
         self.update()
 
     def leaveEvent(self, e) -> None:  # noqa: N802

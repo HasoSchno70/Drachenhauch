@@ -26,6 +26,12 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **Linksklick** auf eine Notenzeile setzt/entfernt eine Note (nochmal auf
   dieselbe Stelle klicken entfernt sie wieder). **Rechtsklick** entfernt
   immer, egal welcher Eingabe-Modus aktiv ist.
+- **Note verschieben** — Klick auf eine bestehende Note halten und ziehen
+  verschiebt sie zu Zeit/Tonhöhe unter dem Cursor (statt Löschen + Neu-
+  Setzen). Ein Klick ohne Bewegung entfernt die Note weiterhin wie bisher.
+  Landet eine verschobene Note auf einer anderen bestehenden Note, wird
+  diese ersetzt. Eine Pause bleibt beim Verschieben eine Pause (nur die
+  Zeitposition ändert sich).
 - **Vorschau-Cursor** — beim Bewegen der Maus über das Notensystem zeigt ein
   halbtransparenter Notenkopf (bzw. eine Pause) genau an, wo/mit welcher
   Tonhöhe ein Klick landen würde, bevor man tatsächlich klickt.
