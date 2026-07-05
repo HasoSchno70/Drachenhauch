@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from .audio_preview import Mixer
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
-from .score.convert import to_tracker_song
+from .score.convert import STACCATO_FACTOR, to_tracker_song
 from .score.document import ScoreDoc
 
 # Diatonische Halbtonversaetze der 7 Stammtoene (C,D,E,F,G,A,B) innerhalb
@@ -50,6 +50,10 @@ DURATIONS = [
     ("Ganze", 4.0), ("Halbe", 2.0), ("Viertel", 1.0),
     ("Achtel", 0.5), ("Sechzehntel", 0.25),
 ]
+
+ENTRY_MODES = ("note", "rest", "slur", "fingering", "staccato")
+ENTRY_MODE_LABELS = {"note": "Note", "rest": "Pause", "slur": "Bindebogen",
+                     "fingering": "Fingersatz", "staccato": "Staccato"}
 
 _TRACK_HUES = ("accent", "success", "danger", "warning",
               "kw_ctrl", "kw_decl", "string", "number")
@@ -105,6 +109,10 @@ class _StaffView(QWidget):
         # bisher) von einem echten Drag (= verschieben).
         self._drag_note = None
         self._drag_moved = False
+        self._drag_orig_beat: float | None = None
+        # Bindebogen-Modus: erste angeklickte Note wartet hier auf die
+        # zweite, die den Bogen abschliesst.
+        self._slur_anchor_beat: float | None = None
         self.setMouseTracking(True)
         self.setMinimumHeight(250)
 
@@ -271,12 +279,16 @@ class _StaffView(QWidget):
             x = int(self._x_for_beat(m * 4) - self.BARLINE_LEAD)
             p.drawLine(x, int(y_top) - 6, x, int(y_bot) + 6)
 
+        self._draw_slurs(p)
+
         beam_groups = self._beam_groups()
         beamed_ids = {id(n) for g in beam_groups for n in g}
         for note in self.track.notes:
             self._draw_note(p, note, beamed=id(note) in beamed_ids)
         for group in beam_groups:
             self._draw_beam_group(p, group)
+
+        self._draw_slur_anchor(p)
 
         if self.playhead_beat is not None:
             x = int(self._x_for_beat(self.playhead_beat))
@@ -366,6 +378,62 @@ class _StaffView(QWidget):
             p.drawText(QRectF(x - 28, y - 12, 20, 24),
                       Qt.AlignmentFlag.AlignCenter, "♯")
 
+        if note.staccato:
+            # Punkt auf der dem Notenhals abgewandten Seite (Konvention).
+            stem_up = step < 4
+            dot_y = (y + self.NOTE_R + 7) if stem_up else (y - self.NOTE_R - 7)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(color)
+            p.drawEllipse(QPointF(x, dot_y), 2.6, 2.6)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+
+        if note.fingering is not None:
+            p.setPen(QColor(COLORS["identifier"]))
+            f3 = QFont(EDITOR_FONT_FAMILY)
+            f3.setPointSize(11)
+            f3.setBold(True)
+            p.setFont(f3)
+            p.drawText(QRectF(x - 8, y - self.STEM_LEN - 22, 16, 18),
+                      Qt.AlignmentFlag.AlignCenter, str(note.fingering))
+
+    # ---- Bindeboegen ------------------------------------------------------
+    def _draw_slurs(self, p: QPainter) -> None:
+        """Rein visuelle Phrasierungsboegen zwischen zwei Beat-Positionen --
+        keine Wirkung auf Wiedergabe/Tracker-Export (siehe `Track.slurs`)."""
+        color = QColor(_track_color(self.track_index))
+        p.setPen(QPen(color, 1.8))
+        for a, b in self.track.slurs:
+            xa, xb = self._x_for_beat(a), self._x_for_beat(b)
+            na, nb = self._existing_at(a), self._existing_at(b)
+            ya = self._y_for_pitch(na.pitch) if na is not None and not na.rest else self._y_for_step(4)
+            yb = self._y_for_pitch(nb.pitch) if nb is not None and not nb.rest else self._y_for_step(4)
+            arc_y = min(ya, yb) - 20
+            path = self._slur_path(xa, ya, xb, yb, arc_y)
+            p.drawPath(path)
+
+    @staticmethod
+    def _slur_path(xa: float, ya: float, xb: float, yb: float, arc_y: float):
+        from PySide6.QtGui import QPainterPath
+        path = QPainterPath()
+        path.moveTo(xa, ya - 4)
+        mx = (xa + xb) / 2.0
+        path.quadTo(mx, arc_y, xb, yb - 4)
+        return path
+
+    def _draw_slur_anchor(self, p: QPainter) -> None:
+        """Markiert die erste im Bindebogen-Modus angeklickte Note, bis die
+        zweite den Bogen abschliesst."""
+        if self._slur_anchor_beat is None:
+            return
+        note = self._existing_at(self._slur_anchor_beat)
+        if note is None:
+            return
+        x = self._x_for_beat(note.start_beat)
+        y = self._y_for_step(4) if note.rest else self._y_for_pitch(note.pitch)
+        p.setPen(QPen(QColor(COLORS["accent"]), 2.0, Qt.PenStyle.DashLine))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(x, y), self.NOTE_R + 5, self.NOTE_R + 5)
+
     # ---- Klick-Eingabe --------------------------------------------------
     def _existing_at(self, beat: float):
         for n in self.track.notes:
@@ -376,22 +444,66 @@ class _StaffView(QWidget):
     def mousePressEvent(self, e) -> None:  # noqa: N802
         beat = self._snap_beat(self._beat_for_x(e.position().x()))
         self.hover_pos = None
+        mode = self.editor.entry_mode
+
         if e.button() == Qt.MouseButton.RightButton:
+            if mode == "slur":
+                # Im Bindebogen-Modus entfernt Rechtsklick nur Boegen an
+                # dieser Stelle -- nie die Note selbst (eigenstaendige
+                # Bedienung getrennt vom normalen Noten-Entfernen).
+                before = len(self.track.slurs)
+                self.track.remove_slurs_at(beat)
+                if len(self.track.slurs) != before:
+                    self.editor._mark_dirty()
+                    self.update()
+                return
             existing = self._existing_at(beat)
             if existing is not None:
                 self.track.remove_note(existing)
                 self.editor._mark_dirty()
                 self.update()
             return
+
         existing = self._existing_at(beat)
+
+        if mode == "fingering":
+            if existing is not None and not existing.rest:
+                value = self.editor.fingering_spin.value()
+                existing.fingering = None if existing.fingering == value else value
+                self.editor._mark_dirty()
+                self.update()
+            return
+
+        if mode == "staccato":
+            if existing is not None and not existing.rest:
+                existing.staccato = not existing.staccato
+                self.editor._mark_dirty()
+                self.update()
+            return
+
+        if mode == "slur":
+            if existing is None:
+                self._slur_anchor_beat = None      # Klick ins Leere -> Auswahl abbrechen
+            elif self._slur_anchor_beat is None:
+                self._slur_anchor_beat = beat        # erste Note des Bogens
+            elif abs(self._slur_anchor_beat - beat) < 1e-6:
+                self._slur_anchor_beat = None         # dieselbe Note nochmal -> abbrechen
+            else:
+                self.track.add_slur(self._slur_anchor_beat, beat)
+                self._slur_anchor_beat = None
+                self.editor._mark_dirty()
+            self.update()
+            return
+
+        # mode "note"/"rest": bestehendes Verhalten -- Klick auf eine
+        # bestehende Note/Pause startet ein Ziehen (siehe mouseMoveEvent/
+        # mouseReleaseEvent), sonst wird an leerer Stelle neu gesetzt.
         if existing is not None:
-            # Ziehen starten statt sofort zu togglen -- ob es beim Loslassen
-            # ein Verschieben oder ein Entfernen war, entscheidet sich in
-            # mouseReleaseEvent (Klick ohne Bewegung = wie bisher entfernen).
             self._drag_note = existing
             self._drag_moved = False
+            self._drag_orig_beat = existing.start_beat
             return
-        if self.editor.entry_rest:
+        if mode == "rest":
             self._place(beat, rest=True)
         else:
             pitch = self._pitch_for_y(e.position().y(),
@@ -415,7 +527,12 @@ class _StaffView(QWidget):
                     note.pitch = pitch
             self.update()
             return
-        if self.editor.entry_rest:
+        mode = self.editor.entry_mode
+        if mode in ("slur", "fingering", "staccato"):
+            self.hover_pos = None
+            self.update()
+            return
+        if mode == "rest":
             self.hover_pos = (beat, None)
         else:
             pitch = self._pitch_for_y(e.position().y(),
@@ -428,8 +545,10 @@ class _StaffView(QWidget):
             return
         note = self._drag_note
         moved = self._drag_moved
+        orig_beat = self._drag_orig_beat
         self._drag_note = None
         self._drag_moved = False
+        self._drag_orig_beat = None
         if moved:
             # Kollision am Zielort aufloesen -- eine ANDERE Note an
             # derselben Stelle wird ersetzt (gleiches Verhalten wie beim
@@ -438,6 +557,8 @@ class _StaffView(QWidget):
                 if other is not note and abs(other.start_beat - note.start_beat) < 1e-6:
                     self.track.remove_note(other)
             self.track.notes.sort(key=lambda n: n.start_beat)
+            if orig_beat is not None:
+                self.track.relocate_slurs(orig_beat, note.start_beat)
         else:
             # Klick ohne Bewegung -- wie bisher: Note entfernen (Toggle).
             self.track.remove_note(note)
@@ -474,7 +595,9 @@ class ScoreEditor(QMainWindow):
         self._mixer = Mixer()
         self._sound_cache: dict = {}
         self.entry_accidental = 0
-        self.entry_rest = False
+        # "note" (setzen/verschieben) | "rest" (Pause) | "slur" (Bindebogen
+        # ueber zwei Klicks anlegen) | "fingering" (Fingersatz zuweisen).
+        self.entry_mode = "note"
         self._dirty = False
         self._playing = False
         self._play_beat = 0.0
@@ -583,10 +706,50 @@ class ScoreEditor(QMainWindow):
         self.acc_group.idClicked.connect(self._on_accidental_changed)
 
         tb.addSpacing(12)
-        self.rest_check = QCheckBox("Pause")
-        self.rest_check.setFont(big_font)
-        self.rest_check.toggled.connect(self._on_rest_toggled)
-        tb.addWidget(self.rest_check)
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.setExclusive(True)
+        mode_font = QFont(EDITOR_FONT_FAMILY)
+        mode_font.setPointSize(11)
+        self.btn_mode_note = QToolButton()
+        self.btn_mode_note.setText("Note")
+        self.btn_mode_note.setToolTip("Noten setzen/verschieben (Standard)")
+        self.btn_mode_rest = QToolButton()
+        self.btn_mode_rest.setText("Pause")
+        self.btn_mode_rest.setToolTip("Pausen setzen statt Noten")
+        self.btn_mode_slur = QToolButton()
+        self.btn_mode_slur.setText("Bindebogen")
+        self.btn_mode_slur.setToolTip(
+            "Bindebogen anlegen: zwei Noten nacheinander anklicken, um sie "
+            "zu verbinden (rein visuell, ohne Wirkung auf Tracker-Export)")
+        self.btn_mode_fingering = QToolButton()
+        self.btn_mode_fingering.setText("Fingersatz")
+        self.btn_mode_fingering.setToolTip(
+            "Fingersatz zuweisen: Note anklicken, um ihr die rechts "
+            "gewaehlte Fingersatz-Zahl zu geben (erneuter Klick entfernt sie)")
+        self.btn_mode_staccato = QToolButton()
+        self.btn_mode_staccato.setText("Staccato")
+        self.btn_mode_staccato.setToolTip(
+            "Staccato an-/ausschalten: Note anklicken, um sie kurz "
+            "abgehackt zu spielen (verkuerzt Wiedergabe + Tracker-Export)")
+        for gid, b in enumerate((self.btn_mode_note, self.btn_mode_rest,
+                                self.btn_mode_slur, self.btn_mode_fingering,
+                                self.btn_mode_staccato)):
+            b.setCheckable(True)
+            b.setFont(mode_font)
+            self.mode_group.addButton(b, gid)
+            tb.addWidget(b)
+        self.btn_mode_note.setChecked(True)
+        self.mode_group.idClicked.connect(self._on_mode_changed)
+
+        self.fingering_spin = QSpinBox()
+        self.fingering_spin.setRange(1, 5)
+        self.fingering_spin.setValue(1)
+        self.fingering_spin.setFont(big_font)
+        self.fingering_spin.setMinimumHeight(34)
+        self.fingering_spin.setToolTip(
+            "Fingersatz-Zahl (1-5), die im Fingersatz-Modus zugewiesen wird")
+        self.fingering_spin.valueChanged.connect(lambda _v: self._update_info())
+        tb.addWidget(self.fingering_spin)
 
         tb.addSpacing(20)
         lbl_bpm = QLabel("Tempo (BPM):")
@@ -703,8 +866,12 @@ class ScoreEditor(QMainWindow):
         self.entry_accidental = {0: 0, 1: 1, 2: -1}.get(gid, 0)
         self._update_info()
 
-    def _on_rest_toggled(self, checked: bool) -> None:
-        self.entry_rest = checked
+    def _on_mode_changed(self, gid: int) -> None:
+        self.entry_mode = ENTRY_MODES[gid] if 0 <= gid < len(ENTRY_MODES) else "note"
+        # Moduswechsel bricht eine offene Bindebogen-Anker-Auswahl ab, damit
+        # kein Klick im NEUEN Modus versehentlich noch den alten Anker nutzt.
+        for row in self._track_rows:
+            row["staff"]._slur_anchor_beat = None
         self._update_info()
 
     def _update_info(self) -> None:
@@ -717,13 +884,20 @@ class ScoreEditor(QMainWindow):
         dotted = " punktiert" if self.dotted_check.isChecked() else ""
         acc = {0: "natuerlich", 1: "Kreuz (+1)", -1: "B (-1)"}.get(
             self.entry_accidental, "natuerlich")
-        mode = "Pause" if self.entry_rest else "Note"
+        mode = ENTRY_MODE_LABELS.get(self.entry_mode, "Note")
         beats = self.doc.length_beats()
+        extra = ""
+        if self.entry_mode == "fingering":
+            extra = f" (Zahl {self.fingering_spin.value()})"
+        elif self.entry_mode == "slur":
+            extra = " (erste Note anklicken, dann die zweite)"
+        elif self.entry_mode == "staccato":
+            extra = " (Note anklicken zum An-/Ausschalten)"
         self.status.showMessage(
-            f"Eingabe: {mode} · {dur_name}{dotted} · Vorzeichen {acc}   |   "
+            f"Eingabe: {mode}{extra} · {dur_name}{dotted} · Vorzeichen {acc}   |   "
             f"{len(self.doc.tracks)} Spur(en) · {beats:g} Beats "
             f"(~{beats / 4.0:.1f} Takte) bei {self.doc.bpm} BPM   |   "
-            f"Linksklick: setzen/entfernen · Rechtsklick: entfernen · "
+            f"Linksklick: setzen/entfernen/ziehen · Rechtsklick: entfernen · "
             f"F11: Vollbild")
 
     def _on_bpm_changed(self, v: int) -> None:
@@ -861,7 +1035,8 @@ class ScoreEditor(QMainWindow):
 
     def _trigger_note(self, track, note) -> None:
         sr = 44100
-        seconds = note.dur_beat * 60.0 / max(1, self.doc.bpm)
+        dur_beat = note.dur_beat * STACCATO_FACTOR if note.staccato else note.dur_beat
+        seconds = dur_beat * 60.0 / max(1, self.doc.bpm)
         n_samples = max(1, int(sr * seconds))
         key = (id(track.instrument), int(note.pitch), n_samples)
         arr = self._sound_cache.get(key)

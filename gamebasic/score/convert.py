@@ -12,6 +12,9 @@ Spurzahl den Tracker-Kanal-Maximalwert sprengt.
 - Zeiten, die kein exaktes Vielfaches einer Sechzehntelnote sind (z.B. aus
   einer handbearbeiteten Datei oder kuenftigen Triolen), werden auf die
   naechste Tracker-Zeile gerundet.
+- Bindeboegen (`Track.slurs`) und Fingersaetze (`NoteEvent.fingering`) sind
+  reine Notationszusaetze ohne Tracker-Entsprechung -- sie werden beim
+  Export ignoriert. `staccato` dagegen wirkt (siehe `STACCATO_FACTOR`).
 """
 from __future__ import annotations
 
@@ -22,6 +25,12 @@ from ..tracker.song import MAX_CHANNELS, MAX_ROWS, MIN_CHANNELS, NOTE_OFF, Song
 
 ROWS_PER_BEAT = 4    # Tracker-Zeile = 1/16-Note (Song.row_ms() = 60000/bpm/4)
 _ROUND_EPS = 1e-6
+# Staccato verkuerzt die Tracker-Klangdauer auf diesen Anteil der notierten
+# Dauer (Rest wird stumm, wie beim Zeichnen einer klassischen Staccato-
+# Interpretation) -- mindestens STACCATO_MIN_ROWS, damit auch sehr kurze
+# Noten noch hoerbar bleiben.
+STACCATO_FACTOR = 0.5
+STACCATO_MIN_ROWS = 1
 
 
 def _beat_to_row(beat: float) -> int:
@@ -107,6 +116,9 @@ def to_tracker_song(doc) -> tuple[Song, list[str]]:
                     f"gerundet")
             start_row = _beat_to_row(note.start_beat)
             end_row = _beat_to_row(note.end_beat)
+            if note.staccato:
+                shortened = note.start_beat + note.dur_beat * STACCATO_FACTOR
+                end_row = max(start_row + STACCATO_MIN_ROWS, _beat_to_row(shortened))
             chunk = _find_chunk(start_row)
             if chunk is None:
                 warnings.append(

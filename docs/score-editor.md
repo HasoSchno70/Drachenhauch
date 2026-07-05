@@ -60,6 +60,23 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **Balken-Gruppierung** — zusammenhängende Achtel/Sechzehntel gleicher Dauer
   im selben Beat bekommen automatisch einen gemeinsamen Balken statt
   Einzel-Fähnchen (Sechzehntel: Doppelbalken).
+- **Eingabe-Modus** (Note/Pause/Bindebogen/Fingersatz/Staccato, exklusive
+  Buttons) — bestimmt, was ein Linksklick auf eine Note bewirkt:
+  - **Note/Pause**: wie oben beschrieben (setzen/verschieben/entfernen).
+  - **Bindebogen**: erste Note anklicken, dann die zweite — verbindet beide
+    mit einem Phrasierungsbogen (rein visuell, keine Wirkung auf Wiedergabe
+    oder Tracker-Export). Dieselbe Note zweimal hintereinander bricht die
+    Auswahl ab. **Rechtsklick** entfernt in diesem Modus einen Bogen an
+    dieser Stelle, ohne die Note zu löschen. Wird eine verbundene Note
+    gezogen, wandert ihr Bogen-Anker automatisch mit.
+  - **Fingersatz**: Note anklicken weist ihr die rechts gewählte Zahl (1–5)
+    zu; erneuter Klick mit derselben Zahl entfernt sie wieder.
+  - **Staccato**: Note anklicken schaltet Staccato an/aus (kurzer, "kurz
+    abgehackter" Ton). Wirkt tatsächlich auf den Klang: sowohl bei der
+    Wiedergabe im Editor als auch nach der Tracker-Übernahme klingt die Note
+    nur die halbe notierte Dauer, dann folgt eine Pause bis zum nächsten
+    Ereignis (mindestens 1 Tracker-Zeile bleibt immer hörbar). Pausen können
+    nicht staccato sein.
 - **Info-Leiste** (unten) — zeigt live den aktuellen Eingabe-Modus (Dauer,
   Vorzeichen, Pause an/aus), einen Stück-Überblick (Spuren, Beats/Takte,
   BPM) und Kurzhinweise zur Bedienung.
@@ -109,13 +126,21 @@ Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
   Beats = 4 Takte) werden dort gekappt — Tracker-Patterns können nicht binden.
 - **Kein Schlagzeug-Spurtyp** — der Pflicht-Drum-Kanal des Tracker-Exports
   bleibt unbelegt.
+- **Bindebögen und Fingersätze sind reine Notationszusätze** — sie werden
+  beim Tracker-Export komplett ignoriert (kein Tracker-Konzept dafür).
+- **Kein optisches Notenlinien-Layout** — anders als echte Notensatz-Software
+  (Sibelius/Finale/Dorico/LilyPond) gibt es keine automatische Kollisions-
+  vermeidung zwischen Vorzeichen/Fingersätzen/Bindebögen/Hilfslinien und
+  keinen proportionalen (nur zeit-proportionalen) Notenabstand. Bei sehr
+  dichten Passagen können sich Beschriftungen überlappen.
 
 ## Geplant
 
-Andere Taktarten, Bindebögen über Pattern-Grenzen hinweg, Partial-Balken bei
-gemischten Notendauern, kontextuelle Kreuz/B-Schreibweise, Mehrstimmigkeit
-pro Spur (automatische Verteilung auf zusätzliche Tracker-Kanäle beim
-Export).
+Andere Taktarten, Triolen/Tuplets, Partial-Balken bei gemischten
+Notendauern, kontextuelle Kreuz/B-Schreibweise, Mehrstimmigkeit pro Spur
+(automatische Verteilung auf zusätzliche Tracker-Kanäle beim Export),
+weitere Artikulationen (Akzent, Tenuto), echtes optisches Notenlinien-
+Layout mit Kollisionsvermeidung.
 
 ## Datenmodell
 

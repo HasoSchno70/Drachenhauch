@@ -1642,6 +1642,27 @@ Code-Editor-Toolbar/Menü (`Strg+Shift+N`,
 angezeigt, das Ergebnis wird als Tracker-Projekt gespeichert und `gbtracker`
 per Subprozess mit der Datei gestartet).
 
+**Notationszusätze über einen exklusiven Eingabe-Modus** (`entry_mode`:
+`note`/`rest`/`slur`/`fingering`/`staccato`, 5er-`QButtonGroup` in der
+Toolbar): `NoteEvent.staccato`/`NoteEvent.fingering` + `Track.slurs` (Liste
+von Beat-Positions-Paaren, JSON-serialisierbar statt Objekt-Referenzen,
+damit Undo/Redo-Snapshots sie automatisch mitnehmen). Im **Bindebogen**-
+Modus verbindet ein zweiter Klick auf eine andere Note die Anker-Note mit
+ihr (`Track.add_slur`, gerendert als quadratische Bézierkurve in
+`_draw_slurs`); Rechtsklick entfernt dort gezielt einen Bogen, ohne die
+Note zu löschen (`Track.remove_slurs_at`); ein Ziehen der Note verschiebt
+ihren Bogen-Anker automatisch mit (`Track.relocate_slurs`, in
+`mouseReleaseEvent`s Drag-Finalisierung). **Fingersatz**-Modus weist die
+per Spinbox gewählte Zahl (1..5) zu (erneuter Klick mit derselben Zahl
+löscht sie). **Staccato**-Modus schaltet `NoteEvent.staccato` um -- wirkt
+NICHT nur optisch: `to_tracker_song` platziert dafür ein früheres
+`NOTE_OFF` (`STACCATO_FACTOR=0.5` der notierten Dauer, mind. 1 Zeile,
+siehe `gamebasic/score/convert.py`) und `ScoreEditor._trigger_note`
+rendert für die Editor-eigene Wiedergabe entsprechend kürzer. Bindebögen/
+Fingersätze sind rein informativ, keine Tracker-Entsprechung. Ein
+Moduswechsel bricht eine offene Bindebogen-Anker-Auswahl ab
+(`_on_mode_changed`).
+
 **V1-Limitationen** (bewusst, dokumentiert statt stillschweigend verschluckt):
 festes 4/4-Metrum (UI zeigt/ändert `time_sig` nicht), ein Instrument pro
 Spur (kein Pattern-Zell-Override wie im Tracker), Akkorde (mehrere Noten
@@ -1651,7 +1672,9 @@ als Kreuz der Stammnote darunter notiert (nie als B), Balken-Gruppierung nur
 innerhalb gleichlanger Achtel-/Sechzehntel-Läufe (keine Partial-Balken bei
 gemischten Dauern), Noten die über eine 64-Zeilen-Tracker-
 Pattern-Grenze hinaus klingen würden werden dort gekappt, kein
-Schlagzeug-Spurtyp (der Pflicht-Drum-Kanal bleibt beim Export unbelegt).
+Schlagzeug-Spurtyp (der Pflicht-Drum-Kanal bleibt beim Export unbelegt),
+kein optisches Notenlinien-Layout (keine automatische Kollisionsvermeidung
+zwischen Vorzeichen/Fingersätzen/Bindebögen/Hilfslinien).
 
 Doku [docs/score-editor.md](docs/score-editor.md), Tests
 `tests/test_score_document.py` + `tests/test_score_convert.py` (Datenmodell +

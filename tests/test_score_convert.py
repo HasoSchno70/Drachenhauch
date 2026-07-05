@@ -119,6 +119,37 @@ def test_legato_note_not_left_with_dangling_note_off():
     assert data[4] == 64                            # keine NOTE_OFF-Ueberreste
 
 
+def test_staccato_note_gets_earlier_note_off():
+    doc = ScoreDoc()
+    doc.tracks[0].add_note(0.0, 4.0, 60, staccato=True)   # Ganze Note, staccato
+    song, warnings = to_tracker_song(doc)
+
+    data = song.patterns[0].data[0]
+    assert data[0] == 60
+    assert data[8] == NOTE_OFF          # Haelfte von 16 Zeilen -> Zeile 8
+    assert all(v is None for v in data[1:8])
+
+
+def test_non_staccato_note_keeps_full_length():
+    doc = ScoreDoc()
+    doc.tracks[0].add_note(0.0, 4.0, 60, staccato=False)
+    song, warnings = to_tracker_song(doc)
+    data = song.patterns[0].data[0]
+    assert data[0] == 60
+    assert all(v is None for v in data[1:])       # kein vorzeitiges NOTE_OFF
+
+
+def test_staccato_very_short_note_keeps_at_least_one_row():
+    doc = ScoreDoc()
+    doc.tracks[0].add_note(0.0, 0.25, 60, staccato=True)  # 1 Zeile -- kann nicht kuerzer
+    song, warnings = to_tracker_song(doc)
+    data = song.patterns[0].data[0]
+    assert data[0] == 60
+    # Zeile 1 ist bereits die naechste Note-Slot-Grenze -- kein Crash/keine
+    # Verkuerzung unter eine Zeile.
+    assert not any("Pattern-Grenze" in w for w in warnings)
+
+
 def test_to_tracker_song_never_mutates_doc():
     doc = ScoreDoc()
     doc.tracks[0].add_note(0.0, 1.0, 60)

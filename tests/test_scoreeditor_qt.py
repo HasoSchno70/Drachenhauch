@@ -79,7 +79,7 @@ def test_hover_pos_tracks_mouse_position():
 
 def test_hover_pos_shows_rest_when_pause_active():
     ed = _editor()
-    ed.rest_check.setChecked(True)
+    ed._on_mode_changed(1)  # Pause-Modus
     staff = ed._track_rows[0]["staff"]
     _move(staff, staff._x_for_beat(1.0), staff._y_for_pitch(60))
     beat, pitch = staff.hover_pos
@@ -197,12 +197,12 @@ def test_drag_onto_existing_note_replaces_it():
 
 def test_drag_rest_only_changes_beat_not_pitch():
     ed = _editor()
-    ed.rest_check.setChecked(True)
+    ed._on_mode_changed(1)  # Pause-Modus
     staff = ed._track_rows[0]["staff"]
     _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
     assert ed.doc.tracks[0].notes[0].rest is True
 
-    ed.rest_check.setChecked(False)                  # Ziehen soll trotzdem Pause bleiben
+    ed._on_mode_changed(0)  # zurueck zu Note-Modus -- Ziehen soll trotzdem Pause bleiben
     _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
          staff._x_for_beat(3.0), staff._y_for_pitch(72))
 
@@ -230,7 +230,7 @@ def test_drag_marks_dirty_and_is_undoable():
 
 def test_rest_toggle_places_rest_instead_of_note():
     ed = _editor()
-    ed.rest_check.setChecked(True)
+    ed._on_mode_changed(1)  # Pause-Modus
     staff = ed._track_rows[0]["staff"]
     x = staff._x_for_beat(0.0)
     y = staff._y_for_pitch(60)
@@ -428,7 +428,7 @@ def test_status_bar_reflects_entry_state_and_song_summary():
     ed = _editor()
     ed.dur_combo.setCurrentIndex(3)          # Achtel
     ed._on_accidental_changed(1)             # Kreuz
-    ed.rest_check.setChecked(True)
+    ed._on_mode_changed(1)  # Pause-Modus
     ed.doc.tracks[0].add_note(0.0, 1.0, 60)
     ed._mark_dirty()
     msg = ed.status.currentMessage()
@@ -653,3 +653,157 @@ def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     assert song.patterns[0].data[0][0] == 60
     assert len(calls) == 1
     assert "--tracker" in calls[0]
+
+
+# ---- Staccato/Fingersatz/Bindebogen (Notationszusaetze) --------------------
+
+def test_staccato_mode_toggles_existing_note():
+    ed = _editor()
+    ed._on_mode_changed(4)                       # Staccato-Modus
+    staff = ed._track_rows[0]["staff"]
+    x, y = staff._x_for_beat(0.0), staff._y_for_pitch(60)
+    _click(staff, x, y)                          # Note existiert noch nicht -> nichts passiert
+    assert ed.doc.tracks[0].notes == []
+
+    ed._on_mode_changed(0)
+    _click(staff, x, y)                          # jetzt eine Note setzen
+    ed._on_mode_changed(4)
+    _click(staff, x, y)
+    assert ed.doc.tracks[0].notes[0].staccato is True
+    _click(staff, x, y)
+    assert ed.doc.tracks[0].notes[0].staccato is False
+
+
+def test_staccato_mode_ignores_rests():
+    ed = _editor()
+    ed._on_mode_changed(1)                        # Pause setzen
+    staff = ed._track_rows[0]["staff"]
+    x, y = staff._x_for_beat(0.0), staff._y_for_pitch(60)
+    _click(staff, x, y)
+    assert ed.doc.tracks[0].notes[0].rest is True
+
+    ed._on_mode_changed(4)                        # Staccato-Modus
+    _click(staff, x, y)
+    assert ed.doc.tracks[0].notes[0].staccato is False   # Pause bleibt unveraendert
+
+
+def test_fingering_mode_assigns_and_clears():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    x, y = staff._x_for_beat(0.0), staff._y_for_pitch(60)
+    _click(staff, x, y)
+
+    ed._on_mode_changed(3)                        # Fingersatz-Modus
+    ed.fingering_spin.setValue(3)
+    _click(staff, x, y)
+    assert ed.doc.tracks[0].notes[0].fingering == 3
+
+    _click(staff, x, y)                           # gleiche Zahl nochmal -> entfernt
+    assert ed.doc.tracks[0].notes[0].fingering is None
+
+    ed.fingering_spin.setValue(5)
+    _click(staff, x, y)
+    ed.fingering_spin.setValue(2)
+    _click(staff, x, y)                           # andere Zahl -> ersetzt, nicht entfernt
+    assert ed.doc.tracks[0].notes[0].fingering == 2
+
+
+def test_slur_mode_two_clicks_create_slur():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+
+    ed._on_mode_changed(2)                        # Bindebogen-Modus
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert staff._slur_anchor_beat is not None
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+    assert staff._slur_anchor_beat is None
+    assert ed.doc.tracks[0].slurs == [(0.0, 1.0)]
+
+
+def test_slur_mode_same_note_twice_cancels_anchor():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed._on_mode_changed(2)
+    x, y = staff._x_for_beat(0.0), staff._y_for_pitch(60)
+    _click(staff, x, y)
+    assert staff._slur_anchor_beat is not None
+    _click(staff, x, y)
+    assert staff._slur_anchor_beat is None
+    assert ed.doc.tracks[0].slurs == []
+
+
+def test_slur_mode_right_click_removes_slur_not_note():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+    ed._on_mode_changed(2)
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+    assert ed.doc.tracks[0].slurs == [(0.0, 1.0)]
+
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60), button="right")
+    assert ed.doc.tracks[0].slurs == []
+    assert len(ed.doc.tracks[0].notes) == 2       # Noten bleiben erhalten
+
+
+def test_dragging_note_relocates_its_slur():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+    ed._on_mode_changed(2)
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(64))
+    assert ed.doc.tracks[0].slurs == [(0.0, 1.0)]
+
+    ed._on_mode_changed(0)                        # zurueck zu Note-Modus zum Ziehen
+    _drag(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60),
+         staff._x_for_beat(3.0), staff._y_for_pitch(72))
+    assert ed.doc.tracks[0].slurs == [(1.0, 3.0)]
+
+
+def test_mode_change_cancels_pending_slur_anchor():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed._on_mode_changed(2)
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert staff._slur_anchor_beat is not None
+
+    ed._on_mode_changed(0)                        # Moduswechsel bricht ab
+    assert staff._slur_anchor_beat is None
+
+
+def test_trigger_note_shortens_staccato_playback(monkeypatch):
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    played = []
+    monkeypatch.setattr(ed._mixer, "play", lambda arr: played.append(arr))
+
+    normal = track.add_note(0.0, 2.0, 60)
+    ed._trigger_note(track, normal)
+    n_normal = played[-1].size
+
+    stacc = track.add_note(2.0, 2.0, 60, staccato=True)
+    ed._trigger_note(track, stacc)
+    n_staccato = played[-1].size
+
+    assert n_staccato < n_normal
+
+
+def test_staff_renders_without_crashing_with_all_annotations():
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    track.add_note(0.0, 1.0, 60, staccato=True)
+    track.add_note(1.0, 1.0, 64, fingering=2)
+    track.add_note(2.0, 1.0, 67, staccato=True, fingering=5)
+    track.add_slur(0.0, 2.0)
+    staff = ed._track_rows[0]["staff"]
+    staff.resize(400, 260)
+    staff._slur_anchor_beat = 1.0     # auch den Anker-Highlight-Pfad ueben
+    pix = staff.grab()                # loest paintEvent aus
+    assert pix.width() > 0 and pix.height() > 0

@@ -89,6 +89,76 @@ def test_track_roundtrip_with_instrument():
     assert t2.notes[0].pitch == 40
 
 
+def test_note_event_staccato_and_fingering_roundtrip():
+    ev = NoteEvent(0.0, 0.5, pitch=60, staccato=True, fingering=3)
+    assert ev.staccato is True
+    assert ev.fingering == 3
+    ev2 = NoteEvent.from_dict(ev.to_dict())
+    assert ev2.staccato is True
+    assert ev2.fingering == 3
+
+    plain = NoteEvent(0.0, 0.5, pitch=60)
+    assert plain.staccato is False
+    assert plain.fingering is None
+    d = plain.to_dict()
+    assert "staccato" not in d and "fingering" not in d       # sparse
+
+
+def test_note_event_fingering_clamped_and_rest_forces_none():
+    ev = NoteEvent(0.0, 1.0, pitch=60, fingering=9)
+    assert ev.fingering == 5
+    ev2 = NoteEvent(0.0, 1.0, fingering=3, rest=True)
+    assert ev2.fingering is None
+    assert ev2.staccato is False
+
+
+def test_track_add_slur_dedup_and_ignores_zero_length():
+    t = Track("T")
+    t.add_note(0.0, 1.0, 60)
+    t.add_note(1.0, 1.0, 62)
+    t.add_slur(0.0, 1.0)
+    t.add_slur(1.0, 0.0)          # gleiches Paar, vertauscht -> kein Duplikat
+    assert t.slurs == [(0.0, 1.0)]
+    t.add_slur(2.0, 2.0)          # Laenge 0 -> ignoriert
+    assert t.slurs == [(0.0, 1.0)]
+
+
+def test_track_remove_note_cleans_up_touching_slurs():
+    t = Track("T")
+    n0 = t.add_note(0.0, 1.0, 60)
+    t.add_note(1.0, 1.0, 62)
+    t.add_slur(0.0, 1.0)
+    t.remove_note(n0)
+    assert t.slurs == []
+
+
+def test_track_relocate_slurs_moves_and_resorts():
+    t = Track("T")
+    t.add_note(0.0, 1.0, 60)
+    t.add_note(1.0, 1.0, 62)
+    t.add_slur(0.0, 1.0)
+    t.relocate_slurs(0.0, 2.0)     # ueberholt den anderen Anker
+    assert t.slurs == [(1.0, 2.0)]
+
+    t.relocate_slurs(5.0, 6.0)     # kein passender Anker -> no-op
+    assert t.slurs == [(1.0, 2.0)]
+
+
+def test_track_slurs_roundtrip_through_dict():
+    t = Track("T")
+    t.add_note(0.0, 1.0, 60)
+    t.add_note(1.0, 1.0, 62)
+    t.add_slur(0.0, 1.0)
+    d = t.to_dict()
+    assert d["slurs"] == [[0.0, 1.0]]
+
+    t2 = Track.from_dict(d)
+    assert t2.slurs == [(0.0, 1.0)]
+
+    empty = Track("T2")
+    assert "slurs" not in empty.to_dict()              # sparse
+
+
 def test_scoredoc_defaults():
     d = ScoreDoc()
     assert d.bpm == 120
