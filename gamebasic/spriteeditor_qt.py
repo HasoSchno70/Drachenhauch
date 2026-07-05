@@ -488,7 +488,18 @@ class SpriteCanvas(QGraphicsView):
         # zusammengefasst (der letzte Zustand gewinnt). Rein visuelles
         # Nachlaufen von <1 Frame, nirgends wird der Pixmap-Inhalt
         # synchron zurueckgelesen.
+        #
+        # WICHTIG: als self-parented QTimer-Instanz (nicht QTimer.singleShot
+        # als static Call) -- so raeumt Qt den Timer synchron mit `self` ab.
+        # Ein unparented singleShot(0, self._do_render) kann sonst nach
+        # Zerstoerung des Canvas noch feuern (Use-after-free/Absturz), z.B.
+        # wenn ein Test-Fenster geschlossen wird, bevor der Event-Loop-Tick
+        # kam.
         self._render_pending = False
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(0)
+        self._render_timer.timeout.connect(self._do_render)
 
         self.rebuild_scene()
 
@@ -531,7 +542,7 @@ class SpriteCanvas(QGraphicsView):
         if self._render_pending:
             return
         self._render_pending = True
-        QTimer.singleShot(0, self._do_render)
+        self._render_timer.start()
 
     def _do_render(self):
         self._render_pending = False
