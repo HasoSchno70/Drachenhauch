@@ -6,6 +6,8 @@ Rechteck und ruft diese Funktionen direkt auf dem `Pattern`-Modell auf.
 """
 from __future__ import annotations
 
+from .song import NOTE_OFF
+
 
 def _norm_rect(c0: int, r0: int, c1: int, r1: int) -> tuple[int, int, int, int]:
     c0, c1 = sorted((c0, c1))
@@ -62,14 +64,15 @@ def block_transpose(pat, c0: int, r0: int, c1: int, r1: int, semitones: int,
                     skip_channel: int | None = None) -> None:
     """Verschiebt alle Noten im Rechteck um `semitones` Halbtoene (geklemmt
     auf MIDI 0..127). `skip_channel` (typischerweise der Drum-Kanal, dessen
-    "Note" nur ein Hit ist) bleibt unveraendert."""
+    "Note" nur ein Hit ist) bleibt unveraendert. Note-Off-Zellen sind keine
+    Tonhoehen und bleiben ebenfalls unveraendert."""
     c0, r0, c1, r1 = _norm_rect(c0, r0, c1, r1)
     for c in range(c0, c1 + 1):
         if c == skip_channel or not (0 <= c < pat.channels):
             continue
         for r in range(r0, r1 + 1):
             note = pat.data[c][r]
-            if note is not None:
+            if note is not None and note != NOTE_OFF:
                 pat.data[c][r] = max(0, min(127, note + semitones))
 
 
@@ -79,13 +82,16 @@ def block_interpolate(pat, c0: int, r0: int, c1: int, r1: int,
     gesetzten Note im Bereich mit einer linearen Notenrampe (klassisches
     Tracker-Werkzeug fuer Glissandi/Tonhoehen-Uebergaenge, z.B. Renoise/
     OpenMPT "Interpolate"). Bereits gesetzte Zwischen-Noten bleiben stehen;
-    Kanaele mit weniger als zwei Noten im Bereich bleiben unveraendert."""
+    Kanaele mit weniger als zwei Noten im Bereich bleiben unveraendert.
+    Note-Off-Zellen zaehlen nicht als Rampen-Endpunkt (keine Tonhoehe),
+    bleiben aber -- wie jede belegte Zelle -- von der Rampe unangetastet."""
     c0, r0, c1, r1 = _norm_rect(c0, r0, c1, r1)
     for c in range(c0, c1 + 1):
         if c == skip_channel or not (0 <= c < pat.channels):
             continue
         rows_with_notes = [r for r in range(r0, r1 + 1)
-                           if pat.data[c][r] is not None]
+                           if pat.data[c][r] is not None
+                           and pat.data[c][r] != NOTE_OFF]
         if len(rows_with_notes) < 2:
             continue
         first, last = rows_with_notes[0], rows_with_notes[-1]

@@ -1177,7 +1177,12 @@ class AnimEditor(QMainWindow):
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
-    app = QApplication.instance() or QApplication([])
+    app = QApplication.instance()
+    if app is None:
+        # Fusion-Style NUR bei frischer QApplication erzwingen -- siehe
+        # trackereditor_qt.launch() fuer die volle Begruendung.
+        app = QApplication([])
+        app.setStyle("Fusion")
     app.setStyleSheet(global_qss())
     win = AnimEditor(project_root)
     # Ohne Datei: die mitgelieferte Beispiel-FSM laden, damit man sofort sieht,

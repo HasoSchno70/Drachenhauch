@@ -33,7 +33,7 @@ from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .synth import synthesize
 from .tracker import (
-    MAX_CHANNELS, MIN_CHANNELS, SLIDE_MAX, VOL_MAX, WAVEFORMS,
+    MAX_CHANNELS, MIN_CHANNELS, NOTE_OFF, SLIDE_MAX, VOL_MAX, WAVEFORMS,
     Song, midi_to_freq, note_name, vol_to_pct,
     FX_NONE, FX_CODES, FX_NAMES,
     block_copy, block_interpolate, block_paste, block_transpose,
@@ -524,7 +524,9 @@ class _CellDelegate(QStyledItemDelegate):
 
     @staticmethod
     def _token_color(idx: int, tok: str) -> str:
-        if idx == 0:                       # Note bzw. Drum-Hit
+        if idx == 0:                       # Note, Drum-Hit oder Note-Off
+            if tok == "OFF":
+                return COLORS["fg_muted"]
             return COLORS["danger"] if tok == "X" else COLORS["accent"]
         if tok.startswith("v"):
             return COLORS["success"]       # Lautstaerke
@@ -786,6 +788,14 @@ class TrackerEditor(QMainWindow):
         self.octave.valueChanged.connect(
             lambda v: self.piano.set_base(12 * (v + 1)))
         krow.addWidget(self.octave)
+        krow.addSpacing(8)
+        b_off = QPushButton("◼ Note Aus")
+        b_off.setToolTip(
+            "Note-Off in die gewaehlte Zelle setzen (Taste 0) -- schneidet "
+            "eine klingende Note VOR der naechsten Note ab, statt sie bis "
+            "dahin durchklingen zu lassen")
+        b_off.clicked.connect(self._set_note_off)
+        krow.addWidget(b_off)
         krow.addWidget(QLabel(
             "  (Zelle waehlen, dann Taste klicken; Entf loescht -- Block: "
             "Shift-Klick/Ziehen, Strg+C/X/V Kopieren/Schneiden/Einfuegen, "
@@ -1177,6 +1187,8 @@ class TrackerEditor(QMainWindow):
                    fx=FX_NONE, fxp=0) -> str:
         if note is None:
             return "···"
+        if note == NOTE_OFF:
+            return " OFF"          # traegt nie vol/slide/fx (Pattern.set())
         base = "  X" if ci == self.song.tonal else note_name(note)
         if vol:
             base += f" v{vol}"
@@ -1282,6 +1294,17 @@ class TrackerEditor(QMainWindow):
             if r + 1 < self.song.patterns[self.cur].rows:
                 self.grid.setCurrentCell(r + 1, c)
 
+    def _set_note_off(self) -> None:
+        """Setzt Note-Off in die gewaehlte Zelle -- schneidet eine klingende
+        Note VOR der naechsten Note im Kanal ab (klassisches Tracker-
+        Konzept). Traegt nie Lautstaerke/Slide/Effekt (Pattern.set())."""
+        if not self._has_sel():
+            return
+        r, c = self._sel()
+        self._set_note(r, c, NOTE_OFF)
+        if r + 1 < self.song.patterns[self.cur].rows:
+            self.grid.setCurrentCell(r + 1, c)
+
     def _has_sel(self) -> bool:
         return self.grid.currentRow() >= 0 and self.grid.currentColumn() >= 0
 
@@ -1296,7 +1319,7 @@ class TrackerEditor(QMainWindow):
             r, c = self._sel()
             pat = self.song.patterns[self.cur]
             n = pat.data[c][r]
-            if n is not None:
+            if n is not None and n != NOTE_OFF:
                 self._play_note(c, n, pat.vol[c][r], pat.slide[c][r] or 0)
 
     # ---- Block-Auswahl (Copy/Cut/Paste/Transpose/Interpolate) ----
@@ -1406,6 +1429,8 @@ class TrackerEditor(QMainWindow):
                 self._reload_and_select(*rect)
                 self._mark()
             return
+        if not ctrl and e.key() == Qt.Key.Key_0:
+            self._set_note_off(); return
         super().keyPressEvent(e)
 
     def _clear(self) -> None:
@@ -1624,7 +1649,7 @@ class TrackerEditor(QMainWindow):
     def _play_columns(self, pat, row: int) -> None:
         for c in range(pat.channels):
             n = pat.data[c][row]
-            if n is not None and self._audible(c):
+            if n is not None and n != NOTE_OFF and self._audible(c):
                 self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
                                 self._note_len_rows(pat, c, row))
 
@@ -1749,7 +1774,19 @@ class TrackerEditor(QMainWindow):
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
-    app = QApplication.instance() or QApplication([])
+    app = QApplication.instance()
+    if app is None:
+        # Fusion-Style NUR bei frischer QApplication erzwingen (nicht auf
+        # einer schon laufenden Instanz -- z.B. im Test-Prozess, wo bereits
+        # viele Widgets anderer Fenster existieren; ein Style-Wechsel dort
+        # riskiert Qt-interne Abstuerze). Der native "windowsvista"-Style
+        # haelt sich fuer Chrome/Buttons/Fensterhintergrund nur teilweise an
+        # QSS -- ohne Fusion sieht der Editor trotz global_qss() spartanisch/
+        # grau aus (nur Widgets mit eigenem lokalem setStyleSheet(), z.B. das
+        # Pattern-Gitter, waeren dann korrekt dunkel). Gleiches Muster wie
+        # editor_qt/__init__.py:_ensure_app.
+        app = QApplication([])
+        app.setStyle("Fusion")
     app.setStyleSheet(global_qss())
     win = TrackerEditor(project_root)
     if initial_file and Path(initial_file).exists():

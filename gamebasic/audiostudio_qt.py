@@ -87,7 +87,12 @@ class AudioStudio(QMainWindow):
 
 def launch(project_root: Path, initial_file: Path | None = None,
            tab: str = "tracker") -> int:
-    app = QApplication.instance() or QApplication([])
+    app = QApplication.instance()
+    if app is None:
+        # Fusion-Style NUR bei frischer QApplication erzwingen -- siehe
+        # trackereditor_qt.launch() fuer die volle Begruendung.
+        app = QApplication([])
+        app.setStyle("Fusion")
     app.setStyleSheet(global_qss())
     win = AudioStudio(project_root, initial_file)
     win.select_tab(tab)

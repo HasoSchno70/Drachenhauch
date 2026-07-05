@@ -16,7 +16,8 @@ import wave
 
 import numpy as np
 
-from .song import vol_to_pct, FX_NONE, FX_ARP, FX_VIB, FX_RET, FX_OFF, TICKS_PER_ROW
+from .song import (NOTE_OFF, vol_to_pct, FX_NONE, FX_ARP, FX_VIB, FX_RET,
+                   FX_OFF, TICKS_PER_ROW)
 
 SAMPLE_RATE = 44100
 
@@ -148,6 +149,11 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
         gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
         evs = events[c]
         for k, (start_row, midi, volc, slidec, fx, fxp) in enumerate(evs):
+            if midi == NOTE_OFF:
+                # Note-Off selbst erzeugt keinen Klang -- es diente schon als
+                # `end_row` fuer das VORHERIGE Event (das dadurch bereits
+                # abgeschnitten wurde). Einfach ueberspringen.
+                continue
             end_row = evs[k + 1][0] if k + 1 < len(evs) else total_rows
             n = (end_row - start_row) * row_samples
             if n <= 0:

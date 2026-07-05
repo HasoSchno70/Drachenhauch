@@ -31,6 +31,14 @@ DEFAULT_ROWS = 16
 MIN_ROWS = 1
 MAX_ROWS = 64
 
+# Note-Off: eine Zelle, die eine klingende Note explizit VOR der naechsten
+# echten Note abschneidet (klassisches Tracker-Konzept, XM/IT nennen es
+# "Key Off"). Liegt im selben Wertebereich wie `data[c][r]` (int | None),
+# damit alle bestehenden "naechstes Event"-Grenzen (Mixer-Sustain, Live-
+# Vorhoeren-Laenge) es automatisch als Grenze erkennen -- kein Sonder-Array
+# noetig. -1 ist ausserhalb des gueltigen MIDI-Bereichs (0..127).
+NOTE_OFF = -1
+
 # Lautstaerke-Effekt pro Note: 1..15 (None = Standard-Lautstaerke).
 VOL_MAX = 15
 DEFAULT_AMP_PCT = 50       # Standard-Amplitude in Prozent (= bisherige 0.5)
@@ -106,7 +114,7 @@ class Pattern:
 
     def set(self, channel: int, row: int, note: int | None) -> None:
         self.data[channel][row] = note
-        if note is None:                     # Note geloescht -> Effekte mit
+        if note is None or note == NOTE_OFF:  # geloescht/Note-Off -> Effekte mit
             self.vol[channel][row] = None
             self.slide[channel][row] = None
             self.fx[channel][row] = None
@@ -429,7 +437,10 @@ class Song:
             for r in range(pat.rows):
                 for c in range(self.channels):
                     note = pat.data[c][r]
-                    if note is None:
+                    # Note-Off hat im Live-GB-Player keine Wirkung -- der
+                    # spielt ohnehin nur genau eine Reihe pro Note (kein
+                    # Sustain-Konzept dort), also einfach wie leer behandeln.
+                    if note is None or note == NOTE_OFF:
                         continue
                     channels[c][i + r] = (
                         1 if c == self.tonal else int(round(midi_to_freq(note))))
