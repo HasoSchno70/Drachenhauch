@@ -131,6 +131,16 @@ def _launch_anim_editor(project_root, initial_file=None):
     return launch(project_root, initial_file)
 
 
+def _launch_score_editor(project_root, initial_file=None):
+    try:
+        from gamebasic.scoreeditor_qt import launch
+    except SystemExit:
+        return None
+    except ImportError:
+        return None
+    return launch(project_root, initial_file)
+
+
 def _launch_chooser(project_root):
     """Start-Dialog ohne Argumente: Code-Editor oder WYSIWYG-Form-Designer.
     Liefert None, wenn PySide6 fehlt (Aufrufer zeigt dann Text-Hilfe)."""
@@ -291,6 +301,19 @@ def main(argv):
             print("Anim-FSM-Editor benoetigt 'PySide6'.")
             print("Im .venv installieren:")
             print("  .venv\\Scripts\\python.exe -m pip install PySide6")
+            return 3
+        return rc
+
+    # --- Notenblatt-Editor (Notensatz-Stil, gbscore) explizit per Flag ---
+    if args and args[0] in ("--score", "--notenblatt", "--score-editor"):
+        args = args[1:]
+        initial = Path(args[0]) if args else None
+        rc = _launch_score_editor(_project_root(), initial)
+        if rc is None:
+            print("Notenblatt-Editor benoetigt 'PySide6', 'numpy' und "
+                  "optional 'sounddevice'.")
+            print("Im .venv installieren:")
+            print("  .venv\\Scripts\\python.exe -m pip install PySide6 numpy")
             return 3
         return rc
 

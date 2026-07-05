@@ -1,0 +1,632 @@
+"""Notenblatt-Editor fuer GameBasic (`gbscore` / `gbrun.py --score`).
+
+Echte Notensatz-Darstellung (5-Linien-System, Violin-/Bassschluessel,
+Hilfslinien, Vorzeichen) statt eines Zeilen-Rasters wie im Tracker: Noten per
+Klick auf eine Notenzeile setzen, pro Spur GENAU EIN Instrument (kein
+Pattern-Zell-Ueberschreiben wie im Tracker -- v1-Vereinfachung), Wiedergabe
+ueber den geteilten additiven Mixer (`gamebasic.audio_preview.Mixer`, auch
+vom Tracker genutzt), eigenes `*.json`-Format ODER Export/Uebernahme in den
+Tracker (`gamebasic.score.convert.to_tracker_song`).
+
+Das Datenmodell + die Tracker-Konvertierung liegen Qt-frei in
+`gamebasic.score` (headless getestet).
+
+**V1-Limitationen** (siehe auch CLAUDE.md/docs/score-editor.md): festes
+4/4-Metrum, ein Instrument pro Spur, Akkorde werden beim Tracker-Export auf
+die hoechste Note reduziert, Vorzeichen werden immer als Kreuz der Stammnote
+darunter notiert (nie als B), Achtel/Sechzehntel bekommen nur Faehnchen statt
+Balken-Gruppierung, kein Schlagzeug-Spurtyp.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import (
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QFileDialog, QGroupBox,
+    QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
+    QScrollArea, QSpinBox, QToolButton, QVBoxLayout, QWidget,
+)
+
+from .audio_preview import Mixer
+from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .score.convert import to_tracker_song
+from .score.document import ScoreDoc
+
+# Diatonische Halbtonversaetze der 7 Stammtoene (C,D,E,F,G,A,B) innerhalb
+# einer Oktave -- Notenlinien sind DIATONISCH gleich verteilt (C->D und
+# E->F belegen je EINEN Schritt), nicht halbtonlinear. Siehe CLAUDE.md.
+NATURAL_MIDI = (0, 2, 4, 5, 7, 9, 11)
+# MIDI-Ton der untersten Notenlinie (Linie 1) je Notenschluessel.
+CLEF_REF = {"treble": 64, "bass": 43}  # E4 / G2
+
+DURATIONS = [
+    ("Ganze", 4.0), ("Halbe", 2.0), ("Viertel", 1.0),
+    ("Achtel", 0.5), ("Sechzehntel", 0.25),
+]
+
+_TRACK_HUES = ("accent", "success", "danger", "warning",
+              "kw_ctrl", "kw_decl", "string", "number")
+
+
+def _track_color(i: int) -> str:
+    return COLORS[_TRACK_HUES[i % len(_TRACK_HUES)]]
+
+
+def _dia_index(midi: int) -> int:
+    """Diatonischer Index (streng monoton mit der Tonhoehe) -- gemeinsamer
+    Bezugsrahmen fuer beide Notenschluessel. Oktavkonvention wie
+    `tracker.song.note_name` (`m // 12 - 1`, MIDI 60 = "C4")."""
+    pc = midi % 12
+    octave = midi // 12 - 1
+    natural_index = (NATURAL_MIDI.index(pc) if pc in NATURAL_MIDI
+                      else NATURAL_MIDI.index(pc - 1))
+    return octave * 7 + natural_index
+
+
+def _has_accidental(midi: int) -> bool:
+    return midi % 12 not in NATURAL_MIDI
+
+
+class _StaffView(QWidget):
+    """Notensystem EINER Spur: Zeichnen + Klick-zu-Note/Pause."""
+
+    LINE_SPACING = 12.0
+    STEP_PX = LINE_SPACING / 2.0
+    LEFT_MARGIN = 64.0
+    TOP_MARGIN = 70.0
+    PIXELS_PER_BEAT = 50.0
+    NOTE_R = 5.5
+
+    def __init__(self, editor: "ScoreEditor", track_index: int, parent=None):
+        super().__init__(parent)
+        self.editor = editor
+        self.track_index = track_index
+        self.playhead_beat: float | None = None
+        self.setMinimumHeight(210)
+
+    @property
+    def track(self):
+        return self.editor.doc.tracks[self.track_index]
+
+    # ---- Geometrie: Tonhoehe <-> Y (Abschnitt 4.1 im Implementierungsplan) --
+    def _dia_ref(self) -> int:
+        return _dia_index(CLEF_REF[self.track.clef])
+
+    def _y_ref(self) -> float:
+        """Y-Koordinate der untersten Notenlinie (Linie 1, step_offset=0)."""
+        return self.TOP_MARGIN + 8 * self.STEP_PX
+
+    def _step_offset(self, midi: int) -> int:
+        return _dia_index(midi) - self._dia_ref()
+
+    def _y_for_step(self, step_offset: int | float) -> float:
+        return self._y_ref() - step_offset * self.STEP_PX
+
+    def _y_for_pitch(self, midi: int) -> float:
+        return self._y_for_step(self._step_offset(midi))
+
+    def _pitch_for_y(self, y: float, accidental: int) -> int:
+        step_offset = round((self._y_ref() - y) / self.STEP_PX)
+        dia = self._dia_ref() + step_offset
+        octave, natural_index = divmod(dia, 7)
+        natural = (octave + 1) * 12 + NATURAL_MIDI[natural_index]
+        return natural + accidental
+
+    @staticmethod
+    def _ledger_steps(step_offset: int) -> list[int]:
+        """Hilfslinien-Positionen (nur an geraden step_offset-Werten, d.h.
+        Linien-Positionen -- niemals an Zwischenraum-Positionen)."""
+        steps: list[int] = []
+        if step_offset > 8:
+            s = 10
+            while s <= step_offset:
+                steps.append(s)
+                s += 2
+        elif step_offset < 0:
+            s = -2
+            while s >= step_offset:
+                steps.append(s)
+                s -= 2
+        return steps
+
+    # ---- Geometrie: Zeit <-> X (Abschnitt 4.2) -----------------------------
+    def _x_for_beat(self, beat: float) -> float:
+        return self.LEFT_MARGIN + beat * self.PIXELS_PER_BEAT
+
+    def _beat_for_x(self, x: float) -> float:
+        return max(0.0, (x - self.LEFT_MARGIN) / self.PIXELS_PER_BEAT)
+
+    def _snap_beat(self, beat_raw: float) -> float:
+        """Die aktuell gewaehlte Notendauer IST die Rasterauflösung -- v1
+        hat kein davon unabhaengiges Raster (siehe Implementierungsplan)."""
+        dur = self.editor.entry_duration_beats()
+        if dur <= 0:
+            return max(0.0, beat_raw)
+        return max(0.0, round(beat_raw / dur) * dur)
+
+    def _content_beats(self) -> float:
+        return max(8.0, self.track.length_beats() + 4.0)
+
+    def _content_width(self) -> int:
+        return int(self._x_for_beat(self._content_beats())) + 40
+
+    def sizeHint(self) -> QSize:  # noqa: N802
+        return QSize(max(700, self._content_width()), 220)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        return QSize(400, 210)
+
+    # ---- Rendering ----------------------------------------------------------
+    def paintEvent(self, e) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(COLORS["bg"]))
+        w = max(self.width(), self._content_width())
+        y_top = self._y_for_step(8)
+        y_bot = self._y_for_step(0)
+
+        p.setPen(QPen(QColor(COLORS["fg_muted"]), 1))
+        for i in range(5):
+            y = self._y_for_step(i * 2)
+            p.drawLine(int(self.LEFT_MARGIN - 14), int(y), w, int(y))
+
+        p.setPen(QColor(COLORS["accent"]))
+        f = QFont(EDITOR_FONT_FAMILY)
+        f.setPointSize(30)
+        p.setFont(f)
+        glyph = "\U0001D11E" if self.track.clef == "treble" else "\U0001D122"
+        p.drawText(QRectF(4, y_top - 30, self.LEFT_MARGIN - 10,
+                          (y_bot - y_top) + 60),
+                   Qt.AlignmentFlag.AlignCenter, glyph)
+
+        p.setPen(QPen(QColor(COLORS["border"]), 1))
+        n_measures = int(self._content_beats() // 4) + 1
+        for m in range(n_measures + 1):
+            x = int(self._x_for_beat(m * 4))
+            p.drawLine(x, int(y_top), x, int(y_bot))
+
+        for note in self.track.notes:
+            self._draw_note(p, note)
+
+        if self.playhead_beat is not None:
+            x = int(self._x_for_beat(self.playhead_beat))
+            p.setPen(QPen(QColor(COLORS["danger"]), 2))
+            p.drawLine(x, int(y_top) - 12, x, int(y_bot) + 12)
+        p.end()
+
+    def _draw_note(self, p: QPainter, note) -> None:
+        x = self._x_for_beat(note.start_beat)
+        if note.rest:
+            y = self._y_for_step(4)
+            p.setPen(QPen(QColor(COLORS["fg_muted"]), 2))
+            p.drawRect(int(x) - 5, int(y) - 3, 10, 6)
+            return
+
+        step = self._step_offset(note.pitch)
+        y = self._y_for_step(step)
+        color = QColor(_track_color(self.track_index))
+        filled = note.dur_beat < 2.0
+
+        for s in self._ledger_steps(step):
+            ly = self._y_for_step(s)
+            p.setPen(QPen(QColor(COLORS["fg_muted"]), 1))
+            p.drawLine(int(x - 10), int(ly), int(x + 10), int(ly))
+
+        p.setPen(QPen(color, 1.6))
+        p.setBrush(color if filled else Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QPointF(x, y), self.NOTE_R, self.NOTE_R)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+
+        if note.dur_beat < 4.0:
+            stem_up = step < 4
+            stem_len = 28
+            p.setPen(QPen(color, 1.4))
+            if stem_up:
+                sx = x + self.NOTE_R
+                p.drawLine(int(sx), int(y), int(sx), int(y - stem_len))
+            else:
+                sx = x - self.NOTE_R
+                p.drawLine(int(sx), int(y), int(sx), int(y + stem_len))
+            if note.dur_beat <= 0.5:
+                n_flags = 2 if note.dur_beat <= 0.25 else 1
+                fy = (y - stem_len) if stem_up else (y + stem_len)
+                for k in range(n_flags):
+                    off = k * 6 * (1 if stem_up else -1)
+                    p.drawLine(int(sx), int(fy + off),
+                              int(sx + 8), int(fy + off + 6))
+
+        if _has_accidental(note.pitch):
+            p.setPen(QColor(COLORS["warning"]))
+            f2 = QFont(EDITOR_FONT_FAMILY)
+            f2.setPointSize(12)
+            p.setFont(f2)
+            p.drawText(QRectF(x - 24, y - 10, 18, 20),
+                      Qt.AlignmentFlag.AlignCenter, "♯")
+
+    # ---- Klick-Eingabe --------------------------------------------------
+    def _existing_at(self, beat: float):
+        for n in self.track.notes:
+            if abs(n.start_beat - beat) < 1e-6:
+                return n
+        return None
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802
+        beat = self._snap_beat(self._beat_for_x(e.position().x()))
+        if e.button() == Qt.MouseButton.RightButton:
+            existing = self._existing_at(beat)
+            if existing is not None:
+                self.track.remove_note(existing)
+                self.editor._mark_dirty()
+                self.update()
+            return
+        if self.editor.entry_rest:
+            self._place(beat, rest=True)
+        else:
+            pitch = self._pitch_for_y(e.position().y(),
+                                      self.editor.entry_accidental)
+            self._place(beat, pitch=pitch)
+
+    def _place(self, beat: float, pitch: int | None = None,
+               rest: bool = False) -> None:
+        existing = self._existing_at(beat)
+        same = (existing is not None and existing.rest == rest
+                and (rest or existing.pitch == pitch))
+        if existing is not None:
+            self.track.remove_note(existing)
+        if not same:
+            dur = self.editor.entry_duration_beats()
+            self.track.add_note(beat, dur, pitch=pitch, rest=rest)
+        self.editor._mark_dirty()
+        self.updateGeometry()
+        self.update()
+
+
+class ScoreEditor(QMainWindow):
+    def __init__(self, project_root: Path):
+        super().__init__()
+        self.project_root = Path(project_root)
+        self.setWindowTitle("GameBasic Notenblatt-Editor")
+        self.resize(1150, 780)
+        self.doc = ScoreDoc()
+        self._mixer = Mixer()
+        self._sound_cache: dict = {}
+        self.entry_accidental = 0
+        self.entry_rest = False
+        self._dirty = False
+        self._playing = False
+        self._play_beat = 0.0
+        self._play_timer = QTimer(self)
+        self._play_timer.timeout.connect(self._play_tick)
+        self._track_rows: list[dict] = []
+
+        central = QWidget()
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+        root.setContentsMargins(10, 8, 10, 8)
+        root.setSpacing(7)
+
+        title = QLabel("♪  GameBasic Notenblatt-Editor")
+        tf = QFont()
+        tf.setBold(True)
+        tf.setPointSize(13)
+        title.setFont(tf)
+        title.setStyleSheet(f"color: {COLORS['accent']}; padding: 2px 0;")
+        root.addWidget(title)
+
+        root.addLayout(self._build_toolbar())
+        root.addLayout(self._build_track_bar())
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.tracks_panel = QWidget()
+        self.tracks_layout = QVBoxLayout(self.tracks_panel)
+        self.tracks_layout.setSpacing(14)
+        self.scroll.setWidget(self.tracks_panel)
+        root.addWidget(self.scroll, 1)
+
+        self._rebuild_tracks_ui()
+        self._build_menu()
+
+    # ---- UI-Aufbau --------------------------------------------------------
+    def _build_toolbar(self) -> QHBoxLayout:
+        tb = QHBoxLayout()
+        tb.addWidget(QLabel("Dauer:"))
+        self.dur_combo = QComboBox()
+        for name, beats in DURATIONS:
+            self.dur_combo.addItem(name, beats)
+        self.dur_combo.setCurrentIndex(2)   # Viertel
+        tb.addWidget(self.dur_combo)
+        self.dotted_check = QCheckBox("Punktiert")
+        tb.addWidget(self.dotted_check)
+
+        tb.addSpacing(12)
+        self.acc_group = QButtonGroup(self)
+        self.acc_group.setExclusive(True)
+        self.btn_natural = QToolButton()
+        self.btn_natural.setText("♮")
+        self.btn_sharp = QToolButton()
+        self.btn_sharp.setText("♯")
+        self.btn_flat = QToolButton()
+        self.btn_flat.setText("♭")
+        for gid, b in enumerate((self.btn_natural, self.btn_sharp, self.btn_flat)):
+            b.setCheckable(True)
+            self.acc_group.addButton(b, gid)
+            tb.addWidget(b)
+        self.btn_natural.setChecked(True)
+        self.acc_group.idClicked.connect(self._on_accidental_changed)
+
+        tb.addSpacing(12)
+        self.rest_check = QCheckBox("Pause")
+        self.rest_check.toggled.connect(self._on_rest_toggled)
+        tb.addWidget(self.rest_check)
+
+        tb.addSpacing(20)
+        tb.addWidget(QLabel("Tempo (BPM):"))
+        self.bpm_spin = QSpinBox()
+        self.bpm_spin.setRange(40, 300)
+        self.bpm_spin.setValue(self.doc.bpm)
+        self.bpm_spin.valueChanged.connect(self._on_bpm_changed)
+        tb.addWidget(self.bpm_spin)
+
+        tb.addStretch(1)
+        self.btn_play = QPushButton("▶ Abspielen")
+        self.btn_play.setProperty("accent", True)
+        self.btn_play.clicked.connect(self._toggle_play)
+        tb.addWidget(self.btn_play)
+
+        b_tracker = QPushButton("In Tracker oeffnen")
+        b_tracker.setToolTip(
+            "Konvertiert das Stueck in ein Tracker-Projekt (ein Kanal pro "
+            "Spur + Instrument) und oeffnet es in gbtracker")
+        b_tracker.clicked.connect(self._export_to_tracker)
+        tb.addWidget(b_tracker)
+        return tb
+
+    def _build_track_bar(self) -> QHBoxLayout:
+        bar = QHBoxLayout()
+        b_add = QPushButton("+ Spur")
+        b_add.clicked.connect(self._add_track)
+        bar.addWidget(b_add)
+        b_remove = QPushButton("- Spur")
+        b_remove.clicked.connect(self._remove_last_track)
+        bar.addWidget(b_remove)
+        bar.addStretch(1)
+        return bar
+
+    def _build_menu(self) -> None:
+        menu = self.menuBar().addMenu("&Datei")
+        menu.addAction("Neu", self._new_doc)
+        menu.addAction("Oeffnen...", self._open)
+        menu.addAction("Speichern...", self._save)
+
+    def _rebuild_tracks_ui(self) -> None:
+        while self.tracks_layout.count():
+            item = self.tracks_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._track_rows = []
+        from .tracker.presets import preset_names
+        names = preset_names()
+        for i, track in enumerate(self.doc.tracks):
+            box = QGroupBox(track.name)
+            box.setStyleSheet(
+                f"QGroupBox {{ color: {_track_color(i)}; font-weight: bold; }}")
+            v = QVBoxLayout(box)
+            header = QHBoxLayout()
+            header.addWidget(QLabel("Name:"))
+            name_edit = QLineEdit(track.name)
+            name_edit.editingFinished.connect(
+                lambda idx=i, e=name_edit: self._on_track_name_changed(idx, e))
+            header.addWidget(name_edit)
+            header.addWidget(QLabel("Schluessel:"))
+            clef_combo = QComboBox()
+            clef_combo.addItem("Violinschluessel", "treble")
+            clef_combo.addItem("Bassschluessel", "bass")
+            clef_combo.setCurrentIndex(0 if track.clef == "treble" else 1)
+            clef_combo.currentIndexChanged.connect(
+                lambda _idx, idx=i, c=clef_combo: self._on_clef_changed(idx, c))
+            header.addWidget(clef_combo)
+            header.addWidget(QLabel("Instrument:"))
+            inst_combo = QComboBox()
+            inst_combo.addItems(names)
+            if track.instrument.name in names:
+                inst_combo.setCurrentIndex(names.index(track.instrument.name))
+            inst_combo.currentIndexChanged.connect(
+                lambda idx, ti=i: self._on_instrument_changed(ti, idx))
+            header.addWidget(inst_combo)
+            header.addStretch(1)
+            v.addLayout(header)
+            staff = _StaffView(self, i)
+            v.addWidget(staff)
+            self.tracks_layout.addWidget(box)
+            self._track_rows.append({
+                "box": box, "staff": staff, "name_edit": name_edit,
+                "clef_combo": clef_combo, "inst_combo": inst_combo,
+            })
+        self.tracks_layout.addStretch(1)
+
+    # ---- Toolbar-Zustand ----------------------------------------------------
+    def entry_duration_beats(self) -> float:
+        base = float(self.dur_combo.currentData())
+        return base * 1.5 if self.dotted_check.isChecked() else base
+
+    def _on_accidental_changed(self, gid: int) -> None:
+        self.entry_accidental = {0: 0, 1: 1, 2: -1}.get(gid, 0)
+
+    def _on_rest_toggled(self, checked: bool) -> None:
+        self.entry_rest = checked
+
+    def _on_bpm_changed(self, v: int) -> None:
+        self.doc.bpm = int(v)
+        self._mark_dirty()
+
+    def _on_track_name_changed(self, idx: int, edit: QLineEdit) -> None:
+        name = edit.text().strip() or f"Stimme {idx + 1}"
+        self.doc.tracks[idx].name = name
+        self._track_rows[idx]["box"].setTitle(name)
+        self._mark_dirty()
+
+    def _on_clef_changed(self, idx: int, combo: QComboBox) -> None:
+        self.doc.tracks[idx].clef = combo.currentData()
+        self._track_rows[idx]["staff"].update()
+        self._mark_dirty()
+
+    def _on_instrument_changed(self, idx: int, combo_idx: int) -> None:
+        from .tracker.presets import factory_instruments
+        insts = factory_instruments()
+        if 0 <= combo_idx < len(insts):
+            self.doc.tracks[idx].instrument = insts[combo_idx]
+            self._sound_cache.clear()
+            self._mark_dirty()
+
+    def _add_track(self) -> None:
+        self.doc.add_track()
+        self._rebuild_tracks_ui()
+        self._mark_dirty()
+
+    def _remove_last_track(self) -> None:
+        if len(self.doc.tracks) > 1:
+            self.doc.remove_track(len(self.doc.tracks) - 1)
+            self._rebuild_tracks_ui()
+            self._mark_dirty()
+
+    def _mark_dirty(self) -> None:
+        self._dirty = True
+
+    # ---- Wiedergabe ---------------------------------------------------------
+    def _toggle_play(self) -> None:
+        if self._playing:
+            self._stop_play()
+        else:
+            self._start_play()
+
+    def _start_play(self) -> None:
+        self._play_beat = 0.0
+        self._playing = True
+        self.btn_play.setText("■ Stop")
+        interval_ms = max(15, int(60000 / max(1, self.doc.bpm) / 4))
+        self._play_timer.setInterval(interval_ms)
+        self._play_timer.start()
+
+    def _stop_play(self) -> None:
+        self._playing = False
+        self._play_timer.stop()
+        self.btn_play.setText("▶ Abspielen")
+        for row in self._track_rows:
+            row["staff"].playhead_beat = None
+            row["staff"].update()
+
+    def _play_tick(self) -> None:
+        step = 0.25   # eine Sechzehntel pro Tick (ROWS_PER_BEAT-Aequivalent)
+        for i, track in enumerate(self.doc.tracks):
+            for note in track.notes:
+                if not note.rest and abs(note.start_beat - self._play_beat) < step / 2:
+                    self._trigger_note(track, note)
+            if i < len(self._track_rows):
+                self._track_rows[i]["staff"].playhead_beat = self._play_beat
+                self._track_rows[i]["staff"].update()
+        self._play_beat += step
+        if self._play_beat > self.doc.length_beats() + step:
+            self._stop_play()
+
+    def _trigger_note(self, track, note) -> None:
+        sr = 44100
+        seconds = note.dur_beat * 60.0 / max(1, self.doc.bpm)
+        n_samples = max(1, int(sr * seconds))
+        key = (id(track.instrument), int(note.pitch), n_samples)
+        arr = self._sound_cache.get(key)
+        if arr is None:
+            wave = track.instrument.render_note(note.pitch, n_samples, sr)
+            arr = np.clip(wave, -1.0, 1.0).astype(np.float32) * 0.6
+            self._sound_cache[key] = arr
+        self._mixer.play(arr)
+
+    # ---- Datei --------------------------------------------------------------
+    def _new_doc(self) -> None:
+        self._stop_play()
+        self.doc = ScoreDoc()
+        self._sound_cache.clear()
+        self.bpm_spin.setValue(self.doc.bpm)
+        self._rebuild_tracks_ui()
+        self.setWindowTitle("GameBasic Notenblatt-Editor")
+        self._dirty = False
+
+    def _open(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Notenblatt oeffnen", str(self.project_root),
+            "GameBasic-Notenblatt (*.json)")
+        if not path:
+            return
+        try:
+            self.doc = ScoreDoc.load_json(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
+            return
+        self._stop_play()
+        self._sound_cache.clear()
+        self.bpm_spin.setValue(self.doc.bpm)
+        self._rebuild_tracks_ui()
+        self.setWindowTitle(f"GameBasic Notenblatt-Editor -- {Path(path).name}")
+        self._dirty = False
+
+    def _save(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Notenblatt speichern", str(self.project_root),
+            "GameBasic-Notenblatt (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        self.doc.save_json(path)
+        self.setWindowTitle(f"GameBasic Notenblatt-Editor -- {Path(path).name}")
+        self._dirty = False
+
+    # ---- Tracker-Export -------------------------------------------------
+    def _export_to_tracker(self) -> None:
+        try:
+            song, warn = to_tracker_song(self.doc)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Export nicht moeglich", str(exc))
+            return
+        if warn:
+            shown = "\n".join(warn[:30]) + ("\n..." if len(warn) > 30 else "")
+            QMessageBox.information(self, "Hinweise beim Export", shown)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Als Tracker-Projekt speichern", str(self.project_root),
+            "Tracker-Projekt (*.json)")
+        if not path:
+            return
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        song.save_json(path)
+        gbrun = self.project_root / "gbrun.py"
+        try:
+            import subprocess
+            import sys
+            subprocess.Popen([sys.executable, str(gbrun), "--tracker", path])
+        except Exception:
+            QMessageBox.information(
+                self, "Exportiert",
+                f"Als Tracker-Projekt gespeichert:\n{path}\n\n"
+                "Oeffne es manuell mit gbtracker.")
+
+
+def launch(project_root: Path, initial_file: Path | None = None) -> int:
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+        app.setStyle("Fusion")
+    app.setStyleSheet(global_qss())
+    win = ScoreEditor(project_root)
+    if initial_file and Path(initial_file).exists():
+        try:
+            win.doc = ScoreDoc.load_json(str(initial_file))
+            win.bpm_spin.setValue(win.doc.bpm)
+            win._rebuild_tracks_ui()
+        except Exception:
+            pass
+    win.show()
+    return app.exec()

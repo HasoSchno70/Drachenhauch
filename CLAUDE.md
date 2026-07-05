@@ -1590,6 +1590,45 @@ Verdrahten. Doku [docs/form-designer.md](docs/form-designer.md), Tests
 Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. Geplant: Resize-Handles/Snap,
 Undo, integrierter Code-Editor (Doppelklick-Control → Handler), Multi-Form.
 
+## Notenblatt-Editor (`gbscore`)
+
+Eigenständiges PySide6-Tool für echte Notensatz-Darstellung (5-Linien-System,
+Violin-/Bassschlüssel, Hilfslinien, Vorzeichen) statt des Zeilen-Rasters des
+Trackers. Qt-frei das Datenmodell [`gamebasic/score/document.py`](gamebasic/score/document.py)
+(`ScoreDoc`/`Track`/`NoteEvent`, Zeiten in Viertel-Beats) + Konvertierung
+[`gamebasic/score/convert.py`](gamebasic/score/convert.py)
+(`to_tracker_song(doc) -> (Song, warnings)`, mappt Beats auf Tracker-Zeilen
+— 4 Zeilen/Beat), UI in [`gamebasic/scoreeditor_qt.py`](gamebasic/scoreeditor_qt.py)
+(`_StaffView` pro Spur: Klick setzt/entfernt Noten via diatonischer
+Tonhöhe↔Y- und Zeit↔X-Zuordnung, Dauer-Auswahl inkl. Punktierung ist
+gleichzeitig das Snap-Raster, Vorzeichen-Toggle ♮/♯/♭, Pause-Toggle). Jede
+Spur hat GENAU EIN Instrument (Presets aus `tracker.presets`), Wiedergabe
+über den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_preview.py)
+(`Mixer` — derselbe, den auch der Tracker nutzt; ein einziger dauerhafter
+`sounddevice.OutputStream` mischt alle gleichzeitig klingenden Stimmen
+additiv, weil `sd.play()` selbst keine Überlappung kann). Start:
+`gbscore [datei.json]` / `gbrun.py --score`. Eigenes `*.json`-Format
+(`"format": "gbscore-song"`, permissiv wie `Song.from_dict`) via
+`ScoreDoc.save_json/load_json` **UND** direkte Übernahme in den Tracker
+("In Tracker öffnen": `to_tracker_song` konvertiert, Warnungen werden
+angezeigt, das Ergebnis wird als Tracker-Projekt gespeichert und `gbtracker`
+per Subprozess mit der Datei gestartet).
+
+**V1-Limitationen** (bewusst, dokumentiert statt stillschweigend verschluckt):
+festes 4/4-Metrum (UI zeigt/ändert `time_sig` nicht), ein Instrument pro
+Spur (kein Pattern-Zell-Override wie im Tracker), Akkorde (mehrere Noten
+gleichen Start-Beats auf einer Spur) werden beim Tracker-Export auf die
+höchste Note reduziert (ein Tracker-Kanal ist einstimmig), Vorzeichen immer
+als Kreuz der Stammnote darunter notiert (nie als B), Achtel/Sechzehntel nur
+Fähnchen statt Balken-Gruppierung, Noten die über eine 64-Zeilen-Tracker-
+Pattern-Grenze hinaus klingen würden werden dort gekappt, kein
+Schlagzeug-Spurtyp (der Pflicht-Drum-Kanal bleibt beim Export unbelegt).
+
+Doku [docs/score-editor.md](docs/score-editor.md), Tests
+`tests/test_score_document.py` + `tests/test_score_convert.py` (Datenmodell +
+Konvertierung, headless), `tests/test_scoreeditor_qt.py` (Offscreen-UI),
+`tests/test_audio_preview_mixer.py` (geteilter Mixer).
+
 ## Language Server (`gamebasic.lsp`) + VSCode-Extension
 
 Externe Editor-Unterstützung via **LSP**, mit derselben Sprach-Intelligenz wie

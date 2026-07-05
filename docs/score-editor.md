@@ -1,0 +1,91 @@
+# Notenblatt-Editor
+
+Eigenständiges Tool zum Komponieren in echter Notensatz-Darstellung (5-Linien-
+System, Violin-/Bassschlüssel, Hilfslinien, Vorzeichen) statt des Zeilen-
+Rasters des [Trackers](tracker.md). Jede Spur hat genau ein Instrument;
+das fertige Stück lässt sich entweder als eigenes Projekt speichern **oder**
+direkt in den Tracker übernehmen (ein Tracker-Kanal pro Spur, mit Instrument).
+
+## Starten
+
+`gbscore [datei.json]` oder `gbrun.py --score [datei.json]` (braucht
+`PySide6` und `numpy`; für echte Wiedergabe zusätzlich `sounddevice`).
+
+## Bedienung
+
+- **Dauer-Auswahl** (Ganze/Halbe/Viertel/Achtel/Sechzehntel + `Punktiert`) —
+  legt fest, was ein Klick auf die Notenzeile einträgt. Die Dauer ist
+  gleichzeitig das **Snap-Raster**: ein Klick landet immer auf dem nächsten
+  Vielfachen der gewählten Dauer.
+- **Vorzeichen** (♮/♯/♭) — verschiebt die durch den Klick bestimmte Stammnote
+  um einen Halbton. Angezeigt wird ein Vorzeichen immer als Kreuz der
+  Stammnote darunter (siehe Limitationen).
+- **Pause** — solange aktiv, trägt ein Klick eine Pause statt einer Note ein.
+- **Linksklick** auf eine Notenzeile setzt/entfernt eine Note (nochmal auf
+  dieselbe Stelle klicken entfernt sie wieder). **Rechtsklick** entfernt
+  immer, egal welcher Eingabe-Modus aktiv ist.
+- **Spur-Leiste** (oberhalb jedes Notensystems): Name, Notenschlüssel
+  (Violin-/Bassschlüssel) und Instrument (Werks-Presets aus dem Tracker,
+  Flügel/Streicher/Bass/Glocke/…) einstellbar. `+ Spur` / `- Spur` fügen
+  Spuren hinzu/entfernen die letzte (mindestens eine bleibt erhalten).
+- **Tempo (BPM)** — wirkt auf Wiedergabe-Geschwindigkeit und die spätere
+  Tracker-Übernahme (`row_ms = 60000/bpm/4`).
+- **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten
+  additiven Mixer (`gamebasic.audio_preview.Mixer`, derselbe Mixer wie im
+  Tracker) mit einem laufenden Cursor auf jedem Notensystem.
+
+## Speichern / Laden
+
+`Datei → Speichern...` schreibt ein eigenes `*.json`-Format
+(`"format": "gbscore-song"`, Zeiten in Viertel-Beats). `Öffnen...` liest es
+zurück; das Laden ist permissiv (fehlende Felder bekommen sinnvolle
+Defaults, wie beim Tracker-Format auch).
+
+## In den Tracker übernehmen
+
+Der Button **„In Tracker öffnen"** konvertiert das Stück
+(`gamebasic.score.convert.to_tracker_song`) in ein Tracker-Projekt:
+
+- Ein Tracker-Kanal pro Spur + der Tracker-Pflicht-Drum-Kanal am Ende.
+- Jede Spur-Note wird auf die nächste Tracker-Zeile gerundet (4 Zeilen pro
+  Viertel-Beat — Viertel=4 Zeilen, Achtel=2, Sechzehntel=1).
+- Überschreitet das Stück 64 Zeilen, wird es automatisch auf mehrere
+  Tracker-Patterns aufgeteilt (per Song-Order verkettet).
+- Jede Spur-Instrument-Zuweisung wandert in den Tracker-Instrumenten-Pool.
+
+Alle Vereinfachungen/Kürzungen (siehe unten) werden als **Warnungen**
+angezeigt, bevor die Datei gespeichert wird — nichts geht unbemerkt verloren.
+Anschließend wird die Datei gespeichert und `gbtracker` per Subprozess mit
+dieser Datei gestartet.
+
+## V1-Limitationen
+
+Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
+
+- **Festes 4/4-Metrum** — die UI zeigt/ändert das Metrum nicht.
+- **Ein Instrument pro Spur** — kein Pattern-Zell-Override wie im Tracker.
+- **Akkorde werden reduziert:** mehrere Noten mit demselben Start-Beat auf
+  einer Spur → beim Tracker-Export bleibt nur die höchste Note (ein
+  Tracker-Kanal ist einstimmig).
+- **Vorzeichen immer als Kreuz** der Stammnote darunter, nie als B —
+  musikalisch enharmonisch gleichwertig, aber nicht immer die übliche
+  Schreibweise.
+- **Keine Balken-Gruppierung** — Achtel/Sechzehntel bekommen nur Fähnchen.
+- **Noten über eine Tracker-Pattern-Grenze hinaus** (alle 64 Zeilen = 16
+  Beats = 4 Takte) werden dort gekappt — Tracker-Patterns können nicht binden.
+- **Kein Schlagzeug-Spurtyp** — der Pflicht-Drum-Kanal des Tracker-Exports
+  bleibt unbelegt.
+
+## Geplant
+
+Andere Taktarten, Bindebögen über Pattern-Grenzen hinweg, echte
+Balken-Gruppierung, kontextuelle Kreuz/B-Schreibweise, Mehrstimmigkeit pro
+Spur (automatische Verteilung auf zusätzliche Tracker-Kanäle beim Export).
+
+## Datenmodell
+
+Qt-frei in `gamebasic/score/document.py` (`ScoreDoc`/`Track`/`NoteEvent`) +
+`gamebasic/score/convert.py` (`to_tracker_song`) — headless getestet:
+`tests/test_score_document.py`, `tests/test_score_convert.py`,
+`tests/test_scoreeditor_qt.py` (Offscreen-UI), `tests/test_audio_preview_mixer.py`
+(geteilter Mixer).
