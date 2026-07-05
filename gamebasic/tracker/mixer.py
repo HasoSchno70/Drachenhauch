@@ -16,14 +16,15 @@ import wave
 
 import numpy as np
 
-from .song import (CHANNELS, vol_to_pct, FX_NONE, FX_ARP, FX_VIB, FX_RET,
-                   FX_OFF, TICKS_PER_ROW)
+from .song import vol_to_pct, FX_NONE, FX_ARP, FX_VIB, FX_RET, FX_OFF, TICKS_PER_ROW
 
 SAMPLE_RATE = 44100
 
 # Amiga/Paula-Hard-Panning-Konvention: Kanaele 1+4 links, 2+3 rechts
 # (Indizes 0,3 = links; 1,2 = rechts). Nicht ganz hart (0.8) fuer einen
-# ertraeglicheren Stereo-Eindruck als das harte +/-1 des echten Amiga.
+# ertraeglicheren Stereo-Eindruck als das harte +/-1 des echten Amiga. Bei
+# mehr als 4 Kanaelen wiederholt sich das Muster (klassische Tracker-
+# Konvention fuer >4-Kanal-Module, z.B. FastTracker).
 _AMIGA_PAN = (-0.8, 0.8, 0.8, -0.8)
 
 
@@ -37,7 +38,7 @@ def _pan_gains(pan: float) -> tuple[float, float]:
 def _channel_pan(c: int, inst, hard_pan: bool) -> float:
     """Endgueltiger Pan eines Kanals: Amiga-Basis (falls hard_pan) +
     Instrument-Pan, geklemmt auf -1..+1."""
-    base = _AMIGA_PAN[c] if (hard_pan and c < len(_AMIGA_PAN)) else 0.0
+    base = _AMIGA_PAN[c % len(_AMIGA_PAN)] if hard_pan else 0.0
     return max(-1.0, min(1.0, base + float(getattr(inst, "pan", 0.0))))
 
 
@@ -102,14 +103,14 @@ def apply_effect(buf: np.ndarray, fx: int, fxp: int, sr: int,
 def _note_events(song):
     """Pro Kanal eine Liste von (global_row, midi, vol, slide, fx, fxp) fuer
     jede gesetzte Note -- die flache Timeline aus der Order."""
-    events = {c: [] for c in range(CHANNELS)}
+    events = {c: [] for c in range(song.channels)}
     i = 0
     for p in (song.order or [0]):
         if not (0 <= p < len(song.patterns)):
             continue
         pat = song.patterns[p]
         for r in range(pat.rows):
-            for c in range(CHANNELS):
+            for c in range(song.channels):
                 note = pat.data[c][r]
                 if note is not None:
                     fx, fxp = pat.get_fx(c, r)
@@ -142,7 +143,7 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
     mix = np.zeros((total, 2) if stereo else total, dtype=np.float32)
 
     events = _note_events(song)
-    for c in range(CHANNELS):
+    for c in range(song.channels):
         inst = song.instrument_for_channel(c)
         gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
         evs = events[c]

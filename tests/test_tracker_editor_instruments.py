@@ -278,3 +278,60 @@ def test_instrument_dialog_applies_loop_and_env(tmp_path):
     assert inst.has_loop() is True
     assert inst.env_attack_ms == 20 and inst.env_release_ms == 40
     assert abs(inst.env_sustain - 0.7) < 1e-6
+
+
+def test_instrument_dialog_waveform_view_syncs_from_spinboxes(tmp_path):
+    """Spinbox-Aenderung muss die Wellenform-Marker nachziehen (Anzeige)."""
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    ed = _editor()
+    p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
+    inst = ed._instrument_from_file(str(p))
+    dlg = _InstrumentDialog(inst)
+    dlg.loop_start.setValue(500)
+    dlg.loop_end.setValue(4000)
+    assert dlg.wave_view.loop_start == 500
+    assert dlg.wave_view.loop_end == 4000
+
+
+def test_instrument_dialog_waveform_drag_updates_spinboxes(tmp_path):
+    """Ziehen am Wellenform-Marker (simuliert per set_loop + Signal, wie ein
+    echter Drag es ausloesen wuerde) muss die Spinboxen nachziehen."""
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    ed = _editor()
+    p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
+    inst = ed._instrument_from_file(str(p))
+    dlg = _InstrumentDialog(inst)
+    dlg.wave_view.loop_changed.emit(777, 5000)
+    assert dlg.loop_start.value() == 777
+    assert dlg.loop_end.value() == 5000
+
+
+def test_waveform_view_drag_via_mouse_events(tmp_path):
+    """End-to-end: echte Maus-Events auf dem _WaveformView-Widget bewegen
+    den Loop-Ende-Marker (Regressionstest fuer die Hit-Test-/Drag-Logik)."""
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    from gamebasic.trackereditor_qt import _WaveformView
+    import numpy as np
+    samples = np.sin(np.linspace(0, 20, 2000)).astype(np.float32)
+    w = _WaveformView(samples, loop_start=0, loop_end=1000)
+    w.resize(400, 100)
+    end_x = w._frame_to_x(1000)
+
+    press = QMouseEvent(QMouseEvent.Type.MouseButtonPress, QPointF(end_x, 50),
+                        Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                        Qt.KeyboardModifier.NoModifier)
+    w.mousePressEvent(press)
+    assert w._drag == "end"
+
+    move = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(end_x + 40, 50),
+                       Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton,
+                       Qt.KeyboardModifier.NoModifier)
+    w.mouseMoveEvent(move)
+    assert w.loop_end > 1000
+
+    release = QMouseEvent(QMouseEvent.Type.MouseButtonRelease, QPointF(end_x + 40, 50),
+                          Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
+                          Qt.KeyboardModifier.NoModifier)
+    w.mouseReleaseEvent(release)
+    assert w._drag is None

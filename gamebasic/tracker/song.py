@@ -1,13 +1,16 @@
 """Song-/Pattern-Datenmodell des Trackers.
 
-Ein **Song** hat ein Tempo (BPM), die Wellenformen der drei Ton-Kanaele,
-eine Liste von **Patterns** und eine **Order** (Song-Arrangement: die
-Reihenfolge, in der Patterns abgespielt werden -- ein Pattern darf mehrfach
-vorkommen).
+Ein **Song** hat ein Tempo (BPM), eine konfigurierbare Kanalzahl
+(`Song.channels`, 4..32 -- `Song.set_channels()`), die Wellenformen der
+tonalen Kanaele, eine Liste von **Patterns** und eine **Order** (Song-
+Arrangement: die Reihenfolge, in der Patterns abgespielt werden -- ein
+Pattern darf mehrfach vorkommen).
 
-Ein **Pattern** ist ein Gitter aus `CHANNELS` Kanaelen x `rows` Reihen.
-Kanaele 0..2 sind tonal (speichern eine MIDI-Note oder None), Kanal 3 ist
-Drum/Noise (speichert einen Hit als beliebige Nicht-None-Note).
+Ein **Pattern** ist ein Gitter aus `Pattern.channels` Kanaelen x `rows`
+Reihen (immer identisch zu `Song.channels`, den es erzeugt hat). Kanal
+0..`Song.tonal - 1` sind tonal (speichern eine MIDI-Note oder None), der
+LETZTE Kanal (`Song.tonal`) ist Drum/Noise (speichert einen Hit als
+beliebige Nicht-None-Note) -- unabhaengig von der Gesamt-Kanalzahl.
 
 Serialisierung als JSON (Editor-eigenes Projektformat). GB-Code-Export
 expandiert die Order zu einer flachen Timeline und schreibt einen frame-
@@ -21,7 +24,9 @@ import json
 NOTE_NAMES = ("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 WAVEFORMS = ("square", "saw", "sine", "triangle")
 TONAL = 3                  # Kanaele 0..2 tonal, Kanal 3 = Noise/Drum
-CHANNELS = TONAL + 1
+CHANNELS = TONAL + 1       # Default-/Mindest-Kanalzahl neuer Songs
+MIN_CHANNELS = CHANNELS
+MAX_CHANNELS = 32         # XM-Tracker-Niveau; letzter Kanal bleibt immer Drum
 DEFAULT_ROWS = 16
 MIN_ROWS = 1
 MAX_ROWS = 64
@@ -70,29 +75,31 @@ def note_name(m: int) -> str:
 
 
 class Pattern:
-    """Ein Pattern: CHANNELS x rows Gitter aus MIDI-Noten (oder None)."""
+    """Ein Pattern: `channels` x rows Gitter aus MIDI-Noten (oder None)."""
 
-    __slots__ = ("name", "rows", "data", "vol", "slide", "fx", "fxp")
+    __slots__ = ("name", "rows", "channels", "data", "vol", "slide", "fx", "fxp")
 
-    def __init__(self, name: str, rows: int = DEFAULT_ROWS):
+    def __init__(self, name: str, rows: int = DEFAULT_ROWS,
+                 channels: int = CHANNELS):
         self.name = name
         self.rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
+        self.channels = max(MIN_CHANNELS, min(MAX_CHANNELS, int(channels)))
         # data[channel][row] = MIDI-Note (int) oder None
         self.data: list[list[int | None]] = [
-            [None] * self.rows for _ in range(CHANNELS)]
+            [None] * self.rows for _ in range(self.channels)]
         # vol[channel][row] = Lautstaerke 1..15 oder None (= Standard).
         # Nur sinnvoll, wo auch eine Note steht.
         self.vol: list[list[int | None]] = [
-            [None] * self.rows for _ in range(CHANNELS)]
+            [None] * self.rows for _ in range(self.channels)]
         # slide[channel][row] = Pitch-Slide in Halbtoenen (-12..12) oder None.
         self.slide: list[list[int | None]] = [
-            [None] * self.rows for _ in range(CHANNELS)]
+            [None] * self.rows for _ in range(self.channels)]
         # fx[channel][row] = Effekt-Code (FX_*), fxp = Parameter-Byte. None =
         # kein Effekt. Nur sinnvoll, wo auch eine Note steht.
         self.fx: list[list[int | None]] = [
-            [None] * self.rows for _ in range(CHANNELS)]
+            [None] * self.rows for _ in range(self.channels)]
         self.fxp: list[list[int | None]] = [
-            [None] * self.rows for _ in range(CHANNELS)]
+            [None] * self.rows for _ in range(self.channels)]
 
     def get(self, channel: int, row: int) -> int | None:
         return self.data[channel][row]
@@ -155,7 +162,7 @@ class Pattern:
         """Aendert die Reihenzahl; bestehende Noten oben bleiben erhalten."""
         rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
         for grid in (self.data, self.vol, self.slide, self.fx, self.fxp):
-            for c in range(CHANNELS):
+            for c in range(self.channels):
                 col = grid[c]
                 if rows < len(col):
                     del col[rows:]
@@ -163,15 +170,28 @@ class Pattern:
                     col.extend([None] * (rows - len(col)))
         self.rows = rows
 
+    def set_channels(self, channels: int) -> None:
+        """Aendert die Kanalzahl; bestehende Kanaele/Noten bleiben erhalten,
+        neue Kanaele kommen leer dazu (rechts angehaengt)."""
+        channels = max(MIN_CHANNELS, min(MAX_CHANNELS, int(channels)))
+        for name in ("data", "vol", "slide", "fx", "fxp"):
+            grid = getattr(self, name)
+            if channels < len(grid):
+                del grid[channels:]
+            else:
+                grid.extend([None] * self.rows for _ in range(channels - len(grid)))
+        self.channels = channels
+
     def clear(self) -> None:
-        self.data = [[None] * self.rows for _ in range(CHANNELS)]
-        self.vol = [[None] * self.rows for _ in range(CHANNELS)]
-        self.slide = [[None] * self.rows for _ in range(CHANNELS)]
-        self.fx = [[None] * self.rows for _ in range(CHANNELS)]
-        self.fxp = [[None] * self.rows for _ in range(CHANNELS)]
+        self.data = [[None] * self.rows for _ in range(self.channels)]
+        self.vol = [[None] * self.rows for _ in range(self.channels)]
+        self.slide = [[None] * self.rows for _ in range(self.channels)]
+        self.fx = [[None] * self.rows for _ in range(self.channels)]
+        self.fxp = [[None] * self.rows for _ in range(self.channels)]
 
     def copy(self, name: str | None = None) -> "Pattern":
-        p = Pattern(name if name is not None else self.name, self.rows)
+        p = Pattern(name if name is not None else self.name, self.rows,
+                   channels=self.channels)
         p.data = [list(col) for col in self.data]
         p.vol = [list(col) for col in self.vol]
         p.slide = [list(col) for col in self.slide]
@@ -189,7 +209,8 @@ class Pattern:
         return any(v is not None for col in self.fx for v in col)
 
     def to_dict(self) -> dict:
-        d = {"name": self.name, "rows": self.rows, "data": self.data}
+        d = {"name": self.name, "rows": self.rows, "channels": self.channels,
+             "data": self.data}
         # Effekt-Spalten nur schreiben, wenn gesetzt -> alte Dateien/leere
         # Patterns bleiben schlank und abwaerts-kompatibel.
         if self._has_vol():
@@ -202,17 +223,21 @@ class Pattern:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Pattern":
-        p = cls(str(d.get("name", "Pattern")), int(d.get("rows", DEFAULT_ROWS)))
+    def from_dict(cls, d: dict, channels: int = CHANNELS) -> "Pattern":
+        """`channels`: Fallback-Kanalzahl, wenn `d` selbst keine (aeltere
+        Dateien) traegt -- ueblicherweise `Song.channels` des ladenden Songs."""
+        n = int(d.get("channels", channels))
+        p = cls(str(d.get("name", "Pattern")), int(d.get("rows", DEFAULT_ROWS)),
+                channels=n)
         raw = d.get("data") or []
-        for c in range(CHANNELS):
+        for c in range(p.channels):
             if c < len(raw):
                 col = [int(v) if isinstance(v, (int, float)) else None
                        for v in raw[c]][:p.rows]
                 col += [None] * (p.rows - len(col))
                 p.data[c] = col
         rawv = d.get("vol") or []
-        for c in range(CHANNELS):
+        for c in range(p.channels):
             if c < len(rawv):
                 col = [max(1, min(VOL_MAX, int(v)))
                        if isinstance(v, (int, float)) else None
@@ -220,7 +245,7 @@ class Pattern:
                 col += [None] * (p.rows - len(col))
                 p.vol[c] = col
         raws = d.get("slide") or []
-        for c in range(CHANNELS):
+        for c in range(p.channels):
             if c < len(raws):
                 col = [max(-SLIDE_MAX, min(SLIDE_MAX, int(v)))
                        if isinstance(v, (int, float)) and int(v) != 0 else None
@@ -229,7 +254,7 @@ class Pattern:
                 p.slide[c] = col
         rawfx = d.get("fx") or []
         rawfp = d.get("fxp") or []
-        for c in range(CHANNELS):
+        for c in range(p.channels):
             if c < len(rawfx):
                 col = [int(v) if isinstance(v, (int, float))
                        and int(v) in FX_CODES and int(v) != FX_NONE else None
@@ -251,28 +276,59 @@ class Song:
     FORMAT = "gbtracker-song"
     VERSION = 1
 
-    def __init__(self):
+    _DEFAULT_WAVES = ("square", "saw", "triangle")
+
+    def __init__(self, channels: int = CHANNELS):
         self.bpm = 120
-        self.waves = ["square", "saw", "triangle"]   # Kanal 0..2 (Synth-Fallback)
-        self.patterns: list[Pattern] = [Pattern("P1")]
+        self.channels = max(MIN_CHANNELS, min(MAX_CHANNELS, int(channels)))
+        # Kanal 0..tonal-1 tonal (je eigene Wellenform), letzter Kanal = Drum.
+        self.waves = [self._DEFAULT_WAVES[i] if i < len(self._DEFAULT_WAVES)
+                      else "square" for i in range(self.tonal)]
+        self.patterns: list[Pattern] = [Pattern("P1", channels=self.channels)]
         self.order: list[int] = [0]                  # Indizes in patterns
         # Instrument-Pool (Samples + benannte Synth-Klaenge). Optional --
         # ein Kanal ohne zugewiesenes Instrument nutzt weiter seine Wellenform.
         self.instruments: list = []                  # list[Instrument]
         # channel_inst[c] = Index ins instruments-Pool oder None (= Synth/waves)
-        self.channel_inst: list[int | None] = [None] * CHANNELS
+        self.channel_inst: list[int | None] = [None] * self.channels
         self.path = ""
+
+    @property
+    def tonal(self) -> int:
+        """Index/Anzahl der tonalen Kanaele -- der LETZTE Kanal ist immer
+        Drum/Noise, unabhaengig von der Gesamt-Kanalzahl."""
+        return self.channels - 1
+
+    def set_channels(self, channels: int) -> None:
+        """Aendert die Kanalzahl des ganzen Songs (alle Patterns + Wellenform-
+        /Instrument-Zuweisungen). Neue Kanaele: leer, Wellenform "square",
+        kein Instrument. Ueberzaehlige Kanaele werden rechts abgeschnitten."""
+        channels = max(MIN_CHANNELS, min(MAX_CHANNELS, int(channels)))
+        if channels == self.channels:
+            return
+        old_tonal = self.tonal
+        self.channels = channels
+        if self.tonal < old_tonal:
+            del self.waves[self.tonal:]
+        else:
+            self.waves.extend(["square"] * (self.tonal - old_tonal))
+        if channels < len(self.channel_inst):
+            del self.channel_inst[channels:]
+        else:
+            self.channel_inst.extend([None] * (channels - len(self.channel_inst)))
+        for pat in self.patterns:
+            pat.set_channels(channels)
 
     # ------------------------------------------------------ Instrumente
     def instrument_for_channel(self, c: int):
         """Liefert das effektive Instrument fuer Kanal `c`: das zugewiesene
         Sample/Instrument -- oder ein fluechtiges Synth-Instrument aus der
-        Kanal-Wellenform (Kanal 3 = Noise)."""
+        Kanal-Wellenform (letzter Kanal = Noise)."""
         from .instrument import Instrument
         idx = self.channel_inst[c] if c < len(self.channel_inst) else None
         if idx is not None and 0 <= idx < len(self.instruments):
             return self.instruments[idx]
-        wf = "noise" if c == TONAL else self.waves[c]
+        wf = "noise" if c == self.tonal else self.waves[c]
         return Instrument.synth(f"Ch{c}", wf)
 
     def _channel_wave(self, c: int) -> str | None:
@@ -313,7 +369,7 @@ class Song:
     def add_pattern(self, name: str | None = None,
                     rows: int = DEFAULT_ROWS) -> int:
         n = name or f"P{len(self.patterns) + 1}"
-        self.patterns.append(Pattern(n, rows))
+        self.patterns.append(Pattern(n, rows, channels=self.channels))
         return len(self.patterns) - 1
 
     def duplicate_pattern(self, idx: int) -> int:
@@ -362,26 +418,26 @@ class Song:
                     if 0 <= p < len(self.patterns))
         total = max(1, total)
         rowms = self.row_ms()
-        channels = [[0] * total for _ in range(CHANNELS)]
-        vols = [[0] * total for _ in range(CHANNELS)]
-        slides = [[0] * total for _ in range(CHANNELS)]
+        channels = [[0] * total for _ in range(self.channels)]
+        vols = [[0] * total for _ in range(self.channels)]
+        slides = [[0] * total for _ in range(self.channels)]
         i = 0
         for p in order:
             if not (0 <= p < len(self.patterns)):
                 continue
             pat = self.patterns[p]
             for r in range(pat.rows):
-                for c in range(CHANNELS):
+                for c in range(self.channels):
                     note = pat.data[c][r]
                     if note is None:
                         continue
                     channels[c][i + r] = (
-                        1 if c == TONAL else int(round(midi_to_freq(note))))
+                        1 if c == self.tonal else int(round(midi_to_freq(note))))
                     v = pat.vol[c][r]
                     if v is not None:
                         vols[c][i + r] = vol_to_pct(v)
                     s = pat.slide[c][r]
-                    if s is not None and c != TONAL:   # nur tonale Kanaele
+                    if s is not None and c != self.tonal:   # nur tonale Kanaele
                         slides[c][i + r] = slide_hz_per_s(
                             midi_to_freq(note), s, rowms)
             i += pat.rows
@@ -402,6 +458,7 @@ class Song:
             "format": self.FORMAT,
             "version": self.VERSION,
             "bpm": self.bpm,
+            "channels": self.channels,
             "waves": list(self.waves),
             "patterns": [p.to_dict() for p in self.patterns],
             "order": list(self.order),
@@ -414,14 +471,17 @@ class Song:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Song":
-        s = cls()
+        channels = max(MIN_CHANNELS, min(MAX_CHANNELS,
+                       int(d.get("channels", CHANNELS))))
+        s = cls(channels=channels)
         s.bpm = int(d.get("bpm", 120))
         waves = d.get("waves") or s.waves
-        s.waves = [str(w) for w in waves][:TONAL]
-        while len(s.waves) < TONAL:
+        s.waves = [str(w) for w in waves][:s.tonal]
+        while len(s.waves) < s.tonal:
             s.waves.append("square")
         pats = d.get("patterns") or []
-        s.patterns = [Pattern.from_dict(p) for p in pats] or [Pattern("P1")]
+        s.patterns = ([Pattern.from_dict(p, channels=channels) for p in pats]
+                      or [Pattern("P1", channels=channels)])
         order = [int(p) for p in (d.get("order") or [0])
                  if 0 <= int(p) < len(s.patterns)]
         s.order = order or [0]
@@ -433,7 +493,7 @@ class Song:
             s.channel_inst = [
                 (int(ci[c]) if c < len(ci) and ci[c] is not None
                  and 0 <= int(ci[c]) < len(s.instruments) else None)
-                for c in range(CHANNELS)]
+                for c in range(s.channels)]
         return s
 
     def save_json(self, path: str) -> None:
@@ -466,14 +526,14 @@ class Song:
             f"CONST TRK_ROWS = {total}",
             f"CONST TRK_ROWMS = {rowms}", "",
         ]
-        for c in range(CHANNELS):
+        for c in range(self.channels):
             lines.append(f"DIM trk{c}[TRK_ROWS] AS INTEGER")
             for r, val in enumerate(channels[c]):
                 if val:
                     lines.append(f"trk{c}[{r}] = {val}")
         if has_vol:
             # Lautstaerke-Spuren (Amplitude in Prozent, 0 = Standard).
-            for c in range(CHANNELS):
+            for c in range(self.channels):
                 if not any(vols[c]):
                     continue
                 lines.append(f"DIM trkV{c}[TRK_ROWS] AS INTEGER")
@@ -482,7 +542,7 @@ class Song:
                         lines.append(f"trkV{c}[{r}] = {val}")
         if has_slide:
             # Pitch-Slide-Spuren (Hz/s, vorberechnet; 0 = kein Slide).
-            for c in range(TONAL):
+            for c in range(self.tonal):
                 if not any(slides[c]):
                     continue
                 lines.append(f"DIM trkSl{c}[TRK_ROWS] AS INTEGER")
@@ -508,7 +568,7 @@ class Song:
                 "",
             ]
         lines.append("SUB TRACKER_PLAY_ROW(r AS INTEGER)")
-        for c in range(TONAL):
+        for c in range(self.tonal):
             wave = self._channel_wave(c)
             if wave is None:
                 # Kanal nutzt ein Sample-Instrument -> der Live-Synth-Export
@@ -535,10 +595,10 @@ class Song:
                 ]
             else:
                 lines.append(f"    IF trk{c}[r] > 0 THEN PLAYSOUND({tone})")
-        damp = (f"TRACKER_AMP(trkV{TONAL}[r])"
-                if has_vol and any(vols[TONAL]) else "0.5")
+        damp = (f"TRACKER_AMP(trkV{self.tonal}[r])"
+                if has_vol and any(vols[self.tonal]) else "0.5")
         lines.append(
-            f"    IF trk{TONAL}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, {damp}))")
+            f"    IF trk{self.tonal}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, {damp}))")
         lines += [
             "END SUB",
             "",

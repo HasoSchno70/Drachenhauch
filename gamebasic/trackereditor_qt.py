@@ -1,9 +1,11 @@
 """Chiptune-Tracker fuer GameBasic (`gbtracker` / `gbrun.py --tracker`).
 
-Mehrspuriger Pattern-Editor: 3 Ton-Kanaele (je eigene Waveform) + 1 Noise-
-Kanal (Drums). **Mehrere Patterns mit einstellbarer Laenge + Song-Arrangement**
-(Order: Reihenfolge, in der Patterns abgespielt werden). Noten per klickbarer
-Klaviatur in die Gitter-Zellen setzen, Pattern ODER ganzen Song abspielen
+Mehrspuriger Pattern-Editor: **einstellbare Kanalzahl** (4..32, "Kanaele:"-
+Spinbox; je eigene Waveform, der LETZTE Kanal ist immer Noise/Drum) +
+**mehrere Patterns mit einstellbarer Laenge + Song-Arrangement** (Order:
+Reihenfolge, in der Patterns abgespielt werden). Noten per klickbarer
+Klaviatur in die Gitter-Zellen setzen, **Block-Auswahl** (Shift-Klick/Ziehen)
+fuer Copy/Cut/Paste/Transpose/Interpolate, Pattern ODER ganzen Song abspielen
 (nutzt den geteilten Synth `gamebasic.synth`), Projekt als `.json` speichern/
 laden und als GB-Code exportieren -- ein frame-basierter Player
 (`TRACKER_UPDATE`), der mit `DELTA()` im Game-Loop laeuft.
@@ -16,23 +18,25 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QItemSelectionModel, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPlainTextEdit, QProgressBar, QPushButton, QSpinBox, QStyle,
-    QStyledItemDelegate, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox, QStyle,
+    QStyledItemDelegate, QTableWidget, QTableWidgetItem,
+    QTableWidgetSelectionRange, QVBoxLayout, QWidget,
 )
 
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
 from .synth import synthesize
 from .tracker import (
-    CHANNELS, SLIDE_MAX, TONAL, VOL_MAX, WAVEFORMS, Song, midi_to_freq,
-    note_name, vol_to_pct,
+    MAX_CHANNELS, MIN_CHANNELS, SLIDE_MAX, VOL_MAX, WAVEFORMS,
+    Song, midi_to_freq, note_name, vol_to_pct,
     FX_NONE, FX_CODES, FX_NAMES,
+    block_copy, block_interpolate, block_paste, block_transpose,
 )
 
 # Styling fuer das Pattern-Gitter (Tracker-Look: Header-Chrome, Reihen-Nummern,
@@ -71,6 +75,97 @@ QTableCornerButton::section {{
 """
 
 
+def _channel_names(n: int) -> list[str]:
+    """Kanal-Labels fuer `n` Kanaele: tonale Kanaele `Ch1..Ch(n-1)`, der
+    LETZTE Kanal ist immer "Drum"."""
+    return [f"Ch{i + 1}" for i in range(n - 1)] + ["Drum"]
+
+
+class _WaveformView(QWidget):
+    """Zeigt die Sample-Wellenform (Min/Max pro Pixel-Spalte -- schnell auch
+    bei langen Samples, kein Downsample-Preprocessing noetig) mit zwei
+    ziehbaren vertikalen Markern fuer Loop-Start/-Ende. Reines Vorschau-/
+    Eingabe-Widget: haelt selbst keine Loop-Semantik, meldet Aenderungen nur
+    ueber `loop_changed` -- der Aufrufer (Dialog) ist die Quelle der Wahrheit
+    (Spinboxen bleiben bidirektional synchron)."""
+
+    loop_changed = Signal(int, int)
+    _HANDLE_PX = 6
+
+    def __init__(self, samples, loop_start: int, loop_end: int, parent=None):
+        super().__init__(parent)
+        self.samples = samples if samples is not None else np.zeros(0, dtype=np.float32)
+        self.n = max(1, int(self.samples.size))
+        self.loop_start = max(0, min(int(loop_start), self.n))
+        self.loop_end = max(0, min(int(loop_end), self.n))
+        self._drag = None          # "start" | "end" | None
+        self.setMinimumHeight(90)
+        self.setMouseTracking(True)
+        self.setToolTip("Loop-Start (gruen) / Loop-Ende (rot) per Ziehen setzen")
+
+    def set_loop(self, start: int, end: int) -> None:
+        """Von aussen (Spinbox-Aenderung) gesetzt -- rein visuell, emittiert
+        KEIN loop_changed (sonst Signal-Ping-Pong mit den Spinboxen)."""
+        self.loop_start = max(0, min(int(start), self.n))
+        self.loop_end = max(0, min(int(end), self.n))
+        self.update()
+
+    def _frame_to_x(self, frame: int) -> float:
+        return frame / self.n * max(1, self.width())
+
+    def _x_to_frame(self, x: float) -> int:
+        return int(round(x / max(1, self.width()) * self.n))
+
+    def _hit(self, x: float) -> str | None:
+        if abs(x - self._frame_to_x(self.loop_start)) <= self._HANDLE_PX:
+            return "start"
+        if abs(x - self._frame_to_x(self.loop_end)) <= self._HANDLE_PX:
+            return "end"
+        return None
+
+    def paintEvent(self, e) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.fillRect(self.rect(), QColor(COLORS["bg"]))
+        w, h = self.width(), self.height()
+        mid = h / 2.0
+        if self.samples.size:
+            n = self.samples.size
+            step = max(1, n // max(1, w))
+            p.setPen(QPen(QColor(COLORS["accent"]), 1))
+            for x in range(w):
+                i0 = int(x / w * n)
+                i1 = min(n, i0 + step)
+                if i1 <= i0:
+                    continue
+                seg = self.samples[i0:i1]
+                lo, hi = float(seg.min()), float(seg.max())
+                p.drawLine(x, int(mid - hi * mid), x, int(mid - lo * mid))
+        x0, x1 = self._frame_to_x(self.loop_start), self._frame_to_x(self.loop_end)
+        p.fillRect(int(x0), 0, max(1, int(x1 - x0)), h, QColor(COLORS["accent_soft"]))
+        p.setPen(QPen(QColor(COLORS["success"]), 2))
+        p.drawLine(int(x0), 0, int(x0), h)
+        p.setPen(QPen(QColor(COLORS["danger"]), 2))
+        p.drawLine(int(x1), 0, int(x1), h)
+        p.end()
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802
+        self._drag = self._hit(e.position().x())
+
+    def mouseMoveEvent(self, e) -> None:  # noqa: N802
+        if self._drag is None:
+            return
+        frame = max(0, min(self.n, self._x_to_frame(e.position().x())))
+        if self._drag == "start":
+            self.loop_start = min(frame, self.loop_end)
+        else:
+            self.loop_end = max(frame, self.loop_start)
+        self.update()
+        self.loop_changed.emit(self.loop_start, self.loop_end)
+
+    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
+        self._drag = None
+
+
 class _InstrumentDialog(QDialog):
     """Bearbeitet ein Sample-Instrument: Grundton, Loop, ADSR-Huellkurve."""
 
@@ -102,6 +197,17 @@ class _InstrumentDialog(QDialog):
         self.loop_end.setValue(min(int(inst.loop_end) or n, max(0, n)))
         form.addRow("Loop-Ende (Sample):", self.loop_end)
 
+        # Wellenform-Vorschau mit ziehbaren Loop-Markern (bidirektional mit
+        # den Spinboxen synchron -- ziehen ODER Zahl eintippen, beides geht).
+        self.wave_view = _WaveformView(
+            inst.samples, self.loop_start.value(), self.loop_end.value())
+        form.addRow(self.wave_view)
+        self.loop_start.valueChanged.connect(
+            lambda v: self.wave_view.set_loop(v, self.loop_end.value()))
+        self.loop_end.valueChanged.connect(
+            lambda v: self.wave_view.set_loop(self.loop_start.value(), v))
+        self.wave_view.loop_changed.connect(self._on_wave_loop_changed)
+
         self.atk = QSpinBox(); self.atk.setRange(0, 5000)
         self.atk.setValue(int(inst.env_attack_ms))
         form.addRow("Attack (ms):", self.atk)
@@ -129,6 +235,16 @@ class _InstrumentDialog(QDialog):
 
     def _upd_base_label(self) -> None:
         self.base_label.setText(note_name(self.base.value()))
+
+    def _on_wave_loop_changed(self, start: int, end: int) -> None:
+        """Marker gezogen -> Spinboxen nachziehen (block_signals verhindert
+        Signal-Ping-Pong zurueck zur Wellenform-Ansicht)."""
+        self.loop_start.blockSignals(True)
+        self.loop_end.blockSignals(True)
+        self.loop_start.setValue(start)
+        self.loop_end.setValue(end)
+        self.loop_start.blockSignals(False)
+        self.loop_end.blockSignals(False)
 
     def apply_to(self) -> None:
         i = self.inst
@@ -430,6 +546,7 @@ class TrackerEditor(QMainWindow):
         self._play_row = 0
         self._play_order_pos = 0
         self._playhead = -1            # aktuell hervorgehobene Wiedergabe-Reihe
+        self._block_clip = None        # Zellen-Liste aus block_copy() (Strg+C)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -463,6 +580,15 @@ class TrackerEditor(QMainWindow):
         self.bpm = QSpinBox(); self.bpm.setRange(40, 300); self.bpm.setValue(self.song.bpm)
         self.bpm.valueChanged.connect(self._on_bpm)
         top.addWidget(self.bpm)
+        top.addSpacing(12)
+        top.addWidget(QLabel("Kanaele:"))
+        self.channels_spin = QSpinBox()
+        self.channels_spin.setRange(MIN_CHANNELS, MAX_CHANNELS)
+        self.channels_spin.setValue(self.song.channels)
+        self.channels_spin.setToolTip(
+            "Kanalzahl des Songs (letzter Kanal bleibt immer Drum/Noise)")
+        self.channels_spin.valueChanged.connect(self._on_channels_changed)
+        top.addWidget(self.channels_spin)
         top.addStretch(1)
         b_wav = QPushButton("♪ Audio (WAV)...")
         b_wav.setToolTip("Song mit allen Instrumenten als WAV rendern "
@@ -478,39 +604,25 @@ class TrackerEditor(QMainWindow):
         sl = QLabel("Spur-Sounds")
         sl.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
         side.addWidget(sl)
-        self.sound_combos = []
-        self.mute_btns = []
-        self.solo_btns = []
-        self.vu_meters = []
-        self._muted = [False] * CHANNELS
-        self._solo = [False] * CHANNELS
-        self.vu_level = [0.0] * CHANNELS
-        ch_names = ["Ch1", "Ch2", "Ch3", "Drum"]
-        for c in range(CHANNELS):
-            r = QHBoxLayout()
-            cl = QLabel(ch_names[c]); cl.setFixedWidth(34)
-            cl.setStyleSheet(f"color: {COLORS['fg_muted']};")
-            r.addWidget(cl)
-            mb = QPushButton("M"); mb.setCheckable(True); mb.setFixedWidth(24)
-            mb.setToolTip("Spur stummschalten (nur Vorhoeren)")
-            mb.toggled.connect(lambda on, ch=c: self._on_mute(ch, on))
-            r.addWidget(mb)
-            sb = QPushButton("S"); sb.setCheckable(True); sb.setFixedWidth(24)
-            sb.setToolTip("Solo -- nur Solo-Spuren klingen (nur Vorhoeren)")
-            sb.toggled.connect(lambda on, ch=c: self._on_solo(ch, on))
-            r.addWidget(sb)
-            cb = QComboBox(); cb.setMinimumWidth(120)
-            cb.currentIndexChanged.connect(
-                lambda idx, ch=c: self._on_sound_changed(ch, idx))
-            r.addWidget(cb, 1)
-            side.addLayout(r)
-            vu = QProgressBar(); vu.setRange(0, 100); vu.setValue(0)
-            vu.setTextVisible(False); vu.setFixedHeight(5)
-            side.addWidget(vu)
-            self.sound_combos.append(cb)
-            self.mute_btns.append(mb)
-            self.solo_btns.append(sb)
-            self.vu_meters.append(vu)
+        # Kanal-Streifen (Name/Mute/Solo/Sound-Dropdown/VU) leben in einem
+        # eigenen scrollbaren Container -- `_rebuild_channel_strips()` baut
+        # ihn neu auf (Kanalzahl ist jetzt variabel, siehe self.song.channels).
+        self.strip_scroll = QScrollArea()
+        self.strip_scroll.setWidgetResizable(True)
+        self.strip_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.strip_container = QWidget()
+        self.strip_layout = QVBoxLayout(self.strip_container)
+        self.strip_layout.setContentsMargins(0, 0, 0, 0)
+        self.strip_layout.setSpacing(6)
+        self.strip_scroll.setWidget(self.strip_container)
+        side.addWidget(self.strip_scroll, 1)
+        self.sound_combos: list = []
+        self.mute_btns: list = []
+        self.solo_btns: list = []
+        self.vu_meters: list = []
+        self._muted: list = []
+        self._solo: list = []
+        self.vu_level: list = []
 
         # VU-Decay: laeuft nur waehrend der Wiedergabe (40 ms).
         self._vu_timer = QTimer(self)
@@ -614,8 +726,8 @@ class TrackerEditor(QMainWindow):
         prow.addStretch(1)
 
         # --- Pattern-Gitter ---
-        self.grid = QTableWidget(self.song.patterns[0].rows, CHANNELS)
-        self.grid.setHorizontalHeaderLabels(["Ch1", "Ch2", "Ch3", "Drum"])
+        self.grid = QTableWidget(self.song.patterns[0].rows, self.song.channels)
+        self.grid.setHorizontalHeaderLabels(_channel_names(self.song.channels))
         self.grid.verticalHeader().setDefaultSectionSize(30)
         self.grid.verticalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Fixed)
@@ -624,7 +736,11 @@ class TrackerEditor(QMainWindow):
         self.grid.horizontalHeader().setFixedHeight(40)
         self.grid.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.grid.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectItems)
-        self.grid.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        # ContiguousSelection statt SingleSelection: erlaubt rechteckige
+        # Mehrfach-Auswahl (Shift-Klick/Ziehen) fuer Block-Copy/Transpose/
+        # Interpolate, ohne die Einzelzell-Semantik (currentRow/currentColumn
+        # via _sel()) zu aendern -- ein Einzelklick bleibt ein 1x1-Block.
+        self.grid.setSelectionMode(QTableWidget.SelectionMode.ContiguousSelection)
         self.grid.setShowGrid(False)
         gfont = QFont(EDITOR_FONT_FAMILY, 13); gfont.setBold(True)
         self.grid.setFont(gfont)
@@ -670,7 +786,10 @@ class TrackerEditor(QMainWindow):
         self.octave.valueChanged.connect(
             lambda v: self.piano.set_base(12 * (v + 1)))
         krow.addWidget(self.octave)
-        krow.addWidget(QLabel("  (Zelle waehlen, dann Taste klicken; Entf loescht)"))
+        krow.addWidget(QLabel(
+            "  (Zelle waehlen, dann Taste klicken; Entf loescht -- Block: "
+            "Shift-Klick/Ziehen, Strg+C/X/V Kopieren/Schneiden/Einfuegen, "
+            "Strg+Pfeil (+Shift=Oktave) Transponieren, Strg+I Interpolieren)"))
         krow.addStretch(1)
         root.addLayout(krow)
         self.piano = _Piano()
@@ -719,11 +838,77 @@ class TrackerEditor(QMainWindow):
     def _reload_all(self) -> None:
         """Komplettes UI aus self.song neu aufbauen."""
         self.bpm.blockSignals(True); self.bpm.setValue(self.song.bpm); self.bpm.blockSignals(False)
+        self.channels_spin.blockSignals(True)
+        self.channels_spin.setValue(self.song.channels)
+        self.channels_spin.blockSignals(False)
+        self._rebuild_channel_strips()
         self.cur = min(self.cur, len(self.song.patterns) - 1)
         self._refresh_instruments()
         self._reload_pattern_combo()
         self._reload_order()
         self._load_pattern(self.cur)
+
+    def _on_channels_changed(self, v: int) -> None:
+        if v == self.song.channels:
+            return
+        self.song.set_channels(v)
+        self._sound_cache.clear()
+        self._reload_all()
+        self._mark()
+
+    def _make_channel_strip(self, c: int, name: str) -> QWidget:
+        """Baut EINEN Kanal-Streifen (Name/Mute/Solo/Sound-Dropdown/VU) und
+        haengt seine Widgets an die sound_combos/mute_btns/solo_btns/
+        vu_meters-Listen an (Reihenfolge = Kanal-Index)."""
+        w = QWidget()
+        v = QVBoxLayout(w); v.setContentsMargins(0, 0, 0, 0); v.setSpacing(2)
+        r = QHBoxLayout()
+        cl = QLabel(name); cl.setFixedWidth(34)
+        cl.setStyleSheet(f"color: {COLORS['fg_muted']};")
+        r.addWidget(cl)
+        mb = QPushButton("M"); mb.setCheckable(True); mb.setFixedWidth(24)
+        mb.setToolTip("Spur stummschalten (nur Vorhoeren)")
+        mb.toggled.connect(lambda on, ch=c: self._on_mute(ch, on))
+        r.addWidget(mb)
+        sb = QPushButton("S"); sb.setCheckable(True); sb.setFixedWidth(24)
+        sb.setToolTip("Solo -- nur Solo-Spuren klingen (nur Vorhoeren)")
+        sb.toggled.connect(lambda on, ch=c: self._on_solo(ch, on))
+        r.addWidget(sb)
+        cb = QComboBox(); cb.setMinimumWidth(120)
+        cb.currentIndexChanged.connect(
+            lambda idx, ch=c: self._on_sound_changed(ch, idx))
+        r.addWidget(cb, 1)
+        v.addLayout(r)
+        vu = QProgressBar(); vu.setRange(0, 100); vu.setValue(0)
+        vu.setTextVisible(False); vu.setFixedHeight(5)
+        v.addWidget(vu)
+        self.sound_combos.append(cb)
+        self.mute_btns.append(mb)
+        self.solo_btns.append(sb)
+        self.vu_meters.append(vu)
+        return w
+
+    def _rebuild_channel_strips(self) -> None:
+        """Baut die Spur-Sounds-Streifen komplett aus `self.song.channels`
+        neu auf -- noetig beim Laden/Erzeugen eines Songs UND nach einer
+        Kanalzahl-Aenderung (`_on_channels_changed`)."""
+        while self.strip_layout.count():
+            item = self.strip_layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self.sound_combos = []
+        self.mute_btns = []
+        self.solo_btns = []
+        self.vu_meters = []
+        n = self.song.channels
+        self._muted = [False] * n
+        self._solo = [False] * n
+        self.vu_level = [0.0] * n
+        for c, name in enumerate(_channel_names(n)):
+            self.strip_layout.addWidget(self._make_channel_strip(c, name))
+        self.strip_layout.addStretch(1)
+        self._rebuild_sound_combos()
 
     def _reload_pattern_combo(self) -> None:
         self.pattern_combo.blockSignals(True)
@@ -740,9 +925,10 @@ class TrackerEditor(QMainWindow):
         self.rows_spin.blockSignals(True); self.rows_spin.setValue(pat.rows); self.rows_spin.blockSignals(False)
         self.grid.blockSignals(True)
         self.grid.setRowCount(pat.rows)
+        self.grid.setColumnCount(pat.channels)
         self.grid.setVerticalHeaderLabels([f"{r:02d}" for r in range(pat.rows)])
         for r in range(pat.rows):
-            for c in range(CHANNELS):
+            for c in range(pat.channels):
                 fx, fxp = pat.get_fx(c, r)
                 it = QTableWidgetItem(
                     self._cell_text(c, pat.data[c][r], pat.vol[c][r],
@@ -762,13 +948,13 @@ class TrackerEditor(QMainWindow):
 
     def _update_channel_headers(self) -> None:
         """Spalten-Header zeigen Kanal + zugewiesenes Instrument/Wellenform."""
-        names = ["Ch1", "Ch2", "Ch3", "Drum"]
+        names = _channel_names(self.song.channels)
         labels = []
-        for c in range(CHANNELS):
+        for c in range(self.song.channels):
             idx = self.song.channel_inst[c]
             if idx is not None and 0 <= idx < len(self.song.instruments):
                 sub = self.song.instruments[idx].name
-            elif c == TONAL:
+            elif c == self.song.tonal:
                 sub = "noise"
             else:
                 sub = self.song.waves[c]
@@ -807,7 +993,7 @@ class TrackerEditor(QMainWindow):
     def _rebuild_sound_combos(self) -> None:
         """Pro-Spur-Sound-Dropdowns aus dem Instrument-Pool fuellen + die
         aktuelle Zuweisung spiegeln."""
-        for c in range(CHANNELS):
+        for c in range(len(self.sound_combos)):
             cb = self.sound_combos[c]
             cb.blockSignals(True)
             cb.clear()
@@ -819,7 +1005,7 @@ class TrackerEditor(QMainWindow):
             cb.blockSignals(False)
 
     def _on_sound_changed(self, c: int, idx: int) -> None:
-        if 0 <= idx < len(self.song.instruments) and 0 <= c < CHANNELS:
+        if 0 <= idx < len(self.song.instruments) and 0 <= c < self.song.channels:
             self.song.channel_inst[c] = idx
             self._sound_cache.clear()
             self._update_channel_headers()
@@ -835,7 +1021,7 @@ class TrackerEditor(QMainWindow):
         by_name = {ins.name: i for i, ins in enumerate(self.song.instruments)}
         defaults = ["Fluegel (Piano)", "Streicher", "Synth-Bass", "Kick"]
         for c, nm in enumerate(defaults):
-            if c < CHANNELS and nm in by_name:
+            if c < self.song.channels and nm in by_name:
                 self.song.channel_inst[c] = by_name[nm]
 
     def _load_sample(self) -> None:
@@ -991,7 +1177,7 @@ class TrackerEditor(QMainWindow):
                    fx=FX_NONE, fxp=0) -> str:
         if note is None:
             return "···"
-        base = "  X" if ci == TONAL else note_name(note)
+        base = "  X" if ci == self.song.tonal else note_name(note)
         if vol:
             base += f" v{vol}"
         if slide:
@@ -1031,7 +1217,7 @@ class TrackerEditor(QMainWindow):
             return
         r, c = self._sel()
         pat = self.song.patterns[self.cur]
-        if pat.data[c][r] is None or c == TONAL:   # nur tonale Noten
+        if pat.data[c][r] is None or c == self.song.tonal:   # nur tonale Noten
             return
         pat.set_slide(c, r, s)               # 0 -> None
         self._cell_refresh(r, c)
@@ -1072,7 +1258,7 @@ class TrackerEditor(QMainWindow):
             pat = self.song.patterns[self.cur]
             self.vol_spin.setValue(pat.vol[c][r] or 0)
             self.slide_spin.setValue(pat.slide[c][r] or 0)
-            self.slide_spin.setEnabled(c != TONAL)
+            self.slide_spin.setEnabled(c != self.song.tonal)
             fx, fxp = pat.get_fx(c, r)
             self.fx_combo.setCurrentIndex(
                 FX_CODES.index(fx) if fx in FX_CODES else 0)
@@ -1113,10 +1299,112 @@ class TrackerEditor(QMainWindow):
             if n is not None:
                 self._play_note(c, n, pat.vol[c][r], pat.slide[c][r] or 0)
 
-    def keyPressEvent(self, e):  # noqa: N802
-        if e.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self._has_sel():
+    # ---- Block-Auswahl (Copy/Cut/Paste/Transpose/Interpolate) ----
+    def _selection_rect(self):
+        """(c0, r0, c1, r1) des aktuell markierten Rechtecks (inklusiv),
+        oder None ohne Auswahl. `ContiguousSelection` liefert bei einem
+        einzelnen Klick ein 1x1-Rechteck -- Einzelzell-Operationen bleiben
+        also ein Spezialfall dieser Block-Rechtecke."""
+        ranges = self.grid.selectedRanges()
+        if ranges:
+            rg = ranges[0]
+            return rg.leftColumn(), rg.topRow(), rg.rightColumn(), rg.bottomRow()
+        if self._has_sel():
             r, c = self._sel()
-            self._set_note(r, c, None)
+            return c, r, c, r
+        return None
+
+    def _reload_and_select(self, c0: int, r0: int, c1: int, r1: int) -> None:
+        """Laedt das Gitter neu (nach einer Block-Op) und stellt die
+        Rechteck-Auswahl wieder her -- sonst wuerde z.B. wiederholtes
+        Strg+Pfeil-Transponieren nach dem ersten Tastendruck auf eine
+        Einzelzelle zurueckfallen."""
+        self._load_pattern(self.cur)
+        top, bottom = sorted((r0, r1))
+        left, right = sorted((c0, c1))
+        self.grid.setRangeSelected(
+            QTableWidgetSelectionRange(top, left, bottom, right), True)
+        # NoUpdate: setCurrentCell() wuerde in ContiguousSelection sonst die
+        # gerade gesetzte Rechteck-Auswahl auf die eine Zelle zusammenklappen.
+        self.grid.setCurrentCell(top, left, QItemSelectionModel.SelectionFlag.NoUpdate)
+
+    def _block_clear(self, c0: int, r0: int, c1: int, r1: int) -> None:
+        pat = self.song.patterns[self.cur]
+        for c in range(min(c0, c1), max(c0, c1) + 1):
+            for r in range(min(r0, r1), max(r0, r1) + 1):
+                pat.set(c, r, None)
+
+    def _block_copy(self) -> None:
+        rect = self._selection_rect()
+        if rect is None:
+            return
+        c0, r0, c1, r1 = rect
+        self._block_clip = block_copy(self.song.patterns[self.cur], c0, r0, c1, r1)
+
+    def _block_cut(self) -> None:
+        rect = self._selection_rect()
+        if rect is None:
+            return
+        self._block_copy()
+        c0, r0, c1, r1 = rect
+        self._block_clear(c0, r0, c1, r1)
+        self._reload_and_select(c0, r0, c1, r1)
+        self._mark()
+
+    def _block_paste(self) -> None:
+        if not self._block_clip:
+            return
+        rect = self._selection_rect()
+        c0, r0 = (rect[0], rect[1]) if rect else (0, 0)
+        pat = self.song.patterns[self.cur]
+        n_c, n_r = block_paste(pat, self._block_clip, c0, r0)
+        if n_c and n_r:
+            self._reload_and_select(c0, r0, c0 + n_c - 1, r0 + n_r - 1)
+            self._mark()
+
+    def _block_transpose(self, semitones: int) -> None:
+        rect = self._selection_rect()
+        if rect is None:
+            return
+        c0, r0, c1, r1 = rect
+        block_transpose(self.song.patterns[self.cur], c0, r0, c1, r1, semitones,
+                        skip_channel=self.song.tonal)
+        self._reload_and_select(c0, r0, c1, r1)
+        self._mark()
+
+    def _block_interpolate(self) -> None:
+        rect = self._selection_rect()
+        if rect is None:
+            return
+        c0, r0, c1, r1 = rect
+        block_interpolate(self.song.patterns[self.cur], c0, r0, c1, r1,
+                          skip_channel=self.song.tonal)
+        self._reload_and_select(c0, r0, c1, r1)
+        self._mark()
+
+    def keyPressEvent(self, e):  # noqa: N802
+        mods = e.modifiers()
+        ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
+        if ctrl and e.key() == Qt.Key.Key_C:
+            self._block_copy(); return
+        if ctrl and e.key() == Qt.Key.Key_X:
+            self._block_cut(); return
+        if ctrl and e.key() == Qt.Key.Key_V:
+            self._block_paste(); return
+        if ctrl and e.key() == Qt.Key.Key_I:
+            self._block_interpolate(); return
+        if ctrl and e.key() == Qt.Key.Key_Up:
+            step = 12 if mods & Qt.KeyboardModifier.ShiftModifier else 1
+            self._block_transpose(step); return
+        if ctrl and e.key() == Qt.Key.Key_Down:
+            step = 12 if mods & Qt.KeyboardModifier.ShiftModifier else 1
+            self._block_transpose(-step); return
+        if e.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            rect = self._selection_rect()
+            if rect is not None:
+                self._block_clear(*rect)
+                self._reload_and_select(*rect)
+                self._mark()
             return
         super().keyPressEvent(e)
 
@@ -1324,17 +1612,17 @@ class TrackerEditor(QMainWindow):
 
     def _vu_decay(self) -> None:
         """Laesst die VU-Meter sanft abklingen (waehrend der Wiedergabe)."""
-        for c in range(CHANNELS):
+        for c in range(len(self.vu_level)):
             self.vu_level[c] *= 0.82
             self.vu_meters[c].setValue(int(self.vu_level[c] * 100))
 
     def _reset_vu(self) -> None:
-        for c in range(CHANNELS):
+        for c in range(len(self.vu_level)):
             self.vu_level[c] = 0.0
             self.vu_meters[c].setValue(0)
 
     def _play_columns(self, pat, row: int) -> None:
-        for c in range(CHANNELS):
+        for c in range(pat.channels):
             n = pat.data[c][row]
             if n is not None and self._audible(c):
                 self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
