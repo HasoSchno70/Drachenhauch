@@ -157,7 +157,7 @@ raylib-rs `ffi`/`rlgl` (wie das Shadow-Mapping). Builtin
 [`graphics.rs`](../rust/gb_runtime/src/graphics.rs) (`light_env_hdr()`):
 
 1. **`.hdr` laden** — eigener Radiance-RGBE-Dekoder (`load_hdr_rgbe`) → RGBA32F
-   2D-Float-Textur via `rlLoadTexture`. (Nötig, weil raylib-sys 5.5.1 **ohne**
+   2D-Float-Textur via `rlLoadTexture`. (Nötig, weil raylib-sys **ohne**
    `SUPPORT_FILEFORMAT_HDR` gebaut ist — `LoadImage("*.hdr")` schlägt fehl.)
 2. **equirect → Cubemap** (512², `ibl_render_cube` + `EQUIRECT_FS`, 6 Faces über
    `rlLoadDrawCube`).
@@ -371,7 +371,8 @@ Maps, Tupel, Strings, alle Benchmarks), 0 echte Mismatches.
 
 Grafik ist **feature-gated** (`graphics`, default aus): der pure VM-Kern baut
 ohne C-Toolchain. Mit Grafik wird [`raylib`](https://crates.io/crates/raylib)
-(raylib-rs 5.5) eingebunden.
+(raylib-rs 6.0, [raylib-rs/raylib-rs](https://github.com/raylib-rs/raylib-rs))
+eingebunden.
 
 **Bit-Identität gilt NICHT für Pixel** (Grafik rendert nur die native Runtime) —
 nur `PRINT`/stdout bleibt bit-identisch. Grafik wird per Screenshot verifiziert.

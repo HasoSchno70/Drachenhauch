@@ -656,22 +656,6 @@ void main()
 }
 "#;
 
-/// Besitzt das von raylib `LoadModelAnimations` allokierte Array roh. Wir nutzen
-/// die ffi direkt, weil der raylib-rs-Wrapper die Structs flach kopiert und dann
-/// `UnloadModelAnimations` ruft (gibt bones/framePoses frei) -> Use-after-free.
-/// Hier bleibt das Array am Leben und wird erst beim Drop sauber freigegeben.
-struct AnimSet {
-    ptr: *mut raylib::ffi::ModelAnimation,
-    count: i32,
-}
-impl Drop for AnimSet {
-    fn drop(&mut self) {
-        if !self.ptr.is_null() {
-            unsafe { raylib::ffi::UnloadModelAnimations(self.ptr, self.count); }
-        }
-    }
-}
-
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -715,8 +699,11 @@ pub struct Graphics {
     cam3d_proj: Option<[f32; 16]>,
     // 3D-Modelle (LOADMODEL / MESH_*): bleiben ueber Frames erhalten.
     models: Vec<Model>,
-    // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set ein rohes raylib-Array.
-    model_anims: Vec<AnimSet>,
+    // Skelett-Animationen (MODEL_LOAD_ANIMS): je Set eine RAII-`ModelAnimations`-
+    // Collection (raylib-rs 6.0 -- ersetzt den fruehreren rohen FFI-Workaround,
+    // der noetig war weil der 5.x-Wrapper die Structs flach kopierte und dann
+    // UnloadModelAnimations rief -> Use-after-free).
+    model_anims: Vec<ModelAnimations>,
     // Beleuchtung (Blinn-Phong via rlights-Shader). light_shader wird beim
     // ersten LIGHT_ENABLE geladen; lights[] sind bis zu MAX_LIGHTS Lichter.
     light_shader: Option<Shader>,
@@ -1169,7 +1156,7 @@ impl Graphics {
             4 => CAMERA_THIRD_PERSON,
             _ => CAMERA_CUSTOM,
         };
-        self.rl.update_camera(&mut self.cam3d, m);
+        self.cam3d.update_camera(m);
     }
     pub fn cam3d_pos(&self) -> (f64, f64, f64) {
         (self.cam3d.position.x as f64, self.cam3d.position.y as f64, self.cam3d.position.z as f64)
@@ -1222,26 +1209,21 @@ impl Graphics {
     /// Laedt Skelett-Animationen (GLTF/IQM/M3D) aus einer Datei -> ANIM_SET-Index.
     pub fn load_model_anims(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let c = std::ffi::CString::new(resolved.as_str())
-            .map_err(|_| "MODEL_LOAD_ANIMS: ungueltiger Pfad".to_string())?;
-        let mut count: i32 = 0;
-        let ptr = unsafe { raylib::ffi::LoadModelAnimations(c.as_ptr(), &mut count) };
-        if ptr.is_null() || count <= 0 {
-            return Err(format!("MODEL_LOAD_ANIMS: '{}' enthaelt keine Animationen", path));
-        }
-        self.model_anims.push(AnimSet { ptr, count });
+        let anims = self.rl.load_model_animations(&self.thread, resolved.as_str())
+            .map_err(|_| format!("MODEL_LOAD_ANIMS: '{}' enthaelt keine Animationen", path))?;
+        self.model_anims.push(anims);
         Ok((self.model_anims.len() - 1) as i64)
     }
-    fn check_anim(&self, set: i64, idx: i64, fn_: &str) -> Result<(usize, isize), String> {
+    fn check_anim(&self, set: i64, idx: i64, fn_: &str) -> Result<(usize, usize), String> {
         let s = set as usize;
         if set < 0 || s >= self.model_anims.len() {
             return Err(format!("{}: ungueltiges ANIM_SET-Handle {}", fn_, set));
         }
-        let cnt = self.model_anims[s].count as i64;
+        let cnt = self.model_anims[s].len() as i64;
         if idx < 0 || idx >= cnt {
             return Err(format!("{}: Animations-Index {} ausserhalb [0..{}]", fn_, idx, cnt - 1));
         }
-        Ok((s, idx as isize))
+        Ok((s, idx as usize))
     }
     /// Anzahl Animationen im Set.
     pub fn anim_count(&self, set: i64) -> Result<i64, String> {
@@ -1249,17 +1231,17 @@ impl Graphics {
         if set < 0 || s >= self.model_anims.len() {
             return Err(format!("MODEL_ANIM_COUNT: ungueltiges ANIM_SET-Handle {}", set));
         }
-        Ok(self.model_anims[s].count as i64)
+        Ok(self.model_anims[s].len() as i64)
     }
     /// Frame-Anzahl einer Animation.
     pub fn anim_frames(&self, set: i64, idx: i64) -> Result<i64, String> {
         let (s, a) = self.check_anim(set, idx, "MODEL_ANIM_FRAMES")?;
-        Ok(unsafe { (*self.model_anims[s].ptr.offset(a)).frameCount } as i64)
+        Ok(self.model_anims[s][a].keyframeCount as i64)
     }
     /// Name einer Animation (leer falls keiner gesetzt).
     pub fn anim_name(&self, set: i64, idx: i64) -> Result<String, String> {
         let (s, a) = self.check_anim(set, idx, "MODEL_ANIM_NAME")?;
-        let raw = unsafe { (*self.model_anims[s].ptr.offset(a)).name };
+        let raw = self.model_anims[s][a].name;
         let bytes: Vec<u8> = raw.iter().take_while(|&&c| c != 0).map(|&c| c as u8).collect();
         Ok(String::from_utf8_lossy(&bytes).into_owned())
     }
@@ -1267,11 +1249,9 @@ impl Graphics {
     pub fn model_animate(&mut self, model_idx: i64, set: i64, anim_idx: i64, frame: i32) -> Result<(), String> {
         let mi = self.check_model(model_idx, "MODEL_ANIMATE")?;
         let (s, a) = self.check_anim(set, anim_idx, "MODEL_ANIMATE")?;
-        let anim = unsafe { *self.model_anims[s].ptr.offset(a) };   // ffi::ModelAnimation (Copy)
-        let frames = anim.frameCount.max(1);
-        let f = frame.rem_euclid(frames);                          // loopt automatisch
-        let model_ffi = *self.models[mi].as_mut();                 // ffi::Model (Copy)
-        unsafe { raylib::ffi::UpdateModelAnimation(model_ffi, anim, f); }
+        let frames = self.model_anims[s][a].keyframeCount.max(1);
+        let f = frame.rem_euclid(frames) as f32;                   // loopt automatisch
+        self.rl.update_model_animation(&self.thread, &mut self.models[mi], &self.model_anims[s][a], f);
         Ok(())
     }
     /// Baut aus einem generierten Mesh ein Modell und gibt das Handle zurueck.
@@ -1574,9 +1554,9 @@ impl Graphics {
     /// 90deg-Projektion fuer die Cubemap-Passes (aspect 1).
     fn ibl_cube_proj() -> raylib::ffi::Matrix {
         let (near, far) = unsafe {
-            (raylib::ffi::rlGetCullDistanceNear() as f32, raylib::ffi::rlGetCullDistanceFar() as f32)
+            (raylib::ffi::rlGetCullDistanceNear(), raylib::ffi::rlGetCullDistanceFar())
         };
-        Matrix::perspective(90.0_f32.to_radians(), 1.0, near, far).into()
+        Matrix::perspective(90.0_f64.to_radians(), 1.0, near, far).into()
     }
 
     /// Rendert eine einfache (1-Mip) Cubemap mit `fs` ueber die 6 Faces. Quelle ist
@@ -1828,7 +1808,7 @@ impl Graphics {
         let mi = self.check_model(model_idx, "MODEL_LIT")?;
         let sh_ffi = *self.light_shader.as_ref().unwrap().as_ref();   // ffi::Shader (Copy)
         for mat in self.models[mi].materials_mut() {
-            mat.as_mut().shader = sh_ffi;
+            unsafe { mat.as_raw_mut().shader = sh_ffi; }
         }
         Ok(())
     }
@@ -2041,10 +2021,7 @@ impl Graphics {
 
     // --- Prozedurale Texturen (Batch 3): liefern ein IMAGE-Handle ---
     pub fn gen_tex_perlin(&mut self, w: i32, h: i32, scale: f64) -> Result<i64, String> {
-        // gen_image_perlin_noise ist in raylib-rs als &self-Methode gebunden
-        // (self wird ignoriert) -> auf einem Wegwerf-Image aufrufen.
-        let scratch = Image::gen_image_color(1, 1, Color::BLACK);
-        let img = scratch.gen_image_perlin_noise(w.max(1), h.max(1), 0, 0, scale.max(0.1) as f32);
+        let img = Image::gen_image_perlin_noise(w.max(1), h.max(1), 0, 0, scale.max(0.1) as f32);
         self.push_tex_from_image(img)
     }
     pub fn gen_tex_gradient(&mut self, w: i32, h: i32, c1: i64, c2: i64, vertical: bool) -> Result<i64, String> {
@@ -3235,7 +3212,7 @@ fn render_scene<D: RaylibDraw>(
                         Cmd3D::Plane(x, y, z, sx, sz, col) =>
                             d3.draw_plane(Vector3::new(*x, *y, *z), Vector2::new(*sx, *sz), *col),
                         Cmd3D::Line(x1, y1, z1, x2, y2, z2, col) =>
-                            d3.draw_line_3D(Vector3::new(*x1, *y1, *z1), Vector3::new(*x2, *y2, *z2), *col),
+                            d3.draw_line3D(Vector3::new(*x1, *y1, *z1), Vector3::new(*x2, *y2, *z2), *col),
                         Cmd3D::Point(x, y, z, col) =>
                             d3.draw_point3D(Vector3::new(*x, *y, *z), *col),
                         Cmd3D::Grid(slices, spacing) =>
