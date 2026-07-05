@@ -42,6 +42,10 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **Rückgängig/Wiederholen** (`↶`/`↷`-Buttons, `Strg+Z`/`Strg+Y`) — jede
   Änderung (Noten, Instrument, Schlüssel, Spuren, Tempo) ist rückgängig
   machbar, auf Basis von Snapshots des ganzen Stücks (wie beim Tracker).
+- **Ungespeicherte Änderungen** — der Fenstertitel zeigt ein `*` nach dem
+  Dateinamen, solange etwas nicht gespeichert ist. `Neu`/`Öffnen` und das
+  Schließen des Fensters fragen bei ungespeicherten Änderungen nach
+  (Speichern/Verwerfen/Abbrechen).
 - **Tempo (BPM)** — wirkt auf Wiedergabe-Geschwindigkeit und die spätere
   Tracker-Übernahme (`row_ms = 60000/bpm/4`).
 - **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten

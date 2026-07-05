@@ -394,7 +394,7 @@ def test_undo_multi_step_and_redo_cleared_by_new_edit():
 
 
 def test_new_doc_and_open_reset_undo_history(tmp_path, monkeypatch):
-    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
 
     ed = _editor()
     staff = ed._track_rows[0]["staff"]
@@ -402,6 +402,9 @@ def test_new_doc_and_open_reset_undo_history(tmp_path, monkeypatch):
     ed.undo.flush()
     assert ed.undo.can_undo()
 
+    # Dokument ist dirty -> _new_doc() fragt nach; "Verwerfen" waehlen.
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.No)
     ed._new_doc()
     assert not ed.undo.can_undo()
 
@@ -413,6 +416,122 @@ def test_new_doc_and_open_reset_undo_history(tmp_path, monkeypatch):
                         lambda *a, **k: (str(path), ""))
     ed._open()
     assert not ed.undo.can_undo()
+
+
+def test_title_shows_asterisk_when_dirty_and_clears_on_save(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    ed = _editor()
+    assert "*" not in ed.windowTitle()
+
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert ed.windowTitle().endswith("*")
+
+    save_path = tmp_path / "stueck.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        lambda *a, **k: (str(save_path), ""))
+    ed._save()
+    assert "*" not in ed.windowTitle()
+    assert save_path.name in ed.windowTitle()
+
+
+def test_confirm_dirty_true_without_dialog_when_clean():
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+
+    def _boom(*a, **k):
+        raise AssertionError("QMessageBox.question sollte bei sauberem Doc nicht aufgerufen werden")
+    import unittest.mock
+    with unittest.mock.patch.object(QMessageBox, "question", _boom):
+        assert ed._confirm_dirty() is True
+
+
+def test_confirm_dirty_cancel_blocks(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    assert ed._dirty
+
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    assert ed._confirm_dirty() is False
+    assert ed._dirty                                # unveraendert
+
+
+def test_confirm_dirty_discard_returns_true_without_saving(monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+
+    calls = []
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        lambda *a, **k: calls.append(1) or (str(tmp_path / "x.json"), ""))
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.No)
+    assert ed._confirm_dirty() is True
+    assert not calls                                 # kein Speichern-Dialog aufgerufen
+
+
+def test_confirm_dirty_yes_saves_and_clears_dirty(monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+
+    save_path = tmp_path / "y.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        lambda *a, **k: (str(save_path), ""))
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    assert ed._confirm_dirty() is True
+    assert save_path.exists()
+    assert not ed._dirty
+
+
+def test_close_event_accepts_when_clean():
+    from PySide6.QtGui import QCloseEvent
+
+    ed = _editor()
+    ev = QCloseEvent()
+    ed.closeEvent(ev)
+    assert ev.isAccepted()
+
+
+def test_close_event_ignored_on_cancel(monkeypatch):
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Cancel)
+    ev = QCloseEvent()
+    ed.closeEvent(ev)
+    assert not ev.isAccepted()
+
+
+def test_close_event_accepts_on_discard(monkeypatch):
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.No)
+    ev = QCloseEvent()
+    ed.closeEvent(ev)
+    assert ev.isAccepted()
 
 
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):

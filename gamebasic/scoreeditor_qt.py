@@ -745,9 +745,18 @@ class ScoreEditor(QMainWindow):
     def _mark_dirty(self) -> None:
         self._dirty = True
         self._update_info()
+        self._update_title()
         u = getattr(self, "undo", None)
         if u is not None:
             u.mark()
+
+    def _update_title(self) -> None:
+        base = "GameBasic Notenblatt-Editor"
+        if self.doc.path:
+            base += f" -- {Path(self.doc.path).name}"
+        if self._dirty:
+            base += " *"
+        self.setWindowTitle(base)
 
     def _update_undo_buttons(self) -> None:
         self.btn_undo.setEnabled(self.undo.can_undo())
@@ -759,6 +768,8 @@ class ScoreEditor(QMainWindow):
         self._sound_cache.clear()
         self.bpm_spin.setValue(self.doc.bpm)
         self._rebuild_tracks_ui()
+        self._mark_dirty()  # Undo/Redo aendert das Doc -- Titel/Dirty nachziehen
+                            # (undo.mark() ist hier ein sicherer No-Op, siehe SnapshotUndo._apply)
 
     # ---- Wiedergabe ---------------------------------------------------------
     def _toggle_play(self) -> None:
@@ -809,17 +820,47 @@ class ScoreEditor(QMainWindow):
         self._mixer.play(arr)
 
     # ---- Datei --------------------------------------------------------------
+    def _confirm_dirty(self) -> bool:
+        """Fragt bei ungespeicherten Aenderungen nach (Speichern/Verwerfen/
+        Abbrechen) -- liefert True, wenn fortgefahren werden darf (gespeichert
+        oder bewusst verworfen), False bei Abbruch."""
+        if not self._dirty:
+            return True
+        ans = QMessageBox.question(
+            self, "Aenderungen speichern?",
+            "Das Notenblatt hat ungespeicherte Aenderungen.\n"
+            "Vor dem Fortfahren speichern?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel)
+        if ans == QMessageBox.StandardButton.Cancel:
+            return False
+        if ans == QMessageBox.StandardButton.Yes:
+            self._save()
+            return not self._dirty     # False, wenn der Speichern-Dialog abgebrochen wurde
+        return True
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._confirm_dirty():
+            event.accept()
+        else:
+            event.ignore()
+
     def _new_doc(self) -> None:
+        if not self._confirm_dirty():
+            return
         self._stop_play()
         self.doc = ScoreDoc()
         self._sound_cache.clear()
         self.bpm_spin.setValue(self.doc.bpm)
         self._rebuild_tracks_ui()
-        self.setWindowTitle("GameBasic Notenblatt-Editor")
         self._dirty = False
+        self._update_title()
         self.undo.reset()      # frisches Dokument -> Historie verwerfen
 
     def _open(self) -> None:
+        if not self._confirm_dirty():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "Notenblatt oeffnen", str(self.project_root),
             "GameBasic-Notenblatt (*.json)")
@@ -834,8 +875,8 @@ class ScoreEditor(QMainWindow):
         self._sound_cache.clear()
         self.bpm_spin.setValue(self.doc.bpm)
         self._rebuild_tracks_ui()
-        self.setWindowTitle(f"GameBasic Notenblatt-Editor -- {Path(path).name}")
         self._dirty = False
+        self._update_title()
         self.undo.reset()      # geladenes Dokument -> Historie verwerfen
 
     def _save(self) -> None:
@@ -847,8 +888,8 @@ class ScoreEditor(QMainWindow):
         if not path.lower().endswith(".json"):
             path += ".json"
         self.doc.save_json(path)
-        self.setWindowTitle(f"GameBasic Notenblatt-Editor -- {Path(path).name}")
         self._dirty = False
+        self._update_title()
 
     # ---- Tracker-Export -------------------------------------------------
     def _export_to_tracker(self) -> None:
