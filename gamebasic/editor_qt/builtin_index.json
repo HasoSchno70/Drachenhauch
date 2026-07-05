@@ -305,7 +305,7 @@
   {
    "name": "AUDIO_MUSIC_PLAY",
    "kind": "core",
-   "signature": "AUDIO_MUSIC_PLAY([loops[, fade_in_ms]])",
+   "signature": "AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]])",
    "module": "audio"
   },
   {
@@ -335,7 +335,7 @@
   {
    "name": "AUDIO_MUSIC_STOP",
    "kind": "core",
-   "signature": "AUDIO_MUSIC_STOP([fade_out_ms])",
+   "signature": "AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])",
    "module": "audio"
   },
   {
@@ -371,7 +371,7 @@
   {
    "name": "AUDIO_PAN_SLIDE",
    "kind": "core",
-   "signature": "AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms)",
+   "signature": "AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms[, easing$])",
    "module": "audio"
   },
   {
@@ -389,7 +389,7 @@
   {
    "name": "AUDIO_PLAY",
    "kind": "core",
-   "signature": "AUDIO_PLAY(1..4 Argumente)",
+   "signature": "AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]])",
    "module": "audio"
   },
   {
@@ -431,7 +431,7 @@
   {
    "name": "AUDIO_STOP",
    "kind": "core",
-   "signature": "AUDIO_STOP(1..2 Argumente)",
+   "signature": "AUDIO_STOP(ch[, fade_out_ms[, easing$]])",
    "module": "audio"
   },
   {

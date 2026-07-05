@@ -315,3 +315,65 @@ def test_audio_play_at_validation(run_gb):
         'END TRY',
     ])
     assert "AUDIO_PLAY_AT: ticks muss >= 0 sein" in run_gb(src)
+
+
+def test_easing_validation_on_fade_builtins(run_gb):
+    # Nicht-lineare Tween-Easings (Kira: Easing::{In,Out,InOut}Powi) fuer
+    # Fades/Slides -- optionaler trailing easing$-Parameter, unbekannter Name
+    # wird VOR der Audio-Initialisierung geprueft -> headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PLAY(0, 0, 1.0, 100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_STOP(0, 100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_MUSIC_PLAY(-1, 100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_MUSIC_STOP(100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_PLAY: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
+    assert "AUDIO_STOP: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
+    assert "AUDIO_PAN_SLIDE: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
+    assert "AUDIO_MUSIC_PLAY: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
+    assert "AUDIO_MUSIC_STOP: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
+
+
+def test_easing_defaults_to_linear_when_omitted(run_gb):
+    # Ohne easing$-Argument bleibt das bestehende Verhalten unveraendert --
+    # die alten fade_in_ms/fade_out_ms/dauer_ms-Validierungen laufen weiter,
+    # ohne dass ein Easing-Fehler dazwischenfunkt.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PLAY(0, -1, 1.0, -5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_PAN_SLIDE(0, 0.0, 1.0, 0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_PLAY: fade_in_ms muss >= 0 sein" in out
+    assert "AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein" in out

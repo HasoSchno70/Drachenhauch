@@ -12,13 +12,13 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering::Relaxed};
 use std::time::Duration;
 
 use kira::sound::{Sound, SoundData};
 
 use kira::{
-    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Frame, Mix, Panning, Tween,
+    AudioManager, AudioManagerSettings, DefaultBackend, Decibels, Easing, Frame, Mix, Panning, Tween,
     clock::{ClockHandle, ClockSpeed, ClockTime},
     effect::{Effect, EffectBuilder},
     effect::filter::{FilterBuilder, FilterHandle},
@@ -158,6 +158,7 @@ fn is_module_path(p: &str) -> bool {
 struct ModShared {
     vol_target: AtomicU32,        // f32-Bits, linear 0..1
     fade_ms: AtomicU32,           // Ramp-Dauer beim naechsten Volume-Wechsel
+    fade_curve: AtomicU8,         // FadeCurve::as_u8() -- Kurve der naechsten Ramp
     pitch: AtomicU32,             // f32-Bits, Abspielrate
     paused: AtomicBool,
     stop_now: AtomicBool,         // sofort beenden
@@ -171,6 +172,7 @@ impl ModShared {
         Arc::new(ModShared {
             vol_target: AtomicU32::new(vol.to_bits()),
             fade_ms: AtomicU32::new(5),
+            fade_curve: AtomicU8::new(FadeCurve::Linear.as_u8()),
             pitch: AtomicU32::new(pitch.to_bits()),
             paused: AtomicBool::new(false),
             stop_now: AtomicBool::new(false),
@@ -200,6 +202,7 @@ impl SoundData for ModuleSoundData {
             shared: self.shared, created: false,
             prev: (0.0, 0.0), next: (0.0, 0.0), frac: 0.0, primed: false, ended: false,
             vol_cur: 0.0, last_target: f32::NAN, ramp_total: 1, ramp_done: 1, ramp_start: 0.0,
+            ramp_curve: FadeCurve::Linear,
             pos: 0,
         }), handle))
     }
@@ -223,6 +226,7 @@ struct ModuleSound {
     ramp_total: u64,
     ramp_done: u64,
     ramp_start: f32,
+    ramp_curve: FadeCurve,
     pos: u64,
 }
 // module_ptr ist exklusiv im Besitz dieses Sounds; xmrs-Daten sind Send-fähig.
@@ -260,6 +264,7 @@ impl Sound for ModuleSound {
             self.ramp_total = ((fade_ms * sr / 1000.0) as u64).max(1);
             self.ramp_done = 0;
             self.last_target = tgt;
+            self.ramp_curve = FadeCurve::from_u8(self.shared.fade_curve.load(Relaxed));
         }
         let finish_at_zero = self.shared.finish_at_zero.load(Relaxed);
 
@@ -285,9 +290,9 @@ impl Sound for ModuleSound {
                 }
                 self.frac -= 1.0;
             }
-            // Volume-Ramp
+            // Volume-Ramp (Kurve identisch zu Kira::Easing::apply(), power=2)
             if self.ramp_done < self.ramp_total {
-                let t = self.ramp_done as f32 / self.ramp_total as f32;
+                let t = self.ramp_curve.apply(self.ramp_done as f32 / self.ramp_total as f32);
                 self.vol_cur = self.ramp_start + (tgt - self.ramp_start) * t;
                 self.ramp_done += 1;
             } else {
@@ -344,6 +349,7 @@ fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
         MusicHandle::Static(x) => x.set_volume(d, t),
         MusicHandle::Module(a) => {
             a.fade_ms.store(5, Relaxed);
+            a.fade_curve.store(FadeCurve::Linear.as_u8(), Relaxed);
             a.vol_target.store(d.as_amplitude().to_bits(), Relaxed);
         }
     }
@@ -443,10 +449,59 @@ fn db(v: f64) -> Decibels {
 /// Pan-Position 0=links .. 0.5=Mitte .. 1=rechts -> Kira-Panning(-1..1).
 fn pan_of(pos: f64) -> Panning { Panning((2.0 * pos.clamp(0.0, 1.0) - 1.0) as f32) }
 
-fn tween_ms(ms: i64) -> Tween {
-    Tween { duration: Duration::from_millis(ms.max(0) as u64), ..Default::default() }
-}
 fn tween_now() -> Tween { Tween { duration: Duration::from_millis(4), ..Default::default() } }
+
+/// Zeitkurve fuer Fades/Slides -- macht sie natuerlicher als eine reine
+/// lineare Rampe klingen (ein Fade-out z.B. wirkt mit "out" laenger hoerbar).
+/// BASIC-seitig als Name (`"linear"`/`"in"`/`"out"`/`"inout"`), quadratische
+/// Kurven (Kira: `Easing::{In,Out,InOut}Powi(2)`). Fuer den Kira-Tween-Pfad
+/// direkt nach `Easing` konvertierbar; fuer den Modul-Fade (eigener Ramp,
+/// kein Kira-Tween) liefert `apply()` dieselbe Mathematik als reine Funktion.
+#[derive(Clone, Copy, PartialEq)]
+enum FadeCurve { Linear, In, Out, InOut }
+
+impl FadeCurve {
+    fn parse(name: &str, fn_: &str) -> Result<Self, String> {
+        match name.to_lowercase().as_str() {
+            "" | "linear" => Ok(Self::Linear),
+            "in" => Ok(Self::In),
+            "out" => Ok(Self::Out),
+            "inout" => Ok(Self::InOut),
+            other => Err(format!(
+                "{}: unbekanntes Easing '{}' (linear, in, out, inout)", fn_, other)),
+        }
+    }
+    fn to_kira(self) -> Easing {
+        match self {
+            Self::Linear => Easing::Linear,
+            Self::In => Easing::InPowi(2),
+            Self::Out => Easing::OutPowi(2),
+            Self::InOut => Easing::InOutPowi(2),
+        }
+    }
+    /// Normalisierte Zeit `t` (0..1) -> geformte Zeit (0..1). Fuer den
+    /// Modul-Fade-Ramp (audio-Thread-Hot-Path, kein Kira-Tween beteiligt).
+    /// Identische Mathematik zu Kira's `Easing::apply()` mit power=2.
+    fn apply(self, t: f32) -> f32 {
+        let t = t.clamp(0.0, 1.0);
+        match self {
+            Self::Linear => t,
+            Self::In => t * t,
+            Self::Out => 1.0 - (1.0 - t) * (1.0 - t),
+            Self::InOut => if t < 0.5 { 2.0 * t * t } else { 1.0 - 2.0 * (1.0 - t) * (1.0 - t) },
+        }
+    }
+    fn as_u8(self) -> u8 {
+        match self { Self::Linear => 0, Self::In => 1, Self::Out => 2, Self::InOut => 3 }
+    }
+    fn from_u8(v: u8) -> Self {
+        match v { 1 => Self::In, 2 => Self::Out, 3 => Self::InOut, _ => Self::Linear }
+    }
+}
+
+fn tween_ms_eased(ms: i64, curve: FadeCurve) -> Tween {
+    Tween { duration: Duration::from_millis(ms.max(0) as u64), easing: curve.to_kira(), ..Default::default() }
+}
 
 // --- Per-Sound-Slot (SFX/Tone/Sample) ----------------------------------
 
@@ -643,7 +698,8 @@ impl Audio {
 
     /// Startet einen Slot neu (stoppt die alte Instanz) mit gegebener
     /// Lautstaerke/Loop/Fade. Gemeinsamer Kern fuer PLAYSOUND + AUDIO_PLAY.
-    fn start_slot(&mut self, idx: i64, fn_: &str, vol: f64, loops: i64, fade_in_ms: i64) -> Result<(), String> {
+    fn start_slot(&mut self, idx: i64, fn_: &str, vol: f64, loops: i64, fade_in_ms: i64,
+                  curve: FadeCurve) -> Result<(), String> {
         let vol = vol.clamp(0.0, 1.0);
         // alte Instanz stoppen
         if let Some(h) = self.slot_mut(idx, fn_)?.handle.as_mut() { h.stop(tween_now()); }
@@ -655,7 +711,7 @@ impl Audio {
             .clone().with_settings(settings);
         let mut handle = self.sfx_track.play(data)   // SFX-Bus
             .map_err(|e| format!("{}: {:?}", fn_, e))?;
-        if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms(fade_in_ms)); }
+        if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
         let s = self.slot_mut(idx, fn_)?;
         s.handle = Some(handle);
         s.vol = vol as f32;
@@ -923,7 +979,7 @@ impl Audio {
     }
 
     pub fn play_sound(&mut self, idx: i64, volume: f64) -> Result<(), String> {
-        self.start_slot(idx, "PLAYSOUND", volume, 0, 0)
+        self.start_slot(idx, "PLAYSOUND", volume, 0, 0, FadeCurve::Linear)
     }
 
     pub fn stop_sound(&mut self, idx: i64) -> Result<(), String> {
@@ -1044,7 +1100,7 @@ impl Audio {
         let v = volume.clamp(0.0, 1.0);
         let key = (si, (semitones * 100.0).round() as i64, dur_ms);
         if let Some(&snd) = self.sample_cache.get(&key) {
-            return self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0).map(|_| snd);
+            return self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0, FadeCurve::Linear).map(|_| snd);
         }
         let sr = self.samples[si].sr;
         let s = &self.samples[si];
@@ -1054,13 +1110,15 @@ impl Audio {
         let data = self.make_data_mono(&buf, 1.0, sr);
         let snd = self.push_slot(data, 1.0);
         self.sample_cache.insert(key, snd);
-        self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0)?;
+        self.start_slot(snd, "SAMPLE_PLAY", v, 0, 0, FadeCurve::Linear)?;
         Ok(snd)
     }
 
     // ================= Channel-Steuerung (AUDIO_*) =================
-    pub fn ch_play(&mut self, idx: i64, loops: i64, volume: f64, fade_in_ms: i64) -> Result<i64, String> {
-        self.start_slot(idx, "AUDIO_PLAY", volume, loops, fade_in_ms)?;
+    pub fn ch_play(&mut self, idx: i64, loops: i64, volume: f64, fade_in_ms: i64,
+                   easing: &str) -> Result<i64, String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_PLAY")?;
+        self.start_slot(idx, "AUDIO_PLAY", volume, loops, fade_in_ms, curve)?;
         Ok(idx)
     }
     pub fn ch_pause(&mut self, idx: i64) -> Result<(), String> {
@@ -1071,11 +1129,12 @@ impl Audio {
         if let Some(h) = self.slot_mut(idx, "AUDIO_RESUME")?.handle.as_mut() { h.resume(tween_now()); }
         Ok(())
     }
-    pub fn ch_stop(&mut self, idx: i64, fade_out_ms: i64) -> Result<(), String> {
+    pub fn ch_stop(&mut self, idx: i64, fade_out_ms: i64, easing: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_STOP")?;
         let s = self.slot_mut(idx, "AUDIO_STOP")?;
         s.loops = 0;
         if let Some(h) = s.handle.as_mut() {
-            h.stop(if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() });
+            h.stop(if fade_out_ms > 0 { tween_ms_eased(fade_out_ms, curve) } else { tween_now() });
         }
         Ok(())
     }
@@ -1122,13 +1181,15 @@ impl Audio {
         if let Some(h) = s.handle.as_mut() { h.set_panning(pan_of(p), tween_now()); }
         Ok(())
     }
-    pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64) -> Result<(), String> {
+    pub fn ch_pan_slide(&mut self, idx: i64, from: f64, to: f64, dur_ms: i64,
+                        easing: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_PAN_SLIDE")?;
         let (from, to) = (from.clamp(0.0, 1.0), to.clamp(0.0, 1.0));
         let s = self.slot_mut(idx, "AUDIO_PAN_SLIDE")?;
         s.pan_anim = None;
         if let Some(h) = s.handle.as_mut() {
-            h.set_panning(pan_of(from), tween_now());           // Startpunkt
-            h.set_panning(pan_of(to), tween_ms(dur_ms));        // Kira tweent nativ
+            h.set_panning(pan_of(from), tween_now());                    // Startpunkt
+            h.set_panning(pan_of(to), tween_ms_eased(dur_ms, curve));    // Kira tweent nativ
         }
         Ok(())
     }
@@ -1187,7 +1248,7 @@ impl Audio {
         Ok(())
     }
 
-    fn start_music(&mut self, vol: f32, loops: i64, fade_in_ms: i64) -> Result<(), String> {
+    fn start_music(&mut self, vol: f32, loops: i64, fade_in_ms: i64, curve: FadeCurve) -> Result<(), String> {
         if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
         let vol_db = if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol as f64) };
         let pitch = self.music_pitch as f64;
@@ -1213,6 +1274,7 @@ impl Audio {
                 let shared = ModShared::new(if fade_in_ms > 0 { 0.0 } else { vol }, self.music_pitch);
                 if fade_in_ms > 0 {
                     shared.fade_ms.store(fade_in_ms as u32, Relaxed);
+                    shared.fade_curve.store(curve.as_u8(), Relaxed);
                     shared.vol_target.store(vol.to_bits(), Relaxed);
                 }
                 let data = ModuleSoundData { module_ptr, loop_max, shared };
@@ -1222,7 +1284,7 @@ impl Audio {
         };
         // Fade-in fuer Stream/Static (Module macht es selbst, s.o.).
         if fade_in_ms > 0 && !matches!(handle, MusicHandle::Module(_)) {
-            mh_set_volume(&mut handle, db(vol as f64), tween_ms(fade_in_ms));
+            mh_set_volume(&mut handle, db(vol as f64), tween_ms_eased(fade_in_ms, curve));
         }
         self.music_handle = Some(handle);
         self.music_loops = if endless { -1 } else { loops };
@@ -1233,28 +1295,32 @@ impl Audio {
     pub fn play_music(&mut self, path: &str, volume: f64) -> Result<(), String> {
         self.music_vol = volume.clamp(0.0, 1.0) as f32;
         self.music_load(path)?;
-        self.start_music(self.music_vol, -1, 0)
+        self.start_music(self.music_vol, -1, 0, FadeCurve::Linear)
     }
     pub fn stop_music(&mut self) {
         if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
         self.music_handle = None;
     }
-    pub fn music_play(&mut self, loops: i64, fade_in_ms: i64) {
+    pub fn music_play(&mut self, loops: i64, fade_in_ms: i64, easing: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_MUSIC_PLAY")?;
         let v = self.music_vol;
-        let _ = self.start_music(v, loops, fade_in_ms);
+        self.start_music(v, loops, fade_in_ms, curve)
     }
-    pub fn music_stop(&mut self, fade_out_ms: i64) {
+    pub fn music_stop(&mut self, fade_out_ms: i64, easing: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_MUSIC_STOP")?;
         match self.music_handle.as_mut() {
             Some(MusicHandle::Module(a)) if fade_out_ms > 0 => {
                 // Ausfaden auf 0 und am Ende beenden (Sound raeumt sich selbst).
                 a.fade_ms.store(fade_out_ms as u32, Relaxed);
+                a.fade_curve.store(curve.as_u8(), Relaxed);
                 a.finish_at_zero.store(true, Relaxed);
                 a.vol_target.store(0.0f32.to_bits(), Relaxed);
             }
-            Some(h) => mh_stop(h, if fade_out_ms > 0 { tween_ms(fade_out_ms) } else { tween_now() }),
+            Some(h) => mh_stop(h, if fade_out_ms > 0 { tween_ms_eased(fade_out_ms, curve) } else { tween_now() }),
             None => {}
         }
         if fade_out_ms <= 0 { self.music_handle = None; }
+        Ok(())
     }
     pub fn music_pause(&mut self) {
         if let Some(h) = self.music_handle.as_mut() { mh_pause(h, tween_now()); self.music_paused = true; }
@@ -1308,7 +1374,7 @@ impl Audio {
             };
             if restart {
                 let (vol, rem) = { let s = &self.sounds[i]; (s.vol as f64, s.loops - 1) };
-                let _ = self.start_slot(i as i64, "AUDIO_PLAY", vol, 0, 0);
+                let _ = self.start_slot(i as i64, "AUDIO_PLAY", vol, 0, 0, FadeCurve::Linear);
                 self.sounds[i].loops = rem;
             }
         }
@@ -1322,11 +1388,11 @@ impl Audio {
             if self.music_loops > 0 && !is_module {
                 self.music_loops -= 1;
                 let v = self.music_vol;
-                let _ = self.start_music(v, 0, 0);
+                let _ = self.start_music(v, 0, 0, FadeCurve::Linear);
             } else if let Some(path) = self.music_queue.take() {
                 let v = self.music_vol;
                 // Queue-Track laden (Stream oder Modul) und endlos starten.
-                if self.music_load(&path).is_ok() { let _ = self.start_music(v, -1, 0); }
+                if self.music_load(&path).is_ok() { let _ = self.start_music(v, -1, 0, FadeCurve::Linear); }
             }
         }
     }
@@ -1509,7 +1575,7 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 #[cfg(test)]
 mod tests {
     use super::{build_sfx_buffer, lofi_chain, pendulum_pos, resample,
-                svf_lowpass, SidFx};
+                svf_lowpass, FadeCurve, SidFx};
 
     #[test]
     fn resample_octave_up_halves_length() {
@@ -1581,5 +1647,51 @@ mod tests {
         let copy = sig.clone();
         svf_lowpass(&mut sig, 0.0, 0.0, 0.0, 44100);
         assert_eq!(sig, copy);
+    }
+
+    #[test]
+    fn fade_curve_parse_accepts_known_names_case_insensitive() {
+        assert!(matches!(FadeCurve::parse("", "X").unwrap(), FadeCurve::Linear));
+        assert!(matches!(FadeCurve::parse("LINEAR", "X").unwrap(), FadeCurve::Linear));
+        assert!(matches!(FadeCurve::parse("In", "X").unwrap(), FadeCurve::In));
+        assert!(matches!(FadeCurve::parse("OUT", "X").unwrap(), FadeCurve::Out));
+        assert!(matches!(FadeCurve::parse("inout", "X").unwrap(), FadeCurve::InOut));
+        assert!(FadeCurve::parse("bounce", "X").is_err());
+    }
+
+    #[test]
+    fn fade_curve_endpoints_are_fixed() {
+        // Jede Kurve muss bei t=0 -> 0 und t=1 -> 1 beginnen/enden (sonst
+        // springt die Lautstaerke am Fade-Rand).
+        for c in [FadeCurve::Linear, FadeCurve::In, FadeCurve::Out, FadeCurve::InOut] {
+            assert!((c.apply(0.0) - 0.0).abs() < 1e-6);
+            assert!((c.apply(1.0) - 1.0).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn fade_curve_matches_kira_easing_powi2() {
+        // FadeCurve::apply() dupliziert Kiras Easing::{In,Out,InOut}Powi(2)-
+        // Mathematik fuer den Modul-Fade-Pfad (kein Kira-Tween beteiligt) --
+        // muss exakt uebereinstimmen, sonst klingen MOD-Fades anders als
+        // Stream/Static-Fades mit derselben Kurve.
+        let samples = [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
+        for &t in &samples {
+            let in_expect = t * t;
+            let out_expect = 1.0 - (1.0 - t) * (1.0 - t);
+            let inout_expect = if t < 0.5 { 2.0 * t * t } else { 1.0 - 2.0 * (1.0 - t) * (1.0 - t) };
+            assert!((FadeCurve::In.apply(t) - in_expect).abs() < 1e-6);
+            assert!((FadeCurve::Out.apply(t) - out_expect).abs() < 1e-6);
+            assert!((FadeCurve::InOut.apply(t) - inout_expect).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn fade_curve_in_starts_slower_than_out() {
+        // "in" beschleunigt erst spaet (leiser Start), "out" ist frueh schon
+        // lauter -- am selben t muss out >= in gelten (ausser an den Enden).
+        for t in [0.1, 0.3, 0.5, 0.7, 0.9] {
+            assert!(FadeCurve::Out.apply(t) >= FadeCurve::In.apply(t));
+        }
     }
 }

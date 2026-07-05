@@ -3248,6 +3248,16 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: Argument {} muss Zahl sein", fn_, i + 1)),
             }
         }
+        // Optionaler Easing-Name fuer Fades/Slides (linear/in/out/inout,
+        // Default "linear" bei fehlendem Argument). Pruefung VOR der Audio-
+        // Initialisierung -> golden-testbar (wie die Bus-Namen-Checks).
+        fn easing_name(a: &[Value], i: usize, fn_: &str) -> R<String> {
+            let name = if a.len() > i { gs(a, i, fn_)?.to_lowercase() } else { "linear".to_string() };
+            if !matches!(name.as_str(), "linear" | "in" | "out" | "inout") {
+                return Err(format!("{}: unbekanntes Easing '{}' (linear, in, out, inout)", fn_, name));
+            }
+            Ok(name)
+        }
         // 1D-INTEGER-Array -> Vec<i32> (fuer Bulk-Draws).
         fn arr_i32(v: &Value, fn_: &str) -> R<Vec<i32>> {
             match v {
@@ -4095,22 +4105,24 @@ impl<'p> Vm<'p> {
             "audio_resume_all" => { self.audio_mut()?.resume_all(); Value::Nil }
             "audio_stop_all" => { self.audio_mut()?.stop_all(); Value::Nil }
             "audio_play" => {
-                // AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms]]]) -- loops=0 einmal (Default), -1 endlos
+                // AUDIO_PLAY(sound[, loops[, volume[, fade_in_ms[, easing$]]]]) -- loops=0 einmal (Default), -1 endlos
                 let idx = gi(a, 0, "AUDIO_PLAY")?;
                 let loops = if a.len() >= 2 { gi(a, 1, "AUDIO_PLAY")? } else { 0 };
                 let vol = if a.len() >= 3 { need_f(a, 2, "AUDIO_PLAY")? } else { 1.0 };
                 let fade = if a.len() >= 4 { gi(a, 3, "AUDIO_PLAY")? } else { 0 };
                 if fade < 0 { return Err("AUDIO_PLAY: fade_in_ms muss >= 0 sein".into()); }
-                Value::Int(self.audio_mut()?.ch_play(idx, loops, vol, fade)?)
+                let easing = easing_name(a, 4, "AUDIO_PLAY")?;
+                Value::Int(self.audio_mut()?.ch_play(idx, loops, vol, fade, &easing)?)
             }
             "audio_pause" => { let i = gi(a, 0, "AUDIO_PAUSE")?; self.audio_mut()?.ch_pause(i)?; Value::Nil }
             "audio_resume" => { let i = gi(a, 0, "AUDIO_RESUME")?; self.audio_mut()?.ch_resume(i)?; Value::Nil }
             "audio_stop" => {
-                // AUDIO_STOP(ch[, fade_out_ms])
+                // AUDIO_STOP(ch[, fade_out_ms[, easing$]])
                 let i = gi(a, 0, "AUDIO_STOP")?;
                 let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_STOP")? } else { 0 };
                 if fade < 0 { return Err("AUDIO_STOP: fade_out_ms muss >= 0 sein".into()); }
-                self.audio_mut()?.ch_stop(i, fade)?; Value::Nil
+                let easing = easing_name(a, 2, "AUDIO_STOP")?;
+                self.audio_mut()?.ch_stop(i, fade, &easing)?; Value::Nil
             }
             "audio_is_playing" => { let i = gi(a, 0, "AUDIO_IS_PLAYING")?; Value::Bool(self.audio_mut()?.ch_is_playing(i)?) }
             "audio_volume" | "audio_set_volume" => { let i = gi(a, 0, "AUDIO_VOLUME")?; let v = need_f(a, 1, "AUDIO_VOLUME")?; self.audio_mut()?.ch_set_volume(i, v)?; Value::Nil }
@@ -4130,13 +4142,14 @@ impl<'p> Vm<'p> {
             "audio_music_get_pitch" => Value::Float(self.audio_mut()?.music_get_pitch()),
             "audio_pan_pos" => { let i = gi(a, 0, "AUDIO_PAN_POS")?; let p = need_f(a, 1, "AUDIO_PAN_POS")?; self.audio_mut()?.ch_pan_pos(i, p)?; Value::Nil }
             "audio_pan_slide" => {
-                // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms) -- Positionen 0=links..1=rechts
+                // AUDIO_PAN_SLIDE(ch, von, nach, dauer_ms[, easing$]) -- Positionen 0=links..1=rechts
                 let i = gi(a, 0, "AUDIO_PAN_SLIDE")?;
                 let von = need_f(a, 1, "AUDIO_PAN_SLIDE")?;
                 let nach = need_f(a, 2, "AUDIO_PAN_SLIDE")?;
                 let dauer = gi(a, 3, "AUDIO_PAN_SLIDE")?;
                 if dauer <= 0 { return Err("AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein".into()); }
-                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer)?; Value::Nil
+                let easing = easing_name(a, 4, "AUDIO_PAN_SLIDE")?;
+                self.audio_mut()?.ch_pan_slide(i, von, nach, dauer, &easing)?; Value::Nil
             }
             "audio_autopan" => {
                 // AUDIO_AUTOPAN(ch, periode_s[, tiefe]) -- periode_s <= 0 = aus
@@ -4186,17 +4199,19 @@ impl<'p> Vm<'p> {
             }
             "audio_music_load" => { let p = gs(a, 0, "AUDIO_MUSIC_LOAD")?.to_string(); self.audio_mut()?.music_load(&p)?; Value::Nil }
             "audio_music_play" => {
-                // AUDIO_MUSIC_PLAY([loops[, fade_in_ms]]) -- loops=-1 endlos (Default)
+                // AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]]) -- loops=-1 endlos (Default)
                 let loops = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_PLAY")? } else { -1 };
                 let fade = if a.len() >= 2 { gi(a, 1, "AUDIO_MUSIC_PLAY")? } else { 0 };
                 if fade < 0 { return Err("AUDIO_MUSIC_PLAY: fade_in_ms muss >= 0 sein".into()); }
-                self.audio_mut()?.music_play(loops, fade); Value::Nil
+                let easing = easing_name(a, 2, "AUDIO_MUSIC_PLAY")?;
+                self.audio_mut()?.music_play(loops, fade, &easing)?; Value::Nil
             }
             "audio_music_stop" => {
-                // AUDIO_MUSIC_STOP([fade_out_ms])
+                // AUDIO_MUSIC_STOP([fade_out_ms[, easing$]])
                 let fade = if !a.is_empty() { gi(a, 0, "AUDIO_MUSIC_STOP")? } else { 0 };
                 if fade < 0 { return Err("AUDIO_MUSIC_STOP: fade_out_ms muss >= 0 sein".into()); }
-                self.audio_mut()?.music_stop(fade); Value::Nil
+                let easing = easing_name(a, 1, "AUDIO_MUSIC_STOP")?;
+                self.audio_mut()?.music_stop(fade, &easing)?; Value::Nil
             }
             "audio_music_pause" => { self.audio_mut()?.music_pause(); Value::Nil }
             "audio_music_resume" => { self.audio_mut()?.music_resume(); Value::Nil }
