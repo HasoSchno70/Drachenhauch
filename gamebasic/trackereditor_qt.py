@@ -15,6 +15,7 @@ Das Datenmodell + I/O + GB-Export liegen Qt-frei in `gamebasic.tracker`
 """
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -584,6 +585,60 @@ class _CellDelegate(QStyledItemDelegate):
         return COLORS["danger"]            # Effekt (Arp/Vib/Ret/Off)
 
 
+class _Mixer:
+    """Additiver Software-Mixer fuer ueberlappende Tracker-Stimmen.
+
+    `sounddevice.play()` ersetzt bei jedem Aufruf die vorher gestartete
+    Wiedergabe (Doku: "It cannot be used for multiple overlapping
+    playbacks.") -- ein Tracker braucht aber pro Zeile mehrere GLEICHZEITIG
+    klingende Kanaele (Akkorde/Drums) und Noten, die ueber die naechste
+    Zeile hinaus nachklingen. Bisher rief jede Note direkt `sd.play()` auf,
+    was jede vorige Stimme sofort stumm schaltete -- ein Song mit mehr als
+    einem gleichzeitig belegten Kanal war beim Abspielen praktisch stumm
+    (nur die zuletzt getriggerte Stimme kam durch, und selbst die wurde
+    von der naechsten Zeile sofort wieder gekappt). Ein einziger dauerhaft
+    offener `OutputStream` mischt stattdessen alle aktiven Stimmen additiv."""
+
+    def __init__(self, sr: int = 44100):
+        self._sr = sr
+        self._lock = threading.Lock()
+        self._voices: list[tuple[np.ndarray, int]] = []
+        self._stream = None
+
+    def _callback(self, outdata, frames, _time, _status) -> None:
+        outdata.fill(0.0)
+        with self._lock:
+            alive = []
+            for arr, pos in self._voices:
+                end = min(pos + frames, arr.size)
+                n = end - pos
+                if n > 0:
+                    outdata[:n, 0] += arr[pos:end]
+                if end < arr.size:
+                    alive.append((arr, end))
+            self._voices = alive
+        np.clip(outdata, -1.0, 1.0, out=outdata)
+
+    def play(self, arr: np.ndarray) -> None:
+        if arr is None or arr.size == 0:
+            return
+        try:
+            import sounddevice as sd
+        except Exception:
+            return
+        voice = np.ascontiguousarray(arr, dtype=np.float32)
+        with self._lock:
+            self._voices.append((voice, 0))
+        if self._stream is None:
+            try:
+                self._stream = sd.OutputStream(
+                    samplerate=self._sr, channels=1, dtype="float32",
+                    callback=self._callback)
+                self._stream.start()
+            except Exception:
+                self._stream = None
+
+
 class TrackerEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
@@ -593,6 +648,7 @@ class TrackerEditor(QMainWindow):
         self.song = Song()
         self.cur = 0                   # aktueller Pattern-Index
         self._sound_cache: dict = {}
+        self._mixer = _Mixer()         # additiver Mixer -- siehe _Mixer-Docstring
         self._play_mode = None         # None | "pattern" | "song"
         self._play_row = 0
         self._play_order_pos = 0
@@ -1649,18 +1705,15 @@ class TrackerEditor(QMainWindow):
             self._sound_cache[key] = arr
         return arr
 
-    @staticmethod
-    def _play_array(arr: np.ndarray, sr: int = 44100, vol: int | None = None):
-        """Spielt ein float32-Array ueber sounddevice (best effort -- still ohne
-        Audio-Geraet/Lib). vol = Lautstaerke 1..15 wird beim Abspielen eingemischt."""
-        try:
-            import sounddevice as sd
-            out = arr
-            if vol:
-                out = arr * min(1.0, max(0.0, vol_to_pct(vol) / 100.0))
-            sd.play(np.ascontiguousarray(out.astype(np.float32)), sr)
-        except Exception:
-            pass
+    def _play_array(self, arr: np.ndarray, sr: int = 44100, vol: int | None = None):
+        """Spielt ein float32-Array ueber den additiven Mixer (best effort --
+        still ohne Audio-Geraet/Lib). vol = Lautstaerke 1..15 wird beim
+        Abspielen eingemischt. `sr` wird nicht mehr durchgereicht -- der Mixer
+        laeuft an einer festen Samplerate (44100, wie `_render_sound`)."""
+        out = arr
+        if vol:
+            out = arr * min(1.0, max(0.0, vol_to_pct(vol) / 100.0))
+        self._mixer.play(out)
 
     def _play_note(self, ci: int, midi: int, vol: int | None = None,
                    slide: int = 0, n_rows: int | None = None, inst=None) -> None:
