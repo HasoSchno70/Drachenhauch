@@ -258,6 +258,47 @@ def test_clef_change_declines_transpose_keeps_pitches(monkeypatch):
     assert [n.pitch for n in track.notes] == [60, 62, 64, 65, 67, 69, 71]
 
 
+def test_beam_groups_join_same_duration_runs_within_a_beat():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    track = ed.doc.tracks[0]
+    track.add_note(0.0, 0.5, 60)
+    track.add_note(0.5, 0.5, 62)          # Beat 0: 2 Achtel -> eine Gruppe
+    track.add_note(1.0, 0.25, 64)
+    track.add_note(1.25, 0.25, 65)
+    track.add_note(1.5, 0.25, 67)
+    track.add_note(1.75, 0.25, 69)        # Beat 1: 4 Sechzehntel -> eine Gruppe
+    track.add_note(3.0, 0.5, 72)          # alleinstehendes Achtel -> keine Gruppe
+
+    groups = staff._beam_groups()
+    pitch_groups = sorted(([n.pitch for n in g] for g in groups))
+    assert pitch_groups == [[60, 62], [64, 65, 67, 69]]
+
+
+def test_beam_groups_break_across_beats_and_rests():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    track = ed.doc.tracks[0]
+    track.add_note(0.5, 0.5, 60)           # startet nicht auf Beat-Grenze
+    track.add_note(1.0, 0.5, 62)           # anderer Beat -> keine Verbindung
+    groups = staff._beam_groups()
+    assert groups == []                     # beide bleiben Einzelnoten
+
+
+def test_status_bar_reflects_entry_state_and_song_summary():
+    ed = _editor()
+    ed.dur_combo.setCurrentIndex(3)          # Achtel
+    ed._on_accidental_changed(1)             # Kreuz
+    ed.rest_check.setChecked(True)
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    ed._mark_dirty()
+    msg = ed.status.currentMessage()
+    assert "Achtel" in msg
+    assert "Kreuz" in msg
+    assert "Pause" in msg
+    assert "1 Spur" in msg
+
+
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     from gamebasic.tracker.song import Song

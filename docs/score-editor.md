@@ -41,6 +41,14 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten
   additiven Mixer (`gamebasic.audio_preview.Mixer`, derselbe Mixer wie im
   Tracker) mit einem laufenden Cursor auf jedem Notensystem.
+- **Balken-Gruppierung** — zusammenhängende Achtel/Sechzehntel gleicher Dauer
+  im selben Beat bekommen automatisch einen gemeinsamen Balken statt
+  Einzel-Fähnchen (Sechzehntel: Doppelbalken).
+- **Info-Leiste** (unten) — zeigt live den aktuellen Eingabe-Modus (Dauer,
+  Vorzeichen, Pause an/aus), einen Stück-Überblick (Spuren, Beats/Takte,
+  BPM) und Kurzhinweise zur Bedienung.
+- **`F11`** schaltet echtes Vollbild um (das Fenster startet bereits
+  maximiert).
 
 ## Speichern / Laden
 
@@ -78,7 +86,9 @@ Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
 - **Vorzeichen immer als Kreuz** der Stammnote darunter, nie als B —
   musikalisch enharmonisch gleichwertig, aber nicht immer die übliche
   Schreibweise.
-- **Keine Balken-Gruppierung** — Achtel/Sechzehntel bekommen nur Fähnchen.
+- **Balken-Gruppierung nur bei gleicher Dauer** — ein Lauf aus Achteln
+  UND Sechzehnteln im selben Beat bekommt keine Partial-Balken, sondern
+  bricht an der Dauer-Grenze in separate Gruppen/Einzel-Fähnchen auf.
 - **Noten über eine Tracker-Pattern-Grenze hinaus** (alle 64 Zeilen = 16
   Beats = 4 Takte) werden dort gekappt — Tracker-Patterns können nicht binden.
 - **Kein Schlagzeug-Spurtyp** — der Pflicht-Drum-Kanal des Tracker-Exports
@@ -86,9 +96,10 @@ Bewusste Vereinfachungen, nicht stillschweigend verschluckt:
 
 ## Geplant
 
-Andere Taktarten, Bindebögen über Pattern-Grenzen hinweg, echte
-Balken-Gruppierung, kontextuelle Kreuz/B-Schreibweise, Mehrstimmigkeit pro
-Spur (automatische Verteilung auf zusätzliche Tracker-Kanäle beim Export).
+Andere Taktarten, Bindebögen über Pattern-Grenzen hinweg, Partial-Balken bei
+gemischten Notendauern, kontextuelle Kreuz/B-Schreibweise, Mehrstimmigkeit
+pro Spur (automatische Verteilung auf zusätzliche Tracker-Kanäle beim
+Export).
 
 ## Datenmodell
 

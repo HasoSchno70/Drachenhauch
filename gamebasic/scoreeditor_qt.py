@@ -82,6 +82,7 @@ class _StaffView(QWidget):
     TOP_MARGIN = 84.0
     PIXELS_PER_BEAT = 64.0
     NOTE_R = 6.5
+    STEM_LEN = 34.0
 
     def __init__(self, editor: "ScoreEditor", track_index: int, parent=None):
         super().__init__(parent)
@@ -162,6 +163,56 @@ class _StaffView(QWidget):
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return QSize(400, 250)
 
+    # ---- Balken-Gruppierung (Achtel/Sechzehntel statt Einzel-Faehnchen) ----
+    def _beam_groups(self) -> list[list]:
+        """Liefert Gruppen von >=2 zusammenhaengenden Noten (gleiche Dauer,
+        Achtel oder kuerzer, im selben Beat, ohne Luecke) -- die bekommen
+        einen gemeinsamen Balken statt je ein Faehnchen. V1-Vereinfachung:
+        nur Laeufe GLEICHER Dauer werden gebalkt (kein Mischen von Achtel+
+        Sechzehntel in einer Gruppe/keine Partial-Balken)."""
+        notes = sorted(
+            (n for n in self.track.notes if not n.rest and n.dur_beat <= 0.5),
+            key=lambda n: n.start_beat)
+        groups: list[list] = []
+        current: list = []
+        for n in notes:
+            if current:
+                prev = current[-1]
+                same_beat = int(prev.start_beat) == int(n.start_beat)
+                contiguous = abs(prev.end_beat - n.start_beat) < 1e-6
+                same_dur = abs(prev.dur_beat - n.dur_beat) < 1e-6
+                if same_beat and contiguous and same_dur:
+                    current.append(n)
+                    continue
+                if len(current) >= 2:
+                    groups.append(current)
+                current = []
+            current = [n]
+        if len(current) >= 2:
+            groups.append(current)
+        return groups
+
+    def _draw_beam_group(self, p: QPainter, group: list) -> None:
+        steps = [self._step_offset(n.pitch) for n in group]
+        ys = [self._y_for_step(s) for s in steps]
+        xs = [self._x_for_beat(n.start_beat) for n in group]
+        stem_up = (sum(steps) / len(steps)) < 4
+        color = QColor(_track_color(self.track_index))
+        n_beams = 2 if group[0].dur_beat <= 0.25 else 1
+        beam_y = (min(ys) - self.STEM_LEN) if stem_up else (max(ys) + self.STEM_LEN)
+
+        p.setPen(QPen(color, 1.4))
+        for x, y in zip(xs, ys):
+            sx = x + self.NOTE_R if stem_up else x - self.NOTE_R
+            p.drawLine(int(sx), int(y), int(sx), int(beam_y))
+
+        sx0 = xs[0] + (self.NOTE_R if stem_up else -self.NOTE_R)
+        sx1 = xs[-1] + (self.NOTE_R if stem_up else -self.NOTE_R)
+        for b in range(n_beams):
+            by = beam_y + b * (5 if stem_up else -5)
+            p.setPen(QPen(color, 3.4))
+            p.drawLine(int(sx0), int(by), int(sx1), int(by))
+
     # ---- Rendering ----------------------------------------------------------
     def paintEvent(self, e) -> None:  # noqa: N802
         p = QPainter(self)
@@ -169,13 +220,23 @@ class _StaffView(QWidget):
         w = max(self.width(), self._content_width())
         y_top = self._y_for_step(8)
         y_bot = self._y_for_step(0)
+        track_color = QColor(_track_color(self.track_index))
 
-        p.setPen(QPen(QColor(COLORS["fg_muted"]), 1))
+        # Abwechselnde Takt-Schattierung (Kontrast-/Lesbarkeitshilfe, wie die
+        # Beat-Schattierung im Tracker-Gitter).
+        n_measures = int(self._content_beats() // 4) + 1
+        band = QColor(COLORS["bg_alt"])
+        for m in range(0, n_measures + 1, 2):
+            x0 = int(self._x_for_beat(m * 4))
+            x1 = int(self._x_for_beat((m + 1) * 4))
+            p.fillRect(x0, int(y_top) - 20, x1 - x0, int(y_bot - y_top) + 40, band)
+
+        p.setPen(QPen(QColor(COLORS["fg"]), 1.2))
         for i in range(5):
             y = self._y_for_step(i * 2)
             p.drawLine(int(self.LEFT_MARGIN - 14), int(y), w, int(y))
 
-        p.setPen(QColor(COLORS["accent"]))
+        p.setPen(track_color)
         f = QFont(EDITOR_FONT_FAMILY)
         f.setPointSize(36)
         p.setFont(f)
@@ -184,57 +245,60 @@ class _StaffView(QWidget):
                           (y_bot - y_top) + 68),
                    Qt.AlignmentFlag.AlignCenter, glyph)
 
-        p.setPen(QPen(QColor(COLORS["border"]), 1))
-        n_measures = int(self._content_beats() // 4) + 1
+        p.setPen(QPen(QColor(COLORS["fg_muted"]), 1.3))
         for m in range(n_measures + 1):
             x = int(self._x_for_beat(m * 4))
-            p.drawLine(x, int(y_top), x, int(y_bot))
+            p.drawLine(x, int(y_top) - 6, x, int(y_bot) + 6)
 
+        beam_groups = self._beam_groups()
+        beamed_ids = {id(n) for g in beam_groups for n in g}
         for note in self.track.notes:
-            self._draw_note(p, note)
+            self._draw_note(p, note, beamed=id(note) in beamed_ids)
+        for group in beam_groups:
+            self._draw_beam_group(p, group)
 
         if self.playhead_beat is not None:
             x = int(self._x_for_beat(self.playhead_beat))
-            p.setPen(QPen(QColor(COLORS["danger"]), 2))
+            p.setPen(QPen(QColor(COLORS["danger"]), 2.4))
             p.drawLine(x, int(y_top) - 12, x, int(y_bot) + 12)
         p.end()
 
-    def _draw_note(self, p: QPainter, note) -> None:
+    def _draw_note(self, p: QPainter, note, beamed: bool = False) -> None:
         x = self._x_for_beat(note.start_beat)
+        color = QColor(_track_color(self.track_index))
         if note.rest:
             y = self._y_for_step(4)
-            p.setPen(QPen(QColor(COLORS["fg_muted"]), 2))
+            p.setPen(QPen(color, 2.2))
             p.drawRect(int(x) - 5, int(y) - 3, 10, 6)
             return
 
         step = self._step_offset(note.pitch)
         y = self._y_for_step(step)
-        color = QColor(_track_color(self.track_index))
         filled = note.dur_beat < 2.0
 
+        ledger_color = color.lighter(115)
         for s in self._ledger_steps(step):
             ly = self._y_for_step(s)
-            p.setPen(QPen(QColor(COLORS["fg_muted"]), 1))
+            p.setPen(QPen(ledger_color, 1.4))
             p.drawLine(int(x - 12), int(ly), int(x + 12), int(ly))
 
-        p.setPen(QPen(color, 1.6))
+        p.setPen(QPen(color, 1.8))
         p.setBrush(color if filled else Qt.BrushStyle.NoBrush)
         p.drawEllipse(QPointF(x, y), self.NOTE_R, self.NOTE_R)
         p.setBrush(Qt.BrushStyle.NoBrush)
 
-        if note.dur_beat < 4.0:
+        if note.dur_beat < 4.0 and not beamed:
             stem_up = step < 4
-            stem_len = 34
-            p.setPen(QPen(color, 1.4))
+            p.setPen(QPen(color, 1.6))
             if stem_up:
                 sx = x + self.NOTE_R
-                p.drawLine(int(sx), int(y), int(sx), int(y - stem_len))
+                p.drawLine(int(sx), int(y), int(sx), int(y - self.STEM_LEN))
             else:
                 sx = x - self.NOTE_R
-                p.drawLine(int(sx), int(y), int(sx), int(y + stem_len))
+                p.drawLine(int(sx), int(y), int(sx), int(y + self.STEM_LEN))
             if note.dur_beat <= 0.5:
                 n_flags = 2 if note.dur_beat <= 0.25 else 1
-                fy = (y - stem_len) if stem_up else (y + stem_len)
+                fy = (y - self.STEM_LEN) if stem_up else (y + self.STEM_LEN)
                 for k in range(n_flags):
                     off = k * 7 * (1 if stem_up else -1)
                     p.drawLine(int(sx), int(fy + off),
@@ -331,6 +395,8 @@ class ScoreEditor(QMainWindow):
 
         self._rebuild_tracks_ui()
         self._build_menu()
+        self.status = self.statusBar()
+        self._update_info()
         QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
 
     def _toggle_fullscreen(self) -> None:
@@ -342,26 +408,45 @@ class ScoreEditor(QMainWindow):
     # ---- UI-Aufbau --------------------------------------------------------
     def _build_toolbar(self) -> QHBoxLayout:
         tb = QHBoxLayout()
-        tb.addWidget(QLabel("Dauer:"))
+        tb.setSpacing(8)
+        big_font = QFont(EDITOR_FONT_FAMILY)
+        big_font.setPointSize(13)
+
+        lbl_dur = QLabel("Dauer:")
+        lbl_dur.setFont(big_font)
+        tb.addWidget(lbl_dur)
         self.dur_combo = QComboBox()
+        self.dur_combo.setFont(big_font)
+        self.dur_combo.setMinimumHeight(34)
         for name, beats in DURATIONS:
             self.dur_combo.addItem(name, beats)
         self.dur_combo.setCurrentIndex(2)   # Viertel
+        self.dur_combo.currentIndexChanged.connect(lambda _i: self._update_info())
         tb.addWidget(self.dur_combo)
         self.dotted_check = QCheckBox("Punktiert")
+        self.dotted_check.setFont(big_font)
+        self.dotted_check.toggled.connect(lambda _c: self._update_info())
         tb.addWidget(self.dotted_check)
 
         tb.addSpacing(12)
         self.acc_group = QButtonGroup(self)
         self.acc_group.setExclusive(True)
+        acc_font = QFont(EDITOR_FONT_FAMILY)
+        acc_font.setPointSize(20)
+        acc_font.setBold(True)
         self.btn_natural = QToolButton()
         self.btn_natural.setText("♮")
+        self.btn_natural.setToolTip("Vorzeichen: natuerlich (kein Halbtonversatz)")
         self.btn_sharp = QToolButton()
         self.btn_sharp.setText("♯")
+        self.btn_sharp.setToolTip("Vorzeichen: Kreuz (+1 Halbton)")
         self.btn_flat = QToolButton()
         self.btn_flat.setText("♭")
+        self.btn_flat.setToolTip("Vorzeichen: B (-1 Halbton)")
         for gid, b in enumerate((self.btn_natural, self.btn_sharp, self.btn_flat)):
             b.setCheckable(True)
+            b.setFont(acc_font)
+            b.setFixedSize(46, 40)
             self.acc_group.addButton(b, gid)
             tb.addWidget(b)
         self.btn_natural.setChecked(True)
@@ -369,12 +454,17 @@ class ScoreEditor(QMainWindow):
 
         tb.addSpacing(12)
         self.rest_check = QCheckBox("Pause")
+        self.rest_check.setFont(big_font)
         self.rest_check.toggled.connect(self._on_rest_toggled)
         tb.addWidget(self.rest_check)
 
         tb.addSpacing(20)
-        tb.addWidget(QLabel("Tempo (BPM):"))
+        lbl_bpm = QLabel("Tempo (BPM):")
+        lbl_bpm.setFont(big_font)
+        tb.addWidget(lbl_bpm)
         self.bpm_spin = QSpinBox()
+        self.bpm_spin.setFont(big_font)
+        self.bpm_spin.setMinimumHeight(34)
         self.bpm_spin.setRange(40, 300)
         self.bpm_spin.setValue(self.doc.bpm)
         self.bpm_spin.valueChanged.connect(self._on_bpm_changed)
@@ -383,10 +473,15 @@ class ScoreEditor(QMainWindow):
         tb.addStretch(1)
         self.btn_play = QPushButton("▶ Abspielen")
         self.btn_play.setProperty("accent", True)
+        self.btn_play.setFont(big_font)
+        self.btn_play.setMinimumHeight(38)
+        self.btn_play.setMinimumWidth(140)
         self.btn_play.clicked.connect(self._toggle_play)
         tb.addWidget(self.btn_play)
 
         b_tracker = QPushButton("In Tracker oeffnen")
+        b_tracker.setFont(big_font)
+        b_tracker.setMinimumHeight(38)
         b_tracker.setToolTip(
             "Konvertiert das Stueck in ein Tracker-Projekt (ein Kanal pro "
             "Spur + Instrument) und oeffnet es in gbtracker")
@@ -465,9 +560,30 @@ class ScoreEditor(QMainWindow):
 
     def _on_accidental_changed(self, gid: int) -> None:
         self.entry_accidental = {0: 0, 1: 1, 2: -1}.get(gid, 0)
+        self._update_info()
 
     def _on_rest_toggled(self, checked: bool) -> None:
         self.entry_rest = checked
+        self._update_info()
+
+    def _update_info(self) -> None:
+        """Info-Leiste (Statusbar): aktueller Eingabe-Modus + Stueck-Ueberblick
+        + kurze Bedienhinweise -- aktualisiert sich bei jeder relevanten
+        Aenderung (siehe `_mark_dirty` + Toolbar-Handler)."""
+        if not hasattr(self, "status"):
+            return
+        dur_name = self.dur_combo.currentText()
+        dotted = " punktiert" if self.dotted_check.isChecked() else ""
+        acc = {0: "natuerlich", 1: "Kreuz (+1)", -1: "B (-1)"}.get(
+            self.entry_accidental, "natuerlich")
+        mode = "Pause" if self.entry_rest else "Note"
+        beats = self.doc.length_beats()
+        self.status.showMessage(
+            f"Eingabe: {mode} · {dur_name}{dotted} · Vorzeichen {acc}   |   "
+            f"{len(self.doc.tracks)} Spur(en) · {beats:g} Beats "
+            f"(~{beats / 4.0:.1f} Takte) bei {self.doc.bpm} BPM   |   "
+            f"Linksklick: setzen/entfernen · Rechtsklick: entfernen · "
+            f"F11: Vollbild")
 
     def _on_bpm_changed(self, v: int) -> None:
         self.doc.bpm = int(v)
@@ -539,6 +655,7 @@ class ScoreEditor(QMainWindow):
 
     def _mark_dirty(self) -> None:
         self._dirty = True
+        self._update_info()
 
     # ---- Wiedergabe ---------------------------------------------------------
     def _toggle_play(self) -> None:

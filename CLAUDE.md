@@ -1601,14 +1601,25 @@ Trackers. Qt-frei das Datenmodell [`gamebasic/score/document.py`](gamebasic/scor
 — 4 Zeilen/Beat), UI in [`gamebasic/scoreeditor_qt.py`](gamebasic/scoreeditor_qt.py)
 (`_StaffView` pro Spur: Klick setzt/entfernt Noten via diatonischer
 Tonhöhe↔Y- und Zeit↔X-Zuordnung, Dauer-Auswahl inkl. Punktierung ist
-gleichzeitig das Snap-Raster, Vorzeichen-Toggle ♮/♯/♭, Pause-Toggle). Jede
-Spur hat GENAU EIN Instrument (Presets aus `tracker.presets`), Wiedergabe
-über den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_preview.py)
+gleichzeitig das Snap-Raster, Vorzeichen-Toggle ♮/♯/♭, Pause-Toggle,
+**Balken-Gruppierung** für zusammenhängende Achtel-/Sechzehntel-Läufe
+gleicher Dauer im selben Beat via `_beam_groups()` — Läufe mit gemischten
+Dauern bekommen weiterhin Einzel-Fähnchen statt Partial-Balken, siehe
+Limitationen). Jede Spur hat GENAU EIN Instrument (Presets aus
+`tracker.presets`) und beim Schlüsselwechsel (Violin-/Bassschlüssel) einen
+optionalen Oktav-Transpose-Dialog (`_octave_shift_for_clef` rückt den
+Notendurchschnitt der Spur ans neue System, wenn er sonst weit ab läge —
+volle Oktaven, Melodie/Intervalle bleiben exakt erhalten), Wiedergabe über
+den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_preview.py)
 (`Mixer` — derselbe, den auch der Tracker nutzt; ein einziger dauerhafter
 `sounddevice.OutputStream` mischt alle gleichzeitig klingenden Stimmen
-additiv, weil `sd.play()` selbst keine Überlappung kann). Start: Code-Editor-
-Toolbar/Menü (`Strg+Shift+N`, `editor_qt/main_window.py:_open_score_editor`)
-oder `gbscore [datei.json]` / `gbrun.py --score`. Eigenes `*.json`-Format
+additiv, weil `sd.play()` selbst keine Überlappung kann). Statusleiste
+(Info-Panel) zeigt live den aktuellen Eingabe-Modus (Dauer/Vorzeichen/
+Pause), Stück-Überblick (Spuren/Beats/BPM) und Kurzhinweise. Start:
+Code-Editor-Toolbar/Menü (`Strg+Shift+N`,
+`editor_qt/main_window.py:_open_score_editor`) oder
+`gbscore [datei.json]` / `gbrun.py --score`. Fenster startet maximiert
+(`F11` = echtes Vollbild, wie Audio Studio). Eigenes `*.json`-Format
 (`"format": "gbscore-song"`, permissiv wie `Song.from_dict`) via
 `ScoreDoc.save_json/load_json` **UND** direkte Übernahme in den Tracker
 ("In Tracker öffnen": `to_tracker_song` konvertiert, Warnungen werden
@@ -1620,8 +1631,9 @@ festes 4/4-Metrum (UI zeigt/ändert `time_sig` nicht), ein Instrument pro
 Spur (kein Pattern-Zell-Override wie im Tracker), Akkorde (mehrere Noten
 gleichen Start-Beats auf einer Spur) werden beim Tracker-Export auf die
 höchste Note reduziert (ein Tracker-Kanal ist einstimmig), Vorzeichen immer
-als Kreuz der Stammnote darunter notiert (nie als B), Achtel/Sechzehntel nur
-Fähnchen statt Balken-Gruppierung, Noten die über eine 64-Zeilen-Tracker-
+als Kreuz der Stammnote darunter notiert (nie als B), Balken-Gruppierung nur
+innerhalb gleichlanger Achtel-/Sechzehntel-Läufe (keine Partial-Balken bei
+gemischten Dauern), Noten die über eine 64-Zeilen-Tracker-
 Pattern-Grenze hinaus klingen würden werden dort gekappt, kein
 Schlagzeug-Spurtyp (der Pflicht-Drum-Kanal bleibt beim Export unbelegt).
 
