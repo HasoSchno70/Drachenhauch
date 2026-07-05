@@ -1615,7 +1615,12 @@ den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_pre
 `sounddevice.OutputStream` mischt alle gleichzeitig klingenden Stimmen
 additiv, weil `sd.play()` selbst keine Überlappung kann). Statusleiste
 (Info-Panel) zeigt live den aktuellen Eingabe-Modus (Dauer/Vorzeichen/
-Pause), Stück-Überblick (Spuren/Beats/BPM) und Kurzhinweise. Start:
+Pause), Stück-Überblick (Spuren/Beats/BPM) und Kurzhinweise. **Undo/Redo**
+über `SnapshotUndo` (`editor_qt/undo_history.py`, gleiches Muster wie
+Tracker/SFX/Partikel-Editor) — snapshotted das ganze `ScoreDoc.to_dict()`,
+`_mark_dirty()` ist der einzige Aufrufpunkt für `undo.mark()` (jede
+Doc-Mutation läuft schon durch diese eine Methode, kein Streuen über
+einzelne Handler nötig). Start:
 Code-Editor-Toolbar/Menü (`Strg+Shift+N`,
 `editor_qt/main_window.py:_open_score_editor`) oder
 `gbscore [datei.json]` / `gbrun.py --score`. Fenster startet maximiert

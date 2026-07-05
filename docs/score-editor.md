@@ -39,6 +39,9 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
   System liegen (viele Hilfslinien), fragt ein Dialog, ob sie um ganze
   Oktaven verschoben werden sollen — Melodie/Intervalle bleiben dabei exakt
   erhalten, nur das Register ändert sich.
+- **Rückgängig/Wiederholen** (`↶`/`↷`-Buttons, `Strg+Z`/`Strg+Y`) — jede
+  Änderung (Noten, Instrument, Schlüssel, Spuren, Tempo) ist rückgängig
+  machbar, auf Basis von Snapshots des ganzen Stücks (wie beim Tracker).
 - **Tempo (BPM)** — wirkt auf Wiedergabe-Geschwindigkeit und die spätere
   Tracker-Übernahme (`row_ms = 60000/bpm/4`).
 - **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten

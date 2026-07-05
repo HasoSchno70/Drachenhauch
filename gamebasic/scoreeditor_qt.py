@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 
 from .audio_preview import Mixer
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
+from .editor_qt.undo_history import SnapshotUndo
 from .score.convert import to_tracker_song
 from .score.document import ScoreDoc
 
@@ -460,6 +461,22 @@ class ScoreEditor(QMainWindow):
         self._update_info()
         QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
 
+        # Undo/Redo ueber Snapshots des ScoreDoc-Modells (to_dict/from_dict) --
+        # gleiches Muster wie im Tracker (SnapshotUndo). deepcopy noetig, weil
+        # Track.to_dict()/Instrument.to_dict() sonst Live-Objekte referenzieren
+        # koennten und der Snapshot mit dem Modell mitmutieren wuerde.
+        import copy as _copy
+        self.undo = SnapshotUndo(
+            lambda: _copy.deepcopy(self.doc.to_dict()), self._restore_score,
+            debounce_ms=1)
+        self.undo.changed.connect(self._update_undo_buttons)
+        self.btn_undo.clicked.connect(self.undo.undo)
+        self.btn_redo.clicked.connect(self.undo.redo)
+        QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
+        QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
+        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
+        self._update_undo_buttons()
+
     def _toggle_fullscreen(self) -> None:
         if self.isFullScreen():
             self.showMaximized()
@@ -558,6 +575,17 @@ class ScoreEditor(QMainWindow):
         b_remove = QPushButton("- Spur")
         b_remove.clicked.connect(self._remove_last_track)
         bar.addWidget(b_remove)
+
+        bar.addSpacing(16)
+        self.btn_undo = QPushButton("↶")
+        self.btn_undo.setFixedWidth(34)
+        self.btn_undo.setToolTip("Rueckgaengig (Strg+Z)")
+        self.btn_redo = QPushButton("↷")
+        self.btn_redo.setFixedWidth(34)
+        self.btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        bar.addWidget(self.btn_undo)
+        bar.addWidget(self.btn_redo)
+
         bar.addStretch(1)
         return bar
 
@@ -717,6 +745,20 @@ class ScoreEditor(QMainWindow):
     def _mark_dirty(self) -> None:
         self._dirty = True
         self._update_info()
+        u = getattr(self, "undo", None)
+        if u is not None:
+            u.mark()
+
+    def _update_undo_buttons(self) -> None:
+        self.btn_undo.setEnabled(self.undo.can_undo())
+        self.btn_redo.setEnabled(self.undo.can_redo())
+
+    def _restore_score(self, snap: dict) -> None:
+        """Setzt das ScoreDoc aus einem to_dict()-Snapshot (fuer Undo)."""
+        self.doc = ScoreDoc.from_dict(snap)
+        self._sound_cache.clear()
+        self.bpm_spin.setValue(self.doc.bpm)
+        self._rebuild_tracks_ui()
 
     # ---- Wiedergabe ---------------------------------------------------------
     def _toggle_play(self) -> None:
@@ -775,6 +817,7 @@ class ScoreEditor(QMainWindow):
         self._rebuild_tracks_ui()
         self.setWindowTitle("GameBasic Notenblatt-Editor")
         self._dirty = False
+        self.undo.reset()      # frisches Dokument -> Historie verwerfen
 
     def _open(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -793,6 +836,7 @@ class ScoreEditor(QMainWindow):
         self._rebuild_tracks_ui()
         self.setWindowTitle(f"GameBasic Notenblatt-Editor -- {Path(path).name}")
         self._dirty = False
+        self.undo.reset()      # geladenes Dokument -> Historie verwerfen
 
     def _save(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

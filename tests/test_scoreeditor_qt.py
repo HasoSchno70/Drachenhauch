@@ -340,6 +340,81 @@ def test_status_bar_reflects_entry_state_and_song_summary():
     assert "1 Spur" in msg
 
 
+def test_undo_redo_note_placement():
+    ed = _editor()
+    assert not ed.undo.can_undo()
+    assert not ed.btn_undo.isEnabled()
+
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed.undo.flush()
+    assert len(ed.doc.tracks[0].notes) == 1
+    assert ed.undo.can_undo()
+    assert ed.btn_undo.isEnabled()
+
+    ed.undo.undo()
+    assert len(ed.doc.tracks[0].notes) == 0     # Note weg
+    assert ed.undo.can_redo()
+    assert ed.btn_redo.isEnabled()
+
+    ed.undo.redo()
+    assert len(ed.doc.tracks[0].notes) == 1
+    assert ed.doc.tracks[0].notes[0].pitch == 60
+
+
+def test_undo_multi_step_and_redo_cleared_by_new_edit():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed.undo.flush()
+    staff = ed._track_rows[0]["staff"]           # nach Restore neu holen
+    _click(staff, staff._x_for_beat(1.0), staff._y_for_pitch(62))
+    ed.undo.flush()
+    assert len(ed.doc.tracks[0].notes) == 2
+
+    ed.undo.undo()
+    assert len(ed.doc.tracks[0].notes) == 1
+    ed.undo.undo()
+    assert len(ed.doc.tracks[0].notes) == 0
+    assert not ed.undo.can_undo()
+
+    ed.undo.redo()
+    assert len(ed.doc.tracks[0].notes) == 1
+    ed.undo.redo()
+    assert len(ed.doc.tracks[0].notes) == 2
+    assert not ed.undo.can_redo()
+
+    # Ein neuer Edit nach einem Undo verwirft den Redo-Stack.
+    ed.undo.undo()
+    assert len(ed.doc.tracks[0].notes) == 1
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(3.0), staff._y_for_pitch(64))
+    ed.undo.flush()
+    assert not ed.undo.can_redo()
+
+
+def test_new_doc_and_open_reset_undo_history(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+    ed.undo.flush()
+    assert ed.undo.can_undo()
+
+    ed._new_doc()
+    assert not ed.undo.can_undo()
+
+    path = tmp_path / "song.json"
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    ed.doc.save_json(str(path))
+    ed._new_doc()
+    monkeypatch.setattr(QFileDialog, "getOpenFileName",
+                        lambda *a, **k: (str(path), ""))
+    ed._open()
+    assert not ed.undo.can_undo()
+
+
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     from gamebasic.tracker.song import Song
