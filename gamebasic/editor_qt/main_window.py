@@ -1912,7 +1912,7 @@ class GameBasicEditor(QMainWindow):
                 f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
             return
         win = sc.ScoreEditor(self.project_root)
-        self._show_companion_window("_score_editor_window", win)
+        self._show_companion_window("_score_editor_window", win, maximized=True)
         win.raise_()
         win.activateWindow()
 

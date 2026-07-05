@@ -23,7 +23,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPen, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QCheckBox, QComboBox, QFileDialog, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMessageBox, QPushButton,
@@ -73,19 +73,19 @@ def _has_accidental(midi: int) -> bool:
 class _StaffView(QWidget):
     """Notensystem EINER Spur: Zeichnen + Klick-zu-Note/Pause."""
 
-    LINE_SPACING = 12.0
+    LINE_SPACING = 15.0
     STEP_PX = LINE_SPACING / 2.0
-    LEFT_MARGIN = 64.0
-    TOP_MARGIN = 70.0
-    PIXELS_PER_BEAT = 50.0
-    NOTE_R = 5.5
+    LEFT_MARGIN = 76.0
+    TOP_MARGIN = 84.0
+    PIXELS_PER_BEAT = 64.0
+    NOTE_R = 6.5
 
     def __init__(self, editor: "ScoreEditor", track_index: int, parent=None):
         super().__init__(parent)
         self.editor = editor
         self.track_index = track_index
         self.playhead_beat: float | None = None
-        self.setMinimumHeight(210)
+        self.setMinimumHeight(250)
 
     @property
     def track(self):
@@ -154,10 +154,10 @@ class _StaffView(QWidget):
         return int(self._x_for_beat(self._content_beats())) + 40
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(max(700, self._content_width()), 220)
+        return QSize(max(800, self._content_width()), 260)
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
-        return QSize(400, 210)
+        return QSize(400, 250)
 
     # ---- Rendering ----------------------------------------------------------
     def paintEvent(self, e) -> None:  # noqa: N802
@@ -174,11 +174,11 @@ class _StaffView(QWidget):
 
         p.setPen(QColor(COLORS["accent"]))
         f = QFont(EDITOR_FONT_FAMILY)
-        f.setPointSize(30)
+        f.setPointSize(36)
         p.setFont(f)
         glyph = "\U0001D11E" if self.track.clef == "treble" else "\U0001D122"
-        p.drawText(QRectF(4, y_top - 30, self.LEFT_MARGIN - 10,
-                          (y_bot - y_top) + 60),
+        p.drawText(QRectF(4, y_top - 34, self.LEFT_MARGIN - 10,
+                          (y_bot - y_top) + 68),
                    Qt.AlignmentFlag.AlignCenter, glyph)
 
         p.setPen(QPen(QColor(COLORS["border"]), 1))
@@ -212,7 +212,7 @@ class _StaffView(QWidget):
         for s in self._ledger_steps(step):
             ly = self._y_for_step(s)
             p.setPen(QPen(QColor(COLORS["fg_muted"]), 1))
-            p.drawLine(int(x - 10), int(ly), int(x + 10), int(ly))
+            p.drawLine(int(x - 12), int(ly), int(x + 12), int(ly))
 
         p.setPen(QPen(color, 1.6))
         p.setBrush(color if filled else Qt.BrushStyle.NoBrush)
@@ -221,7 +221,7 @@ class _StaffView(QWidget):
 
         if note.dur_beat < 4.0:
             stem_up = step < 4
-            stem_len = 28
+            stem_len = 34
             p.setPen(QPen(color, 1.4))
             if stem_up:
                 sx = x + self.NOTE_R
@@ -233,16 +233,16 @@ class _StaffView(QWidget):
                 n_flags = 2 if note.dur_beat <= 0.25 else 1
                 fy = (y - stem_len) if stem_up else (y + stem_len)
                 for k in range(n_flags):
-                    off = k * 6 * (1 if stem_up else -1)
+                    off = k * 7 * (1 if stem_up else -1)
                     p.drawLine(int(sx), int(fy + off),
-                              int(sx + 8), int(fy + off + 6))
+                              int(sx + 9), int(fy + off + 7))
 
         if _has_accidental(note.pitch):
             p.setPen(QColor(COLORS["warning"]))
             f2 = QFont(EDITOR_FONT_FAMILY)
-            f2.setPointSize(12)
+            f2.setPointSize(14)
             p.setFont(f2)
-            p.drawText(QRectF(x - 24, y - 10, 18, 20),
+            p.drawText(QRectF(x - 28, y - 12, 20, 24),
                       Qt.AlignmentFlag.AlignCenter, "♯")
 
     # ---- Klick-Eingabe --------------------------------------------------
@@ -328,6 +328,13 @@ class ScoreEditor(QMainWindow):
 
         self._rebuild_tracks_ui()
         self._build_menu()
+        QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
+
+    def _toggle_fullscreen(self) -> None:
+        if self.isFullScreen():
+            self.showMaximized()
+        else:
+            self.showFullScreen()
 
     # ---- UI-Aufbau --------------------------------------------------------
     def _build_toolbar(self) -> QHBoxLayout:
@@ -628,5 +635,5 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
             win._rebuild_tracks_ui()
         except Exception:
             pass
-    win.show()
+    win.showMaximized()          # "ordentlich Platz" -- wie Audio Studio
     return app.exec()
