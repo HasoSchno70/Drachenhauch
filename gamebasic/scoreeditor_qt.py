@@ -83,12 +83,22 @@ class _StaffView(QWidget):
     PIXELS_PER_BEAT = 64.0
     NOTE_R = 6.5
     STEM_LEN = 34.0
+    # Taktstriche werden etwas VOR ihrer exakten Beat-Position gezeichnet,
+    # damit eine Note genau auf dem Taktanfang (z.B. Beat 4.0) nicht direkt
+    # auf der Linie sitzt -- reine Zeichenposition, beeinflusst NICHT die
+    # Beat<->X-Zuordnung/Snap-Logik.
+    BARLINE_LEAD = 8.0
 
     def __init__(self, editor: "ScoreEditor", track_index: int, parent=None):
         super().__init__(parent)
         self.editor = editor
         self.track_index = track_index
         self.playhead_beat: float | None = None
+        # Vorschau-Cursor: (beat, pitch|None) an der aktuellen Mausposition,
+        # damit man vor dem Klick sieht, wo/welche Note gesetzt wuerde --
+        # sonst aendert man leicht versehentlich eine bestehende Note.
+        self.hover_pos: tuple[float, int | None] | None = None
+        self.setMouseTracking(True)
         self.setMinimumHeight(250)
 
     @property
@@ -231,7 +241,7 @@ class _StaffView(QWidget):
             x1 = int(self._x_for_beat((m + 1) * 4))
             p.fillRect(x0, int(y_top) - 20, x1 - x0, int(y_bot - y_top) + 40, band)
 
-        p.setPen(QPen(QColor(COLORS["fg"]), 1.2))
+        p.setPen(QPen(QColor(COLORS["fg_muted"]), 1.3))
         for i in range(5):
             y = self._y_for_step(i * 2)
             p.drawLine(int(self.LEFT_MARGIN - 14), int(y), w, int(y))
@@ -245,9 +255,13 @@ class _StaffView(QWidget):
                           (y_bot - y_top) + 68),
                    Qt.AlignmentFlag.AlignCenter, glyph)
 
+        # Erster Taktstrich wird bewusst NICHT gezeichnet (sonst kollidiert er
+        # mit einer Note direkt am Anfang) -- ab dem 2. Takt jeweils leicht
+        # VOR der exakten Beat-Position, damit Noten auf dem Taktanfang nicht
+        # direkt auf der Linie sitzen (siehe BARLINE_LEAD).
         p.setPen(QPen(QColor(COLORS["fg_muted"]), 1.3))
-        for m in range(n_measures + 1):
-            x = int(self._x_for_beat(m * 4))
+        for m in range(1, n_measures + 1):
+            x = int(self._x_for_beat(m * 4) - self.BARLINE_LEAD)
             p.drawLine(x, int(y_top) - 6, x, int(y_bot) + 6)
 
         beam_groups = self._beam_groups()
@@ -261,7 +275,40 @@ class _StaffView(QWidget):
             x = int(self._x_for_beat(self.playhead_beat))
             p.setPen(QPen(QColor(COLORS["danger"]), 2.4))
             p.drawLine(x, int(y_top) - 12, x, int(y_bot) + 12)
+
+        self._draw_hover_preview(p, y_top, y_bot)
         p.end()
+
+    def _draw_hover_preview(self, p: QPainter, y_top: float, y_bot: float) -> None:
+        """Vorschau-Cursor an der aktuellen Mausposition -- zeigt VOR dem
+        Klick, an welcher Zeit/Tonhoehe die Note (bzw. Pause) landen wuerde,
+        halbtransparent damit bestehende Noten nicht verdeckt werden."""
+        if self.hover_pos is None:
+            return
+        beat, pitch = self.hover_pos
+        x = self._x_for_beat(beat)
+        color = QColor(_track_color(self.track_index))
+        color.setAlpha(120)
+
+        p.setPen(QPen(color, 1.2, Qt.PenStyle.DashLine))
+        p.drawLine(int(x), int(y_top) - 18, int(x), int(y_bot) + 18)
+
+        if pitch is None:
+            y = self._y_for_step(4)
+            p.setPen(QPen(color, 2.2))
+            p.drawRect(int(x) - 5, int(y) - 3, 10, 6)
+            return
+
+        step = self._step_offset(pitch)
+        y = self._y_for_step(step)
+        for s in self._ledger_steps(step):
+            ly = self._y_for_step(s)
+            p.setPen(QPen(color, 1.3))
+            p.drawLine(int(x - 12), int(ly), int(x + 12), int(ly))
+        p.setPen(QPen(color, 1.6))
+        p.setBrush(color)
+        p.drawEllipse(QPointF(x, y), self.NOTE_R, self.NOTE_R)
+        p.setBrush(Qt.BrushStyle.NoBrush)
 
     def _draw_note(self, p: QPainter, note, beamed: bool = False) -> None:
         x = self._x_for_beat(note.start_beat)
@@ -334,6 +381,20 @@ class _StaffView(QWidget):
             pitch = self._pitch_for_y(e.position().y(),
                                       self.editor.entry_accidental)
             self._place(beat, pitch=pitch)
+
+    def mouseMoveEvent(self, e) -> None:  # noqa: N802
+        beat = self._snap_beat(self._beat_for_x(e.position().x()))
+        if self.editor.entry_rest:
+            self.hover_pos = (beat, None)
+        else:
+            pitch = self._pitch_for_y(e.position().y(),
+                                      self.editor.entry_accidental)
+            self.hover_pos = (beat, pitch)
+        self.update()
+
+    def leaveEvent(self, e) -> None:  # noqa: N802
+        self.hover_pos = None
+        self.update()
 
     def _place(self, beat: float, pitch: int | None = None,
                rest: bool = False) -> None:

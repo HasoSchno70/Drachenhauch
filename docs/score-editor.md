@@ -26,6 +26,9 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **Linksklick** auf eine Notenzeile setzt/entfernt eine Note (nochmal auf
   dieselbe Stelle klicken entfernt sie wieder). **Rechtsklick** entfernt
   immer, egal welcher Eingabe-Modus aktiv ist.
+- **Vorschau-Cursor** — beim Bewegen der Maus über das Notensystem zeigt ein
+  halbtransparenter Notenkopf (bzw. eine Pause) genau an, wo/mit welcher
+  Tonhöhe ein Klick landen würde, bevor man tatsächlich klickt.
 - **Spur-Leiste** (oberhalb jedes Notensystems): Name, Notenschlüssel
   (Violin-/Bassschlüssel) und Instrument (Werks-Presets aus dem Tracker,
   Flügel/Streicher/Bass/Glocke/…) einstellbar. `+ Spur` / `- Spur` fügen

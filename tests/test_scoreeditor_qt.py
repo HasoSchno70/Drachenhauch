@@ -32,6 +32,47 @@ def _click(staff, x, y, button="left"):
     staff.mousePressEvent(ev)
 
 
+def _move(staff, x, y):
+    from PySide6.QtCore import Qt, QPointF
+    from PySide6.QtGui import QMouseEvent
+    ev = QMouseEvent(QMouseEvent.Type.MouseMove, QPointF(x, y),
+                     Qt.MouseButton.NoButton, Qt.MouseButton.NoButton,
+                     Qt.KeyboardModifier.NoModifier)
+    staff.mouseMoveEvent(ev)
+
+
+def test_hover_pos_tracks_mouse_position():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    x = staff._x_for_beat(2.0)
+    y = staff._y_for_pitch(67)
+    _move(staff, x, y)
+    assert staff.hover_pos is not None
+    beat, pitch = staff.hover_pos
+    assert abs(beat - 2.0) < 1e-6
+    assert pitch == 67
+
+
+def test_hover_pos_shows_rest_when_pause_active():
+    ed = _editor()
+    ed.rest_check.setChecked(True)
+    staff = ed._track_rows[0]["staff"]
+    _move(staff, staff._x_for_beat(1.0), staff._y_for_pitch(60))
+    beat, pitch = staff.hover_pos
+    assert pitch is None
+    assert abs(beat - 1.0) < 1e-6
+
+
+def test_hover_pos_cleared_on_leave():
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _move(staff, staff._x_for_beat(1.0), staff._y_for_pitch(60))
+    assert staff.hover_pos is not None
+    from PySide6.QtCore import QEvent
+    staff.leaveEvent(QEvent(QEvent.Type.Leave))
+    assert staff.hover_pos is None
+
+
 def test_editor_constructs_with_one_default_track():
     ed = _editor()
     assert len(ed.doc.tracks) == 1
