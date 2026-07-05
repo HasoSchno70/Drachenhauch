@@ -1,9 +1,12 @@
 """Software-Mixer + Render-to-File fuer den Tracker (Qt-frei, numpy).
 
 Mischt den ganzen Song offline zu einem Mono-Float-Stream: jede Note wird
-ueber ihr Kanal-Instrument gerendert (`Instrument.render_note` -- inkl.
+ueber ihr Instrument gerendert (`Instrument.render_note` -- inkl.
 Resampling, Loop und ADSR) und an ihre Zeitposition gemischt. Eine Note
 klingt bis zur naechsten Note desselben Kanals (klassisches Tracker-Sustain).
+Welches Instrument das ist, wird PRO NOTE aufgeloest (`Pattern.inst`
+ueberschreibt den Kanal-Standard `channel_inst`, wie bei echten Trackern) --
+siehe `Song.instrument_for_cell`.
 
 Damit lassen sich Songs mit Sample-Instrumenten als Audiodatei exportieren
 (`render_song` -> `save_wav`) und im Spiel via `PLAYMUSIC` abspielen --
@@ -102,8 +105,9 @@ def apply_effect(buf: np.ndarray, fx: int, fxp: int, sr: int,
 
 
 def _note_events(song):
-    """Pro Kanal eine Liste von (global_row, midi, vol, slide, fx, fxp) fuer
-    jede gesetzte Note -- die flache Timeline aus der Order."""
+    """Pro Kanal eine Liste von (global_row, midi, vol, slide, fx, fxp, inst)
+    fuer jede gesetzte Note -- die flache Timeline aus der Order. `inst` ist
+    der per-Note-Instrument-Index (Pattern.inst) oder None (= Kanal-Standard)."""
     events = {c: [] for c in range(song.channels)}
     i = 0
     for p in (song.order or [0]):
@@ -117,7 +121,7 @@ def _note_events(song):
                     fx, fxp = pat.get_fx(c, r)
                     events[c].append(
                         (i + r, int(note), pat.vol[c][r], pat.slide[c][r],
-                         fx, fxp))
+                         fx, fxp, pat.get_inst(c, r)))
         i += pat.rows
     return events
 
@@ -145,16 +149,22 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
 
     events = _note_events(song)
     for c in range(song.channels):
-        inst = song.instrument_for_channel(c)
-        gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
+        base_inst = song.instrument_for_channel(c)
         chvol = song.channel_vol[c] if c < len(song.channel_vol) else 1.0
         evs = events[c]
-        for k, (start_row, midi, volc, slidec, fx, fxp) in enumerate(evs):
+        for k, (start_row, midi, volc, slidec, fx, fxp, instc) in enumerate(evs):
             if midi == NOTE_OFF:
                 # Note-Off selbst erzeugt keinen Klang -- es diente schon als
                 # `end_row` fuer das VORHERIGE Event (das dadurch bereits
                 # abgeschnitten wurde). Einfach ueberspringen.
                 continue
+            # Per-Note-Instrument-Ueberschreiben hat Vorrang vor dem Kanal-
+            # Standard (wie echte Tracker) -- Pan/Klang koennen sich daher
+            # innerhalb desselben Kanals von Note zu Note unterscheiden.
+            inst = (song.instruments[instc]
+                    if instc is not None and 0 <= instc < len(song.instruments)
+                    else base_inst)
+            gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
             end_row = evs[k + 1][0] if k + 1 < len(evs) else total_rows
             n = (end_row - start_row) * row_samples
             if n <= 0:

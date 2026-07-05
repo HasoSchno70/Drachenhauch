@@ -21,8 +21,8 @@ def test_note_events_walks_order():
     s.patterns[0].set(0, 2, 64)
     s.patterns[0].set(1, 1, 67)
     ev = _note_events(s)
-    assert ev[0] == [(0, 60, None, None, 0, 0), (2, 64, None, None, 0, 0)]
-    assert ev[1] == [(1, 67, None, None, 0, 0)]
+    assert ev[0] == [(0, 60, None, None, 0, 0, None), (2, 64, None, None, 0, 0, None)]
+    assert ev[1] == [(1, 67, None, None, 0, 0, None)]
 
 
 def test_render_song_nonsilent_and_length():

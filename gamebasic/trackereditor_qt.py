@@ -579,6 +579,8 @@ class _CellDelegate(QStyledItemDelegate):
             return COLORS["success"]       # Lautstaerke
         if tok.startswith("s"):
             return _SLIDE_COLOR            # Slide
+        if tok.startswith("i") and tok[1:].isdigit():
+            return COLORS["info"]          # Per-Note-Instrument-Ueberschreiben
         return COLORS["danger"]            # Effekt (Arp/Vib/Ret/Off)
 
 
@@ -768,6 +770,15 @@ class TrackerEditor(QMainWindow):
             "(z.B. 71 = 0x47 -> +4/+7 HT); Ret: Ticks; Off: x*512 Frames.")
         self.fxp_spin.valueChanged.connect(self._on_fxp_changed)
         prow.addWidget(self.fxp_spin)
+        prow.addWidget(QLabel("Instr:"))
+        self.inst_cell_combo = QComboBox()
+        self.inst_cell_combo.setMinimumWidth(130)
+        self.inst_cell_combo.setToolTip(
+            "Instrument NUR fuer diese Note (— = Kanal-Standard aus "
+            "Spur-Sounds) -- wie echte Tracker: eine Note kann von der "
+            "Spur-Zuweisung abweichen, z.B. ein anderer Drum-Hit im Fill.")
+        self.inst_cell_combo.currentIndexChanged.connect(self._on_cell_inst_changed)
+        prow.addWidget(self.inst_cell_combo)
         b_padd = QPushButton("+ Pattern"); b_padd.clicked.connect(self._add_pattern)
         b_pdup = QPushButton("Duplizieren"); b_pdup.clicked.connect(self._dup_pattern)
         b_pdel = QPushButton("Loeschen"); b_pdel.clicked.connect(self._del_pattern)
@@ -1028,7 +1039,7 @@ class TrackerEditor(QMainWindow):
                 fx, fxp = pat.get_fx(c, r)
                 it = QTableWidgetItem(
                     self._cell_text(c, pat.data[c][r], pat.vol[c][r],
-                                    pat.slide[c][r], fx, fxp))
+                                    pat.slide[c][r], fx, fxp, pat.get_inst(c, r)))
                 it.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.grid.setItem(r, c, it)
                 self._style_cell(it, c, r, pat.data[c][r])
@@ -1084,8 +1095,21 @@ class TrackerEditor(QMainWindow):
             self.inst_combo.addItem(f"{i}: {tag} {ins.name}")
         self.inst_combo.blockSignals(False)
         self._rebuild_sound_combos()
+        self._rebuild_inst_cell_combo()
         if hasattr(self, "grid"):
             self._update_channel_headers()
+
+    def _rebuild_inst_cell_combo(self) -> None:
+        """Fuellt das "Instr:"-Dropdown (per-Note-Instrument-Ueberschreiben)
+        aus dem Instrument-Pool -- "—" (Index None) + alle Instrumente."""
+        cb = self.inst_cell_combo
+        cb.blockSignals(True)
+        cb.clear()
+        cb.addItem("—", None)
+        for i, ins in enumerate(self.song.instruments):
+            tag = {"sample": "♪", "keymap": "▦"}.get(ins.kind, "~")
+            cb.addItem(f"{i}: {tag} {ins.name}", i)
+        cb.blockSignals(False)
 
     def _rebuild_sound_combos(self) -> None:
         """Pro-Spur-Sound-Dropdowns aus dem Instrument-Pool fuellen + die
@@ -1271,11 +1295,11 @@ class TrackerEditor(QMainWindow):
             self._mark()
 
     def _cell_text(self, ci: int, note, vol=None, slide=None,
-                   fx=FX_NONE, fxp=0) -> str:
+                   fx=FX_NONE, fxp=0, inst=None) -> str:
         if note is None:
             return "···"
         if note == NOTE_OFF:
-            return " OFF"          # traegt nie vol/slide/fx (Pattern.set())
+            return " OFF"          # traegt nie vol/slide/fx/inst (Pattern.set())
         base = "  X" if ci == self.song.tonal else note_name(note)
         if vol:
             base += f" v{vol}"
@@ -1283,6 +1307,8 @@ class TrackerEditor(QMainWindow):
             base += f" s{slide:+d}"
         if fx and fx != FX_NONE:
             base += f" {FX_NAMES.get(fx, '?')}{fxp:02X}"
+        if inst is not None:
+            base += f" i{inst}"
         return base
 
     def _cell_refresh(self, row: int, ci: int) -> None:
@@ -1290,7 +1316,8 @@ class TrackerEditor(QMainWindow):
         it = self.grid.item(row, ci)
         fx, fxp = pat.get_fx(ci, row)
         it.setText(self._cell_text(ci, pat.data[ci][row], pat.vol[ci][row],
-                                   pat.slide[ci][row], fx, fxp))
+                                   pat.slide[ci][row], fx, fxp,
+                                   pat.get_inst(ci, row)))
         self._style_cell(it, ci, row, pat.data[ci][row])
 
     def _set_note(self, row: int, ci: int, note) -> None:
@@ -1346,12 +1373,25 @@ class TrackerEditor(QMainWindow):
         self._cell_refresh(r, c)
         self._mark()
 
+    def _on_cell_inst_changed(self, _idx: int) -> None:
+        if not self._has_sel():
+            return
+        r, c = self._sel()
+        pat = self.song.patterns[self.cur]
+        if pat.data[c][r] is None:
+            return
+        pat.set_inst(c, r, self.inst_cell_combo.currentData())
+        self._cell_refresh(r, c)
+        self._sound_cache.clear()
+        self._mark()
+
     def _sync_vol_spin(self) -> None:
         """Spiegelt die Effekte der gewaehlten Zelle in die Spinboxen."""
         self.vol_spin.blockSignals(True)
         self.slide_spin.blockSignals(True)
         self.fx_combo.blockSignals(True)
         self.fxp_spin.blockSignals(True)
+        self.inst_cell_combo.blockSignals(True)
         if self._has_sel():
             r, c = self._sel()
             pat = self.song.patterns[self.cur]
@@ -1362,15 +1402,19 @@ class TrackerEditor(QMainWindow):
             self.fx_combo.setCurrentIndex(
                 FX_CODES.index(fx) if fx in FX_CODES else 0)
             self.fxp_spin.setValue(fxp)
+            found = self.inst_cell_combo.findData(pat.get_inst(c, r))
+            self.inst_cell_combo.setCurrentIndex(found if found >= 0 else 0)
         else:
             self.vol_spin.setValue(0)
             self.slide_spin.setValue(0)
             self.fx_combo.setCurrentIndex(0)
             self.fxp_spin.setValue(0)
+            self.inst_cell_combo.setCurrentIndex(0)
         self.vol_spin.blockSignals(False)
         self.slide_spin.blockSignals(False)
         self.fx_combo.blockSignals(False)
         self.fxp_spin.blockSignals(False)
+        self.inst_cell_combo.blockSignals(False)
 
     def _on_piano(self, midi: int) -> None:
         ch = self._sel_channel() if self._has_sel() else 0
@@ -1407,7 +1451,8 @@ class TrackerEditor(QMainWindow):
             pat = self.song.patterns[self.cur]
             n = pat.data[c][r]
             if n is not None and n != NOTE_OFF:
-                self._play_note(c, n, pat.vol[c][r], pat.slide[c][r] or 0)
+                inst = self.song.instrument_for_cell(pat, c, r)
+                self._play_note(c, n, pat.vol[c][r], pat.slide[c][r] or 0, inst=inst)
 
     # ---- Block-Auswahl (Copy/Cut/Paste/Transpose/Interpolate) ----
     def _selection_rect(self):
@@ -1618,11 +1663,14 @@ class TrackerEditor(QMainWindow):
             pass
 
     def _play_note(self, ci: int, midi: int, vol: int | None = None,
-                   slide: int = 0, n_rows: int | None = None) -> None:
+                   slide: int = 0, n_rows: int | None = None, inst=None) -> None:
         """Spielt eine Note. `n_rows` = Notenlaenge in Reihen (None = kurze
         Vorhoer-Laenge); so klingen Noten waehrend der Wiedergabe so lange,
-        bis die naechste Note kommt."""
-        inst = self.song.instrument_for_channel(ci)
+        bis die naechste Note kommt. `inst` = explizit aufgeloestes Instrument
+        (per-Note-Ueberschreiben via `Song.instrument_for_cell`) -- ohne
+        Vorgabe faellt es auf den Kanal-Standard zurueck (z.B. beim reinen
+        Klaviatur-Vorhoeren ohne platzierte Note)."""
+        inst = inst if inst is not None else self.song.instrument_for_channel(ci)
         row_s = self._row_samples()
         if n_rows is None:
             n = max(int(44100 * 0.6), row_s * 2)      # Vorhoeren
@@ -1739,8 +1787,9 @@ class TrackerEditor(QMainWindow):
         for c in range(pat.channels):
             n = pat.data[c][row]
             if n is not None and n != NOTE_OFF and self._audible(c):
+                inst = self.song.instrument_for_cell(pat, c, row)
                 self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
-                                self._note_len_rows(pat, c, row))
+                                self._note_len_rows(pat, c, row), inst=inst)
 
     # ============================================== Datei
     def _new_song(self) -> None:

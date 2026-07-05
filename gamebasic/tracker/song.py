@@ -83,9 +83,19 @@ def note_name(m: int) -> str:
 
 
 class Pattern:
-    """Ein Pattern: `channels` x rows Gitter aus MIDI-Noten (oder None)."""
+    """Ein Pattern: `channels` x rows Gitter aus MIDI-Noten (oder None).
 
-    __slots__ = ("name", "rows", "channels", "data", "vol", "slide", "fx", "fxp")
+    `inst[c][r]` traegt ein OPTIONALES Instrument-Ueberschreiben pro Note
+    (Index ins `Song.instruments`-Pool). Wie bei echten Trackern (XM/IT/
+    Renoise/ProTracker) ist ein Kanal nur ein Stimmen-Slot -- welches
+    Instrument klingt, wird pro Note entschieden. Anders als dort ist die
+    Instrument-Nummer aber OPTIONAL: fehlt sie, greift `channel_inst[c]`
+    (die "Spur-Sounds"-Zuweisung) als Standard -- so muss man nicht jede
+    Note explizit taggen, nur wenn man auf DIESEM Kanal EINE andere Note
+    mit einem anderen Klang will (z.B. ein Fill mit anderem Drum-Sample)."""
+
+    __slots__ = ("name", "rows", "channels", "data", "vol", "slide", "fx",
+                "fxp", "inst")
 
     def __init__(self, name: str, rows: int = DEFAULT_ROWS,
                  channels: int = CHANNELS):
@@ -108,6 +118,10 @@ class Pattern:
             [None] * self.rows for _ in range(self.channels)]
         self.fxp: list[list[int | None]] = [
             [None] * self.rows for _ in range(self.channels)]
+        # inst[channel][row] = Index ins Instrument-Pool oder None (= Kanal-
+        # Standard aus channel_inst). Nur sinnvoll, wo auch eine Note steht.
+        self.inst: list[list[int | None]] = [
+            [None] * self.rows for _ in range(self.channels)]
 
     def get(self, channel: int, row: int) -> int | None:
         return self.data[channel][row]
@@ -119,6 +133,7 @@ class Pattern:
             self.slide[channel][row] = None
             self.fx[channel][row] = None
             self.fxp[channel][row] = None
+            self.inst[channel][row] = None
 
     def get_vol(self, channel: int, row: int) -> int | None:
         return self.vol[channel][row]
@@ -166,10 +181,23 @@ class Pattern:
             self.fx[channel][row] = int(fx)
             self.fxp[channel][row] = max(0, min(255, int(param)))
 
+    def get_inst(self, channel: int, row: int) -> int | None:
+        """Per-Note-Instrument-Ueberschreiben oder None (= Kanal-Standard
+        aus `Song.channel_inst`)."""
+        return self.inst[channel][row]
+
+    def set_inst(self, channel: int, row: int, idx: int | None) -> None:
+        """Setzt/loescht das Instrument-Ueberschreiben dieser Note. Wirkt
+        nur, wenn an der Stelle eine Note steht. `idx < 0` wird wie None
+        behandelt (= zurueck auf Kanal-Standard)."""
+        if self.data[channel][row] is None:
+            return
+        self.inst[channel][row] = None if idx is None or int(idx) < 0 else int(idx)
+
     def set_rows(self, rows: int) -> None:
         """Aendert die Reihenzahl; bestehende Noten oben bleiben erhalten."""
         rows = max(MIN_ROWS, min(MAX_ROWS, int(rows)))
-        for grid in (self.data, self.vol, self.slide, self.fx, self.fxp):
+        for grid in (self.data, self.vol, self.slide, self.fx, self.fxp, self.inst):
             for c in range(self.channels):
                 col = grid[c]
                 if rows < len(col):
@@ -182,7 +210,7 @@ class Pattern:
         """Aendert die Kanalzahl; bestehende Kanaele/Noten bleiben erhalten,
         neue Kanaele kommen leer dazu (rechts angehaengt)."""
         channels = max(MIN_CHANNELS, min(MAX_CHANNELS, int(channels)))
-        for name in ("data", "vol", "slide", "fx", "fxp"):
+        for name in ("data", "vol", "slide", "fx", "fxp", "inst"):
             grid = getattr(self, name)
             if channels < len(grid):
                 del grid[channels:]
@@ -196,6 +224,7 @@ class Pattern:
         self.slide = [[None] * self.rows for _ in range(self.channels)]
         self.fx = [[None] * self.rows for _ in range(self.channels)]
         self.fxp = [[None] * self.rows for _ in range(self.channels)]
+        self.inst = [[None] * self.rows for _ in range(self.channels)]
 
     def copy(self, name: str | None = None) -> "Pattern":
         p = Pattern(name if name is not None else self.name, self.rows,
@@ -205,6 +234,7 @@ class Pattern:
         p.slide = [list(col) for col in self.slide]
         p.fx = [list(col) for col in self.fx]
         p.fxp = [list(col) for col in self.fxp]
+        p.inst = [list(col) for col in self.inst]
         return p
 
     def _has_vol(self) -> bool:
@@ -215,6 +245,9 @@ class Pattern:
 
     def _has_fx(self) -> bool:
         return any(v is not None for col in self.fx for v in col)
+
+    def _has_inst(self) -> bool:
+        return any(v is not None for col in self.inst for v in col)
 
     def to_dict(self) -> dict:
         d = {"name": self.name, "rows": self.rows, "channels": self.channels,
@@ -228,6 +261,8 @@ class Pattern:
         if self._has_fx():
             d["fx"] = self.fx
             d["fxp"] = self.fxp
+        if self._has_inst():
+            d["inst"] = self.inst
         return d
 
     @classmethod
@@ -275,6 +310,17 @@ class Pattern:
                         for v in rawfp[c]][:p.rows]
                 colp += [None] * (p.rows - len(colp))
                 p.fxp[c] = colp
+        rawi = d.get("inst") or []
+        for c in range(p.channels):
+            if c < len(rawi):
+                # Kein Bounds-Check gegen den Instrument-Pool hier (Pattern
+                # kennt ihn nicht) -- Song.from_dict validiert/klemmt das,
+                # nachdem die Instrumente geladen sind.
+                col = [int(v) if isinstance(v, (int, float)) and int(v) >= 0
+                       else None
+                       for v in rawi[c]][:p.rows]
+                col += [None] * (p.rows - len(col))
+                p.inst[c] = col
         return p
 
 
@@ -337,15 +383,27 @@ class Song:
 
     # ------------------------------------------------------ Instrumente
     def instrument_for_channel(self, c: int):
-        """Liefert das effektive Instrument fuer Kanal `c`: das zugewiesene
-        Sample/Instrument -- oder ein fluechtiges Synth-Instrument aus der
-        Kanal-Wellenform (letzter Kanal = Noise)."""
+        """Liefert das effektive STANDARD-Instrument fuer Kanal `c` (die
+        "Spur-Sounds"-Zuweisung): das zugewiesene Sample/Instrument -- oder
+        ein fluechtiges Synth-Instrument aus der Kanal-Wellenform (letzter
+        Kanal = Noise). Fuer eine konkrete Note siehe `instrument_for_cell`
+        (per-Note-Ueberschreiben hat Vorrang)."""
         from .instrument import Instrument
         idx = self.channel_inst[c] if c < len(self.channel_inst) else None
         if idx is not None and 0 <= idx < len(self.instruments):
             return self.instruments[idx]
         wf = "noise" if c == self.tonal else self.waves[c]
         return Instrument.synth(f"Ch{c}", wf)
+
+    def instrument_for_cell(self, pat: "Pattern", c: int, r: int):
+        """Effektives Instrument fuer EINE Note: der per-Note-Override
+        (`Pattern.inst`) hat Vorrang vor der Kanal-Standard-Zuweisung
+        (`channel_inst`) -- wie bei echten Trackern (XM/IT/Renoise), nur
+        dass die Instrument-Nummer pro Note optional bleibt."""
+        idx = pat.get_inst(c, r)
+        if idx is not None and 0 <= idx < len(self.instruments):
+            return self.instruments[idx]
+        return self.instrument_for_channel(c)
 
     def _channel_wave(self, c: int) -> str | None:
         """Synth-Wellenform fuer Kanal `c` im Live-Export -- oder None, wenn
@@ -364,7 +422,8 @@ class Song:
         return len(self.instruments) - 1
 
     def remove_instrument(self, idx: int) -> bool:
-        """Entfernt ein Instrument; Kanal-Zuweisungen werden nachgezogen."""
+        """Entfernt ein Instrument; Kanal-Zuweisungen UND alle per-Note-
+        Ueberschreiben (Pattern.inst) in allen Patterns werden nachgezogen."""
         if not (0 <= idx < len(self.instruments)):
             return False
         del self.instruments[idx]
@@ -374,6 +433,15 @@ class Song:
                 self.channel_inst[c] = None
             elif ci is not None and ci > idx:
                 self.channel_inst[c] = ci - 1
+        for pat in self.patterns:
+            for c in range(pat.channels):
+                col = pat.inst[c]
+                for r in range(len(col)):
+                    v = col[r]
+                    if v == idx:
+                        col[r] = None
+                    elif v is not None and v > idx:
+                        col[r] = v - 1
         return True
 
     # ------------------------------------------------------ Tempo
@@ -521,6 +589,18 @@ class Song:
                 (int(ci[c]) if c < len(ci) and ci[c] is not None
                  and 0 <= int(ci[c]) < len(s.instruments) else None)
                 for c in range(s.channels)]
+        # Per-Note-Instrument-Ueberschreiben gegen den geladenen Pool
+        # klemmen (Pattern.from_dict kennt den Pool noch nicht) -- ungueltige
+        # oder verwaiste Indizes (kein Pool geladen) werden auf None
+        # zurueckgesetzt statt eine falsche Note klingen zu lassen.
+        n_insts = len(s.instruments)
+        for pat in s.patterns:
+            for c in range(pat.channels):
+                col = pat.inst[c]
+                for r in range(len(col)):
+                    v = col[r]
+                    if v is not None and not (0 <= v < n_insts):
+                        col[r] = None
         return s
 
     def save_json(self, path: str) -> None:
@@ -540,7 +620,14 @@ class Song:
     def gb_code(self) -> str:
         """Selbststaendiger frame-basierter Player. Die Order wird zu einer
         flachen Timeline expandiert (wiederholte Patterns werden dupliziert)
-        -- so bleibt der Player simpel und identisch zum bisherigen Schema."""
+        -- so bleibt der Player simpel und identisch zum bisherigen Schema.
+
+        GRENZE: per-Note-Instrument-Ueberschreiben (`Pattern.inst`) wird HIER
+        ignoriert -- der Live-Synth-Export nutzt pro Kanal EINE feste
+        Wellenform (`_channel_wave`), genau wie er Sample-Kanaele schon
+        nicht direkt abspielen kann. Beides wirkt nur im Vorhoeren und im
+        WAV-Render (`tracker/mixer.py`); fuer Sample-/Multi-Instrument-Songs
+        nimmt man den Audio-Export statt GB-Code."""
         total, channels, vols, slides = self._flatten()
         rowms = self.row_ms()
         n_patterns = len(self.patterns)

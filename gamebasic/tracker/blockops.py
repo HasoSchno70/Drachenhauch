@@ -31,6 +31,7 @@ def block_copy(pat, c0: int, r0: int, c1: int, r1: int) -> list[list[dict]]:
                 "slide": pat.slide[c][r],
                 "fx": fx or None,
                 "fxp": fxp if fx else None,
+                "inst": pat.get_inst(c, r),
             })
         cells.append(col)
     return cells
@@ -57,6 +58,7 @@ def block_paste(pat, cells: list[list[dict]], c0: int, r0: int) -> tuple[int, in
                 pat.set_vol(c, r, cell["vol"])
                 pat.set_slide(c, r, cell["slide"])
                 pat.set_fx(c, r, cell["fx"], cell["fxp"] or 0)
+                pat.set_inst(c, r, cell.get("inst"))
     return n_c, n_r
 
 
