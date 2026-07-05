@@ -585,6 +585,54 @@
    "module": "audio"
   },
   {
+   "name": "AUDIO_LISTENER_NEW",
+   "kind": "core",
+   "signature": "AUDIO_LISTENER_NEW(x, y, z) -> AUDIO_LISTENER",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_LISTENER_SET_POSITION",
+   "kind": "core",
+   "signature": "AUDIO_LISTENER_SET_POSITION(listener, x, y, z)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_LISTENER_SET_ORIENTATION",
+   "kind": "core",
+   "signature": "AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_LISTENER_REMOVE",
+   "kind": "core",
+   "signature": "AUDIO_LISTENER_REMOVE(listener)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_EMITTER_NEW",
+   "kind": "core",
+   "signature": "AUDIO_EMITTER_NEW(listener, x, y, z[, min_dist[, max_dist]]) -> AUDIO_EMITTER",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_EMITTER_SET_POSITION",
+   "kind": "core",
+   "signature": "AUDIO_EMITTER_SET_POSITION(emitter, x, y, z)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_EMITTER_REMOVE",
+   "kind": "core",
+   "signature": "AUDIO_EMITTER_REMOVE(emitter)",
+   "module": "audio"
+  },
+  {
+   "name": "AUDIO_PLAY_ON",
+   "kind": "core",
+   "signature": "AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]]) -> AUDIO_CHANNEL",
+   "module": "audio"
+  },
+  {
    "name": "BATCH_DRAW",
    "kind": "graphics",
    "signature": "BATCH_DRAW(atlas, name: STRING, x, y [, tint: INTEGER])",

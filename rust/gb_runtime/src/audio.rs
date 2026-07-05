@@ -27,10 +27,11 @@ use kira::{
     effect::compressor::{CompressorBuilder, CompressorHandle},
     effect::eq_filter::{EqFilterBuilder, EqFilterHandle, EqFilterKind},
     info::Info,
+    listener::ListenerHandle,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
     sound::FromFileError,
-    track::{MainTrackBuilder, TrackBuilder, TrackHandle},
+    track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackHandle, TrackBuilder, TrackHandle},
 };
 
 /// Echtzeit-Effektkette eines Mixer-Busses (Filter/Reverb/Delay). Die Effekte
@@ -451,6 +452,22 @@ fn pan_of(pos: f64) -> Panning { Panning((2.0 * pos.clamp(0.0, 1.0) - 1.0) as f3
 
 fn tween_now() -> Tween { Tween { duration: Duration::from_millis(4), ..Default::default() } }
 
+// --- Listener/Emitter (raeumliches Audio) -------------------------------
+
+/// GB-Weltkoordinaten (f64, beliebige Einheit) -> Kiras `mint::Vector3<f32>`.
+fn vec3(x: f64, y: f64, z: f64) -> mint::Vector3<f32> {
+    mint::Vector3 { x: x as f32, y: y as f32, z: z as f32 }
+}
+
+/// Blickrichtung als reine Y-Achsen-Drehung (Grad) -> Quaternion. Deckt die
+/// typische Top-Down-/3rd-Person-Kamera ab (links/rechts drehen), ohne BASIC-
+/// Nutzern volle Quaternionen zuzumuten (Pitch/Roll gibt's dafuer nicht).
+/// Kira-Konvention: unrotiert blickt der Listener Richtung -Z, +X ist rechts.
+fn yaw_quat(deg: f64) -> mint::Quaternion<f32> {
+    let half = (deg.to_radians() * 0.5) as f32;
+    mint::Quaternion { v: mint::Vector3 { x: 0.0, y: half.sin(), z: 0.0 }, s: half.cos() }
+}
+
 /// Zeitkurve fuer Fades/Slides -- macht sie natuerlicher als eine reine
 /// lineare Rampe klingen (ein Fade-out z.B. wirkt mit "out" laenger hoerbar).
 /// BASIC-seitig als Name (`"linear"`/`"in"`/`"out"`/`"inout"`), quadratische
@@ -565,6 +582,12 @@ pub struct Audio {
     // `None` = per AUDIO_CLOCK_REMOVE entfernt (Tombstone, Index bleibt stabil;
     // Kira kennt kein remove_clock() -- nur Handle-Drop gibt die Uhr frei).
     clocks: Vec<Option<ClockSlot>>,
+    // Raeumliches Audio: Listener (Ohr/Kamera-Position) + Emitter (spatiale
+    // Sub-Tracks, an je einen Listener gebunden -- Kira berechnet Panning/
+    // Lautstaerke-Abnahme daraus selbst). Gleiches Tombstone-Vec-Pattern wie
+    // Clocks (kein remove_listener()/remove_spatial_sub_track() -- nur Drop).
+    listeners: Vec<Option<ListenerHandle>>,
+    emitters: Vec<Option<SpatialTrackHandle>>,
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
@@ -604,7 +627,8 @@ impl Audio {
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
             sfx_fx, music_fx, master_fx,
             sounds: Vec::new(), samples: Vec::new(),
-            sample_cache: HashMap::new(), clocks: Vec::new(), num_channels: 16,
+            sample_cache: HashMap::new(), clocks: Vec::new(),
+            listeners: Vec::new(), emitters: Vec::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
@@ -812,6 +836,112 @@ impl Audio {
             .ok_or_else(|| format!("AUDIO_CLOCK_REMOVE: ungueltiges Uhr-Handle {}", idx))?;
         *slot = None;
         Ok(())
+    }
+
+    // ================= Listener/Emitter (raeumliches Audio) ===============
+
+    fn listener_slot(&self, idx: i64, fn_: &str) -> Result<&ListenerHandle, String> {
+        self.listeners.get(idx as usize).and_then(|l| l.as_ref())
+            .ok_or_else(|| format!("{}: ungueltiges oder entferntes Listener-Handle {}", fn_, idx))
+    }
+    fn listener_slot_mut(&mut self, idx: i64, fn_: &str) -> Result<&mut ListenerHandle, String> {
+        self.listeners.get_mut(idx as usize).and_then(|l| l.as_mut())
+            .ok_or_else(|| format!("{}: ungueltiges oder entferntes Listener-Handle {}", fn_, idx))
+    }
+    fn emitter_slot_mut(&mut self, idx: i64, fn_: &str) -> Result<&mut SpatialTrackHandle, String> {
+        self.emitters.get_mut(idx as usize).and_then(|e| e.as_mut())
+            .ok_or_else(|| format!("{}: ungueltiges oder entferntes Emitter-Handle {}", fn_, idx))
+    }
+
+    /// AUDIO_LISTENER_NEW(x, y, z) -> AUDIO_LISTENER -- das "Ohr" der Szene
+    /// (typischerweise die Kamera-/Spielerposition). Orientierung startet
+    /// unrotiert (blickt -Z); AUDIO_LISTENER_SET_ORIENTATION dreht um Y (Yaw).
+    pub fn listener_new(&mut self, x: f64, y: f64, z: f64) -> Result<i64, String> {
+        let handle = self.manager.add_listener(vec3(x, y, z), yaw_quat(0.0))
+            .map_err(|e| format!(
+                "AUDIO_LISTENER_NEW: Listener konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+        self.listeners.push(Some(handle));
+        Ok((self.listeners.len() - 1) as i64)
+    }
+    pub fn listener_set_position(&mut self, idx: i64, x: f64, y: f64, z: f64) -> Result<(), String> {
+        self.listener_slot_mut(idx, "AUDIO_LISTENER_SET_POSITION")?
+            .set_position(vec3(x, y, z), tween_now());
+        Ok(())
+    }
+    /// `yaw_deg`: Drehung um die Y-Achse in Grad (0 = blickt -Z, Kira-Default).
+    pub fn listener_set_orientation(&mut self, idx: i64, yaw_deg: f64) -> Result<(), String> {
+        self.listener_slot_mut(idx, "AUDIO_LISTENER_SET_ORIENTATION")?
+            .set_orientation(yaw_quat(yaw_deg), tween_now());
+        Ok(())
+    }
+    /// AUDIO_LISTENER_REMOVE -- Kira hat kein remove_listener(), nur Handle-
+    /// Drop. Emitter, die noch auf diesen Listener zeigen, liefern danach
+    /// keine sinnvolle Panning-Berechnung mehr (kein Crash, aber undefiniert
+    /// -- vor dem Entfernen erst alle abhaengigen Emitter entfernen).
+    pub fn listener_remove(&mut self, idx: i64) -> Result<(), String> {
+        let slot = self.listeners.get_mut(idx as usize)
+            .ok_or_else(|| format!("AUDIO_LISTENER_REMOVE: ungueltiges Listener-Handle {}", idx))?;
+        *slot = None;
+        Ok(())
+    }
+
+    /// AUDIO_EMITTER_NEW(listener, x, y, z[, min_dist[, max_dist]]) ->
+    /// AUDIO_EMITTER -- ein raeumlicher Sub-Track (eigene Mini-Bus), an einen
+    /// Listener + Position gebunden. Kira berechnet Lautstaerke-Abnahme
+    /// (linear zwischen min_dist=laut/max_dist=lautlos) und Stereo-Panning aus
+    /// der Position relativ zum Listener selbst -- keine eigene DSP noetig.
+    /// Laeuft auf dem SFX-Bus (Effekte/Busse gelten weiterhin).
+    pub fn emitter_new(&mut self, listener_idx: i64, x: f64, y: f64, z: f64,
+                       min_dist: f64, max_dist: f64) -> Result<i64, String> {
+        let listener_id = self.listener_slot(listener_idx, "AUDIO_EMITTER_NEW")?.id();
+        let builder = SpatialTrackBuilder::new()
+            .distances((min_dist as f32, max_dist.max(min_dist + 0.01) as f32));
+        let handle = self.sfx_track.add_spatial_sub_track(listener_id, vec3(x, y, z), builder)
+            .map_err(|e| format!(
+                "AUDIO_EMITTER_NEW: Emitter konnte nicht angelegt werden (Limit erreicht?): {:?}", e))?;
+        self.emitters.push(Some(handle));
+        Ok((self.emitters.len() - 1) as i64)
+    }
+    pub fn emitter_set_position(&mut self, idx: i64, x: f64, y: f64, z: f64) -> Result<(), String> {
+        self.emitter_slot_mut(idx, "AUDIO_EMITTER_SET_POSITION")?
+            .set_position(vec3(x, y, z), tween_now());
+        Ok(())
+    }
+    /// AUDIO_EMITTER_REMOVE -- wie bei Clock/Listener: Kira entfernt spatiale
+    /// Sub-Tracks nur per Handle-Drop.
+    pub fn emitter_remove(&mut self, idx: i64) -> Result<(), String> {
+        let slot = self.emitters.get_mut(idx as usize)
+            .ok_or_else(|| format!("AUDIO_EMITTER_REMOVE: ungueltiges Emitter-Handle {}", idx))?;
+        *slot = None;
+        Ok(())
+    }
+
+    /// AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]])
+    /// -- wie AUDIO_PLAY, aber der Sound startet auf dem raeumlichen Emitter-
+    /// Track statt dem flachen SFX-Bus (Panning/Lautstaerke folgen der
+    /// Emitter-Position relativ zum gebundenen Listener). Der SoundSlot-
+    /// Handle ist danach identisch nutzbar (AUDIO_STOP/PAUSE/VOLUME/...) --
+    /// `StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt.
+    pub fn ch_play_on(&mut self, idx: i64, emitter_idx: i64, loops: i64, volume: f64,
+                      fade_in_ms: i64, easing: &str) -> Result<i64, String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_PLAY_ON")?;
+        let vol = volume.clamp(0.0, 1.0);
+        if let Some(h) = self.slot_mut(idx, "AUDIO_PLAY_ON")?.handle.as_mut() { h.stop(tween_now()); }
+        let mut settings = StaticSoundSettings::new();
+        if loops < 0 { settings = settings.loop_region(0.0..); }
+        settings = settings.volume(if fade_in_ms > 0 { Decibels::SILENCE } else { db(vol) });
+        let data = self.slot(idx, "AUDIO_PLAY_ON")?.data.as_ref()
+            .ok_or_else(|| format!("AUDIO_PLAY_ON: Sound {} wurde freigegeben (UNLOADSOUND)", idx))?
+            .clone().with_settings(settings);
+        let emitter = self.emitter_slot_mut(emitter_idx, "AUDIO_PLAY_ON")?;
+        let mut handle = emitter.play(data).map_err(|e| format!("AUDIO_PLAY_ON: {:?}", e))?;
+        if fade_in_ms > 0 { handle.set_volume(db(vol), tween_ms_eased(fade_in_ms, curve)); }
+        let s = self.slot_mut(idx, "AUDIO_PLAY_ON")?;
+        s.handle = Some(handle);
+        s.vol = vol as f32;
+        s.loops = if loops < 0 { -1 } else { loops };
+        s.pan_anim = None;
+        Ok(idx)
     }
 
     // ================= FFT =================
@@ -1575,7 +1705,7 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 #[cfg(test)]
 mod tests {
     use super::{build_sfx_buffer, lofi_chain, pendulum_pos, resample,
-                svf_lowpass, FadeCurve, SidFx};
+                svf_lowpass, FadeCurve, SidFx, yaw_quat};
 
     #[test]
     fn resample_octave_up_halves_length() {
@@ -1693,5 +1823,37 @@ mod tests {
         for t in [0.1, 0.3, 0.5, 0.7, 0.9] {
             assert!(FadeCurve::Out.apply(t) >= FadeCurve::In.apply(t));
         }
+    }
+
+    #[test]
+    fn yaw_quat_zero_is_identity() {
+        // 0 Grad = unrotiert -> Kiras Default-Blickrichtung (-Z) bleibt.
+        let q = yaw_quat(0.0);
+        assert!((q.s - 1.0).abs() < 1e-6);
+        assert!(q.v.x.abs() < 1e-6);
+        assert!(q.v.y.abs() < 1e-6);
+        assert!(q.v.z.abs() < 1e-6);
+    }
+
+    #[test]
+    fn yaw_quat_is_unit_length() {
+        // Jede gueltige Rotation muss ein Einheits-Quaternion sein, sonst
+        // verzerrt Kira die Panning-Berechnung.
+        for deg in [0.0, 45.0, 90.0, 180.0, -90.0, 270.0, 720.0] {
+            let q = yaw_quat(deg);
+            let len_sq = q.s * q.s + q.v.x * q.v.x + q.v.y * q.v.y + q.v.z * q.v.z;
+            assert!((len_sq - 1.0).abs() < 1e-5, "deg={deg} len_sq={len_sq}");
+        }
+    }
+
+    #[test]
+    fn yaw_quat_90_degrees_matches_expected_components() {
+        // 90 Grad um Y: s=cos(45deg), v.y=sin(45deg), x/z bleiben 0.
+        let q = yaw_quat(90.0);
+        let expect = (std::f64::consts::FRAC_PI_4).cos() as f32;
+        assert!((q.s - expect).abs() < 1e-6);
+        assert!((q.v.y - expect).abs() < 1e-6);
+        assert!(q.v.x.abs() < 1e-6);
+        assert!(q.v.z.abs() < 1e-6);
     }
 }

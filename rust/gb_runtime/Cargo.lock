@@ -1004,6 +1004,7 @@ dependencies = [
  "futures",
  "hidapi",
  "kira",
+ "mint",
  "rapier2d",
  "rapier3d",
  "raylib",

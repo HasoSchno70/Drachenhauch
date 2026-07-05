@@ -4253,6 +4253,64 @@ impl<'p> Vm<'p> {
                 Value::Int(self.audio_mut()?.ch_play_at(idx, clock, ticks, vol, loops)?)
             }
 
+            // --- Listener/Emitter (raeumliches Audio) ---
+            "audio_listener_new" => {
+                let x = need_f(a, 0, "AUDIO_LISTENER_NEW")?;
+                let y = need_f(a, 1, "AUDIO_LISTENER_NEW")?;
+                let z = need_f(a, 2, "AUDIO_LISTENER_NEW")?;
+                Value::Int(self.audio_mut()?.listener_new(x, y, z)?)
+            }
+            "audio_listener_set_position" => {
+                let l = gi(a, 0, "AUDIO_LISTENER_SET_POSITION")?;
+                let x = need_f(a, 1, "AUDIO_LISTENER_SET_POSITION")?;
+                let y = need_f(a, 2, "AUDIO_LISTENER_SET_POSITION")?;
+                let z = need_f(a, 3, "AUDIO_LISTENER_SET_POSITION")?;
+                self.audio_mut()?.listener_set_position(l, x, y, z)?; Value::Nil
+            }
+            "audio_listener_set_orientation" => {
+                let l = gi(a, 0, "AUDIO_LISTENER_SET_ORIENTATION")?;
+                let yaw = need_f(a, 1, "AUDIO_LISTENER_SET_ORIENTATION")?;
+                self.audio_mut()?.listener_set_orientation(l, yaw)?; Value::Nil
+            }
+            "audio_listener_remove" => {
+                let l = gi(a, 0, "AUDIO_LISTENER_REMOVE")?;
+                self.audio_mut()?.listener_remove(l)?; Value::Nil
+            }
+            "audio_emitter_new" => {
+                // AUDIO_EMITTER_NEW(listener, x, y, z[, min_dist[, max_dist]])
+                let l = gi(a, 0, "AUDIO_EMITTER_NEW")?;
+                let x = need_f(a, 1, "AUDIO_EMITTER_NEW")?;
+                let y = need_f(a, 2, "AUDIO_EMITTER_NEW")?;
+                let z = need_f(a, 3, "AUDIO_EMITTER_NEW")?;
+                let min_d = if a.len() >= 5 { need_f(a, 4, "AUDIO_EMITTER_NEW")? } else { 1.0 };
+                let max_d = if a.len() >= 6 { need_f(a, 5, "AUDIO_EMITTER_NEW")? } else { 100.0 };
+                if min_d < 0.0 { return Err("AUDIO_EMITTER_NEW: min_dist muss >= 0 sein".into()); }
+                if max_d <= min_d { return Err("AUDIO_EMITTER_NEW: max_dist muss > min_dist sein".into()); }
+                Value::Int(self.audio_mut()?.emitter_new(l, x, y, z, min_d, max_d)?)
+            }
+            "audio_emitter_set_position" => {
+                let e = gi(a, 0, "AUDIO_EMITTER_SET_POSITION")?;
+                let x = need_f(a, 1, "AUDIO_EMITTER_SET_POSITION")?;
+                let y = need_f(a, 2, "AUDIO_EMITTER_SET_POSITION")?;
+                let z = need_f(a, 3, "AUDIO_EMITTER_SET_POSITION")?;
+                self.audio_mut()?.emitter_set_position(e, x, y, z)?; Value::Nil
+            }
+            "audio_emitter_remove" => {
+                let e = gi(a, 0, "AUDIO_EMITTER_REMOVE")?;
+                self.audio_mut()?.emitter_remove(e)?; Value::Nil
+            }
+            "audio_play_on" => {
+                // AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]])
+                let idx = gi(a, 0, "AUDIO_PLAY_ON")?;
+                let emitter = gi(a, 1, "AUDIO_PLAY_ON")?;
+                let loops = if a.len() >= 3 { gi(a, 2, "AUDIO_PLAY_ON")? } else { 0 };
+                let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_PLAY_ON")? } else { 1.0 };
+                let fade = if a.len() >= 5 { gi(a, 4, "AUDIO_PLAY_ON")? } else { 0 };
+                if fade < 0 { return Err("AUDIO_PLAY_ON: fade_in_ms muss >= 0 sein".into()); }
+                let easing = easing_name(a, 5, "AUDIO_PLAY_ON")?;
+                Value::Int(self.audio_mut()?.ch_play_on(idx, emitter, loops, vol, fade, &easing)?)
+            }
+
             // --- Bulk-Draws ---
             "plots" => {
                 let xs = arr_i32(&a[0], "PLOTS")?; let ys = arr_i32(&a[1], "PLOTS")?;

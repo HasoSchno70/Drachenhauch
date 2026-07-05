@@ -377,3 +377,59 @@ def test_easing_defaults_to_linear_when_omitted(run_gb):
     out = run_gb(src)
     assert "AUDIO_PLAY: fade_in_ms muss >= 0 sein" in out
     assert "AUDIO_PAN_SLIDE: dauer_ms muss > 0 sein" in out
+
+
+def test_audio_listener_emitter_types_compile(run_gb):
+    # AUDIO_LISTENER/AUDIO_EMITTER sind externe Typen des audio-Moduls.
+    # DIM ... AS ... initialisiert KEIN Audio-Geraet -> headless golden-
+    # testbar (verifiziert preprocess MODULE_TYPES + Compiler-Verdrahtung).
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'DIM l AS AUDIO_LISTENER',
+        'DIM e AS AUDIO_EMITTER',
+        'PRINT "listener/emitter-typ ok"',
+    ])
+    assert "listener/emitter-typ ok" in run_gb(src)
+
+
+def test_audio_emitter_new_validation(run_gb):
+    # AUDIO_EMITTER_NEW(listener, x, y, z[, min_dist[, max_dist]]) --
+    # min_dist/max_dist-Pruefung laeuft VOR der Audio-Initialisierung ->
+    # headless golden-testbar.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_EMITTER_NEW(0, 0.0, 0.0, 0.0, -1.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_EMITTER_NEW(0, 0.0, 0.0, 0.0, 10.0, 5.0)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_EMITTER_NEW: min_dist muss >= 0 sein" in out
+    assert "AUDIO_EMITTER_NEW: max_dist muss > min_dist sein" in out
+
+
+def test_audio_play_on_validation(run_gb):
+    # AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]])
+    # -- fade_in_ms/easing$-Pruefung laeuft VOR der Audio-Initialisierung.
+    src = '\n'.join([
+        'IMPORT "audio"',
+        'TRY',
+        '    AUDIO_PLAY_ON(0, 0, 0, 1.0, -5)',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+        'TRY',
+        '    AUDIO_PLAY_ON(0, 0, 0, 1.0, 100, "bounce")',
+        'CATCH e',
+        '    PRINT e',
+        'END TRY',
+    ])
+    out = run_gb(src)
+    assert "AUDIO_PLAY_ON: fade_in_ms muss >= 0 sein" in out
+    assert "AUDIO_PLAY_ON: unbekanntes Easing 'bounce' (linear, in, out, inout)" in out
