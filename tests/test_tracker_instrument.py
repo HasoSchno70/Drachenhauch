@@ -208,6 +208,39 @@ def test_envelope_passthrough_default_unchanged():
     assert np.allclose(out[:900], 0.5, atol=1e-3)
 
 
+def test_envelope_short_note_with_long_release_is_not_silent():
+    """Regression: `_adsr_env` klemmte die Release-Phase frueher nur gegen
+    die Gesamtlaenge `n`, nicht gegen `n - na` (Ende der Attack-Phase). Bei
+    einer Note, die kuerzer ist als Attack+Decay+Release zusammen (z.B. das
+    "Fluegel (Piano)"-Preset: attack=2ms, decay=700ms, sustain=0, release=
+    200ms, bei einer Note von nur ~125ms), ueberlappte die Release-Rampe die
+    Attack-Phase und `start_lvl` griff auf einen Wert ~0 zu -- die GESAMTE
+    Huellkurve wurde faelschlich zu einer Rampe von ~0 nach 0 (komplett
+    stumme Note trotz gueltigem Waveform-Signal). Traf reale Presets bei
+    dichten Patterns (viele kurze, aufeinanderfolgende Noten)."""
+    src = np.ones(44100, dtype=np.float32)    # DC -> Huellkurve direkt sichtbar
+    inst = Instrument.from_array("S", src, 44100, 69)
+    inst.env_attack_ms = 2
+    inst.env_decay_ms = 700
+    inst.env_sustain = 0.0
+    inst.env_release_ms = 200
+    for n_samples in (500, 1000, 2000, 5512, 8000, 22050):
+        out = inst.render_note(69, n_samples)
+        assert np.max(np.abs(out)) > 0.1, (
+            f"Note mit n_samples={n_samples} war stumm (ADSR-Regression)")
+
+
+def test_envelope_release_never_overlaps_attack_phase():
+    """Direkter Test von `_adsr_env`: die Release-Rampe darf nie in die
+    Attack-Phase hineinreichen (sonst liest `start_lvl` einen falschen
+    Wert und zerstoert die ganze Huellkurve, siehe Bugfix-Kommentar)."""
+    from gamebasic.tracker.instrument import _adsr_env
+    env = _adsr_env(n=5512, attack_ms=2, decay_ms=700, sustain=0.0,
+                    release_ms=200, sr=44100)
+    assert env[0] == 0.0                       # Attack startet bei 0 (unveraendert)
+    assert np.max(env) > 0.5                    # Huellkurve baut sich echt auf
+
+
 # --- Keymap (Multisample / Drumkit) --------------------------------
 
 def _zone(freq, lo, hi, root, secs=0.05, sr=44100):

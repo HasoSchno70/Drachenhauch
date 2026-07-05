@@ -409,12 +409,23 @@ def _resample(samples: np.ndarray, src_sr: int, base_note: int,
 
 def _adsr_env(n: int, attack_ms: int, decay_ms: int, sustain: float,
               release_ms: int, sr: int) -> np.ndarray:
-    """ADSR-Huellkurve der Laenge n (Attack->Decay->Sustain->Release am Ende)."""
+    """ADSR-Huellkurve der Laenge n (Attack->Decay->Sustain->Release am Ende).
+
+    Kurze Noten (n kleiner als Attack+Decay+Release zusammen) kuerzen die
+    Phasen der Reihe nach: Attack zuerst geschuetzt, dann Decay (durch
+    `n - na` geklemmt), Release zuletzt (durch `n - na - nd` geklemmt) --
+    reicht die Zeit fuer Release nicht mehr, entfaellt die separate Release-
+    Rampe komplett (der Anti-Click-Fade am Ende reicht als Sicherheitsnetz).
+    BUG bis 2026-07-05: `nr` war nur gegen `n` geklemmt (nicht gegen
+    `n - na`) -- bei sehr kurzen Noten mit langem Release ueberlappte die
+    Release-Rampe die Attack-Phase, `start_lvl = env[-nr]` griff dann auf
+    den Attack-START (~0.0) zu und ueberschrieb die GESAMTE Huellkurve mit
+    einer Rampe von ~0 nach 0 -- die Note war komplett stumm."""
     sustain = max(0.0, min(1.0, sustain))
     env = np.full(n, sustain, dtype=np.float64)   # Sustain-Pegel als Basis
     na = min(n, int(sr * max(0, attack_ms) / 1000))
     nd = min(n - na, int(sr * max(0, decay_ms) / 1000))
-    nr = min(n, int(sr * max(0, release_ms) / 1000))
+    nr = min(max(0, n - na - nd), int(sr * max(0, release_ms) / 1000))
     if na > 0:
         env[:na] = np.linspace(0.0, 1.0, na)
     if nd > 0:
