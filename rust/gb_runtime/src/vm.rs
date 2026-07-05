@@ -3713,6 +3713,15 @@ impl<'p> Vm<'p> {
             "model_anim_frames" => Value::Int(g!().anim_frames(gi(a,0,"MODEL_ANIM_FRAMES")?, gi(a,1,"MODEL_ANIM_FRAMES")?)?),
             "model_anim_name" => Value::str_rc(&g!().anim_name(gi(a,0,"MODEL_ANIM_NAME")?, gi(a,1,"MODEL_ANIM_NAME")?)?),
             "model_animate" => { g!().model_animate(gi(a,0,"MODEL_ANIMATE")?, gi(a,1,"MODEL_ANIMATE")?, gi(a,2,"MODEL_ANIMATE")?, gi(a,3,"MODEL_ANIMATE")? as i32)?; Value::Nil }
+            "model_animate_blend" => {
+                g!().model_animate_blend(
+                    gi(a,0,"MODEL_ANIMATE_BLEND")?, gi(a,1,"MODEL_ANIMATE_BLEND")?,
+                    gi(a,2,"MODEL_ANIMATE_BLEND")?, gi(a,3,"MODEL_ANIMATE_BLEND")? as i32,
+                    gi(a,4,"MODEL_ANIMATE_BLEND")?, gi(a,5,"MODEL_ANIMATE_BLEND")? as i32,
+                    need_f(a,6,"MODEL_ANIMATE_BLEND")? as f32,
+                )?;
+                Value::Nil
+            }
             "mesh_cube" => Value::Int(g!().mesh_cube(
                 need_f(a,0,"MESH_CUBE")? as f32, need_f(a,1,"MESH_CUBE")? as f32, need_f(a,2,"MESH_CUBE")? as f32)?),
             "mesh_sphere" => Value::Int(g!().mesh_sphere(

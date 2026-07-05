@@ -3359,6 +3359,7 @@
   { "name": "MODEL_ANIM_FRAMES", "kind": "graphics", "signature": "MODEL_ANIM_FRAMES(set: INTEGER, idx: INTEGER) AS INTEGER", "module": "g3d" },
   { "name": "MODEL_ANIM_NAME", "kind": "graphics", "signature": "MODEL_ANIM_NAME(set: INTEGER, idx: INTEGER) AS STRING", "module": "g3d" },
   { "name": "MODEL_ANIMATE", "kind": "graphics", "signature": "MODEL_ANIMATE(model: INTEGER, set: INTEGER, anim: INTEGER, frame: INTEGER)", "module": "g3d" },
+  { "name": "MODEL_ANIMATE_BLEND", "kind": "graphics", "signature": "MODEL_ANIMATE_BLEND(model: INTEGER, set: INTEGER, anim_a: INTEGER, frame_a: INTEGER, anim_b: INTEGER, frame_b: INTEGER, blend: FLOAT)", "module": "g3d" },
   {
    "name": "PLANE",
    "kind": "graphics",

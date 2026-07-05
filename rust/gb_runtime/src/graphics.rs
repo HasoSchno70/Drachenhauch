@@ -1254,6 +1254,26 @@ impl Graphics {
         self.rl.update_model_animation(&self.thread, &mut self.models[mi], &self.model_anims[s][a], f);
         Ok(())
     }
+    /// Blendet zwischen zwei Animationen desselben Sets (neu in raylib 6.0:
+    /// `UpdateModelAnimationEx`). `blend` 0.0 = ganz `anim_a`, 1.0 = ganz
+    /// `anim_b`, dazwischen interpoliert -- fuer weiche Uebergaenge (z.B.
+    /// Walk->Run) statt hartem Anim-Wechsel.
+    #[allow(clippy::too_many_arguments)]
+    pub fn model_animate_blend(&mut self, model_idx: i64, set: i64,
+                                anim_a: i64, frame_a: i32,
+                                anim_b: i64, frame_b: i32, blend: f32) -> Result<(), String> {
+        let mi = self.check_model(model_idx, "MODEL_ANIMATE_BLEND")?;
+        let (s, ia) = self.check_anim(set, anim_a, "MODEL_ANIMATE_BLEND")?;
+        let (_, ib) = self.check_anim(set, anim_b, "MODEL_ANIMATE_BLEND")?;
+        let frames_a = self.model_anims[s][ia].keyframeCount.max(1);
+        let fa = frame_a.rem_euclid(frames_a) as f32;
+        let frames_b = self.model_anims[s][ib].keyframeCount.max(1);
+        let fb = frame_b.rem_euclid(frames_b) as f32;
+        let blend = blend.clamp(0.0, 1.0);
+        self.rl.update_model_animation_ex(&self.thread, &mut self.models[mi],
+            &self.model_anims[s][ia], fa, &self.model_anims[s][ib], fb, blend);
+        Ok(())
+    }
     /// Baut aus einem generierten Mesh ein Modell und gibt das Handle zurueck.
     fn push_model_from_mesh(&mut self, mesh: Mesh, fn_: &str) -> Result<i64, String> {
         // load_model_from_mesh uebernimmt das Mesh (WeakMesh = kein Drop).
