@@ -386,6 +386,15 @@ class GameBasicEditor(QMainWindow):
             "Tilemap-Editor -- Tiles aufs Gitter malen, Export als Tiled-JSON")
         self.act_tilemap_editor.triggered.connect(self._open_tilemap_editor)
 
+        self.act_score_editor = QAction(
+            icons.get("score"), "Notenblatt-Editor oeffnen ...", self,
+        )
+        self.act_score_editor.setShortcut(QKeySequence("Ctrl+Shift+N"))
+        self.act_score_editor.setToolTip(
+            "Notenblatt-Editor -- Noten auf einem 5-Linien-System setzen, "
+            "Export/Uebernahme in den Tracker")
+        self.act_score_editor.triggered.connect(self._open_score_editor)
+
         # Edit
         self.act_find = QAction(icons.get("find"), "Suchen ...", self)
         self.act_find.setShortcut(QKeySequence.StandardKey.Find)
@@ -586,6 +595,7 @@ class GameBasicEditor(QMainWindow):
         tb.addAction(self.act_particle_editor)
         tb.addAction(self.act_sfx_editor)
         tb.addAction(self.act_tracker_editor)
+        tb.addAction(self.act_score_editor)
         tb.addAction(self.act_tilemap_editor)
         tb.addAction(self.act_theme)
         # Objektnamen fuer farbige Hover-Akzente (siehe theme.global_qss):
@@ -614,6 +624,7 @@ class GameBasicEditor(QMainWindow):
         m_file.addAction(self.act_particle_editor)
         m_file.addAction(self.act_sfx_editor)
         m_file.addAction(self.act_tracker_editor)
+        m_file.addAction(self.act_score_editor)
         m_file.addAction(self.act_tilemap_editor)
         m_file.addSeparator()
         m_file.addAction(self.act_close_tab)
@@ -1746,6 +1757,7 @@ class GameBasicEditor(QMainWindow):
             ("particles", self.act_particle_editor),
             ("sfx", self.act_sfx_editor),
             ("tracker", self.act_tracker_editor),
+            ("score", self.act_score_editor),
             ("tilemap", self.act_tilemap_editor),
         ):
             act.setIcon(icons.get(key))
@@ -1886,6 +1898,24 @@ class GameBasicEditor(QMainWindow):
         win.raise_()
         win.activateWindow()
 
+    def _open_score_editor(self) -> None:
+        """Oeffnet den Notenblatt-Editor als zweites Top-Level-Fenster."""
+        try:
+            from .. import scoreeditor_qt as sc
+        except SystemExit as exc:
+            QMessageBox.warning(self, "Notenblatt-Editor nicht verfuegbar", str(exc))
+            return
+        except Exception as exc:
+            QMessageBox.warning(
+                self, "Notenblatt-Editor-Fehler",
+                f"Konnte Notenblatt-Editor nicht laden:\n"
+                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
+            return
+        win = sc.ScoreEditor(self.project_root)
+        self._show_companion_window("_score_editor_window", win)
+        win.raise_()
+        win.activateWindow()
+
     def _show_shortcuts(self) -> None:
         """Sammelt alle QActions + Editor-interne Shortcuts und zeigt sie."""
         entries: list[tuple[str, str]] = []
@@ -1900,7 +1930,7 @@ class GameBasicEditor(QMainWindow):
             self.act_new, self.act_open, self.act_save, self.act_save_as,
             self.act_print,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
-            self.act_tilemap_editor,
+            self.act_score_editor, self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
         ])
         add_action_group("Bearbeiten", [
@@ -1988,7 +2018,7 @@ class GameBasicEditor(QMainWindow):
             self.act_new, self.act_open, self.act_save, self.act_save_as,
             self.act_print,
             self.act_sprite_editor, self.act_particle_editor, self.act_sfx_editor, self.act_tracker_editor,
-            self.act_tilemap_editor,
+            self.act_score_editor, self.act_tilemap_editor,
             self.act_close_tab, self.act_reopen_tab, self.act_quit,
             self.act_find, self.act_replace, self.act_find_in_project,
             self.act_goto, self.act_settings,

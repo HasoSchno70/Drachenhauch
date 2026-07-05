@@ -8,6 +8,8 @@ direkt in den Tracker übernehmen (ein Tracker-Kanal pro Spur, mit Instrument).
 
 ## Starten
 
+Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
+`Datei → Notenblatt-Editor öffnen ...` (`Strg+Shift+N`). Standalone:
 `gbscore [datei.json]` oder `gbrun.py --score [datei.json]` (braucht
 `PySide6` und `numpy`; für echte Wiedergabe zusätzlich `sounddevice`).
 

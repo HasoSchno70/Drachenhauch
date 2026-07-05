@@ -448,6 +448,22 @@ def _icon_tracker() -> QPixmap:
     return pix
 
 
+def _icon_score() -> QPixmap:
+    """5-Linien-Notensystem + eine Note -- Notenblatt-Editor."""
+    pix = _new_pixmap()
+    p = _painter(pix)
+    p.setPen(_stroke(1.2, "fg_muted"))
+    for y in (5, 8, 11, 14, 17):
+        p.drawLine(QPointF(3, y), QPointF(21, y))
+    p.setPen(_stroke(1.6, "accent"))
+    p.drawLine(15, 6, 15, 16)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QBrush(QColor(COLORS["accent"])))
+    p.drawEllipse(QPointF(13.3, 16), 3.0, 2.3)
+    p.end()
+    return pix
+
+
 def _icon_tilemap() -> QPixmap:
     """3x3-Gitter mit ein paar gefuellten Zellen -- Tilemap/Level."""
     pix = _new_pixmap()
@@ -550,6 +566,7 @@ _BUILDERS = {
     "particles": _icon_particles,
     "sfx": _icon_sfx,
     "tracker": _icon_tracker,
+    "score": _icon_score,
     "tilemap": _icon_tilemap,
     "profiler": _icon_profiler,
     "print":    _icon_print,

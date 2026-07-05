@@ -1606,8 +1606,9 @@ Spur hat GENAU EIN Instrument (Presets aus `tracker.presets`), Wiedergabe
 über den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_preview.py)
 (`Mixer` — derselbe, den auch der Tracker nutzt; ein einziger dauerhafter
 `sounddevice.OutputStream` mischt alle gleichzeitig klingenden Stimmen
-additiv, weil `sd.play()` selbst keine Überlappung kann). Start:
-`gbscore [datei.json]` / `gbrun.py --score`. Eigenes `*.json`-Format
+additiv, weil `sd.play()` selbst keine Überlappung kann). Start: Code-Editor-
+Toolbar/Menü (`Strg+Shift+N`, `editor_qt/main_window.py:_open_score_editor`)
+oder `gbscore [datei.json]` / `gbrun.py --score`. Eigenes `*.json`-Format
 (`"format": "gbscore-song"`, permissiv wie `Song.from_dict`) via
 `ScoreDoc.save_json/load_json` **UND** direkte Übernahme in den Tracker
 ("In Tracker öffnen": `to_tracker_song` konvertiert, Warnungen werden
