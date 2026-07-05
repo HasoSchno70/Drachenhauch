@@ -161,3 +161,69 @@ def test_delete_key_clears_whole_block():
     QTest.keyClick(ed, Qt.Key.Key_Delete)
     assert pat.data[0][0] is None
     assert pat.data[1][0] is None
+
+
+# --------------------------------------------------------------- Kanal-Fader + Farben
+
+def test_channel_strip_has_volume_slider_per_channel():
+    ed = _editor()
+    assert len(ed.vol_sliders) == 4
+    for sl in ed.vol_sliders:
+        assert sl.value() == 100        # Default channel_vol = 1.0
+
+
+def test_moving_volume_slider_updates_song_and_label():
+    ed = _editor()
+    ed.vol_sliders[1].setValue(60)
+    assert ed.song.channel_vol[1] == pytest.approx(0.6)
+    assert "60" in ed.vol_labels[1].text()
+
+
+def test_channels_spin_rebuilds_sliders_with_correct_count():
+    ed = _editor()
+    ed.channels_spin.setValue(8)
+    assert len(ed.vol_sliders) == 8
+    assert len(ed.vol_labels) == 8
+
+
+def test_loaded_song_channel_vol_reflected_in_sliders(tmp_path):
+    from gamebasic.tracker import Song
+    ed = _editor()
+    s = Song()
+    s.channel_vol[2] = 0.3
+    ed._restore_song(s.to_dict())
+    assert ed.vol_sliders[2].value() == pytest.approx(30, abs=1)
+
+
+def test_channels_get_distinct_colors():
+    from gamebasic.trackereditor_qt import _channel_color
+    colors = {_channel_color(c) for c in range(8)}
+    assert len(colors) == 8             # 8 Kanaele, 8 eigene Paletten-Farben
+
+
+def test_channel_header_uses_channel_color():
+    from PySide6.QtGui import QColor
+    from gamebasic.trackereditor_qt import _channel_color
+    ed = _editor()
+    item0 = ed.grid.horizontalHeaderItem(0)
+    item1 = ed.grid.horizontalHeaderItem(1)
+    assert item0.foreground().color() == QColor(_channel_color(0))
+    assert item1.foreground().color() == QColor(_channel_color(1))
+    assert item0.foreground().color() != item1.foreground().color()
+
+
+def test_cell_delegate_note_color_is_channel_specific():
+    from gamebasic.trackereditor_qt import _CellDelegate, _channel_color
+    c0 = _CellDelegate._token_color(0, "C4", channel=0)
+    c1 = _CellDelegate._token_color(0, "C4", channel=1)
+    assert c0 == _channel_color(0)
+    assert c1 == _channel_color(1)
+    assert c0 != c1
+
+
+def test_cell_delegate_drum_and_off_colors_unaffected_by_channel():
+    from gamebasic.trackereditor_qt import _CellDelegate
+    assert _CellDelegate._token_color(0, "X", channel=3) == \
+           _CellDelegate._token_color(0, "X", channel=5)
+    assert _CellDelegate._token_color(0, "OFF", channel=3) == \
+           _CellDelegate._token_color(0, "OFF", channel=5)

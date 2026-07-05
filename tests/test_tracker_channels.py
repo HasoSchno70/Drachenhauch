@@ -222,3 +222,75 @@ def test_block_interpolate_needs_two_notes():
     p.set(0, 0, 60)
     block_interpolate(p, 0, 0, 0, 3)
     assert p.data[0][1] is None and p.data[0][2] is None and p.data[0][3] is None
+
+
+# --------------------------------------------------------------- Kanal-Fader
+# (Song.channel_vol -- Mixer-Lautstaerke pro Kanal, wie das Default-Volume in
+# XM/IT: separat von der Noten-Lautstaerke (vol-Spalte) und vom Instrument.)
+
+def test_channel_vol_defaults_to_full():
+    s = Song()
+    assert s.channel_vol == [1.0] * s.channels
+
+
+def test_set_channels_extends_channel_vol_with_full_default():
+    s = Song()
+    s.channel_vol[0] = 0.4
+    s.set_channels(8)
+    assert len(s.channel_vol) == 8
+    assert s.channel_vol[0] == 0.4
+    assert s.channel_vol[4:] == [1.0] * 4
+
+
+def test_set_channels_shrinks_channel_vol():
+    s = Song(channels=8)
+    s.channel_vol[7] = 0.2
+    s.set_channels(4)
+    assert len(s.channel_vol) == 4
+
+
+def test_channel_vol_json_roundtrip_only_written_if_nondefault():
+    s = Song()
+    d = s.to_dict()
+    assert "channel_vol" not in d          # alles auf 1.0 -> schlank bleiben
+    s.channel_vol[1] = 0.5
+    d = s.to_dict()
+    assert d["channel_vol"][1] == 0.5
+    s2 = Song.from_dict(d)
+    assert s2.channel_vol[1] == 0.5
+    assert s2.channel_vol[0] == 1.0
+
+
+def test_channel_vol_old_file_without_field_defaults_full():
+    s = Song()
+    d = s.to_dict()
+    s2 = Song.from_dict(d)                 # kein "channel_vol"-Feld im Dict
+    assert s2.channel_vol == [1.0] * s2.channels
+
+
+def test_render_song_channel_vol_scales_output():
+    s_full = Song()
+    s_full.patterns[0].set(0, 0, 60)
+    mix_full = render_song(s_full, sr=8000, tail_ms=0)
+
+    s_half = Song()
+    s_half.patterns[0].set(0, 0, 60)
+    s_half.channel_vol[0] = 0.5
+    mix_half = render_song(s_half, sr=8000, tail_ms=0)
+
+    assert np.abs(mix_half).max() == pytest.approx(np.abs(mix_full).max() * 0.5, rel=0.05)
+
+
+def test_gb_code_bakes_channel_vol_into_amp():
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    s.channel_vol[0] = 0.5
+    code = s.gb_code()
+    assert "* 0.5" in code
+
+
+def test_gb_code_omits_channel_vol_multiplier_when_full():
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    code = s.gb_code()
+    assert "* 1.0" not in code

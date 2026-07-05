@@ -24,8 +24,8 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QDoubleSpinBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSpinBox, QStyle,
-    QStyledItemDelegate, QTableWidget, QTableWidgetItem,
+    QPlainTextEdit, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
+    QStyle, QStyledItemDelegate, QTableWidget, QTableWidgetItem,
     QTableWidgetSelectionRange, QVBoxLayout, QWidget,
 )
 
@@ -79,6 +79,34 @@ def _channel_names(n: int) -> list[str]:
     """Kanal-Labels fuer `n` Kanaele: tonale Kanaele `Ch1..Ch(n-1)`, der
     LETZTE Kanal ist immer "Drum"."""
     return [f"Ch{i + 1}" for i in range(n - 1)] + ["Drum"]
+
+
+# Eigene Akzentfarbe pro Kanal (zyklisch) -- sonst sieht bei vielen Kanaelen
+# alles gleich-cyan aus (Spur-Sounds-Panel, Gitter-Header, Noten-Text,
+# VU-Meter, Lautstaerke-Regler). Aus bestehenden Theme-Farben zusammen-
+# gestellt (kein neuer Farbwert), damit es zum Rest des Editors passt.
+_CHANNEL_HUES = ("accent", "success", "danger", "warning",
+                "kw_ctrl", "kw_decl", "string", "number")
+
+
+def _channel_color(c: int) -> str:
+    return COLORS[_CHANNEL_HUES[c % len(_CHANNEL_HUES)]]
+
+
+def _slider_qss(color: str) -> str:
+    """Duenner, farbiger Schieberegler (Griff + gefuellte Seite in der
+    Kanalfarbe) -- Fusion-Default-Slider sind sonst recht unauffaellig grau."""
+    return f"""
+        QSlider::groove:horizontal {{
+            height: 4px; background: {COLORS['bg_alt']}; border-radius: 2px;
+        }}
+        QSlider::sub-page:horizontal {{
+            background: {color}; border-radius: 2px;
+        }}
+        QSlider::handle:horizontal {{
+            background: {color}; width: 12px; margin: -5px 0; border-radius: 6px;
+        }}
+    """
 
 
 class _WaveformView(QWidget):
@@ -221,11 +249,20 @@ class _InstrumentDialog(QDialog):
         self.rel.setValue(int(inst.env_release_ms))
         form.addRow("Release (ms):", self.rel)
 
-        self.pan = QDoubleSpinBox(); self.pan.setRange(-1.0, 1.0)
-        self.pan.setSingleStep(0.1); self.pan.setValue(float(inst.pan))
-        self.pan.setToolTip("Stereo-Position fuer den WAV-Render "
-                            "(-1 links .. 0 Mitte .. +1 rechts)")
-        form.addRow("Pan (L .. R):", self.pan)
+        prow = QHBoxLayout()
+        self.pan_slider = QSlider(Qt.Orientation.Horizontal)
+        self.pan_slider.setRange(-100, 100)
+        self.pan_slider.setValue(round(float(inst.pan) * 100))
+        self.pan_slider.setToolTip("Stereo-Position fuer den WAV-Render "
+                                   "(links .. Mitte .. rechts)")
+        self.pan_slider.setStyleSheet(_slider_qss(COLORS["accent"]))
+        self.pan_slider.valueChanged.connect(self._upd_pan_label)
+        prow.addWidget(self.pan_slider, 1)
+        self.pan_label = QLabel(""); self.pan_label.setFixedWidth(48)
+        prow.addWidget(self.pan_label)
+        pw = QWidget(); pw.setLayout(prow)
+        form.addRow("Pan (L .. R):", pw)
+        self._upd_pan_label(self.pan_slider.value())
 
         box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -235,6 +272,14 @@ class _InstrumentDialog(QDialog):
 
     def _upd_base_label(self) -> None:
         self.base_label.setText(note_name(self.base.value()))
+
+    def _upd_pan_label(self, v: int) -> None:
+        if v == 0:
+            self.pan_label.setText("Mitte")
+        elif v < 0:
+            self.pan_label.setText(f"L {-v}%")
+        else:
+            self.pan_label.setText(f"R {v}%")
 
     def _on_wave_loop_changed(self, start: int, end: int) -> None:
         """Marker gezogen -> Spinboxen nachziehen (block_signals verhindert
@@ -256,7 +301,7 @@ class _InstrumentDialog(QDialog):
         i.env_decay_ms = self.dec.value()
         i.env_sustain = self.sus.value()
         i.env_release_ms = self.rel.value()
-        i.pan = self.pan.value()
+        i.pan = self.pan_slider.value() / 100.0
 
 
 class _KeymapDialog(QDialog):
@@ -483,7 +528,8 @@ _SLIDE_COLOR = "#EF9F27"
 class _CellDelegate(QStyledItemDelegate):
     """Zeichnet die Pattern-Zellen im Renoise-Stil: Beat-Zeilen hinterlegt,
     Wiedergabe-Reihe (playhead) betont, und der Zelltext farbcodiert nach
-    Feld -- Note=Cyan (Drum=Magenta), v=Mint, s=Amber, FX=Magenta."""
+    Feld -- Note=eigene Kanalfarbe (Drum=Magenta, Note-Off=gedaempft),
+    v=Mint, s=Amber, FX=Magenta."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -516,18 +562,19 @@ class _CellDelegate(QStyledItemDelegate):
         total = sum(widths) - (fm.horizontalAdvance(" ") if tokens else 0)
         cx = rect.x() + (rect.width() - total) / 2.0
         base = rect.y() + rect.height() / 2.0 + fm.ascent() / 2.0 - 1
+        channel = index.column()
         for i, t in enumerate(tokens):
-            painter.setPen(QColor(self._token_color(i, t)))
+            painter.setPen(QColor(self._token_color(i, t, channel)))
             painter.drawText(int(cx), int(base), t)
             cx += widths[i]
         painter.restore()
 
     @staticmethod
-    def _token_color(idx: int, tok: str) -> str:
+    def _token_color(idx: int, tok: str, channel: int = 0) -> str:
         if idx == 0:                       # Note, Drum-Hit oder Note-Off
             if tok == "OFF":
                 return COLORS["fg_muted"]
-            return COLORS["danger"] if tok == "X" else COLORS["accent"]
+            return COLORS["danger"] if tok == "X" else _channel_color(channel)
         if tok.startswith("v"):
             return COLORS["success"]       # Lautstaerke
         if tok.startswith("s"):
@@ -621,6 +668,8 @@ class TrackerEditor(QMainWindow):
         self.sound_combos: list = []
         self.mute_btns: list = []
         self.solo_btns: list = []
+        self.vol_sliders: list = []
+        self.vol_labels: list = []
         self.vu_meters: list = []
         self._muted: list = []
         self._solo: list = []
@@ -867,14 +916,17 @@ class TrackerEditor(QMainWindow):
         self._mark()
 
     def _make_channel_strip(self, c: int, name: str) -> QWidget:
-        """Baut EINEN Kanal-Streifen (Name/Mute/Solo/Sound-Dropdown/VU) und
-        haengt seine Widgets an die sound_combos/mute_btns/solo_btns/
-        vu_meters-Listen an (Reihenfolge = Kanal-Index)."""
+        """Baut EINEN Kanal-Streifen (Name/Mute/Solo/Sound-Dropdown/Lautstaerke-
+        Regler/VU) und haengt seine Widgets an die sound_combos/mute_btns/
+        solo_btns/vol_sliders/vol_labels/vu_meters-Listen an (Reihenfolge =
+        Kanal-Index). Jeder Kanal bekommt seine eigene Akzentfarbe
+        (`_channel_color`), damit sich viele Kanaele optisch unterscheiden."""
+        col = _channel_color(c)
         w = QWidget()
         v = QVBoxLayout(w); v.setContentsMargins(0, 0, 0, 0); v.setSpacing(2)
         r = QHBoxLayout()
         cl = QLabel(name); cl.setFixedWidth(34)
-        cl.setStyleSheet(f"color: {COLORS['fg_muted']};")
+        cl.setStyleSheet(f"color: {col}; font-weight: bold;")
         r.addWidget(cl)
         mb = QPushButton("M"); mb.setCheckable(True); mb.setFixedWidth(24)
         mb.setToolTip("Spur stummschalten (nur Vorhoeren)")
@@ -889,14 +941,46 @@ class TrackerEditor(QMainWindow):
             lambda idx, ch=c: self._on_sound_changed(ch, idx))
         r.addWidget(cb, 1)
         v.addLayout(r)
+        # Mixer-Lautstaerke-Regler (echter Schieberegler statt Spinbox/Combo --
+        # wie der Kanal-Fader in Renoise/FastTracker/OpenMPT). Wirkt im
+        # Vorhoeren, WAV-Render UND GB-Code-Export (Song.channel_vol).
+        vr = QHBoxLayout(); vr.setSpacing(4)
+        vol_slider = QSlider(Qt.Orientation.Horizontal)
+        vol_slider.setRange(0, 100)
+        vol0 = self.song.channel_vol[c] if c < len(self.song.channel_vol) else 1.0
+        vol_slider.setValue(round(vol0 * 100))
+        vol_slider.setFixedHeight(14)
+        vol_slider.setToolTip("Kanal-Lautstaerke (Mixer-Fader)")
+        vol_slider.setStyleSheet(_slider_qss(col))
+        vol_slider.valueChanged.connect(
+            lambda val, ch=c: self._on_channel_vol_changed(ch, val))
+        vr.addWidget(vol_slider, 1)
+        vol_label = QLabel(f"{round(vol0 * 100)}%"); vol_label.setFixedWidth(32)
+        vol_label.setStyleSheet(f"color: {COLORS['fg_muted']}; font-size: 9px;")
+        vr.addWidget(vol_label)
+        v.addLayout(vr)
         vu = QProgressBar(); vu.setRange(0, 100); vu.setValue(0)
         vu.setTextVisible(False); vu.setFixedHeight(5)
+        vu.setStyleSheet(
+            f"QProgressBar {{ border: none; background: {COLORS['bg_alt']}; "
+            f"border-radius: 2px; }} "
+            f"QProgressBar::chunk {{ background: {col}; border-radius: 2px; }}")
         v.addWidget(vu)
         self.sound_combos.append(cb)
         self.mute_btns.append(mb)
         self.solo_btns.append(sb)
+        self.vol_sliders.append(vol_slider)
+        self.vol_labels.append(vol_label)
         self.vu_meters.append(vu)
         return w
+
+    def _on_channel_vol_changed(self, c: int, val: int) -> None:
+        if c < len(self.song.channel_vol):
+            self.song.channel_vol[c] = val / 100.0
+        if c < len(self.vol_labels):
+            self.vol_labels[c].setText(f"{val}%")
+        self._sound_cache.clear()
+        self._mark()
 
     def _rebuild_channel_strips(self) -> None:
         """Baut die Spur-Sounds-Streifen komplett aus `self.song.channels`
@@ -910,6 +994,8 @@ class TrackerEditor(QMainWindow):
         self.sound_combos = []
         self.mute_btns = []
         self.solo_btns = []
+        self.vol_sliders = []
+        self.vol_labels = []
         self.vu_meters = []
         n = self.song.channels
         self._muted = [False] * n
@@ -957,9 +1043,9 @@ class TrackerEditor(QMainWindow):
         return
 
     def _update_channel_headers(self) -> None:
-        """Spalten-Header zeigen Kanal + zugewiesenes Instrument/Wellenform."""
+        """Spalten-Header zeigen Kanal + zugewiesenes Instrument/Wellenform,
+        in der jeweiligen Kanalfarbe (`_channel_color`) statt einheitlich."""
         names = _channel_names(self.song.channels)
-        labels = []
         for c in range(self.song.channels):
             idx = self.song.channel_inst[c]
             if idx is not None and 0 <= idx < len(self.song.instruments):
@@ -968,8 +1054,9 @@ class TrackerEditor(QMainWindow):
                 sub = "noise"
             else:
                 sub = self.song.waves[c]
-            labels.append(f"{names[c]}\n{sub}")
-        self.grid.setHorizontalHeaderLabels(labels)
+            item = QTableWidgetItem(f"{names[c]}\n{sub}")
+            item.setForeground(QColor(_channel_color(c)))
+            self.grid.setHorizontalHeaderItem(c, item)
 
     def _reload_order(self) -> None:
         self.order_list.clear()
@@ -1543,11 +1630,13 @@ class TrackerEditor(QMainWindow):
             n = max(row_s, row_s * int(n_rows))
         arr = self._render_sound(inst, midi, n, slide or 0)
         if arr is not None:
-            self._play_array(arr, 44100, vol)
-            # VU-Pegel der Spur setzen (Peak x Lautstaerke) -> Meter leuchtet auf.
+            chvol = (self.song.channel_vol[ci]
+                     if 0 <= ci < len(self.song.channel_vol) else 1.0)
+            self._play_array(arr * chvol, 44100, vol)
+            # VU-Pegel der Spur setzen (Peak x Lautstaerke x Kanal-Fader).
             if arr.size and 0 <= ci < len(self.vu_level):
                 vf = (vol_to_pct(vol) / 100.0) if vol else 1.0
-                peak = float(np.max(np.abs(arr))) * vf
+                peak = float(np.max(np.abs(arr))) * vf * chvol
                 self.vu_level[ci] = max(self.vu_level[ci], min(1.0, peak))
                 self.vu_meters[ci].setValue(int(self.vu_level[ci] * 100))
 

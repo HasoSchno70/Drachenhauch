@@ -147,6 +147,7 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
     for c in range(song.channels):
         inst = song.instrument_for_channel(c)
         gl, gr = _pan_gains(_channel_pan(c, inst, hard_pan)) if stereo else (1.0, 1.0)
+        chvol = song.channel_vol[c] if c < len(song.channel_vol) else 1.0
         evs = events[c]
         for k, (start_row, midi, volc, slidec, fx, fxp) in enumerate(evs):
             if midi == NOTE_OFF:
@@ -163,7 +164,7 @@ def render_song(song, sr: int = SAMPLE_RATE, tail_ms: int = 800,
             note = inst.render_note(midi, n_render, sr, slide=(slidec or 0))
             if fx != FX_NONE:
                 note = apply_effect(note, fx, fxp, sr, song.row_ms())
-            amp = (vol_to_pct(volc) / 100.0) if volc else (inst.default_vol / 15.0)
+            amp = ((vol_to_pct(volc) / 100.0) if volc else (inst.default_vol / 15.0)) * chvol
             start = start_row * row_samples
             seg = note[:max(0, total - start)]
             if not seg.size:

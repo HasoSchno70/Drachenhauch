@@ -280,6 +280,37 @@ def test_instrument_dialog_applies_loop_and_env(tmp_path):
     assert abs(inst.env_sustain - 0.7) < 1e-6
 
 
+def test_instrument_dialog_pan_slider_applies_and_labels(tmp_path):
+    """Pan ist jetzt ein Schieberegler (-100..100) statt einer Spinbox --
+    apply_to() muss weiterhin das erwartete -1.0..1.0-Instrument-Feld setzen,
+    und das Label soll L/R/Mitte anzeigen."""
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    ed = _editor()
+    p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
+    inst = ed._instrument_from_file(str(p))
+    dlg = _InstrumentDialog(inst)
+    assert dlg.pan_label.text() == "Mitte"       # Default-Pan 0.0
+    dlg.pan_slider.setValue(-40)
+    assert dlg.pan_label.text() == "L 40%"
+    dlg.apply_to()
+    assert inst.pan == pytest.approx(-0.4)
+    dlg.pan_slider.setValue(70)
+    assert dlg.pan_label.text() == "R 70%"
+    dlg.apply_to()
+    assert inst.pan == pytest.approx(0.7)
+
+
+def test_instrument_dialog_pan_slider_reflects_existing_instrument_pan(tmp_path):
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    ed = _editor()
+    p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
+    inst = ed._instrument_from_file(str(p))
+    inst.pan = -0.5
+    dlg = _InstrumentDialog(inst)
+    assert dlg.pan_slider.value() == -50
+    assert dlg.pan_label.text() == "L 50%"
+
+
 def test_instrument_dialog_waveform_view_syncs_from_spinboxes(tmp_path):
     """Spinbox-Aenderung muss die Wellenform-Marker nachziehen (Anzeige)."""
     from gamebasic.trackereditor_qt import _InstrumentDialog

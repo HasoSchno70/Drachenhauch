@@ -299,6 +299,10 @@ class Song:
         self.instruments: list = []                  # list[Instrument]
         # channel_inst[c] = Index ins instruments-Pool oder None (= Synth/waves)
         self.channel_inst: list[int | None] = [None] * self.channels
+        # channel_vol[c] = Mixer-Lautstaerke 0.0..1.0 (Default 1.0) -- separat
+        # von der Noten-Lautstaerke (vol-Spalte) und vom Instrument-Volume;
+        # klassischer Tracker-Mixer-Fader pro Spur (wie XM/IT-Default-Volume).
+        self.channel_vol: list[float] = [1.0] * self.channels
         self.path = ""
 
     @property
@@ -324,6 +328,10 @@ class Song:
             del self.channel_inst[channels:]
         else:
             self.channel_inst.extend([None] * (channels - len(self.channel_inst)))
+        if channels < len(self.channel_vol):
+            del self.channel_vol[channels:]
+        else:
+            self.channel_vol.extend([1.0] * (channels - len(self.channel_vol)))
         for pat in self.patterns:
             pat.set_channels(channels)
 
@@ -474,6 +482,10 @@ class Song:
             "patterns": [p.to_dict() for p in self.patterns],
             "order": list(self.order),
         }
+        # channel_vol nur schreiben, wenn von 1.0 abweichend (abwaerts-
+        # kompatibel/schlank -- die meisten Songs lassen den Mixer auf voll).
+        if any(v != 1.0 for v in self.channel_vol):
+            d["channel_vol"] = list(self.channel_vol)
         # Instrumente nur schreiben, wenn vorhanden (abwaerts-kompatibel).
         if self.instruments:
             d["instruments"] = [ins.to_dict() for ins in self.instruments]
@@ -496,6 +508,10 @@ class Song:
         order = [int(p) for p in (d.get("order") or [0])
                  if 0 <= int(p) < len(s.patterns)]
         s.order = order or [0]
+        cv = d.get("channel_vol") or []
+        s.channel_vol = [
+            max(0.0, min(1.0, float(cv[c]))) if c < len(cv) else 1.0
+            for c in range(s.channels)]
         insts = d.get("instruments") or []
         if insts:
             from .instrument import Instrument
@@ -590,6 +606,9 @@ class Song:
                 continue
             amp = (f"TRACKER_AMP(trkV{c}[r])"
                    if has_vol and any(vols[c]) else "0.5")
+            cv = self.channel_vol[c] if c < len(self.channel_vol) else 1.0
+            if cv != 1.0:
+                amp = f"({amp} * {cv})"
             tone = (f'AUDIO_TONE(trk{c}[r], TRK_ROWMS, "{wave}", {amp})')
             if has_slide and any(slides[c]):
                 # Mit Slide -> AUDIO_SFX (Pitch-Bend ueber die Reihe), sonst Ton.
@@ -608,6 +627,10 @@ class Song:
                 lines.append(f"    IF trk{c}[r] > 0 THEN PLAYSOUND({tone})")
         damp = (f"TRACKER_AMP(trkV{self.tonal}[r])"
                 if has_vol and any(vols[self.tonal]) else "0.5")
+        dcv = (self.channel_vol[self.tonal]
+               if self.tonal < len(self.channel_vol) else 1.0)
+        if dcv != 1.0:
+            damp = f"({damp} * {dcv})"
         lines.append(
             f"    IF trk{self.tonal}[r] > 0 THEN PLAYSOUND(AUDIO_NOISE(120, {damp}))")
         lines += [
