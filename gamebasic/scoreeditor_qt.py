@@ -375,8 +375,9 @@ class _StaffView(QWidget):
             f2 = QFont(EDITOR_FONT_FAMILY)
             f2.setPointSize(14)
             p.setFont(f2)
+            symbol = "♭" if note.accidental == -1 else "♯"
             p.drawText(QRectF(x - 28, y - 12, 20, 24),
-                      Qt.AlignmentFlag.AlignCenter, "♯")
+                      Qt.AlignmentFlag.AlignCenter, symbol)
 
         if note.staccato:
             # Punkt auf der dem Notenhals abgewandten Seite (Konvention).
@@ -407,17 +408,28 @@ class _StaffView(QWidget):
             na, nb = self._existing_at(a), self._existing_at(b)
             ya = self._y_for_pitch(na.pitch) if na is not None and not na.rest else self._y_for_step(4)
             yb = self._y_for_pitch(nb.pitch) if nb is not None and not nb.rest else self._y_for_step(4)
-            arc_y = min(ya, yb) - 20
-            path = self._slur_path(xa, ya, xb, yb, arc_y)
+            path = self._slur_path(xa, ya, xb, yb)
             p.drawPath(path)
 
     @staticmethod
-    def _slur_path(xa: float, ya: float, xb: float, yb: float, arc_y: float):
+    def _slur_path(xa: float, ya: float, xb: float, yb: float):
+        """Cubic statt Quad-Bezier mit ZWEI Kontrollpunkten auf GLEICHER
+        Hoehe -- ein einzelner, an die (kleinere) Note gepinnter Kontrollpunkt
+        (frueher: `arc_y = min(ya, yb) - 20`, fixer Offset unabhaengig vom
+        Abstand) ergab bei eng benachbarten, aber weit auseinander liegenden
+        Toenen (z.B. Oktavsprung zwischen zwei Achtelnoten) einen schiefen,
+        hakenfoermigen statt einen sanften Bogen -- der Hub wird jetzt
+        proportional zum Beat-Abstand skaliert (geclampt), damit der Bogen
+        bei jedem Tonabstand gleichmaessig ueber beiden Noten bleibt."""
         from PySide6.QtGui import QPainterPath
         path = QPainterPath()
+        dx = xb - xa
+        lift = max(10.0, min(26.0, abs(dx) * 0.3))
+        top = min(ya, yb) - lift
+        c1x = xa + dx * 0.3
+        c2x = xa + dx * 0.7
         path.moveTo(xa, ya - 4)
-        mx = (xa + xb) / 2.0
-        path.quadTo(mx, arc_y, xb, yb - 4)
+        path.cubicTo(c1x, top, c2x, top, xb, yb - 4)
         return path
 
     def _draw_slur_anchor(self, p: QPainter) -> None:
@@ -508,7 +520,7 @@ class _StaffView(QWidget):
         else:
             pitch = self._pitch_for_y(e.position().y(),
                                       self.editor.entry_accidental)
-            self._place(beat, pitch=pitch)
+            self._place(beat, pitch=pitch, accidental=self.editor.entry_accidental)
 
     def mouseMoveEvent(self, e) -> None:  # noqa: N802
         beat = self._snap_beat(self._beat_for_x(e.position().x()))
@@ -525,6 +537,7 @@ class _StaffView(QWidget):
                 if pitch != note.pitch:
                     self._drag_moved = True
                     note.pitch = pitch
+                    note.accidental = self.editor.entry_accidental
             self.update()
             return
         mode = self.editor.entry_mode
@@ -571,7 +584,7 @@ class _StaffView(QWidget):
         self.update()
 
     def _place(self, beat: float, pitch: int | None = None,
-               rest: bool = False) -> None:
+               rest: bool = False, accidental: int = 1) -> None:
         existing = self._existing_at(beat)
         same = (existing is not None and existing.rest == rest
                 and (rest or existing.pitch == pitch))
@@ -579,7 +592,8 @@ class _StaffView(QWidget):
             self.track.remove_note(existing)
         if not same:
             dur = self.editor.entry_duration_beats()
-            self.track.add_note(beat, dur, pitch=pitch, rest=rest)
+            self.track.add_note(beat, dur, pitch=pitch, rest=rest,
+                               accidental=accidental)
         self.editor._mark_dirty()
         self.updateGeometry()
         self.update()

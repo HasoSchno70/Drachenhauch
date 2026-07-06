@@ -1667,14 +1667,20 @@ Moduswechsel bricht eine offene Bindebogen-Anker-Auswahl ab
 festes 4/4-Metrum (UI zeigt/ändert `time_sig` nicht), ein Instrument pro
 Spur (kein Pattern-Zell-Override wie im Tracker), Akkorde (mehrere Noten
 gleichen Start-Beats auf einer Spur) werden beim Tracker-Export auf die
-höchste Note reduziert (ein Tracker-Kanal ist einstimmig), Vorzeichen immer
-als Kreuz der Stammnote darunter notiert (nie als B), Balken-Gruppierung nur
-innerhalb gleichlanger Achtel-/Sechzehntel-Läufe (keine Partial-Balken bei
+höchste Note reduziert (ein Tracker-Kanal ist einstimmig), Balken-Gruppierung
+nur innerhalb gleichlanger Achtel-/Sechzehntel-Läufe (keine Partial-Balken bei
 gemischten Dauern), Noten die über eine 64-Zeilen-Tracker-
 Pattern-Grenze hinaus klingen würden werden dort gekappt, kein
 Schlagzeug-Spurtyp (der Pflicht-Drum-Kanal bleibt beim Export unbelegt),
 kein optisches Notenlinien-Layout (keine automatische Kollisionsvermeidung
-zwischen Vorzeichen/Fingersätzen/Bindebögen/Hilfslinien).
+zwischen Vorzeichen/Fingersätzen/Bindebögen/Hilfslinien). Bindebögen und
+Fingersätze bleiben rein informativ (keine Tracker-/Wiedergabe-Wirkung) --
+echtes Legato/Phrasing waere machbar (Kira `set_playback_rate`+Tween als
+Glide-Primitiv existiert bereits fuer AUDIO_PITCH), aber bewusst nicht gebaut
+(bräuchte neuen Tracker-Tie-Befehl + Player-Logik in audio.rs).
+**Vorzeichen** (♮/♯/♭) werden seit 2026-07-06 korrekt als Kreuz ODER B
+notiert (`NoteEvent.accidental` haelt fest, welches Vorzeichen beim Setzen
+aktiv war) -- die B-Notation ist NICHT mehr auf "immer Kreuz" beschraenkt.
 
 Doku [docs/score-editor.md](docs/score-editor.md), Tests
 `tests/test_score_document.py` + `tests/test_score_convert.py` (Datenmodell +

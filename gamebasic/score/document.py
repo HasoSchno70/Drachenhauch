@@ -28,13 +28,23 @@ class NoteEvent:
     `staccato` wirkt zusaetzlich auf die Wiedergabe/den Tracker-Export
     (verkuerzte Klangdauer, siehe `_apply_envelope`-Analogon in
     `scoreeditor_qt._trigger_note` und `convert.STACCATO_FACTOR`);
-    `fingering` (1..5, Klavier-Fingersatz) ist rein informativ."""
+    `fingering` (1..5, Klavier-Fingersatz) ist rein informativ.
 
-    __slots__ = ("start_beat", "dur_beat", "pitch", "rest", "staccato", "fingering")
+    `accidental` (-1/0/+1 = B/natuerlich/Kreuz) haelt fest, WELCHES
+    Vorzeichen beim Setzen der Note in der Toolbar aktiv war -- rein
+    fuer die Anzeige (`♯`/`♭`), der Klang haengt nur an `pitch` (MIDI).
+    Ohne das koennte die Darstellung nicht zwischen enharmonisch
+    gleichen Toenen unterscheiden (z.B. Db vs. C#, beide MIDI-pitch=61)
+    -- Default 1 (Kreuz) reproduziert die alte, feste "immer als Kreuz"-
+    Darstellung fuer aeltere/ohne Toolbar erzeugte Noten."""
+
+    __slots__ = ("start_beat", "dur_beat", "pitch", "rest", "staccato",
+                 "fingering", "accidental")
 
     def __init__(self, start_beat: float, dur_beat: float,
                  pitch: int | None = None, rest: bool = False,
-                 staccato: bool = False, fingering: int | None = None):
+                 staccato: bool = False, fingering: int | None = None,
+                 accidental: int = 1):
         self.start_beat = float(start_beat)
         self.dur_beat = max(0.0, float(dur_beat))
         # rest=True erzwingt pitch=None und umgekehrt -- keine
@@ -48,6 +58,7 @@ class NoteEvent:
         self.staccato = bool(staccato) and not self.rest
         self.fingering = (max(1, min(5, int(fingering)))
                           if fingering is not None and not self.rest else None)
+        self.accidental = max(-1, min(1, int(accidental))) if not self.rest else 0
 
     @property
     def end_beat(self) -> float:
@@ -63,6 +74,8 @@ class NoteEvent:
             d["staccato"] = True
         if self.fingering is not None:
             d["fingering"] = self.fingering
+        if self.accidental != 1:
+            d["accidental"] = self.accidental
         return d
 
     @classmethod
@@ -71,12 +84,14 @@ class NoteEvent:
         dur = float(d.get("dur", 1.0))
         staccato = bool(d.get("staccato", False))
         fingering = d.get("fingering")
+        accidental = int(d.get("accidental", 1))
         if d.get("rest"):
             return cls(start, dur, rest=True, staccato=staccato)
         pitch = d.get("pitch")
         return cls(start, dur,
                     pitch=int(pitch) if pitch is not None else None,
-                    staccato=staccato, fingering=fingering)
+                    staccato=staccato, fingering=fingering,
+                    accidental=accidental)
 
 
 class Track:
@@ -105,9 +120,11 @@ class Track:
 
     def add_note(self, start_beat: float, dur_beat: float,
                  pitch: int | None = None, rest: bool = False,
-                 staccato: bool = False, fingering: int | None = None) -> NoteEvent:
+                 staccato: bool = False, fingering: int | None = None,
+                 accidental: int = 1) -> NoteEvent:
         ev = NoteEvent(start_beat, dur_beat, pitch=pitch, rest=rest,
-                      staccato=staccato, fingering=fingering)
+                      staccato=staccato, fingering=fingering,
+                      accidental=accidental)
         self.notes.append(ev)
         self.notes.sort(key=lambda n: n.start_beat)
         return ev

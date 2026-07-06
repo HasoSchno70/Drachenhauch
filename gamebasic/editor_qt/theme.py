@@ -372,6 +372,32 @@ def global_qss() -> str:
                 stop:0 {acc_btn_top_h}, stop:1 {acc_btn_bot_h});
         }}
 
+        /* Bare QToolButtons ausserhalb einer echten QToolBar (z.B. die
+           Eingabemodus-Leiste im Notenblatt-Editor, die eine QHBoxLayout statt
+           QToolBar nutzt) -- ohne diese Regel greift nur "QToolBar QToolButton"
+           und Hover/Pressed/Checked bleiben unsichtbar (Buttons wirken tot). */
+        QToolButton {{
+            background-color: transparent;
+            color: {c['fg']};
+            padding: 5px 11px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }}
+        QToolButton:hover {{
+            background-color: {c['bg_hover']};
+            border: 1px solid {c['border']};
+        }}
+        QToolButton:pressed {{
+            background-color: {c['accent_soft']};
+        }}
+        QToolButton:checked {{
+            background-color: {c['accent_soft']};
+            border: 1px solid {c['accent']};
+        }}
+        QToolButton:disabled {{
+            color: {c['fg_muted']};
+        }}
+
         /* --- Checkbox / Combo --- */
         QCheckBox {{ spacing: 6px; }}
         QCheckBox::indicator {{
