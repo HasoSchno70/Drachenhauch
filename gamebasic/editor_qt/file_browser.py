@@ -102,7 +102,8 @@ def _list_builtin_modules() -> list[str]:
 class FileBrowser(QWidget):
     file_activated = Signal(Path)  # Pfad (.gb ODER docs/module-*.md)
 
-    def __init__(self, project_root: Path, parent=None):
+    def __init__(self, project_root: Path, parent=None,
+                 initial_expanded: set | None = None):
         super().__init__(parent)
         self.project_root = project_root
         self.docs_dir = project_root / "docs"
@@ -111,6 +112,12 @@ class FileBrowser(QWidget):
         self._active_path: Path | None = None
         self._sec_modules: QTreeWidgetItem | None = None
         self._sec_files: QTreeWidgetItem | None = None
+        # Beim ALLERERSTEN Aufbau (Baum noch leer, siehe `refresh()`) gibt es
+        # keinen In-Session-Zustand zum Erhalten -- hier kommt stattdessen der
+        # ueber App-Neustarts persistierte Zustand rein (main_window.py laedt
+        # ihn aus settings.json und dekodiert ihn ueber `decode_expanded`).
+        # Wird nach dem ersten `refresh()` verbraucht (siehe dort).
+        self._initial_expanded: set | None = initial_expanded or None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -215,6 +222,36 @@ class FileBrowser(QWidget):
                 walk(ch)
 
         walk(self.tree.invisibleRootItem())
+
+    # ------------------------------------------- Persistenz ueber Neustarts
+    def encode_expanded(self) -> list:
+        """JSON-taugliche Form des aktuellen Auf-/Zu-Zustands (fuer
+        `settings.json`, key "file_browser_expanded") -- `Path`-Anteile der
+        `_expand_key`-Tupel werden zu `str`, der Rest (Section-/Kategorie-
+        Namen) ist schon JSON-tauglich."""
+        out = []
+        for kind, ident in self._collect_expanded():
+            out.append([kind, str(ident) if isinstance(ident, Path) else ident])
+        return out
+
+    @staticmethod
+    def decode_expanded(entries) -> set:
+        """Kehrfunktion zu `encode_expanded` -- baut aus der gespeicherten
+        Liste wieder `_expand_key`-kompatible Tupel (Pfad-Kinds als `Path`)."""
+        keys: set = set()
+        if not isinstance(entries, list):
+            return keys
+        for entry in entries:
+            if not (isinstance(entry, list) and len(entry) == 2):
+                continue
+            kind, ident = entry
+            if not isinstance(kind, str) or not isinstance(ident, str):
+                continue
+            if kind in ("dir", "moduledoc"):
+                keys.add((kind, Path(ident)))
+            else:
+                keys.add((kind, ident))
+        return keys
 
     # --------------------------------------------------- Styling
     def _apply_style(self) -> None:
@@ -423,9 +460,15 @@ class FileBrowser(QWidget):
             # Vorherigen Auf-/Zu-Zustand wiederherstellen (neue Items sind per
             # Default zugeklappt -> nur die zuvor offenen wieder aufklappen).
             self._restore_expanded(prev_expanded)
+        elif self._initial_expanded:
+            # Erststart NACH einem App-Neustart: der zuletzt gespeicherte
+            # Auf-/Zu-Zustand (aus settings.json) ersetzt den harten Default.
+            self.tree.collapseAll()
+            self._restore_expanded(self._initial_expanded)
+            self._initial_expanded = None  # nur beim ersten Aufbau anwenden
         else:
-            # Erststart: beide Sektionen offen (Module sofort sichtbar), tiefere
-            # Ordner zugeklappt.
+            # Erststart ohne gespeicherten Zustand: beide Sektionen offen
+            # (Module sofort sichtbar), tiefere Ordner zugeklappt.
             self.tree.collapseAll()
             sec_mod.setExpanded(True)
             sec_files.setExpanded(True)

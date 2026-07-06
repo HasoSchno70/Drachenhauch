@@ -227,7 +227,11 @@ class GameBasicEditor(QMainWindow):
 
         # Linke Seite: Stack aus FileBrowser/Outline/Builtins
         self.sidebar_stack = QStackedWidget()
-        self.file_browser = FileBrowser(self.project_root)
+        self.file_browser = FileBrowser(
+            self.project_root,
+            initial_expanded=FileBrowser.decode_expanded(
+                self.settings.get("file_browser_expanded")),
+        )
         self.outline = OutlinePanel()
         self.builtins_panel = BuiltinsPanel()
         self.sidebar_stack.addWidget(self.file_browser)
@@ -2333,6 +2337,7 @@ class GameBasicEditor(QMainWindow):
         self.settings["sidebar_active"] = self.activity._active_key  # type: ignore[attr-defined]
         self.settings["sidebar_visible"] = self.sidebar_stack.isVisible()
         self.settings["workspace"] = self._snapshot_workspace()
+        self.settings["file_browser_expanded"] = self.file_browser.encode_expanded()
         save_settings(self.settings)
 
         if self.console.is_running():
