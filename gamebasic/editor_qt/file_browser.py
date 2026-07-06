@@ -48,6 +48,7 @@ _EXAMPLE_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
     ("3D & Rendering", (
         "3d", "model", "heightmap", "billboard", "lighting", "_light",
         "fog", "shadow", "normalmap", "pbr", "ibl", "postfx", "shader",
+        "instanc", "skeletal", "emissive", "vortex", "schwarm",
     )),
     ("Spiele", (
         "pong", "tetris", "platformer", "coinquest", "amiga",
@@ -58,12 +59,14 @@ _EXAMPLE_CATEGORIES: list[tuple[str, tuple[str, ...]]] = [
         "vec2", "input", "html", "net", "ecs", "curves", "preloader",
         "tiled", "audio", "serial", "wifi", "usb", "_bt", "scene", "save",
         "table", "window", "theme", "particle", "camera", "sprite",
+        "form_runner", "anim_fsm", "timer", "chiptune", "modplayer",
+        "sampler",
     )),
     ("Grafik & Demos", (
         "shapes", "sound", "tilemap", "parallax", "textscroll", "schneefall",
         "hires", "showcase", "demo", "orbital", "layers", "atlas",
         "render_target", "blend_gentex", "2d_extras", "ttf", "collision",
-        "editor",
+        "editor", "monitors", "screen_native", "overlay", "filedialog",
     )),
     ("Sprache & Grundlagen", (
         "hello", "variables", "loops", "fibonacci", "builtins", "functions",
