@@ -262,6 +262,24 @@ class CodeEditor(
         self._color_scan_timer.stop()
         self._rescan_color_literals()
 
+    def replace_text_undoable(self, content: str) -> None:
+        """Wie `set_text()`, aber als EIN normaler (undo-faehiger) Edit --
+        `setPlainText()` in `set_text()` loescht die komplette Undo-Historie
+        (Qt-Doku), was fuer echtes Neu-Laden (Datei oeffnen/Recovery) richtig
+        ist, aber fuer programmatische Edits INNERHALB einer offenen Datei
+        (Rename Symbol/Format Document/Projekt-Ersetzen/Format-on-Save)
+        ueberraschend ist -- der User erwartet dort Strg+Z. Cursor-basierter
+        Ersatz in einem `beginEditBlock`/`endEditBlock` loescht die Historie
+        nicht, sondern haengt EINEN Undo-Schritt an (Muster wie
+        `editor_actions.py`s Kommentar-Toggle/Move-Lines)."""
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        try:
+            cursor.select(QTextCursor.SelectionType.Document)
+            cursor.insertText(content)
+        finally:
+            cursor.endEditBlock()
+
     def goto_line(self, line: int) -> None:
         line = max(1, line)
         block = self.document().findBlockByNumber(line - 1)

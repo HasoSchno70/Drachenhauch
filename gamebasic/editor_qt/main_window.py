@@ -954,7 +954,7 @@ class GameBasicEditor(QMainWindow):
                 formatted = format_source(original)
                 if formatted != original:
                     cur_line = st.editor.textCursor().blockNumber() + 1
-                    st.editor.set_text(formatted)
+                    st.editor.replace_text_undoable(formatted)
                     st.editor.document().setModified(True)
                     st.editor.goto_line(cur_line)
             except Exception:
@@ -1125,7 +1125,7 @@ class GameBasicEditor(QMainWindow):
         p.write_text(new_text, encoding="utf-8")
         st = self.tabs.find_tab_for(p.resolve())
         if st is not None:
-            st.editor.set_text(new_text)
+            st.editor.replace_text_undoable(new_text)
             self.tabs.mark_clean(st)
             st.editor._kick_error_check()
             st.editor.setFocus()
@@ -1271,7 +1271,7 @@ class GameBasicEditor(QMainWindow):
             for col, col_end in pairs:
                 new_line = new_line[:col - 1] + new + new_line[col_end - 1:]
             lines[ln - 1] = new_line
-        st.editor.set_text("\n".join(lines))
+        st.editor.replace_text_undoable("\n".join(lines))
         st.editor.document().setModified(True)
         self.statusBar().showMessage(
             f"{len(refs)} Vorkommen von '{name}' -> '{new}' ersetzt.", 3000,
@@ -1981,7 +1981,7 @@ class GameBasicEditor(QMainWindow):
             return
         # Cursor-Zeile merken und nach Format wieder anspringen.
         cur_line = st.editor.textCursor().blockNumber() + 1
-        st.editor.set_text(formatted)
+        st.editor.replace_text_undoable(formatted)
         st.editor.document().setModified(True)
         st.editor.goto_line(cur_line)
         self.statusBar().showMessage("Dokument formatiert.", 2000)

@@ -189,7 +189,7 @@ class FindReplaceDialog(QDialog):
         full = ed.get_text()
         new, count = pattern.subn(self.replace_entry.text(), full)
         if new != full:
-            ed.set_text(new)
+            ed.replace_text_undoable(new)
             self.status.setText(f"{count} Treffer ersetzt.")
         else:
             self.status.setText("Keine Treffer.")
