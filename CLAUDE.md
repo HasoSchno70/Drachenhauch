@@ -1587,8 +1587,11 @@ her und `GUI_UPDATE` ruft sie automatisch per Name auf — kein manuelles
 Verdrahten. Doku [docs/form-designer.md](docs/form-designer.md), Tests
 `tests/test_formdesigner_document.py` (Modell/Roundtrip/Codegen, headless) +
 `tests/test_formdesigner_qt.py` (Konstruktion offscreen). Neue Control-Art:
-Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. Geplant: Resize-Handles/Snap,
-Undo, integrierter Code-Editor (Doppelklick-Control → Handler), Multi-Form.
+Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. **Geplanter Funktionsumfang
+komplett** (siehe docs/form-designer.md „Status/geplant"): Resize-Handles +
+Snap-Grid, Undo/Redo, integrierter Code-Editor (Doppelklick-Control →
+Handler), Multi-Form-Projekte (`.gbproj`) sind alle vorhanden -- diese
+CLAUDE.md-Zeile listete sie faelschlich noch als offen.
 
 ## Notenblatt-Editor (`gbscore`)
 
