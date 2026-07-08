@@ -205,22 +205,32 @@ class AnimDoc:
     # ---- Mutationen ----
     def add_state(self, x: int, y: int, name: str | None = None) -> State:
         nm = unique_name(name or "state", self.state_names())
-        s = State(name=nm, anim=nm, x=int(x), y=int(y))
-        # Sinnvolle Default-Frames: eine Frame mehr als das letzte last.
+        # Sinnvolle Default-Frames: eine Frame mehr als das letzte `last`
+        # (statt immer bei 0 zu starten) -- spart Klicks, wenn mehrere
+        # States nacheinander auf ein gemeinsames Sheet gelegt werden.
+        first = self.states[-1].last + 1 if self.states else 0
+        s = State(name=nm, anim=nm, x=int(x), y=int(y), first=first, last=first)
         self.states.append(s)
         if not self.default_state:
             self.default_state = nm
         return s
 
-    def rename_state(self, old: str, new: str) -> bool:
+    def can_rename_state(self, old: str, new: str) -> bool:
+        """Reine Vorab-Pruefung (keine Mutation) -- damit UI-Code vor einem
+        Undo-Snapshot wissen kann, ob `rename_state` ueberhaupt etwas tun
+        wird (sonst landet ein wirkungsloser Snapshot auf dem Undo-Stack)."""
         new = new.strip()
         if not new or new == ANY_STATE:
             return False
         if new in self.state_names() - {old}:
             return False
-        s = self.state_by_name(old)
-        if s is None:
+        return self.state_by_name(old) is not None
+
+    def rename_state(self, old: str, new: str) -> bool:
+        if not self.can_rename_state(old, new):
             return False
+        new = new.strip()
+        s = self.state_by_name(old)
         if s.anim == old:        # Animation folgte dem Namen -> mitziehen
             s.anim = new
         s.name = new
@@ -242,14 +252,18 @@ class AnimDoc:
         if self.default_state == name:
             self.default_state = self.states[0].name if self.states else ""
 
-    def add_transition(self, from_state: str, to_state: str) -> Transition | None:
+    def can_add_transition(self, from_state: str, to_state: str) -> bool:
+        """Reine Vorab-Pruefung (keine Mutation), analog `can_rename_state`."""
         if to_state == ANY_STATE or not to_state:
-            return None
+            return False
         if from_state != ANY_STATE and self.state_by_name(from_state) is None:
-            return None
+            return False
         if self.state_by_name(to_state) is None:
-            return None
-        if from_state == to_state:
+            return False
+        return from_state != to_state
+
+    def add_transition(self, from_state: str, to_state: str) -> Transition | None:
+        if not self.can_add_transition(from_state, to_state):
             return None
         t = Transition(from_state=from_state, to_state=to_state)
         self.transitions.append(t)

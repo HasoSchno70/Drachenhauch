@@ -301,7 +301,7 @@ class _GraphCanvas(QWidget):
             src = self._link_from
             self._link_from = None
             self._link_to_pt = None
-            if target is not None and target != ANY_STATE:
+            if target is not None and target != ANY_STATE and self.doc.can_add_transition(src, target):
                 self.before_mutation.emit()
                 t = self.doc.add_transition(src, target)
                 if t is not None:
@@ -382,11 +382,11 @@ class _GraphCanvas(QWidget):
 
     def _rename_dialog(self, name: str):
         new, ok = QInputDialog.getText(self, "State umbenennen", "Neuer Name:", text=name)
-        if ok and new.strip():
+        if ok and new.strip() and self.doc.can_rename_state(name, new.strip()):
             self.before_mutation.emit()
-            if self.doc.rename_state(name, new.strip()):
-                self.doc_changed.emit()
-                self.selection_changed.emit(self.doc.state_by_name(new.strip()))
+            self.doc.rename_state(name, new.strip())
+            self.doc_changed.emit()
+            self.selection_changed.emit(self.doc.state_by_name(new.strip()))
             self.update()
 
     # ---- Zeichnen ----
@@ -430,7 +430,6 @@ class _GraphCanvas(QWidget):
 
     def _draw_any(self, qp: QPainter):
         r = self._node_rect(ANY_STATE)
-        sel = self.selected is None and False
         qp.setPen(QPen(_NODE_BORDER, 1.5))
         qp.setBrush(QBrush(_ANY))
         qp.drawRoundedRect(r, 16, 16)
@@ -548,6 +547,7 @@ def _transition_label(t: Transition) -> str:
 # ============================================================ Inspector-Seiten
 class _StateInspector(QWidget):
     changed = Signal()
+    before_mutation = Signal()   # vor einer Mutation -> History-Snapshot
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -596,6 +596,7 @@ class _StateInspector(QWidget):
     def _apply(self):
         if self._loading or self._state is None:
             return
+        self.before_mutation.emit()
         s = self._state
         s.anim = self.anim.text().strip()
         s.loop = self.loop.isChecked()
@@ -609,7 +610,10 @@ class _StateInspector(QWidget):
             return
         new = self.name.text().strip()
         if new and new != self._state.name:
-            if not self._doc.rename_state(self._state.name, new):
+            if self._doc.can_rename_state(self._state.name, new):
+                self.before_mutation.emit()
+                self._doc.rename_state(self._state.name, new)
+            else:
                 self.name.setText(self._state.name)   # abgelehnt -> zuruecksetzen
         self.changed.emit()
 
@@ -617,12 +621,14 @@ class _StateInspector(QWidget):
         if self._loading or self._state is None or self._doc is None:
             return
         if self.is_default.isChecked():
+            self.before_mutation.emit()
             self._doc.default_state = self._state.name
             self.changed.emit()
 
 
 class _TransitionInspector(QWidget):
     changed = Signal()
+    before_mutation = Signal()   # vor einer Mutation -> History-Snapshot
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -678,7 +684,7 @@ class _TransitionInspector(QWidget):
             QMessageBox.information(self, "Kein Parameter",
                                    "Erst links einen Parameter anlegen.")
             return
-        self.changed.emit()                     # History-Snapshot
+        self.before_mutation.emit()
         p = self._doc.params[0]
         op = "trigger" if p.ptype == "trigger" else ("is_true" if p.ptype == "bool" else "gt")
         self._t.conditions.append(Condition(p.name, op, 0.0))
@@ -688,7 +694,7 @@ class _TransitionInspector(QWidget):
     def remove_cond(self, c: Condition):
         if self._t is None:
             return
-        self.changed.emit()
+        self.before_mutation.emit()
         self._t.conditions = [x for x in self._t.conditions if x is not c]
         self._rebuild_conds()
         self.changed.emit()
@@ -696,6 +702,7 @@ class _TransitionInspector(QWidget):
     def _apply_wait(self):
         if self._loading or self._t is None:
             return
+        self.before_mutation.emit()
         self._t.wait_finished = self.wait.isChecked()
         self.changed.emit()
 
@@ -736,6 +743,7 @@ class _CondRow(QWidget):
         self.value.setEnabled(op in ("gt", "lt", "ge", "le", "eq", "ne"))
 
     def _apply(self):
+        self._owner.before_mutation.emit()
         self._c.param = self.param.currentText()
         self._c.op = self.op.currentData()
         self._c.value = self.value.value()
@@ -989,11 +997,9 @@ class AnimEditor(QMainWindow):
         self.canvas.selection_changed.connect(self._on_selection)
         self.canvas.doc_changed.connect(self._on_doc_changed)
         self.canvas.before_mutation.connect(self._snapshot)
-        for panel in (self.doc_panel, self.param_panel):
+        for panel in (self.doc_panel, self.param_panel, self.state_insp, self.trans_insp):
             panel.changed.connect(self._on_doc_changed)
             panel.before_mutation.connect(self._snapshot)
-        self.state_insp.changed.connect(self._on_inspector_changed)
-        self.trans_insp.changed.connect(self._on_inspector_changed)
 
     def _build_toolbar(self):
         tb = QToolBar("Werkzeuge"); tb.setMovable(False)
@@ -1076,11 +1082,6 @@ class AnimEditor(QMainWindow):
         self.param_panel._reload_keep_row()
         self.canvas.update()
 
-    def _on_inspector_changed(self):
-        self._snapshot()
-        self._mark_dirty()
-        self.canvas.update()
-
     def _toggle_link(self, on: bool):
         self.canvas.link_mode = on
         self.statusBar().showMessage(
@@ -1103,14 +1104,43 @@ class AnimEditor(QMainWindow):
         star = "*" if self.dirty else ""
         self.setWindowTitle(f"gbanim — {name}{star}")
 
+    # ---- Ungespeicherte-Aenderungen-Schutz ----
+    def _confirm_dirty(self) -> bool:
+        """Fragt bei ungespeicherten Aenderungen nach (Speichern/Verwerfen/
+        Abbrechen) -- liefert True, wenn fortgefahren werden darf."""
+        if not self.dirty:
+            return True
+        ans = QMessageBox.question(
+            self, "Aenderungen speichern?",
+            "Die Animations-State-Machine hat ungespeicherte Aenderungen.\n"
+            "Vor dem Fortfahren speichern?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel)
+        if ans == QMessageBox.StandardButton.Cancel:
+            return False
+        if ans == QMessageBox.StandardButton.Yes:
+            return self.save_doc()     # False, wenn der Speichern-Dialog abgebrochen wurde
+        return True
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._confirm_dirty():
+            event.accept()
+        else:
+            event.ignore()
+
     # ---- Datei ----
     def new_doc(self):
+        if not self._confirm_dirty():
+            return
         self.path = None
         self.dirty = False
         self._set_doc(AnimDoc())
         self._update_title()
 
     def open_doc(self):
+        if not self._confirm_dirty():
+            return
         fn, _ = QFileDialog.getOpenFileName(self, "Anim-FSM oeffnen",
                                             str(self.project_root), "Anim-FSM (*.gbanim)")
         if not fn:
