@@ -72,7 +72,7 @@ DRAWIMAGEROT(img, PHYS2D_BODY_X(world, id), PHYS2D_BODY_Y(world, id), _
              DEG(PHYS2D_BODY_ANGLE(world, id)), 2.0)   ' zentriert, 2x skaliert
 ```
 
-Komplettes Beispiel: [examples/113_physics2d_sprites.gb](../examples/113_physics2d_sprites.gb)
+Komplettes Beispiel: [examples/145_physics2d_sprites.gb](../examples/145_physics2d_sprites.gb)
 (purzelnde Sprites). Für reine Vektor-Optik zeichnet
 [examples/112_physics2d.gb](../examples/112_physics2d.gb) Boxen als rotierte
 Linien-Outlines und Kreise mit Spin-Linie.

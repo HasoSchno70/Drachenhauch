@@ -39,7 +39,7 @@ SHOWCASE: list[dict] = [
     {"file": "65_amiga_demo.gb",     "title": "Amiga-Demo",
      "desc": "Copper-Bars, Sinus-Scroller und Bob-Plasma -- Retro pur.",
      "frames": 200},
-    {"file": "70_hires_showcase.gb", "title": "Hi-Res-Showcase",
+    {"file": "144_hires_showcase.gb", "title": "Hi-Res-Showcase",
      "desc": "Hochaufgeloeste 2D-Grafik-Pipeline in Aktion.",
      "frames": 160},
     {"file": "77_tiled_platformer.gb", "title": "Tiled-Platformer",

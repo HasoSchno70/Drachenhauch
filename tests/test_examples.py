@@ -20,9 +20,9 @@ _DETERMINISTIC = [
     "11_arrays", "14_strings", "15_struct",
     "20_try",
     "24_json", "25_db",
-    "28_particles",                   # nutzt RANDOMIZE(42)
+    "140_particles",                  # nutzt RANDOMIZE(42)
     "29_camera",
-    "30_select",
+    "21_select",
 ]
 
 # Programme die zwar laufen, aber non-deterministisch sind (Zeit, ungeseedetes RND,
@@ -41,7 +41,7 @@ _INTERACTIVE_OR_ASSETS = [
     "17_tilemap", "21_modules", "22_tetris", "23_platformer",
     "27_imgfx",     # laedt assets/hero.png - braucht gbrun.py (chdir)
     "31_sprite",    # LOADIMAGE/Sprite-Rendering -> nur native (gbrt)
-    "28_particles_visual", "29_camera_visual",
+    "28_particles_visual", "141_camera_visual",
 ]
 
 

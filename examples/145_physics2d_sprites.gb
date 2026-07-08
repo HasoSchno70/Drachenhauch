@@ -1,5 +1,5 @@
 ' ===========================================================================
-'  113_physics2d_sprites.gb  --  physics2d + DRAWIMAGEROT
+'  145_physics2d_sprites.gb  --  physics2d + DRAWIMAGEROT
 '
 '  Echte 2D-Physik (Modul "physics2d") mit ECHTEN Sprites: jeder Koerper traegt
 '  ein Bild, das per DRAWIMAGEROT um seinen Physik-Winkel gedreht gezeichnet wird

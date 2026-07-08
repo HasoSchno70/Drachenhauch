@@ -204,7 +204,7 @@ WEND
 ## Komplettes Beispiel
 
 - [examples/29_camera.gb](../examples/29_camera.gb) — Logik-Test ohne Grafik-Fenster (S2W-Konvertierung, FOLLOW)
-- [examples/29_camera_visual.gb](../examples/29_camera_visual.gb) — interaktiv mit Pfeilen + Zoom
+- [examples/141_camera_visual.gb](../examples/141_camera_visual.gb) — interaktiv mit Pfeilen + Zoom
 
 ## Tipp: Camera-Push/Pop fehlt
 

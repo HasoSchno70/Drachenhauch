@@ -101,4 +101,4 @@ END IF
 
 ## Komplettes Beispiel
 
-[examples/31_physics.gb](../examples/31_physics.gb) — Ball, der durch eine Box-Welt hüpft, mit Hindernis-Reflektion und einem Maus-Ray-Cast.
+[examples/142_physics.gb](../examples/142_physics.gb) — Ball, der durch eine Box-Welt hüpft, mit Hindernis-Reflektion und einem Maus-Ray-Cast.

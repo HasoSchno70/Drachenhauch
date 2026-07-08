@@ -25,7 +25,7 @@
 '
 '  Performance: laeuft mit dem Tree-Walker (Editor "Run") fluessig bei
 '  ~40 FPS in 1600x900. Fuer maximale FPS die native Cython-VM nutzen:
-'      .venv\Scripts\python.exe gbrun.py --vm examples\70_hires_showcase.gb
+'      .venv\Scripts\python.exe gbrun.py --vm examples\144_hires_showcase.gb
 '  Die Live-FPS-Anzeige oben links zeigt den realen Wert auf deinem Rechner.
 ' ============================================================================
 

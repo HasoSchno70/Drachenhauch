@@ -471,12 +471,12 @@ Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
   (Xbox-Layout). Ohne Pad: Count 0, Achsen 0.0, Buttons false (kein Crash).
 - `camera` — `CAMERA_SET/RESET/X/Y/ZOOM/FOLLOW/S2W_X/S2W_Y`. World→Screen-Transform
   (`w2s`/`ssize`) wird in allen Draw-Methoden angewandt; TEXT-Position transformiert,
-  Font-Größe bleibt. 29_camera_visual rendert korrekt.
+  Font-Größe bleibt. 141_camera_visual rendert korrekt.
 - `sprite` — `Value::Sprite` (Sheet-Animation). `SPRITE_NEW/SET_POS/SET_VELOCITY/
   GET_X/Y/WIDTH/HEIGHT/SET_FLIP/SET_SCALE/TINT/TINT_CLEAR/ADD_ANIM/PLAY/PLAY_ONCE/
   CURRENT_ANIM/IS_FINISHED/SET_FRAME/GET_FRAME/UPDATE/COLLIDES/HIT_BOX/HIT_POINT`
   (in `builtins.rs`) + `SPRITE_DRAW` (Sheet-Frame als Sub-Rect, Camera-aware,
-  Flip/Scale/Tint, in `graphics.rs`). 31_sprite_visual + 66_sprite_editor rendern.
+  Flip/Scale/Tint, in `graphics.rs`). 143_sprite_visual + 66_sprite_editor rendern.
   *Grenze:* Konsolen-Demos ohne `SCREEN` gehen nicht (Texturen brauchen GL-Kontext).
 - `tween` — `Value::Tween`, 19 Easings, `TWEEN_NEW/_LOOP/_PINGPONG/VALUE/PROGRESS/
   DONE/RESTART/PAUSE/RESUME/REVERSE/EASINGS`. **Zeitbasiert** (Wall-Clock) → wie
