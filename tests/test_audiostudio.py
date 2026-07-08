@@ -62,3 +62,39 @@ def test_select_tab_by_name(_qapp):
     assert st.tabs.currentIndex() == 1
     st.select_tab("music")          # Alias fuer Tracker
     assert st.tabs.currentIndex() == 0
+
+
+def test_close_event_delegates_to_embedded_tracker_dirty_check(_qapp, monkeypatch):
+    """TrackerEditor.closeEvent feuert NICHT, wenn er nur eine Tab-Seite ist
+    (kein Top-Level-Fenster) -- AudioStudio.closeEvent muss den Dirty-Check
+    deshalb selbst an self.tracker delegieren, sonst geht ungespeicherte
+    Tracker-Arbeit beim Schliessen des Studio-Fensters kommentarlos verloren."""
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtWidgets import QMessageBox
+    st = _studio(_qapp)
+    st.tracker.song.patterns[0].set(0, 0, 60)
+    st.tracker._mark(); st.tracker.undo.flush()
+    assert st.tracker.dirty is True
+
+    called = []
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: called.append(1) or QMessageBox.StandardButton.Cancel)
+    ev = QCloseEvent()
+    st.closeEvent(ev)
+    assert called == [1]
+    assert not ev.isAccepted()
+
+
+def test_close_event_no_dialog_when_tracker_clean(_qapp):
+    from PySide6.QtGui import QCloseEvent
+    from PySide6.QtWidgets import QMessageBox
+    st = _studio(_qapp)
+    assert st.tracker.dirty is False
+
+    def _boom(*a, **k):
+        raise AssertionError("QMessageBox.question sollte bei sauberem Tracker nicht aufgerufen werden")
+    import unittest.mock
+    with unittest.mock.patch.object(QMessageBox, "question", _boom):
+        ev = QCloseEvent()
+        st.closeEvent(ev)
+    assert ev.isAccepted()

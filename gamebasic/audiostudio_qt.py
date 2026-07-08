@@ -62,8 +62,12 @@ class AudioStudio(QMainWindow):
         if initial_file and Path(initial_file).exists():
             try:
                 self.tracker.song = Song.load_json(str(initial_file))
+                self.tracker.path = Path(initial_file)
                 self.tracker.cur = 0
                 self.tracker._reload_all()
+                self.tracker.undo.reset()
+                self.tracker.dirty = False
+                self.tracker._update_title()
             except Exception:
                 pass
 
@@ -83,6 +87,17 @@ class AudioStudio(QMainWindow):
             self.showMaximized()
         else:
             self.showFullScreen()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # TrackerEditor.closeEvent greift hier NICHT -- als eingebettete
+        # Tab-Seite (kein Top-Level-Fenster) feuert Qt keinen Close-Event auf
+        # ihr, wenn der Vorfahr (dieses Studio-Fenster) geschlossen wird.
+        # Also den Dirty-Check hier direkt aufrufen (SFX-Generator hat kein
+        # Save/Load-Dateimodell -- nichts zu verlieren, keine Pruefung noetig).
+        if self.tracker._confirm_dirty():
+            event.accept()
+        else:
+            event.ignore()
 
 
 def launch(project_root: Path, initial_file: Path | None = None,

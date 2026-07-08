@@ -592,6 +592,8 @@ class TrackerEditor(QMainWindow):
         self.setWindowTitle("GameBasic Tracker")
         self.resize(1120, 840)
         self.song = Song()
+        self.path: Path | None = None  # aktueller Speicherort (fuer Quick-Save)
+        self.dirty = False
         self.cur = 0                   # aktueller Pattern-Index
         self._sound_cache: dict = {}
         self._mixer = Mixer()          # additiver Mixer (gamebasic.audio_preview)
@@ -725,7 +727,9 @@ class TrackerEditor(QMainWindow):
         b_new = QPushButton("Neu"); b_new.clicked.connect(self._new_song)
         b_open = QPushButton("Oeffnen"); b_open.clicked.connect(self._open)
         b_save = QPushButton("Speichern"); b_save.clicked.connect(self._save)
-        for b in (b_new, b_open, b_save):
+        b_save_as = QPushButton("Speichern unter...")
+        b_save_as.clicked.connect(self._save_as)
+        for b in (b_new, b_open, b_save, b_save_as):
             prow.addWidget(b)
         prow.addSpacing(8)
         self.btn_undo = QPushButton("↶"); self.btn_undo.setFixedWidth(34)
@@ -883,12 +887,16 @@ class TrackerEditor(QMainWindow):
             lambda: _copy.deepcopy(self.song.to_dict()), self._restore_song,
             debounce_ms=1)
         self.undo.changed.connect(self._update_undo_buttons)
+        self.undo.changed.connect(self._mark_dirty)
         self.btn_undo.clicked.connect(self.undo.undo)
         self.btn_redo.clicked.connect(self.undo.redo)
         QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
         QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
         QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
+        QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save)
+        QShortcut(QKeySequence("Ctrl+Shift+S"), self, activated=self._save_as)
         self._update_undo_buttons()
+        self._update_title()
 
     def _mark(self) -> None:
         u = getattr(self, "undo", None)
@@ -898,6 +906,43 @@ class TrackerEditor(QMainWindow):
     def _update_undo_buttons(self) -> None:
         self.btn_undo.setEnabled(self.undo.can_undo())
         self.btn_redo.setEnabled(self.undo.can_redo())
+
+    # ---- Ungespeicherte-Aenderungen-Schutz ----
+    def _mark_dirty(self) -> None:
+        # undo.changed feuert auch bei Undo/Redo (nicht nur bei neuen
+        # Aenderungen) -- fuer Dirty-Zwecke reicht das (gleiches simples
+        # Bool-Flag-Muster wie bei den anderen Begleit-Editoren, keine
+        # "zurueck auf exakt den gespeicherten Stand"-Erkennung).
+        self.dirty = True
+        self._update_title()
+
+    def _update_title(self) -> None:
+        base = f"GameBasic Tracker -- {self.path.name}" if self.path else "GameBasic Tracker"
+        self.setWindowTitle(base + ("*" if self.dirty else ""))
+
+    def _confirm_dirty(self) -> bool:
+        """Fragt bei ungespeicherten Aenderungen nach (Speichern/Verwerfen/
+        Abbrechen) -- liefert True, wenn fortgefahren werden darf."""
+        if not self.dirty:
+            return True
+        ans = QMessageBox.question(
+            self, "Aenderungen speichern?",
+            "Das Tracker-Projekt hat ungespeicherte Aenderungen.\n"
+            "Vor dem Fortfahren speichern?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel)
+        if ans == QMessageBox.StandardButton.Cancel:
+            return False
+        if ans == QMessageBox.StandardButton.Yes:
+            return self._save()        # False, wenn der Speichern-Dialog abgebrochen wurde
+        return True
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if self._confirm_dirty():
+            event.accept()
+        else:
+            event.ignore()
 
     def _restore_song(self, snap: dict) -> None:
         """Setzt das Song-Modell aus einem to_dict()-Snapshot (fuer Undo)."""
@@ -1792,14 +1837,20 @@ class TrackerEditor(QMainWindow):
 
     # ============================================== Datei
     def _new_song(self) -> None:
+        if not self._confirm_dirty():
+            return
         self.song = Song()
+        self.path = None
         self._install_factory_presets()
         self.cur = 0
         self._reload_all()
         self.undo.reset()      # frisches Dokument -> Historie verwerfen
-        self.setWindowTitle("GameBasic Tracker")
+        self.dirty = False
+        self._update_title()
 
     def _open(self) -> None:
+        if not self._confirm_dirty():
+            return
         path, _ = QFileDialog.getOpenFileName(
             self, "Tracker-Projekt oeffnen", str(self.project_root),
             "Tracker-Projekt (*.json)")
@@ -1810,27 +1861,42 @@ class TrackerEditor(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
             return
+        self.path = Path(path)
         self.cur = 0
         self._sound_cache.clear()
         self._install_factory_presets()    # alte Songs ohne Instrumente
         self._reload_all()
         self.undo.reset()      # geladenes Dokument -> Historie verwerfen
-        self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")
+        self.dirty = False
+        self._update_title()
 
-    def _save(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Tracker-Projekt speichern", str(self.project_root),
-            "Tracker-Projekt (*.json)")
-        if not path:
-            return
-        if not path.lower().endswith(".json"):
-            path += ".json"
+    def _save(self) -> bool:
+        """Quick-Save: schreibt auf `self.path`, wenn schon bekannt (aus
+        Oeffnen/vorigem Speichern) -- sonst wie `_save_as()` ein Dialog.
+        Frueher IMMER ein Dialog, auch beim wiederholten Strg+S auf eine
+        bereits benannte Datei."""
+        if self.path is None:
+            return self._save_as()
         try:
-            self.song.save_json(path)
+            self.song.save_json(str(self.path))
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
-            return
-        self.setWindowTitle(f"GameBasic Tracker -- {Path(path).name}")
+            return False
+        self.dirty = False
+        self._update_title()
+        return True
+
+    def _save_as(self) -> bool:
+        default = str(self.path) if self.path else str(self.project_root)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Tracker-Projekt speichern", default,
+            "Tracker-Projekt (*.json)")
+        if not path:
+            return False
+        if not path.lower().endswith(".json"):
+            path += ".json"
+        self.path = Path(path)
+        return self._save()
 
     # ============================================== Export
     def _export(self) -> None:
@@ -1929,8 +1995,12 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     if initial_file and Path(initial_file).exists():
         try:
             win.song = Song.load_json(str(initial_file))
+            win.path = Path(initial_file)
             win.cur = 0
             win._reload_all()
+            win.undo.reset()
+            win.dirty = False
+            win._update_title()
         except Exception:
             pass
     win.show()
