@@ -822,7 +822,9 @@ class ScoreEditor(QMainWindow):
         menu = self.menuBar().addMenu("&Datei")
         menu.addAction("Neu", self._new_doc)
         menu.addAction("Oeffnen...", self._open)
-        menu.addAction("Speichern...", self._save)
+        menu.addAction("Speichern", self._save).setShortcut(QKeySequence.StandardKey.Save)
+        act_save_as = menu.addAction("Speichern unter...", self._save_as)
+        act_save_as.setShortcut(QKeySequence("Ctrl+Shift+S"))
 
     def _rebuild_tracks_ui(self) -> None:
         while self.tracks_layout.count():
@@ -1121,8 +1123,21 @@ class ScoreEditor(QMainWindow):
         self.undo.reset()      # geladenes Dokument -> Historie verwerfen
 
     def _save(self) -> None:
+        """Quick-Save: schreibt auf doc.path, wenn schon bekannt (aus Oeffnen/
+        vorigem Speichern) -- sonst wie _save_as() ein Dialog. Frueher IMMER
+        ein Dialog, auch beim wiederholten Strg+S auf eine bereits benannte
+        Datei."""
+        if not self.doc.path:
+            self._save_as()
+            return
+        self.doc.save_json(self.doc.path)
+        self._dirty = False
+        self._update_title()
+
+    def _save_as(self) -> None:
+        default = self.doc.path or str(self.project_root)
         path, _ = QFileDialog.getSaveFileName(
-            self, "Notenblatt speichern", str(self.project_root),
+            self, "Notenblatt speichern", default,
             "GameBasic-Notenblatt (*.json)")
         if not path:
             return

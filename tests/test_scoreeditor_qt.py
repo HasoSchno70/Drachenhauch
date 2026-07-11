@@ -292,6 +292,29 @@ def test_playback_triggers_mixer_without_crashing():
     assert not ed._playing
 
 
+def test_save_reuses_known_path_without_dialog(tmp_path, monkeypatch):
+    """Quick-Save: nach dem ersten Speichern/Oeffnen kennt doc.path den Pfad
+    schon (ScoreDoc.save_json/load_json setzen ihn) -- ein wiederholtes
+    _save() sollte ihn wiederverwenden statt erneut den Save-Dialog zu oeffnen."""
+    from PySide6.QtWidgets import QFileDialog
+
+    ed = _editor()
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    save_path = tmp_path / "erststueck.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        lambda *a, **k: (str(save_path), ""))
+    ed._save()
+    assert ed.doc.path == str(save_path)
+
+    ed.doc.tracks[0].add_note(1.0, 1.0, 64)
+
+    def _boom(*a, **k):
+        raise AssertionError("Quick-Save haette keinen Save-Dialog oeffnen duerfen")
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", _boom)
+    ed._save()
+    assert not ed.windowTitle().endswith("*")
+
+
 def test_save_and_load_roundtrip(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
 
