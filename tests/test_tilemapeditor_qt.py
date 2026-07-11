@@ -48,6 +48,59 @@ def test_add_layer_is_undoable(app):
     assert len(win.doc.layers) == n0 + 1
 
 
+def test_add_layer_updates_dirty_title(app):
+    """Review-Fund: doc.dirty wurde an vielen Stellen gesetzt, aber nie fuer
+    einen Titel-Stern gelesen -- Struktur-Aenderungen liefen ueber
+    _sync_layers() (jetzt der zentrale Hook fuer _update_title())."""
+    win = _win(app)
+    assert "*" not in win.windowTitle()
+    win._add_layer()
+    assert win.doc.dirty is True
+    assert win.windowTitle().endswith("*")
+
+
+def test_undo_after_structural_change_updates_title(app):
+    win = _win(app)
+    win._add_layer()
+    # So tun, als waere gerade gespeichert worden (dirty=False + Titel neu).
+    win.doc.dirty = False
+    win._update_title()
+    assert "*" not in win.windowTitle()
+    win._undo()
+    assert win.doc.dirty is True
+    assert win.windowTitle().endswith("*")
+
+
+def test_tile_paint_commit_updates_dirty_title(app):
+    """Deckt die dirty-VOR-emit-Umsortierung in _Canvas._commit() ab: der
+    Slot im Hauptfenster (_on_committed) ruft _update_title() waehrend des
+    synchronen emit() auf -- ohne die Umsortierung waere doc.dirty an der
+    Stelle noch False (Signal feuert vor der alten dirty=True-Zeile)."""
+    win = _win(app)
+    layer = win.doc.layers[0]
+    assert "*" not in win.windowTitle()
+    win.canvas._before = list(layer.tiles)
+    layer.tiles = [1] * len(layer.tiles)   # tatsaechliche Aenderung
+    win.canvas._commit(layer)
+    assert win.doc.dirty is True
+    assert win.windowTitle().endswith("*")
+
+
+def test_save_clears_dirty_title(app, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    win = _win(app, tmp_path)
+    win._add_layer()
+    assert win.windowTitle().endswith("*")
+
+    target = tmp_path / "map.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        lambda *a, **k: (str(target), ""))
+    win._save()
+    assert win.doc.path == str(target)
+    assert not win.windowTitle().endswith("*")
+    assert target.name in win.windowTitle()
+
+
 def test_add_object_layer_is_undoable(app):
     win = _win(app)
     n0 = len(win.doc.layers)

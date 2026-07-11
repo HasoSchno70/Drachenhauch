@@ -295,8 +295,12 @@ class _Canvas(QWidget):
     def _obj_commit(self, layer) -> None:
         if self._obj_before is not None:
             after = copy.deepcopy(layer.objects)
-            self.obj_committed.emit(self.active_layer, self._obj_before, after)
+            # dirty VOR dem Signal setzen -- der Slot im Hauptfenster
+            # (_on_obj_committed) will fuer den Titel-Stern den bereits
+            # aktualisierten Wert sehen (Qt-Direktverbindungen feuern
+            # synchron waehrend emit()).
             self.doc.dirty = True
+            self.obj_committed.emit(self.active_layer, self._obj_before, after)
         self._obj_before = None
 
     def delete_selected(self) -> None:
@@ -417,8 +421,9 @@ class _Canvas(QWidget):
 
     def _commit(self, layer) -> None:
         if self._before is not None and self._before != layer.tiles:
-            self.committed.emit(self.active_layer, self._before, list(layer.tiles))
+            # dirty VOR dem Signal setzen -- siehe _obj_commit.
             self.doc.dirty = True
+            self.committed.emit(self.active_layer, self._before, list(layer.tiles))
         self._before = None
 
     # ---------------------------------------------------- Select-Clipboard
@@ -1045,6 +1050,15 @@ class TileMapEditor(QMainWindow):
             self._update_status()
 
     # ---------------------------------------------------- Datei
+    def _mark_dirty(self) -> None:
+        self.doc.dirty = True
+        self._update_title()
+
+    def _update_title(self) -> None:
+        name = Path(self.doc.path).name if self.doc.path else "unbenannt"
+        star = "*" if self.doc.dirty else ""
+        self.setWindowTitle(f"GameBasic Tilemap-Editor -- {name}{star}")
+
     def _confirm_discard_changes(self) -> bool:
         """Fragt bei ungespeicherten Aenderungen nach, bevor sie verworfen
         werden (Neu/Oeffnen/Schliessen). Frueher ersetzten _new_map()/_open()
@@ -1082,6 +1096,7 @@ class TileMapEditor(QMainWindow):
         self._sync_layers()
         self._refresh_views()
         self._update_status()
+        self._update_title()
 
     def _load_tileset_pixmaps(self) -> None:
         """Laedt fuer jedes Tileset des Dokuments das Bild (parallele Liste)."""
@@ -1114,6 +1129,7 @@ class TileMapEditor(QMainWindow):
         self._sync_layers()
         self._refresh_views()
         self._update_status()
+        self._update_title()
 
     def _save(self) -> None:
         if not self.doc.path:
@@ -1137,7 +1153,7 @@ class TileMapEditor(QMainWindow):
         except Exception as exc:
             QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
             return
-        self.setWindowTitle(f"GameBasic Tilemap-Editor -- {Path(path).name}")
+        self._update_title()      # doc.save_json() setzt path + dirty=False
         self.status.showMessage(f"Gespeichert: {path}", 4000)
 
     def _export_code(self) -> None:
@@ -1221,6 +1237,11 @@ class TileMapEditor(QMainWindow):
         # aktive Zeile = aktiver Layer
         self._select_layer_row(self.canvas.active_layer)
         self.layer_list.blockSignals(False)
+        # _sync_layers() laeuft nach so gut wie jeder Struktur-Aenderung
+        # (Layer add/remove/rename/tileset-Ops/Undo-Redo) -- guenstiger
+        # zentraler Punkt fuer den Titel-Stern statt jeden Aufrufer einzeln
+        # um _update_title() zu ergaenzen.
+        self._update_title()
 
     def _select_layer_row(self, layer_idx: int) -> None:
         for row in range(self.layer_list.count()):
@@ -1253,7 +1274,7 @@ class TileMapEditor(QMainWindow):
         if li is None or li >= len(self.doc.layers):
             return
         self.doc.layers[li].visible = (item.checkState() == Qt.CheckState.Checked)
-        self.doc.dirty = True
+        self._mark_dirty()
         self.canvas.update()
 
     def _rename_layer(self, item: QListWidgetItem) -> None:
@@ -1262,7 +1283,7 @@ class TileMapEditor(QMainWindow):
                                         text=self.doc.layers[li].name)
         if ok and name.strip():
             self.doc.layers[li].name = name.strip()
-            self.doc.dirty = True
+            self._mark_dirty()
             self._sync_layers()
 
     def _add_layer(self) -> None:
@@ -1297,7 +1318,7 @@ class TileMapEditor(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             dlg.apply_to_obj()
             self._on_obj_committed(li, before, copy.deepcopy(layer.objects))
-            self.doc.dirty = True
+            self._mark_dirty()
             self.canvas.update()
             self._on_obj_selected(obj)
 
@@ -1382,10 +1403,12 @@ class TileMapEditor(QMainWindow):
     def _on_committed(self, layer_idx, before, after) -> None:
         self.undo_stack.append(("tiles", layer_idx, before, after))
         self.redo_stack.clear()
+        self._update_title()
 
     def _on_obj_committed(self, layer_idx, before, after) -> None:
         self.undo_stack.append(("objects", layer_idx, before, after))
         self.redo_stack.clear()
+        self._update_title()
 
     def _restore_undo(self, entry, *, use_before: bool) -> None:
         kind, li, before, after = entry
@@ -1401,7 +1424,7 @@ class TileMapEditor(QMainWindow):
                                            len(self.doc.layers) - 1)
             self.canvas.selected_obj = None
             self.canvas.obj_selected.emit(None)
-            self.doc.dirty = True
+            self._mark_dirty()
             # Tileset-Bilder aus den (evtl. wiederhergestellten) Pfaden neu
             # laden -- QPixmaps sind UI-seitig, nicht Teil des Doc-Snapshots.
             # _refresh_views() allein wuerde neue/wiederhergestellte Slots
@@ -1420,7 +1443,7 @@ class TileMapEditor(QMainWindow):
             layer.objects = copy.deepcopy(snap)
             self.canvas.selected_obj = None
             self.canvas.obj_selected.emit(None)
-        self.doc.dirty = True
+        self._mark_dirty()
         self.canvas.update()
 
     def _undo(self) -> None:
