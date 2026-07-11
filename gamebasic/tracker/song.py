@@ -350,6 +350,12 @@ class Song:
         # klassischer Tracker-Mixer-Fader pro Spur (wie XM/IT-Default-Volume).
         self.channel_vol: list[float] = [1.0] * self.channels
         self.path = ""
+        # Cache fuer die fluechtigen Kanal-Standard-Synths aus
+        # instrument_for_channel() (keyed (channel, waveform), NICHT
+        # persistiert) -- ohne den Cache erzeugte jeder Aufruf ein neues
+        # Instrument.synth()-Objekt, wodurch trackereditor_qt._render_sound()s
+        # id(inst)-basierter Sound-Cache nie traf (jede Note re-synthetisiert).
+        self._channel_synth_cache: dict = {}
 
     @property
     def tonal(self) -> int:
@@ -393,7 +399,12 @@ class Song:
         if idx is not None and 0 <= idx < len(self.instruments):
             return self.instruments[idx]
         wf = "noise" if c == self.tonal else self.waves[c]
-        return Instrument.synth(f"Ch{c}", wf)
+        key = (c, wf)
+        inst = self._channel_synth_cache.get(key)
+        if inst is None:
+            inst = Instrument.synth(f"Ch{c}", wf)
+            self._channel_synth_cache[key] = inst
+        return inst
 
     def instrument_for_cell(self, pat: "Pattern", c: int, r: int):
         """Effektives Instrument fuer EINE Note: der per-Note-Override

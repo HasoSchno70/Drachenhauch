@@ -446,6 +446,32 @@ def test_instrument_for_channel_default_is_synth():
     assert s.instrument_for_channel(TONAL).waveform == "noise"
 
 
+def test_instrument_for_channel_returns_stable_object_when_unassigned():
+    """Regression: instrument_for_channel() baute frueher bei JEDEM Aufruf
+    ein neues Instrument.synth()-Objekt fuer einen Kanal ohne explizite
+    Zuweisung -- trackereditor_qt._render_sound()s id(inst)-basierter
+    Sound-Cache traf dadurch nie (jede Note wurde neu synthetisiert, auch
+    identische Wiederholungen). Jetzt wird das fluechtige Synth pro
+    (Kanal, Wellenform) wiederverwendet -- id() bleibt ueber Aufrufe stabil."""
+    s = Song()
+    a = s.instrument_for_channel(0)
+    b = s.instrument_for_channel(0)
+    assert a is b
+
+    # Wellenform-Wechsel -> bewusst ein ANDERES (neues) Instrument, keine
+    # veraltete Instanz der alten Wellenform.
+    s.waves[0] = "saw"
+    c = s.instrument_for_channel(0)
+    assert c is not a
+    assert c.waveform == "saw"
+
+    # Nach dem Zuweisen eines echten Instruments hat die Identitaets-Frage
+    # keine Bedeutung mehr (kommt direkt aus dem Pool, nicht aus dem Cache).
+    idx = s.add_instrument(_sample_inst("Kick"))
+    s.channel_inst[0] = idx
+    assert s.instrument_for_channel(0) is s.instruments[idx]
+
+
 def test_assign_instrument_to_channel():
     s = Song()
     idx = s.add_instrument(_sample_inst("Kick"))
