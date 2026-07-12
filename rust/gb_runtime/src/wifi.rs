@@ -6,18 +6,78 @@
 mod imp {
     use std::os::windows::process::CommandExt;
     use std::process::Command;
+    use std::time::Duration;
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    /// Zeitlimit fuer `netsh`-Aufrufe -- ohne das kann ein haengender/
+    /// ueberlasteter Netzwerk-Stack den kompletten Game-Loop-Thread
+    /// unbegrenzt blockieren (`Command::output()` ist synchron/blockierend
+    /// und laeuft auf demselben Thread wie Rendering/Input).
+    const NETSH_TIMEOUT: Duration = Duration::from_secs(10);
+
+    /// `netsh`-Konsolenausgabe ist auf Windows NICHT zuverlaessig eine feste
+    /// Kodierung: je nach Windows-Version/Konfiguration liefert `netsh` bei
+    /// umgeleitetem stdout (wie hier, `Command::output()`) mal die
+    /// **OEM-Codepage** der Konsole (CP850/CP437/...), mal tatsaechlich UTF-8
+    /// (empirisch auf diesem System bei `netsh wlan show profiles`
+    /// verifiziert -- die vorherige Version, die blind ueber `GetOEMCP` +
+    /// `MultiByteToWideChar` dekodierte, hat hier gueltiges UTF-8 kaputt
+    /// gemacht statt es zu reparieren). Deshalb: erst UTF-8 versuchen (der
+    /// haeufigere Fall bei umgeleitetem Output), nur bei ungueltigen Bytes auf
+    /// die OEM-Codepage zurueckfallen (kein neues Crate, wie
+    /// `local_datetime()` in builtins.rs -- rohe WinAPI-FFI).
+    fn decode_console_output(bytes: &[u8]) -> String {
+        if bytes.is_empty() {
+            return String::new();
+        }
+        if let Ok(s) = std::str::from_utf8(bytes) {
+            return s.to_string();
+        }
+        extern "system" {
+            fn GetOEMCP() -> u32;
+            fn MultiByteToWideChar(
+                code_page: u32, dw_flags: u32,
+                lp_multi_byte_str: *const u8, cb_multi_byte: i32,
+                lp_wide_char_str: *mut u16, cch_wide_char: i32,
+            ) -> i32;
+        }
+        unsafe {
+            let cp = GetOEMCP();
+            let needed = MultiByteToWideChar(cp, 0, bytes.as_ptr(), bytes.len() as i32, std::ptr::null_mut(), 0);
+            if needed <= 0 {
+                return String::from_utf8_lossy(bytes).into_owned();
+            }
+            let mut buf: Vec<u16> = vec![0u16; needed as usize];
+            let written = MultiByteToWideChar(cp, 0, bytes.as_ptr(), bytes.len() as i32, buf.as_mut_ptr(), needed);
+            if written <= 0 {
+                return String::from_utf8_lossy(bytes).into_owned();
+            }
+            String::from_utf16_lossy(&buf[..written as usize])
+        }
+    }
 
     fn run_netsh(args: &[&str]) -> Result<(i32, String), String> {
-        let out = Command::new("netsh")
-            .args(args)
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-            .map_err(|_| "WIFI: 'netsh' nicht gefunden".to_string())?;
-        let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
-        text.push_str(&String::from_utf8_lossy(&out.stderr));
-        Ok((out.status.code().unwrap_or(-1), text))
+        // `Command::output()` selbst hat kein Timeout -- auf einem Hilfs-Thread
+        // laufen lassen und mit `recv_timeout` begrenzen (gleiches Muster wie
+        // die DNS-Timeout-Aufloesung in net.rs).
+        let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = Command::new("netsh")
+                .args(&args_owned)
+                .creation_flags(CREATE_NO_WINDOW)
+                .output();
+            let _ = tx.send(result);
+        });
+        match rx.recv_timeout(NETSH_TIMEOUT) {
+            Ok(Ok(out)) => {
+                let mut text = decode_console_output(&out.stdout);
+                text.push_str(&decode_console_output(&out.stderr));
+                Ok((out.status.code().unwrap_or(-1), text))
+            }
+            Ok(Err(_)) => Err("WIFI: 'netsh' nicht gefunden".to_string()),
+            Err(_) => Err(format!("WIFI: 'netsh' hat nach {}s nicht geantwortet", NETSH_TIMEOUT.as_secs())),
+        }
     }
 
     fn re(pat: &str) -> regex::Regex {
@@ -25,10 +85,12 @@ mod imp {
     }
 
     pub fn available() -> bool {
-        match run_netsh(&["wlan", "show", "interfaces"]) {
-            Ok((rc, out)) => rc == 0 && (out.contains("WLAN") || out.contains("Wireless") || out.contains("Drahtlos")),
-            Err(_) => false,
-        }
+        // rc==0 heisst "netsh wlan show interfaces" konnte eine Schnittstelle
+        // auflisten -- sprachunabhaengig und damit robuster als die vorherige
+        // feste Woerterliste ("WLAN"/"Wireless"/"Drahtlos"), die auf jedem
+        // Windows jenseits dieser drei Sprachen faelschlich FALSE lieferte
+        // (enger als current()'s 5-Sprachen-Erkennung).
+        matches!(run_netsh(&["wlan", "show", "interfaces"]), Ok((0, out)) if !out.trim().is_empty())
     }
 
     pub fn current() -> Result<String, String> {

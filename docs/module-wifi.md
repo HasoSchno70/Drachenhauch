@@ -29,6 +29,10 @@ Linux nutzt typischerweise `nmcli`, macOS `networksetup` — diese sind hier nic
 
 `netsh wlan` gibt seine Ausgabe in der System-Sprache aus (Deutsch / Englisch / Französisch …). Der Parser ist tolerant — verbundene/getrennte Zustände werden in DE/EN/FR/IT/ES erkannt, Profilnamen werden über das Stichwort „profil" / „Profile" gefunden. Sollte deine Sprache nicht erkannt werden: Issue / Patch willkommen.
 
+`WIFI_AVAILABLE()` prüft NICHT (mehr) auf feste Wörter wie „WLAN"/„Wireless" — das war enger als die 5-Sprachen-Erkennung von `WIFI_CURRENT()` und lieferte auf jeder anderen Windows-Systemsprache fälschlich `FALSE`. Stattdessen zählt allein, ob `netsh wlan show interfaces` erfolgreich eine Schnittstelle auflisten konnte (sprachunabhängig).
+
+Konsolen-Ausgabe von `netsh` ist auf Windows nicht verlässlich eine feste Kodierung (mal UTF-8, mal OEM-Codepage, je nach Windows-Version/Konfiguration) — das Modul versucht zuerst UTF-8, fällt bei ungültigen Bytes auf die OEM-Codepage zurück. Umlaute/Sonderzeichen in SSID-/Profilnamen (z.B. `WIFI_PROFILES()`) werden dadurch korrekt statt als Mojibake dargestellt.
+
 ## Beispiel — aktueller Status + Scan
 
 ```basic
@@ -111,4 +115,4 @@ Siehe [examples/36_wifi.gb](../examples/36_wifi.gb).
 
 ## In der nativen Runtime (gbrt)
 
-`wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows-only via `netsh wlan`, keine Crate). Bauen: `python rust/build_runtime.py --hardware` (oder `--full`).
+`wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows-only via `netsh wlan`, keine Crate). Jeder `netsh`-Aufruf hat ein 10-Sekunden-Timeout — ein haengender/ueberlasteter Netzwerk-Stack friert damit nicht mehr den Game-Loop ein. Bauen: `python rust/build_runtime.py --hardware`.
