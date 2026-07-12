@@ -391,6 +391,16 @@ Voraussetzungen (Windows): VS C++ Build Tools (liefern `cl.exe` + gebündeltes
 cmake), LLVM für `libclang.dll` (`winget install LLVM.LLVM`). `cl.exe` findet die
 `cc`-Crate automatisch; cmake-PATH und `LIBCLANG_PATH` setzt `build_runtime.py`.
 
+**Cross-Platform (Linux/macOS): experimentell, noch nicht auf echter Hardware
+verifiziert** — Entwicklung/CI laufen bisher ausschließlich unter Windows.
+`build_runtime.py` erkennt seit Kurzem das Betriebssystem und sucht auf
+Linux/macOS `cmake`/`clang` nur über `PATH` (Paketmanager-Installation
+vorausgesetzt: `apt install cmake clang libclang-dev` bzw.
+`brew install cmake llvm`), statt wie unter Windows feste Pfade abzusuchen.
+Das `wifi`-Feature bleibt vorerst Windows-only (`netsh`-basiert) — auf
+anderen Systemen baut es zwar mit, `WIFI_*`-Builtins scheitern aber zur
+Laufzeit mit einer klaren Fehlermeldung.
+
 ### Builtins ([`graphics.rs`](../rust/gb_runtime/src/graphics.rs))
 
 `SCREEN`, `CLS`, `FLIP`, `PLOT`, `LINE`, `BOX` (gefüllt), `RECT` (Umriss),
