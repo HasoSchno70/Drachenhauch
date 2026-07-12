@@ -12,14 +12,15 @@ IMPORT "net"
 
 | Funktion | Rueckgabe | Wirkung |
 |---|---|---|
-| `NET_TCP_LISTEN(port)` | NET_LISTENER | Server-Socket auf Port (0 = OS waehlt freien) |
+| `NET_TCP_LISTEN(port [, bind_addr$])` | NET_LISTENER | Server-Socket auf Port (0 = OS waehlt freien). `bind_addr$` optional, Default alle IPv4-Interfaces; `"::"` bindet stattdessen IPv6 |
 | `NET_LISTENER_PORT(lst)` | INTEGER | tatsaechlicher Port (nach LISTEN 0) |
 | `NET_TCP_ACCEPT(lst)` | NET_SOCKET \| NIL | non-blocking: NIL wenn niemand verbindet |
-| `NET_TCP_CONNECT(host, port)` | NET_SOCKET | Client-Verbindung (5s Timeout) |
+| `NET_TCP_CONNECT(host, port)` | NET_SOCKET | Client-Verbindung (5s DNS-Timeout + 5s Connect-Timeout) |
 | `NET_SEND(sock, text)` | INTEGER | gesendete Bytes |
 | `NET_RECV(sock, max_bytes)` | STRING | leer wenn nichts da (non-blocking) |
 | `NET_PEER_ADDR(sock)` | STRING | Remote-IP |
 | `NET_PEER_PORT(sock)` | INTEGER | Remote-Port |
+| `NET_IS_CONNECTED(sock)` | BOOLEAN | FALSE sobald die Gegenseite geschlossen hat oder ein Recv/Send fehlgeschlagen ist |
 | `NET_SET_TIMEOUT(sock, ms)` | — | 0 = blocking, sonst Timeout |
 | `NET_CLOSE(sock)` | — | Socket schliessen |
 | `NET_CLOSE_LISTENER(lst)` | — | Listener schliessen |
@@ -28,7 +29,7 @@ IMPORT "net"
 
 | Funktion | Rueckgabe | Wirkung |
 |---|---|---|
-| `NET_UDP_BIND(port)` | NET_UDP | UDP-Socket auf Port binden |
+| `NET_UDP_BIND(port [, bind_addr$])` | NET_UDP | UDP-Socket auf Port binden. `bind_addr$` optional, Default alle IPv4-Interfaces; `"::"` bindet stattdessen IPv6 |
 | `NET_UDP_OPEN()` | NET_UDP | UDP-Socket ohne Bind (nur Senden) |
 | `NET_UDP_PORT(sock)` | INTEGER | gebundener Port (0 wenn OPEN) |
 | `NET_UDP_SEND(sock, host, port, text)` | INTEGER | gesendete Bytes |
@@ -44,7 +45,7 @@ IMPORT "net"
 
 Alle Sockets sind **non-blocking by default** — RECV / ACCEPT liefern sofort leer/NIL zurueck wenn nichts da ist. So friert dein Game-Loop nicht ein.
 
-Beim `NET_TCP_CONNECT` gibt es einen einmaligen 5-Sekunden-Connect-Timeout (blocking), damit "Server nicht erreichbar" innerhalb endlicher Zeit fehlschlaegt. Danach geht der Socket auf non-blocking.
+Beim `NET_TCP_CONNECT` gibt es einen einmaligen 5-Sekunden-Connect-Timeout (blocking), damit "Server nicht erreichbar" innerhalb endlicher Zeit fehlschlaegt. Danach geht der Socket auf non-blocking. Die vorgelagerte DNS-Aufloesung von `host` hat ebenfalls ein eigenes 5-Sekunden-Timeout — ein haengender/langsamer DNS-Server kann den Game-Loop damit nicht unbegrenzt blockieren.
 
 ## TCP-Echo-Server
 
@@ -146,6 +147,57 @@ answer = NET_RECV(sock, 1024)
 ' Wirft GBRuntimeError nach 2s wenn nichts kommt
 ```
 
+## Verbindungsabbruch erkennen
+
+Ein sauber geschlossener TCP-Socket liefert bei `NET_RECV` einfach weiterhin
+`""` zurueck — genau wie "gerade nichts da" im non-blocking Betrieb. Ohne
+weitere Pruefung merkt eine Warteschleife also nie, dass die Gegenseite weg
+ist. `NET_IS_CONNECTED(sock)` unterscheidet die beiden Faelle:
+
+```basic
+WHILE NET_IS_CONNECTED(client)
+    DIM data AS STRING
+    data = NET_RECV(client, 1024)
+    IF LEN(data) > 0 THEN ProcessMessage(data)
+    SLEEP(16)
+WEND
+PRINT "Verbindung getrennt"
+```
+
+`NET_IS_CONNECTED` wird `FALSE`, sobald entweder die Gegenseite die
+Verbindung sauber geschlossen hat (TCP-FIN) oder ein `NET_RECV`/`NET_SEND`
+mit einem echten Fehler (nicht nur "gerade nichts da") fehlgeschlagen ist.
+
+## UTF-8 ueber TCP
+
+`NET_RECV` dekodiert den empfangenen Byte-Strom als UTF-8. Da TCP ein reiner
+Byte-Strom ohne Nachrichtengrenzen ist, kann ein Mehrbyte-Zeichen (Umlaut,
+Emoji) theoretisch genau zwischen zwei RECV-Aufrufen zerschnitten ankommen.
+`NET_RECV` haelt so einen unvollstaendigen Rest intern zurueck und liefert
+ihn erst mit den naechsten Bytes vervollstaendigt aus — ein zerschnittenes
+Zeichen wird also NIE als kaputtes Zeichen (`�`) sichtbar, unabhaengig von
+`max_bytes` oder Netzwerk-Timing. (Bei UDP stellt sich das Problem praktisch
+nicht: ein Datagramm kommt immer komplett-oder-gar-nicht an; nur ein zu
+klein gewaehltes `max_bytes` kann ein Datagramm abschneiden.)
+
+## IPv6
+
+`NET_TCP_LISTEN`/`NET_UDP_BIND` binden per Default auf allen IPv4-Interfaces
+(wie bisher). Ein optionales zweites Argument `"::"` bindet stattdessen einen
+reinen IPv6-Socket. Fuer Server, die sowohl IPv4- als auch IPv6-Clients
+annehmen sollen, zwei Listener auf demselben Port oeffnen und beide pollen:
+
+```basic
+DIM lst4 AS NET_LISTENER
+DIM lst6 AS NET_LISTENER
+lst4 = NET_TCP_LISTEN(7000)
+lst6 = NET_TCP_LISTEN(7000, "::")
+```
+
+Ausgehende Verbindungen (`NET_TCP_CONNECT`) sind bereits unabhaengig davon
+IPv6-faehig — welche Adressfamilie verwendet wird, entscheidet die
+DNS-Aufloesung von `host` automatisch.
+
 ## Externe Typen
 
 | Typ | Wirkung |
@@ -178,6 +230,13 @@ NET_SEND(sock, len_str + msg)
 - Server muss auf einer Interface-IP binden (Default `""` = alle Interfaces, OK).
 - Firewall muss den Port durchlassen.
 - Client braucht die LAN-IP des Servers.
+
+**Server-Neustart auf demselben Port:** unter Windows (dem einzigen offiziell
+unterstuetzten Zielsystem von gbrt) laesst sich ein Port direkt nach dem
+Schliessen sofort wieder binden — anders als unter Linux/macOS gibt es hier
+kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
+(empirisch verifiziert). `NET_TCP_LISTEN` setzt daher bewusst kein
+`SO_REUSEADDR`.
 
 ## Beispiel
 

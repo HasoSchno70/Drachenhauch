@@ -74,6 +74,68 @@ def test_tcp_set_timeout_no_crash(run_gb):
     assert out == ["ok"]
 
 
+def test_tcp_is_connected_true_while_open(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "PRINT NET_IS_CONNECTED(client)\n"
+        "NET_CLOSE(client)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE"]
+
+
+def test_tcp_is_connected_false_after_peer_closes(run_gb):
+    # Server schliesst seine Seite -> Client muss das ueber NET_IS_CONNECTED
+    # erkennen koennen (frueher wurde ein sauberes Schliessen genauso wie
+    # "gerade nichts da" behandelt -- NET_RECV lief endlos leer weiter).
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        "NET_CLOSE(srv)\n"
+        "DIM waited AS INTEGER\nDIM dummy AS STRING\nwaited = 0\n"
+        "WHILE NET_IS_CONNECTED(client) AND waited < 2000\n"
+        "    dummy = NET_RECV(client, 1024)\n    SLEEP(20)\n    waited = waited + 20\n"
+        "WEND\n"
+        "PRINT NET_IS_CONNECTED(client)\n"
+        "NET_CLOSE(client)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["FALSE"]
+
+
+def test_tcp_listen_optional_bind_addr_backward_compat(run_gb):
+    # Zweites Arg ist optional -- alter 1-Arg-Aufruf muss unveraendert
+    # funktionieren (IPv4 auf allen Interfaces).
+    out = _lines(run_gb('IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+                        "PRINT NET_LISTENER_PORT(l) > 0\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE"]
+
+
+def test_tcp_listen_ipv6_bind_addr(run_gb):
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0, "::")\n'
+        "PRINT NET_LISTENER_PORT(l) > 0\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE"]
+
+
+def test_tcp_recv_reassembles_multibyte_char_split_across_reads(run_gb):
+    # NET_RECV(sock, 1) erzwingt Ein-Byte-Reads -- damit muss selbst ein
+    # Umlaut, dessen UTF-8-Kodierung ueber zwei RECV-Aufrufe verteilt
+    # ankommt, korrekt rekonstruiert werden (vorher: '�'-Ersatzzeichen).
+    out = _lines(run_gb(
+        'IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(0)\n'
+        "DIM client AS NET_SOCKET\nclient = NET_TCP_CONNECT(\"127.0.0.1\", NET_LISTENER_PORT(l))\n"
+        "DIM srv AS NET_SOCKET\nDIM i AS INTEGER\n"
+        "FOR i = 1 TO 50\n    srv = NET_TCP_ACCEPT(l)\n    IF NOT IS_NIL(srv) THEN BREAK\nNEXT\n"
+        'DIM msg AS STRING\nmsg = "a" + CHR$(228) + CHR$(246) + CHR$(252) + "b"\n'
+        "NET_SEND(client, msg)\n"
+        'DIM result AS STRING\nresult = ""\nDIM chunk AS STRING\n'
+        "FOR i = 1 TO 100\n    chunk = NET_RECV(srv, 1)\n    result = result + chunk\nNEXT\n"
+        "PRINT result = msg\n"
+        "PRINT (CHR$(65533) IN result)\n"
+        "NET_CLOSE(client)\nNET_CLOSE(srv)\nNET_CLOSE_LISTENER(l)\n"))
+    assert out == ["TRUE", "FALSE"]
+
+
 # --- UDP -----------------------------------------------------------
 
 def test_udp_bind_returns_socket(run_gb):

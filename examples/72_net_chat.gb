@@ -105,9 +105,20 @@ FOR i = 0 TO 2
     PRINT ""
 NEXT
 
-' --- 5. Cleanup ---
-PRINT "=== Aufraeumen ==="
+' --- 5. Verbindungsabbruch erkennen ---
+' NET_RECV liefert "" sowohl wenn nichts angekommen ist ALS AUCH wenn die
+' Gegenseite die Verbindung sauber geschlossen hat -- NET_IS_CONNECTED
+' unterscheidet die beiden Faelle.
+PRINT "=== Verbindungsabbruch ==="
+PRINT "Client verbunden (vor Server-Close): ", NET_IS_CONNECTED(client)
 NET_CLOSE(srv_conn)
+SLEEP(50)
+DIM drain AS STRING
+drain = NET_RECV(client, 1024)   ' liest das Verbindungsende (leerer String)
+PRINT "Client verbunden (nach Server-Close): ", NET_IS_CONNECTED(client)
+
+' --- 6. Cleanup ---
+PRINT "=== Aufraeumen ==="
 NET_CLOSE(client)
 NET_CLOSE_LISTENER(server)
 PRINT "Sockets geschlossen. Fertig."

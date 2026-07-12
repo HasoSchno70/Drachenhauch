@@ -2293,7 +2293,8 @@ impl<'p> Vm<'p> {
         use crate::net;
         let v = match name {
             "net_tcp_listen" => {
-                let (l, port) = net::listen(bi_int(a, 0, "NET_TCP_LISTEN")?)?;
+                let bind_addr = match a.get(1) { Some(Value::Str(s)) => s.as_ref(), _ => "" };
+                let (l, port) = net::listen(bi_int(a, 0, "NET_TCP_LISTEN")?, bind_addr)?;
                 self.tcp_listeners.push(Some((l, port)));
                 Value::Int((self.tcp_listeners.len() - 1) as i64)
             }
@@ -2316,10 +2317,16 @@ impl<'p> Vm<'p> {
             "net_recv" => { let i = bi_int(a, 0, "NET_RECV")?; let n = bi_int(a, 1, "NET_RECV")?; Value::str_rc(&net::recv(self.net_sock_mut(i)?, n)?) }
             "net_peer_addr" => Value::str_rc(&self.net_sock(bi_int(a, 0, "NET_PEER_ADDR")?)?.peer_host),
             "net_peer_port" => Value::Int(self.net_sock(bi_int(a, 0, "NET_PEER_PORT")?)?.peer_port),
+            "net_is_connected" => Value::Bool(net::is_connected(self.net_sock(bi_int(a, 0, "NET_IS_CONNECTED")?)?)),
             "net_close" => { let i = bi_int(a, 0, "NET_CLOSE")? as usize; if let Some(s) = self.tcp_socks.get_mut(i) { *s = None; } Value::Nil }
             "net_close_listener" => { let i = bi_int(a, 0, "NET_CLOSE_LISTENER")? as usize; if let Some(s) = self.tcp_listeners.get_mut(i) { *s = None; } Value::Nil }
             "net_set_timeout" => { let i = bi_int(a, 0, "NET_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_SET_TIMEOUT")?; net::set_timeout_tcp(&self.net_sock(i)?.stream, ms); Value::Nil }
-            "net_udp_bind" => { let s = net::udp_bind(bi_int(a, 0, "NET_UDP_BIND")?)?; self.udp_socks.push(Some(s)); Value::Int((self.udp_socks.len() - 1) as i64) }
+            "net_udp_bind" => {
+                let bind_addr = match a.get(1) { Some(Value::Str(s)) => s.as_ref(), _ => "" };
+                let s = net::udp_bind(bi_int(a, 0, "NET_UDP_BIND")?, bind_addr)?;
+                self.udp_socks.push(Some(s));
+                Value::Int((self.udp_socks.len() - 1) as i64)
+            }
             "net_udp_open" => { let s = net::udp_open()?; self.udp_socks.push(Some(s)); Value::Int((self.udp_socks.len() - 1) as i64) }
             "net_udp_port" => Value::Int(self.net_udp(bi_int(a, 0, "NET_UDP_PORT")?)?.bound_port),
             "net_udp_send" => {

@@ -2926,6 +2926,12 @@
    "module": "net"
   },
   {
+   "name": "NET_IS_CONNECTED",
+   "kind": "core",
+   "signature": "NET_IS_CONNECTED(sock)",
+   "module": "net"
+  },
+  {
    "name": "NET_RECV",
    "kind": "core",
    "signature": "NET_RECV(sock, max_bytes)",
@@ -2958,13 +2964,13 @@
   {
    "name": "NET_TCP_LISTEN",
    "kind": "core",
-   "signature": "NET_TCP_LISTEN(port: INTEGER)",
+   "signature": "NET_TCP_LISTEN(port: INTEGER, bind_addr: STRING = \"\")",
    "module": "net"
   },
   {
    "name": "NET_UDP_BIND",
    "kind": "core",
-   "signature": "NET_UDP_BIND(port: INTEGER)",
+   "signature": "NET_UDP_BIND(port: INTEGER, bind_addr: STRING = \"\")",
    "module": "net"
   },
   {
