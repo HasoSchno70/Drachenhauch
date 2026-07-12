@@ -44,7 +44,13 @@ exclude = ["tests*", "examples*"]
 # Sprache sowie die Tracker-/Synth-/Tilemap-Modelle). Die PySide6-Editoren
 # (*_qt.py, editor_qt/, spriteeditor/) sind ausgeklammert: die Qt-Stubs sind
 # unvollstaendig und wuerden nur Rauschen erzeugen. Scope spaeter erweiterbar.
-python_version = "3.10"
+# 3.12 statt 3.10 (requires-python bleibt >=3.10 fuer die Laufzeit-Kompatibilitaet
+# unveraendert -- betrifft nur, welche Syntax mypy beim Pruefen akzeptiert):
+# neuere numpy-Stubs (numpy>=1.24 ohne Obergrenze) nutzen inzwischen das
+# PEP-695-`type`-Statement, das mypy bei python_version<3.12 mit einem
+# Parse-Fehler ablehnt -- selbst nur beim Import-Follow, `follow_imports =
+# "skip"` verhindert das NICHT (der Parse-Fehler passiert vor dem Skip).
+python_version = "3.12"
 ignore_missing_imports = true
 follow_imports = "silent"
 exclude = '(_qt\.py$|/editor_qt/|/spriteeditor/)'
