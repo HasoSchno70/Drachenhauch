@@ -1,0 +1,79 @@
+' Idle-/Farm-Game-Bausteine: grosse Zahlen lesbar formatieren (NUMFMT$),
+' den Spielstand in die Cloud speichern/laden (Modul cloud) und einen
+' Highscore in eine gemeinsame Bestenliste einreichen (LEADERBOARD_*).
+'
+' Voraussetzung: ein laufender Cloud-Server (cloudserver/server.py).
+'   cd cloudserver
+'   pip install -r requirements.txt
+'   set GB_CLOUD_API_KEY=demo-key          (Windows; PowerShell: $env:GB_CLOUD_API_KEY="demo-key")
+'   python server.py
+' Laeuft dann per Default auf http://localhost:8787.
+'
+' Siehe auch docs/module-cloud.md.
+
+IMPORT "cloud"
+IMPORT "json"
+
+CLOUD_CONFIGURE("http://localhost:8787", "demo-key")
+
+' --- 1) Grosse Zahlen lesbar machen (NUMFMT$) ------------------------------
+PRINT "--- NUMFMT$ ---"
+DIM gold AS FLOAT
+gold = 1234567.0
+PRINT "Gold: "; NUMFMT$(gold)                 ' 1.23M
+PRINT "Gold genau: "; NUMFMT$(gold, 0)        ' 1M (keine Nachkommastellen)
+PRINT "Kleine Zahl: "; NUMFMT$(42)            ' 42.00 (kein Suffix unter 1000)
+PRINT "Riesig: "; NUMFMT$(POW(10.0, 20))      ' 100.00Qi (10^20)
+PRINT ""
+
+' --- 2) Spielstand in die Cloud speichern/laden ----------------------------
+PRINT "--- Cloud-Save ---"
+DIM spieler_id AS STRING
+spieler_id = "demo-spieler-1"                 ' in echt: pro Geraet erzeugte UUID
+
+DIM alter_stand AS STRING
+alter_stand = CLOUD_LOAD(spieler_id)
+IF alter_stand = "" THEN
+    IF CLOUD_LAST_ERROR$() <> "" THEN
+        PRINT "Cloud nicht erreichbar: "; CLOUD_LAST_ERROR$()
+        PRINT "(Ist der Server aus dem Kommentar oben gestartet?)"
+    ELSE
+        PRINT "Kein Spielstand vorhanden -- neues Spiel."
+    END IF
+ELSE
+    PRINT "Geladen: "; alter_stand
+    DIM h AS JSON_HANDLE
+    h = JSON_PARSE(alter_stand)
+    gold = JSON_GET_FLOAT(h, "gold")
+    PRINT "Wieder da mit "; NUMFMT$(gold); " Gold."
+END IF
+
+gold = gold + 500.0
+DIM neuer_stand AS STRING
+neuer_stand = "{""gold"": " + STR$(gold) + ", ""version"": 1}"
+IF CLOUD_SAVE(spieler_id, neuer_stand) THEN
+    PRINT "Gespeichert: "; neuer_stand
+ELSE
+    PRINT "Speichern fehlgeschlagen: "; CLOUD_LAST_ERROR$()
+END IF
+PRINT ""
+
+' --- 3) Highscore in ein gemeinsames Leaderboard einreichen ----------------
+PRINT "--- Leaderboard ---"
+IF LEADERBOARD_SUBMIT("gold_rekord", spieler_id, gold) THEN
+    PRINT "Neuer persoenlicher Rekord!"
+ELSE
+    PRINT "Kein neuer Rekord (oder Fehler: "; CLOUD_LAST_ERROR$(); ")"
+END IF
+
+DIM bestenliste AS ARRAY OF TUPLE
+bestenliste = LEADERBOARD_FETCH("gold_rekord", 5)
+IF LEN(bestenliste) = 0 AND CLOUD_LAST_ERROR$() <> "" THEN
+    PRINT "Bestenliste nicht abrufbar: "; CLOUD_LAST_ERROR$()
+ELSE
+    PRINT "Top "; LEN(bestenliste); ":"
+    DIM i AS INTEGER
+    FOR i = 0 TO LEN(bestenliste) - 1
+        PRINT "  "; i + 1; ". "; bestenliste[i][0]; " -- "; NUMFMT$(bestenliste[i][1])
+    NEXT
+END IF

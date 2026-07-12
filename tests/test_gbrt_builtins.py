@@ -402,3 +402,41 @@ def test_flt_int_to_float():
     assert _run("PRINT FLT(7)") == "7.0"
     assert _run("PRINT FLT(7) / 2") == "3.5"
     assert _run("PRINT FLT(2.5)") == "2.5"
+
+
+# --- NUMFMT$: Big-Number-Formatierung (Idle-/Incremental-Game-Stil) --------
+
+def test_numfmt_below_1000_no_suffix():
+    assert _run("PRINT NUMFMT$(42)") == "42.00"
+    assert _run("PRINT NUMFMT$(999)") == "999.00"
+    assert _run("PRINT NUMFMT$(0)") == "0.00"
+
+
+def test_numfmt_suffix_tiers():
+    assert _run("PRINT NUMFMT$(1000)") == "1.00K"
+    assert _run("PRINT NUMFMT$(1234)") == "1.23K"
+    assert _run("PRINT NUMFMT$(1234567)") == "1.23M"
+    assert _run("PRINT NUMFMT$(1500000000)") == "1.50B"
+    assert _run("PRINT NUMFMT$(1000000000000000000.0)") == "1.00Qi"  # 10^18
+
+
+def test_numfmt_rounding_overflow_bumps_tier():
+    # 999999 = 999.999K -- bei 2 Nachkommastellen rundet das auf 1000.00K,
+    # was ueber die Grenze rutscht; muss auf "1.00M" hochspringen statt
+    # das falsche "1000.00K" auszugeben.
+    assert _run("PRINT NUMFMT$(999999)") == "1.00M"
+    assert _run("PRINT NUMFMT$(999995)") == "1.00M"
+
+
+def test_numfmt_custom_decimals():
+    assert _run("PRINT NUMFMT$(1234, 0)") == "1K"
+    assert _run("PRINT NUMFMT$(1234567, 1)") == "1.2M"
+
+
+def test_numfmt_negative():
+    assert _run("PRINT NUMFMT$(-2500)") == "-2.50K"
+
+
+def test_numfmt_scientific_fallback_beyond_decillion():
+    # Jenseits von Dc (10^33) gibt es keinen benannten Suffix mehr.
+    assert _run("PRINT NUMFMT$(POW(10.0, 40))") == "1.00e40"

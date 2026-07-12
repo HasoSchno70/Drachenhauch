@@ -45,6 +45,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 | `curves` | Animation-Kurven: Bezier, Catmull-Rom, Hermite, Smoothstep — pure Functions, kein State | [module-curves.md](module-curves.md) |
 | `net` | TCP + UDP via stdlib-Sockets, non-blocking by default, UTF-8-Encoding | [module-net.md](module-net.md) |
 | `html` | HTTP-GET/POST/DOWNLOAD und HTML-Parsing — pure stdlib, kein pip noetig | [module-html.md](module-html.md) |
+| `cloud` | Cloud-Save + Leaderboard gegen den selbst hostbaren Referenz-Server (`cloudserver/`) | [module-cloud.md](module-cloud.md) |
 | `bt` | Bluetooth Low Energy (BLE) — Scan, Connect, Read/Write Characteristics (Python: `bleak`, nativ: `btleplug`) | [module-bt.md](module-bt.md) |
 | `serial` | RS-232 / USB-COM — Open, Read/Write, Available, Flush, Timeout (Python: `pyserial`, nativ: `serialport`) | [module-serial.md](module-serial.md) |
 | `usb` | USB-HID via `hidapi` — Custom-Controller, Maker-Boards, Programmer | [module-usb.md](module-usb.md) |

@@ -23,6 +23,8 @@ mod builtins;
 mod compiler;
 mod parser;
 mod controller;
+#[cfg(feature = "http")]
+mod cloud;
 #[cfg(feature = "db")]
 mod db;
 mod ecs;

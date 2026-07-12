@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1065,
+ "count": 1106,
  "builtins": [
   {
    "name": "ABS",
@@ -6395,6 +6395,48 @@
    "kind": "graphics",
    "signature": "CIRCLEOUTLINE(x, y, r[, color])",
    "module": "core"
+  },
+  {
+   "name": "NUMFMT$",
+   "kind": "core",
+   "signature": "NUMFMT$(zahl[, nachkommastellen])",
+   "module": "core"
+  },
+  {
+   "name": "CLOUD_CONFIGURE",
+   "kind": "core",
+   "signature": "CLOUD_CONFIGURE(base_url$, api_key$)",
+   "module": "cloud"
+  },
+  {
+   "name": "CLOUD_SAVE",
+   "kind": "core",
+   "signature": "CLOUD_SAVE(player_id$, data$) AS BOOLEAN",
+   "module": "cloud"
+  },
+  {
+   "name": "CLOUD_LOAD",
+   "kind": "core",
+   "signature": "CLOUD_LOAD(player_id$) AS STRING",
+   "module": "cloud"
+  },
+  {
+   "name": "CLOUD_LAST_ERROR$",
+   "kind": "core",
+   "signature": "CLOUD_LAST_ERROR$()",
+   "module": "cloud"
+  },
+  {
+   "name": "LEADERBOARD_SUBMIT",
+   "kind": "core",
+   "signature": "LEADERBOARD_SUBMIT(board$, name$, score[, best_low])",
+   "module": "cloud"
+  },
+  {
+   "name": "LEADERBOARD_FETCH",
+   "kind": "core",
+   "signature": "LEADERBOARD_FETCH(board$, n[, ascending]) AS ARRAY OF TUPLE",
+   "module": "cloud"
   }
  ]
 }

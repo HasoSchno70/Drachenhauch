@@ -22,7 +22,7 @@ use regex::Regex;
 /// Muss mit `modules.discover_modules()` synchron bleiben. gbrt implementiert
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
-    "animfsm", "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
+    "animfsm", "astar", "audio", "bt", "camera", "cloud", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "wifi",

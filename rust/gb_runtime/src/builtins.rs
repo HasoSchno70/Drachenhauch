@@ -126,6 +126,40 @@ fn need_num(v: &Value, fn_: &str) -> Result<f64, String> {
     }
 }
 
+/// NUMFMT$: grosse Zahlen kurz+lesbar formatieren (Idle-/Incremental-Game-
+/// Stil: 1234567 -> "1.23M"). Unterhalb 1000 kein Suffix. Ab 10^36 (jenseits
+/// des benannten Suffix-Bereichs) faellt es auf wissenschaftliche Notation
+/// zurueck, statt sich unbenannte Namen auszudenken.
+const NUMFMT_SUFFIXES: &[&str] = &["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
+
+fn numfmt(n: f64, decimals: i64) -> String {
+    let dec = decimals.clamp(0, 15) as usize;
+    if n.is_nan() { return "NaN".to_string(); }
+    if n.is_infinite() { return if n > 0.0 { "Inf".to_string() } else { "-Inf".to_string() }; }
+    let sign = if n < 0.0 { "-" } else { "" };
+    let mag = n.abs();
+    if mag < 1000.0 {
+        return format!("{}{:.*}", sign, dec, mag);
+    }
+    let raw_tier = (mag.log10() / 3.0).floor() as i64;
+    if raw_tier < 0 || raw_tier as usize >= NUMFMT_SUFFIXES.len() {
+        // Jenseits Dc (10^33) oder rechnerisch entartet -> wissenschaftlich.
+        return format!("{}{:.*e}", sign, dec, mag);
+    }
+    let mut tier = raw_tier as usize;
+    let round_to = |v: f64, d: usize| { let f = 10f64.powi(d as i32); (v * f).round() / f };
+    let mut scaled = round_to(mag / 10f64.powi((tier * 3) as i32), dec);
+    // Rundungs-Ueberlauf: z.B. 999999 (=999.999K) rundet bei dec=2 auf
+    // "1000.00K" statt "1.00M" -- muss am GERUNDETEN Wert geprueft werden
+    // (999.999 selbst ist < 1000, aber rundet ueber die Grenze). Tier bei
+    // Bedarf um eins hochsetzen und mit dem neuen Faktor neu runden.
+    if scaled >= 1000.0 && tier + 1 < NUMFMT_SUFFIXES.len() {
+        tier += 1;
+        scaled = round_to(mag / 10f64.powi((tier * 3) as i32), dec);
+    }
+    format!("{}{:.*}{}", sign, dec, scaled, NUMFMT_SUFFIXES[tier])
+}
+
 /// Validiert + liefert ein 1D-ARRAY OF INTEGER/FLOAT fuer die Array-Aggregat-
 /// Builtins (ARRAY_SUM/AVG/MIN/MAX) -- eine gemeinsame Pruefung statt vier
 /// fast identischer Kopien, die frueher leicht divergierten (ARRAY_SUM prüfte
@@ -491,6 +525,7 @@ fn builtin_signature(name: &str) -> Option<&'static str> {
         "curve_catmull"      => "CURVE_CATMULL(t, p0, p1, p2, p3)",
         "curve_catmull2"     => "CURVE_CATMULL2(t, x0,y0, x1,y1, x2,y2, x3,y3)",
         "curve_hermite"      => "CURVE_HERMITE(t, p0, p1, m0, m1)",
+        "numfmt$" | "numfmt" => "NUMFMT$(zahl[, nachkommastellen])",
         _ => return None,
     })
 }
@@ -522,6 +557,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
         "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
+        "numfmt$" | "numfmt" => {
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("NUMFMT$: erwartet 1 oder 2 Argument(e), erhalten {} -- Aufruf: NUMFMT$(zahl[, nachkommastellen])", a.len()));
+            }
+            let n = need_num(&a[0], "NUMFMT$")?;
+            let dec = if a.len() == 2 { need_int(&a[1], "NUMFMT$")? } else { 2 };
+            Ok(Value::str_rc(&numfmt(n, dec)))
+        }
         "abs" => {
             arity!(1);
             match &a[0] {

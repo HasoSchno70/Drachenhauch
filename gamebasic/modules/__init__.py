@@ -22,7 +22,7 @@ _MODULE_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 # Statische Liste der Built-in-Modul-Namen (= gbrts preprocess.rs MODULES).
 KNOWN_MODULES: frozenset = frozenset({
     "animfsm",
-    "astar", "audio", "bt", "camera", "controller", "curves", "db", "ecs",
+    "astar", "audio", "bt", "camera", "cloud", "controller", "curves", "db", "ecs",
     "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "wifi",

@@ -519,6 +519,13 @@ pub struct Vm<'p> {
     http_status: i64,
     #[cfg(feature = "http")]
     http_headers: Vec<(String, String)>,
+    // Modul cloud: Basis-URL/API-Key aus CLOUD_CONFIGURE + letzte Fehlermeldung.
+    #[cfg(feature = "http")]
+    cloud_base_url: String,
+    #[cfg(feature = "http")]
+    cloud_api_key: String,
+    #[cfg(feature = "http")]
+    cloud_last_error: String,
     // Hardware/IoT-Handles (INTEGER-Index in VM-Vecs).
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
@@ -586,6 +593,12 @@ impl<'p> Vm<'p> {
             udp_socks: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
+            #[cfg(feature = "http")]
+            cloud_base_url: String::new(),
+            #[cfg(feature = "http")]
+            cloud_api_key: String::new(),
+            #[cfg(feature = "http")]
+            cloud_last_error: String::new(),
             #[cfg(feature = "http")]
             http_headers: Vec::new(),
             #[cfg(feature = "serial")]
@@ -1711,6 +1724,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
+                        else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
                         else if let Some(v) = self.try_usb(name, bargs)? { v }
                         else if let Some(v) = self.try_wifi(name, bargs)? { v }
@@ -2408,6 +2422,97 @@ impl<'p> Vm<'p> {
                 let n = items.len() as i64;
                 let mut arr = GbArray::new("string".to_string(), vec![n], || Value::str_rc(""));
                 for (i, s) in items.into_iter().enumerate() { arr.cells.set(i, Value::str_rc(&s)); }
+                Value::Array(Rc::new(RefCell::new(arr)))
+            }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul cloud (Cloud-Save + Leaderboard gegen cloudserver/server.py, Feature `http`)
+    // ===================================================================
+    fn try_cloud(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("cloud_") || name.starts_with("leaderboard_")) { return Ok(None); }
+        #[cfg(feature = "http")]
+        { return self.try_cloud_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+
+    #[cfg(feature = "http")]
+    fn cloud_require_configured(&self, ctx: &str) -> R<()> {
+        if self.cloud_base_url.is_empty() {
+            return Err(format!("{}: CLOUD_CONFIGURE(base_url, api_key) muss zuerst aufgerufen werden", ctx));
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "http")]
+    fn try_cloud_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::cloud;
+        fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
+            match a.get(i) {
+                Some(Value::Bool(b)) => Ok(*b),
+                Some(v) => Err(format!("{}: erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
+                None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+            }
+        }
+        let v = match name {
+            "cloud_configure" => {
+                self.cloud_base_url = bi_str(a, 0, "CLOUD_CONFIGURE")?.to_string();
+                self.cloud_api_key = bi_str(a, 1, "CLOUD_CONFIGURE")?.to_string();
+                Value::Nil
+            }
+            "cloud_save" => {
+                self.cloud_require_configured("CLOUD_SAVE")?;
+                let player_id = bi_str(a, 0, "CLOUD_SAVE")?.to_string();
+                let data = bi_str(a, 1, "CLOUD_SAVE")?.to_string();
+                self.cloud_last_error.clear();
+                match cloud::save_upload(&self.cloud_base_url, &self.cloud_api_key, &player_id, &data) {
+                    Ok(()) => Value::Bool(true),
+                    Err(e) => { self.cloud_last_error = e.msg; Value::Bool(false) }
+                }
+            }
+            "cloud_load" | "cloud_load$" => {
+                self.cloud_require_configured("CLOUD_LOAD")?;
+                let player_id = bi_str(a, 0, "CLOUD_LOAD")?.to_string();
+                self.cloud_last_error.clear();
+                match cloud::save_download(&self.cloud_base_url, &self.cloud_api_key, &player_id) {
+                    Ok(Some(data)) => Value::str_rc(&data),
+                    Ok(None) => Value::str_rc(""),
+                    Err(e) => { self.cloud_last_error = e.msg; Value::str_rc("") }
+                }
+            }
+            "cloud_last_error$" | "cloud_last_error" => Value::str_rc(&self.cloud_last_error),
+            "leaderboard_submit" => {
+                self.cloud_require_configured("LEADERBOARD_SUBMIT")?;
+                let board = bi_str(a, 0, "LEADERBOARD_SUBMIT")?.to_string();
+                let pname = bi_str(a, 1, "LEADERBOARD_SUBMIT")?.to_string();
+                let score = bi_num(a, 2, "LEADERBOARD_SUBMIT")?;
+                let best_low = if a.len() >= 4 { bi_bool(a, 3, "LEADERBOARD_SUBMIT")? } else { false };
+                self.cloud_last_error.clear();
+                match cloud::leaderboard_submit(&self.cloud_base_url, &self.cloud_api_key, &board, &pname, score, best_low) {
+                    Ok(updated) => Value::Bool(updated),
+                    Err(e) => { self.cloud_last_error = e.msg; Value::Bool(false) }
+                }
+            }
+            "leaderboard_fetch" => {
+                self.cloud_require_configured("LEADERBOARD_FETCH")?;
+                let board = bi_str(a, 0, "LEADERBOARD_FETCH")?.to_string();
+                let n = bi_int(a, 1, "LEADERBOARD_FETCH")?;
+                let ascending = if a.len() >= 3 { bi_bool(a, 2, "LEADERBOARD_FETCH")? } else { false };
+                self.cloud_last_error.clear();
+                let entries = match cloud::leaderboard_fetch(&self.cloud_base_url, &self.cloud_api_key, &board, n, ascending) {
+                    Ok(e) => e,
+                    Err(e) => { self.cloud_last_error = e.msg; Vec::new() }
+                };
+                let items: Vec<Value> = entries.into_iter()
+                    .map(|e| Value::Tuple(Rc::new(vec![Value::str_rc(&e.name), Value::Float(e.score)])))
+                    .collect();
+                let cnt = items.len() as i64;
+                let mut arr = GbArray::new("tuple".to_string(), vec![cnt], || Value::Tuple(Rc::new(vec![])));
+                for (i, v) in items.into_iter().enumerate() { arr.cells.set(i, v); }
                 Value::Array(Rc::new(RefCell::new(arr)))
             }
             _ => return Ok(None),

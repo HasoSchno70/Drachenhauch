@@ -50,6 +50,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Animations-FSM-Editor](docs/anim-editor.md)** — Knoten-Graph für Animation-State-Machines im Unity-Mecanim-Stil (`gbanim`): States (an Sprite-Anim gebunden) + Parameter + Transitions mit Bedingungen visuell verdrahten, als `.gbanim` speichern, per `ANIM_FSM_LOAD` ([Modul `animfsm`](docs/module-animfsm.md)) nutzen, Live-Vorschau mit F5
 - **[Language Server + VSCode-Extension](docs/lsp.md)** — GameBasic in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline (`py -m gamebasic.lsp`, `vscode-gamebasic/`)
 - **[Web-Playground](docs/web-playground.md)** — `gbrt` als WebAssembly im Browser: Quelle im `<textarea>` tippen → gbrt kompiliert **im Browser** (kein Pyodide) → **Konsole UND animierte Grafik im `<canvas>`** (Render-Loop yieldet pro Frame, kein Tab-Freeze). **Teilbare Links** (Quelle im URL-Hash → öffnen = sehen + starten). Build `rust/build_wasm.py`, Harness `web/`
+- **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
 
 ## Beispiele
 
