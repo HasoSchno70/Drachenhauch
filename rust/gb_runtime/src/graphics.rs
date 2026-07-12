@@ -662,6 +662,11 @@ pub struct Graphics {
     width: i32,
     height: i32,
     scale: i32,
+    // SET_FULLSCREEN(TRUE): merkt sich, ob wir gerade im (pixel-skalierten,
+    // borderless) Vollbild-Modus sind + die windowed (width,height,scale) zum
+    // Zurueckschalten. Siehe set_fullscreen() fuer die Technik.
+    fullscreen: bool,
+    pre_fullscreen: Option<(i32, i32, i32)>,
     // Z-Layer: Index 0 ist der Default-/Main-Layer (z=0). LAYER(name) schaltet
     // `active` um. FLIP komponiert alle Layer aufsteigend nach z und leert sie.
     layers: Vec<Layer>,
@@ -871,6 +876,7 @@ impl Graphics {
         let scene_rt = rl.load_render_texture(&thread, win_w as u32, win_h as u32).ok();
         let mut g = Graphics {
             rl, thread, width, height, scale,
+            fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), post_shader_idx: None, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
@@ -2754,8 +2760,64 @@ impl Graphics {
         let img = self.rl.load_image_from_screen(&self.thread);
         img.export_image(&abs.to_string_lossy());
     }
+    /// SET_FULLSCREEN(an) -- Vollbild an/aus, OHNE raylibs `toggle_fullscreen()`
+    /// (exklusiver Video-Mode-Wechsel): der ist auf manchen Setups unzuverlaessig
+    /// (siehe screen_native()-Kommentar -- GLFW "failed to query video mode") und
+    /// aendert dabei NICHT die tatsaechliche Fenstergroesse auf die native
+    /// Monitor-Aufloesung. Ergebnis war: das logische SCREEN(w,h)-Bild blieb in
+    /// Fenstergroesse in der Bildschirmecke stehen, der Rest des Monitors blieb
+    /// schwarz/leer statt das Bild auszufuellen.
+    ///
+    /// Stattdessen: groesstmoegliche GANZZAHLIGE Pixel-Skalierung waehlen, die
+    /// noch in den Monitor passt (scharf, kein Weichzeichnen) -- randlos machen
+    /// via `toggle_borderless_windowed` (erwiesenermassen zuverlaessig, anders
+    /// als toggle_fullscreen). ACHTUNG: toggle_borderless_windowed zwingt das
+    /// Fenster auf die VOLLE Monitor-Groesse, unabhaengig von einer vorher per
+    /// `set_window_size` gesetzten kleineren Groesse -- bei einem Seitenverhaeltnis-
+    /// Mismatch (Monitor 16:9, SCREEN(...) z.B. 4:3) bleibt darum auf einer Achse
+    /// mehr Platz als `width*k`. Um SCREENWIDTH()/HEIGHT() (== live Fenstergroesse
+    /// / scale) dabei NICHT zu verfaelschen, wird die tatsaechliche Fenstergroesse
+    /// NACH dem Toggle abgefragt und `width`/`height` darauf angepasst -- der
+    /// zusaetzliche Platz wird so zu benutzbarer logischer Zeichenflaeche statt
+    /// eines falschen SCREENWIDTH()-Werts. Bei exakt passendem Seitenverhaeltnis
+    /// (wie in der Praxis meist: 1920x1080/2560x1440-Monitor + 16:9-SCREEN) aendert
+    /// sich dadurch nichts.
     pub fn set_fullscreen(&mut self, fs: bool) {
-        if self.rl.is_window_fullscreen() != fs { self.rl.toggle_fullscreen(); }
+        if fs == self.fullscreen { return; }
+        if fs {
+            self.pre_fullscreen = Some((self.width, self.height, self.scale));
+            let m = get_current_monitor();
+            let mw = get_monitor_width(m).max(1);
+            let mh = get_monitor_height(m).max(1);
+            let k = (mw / self.width.max(1)).min(mh / self.height.max(1)).max(1);
+            self.resize_keep_title(self.width, self.height, k);
+            self.rl.toggle_borderless_windowed();
+            let aw = self.rl.get_screen_width().max(k);
+            let ah = self.rl.get_screen_height().max(k);
+            self.width = aw / k;
+            self.height = ah / k;
+            self.scene_rt = self.rl.load_render_texture(&self.thread, aw as u32, ah as u32).ok();
+        } else {
+            self.rl.toggle_borderless_windowed();
+            if let Some((w, h, sc)) = self.pre_fullscreen.take() {
+                self.resize_keep_title(w, h, sc);
+            }
+        }
+        self.fullscreen = fs;
+    }
+
+    /// Fenster + Szene-Render-Target auf `width*scale x height*scale` bringen,
+    /// ohne (anders als reconfigure_raw) den Fenstertitel anzufassen -- fuer
+    /// SET_FULLSCREEN-Toggles, die den vom User gesetzten Titel nicht
+    /// ueberschreiben duerfen.
+    fn resize_keep_title(&mut self, width: i32, height: i32, scale: i32) {
+        self.width = width;
+        self.height = height;
+        self.scale = scale;
+        let win_w = width * scale;
+        let win_h = height * scale;
+        self.rl.set_window_size(win_w, win_h);
+        self.scene_rt = self.rl.load_render_texture(&self.thread, win_w as u32, win_h as u32).ok();
     }
 
     /// WINDOW_ESC_QUIT(an) -- ESC als Fenster-Schliessen-Taste an/aus.
