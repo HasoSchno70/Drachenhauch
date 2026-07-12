@@ -25,12 +25,15 @@ dev = ["pytest>=7", "mypy>=1.8"]
 serial = ["pyserial>=3.5"]
 usb = ["hidapi>=0.14"]
 bt = ["bleak>=0.21"]
-# wifi: braucht keine externe Lib (nutzt Windows netsh)
+# wifi: braucht keine externe Lib (netsh/nmcli/networksetup je nach OS)
 hw = [
     "pyserial>=3.5",
     "hidapi>=0.14",
     "bleak>=0.21",
 ]
+# Fuer installer/build_installer.py (eigenstaendige IDE-Distribution,
+# Windows-Installer/macOS-.dmg/Linux-Tarball -- siehe installer/README.md).
+package = ["pyinstaller>=6"]
 
 [project.scripts]
 gbrun = "gamebasic.__main__:main"

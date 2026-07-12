@@ -19,16 +19,47 @@ from gamebasic.errors import GameBasicError
 def _project_root():
     """Basisordner des Editors (Beispiele/Showcase + Default-Arbeitsverzeichnis).
 
-    - Eingefroren (per Installer): ein BESCHREIBBARER, fester Ort
-      ``%PUBLIC%\\Documents\\GameBasic``. Dort legt der Installer ``examples/``
-      (inkl. ``screenshots/``) ab; dort speichert „Neu" per Default. Das
-      PyInstaller-Bundle selbst ist schreibgeschuetzt und enthaelt keine Beispiele.
+    - Eingefroren (per Installer): ein BESCHREIBBARER, fester Ort.
+      Windows: ``%PUBLIC%\\Documents\\GameBasic`` -- dort legt der Inno-
+      Installer ``examples/`` (inkl. ``screenshots/``) beim Installieren ab.
+      macOS/Linux: ``~/Documents/GameBasic`` -- .dmg/AppImage/Tarball haben
+      keinen Installations-Skript-Schritt wie Inno Setup, daher werden die
+      Beispiele dort stattdessen beim allerersten Start aus dem Bundle
+      kopiert (siehe `_seed_examples_if_missing`). Das PyInstaller-Bundle
+      selbst ist schreibgeschuetzt (bzw. auf macOS ein signiertes .app-Paket)
+      und enthaelt daher nie die tatsaechlich genutzte Beispiele-Kopie.
     - Entwicklung: das Repo-Verzeichnis (neben gbrun.py).
     """
     if getattr(sys, "frozen", False):
-        public = os.environ.get("PUBLIC") or r"C:\Users\Public"
-        return Path(public) / "Documents" / "GameBasic"
+        if os.name == "nt":
+            public = os.environ.get("PUBLIC") or r"C:\Users\Public"
+            return Path(public) / "Documents" / "GameBasic"
+        root = Path.home() / "Documents" / "GameBasic"
+        _seed_examples_if_missing(root)
+        return root
     return Path(__file__).resolve().parent
+
+
+def _seed_examples_if_missing(root: Path) -> None:
+    """macOS/Linux-Pendant zu Inno Setups Install-Zeit-Kopie: einmalig beim
+    ersten Start examples/ aus dem eingefrorenen Bundle (_MEIPASS) in den
+    beschreibbaren project_root kopieren, falls noch nicht vorhanden. Kein
+    harter Fehler, wenn das (aus welchem Grund auch immer) scheitert --
+    der Editor startet trotzdem, nur ohne Beispiele-Menue."""
+    if (root / "examples").exists():
+        return
+    meipass = getattr(sys, "_MEIPASS", None)
+    if not meipass:
+        return
+    bundled = Path(meipass) / "examples"
+    if not bundled.is_dir():
+        return
+    try:
+        import shutil
+        root.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(bundled, root / "examples", dirs_exist_ok=True)
+    except OSError:
+        pass
 
 
 def _print_help_and_examples():

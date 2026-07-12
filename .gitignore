@@ -47,6 +47,8 @@ examples/highscores.txt
 # GameBasic-Installer: Quelle committen, Build-Artefakte ignorieren
 installer/output/
 installer/GameBasic.ico
+installer/GameBasic.icns
+installer/GameBasic.png
 !installer/GameBasic.spec
 installer/THIRD-PARTY-NOTICES.txt
 

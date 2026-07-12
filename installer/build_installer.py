@@ -1,29 +1,46 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Baut den GameBasic-Windows-Installer in einem Rutsch.
+"""Baut die GameBasic-Distribution fuer das aktuelle Betriebssystem.
 
-Schritte:
-  1. gbrt-Runtime sicherstellen (rust/build_runtime.py, falls gbrt.exe fehlt).
-  2. App-Icon installer/GameBasic.ico aus gamebasic/assets/logo.png erzeugen.
-  3. PyInstaller: gbrun.py + gamebasic-Paket -> dist/GameBasic/ (onedir, ohne Python).
-  4. Inno Setup (ISCC): dist/GameBasic + gbrt.exe -> installer/output/GameBasic-Setup-<version>.exe.
+Schritte (alle Plattformen):
+  1. gbrt-Runtime sicherstellen (rust/build_runtime.py, falls fehlend).
+  2. App-Icon aus gamebasic/assets/logo.png erzeugen (.ico Windows, .icns macOS).
+  3. PyInstaller: gbrun.py + gamebasic-Paket -> dist/GameBasic[.app]/ (onedir,
+     ohne Python).
+  4. Plattformspezifische Paketierung:
+     - Windows: Inno Setup (ISCC) -> installer/output/GameBasic-Setup-<version>.exe
+     - macOS:   gbrt neben die App-Binary legen, .app in .dmg packen (hdiutil)
+     - Linux:   gbrt neben die App-Binary legen, .tar.gz + install.sh (XDG
+                Desktop-Integration ohne sudo/root)
 
 Aufruf (im .venv):
-  .venv\\Scripts\\python.exe installer\\build_installer.py
+  .venv\\Scripts\\python.exe installer\\build_installer.py     # Windows
+  .venv/bin/python installer/build_installer.py                # Linux/macOS
 Optionen:
-  --no-installer   nur PyInstaller (kein Inno-Schritt)
+  --no-installer   nur PyInstaller (kein Paketier-Schritt)
   --rebuild-gbrt   gbrt vorher neu bauen
+
+**Cross-Platform-Status:** Der Windows-Pfad ist etabliert und lokal
+verifiziert. macOS/Linux sind neu (Cross-Platform-Migration Phase 4) und
+NICHT auf echter Hardware getestet (diese Entwicklungsumgebung ist
+Windows-only) -- nur PyInstaller selbst lokal gegen den Windows-Zweig
+regressionsgetestet. Rueckmeldungen von echten macOS-/Linux-Nutzern
+willkommen.
 """
 import os
+import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INST = ROOT / "installer"
 PY = Path(sys.executable)
-GBRT = ROOT / "rust" / "gb_runtime" / "target" / "release" / "gbrt.exe"
+SYSTEM = platform.system()  # "Windows" | "Darwin" | "Linux"
+EXE_SUFFIX = ".exe" if SYSTEM == "Windows" else ""
+GBRT = ROOT / "rust" / "gb_runtime" / "target" / "release" / f"gbrt{EXE_SUFFIX}"
 
 
 def log(msg):
@@ -40,6 +57,9 @@ def log(msg):
 #   set GB_SIGN_CERT=C:\keys\meincert.pfx
 #   set GB_SIGN_PASS=geheim
 #   .venv\Scripts\python.exe installer\build_installer.py
+# Nur Windows -- macOS-Codesigning/Notarization (Apple-Entwicklerkonto noetig)
+# und Linux-Paket-Signierung (GPG) sind separate, hier NICHT implementierte
+# Themen.
 def _find_signtool():
     if os.environ.get("SIGNTOOL") and Path(os.environ["SIGNTOOL"]).exists():
         return os.environ["SIGNTOOL"]
@@ -53,7 +73,10 @@ def _find_signtool():
 
 
 def sign(path: Path):
-    """Signiert eine Datei -- NUR wenn GB_SIGN_CERT gesetzt ist (sonst No-Op)."""
+    """Signiert eine Datei -- NUR wenn GB_SIGN_CERT gesetzt ist (sonst No-Op).
+    Nur unter Windows relevant."""
+    if SYSTEM != "Windows":
+        return
     cert = os.environ.get("GB_SIGN_CERT")
     if not cert:
         return  # Signierung nicht konfiguriert -> still ueberspringen
@@ -86,8 +109,14 @@ def ensure_gbrt(rebuild):
         subprocess.run([str(PY), str(ROOT / "rust" / "build_runtime.py")],
                        cwd=ROOT, check=True)
     if not GBRT.exists():
-        sys.exit("FEHLER: gbrt.exe wurde nicht gebaut.")
-    print("gbrt:", GBRT)
+        # Nicht hart abbrechen -- ein Paketier-Testlauf (z.B. in CI, ohne
+        # volle Grafik-Toolchain) soll trotzdem eine Bundle-Struktur pruefen
+        # koennen. Die fertige App findet dann beim Start kein gbrt und
+        # meldet das ihrerseits klar (siehe gbrt_locate.py).
+        print(f"WARNUNG: {GBRT} wurde nicht gebaut -- Paket enthaelt keine "
+              f"Runtime (nur zum Struktur-Testen brauchbar, nicht zum Verteilen).")
+    else:
+        print("gbrt:", GBRT)
 
 
 def make_icon():
@@ -100,14 +129,27 @@ def make_icon():
     if not src.exists():
         print("logo.png fehlt -> ohne Icon."); return
     im = Image.open(src).convert("RGBA")
-    # Auf Quadrat bringen (transparent gepolstert), dann Multi-Size-ICO.
+    # Auf Quadrat bringen (transparent gepolstert).
     s = max(im.size)
     canvas = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     canvas.paste(im, ((s - im.width) // 2, (s - im.height) // 2))
-    ico = INST / "GameBasic.ico"
-    canvas.save(ico, sizes=[(16, 16), (32, 32), (48, 48), (64, 64),
-                            (128, 128), (256, 256)])
-    print("Icon:", ico)
+
+    if SYSTEM == "Windows":
+        ico = INST / "GameBasic.ico"
+        canvas.save(ico, sizes=[(16, 16), (32, 32), (48, 48), (64, 64),
+                                (128, 128), (256, 256)])
+        print("Icon:", ico)
+    elif SYSTEM == "Darwin":
+        icns = INST / "GameBasic.icns"
+        canvas.save(icns, format="ICNS")
+        print("Icon:", icns)
+    else:
+        # Linux: kein Container-Format noetig, .desktop referenziert direkt
+        # ein PNG. 256x256 ist die von der XDG-Icon-Spec bevorzugte Groesse
+        # fuer hicolor/256x256/apps/.
+        png = INST / "GameBasic.png"
+        canvas.resize((256, 256)).save(png)
+        print("Icon:", png)
 
 
 def gen_notices():
@@ -121,20 +163,29 @@ def gen_notices():
 def run_pyinstaller():
     log("PyInstaller (eingefrorene IDE)")
     dist = ROOT / "dist"
-    if (dist / "GameBasic").exists():
-        shutil.rmtree(dist / "GameBasic")
+    for stale in (dist / "GameBasic", dist / "GameBasic.app"):
+        if stale.exists():
+            shutil.rmtree(stale)
     subprocess.run(
         [str(PY), "-m", "PyInstaller", str(INST / "GameBasic.spec"),
          "--noconfirm", "--distpath", str(dist),
          "--workpath", str(ROOT / "build" / "pyi")],
         cwd=ROOT, check=True)
-    exe = dist / "GameBasic" / "GameBasic.exe"
+    if SYSTEM == "Darwin":
+        app = dist / "GameBasic.app"
+        if not app.exists():
+            sys.exit("FEHLER: PyInstaller-Ausgabe (.app) fehlt.")
+        print("App:", app)
+        return app
+    exe = dist / "GameBasic" / f"GameBasic{EXE_SUFFIX}"
     if not exe.exists():
         sys.exit("FEHLER: PyInstaller-Ausgabe fehlt.")
     print("IDE:", exe)
-    sign(exe)            # die ausgelieferte App-Exe signieren (falls konfiguriert)
+    sign(exe)            # die ausgelieferte App-Exe signieren (falls konfiguriert, nur Windows)
+    return exe
 
 
+# ----------------------------------------------------------------- Windows
 def find_iscc():
     for p in (os.environ.get("ISCC"),
               r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -161,17 +212,141 @@ def run_inno(ver):
     print("\nFERTIG ->", out if out.exists() else (INST / "output"))
 
 
+# ------------------------------------------------------------------- macOS
+def run_macos(app: Path, ver: str):
+    # gbrt gehoert NEBEN die eingefrorene Binary (Contents/MacOS/), damit
+    # gbrt_locate.py sie ueber sys.executable findet (siehe .spec-Kommentar).
+    macos_dir = app / "Contents" / "MacOS"
+    if GBRT.exists():
+        shutil.copy2(GBRT, macos_dir / "gbrt")
+        os.chmod(macos_dir / "gbrt", 0o755)
+        print("gbrt kopiert ->", macos_dir / "gbrt")
+    # EULA/Notices als Referenz mit ins Bundle (Resources) -- Pendant zu den
+    # Startmenue-Eintraegen unter Windows.
+    resources = app / "Contents" / "Resources"
+    for f in ("EULA.txt", "THIRD-PARTY-NOTICES.txt"):
+        src = INST / f
+        if src.exists():
+            shutil.copy2(src, resources / f)
+
+    log("DMG erzeugen (hdiutil)")
+    out_dir = INST / "output"
+    out_dir.mkdir(exist_ok=True)
+    dmg = out_dir / f"GameBasic-{ver}-macOS.dmg"
+    if dmg.exists():
+        dmg.unlink()
+    hdiutil = shutil.which("hdiutil")
+    if not hdiutil:
+        print("WARNUNG: hdiutil nicht gefunden (kein macOS?) -- .app liegt "
+              f"unverpackt unter {app}, kein .dmg erzeugt.")
+        return
+    subprocess.run([hdiutil, "create", "-volname", "GameBasic",
+                     "-srcfolder", str(app), "-ov", "-format", "UDZO", str(dmg)],
+                    check=True)
+    print("\nFERTIG ->", dmg)
+
+
+# ------------------------------------------------------------------- Linux
+_INSTALL_SH = """#!/bin/sh
+# Installiert GameBasic fuer den aktuellen Nutzer (kein root/sudo noetig),
+# nach der XDG-Basisverzeichnis-Konvention. Zum Deinstallieren die unten
+# genannten Pfade einfach loeschen.
+set -e
+HERE="$(cd "$(dirname "$0")" && pwd)"
+DEST="${HOME}/.local/share/GameBasic"
+BIN="${HOME}/.local/bin"
+APPS="${HOME}/.local/share/applications"
+ICONS="${HOME}/.local/share/icons/hicolor/256x256/apps"
+
+echo "Installiere nach $DEST ..."
+mkdir -p "$DEST" "$BIN" "$APPS" "$ICONS"
+cp -r "$HERE/GameBasic/." "$DEST/"
+chmod +x "$DEST/GameBasic" 2>/dev/null || true
+[ -f "$DEST/gbrt" ] && chmod +x "$DEST/gbrt"
+
+cat > "$BIN/gamebasic" <<EOF
+#!/bin/sh
+exec "$DEST/GameBasic" "\\$@"
+EOF
+chmod +x "$BIN/gamebasic"
+
+[ -f "$HERE/GameBasic.png" ] && cp "$HERE/GameBasic.png" "$ICONS/gamebasic.png"
+
+cat > "$APPS/gamebasic.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=GameBasic
+Comment=BASIC-Dialekt mit Pascal-strikter Typisierung und OOP fuer Spiele
+Exec=$DEST/GameBasic %f
+Icon=gamebasic
+Categories=Development;IDE;
+MimeType=text/x-gamebasic;
+EOF
+
+update-desktop-database "$APPS" 2>/dev/null || true
+gtk-update-icon-cache 2>/dev/null || true
+
+echo "Fertig. Falls '$BIN' nicht in deinem PATH ist, fuege es in deiner Shell-rc hinzu:"
+echo "  export PATH=\\"\\$PATH:$BIN\\""
+echo "GameBasic sollte jetzt auch im Anwendungsmenue auftauchen."
+"""
+
+
+def run_linux(exe: Path, ver: str):
+    app_dir = exe.parent  # dist/GameBasic/
+    if GBRT.exists():
+        shutil.copy2(GBRT, app_dir / "gbrt")
+        os.chmod(app_dir / "gbrt", 0o755)
+        print("gbrt kopiert ->", app_dir / "gbrt")
+
+    log("Tarball + install.sh erzeugen")
+    out_dir = INST / "output"
+    out_dir.mkdir(exist_ok=True)
+    stage = ROOT / "build" / "linux-package"
+    if stage.exists():
+        shutil.rmtree(stage)
+    stage.mkdir(parents=True)
+    shutil.copytree(app_dir, stage / "GameBasic")
+    icon = INST / "GameBasic.png"
+    if icon.exists():
+        shutil.copy2(icon, stage / "GameBasic.png")
+    for f in ("EULA.txt", "THIRD-PARTY-NOTICES.txt"):
+        src = INST / f
+        if src.exists():
+            shutil.copy2(src, stage / f)
+    install_sh = stage / "install.sh"
+    install_sh.write_text(_INSTALL_SH, encoding="utf-8", newline="\n")
+    os.chmod(install_sh, 0o755)
+
+    tar_path = out_dir / f"GameBasic-{ver}-linux-x86_64.tar.gz"
+    if tar_path.exists():
+        tar_path.unlink()
+    with tarfile.open(tar_path, "w:gz") as tar:
+        tar.add(stage, arcname="GameBasic-dist")
+    print("\nFERTIG ->", tar_path)
+    print("Installation (kein sudo noetig): tar xzf", tar_path.name,
+          "&& ./GameBasic-dist/install.sh")
+
+
 def main():
     rebuild = "--rebuild-gbrt" in sys.argv
     no_inst = "--no-installer" in sys.argv
     ver = version()
-    print(f"GameBasic {ver} -- Installer-Build")
+    print(f"GameBasic {ver} -- Distributions-Build ({SYSTEM})")
     ensure_gbrt(rebuild)
     make_icon()
     gen_notices()
-    run_pyinstaller()
-    if not no_inst:
+    built = run_pyinstaller()
+    if no_inst:
+        return
+    if SYSTEM == "Windows":
         run_inno(ver)
+    elif SYSTEM == "Darwin":
+        run_macos(built, ver)
+    elif SYSTEM == "Linux":
+        run_linux(built, ver)
+    else:
+        print(f"WARNUNG: unbekanntes System '{SYSTEM}' -- nur PyInstaller-Bundle erzeugt: {built}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,63 @@
+name: Package (manuell)
+
+on:
+  workflow_dispatch:
+
+# Cross-Platform-Migration Phase 4: verifiziert, dass installer/build_installer.py
+# auf allen drei Plattformen tatsaechlich eine Distribution produziert (Windows-
+# Installer/macOS-.dmg/Linux-Tarball). NICHT Teil der normalen push/PR-CI, weil
+# der volle Lauf (PySide6/numpy/Pillow-Installation + PyInstaller) mehrere Minuten
+# pro OS braucht und kein Push-blockierendes Korrektheitskriterium ist -- manuell
+# ueber den Actions-Tab ("Run workflow") ausloesen.
+#
+# gbrt wird hier nur mit --no-graphics gebaut (schnell, keine System-Bibliotheken
+# noetig) -- das erzeugte Bundle enthaelt also NICHT die volle, fuer echte Nutzer
+# gedachte Runtime, nur genug um zu pruefen, dass die Paketier-Schritte selbst
+# (Icon-Erzeugung/PyInstaller/DMG/Tarball/Inno Setup) funktionieren.
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python-Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[editors,package]"
+
+      - name: gbrt bauen (--no-graphics, nur fuer Bundle-Struktur-Test)
+        run: python rust/build_runtime.py --no-graphics
+
+      # Windows: Inno Setup ist auf den GH-Runnern nicht vorinstalliert --
+      # --no-installer testet nur den PyInstaller-Schritt (der Windows-Zweig
+      # inkl. Inno ist bereits lokal etabliert/verifiziert). macOS/Linux
+      # brauchen kein zusaetzliches Tool (hdiutil ist auf macos-latest
+      # vorinstalliert, der Tarball-Schritt ist reines Python).
+      - name: Distribution bauen (Windows)
+        if: runner.os == 'Windows'
+        run: python installer/build_installer.py --no-installer
+
+      - name: Distribution bauen (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: python installer/build_installer.py
+
+      - name: Artefakte hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: gamebasic-${{ matrix.os }}
+          path: |
+            dist/
+            installer/output/
+          if-no-files-found: warn
+          retention-days: 7

@@ -1,40 +1,74 @@
-# GameBasic – Windows-Installer bauen
+# GameBasic – Distribution bauen (Windows/macOS/Linux)
 
-Erzeugt einen eigenständigen Windows-Installer (`GameBasic-Setup-<version>.exe`),
-mit dem GameBasic **ohne installiertes Python** läuft: die komplette IDE
-(Code-Editor + Sprite-/Tilemap-/Form-/Audio-/Anim-Editor) und die native Runtime
-`gbrt` werden mitgeliefert.
+Erzeugt eine eigenständige GameBasic-Distribution, mit der GameBasic **ohne
+installiertes Python** läuft: die komplette IDE (Code-Editor +
+Sprite-/Tilemap-/Form-/Audio-/Anim-Editor) und die native Runtime `gbrt`
+werden mitgeliefert. Windows bekommt einen Installer
+(`GameBasic-Setup-<version>.exe`), macOS ein `.app` in einem `.dmg`, Linux
+einen Tarball mit `install.sh`.
+
+> **Cross-Platform-Status:** Der Windows-Pfad ist etabliert und lokal
+> verifiziert. **macOS/Linux sind neu (Cross-Platform-Migration Phase 4) und
+> NICHT auf echter Hardware getestet** — Entwicklung läuft bisher
+> ausschließlich unter Windows. Nur der PyInstaller-Schritt selbst wurde
+> lokal (Windows) regressionsgetestet; die macOS-/Linux-spezifischen Schritte
+> (`.dmg` via `hdiutil`, `install.sh`) sind nach bestem Wissen geschrieben +
+> isoliert simuliert (Shell-Syntax-Check + Testlauf gegen ein Fake-`$HOME`),
+> aber nie auf einem echten Mac/Linux-Rechner gelaufen. Rückmeldungen von
+> echten macOS-/Linux-Nutzern sind ausdrücklich erwünscht.
 
 ## Schnellstart
 
 ```
-.venv\Scripts\python.exe installer\build_installer.py
+.venv\Scripts\python.exe installer\build_installer.py     # Windows
+.venv/bin/python installer/build_installer.py              # macOS/Linux
 ```
 
 Das macht in einem Rutsch:
-1. **gbrt-Runtime** bauen (falls `rust/gb_runtime/target/release/gbrt.exe` fehlt).
-2. **App-Icon** `installer/GameBasic.ico` aus `gamebasic/assets/logo.png` erzeugen.
+1. **gbrt-Runtime** bauen (falls `rust/gb_runtime/target/release/gbrt[.exe]` fehlt;
+   fehlt sie danach immer noch, wird nur gewarnt statt abzubrechen — nützlich, um
+   die Paketierung selbst zu testen, ohne die volle Grafik-Toolchain zu brauchen).
+2. **App-Icon** aus `gamebasic/assets/logo.png` erzeugen (`.ico` Windows, `.icns`
+   macOS, `.png` Linux).
 3. **PyInstaller**: friert `gbrun.py` + das `gamebasic`-Paket + PySide6 + numpy +
-   Pillow zu `dist/GameBasic/` ein (onedir, kein Python nötig).
-4. **Inno Setup** (ISCC): packt `dist/GameBasic` + `gbrt.exe` + Beispiele + Lehrbuch
-   zu `installer/output/GameBasic-Setup-<version>.exe`.
-
-Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
+   Pillow ein (onedir, kein Python nötig) — `dist/GameBasic/` (Windows/Linux) bzw.
+   `dist/GameBasic.app` (macOS).
+4. Plattformspezifische Paketierung:
+   - **Windows**: Inno Setup (ISCC) → `installer/output/GameBasic-Setup-<version>.exe`
+     (Beispiele + Lehrbuch + Startmenü + optional PATH/.gb-Dateiverknüpfung).
+   - **macOS**: `gbrt` neben die App-Binary legen (`Contents/MacOS/`), `.app` mit
+     `hdiutil` in `installer/output/GameBasic-<version>-macOS.dmg` packen.
+   - **Linux**: `gbrt` neben die Binary legen, `install.sh` (XDG-Desktop-
+     Integration ohne sudo/root: `~/.local/share/GameBasic` + `.desktop`-Eintrag +
+     Icon) dazupacken, alles zu
+     `installer/output/GameBasic-<version>-linux-x86_64.tar.gz`.
 
 ### Optionen
-- `--no-installer` – nur PyInstaller (Schritt 3), kein Inno-Schritt.
+- `--no-installer` – nur PyInstaller (Schritt 3), kein Paketier-Schritt.
 - `--rebuild-gbrt` – gbrt vorher neu bauen.
 
 ## Voraussetzungen
-- Das Projekt-`.venv` mit `PyInstaller`, `PySide6`, `numpy`, `Pillow`
-  (`requirements.txt`).
-- **Inno Setup 6** (für Schritt 4): https://jrsoftware.org/isdl.php
+- Das Projekt-`.venv` mit den `editors`- und `package`-Extras: `pip install -e ".[editors,package]"`.
+- **Windows** – Inno Setup 6 (für Schritt 4): https://jrsoftware.org/isdl.php
   (`ISCC.exe`; gefunden unter `C:\Program Files (x86)\Inno Setup 6\`, per `ISCC`
   auf dem PATH, oder über die Umgebungsvariable `ISCC`). Fehlt es, bleibt
   `dist/GameBasic` stehen und der Installer-Schritt wird übersprungen.
+- **macOS** – `hdiutil` (System-Bordmittel, immer vorhanden).
+- **Linux** – keine externen Tools nötig (reines Python + Tarball).
 - Rust-Toolchain für gbrt (siehe `docs/rust-runtime.md`), falls gbrt neu gebaut wird.
 
-## Was der Installer einrichtet
+## Cross-Platform-Verifikation (CI)
+
+`.github/workflows/package.yml` baut die Distribution manuell auslösbar
+(`workflow_dispatch`, GitHub → Actions-Tab → „Package (manuell)" → „Run
+workflow") auf `ubuntu-latest`/`macos-latest`/`windows-latest` und lädt das
+Ergebnis als Artefakt hoch — mit `gbrt --no-graphics` (schnell, ohne
+System-Bibliotheken), prüft also nur, ob die Paketier-Schritte selbst
+durchlaufen, nicht die volle Runtime.
+
+## Was die Distribution einrichtet
+
+**Windows** (Inno Setup):
 - Installation nach `C:\Program Files\GameBasic`.
 - **Beispiele** (142 `.gb` + Assets + Showcase-Thumbnails `screenshots/`) nach
   `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der `project_root` der
@@ -44,22 +78,32 @@ Ergebnis: **`installer/output/GameBasic-Setup-<version>.exe`** – verteilbar.
 - Startmenü-Einträge: **GameBasic** (öffnet direkt den **Code-Editor** – ohne
   Auswahlfenster), Sprite-Editor, Tilemap-Editor, Form-Designer, Audio-Studio,
   Beispiele.
-- Optional (im Setup abwählbar):
-  - Desktop-Verknüpfung.
-  - **PATH-Eintrag** → `gbrt` und `GameBasic` im Terminal nutzbar.
-  - **`.gb`-Dateiverknüpfung** (Doppelklick öffnet im Editor, Rechtsklick → „Mit
-    GameBasic ausführen").
+- Optional (im Setup abwählbar): Desktop-Verknüpfung, **PATH-Eintrag** (`gbrt`
+  und `GameBasic` im Terminal nutzbar), **`.gb`-Dateiverknüpfung** (Doppelklick
+  öffnet im Editor, Rechtsklick → „Mit GameBasic ausführen").
+
+**macOS** (`.dmg`): `.app` per Drag-and-Drop nach `/Applications` (oder woanders
+hin) ziehen — kein Installations-Skript-Schritt wie bei Inno Setup. `.gb`-Dateien
+im Finder sind über `CFBundleDocumentTypes` mit GameBasic verknüpft. Beispiele
+liegen im Bundle und werden beim **ersten Start** automatisch nach
+`~/Documents/GameBasic/examples` kopiert (`gbrun._seed_examples_if_missing`).
+
+**Linux** (Tarball): `tar xzf GameBasic-<version>-linux-x86_64.tar.gz && ./GameBasic-dist/install.sh`
+installiert nach `~/.local/share/GameBasic` (XDG, **kein sudo/root nötig**),
+legt einen `gamebasic`-Befehl unter `~/.local/bin` an und trägt einen
+`.desktop`-Eintrag samt Icon ein (Anwendungsmenü). Beispiele werden wie bei
+macOS beim ersten Start automatisch aus dem Bundle kopiert.
 
 ## Aufbau
 | Datei | Zweck |
 |---|---|
-| `build_installer.py` | Orchestriert gbrt → Icon → Notices → PyInstaller → Inno. |
-| `GameBasic.spec` | PyInstaller-Konfiguration (onedir, windowed, bündelt das Paket + Daten). |
-| `GameBasic.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung, EULA). |
-| `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). Wird im Setup als Zustimmungsseite gezeigt. |
-| `gen_notices.py` | Sammelt alle Drittanbieter-Lizenztexte → `THIRD-PARTY-NOTICES.txt`. |
+| `build_installer.py` | Orchestriert gbrt → Icon → Notices → PyInstaller → plattformspezifische Paketierung (Inno/DMG/Tarball). |
+| `GameBasic.spec` | PyInstaller-Konfiguration (onedir, windowed, bündelt das Paket + Daten; macOS bekommt zusätzlich einen `BUNDLE()`-Schritt für ein echtes `.app`). |
+| `GameBasic.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung, EULA) — nur Windows. |
+| `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). Wird im Windows-Setup als Zustimmungsseite gezeigt; auf macOS/Linux als Referenzdatei mit ins Paket kopiert. |
+| `gen_notices.py` | Sammelt alle Drittanbieter-Lizenztexte → `THIRD-PARTY-NOTICES.txt` (plattformunabhängig). |
 | `licenses/` | Kanonische Volltexte (LGPL-3.0, GPL-3.0, MPL-2.0) für `gen_notices.py`. |
-| `GameBasic.ico` · `THIRD-PARTY-NOTICES.txt` · `output/` | generiert (gitignored). |
+| `GameBasic.ico`/`.icns`/`.png` · `THIRD-PARTY-NOTICES.txt` · `output/` | generiert (gitignored). |
 
 ## Lizenz-Compliance (für den Verkauf)
 - **`THIRD-PARTY-NOTICES.txt`** wird bei jedem Build automatisch erzeugt (`gen_notices.py`):
