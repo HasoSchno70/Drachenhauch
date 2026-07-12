@@ -1,5 +1,7 @@
 # GameBasic – Das Lehrbuch
 
+*Deutsch · [English overview](README.en.md)*
+
 Ein vollständiges Lehr- und Referenzbuch für GameBasic: lehrt das Programmieren
 von Grund auf **und** erklärt jeden Befehl mit kleinem Beispielprogramm.
 Ausgabe: editierbares `.docx` zum Drucken.

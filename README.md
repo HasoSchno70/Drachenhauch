@@ -1,5 +1,7 @@
 # GameBasic
 
+*Deutsch · [English](README.en.md)*
+
 Ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`gbrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt (Grafik/Audio/3D inklusive). Python ist nur noch Editor-/Tooling-Schicht.
 
 ```basic
