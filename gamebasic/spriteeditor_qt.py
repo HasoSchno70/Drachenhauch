@@ -30,14 +30,10 @@ Tastenkuerzel:
 """
 from __future__ import annotations
 
-import base64
-import io
 import json
 import sys
-from collections import deque
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Iterable
+from typing import Optional
 
 try:
     from PIL import Image, ImageDraw
@@ -50,21 +46,20 @@ except ImportError as exc:  # pragma: no cover
 
 try:
     from PySide6.QtCore import (
-        Qt, QPoint, QPointF, QRect, QRectF, QSize, QTimer, Signal,
+        Qt, QPoint, QPointF, QRectF, QSize, QTimer, Signal,
         QFileSystemWatcher,
     )
     from PySide6.QtGui import (
-        QAction, QBrush, QColor, QCursor, QIcon, QImage, QKeySequence,
-        QPainter, QPen, QPixmap, QPolygon, QPolygonF, QShortcut,
-        QStandardItemModel, QStandardItem, QTransform,
+        QAction, QBrush, QColor, QIcon, QImage, QKeySequence,
+        QPainter, QPen, QPixmap, QShortcut,
     )
     from PySide6.QtWidgets import (
-        QApplication, QButtonGroup, QCheckBox, QColorDialog, QComboBox,
+        QApplication, QCheckBox, QColorDialog,
         QDialog, QDialogButtonBox, QDockWidget, QFileDialog, QFrame,
-        QGraphicsScene, QGraphicsView, QGridLayout, QGroupBox, QHBoxLayout,
+        QGraphicsScene, QGraphicsView, QGridLayout, QHBoxLayout,
         QInputDialog, QLabel, QLineEdit, QListView, QListWidget,
-        QListWidgetItem, QMainWindow, QMenu, QMenuBar, QMessageBox,
-        QPushButton, QSizePolicy, QSlider, QSpinBox, QStatusBar, QStyle,
+        QListWidgetItem, QMainWindow, QMenu, QMessageBox,
+        QPushButton, QSlider, QSpinBox, QStatusBar,
         QToolBar, QToolButton, QVBoxLayout, QWidget,
     )
 except ImportError as exc:  # pragma: no cover
@@ -4553,10 +4548,6 @@ class SpriteEditorWindow(QMainWindow):
             event.acceptProposedAction()
             return
         event.ignore()
-
-
-# QActionGroup separat importieren (vermeidet Symbol-Konflikt im Try/Except oben)
-from PySide6.QtGui import QActionGroup  # noqa: E402
 
 
 # ============================================================
