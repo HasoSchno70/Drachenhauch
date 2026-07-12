@@ -50,8 +50,9 @@ module.exports = (H) => [
       'USB_CLOSE(pad)',
     ]),
 
-  H.h2("wifi – WLAN verwalten (nur Windows)"),
-  H.p("Das wifi-Modul steuert die WLAN-Verbindung unter Windows (es nutzt die eingebaute netsh-Schnittstelle, keine Zusatz-Bibliothek). Du kannst Netze scannen, die aktuelle Verbindung und Signalstärke abfragen oder dich mit SSID und Passwort verbinden."),
+  H.h2("wifi – WLAN verwalten"),
+  H.p("Das wifi-Modul steuert die WLAN-Verbindung über das jeweilige Betriebssystem-Bordmittel, ganz ohne Zusatz-Bibliothek: netsh unter Windows, nmcli unter Linux, networksetup/airport unter macOS. Du kannst Netze scannen, die aktuelle Verbindung und Signalstärke abfragen oder dich mit SSID und Passwort verbinden."),
+  H.note("Der Windows-Pfad (netsh) ist der am längsten erprobte. Die Linux- und macOS-Backends sind neuer und bisher nicht auf echter Hardware verifiziert – bei Problemen lohnt ein Blick in die Fehlermeldung, die Rückgabe von netsh/nmcli/networksetup wird meist direkt durchgereicht."),
   H.cmd("WIFI_AVAILABLE · WIFI_CURRENT · WIFI_SIGNAL · WIFI_SCAN", 'WIFI_AVAILABLE()   WIFI_CURRENT()   WIFI_SIGNAL()   WIFI_SCAN()',
     "AVAILABLE prüft, ob ein WLAN-Adapter da ist. CURRENT liefert die aktuelle SSID (leer = nicht verbunden), SIGNAL die Stärke 0..100. SCAN listet erreichbare Netze (mehrzeilig ssid|signal, nach Stärke sortiert).",
     [

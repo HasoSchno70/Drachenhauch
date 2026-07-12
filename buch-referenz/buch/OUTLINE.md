@@ -241,3 +241,26 @@ exaktem gbrt-Wortlaut + Ursache/Lösung). Tabellen per LibreOffice-Render geprü
 **>>> BUCH-GESAMTSTRUKTUR KOMPLETT: Teile I-V (Kap 0-76) + Anhang A-D, 71 content-Module, 79 Überschriften,
 289 PDF-Seiten. <<<** **Nächstes (optional, Politur): TOC/Vorwort-Feinschliff, kompletter Korrekturlauf
 (Tippfehler/Konsistenz), evtl. echte gbsprites-Screenshots wo noch Platzhalter.**
+
+**Nachtrag 2026-07-12: 89 seit der Fertigstellung (14.06.) neu hinzugekommene Builtins nachgezogen**
+(per `git diff` gegen `builtin_index.json` ermittelt, siehe Memory `project_buch_referenz_update_2026_07`).
+Alle Beispiele gegen frisch gebauten `gbrt` verifiziert (Standard-Build `graphics db net http`, kein
+`--hardware` nötig für diese Charge). Betroffen: Kap 34 (FLT), Kap 38 (FILE_OPEN_DIALOG/SAVE_DIALOG/
+FOLDER_DIALOG, native Dialoge ohne out-Kasten), Kap 40 (SCREEN_NATIVE/SCREEN_TRANSPARENT, WINDOW_ESC_QUIT/
+PASSTHROUGH/TOPMOST/UNDECORATED/X/Y/SET_WINDOW_POS, neuer Monitor-Abschnitt MONITOR_COUNT/WIDTH/HEIGHT/
+NAME/REFRESH/X/Y/CURRENT_MONITOR/SET_WINDOW_MONITOR), Kap 41 (CIRCLEOUTLINE), Kap 43 (GETPIXEL,
+DRAWIMAGEPARTEX, 11× neue IMAGE_*-Filter: BLUR/BRIGHTNESS/CONTRAST/CROP/GRAYSCALE/INVERT/REPLACE_COLOR/
+RESIZE_CANVAS + die 4 in-place-DRAW_*-Befehle), Kap 48 (CAMERA_ORBIT/PICK_MODEL/RAY_HIT_MODEL/
+MODEL_ANIMATE_BLEND/WORLD_TO_SCREEN_*/SCREEN_TO_WORLD_DIR_* als Ausblick-Bullets ergänzt — Audit hatte
+CAMERA_ORBIT+WORLD/SCREEN-Helfer faelschlich Kap 56 zugeordnet, gehören aber inhaltlich zu g3d/Kap 48),
+Kap 59 gui (größter Brocken: Tree-View, Menüleiste+Kontextmenü, Tabs, Splitter, Spinner, Tooltip,
+Textarea, Toolbar+IconButton, GUI_CONFIRM/MESSAGE ohne out-Kasten, GUI_WINDOW_SCROLLABLE — ca. 25
+Builtins mit je eigenem verifiziertem Beispiel), Kap 71 audio (AUDIO_CLOCK_* komplett + räumliches Audio
+AUDIO_LISTENER_*/AUDIO_EMITTER_*/AUDIO_PLAY_AT/AUDIO_PLAY_ON), Kap 73 (NET_IS_CONNECTED), Kap 76
+(wifi-Beschreibung korrigiert: läuft seit der Cross-Platform-Migration auch auf Linux/macOS, nicht mehr
+nur Windows). Ad-hoc-Korrekturlauf (Node-Extraktion aller (codeLines,out)-Paare aus den geänderten
+content/*.js + Python-Runner gegen gbrt) bestätigt: keine echten Fehler, nur erwartete Fortsetzungs-
+Fragmente (Variable aus vorigem cmd()-Block im selben Kapitel, etabliertes Muster) und der vorbestehende
+`<port>`-Platzhalter in Kap 73. Zwei-Pass-Build (`make_book.py`) lief sauber durch (79/79 ToC-Seiten).
+Anhang A ist auto-generiert aus builtin_index.json und zieht die neuen Builtins beim nächsten Build
+automatisch nach — kein manueller Eingriff nötig.

@@ -133,6 +133,33 @@ module.exports = (H) => [
       'PRINT DIRNAME("saves/level1/p.txt")',
     ], { out: ["p.txt", "saves/level1"] }),
 
+  H.h2("Native Datei-Dialoge"),
+  H.p("Statt einen Pfad im Code fest zu verdrahten, kannst du den Nutzer mit dem gewohnten Betriebssystem-Dialog wählen lassen – „Öffnen“, „Speichern unter“ oder „Ordner wählen“. Die drei Befehle blockieren das Programm, bis der Nutzer eine Wahl trifft oder abbricht (abgebrochen = leerer String \"\") – deshalb nicht in einem laufenden Spiel-Loop verwenden, sondern z. B. beim Programmstart oder über einen Menüpunkt."),
+  H.warn("Nicht automatisiert testbar", "Diese drei Befehle öffnen ein echtes System-Fenster und warten auf eine Nutzer-Eingabe. Die folgenden Beispiele zeigen daher die Verwendung, ohne eine Ausgabe abzudrucken."),
+  H.cmd("FILE_OPEN_DIALOG", 'FILE_OPEN_DIALOG([titel$[, endungen$]]) AS STRING',
+    "Öffnet den „Datei öffnen“-Dialog. endungen$ filtert die Anzeige, komma-getrennt ohne Punkt (z. B. \"png,jpg\"). Liefert den gewählten Pfad oder \"\" bei Abbruch.",
+    [
+      'DIM pfad AS STRING',
+      'pfad = FILE_OPEN_DIALOG("Level laden", "json")',
+      'IF pfad <> "" THEN',
+      '    PRINT "Gewaehlt:", pfad',
+      'END IF',
+    ]),
+  H.cmd("FILE_SAVE_DIALOG", 'FILE_SAVE_DIALOG([titel$[, vorschlag$[, endungen$]]]) AS STRING',
+    "Öffnet den „Speichern unter“-Dialog mit optionalem vorgeschlagenem Dateinamen. Liefert den gewählten Pfad oder \"\" bei Abbruch.",
+    [
+      'DIM pfad AS STRING',
+      'pfad = FILE_SAVE_DIALOG("Spielstand speichern", "save1.json", "json")',
+      'IF pfad <> "" THEN WRITEALL(pfad, "{}")',
+    ]),
+  H.cmd("FOLDER_DIALOG", 'FOLDER_DIALOG([titel$]) AS STRING',
+    "Öffnet den „Ordner wählen“-Dialog. Liefert den gewählten Ordnerpfad oder \"\" bei Abbruch.",
+    [
+      'DIM ordner AS STRING',
+      'ordner = FOLDER_DIALOG("Assets-Ordner waehlen")',
+      'IF ordner <> "" THEN PRINT DIRLIST(ordner)',
+    ]),
+
   H.tip("Speicherstände leicht gemacht", "Für echte Spielstände musst du Dateien nicht selbst Zeile für Zeile verwalten: Das save-Modul (Teil V) bietet komfortable Save-Slots mit benannten Werten, und das json-Modul speichert ganze Datenstrukturen. Die rohen Datei-Befehle hier sind die Grundlage darunter."),
   H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit und Dateien. In Teil IV geht es um das, wofür GameBasic gemacht ist: Grafik, Sound und Spiele."),
 ];

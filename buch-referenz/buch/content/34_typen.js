@@ -18,6 +18,15 @@ module.exports = (H) => [
     ],
     { out: ["3 -2"] }),
 
+  H.cmd("FLT", "FLT(zahl)",
+    "Wandelt eine ganze Zahl (oder Kommazahl) in eine Kommazahl (FLOAT) um – das Gegenstück zu INT. Praktisch, wenn eine INTEGER-Variable für eine Rechnung als FLOAT gebraucht wird, z. B. um eine krumme Division zu erzwingen.",
+    [
+      'PRINT FLT(3)',
+      'PRINT FLT(3) + 0.5',
+      'PRINT TYPEOF(FLT(3))',
+    ],
+    { out: ["3.0", "3.5", "FLOAT"] }),
+
   H.h2("Zeichen ↔ Code, Zahlensysteme"),
   H.cmd("CHR$ · ASC", "CHR$(code)   ASC(s$)",
     "CHR$ macht aus einer Zeichen-Nummer (Unicode-Codepoint) das Zeichen, ASC aus dem ersten Zeichen seine Nummer. A ist 65, B ist 66 …",

@@ -81,6 +81,21 @@ module.exports = (H) => [
     ], { out: ["POS 10 20", "127.0.0.1:<port>"] }),
   H.note('NET_UDP_LAST_FROM gibt einen STRING der Form "host:port" zurück (z. B. "127.0.0.1:63332"), nicht zwei getrennte Werte. Den Host-Teil holst du dir bei Bedarf mit SPLIT(adr, ":")[0].'),
 
+  H.cmd("NET_IS_CONNECTED", "NET_IS_CONNECTED(sock) AS BOOLEAN",
+    "Verrät, ob eine TCP-Verbindung noch als offen gilt. Wird FALSE, sobald ein Lese- oder Schreibversuch das Schließen der Gegenseite erkannt hat – praktisch für eine schnelle Vorab-Prüfung, bevor du NET_SEND/NET_RECV aufrufst.",
+    [
+      'IMPORT "net"',
+      'DIM lst AS NET_LISTENER',
+      'lst = NET_TCP_LISTEN(0)',
+      'DIM c AS NET_SOCKET',
+      'c = NET_TCP_CONNECT("127.0.0.1", NET_LISTENER_PORT(lst))',
+      'SLEEP(50)',
+      'DIM s AS NET_SOCKET',
+      's = NET_TCP_ACCEPT(lst)',
+      'PRINT NET_IS_CONNECTED(c)',
+      'NET_CLOSE(c) : NET_CLOSE(s) : NET_CLOSE_LISTENER(lst)',
+    ], { out: ["TRUE"] }),
+
   H.h2("Nicht-blockierend – der Schlüssel für Spiele"),
   H.p("Alle Lese- und Annahme-Befehle (RECV, ACCEPT, UDP_RECV) kehren sofort zurück: Ist nichts da, liefern sie leeren Text bzw. NIL. So fragst du das Netzwerk einmal pro Frame ab, ohne den Loop anzuhalten. Willst du ausnahmsweise warten, bis Daten kommen, setzt du mit NET_SET_TIMEOUT (bzw. NET_UDP_SET_TIMEOUT) ein Zeitlimit – Vorsicht im Game-Loop, denn das hält den Frame an."),
   H.note("NET_TCP_ACCEPT liefert NIL, wenn gerade keine Verbindung wartet. NIL ist ein ganz normaler Wert (Literal), den du direkt schreiben und vergleichen kannst – prüfe also mit IF NOT IS_NIL(client) THEN … oder gleichbedeutend mit IF client <> NIL THEN …."),

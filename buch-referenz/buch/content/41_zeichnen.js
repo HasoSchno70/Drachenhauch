@@ -47,6 +47,13 @@ module.exports = (H) => [
       'CIRCLE(160, 120, 40, RGB(255, 200, 40))',
       'FLIP()',
     ]),
+  H.cmd("CIRCLEOUTLINE", "CIRCLEOUTLINE(x, y, radius[, farbe])",
+    "Wie CIRCLE, zeichnet aber nur die Kontur (1 Pixel breit) statt eine gefüllte Fläche.",
+    [
+      'CLS()',
+      'CIRCLEOUTLINE(160, 120, 40, RGB(255, 200, 40))',
+      'FLIP()',
+    ]),
   H.cmd("ELLIPSE · ELLIPSEOUTLINE", "ELLIPSE(x1, y1, x2, y2[, farbe])   ELLIPSEOUTLINE(...)",
     "Zeichnet eine Ellipse, eingepasst in das Rechteck (x1, y1)–(x2, y2). ELLIPSE füllt, ELLIPSEOUTLINE zeichnet nur die Kontur (mit optionaler Breite).",
     [
