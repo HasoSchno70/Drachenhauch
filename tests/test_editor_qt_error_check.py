@@ -5,7 +5,16 @@ synchron und liefert jetzt eine **Liste** aller ParseProblems (leer = sauber).
 Der Async-Wrapper drumherum ist Plumbing und wird durch die UI-Smoke-Tests
 abgedeckt.
 """
-from gamebasic.editor_qt.error_check import _check_source
+import pytest
+
+from gamebasic.editor_qt.error_check import _check_source, _find_gbrt
+
+# Compile-Phase-Diagnostik (Typ-/Semantikfehler wie unbekannte Typen oder
+# doppelte Funktionsnamen) kann NUR gbrt liefern -- der Syntax-only-Fallback
+# in _check_source() findet ausschliesslich Lexer-/Parser-Fehler. Ohne
+# gebauten gbrt liefert _check_source() fuer diese Faelle eine leere Liste
+# statt des erwarteten Compile-Problems.
+_needs_gbrt = pytest.mark.skipif(_find_gbrt() is None, reason="native Runtime 'gbrt' nicht gebaut")
 
 
 def _first(src, base=None):
@@ -34,6 +43,7 @@ def test_parse_error_phase_parse():
     assert p.phase == "parse"
 
 
+@_needs_gbrt
 def test_compile_error_unknown_type():
     # DIM mit unbekanntem Typ -> Compile-Fehler (gbrt nennt den Typnamen).
     p = _first("DIM p AS NoSuchClass\n")
@@ -42,6 +52,7 @@ def test_compile_error_unknown_type():
     assert "nosuchclass" in p.message.lower()
 
 
+@_needs_gbrt
 def test_compile_error_duplicate_function():
     src = (
         "SUB foo()\n"
@@ -76,6 +87,7 @@ def test_clean_compile_with_imports():
     assert _check_source(src, None) == []
 
 
+@_needs_gbrt
 def test_severity_default_is_error():
     p = _first("DIM x AS NoSuch\n")
     assert p is not None

@@ -17,6 +17,20 @@ _ROOT = Path(__file__).resolve().parent.parent
 _GBRUN = _ROOT / "gbrun.py"
 
 
+def _gbrt_available() -> bool:
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    return any((_ROOT / "rust" / "gb_runtime" / "target" / variant / exe).exists()
+               for variant in ("release", "debug"))
+
+
+# gbrun.py ruft intern "gbrt run" auf -- ohne gebauten gbrt bricht der
+# Subprozess mit einer "Native Runtime nicht gefunden"-Meldung ab statt das
+# GB-Programm auszufuehren. Anders als die run_gb-Fixture (conftest.py)
+# nutzt dieses Modul gbrun.py direkt als echten Subprozess (End-to-End-Test
+# der Editor-Konsole), daher der eigene Skip hier.
+pytestmark = pytest.mark.skipif(not _gbrt_available(), reason="native Runtime 'gbrt' nicht gebaut")
+
+
 def _run_with_stdin(source: str, stdin: str, tmp_path: Path) -> tuple[int, str]:
     src_file = tmp_path / "prog.gb"
     src_file.write_text(source, encoding="utf-8")
