@@ -23,7 +23,7 @@ Wenn `pyserial` nicht installiert ist, lädt das Modul trotzdem — der erste Au
 | `SERIAL_CLOSE(handle)` | — |
 | `SERIAL_IS_OPEN(handle)` | BOOLEAN |
 | `SERIAL_WRITE(handle, s$)` | INTEGER (geschriebene Bytes) |
-| `SERIAL_READ(handle, n)` | STRING (bis zu n Bytes als utf-8/replace) |
+| `SERIAL_READ(handle, n)` | STRING (bis zu n Bytes, max. 64 MiB) |
 | `SERIAL_READLINE(handle)` | STRING (bis Newline) |
 | `SERIAL_AVAILABLE(handle)` | INTEGER (wartende Bytes im Eingangspuffer) |
 | `SERIAL_FLUSH(handle)` | — (Eingangs- und Ausgangspuffer leeren) |
@@ -32,6 +32,8 @@ Wenn `pyserial` nicht installiert ist, lädt das Modul trotzdem — der erste Au
 ## Bytes ↔ STRING
 
 `SERIAL_READ` und `SERIAL_READLINE` dekodieren als UTF-8 mit Replace-Strategie für nicht-dekodierbare Bytes. Für reine Text-Protokolle (Arduino-Serial-Print, NMEA, AT-Befehle) reicht das. Bei rohem Binär-Protokoll lieber Byte-Wert für Byte-Wert über `MID$` und `ASC` parsen.
+
+`SERIAL_READ` haelt ein Mehrbyte-UTF-8-Zeichen (Umlaut/Sonderzeichen), das genau an einer Lesegrenze zerschnitten ankommt, korrekt bis zum naechsten `SERIAL_READ`-Aufruf zurueck, statt es als `�` anzuzeigen. `n` ist auf 64 MiB pro Aufruf begrenzt — ein versehentlich riesiges `n` (z.B. vertauscht mit einem anderen Parameter) wirft einen klaren Fehler statt eine Riesenallokation auszuloesen. `SERIAL_READLINE` dekodiert dagegen pro Aufruf einmalig lossy (kein Zwischenspeichern ueber Timeouts hinweg).
 
 `SERIAL_WRITE` kodiert den STRING als UTF-8 — pure-ASCII-Bytes (0..127) gehen 1:1 raus, Sonderzeichen werden zu Mehr-Byte-UTF-8-Sequenzen.
 

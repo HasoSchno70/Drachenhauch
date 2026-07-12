@@ -10,6 +10,12 @@ use std::net::{TcpListener, TcpStream, ToSocketAddrs, UdpSocket};
 use std::sync::mpsc;
 use std::time::Duration;
 
+/// Obergrenze fuer NET_RECV/NET_UDP_RECV(sock, n) -- ohne Cap loest ein
+/// versehentlich riesiges `n` (Tippfehler, vertauschte Parameter) eine
+/// Multi-GB-Allokation aus, die bei Fehlschlag den Prozess abbricht statt
+/// einen fangbaren Fehler zu liefern.
+const MAX_READ_BYTES: i64 = 64 * 1024 * 1024;
+
 pub struct NetSock {
     pub stream: TcpStream,
     pub peer_host: String,
@@ -26,7 +32,7 @@ impl NetSock {
     fn decode_chunk(&mut self, bytes: &[u8]) -> String {
         let mut data = std::mem::take(&mut self.pending);
         data.extend_from_slice(bytes);
-        let (text, leftover) = decode_utf8_streaming(data);
+        let (text, leftover) = crate::text_stream::decode_utf8_streaming(data);
         self.pending = leftover;
         text
     }
@@ -36,48 +42,6 @@ pub struct UdpSock {
     pub sock: UdpSocket,
     pub bound_port: i64,
     pub last_from: (String, i64),
-}
-
-/// Dekodiert `data` moeglichst als UTF-8: echte Fehlsequenzen werden (wie bei
-/// `from_utf8_lossy`) durch U+FFFD ersetzt, aber Byte am ENDE, die noch der
-/// unvollstaendige Anfang eines Mehrbyte-Zeichens sein koennten, werden NICHT
-/// ersetzt, sondern als `leftover` zurueckgegeben (fuer den naechsten Read).
-/// Ohne das wuerde ein Umlaut/Emoji, der genau an einer TCP-Lesegrenze
-/// zerschnitten wird, als kaputtes Zeichen erscheinen.
-fn decode_utf8_streaming(mut data: Vec<u8>) -> (String, Vec<u8>) {
-    let mut out = String::new();
-    let mut consumed = 0usize;
-    loop {
-        let rest = &data[consumed..];
-        if rest.is_empty() {
-            break;
-        }
-        match std::str::from_utf8(rest) {
-            Ok(s) => {
-                out.push_str(s);
-                consumed = data.len();
-                break;
-            }
-            Err(e) => {
-                let valid = e.valid_up_to();
-                out.push_str(std::str::from_utf8(&rest[..valid]).unwrap());
-                match e.error_len() {
-                    Some(bad_len) => {
-                        // echte Fehlsequenz (kein TCP-Fragment) -> Ersatzzeichen, weiterscannen
-                        out.push('\u{FFFD}');
-                        consumed += valid + bad_len;
-                    }
-                    None => {
-                        // Bytes am Ende koennten noch vervollstaendigt werden -> aufheben
-                        consumed += valid;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    let leftover = data.split_off(consumed);
-    (out, leftover)
 }
 
 fn would_block(e: &std::io::Error) -> bool {
@@ -212,6 +176,9 @@ pub fn recv(s: &mut NetSock, n: i64) -> Result<String, String> {
     if n <= 0 {
         return Err("NET_RECV: max_bytes muss > 0 sein".into());
     }
+    if n > MAX_READ_BYTES {
+        return Err(format!("NET_RECV: max_bytes {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
     let mut buf = vec![0u8; n as usize];
     match s.stream.read(&mut buf) {
         Ok(0) => {
@@ -259,6 +226,9 @@ pub fn udp_recv(s: &mut UdpSock, n: i64) -> Result<String, String> {
     if n <= 0 {
         return Err("NET_UDP_RECV: max_bytes muss > 0 sein".into());
     }
+    if n > MAX_READ_BYTES {
+        return Err(format!("NET_UDP_RECV: max_bytes {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
     let mut buf = vec![0u8; n as usize];
     match s.sock.recv_from(&mut buf) {
         Ok((got, addr)) => {
@@ -268,51 +238,10 @@ pub fn udp_recv(s: &mut UdpSock, n: i64) -> Result<String, String> {
             // kleiner `max_bytes`-Puffer, der das Datagramm abschneidet. Dieser
             // Rest wird verworfen statt in ein naechstes (unabhaengiges!)
             // Datagramm hineingemischt zu werden.
-            let (text, _leftover) = decode_utf8_streaming(buf[..got].to_vec());
+            let (text, _leftover) = crate::text_stream::decode_utf8_streaming(buf[..got].to_vec());
             Ok(text)
         }
         Err(ref e) if would_block(e) => Ok(String::new()),
         Err(e) => Err(format!("NET_UDP_RECV: {}", e)),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::decode_utf8_streaming;
-
-    #[test]
-    fn ascii_passthrough() {
-        let (text, leftover) = decode_utf8_streaming(b"hello".to_vec());
-        assert_eq!(text, "hello");
-        assert!(leftover.is_empty());
-    }
-
-    #[test]
-    fn multibyte_char_split_across_two_reads_reassembles() {
-        // "ae" als Umlaut (2 Byte UTF-8: 0xC3 0xA4), auf zwei Reads verteilt.
-        let full = "Grosse Hitze: \u{00e4}".as_bytes().to_vec();
-        let split_at = full.len() - 1; // mitten im letzten (2-Byte-)Zeichen trennen
-        let (first_chunk, second_chunk) = full.split_at(split_at);
-
-        let (text1, leftover) = decode_utf8_streaming(first_chunk.to_vec());
-        // Das angeschnittene Zeichen darf NICHT als Ersatzzeichen erscheinen.
-        assert!(!text1.contains('\u{FFFD}'));
-        assert!(!leftover.is_empty());
-
-        let mut rest = leftover;
-        rest.extend_from_slice(second_chunk);
-        let (text2, leftover2) = decode_utf8_streaming(rest);
-        assert!(leftover2.is_empty());
-        assert_eq!(format!("{}{}", text1, text2), "Grosse Hitze: \u{00e4}");
-    }
-
-    #[test]
-    fn genuinely_invalid_byte_becomes_replacement_char_not_dropped() {
-        let mut data = b"vor".to_vec();
-        data.push(0xFF); // niemals ein gueltiges UTF-8-Leadbyte
-        data.extend_from_slice(b"nach");
-        let (text, leftover) = decode_utf8_streaming(data);
-        assert!(leftover.is_empty());
-        assert_eq!(text, "vor\u{FFFD}nach");
     }
 }

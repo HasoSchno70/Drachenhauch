@@ -30,6 +30,7 @@ mod ecs;
 mod html;
 #[cfg(feature = "net")]
 mod net;
+mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
 #[cfg(feature = "serial")]
