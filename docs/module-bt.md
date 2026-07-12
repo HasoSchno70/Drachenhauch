@@ -20,7 +20,7 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 
 | Funktion | Rückgabe |
 |---|---|
-| `BT_SCAN(timeout_sek)` | STRING (multi-line `addr|name|rssi`) |
+| `BT_SCAN(timeout_sek)` | STRING (multi-line `addr|name|rssi`), 0..300s |
 | `BT_CONNECT(addr$)` | BT_HANDLE |
 | `BT_DISCONNECT(handle)` | — |
 | `BT_IS_CONNECTED(handle)` | BOOLEAN |
@@ -32,6 +32,8 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 ## Async/Sync
 
 `bleak` ist asyncio-basiert. Dieses Modul betreibt im Hintergrund einen dedizierten Event-Loop in einem Daemon-Thread und reicht jeden Aufruf synchron durch — der GameBasic-VM blockiert pro Aufruf bis zur Antwort. Du musst dich nicht um Coroutinen oder `await` kümmern.
+
+Alle Calls ausser `BT_SCAN` (das sein eigenes, von dir gewähltes Zeitfenster hat) haben ein internes 10-Sekunden-Timeout — ist ein Gerät ausser Reichweite oder antwortet nicht, scheitert `BT_CONNECT`/`BT_READ`/`BT_WRITE`/`BT_SERVICES`/`BT_CHARACTERISTICS` nach spätestens 10s mit einer fangbaren Fehlermeldung, statt den Game-Loop unbegrenzt einzufrieren.
 
 ## Bytes ↔ STRING
 
@@ -123,4 +125,4 @@ Siehe [examples/38_bt.gb](../examples/38_bt.gb).
 
 ## In der nativen Runtime (gbrt)
 
-`bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug` statt `bleak`; async wird ueber eine interne tokio-Runtime synchron getrieben). Scan/Connect/Services/Characteristics/Read/Write wie im Python-Pfad; Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. Bauen: `python rust/build_runtime.py --hardware` (oder `--full`). Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.
+`bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug` statt `bleak`; async wird ueber eine interne tokio-Runtime synchron getrieben). Scan/Connect/Services/Characteristics/Read/Write wie im Python-Pfad; Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. `BT_SCAN` validiert `timeout_sek` streng (endliche Zahl 0..300) — ein NaN/Infinity-Wert (z.B. aus einer Rechenkette wie `POW(10,1000)`) wirft einen sauberen Fehler statt die Runtime abstuerzen zu lassen. Bauen: `python rust/build_runtime.py --hardware`. Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.

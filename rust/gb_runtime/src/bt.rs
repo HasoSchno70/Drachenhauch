@@ -69,14 +69,43 @@ fn char_props(f: CharPropFlags) -> String {
     v.join(",")
 }
 
+/// Zeitlimit fuer alle BLE-Calls ausser BT_SCAN (das hat sein eigenes,
+/// User-gesteuertes Timeout). Ohne das blockiert z.B. BT_CONNECT/BT_READ auf
+/// ein Geraet, das ausser Reichweite ist oder nicht antwortet, den kompletten
+/// Game-Loop-Thread unbegrenzt -- kein Fenster-Close, kein Recovery.
+const CALL_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// Treibt `fut` mit `CALL_TIMEOUT` an und flacht `Result<Result<T, E>, Elapsed>`
+/// zu `Result<T, String>` ab -- Timeout wird zu einer normalen, fangbaren
+/// GBRuntimeError statt eines unbegrenzten Hangs.
+async fn with_timeout<T, E: std::fmt::Display>(
+    fut: impl std::future::Future<Output = Result<T, E>>,
+    fn_: &str,
+) -> Result<T, String> {
+    match tokio::time::timeout(CALL_TIMEOUT, fut).await {
+        Ok(Ok(v)) => Ok(v),
+        Ok(Err(e)) => Err(format!("{}: {}", fn_, e)),
+        Err(_) => Err(format!("{}: Zeitueberschreitung nach {}s (Geraet nicht erreichbar?)", fn_, CALL_TIMEOUT.as_secs())),
+    }
+}
+
 async fn find_char(p: &Peripheral, uuid: &str) -> Option<Characteristic> {
-    let _ = p.discover_services().await;
+    let _ = with_timeout(p.discover_services(), "BT").await;
     p.characteristics().into_iter().find(|c| c.uuid.to_string().eq_ignore_ascii_case(uuid))
 }
 
+/// Obergrenze fuer BT_SCAN(timeout_s) -- verhindert absurde/versehentliche
+/// Werte (z.B. aus einer Rechenkette wie POW(10,1000)) von vornherein.
+const MAX_SCAN_SECS: f64 = 300.0;
+
 pub fn scan(timeout_s: f64) -> Result<String, String> {
-    if timeout_s < 0.0 {
-        return Err("BT_SCAN: Timeout muss >= 0 sein".into());
+    // `timeout_s < 0.0` allein reicht NICHT: NaN- und Infinity-Vergleiche
+    // sind nie `true`, wuerden also durchrutschen und
+    // `Duration::from_secs_f64` (unten) zum Panic bringen -- ein Panic in
+    // einem Builtin-Call ist NICHT durch TRY/CATCH fangbar (kein
+    // catch_unwind auf diesem Aufrufpfad) und reisst den ganzen Prozess mit.
+    if !timeout_s.is_finite() || timeout_s < 0.0 || timeout_s > MAX_SCAN_SECS {
+        return Err(format!("BT_SCAN: Timeout muss eine endliche Zahl zwischen 0 und {} sein", MAX_SCAN_SECS));
     }
     let g = bt()?;
     g.rt.block_on(async {
@@ -104,8 +133,10 @@ pub fn connect(addr: &str) -> Result<Peripheral, String> {
     let p = seen().lock().unwrap().get(addr).cloned()
         .ok_or_else(|| format!("BT_CONNECT: '{}' nicht gefunden - erst BT_SCAN aufrufen", addr))?;
     g.rt.block_on(async {
-        p.connect().await.map_err(|e| format!("BT_CONNECT: {}", e))?;
-        if !p.is_connected().await.unwrap_or(false) {
+        with_timeout(p.connect(), "BT_CONNECT").await?;
+        let connected = tokio::time::timeout(CALL_TIMEOUT, p.is_connected()).await
+            .ok().and_then(|r| r.ok()).unwrap_or(false);
+        if !connected {
             return Err(format!("BT_CONNECT: Konnte {} nicht verbinden", addr));
         }
         Ok::<(), String>(())
@@ -116,8 +147,10 @@ pub fn connect(addr: &str) -> Result<Peripheral, String> {
 pub fn disconnect(p: &Peripheral) -> Result<(), String> {
     let g = bt()?;
     g.rt.block_on(async {
-        if p.is_connected().await.unwrap_or(false) {
-            let _ = p.disconnect().await;
+        let connected = tokio::time::timeout(CALL_TIMEOUT, p.is_connected()).await
+            .ok().and_then(|r| r.ok()).unwrap_or(false);
+        if connected {
+            let _ = tokio::time::timeout(CALL_TIMEOUT, p.disconnect()).await;
         }
     });
     Ok(())
@@ -125,7 +158,9 @@ pub fn disconnect(p: &Peripheral) -> Result<(), String> {
 
 pub fn is_connected(p: &Peripheral) -> bool {
     match bt() {
-        Ok(g) => g.rt.block_on(p.is_connected()).unwrap_or(false),
+        Ok(g) => g.rt.block_on(async {
+            tokio::time::timeout(CALL_TIMEOUT, p.is_connected()).await.ok().and_then(|r| r.ok())
+        }).unwrap_or(false),
         Err(_) => false,
     }
 }
@@ -133,7 +168,7 @@ pub fn is_connected(p: &Peripheral) -> bool {
 pub fn services(p: &Peripheral) -> Result<String, String> {
     let g = bt()?;
     g.rt.block_on(async {
-        p.discover_services().await.map_err(|e| format!("BT_SERVICES: {}", e))?;
+        with_timeout(p.discover_services(), "BT_SERVICES").await?;
         Ok(p.services().iter().map(|s| s.uuid.to_string()).collect::<Vec<_>>().join("\n"))
     })
 }
@@ -141,7 +176,7 @@ pub fn services(p: &Peripheral) -> Result<String, String> {
 pub fn characteristics(p: &Peripheral, svc: &str) -> Result<String, String> {
     let g = bt()?;
     g.rt.block_on(async {
-        p.discover_services().await.map_err(|e| format!("BT_CHARACTERISTICS: {}", e))?;
+        with_timeout(p.discover_services(), "BT_CHARACTERISTICS").await?;
         let mut out = Vec::new();
         for s in p.services() {
             if !s.uuid.to_string().eq_ignore_ascii_case(svc) {
@@ -160,7 +195,7 @@ pub fn read(p: &Peripheral, char_uuid: &str) -> Result<String, String> {
     g.rt.block_on(async {
         let ch = find_char(p, char_uuid).await
             .ok_or_else(|| format!("BT_READ: Characteristic '{}' nicht gefunden", char_uuid))?;
-        let data = p.read(&ch).await.map_err(|e| format!("BT_READ: {}", e))?;
+        let data = with_timeout(p.read(&ch), "BT_READ").await?;
         Ok(latin1_decode(&data))
     })
 }
@@ -176,6 +211,6 @@ pub fn write(p: &Peripheral, char_uuid: &str, payload: &str) -> Result<(), Strin
         } else {
             WriteType::WithoutResponse
         };
-        p.write(&ch, &bytes, wt).await.map_err(|e| format!("BT_WRITE: {}", e))
+        with_timeout(p.write(&ch, &bytes, wt), "BT_WRITE").await
     })
 }
