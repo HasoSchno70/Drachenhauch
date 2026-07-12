@@ -55,7 +55,10 @@ impl DbResult {
         match self.cur_value(idx, "DB_GET_INT")? {
             DbVal::Null => Ok(0),
             DbVal::Int(n) => Ok(*n),
-            DbVal::Real(f) if f.fract() == 0.0 => Ok(*f as i64),
+            // `f as i64` saettigt bei Werten ausserhalb des i64-Bereichs still
+            // auf i64::MAX/MIN statt zu scheitern -- fuer sowas riesige REALs
+            // (z.B. 1e20) ist ein klarer Fehler richtiger als ein falscher Wert.
+            DbVal::Real(f) if f.fract() == 0.0 && *f >= i64::MIN as f64 && *f <= i64::MAX as f64 => Ok(*f as i64),
             v => Err(format!("DB_GET_INT: Spalte {} ist {}, nicht INTEGER", idx, type_name(v))),
         }
     }

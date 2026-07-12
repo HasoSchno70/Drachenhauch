@@ -146,7 +146,7 @@ Siehe [examples/25_db.gb](../examples/25_db.gb) — zeigt CREATE, INSERT mit Bin
 ## Best Practices
 
 - **Immer `?` für Parameter** — niemals Strings interpolieren.
-- **Result schließen** mit `DB_CLOSE_RESULT(r)` wenn fertig (sonst leakt der SQLite-Cursor bis das Programm endet).
+- **Result schließen** mit `DB_CLOSE_RESULT(r)` wenn fertig (sonst bleiben die eager geladenen Zeilen bis Programmende im Speicher).
 - **Verbindung schließen** mit `DB_CLOSE(conn)` am Programm-Ende.
 - **Indizes** anlegen für häufige WHERE/ORDER BY-Spalten:
   ```basic
@@ -156,4 +156,4 @@ Siehe [examples/25_db.gb](../examples/25_db.gb) — zeigt CREATE, INSERT mit Bin
 
 ## In der nativen Runtime (gbrt)
 
-`db` laeuft nativ mit dem Cargo-Feature `db` (SQLite via `rusqlite`, gebuendelt — kein System-SQLite noetig). Bit-identisch zu den Python-Pfaden fuer Standard-SQL (CRUD, `?`-Binding, Transaktionen, typisierte Getter). `DB_QUERY` laedt die Zeilen eager in den Speicher. Bauen: `python rust/build_runtime.py --full` (oder Cargo-Feature `db`). Fehlt das Feature, meldet der Builtin „nicht verfuegbar“.
+`db` laeuft nativ mit dem Cargo-Feature `db` (SQLite via `rusqlite`, gebuendelt — kein System-SQLite noetig). Bit-identisch zu den Python-Pfaden fuer Standard-SQL (CRUD, `?`-Binding, Transaktionen, typisierte Getter). `DB_QUERY` laedt die Zeilen eager in den Speicher; `DB_CLOSE_RESULT` gibt sie wieder frei. Bauen: `python rust/build_runtime.py` (Feature `db` ist im Standard-Dev-Build bereits dabei). Fehlt das Feature, meldet der Builtin „nicht verfuegbar“.

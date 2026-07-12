@@ -115,3 +115,30 @@ def test_get_before_next_raises(run_gb):
         run_gb(_SCHEMA +
                'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1")\n'
                'PRINT DB_GET_INT(r, 0)\n')
+
+
+def test_get_int_huge_real_raises_instead_of_saturating(run_gb):
+    # 1e20 ist ganzzahlig (fract()==0), aber weit ausserhalb des i64-Bereichs
+    # -- vorher saettigte `f as i64` still auf i64::MAX statt zu scheitern.
+    with pytest.raises(GBRuntimeError, match="nicht INTEGER"):
+        run_gb('IMPORT "db"\nDIM c AS DB_CONN\nc = DB_OPEN(":memory:")\n'
+               'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1e20")\n'
+               'DB_NEXT(r)\nPRINT DB_GET_INT(r, 0)\n')
+
+
+def test_get_int_normal_whole_float_still_works(run_gb):
+    out = _lines(run_gb('IMPORT "db"\nDIM c AS DB_CONN\nc = DB_OPEN(":memory:")\n'
+                        'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 42.0")\n'
+                        'DB_NEXT(r)\nPRINT DB_GET_INT(r, 0)\nDB_CLOSE_RESULT(r)\n'))
+    assert out == ["42"]
+
+
+def test_close_result_frees_rows_and_stays_usable(run_gb):
+    # DB_CLOSE_RESULT muss weiterhin idempotent+fehlerfrei funktionieren;
+    # der eigentliche Speicher-Fix (rows werden geleert) ist von aussen nicht
+    # direkt messbar, aber ein zweiter Zugriff nach dem Schliessen muss den
+    # dokumentierten "bereits geschlossen"-Fehler werfen.
+    with pytest.raises(GBRuntimeError, match="bereits geschlossen"):
+        run_gb(_SCHEMA +
+               'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1")\n'
+               'DB_CLOSE_RESULT(r)\nPRINT DB_NEXT(r)\n')
