@@ -69,4 +69,4 @@ def scaled_logo_image(target_w: int):
     pil = Image.open(_logo_path()).convert("RGBA")
     ratio = target_w / pil.size[0]
     target_h = max(1, int(pil.size[1] * ratio))
-    return pil.resize((target_w, target_h), Image.LANCZOS)
+    return pil.resize((target_w, target_h), Image.Resampling.LANCZOS)

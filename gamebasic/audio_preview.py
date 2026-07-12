@@ -8,6 +8,7 @@ muessen.
 from __future__ import annotations
 
 import threading
+from typing import Any
 
 import numpy as np
 
@@ -27,7 +28,10 @@ class Mixer:
         self._sr = sr
         self._lock = threading.Lock()
         self._voices: list[tuple[np.ndarray, int]] = []
-        self._stream = None
+        # sounddevice hat keine Typstubs und wird nur bei Bedarf lokal
+        # importiert (optionale Editor-Abhaengigkeit) -- Any statt eines
+        # unbekannten Stream-Typs.
+        self._stream: Any = None
         # Kein Audio-Geraet (haeufig: Sandboxes/CI/`SDL_AUDIODRIVER=dummy`) ->
         # sd.OutputStream() scheitert dauerhaft. EIN gescheiterter Versuch
         # reicht -- kein Retry bei jedem play()-Aufruf noetig/sinnvoll.

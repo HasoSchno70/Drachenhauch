@@ -13,6 +13,7 @@ JSON-Format (`"format": "gbscore-song"`), analog zu `gamebasic.tracker.song`.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 CLEFS = ("treble", "bass")
 
@@ -65,7 +66,10 @@ class NoteEvent:
         return self.start_beat + self.dur_beat
 
     def to_dict(self) -> dict:
-        d = {"start": self.start_beat, "dur": self.dur_beat}
+        # explizit dict[str, Any] annotiert -- sonst leitet mypy den
+        # Werttyp allein aus den ersten beiden (float-)Eintraegen ab und
+        # meckert bei den spaeteren bool/int/None-Werten.
+        d: dict[str, Any] = {"start": self.start_beat, "dur": self.dur_beat}
         if self.rest:
             d["rest"] = True
         else:
