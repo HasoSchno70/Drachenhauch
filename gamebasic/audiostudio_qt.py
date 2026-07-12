@@ -95,6 +95,7 @@ class AudioStudio(QMainWindow):
         # Also den Dirty-Check hier direkt aufrufen (SFX-Generator hat kein
         # Save/Load-Dateimodell -- nichts zu verlieren, keine Pruefung noetig).
         if self.tracker._confirm_dirty():
+            self.tracker._mixer.stop()
             event.accept()
         else:
             event.ignore()

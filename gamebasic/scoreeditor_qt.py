@@ -1085,6 +1085,7 @@ class ScoreEditor(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._confirm_dirty():
+            self._mixer.stop()
             event.accept()
         else:
             event.ignore()

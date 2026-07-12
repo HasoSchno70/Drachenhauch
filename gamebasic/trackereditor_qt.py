@@ -32,10 +32,9 @@ from PySide6.QtWidgets import (
 from .audio_preview import Mixer
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
-from .synth import synthesize
 from .tracker import (
-    MAX_CHANNELS, MIN_CHANNELS, NOTE_OFF, SLIDE_MAX, VOL_MAX, WAVEFORMS,
-    Song, midi_to_freq, note_name, vol_to_pct,
+    MAX_CHANNELS, MIN_CHANNELS, NOTE_OFF, SLIDE_MAX, VOL_MAX,
+    Song, note_name, vol_to_pct,
     FX_NONE, FX_CODES, FX_NAMES,
     block_copy, block_interpolate, block_paste, block_transpose,
 )
@@ -940,6 +939,7 @@ class TrackerEditor(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._confirm_dirty():
+            self._mixer.stop()
             event.accept()
         else:
             event.ignore()
