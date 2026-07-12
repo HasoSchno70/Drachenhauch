@@ -40,10 +40,13 @@ jobs:
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (gbrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
   # (Stand 2026-07) lief/baute gbrt ausschliesslich unter Windows, nie in CI
-  # verifiziert. Bewusst ohne `graphics`/Hardware-Features (serial/usb/bt/
-  # wifi): die brauchen zusaetzliche System-Bibliotheken (cmake/ALSA/libudev/
-  # D-Bus) und sind ein spaeterer Schritt -- hier zaehlt erstmal, ob der reine
-  # VM-Kern + Daten-Tier (db/net/http) plattformunabhaengig ist.
+  # verifiziert. Bewusst ohne `graphics` (braucht cmake/ALSA/X11-Wayland-Dev-
+  # Header, ein spaeterer Schritt) -- hier zaehlt erstmal, ob VM-Kern +
+  # Daten-Tier (db/net/http) + das wifi-Feature (Phase 3: Linux/macOS-Zweige
+  # noch UNGETESTET, dieser Job ist ihr erstes echtes Kompilier-Signal)
+  # plattformunabhaengig sind. serial/usb/bt bleiben vorerst aussen vor --
+  # die brauchen zusaetzliche System-Bibliotheken (libudev/D-Bus) und sind
+  # ein spaeterer Schritt.
   rust-check:
     strategy:
       fail-fast: false
@@ -64,3 +67,6 @@ jobs:
 
       - name: cargo check (+ db/net/http)
         run: cargo check --locked --features "db net http"
+
+      - name: cargo check (+ wifi)
+        run: cargo check --locked --features "wifi"

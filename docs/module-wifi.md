@@ -1,6 +1,6 @@
 # Modul `wifi`
 
-WLAN-Management unter Windows: Netze scannen, aktuelle Verbindung abfragen, mit SSID + Passwort verbinden, gespeicherte Profile verwalten.
+WLAN-Management: Netze scannen, aktuelle Verbindung abfragen, mit SSID + Passwort verbinden, gespeicherte Profile verwalten.
 
 ```basic
 IMPORT "wifi"
@@ -8,9 +8,11 @@ IMPORT "wifi"
 
 ## Plattform & Dependency
 
-**Nur Windows.** Das Modul ruft die eingebaute `netsh wlan`-CLI auf — keine externe Python-Lib nötig.
+**Windows, Linux, macOS.** Keine externe Lib nötig — das Modul ruft jeweils die eingebaute Kommandozeilen-Verwaltung des Betriebssystems auf: Windows `netsh wlan`, Linux `nmcli` (NetworkManager), macOS `networksetup`/`airport`.
 
-Linux nutzt typischerweise `nmcli`, macOS `networksetup` — diese sind hier nicht implementiert. Auf Nicht-Windows wirft jeder Aufruf `GBRuntimeError` mit einem deutlichen Hinweis.
+**Cross-Platform-Status:** Der Windows-Zweig ist gegen echte Hardware verifiziert. **Linux (`nmcli`) und macOS (`networksetup`/`airport`) sind neu und NICHT auf echter Hardware getestet** (Entwicklung läuft bisher nur unter Windows) — nur nach öffentlicher Doku (Linux) bzw. bestem Wissen (macOS) geschrieben. Der macOS-Zweig ist der unsicherste: `airport` (für `WIFI_SCAN`/`WIFI_SIGNAL`) liegt in einem privaten, undokumentierten Apple-Framework, dessen Verhalten sich zwischen macOS-Versionen schon mehrfach geändert hat und das neuere macOS-Versionen teils hinter einer Standortdienste-Berechtigung versteckt — schlägt es fehl, bekommst du eine klare Fehlermeldung statt eines stillen Fehlschlags. Rückmeldungen von echten Linux-/macOS-Nutzern sind ausdrücklich erwünscht (z.B. als GitHub Issue).
+
+Auf sonstigen Plattformen (BSD, ...) wirft jeder Aufruf `GBRuntimeError` mit einem deutlichen Hinweis.
 
 ## Übersicht
 
@@ -25,7 +27,7 @@ Linux nutzt typischerweise `nmcli`, macOS `networksetup` — diese sind hier nic
 | `WIFI_PROFILES()` | STRING (multi-line gespeicherter Profile) |
 | `WIFI_DELETE_PROFILE(name$)` | BOOLEAN |
 
-## Lokalisierung
+## Lokalisierung (Windows)
 
 `netsh wlan` gibt seine Ausgabe in der System-Sprache aus (Deutsch / Englisch / Französisch …). Der Parser ist tolerant — verbundene/getrennte Zustände werden in DE/EN/FR/IT/ES erkannt, Profilnamen werden über das Stichwort „profil" / „Profile" gefunden. Sollte deine Sprache nicht erkannt werden: Issue / Patch willkommen.
 
@@ -33,13 +35,21 @@ Linux nutzt typischerweise `nmcli`, macOS `networksetup` — diese sind hier nic
 
 Konsolen-Ausgabe von `netsh` ist auf Windows nicht verlässlich eine feste Kodierung (mal UTF-8, mal OEM-Codepage, je nach Windows-Version/Konfiguration) — das Modul versucht zuerst UTF-8, fällt bei ungültigen Bytes auf die OEM-Codepage zurück. Umlaute/Sonderzeichen in SSID-/Profilnamen (z.B. `WIFI_PROFILES()`) werden dadurch korrekt statt als Mojibake dargestellt.
 
+`nmcli` (Linux) und `networksetup`/`airport` (macOS) liefern maschinenlesbaren bzw. sprachneutralen Output (`nmcli -t` = "terse", `networksetup`-Meldungen sind stabile Strings) — dort gibt es kein Lokalisierungsproblem.
+
+## Plattform-Unterschiede
+
+- **`WIFI_SIGNAL()`/`WIFI_SCAN()`-Werte**: Windows und Linux liefern echte Prozentwerte (0..100) direkt vom Treiber. macOS liefert nur RSSI in dBm (`airport`) — das Modul rechnet das mit einer groben, in der Netzwerkwelt gebräuchlichen Formel (`-50dBm≈100%`, `-100dBm≈0%`) auf 0..100 um; das ist eine Näherung, kein Treiber-Originalwert.
+- **`WIFI_DISCONNECT()`**: Windows/Linux trennen die aktive Verbindung sauber. macOS' `networksetup` hat dafür keinen eigenen Befehl — der Workaround schaltet den WLAN-Funk kurz aus und wieder ein (deassoziiert von jedem Netz, WLAN bleibt danach an).
+- **`WIFI_CONNECT`/Profile**: Auf allen drei Plattformen wird beim Verbinden ein Profil/eine Connection gespeichert (Windows-WLAN-Profil, NetworkManager-Connection, macOS-„Preferred Network"), das `WIFI_PROFILES()`/`WIFI_DELETE_PROFILE()` verwaltet.
+
 ## Beispiel — aktueller Status + Scan
 
 ```basic
 IMPORT "wifi"
 
 IF NOT WIFI_AVAILABLE() THEN
-    PRINT "Kein WLAN-Adapter (oder kein Windows)."
+    PRINT "Kein WLAN-Adapter gefunden."
 ELSE
     DIM ssid AS STRING
     ssid = WIFI_CURRENT()
@@ -115,4 +125,4 @@ Siehe [examples/36_wifi.gb](../examples/36_wifi.gb).
 
 ## In der nativen Runtime (gbrt)
 
-`wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows-only via `netsh wlan`, keine Crate). Jeder `netsh`-Aufruf hat ein 10-Sekunden-Timeout — ein haengender/ueberlasteter Netzwerk-Stack friert damit nicht mehr den Game-Loop ein. Bauen: `python rust/build_runtime.py --hardware`.
+`wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows via `netsh wlan`, Linux via `nmcli`, macOS via `networksetup`/`airport` -- alle drei per `std::process`, keine zusaetzliche Crate). Jeder Subprozess-Aufruf hat ein 10-Sekunden-Timeout -- ein haengender/ueberlasteter Netzwerk-Stack friert damit nicht mehr den Game-Loop ein. Bauen: `python rust/build_runtime.py --hardware`. Der `rust-check`-CI-Job (`.github/workflows/ci.yml`) kompiliert das `wifi`-Feature auf allen drei Plattformen (ubuntu/macos/windows-latest) -- das einzige automatische Cross-Platform-Signal bisher, da echte WLAN-Hardware in CI-Runnern fehlt.

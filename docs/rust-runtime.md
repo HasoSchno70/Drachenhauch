@@ -129,15 +129,18 @@ neue Builtins, z.B. fuer SID-Charakter ohne Buffer-Bake).
     Ports/Open/Read/Write/Readline/Available/Flush/Timeout. Nativ COM1 erkannt.
   - `usb` (USB_*, 9, Feature `usb` → `hidapi`): HID. List/Open/Open_Path/Read/
     Write/Product/Manufacturer/Serial. latin-1-Byte<->STRING. Geraete gelistet.
-  - `wifi` (WIFI_*, 8, Feature `wifi`, Windows-only via `netsh wlan`+Regex):
-    Available/Current/Signal/Scan/Connect/Disconnect/Profiles/Delete. Verifiziert.
+  - `wifi` (WIFI_*, 8, Feature `wifi`, Windows via `netsh wlan`, Linux via
+    `nmcli`, macOS via `networksetup`/`airport`): Available/Current/Signal/
+    Scan/Connect/Disconnect/Profiles/Delete. Windows-Zweig verifiziert;
+    Linux/macOS neu (2026-07, Cross-Platform-Migration Phase 3) und NICHT
+    auf echter Hardware getestet, siehe docs/module-wifi.md.
   - `bt` (BT_*, 8, Feature `bt` → `btleplug`+`tokio`): BLE, async->sync ueber
     globale tokio-Runtime (block_on pro Aufruf). Scan/Connect/Services/
     Characteristics/Read/Write, latin-1. **BT_SCAN fand reale BLE-Geraete** (mit
     RSSI). Adresse->Peripheral aus letztem Scan fuer BT_CONNECT.
   - Handles = INTEGER-Index in cfg-gated VM-Vecs. `build_runtime.py --hardware`
-    nimmt sie dazu (`--full` = alles). Default-Dev-Build laesst Hardware weg
-    (haelt die schweren Deps tokio/btleplug/windows aus dem Normal-Build).
+    nimmt sie dazu. Default-Dev-Build laesst Hardware weg (haelt die schweren
+    Deps tokio/btleplug/windows aus dem Normal-Build).
   - **Frueh-Warnung beim IMPORT:** Importiert ein Programm ein Hardware-Modul,
     das dem aktuellen Build fehlt, warnt gbrt schon beim IMPORT — `gbrt run`
     auf stderr vor dem Lauf, `gbrt --check` als `severity:"warning"` auf der

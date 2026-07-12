@@ -1,5 +1,15 @@
 //! WiFi-Management (WIFI_*) -- nativer Port von `gamebasic/modules/wifi.py`.
-//! Windows-only via `netsh wlan` (std::process), Regex-Parsing. Feature `wifi`.
+//! Windows via `netsh wlan`, Linux via `nmcli` (NetworkManager), macOS via
+//! `networksetup`/`airport` (std::process, Text-Parsing). Feature `wifi`.
+//!
+//! **Cross-Platform-Status:** Windows-Zweig ist gegen echte Hardware
+//! verifiziert. Linux-Zweig (nmcli) ist nach oeffentlicher, stabiler
+//! nmcli-Doku geschrieben, aber NICHT auf echter Linux-Hardware getestet
+//! (diese Entwicklungsumgebung ist Windows-only). macOS-Zweig ist der
+//! unsicherste: `airport` ist ein privates, undokumentiertes Apple-Tool,
+//! dessen Verhalten sich zwischen macOS-Versionen schon mehrfach geaendert
+//! hat (Details bei scan()) -- ebenfalls ungetestet. Rueckmeldungen von
+//! echten Linux-/macOS-Nutzern sind ausdruecklich erwuenscht.
 #![cfg(feature = "wifi")]
 
 #[cfg(windows)]
@@ -204,10 +214,340 @@ mod imp {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
+mod imp {
+    use std::process::Command;
+    use std::time::Duration;
+
+    const NMCLI_TIMEOUT: Duration = Duration::from_secs(10);
+
+    fn run_nmcli(args: &[&str]) -> Result<(i32, String), String> {
+        let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = Command::new("nmcli").args(&args_owned).output();
+            let _ = tx.send(result);
+        });
+        match rx.recv_timeout(NMCLI_TIMEOUT) {
+            Ok(Ok(out)) => {
+                let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+                text.push_str(&String::from_utf8_lossy(&out.stderr));
+                Ok((out.status.code().unwrap_or(-1), text))
+            }
+            Ok(Err(_)) => Err("WIFI: 'nmcli' nicht gefunden (NetworkManager installiert?)".to_string()),
+            Err(_) => Err(format!("WIFI: 'nmcli' hat nach {}s nicht geantwortet", NMCLI_TIMEOUT.as_secs())),
+        }
+    }
+
+    /// nmcli-Terse-Output (`-t`) trennt Felder mit `:`; ein `:` INNERHALB
+    /// eines Feldwerts (z.B. in einer SSID) kommt als `\:` zurueck. Ein
+    /// simples `split(':')` wuerde solche SSIDs falsch in zu viele Felder
+    /// zerlegen.
+    fn split_terse(line: &str) -> Vec<String> {
+        let mut fields = Vec::new();
+        let mut cur = String::new();
+        let mut chars = line.chars().peekable();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                if let Some(next) = chars.next() {
+                    cur.push(next);
+                    continue;
+                }
+            }
+            if c == ':' {
+                fields.push(std::mem::take(&mut cur));
+            } else {
+                cur.push(c);
+            }
+        }
+        fields.push(cur);
+        fields
+    }
+
+    pub fn available() -> bool {
+        matches!(run_nmcli(&["-t", "-f", "TYPE", "dev"]), Ok((0, out)) if out.lines().any(|l| l.trim() == "wifi"))
+    }
+
+    pub fn current() -> Result<String, String> {
+        let (_, out) = run_nmcli(&["-t", "-f", "ACTIVE,SSID", "dev", "wifi"])?;
+        for line in out.lines() {
+            let f = split_terse(line);
+            if f.len() >= 2 && f[0] == "yes" {
+                return Ok(f[1].clone());
+            }
+        }
+        Ok(String::new())
+    }
+
+    pub fn signal() -> Result<i64, String> {
+        let (_, out) = run_nmcli(&["-t", "-f", "ACTIVE,SIGNAL", "dev", "wifi"])?;
+        for line in out.lines() {
+            let f = split_terse(line);
+            if f.len() >= 2 && f[0] == "yes" {
+                return Ok(f[1].parse::<i64>().unwrap_or(-1));
+            }
+        }
+        Ok(-1)
+    }
+
+    pub fn scan() -> Result<String, String> {
+        let (_, out) = run_nmcli(&["-t", "-f", "SSID,SIGNAL", "dev", "wifi", "list", "--rescan", "yes"])?;
+        let mut rows: Vec<(String, i64)> = Vec::new();
+        for line in out.lines() {
+            let f = split_terse(line);
+            if f.len() < 2 {
+                continue;
+            }
+            let ssid = if f[0].is_empty() { "(versteckt)".to_string() } else { f[0].clone() };
+            let sig = f[1].parse::<i64>().unwrap_or(0);
+            rows.push((ssid, sig));
+        }
+        rows.sort_by_key(|(_, s)| -s);
+        Ok(rows.iter().map(|(s, sig)| format!("{}|{}", s, sig)).collect::<Vec<_>>().join("\n"))
+    }
+
+    pub fn connect(ssid: &str, password: &str) -> Result<bool, String> {
+        if ssid.is_empty() {
+            return Err("WIFI_CONNECT: SSID darf nicht leer sein".into());
+        }
+        let (rc, out) = if password.is_empty() {
+            run_nmcli(&["dev", "wifi", "connect", ssid])?
+        } else {
+            run_nmcli(&["dev", "wifi", "connect", ssid, "password", password])?
+        };
+        if rc != 0 {
+            return Err(format!("WIFI_CONNECT: {}", out.trim()));
+        }
+        Ok(true)
+    }
+
+    pub fn disconnect() -> Result<bool, String> {
+        // "con down" auf jede aktive WLAN-Connection-ID statt "dev disconnect
+        // <iface>" -- so muss der WLAN-Interface-Name (wlan0/wlp3s0/...) nicht
+        // selbst erraten werden.
+        let (_, out) = run_nmcli(&["-t", "-f", "NAME,TYPE", "con", "show", "--active"])?;
+        let mut any = false;
+        for line in out.lines() {
+            let f = split_terse(line);
+            if f.len() >= 2 && f[1] == "802-11-wireless" {
+                let _ = run_nmcli(&["con", "down", "id", &f[0]]);
+                any = true;
+            }
+        }
+        Ok(any)
+    }
+
+    pub fn profiles() -> Result<String, String> {
+        let (_, out) = run_nmcli(&["-t", "-f", "NAME,TYPE", "con", "show"])?;
+        let names: Vec<String> = out.lines()
+            .filter_map(|line| {
+                let f = split_terse(line);
+                if f.len() >= 2 && f[1] == "802-11-wireless" { Some(f[0].clone()) } else { None }
+            })
+            .collect();
+        Ok(names.join("\n"))
+    }
+
+    pub fn delete_profile(name: &str) -> Result<bool, String> {
+        if name.is_empty() {
+            return Err("WIFI_DELETE_PROFILE: Name darf nicht leer sein".into());
+        }
+        Ok(run_nmcli(&["con", "delete", "id", name])?.0 == 0)
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod imp {
+    use std::process::Command;
+    use std::sync::OnceLock;
+    use std::time::Duration;
+
+    const CMD_TIMEOUT: Duration = Duration::from_secs(10);
+    /// Privates Apple-Framework-Tool, keine oeffentlich dokumentierte/stabile
+    /// API -- siehe scan()-Kommentar.
+    const AIRPORT_BIN: &str = "/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport";
+
+    fn run_cmd(bin: &str, args: &[&str]) -> Result<(i32, String), String> {
+        let bin_owned = bin.to_string();
+        let args_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = Command::new(&bin_owned).args(&args_owned).output();
+            let _ = tx.send(result);
+        });
+        match rx.recv_timeout(CMD_TIMEOUT) {
+            Ok(Ok(out)) => {
+                let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+                text.push_str(&String::from_utf8_lossy(&out.stderr));
+                Ok((out.status.code().unwrap_or(-1), text))
+            }
+            Ok(Err(e)) => Err(format!("WIFI: '{}' nicht ausfuehrbar: {}", bin, e)),
+            Err(_) => Err(format!("WIFI: '{}' hat nach {}s nicht geantwortet", bin, CMD_TIMEOUT.as_secs())),
+        }
+    }
+
+    fn run_networksetup(args: &[&str]) -> Result<(i32, String), String> {
+        run_cmd("networksetup", args)
+    }
+
+    /// Geraetename des Wi-Fi-Hardware-Ports (z.B. "en0") -- einmalig ermittelt
+    /// und gecacht, aendert sich waehrend eines Programmlaufs praktisch nie.
+    fn wifi_device() -> Option<String> {
+        static DEV: OnceLock<Option<String>> = OnceLock::new();
+        DEV.get_or_init(|| {
+            let (_, out) = run_networksetup(&["-listallhardwareports"]).ok()?;
+            let lines: Vec<&str> = out.lines().collect();
+            for (i, line) in lines.iter().enumerate() {
+                let l = line.trim();
+                if l == "Hardware Port: Wi-Fi" || l == "Hardware Port: AirPort" {
+                    if let Some(next) = lines.get(i + 1) {
+                        if let Some(dev) = next.trim().strip_prefix("Device: ") {
+                            return Some(dev.to_string());
+                        }
+                    }
+                }
+            }
+            None
+        }).clone()
+    }
+
+    fn device_or_err() -> Result<String, String> {
+        wifi_device().ok_or_else(|| "WIFI: kein Wi-Fi-Hardware-Port gefunden".to_string())
+    }
+
+    pub fn available() -> bool {
+        wifi_device().is_some()
+    }
+
+    pub fn current() -> Result<String, String> {
+        let dev = device_or_err()?;
+        let (_, out) = run_networksetup(&["-getairportnetwork", &dev])?;
+        let out = out.trim();
+        if let Some(ssid) = out.strip_prefix("Current Wi-Fi Network: ") {
+            return Ok(ssid.trim().to_string());
+        }
+        Ok(String::new())
+    }
+
+    /// RSSI (dBm) -> ungefaehre Prozent-Qualitaet -- dieselbe grobe Formel wie
+    /// NetworkManager (-50dBm~=100%, -100dBm~=0%). macOS liefert Signalstaerke
+    /// nur als dBm, nicht als Prozent wie Windows' netsh.
+    fn rssi_to_percent(rssi: i64) -> i64 {
+        (2 * (rssi + 100)).clamp(0, 100)
+    }
+
+    pub fn signal() -> Result<i64, String> {
+        let (_, out) = run_cmd(AIRPORT_BIN, &["-I"])?;
+        for line in out.lines() {
+            if let Some(v) = line.trim().strip_prefix("agrCtlRSSI:") {
+                if let Ok(rssi) = v.trim().parse::<i64>() {
+                    return Ok(rssi_to_percent(rssi));
+                }
+            }
+        }
+        Ok(-1)
+    }
+
+    /// Findet die Startposition eines BSSID-Musters (`xx:xx:xx:xx:xx:xx`) in
+    /// einer `airport -s`-Zeile -- trennt die SSID-Spalte (kann selbst
+    /// Leerzeichen enthalten) vom Rest der whitespace-getrennten Spalten.
+    fn find_bssid_start(line: &str) -> Option<usize> {
+        let bytes = line.as_bytes();
+        for i in 0..bytes.len() {
+            if i + 17 > bytes.len() {
+                break;
+            }
+            let cand = &line[i..i + 17];
+            let looks_like_bssid = cand.as_bytes().iter().enumerate()
+                .all(|(j, &c)| if j % 3 == 2 { c == b':' } else { c.is_ascii_hexdigit() });
+            if looks_like_bssid && (i == 0 || bytes[i - 1] == b' ') {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    pub fn scan() -> Result<String, String> {
+        // UNGETESTET + am unsichersten von allen drei Plattformen: `airport`
+        // liegt in einem privaten Apple-Framework (keine oeffentliche/stabile
+        // API), und Apple hat WLAN-Scan per CLI in neueren macOS-Versionen
+        // zunehmend eingeschraenkt (teils Standortdienste-Berechtigung fuer
+        // den aufrufenden Prozess noetig). Schlaegt es fehl, kommt eine klare
+        // Fehlermeldung statt eines stillen leeren Ergebnisses oder Crashs.
+        let (rc, out) = run_cmd(AIRPORT_BIN, &["-s"])?;
+        if rc != 0 {
+            return Err(format!(
+                "WIFI_SCAN: 'airport -s' fehlgeschlagen (rc={}) -- auf neueren \
+                 macOS-Versionen evtl. Standortdienste-Berechtigung fuer diesen \
+                 Prozess noetig, oder das Tool wurde von Apple geaendert/entfernt:\n{}",
+                rc, out.trim()));
+        }
+        let mut rows: Vec<(String, i64)> = Vec::new();
+        for line in out.lines().skip(1) {
+            // Spaltenformat: "SSID BSSID RSSI CHANNEL HT CC SECURITY"
+            // (whitespace-getrennt; SSID kann selbst Leerzeichen enthalten,
+            // BSSID ist immer genau 17 Zeichen "xx:xx:xx:xx:xx:xx").
+            if let Some(bssid_pos) = find_bssid_start(line) {
+                let ssid = line[..bssid_pos].trim().to_string();
+                let rest = line[bssid_pos..].trim();
+                let rssi = rest.split_whitespace().nth(1).and_then(|s| s.parse::<i64>().ok()).unwrap_or(-100);
+                if !ssid.is_empty() {
+                    rows.push((ssid, rssi_to_percent(rssi)));
+                }
+            }
+        }
+        rows.sort_by_key(|(_, s)| -s);
+        Ok(rows.iter().map(|(s, sig)| format!("{}|{}", s, sig)).collect::<Vec<_>>().join("\n"))
+    }
+
+    pub fn connect(ssid: &str, password: &str) -> Result<bool, String> {
+        if ssid.is_empty() {
+            return Err("WIFI_CONNECT: SSID darf nicht leer sein".into());
+        }
+        let dev = device_or_err()?;
+        let (rc, out) = if password.is_empty() {
+            run_networksetup(&["-setairportnetwork", &dev, ssid])?
+        } else {
+            run_networksetup(&["-setairportnetwork", &dev, ssid, password])?
+        };
+        if rc != 0 {
+            return Err(format!("WIFI_CONNECT: {}", out.trim()));
+        }
+        Ok(true)
+    }
+
+    pub fn disconnect() -> Result<bool, String> {
+        // networksetup hat keinen echten "trenne WLAN"-Befehl -- etablierter
+        // Workaround: Funk kurz aus- und wieder einschalten (deassoziiert von
+        // jedem Netz, WLAN bleibt danach an).
+        let dev = device_or_err()?;
+        run_networksetup(&["-setairportpower", &dev, "off"])?;
+        run_networksetup(&["-setairportpower", &dev, "on"])?;
+        Ok(true)
+    }
+
+    pub fn profiles() -> Result<String, String> {
+        let dev = device_or_err()?;
+        let (_, out) = run_networksetup(&["-listpreferredwirelessnetworks", &dev])?;
+        // Erste Zeile ist ein Header ("Preferred networks on en0:"), danach
+        // ein eingerueckter Name pro Zeile.
+        Ok(out.lines().skip(1).map(|l| l.trim().to_string()).filter(|l| !l.is_empty())
+            .collect::<Vec<_>>().join("\n"))
+    }
+
+    pub fn delete_profile(name: &str) -> Result<bool, String> {
+        if name.is_empty() {
+            return Err("WIFI_DELETE_PROFILE: Name darf nicht leer sein".into());
+        }
+        let dev = device_or_err()?;
+        Ok(run_networksetup(&["-removepreferredwirelessnetwork", &dev, name])?.0 == 0)
+    }
+}
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 mod imp {
     fn unsupported<T>() -> Result<T, String> {
-        Err("Modul WIFI: nur unter Windows unterstuetzt (nutzt netsh wlan).".into())
+        Err("Modul WIFI: nur unter Windows/Linux/macOS unterstuetzt.".into())
     }
     pub fn available() -> bool { false }
     pub fn current() -> Result<String, String> { unsupported() }
