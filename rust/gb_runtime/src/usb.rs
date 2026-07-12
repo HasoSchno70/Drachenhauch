@@ -3,18 +3,23 @@
 //! Bytes <-> STRING via latin-1 (Codepoint 0..255 == ein Byte).
 #![cfg(feature = "usb")]
 
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use hidapi::{HidApi, HidDevice};
 
-static API: OnceLock<HidApi> = OnceLock::new();
+/// `Mutex` statt `OnceLock<HidApi>` (frueher), weil `USB_LIST()` neu
+/// angesteckte/entfernte Geraete nur sieht, wenn `refresh_devices(&mut self)`
+/// aufgerufen werden kann -- ueber `OnceLock::get()` gibt es nie eine `&mut
+/// HidApi`, `USB_LIST()` haette also strukturell fuer immer den Snapshot vom
+/// allerersten Aufruf geliefert.
+static API: OnceLock<Mutex<HidApi>> = OnceLock::new();
 
-fn api() -> Result<&'static HidApi, String> {
+fn api() -> Result<&'static Mutex<HidApi>, String> {
     if let Some(a) = API.get() {
         return Ok(a);
     }
     let a = HidApi::new().map_err(|e| format!("USB: hidapi-Init fehlgeschlagen: {}", e))?;
-    let _ = API.set(a);
+    let _ = API.set(Mutex::new(a));
     API.get().ok_or_else(|| "USB: hidapi nicht verfuegbar".into())
 }
 
@@ -35,7 +40,12 @@ pub fn latin1_decode(bytes: &[u8]) -> String {
 }
 
 pub fn list() -> Result<String, String> {
-    let a = api()?;
+    let mutex = api()?;
+    let mut a = mutex.lock().map_err(|_| "USB: hidapi-Lock vergiftet".to_string())?;
+    // Ohne Refresh bliebe das immer der Geraete-Snapshot vom allerersten
+    // USB_LIST()/USB_OPEN()-Aufruf -- neu angesteckte Geraete wuerden nie
+    // auftauchen, entfernte nie verschwinden.
+    a.refresh_devices().map_err(|e| format!("USB_LIST: {}", e))?;
     let mut lines = Vec::new();
     for d in a.device_list() {
         let prod = d.product_string().unwrap_or("");
@@ -46,13 +56,17 @@ pub fn list() -> Result<String, String> {
 }
 
 pub fn open(vid: i64, pid: i64) -> Result<HidDevice, String> {
-    api()?.open(vid as u16, pid as u16)
+    let mutex = api()?;
+    let a = mutex.lock().map_err(|_| "USB: hidapi-Lock vergiftet".to_string())?;
+    a.open(vid as u16, pid as u16)
         .map_err(|e| format!("USB_OPEN: {:04X}:{:04X} nicht gefunden oder belegt ({})", vid, pid, e))
 }
 
 pub fn open_path(path: &str) -> Result<HidDevice, String> {
     let c = std::ffi::CString::new(path).map_err(|_| "USB_OPEN_PATH: ungueltiger Pfad".to_string())?;
-    api()?.open_path(&c)
+    let mutex = api()?;
+    let a = mutex.lock().map_err(|_| "USB: hidapi-Lock vergiftet".to_string())?;
+    a.open_path(&c)
         .map_err(|e| format!("USB_OPEN_PATH: '{}' nicht erreichbar ({})", path, e))
 }
 
@@ -61,12 +75,25 @@ pub fn write(d: &HidDevice, data: &str) -> Result<i64, String> {
     d.write(&bytes).map(|n| n as i64).map_err(|e| format!("USB_WRITE: {}", e))
 }
 
+/// Obergrenze fuer USB_READ(dev, n, ...) -- ohne Cap loest ein versehentlich
+/// riesiges `n` (Tippfehler, vertauschte Parameter mit timeout_ms) eine
+/// Multi-GB-Allokation aus, die bei Fehlschlag den Prozess abbricht statt
+/// einen fangbaren Fehler zu liefern.
+const MAX_READ_BYTES: i64 = 64 * 1024 * 1024;
+
 pub fn read(d: &HidDevice, n: i64, timeout_ms: i64) -> Result<String, String> {
     if n < 0 {
         return Err("USB_READ: Anzahl muss >= 0 sein".into());
     }
+    if n > MAX_READ_BYTES {
+        return Err(format!("USB_READ: Anzahl {} ueberschreitet das Limit von {} Byte", n, MAX_READ_BYTES));
+    }
     let mut buf = vec![0u8; n as usize];
-    let got = d.read_timeout(&mut buf, timeout_ms as i32).map_err(|e| format!("USB_READ: {}", e))?;
+    // `timeout_ms as i32` waere ein truncating Cast -- ein Wert > i32::MAX
+    // (~24,8 Tage in ms) wuerde unbemerkt ins Negative kippen und
+    // ungewollt "blockiere fuer immer" ausloesen. Stattdessen clampen.
+    let timeout_i32 = timeout_ms.clamp(i32::MIN as i64, i32::MAX as i64) as i32;
+    let got = d.read_timeout(&mut buf, timeout_i32).map_err(|e| format!("USB_READ: {}", e))?;
     Ok(latin1_decode(&buf[..got]))
 }
 

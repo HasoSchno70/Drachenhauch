@@ -49,7 +49,7 @@ Wird ein Zeichen >255 übergeben, wirft `USB_WRITE`.
 
 ## VID/PID herausfinden
 
-`USB_LIST()` liefert alle gerade erreichbaren HID-Geräte:
+`USB_LIST()` liefert alle gerade erreichbaren HID-Geräte — jeder Aufruf scannt neu (neu angesteckte Geräte tauchen sofort auf, entfernte verschwinden):
 
 ```basic
 IMPORT "usb"
@@ -78,7 +78,7 @@ USB_CLOSE(dev)
 
 ## Read mit Timeout
 
-`USB_READ(handle, n, timeout_ms)` blockiert bis zu `timeout_ms` Millisekunden auf Daten. `0` = sofort zurückkehren (non-blocking, gut für Game-Loops). Negativer Wert / `-1` = blockierend ohne Timeout.
+`USB_READ(handle, n, timeout_ms)` blockiert bis zu `timeout_ms` Millisekunden auf Daten. `0` = sofort zurückkehren (non-blocking, gut für Game-Loops). Negativer Wert / `-1` = blockierend ohne Timeout. `n` ist auf 64 MiB pro Aufruf begrenzt — ein versehentlich riesiges `n` (z.B. vertauscht mit `timeout_ms`) wirft einen klaren Fehler statt eine Riesenallokation auszulösen.
 
 ```basic
 WHILE NOT QUITREQUESTED()
