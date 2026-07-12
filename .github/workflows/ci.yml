@@ -36,3 +36,31 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -q
+
+  # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
+  # Rust-Kern (gbrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
+  # (Stand 2026-07) lief/baute gbrt ausschliesslich unter Windows, nie in CI
+  # verifiziert. Bewusst ohne `graphics`/Hardware-Features (serial/usb/bt/
+  # wifi): die brauchen zusaetzliche System-Bibliotheken (cmake/ALSA/libudev/
+  # D-Bus) und sind ein spaeterer Schritt -- hier zaehlt erstmal, ob der reine
+  # VM-Kern + Daten-Tier (db/net/http) plattformunabhaengig ist.
+  rust-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: rust/gb_runtime
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo check (VM-Kern, ohne Grafik/Daten/Hardware)
+        run: cargo check --locked
+
+      - name: cargo check (+ db/net/http)
+        run: cargo check --locked --features "db net http"
