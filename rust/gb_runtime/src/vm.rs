@@ -2242,7 +2242,15 @@ impl<'p> Vm<'p> {
             }
             "db_col_count" => Value::Int(self.db_res(bi_int(a, 0, "DB_COL_COUNT")?)?.columns.len() as i64),
             "db_col_name" => { let i1 = bi_int(a, 1, "DB_COL_NAME")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_COL_NAME")?)?.col_name(i1)?) }
-            "db_close_result" => { self.db_res_mut(bi_int(a, 0, "DB_CLOSE_RESULT")?)?.closed = true; Value::Nil }
+            "db_close_result" => {
+                let r = self.db_res_mut(bi_int(a, 0, "DB_CLOSE_RESULT")?)?;
+                r.closed = true;
+                // rows leert sich NICHT von selbst durch das closed-Flag -- ohne
+                // das hier bleiben eager geladene Zeilen bis Programmende im
+                // Speicher, auch wenn artig geschlossen wird.
+                r.rows = Vec::new();
+                Value::Nil
+            }
             "db_is_null" => { let i1 = bi_int(a, 1, "DB_IS_NULL")?; Value::Bool(self.db_res(bi_int(a, 0, "DB_IS_NULL")?)?.is_null(i1)?) }
             "db_get_string" => { let i1 = bi_int(a, 1, "DB_GET_STRING")?; Value::str_rc(&self.db_res(bi_int(a, 0, "DB_GET_STRING")?)?.get_string(i1)?) }
             "db_get_int" => { let i1 = bi_int(a, 1, "DB_GET_INT")?; Value::Int(self.db_res(bi_int(a, 0, "DB_GET_INT")?)?.get_int(i1)?) }
@@ -2381,12 +2389,8 @@ impl<'p> Vm<'p> {
             "http_download" => {
                 let url = bi_str(a, 0, "HTTP_DOWNLOAD")?.to_string();
                 let path = bi_str(a, 1, "HTTP_DOWNLOAD")?.to_string();
-                match html::http_get(&url) {
-                    Ok(r) => {
-                        self.http_status = r.status; self.http_headers = r.headers;
-                        std::fs::write(&path, &r.body).map_err(|e| format!("HTTP_DOWNLOAD: Datei nicht schreibbar: {}", e))?;
-                        Value::Int(r.body.len() as i64)
-                    }
+                match html::http_download(&url, &path) {
+                    Ok(r) => { self.http_status = r.status; self.http_headers = r.headers; Value::Int(r.bytes) }
                     Err(e) => { if e.status != 0 { self.http_status = e.status; self.http_headers = e.headers; } return Err(e.msg); }
                 }
             }

@@ -110,6 +110,50 @@ def test_http_get_invalid_url_raises(run_gb):
         run_gb('IMPORT "html"\nPRINT HTTP_GET("not-a-url")\n')
 
 
+class _TruncatedHandler(BaseHTTPRequestHandler):
+    """Verspricht per Content-Length mehr Bytes als gesendet werden und kappt
+    dann die Verbindung -- simuliert einen mitten im Transfer abgebrochenen
+    Download. Frueher wurde das still verschluckt (Body als Erfolg
+    zurueckgegeben, abgeschnitten)."""
+
+    def log_message(self, *args, **kwargs):
+        pass
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Length", "1000000")
+        self.end_headers()
+        self.wfile.write(b"nur ein paar bytes")
+        self.wfile.flush()
+        self.close_connection = True
+
+
+@contextlib.contextmanager
+def _truncated_server():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _TruncatedHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_http_get_truncated_body_raises_instead_of_returning_partial(run_gb):
+    with _truncated_server() as base:
+        with pytest.raises(GBRuntimeError):
+            run_gb(f'IMPORT "html"\nPRINT HTTP_GET("{base}/x")\n')
+
+
+def test_http_download_truncated_body_raises_and_removes_partial_file(run_gb, tmp_path):
+    with _truncated_server() as base:
+        with pytest.raises(GBRuntimeError):
+            run_gb(f'IMPORT "html"\nHTTP_DOWNLOAD("{base}/x", "dl.bin")\n', base=tmp_path)
+    # Keine abgeschnittene Datei zurueckgelassen.
+    assert not (tmp_path / "dl.bin").exists()
+
+
 # --- URL-Helpers ----------------------------------------------------
 
 def test_url_encode_special_chars(run_gb):
@@ -133,6 +177,17 @@ def test_html_text_strips_tags(run_gb):
 def test_html_text_decodes_entities(run_gb):
     assert _lines(run_gb('IMPORT "html"\nPRINT HTML_TEXT("<p>5 &lt; 10 &amp; ok</p>")\n')) == \
         ["5 < 10 & ok"]
+
+
+def test_html_text_comment_with_gt_does_not_leak_into_text(run_gb):
+    # Ein '>' INNERHALB eines Kommentars ist gueltiges HTML -- der Tag-Scanner
+    # darf dort nicht vorzeitig abbrechen (frueher landete der Kommentar-Rest
+    # als sichtbarer Text in der Ausgabe).
+    src = "<p>vorher</p><!-- if (x>1) then y --><p>nachher</p>"
+    out = run_gb(f'IMPORT "html"\nPRINT HTML_TEXT("{src}")\n')
+    assert "if (x" not in out
+    assert "vorher" in out
+    assert "nachher" in out
 
 
 def test_html_text_skips_script_and_style(run_gb):
@@ -168,6 +223,17 @@ def test_find_all_preserves_inner_tags(run_gb):
         "PRINT LEN(a)\nPRINT a[0]\n"))
     assert out[0] == "1"
     assert "<b>bold</b>" in out[1]
+
+
+def test_find_all_orphaned_closing_tag_does_not_break_later_matches(run_gb):
+    # Ein verwaistes </div> VOR jedem passenden <div> darf den Tiefenzaehler
+    # nicht unter 0 druecken -- sonst faellt der danach folgende, korrekt
+    # verschachtelte Treffer stillschweigend aus dem Ergebnis.
+    out = _lines(run_gb(
+        'IMPORT "html"\nDIM a AS ARRAY OF STRING\n'
+        'a = HTML_FIND_ALL("</div><div>echt</div>", "div")\n'
+        "PRINT LEN(a)\nPRINT a[0]\n"))
+    assert out == ["1", "echt"]
 
 
 def test_find_all_nested_same_tag(run_gb):

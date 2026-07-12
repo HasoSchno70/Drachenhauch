@@ -20,7 +20,7 @@ GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgele
 
 Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle bereit.
 
-> **Alle Module laufen auch in der nativen Runtime (gbrt)** — die meisten sind dort immer dabei; `db`/`net`/`http` (= `html`) und Hardware (`serial`/`usb`/`wifi`/`bt`) sind feature-gated und kommen mit `python rust/build_runtime.py --full` (bzw. `--hardware`) dazu. Jede Modul-Doku hat unten einen Abschnitt **„In der nativen Runtime (gbrt)"** mit Feature-Flag und Eigenheiten; Überblick in [rust-runtime.md](rust-runtime.md).
+> **Alle Module laufen auch in der nativen Runtime (gbrt)** — die meisten sind dort immer dabei; `db`/`net`/`http` (= `html`) sind im Standard-Dev-Build (`python rust/build_runtime.py`) schon dabei, Hardware (`serial`/`usb`/`wifi`/`bt`) kommt zusätzlich mit `--hardware` dazu. Jede Modul-Doku hat unten einen Abschnitt **„In der nativen Runtime (gbrt)"** mit Feature-Flag und Eigenheiten; Überblick in [rust-runtime.md](rust-runtime.md).
 
 | Modul | Was es kann | Doku |
 |---|---|---|

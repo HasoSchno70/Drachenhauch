@@ -29,12 +29,21 @@ fn collect_headers(resp: &ureq::Response) -> Vec<(String, String)> {
         .collect()
 }
 
-fn finish(resp: ureq::Response) -> HttpResult {
+fn finish(resp: ureq::Response) -> Result<HttpResult, HttpErr> {
     let status = resp.status() as i64;
     let headers = collect_headers(&resp);
     let mut body = Vec::new();
-    resp.into_reader().read_to_end(&mut body).ok();
-    HttpResult { status, headers, body }
+    // `.ok()` hier wuerde einen abgebrochenen Transfer (Verbindung weg
+    // mitten im Body) verschlucken -- Status bliebe z.B. 200 und der Aufrufer
+    // haette einen still abgeschnittenen Body, ohne jeden Hinweis darauf.
+    match resp.into_reader().read_to_end(&mut body) {
+        Ok(_) => Ok(HttpResult { status, headers, body }),
+        Err(e) => Err(HttpErr {
+            msg: format!("HTTP-Fehler beim Lesen des Response-Body: {}", e),
+            status,
+            headers,
+        }),
+    }
 }
 
 fn map_err(e: ureq::Error, url: &str) -> HttpErr {
@@ -60,8 +69,8 @@ pub fn http_get(url: &str) -> Result<HttpResult, HttpErr> {
         .set("User-Agent", USER_AGENT)
         .timeout(Duration::from_secs(TIMEOUT_SECS))
         .call()
-        .map(finish)
         .map_err(|e| map_err(e, url))
+        .and_then(finish)
 }
 
 pub fn http_post(url: &str, body: &str) -> Result<HttpResult, HttpErr> {
@@ -70,8 +79,46 @@ pub fn http_post(url: &str, body: &str) -> Result<HttpResult, HttpErr> {
         .set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
         .timeout(Duration::from_secs(TIMEOUT_SECS))
         .send_string(body)
-        .map(finish)
         .map_err(|e| map_err(e, url))
+        .and_then(finish)
+}
+
+pub struct HttpDownloadResult {
+    pub status: i64,
+    pub headers: Vec<(String, String)>,
+    pub bytes: i64,
+}
+
+/// Wie http_get, aber streamt den Body direkt in eine Datei statt ihn
+/// komplett im RAM zu puffern (grosse/unerwartete Antworten wuerden sonst
+/// unbegrenzt Speicher belegen, bevor ueberhaupt geschrieben wird). Bricht
+/// der Transfer mitten im Body ab, wird die unvollstaendige Datei geloescht
+/// statt einen abgeschnittenen Rest liegen zu lassen.
+pub fn http_download(url: &str, path: &str) -> Result<HttpDownloadResult, HttpErr> {
+    let resp = ureq::get(url)
+        .set("User-Agent", USER_AGENT)
+        .timeout(Duration::from_secs(TIMEOUT_SECS))
+        .call()
+        .map_err(|e| map_err(e, url))?;
+    let status = resp.status() as i64;
+    let headers = collect_headers(&resp);
+    let file = std::fs::File::create(path).map_err(|e| HttpErr {
+        msg: format!("HTTP_DOWNLOAD: Datei nicht schreibbar: {}", e),
+        status, headers: headers.clone(),
+    })?;
+    let mut writer = std::io::BufWriter::new(file);
+    let mut reader = resp.into_reader();
+    match std::io::copy(&mut reader, &mut writer) {
+        Ok(bytes) => Ok(HttpDownloadResult { status, headers, bytes: bytes as i64 }),
+        Err(e) => {
+            drop(writer);
+            let _ = std::fs::remove_file(path);
+            Err(HttpErr {
+                msg: format!("HTTP_DOWNLOAD: Verbindung beim Lesen abgebrochen: {}", e),
+                status, headers,
+            })
+        }
+    }
 }
 
 // --- URL-Encoding -----------------------------------------------------------
@@ -185,6 +232,25 @@ fn parse_tag(raw: &str) -> Tag {
     Tag { name, closing }
 }
 
+/// Erkennt einen HTML-Kommentar `<!-- ... -->` ab Position `i` (die auf `<`
+/// zeigt) und liefert den Index direkt NACH dem schliessenden `-->`. Ohne das
+/// wuerde der generische Tag-Scanner (der einfach bis zum naechsten `>`
+/// laeuft) an einem `>` INNERHALB eines Kommentars vorzeitig abbrechen --
+/// betrifft auch ganz normales, wohlgeformtes HTML (z.B. `<!-- if (x>1) -->`).
+fn comment_end(chars: &[char], i: usize) -> Option<usize> {
+    if !chars[i..].starts_with(&['<', '!', '-', '-']) {
+        return None;
+    }
+    let mut j = i + 4;
+    while j + 2 < chars.len() {
+        if chars[j] == '-' && chars[j + 1] == '-' && chars[j + 2] == '>' {
+            return Some(j + 3);
+        }
+        j += 1;
+    }
+    Some(chars.len()) // unabgeschlossener Kommentar -> Rest des Dokuments verschlucken
+}
+
 /// HTML_TEXT: Tags raus, Entities dekodiert, script/style geskippt,
 /// Block-Tags -> Newline, Whitespace zusammengezogen.
 pub fn html_text(s: &str) -> String {
@@ -194,6 +260,10 @@ pub fn html_text(s: &str) -> String {
     let mut skip = 0i32;
     while i < chars.len() {
         if chars[i] == '<' {
+            if let Some(end) = comment_end(&chars, i) {
+                i = end;
+                continue;
+            }
             let mut j = i + 1;
             while j < chars.len() && chars[j] != '>' {
                 j += 1;
@@ -236,6 +306,13 @@ pub fn html_find_all(s: &str, target: &str) -> Vec<String> {
     let mut i = 0;
     while i < chars.len() {
         if chars[i] == '<' {
+            if let Some(end) = comment_end(&chars, i) {
+                if depth > 0 {
+                    buf.extend(chars[i..end].iter());
+                }
+                i = end;
+                continue;
+            }
             let mut j = i + 1;
             while j < chars.len() && chars[j] != '>' {
                 j += 1;
@@ -252,12 +329,19 @@ pub fn html_find_all(s: &str, target: &str) -> Vec<String> {
                 }
                 depth += 1;
             } else if tag.name == target && tag.closing {
-                if depth > 1 {
-                    buf.push_str(&format!("</{}>", target));
-                }
-                depth -= 1;
-                if depth == 0 {
-                    found.push(std::mem::take(&mut buf));
+                // Ein verwaistes Closing-Tag (kein passendes Opening zuvor)
+                // darf depth NICHT unter 0 druecken -- sonst passt der
+                // depth==0-Check fuer alle NACHFOLGENDEN, korrekt
+                // verschachtelten Treffer nie wieder und sie fallen
+                // stillschweigend aus dem Ergebnis.
+                if depth > 0 {
+                    if depth > 1 {
+                        buf.push_str(&format!("</{}>", target));
+                    }
+                    depth -= 1;
+                    if depth == 0 {
+                        found.push(std::mem::take(&mut buf));
+                    }
                 }
             } else if depth > 0 {
                 buf.push('<');

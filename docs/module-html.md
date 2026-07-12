@@ -148,6 +148,8 @@ PRINT "Stars: ", JSON_GET_INT(info, "stargazers_count")
 - **HTTPS**: Zertifikats-Validierung läuft via Python-Default (System-CA-Store). Selbst-signierte Zertifikate werden abgelehnt — keine Bypass-Option im Modul (mit Absicht).
 - **Cookies / Sessions** werden nicht persistent gespeichert — jeder Aufruf ist stateless. Für Login-geschützte APIs lieber Token-basierte Auth via Header einsetzen.
 - **Timeout**: 10 Sekunden hart codiert. Game-Loop sollte HTTP-Calls nicht im Render-Tick machen — friert sonst die UI ein.
+- **Kein SSRF-Schutz**: `HTTP_GET`/`HTTP_POST`/`HTTP_DOWNLOAD` akzeptieren jede erreichbare URL, inklusive `localhost`/privater IPs/interner Dienste — das Modul filtert das bewusst nicht (GameBasic-Programme laufen lokal vertrauenswürdig). Wer fremden/eingebetteten GB-Code ausführt (Multiplayer-Skripte, Mod-Support), sollte das selbst absichern (z.B. URL-Allowlist vor dem Aufruf prüfen) — die Runtime tut es nicht für dich.
+- **`HTTP_DOWNLOAD`** streamt direkt in die Zieldatei (kein voller In-Memory-Puffer vorher) — bei sehr großen Downloads bleibt so nur der Festplattenplatz relevant, nicht der RAM-Verbrauch. Bricht der Transfer mitten im Body ab, wird die unvollständige Datei automatisch gelöscht statt einen abgeschnittenen Rest liegen zu lassen.
 
 ## Komplettes Beispiel
 
