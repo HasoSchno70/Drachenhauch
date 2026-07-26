@@ -132,11 +132,32 @@ def test_track_remove_note_cleans_up_touching_slurs():
     assert t.slurs == []
 
 
-def test_track_relocate_slurs_moves_and_resorts():
+def test_track_remove_note_keeps_slur_when_chord_sibling_remains():
+    t = Track("T")
+    n0 = t.add_note(0.0, 1.0, 60)      # Akkord-Note 1 bei Beat 0.0
+    t.add_note(0.0, 1.0, 64)           # Akkord-Note 2, gleicher start_beat
+    t.add_note(2.0, 1.0, 67)
+    t.add_slur(0.0, 2.0)               # gehoert (semantisch) zur zweiten Akkordnote
+    t.remove_note(n0)                  # nur die ERSTE Akkordnote geht weg
+    assert t.slurs == [(0.0, 2.0)]     # Bogen bleibt, weil noch eine Note bei 0.0 sitzt
+
+
+def test_track_relocate_slurs_keeps_when_chord_sibling_remains():
     t = Track("T")
     t.add_note(0.0, 1.0, 60)
+    t.add_note(0.0, 1.0, 64)           # Akkord-Nachbar bei derselben Beat-Position
+    t.add_note(2.0, 1.0, 67)
+    t.add_slur(0.0, 2.0)
+    t.relocate_slurs(0.0, 1.0)         # eine der beiden Akkordnoten wird verschoben
+    assert t.slurs == [(0.0, 2.0)]     # Bogen bleibt am alten Beat (Nachbar sitzt noch da)
+
+
+def test_track_relocate_slurs_moves_and_resorts():
+    t = Track("T")
+    n0 = t.add_note(0.0, 1.0, 60)
     t.add_note(1.0, 1.0, 62)
     t.add_slur(0.0, 1.0)
+    n0.start_beat = 2.0            # Note wurde bereits verschoben (wie beim Drag)
     t.relocate_slurs(0.0, 2.0)     # ueberholt den anderen Anker
     assert t.slurs == [(1.0, 2.0)]
 

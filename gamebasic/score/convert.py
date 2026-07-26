@@ -88,21 +88,27 @@ def to_tracker_song(doc) -> tuple[Song, list[str]]:
         return None
 
     for i, track in enumerate(doc.tracks):
-        # Akkord-Reduktion: mehrere Noten mit identischem start_beat auf
-        # dieser Spur -> nur die hoechste behalten (Tracker-Kanal einstimmig).
-        by_start: dict[float, list] = {}
+        # Akkord-Reduktion: mehrere Noten, die auf dieselbe Tracker-Zeile
+        # runden -> nur die hoechste behalten (Tracker-Kanal einstimmig).
+        # Gruppierung ueber die GERUNDETE Zeile statt des rohen start_beat --
+        # sonst wuerden zwei Noten mit knapp unterschiedlichem start_beat,
+        # die auf dieselbe Zeile runden, NICHT als Akkord erkannt und die
+        # zweite ueberschreibt die erste in pat.set() lautlos (keine
+        # Warnung), statt regulaer per Akkord-Reduktion ersetzt zu werden.
+        by_row: dict[int, list] = {}
         for note in track.notes:
             if note.rest:
                 continue
-            by_start.setdefault(note.start_beat, []).append(note)
+            by_row.setdefault(_beat_to_row(note.start_beat), []).append(note)
         reduced = []
-        for start, group in by_start.items():
+        for row, group in by_row.items():
             if len(group) > 1:
                 top = max(group, key=lambda n: n.pitch)
+                beats = ", ".join(f"{n.start_beat:g}" for n in group)
                 warnings.append(
-                    f"Spur {i + 1} ({track.name}), Beat {start:g}: Akkord "
-                    f"auf hoechste Note reduziert (Tracker-Kanal ist "
-                    f"einstimmig)")
+                    f"Spur {i + 1} ({track.name}), Zeile {row} (Beats "
+                    f"{beats}): Akkord auf hoechste Note reduziert "
+                    f"(Tracker-Kanal ist einstimmig)")
                 reduced.append(top)
             else:
                 reduced.append(group[0])

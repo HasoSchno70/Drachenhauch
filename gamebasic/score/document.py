@@ -136,7 +136,14 @@ class Track:
     def remove_note(self, ev: NoteEvent) -> None:
         if ev in self.notes:
             self.notes.remove(ev)
-            self.remove_slurs_at(ev.start_beat)
+            # Nur aufraeumen, wenn keine andere Note (Akkord-Nachbar mit
+            # identischem start_beat) noch dort sitzt -- sonst wuerde ein
+            # Bogen geloescht, der eigentlich der verbliebenen Note gehoert
+            # (slurs sind nur an Beat-Positionen gebunden, nicht an Noten,
+            # siehe Klassendocstring).
+            if not any(abs(n.start_beat - ev.start_beat) < 1e-6
+                      for n in self.notes):
+                self.remove_slurs_at(ev.start_beat)
 
     def add_slur(self, start_beat: float, end_beat: float) -> None:
         """Fuegt einen Bindebogen zwischen zwei Beat-Positionen hinzu (rein
@@ -159,8 +166,21 @@ class Track:
         """Verschiebt Bindebogen-Anker von `old_beat` nach `new_beat` (wenn
         die zugehoerige Note per Ziehen verschoben wird). Re-sortiert das
         Paar zu (lo, hi), falls der verschobene Anker die andere Seite
-        ueberholt hat."""
+        ueberholt hat.
+
+        Erwartet, dass die gezogene Note SELBST bereits auf `new_beat`
+        steht, wenn dies aufgerufen wird (wie beim Drag in
+        `scoreeditor_qt.py`, wo `note.start_beat` schon waehrend
+        `mouseMoveEvent` mutiert wird) -- sonst kann ein noch auf
+        `old_beat` sitzender Akkord-Nachbar nicht von der bereits
+        verschobenen Note unterschieden werden (siehe Guard unten)."""
         if abs(old_beat - new_beat) < 1e-6:
+            return
+        if any(abs(n.start_beat - old_beat) < 1e-6 for n in self.notes):
+            # Eine andere Note (Akkord-Nachbar) sitzt noch auf old_beat --
+            # ein dort verankerter Bogen gehoert wahrscheinlich ihr, nicht
+            # der verschobenen Note. Nicht mitziehen (gleiche Vorsicht wie
+            # remove_note).
             return
         relocated = [
             (new_beat if abs(a - old_beat) < 1e-6 else a,

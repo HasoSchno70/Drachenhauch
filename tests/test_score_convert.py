@@ -96,6 +96,22 @@ def test_chord_reduces_to_highest_note():
     assert any("Akkord" in w for w in warnings)
 
 
+def test_near_duplicate_beats_rounding_to_same_row_treated_as_chord():
+    # Zwei Noten mit UNTERSCHIEDLICHEM start_beat, die beide auf Zeile 0
+    # runden -- muessen als Akkord erkannt (+ gewarnt) werden, statt dass
+    # die zweite die erste lautlos in pat.set() ueberschreibt.
+    doc = ScoreDoc()
+    doc.tracks[0].add_note(0.0, 1.0, 67)    # exakte Zeile 0, hoechste Note
+    doc.tracks[0].add_note(0.05, 1.0, 60)   # rundet ebenfalls auf Zeile 0
+    song, warnings = to_tracker_song(doc)
+
+    assert song.patterns[0].data[0][0] == 67          # hoechste Note gewinnt
+    assert any("Akkord" in w for w in warnings)
+    # Die ueberlebende (hoechste) Note liegt exakt auf der Zeile -- keine
+    # zusaetzliche "auf die naechste Tracker-Zeile gerundet"-Warnung noetig.
+    assert sum("gerundet" in w for w in warnings) == 0
+
+
 def test_note_off_inserted_for_gap_before_next_note():
     doc = ScoreDoc()
     doc.tracks[0].add_note(0.0, 1.0, 60)           # Zeile 0..3
