@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (
 from .audio_preview import Mixer
 from .editor_qt.theme import COLORS, EDITOR_FONT_FAMILY, global_qss
 from .editor_qt.undo_history import SnapshotUndo
-from .score.convert import STACCATO_FACTOR, to_tracker_song
+from .score.convert import ROWS_PER_BEAT, STACCATO_FACTOR, STACCATO_MIN_ROWS, to_tracker_song
 from .score.document import ScoreDoc
 
 # Diatonische Halbtonversaetze der 7 Stammtoene (C,D,E,F,G,A,B) innerhalb
@@ -514,6 +514,11 @@ class _StaffView(QWidget):
             self._drag_note = existing
             self._drag_moved = False
             self._drag_orig_beat = existing.start_beat
+            # Maus-Grab, damit mouseReleaseEvent zuverlaessig ankommt, auch
+            # wenn der Cursor waehrend eines schnellen Ziehens den Widget-
+            # Bereich verlaesst -- sonst bleibt _drag_note haengen, die Note
+            # bleibt live mutiert, aber ohne _mark_dirty()/Undo (Review-Fund).
+            self.grabMouse()
             return
         if mode == "rest":
             self._place(beat, rest=True)
@@ -556,6 +561,7 @@ class _StaffView(QWidget):
     def mouseReleaseEvent(self, e) -> None:  # noqa: N802
         if e.button() != Qt.MouseButton.LeftButton or self._drag_note is None:
             return
+        self.releaseMouse()
         note = self._drag_note
         moved = self._drag_moved
         orig_beat = self._drag_orig_beat
@@ -975,12 +981,18 @@ class ScoreEditor(QMainWindow):
 
     def _add_track(self) -> None:
         self.doc.add_track()
+        # Neue Spur -> neues Instrument-Objekt; id()-basierte Cache-Keys
+        # (siehe _trigger_note) koennten sonst nach einem spaeteren Entfernen
+        # eine wiederverwendete id() eines alten, entfernten Instruments
+        # treffen (Review-Fund).
+        self._sound_cache.clear()
         self._rebuild_tracks_ui()
         self._mark_dirty()
 
     def _remove_last_track(self) -> None:
         if len(self.doc.tracks) > 1:
             self.doc.remove_track(len(self.doc.tracks) - 1)
+            self._sound_cache.clear()
             self._rebuild_tracks_ui()
             self._mark_dirty()
 
@@ -1051,7 +1063,14 @@ class ScoreEditor(QMainWindow):
 
     def _trigger_note(self, track, note) -> None:
         sr = 44100
-        dur_beat = note.dur_beat * STACCATO_FACTOR if note.staccato else note.dur_beat
+        dur_beat = note.dur_beat
+        if note.staccato:
+            # Gleiche Mindestdauer-Garantie wie beim Tracker-Export
+            # (STACCATO_MIN_ROWS in convert.py) -- sonst klingt eine sehr
+            # kurze Staccato-Note in der Live-Vorschau hoerbar kuerzer als
+            # im exportierten Song (Review-Fund).
+            min_dur_beat = STACCATO_MIN_ROWS / ROWS_PER_BEAT
+            dur_beat = max(min_dur_beat, note.dur_beat * STACCATO_FACTOR)
         seconds = dur_beat * 60.0 / max(1, self.doc.bpm)
         n_samples = max(1, int(sr * seconds))
         key = (id(track.instrument), int(note.pitch), n_samples)
@@ -1079,12 +1098,12 @@ class ScoreEditor(QMainWindow):
         if ans == QMessageBox.StandardButton.Cancel:
             return False
         if ans == QMessageBox.StandardButton.Yes:
-            self._save()
-            return not self._dirty     # False, wenn der Speichern-Dialog abgebrochen wurde
+            return self._save()        # False, wenn Speichern abgebrochen/fehlgeschlagen ist
         return True
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._confirm_dirty():
+            self._stop_play()
             self._mixer.stop()
             event.accept()
         else:
@@ -1123,30 +1142,39 @@ class ScoreEditor(QMainWindow):
         self._update_title()
         self.undo.reset()      # geladenes Dokument -> Historie verwerfen
 
-    def _save(self) -> None:
+    def _save(self) -> bool:
         """Quick-Save: schreibt auf doc.path, wenn schon bekannt (aus Oeffnen/
         vorigem Speichern) -- sonst wie _save_as() ein Dialog. Frueher IMMER
         ein Dialog, auch beim wiederholten Strg+S auf eine bereits benannte
-        Datei."""
+        Datei. Liefert False bei Abbruch/Fehlschlag (fuer _confirm_dirty)."""
         if not self.doc.path:
-            self._save_as()
-            return
-        self.doc.save_json(self.doc.path)
+            return self._save_as()
+        try:
+            self.doc.save_json(self.doc.path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
+            return False
         self._dirty = False
         self._update_title()
+        return True
 
-    def _save_as(self) -> None:
+    def _save_as(self) -> bool:
         default = self.doc.path or str(self.project_root)
         path, _ = QFileDialog.getSaveFileName(
             self, "Notenblatt speichern", default,
             "GameBasic-Notenblatt (*.json)")
         if not path:
-            return
+            return False
         if not path.lower().endswith(".json"):
             path += ".json"
-        self.doc.save_json(path)
+        try:
+            self.doc.save_json(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
+            return False
         self._dirty = False
         self._update_title()
+        return True
 
     # ---- Tracker-Export -------------------------------------------------
     def _export_to_tracker(self) -> None:
@@ -1165,7 +1193,11 @@ class ScoreEditor(QMainWindow):
             return
         if not path.lower().endswith(".json"):
             path += ".json"
-        song.save_json(path)
+        try:
+            song.save_json(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Fehler", f"Konnte nicht speichern:\n{exc}")
+            return
         gbrun = self.project_root / "gbrun.py"
         try:
             import subprocess
@@ -1190,6 +1222,9 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
             win.doc = ScoreDoc.load_json(str(initial_file))
             win.bpm_spin.setValue(win.doc.bpm)
             win._rebuild_tracks_ui()
+            win.undo.reset()      # geladenes Dokument -> Historie verwerfen
+            win._dirty = False
+            win._update_title()
         except Exception:
             pass
     win.showMaximized()          # "ordentlich Platz" -- wie Audio Studio

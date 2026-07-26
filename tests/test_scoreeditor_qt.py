@@ -655,6 +655,119 @@ def test_close_event_accepts_on_discard(monkeypatch):
     assert ev.isAccepted()
 
 
+def test_close_event_stops_playback_timer():
+    """Vorher (Bug): closeEvent stoppte nur den Mixer, nicht den QTimer --
+    ein noch aktiver _play_tick() haette den Mixer nach dem Schliessen
+    erneut gestartet (Mixer.play() reconnectet transparent)."""
+    from PySide6.QtGui import QCloseEvent
+
+    ed = _editor()
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    ed._start_play()
+    assert ed._play_timer.isActive()
+
+    ev = QCloseEvent()
+    ed.closeEvent(ev)
+    assert ev.isAccepted()
+    assert not ed._play_timer.isActive()
+    assert not ed._playing
+
+
+def test_save_shows_warning_and_stays_dirty_on_write_failure(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    ed.doc.tracks[0].add_note(0.0, 1.0, 60)
+    ed.doc.path = str(tmp_path / "stueck.json")
+    ed._dirty = True
+
+    warned = []
+    monkeypatch.setattr(
+        QMessageBox, "warning",
+        lambda *a, **k: warned.append(a) or QMessageBox.StandardButton.Ok)
+
+    def _boom(*_a, **_k):
+        raise OSError("Platte voll")
+    monkeypatch.setattr(ed.doc, "save_json", _boom)
+
+    assert ed._save() is False
+    assert ed._dirty                  # kein falscher "gespeichert"-Zustand
+    assert warned                     # User informiert statt Traceback
+
+
+def test_confirm_dirty_yes_but_save_fails_stays_blocked(monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QMessageBox
+
+    ed = _editor()
+    staff = ed._track_rows[0]["staff"]
+    _click(staff, staff._x_for_beat(0.0), staff._y_for_pitch(60))
+
+    ed.doc.path = str(tmp_path / "z.json")
+
+    def _boom(*_a, **_k):
+        raise OSError("nope")
+    monkeypatch.setattr(ed.doc, "save_json", _boom)
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: QMessageBox.StandardButton.Ok)
+
+    assert ed._confirm_dirty() is False
+    assert ed._dirty
+
+
+def test_launch_with_initial_file_resets_undo_history(tmp_path, monkeypatch):
+    """Vorher (Bug): launch() liess die Undo-Baseline auf dem leeren
+    Default-Dokument stehen -- das erste Strg+Z nach dem Oeffnen einer
+    Datei setzte das geladene Stueck auf leer zurueck."""
+    from PySide6.QtWidgets import QApplication
+    from gamebasic import scoreeditor_qt
+    from gamebasic.score.document import ScoreDoc
+
+    doc = ScoreDoc()
+    doc.tracks[0].add_note(0.0, 1.0, 60)
+    path = tmp_path / "stueck.json"
+    doc.save_json(str(path))
+
+    monkeypatch.setattr(QApplication, "exec", lambda self: 0)
+    captured = {}
+    orig_init = scoreeditor_qt.ScoreEditor.__init__
+
+    def _capture_init(self, *a, **k):
+        orig_init(self, *a, **k)
+        captured["win"] = self
+    monkeypatch.setattr(scoreeditor_qt.ScoreEditor, "__init__", _capture_init)
+
+    scoreeditor_qt.launch(Path("."), initial_file=path)
+    win = captured["win"]
+
+    assert win.doc.tracks[0].notes[0].pitch == 60
+    assert not win.undo.can_undo()
+    assert not win._dirty
+    assert path.name in win.windowTitle()
+
+    win.doc.tracks[0].add_note(1.0, 1.0, 64)
+    win._mark_dirty()
+    win.undo.flush()
+    assert win.undo.can_undo()
+    win.undo.undo()
+    # Regressionsschutz: zurueck zum GELADENEN Stand (1 Note), nicht zum
+    # leeren Default-Dokument.
+    assert len(win.doc.tracks[0].notes) == 1
+    assert win.doc.tracks[0].notes[0].pitch == 60
+
+
+def test_add_remove_track_clears_sound_cache():
+    ed = _editor()
+    ed._sound_cache["stale"] = "x"
+    ed._add_track()
+    assert ed._sound_cache == {}
+
+    ed._sound_cache["stale2"] = "y"
+    ed._remove_last_track()
+    assert ed._sound_cache == {}
+
+
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     from gamebasic.tracker.song import Song
@@ -816,6 +929,29 @@ def test_trigger_note_shortens_staccato_playback(monkeypatch):
     n_staccato = played[-1].size
 
     assert n_staccato < n_normal
+
+
+def test_trigger_note_staccato_respects_minimum_duration(monkeypatch):
+    """Vorher (Bug): die Live-Vorschau kannte STACCATO_MIN_ROWS (die
+    Mindestdauer-Garantie aus convert.py) nicht -- eine sehr kurze
+    Staccato-Note klang live hoerbar kuerzer als beim Tracker-Export."""
+    from gamebasic.score.convert import ROWS_PER_BEAT, STACCATO_MIN_ROWS
+
+    ed = _editor()
+    track = ed.doc.tracks[0]
+    played = []
+    monkeypatch.setattr(ed._mixer, "play", lambda arr: played.append(arr))
+
+    note = track.add_note(0.0, 0.1, 60, staccato=True)   # dur*factor < Mindestdauer
+    ed._trigger_note(track, note)
+    n_samples = played[-1].size
+
+    min_dur_beat = STACCATO_MIN_ROWS / ROWS_PER_BEAT
+    expected_seconds = min_dur_beat * 60.0 / ed.doc.bpm
+    naive_seconds = note.dur_beat * 0.5 * 60.0 / ed.doc.bpm    # alte Formel ohne Floor
+    assert expected_seconds > naive_seconds
+    sr = 44100
+    assert n_samples == max(1, int(sr * expected_seconds))
 
 
 def test_staff_renders_without_crashing_with_all_annotations():
