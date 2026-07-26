@@ -1045,6 +1045,16 @@ class ColorPanel(QWidget):
         sliders_box.setVerticalSpacing(4)
         self.sliders = {}
         self.value_labels = {}
+        # Slider-Drag: waehrend des Ziehens nur die guenstige Live-Vorschau
+        # (siehe _on_slider), volle set_fg()-Wirkung (Farbverlauf-Historie +
+        # bis zu 16 Recent-Swatches komplett neu bauen) erst EINMAL beim
+        # Loslassen -- Fallback-Timer deckt Tastatur-Bedienung ab (Pfeil-
+        # tasten loesen kein sliderReleased aus), debounced statt pro Tick.
+        self._pending_slider_color = None
+        self._slider_commit_timer = QTimer(self)
+        self._slider_commit_timer.setSingleShot(True)
+        self._slider_commit_timer.setInterval(150)
+        self._slider_commit_timer.timeout.connect(self._commit_slider_color)
         for row, (key, label) in enumerate([("r", "R"), ("g", "G"),
                                              ("b", "B"), ("a", "A")]):
             lbl = QLabel(label)
@@ -1055,6 +1065,7 @@ class ColorPanel(QWidget):
             sl = QSlider(Qt.Horizontal)
             sl.setRange(0, 255)
             sl.valueChanged.connect(lambda v, k=key: self._on_slider(k, v))
+            sl.sliderReleased.connect(self._commit_slider_color)
             sliders_box.addWidget(sl, row, 1)
             v_lbl = QLabel("0")
             v_lbl.setFixedWidth(28)
@@ -1159,7 +1170,25 @@ class ColorPanel(QWidget):
         elif key == "b": b = val
         elif key == "a": a = val
         self.value_labels[key].setText(str(val))
-        self.app.set_fg((r, g, b, a))
+        col = self.app._normalize((r, g, b, a))
+        # NUR die guenstige Live-Vorschau (Vorschau-Swatch + Hex-Feld) waehrend
+        # des Drags -- der volle `app.set_fg()`-Aufruf (Farbverlauf-Historie
+        # pflegen + Recent-Swatches komplett neu bauen) kommt einmalig ueber
+        # `_commit_slider_color()` (Review-Fund).
+        self.app.fg = col
+        self.fg_box.set_color(col)
+        hexs = f"{col[0]:02x}{col[1]:02x}{col[2]:02x}"
+        if col[3] != 255:
+            hexs += f"{col[3]:02x}"
+        self.hex_edit.setText(hexs)
+        self._pending_slider_color = col
+        self._slider_commit_timer.start()
+
+    def _commit_slider_color(self):
+        self._slider_commit_timer.stop()
+        if self._pending_slider_color is not None:
+            col, self._pending_slider_color = self._pending_slider_color, None
+            self.app.set_fg(col)
 
     def _on_hex(self):
         s = self.hex_edit.text().strip().lstrip("#")
@@ -1724,6 +1753,15 @@ class LayersPanel(QWidget):
         self.opacity_slider.setRange(0, 100)
         self.opacity_slider.setValue(100)
         self.opacity_slider.valueChanged.connect(self._on_opacity)
+        self.opacity_slider.sliderReleased.connect(self._on_opacity_committed)
+        # Fallback fuer Tastatur-Bedienung (Pfeiltasten aendern den Wert
+        # ohne sliderPressed/sliderReleased auszuloesen) -- debounced statt
+        # bei jedem einzelnen Tick, damit gehaltene Pfeiltasten nicht
+        # dieselbe Stotter-Ursache reproduzieren wie ein Maus-Drag.
+        self._opacity_commit_timer = QTimer(self)
+        self._opacity_commit_timer.setSingleShot(True)
+        self._opacity_commit_timer.setInterval(150)
+        self._opacity_commit_timer.timeout.connect(self._on_opacity_committed)
         op_row.addWidget(self.opacity_slider, 1)
         self.opacity_label = QLabel("100%")
         op_row.addWidget(self.opacity_label)
@@ -1792,10 +1830,23 @@ class LayersPanel(QWidget):
         self.app.mark_dirty()
 
     def _on_opacity(self, value: int):
+        # `mark_dirty()` (frames_panel.refresh()) baut ALLE Frame-/Layer-/
+        # Anim-Thumbnails komplett neu -- bei jedem Slider-Tick waehrend
+        # eines Drags waere das spuerbares Stottern (Review-Fund, gleiche
+        # Ursache wie das bereits gefixte Canvas-Render-Batching, nur fuer
+        # die Panels statt den Canvas). Waehrend des Drags nur die guenstige
+        # Live-Vorschau aktualisieren; der teure Rebuild kommt einmalig bei
+        # `_on_opacity_committed()` (Loslassen des Reglers).
         f = self.app.doc.current
         f.layers[f.active_layer].opacity = value / 100.0
         self.opacity_label.setText(f"{value}%")
         self.app.canvas.invalidate_all()
+        self.app.doc.dirty = True
+        self.app._update_title()
+        self._opacity_commit_timer.start()
+
+    def _on_opacity_committed(self):
+        self._opacity_commit_timer.stop()
         self.app.mark_dirty()
 
     def _add(self):
@@ -1861,6 +1912,11 @@ class AnimRangeDialog(QDialog):
 
     def __init__(self, parent, doc: SpriteDoc, anim: Anim):
         super().__init__(parent)
+        # Ohne das haengt jeder per "+"/"Bearbeiten" geoeffnete Dialog als
+        # verstecktes Kind des Editor-Fensters weiter -- wiederholtes
+        # Oeffnen sammelt so Widgets an, die nie freigegeben werden
+        # (Review-Fund; gleiche Konvention wie in den Sibling-Editoren).
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("Animations-Bereich")
         self._doc = doc
         n = len(doc.frames)
@@ -1967,8 +2023,14 @@ class AnimsPanel(QWidget):
         a = AnimRangeDialog.edit(self, doc,
                                  Anim("", cur, cur, doc.anim_fps_suggestion(cur, cur)))
         if a is not None:
+            # push_struct(), damit Ctrl+Z einen Animations-Bereich ebenso
+            # rueckgaengig machen kann wie jede andere Struktur-Aenderung
+            # (Frame/Layer) -- doc._capture_state()/_restore_state()
+            # sichern `anims` bereits mit, das war hier nur nie aufgerufen
+            # worden (Review-Fund).
+            doc.push_struct()
             doc.anims.append(a)
-            doc.dirty = True
+            self.app.mark_dirty()
             self.refresh()
             self.app.update_status()
 
@@ -1979,8 +2041,9 @@ class AnimsPanel(QWidget):
         doc = self.app.doc
         a = AnimRangeDialog.edit(self, doc, doc.anims[i])
         if a is not None:
+            doc.push_struct()
             doc.anims[i] = a
-            doc.dirty = True
+            self.app.mark_dirty()
             self.refresh()
             self.app.update_status()
 
@@ -1988,8 +2051,10 @@ class AnimsPanel(QWidget):
         i = self._selected()
         if i < 0:
             return
-        del self.app.doc.anims[i]
-        self.app.doc.dirty = True
+        doc = self.app.doc
+        doc.push_struct()
+        del doc.anims[i]
+        self.app.mark_dirty()
         self.refresh()
         self.app.update_status()
 
@@ -1999,6 +2064,15 @@ class AnimationPreview(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Animation-Vorschau")
         self.setModal(False)
+        # Nicht-modal + jederzeit neu instanziierbar (jeder "Animation
+        # abspielen"-Klick erzeugt einen neuen Dialog, siehe
+        # action_play_animation) -- ohne WA_DeleteOnClose haette Qts
+        # Default-close() (X-Button/Escape) den Dialog nur VERSTECKT statt
+        # zerstoert. Der self-geparentete `_timer` unten liefe dann
+        # unsichtbar auf ewig weiter (Render pro Tick) -- ein echtes,
+        # unbegrenztes CPU-/Speicher-Leck bei wiederholtem Oeffnen
+        # (Review-Fund).
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self._frames = frames
         self._sw = sprite_w; self._sh = sprite_h
         self._idx = 0
@@ -2092,6 +2166,15 @@ class AnimationPreview(QDialog):
             self.activateWindow()
         except Exception:
             pass
+
+    def closeEvent(self, event):  # noqa: N802
+        # Explizit stoppen statt uns nur auf WA_DeleteOnClose zu verlassen
+        # -- zwischen close() und der tatsaechlichen deleteLater()-
+        # Verarbeitung im naechsten Event-Loop-Durchlauf koennte der Timer
+        # sonst noch einen letzten Tick nachschieben.
+        self._timer.stop()
+        self._raise_timer.stop()
+        super().closeEvent(event)
 
     def _restart_timer(self):
         # Bei FPS-Override: gleiche Dauer fuer alle. Sonst die Frame-
@@ -2867,6 +2950,7 @@ class SpriteEditorWindow(QMainWindow):
         old_depth = self.canvas._onion_depth
 
         dlg = QDialog(self)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg.setWindowTitle("Onion-Skin-Einstellungen")
         form = QFormLayout(dlg)
 
@@ -3711,7 +3795,11 @@ class SpriteEditorWindow(QMainWindow):
         from collections import Counter
         cnt = Counter()
         for f in self.doc.frames:
-            for col in f.pixels.getdata():
+            # composite() statt f.pixels (= nur die AKTIVE Ebene) -- sonst
+            # fehlen bei mehrlagigen Frames Farben aus anderen sichtbaren
+            # Ebenen, und Farben einer unsichtbaren/durchsichtigen aktiven
+            # Ebene werden faelschlich mitgezaehlt (Review-Fund).
+            for col in f.composite().getdata():
                 if col[3] >= 128:
                     # Auf RGB reduzieren (Alpha hier nicht relevant fuer
                     # Palette -- sonst haetten wir oft die selbe Farbe
@@ -4606,6 +4694,7 @@ class ResizeCanvasDialog(QDialog):
 
     def __init__(self, parent, current_w: int, current_h: int):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("Canvas-Groesse")
         self.setMinimumWidth(380)
         self.result_size: Optional[tuple[int, int]] = None
@@ -4712,6 +4801,7 @@ class SheetImportDialog(QDialog):
 
     def __init__(self, parent, image: Image.Image):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("Sheet-Import")
         self.setMinimumWidth(540)
         self._image = image
@@ -4843,6 +4933,7 @@ class ColorReplaceDialog(QDialog):
 
     def __init__(self, parent: "SpriteEditorWindow"):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("Farbe ersetzen")
         self.setMinimumWidth(360)
         self._src = parent.fg
@@ -4930,6 +5021,7 @@ class NewSpriteDialog(QDialog):
 
     def __init__(self, parent):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("Neues Sprite")
         self.setMinimumWidth(340)
         self.result_size: Optional[tuple[int, int]] = None
