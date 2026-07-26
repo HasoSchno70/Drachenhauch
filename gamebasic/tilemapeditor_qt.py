@@ -180,6 +180,7 @@ class _Canvas(QWidget):
         else:
             self.pixmaps = [pixmaps]
         self.active_layer = 0
+        self.reset_selection_state()
         self._update_size()
         self.update()
 
@@ -443,6 +444,22 @@ class _Canvas(QWidget):
             self._sel_rect = self._sel_start = self._sel_cur = None
             self.update()
 
+    def reset_selection_state(self) -> None:
+        """Wie `clear_selection()`, aber raeumt ZUSAETZLICH das Tile-
+        Clipboard + die Objekt-Auswahl mit ab -- fuer einen kompletten
+        Dokument-Wechsel (Neu/Oeffnen) ODER die Wiederherstellung eines
+        "doc"-Struktur-Snapshots (Resize/Layer-Op rueckgaengig), NICHT fuer
+        simples Werkzeug-Umschalten (dort soll das Clipboard ueberleben).
+        Ohne das: kopierte Tiles zeigen nach einem Dokument-Wechsel auf ein
+        Tileset, das im neuen/wiederhergestellten Dokument evtl. gar nicht
+        (mehr) existiert -- ein Paste stempelt dann GIDs hinein, die auf
+        nichts mehr zeigen (unsichtbar, aber als Muell mitgespeichert;
+        Review-Fund)."""
+        self._sel_rect = self._sel_start = self._sel_cur = None
+        self.tile_clipboard = None
+        self.selected_obj = None
+        self.update()
+
     def copy_selection(self) -> bool:
         """Kopiert die Auswahl als 2D-GID-Block ins Clipboard."""
         if not self.has_selection():
@@ -637,6 +654,12 @@ class _Canvas(QWidget):
 class _PropDialog(QDialog):
     def __init__(self, doc: TileMapDoc, local_id: int, parent=None):
         super().__init__(parent)
+        # Ohne das haengt jeder per "Eigenschaften..." geoeffnete Dialog als
+        # verstecktes Kind des Editor-Fensters weiter (Qt raeumt Kind-
+        # Widgets nur beim Schliessen des Eltern-Fensters auf) -- wieder-
+        # holtes Oeffnen sammelt so Widgets an, die nie freigegeben werden
+        # (Review-Fund; gleiche Konvention wie in den Sibling-Editoren).
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.doc = doc
         self.local_id = local_id
         self.setWindowTitle(f"Eigenschaften -- Tile #{local_id} (gid {local_id + 1})")
@@ -703,6 +726,7 @@ class _ObjectDialog(QDialog):
 
     def __init__(self, obj: MapObject, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.obj = obj
         kind = "Punkt / Spawn" if obj.is_point() else "Rechteck / Zone"
         self.setWindowTitle(f"Objekt bearbeiten ({kind})")
@@ -771,6 +795,7 @@ class _ObjectDialog(QDialog):
 # ===================================================================
 def _ask_map_params(parent, w=20, h=15, tw=16, th=16):
     dlg = QDialog(parent)
+    dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dlg.setWindowTitle("Neue Karte")
     form = QFormLayout(dlg)
     sw = QSpinBox(); sw.setRange(1, 1000); sw.setValue(w)
@@ -1158,7 +1183,9 @@ class TileMapEditor(QMainWindow):
 
     def _export_code(self) -> None:
         code = self.doc.gb_code(self.doc.path or None)
-        dlg = QDialog(self); dlg.setWindowTitle("GB-Code (Tilemap-Renderer)")
+        dlg = QDialog(self)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        dlg.setWindowTitle("GB-Code (Tilemap-Renderer)")
         dlg.resize(680, 560)
         dl = QVBoxLayout(dlg)
         dl.addWidget(QLabel(
@@ -1218,7 +1245,19 @@ class TileMapEditor(QMainWindow):
             return
         dlg = _PropDialog(self.doc, self.sel_local, self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
+            # Einziger Struktur-Mutations-Aufrufer in dieser Datei, der
+            # frueher OHNE Undo-Snapshot auskam -- Ctrl+Z konnte eine Tile-
+            # Eigenschaften-Aenderung ueberhaupt nicht rueckgaengig machen
+            # (Review-Fund). `_mark_dirty()` explizit statt sich auf
+            # apply_to_doc()s interne set_property()-Aufrufe zu verlassen --
+            # loescht der User in der Tabelle ALLE Zeilen, ruft die
+            # Apply-Schleife set_property() kein einziges Mal auf, obwohl
+            # die Properties davor direkt geleert wurden (siehe
+            # apply_to_doc()).
+            before = self._snapshot_doc()
             dlg.apply_to_doc()
+            self._push_doc_undo(before)
+            self._mark_dirty()
 
     # ---------------------------------------------------- Layer
     def _sync_layers(self) -> None:
@@ -1422,7 +1461,12 @@ class TileMapEditor(QMainWindow):
                                                  len(self.doc.tilesets) - 1))
             self.canvas.active_layer = min(self.canvas.active_layer,
                                            len(self.doc.layers) - 1)
-            self.canvas.selected_obj = None
+            # Nicht nur die Objekt-Auswahl, sondern auch eine evtl. laufende
+            # Tile-Auswahl + das Clipboard verwerfen -- beide koennten nach
+            # dem Struktur-Restore (Resize/Layer-Op rueckgaengig) auf
+            # Koordinaten/Tilesets zeigen, die im wiederhergestellten
+            # Zustand nicht mehr gueltig sind (Review-Fund).
+            self.canvas.reset_selection_state()
             self.canvas.obj_selected.emit(None)
             self._mark_dirty()
             # Tileset-Bilder aus den (evtl. wiederhergestellten) Pfaden neu

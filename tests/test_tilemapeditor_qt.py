@@ -299,3 +299,146 @@ def test_remove_tileset_ui_refuses_when_in_use(app, tmp_path):
     win.doc.layers[0].set(0, 0, 0)   # nicht mehr in Benutzung
     win._remove_tileset()
     assert len(win.doc.tilesets) == 1
+
+
+# --------------------------------------------------- Tile-Eigenschaften
+
+def test_edit_props_is_undoable(app, tmp_path):
+    """Review-Fund: _edit_props() war der EINZIGE Struktur-Mutations-
+    Aufrufer in dieser Datei, der keinen Undo-Snapshot anlegte -- Ctrl+Z
+    konnte eine Tile-Eigenschaften-Aenderung ueberhaupt nicht rueckgaengig
+    machen."""
+    from gamebasic.tilemapeditor_qt import _PropDialog
+    win = _win(app, tmp_path)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    win.doc.add_tileset(str(a), 64, 32)
+    win.sel_local = 0
+    assert win.doc.properties_of(0) == {}
+
+    from PySide6.QtWidgets import QDialog
+
+    def _fake_exec(self):
+        self._add_row("solid", "bool", "true")
+        return QDialog.DialogCode.Accepted
+
+    with patch.object(_PropDialog, "exec", _fake_exec):
+        win._edit_props()
+    assert win.doc.properties_of(0) == {"solid": True}
+    assert win.doc.dirty is True
+
+    win._undo()
+    assert win.doc.properties_of(0) == {}
+
+
+def test_edit_props_deleting_all_rows_marks_dirty(app, tmp_path):
+    """Review-Fund: apply_to_doc() leerte tile_properties/-types direkt
+    (bypass von set_property()), OHNE dirty zu setzen, wenn danach KEINE
+    Zeile mehr in der Tabelle stand -- die Apply-Schleife ruft set_property()
+    dann kein einziges Mal auf. `_edit_props()` markiert jetzt explizit
+    selbst dirty, unabhaengig vom Tabelleninhalt."""
+    from gamebasic.tilemapeditor_qt import _PropDialog
+    win = _win(app, tmp_path)
+    a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
+    win.doc.add_tileset(str(a), 64, 32)
+    win.sel_local = 0
+    win.doc.set_property(0, "solid", "true", "bool")
+    win.doc.dirty = False   # so tun, als waere gerade gespeichert worden
+
+    from PySide6.QtWidgets import QDialog
+
+    def _fake_exec(self):
+        while self.table.rowCount():
+            self.table.removeRow(0)   # alle Zeilen loeschen
+        return QDialog.DialogCode.Accepted
+
+    with patch.object(_PropDialog, "exec", _fake_exec):
+        win._edit_props()
+    assert win.doc.properties_of(0) == {}
+    assert win.doc.dirty is True
+    assert win.windowTitle().endswith("*")
+
+
+# --------------------------------------------------- Auswahl/Clipboard
+
+def test_set_doc_resets_selection_and_clipboard(app, tmp_path):
+    """Review-Fund: eine kopierte Tile-Auswahl (Clipboard) und eine laufende
+    Selektion ueberlebten frueher einen Dokument-Wechsel (Neu/Oeffnen) --
+    ein Paste danach haette GIDs aus dem ALTEN Dokument in das neue
+    gestempelt, die dort auf ein evtl. gar nicht existierendes Tileset
+    zeigen."""
+    from gamebasic.tilemap.document import TileMapDoc
+    win = _win(app, tmp_path)
+    win.canvas.tile_clipboard = [[5, 6], [7, 8]]
+    win.canvas._sel_rect = (0, 0, 1, 1)
+    win.canvas.selected_obj = object()
+
+    win.canvas.set_doc(TileMapDoc(4, 4, 16, 16), None)
+    assert win.canvas.tile_clipboard is None
+    assert win.canvas._sel_rect is None
+    assert win.canvas.selected_obj is None
+
+
+def test_doc_undo_restore_resets_selection_and_clipboard(app):
+    """Gleicher Schutz beim Wiederherstellen eines "doc"-Struktur-Snapshots
+    (z.B. Resize rueckgaengig) -- Auswahl/Clipboard koennten sonst auf
+    Koordinaten/Tilesets zeigen, die im wiederhergestellten Zustand nicht
+    mehr gueltig sind."""
+    import gamebasic.tilemapeditor_qt as tm
+    win = _win(app)
+    w0, h0 = win.doc.width, win.doc.height
+
+    before = win._snapshot_doc()
+    win.doc.resize(w0 + 2, h0 + 2)
+    win._push_doc_undo(before)
+
+    win.canvas.tile_clipboard = [[1]]
+    win.canvas._sel_rect = (0, 0, 0, 0)
+
+    win._undo()
+    assert win.canvas.tile_clipboard is None
+    assert win.canvas._sel_rect is None
+
+
+# --------------------------------------------------- WA_DeleteOnClose
+
+def test_prop_dialog_has_delete_on_close(app, tmp_path):
+    from gamebasic.tilemapeditor_qt import _PropDialog
+    from PySide6.QtCore import Qt
+    win = _win(app, tmp_path)
+    dlg = _PropDialog(win.doc, 0, win)
+    assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_object_dialog_has_delete_on_close(app):
+    from gamebasic.tilemapeditor_qt import _ObjectDialog
+    from gamebasic.tilemap.document import MapObject
+    from PySide6.QtCore import Qt
+    win = _win(app)
+    dlg = _ObjectDialog(MapObject(0, 0, name="spawn"), win)
+    assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_map_params_dialog_has_delete_on_close(app, monkeypatch):
+    from gamebasic.tilemapeditor_qt import _ask_map_params
+    from PySide6.QtWidgets import QDialog
+    from PySide6.QtCore import Qt
+    win = _win(app)
+    captured = {}
+    def _capture_exec(self):
+        captured["dlg"] = self
+        return QDialog.DialogCode.Rejected
+    monkeypatch.setattr(QDialog, "exec", _capture_exec)
+    _ask_map_params(win)
+    assert captured["dlg"].testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_export_code_dialog_has_delete_on_close(app, monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QDialog
+    from PySide6.QtCore import Qt
+    win = _win(app, tmp_path)
+    captured = {}
+    def _capture_exec(self):
+        captured["dlg"] = self
+    monkeypatch.setattr(QDialog, "exec", _capture_exec)
+    win._export_code()
+    assert captured["dlg"].testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
