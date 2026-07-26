@@ -7,6 +7,11 @@ import numpy as np
 from gamebasic.audio_preview import Mixer
 
 
+def test_sample_rate_property_exposes_configured_sr():
+    assert Mixer(sr=48000).sample_rate == 48000
+    assert Mixer().sample_rate == 44100
+
+
 def test_play_ignores_none_and_empty():
     m = Mixer()
     m.play(None)

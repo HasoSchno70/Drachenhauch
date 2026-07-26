@@ -282,6 +282,25 @@ def test_instrument_and_clef_change_reflected_in_doc():
     assert ed.doc.tracks[0].clef == "bass"
 
 
+def test_track_name_unchanged_edit_does_not_mark_dirty():
+    """Vorher: jedes editingFinished() markierte dirty + Undo-Snapshot, auch
+    wenn der Text unveraendert war (z.B. Fokus verloren/zurueckgewonnen ohne
+    echten Edit)."""
+    ed = _editor()
+    edit = ed._track_rows[0]["name_edit"]
+    original = ed.doc.tracks[0].name
+    assert edit.text() == original
+
+    ed._on_track_name_changed(0, edit)
+    assert not ed._dirty
+    assert not ed.undo.can_undo()
+
+    edit.setText("Melodie")
+    ed._on_track_name_changed(0, edit)
+    assert ed.doc.tracks[0].name == "Melodie"
+    assert ed._dirty
+
+
 def test_playback_triggers_mixer_without_crashing():
     ed = _editor()
     ed.doc.tracks[0].add_note(0.0, 1.0, 60)

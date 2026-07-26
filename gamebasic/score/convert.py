@@ -134,8 +134,11 @@ def to_tracker_song(doc) -> tuple[Song, list[str]]:
                 continue
             row_lo, row_hi, pat = chunk
             local_row = start_row - row_lo
-            if local_row >= pat.rows:
-                continue
+            # local_row < pat.rows ist hier per Konstruktion garantiert:
+            # `_find_chunk` liefert nur Chunks mit row_lo <= start_row <
+            # row_hi, und jedes chunk-Tupel wird mit pat.rows == row_hi -
+            # row_lo gebaut (s.o., sowohl im Single-Pattern- als auch im
+            # Multi-Chunk-Zweig) -- kein zusaetzlicher Bounds-Check noetig.
             pat.set(i, local_row, note.pitch)
             if end_row > row_hi:
                 warnings.append(

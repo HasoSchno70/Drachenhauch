@@ -37,6 +37,15 @@ class Mixer:
         # reicht -- kein Retry bei jedem play()-Aufruf noetig/sinnvoll.
         self._stream_failed = False
 
+    @property
+    def sample_rate(self) -> int:
+        """Oeffentlicher Zugriff auf die Samplerate -- Aufrufer, die Wellen
+        FUER diesen Mixer rendern (z.B. `scoreeditor_qt._trigger_note`),
+        sollen sie hier lesen statt eine eigene `44100`-Kopie zu pflegen,
+        die bei einer Aenderung hier stillschweigend auseinanderlaufen
+        wuerde (Pitch/Tempo-Mismatch)."""
+        return self._sr
+
     def _callback(self, outdata, frames, _time, _status) -> None:
         outdata.fill(0.0)
         with self._lock:

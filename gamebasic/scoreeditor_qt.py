@@ -93,6 +93,10 @@ class _StaffView(QWidget):
     # auf der Linie sitzt -- reine Zeichenposition, beeinflusst NICHT die
     # Beat<->X-Zuordnung/Snap-Logik.
     BARLINE_LEAD = 8.0
+    # Diatonischer step_offset, ab dem der Notenhals abwaerts statt aufwaerts
+    # zeigt (Mittellinie des Systems) -- gemeinsame Schwelle fuer Haelse UND
+    # Staccato-Punkt-Platzierung, sonst unabhaengig dupliziert.
+    MID_STEP = 4
 
     def __init__(self, editor: "ScoreEditor", track_index: int, parent=None):
         super().__init__(parent)
@@ -136,6 +140,16 @@ class _StaffView(QWidget):
 
     def _y_for_pitch(self, midi: int) -> float:
         return self._y_for_step(self._step_offset(midi))
+
+    def _stem_up(self, step: float) -> bool:
+        return step < self.MID_STEP
+
+    def _y_for_pitch_or_rest(self, pitch: int | None) -> float:
+        """Y-Koordinate fuer eine Note (`pitch`) ODER eine Pause (`None`) --
+        Single-Source-of-Truth fuer die "Pause sitzt auf der Mittellinie"-
+        Konvention (step_offset=4), sonst unabhaengig dupliziert in
+        _draw_note/_draw_hover_preview/_draw_slurs/_draw_slur_anchor."""
+        return self._y_for_step(4) if pitch is None else self._y_for_pitch(pitch)
 
     def _pitch_for_y(self, y: float, accidental: int) -> int:
         step_offset = round((self._y_ref() - y) / self.STEP_PX)
@@ -221,7 +235,7 @@ class _StaffView(QWidget):
         steps = [self._step_offset(n.pitch) for n in group]
         ys = [self._y_for_step(s) for s in steps]
         xs = [self._x_for_beat(n.start_beat) for n in group]
-        stem_up = (sum(steps) / len(steps)) < 4
+        stem_up = self._stem_up(sum(steps) / len(steps))
         color = QColor(_track_color(self.track_index))
         n_beams = 2 if group[0].dur_beat <= 0.25 else 1
         beam_y = (min(ys) - self.STEM_LEN) if stem_up else (max(ys) + self.STEM_LEN)
@@ -313,7 +327,7 @@ class _StaffView(QWidget):
         p.drawLine(int(x), int(y_top) - 18, int(x), int(y_bot) + 18)
 
         if pitch is None:
-            y = self._y_for_step(4)
+            y = self._y_for_pitch_or_rest(None)
             p.setPen(QPen(color, 2.2))
             p.drawRect(int(x) - 5, int(y) - 3, 10, 6)
             return
@@ -333,7 +347,7 @@ class _StaffView(QWidget):
         x = self._x_for_beat(note.start_beat)
         color = QColor(_track_color(self.track_index))
         if note.rest:
-            y = self._y_for_step(4)
+            y = self._y_for_pitch_or_rest(None)
             p.setPen(QPen(color, 2.2))
             p.drawRect(int(x) - 5, int(y) - 3, 10, 6)
             return
@@ -354,7 +368,7 @@ class _StaffView(QWidget):
         p.setBrush(Qt.BrushStyle.NoBrush)
 
         if note.dur_beat < 4.0 and not beamed:
-            stem_up = step < 4
+            stem_up = self._stem_up(step)
             p.setPen(QPen(color, 1.6))
             if stem_up:
                 sx = x + self.NOTE_R
@@ -381,7 +395,7 @@ class _StaffView(QWidget):
 
         if note.staccato:
             # Punkt auf der dem Notenhals abgewandten Seite (Konvention).
-            stem_up = step < 4
+            stem_up = self._stem_up(step)
             dot_y = (y + self.NOTE_R + 7) if stem_up else (y - self.NOTE_R - 7)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(color)
@@ -406,8 +420,10 @@ class _StaffView(QWidget):
         for a, b in self.track.slurs:
             xa, xb = self._x_for_beat(a), self._x_for_beat(b)
             na, nb = self._existing_at(a), self._existing_at(b)
-            ya = self._y_for_pitch(na.pitch) if na is not None and not na.rest else self._y_for_step(4)
-            yb = self._y_for_pitch(nb.pitch) if nb is not None and not nb.rest else self._y_for_step(4)
+            pitch_a = na.pitch if (na is not None and not na.rest) else None
+            pitch_b = nb.pitch if (nb is not None and not nb.rest) else None
+            ya = self._y_for_pitch_or_rest(pitch_a)
+            yb = self._y_for_pitch_or_rest(pitch_b)
             path = self._slur_path(xa, ya, xb, yb)
             p.drawPath(path)
 
@@ -441,7 +457,7 @@ class _StaffView(QWidget):
         if note is None:
             return
         x = self._x_for_beat(note.start_beat)
-        y = self._y_for_step(4) if note.rest else self._y_for_pitch(note.pitch)
+        y = self._y_for_pitch_or_rest(None if note.rest else note.pitch)
         p.setPen(QPen(QColor(COLORS["accent"]), 2.0, Qt.PenStyle.DashLine))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(QPointF(x, y), self.NOTE_R + 5, self.NOTE_R + 5)
@@ -613,6 +629,12 @@ class ScoreEditor(QMainWindow):
         self.resize(1150, 780)
         self.doc = ScoreDoc()
         self._mixer = Mixer()
+        # Kein Groessenlimit/Eviction: der Keyspace ist von Natur aus klein
+        # (id(instrument) x Tonhoehe x Sample-Laenge fuer die tatsaechlich
+        # vom User gesetzten Noten eines einzelnen Stuecks), Eintraege sind
+        # kleine numpy-Arrays -- ein LRU o.ae. waere hier Over-Engineering.
+        # Wird explizit ueber _sound_cache.clear() invalidiert (Instrument-/
+        # Clef-/Track-Wechsel, Undo-Restore), siehe jeweilige Aufrufer.
         self._sound_cache: dict = {}
         self.entry_accidental = 0
         # "note" (setzen/verschieben) | "rest" (Pause) | "slur" (Bindebogen
@@ -928,6 +950,8 @@ class ScoreEditor(QMainWindow):
 
     def _on_track_name_changed(self, idx: int, edit: QLineEdit) -> None:
         name = edit.text().strip() or f"Stimme {idx + 1}"
+        if name == self.doc.tracks[idx].name:
+            return          # kein echter Edit (z.B. nur Fokus verloren/zurueck)
         self.doc.tracks[idx].name = name
         self._track_rows[idx]["box"].setTitle(name)
         self._mark_dirty()
@@ -1061,8 +1085,14 @@ class ScoreEditor(QMainWindow):
         if self._play_beat > self.doc.length_beats() + step:
             self._stop_play()
 
+    # Headroom-Faktor fuer neu gerenderte Noten -- mehrere gleichzeitig
+    # klingende Stimmen werden im Mixer additiv gemischt (siehe
+    # audio_preview.Mixer), volle 1.0-Amplitude pro Einzelstimme wuerde bei
+    # ueberlappenden Akkorden/Kanaelen schnell hart clippen.
+    _VOICE_GAIN = 0.6
+
     def _trigger_note(self, track, note) -> None:
-        sr = 44100
+        sr = self._mixer.sample_rate
         dur_beat = note.dur_beat
         if note.staccato:
             # Gleiche Mindestdauer-Garantie wie beim Tracker-Export
@@ -1077,7 +1107,7 @@ class ScoreEditor(QMainWindow):
         arr = self._sound_cache.get(key)
         if arr is None:
             wave = track.instrument.render_note(note.pitch, n_samples, sr)
-            arr = np.clip(wave, -1.0, 1.0).astype(np.float32) * 0.6
+            arr = np.clip(wave, -1.0, 1.0).astype(np.float32) * self._VOICE_GAIN
             self._sound_cache[key] = arr
         self._mixer.play(arr)
 

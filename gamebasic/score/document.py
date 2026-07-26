@@ -16,6 +16,10 @@ import json
 from typing import Any
 
 CLEFS = ("treble", "bass")
+# Toleranz fuer Beat-Identitaets-Vergleiche (Float-Rundungsfehler) -- gleicher
+# Wert wie `convert._ROUND_EPS`, hier aber fuer Notengleichheit/Slur-Anker
+# statt Tracker-Zeilen-Rundung.
+_BEAT_EPS = 1e-6
 
 
 class NoteEvent:
@@ -141,7 +145,7 @@ class Track:
             # Bogen geloescht, der eigentlich der verbliebenen Note gehoert
             # (slurs sind nur an Beat-Positionen gebunden, nicht an Noten,
             # siehe Klassendocstring).
-            if not any(abs(n.start_beat - ev.start_beat) < 1e-6
+            if not any(abs(n.start_beat - ev.start_beat) < _BEAT_EPS
                       for n in self.notes):
                 self.remove_slurs_at(ev.start_beat)
 
@@ -149,10 +153,10 @@ class Track:
         """Fuegt einen Bindebogen zwischen zwei Beat-Positionen hinzu (rein
         visuell -- keine Wirkung auf Wiedergabe/Tracker-Export)."""
         lo, hi = (start_beat, end_beat) if start_beat <= end_beat else (end_beat, start_beat)
-        if abs(hi - lo) < 1e-6:
+        if abs(hi - lo) < _BEAT_EPS:
             return
         pair = (float(lo), float(hi))
-        if not any(abs(a - pair[0]) < 1e-6 and abs(b - pair[1]) < 1e-6
+        if not any(abs(a - pair[0]) < _BEAT_EPS and abs(b - pair[1]) < _BEAT_EPS
                   for a, b in self.slurs):
             self.slurs.append(pair)
 
@@ -160,7 +164,7 @@ class Track:
         """Entfernt alle Bindeboegen, die an dieser Beat-Position beginnen
         oder enden (z.B. wenn die zugehoerige Note geloescht wird)."""
         self.slurs = [(a, b) for a, b in self.slurs
-                     if abs(a - beat) > 1e-6 and abs(b - beat) > 1e-6]
+                     if abs(a - beat) > _BEAT_EPS and abs(b - beat) > _BEAT_EPS]
 
     def relocate_slurs(self, old_beat: float, new_beat: float) -> None:
         """Verschiebt Bindebogen-Anker von `old_beat` nach `new_beat` (wenn
@@ -174,17 +178,17 @@ class Track:
         `mouseMoveEvent` mutiert wird) -- sonst kann ein noch auf
         `old_beat` sitzender Akkord-Nachbar nicht von der bereits
         verschobenen Note unterschieden werden (siehe Guard unten)."""
-        if abs(old_beat - new_beat) < 1e-6:
+        if abs(old_beat - new_beat) < _BEAT_EPS:
             return
-        if any(abs(n.start_beat - old_beat) < 1e-6 for n in self.notes):
+        if any(abs(n.start_beat - old_beat) < _BEAT_EPS for n in self.notes):
             # Eine andere Note (Akkord-Nachbar) sitzt noch auf old_beat --
             # ein dort verankerter Bogen gehoert wahrscheinlich ihr, nicht
             # der verschobenen Note. Nicht mitziehen (gleiche Vorsicht wie
             # remove_note).
             return
         relocated = [
-            (new_beat if abs(a - old_beat) < 1e-6 else a,
-             new_beat if abs(b - old_beat) < 1e-6 else b)
+            (new_beat if abs(a - old_beat) < _BEAT_EPS else a,
+             new_beat if abs(b - old_beat) < _BEAT_EPS else b)
             for a, b in self.slurs]
         self.slurs = [(min(a, b), max(a, b)) for a, b in relocated]
 
