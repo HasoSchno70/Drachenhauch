@@ -199,6 +199,12 @@ class _InstrumentDialog(QDialog):
 
     def __init__(self, inst, parent=None):
         super().__init__(parent)
+        # Ohne das haengt jeder per "Bearbeiten..." geoeffnete Dialog als
+        # verstecktes Kind von `parent` weiter, statt beim Schliessen
+        # freigegeben zu werden (wiederholtes Oeffnen sammelt so Fenster/
+        # Widgets an, die nie freigegeben werden) -- gleicher Bugtyp wie
+        # die bereits gefixten GB-Code-Export-Fenster.
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.inst = inst
         self.setWindowTitle(f"Instrument: {inst.name}")
         form = QFormLayout(self)
@@ -310,6 +316,7 @@ class _KeymapDialog(QDialog):
 
     def __init__(self, name: str, zones, load_fn, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         from .tracker.instrument import Zone
         self._Zone = Zone
         self._load_fn = load_fn
@@ -421,6 +428,7 @@ class _Sf2PresetDialog(QDialog):
 
     def __init__(self, presets, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setWindowTitle("SoundFont-Preset waehlen")
         self.resize(440, 500)
         self._presets = presets
@@ -939,6 +947,7 @@ class TrackerEditor(QMainWindow):
 
     def closeEvent(self, event) -> None:  # noqa: N802
         if self._confirm_dirty():
+            self._stop_play()
             self._mixer.stop()
             event.accept()
         else:
@@ -989,10 +998,12 @@ class TrackerEditor(QMainWindow):
         mb = QPushButton("M"); mb.setCheckable(True); mb.setFixedWidth(24)
         mb.setToolTip("Spur stummschalten (nur Vorhoeren)")
         mb.toggled.connect(lambda on, ch=c: self._on_mute(ch, on))
+        mb.setChecked(self._muted[c])   # zuvor gemerkten Zustand uebernehmen
         r.addWidget(mb)
         sb = QPushButton("S"); sb.setCheckable(True); sb.setFixedWidth(24)
         sb.setToolTip("Solo -- nur Solo-Spuren klingen (nur Vorhoeren)")
         sb.toggled.connect(lambda on, ch=c: self._on_solo(ch, on))
+        sb.setChecked(self._solo[c])    # zuvor gemerkten Zustand uebernehmen
         r.addWidget(sb)
         cb = QComboBox(); cb.setMinimumWidth(120)
         cb.currentIndexChanged.connect(
@@ -1056,8 +1067,17 @@ class TrackerEditor(QMainWindow):
         self.vol_labels = []
         self.vu_meters = []
         n = self.song.channels
-        self._muted = [False] * n
-        self._solo = [False] * n
+        # Bisherigen Mute/Solo-Zustand PRO KANAL-INDEX uebernehmen statt
+        # zurueckzusetzen -- diese Methode laeuft auch bei jedem Undo/Redo
+        # (ueber _restore_song -> _reload_all), selbst wenn sich nur eine
+        # einzelne Note geaendert hat. Ohne das loescht ein simples Strg+Z
+        # lautlos die Mute/Solo-Einstellungen der gesamten Audition-Session.
+        # Neue Kanaele (z.B. nach einer Kanalzahl-Erhoehung) starten
+        # unstumm/nicht-solo, wie bisher.
+        old_muted = getattr(self, "_muted", [])
+        old_solo = getattr(self, "_solo", [])
+        self._muted = [old_muted[i] if i < len(old_muted) else False for i in range(n)]
+        self._solo = [old_solo[i] if i < len(old_solo) else False for i in range(n)]
         self.vu_level = [0.0] * n
         for c, name in enumerate(_channel_names(n)):
             self.strip_layout.addWidget(self._make_channel_strip(c, name))
@@ -1125,6 +1145,14 @@ class TrackerEditor(QMainWindow):
     # ============================================== Bearbeiten
     def _on_bpm(self, v: int) -> None:
         self.song.bpm = v
+        if self._timer.isActive():
+            # Waehrend laufender Wiedergabe laeuft der QTimer sonst mit dem
+            # ALTEN Intervall weiter, obwohl frisch gerenderte Noten (die
+            # `row_ms()` LIVE lesen, siehe `_row_samples`) sofort die neue
+            # Laenge haben -- Tempo-Aenderung mitten im Abspielen klingt
+            # dann ueberlappend (langsamer gemacht) oder mit Luecken
+            # (schneller gemacht), bis Stop/Play erneut gedrueckt wird.
+            self._timer.setInterval(self.song.row_ms())
         self._mark()
 
     def _set_wave(self, ci: int, v: str) -> None:
@@ -1777,7 +1805,7 @@ class TrackerEditor(QMainWindow):
             pat = self.song.patterns[p_idx]
             self._play_row %= pat.rows
             self._set_playhead(self._play_row)
-            self._play_columns(pat, self._play_row)
+            self._play_columns(pat, self._play_row, self._play_order_pos)
             self._play_row += 1
             if self._play_row >= pat.rows:
                 self._play_row = 0
@@ -1793,14 +1821,38 @@ class TrackerEditor(QMainWindow):
         if 0 <= row < self.grid.rowCount():
             self.grid.scrollToItem(self.grid.item(row, 0))
 
-    @staticmethod
-    def _note_len_rows(pat, c: int, r: int) -> int:
+    def _note_len_rows(self, pat, c: int, r: int, order_pos: int | None = None) -> int:
         """Reihen, bis die naechste Note auf Kanal `c` kommt (sonst bis zum
-        Pattern-Ende) -> Klanglaenge dieser Note."""
+        Pattern-Ende, im Song-Wiedergabemodus weitergesucht bis zur ersten
+        Note im NAECHSTEN Order-Pattern) -> Klanglaenge dieser Note.
+
+        `order_pos` = Position dieses Patterns in `self.song.order` (nur im
+        Song-Modus gesetzt, siehe `_tick`/`_play_columns`). Ohne den Blick
+        ins naechste Pattern klang eine Note nahe dem Pattern-Ende in der
+        Live-Wiedergabe hoerbar kuerzer als im WAV-Export -- `mixer.py`
+        berechnet die Dauer aus der GANZEN, ueber die Order verketteten
+        Notenfolge, nicht pro Pattern isoliert. Im "Play Pattern"-Modus
+        (order_pos=None) bleibt das Kappen am Pattern-Ende weiterhin
+        gewollt (Einzel-Pattern-Loop)."""
         for rr in range(r + 1, pat.rows):
             if pat.data[c][rr] is not None:
                 return rr - r
-        return pat.rows - r
+        tail = pat.rows - r
+        if order_pos is None:
+            return tail
+        order = self.song.order
+        if not order:
+            return tail
+        nxt_idx = order[(order_pos + 1) % len(order)]
+        if not (0 <= nxt_idx < len(self.song.patterns)):
+            return tail
+        nxt = self.song.patterns[nxt_idx]
+        if c >= nxt.channels:
+            return tail
+        for rr in range(nxt.rows):
+            if nxt.data[c][rr] is not None:
+                return tail + rr
+        return tail + nxt.rows
 
     # ---- Mute / Solo (nur Live-Vorhoeren; WAV-Render rendert alle Spuren) ----
     def _on_mute(self, c: int, on: bool) -> None:
@@ -1827,20 +1879,26 @@ class TrackerEditor(QMainWindow):
             self.vu_level[c] = 0.0
             self.vu_meters[c].setValue(0)
 
-    def _play_columns(self, pat, row: int) -> None:
+    def _play_columns(self, pat, row: int, order_pos: int | None = None) -> None:
         for c in range(pat.channels):
             n = pat.data[c][row]
             if n is not None and n != NOTE_OFF and self._audible(c):
                 inst = self.song.instrument_for_cell(pat, c, row)
                 self._play_note(c, n, pat.vol[c][row], pat.slide[c][row] or 0,
-                                self._note_len_rows(pat, c, row), inst=inst)
+                                self._note_len_rows(pat, c, row, order_pos), inst=inst)
 
     # ============================================== Datei
     def _new_song(self) -> None:
         if not self._confirm_dirty():
             return
+        self._stop_play()      # laufende Wiedergabe gehoert zum ALTEN Song
         self.song = Song()
         self.path = None
+        # Neue Instrument-Objekte -- ohne Clear koennte eine wiederverwendete
+        # id() eines gerade verworfenen Instruments den `_sound_cache`
+        # (Key = id(inst), ...) treffen und eine STALE Wellenform aus dem
+        # alten Song im brandneuen Song abspielen (Review-Fund).
+        self._sound_cache.clear()
         self._install_factory_presets()
         self.cur = 0
         self._reload_all()
@@ -1861,6 +1919,7 @@ class TrackerEditor(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Fehler", f"Konnte nicht laden:\n{exc}")
             return
+        self._stop_play()      # laufende Wiedergabe gehoert zum ALTEN Song
         self.path = Path(path)
         self.cur = 0
         self._sound_cache.clear()
@@ -1900,6 +1959,17 @@ class TrackerEditor(QMainWindow):
 
     # ============================================== Export
     def _export(self) -> None:
+        if self.song.has_gb_code_fidelity_gaps():
+            QMessageBox.information(
+                self, "Hinweis zum GB-Code-Export",
+                "Dieser Song nutzt Effekt-Spalten (Arpeggio/Vibrato/"
+                "Retrigger/Sample-Offset) und/oder Per-Note-Instrument-"
+                "Ueberschreiben. Der exportierte GB-Code-Player ignoriert "
+                "beides und laesst jede Note nur fuer EINE Reihe klingen "
+                "(kein Sustain wie im Vorhoeren/WAV-Render) -- der Klang "
+                "weicht dadurch hoerbar vom Vorhoeren ab.\n\n"
+                "Fuer originalgetreuen Klang: \"Audio (WAV)...\" statt "
+                "GB-Code verwenden.")
         self._show_code(self.song.gb_code())
 
     def _export_audio(self) -> None:
@@ -1954,6 +2024,7 @@ class TrackerEditor(QMainWindow):
         bb.accepted.connect(dlg.accept)
         bb.rejected.connect(dlg.reject)
         lay.addWidget(bb)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return None, None
         stereo = cb_stereo.isChecked()
@@ -1972,6 +2043,11 @@ class TrackerEditor(QMainWindow):
         b.clicked.connect(lambda: QApplication.clipboard().setText(code))
         row.addWidget(b)
         dl.addLayout(row)
+        # WA_DeleteOnClose: sonst haengt jedes per Export erzeugte Fenster als
+        # verstecktes Kind von `self` weiter (Qt raeumt Kind-Widgets nur beim
+        # Schliessen des Eltern-Fensters auf) -- wiederholtes Exportieren in
+        # einer Sitzung haette so Fenster angesammelt, die nie freigegeben werden.
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg.show()
         self._code_dlg = dlg
 

@@ -146,3 +146,98 @@ def test_new_song_discards_dirty_only_after_confirmation(monkeypatch):
     ed._new_song()
     assert ed.song.patterns[0].get(0, 0) is None
     assert ed.dirty is False
+
+
+# --- closeEvent muss laufende Wiedergabe VOR dem Mixer stoppen -----------
+# (Review-Fund: Mixer.play() oeffnet nach stop() transparent einen neuen
+# Stream, wenn der Timer noch einen Tick nachschiebt.)
+
+def test_close_event_stops_playback_timer():
+    from PySide6.QtGui import QCloseEvent
+    ed = _editor()
+    ed._toggle_play("pattern")
+    assert ed._timer.isActive()
+
+    ev = QCloseEvent()
+    ed.closeEvent(ev)
+    assert ev.isAccepted()
+    assert not ed._timer.isActive()
+    assert not ed._vu_timer.isActive()
+
+
+# --- _new_song()/_open() stoppen laufende Wiedergabe + leeren den --------
+# --- Sound-Cache (Review-Fund) --------------------------------------------
+
+def test_new_song_stops_playback_and_clears_sound_cache():
+    ed = _editor()
+    ed._toggle_play("pattern")
+    assert ed._timer.isActive()
+    ed._sound_cache["stale"] = "x"
+
+    ed._new_song()
+    assert not ed._timer.isActive()
+    assert ed._sound_cache == {}
+
+
+def test_open_stops_playback(tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    from gamebasic.tracker import Song
+    src = tmp_path / "existing.json"
+    Song().save_json(str(src))
+
+    ed = _editor()
+    ed._toggle_play("pattern")
+    assert ed._timer.isActive()
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileName",
+                        lambda *a, **k: (str(src), ""))
+    ed._open()
+    assert not ed._timer.isActive()
+
+
+# --- BPM-Aenderung waehrend laufender Wiedergabe aktualisiert das ---------
+# --- Timer-Intervall live (Review-Fund) -----------------------------------
+
+def test_bpm_change_updates_running_timer_interval():
+    ed = _editor()
+    ed._toggle_play("pattern")
+    old_interval = ed._timer.interval()
+
+    ed.bpm.setValue(ed.song.bpm * 2)     # deutlich schneller
+    assert ed._timer.interval() == ed.song.row_ms()
+    assert ed._timer.interval() != old_interval
+
+
+def test_bpm_change_without_playback_does_not_touch_timer():
+    ed = _editor()
+    assert not ed._timer.isActive()
+    ed.bpm.setValue(200)
+    assert not ed._timer.isActive()      # kein Crash/Start durch die BPM-Aenderung
+
+
+# --- GB-Code-Export warnt bei Effekt-Spalte/Per-Note-Instrument (Review- --
+# --- Fund: der Export ignoriert beides komplett, vorher ohne Hinweis) -----
+
+def test_export_warns_when_song_uses_fx(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from gamebasic.tracker.song import FX_ARP
+    ed = _editor()
+    ed.song.patterns[0].set(0, 0, 60)
+    ed.song.patterns[0].set_fx(0, 0, FX_ARP, 0x37)
+
+    calls = []
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: calls.append(1))
+    ed._export()
+    assert calls == [1]
+
+
+def test_export_no_warning_for_plain_song(monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    ed = _editor()
+    ed.song.patterns[0].set(0, 0, 60)
+
+    def _boom(*a, **k):
+        raise AssertionError("QMessageBox.information sollte hier nicht aufgerufen werden")
+    monkeypatch.setattr(QMessageBox, "information", _boom)
+    ed._export()   # kein Crash, kein Warn-Dialog

@@ -92,6 +92,49 @@ def test_note_length_in_playback():
     ed._play_columns(pat, 0)
 
 
+def test_note_length_sustains_into_next_order_pattern_in_song_mode():
+    """Review-Fund: im "Play Song"-Modus wurde die Notenlaenge bisher hart
+    am Pattern-Ende gekappt, obwohl der WAV-Export (mixer.py) dieselbe Note
+    ueber die Pattern-Grenze hinweg sustained, wenn im naechsten Order-
+    Pattern auf demselben Kanal keine fruehere Note kommt -- die Live-
+    Vorschau klang dadurch kuerzer/anders als das exportierte Ergebnis."""
+    ed = _editor()
+    p0 = ed.song.patterns[0]
+    p0.set_rows(4)
+    p0.set(0, 2, 60)                     # Note 2 Reihen vor Pattern-Ende
+    idx1 = ed.song.add_pattern(rows=4)
+    p1 = ed.song.patterns[idx1]
+    p1.set(0, 1, 64)                     # naechste Note im Folge-Pattern
+    ed.song.order = [0, idx1]
+
+    # "Play Pattern"-Modus (order_pos=None): kappt weiterhin hart am Ende.
+    assert ed._note_len_rows(p0, 0, 2) == 2
+    # "Play Song"-Modus: sustained bis zur ersten Note im naechsten
+    # Order-Pattern (2 Restreihen in p0 + 1 Reihe in p1 = 3).
+    assert ed._note_len_rows(p0, 0, 2, order_pos=0) == 3
+
+
+def test_note_length_song_mode_without_next_note_uses_whole_next_pattern():
+    ed = _editor()
+    p0 = ed.song.patterns[0]
+    p0.set_rows(4)
+    p0.set(0, 2, 60)
+    idx1 = ed.song.add_pattern(rows=5)   # keine Note im Folge-Pattern
+    ed.song.order = [0, idx1]
+
+    assert ed._note_len_rows(p0, 0, 2, order_pos=0) == 2 + 5
+
+
+def test_note_length_song_mode_wraps_order_to_own_pattern():
+    """Ein 1-Pattern-Order (Loop auf sich selbst) darf nicht crashen."""
+    ed = _editor()
+    p0 = ed.song.patterns[0]
+    p0.set_rows(4)
+    p0.set(0, 2, 60)
+    ed.song.order = [0]
+    assert ed._note_len_rows(p0, 0, 2, order_pos=0) >= 2
+
+
 def test_keymap_dialog_builds_instrument(tmp_path):
     from gamebasic.trackereditor_qt import _KeymapDialog
     from gamebasic.tracker import Zone
@@ -366,3 +409,51 @@ def test_waveform_view_drag_via_mouse_events(tmp_path):
                           Qt.KeyboardModifier.NoModifier)
     w.mouseReleaseEvent(release)
     assert w._drag is None
+
+
+# --- WA_DeleteOnClose auf Dialogen/Export-Fenstern (Review-Fund: fehlte -----
+# --- vorher, jedes wiederholte Oeffnen sammelte hidden Kind-Widgets an) -----
+
+def test_instrument_dialog_has_delete_on_close(tmp_path):
+    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from PySide6.QtCore import Qt
+    ed = _editor()
+    inst = ed.song.instruments[0]
+    dlg = _InstrumentDialog(inst)
+    assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_keymap_dialog_has_delete_on_close():
+    from gamebasic.trackereditor_qt import _KeymapDialog
+    from PySide6.QtCore import Qt
+    ed = _editor()
+    dlg = _KeymapDialog("Kit", [], ed._load_samples_from_file)
+    assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_sf2_preset_dialog_has_delete_on_close():
+    from gamebasic.trackereditor_qt import _Sf2PresetDialog
+    from PySide6.QtCore import Qt
+    dlg = _Sf2PresetDialog([(0, 0, "Piano")])
+    assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_show_code_window_has_delete_on_close():
+    from PySide6.QtCore import Qt
+    ed = _editor()
+    ed._show_code("PRINT 1")
+    assert ed._code_dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+
+
+def test_render_options_dialog_has_delete_on_close(monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QDialog
+    captured = {}
+    orig_exec = QDialog.exec
+    def _capture_exec(self):
+        captured["dlg"] = self
+        return QDialog.DialogCode.Rejected
+    monkeypatch.setattr(QDialog, "exec", _capture_exec)
+    ed = _editor()
+    ed._ask_render_options()
+    assert captured["dlg"].testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)

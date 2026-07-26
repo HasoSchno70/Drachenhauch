@@ -85,6 +85,21 @@ def test_close_event_delegates_to_embedded_tracker_dirty_check(_qapp, monkeypatc
     assert not ev.isAccepted()
 
 
+def test_close_event_stops_tracker_playback_timer(_qapp):
+    """Review-Fund: AudioStudio.closeEvent stoppte nur den Mixer, nicht den
+    Tracker-Playback-Timer -- Mixer.play() oeffnet nach stop() transparent
+    einen neuen Audio-Stream, wenn der Timer noch einen Tick nachschiebt."""
+    from PySide6.QtGui import QCloseEvent
+    st = _studio(_qapp)
+    st.tracker._toggle_play("pattern")
+    assert st.tracker._timer.isActive()
+
+    ev = QCloseEvent()
+    st.closeEvent(ev)
+    assert ev.isAccepted()
+    assert not st.tracker._timer.isActive()
+
+
 def test_close_event_no_dialog_when_tracker_clean(_qapp):
     from PySide6.QtGui import QCloseEvent
     from PySide6.QtWidgets import QMessageBox

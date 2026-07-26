@@ -95,6 +95,13 @@ class AudioStudio(QMainWindow):
         # Also den Dirty-Check hier direkt aufrufen (SFX-Generator hat kein
         # Save/Load-Dateimodell -- nichts zu verlieren, keine Pruefung noetig).
         if self.tracker._confirm_dirty():
+            # _mixer.stop() reicht allein nicht -- Mixer.play() oeffnet nach
+            # stop() transparent einen neuen Stream, wenn der Playback-Timer
+            # noch einen Tick nachschiebt (WA_DeleteOnClose/deleteLater der
+            # Fensters raeumt zuverlaessig, aber nicht GARANTIERT VOR dem
+            # naechsten Timer-Tick unter Last -- gleicher Bugtyp wie beim
+            # bereits gefixten scoreeditor_qt.closeEvent).
+            self.tracker._stop_play()
             self.tracker._mixer.stop()
             event.accept()
         else:

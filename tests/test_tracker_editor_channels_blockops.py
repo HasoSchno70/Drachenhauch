@@ -79,6 +79,42 @@ def test_channel_headers_last_is_drum_after_resize():
     assert labels[0].startswith("Ch1")
 
 
+# --- Mute/Solo ueberleben Undo/Redo + Kanalzahl-Aenderung (Review-Fund: ---
+# --- _rebuild_channel_strips() setzte sie vorher stillschweigend zurueck) -
+
+def test_mute_solo_survive_undo_triggered_rebuild():
+    ed = _editor()
+    ed.mute_btns[1].setChecked(True)
+    ed.solo_btns[2].setChecked(True)
+    assert ed._muted == [False, True, False, False]
+    assert ed._solo == [False, False, True, False]
+
+    # _restore_song() -> _reload_all() -> _rebuild_channel_strips(), wie
+    # bei jedem Undo/Redo (Song-Inhalt hier bewusst unveraendert simuliert).
+    ed._restore_song(ed.song.to_dict())
+
+    assert ed._muted == [False, True, False, False]
+    assert ed._solo == [False, False, True, False]
+    assert ed.mute_btns[1].isChecked() is True
+    assert ed.solo_btns[2].isChecked() is True
+
+
+def test_mute_solo_extend_with_false_on_more_channels():
+    ed = _editor()
+    ed.mute_btns[0].setChecked(True)
+    ed.channels_spin.setValue(8)
+    assert ed._muted == [True, False, False, False, False, False, False, False]
+    assert ed.mute_btns[0].isChecked() is True
+
+
+def test_mute_solo_truncate_on_fewer_channels():
+    ed = _editor()
+    ed.channels_spin.setValue(8)
+    ed.mute_btns[6].setChecked(True)
+    ed.channels_spin.setValue(4)
+    assert ed._muted == [False, False, False, False]   # Kanal 6 existiert nicht mehr
+
+
 # --------------------------------------------------------------- Block-Ops
 
 def test_block_copy_paste_via_editor_methods():
