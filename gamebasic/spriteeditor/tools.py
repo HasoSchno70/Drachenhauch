@@ -215,11 +215,15 @@ class BucketTool(Tool):
     def begin(self, app, x, y, button):
         if not app.in_bounds(x, y):
             return
-        app.doc.current.snapshot()
         target = app.doc.current.pixels.getpixel((x, y))
         replacement = app.fg if button == Qt.LeftButton else app.bg
         if target == replacement:
+            # Nichts zu tun -- der Snapshot muss VOR diesem Check kommen,
+            # sonst landet ein No-op-Eintrag in der Undo-Historie (ein
+            # spaeteres Strg+Z macht dann sichtbar nichts rueckgaengig;
+            # Review-Fund).
             return
+        app.doc.current.snapshot()
         self._flood(app.doc.current.pixels, x, y, target, replacement)
         app.canvas.invalidate_all()
         app.mark_dirty()

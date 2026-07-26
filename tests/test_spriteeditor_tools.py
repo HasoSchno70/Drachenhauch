@@ -194,6 +194,7 @@ def test_bucket_fills_connected_region():
         app.doc.current.pixels.putpixel((1, y), (50, 50, 50, 255))
     tool = BucketTool()
     tool.begin(app, 0, 0, Qt.LeftButton)
+    assert app.doc.current.snapshot_count == 1   # echter Fill legt einen Undo-Eintrag an
     # Linke Spalte (x=0) gefuellt
     for y in range(4):
         assert app.doc.current.pixels.getpixel((0, y)) == (255, 0, 0, 255)
@@ -207,17 +208,19 @@ def test_bucket_fills_connected_region():
 
 
 def test_bucket_no_change_if_target_is_replacement():
-    """Klick auf ein Pixel, das schon die Ziel-Farbe hat: snapshot trotzdem,
-    aber kein Pixel-Update (early-return). Das ist konsistent mit
-    klassischem Verhalten."""
+    """Klick auf ein Pixel, das schon die Ziel-Farbe hat: kein Pixel-Update
+    (early-return) UND kein Undo-Eintrag (Review-Fund: vorher wurde der
+    Snapshot noch VOR diesem Check genommen -- ein No-op-Strg+Z war die
+    Folge, obwohl sichtbar nichts passiert war)."""
     from gamebasic.spriteeditor.tools import BucketTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     app.doc.current.pixels.putpixel((1, 1), (255, 0, 0, 255))  # = fg
     tool = BucketTool()
     tool.begin(app, 1, 1, Qt.LeftButton)
-    # Snapshot wurde genommen, aber Bild unveraendert
+    # Bild unveraendert, KEIN Undo-Eintrag angelegt.
     assert app.doc.current.pixels.getpixel((1, 1)) == (255, 0, 0, 255)
+    assert app.doc.current.snapshot_count == 0
 
 
 # --- Line / Rect / Ellipse -----------------------------------------

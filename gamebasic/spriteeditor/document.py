@@ -137,6 +137,12 @@ class Frame:
                            Layer(pixels=Image.new("RGBA", size, (0, 0, 0, 0)),
                                  name=name))
         self.active_layer += 1
+        # Undo-Eintraege zeigen auf Layer-Indizes -- nach dem Einfuegen
+        # verschieben sich die Indizes aller Ebenen darueber (gleicher
+        # Grund wie bei delete_layer/move_layer/merge_down unten; war hier
+        # bisher vergessen -- Review-Fund).
+        self.history.clear()
+        self.redo_stack.clear()
         return self.active_layer
 
     def duplicate_layer(self) -> int:
@@ -146,6 +152,8 @@ class Frame:
                                  name=src.name + " (Kopie)",
                                  visible=src.visible, opacity=src.opacity))
         self.active_layer += 1
+        self.history.clear()
+        self.redo_stack.clear()
         return self.active_layer
 
     def delete_layer(self) -> bool:
@@ -293,8 +301,35 @@ class SpriteDoc:
     def last_struct_undo_seq(self) -> int:
         return self._struct_undo[-1][0] if self._struct_undo else 0
 
+    def _newest_undo_seq(self) -> int:
+        """Hoechste Sequenznummer unter ALLEN Undo-Eintraegen (Struktur UND
+        Pixel, ueber alle Frames) -- Referenzpunkt fuer die Redo-
+        Gueltigkeitspruefung in `last_struct_redo_seq`/`frame_with_latest_redo`."""
+        m = self._struct_undo[-1][0] if self._struct_undo else 0
+        for f in self.frames:
+            if f.history:
+                m = max(m, f.history[-1][0])
+        return m
+
     def last_struct_redo_seq(self) -> int:
-        return self._struct_redo[-1][0] if self._struct_redo else 0
+        """0, wenn kein Struktur-Redo vorliegt ODER es durch eine NEUERE
+        Aktion (Pixel-Strich in irgendeinem Frame, oder eine weitere
+        Struktur-Mutation) ungueltig geworden ist.
+
+        Ohne diese Gueltigkeitspruefung: undo_struct() legt einen Redo-
+        Eintrag mit den zu diesem Zeitpunkt aktuellen Frames an. Zeichnet
+        der User danach einen NEUEN Strich (der nur die per-Frame
+        Pixel-History betrifft, nicht `_struct_redo`), blieb der alte
+        Struktur-Redo-Eintrag bestehen und konnte per Redo faelschlich
+        angewendet werden -- das ersetzt `self.frames` komplett durch den
+        AELTEREN Snapshot und wirft den frischen Strich lautlos weg
+        (Review-Fund). Standard-Undo/Redo-Semantik: eine neue Aktion nach
+        einem Undo verwirft den Redo-Zweig -- hier lazy geprueft statt
+        eager an jeder der ~15 `snapshot()`-Aufrufstellen invalidiert."""
+        if not self._struct_redo:
+            return 0
+        seq = self._struct_redo[-1][0]
+        return 0 if seq < self._newest_undo_seq() else seq
 
     def frame_with_latest_undo(self) -> tuple[int, int]:
         """`(frame_index, seq)` des Frames mit dem juengsten Pixel-Undo-Eintrag
@@ -310,11 +345,17 @@ class SpriteDoc:
         return best_idx, best_seq
 
     def frame_with_latest_redo(self) -> tuple[int, int]:
-        """Pendant zu `frame_with_latest_undo` fuer Redo."""
+        """Pendant zu `frame_with_latest_undo` fuer Redo. Ein per-Frame
+        Redo-Eintrag gilt nur, wenn seither KEINE neuere Undo-Aktion
+        (Struktur oder Pixel, irgendein Frame) stattgefunden hat -- gleiche
+        Gueltigkeitspruefung wie `last_struct_redo_seq`, spiegelverkehrt
+        (verhindert z.B., dass ein laengst durch eine Struktur-Mutation
+        ueberholter Pixel-Redo-Eintrag faelschlich angewendet wird)."""
+        newest_undo = self._newest_undo_seq()
         best_idx, best_seq = -1, 0
         for i, f in enumerate(self.frames):
             s = f.last_redo_seq()
-            if s > best_seq:
+            if s > best_seq and s >= newest_undo:
                 best_idx, best_seq = i, s
         return best_idx, best_seq
 
@@ -717,8 +758,18 @@ class SpriteDoc:
                 key = f"{name_prefix}_{i}"
             # Kollisionen (doppelte Namen / Ueberlapp mit <prefix>_<idx>)
             # eindeutig machen, sonst ueberschreibt der spaetere Eintrag.
+            # Schleife statt einmaligem "_<i>"-Anhaengen: ein einzelner
+            # Suffix-Versuch kann selbst wieder mit einem bereits
+            # vergebenen Namen kollidieren (z.B. wenn ein FRUEHERES Frame
+            # zufaellig genau "<key>_<i>" heisst) -- das wuerde den frueheren
+            # Eintrag lautlos ueberschreiben statt eine neue Kollision zu
+            # erkennen (Review-Fund).
             if key in sprites:
-                key = f"{key}_{i}"
+                base_key = key
+                suffix = i
+                while key in sprites:
+                    key = f"{base_key}_{suffix}"
+                    suffix += 1
             sprites[key] = rect
         # image-Pfad ist relativ zum JSON -- nimm den png-Dateinamen wenn
         # beide im selben Verzeichnis liegen, sonst relativen Pfad.

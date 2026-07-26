@@ -339,6 +339,25 @@ def test_save_sheet_atlas_duplicate_names_disambiguated(tmp_path):
     assert "dup_1" in data["sprites"]
 
 
+def test_save_sheet_atlas_double_collision_disambiguated(tmp_path):
+    """Review-Fund: ein einzelner Suffix-Versuch (`f"{key}_{i}"`) konnte
+    selbst wieder kollidieren, wenn ein FRUEHERES Frame zufaellig genau
+    diesen Namen trug -- der spaetere Eintrag ueberschrieb den frueheren
+    lautlos statt eine neue Kollision zu erkennen und weiterzusuchen."""
+    import json as _json
+    d = SpriteDoc(8, 8)
+    d.add_frame()
+    d.add_frame()
+    d.frames[0].name = "hero_2"     # kollidiert absichtlich mit dem Fallback von Frame 2
+    d.frames[1].name = "hero"
+    d.frames[2].name = "hero"       # Frame-Index 2 -> naiver Fallback waere "_2"
+    png = tmp_path / "d.png"
+    j = tmp_path / "d.json"
+    d.save_sheet_atlas(png, j)
+    data = _json.loads(j.read_text(encoding="utf-8"))
+    assert len(data["sprites"]) == 3    # alle drei Frames vertreten, keins ueberschrieben
+
+
 def test_native_roundtrip_preserves_frame_name(tmp_path):
     """name-Feld ueberlebt save_native -> load_native (Version 3)."""
     d = SpriteDoc(8, 8)
@@ -623,6 +642,54 @@ def test_unified_sequence_pixel_vs_struct():
     assert doc.current.last_undo_seq() > doc.last_struct_undo_seq()
 
 
+def test_redo_does_not_apply_stale_struct_redo_after_new_stroke():
+    """Review-Fund: undo_struct() legt einen Struktur-Redo-Eintrag an. Ein
+    NEUER Pixel-Strich danach betrifft nur die per-Frame Pixel-History, hat
+    den Struktur-Redo-Eintrag aber bisher NICHT invalidiert -- ein Redo
+    wendete dann faelschlich den AELTEREN Struktur-Snapshot an
+    (`redo_struct()` ersetzt `self.frames` komplett) und warf den frischen
+    Strich lautlos weg."""
+    doc = SpriteDoc(8, 8)
+    doc.current.snapshot()
+    doc.current.pixels.putpixel((0, 0), (255, 0, 0, 255))   # Strich 1
+
+    doc.add_frame()                                          # Struktur-Op
+
+    struct_seq = doc.last_struct_undo_seq()
+    _, pix_seq = doc.frame_with_latest_undo()
+    assert struct_seq > pix_seq
+    assert doc.undo_struct()
+    assert len(doc.frames) == 1
+    assert doc.last_struct_redo_seq() != 0        # Struktur-Redo steht bereit
+
+    doc.current.snapshot()
+    doc.current.pixels.putpixel((1, 1), (0, 255, 0, 255))   # Strich 2, NACH dem Undo
+
+    # Der Struktur-Redo gilt jetzt nicht mehr -- ein Redo darf ihn nicht
+    # mehr waehlen (action_redo() im UI-Layer trifft dieselbe Entscheidung).
+    assert doc.last_struct_redo_seq() == 0
+    struct_seq = doc.last_struct_redo_seq()
+    _, pix_seq = doc.frame_with_latest_redo()
+    assert not (struct_seq > pix_seq)
+    assert doc.current.pixels.getpixel((1, 1)) == (0, 255, 0, 255)
+
+
+def test_pixel_redo_invalidated_by_later_struct_op():
+    """Spiegelbild: ein anstehendes Pixel-Redo darf nicht mehr gelten,
+    wenn seither eine Struktur-Mutation stattgefunden hat."""
+    doc = SpriteDoc(8, 8)
+    doc.current.snapshot()
+    doc.current.pixels.putpixel((0, 0), (255, 0, 0, 255))
+    assert doc.current.undo() is True             # Pixel-Redo steht jetzt bereit
+    _, seq = doc.frame_with_latest_redo()
+    assert seq != 0
+
+    doc.add_frame()                                # neue Struktur-Aktion danach
+
+    _, seq = doc.frame_with_latest_redo()
+    assert seq == 0                                # Pixel-Redo gilt nicht mehr
+
+
 # --- Onion-Skin-Helfer ---------------------------------------------
 
 def test_onion_indices_single_frame_empty():
@@ -813,6 +880,33 @@ def test_layer_move_and_delete():
     assert f.delete_layer()
     assert len(f.layers) == 1
     assert not f.delete_layer()   # letzte Ebene bleibt
+
+
+def test_add_layer_clears_pixel_undo_history():
+    """Review-Fund: add_layer()/duplicate_layer() vergassen (anders als
+    delete_layer/move_layer/merge_down) die Pixel-Undo-Historie zu leeren --
+    nach dem Einfuegen verschieben sich Layer-Indizes, eine alte History-
+    Eintrag wuerde dann beim Undo in die FALSCHE (verschobene) Ebene
+    schreiben."""
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.snapshot()
+    f.pixels.putpixel((0, 0), _green())
+    assert f.history
+    f.add_layer()
+    assert not f.history
+    assert not f.redo_stack
+
+
+def test_duplicate_layer_clears_pixel_undo_history():
+    doc = SpriteDoc(4, 4)
+    f = doc.current
+    f.snapshot()
+    f.pixels.putpixel((0, 0), _green())
+    assert f.history
+    f.duplicate_layer()
+    assert not f.history
+    assert not f.redo_stack
 
 
 def test_layer_pixel_undo_targets_recorded_layer():
