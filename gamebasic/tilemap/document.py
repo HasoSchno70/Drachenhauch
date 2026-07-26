@@ -210,6 +210,25 @@ class Tileset:
         return self.firstgid <= gid < self.firstgid + max(0, self.tile_count)
 
 
+def _rel_image_path(abs_path: str, fallback: str, map_path: str | None) -> str:
+    """Tileset-Bildpfad relativ zu `map_path` (wenn gesetzt), sonst
+    `fallback` unveraendert. Geteilte Quelle der Wahrheit fuer
+    `to_tiled_dict()` (schreibt die .json) UND `gb_code()` (LOADIMAGE im
+    exportierten Programm) -- vorher rechnete nur `to_tiled_dict()` relativ,
+    `gb_code()` schrieb den rohen (oft absoluten, maschinenspezifischen)
+    Pfad direkt in den LOADIMAGE-Aufruf. Das exportierte Programm brach
+    dadurch, sobald der Projektordner verschoben/geteilt wurde, obwohl die
+    .json selbst portabel war (Review-Fund)."""
+    if map_path and abs_path:
+        try:
+            return os.path.relpath(
+                abs_path, Path(map_path).resolve().parent
+            ).replace("\\", "/")
+        except ValueError:
+            return fallback
+    return fallback
+
+
 class TileMapDoc:
     """Vollstaendige Tilemap: Geometrie, N Tilesets, N Tile-/Object-Layer."""
 
@@ -230,11 +249,40 @@ class TileMapDoc:
 
     # ------------------------------------------------------ Tileset-Geometrie
     def recompute_firstgids(self) -> None:
-        """Vergibt firstgids fortlaufend (erstes = 1)."""
+        """Vergibt firstgids fortlaufend (erstes = 1) UND zieht bereits
+        platzierte GIDs entsprechend nach, falls sich dabei ein firstgid
+        AENDERT (Tileset entfernt oder Bild ersetzt aendert den tile_count
+        eines vorherigen Tilesets) -- sonst wuerden GIDs, die auf ein
+        DAHINTER liegendes, unveraendertes Tileset zeigen, ploetzlich auf
+        ein falsches (oder gar kein) Tileset zeigen, obwohl dieses Tileset
+        selbst gar nicht angefasst wurde (Review-Fund: `remove_tileset`/
+        `set_tileset` riefen frueher nur die reine Umnummerierung auf, ohne
+        bereits platzierte GIDs nachzuziehen -- stille Level-Korruption).
+
+        `add_tileset()` haengt ein neues Tileset ans Ende an -- die
+        firstgids aller bestehenden Tilesets bleiben dabei unveraendert,
+        die Migration unten ist dort automatisch ein No-op."""
+        old = [(ts, ts.firstgid, ts.tile_count) for ts in self.tilesets]
         gid = 1
         for ts in self.tilesets:
             ts.firstgid = gid
             gid += max(0, ts.tile_count)
+        shifts = [(old_fg, old_count, ts.firstgid - old_fg)
+                 for ts, old_fg, old_count in old if ts.firstgid != old_fg]
+        if not shifts:
+            return
+        for layer in self.layers:
+            if not isinstance(layer, TileLayer):
+                continue
+            tiles = layer.tiles
+            for i, g in enumerate(tiles):
+                if g <= 0:
+                    continue
+                for lo, count, delta in shifts:
+                    if lo <= g < lo + count:
+                        if delta:
+                            tiles[i] = g + delta
+                        break
 
     @property
     def active_ts(self) -> Tileset | None:
@@ -433,6 +481,8 @@ class TileMapDoc:
                    w: int, h: int) -> list[list[int]]:
         """2D-Block (h Zeilen x w Spalten) von GIDs ab (x0,y0). Out-of-bounds
         liefert 0 (TileLayer.get clamped)."""
+        if not (0 <= layer_idx < len(self.layers)):
+            return []
         layer = self.layers[layer_idx]
         if not isinstance(layer, TileLayer):
             return []
@@ -443,6 +493,8 @@ class TileMapDoc:
                      block: list[list[int]]) -> bool:
         """Stempelt einen 2D-GID-Block ab (x0,y0). Out-of-bounds-Zellen
         werden ignoriert. Liefert True, wenn sich etwas geaendert hat."""
+        if not (0 <= layer_idx < len(self.layers)):
+            return False
         layer = self.layers[layer_idx]
         if not isinstance(layer, TileLayer):
             return False
@@ -464,6 +516,8 @@ class TileMapDoc:
     # ------------------------------------------------------ Flood-Fill
     def flood_fill(self, layer_idx: int, x: int, y: int, gid: int) -> int:
         """Bucket-Fill der 4-verbundenen Region. Liefert Anzahl Tiles."""
+        if not (0 <= layer_idx < len(self.layers)):
+            return 0
         layer = self.layers[layer_idx]
         if not isinstance(layer, TileLayer):
             return 0  # Flood-Fill nur auf Tile-Layern
@@ -495,16 +549,6 @@ class TileMapDoc:
 
         Der Tileset-Bildpfad wird relativ zu `map_path` geschrieben (wenn
         gesetzt), sonst der gespeicherte Pfad unveraendert uebernommen."""
-        def _rel(abs_path: str, fallback: str) -> str:
-            if map_path and abs_path:
-                try:
-                    return os.path.relpath(
-                        abs_path, Path(map_path).resolve().parent
-                    ).replace("\\", "/")
-                except ValueError:
-                    return fallback
-            return fallback
-
         tilesets_json = []
         for ts in self.tilesets:
             tiles_meta = []
@@ -525,7 +569,7 @@ class TileMapDoc:
                 "columns": ts.columns,
                 "margin": 0,
                 "spacing": 0,
-                "image": _rel(ts.image_abs, ts.image),
+                "image": _rel_image_path(ts.image_abs, ts.image, map_path),
                 "imagewidth": ts.image_w,
                 "imageheight": ts.image_h,
             }
@@ -712,24 +756,36 @@ class TileMapDoc:
         if map_path:
             map_rel = Path(map_path).name
         # Tileset-Liste fuer den Renderer (mind. ein Eintrag, damit das
-        # erzeugte Programm immer kompiliert).
-        ts_render = [(ts.image or f"tileset{i}.png",
-                      max(1, ts.columns), ts.firstgid)
+        # erzeugte Programm immer kompiliert). Bildpfad relativ zur Map
+        # (wie to_tiled_dict()s JSON) -- vorher schrieb gb_code() den rohen,
+        # oft absoluten Pfad direkt in LOADIMAGE(), was das exportierte
+        # Programm beim Verschieben/Teilen des Projektordners zerbrach,
+        # obwohl die .json daneben portabel war (Review-Fund).
+        ts_render = [(_rel_image_path(ts.image_abs, ts.image or f"tileset{i}.png", map_path),
+                      max(1, ts.columns), ts.firstgid, max(0, ts.tile_count))
                      for i, ts in enumerate(self.tilesets)]
         if not ts_render:
-            ts_render = [("tileset.png", 1, 1)]
+            ts_render = [("tileset.png", 1, 1, 10 ** 9)]
         # Bild-DIMs
         img_dims = "\n".join(
             f'DIM ts{i} AS IMAGE\nts{i} = LOADIMAGE("{rel}")'
-            for i, (rel, _cols, _fg) in enumerate(ts_render))
-        # gid -> Tileset aufloesen (absteigend nach firstgid)
+            for i, (rel, _cols, _fg, _count) in enumerate(ts_render))
+        # gid -> Tileset aufloesen (absteigend nach firstgid). Obere Grenze
+        # (`g < fg + tile_count`) mit aufgenommen -- exakt wie
+        # `Tileset.contains_gid()`/`gid_to_tileset()` es schon fuer die
+        # Editor-Vorschau tun. Vorher fehlte die obere Grenze hier: nach
+        # einem Retile (Kachelgroesse aendern -> tile_count kann schrumpfen)
+        # rendert die Editor-Vorschau eine jetzt ungueltige GID korrekt gar
+        # nicht mehr, das exportierte Programm haette aber weiterhin
+        # (aus dem falschen Quell-Rechteck) irgendein Tile gezeichnet.
         order = sorted(range(len(ts_render)),
                        key=lambda i: ts_render[i][2], reverse=True)
         chain_lines = []
         for k, i in enumerate(order):
-            _rel, cols, fg = ts_render[i]
+            _rel, cols, fg, count = ts_render[i]
             kw = "IF" if k == 0 else "ELSEIF"
-            chain_lines.append(f"                        {kw} g >= {fg} THEN")
+            chain_lines.append(
+                f"                        {kw} g >= {fg} AND g < {fg + count} THEN")
             chain_lines.append(f"                            lid = g - {fg}")
             chain_lines.append(
                 f"                            DRAWIMAGEPART(ts{i}, "

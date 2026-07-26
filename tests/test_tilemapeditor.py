@@ -267,6 +267,46 @@ def test_remove_tileset_refuses_when_in_use(tmp_path):
     assert len(doc.tilesets) == 1
 
 
+def test_remove_tileset_migrates_gids_of_remaining_tilesets(tmp_path):
+    """Review-Fund: remove_tileset() liess firstgids fortlaufend neu
+    vergeben, ohne bereits platzierte GIDs eines ANDEREN (noch benutzten,
+    also NICHT geloeschten) Tilesets nachzuziehen -- ein Tile aus dem
+    ueberlebenden Tileset zeigte danach lautlos auf die falsche
+    Kachel (oder wurde unaufloesbar), obwohl dieses Tileset selbst gar
+    nicht angefasst wurde."""
+    doc = _build_multi(tmp_path)          # A: firstgid=1,count=8 / B: firstgid=9,count=4
+    doc.layers[0].set(0, 0, 12)            # Tileset B, lokale ID 3
+    assert doc.gid_to_tileset(12) == (1, 3)
+
+    assert doc.remove_tileset(0) is True   # A ist unbenutzt -> erlaubt
+    assert [t.firstgid for t in doc.tilesets] == [1]   # B ruckt auf firstgid=1
+
+    new_gid = doc.layers[0].get(0, 0)
+    assert new_gid != 12                   # die alte GID zeigt jetzt woanders hin
+    assert new_gid == 4                    # neue firstgid(1) + lokale ID(3)
+    assert doc.gid_to_tileset(new_gid) == (0, 3)   # loest weiterhin auf dieselbe Kachel auf
+
+
+def test_retile_migrates_gids_of_untouched_tileset(tmp_path):
+    """Gleicher Migrations-Mechanismus greift auch beim Retile-Pfad (Kachel-
+    groesse aendern aendert tile_count jedes Tilesets -> firstgids
+    verschieben sich)."""
+    doc = _build_multi(tmp_path)
+    doc.layers[0].set(0, 0, 12)            # Tileset B (firstgid=9), lokale ID 3
+    # Tileset A auf eine kleinere effektive Kachelzahl "retilen" (wie
+    # tilemapeditor_qt.py._resize_map()'s Retile-Zweig: Kachelgroesse
+    # aendern -> set_image() neu, dann recompute_firstgids()).
+    doc.tilesets[0].tile_w, doc.tilesets[0].tile_h = 32, 32
+    doc.tilesets[0].set_image(doc.tilesets[0].image_abs, 64, 32)  # jetzt nur noch 2 Tiles
+    doc.recompute_firstgids()
+
+    assert doc.tilesets[0].firstgid == 1
+    assert doc.tilesets[1].firstgid == 3   # A hat jetzt nur noch 2 Tiles (statt 8)
+    new_gid = doc.layers[0].get(0, 0)
+    assert new_gid == 6                    # neue firstgid(3) + lokale ID(3)
+    assert doc.gid_to_tileset(new_gid) == (1, 3)
+
+
 def test_gid_to_tileset_prefers_largest_firstgid_on_overlap(tmp_path):
     """Review-Fund: bei ueberlappenden (fehlerhaften) deklarierten
     tile_count-Bereichen gewinnt jetzt das Tileset mit dem GROESSTEN
@@ -438,6 +478,35 @@ def test_gb_code_compiles_with_object_layer(tmp_path):
     assert _check_compiles(tmp_path, code) == []
 
 
+def test_gb_code_loadimage_path_is_relative_like_json(tmp_path):
+    """Review-Fund: gb_code() schrieb frueher den ROHEN (oft absoluten,
+    maschinenspezifischen) Tileset-Bildpfad direkt in LOADIMAGE() -- anders
+    als to_tiled_dict(), das den Pfad schon relativ zur Map schrieb. Das
+    exportierte Programm brach dadurch beim Verschieben/Teilen des Projekt-
+    ordners, obwohl die .json daneben portabel blieb."""
+    doc = _build_sample(tmp_path)
+    map_path = str(tmp_path / "level.json")
+    d = doc.to_tiled_dict(map_path)
+    json_image = d["tilesets"][0]["image"]
+
+    code = doc.gb_code(map_path)
+    assert f'LOADIMAGE("{json_image}")' in code
+    assert str(tmp_path).replace("\\", "/") not in code   # kein absoluter Pfad im Code
+
+
+def test_gb_code_resolve_chain_has_upper_bound_check(tmp_path):
+    """Review-Fund: die im exportierten Code generierte gid->Tileset-Kette
+    prüfte nur `g >= firstgid`, nicht die obere Grenze (`g < firstgid +
+    tile_count`) -- anders als `Tileset.contains_gid()`/`gid_to_tileset()`,
+    die die Editor-Vorschau schon korrekt begrenzen. Eine durch einen
+    Retile ungueltig gewordene GID haette im Export weiterhin (aus dem
+    falschen Quell-Rechteck) irgendein Tile gezeichnet."""
+    doc = _build_multi(tmp_path)   # A: firstgid=1,count=8 / B: firstgid=9,count=4
+    code = doc.gb_code(str(tmp_path / "level.json"))
+    assert "g >= 9 AND g < 13" in code   # Tileset B: [9, 9+4)
+    assert "g >= 1 AND g < 9" in code    # Tileset A: [1, 1+8)
+
+
 # --------------------------------------------------------------- Editor-UI
 
 # --------------------------------------------------------------- Regionen (Select)
@@ -472,6 +541,19 @@ def test_region_ops_ignore_object_layer():
     oi = len(doc.layers) - 1
     assert doc.get_region(oi, 0, 0, 2, 2) == []
     assert doc.stamp_region(oi, 0, 0, [[1]]) is False
+
+
+def test_region_ops_reject_invalid_layer_index():
+    """Review-Fund: get_region()/stamp_region()/clear_region()/flood_fill()
+    indizierten `self.layers[layer_idx]` ohne Bounds-Check -- ein
+    ungueltiger Index warf einen rohen IndexError statt sich (wie
+    remove_layer/move_layer) selbst gegen falsche Aufrufer abzusichern."""
+    doc = TileMapDoc(4, 4, 16, 16)
+    assert doc.get_region(5, 0, 0, 2, 2) == []
+    assert doc.get_region(-1, 0, 0, 2, 2) == []
+    assert doc.stamp_region(5, 0, 0, [[1]]) is False
+    assert doc.clear_region(5, 0, 0, 2, 2) is False
+    assert doc.flood_fill(5, 0, 0, 1) == 0
 
 
 def test_editor_select_copy_paste(tmp_path, monkeypatch):
