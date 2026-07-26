@@ -58,3 +58,17 @@ def test_split_editor_in_splitter():
     assert st.editor_split.count() == 2
     area.toggle_split(st)
     assert st.editor_split.count() == 1
+
+
+def test_close_tab_cancels_live_error_check():
+    """Review-Fund: close_tab() liess einen laufenden Live-Error-Check
+    (Worker-Thread + `gbrt --check`-Subprozess) unangetastet weiterlaufen
+    -- der haelt eine Referenz auf den Editor/sein Dokument bis zu 15s
+    laenger als noetig am Leben."""
+    area = _area()
+    st = area.open_tab(file_path=None, content="PRINT 1")
+
+    calls = []
+    st.editor._error_checker.cancel = lambda: calls.append(1)
+    area.close_tab(st)
+    assert calls == [1]

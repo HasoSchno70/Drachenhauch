@@ -212,6 +212,22 @@ class LiveErrorChecker(QObject):
         )
         t.start()
 
+    def cancel(self) -> None:
+        """Bricht einen laufenden Check ab (Generation-Bump + Subprozess
+        terminieren), OHNE einen neuen zu starten. Fuer Tab-Close gedacht:
+        ohne das haelt der Worker-Thread (der eine Referenz auf `self`,
+        also indirekt den Editor + sein Dokument haelt) den geschlossenen
+        Editor bis zu 15s (Subprozess-Timeout) laenger am Leben als noetig
+        (Review-Fund)."""
+        with self._lock:
+            self._gen += 1
+            proc = self._active_proc
+        if proc is not None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+
     def _set_active_proc(self, proc) -> None:
         with self._lock:
             self._active_proc = proc

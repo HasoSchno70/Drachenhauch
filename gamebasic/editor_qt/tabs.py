@@ -175,6 +175,11 @@ class TabbedEditorArea(QTabWidget):
     def close_tab(self, st: TabState) -> None:
         if st not in self._states:
             return
+        # Einen noch laufenden Live-Error-Check abbrechen -- sonst haelt der
+        # Worker-Thread/Subprozess den Editor (+ Dokument) bis zu 15s laenger
+        # am Leben, als der Tab sichtbar ist (Review-Fund). Der Split-Editor
+        # hat bewusst keinen eigenen Checker (siehe toggle_split()).
+        st.editor._error_checker.cancel()
         idx = self._states.index(st)
         self._states.pop(idx)
         self.removeTab(idx)

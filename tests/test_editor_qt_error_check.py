@@ -168,3 +168,30 @@ def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
         "gamebasic.editor_qt.error_check.threading.Thread.start", lambda self: None)
     checker.check("PRINT 1\n", tmp_path)
     assert terminated.is_set()
+
+
+def test_cancel_terminates_active_process_and_bumps_generation():
+    """`cancel()` (Review-Fund: Tab-Close liess den Checker unbeaufsichtigt
+    weiterlaufen) muss wie `check()` einen laufenden Subprozess abbrechen --
+    aber OHNE einen neuen Check zu starten."""
+    from gamebasic.editor_qt.error_check import LiveErrorChecker
+
+    checker = LiveErrorChecker()
+    terminated = []
+
+    class _StubProc:
+        def terminate(self):
+            terminated.append(1)
+
+    checker._set_active_proc(_StubProc())
+    gen_before = checker._gen
+    checker.cancel()
+    assert terminated == [1]
+    assert checker._gen == gen_before + 1
+
+
+def test_cancel_without_active_process_is_noop():
+    from gamebasic.editor_qt.error_check import LiveErrorChecker
+
+    checker = LiveErrorChecker()
+    checker.cancel()   # kein Absturz ohne laufenden Prozess

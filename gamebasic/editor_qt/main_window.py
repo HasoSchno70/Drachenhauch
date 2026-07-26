@@ -717,7 +717,16 @@ class GameBasicEditor(QMainWindow):
 
     def _on_tab_opened(self, st: TabState) -> None:
         st.editor.cursorPositionChanged.connect(self._update_cursor_label)
-        st.editor.cursorPositionChanged.connect(self._update_breadcrumbs)
+        # Debounced statt direkt verbunden -- `cursorPositionChanged`
+        # feuert bei JEDER Cursor-Bewegung (auch reine Navigation, nicht
+        # nur Tippen), `_update_breadcrumbs` scannt aber das GANZE
+        # Dokument (`scope_path`/`scan_scopes`) neu. Ohne Debounce war das
+        # ein voller Dokument-Scan pro Tastendruck, waehrend Text-Change-
+        # getriebene Features (Color-Literal-/Fold-Scan) laengst debounced
+        # sind (Review-Fund).
+        self._breadcrumb_timer = (
+            getattr(self, "_breadcrumb_timer", None) or self._make_breadcrumb_timer())
+        st.editor.cursorPositionChanged.connect(self._schedule_breadcrumb_refresh)
         st.editor.cursorPositionChanged.connect(self._blame_sync_cursor)
         st.editor.set_auto_complete(self._auto_complete_default)
         # Outline triggert auf Inhalts-Aenderungen mit Debounce.
@@ -812,6 +821,17 @@ class GameBasicEditor(QMainWindow):
     def _schedule_outline_refresh(self) -> None:
         if hasattr(self, "_outline_timer"):
             self._outline_timer.start()
+
+    def _make_breadcrumb_timer(self) -> QTimer:
+        t = QTimer(self)
+        t.setSingleShot(True)
+        t.setInterval(80)
+        t.timeout.connect(self._update_breadcrumbs)
+        return t
+
+    def _schedule_breadcrumb_refresh(self) -> None:
+        if hasattr(self, "_breadcrumb_timer"):
+            self._breadcrumb_timer.start()
 
     def _refresh_outline(self) -> None:
         st = self.tabs.active
@@ -990,6 +1010,15 @@ class GameBasicEditor(QMainWindow):
                 return
             if ans is True and not self._save_tab(st):
                 return
+        # Wird der Tab gerade debuggt: Sitzung sauber beenden. Sonst haelt
+        # `_debug_editor` eine dangling Referenz auf den (gleich entfernten)
+        # Editor -- der bleibt dadurch fuer den Rest der Session lebendig
+        # und wird von spaeteren set_debug_line()/Breakpoint-Calls weiter
+        # lautlos mutiert, obwohl er in keinem Tab mehr sichtbar ist
+        # (Review-Fund: Zombie-Editor).
+        if self.debugger.is_active() and st.editor is self._debug_editor:
+            self.debugger.stop()
+            self._debug_editor = None
         # Pfad fuer Re-Open merken (max 20 Eintraege).
         if st.file_path is not None:
             p = str(st.file_path)
