@@ -157,6 +157,97 @@ def test_typing_debounces_rescan(app):
     assert len(ed._color_literals) == 2
 
 
+# --- Hex-Alpha-Schreiben (Review-Fund) ------------------------------------
+
+def test_hexa_write_back_bumps_zero_alpha_to_one(app, monkeypatch):
+    """Die Laufzeit liest Alpha=0 in einem &HAARRGGBB-Literal als "deckend"
+    (Rueckwaerts-Kompat., siehe RGBA()-Builtin). Waehlt der User im Picker
+    volle Transparenz (Alpha-Regler auf 0), darf der Editor NICHT genau das
+    Gegenteil (deckend) hinschreiben."""
+    from PySide6.QtGui import QColor
+    from PySide6.QtWidgets import QColorDialog
+
+    ed = _editor(app, "col = &H80FF8800")
+    start, end, _c, kind = ed._color_literals[0]
+    assert kind == "hexa"
+
+    monkeypatch.setattr(
+        QColorDialog, "getColor",
+        staticmethod(lambda *a, **k: QColor(255, 136, 0, 0)))
+    ed._edit_color_literal(start, end, QColor(255, 136, 0, 0x80), "hexa")
+    assert ed.toPlainText() == "col = &H01FF8800"
+
+
+def test_hexa_write_back_keeps_nonzero_alpha_unchanged(app, monkeypatch):
+    from PySide6.QtGui import QColor
+    from PySide6.QtWidgets import QColorDialog
+
+    ed = _editor(app, "col = &H80FF8800")
+    start, end, _c, kind = ed._color_literals[0]
+
+    monkeypatch.setattr(
+        QColorDialog, "getColor",
+        staticmethod(lambda *a, **k: QColor(255, 136, 0, 0x40)))
+    ed._edit_color_literal(start, end, QColor(255, 136, 0, 0x80), "hexa")
+    assert ed.toPlainText() == "col = &H40FF8800"
+
+
+# --- String-/Kommentar-Awareness (Review-Fund) ---------------------------
+
+def test_color_literal_inside_line_comment_not_detected(app):
+    ed = _editor(app, "' see &HFF8800 for reference")
+    assert ed._color_literals == []
+
+
+def test_color_literal_inside_string_not_detected(app):
+    ed = _editor(app, 'PRINT "color &HFF8800 here"')
+    assert ed._color_literals == []
+
+
+def test_color_literal_after_inline_comment_not_detected(app):
+    ed = _editor(app, "x = 1 ' &HFF8800")
+    assert ed._color_literals == []
+
+
+def test_real_literal_still_detected_next_to_comment(app):
+    # Ein echtes Literal VOR dem Kommentar bleibt erkannt -- nur der
+    # Kommentar-Teil selbst wird ausgeblendet.
+    ed = _editor(app, "col = &HFF8800 ' &H001122 ist nur ein Beispiel")
+    assert len(ed._color_literals) == 1
+    _s, _e, color, kind = ed._color_literals[0]
+    assert kind == "hex"
+    assert (color.red(), color.green(), color.blue()) == (0xFF, 0x88, 0x00)
+
+
+# --- Stale-Cache-Race beim Klick (Review-Fund) ----------------------------
+
+def test_swatch_click_uses_live_offsets_not_stale_cache(app):
+    """`_swatch_at` nutzte den (bis zu 150ms) debounced Cache blind -- ein
+    Klick kurz nach einer Texteinfuegung VOR dem Literal (ohne die 150ms
+    Debounce-Pause abzuwarten) konnte den FALSCHEN, verschobenen Text
+    treffen. `_swatch_at` muss vor dem Hit-Test selbst frisch scannen."""
+    ed = _editor(app, "col = &HFF8800")
+    assert len(ed._color_literals) == 1
+    start_before, end_before, _c, _k = ed._color_literals[0]
+
+    cur = ed.textCursor()
+    cur.movePosition(cur.MoveOperation.Start)
+    cur.insertText("REM prefix\n")
+    app.processEvents()
+    assert ed._color_scan_timer.isActive()      # Debounce laeuft noch
+
+    shift = len("REM prefix\n")
+    cur2 = ed.textCursor()
+    cur2.setPosition(start_before + shift + (end_before - start_before) // 2)
+    pos = ed.cursorRect(cur2).center()
+    hit = ed._swatch_at(pos)
+    assert hit is not None
+    s, e, color, kind = hit
+    assert (s, e) == (start_before + shift, end_before + shift)
+    assert kind == "hex"
+    assert (color.red(), color.green(), color.blue()) == (0xFF, 0x88, 0x00)
+
+
 def test_set_text_rescans_synchronously(app):
     # Programmatischer Volltext-Ersatz darf NICHT auf den Debounce warten
     # (Caller/Tests erwarten sofort aktuelle _color_literals).

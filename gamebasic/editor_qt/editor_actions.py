@@ -151,6 +151,17 @@ class EditorActionsMixin:
         if direction > 0 and last >= doc.blockCount() - 1:
             return
 
+        # 1-basierte Zeilen-Umordnung fuer Line-Marker (Breakpoints/
+        # Bookmarks/Folds): der Text-Ersatz unten ist ein Delete+Insert
+        # ueber den ganzen betroffenen Bereich, wodurch ein QTextCursor
+        # AUF einer der verschobenen Zeilen NICHT automatisch mitwandert
+        # (anders als bei Edits oberhalb/unterhalb eines Markers) --
+        # Qt kollabiert ihn stattdessen an den Einfuegepunkt. Deshalb
+        # migrieren wir betroffene Marker explizit ueber `remap()`
+        # (Review-Fund: Alt+Up/Down liess Breakpoints/Bookmarks auf der
+        # alten Zeile zurueck, die jetzt woanders liegt).
+        marker_remap: dict[int, int] = {}
+
         if direction < 0:
             swap_ln = first - 1
             block_swap = doc.findBlockByNumber(swap_ln).text()
@@ -158,6 +169,9 @@ class EditorActionsMixin:
             new_lines = block_lines + [block_swap]
             replace_first = swap_ln
             replace_last = last
+            marker_remap[swap_ln + 1] = last + 1
+            for i in range(first, last + 1):
+                marker_remap[i + 1] = i
         else:
             swap_ln = last + 1
             block_swap = doc.findBlockByNumber(swap_ln).text()
@@ -165,6 +179,9 @@ class EditorActionsMixin:
             new_lines = [block_swap] + block_lines
             replace_first = first
             replace_last = swap_ln
+            marker_remap[swap_ln + 1] = first + 1
+            for i in range(first, last + 1):
+                marker_remap[i + 1] = i + 2
 
         edit = QTextCursor(doc)
         edit.beginEditBlock()
@@ -178,6 +195,8 @@ class EditorActionsMixin:
             edit.insertText("\n".join(new_lines))
         finally:
             edit.endEditBlock()
+
+        self._shift_line_markers(marker_remap)
 
         new_first = replace_first if direction < 0 else first + 1
         new_last = new_first + (last - first)

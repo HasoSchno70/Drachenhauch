@@ -92,6 +92,96 @@ _INDENT_AFTER_PATTERNS = re.compile(
 )
 
 
+_MISSING = object()   # Sentinel fuer "kein Eintrag" (Wert None ist gueltig)
+
+
+class _LineTracker:
+    """Verfolgt eine Menge zeilengebundener Marker (Bookmarks, Breakpoints
+    + ihre Bedingungen, gefaltete Bloecke) robust gegen Zeilen-Verschiebung
+    durch Edits.
+
+    Ein rohes `set[int]`/`dict[int, T]` zeigt nach einem Edit OBERHALB des
+    Markers auf die falsche Zeile -- die Zeilennummer selbst war nie mehr
+    als eine Momentaufnahme. Dieser Tracker haelt pro Marker stattdessen
+    einen `QTextCursor`: Qt aktualisiert dessen Position automatisch bei
+    jedem Dokument-Edit (Einfuegen/Loeschen von Zeilen), die aktuelle Zeile
+    ergibt sich jederzeit aus `cursor.blockNumber() + 1`. Die oeffentliche
+    API bleibt zeilenbasiert (1-indiziert), damit Aufrufer unveraendert
+    bleiben -- nur die interne Anker-Strategie aendert sich.
+
+    Deckt NICHT den Fall ab, dass eine Operation die Zeile selbst per
+    Delete+Insert ersetzt (z.B. `move_lines()` beim Zeilen-Verschieben) --
+    dort kollabiert Qt einen Cursor auf der geloeschten Zeile an den
+    Einfuegepunkt statt ihn "mitzuziehen". Solche Operationen migrieren
+    Marker explizit ueber `remap()` (siehe `move_lines`)."""
+
+    def __init__(self, document) -> None:
+        self._document = document
+        self._entries: list[tuple[QTextCursor, object]] = []
+
+    @staticmethod
+    def _line_of(cursor: QTextCursor) -> int:
+        return cursor.blockNumber() + 1
+
+    def _find_index(self, line: int) -> int | None:
+        for i, (cur, _val) in enumerate(self._entries):
+            if self._line_of(cur) == line:
+                return i
+        return None
+
+    def __contains__(self, line: int) -> bool:
+        return self._find_index(line) is not None
+
+    def __bool__(self) -> bool:
+        return bool(self._entries)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+    def get(self, line: int, default=None):
+        i = self._find_index(line)
+        return self._entries[i][1] if i is not None else default
+
+    def set(self, line: int, value=None) -> None:
+        """Marker auf `line` setzen (oder seinen Wert aktualisieren, falls
+        dort schon einer existiert)."""
+        block = self._document.findBlockByNumber(line - 1)
+        if not block.isValid():
+            return
+        cursor = QTextCursor(block)
+        i = self._find_index(line)
+        if i is not None:
+            self._entries[i] = (cursor, value)
+        else:
+            self._entries.append((cursor, value))
+
+    def discard(self, line: int) -> None:
+        i = self._find_index(line)
+        if i is not None:
+            del self._entries[i]
+
+    def lines(self) -> list[int]:
+        return sorted(self._line_of(cur) for cur, _val in self._entries)
+
+    def items(self) -> list[tuple[int, object]]:
+        return [(self._line_of(cur), val) for cur, val in self._entries]
+
+    def clear(self) -> None:
+        self._entries.clear()
+
+    def remap(self, mapping: dict[int, int]) -> None:
+        """Verschiebt Marker gemaess `mapping` (alte Zeile -> neue Zeile,
+        1-basiert) -- fuer Operationen wie `move_lines()`, die eine Zeile
+        per Delete+Insert an eine andere Stelle verschieben, wo die
+        automatische Cursor-Verfolgung NICHT greift (siehe Klassen-Doc)."""
+        for old_line, new_line in mapping.items():
+            value = self.get(old_line, _MISSING)
+            if value is _MISSING:
+                continue
+            self.discard(old_line)
+            self.set(new_line, None if value is None else value)
+
+
 class _LineNumberArea(QWidget):
     """Schmaler Streifen links neben dem Editor mit den Zeilennummern."""
 
@@ -192,14 +282,14 @@ class CodeEditor(
         self.textChanged.connect(self._color_scan_timer.start)
 
         # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
-        self._breakpoints: set[int] = set()
-        # Conditional Breakpoints: Zeile -> GameBasic-Ausdruck (nur Zeilen
-        # mit aktivem Breakpoint). Leer = unbedingter BP.
-        self._bp_conditions: dict[int, str] = {}
+        # Wert je Zeile = Bedingung (GameBasic-Ausdruck) oder None fuer
+        # einen unbedingten Breakpoint -- EIN Tracker statt zweier separater
+        # Container, damit Zeile+Bedingung nie auseinanderlaufen koennen.
+        self._breakpoints = _LineTracker(self.document())
         self._debug_line: int | None = None
 
         # Bookmarks (1-basierte Zeilen) -- Schnell-Navigation in langen Dateien.
-        self._bookmarks: set[int] = set()
+        self._bookmarks = _LineTracker(self.document())
 
         # Multi-Cursor (Strg+D Add-Next-Occurrence). Liste sekundaerer
         # Selektionen als (start, end). Primaere Cursor bleibt im
@@ -224,7 +314,12 @@ class CodeEditor(
         # Re-Scan nach jedem textChanged mit kurzem Debounce, damit grosse
         # Buffer beim Tippen nicht jedes Mal komplett neu gescannt werden.
         self._fold_regions: list[tuple[int, int, str]] = []
-        self._folded: set[int] = set()
+        # Wert je Start-Zeile = die END-Zeile als eigener Cursor (nicht nur
+        # der rohe int) -- so bleibt bekannt, welcher exakte Block-Bereich
+        # verborgen ist, selbst wenn die Fold-Region beim naechsten Rescan
+        # nicht mehr an derselben Stelle gefunden wird (siehe
+        # _rescan_fold_regions).
+        self._folded = _LineTracker(self.document())
         self._fold_scan_timer = QTimer(self)
         self._fold_scan_timer.setSingleShot(True)
         self._fold_scan_timer.setInterval(150)
@@ -235,9 +330,18 @@ class CodeEditor(
         self._auto_complete_enabled = True
 
         # Signature-Help (Parameter-Hints beim Tippen eines Aufrufs).
+        # `cursorPositionChanged` feuert bei JEDEM Tastendruck (nicht nur
+        # Navigation); der Fallback fuer User-Funktionen (`_user_signature`)
+        # scannt bei Bedarf das GANZE Dokument neu -- debounced wie
+        # Color-Literal-/Fold-Scan (150ms), sonst gleiche Latenz-Gefahr beim
+        # Tippen in grossen Dateien (Review-Fund).
         from .signature_help import SignaturePopup
         self._sig_popup = SignaturePopup(self)
-        self.cursorPositionChanged.connect(self._update_signature_help)
+        self._sig_help_timer = QTimer(self)
+        self._sig_help_timer.setSingleShot(True)
+        self._sig_help_timer.setInterval(80)
+        self._sig_help_timer.timeout.connect(self._update_signature_help)
+        self.cursorPositionChanged.connect(self._sig_help_timer.start)
         self.verticalScrollBar().valueChanged.connect(
             lambda _v: self._sig_popup.hide())
 
@@ -435,7 +539,7 @@ class CodeEditor(
                     r = max(3, line_h // 3)
                     cx = 8
                     cy = int(top) + line_h // 2
-                    if line1b in self._bp_conditions:
+                    if self._breakpoints.get(line1b) is not None:
                         pen = QPen(QColor(COLORS["danger"]))
                         pen.setWidth(2)
                         painter.setPen(pen)
@@ -518,8 +622,15 @@ class CodeEditor(
         while block.isValid():
             text = block.text()
             if "&H" in text or "RGB" in text.upper():
+                # String-/Kommentar-Inhalt durch gleich lange Leerzeichen
+                # ersetzen (Spalten-Positionen bleiben stabil) -- sonst wird
+                # ein Color-Literal INNERHALB eines Kommentars/String-
+                # Literals faelschlich als editierbarer Swatch erkannt und
+                # ein Klick darauf ueberschreibt Text, der gar keine echte
+                # Farbe ist (Review-Fund).
+                scan_text = gb_symbols._strip_comment_and_strings(text)
                 base = block.position()
-                for s, e, color, kind in self._scan_color_swatches(text):
+                for s, e, color, kind in self._scan_color_swatches(scan_text):
                     lits.append((base + s, base + e, color, kind))
             block = block.next()
         self._color_literals = lits
@@ -534,7 +645,15 @@ class CodeEditor(
 
     def _swatch_at(self, pos) -> tuple | None:
         """`(abs_start, abs_end, color, kind)` des Color-Literals unter `pos`
-        (Viewport-Koordinate) oder None. Klick-Bereich = das Literal selbst."""
+        (Viewport-Koordinate) oder None. Klick-Bereich = das Literal selbst.
+
+        Der Cache (`_color_literals`) ist debounced (150ms) -- vor dem
+        eigentlichen Hit-Test wird IMMER frisch neu gescannt, sonst koennte
+        ein Klick kurz nach schnellem Tippen (ohne 150ms Pause seit dem
+        letzten Zeichen) einen veralteten Offset treffen und beim Ersetzen
+        den FALSCHEN Text ueberschreiben (Review-Fund: Stale-Cache-Race)."""
+        self._color_scan_timer.stop()
+        self._rescan_color_literals()
         abs_pos = self.cursorForPosition(pos).position()
         for start, end, color, kind in self._color_literals:
             if start <= abs_pos < end:
@@ -560,7 +679,13 @@ class CodeEditor(
         elif kind == "rgba":
             repl = f"RGBA({r}, {g}, {b}, {al})"
         elif kind == "hexa":
-            repl = f"&H{al:02X}{r:02X}{g:02X}{b:02X}"
+            # Die Laufzeit liest Alpha=0 als "deckend" (Rueckwaerts-Kompat.
+            # zu 24-bit-Farben, siehe RGB()/RGBA()-Builtins in builtins.rs)
+            # -- ohne diesen Bump wuerde "voll transparent" im Picker
+            # (Alpha-Regler auf 0) als das GENAUE GEGENTEIL geschrieben
+            # (deckend) statt als das gemeinte Alpha=1 (Review-Fund).
+            al_write = 1 if al == 0 else al
+            repl = f"&H{al_write:02X}{r:02X}{g:02X}{b:02X}"
         else:  # "hex"
             repl = f"&H{r:02X}{g:02X}{b:02X}"
         cur = QTextCursor(self.document())
@@ -645,15 +770,26 @@ class CodeEditor(
     def _rescan_fold_regions(self) -> None:
         self._fold_regions = scan_fold_regions(self.toPlainText())
         valid_starts = {s for s, _e, _k in self._fold_regions}
-        dropped = self._folded - valid_starts
-        if dropped:
-            # Eine bisher gefaltete Region wurde durch Edits verschoben,
-            # sodass ihre Start-Zeile nicht mehr stimmt. Da Line-Numbers
-            # bei Edits nicht stabil sind, klappen wir defensiv alles auf,
-            # damit kein "Geist-Block" unsichtbar haengen bleibt. Der User
-            # kann jederzeit erneut falten.
-            self._unfold_all_blocks()
-            self._folded.clear()
+        for start_line in list(self._folded.lines()):
+            if start_line in valid_starts:
+                continue
+            # Die Region an dieser (aktuellen, Cursor-getrackten) Start-
+            # Zeile ist nach dem Rescan keine gueltige Fold-Region mehr
+            # (Struktur geaendert/entfernt) -- NUR ihren tatsaechlich
+            # verborgenen Bereich wieder sichtbar machen (Ende steht im
+            # Tracker-Wert als eigener Cursor, unabhaengig vom neuen Scan).
+            # Fruehere Notbremse "alles aufklappen" war noetig, weil rohe
+            # int-Zeilen bei Edits nicht mehr zuverlaessig auf den
+            # richtigen Block zeigten -- mit Cursor-Ankern nicht mehr.
+            end_cursor = self._folded.get(start_line)
+            end_line = end_cursor.blockNumber() + 1 if end_cursor is not None else start_line
+            for ln in range(start_line + 1, end_line + 1):
+                blk = self.document().findBlockByNumber(ln - 1)
+                if blk.isValid():
+                    blk.setVisible(True)
+            self._folded.discard(start_line)
+            self.document().markContentsDirty(0, self.document().characterCount())
+            self.viewport().update()
         self._line_area.update()
 
     def _unfold_all_blocks(self) -> None:
@@ -699,13 +835,20 @@ class CodeEditor(
             bottom = top + self.blockBoundingRect(block).height()
         return None
 
+    def _shift_line_markers(self, remap: dict[int, int]) -> None:
+        """Migriert Bookmarks/Breakpoints/Folds gemaess `remap` (alte Zeile
+        -> neue Zeile, 1-basiert). Gebraucht von `move_lines()`
+        (`editor_actions.py`) -- siehe dort fuer die Begruendung, warum
+        Cursor-Auto-Tracking dort nicht ausreicht."""
+        for tracker in (self._breakpoints, self._bookmarks, self._folded):
+            tracker.remap(remap)
+
     # ----------------------------------------------- Breakpoints / Debug
     def toggle_breakpoint(self, line: int) -> None:
         if line in self._breakpoints:
             self._breakpoints.discard(line)
-            self._bp_conditions.pop(line, None)   # Bedingung mit entfernen
         else:
-            self._breakpoints.add(line)
+            self._breakpoints.set(line, None)
         self._line_area.update()
         self.breakpoints_changed.emit()
 
@@ -713,23 +856,19 @@ class CodeEditor(
         """Fragt eine Bedingung (GameBasic-Ausdruck) fuer den Breakpoint auf
         `line` ab. Setzt automatisch einen Breakpoint, falls noch keiner da
         ist. Leere Eingabe -> unbedingter Breakpoint."""
-        cur = self._bp_conditions.get(line, "")
+        cur = self._breakpoints.get(line, None) or ""
         expr, ok = QInputDialog.getText(
             self, f"Breakpoint-Bedingung (Zeile {line})",
             "Anhalten, wenn Ausdruck wahr ist (leer = immer):", text=cur)
         if not ok:
             return
         expr = expr.strip()
-        self._breakpoints.add(line)
-        if expr:
-            self._bp_conditions[line] = expr
-        else:
-            self._bp_conditions.pop(line, None)
+        self._breakpoints.set(line, expr or None)
         self._line_area.update()
         self.breakpoints_changed.emit()
 
     def breakpoint_conditions(self) -> dict[int, str]:
-        return dict(self._bp_conditions)
+        return {ln: cond for ln, cond in self._breakpoints.items() if cond}
 
     # ----------------------------------------------- Bookmarks
     def toggle_bookmark(self) -> None:
@@ -737,14 +876,14 @@ class CodeEditor(
         if line in self._bookmarks:
             self._bookmarks.discard(line)
         else:
-            self._bookmarks.add(line)
+            self._bookmarks.set(line)
         self._line_area.update()
 
     def _goto_bookmark(self, forward: bool) -> None:
         if not self._bookmarks:
             return
         cur = self.textCursor().blockNumber() + 1
-        marks = sorted(self._bookmarks)
+        marks = self._bookmarks.lines()
         if forward:
             nxt = next((m for m in marks if m > cur), marks[0])      # wrap
         else:
@@ -766,13 +905,16 @@ class CodeEditor(
             else QPlainTextEdit.LineWrapMode.NoWrap)
 
     def breakpoints(self) -> set[int]:
-        return set(self._breakpoints)
+        return set(self._breakpoints.lines())
 
     def set_breakpoints(self, lines) -> None:
-        self._breakpoints = set(int(x) for x in lines)
-        # Bedingungen ohne zugehoerigen Breakpoint verwerfen.
-        self._bp_conditions = {ln: c for ln, c in self._bp_conditions.items()
-                               if ln in self._breakpoints}
+        """Ersetzt die komplette Breakpoint-Menge (z.B. nach externem
+        State-Load). Bedingungen bereits vorhandener Zeilen bleiben
+        erhalten, wenn diese Zeile auch in `lines` weiterhin vorkommt."""
+        old_conditions = dict(self._breakpoints.items())
+        self._breakpoints.clear()
+        for ln in (int(x) for x in lines):
+            self._breakpoints.set(ln, old_conditions.get(ln))
         self._line_area.update()
 
     def set_debug_line(self, line: int | None) -> None:
@@ -789,9 +931,14 @@ class CodeEditor(
 
     def _toggle_fold(self, start_line: int, end_line: int) -> None:
         """Schaltet die Sichtbarkeit von Bloecken (start, end] um."""
-        folded_now = start_line in self._folded
+        entry_end = self._folded.get(start_line)
+        folded_now = entry_end is not None
         new_visible = folded_now    # bei "war gefaltet" -> jetzt wieder sichtbar
-        for ln in range(start_line + 1, end_line + 1):
+        # Beim Auffalten den TATSAECHLICH verborgenen Bereich nutzen (der
+        # Cursor-Wert im Tracker), nicht das uebergebene `end_line` -- die
+        # koennten seit dem Falten auseinandergelaufen sein.
+        actual_end = entry_end.blockNumber() + 1 if entry_end is not None else end_line
+        for ln in range(start_line + 1, actual_end + 1):
             blk = self.document().findBlockByNumber(ln - 1)
             if not blk.isValid():
                 continue
@@ -799,7 +946,11 @@ class CodeEditor(
         if folded_now:
             self._folded.discard(start_line)
         else:
-            self._folded.add(start_line)
+            end_block = self.document().findBlockByNumber(end_line - 1)
+            self._folded.set(
+                start_line,
+                QTextCursor(end_block if end_block.isValid() else self.document().lastBlock()),
+            )
         # Layout-Update erzwingen -- ohne diesen Hint wirken setVisible-Aenderungen
         # erst beim naechsten Repaint und der Scrollbalken bleibt veraltet.
         self.document().markContentsDirty(0, self.document().characterCount())
@@ -831,7 +982,7 @@ class CodeEditor(
         (1-basiert). Fuer Persistierung in Settings: nach Close den
         Wert wegspeichern, beim Re-Open via `apply_folded_starts()`
         wiederherstellen."""
-        return sorted(self._folded)
+        return self._folded.lines()
 
     def apply_folded_starts(self, starts) -> None:
         """Klappt die uebergebenen Start-Zeilen wieder ein. Wird typisch
@@ -1117,6 +1268,7 @@ class CodeEditor(
         # Esc raeumt das Signature-Help-Popup ab (ohne den Event zu schlucken --
         # weitere Esc-Handler wie Multi-Cursor laufen danach normal).
         if event.key() == Qt.Key.Key_Escape:
+            self._sig_help_timer.stop()
             self._sig_popup.hide()
         # Wenn das Completer-Popup sichtbar ist: Enter/Tab -> Auswahl uebernehmen,
         # Esc -> ausblenden, Up/Down -> Popup-Navigation (default-Forward).
@@ -1430,6 +1582,7 @@ class CodeEditor(
     def focusOutEvent(self, event):  # noqa: N802
         # Editor verliert Fokus -> Signature-Help-Popup wegblenden.
         if hasattr(self, "_sig_popup"):
+            self._sig_help_timer.stop()
             self._sig_popup.hide()
         super().focusOutEvent(event)
 
