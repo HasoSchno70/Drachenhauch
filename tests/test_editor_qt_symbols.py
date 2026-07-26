@@ -272,6 +272,24 @@ def test_scan_scopes_unclosed_block_ends_at_eof():
     assert scopes[0].kind == "sub" and scopes[0].end == 2
 
 
+def test_scan_scopes_mismatched_end_closes_inner_scopes_too():
+    """Vorher: `END CLASS` ohne vorheriges `END SUB` schloss beim Match nur
+    den CLASS-Frame; der innere SUB-Frame wurde vom Stack entfernt, aber
+    sein `.end` blieb auf dem Default (Dateiende) stehen -- die Breadcrumb-
+    Leiste zeigte "Foo" dadurch faelschlich fuer den Rest der Datei an."""
+    src = (
+        "CLASS A\n"     # 1
+        "SUB Foo()\n"   # 2
+        "END CLASS\n"   # 3  <- END SUB fehlt
+        "PRINT 1\n"     # 4
+    )
+    scopes = {s.name: s for s in scan_scopes(src)}
+    assert scopes["A"].end == 3
+    assert scopes["Foo"].end == 3          # nicht laenger bis EOF offen
+    # Zeile 4 gehoert dadurch zu KEINEM der beiden Scopes mehr.
+    assert scope_path(src, 4) == []
+
+
 def test_scan_scopes_ignores_keywords_in_comments_and_strings():
     src = (
         'SUB real()\n'

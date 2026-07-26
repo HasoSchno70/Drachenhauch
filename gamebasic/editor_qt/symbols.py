@@ -270,8 +270,18 @@ def scan_scopes(source: str) -> list[Scope]:
             # passenden Block vom Stack nehmen (top wenn Art passt)
             for i in range(len(stack) - 1, -1, -1):
                 if stack[i].kind == ender:
-                    sc = stack[i]
-                    sc.end = ln
+                    # ALLE Frames ab i schliessen (nicht nur den
+                    # gematchten) -- bei einem fehlenden inneren END
+                    # (z.B. "CLASS A / SUB Foo() / END CLASS" ohne
+                    # "END SUB", ein sehr plausibler Tippfehler/
+                    # Zwischenzustand beim Tippen) blieben die
+                    # ueberliegenden Frames sonst mit ihrem Default-
+                    # `.end` (Dateiende) auf dem Stack, obwohl sie
+                    # laengst vom Stack entfernt wurden -- ihr
+                    # Breadcrumb-Segment erschien dann faelschlich fuer
+                    # den Rest der Datei (Review-Fund).
+                    for sc in stack[i:]:
+                        sc.end = ln
                     del stack[i:]   # i und alles darueber schliessen
                     break
             continue
