@@ -186,8 +186,15 @@ class Instrument:
         return self.kind == "keymap" and len(self.zones) > 0
 
     def has_loop(self) -> bool:
+        # Grenze exakt wie in `_resample()`s eigenem `loop_ok` -- eine
+        # Loop-Region ausserhalb der tatsaechlichen Sample-Laenge zaehlt
+        # NICHT als gueltig (vorher fehlte hier die Laengen-Pruefung; der
+        # eigentliche Render-Pfad validierte zwar korrekt, aber `has_loop()`
+        # selbst meldete faelschlich "ja" fuer einen kuenftigen Aufrufer,
+        # der sich direkt darauf statt auf `_resample()`s Check verlaesst).
+        n = self.samples.size if self.samples is not None else 0
         return (self.loop_mode in ("forward", "pingpong")
-                and self.loop_end > self.loop_start >= 0)
+                and 0 <= self.loop_start < self.loop_end <= n)
 
     def zone_for(self, midi: int):
         """Die Zone, die `midi` abdeckt -- sonst die naechstgelegene (damit
@@ -212,7 +219,8 @@ class Instrument:
                 out = np.zeros(n_samples, dtype=np.float32)
             else:
                 lm = (z.loop_mode if z.loop_mode in ("forward", "pingpong")
-                      and z.loop_end > z.loop_start >= 0 else "none")
+                      and 0 <= z.loop_start < z.loop_end <= z.samples.size
+                      else "none")
                 out = _resample(z.samples, z.sample_rate, z.root_note,
                                 midi, n_samples, sr,
                                 lm, int(z.loop_start), int(z.loop_end),

@@ -517,3 +517,36 @@ def test_gb_code_sample_channel_commented(tmp_path):
     assert "Sample-Instrument" in code      # Hinweis-Kommentar
     # Synth-Kanaele + Drum bleiben gueltig -> kompiliert weiter
     _check_compiles(tmp_path, code)
+
+
+# --- has_gb_code_fidelity_gaps() (Review-Fund: GB-Code-Export ignoriert ---
+# --- Effekt-Spalte + Per-Note-Instrument komplett, ohne Warnung) ----------
+
+def test_no_fidelity_gaps_on_plain_song():
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    assert s.has_gb_code_fidelity_gaps() is False
+
+
+def test_fidelity_gap_detected_for_fx():
+    from gamebasic.tracker.song import FX_ARP
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_fx(0, 0, FX_ARP, 0x37)
+    assert s.has_gb_code_fidelity_gaps() is True
+
+
+def test_fidelity_gap_detected_for_per_note_instrument():
+    s = Song()
+    idx = s.add_instrument(_sample_inst("Lead"))
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_inst(0, 0, idx)
+    assert s.has_gb_code_fidelity_gaps() is True
+
+
+def test_fidelity_gap_ignores_fx_none():
+    from gamebasic.tracker.song import FX_NONE
+    s = Song()
+    s.patterns[0].set(0, 0, 60)
+    s.patterns[0].set_fx(0, 0, FX_NONE)
+    assert s.has_gb_code_fidelity_gaps() is False

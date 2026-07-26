@@ -627,18 +627,43 @@ class Song:
         s.path = path
         return s
 
+    def has_gb_code_fidelity_gaps(self) -> bool:
+        """True, wenn dieser Song etwas benutzt, das `gb_code()` NICHT
+        originalgetreu exportiert (Effekt-Spalte, Per-Note-Instrument-
+        Ueberschreiben) -- fuer eine Hinweis-Warnung beim Export, siehe
+        `gb_code()`s GRENZE-Dokumentation fuer die genaue Liste."""
+        for pat in self.patterns:
+            for c in range(pat.channels):
+                for r in range(pat.rows):
+                    if pat.fx[c][r] not in (None, FX_NONE):
+                        return True
+                    if pat.inst[c][r] is not None:
+                        return True
+        return False
+
     # ------------------------------------------------------ GB-Code-Export
     def gb_code(self) -> str:
         """Selbststaendiger frame-basierter Player. Die Order wird zu einer
         flachen Timeline expandiert (wiederholte Patterns werden dupliziert)
         -- so bleibt der Player simpel und identisch zum bisherigen Schema.
 
-        GRENZE: per-Note-Instrument-Ueberschreiben (`Pattern.inst`) wird HIER
-        ignoriert -- der Live-Synth-Export nutzt pro Kanal EINE feste
-        Wellenform (`_channel_wave`), genau wie er Sample-Kanaele schon
-        nicht direkt abspielen kann. Beides wirkt nur im Vorhoeren und im
-        WAV-Render (`tracker/mixer.py`); fuer Sample-/Multi-Instrument-Songs
-        nimmt man den Audio-Export statt GB-Code."""
+        GRENZE: der exportierte Player ist bewusst simpel und klingt DEUTLICH
+        ANDERS als das Vorhoeren/der WAV-Render (`tracker/mixer.py`):
+        - Per-Note-Instrument-Ueberschreiben (`Pattern.inst`) wird ignoriert
+          -- der Live-Synth-Export nutzt pro Kanal EINE feste Wellenform
+          (`_channel_wave`), genau wie er Sample-Kanaele schon nicht direkt
+          abspielen kann.
+        - Effekt-Spalte (Arpeggio/Vibrato/Retrigger/Sample-Offset,
+          `Pattern.fx`/`fxp`) wird HIER GAR NICHT gelesen/angewendet --
+          `apply_effect()` (mixer.py) laeuft nur im WAV-Render.
+        - Jede Note klingt hier fuer genau EINE Reihe (`TRK_ROWMS`,
+          `AUDIO_TONE(...)` pro Reihe mit gesetzter Note), unabhaengig von
+          ihrer notierten Laenge -- kein Sustain bis zur naechsten Note wie
+          im Vorhoeren/WAV-Render. Ein Pitch-Slide rampt entsprechend nur
+          ueber diese eine Reihe, nicht ueber die volle Notendauer.
+        Wer Effekte, echtes Sustain oder Sample-/Multi-Instrument-Klang im
+        exportierten Ergebnis braucht, nimmt den Audio-(WAV-)Export statt
+        GB-Code."""
         total, channels, vols, slides = self._flatten()
         rowms = self.row_ms()
         n_patterns = len(self.patterns)

@@ -187,6 +187,20 @@ def test_has_loop_validation():
     assert inst.has_loop() is True
 
 
+def test_has_loop_rejects_end_past_sample_length():
+    """Review-Fund: has_loop() pruefte vorher nur `loop_end > loop_start`,
+    nicht gegen die tatsaechliche Sample-Laenge -- anders als der
+    render-Pfad (_resample's eigenes `loop_ok`), der das schon korrekt tat.
+    Ein `has_loop()`-Aufrufer haette also faelschlich "ja" gehoert, obwohl
+    render_note() dieselbe Region intern als ungueltig verwirft."""
+    src = _sine(440, 0.05)          # 2205 Samples
+    inst = Instrument.from_array("S", src, 44100, 69)
+    inst.loop_mode = "forward"
+    inst.loop_start = 100
+    inst.loop_end = src.size + 500  # deutlich hinter dem Sample-Ende
+    assert inst.has_loop() is False
+
+
 # --- Envelope ------------------------------------------------------
 
 def test_envelope_attack_starts_quiet_release_ends_quiet():
