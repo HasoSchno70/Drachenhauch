@@ -4,6 +4,7 @@ import io
 import json
 import subprocess
 import sys
+import time
 
 from gamebasic.lsp.server import LspServer, _read_message, _write_message, uri_to_path
 
@@ -12,6 +13,21 @@ def _server():
     sent = []
     srv = LspServer(sent.append)
     return srv, sent
+
+
+def _wait_for_diagnostics(sent, prev_count, timeout=5.0):
+    """Diagnostics laufen seit dem Fix in Task 28 in einem Hintergrund-Thread
+    (_DiagWorker) -- didOpen/didChange kehren sofort zurueck, die
+    publishDiagnostics-Notification landet asynchron in `sent`. Statt eines
+    festen `sleep()` (langsam + flaky) pollt dies kurz, bis mindestens EINE
+    neue Nachricht seit `prev_count` ankam."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        pub = [m for m in sent if m.get("method") == "textDocument/publishDiagnostics"]
+        if len(pub) > prev_count:
+            return pub
+        time.sleep(0.01)
+    raise AssertionError("Timeout: keine publishDiagnostics-Notification angekommen")
 
 
 def _req(srv, sent, method, params, msg_id):
@@ -50,25 +66,26 @@ def test_initialize_capabilities():
 def test_didopen_publishes_diagnostics():
     srv, sent = _server()
     _open(srv, "DIM x AS\n")     # Fehler
-    pub = [m for m in sent if m.get("method") == "textDocument/publishDiagnostics"]
-    assert pub
+    pub = _wait_for_diagnostics(sent, 0)
     assert len(pub[-1]["params"]["diagnostics"]) == 1
 
 
 def test_didopen_clean_no_diagnostics():
     srv, sent = _server()
     _open(srv)
-    pub = [m for m in sent if m.get("method") == "textDocument/publishDiagnostics"]
+    pub = _wait_for_diagnostics(sent, 0)
     assert pub[-1]["params"]["diagnostics"] == []
 
 
 def test_didchange_updates_and_rediagnoses():
     srv, sent = _server()
     _open(srv)
+    pub = _wait_for_diagnostics(sent, 0)
+    prev = len(pub)
     _notif(srv, "textDocument/didChange",
            {"textDocument": {"uri": URI, "version": 2},
             "contentChanges": [{"text": "DIM x AS\n"}]})
-    pub = [m for m in sent if m.get("method") == "textDocument/publishDiagnostics"]
+    pub = _wait_for_diagnostics(sent, prev)
     assert len(pub[-1]["params"]["diagnostics"]) == 1
 
 
@@ -139,6 +156,40 @@ def test_framing_roundtrip():
     buf.seek(0)
     msg = _read_message(buf)
     assert msg["result"]["ok"] is True
+
+
+def test_handle_ignores_non_dict_message():
+    # Review-Fund: ein valider JSON-Top-Level-Wert, der kein Objekt ist (z.B.
+    # ein JSON-RPC-Batch-Array), liess `msg.get(...)` mit einem ungefangenen
+    # AttributeError abbrechen -- serve() ruft handle() ausserhalb jedes
+    # try/except auf, das haette den kompletten Server-Prozess mitgerissen.
+    srv, sent = _server()
+    srv.handle([])
+    srv.handle("not-a-dict")
+    srv.handle(42)
+    assert sent == []
+
+
+def test_read_message_raises_instead_of_silent_eof_on_missing_content_length():
+    # Review-Fund: ein fehlender Content-Length-Header lieferte bisher `None`
+    # -- identisch zu echtem Stream-EOF. serve() behandelt jedes `None` als
+    # "Verbindung zu Ende" (break) und beendet den ganzen Server. Jetzt wirft
+    # das stattdessen, damit serve()s bestehendes `except Exception: continue`
+    # nur DIESE eine kaputte Nachricht ueberspringt statt die Session zu
+    # beenden.
+    buf = io.BytesIO(b"X-Custom-Header: 5\r\n\r\nhello")
+    try:
+        _read_message(buf)
+        assert False, "sollte ValueError werfen"
+    except ValueError:
+        pass
+
+
+def test_read_message_returns_none_on_real_eof():
+    # Echtes EOF (keine Bytes mehr) muss weiterhin None liefern, NICHT werfen
+    # -- das ist der legitime "Verbindung geschlossen"-Fall.
+    buf = io.BytesIO(b"")
+    assert _read_message(buf) is None
 
 
 def test_uri_to_path():

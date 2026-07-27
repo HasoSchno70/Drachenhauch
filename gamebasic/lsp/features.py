@@ -53,10 +53,19 @@ def word_at(text: str, line0: int, char0: int) -> tuple[str, int, int]:
     n = len(line)
     if char0 > n:
         char0 = n
-    a = char0
+    # Review-Fund: steht der Cursor direkt HINTER einem `$` (String-Variable
+    # wie `x$`, Cursor am Wortende), stoppte die Rueckwaerts-Suche bisher
+    # sofort (`$` ist kein _IDENT_CHARS-Zeichen) und lieferte ein leeres
+    # Wort -- Hover/Goto-Definition/Find-References fanden `x$` dann nicht,
+    # obwohl der Cursor direkt am Ende des Tokens steht (ein voelliger
+    # Alltagsfall). Scan-Start in diesem Fall einen Schritt vor den `$`
+    # zurueckversetzen, damit die Identifier-Zeichen davor erfasst werden.
+    has_dollar = char0 > 0 and line[char0 - 1] == "$"
+    scan_from = char0 - 1 if has_dollar else char0
+    a = scan_from
     while a > 0 and line[a - 1] in _IDENT_CHARS:
         a -= 1
-    b = char0
+    b = scan_from
     while b < n and line[b] in _IDENT_CHARS:
         b += 1
     # `$`-Suffix (GB-String-Variablen) als Teil des Worts akzeptieren
@@ -79,12 +88,17 @@ def _prefix_at(text: str, line0: int, char0: int) -> tuple[str, int]:
 
 # --------------------------------------------------------------- Diagnostics
 
-def diagnostics(text: str, base_path) -> list[dict]:
-    """Alle Diagnosen der Pipeline als LSP-Diagnostics (Errors + Warnungen)."""
+def diagnostics(text: str, base_path, checker=None) -> list[dict]:
+    """Alle Diagnosen der Pipeline als LSP-Diagnostics (Errors + Warnungen).
+
+    `checker` (optional): wie bei `editor_qt.error_check.LiveErrorChecker` --
+    ein Objekt mit `_set_active_proc(proc)`, damit der aufrufende Worker den
+    laufenden `gbrt --check`-Subprozess kennt und bei einer neueren Anfrage
+    abbrechen kann (siehe `lsp.server._DiagWorker`)."""
     from ..editor_qt.error_check import _check_source
     base = Path(base_path) if base_path else None
     out: list[dict] = []
-    for problem in _check_source(text, base):
+    for problem in _check_source(text, base, checker):
         line0 = max(0, problem.line - 1)
         end_char = len(_line_text(text, line0)) or 1
         out.append({

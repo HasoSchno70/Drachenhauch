@@ -31,6 +31,23 @@ def test_word_at_empty_on_space():
     assert word == ""
 
 
+def test_word_at_dollar_suffix_cursor_right_after():
+    # Review-Fund: Cursor direkt HINTER dem `$` einer String-Variable (Wort-
+    # ende) lieferte bisher ein leeres Wort -- die Rueckwaerts-Suche stoppte
+    # sofort am `$` (kein _IDENT_CHARS-Zeichen), ohne die Identifier-Zeichen
+    # davor zu erfassen.
+    word, a, b = F.word_at("x$ = \"hi\"", 0, 2)
+    assert word == "x"
+    assert (a, b) == (0, 2)
+
+
+def test_word_at_dollar_suffix_cursor_middle_unaffected():
+    # Cursor MITTEN im Identifier (vor dem `$`) funktionierte schon vorher --
+    # Regressionsschutz fuer den Fix oben.
+    word, _, _ = F.word_at("x$ = \"hi\"", 0, 1)
+    assert word == "x"
+
+
 # --------------------------------------------------------------- diagnostics
 
 def test_diagnostics_clean():

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -52,6 +53,71 @@ def _loc(uri: str, item: dict) -> dict:
     }
 
 
+class _DiagWorker:
+    """Async-Diagnostik fuer EIN Dokument -- dasselbe Generation-Counter +
+    Subprozess-Abbruch-Muster wie `editor_qt.error_check.LiveErrorChecker`,
+    aber ohne Qt-Abhaengigkeit (der LSP-Server bleibt headless). Statt eines
+    Qt-Signals ruft das Ergebnis einen einfachen Callback auf.
+
+    Review-Fund: `LspServer._publish_diagnostics` rief `F.diagnostics(...)`
+    bisher DIREKT aus `handle()` auf -- das laeuft (bei gebautem gbrt) durch
+    `gbrt --check` als blockierenden Subprozess mit bis zu 15s Timeout.
+    `serve()`s Lese-Loop ist strikt sequentiell: WAEHREND dieser Subprozess
+    laeuft, kann der Server absolut nichts anderes verarbeiten -- kein Hover,
+    keine Completion, keine neuere didChange. Bei normalem Tippen (jeder
+    Tastendruck sendet ein volles didChange, Full-Sync) sammeln sich so
+    Subprozess-Aufrufe seriell an; ein einzelner haengender/langsamer
+    gbrt-Aufruf friert den GESAMTEN Server ein. Jetzt laeuft der eigentliche
+    Check in einem Daemon-Thread; `check()` selbst kehrt sofort zurueck."""
+
+    def __init__(self, on_result):
+        self._gen = 0
+        self._lock = threading.Lock()
+        self._active_proc = None
+        self._on_result = on_result
+
+    def check(self, text: str, base_path) -> None:
+        with self._lock:
+            self._gen += 1
+            gen = self._gen
+            proc = self._active_proc
+        # Einen noch laufenden Check-Subprozess abbrechen, nicht nur dessen
+        # (dann veraltetes) Ergebnis verwerfen -- sonst koennten sich bei
+        # schnellem Tippen mehrere `gbrt --check`-Prozesse gleichzeitig
+        # ansammeln (identisches Muster zu LiveErrorChecker.check).
+        if proc is not None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+        t = threading.Thread(target=self._run, args=(gen, text, base_path),
+                             name="LspDiagnostics", daemon=True)
+        t.start()
+
+    def cancel(self) -> None:
+        """Fuer didClose: laufenden Check abbrechen, OHNE einen neuen zu
+        starten (das Dokument ist geschlossen, ein Ergebnis waere sinnlos)."""
+        with self._lock:
+            self._gen += 1
+            proc = self._active_proc
+        if proc is not None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+
+    def _set_active_proc(self, proc) -> None:
+        with self._lock:
+            self._active_proc = proc
+
+    def _run(self, gen: int, text: str, base_path) -> None:
+        diags = F.diagnostics(text, base_path, checker=self)
+        with self._lock:
+            if gen != self._gen:
+                return                                 # ueberholt -- verwerfen
+        self._on_result(diags)
+
+
 class LspServer:
     """Transport-unabhaengiger Kern. `send` schreibt eine ausgehende Message."""
 
@@ -59,9 +125,23 @@ class LspServer:
         self.send = send
         self.docs: dict[str, str] = {}
         self.shutdown_requested = False
+        # stdout-Schreiben ist nicht threadsicher -- Diagnostics laufen in
+        # eigenen Hintergrund-Threads (_DiagWorker) und wuerden sonst mit dem
+        # Haupt-Thread um denselben Stream konkurrieren koennen (ineinander
+        # verschraenkte Bytes wuerden die Content-Length-Rahmung brechen).
+        self._send_lock = threading.Lock()
+        self._diag_workers: dict[str, _DiagWorker] = {}
 
     # -------------------------------------------------- Eingang
-    def handle(self, msg: dict) -> None:
+    def handle(self, msg) -> None:
+        # Review-Fund: ein valides JSON-Top-Level-Wert, der KEIN Objekt ist
+        # (z.B. ein JSON-RPC-Batch-Array `[]`), liess `msg.get(...)` unten mit
+        # einem ungefangenen AttributeError abbrechen -- serve() ruft handle()
+        # ausserhalb jedes try/except auf, das riss den kompletten Server-
+        # Prozess mit. So etwas (bewusst nicht unterstuetzte Batch-Requests
+        # o.ae.) wird jetzt einfach ignoriert statt zu crashen.
+        if not isinstance(msg, dict):
+            return
         method = msg.get("method")
         msg_id = msg.get("id")
         if method is None:
@@ -76,18 +156,27 @@ class LspServer:
             if msg_id is not None:
                 self._respond(msg_id, result)
         except Exception as exc:  # noqa: BLE001 -- Server soll nicht crashen
+            # Immer nach stderr loggen (nicht nur bei Requests mit msg_id) --
+            # sonst verschwindet z.B. ein Fehler in _publish_diagnostics
+            # (ueber didOpen/didChange, beides Notifications ohne msg_id)
+            # spurlos: der Client sieht weiterhin die Diagnostics der
+            # VORHERIGEN Dokument-Version, ohne jeden Hinweis warum.
+            print(f"[gamebasic-lsp] {method}: {type(exc).__name__}: {exc}", file=sys.stderr)
             if msg_id is not None:
                 self._error(msg_id, -32603, f"{type(exc).__name__}: {exc}")
 
     def _respond(self, msg_id, result) -> None:
-        self.send({"jsonrpc": "2.0", "id": msg_id, "result": result})
+        with self._send_lock:
+            self.send({"jsonrpc": "2.0", "id": msg_id, "result": result})
 
     def _error(self, msg_id, code, message) -> None:
-        self.send({"jsonrpc": "2.0", "id": msg_id,
-                   "error": {"code": code, "message": message}})
+        with self._send_lock:
+            self.send({"jsonrpc": "2.0", "id": msg_id,
+                       "error": {"code": code, "message": message}})
 
     def _notify(self, method, params) -> None:
-        self.send({"jsonrpc": "2.0", "method": method, "params": params})
+        with self._send_lock:
+            self.send({"jsonrpc": "2.0", "method": method, "params": params})
 
     # -------------------------------------------------- Lifecycle
     def _m_initialize(self, _params):
@@ -131,12 +220,21 @@ class LspServer:
     def _m_textDocument_didClose(self, params):
         uri = params["textDocument"]["uri"]
         self.docs.pop(uri, None)
+        worker = self._diag_workers.pop(uri, None)
+        if worker is not None:
+            worker.cancel()
         self._notify("textDocument/publishDiagnostics",
                      {"uri": uri, "diagnostics": []})
 
     def _publish_diagnostics(self, uri: str) -> None:
         text = self.docs.get(uri, "")
-        diags = F.diagnostics(text, _base_of(uri))
+        worker = self._diag_workers.get(uri)
+        if worker is None:
+            worker = _DiagWorker(lambda diags, uri=uri: self._on_diagnostics(uri, diags))
+            self._diag_workers[uri] = worker
+        worker.check(text, _base_of(uri))
+
+    def _on_diagnostics(self, uri: str, diags: list[dict]) -> None:
         self._notify("textDocument/publishDiagnostics",
                      {"uri": uri, "diagnostics": diags})
 
@@ -147,11 +245,11 @@ class LspServer:
         return uri, self.docs.get(uri, ""), pos["line"], pos["character"]
 
     def _m_textDocument_completion(self, params):
-        uri, text, line, char = self._pos(params)
+        _, text, line, char = self._pos(params)
         return F.completions(text, line, char)
 
     def _m_textDocument_hover(self, params):
-        uri, text, line, char = self._pos(params)
+        _, text, line, char = self._pos(params)
         return F.hover(text, line, char)
 
     def _m_textDocument_definition(self, params):
@@ -171,21 +269,36 @@ class LspServer:
 # ------------------------------------------------------ stdio-Transport
 
 def _read_message(stream) -> dict | None:
-    """Liest eine Content-Length-gerahmte JSON-RPC-Message von `stream` (binary)."""
+    """Liest eine Content-Length-gerahmte JSON-RPC-Message von `stream` (binary).
+
+    Liefert `None` NUR bei echtem EOF (Stream/Verbindung geschlossen, kein
+    einziges Header-Byte mehr verfuegbar). Ein fehlender/ungueltiger
+    Content-Length-Header wirft stattdessen eine `ValueError` -- Review-Fund:
+    vorher lieferte auch DAS `None`, und `serve()` behandelte jedes `None`
+    identisch zu einem echten Verbindungsende (`break` -> Server-Prozess
+    beendet sich). Eine einzelne kaputte/unvollstaendige Nachricht liess so
+    die komplette LSP-Session lautlos sterben, ohne jeden Fehlerhinweis.
+    """
     headers = {}
     while True:
         line = stream.readline()
         if not line:
-            return None
+            return None                              # echtes EOF
         line = line.decode("ascii", "replace").strip()
         if line == "":
             break
         if ":" in line:
             k, v = line.split(":", 1)
             headers[k.strip().lower()] = v.strip()
-    length = int(headers.get("content-length", 0))
+    raw_length = headers.get("content-length")
+    if raw_length is None:
+        raise ValueError("LSP-Nachricht ohne Content-Length-Header")
+    try:
+        length = int(raw_length)
+    except ValueError:
+        raise ValueError(f"LSP-Nachricht mit ungueltigem Content-Length: {raw_length!r}") from None
     if length <= 0:
-        return None
+        raise ValueError(f"LSP-Nachricht mit Content-Length <= 0: {length}")
     body = stream.read(length)
     return json.loads(body.decode("utf-8"))
 
