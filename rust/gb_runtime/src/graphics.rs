@@ -1080,11 +1080,25 @@ impl Graphics {
 
     // --- Kamera (Modul `camera`) ---
     // World->Screen: sx = int((x - cam_x) * zoom). Bei Identitaet (0,0,1) No-Op.
+    //
+    // Review-Fund: while RENDERTARGET_BEGIN/END ist aktiv, liefen Draws bisher
+    // trotzdem durch w2s()/ssize() -- Inhalt, der IN ein Target gezeichnet
+    // wird, bekam so die aktuelle Kamera-Transformation eingebrannt. Wird das
+    // Target danach per RENDERTARGET_DRAW auf den Screen gestempelt, ist DAS
+    // selbst wiederum ein camera-aware Draw (eigener w2s()/ssize()-Aufruf in
+    // rendertarget_draw) -- die Kamera wirkte damit doppelt. Ein Render-Target
+    // ist konzeptionell eine eigene, kamera-unabhaengige Leinwand (das Stempeln
+    // selbst bleibt camera-aware, weil active_rt dabei bereits None ist) --
+    // daher hier gaten: waehrend active_rt gesetzt ist, No-Op/Identitaet.
     fn w2s(&self, x: i32, y: i32) -> (i32, i32) {
+        if self.active_rt.is_some() { return (x, y); }
         (((x as f64 - self.cam_x + self.shake_x) * self.cam_zoom) as i32,
          ((y as f64 - self.cam_y + self.shake_y) * self.cam_zoom) as i32)
     }
-    fn ssize(&self, s: i32) -> i32 { ((s as f64 * self.cam_zoom) as i32).max(0) }
+    fn ssize(&self, s: i32) -> i32 {
+        if self.active_rt.is_some() { return s.max(0); }
+        ((s as f64 * self.cam_zoom) as i32).max(0)
+    }
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) { self.cam_x = x; self.cam_y = y; self.cam_zoom = zoom; }
     pub fn reset_camera(&mut self) { self.cam_x = 0.0; self.cam_y = 0.0; self.cam_zoom = 1.0; }
 
@@ -1792,22 +1806,45 @@ impl Graphics {
             raylib::ffi::SetTextureFilter(tex, 1 /*BILINEAR*/);
             raylib::ffi::SetTextureWrap(tex, 1 /*CLAMP*/);
         }
-        // 2) equirect -> Cubemap (512).
-        let env = self.ibl_render_cube(EQUIRECT_FS, pano_id, false, 512)?;
-        // 3) Irradiance-Cubemap (32, diffuse).
-        let irradiance = self.ibl_render_cube(IRRADIANCE_FS, env, true, 32)?;
-        // 4) Prefilter-Cubemap (128 + Roughness-Mips, specular).
-        let prefilter = self.ibl_render_prefilter(env, 128)?;
-        // 5) BRDF-LUT (512, 2D).
-        let brdf = self.ibl_render_brdf(512)?;
-        // Equirect freigeben; env-Cubemap fuer die Skybox aufbewahren.
-        unsafe { raylib::ffi::rlUnloadTexture(pano_id); }
-        self.ibl_env = env;
-        self.ibl_irradiance = irradiance;
-        self.ibl_prefilter = prefilter;
-        self.ibl_brdf = brdf;
-        self.use_ibl_maps = true;
-        Ok(())
+        // Review-Fund: die vier folgenden Schritte erzeugen der Reihe nach
+        // GPU-Cubemaps/-Texturen; schlaegt ein SPAETERER Schritt fehl (z.B.
+        // Shader-Kompilierung), leakten die bereits erzeugten Texturen der
+        // vorherigen Schritte -- nur der Erfolgspfad rief bislang
+        // rlUnloadTexture auf. `built` sammelt jede erfolgreich erzeugte
+        // Textur-ID (inkl. der Panorama-Textur); im Fehlerfall werden alle
+        // hier explizit freigegeben, bevor der Fehler propagiert wird.
+        let mut built: Vec<u32> = vec![pano_id];
+        let step = |g: &mut Self, built: &mut Vec<u32>| -> Result<(u32, u32, u32, u32), String> {
+            // 2) equirect -> Cubemap (512).
+            let env = g.ibl_render_cube(EQUIRECT_FS, pano_id, false, 512)?;
+            built.push(env);
+            // 3) Irradiance-Cubemap (32, diffuse).
+            let irradiance = g.ibl_render_cube(IRRADIANCE_FS, env, true, 32)?;
+            built.push(irradiance);
+            // 4) Prefilter-Cubemap (128 + Roughness-Mips, specular).
+            let prefilter = g.ibl_render_prefilter(env, 128)?;
+            built.push(prefilter);
+            // 5) BRDF-LUT (512, 2D).
+            let brdf = g.ibl_render_brdf(512)?;
+            built.push(brdf);
+            Ok((env, irradiance, prefilter, brdf))
+        };
+        match step(self, &mut built) {
+            Ok((env, irradiance, prefilter, brdf)) => {
+                // Equirect freigeben; env-Cubemap fuer die Skybox aufbewahren.
+                unsafe { raylib::ffi::rlUnloadTexture(pano_id); }
+                self.ibl_env = env;
+                self.ibl_irradiance = irradiance;
+                self.ibl_prefilter = prefilter;
+                self.ibl_brdf = brdf;
+                self.use_ibl_maps = true;
+                Ok(())
+            }
+            Err(e) => {
+                for id in built { unsafe { raylib::ffi::rlUnloadTexture(id); } }
+                Err(e)
+            }
+        }
     }
 
     /// Skybox an/aus: zeichnet die env-Cubemap (von LIGHT_ENV_HDR) als 3D-
@@ -2402,10 +2439,23 @@ impl Graphics {
     // die GPU-Textur neu hochgeladen, damit DRAWIMAGE das Ergebnis zeigt. Daher:
     // zum Aufbauen eines Bildes (LOADIMAGE-Zeit), nicht pro Frame. ---
     fn reupload_tex(&mut self, i: usize) -> Result<(), String> {
-        let tex = self.rl.load_texture_from_image(&self.thread, &self.textures[i].img)
-            .map_err(|e| format!("IMAGE_DRAW: {}", e))?;
-        self.textures[i].tex = tex;
-        Ok(())
+        // Review-Fund: baute hier bisher IMMER eine komplett NEUE GPU-Textur
+        // (neue GL-Textur-ID) und ersetzte `self.textures[i].tex` -- das
+        // droppt die ALTE Texture2D (UnloadTexture). raylibs Texture2D ist
+        // nur ein {id, width, height, ...}-Struct OHNE Refcounting: jedes
+        // Model/Material, das vorher per MODEL_TEXTURE/MODEL_TEXTURE_NORMAL
+        // auf diese Textur-ID zeigte, haelt eine reine Kopie der ALTEN ID und
+        // zeigt danach auf eine freigegebene/von der GPU wiederverwendete
+        // Textur (Model rendert falsch/leer/garbage). IMAGE_DRAW_* aendert
+        // Bild-Dimensionen/-Format nie (nur einzelne Pixel werden mutiert) --
+        // ein In-Place-Update der BESTEHENDEN Textur via UpdateTexture (GL-ID
+        // bleibt unveraendert bestehen) ist daher moeglich und vermeidet den
+        // Unload+Reload-Zyklus komplett.
+        let t = &mut self.textures[i];
+        let size = t.img.get_pixel_data_size();
+        let bytes: &[u8] = unsafe { std::slice::from_raw_parts(t.img.data as *const u8, size) };
+        t.tex.update_texture(bytes)
+            .map_err(|e| format!("IMAGE_DRAW: Textur-Update fehlgeschlagen: {:?}", e))
     }
     pub fn image_draw_line(&mut self, idx: i64, x1: i32, y1: i32, x2: i32, y2: i32, color: i64) -> Result<(), String> {
         let i = idx as usize;
@@ -3095,6 +3145,23 @@ impl Graphics {
                 self.shadow_fbo = fbo;
                 self.shadow_depth = depth;
             }
+        } else if res != self.shadow_res {
+            // Review-Fund: ein ZWEITER SHADOW_ENABLE-Aufruf mit anderer
+            // Aufloesung aktualisierte bisher nur `self.shadow_res` (das
+            // Viewport/Shader-Uniform in render_shadow_map lesen) -- die
+            // tatsaechliche Depth-Textur blieb in ihrer URSPRUENGLICHEN
+            // Groesse angelegt. Viewport/Shader gingen danach von einer
+            // Aufloesung aus, die nicht zur echten Textur passte (falsch
+            // skalierte/abgeschnittene/aliasing Schatten). Depth-Attachment
+            // am bestehenden FBO neu anlegen statt nur die Zahl zu aendern.
+            unsafe {
+                raylib::ffi::rlEnableFramebuffer(self.shadow_fbo);
+                raylib::ffi::rlUnloadTexture(self.shadow_depth);
+                let depth = raylib::ffi::rlLoadTextureDepth(res, res, false);
+                raylib::ffi::rlFramebufferAttach(self.shadow_fbo, depth, 100, 100, 0);
+                raylib::ffi::rlDisableFramebuffer();
+                self.shadow_depth = depth;
+            }
         }
         self.shadow_res = res;
         let (vp, map, r, on) = {
@@ -3117,8 +3184,13 @@ impl Graphics {
     /// Lights in die Depth-Map und setzt lightVP + bindet die Map an Slot 10.
     fn render_shadow_map(&mut self) {
         if !self.shadow_enabled || self.light_shader.is_none() { return; }
-        // Schattenwerfendes Licht = erstes directional (kind 0). Sonst aus.
-        let dir = match self.lights.iter().find(|l| l.kind == 0) {
+        // Schattenwerfendes Licht = erstes AKTIVES directional (kind 0). Sonst
+        // aus. Review-Fund: ohne den enabled-Check waehlte diese Suche ein per
+        // LIGHT_SET_ENABLED(false) deaktiviertes directional Light an Index 0
+        // weiter aus, obwohl update_light_uniforms() die Szene bereits korrekt
+        // nur aus den AKTIVEN Lichtern beleuchtet -- der Schatten zeigte dann
+        // in eine Richtung, die nicht zum sichtbaren Licht passte.
+        let dir = match self.lights.iter().find(|l| l.kind == 0 && l.enabled) {
             Some(l) => {
                 let d = [l.target[0] - l.pos[0], l.target[1] - l.pos[1], l.target[2] - l.pos[2]];
                 let len = (d[0]*d[0] + d[1]*d[1] + d[2]*d[2]).sqrt().max(1e-6);
@@ -3485,6 +3557,17 @@ fn render_scene<D: RaylibDraw>(
                 }
             }
             for &li in order {
+              // Review-Fund: Blend-Mode/Scissor-Clip wurden bisher nur EINMAL
+              // vor der gesamten Layer-Schleife deklariert und nie zwischen
+              // Layern zurueckgesetzt -- ein BLEND_MODE("add")/PUSH_CLIP auf
+              // Layer A ohne passenden Reset lief in Layer B (und jede
+              // weitere, spaeter im z-Order gezeichnete Layer) hinein, weil
+              // alle Layer-Cmds hier in EINEM flachen Replay ablaufen. Vor
+              // jeder neuen Layer auf Default zurueckstellen, statt erst am
+              // Ende der kompletten Schleife (das schuetzte bisher nur den
+              // naechsten FRAME, nicht die naechste Layer im selben Frame).
+              if cur_blend != 0 { unsafe { raylib::ffi::EndBlendMode(); } cur_blend = 0; }
+              if !clip_stack.is_empty() { unsafe { raylib::ffi::EndScissorMode(); } clip_stack.clear(); }
               for c in layers[li].cmds.iter() {
                 match c {
                     Cmd::Clear(col) => d.clear_background(*col),
