@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import (
-    QColor, QFont, QKeySequence, QPainter, QPen, QRadialGradient, QShortcut,
+    QColor, QFont, QKeySequence, QPainter, QPen, QShortcut,
 )
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QColorDialog, QComboBox, QDoubleSpinBox,
@@ -30,6 +30,21 @@ from .editor_qt.preset_library import PresetLibrary, default_dir
 from .particle_sim import _ParticleSystem
 
 _MODES = ("circle", "pixel", "square", "streak", "glow")
+
+# Vorschau-Frame-Zeit (ms) -- treibt Timer-Intervall, Sim-dt UND den
+# Burst-Hold; an einer Stelle benannt statt als Literal 16 an fuenf Stellen
+# dupliziert (Review-Fund: Re-Timing haette sonst leicht eine Stelle vergessen).
+_FRAME_MS = 16
+
+# Trail-Laenge im "streak"-Modus (Vorschau UND Laufzeit multiplizieren die
+# Geschwindigkeit mit demselben Faktor) -- muss synchron zu
+# `rust/gb_runtime/src/vm.rs`s `particle_draw` (Zeile mit `* 0.04`) bleiben.
+_STREAK_TRAIL_FACTOR = 0.04
+
+# Burst-Groesse: min. Partikelzahl bzw. Vielfaches der Dauerrate (Burst-
+# Button UND generierte Test-Demo nutzen dieselbe Formel).
+_BURST_MIN = 40
+_BURST_RATE_MULTIPLIER = 8
 
 # Werks-Presets (Parameter-Dicts wie _capture_state). Als Startbibliothek;
 # der Nutzer kann eigene dazu speichern.
@@ -68,7 +83,16 @@ _FACTORY_PRESETS = {
 
 
 def _compute_colors(sys: _ParticleSystem):
-    """Finale Farben pro Partikel (repliziert particles._draw)."""
+    """Finale Farben (+ Alpha) pro Partikel -- repliziert `particle_color()` in
+    `rust/gb_runtime/src/vm.rs` (der eigentliche Laufzeit-Pfad; das fruehere
+    Python-Modul `particles.py`, auf das diese Funktion urspruenglich verwies,
+    ist seit Phase 8 entfernt).
+
+    Review-Fund: FADE senkte hier frueher die RGB-Kanaele Richtung Schwarz ab,
+    waehrend die Laufzeit laengst auf Alpha-Fade umgestellt wurde (funktioniert
+    auch additiv/auf hellem Untergrund) -- die Vorschau zeigte auf einem
+    hellen Hintergrund erloeschende Partikel faelschlich schwarz statt
+    transparent. Jetzt identisch zu `vm.rs::particle_color`."""
     lifetimes = np.maximum(sys._lifetimes, 1).astype(np.float32)
     life_t = np.clip(sys._ages.astype(np.float32) / lifetimes, 0.0, 1.0)
     sr = ((sys._colors >> 16) & 0xFF).astype(np.float32)
@@ -83,11 +107,13 @@ def _compute_colors(sys: _ParticleSystem):
         sg = sg * inv + eg * life_t
         sb = sb * inv + eb * life_t
     if sys.fade:
-        f = 1.0 - life_t
-        sr, sg, sb = sr * f, sg * f, sb * f
+        aa = np.clip(np.round((1.0 - life_t) * 255.0), 1, 255)
+    else:
+        aa = np.full_like(life_t, 255.0)
     return (np.clip(sr, 0, 255).astype(np.int32),
             np.clip(sg, 0, 255).astype(np.int32),
-            np.clip(sb, 0, 255).astype(np.int32))
+            np.clip(sb, 0, 255).astype(np.int32),
+            aa.astype(np.int32))
 
 
 class _Preview(QWidget):
@@ -110,7 +136,7 @@ class _Preview(QWidget):
         self._burst_hold = 0      # Frames, in denen die Dauer-Emission aussetzt
         self.setMinimumSize(420, 420)
         self._timer = QTimer(self)
-        self._timer.setInterval(16)            # ~60 fps
+        self._timer.setInterval(_FRAME_MS)     # ~60 fps
         self._timer.timeout.connect(self._tick)
         self._timer.start()
 
@@ -127,17 +153,18 @@ class _Preview(QWidget):
         self.sys.y = self.height() / 2.0
         self.sys.clear()
         self.sys.emit(max(1, n))
-        self._burst_hold = int(self.sys.lifetime_max / 16) + 30
+        self._burst_hold = int(self.sys.lifetime_max / _FRAME_MS) + 30
 
     def _tick(self) -> None:
-        if not self.paused:
-            self.sys.x = self.width() / 2.0
-            self.sys.y = self.height() / 2.0
-            if self._burst_hold > 0:
-                self._burst_hold -= 1     # waehrend des Bursts kein Dauer-Nachschub
-            else:
-                self.sys.emit(self.emit_rate)
-            self.sys.update(16)
+        if self.paused:
+            return
+        self.sys.x = self.width() / 2.0
+        self.sys.y = self.height() / 2.0
+        if self._burst_hold > 0:
+            self._burst_hold -= 1     # waehrend des Bursts kein Dauer-Nachschub
+        else:
+            self.sys.emit(self.emit_rate)
+        self.sys.update(_FRAME_MS)
         self.update()
 
     def _paint_bg(self, p: QPainter) -> None:
@@ -162,34 +189,40 @@ class _Preview(QWidget):
         xs = self.sys._xs
         ys = self.sys._ys
         sizes = self.sys._sizes
-        rr, gg, bb = _compute_colors(self.sys)
+        rr, gg, bb, aa = _compute_colors(self.sys)
         mode = self.sys.mode
-        if mode == "glow":
-            p.setCompositionMode(QPainter.CompositionMode.CompositionMode_Plus)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, mode in ("circle", "glow"))
+        # Review-Fund: die Laufzeit (vm.rs::particle_draw) kennt kein echtes
+        # additives Glow -- ihr eigener Kommentar sagt es explizit ("glow
+        # additiv ist im Recording-Modell nicht direkt machbar -> Kreis-
+        # Approx."), "glow" faellt dort in denselben Match-Arm wie "circle"
+        # (ein deckender Kreis, keine additive Ueberblendung, keine
+        # Groessen-Aufweitung). Die Vorschau zeichnete "glow" zuvor als
+        # 4x-grosses additives Radialverlauf-Bloom -- optisch komplett anders
+        # als das, was im Spiel tatsaechlich erscheint. Jetzt identisch: nur
+        # "circle" behandelt beide Modi.
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, mode not in ("pixel", "square", "streak"))
         for i in range(n):
             x = float(xs[i]); y = float(ys[i])
             s = int(sizes[i]) or 1
-            col = QColor(int(rr[i]), int(gg[i]), int(bb[i]))
+            col = QColor(int(rr[i]), int(gg[i]), int(bb[i]), int(aa[i]))
             if mode == "pixel":
-                p.setPen(QPen(col, 2))
-                p.drawPoint(int(x), int(y))
+                # g.plot() zeichnet exakt 1 Pixel -- die Vorschau malte zuvor
+                # per QPen-Breite 2 einen 2x2-Block.
+                p.fillRect(int(x), int(y), 1, 1, col)
             elif mode == "square":
-                p.fillRect(int(x - s), int(y - s), s * 2, s * 2, col)
+                # g.box_fill(x-sz,...,x+sz,...) ist EINSCHLIESSLICH beider
+                # Kanten -> Breite/Hoehe = 2*sz+1 (nicht 2*sz).
+                p.fillRect(int(x - s), int(y - s), s * 2 + 1, s * 2 + 1, col)
             elif mode == "streak":
+                # g.line() (raylib draw_line) ist immer 1px -- die "Groesse"
+                # beeinflusst im Spiel NUR die (hier weiterhin nachgebildete)
+                # Trail-Laenge, nie die Strichstaerke.
                 vx = float(self.sys._vxs[i]); vy = float(self.sys._vys[i])
-                p.setPen(QPen(col, max(1, s)))
+                p.setPen(QPen(col, 1))
                 p.drawLine(int(x), int(y),
-                           int(x - vx * 0.04), int(y - vy * 0.04))
-            elif mode == "glow":
-                grad = QRadialGradient(x, y, s * 2)
-                c0 = QColor(col); c1 = QColor(col); c1.setAlpha(0)
-                grad.setColorAt(0.0, c0)
-                grad.setColorAt(1.0, c1)
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(grad)
-                p.drawEllipse(int(x - s * 2), int(y - s * 2), s * 4, s * 4)
-            else:  # circle
+                           int(x - vx * _STREAK_TRAIL_FACTOR),
+                           int(y - vy * _STREAK_TRAIL_FACTOR))
+            else:  # circle & glow (siehe Kommentar oben)
                 p.setPen(Qt.PenStyle.NoPen)
                 p.setBrush(col)
                 p.drawEllipse(int(x - s), int(y - s), s * 2, s * 2)
@@ -245,6 +278,7 @@ class ParticleEditor(QMainWindow):
         self.setWindowTitle("GameBasic Partikel-Editor")
         self.resize(1240, 820)
         self.sys = _ParticleSystem(0.0, 0.0)
+        self._syncing = False
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -273,9 +307,24 @@ class ParticleEditor(QMainWindow):
         self.btn_undo.clicked.connect(self.undo.undo)
         self.btn_redo.clicked.connect(self.undo.redo)
         QShortcut(QKeySequence.StandardKey.Undo, self, activated=self.undo.undo)
+        # Review-Fund: NUR den Standard-Key registrieren -- auf Windows IST
+        # QKeySequence::Redo bereits Ctrl+Y. Ein zusaetzliches, separates
+        # QShortcut("Ctrl+Y") auf demselben Fenster/Kontext macht daraus eine
+        # AMBIGUE Sequenz -> Qt feuert activatedAmbiguously() statt
+        # activated(), Ctrl+Y wurde also gar nicht ausgefuehrt (nur der
+        # Toolbar-Button funktionierte, was den Bug verdeckte).
         QShortcut(QKeySequence.StandardKey.Redo, self, activated=self.undo.redo)
-        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self.undo.redo)
         self._update_undo_buttons()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        # Preview-QTimer liefe sonst nach dem Schliessen unbegrenzt weiter --
+        # besonders im launch()-Pfad, der eine bestehende QApplication
+        # wiederverwendet (dort ist das Fenster nicht WA_DeleteOnClose,
+        # Schliessen wuerde es nur verstecken). Kein Dokumentmodell hier
+        # (Presets + Export sind die einzige Persistenz) -> kein Dirty-Check
+        # noetig, analog zum SFX-Generator (audiostudio_qt.py).
+        self.preview._timer.stop()
+        event.accept()
 
     def _update_undo_buttons(self) -> None:
         self.btn_undo.setEnabled(self.undo.can_undo())
@@ -297,17 +346,39 @@ class ParticleEditor(QMainWindow):
         }
 
     def _apply_state(self, s: dict) -> None:
-        self.vx_min.setValue(s["vx_min"]); self.vx_max.setValue(s["vx_max"])
-        self.vy_min.setValue(s["vy_min"]); self.vy_max.setValue(s["vy_max"])
-        self.gx.setValue(s["gx"]); self.gy.setValue(s["gy"])
-        self.mode.setCurrentText(s["mode"])
-        self.size_min.setValue(s["size_min"]); self.size_max.setValue(s["size_max"])
-        self.color.set_value(s["color"])
-        self.color_end_on.setChecked(s["color_end_on"])
-        self.color_end.set_value(s["color_end"])
-        self.fade.setChecked(s["fade"])
-        self.life_min.setValue(s["life_min"]); self.life_max.setValue(s["life_max"])
-        self.rate.setValue(s["rate"])
+        """Setzt alle Parameter-Widgets aus einem Snapshot (Undo ODER ein
+        User-Preset aus `~/.gamebasic/presets/particles.json`).
+
+        Review-Fund: `PresetLibrary.load()` validiert das JSON nicht gegen
+        ein Schema -- ein handbearbeitetes oder von einer aelteren/neueren
+        Editor-Version stammendes Preset mit fehlendem Key liess diese
+        Methode zuvor mit einem KeyError innerhalb eines Qt-Slots abstuerzen.
+        Jetzt behaelt ein fehlender Key einfach den aktuellen Widget-Wert.
+        Ein `mode`-Wert ausserhalb von `_MODES` wurde zuvor STILL verworfen
+        (setCurrentText() ist auf einer nicht-editierbaren Combo ein No-Op
+        fuer unbekannte Strings) -- der alte Modus blieb unbemerkt aktiv und
+        wurde beim naechsten Undo-Snapshot als "der geladene Zustand"
+        festgeschrieben. Jetzt explizit geprueft, gleiches Verhalten
+        (behalte aktuellen Modus), aber ohne den stillen Seiteneffekt."""
+        g = s.get
+        self.vx_min.setValue(g("vx_min", self.vx_min.value()))
+        self.vx_max.setValue(g("vx_max", self.vx_max.value()))
+        self.vy_min.setValue(g("vy_min", self.vy_min.value()))
+        self.vy_max.setValue(g("vy_max", self.vy_max.value()))
+        self.gx.setValue(g("gx", self.gx.value()))
+        self.gy.setValue(g("gy", self.gy.value()))
+        mode = g("mode", self.mode.currentText())
+        if mode in _MODES:
+            self.mode.setCurrentText(mode)
+        self.size_min.setValue(g("size_min", self.size_min.value()))
+        self.size_max.setValue(g("size_max", self.size_max.value()))
+        self.color.set_value(g("color", self.color.value()))
+        self.color_end_on.setChecked(g("color_end_on", self.color_end_on.isChecked()))
+        self.color_end.set_value(g("color_end", self.color_end.value()))
+        self.fade.setChecked(g("fade", self.fade.isChecked()))
+        self.life_min.setValue(g("life_min", self.life_min.value()))
+        self.life_max.setValue(g("life_max", self.life_max.value()))
+        self.rate.setValue(g("rate", self.rate.value()))
         self._on_change()
 
     # ------------------------------------------------- Controls
@@ -382,10 +453,16 @@ class ParticleEditor(QMainWindow):
         bg_lab.setStyleSheet(f"color:{COLORS['fg_muted']}; font-size:11px;")
         prev_row.addWidget(bg_lab)
         self.bg_combo = QComboBox()
-        # (Anzeige, Modus) -- Modus geht an _Preview.set_bg_mode.
-        for label, mode in (("Dunkel", "dark"), ("Schwarz", "black"),
-                            ("Hell", "light"), ("Schachbrett", "checker")):
-            self.bg_combo.addItem(label, mode)
+        # Modus-Liste kommt aus _Preview._BG selbst (+ "checker", das dort
+        # nicht als Farbe gefuehrt wird, weil es prozedural gezeichnet wird)
+        # -- vorher war diese Liste eine dritte, separate Kopie der Modi und
+        # ein Tippfehler haette hier still auf den Dunkel-Hintergrund
+        # zurueckgefallen (_BG.get(..., _BG["dark"])), statt sichtbar zu
+        # brechen (Review-Fund).
+        bg_labels = {"dark": "Dunkel", "black": "Schwarz", "light": "Hell",
+                     "checker": "Schachbrett"}
+        for mode in (*_Preview._BG.keys(), "checker"):
+            self.bg_combo.addItem(bg_labels[mode], mode)
         self.bg_combo.currentIndexChanged.connect(
             lambda _i: self.preview.set_bg_mode(self.bg_combo.currentData()))
         prev_row.addWidget(self.bg_combo, 1)
@@ -401,7 +478,7 @@ class ParticleEditor(QMainWindow):
             "QPushButton#burstBtn:hover { background: qlineargradient("
             "x1:0, y1:0, x2:0, y2:1, stop:0 #C9762B, stop:1 #9C4A12); }")
         self.btn_burst.clicked.connect(
-            lambda: self.preview.burst(max(40, self.rate.value() * 8)))
+            lambda: self.preview.burst(self._burst_count()))
         prev_row.addWidget(self.btn_burst)
         cl.addLayout(prev_row)
 
@@ -421,7 +498,7 @@ class ParticleEditor(QMainWindow):
             lambda on: setattr(self.preview, "paused", on))
         btns.addWidget(self.btn_pause)
         btn_clear = QPushButton("Leeren")
-        btn_clear.clicked.connect(self.sys.clear)
+        btn_clear.clicked.connect(self._on_clear)
         btns.addWidget(btn_clear)
         btn_export = QPushButton("GB-Code exportieren")
         # Nutzt den globalen (jetzt ruhigen) Accent-Button-Stil aus theme.py.
@@ -481,7 +558,7 @@ class ParticleEditor(QMainWindow):
         still `max(min,max)`, waehrend die Spinbox den ignorierten Wert zeigte
         (Anzeige != Verhalten). Jetzt zieht das max-Widget sichtbar nach.
         blockSignals verhindert Re-Entrancy ueber valueChanged -> _on_change."""
-        if getattr(self, "_syncing", False):
+        if self._syncing:
             return
         self._syncing = True
         try:
@@ -496,36 +573,54 @@ class ParticleEditor(QMainWindow):
             self._syncing = False
 
     def _on_change(self, *_a) -> None:
+        # _enforce_minmax() laeuft zuerst und garantiert bereits hi >= lo auf
+        # den Widgets selbst -- die max(lo, hi)-Klemmung hier war ein zweiter,
+        # redundanter Mechanismus fuer dieselbe Invariante (Review-Fund).
         self._enforce_minmax()
         s = self.sys
         s.vx_min = self.vx_min.value()
-        s.vx_max = max(self.vx_min.value(), self.vx_max.value())
+        s.vx_max = self.vx_max.value()
         s.vy_min = self.vy_min.value()
-        s.vy_max = max(self.vy_min.value(), self.vy_max.value())
+        s.vy_max = self.vy_max.value()
         s.gravity_x = self.gx.value()
         s.gravity_y = self.gy.value()
         s.mode = self.mode.currentText()
         s.size_min = self.size_min.value()
-        s.size_max = max(self.size_min.value(), self.size_max.value())
+        s.size_max = self.size_max.value()
         s.color = self.color.value()
         s.has_color_end = self.color_end_on.isChecked()
         s.color_end = self.color_end.value()
         s.fade = self.fade.isChecked()
         s.lifetime_min = self.life_min.value()
-        s.lifetime_max = max(self.life_min.value(), self.life_max.value())
+        s.lifetime_max = self.life_max.value()
         self.preview.emit_rate = self.rate.value()
         u = getattr(self, "undo", None)
         if u is not None:
             u.mark()
 
+    def _burst_count(self) -> int:
+        """Burst-Groesse aus der Dauerrate -- von Burst-Button UND der
+        generierten Test-Demo geteilt (waren zuvor zwei Kopien derselben
+        Formel, Review-Fund)."""
+        return max(_BURST_MIN, self.rate.value() * _BURST_RATE_MULTIPLIER)
+
+    def _on_clear(self) -> None:
+        """Review-Fund: 'Leeren' waehrend eines aktiven Bursts loeschte die
+        Partikel, liess aber `_burst_hold` (bis zu ~530 Frames / ~8.5s bei
+        maximaler Lebensdauer) unangetastet -- die Dauer-Emission blieb also
+        weiter ausgesetzt und die Vorschau wirkte fuer mehrere Sekunden
+        eingefroren, ohne jeden Hinweis darauf."""
+        self.sys.clear()
+        self.preview._burst_hold = 0
+
     # ------------------------------------------------- Export
-    def _export(self) -> None:
+    def _particle_set_lines(self) -> list[str]:
+        """PARTICLE_SET_*-Zeilen aus dem aktuellen Zustand -- von `_export()`
+        UND `_build_runnable_demo()` geteilt (waren zuvor zwei Kopien
+        derselben neun Zeilen; ein neuer Parameter liess sich so leicht in
+        einem der beiden Pfade vergessen, Review-Fund)."""
         s = self.sys
         lines = [
-            'IMPORT "particles"',
-            "",
-            "DIM ps AS PARTICLE_SYSTEM",
-            "ps = PARTICLE_SYSTEM_NEW(160, 120)",
             f"PARTICLE_SET_VELOCITY(ps, {s.vx_min:g}, {s.vx_max:g}, "
             f"{s.vy_min:g}, {s.vy_max:g})",
             f"PARTICLE_SET_LIFETIME(ps, {s.lifetime_min}, {s.lifetime_max})",
@@ -537,11 +632,19 @@ class ParticleEditor(QMainWindow):
             lines.append(f"PARTICLE_SET_COLOR_END(ps, &H{s.color_end:06X})")
         lines.append(f"PARTICLE_SET_FADE(ps, {'TRUE' if s.fade else 'FALSE'})")
         lines.append(f'PARTICLE_SET_MODE(ps, "{s.mode}")')
-        lines += [
+        return lines
+
+    def _export(self) -> None:
+        lines = [
+            'IMPORT "particles"',
+            "",
+            "DIM ps AS PARTICLE_SYSTEM",
+            "ps = PARTICLE_SYSTEM_NEW(160, 120)",
+            *self._particle_set_lines(),
             "",
             "' --- im Game-Loop ---",
             f"' PARTICLE_EMIT(ps, {self.rate.value()})",
-            "' PARTICLE_UPDATE(ps, 16)",
+            f"' PARTICLE_UPDATE(ps, {_FRAME_MS})",
             "' PARTICLE_DRAW(ps)",
         ]
         code = "\n".join(lines)
@@ -549,6 +652,15 @@ class ParticleEditor(QMainWindow):
         dlg = QFrame(self, Qt.WindowType.Window)
         dlg.setWindowTitle("GB-Code")
         dlg.resize(560, 420)
+        # Review-Fund: dieses Fenster blieb bisher NICHT-modal, waehrend
+        # "Kopieren"/"Speichern" den `code`-String vom OEFFNEN des Dialogs
+        # einfrieren -- tunte man danach weiter an den Reglern, gaben
+        # Anzeige/Kopieren/Speichern und der (live neu bauende) "In
+        # GameBasic testen"-Button drei VERSCHIEDENE Ergebnisse. WindowModal
+        # blockiert waehrend der Dialog offen ist genau das Eltern-Fenster
+        # (`self`) -- der eingefrorene Snapshot kann dadurch gar nicht mehr
+        # veralten, ohne den funktionierenden Test-Button anzutasten.
+        dlg.setWindowModality(Qt.WindowModality.WindowModal)
         dl = QVBoxLayout(dlg)
         edit = QPlainTextEdit()
         edit.setPlainText(code)
@@ -576,6 +688,11 @@ class ParticleEditor(QMainWindow):
         # -- wiederholtes Exportieren in einer Sitzung haette so Fenster
         # angesammelt, die nie wieder freigegeben werden.
         dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        # Review-Fund: `self._export_dlg` blieb nach der Zerstoerung ein
+        # dangelnder Verweis auf ein geloeschtes C++-Objekt -- jede spaetere
+        # Beruehrung haette ein RuntimeError geworfen. Gleiches Muster wie
+        # main_window.py's WA_DeleteOnClose-Referenzen.
+        dlg.destroyed.connect(lambda: setattr(self, "_export_dlg", None))
         dlg.show()
         self._export_dlg = dlg          # Referenz halten, solange offen
 
@@ -594,9 +711,8 @@ class ParticleEditor(QMainWindow):
         """Lauffaehiges Test-Programm (im Gegensatz zum Export-Snippet, dessen
         Game-Loop auskommentiert ist): Fenster + Loop, Emitter folgt der Maus,
         Klick = Eruption. Mirror von examples/28_particles_visual.gb."""
-        s = self.sys
         rate = self.rate.value()
-        burst = max(40, rate * 8)
+        burst = self._burst_count()
         lines = [
             "' Auto-generiert vom Partikel-Editor.",
             "' Maus bewegen = Emitter, Klick = Eruption, ESC = Ende.",
@@ -606,18 +722,7 @@ class ParticleEditor(QMainWindow):
             "",
             "DIM ps AS PARTICLE_SYSTEM",
             "ps = PARTICLE_SYSTEM_NEW(320.0, 240.0)",
-            f"PARTICLE_SET_VELOCITY(ps, {s.vx_min:g}, {s.vx_max:g}, "
-            f"{s.vy_min:g}, {s.vy_max:g})",
-            f"PARTICLE_SET_LIFETIME(ps, {s.lifetime_min}, {s.lifetime_max})",
-            f"PARTICLE_SET_GRAVITY(ps, {s.gravity_x:g}, {s.gravity_y:g})",
-            f"PARTICLE_SET_SIZE(ps, {s.size_min}, {s.size_max})",
-            f"PARTICLE_SET_COLOR(ps, &H{s.color:06X})",
-        ]
-        if s.has_color_end:
-            lines.append(f"PARTICLE_SET_COLOR_END(ps, &H{s.color_end:06X})")
-        lines += [
-            f"PARTICLE_SET_FADE(ps, {'TRUE' if s.fade else 'FALSE'})",
-            f'PARTICLE_SET_MODE(ps, "{s.mode}")',
+            *self._particle_set_lines(),
             "",
             "DIM last_ms AS INTEGER",
             "last_ms = MILLIS()",
@@ -643,7 +748,7 @@ class ParticleEditor(QMainWindow):
             '    TEXT(8, 8, "Maus = Emitter, Klick = Eruption, ESC = Ende", '
             "RGB(200, 200, 200))",
             "    FLIP()",
-            "    SLEEP(16)",
+            f"    SLEEP({_FRAME_MS})",
             "WEND",
         ]
         return "\n".join(lines)
@@ -663,8 +768,12 @@ class ParticleEditor(QMainWindow):
         # Datei noch beim Start (OS-Cleanup nach Reboot ist OK).
         tmpdir = Path(tempfile.mkdtemp(prefix="gb_particle_test_"))
         gb_path = tmpdir / "_test.gb"
-        gb_path.write_text(self._build_runnable_demo(), encoding="utf-8")
         try:
+            # Review-Fund: das Schreiben lag zuvor AUSSERHALB des try-Blocks
+            # -- ein OSError (voller Datentraeger, keine Schreibrechte etc.)
+            # entkam als unbehandelter Traceback, waehrend der Popen-Aufruf
+            # direkt darunter bereits sauber abgefangen wurde.
+            gb_path.write_text(self._build_runnable_demo(), encoding="utf-8")
             subprocess.Popen([sys.executable, str(gbrun), str(gb_path)],
                              cwd=str(tmpdir))
         except Exception as exc:
@@ -672,6 +781,11 @@ class ParticleEditor(QMainWindow):
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
+    # `initial_file` wird bewusst ignoriert: anders als Score-/Tracker-/
+    # Tilemap-Editor hat der Partikel-Editor kein Dateimodell zum Oeffnen --
+    # Zustand kommt nur aus der Preset-Bibliothek oder GB-Code-Export. Der
+    # Parameter existiert nur fuer eine einheitliche launch()-Signatur ueber
+    # alle Begleit-Editoren hinweg (gbrun.py ruft ihn immer mit `None` auf).
     app = QApplication.instance()
     if app is None:
         # Fusion-Style NUR bei frischer QApplication erzwingen -- siehe

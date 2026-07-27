@@ -24,6 +24,15 @@ class ParticleSystem:
                  "_xs", "_ys", "_vxs", "_vys",
                  "_lifetimes", "_ages", "_sizes", "_colors")
 
+    # Sicherheitsgrenze fuer die Editor-Vorschau: paintEvent() zeichnet jeden
+    # aktiven Partikel per Python-Schleife/QPainter-Aufruf, und emit() kopiert
+    # bei jedem Aufruf alle Arrays neu (np.concatenate). Ohne Deckel liessen
+    # sich per Slider (Emission/Frame=200, Lebensdauer=8000ms) im Steady-
+    # State ~100000 Partikel erreichen -- reproduzierbares UI-Haengen
+    # (Review-Fund). Betrifft NUR die Vorschau-Sim; exportierter GB-Code laeuft
+    # ueber die native gbrt-Laufzeit und diesen Deckel nicht.
+    MAX_PARTICLES = 6000
+
     def __init__(self, x: float, y: float):
         self.x = float(x)
         self.y = float(y)
@@ -44,17 +53,9 @@ class ParticleSystem:
         self.mode = "circle"          # circle | pixel | square | streak | glow
         self.color_end = 0x000000
         self.has_color_end = False
-        # Initial leere Arrays. Float32 fuer Position/Velocity (geringerer
-        # Speicher, ausreichend Praezision fuer Pixel-Koordinaten); int32
-        # fuer Ganzzahlen.
-        self._xs = np.empty(0, dtype=np.float32)
-        self._ys = np.empty(0, dtype=np.float32)
-        self._vxs = np.empty(0, dtype=np.float32)
-        self._vys = np.empty(0, dtype=np.float32)
-        self._lifetimes = np.empty(0, dtype=np.int32)
-        self._ages = np.empty(0, dtype=np.int32)
-        self._sizes = np.empty(0, dtype=np.int32)
-        self._colors = np.empty(0, dtype=np.int32)
+        # Initial leere Arrays -- ueber clear() (identisch zum Reset-Pfad,
+        # vorher zwei Kopien desselben 8-zeiligen Blocks, Review-Fund).
+        self.clear()
 
     def __repr__(self):
         return (f"<PARTICLE_SYSTEM @({self.x:.0f},{self.y:.0f}) "
@@ -64,6 +65,8 @@ class ParticleSystem:
         return int(self._xs.shape[0])
 
     def clear(self) -> None:
+        # Float32 fuer Position/Velocity (geringerer Speicher, ausreichend
+        # Praezision fuer Pixel-Koordinaten); int32 fuer Ganzzahlen.
         self._xs = np.empty(0, dtype=np.float32)
         self._ys = np.empty(0, dtype=np.float32)
         self._vxs = np.empty(0, dtype=np.float32)
@@ -74,6 +77,13 @@ class ParticleSystem:
         self._colors = np.empty(0, dtype=np.int32)
 
     def emit(self, count: int) -> None:
+        if count <= 0:
+            return
+        # Deckel gegen Slider-Kombinationen, die einen Steady-State weit ueber
+        # MAX_PARTICLES erzeugen wuerden (Review-Fund, siehe Klassen-
+        # Docstring) -- sobald Partikel per Lebensdauer natuerlich absterben
+        # (update()), ist wieder Platz fuer neue.
+        count = min(count, self.MAX_PARTICLES - self.count())
         if count <= 0:
             return
         # Random aus dem Python-`random`-Modul: das ist GB's RANDOMIZE-Seed
