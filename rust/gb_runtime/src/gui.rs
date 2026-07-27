@@ -511,7 +511,16 @@ impl Gui {
     }
     pub fn window_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
         let w = self.win_mut(h, "GUI_WINDOW_VISIBLE")?;
-        w.visible = f; if f { w.close_clicked = false; } Ok(())
+        w.visible = f; if f { w.close_clicked = false; }
+        // Review-Fund: ein unsichtbares Fenster behielt bisher den
+        // Tastatur-Fokus (und jede andere Interaktions-Referenz) -- `update()`
+        // routete Tippen/Backspace/GUI_ON_CHANGE weiter in ein Fenster, das
+        // der Nutzer gar nicht mehr sieht.
+        if !f {
+            let wi = h as usize;
+            self.clear_window_interactions(wi);
+        }
+        Ok(())
     }
     pub fn window_closed(&self, h: i64) -> Result<bool, String> {
         Ok(self.windows.get(h as usize)
@@ -739,16 +748,47 @@ impl Gui {
         self.add_widget(win, "GUI_TABLE", wd)
     }
     pub fn table_set_headers(&mut self, h: i64, headers: Vec<String>) -> Result<(), String> {
-        self.tbl_mut(h, "GUI_TABLE_HEADERS")?.headers = headers; Ok(())
+        // Review-Fund: validierte bisher NICHTS -- Zeilen VOR den Headern
+        // gesetzt (mit n_cols==0 zum Zeitpunkt von table_set_rows) blieben
+        // unentdeckt ragged, `draw_table` paniked dann beim naechsten
+        // GUI_DRAW mit einem Index-Out-Of-Bounds auf der kuerzeren Zeile.
+        let t = self.tbl_mut(h, "GUI_TABLE_HEADERS")?;
+        let n_cols = headers.len();
+        if n_cols != 0 {
+            if let Some(bad) = t.rows.iter().position(|r| r.len() != n_cols) {
+                return Err(format!(
+                    "GUI_TABLE_HEADERS: {} Spalten, aber Zeile {} hat bereits {}",
+                    n_cols, bad, t.rows[bad].len()));
+            }
+        }
+        t.headers = headers;
+        Ok(())
     }
     pub fn table_set_rows(&mut self, h: i64, rows: Vec<Vec<String>>) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_ROWS")?;
         let n_cols = t.headers.len();
-        if !rows.is_empty() && n_cols != 0 && rows[0].len() != n_cols {
-            return Err(format!("GUI_TABLE_ROWS: Zeilen haben {} Spalten, Header hat {}", rows[0].len(), n_cols));
+        // Review-Fund: nur rows[0] wurde gegen n_cols geprueft -- eine
+        // spaetere ragged Zeile (z.B. [["a","b"],["c"]]) rutschte durch und
+        // liess `draw_table` beim Zugriff auf `row[c]` fuer die kuerzere
+        // Zeile panicken.
+        if n_cols != 0 {
+            if let Some(bad) = rows.iter().position(|r| r.len() != n_cols) {
+                return Err(format!(
+                    "GUI_TABLE_ROWS: Zeile {} hat {} Spalten, Header hat {}",
+                    bad, rows[bad].len(), n_cols));
+            }
         }
+        let old_n = t.rows.len();
         t.rows = rows;
         if t.selected >= t.rows.len() as i32 { t.selected = -1; }
+        // Review-Fund: `scroll_y` wurde nur in table_hover() (verlangt einen
+        // Mauszeiger ueber dem Widget) neu geklemmt -- eine Tabelle, die weit
+        // heruntergescrollt war, dann per GUI_TABLE_ROWS auf WENIGER Zeilen
+        // schrumpft, blieb bis zur naechsten Mausbewegung leer, statt sofort
+        // wieder etwas anzuzeigen. Nur bei einem Schrumpf zuruecksetzen (nicht
+        // bei jedem Refresh mit gleicher/groesserer Zeilenzahl, sonst waere
+        // ein periodisch aktualisiertes Scoreboard nie scrollbar).
+        if t.rows.len() < old_n { t.scroll_y = 0; }
         Ok(())
     }
     pub fn table_set_col_widths(&mut self, h: i64, widths: Option<Vec<i32>>) -> Result<(), String> {
@@ -968,14 +1008,23 @@ impl Gui {
         if t.drag_v && gm.max_scroll_y > 0 {
             let track = gm.body_h;
             let handle = Self::handle_height(track, gm.body_h, gm.total_h);
-            let new_y = ((my - gm.body_y) - t.drag_off).clamp(0, track - handle);
-            let pos = new_y as f64 / (track - handle).max(1) as f64;
+            // Review-Fund: `handle` hat eine feste Untergrenze (handle_height
+            // clamped auf min. 16px), `track` (die Widget-Hoehe abzueglich
+            // Kopfzeile) nicht -- ein sehr kleines/geschrumpftes Table-Widget
+            // (z.B. per GUI_SET_BOUNDS) liess `track - handle` negativ werden,
+            // und `i32::clamp(0, negativ)` paniked hart ("assertion failed:
+            // min <= max"). `.max(0)` haelt die Invariante unabhaengig von
+            // der Widget-Groesse.
+            let hi = (track - handle).max(0);
+            let new_y = ((my - gm.body_y) - t.drag_off).clamp(0, hi);
+            let pos = new_y as f64 / hi.max(1) as f64;
             t.scroll_y = (pos * gm.max_scroll_y as f64) as i32;
         } else if t.drag_h && gm.max_scroll_x > 0 {
             let track = gm.body_w;
             let handle = Self::handle_height(track, gm.body_w, gm.total_w);
-            let new_x = ((mx - gm.body_x) - t.drag_off).clamp(0, track - handle);
-            let pos = new_x as f64 / (track - handle).max(1) as f64;
+            let hi = (track - handle).max(0);
+            let new_x = ((mx - gm.body_x) - t.drag_off).clamp(0, hi);
+            let pos = new_x as f64 / hi.max(1) as f64;
             t.scroll_x = (pos * gm.max_scroll_x as f64) as i32;
         }
     }
@@ -1102,6 +1151,14 @@ impl Gui {
             let (wi, i) = Self::dec_widget(h);
             if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
             if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
+            // Review-Fund: press_origin/active_slider/active_split fehlten --
+            // ein Slider mitten im Drag deaktiviert feuerte weiter
+            // GUI_ON_CHANGE (drag_slider haelt sich nicht an `enabled`), und
+            // ein zwischen Press und Release deaktivierter Button loeste
+            // beim Loslassen trotzdem noch GUI_ON_CLICK aus.
+            if self.press_origin == Some((wi, i)) { self.press_origin = None; }
+            if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+            if self.active_split == Some((wi, i)) { self.active_split = None; }
         }
         Ok(())
     }
@@ -1160,11 +1217,20 @@ impl Gui {
         let wd = self.wdg_mut(h, "GUI_DESTROY")?;
         wd.alive = false;
         // Haengende Interaktions-Referenzen auf dieses Widget loesen.
+        // Review-Fund: active_table/table_press/hover_w fehlten hier -- ein
+        // GUI_DESTROY waehrend eines Table-Scrollbar-Drags oder mit noch
+        // gedrueckter Tabellenzeile liess GUI_TABLE_SELECTED/GUI_ON_CHANGE
+        // weiter auf das (tombstoned) Widget wirken, und ein laufendes
+        // Scrollbar-Drag konnte weiterhin table_drag() (und dessen
+        // clamp-Panic-Risiko) fuer das zerstoerte Widget ausloesen.
         if self.focus_widget == Some((wi, i)) { self.focus_widget = None; }
         if self.active_slider == Some((wi, i)) { self.active_slider = None; }
         if self.active_split == Some((wi, i)) { self.active_split = None; }
         if self.press_origin == Some((wi, i)) { self.press_origin = None; }
         if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
+        if self.active_table == Some((wi, i)) { self.active_table = None; }
+        if self.table_press.map(|(tw, ti, _)| (tw, ti)) == Some((wi, i)) { self.table_press = None; }
+        if self.hover_w == Some((wi, i)) { self.hover_w = None; }
         Ok(())
     }
     pub fn set_widget_visible(&mut self, h: i64, f: bool) -> Result<(), String> {
@@ -1178,7 +1244,16 @@ impl Gui {
     }
     pub fn focus(&mut self, h: i64) -> Result<(), String> {
         let (wi, i) = Self::dec_widget(h);
-        self.wdg(h, "GUI_FOCUS")?;          // Handle validieren
+        let wd = self.wdg(h, "GUI_FOCUS")?;
+        // Review-Fund: `wdg()` prueft nur, ob der Handle ueberhaupt in den
+        // Bounds liegt, NICHT ob das Widget noch lebt -- GUI_FOCUS auf ein
+        // getombstontes Handle wurde klaglos akzeptiert und rief
+        // bring_to_front() fuer ein bereits ZERSTOERTES Fenster auf, was den
+        // Index wieder in z_order einfuegte (den window_destroy gerade erst
+        // entfernt hatte).
+        if !wd.alive || !self.windows.get(wi).map(|w| w.alive).unwrap_or(false) {
+            return Err("GUI_FOCUS: Widget/Fenster wurde bereits zerstoert".into());
+        }
         self.focus_widget = Some((wi, i));
         self.focus_window = Some(wi);
         self.bring_to_front(wi);
@@ -1192,9 +1267,15 @@ impl Gui {
             if !win.alive || !win.visible { continue; }
             if !Self::in_rect(mx, my, (win.x, win.y, win.w, win.h)) { continue; }
             // innerhalb des Fensters: spaeter gezeichnete Widgets liegen oben.
+            // Review-Fund: pruefte bisher nur alive+visible, nicht die
+            // Tab-Seite -- GUI_HIT_TEST fand auf einem getabbten Fenster
+            // Widgets einer INAKTIVEN Reiter-Seite, obwohl update()/draw()
+            // konsequent widget_shown() (das den Tab zusaetzlich prueft)
+            // verwenden. Ein darauf aufbauender WYSIWYG-Editor haette so
+            // unsichtbare Controls selektiert.
             for i in (0..win.widgets.len()).rev() {
                 let wd = &win.widgets[i];
-                if wd.alive && wd.visible && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
+                if self.widget_shown(wi, wd) && Self::in_rect(mx, my, self.abs_rect(wi, wd)) {
                     return Self::enc_widget(wi, i);
                 }
             }
@@ -1218,20 +1299,56 @@ impl Gui {
             .ok_or("GUI_WINDOW_GET_*: ungueltiges GUI_WINDOW-Handle")?;
         Ok((w.x, w.y, w.w, w.h))
     }
+    /// Loest JEDE Interaktions-Referenz auf Fenster `wi` (oder ein Widget
+    /// darin), egal ob das Fenster gerade zerstoert, unsichtbar gemacht oder
+    /// per Close-Button geschlossen wird.
+    ///
+    /// Review-Fund: `window_destroy` loeste bisher nur 5 von ~14 solchen
+    /// Referenzen (focus_window/drag_window/resize_window/open_dropdown) --
+    /// focus_widget/press_origin/active_slider/active_split/active_table/
+    /// table_press/scroll_drag/open_menu/context_open/hover_w zeigten
+    /// danach weiter auf das (tombstoned, aber nie geloeschte) Fenster/
+    /// Widget. Weil Widgets nie wirklich entfernt werden (Tombstone-Pattern),
+    /// indizierten diese Referenzen weiter erfolgreich -- `update()` feuerte
+    /// dadurch z.B. GUI_ON_CHANGE/GUI_ON_CLICK fuer ein bereits zerstoertes
+    /// Fenster, oder ein laufendes Table-Scrollbar-Drag lief gegen ein totes
+    /// Widget weiter (und konnte den clamp-Panic in table_drag ausloesen).
+    fn clear_window_interactions(&mut self, wi: usize) {
+        if self.focus_window == Some(wi) { self.focus_window = None; }
+        if self.drag_window == Some(wi) { self.drag_window = None; }
+        if self.resize_window == Some(wi) { self.resize_window = None; }
+        if self.scroll_drag == Some(wi) { self.scroll_drag = None; }
+        if self.focus_widget.map(|(w, _)| w) == Some(wi) { self.focus_widget = None; }
+        if self.press_origin.map(|(w, _)| w) == Some(wi) { self.press_origin = None; }
+        if self.active_slider.map(|(w, _)| w) == Some(wi) { self.active_slider = None; }
+        if self.active_split.map(|(w, _)| w) == Some(wi) { self.active_split = None; }
+        if self.active_table.map(|(w, _)| w) == Some(wi) { self.active_table = None; }
+        if self.table_press.map(|(w, _, _)| w) == Some(wi) { self.table_press = None; }
+        if self.hover_w.map(|(w, _)| w) == Some(wi) { self.hover_w = None; }
+        if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
+        if self.open_menu.map(|(w, _)| w) == Some(wi) { self.open_menu = None; }
+        if self.context_open.map(|(w, _, _, _)| w) == Some(wi) { self.context_open = None; }
+    }
     pub fn window_destroy(&mut self, h: i64) -> Result<(), String> {
         let win = self.win_mut(h, "GUI_WINDOW_DESTROY")?;
         win.alive = false; win.visible = false;
         let wi = h as usize;
+        // z_order-Entfernung nur beim ECHTEN Destroy -- ein nur unsichtbar
+        // gemachtes Fenster (window_visible(false)/Close-Button) bleibt in
+        // z_order, sonst wuerde es nach einem erneuten window_visible(true)
+        // nie wieder gezeichnet/getroffen (nichts fuegt es sonst wieder ein).
         self.z_order.retain(|&i| i != wi);
-        if self.focus_window == Some(wi) { self.focus_window = None; }
-        if self.drag_window == Some(wi) { self.drag_window = None; }
-        if self.resize_window == Some(wi) { self.resize_window = None; }
-        if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
+        self.clear_window_interactions(wi);
         Ok(())
     }
     pub fn window_widget_count(&self, h: i64) -> Result<i64, String> {
         let w = self.windows.get(h as usize)
             .ok_or("GUI_WINDOW_WIDGET_COUNT: ungueltiges GUI_WINDOW-Handle")?;
+        // Review-Fund: pruefte nur die Widgets auf `alive`, nie das FENSTER
+        // selbst -- ein zerstoertes Fenster (window_destroy) lieferte
+        // weiterhin seine (noch lebenden) Widget-Handles, obwohl to_json()
+        // solche Fenster beim Serialisieren bereits konsequent ausfiltert.
+        if !w.alive { return Ok(0); }
         Ok(w.widgets.iter().filter(|wd| wd.alive).count() as i64)
     }
     /// Handle des `n`-ten LEBENDEN Widgets von Fenster `h` (Einfuege-Reihenfolge),
@@ -1240,6 +1357,7 @@ impl Gui {
         let wi = h as usize;
         let w = self.windows.get(wi)
             .ok_or("GUI_WINDOW_WIDGET: ungueltiges GUI_WINDOW-Handle")?;
+        if !w.alive { return Ok(-1); }
         let mut k = 0i64;
         for (i, wd) in w.widgets.iter().enumerate() {
             if !wd.alive { continue; }
@@ -1296,6 +1414,13 @@ impl Gui {
         w.value = wj["value"].as_f64().unwrap_or(0.0);
         w.min = wj["min"].as_f64().unwrap_or(0.0);
         w.max = wj["max"].as_f64().unwrap_or(1.0);
+        // Review-Fund: `slider()`/`spinner()` (Konstruktoren) lehnen
+        // `max <= min` ab, aber GUI_LOAD baut Widgets direkt aus JSON ohne
+        // diese Pruefung -- ein geladenes `{"min":10,"max":0}` liess jeden
+        // spaeteren `v.clamp(w.min, w.max)` (GUI_SET_VALUE, Spinner-Schritt)
+        // mit "min <= max"-Panic abstuerzen. Reihenfolge einfach herstellen
+        // statt hart abzulehnen -- ein geladenes Widget soll nutzbar bleiben.
+        if w.min > w.max { std::mem::swap(&mut w.min, &mut w.max); }
         w.checked = wj["checked"].as_bool().unwrap_or(false);
         w.placeholder = wj["placeholder"].as_str().unwrap_or("").to_string();
         w.visible = wj["visible"].as_bool().unwrap_or(true);
@@ -1319,8 +1444,23 @@ impl Gui {
                     ts.headers = hs.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
                 }
                 if let Some(rs) = tj["rows"].as_array() {
+                    // Review-Fund: `filter_map(|x| x.as_str())` liess jede
+                    // NICHT-String-Zelle (Zahl, Bool, null) STILLSCHWEIGEND
+                    // aus der Zeile verschwinden -- ein `.gbform`/gespeichertes
+                    // GUI_SAVE mit einer numerischen Tabellenzelle lud eine zu
+                    // kurze Zeile, `draw_table` paniked dann beim naechsten
+                    // GUI_DRAW. Jede Zelle wird jetzt zu einem String
+                    // konvertiert statt verworfen -- Zeilenlaenge bleibt erhalten.
+                    fn cell_to_string(x: &serde_json::Value) -> String {
+                        match x {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
+                            serde_json::Value::Null => String::new(),
+                            other => other.to_string(),
+                        }
+                    }
                     ts.rows = rs.iter().map(|row| row.as_array()
-                        .map(|r| r.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                        .map(|r| r.iter().map(cell_to_string).collect())
                         .unwrap_or_default()).collect();
                 }
                 if let Some(cw) = tj["col_widths"].as_array() {
@@ -1541,9 +1681,16 @@ impl Gui {
         let bw = 10;
         let tx = w.x + w.w - bw - 2;
         let ty = w.y + self.content_top(wi) + 1;
-        let th = view - 2;
+        // Review-Fund: `th` (Scrollbar-Spurlaenge) hat keine Untergrenze --
+        // ein kleines/schmales scrollbares Fenster (z.B. `GUI_WINDOW_SET_
+        // BOUNDS win, x, y, w, 40`) liess `th < 24` werden, und
+        // `.clamp(24, th)` paniked hart ("assertion failed: min <= max"),
+        // reproduzierbar in JEDEM GUI_DRAW eines solchen Fensters. `lo`
+        // haelt sich selbst unter 24, wenn die Spur kuerzer ist.
+        let th = (view - 2).max(0);
         let max_s = content - view;
-        let thh = ((th * view) / content).clamp(24, th);
+        let lo = th.min(24);
+        let thh = if th > 0 { ((th * view) / content.max(1)).clamp(lo, th) } else { 0 };
         let thy = ty + if max_s > 0 { (w.scroll_y * (th - thh)) / max_s } else { 0 };
         Some((tx, ty, bw, th, thy, thh))
     }
@@ -2314,6 +2461,9 @@ impl Gui {
             && Self::in_rect(mx, my, (wx + ww - th, wy, th, th)) {
             self.windows[win].close_clicked = true;
             self.windows[win].visible = false;
+            // Review-Fund: derselbe haengende-Fokus-Bug wie GUI_WINDOW_VISIBLE
+            // FALSE -- der Close-Button rief das bisher gar nicht auf.
+            self.clear_window_interactions(win);
             return;
         }
         // Titelleiste -> Drag? (nur mit Chrome)
