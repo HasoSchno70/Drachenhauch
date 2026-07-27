@@ -43,13 +43,22 @@ enum Cmd {
     Text(i32, i32, String, i32, Color, i64, f32),
     // TEXTROT: (cx, cy, text, groesse, farbe, font, spacing, winkel_grad, skala)
     TextRot(i32, i32, String, i32, Color, i64, f32, f32, f32),
-    Texture(usize, i32, i32),
-    TexturePart(usize, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy
+    // Review-Fund: Texture/TexturePart/TextureFlipped/AtlasDraw hatten keine
+    // vom cam_zoom unabhaengige Ziel-Groesse -- die Ziel-Rechtecke wurden beim
+    // Replay entweder aus der Quell-Groesse (sw,sh) uebernommen oder aus der
+    // rohen Textur-Breite/-Hoehe gelesen, in beiden Faellen NUR mit dem
+    // SCREEN()-Skalierungsfaktor `s` multipliziert, nie mit `cam_zoom`
+    // (CAMERA_SET-Zoom). TextureRect/SpriteDraw machten es schon richtig
+    // (ssize()/cam_zoom-Multiplikation beim EMIT, bevor der Cmd gebaut wird)
+    // -- jetzt tragen auch diese Varianten eine explizite, bereits
+    // zoom-skalierte Ziel-Groesse.
+    Texture(usize, i32, i32, i32, i32),               // tex, x, y, dw, dh (zoom-skaliert)
+    TexturePart(usize, i32, i32, i32, i32, i32, i32, i32, i32), // tex, sx,sy,sw,sh, dx,dy, dw,dh
     TexturePartEx(usize, i32, i32, i32, i32, i32, i32, i32, i32), // +dw,dh (skaliert)
     TextureRect(usize, i32, i32, i32, i32),           // tex skaliert in dx,dy,dw,dh (bounds-safe)
-    TextureFlipped(usize, i32, i32, bool, bool),       // tex, x, y, flip_h, flip_v
-    TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala, tint (um Zentrum)
-    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, flip_h, flip_v, tint
+    TextureFlipped(usize, i32, i32, i32, i32, bool, bool), // tex, x, y, dw, dh, flip_h, flip_v
+    TextureRot(usize, i32, i32, f32, f32, Color),      // tex, cx, cy, winkel_grad, skala (inkl. cam_zoom), tint (um Zentrum)
+    AtlasDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color), // tex, sx,sy,sw,sh, dx,dy, dw,dh, flip_h, flip_v, tint
     // tex, src(sx,sy,sw,sh), dst(dx,dy,dw,dh), flip_x, flip_y, tint
     SpriteDraw(usize, i32, i32, i32, i32, i32, i32, i32, i32, bool, bool, Color),
     // Clip-Stack (Scissor): Push schneidet mit dem aktuellen Clip, Pop stellt
@@ -1289,28 +1298,58 @@ impl Graphics {
         self.models.push(m);
         Ok((self.models.len() - 1) as i64)
     }
+    // Review-Fund: Segment-Zahlen wurden nur nach UNTEN geklemmt (.max(3)
+    // etc.), nie nach oben -- `MESH_SPHERE(1, 100000, 100000)` fordert von
+    // raylib/par_shapes ~1e10 Vertices an (Allocator-Abort/Hang), direkt aus
+    // gewoehnlichem BASIC-Code heraus. Dimensionen (w/h/d/r/size) wurden
+    // GAR NICHT geprueft -- negative/NaN-Werte gingen unveraendert an den
+    // C-Generator. Ein Deckel + eine Endlichkeits-/Positiv-Pruefung schliessen
+    // beides an einer Stelle.
+    const MAX_MESH_SEGMENTS: i32 = 256;
+    fn check_mesh_dim(name: &str, label: &str, v: f32) -> Result<(), String> {
+        if !v.is_finite() || v <= 0.0 {
+            return Err(format!("{}: '{}' muss eine endliche Zahl > 0 sein, erhalten {}", name, label, v));
+        }
+        Ok(())
+    }
     pub fn mesh_cube(&mut self, w: f32, h: f32, d: f32) -> Result<i64, String> {
+        Self::check_mesh_dim("MESH_CUBE", "w", w)?;
+        Self::check_mesh_dim("MESH_CUBE", "h", h)?;
+        Self::check_mesh_dim("MESH_CUBE", "d", d)?;
         let mesh = Mesh::gen_mesh_cube(&self.thread, w, h, d);
         self.push_model_from_mesh(mesh, "MESH_CUBE")
     }
     pub fn mesh_sphere(&mut self, r: f32, rings: i32, slices: i32) -> Result<i64, String> {
-        let mesh = Mesh::gen_mesh_sphere(&self.thread, r, rings.max(3), slices.max(3));
+        Self::check_mesh_dim("MESH_SPHERE", "r", r)?;
+        let mesh = Mesh::gen_mesh_sphere(&self.thread, r,
+            rings.clamp(3, Self::MAX_MESH_SEGMENTS), slices.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_SPHERE")
     }
     pub fn mesh_cylinder(&mut self, r: f32, h: f32, slices: i32) -> Result<i64, String> {
-        let mesh = Mesh::gen_mesh_cylinder(&self.thread, r, h, slices.max(3));
+        Self::check_mesh_dim("MESH_CYLINDER", "r", r)?;
+        Self::check_mesh_dim("MESH_CYLINDER", "h", h)?;
+        let mesh = Mesh::gen_mesh_cylinder(&self.thread, r, h, slices.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_CYLINDER")
     }
     pub fn mesh_torus(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
-        let mesh = Mesh::gen_mesh_torus(&self.thread, r, size, rad_seg.max(3), sides.max(3));
+        Self::check_mesh_dim("MESH_TORUS", "r", r)?;
+        Self::check_mesh_dim("MESH_TORUS", "size", size)?;
+        let mesh = Mesh::gen_mesh_torus(&self.thread, r, size,
+            rad_seg.clamp(3, Self::MAX_MESH_SEGMENTS), sides.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_TORUS")
     }
     pub fn mesh_knot(&mut self, r: f32, size: f32, rad_seg: i32, sides: i32) -> Result<i64, String> {
-        let mesh = Mesh::gen_mesh_knot(&self.thread, r, size, rad_seg.max(3), sides.max(3));
+        Self::check_mesh_dim("MESH_KNOT", "r", r)?;
+        Self::check_mesh_dim("MESH_KNOT", "size", size)?;
+        let mesh = Mesh::gen_mesh_knot(&self.thread, r, size,
+            rad_seg.clamp(3, Self::MAX_MESH_SEGMENTS), sides.clamp(3, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_KNOT")
     }
     pub fn mesh_plane(&mut self, w: f32, l: f32, res_x: i32, res_z: i32) -> Result<i64, String> {
-        let mesh = Mesh::gen_mesh_plane(&self.thread, w, l, res_x.max(1), res_z.max(1));
+        Self::check_mesh_dim("MESH_PLANE", "w", w)?;
+        Self::check_mesh_dim("MESH_PLANE", "l", l)?;
+        let mesh = Mesh::gen_mesh_plane(&self.thread, w, l,
+            res_x.clamp(1, Self::MAX_MESH_SEGMENTS), res_z.clamp(1, Self::MAX_MESH_SEGMENTS));
         self.push_model_from_mesh(mesh, "MESH_PLANE")
     }
     /// Terrain-Mesh aus einer (Graustufen-)Image (LOADIMAGE-Handle): Helligkeit
@@ -1427,9 +1466,23 @@ impl Graphics {
     #[allow(clippy::too_many_arguments)]
     pub fn ray_hit_sphere(&self, ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32,
                           cx: f32, cy: f32, cz: f32, r: f32) -> f64 {
-        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(dx, dy, dz));
+        // Review-Fund: raylibs GetRayCollisionSphere ist ein reiner
+        // Abstand-zur-Gerade-Test (`hit = d >= 0.0`), OHNE zu pruefen, ob der
+        // Treffer VOR dem Ursprung liegt -- ein Objekt HINTER der Kamera,
+        // das die rueckwaertige Verlaengerung des Mausstrahls kreuzt, liefert
+        // `hit=true` mit einer NEGATIVEN `distance`. Der dokumentierte
+        // Vertrag ("Distanz oder -1") wird dadurch verletzt: `PICK_SPHERE(...)
+        // <> -1` waehlt so ein Objekt hinter der Kamera aus. Ausserdem
+        // erwartet die zugrundeliegende Formel eine NORMALISIERTE Richtung --
+        // ein unnormalisierter Vektor (aus GB-Code plausibel, z.B. eine
+        // Differenz zweier Punkte) liefert nicht nur einen skalierten,
+        // sondern einen tatsaechlich FALSCHEN Treffer/Kein-Treffer-Ausschlag.
+        let len = (dx * dx + dy * dy + dz * dz).sqrt();
+        if len < 1e-6 { return -1.0; }
+        let (ndx, ndy, ndz) = (dx / len, dy / len, dz / len);
+        let ray = Ray::new(Vector3::new(ox, oy, oz), Vector3::new(ndx, ndy, ndz));
         let rc = get_ray_collision_sphere(ray, Vector3::new(cx, cy, cz), r);
-        if rc.hit { rc.distance as f64 } else { -1.0 }
+        if rc.hit && rc.distance >= 0.0 { rc.distance as f64 } else { -1.0 }
     }
     /// Mausstrahl durch die aktuelle 3D-Kamera (Fenster-Pixel -> Welt-Ray).
     fn mouse_ray(&self) -> Ray {
@@ -1982,7 +2035,18 @@ impl Graphics {
             b.a = 255;
             b
         };
-        self.clear_color = bg;
+        // Review-Fund: `clear_color` ist die GLOBALE Frame-Hintergrundfarbe
+        // (FLIP macht `d.clear_background(clear_color)`), nicht pro Layer --
+        // CLS() innerhalb einer NICHT-Haupt-Layer (`LAYER("ui") :
+        // CLS(RGB(0,0,0))`, gedacht als reines Wipe dieser einen Layer)
+        // ueberschrieb bisher trotzdem die globale Hintergrundfarbe und damit
+        // effektiv den `bg`-Layer, unabhaengig von dessen z-Reihenfolge. Nur
+        // auf der Haupt-Layer (active==0, kein LAYER(...) aktiv) darf CLS
+        // die globale Hintergrundfarbe setzen; jede benannte Layer wird nur
+        // per Cmds-Clear gewischt (das war schon vorher korrekt).
+        if self.active == 0 {
+            self.clear_color = bg;
+        }
         let a = self.active;
         self.layers[a].cmds.clear();
     }
@@ -2046,22 +2110,46 @@ impl Graphics {
     pub fn blend_mode(&mut self, mode: i32) { self.emit(Cmd::BlendMode(mode)); }
 
     // --- Prozedurale Texturen (Batch 3): liefern ein IMAGE-Handle ---
+
+    /// Obergrenze fuer GENTEX_*(w, h, ...) -- ohne Cap loest ein versehentlich
+    /// riesiges w/h (Tippfehler, vertauschte Parameter, z.B. GENTEX_COLOR mit
+    /// vertauschten Skalierungs-/Pixel-Einheiten) eine Multi-GB/TB-Allokation
+    /// in raylibs Image-Generatoren aus, die bei Fehlschlag den Prozess
+    /// abbricht statt einen fangbaren Fehler zu liefern.
+    const MAX_GENTEX_CELLS: i64 = 64_000_000; // z.B. 8000x8000
+
+    fn check_gentex_dims(fn_: &str, w: i32, h: i32) -> Result<(i32, i32), String> {
+        let w = w.max(1);
+        let h = h.max(1);
+        match (w as i64).checked_mul(h as i64) {
+            Some(cells) if cells <= Self::MAX_GENTEX_CELLS => Ok((w, h)),
+            _ => Err(format!(
+                "{}: Breite*Hoehe ueberschreitet das Limit von {} Pixeln (erhalten {}x{})",
+                fn_, Self::MAX_GENTEX_CELLS, w, h
+            )),
+        }
+    }
+
     pub fn gen_tex_perlin(&mut self, w: i32, h: i32, scale: f64) -> Result<i64, String> {
-        let img = Image::gen_image_perlin_noise(w.max(1), h.max(1), 0, 0, scale.max(0.1) as f32);
+        let (w, h) = Self::check_gentex_dims("GENTEX_PERLIN", w, h)?;
+        let img = Image::gen_image_perlin_noise(w, h, 0, 0, scale.max(0.1) as f32);
         self.push_tex_from_image(img)
     }
     pub fn gen_tex_gradient(&mut self, w: i32, h: i32, c1: i64, c2: i64, vertical: bool) -> Result<i64, String> {
         // direction in Grad: 0 = vertikal (oben->unten), 90 = horizontal.
+        let (w, h) = Self::check_gentex_dims("GENTEX_GRADIENT", w, h)?;
         let dir = if vertical { 0 } else { 90 };
-        let img = Image::gen_image_gradient_linear(w.max(1), h.max(1), dir, col(c1), col(c2));
+        let img = Image::gen_image_gradient_linear(w, h, dir, col(c1), col(c2));
         self.push_tex_from_image(img)
     }
     pub fn gen_tex_checked(&mut self, w: i32, h: i32, cx: i32, cy: i32, c1: i64, c2: i64) -> Result<i64, String> {
-        let img = Image::gen_image_checked(w.max(1), h.max(1), cx.max(1), cy.max(1), col(c1), col(c2));
+        let (w, h) = Self::check_gentex_dims("GENTEX_CHECKED", w, h)?;
+        let img = Image::gen_image_checked(w, h, cx.max(1), cy.max(1), col(c1), col(c2));
         self.push_tex_from_image(img)
     }
     pub fn gen_tex_color(&mut self, w: i32, h: i32, c: i64) -> Result<i64, String> {
-        let img = Image::gen_image_color(w.max(1), h.max(1), col(c));
+        let (w, h) = Self::check_gentex_dims("GENTEX_COLOR", w, h)?;
+        let img = Image::gen_image_color(w, h, col(c));
         self.push_tex_from_image(img)
     }
     /// Radialer Farbverlauf (Mitte `inner` -> Rand `outer`). `density` 0..1
@@ -2069,8 +2157,9 @@ impl Graphics {
     /// weiche Glows/Lichter/Vignetten -- additiv gezeichnet ein sauberer Schein
     /// ohne die harten Kanten gestapelter Kreise.
     pub fn gen_tex_radial(&mut self, w: i32, h: i32, inner: i64, outer: i64, density: f64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_RADIAL", w, h)?;
         let img = Image::gen_image_gradient_radial(
-            w.max(1), h.max(1), density.clamp(0.0, 1.0) as f32, col(inner), col(outer));
+            w, h, density.clamp(0.0, 1.0) as f32, col(inner), col(outer));
         self.push_tex_from_image(img)
     }
 
@@ -2348,8 +2437,10 @@ impl Graphics {
     pub fn draw_image(&mut self, idx: i64, x: i32, y: i32) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGE: ungueltiges IMAGE-Handle".into()); }
+        let (dw, dh) = (self.textures[i].tex.width, self.textures[i].tex.height);
+        let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (x, y) = self.w2s(x, y);
-        self.emit(Cmd::Texture(i, x, y));
+        self.emit(Cmd::Texture(i, x, y, dw, dh));
         Ok(())
     }
     /// Textur skaliert in ein Ziel-Rechteck (Modul `gui` Image-Widget).
@@ -2363,8 +2454,9 @@ impl Graphics {
     pub fn draw_image_part(&mut self, idx: i64, sx: i32, sy: i32, sw: i32, sh: i32, dx: i32, dy: i32) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEPART: ungueltiges IMAGE-Handle".into()); }
+        let (dw, dh) = (self.ssize(sw), self.ssize(sh));
         let (dx, dy) = self.w2s(dx, dy);
-        self.emit(Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy));
+        self.emit(Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy, dw, dh));
         Ok(())
     }
     /// Wie draw_image_part, aber mit Ziel-Groesse (dw,dh) -> skaliertes Blitten
@@ -2373,6 +2465,7 @@ impl Graphics {
                               dx: i32, dy: i32, dw: i32, dh: i32) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEPARTEX: ungueltiges IMAGE-Handle".into()); }
+        let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (dx, dy) = self.w2s(dx, dy);
         self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh));
         Ok(())
@@ -2380,8 +2473,10 @@ impl Graphics {
     pub fn draw_image_flipped(&mut self, idx: i64, x: i32, y: i32, fh: bool, fv: bool) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEFLIPPED: ungueltiges IMAGE-Handle".into()); }
+        let (dw, dh) = (self.textures[i].tex.width, self.textures[i].tex.height);
+        let (dw, dh) = (self.ssize(dw), self.ssize(dh));
         let (x, y) = self.w2s(x, y);
-        self.emit(Cmd::TextureFlipped(i, x, y, fh, fv));
+        self.emit(Cmd::TextureFlipped(i, x, y, dw, dh, fh, fv));
         Ok(())
     }
     /// Rotierter Sprite-Blit: zeichnet das Bild **zentriert** auf (x,y), gedreht
@@ -2394,7 +2489,11 @@ impl Graphics {
         if i >= self.textures.len() { return Err("DRAWIMAGEROT: ungueltiges IMAGE-Handle".into()); }
         let (x, y) = self.w2s(x, y);
         let c = tint.map(col).unwrap_or(Color::WHITE);
-        self.emit(Cmd::TextureRot(i, x, y, angle_deg, scale.max(0.0001), c));
+        // `scale` ist der User-Skalierungsfaktor -- cam_zoom hier mit
+        // hineinmultiplizieren (wie ssize() es fuer Integer-Groessen tut),
+        // sonst ignoriert DRAWIMAGEROT die Kamera-Zoomstufe komplett.
+        let scl = (scale.max(0.0001) as f64 * self.cam_zoom).max(0.0001) as f32;
+        self.emit(Cmd::TextureRot(i, x, y, angle_deg, scl, c));
         Ok(())
     }
     /// Zeichnet eine 2D-Tilemap (flache row-major `values`; Tile < 0 =
@@ -2493,9 +2592,10 @@ impl Graphics {
                 .ok_or_else(|| format!("ATLAS_DRAW: Sprite '{}' nicht im Atlas", name))?;
             (a.tex_idx, sx, sy, sw, sh)
         };
+        let (dw, dh) = (self.ssize(sw), self.ssize(sh));
         let (x, y) = self.w2s(x, y);
         let tcol = match tint { Some(c) => col(c), None => Color::WHITE };
-        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, flip_h, flip_v, tcol));
+        self.emit(Cmd::AtlasDraw(tex, sx, sy, sw, sh, x, y, dw, dh, flip_h, flip_v, tcol));
         Ok(())
     }
 
@@ -3174,6 +3274,19 @@ impl Graphics {
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
         self.cmds3d.clear();
+        // Review-Fund: CLAUDE.md/docs dokumentieren "LAYER_END() -- zurueck
+        // zum Main-Buffer (optional, FLIP macht's auch)" -- das stimmte
+        // bisher nicht: weder `active` (aktive Layer) noch `active_rt`
+        // (aktives Render-Target) wurden hier zurueckgesetzt. Ein Frame, der
+        // mit `LAYER("ui") : TEXT(...) : FLIP()` endet (ohne explizites
+        // LAYER_END()), liess ALLE Draws des naechsten Frames -- inklusive
+        // CLS() -- weiter in die "ui"-Layer laufen, die Haupt-/Hintergrund-
+        // Zeichnungen verschwanden dadurch effektiv hinter der UI-Layer.
+        // Ein vergessenes RENDERTARGET_END() verschluckte auf dieselbe Art
+        // alle folgenden Frames komplett (sie liefen weiter ins Render-
+        // Target statt auf den Screen).
+        self.active = 0;
+        self.active_rt = None;
         self.frame_count += 1;
         // CAMERA_SHAKE: Offset fuer den naechsten Frame wuerfeln/abklingen.
         self.update_shake();
@@ -3491,13 +3604,18 @@ fn render_scene<D: RaylibDraw>(
                             }
                         }
                     }
-                    Cmd::Texture(i, x, y) => {
-                        if s == 1 { d.draw_texture(&textures[*i].tex, *x, *y, Color::WHITE); }
-                        else { d.draw_texture_ex(&textures[*i].tex, Vector2::new((x * s) as f32, (y * s) as f32), 0.0, s as f32, Color::WHITE); }
+                    Cmd::Texture(i, x, y, dw, dh) => {
+                        // Review-Fund: `dw`/`dh` sind bereits beim Emit ueber
+                        // ssize() mit cam_zoom skaliert -- hier nur noch der
+                        // SCREEN()-Skalierungsfaktor `s`, analog zu TextureRect.
+                        let t = &textures[*i].tex;
+                        let src = Rectangle::new(0.0, 0.0, t.width as f32, t.height as f32);
+                        let dst = Rectangle::new((x * s) as f32, (y * s) as f32, (dw * s) as f32, (dh * s) as f32);
+                        d.draw_texture_pro(t, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                     }
-                    Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy) => {
+                    Cmd::TexturePart(i, sx, sy, sw, sh, dx, dy, dw, dh) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32, *sw as f32, *sh as f32);
-                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
+                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                     }
                     Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh) => {
@@ -3512,12 +3630,12 @@ fn render_scene<D: RaylibDraw>(
                             d.draw_texture_pro(&t.tex, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                         }
                     }
-                    Cmd::TextureFlipped(i, x, y, fh, fv) => {
+                    Cmd::TextureFlipped(i, x, y, dw, dh, fh, fv) => {
                         let t = &textures[*i].tex;
                         let sw = if *fh { -(t.width as f32) } else { t.width as f32 };
                         let sh = if *fv { -(t.height as f32) } else { t.height as f32 };
                         let src = Rectangle::new(0.0, 0.0, sw, sh);
-                        let dst = Rectangle::new((x * s) as f32, (y * s) as f32, (t.width * s) as f32, (t.height * s) as f32);
+                        let dst = Rectangle::new((x * s) as f32, (y * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(t, src, dst, Vector2::zero(), 0.0, Color::WHITE);
                     }
                     Cmd::TextureRot(i, cx, cy, ang, scl, tint) => {
@@ -3529,11 +3647,11 @@ fn render_scene<D: RaylibDraw>(
                         let dst = Rectangle::new((cx * s) as f32, (cy * s) as f32, w, h);
                         d.draw_texture_pro(t, src, dst, Vector2::new(w / 2.0, h / 2.0), *ang, *tint);
                     }
-                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, fh, fv, tint) => {
+                    Cmd::AtlasDraw(i, sx, sy, sw, sh, dx, dy, dw, dh, fh, fv, tint) => {
                         let src = Rectangle::new(*sx as f32, *sy as f32,
                             if *fh { -(*sw as f32) } else { *sw as f32 },
                             if *fv { -(*sh as f32) } else { *sh as f32 });
-                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (sw * s) as f32, (sh * s) as f32);
+                        let dst = Rectangle::new((dx * s) as f32, (dy * s) as f32, (dw * s) as f32, (dh * s) as f32);
                         d.draw_texture_pro(&textures[*i].tex, src, dst, Vector2::zero(), 0.0, *tint);
                     }
                     Cmd::SpriteDraw(i, sx, sy, sw, sh, dx, dy, dw, dh, fx, fy, tint) => {
@@ -3568,7 +3686,24 @@ fn render_scene<D: RaylibDraw>(
                             let v: Vec<Vector2> = pts.iter()
                                 .map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
                             // Catmull-Rom braucht >= 4 Punkte; sonst dicke Linie.
-                            if v.len() >= 4 { d.draw_spline_catmull_rom(&v, thick * s as f32, *col); }
+                            // Review-Fund: raylibs DrawSplineCatmullRom behandelt
+                            // den ERSTEN und LETZTEN Punkt nur als Tangenten-
+                            // Kontrollpunkte (startet bei points[1], endet vor
+                            // points[n-1]) -- die Kurve lief bisher NICHT durch
+                            // die tatsaechlich uebergebenen Start-/Endpunkte,
+                            // obwohl SPLINE laut Doku "Catmull-Rom DURCH Punkte"
+                            // verspricht (sichtbar im shipped-Demo
+                            // examples/100_2d_extras.gb: die Kurve endete
+                            // sichtbar vor den letzten Stuetzpunkt-Markern).
+                            // Phantom-Duplikat von erstem/letztem Punkt ist der
+                            // uebliche Catmull-Rom-Trick dagegen.
+                            if v.len() >= 4 {
+                                let mut vv = Vec::with_capacity(v.len() + 2);
+                                vv.push(v[0]);
+                                vv.extend_from_slice(&v);
+                                vv.push(*v.last().unwrap());
+                                d.draw_spline_catmull_rom(&vv, thick * s as f32, *col);
+                            }
                             else {
                                 for i in 0..v.len() - 1 {
                                     d.draw_line_ex(v[i], v[i + 1], thick * s as f32, *col);
