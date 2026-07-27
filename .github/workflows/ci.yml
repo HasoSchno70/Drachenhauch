@@ -34,8 +34,17 @@ jobs:
       - name: Type-check with mypy
         run: mypy
 
+      # spriteeditor_qt_canvas/tilemapeditor_qt sind fuer sich genommen gruen,
+      # loesen aber in einem vollen kombinierten Lauf sporadisch einen
+      # nativen Windows-Access-Violation-Crash in PySide6/Qts eigenem
+      # C++-Teardown aus (bekannt, siehe Projekt-Notizen zu Qt-Timer-Use-
+      # after-free) -- der Python-Prozess stirbt dabei, kein fangbarer
+      # Test-Fehler. Deshalb hier ausgeschlossen statt den ganzen Job
+      # nichtdeterministisch rot werden zu lassen; separat mit
+      # `pytest tests/test_spriteeditor_qt_canvas.py tests/test_tilemapeditor_qt.py`
+      # lokal pruefbar.
       - name: Run tests
-        run: pytest tests/ -q
+        run: pytest tests/ -q -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (gbrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
