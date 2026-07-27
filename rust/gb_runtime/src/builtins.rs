@@ -343,7 +343,6 @@ fn format_one(mask: &str, v: &Value) -> R {
     let bytes: Vec<char> = mask.chars().collect();
     let mut out = String::new();
     let mut i = 0;
-    let mut used = false;
     while i < bytes.len() {
         if bytes[i] != '%' {
             out.push(bytes[i]);
@@ -363,18 +362,29 @@ fn format_one(mask: &str, v: &Value) -> R {
             if bytes[i] == '0' { zero = true; }
             i += 1;
         }
+        // Review-Fund: unbegrenzter Multiply-Akku -- eine absurd lange
+        // Ziffernfolge (z.B. "%99999999999999999999d") ueberlief `usize` in
+        // release lautlos zu einem beliebigen Wert, in debug paniked es.
+        // Ein Deckel weit ueber jeder sinnvollen Spaltenbreite genuegt.
+        const MAX_WIDTH: usize = 4096;
         let mut width = 0usize;
         while i < bytes.len() && bytes[i].is_ascii_digit() {
-            width = width * 10 + (bytes[i] as usize - '0' as usize);
+            width = (width * 10 + (bytes[i] as usize - '0' as usize)).min(MAX_WIDTH + 1);
             i += 1;
+        }
+        if width > MAX_WIDTH {
+            return err(format!("FORMAT$: Breite zu gross (max. {})", MAX_WIDTH));
         }
         let mut prec: Option<usize> = None;
         if i < bytes.len() && bytes[i] == '.' {
             i += 1;
             let mut p = 0usize;
             while i < bytes.len() && bytes[i].is_ascii_digit() {
-                p = p * 10 + (bytes[i] as usize - '0' as usize);
+                p = (p * 10 + (bytes[i] as usize - '0' as usize)).min(MAX_WIDTH + 1);
                 i += 1;
+            }
+            if p > MAX_WIDTH {
+                return err(format!("FORMAT$: Genauigkeit zu gross (max. {})", MAX_WIDTH));
             }
             prec = Some(p);
         }
@@ -383,7 +393,6 @@ fn format_one(mask: &str, v: &Value) -> R {
         }
         let conv = bytes[i];
         i += 1;
-        used = true;
         let s = match conv {
             'd' | 'i' => {
                 let n = match v {
@@ -401,16 +410,30 @@ fn format_one(mask: &str, v: &Value) -> R {
             }
             'x' => format!("{:x}", need_int(v, "FORMAT$")?),
             'X' => format!("{:X}", need_int(v, "FORMAT$")?),
-            's' => match v {
-                Value::Str(s) => s.to_string(),
-                Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
-                other => str_of(other),
-            },
+            's' => {
+                let raw = match v {
+                    Value::Str(s) => s.to_string(),
+                    Value::Bool(b) => if *b { "TRUE" } else { "FALSE" }.to_string(),
+                    other => str_of(other),
+                };
+                // Review-Fund: `%.Ns`-Praezision wurde geparst, aber nie
+                // angewendet -- FORMAT$("abcdef", "%.3s") lieferte "abcdef"
+                // statt auf 3 Zeichen zu kuerzen.
+                match prec {
+                    Some(p) => raw.chars().take(p).collect(),
+                    None => raw,
+                }
+            }
             c => return err(format!("FORMAT$: unbekannter Spezifizierer %{}", c)),
         };
-        // Padding
-        if s.len() < width {
-            let pad = width - s.len();
+        // Padding. Review-Fund: `s.len()` ist die BYTE-Laenge, nicht die
+        // Zeichenanzahl -- bei jedem Nicht-ASCII-Zeichen (Umlaute etc., in
+        // diesem deutschsprachigen Projekt haeufig) driftete die Spalten-
+        // breite um 1+ Spalten pro Mehrbyte-Zeichen. Der Rest der Datei ist
+        // konsequent Zeichen-basiert (LEN/PADL$/LEFT$/MID$/INSTR).
+        let char_count = s.chars().count();
+        if char_count < width {
+            let pad = width - char_count;
             if left {
                 out.push_str(&s);
                 out.push_str(&" ".repeat(pad));
@@ -432,7 +455,6 @@ fn format_one(mask: &str, v: &Value) -> R {
             out.push_str(&s);
         }
     }
-    let _ = used;
     Ok(Value::str_rc(&out))
 }
 
@@ -553,7 +575,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Ok(Value::Int(s.parse::<i64>().unwrap_or(0)))
             }
         }
-        "int" => { arity!(1); Ok(Value::Int(need_num(&a[0], "INT")?.floor() as i64)) }
+        "int" => {
+            arity!(1);
+            let f = need_num(&a[0], "INT")?.floor();
+            // Review-Fund: `f as i64` saettigt (Rust seit 1.45) statt zu
+            // ueberlaufen -- INT(1e19) lieferte bisher stillschweigend
+            // i64::MAX statt eines Fehlers.
+            if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                Ok(Value::Int(f as i64))
+            } else {
+                err("INT: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string())
+            }
+        }
         // FLT(x): Int/Float -> Float (Gegenstueck zu INT). Im Tree-Walker laengst
         // vorhanden; hier nachgezogen, damit `FLT(...)` auch nativ laeuft.
         "flt" => { arity!(1); Ok(Value::Float(need_num(&a[0], "FLT")?)) }
@@ -568,7 +601,12 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "abs" => {
             arity!(1);
             match &a[0] {
-                Value::Int(i) => Ok(Value::Int(i.abs())),
+                // Review-Fund: i64::MIN.abs() ueberlaeuft (der positive Wert
+                // passt nicht in i64) -- release wrapt lautlos zurueck auf
+                // i64::MIN (ABS(x) < 0!), debug paniked. checked_abs faengt
+                // exakt diesen einen Wert ab.
+                Value::Int(i) => i.checked_abs().map(Value::Int).ok_or_else(||
+                    "ABS: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string()),
                 Value::Float(f) => Ok(Value::Float(f.abs())),
                 v => err(format!("ABS erwartet Zahl, erhalten {}", v.type_name())),
             }
@@ -845,17 +883,41 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
         }
         "log" => {
+            // Review-Fund: keinerlei Arity-Pruefung -- LOG() indizierte a[0]
+            // direkt und paniked (statt "LOG: erwartet ..."), LOG(x,y,z)
+            // wurde stillschweigend akzeptiert (Extra-Argument ignoriert).
+            if a.is_empty() || a.len() > 2 {
+                return err(format!("LOG: erwartet 1..2 Argument(e), erhalten {}", a.len()));
+            }
             let x = need_num(&a[0], "LOG")?;
             if x <= 0.0 { return err("LOG: Argument muss > 0 sein".to_string()); }
-            if a.len() == 2 { Ok(Value::Float(x.log(need_num(&a[1], "LOG")?))) }
-            else { Ok(Value::Float(x.ln())) }
+            if a.len() == 2 {
+                let base = need_num(&a[1], "LOG")?;
+                if base <= 0.0 || base == 1.0 {
+                    return err("LOG: Basis muss > 0 und <> 1 sein".to_string());
+                }
+                Ok(Value::Float(x.log(base)))
+            } else { Ok(Value::Float(x.ln())) }
         }
         "exp" => { arity!(1); Ok(Value::Float(need_num(&a[0], "EXP")?.exp())) }
         "pow" => {
             arity!(2);
             // base ** exponent (Python): int**int>=0 -> int, sonst float
+            // Review-Fund: `b.pow(*e as u32)` ist die UNCHECKED Variante --
+            // in release (kein overflow-checks) liefert POW(2,64) still 0
+            // statt eines Fehlers, waehrend der `^`-Operator (vm.rs) fuer
+            // dieselbe Rechnung ueber checked_pow korrekt einen
+            // Ganzzahl-Ueberlauf-Fehler wirft. `*e as u32` truncated ausserdem
+            // einen zu grossen Exponenten lautlos (POW(2,4294967296) -> 1).
+            // Jetzt identisch zum `^`-Operator abgesichert.
             match (&a[0], &a[1]) {
-                (Value::Int(b), Value::Int(e)) if *e >= 0 => Ok(Value::Int(b.pow(*e as u32))),
+                (Value::Int(b), Value::Int(e)) if *e >= 0 => {
+                    if *e > u32::MAX as i64 {
+                        return err("POW: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string());
+                    }
+                    b.checked_pow(*e as u32).map(Value::Int).ok_or_else(||
+                        "POW: Ganzzahl-Ueberlauf (INTEGER ist 64-bit; Wertebereich ueberschritten)".to_string())
+                }
                 _ => Ok(Value::Float(need_num(&a[0], "POW")?.powf(need_num(&a[1], "POW")?))),
             }
         }
@@ -1037,8 +1099,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Int((u8c(r1) << 16) | (u8c(g1) << 8) | u8c(b1)))
         }
         "padl$" | "padl" | "padr$" | "padr" => {
+            // Review-Fund: keine Arity-Pruefung (PADL$("x") indizierte a[1]
+            // direkt -> Panic statt Fehlermeldung) und keine Untergrenze fuer
+            // `n` (PADL$("x", -1) liess `n - count` als riesigen `take()`-
+            // Count durchlaufen -> capacity-overflow-Panic beim Allozieren).
+            // Jedes andere PAD-artige Builtin in dieser Datei (REPEAT$,
+            // SPACE$, LEFT$, RIGHT$) clampt bereits mit `.max(0)`.
+            if a.len() < 2 || a.len() > 3 {
+                return err(format!("PAD: erwartet 2..3 Argument(e), erhalten {}", a.len()));
+            }
             let s = need_str(&a[0], "PAD")?;
-            let n = need_int(&a[1], "PAD")? as usize;
+            let n = need_int(&a[1], "PAD")?.max(0) as usize;
             let fill = if a.len() == 3 {
                 let f = need_str(&a[2], "PAD")?;
                 f.chars().next().unwrap_or(' ')
@@ -2258,6 +2329,22 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_new" => {
             arity!(2); let (w, h) = (need_int(&a[0], "ASTAR_NEW")?, need_int(&a[1], "ASTAR_NEW")?);
             if w <= 0 || h <= 0 { return err(format!("ASTAR_NEW: Breite und Hoehe muessen > 0 sein (erhalten {}x{})", w, h)); }
+            // Review-Fund: `w as i32`/`h as i32` truncated einen zu grossen
+            // i64 (z.B. 4294967296) VOR der `>0`-Pruefung stillschweigend auf
+            // einen kleinen/falschen Wert, und selbst ein plausibel
+            // aussehendes `ASTAR_NEW(100000,100000)` liess `w*h` (i32-
+            // Multiplikation in AStarGrid::new) ueberlaufen -- in beiden
+            // Faellen entstand ein Grid, dessen tatsaechliche Groesse nicht
+            // zu w/h passte, mit Panic-Risiko bei jedem spaeteren Zugriff.
+            const MAX_ASTAR_CELLS: i64 = 50_000_000;
+            if w > i32::MAX as i64 || h > i32::MAX as i64 {
+                return err(format!("ASTAR_NEW: Breite/Hoehe zu gross ({}/{})", w, h));
+            }
+            match w.checked_mul(h) {
+                Some(cells) if cells <= MAX_ASTAR_CELLS => {}
+                _ => return err(format!(
+                    "ASTAR_NEW: Grid zu gross ({}x{} Zellen, max. {})", w, h, MAX_ASTAR_CELLS)),
+            }
             Ok(Value::AStar(Rc::new(RefCell::new(crate::astar::AStarGrid::new(w as i32, h as i32)))))
         }
         "astar_clear" => { arity!(1); astar_h(&a[0], "ASTAR_CLEAR")?.borrow_mut().clear(); Ok(Value::Nil) }
@@ -3441,10 +3528,18 @@ fn ray_circle(rx: f64, ry: f64, dx: f64, dy: f64, cx: f64, cy: f64, cr: f64) -> 
     let disc = b * b - 4.0 * a * c;
     if disc < 0.0 { return -1.0; }
     let sq = disc.sqrt();
-    let t1 = (-b - sq) / (2.0 * a);
-    let t2 = (-b + sq) / (2.0 * a);
-    for t in [t1, t2] { if (0.0..=1.0).contains(&t) { return t; } }
-    -1.0
+    let t1 = (-b - sq) / (2.0 * a);   // Eintritt (kleinere Wurzel)
+    let t2 = (-b + sq) / (2.0 * a);   // Austritt (groessere Wurzel)
+    // Review-Fund: die alte Version verlangte, dass EINE der beiden Wurzeln
+    // in [0,1] liegt -- ein Segment, das komplett INNERHALB des Kreises
+    // startet und endet (t1<0 UND t2>1), erfuellte das nie und meldete
+    // faelschlich "kein Treffer", obwohl der Ray den Kreis eindeutig
+    // schneidet. `ray_box` (selbe Datei) loest genau das schon richtig:
+    // pruefen, ob das Intervall [t1,t2] das Segment [0,1] ueberhaupt
+    // ueberlappt, und den Eintritt auf 0 klemmen (schon-drinnen = Treffer
+    // bei t=0, nicht der Austrittspunkt).
+    if t2 < 0.0 || t1 > 1.0 { return -1.0; }
+    t1.max(0.0)
 }
 
 /// Map-Wert-Coercion (`_coerce_map_value`).
