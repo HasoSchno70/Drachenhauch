@@ -111,9 +111,23 @@ pub fn scan(timeout_s: f64) -> Result<String, String> {
     g.rt.block_on(async {
         g.adapter.start_scan(ScanFilter::default()).await.map_err(|e| format!("BT_SCAN: {}", e))?;
         tokio::time::sleep(Duration::from_secs_f64(timeout_s)).await;
-        let peris = g.adapter.peripherals().await.map_err(|e| format!("BT_SCAN: {}", e))?;
+        // Review-Fund: kein Pfad rief je stop_scan() -- der Adapter blieb nach
+        // JEDEM BT_SCAN dauerhaft in aktiver Discovery (Batterie-/Funk-
+        // Verbrauch, und auf Windows/BlueZ kann eine laufende Discovery
+        // nachfolgende GATT-Connects messbar verlangsamen/blockieren --
+        // gerade BT_CONNECT direkt nach BT_SCAN ist die dokumentierte
+        // Nutzung). peripherals() zuerst abfragen (nutzt die bisherigen
+        // Scan-Ergebnisse), dann Scan sauber stoppen, unabhaengig vom
+        // Ausgang.
+        let peris_res = g.adapter.peripherals().await.map_err(|e| format!("BT_SCAN: {}", e));
+        let _ = g.adapter.stop_scan().await;
+        let peris = peris_res?;
         let mut rows = Vec::new();
-        let mut map = seen().lock().unwrap();
+        // Review-Fund: `.unwrap()` auf einem vergifteten Mutex (nach einem
+        // Panic waehrend ein anderer Thread den Lock hielt) haette JEDEN
+        // weiteren BT_SCAN/BT_CONNECT-Aufruf fuer den Rest des Prozesses
+        // panicen lassen statt eines fangbaren Fehlers.
+        let mut map = seen().lock().map_err(|_| "BT_SCAN: seen()-Lock vergiftet".to_string())?;
         for p in peris {
             let addr = p.address().to_string();
             let props = p.properties().await.ok().flatten();
@@ -130,13 +144,21 @@ pub fn scan(timeout_s: f64) -> Result<String, String> {
 
 pub fn connect(addr: &str) -> Result<Peripheral, String> {
     let g = bt()?;
-    let p = seen().lock().unwrap().get(addr).cloned()
+    let p = seen().lock().map_err(|_| "BT_CONNECT: seen()-Lock vergiftet".to_string())?
+        .get(addr).cloned()
         .ok_or_else(|| format!("BT_CONNECT: '{}' nicht gefunden - erst BT_SCAN aufrufen", addr))?;
     g.rt.block_on(async {
         with_timeout(p.connect(), "BT_CONNECT").await?;
         let connected = tokio::time::timeout(CALL_TIMEOUT, p.is_connected()).await
             .ok().and_then(|r| r.ok()).unwrap_or(false);
         if !connected {
+            // Review-Fund: der Connect-Versuch kann teilweise durchgekommen
+            // sein (OS-Link steht, GATT-Handshake aber nicht abgeschlossen)
+            // -- ohne diesen Disconnect blieb das dem GB-Programm verborgen,
+            // weil bei einem Err niemals ein Handle zurueckgegeben wird und
+            // es damit auch keine Moeglichkeit gibt, BT_DISCONNECT selbst
+            // aufzurufen. Best-effort aufraeumen, bevor der Fehler propagiert.
+            let _ = tokio::time::timeout(CALL_TIMEOUT, p.disconnect()).await;
             return Err(format!("BT_CONNECT: Konnte {} nicht verbinden", addr));
         }
         Ok::<(), String>(())

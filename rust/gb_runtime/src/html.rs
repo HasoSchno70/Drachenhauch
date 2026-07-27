@@ -9,6 +9,13 @@ use std::time::Duration;
 
 const USER_AGENT: &str = "GameBasic/0.1 (+https://github.com/anthropic-ai)";
 const TIMEOUT_SECS: u64 = 10;
+// Review-Fund: `read_to_end` hatte KEINE Groessenbegrenzung -- jedes andere
+// Read-Builtin in diesem Projekt (NET_RECV/SERIAL_READ/USB_READ) deckelt bei
+// genau diesem Wert, mit exakt derselben Begruendung: HTTP_GET/HTTP_POST
+// gegen eine URL, die einen mehrere-GB-Stream liefert (oder versehentlich
+// eine Video-Datei/einen chunked Endpunkt trifft), allozierte sonst bis der
+// Allocator abstuerzt.
+const MAX_READ_BYTES: usize = 64 * 1024 * 1024;
 
 pub struct HttpResult {
     pub status: i64,
@@ -36,7 +43,13 @@ fn finish(resp: ureq::Response) -> Result<HttpResult, HttpErr> {
     // `.ok()` hier wuerde einen abgebrochenen Transfer (Verbindung weg
     // mitten im Body) verschlucken -- Status bliebe z.B. 200 und der Aufrufer
     // haette einen still abgeschnittenen Body, ohne jeden Hinweis darauf.
-    match resp.into_reader().read_to_end(&mut body) {
+    let mut limited = resp.into_reader().take(MAX_READ_BYTES as u64 + 1);
+    match limited.read_to_end(&mut body) {
+        Ok(_) if body.len() > MAX_READ_BYTES => Err(HttpErr {
+            msg: format!("HTTP-Antwort ueberschreitet das Limit von {} Byte", MAX_READ_BYTES),
+            status,
+            headers,
+        }),
         Ok(_) => Ok(HttpResult { status, headers, body }),
         Err(e) => Err(HttpErr {
             msg: format!("HTTP-Fehler beim Lesen des Response-Body: {}", e),

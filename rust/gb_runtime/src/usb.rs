@@ -56,6 +56,15 @@ pub fn list() -> Result<String, String> {
 }
 
 pub fn open(vid: i64, pid: i64) -> Result<HidDevice, String> {
+    // Review-Fund: `vid as u16`/`pid as u16` truncated einen ausserhalb
+    // 0..=0xFFFF liegenden Wert lautlos -- USB_OPEN(&H10000, &H1234) haette
+    // VID 0x0000 versucht (moeglicherweise ein VOELLIG ANDERES Geraet
+    // getroffen), waehrend die Fehlermeldung im Misserfolgsfall trotzdem die
+    // UNGETRUNCATEN Werte zeigte ("10000:1234 nicht gefunden") -- irrefuehrend
+    // beim Debuggen, weil diese IDs nie tatsaechlich angefragt wurden.
+    if !(0..=0xFFFF).contains(&vid) || !(0..=0xFFFF).contains(&pid) {
+        return Err(format!("USB_OPEN: VID/PID muessen 0..0xFFFF sein (erhalten {:X}:{:X})", vid, pid));
+    }
     let mutex = api()?;
     let a = mutex.lock().map_err(|_| "USB: hidapi-Lock vergiftet".to_string())?;
     a.open(vid as u16, pid as u16)

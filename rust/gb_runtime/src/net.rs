@@ -121,7 +121,7 @@ pub fn accept(l: &TcpListener) -> Result<Option<NetSock>, String> {
 /// Loest `host` mit einem eigenen Timeout auf (statt der unbegrenzt blockierenden
 /// stdlib-DNS-Aufloesung), damit ein haengender/langsamer DNS-Server
 /// `NET_TCP_CONNECT` nicht den Game-Loop einfrieren lassen kann.
-fn resolve_with_timeout(host: &str, port: i64, timeout: Duration) -> Result<std::net::SocketAddr, String> {
+fn resolve_with_timeout(fn_: &str, host: &str, port: i64, timeout: Duration) -> Result<std::net::SocketAddr, String> {
     let host = host.to_string();
     let host_for_thread = host.clone();
     let (tx, rx) = mpsc::channel();
@@ -134,9 +134,9 @@ fn resolve_with_timeout(host: &str, port: i64, timeout: Duration) -> Result<std:
     });
     match rx.recv_timeout(timeout) {
         Ok(Ok(Some(addr))) => Ok(addr),
-        Ok(Ok(None)) => Err(format!("NET_TCP_CONNECT: Host '{}' nicht aufloesbar", host)),
-        Ok(Err(e)) => Err(format!("NET_TCP_CONNECT: {}", e)),
-        Err(_) => Err(format!("NET_TCP_CONNECT: DNS-Aufloesung von '{}' hat laenger als {}ms gedauert", host, timeout.as_millis())),
+        Ok(Ok(None)) => Err(format!("{}: Host '{}' nicht aufloesbar", fn_, host)),
+        Ok(Err(e)) => Err(format!("{}: {}", fn_, e)),
+        Err(_) => Err(format!("{}: DNS-Aufloesung von '{}' hat laenger als {}ms gedauert", fn_, host, timeout.as_millis())),
     }
     // Hinweis: der Resolver-Thread laeuft im Timeout-Fall im Hintergrund weiter
     // zu Ende (blockierender OS-Resolver-Call laesst sich nicht abbrechen) und
@@ -148,7 +148,7 @@ pub fn connect(host: &str, port: i64) -> Result<NetSock, String> {
     if !(0..=65535).contains(&port) {
         return Err(format!("NET_TCP_CONNECT: port out of range: {}", port));
     }
-    let addr = resolve_with_timeout(host, port, Duration::from_secs(5))?;
+    let addr = resolve_with_timeout("NET_TCP_CONNECT", host, port, Duration::from_secs(5))?;
     let stream = TcpStream::connect_timeout(&addr, Duration::from_secs(5))
         .map_err(|e| format!("NET_TCP_CONNECT: {}", e))?;
     stream.set_nonblocking(true).ok();
@@ -217,7 +217,21 @@ pub fn udp_open() -> Result<UdpSock, String> {
 }
 
 pub fn udp_send(s: &UdpSock, host: &str, port: i64, text: &str) -> Result<i64, String> {
-    s.sock.send_to(text.as_bytes(), (host, port as u16))
+    // Review-Fund: `(host, port).to_socket_addrs()` (versteckt hinter dem
+    // Tupel-ToSocketAddrs-Impl, den send_to hier nutzt) macht einen
+    // SYNCHRONEN, nicht abbrechbaren OS-Resolver-Aufruf VOR jedem einzelnen
+    // Datagramm -- genau das, wofuer NET_TCP_CONNECT extra
+    // resolve_with_timeout() bekommen hat ("ein haengender/langsamer DNS-
+    // Server soll NET_TCP_CONNECT nicht den Game-Loop einfrieren lassen").
+    // Bei einer hostname-basierten UDP-Position-Sync (dokumentiertes 30-Hz-
+    // Beispiel) haette ein antwortloser DNS-Server das Spiel bei JEDEM
+    // Frame kurz eingefroren. Port wurde ausserdem gar nicht validiert
+    // (NET_UDP_SEND(s,"host",70000,"x") sendete lautlos an Port 4464).
+    if !(0..=65535).contains(&port) {
+        return Err(format!("NET_UDP_SEND: port out of range: {}", port));
+    }
+    let addr = resolve_with_timeout("NET_UDP_SEND", host, port, Duration::from_secs(2))?;
+    s.sock.send_to(text.as_bytes(), addr)
         .map(|n| n as i64)
         .map_err(|e| format!("NET_UDP_SEND: {}", e))
 }

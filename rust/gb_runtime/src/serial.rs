@@ -100,6 +100,10 @@ pub fn set_timeout(p: &mut Port, secs: f64) {
     // secs.max(0.0) faengt NaN ab (Rust: max() mit NaN liefert den anderen
     // Operanden), aber NICHT +Infinity -- Duration::from_secs_f64 dort wuerde
     // panicen (gleiche Bug-Klasse wie BT_SCAN mit NaN/Infinity-Timeout).
-    let clamped = if secs.is_finite() { secs.max(0.0) } else { 0.0 };
+    // Review-Fund: das faengt auch NUR NaN/Infinity ab, nicht einen riesigen
+    // aber ENDLICHEN Wert (z.B. 1e300) -- Duration::from_secs_f64 paniked
+    // auch dafuer ("value is either too big or NaN"). 1h ist bereits weit
+    // jenseits jedes sinnvollen Timeouts, deckelt aber diesen Fall mit ab.
+    let clamped = if secs.is_finite() { secs.clamp(0.0, 3600.0) } else { 0.0 };
     let _ = p.conn.set_timeout(Duration::from_secs_f64(clamped));
 }
