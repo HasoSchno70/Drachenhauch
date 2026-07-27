@@ -84,7 +84,11 @@ fn main() -> ExitCode {
     // Front-End-Debug: `gbrt --tokens <datei.gb>` gibt den Token-Strom als
     // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
     {
-        let raw: Vec<String> = std::env::args().collect();
+        // Review-Fund: `std::env::args()` paniked bei nicht-UTF8-Argumenten
+        // (auf Unix moeglich, z.B. ein Dateiname in Latin-1) -- `args_os()` +
+        // verlustbehaftete Konvertierung crasht dort nie, sondern ersetzt nur
+        // ungueltige Bytes.
+        let raw: Vec<String> = std::env::args_os().map(|s| s.to_string_lossy().into_owned()).collect();
         if raw.len() >= 3 && raw[1] == "--tokens" {
             return tokens_main(&raw[2]);
         }
@@ -181,9 +185,14 @@ fn main() -> ExitCode {
         }
     }
 
-    let args: Vec<String> = std::env::args().collect();
+    let args: Vec<String> = std::env::args_os().map(|s| s.to_string_lossy().into_owned()).collect();
     if args.len() < 2 {
-        eprintln!("Verwendung: {} <datei.gbc>", args[0]);
+        // Review-Fund: `args[0]` indexierte unbedingt, aber `args.len() < 2`
+        // schliesst auch `len == 0` (leeres argv, z.B. via execve) ein --
+        // ein zweiter Panic direkt im Fehlerpfad. `argv[0]` als Programmname
+        // ist per Konvention ohnehin praesent, `.get(0)` mit Fallback ist der
+        // billige, sichere Weg.
+        eprintln!("Verwendung: {} <datei.gbc>", args.first().map(String::as_str).unwrap_or("gbrt"));
         return ExitCode::from(1);
     }
     let path = &args[1];
@@ -359,7 +368,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
         machine.set_stop_flag(flag);
     }
     let run_res = machine.run();
-    let stopped = matches!(&run_res, Err(e) if vm::Vm::was_stopped(e));
+    let stopped = matches!(&run_res, Err(e) if machine.was_stopped(e));
     let (total, lines) = machine.take_profile();
     let err_line = machine.error_line();
     let output = machine.take_output();
@@ -370,8 +379,10 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
         "total_time": total, "output": output, "lines": lines_json, "stopped": stopped
     });
     // Echte Laufzeitfehler ins JSON -- der Stop-Sentinel ist KEIN Fehler.
+    // `stopped` (oben, VOR dem `take_output`-Move von `machine`) ist bereits
+    // die richtige Antwort -- kein zweiter `was_stopped`-Aufruf noetig.
     if let Err(e) = &run_res {
-        if !vm::Vm::was_stopped(e) {
+        if !stopped {
             blob["error"] = serde_json::json!(e);
             blob["error_line"] = serde_json::json!(err_line);
         }
@@ -406,9 +417,13 @@ fn debug_main(path: &str) -> ExitCode {
     machine.enable_debug();
     let res = machine.run();
     machine.debug_flush_output();
+    // Review-Fund: verglich frueher den Fehlertext gegen "__DEBUG_STOP__" --
+    // ein GB-Programm mit `THROW "__DEBUG_STOP__"` haette einen echten Fehler
+    // so faelschlich als "sauber gestoppt" gemeldet. `was_debug_stopped()`
+    // liest stattdessen das interne Flag, das THROW nie setzt.
     let ev = match &res {
         Ok(()) => serde_json::json!({"event": "finished", "reason": "done"}),
-        Err(e) if e == "__DEBUG_STOP__" =>
+        Err(_) if machine.was_debug_stopped() =>
             serde_json::json!({"event": "finished", "reason": "stopped"}),
         Err(e) => serde_json::json!({
             "event": "error", "line": machine.error_line(), "message": e }),
@@ -587,7 +602,15 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
         Ok(j) => j,
         Err(code) => return code,
     };
-    let gbc_bytes = serde_json::to_string(&json).unwrap_or_default().into_bytes();
+    // Review-Fund: `unwrap_or_default()` liess einen Serialisierungsfehler
+    // lautlos zu einem LEEREN Payload werden -- das Bundle wurde trotzdem
+    // geschrieben und "Exportiert: ..." gemeldet, obwohl `embedded_gbc()`
+    // `len == 0` ablehnt und die ausgelieferte Exe beim Start nur noch
+    // "Verwendung: gbrt <datei.gbc>" ausgibt.
+    let gbc_bytes = match serde_json::to_string(&json) {
+        Ok(s) => s.into_bytes(),
+        Err(e) => { eprintln!("Kann .gbc nicht serialisieren: {}", e); return ExitCode::from(1); }
+    };
     // 2) Eigene Exe lesen + Payload anhaengen.
     let exe = match std::env::current_exe() {
         Ok(p) => p,
@@ -683,12 +706,31 @@ fn bundle_referenced_assets(source: &str, base: &std::path::Path, out: &std::pat
     let mut count = 0usize;
     for lit in string_literals(source) {
         if lit.is_empty() || lit.len() > 400 { continue; }
+        // Review-Fund: "." bzw. ".." sind gaengige String-Literale in GANZ
+        // GEWOEHNLICHEM Code (`IF ch = "."`, `JOIN(parts, ".")`, ...), keine
+        // Asset-Pfade. `strip_parent_prefix(".")` liess sie aber unveraendert
+        // durch ("." hat kein "../"/"./"-Praefix), und `base.join(".")` /
+        // `base.join("..")` zeigen auf `base` bzw. dessen Elternverzeichnis
+        // -- beide EXISTIEREN immer. `copy_dir_recursive(base, out)` kopiert
+        // dann `out` (das gerade erst angelegte `_dist`-Verzeichnis) in sich
+        // selbst hinein und rekursiert bis zur Pfadlaengen-Grenze, wobei bei
+        // jeder Ebene die frisch geschriebene Bundle-Exe erneut kopiert wird
+        // -- ein reproduzierbarer Festplatten-Fuellstand-Bug aus voellig
+        // gewoehnlichem GB-Code.
+        if lit == "." || lit == ".." { continue; }
         // Absolute Pfade ueberspringen (nicht buendelbar): /... oder C:\...
         if lit.starts_with('/') || lit.starts_with('\\') { continue; }
         let b = lit.as_bytes();
         if b.len() >= 2 && b[1] == b':' { continue; }   // C:\ / D:/
         let src = base.join(&lit);
         if !src.exists() { continue; }
+        // Verteidigung in der Tiefe: `src` darf nicht `out` selbst oder ein
+        // Vorfahre von `out` sein (sonst kopiert copy_dir_recursive das
+        // Zielverzeichnis in sich selbst hinein, egal ueber welches Literal
+        // das passiert waere).
+        if let (Ok(src_c), Ok(out_c)) = (src.canonicalize(), out.canonicalize()) {
+            if out_c.starts_with(&src_c) { continue; }
+        }
         let rel = strip_parent_prefix(&lit);
         if rel.is_empty() || !seen.insert(rel.clone()) { continue; }
         let dst = out.join(&rel);
