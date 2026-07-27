@@ -127,7 +127,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 | `tween` | Werteinterpolation. 13 Easings (`linear`, `out_bounce`, `out_elastic`, …), Pause/Resume/Reverse | `TWEEN` |
 | `timer` | Geplante Aktionen ohne MILLIS-Buchführung: `TIMER_AFTER/EVERY(ms, fnref)` → ID (FUNCREF-Callbacks, parameterlos), `TIMER_UPDATE()` pro Frame feuert die fälligen (Muster wie INPUT_UPDATE/GUI_UPDATE; EVERY max. 1×/Update, kein Aufhol-Burst), `TIMER_CANCEL/ACTIVE/COUNT/CLEAR` (Tombstone-stabile IDs). Plus `COOLDOWN(id$, ms)` — String-ID-Ratenbegrenzer (TRUE wenn frei, startet dann die Sperre; braucht kein UPDATE). Konsolen-tauglich (kein Grafik-Bezug; `rust/gb_runtime/src/timer.rs` + `try_timer` in vm.rs). Doku `docs/module-timer.md`, Demo `examples/113_timer.gb`, Tests `tests/test_modules_timer.py`. | — |
 | `imgfx` | `IMAGE_SCALE/ROTATE/FLIP/TINT/COPY` — immutable, geben neues IMAGE zurück | — |
-| `particles` | Emitter mit Velocity/Lifetime/Gravity/Color/Size/Fade. `PARTICLE_EMIT/UPDATE/DRAW`. NumPy-vektorisiert. **Render-Modi** `PARTICLE_SET_MODE` (`circle`/`pixel`/`square`/`streak`/`glow`-additiv) + **Farbverlauf** `PARTICLE_SET_COLOR_END` (Start→End ueber die Lebenszeit, z.B. Feuer gelb→rot). | `PARTICLE_SYSTEM` |
+| `particles` | Emitter mit Velocity/Lifetime/Gravity/Color/Size/Fade. `PARTICLE_EMIT/UPDATE/DRAW`. NumPy-vektorisiert. **Render-Modi** `PARTICLE_SET_MODE` (`circle`/`pixel`/`square`/`streak`/`glow` — `glow` wird in `PARTICLE_DRAW` (vm.rs) aktuell identisch zu `circle` gerendert, kein additives Blending im Recording-Modell; fuer echtes additives Leuchten `BLEND_MODE("add")` um die `PARTICLE_DRAW`-Aufrufe legen) + **Farbverlauf** `PARTICLE_SET_COLOR_END` (Start→End ueber die Lebenszeit, z.B. Feuer gelb→rot). | `PARTICLE_SYSTEM` |
 | `physics` | Pure Functions: AABB-/Circle-Collision, Distance, Reflect, Normalize, Ray-Cast (Box+Circle). Kein State. Plus **Broadphase** (`PHYSICS_BROAD_NEW/ADD/QUERY/PAIR_A/PAIR_B`): O(n)-Kollisionspaare fuer viele Kreis-Entities (Uniform-Grid, nativ via `gb_native`). | `PHYSICS_BROAD` |
 | `physics3d` | **Echte 3D-Starrkoerper-Physik via Rapier3D** (voller Solver: Schwerkraft, Integration, Kollisionsaufloesung, Restitution/Reibung — kein blosses Kollisions-Toolkit wie `physics`). `PHYS3D_NEW`, `PHYS3D_SET_GRAVITY`, `PHYS3D_ADD_BOX`/`ADD_SPHERE(... , dynamic, bounce)`, `PHYS3D_STEP(w, dt)`, `PHYS3D_BODY_X/Y/Z` + `BODY_QX/QY/QZ/QW` (Quaternion -> `MAT4_TRS`/`MODEL_MATRIX`), `PHYS3D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`REMOVE`/`COUNT`. Koerper-Index stabil (Tombstones). Rapier3D ist pure-Rust (nalgebra) -> ungated in gbrt. Demo `examples/107_physics3d.gb`, Tests `tests/test_physics3d.py`. | `PHYS_WORLD` |
 | `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/`REMOVE`/`COUNT`. **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.gb`, Tests `tests/test_physics2d.py`. | `PHYS2D_WORLD` |
@@ -163,7 +163,7 @@ So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in h
 |---|---|---|
 | Asset-Cache | `LOAD_ASSETS(manifest.json)` — bulk-Preload mit Alias-Cache. `LOADIMAGE` / `LOADSOUND` cachen automatisch (rohem + abs Pfad). | — |
 | Z-Layer | `LAYER_DEFINE(name, z)`, `LAYER(name)`, `LAYER_END()`, `LAYER_CLEAR(name)`. Layer-Surfaces mit SRCALPHA, FLIP composiert in z-Order und cleart. | — |
-| Sprite-Atlas | `ATLAS_LOAD(manifest.json)` -> `SPRITE_ATLAS`. `ATLAS_DRAW(atlas, name, x, y)`. `BATCH_DRAW(...)` + `BATCH_FLUSH()` als gebatchter Sprite-Draw (nativ in gbrt). Auto-Flush bei FLIP / Layer-Switch / Direct-Draw. | `SPRITE_ATLAS` |
+| Sprite-Atlas | `ATLAS_LOAD(manifest.json)` -> `SPRITE_ATLAS`. `ATLAS_DRAW(atlas, name, x, y)` zeichnet einzeln, Camera-aware. `BATCH_DRAW(...)`/`BATCH_FLUSH()` existieren aus Kompatibilitaet zur alten Python-Engine, sind in gbrt aber **kein echtes Batching**: `BATCH_DRAW` ist derselbe Dispatch-Arm wie `ATLAS_DRAW` (sofortiges Emit in den Layer-Command-Puffer), `BATCH_FLUSH()` ist ein No-Op (`vm.rs`: "Recording-Modell: alles flusht beim FLIP"). Kein separater Batch-Queue-Zustand, keine Draw-Call-Ersparnis gegenueber `ATLAS_DRAW`. | `SPRITE_ATLAS` |
 | Bulk-Plot | `PLOTS(xs, ys, color)` — viele Pixel in EINEM Aufruf (vektorisiert), `color` = INT (alle gleich) oder ARRAY OF INT (pro Pixel). Groessenordnungen schneller als `PLOT` in einer Schleife (Starfields, Punktwolken). | — |
 | Bulk-Shapes | `BOXES(x1s,y1s,x2s,y2s,color)`, `CIRCLES(xs,ys,rs,color)`, `LINES(x1s,y1s,x2s,y2s,color)` — viele Shapes in EINEM Builtin-Call (spart den Dispatch pro Shape; gezeichnet wird pro Shape). `color` = INT oder ARRAY. | — |
 | Bulk-Tilemap | `TILED_FILL_RECT`, `TILED_REPLACE`, `TILED_COUNT_GID`, `TILED_FLOOD_FILL` (Bucket-Fill, nativ via `gb_native`) — siehe `tiled`-Modul. `DRAWTILEMAP` rendert intern via `blits()`-Batch (1 Call statt rows×cols). | — |
@@ -1259,12 +1259,17 @@ FLIP()   ' composiert in z-Order, cleart fuer naechsten Frame
 - `LAYER_END()` — zurueck zum Main-Buffer (optional, FLIP macht's auch)
 - `LAYER_CLEAR(name)` — manuell leeren (selten gebraucht)
 
-**Implementation** ([graphics.py](gamebasic/graphics.py)): `_Layer`-Class
-mit `name`, `z`, `surface` (SRCALPHA, lazy-allokiert beim ersten USE
-nach SCREEN). `_main_buffer` ist das Compose-Target; `_buffer` ist der
-aktive Draw-Target (kann auf `_main_buffer` oder eine Layer-Surface
-zeigen). FLIP composiert sortiert nach z aufsteigend (niedrigstes z =
-hinten, hoechstes z = vorne).
+**Implementation** ([rust/gb_runtime/src/graphics.rs](rust/gb_runtime/src/graphics.rs)):
+kein Surface-Compositing (das war das alte, entfernte Python-`graphics.py`
+via pygame) — gbrt ist ein **Command-Recording-Modell**. Jede Layer ist ein
+`Layer { z, cmds: Vec<Cmd> }`; Draw-Aufrufe haengen sofort einen `Cmd` an
+die *aktive* Layer (`self.active`, per `LAYER(name)` umgeschaltet) an, statt
+etwas zu rendern. `FLIP()` sortiert alle Layer-Indizes nach `z` aufsteigend
+(niedrigstes z = hinten, hoechstes z = vorne) und spielt deren `cmds` in
+dieser Reihenfolge in EINEM `begin_drawing`-Block ab (`render_scene`),
+danach werden alle `cmds`-Vecs geleert (Immediate-Mode: ein Frame lang
+gueltig) und `self.active`/`self.active_rt` auf den Main-Buffer
+zurueckgesetzt.
 
 **Backwards-Compat:** Code ohne `LAYER_*`-Calls hat `_layer_order = []`,
 der Compose-Pfad in FLIP ist ein No-Op und `_buffer` zeigt direkt auf
@@ -1275,10 +1280,22 @@ der Compose-Pfad in FLIP ist ein No-Op und `_buffer` zeigt direkt auf
 ## Sprite-Atlas + Batch-Draw
 
 Sprite-Atlas: EIN grosses Image + Dict von `name -> (x, y, w, h)`-Rects.
-Mehrere Sub-Sprites teilen sich eine Textur -- ideal fuer gebatchtes
-Rendern (viele Sprites in einem Draw-Call; Game-Engine-Pattern fuer
-Tilemaps, Bullet-Hell, Tile-Drawing). Nativ in gbrt; Tree-Walker
+Mehrere Sub-Sprites teilen sich eine Textur -- Game-Engine-Pattern fuer
+Tilemaps, Bullet-Hell, Tile-Drawing. Nativ in gbrt; Tree-Walker
 konsolen-only -> wirft "nur gbrt".
+
+> **`BATCH_DRAW`/`BATCH_FLUSH` sind heute reine API-Kompatibilitaet, KEIN
+> echtes Batching.** Der Name + die Kommentare unten stammen aus der alten
+> Python-Engine (pygame-Surface-Blits, die sich tatsaechlich zu einem
+> gebatchten Blit sammeln liessen). gbrts Immediate-Mode ist ein
+> Command-Recording-Modell: jeder Draw-Aufruf haengt sofort einen `Cmd` an
+> die aktive Layer, `FLIP()` sortiert die Layer nach z und spielt sie ab.
+> In diesem Modell IST `BATCH_DRAW` identisch zu `ATLAS_DRAW` (derselbe
+> Match-Arm in `vm.rs`), und `BATCH_FLUSH()` ist ein No-Op -- es gibt
+> keinen separaten Batch-Queue-Zustand, der etwas zu flushen haette. Die
+> "Auto-Flush"/"Zoom-Caveat"-Absaetze unten beschreiben daher ein
+> Verhalten, das in gbrt nicht (mehr) existiert; sie sind als historische
+> Notiz stehen gelassen, nicht als aktuelle Verhaltensdokumentation.
 
 ```basic
 DIM atlas AS SPRITE_ATLAS

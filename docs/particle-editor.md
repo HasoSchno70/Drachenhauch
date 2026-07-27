@@ -26,10 +26,10 @@ oder
 
 - **Preset-Bibliothek** — Combo mit **Werks-Presets** (★ `Feuer`, `Rauch`, `Funken`, `Explosion`, `Regen`) als Startpunkt plus deinen **eigenen Presets**. „Speichern unter..." legt den aktuellen Zustand als benanntes Preset ab (persistiert unter `~/.gamebasic/presets/particles.json`), „Loeschen" entfernt eigene Presets (Werks-Presets sind geschützt).
 - **Bewegung** — `vx/vy min/max` (Start-Geschwindigkeit, px/s), `Gravity x/y` (px/s²).
-- **Aussehen** — **Modus** (`circle` / `pixel` / `square` / `streak` / `glow`), Größe min/max, **Farbe**, optionaler **Farbverlauf** zu einer End-Farbe (über die Lebenszeit interpoliert, z. B. Feuer gelb→rot), **Fade** (am Lebensende abdunkeln).
+- **Aussehen** — **Modus** (`circle` / `pixel` / `square` / `streak` / `glow` — `glow` wird aktuell identisch zu `circle` gezeichnet, kein additives Blending; für echtes additives Leuchten im Spiel selbst `BLEND_MODE("add")` um `PARTICLE_DRAW` legen), Größe min/max, **Farbe**, optionaler **Farbverlauf** zu einer End-Farbe (über die Lebenszeit interpoliert, z. B. Feuer gelb→rot), **Fade** (am Lebensende abdunkeln).
 - **Lebenszeit & Emission** — Lebensdauer min/max (ms), Emission pro Frame.
 
-**Rechts** die Echtzeit-Vorschau. Sie treibt eine echte `_ParticleSystem`-Instanz — **dasselbe Simulationsmodell wie die Engine**, also entspricht die Vorschau exakt dem späteren Verhalten im Spiel (inkl. additivem `glow`).
+**Rechts** die Echtzeit-Vorschau. Sie treibt eine echte `_ParticleSystem`-Instanz — **dasselbe Simulationsmodell wie die Engine**, also entspricht die Vorschau exakt dem späteren Verhalten im Spiel (inkl. `glow`, das bewusst wie `circle` aussieht — siehe oben).
 
 **Unten:** **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Parameter-Änderungen rückgängig bzw. wieder her — ein Slider-Drag zählt als ein Schritt. `Pause` friert die Simulation ein, `Leeren` entfernt alle Partikel, **`GB-Code exportieren`** öffnet ein Fenster mit dem fertigen `PARTICLE_*`-Setup-Snippet und kopiert es auf Wunsch in die Zwischenablage.
 

@@ -33,7 +33,7 @@ module.exports = (H) => [
       'PARTICLE_SET_COLOR_END(funken, RGB(255, 60, 0))    \' Ende: rot',
     ]),
   H.cmd("PARTICLE_SET_MODE · PARTICLE_SET_FADE", 'PARTICLE_SET_MODE(sys, modus$)   PARTICLE_SET_FADE(sys, an)',
-    "MODE wählt die Darstellung: \"circle\", \"pixel\", \"square\", \"streak\" oder \"glow\" (additiv – überlappende Teilchen leuchten heller, perfekt für Feuer und Magie). FADE = TRUE lässt Teilchen mit dem Alter ausblenden.",
+    "MODE wählt die Darstellung: \"circle\", \"pixel\", \"square\", \"streak\" oder \"glow\" (aktuell identisch zu \"circle\" gerendert – ein echter additiver Blend-Modus für Partikel ist mit dem heutigen Draw-Recording-Modell noch nicht umgesetzt; für echtes additives Leuchten BLEND_MODE(\"add\") um die PARTICLE_DRAW-Aufrufe legen). FADE = TRUE lässt Teilchen mit dem Alter ausblenden.",
     [
       'PARTICLE_SET_MODE(funken, "glow")',
       'PARTICLE_SET_FADE(funken, TRUE)',
