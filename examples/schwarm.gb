@@ -144,18 +144,18 @@ DIM rmbPrev AS BOOLEAN
 rmbPrev = FALSE
 
 ' --- Tiere -------------------------------------------------------------
-DIM bx[150] AS FLOAT
-DIM by[150] AS FLOAT
-DIM bz[150] AS FLOAT
-DIM bvx[150] AS FLOAT
-DIM bvy[150] AS FLOAT
-DIM bvz[150] AS FLOAT
-DIM bs[150] AS INTEGER
+DIM bx[NUM] AS FLOAT
+DIM by[NUM] AS FLOAT
+DIM bz[NUM] AS FLOAT
+DIM bvx[NUM] AS FLOAT
+DIM bvy[NUM] AS FLOAT
+DIM bvz[NUM] AS FLOAT
+DIM bs[NUM] AS INTEGER
 
 ' --- Farben pro Schwarm ------------------------------------------------
-DIM colDim[3] AS INTEGER
-DIM colHi[3] AS INTEGER
-DIM baseCol[3] AS INTEGER
+DIM colDim[SWARMS] AS INTEGER
+DIM colHi[SWARMS] AS INTEGER
+DIM baseCol[SWARMS] AS INTEGER
 baseCol[0] = RGB(255, 120, 50)
 baseCol[1] = RGB(70, 200, 235)
 baseCol[2] = RGB(190, 120, 255)
@@ -171,10 +171,10 @@ DIM bgTex AS INTEGER
 bgTex = GENTEX_GRADIENT(256, 256, RGB(46, 30, 78), RGB(7, 10, 24), TRUE)
 
 ' --- Sternenfeld: zufaellige Punkte auf einer grossen Kugel ------------
-DIM sx[220] AS FLOAT
-DIM sy[220] AS FLOAT
-DIM sz[220] AS FLOAT
-DIM scol[220] AS INTEGER
+DIM sx[STARS] AS FLOAT
+DIM sy[STARS] AS FLOAT
+DIM sz[STARS] AS FLOAT
+DIM scol[STARS] AS INTEGER
 DIM st AS INTEGER
 DIM rxx AS FLOAT
 DIM ryy AS FLOAT
@@ -203,12 +203,12 @@ FOR st = 0 TO STARS - 1
 NEXT
 
 ' --- Schwarm-Heimatpunkte (driften in X/Z, in 3D auch in Y) ------------
-DIM homeX[3] AS FLOAT
-DIM homeY[3] AS FLOAT
-DIM homeZ[3] AS FLOAT
-DIM homeVX[3] AS FLOAT
-DIM homeVY[3] AS FLOAT
-DIM homeVZ[3] AS FLOAT
+DIM homeX[SWARMS] AS FLOAT
+DIM homeY[SWARMS] AS FLOAT
+DIM homeZ[SWARMS] AS FLOAT
+DIM homeVX[SWARMS] AS FLOAT
+DIM homeVY[SWARMS] AS FLOAT
+DIM homeVZ[SWARMS] AS FLOAT
 FOR s = 0 TO SWARMS - 1
     homeX[s] = (s - 1) * (HF * 0.6)
     homeY[s] = 0.0
@@ -278,21 +278,21 @@ last_ms = MILLIS()
 ' ======================================================================
 
 WHILE NOT QUITREQUESTED()
-    
+
     IF KEYPRESSED(KEY_ESCAPE) THEN
         BREAK
     END IF
 
     ' --- Vollbild (Flanke) ---
     DIM fNow AS BOOLEAN
-    
+
     fNow = KEYPRESSED(KEY_F)
-    
+
     IF fNow AND NOT fPrev THEN
         isFull = NOT isFull
         SET_FULLSCREEN(isFull)
     END IF
-    
+
     fPrev = fNow
 
     ' --- 2D/3D umschalten (Flanke) ---
