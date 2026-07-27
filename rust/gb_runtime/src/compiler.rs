@@ -614,7 +614,15 @@ impl Compiler {
             return Err(format!("Klasse '{}' nicht gefunden", class_name));
         }
         let args = match args {
-            None => { self.ctx.emit(oc::NEW_INSTANCE, json!([class_name, 0, false])); return Ok(()); }
+            // Review-Fund: `NEW Klasse` (ohne Klammern) emittierte hier den
+            // has_init_args=false-Pfad, den die VM als "gar nicht erst
+            // versuchen, Init aufzurufen" liest -- eine parameterlose
+            // `SUB Init()` wurde bei dieser Schreibweise also NIE ausgefuehrt
+            // (waehrend `NEW Klasse()` mit leeren Klammern korrekt
+            // funktionierte). `true` mit 0 Argumenten macht beide
+            // Schreibweisen identisch: die VM ruft Init mit 0 Argumenten auf,
+            // wenn es eine gibt, und ist sonst ein No-Op (unveraendert).
+            None => { self.ctx.emit(oc::NEW_INSTANCE, json!([class_name, 0, true])); return Ok(()); }
             Some(a) => a,
         };
         let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
@@ -761,8 +769,14 @@ impl Compiler {
         // var = start
         self.expr(start)?;
         self.store_var(var);
-        // end -> Temp
-        let end_slot = self.ctx.alloc_temp("integer");
+        // end -> Temp. Review-Fund: war "integer" getypt, obwohl `end`
+        // (und `step` unten) durchaus ein FLOAT sein koennen (z.B.
+        // `FOR i = 1 TO 7 / 2` -> end=3.5) -- STORE_LOCAL coerct dann nach
+        // "integer" und wirft einen falschen Laufzeitfehler fuer ansonsten
+        // gueltigen Code. Die GT/LT/FOR_NEXT-Vergleichs-Opcodes kommen mit
+        // gemischtem INT/FLOAT klar, die Annotation "integer" war also nur
+        // eine unnoetig strenge Regression.
+        let end_slot = self.ctx.alloc_temp("any");
         self.expr(end)?;
         self.ctx.emit(oc::STORE_LOCAL, json!(end_slot));
         // step -> Temp (nur wenn nicht-konstant)
@@ -774,7 +788,7 @@ impl Compiler {
             _ => None,
         };
         if step_const_val.is_none() {
-            let s = self.ctx.alloc_temp("integer");
+            let s = self.ctx.alloc_temp("any");
             step_slot = s as i64;
             self.expr(step.as_deref().unwrap())?;
             self.ctx.emit(oc::STORE_LOCAL, json!(s));
@@ -870,8 +884,17 @@ impl Compiler {
             Some(t) => self.ctx.add_const(json!(t)),
             None => self.ctx.add_const(Value::Null),
         };
-        let slot = self.global_slots[name] as i64;
-        self.ctx.emit(oc::DECLARE_GLOBAL_CONST_SLOT, json!([slot, name_idx, type_idx]));
+        // Review-Fund: `self.global_slots[name]` paniked, wenn `name` keine
+        // Top-Level-CONST ist (`collect_globals` durchlaeuft nur Top-Level-
+        // Statements) -- ein `CONST` innerhalb einer SUB/FUNCTION oder in
+        // einem verschachtelten Block (IF/SELECT/...) ist vom Parser aus
+        // erlaubt, brachte den Compiler hier aber zum Absturz statt eines
+        // GBRuntimeError. Gleicher Fallback wie emit_namespace_const (ENUM):
+        // ohne Slot auf den namensbasierten DECLARE_CONST zurueckfallen.
+        match self.global_slots.get(name) {
+            Some(&slot) => self.ctx.emit(oc::DECLARE_GLOBAL_CONST_SLOT, json!([slot as i64, name_idx, type_idx])),
+            None => self.ctx.emit(oc::DECLARE_CONST, json!([name_idx, type_idx])),
+        };
         Ok(())
     }
 
@@ -1173,8 +1196,27 @@ impl Compiler {
             _ => return Err("Stufe 3e: aufrufbare Werte noch nicht unterstuetzt".into()),
         };
         let has_named = args.iter().any(|a| matches!(a, Node::NamedArg { .. }));
-        // Impliziter Methoden-Aufruf: bare Name = Methode der eigenen Klasse.
-        if let Some(cn) = self.ctx.current_class.clone() {
+        let is_local = self.ctx.local_slots.contains_key(&name);
+        let is_global = self.global_vars.contains(&name);
+        // Review-Fund: der implizite Methoden-Aufruf lief bisher IMMER zuerst
+        // (vor der is_local/is_global-Pruefung) -- ein Parameter oder eine
+        // lokale Variable mit demselben Namen wie eine Methode dieser Klasse
+        // (z.B. `DIM update AS FUNCREF` in einer Klasse mit `SUB update()`)
+        // wurde beim Aufruf `update(x)` also STILLSCHWEIGEND ignoriert und
+        // immer die Methode aufgerufen. Der freie-Funktions-Pfad direkt
+        // darunter behandelt dieselbe Situation seit jeher als Compile-Fehler
+        // ("Namens-Kollision") -- jetzt symmetrisch fuer Methoden.
+        if is_local || is_global {
+            if let Some(cn) = self.ctx.current_class.clone() {
+                if self.resolve_method(&cn, &name) {
+                    return Err(format!(
+                        "Namens-Kollision: '{}' ist zugleich eine Variable/ein Parameter \
+                         und eine Methode dieser Klasse -- beim Aufruf verdeckt die \
+                         Variable die Methode. Benenne eines von beiden um.", name));
+                }
+            }
+        } else if let Some(cn) = self.ctx.current_class.clone() {
+            // Impliziter Methoden-Aufruf: bare Name = Methode der eigenen Klasse.
             if self.resolve_method(&cn, &name) {
                 if has_named {
                     return Err(format!("{}: Named-Args bei Methoden-Call nicht unterstuetzt", name));
@@ -1185,8 +1227,6 @@ impl Compiler {
                 return Ok(());
             }
         }
-        let is_local = self.ctx.local_slots.contains_key(&name);
-        let is_global = self.global_vars.contains(&name);
         // Namens-Kollision: eine Variable verdeckt eine gleichnamige SUB/FUNCTION
         // (case-insensitiv). Beim Aufruf gewinnt die Variable -> sonst kryptisches
         // "nicht aufrufbar" zur Laufzeit. Klare Meldung schon beim Kompilieren.
@@ -1773,6 +1813,19 @@ impl Compiler {
         let mut method_sigs = HashMap::new();
         for m in methods {
             let (mname, _, _, _, _) = fn_parts(m);
+            // Review-Fund: `method_sigs.insert` (HashMap) und der `compiled`-
+            // Vec in compile_class_methods ueberschreiben/verdoppeln bei
+            // einem doppelten Methodennamen bisher stillschweigend (letzter
+            // gewinnt) -- Property-Get/Set desugaren zum selben Namensmuster
+            // (__get_x/__set_x, siehe parser.rs::property_decl), zwei
+            // `PROPERTY GET x` fuer dieselbe Klasse sind also derselbe Fall.
+            // Freie Funktionen lehnen ein Duplikat bereits klar ab
+            // (register_stub) -- hier symmetrisch.
+            if method_sigs.contains_key(mname) {
+                return Err(format!(
+                    "Klasse '{}': Methode/Property '{}' ist mehrfach deklariert",
+                    name, mname));
+            }
             method_sigs.insert(mname.to_string(), make_sig(m)?);
         }
         let property_set: Vec<String> = properties.iter().filter_map(|p| match p {
@@ -2019,6 +2072,19 @@ fn make_sig(decl: &Node) -> Result<FnSig, String> {
     // n_required = erster Parameter MIT Default (Literal oder Ausdruck).
     let n_required = params.iter().position(|p| p.default.is_some()).unwrap_or(params.len());
     let is_variadic = params.last().map(|p| p.is_variadic).unwrap_or(false);
+    let is_coroutine = body_has_yield(body);
+    // Review-Fund: ein CALL_USER auf eine Coroutine pusht NUR das Handle (ein
+    // Wert), waehrend BYREF-Aufrufer ein `[bv0..bv{m-1}, result]`-Layout vom
+    // Stack erwarten (emit_byref_writeback) -- diese beiden Annahmen sind
+    // unvereinbar (die finalen BYREF-Werte stehen bei einer Coroutine erst
+    // nach CORO_RESUME/CORO_DONE fest, nicht direkt nach dem Aufruf). Statt
+    // den Aufrufer-Stack lautlos zu korrumpieren: schon beim Deklarieren
+    // ablehnen.
+    if is_coroutine && params.iter().any(|p| p.by_ref) {
+        return Err("BYREF-Parameter werden bei Coroutinen (Funktionen/Subs mit YIELD) \
+                     nicht unterstuetzt -- die finalen Werte stehen erst nach dem \
+                     Abschluss der Coroutine fest, nicht direkt beim Aufruf.".into());
+    }
     Ok(FnSig {
         n_params: params.len(),
         n_required,
@@ -2028,7 +2094,7 @@ fn make_sig(decl: &Node) -> Result<FnSig, String> {
         param_byref: params.iter().map(|p| p.by_ref).collect(),
         is_variadic,
         return_type: if is_sub { String::new() } else { return_type.to_string() },
-        is_coroutine: body_has_yield(body),
+        is_coroutine,
     })
 }
 
@@ -2049,6 +2115,16 @@ fn eval_literal_default(e: &Node) -> Result<CVal, String> {
 }
 
 fn body_has_yield(stmts: &[Node]) -> bool {
+    // Review-Fund: fehlte urspruenglich mehrere Statement- UND Expression-
+    // Formen (Select/Try/With/IndexAssign/MemberAssign/TupleAssign/Print/Read
+    // bei ns(); MemberAccess/ArrayLit/TupleLit/New/NamedArg/SliceAccess/
+    // Comprehensions bei ny()) -- eine Funktion mit `YIELD` z.B. innerhalb
+    // eines SELECT CASE oder TRY-Blocks wurde dadurch faelschlich NICHT als
+    // Coroutine erkannt (is_coroutine=false), lief eager durch `exec` und
+    // schlug beim ersten YIELD_VALUE mit "YIELD ausserhalb einer Coroutine"
+    // fehl. `collect_data` (gleiche Datei) hat fuer DATA-Sammlung bereits das
+    // richtige Vorbild (deckt Select/Try ab) -- hier read Vorbild uebernommen
+    // und um With/IndexAssign/MemberAssign/TupleAssign/Print/Read ergaenzt.
     fn ny(e: &Node) -> bool {
         match e {
             Node::Yield(_) => true,
@@ -2058,6 +2134,19 @@ fn body_has_yield(stmts: &[Node]) -> bool {
             Node::IndexAccess { target, indices } => ny(target) || indices.iter().any(ny),
             Node::TernaryExpr { cond, then_expr, else_expr } =>
                 ny(cond) || ny(then_expr) || ny(else_expr),
+            Node::MemberAccess { target, .. } => ny(target),
+            Node::SliceAccess { target, lo, hi } =>
+                ny(target) || lo.as_deref().map(ny).unwrap_or(false)
+                || hi.as_deref().map(ny).unwrap_or(false),
+            Node::ArrayLit(elements) | Node::TupleLit { elements } => elements.iter().any(ny),
+            Node::NamedArg { value, .. } => ny(value),
+            Node::New { args, .. } => args.as_ref().map(|a| a.iter().any(ny)).unwrap_or(false),
+            Node::ListComp { iterable, filter, transform, .. } =>
+                ny(iterable) || filter.as_deref().map(ny).unwrap_or(false) || ny(transform),
+            Node::DictComp { iterable, filter, key, value, .. } =>
+                ny(iterable) || filter.as_deref().map(ny).unwrap_or(false) || ny(key) || ny(value),
+            Node::SetComp { iterable, filter, transform, .. } =>
+                ny(iterable) || filter.as_deref().map(ny).unwrap_or(false) || ny(transform),
             _ => false,
         }
     }
@@ -2071,7 +2160,21 @@ fn body_has_yield(stmts: &[Node]) -> bool {
                 || elseif_branches.iter().any(|(_, b)| b.iter().any(ns))
                 || else_block.iter().any(ns),
             Node::While { body, .. } | Node::For { body, .. }
-            | Node::Repeat { body, .. } | Node::ForEach { body, .. } => body.iter().any(ns),
+            | Node::Repeat { body, .. } | Node::ForEach { body, .. }
+            | Node::With { body, .. } => body.iter().any(ns),
+            Node::Select { subject, cases, else_block } =>
+                ny(subject)
+                || cases.iter().any(|(_, guard, blk)|
+                    guard.as_ref().map(ny).unwrap_or(false) || blk.iter().any(ns))
+                || else_block.iter().any(ns),
+            Node::Try { body, catch_block, .. } =>
+                body.iter().any(ns) || catch_block.iter().any(ns),
+            Node::IndexAssign { target, indices, value } =>
+                ny(target) || indices.iter().any(ny) || ny(value),
+            Node::MemberAssign { target, value, .. } => ny(target) || ny(value),
+            Node::TupleAssign { targets, value } => targets.iter().any(ny) || ny(value),
+            Node::Print { items, .. } => items.iter().any(ny),
+            Node::Read { .. } => false,
             _ => false,
         }
     }
@@ -2290,11 +2393,70 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
         // Klassen-Statics bekommen einen Slot.
         for cd in &cls_decls {
             if let Node::ClassDecl { name, statics, .. } = cd {
-                if !statics.is_empty() { c.alloc_slot(name); }
+                if !statics.is_empty() {
+                    // Review-Fund: alloc_slot() macht bei einer Kollision
+                    // (z.B. eine globale DIM/CONST/ENUM mit demselben Namen)
+                    // STILLSCHWEIGEND nichts (HashMap::entry().or_insert()
+                    // behaelt den bestehenden Slot) -- die Klassen-Statics
+                    // haetten sich lautlos denselben Speicherplatz wie diese
+                    // globale Variable geteilt, statt eines klaren Fehlers.
+                    if c.global_slots.contains_key(name) {
+                        return Err(format!(
+                            "Namens-Kollision: Klasse '{}' hat STATIC-Member, \
+                             aber '{}' ist bereits als globale Variable/CONST/ENUM \
+                             belegt -- benenne eines von beiden um.", name, name));
+                    }
+                    c.alloc_slot(name);
+                }
             }
         }
         // Phase 1: Klassen registrieren (Felder/Methoden-Sigs/Properties).
         for cd in &cls_decls { c.register_class(cd)?; }
+        // Review-Fund: zyklische Vererbung (CLASS A EXTENDS B / CLASS B EXTENDS
+        // A) wurde bisher klaglos akzeptiert und liess die MRO-Walker zur
+        // Laufzeit (resolve_method/is_property/allocate_instance in vm.rs) in
+        // eine Endlosschleife bzw. unbegrenztes Allozieren laufen. Hier einmalig
+        // nach der Registrierungsphase pruefen, solange alle Klassen bekannt sind.
+        for (name, ci) in &c.classes {
+            let mut seen = std::collections::HashSet::new();
+            seen.insert(name.clone());
+            let mut cur = ci.parent_name.clone();
+            while !cur.is_empty() {
+                if !seen.insert(cur.clone()) {
+                    return Err(format!(
+                        "Zyklische Vererbung: '{}' erscheint zweimal in der EXTENDS-Kette ab Klasse '{}'",
+                        cur, name));
+                }
+                cur = match c.classes.get(&cur) {
+                    Some(parent_ci) => parent_ci.parent_name.clone(),
+                    None => break,
+                };
+            }
+        }
+        // Selbstreferenzierende Structs (STRUCT N : DIM next AS N, direkt oder
+        // ueber eine Kette anderer Structs -- auch als Array-Feld, das array-
+        // gebackte Feld ruft pro Element ebenfalls element_default/
+        // allocate_instance auf) wuerden allocate_instance in vm.rs ebenso
+        // endlos rekursieren lassen (Struct-Groesse waere unendlich).
+        fn struct_field_cycle(classes: &HashMap<String, ClassInfo>, name: &str, stack: &mut Vec<String>) -> bool {
+            if stack.iter().any(|s| s == name) { return true; }
+            let Some(ci) = classes.get(name) else { return false; };
+            if !ci.is_struct { return false; }
+            stack.push(name.to_string());
+            let hit = ci.fields.iter().any(|fd| struct_field_cycle(classes, &fd.type_name, stack));
+            stack.pop();
+            hit
+        }
+        for (name, ci) in &c.classes {
+            if ci.is_struct {
+                let mut stack = Vec::new();
+                if struct_field_cycle(&c.classes, name, &mut stack) {
+                    return Err(format!(
+                        "Struct '{}' referenziert sich selbst (direkt oder ueber andere Structs) -- unendliche Groesse",
+                        name));
+                }
+            }
+        }
         // Phase 2/3: Funktions-Stubs + -Bodies (Forward-Refs/Rekursion).
         for d in &fn_decls { c.register_stub(d)?; }
         for d in &fn_decls { c.compile_function(d)?; }

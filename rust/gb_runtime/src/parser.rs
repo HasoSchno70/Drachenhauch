@@ -162,6 +162,15 @@ impl Parser {
             _ => {
                 let expr = self.expression()?;
                 self.consume_terminator()?;
+                // Review-Fund (Sicherheitsnetz, siehe inline_statement): kein
+                // gueltiges GB-Programm berechnet einen Top-Level-Vergleich
+                // und verwirft ihn -- jede Lvalue-Form, die trotz der obigen
+                // Zweige noch durchrutscht, bricht hier klar statt lautlos.
+                if let Node::BinaryOp { op, .. } = &expr {
+                    if op.as_str() == "=" {
+                        return self.err("'=' als Anweisung -- meintest du eine Zuweisung?");
+                    }
+                }
                 Ok(Node::ExprStmt { expr: Box::new(expr) })
             }
         }
@@ -189,7 +198,17 @@ impl Parser {
         let mut i = 1;
         loop {
             let t = self.tt(i);
-            if t == Tt::Dot && self.tt(i + 1) == Tt::Ident { i += 2; continue; }
+            // Review-Fund: verlangte bisher striktes Tt::Ident nach dem Punkt
+            // -- ein Membername, der zufaellig wie ein Keyword lexed (z.B.
+            // `.image`, `.sound`, `.data`), liess die Lookahead-Erkennung
+            // fehlschlagen, und `spr.image = x` wurde dann als normale
+            // Ausdrucks-Anweisung geparst (`=` als Vergleichsoperator -> die
+            // Zuweisung ging lautlos verloren). Gleiche Toleranz wie
+            // postfix()/member_name_after_dot(): jedes Token mit einem
+            // nicht-leeren String-Wert ist ein gueltiger Membername.
+            if t == Tt::Dot && matches!(&self.peek(i + 1).val, Val::Str(s) if !s.is_empty()) {
+                i += 2; continue;
+            }
             if t == Tt::Lbracket {
                 let mut depth = 1;
                 i += 1;
@@ -226,7 +245,7 @@ impl Parser {
         let mut target = Node::Identifier(name);
         loop {
             if self.matches(Tt::Dot) {
-                let m = sval(&self.expect(Tt::Ident, "Erwartet Membername nach '.'")?);
+                let m = self.member_name_after_dot()?;
                 target = Node::MemberAccess { target: Box::new(target), name: m };
             } else if self.matches(Tt::Lbracket) {
                 let mut idxs = vec![self.expression()?];
@@ -300,6 +319,22 @@ impl Parser {
             if !s.is_empty() { let r = s.clone(); self.pos += 1; return Ok(r); }
         }
         self.err("Erwartet Member-Name in ENUM")
+    }
+
+    /// `.member` nach einem bereits konsumierten `.` -- akzeptiert JEDES
+    /// Token mit einem String-Wert (nicht nur Tt::Ident), damit Member-Namen,
+    /// die zufaellig wie ein Keyword lexen (`.image`, `.sound`, `.data`,
+    /// `.next`, ...), funktionieren. Gleiche Toleranz wie `postfix()`s
+    /// inline-Variante -- Review-Fund: `dot_assign_in_with`/
+    /// `tuple_assign_target` nutzten stattdessen `expect(Tt::Ident, ...)` und
+    /// scheiterten (oder liesen die Zuweisung im schlimmeren Fall gar nicht
+    /// erst als Zuweisung erkennen) bei genau solchen Namen.
+    fn member_name_after_dot(&mut self) -> R<String> {
+        let tok = self.peek(0).clone();
+        if let Val::Str(s) = &tok.val {
+            if !s.is_empty() { self.pos += 1; return Ok(s.clone()); }
+        }
+        self.err("Erwartet Membername nach '.'")
     }
 
     fn enum_decl(&mut self) -> R<Node> {
@@ -377,10 +412,17 @@ impl Parser {
     }
 
     fn dot_assign_in_with(&mut self) -> R<Node> {
+        // Review-Fund: Position merken -- ein `.Method(...)`-STATEMENT (kein
+        // `=`/Compound-Op danach, z.B. `.Draw()`) muss zurueckspulen und
+        // generisch als Expression-Statement geparst werden (das der
+        // Expressions-Parser primary()/postfix() ueber den with_stack schon
+        // korrekt aufloest) -- vorher endete jede Methoden-Aufruf-Anweisung
+        // in einem WITH-Block hart mit "Erwartet '=' oder Compound-Operator".
+        let start = self.pos;
         let mut target = Node::Identifier(self.with_stack.last().unwrap().clone());
         loop {
             if self.matches(Tt::Dot) {
-                let m = sval(&self.expect(Tt::Ident, "Erwartet Membername nach '.'")?);
+                let m = self.member_name_after_dot()?;
                 target = Node::MemberAccess { target: Box::new(target), name: m };
             } else if self.matches(Tt::Lbracket) {
                 let mut idxs = vec![self.expression()?];
@@ -391,7 +433,10 @@ impl Parser {
         }
         let op_tt = self.tt(0);
         if !is_assign_op(op_tt) {
-            return self.err("Erwartet '=' oder Compound-Operator in WITH-Block");
+            self.pos = start;
+            let expr = self.expression()?;
+            self.consume_terminator()?;
+            return Ok(Node::ExprStmt { expr: Box::new(expr) });
         }
         self.pos += 1;
         let cop = compound_op(op_tt);
@@ -478,17 +523,35 @@ impl Parser {
         let mut target = Node::Identifier(name);
         loop {
             if self.matches(Tt::Dot) {
-                let m = sval(&self.expect(Tt::Ident, "Erwartet Membername nach '.'")?);
+                // Review-Fund: `expect(Tt::Ident, ...)` lehnte jeden Membernamen
+                // ab, der zufaellig wie ein Keyword lexed (`.image`, `.sound`,
+                // `.data`, `.next`, ...) -- kombiniert mit der (ebenfalls
+                // gefixten) is_assignment_lookahead() fuehrte das dazu, dass
+                // `spr.image = LoadImage(...)` entweder lautlos zu einem
+                // verworfenen Vergleich wurde oder hier hart fehlschlug.
+                let m = self.member_name_after_dot()?;
                 target = Node::MemberAccess { target: Box::new(target), name: m };
             } else if self.matches(Tt::Lbracket) {
+                const SLICE_ASSIGN_MSG: &str =
+                    "Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.";
                 if self.check(Tt::Colon) {
-                    return self.err("Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.");
+                    return self.err(SLICE_ASSIGN_MSG);
                 }
                 let mut indices = vec![self.expression()?];
                 if self.check(Tt::Colon) {
-                    return self.err("Slice-Zuweisung (`x[a:b] = ...`) ist nicht unterstuetzt -- nutze eine Schleife.");
+                    return self.err(SLICE_ASSIGN_MSG);
                 }
-                while self.matches(Tt::Comma) { indices.push(self.expression()?); }
+                // Review-Fund: die Slice-Pruefung galt bisher nur fuer den
+                // ERSTEN Index -- `x[1, 2:3] = 5` ueberspringt sie und
+                // scheitert stattdessen mit der generischen "Erwartet ']'"-
+                // Meldung. Jetzt bei jedem weiteren Komma-Index ebenfalls
+                // geprueft.
+                while self.matches(Tt::Comma) {
+                    indices.push(self.expression()?);
+                    if self.check(Tt::Colon) {
+                        return self.err(SLICE_ASSIGN_MSG);
+                    }
+                }
                 self.expect(Tt::Rbracket, "Erwartet ']'")?;
                 target = Node::IndexAccess { target: Box::new(target), indices };
             } else { break; }
@@ -516,7 +579,12 @@ impl Parser {
     // ------------------------------------------------------ PRINT/INPUT
     fn print_stmt(&mut self) -> R<Node> {
         self.expect(Tt::Print, "")?;
-        if self.check(Tt::Newline) || self.at_end() {
+        // Review-Fund: fehlte Tt::Colon -- `PRINT : PRINT "x"` (klassisches
+        // BASIC-Idiom fuer eine Leerzeile) warf "Unerwartetes Token COLON",
+        // weil das leere `:` in print_items()->expression() lief.
+        // print_items() selbst behandelt ':' als Trenner bereits korrekt
+        // (Zeile weiter unten) -- nur dieser Leer-PRINT-Fall fehlte.
+        if self.check(Tt::Newline) || self.check(Tt::Colon) || self.at_end() {
             self.consume_terminator()?;
             return Ok(Node::Print { items: vec![], seps: vec![], newline: true });
         }
@@ -666,16 +734,34 @@ impl Parser {
         match self.tt(0) {
             Tt::Print => {
                 self.pos += 1;
-                if self.checks(&[Tt::Newline, Tt::Else]) || self.at_end() {
+                // Review-Fund: fehlte Tt::Colon in dieser Leer-PRINT-Erkennung
+                // (print_items() selbst behandelt ':' als Trenner korrekt) --
+                // `PRINT : PRINT "x"` (klassisches BASIC fuer eine Leerzeile)
+                // schickte das ':' in print_items()->expression() und warf
+                // "Unerwartetes Token COLON".
+                if self.checks(&[Tt::Newline, Tt::Else, Tt::Colon]) || self.at_end() {
                     return Ok(Node::Print { items: vec![], seps: vec![], newline: true });
                 }
                 let (items, seps, newline) = self.print_items()?;
                 Ok(Node::Print { items, seps, newline })
             }
             Tt::Ident if self.is_assignment_lookahead() => self.assign_from_lvalue(),
+            // Review-Fund: `Dot`/`Lparen`-Tupel-Ziele fehlten hier komplett
+            // (im Gegensatz zu statement_inner) -- `IF ok THEN .hp = 0` in
+            // einem WITH-Block bzw. `IF ok THEN (a, b) = f()` fielen auf den
+            // generischen `_`-Zweig durch: `=` ist dort eine Vergleichs-
+            // Operation in expression(), die Zuweisung ging also lautlos als
+            // verworfener Vergleichswert verloren.
+            Tt::Dot if !self.with_stack.is_empty() => self.dot_assign_in_with(),
+            Tt::Lparen if self.is_tuple_assign_lookahead() => self.tuple_assign(),
             Tt::Return => {
                 self.pos += 1;
-                let value = if !(self.checks(&[Tt::Newline, Tt::Else]) || self.at_end()) {
+                // Review-Fund: fehlte ebenfalls Tt::Colon -- `IF done THEN
+                // RETURN : PRINT "x"` warf "Unerwartetes Token COLON", weil
+                // RETURN ohne Operand hier nur vor Newline/Else/EOF erkannt
+                // wurde (BREAK/CONTINUE direkt darunter brauchen das nicht,
+                // die haben nie einen Operanden).
+                let value = if !(self.checks(&[Tt::Newline, Tt::Else, Tt::Colon]) || self.at_end()) {
                     Some(Box::new(self.expression()?))
                 } else { None };
                 Ok(Node::Return(value))
@@ -683,7 +769,22 @@ impl Parser {
             Tt::Break => { self.pos += 1; Ok(Node::Break) }
             Tt::Continue => { self.pos += 1; Ok(Node::Continue) }
             Tt::Throw => { self.pos += 1; let v = self.expression()?; Ok(Node::Throw { value: Box::new(v) }) }
-            _ => { let e = self.expression()?; Ok(Node::ExprStmt { expr: Box::new(e) }) }
+            _ => {
+                let e = self.expression()?;
+                // Review-Fund (Sicherheitsnetz): jede Lvalue-Form, die trotz
+                // der obigen Zweige noch durchrutscht (z.B. ein Membername,
+                // der wie ein Keyword lexed, als Ziel EINER einzelnen
+                // Zuweisung ohne with_stack), soll nicht lautlos als
+                // verworfener Vergleichswert enden -- kein gueltiges
+                // GB-Programm berechnet einen Top-Level-Vergleich und
+                // verwirft ihn.
+                if let Node::BinaryOp { op, .. } = &e {
+                    if op.as_str() == "=" {
+                        return self.err("'=' als Anweisung -- meintest du eine Zuweisung?");
+                    }
+                }
+                Ok(Node::ExprStmt { expr: Box::new(e) })
+            }
         }
     }
 
@@ -892,7 +993,11 @@ impl Parser {
 
     fn return_stmt(&mut self) -> R<Node> {
         self.expect(Tt::Return, "")?;
-        let value = if !self.check(Tt::Newline) && !self.at_end() {
+        // Review-Fund: fehlte Tt::Colon -- `x = 1 : RETURN : y = 2` warf
+        // "Unerwartetes Token COLON", weil das ':' als Start eines
+        // (nicht-existenten) Rueckgabewert-Ausdrucks interpretiert wurde.
+        // BREAK/CONTINUE brauchen diese Pruefung nicht (nie ein Operand).
+        let value = if !self.check(Tt::Newline) && !self.check(Tt::Colon) && !self.at_end() {
             Some(Box::new(self.expression()?))
         } else { None };
         self.consume_terminator()?;
