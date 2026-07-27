@@ -543,6 +543,7 @@ struct Sample {
 }
 
 /// AUTOPAN-Pendel (per-Frame in update() geschrieben).
+#[derive(Clone, Copy)]
 struct Pendulum { period_s: f64, depth: f64, start: std::time::Instant }
 
 /// Eine Kira-Uhr + der zuletzt KOMMANDIERTE Ticking-Zustand. `ClockHandle::
@@ -1438,6 +1439,14 @@ impl Audio {
     }
     pub fn music_stop(&mut self, fade_out_ms: i64, easing: &str) -> Result<(), String> {
         let curve = FadeCurve::parse(easing, "AUDIO_MUSIC_STOP")?;
+        // Review-Fund: `ch_stop` (normale Kanaele) setzt `loops = 0` VOR dem
+        // eigentlichen Stop -- music_stop tat das nie. `update()` sieht einen
+        // Fade-Stop als normales "Ende erreicht" (music_ended), und mit noch
+        // positivem `music_loops` (endliche Wiederholungen) startete der Song
+        // einen Frame nach dem beabsichtigten Fade-Out wieder von vorne, auf
+        // voller Lautstaerke. Endlos-Loops (-1) und Tracker-Module waren
+        // unbetroffen (music_loops bleibt -1 bzw. `is_module`-Gate greift).
+        self.music_loops = 0;
         match self.music_handle.as_mut() {
             Some(MusicHandle::Module(a)) if fade_out_ms > 0 => {
                 // Ausfaden auf 0 und am Ende beenden (Sound raeumt sich selbst).
@@ -1465,7 +1474,14 @@ impl Audio {
     }
     pub fn music_get_volume(&self) -> f64 { self.music_vol as f64 }
     pub fn music_set_pitch(&mut self, factor: f64) {
-        self.music_pitch = factor.max(0.0) as f32;
+        // Review-Fund: nur nach unten geklemmt -- ein absurd hoher Faktor
+        // (z.B. AUDIO_MUSIC_PITCH 1000000) laesst ModuleSound::process
+        // (`self.frac += pitch; while self.frac >= 1.0 { pull(); }`) pro
+        // Ausgabe-Sample ~pitch-mal den Tracker-Player aufrufen -- auf dem
+        // ECHTZEIT-Audio-Thread, also Dropouts/Freeze statt nur einer
+        // Verzerrung. 64x Geschwindigkeit ist bereits weit jenseits jedes
+        // musikalischen Sinns, deckelt aber die Worst-Case-Arbeit pro Sample.
+        self.music_pitch = factor.clamp(0.0, 64.0) as f32;
         let r = self.music_pitch as f64;
         if let Some(h) = self.music_handle.as_mut() { mh_set_rate(h, r, tween_now()); }
     }
@@ -1503,9 +1519,16 @@ impl Audio {
                 s.loops > 0 && matches!(s.handle.as_ref().map(|h| h.state()), Some(PlaybackState::Stopped))
             };
             if restart {
-                let (vol, rem) = { let s = &self.sounds[i]; (s.vol as f64, s.loops - 1) };
+                // Review-Fund: `start_slot` setzt `pan_anim = None` (richtig
+                // fuer einen ECHTEN neuen AUDIO_PLAY-Aufruf) -- dieser interne
+                // Neustart fuer eine endliche Wiederholung ist aber dieselbe
+                // logische Wiedergabe, kein neuer AUDIO_PLAY. Ohne diese
+                // Rettung stoppte AUTOPAN nach der ersten Wiederholung eines
+                // Sounds mit `AUDIO_PLAY(ch, 3)` + `AUDIO_AUTOPAN(ch, ...)`.
+                let (vol, rem, pan) = { let s = &self.sounds[i]; (s.vol as f64, s.loops - 1, s.pan_anim) };
                 let _ = self.start_slot(i as i64, "AUDIO_PLAY", vol, 0, 0, FadeCurve::Linear);
                 self.sounds[i].loops = rem;
+                self.sounds[i].pan_anim = pan;
             }
         }
         // Musik: endliche Loops + Queue.
