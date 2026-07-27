@@ -98,6 +98,14 @@ class SnapshotUndo(QObject):
         self._apply(self._baseline)
 
     def redo(self) -> None:
+        # Review-Fund: fehlte hier (im Gegensatz zu undo()) -- ohne flush()
+        # konnte ein gerade erst gemachter, noch debounce-ausstehender Edit
+        # spurlos verloren gehen: undo() fuellt _redo, man aendert rasch noch
+        # etwas (mark() startet den Debounce-Timer) und drueckt sofort redo()
+        # -- _baseline war zu dem Zeitpunkt noch der vorherige committete
+        # Snapshot, nicht der gerade getippte Wert, der beim Ueberschreiben
+        # durch _apply() dann ohne jede Spur verschwand.
+        self.flush()
         if not self._redo:
             return
         self._undo.append(self._baseline)

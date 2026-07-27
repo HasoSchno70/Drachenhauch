@@ -44,8 +44,14 @@ class PresetLibrary:
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            json.dumps(self.user, indent=2), encoding="utf-8")
+        # Review-Fund: ein direktes write_text() ueber die lebende Datei ist
+        # NICHT atomar -- ein Fehler/Absturz mitten im Schreiben (voller
+        # Datentraeger etc.) haette die gesamte Preset-Bibliothek des Nutzers
+        # korrumpiert. Erst in eine Temp-Datei schreiben, dann per Rename
+        # ersetzen (Path.replace() ist auf demselben Dateisystem atomar).
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(self.user, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
 
     # ---------------------------------------------------------- Query
     def names(self) -> list[str]:

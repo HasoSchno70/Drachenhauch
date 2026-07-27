@@ -97,7 +97,15 @@ class PresetBar(QWidget):
                 f'Preset "{name}" existiert bereits. Ueberschreiben?')
             if ans != QMessageBox.StandardButton.Yes:
                 return
-        self._lib.add(name, self._get_state())
+        # Review-Fund: PresetLibrary.add()/remove() koennen bei einem I/O-
+        # Fehler (schreibgeschuetztes Home-Verzeichnis, voller Datentraeger)
+        # eine OSError werfen -- unbehandelt waere das ein Traceback aus
+        # diesem Qt-Slot statt einer verstaendlichen Fehlermeldung.
+        try:
+            self._lib.add(name, self._get_state())
+        except OSError as exc:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen", str(exc))
+            return
         self._refresh(select=name)
 
     def _on_delete(self) -> None:
@@ -108,5 +116,9 @@ class PresetBar(QWidget):
             self, "Preset loeschen", f'Preset "{name}" loeschen?')
         if ans != QMessageBox.StandardButton.Yes:
             return
-        self._lib.remove(name)
+        try:
+            self._lib.remove(name)
+        except OSError as exc:
+            QMessageBox.critical(self, "Loeschen fehlgeschlagen", str(exc))
+            return
         self._refresh()
