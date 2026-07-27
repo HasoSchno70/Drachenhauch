@@ -29,7 +29,17 @@ DECL = {"DIM", "CONST", "SUB", "FUNCTION", "CLASS", "STRUCT", "ENUM",
 
 
 def _alt(names) -> str:
-    return "|".join(re.escape(n) for n in sorted(set(names), key=len, reverse=True))
+    # Review-Fund: `key=len` allein sortiert nur nach Laenge -- gleichlange
+    # Namen wurden ueber die `set()`-Iterationsreihenfolge sortiert, die
+    # Python pro Prozess ueber Hash-Randomisierung (PYTHONHASHSEED) mischt.
+    # Ergebnis: zweimal hintereinander ausgefuehrt (ohne jede Code-Aenderung)
+    # erzeugte dieses Skript ein anderes Byte-fuer-Byte-Grammatik-File --
+    # jede Regeneration nach einer echten Keyword-Aenderung produzierte so
+    # einen grossen, verrauschten Diff (jede gleichlange Gruppe neu gemischt),
+    # in dem sich die eigentliche Aenderung kaum noch erkennen liess.
+    # Stabiler Tiebreak (zusaetzlich alphabetisch) macht die Ausgabe
+    # deterministisch -- ein Diff zeigt dann nur echte Aenderungen.
+    return "|".join(re.escape(n) for n in sorted(set(names), key=lambda n: (-len(n), n)))
 
 
 def build() -> dict:
@@ -49,9 +59,25 @@ def build() -> dict:
         {"name": "comment.line.rem.gamebasic",
          "match": "(?i)\\bREM\\b.*$"},
         {"name": "string.quoted.double.gamebasic",
-         "begin": "\"", "end": "\"",
+         # Review-Fund: ohne Zeilenende-Fallback spannte diese begin/end-Regel
+         # ueber Zeilen hinweg, solange (noch) keine schliessende `"` folgte --
+         # lexer.py verbietet Zeilenumbrueche in Strings explizit
+         # ("Zeilenumbruch im String nicht erlaubt"), das Highlighting bildete
+         # das bisher nicht ab. Alltagsfall: `x = "hallo` tippen und VOR der
+         # schliessenden Anfuehrungszeichen pausieren faerbte alles bis zum
+         # naechsten `"` irgendwo spaeter im Dokument als EINEN String.
+         "begin": "\"", "end": "\"|$",
          "patterns": [{"name": "constant.character.escape.gamebasic",
                        "match": "\"\""}]},
+        # Review-Fund: nur Dezimalzahlen wurden erkannt -- lexer.py unterstuetzt
+        # zusaetzlich C-Stil (0xFF/0b1010) UND BASIC-Stil (&HFF/&B1010) Hex-/
+        # Binaer-Literale (_scan_number/_scan_hex_or_binary), die bisher
+        # unfarbig blieben. Vor der generischen Dezimal-Regel einsortiert,
+        # damit z.B. "0x1A" nicht zuerst als Dezimalzahl "0" + Rest matcht.
+        {"name": "constant.numeric.hex.gamebasic",
+         "match": "\\b0[xX][0-9a-fA-F]+\\b|&[Hh][0-9a-fA-F]+"},
+        {"name": "constant.numeric.binary.gamebasic",
+         "match": "\\b0[bB][01]+\\b|&[Bb][01]+"},
         {"name": "constant.numeric.gamebasic",
          "match": "\\b[0-9]+(\\.[0-9]+)?\\b"},
         {"name": "constant.language.boolean.gamebasic",
