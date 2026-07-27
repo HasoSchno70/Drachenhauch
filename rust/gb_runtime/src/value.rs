@@ -87,6 +87,13 @@ pub struct CoroState {
     pub args: Vec<Value>,   // nur bis zum ersten Resume (Parameter-Bindung)
     pub started: bool,
     pub done: bool,
+    // Review-Fund: ohne dieses Flag konnte eine Coroutine sich selbst (direkt
+    // oder ueber eine Kette anderer Coroutinen) re-entrant per CORO_RESUME
+    // wieder aufrufen, waehrend ihr Frame bereits "unterwegs" war (locals/
+    // stack per mem::take entleert) -- die verschachtelte Ausfuehrung sah dann
+    // einen leeren `locals`-Vec und paniked mit einem Index-Out-of-Bounds statt
+    // einen fangbaren Fehler zu werfen.
+    pub running: bool,
     pub result: Value,
     // Suspendierter Frame:
     pub locals: Vec<Value>,
@@ -542,7 +549,13 @@ impl Value {
             Value::Tween(t) => { let t = t.borrow(); format!("<Tween {}->{} {}ms {} {}>", t.start, t.end, t.duration, t.easing, t.mode) }
             Value::Json(j) => {
                 let s = serde_json::to_string(j.as_ref()).unwrap_or_default();
-                let short = if s.len() <= 40 { s } else { format!("{}...", &s[..37]) };
+                // Review-Fund: `&s[..37]` ist ein BYTE-Slice -- bei einem
+                // Mehrbyte-Zeichen (Umlaute etc.) genau an Position 37 paniked
+                // das mit "byte index 37 is not a char boundary" (reproduzierbar
+                // allein durch `PRINT JSON_PARSE(...)` mit passendem Inhalt).
+                // char-basiertes take() ist immer eine gueltige Grenze.
+                let short = if s.chars().count() <= 40 { s }
+                    else { format!("{}...", s.chars().take(37).collect::<String>()) };
                 format!("<JSON {}>", short)
             }
             Value::Save(s) => { let s = s.borrow(); format!("<Save v{} keys={}>", s.version, s.data.len()) }
@@ -655,13 +668,39 @@ pub fn value_eq(a: &Value, b: &Value) -> bool {
         (Value::Quat(ax, ay, az, aw), Value::Quat(bx, by, bz, bw)) =>
             ax == bx && ay == by && az == bz && aw == bw,
         (Value::Mat4(x), Value::Mat4(y)) => x.iter().zip(y.iter()).all(|(p, q)| p == q),
-        // Referenz-Typen (ARRAY/MAP/Instanz/Tiled) sind ueber Rc aliasbar
+        // Referenz-Typen (ARRAY/MAP/Instanz/Tiled/...) sind ueber Rc aliasbar
         // (`b = a` teilt dasselbe Objekt) -> Gleichheit = Identitaet. Damit ist
         // u.a. `a = a` TRUE (vorher fielen sie auf `=> false`).
+        // Review-Fund: nur 4 von ~18 Referenz-Typen hatten einen ptr_eq-Arm --
+        // Sprite/Tween/File/Save/AStar/Particles/Ecs/Coroutine/
+        // CharController/PhysicsBroad/Phys3d/Phys2d/AnimFsm/Namespace/Json
+        // fielen alle auf `_ => false` durch, `IF spr = spr THEN` war also
+        // FALSE und ARRAY_INDEXOF(handles, h) konnte ein Handle nie finden.
         (Value::Array(x), Value::Array(y)) => Rc::ptr_eq(x, y),
         (Value::Map(x), Value::Map(y)) => Rc::ptr_eq(x, y),
         (Value::Instance(x), Value::Instance(y)) => Rc::ptr_eq(x, y),
         (Value::Tiled(x), Value::Tiled(y)) => Rc::ptr_eq(x, y),
+        (Value::Sprite(x), Value::Sprite(y)) => Rc::ptr_eq(x, y),
+        (Value::File(x), Value::File(y)) => Rc::ptr_eq(x, y),
+        (Value::Tween(x), Value::Tween(y)) => Rc::ptr_eq(x, y),
+        (Value::Json(x), Value::Json(y)) => Rc::ptr_eq(x, y),
+        (Value::Save(x), Value::Save(y)) => Rc::ptr_eq(x, y),
+        (Value::AStar(x), Value::AStar(y)) => Rc::ptr_eq(x, y),
+        (Value::Particles(x), Value::Particles(y)) => Rc::ptr_eq(x, y),
+        (Value::Ecs(x), Value::Ecs(y)) => Rc::ptr_eq(x, y),
+        (Value::Coroutine(x), Value::Coroutine(y)) => Rc::ptr_eq(x, y),
+        (Value::CharController(x), Value::CharController(y)) => Rc::ptr_eq(x, y),
+        (Value::PhysicsBroad(x), Value::PhysicsBroad(y)) => Rc::ptr_eq(x, y),
+        (Value::Phys3d(x), Value::Phys3d(y)) => Rc::ptr_eq(x, y),
+        (Value::Phys2d(x), Value::Phys2d(y)) => Rc::ptr_eq(x, y),
+        (Value::AnimFsm(x), Value::AnimFsm(y)) => Rc::ptr_eq(x, y),
+        (Value::Namespace(x), Value::Namespace(y)) => Rc::ptr_eq(x, y),
+        // FUNCREF ist ein WERT-Typ (Funktionsname), keine mutierbare Referenz
+        // -- `f = @foo` muss unabhaengig davon TRUE sein, ob beide FuncRefs
+        // aus demselben LOAD_FUNCREF stammen. `Rc<str> == Rc<str>` vergleicht
+        // ueber Deref bereits den STRING-Inhalt (nicht die Pointer-Adresse).
+        (Value::FuncRef(x), Value::FuncRef(y)) => x == y,
+        (Value::CompMarker, Value::CompMarker) => true,
         _ if is_num(a) && is_num(b) => as_f64(a) == as_f64(b),
         _ => false,
     }

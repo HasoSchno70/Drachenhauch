@@ -16,6 +16,12 @@ use std::sync::Arc;
 /// `__DEBUG_STOP__` NICHT von TRY/CATCH gefangen werden.
 const PROFILE_STOP: &str = "__PROFILE_STOP__";
 
+/// Obergrenze fuer verschachtelte `exec`/`exec_byref`-Aufrufe (Rekursionstiefe).
+/// `exec` rekursiert ueber den NATIVEN Rust-Stack (exec->run_frame->dispatch->
+/// exec), es gibt kein GB-seitiges Frame-Limit -- ohne diese Grenze crasht eine
+/// unendliche Rekursion den ganzen Prozess statt einen fangbaren Fehler zu werfen.
+const MAX_CALL_DEPTH: u32 = 3000;
+
 use crate::builtins;
 use crate::model::{op, Arg, ClassInfo, Func, Program};
 use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, FieldVal, GbArray, GbMap, Instance, Value};
@@ -107,7 +113,16 @@ fn bind_params(fn_: &Func, args: Vec<Value>, mut locals: Vec<Value>) -> R<Vec<Va
         let rest: Vec<Value> = it.collect();
         locals[fn_.n_params - 1] = Value::Tuple(Rc::new(rest));
     } else {
-        let n_required = if fn_.n_required == 0 { fn_.n_params } else { fn_.n_required };
+        // Review-Fund: `n_required == 0` wurde bisher als "nicht gesetzt"
+        // gelesen und durch `n_params` ersetzt (= "alle Parameter Pflicht").
+        // Das war aber der GUELTIGE Wert genau dann, wenn der ERSTE Parameter
+        // schon einen Default hat (make_sig: n_required = Position des ersten
+        // Parameters MIT Default) -- eine Methode/Init/FUNCREF, bei der ALLE
+        // Parameter Defaults haben, liess sich dadurch nie mit 0 Argumenten
+        // aufrufen (ueber NEW/CALL_METHOD/CALL_VALUE; der CALL_USER-Pfad
+        // materialisiert immer alle n Argumente zur Compile-Zeit und war
+        // deshalb nicht betroffen).
+        let n_required = fn_.n_required;
         if args.len() < n_required || args.len() > fn_.n_params {
             return Err(format!("{}: erwartet {}..{} Argument(e), erhalten {}",
                 fn_.name.to_uppercase(), n_required, fn_.n_params, args.len()));
@@ -146,6 +161,7 @@ fn make_coro(callee: &Func, args: Vec<Value>, self_obj: Option<Value>) -> Value 
         args,
         started: false,
         done: false,
+        running: false,
         result: Value::Nil,
         locals: Vec::new(),
         stack: Vec::new(),
@@ -483,6 +499,15 @@ pub struct Vm<'p> {
     // Lazy-Fehlerzeile: gesetzt vom INNERSTEN run_frame beim ersten Fehler,
     // von TRY/CATCH beim Konsumieren geloescht (s. run_frame).
     err_line_set: bool,
+    // Review-Fund: TRY/CATCH-Bypass + `was_stopped()` verglichen bisher den
+    // FEHLERTEXT gegen "__DEBUG_STOP__"/PROFILE_STOP -- ein GB-Programm mit
+    // `THROW "__DEBUG_STOP__"` konnte diese internen Kontroll-Signale also
+    // faelschlich vortaeuschen (TRY/CATCH faengt es dann nie, main.rs meldet
+    // "gestoppt" statt den echten Fehler). Diese beiden Flags sind der
+    // eigentliche Signalkanal -- THROW beruehrt sie nie, ein Stringinhalt
+    // kann sie also nicht mehr faelschen.
+    debug_stop_flag: bool,
+    profile_stop_flag: bool,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
     // Externes Stop-Signal (Editor-Stop-Button bei `gbrt profile --stoppable`):
@@ -571,6 +596,8 @@ impl<'p> Vm<'p> {
             pool_stacks: Vec::new(),
             cur_line: 0,
             err_line_set: false,
+            debug_stop_flag: false,
+            profile_stop_flag: false,
             prof: None,
             stop: None,
             dbg: None,
@@ -673,8 +700,21 @@ impl<'p> Vm<'p> {
     }
 
     /// Ob `run()` durch das externe Stop-Signal abgebrochen wurde.
-    pub fn was_stopped(err: &str) -> bool {
-        err == PROFILE_STOP
+    ///
+    /// Review-Fund: verglich frueher den Fehlertext gegen PROFILE_STOP -- ein
+    /// GB-Programm mit `THROW "__PROFILE_STOP__"` haette einen echten Fehler
+    /// so als "sauber gestoppt" maskiert. Jetzt liest die Funktion das
+    /// interne Flag, das THROW nie setzt (`err` bleibt fuer Kompatibilitaet
+    /// im Signature, wird aber nicht mehr fuer die Entscheidung genutzt).
+    pub fn was_stopped(&self, _err: &str) -> bool {
+        self.profile_stop_flag
+    }
+
+    /// Ob `run()` durch den Debugger-Stop-Befehl (oder EOF auf stdin waehrend
+    /// `gbrt debug`) abgebrochen wurde -- analog zu `was_stopped`, siehe
+    /// dortiger Review-Fund-Kommentar.
+    pub fn was_debug_stopped(&self) -> bool {
+        self.debug_stop_flag
     }
 
     /// Eine INPUT-Zeile lesen. Bei aktivem Stop-Kanal (`gbrt profile
@@ -799,17 +839,30 @@ impl<'p> Vm<'p> {
 
     /// User-Operator-Overloading. Liefert Some(Ergebnis) wenn LHS oder RHS
     /// eine Instanz mit der Operator-Methode ist.
-    fn user_op(&mut self, method: &str, a: &Value, b: &Value) -> R<Option<Value>> {
+    ///
+    /// `commutative` steuert den RHS-Reverse-Fallback: fuer +/*/=/<> ist
+    /// `b.method(a)` (b als Self, a als Argument) semantisch gleichwertig zu
+    /// `a OP b`, weil diese Operatoren kommutativ sein sollen -- das ist der
+    /// dokumentierte Mechanismus, der `5 + money` unterstuetzt. Review-Fund:
+    /// derselbe Fallback lief FRUEHER auch fuer -, /, MOD, <, >, <=, >= --
+    /// dort berechnet `b.method(a)` aber `b OP a`, nicht `a OP b` (z.B. bei
+    /// `5 - m` wurde still `m - 5` ausgefuehrt). Reflektierte Operatoren
+    /// (`__radd__` etc.) sind laut CLAUDE.md bewusst nicht unterstuetzt --
+    /// fuer die nicht-kommutativen Faelle daher lieber `None` (-> normaler
+    /// Typ-Fehler) als ein stillschweigend falsches Ergebnis.
+    fn user_op(&mut self, method: &str, a: &Value, b: &Value, commutative: bool) -> R<Option<Value>> {
         if let Value::Instance(rc) = a {
             let cn = rc.borrow().class_name.clone();
             if let Some(m) = self.resolve_method(&cn, method) {
                 return Ok(Some(self.exec(m, vec![b.clone()], Some(a.clone()))?));
             }
         }
-        if let Value::Instance(rc) = b {
-            let cn = rc.borrow().class_name.clone();
-            if let Some(m) = self.resolve_method(&cn, method) {
-                return Ok(Some(self.exec(m, vec![a.clone()], Some(b.clone()))?));
+        if commutative {
+            if let Value::Instance(rc) = b {
+                let cn = rc.borrow().class_name.clone();
+                if let Some(m) = self.resolve_method(&cn, method) {
+                    return Ok(Some(self.exec(m, vec![a.clone()], Some(b.clone()))?));
+                }
             }
         }
         Ok(None)
@@ -878,14 +931,14 @@ impl<'p> Vm<'p> {
         loop {
             let cmd = match dbg_read_cmd() {
                 Some(c) => c,
-                None => return Err("__DEBUG_STOP__".into()),
+                None => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
             };
             match cmd.get("cmd").and_then(|v| v.as_str()).unwrap_or("") {
                 "continue"  => { dbg.step = StepMode::Run; return Ok(()); }
                 "step-over" => { dbg.step = StepMode::Over; dbg.step_depth = depth; return Ok(()); }
                 "step-into" => { dbg.step = StepMode::Into; return Ok(()); }
                 "step-out"  => { dbg.step = StepMode::Out; dbg.step_depth = depth; return Ok(()); }
-                "stop"      => return Err("__DEBUG_STOP__".into()),
+                "stop"      => { self.debug_stop_flag = true; return Err("__DEBUG_STOP__".into()); }
                 "set-breakpoints" => self.dbg_set_breakpoints(dbg, &cmd),
                 "eval" => {
                     let src = cmd.get("expr").and_then(|v| v.as_str()).unwrap_or("");
@@ -985,7 +1038,15 @@ impl<'p> Vm<'p> {
     fn exec(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>) -> R<Value> {
         // Call-Tiefe fuer den Debugger (Step over/into/out). Inkrement pro Frame;
         // garantiert dekrementiert (auch bei Fehler/Return) via Wrapper.
+        // Review-Fund: ohne Obergrenze rekursiert exec->run_frame->dispatch->exec
+        // auf dem NATIVEN Stack -- eine ausufernde GB-Rekursion (oder eine
+        // Property/Operator, die sich selbst aufruft) fuehrte zu einem
+        // Stack-Overflow-Absturz statt einem fangbaren GBRuntimeError.
         self.depth += 1;
+        if self.depth > MAX_CALL_DEPTH {
+            self.depth -= 1;
+            return Err(format!("Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?", MAX_CALL_DEPTH));
+        }
         let r = self.exec_inner(fn_, args, self_obj);
         self.depth -= 1;
         r
@@ -1016,6 +1077,10 @@ impl<'p> Vm<'p> {
     fn exec_byref(&mut self, fn_: &'p Func, args: Vec<Value>, self_obj: Option<Value>)
         -> R<(Value, Vec<Value>)> {
         self.depth += 1;
+        if self.depth > MAX_CALL_DEPTH {
+            self.depth -= 1;
+            return Err(format!("Maximale Aufruftiefe ({}) ueberschritten -- unendliche Rekursion?", MAX_CALL_DEPTH));
+        }
         let r = self.exec_byref_inner(fn_, args, self_obj);
         self.depth -= 1;
         r
@@ -1028,11 +1093,13 @@ impl<'p> Vm<'p> {
         let mut stack: Vec<Value> = self.pool_stacks.pop().unwrap_or_else(|| Vec::with_capacity(16));
         let mut ip: usize = 0;
         let mut try_handlers: Vec<(usize, usize)> = Vec::new();
-        let ret = match self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref())? {
-            Step::Return(v) => v,
-            Step::Yield(_) => return Err("YIELD ausserhalb einer Coroutine".into()),
-        };
-        // Finale Werte der BYREF-Param-Slots (in Param-Reihenfolge) auslesen.
+        let step = self.run_frame(fn_, &mut locals, &mut stack, &mut ip, &mut try_handlers, self_obj.as_ref());
+        // Review-Fund: applied `?` sofort auf `step` (statt wie exec_inner erst
+        // zu binden), sodass bei einem Fehler `locals`/`stack` verworfen statt
+        // recycelt wurden -- genau im Fall (BYREF-Call, z.B. in einer
+        // TRY/CATCH-Retry-Schleife), in dem das Pooling am meisten bringt.
+        // Finale Werte der BYREF-Param-Slots (in Param-Reihenfolge) auslesen --
+        // vor dem Recycling, damit sie danach noch verfuegbar sind.
         let mut byref_vals = Vec::new();
         for (i, &is_br) in fn_.param_byref.iter().enumerate() {
             if is_br {
@@ -1043,7 +1110,10 @@ impl<'p> Vm<'p> {
         stack.clear();
         if self.pool_locals.len() < 64 { self.pool_locals.push(locals); }
         if self.pool_stacks.len() < 64 { self.pool_stacks.push(stack); }
-        Ok((ret, byref_vals))
+        match step? {
+            Step::Return(v) => Ok((v, byref_vals)),
+            Step::Yield(_) => Err("YIELD ausserhalb einer Coroutine".into()),
+        }
     }
 
     /// Treibt den Frame durch die Dispatch-Schleife inkl. TRY/CATCH-Unwinding,
@@ -1062,7 +1132,10 @@ impl<'p> Vm<'p> {
                 Ok(step) => return Ok(step),
                 // Debugger-Abbruch (`stop`) und Profiler-Stop-Signal duerfen
                 // NICHT von TRY/CATCH gefangen werden -- unbedingt durchreichen.
-                Err(e) if e == "__DEBUG_STOP__" || e == PROFILE_STOP => return Err(e),
+                // Entscheidend ist das Flag, NICHT der Fehlertext: ein GB-Programm
+                // mit `THROW "__DEBUG_STOP__"` erzeugt zwar denselben String,
+                // setzt aber nie eines der beiden Flags (Review-Fund).
+                Err(e) if self.debug_stop_flag || self.profile_stop_flag => return Err(e),
                 Err(e) => {
                     // Quell-Zeile lazy ermitteln: ip zeigt HINTER die
                     // fehlgeschlagene Instruktion. Nur der innerste Frame
@@ -1094,6 +1167,14 @@ impl<'p> Vm<'p> {
         if co.borrow().done {
             return Err("CORO_RESUME/SEND auf bereits beendeter Coroutine".into());
         }
+        // Review-Fund: re-entranter Resume (die Coroutine ruft sich selbst
+        // oder eine Kette anderer Coroutinen resumt sie zurueck) faende sonst
+        // ihren Frame per mem::take() bereits geleert vor -- klarer Fehler
+        // statt eines Index-Out-of-Bounds-Panics.
+        if co.borrow().running {
+            return Err("CORO_RESUME/SEND: Coroutine ist bereits aktiv (re-entranter Aufruf)".into());
+        }
+        co.borrow_mut().running = true;
         // Func-Zeiger ist fuer 'p (Programmlaufzeit) gueltig -- siehe CoroState.
         let ptr = co.borrow().fn_ptr;
         let fn_: &'p Func = unsafe { &*ptr };
@@ -1129,16 +1210,25 @@ impl<'p> Vm<'p> {
                 c.stack = stack;
                 c.ip = ip;
                 c.try_handlers = try_handlers;
+                c.running = false;
                 Ok(v)
             }
             Ok(Step::Return(v)) => {
                 let mut c = co.borrow_mut();
                 c.done = true;
+                c.running = false;
                 c.result = v.clone();
                 Ok(v)
             }
             Err(e) => {
-                co.borrow_mut().done = true;
+                let mut c = co.borrow_mut();
+                c.done = true;
+                c.running = false;
+                // Review-Fund: `result` blieb Nil, ohne dass CORO_RESULT einen
+                // Hinweis auf den Fehlerfall geben konnte -- den Fehlertext
+                // als Ersatzwert ablegen, statt stillschweigend Nil zu lassen.
+                c.result = Value::str_rc(&e);
+                drop(c);
                 Err(e)
             }
         }
@@ -1216,21 +1306,35 @@ impl<'p> Vm<'p> {
     fn try_coro(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
         // Builtin-Namen liegen im .gbc lowercase vor.
         if !name.starts_with("coro_") && name != "__comp_iter" { return Ok(None); }
+        // Review-Fund: alle fuenf CORO_*-Arme indizierten `a[0]`/`a[1]` ohne
+        // Arity-Pruefung (diese Namen tauchen in keiner Compiler-Arity-Tabelle
+        // auf) -- `CORO_RESUME()` oder `CORO_SEND(c)` kompilierten anstandslos
+        // und paniked dann mit einem Index-Out-of-Bounds statt eines
+        // GBRuntimeError.
+        let need = |n: usize, fname: &str| -> R<()> {
+            if a.len() != n {
+                Err(format!("{}: erwartet {} Argument(e), erhalten {}", fname, n, a.len()))
+            } else { Ok(()) }
+        };
         match name {
             "coro_resume" => {
+                need(1, "CORO_RESUME")?;
                 let co = expect_coro(&a[0], "CORO_RESUME")?;
                 Ok(Some(self.coro_resume(&co, Value::Nil)?))
             }
             "coro_send" => {
+                need(2, "CORO_SEND")?;
                 let co = expect_coro(&a[0], "CORO_SEND")?;
                 Ok(Some(self.coro_resume(&co, a[1].clone())?))
             }
             "coro_done" => {
+                need(1, "CORO_DONE")?;
                 let co = expect_coro(&a[0], "CORO_DONE")?;
                 let d = co.borrow().done;
                 Ok(Some(Value::Bool(d)))
             }
             "coro_result" => {
+                need(1, "CORO_RESULT")?;
                 let co = expect_coro(&a[0], "CORO_RESULT")?;
                 let c = co.borrow();
                 if !c.done {
@@ -1239,6 +1343,7 @@ impl<'p> Vm<'p> {
                 Ok(Some(c.result.clone()))
             }
             "coro_close" => {
+                need(1, "CORO_CLOSE")?;
                 let co = expect_coro(&a[0], "CORO_CLOSE")?;
                 let mut c = co.borrow_mut();
                 c.done = true;
@@ -1289,6 +1394,7 @@ impl<'p> Vm<'p> {
                         // bisherigen Profile-Daten noch ausgegeben werden.
                         if let Some(s) = self.stop.as_ref() {
                             if s.load(Ordering::Relaxed) {
+                                self.profile_stop_flag = true;
                                 return Err(PROFILE_STOP.into());
                             }
                         }
@@ -1302,7 +1408,12 @@ impl<'p> Vm<'p> {
 
             match instr.op {
                 op::LOAD_CONST => stack.push(constants[arg.as_usize()].clone()),
-                op::POP => { stack.pop(); }
+                // Review-Fund: war der einzige Stack-Konsument, der ein leeres
+                // Ergebnis stillschweigend ignorierte (jeder andere Pop nutzt
+                // vm_pop und meldet "Stack leer") -- ein Stack-Imbalance-Bug im
+                // Compiler waere hier unsichtbar geblieben und erst an einer
+                // spaeteren, voellig unabhaengigen Opcode-Stelle aufgefallen.
+                op::POP => { vm_pop(stack)?; }
                 op::DUP => { let v = vm_top(stack)?.clone(); stack.push(v); }
 
                 // --- Lokale ---
@@ -1443,13 +1554,22 @@ impl<'p> Vm<'p> {
                     let l = arg.list();
                     let slot_idx = l[0].as_usize();
                     let value = vm_pop(stack)?;
-                    let (ty, value) = match &l[1] {
-                        Arg::None => (infer_type(&value).to_string(), value),
-                        ti => {
-                            let t = constants[ti.as_usize()].fmt();
-                            let v = coerce(value, &t, "CONST")?;
-                            (t, v)
-                        }
+                    // Review-Fund: der Compiler emittiert [slot, name_idx,
+                    // type_idx] (siehe stmt_const/emit_namespace_const) --
+                    // dieser Zweig las bisher l[1] (den NAME-Index) statt
+                    // l[2] (den TYPE-Index) als Typ-Konstante. `coerce(value,
+                    // "<name-der-const>", ...)` traf so gut wie nie einen der
+                    // bekannten Typnamen und lief in coerce()'s Catch-all
+                    // (unveraendert durchreichen) -- eine typisierte
+                    // `CONST X AS FLOAT = 1` wurde dadurch NIE tatsaechlich
+                    // nach FLOAT gecoerct.
+                    let ti = l[2].as_usize();
+                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
+                        (infer_type(&value).to_string(), value)
+                    } else {
+                        let t = constants[ti].fmt();
+                        let v = coerce(value, &t, "CONST")?;
+                        (t, v)
                     };
                     if self.global_slots[slot_idx].is_none() {
                         let sl = Rc::new(RefCell::new(Slot { ty, value, is_const: true }));
@@ -1492,13 +1612,18 @@ impl<'p> Vm<'p> {
                     let l = arg.list();
                     let name = constants[l[0].as_usize()].fmt();
                     let value = vm_pop(stack)?;
-                    let (ty, value) = match &l[1] {
-                        Arg::None => (infer_type(&value).to_string(), value),
-                        ti => {
-                            let t = constants[ti.as_usize()].fmt();
-                            let v = coerce(value, &t, "CONST")?;
-                            (t, v)
-                        }
+                    // Review-Fund: `type_idx` ist IMMER ein gueltiger Konstanten-
+                    // Index (der Compiler backt auch den untypisierten Fall als
+                    // add_const(Null) ein) -- der Arg selbst ist also nie
+                    // Arg::None, dieser Zweig war faktisch tot. Die eigentliche
+                    // "untypisiert?"-Frage steckt im WERT der Konstante.
+                    let ti = l[1].as_usize();
+                    let (ty, value) = if matches!(constants[ti], Value::Nil) {
+                        (infer_type(&value).to_string(), value)
+                    } else {
+                        let t = constants[ti].fmt();
+                        let v = coerce(value, &t, "CONST")?;
+                        (t, v)
                     };
                     self.globals.entry(name).or_insert_with(|| {
                         Rc::new(RefCell::new(Slot { ty, value, is_const: true }))
@@ -1520,7 +1645,7 @@ impl<'p> Vm<'p> {
                         (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x + *y as f64)),
                         _ => {
                             if let Some(r) = module_op('+', &a, &b) { stack.push(r?); }
-                            else if let Some(r) = self.user_op("__op_add__", &a, &b)? { stack.push(r); }
+                            else if let Some(r) = self.user_op("__op_add__", &a, &b, true)? { stack.push(r); }
                             else if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
                                 stack.push(Value::str_rc(&format!("{}{}", a.fmt(), b.fmt())));
                             } else { require_number(&a, &b, "+")?; stack.push(nn_add(a, b)?); }
@@ -1537,7 +1662,7 @@ impl<'p> Vm<'p> {
                         (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x - *y as f64)),
                         _ => {
                             if let Some(r) = module_op('-', &a, &b) { stack.push(r?); }
-                            else if let Some(r) = self.user_op("__op_sub__", &a, &b)? { stack.push(r); }
+                            else if let Some(r) = self.user_op("__op_sub__", &a, &b, false)? { stack.push(r); }
                             else { require_number(&a, &b, "-")?; stack.push(nn_arith(a, b, '-')?); }
                         }
                     }
@@ -1552,7 +1677,7 @@ impl<'p> Vm<'p> {
                         (Value::Float(x), Value::Int(y)) => stack.push(Value::Float(x * *y as f64)),
                         _ => {
                             if let Some(r) = module_op('*', &a, &b) { stack.push(r?); }
-                            else if let Some(r) = self.user_op("__op_mul__", &a, &b)? { stack.push(r); }
+                            else if let Some(r) = self.user_op("__op_mul__", &a, &b, true)? { stack.push(r); }
                             else { stack.push(mul(a, b)?); }
                         }
                     }
@@ -1562,14 +1687,14 @@ impl<'p> Vm<'p> {
                     if matches!(&a, Value::Int(_) | Value::Float(_)) && matches!(&b, Value::Int(_) | Value::Float(_)) {
                         stack.push(div(a, b)?);
                     } else if let Some(r) = module_op('/', &a, &b) { stack.push(r?); }
-                    else if let Some(r) = self.user_op("__op_div__", &a, &b)? { stack.push(r); }
+                    else if let Some(r) = self.user_op("__op_div__", &a, &b, false)? { stack.push(r); }
                     else { stack.push(div(a, b)?); }
                 }
                 op::MOD => {
                     let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     if matches!(&a, Value::Int(_) | Value::Float(_)) && matches!(&b, Value::Int(_) | Value::Float(_)) {
                         stack.push(modulo(a, b)?);
-                    } else if let Some(r) = self.user_op("__op_mod__", &a, &b)? { stack.push(r); }
+                    } else if let Some(r) = self.user_op("__op_mod__", &a, &b, false)? { stack.push(r); }
                     else { stack.push(modulo(a, b)?); }
                 }
                 op::POW => { let b = vm_pop(stack)?; let a = vm_pop(stack)?; stack.push(pow(a, b)?); }
@@ -1580,49 +1705,60 @@ impl<'p> Vm<'p> {
                 op::EQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x == y)),
-                        _ => match self.user_op("__op_eq__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(value_eq(&a, &b))) }
+                        _ => match self.user_op("__op_eq__", &a, &b, true)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(value_eq(&a, &b))) }
                     } }
                 op::NEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x != y)),
-                        _ => match self.user_op("__op_ne__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(!value_eq(&a, &b))) }
+                        _ => match self.user_op("__op_ne__", &a, &b, true)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(!value_eq(&a, &b))) }
                     } }
                 op::LT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x < y)),
                         (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
                             stack.push(Value::Bool(cmp(&a, &b, '<')?)),
-                        _ => match self.user_op("__op_lt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '<')?)) }
+                        _ => match self.user_op("__op_lt__", &a, &b, false)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '<')?)) }
                     } }
                 op::GT => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x > y)),
                         (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
                             stack.push(Value::Bool(cmp(&a, &b, '>')?)),
-                        _ => match self.user_op("__op_gt__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '>')?)) }
+                        _ => match self.user_op("__op_gt__", &a, &b, false)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, '>')?)) }
                     } }
                 op::LEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x <= y)),
                         (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
                             stack.push(Value::Bool(cmp(&a, &b, 'l')?)),
-                        _ => match self.user_op("__op_le__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'l')?)) }
+                        _ => match self.user_op("__op_le__", &a, &b, false)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'l')?)) }
                     } }
                 op::GEQ => { let b = vm_pop(stack)?; let a = vm_pop(stack)?;
                     match (&a, &b) {
                         (Value::Int(x), Value::Int(y)) => stack.push(Value::Bool(x >= y)),
                         (Value::Float(_), Value::Float(_)) | (Value::Int(_), Value::Float(_)) | (Value::Float(_), Value::Int(_)) =>
                             stack.push(Value::Bool(cmp(&a, &b, 'g')?)),
-                        _ => match self.user_op("__op_ge__", &a, &b)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) }
+                        _ => match self.user_op("__op_ge__", &a, &b, false)? { Some(r) => stack.push(r), None => stack.push(Value::Bool(cmp(&a, &b, 'g')?)) }
                     } }
                 op::NOT => { let v = vm_pop(stack)?; stack.push(Value::Bool(!v.truthy())); }
 
                 // --- Bitwise ---
-                op::BAND => { let (x, y) = int_pair2(stack)?; stack.push(Value::Int(x & y)); }
-                op::BOR => { let (x, y) = int_pair2(stack)?; stack.push(Value::Int(x | y)); }
-                op::BXOR => { let (x, y) = int_pair2(stack)?; stack.push(Value::Int(x ^ y)); }
-                op::SHL => { let (x, y) = int_pair2(stack)?; if y < 0 { return Err("SHL: negativ".into()); } stack.push(Value::Int(x << y)); }
-                op::SHR => { let (x, y) = int_pair2(stack)?; if y < 0 { return Err("SHR: negativ".into()); } stack.push(Value::Int(x >> y)); }
+                op::BAND => { let (x, y) = int_pair2(stack, "BAND")?; stack.push(Value::Int(x & y)); }
+                op::BOR => { let (x, y) = int_pair2(stack, "BOR")?; stack.push(Value::Int(x | y)); }
+                op::BXOR => { let (x, y) = int_pair2(stack, "BXOR")?; stack.push(Value::Int(x ^ y)); }
+                op::SHL => {
+                    let (x, y) = int_pair2(stack, "SHL")?;
+                    // Review-Fund: Rusts `<<` ist nur fuer 0..=63 definiert -- ohne
+                    // diese Grenze maskiert der Compiler die Schiebeweite still
+                    // (release, falsches Ergebnis) bzw. paniked (debug).
+                    if !(0..64).contains(&y) { return Err(format!("SHL: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
+                    stack.push(Value::Int(x << y));
+                }
+                op::SHR => {
+                    let (x, y) = int_pair2(stack, "SHR")?;
+                    if !(0..64).contains(&y) { return Err(format!("SHR: Schiebeweite muss 0..63 sein, erhalten {}", y)); }
+                    stack.push(Value::Int(x >> y));
+                }
                 op::BNOT => { let v = vm_pop(stack)?; match v { Value::Int(i) => stack.push(Value::Int(!i)), _ => return Err("BNOT erwartet INTEGER".into()) } }
 
 
@@ -2148,6 +2284,25 @@ impl<'p> Vm<'p> {
             match d {
                 Value::Int(i) if i >= 0 => dims.push(i),
                 _ => return Err("Array-Groesse muss INTEGER >= 0 sein".into()),
+            }
+        }
+        // Review-Fund: GbArray::new multipliziert die Dimensionen ungeprueft
+        // (`acc *= dims[k]`) -- `DIM a[4294967296, 4294967296]` ueberlief den
+        // i64-Akkumulator lautlos zu einem kleinen/negativen Wert (eine
+        // Groessen-Diskrepanz, die spaeter beim Indexzugriff in einen rohen
+        // Index-Out-Of-Bounds-Panic lief), und ein legitimer, aber riesiger
+        // Wert wie `DIM a[100000, 100000]` (1e10 Elemente, ~80 GB) fuehrte zu
+        // einem harten Allocator-Abort statt eines GB-Fehlers. Hier einmalig
+        // mit checked_mul + einer Obergrenze validieren, BEVOR GbArray::new
+        // (das selbst keinen Result-Rueckgabewert hat) ueberhaupt aufgerufen wird.
+        const MAX_ARRAY_ELEMENTS: i64 = 100_000_000;
+        let mut total: i64 = 1;
+        for &d in &dims {
+            total = total.checked_mul(d).ok_or_else(||
+                "Array-Groesse: Ganzzahl-Ueberlauf beim Berechnen der Gesamtgroesse".to_string())?;
+            if total > MAX_ARRAY_ELEMENTS {
+                return Err(format!(
+                    "Array-Groesse zu gross ({} Elemente, max. {})", total, MAX_ARRAY_ELEMENTS));
             }
         }
         Ok(dims)
@@ -4053,8 +4208,24 @@ impl<'p> Vm<'p> {
                 // SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms]) -> AUDIO_CHANNEL
                 let idx = gi(a, 0, "SAMPLE_PLAY")?;
                 let semis = need_f(a, 1, "SAMPLE_PLAY")?;
+                // Review-Fund: `semis`/`dur_ms` waren voellig unbeschraenkt.
+                // resample() leitet aus `semis` ein Pitch-Verhaeltnis
+                // `2^(semis/12)` ab und daraus `out_len = n/ratio` -- ein
+                // stark negativer Wert (z.B. -700) macht `ratio` astronomisch
+                // klein, `out_len` ueberlief/saettigte auf usize::MAX, und
+                // `Vec::with_capacity(out_len)` paniked mit einem
+                // Kapazitaets-Ueberlauf (nicht fangbar per TRY/CATCH) --
+                // direkt aus einem einzigen, gewoehnlich aussehenden
+                // SAMPLE_PLAY-Aufruf heraus. +/-120 Halbtoene (10 Oktaven)
+                // ist bereits weit jenseits jedes musikalischen Sinns.
+                if !(-120.0..=120.0).contains(&semis) {
+                    return Err("SAMPLE_PLAY: Halbtoene muss -120..120 sein".into());
+                }
                 let vol = if a.len() >= 3 { need_f(a, 2, "SAMPLE_PLAY")? } else { 1.0 };
                 let dur = if a.len() >= 4 { gi(a, 3, "SAMPLE_PLAY")? } else { 0 };
+                if !(0..=600_000).contains(&dur) {
+                    return Err("SAMPLE_PLAY: dur_ms muss 0..600000 sein".into());
+                }
                 Value::Int(self.audio_mut()?.sample_play(idx, semis, vol, dur)?)
             }
             "audio_lofi" => {
@@ -4286,12 +4457,23 @@ impl<'p> Vm<'p> {
             "audio_tone" => {
                 let freq = need_f(a, 0, "AUDIO_TONE")?;
                 let dur = gi(a, 1, "AUDIO_TONE")?;
+                // Review-Fund: keine Obergrenze -- `dur` geht direkt in
+                // `vec![0.0f64; n]` (n = Samples fuer die Dauer), ein absurd
+                // grosser Wert (z.B. eine fehlerhafte Berechnung) fuehrte zu
+                // einer Mehrere-GB-Allokation / Allocator-Abort statt eines
+                // GB-Fehlers.
+                if !(0..=600_000).contains(&dur) {
+                    return Err("AUDIO_TONE: dur_ms muss 0..600000 sein".into());
+                }
                 let wf = if a.len() >= 3 { gs(a, 2, "AUDIO_TONE")?.to_string() } else { "sine".to_string() };
                 let vol = if a.len() >= 4 { need_f(a, 3, "AUDIO_TONE")? } else { 1.0 };
                 Value::Int(self.audio_mut()?.tone(freq, dur, &wf, vol)?)
             }
             "audio_noise" => {
                 let dur = gi(a, 0, "AUDIO_NOISE")?;
+                if !(0..=600_000).contains(&dur) {
+                    return Err("AUDIO_NOISE: dur_ms muss 0..600000 sein".into());
+                }
                 let vol = if a.len() >= 2 { need_f(a, 1, "AUDIO_NOISE")? } else { 1.0 };
                 Value::Int(self.audio_mut()?.noise(dur, vol)?)
             }
@@ -5273,12 +5455,12 @@ fn require_number(a: &Value, b: &Value, op: &str) -> R<()> {
     Ok(())
 }
 
-fn int_pair2(stack: &mut Vec<Value>) -> R<(i64, i64)> {
+fn int_pair2(stack: &mut Vec<Value>, op: &str) -> R<(i64, i64)> {
     let b = vm_pop(stack)?;
     let a = vm_pop(stack)?;
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => Ok((*x, *y)),
-        _ => Err("Bitwise erwartet INTEGER".into()),
+        _ => Err(format!("{} erwartet INTEGER, erhalten {} / {}", op, a.type_name(), b.type_name())),
     }
 }
 
@@ -5311,6 +5493,16 @@ fn particle_color(start: i64, end: i64, has_end: bool, fade: bool, age: i32, lif
 /// Modul-Typ ist (Standard-Pfad). Mat4-/Quat-Mathe teilt sich die puren
 /// Helfer aus `builtins` (eine Quelle).
 fn module_op(op: char, a: &Value, b: &Value) -> Option<R<Value>> {
+    // Review-Fund: STRING ist unter keinem dieser Operatoren ein gueltiger
+    // Vektor-Operand -- ohne diesen fruehen Bail griff `module_op` bei z.B.
+    // `"pos: " + v` (v ein VEC2) trotzdem zu (is_mod(b)==true), landete im
+    // Catch-all-Arm des '+'-Zweigs und lieferte `Some(Err("inkompatible
+    // Vektor-Operanden"))` -- das hat den eigentlich vorgesehenen String-
+    // Konkatenations-Fallback (und jedes User-`OPERATOR +`, das STRING als
+    // `other` akzeptiert) NIE erreichen lassen.
+    if matches!(a, Value::Str(_)) || matches!(b, Value::Str(_)) {
+        return None;
+    }
     let is_mod = |v: &Value| matches!(v,
         Value::Vec2(..) | Value::Vec3(..) | Value::Vec4(..) | Value::Quat(..) | Value::Mat4(_));
     if !is_mod(a) && !is_mod(b) {
@@ -5396,7 +5588,16 @@ fn nn_arith(a: Value, b: Value, op: char) -> R<Value> {
 fn mul(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
         (Value::Str(s), Value::Int(n)) | (Value::Int(n), Value::Str(s)) => {
-            return Ok(if *n > 0 { Value::str_rc(&s.repeat(*n as usize)) } else { Value::str_rc("") });
+            if *n <= 0 { return Ok(Value::str_rc("")); }
+            // Review-Fund: `String::repeat` abortiert den Prozess bei
+            // Kapazitaets-Ueberlauf statt einen Fehler zu liefern -- ein
+            // Deckel verhindert das bei absurd grossem `n` (z.B. aus einer
+            // fehlerhaften Berechnung).
+            const MAX_REPEAT_LEN: usize = 10_000_000;
+            return match s.len().checked_mul(*n as usize) {
+                Some(total) if total <= MAX_REPEAT_LEN => Ok(Value::str_rc(&s.repeat(*n as usize))),
+                _ => Err(format!("* : String-Wiederholung zu gross (max. {} Zeichen)", MAX_REPEAT_LEN)),
+            };
         }
         _ => {}
     }
@@ -5420,7 +5621,14 @@ fn array_literal(vals: Vec<Value>) -> Value {
     let all_num = vals.iter().all(|v| matches!(v, Value::Int(_) | Value::Float(_)));
     let all_str = vals.iter().all(|v| matches!(v, Value::Str(_)));
     let all_bool = vals.iter().all(|v| matches!(v, Value::Bool(_)));
-    let (etype, cells) = if all_int {
+    // Review-Fund: bei einem leeren Literal `[]` sind all_int/all_num/all_str/
+    // all_bool alle vacuous-true (Iterator::all() auf einem leeren Iterator),
+    // und all_int gewinnt per Reihenfolge -- ein leeres Array wurde also immer
+    // als ARRAY OF INTEGER getypt, ein spaeteres ARRAY_PUSH(a, "x") scheiterte
+    // dann mit einer fuer den Nutzer unerklaerlichen Typ-Fehlermeldung.
+    let (etype, cells) = if vals.is_empty() {
+        ("any", Cells::Val(vals))
+    } else if all_int {
         ("integer", Cells::Int(vals.iter()
             .map(|v| if let Value::Int(i) = v { *i } else { 0 }).collect()))
     } else if all_num {
@@ -5442,7 +5650,11 @@ fn div(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("Division durch 0".into()); }
-            if x % y == 0 { Ok(Value::Int(x / y)) } else { Ok(Value::Float(*x as f64 / *y as f64)) }
+            // Review-Fund: i64::MIN / -1 ist UB-nah und paniked in Rust IMMER
+            // (unabhaengig von overflow-checks) -- checked_div faengt das ab.
+            let q = x.checked_div(*y).ok_or_else(|| int_overflow_msg("/"))?;
+            let r = x.checked_rem(*y).ok_or_else(|| int_overflow_msg("/"))?;
+            if r == 0 { Ok(Value::Int(q)) } else { Ok(Value::Float(*x as f64 / *y as f64)) }
         }
         _ => { let y = as_f64(&b); if y == 0.0 { return Err("Division durch 0".into()); } Ok(Value::Float(as_f64(&a) / y)) }
     }
@@ -5452,9 +5664,12 @@ fn int_div(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("Integer-Division durch 0".into()); }
-            Ok(Value::Int(x / y))
+            x.checked_div(*y).map(Value::Int).ok_or_else(|| int_overflow_msg("\\"))
         }
-        _ => Err("\\ erwartet INTEGER (kein FLOAT)".into()),
+        // Review-Fund: dieser Zweig faengt JEDEN nicht-Int/Int-Fall ab, nicht
+        // nur FLOAT -- die Meldung nannte faelschlich immer "FLOAT" auch fuer
+        // BOOLEAN/STRING-Operanden.
+        _ => Err(format!("\\ erwartet INTEGER, erhalten {} / {}", a.type_name(), b.type_name())),
     }
 }
 
@@ -5463,7 +5678,7 @@ fn modulo(a: Value, b: Value) -> R<Value> {
     match (&a, &b) {
         (Value::Int(x), Value::Int(y)) => {
             if *y == 0 { return Err("MOD durch 0".into()); }
-            let m = x % y;
+            let m = x.checked_rem(*y).ok_or_else(|| int_overflow_msg("MOD"))?;
             let m = if m != 0 && (m < 0) != (*y < 0) { m + y } else { m };
             Ok(Value::Int(m))
         }
@@ -5547,8 +5762,17 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
         "integer" => match value {
             Value::Int(_) => Ok(value),
             Value::Float(f) => {
-                if f.fract() == 0.0 { Ok(Value::Int(f as i64)) }
-                else { Err(format!("{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \\ statt / nehmen, sonst mit INT()/ROUND() runden", ctx, f)) }
+                if f.fract() != 0.0 {
+                    Err(format!("{}: FLOAT {} passt nicht verlustfrei in INTEGER -- fuer ganzzahlige Division \\ statt / nehmen, sonst mit INT()/ROUND() runden", ctx, f))
+                // Review-Fund: `f as i64` saettigt in Rust (seit 1.45) statt zu
+                // ueberlaufen -- ohne diese Grenzpruefung wurde z.B. `1e19`
+                // (fract()==0.0, aber weit ausserhalb i64) still zu
+                // i64::MAX statt zu einem Fehler.
+                } else if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                    Ok(Value::Int(f as i64))
+                } else {
+                    Err(format!("{}: {}", ctx, int_overflow_msg("Zuweisung")))
+                }
             }
             Value::Bool(_) => Err(format!("{}: Erwartet INTEGER, erhalten BOOLEAN", ctx)),
             _ => Err(format!("{}: Erwartet INTEGER, erhalten {}", ctx, value.type_name())),
