@@ -98,6 +98,16 @@ pub struct TiledMap {
 impl TiledMap {
     /// (Tileset, local_id) fuer eine GID, oder (None,0).
     fn tileset_for_gid(&self, gid: i64) -> Option<(&TiledTileset, i64)> {
+        // Review-Fund: Tiled kodiert Flip-Zustand (horizontal/vertikal/
+        // diagonal) in den oberen 3 Bits einer GID (0x80000000/0x40000000/
+        // 0x20000000); die eigentliche Tile-ID ist `gid & 0x1FFFFFFF`. Ohne
+        // diese Maskierung landete eine gespiegelte Kachel (vom Tiled-Editor
+        // ganz normal per Klick erzeugt) bei einer riesigen GID, die
+        // `tileset_for_gid` auf das FALSCHE (meist letzte) Tileset abbildete
+        // -- `tile_property`/`is_solid_gid` fanden dann kein `solid`-Property
+        // mehr, gespiegelte Waende liessen den Spieler stillschweigend
+        // hindurchlaufen.
+        let gid = gid & 0x1FFF_FFFF;
         if gid <= 0 {
             return None;
         }
@@ -360,6 +370,14 @@ fn parse_layer(layer: &J) -> Result<TiledLayer, String> {
             l.kind = "tile".into();
             l.width = jint(layer, "width", 0);
             l.height = jint(layer, "height", 0);
+            // Review-Fund: width/height wurden nie auf Plausibilitaet
+            // geprueft -- ein negativer Wert oder ein absurd grosser Wert
+            // (i64::MAX) liess `width * height` weiter unten ueberlaufen.
+            if l.width < 0 || l.height < 0 {
+                return Err(format!(
+                    "TILED_LOAD: Layer '{}' hat negative width/height ({}/{})",
+                    l.name, l.width, l.height));
+            }
             match layer.get("data") {
                 Some(J::Array(a)) => {
                     l.tiles = a.iter().map(|x| x.as_i64().unwrap_or(0)).collect();
@@ -369,6 +387,21 @@ fn parse_layer(layer: &J) -> Result<TiledLayer, String> {
 In Tiled: Edit -> Preferences -> 'Store tile layer data as: CSV' und Map neu speichern.".into());
                 }
                 _ => {}
+            }
+            // Review-Fund: `tiles.len()` wurde nie gegen `width*height`
+            // geprueft -- jeder Aufrufer indiziert stattdessen ueber
+            // `ty * layer.width + tx` (gegen den HEADER, nicht den
+            // tatsaechlichen Vektor) -- eine gekuerzte/manipulierte `data`
+            // liess `tile_is_solid_at`/`TILED_TILE_AT`/`TILE_COLLIDE` mit
+            // einem rohen Index-Out-Of-Bounds-Panic abstuerzen statt eines
+            // sauberen TILED_LOAD-Fehlers.
+            let expected = (l.width as i64).checked_mul(l.height as i64);
+            match expected {
+                Some(n) if n as usize == l.tiles.len() => {}
+                _ => return Err(format!(
+                    "TILED_LOAD: Layer '{}' hat {} Tile(s), erwartet {}x{}={}",
+                    l.name, l.tiles.len(), l.width, l.height,
+                    expected.map(|n| n.to_string()).unwrap_or_else(|| "??".into()))),
             }
         }
         "objectgroup" => {

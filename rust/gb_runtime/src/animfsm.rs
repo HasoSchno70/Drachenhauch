@@ -169,6 +169,20 @@ impl AnimFsmObj {
                 s.get("last").and_then(|v| v.as_i64()),
             ) {
                 (Some(f), Some(l)) => {
+                    // Review-Fund: SPRITE_ADD_ANIM (der User-facing Weg,
+                    // Animationen zu registrieren) lehnt `first < 0 || last <
+                    // first` ab -- ANIM_FSM_LOAD nahm first/last dagegen
+                    // ungeprueft aus einer `.gbanim`-Datei, `setup()` schrieb
+                    // sie direkt in `sp.anims`. Ein State mit
+                    // `{"first":5,"last":4}` (last < first) ergab dort
+                    // `n = last-first+1 == 0`, und `value.rs`s
+                    // `elapsed.rem_euclid(n)` paniked mit Division durch 0
+                    // beim ersten ANIM_FSM_UPDATE.
+                    if f < 0 || l < f {
+                        return Err(format!(
+                            "ANIM_FSM_LOAD: State '{}' hat ungueltige first/last ({}/{}) -- \
+                             first muss >= 0 und <= last sein", name, f, l));
+                    }
                     let fps = s.get("fps").and_then(|v| v.as_f64()).unwrap_or(8.0);
                     Some((f as i32, l as i32, fps))
                 }
