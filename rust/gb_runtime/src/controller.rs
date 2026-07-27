@@ -75,9 +75,18 @@ impl CharController {
         } else if self.coyote_counter > 0 {
             self.coyote_counter -= 1;
         }
-        // 2. Jump-Buffer setzen
+        // 2. Jump-Buffer setzen/decrement -- bewusst dasselbe if/else-if-Muster
+        // wie der Coyote-Counter oben (Schritt 1): GENAU eine der beiden
+        // Operationen pro Frame. Review-Fund: vorher wurde hier nur GESETZT,
+        // das Decrement lief separat am Frame-ENDE (Schritt 9) und wurde dort
+        // per `!in_jump_pressed`-Guard genau auf dem Press-Frame uebersprungen
+        // -- macht den Jump-Buffer bei identischem `jump_buffer_max` effektiv
+        // 1 Frame LAENGER als das Coyote-Fenster (7 statt 6 nutzbare Frames
+        // bei max=6), obwohl beide dieselbe Gnadenfrist-Semantik haben sollen.
         if self.in_jump_pressed {
             self.jump_buffer_counter = self.jump_buffer_max;
+        } else if self.jump_buffer_counter > 0 {
+            self.jump_buffer_counter -= 1;
         }
         // 3. Variable-Jump-Cut
         if self.variable_jump && self.was_jumping
@@ -134,9 +143,8 @@ impl CharController {
             let (_, pr) = map.sweep_axis(layer, self.x, self.y, self.w, self.h, 1.0, 0);
             self.on_wall_right = pr;
         }
-        // 9. Jump-Buffer-Decrement (am Frame-Ende)
-        if !self.in_jump_pressed && self.jump_buffer_counter > 0 {
-            self.jump_buffer_counter -= 1;
-        }
+        // (Jump-Buffer-Decrement laeuft jetzt in Schritt 2, symmetrisch zum
+        // Coyote-Counter in Schritt 1 -- kein separates Frame-Ende-Decrement
+        // mehr noetig.)
     }
 }

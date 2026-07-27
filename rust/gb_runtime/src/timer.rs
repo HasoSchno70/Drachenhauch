@@ -35,7 +35,7 @@ impl Timers {
 
     fn add(&mut self, ms: i64, interval_ms: Option<i64>, func: String) -> i64 {
         self.entries.push(Some(Entry {
-            due: Instant::now() + Duration::from_millis(ms.max(0) as u64),
+            due: Instant::now() + Duration::from_millis(clamp_ms(ms)),
             interval_ms, func,
         }));
         (self.entries.len() - 1) as i64
@@ -59,7 +59,15 @@ impl Timers {
 
     /// Alle Timer + Cooldowns verwerfen (z.B. beim Scene-Wechsel).
     pub fn clear(&mut self) {
-        self.entries.clear();
+        // Review-Fund: `entries.clear()` leert den Vec komplett -- die
+        // naechste TIMER_AFTER/EVERY-ID beginnt danach wieder bei 0 und
+        // kollidiert mit IDs aus VOR dem Clear (z.B. eine alte, laengst
+        // vergessene ID aus der letzten Szene trifft per TIMER_CANCEL/ACTIVE
+        // einen VOELLIG ANDEREN, neu registrierten Timer). Das widerspricht
+        // dem dokumentierten Tombstone-Vertrag ("Timer-IDs bleiben stabil").
+        // Stattdessen jeden Slot einzeln auf None setzen (wie cancel()) --
+        // die Vec-Laenge (und damit die naechste vergebene ID) bleibt erhalten.
+        for slot in &mut self.entries { *slot = None; }
         self.cooldowns.clear();
     }
 
@@ -75,7 +83,7 @@ impl Timers {
                 if e.due <= now {
                     due.push(e.func.clone());
                     match e.interval_ms {
-                        Some(iv) => e.due = now + Duration::from_millis(iv.max(0) as u64),
+                        Some(iv) => e.due = now + Duration::from_millis(clamp_ms(iv)),
                         None => *slot = None,
                     }
                 }
@@ -91,9 +99,19 @@ impl Timers {
         if matches!(self.cooldowns.get(id), Some(frei_ab) if *frei_ab > now) {
             return false;
         }
-        self.cooldowns.insert(id.to_string(), now + Duration::from_millis(ms.max(0) as u64));
+        self.cooldowns.insert(id.to_string(), now + Duration::from_millis(clamp_ms(ms)));
         true
     }
+}
+
+/// Review-Fund: `Instant + Duration` PANIKED, wenn die Summe ueberlaeuft --
+/// `TIMER_AFTER(9223372036854775807, cb)` bzw. `COOLDOWN("x", i64::MAX)`
+/// abortierten so den gesamten Prozess (nicht per TRY/CATCH fangbar), obwohl
+/// nur `ms >= 0` geprueft wurde. Ein Deckel weit ueber jeder realistischen
+/// Spiellaufzeit (24h) verhindert das, ohne echte Anwendungsfaelle einzuschraenken.
+fn clamp_ms(ms: i64) -> u64 {
+    const MAX_TIMER_MS: i64 = 24 * 60 * 60 * 1000;
+    ms.clamp(0, MAX_TIMER_MS) as u64
 }
 
 #[cfg(test)]

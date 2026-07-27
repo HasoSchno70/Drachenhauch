@@ -184,10 +184,22 @@ def test_coyote_time_expires(run_gb, tmp_path):
 # --- Jump-Buffer --------------------------------------------------
 
 def test_jump_buffer_fires_on_landing(run_gb, tmp_path):
-    """Sprung-Press kurz vor der Landung feuert beim Touchdown (vy < 0)."""
+    """Sprung-Press kurz vor der Landung feuert beim Touchdown (vy < 0).
+
+    Startet naeher am Boden als frueher (102.0 statt 98.0): Review-Fund-Fix
+    in controller.rs machte das Jump-Buffer-Fenster exakt `jump_buffer_max`
+    (6) Frames lang statt vorher effektiv 7 (Decrement lief am Frame-ENDE
+    und wurde ausgerechnet auf dem Press-Frame uebersprungen -- 1 Frame
+    laenger als der strukturell identische Coyote-Counter). Bei y=98.0 landet
+    der Fall exakt auf dem 6. Frame -- also GENAU auf der (jetzt korrekten)
+    Fenstergrenze, nicht mit Sicherheitsabstand. y=102.0 laesst den Fall
+    bequem innerhalb des Fensters landen und testet damit wieder das
+    eigentlich gemeinte Verhalten ("kurz vor der Landung"), statt zufaellig
+    exakt an dessen Rand zu haengen.
+    """
     _floor(tmp_path)
     out = _run(run_gb, tmp_path,
-               "DIM c AS CHAR_CONTROLLER\nc = CHAR_NEW(50.0, 98.0, 8.0, 8.0)\n"
+               "DIM c AS CHAR_CONTROLLER\nc = CHAR_NEW(50.0, 102.0, 8.0, 8.0)\n"
                "CHAR_SET_INPUT(c, 0, TRUE, TRUE)\nCHAR_UPDATE(c, m, 0)\n"
                "DIM best AS FLOAT\nbest = CHAR_VY(c)\n"
                "DIM i AS INTEGER\nFOR i = 1 TO 10\n"
