@@ -203,6 +203,7 @@ impl SoundData for ModuleSoundData {
             shared: self.shared, created: false,
             prev: (0.0, 0.0), next: (0.0, 0.0), frac: 0.0, primed: false, ended: false,
             vol_cur: 0.0, last_target: f32::NAN, ramp_total: 1, ramp_done: 1, ramp_start: 0.0,
+            ramp_start_db: db(0.0).0, ramp_tgt_db: db(0.0).0,
             ramp_curve: FadeCurve::Linear,
             pos: 0,
         }), handle))
@@ -227,6 +228,19 @@ struct ModuleSound {
     ramp_total: u64,
     ramp_done: u64,
     ramp_start: f32,
+    // Review-Fund: `ramp_start`/`tgt` (linear 0..1) wurden bisher DIREKT linear
+    // interpoliert und mit der FadeCurve geformt -- Kiras eigener Tween-Pfad
+    // (AUDIO_PLAY/STOP/AUDIO_MUSIC_PLAY/STOP fade_in/out_ms, siehe `mh_set_volume`
+    // + die Kira-`Tweenable for Decibels`-Impl) interpoliert stattdessen den
+    // DEZIBEL-Wert linear und konvertiert erst am Ende exponentiell zu
+    // Amplitude. Dezibel ist eine logarithmische Skala -- "linear in Amplitude"
+    // und "linear in dB" sind fuer denselben Start/Ziel-Wert UNTERSCHIEDLICHE
+    // Kurven (v.a. nahe Stille), obwohl beide dieselbe FadeCurve-Formung
+    // nutzen. Diese beiden Felder cachen die dB-Werte EINMAL pro Ramp-Start
+    // (nicht pro Sample -- `db()` ruft `log10()`), damit der Modul-Fade-Pfad
+    // dieselbe Kurve wie der Kira-Tween-Pfad trifft.
+    ramp_start_db: f32,
+    ramp_tgt_db: f32,
     ramp_curve: FadeCurve,
     pos: u64,
 }
@@ -261,6 +275,9 @@ impl Sound for ModuleSound {
         let tgt = f32::from_bits(self.shared.vol_target.load(Relaxed));
         if tgt.to_bits() != self.last_target.to_bits() {
             self.ramp_start = self.vol_cur;
+            // dB-Endpunkte EINMAL pro Ramp-Start cachen (nicht pro Sample).
+            self.ramp_start_db = db(self.ramp_start as f64).0;
+            self.ramp_tgt_db = db(tgt as f64).0;
             let fade_ms = self.shared.fade_ms.load(Relaxed) as f64;
             self.ramp_total = ((fade_ms * sr / 1000.0) as u64).max(1);
             self.ramp_done = 0;
@@ -291,10 +308,13 @@ impl Sound for ModuleSound {
                 }
                 self.frac -= 1.0;
             }
-            // Volume-Ramp (Kurve identisch zu Kira::Easing::apply(), power=2)
+            // Volume-Ramp: linear-in-dB interpolieren (wie Kiras Tweenable
+            // fuer Decibels), Kurve identisch zu Kira::Easing::apply()
+            // (power=2), erst am Ende exponentiell zurueck zu Amplitude.
             if self.ramp_done < self.ramp_total {
                 let t = self.ramp_curve.apply(self.ramp_done as f32 / self.ramp_total as f32);
-                self.vol_cur = self.ramp_start + (tgt - self.ramp_start) * t;
+                let db_cur = self.ramp_start_db + (self.ramp_tgt_db - self.ramp_start_db) * t;
+                self.vol_cur = Decibels(db_cur).as_amplitude();
                 self.ramp_done += 1;
             } else {
                 self.vol_cur = tgt;
@@ -1727,8 +1747,9 @@ fn lofi_chain(buf: &mut [f64], sr: u32, bits: u32, cutoff: f64) {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_sfx_buffer, lofi_chain, pendulum_pos, resample,
-                svf_lowpass, FadeCurve, SidFx, yaw_quat};
+    use super::{build_sfx_buffer, db, lofi_chain, pendulum_pos, resample,
+                svf_lowpass, Decibels, FadeCurve, SidFx, yaw_quat};
+    use kira::Tweenable;
 
     #[test]
     fn resample_octave_up_halves_length() {
@@ -1836,6 +1857,35 @@ mod tests {
             assert!((FadeCurve::In.apply(t) - in_expect).abs() < 1e-6);
             assert!((FadeCurve::Out.apply(t) - out_expect).abs() < 1e-6);
             assert!((FadeCurve::InOut.apply(t) - inout_expect).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn module_fade_ramp_matches_kira_decibels_tween() {
+        // Review-Fund: der MOD/XM-Modul-Fade-Pfad (ModuleSound::process)
+        // interpolierte bisher DIREKT die lineare Amplitude (`ramp_start +
+        // (tgt - ramp_start) * t`), waehrend der Kira-Tween-Pfad (AUDIO_PLAY/
+        // STOP/AUDIO_MUSIC_PLAY/STOP fade_in/out_ms) ueber Kiras `Tweenable
+        // for Decibels` linear-in-DEZIBEL interpoliert und erst am Ende
+        // exponentiell zu Amplitude konvertiert -- zwei unterschiedliche
+        // Kurven fuer denselben Start/Ziel-Wert (dB ist eine log-Skala).
+        // Dieser Test verifiziert, dass die (jetzt korrigierte) Formel im
+        // Modul-Pfad exakt Kiras eigene `Decibels::interpolate` +
+        // `as_amplitude` nachbildet, statt nur die Formung (FadeCurve::apply)
+        // gegen sich selbst zu pruefen wie `fade_curve_matches_kira_easing_powi2`.
+        let vol_pairs = [(1.0, 0.0), (0.0, 1.0), (0.3, 0.8), (0.6, 0.1)];
+        let ts = [0.0f32, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0];
+        for &(v_start, v_target) in &vol_pairs {
+            for &t in &ts {
+                // Modul-Pfad-Formel (audio.rs ModuleSound::process).
+                let db_start = db(v_start).0;
+                let db_tgt = db(v_target).0;
+                let got = Decibels(db_start + (db_tgt - db_start) * t).as_amplitude();
+                // Kiras eigene Tweenable-Interpolation ueber Decibels.
+                let expect = Decibels::interpolate(db(v_start), db(v_target), t as f64).as_amplitude();
+                assert!((got - expect).abs() < 1e-5,
+                    "v_start={v_start} v_target={v_target} t={t}: got {got}, expected {expect} (Kira-Tween)");
+            }
         }
     }
 
