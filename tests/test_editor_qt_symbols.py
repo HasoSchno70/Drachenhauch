@@ -77,6 +77,26 @@ def test_scan_references_ignores_strings_and_comments():
     assert len(refs) == 2
 
 
+def test_scan_references_finds_usages_inside_fstring():
+    # Review-Fund: Identifier INNERHALB von f-String-{...}-Ausdruecken sind
+    # echter Code (siehe CLAUDE.md f-String-Sektion) -- wurden bisher wie
+    # der Rest des Strings komplett blank-maskiert, sodass Find-References/
+    # Rename sie nie sah (stille Code-Korruption bei einem Rename).
+    src = 'DIM hp AS INTEGER\nhp = 75\nPRINT f"{hp} HP left, formula: {hp*2}"\n'
+    refs = scan_references(src, "hp")
+    assert len(refs) == 4   # DIM, Zuweisung, {hp}, {hp*2}
+    assert (3, 10) in [(r.line, r.col) for r in refs]   # {hp}
+    assert (3, 33) in [(r.line, r.col) for r in refs]   # {hp*2}
+
+
+def test_scan_references_fstring_literal_braces_not_treated_as_code():
+    # `{{`/`}}` sind Escapes fuer woertliche Klammern, kein Ausdrucksbeginn --
+    # der Text dazwischen bleibt Literal (maskiert), kein falscher Treffer.
+    src = 'DIM hp AS INTEGER\nPRINT f"literal {{not hp}}, but {hp}"\n'
+    refs = scan_references(src, "hp")
+    assert len(refs) == 2   # nur DIM + das echte {hp}, nicht das literale "hp" in {{...}}
+
+
 def test_find_definition_first_match():
     src = "DIM Player AS INTEGER\nCLASS Player\nEND CLASS"
     d = find_definition(src, "Player")
@@ -86,6 +106,23 @@ def test_find_definition_first_match():
 
 def test_find_definition_none_when_missing():
     assert find_definition("PRINT 1", "Foo") is None
+
+
+def test_find_definition_property_get():
+    # Review-Fund: PROPERTY GET/SET-Member wurden gar nicht als Definition
+    # erfasst -- Goto-Definition/Hover fanden sie in Qt-Editor UND LSP nie.
+    src = (
+        "CLASS Player\n"
+        "    DIM _hp AS INTEGER\n"
+        "    PROPERTY GET hp() AS INTEGER\n"
+        "        RETURN Self._hp\n"
+        "    END PROPERTY\n"
+        "END CLASS\n"
+    )
+    d = find_definition(src, "hp")
+    assert d is not None
+    assert d.kind == "property"
+    assert d.line == 3
 
 
 def test_all_user_identifier_positions_filters_keywords():

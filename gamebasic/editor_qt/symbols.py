@@ -29,6 +29,13 @@ _DEF_PATTERNS = [
     (re.compile(r"^\s*CONST\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE), "const", 1),
     (re.compile(r"^\s*DIM\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE), "dim", 1),
     (re.compile(r"^\s*STATIC\s+CONST\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE), "const", 1),
+    # Review-Fund: PROPERTY GET/SET-Member wurden hier gar nicht erfasst --
+    # find_definition()/extract_user_doc() (Basis fuer Goto-Definition UND
+    # Hover, in Qt-Editor UND LSP) fanden Properties dadurch nie. Bei
+    # GET+SET desselben Namens gewinnt die ERSTE (in Quell-Reihenfolge,
+    # ueblicherweise GET) -- passend zu find_definition()s bereits
+    # bestehender "erste Definition gewinnt"-Regel.
+    (re.compile(r"^\s*PROPERTY\s+(?:GET|SET)\s+([A-Za-z_][A-Za-z0-9_]*)", re.IGNORECASE), "property", 1),
 ]
 
 # Tokens, die KEINE User-Symbole sind und die wir bei References ueberspringen.
@@ -96,6 +103,42 @@ def _strip_comment_and_strings(line: str) -> str:
         if ch == "'":
             out.append(" " * (n - i))
             break
+        # Review-Fund: f-Strings (`f"text {expr} text"`, siehe CLAUDE.md)
+        # wurden bisher wie ein normaler String komplett blank-maskiert --
+        # echte Identifier-Vorkommen INNERHALB von `{...}` (z.B.
+        # f"{hp} HP") waren fuer scan_references()/all_user_identifier_
+        # positions() dadurch unsichtbar. Ein Rename liesse solche Stellen
+        # unveraendert stehen (stille Code-Korruption), und Find-References
+        # zeigte f-String-Nutzungen nie an. `{{`/`}}` sind laut Doku
+        # Escapes fuer woertliche Klammern, kein Ausdrucksbeginn.
+        if ch == '"' and i > 0 and line[i - 1] in ("f", "F"):
+            out[-1] = " "     # das 'f'-Prefix selbst maskieren
+            out.append(" ")   # oeffnendes Anfuehrungszeichen
+            i += 1
+            depth = 0
+            while i < n:
+                c = line[i]
+                if c == '"' and depth == 0:
+                    out.append(" ")
+                    i += 1
+                    break
+                if c == "{" and i + 1 < n and line[i + 1] == "{":
+                    out.append("  "); i += 2; continue
+                if c == "}" and i + 1 < n and line[i + 1] == "}":
+                    out.append("  "); i += 2; continue
+                if c == "{":
+                    depth += 1
+                    out.append(" ")
+                    i += 1
+                    continue
+                if c == "}" and depth > 0:
+                    depth -= 1
+                    out.append(" ")
+                    i += 1
+                    continue
+                out.append(c if depth > 0 else " ")
+                i += 1
+            continue
         if ch == '"':
             out.append(" ")
             i += 1
@@ -350,7 +393,7 @@ def _extract_signature(decl_line: str, kind: str, lines: list[str],
     sig = decl_line.rstrip()
     # Inline-Kommentar abschneiden.
     sig = _strip_inline_comment(sig)
-    if kind in ("sub", "function"):
+    if kind in ("sub", "function", "property"):
         # Multi-Line-Param-Listen sind selten, aber moeglich. Wenn die Decl-
         # Zeile keinen `)` hat, lesen wir weiter.
         if "(" in sig and ")" not in sig:

@@ -45,7 +45,6 @@ def find_active_call(text: str) -> tuple[str, int] | None:
     stack: list[list] = []   # [opener, name, comma_count]
     i, n = 0, len(text)
     in_str = False
-    at_line_start = True     # nur Whitespace seit dem letzten '\n' gesehen
     while i < n:
         ch = text[i]
         if in_str:
@@ -53,34 +52,27 @@ def find_active_call(text: str) -> tuple[str, int] | None:
                 in_str = False
             i += 1
             continue
-        if ch == "\n":
-            at_line_start = True
-            i += 1
-            continue
-        if at_line_start:
-            if ch in (" ", "\t"):
-                i += 1
-                continue
-            # REM-Kommentar ist (wie im restlichen Editor, siehe
-            # symbols._strip_comment_and_strings/_strip_inline_comment) NUR
-            # am Zeilenanfang gueltig. Ohne diese Erkennung wuerde eine
-            # unbalancierte Klammer in einem REM-Kommentar (z.B. "REM
-            # siehe auch zoom(") einen Phantom-Stack-Frame erzeugen, der
-            # bei einem spaeteren, unabhaengigen ")" im echten Code
-            # faelschlich konsumiert wird und danach an der Basis des
-            # Stacks haengen bleibt -- Signature-Help zeigt dann eine
-            # Funktion an, obwohl der Cursor auf normalem Top-Level-Code
-            # steht (Review-Fund).
-            if text[i:i + 3].upper() == "REM" and (
-                    i + 3 == n or not (text[i + 3].isalnum() or text[i + 3] == "_")):
-                j = text.find("\n", i)
-                if j == -1:
-                    break
-                i = j
-                continue
-            at_line_start = False
         if ch == '"':
             in_str = True
+        elif (ch in ("R", "r") and text[i:i + 3].upper() == "REM"
+              and (i + 3 == n or not (text[i + 3].isalnum() or text[i + 3] == "_"))
+              and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] == "_"))):
+            # Review-Fund: REM ist an JEDEM Wort-Anfang ein Kommentar bis
+            # Zeilenende -- nicht nur am Zeilenanfang (die vorherige Fassung
+            # dieses Checks gatete auf `at_line_start`, uebereinstimmend mit
+            # einem falschen Kommentar, der behauptete, das sei auch
+            # `symbols._strip_comment_and_strings`s Verhalten -- tatsaechlich
+            # prueft DIE dort nur, ob das Zeichen davor kein Identifier-
+            # Zeichen ist, NICHT ob es Zeilenanfang ist). Ein TRAILING REM-
+            # Kommentar (z.B. "x = 1 REM siehe auch zoom(", ein gaengiger
+            # Stil) wurde dadurch nicht erkannt -- die unbalancierte Klammer
+            # darin erzeugte denselben Phantom-Stack-Frame-Bug, den dieser
+            # Check eigentlich schon beheben sollte.
+            j = text.find("\n", i)
+            if j == -1:
+                break
+            i = j
+            continue
         elif ch == "'":                      # Kommentar bis Zeilenende
             j = text.find("\n", i)
             if j == -1:

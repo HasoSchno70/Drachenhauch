@@ -174,13 +174,24 @@ class EditorIntelligenceMixin:
         if not all(ch.isalnum() or ch in ("_", "$") for ch in sel_text):
             return []
         text = self.toPlainText()
+        # Review-Fund: suchte bisher im rohen Dokumenttext, ohne Kommentare/
+        # Strings auszusparen -- ein Doppelklick auf einen Bezeichner
+        # highlightete so auch dessen Vorkommen INNERHALB eines '/REM-
+        # Kommentars oder String-Literals, obwohl das eigentliche Find-
+        # References-Feature (symbols.scan_references) genau das korrekt
+        # ausspart. `masked` hat dieselbe Laenge/Spalten-Positionen wie
+        # `text` (Kommentare/Strings durch Leerzeichen ersetzt) -- ein
+        # echter Identifier kann nie aus Leerzeichen bestehen, daher findet
+        # die Suche darin automatisch nur noch echte Code-Vorkommen.
+        from . import symbols as _sym
+        masked = "\n".join(_sym._strip_comment_and_strings(ln) for ln in text.split("\n"))
         out: list[tuple[int, int]] = []
         ssel = cursor.selectionStart()
         esel = cursor.selectionEnd()
         i = 0
         n = len(sel_text)
         while True:
-            idx = text.find(sel_text, i)
+            idx = masked.find(sel_text, i)
             if idx < 0:
                 break
             i = idx + 1

@@ -29,6 +29,20 @@ _PLACEHOLDER_RE = re.compile(r"\$\{(\d+)(?::([^{}]*))?\}")
 
 # Trigger -> Body. ``|`` markiert die Cursor-Position nach Insertion.
 # ``${N:default}`` markiert einen Placeholder mit auswaehlbarem Default.
+#
+# Review-Fund: "if"/"for"/"sub"/"try" sind ABSICHTLICH exakt die echten
+# GB-Keywords (case-insensitiv, wie gbrts Lexer sie behandelt) -- tippt ein
+# User eines dieser Woerter und drueckt Tab aus Gewohnheit (z.B. um VOR dem
+# eigentlichen Statement einzuruecken), bekommt er IMMER das volle Snippet
+# statt eines einfachen Einrueckens, ohne offensichtlichen Ausweg. Da die
+# komplette Expansion (Trigger entfernen + Body einfuegen,
+# `_try_expand_snippet` in code_editor.py) in EINEM `beginEditBlock`/
+# `endEditBlock` laeuft, ist ein sofortiges Ctrl+Z (Undo) tatsaechlich schon
+# ein funktionierender Ausweg -- es macht die komplette Expansion in einem
+# Schritt rueckgaengig und stellt exakt den getippten Trigger-Text wieder
+# her, wonach normal weitergetippt/eingerueckt werden kann. Nicht besonders
+# entdeckbar, aber vorhanden; nicht-kollidierende Trigger ("ife" fuer
+# If/Else, "wh"/"rp"/"fn"/"cls" usw.) bleiben der reibungsfreie Standardweg.
 SNIPPETS: dict[str, str] = {
     "if":  "IF ${1:condition} THEN\n    ${0}\nEND IF",
     "ife": "IF ${1:condition} THEN\n    ${2}\nELSE\n    ${0}\nEND IF",
