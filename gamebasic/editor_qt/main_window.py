@@ -1504,9 +1504,24 @@ class GameBasicEditor(QMainWindow):
         self.profile_panel = ProfilePanel()
         self.profile_dock = self._make_hidden_dock(
             "Profiler", "ProfilerDock", self.profile_panel)
-        self.profile_panel.jump_requested.connect(self._goto_line_in_active)
+        # Review-Fund: Datei, gegen die GERADE profiliert wird -- ein Doppel-
+        # klick auf eine Hotspot-Zeile sprang bisher immer in den AKTUELL
+        # aktiven Tab (_goto_line_in_active), nicht in die tatsaechlich
+        # profilierte Datei. Wechselt der User waehrend/nach dem Profiler-
+        # Lauf den Tab, landete der Sprung in einer voelligen anderen Datei
+        # (bei genug Zeilen-Unterschied auf einer sinnlosen Position).
+        self._profiled_file_path: Path | None = None
+        self.profile_panel.jump_requested.connect(self._on_profile_jump)
         self.profiler.finished.connect(self._on_profile_finished)
         self.profiler.failed.connect(self._on_profile_failed)
+
+    def _on_profile_jump(self, line: int) -> None:
+        path = self._profiled_file_path
+        if path is not None:
+            existing = self.tabs.find_tab_for(path)
+            if existing is not None:
+                self.tabs.activate(existing)
+        self._goto_line_in_active(line)
 
     def _profile_start(self) -> None:
         if self.profiler.is_running():
@@ -1521,6 +1536,7 @@ class GameBasicEditor(QMainWindow):
         if st is None or st.file_path is None:
             return
         base = st.file_path.parent
+        self._profiled_file_path = st.file_path
         self.console.clear()
         self.console.append(f"⏱ Profiler: {st.file_path.name}\n\n", "info")
         self.profile_dock.show()
@@ -1828,6 +1844,22 @@ class GameBasicEditor(QMainWindow):
         else:
             win.show()
 
+    def _companion_import_error(self, display_name: str, exc: BaseException,
+                                 extra_hint: str = "") -> None:
+        """Einheitliche Fehleranzeige fuer einen fehlgeschlagenen Begleit-
+        Editor-Import. Review-Fund: die 5 `_open_*_editor`/`_open_audio_studio`-
+        Methoden wiederholten denselben try/except-SystemExit/except-Exception-
+        Block, der sich nur im Anzeigenamen + optionalem Abhaengigkeits-
+        Hinweis unterschied."""
+        if isinstance(exc, SystemExit):
+            QMessageBox.warning(self, f"{display_name} nicht verfuegbar", str(exc))
+            return
+        hint = f"\n\n{extra_hint}" if extra_hint else ""
+        QMessageBox.warning(
+            self, f"{display_name}-Fehler",
+            f"Konnte {display_name} nicht laden:\n{type(exc).__name__}: {exc}{hint}",
+        )
+
     def _open_sprite_editor(self) -> None:
         """Oeffnet den Sprite-Editor als zweites Top-Level-Fenster.
 
@@ -1838,14 +1870,8 @@ class GameBasicEditor(QMainWindow):
         """
         try:
             from .. import spriteeditor_qt as se
-        except SystemExit as exc:
-            QMessageBox.warning(self, "Sprite-Editor nicht verfuegbar", str(exc))
-            return
-        except Exception as exc:
-            QMessageBox.warning(
-                self, "Sprite-Editor-Fehler",
-                f"Konnte Sprite-Editor nicht laden:\n{type(exc).__name__}: {exc}",
-            )
+        except (SystemExit, Exception) as exc:
+            self._companion_import_error("Sprite-Editor", exc)
             return
         win = se.SpriteEditorWindow(self.project_root)
         # Stylesheet bekommt das Sprite-Window EXKLUSIV (per-Window) statt
@@ -1867,15 +1893,8 @@ class GameBasicEditor(QMainWindow):
         bereits aktiv, der Partikel-Editor erbt also unser Theme."""
         try:
             from .. import particleeditor_qt as pe
-        except SystemExit as exc:
-            QMessageBox.warning(self, "Partikel-Editor nicht verfuegbar", str(exc))
-            return
-        except Exception as exc:
-            QMessageBox.warning(
-                self, "Partikel-Editor-Fehler",
-                f"Konnte Partikel-Editor nicht laden:\n"
-                f"{type(exc).__name__}: {exc}\n\n"
-                f"Braucht 'PySide6' und 'numpy'.")
+        except (SystemExit, Exception) as exc:
+            self._companion_import_error("Partikel-Editor", exc, "Braucht 'PySide6' und 'numpy'.")
             return
         win = pe.ParticleEditor(self.project_root)
         self._show_companion_window("_particle_editor_window", win)
@@ -1898,14 +1917,8 @@ class GameBasicEditor(QMainWindow):
         if win is None:
             try:
                 from .. import audiostudio_qt as studio
-            except SystemExit as exc:
-                QMessageBox.warning(self, "Audio-Studio nicht verfuegbar", str(exc))
-                return
-            except Exception as exc:
-                QMessageBox.warning(
-                    self, "Audio-Studio-Fehler",
-                    f"Konnte Audio Studio nicht laden:\n"
-                    f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
+            except (SystemExit, Exception) as exc:
+                self._companion_import_error("Audio-Studio", exc, "Braucht 'PySide6' und 'numpy'.")
                 return
             win = studio.AudioStudio(self.project_root)
             self._show_companion_window("_audio_studio_window", win, maximized=True)
@@ -1917,14 +1930,8 @@ class GameBasicEditor(QMainWindow):
         """Oeffnet den Tilemap-/Level-Editor als zweites Top-Level-Fenster."""
         try:
             from .. import tilemapeditor_qt as tm
-        except SystemExit as exc:
-            QMessageBox.warning(self, "Tilemap-Editor nicht verfuegbar", str(exc))
-            return
-        except Exception as exc:
-            QMessageBox.warning(
-                self, "Tilemap-Editor-Fehler",
-                f"Konnte Tilemap-Editor nicht laden:\n"
-                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6'.")
+        except (SystemExit, Exception) as exc:
+            self._companion_import_error("Tilemap-Editor", exc, "Braucht 'PySide6'.")
             return
         win = tm.TileMapEditor(self.project_root)
         self._show_companion_window("_tilemap_editor_window", win)
@@ -1935,14 +1942,8 @@ class GameBasicEditor(QMainWindow):
         """Oeffnet den Notenblatt-Editor als zweites Top-Level-Fenster."""
         try:
             from .. import scoreeditor_qt as sc
-        except SystemExit as exc:
-            QMessageBox.warning(self, "Notenblatt-Editor nicht verfuegbar", str(exc))
-            return
-        except Exception as exc:
-            QMessageBox.warning(
-                self, "Notenblatt-Editor-Fehler",
-                f"Konnte Notenblatt-Editor nicht laden:\n"
-                f"{type(exc).__name__}: {exc}\n\nBraucht 'PySide6' und 'numpy'.")
+        except (SystemExit, Exception) as exc:
+            self._companion_import_error("Notenblatt-Editor", exc, "Braucht 'PySide6' und 'numpy'.")
             return
         win = sc.ScoreEditor(self.project_root)
         self._show_companion_window("_score_editor_window", win, maximized=True)
@@ -2371,6 +2372,20 @@ class GameBasicEditor(QMainWindow):
 
         if self.console.is_running():
             self.console.stop_run()
+        # Review-Fund: hier fehlten Debugger/Profiler/Live-Error-Checker --
+        # nur der Konsolen-Run wurde beim Schliessen gestoppt. Der Einzel-
+        # Tab-Close-Pfad (_on_tab_close_requested / tabs.close_tab) stoppt
+        # den Debugger bereits korrekt und bricht den Live-Error-Checker
+        # jedes Tabs ab -- beim Schliessen des GESAMTEN Fensters lief das
+        # nicht mit, sodass ein laufender `gbrt debug`/`gbrt profile`-
+        # Subprozess (oder ein noch offener `gbrt --check`-Aufruf) verwaist
+        # zurueckblieb, statt terminiert zu werden.
+        if self.debugger.is_active():
+            self.debugger.stop()
+        if self.profiler.is_running():
+            self.profiler.stop()
+        for st in self.tabs.states:
+            st.editor._error_checker.cancel()
         # Sauberer Close: keine Recovery beim naechsten Start noetig.
         self._autosave_timer.stop()
         clear_autosaves()
