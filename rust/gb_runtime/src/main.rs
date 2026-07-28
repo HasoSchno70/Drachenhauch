@@ -37,6 +37,8 @@ mod text_stream;
 mod bt;
 #[cfg(feature = "serial")]
 mod serial;
+#[cfg(feature = "serial")]
+mod firmata;
 #[cfg(feature = "usb")]
 mod usb;
 #[cfg(feature = "wifi")]

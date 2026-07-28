@@ -1,0 +1,52 @@
+' Direkte Arduino/ESP32-Pin-Steuerung ueber StandardFirmata (kein eigener
+' Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen).
+' Native Runtime (gbrt): mit 'python rust/build_runtime.py --hardware' bauen.
+'
+' Liste aller verfuegbaren Ports anzeigen, dann (falls vorhanden) am ersten
+' Port Pin 13 (eingebaute LED auf vielen Boards) ein paar mal blinken lassen
+' und einen Analog-Kanal auslesen.
+
+IMPORT "firmata"
+
+DIM ports AS STRING
+ports = FIRMATA_PORTS()
+PRINT "Verfuegbare Ports: ", ports
+
+IF LEN(ports) = 0 THEN
+    PRINT "Kein serieller Port gefunden - Beispiel uebersprungen."
+ELSE
+    DIM board AS FIRMATA_HANDLE
+    DIM first$ AS STRING
+    DIM komma AS INTEGER
+
+    komma = INSTR(ports, ",")
+    IF komma > 0 THEN
+        first$ = LEFT$(ports, komma - 1)
+    ELSE
+        first$ = ports
+    END IF
+    first$ = TRIM$(first$)
+
+    PRINT "Oeffne ", first$, " mit 57600 Baud (blockiert ~2s fuer Arduino-Autoreset) ..."
+    board = FIRMATA_OPEN(first$, 57600)
+
+    FIRMATA_PIN_MODE(board, 13, 1)   ' Pin 13 = OUTPUT
+
+    DIM i AS INTEGER
+    DIM an AS BOOLEAN
+    an = TRUE
+    FOR i = 1 TO 6
+        FIRMATA_DIGITAL_WRITE(board, 13, an)
+        an = NOT an
+        SLEEP(300)
+    NEXT
+
+    ' Kanal 0 = A0 -- Analog-Kanal, NICHT die digitale Pin-Nummer (siehe
+    ' docs/module-firmata.md fuer die Pin-vs-Kanal-Unterscheidung).
+    FIRMATA_UPDATE(board)
+    SLEEP(50)
+    FIRMATA_UPDATE(board)
+    PRINT "A0: ", FIRMATA_ANALOG_READ(board, 0)
+
+    FIRMATA_CLOSE(board)
+END IF

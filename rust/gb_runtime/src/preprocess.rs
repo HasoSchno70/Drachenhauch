@@ -23,7 +23,7 @@ use regex::Regex;
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "cloud", "controller", "curves", "db", "ecs",
-    "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
+    "firmata", "g3d", "gui", "html", "imgfx", "input", "json", "m3d", "net", "particles",
     "physics", "physics2d", "physics3d", "regex", "save", "scene", "serial", "sprite",
     "tile_collide", "tiled", "timer", "tween", "ui", "usb", "vec2", "wifi",
 ];
@@ -33,7 +33,7 @@ const MODULES: &[&str] = &[
 /// Default-Build NICHT einkompiliert -- jeder Funktionsaufruf schluege sonst
 /// erst zur Laufzeit fehl (vgl. `vm.rs::unknown_builtin_msg`). Darum wird beim
 /// IMPORT frueh gewarnt.
-const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi"];
+const HARDWARE_MODULES: &[&str] = &["serial", "usb", "bt", "wifi", "firmata"];
 
 /// Externe Typen, die ein Built-in-Modul registriert (lowercase, wie der
 /// Lexer IDENTs liefert). Spiegelt `register_type(...)` der Module -- damit
@@ -48,6 +48,7 @@ const MODULE_TYPES: &[(&str, &[&str])] = &[
     ("controller", &["char_controller", "tiled_map"]),
     ("db", &["db_conn", "db_result"]),
     ("ecs", &["ecs_world"]),
+    ("firmata", &["firmata_handle"]),
     ("gui", &["gui_widget", "gui_window"]),
     ("json", &["json_handle"]),
     ("m3d", &["vec3", "vec4", "quat", "mat4"]),
@@ -170,6 +171,7 @@ fn is_known_module(rel: &str) -> bool {
 fn hardware_module_compiled(m: &str) -> bool {
     match m {
         "serial" => cfg!(feature = "serial"),
+        "firmata" => cfg!(feature = "serial"),
         "usb" => cfg!(feature = "usb"),
         "bt" => cfg!(feature = "bt"),
         "wifi" => cfg!(feature = "wifi"),
