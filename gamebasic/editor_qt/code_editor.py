@@ -119,6 +119,19 @@ class _LineTracker:
         self._document = document
         self._entries: list[tuple[QTextCursor, object]] = []
 
+    def retarget(self, document) -> None:
+        """Bindet den Tracker an ein NEUES Dokument um -- fuer
+        `CodeEditor.setDocument()` (der Split-View-Editor teilt sich das
+        Dokument des Primaer-Editors NACH seinem eigenen `__init__`, siehe
+        `tabs.toggle_split()`). Review-Fund: ohne dieses Retarget zeigte der
+        Tracker weiter auf das urspruengliche (jetzt verworfene) Dokument --
+        `set()`s `findBlockByNumber()` griff dann ins Leere, Breakpoint-/
+        Bookmark-/Fold-Klicks im Split-View-Gutter wurden zu stillen No-Ops.
+        Bestehende Marker gehoeren zum ALTEN Dokument und werden verworfen
+        (ihre QTextCursor-Positionen waeren nach dem Wechsel bedeutungslos)."""
+        self._document = document
+        self._entries.clear()
+
     @staticmethod
     def _line_of(cursor: QTextCursor) -> int:
         return cursor.blockNumber() + 1
@@ -351,6 +364,25 @@ class CodeEditor(
         self._rescan_color_literals()
         self._highlight_current_line()
         self._rescan_fold_regions()
+
+    def setDocument(self, document) -> None:  # noqa: N802 (Qt-API)
+        """Review-Fund: `tabs.toggle_split()` erzeugt einen zweiten
+        `CodeEditor()` und ruft danach `setDocument()` auf, um sich das
+        Dokument des Primaer-Editors zu teilen -- die drei `_LineTracker`
+        (Breakpoints/Bookmarks/Folds, im `__init__` gegen das TEMPORAERE
+        Default-Dokument angelegt) zeigten ohne dieses Override weiter auf
+        das verworfene Dokument. Breakpoint-/Bookmark-/Fold-Klicks im
+        Split-View-Gutter wurden dadurch zu stillen No-Ops (`findBlockByNumber`
+        gegen ein fast leeres Dokument liefert einen ungueltigen Block, kein
+        Fehler). `getattr(..., None)` schuetzt gegen den Fall, dass Qt
+        `setDocument()` schon waehrend `super().__init__()` aufruft, bevor
+        diese Attribute existieren."""
+        super().setDocument(document)
+        for tracker in (getattr(self, "_breakpoints", None),
+                        getattr(self, "_bookmarks", None),
+                        getattr(self, "_folded", None)):
+            if tracker is not None:
+                tracker.retarget(document)
 
     # ------------------------------------------------------------ API
     def get_text(self) -> str:
@@ -801,39 +833,42 @@ class CodeEditor(
         self.document().markContentsDirty(0, self.document().characterCount())
         self.viewport().update()
 
-    def _handle_fold_click(self, y_pixel: int) -> bool:
-        """Identifiziert den Block bei der Y-Pixel-Position und togglet ihn,
-        sofern er Block-Anfang einer Fold-Region ist."""
-        block = self.firstVisibleBlock()
-        offset = self.contentOffset()
-        top = self.blockBoundingGeometry(block).translated(offset).top()
-        bottom = top + self.blockBoundingRect(block).height()
-        while block.isValid():
-            if block.isVisible() and top <= y_pixel < bottom:
-                line = block.blockNumber() + 1
-                for s, e, _k in self._fold_regions:
-                    if s == line:
-                        self._toggle_fold(s, e)
-                        return True
-                return False
-            block = block.next()
-            top = bottom
-            bottom = top + self.blockBoundingRect(block).height()
-        return False
+    def _block_at_y(self, y_pixel: int):
+        """Liefert den sichtbaren Block, dessen vertikale Spanne `y_pixel`
+        (Widget-lokale Pixel-Y-Koordinate) enthaelt, oder None.
 
-    def _line_at_y(self, y_pixel: int) -> int | None:
-        """1-basierte Zeile an einer Y-Pixel-Position im Gutter (oder None)."""
+        Review-Fund: `_handle_fold_click`/`_line_at_y` duplizierten beide
+        exakt dieselbe Block-Lauf-Schleife (nur die Verwendung des
+        gefundenen Blocks unterschied sich) -- jetzt eine gemeinsame Basis."""
         block = self.firstVisibleBlock()
         offset = self.contentOffset()
         top = self.blockBoundingGeometry(block).translated(offset).top()
         bottom = top + self.blockBoundingRect(block).height()
         while block.isValid():
             if block.isVisible() and top <= y_pixel < bottom:
-                return block.blockNumber() + 1
+                return block
             block = block.next()
             top = bottom
             bottom = top + self.blockBoundingRect(block).height()
         return None
+
+    def _handle_fold_click(self, y_pixel: int) -> bool:
+        """Identifiziert den Block bei der Y-Pixel-Position und togglet ihn,
+        sofern er Block-Anfang einer Fold-Region ist."""
+        block = self._block_at_y(y_pixel)
+        if block is None:
+            return False
+        line = block.blockNumber() + 1
+        for s, e, _k in self._fold_regions:
+            if s == line:
+                self._toggle_fold(s, e)
+                return True
+        return False
+
+    def _line_at_y(self, y_pixel: int) -> int | None:
+        """1-basierte Zeile an einer Y-Pixel-Position im Gutter (oder None)."""
+        block = self._block_at_y(y_pixel)
+        return block.blockNumber() + 1 if block is not None else None
 
     def _shift_line_markers(self, remap: dict[int, int]) -> None:
         """Migriert Bookmarks/Breakpoints/Folds gemaess `remap` (alte Zeile
@@ -1365,6 +1400,25 @@ class CodeEditor(
             if key == Qt.Key.Key_Delete:
                 self._multi_edit(lambda c: c.deleteChar() if not c.hasSelection() else c.removeSelectedText())
                 return
+            # Review-Fund: Tab/Enter sind KEINE "printable"-Zeichen
+            # (`"\t".isprintable()`/`"\r".isprintable()` sind beide False),
+            # fielen also durch diesen Zweig hindurch und landeten im
+            # "sonstige Taste -> Multi-Selektion verwerfen"-Fallback unten --
+            # ein User mit aktiver Multi-Selektion, der Tab zum Einruecken
+            # oder Enter fuer eine neue Zeile drueckte, verlor seine
+            # Selektion STILLSCHWEIGEND und nur der primaere Cursor wurde
+            # bearbeitet. Snippet-Expansion (Tab im Single-Cursor-Pfad)
+            # bleibt bewusst Single-Cursor-only -- mehrdeutig bei mehreren
+            # Cursorn -- Multi-Cursor-Tab ruecktb daher immer nur ein.
+            if key == Qt.Key.Key_Tab and not shift:
+                self._multi_edit(lambda c: self._insert_indent(c))
+                return
+            if key == Qt.Key.Key_Backtab or (key == Qt.Key.Key_Tab and shift):
+                self._multi_edit(lambda c: self._remove_indent(c))
+                return
+            if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self._multi_edit(lambda c: self._auto_indent_newline(c))
+                return
             if text and text.isprintable():
                 self._multi_edit(lambda c, t=text: c.insertText(t))
                 return
@@ -1500,8 +1554,9 @@ class CodeEditor(
 
 
 
-    def _auto_indent_newline(self) -> None:
-        cursor = self.textCursor()
+    def _auto_indent_newline(self, cursor: QTextCursor | None = None) -> None:
+        if cursor is None:
+            cursor = self.textCursor()
         block_text = cursor.block().text()
         col = cursor.positionInBlock()
         i = 0
@@ -1629,6 +1684,17 @@ class CodeEditor(
                     sig, desc = user_doc
                     text = sig if not desc else f"{sig}\n\n{desc}"
                     QToolTip.showText(ev.globalPos(), text, self)
+                    return True
+                # Review-Fund: BUILTIN_DOCS deckt nur einen Bruchteil der
+                # tatsaechlichen Built-ins ab (~243 von ~1106) -- fuer den
+                # Rest zeigte Hover bisher GAR NICHTS, ohne jeden Hinweis,
+                # obwohl Signature-Help fuer dieselben Namen schon laenger
+                # auf gbrt_meta.signature() zurueckfaellt (_builtin_signature
+                # oben). Wenigstens die Signatur (ohne Beschreibung) ist
+                # besser als eine komplett tote Tooltip.
+                sig = self._builtin_signature(word)
+                if sig is not None:
+                    QToolTip.showText(ev.globalPos(), sig, self)
                     return True
             QToolTip.hideText()
             return True

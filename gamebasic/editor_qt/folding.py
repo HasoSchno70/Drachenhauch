@@ -21,6 +21,8 @@ Erkannte Block-Konstrukte:
 """
 from __future__ import annotations
 
+from .symbols import _strip_inline_comment
+
 
 # Mapping Opener-Kind -> Set akzeptierter Closer-Tokens.
 # Multi-Token-Closer werden zur Erkennung als String mit Whitespace
@@ -104,7 +106,17 @@ def scan(source: str) -> list[tuple[int, int, str]]:
     out: list[tuple[int, int, str]] = []
     stack: list[tuple[int, str]] = []   # (line_number, kind)
     for ln, raw in enumerate(source.split("\n"), start=1):
-        stripped = raw.strip()
+        # Review-Fund: ein Trailing-Kommentar (z.B. "IF x > 0 THEN ' positive"
+        # oder "END SUB ' cleanup done") wurde bisher NICHT abgeschnitten,
+        # bevor die Zeile klassifiziert wurde -- weder Opener- noch Closer-
+        # Erkennung tolerierten dadurch einen Kommentar am Zeilenende (die
+        # Zeile endete dann z.B. auf "' POSITIVE" statt " THEN", oder
+        # "END SUB ' CLEANUP DONE" traf den exakten Closer-String "end sub"
+        # nicht mehr) -- der gesamte Block bekam still keinen Fold-Pfeil.
+        # `_strip_inline_comment` (aus symbols.py) kennt bereits die
+        # Quoted-String-Ausnahme (ein `'` INNERHALB eines "..."-Literals ist
+        # kein Kommentar-Start).
+        stripped = _strip_inline_comment(raw).strip()
         if not stripped:
             continue
         upper = stripped.upper()

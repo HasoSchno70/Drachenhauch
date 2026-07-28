@@ -60,6 +60,26 @@ def test_split_editor_in_splitter():
     assert st.editor_split.count() == 1
 
 
+def test_split_editor_breakpoint_bookmark_fold_target_shared_document():
+    """Review-Fund: der Split-Editor wird als `CodeEditor()` (eigenes
+    temporaeres Default-Dokument) konstruiert und ERST danach per
+    setDocument() auf das geteilte Dokument umgehaengt. Ohne ein
+    setDocument()-Override zeigten die drei _LineTracker (Breakpoints/
+    Bookmarks/Folds) weiterhin auf das verworfene temporaere Dokument --
+    ein Klick im Split-View-Gutter war dadurch ein stiller No-Op."""
+    area = _area()
+    st = area.open_tab(file_path=None, content="PRINT 1\nPRINT 2\nPRINT 3\n")
+    area.toggle_split(st)
+    ed2 = st.split_editor
+
+    assert ed2._breakpoints._document is ed2.document()
+    assert ed2._bookmarks._document is ed2.document()
+    assert ed2._folded._document is ed2.document()
+
+    ed2.toggle_breakpoint(2)
+    assert 2 in ed2._breakpoints.lines()
+
+
 def test_close_tab_cancels_live_error_check():
     """Review-Fund: close_tab() liess einen laufenden Live-Error-Check
     (Worker-Thread + `gbrt --check`-Subprozess) unangetastet weiterlaufen

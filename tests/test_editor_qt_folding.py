@@ -86,12 +86,22 @@ def test_robust_against_missing_closer():
 
 
 def test_ignore_comments_with_block_keywords():
-    """`' END SUB` im Kommentar darf nicht als Closer zaehlen.
+    """Eine eigenstaendige Kommentar-Zeile mit einem Block-Keyword-Text
+    darf nicht als echter Opener/Closer zaehlen -- sie beginnt mit `'`,
+    was schon vor dem Review-Fund-Fix (Trailing-Kommentare abschneiden)
+    korrekt kein Opener/Closer-Praefix ergab."""
+    src = "SUB foo()\n' END SUB (nur ein Kommentar)\nPRINT 1\nEND SUB"
+    assert scan(src) == [(1, 4, "sub")]
 
-    Aktuelle Heuristik scant per upper-startswith, ohne Comment-Strip --
-    dieser Test dokumentiert den Status. Falls wir spaeter strenger
-    werden, sollte dieser Test fehlschlagen und wir koennen ihn
-    aktualisieren.
-    """
-    src = "SUB foo()\nPRINT 1\nEND SUB"   # baseline, kein Kommentar
-    assert scan(src) == [(1, 3, "sub")]
+
+def test_trailing_comment_on_opener_and_closer_still_recognized():
+    """Review-Fund: ein Trailing-Kommentar auf der Opener- ODER Closer-
+    Zeile selbst (z.B. "IF x > 0 THEN ' positive" oder "END SUB ' cleanup
+    done") liess den gesamten Block bisher STILLSCHWEIGEND ohne Fold-Pfeil
+    -- weder endete die Opener-Zeile noch auf " THEN", noch traf die
+    Closer-Zeile den exakten "end sub"-String."""
+    src_opener = "IF x > 0 THEN ' positive\nPRINT 1\nEND IF"
+    assert scan(src_opener) == [(1, 3, "if")]
+
+    src_closer = "SUB foo()\nPRINT 1\nEND SUB ' cleanup done"
+    assert scan(src_closer) == [(1, 3, "sub")]

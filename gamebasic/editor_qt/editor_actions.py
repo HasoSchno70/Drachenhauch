@@ -24,8 +24,9 @@ class EditorActionsMixin:
     """Indent + Comment-Toggle + Move-Line + Duplicate-Line."""
 
     # ----------------------------------------------- Indent / Outdent
-    def _insert_indent(self) -> None:
-        cursor = self.textCursor()
+    def _insert_indent(self, cursor: QTextCursor | None = None) -> None:
+        if cursor is None:
+            cursor = self.textCursor()
         if cursor.hasSelection():
             self._indent_selection(cursor, outdent=False)
             return
@@ -35,8 +36,9 @@ class EditorActionsMixin:
             spaces = INDENT_SPACES
         cursor.insertText(" " * spaces)
 
-    def _remove_indent(self) -> None:
-        cursor = self.textCursor()
+    def _remove_indent(self, cursor: QTextCursor | None = None) -> None:
+        if cursor is None:
+            cursor = self.textCursor()
         if cursor.hasSelection():
             self._indent_selection(cursor, outdent=True)
             return
