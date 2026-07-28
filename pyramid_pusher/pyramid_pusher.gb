@@ -1540,7 +1540,7 @@ SUB layout_map()
     DIM span AS INTEGER
     span = SCR_W - 2 * marginx
     DIM topy AS INTEGER
-    topy = 140
+    topy = 168
     DIM rowh AS INTEGER
     rowh = 86
     DIM i AS INTEGER
@@ -1550,37 +1550,31 @@ SUB layout_map()
         row = i \ MAP_COLS
         col = i MOD MAP_COLS
         IF (row MOD 2) = 1 THEN col = MAP_COLS - 1 - col
-        mapx[i] = marginx + INT(col * span / (MAP_COLS - 1))
-        mapy[i] = topy + row * rowh
+        ' Kleiner, deterministischer Versatz je Knoten -- wirkt wie eine
+        ' handgezeichnete Route statt eines starren Rasters (rein optisch,
+        ' die Navigation rechnet weiter mit Indizes, nicht mit Pixeln).
+        DIM jx AS INTEGER
+        DIM jy AS INTEGER
+        jx = INT(13.0 * SIN(i * 12.9898))
+        jy = INT(9.0 * COS(i * 78.233))
+        mapx[i] = marginx + INT(col * span / (MAP_COLS - 1)) + jx
+        mapy[i] = topy + row * rowh + jy
     NEXT
 END SUB
 
 SUB draw_map()
-    IF has_title THEN
-        DRAWIMAGE(img_title, 0, 0)
-    ELSE
-        CLS(&H2A1E12)
-    END IF
+    CLS(&H3A2A18)
     BLEND_MODE("mult")
     DRAWIMAGE(vig, 0, 0)
     BLEND_MODE("alpha")
-    BOX(0, 0, SCR_W, SCR_H, RGBA(22, 15, 9, 150))
+    RECTROUND(16, 56, SCR_W - 16, SCR_H - 16, 18, &H6B4A28)
     ctext(SCR_W \ 2, 22, "SCHATZKARTE", &HF5C542)
 
-    DIM i AS INTEGER
-    FOR i = 0 TO nchap - 2
-        DIM s AS INTEGER
-        FOR s = 0 TO 14
-            IF (s MOD 2) = 0 THEN
-                DIM lx AS INTEGER
-                DIM ly AS INTEGER
-                lx = mapx[i] + (mapx[i + 1] - mapx[i]) * s \ 14
-                ly = mapy[i] + (mapy[i + 1] - mapy[i]) * s \ 14
-                CIRCLE(lx, ly, 2, &H8A6A40)
-            END IF
-        NEXT
-    NEXT
+    IF nchap >= 2 THEN
+        SPLINE(mapx[0:nchap], mapy[0:nchap], &H8A6A40, 3.0)
+    END IF
 
+    DIM i AS INTEGER
     FOR i = 0 TO nchap - 1
         DIM nx AS INTEGER
         DIM ny AS INTEGER
@@ -1589,18 +1583,34 @@ SUB draw_map()
         unlocked = chap_first[i] <= best_unlocked
         DIM solvedn AS INTEGER
         solvedn = chap_solved(i)
+        DIM done AS BOOLEAN
+        done = unlocked AND solvedn >= chap_count[i]
         DIM col AS INTEGER
         col = &H4A3A28
         IF unlocked THEN col = &HC89030
-        IF unlocked AND solvedn >= chap_count[i] THEN col = &HF5C542
+        IF done THEN col = &HF5C542
         IF i = cur_chap THEN
             DIM rr AS INTEGER
             rr = 19 + INT(2.0 * SIN(MILLIS() * 0.006))
             CIRCLE(nx, ny, rr, &HFFE060)
         END IF
+        IF unlocked AND NOT done AND solvedn > 0 THEN
+            ' Fortschritts-Ring: zeigt geloeste/Gesamt-Kammern eines Kapitels
+            ' direkt auf der Karte, statt es nur nach dem Oeffnen zu verraten.
+            ' ARC() zeichnet nur eine 1px-Kontur, daher 3x versetzt fuer einen
+            ' dickeren, gut sichtbaren Ring in deutlichem Kontrastton.
+            DIM frac AS FLOAT
+            frac = solvedn / FLT(chap_count[i])
+            DIM aend AS FLOAT
+            aend = PI * 0.5 - frac * 2.0 * PI
+            DIM rk AS INTEGER
+            FOR rk = 17 TO 19
+                ARC(nx - rk, ny - rk, nx + rk, ny + rk, PI * 0.5, aend, &HFFD880)
+            NEXT
+        END IF
         CIRCLE(nx, ny, 15, &H241A10)
         CIRCLE(nx, ny, 12, col)
-        IF unlocked AND solvedn >= chap_count[i] THEN
+        IF done THEN
             DRAWIMAGEROT(img_star, nx, ny - 24, 0.0, 0.7, &HFFE060)
         END IF
         DIM nlab AS STRING
