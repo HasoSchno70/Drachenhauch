@@ -173,6 +173,17 @@ def hover(text: str, line0: int, char0: int) -> dict | None:
         ud = _sym.extract_user_doc(text, word)
         if ud is not None:
             sig, doc = ud
+        else:
+            # Review-Fund: BUILTIN_DOCS deckt nur einen Bruchteil der
+            # tatsaechlichen Built-ins ab -- fuer den Rest lieferte Hover
+            # bisher komplett None, ohne jeden Hinweis. Wenigstens die
+            # Signatur (aus dem gefrorenen gbrt-Metadaten-Index, derselbe
+            # den auch der Qt-Editor als Fallback nutzt) ist besser als gar
+            # kein Hover.
+            from ..editor_qt.gbrt_meta import signature as _gbrt_sig
+            gsig = _gbrt_sig(word)
+            if gsig:
+                sig, doc = gsig, ""
     if sig is None:
         return None
     md = f"```gamebasic\n{sig}\n```"

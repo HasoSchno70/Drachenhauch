@@ -353,5 +353,20 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
 
 
 def get_doc(name: str) -> tuple[str, str] | None:
-    """Liefert (Signatur, Beschreibung) zu einem Built-in oder None."""
-    return BUILTIN_DOCS.get(name.lower())
+    """Liefert (Signatur, Beschreibung) zu einem Built-in oder None.
+
+    `name` kommt haeufig OHNE trailing `$` an -- `lsp.features.word_at()`
+    strippt ihn z.B. per Konvention ("Wort ohne trailing $"), waehrend
+    BUILTIN_DOCS $-Builtins MIT `$` als Key speichert (z.B. "str$"). Review-
+    Fund: dieser Lookup versuchte bisher nur den Namen wie uebergeben --
+    Hover fuer JEDES $-Builtin (STR$, LEFT$, MID$, CHR$, ...) lief dadurch
+    ueber die LSP immer ins Leere. Der Qt-Editor selbst war unbetroffen
+    (sein eigenes _word_at_cursor haelt das `$` im Identifier), daher hier:
+    erst den Namen wie uebergeben versuchen, dann zusaetzlich mit
+    angehaengtem `$`.
+    """
+    key = name.lower()
+    doc = BUILTIN_DOCS.get(key)
+    if doc is not None:
+        return doc
+    return BUILTIN_DOCS.get(key + "$")
