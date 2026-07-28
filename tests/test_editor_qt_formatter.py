@@ -239,3 +239,20 @@ def test_multiline_comment_block_not_fragmented():
     Leerzeilen zwischen den einzelnen Kommentarzeilen auseinandergerissen."""
     src = "' Zeile 1\n' Zeile 2\n' Zeile 3\nPRINT 1"
     assert format_source(src) == src
+
+
+def test_compact_enum_does_not_open_a_block():
+    # Review-Fund: die kompakte ENUM-Form (ENUM Name = A, B, C) hat kein
+    # passendes END ENUM -- wurde sie faelschlich als Block-Opener behandelt,
+    # blieb JEDER folgende Code dauerhaft eine Stufe zu tief eingerueckt.
+    src = "ENUM State = MENU, PLAYING, PAUSED\nPRINT 1\nPRINT 2"
+    assert format_source(src) == src
+
+
+def test_block_enum_still_opens_and_closes():
+    # Regressionsschutz: die BLOCK-Form (ENUM Name allein, mit END ENUM)
+    # muss weiterhin normal ein-/ausruecken (die Leerzeile nach END ENUM
+    # kommt von der separaten "Leerzeile nach Block-Ende"-Regel).
+    src = "ENUM Permission\nNONE = 0\nREAD = 1\nEND ENUM\nPRINT 1"
+    expected = "ENUM Permission\n    NONE = 0\n    READ = 1\nEND ENUM\n\nPRINT 1"
+    assert format_source(src) == expected

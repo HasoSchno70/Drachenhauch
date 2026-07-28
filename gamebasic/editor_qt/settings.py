@@ -32,6 +32,20 @@ def _settings_path() -> Path:
     return config_dir() / "settings.json"
 
 
+def _atomic_write_text(path: Path, text: str) -> None:
+    """Review-Fund: ein direktes write_text() ueber die lebende Datei ist
+    nicht atomar -- ein Crash/Stromausfall MITTEN im Schreiben (settings.json
+    haelt Fenster-Geometrie/Workspace-/offene-Tabs-Zustand, recent.json die
+    zuletzt-geoeffneten Dateien; beides wird bei jedem Fenster-Close
+    ueberschrieben) haette den jeweils aktuellen Stand kaputt hinterlassen.
+    Gleiches Muster wie bereits in preset_library.py gefixt: erst in eine
+    Temp-Datei schreiben, dann per Path.replace() (auf demselben Dateisystem
+    atomar) ersetzen."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)
+
+
 def load_recent() -> list[str]:
     p = _recent_path()
     if not p.exists():
@@ -47,10 +61,8 @@ def load_recent() -> list[str]:
 
 def save_recent(items: list[str]) -> None:
     try:
-        _recent_path().write_text(
-            json.dumps(items[:RECENT_FILES_MAX], ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        _atomic_write_text(_recent_path(),
+                            json.dumps(items[:RECENT_FILES_MAX], ensure_ascii=False, indent=2))
     except OSError:
         pass
 
@@ -68,9 +80,6 @@ def load_settings() -> dict:
 
 def save_settings(data: dict) -> None:
     try:
-        _settings_path().write_text(
-            json.dumps(data, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        _atomic_write_text(_settings_path(), json.dumps(data, ensure_ascii=False, indent=2))
     except OSError:
         pass

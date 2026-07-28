@@ -64,8 +64,17 @@ def write_manifest(entries: list[RecoveryEntry]) -> bool:
     """Liefert False bei Schreibfehler (z.B. Ordner nicht beschreibbar/voll)
     -- der Aufrufer kann das nutzen, um dem User EINMALIG einen Hinweis zu
     geben, statt dass das Autosave-Sicherheitsnetz unbemerkt ausfaellt."""
+    # Review-Fund: ein direktes write_text() ueber die lebende Manifest-Datei
+    # ist nicht atomar -- ein Crash/Stromausfall MITTEN im Schreiben (das
+    # Manifest wird per 30s-Timer und bei jedem Tab-Close neu geschrieben)
+    # haette genau das Sicherheitsnetz kaputt hinterlassen, das fuer den
+    # Crash-Fall gedacht ist. Gleiches Muster wie bereits in
+    # preset_library.py gefixt: erst in eine Temp-Datei schreiben, dann
+    # per Path.replace() (auf demselben Dateisystem atomar) ersetzen.
+    path = manifest_path()
+    tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        manifest_path().write_text(
+        tmp.write_text(
             json.dumps(
                 [{
                     "autosave_file": e.autosave_file,
@@ -76,6 +85,7 @@ def write_manifest(entries: list[RecoveryEntry]) -> bool:
             ),
             encoding="utf-8",
         )
+        tmp.replace(path)
         return True
     except OSError:
         return False

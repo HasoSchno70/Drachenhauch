@@ -45,6 +45,13 @@ _OPENERS = re.compile(
 # IF mit THEN am Ende ohne Statement danach == Block-Opener. Single-Line-IF
 # (IF x THEN PRINT y) ist KEIN Opener.
 _IF_BLOCK = re.compile(r"^IF\b.*\bTHEN\s*$", re.IGNORECASE)
+# Review-Fund: die kompakte ENUM-Form (`ENUM State = MENU, PLAYING, PAUSED`,
+# siehe CLAUDE.md) hat KEIN passendes `END ENUM` -- `_OPENERS` behandelte
+# aber JEDE mit ENUM beginnende Zeile als Block-Opener, was `level` fuer den
+# Rest der Datei permanent um eins zu hoch liess (kein Closer poppt ihn
+# jemals zurueck). Nur die Block-Form (`ENUM Name` allein, ohne `=`) oeffnet
+# tatsaechlich einen Block.
+_ENUM_COMPACT = re.compile(r"^ENUM\b[^=]*=", re.IGNORECASE)
 # Closer (1:1 zu Opener)
 _CLOSER_EXACT = {
     "END IF", "END SUB", "END FUNCTION", "END CLASS", "END STRUCT",
@@ -64,7 +71,11 @@ def _classify(stripped: str) -> str:
         return "close"
     if upper in _MID_EXACT or any(upper.startswith(p) for p in _MID_PREFIX):
         return "mid"
-    if _OPENERS.match(upper) or _IF_BLOCK.match(upper):
+    if _OPENERS.match(upper):
+        if upper.startswith("ENUM") and _ENUM_COMPACT.match(upper):
+            return "plain"
+        return "open"
+    if _IF_BLOCK.match(upper):
         return "open"
     return "plain"
 
