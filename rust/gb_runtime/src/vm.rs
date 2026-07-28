@@ -547,6 +547,9 @@ pub struct Vm<'p> {
     tcp_socks: Vec<Option<crate::net::NetSock>>,
     #[cfg(feature = "net")]
     udp_socks: Vec<Option<crate::net::UdpSock>>,
+    // Modul mqtt: baut auf std::net auf wie net, eigener Handle-Typ.
+    #[cfg(feature = "net")]
+    mqtt_clients: Vec<Option<crate::mqtt::Client>>,
     // Modul html: letzter HTTP-Status/-Header (fuer HTTP_STATUS/HTTP_HEADER).
     #[cfg(feature = "http")]
     http_status: i64,
@@ -628,6 +631,8 @@ impl<'p> Vm<'p> {
             tcp_socks: Vec::new(),
             #[cfg(feature = "net")]
             udp_socks: Vec::new(),
+            #[cfg(feature = "net")]
+            mqtt_clients: Vec::new(),
             #[cfg(feature = "http")]
             http_status: 0,
             #[cfg(feature = "http")]
@@ -1871,6 +1876,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_timer(name, bargs)? { v }
                         else if let Some(v) = self.try_db(name, bargs)? { v }
                         else if let Some(v) = self.try_net(name, bargs)? { v }
+                        else if let Some(v) = self.try_mqtt(name, bargs)? { v }
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
@@ -2533,6 +2539,59 @@ impl<'p> Vm<'p> {
             }
             "net_udp_set_timeout" => { let i = bi_int(a, 0, "NET_UDP_SET_TIMEOUT")?; let ms = bi_int(a, 1, "NET_UDP_SET_TIMEOUT")?; net::set_timeout_udp(&self.net_udp(i)?.sock, ms); Value::Nil }
             "net_udp_close" => { let i = bi_int(a, 0, "NET_UDP_CLOSE")? as usize; if let Some(s) = self.udp_socks.get_mut(i) { *s = None; } Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul mqtt (baut auf std::net auf, Feature `net`)
+    // ===================================================================
+    fn try_mqtt(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("mqtt_")) { return Ok(None); }
+        #[cfg(feature = "net")]
+        { return self.try_mqtt_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+    #[cfg(feature = "net")]
+    fn mqtt_client(&mut self, idx: i64) -> R<&mut crate::mqtt::Client> {
+        Self::handle_get_mut(&mut self.mqtt_clients, idx, "MQTT", "ungueltiges/geschlossenes MQTT_HANDLE")
+    }
+    #[cfg(feature = "net")]
+    fn try_mqtt_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::mqtt;
+        let v = match name {
+            "mqtt_connect" => {
+                let host = bi_str(a, 0, "MQTT_CONNECT")?.to_string();
+                let port = bi_int(a, 1, "MQTT_CONNECT")?;
+                let client_id = bi_str(a, 2, "MQTT_CONNECT")?.to_string();
+                let keepalive = if a.len() >= 4 { bi_int(a, 3, "MQTT_CONNECT")? } else { 60 };
+                let username = match a.get(4) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
+                let password = match a.get(5) { Some(Value::Str(s)) => Some(s.to_string()), _ => None };
+                let c = mqtt::connect(&host, port, &client_id, keepalive, username.as_deref(), password.as_deref())?;
+                self.mqtt_clients.push(Some(c));
+                Value::Int((self.mqtt_clients.len() - 1) as i64)
+            }
+            "mqtt_disconnect" => {
+                let i = bi_int(a, 0, "MQTT_DISCONNECT")? as usize;
+                if let Some(slot) = self.mqtt_clients.get_mut(i) {
+                    if let Some(c) = slot.as_mut() { mqtt::disconnect(c); }
+                    *slot = None;
+                }
+                Value::Nil
+            }
+            "mqtt_is_connected" => { let i = bi_int(a, 0, "MQTT_IS_CONNECTED")?; Value::Bool(self.mqtt_clients.get(i as usize).and_then(|o| o.as_ref()).map(mqtt::is_connected).unwrap_or(false)) }
+            "mqtt_publish" => {
+                let i = bi_int(a, 0, "MQTT_PUBLISH")?; let topic = bi_str(a, 1, "MQTT_PUBLISH")?.to_string(); let payload = bi_str(a, 2, "MQTT_PUBLISH")?.to_string();
+                let retain = if a.len() >= 4 { bi_bool(a, 3, "MQTT_PUBLISH")? } else { false };
+                mqtt::publish(self.mqtt_client(i)?, &topic, &payload, retain)?; Value::Nil
+            }
+            "mqtt_subscribe" => { let i = bi_int(a, 0, "MQTT_SUBSCRIBE")?; let topic = bi_str(a, 1, "MQTT_SUBSCRIBE")?.to_string(); mqtt::subscribe(self.mqtt_client(i)?, &topic)?; Value::Nil }
+            "mqtt_update" => { let i = bi_int(a, 0, "MQTT_UPDATE")?; mqtt::update(self.mqtt_client(i)?)?; Value::Nil }
+            "mqtt_next_message" => { let i = bi_int(a, 0, "MQTT_NEXT_MESSAGE")?; Value::Bool(mqtt::next_message(self.mqtt_client(i)?)) }
+            "mqtt_message_topic" => { let i = bi_int(a, 0, "MQTT_MESSAGE_TOPIC")?; Value::str_rc(&mqtt::message_topic(self.mqtt_client(i)?)) }
+            "mqtt_message_payload" => { let i = bi_int(a, 0, "MQTT_MESSAGE_PAYLOAD")?; Value::str_rc(&mqtt::message_payload(self.mqtt_client(i)?)) }
             _ => return Ok(None),
         };
         Ok(Some(v))

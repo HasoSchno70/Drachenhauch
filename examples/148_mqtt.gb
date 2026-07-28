@@ -1,0 +1,42 @@
+' MQTT-Pub/Sub gegen einen lokalen Broker (z.B. Mosquitto, mosquitto.org,
+' Default-Port 1883, kein Login fuer einen lokalen Test-Broker noetig).
+' Dominantes ESP32/IoT-Steuerprotokoll -- typischer Anwendungsfall: ein
+' ESP32 publiziert Sensor-Werte, GameBasic subscribt darauf; umgekehrt
+' publiziert GameBasic Steuerbefehle, auf die der ESP32 subscribt hat.
+'
+' Verbindet sich, abonniert ein Test-Topic, publiziert eine Nachricht
+' darauf (kommt beim eigenen Client wieder an, weil der Broker sie an alle
+' Subscriber inkl. sich selbst zurueckschickt) und zeigt sie an.
+
+IMPORT "mqtt"
+
+TRY
+    DIM h AS MQTT_HANDLE
+    h = MQTT_CONNECT("127.0.0.1", 1883, "gamebasic-demo")
+    PRINT "Verbunden: ", MQTT_IS_CONNECTED(h)
+
+    MQTT_SUBSCRIBE(h, "gamebasic/demo")
+    MQTT_PUBLISH(h, "gamebasic/demo", "Hallo vom Bastler-Bereich!")
+
+    DIM tries AS INTEGER
+    DIM got AS BOOLEAN
+    got = FALSE
+    FOR tries = 1 TO 40
+        MQTT_UPDATE(h)
+        WHILE MQTT_NEXT_MESSAGE(h)
+            PRINT MQTT_MESSAGE_TOPIC(h), ": ", MQTT_MESSAGE_PAYLOAD(h)
+            got = TRUE
+        WEND
+        IF got THEN BREAK
+        SLEEP(50)
+    NEXT
+
+    IF NOT got THEN
+        PRINT "Keine Antwort vom Broker erhalten (Timeout)."
+    END IF
+
+    MQTT_DISCONNECT(h)
+CATCH e
+    PRINT "Kein MQTT-Broker auf 127.0.0.1:1883 erreichbar - Beispiel uebersprungen."
+    PRINT "  (", e, ")"
+END TRY

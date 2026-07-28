@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1119,
+ "count": 1128,
  "builtins": [
   {
    "name": "ABS",
@@ -2948,6 +2948,60 @@
    "kind": "graphics",
    "signature": "MODEL_WIRES(*args)",
    "module": "g3d"
+  },
+  {
+   "name": "MQTT_CONNECT",
+   "kind": "core",
+   "signature": "MQTT_CONNECT(host: STRING, port: INTEGER, client_id: STRING[, keepalive_s: INTEGER[, user$[, pass$]]]) AS MQTT_HANDLE",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_DISCONNECT",
+   "kind": "core",
+   "signature": "MQTT_DISCONNECT(h)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_IS_CONNECTED",
+   "kind": "core",
+   "signature": "MQTT_IS_CONNECTED(h) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_MESSAGE_PAYLOAD",
+   "kind": "core",
+   "signature": "MQTT_MESSAGE_PAYLOAD(h) AS STRING",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_MESSAGE_TOPIC",
+   "kind": "core",
+   "signature": "MQTT_MESSAGE_TOPIC(h) AS STRING",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_NEXT_MESSAGE",
+   "kind": "core",
+   "signature": "MQTT_NEXT_MESSAGE(h) AS BOOLEAN",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_PUBLISH",
+   "kind": "core",
+   "signature": "MQTT_PUBLISH(h, topic$, payload$[, retain: BOOLEAN])",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_SUBSCRIBE",
+   "kind": "core",
+   "signature": "MQTT_SUBSCRIBE(h, topic$)",
+   "module": "mqtt"
+  },
+  {
+   "name": "MQTT_UPDATE",
+   "kind": "core",
+   "signature": "MQTT_UPDATE(h)",
+   "module": "mqtt"
   },
   {
    "name": "MOUSEBUTTON",

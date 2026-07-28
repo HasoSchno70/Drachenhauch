@@ -32,6 +32,8 @@ mod ecs;
 mod html;
 #[cfg(feature = "net")]
 mod net;
+#[cfg(feature = "net")]
+mod mqtt;
 mod text_stream;
 #[cfg(feature = "bt")]
 mod bt;
