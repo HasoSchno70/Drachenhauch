@@ -76,9 +76,20 @@ def plan_replacements(root: Path, pattern: "re.Pattern", repl_str: str,
     for path in iter_gb_files(root):
         text = text_provider(path) if text_provider else None
         if text is None:
+            # Review-Fund: `errors="replace"` las bisher LOSSY -- eine Datei
+            # mit nicht-UTF-8-Bytes (z.B. cp1252/Latin-1-Reste von einem
+            # Paste aus Word) bekam jedes ungueltige Byte durch U+FFFD
+            # ersetzt. Gab es IRGENDWO im (jetzt mit U+FFFD durchsetzten)
+            # Text einen Treffer, wurde die KOMPLETTE lossy-dekodierte
+            # Fassung zurueckgeschrieben -- auch die Stellen, die mit dem
+            # eigentlichen Treffer nichts zu tun hatten, wurden so dauerhaft
+            # mit Replacement-Zeichen ueberschrieben. Strikt dekodieren und
+            # eine nicht als UTF-8 lesbare Datei wie einen Lesefehler
+            # behandeln (uebersprungen, `skipped` gezaehlt) statt sie lossy
+            # zu lesen und potenziell korrumpiert zurueckzuschreiben.
             try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
                 skipped += 1
                 continue
         new_text, n = pattern.subn(repl_str, text)

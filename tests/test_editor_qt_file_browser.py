@@ -112,3 +112,43 @@ def test_refresh_preserves_expand_state(app, tmp_path):
     assert ("dir", tmp_path / "a" / "b") not in after  # zu geblieben
 
     fb.deleteLater()
+
+
+def test_watcher_registers_project_root_and_gb_dirs(app, tmp_path):
+    """Review-Fund: der Baum synchronisierte sich bisher NUR ueber manuelles
+    "Aktualisieren" -- externe Aenderungen (anderes Programm, git checkout,
+    zweiter Editor-Prozess) blieben bis zum naechsten Klick unsichtbar."""
+    (tmp_path / "sub").mkdir()
+    (tmp_path / "sub" / "x.gb").write_text("PRINT 1", encoding="utf-8")
+
+    from gamebasic.editor_qt.file_browser import FileBrowser
+    fb = FileBrowser(tmp_path)
+    app.processEvents()
+
+    watched = set(fb._watcher.directories())
+    assert str(tmp_path) in watched
+    assert str(tmp_path / "sub") in watched
+
+    fb.deleteLater()
+
+
+def test_external_file_change_triggers_debounced_refresh(app, tmp_path, monkeypatch):
+    """Eine externe Aenderung (hier simuliert per direktem Signal-Emit, da
+    echte Dateisystem-Events auf manchen CI-Dateisystemen unzuverlaessig/
+    verzoegert sind) muss -- nach dem Debounce -- refresh() ausloesen."""
+    from gamebasic.editor_qt.file_browser import FileBrowser
+    fb = FileBrowser(tmp_path)
+    app.processEvents()
+
+    calls = []
+    monkeypatch.setattr(fb, "refresh", lambda: calls.append(1))
+
+    fb._on_fs_changed(str(tmp_path))
+    assert calls == []   # noch nicht sofort
+
+    # Debounce-Timer manuell ablaufen lassen, statt real 300ms zu warten.
+    fb._watch_debounce.stop()
+    fb._watch_debounce.timeout.emit()
+    assert calls == [1]
+
+    fb.deleteLater()

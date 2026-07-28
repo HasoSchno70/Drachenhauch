@@ -125,7 +125,15 @@ def _run_git(args, cwd) -> tuple[int, str, str]:
 
 
 def is_git_repo(path) -> bool:
-    rc, out, _ = _run_git(["rev-parse", "--is-inside-work-tree"], _dir_of(path))
+    """`path` muss bereits ein VERZEICHNIS sein (kein Datei-vs-Verzeichnis-
+    Raten hier). Review-Fund: rief bisher zusaetzlich `_dir_of(path)` auf --
+    der einzige Aufrufer (`blame()`) uebergibt aber schon `p.parent` (also
+    bereits ein Verzeichnis). `_dir_of` wendete seine Datei-vs-Verzeichnis-
+    Heuristik (".suffix vorhanden -> muss eine Datei sein -> eine Ebene
+    hoch") dann ein ZWEITES Mal an -- hiess der Verzeichnisname selbst
+    einen Punkt (z.B. "examples.bak/", "v1.2/"), landete die Pruefung
+    faelschlich im GROSSELTERN-Verzeichnis statt im echten Parent."""
+    rc, out, _ = _run_git(["rev-parse", "--is-inside-work-tree"], Path(path))
     return rc == 0 and out.strip() == "true"
 
 

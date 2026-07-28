@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QFileSystemWatcher, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton, QTreeWidget,
@@ -121,6 +121,23 @@ class FileBrowser(QWidget):
         # ihn aus settings.json und dekodiert ihn ueber `decode_expanded`).
         # Wird nach dem ersten `refresh()` verbraucht (siehe dort).
         self._initial_expanded: set | None = initial_expanded or None
+
+        # Review-Fund: der Baum synchronisierte sich bisher NUR ueber den
+        # manuellen "Aktualisieren"-Button -- Dateien, die extern (anderes
+        # Programm, git checkout, ein zweiter Editor-Prozess) angelegt/
+        # entfernt/umbenannt wurden, blieben bis zum naechsten Klick
+        # unsichtbar bzw. als stale Eintrag stehen. `QFileSystemWatcher`
+        # beobachtet Projekt-Root + jedes Verzeichnis mit .gb-Dateien
+        # (Pfad-Liste wird bei jedem refresh() neu gesetzt); ein kurzes
+        # Debounce (300ms) buendelt mehrere schnelle Aenderungen (z.B. ein
+        # `git checkout`) zu EINEM Re-Scan statt vieler.
+        self._watcher = QFileSystemWatcher(self)
+        self._watcher.directoryChanged.connect(self._on_fs_changed)
+        self._watcher.fileChanged.connect(self._on_fs_changed)
+        self._watch_debounce = QTimer(self)
+        self._watch_debounce.setSingleShot(True)
+        self._watch_debounce.setInterval(300)
+        self._watch_debounce.timeout.connect(self.refresh)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -459,6 +476,17 @@ class FileBrowser(QWidget):
             for c in ordered:
                 ex_item.addChild(c)
 
+        # Watcher-Pfade an den frischen Baum anpassen: Projekt-Root + jedes
+        # Verzeichnis, das (rekursiv) mindestens eine .gb-Datei enthaelt.
+        # Alte Pfade zuerst komplett entfernen (ein Verzeichnis kann seit dem
+        # letzten refresh() keine .gb-Dateien mehr haben oder ganz weg sein).
+        old_watched = self._watcher.directories()
+        if old_watched:
+            self._watcher.removePaths(old_watched)
+        watch_dirs = [str(self.project_root)] + [str(d) for d in dir_counts]
+        if watch_dirs:
+            self._watcher.addPaths(watch_dirs)
+
         if had_state:
             # Vorherigen Auf-/Zu-Zustand wiederherstellen (neue Items sind per
             # Default zugeklappt -> nur die zuvor offenen wieder aufklappen).
@@ -475,6 +503,13 @@ class FileBrowser(QWidget):
             self.tree.collapseAll()
             sec_mod.setExpanded(True)
             sec_files.setExpanded(True)
+
+    def _on_fs_changed(self, _path: str) -> None:
+        """`QFileSystemWatcher`-Signal (Datei ODER Verzeichnis) -- startet
+        das Debounce neu, statt sofort zu `refresh()`en (mehrere schnelle
+        Aenderungen, z.B. ein `git checkout`, sollen EINEN Re-Scan ausloesen,
+        nicht einen pro Datei)."""
+        self._watch_debounce.start()
 
     # --------------------------------------------------- Filter
     def _apply_filter(self, _q: str = "") -> None:

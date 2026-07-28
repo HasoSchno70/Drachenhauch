@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .symbols import _strip_comment_and_strings
 from .theme import COLORS, theme_signals
 
 
@@ -83,6 +84,7 @@ class OutlinePanel(QWidget):
             "struct":   COLORS["type"],
             "function": COLORS["builtin"],
             "sub":      COLORS["builtin"],
+            "property": COLORS["builtin"],
         }
         for kind, name, line, indent, params in items:
             label = f"{'  ' * indent}{kind.upper():9s} {name}{params}"
@@ -106,7 +108,16 @@ class OutlinePanel(QWidget):
         results: list[tuple[str, str, int, int, str]] = []
         container_stack: list[str] = []
         for ln_idx, raw in enumerate(source.split("\n"), start=1):
-            stripped = raw.strip()
+            # Review-Fund: dieser Scanner ist unabhaengig von symbols.py's
+            # scan_scopes() (das Breadcrumbs/Outline-Symbole eigentlich schon
+            # ueber EINE geteilte, comment-/string-aware Quelle beziehen
+            # sollten) und war weder comment-/string-aware NOCH kannte er
+            # PROPERTY GET/SET -- eine Klasse mit nur Properties zeigte gar
+            # nichts im Outline, obwohl dieselbe Property in der Breadcrumb-
+            # Leiste (die scan_scopes nutzt) korrekt als "◆ propname"
+            # erscheint. Ohne Comment-Strip haette ausserdem z.B.
+            # `' SUB fake()` als echter Opener durchgehen koennen.
+            stripped = _strip_comment_and_strings(raw).strip()
             upper = stripped.upper()
             if upper.startswith("CLASS "):
                 tail = stripped[6:].split(maxsplit=1)
@@ -136,6 +147,12 @@ class OutlinePanel(QWidget):
                 rest = stripped[9:]
                 name, params = OutlinePanel._split_name_params(rest)
                 results.append(("function", name, ln_idx, len(container_stack), params))
+            elif upper.startswith("PROPERTY GET ") or upper.startswith("PROPERTY SET "):
+                # Wie SUB/FUNCTION ein Blatt (kein Nesting-Push/Pop noetig --
+                # GameBasic verschachtelt keine PROPERTY-Bloecke ineinander).
+                rest = stripped[13:]   # nach "PROPERTY GET "/"PROPERTY SET " (je 13 Zeichen)
+                name, params = OutlinePanel._split_name_params(rest)
+                results.append(("property", name, ln_idx, len(container_stack), params))
         return results
 
     @staticmethod

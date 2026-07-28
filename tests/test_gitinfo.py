@@ -97,6 +97,33 @@ def test_blame_real_repo(tmp_path):
     assert res.ok is True
     assert len(res.lines) == 2
     assert all(isinstance(l, BlameLine) for l in res.lines)
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git nicht installiert")
+def test_blame_repo_dir_name_containing_dot(tmp_path):
+    """Review-Fund: blame() ruft is_git_repo(cwd) mit einem BEREITS
+    aufgeloesten Verzeichnis auf -- is_git_repo wendete intern zusaetzlich
+    die Datei-vs-Verzeichnis-Heuristik (".suffix vorhanden -> eine Ebene
+    hoch") ein ZWEITES Mal an. Heisst das Verzeichnis selbst z.B.
+    "examples.bak" (Punkt im Namen), landete die Pruefung faelschlich im
+    Elternverzeichnis (das kein Git-Repo ist) statt im echten Repo."""
+    repo_dir = tmp_path / "examples.bak"
+    repo_dir.mkdir()
+
+    def run(*args):
+        subprocess.run(["git", *args], cwd=repo_dir, check=True,
+                       capture_output=True)
+    run("init")
+    run("config", "user.email", "t@t.de")
+    run("config", "user.name", "Tester")
+    f = repo_dir / "prog.gb"
+    f.write_text("PRINT 1\n", encoding="utf-8")
+    run("add", "prog.gb")
+    run("-c", "commit.gpgsign=false", "commit", "-m", "init prog")
+
+    assert is_git_repo(repo_dir) is True
+    res = blame(str(f))
+    assert res.ok is True
     assert res.lines[0].author == "Tester"
     assert res.lines[0].summary == "init prog"
     assert res.lines[0].sha and not res.lines[0].uncommitted

@@ -130,6 +130,30 @@ def test_plan_replacements_counts_unreadable_files(tmp_path, monkeypatch):
     assert total == 1 and len(plan) == 1   # a.gb weiterhin gefunden
 
 
+def test_plan_replacements_skips_non_utf8_file_instead_of_corrupting_it(tmp_path):
+    """Review-Fund: eine Datei mit nicht-UTF-8-Bytes (z.B. cp1252-Reste)
+    wurde bisher lossy gelesen (errors="replace") -- bei einem Treffer
+    IRGENDWO im Text wurde die KOMPLETTE (mit U+FFFD durchsetzte) Fassung
+    zurueckgeschrieben, auch Stellen, die mit dem Treffer nichts zu tun
+    hatten. Die Datei muss jetzt wie ein Lesefehler behandelt (uebersprungen)
+    werden, statt lossy in den Plan aufgenommen zu werden."""
+    good = tmp_path / "a.gb"
+    good.write_text("PRINT foo\n", encoding="utf-8")
+    bad = tmp_path / "b.gb"
+    # "foo" als Treffer-Text PLUS ein paar echte cp1252-Bytes (0x84 = "„" in
+    # cp1252, aber ungueltiges UTF-8-Fortsetzungsbyte) anderswo in der Datei.
+    bad.write_bytes("PRINT foo\n' Kommentar: ".encode("utf-8") + b"\x84\n")
+    pat = build_pattern("foo", case_sensitive=True, whole_word=False, regex=False)
+
+    plan, total, skipped = plan_replacements(tmp_path, pat, replacement_string("bar", False))
+
+    assert skipped == 1
+    assert total == 1 and len(plan) == 1
+    assert plan[0][0] == good
+    # Die kaputte Datei bleibt auf der Platte unveraendert (nie geschrieben).
+    assert bad.read_bytes() == "PRINT foo\n' Kommentar: ".encode("utf-8") + b"\x84\n"
+
+
 # ------------------------------------------------------------- Dialog (UI)
 
 def test_dialog_replace_all_writes_disk(tmp_path, monkeypatch):
