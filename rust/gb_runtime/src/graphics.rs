@@ -694,6 +694,17 @@ pub struct Graphics {
     cam_x: f64,
     cam_y: f64,
     cam_zoom: f64,
+    // Rotation in Grad, um den Bildschirm-Mittelpunkt (logische width/height/2),
+    // NACH Translation+Zoom angewandt -- bei 0.0 bit-identisch zum alten
+    // (translate+scale-only) Verhalten. Positiv = Kamera dreht sich im
+    // Uhrzeigersinn -> die Welt erscheint gegen den Uhrzeigersinn gedreht
+    // (Standard-View-Matrix-Konvention). Wirkt ausschliesslich auf POSITIONEN
+    // (w2s, damit auf jeden Draw automatisch) -- KEINE automatische Kontur-
+    // Rotation von Formen/Bildern/Sprites (die behalten ihre eigene Achse;
+    // wer ein Objekt auch optisch mitdrehen will, addiert CAMERA_ROTATION()
+    // selbst zum eigenen Rotationswinkel, z.B. bei DRAWIMAGEROT). Siehe
+    // docs/module-camera.md.
+    cam_rotation: f64,
     // CAMERA_SHAKE: zufaelliger Kamera-Offset, klingt linear ueber die Dauer
     // ab. Pro Frame EIN Offset (in flip() fuer den naechsten Frame gewuerfelt).
     shake_amp: f64,
@@ -895,7 +906,7 @@ impl Graphics {
             // Transparente Fenster starten voll durchsichtig (Alpha 0), normale deckend schwarz.
             clear_color: if transparent { Color::new(0, 0, 0, 0) } else { Color::BLACK },
             transparent,
-            cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0,
+            cam_x: 0.0, cam_y: 0.0, cam_zoom: 1.0, cam_rotation: 0.0,
             shake_amp: 0.0, shake_dur_ms: 0.0, shake_start: None,
             shake_x: 0.0, shake_y: 0.0,
             cmds3d: Vec::new(),
@@ -1092,15 +1103,27 @@ impl Graphics {
     // daher hier gaten: waehrend active_rt gesetzt ist, No-Op/Identitaet.
     fn w2s(&self, x: i32, y: i32) -> (i32, i32) {
         if self.active_rt.is_some() { return (x, y); }
-        (((x as f64 - self.cam_x + self.shake_x) * self.cam_zoom) as i32,
-         ((y as f64 - self.cam_y + self.shake_y) * self.cam_zoom) as i32)
+        let px = (x as f64 - self.cam_x + self.shake_x) * self.cam_zoom;
+        let py = (y as f64 - self.cam_y + self.shake_y) * self.cam_zoom;
+        if self.cam_rotation == 0.0 { return (px as i32, py as i32); }
+        let (rx, ry) = self.rotate_around_screen_center(px, py, -self.cam_rotation);
+        (rx as i32, ry as i32)
     }
     fn ssize(&self, s: i32) -> i32 {
         if self.active_rt.is_some() { return s.max(0); }
         ((s as f64 * self.cam_zoom) as i32).max(0)
     }
+    /// Dreht einen bereits translatierten/gezoomten Screen-Punkt um den
+    /// logischen Bildschirm-Mittelpunkt (width/height/2) -- der Punkt genau
+    /// im Zentrum bleibt fix, weshalb CAMERA_FOLLOW's "target landet in der
+    /// Mitte"-Rechnung auch bei aktiver Rotation unveraendert stimmt.
+    fn rotate_around_screen_center(&self, px: f64, py: f64, deg: f64) -> (f64, f64) {
+        rotate_point_around(px, py, self.width as f64 / 2.0, self.height as f64 / 2.0, deg)
+    }
     pub fn set_camera(&mut self, x: f64, y: f64, zoom: f64) { self.cam_x = x; self.cam_y = y; self.cam_zoom = zoom; }
-    pub fn reset_camera(&mut self) { self.cam_x = 0.0; self.cam_y = 0.0; self.cam_zoom = 1.0; }
+    pub fn reset_camera(&mut self) { self.cam_x = 0.0; self.cam_y = 0.0; self.cam_zoom = 1.0; self.cam_rotation = 0.0; }
+    pub fn set_camera_rotation(&mut self, deg: f64) { self.cam_rotation = deg; }
+    pub fn camera_rotation(&self) -> f64 { self.cam_rotation }
 
     /// CAMERA_SHAKE(staerke, dauer_ms) -- zufaelliger Kamera-Ruckel-Offset
     /// (Welt-Pixel), klingt linear ueber dauer_ms ab. Liegt im selben
@@ -1137,6 +1160,20 @@ impl Graphics {
     pub fn camera(&self) -> (f64, f64, f64) { (self.cam_x, self.cam_y, self.cam_zoom) }
     pub fn s2w_x(&self, sx: f64) -> f64 { if self.cam_zoom == 0.0 { sx } else { sx / self.cam_zoom + self.cam_x } }
     pub fn s2w_y(&self, sy: f64) -> f64 { if self.cam_zoom == 0.0 { sy } else { sy / self.cam_zoom + self.cam_y } }
+    /// Rotations-bewusste Umkehrung von w2s: braucht BEIDE Screen-Koordinaten
+    /// (Rotation mischt x/y), darum eigene _rot-Varianten statt s2w_x/y direkt
+    /// zu aendern -- CAMERA_S2W_X(sx) ohne sy bleibt bei Rotation=0 exakt wie
+    /// bisher (Abwaertskompatibel fuer alle Scripte ohne CAMERA_SET_ROTATION).
+    pub fn s2w_x_rot(&self, sx: f64, sy: f64) -> f64 {
+        if self.cam_rotation == 0.0 { return self.s2w_x(sx); }
+        let (ux, _) = self.rotate_around_screen_center(sx, sy, self.cam_rotation);
+        self.s2w_x(ux)
+    }
+    pub fn s2w_y_rot(&self, sx: f64, sy: f64) -> f64 {
+        if self.cam_rotation == 0.0 { return self.s2w_y(sy); }
+        let (_, uy) = self.rotate_around_screen_center(sx, sy, self.cam_rotation);
+        self.s2w_y(uy)
+    }
 
     // --- 3D (Modul `g3d`) ---
     #[allow(clippy::too_many_arguments)]
@@ -4026,6 +4063,18 @@ fn shake_remaining(elapsed_ms: f64, dur_ms: f64) -> f64 {
     (1.0 - elapsed_ms / dur_ms).clamp(0.0, 1.0)
 }
 
+/// Dreht (px,py) um den Pivot (cx,cy) um `deg` Grad gegen den Uhrzeigersinn
+/// (Standard-Mathe-Konvention; Screen-Y-nach-unten wird bewusst NICHT extra
+/// gespiegelt -- w2s/s2w_*_rot sind sich beide konsistent in dieser
+/// Konvention, siehe Kommentar an cam_rotation). Pure Funktion (fuer #[test]
+/// ohne echte Graphics/raylib-Instanz).
+fn rotate_point_around(px: f64, py: f64, cx: f64, cy: f64, deg: f64) -> (f64, f64) {
+    let (s, c) = deg.to_radians().sin_cos();
+    let dx = px - cx;
+    let dy = py - cy;
+    (cx + dx * c - dy * s, cy + dx * s + dy * c)
+}
+
 #[cfg(test)]
 mod shake_tests {
     use super::shake_remaining;
@@ -4037,5 +4086,60 @@ mod shake_tests {
         assert_eq!(shake_remaining(400.0, 400.0), 0.0);
         assert_eq!(shake_remaining(999.0, 400.0), 0.0);   // ueber Ende
         assert_eq!(shake_remaining(10.0, 0.0), 0.0);      // dur=0 -> aus
+    }
+}
+
+#[cfg(test)]
+mod camera_rotation_tests {
+    use super::rotate_point_around;
+
+    #[test]
+    fn zero_degrees_is_identity() {
+        let (x, y) = rotate_point_around(37.0, -12.5, 100.0, 100.0, 0.0);
+        assert!((x - 37.0).abs() < 1e-9);
+        assert!((y - (-12.5)).abs() < 1e-9);
+    }
+
+    #[test]
+    fn center_point_is_fixed_under_any_rotation() {
+        // Der Pivot selbst bleibt immer an Ort und Stelle -- Grundlage dafuer,
+        // dass CAMERA_FOLLOW's "target landet auf Bildschirm-Mitte" bei
+        // aktiver Rotation weiterhin stimmt.
+        for deg in [15.0, 90.0, 180.0, 271.0, -40.0] {
+            let (x, y) = rotate_point_around(100.0, 100.0, 100.0, 100.0, deg);
+            assert!((x - 100.0).abs() < 1e-9, "deg={deg}");
+            assert!((y - 100.0).abs() < 1e-9, "deg={deg}");
+        }
+    }
+
+    #[test]
+    fn ninety_degrees_matches_hand_calculation() {
+        // Weltpunkt liegt vor der Rotation (nach Translate+Zoom) bei
+        // Screen-(50,0) auf einem 200x200-Screen (Pivot (100,100)).
+        // -90 Grad ist die w2s-Konvention fuer CAMERA_SET_ROTATION(90).
+        let (x, y) = rotate_point_around(50.0, 0.0, 100.0, 100.0, -90.0);
+        assert!((x - 0.0).abs() < 1e-6, "x={x}");
+        assert!((y - 150.0).abs() < 1e-6, "y={y}");
+    }
+
+    #[test]
+    fn hundred_eighty_degrees_is_point_reflection() {
+        let (x, y) = rotate_point_around(0.0, 0.0, 100.0, 100.0, 180.0);
+        assert!((x - 200.0).abs() < 1e-6, "x={x}");
+        assert!((y - 200.0).abs() < 1e-6, "y={y}");
+    }
+
+    #[test]
+    fn forward_and_inverse_round_trip() {
+        // w2s dreht um -cam_rotation, s2w_*_rot um +cam_rotation -- muss sich
+        // exakt aufheben (Grundvoraussetzung fuer korrektes Maus-Picking).
+        let (cx, cy) = (100.0, 100.0);
+        let (px, py) = (17.0, 233.0);
+        for deg in [0.0, 30.0, 90.0, 145.0, 260.0] {
+            let (sx, sy) = rotate_point_around(px, py, cx, cy, -deg);
+            let (ux, uy) = rotate_point_around(sx, sy, cx, cy, deg);
+            assert!((ux - px).abs() < 1e-6, "deg={deg} ux={ux}");
+            assert!((uy - py).abs() < 1e-6, "deg={deg} uy={uy}");
+        }
     }
 }

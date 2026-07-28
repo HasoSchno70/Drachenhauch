@@ -39,3 +39,30 @@ TRY
 CATCH e
     PRINT "Erwarteter Fehler: ", e
 END TRY
+
+PRINT ""
+PRINT "=== Rotation (um Bildschirm-Mitte, 200x200 -> Pivot 100,100) ==="
+SCREEN(200, 200, "Camera-Rotation-Test")
+CAMERA_RESET()
+PRINT "Startwert:", CAMERA_ROTATION(), " (erwartet 0.0)"
+
+CAMERA_SET_ROTATION(90.0)
+PRINT "nach SET_ROTATION(90):", CAMERA_ROTATION()
+' Weltpunkt (50,0) landet bei Rotation=90 auf Screen (0,150) -- die
+' Ein-Argument-Form von S2W_X/Y ignoriert Rotation (Abwaertskompatibel);
+' die korrekte Umkehrung braucht BEIDE Screen-Koordinaten. ROUND() nur fuers
+' Beispiel (SIN/COS von 90 Grad liefert intern ein Float-Epsilon statt exakt
+' 0.0 -- reine Anzeigesache, keine Ungenauigkeit im Feature selbst).
+PRINT "S2W_X(0,150):", ROUND(CAMERA_S2W_X(0.0, 150.0)), " (erwartet 50)"
+PRINT "S2W_Y(150,0):", ROUND(CAMERA_S2W_Y(150.0, 0.0)), " (erwartet 0)"
+
+CAMERA_SET_ROTATION(180.0)
+PRINT "S2W_X(200,200):", ROUND(CAMERA_S2W_X(200.0, 200.0)), " (erwartet 0)"
+PRINT "S2W_Y(200,200):", ROUND(CAMERA_S2W_Y(200.0, 200.0)), " (erwartet 0)"
+
+' CAMERA_SET(x, y[, zoom[, rotation]]) setzt Rotation optional gleich mit.
+CAMERA_SET(0.0, 0.0, 1.0, 45.0)
+PRINT "CAMERA_SET(...,45):", CAMERA_ROTATION()
+
+CAMERA_RESET()
+PRINT "nach RESET:", CAMERA_ROTATION(), " (erwartet 0.0)"

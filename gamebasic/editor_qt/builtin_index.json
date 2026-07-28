@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1106,
+ "count": 1119,
  "builtins": [
   {
    "name": "ABS",
@@ -795,21 +795,33 @@
    "module": "camera"
   },
   {
+   "name": "CAMERA_ROTATION",
+   "kind": "graphics",
+   "signature": "CAMERA_ROTATION()",
+   "module": "camera"
+  },
+  {
    "name": "CAMERA_S2W_X",
    "kind": "graphics",
-   "signature": "CAMERA_S2W_X(sx)",
+   "signature": "CAMERA_S2W_X(sx[, sy])",
    "module": "camera"
   },
   {
    "name": "CAMERA_S2W_Y",
    "kind": "graphics",
-   "signature": "CAMERA_S2W_Y(sy)",
+   "signature": "CAMERA_S2W_Y(sy[, sx])",
    "module": "camera"
   },
   {
    "name": "CAMERA_SET",
    "kind": "graphics",
-   "signature": "CAMERA_SET(2..3 Argumente)",
+   "signature": "CAMERA_SET(x, y[, zoom[, rotation_deg]])",
+   "module": "camera"
+  },
+  {
+   "name": "CAMERA_SET_ROTATION",
+   "kind": "graphics",
+   "signature": "CAMERA_SET_ROTATION(rotation_deg)",
    "module": "camera"
   },
   {
@@ -1615,6 +1627,66 @@
    "kind": "graphics",
    "signature": "FILE_SAVE_DIALOG([titel$[, default$[, endungen$]]]) AS STRING",
    "module": "core"
+  },
+  {
+   "name": "FIRMATA_ANALOG_READ",
+   "kind": "core",
+   "signature": "FIRMATA_ANALOG_READ(h, kanal: INTEGER) AS INTEGER",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_ANALOG_WRITE",
+   "kind": "core",
+   "signature": "FIRMATA_ANALOG_WRITE(h, pin: INTEGER, wert: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_CLOSE",
+   "kind": "core",
+   "signature": "FIRMATA_CLOSE(h)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_DIGITAL_READ",
+   "kind": "core",
+   "signature": "FIRMATA_DIGITAL_READ(h, pin: INTEGER) AS BOOLEAN",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_DIGITAL_WRITE",
+   "kind": "core",
+   "signature": "FIRMATA_DIGITAL_WRITE(h, pin: INTEGER, wert: BOOLEAN)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_IS_OPEN",
+   "kind": "core",
+   "signature": "FIRMATA_IS_OPEN(h) AS BOOLEAN",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_PORTS",
+   "kind": "core",
+   "signature": "FIRMATA_PORTS() AS STRING",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_OPEN",
+   "kind": "core",
+   "signature": "FIRMATA_OPEN(port: STRING, baud: INTEGER) AS FIRMATA_HANDLE",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_PIN_MODE",
+   "kind": "core",
+   "signature": "FIRMATA_PIN_MODE(h, pin: INTEGER, modus: INTEGER)",
+   "module": "firmata"
+  },
+  {
+   "name": "FIRMATA_UPDATE",
+   "kind": "core",
+   "signature": "FIRMATA_UPDATE(h)",
+   "module": "firmata"
   },
   {
    "name": "FOLDER_DIALOG",

@@ -10,11 +10,12 @@ IMPORT "camera"
 
 | Funktion | Zweck |
 |---|---|
-| `CAMERA_SET(x, y[, zoom])` | Camera-Position (Welt-Punkt für Bildschirm-Top-Left) und Zoom |
-| `CAMERA_RESET()` | wieder Identität (0, 0, 1.0) |
-| `CAMERA_X()`, `CAMERA_Y()`, `CAMERA_ZOOM()` → FLOAT | aktuelle Werte lesen |
-| `CAMERA_FOLLOW(target_x, target_y, screen_w, screen_h)` | zentriert Camera auf target |
-| `CAMERA_S2W_X(sx)`, `CAMERA_S2W_Y(sy)` → FLOAT | Screen-Pixel zu Welt-Koordinate (z.B. für Maus-Klick) |
+| `CAMERA_SET(x, y[, zoom[, rotation_deg]])` | Camera-Position (Welt-Punkt für Bildschirm-Top-Left), Zoom und optional Rotation |
+| `CAMERA_RESET()` | wieder Identität (0, 0, 1.0, 0°) |
+| `CAMERA_SET_ROTATION(rotation_deg)` | nur die Rotation setzen (x/y/zoom unverändert) |
+| `CAMERA_X()`, `CAMERA_Y()`, `CAMERA_ZOOM()`, `CAMERA_ROTATION()` → FLOAT | aktuelle Werte lesen |
+| `CAMERA_FOLLOW(target_x, target_y, screen_w, screen_h)` | zentriert Camera auf target (Rotation bleibt unverändert) |
+| `CAMERA_S2W_X(sx[, sy])`, `CAMERA_S2W_Y(sy[, sx])` → FLOAT | Screen-Pixel zu Welt-Koordinate (z.B. für Maus-Klick) |
 | `CAMERA_SHAKE(staerke[, dauer_ms])` | Screen-Shake: zufälliger Kamera-Ruckel (Welt-Pixel), klingt linear über `dauer_ms` ab (Default 300) — läuft selbstständig, kein Pro-Frame-Code. `staerke = 0` stoppt sofort |
 
 ## Konzept
@@ -88,6 +89,57 @@ CAMERA_SET(0.0, 0.0, 0.5)        ' alles halb so groß (mehr Welt sichtbar)
 - Bei `zoom = 2.0` wird **jedes** Drawing — Linien, Boxen, **und Bilder** — verdoppelt gezeichnet.
 - Bei zoom != 1 werden Bilder jeden Frame neu skaliert gezeichnet; das kostet etwas Performance, ist aber meist OK.
 - **Text wird NICHT gezoomt** (nur translatiert). Sonst würde Text bei Zoom > 1 verschwommen werden. Wer großen Text will, nutzt entweder eine größere Schrift oder rendert vorab als Bild.
+
+## Rotation
+
+```basic
+CAMERA_SET_ROTATION(15.0)      ' Kamera 15 Grad im Uhrzeigersinn gedreht
+CAMERA_SET(x, y, zoom, 15.0)   ' aequivalent, gleich mit x/y/zoom gesetzt
+```
+
+Rotiert **nur die Position** jedes Draws um den Bildschirm-Mittelpunkt (die
+logische `SCREEN`-Breite/Höhe halbiert) — positive Werte drehen die Kamera im
+Uhrzeigersinn, wodurch die Welt gegen den Uhrzeigersinn zu rotieren scheint
+(Standard-Kamera-Konvention). Der Punkt genau in der Bildschirm-Mitte bleibt
+fix, darum funktioniert `CAMERA_FOLLOW` unverändert auch bei aktiver Rotation.
+
+**Wichtige Einschränkung:** Rotation dreht **nur Positionen**, nicht die
+Kontur der Formen selbst. Ein `BOX`/`RECT`/`CIRCLE` landet an der korrekt
+rotierten Stelle, bleibt aber achsenparallel/rund gezeichnet — kein
+gekipptes Rechteck. Bilder/Sprites mit eigenem Rotationswinkel
+(`DRAWIMAGEROT`, `SPRITE_*`) drehen sich ebenfalls nicht automatisch mit;
+wer z. B. ein Fahrzeug-Sprite mit der Kamera mitdrehen lassen will, addiert
+`CAMERA_ROTATION()` selbst zum eigenen Rotationswinkel:
+
+```basic
+DRAWIMAGEROT(schiff_bild, schiff_x, schiff_y, schiff_winkel + CAMERA_ROTATION(), 1.0)
+```
+
+Für Text gilt dieselbe Grenze wie bei Zoom — `TEXT` wird nur übersetzt, nie
+gedreht (sonst würde jede Zeile verzerrt).
+
+### Maus-Klick bei aktiver Rotation
+
+Solange die Rotation 0 ist, reicht die Ein-Argument-Form von `CAMERA_S2W_X`/
+`CAMERA_S2W_Y` wie gehabt. **Sobald rotiert wird, mischt die Umkehrung x und
+y** — die Ein-Argument-Form ignoriert Rotation dann (Abwärtskompatibel für
+alten Code), man braucht die Zwei-Argument-Form mit beiden Screen-Koordinaten:
+
+```basic
+DIM mx AS FLOAT
+DIM my AS FLOAT
+mx = MOUSEX() * 1.0
+my = MOUSEY() * 1.0
+' Achtung: die eigene Achse steht IMMER zuerst -- bei S2W_Y also (my, mx),
+' nicht (mx, my).
+DIM wx AS FLOAT
+DIM wy AS FLOAT
+wx = CAMERA_S2W_X(mx, my)
+wy = CAMERA_S2W_Y(my, mx)
+```
+
+Komplettes Beispiel inkl. Hand-nachgerechneter Werte:
+[examples/29_camera.gb](../examples/29_camera.gb) (Abschnitt "Rotation").
 
 ## HUD im Screen-Space
 

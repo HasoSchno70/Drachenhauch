@@ -221,6 +221,14 @@ fn bi_num(a: &[Value], i: usize, fn_: &str) -> R<f64> {
         None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
     }
 }
+#[allow(dead_code)]
+fn bi_bool(a: &[Value], i: usize, fn_: &str) -> R<bool> {
+    match a.get(i) {
+        Some(Value::Bool(b)) => Ok(*b),
+        Some(v) => Err(format!("{}: erwartet BOOLEAN, erhalten {}", fn_, v.type_name())),
+        None => Err(format!("{}: fehlendes Argument {}", fn_, i + 1)),
+    }
+}
 #[cfg(feature = "db")]
 fn db_params(args: &[Value], fn_: &str) -> R<Vec<rusqlite::types::Value>> {
     args.iter().map(|v| crate::db::gb_to_sql(v, fn_)).collect()
@@ -554,6 +562,8 @@ pub struct Vm<'p> {
     // Hardware/IoT-Handles (INTEGER-Index in VM-Vecs).
     #[cfg(feature = "serial")]
     serial_ports: Vec<Option<crate::serial::Port>>,
+    #[cfg(feature = "serial")]
+    firmata_boards: Vec<Option<crate::firmata::Board>>,
     #[cfg(feature = "usb")]
     usb_devs: Vec<Option<hidapi::HidDevice>>,
     #[cfg(feature = "bt")]
@@ -630,6 +640,8 @@ impl<'p> Vm<'p> {
             http_headers: Vec::new(),
             #[cfg(feature = "serial")]
             serial_ports: Vec::new(),
+            #[cfg(feature = "serial")]
+            firmata_boards: Vec::new(),
             #[cfg(feature = "usb")]
             usb_devs: Vec::new(),
             #[cfg(feature = "bt")]
@@ -1862,6 +1874,7 @@ impl<'p> Vm<'p> {
                         else if let Some(v) = self.try_html(name, bargs)? { v }
                         else if let Some(v) = self.try_cloud(name, bargs)? { v }
                         else if let Some(v) = self.try_serial(name, bargs)? { v }
+                        else if let Some(v) = self.try_firmata(name, bargs)? { v }
                         else if let Some(v) = self.try_usb(name, bargs)? { v }
                         else if let Some(v) = self.try_wifi(name, bargs)? { v }
                         else if let Some(v) = self.try_bt(name, bargs)? { v }
@@ -2707,6 +2720,60 @@ impl<'p> Vm<'p> {
             "serial_available" => { let i = bi_int(a, 0, "SERIAL_AVAILABLE")?; Value::Int(serial::available(self.ser_port(i)?)?) }
             "serial_flush" => { let i = bi_int(a, 0, "SERIAL_FLUSH")?; serial::flush(self.ser_port(i)?); Value::Nil }
             "serial_timeout" => { let i = bi_int(a, 0, "SERIAL_TIMEOUT")?; let s = bi_num(a, 1, "SERIAL_TIMEOUT")?; serial::set_timeout(self.ser_port(i)?, s); Value::Nil }
+            _ => return Ok(None),
+        };
+        Ok(Some(v))
+    }
+
+    // ===================================================================
+    // Modul firmata (Feature `serial`, keine eigene Cargo-Abhaengigkeit)
+    // ===================================================================
+    fn try_firmata(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        if !(name.starts_with("firmata_")) { return Ok(None); }
+        #[cfg(feature = "serial")]
+        { return self.try_firmata_impl(name, a); }
+        #[allow(unreachable_code)]
+        { let _ = (name, a); Ok(None) }
+    }
+    #[cfg(feature = "serial")]
+    fn firmata_board(&mut self, idx: i64) -> R<&mut crate::firmata::Board> {
+        Self::handle_get_mut(&mut self.firmata_boards, idx, "FIRMATA", "ungueltiges/geschlossenes FIRMATA_HANDLE")
+    }
+    #[cfg(feature = "serial")]
+    fn try_firmata_impl(&mut self, name: &str, a: &[Value]) -> R<Option<Value>> {
+        use crate::firmata;
+        let v = match name {
+            // Dieselbe Port-Liste wie SERIAL_PORTS() (serialport::available_ports) --
+            // eigener Name, damit ein firmata-only-Script nicht extra IMPORT "serial" braucht.
+            "firmata_ports" => Value::str_rc(&crate::serial::ports()),
+            "firmata_open" => {
+                let b = firmata::open(bi_str(a, 0, "FIRMATA_OPEN")?, bi_int(a, 1, "FIRMATA_OPEN")?)?;
+                self.firmata_boards.push(Some(b));
+                Value::Int((self.firmata_boards.len() - 1) as i64)
+            }
+            "firmata_close" => { let i = bi_int(a, 0, "FIRMATA_CLOSE")? as usize; if let Some(s) = self.firmata_boards.get_mut(i) { *s = None; } Value::Nil }
+            "firmata_is_open" => { let i = bi_int(a, 0, "FIRMATA_IS_OPEN")?; Value::Bool(self.firmata_boards.get(i as usize).map(|o| o.is_some()).unwrap_or(false)) }
+            "firmata_pin_mode" => {
+                let i = bi_int(a, 0, "FIRMATA_PIN_MODE")?; let pin = bi_int(a, 1, "FIRMATA_PIN_MODE")?; let mode = bi_int(a, 2, "FIRMATA_PIN_MODE")?;
+                firmata::pin_mode(self.firmata_board(i)?, pin, mode)?; Value::Nil
+            }
+            "firmata_digital_write" => {
+                let i = bi_int(a, 0, "FIRMATA_DIGITAL_WRITE")?; let pin = bi_int(a, 1, "FIRMATA_DIGITAL_WRITE")?; let val = bi_bool(a, 2, "FIRMATA_DIGITAL_WRITE")?;
+                firmata::digital_write(self.firmata_board(i)?, pin, val)?; Value::Nil
+            }
+            "firmata_digital_read" => {
+                let i = bi_int(a, 0, "FIRMATA_DIGITAL_READ")?; let pin = bi_int(a, 1, "FIRMATA_DIGITAL_READ")?;
+                Value::Bool(firmata::digital_read(self.firmata_board(i)?, pin)?)
+            }
+            "firmata_analog_write" => {
+                let i = bi_int(a, 0, "FIRMATA_ANALOG_WRITE")?; let pin = bi_int(a, 1, "FIRMATA_ANALOG_WRITE")?; let val = bi_int(a, 2, "FIRMATA_ANALOG_WRITE")?;
+                firmata::analog_write(self.firmata_board(i)?, pin, val)?; Value::Nil
+            }
+            "firmata_analog_read" => {
+                let i = bi_int(a, 0, "FIRMATA_ANALOG_READ")?; let ch = bi_int(a, 1, "FIRMATA_ANALOG_READ")?;
+                Value::Int(firmata::analog_read(self.firmata_board(i)?, ch)?)
+            }
+            "firmata_update" => { let i = bi_int(a, 0, "FIRMATA_UPDATE")?; firmata::update(self.firmata_board(i)?)?; Value::Nil }
             _ => return Ok(None),
         };
         Ok(Some(v))
@@ -4812,10 +4879,14 @@ impl<'p> Vm<'p> {
             // --- Modul: camera ---
             "camera_set" => {
                 let x = need_f(a, 0, "CAMERA_SET")?; let y = need_f(a, 1, "CAMERA_SET")?;
-                let zoom = if a.len() == 3 { let z = need_f(a, 2, "CAMERA_SET")?; if z <= 0.0 { return Err("CAMERA_SET: zoom muss > 0 sein".into()); } z } else { 1.0 };
-                g!().set_camera(x, y, zoom); Value::Nil
+                let zoom = if a.len() >= 3 { let z = need_f(a, 2, "CAMERA_SET")?; if z <= 0.0 { return Err("CAMERA_SET: zoom muss > 0 sein".into()); } z } else { 1.0 };
+                g!().set_camera(x, y, zoom);
+                if a.len() >= 4 { g!().set_camera_rotation(need_f(a, 3, "CAMERA_SET")?); }
+                Value::Nil
             }
             "camera_reset" => { g!().reset_camera(); Value::Nil }
+            "camera_set_rotation" => { g!().set_camera_rotation(need_f(a, 0, "CAMERA_SET_ROTATION")?); Value::Nil }
+            "camera_rotation" => Value::Float(g!().camera_rotation()),
             "camera_shake" => {
                 // CAMERA_SHAKE(staerke[, dauer_ms]) -- staerke=0 stoppt sofort
                 let amp = need_f(a, 0, "CAMERA_SHAKE")?;
@@ -4832,8 +4903,18 @@ impl<'p> Vm<'p> {
                 let z = g!().camera().2;
                 g!().set_camera(tx - (sw / z) / 2.0, ty - (sh / z) / 2.0, z); Value::Nil
             }
-            "camera_s2w_x" => Value::Float(g!().s2w_x(need_f(a, 0, "CAMERA_S2W_X")?)),
-            "camera_s2w_y" => Value::Float(g!().s2w_y(need_f(a, 0, "CAMERA_S2W_Y")?)),
+            // Zweites Argument (die jeweils andere Screen-Achse) ist optional --
+            // ohne Rotation identisch zur alten Ein-Argument-Form; MIT aktiver
+            // CAMERA_SET_ROTATION braucht die korrekte Umkehrung beide Werte
+            // (Rotation mischt x/y), siehe s2w_x_rot/s2w_y_rot.
+            "camera_s2w_x" => {
+                let sx = need_f(a, 0, "CAMERA_S2W_X")?;
+                Value::Float(if a.len() >= 2 { g!().s2w_x_rot(sx, need_f(a, 1, "CAMERA_S2W_X")?) } else { g!().s2w_x(sx) })
+            }
+            "camera_s2w_y" => {
+                let sy = need_f(a, 0, "CAMERA_S2W_Y")?;
+                Value::Float(if a.len() >= 2 { g!().s2w_y_rot(need_f(a, 1, "CAMERA_S2W_Y")?, sy) } else { g!().s2w_y(sy) })
+            }
 
             // --- Modul: sprite (nur SPRITE_DRAW braucht Grafik) ---
             "sprite_draw" => {
