@@ -217,3 +217,14 @@ def test_on_error_other_kinds_are_noop(_qapp, tmp_path):
     con._on_error(QProcess.ProcessError.Crashed)
     assert con._proc is sentinel
     assert got_finished == []
+
+
+def test_console_caps_block_count_to_avoid_unbounded_growth(_qapp, tmp_path):
+    """Review-Fund: kein Cap fuer die Konsolen-Groesse -- ein Programm mit
+    schneller PRINT-Endlosschleife liess das Dokument unbegrenzt wachsen
+    (mit steigenden Kosten pro append() durch den Link-Regex-Scan)."""
+    con = _console(_qapp, tmp_path)
+    assert con.text.maximumBlockCount() > 0
+    for i in range(con.text.maximumBlockCount() + 500):
+        con.append(f"line {i}\n")
+    assert con.text.document().blockCount() <= con.text.maximumBlockCount()

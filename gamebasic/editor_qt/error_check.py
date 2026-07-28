@@ -29,6 +29,14 @@ from typing import Optional
 
 from PySide6.QtCore import QObject, Signal
 
+# Review-Fund: 4 Module (error_check/debugger/profiler/output_console)
+# definierten je eine eigene, fast wortgleiche `_find_gbrt()`-Wrapper-
+# Funktion (inkl. dupliziertem Docstring) um dieselbe `gbrt_locate.find_gbrt`
+# -- als Alias importiert bleibt der Modul-Name `_find_gbrt` fuer bestehende
+# Tests patchbar (`monkeypatch.setattr(modul, "_find_gbrt", ...)`), ohne die
+# Wrapper-Funktion + ihren Docstring viermal zu duplizieren.
+from .gbrt_locate import find_gbrt as _find_gbrt
+
 
 @dataclass
 class ParseProblem:
@@ -42,13 +50,6 @@ class ParseProblem:
     # erlaubt der UI, Compile-Errors anders zu rendern als Parse-Errors
     # (z.B. anderes Icon).
     phase: str = "parse"
-
-
-def _find_gbrt():
-    """Pfad zur gbrt-Binary (frozen-aware: installiert neben GameBasic.exe,
-    sonst Dev-Baum) oder None."""
-    from .gbrt_locate import find_gbrt
-    return find_gbrt()
 
 
 def _check_source(source: str, base_path: Path | None,

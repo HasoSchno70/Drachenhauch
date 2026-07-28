@@ -23,6 +23,11 @@ from PySide6.QtWidgets import (
 )
 
 from .theme import COLORS, EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE, theme_signals
+# Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
+# duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
+# find_gbrt(project_root) hat dieselbe Signatur wie das bisherige lokale
+# _find_gbrt(project_root) -- der Alias ist ein direkter Drop-in.
+from .gbrt_locate import find_gbrt as _find_gbrt
 
 
 # Regexes fuer Linkable-Output
@@ -39,13 +44,6 @@ from .theme import COLORS, EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE, theme_signals
 _LINK_LINE = re.compile(r"\[Zeile (\d+)\]")
 _LINK_FILE_HEADER = re.compile(r"Fehler in ([^\n:]+?\.gb):")
 _LINK_FILE_LINE = re.compile(r"(\S+\.gb):(\d+)")
-
-
-def _find_gbrt(project_root: Path) -> Path | None:
-    """Sucht das `gbrt`-Binary (frozen-aware -- installiert neben GameBasic.exe,
-    sonst im Dev-Baum). Siehe gbrt_locate.find_gbrt."""
-    from .gbrt_locate import find_gbrt
-    return find_gbrt(project_root)
 
 
 class _LinkableText(QPlainTextEdit):
@@ -146,6 +144,15 @@ class OutputConsole(QWidget):
         self.text = _LinkableText()
         self.text.setReadOnly(True)
         self.text.setMouseTracking(True)
+        # Review-Fund: kein Cap fuer die Konsolen-Groesse -- ein Programm mit
+        # schnellem PRINT-in-Endlosschleife liess das Dokument unbegrenzt
+        # wachsen, jeder append() zusaetzlich mit Link-Regex-Scan ueber immer
+        # mehr Text -> die UI wurde mit der Laufzeit immer traeger.
+        # setMaximumBlockCount() verwirft aelteste Bloecke automatisch (inkl.
+        # ihrer Zeichen-Formate -- Links sind als CharFormat-Property direkt
+        # am Text gespeichert, kein separates Positions-Mapping das
+        # veralten koennte).
+        self.text.setMaximumBlockCount(10_000)
         font = QFont(EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE)
         font.setStyleHint(QFont.StyleHint.Monospace)
         self.text.setFont(font)

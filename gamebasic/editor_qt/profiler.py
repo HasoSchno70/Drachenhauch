@@ -19,6 +19,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 
+# Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
+# duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
+from .gbrt_locate import find_gbrt as _find_gbrt
+
 
 @dataclass
 class LineStat:
@@ -67,15 +71,6 @@ def _extract_profile_json(out: str) -> dict:
             except json.JSONDecodeError:
                 continue
     return {}
-
-
-def _find_gbrt():
-    """Pfad zur gbrt-Binary (frozen-aware: installiert neben GameBasic.exe,
-    sonst Dev-Baum) oder None. Frueher eine eigene, engere Suche (nur
-    Dev-Baum) -- fand gbrt.exe im installierten Setup nicht. Jetzt wie
-    debugger.py/output_console.py ueber die gemeinsame gbrt_locate-Quelle."""
-    from .gbrt_locate import find_gbrt
-    return find_gbrt()
 
 
 def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:

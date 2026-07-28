@@ -24,12 +24,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
 
-
-def _find_gbrt():
-    """Pfad zur gbrt-Binary (frozen-aware: installiert neben GameBasic.exe,
-    sonst Dev-Baum) oder None."""
-    from .gbrt_locate import find_gbrt
-    return find_gbrt()
+# Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
+# duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
+from .gbrt_locate import find_gbrt as _find_gbrt
 
 
 class DebugController(QObject):
