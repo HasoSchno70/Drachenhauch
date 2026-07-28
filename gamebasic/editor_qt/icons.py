@@ -109,14 +109,10 @@ def _icon_save() -> QPixmap:
 def _icon_save_as() -> QPixmap:
     pix = _icon_save()
     p = _painter(pix)
-    # Pfeil rechts unten -- "exportieren"
+    # Pfeil rechts unten -- "exportieren". Vereinfacht: einfacher Pfeil
+    # nach rechts unten (kein Polygon noetig).
     p.setPen(_stroke(1.6, "accent"))
     p.setBrush(QBrush(QColor(COLORS["accent"])))
-    poly = QPolygonF([QPointF(17, 22), QPointF(22, 18), QPointF(20, 18),
-                       QPointF(20, 14), QPointF(14, 14), QPointF(14, 18),
-                       QPointF(12, 18)])
-    # Vereinfacht: einfacher Pfeil nach rechts unten
-    p.setPen(_stroke(1.6, "accent"))
     p.drawLine(20, 16, 22, 16)
     p.drawLine(22, 16, 22, 22)
     p.drawLine(22, 22, 16, 22)

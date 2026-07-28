@@ -14,7 +14,8 @@ from typing import Callable
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QKeyEvent
 from PySide6.QtWidgets import (
-    QDialog, QLineEdit, QListWidget, QListWidgetItem, QVBoxLayout, QWidget,
+    QDialog, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QVBoxLayout,
+    QWidget,
 )
 
 from .fuzzy import score
@@ -52,7 +53,14 @@ class _PickerDialog(QDialog):
         layout.addWidget(self.entry)
 
         self.list = QListWidget()
-        self.list.setUniformRowHeights(True)
+        # Review-Fund (waehrend Testerstellung entdeckt, nicht im urspruengl.
+        # Review): `setUniformRowHeights` gibt es nur auf QTreeView/
+        # QTreeWidget -- `self.list` ist ein QListWidget (QListView-Basis),
+        # dessen Aequivalent `setUniformItemSizes` heisst. Der falsche
+        # Methodenname liess JEDEN Aufruf von command_palette()/quick_open()
+        # sofort mit AttributeError in __init__ abstuerzen -- Command
+        # Palette und Quick-Open waren dadurch komplett unbenutzbar.
+        self.list.setUniformItemSizes(True)
         self.list.itemActivated.connect(self._activate)
         layout.addWidget(self.list)
 
@@ -162,7 +170,19 @@ def quick_open(parent: QWidget, project_root: Path,
             user_data=p,
         ))
     dlg = _PickerDialog(parent, "Datei oeffnen ...", entries)
-    dlg.chosen.connect(lambda e: on_open(e.user_data))
+
+    def _open(e: PickerEntry) -> None:
+        # Review-Fund: rief on_open() bisher ungeschuetzt aus dem Signal-
+        # Handler auf -- eine Exception darin (z.B. Datei zwischen Scan und
+        # Klick geloescht/gesperrt) liefe unbehandelt durch Qts Signal-
+        # Dispatch (innerhalb von dlg.exec()s verschachtelter Event-Loop)
+        # statt eine verstaendliche Fehlermeldung zu zeigen.
+        try:
+            on_open(e.user_data)
+        except Exception as exc:  # noqa: BLE001 -- User soll eine Meldung sehen, kein Traceback
+            QMessageBox.warning(parent, "Datei oeffnen fehlgeschlagen", str(exc))
+
+    dlg.chosen.connect(_open)
     _show_centered(dlg, parent)
     dlg.exec()
 
@@ -180,8 +200,16 @@ def command_palette(parent: QWidget, commands: list[tuple[str, str, Callable]]) 
 
     def _run(e: PickerEntry):
         cb = e.user_data
-        if callable(cb):
+        if not callable(cb):
+            return
+        # Review-Fund: rief den Befehl bisher ungeschuetzt auf -- eine
+        # Exception darin lief unbehandelt durch Qts Signal-Dispatch
+        # (innerhalb von dlg.exec()s verschachtelter Event-Loop), statt
+        # eine verstaendliche Fehlermeldung zu zeigen.
+        try:
             cb()
+        except Exception as exc:  # noqa: BLE001 -- User soll eine Meldung sehen, kein Traceback
+            QMessageBox.warning(parent, "Befehl fehlgeschlagen", str(exc))
 
     dlg.chosen.connect(_run)
     _show_centered(dlg, parent)

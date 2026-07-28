@@ -82,12 +82,22 @@ class FindReplaceDialog(QDialog):
         btn_row.addWidget(btn_close)
         layout.addLayout(btn_row, opt_row + 1, 0, 1, 4)
 
-        from .theme import COLORS
+        from .theme import COLORS, theme_signals
         self.status = QLabel("")
         self.status.setStyleSheet(f"color: {COLORS['fg_muted']};")
         layout.addWidget(self.status, opt_row + 2, 0, 1, 4)
+        # Review-Fund: die Status-Label-Farbe wurde nur EINMAL hier gesetzt
+        # und nie neu abonniert -- MainWindow haelt diesen Dialog ueber die
+        # gesamte App-Laufzeit als Member am Leben (auch versteckt), ein
+        # Dark<->Light-Wechsel liess den Status-Text bis zum naechsten
+        # App-Start in der alten Theme-Farbe stehen.
+        theme_signals.changed.connect(self._on_theme_changed)
 
         self.resize(520, 200)
+
+    def _on_theme_changed(self, _name: str) -> None:
+        from .theme import COLORS
+        self.status.setStyleSheet(f"color: {COLORS['fg_muted']};")
 
     def show_for(self, prefill: str | None = None) -> None:
         ed = self.get_editor()
@@ -109,6 +119,16 @@ class FindReplaceDialog(QDialog):
         if ed is not None:
             ed.clear_find_hits()
         super().closeEvent(ev)
+
+    def reject(self) -> None:  # noqa: N802 (Qt-API)
+        # Review-Fund: QDialog.reject() (Escapes Default-Handler) ruft
+        # standardmaessig nur hide() auf, OHNE ueber close()/closeEvent zu
+        # laufen -- closeEvent() (oben) raeumt die Find-Highlights im
+        # Editor auf, das griff bei Escape bisher NICHT (nur X-Button und
+        # der "Schliessen"-Button rufen close() auf und funktionierten
+        # schon). Escape liess die gelben Treffer-Markierungen im Editor
+        # so bis zur naechsten Suche stehen, obwohl der Dialog laengst weg war.
+        self.close()
 
     # ----------------------------------------------- Operations
     def _find_all(self, *_args) -> None:

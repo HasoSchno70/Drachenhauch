@@ -38,6 +38,7 @@ COLORS_DARK: dict[str, str] = {
     "accent":        "#2DE0E0",     # Logo-Hauptfarbe Cyan
     "accent_hover":  "#5EEAEA",
     "accent_text":   "#0B1421",
+    "accent_btn_text": "#0B1421",   # Text auf dem Akzent-Gradient-Button (Primaer-Button)
     "accent_soft":   "#16404C",     # gedaempfter Akzent-Hintergrund
     "success":       "#2DE89A",     # Logo-Mint
     "success_hover": "#5EEDB2",
@@ -82,6 +83,7 @@ COLORS_LIGHT: dict[str, str] = {
     "accent":        "#0090A8",     # dunkleres Cyan fuer Kontrast auf hell
     "accent_hover":  "#00B0C8",
     "accent_text":   "#FFFFFF",
+    "accent_btn_text": "#EAFBFB",   # Text auf dem Akzent-Gradient-Button (Primaer-Button)
     "accent_soft":   "#CFEAF0",     # gedaempfter Akzent-Hintergrund
     "success":       "#0E9F6E",
     "success_hover": "#10B981",
@@ -211,7 +213,7 @@ def global_qss() -> str:
         QToolBar QToolButton#StopButton:hover {{
             background-color: {c['danger']};
             border: 1px solid {c['danger']};
-            color: #FFFFFF;
+            color: {c['accent_text']};
         }}
 
         /* --- Statusbar: farbige Akzent-Oberkante --- */
@@ -363,7 +365,7 @@ def global_qss() -> str:
         QPushButton[accent="true"] {{
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                 stop:0 {acc_btn_top}, stop:1 {acc_btn_bot});
-            color: #EAFBFB;
+            color: {c['accent_btn_text']};
             border: 0;
             font-weight: 600;
         }}
