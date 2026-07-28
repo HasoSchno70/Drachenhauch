@@ -1326,9 +1326,6 @@ SUB draw_menu()
     DRAWIMAGE(vig, 0, 0)
     BLEND_MODE("alpha")
 
-    DIM doneN AS INTEGER
-    doneN = best_unlocked
-    IF doneN > ncat THEN doneN = ncat
     ctext(SCR_W \ 2, 360, f"Geloeste Kammern: {best_unlocked} / {ncat}", &HE8C88A)
 
     DIM blink AS INTEGER
@@ -1338,7 +1335,7 @@ SUB draw_menu()
     END IF
     ctext(SCR_W \ 2, 452, "L  Schatzkarte    C  Code-Schloss    T  Bestenliste", &HD2A860)
     ctext(SCR_W \ 2, 482, "ESC  beenden", &H9A8060)
-    ctext(SCR_W \ 2, 560, "Pfeile/WASD . U Rueckgaengig . R Neustart . F Fackel . M Musik", &H7A6048)
+    ctext(SCR_W \ 2, 560, "RUECKTASTE  Fortschritt loeschen (mit Bestaetigung)", &H7A6048)
 END SUB
 
 SUB draw_stars(cx AS INTEGER, y AS INTEGER, count AS INTEGER, scale AS FLOAT, gap AS INTEGER)
@@ -1507,6 +1504,33 @@ SUB draw_stats()
     NEXT
     IF nrec = 0 THEN ctext(SCR_W \ 2, 220, "Noch keine Loesung - los geht's!", &H9A8060)
     ctext(SCR_W \ 2, SCR_H - 22, "ESC zurueck", &H9A8060)
+END SUB
+
+SUB draw_resetconfirm()
+    CLS(&H2A1E12)
+    BLEND_MODE("mult")
+    DRAWIMAGE(vig, 0, 0)
+    BLEND_MODE("alpha")
+    ctext(SCR_W \ 2, 220, "FORTSCHRITT LOESCHEN?", &HF5C542)
+    ctext(SCR_W \ 2, 268, "Alle geloesten Kammern, Sterne und Bestzeiten", &HD2A860)
+    ctext(SCR_W \ 2, 296, "gehen dabei unwiderruflich verloren.", &HD2A860)
+    DIM blink AS INTEGER
+    blink = (MILLIS() \ 500) MOD 2
+    IF blink = 0 THEN
+        ctext(SCR_W \ 2, 360, "[ LEERTASTE ]  Ja, Fortschritt loeschen", &HE55A5A)
+    END IF
+    ctext(SCR_W \ 2, 400, "ESC  Abbrechen", &H9A8060)
+END SUB
+
+SUB reset_progress()
+    ' Kompletten Save verwerfen (SAVE_NEW() -> leerer Handle) und sofort
+    ' als leere Datei schreiben -- danach ist "unlocked" wieder 0 und keine
+    ' "best_"/"stars_"/"time_"-Eintraege existieren mehr, exakt wie bei
+    ' einem allerersten Programmstart ohne Save-Datei.
+    sav = SAVE_NEW()
+    best_unlocked = 0
+    SAVE_SET_INT(sav, "unlocked", 0)
+    SAVE_WRITE(sav, SAVE_PATH)
 END SUB
 
 ' Knoten-Positionen der Schatzkarte (Schlangenlinie = gewundener Pfad)
@@ -1706,6 +1730,8 @@ SUB render_frame()
         draw_map()
     ELSEIF state = "stats" THEN
         draw_stats()
+    ELSEIF state = "resetconfirm" THEN
+        draw_resetconfirm()
     ELSEIF state = "select" THEN
         draw_select()
     ELSE
@@ -1817,6 +1843,7 @@ INPUT_BIND("torch", KEY_F)
 INPUT_BIND("music", KEY_M)
 INPUT_BIND("stats", KEY_T)
 INPUT_BIND("hint", KEY_H)
+INPUT_BIND("resetprogress", KEY_BACKSPACE)
 
 state = "menu"
 dialpos = 0
@@ -1847,6 +1874,17 @@ WHILE NOT QUITREQUESTED()
         END IF
         IF INPUT_PRESSED("stats") THEN
             compute_stats() : state = "stats"
+        END IF
+        IF INPUT_PRESSED("resetprogress") THEN
+            state = "resetconfirm"
+        END IF
+
+    ELSEIF state = "resetconfirm" THEN
+        IF INPUT_PRESSED("back") THEN state = "menu"
+        IF INPUT_PRESSED("confirm") THEN
+            reset_progress()
+            selpos = best_unlocked
+            state = "menu"
         END IF
 
     ELSEIF state = "play" THEN
