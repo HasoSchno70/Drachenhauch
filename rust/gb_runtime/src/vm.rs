@@ -3817,6 +3817,10 @@ impl<'p> Vm<'p> {
             "joystick_button" => Value::Bool(g!().joystick_button(gi(a,0,"JOYSTICK_BUTTON")?, gi(a,1,"JOYSTICK_BUTTON")?)?),
             "joystick_hat_x" => Value::Int(g!().joystick_hat_x(gi(a,0,"JOYSTICK_HAT_X")?, gi(a,1,"JOYSTICK_HAT_X")?)?),
             "joystick_hat_y" => Value::Int(g!().joystick_hat_y(gi(a,0,"JOYSTICK_HAT_Y")?, gi(a,1,"JOYSTICK_HAT_Y")?)?),
+            "joystick_rumble" => {
+                g!().joystick_rumble(gi(a,0,"JOYSTICK_RUMBLE")?, need_f(a,1,"JOYSTICK_RUMBLE")?, need_f(a,2,"JOYSTICK_RUMBLE")?, need_f(a,3,"JOYSTICK_RUMBLE")?)?;
+                Value::Nil
+            }
             "quitrequested" => Value::Bool(g!().quit_requested()),
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),

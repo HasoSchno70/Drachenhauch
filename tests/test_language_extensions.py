@@ -244,8 +244,17 @@ def test_joystick_builtins_registered():
         "joystick_count", "joystick_name",
         "joystick_axis", "joystick_button",
         "joystick_hat_x", "joystick_hat_y",
+        "joystick_rumble",
     }
     assert expected <= builtin_names_lower()
+
+
+def test_joystick_rumble_no_gamepad_graceful_error(run_gb):
+    """Ohne angeschlossenes Gamepad wirft JOYSTICK_RUMBLE denselben
+    faengbaren Fehler wie die anderen JOYSTICK_*-Funktionen (kein Crash)."""
+    from gamebasic.errors import GBRuntimeError
+    with pytest.raises(GBRuntimeError, match="kein Gamepad angeschlossen"):
+        run_gb("JOYSTICK_RUMBLE(0, 1.0, 1.0, 0.5)")
 
 
 # --- Regression: REPEAT$ funktioniert weiter -------------------------

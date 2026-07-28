@@ -2433,6 +2433,12 @@
    "module": "core"
   },
   {
+   "name": "JOYSTICK_RUMBLE",
+   "kind": "graphics",
+   "signature": "JOYSTICK_RUMBLE(idx: Zahl, links: Zahl, rechts: Zahl, dauer_s: Zahl)",
+   "module": "core"
+  },
+  {
    "name": "JSON_GET_BOOL",
    "kind": "core",
    "signature": "JSON_GET_BOOL(h: ?, path: STRING)",

@@ -2853,6 +2853,17 @@ impl Graphics {
         let d = self.rl.is_gamepad_button_down(idx as i32, GAMEPAD_BUTTON_LEFT_FACE_DOWN);
         Ok((u as i64) - (d as i64))
     }
+    /// JOYSTICK_RUMBLE(idx, links, rechts, dauer_s): Vibrationsmotoren ansteuern
+    /// (0.0..1.0 je Motor). NaN/Infinity/negative Werte werden wie bei
+    /// SERIAL_SET_TIMEOUT geklemmt statt den zugrunde liegenden C-Aufruf mit
+    /// Unsinn zu fuettern.
+    pub fn joystick_rumble(&mut self, idx: i64, left: f64, right: f64, duration: f64) -> Result<(), String> {
+        self.joystick_check(idx, "JOYSTICK_RUMBLE")?;
+        let clamp01 = |v: f64| if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
+        let dur = if duration.is_finite() { duration.clamp(0.0, 60.0) } else { 0.0 };
+        self.rl.set_gamepad_vibration(idx as i32, clamp01(left) as f32, clamp01(right) as f32, dur as f32);
+        Ok(())
+    }
 
     /// Leert raylibs Tipp-Zeichen-Queue dieses Frames und liefert die getippten
     /// Zeichen als String (für UI_TEXTFIELD). Wie pygames Text-Input-Puffer.
