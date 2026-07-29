@@ -80,7 +80,8 @@ class TodoPanel(QWidget):
         layout.addWidget(self.list, 1)
 
         self._apply_style()
-        theme_signals.changed.connect(lambda _n: self._apply_style())
+        # Bound-Method statt Lambda (Use-after-free-Fix, siehe breadcrumbs.py).
+        theme_signals.changed.connect(self._apply_style)
 
     def _apply_style(self) -> None:
         c = COLORS

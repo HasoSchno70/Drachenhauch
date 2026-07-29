@@ -44,7 +44,18 @@ class Breadcrumbs(QWidget):
         self._file_name = ""
         self._scopes: list = []
         self._apply_style()
-        theme_signals.changed.connect(lambda *_: (self._apply_style(), self._rebuild()))
+        # Bound-Method statt Lambda: eine Lambda-Closure haelt zwar `self` am
+        # Leben, traegt aber KEINE Qt-Receiver-Info -- stirbt das C++-Objekt
+        # (Parent-Fenster geschlossen/GC'd), disconnected Qt die Verbindung
+        # nicht automatisch (das klappt nur bei Bound-Methods). Ein spaeteres
+        # `theme_signals.changed.emit(...)` (z.B. beim naechsten
+        # `MainWindow.__init__`) ruft dann auf ein geloeschtes QObject --
+        # Use-after-free (siehe error_check.py fuer denselben Bugtyp).
+        theme_signals.changed.connect(self._on_theme_changed)
+        self._rebuild()
+
+    def _on_theme_changed(self, _name=None) -> None:
+        self._apply_style()
         self._rebuild()
 
     def _apply_style(self) -> None:

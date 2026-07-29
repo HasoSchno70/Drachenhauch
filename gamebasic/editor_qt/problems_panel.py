@@ -47,7 +47,8 @@ class ProblemsPanel(QWidget):
 
         self._empty_hint = "Keine Probleme"
         self._apply_style()
-        theme_signals.changed.connect(lambda _n: self._apply_style())
+        # Bound-Method statt Lambda (Use-after-free-Fix, siehe breadcrumbs.py).
+        theme_signals.changed.connect(self._apply_style)
 
     def _apply_style(self) -> None:
         c = COLORS

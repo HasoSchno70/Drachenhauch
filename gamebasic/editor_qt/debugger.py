@@ -22,6 +22,7 @@ import threading
 import time
 from pathlib import Path
 
+import shiboken6
 from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
@@ -84,12 +85,18 @@ class DebugController(QObject):
         os.close(fd)
         self._tmp = tmp
         try:
+            from .gbrt_locate import gbrt_spawn_semaphore
             Path(tmp).write_text(source, encoding="utf-8")
-            self._proc = subprocess.Popen(
-                [str(gbrt), "debug", tmp],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE, text=True,
-                cwd=str(base) if base.is_dir() else None, bufsize=1)
+            # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen
+            # gleichzeitig startende `gbrt`-Subprozesse aus anderen Editor-
+            # Threads (siehe gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer
+            # den verifizierten Crash).
+            with gbrt_spawn_semaphore:
+                self._proc = subprocess.Popen(
+                    [str(gbrt), "debug", tmp],
+                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE, text=True,
+                    cwd=str(base) if base.is_dir() else None, bufsize=1)
         except Exception as exc:  # noqa: BLE001
             self._cleanup_tmp()
             self.failed.emit(f"gbrt-Start: {exc}", -1)
@@ -100,6 +107,15 @@ class DebugController(QObject):
         self._reader = threading.Thread(target=self._read_loop, daemon=True)
         self._reader.start()
         return True
+
+    def _safe_emit(self, signal, *args) -> None:
+        """Emit von Signalen, die auch vom Reader-Thread (`_read_loop`) aus
+        aufgerufen werden. `self` haengt am Editor-Fenster (Qt-Parent) --
+        wird das Fenster zerstoert, waehrend der Reader-Thread noch laeuft
+        (z.B. ein Testfenster, das nie geschlossen wird), ist das C++-Objekt
+        bereits weg; `.emit()` darauf ist Use-after-free (siehe error_check.py)."""
+        if shiboken6.isValid(self):
+            signal.emit(*args)
 
     # ----------------------------------------------------- Protokoll
     def _send(self, obj: dict) -> None:
@@ -115,7 +131,7 @@ class DebugController(QObject):
                 # bereits erklaert, keine zusaetzliche Fehlermeldung noetig).
                 if not self._got_terminal:
                     self._mode = "idle"
-                    self.failed.emit(f"Debugger-Verbindung verloren: {exc}", -1)
+                    self._safe_emit(self.failed, f"Debugger-Verbindung verloren: {exc}", -1)
 
     def _send_breakpoints(self) -> None:
         self._send({
@@ -151,20 +167,21 @@ class DebugController(QObject):
                 stderr_read_failed = True
             self._mode = "idle"
             if err:
-                self.failed.emit(err, self._err_line(err))
-                self.finished.emit("fehler")
+                self._safe_emit(self.failed, err, self._err_line(err))
+                self._safe_emit(self.finished, "fehler")
             elif stderr_read_failed:
-                self.failed.emit(
+                self._safe_emit(
+                    self.failed,
                     "gbrt-Prozess beendet, stderr nicht lesbar (moeglicher Absturz)", -1)
-                self.finished.emit("fehler")
+                self._safe_emit(self.finished, "fehler")
             else:
-                self.finished.emit("fertig")
+                self._safe_emit(self.finished, "fertig")
         self._cleanup_tmp()
 
     def _handle_event(self, ev: dict) -> None:
         kind = ev.get("event")
         if kind == "output":
-            self.output.emit(ev.get("text", ""))
+            self._safe_emit(self.output, ev.get("text", ""))
         elif kind == "paused":
             if not self._started:
                 # Initial-Pause an Zeile 1: Breakpoints setzen; mit Breakpoints
@@ -177,19 +194,19 @@ class DebugController(QObject):
                     self._send({"cmd": "continue"})
                     return
             self._mode = "paused"
-            self.paused.emit(int(ev.get("line", -1)), self._frames(ev))
+            self._safe_emit(self.paused, int(ev.get("line", -1)), self._frames(ev))
         elif kind == "finished":
             self._got_terminal = True
             self._mode = "idle"
             reason = {"done": "fertig", "stopped": "abgebrochen"}.get(
                 ev.get("reason"), "fertig")
-            self.finished.emit(reason)
+            self._safe_emit(self.finished, reason)
         elif kind == "error":
             self._got_terminal = True
             self._mode = "idle"
-            self.failed.emit(str(ev.get("message", "")),
-                             int(ev.get("line", -1) or -1))
-            self.finished.emit("fehler")
+            self._safe_emit(self.failed, str(ev.get("message", "")),
+                            int(ev.get("line", -1) or -1))
+            self._safe_emit(self.finished, "fehler")
         # eval-result/eval-error: vom Editor aktuell ungenutzt.
 
     @staticmethod

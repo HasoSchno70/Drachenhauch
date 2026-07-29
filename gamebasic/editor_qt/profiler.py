@@ -17,6 +17,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import shiboken6
 from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
@@ -106,10 +107,18 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         # (Grafik-Render-Loop, WHILE TRUE) per "stop"-Zeile SAUBER abbrechen,
         # sodass gbrt die bis dahin gesammelten Profile-Daten noch ausgibt
         # (ein harter terminate() wuerde den finalen JSON-println verschlucken).
-        proc = subprocess.Popen(
-            [str(gbrt), "profile", "--stoppable", tmp],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            stdin=subprocess.PIPE, text=True)
+        from .gbrt_locate import gbrt_spawn_semaphore
+        # Semaphor rund um die Prozess-ERSTELLUNG: `subprocess.Popen` laeuft
+        # hier in einem Hintergrund-Thread (`Profiler._run`); auf Windows ist
+        # die Handle-Vererbung in `subprocess.Popen.__init__` nicht dafuer
+        # ausgelegt, aus mehreren Threads gleichzeitig aufgerufen zu werden
+        # (siehe gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer den
+        # verifizierten Crash).
+        with gbrt_spawn_semaphore:
+            proc = subprocess.Popen(
+                [str(gbrt), "profile", "--stoppable", tmp],
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                stdin=subprocess.PIPE, text=True)
 
         # stdout in einem Thread leeren: der JSON-Blob kommt am Ende in einem
         # Rutsch, waehrend des Laufs schreibt gbrt (fast) nichts -> der Pipe-
@@ -239,9 +248,15 @@ class Profiler(QObject):
         try:
             result = run_profile(source, base_path, should_stop=lambda: self._stop)
         except GameBasicError as exc:
-            self.failed.emit(str(exc), getattr(exc, "line", -1) or -1)
+            if shiboken6.isValid(self):
+                self.failed.emit(str(exc), getattr(exc, "line", -1) or -1)
             return
         except Exception as exc:  # noqa: BLE001
-            self.failed.emit(f"{type(exc).__name__}: {exc}", -1)
+            if shiboken6.isValid(self):
+                self.failed.emit(f"{type(exc).__name__}: {exc}", -1)
             return
-        self.finished.emit(result)
+        # `self` (Qt-Parent = das Fenster, das den Profiler besitzt) kann
+        # inzwischen zerstoert worden sein (siehe error_check.py-Kommentar) --
+        # ein `.emit()` auf einem geloeschten C++-Objekt ist Use-after-free.
+        if shiboken6.isValid(self):
+            self.finished.emit(result)

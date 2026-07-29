@@ -19,6 +19,16 @@ silent-hangs erzeugt hat (vermutlich Reparenting-Issues mit dem
 Worker beim moveToThread). Cross-Thread-Signal-Emission funktioniert
 in Qt6/PySide6 zuverlaessig auch von Python-Native-Threads -- Qt
 queue't die Slot-Calls automatisch in die Empfaenger-Event-Loop.
+
+WICHTIG (Use-after-free-Fix): `LiveErrorChecker` haengt am `CodeEditor`
+(als Qt-Parent) -- wird der Editor waehrend ein Check-Thread noch laeuft
+zerstoert (z.B. ein Test-Fenster, das nie explizit geschlossen wird und
+per Python-Refcount weggeraeumt wird), ist das C++-Objekt bereits
+geloescht, wenn der Hintergrund-Thread danach `.emit()` aufruft --
+ein Cross-Thread-Use-after-free auf dem geloeschten QObject (fuehrte zu
+sporadischen Access-Violations, sichtbar erst beim naechsten
+`processEvents()` irgendwo im Prozess). Deshalb vor jedem `.emit()`
+`shiboken6.isValid(self)` pruefen.
 """
 from __future__ import annotations
 
@@ -27,6 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import shiboken6
 from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: 4 Module (error_check/debugger/profiler/output_console)
@@ -60,9 +71,15 @@ def _check_source(source: str, base_path: Path | None,
     Fallback findet nur das erste Syntaxproblem. `checker` (optional) registriert
     den laufenden gbrt-Subprozess, damit ein neuerer `check()`-Aufruf ihn
     abbrechen kann (siehe LiveErrorChecker.check)."""
-    gbrt = _find_gbrt()
-    if gbrt is not None:
-        return _check_via_gbrt(source, base_path, gbrt, checker)
+    from .gbrt_locate import gbrt_spawn_semaphore
+    # Das Semaphor umschliesst ABSICHTLICH auch `_find_gbrt()` (nicht nur den
+    # Popen()-Call) -- dessen `Path.resolve()` ist unter Buendel-Last (viele
+    # gleichzeitig feuernde Checker-Threads) selbst abgestuerzt (siehe
+    # gbrt_locate.py-Kommentar).
+    with gbrt_spawn_semaphore:
+        gbrt = _find_gbrt()
+        if gbrt is not None:
+            return _check_via_gbrt(source, base_path, gbrt, checker)
     one = _check_syntax_only(source, base_path)
     return [one] if one is not None else []
 
@@ -91,6 +108,7 @@ def _check_via_gbrt(source: str, base_path, gbrt,
     os.close(fd)
     proc = None
     try:
+        # Laeuft bereits unter `gbrt_spawn_semaphore` (siehe `_check_source`).
         Path(tmp).write_text(source, encoding="utf-8")
         proc = subprocess.Popen(
             [str(gbrt), "--check", tmp],
@@ -239,6 +257,12 @@ class LiveErrorChecker(QObject):
         with self._lock:
             if gen != self._gen:
                 return
+        # Der Empfaenger (dieses QObject selbst, per Qt-Parent am Editor)
+        # kann inzwischen zerstoert worden sein (z.B. Testfenster, das nie
+        # geschlossen wurde und per Refcount weggeraeumt wurde) -- ein
+        # `.emit()` auf einem geloeschten C++-Objekt ist Use-after-free.
+        if not shiboken6.isValid(self):
+            return
         # Erst die Voll-Liste (Editor-Underlines + Problems-Panel), dann das
         # erste Problem (Statusbar) -- so ist `current_error()` schon frisch,
         # wenn der Statusbar-Slot laeuft.
