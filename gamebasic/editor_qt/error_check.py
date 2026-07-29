@@ -132,14 +132,53 @@ def _check_via_gbrt(source: str, base_path, gbrt,
             os.unlink(tmp)
         except OSError:
             pass
+    origins = _origins_for(source, base)
     out: list[ParseProblem] = []
     for d in diags:
+        phase = str(d.get("phase", "compile"))
+        line = int(d.get("line", 0)) or 1
+        message = str(d.get("message", ""))
+        # NUR die Phasen mappen, die auf der GEMERGTEN Quelle laufen.
+        # gbrt liefert in EINEM Array drei Koordinatensysteme (siehe
+        # main.rs::check_source): lex/parse/compile laufen auf dem
+        # gemergten Text, die Hardware-Import-Warnungen werden dagegen
+        # ausdruecklich aus `raw_source` berechnet und sind damit schon
+        # Buffer-Zeilen. Alles blind zu mappen wuerde die korrekten
+        # Warnungen kaputtmachen.
+        if origins is not None and phase in ("lex", "parse", "compile"):
+            line, message = _map_back(origins, line, message)
         out.append(ParseProblem(
-            line=int(d.get("line", 0)) or 1,
-            message=str(d.get("message", "")),
+            line=line,
+            message=message,
             severity=str(d.get("severity", "error")),
-            phase=str(d.get("phase", "compile"))))
+            phase=phase))
     return out
+
+
+def _origins_for(source: str, base_path) -> list | None:
+    """`origins`-Tabelle der gemergten Quelle (oder None, wenn nicht ermittelbar).
+
+    gbrt preprocesst intern selbst und meldet Diagnosen deshalb in
+    GEMERGTEN Zeilen -- `main.rs::check_main` sagt das ausdruecklich
+    ("der Editor mappt via origins zurueck"). Genau diese Haelfte fehlte
+    hier: die Zeilen wurden woertlich uebernommen, wodurch in JEDER Datei
+    mit `IMPORT "x.gb"` saemtliche Marker um die Laenge des inlinierten
+    Codes verrutschten -- bis weit hinter das Dateiende. Der Fallback
+    `_check_syntax_only` machte es die ganze Zeit richtig.
+
+    Wir preprocessen dafuer ein zweites Mal in Python; die Paritaet der
+    beiden Implementierungen ist durch `tests/test_rust_preprocess_parity.py`
+    abgesichert. Schlaegt es fehl (z.B. kaputter IMPORT), liefern wir None
+    und lassen die Zeilen unveraendert -- lieber unverschoben-ungenau als
+    falsch verschoben.
+    """
+    try:
+        from ..preprocess import process as _preprocess
+        _merged, origins = _preprocess(
+            source, base_path or Path.cwd(), file_label="<editor>")
+        return origins
+    except Exception:
+        return None
 
 
 def _check_syntax_only(source: str, base_path: Path | None) -> Optional[ParseProblem]:

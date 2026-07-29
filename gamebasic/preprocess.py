@@ -87,8 +87,22 @@ def process(source: str, base_path: Path | None = None,
         except OSError as exc:
             raise LexerError(f"IMPORT: Lesefehler bei {rel}: {exc}", line_idx, 1)
         seen.add(target)
-        inner_src, inner_origins = process(content, target.parent, seen,
-                                           file_label=target.name)
+        try:
+            # file_label = der IMPORT-Pfad wie geschrieben (`rel`), nicht nur
+            # `target.name`: zwei `util.gb` aus verschiedenen Verzeichnissen
+            # waren in `origins` sonst nicht unterscheidbar, und die
+            # "in <datei>:<zeile>"-Meldung nannte einen mehrdeutigen Namen.
+            inner_src, inner_origins = process(content, target.parent, seen,
+                                               file_label=rel)
+        except LexerError as exc:
+            # Ein IMPORT-Fehler TIEFER in der Kette trug bisher die Zeile der
+            # inneren Datei nach oben -- der Editor markierte damit eine voellig
+            # unbeteiligte Zeile im Puffer des Nutzers (z.B. Zeile 3, obwohl
+            # der Nutzer den Import auf Zeile 6 stehen hat). Der Ort, den der
+            # Nutzer tatsaechlich anfassen kann, ist SEINE IMPORT-Zeile --
+            # die innere Position gehoert in den Text, nicht in die Koordinate.
+            raise LexerError(f"in {rel}: {exc.args[0] if exc.args else exc}",
+                             line_idx, 1) from exc
         out_lines.append(f"' === IMPORT {rel} ===")
         origins.append((file_label, line_idx))
         # Inner-Quelle einfuegen
