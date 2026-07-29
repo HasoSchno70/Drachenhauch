@@ -14,6 +14,21 @@ from .tokens import Token, TokenType, KEYWORDS
 from .errors import LexerError
 
 
+def _is_digit(ch: str) -> bool:
+    """ASCII-Ziffer 0-9 -- bewusst NICHT `str.isdigit()`.
+
+    `str.isdigit()` ist auch fuer Hochzahlen ('²', '³') und fremde
+    Ziffernsysteme (z.B. arabisch-indisch '٣') True, aber `int()`/`float()`
+    akzeptieren nur einen Teil davon. Das erzeugte zwei Fehler auf einmal:
+    `PRINT 5²` warf eine ungefangene ValueError (der Highlighter faengt nur
+    LexerError ab -> Ausnahme bis in Qts Paint-Pfad), und `PRINT ٣` lexte
+    still als NUMBER(3) durch, obwohl gbrt es als "Unbekanntes Zeichen"
+    ablehnt. gbrts Lexer nutzt `is_ascii_digit` -- hier dieselbe Regel,
+    damit Editor und Laufzeit dieselbe Sprache sehen.
+    """
+    return "0" <= ch <= "9"
+
+
 def _split_fstring_spec(s: str):
     """Trennt einen f-String-Ausdruck am ersten Format-Spec-`:` auf Top-Level.
 
@@ -60,10 +75,14 @@ class Lexer:
     def tokenize(self) -> list[Token]:
         while self.pos < len(self.source):
             self._scan_token()
-        # Garantiere Schluss-NEWLINE vor EOF, vereinfacht Parser
+        # Garantiere Schluss-NEWLINE vor EOF, vereinfacht Parser.
+        # end_* explizit = start (Null-Breite am Dateiende): der Default 0
+        # haette sonst eine Span geliefert, deren Ende vor dem Start liegt.
         if self.tokens and self.tokens[-1].type != TokenType.NEWLINE:
-            self.tokens.append(Token(TokenType.NEWLINE, None, self.line, self.col))
-        self.tokens.append(Token(TokenType.EOF, None, self.line, self.col))
+            self.tokens.append(Token(TokenType.NEWLINE, None, self.line, self.col,
+                                     self.line, self.col))
+        self.tokens.append(Token(TokenType.EOF, None, self.line, self.col,
+                                 self.line, self.col))
         return self.tokens
 
     # ------------------------------------------------------------------
@@ -130,7 +149,7 @@ class Lexer:
             return
 
         # Zahl
-        if ch.isdigit():
+        if _is_digit(ch):
             self._scan_number(line, col)
             return
 
@@ -183,13 +202,13 @@ class Lexer:
         if self._peek() == "0" and self._peek(1) in ("x", "X", "b", "B"):
             prefix = self._peek(1)
             after = self._peek(2)
-            if prefix in ("x", "X") and after and (after.isdigit() or after.lower() in "abcdef"):
+            if prefix in ("x", "X") and after and (_is_digit(after) or after.lower() in "abcdef"):
                 self._advance()              # 0
                 self._advance()              # x
                 hexchars: list[str] = []
                 while True:
                     c = self._peek()
-                    if c and (c.isdigit() or c.lower() in "abcdef"):
+                    if c and (_is_digit(c) or c.lower() in "abcdef"):
                         hexchars.append(self._advance())
                     else:
                         break
@@ -204,13 +223,13 @@ class Lexer:
                 self._add(TokenType.NUMBER, int("".join(binchars), 2), line, col)
                 return
         chars: list[str] = []
-        while self._peek().isdigit():
+        while _is_digit(self._peek()):
             chars.append(self._advance())
         is_float = False
-        if self._peek() == "." and self._peek(1).isdigit():
+        if self._peek() == "." and _is_digit(self._peek(1)):
             is_float = True
             chars.append(self._advance())
-            while self._peek().isdigit():
+            while _is_digit(self._peek()):
                 chars.append(self._advance())
         text = "".join(chars)
         value = float(text) if is_float else int(text)
@@ -224,8 +243,12 @@ class Lexer:
         - Jeder Ausdruck zwischen { } wird mit STR$(...) automatisch
           stringifiziert, damit `f"score: {x}"` auch fuer INTEGER `x`
           funktioniert.
-        - Verschachtelte f-Strings sind nicht erlaubt (kein f"{f"..."}");
-          ein Ausdruck darf aber Klammern und Funktionsaufrufe enthalten.
+        - Ein Ausdruck darf Klammern und Funktionsaufrufe enthalten.
+        - Grenze: der Platzhalter-Scanner zaehlt nur Klammern, er kennt
+          keine String-Literale. Ein `{`/`}` INNERHALB eines Strings im
+          Platzhalter (z.B. f"{REPLACE$(s, "}", "-")}") beendet den
+          Ausdruck darum zu frueh. gbrt hat dieselbe Grenze, das Programm
+          scheitert also ohnehin -- Editor und Laufzeit sind sich einig.
         """
         self._advance()              # 'f'
         self._advance()              # '"'
@@ -274,7 +297,10 @@ class Lexer:
                             self._advance()
                             break
                     expr_chars.append(self._advance())
-                if not expr_chars:
+                # strip(): `f"{ }"` (nur Whitespace) rutschte an dieser
+                # Pruefung vorbei und emittierte ein argumentloses `str$()`,
+                # das erst spaeter als verwirrender Parse-Fehler auffiel.
+                if not "".join(expr_chars).strip():
                     self._error("Leerer f-String-Ausdruck {}", line, col)
                 parts.append(("expr", "".join(expr_chars)))
                 continue
@@ -304,6 +330,13 @@ class Lexer:
             else:
                 # Format-Spec? `{x:.2f}` -> FORMAT$(x, "%.2f"); sonst STR$(x).
                 expr_src, spec = _split_fstring_spec(text)
+                if spec is not None and not spec:
+                    # `f"{x:}"` -- Doppelpunkt ohne Spec. Frueher fiel das
+                    # durch die truthiness-Pruefung in den str$-Zweig, wobei
+                    # `expr_src = text` den Doppelpunkt WIEDER hereinholte
+                    # -> `str$(x :)` mit Streu-COLON und einem Folgefehler
+                    # weit weg von der Ursache.
+                    self._error("Leere Format-Spec im f-String ({x:})", line, col)
                 if spec:
                     fn_name, suffix = "format$", spec
                 else:
@@ -316,10 +349,18 @@ class Lexer:
                 while inner and inner[-1].type in (TokenType.NEWLINE, TokenType.EOF):
                     inner.pop()
                 # Line/col ueberschreiben damit Fehlermeldungen auf den
-                # f-String-Ort zeigen, nicht auf den synthetischen 1:1 input
+                # f-String-Ort zeigen, nicht auf den synthetischen 1:1 input.
+                # WICHTIG auch end_line/end_col mitziehen: die stammten sonst
+                # aus dem Sub-Lexer (Zeile 1) und lagen damit VOR dem Start
+                # -- eine invertierte Span. Der Highlighter clamped das zwar
+                # weg, aber jeder Konsument ohne Clamp (LSP-Semantic-Tokens,
+                # Hover, Selection-Ranges) haette einen rueckwaerts laufenden
+                # Bereich bekommen.
                 for tok in inner:
                     tok.line = line
                     tok.col = col
+                    tok.end_line = self.line
+                    tok.end_col = self.col
                 self.tokens.extend(inner)
                 if suffix is not None:
                     self._add(TokenType.COMMA, ",", line, col)
@@ -341,7 +382,7 @@ class Lexer:
                 c = self._peek()
                 # Wichtig: leerer String "" ist Substring von "abcdef" - daher
                 # explizit pruefen ob c ueberhaupt da ist.
-                if c and (c.isdigit() or c.lower() in "abcdef"):
+                if c and (_is_digit(c) or c.lower() in "abcdef"):
                     chars.append(self._advance())
                 else:
                     break
