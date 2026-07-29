@@ -29,6 +29,26 @@ def _is_digit(ch: str) -> bool:
     return "0" <= ch <= "9"
 
 
+def _radix_int(digits: str, radix: int, what: str, line: int, col: int) -> int:
+    """Hex-/Binaer-Literal -> INTEGER ueber die volle 64-Bit-Breite.
+
+    Muss exakt gbrts `Lexer::radix_i64` entsprechen (`lexer.rs`), sonst
+    sieht der Editor andere Werte als die Laufzeit. Bitmasken adressieren
+    Bitmuster, keine Zahlengroessen: `&HFFFFFFFFFFFFFFFF` ("alle Bits
+    gesetzt") wird darum als Zweierkomplement gedeutet und ergibt -1 --
+    wie in C, Rust und der BASIC-Tradition. `&H8000000000000000` ist
+    zugleich der einzige Weg, i64::MIN als Literal zu schreiben (der
+    Dezimal-Pfad lext erst den positiven Betrag, der dann ueberlaeuft).
+    Erst jenseits von 64 Bit ist es ein echter Fehler.
+    """
+    v = int(digits, radix)
+    if v >= 1 << 64:
+        raise LexerError(f"{what}-Literal zu gross (INTEGER ist 64-bit)", line, col)
+    if v >= 1 << 63:
+        v -= 1 << 64            # Zweierkomplement
+    return v
+
+
 def _split_fstring_spec(s: str):
     """Trennt einen f-String-Ausdruck am ersten Format-Spec-`:` auf Top-Level.
 
@@ -212,7 +232,8 @@ class Lexer:
                         hexchars.append(self._advance())
                     else:
                         break
-                self._add(TokenType.NUMBER, int("".join(hexchars), 16), line, col)
+                self._add(TokenType.NUMBER,
+                          _radix_int("".join(hexchars), 16, "Hex", line, col), line, col)
                 return
             if prefix in ("b", "B") and after in ("0", "1"):
                 self._advance()              # 0
@@ -220,7 +241,8 @@ class Lexer:
                 binchars: list[str] = []
                 while self._peek() in ("0", "1"):
                     binchars.append(self._advance())
-                self._add(TokenType.NUMBER, int("".join(binchars), 2), line, col)
+                self._add(TokenType.NUMBER,
+                          _radix_int("".join(binchars), 2, "Binaer", line, col), line, col)
                 return
         chars: list[str] = []
         while _is_digit(self._peek()):
@@ -388,13 +410,13 @@ class Lexer:
                     break
             if not chars:
                 self._error("Hex-Literal &H ohne Ziffern", line, col)
-            value = int("".join(chars), 16)
+            value = _radix_int("".join(chars), 16, "Hex", line, col)
         else:                        # B/b
             while self._peek() in ("0", "1"):
                 chars.append(self._advance())
             if not chars:
                 self._error("Binaer-Literal &B ohne Ziffern", line, col)
-            value = int("".join(chars), 2)
+            value = _radix_int("".join(chars), 2, "Binaer", line, col)
         self._add(TokenType.NUMBER, value, line, col)
 
     def _scan_ident(self, line: int, col: int):

@@ -163,6 +163,34 @@ impl Lexer {
         LexError { msg: msg.to_string(), line, col }
     }
 
+    /// Hex-/Binaer-Literal -> i64, ueber die VOLLE 64-Bit-Breite.
+    ///
+    /// Frueher stand an den vier Aufrufstellen `i64::from_str_radix(..)
+    /// .unwrap_or(0)`: `&HFFFFFFFFFFFFFFFF` -- die klassische
+    /// "alle Bits gesetzt"-Maske -- wurde damit still zu `0`, ohne
+    /// Warnung, genau in dem Code, der ueberhaupt zu Hex greift
+    /// (Bitmasken mit BAND/BNOT). Der Dezimal-Pfad direkt daneben war
+    /// bereits bewusst gegen genau dieses stille Verschlucken gehaertet;
+    /// die Radix-Pfade waren dabei uebersehen worden.
+    ///
+    /// Bewusst NICHT einfach "zu gross"-Fehler wie im Dezimal-Pfad:
+    /// Hex-Masken adressieren Bitmuster, nicht Zahlengroessen. Wir parsen
+    /// als u64 und deuten das Bitmuster als i64 (Zweierkomplement -- wie
+    /// C, Rust und die BASIC-Tradition mit `&HFFFF` = -1). Damit ergibt
+    /// `&HFFFFFFFFFFFFFFFF` korrekt -1, und `&H8000000000000000` ist der
+    /// einzige Weg, i64::MIN ueberhaupt als Literal zu schreiben (der
+    /// Dezimal-Pfad lext erst den positiven Betrag, der dann ueberlaeuft).
+    /// Erst jenseits von 64 Bit ist es ein echter Fehler.
+    fn radix_i64(&self, s: &str, radix: u32, what: &str, line: usize, col: usize)
+        -> Result<i64, LexError>
+    {
+        match u64::from_str_radix(s, radix) {
+            Ok(v) => Ok(v as i64),
+            Err(_) => Err(self.err(
+                &format!("{}-Literal zu gross (INTEGER ist 64-bit)", what), line, col)),
+        }
+    }
+
     fn scan_token(&mut self) -> Result<(), LexError> {
         let ch = self.peek(0);
         let (line, col) = (self.line, self.col);
@@ -257,7 +285,7 @@ impl Lexer {
                             s.push(self.advance());
                         } else { break; }
                     }
-                    let value = i64::from_str_radix(&s, 16).unwrap_or(0);
+                    let value = self.radix_i64(&s, 16, "Hex", line, col)?;
                     self.push(Tt::Number, Val::Int(value), line, col);
                     return Ok(());
                 }
@@ -265,7 +293,7 @@ impl Lexer {
                 self.advance(); self.advance();       // 0b
                 let mut s = String::new();
                 while matches!(self.peek(0), '0' | '1') { s.push(self.advance()); }
-                let value = i64::from_str_radix(&s, 2).unwrap_or(0);
+                let value = self.radix_i64(&s, 2, "Binaer", line, col)?;
                 self.push(Tt::Number, Val::Int(value), line, col);
                 return Ok(());
             }
@@ -309,13 +337,13 @@ impl Lexer {
             if s.is_empty() {
                 return Err(self.err("Hex-Literal &H ohne Ziffern", line, col));
             }
-            value = i64::from_str_radix(&s, 16).unwrap_or(0);
+            value = self.radix_i64(&s, 16, "Hex", line, col)?;
         } else {
             while matches!(self.peek(0), '0' | '1') { s.push(self.advance()); }
             if s.is_empty() {
                 return Err(self.err("Binaer-Literal &B ohne Ziffern", line, col));
             }
-            value = i64::from_str_radix(&s, 2).unwrap_or(0);
+            value = self.radix_i64(&s, 2, "Binaer", line, col)?;
         }
         self.push(Tt::Number, Val::Int(value), line, col);
         Ok(())
@@ -527,4 +555,68 @@ pub fn dump_tokens_json(source: &str) -> Result<String, LexError> {
         out.push('\n');
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod radix_tests {
+    use super::*;
+
+    /// Erstes NUMBER-Token als i64.
+    fn first_int(src: &str) -> i64 {
+        let toks = match Lexer::new(src).tokenize() {
+            Ok(t) => t,
+            Err(e) => panic!("lex fehlgeschlagen: {}", e.msg),
+        };
+        for t in toks {
+            if t.tt == Tt::Number {
+                if let Val::Int(n) = t.val { return n; }
+                panic!("NUMBER war kein Int");
+            }
+        }
+        panic!("kein NUMBER-Token");
+    }
+
+    fn lex_err(src: &str) -> String {
+        match Lexer::new(src).tokenize() {
+            Err(e) => e.msg,
+            Ok(_) => panic!("sollte scheitern: {}", src),
+        }
+    }
+
+    #[test]
+    fn small_hex_and_binary_unchanged() {
+        assert_eq!(first_int("PRINT &HFF"), 255);
+        assert_eq!(first_int("PRINT 0xFF"), 255);
+        assert_eq!(first_int("PRINT &B1010"), 10);
+        assert_eq!(first_int("PRINT 0b1010"), 10);
+    }
+
+    #[test]
+    fn all_bits_mask_is_minus_one_not_zero() {
+        // Der eigentliche Fehler: `unwrap_or(0)` machte aus der klassischen
+        // "alle Bits gesetzt"-Maske still eine 0 -- ohne jede Warnung, genau
+        // im Bitmasken-Code, der als einziger ueberhaupt zu Hex greift.
+        assert_eq!(first_int("PRINT &HFFFFFFFFFFFFFFFF"), -1);
+        assert_eq!(first_int("PRINT 0xFFFFFFFFFFFFFFFF"), -1);
+        assert_eq!(first_int(&format!("PRINT &B{}", "1".repeat(64))), -1);
+    }
+
+    #[test]
+    fn hex_is_the_only_way_to_write_i64_min() {
+        // Der Dezimal-Pfad lext erst den positiven Betrag, der dann
+        // ueberlaeuft -- i64::MIN war als Literal darum gar nicht schreibbar.
+        assert_eq!(first_int("PRINT &H8000000000000000"), i64::MIN);
+    }
+
+    #[test]
+    fn beyond_64_bits_is_a_clean_error() {
+        assert!(lex_err("PRINT &H1FFFFFFFFFFFFFFFFF").contains("zu gross"));
+        assert!(lex_err(&format!("PRINT &B{}", "1".repeat(65))).contains("zu gross"));
+    }
+
+    #[test]
+    fn decimal_path_still_rejects_oversized() {
+        // Regression: der bereits gehaertete Dezimal-Pfad bleibt unveraendert.
+        assert!(lex_err("PRINT 99999999999999999999").contains("zu gross"));
+    }
 }
