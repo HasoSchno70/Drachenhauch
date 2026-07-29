@@ -37,7 +37,7 @@ enum Cmd {
     Triangle(i32, i32, i32, i32, i32, i32, Color),
     TriLines(i32, i32, i32, i32, i32, i32, Color),
     Ellipse(i32, i32, i32, i32, Color, bool), // cx, cy, rh, rv, color, filled
-    Poly(Vec<(i32, i32)>, Color, bool),       // points, color, closed
+    Poly(Vec<(i32, i32)>, f32, Color, bool),  // points, thick, color, closed
     FillPoly(Vec<(i32, i32)>, Color),
     // x, y, text, size, color, font_idx (-1 = Default), spacing
     Text(i32, i32, String, i32, Color, i64, f32),
@@ -2267,7 +2267,10 @@ impl Graphics {
         let (cx, cy, rh, rv) = Self::ellipse_box(x1, y1, x2, y2);
         self.emit(Cmd::Ellipse(cx, cy, rh, rv, col(c), false));
     }
-    pub fn arc(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, start: f64, end: f64, c: i64) {
+    /// `width`: `None` = klassischer 1px-Strich (zoom-unabhaengig, wie vor
+    /// Einfuehrung des Width-Parameters). `Some(w)` skaliert wie bei
+    /// `line_thick`/`spline` mit `cam_zoom`.
+    pub fn arc(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, start: f64, end: f64, width: Option<f64>, c: i64) {
         let (x1, y1) = self.w2s(x1, y1); let (x2, y2) = self.w2s(x2, y2);
         let (cx, cy, rh, rv) = Self::ellipse_box(x1, y1, x2, y2);
         let n = 48;
@@ -2278,7 +2281,8 @@ impl Graphics {
             let py = cy as f64 - rv as f64 * t.sin(); // y nach unten -> CCW = minus sin
             pts.push((px.round() as i32, py.round() as i32));
         }
-        self.emit(Cmd::Poly(pts, col(c), false));
+        let thick = match width { Some(w) => (w * self.cam_zoom).max(1.0) as f32, None => 1.0 };
+        self.emit(Cmd::Poly(pts, thick, col(c), false));
     }
     pub fn polygon(&mut self, flat: &[i32], c: i64, filled: bool) -> Result<(), String> {
         if flat.len() < 6 || flat.len() % 2 != 0 {
@@ -2286,7 +2290,7 @@ impl Graphics {
         }
         let pts: Vec<(i32, i32)> = flat.chunks(2).map(|p| { let (x, y) = self.w2s(p[0], p[1]); (x, y) }).collect();
         if filled { self.emit(Cmd::FillPoly(pts, col(c))); }
-        else { self.emit(Cmd::Poly(pts, col(c), true)); }
+        else { self.emit(Cmd::Poly(pts, 1.0, col(c), true)); }
         Ok(())
     }
     pub fn text(&mut self, x: i32, y: i32, s: String, c: i64) {
@@ -3667,14 +3671,42 @@ fn render_scene<D: RaylibDraw>(
                         if *filled { d.draw_ellipse(cx * s, cy * s, (*rh * s) as f32, (*rv * s) as f32, *col); }
                         else { d.draw_ellipse_lines(cx * s, cy * s, (*rh * s) as f32, (*rv * s) as f32, *col); }
                     }
-                    Cmd::Poly(pts, col, closed) => {
+                    Cmd::Poly(pts, thick, col, closed) => {
                         let n = pts.len();
                         if n >= 2 {
-                            for i in 0..n - 1 {
-                                d.draw_line(pts[i].0 * s, pts[i].1 * s, pts[i + 1].0 * s, pts[i + 1].1 * s, *col);
-                            }
-                            if *closed {
-                                d.draw_line(pts[n - 1].0 * s, pts[n - 1].1 * s, pts[0].0 * s, pts[0].1 * s, *col);
+                            if *thick > 1.0 {
+                                // `DrawSplineLinear` zeichnet jedes Segment als eigenes,
+                                // ungemitertes Quad (raylib ohne SUPPORT_SPLINE_MITERS) --
+                                // an den Gelenken zwischen den vielen kurzen Arc-Segmenten
+                                // reisst die Innenseite der Kurve dadurch sichtbar auf
+                                // (Loecher). Stattdessen jedes Segment per `draw_line_ex`
+                                // zeichnen und an jedem Gelenk einen gefuellten Kreis
+                                // (Radius = halbe Dicke) draufsetzen -- klassisches
+                                // Round-Join-Pattern, luecken-frei unabhaengig vom Winkel.
+                                let thick_s = *thick * s as f32;
+                                let v: Vec<Vector2> = pts.iter()
+                                    .map(|p| Vector2::new((p.0 * s) as f32, (p.1 * s) as f32)).collect();
+                                for i in 0..n - 1 {
+                                    d.draw_line_ex(v[i], v[i + 1], thick_s, *col);
+                                }
+                                if *closed {
+                                    d.draw_line_ex(v[n - 1], v[0], thick_s, *col);
+                                }
+                                let r = thick_s * 0.5;
+                                // Offene Linie: nur die inneren Gelenke runden (Enden
+                                // bleiben flach, wie bei einem einzelnen draw_line_ex).
+                                // Geschlossen: JEDER Punkt ist ein Gelenk, inkl. v[0].
+                                let joints: &[Vector2] = if *closed { &v[..] } else { &v[1..n - 1] };
+                                for p in joints {
+                                    d.draw_circle_v(*p, r, *col);
+                                }
+                            } else {
+                                for i in 0..n - 1 {
+                                    d.draw_line(pts[i].0 * s, pts[i].1 * s, pts[i + 1].0 * s, pts[i + 1].1 * s, *col);
+                                }
+                                if *closed {
+                                    d.draw_line(pts[n - 1].0 * s, pts[n - 1].1 * s, pts[0].0 * s, pts[0].1 * s, *col);
+                                }
                             }
                         }
                     }

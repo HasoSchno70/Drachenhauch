@@ -3867,7 +3867,8 @@ impl<'p> Vm<'p> {
                 let start = match a.get(4) { Some(Value::Int(n)) => *n as f64, Some(Value::Float(f)) => *f, _ => return Err("ARC: start muss Zahl sein".into()) };
                 let end = match a.get(5) { Some(Value::Int(n)) => *n as f64, Some(Value::Float(f)) => *f, _ => return Err("ARC: end muss Zahl sein".into()) };
                 let c = if a.len() >= 7 { gi(a, 6, "ARC")? } else { 0xFFFFFF };
-                g!().arc(gi(a,0,"ARC")? as i32, gi(a,1,"ARC")? as i32, gi(a,2,"ARC")? as i32, gi(a,3,"ARC")? as i32, start, end, c); Value::Nil
+                let width = if a.len() >= 8 { Some(need_f(a, 7, "ARC")?) } else { None };
+                g!().arc(gi(a,0,"ARC")? as i32, gi(a,1,"ARC")? as i32, gi(a,2,"ARC")? as i32, gi(a,3,"ARC")? as i32, start, end, width, c); Value::Nil
             }
             "polygon" | "polygonoutline" => {
                 let filled = name == "polygon";

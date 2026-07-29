@@ -169,7 +169,7 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 | `POLYGONOUTLINE(points[, color[, width]])` | Polygon nur als Kontur |
 | `ELLIPSE(x1, y1, x2, y2[, color])` | gefüllte Ellipse, eingepasst in die Bounding-Box |
 | `ELLIPSEOUTLINE(x1, y1, x2, y2[, color[, width]])` | Ellipse nur als Kontur |
-| `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | Bogen-Segment in der Bounding-Box; Winkel in Radiant, gegen den Uhrzeigersinn |
+| `ARC(x1, y1, x2, y2, start_rad, end_rad[, color[, width]])` | Bogen-Segment in der Bounding-Box; Winkel in Radiant, gegen den Uhrzeigersinn. `width` (Float, optional) = Strichbreite; ohne Angabe 1px (zoom-unabhaengig), mit Angabe wie `LINEW`/`SPLINE` mit `CAMERA_SET`-Zoom skaliert |
 | `TEXT(x, y, s$[, color])` | Text bei (x, y) |
 | `TEXTROT(x, y, s$, winkel[, skala[, farbe]])` | Text **zentriert** auf (x, y), um das Zentrum gedreht (Grad, wie `DRAWIMAGEROT`) und skaliert — für Score-Popups, schräge Labels. Nutzt aktiven Font/Größe |
 
