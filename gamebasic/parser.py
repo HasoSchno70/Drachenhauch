@@ -251,8 +251,12 @@ class Parser:
         # nach `)` muss `=` kommen
         return saw_top_comma and self._peek(i + 1).type == TokenType.EQ
 
-    def _tuple_assign(self):
-        """Parst `(target, target, ...) = expr`."""
+    def _tuple_assign(self, consume_term: bool = True):
+        """Parst `(target, target, ...) = expr`.
+
+        `consume_term=False` fuer den Single-Line-IF-Pfad (siehe
+        `_dot_assign_in_with`).
+        """
         self._expect(TokenType.LPAREN)
         targets = [self._tuple_assign_target()]
         while self._match(TokenType.COMMA):
@@ -265,7 +269,8 @@ class Parser:
         self._expect(TokenType.RPAREN)
         self._expect(TokenType.EQ, "Erwartet '=' nach Tupel-Zielen")
         value = self._expression()
-        self._consume_terminator()
+        if consume_term:
+            self._consume_terminator()
         return TupleAssign(targets, value)
 
     def _tuple_assign_target(self):
@@ -279,26 +284,84 @@ class Parser:
         Zuweisung.
         """
         name_tok = self._expect(TokenType.IDENT, "Erwartet Variablenname als Tupel-Ziel")
-        target_expr = Identifier(name_tok.value)
+        return self._lvalue_chain(Identifier(name_tok.value))
+
+    def _member_name_after_dot(self) -> str:
+        """Membername nach `.` -- akzeptiert IDENT UND Keywords.
+
+        Beim qualifizierten Zugriff (`obj.member`) gibt es keine
+        Mehrdeutigkeit mit Sprach-Keywords, deshalb muessen Felder, die
+        zufaellig wie ein Keyword lexen (`.image`, `.sound`, `.data`,
+        `.next`, ...), funktionieren. `_postfix` (Lesen) war schon so
+        tolerant, die drei Zuweisungs-Pfade dagegen verlangten IDENT --
+        `spr.image = x` wurde dadurch nicht einmal als Zuweisung ERKANNT
+        und landete still als verworfener `=`-Vergleich im AST.
+        Spiegelt `Parser::member_name_after_dot` in parser.rs, wo derselbe
+        Fund bereits gefixt wurde.
+        """
+        tok = self._peek()
+        if isinstance(tok.value, str) and tok.value:
+            self.pos += 1
+            return tok.value
+        raise ParseError(
+            f"Erwartet Membername nach '.', gefunden {tok.type.name}",
+            tok.line, tok.col,
+        )
+
+    def _lvalue_chain(self, target_expr):
+        """`(.member | [index, ...])*` auf einem schon geparsten Ziel.
+
+        EINE Stelle fuer alle Zuweisungs-Kontexte (`_assign_from_lvalue`,
+        `_tuple_assign_target`, `_dot_assign_in_with`). Vorher existierte
+        diese Schleife dort dreimal nebeneinander und die Kopien waren
+        bereits auseinandergelaufen: nur eine akzeptierte Keyword-Member-
+        namen, nur eine hatte die freundliche Slice-Zuweisungs-Meldung,
+        und die Slice-Pruefung deckte nur den ERSTEN Index ab
+        (`x[1, 2:3] = 5` fiel darum in ein generisches "Erwartet ']'").
+
+        Aufrufe `(...)` gehoeren bewusst NICHT hierher -- ein Funktions-
+        aufruf ist kein Zuweisungsziel. Der Lese-Pfad `_postfix` bleibt
+        deshalb getrennt (er kann zusaetzlich Calls und Slices).
+        """
         while True:
             if self._match(TokenType.DOT):
-                m = self._expect(TokenType.IDENT, "Erwartet Membername nach '.'")
-                target_expr = MemberAccess(target_expr, m.value)
+                target_expr = MemberAccess(target_expr, self._member_name_after_dot())
             elif self._match(TokenType.LBRACKET):
-                idxs = [self._expression()]
-                while self._match(TokenType.COMMA):
-                    idxs.append(self._expression())
+                indices = []
+                while True:
+                    # Slice-Zuweisung (`arr[1:5] = ...`) ist nicht unterstuetzt
+                    # (Laenge muss matchen? Truncate?) -- klar melden statt
+                    # generischem "Erwartet ']'". Gilt fuer JEDEN Index, nicht
+                    # nur den ersten.
+                    if self._check(TokenType.COLON):
+                        raise ParseError(
+                            "Slice-Zuweisung (`x[a:b] = ...`) ist nicht "
+                            "unterstuetzt -- nutze eine Schleife.",
+                            self._peek().line, self._peek().col,
+                        )
+                    indices.append(self._expression())
+                    if self._check(TokenType.COLON):
+                        raise ParseError(
+                            "Slice-Zuweisung (`x[a:b] = ...`) ist nicht "
+                            "unterstuetzt -- nutze eine Schleife.",
+                            self._peek().line, self._peek().col,
+                        )
+                    if not self._match(TokenType.COMMA):
+                        break
                 self._expect(TokenType.RBRACKET, "Erwartet ']'")
-                target_expr = IndexAccess(target_expr, idxs)
+                target_expr = IndexAccess(target_expr, indices)
             else:
-                break
-        return target_expr
+                return target_expr
 
     def _is_assignment_lookahead(self) -> bool:
         i = 1
         while True:
             t = self._peek(i).type
-            if t == TokenType.DOT and self._peek(i + 1).type == TokenType.IDENT:
+            # Membername: wie `_member_name_after_dot` auch Keywords zulassen
+            # -- sonst wird `spr.image = 5` gar nicht erst als Zuweisung
+            # erkannt und verschwindet still als `=`-Vergleich.
+            nxt = self._peek(i + 1)
+            if t == TokenType.DOT and isinstance(nxt.value, str) and nxt.value:
                 i += 2
                 continue
             if t == TokenType.LBRACKET:
@@ -540,40 +603,43 @@ class Parser:
         self._consume_terminator()
         return With(var_name, target, body)
 
-    def _dot_assign_in_with(self):
+    def _dot_assign_in_with(self, consume_term: bool = True):
         """`.member = expr` oder `.member.sub = expr` oder `.arr[i] = expr`
         innerhalb eines WITH-Blocks. De-sugared zu MemberAssign/IndexAssign
         auf dem aktuellen WITH-Ziel.
+
+        `consume_term=False` fuer den Single-Line-IF-Pfad: dort darf der
+        Terminator nicht geschluckt werden, sonst verschwindet ein
+        folgendes ELSE (`IF c THEN .x = 1 ELSE .y = 2`).
         """
         # Wir bauen einen Lvalue beginnend mit `Identifier(__with_n)` und
         # erlauben dann denselben Postfix-Pfad wie _assign_from_lvalue.
-        target_expr: object = Identifier(self._with_stack[-1])
+        start = self.pos
+        target_expr: object = self._lvalue_chain(Identifier(self._with_stack[-1]))
         # Erstes Token MUSS DOT sein (vom Caller geprueft).
-        while True:
-            if self._match(TokenType.DOT):
-                m_tok = self._expect(TokenType.IDENT, "Erwartet Membername nach '.'")
-                target_expr = MemberAccess(target_expr, m_tok.value)
-            elif self._match(TokenType.LBRACKET):
-                indices = [self._expression()]
-                while self._match(TokenType.COMMA):
-                    indices.append(self._expression())
-                self._expect(TokenType.RBRACKET, "Erwartet ']'")
-                target_expr = IndexAccess(target_expr, indices)
-            else:
-                break
         op_tok = self._peek()
         if op_tok.type not in _ASSIGN_OPS:
-            raise ParseError(
-                f"Erwartet '=' oder Compound-Operator in WITH-Block, "
-                f"gefunden {op_tok.type.name}",
-                op_tok.line, op_tok.col,
-            )
+            # KEINE Zuweisung -- dann ist es ein Ausdruck-Statement, allen
+            # voran der Methodenaufruf `.update()`. Der lief hier frueher in
+            # einen harten "Erwartet '=' ..."-Fehler, weil die Lvalue-Kette
+            # `(` gar nicht kennt (ein Aufruf ist kein Zuweisungsziel).
+            # Ergebnis: der Editor strich voellig gueltigen Code rot an --
+            # und weil der Fallback-Check nur das ERSTE Problem liefert,
+            # verdeckte dieser Fehlalarm alle echten Fehler der Datei.
+            # gbrt fuehrt dieselbe Zeile korrekt aus; der Rewind hier
+            # spiegelt `dot_assign_in_with` in parser.rs.
+            self.pos = start
+            expr = self._expression()
+            if consume_term:
+                self._consume_terminator()
+            return ExprStmt(expr)
         self.pos += 1
         compound_op = _ASSIGN_OPS[op_tok.type]
         rhs = self._expression()
         if compound_op is not None:
             rhs = BinaryOp(compound_op, target_expr, rhs)
-        self._consume_terminator()
+        if consume_term:
+            self._consume_terminator()
         if isinstance(target_expr, MemberAccess):
             return MemberAssign(target_expr.target, target_expr.name, rhs)
         if isinstance(target_expr, IndexAccess):
@@ -670,34 +736,7 @@ class Parser:
         de-sugared. AST und Interpreter/VM kennen nur das einfache Assign.
         """
         name_tok = self._expect(TokenType.IDENT)
-        target_expr: object = Identifier(name_tok.value)
-        while True:
-            if self._match(TokenType.DOT):
-                member_tok = self._expect(TokenType.IDENT, "Erwartet Membername nach '.'")
-                target_expr = MemberAccess(target_expr, member_tok.value)
-            elif self._match(TokenType.LBRACKET):
-                # Slice-Assign (`arr[1:5] = ...`) wird NICHT unterstuetzt --
-                # waere semantisch unklar (Laenge muss matchen? Truncate?).
-                # Klar werfen statt Parser-Crash.
-                if self._check(TokenType.COLON):
-                    raise ParseError(
-                        "Slice-Zuweisung (`x[a:b] = ...`) ist nicht "
-                        "unterstuetzt -- nutze eine Schleife.",
-                        self._peek().line, self._peek().col,
-                    )
-                indices = [self._expression()]
-                if self._check(TokenType.COLON):
-                    raise ParseError(
-                        "Slice-Zuweisung (`x[a:b] = ...`) ist nicht "
-                        "unterstuetzt -- nutze eine Schleife.",
-                        self._peek().line, self._peek().col,
-                    )
-                while self._match(TokenType.COMMA):
-                    indices.append(self._expression())
-                self._expect(TokenType.RBRACKET, "Erwartet ']'")
-                target_expr = IndexAccess(target_expr, indices)
-            else:
-                break
+        target_expr: object = self._lvalue_chain(Identifier(name_tok.value))
         # Zuweisungs-Operator (= oder Compound-Form)
         op_tok = self._peek()
         if op_tok.type not in _ASSIGN_OPS:
@@ -915,6 +954,28 @@ class Parser:
             return Print(items, seps, newline)
         if t == TokenType.IDENT and self._is_assignment_lookahead():
             return self._assign_from_lvalue()
+        # `IF c THEN .x = 1` (im WITH-Block) und `IF c THEN (a, b) = f()`
+        # liefen hier still ueber den ExprStmt-Fallback: `=` wurde als
+        # VERGLEICH geparst, die Zuweisung verschwand spurlos aus dem AST --
+        # ohne jede Fehlermeldung.
+        #
+        # gbrt unterstuetzt beide Formen NICHT (verifiziert per `--check`:
+        # "Erwartet Zeilenende"). Sie hier zu akzeptieren waere also die
+        # falsche Richtung -- der Editor bliebe stumm bei Code, der zur
+        # Laufzeit scheitert. Stattdessen dieselbe Grenze klar benennen,
+        # statt sie stillschweigend zu verschlucken.
+        if t == TokenType.DOT and self._with_stack:
+            raise ParseError(
+                "Zuweisung an `.member` ist im einzeiligen IF nicht "
+                "unterstuetzt -- nutze die mehrzeilige IF/END IF-Form.",
+                tok.line, tok.col,
+            )
+        if t == TokenType.LPAREN and self._is_tuple_assign_lookahead():
+            raise ParseError(
+                "Tupel-Zuweisung ist im einzeiligen IF nicht unterstuetzt "
+                "-- nutze die mehrzeilige IF/END IF-Form.",
+                tok.line, tok.col,
+            )
         if t == TokenType.RETURN:
             self.pos += 1
             value = None
