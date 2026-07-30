@@ -2209,6 +2209,31 @@ impl Graphics {
         let img = Image::gen_image_perlin_noise(w, h, 0, 0, scale.max(0.1) as f32);
         self.push_tex_from_image(img)
     }
+    /// GENTEX_CELLULAR(w, h, kachel): Voronoi-/Zellrauschen -- Steinboden,
+    /// Rissmuster, organische Strukturen. Kleinere Kachel = feiner.
+    pub fn gen_tex_cellular(&mut self, w: i32, h: i32, tile: i64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_CELLULAR", w, h)?;
+        let img = Image::gen_image_cellular(w, h, tile.clamp(1, 4096) as i32);
+        self.push_tex_from_image(img)
+    }
+    /// GENTEX_NOISE(w, h, anteil): Weissrauschen, `anteil` 0..1 = Anteil
+    /// weisser Pixel. Grundlage fuer Sternenfelder, Korn, Dither-Masken.
+    pub fn gen_tex_noise(&mut self, w: i32, h: i32, factor: f64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_NOISE", w, h)?;
+        let f = if factor.is_finite() { factor.clamp(0.0, 1.0) } else { 0.5 };
+        let img = Image::gen_image_white_noise(w, h, f as f32);
+        self.push_tex_from_image(img)
+    }
+    /// GENTEX_GRADIENT_BOX(w, h, dichte, c1, c2): rechteckiger Verlauf von der
+    /// Mitte nach aussen -- Vignetten, Rahmen-Schatten (das eckige Gegenstueck
+    /// zu GENTEX_RADIAL).
+    pub fn gen_tex_gradient_square(&mut self, w: i32, h: i32, density: f64,
+                                   c1: i64, c2: i64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_GRADIENT_BOX", w, h)?;
+        let d = if density.is_finite() { density.clamp(0.0, 1.0) } else { 0.5 };
+        let img = Image::gen_image_gradient_square(w, h, d as f32, col(c1), col(c2));
+        self.push_tex_from_image(img)
+    }
     pub fn gen_tex_gradient(&mut self, w: i32, h: i32, c1: i64, c2: i64, vertical: bool) -> Result<i64, String> {
         // direction in Grad: 0 = vertikal (oben->unten), 90 = horizontal.
         let (w, h) = Self::check_gentex_dims("GENTEX_GRADIENT", w, h)?;
@@ -2379,6 +2404,43 @@ impl Graphics {
     }
     pub fn text_height(&self) -> i32 { self.text_size }
 
+    // Bewusst NICHT uebernommen: animierte GIFs (`LoadImageAnim`). raylib haengt
+    // die weiteren Bilder an `image.data` an, laesst `width`/`height` aber bei
+    // EINEM Bild -- eine Textur daraus zeigt nur Bild 0. Korrigieren liesse sich
+    // das nur, indem man `height` im Bild-Struct ueberschreibt; raylib-rs macht
+    // `Image` dafuer aber ausdruecklich `readonly` (kein DerefMut, innerer Wert
+    // `pub(crate)`, kein Konstruktor aus einer rohen ffi::Image). Der einzige Weg
+    // waere rohes FFI am Wrapper vorbei -- genau das Muster, das hier schon
+    // einmal einen Use-after-free verursacht hat (siehe MODEL_ANIMATE). Fuer
+    // Animationen gibt es den Sprite-Blatt-Weg (ATLAS_*, `sprite`-Modul, der
+    // Sprite-Editor exportiert Blaetter) -- der ist ohnehin der schnellere.
+
+    // Bewusst NICHT uebernommen: raylibs `GetClipboardImage` ist ausdruecklich
+    // Windows-only ("Do not use if you plan to compile to other platforms").
+    // Ein Builtin, das nur auf einem der drei unterstuetzten Systeme etwas tut,
+    // waere ein Rueckschritt gegenueber der Cross-Platform-Arbeit -- und CLIPBOARD_GET
+    // (Text) funktioniert ueberall.
+
+    /// LOADFONT_IMAGE(bild, trennfarbe, erstes_zeichen) -> FONT: Bitmap-Font
+    /// aus einem PNG. Die Zeichen stehen nebeneinander, durch `trennfarbe`
+    /// getrennt -- das klassische Verfahren fuer Pixel-Schriften, die
+    /// LOADFONT (TTF) nicht scharf hinbekommt.
+    pub fn load_font_image(&mut self, img: i64, key: i64, first: i64) -> Result<i64, String> {
+        let src = self.src_image(img, "LOADFONT_IMAGE")?;
+        let f = self.rl.load_font_from_image(&self.thread, &src, col(key), first as i32)
+            .map_err(|e| format!("LOADFONT_IMAGE: {}", e))?;
+        // Nearest lassen: Pixel-Schrift soll pixelig bleiben (anders als bei
+        // LOADFONT, wo bilinear die skalierte TTF-Schrift glaettet).
+        let size = f.baseSize.max(4);
+        self.fonts.push(f);
+        self.font_sizes.push(size);
+        Ok((self.fonts.len() - 1) as i64)
+    }
+    /// TEXT_LINE_SPACING(px): Zeilenabstand fuer mehrzeiligen Text.
+    pub fn text_line_spacing(&mut self, px: i64) {
+        self.rl.set_text_line_spacing(px.clamp(0, 4096) as i32);
+    }
+
     pub fn load_texture(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
@@ -2448,6 +2510,82 @@ impl Graphics {
         let mut img = self.src_image(idx, "IMAGE_BLUR")?;
         img.blur_gaussian(radius.max(0));
         self.push_tex_from_image(img)
+    }
+    /// IMAGE_CONVOLVE(bild, kern): freie Faltung mit einem quadratischen Kern
+    /// (3x3, 5x5, ...). Damit sind Schaerfen, Kantenerkennung, Praegen und
+    /// eigene Weichzeichner moeglich -- `IMAGE_BLUR` kann nur Gauss.
+    /// Der Kern kommt als flaches ARRAY OF FLOAT in Zeilenfolge.
+    pub fn image_convolve(&mut self, idx: i64, kernel: &[f64]) -> Result<i64, String> {
+        let n = kernel.len();
+        let side = (n as f64).sqrt().round() as usize;
+        if n == 0 || side * side != n {
+            return Err(format!(
+                "IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), \
+hat aber {} Werte", n));
+        }
+        if side % 2 == 0 {
+            return Err(format!(
+                "IMAGE_CONVOLVE: Kern-Seitenlaenge muss ungerade sein (3, 5, 7, ...), ist {}",
+                side));
+        }
+        let k: Vec<f32> = kernel.iter().map(|v| if v.is_finite() { *v as f32 } else { 0.0 }).collect();
+        let mut img = self.src_image(idx, "IMAGE_CONVOLVE")?;
+        img.kernel_convolution(&k)
+            .map_err(|e| format!("IMAGE_CONVOLVE: {}", e))?;
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_MASK(bild, maske): Graustufen der Maske werden zum
+    /// Alphakanal -- der uebliche Weg fuer weiche Raender und Uebergaenge.
+    pub fn image_alpha_mask(&mut self, idx: i64, mask: i64) -> Result<i64, String> {
+        let m = self.src_image(mask, "IMAGE_ALPHA_MASK")?;
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_MASK")?;
+        img.alpha_mask(&m);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_CROP(bild, schwelle): voellig durchsichtigen Rand abschneiden
+    /// (Sprites aus einem zu grossen Blatt eng zuschneiden).
+    pub fn image_alpha_crop(&mut self, idx: i64, threshold: f64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_CROP")?;
+        img.alpha_crop(if threshold.is_finite() { threshold.clamp(0.0, 1.0) as f32 } else { 0.0 });
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_PREMULTIPLY(bild): Farbe mit Alpha vormultiplizieren --
+    /// beseitigt die dunklen Saeume an weichen Raendern beim Skalieren.
+    pub fn image_alpha_premultiply(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_PREMULTIPLY")?;
+        img.alpha_premultiply();
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_DITHER(bild, r, g, b, a): Farbtiefe pro Kanal in Bit reduzieren,
+    /// mit Floyd-Steinberg-Fehlerverteilung -- der Retro-Look.
+    ///
+    /// raylib setzt NUR die drei echten 16-Bit-Formate um; bei jeder anderen
+    /// Kombination warnt es bloss und laesst das Bild mit ungueltigem Format
+    /// zurueck (die Textur wird dann schwarz). Deshalb hier hart abgelehnt --
+    /// Validierung gehoert in den Wrapper, nicht ins Backend.
+    pub fn image_dither(&mut self, idx: i64, r: i64, g: i64, b: i64, al: i64) -> Result<i64, String> {
+        if !matches!((r, g, b, al), (5, 6, 5, 0) | (5, 5, 5, 1) | (4, 4, 4, 4)) {
+            return Err(format!(
+                "IMAGE_DITHER: nur 5,6,5,0 (RGB565) / 5,5,5,1 (RGB5551) / 4,4,4,4 (RGBA4444) \
+moeglich -- bekam {},{},{},{}", r, g, b, al));
+        }
+        let mut img = self.src_image(idx, "IMAGE_DITHER")?;
+        // raylib dithert nur aus R8G8B8(A8) heraus; GENTEX_*-Bilder koennen ein
+        // anderes Format haben -> vorher angleichen, sonst passiert nichts.
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        img.dither(r as i32, g as i32, b as i32, al as i32);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_PALETTE(bild, max): die haeufigsten Farben als ARRAY OF INTEGER
+    /// (0xRRGGBB) -- fuer automatische Paletten, Farbschema-Ableitung, Retro-
+    /// Umfaerbung.
+    pub fn image_palette(&mut self, idx: i64, max: i64) -> Result<Vec<i64>, String> {
+        let img = self.src_image(idx, "IMAGE_PALETTE")?;
+        let pal = img.extract_palette(max.clamp(1, 4096) as u32);
+        Ok(pal.iter()
+            .filter(|c| c.a > 0)                  // voll durchsichtige Fuellwerte weglassen
+            .map(|c| ((c.r as i64) << 16) | ((c.g as i64) << 8) | c.b as i64)
+            .collect())
     }
     pub fn image_brightness(&mut self, idx: i64, n: i32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_BRIGHTNESS")?;

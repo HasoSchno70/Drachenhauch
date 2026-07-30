@@ -79,6 +79,25 @@ enum Step {
 /// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
 /// faellt fuer rohe Listen (z.B. alte .gbc ohne specialize-Pass) zurueck.
 #[inline]
+/// 1D `ARRAY OF FLOAT`/`INTEGER` -> `Vec<f64>` (Faltungskern, Shader-Arrays).
+/// Auf Modul-Ebene, weil mehrere Dispatch-Bloecke (`try_graphics`, imgfx) sie
+/// brauchen -- die `gstrs`-Helfer liegen dagegen lokal im Haupt-Match.
+fn gfloats(a: &[Value], i: usize, f: &str) -> R<Vec<f64>> {
+    match a.get(i) {
+        Some(Value::Array(arr)) => {
+            let arr = arr.borrow();
+            if arr.dims.len() != 1 {
+                return Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f));
+            }
+            arr.cells.iter()
+                .map(|v| if is_num(&v) { Ok(as_f64(&v)) }
+                         else { Err(format!("{}: ARRAY enthaelt einen Nicht-Zahlenwert", f)) })
+                .collect()
+        }
+        _ => Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f)),
+    }
+}
+
 fn call_parts(arg: &Arg) -> (&str, usize, i32) {
     match arg {
         Arg::Call(n, c, i) => (n, *c as usize, *i),
@@ -3821,6 +3840,21 @@ impl<'p> Vm<'p> {
                 gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
                 gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
                 if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
+            "gentex_cellular" => Value::Int(g!().gen_tex_cellular(
+                gi(a,0,"GENTEX_CELLULAR")? as i32, gi(a,1,"GENTEX_CELLULAR")? as i32,
+                gi(a,2,"GENTEX_CELLULAR")?)?),
+            "gentex_noise" => Value::Int(g!().gen_tex_noise(
+                gi(a,0,"GENTEX_NOISE")? as i32, gi(a,1,"GENTEX_NOISE")? as i32,
+                need_f(a,2,"GENTEX_NOISE")?)?),
+            "gentex_gradient_box" => Value::Int(g!().gen_tex_gradient_square(
+                gi(a,0,"GENTEX_GRADIENT_BOX")? as i32, gi(a,1,"GENTEX_GRADIENT_BOX")? as i32,
+                need_f(a,2,"GENTEX_GRADIENT_BOX")?, gi(a,3,"GENTEX_GRADIENT_BOX")?,
+                gi(a,4,"GENTEX_GRADIENT_BOX")?)?),
+            // --- Bitmap-Font ---
+            "loadfont_image" => Value::Int(g!().load_font_image(
+                gi(a,0,"LOADFONT_IMAGE")?, gi(a,1,"LOADFONT_IMAGE")?, gi(a,2,"LOADFONT_IMAGE")?)?),
+            "text_line_spacing" => { let n = gi(a,0,"TEXT_LINE_SPACING")?;
+                                     g!().text_line_spacing(n); Value::Nil }
             // --- Clipboard + Drag&Drop (Batch 5) ---
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
             "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }
@@ -5045,6 +5079,23 @@ impl<'p> Vm<'p> {
             "image_resize_canvas" => {
                 let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };
                 Value::Int(g!().image_resize_canvas(gi(a,0,"IMAGE_RESIZE_CANVAS")?, gi(a,1,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,2,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,3,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,4,"IMAGE_RESIZE_CANVAS")? as i32, fill)?)
+            }
+            "image_convolve" => {
+                let k = gfloats(a, 1, "IMAGE_CONVOLVE")?;
+                Value::Int(g!().image_convolve(gi(a,0,"IMAGE_CONVOLVE")?, &k)?)
+            }
+            "image_alpha_mask" => Value::Int(g!().image_alpha_mask(
+                gi(a,0,"IMAGE_ALPHA_MASK")?, gi(a,1,"IMAGE_ALPHA_MASK")?)?),
+            "image_alpha_crop" => Value::Int(g!().image_alpha_crop(
+                gi(a,0,"IMAGE_ALPHA_CROP")?, need_f(a,1,"IMAGE_ALPHA_CROP")?)?),
+            "image_alpha_premultiply" => Value::Int(g!().image_alpha_premultiply(
+                gi(a,0,"IMAGE_ALPHA_PREMULTIPLY")?)?),
+            "image_dither" => Value::Int(g!().image_dither(
+                gi(a,0,"IMAGE_DITHER")?, gi(a,1,"IMAGE_DITHER")?, gi(a,2,"IMAGE_DITHER")?,
+                gi(a,3,"IMAGE_DITHER")?, gi(a,4,"IMAGE_DITHER")?)?),
+            "image_palette" => {
+                let cols = g!().image_palette(gi(a,0,"IMAGE_PALETTE")?, gi(a,1,"IMAGE_PALETTE")?)?;
+                crate::builtins::new_int_array(cols)
             }
             "image_blur" => Value::Int(g!().image_blur(gi(a,0,"IMAGE_BLUR")?, gi(a,1,"IMAGE_BLUR")? as i32)?),
             "image_brightness" => Value::Int(g!().image_brightness(gi(a,0,"IMAGE_BRIGHTNESS")?, gi(a,1,"IMAGE_BRIGHTNESS")? as i32)?),

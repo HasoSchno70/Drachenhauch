@@ -323,6 +323,16 @@ fn new_str_array(items: Vec<String>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
+/// 1D `ARRAY OF INTEGER` aus einer Zahlenliste (Gegenstueck zu new_str_array).
+pub fn new_int_array(items: Vec<i64>) -> Value {
+    let n = items.len() as i64;
+    let mut arr = GbArray::new("integer".to_string(), vec![n], || Value::Int(0));
+    for (i, v) in items.into_iter().enumerate() {
+        arr.cells.set(i, Value::Int(v));
+    }
+    Value::Array(Rc::new(RefCell::new(arr)))
+}
+
 /// Banker's Rounding (Python `round`), Ergebnis als i64.
 fn round_half_even(x: f64) -> i64 {
     let f = x.floor();

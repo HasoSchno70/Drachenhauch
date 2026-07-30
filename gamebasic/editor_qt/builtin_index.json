@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1166,
+  "count": 1177,
   "builtins": [
     {
       "name": "ABS",
@@ -1929,6 +1929,12 @@
       "module": "core"
     },
     {
+      "name": "GENTEX_CELLULAR",
+      "kind": "graphics",
+      "signature": "GENTEX_CELLULAR(w: Zahl, h: Zahl, kachel: Zahl) -> IMAGE",
+      "module": "core"
+    },
+    {
       "name": "GENTEX_CHECKED",
       "kind": "graphics",
       "signature": "GENTEX_CHECKED(*args)",
@@ -1944,6 +1950,18 @@
       "name": "GENTEX_GRADIENT",
       "kind": "graphics",
       "signature": "GENTEX_GRADIENT(*args)",
+      "module": "core"
+    },
+    {
+      "name": "GENTEX_GRADIENT_BOX",
+      "kind": "graphics",
+      "signature": "GENTEX_GRADIENT_BOX(w: Zahl, h: Zahl, dichte: Zahl, c1: Zahl, c2: Zahl) -> IMAGE",
+      "module": "core"
+    },
+    {
+      "name": "GENTEX_NOISE",
+      "kind": "graphics",
+      "signature": "GENTEX_NOISE(w: Zahl, h: Zahl, anteil: Zahl) -> IMAGE",
       "module": "core"
     },
     {
@@ -2853,6 +2871,24 @@
       "module": "core"
     },
     {
+      "name": "IMAGE_ALPHA_CROP",
+      "kind": "graphics",
+      "signature": "IMAGE_ALPHA_CROP(bild: IMAGE, schwelle: Zahl) -> IMAGE",
+      "module": "imgfx"
+    },
+    {
+      "name": "IMAGE_ALPHA_MASK",
+      "kind": "graphics",
+      "signature": "IMAGE_ALPHA_MASK(bild: IMAGE, maske: IMAGE) -> IMAGE",
+      "module": "imgfx"
+    },
+    {
+      "name": "IMAGE_ALPHA_PREMULTIPLY",
+      "kind": "graphics",
+      "signature": "IMAGE_ALPHA_PREMULTIPLY(bild: IMAGE) -> IMAGE",
+      "module": "imgfx"
+    },
+    {
       "name": "IMAGE_BLUR",
       "kind": "core",
       "signature": "IMAGE_BLUR(img, radius)",
@@ -2871,6 +2907,12 @@
       "module": "imgfx"
     },
     {
+      "name": "IMAGE_CONVOLVE",
+      "kind": "graphics",
+      "signature": "IMAGE_CONVOLVE(bild: IMAGE, kern: ARRAY OF FLOAT) -> IMAGE",
+      "module": "imgfx"
+    },
+    {
       "name": "IMAGE_COPY",
       "kind": "core",
       "signature": "IMAGE_COPY(img)",
@@ -2880,6 +2922,12 @@
       "name": "IMAGE_CROP",
       "kind": "core",
       "signature": "IMAGE_CROP(img, x, y, w, h)",
+      "module": "imgfx"
+    },
+    {
+      "name": "IMAGE_DITHER",
+      "kind": "graphics",
+      "signature": "IMAGE_DITHER(bild: IMAGE, r: Zahl, g: Zahl, b: Zahl, a: Zahl) -> IMAGE",
       "module": "imgfx"
     },
     {
@@ -2922,6 +2970,12 @@
       "name": "IMAGE_INVERT",
       "kind": "core",
       "signature": "IMAGE_INVERT(img)",
+      "module": "imgfx"
+    },
+    {
+      "name": "IMAGE_PALETTE",
+      "kind": "graphics",
+      "signature": "IMAGE_PALETTE(bild: IMAGE, max: Zahl) -> ARRAY OF INTEGER",
       "module": "imgfx"
     },
     {
@@ -3396,6 +3450,12 @@
       "name": "LOADFONT",
       "kind": "graphics",
       "signature": "LOADFONT(path: STRING, size: Zahl)",
+      "module": "core"
+    },
+    {
+      "name": "LOADFONT_IMAGE",
+      "kind": "graphics",
+      "signature": "LOADFONT_IMAGE(bild: IMAGE, trennfarbe: Zahl, erstes_zeichen: Zahl) -> FONT",
       "module": "core"
     },
     {
@@ -5832,6 +5892,12 @@
       "name": "TEXT_ITALIC",
       "kind": "graphics",
       "signature": "TEXT_ITALIC(on: BOOLEAN)",
+      "module": "core"
+    },
+    {
+      "name": "TEXT_LINE_SPACING",
+      "kind": "graphics",
+      "signature": "TEXT_LINE_SPACING(px: Zahl)",
       "module": "core"
     },
     {
