@@ -263,6 +263,18 @@ Tree-Walker-Vergleich ist entfernt — es gibt nur noch gbrt.)
   Verzeichnis, damit relative Fixture-Pfade (TILED_LOAD etc.) gefunden werden.
 - **`IS NIL`/`IS NOT NIL` gibt es NICHT** als Parser-Konstrukt (Doku-Altlast) —
   nil-Check via `IS_NIL(x)`-Builtin.
+- **Qt-Tests: nie ungebremst `app.processEvents()` aufrufen.** Die Qt-Testdateien
+  lassen ihre Fenster stehen; in EINEM gemeinsamen `pytest tests/`-Prozess
+  sammeln sich so tausende QObjects mit hunderten scharfen Timern (u.a.
+  wiederholende 16-ms-Vorschau-Timer). Ein nacktes `processEvents()` laeuft
+  dann NIE zurueck — der ganze Lauf haengt mit 100 % CPU. Wer wirklich pumpen
+  muss: die `quiet_qt_process`-Fixture aus `tests/conftest.py` anfordern (stellt
+  den Prozess vorher ruhig) UND mit Zeitgrenze pumpen
+  (`processEvents(flags, ms)` in einer Schleife mit `QDeadlineTimer`) — Muster
+  in `tests/test_spriteeditor_qt_canvas.py::_event_loop_tick`. Die autouse-
+  Fixture `_qt_widget_cleanup` entschaerft Altlasten nach jedem Test; sie
+  ZERSTOERT sie bewusst nicht (`deleteLater()` auf die Editor-Fenster crasht —
+  echte Zerstoerungs-Reihenfolge-Fehler, noch offen).
 
 ## Coroutines / YIELD
 
