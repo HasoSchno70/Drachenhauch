@@ -1046,3 +1046,62 @@ def test_open_initial_reports_a_missing_file(tmp_path):
     assert open_initial(win, tmp_path / "tippfehler.gbform") is False
     assert open_initial(win, tmp_path) is False           # Verzeichnis
     win.close()
+
+
+# ------------------------------------------------------- F5-Run-Pfad (Review)
+def test_run_form_uses_the_shared_gbrt_lookup(tmp_path):
+    # Die lokale Kopie kannte den PyInstaller-Fall nicht -> F5 war in der
+    # installierten IDE unmoeglich ("Runtime nicht gebaut").
+    import gamebasic.formdesigner_qt as fq
+    from gamebasic.editor_qt.gbrt_locate import find_gbrt
+    assert fq._find_gbrt is find_gbrt
+
+
+def test_run_form_reports_a_broken_program_instead_of_failing_silently(
+        tmp_path, monkeypatch):
+    # `Popen` lief ohne Ausgabe-Capture und ohne Exit-Code-Pruefung: jeder
+    # Fehler im erzeugten Programm endete in einem stummen F5.
+    import gamebasic.formdesigner_qt as fq
+    if fq._find_gbrt(tmp_path) is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    _app()
+    win = FormDesigner(tmp_path)
+    b = win.canvas.doc.add("button", 10, 10)
+    b.on_click = "kaputt"                              # Handler mit Syntaxfehler
+    win.canvas.doc.code["kaputt"] = "PRINT ((("
+    shown, started = {}, []
+    monkeypatch.setattr(_mb(), "critical",
+                        staticmethod(lambda p, t, msg, *a, **k: shown.update(t=t, msg=msg)))
+    monkeypatch.setattr(FormDesigner, "_spawn",
+                        lambda self, cmd, cwd: started.append(cmd))
+    win.run_form()
+    assert not started                                 # gar nicht erst gestartet
+    assert "Fehler" in shown.get("msg", "") or "Zeile" in shown.get("msg", "")
+    win.close()
+
+
+def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeypatch):
+    import gamebasic.formdesigner_qt as fq
+    if fq._find_gbrt(tmp_path) is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    _app()
+    win = FormDesigner(tmp_path)
+    win.canvas.doc.add("button", 10, 10)
+
+    class _FakeProc:
+        def __init__(self): self.killed = False
+        def poll(self): return None if not self.killed else 0
+        def terminate(self): self.killed = True
+
+    proc = _FakeProc()
+    monkeypatch.setattr(FormDesigner, "_spawn", lambda self, cmd, cwd: proc)
+    win.run_form()
+    run_dir = win._run_dir
+    assert run_dir is not None and (run_dir / "run.gb").exists()
+    assert (run_dir / "form.gbform").exists()          # neben der .gb, fuer GUI_LOAD
+    win.run_form()                                     # zweites F5
+    assert proc.killed                                 # alter Prozess beendet
+    assert not run_dir.exists()                        # alter Temp-Ordner weg
+    leftover = win._run_dir
+    win.close()
+    assert not leftover.exists()                       # closeEvent raeumt auf

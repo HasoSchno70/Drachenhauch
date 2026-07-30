@@ -11,6 +11,9 @@ Start: `gbform [datei.gbform]` bzw. `gbrun.py --form`.
 """
 from __future__ import annotations
 
+import json
+import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -57,11 +60,28 @@ _HANDLE_CURSORS = {
 }
 
 
-# EINE Quelle fuer die gbrt-Suche (`editor_qt/gbrt_locate.py`): die frueher hier
-# stehende Kopie kannte nur den Dev-Baum und meldete in der installierten IDE
-# "Runtime nicht gebaut", obwohl `gbrt.exe` neben `GameBasic.exe` liegt. Als
-# Alias importiert bleibt der Modul-Name `_find_gbrt` fuer Tests patchbar.
-from .editor_qt.gbrt_locate import find_gbrt as _find_gbrt
+# Geteilte Fundstelle statt einer eigenen Kopie: die lokale Variante suchte NUR
+# im Dev-Baum (`rust/gb_runtime/target/...` relativ zu dieser Datei) und kannte
+# den PyInstaller-Fall nicht -- in der installierten IDE liegt `gbrt.exe` neben
+# `GameBasic.exe`, F5 meldete dort also "Runtime nicht gebaut: python
+# rust/build_runtime.py", einen Rat, den ein Installer-Nutzer nicht befolgen
+# kann. Der Alias haelt den Namen fuer Tests patchbar (wie in output_console).
+from .editor_qt.gbrt_locate import find_gbrt as _find_gbrt, gbrt_spawn_semaphore
+
+
+def _gbrt_diagnostics(gbrt, gb_path: Path) -> list:
+    """`gbrt --check` auf die erzeugte Datei. Liefert die Diagnose-Liste
+    (leer = sauber). ACHTUNG: `--check` endet IMMER mit Code 0, die Fehler
+    stehen als JSON auf stdout -- wer nur den Rueckgabewert prueft, sieht
+    nichts."""
+    try:
+        with gbrt_spawn_semaphore:
+            r = subprocess.run([str(gbrt), "--check", str(gb_path)],
+                               capture_output=True, text=True,
+                               encoding="utf-8", timeout=30)
+        return json.loads((r.stdout or "").strip() or "[]")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return []          # Pruefung nicht moeglich -> Lauf trotzdem versuchen
 
 
 def _col(i: int) -> QColor:
@@ -1430,6 +1450,8 @@ class FormDesigner(QMainWindow):
         self._code_baseline: dict | None = None
         self._code_dirty = False
         self._clip: dict | None = None            # Clipboard fuer Kopieren/Einfuegen
+        self._proc = None                         # laufender F5-Testlauf
+        self._run_dir: Path | None = None         # dessen Temp-Verzeichnis
 
         self.canvas.selection_changed.connect(self.inspector.set_control)
         self.canvas.selection_changed.connect(self._on_selection_changed)
@@ -1481,6 +1503,7 @@ class FormDesigner(QMainWindow):
             ev.ignore()
             return
         self.code_panel.detach_highlighter()
+        self._stop_run()          # Testlauf + Temp-Ordner nicht ueberleben lassen
         super().closeEvent(ev)
 
     def _dock(self, title, widget, area):
@@ -2114,29 +2137,74 @@ class FormDesigner(QMainWindow):
         if not fn.endswith(".gb"):
             fn += ".gb"
         code = self.canvas.doc.generate_gb_code(screen_title=self.canvas.doc.title)
-        Path(fn).write_text(code, encoding="utf-8")
+        if not self._write(fn, lambda: Path(fn).write_text(code, encoding="utf-8")):
+            return
         self.statusBar().showMessage(f"GB-Code exportiert: {Path(fn).name}", 4000)
+
+    def _stop_run(self):
+        """Laufenden Testlauf beenden + sein Temp-Verzeichnis raeumen. Vorher
+        blieb pro F5 ein `gbform_*`-Ordner in %TEMP% liegen und die
+        gbrt-Fenster sammelten sich an -- sie ueberlebten sogar den Designer."""
+        p = getattr(self, "_proc", None)
+        if p is not None and p.poll() is None:
+            try:
+                p.terminate()
+            except OSError:
+                pass
+        self._proc = None
+        d = getattr(self, "_run_dir", None)
+        if d:
+            shutil.rmtree(d, ignore_errors=True)
+        self._run_dir = None
 
     def run_form(self):
         gbrt = _find_gbrt(self.project_root)
         if gbrt is None:
-            QMessageBox.warning(self, "gbrt fehlt", "Native Runtime nicht gebaut:\n"
-                                "python rust/build_runtime.py")
+            QMessageBox.warning(self, "gbrt fehlt", "Native Runtime nicht gefunden.\n"
+                                "Im Entwicklungsbaum: python rust/build_runtime.py")
             return
+        self._stop_run()
         tmp = Path(tempfile.mkdtemp(prefix="gbform_"))
-        form_path = tmp / "form.gbform"
-        self.canvas.doc.save(str(form_path))
+        self._run_dir = tmp
+        gb = tmp / "run.gb"
         runner = self.canvas.doc.generate_runner("form.gbform",
                                                  screen_title=self.canvas.doc.title)
-        gb = tmp / "run.gb"
-        gb.write_text(runner, encoding="utf-8")
-        # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen gleichzeitig
-        # startende `gbrt`-Subprozesse aus anderen Editor-Threads (siehe
-        # gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer den verifizierten
-        # Windows-Crash).
-        from .editor_qt.gbrt_locate import gbrt_spawn_semaphore
+        if not self._write(str(tmp), lambda: (
+                self.canvas.doc.save(str(tmp / "form.gbform")),
+                gb.write_text(runner, encoding="utf-8"))):
+            return
+        # Vorab pruefen: `run` scheiterte sonst STUMM. Weder stdout/stderr noch
+        # der Exit-Code wurden ausgewertet, es gab also keinerlei Rueckmeldung
+        # -- der Nutzer druckte mehrfach F5 und hielt den Designer fuer kaputt.
+        diags = _gbrt_diagnostics(gbrt, gb)
+        errs = [d for d in diags if d.get("severity") != "warning"]
+        if errs:
+            lines = runner.splitlines()
+            def _at(d):
+                n = int(d.get("line", 0))
+                src = lines[n - 1].strip() if 1 <= n <= len(lines) else ""
+                return f"Zeile {n}: {d.get('message', '')}" + (f"\n    {src}" if src else "")
+            QMessageBox.critical(
+                self, "Formular laeuft nicht",
+                "Das erzeugte Programm hat Fehler:\n\n"
+                + "\n".join(_at(d) for d in errs[:5])
+                + ("\n\n(weitere ausgelassen)" if len(errs) > 5 else ""))
+            return
+        try:
+            self._proc = self._spawn([str(gbrt), "run", str(gb)], str(tmp))
+        except OSError as e:
+            QMessageBox.critical(self, "Start fehlgeschlagen", str(e))
+
+    def _spawn(self, cmd: list, cwd: str):
+        """Eigene Methode, damit Tests den Start ersetzen koennen, ohne
+        `subprocess.Popen` global zu patchen (das zerlegt sonst das
+        `subprocess.run` der Vorab-Pruefung).
+
+        Der Semaphor schuetzt die Prozess-ERSTELLUNG gegen gleichzeitig
+        startende `gbrt`-Subprozesse aus anderen Editor-Threads (verifizierter
+        Windows-Crash, siehe Kommentar in `gbrt_locate`)."""
         with gbrt_spawn_semaphore:
-            subprocess.Popen([str(gbrt), "run", str(gb)], cwd=str(tmp))
+            return subprocess.Popen(cmd, cwd=cwd)
 
     def _arm_place(self, item: QListWidgetItem):
         self.canvas.place_kind = item.data(Qt.ItemDataRole.UserRole)
