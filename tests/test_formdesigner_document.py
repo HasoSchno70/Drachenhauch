@@ -743,3 +743,74 @@ def test_formdoc_load_rejects_a_project_manifest(tmp_path):
         assert False, "Manifest wurde als Formular akzeptiert"
     except ValueError as e:
         assert "gbproj" in str(e).lower() or "manifest" in str(e).lower()
+
+
+# ------------------------- Export vs. GUI_LOAD: beide Wege muessen dasselbe bauen
+def _export_vs_load(run_gb, tmp_path, doc, probes: str):
+    """Dasselbe Formular einmal per GUI_LOAD und einmal per generiertem
+    GB-Code aufbauen und dieselben Getter abfragen. Liefert (load, export)."""
+    doc.save(str(tmp_path / "f.gbform"))
+    load_out = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\n'
+                      'frm = GUI_LOAD("f.gbform")\n' + probes, base=tmp_path)
+    src = doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes
+    return load_out.strip().splitlines(), run_gb(src, base=tmp_path).strip().splitlines()
+
+
+def test_export_keeps_label_and_slider_geometry(run_gb, tmp_path):
+    # GUI_LABEL/GUI_SLIDER/GUI_SEPARATOR berechnen ihre Groesse selbst -- ohne
+    # nachgereichtes GUI_SET_BOUNDS war ein 300x40-Label im Export 40x16.
+    doc = FormDoc(title="G", w=420, h=300)
+    lbl = doc.add("label", 10, 10); lbl.text = "Hi"; lbl.w, lbl.h = 300, 40
+    sld = doc.add("slider", 10, 60); sld.h = 40
+    sep = doc.add("separator", 10, 120); sep.h = 20
+    probes = ("PRINT GUI_GET_W(GUI_WINDOW_WIDGET(frm, 0))\n"
+              "PRINT GUI_GET_H(GUI_WINDOW_WIDGET(frm, 0))\n"
+              "PRINT GUI_GET_H(GUI_WINDOW_WIDGET(frm, 1))\n"
+              "PRINT GUI_GET_H(GUI_WINDOW_WIDGET(frm, 2))\n")
+    load, exp = _export_vs_load(run_gb, tmp_path, doc, probes)
+    assert load == ["300", "40", "40", "20"]
+    assert exp == load
+
+
+def test_export_progress_shows_same_fill_as_gbform(run_gb, tmp_path):
+    # GUI_PROGRESS ist fest 0..1 und GUI_SET_VALUE clampt -- ein roher Wert 25
+    # (bei max=100) wurde zu 1.0 = randvoll. Der Export normiert deshalb.
+    doc = FormDoc(title="P", w=300, h=120)
+    prg = doc.add("progress", 10, 10)
+    prg.min, prg.max, prg.value = 0.0, 100.0, 25.0
+    probes = "PRINT GUI_TO_JSON(frm)\n"
+    doc.save(str(tmp_path / "f.gbform"))
+    a = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\n'
+               'frm = GUI_LOAD("f.gbform")\n' + probes, base=tmp_path)
+    b = run_gb(doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes,
+               base=tmp_path)
+
+    def fill(js):                      # so zeichnet gui.rs den Balken
+        w = json.loads(js)["widgets"][0]
+        span = w["max"] - w["min"]
+        return 0.0 if span == 0 else (w["value"] - w["min"]) / span
+
+    assert fill(a) == 0.25
+    assert fill(b) == 0.25             # vorher 1.0 = randvoll
+
+
+def test_export_window_is_closable_like_the_gbform(run_gb, tmp_path):
+    # GUI_WINDOW legt closable=false an, GUI_LOAD liest den .gbform-Wert.
+    doc = FormDoc(title="C", w=200, h=140)
+    doc.closable = True
+    probes = 'PRINT GUI_TO_JSON(frm)\n'
+    doc.save(str(tmp_path / "f.gbform"))
+    a = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.gbform")\n'
+               + probes, base=tmp_path)
+    b = run_gb(doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes,
+               base=tmp_path)
+    assert json.loads(a)["closable"] is True
+    assert json.loads(b)["closable"] is True
+
+
+def test_runner_max_size_with_only_one_bound_set():
+    doc = FormDoc(title="M", w=300, h=200)
+    doc.resizable = True; doc.max_w = 900          # max_h bleibt 0
+    src = doc.generate_runner("f.gbform")
+    assert "WINDOW_MAX_SIZE(900, 0)" not in src    # 0 wuerde GLFW hart klemmen
+    assert "WINDOW_MAX_SIZE(900, 32000)" in src

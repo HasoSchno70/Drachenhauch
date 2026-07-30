@@ -700,7 +700,13 @@ class FormDoc:
             if self.min_w or self.min_h:
                 lines.append(f"WINDOW_MIN_SIZE({self.min_w or 1}, {self.min_h or 1})")
             if self.max_w or self.max_h:
-                lines.append(f"WINDOW_MAX_SIZE({self.max_w}, {self.max_h})")
+                # `or 32000` wie beim MIN-Pendant: `Graphics::window_max_size`
+                # reicht eine 0 direkt an GLFW durch (anders als die
+                # GUI-Variante, die >0 als "gesetzt" prueft) -- bei nur einer
+                # gesetzten Grenze waere das Fenster in der anderen Achse
+                # auf 0 geklemmt.
+                lines.append(f"WINDOW_MAX_SIZE({self.max_w or 32000}, "
+                             f"{self.max_h or 32000})")
         lines += [
             "",
             "DIM frm AS GUI_WINDOW",
@@ -763,8 +769,11 @@ class FormDoc:
         L.append(f"frm = GUI_WINDOW({_gb_str(self.title)}, {self.x}, {self.y}, {self.w}, {self.h})")
         if not self.movable:
             L.append("GUI_WINDOW_MOVABLE(frm, FALSE)")
-        if not self.closable:
-            L.append("GUI_WINDOW_CLOSABLE(frm, FALSE)")
+        # Beide Richtungen emittieren: `GUI_WINDOW` legt `closable: false` an
+        # (gui.rs::new_window), `GUI_LOAD` liest den `.gbform`-Wert. Ohne den
+        # Positivfall fehlte dem exportierten Fenster das Schliessen-Kreuz,
+        # obwohl im Designer "schliessbar" angehakt war.
+        L.append(f"GUI_WINDOW_CLOSABLE(frm, {_gb_bool(self.closable)})")
         if not self.visible:
             L.append("GUI_WINDOW_VISIBLE(frm, FALSE)")
         if self.resizable:
@@ -846,13 +855,31 @@ class FormDoc:
             out.append(f"{var} = {ctor}(frm, {c.x}, {c.y}, {c.w}, {c.h}, {iv})")
         else:
             return [f"' Control-Typ '{k}' uebersprungen (kein Konstruktor)"]
+        # Diese Konstruktoren berechnen ihre Groesse selbst (Label aus der
+        # Textlaenge, Checkbox/Radio aus `check_size`, Slider/Separator aus den
+        # Metriken) -- die im Designer eingestellte Groesse ginge sonst verloren
+        # und das Anchoring rechnete mit einer falschen Basis.
+        if k in ("label", "checkbox", "radio", "slider", "separator"):
+            out.append(f"GUI_SET_BOUNDS({var}, {c.x}, {c.y}, {c.w}, {c.h})")
         # Nachbearbeitung (nur abweichende Werte)
         if k == "dropdown" and c.sel not in (-1, 0):
             out.append(f"GUI_DROPDOWN_SET_SELECTED({var}, {c.sel})")
         if k == "listbox" and c.sel >= 0:
             out.append(f"GUI_LISTBOX_SET_SELECTED({var}, {c.sel})")
-        if k == "progress" and c.value != 0.0:
-            out.append(f"GUI_SET_VALUE({var}, {_gb_num(c.value)})")
+        if k == "progress":
+            # `GUI_PROGRESS` legt den Balken fest auf min=0/max=1 an und kennt
+            # keinen Range-Setter; `GUI_SET_VALUE` clampt auf [min,max]. Ein
+            # roher Wert 25 (bei max=100) wurde dadurch zu 1.0 = randvoll.
+            # Deshalb auf den Anteil normieren -- optisch identisch zum
+            # `.gbform`-Weg, den die Laufzeit als (value-min)/(max-min) zeichnet.
+            span = c.max - c.min
+            frac = 0.0 if span == 0 else min(1.0, max(0.0, (c.value - c.min) / span))
+            if (c.min, c.max) != (0.0, 1.0):
+                out.append(f"' {var}: GUI_PROGRESS rechnet in 0..1 -- "
+                           f"{_gb_num(c.value)} von {_gb_num(c.min)}..{_gb_num(c.max)} "
+                           f"entspricht {_gb_num(frac)}")
+            if frac != 0.0:
+                out.append(f"GUI_SET_VALUE({var}, {_gb_num(frac)})")
         if not c.enabled:
             out.append(f"GUI_SET_ENABLED({var}, FALSE)")
         if not c.visible:

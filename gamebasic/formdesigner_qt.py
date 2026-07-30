@@ -619,7 +619,12 @@ class _Canvas(QWidget):
             qp.restore()
         elif k == "progress":
             qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
-            frac = min(1.0, max(0.0, c.value))
+            # Wie die Laufzeit (gui.rs, Kind::Progress): Anteil an [min,max].
+            # Vorher wurde `value` roh als 0..1 gelesen -- ein Balken mit
+            # max=100/value=25 sah im Designer randvoll aus, lief aber bei 25 %.
+            pspan = c.max - c.min
+            frac = 0.0 if pspan == 0 else (c.value - c.min) / pspan
+            frac = min(1.0, max(0.0, frac))
             fillw = int((w - 2) * frac)
             if fillw > 0:
                 qp.fillRect(QRect(x + 1, y + 1, fillw, h - 2), accent)
