@@ -217,6 +217,17 @@ class Parser:
             return self._tuple_assign()
         # Fallback: Ausdrucks-Statement
         expr = self._expression()
+        # Sicherheitsnetz: ein Top-Level `=` ist fast immer eine gemeinte
+        # ZUWEISUNG, deren Ziel der Lookahead nicht erkannt hat -- der
+        # Ausdruck wuerde sonst als Vergleich geparst, sein Ergebnis
+        # verworfen und die Zuweisung verschwaende spurlos. Genau diese
+        # Stille liess die Keyword-Member-Faelle (`spr.image = 5`) so lange
+        # unentdeckt. gbrt hat denselben Wortlaut (parser.rs:171/783).
+        if isinstance(expr, BinaryOp) and expr.op == "=":
+            raise ParseError(
+                "'=' als Anweisung -- meintest du eine Zuweisung?",
+                tok.line, tok.col,
+            )
         self._consume_terminator()
         return ExprStmt(expr)
 
@@ -763,7 +774,11 @@ class Parser:
 
     def _print(self):
         self._expect(TokenType.PRINT)
-        if self._check(TokenType.NEWLINE) or self._at_end():
+        # COLON zaehlt wie NEWLINE als Terminator: `PRINT : PRINT "x"` ist
+        # die klassische Leerzeilen-Redewendung. Ohne COLON hier lief das in
+        # "Unerwartetes Token COLON" -- ein Fehlalarm auf Code, den gbrt
+        # ausfuehrt (per --check verifiziert).
+        if self._check(TokenType.NEWLINE, TokenType.COLON) or self._at_end():
             self._consume_terminator()
             return Print([])
         items, seps, newline = self._print_items()
@@ -799,7 +814,7 @@ class Parser:
         return Input(prompt, name_tok.value)
 
     def _if(self):
-        self._expect(TokenType.IF)
+        if_tok = self._expect(TokenType.IF)
         cond = self._expression()
         self._expect(TokenType.THEN, "Erwartet THEN nach Bedingung")
 
@@ -824,8 +839,14 @@ class Parser:
 
         # Block: IF cond THEN \n ... [ELSEIF cond THEN \n ...] [ELSE \n ...] END IF
         self._consume_terminator()
+        # `_at_end()`-Wache wie bei WHILE/FOR/TRY/SELECT: ohne sie meldet ein
+        # nicht geschlossenes IF "Unerwartetes Token EOF" auf der LETZTEN
+        # Zeile der Datei statt "END IF erwartet" an der oeffnenden Zeile --
+        # beim Tippen der Normalfall und dann maximal irrefuehrend.
         then_block = []
         while not self._check(TokenType.ELSEIF, TokenType.ELSE, TokenType.END):
+            if self._at_end():
+                raise ParseError("END IF erwartet", if_tok.line, if_tok.col)
             then_block.append(self._statement())
 
         elseif_branches = []
@@ -835,6 +856,8 @@ class Parser:
             self._consume_terminator()
             block = []
             while not self._check(TokenType.ELSEIF, TokenType.ELSE, TokenType.END):
+                if self._at_end():
+                    raise ParseError("END IF erwartet", if_tok.line, if_tok.col)
                 block.append(self._statement())
             elseif_branches.append((ec, block))
 
@@ -842,6 +865,8 @@ class Parser:
         if self._match(TokenType.ELSE):
             self._consume_terminator()
             while not self._check(TokenType.END):
+                if self._at_end():
+                    raise ParseError("END IF erwartet", if_tok.line, if_tok.col)
                 else_block.append(self._statement())
 
         self._expect(TokenType.END, "Erwartet END IF")
@@ -948,7 +973,8 @@ class Parser:
         t = tok.type
         if t == TokenType.PRINT:
             self.pos += 1
-            if self._check(TokenType.NEWLINE, TokenType.ELSE) or self._at_end():
+            if (self._check(TokenType.NEWLINE, TokenType.ELSE, TokenType.COLON)
+                    or self._at_end()):
                 return Print([])
             items, seps, newline = self._print_items()
             return Print(items, seps, newline)
@@ -979,7 +1005,8 @@ class Parser:
         if t == TokenType.RETURN:
             self.pos += 1
             value = None
-            if not (self._check(TokenType.NEWLINE, TokenType.ELSE) or self._at_end()):
+            if not (self._check(TokenType.NEWLINE, TokenType.ELSE, TokenType.COLON)
+                    or self._at_end()):
                 value = self._expression()
             return Return(value)
         if t == TokenType.BREAK:
@@ -993,7 +1020,19 @@ class Parser:
             value = self._expression()
             return Throw(value)
         # Fallback
-        return ExprStmt(self._expression())
+        expr = self._expression()
+        # Sicherheitsnetz: ein Top-Level `=` ist fast immer eine gemeinte
+        # ZUWEISUNG, deren Ziel der Lookahead nicht erkannt hat -- der
+        # Ausdruck wuerde sonst als Vergleich geparst, sein Ergebnis
+        # verworfen und die Zuweisung verschwaende spurlos. Genau diese
+        # Stille liess die Keyword-Member-Faelle (`spr.image = 5`) so lange
+        # unentdeckt. gbrt hat denselben Wortlaut (parser.rs:171/783).
+        if isinstance(expr, BinaryOp) and expr.op == "=":
+            raise ParseError(
+                "'=' als Anweisung -- meintest du eine Zuweisung?",
+                tok.line, tok.col,
+            )
+        return ExprStmt(expr)
 
     def _while(self):
         self._expect(TokenType.WHILE)
@@ -1318,7 +1357,8 @@ class Parser:
     def _return(self):
         self._expect(TokenType.RETURN)
         value = None
-        if not self._check(TokenType.NEWLINE) and not self._at_end():
+        # Wie bei `_print`: COLON beendet das Statement (`x = 1 : RETURN : ...`).
+        if not self._check(TokenType.NEWLINE, TokenType.COLON) and not self._at_end():
             value = self._expression()
         self._consume_terminator()
         return Return(value)
@@ -1598,6 +1638,16 @@ class Parser:
         expr = self._primary()
         while True:
             if self._match(TokenType.LPAREN):
+                # Ein Literal ist nicht aufrufbar. `PRINT 1(2)` parste hier
+                # klaglos als Call durch, waehrend gbrt es ablehnt -- der
+                # Editor blieb also stumm bei Code, der zur Laufzeit
+                # scheitert (per --check verifiziert). Identifier,
+                # Member-Zugriffe und Index-Zugriffe bleiben aufrufbar
+                # (`f(1)`, `o.m(1)`, `arr[0](1)` mit FUNCREF).
+                if isinstance(expr, (NumberLit, StringLit, BoolLit, NilLit)):
+                    tok = self._peek()
+                    raise ParseError(
+                        "Literal ist nicht aufrufbar", tok.line, tok.col)
                 args = self._call_args()
                 self._expect(TokenType.RPAREN)
                 expr = Call(expr, args)
