@@ -1371,6 +1371,9 @@ class _OpenForm:
         self.path = path
         self.history = History()
         self.dirty = False
+        # Stand beim letzten Speichern/Laden -- damit ein Undo zurueck auf die
+        # Datei den Stern wieder loescht, statt ihn fuer immer stehen zu lassen.
+        self.saved: dict | None = doc.to_dict() if path is not None else None
 
 
 class FormDesigner(QMainWindow):
@@ -1382,6 +1385,8 @@ class FormDesigner(QMainWindow):
         self.active_index: int = -1
         self.project = FormProject()
         self.project_path: Path | None = None
+        self._main_form: _OpenForm | None = None   # Startformular (Objekt, nicht Pfad)
+        self.unresolved: list[str] = []            # beim Laden fehlende .gbform
         self._suppress_row = False
         self.setWindowTitle("GameBasic Form-Designer")
         self.resize(1500, 950)
@@ -1450,7 +1455,31 @@ class FormDesigner(QMainWindow):
         self._build_arrange_toolbar()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
 
+    # -- Ungespeichert-Schutz ------------------------------------------------
+    def _confirm_dirty(self) -> bool:
+        """True = fortfahren. Fragt fuer ALLE ungespeicherten Formulare, nicht
+        nur das aktive -- vorher gingen beim Schliessen des Fensters oder beim
+        Oeffnen eines Projekts saemtliche Aenderungen kommentarlos verloren
+        (samt ihrer Undo-Historien)."""
+        dirty = [of for of in self.forms if of.dirty]
+        if not dirty:
+            return True
+        names = ", ".join(of.path.name if of.path else "(unbenannt)" for of in dirty)
+        r = QMessageBox.question(
+            self, "Ungespeicherte Aenderungen",
+            f"Nicht gespeichert: {names}\n\nAenderungen speichern?",
+            QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel)
+        if r == QMessageBox.StandardButton.Cancel:
+            return False
+        if r == QMessageBox.StandardButton.Save:
+            return self.save_all()
+        return True
+
     def closeEvent(self, ev):
+        if not self._confirm_dirty():
+            ev.ignore()
+            return
         self.code_panel.detach_highlighter()
         super().closeEvent(ev)
 
@@ -1644,8 +1673,12 @@ class FormDesigner(QMainWindow):
         for of in self.forms:
             title = of.doc.title or "(Formular)"
             star = " *" if of.dirty else ""
-            crown = "★ " if (of.path and self.project.main and
-                             self._rel(of.path) == self.project.main) else ""
+            # Primaer das gemerkte Objekt, sonst der Manifest-Pfad. Der reine
+            # String-Vergleich verfehlte ein von Hand mit Backslashes
+            # geschriebenes Manifest und liess die Krone verschwinden.
+            crown = "★ " if (of is self._main_form or
+                             (self._main_form is None and of.path and self.project.main
+                              and self._rel(of.path) == self.project.main)) else ""
             self.form_list.addItem(f"{crown}{title}{star}")
         if 0 <= self.active_index < len(self.forms):
             self.form_list.setCurrentRow(self.active_index)
@@ -1657,12 +1690,18 @@ class FormDesigner(QMainWindow):
         self._switch_to(row)
 
     def _rel(self, p: Path) -> str:
-        """Pfad relativ zum Projekt-Verzeichnis (fuer das `.gbproj`-Manifest)."""
+        """Pfad relativ zum Projekt-Verzeichnis (fuer das `.gbproj`-Manifest).
+
+        `os.path.relpath` statt `Path.relative_to`: letzteres kann nicht nach
+        oben laufen, und der Fallback schrieb dann den BLOSSEN DATEINAMEN ins
+        Manifest -- eine Form in `../shared/` war beim naechsten Oeffnen des
+        Projekts spurlos verschwunden. Auf einem anderen Laufwerk (relpath
+        wirft) bleibt der Absolutpfad stehen, der wenigstens auffindbar ist."""
         if self.project_path is not None:
             try:
-                return str(Path(p).relative_to(self.project_path.parent)).replace("\\", "/")
+                return Path(os.path.relpath(Path(p), self.project_path.parent)).as_posix()
             except ValueError:
-                pass
+                return Path(p).as_posix()
         return Path(p).name
 
     # -- Undo/Redo --
@@ -1718,7 +1757,7 @@ class FormDesigner(QMainWindow):
         prev = self.history.undo(self.canvas.doc.to_dict())
         self._set_active_doc(FormDoc.from_dict(prev))
         self._refresh_history_actions()
-        self._mark_dirty()
+        self._resync_dirty()
 
     def redo(self):
         if not self.history.can_redo:
@@ -1726,7 +1765,7 @@ class FormDesigner(QMainWindow):
         nxt = self.history.redo(self.canvas.doc.to_dict())
         self._set_active_doc(FormDoc.from_dict(nxt))
         self._refresh_history_actions()
-        self._mark_dirty()
+        self._resync_dirty()
 
     # -- Edit-Ops (Control-bezogen, je mit Undo-Checkpoint) --
     def _control_op(self, mutate, select=None):
@@ -1841,6 +1880,15 @@ class FormDesigner(QMainWindow):
         if not was:
             self._refresh_form_list()    # nur bei Uebergang -> Stern erscheint
 
+    def _resync_dirty(self):
+        """Dirty gegen den gespeicherten Stand neu bestimmen (nach Undo/Redo).
+        Ein Undo bis zurueck zur Datei liess den Stern sonst fuer immer
+        stehen -- er wurde bedeutungslos und verdeckte echte Aenderungen."""
+        of = self.active
+        of.dirty = of.saved is None or self.canvas.doc.to_dict() != of.saved
+        self._update_title()
+        self._refresh_form_list()        # Navigator lief nach Undo sonst nach
+
     def _update_title(self):
         of = self.active
         name = of.path.name if of.path else "(unbenannt)"
@@ -1856,6 +1904,15 @@ class FormDesigner(QMainWindow):
                                             "GameBasic-Form (*.gbform);;Alle (*.*)")
         if not fn:
             return
+        # Schon offen? Dann dorthin wechseln statt einen zweiten Puffer
+        # anzulegen -- sonst arbeitet man abwechselnd in beiden und der
+        # zuletzt gespeicherte ueberschreibt den anderen ersatzlos.
+        target = Path(fn).resolve()
+        for i, of in enumerate(self.forms):
+            if of.path is not None and Path(of.path).resolve() == target:
+                self._switch_to(i)
+                self.statusBar().showMessage(f"{target.name} ist bereits geoeffnet.", 3000)
+                return
         try:
             self._add_open_form(FormDoc.load(fn), Path(fn))
         except Exception as e:  # noqa: BLE001
@@ -1863,24 +1920,44 @@ class FormDesigner(QMainWindow):
 
     def close_form(self):
         if self.active.dirty:
-            r = QMessageBox.question(self, "Schliessen",
-                                     "Ungespeicherte Aenderungen verwerfen?",
-                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-            if r != QMessageBox.StandardButton.Yes:
+            r = QMessageBox.question(
+                self, "Formular schliessen",
+                "Das Formular hat ungespeicherte Aenderungen.",
+                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard
+                | QMessageBox.StandardButton.Cancel)
+            if r == QMessageBox.StandardButton.Cancel:
+                return
+            # Vorher gab es nur Ja/Nein -- kein Weg, beim Schliessen zu sichern.
+            if r == QMessageBox.StandardButton.Save and not self.save_form():
                 return
         i = self.active_index
+        if self.forms[i] is self._main_form:
+            self._main_form = None
         del self.forms[i]
         if not self.forms:
             self._add_open_form(FormDoc())        # nie ganz leer
         else:
             self._switch_to(min(i, len(self.forms) - 1))
 
+    def _write(self, fn: str, write) -> bool:
+        """Schreibvorgang mit Fehlerdialog. Vorher hatte KEIN Speicherpfad eine
+        Fehlerbehandlung: auf ein volles/schreibgeschuetztes Ziel oder einen
+        getrennten Netzpfad flog ein roher Traceback, im UI passierte nichts --
+        der Nutzer hielt die Datei fuer gespeichert."""
+        try:
+            write()
+            return True
+        except OSError as e:
+            QMessageBox.critical(self, "Speichern fehlgeschlagen",
+                                 f"{fn}\n\n{e}")
+            return False
+
     def save_form(self):
         if self.path is None:
             return self.save_form_as()
-        self.canvas.doc.save(str(self.path))
-        self.active.dirty = False
-        self._update_title(); self._refresh_form_list()
+        if not self._write(str(self.path), lambda: self.canvas.doc.save(str(self.path))):
+            return False
+        self._mark_saved()
         return True
 
     def save_form_as(self):
@@ -1890,28 +1967,50 @@ class FormDesigner(QMainWindow):
             return False
         if not fn.endswith(".gbform"):
             fn += ".gbform"
+        # Pfad ERST nach erfolgreichem Schreiben uebernehmen -- sonst zeigte der
+        # Titel nach einem Fehlschlag eine Datei an, die nie existiert hat, und
+        # ein spaeteres Strg+S schrieb still an denselben kaputten Ort.
+        if not self._write(fn, lambda: self.canvas.doc.save(fn)):
+            return False
         self.path = Path(fn)
-        self.canvas.doc.save(fn)
-        self.active.dirty = False
-        self._update_title(); self._refresh_form_list()
+        self._mark_saved()
         return True
 
-    def save_all(self):
+    def _mark_saved(self):
+        """Formular als gespeichert markieren + den Stand merken, damit ein
+        Undo zurueck zur Datei den Stern wieder verschwinden laesst."""
+        of = self.active
+        of.dirty = False
+        of.saved = self.canvas.doc.to_dict()
+        self._update_title(); self._refresh_form_list()
+
+    def save_all(self) -> bool:
         start = self.active_index
+        ok = True
         for i in range(len(self.forms)):
             if self.forms[i].dirty or self.forms[i].path is None:
                 self._switch_to(i)
                 if not self.save_form():
+                    ok = False
                     break                          # Abbruch im Speichern-Dialog
         self._switch_to(min(start, len(self.forms) - 1))
+        if not ok:
+            self.statusBar().showMessage("Speichern abgebrochen -- nicht alle "
+                                         "Formulare wurden gesichert.", 5000)
+        return ok
 
     def set_main_form(self):
         if self.path is None:
             self.statusBar().showMessage("Formular zuerst speichern.", 3000)
             return
+        # Das Formular selbst merken, nicht den relativen Pfad: solange kein
+        # Projektpfad feststeht, liefert `_rel` nur den Dateinamen. Nach dem
+        # Speichern in ein Unterverzeichnis passte der nicht mehr zu den
+        # Manifest-Eintraegen und `main` fiel still auf forms[0] zurueck.
+        self._main_form = self.active
         self.project.main = self._rel(self.path)
         self._refresh_form_list()
-        self.statusBar().showMessage(f"Startformular: {self.project.main}", 3000)
+        self.statusBar().showMessage(f"Startformular: {self.path.name}", 3000)
 
     # -- Projekt (.gbproj) --
     def open_project(self):
@@ -1921,6 +2020,8 @@ class FormDesigner(QMainWindow):
             self.load_project_file(fn)
 
     def load_project_file(self, fn: str):
+        if not self._confirm_dirty():        # sonst waren alle offenen Formulare weg
+            return
         try:
             proj = FormProject.load(fn)
         except Exception as e:  # noqa: BLE001
@@ -1931,18 +2032,28 @@ class FormDesigner(QMainWindow):
         self.project_path = Path(fn)
         self.forms = []
         self.active_index = -1
+        # Nicht ladbare Formulare merken statt sie stumm zu schlucken: sie
+        # bleiben im Manifest (siehe save_project) und der Nutzer erfaehrt davon.
+        self.unresolved: list[str] = []
         main_idx = 0
-        for i, rel in enumerate(proj.forms):
+        for rel in proj.forms:
             try:
                 doc = FormDoc.load(str(base / rel))
-            except Exception:  # noqa: BLE001 -- fehlende Form ueberspringen
+            except Exception:  # noqa: BLE001
+                self.unresolved.append(rel)
                 continue
-            self._add_open_form(doc, base / rel, switch=False)
+            of = self._add_open_form(doc, base / rel, switch=False)
             if rel == proj.main:
                 main_idx = len(self.forms) - 1
+                self._main_form = of
         if not self.forms:
             self._add_open_form(FormDoc(), switch=False)
         self._switch_to(min(main_idx, len(self.forms) - 1))
+        if self.unresolved:
+            QMessageBox.warning(
+                self, "Formulare fehlen",
+                "Diese Formulare konnten nicht geladen werden und bleiben "
+                "unveraendert im Projekt:\n\n" + "\n".join(self.unresolved))
 
     def save_project(self):
         # Erst sicherstellen, dass jede Form einen Pfad hat (+ gespeichert ist).
@@ -1964,12 +2075,31 @@ class FormDesigner(QMainWindow):
             self.project_path = Path(fn)
         # Alle Forms speichern + Manifest aufbauen (relativ zum Projektpfad).
         self.project.forms = []
+        main_rel = ""
         for of in self.forms:
-            of.doc.save(str(of.path)); of.dirty = False
-            self.project.add(self._rel(of.path))
+            if not self._write(str(of.path), lambda of=of: of.doc.save(str(of.path))):
+                self._switch_to(start)
+                return
+            rel = self._rel(of.path)
+            self.project.add(rel)
+            if of is getattr(self, "_main_form", None):
+                main_rel = rel
+        # Beim Laden uebersprungene Formulare bleiben im Manifest -- vorher hat
+        # der Neuaufbau aus den OFFENEN Formularen sie dauerhaft geloescht,
+        # obwohl die Datei nur kurzzeitig nicht erreichbar war.
+        for rel in getattr(self, "unresolved", []):
+            self.project.add(rel)
+        if main_rel:
+            self.project.main = main_rel
         if self.project.main not in self.project.forms:
             self.project.main = self.project.forms[0] if self.project.forms else ""
-        self.project.save(str(self.project_path))
+        if not self._write(str(self.project_path),
+                           lambda: self.project.save(str(self.project_path))):
+            self._switch_to(start)
+            return
+        for of in self.forms:                       # erst jetzt als sauber markieren
+            of.dirty = False
+            of.saved = of.doc.to_dict()
         self._switch_to(min(start, len(self.forms) - 1))
         self.statusBar().showMessage(f"Projekt gespeichert: {self.project_path.name}", 3000)
 
@@ -2022,18 +2152,34 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
         app.setStyle("Fusion")
     app.setStyleSheet(global_qss())
     win = FormDesigner(project_root)
-    if initial_file and Path(initial_file).exists():
-        p = Path(initial_file)
-        try:
-            if p.suffix == ".gbproj":
-                win.load_project_file(str(p))
-            else:
-                # leeres Start-Formular durch die geladene Datei ersetzen
-                doc = FormDoc.load(str(p))
-                of = win.forms[0]
-                of.doc = doc; of.path = p
-                win._switch_to(0)
-        except Exception:
-            pass
+    if initial_file:
+        open_initial(win, Path(initial_file))
     win.show()
     return app.exec()
+
+
+def open_initial(win: FormDesigner, p: Path) -> bool:
+    """Start-Argument oeffnen (`.gbform` oder `.gbproj`). True bei Erfolg.
+    Eigene Funktion, damit der Zweig ohne `app.exec()` testbar ist."""
+    try:
+        if not p.is_file():
+            raise OSError("Datei nicht gefunden" if not p.exists()
+                          else "ist ein Verzeichnis")
+        # `.lower()`: auf Windows ist `Projekt.GBPROJ` dieselbe Datei. Der
+        # case-sensitive Vergleich schickte sie in den Formular-Zweig, wo das
+        # Manifest als leeres Formular durchging -- das naechste Strg+S hat
+        # dann die Projektdatei ueberschrieben.
+        if p.suffix.lower() == ".gbproj":
+            win.load_project_file(str(p))
+        else:
+            # leeres Start-Formular durch die geladene Datei ersetzen
+            doc = FormDoc.load(str(p))
+            of = win.forms[0]
+            of.doc = doc; of.path = p; of.saved = doc.to_dict()
+            win._switch_to(0)
+        return True
+    except Exception as e:  # noqa: BLE001
+        # Vorher still verschluckt: ein Tippfehler im Dateinamen oeffnete
+        # kommentarlos ein leeres Formular, der Nutzer baute es neu.
+        QMessageBox.warning(win, "Nicht ladbar", f"{p}\n\n{e}")
+        return False

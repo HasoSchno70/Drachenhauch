@@ -1,6 +1,7 @@
 """Konstruktions-Smoke-Tests fuer die Form-Designer-Qt-UI (offscreen).
 Faengt Import-/API-/Wiring-Fehler; Interaktion (Maus) ist nicht abgedeckt.
 """
+import json
 import os
 
 import pytest
@@ -9,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication   # noqa: E402
-from PySide6.QtGui import QDropEvent, QKeyEvent, QMouseEvent   # noqa: E402
+from PySide6.QtGui import QCloseEvent, QDropEvent, QKeyEvent, QMouseEvent   # noqa: E402
 from PySide6.QtCore import Qt, QPointF, QMimeData, QEvent   # noqa: E402
 
 from gamebasic.formdesigner_qt import (   # noqa: E402
@@ -19,6 +20,20 @@ from gamebasic.formdesigner_qt import (   # noqa: E402
 
 def _app():
     return QApplication.instance() or QApplication([])
+
+
+@pytest.fixture(autouse=True)
+def _no_modal_dialogs(monkeypatch):
+    """Kein Test darf einen modalen Dialog oeffnen -- `exec()` im geteilten
+    pytest-Prozess haelt den Lauf an (bzw. segfaultet). `win.close()` fragt
+    jetzt bei ungespeicherten Formularen nach, also standardmaessig
+    "Verwerfen" antworten. Tests, die den Dialog selbst pruefen, patchen
+    `QMessageBox.question` danach erneut."""
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.StandardButton.Discard))
+    monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+    monkeypatch.setattr(QMessageBox, "critical", staticmethod(lambda *a, **k: None))
 
 
 def test_construct_and_palette(tmp_path):
@@ -835,4 +850,199 @@ def test_progress_preview_uses_min_max_like_the_runtime(tmp_path):
     p.min, p.max = 5.0, 5.0
     assert _progress_frac(p) == 0.0                    # Nullspanne, keine Division
     assert not cv.grab().isNull()                      # paintEvent laeuft
+    win.close()
+
+
+# ------------------------------------------- Lebenszyklus / Speichern (Review)
+def _mb():
+    from PySide6.QtWidgets import QMessageBox
+    return QMessageBox
+
+
+def test_close_is_blocked_when_the_user_cancels(tmp_path, monkeypatch):
+    # closeEvent hatte gar keinen Schutz: das X verwarf alles kommentarlos.
+    _app()
+    win = FormDesigner(tmp_path)
+    win.canvas.doc.add("button", 10, 10)
+    win._mark_dirty()
+    monkeypatch.setattr(_mb(), "question",
+                        staticmethod(lambda *a, **k: _mb().StandardButton.Cancel))
+    assert win._confirm_dirty() is False
+    ev = QCloseEvent()
+    win.closeEvent(ev)
+    assert not ev.isAccepted()                     # Fenster bleibt offen
+    monkeypatch.setattr(_mb(), "question",
+                        staticmethod(lambda *a, **k: _mb().StandardButton.Discard))
+    win.close()
+
+
+def test_confirm_dirty_covers_all_forms_not_just_the_active(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    win._mark_dirty()                              # Formular 0 dirty
+    win._add_open_form(FormDoc(title="B"))         # wechselt auf 1 (sauber)
+    seen = {}
+
+    def _q(parent, title, text, *a, **k):
+        seen["text"] = text
+        return _mb().StandardButton.Discard
+
+    import unittest.mock
+    with unittest.mock.patch.object(_mb(), "question", _q):
+        assert win._confirm_dirty() is True
+    assert "unbenannt" in seen["text"]             # das INAKTIVE Formular kam vor
+    win.close()
+
+
+def test_open_project_asks_before_dropping_forms(tmp_path, monkeypatch):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormProject
+    win.canvas.doc.title = "WICHTIG"
+    win._mark_dirty()
+    proj = tmp_path / "p.gbproj"
+    FormProject(forms=[], main="").save(str(proj))
+    monkeypatch.setattr(_mb(), "question",
+                        staticmethod(lambda *a, **k: _mb().StandardButton.Cancel))
+    win.load_project_file(str(proj))
+    assert win.forms[0].doc.title == "WICHTIG"     # nichts verworfen
+    monkeypatch.setattr(_mb(), "question",
+                        staticmethod(lambda *a, **k: _mb().StandardButton.Discard))
+    win.close()
+
+
+def test_save_failure_keeps_dirty_and_does_not_take_the_path(tmp_path, monkeypatch):
+    # save_form_as setzte den Pfad VOR dem Schreiben -- nach einem Fehlschlag
+    # zeigte der Titel eine Datei an, die nie existiert hat.
+    _app()
+    win = FormDesigner(tmp_path)
+    win._mark_dirty()
+    bad = str(tmp_path / "gibtsnicht" / "x.gbform")
+    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getSaveFileName",
+                        staticmethod(lambda *a, **k: (bad, "")))
+    assert win.save_form_as() is False             # kein Traceback
+    assert win.path is None and win.active.dirty
+    win.close()
+
+
+def test_undo_back_to_saved_state_clears_the_star(tmp_path, monkeypatch):
+    _app()
+    win = FormDesigner(tmp_path)
+    p = tmp_path / "f.gbform"
+    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(p), "")))
+    assert win.save_form_as() is True
+    assert not win.active.dirty
+    pre = win.canvas.doc.to_dict()                 # Aenderung mit Checkpoint
+    win.canvas.doc.add("button", 10, 10)
+    win.canvas.commit_history(pre)
+    win._mark_dirty()
+    assert win.active.dirty
+    win.undo()
+    assert not win.active.dirty                    # zurueck auf dem Dateistand
+    assert "*" not in win.windowTitle()
+    win.close()
+
+
+def test_undo_refreshes_the_form_navigator(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    pre = win.canvas.doc.to_dict()
+    win.canvas.doc.title = "NeuerTitel"
+    win.canvas.commit_history(pre)
+    win._mark_dirty(); win._refresh_form_list()
+    assert "NeuerTitel" in win.form_list.item(0).text()
+    win.undo()
+    assert "NeuerTitel" not in win.form_list.item(0).text()
+    win.close()
+
+
+def test_open_form_twice_switches_instead_of_duplicating(tmp_path, monkeypatch):
+    _app()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    p = tmp_path / "a.gbform"
+    FormDoc(title="A").save(str(p))
+    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getOpenFileName",
+                        staticmethod(lambda *a, **k: (str(p), "")))
+    win.open_form(); n = len(win.forms)
+    win.open_form()
+    assert len(win.forms) == n                     # kein zweiter Puffer
+    win.close()
+
+
+def test_project_keeps_forms_outside_its_directory(tmp_path):
+    # `relative_to` kann nicht nach oben -- der Fallback schrieb den blossen
+    # Dateinamen, die Form war beim naechsten Oeffnen verschwunden.
+    _app()
+    proj_dir = tmp_path / "projekt"; proj_dir.mkdir()
+    extern = tmp_path / "shared"; extern.mkdir()
+    win = FormDesigner(proj_dir)
+    from gamebasic.formdesigner import FormDoc
+    win.active.doc.title = "Haupt"; win.active.path = proj_dir / "haupt.gbform"
+    win._add_open_form(FormDoc(title="Extern"), extern / "extern.gbform")
+    win.project_path = proj_dir / "app.gbproj"
+    win.save_project()
+    rel = json.loads((proj_dir / "app.gbproj").read_text(encoding="utf-8"))["forms"]
+    assert any(".." in r for r in rel)             # zeigt wirklich nach draussen
+    win2 = FormDesigner(proj_dir)
+    win2.load_project_file(str(proj_dir / "app.gbproj"))
+    assert {f.doc.title for f in win2.forms} == {"Haupt", "Extern"}
+    win.close(); win2.close()
+
+
+def test_missing_form_stays_in_the_manifest(tmp_path):
+    # Stumm uebersprungen UND danach dauerhaft aus dem .gbproj geloescht.
+    _app()
+    from gamebasic.formdesigner import FormDoc, FormProject
+    FormDoc(title="OK").save(str(tmp_path / "ok.gbform"))
+    FormProject(forms=["ok.gbform", "weg.gbform"], main="ok.gbform").save(
+        str(tmp_path / "p.gbproj"))
+    win = FormDesigner(tmp_path)
+    win.load_project_file(str(tmp_path / "p.gbproj"))
+    assert win.unresolved == ["weg.gbform"]
+    win.save_project()
+    forms = json.loads((tmp_path / "p.gbproj").read_text(encoding="utf-8"))["forms"]
+    assert "weg.gbform" in forms
+    win.close()
+
+
+def test_main_form_survives_saving_into_a_subdirectory(tmp_path):
+    _app()
+    sub = tmp_path / "sub"; sub.mkdir()
+    win = FormDesigner(tmp_path)
+    from gamebasic.formdesigner import FormDoc
+    win.active.doc.title = "A"; win.active.path = sub / "a.gbform"
+    win._add_open_form(FormDoc(title="B"), sub / "b.gbform")
+    win.set_main_form()                            # B ist aktiv -> Startformular
+    win.project_path = tmp_path / "app.gbproj"
+    win.save_project()
+    m = json.loads((tmp_path / "app.gbproj").read_text(encoding="utf-8"))["main"]
+    assert m == "sub/b.gbform"                     # nicht auf a zurueckgefallen
+    win.close()
+
+
+def test_uppercase_gbproj_opens_as_project_not_as_form(tmp_path):
+    # `gbform Projekt.GBPROJ` lud das Manifest als Formular (case-sensitiver
+    # Suffix-Vergleich); ein Strg+S danach hat die Projektdatei ueberschrieben.
+    from gamebasic.formdesigner import FormDoc, FormProject
+    from gamebasic.formdesigner_qt import open_initial
+    FormDoc(title="A").save(str(tmp_path / "a.gbform"))
+    p = tmp_path / "Projekt.GBPROJ"
+    FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))
+    _app()
+    win = FormDesigner(tmp_path)
+    assert open_initial(win, p) is True
+    assert [f.doc.title for f in win.forms] == ["A"]      # als Projekt geladen
+    assert all(f.path != p for f in win.forms)            # Manifest nie als Form
+    win.close()
+
+
+def test_open_initial_reports_a_missing_file(tmp_path):
+    from gamebasic.formdesigner_qt import open_initial
+    _app()
+    win = FormDesigner(tmp_path)
+    assert open_initial(win, tmp_path / "tippfehler.gbform") is False
+    assert open_initial(win, tmp_path) is False           # Verzeichnis
     win.close()
