@@ -1105,3 +1105,151 @@ def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeyp
     leftover = win._run_dir
     win.close()
     assert not leftover.exists()                       # closeEvent raeumt auf
+
+
+# --------------------------------------- Inspector / Bearbeiten-Ops (Review)
+def test_renaming_a_handler_keeps_its_code_body(tmp_path):
+    # `doc.code` ist nach Namen geschluesselt -- der Rumpf blieb unter dem
+    # alten Schluessel liegen, das Panel zeigte leer, der Export nur ' TODO.
+    _app()
+    win = FormDesigner(tmp_path)
+    b = win.canvas.doc.add("button", 10, 10)
+    win.canvas.handler_requested.emit(b)                  # legt btn1Click an
+    win.code_panel.editor.setPlainText('PRINT "wichtig"')
+    win.canvas._select(b)
+    win.inspector.on_click.setText("SpeichernClick")
+    win.inspector._apply()
+    assert win.canvas.doc.code.get("SpeichernClick") == 'PRINT "wichtig"'
+    assert "btn1Click" not in win.canvas.doc.code
+    assert 'PRINT "wichtig"' in win.canvas.doc.generate_gb_code()
+    win.close()
+
+
+def test_rename_does_not_steal_a_shared_handler(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    a = win.canvas.doc.add("button", 10, 10)
+    b = win.canvas.doc.add("button", 10, 60)
+    a.on_click = b.on_click = "gemeinsam"
+    win.canvas.doc.code["gemeinsam"] = "PRINT 1"
+    win.canvas._select(a)
+    win.inspector.set_control(a)
+    win.inspector.on_click.setText("nurA")
+    win.inspector._apply()
+    assert win.canvas.doc.code["gemeinsam"] == "PRINT 1"   # b braucht ihn noch
+    assert "nurA" not in win.canvas.doc.code
+    win.close()
+
+
+def test_inspector_edits_group_placeholder_visible_and_sel(tmp_path):
+    # Ohne `group` landen ALLE RadioButtons in derselben leeren Gruppe und
+    # schliessen sich nicht gegenseitig aus -- der Designer war fuer Radios
+    # unbrauchbar. `placeholder`/`visible`/`sel` fehlten ebenfalls.
+    _app()
+    win = FormDesigner(tmp_path)
+    r = win.canvas.doc.add("radio", 10, 10)
+    win.canvas._select(r)
+    win.inspector.group.setText("schwierigkeit")
+    win.inspector.visible.setChecked(False)
+    win.inspector._apply()
+    assert r.group == "schwierigkeit" and r.visible is False
+    assert 'GUI_RADIO(frm, "schwierigkeit"' in win.canvas.doc.generate_gb_code()
+
+    t = win.canvas.doc.add("textinput", 10, 60)
+    win.canvas._select(t)
+    win.inspector.placeholder.setText("dein Name")
+    win.inspector._apply()
+    assert t.placeholder == "dein Name"
+
+    d = win.canvas.doc.add("dropdown", 10, 110)
+    win.canvas._select(d)
+    win.inspector.ssel.setValue(2)
+    win.inspector._apply()
+    assert d.sel == 2
+    win.close()
+
+
+def test_shortening_items_clamps_the_selection(tmp_path):
+    # sel blieb out-of-range -> GUI_DROPDOWN_SET_SELECTED(dd1, 2) bei einem
+    # einzigen Eintrag, das Programm fiel zur Laufzeit um.
+    _app()
+    win = FormDesigner(tmp_path)
+    d = win.canvas.doc.add("dropdown", 10, 10)
+    win.canvas._select(d)
+    win.inspector.ssel.setValue(2)
+    win.inspector._apply()
+    win.inspector.items.setPlainText("nur eins")
+    win.inspector._apply()
+    assert d.sel <= len(d.items) - 1
+    assert "SET_SELECTED" not in win.canvas.doc.generate_gb_code() or d.sel == 0
+    win.close()
+
+
+def test_window_inspector_keeps_max_above_min(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    wi = win.win_inspector
+    wi.set_doc(win.canvas.doc)
+    wi.minw.setValue(900); wi.maxw.setValue(200)
+    wi._apply()
+    assert win.canvas.doc.max_w >= win.canvas.doc.min_w
+    assert win.canvas._clamp_fw(500) >= win.canvas.doc.min_w
+    win.close()
+
+
+def test_no_empty_undo_step_for_ineffective_operations(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    a = win.canvas.doc.add("button", 16, 16)
+    b = win.canvas.doc.add("button", 16, 60)     # schon linksbuendig
+    win.canvas._select_many([a, b])
+    win.history.clear()
+    win._align("left")
+    assert len(win.history._undo) == 0
+    win.canvas._select(b)                        # b ist bereits das vorderste
+    win.raise_selected()
+    assert len(win.history._undo) == 0
+    win.close()
+
+
+def test_duplicate_and_paste_handle_the_whole_selection(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    a = win.canvas.doc.add("button", 16, 16)
+    b = win.canvas.doc.add("button", 16, 60)
+    win.canvas._select_many([a, b])
+    win.duplicate_selected()
+    assert len(win.canvas.doc.controls) == 4     # beide dupliziert
+    win.canvas._select_many([a, b])
+    win.copy_selected()
+    n = len(win.canvas.doc.controls)
+    win.paste_clip()
+    assert len(win.canvas.doc.controls) == n + 2
+    win.close()
+
+
+def test_code_panel_keeps_its_handler_across_undo(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    a = win.canvas.doc.add("button", 10, 10); a.on_click = "AClick"
+    b = win.canvas.doc.add("button", 10, 60); b.on_click = "BClick"
+    win.canvas.doc.code.update({"AClick": "", "BClick": ""})
+    win.code_panel.set_doc(win.canvas.doc)
+    win.code_panel.show_handler("BClick")
+    pre = win.canvas.doc.to_dict()
+    win.canvas.doc.title = "X"
+    win.canvas.commit_history(pre)
+    win.undo()
+    assert win.code_panel.current == "BClick"    # nicht auf AClick gesprungen
+    win.close()
+
+
+def test_double_click_on_an_existing_handler_does_not_dirty(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    b = win.canvas.doc.add("button", 10, 10)
+    win.canvas.handler_requested.emit(b)         # legt den Handler an
+    win.active.dirty = False
+    win.canvas.handler_requested.emit(b)         # zweites Mal: aendert nichts
+    assert win.active.dirty is False
+    win.close()

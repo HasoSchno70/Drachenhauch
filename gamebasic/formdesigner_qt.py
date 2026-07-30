@@ -1072,6 +1072,7 @@ class _Canvas(QWidget):
 class _Inspector(QWidget):
     """Eigenschaften + Events des gewaehlten Controls editieren."""
     changed = Signal()
+    handler_renamed = Signal(str, str)     # alter, neuer Handler-Name
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1087,8 +1088,15 @@ class _Inspector(QWidget):
         # nur per Undo zurueckzuholen.
         self.sw.setMinimum(1); self.sh.setMinimum(1)
         self.enabled = QCheckBox("aktiviert")
+        self.visible = QCheckBox("sichtbar")
         self.checked = QCheckBox("angehakt")
         self.on_click = QLineEdit(); self.on_change = QLineEdit()
+        # `group` fehlte komplett -- ohne sie landen ALLE RadioButtons in
+        # derselben leeren Gruppe und schliessen sich nicht gegenseitig aus.
+        self.group = QLineEdit(); self.group.setPlaceholderText("z.B. schwierigkeit")
+        self.placeholder = QLineEdit()
+        self.ssel = QSpinBox(); self.ssel.setRange(-1, 9999)
+        self.ssel.setToolTip("Ausgewaehlter Eintrag (-1 = keiner)")
         self.items = QPlainTextEdit(); self.items.setMaximumHeight(90)
         self.vmin = QDoubleSpinBox(); self.vmax = QDoubleSpinBox(); self.vval = QDoubleSpinBox()
         for s in (self.vmin, self.vmax, self.vval):
@@ -1112,6 +1120,8 @@ class _Inspector(QWidget):
         self._rows = []
         self._add("Name", self.name)
         self._add("Text", self.text)
+        self._add("Gruppe", self.group)
+        self._add("Platzhalter", self.placeholder)
         self._add("Farbe", self.color_btn)
         self._add("Schriftgroesse", self.sfont)
         self._add("X", self.sx); self._add("Y", self.sy)
@@ -1120,12 +1130,18 @@ class _Inspector(QWidget):
         self._add("on_click", self.on_click)
         self._add("on_change", self.on_change)
         self._add("Items (1/Zeile)", self.items)
+        self._add("Auswahl", self.ssel)
         self._add("Min", self.vmin); self._add("Max", self.vmax); self._add("Wert", self.vval)
         self._add("", self.enabled)
+        self._add("", self.visible)
         self._add("", self.checked)
         # Signale
         self.name.editingFinished.connect(self._apply)
         self.text.editingFinished.connect(self._apply)
+        self.group.editingFinished.connect(self._apply)
+        self.placeholder.editingFinished.connect(self._apply)
+        self.ssel.valueChanged.connect(self._apply)
+        self.visible.toggled.connect(self._apply)
         for s in (self.sx, self.sy, self.sw, self.sh, self.vmin, self.vmax, self.vval):
             s.valueChanged.connect(self._apply)
         self.on_click.editingFinished.connect(self._apply)
@@ -1177,9 +1193,12 @@ class _Inspector(QWidget):
         self.name.setText(c.name); self.text.setText(c.text)
         self.sx.setValue(c.x); self.sy.setValue(c.y); self.sw.setValue(c.w); self.sh.setValue(c.h)
         self.on_click.setText(c.on_click); self.on_change.setText(c.on_change)
+        self.group.setText(c.group); self.placeholder.setText(c.placeholder)
         self.items.setPlainText("\n".join(c.items))
+        self.ssel.setValue(c.sel)
         self.vmin.setValue(c.min); self.vmax.setValue(c.max); self.vval.setValue(c.value)
         self.enabled.setChecked(c.enabled); self.checked.setChecked(c.checked)
+        self.visible.setChecked(c.visible)
         self.sfont.setValue(c.font_size); self._update_color_btn()
         a = c.anchor or "lt"
         self.a_l.setChecked("l" in a); self.a_r.setChecked("r" in a)
@@ -1190,10 +1209,13 @@ class _Inspector(QWidget):
         is_range = c.kind in ("slider", "progress")
         is_check = c.kind in ("checkbox", "radio")
         for w in (self.name, self.color_btn, self.sfont, self.sx, self.sy,
-                  self.sw, self.sh, self._anchor_box, self.enabled):
+                  self.sw, self.sh, self._anchor_box, self.enabled, self.visible):
             self._show(w, True)
         self._show(self.text, has_text)
         self._show(self.items, has_items)
+        self._show(self.ssel, has_items)
+        self._show(self.group, c.kind == "radio")
+        self._show(self.placeholder, c.kind == "textinput")
         self._show(self.on_click, "on_click" in events)
         self._show(self.on_change, "on_change" in events)
         self._show(self.vmin, is_range); self._show(self.vmax, is_range); self._show(self.vval, is_range)
@@ -1204,22 +1226,37 @@ class _Inspector(QWidget):
         if self._loading or self._c is None:
             return
         c = self._c
+        old_click, old_change = c.on_click, c.on_change
         c.name = self.name.text().strip()
         c.text = self.text.text()
         c.x, c.y, c.w, c.h = self.sx.value(), self.sy.value(), self.sw.value(), self.sh.value()
         c.on_click = self.on_click.text().strip()
         c.on_change = self.on_change.text().strip()
+        c.group = self.group.text().strip()
+        c.placeholder = self.placeholder.text()
         items = [ln for ln in self.items.toPlainText().splitlines() if ln != ""]
         c.items = items
         if c.kind == "dropdown" and items and c.sel < 0:
             c.sel = 0
+        c.sel = min(self.ssel.value(), len(items) - 1) if items else min(c.sel, -1)
         c.min, c.max, c.value = self.vmin.value(), self.vmax.value(), self.vval.value()
+        if c.max < c.min:                      # sonst clampt GUI_SET_VALUE ins Leere
+            c.max = c.min
+        c.value = min(max(c.value, c.min), c.max)
         c.enabled = self.enabled.isChecked()
+        c.visible = self.visible.isChecked()
         c.checked = self.checked.isChecked()
         c.font_size = self.sfont.value()
         a = ("l" if self.a_l.isChecked() else "") + ("r" if self.a_r.isChecked() else "") \
             + ("t" if self.a_t.isChecked() else "") + ("b" if self.a_b.isChecked() else "")
         c.anchor = a or "lt"
+        # Handler-Umbenennung melden, BEVOR `changed` das Code-Panel neu
+        # befuellt: `doc.code` ist nach Namen geschluesselt, der alte Rumpf
+        # blieb sonst als unerreichbare Leiche zurueck und der Export
+        # emittierte fuer den neuen Namen nur ein `' TODO`.
+        for old, new in ((old_click, c.on_click), (old_change, c.on_change)):
+            if old and new and old != new:
+                self.handler_renamed.emit(old, new)
         self.changed.emit()
 
 
@@ -1276,6 +1313,12 @@ class _WindowInspector(QWidget):
         d.w, d.h = self.sw.value(), self.sh.value()
         d.min_w, d.min_h = self.minw.value(), self.minh.value()
         d.max_w, d.max_h = self.maxw.value(), self.maxh.value()
+        # min > max ist widerspruechlich: `_clamp_fw`/`_clamp_fh` wenden erst
+        # min, dann max an -- das Formular landete unter seinem eigenen Minimum.
+        if d.max_w and d.max_w < d.min_w:
+            d.max_w = d.min_w; self.maxw.setValue(d.max_w)
+        if d.max_h and d.max_h < d.min_h:
+            d.max_h = d.min_h; self.maxh.setValue(d.max_h)
         d.movable, d.closable = self.movable.isChecked(), self.closable.isChecked()
         d.resizable, d.visible = self.resizable.isChecked(), self.visible.isChecked()
         self.changed.emit()
@@ -1318,8 +1361,10 @@ class _CodePanel(QWidget):
         self._show_empty()
 
     def set_doc(self, doc: FormDoc):
+        # `current` NICHT zuruecksetzen: nach jedem Undo tauscht die Canvas das
+        # Dokument, und `refresh()` waehlte dann wieder den ERSTEN Handler --
+        # beim Code-Schreiben wurde man staendig in einen fremden geworfen.
         self.doc = doc
-        self.current = None
         self.refresh()
 
     def refresh(self):
@@ -1462,6 +1507,7 @@ class FormDesigner(QMainWindow):
         self.canvas.handler_requested.connect(self._open_handler)
         self.canvas.context_menu.connect(self._show_context_menu)
         self.inspector.changed.connect(self._on_inspector_changed)
+        self.inspector.handler_renamed.connect(self._on_handler_renamed)
         self.win_inspector.changed.connect(self._on_window_changed)
         self.code_panel.session_started.connect(self._on_code_session)
         self.code_panel.edited.connect(self._on_code_edited)
@@ -1634,6 +1680,8 @@ class FormDesigner(QMainWindow):
             return
         pre = self.canvas.doc.to_dict()
         op(sel)
+        if pre == self.canvas.doc.to_dict():
+            return                       # nichts geaendert -> kein leerer Undo-Schritt
         self._commit_history(pre)
         self.canvas.update()
         self._mark_dirty()
@@ -1760,6 +1808,19 @@ class FormDesigner(QMainWindow):
         self.win_inspector.set_doc(self.canvas.doc)
         self._mark_dirty()
 
+    def _on_handler_renamed(self, old: str, new: str):
+        """Handler im Inspector umbenannt -> den Code-Rumpf mitnehmen. Sonst
+        blieb er unter dem alten Schluessel liegen: das Code-Panel zeigte
+        schlagartig leer und der Export erzeugte nur ein `' TODO`."""
+        doc = self.canvas.doc
+        if old not in doc.code:
+            return
+        if old in doc.handler_names():
+            return                       # ein anderes Control nutzt ihn noch
+        if doc.code.get(new):
+            return                       # dort steht schon Code -- nicht ueberschreiben
+        doc.code[new] = doc.code.pop(old)
+
     def _on_inspector_changed(self):
         """Inspector-Aenderung. Alle Edits einer Selektion = EIN Undo-Schritt."""
         if not self._insp_dirty and self._insp_baseline is not None:
@@ -1799,6 +1860,8 @@ class FormDesigner(QMainWindow):
             return
         pre = self.canvas.doc.to_dict()
         res = mutate(self.canvas.doc, c)
+        if pre == self.canvas.doc.to_dict():
+            return                       # z.B. "nach vorne" auf dem vordersten
         self._commit_history(pre)
         if select == "result":
             self.canvas._select(res)
@@ -1808,7 +1871,17 @@ class FormDesigner(QMainWindow):
         self._mark_dirty()
 
     def duplicate_selected(self):
-        self._control_op(lambda d, c: d.duplicate(c), select="result")
+        """Ganze Auswahl duplizieren -- Loeschen/Ziehen/Nudge bedienen sie
+        ebenfalls, Strg+D erwischte vorher nur das primaere Control."""
+        sel = list(self.canvas.selection)
+        if not sel:
+            return
+        pre = self.canvas.doc.to_dict()
+        copies = [self.canvas.doc.duplicate(c) for c in sel]
+        self._commit_history(pre)
+        self.canvas._select_many(copies)
+        self.canvas.update()
+        self._mark_dirty()
 
     def delete_selected(self):
         sel = list(self.canvas.selection)
@@ -1829,18 +1902,19 @@ class FormDesigner(QMainWindow):
         self._control_op(lambda d, c: d.to_back(c))
 
     def copy_selected(self):
-        c = self.canvas.selected
-        if c is not None:
-            self._clip = c.to_dict()
-            self.statusBar().showMessage(f"Kopiert: {c.name}", 2000)
+        sel = list(self.canvas.selection)
+        if not sel:
+            return
+        self._clip = [c.to_dict() for c in sel]     # ganze Auswahl, nicht nur eines
+        self.statusBar().showMessage(f"Kopiert: {len(sel)} Control(s)", 2000)
 
     def paste_clip(self):
         if not self._clip:
             return
         pre = self.canvas.doc.to_dict()
-        nc = self.canvas.doc.clone_from_dict(self._clip)
+        new = [self.canvas.doc.clone_from_dict(d) for d in self._clip]
         self._commit_history(pre)
-        self.canvas._select(nc)
+        self.canvas._select_many(new)
         self.canvas.update()
         self._mark_dirty()
 
@@ -1848,6 +1922,10 @@ class FormDesigner(QMainWindow):
         if self.canvas.selected is None:
             return
         menu = QMenu(self)
+        # Ohne das sammelt das Hauptfenster pro Rechtsklick ein totes
+        # QMenu-Kind an -- in diesem Projekt die typische Vorstufe eines
+        # Teardown-Race beim Schliessen.
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         menu.addAction("Duplizieren", self.duplicate_selected)
         menu.addAction("Kopieren", self.copy_selected)
         menu.addAction("Loeschen", self.delete_selected)
@@ -1873,7 +1951,8 @@ class FormDesigner(QMainWindow):
             return
         pre = self.canvas.doc.to_dict()
         name = self.canvas.doc.ensure_handler(c)
-        if pre != self.canvas.doc.to_dict():
+        changed = pre != self.canvas.doc.to_dict()
+        if changed:
             self._commit_history(pre)             # Handler-Erzeugung = Undo-Schritt
         self.code_panel.refresh()
         self.code_panel.show_handler(name)
@@ -1881,7 +1960,8 @@ class FormDesigner(QMainWindow):
         self.canvas.update()
         self.code_dock.show(); self.code_dock.raise_()
         self.code_panel.focus_editor()
-        self._mark_dirty()
+        if changed:                               # Doppelklick auf einen schon
+            self._mark_dirty()                    # vorhandenen Handler aendert nichts
 
     def _on_code_session(self):
         self._code_baseline = self.canvas.doc.to_dict()
