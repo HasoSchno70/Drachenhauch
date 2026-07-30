@@ -36,7 +36,28 @@ def _pixel(canvas, x, y):
     return img.pixelColor(x * z + z // 2, y * z + z // 2).getRgb()
 
 
-def test_moves_are_coalesced_until_event_loop_tick(app):
+def _event_loop_tick(app, canvas):
+    """Einen Event-Loop-Tick fahren -- mit harter Zeitgrenze.
+
+    NICHT das nackte `app.processEvents()`: das arbeitet, bis die Queue leer
+    ist, und die wird nie leer, wenn irgendwo im Prozess noch ein
+    wiederholender Timer haengt (ein geleaktes 60-FPS-Vorschau-Fenster aus
+    einer frueheren Testdatei reicht) oder zwei Objekte sich per Signal
+    gegenseitig neu scharf machen. Genau daran hing der gemeinsame Lauf hier
+    frueher fest -- eine Stunde auf dieser Zeile, 100 % CPU.
+
+    Die `quiet_qt_process`-Fixture stellt den Prozess vorher ruhig; die
+    Zeitgrenze hier ist die zweite Sicherung: ein kuenftiger Leak laesst
+    diesen Test dann fehlschlagen, statt den ganzen Lauf anzuhalten.
+    """
+    from PySide6.QtCore import QDeadlineTimer, QEventLoop
+
+    deadline = QDeadlineTimer(2000)
+    while canvas._render_pending and not deadline.hasExpired():
+        app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 20)
+
+
+def test_moves_are_coalesced_until_event_loop_tick(app, quiet_qt_process):
     win = _window(app)
     canvas = win.canvas
     win.activate_tool("pencil")
@@ -53,14 +74,14 @@ def test_moves_are_coalesced_until_event_loop_tick(app):
     # steht noch aus.
     assert _pixel(canvas, 4, 4) == (0, 0, 0, 0)
 
-    app.processEvents()
+    _event_loop_tick(app, canvas)
 
     assert not canvas._render_pending
     assert _pixel(canvas, 4, 4) == (255, 0, 0, 255)
     win.tool.end(win, 4, 4)
 
 
-def test_render_reflects_final_state_not_intermediate(app):
+def test_render_reflects_final_state_not_intermediate(app, quiet_qt_process):
     """Zwischenstaende gehen beim Buendeln nicht verloren -- der finale
     Dokument-Zustand wird gerendert, auch wenn dazwischen mehrfach
     invalidate_all() aufgerufen wurde."""
@@ -74,6 +95,6 @@ def test_render_reflects_final_state_not_intermediate(app):
         win.tool.move(win, i, i)
     win.tool.end(win, 5, 5)
 
-    app.processEvents()
+    _event_loop_tick(app, canvas)
     assert _pixel(canvas, 5, 5) == (0, 255, 0, 255)
     assert _pixel(canvas, 0, 0) == (0, 255, 0, 255)

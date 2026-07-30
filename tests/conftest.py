@@ -131,3 +131,136 @@ def run_all(run_gb):
 # `interpreter.BUILTINS`) ist entfernt -- alle Modul-Tests laufen jetzt als
 # run_gb-Golden gegen gbrt (Stufe B, Phase 6/7-Teil2). Damit haengt kein Test
 # mehr an interpreter.py/modules (Phase-8-Entblocker erledigt).
+
+
+# --------------------------------------------------------------------------
+# Qt-Altlasten nach JEDEM Test stilllegen
+# --------------------------------------------------------------------------
+# Die Qt-Testdateien bauen ihre Fenster als lokale Variable bzw. in einer
+# function-scoped Fixture und schliessen sie nie -- das C++-Objekt lebt danach
+# weiter (Qt haelt Top-Level-Widgets selbst am Leben, der Python-Refcount
+# entscheidet nicht allein). In EINEM gemeinsamen pytest-Prozess summierte
+# sich das auf ~16.000 lebende QObjects mit 244 faelligen QTimern, darunter
+# 9 WIEDERHOLENDE 16-ms-Vorschau-Timer (Partikel-Editor, 60 FPS) und
+# 8 wiederholende 30-s-Autosave-Timer aus geleakten `GameBasicEditor`n.
+#
+# Solange kein Test die Event-Loop pumpt, faellt das nicht auf. Der EINE Test,
+# der es tut (`test_spriteeditor_qt_canvas.py`, "coalesced until event loop
+# tick"), liess dann alle 244 ueberfaelligen Timer auf einmal feuern -- und
+# weil die 16-ms-Timer sich schneller neu scharf machen, als die Queue
+# abgearbeitet wird, kehrte `processEvents()` NIE zurueck (Haenger mit 100 %
+# CPU, per py-spy exakt auf dieser Zeile stehend). Wo ein Slot dabei ein
+# bereits geloeschtes C++-Objekt traf, gab es stattdessen die
+# "Windows fatal exception: access violation".
+#
+# WARUM ENTSCHAERFEN STATT ZERSTOEREN: der naheliegende Weg waere
+# `deleteLater()` auf jedes uebrige Top-Level-Widget. Genau das wurde
+# ausprobiert -- und stuerzt beim tatsaechlichen Zerstoeren ab (Access
+# Violation im `sendPostedEvents(DeferredDelete)`). Der Grund liegt NICHT im
+# Test, sondern in echten Zerstoerungs-Reihenfolge-Fehlern der Editor-Widgets
+# (dieselbe bekannte PySide6-Use-after-free-Serie; sichtbar auch als
+# "RuntimeError: Internal C++ object (GBHighlighter) already deleted" aus
+# `CodeEditor._on_theme_changed`). Diese Fixture repariert die NICHT und tut
+# auch nicht so -- sie nimmt den Leichen nur die Zuendschnur:
+#
+#   * jeder aktive QTimer wird gestoppt  -> keine faelligen/wiederholenden
+#     Timer mehr, die Queue laeuft leer, `processEvents()` kehrt zurueck
+#   * jeder QFileSystemWatcher verliert seine Pfade -> kein Watcher-Thread,
+#     der im Hintergrund weiter Aenderungs-Events nachschiebt
+#   * die Fenster werden versteckt -> keine Repaints
+#
+# Die Objekte selbst bleiben am Leben (Speicher waechst weiter). Das ist
+# unschoen, aber harmlos -- toedlich war ausschliesslich das Feuern.
+
+def _disarm_leftover_qt_widgets() -> None:
+    """Timer/Watcher aller uebrig gebliebenen Top-Level-Widgets stilllegen."""
+    qtwidgets = sys.modules.get("PySide6.QtWidgets")
+    if qtwidgets is None:
+        return                      # Nicht-Qt-Test: nichts zu tun, nichts zu zahlen
+    app = qtwidgets.QApplication.instance()
+    if app is None:
+        return
+
+    import shiboken6
+    from PySide6.QtCore import QFileSystemWatcher, QTimer
+
+    for w in list(app.topLevelWidgets()):
+        # Ein zerstoertes Elternteil nimmt seine Kinder mit -- die stehen
+        # dann noch in der Liste, sind aber schon ungueltig.
+        if not shiboken6.isValid(w):
+            continue
+        try:
+            for t in w.findChildren(QTimer):
+                if shiboken6.isValid(t) and t.isActive():
+                    t.stop()
+            for fsw in w.findChildren(QFileSystemWatcher):
+                if not shiboken6.isValid(fsw):
+                    continue
+                paths = fsw.directories() + fsw.files()
+                if paths:
+                    fsw.removePaths(paths)
+            if not w.isHidden():
+                w.hide()
+        except RuntimeError:
+            # Waehrend des Durchlaufs weggeraeumtes C++-Objekt -- egal,
+            # tot ist auch entschaerft.
+            continue
+
+
+@pytest.fixture(autouse=True)
+def _qt_widget_cleanup():
+    """Legt nach jedem Test die zurueckgelassenen Qt-Fenster still.
+
+    Autouse + function-scoped: laeuft damit VOR den modul-eigenen Fixtures
+    im Setup und folglich NACH deren Teardown -- eine `win`-Fixture darf ihr
+    Fenster also noch ganz normal selbst abbauen.
+    """
+    yield
+    _disarm_leftover_qt_widgets()
+
+
+def quiesce_qt() -> int:
+    """Den GANZEN Prozess ruhigstellen: jeden aktiven QTimer stoppen und alle
+    schon zugestellten Events verwerfen. Gibt die Zahl gestoppter Timer zurueck.
+
+    Warum zusaetzlich zu `_disarm_leftover_qt_widgets()`: das laeuft ueber
+    `topLevelWidget.findChildren()` und erwischt damit nur Timer, die im
+    Objektbaum eines Fensters haengen. `SnapshotUndo` (Undo-Debounce der
+    Editoren) ist aber ein parentloses QObject -- nach einem gemeinsamen Lauf
+    blieben so noch ~39 scharfe Timer uebrig, deren `changed`-Signal ueber
+    `_mark_dirty()` wieder ein `mark()` ausloest. Diese Rueckkopplung reicht,
+    damit die Event-Queue nie leer wird.
+
+    TEUER (einmaliger Heap-Scan) -- nur direkt vor einer Stelle aufrufen, die
+    wirklich die Event-Loop pumpt, nicht pro Test.
+    """
+    qtcore = sys.modules.get("PySide6.QtCore")
+    if qtcore is None:
+        return 0
+
+    import gc
+    import shiboken6
+
+    stopped = 0
+    for obj in gc.get_objects():
+        if not isinstance(obj, qtcore.QTimer):
+            continue
+        try:
+            if shiboken6.isValid(obj) and obj.isActive():
+                obj.stop()
+                stopped += 1
+        except RuntimeError:
+            pass                    # waehrenddessen weggeraeumt -- auch gut
+    # Bereits gepostete Events (Repaints, queued Signals) der Altlasten
+    # wegwerfen, damit der folgende Pump nur noch das sieht, was der Test
+    # selbst erzeugt.
+    qtcore.QCoreApplication.removePostedEvents(None)
+    return stopped
+
+
+@pytest.fixture
+def quiet_qt_process():
+    """Fixture-Form von `quiesce_qt()` -- fuer Tests, die selbst die
+    Event-Loop pumpen muessen und deshalb einen ruhigen Prozess brauchen."""
+    quiesce_qt()
+    yield
