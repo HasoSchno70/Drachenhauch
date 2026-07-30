@@ -56,8 +56,12 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   „primäre" Control), **Horizontal/Vertikal verteilen** (gleiche Lücken, erstes +
   letztes bleiben fix) — alles undobar.
 - **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
-  Text, Position/Größe, **Anker** L/R/O/U, `on_click`/`on_change`-Handler, Items,
-  Min/Max/Wert, aktiviert …). **Anker** = an welchen Fensterkanten das Control
+  Text, **Gruppe** (nur RadioButton — Radios derselben Gruppe schließen sich
+  gegenseitig aus), **Platzhalter** (nur TextInput), Position/Größe, **Anker**
+  L/R/O/U, `on_click`/`on_change`-Handler, Items, **Auswahl** (Dropdown/ListBox,
+  `-1` = keine), Min/Max/Wert, aktiviert, sichtbar …). Wird ein Handler hier
+  **umbenannt**, wandert sein Code-Rumpf mit (außer ein zweites Control nutzt
+  ihn noch). **Anker** = an welchen Fensterkanten das Control
   klebt; beim Vergrößern des (resizeable) Formulars wandern/wachsen die Controls
   entsprechend mit (Xojo-Reflow, `GUI_SET_ANCHOR` in der Runtime). Ist **kein**
   Control gewählt, zeigt der Inspector das **Formular selbst** (Xojo-Stil):
@@ -81,7 +85,10 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
    - **Im eigenen Code:** `GUI_LOAD("meinform.gbform")` und die Handler-`SUB`s
      schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
    - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
-     ein generiertes Programm-Gerüst in einen Temp-Ordner und startet `gbrt`.
+     ein generiertes Programm-Gerüst in einen Temp-Ordner, prüft es mit
+     `gbrt --check` (Fehler landen in einem Dialog statt im Nichts) und startet
+     dann `gbrt`. Ein erneutes F5 beendet den vorigen Lauf und räumt dessen
+     Temp-Ordner; das Schließen des Designers ebenso.
      Die Form läuft **randlos auf dem echten OS-Fenster** (Fenstergröße =
      Formgröße, Titel = Formtitel); ist sie „größenveränderbar", ist das
      **Programmfenster nativ resizebar** und die Form füllt es jeden Frame —
@@ -118,6 +125,22 @@ gb-code}`) mit den Event-Handler-Körpern. Der Designer und ein handgeschriebene
 (F5)** webt der Designer die `code`-Körper als `SUB`-Rümpfe in das generierte
 Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 
+**Felder, die der Designer nicht darstellt, reicht er unverändert durch.** Die
+`gui`-Laufzeit kennt mehr als die Palette anbietet — auf Fenster-Ebene `chrome`,
+`menus`, `tabs`/`active_tab`, pro Widget `table`, `tree`, `tab_page`, `font`,
+und die Widget-Arten `table`/`tree`/`textarea`/`spinner`/`splitter`/`toolbar`.
+Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt sich also im
+Designer öffnen und nachjustieren, ohne dass Menüs, Reiter oder Tabellendaten
+verloren gehen; bearbeiten lassen sie sich dort aber nicht (sie werden auf der
+Design-Fläche auch nicht gezeichnet). Ein Golden-Test führt diesen Roundtrip
+real durch gbrt.
+
+**Robustheit beim Laden:** Beschädigte oder von Hand geschriebene Dateien
+(fehlende Felder, falsche Typen, `null`) fallen feldweise auf den Default
+zurück — genau wie `gui.rs` es tut — statt einen Fehler zu werfen. Ein
+`.gbproj`-Manifest wird beim Laden als Formular **abgelehnt** (sonst hätte ein
+anschließendes Speichern die Projektdatei überschrieben).
+
 ## Architektur / Erweiterung
 
 - Datenmodell Qt-frei in [`gamebasic/formdesigner/document.py`](../gamebasic/formdesigner/document.py)
@@ -126,6 +149,12 @@ Programm-Gerüst (Handler ohne Body werden zu `' TODO`-Stubs).
 - UI in [`gamebasic/formdesigner_qt.py`](../gamebasic/formdesigner_qt.py)
   (Palette/Canvas/Inspector/Code-Panel). Neue Control-Arten: Eintrag in `PALETTE`
   ergänzen — Inspector/Canvas/Serialisierung ziehen daraus.
+- **Ungespeichert-Schutz:** `FormDesigner._confirm_dirty()` fragt für **alle**
+  offenen Formulare (nicht nur das aktive) und wird von `closeEvent`,
+  „Projekt öffnen…" und `close_form` benutzt. Qt-Tests dieser Datei müssen
+  modale Dialoge abfangen — dafür gibt es in `tests/test_formdesigner_qt.py`
+  eine Autouse-Fixture, die `QMessageBox.question/warning/critical` ersetzt.
+  Ohne sie hält der erste Dialog den ganzen pytest-Lauf an.
 - **Gotcha:** Das Code-Panel hängt einen `GBHighlighter` an sein Editor-Dokument.
   Ein lebender `QSyntaxHighlighter` segfaultet beim Interpreter-Shutdown, wenn er
   die Teardown-Race von Dokument + `QApplication` überlebt (im Test sichtbar als
@@ -149,7 +178,18 @@ Setter (`GUI_SET_ENABLED/VISIBLE/VALUE/FONT_SIZE/COLOR`, `*_SET_SELECTED`).
 Handler werden per `GUI_ON_CLICK/CHANGE`-FUNCREF verdrahtet. **Grenze:**
 `image`-Controls werden übersprungen (das `.gbform` speichert keine Bildquelle —
 `GUI_IMAGE` bräuchte ein `LOADIMAGE`). Strings escapen `"`→`""`. Ein
-run_gb-Golden-Test führt die erzeugte Konstruktion real in gbrt aus.
+run_gb-Golden-Test führt die erzeugte Konstruktion real in gbrt aus **und
+vergleicht sie gegen `GUI_LOAD` desselben `.gbform`** — beide Wege müssen
+dasselbe Formular bauen.
+
+**Zwei Eigenheiten der Konstruktoren**, die der Export ausgleicht:
+`GUI_LABEL`/`CHECKBOX`/`RADIO`/`SLIDER`/`SEPARATOR` berechnen ihre Größe selbst,
+deshalb wird `GUI_SET_BOUNDS` nachgereicht. `GUI_PROGRESS` liegt fest auf
+`min=0/max=1` und hat keinen Range-Setter, deshalb wird der Wert auf den Anteil
+normiert (optisch identisch — die Laufzeit zeichnet den Balken als
+`(value-min)/(max-min)`). *Restgrenze:* `GUI_SET_BOUNDS` aktualisiert die
+Anchor-Basis der Laufzeit nicht mit — wird ein exportiertes, resizebares Fenster
+gezogen, springen diese fünf Control-Arten auf ihre Konstruktor-Größe zurück.
 
 **Multi-Form-Architektur:** Qt-freies `FormProject` (in
 `formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede
