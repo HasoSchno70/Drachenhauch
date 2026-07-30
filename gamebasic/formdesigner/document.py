@@ -5,11 +5,51 @@ nur der Designer braucht (`name`), ignoriert die Runtime beim Laden.
 """
 from __future__ import annotations
 
+import copy
 import json
 import math
 import re
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+
+from ..tokens import KEYWORDS
+
+
+# --- Tolerante JSON-Coercion ------------------------------------------------
+# Ein `.gbform` kann von Hand geschrieben, von einem Fremdwerkzeug erzeugt oder
+# leicht beschaedigt sein. Die Laufzeit (`gui.rs`, `widget_from_json`) faellt in
+# so einem Fall durchgaengig auf den Default zurueck (`as_i64().unwrap_or(d)`)
+# statt abzubrechen -- der Designer macht es genauso, sonst quittiert er eine
+# Datei, die gbrt anstandslos laedt, mit einem rohen Python-Traceback.
+def _as_int(d: dict, key: str, default: int) -> int:
+    v = d.get(key, default)
+    if isinstance(v, bool) or v is None:
+        return default
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(d: dict, key: str, default: float) -> float:
+    v = d.get(key, default)
+    if isinstance(v, bool) or v is None:
+        return default
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
+
+
+def _as_bool(d: dict, key: str, default: bool) -> bool:
+    v = d.get(key, default)
+    return v if isinstance(v, bool) else default
+
+
+def _as_str(d: dict, key: str, default: str = "") -> str:
+    v = d.get(key, default)
+    return v if isinstance(v, str) else default
 
 
 # --- Control-Palette --------------------------------------------------------
@@ -65,15 +105,32 @@ def _gb_bool(b: bool) -> str:
 
 
 def _gb_num(x) -> str:
-    """FLOAT-Literal mit Dezimalpunkt (GB-FLOAT erwartet z.B. `0.0`, nicht `0`)."""
-    return repr(float(x))
+    """FLOAT-Literal mit Dezimalpunkt (GB-FLOAT erwartet z.B. `0.0`, nicht `0`).
+
+    Bewusst Fixpunkt statt `repr()`: `repr` schaltet ab |x| >= 1e16 bzw. unter
+    1e-4 auf Exponentialschreibweise (`1e-05`), die GameBasics Lexer NICHT kennt
+    -- ein Slider mit feiner Skala erzeugte damit nicht parsbaren Export-Code.
+    `inf`/`nan` (aus einem beschaedigten `.gbform`) werden zu 0.0."""
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return "0.0"
+    if not math.isfinite(f):
+        return "0.0"
+    t = f"{f:.10f}".rstrip("0")
+    return t + "0" if t.endswith(".") else t
 
 
 def _gb_ident(s: str) -> str:
-    """Bezeichner aus einem Control-Namen: nur [A-Za-z0-9_], nicht mit Ziffer."""
+    """Bezeichner aus einem Control-Namen: nur [A-Za-z0-9_], nicht mit Ziffer,
+    kein reserviertes Wort (sonst `_`-Suffix -- `DIM Print AS ...` waere sonst
+    ein Parse-Fehler im exportierten Programm). `KEYWORDS` deckt exakt die
+    Woerter ab, die gbrt als Bezeichner ablehnt (empirisch abgeglichen)."""
     t = re.sub(r"[^A-Za-z0-9_]", "_", str(s))
     if not t or t[0].isdigit():
         t = "_" + t
+    if t.lower() in KEYWORDS:
+        t += "_"
     return t
 
 
@@ -122,13 +179,23 @@ class FormProject:
     forms: list = field(default_factory=list)   # list[str] relative .gbform-Pfade
     main: str = ""
 
+    @staticmethod
+    def norm(rel: str) -> str:
+        """Manifest-Pfade auf eine Schreibweise bringen (`/` statt `\\`, kein
+        `./`). Ohne das galten `forms/a.gbform`, `forms\\a.gbform` und
+        `./forms/a.gbform` als drei verschiedene Formulare -- auf Windows
+        dieselbe Datei, die dann mehrfach in der Projektliste stand."""
+        return Path(str(rel)).as_posix()
+
     def add(self, rel: str) -> None:
+        rel = self.norm(rel)
         if rel not in self.forms:
             self.forms.append(rel)
         if not self.main:
             self.main = rel
 
     def remove(self, rel: str) -> None:
+        rel = self.norm(rel)
         if rel in self.forms:
             self.forms.remove(rel)
         if self.main == rel:
@@ -139,11 +206,27 @@ class FormProject:
 
     @classmethod
     def from_dict(cls, d: dict) -> "FormProject":
-        forms = [str(x) for x in d.get("forms", [])]
-        main = str(d.get("main", ""))
+        if not isinstance(d, dict):
+            d = {}
+        raw = d.get("forms")
+        forms: list = []
+        for x in (raw if isinstance(raw, list) else []):
+            n = cls.norm(x)
+            if n not in forms:
+                forms.append(n)
+        main = cls.norm(d.get("main", "")) if d.get("main") else ""
         if main not in forms:                       # defensiv: main muss Mitglied sein
             main = forms[0] if forms else ""
         return cls(forms=forms, main=main)
+
+    @staticmethod
+    def looks_like_manifest(d) -> bool:
+        """Ist dieses JSON ein `.gbproj`-Manifest (und KEIN Formular)? `FormDoc.
+        from_dict` ist so permissiv, dass ein Manifest klaglos als leeres
+        Formular durchginge -- ein anschliessendes Speichern hat dann die
+        Projektdatei ueberschrieben."""
+        return isinstance(d, dict) and "widgets" not in d and (
+            "forms" in d or "main" in d)
 
     def save(self, path: str) -> None:
         Path(path).write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False),
@@ -226,6 +309,18 @@ class Control:
     on_click: str = ""
     on_change: str = ""
     ov: dict = field(default_factory=dict)   # Farb-Overrides: bg/fg/border/accent -> int
+    # Laufzeit-Felder, die der Designer (noch) nicht darstellt -- z.B. `table`,
+    # `tree`, `tab_page`, `font`. Sie werden unveraendert durchgereicht, damit
+    # ein mit GUI_SAVE erzeugtes Formular beim Oeffnen+Speichern im Designer
+    # nichts verliert. Siehe `gui.rs::widget_json`.
+    extra: dict = field(default_factory=dict)
+
+    # Felder, die der Designer selbst kennt -- alles andere landet in `extra`.
+    _KNOWN = frozenset((
+        "kind", "name", "x", "y", "w", "h", "text", "color", "value", "min",
+        "max", "checked", "placeholder", "group", "items", "sel", "enabled",
+        "visible", "font_size", "anchor", "on_click", "on_change", "ov",
+    ))
 
     def to_dict(self) -> dict:
         """Runtime-kompatibles widget-Dict (+ Designer-`name`)."""
@@ -256,35 +351,54 @@ class Control:
             d["font_size"] = self.font_size
         if self.anchor and self.anchor != "lt":
             d["anchor"] = self.anchor
+        for k, v in self.extra.items():       # unbekannte Laufzeit-Felder zurueckgeben
+            # tief kopiert: `to_dict()` liefert auch die Undo-Snapshots -- ein
+            # geteiltes `table`/`menus`-Dict wuerde einen alten Snapshot
+            # nachtraeglich veraendern.
+            d.setdefault(k, copy.deepcopy(v))
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Control":
+        if not isinstance(d, dict):
+            d = {}
+        ov_src = d.get("ov")
+        ov = {}
+        if isinstance(ov_src, dict):
+            for k, v in ov_src.items():
+                if isinstance(v, int) and not isinstance(v, bool):
+                    ov[str(k)] = v
+        items_src = d.get("items")
+        items = [x for x in items_src if isinstance(x, str)] \
+            if isinstance(items_src, list) else []
+        extra = {k: v for k, v in d.items() if k not in cls._KNOWN}
         return cls(
-            kind=str(d.get("kind", "label")),
-            name=str(d.get("name", "")),
-            x=int(d.get("x", 0)), y=int(d.get("y", 0)),
-            w=int(d.get("w", 100)), h=int(d.get("h", 24)),
-            text=str(d.get("text", "")),
-            color=int(d.get("color", 0xFFFFFF)),
-            value=float(d.get("value", 0.0)),
-            min=float(d.get("min", 0.0)), max=float(d.get("max", 1.0)),
-            checked=bool(d.get("checked", False)),
-            placeholder=str(d.get("placeholder", "")),
-            group=str(d.get("group", "")),
-            items=list(d.get("items", [])),
-            sel=int(d.get("sel", -1)),
-            enabled=bool(d.get("enabled", True)),
-            visible=bool(d.get("visible", True)),
-            font_size=int(d.get("font_size", 0)),
-            anchor=str(d.get("anchor", "lt")) or "lt",
-            on_click=str(d.get("on_click", "")),
-            on_change=str(d.get("on_change", "")),
-            ov={str(k): int(v) for k, v in dict(d.get("ov", {})).items()},
+            kind=_as_str(d, "kind", "label") or "label",
+            name=_as_str(d, "name"),
+            x=_as_int(d, "x", 0), y=_as_int(d, "y", 0),
+            w=_as_int(d, "w", 100), h=_as_int(d, "h", 24),
+            text=_as_str(d, "text"),
+            color=_as_int(d, "color", 0xFFFFFF),
+            value=_as_float(d, "value", 0.0),
+            min=_as_float(d, "min", 0.0), max=_as_float(d, "max", 1.0),
+            checked=_as_bool(d, "checked", False),
+            placeholder=_as_str(d, "placeholder"),
+            group=_as_str(d, "group"),
+            items=items,
+            sel=_as_int(d, "sel", -1),
+            enabled=_as_bool(d, "enabled", True),
+            visible=_as_bool(d, "visible", True),
+            font_size=_as_int(d, "font_size", 0),
+            anchor=_as_str(d, "anchor", "lt") or "lt",
+            on_click=_as_str(d, "on_click"),
+            on_change=_as_str(d, "on_change"),
+            ov=ov,
+            extra=extra,
         )
 
     def clone(self) -> "Control":
-        return replace(self, items=list(self.items), ov=dict(self.ov))
+        return replace(self, items=list(self.items), ov=dict(self.ov),
+                       extra=copy.deepcopy(self.extra))
 
 
 # --- FormDoc ----------------------------------------------------------------
@@ -305,6 +419,15 @@ class FormDoc:
     max_h: int = 0
     controls: list = field(default_factory=list)   # list[Control]
     code: dict = field(default_factory=dict)       # Event-Handler-Koerper: name -> GB-Code
+    # Fenster-Felder der Laufzeit, die der Designer nicht darstellt (`chrome`,
+    # `menus`, `tabs`, `active_tab`) -- unveraendert durchgereicht, siehe
+    # `Control.extra`.
+    extra: dict = field(default_factory=dict)
+
+    _KNOWN = frozenset((
+        "title", "x", "y", "w", "h", "movable", "closable", "visible",
+        "resizable", "min_w", "min_h", "max_w", "max_h", "widgets", "code",
+    ))
 
     # ---- Bearbeiten ----
     def add(self, kind: str, x: int, y: int) -> Control:
@@ -320,9 +443,29 @@ class FormDoc:
         self.controls.append(c)
         return c
 
+    # Identitaets- statt Wertvergleich: `Control` ist eine dataclass mit
+    # generiertem `__eq__`, `list.remove()`/`in` treffen also das ERSTE
+    # feldgleiche Control. Zwei feldgleiche Controls sind leicht herstellbar --
+    # eine per GUI_SAVE erzeugte `.gbform` hat gar keine `name`-Felder. Vorher
+    # loeschte "das obere markieren + Entf" das untere.
+    def _index_of(self, c: Control) -> int:
+        for i, x in enumerate(self.controls):
+            if x is c:
+                return i
+        return -1
+
     def remove(self, c: Control) -> None:
-        if c in self.controls:
-            self.controls.remove(c)
+        i = self._index_of(c)
+        if i >= 0:
+            del self.controls[i]
+            self.prune_code()
+
+    def prune_code(self) -> None:
+        """Handler-Koerper verwerfen, auf die kein Control mehr zeigt -- sonst
+        wachsen `.gbform`-Dateien mit Leichen, und `_unique_handler_name` haengt
+        einem neu angelegten Handler wegen des toten Namens ein `2` an."""
+        live = set(self.handler_names())
+        self.code = {k: v for k, v in self.code.items() if k in live}
 
     def duplicate(self, c: Control, dx: int = GRID, dy: int = GRID) -> Control:
         """Kopie von `c` (versetzt, frischer Name) ans Ende (= oben) anhaengen."""
@@ -400,13 +543,15 @@ class FormDoc:
 
     def to_front(self, c: Control) -> None:
         """Z-Reihenfolge: ans Ende (zuletzt gezeichnet = oben)."""
-        if c in self.controls:
-            self.controls.remove(c); self.controls.append(c)
+        i = self._index_of(c)
+        if i >= 0:
+            del self.controls[i]; self.controls.append(c)
 
     def to_back(self, c: Control) -> None:
         """Z-Reihenfolge: an den Anfang (zuerst gezeichnet = unten)."""
-        if c in self.controls:
-            self.controls.remove(c); self.controls.insert(0, c)
+        i = self._index_of(c)
+        if i >= 0:
+            del self.controls[i]; self.controls.insert(0, c)
 
     def _unique_name(self, kind: str) -> str:
         base = {"textinput": "txt", "button": "btn", "checkbox": "chk", "radio": "rad",
@@ -441,7 +586,11 @@ class FormDoc:
         name = getattr(c, ev)
         if not name:
             suffix = {"on_click": "Click", "on_change": "Changed"}.get(ev, "Action")
-            name = self._unique_handler_name((c.name or c.kind) + suffix)
+            # Durch `_gb_ident`: der Name wird als `SUB <name>()` und als
+            # FUNCREF emittiert. Ein Control "OK Knopf" erzeugte sonst
+            # `SUB OK KnopfClick()` -- Parse-Fehler, und weil F5 die
+            # gbrt-Ausgabe verwarf, passierte einfach gar nichts.
+            name = self._unique_handler_name(_gb_ident((c.name or c.kind) + suffix))
             setattr(c, ev, name)
         self.code.setdefault(name, "")
         return name
@@ -473,23 +622,37 @@ class FormDoc:
         if self.code:
             # Designer-Metadaten (Handler-Koerper); die Runtime ignoriert `code`.
             d["code"] = {str(k): str(v) for k, v in self.code.items()}
+        for k, v in self.extra.items():       # unbekannte Laufzeit-Felder zurueckgeben
+            d.setdefault(k, copy.deepcopy(v))
         return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "FormDoc":
+        if not isinstance(d, dict):
+            d = {}
+        code_src = d.get("code")
+        code = {str(k): v for k, v in code_src.items() if isinstance(v, str)} \
+            if isinstance(code_src, dict) else {}
         doc = cls(
-            title=str(d.get("title", "Form1")),
-            x=int(d.get("x", 200)), y=int(d.get("y", 120)),
-            w=int(d.get("w", 360)), h=int(d.get("h", 260)),
-            movable=bool(d.get("movable", True)),
-            closable=bool(d.get("closable", True)),
-            visible=bool(d.get("visible", True)),
-            resizable=bool(d.get("resizable", False)),
-            min_w=int(d.get("min_w", 0)), min_h=int(d.get("min_h", 0)),
-            max_w=int(d.get("max_w", 0)), max_h=int(d.get("max_h", 0)),
-            code={str(k): str(v) for k, v in dict(d.get("code", {})).items()},
+            title=_as_str(d, "title", "Form1"),
+            x=_as_int(d, "x", 200), y=_as_int(d, "y", 120),
+            w=_as_int(d, "w", 360), h=_as_int(d, "h", 260),
+            movable=_as_bool(d, "movable", True),
+            # Default `False` wie `Gui::from_json` (gui.rs) -- der Designer zeigte
+            # sonst bei einer Datei ohne `closable` ein Schliessen-Kreuz an, das
+            # die laufende Form nicht hat. Neue Formulare bleiben schliessbar
+            # (Dataclass-Default), denn `to_dict` schreibt das Feld immer.
+            closable=_as_bool(d, "closable", False),
+            visible=_as_bool(d, "visible", True),
+            resizable=_as_bool(d, "resizable", False),
+            min_w=_as_int(d, "min_w", 0), min_h=_as_int(d, "min_h", 0),
+            max_w=_as_int(d, "max_w", 0), max_h=_as_int(d, "max_h", 0),
+            code=code,
+            extra={k: v for k, v in d.items() if k not in cls._KNOWN},
         )
-        doc.controls = [Control.from_dict(w) for w in d.get("widgets", [])]
+        widgets = d.get("widgets")
+        doc.controls = [Control.from_dict(w) for w in widgets] \
+            if isinstance(widgets, list) else []
         return doc
 
     def save(self, path: str) -> None:
@@ -498,7 +661,11 @@ class FormDoc:
 
     @classmethod
     def load(cls, path: str) -> "FormDoc":
-        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+        d = json.loads(Path(path).read_text(encoding="utf-8"))
+        if FormProject.looks_like_manifest(d):
+            raise ValueError(f"{Path(path).name} ist ein Projekt-Manifest "
+                             "(.gbproj), kein Formular")
+        return cls.from_dict(d)
 
     # ---- Code-Generierung ----
     def handler_names(self) -> list[str]:

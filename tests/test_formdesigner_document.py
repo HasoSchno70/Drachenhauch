@@ -583,3 +583,163 @@ def test_generated_runner_with_bodies():
     doc.add("button", 0, 0).on_click = "on_ok"
     src = doc.generate_runner("f.gbform", handler_bodies={"on_ok": 'PRINT "hi"'})
     assert 'PRINT "hi"' in src
+
+
+# ----------------------------------------- Roundtrip-Treue gegenueber gbrt
+# Der Designer kennt nur eine Teilmenge des Laufzeit-Formats (`gui.rs`). Alles
+# Uebrige muss er unveraendert durchreichen, sonst zerstoert ein Oeffnen+
+# Speichern im Designer Menues, Reiter, Tabellen und Baeume einer per GUI_SAVE
+# erzeugten Form.
+def test_unknown_widget_fields_survive_roundtrip():
+    src = {"kind": "table", "x": 1, "y": 2, "w": 3, "h": 4,
+           "tab_page": 1, "font": 7,
+           "table": {"headers": ["A", "B"], "rows": [["1", "2"]],
+                     "col_widths": [10, 20], "selected": -1}}
+    c = Control.from_dict(src)
+    assert c.extra["table"]["headers"] == ["A", "B"]
+    out = c.to_dict()
+    assert out["table"] == src["table"]
+    assert out["tab_page"] == 1 and out["font"] == 7
+    assert Control.from_dict(out).to_dict() == out          # stabil
+
+
+def test_unknown_window_fields_survive_roundtrip(tmp_path):
+    src = {"title": "T", "w": 100, "h": 80, "widgets": [],
+           "chrome": False, "tabs": ["Eins", "Zwei"], "active_tab": 1,
+           "menus": [{"label": "Datei", "in_bar": True,
+                      "items": [{"label": "Beenden", "separator": False,
+                                 "enabled": True}]}]}
+    p = tmp_path / "m.gbform"
+    p.write_text(json.dumps(src), encoding="utf-8")
+    FormDoc.load(str(p)).save(str(p))
+    back = json.loads(p.read_text(encoding="utf-8"))
+    for k in ("chrome", "tabs", "active_tab", "menus"):
+        assert back[k] == src[k], k
+
+
+def test_clone_does_not_share_extra():
+    c = Control.from_dict({"kind": "table", "table": {"rows": []}})
+    d = c.clone()
+    d.extra["table"]["rows"].append(["x"])
+    assert c.extra["table"]["rows"] == []
+
+
+def test_gui_save_form_survives_designer_roundtrip(run_gb, tmp_path):
+    # Golden gegen die Laufzeit: eine von gbrt geschriebene Form durch den
+    # Designer schleusen und pruefen, dass GUI_LOAD danach dasselbe sieht.
+    run_gb(
+        'IMPORT "gui"\n'
+        'DIM w AS GUI_WINDOW\nw = GUI_WINDOW("RT", 10, 20, 400, 300)\n'
+        'GUI_WINDOW_CHROME(w, FALSE)\n'
+        'DIM m AS INTEGER\nm = GUI_MENU(w, "Datei")\n'
+        'GUI_MENU_ITEM(m, "Beenden")\n'
+        'DIM tb[2] AS STRING\ntb[0] = "Eins"\ntb[1] = "Zwei"\nGUI_TABS(w, tb)\n'
+        'DIM t AS GUI_WIDGET\nt = GUI_TABLE(w, 10, 40, 200, 100)\n'
+        'DIM b AS GUI_WIDGET\nb = GUI_BUTTON(w, "K", 10, 160, 80, 24)\n'
+        'GUI_SET_TAB(b, 1)\nGUI_SAVE(w, "orig.gbform")\n',
+        base=tmp_path)
+    FormDoc.load(str(tmp_path / "orig.gbform")).save(str(tmp_path / "after.gbform"))
+    out = run_gb(
+        'IMPORT "gui"\n'
+        'DIM a AS GUI_WINDOW\nDIM b AS GUI_WINDOW\n'
+        'a = GUI_LOAD("orig.gbform")\nb = GUI_LOAD("after.gbform")\n'
+        'PRINT GUI_TO_JSON(a) = GUI_TO_JSON(b)\n',
+        base=tmp_path)
+    assert out.strip() == "TRUE"
+
+
+# ----------------------------------------- Identitaet statt Wertvergleich
+def test_remove_hits_the_selected_control_not_an_equal_twin():
+    doc = FormDoc()
+    a = doc.add("button", 10, 10); b = doc.add("button", 10, 10)
+    a.name = b.name = ""                 # feldgleich (wie bei GUI_SAVE-Formen)
+    assert a == b and a is not b
+    doc.remove(b)
+    assert len(doc.controls) == 1 and doc.controls[0] is a
+
+
+def test_to_front_does_not_duplicate_an_equal_twin():
+    doc = FormDoc()
+    a = doc.add("button", 10, 10); b = doc.add("button", 10, 10)
+    a.name = b.name = ""
+    doc.to_front(a)
+    assert [c is a for c in doc.controls].count(True) == 1
+    assert doc.controls[-1] is a and doc.controls[0] is b
+
+
+def test_remove_prunes_orphaned_handler_bodies():
+    doc = FormDoc()
+    btn = doc.add("button", 0, 0)
+    name = doc.ensure_handler(btn)
+    doc.code[name] = 'PRINT "x"'
+    doc.remove(btn)
+    assert doc.code == {}
+    assert doc.ensure_handler(doc.add("button", 0, 0)) == name   # kein "…2"
+
+
+# ----------------------------------------- Tolerantes Laden (wie gui.rs)
+def test_from_dict_tolerates_broken_json():
+    c = Control.from_dict({"kind": "button", "x": None, "color": "#ff0000",
+                           "items": None, "ov": {"bg": "blau"},
+                           "checked": "ja", "text": 42})
+    assert c.x == 0 and c.color == 0xFFFFFF and c.items == []
+    assert c.ov == {} and c.checked is False and c.text == ""
+    d = FormDoc.from_dict({"widgets": "keine liste", "code": None, "w": None})
+    assert d.controls == [] and d.code == {} and d.w == 360
+    assert FormDoc.from_dict(None).title == "Form1"
+
+
+def test_closable_default_matches_runtime():
+    # gui.rs::from_json defaultet auf false -- der Designer zeigte sonst ein
+    # Schliessen-Kreuz an, das die laufende Form nicht hat.
+    assert FormDoc.from_dict({"title": "X"}).closable is False
+    assert FormDoc().closable is True                  # neue Formulare schon
+
+
+# ----------------------------------------- GB-Emit-Helfer
+def test_gb_num_never_uses_exponent_notation():
+    from gamebasic.formdesigner.document import _gb_num
+    for v in (1e-5, 1e20, 1e-12, 0.0, -2.5):
+        assert "e" not in _gb_num(v).lower(), v
+        assert "." in _gb_num(v)
+    assert _gb_num(float("inf")) == "0.0" and _gb_num(float("nan")) == "0.0"
+
+
+def test_gb_ident_escapes_reserved_words():
+    from gamebasic.formdesigner.document import _gb_ident
+    from gamebasic.tokens import KEYWORDS
+    for w in ("Print", "DATA", "to", "Step", "Next", "End", "True"):
+        assert _gb_ident(w).lower() not in KEYWORDS, w
+    assert _gb_ident("btnSave") == "btnSave"            # unveraendert
+    assert _gb_ident("OK Knopf") == "OK_Knopf"
+
+
+def test_ensure_handler_yields_a_valid_identifier():
+    doc = FormDoc()
+    b = doc.add("button", 0, 0); b.name = "OK Knopf"
+    assert doc.ensure_handler(b) == "OK_KnopfClick"
+    b2 = doc.add("button", 0, 0); b2.name = "Print"
+    assert doc.ensure_handler(b2) == "PrintClick"       # Suffix -> kein Keyword
+
+
+# ----------------------------------------- FormProject
+def test_project_normalizes_paths():
+    p = FormProject()
+    p.add("forms/a.gbform"); p.add(r"forms\a.gbform"); p.add("./forms/a.gbform")
+    assert p.forms == ["forms/a.gbform"]
+    p.remove(r"forms\a.gbform")
+    assert p.forms == []
+    q = FormProject.from_dict({"forms": [r"sub\s.gbform"], "main": r"sub\s.gbform"})
+    assert q.forms == ["sub/s.gbform"] and q.main == "sub/s.gbform"
+
+
+def test_formdoc_load_rejects_a_project_manifest(tmp_path):
+    # Sonst laedt `gbform Projekt.GBPROJ` das Manifest als leeres Formular --
+    # und das naechste Strg+S ueberschreibt die Projektdatei.
+    p = tmp_path / "Projekt.GBPROJ"
+    FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))
+    try:
+        FormDoc.load(str(p))
+        assert False, "Manifest wurde als Formular akzeptiert"
+    except ValueError as e:
+        assert "gbproj" in str(e).lower() or "manifest" in str(e).lower()
