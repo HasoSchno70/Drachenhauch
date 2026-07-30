@@ -1,19 +1,25 @@
-"""Recursive-Descent-Parser fuer GameBasic.
+"""Recursive-Descent-Parser fuer GameBasic (Editor-Schicht).
 
-Grammatik (Phase 1):
+WICHTIG zum Einordnen: dieser Parser fuehrt NICHTS mehr aus. Seit dem
+Entfernen des Python-Tree-Walkers (Stufe B) ist `gbrt` die einzige
+Laufzeit und bringt sein eigenes Front-End mit
+(`rust/gb_runtime/src/parser.rs`). Was hier entsteht, bedient nur noch
+die Editor-/Tooling-Schicht: LSP, Live-Error-Check (als FALLBACK, wenn
+`gbrt --check` nicht auffindbar ist), Folding und Formatter. Das Outline
+ist textbasiert (`editor_qt/symbols.py`) und nutzt den AST gar nicht.
 
-  program       := { NEWLINE | statement }
-  statement     := dim | assign | print | input | if | while | for | exprstmt
-  dim           := 'DIM' IDENT 'AS' type
-  type          := 'INTEGER' | 'FLOAT' | 'STRING' | 'BOOLEAN'
-  assign        := IDENT '=' expression
-  print         := 'PRINT' [ expression { ',' expression } [ ';' ] ]
-  input         := 'INPUT' [ STRING ',' ] IDENT
-  if            := 'IF' expression 'THEN' (single_line | block_if)
-  while         := 'WHILE' expression NEWLINE { statement } 'WEND'
-  for           := 'FOR' IDENT '=' expression 'TO' expression
-                   [ 'STEP' expression ] NEWLINE { statement } 'NEXT' [ IDENT ]
-  exprstmt      := expression
+Daraus folgt die Leitregel fuer Aenderungen hier: **akzeptiere genau das,
+was gbrt auch ausfuehrt.** Zu streng heisst, der Editor streicht
+laufenden Code rot an (und weil der Fallback nur das ERSTE Problem
+liefert, verdeckt ein Fehlalarm alle echten Fehler der Datei); zu lax
+heisst, der Editor schweigt und das Programm scheitert erst zur Laufzeit.
+Im Zweifel gegen `gbrt --check` gegenpruefen, nicht raten.
+
+Die vollstaendige Grammatik steht in CLAUDE.md (Klassen, PROPERTY,
+OPERATOR, ENUM, SELECT CASE mit Guards, WITH, TRY, Comprehensions,
+Coroutinen/YIELD, Tupel-Destructuring, Slicing, IIF, ...) -- eine
+Kurzfassung hier zu pflegen ist mehrfach veraltet (sie beschrieb noch den
+"Phase 1"-Sprachstand ohne Klassen).
 
 Ausdrucks-Praezedenz (niedrig -> hoch):
   OR -> AND -> NOT -> Vergleich -> Bitwise-Binaer -> +,- -> *,/,MOD ->
@@ -81,6 +87,8 @@ class Parser:
         # de-sugared.
         self._with_counter: int = 0
         self._with_stack: list = []
+        # Verschachtelungstiefe der Ausdrucks-Rekursion (siehe _expression).
+        self._expr_depth: int = 0
 
     # ---- Helfer ------------------------------------------------------
     def _peek(self, offset=0) -> Token:
@@ -537,7 +545,7 @@ class Parser:
             func(name: "x", 5)                  -> Fehler im Caller (Reihenfolge)
 
         Wir akzeptieren hier alle Reihenfolgen - die Validierung "positional
-        muss vor named kommen" macht der Caller (Interpreter/Compiler), weil
+        muss vor named kommen" macht gbrts Compiler, weil
         er den Funktions-Kontext fuer schoenere Fehlermeldungen hat.
         """
         args: list = []
@@ -708,10 +716,10 @@ class Parser:
             self._expect(TokenType.OF, "Erwartet OF nach MAP")
             first = self._parse_type()
             if self._match(TokenType.TO):
-                # MAP OF KEY TO VALUE - in Phase 5a nur STRING-Keys erlaubt
+                # MAP OF KEY TO VALUE - nur STRING-Keys erlaubt (MAP-Konvention)
                 if first != "string":
                     raise ParseError(
-                        "MAP-Schluessel muessen STRING sein (Phase 5a)",
+                        "MAP-Schluessel muessen STRING sein",
                         type_tok.line, type_tok.col,
                     )
                 value_type = self._parse_type()
@@ -1280,7 +1288,7 @@ class Parser:
 
     # Mapping: Operator-Token -> interner Methoden-Name. Die internen Namen
     # werden im Class-Methods-Dict gespeichert; der BinaryOp-Dispatch in
-    # Tree-Walker und VMs lookt sie auf.
+    # gbrts VM lookt sie unter diesem Namen auf.
     _OPERATOR_NAMES = {
         TokenType.PLUS:  "__op_add__",
         TokenType.MINUS: "__op_sub__",
@@ -1300,7 +1308,7 @@ class Parser:
 
         Erlaubt nur in Class-Body. Wird intern als Methode mit reserviertem
         Namen registriert (z.B. `__op_add__` fuer `OPERATOR +`). Der
-        BinaryOp-Dispatch in Tree-Walker und beiden VMs lookt diese Methoden
+        Der BinaryOp-Dispatch in gbrts VM lookt diese Methoden
         auf, wenn ein Operand eine User-Instanz mit passender Operator-Methode
         ist.
 
@@ -1387,7 +1395,7 @@ class Parser:
         prop_name = name_tok.value
         internal_name = f"__{kind}_{prop_name.lower()}"
         params = self._params()
-        # Beim Compiler/Tree-Walker: getter ist FUNCTION, setter ist SUB.
+        # In gbrts Compiler: getter ist FUNCTION, setter ist SUB.
         if kind == "get":
             self._expect(TokenType.AS, "Erwartet AS <Rueckgabetyp> nach PROPERTY GET-Parametern")
             return_type = self._parse_type()
@@ -1518,13 +1526,37 @@ class Parser:
         return New(name_tok.value, args)
 
     # ---- Ausdruecke --------------------------------------------------
+    # Jede Verschachtelungsebene kostet ~12 Stack-Frames durch die feste
+    # Praezedenz-Kette. Ohne eigene Grenze knallt tief verschachtelter Code
+    # in Pythons RecursionError -- die faengt `_check_syntax_only` zwar ab,
+    # meldet dem Nutzer dann aber "maximum recursion depth exceeded" auf
+    # Zeile 1 statt zu sagen, WO und WAS das Problem ist.
+    #
+    # Die Grenze muss deutlich UNTER dem physisch Moeglichen liegen: gemessen
+    # sind unter pytest nur ~78 Ebenen drin, bevor Python selbst abbricht --
+    # und wie viel Stack uebrig ist, haengt davon ab, wie tief der Aufrufer
+    # schon steckt (Editor-Thread, LSP-Handler, Test-Runner sind
+    # unterschiedlich tief). 40 laesst rund die Haelfte des Budgets als
+    # Reserve und ist fuer echten Code weit jenseits von allem Sinnvollen
+    # (typische Ausdruecke bleiben unter 10 Ebenen).
+    _MAX_EXPR_DEPTH = 40
+
     def _expression(self):
         # YIELD ist ein niedrig-praezedenter Ausdruck: `x = YIELD a + b`
         # parst als `x = YIELD (a + b)`. Als Statement (`YIELD v`) faellt es
         # ueber den ExprStmt-Fallback hier herein.
-        if self._check(TokenType.YIELD):
-            return self._yield_expr()
-        return self._or_expr()
+        self._expr_depth += 1
+        try:
+            if self._expr_depth > self._MAX_EXPR_DEPTH:
+                tok = self._peek()
+                raise ParseError(
+                    f"Ausdruck zu tief verschachtelt (max. "
+                    f"{self._MAX_EXPR_DEPTH} Ebenen)", tok.line, tok.col)
+            if self._check(TokenType.YIELD):
+                return self._yield_expr()
+            return self._or_expr()
+        finally:
+            self._expr_depth -= 1
 
     def _yield_expr(self):
         self._expect(TokenType.YIELD)

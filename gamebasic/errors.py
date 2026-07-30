@@ -1,4 +1,14 @@
-"""Fehlerklassen fuer GameBasic."""
+"""Fehlerklassen fuer GameBasic.
+
+Nur noch drei Typen: `LexerError` und `ParseError` aus der Editor-Schicht
+(Lexer/Parser bedienen Highlighting, LSP, Error-Check, Folding, Formatter),
+`GBRuntimeError` fuer alles, was `conftest.run_gb` aus gbrts stderr
+zurueckuebersetzt.
+
+Entfernt: `TypeMismatchError` (seit dem Wegfall des Python-Tree-Walkers kann
+es niemand mehr werfen -- Typpruefung passiert ausschliesslich in gbrt) und
+`GameBasicError.set_line()` (hatte projektweit keinen einzigen Aufrufer).
+"""
 
 
 class GameBasicError(Exception):
@@ -14,26 +24,12 @@ class GameBasicError(Exception):
             return f"[Zeile {self.line}] {kind}: {self.message}"
         return f"{kind}: {self.message}"
 
-    def set_line(self, line: int) -> "GameBasicError":
-        """Setzt nachtraeglich eine Quell-Zeile (nur wenn noch keine gesetzt)
-        und aktualisiert die formatierte Meldung. `str(e)` enthaelt die
-        Zeile erst dann -- die Exception-Args werden bei __init__ EINMAL
-        eingefroren, darum hier neu formatieren. Liefert self (chainbar)."""
-        if line and not self.line:
-            self.line = line
-            self.args = (self._format(),)
-        return self
-
 
 class LexerError(GameBasicError):
     pass
 
 
 class ParseError(GameBasicError):
-    pass
-
-
-class TypeMismatchError(GameBasicError):
     pass
 
 

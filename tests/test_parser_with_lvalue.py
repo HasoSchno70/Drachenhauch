@@ -202,3 +202,20 @@ def test_calling_a_literal_is_rejected_like_gbrt(src):
 ])
 def test_legitimate_call_targets_still_work(src):
     parse(src)
+
+
+# --- L6: tiefe Verschachtelung ergibt einen positionierten Fehler ---
+
+def test_deeply_nested_expression_gives_a_positioned_parse_error():
+    """Jede Ebene kostet ~12 Stack-Frames durch die feste Praezedenz-Kette.
+    Ohne eigene Grenze knallte es in Pythons RecursionError -- den faengt
+    `_check_syntax_only` zwar ab, meldet dem Nutzer dann aber "maximum
+    recursion depth exceeded" auf Zeile 1 statt zu sagen, wo und was."""
+    src = "PRINT " + "(" * 120 + "1" + ")" * 120
+    with pytest.raises(ParseError, match="zu tief verschachtelt"):
+        parse(src)
+
+
+@pytest.mark.parametrize("n", [1, 5, 20])
+def test_normal_nesting_depth_still_parses(n):
+    parse("PRINT " + "(" * n + "1" + ")" * n)

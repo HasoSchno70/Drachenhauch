@@ -110,13 +110,19 @@ sonst erkennt der Preprocessor `IMPORT "modul"` nicht). Dann Golden-Test +
 `builtin_index.json`.
 
 **IMPORT-Auflösung in [preprocess.py](gamebasic/preprocess.py):**
-1. Existiert `<name>.gb` im aktuellen Verzeichnis? → textuelles Inkludieren (Quellcode-Modul).
-2. Sonst: ist `<name>` ein bekanntes Built-in-Modul (`KNOWN_MODULES`)? → die
+Der Pfad wird **wörtlich** aufgelöst — es wird KEINE `.gb`-Endung angehängt.
+1. Existiert der geschriebene Pfad als Datei? → textuelles Inkludieren
+   (Quellcode-Modul). Dafür muss die Endung mitgeschrieben werden:
+   `IMPORT "helfer.gb"`.
+2. Sonst: ist der Name ein bekanntes Built-in-Modul (`KNOWN_MODULES`)? → die
    `IMPORT`-Zeile wird zu einem Kommentar (gbrt kennt das Modul nativ).
 3. Sonst: Fehler.
 
-So kann ein User ein eigenes `json.gb` schreiben, das Vorrang vor dem Built-in hat
-— hilfreich für Tests.
+Daraus folgt: **`IMPORT "json"` nimmt IMMER das eingebaute Modul**, auch wenn
+ein `json.gb` daneben liegt — die Endung fehlt, also greift Regel 1 gar nicht.
+Wer ein Built-in mit eigenem Code überschreiben will (z.B. für Tests), muss die
+Endung schreiben: `IMPORT "json.gb"`. Beide Engines verhalten sich identisch
+(in beiden verifiziert).
 
 ## Verfügbare Built-in-Module
 

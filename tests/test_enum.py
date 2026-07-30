@@ -6,7 +6,7 @@ in test_enum_native.py separat gepflegt.
 """
 import pytest
 
-from gamebasic.errors import ParseError, GBRuntimeError, TypeMismatchError
+from gamebasic.errors import ParseError, GBRuntimeError
 
 
 # Beide Helper geben stdout zurueck, identisch verwendbar.
