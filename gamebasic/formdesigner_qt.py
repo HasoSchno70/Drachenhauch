@@ -68,6 +68,17 @@ def _col(i: int) -> QColor:
     return QColor((i >> 16) & 0xFF, (i >> 8) & 0xFF, i & 0xFF)
 
 
+def _progress_frac(c) -> float:
+    """Fuellstand eines ProgressBar-Controls -- exakt wie die Laufzeit
+    (`gui.rs`, `Kind::Progress`): Anteil an [min, max]. Die Canvas las `value`
+    vorher roh als 0..1, ein Balken mit max=100/value=25 sah dadurch randvoll
+    aus und lief zur Laufzeit dann bei 25 %."""
+    span = c.max - c.min
+    if span == 0:
+        return 0.0
+    return min(1.0, max(0.0, (c.value - c.min) / span))
+
+
 # MIME-Typ fuer Drag&Drop eines Palette-Eintrags (Control-Art).
 _CONTROL_MIME = "application/x-gbcontrol-kind"
 
@@ -265,8 +276,17 @@ class _Canvas(QWidget):
         self.doc = doc
         self.selected = None
         self.selection = []
+        # Alle Gesten-Flags loeschen: das Dokument kann mitten im Ziehen
+        # getauscht werden (Strg+Z, Formularwechsel). Blieben sie stehen,
+        # verschob die naechste Mausbewegung das neue Dokument.
         self._pending = None
         self._band = False
+        self._drag = False
+        self._multi = False
+        self._drag_starts = []
+        self._resize_handle = None
+        self._form_resize = None
+        self.place_kind = None
         self._guides_v = []; self._guides_h = []
         self.selection_changed.emit(None)
         self.doc_replaced.emit(doc)
@@ -349,7 +369,12 @@ class _Canvas(QWidget):
         ny, gy = self._align_axis(py, c.h, self._y_targets(c))
         c.x = int(nx) if nx is not None else self._snap(px)
         c.y = int(ny) if ny is not None else self._snap(py)
-        c.x = max(0, c.x); c.y = max(0, c.y)
+        # Im Formular halten: ein weit nach rechts/unten gezogenes Control lag
+        # sonst ausserhalb der Zeichenflaeche -- unsichtbar, nicht anklickbar,
+        # in keiner Liste, und so auch ins .gbform gespeichert. Zurueckholen
+        # ging nur per Undo oder Hand-Edit im JSON.
+        c.x = min(max(0, c.x), self._max_x(c))
+        c.y = min(max(0, c.y), self._max_y(c))
         self._guides_v = [int(gx)] if gx is not None else []
         self._guides_h = [int(gy)] if gy is not None else []
 
@@ -370,12 +395,32 @@ class _Canvas(QWidget):
             "sw": QPoint(x, by), "w": QPoint(x, my),
         }
 
+    def _handle_tol(self, c: Control | None = None) -> float:
+        """Trefferradius eines Resize-Griffs im Zeichen-Raum.
+
+        `/zoom`, damit der Griff auf dem BILDSCHIRM immer gleich gross ist (bei
+        0,25x war er sonst 2 px gross und praktisch nicht treffbar). Zusaetzlich
+        nie mehr als ein Viertel des Controls: die 8 Zonen ueberdeckten ein
+        16x16-Control (Checkbox/Radio = Palette-Default) sonst zu 100 %, es gab
+        keinen Pixel mehr zum Verschieben -- jeder Zieh-Versuch hat die Checkbox
+        stattdessen auf 8x8 geschrumpft."""
+        t = (HANDLE / 2.0) / (self.zoom or 1.0)
+        if c is not None:
+            t = min(t, c.w / 4.0, c.h / 4.0)
+        return max(2.0, t)
+
     def _handle_at(self, p: QPoint) -> str | None:
         """Welcher Resize-Griff des selektierten Controls liegt unter `p`?"""
-        if self.selected is None:
+        c = self.selected
+        if c is None:
             return None
-        tol = HANDLE
-        for name, hp in self._handle_points(self.selected).items():
+        tol = self._handle_tol(c)
+        # Innenbereich gehoert immer dem Verschieben (durch die Viertel-Grenze
+        # oben bleibt er mindestens halb so gross wie das Control).
+        x, y = PAD + c.x, PAD + TITLE_H + c.y
+        if (x + tol < p.x() < x + c.w - tol) and (y + tol < p.y() < y + c.h - tol):
+            return None
+        for name, hp in self._handle_points(c).items():
             if abs(p.x() - hp.x()) <= tol and abs(p.y() - hp.y()) <= tol:
                 return name
         return None
@@ -392,7 +437,7 @@ class _Canvas(QWidget):
     def _form_handle_at(self, p: QPoint) -> str | None:
         if self.selection:                       # nur wenn das Fenster "selektiert" ist
             return None
-        tol = HANDLE
+        tol = self._handle_tol()
         for name, hp in self._form_handle_points().items():
             if abs(p.x() - hp.x()) <= tol and abs(p.y() - hp.y()) <= tol:
                 return name
@@ -448,7 +493,12 @@ class _Canvas(QWidget):
         Koordinaten (Inhalt: x ab Form-Links, y ab unter der Titelleiste),
         skaliert mit dem Zoom; markieren den Bereich der Selektion cyan."""
         z = self.zoom
-        R = RULER
+        # Die Lineale liegen im Widget-Raum und schrumpfen daher NICHT mit dem
+        # Zoom -- der Formularrand (PAD) schon. Ab etwa 0,7x deckten sie sonst
+        # den Anfang des Formulars zu: Controls bis x=48 waren bei 0,25x
+        # unsichtbar (aber weiter anklickbar), man suchte ein "verschwundenes"
+        # Control. Darum die Leiste auf den verfuegbaren Rand begrenzen.
+        R = max(6, min(RULER, int(PAD * z)))
         bg = QColor(28, 34, 42); tickc = QColor(96, 112, 128); txt = QColor(150, 165, 180)
         ox = PAD * z                       # Widget-x von Form-Inhalt-x = 0
         oy = (PAD + TITLE_H) * z            # Widget-y von Form-Inhalt-y = 0
@@ -492,9 +542,9 @@ class _Canvas(QWidget):
         qp.drawRect(QRect(PAD - 1, PAD - 1, d.w + 2, d.h + 2))
         qp.setPen(QPen(QColor(12, 18, 24), 1))
         qp.setBrush(QBrush(QColor(43, 196, 232)))
-        s = HANDLE
+        s = HANDLE / (self.zoom or 1.0)      # auf dem Bildschirm konstant gross
         for hp in self._form_handle_points().values():
-            qp.drawRect(QRect(hp.x() - s // 2, hp.y() - s // 2, s, s))
+            qp.drawRect(QRectF(hp.x() - s / 2, hp.y() - s / 2, s, s))
 
     def _paint_selection(self, qp: QPainter):
         """Mehrfach-Selektion: alle bekommen einen Rahmen, das primaere Control
@@ -619,12 +669,7 @@ class _Canvas(QWidget):
             qp.restore()
         elif k == "progress":
             qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
-            # Wie die Laufzeit (gui.rs, Kind::Progress): Anteil an [min,max].
-            # Vorher wurde `value` roh als 0..1 gelesen -- ein Balken mit
-            # max=100/value=25 sah im Designer randvoll aus, lief aber bei 25 %.
-            pspan = c.max - c.min
-            frac = 0.0 if pspan == 0 else (c.value - c.min) / pspan
-            frac = min(1.0, max(0.0, frac))
+            frac = _progress_frac(c)
             fillw = int((w - 2) * frac)
             if fillw > 0:
                 qp.fillRect(QRect(x + 1, y + 1, fillw, h - 2), accent)
@@ -665,15 +710,51 @@ class _Canvas(QWidget):
         qp.setPen(QPen(QColor(43, 196, 232), 1, Qt.PenStyle.DashLine))
         qp.setBrush(Qt.BrushStyle.NoBrush)
         qp.drawRect(QRect(x - 1, y - 1, c.w + 2, c.h + 2))
-        # 8 Resize-Griffe
+        # 8 Resize-Griffe -- so gross wie ihre Trefferzone (siehe _handle_tol)
         qp.setPen(QPen(QColor(12, 18, 24), 1))
         qp.setBrush(QBrush(QColor(43, 196, 232)))
-        s = HANDLE
+        s = 2 * self._handle_tol(c)
         for hp in self._handle_points(c).values():
-            qp.drawRect(QRect(hp.x() - s // 2, hp.y() - s // 2, s, s))
+            qp.drawRect(QRectF(hp.x() - s / 2, hp.y() - s / 2, s, s))
 
     # -- Maus --
+    def _finish_gesture(self):
+        """Laufende Geste beenden: Undo-Checkpoint setzen (falls sich wirklich
+        etwas geaendert hat) und ALLE Gesten-Flags loeschen.
+
+        Wird nicht nur beim Loslassen gerufen, sondern auch, wenn sich die Maus
+        ohne gedrueckte Taste bewegt. Sonst ueberlebte der Zustand jede
+        Unterbrechung, die das Release verschluckt (modales Kontextmenue,
+        Fokusverlust) oder das Dokument tauscht (Strg+Z waehrend des Ziehens) --
+        danach verschob schon blosses Hovern das Control, ohne Undo."""
+        active = (self._drag or self._multi or self._band
+                  or self._resize_handle is not None or self._form_resize is not None
+                  or self._pending is not None)
+        if not active:
+            return False
+        if self._band:
+            self._finish_band()
+            self._band = False
+        if self._pending is not None:
+            if self.commit_history and self._pending != self.doc.to_dict():
+                self.commit_history(self._pending)
+            self._pending = None
+        self._drag = False
+        self._multi = False
+        self._drag_starts = []
+        self._resize_handle = None
+        self._form_resize = None
+        self._clear_guides()
+        return True
+
     def mousePressEvent(self, ev):
+        # Nur die linke Taste bedient Platzieren/Selektieren/Ziehen. Vorher
+        # platzierte auch ein Rechtsklick ein scharf geschaltetes Control und
+        # startete unsichtbare Auswahlrahmen; ausserdem ueberschrieb eine
+        # zweite Taste mitten im Ziehen den Pre-Gesten-Snapshot, womit die
+        # ganze Verschiebung nicht mehr rueckgaengig zu machen war.
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return
         self._nudge_active = False
         p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
@@ -709,7 +790,7 @@ class _Canvas(QWidget):
             self._toggle_select(hit)
             self.update()
             return
-        if hit not in self.selection:                         # neues Einzel-Ziel
+        if not self._in_selection(hit):                       # neues Einzel-Ziel
             self._select(hit)
         else:                                                 # Teil der Gruppe -> primary
             self.selected = hit
@@ -731,12 +812,39 @@ class _Canvas(QWidget):
     def _multi_move(self, cx: int, cy: int):
         dx = self._snap(cx - self._drag_origin[0])
         dy = self._snap(cy - self._drag_origin[1])
+        # Das Delta begrenzen, NICHT jedes Control einzeln: bei einem
+        # Einzel-Clamp liefen die Controls am Rand auf, waehrend die anderen
+        # weiterwanderten -- eine ausgerichtete Knopfreihe wurde beim Schieben
+        # an den linken Rand still zusammengedrueckt.
+        dx = self._clamp_delta(dx, [(sx, self._max_x(c)) for c, sx, _ in self._drag_starts])
+        dy = self._clamp_delta(dy, [(sy, self._max_y(c)) for c, _, sy in self._drag_starts])
         for c, sx, sy in self._drag_starts:
-            c.x = max(0, sx + dx); c.y = max(0, sy + dy)
+            c.x = sx + dx; c.y = sy + dy
+
+    @staticmethod
+    def _clamp_delta(d: int, starts: list) -> int:
+        """Verschiebe-Delta so begrenzen, dass alle Controls im Formular
+        bleiben. `starts` = [(startwert, maximum)]. Passt die Gruppe nicht
+        vollstaendig hinein, wird nur nach links/oben geklemmt -- lieber ein
+        Ueberstand als eine verzerrte Gruppe."""
+        lo = -min(s for s, _ in starts)
+        hi = min(m - s for s, m in starts)
+        return max(lo, min(d, hi)) if hi >= lo else max(lo, d)
+
+    def _max_x(self, c: Control) -> int:
+        return max(0, self.doc.w - c.w)
+
+    def _max_y(self, c: Control) -> int:
+        return max(0, self.doc.h - TITLE_H - c.h)
 
     def mouseMoveEvent(self, ev):
         p = self._to_draw(ev.position())
         cx, cy = self._to_ctrl(p)
+        if not (ev.buttons() & Qt.MouseButton.LeftButton):
+            # Ohne gedrueckte Taste darf keine Geste mehr laufen -- sonst
+            # verschiebt/resized blosses Hovern (siehe _finish_gesture).
+            if self._finish_gesture():
+                self.update()
         if self._band:
             self._band_now = (cx, cy)
             self.update()
@@ -754,7 +862,16 @@ class _Canvas(QWidget):
         if self._resize_handle is not None and self.selected is not None:
             c = self.selected
             nx, ny = self._snap(cx), self._snap(cy)
-            c.x, c.y, c.w, c.h = resize_rect(c.x, c.y, c.w, c.h, self._resize_handle, nx, ny)
+            rx, ry, rw, rh = resize_rect(c.x, c.y, c.w, c.h, self._resize_handle, nx, ny)
+            # Der Resize-Pfad klemmte als einziger NICHT auf >= 0: ein Zug am
+            # NW-/N-/W-Griff ueber die obere/linke Formularkante hinaus schrieb
+            # `x: -56` ins .gbform, zur Laufzeit ragte das Widget aus dem
+            # Fenster und wurde weggeclippt. Kante festhalten, Groesse kuerzen.
+            if rx < 0:
+                rw += rx; rx = 0
+            if ry < 0:
+                rh += ry; ry = 0
+            c.x, c.y, c.w, c.h = rx, ry, max(1, rw), max(1, rh)
             self.selection_changed.emit(c)               # Inspector live aktualisieren
             self.doc_changed.emit()
             self.update()
@@ -776,19 +893,9 @@ class _Canvas(QWidget):
             self.setCursor(_HANDLE_CURSORS[handle] if handle else Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, _ev):
-        if self._band:                                       # Rubber-Band auswerten
-            self._finish_band()
-            self._band = False
-        # Gesten-Ende: nur einen Undo-Checkpoint, falls sich wirklich was aenderte.
-        if self._pending is not None:
-            if self.commit_history and self._pending != self.doc.to_dict():
-                self.commit_history(self._pending)
-            self._pending = None
-        self._drag = False
-        self._multi = False
-        self._resize_handle = None
-        self._form_resize = None
-        self._clear_guides()                     # Hilfslinien nach dem Ziehen weg
+        # Gesten-Ende: Rubber-Band auswerten, dann nur EIN Undo-Checkpoint --
+        # und auch nur, falls sich wirklich etwas geaendert hat.
+        self._finish_gesture()
         self.update()
 
     def _finish_band(self):
@@ -802,12 +909,15 @@ class _Canvas(QWidget):
             self._select_many(hits, additive=self._band_additive)
 
     def mouseDoubleClickEvent(self, ev):
+        if ev.button() != Qt.MouseButton.LeftButton:
+            return
         cx, cy = self._to_ctrl(self._to_draw(ev.position()))
         hit = self.doc.control_at(cx, cy)
         if hit is not None:
-            self._drag = False
-            self._pending = None        # kein Drag aus dem ersten Klick verschleppen
-            self._select(hit)
+            # Geste des ersten Klicks sauber abschliessen statt den Snapshot zu
+            # verwerfen -- eine Bewegung dazwischen waere sonst nicht undobar.
+            self._finish_gesture()
+            self._focus_on(hit)         # Mehrfach-Auswahl nicht wegwerfen
             self.update()
             self.handler_requested.emit(hit)
 
@@ -816,6 +926,8 @@ class _Canvas(QWidget):
         Drag&Drop genutzt). Setzt einen Undo-Checkpoint + selektiert es."""
         pre = self.doc.to_dict()
         c = self.doc.add(kind, max(self._snap(cx), 0), max(self._snap(cy), 0))
+        # Auch ein Klick neben das Formular soll ein erreichbares Control geben.
+        c.x = min(c.x, self._max_x(c)); c.y = min(c.y, self._max_y(c))
         if self.commit_history:
             self.commit_history(pre)
         self._select(c)
@@ -850,6 +962,10 @@ class _Canvas(QWidget):
 
     def keyPressEvent(self, ev):
         if ev.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace) and self.selection:
+            # Ein laufender Drag darf hier nicht weiterlaufen -- sein Release
+            # haette sonst einen zweiten, leeren Undo-Schritt erzeugt.
+            self._drag = False; self._multi = False; self._pending = None
+            self._resize_handle = None; self._form_resize = None
             pre = self.doc.to_dict()                         # Undo: Zustand vor dem Loeschen
             for c in list(self.selection):
                 self.doc.remove(c)
@@ -873,7 +989,8 @@ class _Canvas(QWidget):
                 self.commit_history(self.doc.to_dict())      # Pre-Nudge-Snapshot
             self._nudge_active = True
         for c in self.selection:
-            c.x = max(0, c.x + dx); c.y = max(0, c.y + dy)
+            c.x = min(max(0, c.x + dx), self._max_x(c))
+            c.y = min(max(0, c.y + dy), self._max_y(c))
         self.selection_changed.emit(self.selected)
         self.doc_changed.emit()
         self.update()
@@ -882,9 +999,26 @@ class _Canvas(QWidget):
         cx, cy = self._to_ctrl(self._to_draw(ev.pos()))
         hit = self.doc.control_at(cx, cy)
         if hit is not None:
-            self._select(hit)
+            self._focus_on(hit)
             self.update()
             self.context_menu.emit(ev.globalPos())
+
+    def _in_selection(self, c: Control) -> bool:
+        """Identitaets- statt Wertvergleich -- `Control` ist eine dataclass mit
+        generiertem `__eq__`, `in` traefe also jedes feldgleiche Control."""
+        return any(x is c for x in self.selection)
+
+    def _focus_on(self, c: Control):
+        """`c` zum primaeren Control machen. Gehoert es schon zur Auswahl,
+        bleibt die Gruppe bestehen -- Rechtsklick/Doppelklick auf ein
+        Gruppenmitglied warf sie vorher weg, weshalb das Kontextmenue-Loeschen
+        von fuenf markierten Controls nur eines erwischte."""
+        if self._in_selection(c):
+            self.selected = c
+            self._nudge_active = False
+            self.selection_changed.emit(c)
+        else:
+            self._select(c)
 
     def _select(self, c: Control | None):
         self.selected = c
@@ -894,8 +1028,8 @@ class _Canvas(QWidget):
 
     def _toggle_select(self, c: Control):
         """Strg+Klick: Control zur Mehrfach-Selektion hinzu/heraus."""
-        if c in self.selection:
-            self.selection.remove(c)
+        if self._in_selection(c):
+            self.selection = [x for x in self.selection if x is not c]
             self.selected = self.selection[-1] if self.selection else None
         else:
             self.selection.append(c)
@@ -906,7 +1040,7 @@ class _Canvas(QWidget):
     def _select_many(self, controls: list, additive: bool = False):
         if additive:
             for c in controls:
-                if c not in self.selection:
+                if not self._in_selection(c):
                     self.selection.append(c)
         else:
             self.selection = list(controls)
@@ -927,7 +1061,11 @@ class _Inspector(QWidget):
         self.name = QLineEdit(); self.text = QLineEdit()
         self.sx = QSpinBox(); self.sy = QSpinBox(); self.sw = QSpinBox(); self.sh = QSpinBox()
         for s in (self.sx, self.sy, self.sw, self.sh):
-            s.setRange(0, 4000)
+            s.setRange(0, 32000)         # 4000 klemmte grosse Controls still ab
+        # Mindestens 1x1: bei Breite oder Hoehe 0 trifft `control_at` das
+        # Control nicht mehr -- es war weder selektierbar noch sichtbar und
+        # nur per Undo zurueckzuholen.
+        self.sw.setMinimum(1); self.sh.setMinimum(1)
         self.enabled = QCheckBox("aktiviert")
         self.checked = QCheckBox("angehakt")
         self.on_click = QLineEdit(); self.on_change = QLineEdit()

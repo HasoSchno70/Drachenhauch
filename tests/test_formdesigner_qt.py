@@ -637,3 +637,202 @@ def test_export_gb_writes_file(tmp_path, monkeypatch):
     txt = out.read_text(encoding="utf-8")
     assert "GUI_BUTTON(" in txt and "GUI_ON_CLICK(" in txt and "SUB go()" in txt
     win.close()
+
+
+# ------------------------------------------------- Canvas-Interaktion (Review)
+_R = Qt.MouseButton.RightButton
+
+
+def _mhover(cv, cx, cy):
+    """Mausbewegung OHNE gedrueckte Taste."""
+    cv.mouseMoveEvent(QMouseEvent(QEvent.Type.MouseMove,
+        QPointF(PAD + cx, PAD + TITLE_H + cy), _NB, _NB, _NO))
+
+
+def test_small_control_can_be_dragged_not_resized(tmp_path):
+    # Die 8 Griff-Trefferzonen ueberdeckten ein 16x16-Control (Checkbox/Radio =
+    # Palette-Default) vollstaendig -- jeder Zieh-Versuch hat es auf 8x8
+    # geschrumpft statt es zu verschieben.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("checkbox", 48, 48)
+    assert (c.w, c.h) == (16, 16)
+    cv._select(c)
+    _mpress(cv, c.x + c.w // 2, c.y + c.h // 2)       # Mitte = Verschieben
+    assert cv._resize_handle is None and cv._drag
+    _mmove(cv, c.x + c.w // 2 + 40, c.y + c.h // 2 + 40)
+    _mrelease(cv)
+    assert (c.w, c.h) == (16, 16)                     # Groesse unveraendert
+    assert (c.x, c.y) != (48, 48)                     # aber verschoben
+    win.close()
+
+
+def test_small_control_corner_still_resizes(tmp_path):
+    # Der Innenbereich gehoert dem Verschieben -- die Ecke muss trotzdem greifen.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("checkbox", 48, 48)
+    cv._select(c)
+    _mpress(cv, c.x + c.w, c.y + c.h)                 # exakt der SE-Griff
+    assert cv._resize_handle == "se"
+    win.close()
+
+
+def test_hover_after_interrupted_drag_does_not_move(tmp_path):
+    # Verschluckt etwas das Release (modales Kontextmenue, Fokusverlust), blieb
+    # `_drag` gesetzt und jede Mausbewegung schleppte das Control mit.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("button", 16, 16)
+    cv._select(c)
+    _mpress(cv, 66, 30)   # Control-Mitte
+    _mmove(cv, 106, 70)
+    pos = (c.x, c.y)
+    _mhover(cv, 200, 150)                             # nur Hovern, keine Taste
+    assert (c.x, c.y) == pos
+    assert not cv._drag and cv._pending is None
+    win.close()
+
+
+def test_right_click_keeps_multi_selection(tmp_path):
+    # Rechtsklick auf ein Gruppenmitglied warf die Auswahl weg -- das
+    # Kontextmenue-"Loeschen" erwischte danach nur ein Control von fuenf.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 16, 16)
+    b = cv.doc.add("button", 16, 60)
+    cv._select_many([a, b])
+    # Signal blocken: `_show_context_menu` wuerde `menu.exec()` modal oeffnen
+    # und den Testprozess anhalten.
+    cv.blockSignals(True)
+    cv.contextMenuEvent(type("E", (), {
+        "pos": lambda self=None: QPointF(PAD + 20, PAD + TITLE_H + 20).toPoint(),
+        "globalPos": lambda self=None: QPointF(0, 0).toPoint()})())
+    cv.blockSignals(False)
+    assert len(cv.selection) == 2 and cv.selected is a
+    win.close()
+
+
+def test_right_button_does_not_place_or_band(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    cv.place_kind = "button"
+    cv.mousePressEvent(QMouseEvent(QEvent.Type.MouseButtonPress,
+        QPointF(PAD + 40, PAD + TITLE_H + 40), _R, _R, _NO))
+    assert len(cv.doc.controls) == 0 and cv.place_kind == "button"
+    assert not cv._band
+    win.close()
+
+
+def test_selection_ops_use_identity_not_equality(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 16, 16)
+    b = cv.doc.add("button", 16, 16)
+    a.name = b.name = ""                              # feldgleich
+    assert a == b and a is not b
+    cv._select_many([a, b])
+    cv._toggle_select(b)          # b raus -- `remove()` traf vorher a (erstes gleiches)
+    assert len(cv.selection) == 1 and cv.selection[0] is a
+    win.close()
+
+
+def test_group_drag_keeps_spacing_at_the_left_edge(tmp_path):
+    # Der 0-Clamp wirkte pro Control: die Gruppe wurde am Rand zusammengedrueckt.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    a = cv.doc.add("button", 8, 8)
+    b = cv.doc.add("button", 80, 8)
+    gap = b.x - a.x
+    cv._select_many([a, b])
+    _mpress(cv, 12, 12)
+    _mmove(cv, -200, 12)                              # weit ueber den Rand
+    _mrelease(cv)
+    assert a.x == 0 and b.x - a.x == gap
+    win.close()
+
+
+def test_resize_never_produces_negative_coordinates(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("button", 100, 100)
+    cv._select(c)
+    _mpress(cv, c.x, c.y)                             # NW-Griff
+    assert cv._resize_handle == "nw"
+    _mmove(cv, -80, -70)                              # ueber die Formularkante
+    _mrelease(cv)
+    assert c.x >= 0 and c.y >= 0 and c.w >= 1 and c.h >= 1
+    win.close()
+
+
+def test_control_stays_inside_the_form(tmp_path):
+    # Weit nach rechts/unten gezogen lag das Control ausserhalb der
+    # Zeichenflaeche: unsichtbar, nicht anklickbar, so gespeichert.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("button", 16, 16)
+    cv._select(c)
+    _mpress(cv, 66, 30)   # Control-Mitte
+    _mmove(cv, 4000, 3000)
+    _mrelease(cv)
+    assert c.x + c.w <= cv.doc.w
+    assert c.y + c.h <= cv.doc.h - TITLE_H
+    assert cv.doc.control_at(c.x + 2, c.y + 2) is c   # weiter erreichbar
+    win.close()
+
+
+def test_set_doc_clears_gesture_state(tmp_path):
+    # Undo/Formularwechsel mitten im Ziehen: die Flags durften nicht ueberleben.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("button", 16, 16)
+    cv._select(c)
+    _mpress(cv, 66, 30)   # Control-Mitte
+    assert cv._drag
+    cv.set_doc(cv.doc)
+    assert not cv._drag and cv._pending is None and cv.place_kind is None
+    win.close()
+
+
+def test_delete_during_drag_makes_one_undo_step(tmp_path):
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    c = cv.doc.add("button", 16, 16)
+    win.history.clear()
+    cv._select(c)
+    _mpress(cv, 66, 30)   # Control-Mitte
+    _mmove(cv, 106, 70)
+    _press(cv, Qt.Key.Key_Delete)
+    _mrelease(cv)
+    assert len(cv.doc.controls) == 0
+    assert len(win.history._undo) == 1
+    win.close()
+
+
+def test_progress_preview_uses_min_max_like_the_runtime(tmp_path):
+    # Die Canvas las `value` roh als 0..1 -- ein Balken mit max=100/value=25
+    # sah randvoll aus, lief zur Laufzeit aber bei 25 %.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    from gamebasic.formdesigner_qt import _progress_frac
+    p = cv.doc.add("progress", 10, 10)
+    p.min, p.max, p.value = 0.0, 100.0, 25.0
+    assert _progress_frac(p) == 0.25                   # vorher 1.0 = randvoll
+    p.min, p.max, p.value = 0.0, 1.0, 0.5
+    assert _progress_frac(p) == 0.5                    # 0..1 unveraendert
+    p.min, p.max = 5.0, 5.0
+    assert _progress_frac(p) == 0.0                    # Nullspanne, keine Division
+    assert not cv.grab().isNull()                      # paintEvent laeuft
+    win.close()
