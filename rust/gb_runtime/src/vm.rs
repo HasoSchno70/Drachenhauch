@@ -3952,6 +3952,41 @@ impl<'p> Vm<'p> {
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),
             "mousebutton" => Value::Bool(g!().mouse_button(gi(a,0,"MOUSEBUTTON")?)),
+            // --- Eingabe-Flanken: "genau in DIESEM Frame" ---------------------
+            // MOUSEBUTTON/KEYPRESSED bleiben "gehalten" (Namen sind historisch,
+            // sie umzudeuten wuerde bestehende Programme still kaputtmachen).
+            "mouse_hit" => Value::Bool(g!().mouse_hit(gi(a,0,"MOUSE_HIT")?)),
+            "mouse_released" => Value::Bool(g!().mouse_released(gi(a,0,"MOUSE_RELEASED")?)),
+            "keyhit" => Value::Bool(g!().key_hit(gi(a,0,"KEYHIT")?)),
+            "keyreleased" => Value::Bool(g!().key_released_edge(gi(a,0,"KEYRELEASED")?)),
+            "keyrepeat" => Value::Bool(g!().key_repeat(gi(a,0,"KEYREPEAT")?)),
+            "mouse_delta_x" => Value::Float(g!().mouse_delta_x()),
+            "mouse_delta_y" => Value::Float(g!().mouse_delta_y()),
+            "mouse_set_pos" => { let (x, y) = (gi(a,0,"MOUSE_SET_POS")?, gi(a,1,"MOUSE_SET_POS")?);
+                                 g!().mouse_set_pos(x, y); Value::Nil }
+            "mouse_on_screen" => Value::Bool(g!().mouse_on_screen()),
+            "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
+                                g!().mouse_cursor(&s)?; Value::Nil }
+            "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
+                                                            gi(a,1,"JOYSTICK_HIT")?)?),
+            "joystick_released" => Value::Bool(g!().joystick_released(
+                gi(a,0,"JOYSTICK_RELEASED")?, gi(a,1,"JOYSTICK_RELEASED")?)?),
+            "joystick_any_button" => Value::Int(g!().joystick_any_button()),
+            "joystick_axis_count" => Value::Int(g!().joystick_axis_count(
+                gi(a,0,"JOYSTICK_AXIS_COUNT")?)?),
+            // --- Touch + Gesten (raylib-Subsystem, war komplett ungenutzt) ----
+            "touch_count" => Value::Int(g!().touch_count()),
+            "touch_x" => Value::Float(g!().touch_x(gi(a,0,"TOUCH_X")?)),
+            "touch_y" => Value::Float(g!().touch_y(gi(a,0,"TOUCH_Y")?)),
+            "touch_id" => Value::Int(g!().touch_id(gi(a,0,"TOUCH_ID")?)),
+            "gesture$" => Value::Str(g!().gesture().into()),
+            "gesture_drag_x" => Value::Float(g!().gesture_drag_x()),
+            "gesture_drag_y" => Value::Float(g!().gesture_drag_y()),
+            "gesture_drag_angle" => Value::Float(g!().gesture_drag_angle()),
+            "gesture_pinch_x" => Value::Float(g!().gesture_pinch_x()),
+            "gesture_pinch_y" => Value::Float(g!().gesture_pinch_y()),
+            "gesture_pinch_angle" => Value::Float(g!().gesture_pinch_angle()),
+            "gesture_hold_time" => Value::Float(g!().gesture_hold_time()),
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
             // pop_mouse_wheel ohne Fenster = 0).
             "mousewheel" => Value::Int(self.gfx.as_ref().map(|g| g.pop_mouse_wheel()).unwrap_or(0)),

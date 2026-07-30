@@ -2850,9 +2850,17 @@ impl Graphics {
     /// (0..17). Best-effort -- die Roh-Index-Zuordnung weicht von pygame ab;
     /// fuer praezise Bindings IMPORT "input" (JOY_BUTTON_*) nutzen.
     pub fn joystick_button(&self, idx: i64, btn: i64) -> Result<bool, String> {
-        use raylib::consts::GamepadButton::*;
         self.joystick_check(idx, "JOYSTICK_BUTTON")?;
-        let b = match btn {
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_down(idx as i32, b),
+            None => false,
+        })
+    }
+    /// Roh-Index (0..17) -> raylib-GamepadButton. Von JOYSTICK_BUTTON und den
+    /// Flanken-Varianten JOYSTICK_HIT/RELEASED geteilt.
+    fn joy_btn_enum(btn: i64) -> Option<raylib::consts::GamepadButton> {
+        use raylib::consts::GamepadButton::*;
+        Some(match btn {
             0 => GAMEPAD_BUTTON_UNKNOWN,
             1 => GAMEPAD_BUTTON_LEFT_FACE_UP,
             2 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
@@ -2871,9 +2879,8 @@ impl Graphics {
             15 => GAMEPAD_BUTTON_MIDDLE_RIGHT,
             16 => GAMEPAD_BUTTON_LEFT_THUMB,
             17 => GAMEPAD_BUTTON_RIGHT_THUMB,
-            _ => return Ok(false),
-        };
-        Ok(self.rl.is_gamepad_button_down(idx as i32, b))
+            _ => return None,
+        })
     }
     /// JOYSTICK_HAT_X(idx, hat): nur hat 0 -- aus dem D-Pad abgeleitet
     /// (raylib hat keine Hats). +1 rechts, -1 links, 0 sonst.
@@ -2918,9 +2925,159 @@ impl Graphics {
     pub fn mouse_x(&self) -> i64 { (self.rl.get_mouse_x() / self.scale) as i64 }
     pub fn mouse_y(&self) -> i64 { (self.rl.get_mouse_y() / self.scale) as i64 }
     pub fn mouse_button(&self, b: i64) -> bool {
-        let btn = match b { 0 => MouseButton::MOUSE_BUTTON_LEFT, 1 => MouseButton::MOUSE_BUTTON_RIGHT, 2 => MouseButton::MOUSE_BUTTON_MIDDLE, _ => return false };
-        self.rl.is_mouse_button_down(btn)
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x), None => false }
     }
+
+    // --- Eingabe-FLANKEN -----------------------------------------------------
+    // `MOUSEBUTTON` und `KEYPRESSED` liefern beide "wird gehalten". Damit fehlte
+    // im Kern ausgerechnet der haeufigste Fall: "genau in DIESEM Frame
+    // gedrueckt". Dafuer musste man bisher das `input`-Modul mit Bindings +
+    // INPUT_UPDATE bemuehen, obwohl raylib die Flanken direkt kennt.
+    fn mouse_btn(b: i64) -> Option<MouseButton> {
+        Some(match b {
+            0 => MouseButton::MOUSE_BUTTON_LEFT,
+            1 => MouseButton::MOUSE_BUTTON_RIGHT,
+            2 => MouseButton::MOUSE_BUTTON_MIDDLE,
+            3 => MouseButton::MOUSE_BUTTON_SIDE,
+            4 => MouseButton::MOUSE_BUTTON_EXTRA,
+            _ => return None,
+        })
+    }
+    /// MOUSE_HIT(b): in DIESEM Frame gedrueckt worden?
+    pub fn mouse_hit(&self, b: i64) -> bool {
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x), None => false }
+    }
+    /// MOUSE_RELEASED(b): in DIESEM Frame losgelassen worden?
+    pub fn mouse_released(&self, b: i64) -> bool {
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x), None => false }
+    }
+
+    /// Wie `key_down`, aber mit frei waehlbarem raylib-Test -- inklusive der
+    /// "+"/"-"-Sonderbehandlung (siehe key_down: pygame-Keysym vs. physische
+    /// US-Position), damit die Flanken-Varianten dieselben Tasten treffen.
+    fn key_test(&self, code: i64, f: impl Fn(raylib::consts::KeyboardKey) -> bool) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        if code < 0 { return false; }              // Gamepad-Codes: siehe JOYSTICK_HIT
+        match code {
+            43 => return f(KEY_EQUAL) || f(KEY_KP_ADD) || f(KEY_RIGHT_BRACKET),
+            45 => return f(KEY_MINUS) || f(KEY_KP_SUBTRACT) || f(KEY_SLASH),
+            _ => {}
+        }
+        match map_key(code) { Some(k) => f(k), None => false }
+    }
+    /// KEYHIT(code): in DIESEM Frame gedrueckt (Blitz-BASIC-Sprech). `KEYPRESSED`
+    /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
+    /// bestehende Programme still kaputtmachen.
+    pub fn key_hit(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_pressed(k))
+    }
+    /// KEYRELEASED(code): in DIESEM Frame losgelassen.
+    pub fn key_released_edge(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_released(k))
+    }
+    /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
+    /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
+    pub fn key_repeat(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_pressed(k) || self.rl.is_key_pressed_repeat(k))
+    }
+
+    /// Relative Mausbewegung seit dem letzten Frame -- Grundlage fuer
+    /// Maus-Blick-Steuerung. Ohne sie war `MOUSE_LOCK` kaum zu gebrauchen: bei
+    /// gefangenem Cursor stehen MOUSEX/MOUSEY still. Durch `scale` geteilt,
+    /// damit die Einheit zu MOUSEX/MOUSEY passt.
+    pub fn mouse_delta_x(&self) -> f64 { self.rl.get_mouse_delta().x as f64 / self.scale.max(1) as f64 }
+    pub fn mouse_delta_y(&self) -> f64 { self.rl.get_mouse_delta().y as f64 / self.scale.max(1) as f64 }
+    /// MOUSE_SET_POS(x, y): Zeiger setzen (z.B. Recentern bei Maus-Blick).
+    pub fn mouse_set_pos(&mut self, x: i64, y: i64) {
+        let s = self.scale.max(1) as f32;
+        self.rl.set_mouse_position(Vector2::new(x as f32 * s, y as f32 * s));
+    }
+    /// MOUSE_ON_SCREEN(): liegt der Zeiger ueber dem Fenster?
+    pub fn mouse_on_screen(&self) -> bool { self.rl.is_cursor_on_screen() }
+
+    /// MOUSE_CURSOR(form$): Systemcursor umschalten -- Hand ueber Knoepfen,
+    /// Textmarke ueber Eingabefeldern, Groesse-Pfeile an Kanten.
+    pub fn mouse_cursor(&mut self, name: &str) -> Result<(), String> {
+        use raylib::consts::MouseCursor::*;
+        let c = match name.to_ascii_lowercase().as_str() {
+            "default" | "arrow" => MOUSE_CURSOR_DEFAULT,
+            "ibeam" | "text" => MOUSE_CURSOR_IBEAM,
+            "crosshair" | "cross" => MOUSE_CURSOR_CROSSHAIR,
+            "hand" | "pointer" => MOUSE_CURSOR_POINTING_HAND,
+            "resize_ew" => MOUSE_CURSOR_RESIZE_EW,
+            "resize_ns" => MOUSE_CURSOR_RESIZE_NS,
+            "resize_nwse" => MOUSE_CURSOR_RESIZE_NWSE,
+            "resize_nesw" => MOUSE_CURSOR_RESIZE_NESW,
+            "resize_all" | "move" => MOUSE_CURSOR_RESIZE_ALL,
+            "not_allowed" | "no" => MOUSE_CURSOR_NOT_ALLOWED,
+            other => return Err(format!(
+                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/\
+hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)),
+        };
+        self.rl.set_mouse_cursor(c);
+        Ok(())
+    }
+
+    /// JOYSTICK_HIT / JOYSTICK_RELEASED: Flanken analog zu JOYSTICK_BUTTON.
+    pub fn joystick_hit(&self, idx: i64, btn: i64) -> Result<bool, String> {
+        self.joystick_check(idx, "JOYSTICK_HIT")?;
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_pressed(idx as i32, b), None => false })
+    }
+    pub fn joystick_released(&self, idx: i64, btn: i64) -> Result<bool, String> {
+        self.joystick_check(idx, "JOYSTICK_RELEASED")?;
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_released(idx as i32, b), None => false })
+    }
+    /// JOYSTICK_ANY_BUTTON(): zuletzt gedrueckter Gamepad-Knopf, -1 = keiner.
+    /// Fuer "Druecke einen Knopf"-Belegungsdialoge.
+    pub fn joystick_any_button(&self) -> i64 {
+        // raylib-rs liefert bereits `None`, wenn nichts anliegt (es filtert
+        // GAMEPAD_BUTTON_UNKNOWN heraus) -> -1 durchreichen.
+        self.rl.get_gamepad_button_pressed().map(|b| b as i64).unwrap_or(-1)
+    }
+    /// JOYSTICK_AXIS_COUNT(idx): wie viele Achsen hat das Pad wirklich?
+    pub fn joystick_axis_count(&self, idx: i64) -> Result<i64, String> {
+        self.joystick_check(idx, "JOYSTICK_AXIS_COUNT")?;
+        Ok(self.rl.get_gamepad_axis_count(idx as i32) as i64)
+    }
+
+    // --- Touch + Gesten ------------------------------------------------------
+    // Bisher komplett ungenutzt (0 von 12 raylib-Funktionen). Auf einem
+    // Touchscreen meldet raylib den ersten Finger zwar zusaetzlich als Maus,
+    // aber Multitouch, Wisch und Pinch waren gar nicht erreichbar.
+    pub fn touch_count(&self) -> i64 { self.rl.get_touch_point_count() as i64 }
+    pub fn touch_x(&self, i: i64) -> f64 {
+        self.rl.get_touch_position(i.max(0) as u32).x as f64 / self.scale.max(1) as f64
+    }
+    pub fn touch_y(&self, i: i64) -> f64 {
+        self.rl.get_touch_position(i.max(0) as u32).y as f64 / self.scale.max(1) as f64
+    }
+    /// TOUCH_ID(i): stabile Finger-Kennung -- damit laesst sich ein Finger ueber
+    /// Frames hinweg verfolgen, auch wenn ein anderer dazwischen losgelassen wird.
+    pub fn touch_id(&self, i: i64) -> i64 { self.rl.get_touch_point_id(i.max(0) as u32) as i64 }
+
+    /// GESTURE$(): erkannte Geste dieses Frames als Name ("" = keine).
+    /// Namen statt Zahlen, damit BASIC-Code lesbar bleibt.
+    pub fn gesture(&self) -> String {
+        use raylib::consts::Gesture::*;
+        let g = self.rl.get_gesture_detected();
+        match g {
+            GESTURE_TAP => "tap", GESTURE_DOUBLETAP => "doubletap", GESTURE_HOLD => "hold",
+            GESTURE_DRAG => "drag", GESTURE_SWIPE_RIGHT => "swipe_right",
+            GESTURE_SWIPE_LEFT => "swipe_left", GESTURE_SWIPE_UP => "swipe_up",
+            GESTURE_SWIPE_DOWN => "swipe_down", GESTURE_PINCH_IN => "pinch_in",
+            GESTURE_PINCH_OUT => "pinch_out", _ => "",
+        }.to_string()
+    }
+    pub fn gesture_drag_x(&self) -> f64 { self.rl.get_gesture_drag_vector().x as f64 }
+    pub fn gesture_drag_y(&self) -> f64 { self.rl.get_gesture_drag_vector().y as f64 }
+    pub fn gesture_drag_angle(&self) -> f64 { self.rl.get_gesture_drag_angle() as f64 }
+    pub fn gesture_pinch_x(&self) -> f64 { self.rl.get_gesture_pinch_vector().x as f64 }
+    pub fn gesture_pinch_y(&self) -> f64 { self.rl.get_gesture_pinch_vector().y as f64 }
+    pub fn gesture_pinch_angle(&self) -> f64 { self.rl.get_gesture_pinch_angle() as f64 }
+    /// GESTURE_HOLD_TIME(): wie lange wird schon gehalten (Sekunden)?
+    pub fn gesture_hold_time(&self) -> f64 { self.rl.get_gesture_hold_duration() as f64 }
 
     /// Mausrad-Delta dieses Frames (raylib liefert es pro Frame; "pop" =
     /// einmal lesen). Positiv = nach oben/vorn.

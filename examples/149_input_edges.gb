@@ -1,0 +1,105 @@
+' 149 -- Eingabe-Flanken, Maus-Blick, Cursor-Formen, Touch + Gesten
+'
+' "Flanke" = genau in DIESEM Frame passiert. MOUSEBUTTON und KEYPRESSED melden
+' dagegen "wird gehalten" -- fuer einen Klick ist das fast nie gemeint.
+'
+'   MOUSE_HIT(n) / MOUSE_RELEASED(n)      Maustaste gedrueckt / losgelassen
+'   KEYHIT(c) / KEYRELEASED(c)            Taste gedrueckt / losgelassen
+'   KEYREPEAT(c)                          + System-Auto-Repeat (Textcursor)
+'   MOUSE_DELTA_X/Y()                     relative Bewegung (Maus-Blick)
+'   MOUSE_SET_POS(x, y) / MOUSE_ON_SCREEN()
+'   MOUSE_CURSOR(form$)                   default/hand/ibeam/crosshair/...
+'   TOUCH_COUNT/X/Y/ID, GESTURE$(), GESTURE_DRAG_*/PINCH_*, GESTURE_HOLD_TIME
+'   JOYSTICK_HIT/RELEASED, JOYSTICK_ANY_BUTTON, JOYSTICK_AXIS_COUNT
+
+SCREEN(640, 400, "Eingabe-Flanken", 1)
+SETFPS(60)
+
+CONST W AS INTEGER = 640
+CONST H AS INTEGER = 400
+
+DIM klicks AS INTEGER
+DIM leertasten AS INTEGER
+DIM blick_x AS FLOAT
+DIM blick_y AS FLOAT
+DIM blick_an AS BOOLEAN
+DIM letzte_geste AS STRING
+letzte_geste = "-"
+
+' Ein Knopf, damit sich der Hand-Cursor zeigen laesst.
+CONST BX AS INTEGER = 420
+CONST BY AS INTEGER = 300
+CONST BW AS INTEGER = 180
+CONST BH AS INTEGER = 44
+
+WHILE NOT QUITREQUESTED()
+    ' --- Flanken zaehlen: je EIN Ereignis pro Druck, egal wie lange gehalten
+    IF MOUSE_HIT(0) THEN klicks = klicks + 1
+    IF KEYHIT(32) THEN leertasten = leertasten + 1
+
+    ' --- Maus-Blick: TAB schaltet um. Bei gefangenem Zeiger stehen MOUSEX/
+    '     MOUSEY still -- nur MOUSE_DELTA_* liefert dann noch Bewegung.
+    IF KEYHIT(9) THEN
+        blick_an = NOT blick_an
+        MOUSE_LOCK(blick_an)
+    END IF
+    IF blick_an THEN
+        blick_x = blick_x + MOUSE_DELTA_X() * 0.2
+        blick_y = CLAMP(blick_y + MOUSE_DELTA_Y() * 0.2, -60.0, 60.0)
+    END IF
+
+    ' --- Cursor-Form nach Kontext (das macht eine Oberflaeche sofort runder)
+    DIM ueber_knopf AS BOOLEAN
+    ueber_knopf = MOUSEX() >= BX AND MOUSEX() < BX + BW AND MOUSEY() >= BY AND MOUSEY() < BY + BH
+    IF blick_an THEN
+        MOUSE_CURSOR("crosshair")
+    ELIF ueber_knopf THEN
+        MOUSE_CURSOR("hand")
+    ELSE
+        MOUSE_CURSOR("default")
+    END IF
+
+    ' --- Gesten (Touchscreen; am Desktop liefert die Maus tap/drag)
+    IF GESTURE$() <> "" THEN letzte_geste = GESTURE$()
+
+    ' ------------------------------------------------------------------ Zeichnen
+    CLS(&H101820)
+
+    TEXT(20, 20, "Flanken -- klicken und Leertaste druecken:")
+    TEXT(40, 44, "Mausklicks:  " + STR$(klicks))
+    TEXT(40, 62, "Leertasten:  " + STR$(leertasten))
+    TEXT(40, 84, "gehalten (MOUSEBUTTON):  " + STR$(MOUSEBUTTON(0)))
+    TEXT(40, 102, "gehalten (KEYPRESSED):   " + STR$(KEYPRESSED(32)))
+
+    TEXT(20, 136, "TAB = Maus-Blick " + IIF(blick_an, "AN", "aus"))
+    TEXT(40, 160, "Blick:  " + FORMAT$(blick_x, "%.1f") + " / " + FORMAT$(blick_y, "%.1f"))
+    TEXT(40, 178, "Delta:  " + FORMAT$(MOUSE_DELTA_X(), "%.1f") + " / " + FORMAT$(MOUSE_DELTA_Y(), "%.1f"))
+    TEXT(40, 196, "Zeiger im Fenster: " + STR$(MOUSE_ON_SCREEN()))
+
+    ' Fadenkreuz, das dem Blick folgt -- macht das Delta sichtbar
+    DIM hx AS INTEGER
+    DIM hy AS INTEGER
+    hx = 300 + INT(WRAP(blick_x, -80.0, 80.0))
+    hy = 250 + INT(blick_y)
+    LINE(hx - 10, hy, hx + 10, hy, &H2BC4E8)
+    LINE(hx, hy - 10, hx, hy + 10, &H2BC4E8)
+
+    TEXT(20, 236, "Touch / Gesten:")
+    TEXT(40, 260, "Finger: " + STR$(TOUCH_COUNT()) + "   letzte Geste: " + letzte_geste)
+    TEXT(40, 278, "Halten: " + FORMAT$(GESTURE_HOLD_TIME(), "%.2f") + " s")
+    DIM i AS INTEGER
+    FOR i = 0 TO TOUCH_COUNT() - 1
+        CIRCLE(INT(TOUCH_X(i)), INT(TOUCH_Y(i)), 18, &HFF5CA2)
+    NEXT
+
+    TEXT(20, 316, "Gamepad:")
+    TEXT(40, 340, "Achsen: " + STR$(IIF(JOYSTICK_COUNT() > 0, JOYSTICK_AXIS_COUNT(0), 0)))
+    TEXT(40, 358, "zuletzt gedrueckt: " + STR$(JOYSTICK_ANY_BUTTON()) + "   (-1 = keiner)")
+
+    ' Knopf mit Hand-Cursor
+    BOXROUND(BX, BY, BX + BW, BY + BH, 8, IIF(ueber_knopf, &H2E4456, &H1E2C3A))
+    RECTROUND(BX, BY, BX + BW, BY + BH, 8, &H2BC4E8)
+    TEXT(BX + 26, BY + 16, IIF(ueber_knopf, "Hand-Cursor!", "hier druebergehen"))
+
+    FLIP()
+WEND
