@@ -3243,6 +3243,53 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     /// Wurde das Fenster seit dem letzten FLIP vom Nutzer/OS in der Groesse geaendert?
     pub fn window_resized(&self) -> bool { self.rl.is_window_resized() }
 
+    // --- Fenster-Zustand + Politur ------------------------------------------
+    /// WINDOW_FOCUSED(): hat das Fenster den Tastaturfokus? Damit laesst sich
+    /// ein Spiel pausieren, sobald der Nutzer wegklickt.
+    pub fn window_focused(&self) -> bool { self.rl.is_window_focused() }
+    pub fn window_minimized(&self) -> bool { self.rl.is_window_minimized() }
+    pub fn window_maximized(&self) -> bool { self.rl.is_window_maximized() }
+    pub fn window_hidden(&self) -> bool { self.rl.is_window_hidden() }
+    pub fn window_fullscreen_state(&self) -> bool { self.rl.is_window_fullscreen() }
+    /// WINDOW_FOCUS(): Fenster nach vorne holen.
+    pub fn window_focus(&mut self) { self.rl.set_window_focused(); }
+    /// WINDOW_OPACITY(0..1): ganzes Fenster durchscheinend (Overlays, Fade-ins).
+    pub fn window_opacity(&mut self, v: f64) {
+        let o = if v.is_finite() { v.clamp(0.0, 1.0) } else { 1.0 };
+        self.rl.set_window_opacity(o as f32);
+    }
+    /// WINDOW_ICON(bild): Fenster-/Taskleisten-Symbol setzen. Ohne das trug
+    /// JEDES exportierte Spiel das raylib-Standardsymbol.
+    pub fn window_icon(&mut self, img: i64) -> Result<(), String> {
+        let t = self.textures.get(img.max(0) as usize)
+            .ok_or("WINDOW_ICON: ungueltiges IMAGE-Handle")?;
+        // raylib verlangt RGBA8 fuers Icon und ignoriert andere Formate still
+        // -> auf einer Kopie konvertieren, das Original bleibt unangetastet.
+        let mut copy = t.img.clone();
+        copy.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        self.rl.set_window_icon(&copy);
+        Ok(())
+    }
+    /// GET_TIME(): Sekunden seit Programmstart (monoton, unabhaengig von DELTA).
+    pub fn get_time(&self) -> f64 { self.rl.get_time() }
+
+    /// OPENURL(adresse$): Adresse im Standardbrowser oeffnen (Itch-Seite,
+    /// Anleitung, Mitmach-Link aus dem Spiel heraus).
+    ///
+    /// Absichtlich auf http/https begrenzt: raylibs OpenURL reicht die
+    /// Zeichenkette an die Shell weiter, und ein `file:`- oder gar
+    /// Programm-Schema waere damit ein Weg, aus einem harmlos wirkenden
+    /// GB-Programm heraus Beliebiges zu starten.
+    pub fn open_url(&self, url: &str) -> Result<(), String> {
+        let low = url.trim().to_ascii_lowercase();
+        if !(low.starts_with("http://") || low.starts_with("https://")) {
+            return Err(format!(
+                "OPENURL: nur http:// und https:// erlaubt (bekam '{}')", url));
+        }
+        raylib::misc::open_url(url.trim());
+        Ok(())
+    }
+
     // --- Monitore / Display-Infos (raylib GetMonitor*) ---
     // Alle Monitor-Masse sind ECHTE OS-Pixel (kein Screen-Scale), denn sie
     // beschreiben die Hardware, nicht das logische SCREEN-Raster. Monitor-Index

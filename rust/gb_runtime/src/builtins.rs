@@ -1055,6 +1055,27 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 Err(_) => err("BASE64_DECODE: dekodierte Bytes sind kein gueltiges UTF-8".to_string()),
             }
         }
+        // COMPRESS$/DECOMPRESS$: DEFLATE, danach Base64. Der Umweg ueber Base64
+        // ist noetig, weil GB-Strings UTF-8 sind -- roher Deflate-Output waere
+        // kein gueltiges UTF-8 und liesse sich weder in eine Datei noch durch
+        // JSON schleusen. Damit passen Ergebnisse ueberall dorthin, wo heute
+        // schon BASE64_ENCODE-Ausgaben stehen (Savegames, Cloud-Slots).
+        "compress$" => {
+            arity!(1);
+            let raw = need_str(&a[0], "COMPRESS$")?;
+            let packed = miniz_oxide::deflate::compress_to_vec(raw.as_bytes(), 6);
+            Ok(Value::str_rc(&b64_encode(&packed)))
+        }
+        "decompress$" => {
+            arity!(1);
+            let bytes = b64_decode(need_str(&a[0], "DECOMPRESS$")?)?;
+            let raw = miniz_oxide::inflate::decompress_to_vec(&bytes)
+                .map_err(|_| "DECOMPRESS$: Daten sind nicht mit COMPRESS$ gepackt".to_string())?;
+            match String::from_utf8(raw) {
+                Ok(s) => Ok(Value::str_rc(&s)),
+                Err(_) => err("DECOMPRESS$: entpackte Bytes sind kein gueltiges UTF-8".to_string()),
+            }
+        }
         "crc32" => { arity!(1); Ok(Value::Int(crc32(need_str(&a[0], "CRC32")?.as_bytes()) as i64)) }
         "hash" => { arity!(1); Ok(Value::Int(fnv1a64(need_str(&a[0], "HASH")?.as_bytes()) as i64)) }
         "red" => { arity!(1); Ok(Value::Int((need_int(&a[0], "RED")? >> 16) & 0xFF)) }

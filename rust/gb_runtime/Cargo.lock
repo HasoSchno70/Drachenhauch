@@ -1006,6 +1006,7 @@ dependencies = [
  "futures",
  "hidapi",
  "kira",
+ "miniz_oxide",
  "mint",
  "rapier2d",
  "rapier3d",

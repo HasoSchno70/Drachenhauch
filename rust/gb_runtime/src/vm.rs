@@ -3987,6 +3987,18 @@ impl<'p> Vm<'p> {
             "gesture_pinch_y" => Value::Float(g!().gesture_pinch_y()),
             "gesture_pinch_angle" => Value::Float(g!().gesture_pinch_angle()),
             "gesture_hold_time" => Value::Float(g!().gesture_hold_time()),
+            // --- Fenster-Zustand + Politur ------------------------------------
+            "window_focused" => Value::Bool(g!().window_focused()),
+            "window_minimized" => Value::Bool(g!().window_minimized()),
+            "window_maximized" => Value::Bool(g!().window_maximized()),
+            "window_hidden" => Value::Bool(g!().window_hidden()),
+            "window_is_fullscreen" => Value::Bool(g!().window_fullscreen_state()),
+            "window_focus" => { g!().window_focus(); Value::Nil }
+            "window_opacity" => { let v = need_f(a,0,"WINDOW_OPACITY")?;
+                                  g!().window_opacity(v); Value::Nil }
+            "window_icon" => { let i = gi(a,0,"WINDOW_ICON")?; g!().window_icon(i)?; Value::Nil }
+            "get_time" => Value::Float(g!().get_time()),
+            "openurl" => { let u = gs(a,0,"OPENURL")?.to_string(); g!().open_url(&u)?; Value::Nil }
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
             // pop_mouse_wheel ohne Fenster = 0).
             "mousewheel" => Value::Int(self.gfx.as_ref().map(|g| g.pop_mouse_wheel()).unwrap_or(0)),

@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1154,
+  "count": 1166,
   "builtins": [
     {
       "name": "ABS",
@@ -1209,6 +1209,12 @@
       "module": "core"
     },
     {
+      "name": "COMPRESS$",
+      "kind": "function",
+      "signature": "COMPRESS$(text: STRING) -> STRING",
+      "module": "core"
+    },
+    {
       "name": "CONTAINS",
       "kind": "core",
       "signature": "CONTAINS(s, teil) AS BOOLEAN",
@@ -1459,6 +1465,12 @@
       "kind": "core",
       "signature": "DB_ROLLBACK(c)",
       "module": "db"
+    },
+    {
+      "name": "DECOMPRESS$",
+      "kind": "function",
+      "signature": "DECOMPRESS$(gepackt: STRING) -> STRING",
+      "module": "core"
     },
     {
       "name": "DEG",
@@ -1998,6 +2010,12 @@
       "name": "GETPIXEL",
       "kind": "graphics",
       "signature": "GETPIXEL(img, x, y)",
+      "module": "core"
+    },
+    {
+      "name": "GET_TIME",
+      "kind": "graphics",
+      "signature": "GET_TIME() -> FLOAT",
       "module": "core"
     },
     {
@@ -4134,6 +4152,12 @@
       "name": "OPENFILE",
       "kind": "core",
       "signature": "OPENFILE(path: STRING, mode: STRING)",
+      "module": "core"
+    },
+    {
+      "name": "OPENURL",
+      "kind": "graphics",
+      "signature": "OPENURL(adresse: STRING)",
       "module": "core"
     },
     {
@@ -6801,10 +6825,46 @@
       "module": "gbrt"
     },
     {
+      "name": "WINDOW_FOCUS",
+      "kind": "graphics",
+      "signature": "WINDOW_FOCUS()",
+      "module": "core"
+    },
+    {
+      "name": "WINDOW_FOCUSED",
+      "kind": "graphics",
+      "signature": "WINDOW_FOCUSED() -> BOOLEAN",
+      "module": "core"
+    },
+    {
+      "name": "WINDOW_HIDDEN",
+      "kind": "graphics",
+      "signature": "WINDOW_HIDDEN() -> BOOLEAN",
+      "module": "core"
+    },
+    {
+      "name": "WINDOW_ICON",
+      "kind": "graphics",
+      "signature": "WINDOW_ICON(bild: IMAGE)",
+      "module": "core"
+    },
+    {
+      "name": "WINDOW_IS_FULLSCREEN",
+      "kind": "graphics",
+      "signature": "WINDOW_IS_FULLSCREEN() -> BOOLEAN",
+      "module": "core"
+    },
+    {
       "name": "WINDOW_MAXIMIZE",
       "kind": "graphics",
       "signature": "WINDOW_MAXIMIZE()",
       "module": "gbrt"
+    },
+    {
+      "name": "WINDOW_MAXIMIZED",
+      "kind": "graphics",
+      "signature": "WINDOW_MAXIMIZED() -> BOOLEAN",
+      "module": "core"
     },
     {
       "name": "WINDOW_MAX_SIZE",
@@ -6819,10 +6879,22 @@
       "module": "gbrt"
     },
     {
+      "name": "WINDOW_MINIMIZED",
+      "kind": "graphics",
+      "signature": "WINDOW_MINIMIZED() -> BOOLEAN",
+      "module": "core"
+    },
+    {
       "name": "WINDOW_MIN_SIZE",
       "kind": "graphics",
       "signature": "WINDOW_MIN_SIZE(w, h)",
       "module": "gbrt"
+    },
+    {
+      "name": "WINDOW_OPACITY",
+      "kind": "graphics",
+      "signature": "WINDOW_OPACITY(wert: Zahl)",
+      "module": "core"
     },
     {
       "name": "WINDOW_PASSTHROUGH",
