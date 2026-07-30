@@ -1501,7 +1501,7 @@ class FormDesigner(QMainWindow):
         self.canvas.selection_changed.connect(self.inspector.set_control)
         self.canvas.selection_changed.connect(self._on_selection_changed)
         self.canvas.selection_changed.connect(self._update_status)
-        self.canvas.doc_changed.connect(self._mark_dirty)
+        self.canvas.doc_changed.connect(self._on_doc_changed)
         self.canvas.doc_replaced.connect(self.code_panel.set_doc)
         self.canvas.form_resized.connect(self._on_form_resized)
         self.canvas.handler_requested.connect(self._open_handler)
@@ -1522,6 +1522,12 @@ class FormDesigner(QMainWindow):
         self._build_menu()
         self._build_arrange_toolbar()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
+        # Zusaetzlich zum closeEvent: laeuft der Designer in-process (gbrun.py
+        # --form) und die Host-App ruft `QApplication.quit()`, gibt es kein
+        # closeEvent -- der lebende GBHighlighter segfaultet dann im Teardown.
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self.code_panel.detach_highlighter)
 
     # -- Ungespeichert-Schutz ------------------------------------------------
     def _confirm_dirty(self) -> bool:
@@ -1976,6 +1982,22 @@ class FormDesigner(QMainWindow):
         self._mark_dirty()
 
     # -- Aktionen --
+    def _on_doc_changed(self):
+        """Canvas hat das Dokument geaendert. Die Handler-Combo muss folgen,
+        wenn sich die Handler-Liste geaendert hat -- nach dem Loeschen eines
+        Controls auf der Canvas zeigte sie weiter dessen Handler an und
+        schrieb Edits in einen `code`-Eintrag, den es nicht mehr gibt. Der
+        Listenvergleich ist billig genug fuer den Drag-Pfad (dort aendert er
+        sich nie), ein blindes `refresh()` waere es nicht. Verglichen wird
+        gegen den TATSAECHLICHEN Combo-Inhalt, nicht gegen eine mitgefuehrte
+        Kopie -- die liefe bei jedem anderen Weg, der `refresh()` ruft, aus
+        dem Tritt."""
+        self._mark_dirty()
+        combo = self.code_panel.combo
+        shown = [combo.itemText(i) for i in range(combo.count())]
+        if self.canvas.doc.handler_names() != shown:
+            self.code_panel.refresh()
+
     def _mark_dirty(self):
         was = self.active.dirty
         self.active.dirty = True

@@ -1253,3 +1253,20 @@ def test_double_click_on_an_existing_handler_does_not_dirty(tmp_path):
     win.canvas.handler_requested.emit(b)         # zweites Mal: aendert nichts
     assert win.active.dirty is False
     win.close()
+
+
+def test_code_panel_follows_a_delete_on_the_canvas(tmp_path):
+    # Die Handler-Combo zeigte weiter den Handler des geloeschten Controls und
+    # schrieb Edits in einen `code`-Eintrag, den es nicht mehr gibt.
+    _app()
+    win = FormDesigner(tmp_path)
+    cv = win.canvas
+    b = cv.doc.add("button", 16, 16)
+    cv.handler_requested.emit(b)                       # legt btn1Click an
+    assert win.code_panel.current == "btn1Click"
+    cv._select(b)
+    _press(cv, Qt.Key.Key_Delete)
+    assert win.code_panel.combo.count() == 0
+    assert win.code_panel.current is None
+    assert "btn1Click" not in cv.doc.code              # Rumpf mit aufgeraeumt
+    win.close()
