@@ -41,14 +41,11 @@ except Exception:  # pragma: no cover - Theme optional
         return ""
 
 
-def _find_gbrt():
-    root = Path(__file__).resolve().parents[1]
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    for v in ("release", "debug"):
-        p = root / "rust" / "gb_runtime" / "target" / v / exe
-        if p.exists():
-            return p
-    return None
+# EINE Quelle fuer die gbrt-Suche (`editor_qt/gbrt_locate.py`): die frueher hier
+# stehende Kopie kannte nur den Dev-Baum und meldete in der installierten IDE
+# "Runtime nicht gebaut", obwohl `gbrt.exe` neben `GameBasic.exe` liegt. Als
+# Alias importiert bleibt der Modul-Name `_find_gbrt` fuer Tests patchbar.
+from .editor_qt.gbrt_locate import find_gbrt as _find_gbrt
 
 
 def _editor_qss() -> str:
@@ -1179,7 +1176,7 @@ class AnimEditor(QMainWindow):
         if not self.canvas.doc.states:
             QMessageBox.information(self, "Leer", "Erst mindestens einen State anlegen.")
             return
-        gbrt = _find_gbrt()
+        gbrt = _find_gbrt(self.project_root)
         if gbrt is None:
             QMessageBox.warning(self, "gbrt fehlt",
                                 "Native Runtime nicht gebaut:\npython rust/build_runtime.py")
@@ -1203,7 +1200,13 @@ class AnimEditor(QMainWindow):
         runner = doc.generate_runner("anim.gbanim",
                                      title=(self.path.stem if self.path else "gbanim"))
         (tmp / "run.gb").write_text(runner, encoding="utf-8")
-        subprocess.Popen([str(gbrt), "run", str(tmp / "run.gb")], cwd=str(tmp))
+        # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen gleichzeitig
+        # startende `gbrt`-Subprozesse aus anderen Editor-Threads (siehe
+        # gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer den verifizierten
+        # Windows-Crash).
+        from .editor_qt.gbrt_locate import gbrt_spawn_semaphore
+        with gbrt_spawn_semaphore:
+            subprocess.Popen([str(gbrt), "run", str(tmp / "run.gb")], cwd=str(tmp))
 
 
 def launch(project_root: Path, initial_file: Path | None = None) -> int:
