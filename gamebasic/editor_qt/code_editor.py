@@ -383,6 +383,21 @@ class CodeEditor(
                         getattr(self, "_folded", None)):
             if tracker is not None:
                 tracker.retarget(document)
+        # Der `GBHighlighter` aus `__init__` haengt als Kind am ALTEN
+        # (Default-)Dokument -- `super().setDocument()` gibt das her und
+        # zerstoert es, der Highlighter stirbt also mit. `self._highlighter`
+        # zeigte danach auf ein totes C++-Objekt, und der naechste
+        # Theme-Wechsel lief in `_on_theme_changed()` in ein
+        # "RuntimeError: Internal C++ object (GBHighlighter) already deleted"
+        # (real reproduzierbar: Split-View oeffnen, dann Theme umstellen --
+        # `tabs.toggle_split()` ist der einzige Aufrufer dieses Overrides).
+        # Der Split-View WILL keinen eigenen Highlighter (die Formate kommen
+        # vom Primaer-Editor ueber die geteilten Block-Formate), deshalb wird
+        # die tote Referenz nur geloescht, nicht neu aufgebaut.
+        import shiboken6
+        hl = getattr(self, "_highlighter", None)
+        if hl is not None and not shiboken6.isValid(hl):
+            self._highlighter = None
 
     # ------------------------------------------------------------ API
     def get_text(self) -> str:
@@ -1718,9 +1733,12 @@ class CodeEditor(
     # ----------------------------------------- Theme-Listener
     def _on_theme_changed(self, _name: str) -> None:
         # Highlighter-Formats neu anlegen, ExtraSelections + LineNumberArea
-        # neu zeichnen lassen.
-        self._highlighter._init_formats()
-        self._highlighter.rehighlight()
+        # neu zeichnen lassen. Ein Split-View-Editor hat keinen eigenen
+        # Highlighter (siehe `setDocument()`) -- er zeigt die Formate des
+        # Primaer-Editors, der sie beim selben Signal ohnehin neu setzt.
+        if self._highlighter is not None:
+            self._highlighter._init_formats()
+            self._highlighter.rehighlight()
         self._refresh_extra_selections()
         self._line_area.update()
 

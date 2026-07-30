@@ -80,6 +80,29 @@ def test_split_editor_breakpoint_bookmark_fold_target_shared_document():
     assert 2 in ed2._breakpoints.lines()
 
 
+def test_theme_change_after_split_does_not_touch_dead_highlighter():
+    """Review-Fund: der Split-Editor legt in `__init__` einen `GBHighlighter`
+    auf seinem temporaeren Default-Dokument an. `setDocument()` gibt dieses
+    Dokument her und zerstoert es -- der Highlighter stirbt mit, `_highlighter`
+    zeigte danach auf ein totes C++-Objekt. Der naechste Theme-Wechsel lief
+    deshalb in ein "Internal C++ object (GBHighlighter) already deleted"
+    (im gemeinsamen Testlauf massenhaft in der Konsole zu sehen)."""
+    import shiboken6
+    area = _area()
+    st = area.open_tab(file_path=None, content="PRINT 1")
+    area.toggle_split(st)
+    ed2 = st.split_editor
+
+    # Der Highlighter des Split-Editors ist tatsaechlich weg ...
+    assert ed2._highlighter is None
+    # ... und der Primaer-Editor hat weiterhin seinen eigenen.
+    assert shiboken6.isValid(st.editor._highlighter)
+
+    # Theme-Wechsel darf nicht mehr werfen.
+    ed2._on_theme_changed("dark")
+    st.editor._on_theme_changed("dark")
+
+
 def test_close_tab_cancels_live_error_check():
     """Review-Fund: close_tab() liess einen laufenden Live-Error-Check
     (Worker-Thread + `gbrt --check`-Subprozess) unangetastet weiterlaufen
