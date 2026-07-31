@@ -816,6 +816,12 @@ pub struct Graphics {
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
+    /// Zusaetzliche Sampler je Shader: (Uniform-Position, Textur).
+    /// Sie werden ERST beim Zeichnen gesetzt -- `SetShaderValueTexture` ruft
+    /// intern `glUniform1i` und wirkt damit auf das GERADE AKTIVE Programm.
+    /// Ausserhalb von `BeginShaderMode` landet die Zuweisung also am falschen
+    /// Shader und der Sampler bleibt schwarz.
+    shader_textures: HashMap<usize, Vec<(i32, raylib::ffi::Texture2D)>>,
     post_shader_idx: Option<usize>,
     scene_rt: Option<RenderTexture2D>,
 }
@@ -897,7 +903,8 @@ impl Graphics {
         let mut g = Graphics {
             rl, thread, width, height, scale,
             fullscreen: false, pre_fullscreen: None,
-            shaders: Vec::new(), post_shader_idx: None, scene_rt,
+            shaders: Vec::new(), shader_textures: HashMap::new(),
+            post_shader_idx: None, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -3507,6 +3514,68 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32, z as f32]); }
         }
     }
+    /// SHADER_SET_ARRAY(shader, name$, werte): `uniform float[]` fuellen.
+    /// Bisher liess sich pro Aufruf nur EIN Wert setzen -- damit waren
+    /// Effekte, die eine Liste brauchen (Lichtpositionen, Farbverlaufs-Stufen,
+    /// Wellen-Parameter), gar nicht anzusteuern.
+    pub fn shader_set_array(&mut self, h: i64, name: &str, vals: &[f64]) -> Result<(), String> {
+        if vals.is_empty() {
+            return Err("SHADER_SET_ARRAY: Werte-Array ist leer".into());
+        }
+        let sh = self.shaders.get_mut(h as usize)
+            .ok_or("SHADER_SET_ARRAY: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc < 0 {
+            // Kein Fehler: ein Uniform, das der Shader wegoptimiert hat, ist
+            // ein haeufiger und harmloser Fall (wie bei SHADER_SET).
+            return Ok(());
+        }
+        let v: Vec<f32> = vals.iter().map(|x| if x.is_finite() { *x as f32 } else { 0.0 }).collect();
+        sh.set_shader_value_v(loc, &v);
+        Ok(())
+    }
+    /// SHADER_SET_TEXTURE(shader, name$, bild): zweiten Sampler belegen.
+    /// Ohne das war jeder Shader auf die EINE Textur beschraenkt, die raylib
+    /// selbst bindet -- Masken, Paletten-Nachschlagetabellen, Normal-Maps in
+    /// 2D und Ueberblendungen zwischen zwei Bildern waren unmoeglich.
+    pub fn shader_set_texture(&mut self, h: i64, name: &str, img: i64) -> Result<(), String> {
+        // ffi::Texture2D ist Copy -- vorher herauskopieren, damit `self.textures`
+        // nicht ausgeliehen bleibt, waehrend `self.shaders` veraendert wird.
+        let tex: raylib::ffi::Texture2D = *self.textures.get(img.max(0) as usize)
+            .ok_or("SHADER_SET_TEXTURE: ungueltiges IMAGE-Handle")?
+            .tex;
+        let idx = h as usize;
+        let sh = self.shaders.get(idx)
+            .ok_or("SHADER_SET_TEXTURE: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc < 0 { return Ok(()); }            // Uniform wegoptimiert: harmlos
+        // Nur vormerken -- gesetzt wird beim Zeichnen (siehe Feld-Kommentar).
+        let slots = self.shader_textures.entry(idx).or_default();
+        match slots.iter_mut().find(|(l, _)| *l == loc) {
+            Some(slot) => slot.1 = tex,
+            None => slots.push((loc, tex)),
+        }
+        Ok(())
+    }
+    /// SHADER_SET_MATRIX(shader, name$, mat): MAT4 aus dem `m3d`-Modul als
+    /// `uniform mat4` -- eigene Projektionen/Bone-Transformationen im Shader.
+    pub fn shader_set_matrix(&mut self, h: i64, name: &str, m: &[f32; 16]) -> Result<(), String> {
+        let sh = self.shaders.get_mut(h as usize)
+            .ok_or("SHADER_SET_MATRIX: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc >= 0 {
+            // m3d liefert column-major (wie OpenGL), raylibs Matrix ist
+            // row-major -> beim Umfuellen transponieren.
+            sh.set_shader_value_matrix(loc, raylib::math::Matrix {
+                m0: m[0], m1: m[1], m2: m[2], m3: m[3],
+                m4: m[4], m5: m[5], m6: m[6], m7: m[7],
+                m8: m[8], m9: m[9], m10: m[10], m11: m[11],
+                m12: m[12], m13: m[13], m14: m[14], m15: m[15],
+            });
+        }
+        Ok(())
+    }
+
     /// Aktiven Post-Processing-Shader setzen (-1 = aus).
     pub fn set_postfx(&mut self, h: i64) {
         self.post_shader_idx = if h >= 0 && (h as usize) < self.shaders.len() {
@@ -3681,7 +3750,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             emissive, loc_emissive,
-            scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
+            scene_rt, shaders, shader_textures, post_shader_idx, render_targets, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
@@ -3723,7 +3792,17 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             let mut d = rl.begin_drawing(thread);
             d.clear_background(Color::BLACK);
             {
+                // ffi::Shader ist Copy -- vor dem mutablen Ausleihen kopieren.
+                let sh_ffi = *shaders[idx].as_ref();
                 let mut sm = d.begin_shader_mode(&mut shaders[idx]);
+                // Zusaetzliche Sampler JETZT setzen -- `SetShaderValueTexture`
+                // ruft glUniform1i auf dem gerade aktiven Programm, vorher waere
+                // es am falschen gelandet (Sampler bliebe schwarz).
+                if let Some(slots) = shader_textures.get(&idx) {
+                    for (loc, tex) in slots {
+                        unsafe { raylib::ffi::SetShaderValueTexture(sh_ffi, *loc, *tex); }
+                    }
+                }
                 sm.draw_texture_pro(&*rt, src, dst, Vector2::zero(), 0.0, Color::WHITE);
             }
         } else {

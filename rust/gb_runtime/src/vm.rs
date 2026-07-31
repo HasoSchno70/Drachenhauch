@@ -4131,6 +4131,27 @@ impl<'p> Vm<'p> {
                     need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?);
                 Value::Nil
             }
+            "shader_set_array" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_ARRAY")?, gs(a,1,"SHADER_SET_ARRAY")?.to_string());
+                let v = gfloats(a, 2, "SHADER_SET_ARRAY")?;
+                g!().shader_set_array(h, &n, &v)?;
+                Value::Nil
+            }
+            "shader_set_texture" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_TEXTURE")?, gs(a,1,"SHADER_SET_TEXTURE")?.to_string());
+                let img = gi(a,2,"SHADER_SET_TEXTURE")?;
+                g!().shader_set_texture(h, &n, img)?;
+                Value::Nil
+            }
+            "shader_set_matrix" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_MATRIX")?, gs(a,1,"SHADER_SET_MATRIX")?.to_string());
+                let m = match a.get(2) {
+                    Some(Value::Mat4(m)) => **m,
+                    _ => return Err("SHADER_SET_MATRIX: erwartet MAT4 (Modul m3d)".into()),
+                };
+                g!().shader_set_matrix(h, &n, &m)?;
+                Value::Nil
+            }
             "postfx" => { g!().set_postfx(gi(a, 0, "POSTFX")?); Value::Nil }
 
             // --- 3D (Modul g3d) ---

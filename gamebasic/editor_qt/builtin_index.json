@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1177,
+  "count": 1186,
   "builtins": [
     {
       "name": "ABS",
@@ -4605,6 +4605,12 @@
       "module": "physics"
     },
     {
+      "name": "PHYSICS_CIRCLE_LINE",
+      "kind": "function",
+      "signature": "PHYSICS_CIRCLE_LINE(cx,cy,r, ax,ay, bx,by) -> BOOLEAN",
+      "module": "physics"
+    },
+    {
       "name": "PHYSICS_DISTANCE",
       "kind": "core",
       "signature": "PHYSICS_DISTANCE(x1: Zahl, y1: Zahl, x2: Zahl, y2: Zahl)",
@@ -4620,6 +4626,24 @@
       "name": "PHYSICS_LENGTH",
       "kind": "core",
       "signature": "PHYSICS_LENGTH(vx: Zahl, vy: Zahl)",
+      "module": "physics"
+    },
+    {
+      "name": "PHYSICS_LINES_HIT",
+      "kind": "function",
+      "signature": "PHYSICS_LINES_HIT(ax,ay,bx,by, cx,cy,dx,dy) -> BOOLEAN",
+      "module": "physics"
+    },
+    {
+      "name": "PHYSICS_LINES_X",
+      "kind": "function",
+      "signature": "PHYSICS_LINES_X(ax,ay,bx,by, cx,cy,dx,dy) -> FLOAT",
+      "module": "physics"
+    },
+    {
+      "name": "PHYSICS_LINES_Y",
+      "kind": "function",
+      "signature": "PHYSICS_LINES_Y(ax,ay,bx,by, cx,cy,dx,dy) -> FLOAT",
       "module": "physics"
     },
     {
@@ -4644,6 +4668,18 @@
       "name": "PHYSICS_POINT_CIRCLE",
       "kind": "core",
       "signature": "PHYSICS_POINT_CIRCLE(px: Zahl, py: Zahl, cx: Zahl, cy: Zahl, cr: Zahl)",
+      "module": "physics"
+    },
+    {
+      "name": "PHYSICS_POINT_LINE",
+      "kind": "function",
+      "signature": "PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke) -> BOOLEAN",
+      "module": "physics"
+    },
+    {
+      "name": "PHYSICS_POINT_POLY",
+      "kind": "function",
+      "signature": "PHYSICS_POINT_POLY(px, py, xs: ARRAY, ys: ARRAY) -> BOOLEAN",
       "module": "physics"
     },
     {
@@ -5568,6 +5604,24 @@
       "name": "SHADER_SET3",
       "kind": "graphics",
       "signature": "SHADER_SET3(h: INTEGER, name: STRING, x: Zahl, y: Zahl, z: Zahl)",
+      "module": "core"
+    },
+    {
+      "name": "SHADER_SET_ARRAY",
+      "kind": "graphics",
+      "signature": "SHADER_SET_ARRAY(shader: Zahl, name: STRING, werte: ARRAY OF FLOAT)",
+      "module": "core"
+    },
+    {
+      "name": "SHADER_SET_MATRIX",
+      "kind": "graphics",
+      "signature": "SHADER_SET_MATRIX(shader: Zahl, name: STRING, mat: MAT4)",
+      "module": "core"
+    },
+    {
+      "name": "SHADER_SET_TEXTURE",
+      "kind": "graphics",
+      "signature": "SHADER_SET_TEXTURE(shader: Zahl, name: STRING, bild: IMAGE)",
       "module": "core"
     },
     {

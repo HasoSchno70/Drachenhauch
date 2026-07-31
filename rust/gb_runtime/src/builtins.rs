@@ -323,6 +323,22 @@ fn new_str_array(items: Vec<String>) -> Value {
     Value::Array(Rc::new(RefCell::new(arr)))
 }
 
+/// 1D-Zahlen-ARRAY -> `Vec<f64>` (Polygon-Koordinaten, Kerne, Messreihen).
+fn num_array(v: &Value, fn_: &str) -> Result<Vec<f64>, String> {
+    match v {
+        Value::Array(arr) => {
+            let arr = arr.borrow();
+            if arr.dims.len() != 1 {
+                return Err(format!("{}: erwartet 1D-ARRAY", fn_));
+            }
+            arr.cells.iter()
+                .map(|c| need_num(&c, fn_))
+                .collect()
+        }
+        _ => Err(format!("{}: erwartet 1D-ARRAY von Zahlen", fn_)),
+    }
+}
+
 /// 1D `ARRAY OF INTEGER` aus einer Zahlenliste (Gegenstueck zu new_str_array).
 pub fn new_int_array(items: Vec<i64>) -> Value {
     let n = items.len() as i64;
@@ -1711,8 +1727,91 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "physics_box_box" => { arity!(8); let v = nums(a, "PHYSICS_BOX_BOX")?; Ok(Value::Bool(v[0] < v[4] + v[6] && v[0] + v[2] > v[4] && v[1] < v[5] + v[7] && v[1] + v[3] > v[5])) }
         "physics_circle_circle" => { arity!(6); let v = nums(a, "PHYSICS_CIRCLE_CIRCLE")?; let dx = v[0] - v[3]; let dy = v[1] - v[4]; let rs = v[2] + v[5]; Ok(Value::Bool(dx * dx + dy * dy < rs * rs)) }
         "physics_box_circle" => { arity!(7); let v = nums(a, "PHYSICS_BOX_CIRCLE")?; let nx = v[0].max(v[4].min(v[0] + v[2])); let ny = v[1].max(v[5].min(v[1] + v[3])); let dx = v[4] - nx; let dy = v[5] - ny; Ok(Value::Bool(dx * dx + dy * dy < v[6] * v[6])) }
+        // PHYSICS_POINT_POLY(px, py, xs, ys): Punkt in beliebigem Polygon
+        // (Strahl-Verfahren, ungerade Kreuzungszahl = innen). Fuer unregelmaessige
+        // Klickflaechen, Laender-/Zonen-Karten, Sichtbereiche.
+        "physics_point_poly" => {
+            arity!(4);
+            let px = need_num(&a[0], "PHYSICS_POINT_POLY")?;
+            let py = need_num(&a[1], "PHYSICS_POINT_POLY")?;
+            let xs = num_array(&a[2], "PHYSICS_POINT_POLY")?;
+            let ys = num_array(&a[3], "PHYSICS_POINT_POLY")?;
+            if xs.len() != ys.len() {
+                return err("PHYSICS_POINT_POLY: xs und ys muessen gleich lang sein".to_string());
+            }
+            if xs.len() < 3 {
+                return err("PHYSICS_POINT_POLY: Polygon braucht mindestens 3 Punkte".to_string());
+            }
+            let n = xs.len();
+            let mut inside = false;
+            let mut j = n - 1;
+            for i in 0..n {
+                if (ys[i] > py) != (ys[j] > py)
+                    && px < (xs[j] - xs[i]) * (py - ys[i]) / (ys[j] - ys[i]) + xs[i]
+                {
+                    inside = !inside;
+                }
+                j = i;
+            }
+            Ok(Value::Bool(inside))
+        }
         "physics_point_box" => { arity!(6); let v = nums(a, "PHYSICS_POINT_BOX")?; Ok(Value::Bool(v[2] <= v[0] && v[0] < v[2] + v[4] && v[3] <= v[1] && v[1] < v[3] + v[5])) }
         "physics_point_circle" => { arity!(5); let v = nums(a, "PHYSICS_POINT_CIRCLE")?; let dx = v[0] - v[2]; let dy = v[1] - v[3]; Ok(Value::Bool(dx * dx + dy * dy < v[4] * v[4])) }
+        // --- Linien-/Polygon-Geometrie (fehlte bisher ganz) -------------------
+        // PHYSICS_LINES_HIT(ax,ay,bx,by, cx,cy,dx,dy): schneiden sich die
+        // Strecken A-B und C-D? Der klassische Fall fuer Laser/Sichtlinie gegen
+        // Wand, Wegkreuzung, Schnittpunkt-Pruefung.
+        "physics_lines_hit" | "physics_lines_x" | "physics_lines_y" => {
+            arity!(8);
+            let v = nums(a, "PHYSICS_LINES_HIT")?;
+            let (r_x, r_y) = (v[2] - v[0], v[3] - v[1]);
+            let (s_x, s_y) = (v[6] - v[4], v[7] - v[5]);
+            let den = r_x * s_y - r_y * s_x;
+            // den == 0 -> parallel oder kollinear: kein eindeutiger Schnittpunkt.
+            if den.abs() < 1e-12 {
+                return Ok(match name {
+                    "physics_lines_hit" => Value::Bool(false),
+                    _ => Value::Float(f64::NAN),
+                });
+            }
+            let t = ((v[4] - v[0]) * s_y - (v[5] - v[1]) * s_x) / den;
+            let u = ((v[4] - v[0]) * r_y - (v[5] - v[1]) * r_x) / den;
+            let hit = (0.0..=1.0).contains(&t) && (0.0..=1.0).contains(&u);
+            Ok(match name {
+                "physics_lines_hit" => Value::Bool(hit),
+                // Kein Schnitt -> NAN statt einer erfundenen Koordinate; der
+                // Aufrufer soll erst PHYSICS_LINES_HIT fragen.
+                "physics_lines_x" => Value::Float(if hit { v[0] + t * r_x } else { f64::NAN }),
+                _ => Value::Float(if hit { v[1] + t * r_y } else { f64::NAN }),
+            })
+        }
+        // PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke): liegt der Punkt auf der
+        // Strecke (mit Toleranz)? Fuer Klick-auf-Linie / Treffer an duennen Kanten.
+        "physics_point_line" => {
+            arity!(7);
+            let v = nums(a, "PHYSICS_POINT_LINE")?;
+            let (dx, dy) = (v[4] - v[2], v[5] - v[3]);
+            let len2 = dx * dx + dy * dy;
+            let t = if len2 > 0.0 {
+                (((v[0] - v[2]) * dx + (v[1] - v[3]) * dy) / len2).clamp(0.0, 1.0)
+            } else { 0.0 };                       // entartete Strecke = Punkt
+            let (cx, cy) = (v[2] + t * dx, v[3] + t * dy);
+            let half = (v[6] / 2.0).max(0.0);
+            Ok(Value::Bool((v[0] - cx).hypot(v[1] - cy) <= half))
+        }
+        // PHYSICS_CIRCLE_LINE(cx,cy,r, ax,ay, bx,by): Kreis gegen Strecke --
+        // Geschoss gegen Wand, Ball gegen Schlaeger.
+        "physics_circle_line" => {
+            arity!(7);
+            let v = nums(a, "PHYSICS_CIRCLE_LINE")?;
+            let (dx, dy) = (v[5] - v[3], v[6] - v[4]);
+            let len2 = dx * dx + dy * dy;
+            let t = if len2 > 0.0 {
+                (((v[0] - v[3]) * dx + (v[1] - v[4]) * dy) / len2).clamp(0.0, 1.0)
+            } else { 0.0 };
+            let (px, py) = (v[3] + t * dx, v[4] + t * dy);
+            Ok(Value::Bool((v[0] - px).hypot(v[1] - py) < v[2]))
+        }
         "physics_distance" => { arity!(4); let v = nums(a, "PHYSICS_DISTANCE")?; Ok(Value::Float((v[2] - v[0]).hypot(v[3] - v[1]))) }
         "physics_distance2" => { arity!(4); let v = nums(a, "PHYSICS_DISTANCE2")?; let dx = v[2] - v[0]; let dy = v[3] - v[1]; Ok(Value::Float(dx * dx + dy * dy)) }
         "physics_length" => { arity!(2); let v = nums(a, "PHYSICS_LENGTH")?; Ok(Value::Float(v[0].hypot(v[1]))) }
