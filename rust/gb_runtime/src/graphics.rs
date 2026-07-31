@@ -813,6 +813,23 @@ pub struct Graphics {
     max_frames: Option<u64>,
     screenshot: Option<String>,
     shot_taken: bool,
+    // --- Eingabe aufzeichnen/abspielen (AUTOMATION_*) --------------------
+    // Die Liste liegt in einer Box, weil `SetAutomationEventList` sich einen
+    // ROHEN ZEIGER auf sie merkt: laege sie direkt im Graphics-Struct, wuerde
+    // jedes Verschieben von Graphics den Zeiger ins Leere zeigen lassen.
+    auto_list: Option<Box<AutomationEventList>>,
+    auto_recording: bool,
+    /// Zieldatei der laufenden Aufnahme (beim Stoppen geschrieben).
+    auto_path: Option<String>,
+    /// Kopien der abzuspielenden Ereignisse (die Liste selbst besitzt raylib).
+    auto_events: Vec<AutomationEvent>,
+    auto_playing: bool,
+    auto_play_idx: usize,
+    /// Frame-Zaehler der Wiedergabe (0 = erster Frame nach AUTOMATION_PLAY).
+    auto_play_frame: u32,
+    /// Frame-Nummer des ersten Ereignisses -- die Aufnahme beginnt nicht
+    /// zwingend bei 0 (raylibs Zaehler laeuft seit Programmstart durch).
+    auto_play_base: u32,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
@@ -990,6 +1007,14 @@ impl Graphics {
             max_frames,
             screenshot,
             shot_taken: false,
+            auto_list: None,
+            auto_recording: false,
+            auto_path: None,
+            auto_events: Vec::new(),
+            auto_playing: false,
+            auto_play_idx: 0,
+            auto_play_frame: 0,
+            auto_play_base: 0,
         };
         // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
         // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
@@ -3207,6 +3232,100 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
             _ => key_label(k).to_string(),
         }
     }
+    // --- Eingabe aufzeichnen / abspielen (AUTOMATION_*) ---------------------
+    // raylib zeichnet in `EndDrawing` den kompletten Eingabe-Zustand des Frames
+    // auf (Tasten, Maus, Rad, Gamepad, Touch) und kann ihn spaeter wieder in
+    // seinen Eingabe-Zustand einspeisen. Damit sind Demo-Modus ("Attract"),
+    // Bug-Berichte zum Nachspielen und automatische Spieltests moeglich --
+    // vorher hatte GB dafuer gar nichts.
+    //
+    // WICHTIG: raylib gibt die Wiedergabe NICHT selbst getaktet, das muss der
+    // Aufrufer tun (`PlayAutomationEvent` je faelligem Ereignis). Genau das
+    // macht `automation_tick()` am Ende jedes FLIP -- direkt NACH dem
+    // Einlesen der echten Eingabe, damit die eingespeisten Werte den Frame
+    // gewinnen, den das GB-Programm als naechstes liest.
+
+    /// AUTOMATION_RECORD(datei$): Aufnahme starten. Eine laufende Wiedergabe
+    /// wird beendet (raylib spielt waehrend einer Aufnahme ohnehin nichts ab).
+    pub fn automation_record(&mut self, path: &str) -> Result<(), String> {
+        if path.trim().is_empty() {
+            return Err("AUTOMATION_RECORD: Dateiname fehlt".into());
+        }
+        self.auto_playing = false;
+        let mut list = Box::new(self.rl.load_automation_event_list(None));
+        self.rl.set_automation_event_list(&mut list);
+        self.rl.start_automation_event_recording();
+        self.auto_list = Some(list);
+        self.auto_path = Some(path.to_string());
+        self.auto_recording = true;
+        Ok(())
+    }
+    /// AUTOMATION_STOP(): beendet, was gerade laeuft. Eine Aufnahme wird dabei
+    /// in ihre Datei geschrieben; Rueckgabe = Anzahl der Ereignisse (bei
+    /// gestoppter Wiedergabe 0).
+    pub fn automation_stop(&mut self) -> Result<i64, String> {
+        self.auto_playing = false;
+        if !self.auto_recording { return Ok(0); }
+        self.rl.stop_automation_event_recording();
+        self.auto_recording = false;
+        let path = self.auto_path.take().unwrap_or_default();
+        let Some(list) = self.auto_list.as_ref() else { return Ok(0); };
+        let count = list.count() as i64;
+        if !list.export(&path) {
+            return Err(format!("AUTOMATION_STOP: '{}' nicht schreibbar", path));
+        }
+        Ok(count)
+    }
+    /// AUTOMATION_PLAY(datei$): Aufnahme laden und ab dem naechsten Frame
+    /// abspielen. Rueckgabe = Anzahl geladener Ereignisse.
+    pub fn automation_play(&mut self, path: &str) -> Result<i64, String> {
+        if self.auto_recording {
+            return Err("AUTOMATION_PLAY: laeuft noch eine Aufnahme (erst AUTOMATION_STOP)".into());
+        }
+        if !std::path::Path::new(path).exists() {
+            return Err(format!("AUTOMATION_PLAY: '{}' nicht gefunden", path));
+        }
+        // Hinweis: die alte Liste wird beim Zuweisen unten freigegeben. raylib
+        // haelt zwar noch seinen internen Zeiger darauf, liest ihn aber NUR
+        // waehrend einer laufenden Aufnahme -- und eine solche schliesst der
+        // Wachtposten oben aus. Jede neue Aufnahme setzt den Zeiger neu.
+        let list = Box::new(self.rl.load_automation_event_list(Some(path.into())));
+        self.auto_events = list.events();
+        // Aufsteigend nach Frame -- die Wiedergabe laeuft strikt vorwaerts.
+        self.auto_events.sort_by_key(|e| e.frame());
+        self.auto_play_base = self.auto_events.first().map(|e| e.frame()).unwrap_or(0);
+        self.auto_play_idx = 0;
+        self.auto_play_frame = 0;
+        self.auto_playing = !self.auto_events.is_empty();
+        self.auto_list = Some(list);
+        Ok(self.auto_events.len() as i64)
+    }
+    pub fn automation_recording(&self) -> bool { self.auto_recording }
+    pub fn automation_playing(&self) -> bool { self.auto_playing }
+    /// AUTOMATION_FRAME(): Frame-Nummer innerhalb der Wiedergabe (0 = erster).
+    pub fn automation_frame(&self) -> i64 { self.auto_play_frame as i64 }
+    /// AUTOMATION_COUNT(): Ereignisse in der zuletzt geladenen/aufgenommenen Liste.
+    pub fn automation_count(&self) -> i64 {
+        if self.auto_recording {
+            return self.auto_list.as_ref().map(|l| l.count() as i64).unwrap_or(0);
+        }
+        self.auto_events.len() as i64
+    }
+    /// Am Ende jedes FLIP: die fuer diesen Frame aufgezeichneten Ereignisse in
+    /// raylibs Eingabe-Zustand einspeisen. Ereignisse, deren Frame uebersprungen
+    /// wurde (Aufnahme mit anderer Bildrate), werden nachgeholt statt verworfen.
+    fn automation_tick(&mut self) {
+        if !self.auto_playing { return; }
+        while self.auto_play_idx < self.auto_events.len() {
+            let e = &self.auto_events[self.auto_play_idx];
+            if e.frame().saturating_sub(self.auto_play_base) > self.auto_play_frame { break; }
+            e.play();
+            self.auto_play_idx += 1;
+        }
+        self.auto_play_frame += 1;
+        if self.auto_play_idx >= self.auto_events.len() { self.auto_playing = false; }
+    }
+
     /// KEY_ANY_HIT(): GB-Code der zuletzt gedrueckten Taste, -1 wenn keine.
     /// Das Gegenstueck zu JOYSTICK_ANY_BUTTON -- zusammen mit `KEY_NAME$` ist
     /// ein Belegungsdialog ("Druecke eine Taste ...") damit in drei Zeilen
@@ -3913,6 +4032,12 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
         unsafe { emscripten_sleep(0); }
+
+        // Aufgezeichnete Eingabe einspeisen. Muss HIER stehen: das Draw-Handle
+        // ist gerade gedroppt worden (= EndDrawing), raylib hat die echte
+        // Eingabe fuer den naechsten Frame schon eingelesen -- die eingespeisten
+        // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
+        self.automation_tick();
 
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }

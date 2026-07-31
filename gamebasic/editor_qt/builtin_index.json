@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1209,
+  "count": 1216,
   "builtins": [
     {
       "name": "ABS",
@@ -745,6 +745,48 @@
       "kind": "core",
       "signature": "AUDIO_VOLUME(ch, v)",
       "module": "audio"
+    },
+    {
+      "name": "AUTOMATION_COUNT",
+      "kind": "graphics",
+      "signature": "AUTOMATION_COUNT() -> INTEGER",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_FRAME",
+      "kind": "graphics",
+      "signature": "AUTOMATION_FRAME() -> INTEGER",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_PLAY",
+      "kind": "graphics",
+      "signature": "AUTOMATION_PLAY(datei$) -> INTEGER",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_PLAYING",
+      "kind": "graphics",
+      "signature": "AUTOMATION_PLAYING() -> BOOLEAN",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_RECORD",
+      "kind": "graphics",
+      "signature": "AUTOMATION_RECORD(datei$)",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_RECORDING",
+      "kind": "graphics",
+      "signature": "AUTOMATION_RECORDING() -> BOOLEAN",
+      "module": "core"
+    },
+    {
+      "name": "AUTOMATION_STOP",
+      "kind": "graphics",
+      "signature": "AUTOMATION_STOP() -> INTEGER",
+      "module": "core"
     },
     {
       "name": "BASE64_DECODE",

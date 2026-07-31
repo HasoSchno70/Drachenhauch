@@ -4048,6 +4048,15 @@ impl<'p> Vm<'p> {
             "mousewheel_y" => Value::Float(self.gfx.as_ref().map(|g| g.mouse_wheel_y()).unwrap_or(0.0)),
             "key_name$" => Value::Str(g!().key_name(gi(a,0,"KEY_NAME$")?).into()),
             "key_any_hit" => Value::Int(g!().key_any_hit()),
+            // Eingabe aufzeichnen/abspielen: Demo-Modus, Fehlerberichte zum
+            // Nachspielen, automatische Spieltests.
+            "automation_record" => { let p = gs(a,0,"AUTOMATION_RECORD")?.to_string(); g!().automation_record(&p)?; Value::Nil }
+            "automation_stop" => Value::Int(g!().automation_stop()?),
+            "automation_play" => { let p = gs(a,0,"AUTOMATION_PLAY")?.to_string(); Value::Int(g!().automation_play(&p)?) }
+            "automation_recording" => Value::Bool(g!().automation_recording()),
+            "automation_playing" => Value::Bool(g!().automation_playing()),
+            "automation_frame" => Value::Int(g!().automation_frame()),
+            "automation_count" => Value::Int(g!().automation_count()),
             "joystick_mappings" => Value::Int(g!().joystick_mappings(gs(a,0,"JOYSTICK_MAPPINGS")?)),
             "window_dpi_x" => Value::Float(g!().window_dpi_x()),
             "window_dpi_y" => Value::Float(g!().window_dpi_y()),
