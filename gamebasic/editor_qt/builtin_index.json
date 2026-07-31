@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1194,
+  "count": 1201,
   "builtins": [
     {
       "name": "ABS",
@@ -4671,6 +4671,12 @@
       "module": "physics"
     },
     {
+      "name": "PHYSICS_DISTANCE3",
+      "kind": "core",
+      "signature": "PHYSICS_DISTANCE3(x1: Zahl, y1: Zahl, z1: Zahl, x2: Zahl, y2: Zahl, z2: Zahl)",
+      "module": "physics"
+    },
+    {
       "name": "PHYSICS_LENGTH",
       "kind": "core",
       "signature": "PHYSICS_LENGTH(vx: Zahl, vy: Zahl)",
@@ -4731,6 +4737,12 @@
       "module": "physics"
     },
     {
+      "name": "PHYSICS_POINT_TRI",
+      "kind": "core",
+      "signature": "PHYSICS_POINT_TRI(px: Zahl, py: Zahl, ax: Zahl, ay: Zahl, bx: Zahl, by: Zahl, cx: Zahl, cy: Zahl)",
+      "module": "physics"
+    },
+    {
       "name": "PHYSICS_RAY_BOX",
       "kind": "core",
       "signature": "PHYSICS_RAY_BOX(rx: Zahl, ry: Zahl, dx: Zahl, dy: Zahl, bx: Zahl, by: Zahl, bw: Zahl, bh: Zahl)",
@@ -4755,6 +4767,12 @@
       "module": "physics"
     },
     {
+      "name": "PHYSICS_SPHERE_SPHERE",
+      "kind": "core",
+      "signature": "PHYSICS_SPHERE_SPHERE(x1: Zahl, y1: Zahl, z1: Zahl, r1: Zahl, x2: Zahl, y2: Zahl, z2: Zahl, r2: Zahl)",
+      "module": "physics"
+    },
+    {
       "name": "PICK_BOX",
       "kind": "graphics",
       "signature": "PICK_BOX(*args)",
@@ -4767,9 +4785,21 @@
       "module": "g3d"
     },
     {
+      "name": "PICK_QUAD",
+      "kind": "graphics",
+      "signature": "PICK_QUAD(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)",
+      "module": "g3d"
+    },
+    {
       "name": "PICK_SPHERE",
       "kind": "graphics",
       "signature": "PICK_SPHERE(*args)",
+      "module": "g3d"
+    },
+    {
+      "name": "PICK_TRI",
+      "kind": "graphics",
+      "signature": "PICK_TRI(x1, y1, z1, x2, y2, z2, x3, y3, z3)",
       "module": "g3d"
     },
     {
@@ -4971,9 +5001,21 @@
       "module": "g3d"
     },
     {
+      "name": "RAY_HIT_QUAD",
+      "kind": "graphics",
+      "signature": "RAY_HIT_QUAD(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4)",
+      "module": "g3d"
+    },
+    {
       "name": "RAY_HIT_SPHERE",
       "kind": "graphics",
       "signature": "RAY_HIT_SPHERE(*args)",
+      "module": "g3d"
+    },
+    {
+      "name": "RAY_HIT_TRI",
+      "kind": "graphics",
+      "signature": "RAY_HIT_TRI(ox, oy, oz, dx, dy, dz, x1, y1, z1, x2, y2, z2, x3, y3, z3)",
       "module": "g3d"
     },
     {

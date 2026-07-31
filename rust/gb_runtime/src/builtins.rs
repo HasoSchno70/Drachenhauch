@@ -1812,6 +1812,41 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             let (px, py) = (v[3] + t * dx, v[4] + t * dy);
             Ok(Value::Bool((v[0] - px).hypot(v[1] - py) < v[2]))
         }
+        // PHYSICS_POINT_TRI(px,py, ax,ay, bx,by, cx,cy): Punkt im Dreieck
+        // (baryzentrisch). Fuer dreieckige Klickflaechen -- PHYSICS_POINT_POLY
+        // kann das auch, aber ohne Array-Aufbau fuer den haeufigsten Fall.
+        "physics_point_tri" => {
+            arity!(8);
+            let v = nums(a, "PHYSICS_POINT_TRI")?;
+            // Vorzeichen der drei Kanten-Kreuzprodukte: alle gleich = innen.
+            // (Funktioniert unabhaengig vom Umlaufsinn des Dreiecks.)
+            let side = |ax: f64, ay: f64, bx: f64, by: f64| {
+                (v[0] - bx) * (ay - by) - (ax - bx) * (v[1] - by)
+            };
+            let d1 = side(v[2], v[3], v[4], v[5]);
+            let d2 = side(v[4], v[5], v[6], v[7]);
+            let d3 = side(v[6], v[7], v[2], v[3]);
+            let neg = d1 < 0.0 || d2 < 0.0 || d3 < 0.0;
+            let pos = d1 > 0.0 || d2 > 0.0 || d3 > 0.0;
+            Ok(Value::Bool(!(neg && pos)))
+        }
+        // PHYSICS_SPHERE_SPHERE(x1,y1,z1,r1, x2,y2,z2,r2): das 3D-Gegenstueck
+        // zu PHYSICS_CIRCLE_CIRCLE -- Naeherungs-/Treffer-Pruefung in 3D ohne
+        // eine ganze Physik-Welt (physics3d) aufzusetzen.
+        "physics_sphere_sphere" => {
+            arity!(8);
+            let v = nums(a, "PHYSICS_SPHERE_SPHERE")?;
+            let (dx, dy, dz) = (v[0] - v[4], v[1] - v[5], v[2] - v[6]);
+            let rs = v[3] + v[7];
+            Ok(Value::Bool(dx * dx + dy * dy + dz * dz < rs * rs))
+        }
+        // PHYSICS_DISTANCE3(x1,y1,z1, x2,y2,z2): Abstand in 3D.
+        "physics_distance3" => {
+            arity!(6);
+            let v = nums(a, "PHYSICS_DISTANCE3")?;
+            let (dx, dy, dz) = (v[3] - v[0], v[4] - v[1], v[5] - v[2]);
+            Ok(Value::Float((dx * dx + dy * dy + dz * dz).sqrt()))
+        }
         "physics_distance" => { arity!(4); let v = nums(a, "PHYSICS_DISTANCE")?; Ok(Value::Float((v[2] - v[0]).hypot(v[3] - v[1]))) }
         "physics_distance2" => { arity!(4); let v = nums(a, "PHYSICS_DISTANCE2")?; let dx = v[2] - v[0]; let dy = v[3] - v[1]; Ok(Value::Float(dx * dx + dy * dy)) }
         "physics_length" => { arity!(2); let v = nums(a, "PHYSICS_LENGTH")?; Ok(Value::Float(v[0].hypot(v[1]))) }

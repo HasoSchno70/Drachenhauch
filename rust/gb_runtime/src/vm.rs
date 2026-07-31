@@ -3664,6 +3664,14 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: Argument {} muss Zahl sein", fn_, i + 1)),
             }
         }
+        // Genau `n` Zahlen-Argumente als f32 (fuer die koordinatenreichen
+        // Geometrie-Builtins -- 15 einzelne need_f-Zeilen liest niemand mehr).
+        fn fv(a: &[Value], n: usize, fn_: &str) -> R<Vec<f32>> {
+            if a.len() != n {
+                return Err(format!("{}: erwartet {} Zahlen, erhalten {}", fn_, n, a.len()));
+            }
+            (0..n).map(|i| Ok(need_f(a, i, fn_)? as f32)).collect()
+        }
         // Optionaler Easing-Name fuer Fades/Slides (linear/in/out/inout,
         // Default "linear" bei fehlendem Argument). Pruefung VOR der Audio-
         // Initialisierung -> golden-testbar (wie die Bus-Namen-Checks).
@@ -4331,6 +4339,27 @@ impl<'p> Vm<'p> {
                 need_f(a,3,"RAY_HIT_SPHERE")? as f32, need_f(a,4,"RAY_HIT_SPHERE")? as f32, need_f(a,5,"RAY_HIT_SPHERE")? as f32,
                 need_f(a,6,"RAY_HIT_SPHERE")? as f32, need_f(a,7,"RAY_HIT_SPHERE")? as f32, need_f(a,8,"RAY_HIT_SPHERE")? as f32,
                 need_f(a,9,"RAY_HIT_SPHERE")? as f32)),
+            // Picking auf ECHTER Geometrie statt nur Huellkoerper: einzelne
+            // Dreiecke/Vierecke (Boden-Kacheln, Wandflaechen, In-Welt-Panels).
+            "ray_hit_tri" => {
+                let v = fv(a, 15, "RAY_HIT_TRI")?;
+                Value::Float(g!().ray_hit_tri([v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                    [[v[6],v[7],v[8]], [v[9],v[10],v[11]], [v[12],v[13],v[14]]]))
+            }
+            "ray_hit_quad" => {
+                let v = fv(a, 18, "RAY_HIT_QUAD")?;
+                Value::Float(g!().ray_hit_quad([v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                    [[v[6],v[7],v[8]], [v[9],v[10],v[11]], [v[12],v[13],v[14]], [v[15],v[16],v[17]]]))
+            }
+            "pick_tri" => {
+                let v = fv(a, 9, "PICK_TRI")?;
+                Value::Float(g!().pick_tri([[v[0],v[1],v[2]], [v[3],v[4],v[5]], [v[6],v[7],v[8]]]))
+            }
+            "pick_quad" => {
+                let v = fv(a, 12, "PICK_QUAD")?;
+                Value::Float(g!().pick_quad([[v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                                             [v[6],v[7],v[8]], [v[9],v[10],v[11]]]))
+            }
             "pick_box" => Value::Float(g!().pick_box(
                 need_f(a,0,"PICK_BOX")? as f32, need_f(a,1,"PICK_BOX")? as f32, need_f(a,2,"PICK_BOX")? as f32,
                 need_f(a,3,"PICK_BOX")? as f32, need_f(a,4,"PICK_BOX")? as f32, need_f(a,5,"PICK_BOX")? as f32)),

@@ -1542,6 +1542,35 @@ impl Graphics {
         let rc = get_ray_collision_sphere(ray, Vector3::new(cx, cy, cz), r);
         if rc.hit && rc.distance >= 0.0 { rc.distance as f64 } else { -1.0 }
     }
+    /// Strahl aus Ursprung + Richtung mit NORMALISIERTER Richtung. Alle
+    /// raylib-Strahl-Tests liefern die Distanz in Vielfachen der Richtungs-
+    /// laenge -- nur bei Einheitslaenge ist das Ergebnis eine Weltdistanz.
+    /// Eine Nullrichtung gibt es nicht als Strahl -> None.
+    fn unit_ray(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32) -> Option<Ray> {
+        let len = (dx * dx + dy * dy + dz * dz).sqrt();
+        if len < 1e-6 { return None; }
+        Some(Ray::new(Vector3::new(ox, oy, oz),
+                      Vector3::new(dx / len, dy / len, dz / len)))
+    }
+    /// Strahl gegen ein einzelnes Dreieck (Moeller-Trumbore). raylib cullt
+    /// bewusst NICHT -- ein Treffer von der Rueckseite zaehlt genauso. Punkte
+    /// je (x,y,z), Ergebnis Distanz oder -1.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ray_hit_tri(&self, o: [f32; 3], d: [f32; 3], p: [[f32; 3]; 3]) -> f64 {
+        let Some(ray) = Self::unit_ray(o[0], o[1], o[2], d[0], d[1], d[2]) else { return -1.0; };
+        let v = |q: [f32; 3]| Vector3::new(q[0], q[1], q[2]);
+        let rc = get_ray_collision_triangle(ray, v(p[0]), v(p[1]), v(p[2]));
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
+    /// Strahl gegen ein Viereck (zwei Dreiecke). Die Punkte muessen REIHUM
+    /// liegen (p1-p2-p3-p4 im Kreis) -- bei einer Ueberkreuz-Reihenfolge
+    /// testet raylib zwei sich ueberlappende Dreiecke und der Treffer fehlt.
+    pub fn ray_hit_quad(&self, o: [f32; 3], d: [f32; 3], p: [[f32; 3]; 4]) -> f64 {
+        let Some(ray) = Self::unit_ray(o[0], o[1], o[2], d[0], d[1], d[2]) else { return -1.0; };
+        let v = |q: [f32; 3]| Vector3::new(q[0], q[1], q[2]);
+        let rc = get_ray_collision_quad(ray, v(p[0]), v(p[1]), v(p[2]), v(p[3]));
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
     /// Mausstrahl durch die aktuelle 3D-Kamera (Fenster-Pixel -> Welt-Ray).
     fn mouse_ray(&self) -> Ray {
         let m = self.rl.get_mouse_position();
@@ -1571,6 +1600,16 @@ impl Graphics {
         let r = self.mouse_ray();
         self.ray_hit_sphere(r.position.x, r.position.y, r.position.z,
                             r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, radius)
+    }
+    pub fn pick_tri(&self, p: [[f32; 3]; 3]) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_tri([r.position.x, r.position.y, r.position.z],
+                         [r.direction.x, r.direction.y, r.direction.z], p)
+    }
+    pub fn pick_quad(&self, p: [[f32; 3]; 4]) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_quad([r.position.x, r.position.y, r.position.z],
+                          [r.direction.x, r.direction.y, r.direction.z], p)
     }
     /// 3D-Weltpunkt -> Bildschirm-Pixel (durch die aktuelle 3D-Kamera).
     pub fn world_to_screen(&self, wx: f32, wy: f32, wz: f32) -> (f32, f32) {
