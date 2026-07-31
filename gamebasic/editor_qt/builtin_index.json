@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1186,
+  "count": 1193,
   "builtins": [
     {
       "name": "ABS",
@@ -459,6 +459,24 @@
       "module": "audio"
     },
     {
+      "name": "AUDIO_LFO_NEW",
+      "kind": "function",
+      "signature": "AUDIO_LFO_NEW(wellenform: STRING, hz: Zahl [, amplitude: Zahl [, mitte: Zahl]]) -> AUDIO_MOD",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_LFO_SET",
+      "kind": "function",
+      "signature": "AUDIO_LFO_SET(mod: AUDIO_MOD [, hz [, amplitude [, mitte]]])",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_LFO_WAVEFORM",
+      "kind": "function",
+      "signature": "AUDIO_LFO_WAVEFORM(mod: AUDIO_MOD, wellenform: STRING)",
+      "module": "audio"
+    },
+    {
       "name": "AUDIO_LISTENER_NEW",
       "kind": "core",
       "signature": "AUDIO_LISTENER_NEW(x, y, z) -> AUDIO_LISTENER",
@@ -486,6 +504,18 @@
       "name": "AUDIO_LOFI",
       "kind": "core",
       "signature": "AUDIO_LOFI(an[, bits[, cutoff_hz]])",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_MODULATE",
+      "kind": "function",
+      "signature": "AUDIO_MODULATE(bus: STRING, ziel: STRING, mod: AUDIO_MOD, min: Zahl, max: Zahl)",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_MOD_REMOVE",
+      "kind": "function",
+      "signature": "AUDIO_MOD_REMOVE(mod: AUDIO_MOD)",
       "module": "audio"
     },
     {
@@ -690,6 +720,18 @@
       "name": "AUDIO_TONE",
       "kind": "core",
       "signature": "AUDIO_TONE(2..4 Argumente)",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_TWEENER_NEW",
+      "kind": "function",
+      "signature": "AUDIO_TWEENER_NEW([startwert: Zahl]) -> AUDIO_MOD",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_TWEENER_TO",
+      "kind": "function",
+      "signature": "AUDIO_TWEENER_TO(mod: AUDIO_MOD, ziel: Zahl [, dauer_ms [, easing: STRING]])",
       "module": "audio"
     },
     {

@@ -1,0 +1,109 @@
+' 150 -- Modulatoren: Klaenge, die sich von selbst bewegen
+'
+' Ein LFO schwingt fortlaufend und faehrt damit einen Bus-Parameter. Ein
+' Tweener faehrt auf Kommando weich zu einem Zielwert. Beide laufen auf Kiras
+' AUDIO-Thread -- das Programm rechnet pro Frame NICHTS nach, und der Effekt
+' bleibt sample-genau, auch wenn die Bildrate einbricht.
+'
+'   AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]]) -> AUDIO_MOD
+'         wellenform$: sine / triangle / saw / pulse
+'   AUDIO_LFO_SET(mod [, hz [, amplitude [, mitte]]])
+'   AUDIO_LFO_WAVEFORM(mod, wellenform$)
+'   AUDIO_TWEENER_NEW([start]) -> AUDIO_MOD
+'   AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])
+'   AUDIO_MODULATE(bus$, ziel$, mod, min, max)
+'         bus$:  sfx / music / master
+'         ziel$: filter / resonance / reverb / distortion
+'   AUDIO_MOD_REMOVE(mod)
+
+IMPORT "audio"
+
+SCREEN(640, 340, "Audio-Modulatoren", 1)
+SETFPS(60)
+
+' Dauerhaftes Rauschen als Klangquelle -- daran hoert man den Filter am besten.
+DIM quelle AS SOUND
+quelle = AUDIO_NOISE(4000)
+DIM ch AS AUDIO_CHANNEL
+ch = AUDIO_PLAY(quelle, -1, 0.35)
+
+' --- Auto-Wah: der LFO fährt den Filter-Cutoff zwischen 200 und 6000 Hz
+DIM wah AS AUDIO_MOD
+wah = AUDIO_LFO_NEW("sine", 1.5, 1.0, 0.0)
+AUDIO_MODULATE("sfx", "filter", wah, 200.0, 6000.0)
+
+' --- Tweener auf dem Hall: per Taste weich auf/zu fahren
+DIM hall AS AUDIO_MOD
+hall = AUDIO_TWEENER_NEW(0.0)
+AUDIO_MODULATE("sfx", "reverb", hall, 0.0, 0.9)
+
+DIM tempo AS FLOAT
+tempo = 1.5
+DIM form AS INTEGER
+DIM formen AS ARRAY OF STRING
+DIM bands[16] AS FLOAT
+DIM hallwert AS FLOAT
+
+CONST FORM_ANZ AS INTEGER = 4
+
+FUNCTION formname(i AS INTEGER) AS STRING
+    SELECT CASE i MOD FORM_ANZ
+        CASE 0
+            RETURN "sine"
+        CASE 1
+            RETURN "triangle"
+        CASE 2
+            RETURN "saw"
+        CASE ELSE
+            RETURN "pulse"
+    END SELECT
+END FUNCTION
+
+WHILE NOT QUITREQUESTED()
+    ' Tempo des Auto-Wah
+    IF KEYHIT(KEY_UP) THEN
+        tempo = CLAMP(tempo * 1.5, 0.1, 20.0)
+        AUDIO_LFO_SET(wah, tempo)
+    END IF
+    IF KEYHIT(KEY_DOWN) THEN
+        tempo = CLAMP(tempo / 1.5, 0.1, 20.0)
+        AUDIO_LFO_SET(wah, tempo)
+    END IF
+    ' Wellenform durchschalten
+    IF KEYHIT(KEY_SPACE) THEN
+        form = form + 1
+        AUDIO_LFO_WAVEFORM(wah, formname(form))
+    END IF
+    ' Hall weich auf/zu -- der Tweener macht die Rampe, nicht dieses Programm
+    IF KEYHIT(KEY_RIGHT) THEN
+        hallwert = 1.0
+        AUDIO_TWEENER_TO(hall, 1.0, 1200.0, "inout")
+    END IF
+    IF KEYHIT(KEY_LEFT) THEN
+        hallwert = 0.0
+        AUDIO_TWEENER_TO(hall, 0.0, 1200.0, "inout")
+    END IF
+
+    CLS(&H101820)
+    TEXT(20, 20, "Modulatoren -- der Klang bewegt sich von selbst")
+    TEXT(20, 52, "Auto-Wah (LFO auf Filter-Cutoff)")
+    TEXT(40, 74, "Tempo:      " + FORMAT$(tempo, "%.2f") + " Hz     (Pfeil hoch/runter)")
+    TEXT(40, 92, "Wellenform: " + formname(form) + "     (Leertaste)")
+    TEXT(20, 124, "Hall (Tweener)")
+    TEXT(40, 146, "Ziel: " + FORMAT$(hallwert, "%.1f") + "     (Pfeil links/rechts)")
+
+    ' Spektrum -- hier sieht man das Wandern des Filters
+    AUDIO_FFT(bands)
+    DIM i AS INTEGER
+    FOR i = 0 TO 15
+        DIM hoehe AS INTEGER
+        hoehe = INT(bands[i] * 110.0)
+        BOX(40 + i * 34, 300 - hoehe, 40 + i * 34 + 26, 300, &H2BC4E8)
+    NEXT
+    TEXT(20, 312, "Spektrum: der helle Bereich wandert mit dem Filter")
+
+    FLIP()
+WEND
+
+AUDIO_MOD_REMOVE(wah)
+AUDIO_MOD_REMOVE(hall)

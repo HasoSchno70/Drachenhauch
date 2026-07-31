@@ -4762,6 +4762,53 @@ impl<'p> Vm<'p> {
             "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
 
             // --- Clock (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing) ---
+            // --- Modulatoren: LFO + Tweener ---------------------------------
+            // Kira faehrt sie auf dem Audio-Thread: ein Tremolo/Filter-Sweep
+            // laeuft sample-genau weiter, auch wenn ein Frame einbricht -- und
+            // das GB-Programm ruft dafuer NICHTS pro Frame.
+            "audio_lfo_new" => {
+                let wave = gs(a, 0, "AUDIO_LFO_NEW")?.to_string();
+                let hz = need_f(a, 1, "AUDIO_LFO_NEW")?;
+                if hz < 0.0 { return Err("AUDIO_LFO_NEW: Frequenz darf nicht negativ sein".into()); }
+                let amp = if a.len() > 2 { need_f(a, 2, "AUDIO_LFO_NEW")? } else { 1.0 };
+                let off = if a.len() > 3 { need_f(a, 3, "AUDIO_LFO_NEW")? } else { 0.0 };
+                Value::Int(self.audio_mut()?.lfo_new(&wave, hz, amp, off)?)
+            }
+            "audio_lfo_set" => {
+                let m = gi(a, 0, "AUDIO_LFO_SET")?;
+                let hz = if a.len() > 1 { Some(need_f(a, 1, "AUDIO_LFO_SET")?) } else { None };
+                let amp = if a.len() > 2 { Some(need_f(a, 2, "AUDIO_LFO_SET")?) } else { None };
+                let off = if a.len() > 3 { Some(need_f(a, 3, "AUDIO_LFO_SET")?) } else { None };
+                self.audio_mut()?.lfo_set(m, hz, amp, off)?; Value::Nil
+            }
+            "audio_lfo_waveform" => {
+                let m = gi(a, 0, "AUDIO_LFO_WAVEFORM")?;
+                let w = gs(a, 1, "AUDIO_LFO_WAVEFORM")?.to_string();
+                self.audio_mut()?.lfo_waveform(m, &w)?; Value::Nil
+            }
+            "audio_tweener_new" => {
+                let v = if a.is_empty() { 0.0 } else { need_f(a, 0, "AUDIO_TWEENER_NEW")? };
+                Value::Int(self.audio_mut()?.tweener_new(v)?)
+            }
+            "audio_tweener_to" => {
+                let m = gi(a, 0, "AUDIO_TWEENER_TO")?;
+                let target = need_f(a, 1, "AUDIO_TWEENER_TO")?;
+                let ms = if a.len() > 2 { need_f(a, 2, "AUDIO_TWEENER_TO")? } else { 0.0 };
+                let ez = if a.len() > 3 { gs(a, 3, "AUDIO_TWEENER_TO")?.to_string() } else { String::new() };
+                self.audio_mut()?.tweener_to(m, target, ms, &ez)?; Value::Nil
+            }
+            "audio_mod_remove" => {
+                let m = gi(a, 0, "AUDIO_MOD_REMOVE")?;
+                self.audio_mut()?.mod_remove(m)?; Value::Nil
+            }
+            "audio_modulate" => {
+                let bus = gs(a, 0, "AUDIO_MODULATE")?.to_string();
+                let target = gs(a, 1, "AUDIO_MODULATE")?.to_string();
+                let m = gi(a, 2, "AUDIO_MODULATE")?;
+                let lo = need_f(a, 3, "AUDIO_MODULATE")?;
+                let hi = need_f(a, 4, "AUDIO_MODULATE")?;
+                self.audio_mut()?.modulate(&bus, &target, m, lo, hi)?; Value::Nil
+            }
             "audio_clock_new" => {
                 // AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung VOR der
                 // Audio-Initialisierung (golden-testbar).
