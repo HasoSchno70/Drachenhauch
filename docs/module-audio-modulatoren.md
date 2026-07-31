@@ -57,8 +57,19 @@ AUDIO_MOD_REMOVE(mod)
 ```
 
 - `bus$`: `sfx`, `music` oder `master`
-- `ziel$`: `filter` (Cutoff in Hz), `resonance`, `reverb` (Mix 0..1),
-  `distortion` (Stärke in dB)
+- `ziel$`:
+  - `volume` — **Tremolo**. `min`/`max` sind ein Faktor wie bei
+    `AUDIO_BUS_VOLUME` (1.0 = unverändert), nicht Dezibel.
+  - `pan` — **Auto-Pan**. -1 = ganz links, +1 = ganz rechts.
+  - `filter` (Cutoff in Hz), `resonance`, `reverb` (Mix 0..1),
+    `distortion` (Stärke in dB)
+
+Feste Balance ohne Modulator: `AUDIO_BUS_PAN(bus$, pos)`. Bis dahin ließ sich
+nur ein *einzelner* Kanal pannen (`AUDIO_PAN`), nicht die Musik als Ganzes.
+
+> Panning liegt bei Kira nicht auf dem Track, sondern in einem eigenen Effekt.
+> Er hängt seit Etappe 6 in jeder Bus-Kette — ohne ihn gäbe es weder
+> `AUDIO_BUS_PAN` noch Auto-Pan.
 
 Der Wertebereich des Modulators wird auf `min..max` abgebildet — bei einem
 LFO mit Standard-Amplitude also **-1 → min** und **+1 → max**. Wer einen LFO

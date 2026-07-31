@@ -4809,6 +4809,11 @@ impl<'p> Vm<'p> {
                 let hi = need_f(a, 4, "AUDIO_MODULATE")?;
                 self.audio_mut()?.modulate(&bus, &target, m, lo, hi)?; Value::Nil
             }
+            "audio_bus_pan" => {
+                let bus = gs(a, 0, "AUDIO_BUS_PAN")?.to_string();
+                let pos = need_f(a, 1, "AUDIO_BUS_PAN")?;
+                self.audio_mut()?.bus_pan(&bus, pos)?; Value::Nil
+            }
             "audio_clock_new" => {
                 // AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung VOR der
                 // Audio-Initialisierung (golden-testbar).

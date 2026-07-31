@@ -151,8 +151,11 @@ def test_bad_handles_are_rejected(tmp_path):
 
 
 def test_unknown_modulation_target_and_bus_are_rejected(tmp_path):
+    # "tonhoehe" gibt es bewusst nicht -- Kira bietet dafuer keinen Track-
+    # Parameter. ("lautstaerke" stand hier frueher, ist seit Etappe 6 aber ein
+    # gueltiger Alias fuer volume.)
     r = _run('DIM m AS AUDIO_MOD\nm = AUDIO_LFO_NEW("sine", 1.0)\n'
-             'AUDIO_MODULATE("sfx", "lautstaerke", m, 0.0, 1.0)\n', tmp_path)
+             'AUDIO_MODULATE("sfx", "tonhoehe", m, 0.0, 1.0)\n', tmp_path)
     assert r.returncode != 0 and "AUDIO_MODULATE" in r.stderr
 
     r2 = _run('DIM m AS AUDIO_MOD\nm = AUDIO_LFO_NEW("sine", 1.0)\n'
@@ -187,3 +190,74 @@ def test_unknown_easing_is_rejected(tmp_path):
     r = _run('DIM m AS AUDIO_MOD\nm = AUDIO_TWEENER_NEW(0.0)\n'
              'AUDIO_TWEENER_TO(m, 1.0, 10.0, "huepfend")\n', tmp_path)
     assert r.returncode != 0 and "huepfend" in r.stderr
+
+
+# ------------------------------------------------- Tremolo + Auto-Pan (Etappe 6)
+def test_volume_modulation_produces_a_tremolo(tmp_path):
+    # Schwelle 1.6 gemessen, nicht geraten: ueber je 4 Laeufe lag der Hub ohne
+    # Modulation bei 0.66-1.17, mit Tremolo bei 2.13-2.44.
+    r = _run('DIM n AS SOUND\nn = AUDIO_NOISE(4000)\n'
+             'DIM ch AS AUDIO_CHANNEL\nch = AUDIO_PLAY(n, -1, 1.0)\n'
+             'DIM lfo AS AUDIO_MOD\nlfo = AUDIO_LFO_NEW("sine", 3.0)\n'
+             'AUDIO_MODULATE("sfx", "volume", lfo, 0.0, 1.0)\n'
+             'DIM bands[16] AS FLOAT\n'
+             'DIM i AS INTEGER\nDIM hoch AS FLOAT\nDIM tief AS FLOAT\n'
+             'FOR i = 0 TO 40\n'
+             '    SLEEP(25)\n'
+             '    AUDIO_FFT(bands)\n'
+             '    DIM s AS FLOAT\n'
+             '    s = bands[4] + bands[5] + bands[6]\n'
+             '    IF s > hoch THEN hoch = s\n'
+             '    IF i = 0 OR s < tief THEN tief = s\n'
+             'NEXT\n'
+             'PRINT (hoch - tief) > 1.6\n', tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert r.out == ["TRUE"], f"kein Tremolo messbar: {r.stdout}"
+
+
+def test_without_volume_modulation_the_level_stays_put(tmp_path):
+    # Gegenprobe -- sonst wuerde der Test oben nur das Eigenzappeln des
+    # Rauschens messen und auch ohne die Funktion bestehen.
+    r = _run('DIM n AS SOUND\nn = AUDIO_NOISE(4000)\n'
+             'DIM ch AS AUDIO_CHANNEL\nch = AUDIO_PLAY(n, -1, 1.0)\n'
+             'DIM bands[16] AS FLOAT\n'
+             'DIM i AS INTEGER\nDIM hoch AS FLOAT\nDIM tief AS FLOAT\n'
+             'FOR i = 0 TO 40\n'
+             '    SLEEP(25)\n'
+             '    AUDIO_FFT(bands)\n'
+             '    DIM s AS FLOAT\n'
+             '    s = bands[4] + bands[5] + bands[6]\n'
+             '    IF s > hoch THEN hoch = s\n'
+             '    IF i = 0 OR s < tief THEN tief = s\n'
+             'NEXT\n'
+             'PRINT (hoch - tief) < 1.6\n', tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert r.out == ["TRUE"], f"Pegel schwankte ohne Modulation zu stark: {r.stdout}"
+
+
+def test_bus_panning_and_auto_pan_are_accepted(tmp_path):
+    # BEWUSST nur strukturell geprueft: der FFT-Abgriff summiert die Kanaele,
+    # das Stereobild laesst sich damit nicht messen. Ein Test, der so tut als
+    # ob, waere schlimmer als keiner -- geprueft wird also, dass die Aufrufe
+    # durchgehen und die Grenzwerte greifen.
+    r = _run('AUDIO_BUS_PAN("sfx", -1.0)\nAUDIO_BUS_PAN("music", 0.5)\n'
+             'AUDIO_BUS_PAN("master", 0.0)\n'
+             'AUDIO_BUS_PAN("sfx", -9.0)\nAUDIO_BUS_PAN("sfx", 9.0)\n'
+             'DIM lfo AS AUDIO_MOD\nlfo = AUDIO_LFO_NEW("triangle", 0.5)\n'
+             'AUDIO_MODULATE("sfx", "pan", lfo, -1.0, 1.0)\n'
+             'AUDIO_MODULATE("music", "panning", lfo, -0.5, 0.5)\n'
+             'PRINT "ok"\n', tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert r.out == ["ok"]
+
+
+def test_bus_pan_rejects_an_unknown_bus(tmp_path):
+    r = _run('AUDIO_BUS_PAN("gitarre", 0.0)\n', tmp_path)
+    assert r.returncode != 0 and "AUDIO_BUS_PAN" in r.stderr
+
+
+def test_modulation_target_list_names_the_new_targets(tmp_path):
+    r = _run('DIM m AS AUDIO_MOD\nm = AUDIO_LFO_NEW("sine", 1.0)\n'
+             'AUDIO_MODULATE("sfx", "quatsch", m, 0.0, 1.0)\n', tmp_path)
+    assert r.returncode != 0
+    assert "volume" in r.stderr and "pan" in r.stderr

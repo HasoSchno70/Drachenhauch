@@ -26,6 +26,7 @@ use kira::{
     effect::distortion::{DistortionBuilder, DistortionHandle},
     effect::compressor::{CompressorBuilder, CompressorHandle},
     effect::eq_filter::{EqFilterBuilder, EqFilterHandle, EqFilterKind},
+    effect::panning_control::{PanningControlBuilder, PanningControlHandle},
     info::Info,
     listener::ListenerHandle,
     modulator::ModulatorId,
@@ -48,6 +49,7 @@ struct BusFx {
     distortion: DistortionHandle,
     compressor: CompressorHandle,
     eq: EqFilterHandle,
+    panning: PanningControlHandle,
 }
 
 /// Ein Modulator: entweder ein LFO (schwingt von selbst) oder ein Tweener
@@ -144,6 +146,11 @@ macro_rules! attach_bus_fx {
         compressor: $b.add_effect(CompressorBuilder::new().mix(Mix(0.0))),
         reverb: $b.add_effect(ReverbBuilder::new().mix(Mix(0.0))),
         delay: $b.add_effect(DelayBuilderRT),
+        // Panning liegt bei Kira NICHT auf dem Track selbst, sondern in einem
+        // eigenen Effekt. Ohne ihn in der Kette gaebe es weder eine
+        // Bus-Balance (AUDIO_BUS_PAN) noch Auto-Pan per Modulator -- und
+        // Auto-Pan ist neben Tremolo die bekannteste LFO-Anwendung ueberhaupt.
+        panning: $b.add_effect(PanningControlBuilder(Panning(0.0).into())),
     }};
 }
 use xmrs::prelude::Module;
@@ -944,6 +951,25 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
             .id();
         let (lo, hi) = (finite(lo, 0.0), finite(hi, 1.0));
         let t = target.to_ascii_lowercase();
+        // Die Lautstaerke sitzt auf dem TRACK, nicht in der Effektkette --
+        // eigener Zweig vor dem `bus_fx`-Zugriff. Das ist das Tremolo.
+        // `min`/`max` sind hier ein Faktor wie bei AUDIO_BUS_VOLUME (1.0 =
+        // unveraendert), nicht Dezibel -- sonst muesste der Nutzer umrechnen.
+        if t == "volume" || t == "lautstaerke" {
+            let v = KValue::from_modulator(id, Mapping {
+                input_range: (-1.0, 1.0),
+                output_range: (db(lo.max(0.0)), db(hi.max(0.0))),
+                easing: Easing::Linear,
+            });
+            match bus.to_lowercase().as_str() {
+                "sfx" => self.sfx_track.set_volume(v, tween_now()),
+                "music" => self.music_track.set_volume(v, tween_now()),
+                "master" => self.manager.main_track().set_volume(v, tween_now()),
+                other => return Err(format!(
+                    "AUDIO_MODULATE: unbekannter Bus '{}' -- erwartet sfx/music/master", other)),
+            }
+            return Ok(());
+        }
         let fx = self.bus_fx(bus, "AUDIO_MODULATE")?;
         let map = |a: f64, b: f64| Mapping {
             input_range: (-1.0, 1.0), output_range: (a, b), easing: Easing::Linear,
@@ -968,10 +994,28 @@ schwingt von selbst und faehrt nicht zu einem Ziel".into()),
                 }), tween_now()),
             "resonance" => fx.filter.set_resonance(
                 KValue::from_modulator(id, map(lo, hi)), tween_now()),
+            // Auto-Pan: -1 = ganz links, +1 = ganz rechts.
+            "pan" | "panning" => fx.panning.set_panning(
+                KValue::from_modulator(id, Mapping {
+                    input_range: (-1.0, 1.0),
+                    output_range: (Panning(lo.clamp(-1.0, 1.0) as f32),
+                                   Panning(hi.clamp(-1.0, 1.0) as f32)),
+                    easing: Easing::Linear,
+                }), tween_now()),
             other => return Err(format!(
-                "AUDIO_MODULATE: unbekanntes Ziel '{}' -- erwartet filter/resonance/\
-reverb/distortion", other)),
+                "AUDIO_MODULATE: unbekanntes Ziel '{}' -- erwartet volume/pan/filter/\
+resonance/reverb/distortion", other)),
         }
+        Ok(())
+    }
+
+    /// AUDIO_BUS_PAN(bus$, pos): feste Balance eines ganzen Busses
+    /// (-1 = links, 0 = Mitte, +1 = rechts). Bisher liess sich nur ein
+    /// EINZELNER Kanal pannen (AUDIO_PAN) -- nicht die Musik als Ganzes.
+    pub fn bus_pan(&mut self, bus: &str, pos: f64) -> Result<(), String> {
+        let p = finite(pos, 0.0).clamp(-1.0, 1.0) as f32;
+        let fx = self.bus_fx(bus, "AUDIO_BUS_PAN")?;
+        fx.panning.set_panning(Panning(p), tween_now());
         Ok(())
     }
 

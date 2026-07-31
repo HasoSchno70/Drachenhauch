@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1193,
+  "count": 1194,
   "builtins": [
     {
       "name": "ABS",
@@ -330,6 +330,12 @@
       "name": "AUDIO_BUS_GET_VOLUME",
       "kind": "core",
       "signature": "AUDIO_BUS_GET_VOLUME(bus$)",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_BUS_PAN",
+      "kind": "function",
+      "signature": "AUDIO_BUS_PAN(bus: STRING, pos: Zahl)",
       "module": "audio"
     },
     {
