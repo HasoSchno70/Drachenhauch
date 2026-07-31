@@ -813,9 +813,32 @@ pub struct Graphics {
     max_frames: Option<u64>,
     screenshot: Option<String>,
     shot_taken: bool,
+    // --- Eingabe aufzeichnen/abspielen (AUTOMATION_*) --------------------
+    // Die Liste liegt in einer Box, weil `SetAutomationEventList` sich einen
+    // ROHEN ZEIGER auf sie merkt: laege sie direkt im Graphics-Struct, wuerde
+    // jedes Verschieben von Graphics den Zeiger ins Leere zeigen lassen.
+    auto_list: Option<Box<AutomationEventList>>,
+    auto_recording: bool,
+    /// Zieldatei der laufenden Aufnahme (beim Stoppen geschrieben).
+    auto_path: Option<String>,
+    /// Kopien der abzuspielenden Ereignisse (die Liste selbst besitzt raylib).
+    auto_events: Vec<AutomationEvent>,
+    auto_playing: bool,
+    auto_play_idx: usize,
+    /// Frame-Zaehler der Wiedergabe (0 = erster Frame nach AUTOMATION_PLAY).
+    auto_play_frame: u32,
+    /// Frame-Nummer des ersten Ereignisses -- die Aufnahme beginnt nicht
+    /// zwingend bei 0 (raylibs Zaehler laeuft seit Programmstart durch).
+    auto_play_base: u32,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
+    /// Zusaetzliche Sampler je Shader: (Uniform-Position, Textur).
+    /// Sie werden ERST beim Zeichnen gesetzt -- `SetShaderValueTexture` ruft
+    /// intern `glUniform1i` und wirkt damit auf das GERADE AKTIVE Programm.
+    /// Ausserhalb von `BeginShaderMode` landet die Zuweisung also am falschen
+    /// Shader und der Sampler bleibt schwarz.
+    shader_textures: HashMap<usize, Vec<(i32, raylib::ffi::Texture2D)>>,
     post_shader_idx: Option<usize>,
     scene_rt: Option<RenderTexture2D>,
 }
@@ -897,7 +920,8 @@ impl Graphics {
         let mut g = Graphics {
             rl, thread, width, height, scale,
             fullscreen: false, pre_fullscreen: None,
-            shaders: Vec::new(), post_shader_idx: None, scene_rt,
+            shaders: Vec::new(), shader_textures: HashMap::new(),
+            post_shader_idx: None, scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -983,6 +1007,14 @@ impl Graphics {
             max_frames,
             screenshot,
             shot_taken: false,
+            auto_list: None,
+            auto_recording: false,
+            auto_path: None,
+            auto_events: Vec::new(),
+            auto_playing: false,
+            auto_play_idx: 0,
+            auto_play_frame: 0,
+            auto_play_base: 0,
         };
         // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
         // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
@@ -1535,6 +1567,35 @@ impl Graphics {
         let rc = get_ray_collision_sphere(ray, Vector3::new(cx, cy, cz), r);
         if rc.hit && rc.distance >= 0.0 { rc.distance as f64 } else { -1.0 }
     }
+    /// Strahl aus Ursprung + Richtung mit NORMALISIERTER Richtung. Alle
+    /// raylib-Strahl-Tests liefern die Distanz in Vielfachen der Richtungs-
+    /// laenge -- nur bei Einheitslaenge ist das Ergebnis eine Weltdistanz.
+    /// Eine Nullrichtung gibt es nicht als Strahl -> None.
+    fn unit_ray(ox: f32, oy: f32, oz: f32, dx: f32, dy: f32, dz: f32) -> Option<Ray> {
+        let len = (dx * dx + dy * dy + dz * dz).sqrt();
+        if len < 1e-6 { return None; }
+        Some(Ray::new(Vector3::new(ox, oy, oz),
+                      Vector3::new(dx / len, dy / len, dz / len)))
+    }
+    /// Strahl gegen ein einzelnes Dreieck (Moeller-Trumbore). raylib cullt
+    /// bewusst NICHT -- ein Treffer von der Rueckseite zaehlt genauso. Punkte
+    /// je (x,y,z), Ergebnis Distanz oder -1.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ray_hit_tri(&self, o: [f32; 3], d: [f32; 3], p: [[f32; 3]; 3]) -> f64 {
+        let Some(ray) = Self::unit_ray(o[0], o[1], o[2], d[0], d[1], d[2]) else { return -1.0; };
+        let v = |q: [f32; 3]| Vector3::new(q[0], q[1], q[2]);
+        let rc = get_ray_collision_triangle(ray, v(p[0]), v(p[1]), v(p[2]));
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
+    /// Strahl gegen ein Viereck (zwei Dreiecke). Die Punkte muessen REIHUM
+    /// liegen (p1-p2-p3-p4 im Kreis) -- bei einer Ueberkreuz-Reihenfolge
+    /// testet raylib zwei sich ueberlappende Dreiecke und der Treffer fehlt.
+    pub fn ray_hit_quad(&self, o: [f32; 3], d: [f32; 3], p: [[f32; 3]; 4]) -> f64 {
+        let Some(ray) = Self::unit_ray(o[0], o[1], o[2], d[0], d[1], d[2]) else { return -1.0; };
+        let v = |q: [f32; 3]| Vector3::new(q[0], q[1], q[2]);
+        let rc = get_ray_collision_quad(ray, v(p[0]), v(p[1]), v(p[2]), v(p[3]));
+        if rc.hit { rc.distance as f64 } else { -1.0 }
+    }
     /// Mausstrahl durch die aktuelle 3D-Kamera (Fenster-Pixel -> Welt-Ray).
     fn mouse_ray(&self) -> Ray {
         let m = self.rl.get_mouse_position();
@@ -1564,6 +1625,16 @@ impl Graphics {
         let r = self.mouse_ray();
         self.ray_hit_sphere(r.position.x, r.position.y, r.position.z,
                             r.direction.x, r.direction.y, r.direction.z, cx, cy, cz, radius)
+    }
+    pub fn pick_tri(&self, p: [[f32; 3]; 3]) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_tri([r.position.x, r.position.y, r.position.z],
+                         [r.direction.x, r.direction.y, r.direction.z], p)
+    }
+    pub fn pick_quad(&self, p: [[f32; 3]; 4]) -> f64 {
+        let r = self.mouse_ray();
+        self.ray_hit_quad([r.position.x, r.position.y, r.position.z],
+                          [r.direction.x, r.direction.y, r.direction.z], p)
     }
     /// 3D-Weltpunkt -> Bildschirm-Pixel (durch die aktuelle 3D-Kamera).
     pub fn world_to_screen(&self, wx: f32, wy: f32, wz: f32) -> (f32, f32) {
@@ -2209,6 +2280,31 @@ impl Graphics {
         let img = Image::gen_image_perlin_noise(w, h, 0, 0, scale.max(0.1) as f32);
         self.push_tex_from_image(img)
     }
+    /// GENTEX_CELLULAR(w, h, kachel): Voronoi-/Zellrauschen -- Steinboden,
+    /// Rissmuster, organische Strukturen. Kleinere Kachel = feiner.
+    pub fn gen_tex_cellular(&mut self, w: i32, h: i32, tile: i64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_CELLULAR", w, h)?;
+        let img = Image::gen_image_cellular(w, h, tile.clamp(1, 4096) as i32);
+        self.push_tex_from_image(img)
+    }
+    /// GENTEX_NOISE(w, h, anteil): Weissrauschen, `anteil` 0..1 = Anteil
+    /// weisser Pixel. Grundlage fuer Sternenfelder, Korn, Dither-Masken.
+    pub fn gen_tex_noise(&mut self, w: i32, h: i32, factor: f64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_NOISE", w, h)?;
+        let f = if factor.is_finite() { factor.clamp(0.0, 1.0) } else { 0.5 };
+        let img = Image::gen_image_white_noise(w, h, f as f32);
+        self.push_tex_from_image(img)
+    }
+    /// GENTEX_GRADIENT_BOX(w, h, dichte, c1, c2): rechteckiger Verlauf von der
+    /// Mitte nach aussen -- Vignetten, Rahmen-Schatten (das eckige Gegenstueck
+    /// zu GENTEX_RADIAL).
+    pub fn gen_tex_gradient_square(&mut self, w: i32, h: i32, density: f64,
+                                   c1: i64, c2: i64) -> Result<i64, String> {
+        let (w, h) = Self::check_gentex_dims("GENTEX_GRADIENT_BOX", w, h)?;
+        let d = if density.is_finite() { density.clamp(0.0, 1.0) } else { 0.5 };
+        let img = Image::gen_image_gradient_square(w, h, d as f32, col(c1), col(c2));
+        self.push_tex_from_image(img)
+    }
     pub fn gen_tex_gradient(&mut self, w: i32, h: i32, c1: i64, c2: i64, vertical: bool) -> Result<i64, String> {
         // direction in Grad: 0 = vertikal (oben->unten), 90 = horizontal.
         let (w, h) = Self::check_gentex_dims("GENTEX_GRADIENT", w, h)?;
@@ -2379,6 +2475,43 @@ impl Graphics {
     }
     pub fn text_height(&self) -> i32 { self.text_size }
 
+    // Bewusst NICHT uebernommen: animierte GIFs (`LoadImageAnim`). raylib haengt
+    // die weiteren Bilder an `image.data` an, laesst `width`/`height` aber bei
+    // EINEM Bild -- eine Textur daraus zeigt nur Bild 0. Korrigieren liesse sich
+    // das nur, indem man `height` im Bild-Struct ueberschreibt; raylib-rs macht
+    // `Image` dafuer aber ausdruecklich `readonly` (kein DerefMut, innerer Wert
+    // `pub(crate)`, kein Konstruktor aus einer rohen ffi::Image). Der einzige Weg
+    // waere rohes FFI am Wrapper vorbei -- genau das Muster, das hier schon
+    // einmal einen Use-after-free verursacht hat (siehe MODEL_ANIMATE). Fuer
+    // Animationen gibt es den Sprite-Blatt-Weg (ATLAS_*, `sprite`-Modul, der
+    // Sprite-Editor exportiert Blaetter) -- der ist ohnehin der schnellere.
+
+    // Bewusst NICHT uebernommen: raylibs `GetClipboardImage` ist ausdruecklich
+    // Windows-only ("Do not use if you plan to compile to other platforms").
+    // Ein Builtin, das nur auf einem der drei unterstuetzten Systeme etwas tut,
+    // waere ein Rueckschritt gegenueber der Cross-Platform-Arbeit -- und CLIPBOARD_GET
+    // (Text) funktioniert ueberall.
+
+    /// LOADFONT_IMAGE(bild, trennfarbe, erstes_zeichen) -> FONT: Bitmap-Font
+    /// aus einem PNG. Die Zeichen stehen nebeneinander, durch `trennfarbe`
+    /// getrennt -- das klassische Verfahren fuer Pixel-Schriften, die
+    /// LOADFONT (TTF) nicht scharf hinbekommt.
+    pub fn load_font_image(&mut self, img: i64, key: i64, first: i64) -> Result<i64, String> {
+        let src = self.src_image(img, "LOADFONT_IMAGE")?;
+        let f = self.rl.load_font_from_image(&self.thread, &src, col(key), first as i32)
+            .map_err(|e| format!("LOADFONT_IMAGE: {}", e))?;
+        // Nearest lassen: Pixel-Schrift soll pixelig bleiben (anders als bei
+        // LOADFONT, wo bilinear die skalierte TTF-Schrift glaettet).
+        let size = f.baseSize.max(4);
+        self.fonts.push(f);
+        self.font_sizes.push(size);
+        Ok((self.fonts.len() - 1) as i64)
+    }
+    /// TEXT_LINE_SPACING(px): Zeilenabstand fuer mehrzeiligen Text.
+    pub fn text_line_spacing(&mut self, px: i64) {
+        self.rl.set_text_line_spacing(px.clamp(0, 4096) as i32);
+    }
+
     pub fn load_texture(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         let path = resolved.as_str();
@@ -2410,6 +2543,16 @@ impl Graphics {
         if w <= 0 || h <= 0 { return Err("IMAGE_SCALE: w und h muessen > 0 sein".into()); }
         let mut img = self.src_image(idx, "IMAGE_SCALE")?;
         img.resize(w, h);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_SCALE_NN: Skalieren OHNE Interpolation (Nearest-Neighbour).
+    /// `IMAGE_SCALE` glaettet bilinear -- fuer Pixelgrafik ist das falsch: aus
+    /// harten Kanten werden Farbverlaeufe, ein 8x8-Sprite auf 32x32 ist danach
+    /// matschig statt gross. Diese Variante behaelt die Bloecke.
+    pub fn image_scale_nn(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_SCALE_NN: w und h muessen > 0 sein".into()); }
+        let mut img = self.src_image(idx, "IMAGE_SCALE_NN")?;
+        img.resize_nn(w, h);
         self.push_tex_from_image(img)
     }
     pub fn image_rotate(&mut self, idx: i64, degrees: f32) -> Result<i64, String> {
@@ -2448,6 +2591,82 @@ impl Graphics {
         let mut img = self.src_image(idx, "IMAGE_BLUR")?;
         img.blur_gaussian(radius.max(0));
         self.push_tex_from_image(img)
+    }
+    /// IMAGE_CONVOLVE(bild, kern): freie Faltung mit einem quadratischen Kern
+    /// (3x3, 5x5, ...). Damit sind Schaerfen, Kantenerkennung, Praegen und
+    /// eigene Weichzeichner moeglich -- `IMAGE_BLUR` kann nur Gauss.
+    /// Der Kern kommt als flaches ARRAY OF FLOAT in Zeilenfolge.
+    pub fn image_convolve(&mut self, idx: i64, kernel: &[f64]) -> Result<i64, String> {
+        let n = kernel.len();
+        let side = (n as f64).sqrt().round() as usize;
+        if n == 0 || side * side != n {
+            return Err(format!(
+                "IMAGE_CONVOLVE: Kern muss quadratisch sein (9 = 3x3, 25 = 5x5, ...), \
+hat aber {} Werte", n));
+        }
+        if side % 2 == 0 {
+            return Err(format!(
+                "IMAGE_CONVOLVE: Kern-Seitenlaenge muss ungerade sein (3, 5, 7, ...), ist {}",
+                side));
+        }
+        let k: Vec<f32> = kernel.iter().map(|v| if v.is_finite() { *v as f32 } else { 0.0 }).collect();
+        let mut img = self.src_image(idx, "IMAGE_CONVOLVE")?;
+        img.kernel_convolution(&k)
+            .map_err(|e| format!("IMAGE_CONVOLVE: {}", e))?;
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_MASK(bild, maske): Graustufen der Maske werden zum
+    /// Alphakanal -- der uebliche Weg fuer weiche Raender und Uebergaenge.
+    pub fn image_alpha_mask(&mut self, idx: i64, mask: i64) -> Result<i64, String> {
+        let m = self.src_image(mask, "IMAGE_ALPHA_MASK")?;
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_MASK")?;
+        img.alpha_mask(&m);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_CROP(bild, schwelle): voellig durchsichtigen Rand abschneiden
+    /// (Sprites aus einem zu grossen Blatt eng zuschneiden).
+    pub fn image_alpha_crop(&mut self, idx: i64, threshold: f64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_CROP")?;
+        img.alpha_crop(if threshold.is_finite() { threshold.clamp(0.0, 1.0) as f32 } else { 0.0 });
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_ALPHA_PREMULTIPLY(bild): Farbe mit Alpha vormultiplizieren --
+    /// beseitigt die dunklen Saeume an weichen Raendern beim Skalieren.
+    pub fn image_alpha_premultiply(&mut self, idx: i64) -> Result<i64, String> {
+        let mut img = self.src_image(idx, "IMAGE_ALPHA_PREMULTIPLY")?;
+        img.alpha_premultiply();
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_DITHER(bild, r, g, b, a): Farbtiefe pro Kanal in Bit reduzieren,
+    /// mit Floyd-Steinberg-Fehlerverteilung -- der Retro-Look.
+    ///
+    /// raylib setzt NUR die drei echten 16-Bit-Formate um; bei jeder anderen
+    /// Kombination warnt es bloss und laesst das Bild mit ungueltigem Format
+    /// zurueck (die Textur wird dann schwarz). Deshalb hier hart abgelehnt --
+    /// Validierung gehoert in den Wrapper, nicht ins Backend.
+    pub fn image_dither(&mut self, idx: i64, r: i64, g: i64, b: i64, al: i64) -> Result<i64, String> {
+        if !matches!((r, g, b, al), (5, 6, 5, 0) | (5, 5, 5, 1) | (4, 4, 4, 4)) {
+            return Err(format!(
+                "IMAGE_DITHER: nur 5,6,5,0 (RGB565) / 5,5,5,1 (RGB5551) / 4,4,4,4 (RGBA4444) \
+moeglich -- bekam {},{},{},{}", r, g, b, al));
+        }
+        let mut img = self.src_image(idx, "IMAGE_DITHER")?;
+        // raylib dithert nur aus R8G8B8(A8) heraus; GENTEX_*-Bilder koennen ein
+        // anderes Format haben -> vorher angleichen, sonst passiert nichts.
+        img.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        img.dither(r as i32, g as i32, b as i32, al as i32);
+        self.push_tex_from_image(img)
+    }
+    /// IMAGE_PALETTE(bild, max): die haeufigsten Farben als ARRAY OF INTEGER
+    /// (0xRRGGBB) -- fuer automatische Paletten, Farbschema-Ableitung, Retro-
+    /// Umfaerbung.
+    pub fn image_palette(&mut self, idx: i64, max: i64) -> Result<Vec<i64>, String> {
+        let img = self.src_image(idx, "IMAGE_PALETTE")?;
+        let pal = img.extract_palette(max.clamp(1, 4096) as u32);
+        Ok(pal.iter()
+            .filter(|c| c.a > 0)                  // voll durchsichtige Fuellwerte weglassen
+            .map(|c| ((c.r as i64) << 16) | ((c.g as i64) << 8) | c.b as i64)
+            .collect())
     }
     pub fn image_brightness(&mut self, idx: i64, n: i32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_BRIGHTNESS")?;
@@ -2850,9 +3069,17 @@ impl Graphics {
     /// (0..17). Best-effort -- die Roh-Index-Zuordnung weicht von pygame ab;
     /// fuer praezise Bindings IMPORT "input" (JOY_BUTTON_*) nutzen.
     pub fn joystick_button(&self, idx: i64, btn: i64) -> Result<bool, String> {
-        use raylib::consts::GamepadButton::*;
         self.joystick_check(idx, "JOYSTICK_BUTTON")?;
-        let b = match btn {
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_down(idx as i32, b),
+            None => false,
+        })
+    }
+    /// Roh-Index (0..17) -> raylib-GamepadButton. Von JOYSTICK_BUTTON und den
+    /// Flanken-Varianten JOYSTICK_HIT/RELEASED geteilt.
+    fn joy_btn_enum(btn: i64) -> Option<raylib::consts::GamepadButton> {
+        use raylib::consts::GamepadButton::*;
+        Some(match btn {
             0 => GAMEPAD_BUTTON_UNKNOWN,
             1 => GAMEPAD_BUTTON_LEFT_FACE_UP,
             2 => GAMEPAD_BUTTON_LEFT_FACE_RIGHT,
@@ -2871,9 +3098,8 @@ impl Graphics {
             15 => GAMEPAD_BUTTON_MIDDLE_RIGHT,
             16 => GAMEPAD_BUTTON_LEFT_THUMB,
             17 => GAMEPAD_BUTTON_RIGHT_THUMB,
-            _ => return Ok(false),
-        };
-        Ok(self.rl.is_gamepad_button_down(idx as i32, b))
+            _ => return None,
+        })
     }
     /// JOYSTICK_HAT_X(idx, hat): nur hat 0 -- aus dem D-Pad abgeleitet
     /// (raylib hat keine Hats). +1 rechts, -1 links, 0 sonst.
@@ -2918,9 +3144,302 @@ impl Graphics {
     pub fn mouse_x(&self) -> i64 { (self.rl.get_mouse_x() / self.scale) as i64 }
     pub fn mouse_y(&self) -> i64 { (self.rl.get_mouse_y() / self.scale) as i64 }
     pub fn mouse_button(&self, b: i64) -> bool {
-        let btn = match b { 0 => MouseButton::MOUSE_BUTTON_LEFT, 1 => MouseButton::MOUSE_BUTTON_RIGHT, 2 => MouseButton::MOUSE_BUTTON_MIDDLE, _ => return false };
-        self.rl.is_mouse_button_down(btn)
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_down(x), None => false }
     }
+
+    // --- Eingabe-FLANKEN -----------------------------------------------------
+    // `MOUSEBUTTON` und `KEYPRESSED` liefern beide "wird gehalten". Damit fehlte
+    // im Kern ausgerechnet der haeufigste Fall: "genau in DIESEM Frame
+    // gedrueckt". Dafuer musste man bisher das `input`-Modul mit Bindings +
+    // INPUT_UPDATE bemuehen, obwohl raylib die Flanken direkt kennt.
+    fn mouse_btn(b: i64) -> Option<MouseButton> {
+        Some(match b {
+            0 => MouseButton::MOUSE_BUTTON_LEFT,
+            1 => MouseButton::MOUSE_BUTTON_RIGHT,
+            2 => MouseButton::MOUSE_BUTTON_MIDDLE,
+            3 => MouseButton::MOUSE_BUTTON_SIDE,
+            4 => MouseButton::MOUSE_BUTTON_EXTRA,
+            _ => return None,
+        })
+    }
+    /// MOUSE_HIT(b): in DIESEM Frame gedrueckt worden?
+    pub fn mouse_hit(&self, b: i64) -> bool {
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_pressed(x), None => false }
+    }
+    /// MOUSE_RELEASED(b): in DIESEM Frame losgelassen worden?
+    pub fn mouse_released(&self, b: i64) -> bool {
+        match Self::mouse_btn(b) { Some(x) => self.rl.is_mouse_button_released(x), None => false }
+    }
+
+    /// Wie `key_down`, aber mit frei waehlbarem raylib-Test -- inklusive der
+    /// "+"/"-"-Sonderbehandlung (siehe key_down: pygame-Keysym vs. physische
+    /// US-Position), damit die Flanken-Varianten dieselben Tasten treffen.
+    fn key_test(&self, code: i64, f: impl Fn(raylib::consts::KeyboardKey) -> bool) -> bool {
+        use raylib::consts::KeyboardKey::*;
+        if code < 0 { return false; }              // Gamepad-Codes: siehe JOYSTICK_HIT
+        match code {
+            43 => return f(KEY_EQUAL) || f(KEY_KP_ADD) || f(KEY_RIGHT_BRACKET),
+            45 => return f(KEY_MINUS) || f(KEY_KP_SUBTRACT) || f(KEY_SLASH),
+            _ => {}
+        }
+        match map_key(code) { Some(k) => f(k), None => false }
+    }
+    /// KEYHIT(code): in DIESEM Frame gedrueckt (Blitz-BASIC-Sprech). `KEYPRESSED`
+    /// bleibt "gehalten" -- der Name ist historisch, ihn umzudeuten wuerde
+    /// bestehende Programme still kaputtmachen.
+    pub fn key_hit(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_pressed(k))
+    }
+    /// KEYRELEASED(code): in DIESEM Frame losgelassen.
+    pub fn key_released_edge(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_released(k))
+    }
+    /// KEYREPEAT(code): erster Druck ODER System-Auto-Repeat (Textcursor,
+    /// Mengen-Eingabe) -- haelt man die Taste, feuert es wiederholt.
+    pub fn key_repeat(&self, code: i64) -> bool {
+        self.key_test(code, |k| self.rl.is_key_pressed(k) || self.rl.is_key_pressed_repeat(k))
+    }
+
+    /// Relative Mausbewegung seit dem letzten Frame -- Grundlage fuer
+    /// Maus-Blick-Steuerung. Ohne sie war `MOUSE_LOCK` kaum zu gebrauchen: bei
+    /// gefangenem Cursor stehen MOUSEX/MOUSEY still. Durch `scale` geteilt,
+    /// damit die Einheit zu MOUSEX/MOUSEY passt.
+    pub fn mouse_delta_x(&self) -> f64 { self.rl.get_mouse_delta().x as f64 / self.scale.max(1) as f64 }
+    pub fn mouse_delta_y(&self) -> f64 { self.rl.get_mouse_delta().y as f64 / self.scale.max(1) as f64 }
+    /// MOUSE_SET_POS(x, y): Zeiger setzen (z.B. Recentern bei Maus-Blick).
+    pub fn mouse_set_pos(&mut self, x: i64, y: i64) {
+        let s = self.scale.max(1) as f32;
+        self.rl.set_mouse_position(Vector2::new(x as f32 * s, y as f32 * s));
+    }
+    /// MOUSE_ON_SCREEN(): liegt der Zeiger ueber dem Fenster?
+    pub fn mouse_on_screen(&self) -> bool { self.rl.is_cursor_on_screen() }
+    /// MOUSEWHEEL_X/Y(): Rad-Bewegung als KOMMAZAHL und in beiden Achsen.
+    /// `MOUSEWHEEL` liefert nur die vertikale Achse als ganze Zahl -- ein
+    /// horizontales Rad (viele Maeuse, jedes Touchpad) war damit unerreichbar,
+    /// und feine Touchpad-Schritte (0.25) fielen auf 0 herunter.
+    pub fn mouse_wheel_x(&self) -> f64 { self.rl.get_mouse_wheel_move_v().x as f64 }
+    pub fn mouse_wheel_y(&self) -> f64 { self.rl.get_mouse_wheel_move_v().y as f64 }
+
+    /// KEY_NAME$(code): Anzeigename einer Taste fuer Belegungsdialoge.
+    /// raylib/GLFW kennt nur die Namen der DRUCKBAREN Tasten (und die
+    /// layout-abhaengig: auf einer deutschen Tastatur heisst KEY_Y "z") --
+    /// fuer Sondertasten liefert es nichts. Genau die will ein
+    /// Belegungsdialog aber anzeigen, daher die eigene Ersatztabelle.
+    pub fn key_name(&self, code: i64) -> String {
+        let Some(k) = map_key(code) else { return String::new(); };
+        match self.rl.get_key_name(k) {
+            Some(n) if !n.trim().is_empty() => n.to_uppercase(),
+            _ => key_label(k).to_string(),
+        }
+    }
+    // --- Eingabe aufzeichnen / abspielen (AUTOMATION_*) ---------------------
+    // raylib zeichnet in `EndDrawing` den kompletten Eingabe-Zustand des Frames
+    // auf (Tasten, Maus, Rad, Gamepad, Touch) und kann ihn spaeter wieder in
+    // seinen Eingabe-Zustand einspeisen. Damit sind Demo-Modus ("Attract"),
+    // Bug-Berichte zum Nachspielen und automatische Spieltests moeglich --
+    // vorher hatte GB dafuer gar nichts.
+    //
+    // WICHTIG: raylib gibt die Wiedergabe NICHT selbst getaktet, das muss der
+    // Aufrufer tun (`PlayAutomationEvent` je faelligem Ereignis). Genau das
+    // macht `automation_tick()` am Ende jedes FLIP -- direkt NACH dem
+    // Einlesen der echten Eingabe, damit die eingespeisten Werte den Frame
+    // gewinnen, den das GB-Programm als naechstes liest.
+
+    /// AUTOMATION_RECORD(datei$): Aufnahme starten. Eine laufende Wiedergabe
+    /// wird beendet (raylib spielt waehrend einer Aufnahme ohnehin nichts ab).
+    pub fn automation_record(&mut self, path: &str) -> Result<(), String> {
+        if path.trim().is_empty() {
+            return Err("AUTOMATION_RECORD: Dateiname fehlt".into());
+        }
+        self.auto_playing = false;
+        let mut list = Box::new(self.rl.load_automation_event_list(None));
+        self.rl.set_automation_event_list(&mut list);
+        self.rl.start_automation_event_recording();
+        self.auto_list = Some(list);
+        self.auto_path = Some(path.to_string());
+        self.auto_recording = true;
+        Ok(())
+    }
+    /// AUTOMATION_STOP(): beendet, was gerade laeuft. Eine Aufnahme wird dabei
+    /// in ihre Datei geschrieben; Rueckgabe = Anzahl der Ereignisse (bei
+    /// gestoppter Wiedergabe 0).
+    pub fn automation_stop(&mut self) -> Result<i64, String> {
+        self.auto_playing = false;
+        if !self.auto_recording { return Ok(0); }
+        self.rl.stop_automation_event_recording();
+        self.auto_recording = false;
+        let path = self.auto_path.take().unwrap_or_default();
+        let Some(list) = self.auto_list.as_ref() else { return Ok(0); };
+        let count = list.count() as i64;
+        if !list.export(&path) {
+            return Err(format!("AUTOMATION_STOP: '{}' nicht schreibbar", path));
+        }
+        Ok(count)
+    }
+    /// AUTOMATION_PLAY(datei$): Aufnahme laden und ab dem naechsten Frame
+    /// abspielen. Rueckgabe = Anzahl geladener Ereignisse.
+    pub fn automation_play(&mut self, path: &str) -> Result<i64, String> {
+        if self.auto_recording {
+            return Err("AUTOMATION_PLAY: laeuft noch eine Aufnahme (erst AUTOMATION_STOP)".into());
+        }
+        if !std::path::Path::new(path).exists() {
+            return Err(format!("AUTOMATION_PLAY: '{}' nicht gefunden", path));
+        }
+        // Hinweis: die alte Liste wird beim Zuweisen unten freigegeben. raylib
+        // haelt zwar noch seinen internen Zeiger darauf, liest ihn aber NUR
+        // waehrend einer laufenden Aufnahme -- und eine solche schliesst der
+        // Wachtposten oben aus. Jede neue Aufnahme setzt den Zeiger neu.
+        let list = Box::new(self.rl.load_automation_event_list(Some(path.into())));
+        self.auto_events = list.events();
+        // Aufsteigend nach Frame -- die Wiedergabe laeuft strikt vorwaerts.
+        self.auto_events.sort_by_key(|e| e.frame());
+        self.auto_play_base = self.auto_events.first().map(|e| e.frame()).unwrap_or(0);
+        self.auto_play_idx = 0;
+        self.auto_play_frame = 0;
+        self.auto_playing = !self.auto_events.is_empty();
+        self.auto_list = Some(list);
+        Ok(self.auto_events.len() as i64)
+    }
+    pub fn automation_recording(&self) -> bool { self.auto_recording }
+    pub fn automation_playing(&self) -> bool { self.auto_playing }
+    /// AUTOMATION_FRAME(): Frame-Nummer innerhalb der Wiedergabe (0 = erster).
+    pub fn automation_frame(&self) -> i64 { self.auto_play_frame as i64 }
+    /// AUTOMATION_COUNT(): Ereignisse in der zuletzt geladenen/aufgenommenen Liste.
+    pub fn automation_count(&self) -> i64 {
+        if self.auto_recording {
+            return self.auto_list.as_ref().map(|l| l.count() as i64).unwrap_or(0);
+        }
+        self.auto_events.len() as i64
+    }
+    /// Am Ende jedes FLIP: die fuer diesen Frame aufgezeichneten Ereignisse in
+    /// raylibs Eingabe-Zustand einspeisen. Ereignisse, deren Frame uebersprungen
+    /// wurde (Aufnahme mit anderer Bildrate), werden nachgeholt statt verworfen.
+    fn automation_tick(&mut self) {
+        if !self.auto_playing { return; }
+        while self.auto_play_idx < self.auto_events.len() {
+            let e = &self.auto_events[self.auto_play_idx];
+            if e.frame().saturating_sub(self.auto_play_base) > self.auto_play_frame { break; }
+            e.play();
+            self.auto_play_idx += 1;
+        }
+        self.auto_play_frame += 1;
+        if self.auto_play_idx >= self.auto_events.len() { self.auto_playing = false; }
+    }
+
+    /// KEY_ANY_HIT(): GB-Code der zuletzt gedrueckten Taste, -1 wenn keine.
+    /// Das Gegenstueck zu JOYSTICK_ANY_BUTTON -- zusammen mit `KEY_NAME$` ist
+    /// ein Belegungsdialog ("Druecke eine Taste ...") damit in drei Zeilen
+    /// gebaut, statt alle Konstanten einzeln mit KEYHIT abzuklappern.
+    pub fn key_any_hit(&mut self) -> i64 {
+        // raylib fuehrt eine Warteschlange. Wir nehmen die erste Taste dieses
+        // Frames, die GB ueberhaupt kennt, und leeren den Rest -- ein Dialog
+        // will genau eine Belegung, keine Sammlung.
+        let mut found = -1;
+        while let Some(k) = self.rl.get_key_pressed() {
+            if found < 0 {
+                if let Some(code) = gb_key_code(k) { found = code; }
+            }
+        }
+        found
+    }
+    /// JOYSTICK_MAPPINGS(text$): SDL-GameControllerDB-Zeilen nachladen, damit
+    /// auch exotische Pads die richtige Knopf-Belegung bekommen. Liefert
+    /// raylibs Rueckgabe (Anzahl erkannter Zuordnungen, -1 bei Fehler).
+    pub fn joystick_mappings(&self, text: &str) -> i64 {
+        let Ok(cs) = std::ffi::CString::new(text) else { return -1; };
+        let bytes: Vec<std::os::raw::c_char> =
+            cs.as_bytes_with_nul().iter().map(|&b| b as std::os::raw::c_char).collect();
+        self.rl.set_gamepad_mappings(&bytes) as i64
+    }
+    /// WINDOW_DPI_X/Y(): Skalierungsfaktor des Bildschirms (1.0 = normal,
+    /// 2.0 = HiDPI/Retina). Ohne den weiss ein Programm nicht, ob seine
+    /// Pixelgroessen auf dem Zielgeraet winzig herauskommen.
+    pub fn window_dpi_x(&self) -> f64 { self.rl.get_window_scale_dpi().x as f64 }
+    pub fn window_dpi_y(&self) -> f64 { self.rl.get_window_scale_dpi().y as f64 }
+
+    /// MOUSE_CURSOR(form$): Systemcursor umschalten -- Hand ueber Knoepfen,
+    /// Textmarke ueber Eingabefeldern, Groesse-Pfeile an Kanten.
+    pub fn mouse_cursor(&mut self, name: &str) -> Result<(), String> {
+        use raylib::consts::MouseCursor::*;
+        let c = match name.to_ascii_lowercase().as_str() {
+            "default" | "arrow" => MOUSE_CURSOR_DEFAULT,
+            "ibeam" | "text" => MOUSE_CURSOR_IBEAM,
+            "crosshair" | "cross" => MOUSE_CURSOR_CROSSHAIR,
+            "hand" | "pointer" => MOUSE_CURSOR_POINTING_HAND,
+            "resize_ew" => MOUSE_CURSOR_RESIZE_EW,
+            "resize_ns" => MOUSE_CURSOR_RESIZE_NS,
+            "resize_nwse" => MOUSE_CURSOR_RESIZE_NWSE,
+            "resize_nesw" => MOUSE_CURSOR_RESIZE_NESW,
+            "resize_all" | "move" => MOUSE_CURSOR_RESIZE_ALL,
+            "not_allowed" | "no" => MOUSE_CURSOR_NOT_ALLOWED,
+            other => return Err(format!(
+                "MOUSE_CURSOR: unbekannte Form '{}' -- erwartet default/ibeam/crosshair/\
+hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)),
+        };
+        self.rl.set_mouse_cursor(c);
+        Ok(())
+    }
+
+    /// JOYSTICK_HIT / JOYSTICK_RELEASED: Flanken analog zu JOYSTICK_BUTTON.
+    pub fn joystick_hit(&self, idx: i64, btn: i64) -> Result<bool, String> {
+        self.joystick_check(idx, "JOYSTICK_HIT")?;
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_pressed(idx as i32, b), None => false })
+    }
+    pub fn joystick_released(&self, idx: i64, btn: i64) -> Result<bool, String> {
+        self.joystick_check(idx, "JOYSTICK_RELEASED")?;
+        Ok(match Self::joy_btn_enum(btn) {
+            Some(b) => self.rl.is_gamepad_button_released(idx as i32, b), None => false })
+    }
+    /// JOYSTICK_ANY_BUTTON(): zuletzt gedrueckter Gamepad-Knopf, -1 = keiner.
+    /// Fuer "Druecke einen Knopf"-Belegungsdialoge.
+    pub fn joystick_any_button(&self) -> i64 {
+        // raylib-rs liefert bereits `None`, wenn nichts anliegt (es filtert
+        // GAMEPAD_BUTTON_UNKNOWN heraus) -> -1 durchreichen.
+        self.rl.get_gamepad_button_pressed().map(|b| b as i64).unwrap_or(-1)
+    }
+    /// JOYSTICK_AXIS_COUNT(idx): wie viele Achsen hat das Pad wirklich?
+    pub fn joystick_axis_count(&self, idx: i64) -> Result<i64, String> {
+        self.joystick_check(idx, "JOYSTICK_AXIS_COUNT")?;
+        Ok(self.rl.get_gamepad_axis_count(idx as i32) as i64)
+    }
+
+    // --- Touch + Gesten ------------------------------------------------------
+    // Bisher komplett ungenutzt (0 von 12 raylib-Funktionen). Auf einem
+    // Touchscreen meldet raylib den ersten Finger zwar zusaetzlich als Maus,
+    // aber Multitouch, Wisch und Pinch waren gar nicht erreichbar.
+    pub fn touch_count(&self) -> i64 { self.rl.get_touch_point_count() as i64 }
+    pub fn touch_x(&self, i: i64) -> f64 {
+        self.rl.get_touch_position(i.max(0) as u32).x as f64 / self.scale.max(1) as f64
+    }
+    pub fn touch_y(&self, i: i64) -> f64 {
+        self.rl.get_touch_position(i.max(0) as u32).y as f64 / self.scale.max(1) as f64
+    }
+    /// TOUCH_ID(i): stabile Finger-Kennung -- damit laesst sich ein Finger ueber
+    /// Frames hinweg verfolgen, auch wenn ein anderer dazwischen losgelassen wird.
+    pub fn touch_id(&self, i: i64) -> i64 { self.rl.get_touch_point_id(i.max(0) as u32) as i64 }
+
+    /// GESTURE$(): erkannte Geste dieses Frames als Name ("" = keine).
+    /// Namen statt Zahlen, damit BASIC-Code lesbar bleibt.
+    pub fn gesture(&self) -> String {
+        use raylib::consts::Gesture::*;
+        let g = self.rl.get_gesture_detected();
+        match g {
+            GESTURE_TAP => "tap", GESTURE_DOUBLETAP => "doubletap", GESTURE_HOLD => "hold",
+            GESTURE_DRAG => "drag", GESTURE_SWIPE_RIGHT => "swipe_right",
+            GESTURE_SWIPE_LEFT => "swipe_left", GESTURE_SWIPE_UP => "swipe_up",
+            GESTURE_SWIPE_DOWN => "swipe_down", GESTURE_PINCH_IN => "pinch_in",
+            GESTURE_PINCH_OUT => "pinch_out", _ => "",
+        }.to_string()
+    }
+    pub fn gesture_drag_x(&self) -> f64 { self.rl.get_gesture_drag_vector().x as f64 }
+    pub fn gesture_drag_y(&self) -> f64 { self.rl.get_gesture_drag_vector().y as f64 }
+    pub fn gesture_drag_angle(&self) -> f64 { self.rl.get_gesture_drag_angle() as f64 }
+    pub fn gesture_pinch_x(&self) -> f64 { self.rl.get_gesture_pinch_vector().x as f64 }
+    pub fn gesture_pinch_y(&self) -> f64 { self.rl.get_gesture_pinch_vector().y as f64 }
+    pub fn gesture_pinch_angle(&self) -> f64 { self.rl.get_gesture_pinch_angle() as f64 }
+    /// GESTURE_HOLD_TIME(): wie lange wird schon gehalten (Sekunden)?
+    pub fn gesture_hold_time(&self) -> f64 { self.rl.get_gesture_hold_duration() as f64 }
 
     /// Mausrad-Delta dieses Frames (raylib liefert es pro Frame; "pop" =
     /// einmal lesen). Positiv = nach oben/vorn.
@@ -3086,6 +3605,53 @@ impl Graphics {
     /// Wurde das Fenster seit dem letzten FLIP vom Nutzer/OS in der Groesse geaendert?
     pub fn window_resized(&self) -> bool { self.rl.is_window_resized() }
 
+    // --- Fenster-Zustand + Politur ------------------------------------------
+    /// WINDOW_FOCUSED(): hat das Fenster den Tastaturfokus? Damit laesst sich
+    /// ein Spiel pausieren, sobald der Nutzer wegklickt.
+    pub fn window_focused(&self) -> bool { self.rl.is_window_focused() }
+    pub fn window_minimized(&self) -> bool { self.rl.is_window_minimized() }
+    pub fn window_maximized(&self) -> bool { self.rl.is_window_maximized() }
+    pub fn window_hidden(&self) -> bool { self.rl.is_window_hidden() }
+    pub fn window_fullscreen_state(&self) -> bool { self.rl.is_window_fullscreen() }
+    /// WINDOW_FOCUS(): Fenster nach vorne holen.
+    pub fn window_focus(&mut self) { self.rl.set_window_focused(); }
+    /// WINDOW_OPACITY(0..1): ganzes Fenster durchscheinend (Overlays, Fade-ins).
+    pub fn window_opacity(&mut self, v: f64) {
+        let o = if v.is_finite() { v.clamp(0.0, 1.0) } else { 1.0 };
+        self.rl.set_window_opacity(o as f32);
+    }
+    /// WINDOW_ICON(bild): Fenster-/Taskleisten-Symbol setzen. Ohne das trug
+    /// JEDES exportierte Spiel das raylib-Standardsymbol.
+    pub fn window_icon(&mut self, img: i64) -> Result<(), String> {
+        let t = self.textures.get(img.max(0) as usize)
+            .ok_or("WINDOW_ICON: ungueltiges IMAGE-Handle")?;
+        // raylib verlangt RGBA8 fuers Icon und ignoriert andere Formate still
+        // -> auf einer Kopie konvertieren, das Original bleibt unangetastet.
+        let mut copy = t.img.clone();
+        copy.set_format(raylib::consts::PixelFormat::PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+        self.rl.set_window_icon(&copy);
+        Ok(())
+    }
+    /// GET_TIME(): Sekunden seit Programmstart (monoton, unabhaengig von DELTA).
+    pub fn get_time(&self) -> f64 { self.rl.get_time() }
+
+    /// OPENURL(adresse$): Adresse im Standardbrowser oeffnen (Itch-Seite,
+    /// Anleitung, Mitmach-Link aus dem Spiel heraus).
+    ///
+    /// Absichtlich auf http/https begrenzt: raylibs OpenURL reicht die
+    /// Zeichenkette an die Shell weiter, und ein `file:`- oder gar
+    /// Programm-Schema waere damit ein Weg, aus einem harmlos wirkenden
+    /// GB-Programm heraus Beliebiges zu starten.
+    pub fn open_url(&self, url: &str) -> Result<(), String> {
+        let low = url.trim().to_ascii_lowercase();
+        if !(low.starts_with("http://") || low.starts_with("https://")) {
+            return Err(format!(
+                "OPENURL: nur http:// und https:// erlaubt (bekam '{}')", url));
+        }
+        raylib::misc::open_url(url.trim());
+        Ok(())
+    }
+
     // --- Monitore / Display-Infos (raylib GetMonitor*) ---
     // Alle Monitor-Masse sind ECHTE OS-Pixel (kein Screen-Scale), denn sie
     // beschreiben die Hardware, nicht das logische SCREEN-Raster. Monitor-Index
@@ -3165,6 +3731,68 @@ impl Graphics {
             if loc >= 0 { sh.set_shader_value(loc, [x as f32, y as f32, z as f32]); }
         }
     }
+    /// SHADER_SET_ARRAY(shader, name$, werte): `uniform float[]` fuellen.
+    /// Bisher liess sich pro Aufruf nur EIN Wert setzen -- damit waren
+    /// Effekte, die eine Liste brauchen (Lichtpositionen, Farbverlaufs-Stufen,
+    /// Wellen-Parameter), gar nicht anzusteuern.
+    pub fn shader_set_array(&mut self, h: i64, name: &str, vals: &[f64]) -> Result<(), String> {
+        if vals.is_empty() {
+            return Err("SHADER_SET_ARRAY: Werte-Array ist leer".into());
+        }
+        let sh = self.shaders.get_mut(h as usize)
+            .ok_or("SHADER_SET_ARRAY: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc < 0 {
+            // Kein Fehler: ein Uniform, das der Shader wegoptimiert hat, ist
+            // ein haeufiger und harmloser Fall (wie bei SHADER_SET).
+            return Ok(());
+        }
+        let v: Vec<f32> = vals.iter().map(|x| if x.is_finite() { *x as f32 } else { 0.0 }).collect();
+        sh.set_shader_value_v(loc, &v);
+        Ok(())
+    }
+    /// SHADER_SET_TEXTURE(shader, name$, bild): zweiten Sampler belegen.
+    /// Ohne das war jeder Shader auf die EINE Textur beschraenkt, die raylib
+    /// selbst bindet -- Masken, Paletten-Nachschlagetabellen, Normal-Maps in
+    /// 2D und Ueberblendungen zwischen zwei Bildern waren unmoeglich.
+    pub fn shader_set_texture(&mut self, h: i64, name: &str, img: i64) -> Result<(), String> {
+        // ffi::Texture2D ist Copy -- vorher herauskopieren, damit `self.textures`
+        // nicht ausgeliehen bleibt, waehrend `self.shaders` veraendert wird.
+        let tex: raylib::ffi::Texture2D = *self.textures.get(img.max(0) as usize)
+            .ok_or("SHADER_SET_TEXTURE: ungueltiges IMAGE-Handle")?
+            .tex;
+        let idx = h as usize;
+        let sh = self.shaders.get(idx)
+            .ok_or("SHADER_SET_TEXTURE: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc < 0 { return Ok(()); }            // Uniform wegoptimiert: harmlos
+        // Nur vormerken -- gesetzt wird beim Zeichnen (siehe Feld-Kommentar).
+        let slots = self.shader_textures.entry(idx).or_default();
+        match slots.iter_mut().find(|(l, _)| *l == loc) {
+            Some(slot) => slot.1 = tex,
+            None => slots.push((loc, tex)),
+        }
+        Ok(())
+    }
+    /// SHADER_SET_MATRIX(shader, name$, mat): MAT4 aus dem `m3d`-Modul als
+    /// `uniform mat4` -- eigene Projektionen/Bone-Transformationen im Shader.
+    pub fn shader_set_matrix(&mut self, h: i64, name: &str, m: &[f32; 16]) -> Result<(), String> {
+        let sh = self.shaders.get_mut(h as usize)
+            .ok_or("SHADER_SET_MATRIX: ungueltiges SHADER-Handle")?;
+        let loc = sh.get_shader_location(name);
+        if loc >= 0 {
+            // m3d liefert column-major (wie OpenGL), raylibs Matrix ist
+            // row-major -> beim Umfuellen transponieren.
+            sh.set_shader_value_matrix(loc, raylib::math::Matrix {
+                m0: m[0], m1: m[1], m2: m[2], m3: m[3],
+                m4: m[4], m5: m[5], m6: m[6], m7: m[7],
+                m8: m[8], m9: m[9], m10: m[10], m11: m[11],
+                m12: m[12], m13: m[13], m14: m[14], m15: m[15],
+            });
+        }
+        Ok(())
+    }
+
     /// Aktiven Post-Processing-Shader setzen (-1 = aus).
     pub fn set_postfx(&mut self, h: i64) {
         self.post_shader_idx = if h >= 0 && (h as usize) < self.shaders.len() {
@@ -3339,7 +3967,7 @@ impl Graphics {
         let Graphics { rl, thread, layers, textures, fonts, cmds3d, cam3d, models,
             light_shader, normal_mapped, loc_use_normal, pbr_params, loc_metalness, loc_roughness,
             emissive, loc_emissive,
-            scene_rt, shaders, post_shader_idx, render_targets, .. } = self;
+            scene_rt, shaders, shader_textures, post_shader_idx, render_targets, .. } = self;
         let mat_locs = (*loc_use_normal, *loc_metalness, *loc_roughness, *loc_emissive);
         let nmap_set: &std::collections::HashSet<usize> = normal_mapped;
         let pbr_ref: &std::collections::HashMap<usize, (f32, f32)> = pbr_params;
@@ -3381,7 +4009,17 @@ impl Graphics {
             let mut d = rl.begin_drawing(thread);
             d.clear_background(Color::BLACK);
             {
+                // ffi::Shader ist Copy -- vor dem mutablen Ausleihen kopieren.
+                let sh_ffi = *shaders[idx].as_ref();
                 let mut sm = d.begin_shader_mode(&mut shaders[idx]);
+                // Zusaetzliche Sampler JETZT setzen -- `SetShaderValueTexture`
+                // ruft glUniform1i auf dem gerade aktiven Programm, vorher waere
+                // es am falschen gelandet (Sampler bliebe schwarz).
+                if let Some(slots) = shader_textures.get(&idx) {
+                    for (loc, tex) in slots {
+                        unsafe { raylib::ffi::SetShaderValueTexture(sh_ffi, *loc, *tex); }
+                    }
+                }
                 sm.draw_texture_pro(&*rt, src, dst, Vector2::zero(), 0.0, Color::WHITE);
             }
         } else {
@@ -3394,6 +4032,12 @@ impl Graphics {
         // Stack ab; beim naechsten Frame geht es hier weiter.
         #[cfg(target_os = "emscripten")]
         unsafe { emscripten_sleep(0); }
+
+        // Aufgezeichnete Eingabe einspeisen. Muss HIER stehen: das Draw-Handle
+        // ist gerade gedroppt worden (= EndDrawing), raylib hat die echte
+        // Eingabe fuer den naechsten Frame schon eingelesen -- die eingespeisten
+        // Werte ueberschreiben sie also und gelten fuer genau diesen Frame.
+        self.automation_tick();
 
         // Layer + 3D-Befehle fuer den naechsten Frame leeren (Immediate-Mode).
         for l in self.layers.iter_mut() { l.cmds.clear(); }
@@ -4059,6 +4703,30 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         1073741905 => KEY_DOWN,
         1073741898 => KEY_HOME,
         1073741901 => KEY_END,
+        1073741897 => KEY_INSERT,
+        1073741899 => KEY_PAGE_UP,
+        1073741902 => KEY_PAGE_DOWN,
+        1073741881 => KEY_CAPS_LOCK,
+        // Umschalt-/Steuertasten (SDL-Keycodes 224..230 | Scancode-Maske)
+        1073742048 => KEY_LEFT_CONTROL,
+        1073742049 => KEY_LEFT_SHIFT,
+        1073742050 => KEY_LEFT_ALT,
+        1073742051 => KEY_LEFT_SUPER,
+        1073742052 => KEY_RIGHT_CONTROL,
+        1073742053 => KEY_RIGHT_SHIFT,
+        1073742054 => KEY_RIGHT_ALT,
+        1073742055 => KEY_RIGHT_SUPER,
+        // Ziffernblock: SDL zaehlt KP_1..KP_9 aufsteigend, KP_0 kommt DANACH.
+        1073741908 => KEY_KP_DIVIDE,
+        1073741909 => KEY_KP_MULTIPLY,
+        1073741910 => KEY_KP_SUBTRACT,
+        1073741911 => KEY_KP_ADD,
+        1073741912 => KEY_KP_ENTER,
+        1073741913 => KEY_KP_1, 1073741914 => KEY_KP_2, 1073741915 => KEY_KP_3,
+        1073741916 => KEY_KP_4, 1073741917 => KEY_KP_5, 1073741918 => KEY_KP_6,
+        1073741919 => KEY_KP_7, 1073741920 => KEY_KP_8, 1073741921 => KEY_KP_9,
+        1073741922 => KEY_KP_0,
+        1073741923 => KEY_KP_DECIMAL,
         // Buchstaben: pygame 97..122 (lowercase ascii) -> raylib 65..90.
         97..=122 => return key_from_i32((code - 32) as i32),
         // Ziffern: pygame 48..57 == raylib KEY_ZERO..KEY_NINE.
@@ -4086,6 +4754,66 @@ fn key_from_i32(v: i32) -> Option<KeyboardKey> {
         300 => KEY_F11, 301 => KEY_F12,
         _ => return None,
     })
+}
+
+/// Umkehrung von `map_key`: raylib-Taste -> GB-Tastencode (SDL-Konvention).
+/// Buchstaben/Ziffern/F-Tasten rechnet die Nummerierung selbst um, alles
+/// andere kommt aus der Tabelle -- so muss hier KEIN roher raylib-Zahlenwert
+/// geraten werden (die Enum-Variante ist die Quelle).
+fn gb_key_code(k: KeyboardKey) -> Option<i64> {
+    use KeyboardKey::*;
+    let v = k as u32 as i64;
+    match v {
+        65..=90 => return Some(v + 32),        // A..Z -> 97..122 (SDL: klein)
+        48..=57 => return Some(v),             // 0..9 identisch
+        290..=301 => return Some(1073741882 + (v - 290)),   // F1..F12
+        _ => {}
+    }
+    Some(match k {
+        KEY_ESCAPE => 27, KEY_ENTER => 13, KEY_SPACE => 32, KEY_TAB => 9,
+        KEY_BACKSPACE => 8, KEY_DELETE => 127, KEY_INSERT => 1073741897,
+        KEY_LEFT => 1073741904, KEY_RIGHT => 1073741903,
+        KEY_UP => 1073741906, KEY_DOWN => 1073741905,
+        KEY_HOME => 1073741898, KEY_END => 1073741901,
+        KEY_PAGE_UP => 1073741899, KEY_PAGE_DOWN => 1073741902,
+        KEY_CAPS_LOCK => 1073741881,
+        KEY_LEFT_CONTROL => 1073742048, KEY_LEFT_SHIFT => 1073742049,
+        KEY_LEFT_ALT => 1073742050, KEY_LEFT_SUPER => 1073742051,
+        KEY_RIGHT_CONTROL => 1073742052, KEY_RIGHT_SHIFT => 1073742053,
+        KEY_RIGHT_ALT => 1073742054, KEY_RIGHT_SUPER => 1073742055,
+        KEY_KP_DIVIDE => 1073741908, KEY_KP_MULTIPLY => 1073741909,
+        KEY_KP_SUBTRACT => 1073741910, KEY_KP_ADD => 1073741911,
+        KEY_KP_ENTER => 1073741912, KEY_KP_DECIMAL => 1073741923,
+        KEY_KP_1 => 1073741913, KEY_KP_2 => 1073741914, KEY_KP_3 => 1073741915,
+        KEY_KP_4 => 1073741916, KEY_KP_5 => 1073741917, KEY_KP_6 => 1073741918,
+        KEY_KP_7 => 1073741919, KEY_KP_8 => 1073741920, KEY_KP_9 => 1073741921,
+        KEY_KP_0 => 1073741922,
+        _ => return None,
+    })
+}
+
+/// Anzeigename der Tasten, fuer die GLFW keinen liefert (alles Nicht-
+/// Druckbare). Bewusst kurze, in Spielen uebliche Beschriftungen; leer, wenn
+/// auch hier nichts Sinnvolles steht (dann zeigt der Aufrufer den Code).
+fn key_label(k: KeyboardKey) -> &'static str {
+    use KeyboardKey::*;
+    match k {
+        KEY_SPACE => "LEER", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",
+        KEY_TAB => "TAB", KEY_BACKSPACE => "RUECK", KEY_DELETE => "ENTF",
+        KEY_INSERT => "EINFG", KEY_HOME => "POS1", KEY_END => "ENDE",
+        KEY_PAGE_UP => "BILD-AUF", KEY_PAGE_DOWN => "BILD-AB",
+        KEY_LEFT => "LINKS", KEY_RIGHT => "RECHTS", KEY_UP => "HOCH", KEY_DOWN => "RUNTER",
+        KEY_LEFT_SHIFT | KEY_RIGHT_SHIFT => "UMSCHALT",
+        KEY_LEFT_CONTROL | KEY_RIGHT_CONTROL => "STRG",
+        KEY_LEFT_ALT | KEY_RIGHT_ALT => "ALT",
+        KEY_LEFT_SUPER | KEY_RIGHT_SUPER => "SUPER",
+        KEY_CAPS_LOCK => "FESTSTELL", KEY_NUM_LOCK => "NUM", KEY_SCROLL_LOCK => "ROLLEN",
+        KEY_PRINT_SCREEN => "DRUCK", KEY_PAUSE => "PAUSE",
+        KEY_F1 => "F1", KEY_F2 => "F2", KEY_F3 => "F3", KEY_F4 => "F4",
+        KEY_F5 => "F5", KEY_F6 => "F6", KEY_F7 => "F7", KEY_F8 => "F8",
+        KEY_F9 => "F9", KEY_F10 => "F10", KEY_F11 => "F11", KEY_F12 => "F12",
+        _ => "",
+    }
 }
 
 /// Restanteil eines CAMERA_SHAKE 1..0 (pure, fuer #[test]): linearer Abfall

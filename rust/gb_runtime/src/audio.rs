@@ -26,8 +26,13 @@ use kira::{
     effect::distortion::{DistortionBuilder, DistortionHandle},
     effect::compressor::{CompressorBuilder, CompressorHandle},
     effect::eq_filter::{EqFilterBuilder, EqFilterHandle, EqFilterKind},
+    effect::panning_control::{PanningControlBuilder, PanningControlHandle},
     info::Info,
     listener::ListenerHandle,
+    modulator::ModulatorId,
+    modulator::lfo::{LfoBuilder, LfoHandle, Waveform},
+    modulator::tweener::{TweenerBuilder, TweenerHandle},
+    Mapping, Value as KValue,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
     sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
     sound::FromFileError,
@@ -44,6 +49,26 @@ struct BusFx {
     distortion: DistortionHandle,
     compressor: CompressorHandle,
     eq: EqFilterHandle,
+    panning: PanningControlHandle,
+}
+
+/// Ein Modulator: entweder ein LFO (schwingt von selbst) oder ein Tweener
+/// (faehrt auf Kommando weich zu einem Zielwert). Beide liefern eine
+/// `ModulatorId`, die sich an jeden Kira-Parameter binden laesst -- deshalb
+/// teilen sie sich EINEN GB-Handle-Typ (`AUDIO_MOD`), und `AUDIO_MODULATE`
+/// nimmt beide entgegen.
+enum ModSlot {
+    Lfo(LfoHandle),
+    Tweener(TweenerHandle),
+}
+
+impl ModSlot {
+    fn id(&self) -> ModulatorId {
+        match self {
+            ModSlot::Lfo(h) => h.id(),
+            ModSlot::Tweener(h) => h.id(),
+        }
+    }
 }
 
 /// Maximale Delay-Zeit des eigenen Delay-Effekts (Ringpuffer-Groesse).
@@ -121,6 +146,11 @@ macro_rules! attach_bus_fx {
         compressor: $b.add_effect(CompressorBuilder::new().mix(Mix(0.0))),
         reverb: $b.add_effect(ReverbBuilder::new().mix(Mix(0.0))),
         delay: $b.add_effect(DelayBuilderRT),
+        // Panning liegt bei Kira NICHT auf dem Track selbst, sondern in einem
+        // eigenen Effekt. Ohne ihn in der Kette gaebe es weder eine
+        // Bus-Balance (AUDIO_BUS_PAN) noch Auto-Pan per Modulator -- und
+        // Auto-Pan ist neben Tremolo die bekannteste LFO-Anwendung ueberhaupt.
+        panning: $b.add_effect(PanningControlBuilder(Panning(0.0).into())),
     }};
 }
 use xmrs::prelude::Module;
@@ -472,6 +502,10 @@ fn pan_of(pos: f64) -> Panning { Panning((2.0 * pos.clamp(0.0, 1.0) - 1.0) as f3
 
 fn tween_now() -> Tween { Tween { duration: Duration::from_millis(4), ..Default::default() } }
 
+/// NaN/Inf abfangen, bevor sie in den Audio-Thread gelangen: dort erzeugen sie
+/// stille oder kratzende Ausgabe, die sich kaum zurueckverfolgen laesst.
+fn finite(v: f64, fallback: f64) -> f64 { if v.is_finite() { v } else { fallback } }
+
 // --- Listener/Emitter (raeumliches Audio) -------------------------------
 
 /// GB-Weltkoordinaten (f64, beliebige Einheit) -> Kiras `mint::Vector3<f32>`.
@@ -609,6 +643,11 @@ pub struct Audio {
     // Clocks (kein remove_listener()/remove_spatial_sub_track() -- nur Drop).
     listeners: Vec<Option<ListenerHandle>>,
     emitters: Vec<Option<SpatialTrackHandle>>,
+    // Modulatoren (AUDIO_LFO_* / AUDIO_TWEENER_*): Kira faehrt sie auf dem
+    // Audio-Thread und speist damit Parameter -- das GB-Programm muss pro Frame
+    // NICHTS nachrechnen. Gleiches Tombstone-Vec-Pattern wie Clocks (Kira kennt
+    // kein remove_modulator(), nur Handle-Drop gibt sie frei).
+    mods: Vec<Option<ModSlot>>,
     num_channels: i64,
     bands: Vec<f32>,
     agc: f32,
@@ -649,7 +688,7 @@ impl Audio {
             sfx_fx, music_fx, master_fx,
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
-            listeners: Vec::new(), emitters: Vec::new(), num_channels: 16,
+            listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), num_channels: 16,
             bands: Vec::new(), agc: 1e-4,
             lofi: false, lofi_bits: 8, lofi_cutoff: 3300.0,
             music_source: None, music_handle: None, music_vol: 1.0, music_pitch: 1.0,
@@ -807,6 +846,179 @@ impl Audio {
     /// Konvention -- explizit AUDIO_CLOCK_START noetig). `ticks_per_second`
     /// ist die einzige Geschwindigkeits-Einheit; BPM rechnet der Aufrufer
     /// selbst um (z.B. `bpm / 60.0 * subdivisions`).
+    // --- Modulatoren: LFO + Tweener -------------------------------------
+    // Der Gewinn liegt darin, dass Kira sie auf dem AUDIO-Thread faehrt: ein
+    // Tremolo oder Filter-Sweep laeuft sample-genau weiter, auch wenn der
+    // Frame einbricht -- und das GB-Programm ruft dafuer gar nichts pro Frame.
+
+    fn waveform_from(name: &str) -> Result<Waveform, String> {
+        Ok(match name.to_ascii_lowercase().as_str() {
+            "sine" | "sinus" => Waveform::Sine,
+            "triangle" | "dreieck" => Waveform::Triangle,
+            "saw" | "saegezahn" => Waveform::Saw,
+            "pulse" | "puls" | "square" | "rechteck" => Waveform::Pulse { width: 0.5 },
+            other => return Err(format!(
+                "AUDIO_LFO: unbekannte Wellenform '{}' -- erwartet sine/triangle/saw/pulse",
+                other)),
+        })
+    }
+
+    /// AUDIO_LFO_NEW(wellenform$, hz, amplitude, mitte) -> AUDIO_MOD.
+    /// Schwingt zwischen `mitte - amplitude` und `mitte + amplitude`.
+    pub fn lfo_new(&mut self, wave: &str, hz: f64, amp: f64, offset: f64) -> Result<i64, String> {
+        let w = Self::waveform_from(wave)?;
+        let h = self.manager.add_modulator(
+            LfoBuilder::new()
+                .waveform(w)
+                .frequency(finite(hz, 1.0).max(0.0))
+                .amplitude(finite(amp, 1.0))
+                .offset(finite(offset, 0.0)))
+            .map_err(|e| format!("AUDIO_LFO_NEW: Modulator-Limit erreicht: {:?}", e))?;
+        self.mods.push(Some(ModSlot::Lfo(h)));
+        Ok((self.mods.len() - 1) as i64)
+    }
+
+    /// AUDIO_TWEENER_NEW(startwert) -> AUDIO_MOD. Faehrt auf Kommando weich zu
+    /// einem Zielwert (AUDIO_TWEENER_TO) -- gut fuer Uebergaenge, die exakt
+    /// getimt sein muessen (Duck beim Dialog, Filter-Sweep beim Levelwechsel).
+    pub fn tweener_new(&mut self, start: f64) -> Result<i64, String> {
+        let h = self.manager.add_modulator(TweenerBuilder { initial_value: finite(start, 0.0) })
+            .map_err(|e| format!("AUDIO_TWEENER_NEW: Modulator-Limit erreicht: {:?}", e))?;
+        self.mods.push(Some(ModSlot::Tweener(h)));
+        Ok((self.mods.len() - 1) as i64)
+    }
+
+    fn mod_slot_mut(&mut self, idx: i64, fn_: &str) -> Result<&mut ModSlot, String> {
+        self.mods.get_mut(idx.max(-1) as usize)
+            .and_then(|o| o.as_mut())
+            .ok_or_else(|| format!("{}: ungueltiges AUDIO_MOD-Handle", fn_))
+    }
+
+    pub fn lfo_set(&mut self, idx: i64, hz: Option<f64>, amp: Option<f64>,
+                   offset: Option<f64>) -> Result<(), String> {
+        match self.mod_slot_mut(idx, "AUDIO_LFO_SET")? {
+            ModSlot::Lfo(h) => {
+                if let Some(v) = hz { h.set_frequency(finite(v, 1.0).max(0.0), tween_now()); }
+                if let Some(v) = amp { h.set_amplitude(finite(v, 1.0), tween_now()); }
+                if let Some(v) = offset { h.set_offset(finite(v, 0.0), tween_now()); }
+                Ok(())
+            }
+            ModSlot::Tweener(_) => Err(
+                "AUDIO_LFO_SET: dieses Handle ist ein Tweener, kein LFO".into()),
+        }
+    }
+
+    pub fn lfo_waveform(&mut self, idx: i64, wave: &str) -> Result<(), String> {
+        let w = Self::waveform_from(wave)?;
+        match self.mod_slot_mut(idx, "AUDIO_LFO_WAVEFORM")? {
+            ModSlot::Lfo(h) => { h.set_waveform(w); Ok(()) }
+            ModSlot::Tweener(_) => Err(
+                "AUDIO_LFO_WAVEFORM: dieses Handle ist ein Tweener, kein LFO".into()),
+        }
+    }
+
+    /// AUDIO_TWEENER_TO(mod, ziel, dauer_ms[, easing$]).
+    pub fn tweener_to(&mut self, idx: i64, target: f64, ms: f64,
+                      easing: &str) -> Result<(), String> {
+        let curve = FadeCurve::parse(easing, "AUDIO_TWEENER_TO")?;
+        let tw = Tween {
+            duration: std::time::Duration::from_millis(finite(ms, 0.0).max(0.0) as u64),
+            easing: curve.to_kira(),
+            ..Default::default()
+        };
+        match self.mod_slot_mut(idx, "AUDIO_TWEENER_TO")? {
+            ModSlot::Tweener(h) => { h.set(finite(target, 0.0), tw); Ok(()) }
+            ModSlot::Lfo(_) => Err(
+                "AUDIO_TWEENER_TO: dieses Handle ist ein LFO, kein Tweener -- ein LFO \
+schwingt von selbst und faehrt nicht zu einem Ziel".into()),
+        }
+    }
+
+    pub fn mod_remove(&mut self, idx: i64) -> Result<(), String> {
+        let slot = self.mods.get_mut(idx.max(-1) as usize)
+            .ok_or("AUDIO_MOD_REMOVE: ungueltiges AUDIO_MOD-Handle")?;
+        *slot = None;                  // Drop gibt den Modulator frei
+        Ok(())
+    }
+
+    /// AUDIO_MODULATE(bus$, ziel$, mod, min, max): Bus-Parameter von einem
+    /// Modulator fahren lassen. Der Wertebereich des Modulators (-1..+1 beim
+    /// LFO mit Standard-Amplitude) wird auf `min..max` abgebildet.
+    pub fn modulate(&mut self, bus: &str, target: &str, m: i64,
+                    lo: f64, hi: f64) -> Result<(), String> {
+        let id = self.mods.get(m.max(-1) as usize).and_then(|o| o.as_ref())
+            .ok_or("AUDIO_MODULATE: ungueltiges AUDIO_MOD-Handle")?
+            .id();
+        let (lo, hi) = (finite(lo, 0.0), finite(hi, 1.0));
+        let t = target.to_ascii_lowercase();
+        // Die Lautstaerke sitzt auf dem TRACK, nicht in der Effektkette --
+        // eigener Zweig vor dem `bus_fx`-Zugriff. Das ist das Tremolo.
+        // `min`/`max` sind hier ein Faktor wie bei AUDIO_BUS_VOLUME (1.0 =
+        // unveraendert), nicht Dezibel -- sonst muesste der Nutzer umrechnen.
+        if t == "volume" || t == "lautstaerke" {
+            let v = KValue::from_modulator(id, Mapping {
+                input_range: (-1.0, 1.0),
+                output_range: (db(lo.max(0.0)), db(hi.max(0.0))),
+                easing: Easing::Linear,
+            });
+            match bus.to_lowercase().as_str() {
+                "sfx" => self.sfx_track.set_volume(v, tween_now()),
+                "music" => self.music_track.set_volume(v, tween_now()),
+                "master" => self.manager.main_track().set_volume(v, tween_now()),
+                other => return Err(format!(
+                    "AUDIO_MODULATE: unbekannter Bus '{}' -- erwartet sfx/music/master", other)),
+            }
+            return Ok(());
+        }
+        let fx = self.bus_fx(bus, "AUDIO_MODULATE")?;
+        let map = |a: f64, b: f64| Mapping {
+            input_range: (-1.0, 1.0), output_range: (a, b), easing: Easing::Linear,
+        };
+        match t.as_str() {
+            // Auto-Wah / Filter-Sweep: der Klassiker.
+            "filter" | "cutoff" => fx.filter.set_cutoff(
+                KValue::from_modulator(id, map(lo.max(20.0), hi.max(20.0))), tween_now()),
+            // Tremolo ueber den Reverb-/Distortion-Mix ist ungewoehnlich, aber
+            // dieselbe Mechanik -- 0..1-Bereiche.
+            "reverb" => fx.reverb.set_mix(KValue::from_modulator(
+                id, Mapping { input_range: (-1.0, 1.0),
+                              output_range: (Mix(lo.clamp(0.0, 1.0) as f32),
+                                             Mix(hi.clamp(0.0, 1.0) as f32)),
+                              easing: Easing::Linear }), tween_now()),
+            // `set_drive` rechnet in Dezibel -- eigenes Mapping noetig.
+            "distortion" => fx.distortion.set_drive(
+                KValue::from_modulator(id, Mapping {
+                    input_range: (-1.0, 1.0),
+                    output_range: (Decibels(lo as f32), Decibels(hi as f32)),
+                    easing: Easing::Linear,
+                }), tween_now()),
+            "resonance" => fx.filter.set_resonance(
+                KValue::from_modulator(id, map(lo, hi)), tween_now()),
+            // Auto-Pan: -1 = ganz links, +1 = ganz rechts.
+            "pan" | "panning" => fx.panning.set_panning(
+                KValue::from_modulator(id, Mapping {
+                    input_range: (-1.0, 1.0),
+                    output_range: (Panning(lo.clamp(-1.0, 1.0) as f32),
+                                   Panning(hi.clamp(-1.0, 1.0) as f32)),
+                    easing: Easing::Linear,
+                }), tween_now()),
+            other => return Err(format!(
+                "AUDIO_MODULATE: unbekanntes Ziel '{}' -- erwartet volume/pan/filter/\
+resonance/reverb/distortion", other)),
+        }
+        Ok(())
+    }
+
+    /// AUDIO_BUS_PAN(bus$, pos): feste Balance eines ganzen Busses
+    /// (-1 = links, 0 = Mitte, +1 = rechts). Bisher liess sich nur ein
+    /// EINZELNER Kanal pannen (AUDIO_PAN) -- nicht die Musik als Ganzes.
+    pub fn bus_pan(&mut self, bus: &str, pos: f64) -> Result<(), String> {
+        let p = finite(pos, 0.0).clamp(-1.0, 1.0) as f32;
+        let fx = self.bus_fx(bus, "AUDIO_BUS_PAN")?;
+        fx.panning.set_panning(Panning(p), tween_now());
+        Ok(())
+    }
+
     pub fn clock_new(&mut self, ticks_per_second: f64) -> Result<i64, String> {
         let handle = self.manager.add_clock(ClockSpeed::TicksPerSecond(ticks_per_second))
             .map_err(|e| format!(

@@ -707,10 +707,23 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
     `scale` platzierten Modells (Default `scale=1`). Distanz zum nächsten
     Treffer oder `-1`. So lassen sich auch geladene Meshes (`LOADMODEL`) und
     Prozedural-Modelle (`MESH_*`) picken, nicht nur Box/Sphere-Proxys.
+  - `RAY_HIT_TRI(ox,oy,oz, dx,dy,dz, x1,y1,z1, x2,y2,z2, x3,y3,z3)` — ein
+    einzelnes **Dreieck** via `GetRayCollisionTriangle` (Möller-Trumbore,
+    **ohne Backface-Culling**: eine Fläche trifft auch von hinten).
+  - `RAY_HIT_QUAD(ox,oy,oz, dx,dy,dz, <4 Punkte à x,y,z>)` — ein **Viereck**
+    (intern zwei Dreiecke). Die vier Punkte müssen **reihum** liegen (im Kreis,
+    nicht über Kreuz), sonst prüfen die Teildreiecke die falsche Fläche.
+  - Die Richtung muss **nicht** normalisiert sein — gbrt normalisiert vor dem
+    Test, sonst käme die Distanz in Vielfachen der Richtungslänge zurück
+    (raylibs Rohverhalten).
 - **Maus-Picking** (Strahl vom Cursor durch die aktuelle 3D-Kamera,
   `GetScreenToWorldRay` + Treffertest): `PICK_BOX(cx,cy,cz, sx,sy,sz)`,
-  `PICK_SPHERE(cx,cy,cz, r)`, `PICK_MODEL(modell, px,py,pz[, scale])` — ideal
-  für Klick-Selektion. Nächstes Objekt = kleinste nicht-negative Distanz.
+  `PICK_SPHERE(cx,cy,cz, r)`, `PICK_MODEL(modell, px,py,pz[, scale])`,
+  `PICK_TRI(<3 Punkte>)`, `PICK_QUAD(<4 Punkte>)` — ideal für Klick-Selektion.
+  Nächstes Objekt = kleinste nicht-negative Distanz. TRI/QUAD treffen die
+  **tatsächliche Fläche** statt eines Hüllkörpers: Bodenkacheln, Wandstücke,
+  frei im Raum schwebende Panels (Demo
+  [examples/151_picking_flaechen.gb](../examples/151_picking_flaechen.gb)).
 - **Projektion in beide Richtungen** (durch die aktuelle 3D-Kamera):
   `WORLD_TO_SCREEN_X(wx,wy,wz)` / `WORLD_TO_SCREEN_Y(wx,wy,wz)` projizieren einen
   3D-Weltpunkt auf Bildschirm-Pixel (z.B. ein 2D-Label über ein 3D-Objekt

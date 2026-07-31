@@ -79,6 +79,25 @@ enum Step {
 /// Call-Argument zerlegen: bevorzugt das beim Laden gepackte Arg::Call,
 /// faellt fuer rohe Listen (z.B. alte .gbc ohne specialize-Pass) zurueck.
 #[inline]
+/// 1D `ARRAY OF FLOAT`/`INTEGER` -> `Vec<f64>` (Faltungskern, Shader-Arrays).
+/// Auf Modul-Ebene, weil mehrere Dispatch-Bloecke (`try_graphics`, imgfx) sie
+/// brauchen -- die `gstrs`-Helfer liegen dagegen lokal im Haupt-Match.
+fn gfloats(a: &[Value], i: usize, f: &str) -> R<Vec<f64>> {
+    match a.get(i) {
+        Some(Value::Array(arr)) => {
+            let arr = arr.borrow();
+            if arr.dims.len() != 1 {
+                return Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f));
+            }
+            arr.cells.iter()
+                .map(|v| if is_num(&v) { Ok(as_f64(&v)) }
+                         else { Err(format!("{}: ARRAY enthaelt einen Nicht-Zahlenwert", f)) })
+                .collect()
+        }
+        _ => Err(format!("{}: erwartet 1D ARRAY OF FLOAT", f)),
+    }
+}
+
 fn call_parts(arg: &Arg) -> (&str, usize, i32) {
     match arg {
         Arg::Call(n, c, i) => (n, *c as usize, *i),
@@ -3645,6 +3664,14 @@ impl<'p> Vm<'p> {
                 _ => Err(format!("{}: Argument {} muss Zahl sein", fn_, i + 1)),
             }
         }
+        // Genau `n` Zahlen-Argumente als f32 (fuer die koordinatenreichen
+        // Geometrie-Builtins -- 15 einzelne need_f-Zeilen liest niemand mehr).
+        fn fv(a: &[Value], n: usize, fn_: &str) -> R<Vec<f32>> {
+            if a.len() != n {
+                return Err(format!("{}: erwartet {} Zahlen, erhalten {}", fn_, n, a.len()));
+            }
+            (0..n).map(|i| Ok(need_f(a, i, fn_)? as f32)).collect()
+        }
         // Optionaler Easing-Name fuer Fades/Slides (linear/in/out/inout,
         // Default "linear" bei fehlendem Argument). Pruefung VOR der Audio-
         // Initialisierung -> golden-testbar (wie die Bus-Namen-Checks).
@@ -3821,6 +3848,21 @@ impl<'p> Vm<'p> {
                 gi(a,0,"GENTEX_RADIAL")? as i32, gi(a,1,"GENTEX_RADIAL")? as i32,
                 gi(a,2,"GENTEX_RADIAL")?, gi(a,3,"GENTEX_RADIAL")?,
                 if a.len() >= 5 { need_f(a,4,"GENTEX_RADIAL")? } else { 0.0 })?),
+            "gentex_cellular" => Value::Int(g!().gen_tex_cellular(
+                gi(a,0,"GENTEX_CELLULAR")? as i32, gi(a,1,"GENTEX_CELLULAR")? as i32,
+                gi(a,2,"GENTEX_CELLULAR")?)?),
+            "gentex_noise" => Value::Int(g!().gen_tex_noise(
+                gi(a,0,"GENTEX_NOISE")? as i32, gi(a,1,"GENTEX_NOISE")? as i32,
+                need_f(a,2,"GENTEX_NOISE")?)?),
+            "gentex_gradient_box" => Value::Int(g!().gen_tex_gradient_square(
+                gi(a,0,"GENTEX_GRADIENT_BOX")? as i32, gi(a,1,"GENTEX_GRADIENT_BOX")? as i32,
+                need_f(a,2,"GENTEX_GRADIENT_BOX")?, gi(a,3,"GENTEX_GRADIENT_BOX")?,
+                gi(a,4,"GENTEX_GRADIENT_BOX")?)?),
+            // --- Bitmap-Font ---
+            "loadfont_image" => Value::Int(g!().load_font_image(
+                gi(a,0,"LOADFONT_IMAGE")?, gi(a,1,"LOADFONT_IMAGE")?, gi(a,2,"LOADFONT_IMAGE")?)?),
+            "text_line_spacing" => { let n = gi(a,0,"TEXT_LINE_SPACING")?;
+                                     g!().text_line_spacing(n); Value::Nil }
             // --- Clipboard + Drag&Drop (Batch 5) ---
             "clipboard_get" => Value::Str(g!().clipboard_get().into()),
             "clipboard_set" => { let s = gs(a,0,"CLIPBOARD_SET")?.to_string(); g!().clipboard_set(&s); Value::Nil }
@@ -3952,9 +3994,72 @@ impl<'p> Vm<'p> {
             "mousex" => Value::Int(g!().mouse_x()),
             "mousey" => Value::Int(g!().mouse_y()),
             "mousebutton" => Value::Bool(g!().mouse_button(gi(a,0,"MOUSEBUTTON")?)),
+            // --- Eingabe-Flanken: "genau in DIESEM Frame" ---------------------
+            // MOUSEBUTTON/KEYPRESSED bleiben "gehalten" (Namen sind historisch,
+            // sie umzudeuten wuerde bestehende Programme still kaputtmachen).
+            "mouse_hit" => Value::Bool(g!().mouse_hit(gi(a,0,"MOUSE_HIT")?)),
+            "mouse_released" => Value::Bool(g!().mouse_released(gi(a,0,"MOUSE_RELEASED")?)),
+            "keyhit" => Value::Bool(g!().key_hit(gi(a,0,"KEYHIT")?)),
+            "keyreleased" => Value::Bool(g!().key_released_edge(gi(a,0,"KEYRELEASED")?)),
+            "keyrepeat" => Value::Bool(g!().key_repeat(gi(a,0,"KEYREPEAT")?)),
+            "mouse_delta_x" => Value::Float(g!().mouse_delta_x()),
+            "mouse_delta_y" => Value::Float(g!().mouse_delta_y()),
+            "mouse_set_pos" => { let (x, y) = (gi(a,0,"MOUSE_SET_POS")?, gi(a,1,"MOUSE_SET_POS")?);
+                                 g!().mouse_set_pos(x, y); Value::Nil }
+            "mouse_on_screen" => Value::Bool(g!().mouse_on_screen()),
+            "mouse_cursor" => { let s = gs(a,0,"MOUSE_CURSOR")?.to_string();
+                                g!().mouse_cursor(&s)?; Value::Nil }
+            "joystick_hit" => Value::Bool(g!().joystick_hit(gi(a,0,"JOYSTICK_HIT")?,
+                                                            gi(a,1,"JOYSTICK_HIT")?)?),
+            "joystick_released" => Value::Bool(g!().joystick_released(
+                gi(a,0,"JOYSTICK_RELEASED")?, gi(a,1,"JOYSTICK_RELEASED")?)?),
+            "joystick_any_button" => Value::Int(g!().joystick_any_button()),
+            "joystick_axis_count" => Value::Int(g!().joystick_axis_count(
+                gi(a,0,"JOYSTICK_AXIS_COUNT")?)?),
+            // --- Touch + Gesten (raylib-Subsystem, war komplett ungenutzt) ----
+            "touch_count" => Value::Int(g!().touch_count()),
+            "touch_x" => Value::Float(g!().touch_x(gi(a,0,"TOUCH_X")?)),
+            "touch_y" => Value::Float(g!().touch_y(gi(a,0,"TOUCH_Y")?)),
+            "touch_id" => Value::Int(g!().touch_id(gi(a,0,"TOUCH_ID")?)),
+            "gesture$" => Value::Str(g!().gesture().into()),
+            "gesture_drag_x" => Value::Float(g!().gesture_drag_x()),
+            "gesture_drag_y" => Value::Float(g!().gesture_drag_y()),
+            "gesture_drag_angle" => Value::Float(g!().gesture_drag_angle()),
+            "gesture_pinch_x" => Value::Float(g!().gesture_pinch_x()),
+            "gesture_pinch_y" => Value::Float(g!().gesture_pinch_y()),
+            "gesture_pinch_angle" => Value::Float(g!().gesture_pinch_angle()),
+            "gesture_hold_time" => Value::Float(g!().gesture_hold_time()),
+            // --- Fenster-Zustand + Politur ------------------------------------
+            "window_focused" => Value::Bool(g!().window_focused()),
+            "window_minimized" => Value::Bool(g!().window_minimized()),
+            "window_maximized" => Value::Bool(g!().window_maximized()),
+            "window_hidden" => Value::Bool(g!().window_hidden()),
+            "window_is_fullscreen" => Value::Bool(g!().window_fullscreen_state()),
+            "window_focus" => { g!().window_focus(); Value::Nil }
+            "window_opacity" => { let v = need_f(a,0,"WINDOW_OPACITY")?;
+                                  g!().window_opacity(v); Value::Nil }
+            "window_icon" => { let i = gi(a,0,"WINDOW_ICON")?; g!().window_icon(i)?; Value::Nil }
+            "get_time" => Value::Float(g!().get_time()),
+            "openurl" => { let u = gs(a,0,"OPENURL")?.to_string(); g!().open_url(&u)?; Value::Nil }
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
             // pop_mouse_wheel ohne Fenster = 0).
             "mousewheel" => Value::Int(self.gfx.as_ref().map(|g| g.pop_mouse_wheel()).unwrap_or(0)),
+            "mousewheel_x" => Value::Float(self.gfx.as_ref().map(|g| g.mouse_wheel_x()).unwrap_or(0.0)),
+            "mousewheel_y" => Value::Float(self.gfx.as_ref().map(|g| g.mouse_wheel_y()).unwrap_or(0.0)),
+            "key_name$" => Value::Str(g!().key_name(gi(a,0,"KEY_NAME$")?).into()),
+            "key_any_hit" => Value::Int(g!().key_any_hit()),
+            // Eingabe aufzeichnen/abspielen: Demo-Modus, Fehlerberichte zum
+            // Nachspielen, automatische Spieltests.
+            "automation_record" => { let p = gs(a,0,"AUTOMATION_RECORD")?.to_string(); g!().automation_record(&p)?; Value::Nil }
+            "automation_stop" => Value::Int(g!().automation_stop()?),
+            "automation_play" => { let p = gs(a,0,"AUTOMATION_PLAY")?.to_string(); Value::Int(g!().automation_play(&p)?) }
+            "automation_recording" => Value::Bool(g!().automation_recording()),
+            "automation_playing" => Value::Bool(g!().automation_playing()),
+            "automation_frame" => Value::Int(g!().automation_frame()),
+            "automation_count" => Value::Int(g!().automation_count()),
+            "joystick_mappings" => Value::Int(g!().joystick_mappings(gs(a,0,"JOYSTICK_MAPPINGS")?)),
+            "window_dpi_x" => Value::Float(g!().window_dpi_x()),
+            "window_dpi_y" => Value::Float(g!().window_dpi_y()),
             "screenwidth" => Value::Int(self.gfx.as_ref().map(|g| g.screen_width()).unwrap_or(0)),
             "screenheight" => Value::Int(self.gfx.as_ref().map(|g| g.screen_height()).unwrap_or(0)),
             // raylib-Default-Font hat keine Bold/Italic-Variante -> No-Op
@@ -4048,6 +4153,27 @@ impl<'p> Vm<'p> {
             "shader_set3" => {
                 g!().shader_set_vec3(gi(a,0,"SHADER_SET3")?, gs(a,1,"SHADER_SET3")?,
                     need_f(a,2,"SHADER_SET3")?, need_f(a,3,"SHADER_SET3")?, need_f(a,4,"SHADER_SET3")?);
+                Value::Nil
+            }
+            "shader_set_array" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_ARRAY")?, gs(a,1,"SHADER_SET_ARRAY")?.to_string());
+                let v = gfloats(a, 2, "SHADER_SET_ARRAY")?;
+                g!().shader_set_array(h, &n, &v)?;
+                Value::Nil
+            }
+            "shader_set_texture" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_TEXTURE")?, gs(a,1,"SHADER_SET_TEXTURE")?.to_string());
+                let img = gi(a,2,"SHADER_SET_TEXTURE")?;
+                g!().shader_set_texture(h, &n, img)?;
+                Value::Nil
+            }
+            "shader_set_matrix" => {
+                let (h, n) = (gi(a,0,"SHADER_SET_MATRIX")?, gs(a,1,"SHADER_SET_MATRIX")?.to_string());
+                let m = match a.get(2) {
+                    Some(Value::Mat4(m)) => **m,
+                    _ => return Err("SHADER_SET_MATRIX: erwartet MAT4 (Modul m3d)".into()),
+                };
+                g!().shader_set_matrix(h, &n, &m)?;
                 Value::Nil
             }
             "postfx" => { g!().set_postfx(gi(a, 0, "POSTFX")?); Value::Nil }
@@ -4229,6 +4355,27 @@ impl<'p> Vm<'p> {
                 need_f(a,3,"RAY_HIT_SPHERE")? as f32, need_f(a,4,"RAY_HIT_SPHERE")? as f32, need_f(a,5,"RAY_HIT_SPHERE")? as f32,
                 need_f(a,6,"RAY_HIT_SPHERE")? as f32, need_f(a,7,"RAY_HIT_SPHERE")? as f32, need_f(a,8,"RAY_HIT_SPHERE")? as f32,
                 need_f(a,9,"RAY_HIT_SPHERE")? as f32)),
+            // Picking auf ECHTER Geometrie statt nur Huellkoerper: einzelne
+            // Dreiecke/Vierecke (Boden-Kacheln, Wandflaechen, In-Welt-Panels).
+            "ray_hit_tri" => {
+                let v = fv(a, 15, "RAY_HIT_TRI")?;
+                Value::Float(g!().ray_hit_tri([v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                    [[v[6],v[7],v[8]], [v[9],v[10],v[11]], [v[12],v[13],v[14]]]))
+            }
+            "ray_hit_quad" => {
+                let v = fv(a, 18, "RAY_HIT_QUAD")?;
+                Value::Float(g!().ray_hit_quad([v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                    [[v[6],v[7],v[8]], [v[9],v[10],v[11]], [v[12],v[13],v[14]], [v[15],v[16],v[17]]]))
+            }
+            "pick_tri" => {
+                let v = fv(a, 9, "PICK_TRI")?;
+                Value::Float(g!().pick_tri([[v[0],v[1],v[2]], [v[3],v[4],v[5]], [v[6],v[7],v[8]]]))
+            }
+            "pick_quad" => {
+                let v = fv(a, 12, "PICK_QUAD")?;
+                Value::Float(g!().pick_quad([[v[0],v[1],v[2]], [v[3],v[4],v[5]],
+                                             [v[6],v[7],v[8]], [v[9],v[10],v[11]]]))
+            }
             "pick_box" => Value::Float(g!().pick_box(
                 need_f(a,0,"PICK_BOX")? as f32, need_f(a,1,"PICK_BOX")? as f32, need_f(a,2,"PICK_BOX")? as f32,
                 need_f(a,3,"PICK_BOX")? as f32, need_f(a,4,"PICK_BOX")? as f32, need_f(a,5,"PICK_BOX")? as f32)),
@@ -4660,6 +4807,58 @@ impl<'p> Vm<'p> {
             "audio_music_queue" => { let p = gs(a, 0, "AUDIO_MUSIC_QUEUE")?.to_string(); self.audio_mut()?.music_queue(&p); Value::Nil }
 
             // --- Clock (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing) ---
+            // --- Modulatoren: LFO + Tweener ---------------------------------
+            // Kira faehrt sie auf dem Audio-Thread: ein Tremolo/Filter-Sweep
+            // laeuft sample-genau weiter, auch wenn ein Frame einbricht -- und
+            // das GB-Programm ruft dafuer NICHTS pro Frame.
+            "audio_lfo_new" => {
+                let wave = gs(a, 0, "AUDIO_LFO_NEW")?.to_string();
+                let hz = need_f(a, 1, "AUDIO_LFO_NEW")?;
+                if hz < 0.0 { return Err("AUDIO_LFO_NEW: Frequenz darf nicht negativ sein".into()); }
+                let amp = if a.len() > 2 { need_f(a, 2, "AUDIO_LFO_NEW")? } else { 1.0 };
+                let off = if a.len() > 3 { need_f(a, 3, "AUDIO_LFO_NEW")? } else { 0.0 };
+                Value::Int(self.audio_mut()?.lfo_new(&wave, hz, amp, off)?)
+            }
+            "audio_lfo_set" => {
+                let m = gi(a, 0, "AUDIO_LFO_SET")?;
+                let hz = if a.len() > 1 { Some(need_f(a, 1, "AUDIO_LFO_SET")?) } else { None };
+                let amp = if a.len() > 2 { Some(need_f(a, 2, "AUDIO_LFO_SET")?) } else { None };
+                let off = if a.len() > 3 { Some(need_f(a, 3, "AUDIO_LFO_SET")?) } else { None };
+                self.audio_mut()?.lfo_set(m, hz, amp, off)?; Value::Nil
+            }
+            "audio_lfo_waveform" => {
+                let m = gi(a, 0, "AUDIO_LFO_WAVEFORM")?;
+                let w = gs(a, 1, "AUDIO_LFO_WAVEFORM")?.to_string();
+                self.audio_mut()?.lfo_waveform(m, &w)?; Value::Nil
+            }
+            "audio_tweener_new" => {
+                let v = if a.is_empty() { 0.0 } else { need_f(a, 0, "AUDIO_TWEENER_NEW")? };
+                Value::Int(self.audio_mut()?.tweener_new(v)?)
+            }
+            "audio_tweener_to" => {
+                let m = gi(a, 0, "AUDIO_TWEENER_TO")?;
+                let target = need_f(a, 1, "AUDIO_TWEENER_TO")?;
+                let ms = if a.len() > 2 { need_f(a, 2, "AUDIO_TWEENER_TO")? } else { 0.0 };
+                let ez = if a.len() > 3 { gs(a, 3, "AUDIO_TWEENER_TO")?.to_string() } else { String::new() };
+                self.audio_mut()?.tweener_to(m, target, ms, &ez)?; Value::Nil
+            }
+            "audio_mod_remove" => {
+                let m = gi(a, 0, "AUDIO_MOD_REMOVE")?;
+                self.audio_mut()?.mod_remove(m)?; Value::Nil
+            }
+            "audio_modulate" => {
+                let bus = gs(a, 0, "AUDIO_MODULATE")?.to_string();
+                let target = gs(a, 1, "AUDIO_MODULATE")?.to_string();
+                let m = gi(a, 2, "AUDIO_MODULATE")?;
+                let lo = need_f(a, 3, "AUDIO_MODULATE")?;
+                let hi = need_f(a, 4, "AUDIO_MODULATE")?;
+                self.audio_mut()?.modulate(&bus, &target, m, lo, hi)?; Value::Nil
+            }
+            "audio_bus_pan" => {
+                let bus = gs(a, 0, "AUDIO_BUS_PAN")?.to_string();
+                let pos = need_f(a, 1, "AUDIO_BUS_PAN")?;
+                self.audio_mut()?.bus_pan(&bus, pos)?; Value::Nil
+            }
             "audio_clock_new" => {
                 // AUDIO_CLOCK_NEW(ticks_per_second) -- Wertpruefung VOR der
                 // Audio-Initialisierung (golden-testbar).
@@ -4990,6 +5189,7 @@ impl<'p> Vm<'p> {
             }
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
             "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
+            "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
@@ -4998,6 +5198,23 @@ impl<'p> Vm<'p> {
             "image_resize_canvas" => {
                 let fill = if a.len() >= 6 { gi(a,5,"IMAGE_RESIZE_CANVAS")? } else { 0 };
                 Value::Int(g!().image_resize_canvas(gi(a,0,"IMAGE_RESIZE_CANVAS")?, gi(a,1,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,2,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,3,"IMAGE_RESIZE_CANVAS")? as i32, gi(a,4,"IMAGE_RESIZE_CANVAS")? as i32, fill)?)
+            }
+            "image_convolve" => {
+                let k = gfloats(a, 1, "IMAGE_CONVOLVE")?;
+                Value::Int(g!().image_convolve(gi(a,0,"IMAGE_CONVOLVE")?, &k)?)
+            }
+            "image_alpha_mask" => Value::Int(g!().image_alpha_mask(
+                gi(a,0,"IMAGE_ALPHA_MASK")?, gi(a,1,"IMAGE_ALPHA_MASK")?)?),
+            "image_alpha_crop" => Value::Int(g!().image_alpha_crop(
+                gi(a,0,"IMAGE_ALPHA_CROP")?, need_f(a,1,"IMAGE_ALPHA_CROP")?)?),
+            "image_alpha_premultiply" => Value::Int(g!().image_alpha_premultiply(
+                gi(a,0,"IMAGE_ALPHA_PREMULTIPLY")?)?),
+            "image_dither" => Value::Int(g!().image_dither(
+                gi(a,0,"IMAGE_DITHER")?, gi(a,1,"IMAGE_DITHER")?, gi(a,2,"IMAGE_DITHER")?,
+                gi(a,3,"IMAGE_DITHER")?, gi(a,4,"IMAGE_DITHER")?)?),
+            "image_palette" => {
+                let cols = g!().image_palette(gi(a,0,"IMAGE_PALETTE")?, gi(a,1,"IMAGE_PALETTE")?)?;
+                crate::builtins::new_int_array(cols)
             }
             "image_blur" => Value::Int(g!().image_blur(gi(a,0,"IMAGE_BLUR")?, gi(a,1,"IMAGE_BLUR")? as i32)?),
             "image_brightness" => Value::Int(g!().image_brightness(gi(a,0,"IMAGE_BRIGHTNESS")?, gi(a,1,"IMAGE_BRIGHTNESS")? as i32)?),
@@ -5382,6 +5599,24 @@ const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_f1", 1073741882), ("key_f2", 1073741883), ("key_f3", 1073741884), ("key_f4", 1073741885),
     ("key_f5", 1073741886), ("key_f6", 1073741887), ("key_f7", 1073741888), ("key_f8", 1073741889),
     ("key_f9", 1073741890), ("key_f10", 1073741891), ("key_f11", 1073741892), ("key_f12", 1073741893),
+    // Umschalt-/Steuertasten: bis hierher gab es KEINEN Code dafuer -- ein
+    // "Sprint mit Shift" oder "Strg+S" war aus GB heraus nicht abfragbar.
+    ("key_lshift", 1073742049), ("key_rshift", 1073742053),
+    ("key_lctrl", 1073742048), ("key_rctrl", 1073742052),
+    ("key_lalt", 1073742050), ("key_ralt", 1073742054),
+    ("key_lsuper", 1073742051), ("key_rsuper", 1073742055),
+    ("key_capslock", 1073741881),
+    // Navigationsblock
+    ("key_insert", 1073741897), ("key_delete", 127),
+    ("key_home", 1073741898), ("key_end", 1073741901),
+    ("key_pageup", 1073741899), ("key_pagedown", 1073741902),
+    // Ziffernblock (eigene Codes -- eine Spiel-Steuerung darf ihn getrennt belegen)
+    ("key_kp0", 1073741922), ("key_kp1", 1073741913), ("key_kp2", 1073741914),
+    ("key_kp3", 1073741915), ("key_kp4", 1073741916), ("key_kp5", 1073741917),
+    ("key_kp6", 1073741918), ("key_kp7", 1073741919), ("key_kp8", 1073741920),
+    ("key_kp9", 1073741921),
+    ("key_kp_enter", 1073741912), ("key_kp_plus", 1073741911), ("key_kp_minus", 1073741910),
+    ("key_kp_multiply", 1073741909), ("key_kp_divide", 1073741908), ("key_kp_period", 1073741923),
     // Gamepad-Bind-Codes (negativ, kollidieren nicht mit Tasten) -- wie graphics.KEYS.
     ("joy_button_a", -100), ("joy_button_b", -101), ("joy_button_x", -102), ("joy_button_y", -103),
     ("joy_button_lb", -104), ("joy_button_rb", -105), ("joy_button_back", -106), ("joy_button_start", -107),

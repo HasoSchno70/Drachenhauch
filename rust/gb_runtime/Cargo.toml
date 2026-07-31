@@ -17,6 +17,10 @@ regex = "1"
 # Schneller Nicht-DoS-Hasher fuer interne Lookup-Maps (Funktionen/Klassen/
 # Instanz-Felder) -- Keys kommen aus dem Compiler, nicht von Angreifern.
 rustc-hash = "2"
+# COMPRESS$/DECOMPRESS$ (DEFLATE). Pure-Rust und ohnehin schon transitiv in der
+# Lockfile -> ungated, damit auch Konsolen-Programme ihre Savegames packen
+# koennen (raylibs CompressData haengt dagegen am graphics-Feature).
+miniz_oxide = "0.8"
 # physics3d-Modul (PHYS3D_*): echte 3D-Starrkoerper-Physik. Pure-Rust (nalgebra),
 # keine C-Toolchain -> ungated immer dabei.
 rapier3d = "0.22"
