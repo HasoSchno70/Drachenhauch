@@ -2520,6 +2520,16 @@ impl Graphics {
         img.resize(w, h);
         self.push_tex_from_image(img)
     }
+    /// IMAGE_SCALE_NN: Skalieren OHNE Interpolation (Nearest-Neighbour).
+    /// `IMAGE_SCALE` glaettet bilinear -- fuer Pixelgrafik ist das falsch: aus
+    /// harten Kanten werden Farbverlaeufe, ein 8x8-Sprite auf 32x32 ist danach
+    /// matschig statt gross. Diese Variante behaelt die Bloecke.
+    pub fn image_scale_nn(&mut self, idx: i64, w: i32, h: i32) -> Result<i64, String> {
+        if w <= 0 || h <= 0 { return Err("IMAGE_SCALE_NN: w und h muessen > 0 sein".into()); }
+        let mut img = self.src_image(idx, "IMAGE_SCALE_NN")?;
+        img.resize_nn(w, h);
+        self.push_tex_from_image(img)
+    }
     pub fn image_rotate(&mut self, idx: i64, degrees: f32) -> Result<i64, String> {
         let mut img = self.src_image(idx, "IMAGE_ROTATE")?;
         img.rotate(degrees as i32);
@@ -3178,6 +3188,55 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     }
     /// MOUSE_ON_SCREEN(): liegt der Zeiger ueber dem Fenster?
     pub fn mouse_on_screen(&self) -> bool { self.rl.is_cursor_on_screen() }
+    /// MOUSEWHEEL_X/Y(): Rad-Bewegung als KOMMAZAHL und in beiden Achsen.
+    /// `MOUSEWHEEL` liefert nur die vertikale Achse als ganze Zahl -- ein
+    /// horizontales Rad (viele Maeuse, jedes Touchpad) war damit unerreichbar,
+    /// und feine Touchpad-Schritte (0.25) fielen auf 0 herunter.
+    pub fn mouse_wheel_x(&self) -> f64 { self.rl.get_mouse_wheel_move_v().x as f64 }
+    pub fn mouse_wheel_y(&self) -> f64 { self.rl.get_mouse_wheel_move_v().y as f64 }
+
+    /// KEY_NAME$(code): Anzeigename einer Taste fuer Belegungsdialoge.
+    /// raylib/GLFW kennt nur die Namen der DRUCKBAREN Tasten (und die
+    /// layout-abhaengig: auf einer deutschen Tastatur heisst KEY_Y "z") --
+    /// fuer Sondertasten liefert es nichts. Genau die will ein
+    /// Belegungsdialog aber anzeigen, daher die eigene Ersatztabelle.
+    pub fn key_name(&self, code: i64) -> String {
+        let Some(k) = map_key(code) else { return String::new(); };
+        match self.rl.get_key_name(k) {
+            Some(n) if !n.trim().is_empty() => n.to_uppercase(),
+            _ => key_label(k).to_string(),
+        }
+    }
+    /// KEY_ANY_HIT(): GB-Code der zuletzt gedrueckten Taste, -1 wenn keine.
+    /// Das Gegenstueck zu JOYSTICK_ANY_BUTTON -- zusammen mit `KEY_NAME$` ist
+    /// ein Belegungsdialog ("Druecke eine Taste ...") damit in drei Zeilen
+    /// gebaut, statt alle Konstanten einzeln mit KEYHIT abzuklappern.
+    pub fn key_any_hit(&mut self) -> i64 {
+        // raylib fuehrt eine Warteschlange. Wir nehmen die erste Taste dieses
+        // Frames, die GB ueberhaupt kennt, und leeren den Rest -- ein Dialog
+        // will genau eine Belegung, keine Sammlung.
+        let mut found = -1;
+        while let Some(k) = self.rl.get_key_pressed() {
+            if found < 0 {
+                if let Some(code) = gb_key_code(k) { found = code; }
+            }
+        }
+        found
+    }
+    /// JOYSTICK_MAPPINGS(text$): SDL-GameControllerDB-Zeilen nachladen, damit
+    /// auch exotische Pads die richtige Knopf-Belegung bekommen. Liefert
+    /// raylibs Rueckgabe (Anzahl erkannter Zuordnungen, -1 bei Fehler).
+    pub fn joystick_mappings(&self, text: &str) -> i64 {
+        let Ok(cs) = std::ffi::CString::new(text) else { return -1; };
+        let bytes: Vec<std::os::raw::c_char> =
+            cs.as_bytes_with_nul().iter().map(|&b| b as std::os::raw::c_char).collect();
+        self.rl.set_gamepad_mappings(&bytes) as i64
+    }
+    /// WINDOW_DPI_X/Y(): Skalierungsfaktor des Bildschirms (1.0 = normal,
+    /// 2.0 = HiDPI/Retina). Ohne den weiss ein Programm nicht, ob seine
+    /// Pixelgroessen auf dem Zielgeraet winzig herauskommen.
+    pub fn window_dpi_x(&self) -> f64 { self.rl.get_window_scale_dpi().x as f64 }
+    pub fn window_dpi_y(&self) -> f64 { self.rl.get_window_scale_dpi().y as f64 }
 
     /// MOUSE_CURSOR(form$): Systemcursor umschalten -- Hand ueber Knoepfen,
     /// Textmarke ueber Eingabefeldern, Groesse-Pfeile an Kanten.
@@ -4519,6 +4578,30 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         1073741905 => KEY_DOWN,
         1073741898 => KEY_HOME,
         1073741901 => KEY_END,
+        1073741897 => KEY_INSERT,
+        1073741899 => KEY_PAGE_UP,
+        1073741902 => KEY_PAGE_DOWN,
+        1073741881 => KEY_CAPS_LOCK,
+        // Umschalt-/Steuertasten (SDL-Keycodes 224..230 | Scancode-Maske)
+        1073742048 => KEY_LEFT_CONTROL,
+        1073742049 => KEY_LEFT_SHIFT,
+        1073742050 => KEY_LEFT_ALT,
+        1073742051 => KEY_LEFT_SUPER,
+        1073742052 => KEY_RIGHT_CONTROL,
+        1073742053 => KEY_RIGHT_SHIFT,
+        1073742054 => KEY_RIGHT_ALT,
+        1073742055 => KEY_RIGHT_SUPER,
+        // Ziffernblock: SDL zaehlt KP_1..KP_9 aufsteigend, KP_0 kommt DANACH.
+        1073741908 => KEY_KP_DIVIDE,
+        1073741909 => KEY_KP_MULTIPLY,
+        1073741910 => KEY_KP_SUBTRACT,
+        1073741911 => KEY_KP_ADD,
+        1073741912 => KEY_KP_ENTER,
+        1073741913 => KEY_KP_1, 1073741914 => KEY_KP_2, 1073741915 => KEY_KP_3,
+        1073741916 => KEY_KP_4, 1073741917 => KEY_KP_5, 1073741918 => KEY_KP_6,
+        1073741919 => KEY_KP_7, 1073741920 => KEY_KP_8, 1073741921 => KEY_KP_9,
+        1073741922 => KEY_KP_0,
+        1073741923 => KEY_KP_DECIMAL,
         // Buchstaben: pygame 97..122 (lowercase ascii) -> raylib 65..90.
         97..=122 => return key_from_i32((code - 32) as i32),
         // Ziffern: pygame 48..57 == raylib KEY_ZERO..KEY_NINE.
@@ -4546,6 +4629,66 @@ fn key_from_i32(v: i32) -> Option<KeyboardKey> {
         300 => KEY_F11, 301 => KEY_F12,
         _ => return None,
     })
+}
+
+/// Umkehrung von `map_key`: raylib-Taste -> GB-Tastencode (SDL-Konvention).
+/// Buchstaben/Ziffern/F-Tasten rechnet die Nummerierung selbst um, alles
+/// andere kommt aus der Tabelle -- so muss hier KEIN roher raylib-Zahlenwert
+/// geraten werden (die Enum-Variante ist die Quelle).
+fn gb_key_code(k: KeyboardKey) -> Option<i64> {
+    use KeyboardKey::*;
+    let v = k as u32 as i64;
+    match v {
+        65..=90 => return Some(v + 32),        // A..Z -> 97..122 (SDL: klein)
+        48..=57 => return Some(v),             // 0..9 identisch
+        290..=301 => return Some(1073741882 + (v - 290)),   // F1..F12
+        _ => {}
+    }
+    Some(match k {
+        KEY_ESCAPE => 27, KEY_ENTER => 13, KEY_SPACE => 32, KEY_TAB => 9,
+        KEY_BACKSPACE => 8, KEY_DELETE => 127, KEY_INSERT => 1073741897,
+        KEY_LEFT => 1073741904, KEY_RIGHT => 1073741903,
+        KEY_UP => 1073741906, KEY_DOWN => 1073741905,
+        KEY_HOME => 1073741898, KEY_END => 1073741901,
+        KEY_PAGE_UP => 1073741899, KEY_PAGE_DOWN => 1073741902,
+        KEY_CAPS_LOCK => 1073741881,
+        KEY_LEFT_CONTROL => 1073742048, KEY_LEFT_SHIFT => 1073742049,
+        KEY_LEFT_ALT => 1073742050, KEY_LEFT_SUPER => 1073742051,
+        KEY_RIGHT_CONTROL => 1073742052, KEY_RIGHT_SHIFT => 1073742053,
+        KEY_RIGHT_ALT => 1073742054, KEY_RIGHT_SUPER => 1073742055,
+        KEY_KP_DIVIDE => 1073741908, KEY_KP_MULTIPLY => 1073741909,
+        KEY_KP_SUBTRACT => 1073741910, KEY_KP_ADD => 1073741911,
+        KEY_KP_ENTER => 1073741912, KEY_KP_DECIMAL => 1073741923,
+        KEY_KP_1 => 1073741913, KEY_KP_2 => 1073741914, KEY_KP_3 => 1073741915,
+        KEY_KP_4 => 1073741916, KEY_KP_5 => 1073741917, KEY_KP_6 => 1073741918,
+        KEY_KP_7 => 1073741919, KEY_KP_8 => 1073741920, KEY_KP_9 => 1073741921,
+        KEY_KP_0 => 1073741922,
+        _ => return None,
+    })
+}
+
+/// Anzeigename der Tasten, fuer die GLFW keinen liefert (alles Nicht-
+/// Druckbare). Bewusst kurze, in Spielen uebliche Beschriftungen; leer, wenn
+/// auch hier nichts Sinnvolles steht (dann zeigt der Aufrufer den Code).
+fn key_label(k: KeyboardKey) -> &'static str {
+    use KeyboardKey::*;
+    match k {
+        KEY_SPACE => "LEER", KEY_ENTER | KEY_KP_ENTER => "ENTER", KEY_ESCAPE => "ESC",
+        KEY_TAB => "TAB", KEY_BACKSPACE => "RUECK", KEY_DELETE => "ENTF",
+        KEY_INSERT => "EINFG", KEY_HOME => "POS1", KEY_END => "ENDE",
+        KEY_PAGE_UP => "BILD-AUF", KEY_PAGE_DOWN => "BILD-AB",
+        KEY_LEFT => "LINKS", KEY_RIGHT => "RECHTS", KEY_UP => "HOCH", KEY_DOWN => "RUNTER",
+        KEY_LEFT_SHIFT | KEY_RIGHT_SHIFT => "UMSCHALT",
+        KEY_LEFT_CONTROL | KEY_RIGHT_CONTROL => "STRG",
+        KEY_LEFT_ALT | KEY_RIGHT_ALT => "ALT",
+        KEY_LEFT_SUPER | KEY_RIGHT_SUPER => "SUPER",
+        KEY_CAPS_LOCK => "FESTSTELL", KEY_NUM_LOCK => "NUM", KEY_SCROLL_LOCK => "ROLLEN",
+        KEY_PRINT_SCREEN => "DRUCK", KEY_PAUSE => "PAUSE",
+        KEY_F1 => "F1", KEY_F2 => "F2", KEY_F3 => "F3", KEY_F4 => "F4",
+        KEY_F5 => "F5", KEY_F6 => "F6", KEY_F7 => "F7", KEY_F8 => "F8",
+        KEY_F9 => "F9", KEY_F10 => "F10", KEY_F11 => "F11", KEY_F12 => "F12",
+        _ => "",
+    }
 }
 
 /// Restanteil eines CAMERA_SHAKE 1..0 (pure, fuer #[test]): linearer Abfall

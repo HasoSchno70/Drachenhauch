@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1201,
+  "count": 1209,
   "builtins": [
     {
       "name": "ABS",
@@ -3051,6 +3051,12 @@
       "module": "imgfx"
     },
     {
+      "name": "IMAGE_SCALE_NN",
+      "kind": "core",
+      "signature": "IMAGE_SCALE_NN(img, w, h)",
+      "module": "imgfx"
+    },
+    {
       "name": "IMAGE_TINT",
       "kind": "core",
       "signature": "IMAGE_TINT(img: ?, color: INTEGER)",
@@ -3243,6 +3249,12 @@
       "module": "core"
     },
     {
+      "name": "JOYSTICK_MAPPINGS",
+      "kind": "graphics",
+      "signature": "JOYSTICK_MAPPINGS(sdl_db$) -> INTEGER",
+      "module": "core"
+    },
+    {
       "name": "JOYSTICK_NAME",
       "kind": "graphics",
       "signature": "JOYSTICK_NAME(idx: Zahl)",
@@ -3348,6 +3360,18 @@
       "name": "KEYREPEAT",
       "kind": "graphics",
       "signature": "KEYREPEAT(code: Zahl) -> BOOLEAN",
+      "module": "core"
+    },
+    {
+      "name": "KEY_ANY_HIT",
+      "kind": "graphics",
+      "signature": "KEY_ANY_HIT() -> INTEGER",
+      "module": "core"
+    },
+    {
+      "name": "KEY_NAME$",
+      "kind": "graphics",
+      "signature": "KEY_NAME$(code) -> STRING",
       "module": "core"
     },
     {
@@ -3954,6 +3978,18 @@
       "name": "MOUSEWHEEL",
       "kind": "graphics",
       "signature": "MOUSEWHEEL()",
+      "module": "core"
+    },
+    {
+      "name": "MOUSEWHEEL_X",
+      "kind": "graphics",
+      "signature": "MOUSEWHEEL_X() -> FLOAT",
+      "module": "core"
+    },
+    {
+      "name": "MOUSEWHEEL_Y",
+      "kind": "graphics",
+      "signature": "MOUSEWHEEL_Y() -> FLOAT",
       "module": "core"
     },
     {
@@ -7027,6 +7063,18 @@
       "kind": "core",
       "signature": "WIFI_SIGNAL()",
       "module": "wifi"
+    },
+    {
+      "name": "WINDOW_DPI_X",
+      "kind": "graphics",
+      "signature": "WINDOW_DPI_X() -> FLOAT",
+      "module": "core"
+    },
+    {
+      "name": "WINDOW_DPI_Y",
+      "kind": "graphics",
+      "signature": "WINDOW_DPI_Y() -> FLOAT",
+      "module": "core"
     },
     {
       "name": "WINDOW_ESC_QUIT",

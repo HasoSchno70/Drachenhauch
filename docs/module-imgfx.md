@@ -10,7 +10,8 @@ IMPORT "imgfx"
 
 | Funktion | Rückgabe |
 |---|---|
-| `IMAGE_SCALE(img, w, h)` | IMAGE (neu, in `w × h`) |
+| `IMAGE_SCALE(img, w, h)` | IMAGE (neu, in `w × h`) — **bilinear geglättet** |
+| `IMAGE_SCALE_NN(img, w, h)` | IMAGE (neu, in `w × h`) — **ohne Interpolation** (Nearest-Neighbour), für Pixelgrafik |
 | `IMAGE_ROTATE(img, grad)` | IMAGE (neu, Bounding-Box wächst ggf.) |
 | `IMAGE_FLIP(img, flipX, flipY)` | IMAGE (neu, gespiegelt) |
 | `IMAGE_TINT(img, color)` | IMAGE (neu, RGB-multipliziert) |
@@ -56,7 +57,10 @@ DIM klein AS IMAGE
 klein = IMAGE_SCALE(hero, 8, 8)              ' halbe Groesse
 
 DIM gross AS IMAGE
-gross = IMAGE_SCALE(hero, 32, 32)            ' doppelte Groesse
+gross = IMAGE_SCALE(hero, 32, 32)            ' doppelte Groesse (weich)
+
+DIM pixelig AS IMAGE
+pixelig = IMAGE_SCALE_NN(hero, 32, 32)       ' doppelte Groesse, Pixel bleiben Pixel
 
 DIM rot_held AS IMAGE
 rot_held = IMAGE_TINT(hero, RGB(255, 80, 80))   ' rot getoent

@@ -11,12 +11,23 @@
 '   MOUSE_CURSOR(form$)                   default/hand/ibeam/crosshair/...
 '   TOUCH_COUNT/X/Y/ID, GESTURE$(), GESTURE_DRAG_*/PINCH_*, GESTURE_HOLD_TIME
 '   JOYSTICK_HIT/RELEASED, JOYSTICK_ANY_BUTTON, JOYSTICK_AXIS_COUNT
+'   KEY_ANY_HIT() / KEY_NAME$(code)       Belegungsdialog ("Druecke eine Taste")
+'   MOUSEWHEEL_X/Y()                      Rad in BEIDEN Achsen, als Kommazahl
+'   WINDOW_DPI_X/Y()                      Bildschirm-Skalierung (HiDPI)
+'   KEY_LSHIFT/KEY_LCTRL/KEY_LALT, KEY_PAGEUP..., KEY_KP0...
+'                                         Umschalt-/Navigations-/Ziffernblock
 
-SCREEN(640, 400, "Eingabe-Flanken", 1)
+SCREEN(640, 470, "Eingabe-Flanken", 1)
 SETFPS(60)
 
 CONST W AS INTEGER = 640
-CONST H AS INTEGER = 400
+CONST H AS INTEGER = 470
+
+' Belegungsdialog-Zustand + aufsummierte Radbewegung.
+DIM letzte_taste AS INTEGER
+letzte_taste = -1
+DIM rad_x AS FLOAT
+DIM rad_y AS FLOAT
 
 DIM klicks AS INTEGER
 DIM leertasten AS INTEGER
@@ -62,6 +73,15 @@ WHILE NOT QUITREQUESTED()
     ' --- Gesten (Touchscreen; am Desktop liefert die Maus tap/drag)
     IF GESTURE$() <> "" THEN letzte_geste = GESTURE$()
 
+    ' --- Belegungsdialog: EINE Abfrage statt aller Konstanten durchprobieren
+    DIM taste AS INTEGER
+    taste = KEY_ANY_HIT()
+    IF taste <> -1 THEN letzte_taste = taste
+
+    ' --- Mausrad in beiden Achsen (MOUSEWHEEL kennt nur die vertikale, ganzzahlig)
+    rad_x = rad_x + MOUSEWHEEL_X()
+    rad_y = rad_y + MOUSEWHEEL_Y()
+
     ' ------------------------------------------------------------------ Zeichnen
     CLS(&H101820)
 
@@ -95,6 +115,14 @@ WHILE NOT QUITREQUESTED()
     TEXT(20, 316, "Gamepad:")
     TEXT(40, 340, "Achsen: " + STR$(IIF(JOYSTICK_COUNT() > 0, JOYSTICK_AXIS_COUNT(0), 0)))
     TEXT(40, 358, "zuletzt gedrueckt: " + STR$(JOYSTICK_ANY_BUTTON()) + "   (-1 = keiner)")
+
+    TEXT(20, 384, "Tastenbelegung / Rad / Bildschirm:")
+    TEXT(40, 408, "zuletzt gedrueckt: " + _
+         IIF(letzte_taste = -1, "(noch nichts)", KEY_NAME$(letzte_taste)) + _
+         "   Code " + STR$(letzte_taste))
+    TEXT(40, 426, "Rad x/y: " + FORMAT$(rad_x, "%.2f") + " / " + FORMAT$(rad_y, "%.2f") + _
+         "    Umschalt gehalten: " + STR$(KEYPRESSED(KEY_LSHIFT)))
+    TEXT(40, 444, "Bildschirm-Skalierung: " + FORMAT$(WINDOW_DPI_X(), "%.2f") + "x")
 
     ' Knopf mit Hand-Cursor
     BOXROUND(BX, BY, BX + BW, BY + BH, 8, IIF(ueber_knopf, &H2E4456, &H1E2C3A))

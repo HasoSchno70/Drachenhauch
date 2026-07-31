@@ -4044,6 +4044,13 @@ impl<'p> Vm<'p> {
             // Graceful ohne SCREEN (0 / 0) -- wie der Tree-Walker (_buf_size=(0,0),
             // pop_mouse_wheel ohne Fenster = 0).
             "mousewheel" => Value::Int(self.gfx.as_ref().map(|g| g.pop_mouse_wheel()).unwrap_or(0)),
+            "mousewheel_x" => Value::Float(self.gfx.as_ref().map(|g| g.mouse_wheel_x()).unwrap_or(0.0)),
+            "mousewheel_y" => Value::Float(self.gfx.as_ref().map(|g| g.mouse_wheel_y()).unwrap_or(0.0)),
+            "key_name$" => Value::Str(g!().key_name(gi(a,0,"KEY_NAME$")?).into()),
+            "key_any_hit" => Value::Int(g!().key_any_hit()),
+            "joystick_mappings" => Value::Int(g!().joystick_mappings(gs(a,0,"JOYSTICK_MAPPINGS")?)),
+            "window_dpi_x" => Value::Float(g!().window_dpi_x()),
+            "window_dpi_y" => Value::Float(g!().window_dpi_y()),
             "screenwidth" => Value::Int(self.gfx.as_ref().map(|g| g.screen_width()).unwrap_or(0)),
             "screenheight" => Value::Int(self.gfx.as_ref().map(|g| g.screen_height()).unwrap_or(0)),
             // raylib-Default-Font hat keine Bold/Italic-Variante -> No-Op
@@ -5173,6 +5180,7 @@ impl<'p> Vm<'p> {
             }
             // --- Modul: imgfx (immutable, liefern neues IMAGE-Handle) ---
             "image_scale" => Value::Int(g!().image_scale(gi(a,0,"IMAGE_SCALE")?, gi(a,1,"IMAGE_SCALE")? as i32, gi(a,2,"IMAGE_SCALE")? as i32)?),
+            "image_scale_nn" => Value::Int(g!().image_scale_nn(gi(a,0,"IMAGE_SCALE_NN")?, gi(a,1,"IMAGE_SCALE_NN")? as i32, gi(a,2,"IMAGE_SCALE_NN")? as i32)?),
             "image_rotate" => Value::Int(g!().image_rotate(gi(a,0,"IMAGE_ROTATE")?, need_f(a,1,"IMAGE_ROTATE")? as f32)?),
             "image_flip" => Value::Int(g!().image_flip(gi(a,0,"IMAGE_FLIP")?, gb(a,1), gb(a,2))?),
             "image_tint" => { let c = gi(a,1,"IMAGE_TINT")?; if c < 0 || c > 0xFFFFFF { return Err("IMAGE_TINT: Farbe muss 0..0xFFFFFF sein".into()); } Value::Int(g!().image_tint(gi(a,0,"IMAGE_TINT")?, c)?) }
@@ -5582,6 +5590,24 @@ const DEFAULT_KEYS: &[(&str, i64)] = &[
     ("key_f1", 1073741882), ("key_f2", 1073741883), ("key_f3", 1073741884), ("key_f4", 1073741885),
     ("key_f5", 1073741886), ("key_f6", 1073741887), ("key_f7", 1073741888), ("key_f8", 1073741889),
     ("key_f9", 1073741890), ("key_f10", 1073741891), ("key_f11", 1073741892), ("key_f12", 1073741893),
+    // Umschalt-/Steuertasten: bis hierher gab es KEINEN Code dafuer -- ein
+    // "Sprint mit Shift" oder "Strg+S" war aus GB heraus nicht abfragbar.
+    ("key_lshift", 1073742049), ("key_rshift", 1073742053),
+    ("key_lctrl", 1073742048), ("key_rctrl", 1073742052),
+    ("key_lalt", 1073742050), ("key_ralt", 1073742054),
+    ("key_lsuper", 1073742051), ("key_rsuper", 1073742055),
+    ("key_capslock", 1073741881),
+    // Navigationsblock
+    ("key_insert", 1073741897), ("key_delete", 127),
+    ("key_home", 1073741898), ("key_end", 1073741901),
+    ("key_pageup", 1073741899), ("key_pagedown", 1073741902),
+    // Ziffernblock (eigene Codes -- eine Spiel-Steuerung darf ihn getrennt belegen)
+    ("key_kp0", 1073741922), ("key_kp1", 1073741913), ("key_kp2", 1073741914),
+    ("key_kp3", 1073741915), ("key_kp4", 1073741916), ("key_kp5", 1073741917),
+    ("key_kp6", 1073741918), ("key_kp7", 1073741919), ("key_kp8", 1073741920),
+    ("key_kp9", 1073741921),
+    ("key_kp_enter", 1073741912), ("key_kp_plus", 1073741911), ("key_kp_minus", 1073741910),
+    ("key_kp_multiply", 1073741909), ("key_kp_divide", 1073741908), ("key_kp_period", 1073741923),
     // Gamepad-Bind-Codes (negativ, kollidieren nicht mit Tasten) -- wie graphics.KEYS.
     ("joy_button_a", -100), ("joy_button_b", -101), ("joy_button_x", -102), ("joy_button_y", -103),
     ("joy_button_lb", -104), ("joy_button_rb", -105), ("joy_button_back", -106), ("joy_button_start", -107),
