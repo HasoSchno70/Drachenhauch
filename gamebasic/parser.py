@@ -33,6 +33,7 @@ und macht `IF flags BAND MASK THEN` lesbar genug ohne Klammer-Wirrwarr.
 from .tokens import Token, TokenType, KEYWORDS
 from .errors import ParseError
 from .ast_nodes import (
+    Expr,
     NumberLit, StringLit, BoolLit, NilLit, Identifier, BinaryOp, UnaryOp, Call,
     Dim, MultiDim, Assign, Print, Input, If, While, For, ForEach, ExprStmt, Program,
     Param, SubDecl, FunctionDecl, Return,
@@ -634,7 +635,7 @@ class Parser:
         # Wir bauen einen Lvalue beginnend mit `Identifier(__with_n)` und
         # erlauben dann denselben Postfix-Pfad wie _assign_from_lvalue.
         start = self.pos
-        target_expr: object = self._lvalue_chain(Identifier(self._with_stack[-1]))
+        target_expr: Expr = self._lvalue_chain(Identifier(self._with_stack[-1]))
         # Erstes Token MUSS DOT sein (vom Caller geprueft).
         op_tok = self._peek()
         if op_tok.type not in _ASSIGN_OPS:
