@@ -155,19 +155,40 @@ def run_all(run_gb):
 #
 # WARUM ENTSCHAERFEN STATT ZERSTOEREN: der naheliegende Weg waere
 # `deleteLater()` auf jedes uebrige Top-Level-Widget. Genau das wurde
-# ausprobiert -- und stuerzt beim tatsaechlichen Zerstoeren ab (Access
-# Violation im `sendPostedEvents(DeferredDelete)`). Der Grund liegt NICHT im
+# ausprobiert -- und stuerzt beim tatsaechlichen Zerstoeren ab (Abbruch in
+# `CodeEditor.event()`, waehrend `sendPostedEvents(DeferredDelete)` das
+# Objekt unter dem laufenden Python-Frame zerlegt). Der Grund liegt NICHT im
 # Test, sondern in echten Zerstoerungs-Reihenfolge-Fehlern der Editor-Widgets
-# (dieselbe bekannte PySide6-Use-after-free-Serie; sichtbar auch als
-# "RuntimeError: Internal C++ object (GBHighlighter) already deleted" aus
-# `CodeEditor._on_theme_changed`). Diese Fixture repariert die NICHT und tut
-# auch nicht so -- sie nimmt den Leichen nur die Zuendschnur:
+# (dieselbe bekannte PySide6-Use-after-free-Serie).
+#
+# NACHGEMESSEN, damit das nicht wieder jemand "aufraeumt": einzeln laesst sich
+# JEDES der sieben Editor-Fenster sauber abbauen (erzeugen, schliessen,
+# deleteLater, DeferredDelete zustellen -- kein Absturz, kein Rest). Erst im
+# echten Testlauf, mit den Altlasten vieler vorheriger Tests, kippt es: die
+# Abbau-Variante dieser Fixture stuerzte in 1 von 5 Laeufen ab (immer derselbe
+# Stack). Wer es erneut versuchen will, misst also bitte im vollen Lauf und
+# mehrfach -- ein einzelner gruener Durchgang beweist hier gar nichts.
+#
+# Die Fixture nimmt den Leichen daher nur die Zuendschnur:
 #
 #   * jeder aktive QTimer wird gestoppt  -> keine faelligen/wiederholenden
 #     Timer mehr, die Queue laeuft leer, `processEvents()` kehrt zurueck
 #   * jeder QFileSystemWatcher verliert seine Pfade -> kein Watcher-Thread,
 #     der im Hintergrund weiter Aenderungs-Events nachschiebt
 #   * die Fenster werden versteckt -> keine Repaints
+#   * die schon GEPOSTETEN Repaint- und Queued-Signal-Ereignisse werden
+#     verworfen (siehe unten) -> ein `processEvents()` im naechsten Test
+#     stellt nichts mehr an die Halbtoten zu
+#
+# Der letzte Punkt ist der Fix fuer den CI-Absturz auf Python 3.11:
+# "Windows fatal exception: code 0xc0000374" (HEAP CORRUPTION), gemeldet beim
+# `topLevelWidgets()`-Aufruf hier -- das ist aber nur die Stelle, an der der
+# Schaden AUFFAELLT (Windows prueft den Heap bei der naechsten groesseren
+# Allokation). Entstanden ist er vorher: die Swatch-Tests bauen fuer jeden
+# Fall einen neuen `CodeEditor` und rufen danach `app.processEvents()` -- mit
+# ~500 Tests Altlast davor liefert dieser Pump gepostete Ereignisse an
+# Objekte aus, deren C++-Seite schon halb abgeraeumt ist. Ohne Fundus
+# gepposteter Ereignisse laeuft derselbe Pump ins Leere.
 #
 # Die Objekte selbst bleiben am Leben (Speicher waechst weiter). Das ist
 # unschoen, aber harmlos -- toedlich war ausschliesslich das Feuern.
@@ -207,6 +228,26 @@ def _disarm_leftover_qt_widgets() -> None:
             continue
 
 
+def _drop_pending_events() -> None:
+    """Gepostete Repaint- und Queued-Signal-Ereignisse der Altlasten wegwerfen.
+
+    Nur diese beiden Arten, NICHT alles: ein pauschales
+    `removePostedEvents(None)` wuerde auch `DeferredDelete` mitnehmen und damit
+    Objekte, die ein Test ordentlich per `deleteLater()` abgemeldet hat, fuer
+    immer am Leben lassen (davor warnt die Qt-Doku ausdruecklich).
+
+    * `UpdateRequest` -- der Repaint-Nachschub versteckter Fenster
+    * `MetaCall`      -- Slot-Aufrufe aus queued Signal-Verbindungen; genau die
+                         treffen sonst Objekte, deren C++-Seite schon weg ist
+    """
+    qtcore = sys.modules.get("PySide6.QtCore")
+    if qtcore is None:
+        return
+    ev = qtcore.QEvent.Type
+    for kind in (ev.UpdateRequest, ev.MetaCall):
+        qtcore.QCoreApplication.removePostedEvents(None, kind)
+
+
 @pytest.fixture(autouse=True)
 def _qt_widget_cleanup():
     """Legt nach jedem Test die zurueckgelassenen Qt-Fenster still.
@@ -217,6 +258,7 @@ def _qt_widget_cleanup():
     """
     yield
     _disarm_leftover_qt_widgets()
+    _drop_pending_events()
 
 
 def quiesce_qt() -> int:
