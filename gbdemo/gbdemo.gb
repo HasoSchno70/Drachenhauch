@@ -643,6 +643,101 @@ SUB szene_physik()
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SZENE 6 -- Tunnel + Nachhall aus dem Render-Target
+' ----------------------------------------------------------------------
+' Den Tunnel selbst zeichnet der Post-Effekt (mode 2, siehe demo.fs) --
+' 1/r-Abbildung, der klassische Demo-Tunnel. Davor liegt ein Ring, dessen
+' Radius Band fuer Band aus dem Spektrum kommt: die Musik als Gestalt.
+'
+' Der Nachhall entsteht NICHT aus dem letzten Bild -- Render-Targets werden
+' in gbrt jedes Bild transparent geleert, ein echter Rueckkopplungs-Puffer
+' ist also nicht zu haben. Stattdessen wird DASSELBE Bild mehrfach in
+' abnehmender Groesse additiv gestempelt: derselbe Eindruck, eine Quelle.
+' Der Ring hat DOPPELT so viele Punkte wie Baender: das Spektrum laeuft von
+' 0 bis 31 die eine Haelfte hoch und gespiegelt wieder herunter. Ohne diese
+' Spiegelung stossen im Ring Band 31 (Hoehen, klein) und Band 0 (Bass, gross)
+' direkt aneinander -- ein Sprung von ueber 150 Pixeln zwischen zwei
+' Nachbarpunkten, aus dem die Catmull-Rom einen weit hinausschiessenden
+' Zacken macht. (Der Spline selbst schliesst sauber; nachgemessen.)
+'
+' Dazu vier Punkte extra: eine geschlossene Catmull-Rom braucht Stuetzpunkte
+' auf BEIDEN Seiten -- vor dem ersten den letzten, hinter dem letzten die
+' ersten.
+CONST RINGN AS INTEGER = BAENDER * 2       ' Punkte rund herum
+CONST RINGP AS INTEGER = RINGN + 4         ' plus Stuetzpunkte
+CONST ECHOS AS INTEGER = 6
+
+DIM rt_ring AS INTEGER
+DIM ringx[RINGP] AS INTEGER
+DIM ringy[RINGP] AS INTEGER
+
+' Punkt k des Rings -> gespiegelter Band-Index (0..BAENDER-1).
+FUNCTION ringband(k AS INTEGER) AS INTEGER
+    DIM p AS INTEGER
+    p = (k + RINGN - 1) MOD RINGN
+    IF p < BAENDER THEN RETURN p
+    RETURN RINGN - 1 - p
+END FUNCTION
+
+FUNCTION ringwinkel(k AS INTEGER) AS FLOAT
+    RETURN ((k + RINGN - 1) MOD RINGN) * 6.28318 / RINGN
+END FUNCTION
+
+SUB szene_tunnel()
+    modus = 2.0
+
+    ' --- Den Ring in das Render-Target zeichnen ---
+    RENDERTARGET_BEGIN(rt_ring)
+    DIM k AS INTEGER
+    FOR k = 0 TO RINGP - 1
+        DIM b AS INTEGER
+        b = ringband(k)
+        DIM a AS FLOAT
+        a = ringwinkel(k) + zeit * 0.25
+        DIM r AS FLOAT
+        r = 120.0 + glatt[b] * 190.0
+        ringx[k] = INT(BREITE / 2.0 + COS(a) * r)
+        ringy[k] = INT(HOEHE / 2.0 + SIN(a) * r * 0.86)
+    NEXT
+    SPLINE(ringx, ringy, regenbogen(zeit * 0.9, 1.0), 5.0 + 8.0 * bass)
+
+    ' Ein zweiter, kleinerer Ring gegenlaeufig -- gibt dem Ganzen Tiefe.
+    FOR k = 0 TO RINGP - 1
+        DIM b2 AS INTEGER
+        b2 = ringband(k)
+        DIM a2 AS FLOAT
+        a2 = ringwinkel(k) - zeit * 0.4
+        DIM r2 AS FLOAT
+        r2 = 56.0 + glatt[b2] * 80.0
+        ringx[k] = INT(BREITE / 2.0 + COS(a2) * r2)
+        ringy[k] = INT(HOEHE / 2.0 + SIN(a2) * r2 * 0.86)
+    NEXT
+    SPLINE(ringx, ringy, regenbogen(zeit * 0.9 + 2.4, 1.0), 3.0 + 4.0 * hoehen)
+    RENDERTARGET_END()
+
+    ' --- Nachhall: dasselbe Bild mehrfach, von gross nach klein ---
+    BLEND_MODE("add")
+    DIM e AS INTEGER
+    FOR e = ECHOS - 1 TO 0 STEP -1
+        DIM sk AS FLOAT
+        ' In den Tunnel hinein: jedes Echo kleiner, das aeusserste zuerst.
+        sk = 1.45 - e * 0.22 + SIN(zeit * 1.2 - e * 0.5) * 0.03
+        IF sk > 0.05 THEN
+            DIM hell AS FLOAT
+            hell = 1.0 - e / (ECHOS * 1.15)
+            RENDERTARGET_DRAW(rt_ring, INT((BREITE - BREITE * sk) / 2.0), _
+                              INT((HOEHE - HOEHE * sk) / 2.0), sk, _
+                              regenbogen(zeit * 0.6 + e * 0.35, hell))
+        END IF
+    NEXT
+    BLEND_MODE("alpha")
+
+    mtext(BREITE \ 2, HOEHE - 54, _
+          "RENDERTARGET + SPLINE  -  ein Bild, " + STR$(ECHOS) + " Stempel", _
+          0.5, RGB(140, 180, 210))
+END SUB
+
+' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
 ' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
@@ -703,6 +798,7 @@ logo_b[4] = "#...#"
 logo_b[5] = "#...#"
 logo_b[6] = "####."
 weiss = GENTEX_COLOR(32, 32, &HFFFFFF)
+rt_ring = RENDERTARGET_NEW(BREITE, HOEHE)
 
 mesh_box = MESH_CUBE(0.8, 0.8, 0.8)
 ' Platzhalter-Matrix fuer ungenutzte Array-Plaetze: weit unter die Szene.
@@ -836,7 +932,7 @@ WHILE NOT QUITREQUESTED()
         szene = 6
         szene_t = zeit - T5
         blende = randblende(szene_t, T6 - T5, 1.5)
-        szene_platzhalter("6  TUNNEL")
+        szene_tunnel()
     ELSEIF zeit < T7 THEN
         szene = 7
         szene_t = zeit - T6

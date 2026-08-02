@@ -38,7 +38,7 @@ einer Demo:
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
 | 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
-| 6 | 3:34 | Tunnel | *in Arbeit* |
+| 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, Nachhall aus `RENDERTARGET_*` |
 | 7 | 4:16 | Klangfarben | *in Arbeit* |
 | 8 | 5:00 | Abspann | *in Arbeit* |
 
@@ -91,3 +91,13 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   (`PHYS2D_REMOVE` + neu anlegen; die Nummern bleiben dank Tombstones gültig).
   Ohne das fällt der Querbalken des „G" in dem Moment herunter, in dem die Szene
   beginnt — man sieht das Logo nie.
+- **Render-Targets werden in gbrt jedes Bild transparent geleert** — eine echte
+  Rückkopplung („das letzte Bild wieder hineinzeichnen") gibt es also nicht.
+  Szene 6 stempelt stattdessen *dasselbe* Bild mehrfach in abnehmender Größe:
+  derselbe Eindruck, eine Quelle.
+- **Ein Spektrum-Ring braucht ein gespiegeltes Spektrum.** Legt man die Bänder
+  einfach rundherum, stoßen Band 31 (Höhen, klein) und Band 0 (Bass, groß)
+  direkt aneinander — ein Sprung von über 150 Pixeln zwischen zwei
+  Nachbarpunkten, aus dem die Catmull-Rom einen weit hinausschießenden Zacken
+  macht. Der Spline selbst schließt sauber (nachgemessen); die Daten waren
+  unstetig, nicht die Kurve.

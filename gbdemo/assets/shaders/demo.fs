@@ -43,9 +43,11 @@ vec3 tunnel(vec2 uv, float t) {
     float v = a / 3.14159 * 4.0 + sin(t * 0.4) * 2.0;
     float karo = step(0.5, fract(u)) * step(0.5, fract(v))
                + step(0.5, 1.0 - fract(u)) * step(0.5, 1.0 - fract(v));
-    vec3 c = mix(vec3(0.04, 0.09, 0.20), vec3(0.20, 0.95, 0.95), karo);
+    // Wie beim Plasma: das hier ist HINTERGRUND. Ein voll gesaettigtes Karo
+    // frisst den Ring davor auf.
+    vec3 c = mix(vec3(0.02, 0.05, 0.11), vec3(0.06, 0.26, 0.30), karo);
     c *= smoothstep(0.0, 0.45, r);                    // Mitte dunkel = Tiefe
-    return c * (0.5 + 0.9 * bass);
+    return c * (0.6 + 0.8 * bass);
 }
 
 void main() {
