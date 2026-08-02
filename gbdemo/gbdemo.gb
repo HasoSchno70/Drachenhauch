@@ -548,18 +548,11 @@ SUB physik_aufbauen()
     welt_bereit = TRUE
 END SUB
 
-' Die stehenden Kloetze gegen bewegliche an derselben Stelle tauschen.
-' Rapier kennt in unserer API kein Umschalten statisch <-> dynamisch, also
-' entfernen und neu setzen -- die Nummern bleiben dank Tombstones gueltig.
+' Die stehenden Kloetze beweglich machen -- ein Aufruf pro Klotz.
 SUB logo_umkippen()
     DIM k AS INTEGER
     FOR k = 0 TO n_logo - 1
-        DIM x AS FLOAT
-        DIM y AS FLOAT
-        x = PHYS2D_BODY_X(welt, kid[k])
-        y = PHYS2D_BODY_Y(welt, kid[k])
-        PHYS2D_REMOVE(welt, kid[k])
-        kid[k] = PHYS2D_ADD_BOX(welt, x, y, KLOTZ / 2 - 1, KLOTZ / 2 - 1, TRUE, 0.05)
+        PHYS2D_SET_DYNAMIC(welt, kid[k], TRUE)
     NEXT
     steht = FALSE
 END SUB

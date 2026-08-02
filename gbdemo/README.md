@@ -113,12 +113,11 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   gleitenden Mittel — der Vergleich „deutlich über dem Mittel" schlägt darauf
   nie an. Die Demo führt beides getrennt: `glatt[]` fürs Bild, die rohen Werte
   für den Schlag.
-- **`physics2d` kennt kein Umschalten statisch ↔ dynamisch.** Ein Logo, das erst
-  stehen und dann zusammenfallen soll, baut man statisch auf und tauscht die
-  Körper im richtigen Moment gegen dynamische an derselben Stelle aus
-  (`PHYS2D_REMOVE` + neu anlegen; die Nummern bleiben dank Tombstones gültig).
-  Ohne das fällt der Querbalken des „G" in dem Moment herunter, in dem die Szene
-  beginnt — man sieht das Logo nie.
+- **Ein Logo, das erst stehen und dann fallen soll, baut man statisch auf** und
+  schaltet es im richtigen Moment mit `PHYS2D_SET_DYNAMIC` um. Baut man es gleich
+  beweglich, fällt der Querbalken des „G" in dem Moment herunter, in dem die
+  Szene beginnt — man sieht das Logo nie. *(Bis 2026-08-02 gab es das Umschalten
+  nicht; man musste die Körper entfernen und neu anlegen.)*
 - **Render-Targets werden in gbrt jedes Bild transparent geleert** — eine echte
   Rückkopplung („das letzte Bild wieder hineinzeichnen") gibt es also nicht.
   Szene 6 stempelt stattdessen *dasselbe* Bild mehrfach in abnehmender Größe:

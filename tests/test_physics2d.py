@@ -148,3 +148,53 @@ def test_bad_world_type_errors(run_gb):
     '''
     with pytest.raises(GameBasicError):
         run_gb(src)
+
+
+# --- Statisch <-> dynamisch umschalten -----------------------------------
+# Der klassische Fall: ein Aufbau soll erst STEHEN und dann zusammenfallen.
+# Vorher ging das nur ueber Entfernen + an derselben Stelle neu anlegen.
+def test_statischer_koerper_faellt_erst_nach_dem_umschalten(run_gb):
+    src = """
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, 980.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, FALSE, 0.0)
+DIM i AS INTEGER
+FOR i = 0 TO 29
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT "statisch: " + STR$(ROUND(PHYS2D_BODY_Y(w, b))) + " dyn=" + STR$(PHYS2D_IS_DYNAMIC(w, b))
+PHYS2D_SET_DYNAMIC(w, b, TRUE)
+FOR i = 0 TO 29
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT "gefallen: " + STR$(PHYS2D_BODY_Y(w, b) > 110.0) + " dyn=" + STR$(PHYS2D_IS_DYNAMIC(w, b))
+"""
+    zeilen = run_gb(src).splitlines()
+    assert zeilen[0] == "statisch: 100 dyn=FALSE"
+    assert zeilen[1] == "gefallen: TRUE dyn=TRUE"
+
+
+def test_dynamisch_zu_statisch_haelt_den_koerper_an(run_gb):
+    src = """
+IMPORT "physics2d"
+DIM w AS PHYS2D_WORLD
+w = PHYS2D_NEW()
+PHYS2D_SET_GRAVITY(w, 0.0, 980.0)
+DIM b AS INTEGER
+b = PHYS2D_ADD_BOX(w, 100.0, 100.0, 10.0, 10.0, TRUE, 0.0)
+DIM i AS INTEGER
+FOR i = 0 TO 19
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PHYS2D_SET_DYNAMIC(w, b, FALSE)
+DIM y0 AS FLOAT
+y0 = PHYS2D_BODY_Y(w, b)
+FOR i = 0 TO 19
+    PHYS2D_STEP(w, 0.016)
+NEXT
+PRINT ABS(PHYS2D_BODY_Y(w, b) - y0) < 0.01
+"""
+    assert run_gb(src).strip() == "TRUE"

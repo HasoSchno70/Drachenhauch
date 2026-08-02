@@ -169,6 +169,35 @@ impl Phys2dWorld {
         }
     }
 
+    /// Zwischen statisch und dynamisch umschalten.
+    ///
+    /// Der klassische Fall ist ein Aufbau, der erst STEHEN und dann
+    /// zusammenfallen soll: eine Mauer, ein Logo, ein Turm. Ohne diese
+    /// Moeglichkeit muss man die Koerper entfernen und an derselben Stelle neu
+    /// anlegen -- was Geschwindigkeit, Drehung und Kontakte verliert.
+    ///
+    /// `wake` weckt den Koerper mit auf: Rapier laesst ruhende Koerper
+    /// schlafen, und ein frisch dynamisch gemachter Klotz wuerde sonst
+    /// reglos in der Luft haengen, bis ihn etwas anstoesst.
+    pub fn set_dynamic(&mut self, idx: i64, dynamic: bool) {
+        if let Some(h) = self.handle(idx) {
+            if let Some(rb) = self.bodies.get_mut(h) {
+                rb.set_body_type(
+                    if dynamic { RigidBodyType::Dynamic } else { RigidBodyType::Fixed },
+                    true,
+                );
+            }
+        }
+    }
+
+    /// Ist der Koerper dynamisch? (Statische zaehlen als FALSE.)
+    pub fn is_dynamic(&self, idx: i64) -> bool {
+        self.handle(idx)
+            .and_then(|h| self.bodies.get(h))
+            .map(|rb| rb.body_type() == RigidBodyType::Dynamic)
+            .unwrap_or(false)
+    }
+
     pub fn remove(&mut self, idx: i64) {
         let i = idx as usize;
         if idx < 0 || i >= self.handles.len() { return; }

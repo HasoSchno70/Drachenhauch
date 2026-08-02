@@ -4521,6 +4521,12 @@
       "module": "physics2d"
     },
     {
+      "name": "PHYS2D_IS_DYNAMIC",
+      "kind": "core",
+      "signature": "PHYS2D_IS_DYNAMIC(w, idx) AS BOOLEAN",
+      "module": "physics2d"
+    },
+    {
       "name": "PHYS2D_LOCK_ROTATION",
       "kind": "core",
       "signature": "PHYS2D_LOCK_ROTATION(w, idx, locked)",
@@ -4536,6 +4542,12 @@
       "name": "PHYS2D_REMOVE",
       "kind": "core",
       "signature": "PHYS2D_REMOVE(w, idx)",
+      "module": "physics2d"
+    },
+    {
+      "name": "PHYS2D_SET_DYNAMIC",
+      "kind": "core",
+      "signature": "PHYS2D_SET_DYNAMIC(w, idx, dynamic)",
       "module": "physics2d"
     },
     {

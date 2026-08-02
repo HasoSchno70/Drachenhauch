@@ -2052,6 +2052,18 @@ fn call_inner(name: &str, a: &[Value]) -> R {
                 need_num(&a[2], "PHYS2D_SET_POS")? as f32, need_num(&a[3], "PHYS2D_SET_POS")? as f32);
             Ok(Value::Nil)
         }
+        "phys2d_set_dynamic" => {
+            arity!(3);
+            phys2d_h(&a[0], "PHYS2D_SET_DYNAMIC")?.borrow_mut().set_dynamic(
+                need_int(&a[1], "PHYS2D_SET_DYNAMIC")?,
+                need_flag(&a[2], "PHYS2D_SET_DYNAMIC")?);
+            Ok(Value::Nil)
+        }
+        "phys2d_is_dynamic" => {
+            arity!(2);
+            Ok(Value::Bool(phys2d_h(&a[0], "PHYS2D_IS_DYNAMIC")?.borrow()
+                .is_dynamic(need_int(&a[1], "PHYS2D_IS_DYNAMIC")?)))
+        }
         "phys2d_lock_rotation" => {
             arity!(3);
             phys2d_h(&a[0], "PHYS2D_LOCK_ROTATION")?.borrow_mut().lock_rotation(

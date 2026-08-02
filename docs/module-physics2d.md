@@ -56,6 +56,8 @@ ang = PHYS2D_BODY_ANGLE(world, box)       ' Radiant -> Sprite rotieren
 | `PHYS2D_SET_VEL(w, idx, vx, vy)` | Geschwindigkeit setzen |
 | `PHYS2D_APPLY_IMPULSE(w, idx, ix, iy)` | Impuls (z.B. Sprung/Schuss) |
 | `PHYS2D_SET_POS(w, idx, x, y)` | Position teleportieren |
+| `PHYS2D_SET_DYNAMIC(w, idx, dynamic)` | zwischen statisch und dynamisch umschalten — fuer Aufbauten, die erst **stehen** und dann zusammenfallen sollen (Mauer, Logo, Turm). Weckt den Koerper mit auf; ruhende Koerper laesst Rapier sonst schlafen und ein frisch dynamisch gemachter Klotz haenge reglos in der Luft |
+| `PHYS2D_IS_DYNAMIC(w, idx) AS BOOLEAN` | ist der Koerper dynamisch? |
 | `PHYS2D_LOCK_ROTATION(w, idx, locked)` | Rotation sperren — z.B. damit eine Spielfigur nicht umkippt |
 | `PHYS2D_REMOVE(w, idx)` | Körper entfernen |
 | `PHYS2D_COUNT(w) AS INTEGER` | Anzahl lebender Körper |
