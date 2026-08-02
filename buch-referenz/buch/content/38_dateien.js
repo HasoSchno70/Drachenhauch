@@ -160,6 +160,16 @@ module.exports = (H) => [
       'IF ordner <> "" THEN PRINT DIRLIST(ordner)',
     ]),
 
+  H.h2("Text packen: COMPRESS$ & DECOMPRESS$"),
+  H.cmd("COMPRESS$ · DECOMPRESS$", 'COMPRESS$(text$)   DECOMPRESS$(gepackt$)',
+    "COMPRESS$ packt einen Text zusammen (DEFLATE) und liefert das Ergebnis als Base64-Text – also wieder als ganz normalen String, den du speichern oder verschicken kannst. DECOMPRESS$ packt ihn wieder aus. Bei Spielstand-artigem Text schrumpft die Größe typisch auf etwa ein Neuntel.",
+    [
+      'DIM stand AS STRING',
+      'stand = "gold=1200;level=7;name=Anna"',
+      'DIM klein AS STRING',
+      'klein = COMPRESS$(stand)',
+      'PRINT DECOMPRESS$(klein) = stand',
+    ], { out: ["TRUE"] }),
   H.tip("Speicherstände leicht gemacht", "Für echte Spielstände musst du Dateien nicht selbst Zeile für Zeile verwalten: Das save-Modul (Teil V) bietet komfortable Save-Slots mit benannten Werten, und das json-Modul speichert ganze Datenstrukturen. Die rohen Datei-Befehle hier sind die Grundlage darunter."),
   H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit und Dateien. In Teil IV geht es um das, wofür GameBasic gemacht ist: Grafik, Sound und Spiele."),
 ];

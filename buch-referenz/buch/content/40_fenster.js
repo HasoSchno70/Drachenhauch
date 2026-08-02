@@ -171,5 +171,101 @@ module.exports = (H) => [
       'mx = SCREENWIDTH() \\ 2     \' Bildmitte (x)',
       'PRINT mx',
     ], { out: ["240"] }),
+  H.h2("Titel, Vollbild, Bildschirmfoto"),
+  H.cmd("SETWINDOWTITLE · SET_FULLSCREEN · WINDOW_IS_FULLSCREEN", 'SETWINDOWTITLE(text$)   SET_FULLSCREEN(an)   WINDOW_IS_FULLSCREEN()',
+    "Den Fenstertitel kannst du jederzeit ändern (etwa um den Dateinamen oder die Punktzahl anzuzeigen). SET_FULLSCREEN schaltet auf Vollbild um und zurück, WINDOW_IS_FULLSCREEN fragt den Zustand ab.",
+    [
+      'SETWINDOWTITLE("Mein Spiel - Level 3")',
+      'IF KEYHIT(KEY_F11) THEN SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())',
+    ]),
+  H.cmd("SAVESCREENSHOT", 'SAVESCREENSHOT(datei$)',
+    "Speichert den aktuellen Bildschirminhalt als PNG. Ideal für eine Screenshot-Taste im Spiel oder für Belege in einem Fehlerbericht.",
+    [
+      'IF KEYHIT(KEY_F12) THEN SAVESCREENSHOT("bild.png")',
+    ]),
+  H.cmd("WINDOW_ICON", 'WINDOW_ICON(bild)',
+    "Setzt das Fenstersymbol aus einem per LOADIMAGE geladenen Bild. Ohne das trägt ein exportiertes Spiel das Standardsymbol der Runtime – ein Detail, das den Unterschied zwischen „Bastelei“ und „fertiges Programm“ ausmacht.",
+    [
+      'DIM icon AS IMAGE',
+      'icon = LOADIMAGE("assets/icon.png")',
+      'WINDOW_ICON(icon)',
+    ]),
+
+  H.h2("Fenstergröße vom Nutzer ändern lassen"),
+  H.p("Normalerweise hat ein SCREEN-Fenster eine feste Größe. Du kannst es aber freigeben – dann liefern SCREENWIDTH/SCREENHEIGHT die jeweils aktuelle Größe, und dein Programm muss sein Layout danach richten."),
+  H.cmd("WINDOW_RESIZABLE · WINDOW_MIN_SIZE · WINDOW_MAX_SIZE", 'WINDOW_RESIZABLE(an)   WINDOW_MIN_SIZE(w, h)   WINDOW_MAX_SIZE(w, h)',
+    "Gibt das Fenster zum Ziehen frei und begrenzt, wie klein oder groß es werden darf.",
+    [
+      'WINDOW_RESIZABLE(TRUE)',
+      'WINDOW_MIN_SIZE(320, 240)',
+    ]),
+  H.cmd("WINDOW_RESIZED", 'WINDOW_RESIZED()',
+    "TRUE in dem Frame, in dem der Nutzer die Größe geändert hat – der richtige Moment, um ein Layout neu zu berechnen, statt das in jedem Frame zu tun.",
+    [
+      'IF WINDOW_RESIZED() THEN layout_neu_berechnen()',
+    ]),
+  H.cmd("WINDOW_MAXIMIZE · WINDOW_MINIMIZE · WINDOW_RESTORE", 'WINDOW_MAXIMIZE()   WINDOW_MINIMIZE()   WINDOW_RESTORE()',
+    "Steuert den Fensterzustand von Programmseite – maximieren, in die Taskleiste legen, wiederherstellen.",
+    [
+      'IF KEYHIT(KEY_F10) THEN WINDOW_MAXIMIZE()',
+    ]),
+  H.cmd("WINDOW_MAXIMIZED · WINDOW_MINIMIZED · WINDOW_HIDDEN", 'WINDOW_MAXIMIZED()   WINDOW_MINIMIZED()   WINDOW_HIDDEN()',
+    "Fragen denselben Zustand ab. WINDOW_MINIMIZED ist nützlich, um bei minimiertem Fenster Rechenzeit zu sparen.",
+    [
+      'IF WINDOW_MINIMIZED() THEN SLEEP(100) : CONTINUE',
+    ]),
+
+  H.h2("Fokus, Deckkraft, Bildschirm-Skalierung"),
+  H.cmd("WINDOW_FOCUSED · WINDOW_FOCUS", 'WINDOW_FOCUSED()   WINDOW_FOCUS()',
+    "WINDOW_FOCUSED sagt, ob dein Fenster gerade im Vordergrund ist – der übliche Weg, ein Spiel automatisch zu pausieren, wenn der Spieler wegklickt. WINDOW_FOCUS holt das Fenster nach vorne.",
+    [
+      'IF NOT WINDOW_FOCUSED() THEN',
+      '    TEXT(200, 150, "PAUSE", RGB(255, 220, 120))',
+      '    FLIP()',
+      '    CONTINUE',
+      'END IF',
+    ]),
+  H.cmd("WINDOW_OPACITY", 'WINDOW_OPACITY(wert)',
+    "Macht das ganze Fenster durchscheinend (1.0 = deckend, 0.0 = unsichtbar) – für Overlays, Einblendungen oder ein sanftes Erscheinen beim Start.",
+    [
+      'WINDOW_OPACITY(0.85)',
+    ]),
+  H.cmd("WINDOW_DPI_X · WINDOW_DPI_Y", 'WINDOW_DPI_X()   WINDOW_DPI_Y()',
+    "Die Skalierung des Bildschirms: 1.0 ist normal, 2.0 ein HiDPI-/Retina-Display. Ohne diese Werte weiß ein Programm nicht, ob seine Pixelgrößen auf dem Zielgerät winzig herauskommen – etwa um Schrift und Bedienelemente zu vergrößern.",
+    [
+      'DIM sk AS FLOAT',
+      'sk = WINDOW_DPI_X()',
+      'TEXT_SIZE(INT(16 * sk))',
+    ]),
+  H.cmd("GET_TIME", 'GET_TIME()',
+    "Sekunden seit Programmstart als Kommazahl, monoton steigend. Anders als TIMER läuft sie unabhängig von der Uhrzeit weiter – gut für Animationen, Zeitmessungen und Abläufe.",
+    [
+      'DIM t AS FLOAT',
+      't = GET_TIME()',
+      'y = 100 + SIN(t * 2.0) * 30.0        \' sanftes Schweben',
+    ]),
+
+  H.h2("Zwischenablage & Drag-and-Drop"),
+  H.cmd("CLIPBOARD_GET · CLIPBOARD_SET", 'CLIPBOARD_GET()   CLIPBOARD_SET(text$)',
+    "Lesen und Schreiben der System-Zwischenablage. Damit lässt sich ein Spielstand als Text weitergeben oder ein Level-Code einfügen.",
+    [
+      'IF KEYPRESSED(KEY_LCTRL) AND KEYHIT(KEY_V) THEN code = CLIPBOARD_GET()',
+      'CLIPBOARD_SET("Level-Code: " + code)',
+    ]),
+  H.cmd("FILES_DROPPED · FILE_DROPPED", 'FILES_DROPPED()   FILE_DROPPED(i)',
+    "Zieht der Nutzer Dateien auf das Fenster, liefert FILES_DROPPED in diesem Frame ihre Anzahl und FILE_DROPPED(i) den jeweiligen Pfad – der bequemste Weg, ein Level oder ein Bild zu öffnen.",
+    [
+      'DIM i AS INTEGER',
+      'FOR i = 0 TO FILES_DROPPED() - 1',
+      '    PRINT "Geladen: " + FILE_DROPPED(i)',
+      'NEXT',
+    ]),
+  H.cmd("OPENURL", 'OPENURL(adresse$)',
+    "Öffnet eine Adresse im Standardbrowser – etwa die Anleitung oder die Seite des Spiels.",
+    [
+      'IF GUI_CLICKED(hilfe) THEN OPENURL("https://example.org/anleitung")',
+    ]),
+  H.warn("Nur http und https", "OPENURL nimmt bewusst keine anderen Schemata an. Die Adresse geht an die System-Shell weiter; ein file:-Schema wäre damit ein Weg, aus einem GameBasic-Programm heraus beliebige Programme zu starten."),
+
   H.tip("Konsole vs. Fenster", "PRINT und INPUT (Teil III) gehören zur Textkonsole. Sobald SCREEN läuft, gibst du Text mit TEXT ins Fenster und fragst Eingaben mit Tastatur-/Maus-Befehlen ab (Kapitel „Eingabe“). Mische beides nicht im selben Programmteil."),
 ];

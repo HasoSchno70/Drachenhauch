@@ -38,5 +38,13 @@ module.exports = (H) => [
 
   H.h2("Hinweis zur Konsole und zum Spielfenster"),
   H.p("PRINT und INPUT arbeiten mit der Textkonsole. Sobald du ein Grafikfenster öffnest (mit SCREEN, siehe Teil IV), zeichnest du Text stattdessen mit TEXT an eine Bildposition, und Tastendrücke fragst du mit Befehlen wie KEYPRESSED oder dem Eingabe-Modul ab – nicht mit INPUT. Für Konsolen-Programme (reine Logik, kleine Helfer, Lernbeispiele) bleibt dieses Kapitel dein Handwerkszeug."),
+  H.h2("Auf Tastendruck warten"),
+  H.cmd("WAITKEY · INKEY$", 'WAITKEY()   INKEY$()',
+    "WAITKEY hält das Programm an, bis eine Taste gedrückt wird – der klassische Abschluss („Weiter mit beliebiger Taste“). INKEY$ liefert das zuletzt getippte Zeichen ODER einen leeren Text, wenn gerade nichts anliegt; es wartet also NICHT.",
+    [
+      'PRINT "Weiter mit einer Taste ..."',
+      'WAITKEY()',
+      'PRINT "Es geht weiter!"',
+    ]),
   H.tip("Wo geht es weiter?", "Zahl- und Textumwandlung für die Ausgabe (STR$, VAL, CHR$ …) findest du im Kapitel „Typumwandlung & Prüfung“ und bei den „Zeichenketten-Funktionen“. Grafiktext, Tastatur und Maus kommen in Teil IV („Grafik, Sound & Spiele“)."),
 ];

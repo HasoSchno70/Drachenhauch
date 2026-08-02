@@ -87,5 +87,24 @@ module.exports = (H) => [
     'PRINT ROUND(TAU, 5)',
   ]),
   H.code(["3.14159", "6.28319"], { out: true }),
+  H.h2("Vorzeichen, Nachkommateil, Fast-Gleichheit"),
+  H.cmd("SGN · FRAC", 'SGN(zahl)   FRAC(x)',
+    "SGN liefert das Vorzeichen als -1, 0 oder +1 – praktisch, um eine Richtung aus einer Geschwindigkeit zu gewinnen. FRAC gibt den Nachkommateil zurück (FRAC(3.75) = 0.75).",
+    [
+      'PRINT SGN(-12.5)',
+      'PRINT FRAC(3.75)',
+    ], { out: ["-1", "0.75"] }),
+  H.cmd("APPROX", 'APPROX(a, b[, epsilon])',
+    "Prüft, ob zwei Kommazahlen NAHEZU gleich sind. Das ist bei Kommazahlen fast immer die richtige Frage: 0.1 + 0.2 ergibt intern nicht exakt 0.3, ein Vergleich mit = schlägt also fehl. Ohne epsilon wird eine kleine Standardtoleranz benutzt.",
+    [
+      'PRINT 0.1 + 0.2 = 0.3',
+      'PRINT APPROX(0.1 + 0.2, 0.3)',
+    ], { out: ["FALSE", "TRUE"] }),
+  H.cmd("FBM3", 'FBM3(x, y, z, oktaven)',
+    "Dreidimensionales, geschichtetes Rauschen (fractal brownian motion): mehrere Rausch-Ebenen übereinander ergeben natürlicher wirkende Strukturen als eine einzelne. Mit der dritten Achse als Zeit bekommst du Rauschen, das sich langsam verändert – etwa ziehende Wolken.",
+    [
+      'DIM wolke AS FLOAT',
+      'wolke = FBM3(x * 0.02, y * 0.02, GET_TIME() * 0.1, 4)',
+    ]),
   H.tip("Zufall und Rauschen", "Für Zufallszahlen gibt es ein eigenes Kapitel („Zufall“). Für sanftes, zusammenhängendes „Rauschen“ – etwa zur Gelände- oder Wolkenerzeugung – stehen NOISE, NOISE2, NOISE3 und FBM bereit; mehr dazu bei den Spiel-Helfern in Teil IV."),
 ];

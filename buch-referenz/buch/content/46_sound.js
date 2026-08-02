@@ -65,5 +65,10 @@ module.exports = (H) => [
 
   H.h2("Lautstärke, Stereo & mehr"),
   H.p("Das audio-Modul kann weit mehr, als hier gezeigt: einzelne Kanäle in der Lautstärke regeln (AUDIO_VOLUME) oder im Stereobild verschieben (AUDIO_PAN), getrennte Lautstärke-Busse für Effekte und Musik (AUDIO_BUS_VOLUME) sowie Echtzeit-Effekte wie Hall, Echo oder Filter pro Bus. Für die meisten Spiele reichen LOADSOUND/PLAYSOUND und PLAYMUSIC – die feineren Werkzeuge findest du in der Modul-Dokumentation."),
+  H.cmd("STOPMUSIC · AUDIO_SOUND_COUNT", 'STOPMUSIC()   AUDIO_SOUND_COUNT()',
+    "STOPMUSIC beendet die laufende Musik (etwa beim Szenenwechsel). AUDIO_SOUND_COUNT sagt, wie viele Klänge gerade geladen sind – nützlich beim Aufräumen langer Spielsitzungen.",
+    [
+      'IF neues_level THEN STOPMUSIC() : PLAYMUSIC("musik/level2.ogg")',
+    ]),
   H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor gbsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum GameBasic-Werkzeugkasten rund um den Sound."),
 ];

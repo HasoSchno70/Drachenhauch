@@ -79,6 +79,15 @@ module.exports = (H) => [
       'PRINT a[0]; " "; b[0]',
     ], { out: ["1 99"] }),
 
+  H.h2("Zahlenreihen erzeugen"),
+  H.cmd("RANGE", 'RANGE(ende)   RANGE(start, ende)   RANGE(start, ende, schritt)',
+    "Erzeugt eine fertige Zahlenreihe als TUPLE – wie das FOR aus anderen Sprachen, nur als Wert. Das Ende gehört NICHT dazu. Sehr praktisch zusammen mit FOR EACH oder einer Comprehension.",
+    [
+      'PRINT RANGE(5)',
+      'PRINT RANGE(2, 6)',
+      'PRINT RANGE(0, 10, 3)',
+    ], { out: ["(0, 1, 2, 3, 4)", "(2, 3, 4, 5)", "(0, 3, 6, 9)"] }),
+
   H.h2("Wachsen & schrumpfen"),
   H.cmd("ARRAY_PUSH · ARRAY_POP", "ARRAY_PUSH(array, wert)   ARRAY_POP(array)",
     "ARRAY_PUSH hängt einen Wert hinten an und liefert die neue Länge. ARRAY_POP entfernt das letzte Element und gibt es zurück (Array darf nicht leer sein). Zusammen ergeben sie einen Stapel.",

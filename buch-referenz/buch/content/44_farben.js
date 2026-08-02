@@ -51,5 +51,14 @@ module.exports = (H) => [
       'DIM gruenZuRot AS INTEGER',
       'gruenZuRot = COLOR_LERP(GREEN, RED, 0.5)',
     ], { out: ["8421504"] }),
+  H.h2("Durchsichtigkeit: RGBA & ALPHA"),
+  H.cmd("RGBA · ALPHA", 'RGBA(r, g, b, a)   ALPHA(farbe)',
+    "RGBA baut eine Farbe MIT Durchsichtigkeit: a = 255 ist deckend, 0 unsichtbar, Werte dazwischen lassen den Hintergrund durchscheinen. ALPHA liest den Alpha-Anteil einer Farbe wieder aus.",
+    [
+      'DIM schatten AS INTEGER',
+      "schatten = RGBA(0, 0, 0, 120)      ' halbdurchsichtiges Schwarz",
+      "BOX(0, 0, 320, 240, schatten)      ' Abdunkeln fuers Pausenmenue",
+      'PRINT ALPHA(schatten)',
+    ], { out: ["120"] }),
   H.tip("Energiebalken einfärben", "Ein hübsches Muster: Färbe einen Lebensbalken je nach Füllstand. anteil = hp / max_hp (0..1), dann farbe = COLOR_LERP(RED, GREEN, anteil) – voll ist grün, leer ist rot, dazwischen fließend."),
 ];

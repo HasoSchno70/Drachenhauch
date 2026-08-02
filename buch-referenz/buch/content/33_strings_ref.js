@@ -79,5 +79,32 @@ module.exports = (H) => [
     'PRINT eingabe.trim().replace("Welt", "GameBasic")',
   ]),
   H.code(["HALLO WELT", "Hallo GameBasic"], { out: true }),
+  H.h2("Weitere Text-Helfer"),
+  H.cmd("TITLE$ · SPACE$", 'TITLE$(text$)   SPACE$(n)',
+    "TITLE$ schreibt jedes Wort groß (für Überschriften oder Namen), SPACE$ liefert n Leerzeichen – nützlich, um Spalten auszurichten.",
+    [
+      'PRINT TITLE$("hallo neue welt")',
+      'PRINT "A" + SPACE$(3) + "B"',
+    ], { out: ["Hallo Neue Welt", "A   B"] }),
+  H.cmd("COUNT", 'COUNT(text$, teil$)',
+    "Zählt, wie oft teil$ in text$ vorkommt.",
+    [
+      'PRINT COUNT("banane", "an")',
+    ], { out: ["2"] }),
+  H.cmd("ISNUMERIC", 'ISNUMERIC(text$)',
+    "Prüft, ob sich der Text als Zahl lesen lässt – der saubere Weg, eine Nutzereingabe zu prüfen, BEVOR du sie mit VAL umwandelst.",
+    [
+      'DIM s AS STRING',
+      's = "42"',
+      'IF ISNUMERIC(s) THEN PRINT VAL(s) * 2',
+    ], { out: ["84"] }),
+  H.cmd("OCT$ · NUMFMT$", 'OCT$(n)   NUMFMT$(zahl[, nachkommastellen])',
+    "OCT$ stellt eine Zahl im Achtersystem dar (das Gegenstück zu HEX$). NUMFMT$ kürzt große Zahlen lesbar ab (K, M, T …) – genau das, was Aufbau- und Idle-Spiele ständig brauchen. Die Nachkommastellen sind wählbar, voreingestellt sind zwei; kleine Zahlen bekommen keine Abkürzung, aber dieselbe Nachkommastellen-Zahl.",
+    [
+      'PRINT OCT$(64)',
+      'PRINT NUMFMT$(1500000)',
+      'PRINT NUMFMT$(1500000, 1)',
+      'PRINT NUMFMT$(999)',
+    ], { out: ["100", "1.50M", "1.5M", "999.00"] }),
   H.note("Zum Umwandeln zwischen Text und Zahl (STR$, VAL, CHR$, ASC) siehe das Kapitel „Typumwandlung & Prüfung“. Text bequem aus Werten zusammenbauen kannst du mit f-Strings (Kapitel „Ein- und Ausgabe“)."),
 ];

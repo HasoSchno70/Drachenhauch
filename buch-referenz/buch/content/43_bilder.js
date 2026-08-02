@@ -64,6 +64,35 @@ module.exports = (H) => [
       'FLIP()',
     ]),
 
+  H.cmd("DRAWIMAGEFLIPPED", 'DRAWIMAGEFLIPPED(img, x, y[, flip_x[, flip_y]])',
+    "Zeichnet das Bild gespiegelt, ohne dafür eine gespiegelte Kopie anzulegen. Der klassische Fall: eine Spielfigur, die nach links UND rechts laufen soll – du zeichnest dasselbe Bild einmal normal und einmal mit flip_x = TRUE.",
+    [
+      'DRAWIMAGEFLIPPED(held, px, py, blickt_links, FALSE)',
+    ]),
+  H.cmd("SCROLL", 'SCROLL(dx, dy)',
+    "Verschiebt den gesamten bisherigen Bildinhalt um dx/dy Pixel. Damit baust du einen Nachzieh-Effekt oder einen endlos scrollenden Hintergrund, ohne alles neu zu zeichnen – der frei werdende Rand bleibt allerdings leer und muss selbst gefüllt werden.",
+    [
+      'SCROLL(-1, 0)                  \' Bild um 1 Pixel nach links',
+      'LINE(SCREENWIDTH() - 1, 0, SCREENWIDTH() - 1, SCREENHEIGHT() - 1, RGB(0,0,0))',
+    ]),
+
+  H.h2("Viele Bilder auf einmal laden"),
+  H.cmd("LOAD_ASSETS", 'LOAD_ASSETS(manifest$)',
+    "Lädt alle in einer JSON-Datei aufgeführten Bilder und Klänge im Voraus und legt sie in den Zwischenspeicher; liefert die Anzahl geladener Dateien. Danach ist jedes spätere LOADIMAGE/LOADSOUND ein Treffer im Zwischenspeicher – das Spiel ruckelt nicht mehr beim ersten Auftauchen eines Gegners.",
+    [
+      'SCREEN(640, 480)',
+      'PRINT LOAD_ASSETS("assets/manifest.json")   \' z.B. 12',
+      'DIM held AS IMAGE',
+      'held = LOADIMAGE("player")     \' Alias aus dem Manifest, sofort da',
+    ]),
+  H.p("Im Manifest stehen zwei Abschnitte, beide freiwillig. Als Objekt geschrieben (Alias → Pfad) kannst du das Bild später über den kurzen Alias laden, als Liste nur über den Pfad. Die Pfade gelten relativ zum Manifest:"),
+  H.code([
+    '{',
+    '  "images": { "player": "sprites/held.png", "gegner": "sprites/orc.png" },',
+    '  "sounds": [ "sfx/sprung.wav", "musik/level1.ogg" ]',
+    '}',
+  ]),
+
   H.h2("Bilder umrechnen: das Modul imgfx"),
   H.p("Das Modul imgfx erzeugt aus einem Bild ein NEUES, verändertes Bild – skaliert, gedreht, gespiegelt oder eingefärbt. Das Original bleibt unverändert. Mache solche Umrechnungen einmalig vor dem Game-Loop (nicht jeden Frame), denn sie kosten etwas Zeit."),
   H.cmd("IMAGE_SCALE", 'IMAGE_SCALE(img, breite, höhe)',

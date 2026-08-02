@@ -88,5 +88,12 @@ module.exports = (H) => [
       'PRINT ROUND(y, 1)   \' sinkt mit der Zeit',
     ]),
 
+  H.cmd("COLLIDES", 'COLLIDES(x1, y1, w1, h1, x2, y2, w2, h2)',
+    "Der einfachste Treffer-Test überhaupt und ohne IMPORT verfügbar: überlappen sich zwei Rechtecke? Angegeben werden jeweils die linke obere Ecke sowie Breite und Höhe. Für die meisten 2D-Spiele – Schuss trifft Gegner, Spieler berührt Münze – reicht genau das.",
+    [
+      'PRINT COLLIDES(0, 0, 10, 10, 5, 5, 10, 10)',
+      'PRINT COLLIDES(0, 0, 10, 10, 20, 0, 10, 10)',
+    ], { out: ["TRUE", "FALSE"] }),
+
   H.tip("Welches Physik-Modul?", "Für simple Treffer-Abfragen und selbst gesteuerte Bewegung reicht physics (schnell, vorhersehbar). Soll sich etwas „echt“ anfühlen – fallen, stapeln, abprallen – nimm physics2d bzw. physics3d. Du kannst beides mischen: die Engine für die Welt, physics-Mathe für eigene Sonderfälle."),
 ];
