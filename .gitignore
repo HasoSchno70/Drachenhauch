@@ -43,6 +43,8 @@ fireplace/assets/fireplace.jpg
 fireplace/assets/fire.ogg
 fireplace/assets/wind.mp3
 examples/highscores.txt
+# Eingabe-Aufnahme der AUTOMATION-Demo (153_automation.gb, F9 schreibt sie)
+examples/aufnahme.txt
 
 # GameBasic-Installer: Quelle committen, Build-Artefakte ignorieren
 installer/output/
