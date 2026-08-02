@@ -89,13 +89,15 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
 
 ## Stolpersteine, die hier gelernt wurden
 
-- **`PLOTS`, `LINES`, `BOXES`, `CIRCLES` und `MODEL_INSTANCED` nehmen KEINE
-  Stückzahl entgegen** — sie zeichnen immer das *ganze* Array. Ein viertes
-  Argument wird stillschweigend ignoriert. Unbenutzte Plätze muss man selbst
-  aus dem Bild schieben (Koordinate `-10`, bei Matrizen eine Verschiebung weit
-  nach unten).
+- **`PLOTS`, `LINES`, `BOXES`, `CIRCLES` und `MODEL_INSTANCED` nehmen eine
+  optionale Stückzahl** als letztes Argument. Ohne sie zeichnen sie das *ganze*
+  Array — wer einen Puffer fest dimensioniert und nur teilweise füllt, bekommt
+  sonst die alten Werte der restlichen Plätze mitgezeichnet. *(Bis 2026-08-02
+  gab es die Stückzahl nicht und ein viertes Argument wurde stillschweigend
+  ignoriert; jetzt ist ein Argument zu viel ein Fehler.)*
 - Eine **nicht zugewiesene `MAT4` ist NIL** — `MODEL_INSTANCED` lehnt das mit
-  klarer Meldung ab. Platzhalter einmal beim Aufbau setzen.
+  klarer Meldung ab. Mit der Stückzahl kommt man aber gar nicht mehr dorthin:
+  ungenutzte Plätze werden schlicht nicht angefasst.
 - **`MODEL_INSTANCED` färbt einen ganzen Draw-Call einheitlich.** Mehrere Farben
   = mehrere Aufrufe; drei sind immer noch drei statt 1600.
 - `PARTICLE_SET_SIZE` und `PARTICLE_SET_POS` wollen **ganze Zahlen**.

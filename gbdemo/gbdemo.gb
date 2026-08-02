@@ -359,7 +359,6 @@ CONST GRUPPEN AS INTEGER = 3
 DIM matsA[WUERFEL] AS MAT4
 DIM matsB[WUERFEL] AS MAT4
 DIM matsC[WUERFEL] AS MAT4
-DIM leer AS MAT4
 
 SUB szene_instancing()
     modus = 0.0
@@ -403,24 +402,13 @@ SUB szene_instancing()
         NEXT
     NEXT
 
-    ' Ungenutzte Plaetze aus dem Bild schieben -- MODEL_INSTANCED zeichnet
-    ' (wie LINES) IMMER das ganze Array.
-    DIM k AS INTEGER
-    FOR k = na TO WUERFEL - 1
-        matsA[k] = leer
-    NEXT
-    FOR k = nb TO WUERFEL - 1
-        matsB[k] = leer
-    NEXT
-    FOR k = nc TO WUERFEL - 1
-        matsC[k] = leer
-    NEXT
-
     ' Nah beieinander liegende Phasen -> verwandte Farben. Ein Abstand von
     ' 2.1 waere reines Rot/Gruen/Blau und sieht nach Testbild aus.
-    MODEL_INSTANCED(mesh_box, matsA, regenbogen(zeit * 0.5, 1.0))
-    MODEL_INSTANCED(mesh_box, matsB, regenbogen(zeit * 0.5 + 0.8, 1.0))
-    MODEL_INSTANCED(mesh_box, matsC, regenbogen(zeit * 0.5 + 1.6, 1.0))
+    ' Die Stueckzahl am Ende zeichnet nur die belegten Plaetze -- ohne sie
+    ' muesste man den Rest von Hand aus dem Bild schieben.
+    MODEL_INSTANCED(mesh_box, matsA, regenbogen(zeit * 0.5, 1.0), na)
+    MODEL_INSTANCED(mesh_box, matsB, regenbogen(zeit * 0.5 + 0.8, 1.0), nb)
+    MODEL_INSTANCED(mesh_box, matsC, regenbogen(zeit * 0.5 + 1.6, 1.0), nc)
 
     mtext(BREITE \ 2, HOEHE - 54, _
           "MODEL_INSTANCED  -  " + STR$(WUERFEL) + " Wuerfel in 3 Draw-Calls", _
@@ -1059,9 +1047,6 @@ weiss = GENTEX_COLOR(32, 32, &HFFFFFF)
 rt_ring = RENDERTARGET_NEW(BREITE, HOEHE)
 
 mesh_box = MESH_CUBE(0.8, 0.8, 0.8)
-' Platzhalter-Matrix fuer ungenutzte Array-Plaetze: weit unter die Szene.
-' Eine nicht zugewiesene MAT4 waere NIL -- MODEL_INSTANCED lehnt das ab.
-leer = MAT4_TRANSLATE(0.0, -9999.0, 0.0)
 
 LIGHT_ENABLE()
 LIGHT_AMBIENT(&H1A2030, 0.55)

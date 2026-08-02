@@ -851,7 +851,7 @@
     {
       "name": "BOXES",
       "kind": "graphics",
-      "signature": "BOXES(*args)",
+      "signature": "BOXES(x1s, y1s, x2s, y2s, farbe [, anzahl])",
       "module": "core"
     },
     {
@@ -1223,7 +1223,7 @@
     {
       "name": "CIRCLES",
       "kind": "graphics",
-      "signature": "CIRCLES(*args)",
+      "signature": "CIRCLES(xs, ys, rs, farbe [, anzahl])",
       "module": "core"
     },
     {
@@ -3551,7 +3551,7 @@
     {
       "name": "LINES",
       "kind": "graphics",
-      "signature": "LINES(*args)",
+      "signature": "LINES(x1s, y1s, x2s, y2s, farbe [, anzahl])",
       "module": "core"
     },
     {
@@ -3923,7 +3923,7 @@
     {
       "name": "MODEL_INSTANCED",
       "kind": "graphics",
-      "signature": "MODEL_INSTANCED(handle, mats [, tint])",
+      "signature": "MODEL_INSTANCED(handle, mats [, tint [, anzahl]])",
       "module": "m3d"
     },
     {
@@ -4913,7 +4913,7 @@
     {
       "name": "PLOTS",
       "kind": "graphics",
-      "signature": "PLOTS(*args)",
+      "signature": "PLOTS(xs, ys, farbe [, anzahl])",
       "module": "core"
     },
     {

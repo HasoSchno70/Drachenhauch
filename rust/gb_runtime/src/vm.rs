@@ -3700,15 +3700,43 @@ impl<'p> Vm<'p> {
             }
         }
         // color-Arg fuer Bulk: INTEGER (alle gleich) oder ARRAY OF INTEGER.
+        /// Optionale Stueckzahl der Bulk-Zeichenbefehle lesen.
+        ///
+        /// Ohne sie zeichnen sie das GANZE Array -- wer einen Puffer fest
+        /// dimensioniert und pro Bild nur teilweise fuellt, bekam die alten
+        /// Werte der restlichen Plaetze mitgezeichnet. Zusaetzlich wird hier
+        /// ein Argument zu viel abgelehnt: vorher wurde es still ignoriert,
+        /// eine mitgegebene Stueckzahl also wirkungslos verschluckt.
+        fn bulk_count(a: &[Value], idx: usize, n: usize, fn_: &str) -> R<usize> {
+            if a.len() > idx + 1 {
+                return Err(format!("{}: zu viele Argumente ({} statt hoechstens {})",
+                                   fn_, a.len(), idx + 1));
+            }
+            match a.get(idx) {
+                None => Ok(n),
+                Some(v) => {
+                    let c = match v {
+                        Value::Int(i) => *i,
+                        Value::Float(f) if f.fract() == 0.0 => *f as i64,
+                        _ => return Err(format!("{}: anzahl muss eine ganze Zahl sein", fn_)),
+                    };
+                    if c < 0 { return Err(format!("{}: anzahl darf nicht negativ sein", fn_)); }
+                    Ok((c as usize).min(n))
+                }
+            }
+        }
+
         fn bulk_color(v: &Value, n: usize, fn_: &str) -> R<Vec<i64>> {
             match v {
                 Value::Int(c) => Ok(vec![*c; n]),
                 Value::Array(a) => {
                     let a = a.borrow();
-                    if a.cells.len() != n { return Err(format!("{}: colors-Array muss so lang wie Koordinaten sein", fn_)); }
+                    // >= statt ==: mit einer Stueckzahl darf das Farb-Array so
+                    // lang bleiben wie der Puffer, auch wenn weniger gezeichnet wird.
+                    if a.cells.len() < n { return Err(format!("{}: colors-Array muss mindestens so lang wie die Stueckzahl sein", fn_)); }
                     let mut o = Vec::with_capacity(n);
-                    if let Some(ints) = a.cells.as_ints() { return Ok(ints.to_vec()); }
-                    for x in a.cells.iter() { match x { Value::Int(i) => o.push(i), _ => return Err(format!("{}: color-ARRAY OF INTEGER noetig", fn_)) } }
+                    if let Some(ints) = a.cells.as_ints() { return Ok(ints[..n].to_vec()); }
+                    for x in a.cells.iter().take(n) { match x { Value::Int(i) => o.push(i), _ => return Err(format!("{}: color-ARRAY OF INTEGER noetig", fn_)) } }
                     Ok(o)
                 }
                 _ => Err(format!("{}: color muss INTEGER oder ARRAY sein", fn_)),
@@ -4306,6 +4334,12 @@ impl<'p> Vm<'p> {
                     }
                     Ok(v)
                 };
+                // Optionale Stueckzahl wie bei PLOTS/LINES/... -- ohne sie wird das
+                // ganze Array gezeichnet, und ein fest dimensionierter Puffer
+                // schleppt seine ungenutzten Plaetze mit ins Bild. Sie muss VOR
+                // dem Einsammeln greifen: sonst stolpert das Einsammeln ueber
+                // die noch nicht belegten (NIL-)Plaetze, die gar nicht gezeichnet
+                // werden sollen.
                 let mats = match a.get(1) {
                     Some(Value::Array(arr)) => {
                         let b = arr.borrow();
@@ -4313,11 +4347,17 @@ impl<'p> Vm<'p> {
                             return Err("MODEL_INSTANCED: Arg 2 muss ein 1D-ARRAY OF MAT4 sein".into());
                         }
                         match b.cells.as_vals() {
-                            Some(vals) => collect_mats(&mut vals.iter())?,
+                            Some(vals) => {
+                                let n = bulk_count(a, 3, vals.len(), "MODEL_INSTANCED")?;
+                                collect_mats(&mut vals.iter().take(n))?
+                            }
                             None => return Err("MODEL_INSTANCED: Arg 2 muss ein ARRAY OF MAT4 sein".into()),
                         }
                     }
-                    Some(Value::Tuple(t)) => collect_mats(&mut t.iter())?,
+                    Some(Value::Tuple(t)) => {
+                        let n = bulk_count(a, 3, t.len(), "MODEL_INSTANCED")?;
+                        collect_mats(&mut t.iter().take(n))?
+                    }
                     _ => return Err("MODEL_INSTANCED: Arg 2 muss ARRAY OF MAT4 oder TUPLE von MAT4 sein".into()),
                 };
                 let tint = if a.len() >= 3 { gi(a, 2, "MODEL_INSTANCED")? } else { 0xFF_FFFF };
@@ -4951,7 +4991,7 @@ impl<'p> Vm<'p> {
             // --- Bulk-Draws ---
             "plots" => {
                 let xs = arr_i32(&a[0], "PLOTS")?; let ys = arr_i32(&a[1], "PLOTS")?;
-                let n = xs.len().min(ys.len());
+                let n = bulk_count(a, 3, xs.len().min(ys.len()), "PLOTS")?;
                 let cols = bulk_color(&a[2], n, "PLOTS")?;
                 let g = self.gfx.as_mut().ok_or("Grafik-Builtin vor SCREEN aufgerufen")?;
                 for i in 0..n { g.plot(xs[i], ys[i], cols[i]); }
@@ -4959,7 +4999,7 @@ impl<'p> Vm<'p> {
             }
             "boxes" => {
                 let x1=arr_i32(&a[0],"BOXES")?; let y1=arr_i32(&a[1],"BOXES")?; let x2=arr_i32(&a[2],"BOXES")?; let y2=arr_i32(&a[3],"BOXES")?;
-                let n = x1.len().min(y1.len()).min(x2.len()).min(y2.len());
+                let n = bulk_count(a, 5, x1.len().min(y1.len()).min(x2.len()).min(y2.len()), "BOXES")?;
                 let cols = bulk_color(&a[4], n, "BOXES")?;
                 let g = self.gfx.as_mut().ok_or("Grafik-Builtin vor SCREEN aufgerufen")?;
                 for i in 0..n { g.box_fill(x1[i], y1[i], x2[i], y2[i], cols[i]); }
@@ -4967,7 +5007,7 @@ impl<'p> Vm<'p> {
             }
             "circles" => {
                 let xs=arr_i32(&a[0],"CIRCLES")?; let ys=arr_i32(&a[1],"CIRCLES")?; let rs=arr_i32(&a[2],"CIRCLES")?;
-                let n = xs.len().min(ys.len()).min(rs.len());
+                let n = bulk_count(a, 4, xs.len().min(ys.len()).min(rs.len()), "CIRCLES")?;
                 let cols = bulk_color(&a[3], n, "CIRCLES")?;
                 let g = self.gfx.as_mut().ok_or("Grafik-Builtin vor SCREEN aufgerufen")?;
                 for i in 0..n { g.circle(xs[i], ys[i], rs[i], cols[i]); }
@@ -4975,7 +5015,7 @@ impl<'p> Vm<'p> {
             }
             "lines" => {
                 let x1=arr_i32(&a[0],"LINES")?; let y1=arr_i32(&a[1],"LINES")?; let x2=arr_i32(&a[2],"LINES")?; let y2=arr_i32(&a[3],"LINES")?;
-                let n = x1.len().min(y1.len()).min(x2.len()).min(y2.len());
+                let n = bulk_count(a, 5, x1.len().min(y1.len()).min(x2.len()).min(y2.len()), "LINES")?;
                 let cols = bulk_color(&a[4], n, "LINES")?;
                 let g = self.gfx.as_mut().ok_or("Grafik-Builtin vor SCREEN aufgerufen")?;
                 for i in 0..n { g.line(x1[i], y1[i], x2[i], y2[i], cols[i]); }
