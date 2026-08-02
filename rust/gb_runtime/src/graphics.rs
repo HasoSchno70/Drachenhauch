@@ -830,6 +830,12 @@ pub struct Graphics {
     /// Frame-Nummer des ersten Ereignisses -- die Aufnahme beginnt nicht
     /// zwingend bei 0 (raylibs Zaehler laeuft seit Programmstart durch).
     auto_play_base: u32,
+    /// raylib-Tastencodes, die die laufende Wiedergabe zuletzt selbst
+    /// eingespeist hat. Noetig, weil raylib eingespeiste Tasten auch in seine
+    /// "zuletzt gedrueckt"-Warteschlange legt -- ohne diese Liste meldet
+    /// `KEY_ANY_HIT` die Demo-Tasten als Nutzereingabe, und ein Attract-Modus
+    /// ("bei Tastendruck abbrechen") wuerde sich selbst sofort beenden.
+    auto_injected_keys: Vec<i32>,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
@@ -1015,6 +1021,7 @@ impl Graphics {
             auto_play_idx: 0,
             auto_play_frame: 0,
             auto_play_base: 0,
+            auto_injected_keys: Vec::new(),
         };
         // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
         // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
@@ -3315,10 +3322,20 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// raylibs Eingabe-Zustand einspeisen. Ereignisse, deren Frame uebersprungen
     /// wurde (Aufnahme mit anderer Bildrate), werden nachgeholt statt verworfen.
     fn automation_tick(&mut self) {
+        self.auto_injected_keys.clear();
         if !self.auto_playing { return; }
         while self.auto_play_idx < self.auto_events.len() {
             let e = &self.auto_events[self.auto_play_idx];
             if e.frame().saturating_sub(self.auto_play_base) > self.auto_play_frame { break; }
+            // Merken, welche TASTEN wir gleich einspeisen -- KEY_ANY_HIT soll nur
+            // echte Eingabe melden (raylibs AutomationEventType-Nummern aus
+            // rcore.c: 2 = INPUT_KEY_DOWN, 3 = INPUT_KEY_PRESSED). Gamepad-Knoepfe
+            // brauchen das NICHT: deren Wiedergabe setzt nur `currentButtonState`,
+            // nicht raylibs "zuletzt gedrueckter Knopf" -- JOYSTICK_ANY_BUTTON
+            // sieht die Demo also ohnehin nicht.
+            if matches!(e.get_type(), 2 | 3) {
+                self.auto_injected_keys.push(e.params()[0]);
+            }
             e.play();
             self.auto_play_idx += 1;
         }
@@ -3336,6 +3353,10 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         // will genau eine Belegung, keine Sammlung.
         let mut found = -1;
         while let Some(k) = self.rl.get_key_pressed() {
+            // Von der laufenden Wiedergabe eingespeiste Tasten sind KEINE
+            // Nutzereingabe -- sonst braeche ein Attract-Modus, der "bei
+            // Tastendruck abbrechen" prueft, an seiner eigenen Demo ab.
+            if self.auto_injected_keys.contains(&(k as i32)) { continue; }
             if found < 0 {
                 if let Some(code) = gb_key_code(k) { found = code; }
             }

@@ -143,6 +143,26 @@ def test_far_away_events_wait_instead_of_being_skipped(tmp_path):
     assert r.lines == ["10,10", "TRUE"]
 
 
+def test_injected_keys_do_not_count_as_user_input(tmp_path):
+    # Der Attract-Modus ist der Haupt-Anwendungsfall: die Demo laeuft, bis der
+    # Spieler eine Taste drueckt. raylib legt eingespeiste Tasten aber AUCH in
+    # seine "zuletzt gedrueckt"-Warteschlange -- ohne Filter meldete
+    # KEY_ANY_HIT die Demo-Tasten als Nutzereingabe und die Demo brach sofort
+    # an sich selbst ab. KEYHIT muss sie weiterhin sehen (darum geht es ja).
+    _events(tmp_path, "demo.txt", [(0, KEY_DOWN, 32), (2, KEY_UP, 32)])
+    gb = (_HEAD + 'AUTOMATION_PLAY("demo.txt")\n'
+          'DIM f AS INTEGER\n'
+          'FOR f = 0 TO 3\n'
+          '    PRINT STR$(KEY_ANY_HIT()) + " " + STR$(KEYHIT(KEY_SPACE))\n'
+          '    FLIP()\n'
+          'NEXT\n')
+    r = _run(gb, tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert [ln.split()[0] for ln in r.lines] == ["-1"] * 4, \
+        "KEY_ANY_HIT darf keine eingespeiste Taste melden"
+    assert "TRUE" in r.lines[1], "KEYHIT muss die eingespeiste Taste sehr wohl sehen"
+
+
 # -------------------------------------------------------------- Aufnahme
 def test_recording_writes_a_readable_file(tmp_path):
     gb = (_HEAD + 'AUTOMATION_RECORD("out.txt")\n'

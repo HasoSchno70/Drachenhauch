@@ -61,6 +61,23 @@ nachdem die echte Eingabe für den nächsten Frame gelesen wurde, damit die
 aufgezeichneten Werte gewinnen. Ein Ereignis aus Aufnahme-Frame `N` wirkt
 daher im Programmdurchlauf `N+1`.
 
+**`KEY_ANY_HIT` sieht die Demo nicht.** Ein Attract-Modus bricht typischerweise
+ab, sobald der Spieler irgendeine Taste drückt — und genau dafür ist
+`KEY_ANY_HIT()` da. raylib legt eingespeiste Tasten allerdings **auch** in seine
+„zuletzt gedrückt"-Warteschlange; ungefiltert hätte die Demo sich an ihrem
+eigenen ersten Tastendruck beendet. `gbrt` blendet deshalb aus, was die laufende
+Wiedergabe selbst eingespeist hat: `KEY_ANY_HIT` meldet nur echte Eingabe,
+während `KEYHIT`/`KEYPRESSED` die aufgezeichneten Tasten weiterhin sehen (darum
+geht es ja). `JOYSTICK_ANY_BUTTON` braucht das nicht — die Wiedergabe setzt dort
+nur den Knopf-Zustand, nicht raylibs „zuletzt gedrückter Knopf".
+
+```basic
+IF attract AND (KEY_ANY_HIT() <> -1 OR JOYSTICK_ANY_BUTTON() <> -1) THEN
+    AUTOMATION_STOP()          ' Spieler uebernimmt
+    attract = FALSE
+END IF
+```
+
 **Aufnahme und Wiedergabe schließen sich aus.** raylib spielt während einer
 laufenden Aufnahme grundsätzlich nichts ab; `AUTOMATION_PLAY` meldet das als
 Fehler, statt es still zu schlucken.
