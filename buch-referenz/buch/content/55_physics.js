@@ -67,6 +67,26 @@ module.exports = (H) => [
     'WEND',
   ]),
 
+  H.cmd("PHYS2D_SET_VEL · PHYS2D_APPLY_IMPULSE · PHYS2D_BODY_VX/VY", 'PHYS2D_SET_VEL(w, id, vx, vy)   PHYS2D_APPLY_IMPULSE(w, id, ix, iy)   PHYS2D_BODY_VX(w, id)   PHYS2D_BODY_VY(w, id)',
+    "In die Simulation eingreifen: SET_VEL setzt die Geschwindigkeit hart (Sprung, Katapult), APPLY_IMPULSE gibt einen einmaligen Stoß dazu (Explosion, Schlag), die beiden Getter lesen die aktuelle Geschwindigkeit – etwa um bei hohem Tempo einen Aufprall-Klang zu spielen.",
+    [
+      'IF INPUT_PRESSED("springen") THEN PHYS2D_SET_VEL(welt, spieler, 0.0, -400.0)',
+      'PHYS2D_APPLY_IMPULSE(welt, kiste, 250.0, -120.0)',
+      'IF ABS(PHYS2D_BODY_VY(welt, kiste)) > 300.0 THEN PLAYSOUND(rums)',
+    ]),
+  H.cmd("PHYS2D_SET_POS · PHYS2D_LOCK_ROTATION", 'PHYS2D_SET_POS(w, id, x, y)   PHYS2D_LOCK_ROTATION(w, id, gesperrt)',
+    "SET_POS versetzt einen Körper (Wiedereinstieg nach dem Tod, Teleport). LOCK_ROTATION verhindert, dass er sich dreht – genau das braucht eine Spielfigur, die sonst bei jeder Berührung umkippen würde.",
+    [
+      'PHYS2D_LOCK_ROTATION(welt, spieler, TRUE)',
+      'PHYS2D_SET_POS(welt, spieler, 100.0, 50.0)',
+    ]),
+  H.cmd("PHYS2D_REMOVE · PHYS2D_COUNT", 'PHYS2D_REMOVE(w, id)   PHYS2D_COUNT(w)',
+    "Entfernt einen Körper aus der Welt bzw. zählt die vorhandenen. Die Nummern bleiben nach einem REMOVE stabil – eine gemerkte Körper-Nummer zeigt also nie versehentlich auf einen anderen Körper.",
+    [
+      'PHYS2D_REMOVE(welt, kiste)',
+      'PRINT PHYS2D_COUNT(welt)',
+    ]),
+
   H.h2("physics3d — echte 3D-Physik"),
   H.p("physics3d ist das Gegenstück in drei Dimensionen: dieselbe Idee, nur mit z-Achse und 3D-Körpern. Die Körper haben zusätzlich eine räumliche Drehung (als Quaternion), die du beim Zeichnen deines 3D-Modells verwendest. Zusammen mit dem g3d-Modul lassen sich so physikalisch fallende, rollende und stapelnde 3D-Objekte bauen."),
   H.cmd("PHYS3D_NEW · ADD_BOX · ADD_SPHERE · STEP", 'PHYS3D_NEW()   PHYS3D_ADD_BOX(w, x,y,z, hw,hh,hd, dynamisch, bounce)   PHYS3D_ADD_SPHERE(w, x,y,z, r, dynamisch, bounce)   PHYS3D_STEP(w, dt)',
@@ -80,12 +100,25 @@ module.exports = (H) => [
       'kugel = PHYS3D_ADD_SPHERE(w, 0.0, 8.0, 0.0, 1.0, TRUE, 0.5)     \' fällt',
       'PHYS3D_STEP(w, DELTA())',
     ]),
-  H.cmd("PHYS3D_BODY_X / _Y / _Z (+ Quaternion)", 'PHYS3D_BODY_X / _Y / _Z(w, id)   PHYS3D_BODY_QX/_QY/_QZ/_QW(w, id)',
+  H.cmd("PHYS3D_BODY_X / _Y / _Z (+ Quaternion)", 'PHYS3D_BODY_X(w, id)   PHYS3D_BODY_Y(w, id)   PHYS3D_BODY_Z(w, id)   PHYS3D_BODY_QX/_QY/_QZ/_QW(w, id)',
     "Lesen die 3D-Position und die Drehung (als Quaternion QX/QY/QZ/QW) eines Körpers. Position und Drehung steckst du in eine Modell-Matrix (Modul m3d) und zeichnest damit dein 3D-Modell an die simulierte Stelle.",
     [
       'DIM y AS FLOAT',
       'y = PHYS3D_BODY_Y(w, kugel)',
       'PRINT ROUND(y, 1)   \' sinkt mit der Zeit',
+    ]),
+
+  H.cmd("PHYS3D_SET_GRAVITY · PHYS3D_SET_VEL · PHYS3D_APPLY_IMPULSE", 'PHYS3D_SET_GRAVITY(w, gx, gy, gz)   PHYS3D_SET_VEL(w, id, vx, vy, vz)   PHYS3D_APPLY_IMPULSE(w, id, ix, iy, iz)',
+    "Dieselben Eingriffe wie in 2D, nur mit drei Achsen. Die Schwerkraft lässt sich jederzeit ändern – für Mondlandung, Unterwasser-Abschnitte oder einen Schwerkraft-Umkehr-Schalter.",
+    [
+      "PHYS3D_SET_GRAVITY(w, 0.0, -1.6, 0.0)      ' Mond statt Erde",
+      'PHYS3D_APPLY_IMPULSE(w, kiste, 0.0, 8.0, 0.0)',
+    ]),
+  H.cmd("PHYS3D_SET_POS · PHYS3D_REMOVE · PHYS3D_COUNT", 'PHYS3D_SET_POS(w, id, x, y, z)   PHYS3D_REMOVE(w, id)   PHYS3D_COUNT(w)',
+    "Versetzen, entfernen, zählen – wie in 2D, und ebenso mit stabilen Körper-Nummern.",
+    [
+      'PHYS3D_SET_POS(w, spieler, 0.0, 5.0, 0.0)',
+      'PRINT PHYS3D_COUNT(w)',
     ]),
 
   H.cmd("COLLIDES", 'COLLIDES(x1, y1, w1, h1, x2, y2, w2, h2)',
