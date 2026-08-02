@@ -3,7 +3,9 @@ GameBasic-Demo -- Herkunft und Lizenz der Fremdmaterialien
 
 MUSIK (assets/music/)
 ---------------------
-stardust_jam.mod, silicon_dancer.mod, neon_techno.mod, assembly.xm
+stardust_jam.mod, silicon_dancer.mod, neon_techno.mod,
+mecanum_overdrive.xm, assembly.xm, keygen_wraith.xm,
+building_energy.xm, cyber_spider.xm
     Drozerix
     Bezogen ueber The Mod Archive (modarchive.org), Rubrik "Public Domain".
     Lizenz: Public Domain -- gemeinfrei, keine Auflagen.

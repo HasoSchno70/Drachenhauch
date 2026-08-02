@@ -30,7 +30,9 @@ SID-Erweiterungen (Pulsbreite/PWM + resonanter Filter-Sweep). Es liegt keine
 einzige Klangdatei dabei — jeder dieser Klänge steht als eine Zeile im
 Quelltext.
 
-**M** schaltet zwischen den vier gemeinfreien Musikstücken um. Wichtig dabei:
+**M** schaltet zwischen den **acht** gemeinfreien Musikstücken um — von einem
+4-Kanal-Amiga-Modul bis zu einem 24-Kanal-Satz; der Unterschied ist deutlich zu
+hören. Der eingeblendete Name nennt Kanäle und Länge dazu. Wichtig dabei:
 der Ablaufplan hängt an `AUDIO_MUSIC_POSITION`, und die springt beim Laden auf
 0 zurück — die Demo schiebt deshalb `versatz` mit, sonst finge sie bei jedem
 Musikwechsel wieder bei Szene 1 an.
@@ -102,9 +104,23 @@ neutral zurück (`klang_neutral()`), sonst läuft der Abspann durch den Verzerre
 ## Musik
 
 „Stardust Jam" von **Drozerix**, **gemeinfrei** (The Mod Archive) — ein echtes
-ProTracker-Modul, das die Laufzeit in Echtzeit streamt (kein OGG). Drei weitere
-gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
-`MUSIK` umstellen. Herkunft und Bezugsskript: `assets/CREDITS.txt` bzw.
+ProTracker-Modul, das die Laufzeit in Echtzeit streamt (kein OGG). Der
+Ablaufplan ist auf dieses Stück geschnitten. **Sieben weitere** gemeinfreie
+Stücke desselben Urhebers liegen dabei und lassen sich im Betrieb mit **M**
+durchschalten:
+
+| # | Stück | Kanäle | Länge |
+|---|---|---|---|
+| 1 | Stardust Jam | 4 | 6:24 |
+| 2 | Silicon Dancer | 4 | 4:05 |
+| 3 | Neon Techno | 4 | 3:58 |
+| 4 | Mecanum Overdrive | 4 | 2:57 |
+| 5 | Assembly! | 4 | 1:55 |
+| 6 | Keygen Wraith | 6 | 1:33 |
+| 7 | Building Energy | 24 | 1:29 |
+| 8 | Cyber Spider | 10 | 1:03 |
+
+Die kurzen Stücke loopen; der Ablaufplan läuft davon unbeirrt weiter. Herkunft und Bezugsskript: `assets/CREDITS.txt` bzw.
 `download_music.py`.
 
 ## Stolpersteine, die hier gelernt wurden

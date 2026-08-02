@@ -4,7 +4,7 @@ module.exports = (H) => [
   H.p("In Teil IV hast du ein Spiel gebaut, in Teil V ein Modul nach dem anderen kennengelernt. Zum Abschluss kommt etwas anderes: eine Demo. Das ist ein Programm, das nichts tut, außer vorzuführen, was die Maschine kann – ein durchlaufendes Stück aus Bild und Musik, Szene für Szene. Diese Form gibt es seit den Achtzigern; sie heißt Demoszene, und sie hat einen guten Teil dessen hervorgebracht, was heute selbstverständlich in Spielen steckt."),
   H.p("Warum das als Abschlusskapitel taugt: Eine Demo zwingt dich, alles gleichzeitig zu beherrschen – Zeit, Ton, 2D, 3D, Physik, Shader – und sie verzeiht keine Schlamperei bei der einen Sache, auf die es wirklich ankommt: dass Bild und Musik zusammengehören. Genau davon handelt dieses Kapitel."),
   H.figure("80_demo_titel.png", "Die Titelszene der mitgelieferten Demo: Plasma im Post-Effekt, ein Sinus-Scroller und Spektrum-Säulen, die auf der echten Musik tanzen."),
-  H.p("Die vollständige Demo liegt als gbdemo/gbdemo.gb bei. Starte sie ruhig zuerst und lies dann weiter – es ist leichter zu verstehen, was du schon gesehen hast."),
+  H.p("Die vollständige Demo liegt als gbdemo/gbdemo.gb bei. Starte sie ruhig zuerst und lies dann weiter – es ist leichter zu verstehen, was du schon gesehen hast. Mit den Zifferntasten springst du in eine Szene, mit A bis K spielst du Klänge, und M schaltet zwischen acht gemeinfreien Musikstücken um."),
   H.code([
     "gbrun.py gbdemo\\gbdemo.gb",
   ]),

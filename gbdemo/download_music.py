@@ -23,10 +23,14 @@ from pathlib import Path
 
 # Zielname -> Modul-Nummer bei modarchive.org (alle "Public Domain", Drozerix)
 TRACKS = {
-    "stardust_jam.mod": 201039,     # ~6:24 -- das Stueck, auf das die Demo geschnitten ist
-    "silicon_dancer.mod": 209692,   # ~4:05 -- Ausweichstueck
-    "neon_techno.mod": 178172,      # ~3:58 -- Ausweichstueck
-    "assembly.xm": 209551,          # ~1:55 -- kurz, XM statt MOD
+    "stardust_jam.mod": 201039,       # ~6:24 -- das Stueck, auf das die Demo geschnitten ist
+    "silicon_dancer.mod": 209692,     # ~4:05
+    "neon_techno.mod": 178172,        # ~3:58
+    "mecanum_overdrive.xm": 175349,   # ~2:57 -- 4 Kanaele, treibend
+    "assembly.xm": 209551,            # ~1:55 -- nach der Demoparty benannt
+    "keygen_wraith.xm": 207854,       # ~1:33 -- 6 Kanaele, BPM 240
+    "building_energy.xm": 185456,     # ~1:29 -- 24 Kanaele, dichtester Satz
+    "cyber_spider.xm": 192354,        # ~1:03 -- 10 Kanaele, schnellstes Stueck
 }
 
 BASE = "https://api.modarchive.org/downloads.php?moduleid="

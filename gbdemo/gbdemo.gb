@@ -35,8 +35,8 @@ IMPORT "timer"
 CONST BREITE AS INTEGER = 1280
 CONST HOEHE AS INTEGER = 720
 CONST MUSIK AS STRING = "assets/music/stardust_jam.mod"
-' Alle vier liegen bei und sind gemeinfrei -- M schaltet im Betrieb um.
-CONST STUECKE AS INTEGER = 4
+' Alle acht liegen bei und sind gemeinfrei -- M schaltet im Betrieb um.
+CONST STUECKE AS INTEGER = 8
 CONST BAENDER AS INTEGER = 32
 
 ' Szenen-Grenzen in Sekunden des Stuecks (Stardust Jam laeuft ~6:24).
@@ -1357,14 +1357,25 @@ SUB klaviatur_bauen()
     letzter_klang = -1
     klang_alter = 99.0
 
+    ' Alle acht sind von Drozerix und gemeinfrei (The Mod Archive).
+    ' Der Zusatz nennt Kanaele und Laenge -- daran hoert man den Unterschied
+    ' zwischen einem 4-Kanal-Amiga-Modul und einem 24-Kanal-Satz am ehesten.
     stueck_datei[0] = "assets/music/stardust_jam.mod"
-    stueck_name[0] = "Drozerix - Stardust Jam"
+    stueck_name[0] = "Stardust Jam  (4 Kanaele, 6:24)"
     stueck_datei[1] = "assets/music/silicon_dancer.mod"
-    stueck_name[1] = "Drozerix - Silicon Dancer"
+    stueck_name[1] = "Silicon Dancer  (4 Kanaele, 4:05)"
     stueck_datei[2] = "assets/music/neon_techno.mod"
-    stueck_name[2] = "Drozerix - Neon Techno"
-    stueck_datei[3] = "assets/music/assembly.xm"
-    stueck_name[3] = "Drozerix - Assembly!"
+    stueck_name[2] = "Neon Techno  (4 Kanaele, 3:58)"
+    stueck_datei[3] = "assets/music/mecanum_overdrive.xm"
+    stueck_name[3] = "Mecanum Overdrive  (4 Kanaele, 2:57)"
+    stueck_datei[4] = "assets/music/assembly.xm"
+    stueck_name[4] = "Assembly!  (4 Kanaele, 1:55)"
+    stueck_datei[5] = "assets/music/keygen_wraith.xm"
+    stueck_name[5] = "Keygen Wraith  (6 Kanaele, 1:33)"
+    stueck_datei[6] = "assets/music/building_energy.xm"
+    stueck_name[6] = "Building Energy  (24 Kanaele, 1:29)"
+    stueck_datei[7] = "assets/music/cyber_spider.xm"
+    stueck_name[7] = "Cyber Spider  (10 Kanaele, 1:03)"
     stueck = 0
     stueck_alter = 99.0
 END SUB
@@ -1420,8 +1431,9 @@ SUB klaviatur_zeigen()
         BLEND_MODE("mult")
         BOX(0, 6, BREITE, 44, RGB(60, 62, 74))
         BLEND_MODE("alpha")
-        mtext(BREITE \ 2, 25, stueck_name[stueck], 0.42, _
-              RGB(INT(170 * mb), INT(200 * mb), INT(230 * mb)))
+        mtext(BREITE \ 2, 25, _
+              STR$(stueck + 1) + "/" + STR$(STUECKE) + "  Drozerix - " + stueck_name[stueck], _
+              0.42, RGB(INT(170 * mb), INT(200 * mb), INT(230 * mb)))
     END IF
 
     ' Der zuletzt gedrueckte Klang blitzt kurz auf.
