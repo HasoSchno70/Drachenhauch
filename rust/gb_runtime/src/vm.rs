@@ -835,7 +835,13 @@ impl<'p> Vm<'p> {
             "string" => Value::str_rc(""),
             "boolean" => Value::Bool(false),
             "tuple" => Value::Tuple(Rc::new(vec![])),
-            _ => Value::Nil,
+            // Mathe-Typen bekommen ihr NEUTRALES Element statt NIL -- genauso,
+            // wie INTEGER mit 0 und STRING mit "" anfaengt. Ohne das ist ein
+            // frisches `DIM m AS MAT4` unbrauchbar (jede Rechnung darauf
+            // scheitert an NIL), und ein `DIM mats[N] AS MAT4` laesst sich
+            // nicht schrittweise fuellen. Eine Quelle fuer alle drei Wege
+            // (global, lokal, Array-Element): model::neutrales_element.
+            other => crate::model::neutrales_element(other).unwrap_or(Value::Nil),
         }
     }
 
@@ -1578,7 +1584,13 @@ impl<'p> Vm<'p> {
                     let default = if let Some(vt) = ty.strip_prefix("map:") {
                         Value::Map(Rc::new(RefCell::new(GbMap::new(vt.to_string()))))
                     } else {
-                        constants[l[3].as_usize()].clone()
+                        let d = constants[l[3].as_usize()].clone();
+                        // Der Compiler kann Mathe-Werte nicht als Konstante
+                        // ablegen (CVal kennt kein MAT4) und legt NIL hin. Hier
+                        // wird daraus das neutrale Element -- fuer alle anderen
+                        // Typen liefert element_default wieder NIL, es aendert
+                        // sich also nichts.
+                        if matches!(d, Value::Nil) { self.element_default(&ty) } else { d }
                     };
                     if self.global_slots[slot_idx].is_none() {
                         let sl = Rc::new(RefCell::new(Slot { ty, value: default, is_const: false }));

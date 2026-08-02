@@ -93,3 +93,22 @@ def test_set_size_invalid_raises(run_gb):
 def test_emit_negative_count_raises(run_gb):
     with pytest.raises(GBRuntimeError, match=">= 0"):
         run_gb(_PRE + "PARTICLE_EMIT(s, -1)\n")
+
+
+# --- Ausgerechnete Werte statt Pflicht-INT() -----------------------------
+# Groessen, Dauern und Stueckzahlen werden im Programm typischerweise
+# AUSGERECHNET (dt * 1000.0). Dort ein INTEGER zu verlangen zwang den Aufrufer
+# zu einem INT(...) um jeden Ausdruck -- und wer es vergass, bekam einen
+# Typfehler fuer etwas, das rechnerisch in Ordnung war.
+def test_kommazahlen_werden_gerundet_statt_abgelehnt(run_gb):
+    src = """
+IMPORT "particles"
+DIM p AS PARTICLE_SYSTEM
+p = PARTICLE_SYSTEM_NEW(0, 0)
+PARTICLE_SET_SIZE(p, 2.0, 6.4)
+PARTICLE_SET_LIFETIME(p, 100.0, 900.6)
+PARTICLE_EMIT(p, 5.0)
+PARTICLE_UPDATE(p, 16.7)
+PRINT PARTICLE_COUNT(p)
+"""
+    assert run_gb(src).strip() == "5"

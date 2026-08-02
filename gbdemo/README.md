@@ -100,7 +100,6 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   ungenutzte Plätze werden schlicht nicht angefasst.
 - **`MODEL_INSTANCED` färbt einen ganzen Draw-Call einheitlich.** Mehrere Farben
   = mehrere Aufrufe; drei sind immer noch drei statt 1600.
-- `PARTICLE_SET_SIZE` und `PARTICLE_SET_POS` wollen **ganze Zahlen**.
 - **GameBasic ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
   damit lautlos die Konstante `HOEHE`, und aus `HOEHE - 54` wird `0.6 - 54`.
   Das fällt erst als merkwürdiger Typfehler weit weg von der Ursache auf.

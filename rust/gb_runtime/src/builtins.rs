@@ -118,6 +118,22 @@ fn need_int(v: &Value, fn_: &str) -> Result<i64, String> {
     }
 }
 
+/// Wie `need_int`, nimmt aber auch eine Kommazahl und rundet sie.
+///
+/// Fuer Groessen, Dauern und Stueckzahlen, die im Programm typischerweise
+/// AUSGERECHNET werden (`dt * 1000.0`, `2.5 * skala`). Dort ein INTEGER zu
+/// verlangen zwingt den Aufrufer zu einem `INT(...)` um jeden Ausdruck --
+/// und wer es vergisst, bekommt einen Typfehler fuer etwas, das rechnerisch
+/// voellig in Ordnung ist.
+fn need_int_gerundet(v: &Value, fn_: &str) -> Result<i64, String> {
+    match v {
+        Value::Int(i) => Ok(*i),
+        Value::Float(f) if f.is_finite() => Ok(f.round() as i64),
+        Value::Float(_) => Err(format!("{} erwartet eine endliche Zahl", fn_)),
+        _ => Err(format!("{} erwartet eine Zahl, erhalten {}", fn_, v.type_name())),
+    }
+}
+
 fn need_num(v: &Value, fn_: &str) -> Result<f64, String> {
     match v {
         Value::Int(i) => Ok(*i as f64),
@@ -2552,14 +2568,14 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "particle_set_lifetime" => {
-            arity!(3); let (mi, ma) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32);
+            arity!(3); let (mi, ma) = (need_int_gerundet(&a[1], "PARTICLE_SET_LIFETIME")? as i32, need_int_gerundet(&a[2], "PARTICLE_SET_LIFETIME")? as i32);
             if mi < 0 || ma < mi { return err("PARTICLE_SET_LIFETIME: ms_min >= 0 und ms_max >= ms_min noetig"); }
             let s = psys(&a[0], "PARTICLE_SET_LIFETIME")?; let mut s = s.borrow_mut(); s.lifetime_min = mi; s.lifetime_max = ma; Ok(Value::Nil)
         }
         "particle_set_gravity" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_GRAVITY")?; let mut s = s.borrow_mut(); s.gravity_x = need_num(&a[1], "S")?; s.gravity_y = need_num(&a[2], "S")?; Ok(Value::Nil) }
         "particle_set_color" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR: Farbe muss 0..0xFFFFFF sein"); } psys(&a[0], "PARTICLE_SET_COLOR")?.borrow_mut().color = c; Ok(Value::Nil) }
         "particle_set_size" => {
-            arity!(3); let (mi, ma) = (need_int(&a[1], "S")? as i32, need_int(&a[2], "S")? as i32);
+            arity!(3); let (mi, ma) = (need_int_gerundet(&a[1], "PARTICLE_SET_SIZE")? as i32, need_int_gerundet(&a[2], "PARTICLE_SET_SIZE")? as i32);
             if mi < 1 || ma < mi { return err("PARTICLE_SET_SIZE: min >= 1 und max >= min noetig"); }
             let s = psys(&a[0], "PARTICLE_SET_SIZE")?; let mut s = s.borrow_mut(); s.size_min = mi; s.size_max = ma; Ok(Value::Nil)
         }
@@ -2571,7 +2587,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         }
         "particle_set_color_end" => { arity!(2); let c = need_int(&a[1], "PARTICLE_SET_COLOR_END")?; if c < 0 || c > 0xFFFFFF { return err("PARTICLE_SET_COLOR_END: Farbe muss 0..0xFFFFFF sein"); } let s = psys(&a[0], "PARTICLE_SET_COLOR_END")?; let mut s = s.borrow_mut(); s.color_end = c; s.has_color_end = true; Ok(Value::Nil) }
         "particle_emit" => {
-            arity!(2); let count = need_int(&a[1], "PARTICLE_EMIT")?;
+            arity!(2); let count = need_int_gerundet(&a[1], "PARTICLE_EMIT")?;
             if count < 0 { return err("PARTICLE_EMIT: count muss >= 0 sein"); }
             let s = psys(&a[0], "PARTICLE_EMIT")?; let mut s = s.borrow_mut();
             for _ in 0..count {
@@ -2585,7 +2601,7 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             }
             Ok(Value::Nil)
         }
-        "particle_update" => { arity!(2); let dt = need_int(&a[1], "PARTICLE_UPDATE")?; if dt < 0 { return err("PARTICLE_UPDATE: dt_ms muss >= 0 sein"); } psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
+        "particle_update" => { arity!(2); let dt = need_int_gerundet(&a[1], "PARTICLE_UPDATE")?; if dt < 0 { return err("PARTICLE_UPDATE: dt_ms muss >= 0 sein"); } psys(&a[0], "PARTICLE_UPDATE")?.borrow_mut().update(dt as i32); Ok(Value::Nil) }
 
         // ===== Modul: ecs =====
         "ecs_new_world" => { arity!(0); Ok(Value::Ecs(Rc::new(RefCell::new(crate::ecs::World::new())))) }
@@ -3431,6 +3447,9 @@ fn normalize3(a: (f32, f32, f32)) -> (f32, f32, f32) {
 }
 
 // MAT4 = [f32;16] column-major: arr[col*4 + row] (= raylib::ffi::Matrix-Memory).
+/// Einheitsmatrix -- auch die Vorbelegung fuer `DIM ... AS MAT4` (vm.rs).
+pub(crate) fn mat4_identity() -> [f32; 16] { m3_identity() }
+
 fn m3_identity() -> [f32; 16] {
     [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
 }

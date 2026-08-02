@@ -213,3 +213,42 @@ def test_model_instanced_headless_render(tmp_path):
                        text=True, encoding="utf-8", timeout=60, env=env)
     assert r.returncode == 0, f"gbrt Exit {r.returncode}: {r.stderr}"
     assert shot.exists() and shot.stat().st_size > 0, "kein Screenshot erzeugt"
+
+
+# --- Vorbelegung der Mathe-Typen -----------------------------------------
+# Frueher waren MAT4/QUAT/VEC* nach dem DIM NIL: jede Rechnung darauf schlug
+# fehl, und ein Array liess sich nicht schrittweise fuellen. Jetzt starten sie
+# mit ihrem NEUTRALEN Element -- so wie INTEGER mit 0 und STRING mit "".
+def test_mat4_startet_als_einheitsmatrix(run_gb):
+    src = """
+IMPORT "m3d"
+DIM m AS MAT4
+DIM v AS VEC3
+v = VEC3_NEW(2.0, 3.0, 4.0)
+PRINT m * v
+"""
+    assert run_gb(src).strip() == "Vec3(2.0, 3.0, 4.0)"
+
+
+def test_mat4_array_ist_ohne_zuweisung_benutzbar(run_gb):
+    src = """
+IMPORT "m3d"
+DIM ms[3] AS MAT4
+ms[0] = MAT4_TRANSLATE(1.0, 0.0, 0.0)
+PRINT ms[2] = MAT4_IDENTITY()
+"""
+    assert run_gb(src).strip() == "TRUE"
+
+
+def test_quat_und_vektoren_starten_neutral(run_gb):
+    src = """
+IMPORT "m3d"
+DIM q AS QUAT
+DIM v AS VEC3
+DIM w AS VEC4
+PRINT q
+PRINT v
+PRINT w
+"""
+    assert run_gb(src).splitlines() == [
+        "Quat(0.0, 0.0, 0.0, 1.0)", "Vec3(0.0, 0.0, 0.0)", "Vec4(0.0, 0.0, 0.0, 0.0)"]

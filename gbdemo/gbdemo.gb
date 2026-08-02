@@ -333,7 +333,7 @@ SUB szene_sterne()
         PARTICLE_SET_COLOR_END(psys, RGB(30, 0, 70))
         PARTICLE_EMIT(psys, 120)
     END IF
-    PARTICLE_UPDATE(psys, INT(dt * 1000.0))
+    PARTICLE_UPDATE(psys, dt * 1000.0)
     PARTICLE_DRAW(psys)
 
     ' Kern, der auf dem Bass atmet

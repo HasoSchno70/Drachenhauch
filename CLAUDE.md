@@ -211,6 +211,13 @@ GB-Code schreibt ihn in jeder Casing-Form (`DIM j AS JSON_HANDLE`).
 | FILE / IMAGE / SOUND | `_GBFile` / `_Image` / `_Sound` | — (eigene target-Strings) |
 | SPRITE_ATLAS | `_SpriteAtlas` (image + frames-Dict) | — (eigener target-String `"sprite_atlas"`) |
 
+**Mathe-Typen starten neutral:** `DIM m AS MAT4` ist die Einheitsmatrix,
+`QUAT` das Einheits-Quaternion, `VEC2/3/4` der Nullvektor — nicht NIL. Genauso
+wie INTEGER mit 0 und STRING mit `""` anfaengt; ein `DIM mats[N] AS MAT4` laesst
+sich damit schrittweise fuellen. Eine Quelle fuer alle drei Wege (global, lokal,
+Array-Element): `model::neutrales_element` (die Compiler-Konstanten koennen kein
+MAT4 tragen, deshalb wird es beim Laden bzw. beim DECLARE nachgetragen).
+
 **Bool ist KEINE Zahl** — `_check_num(True)` wirft, weil `isinstance(True, int)` zwar `True`
 ist, aber `True` semantisch keine Zahl in GB ist.
 

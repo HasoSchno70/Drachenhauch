@@ -278,6 +278,19 @@ fn specialize_args(code: &mut [Instr], fn_index: &rustc_hash::FxHashMap<String, 
 // ---------------------------------------------------------------------------
 
 /// Dekodiert einen `.gbc`-Wert (Encoding aus `serialize.py::_enc`).
+/// Neutrales Element der Mathe-Typen (MAT4 = Einheitsmatrix, VEC* = Null,
+/// QUAT = Einheits-Quaternion). Alles andere: None -- bleibt NIL.
+pub(crate) fn neutrales_element(t: &str) -> Option<Value> {
+    match t {
+        "mat4" => Some(Value::Mat4(std::rc::Rc::new(crate::builtins::mat4_identity()))),
+        "quat" => Some(Value::Quat(0.0, 0.0, 0.0, 1.0)),
+        "vec2" => Some(Value::Vec2(0.0, 0.0)),
+        "vec3" => Some(Value::Vec3(0.0, 0.0, 0.0)),
+        "vec4" => Some(Value::Vec4(0.0, 0.0, 0.0, 0.0)),
+        _ => None,
+    }
+}
+
 fn decode_value(j: &J) -> Value {
     match j {
         J::Null => Value::Nil,
@@ -357,14 +370,25 @@ fn decode_func(j: &J) -> Func {
         .as_array()
         .map(|a| a.iter().map(|x| x.as_bool().unwrap_or(false)).collect())
         .unwrap_or_default();
-    let local_defaults = get("local_defaults")
+    let mut local_defaults: Vec<Value> = get("local_defaults")
         .as_array()
         .map(|a| a.iter().map(decode_value).collect())
         .unwrap_or_default();
-    let local_types = get("local_types")
+    let local_types: Vec<String> = get("local_types")
         .as_array()
         .map(|a| a.iter().map(|x| x.as_str().unwrap_or("any").to_string()).collect())
         .unwrap_or_default();
+    // Mathe-Typen starten mit ihrem neutralen Element statt mit NIL. Der
+    // Compiler kann das nicht ablegen (seine Konstanten kennen kein MAT4),
+    // also wird es hier beim Laden nachgetragen -- genauso wie fuer globale
+    // Variablen in vm.rs. Alle anderen Typen bleiben, wie sie sind.
+    for (i, t) in local_types.iter().enumerate() {
+        if i < local_defaults.len() && matches!(local_defaults[i], Value::Nil) {
+            if let Some(v) = neutrales_element(t) {
+                local_defaults[i] = v;
+            }
+        }
+    }
     let code = get("code")
         .as_array()
         .map(|a| {
