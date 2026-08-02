@@ -4,7 +4,7 @@ module.exports = (H) => [
   H.figure("67_m3d.png", "Fünf Würfel, jeder mit MAT4_TRS aus Position, einer Quaternion-Drehung und Skalierung platziert und per MODEL_MATRIX gezeichnet."),
 
   H.h2("VEC3 – der 3D-Vektor"),
-  H.cmd("VEC3_NEW · VEC3_X/Y/Z · Operatoren", 'VEC3_NEW(x, y, z)   VEC3_X(v)/Y/Z   v + w   v * skalar',
+  H.cmd("VEC3_NEW · VEC3_X/Y/Z · Operatoren", 'VEC3_NEW(x, y, z)   VEC3_X(v)   VEC3_Y(v)   VEC3_Z(v)   v + w   v * skalar',
     "Erzeugt und liest 3D-Vektoren; die Operatoren rechnen wie bei vec2 (komponentenweise addieren/subtrahieren, mit Zahl skalieren).",
     [
       'IMPORT "m3d"',
@@ -19,6 +19,44 @@ module.exports = (H) => [
       'PRINT VEC3_CROSS(VEC3_NEW(1.0,0.0,0.0), VEC3_NEW(0.0,1.0,0.0))',
     ], { out: ["Vec3(0.0, 0.0, 1.0)"] }),
 
+  H.cmd("VEC3_ZERO · VEC3_NEG · VEC3_SCALE", 'VEC3_ZERO()   VEC3_NEG(v)   VEC3_SCALE(v, s)',
+    "VEC3_ZERO liefert den Nullvektor (der übliche Startwert), VEC3_NEG kehrt die Richtung um, VEC3_SCALE streckt oder staucht – dasselbe wie v * s, aber als Funktion lesbarer in längeren Ausdrücken.",
+    [
+      'PRINT VEC3_ZERO()',
+      'PRINT VEC3_NEG(VEC3_NEW(1.0, -2.0, 3.0))',
+      'PRINT VEC3_SCALE(VEC3_NEW(1.0, 2.0, 3.0), 2.0)',
+    ], { out: ["Vec3(0.0, 0.0, 0.0)", "Vec3(-1.0, 2.0, -3.0)", "Vec3(2.0, 4.0, 6.0)"] }),
+  H.cmd("VEC3_DISTANCE · VEC3_LENGTH_SQ · VEC3_LERP", 'VEC3_DISTANCE(a, b)   VEC3_LENGTH_SQ(v)   VEC3_LERP(a, b, t)',
+    "DISTANCE ist der Abstand zweier Punkte. LENGTH_SQ liefert die QUADRIERTE Länge – ohne Wurzel und damit schneller; für Vergleiche („wer ist näher?“, „im Umkreis?“) reicht das völlig, du vergleichst dann eben mit dem Quadrat der Reichweite. LERP blendet linear zwischen zwei Punkten (t = 0 … 1).",
+    [
+      'PRINT VEC3_DISTANCE(VEC3_ZERO(), VEC3_NEW(1.0, 2.0, 2.0))',
+      'PRINT VEC3_LENGTH_SQ(VEC3_NEW(1.0, 2.0, 2.0))',
+      'PRINT VEC3_LERP(VEC3_ZERO(), VEC3_NEW(10.0, 0.0, 0.0), 0.25)',
+    ], { out: ["3.0", "9.0", "Vec3(2.5, 0.0, 0.0)"] }),
+  H.cmd("VEC3_REFLECT · VEC3_TRANSFORM · VEC3_TRANSFORM_DIR", 'VEC3_REFLECT(v, n)   VEC3_TRANSFORM(v, mat)   VEC3_TRANSFORM_DIR(v, mat)',
+    "REFLECT spiegelt einen Vektor an einer Fläche mit der Normalen n – der Abpraller eines Balls. TRANSFORM wendet eine Matrix auf einen PUNKT an (Verschiebung wirkt mit), TRANSFORM_DIR auf eine RICHTUNG (Verschiebung wird ignoriert). Diesen Unterschied verwechselt man leicht: eine gedrehte Blickrichtung darf nicht mitverschoben werden.",
+    [
+      'PRINT VEC3_REFLECT(VEC3_NEW(1.0, -1.0, 0.0), VEC3_NEW(0.0, 1.0, 0.0))',
+      'DIM m AS MAT4',
+      'm = MAT4_TRANSLATE(5.0, 0.0, 0.0)',
+      'PRINT VEC3_TRANSFORM(VEC3_NEW(1.0, 0.0, 0.0), m)',
+      'PRINT VEC3_TRANSFORM_DIR(VEC3_NEW(1.0, 0.0, 0.0), m)',
+    ], { out: ["Vec3(1.0, 1.0, 0.0)", "Vec3(6.0, 0.0, 0.0)", "Vec3(1.0, 0.0, 0.0)"] }),
+
+  H.h2("VEC4 – der Vektor mit vierter Komponente"),
+  H.p("VEC4 brauchst du selten direkt, aber an zwei Stellen doch: für Farben mit Alpha und für „homogene“ Punkte, wie sie Matrizen intern verwenden (w = 1 bedeutet Punkt, w = 0 Richtung)."),
+  H.cmd("VEC4_NEW · VEC4_FROM_VEC3 · VEC4_X/Y/Z/W", 'VEC4_NEW(x, y, z, w)   VEC4_FROM_VEC3(v, w)   VEC4_X(v)   VEC4_Y(v)   VEC4_Z(v)   VEC4_W(v)',
+    "Erzeugen und Auslesen. VEC4_FROM_VEC3 hängt an einen VEC3 die vierte Komponente an.",
+    [
+      'PRINT VEC4_NEW(1.0, 2.0, 3.0, 4.0)',
+      'PRINT VEC4_W(VEC4_FROM_VEC3(VEC3_NEW(1.0, 2.0, 3.0), 1.0))',
+    ], { out: ["Vec4(1.0, 2.0, 3.0, 4.0)", "1.0"] }),
+  H.cmd("VEC4_DOT · VEC4_LENGTH · VEC4_NORMALIZE · VEC4_LERP", 'VEC4_DOT(a, b)   VEC4_LENGTH(v)   VEC4_NORMALIZE(v)   VEC4_LERP(a, b, t)',
+    "Dieselben Rechenwege wie bei VEC3, nur über alle vier Komponenten.",
+    [
+      'PRINT VEC4_LENGTH(VEC4_NEW(1.0, 0.0, 0.0, 0.0))',
+    ], { out: ["1.0"] }),
+
   H.h2("QUAT – Drehungen ohne Stolpern"),
   H.p("Drehungen im Raum stellt man am besten mit Quaternionen dar – sie vermeiden das berüchtigte „Gimbal-Lock“ und lassen sich sauber ineinander überblenden. Du erzeugst eine Drehung meist aus einer Achse und einem Winkel."),
   H.cmd("QUAT_FROM_AXIS_ANGLE · QUAT_MUL · QUAT_SLERP", 'QUAT_FROM_AXIS_ANGLE(ax, ay, az, winkel)   QUAT_MUL(a, b)   QUAT_SLERP(a, b, t)',
@@ -28,6 +66,29 @@ module.exports = (H) => [
       'rot = QUAT_FROM_AXIS_ANGLE(0.0, 1.0, 0.0, RAD(45.0))   \' 45° um Y',
     ]),
 
+  H.cmd("QUAT_NEW · QUAT_IDENTITY · QUAT_X/Y/Z/W", 'QUAT_NEW(x, y, z, w)   QUAT_IDENTITY()   QUAT_X(q)   QUAT_Y(q)   QUAT_Z(q)   QUAT_W(q)',
+    "QUAT_IDENTITY ist die Drehung um nichts – der Startwert für jede Orientierung. QUAT_NEW und die Getter brauchst du fast nur, wenn du Quaternionen speicherst oder aus einer Physik-Engine übernimmst (etwa PHYS3D_BODY_QX/QY/QZ/QW).",
+    [
+      'PRINT QUAT_IDENTITY()',
+      'DIM q AS QUAT',
+      'q = QUAT_NEW(PHYS3D_BODY_QX(w, i), PHYS3D_BODY_QY(w, i), _',
+      '             PHYS3D_BODY_QZ(w, i), PHYS3D_BODY_QW(w, i))',
+    ], { out: ["Quat(0.0, 0.0, 0.0, 1.0)"] }),
+  H.cmd("QUAT_NORMALIZE · QUAT_CONJUGATE", 'QUAT_NORMALIZE(q)   QUAT_CONJUGATE(q)',
+    "NORMALIZE bringt eine Quaternion auf Einheitslänge – nötig, wenn du viele Drehungen hintereinander verkettest, weil sich sonst Rundungsfehler aufschaukeln. CONJUGATE liefert die UMGEKEHRTE Drehung (bei Einheitslänge identisch zur Inversen).",
+    [
+      'orientierung = QUAT_NORMALIZE(QUAT_MUL(orientierung, drehung))',
+    ]),
+  H.cmd("QUAT_ROTATE_VEC3 · QUAT_TO_MAT4", 'QUAT_ROTATE_VEC3(q, v)   QUAT_TO_MAT4(q)',
+    "ROTATE_VEC3 dreht einen einzelnen Vektor – so bekommst du aus der Blickrichtung „vorwärts“ die tatsächliche Richtung einer gedrehten Figur. QUAT_TO_MAT4 macht aus der Drehung eine Matrix (etwa um sie mit einer Verschiebung zu verketten).",
+    [
+      'DIM dreh AS QUAT',
+      'dreh = QUAT_FROM_AXIS_ANGLE(0.0, 1.0, 0.0, RAD(90.0))',
+      'DIM vorwaerts AS VEC3',
+      'vorwaerts = QUAT_ROTATE_VEC3(dreh, VEC3_NEW(1.0, 0.0, 0.0))',
+    ]),
+  H.note("Bei gedrehten Vektoren bleiben winzige Rundungsreste stehen: aus einer 90°-Drehung von (1, 0, 0) wird nicht exakt (0, 0, -1), sondern (0.00000006, 0, -0.99999994). Das ist normal für Kommazahlen – vergleiche solche Werte nie mit =, sondern mit APPROX."),
+
   H.h2("MAT4 – die Transformationsmatrix"),
   H.p("Eine 4×4-Matrix fasst Verschiebung, Drehung und Skalierung in einem Wert zusammen – genau das, was der Renderer braucht. Der bequemste Konstruktor ist MAT4_TRS: er baut „Translation · Rotation · Scale“ in einem Schritt aus einem Positions-Vektor, einer Dreh-Quaternion und einem Skalierungs-Vektor."),
   H.cmd("MAT4_TRS · MAT4_MUL · MAT4_IDENTITY", 'MAT4_TRS(pos, rot, scale)   MAT4_MUL(a, b)   MAT4_IDENTITY()',
@@ -35,6 +96,39 @@ module.exports = (H) => [
     [
       'DIM m AS MAT4',
       'm = MAT4_TRS(VEC3_NEW(0.0, 0.8, 0.0), rot, VEC3_NEW(1.0, 1.0, 1.0))',
+    ]),
+
+  H.cmd("MAT4_TRANSLATE · MAT4_SCALE · MAT4_ROTATE_X/Y/Z · MAT4_ROTATE_AXIS", 'MAT4_TRANSLATE(x, y, z)   MAT4_SCALE(x, y, z)   MAT4_ROTATE_X(winkel)   MAT4_ROTATE_Y(winkel)   MAT4_ROTATE_Z(winkel)   MAT4_ROTATE_AXIS(ax, ay, az, winkel)',
+    "Die einzelnen Bausteine, wenn MAT4_TRS zu grob ist. Winkel im Bogenmaß (RAD(grad) hilft). Verkettet wird mit MAT4_MUL – die Reihenfolge entscheidet: erst skalieren, dann drehen, dann verschieben ist die übliche Lesart.",
+    [
+      'DIM m AS MAT4',
+      'm = MAT4_MUL(MAT4_TRANSLATE(0.0, 1.0, 0.0), MAT4_ROTATE_Y(RAD(45.0)))',
+    ]),
+  H.cmd("MAT4_FROM_QUAT · MAT4_TRANSPOSE · MAT4_INVERT", 'MAT4_FROM_QUAT(q)   MAT4_TRANSPOSE(m)   MAT4_INVERT(m)',
+    "FROM_QUAT baut die Drehmatrix zu einer Quaternion. TRANSPOSE spiegelt an der Diagonalen. INVERT kehrt eine Transformation um – damit rechnest du von Welt- in lokale Koordinaten zurück (etwa: „wo liegt dieser Weltpunkt im Koordinatensystem des Fahrzeugs?“). Eine nicht invertierbare Matrix meldet einen Fehler.",
+    [
+      'DIM lokal AS VEC3',
+      'lokal = VEC3_TRANSFORM(weltpunkt, MAT4_INVERT(fahrzeug_matrix))',
+    ]),
+  H.cmd("MAT4_LOOKAT · MAT4_PERSPECTIVE · MAT4_ORTHO", 'MAT4_LOOKAT(auge, ziel, oben)   MAT4_PERSPECTIVE(fovy, seitenverhaeltnis, nah, fern)   MAT4_ORTHO(links, rechts, unten, oben, nah, fern)',
+    "Die Kamera-Matrizen. LOOKAT ist die Sicht-Matrix (View), PERSPECTIVE die perspektivische Projektion, ORTHO die parallele – letztere für Draufsichten, Baupläne oder einen 2D-Look in einer 3D-Szene.",
+    [
+      'DIM view AS MAT4',
+      'view = MAT4_LOOKAT(VEC3_NEW(0.0, 5.0, 8.0), VEC3_ZERO(), VEC3_NEW(0.0, 1.0, 0.0))',
+      'DIM proj AS MAT4',
+      'proj = MAT4_ORTHO(-8.0, 8.0, -6.0, 6.0, 0.1, 100.0)',
+    ]),
+  H.cmd("MAT4_GET · MAT4_TRANSFORM_VEC3 · MAT4_TRANSFORM_VEC4", 'MAT4_GET(m, zeile, spalte)   MAT4_TRANSFORM_VEC3(m, v)   MAT4_TRANSFORM_VEC4(m, v)',
+    "MAT4_GET liest einen einzelnen Wert (Zeile und Spalte je 0–3) – die Verschiebung steht in Spalte 3. Die TRANSFORM-Funktionen wenden die Matrix auf einen Vektor an; sie sind die Gegenstücke zu VEC3_TRANSFORM mit vertauschter Argumentreihenfolge.",
+    [
+      'DIM m AS MAT4',
+      'm = MAT4_TRANSLATE(5.0, 0.0, 0.0)',
+      'PRINT MAT4_GET(m, 0, 3)',
+    ], { out: ["5.0"] }),
+  H.cmd("CAMERA3D_VIEW · CAMERA3D_PROJECTION", 'CAMERA3D_VIEW(mat)   CAMERA3D_PROJECTION(mat)',
+    "Setzen eigene Kamera-Matrizen statt der von CAMERA3D erzeugten – der Weg zu einer Parallel-Projektion (Ortho) oder einem ungewöhnlichen Sichtfeld.",
+    [
+      'CAMERA3D_PROJECTION(MAT4_ORTHO(-8.0, 8.0, -6.0, 6.0, 0.1, 100.0))',
     ]),
 
   H.h2("Rendern: MODEL_MATRIX"),
