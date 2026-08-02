@@ -73,7 +73,6 @@ CONST NBULLET AS INTEGER = 5
 DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER
 DIM bAlive[NBULLET] AS BOOLEAN
 FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
-DIM prevShoot AS BOOLEAN
 
 ' --- Gegner ---
 CONST COLS AS INTEGER = 8
@@ -111,8 +110,7 @@ WHILE NOT QUITREQUESTED()
     IF shipX < 0 THEN shipX = 0
     IF shipX > 464 THEN shipX = 464
 
-    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
-    IF firing AND NOT prevShoot THEN
+    IF KEYHIT(KEY_SPACE) THEN
         DIM s AS INTEGER
         FOR s = 0 TO NBULLET - 1
             IF NOT bAlive[s] THEN
@@ -120,7 +118,6 @@ WHILE NOT QUITREQUESTED()
             END IF
         NEXT s
     END IF
-    prevShoot = firing
     FOR i = 0 TO NBULLET - 1
         IF bAlive[i] THEN
             by[i] = by[i] - 8

@@ -30,7 +30,6 @@ DIM by[NBULLET] AS INTEGER          ' y-Position
 DIM bAlive[NBULLET] AS BOOLEAN      ' fliegt dieser Schuss gerade?
 FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i
 
-DIM prevShoot AS BOOLEAN            ' war die Feuertaste im letzten Frame gedrueckt?
 
 WHILE NOT QUITREQUESTED()
     CLS(&H05060F)
@@ -48,9 +47,10 @@ WHILE NOT QUITREQUESTED()
     IF shipX < 0 THEN shipX = 0
     IF shipX > 464 THEN shipX = 464
 
-    ' --- Feuern: genau EIN Schuss pro Tastendruck (Flankenerkennung) ---
-    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
-    IF firing AND NOT prevShoot THEN
+    ' --- Feuern: genau EIN Schuss pro Tastendruck ---
+    ' KEYHIT ist nur in dem einen Frame wahr, in dem die Taste
+    ' heruntergeht -- gehalten feuert sie also nicht weiter.
+    IF KEYHIT(KEY_SPACE) THEN
         DIM s AS INTEGER
         FOR s = 0 TO NBULLET - 1
             IF NOT bAlive[s] THEN
@@ -59,7 +59,6 @@ WHILE NOT QUITREQUESTED()
             END IF
         NEXT s
     END IF
-    prevShoot = firing
 
     ' --- Schuesse bewegen + zeichnen ---
     FOR i = 0 TO NBULLET - 1

@@ -117,10 +117,13 @@ END CLASS
 SCREEN(960, 540, "Galaga", 1)
 IF FULL THEN SET_FULLSCREEN(TRUE)
 
+' Eigenes Fenstersymbol statt des Standardsymbols der Laufzeit -- das Schiff
+' liegt ohnehin als Bild vor. Wirkt auch in der exportierten .exe.
+WINDOW_ICON(LOADIMAGE("../assets/sprites/player.png"))
+
 ' Retro-Arcade-Look: CRT-Shader (Scanlines/Woelbung/Vignette) per F1 ein/aus.
 DIM crtShader AS INTEGER : crtShader = SHADER_LOAD("../assets/shaders/crt.fs")
 DIM crtOn AS BOOLEAN : crtOn = (crtShader >= 0)
-DIM prevF1 AS BOOLEAN
 
 DIM shipImg AS IMAGE   : shipImg = LOADIMAGE("../assets/sprites/player.png")
 DIM bulletImg AS IMAGE : bulletImg = LOADIMAGE("../assets/sprites/bullet.png")
@@ -174,7 +177,6 @@ FOR mi = 0 TO 7
 NEXT mi
 DIM musOn AS BOOLEAN : musOn = TRUE
 DIM musStep AS INTEGER : DIM musBeat AS INTEGER
-DIM prevM AS BOOLEAN
 
 ' --- Explosionen (ein gemeinsames Partikelsystem, additiver Glow) ---
 DIM explFx AS PARTICLE_SYSTEM
@@ -193,7 +195,7 @@ DIM bmx[NBOMB] AS FLOAT : DIM bmy[NBOMB] AS FLOAT : DIM bmvx[NBOMB] AS FLOAT : D
 
 DIM playerX AS FLOAT : DIM playerY AS FLOAT
 DIM lives AS INTEGER : DIM score AS INTEGER : DIM level AS INTEGER
-DIM frame AS INTEGER : DIM prevShoot AS BOOLEAN : DIM invuln AS INTEGER
+DIM frame AS INTEGER : DIM invuln AS INTEGER
 DIM diveTimer AS INTEGER : DIM diveSpeed AS FLOAT : DIM bombSpeed AS FLOAT
 DIM levelMsg AS INTEGER : DIM bugsAlive AS INTEGER
 DIM bonus AS BOOLEAN              ' ist die aktuelle Welle eine Bonus-Welle?
@@ -231,15 +233,28 @@ DIM muzzle AS INTEGER            ' Restframes Muendungsblitz
 ' --- Spielzustand (Titel / Spiel / Namens-Eingabe) + Highscore-Liste ---
 ENUM GS = TITLE, PLAY, ENTER
 DIM mode AS INTEGER
+
+' --- Attract-Modus (wie am Spielautomaten) ---------------------------------
+' Passiert auf dem Titelbild eine Weile nichts, spielt das Spiel sich selbst:
+' AUTOMATION_PLAY speist eine aufgezeichnete Eingabe wieder ein, das Spiel
+' merkt davon nichts (KEYPRESSED & Co. liefern die aufgezeichneten Werte).
+' F2 nimmt eine neue Demo auf, jede Eingabe bricht die Wiedergabe ab.
+CONST DEMO_FILE  AS STRING  = "demo.txt"
+CONST ATTRACT_MS AS INTEGER = 12000       ' Ruhe vor dem Demo-Start
+DIM demoExists AS BOOLEAN : demoExists = FILEEXISTS(DEMO_FILE)
+DIM attract AS BOOLEAN                    ' laeuft gerade eine Demo?
+DIM idleSince AS INTEGER                  ' Frame der letzten echten Eingabe
 CONST NHS AS INTEGER = 8
 DIM hsName[NHS] AS STRING        ' Top-NHS Namen
 DIM hsScore[NHS] AS INTEGER      ' Top-NHS Punkte (absteigend)
 DIM hs AS SAVE_HANDLE            ' persistente Highscore-Datei
 DIM entInit[3] AS INTEGER        ' 3 Initialen als Buchstaben-Index 0..25
 DIM entPos AS INTEGER            ' aktive Initiale 0..2
-DIM prevStart AS BOOLEAN         ' Flanke fuer Start/Bestaetigen-Taste
-DIM peUp AS BOOLEAN : DIM peDn AS BOOLEAN
-DIM peL AS BOOLEAN : DIM peR AS BOOLEAN : DIM peFire AS BOOLEAN
+' Tasten und Gamepad-Knoepfe haben mit KEYHIT/JOYSTICK_HIT eine eingebaute
+' Flankenerkennung. Nur der ANALOGSTICK hat keine -- er liefert eine Zahl, kein
+' Gedrueckt/Losgelassen. Fuer ihn merken wir uns die Auslenkung des letzten
+' Frames selbst, damit ein gehaltener Stick im Menue nicht durchrattert.
+DIM axPrevX AS INTEGER : DIM axPrevY AS INTEGER
 
 CONST PY_LOW  AS FLOAT = 288.0          ' unterste Schiffsposition
 CONST PY_HIGH AS FLOAT = 196.0          ' hoechste (nach oben manoevriert)
@@ -369,23 +384,35 @@ FUNCTION EntryName() AS STRING
     RETURN letters[entInit[0]] + letters[entInit[1]] + letters[entInit[2]]
 END FUNCTION
 
+' Gamepad-Flanke mit Sicherheitsnetz: OHNE angeschlossenes Pad melden die
+' JOYSTICK_-Befehle einen Fehler (sie pruefen den Index). Diese Huelle liefert
+' dann einfach FALSE -- so bleibt der Spielcode frei von Abfragen.
+FUNCTION PadHit(btn AS INTEGER) AS BOOLEAN
+    IF JOYSTICK_COUNT() = 0 THEN RETURN FALSE
+    RETURN JOYSTICK_HIT(0, btn)
+END FUNCTION
+
+' Kurzer Ruettler im Gamepad -- nur wenn ueberhaupt eins angeschlossen ist.
+' staerke 0..1 je Motor, dauer in Millisekunden.
+SUB Rumble(staerke AS FLOAT, dauer AS INTEGER)
+    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer)
+END SUB
+
 ' ===================== Modus-Wechsel =====================
 SUB StartGame()
     lives = 3 : score = 0 : level = 1
     playerX = PW / 2.0 - 8.0 : playerY = PY_LOW
     invuln = 0
     dual = FALSE              ' Doppeljaeger nur durch Rettung
-    prevShoot = TRUE          ' der Start-Tastendruck soll nicht sofort schiessen
     NewLevel()
     mode = GS.PLAY
 END SUB
 
 SUB GameOver()
-    ' Beim Tod oft die Leertaste (Feuer) gedrueckt -> Flanken-Flags setzen, damit
-    ' der gehaltene Tastendruck NICHT sofort neu startet bzw. die Namens-Eingabe
-    ' bestaetigt. Der Score bleibt erhalten (wird erst beim naechsten Start = 0).
-    prevStart = TRUE
-    peFire = TRUE : peUp = TRUE : peDn = TRUE : peL = TRUE : peR = TRUE
+    ' Frueher mussten hier Flanken-Flags gesetzt werden, damit die beim Tod
+    ' gehaltene Leertaste nicht sofort neu startet. Mit KEYHIT erledigt sich das
+    ' von selbst: eine gehaltene Taste loest erst nach dem Loslassen wieder aus.
+    ' Der Score bleibt erhalten (wird erst beim naechsten Start = 0).
     IF Qualifies(score) THEN
         entInit[0] = 0 : entInit[1] = 0 : entInit[2] = 0 : entPos = 0
         mode = GS.ENTER
@@ -397,23 +424,34 @@ END SUB
 ' Namens-Eingabe: hoch/runter wechselt den Buchstaben, links/rechts die Stelle,
 ' Leertaste bestaetigt. Alle mit Flankenerkennung (kein Dauer-Scrollen).
 SUB NameEntry()
-    DIM pad AS BOOLEAN : pad = (JOYSTICK_COUNT() > 0)
-    DIM up AS BOOLEAN : up = KEYPRESSED(KEY_UP) OR KEYPRESSED(KEY_W) OR (pad AND (JOYSTICK_AXIS(0, 1) < -0.35 OR JOYSTICK_BUTTON(0, 1)))
-    DIM dn AS BOOLEAN : dn = KEYPRESSED(KEY_DOWN) OR KEYPRESSED(KEY_S) OR (pad AND (JOYSTICK_AXIS(0, 1) > 0.35 OR JOYSTICK_BUTTON(0, 3)))
-    DIM lf AS BOOLEAN : lf = KEYPRESSED(KEY_LEFT) OR KEYPRESSED(KEY_A) OR (pad AND (JOYSTICK_AXIS(0, 0) < -0.35 OR JOYSTICK_BUTTON(0, 4)))
-    DIM rt AS BOOLEAN : rt = KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) OR (pad AND (JOYSTICK_AXIS(0, 0) > 0.35 OR JOYSTICK_BUTTON(0, 2)))
-    DIM ok AS BOOLEAN : ok = KEYPRESSED(KEY_ENTER) OR KEYPRESSED(KEY_RETURN) OR (pad AND (JOYSTICK_BUTTON(0, 7) OR JOYSTICK_BUTTON(0, 9)))
-    IF up AND NOT peUp THEN entInit[entPos] = (entInit[entPos] + 1) MOD 26
-    IF dn AND NOT peDn THEN entInit[entPos] = (entInit[entPos] + 25) MOD 26
-    IF rt AND NOT peR AND entPos < 2 THEN entPos = entPos + 1
-    IF lf AND NOT peL AND entPos > 0 THEN entPos = entPos - 1
-    IF ok AND NOT peFire THEN
+    ' Tastatur und D-Pad liefern ihre Flanke selbst (KEYHIT/JOYSTICK_HIT), beim
+    ' Analogstick berechnen wir sie aus der Auslenkung des letzten Frames.
+    DIM ax AS INTEGER : DIM ay AS INTEGER
+    IF JOYSTICK_COUNT() > 0 THEN
+        ax = SGN2(JOYSTICK_AXIS(0, 0)) : ay = SGN2(JOYSTICK_AXIS(0, 1))
+    END IF
+    DIM up AS BOOLEAN : up = KEYHIT(KEY_UP) OR KEYHIT(KEY_W) OR PadHit(1) OR (ay < 0 AND axPrevY >= 0)
+    DIM dn AS BOOLEAN : dn = KEYHIT(KEY_DOWN) OR KEYHIT(KEY_S) OR PadHit(3) OR (ay > 0 AND axPrevY <= 0)
+    DIM lf AS BOOLEAN : lf = KEYHIT(KEY_LEFT) OR KEYHIT(KEY_A) OR PadHit(4) OR (ax < 0 AND axPrevX >= 0)
+    DIM rt AS BOOLEAN : rt = KEYHIT(KEY_RIGHT) OR KEYHIT(KEY_D) OR PadHit(2) OR (ax > 0 AND axPrevX <= 0)
+    DIM ok AS BOOLEAN : ok = KEYHIT(KEY_ENTER) OR KEYHIT(KEY_RETURN) OR PadHit(7) OR PadHit(9)
+    axPrevX = ax : axPrevY = ay
+    IF up THEN entInit[entPos] = (entInit[entPos] + 1) MOD 26
+    IF dn THEN entInit[entPos] = (entInit[entPos] + 25) MOD 26
+    IF rt AND entPos < 2 THEN entPos = entPos + 1
+    IF lf AND entPos > 0 THEN entPos = entPos - 1
+    IF ok THEN
         InsertScore(EntryName(), score)
         mode = GS.TITLE
-        prevStart = TRUE      ' nicht mit derselben Taste sofort neu starten
     END IF
-    peUp = up : peDn = dn : peL = lf : peR = rt : peFire = ok
 END SUB
+
+' Vorzeichen einer Achse mit Totzone: -1 / 0 / +1.
+FUNCTION SGN2(v AS FLOAT) AS INTEGER
+    IF v < -0.35 THEN RETURN -1
+    IF v > 0.35 THEN RETURN 1
+    RETURN 0
+END FUNCTION
 
 ' Ein Begleiter (Nachbar des Bosses) stuerzt mit, wenn er lebt + in Formation ist.
 SUB EscortDive(idx AS INTEGER)
@@ -450,7 +488,7 @@ SUB UpdateCapture()
                 hasCaptured = TRUE
                 dual = FALSE                 ' ein evtl. Doppeljaeger geht dabei verloren
                 lives = lives - 1
-                shake = 7.0 : PLAYSOUND(sfxHit)
+                shake = 7.0 : PLAYSOUND(sfxHit) : Rumble(0.7, 260)
                 IF lives <= 0 THEN
                     GameOver()
                 ELSE
@@ -489,9 +527,9 @@ SUB UpdatePlay()
     IF playerX > maxX THEN playerX = maxX
     IF playerY < PY_HIGH THEN playerY = PY_HIGH
     IF playerY > PY_LOW THEN playerY = PY_LOW
-    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE) OR (pad AND JOYSTICK_BUTTON(0, 7))
-    IF firing AND NOT prevShoot THEN Shoot()
-    prevShoot = firing
+    ' Ein Schuss pro Tastendruck -- KEYHIT/JOYSTICK_HIT liefern genau den einen
+    ' Frame, in dem die Taste heruntergeht (gehalten feuert also nicht weiter).
+    IF KEYHIT(KEY_SPACE) OR PadHit(7) THEN Shoot()
 
     ' --- Boss-Fangsequenz (nur ausserhalb der Bonus-Welle) ---
     IF NOT bonus THEN
@@ -630,6 +668,7 @@ SUB UpdatePlay()
         IF hit THEN
             invuln = 90 : shake = 7.0
             PLAYSOUND(sfxHit)
+            Rumble(0.7, 260)
             IF dual THEN
                 dual = FALSE                                  ' zweites Schiff verloren
                 Explode(playerX + 19.0, playerY + 6.0, &HFFC040, 26)
@@ -767,26 +806,64 @@ NEXT s
 WHILE NOT QUITREQUESTED()
     frame = frame + 1
 
-    ' ---- Retro-Look (F1) und Musik (M) umschalten (Flankenerkennung) ----
-    DIM f1 AS BOOLEAN : f1 = KEYPRESSED(KEY_F1)
-    IF f1 AND NOT prevF1 AND crtShader >= 0 THEN crtOn = NOT crtOn
-    prevF1 = f1
-    DIM mk AS BOOLEAN : mk = KEYPRESSED(KEY_M)
-    IF mk AND NOT prevM THEN
+    ' ---- Pause, wenn das Fenster nicht im Vordergrund ist ----
+    ' Ohne das laeuft das Spiel munter weiter, waehrend der Spieler etwas
+    ' anderes tut -- und er kommt zu einem verlorenen Leben zurueck.
+    IF NOT WINDOW_FOCUSED() THEN
+        CLS(BG)
+        CenterText(INT(SCREENHEIGHT() / 2) - 8, "PAUSE", &HFFE070)
+        FLIP()
+        CONTINUE
+    END IF
+
+    ' ---- Demo aufnehmen (F2) bzw. laufende Wiedergabe abbrechen ----
+    IF KEYHIT(KEY_F2) THEN
+        IF AUTOMATION_RECORDING() THEN
+            AUTOMATION_STOP()
+            demoExists = TRUE
+        ELSE
+            RANDOMIZE(4711)            ' derselbe Startwert wie bei der Wiedergabe
+            AUTOMATION_RECORD(DEMO_FILE)
+        END IF
+    END IF
+    IF attract AND (KEY_ANY_HIT() <> -1 OR JOYSTICK_ANY_BUTTON() <> -1) THEN
+        AUTOMATION_STOP()               ' Spieler uebernimmt -> Demo beenden
+        attract = FALSE
+        mode = GS.TITLE
+    END IF
+    IF attract AND NOT AUTOMATION_PLAYING() THEN     ' Demo zu Ende
+        attract = FALSE
+        mode = GS.TITLE
+    END IF
+
+    ' ---- Retro-Look (F1) und Musik (M) umschalten ----
+    IF KEYHIT(KEY_F1) AND crtShader >= 0 THEN crtOn = NOT crtOn
+    IF KEYHIT(KEY_M) THEN
         musOn = NOT musOn
         IF hasMusic AND musOn THEN AUDIO_MUSIC_RESUME()
         IF hasMusic AND NOT musOn THEN AUDIO_MUSIC_PAUSE()
     END IF
-    prevM = mk
 
     ' ---- Modus-Logik ----
     DIM i AS INTEGER
     IF mode = GS.PLAY THEN
         UpdatePlay()
     ELSEIF mode = GS.TITLE THEN
-        DIM sk AS BOOLEAN : sk = KEYPRESSED(KEY_SPACE) OR (JOYSTICK_COUNT() > 0 AND (JOYSTICK_BUTTON(0, 7) OR JOYSTICK_BUTTON(0, 9)))
-        IF sk AND NOT prevStart THEN StartGame()
-        prevStart = sk
+        IF KEYHIT(KEY_SPACE) OR PadHit(7) OR PadHit(9) THEN
+            StartGame()
+            idleSince = frame
+        ELSEIF demoExists AND NOT AUTOMATION_RECORDING() _
+               AND (frame - idleSince) * 1000 / 60 > ATTRACT_MS THEN
+            ' Lange nichts passiert -> das Spiel spielt sich selbst. Die
+            ' Aufnahme enthaelt auch den Druck auf die Leertaste, startet das
+            ' Spiel also von allein -- ein StartGame() hier waere sogar falsch.
+            ' Fester Zufalls-Startwert, damit dieselbe Eingabe denselben
+            ' Verlauf ergibt: aufgezeichnet wird die EINGABE, nicht das
+            ' Ergebnis.
+            RANDOMIZE(4711)
+            AUTOMATION_PLAY(DEMO_FILE)
+            attract = TRUE
+        END IF
     ELSEIF mode = GS.ENTER THEN
         NameEntry()
     END IF
@@ -932,8 +1009,13 @@ WHILE NOT QUITREQUESTED()
         END IF
     END IF
     ' Umschalt-Hinweise immer sichtbar (oben rechts im Spielfeld).
-    TEXT(INT(sw - offx) - 56, 6, IIF(crtOn, "F1:CRT*", "F1:CRT "), &H5C7088)
-    TEXT(INT(sw - offx) - 56, 22, IIF(musOn, "M:Mus*", "M:Mus "), &H5C7088)
+    ' Rechtsbuendig am Spielfeldrand: TEXT_WIDTH misst die tatsaechliche Breite
+    ' in der aktuellen Schrift. Frueher stand hier ein geschaetztes -56 -- der
+    ' Hinweis ragte dadurch in den Regenbogenrand hinein.
+    DIM h1 AS STRING : h1 = IIF(crtOn, "F1:CRT*", "F1:CRT")
+    DIM h2 AS STRING : h2 = IIF(musOn, "M:Mus*", "M:Mus")
+    TEXT(INT(sw - offx) - TEXT_WIDTH(h1) - 4, 6, h1, &H5C7088)
+    TEXT(INT(sw - offx) - TEXT_WIDTH(h2) - 4, 22, h2, &H5C7088)
 
     IF mode = GS.TITLE THEN
         DrawTitle(cx, sh)

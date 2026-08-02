@@ -282,6 +282,7 @@ children.push(bulletRich("Sprites selbst zeichnen: ", "im Pixel-Editor gbsprites
 children.push(bulletRich("Schiessen, Gegner, Formation: ", "Arrays, Klassen, Bewegung."));
 children.push(bulletRich("Einflug, Stürze, Bomben, Kollisionen: ", "das eigentliche Spielgefühl."));
 children.push(bulletRich("Politur: ", "Sound, Effekte, Highscores, Export als .exe."));
+children.push(bulletRich("Automaten-Schliff: ", "Fenstersymbol, Rüttel-Feedback im Gamepad, Pause beim Wegklicken – und ein Attract-Modus, in dem sich das Spiel selbst vorführt."));
 children.push(tip("Alles in Farbe und zum Selbermachen", "Dieses Buch ist als Word-Dokument angelegt. Du kannst es nach Belieben ergänzen, umstellen, eigene Screenshots einfügen – und natürlich ausdrucken."));
 
 // ===================== Kapitel 1 =====================
@@ -621,10 +622,9 @@ children.push(why("Warum legen wir den Vorrat einmal fest, statt bei jedem Schus
 
 children.push(h2("Feuern auf Tastendruck"));
 children.push(p("Beim Feuern suchen wir einen freien Platz im Köcher und starten dort einen Schuss. Klingt simpel, hat aber einen Haken, über den fast jeder einmal stolpert: Die Spielschleife läuft sechzig Mal pro Sekunde. Würden wir einfach „wenn Leertaste gedrückt, dann schieße“ schreiben, dann feuerte das Schiff bei gehaltener Taste sechzig Schüsse pro Sekunde – ein Wasserfall aus Geschossen, und der Köcher wäre im selben Wimpernschlag leer."));
-children.push(p("Was wir wollen, ist ein Schuss pro Tastendruck. Dafür müssen wir den Moment erwischen, in dem die Taste gerade eben heruntergeht – nicht die ganze Zeit, in der sie unten bleibt. Der Trick: Wir merken uns von einem Frame zum nächsten, ob die Taste schon vorher gedrückt war. Nur wenn sie jetzt gedrückt ist, vorher aber nicht, ist das ein frischer Tastendruck:"));
+children.push(p("Was wir wollen, ist ein Schuss pro Tastendruck. Dafür müssen wir den Moment erwischen, in dem die Taste gerade eben heruntergeht – nicht die ganze Zeit, in der sie unten bleibt. Diesen Moment nennt man die FLANKE eines Tastendrucks, und GameBasic hat dafür einen eigenen Befehl:"));
 children.push(codeBlock([
-  "DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)",
-  "IF firing AND NOT prevShoot THEN",
+  "IF KEYHIT(KEY_SPACE) THEN",
   "    DIM s AS INTEGER",
   "    FOR s = 0 TO NBULLET - 1",
   "        IF NOT bAlive[s] THEN",
@@ -633,15 +633,21 @@ children.push(codeBlock([
   "        END IF",
   "    NEXT s",
   "END IF",
-  "prevShoot = firing",
 ]));
 children.push(pmix([
   ["", false],
-  ["firing AND NOT prevShoot", true],
-  [" ist nur im ersten Bild des Drückens wahr – das nennt man Flankenerkennung. Die ", false],
-  ["FOR", true], ["-Schleife sucht den ersten freien Platz; ", false],
-  ["BREAK", true], [" verlässt die Schleife sofort, sobald einer gefunden ist. Der Schuss startet knapp über dem Schiff.", false],
+  ["KEYHIT", true],
+  [" ist nur in dem einen Bild wahr, in dem die Taste heruntergeht – gehalten feuert sie also nicht weiter. Merke dir das Paar: ", false],
+  ["KEYPRESSED", true], [" fragt „wird gehalten?“ (richtig fürs Bewegen), ", false],
+  ["KEYHIT", true], [" fragt „gerade gedrückt?“ (richtig für Aktionen). Für die Maus heißen sie ", false],
+  ["MOUSEBUTTON", true], [" und ", false], ["MOUSE_HIT", true],
+  [", fürs Gamepad ", false], ["JOYSTICK_BUTTON", true], [" und ", false], ["JOYSTICK_HIT", true], [".", false],
 ]));
+children.push(pmix([
+  ["Die ", false], ["FOR", true], ["-Schleife sucht den ersten freien Platz im Köcher; ", false],
+  ["BREAK", true], [" verlässt sie sofort, sobald einer gefunden ist. Der Schuss startet knapp über dem Schiff.", false],
+]));
+children.push(why("Wie käme man ohne KEYHIT aus? Man müsste sich von einem Frame zum nächsten selbst merken, ob die Taste schon vorher unten war, und nur dann feuern, wenn sie JETZT unten ist und vorher nicht: eine zusätzliche Variable, zwei zusätzliche Zeilen – und das für jede Taste, die eine Aktion auslöst. Genau so stand es in der ersten Fassung dieses Buchs. Es lohnt sich trotzdem, den Gedanken zu kennen: Die Unterscheidung zwischen „gehalten“ und „gerade gedrückt“ musst du in jedem Spiel treffen, egal in welcher Sprache. GameBasic nimmt dir nur die Buchführung ab."));
 
 children.push(h2("Schüsse bewegen und zeichnen"));
 children.push(p("Ein gestarteter Schuss soll natürlich nicht in der Luft hängen bleiben wie ein vergessener Luftballon. Jeden Frame lassen wir deshalb alle gerade fliegenden Schüsse ein Stück nach oben wandern. Und sobald einer oben aus dem Bild verschwindet, geben wir seinen Platz im Köcher wieder frei – damit er für den nächsten Schuss bereitsteht. Genau das macht den Pool so sparsam:"));
@@ -681,7 +687,6 @@ children.push(codeBlock([
   "DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER",
   "DIM bAlive[NBULLET] AS BOOLEAN",
   "FOR i = 0 TO NBULLET - 1 : bAlive[i] = FALSE : NEXT i",
-  "DIM prevShoot AS BOOLEAN",
   "",
   "WHILE NOT QUITREQUESTED()",
   "    CLS(&H05060F)",
@@ -694,8 +699,7 @@ children.push(codeBlock([
   "    IF KEYPRESSED(KEY_RIGHT) OR KEYPRESSED(KEY_D) THEN shipX = shipX + 4",
   "    IF shipX < 0 THEN shipX = 0",
   "    IF shipX > 464 THEN shipX = 464",
-  "    DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)",
-  "    IF firing AND NOT prevShoot THEN",
+  "    IF KEYHIT(KEY_SPACE) THEN",
   "        DIM s AS INTEGER",
   "        FOR s = 0 TO NBULLET - 1",
   "            IF NOT bAlive[s] THEN",
@@ -703,7 +707,6 @@ children.push(codeBlock([
   "            END IF",
   "        NEXT s",
   "    END IF",
-  "    prevShoot = firing",
   "    FOR i = 0 TO NBULLET - 1",
   "        IF bAlive[i] THEN",
   "            by[i] = by[i] - 8",
@@ -720,13 +723,13 @@ figure("kap04_schiessen.png", "Feuer frei: Die Schüsse steigen in einer Reihe n
 children.push(h2("Was du gelernt hast"));
 children.push(bulletRich("Pool ", "= fester Vorrat (hier 5 Schüsse), der wiederverwendet wird – mit bAlive merken wir, welche Plätze belegt sind."));
 children.push(bulletRich("BOOLEAN ", "speichert Ja/Nein (TRUE/FALSE)."));
-children.push(bulletRich("Flankenerkennung ", "(firing AND NOT prevShoot) = ein Schuss pro Tastendruck."));
+children.push(bulletRich("KEYHIT ", "= die Flanke eines Tastendrucks: ein Schuss pro Druck, statt sechzig pro Sekunde. KEYPRESSED bleibt fürs Bewegen."));
 children.push(bulletRich("BREAK ", "verlässt eine Schleife vorzeitig."));
 
 children.push(h2("Übung"));
 children.push(bullet("Erlaube mehr Schüsse gleichzeitig (NBULLET erhöhen)."));
 children.push(bullet("Mach die Schüsse schneller oder langsamer (die 8)."));
-children.push(bullet("Entferne die Flankenerkennung (feuere bei gehaltener Taste) – wie fühlt sich das an?"));
+children.push(bullet("Tausche KEYHIT gegen KEYPRESSED (feuere bei gehaltener Taste) – wie fühlt sich das an?"));
 
 // ===================== Kapitel 5 =====================
 children.push(chapter("Kapitel 5: Sternenhimmel mit Parallax"));
@@ -1328,6 +1331,12 @@ children.push(codeBlock([
   "CAMERA_RESET()                         ' zurueck zu Bildschirm-Koordinaten",
   'TEXT(INT(offx) + 8, 6, "SCORE: " + STR$(score))',
 ]));
+children.push(p("Etwas rechtsbündig an den Spielfeldrand zu setzen ist kniffliger, als es aussieht: Du musst wissen, wie breit dein Text überhaupt wird. Genau das verrät TEXT_WIDTH – und zwar in der Schrift und Größe, die gerade aktiv ist:"));
+children.push(codeBlock([
+  'DIM hinweis AS STRING : hinweis = "F1:CRT"',
+  "TEXT(INT(sw - offx) - TEXT_WIDTH(hinweis) - 4, 6, hinweis, &H5C7088)",
+]));
+children.push(tip("Nicht schätzen, messen", "Die erste Fassung dieses Spiels zog hier einfach 56 Pixel ab – eine geschätzte Textbreite. Auf einem großen Bildschirm ragte der Hinweis dadurch sichtbar über den Spielfeldrand in die bunten Ränder hinein. Mit TEXT_WIDTH sitzt er auf jedem Bildschirm und in jeder Schriftgröße genau dort, wo er hingehört."));
 children.push(pmix([
   ["", false],
   ["CAMERA_RESET", true],
@@ -1402,6 +1411,102 @@ children.push(bulletRich("Bonus-Wellen: ", "Alle paar Level eine Runde nur für 
 children.push(bulletRich("Highscore-Liste: ", "Namen eintragen, dauerhaft gespeichert (save-Modul)."));
 children.push(bulletRich("Effekte: ", "Explosionen (Partikel), Bildschirm-Wackeln, CRT-Retro-Look, Regenbogen-Titel, Laufschrift."));
 children.push(bulletRich("Musik & Gamepad: ", "Hintergrundmusik und Steuerung per Controller."));
+
+// ===================== Kapitel 13 =====================
+children.push(chapter("Kapitel 13: Der Automaten-Schliff"));
+children.push(tip("In diesem Kapitel",
+  "Vier Kleinigkeiten, die aus einem Programm ein Gerät machen: ein eigenes Fenstersymbol, ein Rütteln im Gamepad, eine Pause beim Wegklicken – und ein Attract-Modus, in dem sich das Spiel selbst spielt."));
+
+children.push(p("Dein Spiel ist fertig. Es läuft, es macht Spaß, es hat Sound und Highscores. Was jetzt kommt, braucht kein Mensch – und trotzdem ist es genau das, was den Unterschied zwischen „ein Programm“ und „ein Gerät“ ausmacht. Stell dir einen echten Spielautomaten in einer Spielhalle vor: Er zeigt sein eigenes Logo, er brummt in den Händen, wenn es kracht, und wenn eine Weile niemand spielt, fängt er von selbst an, sich vorzuführen. Genau diese vier Dinge bauen wir jetzt ein."));
+
+children.push(h2("Ein eigenes Fenstersymbol"));
+children.push(p("Bisher trägt dein Fenster – und die exportierte .exe – das Standardsymbol der Laufzeit. Dabei liegt ein perfektes Symbol längst herum: dein Raumschiff."));
+children.push(codeBlock([
+  'WINDOW_ICON(LOADIMAGE("../assets/sprites/player.png"))',
+]));
+children.push(p("Eine Zeile, direkt nach SCREEN. Das ist der billigste Politur-Punkt im ganzen Buch."));
+
+children.push(h2("Das Gamepad rütteln lassen"));
+children.push(p("Wenn dein Schiff getroffen wird, wackelt der Bildschirm und es kracht. Mit einem Gamepad in der Hand kommt eine dritte Sinnesebene dazu – man SPÜRT den Treffer. Ein kurzer, kräftiger Impuls reicht; alles Längere nervt."));
+children.push(codeBlock([
+  "' Kurzer Ruettler -- nur wenn ueberhaupt ein Pad angeschlossen ist.",
+  "SUB Rumble(staerke AS FLOAT, dauer AS INTEGER)",
+  "    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer)",
+  "END SUB",
+  "",
+  "' ... beim Treffer, neben Wackeln und Krach:",
+  "Rumble(0.7, 260)",
+]));
+children.push(tip("Erst fragen, dann rütteln", "Ohne angeschlossenes Gamepad melden die JOYSTICK-Befehle einen Fehler – sie prüfen den Index. Deshalb steckt die Abfrage JOYSTICK_COUNT() > 0 in der kleinen Hülle Rumble, und der Spielcode bleibt frei davon. Dasselbe gilt für JOYSTICK_HIT: Baust du es in eine Bedingung ein, schreib eine eigene kleine Funktion drumherum."));
+
+children.push(h2("Pause, wenn niemand hinsieht"));
+children.push(p("Klickt der Spieler mitten im Gefecht auf ein anderes Fenster, läuft dein Spiel munter weiter – und er kommt zu einem verlorenen Leben zurück. Ein einziger Befehl verrät dir, ob dein Fenster gerade im Vordergrund ist:"));
+children.push(codeBlock([
+  "IF NOT WINDOW_FOCUSED() THEN",
+  "    CLS(BG)",
+  '    CenterText(INT(SCREENHEIGHT() / 2) - 8, "PAUSE", &HFFE070)',
+  "    FLIP()",
+  "    CONTINUE",
+  "END IF",
+]));
+children.push(pmix([
+  ["Das ", false], ["CONTINUE", true],
+  [" springt zum Anfang der Spielschleife zurück – die ganze Spiellogik wird also übersprungen, nur das Standbild mit dem Wort PAUSE erscheint. Sobald das Fenster wieder vorn ist, läuft alles weiter, als wäre nichts gewesen.", false],
+]));
+
+children.push(h2("Der Attract-Modus: das Spiel spielt sich selbst"));
+children.push(p("Und jetzt das Beste. Ein Spielautomat, bei dem eine Weile niemand einwirft, fängt an, sich selbst vorzuführen – damit Vorbeigehende sehen, worum es geht. Das nennt man Attract-Modus. Bisher hätte man dafür eine kleine künstliche Intelligenz schreiben müssen, die das Schiff steuert. Es geht viel einfacher: GameBasic kann deine EINGABE aufzeichnen und später wieder einspeisen. Das Spiel merkt davon nichts – KEYHIT und KEYPRESSED liefern brav die aufgezeichneten Tastendrücke."));
+children.push(codeBlock([
+  'CONST DEMO_FILE  AS STRING  = "demo.txt"',
+  "CONST ATTRACT_MS AS INTEGER = 12000       ' Ruhe vor dem Demo-Start",
+  "DIM demoExists AS BOOLEAN : demoExists = FILEEXISTS(DEMO_FILE)",
+  "DIM attract AS BOOLEAN                    ' laeuft gerade eine Demo?",
+  "DIM idleSince AS INTEGER                  ' Frame der letzten echten Eingabe",
+]));
+children.push(p("Aufgenommen wird auf Tastendruck – F2 startet und beendet die Aufnahme:"));
+children.push(codeBlock([
+  "IF KEYHIT(KEY_F2) THEN",
+  "    IF AUTOMATION_RECORDING() THEN",
+  "        AUTOMATION_STOP()",
+  "        demoExists = TRUE",
+  "    ELSE",
+  "        RANDOMIZE(4711)           ' derselbe Startwert wie bei der Wiedergabe",
+  "        AUTOMATION_RECORD(DEMO_FILE)",
+  "    END IF",
+  "END IF",
+]));
+children.push(p("Und auf dem Titelbild wartet das Spiel darauf, dass eine Weile nichts passiert:"));
+children.push(codeBlock([
+  "ELSEIF demoExists AND (frame - idleSince) * 1000 / 60 > ATTRACT_MS THEN",
+  "    RANDOMIZE(4711)",
+  "    AUTOMATION_PLAY(DEMO_FILE)",
+  "    attract = TRUE",
+  "END IF",
+]));
+children.push(pmix([
+  ["Beachte, was hier NICHT steht: kein Aufruf von ", false], ["StartGame", true],
+  [". Die Aufnahme enthält ja auch den Druck auf die Leertaste, mit dem du das Spiel damals gestartet hast – die Demo startet sich also selbst. Und jede echte Eingabe bricht sie wieder ab:", false],
+]));
+children.push(codeBlock([
+  "IF attract AND (KEY_ANY_HIT() <> -1 OR JOYSTICK_ANY_BUTTON() <> -1) THEN",
+  "    AUTOMATION_STOP()             ' Spieler uebernimmt",
+  "    attract = FALSE",
+  "    mode = GS.TITLE",
+  "END IF",
+]));
+children.push(why("Warum steht bei Aufnahme UND Wiedergabe dasselbe RANDOMIZE? Weil aufgezeichnet wird, was du GEDRÜCKT hast – nicht, was daraus wurde. Die Gegner fliegen ihre Bahnen weiterhin nach Zufall. Bekommt die Wiedergabe andere Zufallszahlen als die Aufnahme, drückt das Schiff zwar dieselben Tasten, trifft aber ins Leere und stirbt an Stellen, an denen du damals ausgewichen bist. Mit demselben Startwert würfelt der Zufall dieselbe Reihenfolge – und die Demo läuft wie am Schnürchen."));
+children.push(tip("Selbst ausprobieren", "Starte das Spiel, drücke F2, spiel eine gute Runde, drücke wieder F2. Ab jetzt liegt neben deinem Programm eine Datei demo.txt. Geh zurück zum Titelbild und lass die Finger von der Tastatur – nach zwölf Sekunden übernimmt dein eigener Geist das Steuer. Übrigens: demo.txt ist reiner Text. Öffne sie ruhig mal in einem Editor; jede Zeile ist ein Ereignis mit Bildnummer, Art und Werten."));
+
+children.push(h2("Was du gelernt hast"));
+children.push(bulletRich("WINDOW_ICON ", "gibt Fenster und exportierter .exe ein eigenes Symbol."));
+children.push(bulletRich("JOYSTICK_RUMBLE ", "lässt das Gamepad vibrieren – vorher mit JOYSTICK_COUNT prüfen, ob eines da ist."));
+children.push(bulletRich("WINDOW_FOCUSED ", "verrät, ob dein Fenster vorne ist – der ehrlichste Weg zur automatischen Pause."));
+children.push(bulletRich("AUTOMATION_RECORD / _PLAY ", "zeichnen Eingabe auf und spielen sie wieder ein: Attract-Modus, nachspielbare Fehlerberichte, automatische Tests."));
+
+children.push(h2("Übung"));
+children.push(bullet("Nimm zwei verschiedene Demos auf und wähle beim Attract-Modus zufällig eine aus."));
+children.push(bullet("Blende während der Demo groß „DEMO“ ein, damit niemand denkt, das Spiel hänge."));
+children.push(bullet("Lass das Gamepad auch beim Levelaufstieg kurz rütteln – aber schwächer als beim Treffer."));
 
 children.push(h2("Glückwunsch!"));
 children.push(p("Halt einen Moment inne und sieh dir an, was du geschafft hast. Du hast bei einem komplett leeren schwarzen Fenster angefangen – und am Ende steht ein echtes Arcade-Spiel mit einfliegenden, stürzenden, bombenwerfenden Gegnern, mit Punkten, Leben, mehreren Leveln, Sound und Effekten. Das ist keine Kleinigkeit. Das ist genau das, was professionelle Spieleentwickler tun, nur eine Nummer kleiner."));

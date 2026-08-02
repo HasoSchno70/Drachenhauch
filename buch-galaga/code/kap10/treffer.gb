@@ -102,7 +102,6 @@ bulletImg = LOADIMAGE("../../assets/sprites/bullet.png")
 CONST NBULLET AS INTEGER = 5
 DIM bx[NBULLET] AS INTEGER : DIM by[NBULLET] AS INTEGER
 DIM bAlive[NBULLET] AS BOOLEAN
-DIM prevShoot AS BOOLEAN
 
 DIM bombImg AS IMAGE
 bombImg = LOADIMAGE("../../assets/sprites/bomb.png")
@@ -160,8 +159,7 @@ WHILE NOT QUITREQUESTED()
         IF shipX < 0 THEN shipX = 0
         IF shipX > 464 THEN shipX = 464
 
-        DIM firing AS BOOLEAN : firing = KEYPRESSED(KEY_SPACE)
-        IF firing AND NOT prevShoot THEN
+        IF KEYHIT(KEY_SPACE) THEN
             DIM s AS INTEGER
             FOR s = 0 TO NBULLET - 1
                 IF NOT bAlive[s] THEN
@@ -169,7 +167,6 @@ WHILE NOT QUITREQUESTED()
                 END IF
             NEXT s
         END IF
-        prevShoot = firing
 
         diveTimer = diveTimer - 1
         IF diveTimer <= 0 THEN
