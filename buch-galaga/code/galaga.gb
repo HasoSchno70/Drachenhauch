@@ -393,9 +393,9 @@ FUNCTION PadHit(btn AS INTEGER) AS BOOLEAN
 END FUNCTION
 
 ' Kurzer Ruettler im Gamepad -- nur wenn ueberhaupt eins angeschlossen ist.
-' staerke 0..1 je Motor, dauer in Millisekunden.
-SUB Rumble(staerke AS FLOAT, dauer AS INTEGER)
-    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer)
+' staerke 0..1 je Motor, dauer in SEKUNDEN (nicht Millisekunden!).
+SUB Rumble(staerke AS FLOAT, dauer_s AS FLOAT)
+    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer_s)
 END SUB
 
 ' ===================== Modus-Wechsel =====================
@@ -488,7 +488,7 @@ SUB UpdateCapture()
                 hasCaptured = TRUE
                 dual = FALSE                 ' ein evtl. Doppeljaeger geht dabei verloren
                 lives = lives - 1
-                shake = 7.0 : PLAYSOUND(sfxHit) : Rumble(0.7, 260)
+                shake = 7.0 : PLAYSOUND(sfxHit) : Rumble(0.7, 0.26)
                 IF lives <= 0 THEN
                     GameOver()
                 ELSE
@@ -668,7 +668,7 @@ SUB UpdatePlay()
         IF hit THEN
             invuln = 90 : shake = 7.0
             PLAYSOUND(sfxHit)
-            Rumble(0.7, 260)
+            Rumble(0.7, 0.26)
             IF dual THEN
                 dual = FALSE                                  ' zweites Schiff verloren
                 Explode(playerX + 19.0, playerY + 6.0, &HFFC040, 26)

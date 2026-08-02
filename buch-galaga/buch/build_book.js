@@ -1430,13 +1430,15 @@ children.push(h2("Das Gamepad rütteln lassen"));
 children.push(p("Wenn dein Schiff getroffen wird, wackelt der Bildschirm und es kracht. Mit einem Gamepad in der Hand kommt eine dritte Sinnesebene dazu – man SPÜRT den Treffer. Ein kurzer, kräftiger Impuls reicht; alles Längere nervt."));
 children.push(codeBlock([
   "' Kurzer Ruettler -- nur wenn ueberhaupt ein Pad angeschlossen ist.",
-  "SUB Rumble(staerke AS FLOAT, dauer AS INTEGER)",
-  "    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer)",
+  "' staerke 0..1 je Motor, dauer in SEKUNDEN.",
+  "SUB Rumble(staerke AS FLOAT, dauer_s AS FLOAT)",
+  "    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer_s)",
   "END SUB",
   "",
   "' ... beim Treffer, neben Wackeln und Krach:",
-  "Rumble(0.7, 260)",
+  "Rumble(0.7, 0.26)",
 ]));
+children.push(p("Achte auf die Einheit: Die Dauer zählt in SEKUNDEN, nicht in Millisekunden. 0.26 ist ein knapper Stoß; wer aus Gewohnheit 260 hinschreibt, bekommt eine Minute Dauervibration (länger geht nicht, dort klemmt die Laufzeit ab)."));
 children.push(tip("Erst fragen, dann rütteln", "Ohne angeschlossenes Gamepad melden die JOYSTICK-Befehle einen Fehler – sie prüfen den Index. Deshalb steckt die Abfrage JOYSTICK_COUNT() > 0 in der kleinen Hülle Rumble, und der Spielcode bleibt frei davon. Dasselbe gilt für JOYSTICK_HIT: Baust du es in eine Bedingung ein, schreib eine eigene kleine Funktion drumherum."));
 
 children.push(h2("Pause, wenn niemand hinsieht"));
