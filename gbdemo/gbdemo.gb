@@ -118,42 +118,55 @@ FUNCTION randblende(t AS FLOAT, dauer AS FLOAT, rand AS FLOAT) AS FLOAT
 END FUNCTION
 
 ' Spektrum lesen und in bass/mitten/hoehen zusammenfassen.
+'
+' Zwei Wege, absichtlich getrennt:
+'   glatt[]  haelt Spitzen und faellt langsam nach -- ruhige Saeulen, schoene
+'            Optik, aber TRAEGE.
+'   roh_*    ist das ungeglaettete Bild dieses Augenblicks.
+' Der Schlag muss aus den ROHEN Werten kommen. Auf den geglaetteten liegt er
+' dauerhaft dicht an seinem eigenen Mittel und schlaegt nie an -- genau das
+' war hier zuerst der Fehler.
 SUB spektrum_lesen()
     AUDIO_FFT(spek)
     DIM k AS INTEGER
-    DIM sb AS FLOAT
-    DIM sm AS FLOAT
-    DIM sh2 AS FLOAT
-    sb = 0.0
-    sm = 0.0
-    sh2 = 0.0
+    DIM rb AS FLOAT
+    DIM rm AS FLOAT
+    DIM rh AS FLOAT
+    rb = 0.0
+    rm = 0.0
+    rh = 0.0
     FOR k = 0 TO BAENDER - 1
-        ' Nachfallend: schnell hoch, langsam runter -- so zappelt nichts.
         IF spek[k] > glatt[k] THEN
             glatt[k] = spek[k]
         ELSE
             glatt[k] = glatt[k] * 0.86 + spek[k] * 0.14
         END IF
         IF k < 6 THEN
-            sb = sb + glatt[k]
+            rb = rb + spek[k]
         ELSEIF k < 16 THEN
-            sm = sm + glatt[k]
+            rm = rm + spek[k]
         ELSE
-            sh2 = sh2 + glatt[k]
+            rh = rh + spek[k]
         END IF
     NEXT
-    bass = sb / 6.0
-    mitten = sm / 10.0
-    hoehen = sh2 / 16.0
+    rb = rb / 6.0
+    rm = rm / 10.0
+    rh = rh / 16.0
+
+    ' Leicht geglaettet fuers Bild -- gerade so viel, dass nichts flackert.
+    bass = bass * 0.55 + rb * 0.45
+    mitten = mitten * 0.55 + rm * 0.45
+    hoehen = hoehen * 0.55 + rh * 0.45
     IF bass > 1.0 THEN bass = 1.0
     IF mitten > 1.0 THEN mitten = 1.0
     IF hoehen > 1.0 THEN hoehen = 1.0
 
-    ' Schlag = Bass deutlich ueber seinem eigenen Mittel, mit Sperrzeit.
-    bass_lang = bass_lang * 0.97 + bass * 0.03
+    ' Schlag = roher Bass deutlich ueber seinem eigenen gleitenden Mittel,
+    ' mit Sperrzeit gegen Doppelausloesung.
+    bass_lang = bass_lang * 0.94 + rb * 0.06
     beat = FALSE
-    IF bass > bass_lang * 1.28 AND bass > 0.10 THEN
-        IF COOLDOWN("beat", 160) THEN
+    IF rb > bass_lang * 1.18 AND rb > 0.12 THEN
+        IF COOLDOWN("beat", 170) THEN
             beat = TRUE
             beat_alter = 0.0
         END IF
@@ -470,6 +483,166 @@ SUB szene_pbr()
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SZENE 5 -- Physik: das Logo faellt in sich zusammen
+' ----------------------------------------------------------------------
+' physics2d ist KEINE Kollisions-Mathematik, sondern ein echter
+' Starrkoerper-Solver (Rapier2D): Schwerkraft, Stapeln, Reibung, Abprallen
+' rechnet die Laufzeit. Die Demo baut nur die Kloetze auf und schaut zu.
+'
+' Die Buchstaben stehen als Muster da -- ein '#' wird ein Klotz. So laesst
+' sich das Logo aendern, ohne eine einzige Koordinate anzufassen.
+CONST KLOTZ AS INTEGER = 26          ' Kantenlaenge eines Klotzes in Pixeln
+CONST MAXK AS INTEGER = 260
+CONST LOGO_ZEILEN AS INTEGER = 7
+
+DIM logo_g[LOGO_ZEILEN] AS STRING
+DIM logo_b[LOGO_ZEILEN] AS STRING
+
+DIM welt AS PHYS2D_WORLD
+DIM kid[MAXK] AS INTEGER             ' Koerper-Nummern in der Welt
+DIM kfarbe[MAXK] AS INTEGER
+DIM ist_kugel[MAXK] AS BOOLEAN
+DIM nk AS INTEGER
+DIM naechster_aufbau AS FLOAT
+DIM aufbau_zeit AS FLOAT
+DIM n_logo AS INTEGER                ' wie viele Koerper zum Logo gehoeren
+DIM steht AS BOOLEAN                 ' steht das Logo noch?
+DIM weiss AS IMAGE
+DIM welt_bereit AS BOOLEAN
+
+' Eine Buchstaben-Schablone in Kloetze uebersetzen.
+SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, farbe AS INTEGER)
+    DIM r AS INTEGER
+    FOR r = 0 TO LOGO_ZEILEN - 1
+        DIM zeile AS STRING
+        zeile = muster[r]
+        DIM c AS INTEGER
+        FOR c = 0 TO LEN(zeile) - 1
+            IF MID$(zeile, c, 1) = "#" AND nk < MAXK THEN
+                ' Erst einmal STATISCH: sonst faellt der Querbalken des G in
+                ' dem Moment herunter, in dem die Szene beginnt -- man saehe
+                ' das Logo nie. Umgekippt wird es unten auf den Einschlag.
+                kid[nk] = PHYS2D_ADD_BOX(welt, x0 + c * KLOTZ, y0 + r * KLOTZ, _
+                                         KLOTZ / 2 - 1, KLOTZ / 2 - 1, FALSE, 0.05)
+                kfarbe[nk] = farbe
+                ist_kugel[nk] = FALSE
+                nk = nk + 1
+            END IF
+        NEXT
+    NEXT
+END SUB
+
+SUB physik_aufbauen()
+    ' Eine frische Welt ist der einfachste Weg zurueck auf Anfang -- die alte
+    ' gibt die Laufzeit selbst frei.
+    welt = PHYS2D_NEW()
+    PHYS2D_SET_GRAVITY(welt, 0.0, 1600.0)
+    nk = 0
+
+    ' Boden und zwei Waende, statisch (dynamic = FALSE).
+    PHYS2D_ADD_BOX(welt, BREITE \ 2, HOEHE - 20, BREITE \ 2, 20, FALSE, 0.1)
+    PHYS2D_ADD_BOX(welt, -20, HOEHE \ 2, 20, HOEHE, FALSE, 0.1)
+    PHYS2D_ADD_BOX(welt, BREITE + 20, HOEHE \ 2, 20, HOEHE, FALSE, 0.1)
+
+    DIM y0 AS INTEGER
+    y0 = HOEHE - 60 - LOGO_ZEILEN * KLOTZ
+    logo_setzen(logo_g, BREITE \ 2 - 6 * KLOTZ, y0, RGB(90, 220, 210))
+    logo_setzen(logo_b, BREITE \ 2 + 1 * KLOTZ, y0, RGB(230, 110, 190))
+    n_logo = nk
+    steht = TRUE
+    welt_bereit = TRUE
+END SUB
+
+' Die stehenden Kloetze gegen bewegliche an derselben Stelle tauschen.
+' Rapier kennt in unserer API kein Umschalten statisch <-> dynamisch, also
+' entfernen und neu setzen -- die Nummern bleiben dank Tombstones gueltig.
+SUB logo_umkippen()
+    DIM k AS INTEGER
+    FOR k = 0 TO n_logo - 1
+        DIM x AS FLOAT
+        DIM y AS FLOAT
+        x = PHYS2D_BODY_X(welt, kid[k])
+        y = PHYS2D_BODY_Y(welt, kid[k])
+        PHYS2D_REMOVE(welt, kid[k])
+        kid[k] = PHYS2D_ADD_BOX(welt, x, y, KLOTZ / 2 - 1, KLOTZ / 2 - 1, TRUE, 0.05)
+    NEXT
+    steht = FALSE
+END SUB
+
+SUB szene_physik()
+    modus = 0.0
+    IF NOT welt_bereit THEN
+        physik_aufbauen()
+        aufbau_zeit = zeit
+        naechster_aufbau = zeit + 14.0
+    END IF
+
+    ' Auf dem Schlag von der Seite eine Kugel hineinwerfen -- die Musik
+    ' raeumt das Logo also selbst ab.
+    ' Die ERSTE Kugel kippt das Logo um; vorher bekommt der Zuschauer drei
+    ' Sekunden, es ueberhaupt zu sehen.
+    ' COOLDOWN bremst den Nachschub: der Schlagerkenner meldet oefter als
+    ' hier eine Kugel gebraucht wird.
+    IF beat AND bass > 0.20 AND nk < MAXK AND zeit - aufbau_zeit > 3.0 _
+       AND COOLDOWN("wurf", 650) THEN
+        IF steht THEN logo_umkippen()
+        DIM von_links AS BOOLEAN
+        von_links = (INT(zeit * 3.0) MOD 2) = 0
+        DIM sx AS INTEGER
+        DIM v AS FLOAT
+        IF von_links THEN
+            sx = 40
+            v = 900.0 + 700.0 * bass
+        ELSE
+            sx = BREITE - 40
+            v = -900.0 - 700.0 * bass
+        END IF
+        kid[nk] = PHYS2D_ADD_CIRCLE(welt, sx, HOEHE - 250, 16, TRUE, 0.45)
+        kfarbe[nk] = regenbogen(zeit * 2.0, 1.0)
+        ist_kugel[nk] = TRUE
+        PHYS2D_SET_VEL(welt, kid[nk], v, -260.0)
+        nk = nk + 1
+    END IF
+
+    PHYS2D_STEP(welt, dt)
+
+    ' Neu aufbauen, bevor der Platz ausgeht oder nichts mehr steht.
+    IF zeit > naechster_aufbau OR nk >= MAXK - 4 THEN
+        physik_aufbauen()
+        aufbau_zeit = zeit
+        naechster_aufbau = zeit + 14.0
+    END IF
+
+    ' --- Zeichnen ---
+    BOX(0, HOEHE - 40, BREITE, HOEHE, RGB(26, 30, 44))
+    DIM k AS INTEGER
+    FOR k = 0 TO nk - 1
+        DIM cx AS FLOAT
+        DIM cy AS FLOAT
+        cx = PHYS2D_BODY_X(welt, kid[k])
+        cy = PHYS2D_BODY_Y(welt, kid[k])
+        IF cy < HOEHE + 100 THEN
+            IF ist_kugel[k] THEN
+                DIM ang AS FLOAT
+                ang = PHYS2D_BODY_ANGLE(welt, kid[k])
+                CIRCLE(INT(cx), INT(cy), 16, kfarbe[k])
+                ' Ein Radiusstrich macht die Eigendrehung sichtbar -- sonst
+                ' saehe man einer rollenden Kugel gar nicht an, dass sie rollt.
+                LINE(INT(cx), INT(cy), INT(cx + 15.0 * COS(ang)), INT(cy + 15.0 * SIN(ang)), _
+                     RGB(20, 20, 30))
+            ELSE
+                ' BODY_ANGLE ist Radiant, der Blit will Grad.
+                DRAWIMAGEROT(weiss, INT(cx), INT(cy), DEG(PHYS2D_BODY_ANGLE(welt, kid[k])), _
+                             KLOTZ / 32.0, kfarbe[k])
+            END IF
+        END IF
+    NEXT
+
+    mtext(BREITE \ 2, 46, "physics2d (Rapier)  -  " + STR$(PHYS2D_COUNT(welt)) + " Koerper", _
+          0.5, RGB(140, 180, 210))
+END SUB
+
+' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
 ' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
@@ -513,6 +686,23 @@ PARTICLE_SET_SIZE(psys, 2, 7)
 PARTICLE_SET_GRAVITY(psys, 0.0, 30.0)
 PARTICLE_SET_FADE(psys, TRUE)
 PARTICLE_SET_MODE(psys, "glow")
+
+' Buchstaben-Schablonen fuer Szene 5 (ein '#' wird ein Klotz)
+logo_g[0] = "#####"
+logo_g[1] = "#...."
+logo_g[2] = "#...."
+logo_g[3] = "#.###"
+logo_g[4] = "#...#"
+logo_g[5] = "#...#"
+logo_g[6] = "#####"
+logo_b[0] = "####."
+logo_b[1] = "#...#"
+logo_b[2] = "#...#"
+logo_b[3] = "####."
+logo_b[4] = "#...#"
+logo_b[5] = "#...#"
+logo_b[6] = "####."
+weiss = GENTEX_COLOR(32, 32, &HFFFFFF)
 
 mesh_box = MESH_CUBE(0.8, 0.8, 0.8)
 ' Platzhalter-Matrix fuer ungenutzte Array-Plaetze: weit unter die Szene.
@@ -641,7 +831,7 @@ WHILE NOT QUITREQUESTED()
         szene = 5
         szene_t = zeit - T4
         blende = randblende(szene_t, T5 - T4, 1.5)
-        szene_platzhalter("5  PHYSIK")
+        szene_physik()
     ELSEIF zeit < T6 THEN
         szene = 6
         szene_t = zeit - T5

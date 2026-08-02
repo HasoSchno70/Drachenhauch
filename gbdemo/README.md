@@ -37,7 +37,7 @@ einer Demo:
 | 2 | 0:42 | Sternenflug | `LINES` — 1400 Streifen in einem Aufruf, `particles`, additives Blenden |
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
-| 5 | 2:52 | Physik | *in Arbeit* |
+| 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
 | 6 | 3:34 | Tunnel | *in Arbeit* |
 | 7 | 4:16 | Klangfarben | *in Arbeit* |
 | 8 | 5:00 | Abspann | *in Arbeit* |
@@ -80,3 +80,14 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   sonst zieht der HDR-Himmel auch hinter der nächsten Szene auf.
 - `MODEL_EMISSIVE` mit Stärke über ~1.5 ergibt zusammen mit dem Bloom nur noch
   eine weiße Scheibe — die Farbe geht verloren.
+- **Ein Schlagerkenner braucht das ROHE Spektrum.** Die nachfallende Glättung,
+  die die Säulen ruhig aussehen lässt, liegt dauerhaft dicht an ihrem eigenen
+  gleitenden Mittel — der Vergleich „deutlich über dem Mittel" schlägt darauf
+  nie an. Die Demo führt beides getrennt: `glatt[]` fürs Bild, die rohen Werte
+  für den Schlag.
+- **`physics2d` kennt kein Umschalten statisch ↔ dynamisch.** Ein Logo, das erst
+  stehen und dann zusammenfallen soll, baut man statisch auf und tauscht die
+  Körper im richtigen Moment gegen dynamische an derselben Stelle aus
+  (`PHYS2D_REMOVE` + neu anlegen; die Nummern bleiben dank Tombstones gültig).
+  Ohne das fällt der Querbalken des „G" in dem Moment herunter, in dem die Szene
+  beginnt — man sieht das Logo nie.
