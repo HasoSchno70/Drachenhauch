@@ -25,6 +25,7 @@
 '  Start:  gbrun.py gbdemo\gbdemo.gb
 ' ======================================================================
 
+IMPORT "audio"
 IMPORT "m3d"
 IMPORT "g3d"
 IMPORT "particles"
@@ -738,6 +739,137 @@ SUB szene_tunnel()
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SZENE 7 -- Klangfarben: die Effektkette bei der Arbeit
+' ----------------------------------------------------------------------
+' Die einzige Szene, in der die Demo den KLANG anfasst. Kira faehrt die
+' Effekte auf dem Audio-Thread; das Programm setzt nur Werte und rechnet pro
+' Bild NICHTS nach -- ein Filter-Sweep laeuft also sample-genau weiter, auch
+' wenn die Bildrate einbricht.
+'
+' Der Beweis steht im Bild: die Saeulen sind das ECHTE Spektrum hinter der
+' Kette. Faehrt der Tiefpass herunter, sieht man die rechten Saeulen
+' verschwinden -- nicht als Animation, sondern weil sie wirklich weg sind.
+CONST STUFEN AS INTEGER = 6
+
+DIM lfo AS AUDIO_MOD
+DIM lfo_aktiv AS BOOLEAN
+DIM stufe AS INTEGER
+DIM stufe_alt AS INTEGER
+
+FUNCTION stufenname(n AS INTEGER) AS STRING
+    IF n = 0 THEN RETURN "TIEFPASS-SWEEP"
+    IF n = 1 THEN RETURN "WOBBLE  (LFO auf den Filter)"
+    IF n = 2 THEN RETURN "ECHO  (Delay)"
+    IF n = 3 THEN RETURN "HALL  (Reverb)"
+    IF n = 4 THEN RETURN "VERZERRER  (Distortion)"
+    RETURN "AUTO-PAN  (LFO auf die Balance)"
+END FUNCTION
+
+FUNCTION stufenzeile(n AS INTEGER) AS STRING
+    IF n = 0 THEN RETURN "AUDIO_FILTER(bus$, cutoff_hz, resonance)"
+    IF n = 1 THEN RETURN "AUDIO_LFO_NEW + AUDIO_MODULATE(bus$, ""filter"", ...)"
+    IF n = 2 THEN RETURN "AUDIO_DELAY(bus$, mix, feedback, time_ms)"
+    IF n = 3 THEN RETURN "AUDIO_REVERB(bus$, mix, feedback, damping)"
+    IF n = 4 THEN RETURN "AUDIO_DISTORTION(bus$, amount, mix)"
+    RETURN "AUDIO_MODULATE(bus$, ""pan"", lfo, -1, +1)"
+END FUNCTION
+
+' Alles auf neutral -- vor jeder Stufe und beim Verlassen der Szene.
+SUB klang_neutral()
+    IF lfo_aktiv THEN
+        AUDIO_MOD_REMOVE(lfo)
+        lfo_aktiv = FALSE
+    END IF
+    AUDIO_FILTER("music", 0, 0)          ' 0 = offen
+    AUDIO_DELAY("music", 0.0)
+    AUDIO_REVERB("music", 0.0)
+    AUDIO_DISTORTION("music", 0.0)
+    AUDIO_BUS_PAN("music", 0.0)
+END SUB
+
+SUB klang_stufe_setzen(n AS INTEGER)
+    klang_neutral()
+    IF n = 1 THEN
+        lfo = AUDIO_LFO_NEW("sine", 5.5)
+        AUDIO_MODULATE("music", "filter", lfo, 260.0, 5200.0)
+        lfo_aktiv = TRUE
+    ELSEIF n = 2 THEN
+        AUDIO_DELAY("music", 0.42, 0.55, 300)
+    ELSEIF n = 3 THEN
+        AUDIO_REVERB("music", 0.55, 0.88, 0.25)
+    ELSEIF n = 4 THEN
+        AUDIO_DISTORTION("music", 0.45, 0.7)
+    ELSEIF n = 5 THEN
+        lfo = AUDIO_LFO_NEW("triangle", 0.7)
+        AUDIO_MODULATE("music", "pan", lfo, -0.9, 0.9)
+        lfo_aktiv = TRUE
+    END IF
+END SUB
+
+SUB szene_klang()
+    modus = 0.0
+    DIM dauer AS FLOAT
+    dauer = (T7 - T6) / STUFEN
+    stufe = INT(szene_t / dauer)
+    IF stufe > STUFEN - 1 THEN stufe = STUFEN - 1
+    IF stufe <> stufe_alt THEN
+        klang_stufe_setzen(stufe)
+        stufe_alt = stufe
+    END IF
+
+    ' Stufe 0 faehrt den Cutoff von Hand -- der einzige Wert, den die Demo
+    ' hier pro Bild nachzieht; alle anderen laufen von selbst weiter.
+    DIM cutoff AS FLOAT
+    cutoff = 0.0
+    IF stufe = 0 THEN
+        DIM ph AS FLOAT
+        ph = (szene_t / dauer) * 6.28318 * 2.0
+        cutoff = 300.0 + (0.5 + 0.5 * SIN(ph - 1.57)) * 7000.0
+        AUDIO_FILTER("music", cutoff, 0.55)
+    END IF
+
+    ' --- Spektrum gross in die Mitte: DAS ist der Beweis ---
+    DIM bw AS INTEGER
+    bw = (BREITE - 160) \ BAENDER
+    DIM k AS INTEGER
+    FOR k = 0 TO BAENDER - 1
+        DIM h AS INTEGER
+        h = INT(glatt[k] * HOEHE * 0.42)
+        DIM x0 AS INTEGER
+        x0 = 80 + k * bw
+        DIM c AS INTEGER
+        c = regenbogen(k * 0.16 + zeit * 0.5, 0.45 + 0.55 * glatt[k])
+        BOXROUND(x0 + 2, HOEHE \ 2 + 150 - h, x0 + bw - 3, HOEHE \ 2 + 150, 4, c)
+    NEXT
+    LINE(80, HOEHE \ 2 + 151, BREITE - 80, HOEHE \ 2 + 151, RGB(60, 72, 96))
+
+    ' --- Was gerade laeuft ---
+    mtext(BREITE \ 2, 120, stufenname(stufe), 1.0, regenbogen(zeit * 0.8, 1.0))
+    mtext(BREITE \ 2, 176, stufenzeile(stufe), 0.5, RGB(150, 190, 220))
+
+    ' Fortschritt durch die Kette
+    DIM e AS INTEGER
+    FOR e = 0 TO STUFEN - 1
+        DIM px AS INTEGER
+        px = BREITE \ 2 + (e - (STUFEN - 1) / 2.0) * 46
+        IF e = stufe THEN
+            CIRCLE(px, 226, 9, regenbogen(zeit * 0.8, 1.0))
+        ELSE
+            CIRCLE(px, 226, 5, RGB(60, 72, 96))
+        END IF
+    NEXT
+
+    IF stufe = 0 THEN
+        mtext(BREITE \ 2, HOEHE - 96, "Cutoff " + STR$(INT(cutoff)) + " Hz  -  " + _
+              "die rechten Saeulen verschwinden wirklich", 0.46, RGB(140, 180, 210))
+    ELSE
+        mtext(BREITE \ 2, HOEHE - 96, _
+              "Kira faehrt das auf dem Audio-Thread  -  das Programm rechnet nichts nach", _
+              0.46, RGB(140, 180, 210))
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
 ' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
@@ -754,6 +886,14 @@ SUB szene_start(neu AS INTEGER)
         SKYBOX(FALSE)
         LIGHT_AMBIENT(&H1A2030, 0.55)
         LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+    END IF
+
+    ' Szene 7 haengt Effekte in den Musik-Bus. Die bleiben sonst haengen und
+    ' der Abspann liefe durch einen Verzerrer.
+    IF neu = 7 THEN
+        stufe_alt = -1
+    ELSE
+        klang_neutral()
     END IF
 END SUB
 
@@ -937,7 +1077,7 @@ WHILE NOT QUITREQUESTED()
         szene = 7
         szene_t = zeit - T6
         blende = randblende(szene_t, T7 - T6, 1.5)
-        szene_platzhalter("7  KLANGFARBEN")
+        szene_klang()
     ELSE
         szene = 8
         szene_t = zeit - T7

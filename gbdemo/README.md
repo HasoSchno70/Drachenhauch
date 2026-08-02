@@ -39,7 +39,7 @@ einer Demo:
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
 | 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
 | 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, Nachhall aus `RENDERTARGET_*` |
-| 7 | 4:16 | Klangfarben | *in Arbeit* |
+| 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
 | 8 | 5:00 | Abspann | *in Arbeit* |
 
 ## Der Post-Effekt
@@ -51,6 +51,29 @@ und füttert ihn mit `bass`, `hoehen` und `fade`.
 Wichtig zum Verständnis: `POSTFX` bekommt das **fertige Bild**. Ein Hintergrund
 lässt sich dort nur einblenden, *wo das Bild dunkel ist* — die Demo zeichnet
 ihre Szenen deshalb auf Schwarz, und der Shader füllt die dunklen Stellen.
+
+### Die einzige Szene, die den Klang anfasst
+
+Szene 7 hängt echte Effekte in den Musik-Bus — Kira fährt sie auf dem
+Audio-Thread, das Programm setzt nur Werte und rechnet pro Bild **nichts** nach.
+Ein Filter-Sweep läuft deshalb sample-genau weiter, auch wenn die Bildrate
+einbricht.
+
+Der Beweis steht im Bild: die Säulen sind das **echte** Spektrum *hinter* der
+Kette. Nachgemessen beim Tiefpass-Sweep — Summe der oberen zwölf Bänder:
+
+| Cutoff | Höhen | Bass |
+|---|---|---|
+| ~7200 Hz | 0.79 | 3.76 |
+| ~5400 Hz | 1.30 | 4.84 |
+| ~890 Hz | 0.18 | 3.77 |
+| ~460 Hz | 0.13 | 5.58 |
+
+Faktor sechs bei den Höhen, der Bass bleibt stehen. Die rechten Säulen
+verschwinden also wirklich, statt es nur zu spielen.
+
+**Effekte sind globaler Bus-Zustand** — beim Verlassen der Szene muss alles auf
+neutral zurück (`klang_neutral()`), sonst läuft der Abspann durch den Verzerrer.
 
 ## Musik
 
