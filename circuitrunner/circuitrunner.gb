@@ -20,6 +20,7 @@
 '  Start:  gbrun.py circuitrunner\circuitrunner.gb       (oder im Editor F5)
 ' =====================================================================
 IMPORT "json"
+IMPORT "imgfx"
 IMPORT "input"
 IMPORT "audio"
 IMPORT "save"
@@ -218,6 +219,16 @@ DIM sl_pctx AS INTEGER
 DIM sl_my AS INTEGER           ' Musik-Slider Mittel-Y
 DIM sl_sy AS INTEGER           ' Effekte-Slider Mittel-Y
 DIM sl_h AS INTEGER            ' Slider-Hoehe / Hit-Toleranz
+DIM cursor_form AS STRING      ' aktuell gesetzte Mauszeiger-Form
+
+' --- Loesungen aufzeichnen und wieder abspielen --------------------------
+' AUTOMATION_* schreibt die EINGABE mit und speist sie spaeter wieder ein.
+' Damit dieselbe Eingabe auch dasselbe Ergebnis liefert, muss der Rest
+' gleich sein: derselbe Level-Zustand, dieselbe Zufallsfolge (Zufalls-
+' Laufbaender und Blobs wuerfeln!) und dieselbe Zeitrechnung.
+CONST DEMO_SEED AS INTEGER = 1337
+DIM demo_mode AS INTEGER       ' 0 = normal, 1 = Aufnahme, 2 = Wiedergabe
+DIM demo_frames AS INTEGER     ' Bilder seit Demo-Start (ersetzt die Wanduhr)
 
 ' Bildschirm-Layout (native Aufloesung; Text/Icons scharf, Board pixelig)
 DIM SW AS INTEGER
@@ -449,7 +460,7 @@ END FUNCTION
 ' Sieg verbuchen: Bestwert aktualisieren, Fortschritt sichern, Datei schreiben
 SUB record_win()
     DIM elapsed AS INTEGER
-    elapsed = (MILLIS() - start_ms) \ 1000
+    elapsed = (now_ms() - start_ms) \ 1000
     IF lvl_time > 0 THEN
         win_secs = lvl_time - elapsed       ' CC-Zeitbonus: verbliebene Zeit
         IF win_secs < 0 THEN win_secs = 0
@@ -874,13 +885,31 @@ SUB adjust_sfx(d AS FLOAT)
     sfx_chip()                ' kurzes Feedback auf dem neuen Effekt-Pegel
 END SUB
 
+' Mauszeiger-Form nur bei echter Aenderung setzen -- MOUSE_CURSOR jedes Bild
+' neu zu rufen waere zwar harmlos, aber unnoetiger Fensterverkehr.
+SUB set_cursor(form AS STRING)
+    IF form = cursor_form THEN RETURN
+    cursor_form = form
+    MOUSE_CURSOR(form)
+END SUB
+
 ' Lautstaerke-Slider per Maus bedienen (nur wenn das HUD sichtbar ist)
 SUB update_volume()
-    IF NOT MOUSEBUTTON(0) THEN RETURN
     DIM mx AS INTEGER
     DIM my AS INTEGER
     mx = MOUSEX()
     my = MOUSEY()
+    ' Zeigt der Zeiger auf eine der beiden Leisten? Die Antwort steuert die
+    ' Zeigerform -- was man anfassen kann, soll auch so aussehen.
+    DIM auf_leiste AS BOOLEAN
+    auf_leiste = mx >= sl_x0 - sl_h AND mx <= sl_x1 + sl_h AND (ABS(my - sl_my) <= sl_h OR ABS(my - sl_sy) <= sl_h)
+    IF auf_leiste THEN
+        set_cursor("hand")
+    ELSE
+        set_cursor("default")
+    END IF
+
+    IF NOT MOUSEBUTTON(0) THEN RETURN
     IF mx < sl_x0 - sl_h OR mx > sl_x1 + sl_h THEN RETURN
     DIM v AS FLOAT
     v = (mx - sl_x0) * 1.0 / (sl_x1 - sl_x0)
@@ -909,10 +938,53 @@ END SUB
 ' ----------------------------------------------------------------------
 '  SPIELER-BEWEGUNG + MECHANIK
 ' ----------------------------------------------------------------------
+' Kurzer Ruettler im Gamepad -- nur wenn ueberhaupt eins angeschlossen ist,
+' sonst meldet JOYSTICK_RUMBLE einen ungueltigen Index. Dauer in SEKUNDEN.
+SUB rumble(staerke AS FLOAT, dauer_s AS FLOAT)
+    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer_s)
+END SUB
+
+' Spiel-Uhr. Normal die Wanduhr -- waehrend Aufnahme/Wiedergabe aber aus der
+' Bildzaehlung abgeleitet. Die Wanduhr schwankt von Lauf zu Lauf um
+' Millisekunden; ein einziger dadurch anders gesetzter Zug reicht, damit eine
+' aufgezeichnete Loesung nicht mehr passt.
+FUNCTION now_ms() AS INTEGER
+    IF demo_mode > 0 THEN RETURN start_ms + demo_frames * 1000 \ 60
+    RETURN MILLIS()
+END FUNCTION
+
+' Dateiname der Loesung zum aktuellen Level -- eine Datei je Set und Level.
+FUNCTION demo_file() AS STRING
+    RETURN "loesung_" + cur_setkey + "_" + STR$(cur_level + 1) + ".txt"
+END FUNCTION
+
+SUB demo_stop()
+    IF AUTOMATION_RECORDING() OR AUTOMATION_PLAYING() THEN AUTOMATION_STOP()
+    demo_mode = 0
+END SUB
+
+' modus: 1 = aufnehmen, 2 = abspielen. Beide starten den Level neu, damit
+' Aufnahme und Wiedergabe vom exakt gleichen Punkt aus laufen.
+SUB demo_start(modus AS INTEGER)
+    demo_stop()
+    RANDOMIZE(DEMO_SEED)
+    load_level(cur_level)
+    state = "play"
+    demo_frames = 0
+    demo_mode = modus
+    IF modus = 1 THEN
+        AUTOMATION_RECORD(demo_file())
+    ELSEIF AUTOMATION_PLAY(demo_file()) = 0 THEN
+        demo_mode = 0              ' leere/fehlende Aufnahme -> normal spielen
+    END IF
+END SUB
+
 SUB player_die(msg AS STRING)
     state = "dead"
     death_msg = msg
     sfx_die()
+    rumble(0.8, 0.35)         ' der Tod ist auch in den Haenden zu spueren
+    demo_stop()               ' eine gescheiterte Runde ist keine Loesung
 END SUB
 
 ' Kann der Spieler von (px,py) nach (nx,ny) in Richtung d?
@@ -1203,6 +1275,8 @@ SUB land_on()
         state = "win"
         record_win()
         sfx_win()
+        rumble(0.4, 0.18)     ' kurzer Erfolgs-Stups, schwaecher als der Tod
+        demo_stop()           ' hier endet die Aufnahme: DAS ist die Loesung
         RETURN
     END IF
 
@@ -1661,7 +1735,7 @@ SUB world_tick()
 
     ' --- Zeitlimit ---
     IF lvl_time > 0 THEN
-        time_left = lvl_time - ((MILLIS() - start_ms) \ 1000)
+        time_left = lvl_time - ((now_ms() - start_ms) \ 1000)
         IF time_left <= 0 THEN
             time_left = 0
             player_die("Zeit abgelaufen!")
@@ -1957,6 +2031,13 @@ SUB draw_hud()
     draw_slider(sl_sy, "Effekte", sfx_vol)
     ct(cxp, hb(0.886), sc_sm * 0.70, "Maus  -  F1/F2 Musik  -  F3/F4 Effekte", RGB(98, 112, 140))
 
+    ' --- Loesungs-Aufzeichnung ---
+    IF demo_mode = 1 THEN
+        ct(cxp, hb(0.912), sc_sm * 0.78, "* AUFNAHME  (F5 beendet)", RGB(240, 110, 110))
+    ELSEIF demo_mode = 2 THEN
+        ct(cxp, hb(0.912), sc_sm * 0.78, "> WIEDERGABE  (Taste uebernimmt)", RGB(120, 220, 160))
+    END IF
+
     ' --- Footer (Steuerung) ---
     ct(cxp, hb(0.928), sc_sm * 0.78, "Pfeile / WASD bewegen", RGB(122, 136, 162))
     ct(cxp, hb(0.962), sc_sm * 0.78, "R neu  -  P Passwort  -  M Musik  -  ESC Menue", RGB(110, 124, 150))
@@ -2185,6 +2266,11 @@ END IF
 SETFPS(60)
 WINDOW_ESC_QUIT(FALSE)
 
+' Eigenes Fenstersymbol statt des Standardsymbols der Laufzeit: der Daten-Chip
+' aus dem Kachelsatz (Kachel T_CHIP, also Spalte 2 der obersten Zeile).
+DIM icon_sheet AS IMAGE : icon_sheet = LOADIMAGE("assets/tiles.png")
+WINDOW_ICON(IMAGE_CROP(icon_sheet, T_CHIP * TILE, 0, TILE, TILE))
+
 SW = SCREENWIDTH()
 SH = SCREENHEIGHT()
 
@@ -2273,14 +2359,16 @@ lvl_best = -1
 pw_input = ""
 pw_msg = ""
 
-INPUT_BIND("up", KEY_UP, KEY_W)
-INPUT_BIND("down", KEY_DOWN, KEY_S)
-INPUT_BIND("left", KEY_LEFT, KEY_A)
-INPUT_BIND("right", KEY_RIGHT, KEY_D)
-INPUT_BIND("confirm", KEY_SPACE, KEY_ENTER)
-INPUT_BIND("restart", KEY_R)
+' Tastatur UND Gamepad auf dieselben Aktionen -- das input-Modul nimmt beide
+' Sorten Codes in einem Aufruf, die Spiellogik merkt keinen Unterschied.
+INPUT_BIND("up", KEY_UP, KEY_W, JOY_DPAD_UP)
+INPUT_BIND("down", KEY_DOWN, KEY_S, JOY_DPAD_DOWN)
+INPUT_BIND("left", KEY_LEFT, KEY_A, JOY_DPAD_LEFT)
+INPUT_BIND("right", KEY_RIGHT, KEY_D, JOY_DPAD_RIGHT)
+INPUT_BIND("confirm", KEY_SPACE, KEY_ENTER, JOY_BUTTON_A, JOY_BUTTON_START)
+INPUT_BIND("restart", KEY_R, JOY_BUTTON_Y)
 INPUT_BIND("skip", KEY_N)
-INPUT_BIND("back", KEY_ESCAPE)
+INPUT_BIND("back", KEY_ESCAPE, JOY_BUTTON_B)
 INPUT_BIND("password", KEY_P)
 INPUT_BIND("delchar", KEY_BACKSPACE)
 INPUT_BIND("continue", KEY_C)
@@ -2289,6 +2377,8 @@ INPUT_BIND("mus_down", KEY_F1)
 INPUT_BIND("mus_up", KEY_F2)
 INPUT_BIND("sfx_down", KEY_F3)
 INPUT_BIND("sfx_up", KEY_F4)
+INPUT_BIND("demo_rec", KEY_F5)     ' Loesung aufzeichnen (nochmal = beenden)
+INPUT_BIND("demo_play", KEY_F6)    ' aufgezeichnete Loesung abspielen
 
 state = "menu"
 cur_level = 0
@@ -2302,6 +2392,22 @@ anim_ms = 0.0
 '  HAUPTSCHLEIFE
 ' ======================================================================
 WHILE NOT QUITREQUESTED()
+    ' --- Pause, wenn das Fenster nicht im Vordergrund ist ---------------
+    ' Wichtig ist hier nicht nur das Anhalten: Die Level-Uhr rechnet mit
+    ' MILLIS() -- der Wanduhr. Ohne Korrektur laeuft die Zeit weiter, waehrend
+    ' der Spieler in einem anderen Fenster ist, und er kommt in ein
+    ' abgelaufenes Level zurueck. Deshalb merken wir uns den Beginn der Pause
+    ' und schieben den Level-Startzeitpunkt anschliessend um dieselbe Dauer.
+    IF NOT WINDOW_FOCUSED() THEN
+        DIM pause_ms AS INTEGER : pause_ms = MILLIS()
+        WHILE NOT WINDOW_FOCUSED() AND NOT QUITREQUESTED()
+            CLS(RGB(8, 10, 16))
+            ct(SCREENWIDTH() \ 2, SCREENHEIGHT() \ 2, 3.0, "PAUSE", RGB(244, 222, 120))
+            FLIP()
+        WEND
+        start_ms = start_ms + (MILLIS() - pause_ms)
+    END IF
+
     INPUT_UPDATE()
     anim_ms = anim_ms + DELTA() * 1000.0
     IF anim_ms >= 520.0 THEN anim_ms = anim_ms - 520.0
@@ -2322,7 +2428,26 @@ WHILE NOT QUITREQUESTED()
     END IF
 
     ' Lautstaerke-Slider sind nur sichtbar, wenn das HUD gezeichnet wird
-    IF state = "play" OR state = "win" OR state = "dead" THEN update_volume()
+    IF state = "play" OR state = "win" OR state = "dead" THEN
+        update_volume()
+    ELSE
+        set_cursor("default")   ' ohne HUD gibt es nichts zum Anfassen
+    END IF
+
+    ' --- Loesungs-Aufzeichnung ------------------------------------------
+    IF demo_mode > 0 THEN demo_frames = demo_frames + 1
+    IF demo_mode = 2 AND NOT AUTOMATION_PLAYING() THEN demo_mode = 0
+    ' Echte Eingabe uebernimmt: KEY_ANY_HIT meldet bewusst NUR echte Tasten,
+    ' die von der Wiedergabe eingespeisten blendet die Laufzeit aus -- sonst
+    ' braeche die Wiedergabe an ihrem eigenen ersten Zug ab.
+    IF demo_mode = 2 AND KEY_ANY_HIT() <> -1 THEN demo_stop()
+    IF state = "play" OR state = "intro" OR state = "dead" OR state = "win" THEN
+        IF INPUT_PRESSED("demo_rec") THEN
+            IF demo_mode = 1 THEN demo_stop() ELSE demo_start(1)
+        ELSEIF INPUT_PRESSED("demo_play") AND demo_mode <> 2 THEN
+            demo_start(2)
+        END IF
+    END IF
 
     IF state = "menu" THEN
         IF INPUT_PRESSED("back") THEN BREAK
@@ -2383,7 +2508,14 @@ WHILE NOT QUITREQUESTED()
 
         IF state = "play" THEN
             read_intent()
-            tick_timer = tick_timer + DELTA() * 1000.0
+            ' Waehrend Aufnahme/Wiedergabe zaehlt das Spiel BILDER statt
+            ' Sekunden -- sonst faellt ein Zug je nach Bildrate mal in den
+            ' einen, mal in den naechsten Spielschritt.
+            IF demo_mode > 0 THEN
+                tick_timer = tick_timer + 1000.0 / 60.0
+            ELSE
+                tick_timer = tick_timer + DELTA() * 1000.0
+            END IF
             IF tick_timer > TICK_MS * 3.0 THEN tick_timer = TICK_MS
             IF tick_timer >= TICK_MS AND state = "play" THEN
                 tick_timer = tick_timer - TICK_MS

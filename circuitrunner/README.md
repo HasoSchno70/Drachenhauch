@@ -31,7 +31,29 @@ wählen, mit LEER/ENTER starten.
 | M | Musik an/aus |
 | F1 / F2 | Musik leiser / lauter |
 | F3 / F4 | Effekte leiser / lauter |
+| F5 | Lösung aufzeichnen (nochmal = beenden) |
+| F6 | aufgezeichnete Lösung abspielen |
 | ESC | zurück / Menü |
+
+Ein **Gamepad** ist gleichwertig belegt: Steuerkreuz bewegt, **A**/**Start**
+bestätigt, **B** geht zurück, **Y** startet den Level neu. Beim Sterben und beim
+Erreichen des Ausgangs rüttelt es kurz.
+
+### Lösungen aufzeichnen (F5/F6)
+
+Ein hartes Level einmal geschafft und beim nächsten Mal nicht mehr gewusst, wie?
+**F5** startet den Level neu und schreibt ab da jede Eingabe mit; erreichst du
+den Ausgang, landet die Runde als `loesung_<set>_<level>.txt` neben dem Spiel.
+**F6** spielt sie wieder ab — die Figur läuft die Lösung von selbst. Jede echte
+Taste bricht die Wiedergabe ab und du übernimmst.
+
+Aufgezeichnet wird die **Eingabe**, nicht der Ablauf. Damit dieselben Tasten
+auch dasselbe Ergebnis liefern, startet F5 und F6 den Level neu, nageln den
+Zufall auf denselben Startwert (Zufalls-Laufbänder und Blobs würfeln!) und
+rechnen für die Dauer der Aufnahme/Wiedergabe in **Bildern statt Sekunden** —
+sonst fiele ein Zug je nach Bildrate mal in den einen, mal in den nächsten
+Spielschritt. Eine Aufnahme gilt darum immer nur für **das Level, in dem sie
+entstand**; stirbst du, wird sie verworfen.
 
 **Fortschritt & Bestzeiten** werden in `circuitrunner.save` (neben dem Spiel)
 gesichert: pro Level die schnellste Lösungszeit (im HUD, Intro und Sieg-Overlay
@@ -153,6 +175,7 @@ gbrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
 ## Grenzen / Ideen
 
 - Bestzeit: getimte Level werten die übrige Zeit (CC-Zeitbonus), ungetimte die kürzeste verbrauchte Zeit.
+- Aufgezeichnete Lösungen (F5/F6) sind an Level **und** Levelset gebunden; ein geändertes Level macht die Aufnahme wertlos (sie läuft dann einfach ins Leere).
 - Monster-Bewegungsreihenfolge innerhalb eines Ticks folgt der `monsters`-Liste; ungelistete Monster werden in Lese-Reihenfolge ergänzt (bei extrem timing-präzisen Puzzles möglich, dass Sonderfälle minimal abweichen).
 
 ## Sound & Musik

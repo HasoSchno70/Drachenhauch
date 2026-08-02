@@ -2,3 +2,5 @@
 *.db
 # heruntergeladene Levelsets (urheberrechtlich) hier ablegen:
 levels/_downloaded/
+# aufgezeichnete Loesungen (F5) -- gehoeren dem Spieler, nicht dem Repo
+loesung_*.txt
