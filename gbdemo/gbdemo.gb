@@ -436,7 +436,7 @@ SUB szene_pbr()
     CAMERA3D(SIN(w) * 10.5, 3.4 + SIN(zeit * 0.45) * 1.4, COS(w) * 10.5, 0, 1.2, 0, 50)
     SHADOW_TARGET(0, 1, 0)
 
-    MODEL(boden, 0, -1.4, 0, 1.0, &H4A5260)
+    MODEL(boden, 0, -1.4, 0, 1.0, &H2A3038)
 
     ' Ring aus Metallkugeln -- jede haengt an ihrem eigenen Frequenzband.
     DIM k AS INTEGER
@@ -497,6 +497,9 @@ DIM naechster_aufbau AS FLOAT
 DIM aufbau_zeit AS FLOAT
 DIM n_logo AS INTEGER                ' wie viele Koerper zum Logo gehoeren
 DIM steht AS BOOLEAN                 ' steht das Logo noch?
+DIM logo_x0 AS INTEGER               ' Ausdehnung des Logos (fuer den Einschlag)
+DIM logo_x1 AS INTEGER
+DIM logo_y0 AS INTEGER
 DIM weiss AS IMAGE
 DIM welt_bereit AS BOOLEAN
 
@@ -509,6 +512,13 @@ SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, farbe A
         DIM c AS INTEGER
         FOR c = 0 TO LEN(zeile) - 1
             IF MID$(zeile, c, 1) = "#" AND nk < MAXK THEN
+                ' Ausdehnung mitfuehren statt sie zu schaetzen -- der
+                ' Einschlag-Bereich unten haengt daran, und der soll auch
+                ' stimmen, wenn jemand die Buchstaben aendert.
+                DIM bx AS INTEGER
+                bx = x0 + c * KLOTZ
+                IF nk = 0 OR bx < logo_x0 THEN logo_x0 = bx
+                IF nk = 0 OR bx > logo_x1 THEN logo_x1 = bx
                 ' Erst einmal STATISCH: sonst faellt der Querbalken des G in
                 ' dem Moment herunter, in dem die Szene beginnt -- man saehe
                 ' das Logo nie. Umgekippt wird es unten auf den Einschlag.
@@ -539,6 +549,11 @@ SUB physik_aufbauen()
     logo_setzen(logo_g, BREITE \ 2 - 6 * KLOTZ, y0, RGB(90, 220, 210))
     logo_setzen(logo_b, BREITE \ 2 + 1 * KLOTZ, y0, RGB(230, 110, 190))
     n_logo = nk
+    ' Halbe Klotzbreite plus Kugelradius Toleranz -- so loest der Einschlag
+    ' genau dann aus, wenn die Kugel die aeusserste Saeule beruehrt.
+    logo_x0 = logo_x0 - KLOTZ \ 2 - 16
+    logo_x1 = logo_x1 + KLOTZ \ 2 + 16
+    logo_y0 = y0 - KLOTZ
     steht = TRUE
     welt_bereit = TRUE
 END SUB
@@ -568,7 +583,6 @@ SUB szene_physik()
     ' hier eine Kugel gebraucht wird.
     IF beat AND bass > 0.20 AND nk < MAXK AND zeit - aufbau_zeit > 3.0 _
        AND COOLDOWN("wurf", 650) THEN
-        IF steht THEN logo_umkippen()
         DIM von_links AS BOOLEAN
         von_links = (INT(zeit * 3.0) MOD 2) = 0
         DIM sx AS INTEGER
@@ -585,6 +599,25 @@ SUB szene_physik()
         ist_kugel[nk] = TRUE
         PHYS2D_SET_VEL(welt, kid[nk], v, -260.0)
         nk = nk + 1
+    END IF
+
+    ' Umgekippt wird beim EINSCHLAG, nicht beim Abschuss: die Kugel braucht
+    ' eine halbe Sekunde bis zum Logo, und faellt es schon vorher zusammen,
+    ' sieht es aus, als kippe es von selbst.
+    IF steht THEN
+        DIM j AS INTEGER
+        FOR j = n_logo TO nk - 1
+            IF ist_kugel[j] THEN
+                DIM bx AS FLOAT
+                DIM by AS FLOAT
+                bx = PHYS2D_BODY_X(welt, kid[j])
+                by = PHYS2D_BODY_Y(welt, kid[j])
+                IF bx > logo_x0 AND bx < logo_x1 AND by > logo_y0 THEN
+                    logo_umkippen()
+                    BREAK
+                END IF
+            END IF
+        NEXT
     END IF
 
     PHYS2D_STEP(welt, dt)
@@ -915,9 +948,9 @@ SUB szene_abspann()
     ' --- Drahtgitter-Knoten, langsam kreisende Kamera ---
     ' Zielpunkt nach unten -> der Knoten sitzt im oberen Drittel und laesst
     ' dem Abspann den Platz, den er braucht.
-    CAMERA3D(SIN(zeit * 0.12) * 8.0, 1.6, COS(zeit * 0.12) * 8.0, 0, -1.8, 0, 45)
-    MODEL_WIRES(knoten, 0, 0, 0, 2.4 + 0.3 * bass, _
-                regenbogen(zeit * 0.35, 0.22 + 0.25 * bass))
+    CAMERA3D(SIN(zeit * 0.12) * 7.5, 2.4, COS(zeit * 0.12) * 7.5, 0, -1.6, 0, 45)
+    MODEL_WIRES(knoten, 0, 0, 0, 1.5 + 0.12 * bass, _
+                regenbogen(zeit * 0.35, 0.20 + 0.22 * bass))
 
     ' --- Der kreisende Ping: hoerbar links/rechts, sichtbar als Punkt ---
     DIM w AS FLOAT
@@ -931,6 +964,16 @@ SUB szene_abspann()
     BLEND_MODE("add")
     DRAWIMAGEROT(glow, qx, qy, 0, 0.45, RGB(120, 220, 255))
     BLEND_MODE("alpha")
+    ' Ohne Beschriftung bleibt der kreisende Punkt raetselhaft -- er ist die
+    ' SCHALLQUELLE, und der Ping wandert hoerbar mit ihm von links nach rechts.
+    IF szene_t < 26.0 THEN
+        DIM b AS FLOAT
+        b = 1.0
+        IF szene_t > 22.0 THEN b = (26.0 - szene_t) / 4.0
+        mtext(BREITE \ 2, INT(HOEHE * 0.26) - 92, _
+              "AUDIO_EMITTER  -  der Ping kreist wirklich um dich herum", _
+              0.44, RGB(INT(120 * b), INT(170 * b), INT(200 * b)))
+    END IF
 
     ' --- Abspann laeuft hoch ---
     DIM y0 AS FLOAT
@@ -1064,11 +1107,20 @@ FOR kk = 0 TO N_KUGELN - 1
     MODEL_PBR(kugeln[kk], 1.0, 0.03 + kk / (N_KUGELN - 1.0) * 0.82)
 NEXT
 
-boden = MESH_PLANE(60.0, 60.0, 1, 1)     ' bis zum Horizont, sonst sieht man die Kante
+' Weit ueber den Horizont hinaus UND spiegelnd: eine kleine, matte Platte
+' schwebt als graues Rechteck in der Landschaft (sah aus wie ein Panel).
+' Als grosse, glaenzende Flaeche nimmt sie stattdessen den Himmel auf und
+' liest sich als Boden.
+boden = MESH_PLANE(400.0, 400.0, 1, 1)
 MODEL_LIT(boden)
-MODEL_PBR(boden, 0.1, 0.65)
+' Nicht zu metallisch: auf einer fast reinen Spiegelflaeche bleibt kaum
+' Diffusanteil uebrig, und der Schattenwurf verschwindet mit ihm.
+MODEL_PBR(boden, 0.30, 0.22)
 
-knoten = MESH_KNOT(1.0, 0.26, 160, 20)   ' viele Segmente = sauberes Gitter
+' Ein Ring statt eines Knotens: der Knoten war bei dieser Groesse nur ein
+' undeutliches Gebilde. Ein Torus ist auf einen Blick als Form erkennbar --
+' und passt zum Spektrum-Ring aus Szene 6.
+knoten = MESH_TORUS(1.6, 0.42, 48, 24)
 
 abspann[0] = "*GAMEBASIC - DEMO*"
 abspann[1] = ""

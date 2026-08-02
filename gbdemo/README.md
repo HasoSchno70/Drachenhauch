@@ -40,7 +40,7 @@ einer Demo:
 | 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
 | 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, echte Schweife aus einem behaltenen `RENDERTARGET` |
 | 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
-| 8 | 5:00 | Abspann | Drahtgitter-Knoten, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
+| 8 | 5:00 | Abspann | Drahtgitter-Ring, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
 
 Am Ende springt die Demo wieder an den Anfang — die Musik loopt endlos, der
 Ablaufplan geht mit. Ein kompletter Durchlauf wurde headless verifiziert
