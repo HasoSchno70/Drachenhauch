@@ -86,6 +86,35 @@ module.exports = (H) => [
       'AUDIO_MUSIC_PITCH(0.8)   \' tiefer und langsamer',
     ]),
 
+  H.cmd("AUDIO_MUSIC_LOAD · AUDIO_MUSIC_PLAY · AUDIO_MUSIC_QUEUE", 'AUDIO_MUSIC_LOAD(pfad$)   AUDIO_MUSIC_PLAY([wiederholungen[, fade_in_ms[, easing$]]])   AUDIO_MUSIC_QUEUE(pfad$)',
+    "Der zweistufige Weg statt PLAYMUSIC: erst laden, dann starten – so kannst du ein Stück im Ladebildschirm vorbereiten und später ohne Verzögerung anspielen. AUDIO_MUSIC_QUEUE hängt ein Stück an, das automatisch folgt, wenn das laufende endet (Intro → Hauptthema).",
+    [
+      'AUDIO_MUSIC_LOAD("musik/level1.ogg")',
+      'AUDIO_MUSIC_PLAY(-1, 1500, "inout")   \' endlos, 1,5 s weich einblenden',
+      'AUDIO_MUSIC_QUEUE("musik/level1_loop.ogg")',
+    ]),
+  H.cmd("AUDIO_MUSIC_VOLUME · AUDIO_MUSIC_GET_VOLUME · AUDIO_MUSIC_GET_PITCH · AUDIO_MUSIC_BUSY", 'AUDIO_MUSIC_VOLUME(v)   AUDIO_MUSIC_GET_VOLUME()   AUDIO_MUSIC_GET_PITCH()   AUDIO_MUSIC_BUSY()',
+    "Die Abfrage-Seite: aktuelle Lautstärke und Tonhöhe auslesen (etwa um sie in den Optionen anzuzeigen), und prüfen, ob überhaupt Musik läuft. AUDIO_MUSIC_VOLUME ist der kürzere Name für AUDIO_MUSIC_SET_VOLUME.",
+    [
+      'IF NOT AUDIO_MUSIC_BUSY() THEN naechstes_stueck()',
+      'PRINT AUDIO_MUSIC_GET_VOLUME()',
+    ]),
+
+  H.h2("Kanäle verwalten"),
+  H.cmd("AUDIO_INIT · AUDIO_NUM_CHANNELS · AUDIO_SET_NUM_CHANNELS", 'AUDIO_INIT([frequenz[, kanaele[, puffer]]])   AUDIO_NUM_CHANNELS()   AUDIO_SET_NUM_CHANNELS(n)',
+    "Die Tonausgabe startet von selbst, sobald du etwas abspielst – AUDIO_INIT brauchst du nur, wenn du sie vorher mit eigenen Werten einrichten willst. Voreingestellt sind 16 gleichzeitige Kanäle; reicht das bei vielen Effekten nicht, erhöhst du sie.",
+    [
+      'PRINT AUDIO_NUM_CHANNELS()',
+      'AUDIO_SET_NUM_CHANNELS(32)',
+      'PRINT AUDIO_NUM_CHANNELS()',
+    ], { out: ["16", "32"] }),
+  H.cmd("AUDIO_BUSY_CHANNELS · AUDIO_STOP_ALL", 'AUDIO_BUSY_CHANNELS()   AUDIO_STOP_ALL()',
+    "AUDIO_BUSY_CHANNELS zählt die gerade klingenden Kanäle – nützlich, um bei Massen-Explosionen nicht jeden Treffer einzeln zu vertonen. AUDIO_STOP_ALL bricht alles ab, der saubere Schnitt beim Szenenwechsel.",
+    [
+      'IF AUDIO_BUSY_CHANNELS() < 8 THEN AUDIO_PLAY(treffer)',
+      'AUDIO_STOP_ALL()',
+    ]),
+
   H.h2("Mixer-Busse: ganze Gruppen regeln"),
   H.p('Alle Klänge laufen über drei Busse: "sfx" (Effekte, Samples, Synth), "music" (Musik) und "master" (die Summe von beidem). Über den Bus regelst du eine ganze Gruppe auf einmal – klassisch getrennte Regler für „Effekte“ und „Musik“ im Optionsmenü.'),
   H.cmd("AUDIO_BUS_VOLUME · AUDIO_BUS_GET_VOLUME", 'AUDIO_BUS_VOLUME(bus$, vol)   AUDIO_BUS_GET_VOLUME(bus$)',
@@ -190,6 +219,39 @@ module.exports = (H) => [
       'AUDIO_LISTENER_REMOVE(ohr)',
       'PRINT "ok"',
     ], { out: ["ok"] }),
+
+  H.h2("Modulatoren: Klänge, die sich von selbst bewegen"),
+  H.p("Ein Tremolo, ein Wobble-Bass oder ein Filter-Sweep bedeutet: ein Wert bewegt sich ständig. Du könntest ihn pro Frame selbst ausrechnen – dann hängt der Klang aber an der Bildrate und stottert, sobald das Spiel ruckelt. Modulatoren laufen stattdessen auf dem AUDIO-Thread: sample-genau, unabhängig davon, was das Spiel gerade tut, und ohne dass dein Programm pro Frame irgendetwas nachrechnet."),
+  H.p("Es gibt zwei Sorten. Ein LFO schwingt endlos (für alles Wiederkehrende), ein Tweener fährt einmalig von einem Wert zum anderen (für Übergänge). Beide liefern denselben Handle-Typ AUDIO_MOD."),
+  H.cmd("AUDIO_LFO_NEW · AUDIO_LFO_SET · AUDIO_LFO_WAVEFORM", 'AUDIO_LFO_NEW(wellenform$, hz[, amplitude[, mitte]])   AUDIO_LFO_SET(mod[, hz[, amplitude[, mitte]]])   AUDIO_LFO_WAVEFORM(mod, wellenform$)',
+    'Erzeugt einen Schwinger. wellenform$ ist "sine", "triangle", "saw" oder "pulse", hz die Geschwindigkeit (4.0 = viermal pro Sekunde). Amplitude und Mitte legen den Wertebereich fest (voreingestellt schwingt er zwischen -1 und +1). Die beiden Setter ändern einen laufenden LFO, ohne ihn neu anzulegen.',
+    [
+      'IMPORT "audio"',
+      'DIM lfo AS AUDIO_MOD',
+      'lfo = AUDIO_LFO_NEW("sine", 4.0)',
+      'AUDIO_LFO_SET(lfo, 6.0)              \' schneller',
+      'AUDIO_LFO_WAVEFORM(lfo, "triangle")',
+    ]),
+  H.cmd("AUDIO_TWEENER_NEW · AUDIO_TWEENER_TO", 'AUDIO_TWEENER_NEW([startwert])   AUDIO_TWEENER_TO(mod, ziel[, dauer_ms[, easing$]])',
+    'Ein Tweener hält einen Wert und fährt ihn auf Ansage zu einem neuen – etwa einen Filter langsam öffnen, wenn der Spieler auftaucht. easing$ ist "linear", "in", "out" oder "inout".',
+    [
+      'DIM tw AS AUDIO_MOD',
+      'tw = AUDIO_TWEENER_NEW(0.0)',
+      'AUDIO_TWEENER_TO(tw, 1.0, 800, "inout")',
+    ]),
+  H.cmd("AUDIO_MODULATE · AUDIO_MOD_REMOVE", 'AUDIO_MODULATE(bus$, ziel$, mod, min, max)   AUDIO_MOD_REMOVE(mod)',
+    'Verbindet einen Modulator mit einem Bus. ziel$ ist "volume" (Tremolo), "pan" (Auto-Pan), "filter", "resonance", "reverb" oder "distortion". Der Wertebereich des Modulators wird dabei auf min…max abgebildet – ein LFO zwischen -1 und +1 bei min=0.4/max=1.0 lässt die Lautstärke also zwischen 40 % und 100 % pendeln. AUDIO_MOD_REMOVE löst die Verbindung wieder.',
+    [
+      'AUDIO_MODULATE("sfx", "volume", lfo, 0.4, 1.0)      \' Tremolo',
+      'AUDIO_MODULATE("music", "filter", tw, 200.0, 8000.0) \' Filter oeffnet',
+      'AUDIO_MOD_REMOVE(lfo)',
+    ]),
+  H.cmd("AUDIO_BUS_PAN", 'AUDIO_BUS_PAN(bus$, position)',
+    "Verschiebt einen ganzen Bus im Stereobild (-1 = links, 0 = Mitte, +1 = rechts). Bis dahin ließ sich nur ein einzelner Kanal pannen; damit legst du etwa die gesamte Musik leicht nach links, während die Effekte mittig bleiben.",
+    [
+      'AUDIO_BUS_PAN("music", -0.3)',
+    ]),
+  H.note("Weil die Modulatoren auf dem Audio-Thread laufen, bleiben Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps auch dann sauber, wenn die Bildrate einbricht – genau der Unterschied zu einer selbst gebauten Lösung im Game-Loop. Eine vollständige Demo ist examples/150_audio_modulatoren.gb."),
 
   H.tip("Spektrum für Visualizer: AUDIO_FFT", "Mit AUDIO_FFT(array) füllst du ein ARRAY OF FLOAT mit den aktuellen Frequenz-Stärken der Gesamtausgabe. Daraus baust du Balken-Visualizer oder lässt Effekte „zur Musik tanzen“. Zusammen mit den Bus-Effekten und den Kira-Streaming-Funktionen deckt das audio-Modul alles ab, was ein Spiel klanglich braucht – von einem einzelnen Piepton bis zum dynamischen Soundtrack."),
 ];
