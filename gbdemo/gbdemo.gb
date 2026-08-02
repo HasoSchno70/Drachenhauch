@@ -1,0 +1,550 @@
+' ======================================================================
+'  G A M E   B A S I C   --   D E M O
+' ======================================================================
+'
+'  Eine Demo im Sinne der Demoszene: ein durchlaufendes Stueck, das Szene
+'  fuer Szene zeigt, was die Laufzeit kann -- und dabei auf die Musik
+'  reagiert statt bloss daneben zu laufen.
+'
+'  Zwei Bausteine tragen das Ganze:
+'
+'    AUDIO_FFT              greift das echte Spektrum vom Master ab. Alles,
+'                           was hier pulsiert, pulsiert auf dem tatsaechlich
+'                           hoerbaren Mix -- nicht auf einem nachgebauten
+'                           Zaehler.
+'    AUDIO_MUSIC_POSITION   liefert die Sekunde IM STUECK. Daran haengt der
+'                           Ablaufplan, nicht an der Wanduhr: bricht die
+'                           Bildrate ein, verrutschen die Szenen trotzdem
+'                           nicht gegen die Musik.
+'
+'  Musik: "Stardust Jam" von Drozerix, gemeinfrei (The Mod Archive).
+'  Ein echtes ProTracker-Modul, in Echtzeit gestreamt -- kein OGG.
+'
+'  Steuerung:  LEER = Szene weiter    F11 = Vollbild    ESC = Ende
+'
+'  Start:  gbrun.py gbdemo\gbdemo.gb
+' ======================================================================
+
+IMPORT "m3d"
+IMPORT "g3d"
+IMPORT "particles"
+IMPORT "physics2d"
+IMPORT "timer"
+
+CONST BREITE AS INTEGER = 1280
+CONST HOEHE AS INTEGER = 720
+CONST MUSIK AS STRING = "assets/music/stardust_jam.mod"
+CONST BAENDER AS INTEGER = 32
+
+' Szenen-Grenzen in Sekunden des Stuecks (Stardust Jam laeuft ~6:24).
+CONST T1 AS FLOAT = 42.0        ' Titel
+CONST T2 AS FLOAT = 84.0        ' Sternenfeld
+CONST T3 AS FLOAT = 128.0       ' Instancing
+CONST T4 AS FLOAT = 172.0       ' PBR + HDR
+CONST T5 AS FLOAT = 214.0       ' Physik
+CONST T6 AS FLOAT = 256.0       ' Tunnel
+CONST T7 AS FLOAT = 300.0       ' Audio-Effekte
+CONST T8 AS FLOAT = 384.0       ' Abspann
+
+SCREEN(BREITE, HOEHE, "GameBasic -- Demo", 1)
+SETFPS(60)
+WINDOW_ESC_QUIT(FALSE)
+
+' ----------------------------------------------------------------------
+'  Globaler Zustand
+' ----------------------------------------------------------------------
+DIM fnt AS INTEGER
+fnt = LOADFONT("assets/font.ttf", 48)
+SETFONT(fnt)
+
+DIM sh AS INTEGER
+sh = SHADER_LOAD("assets/shaders/demo.fs")
+SHADER_SET2(sh, "resolution", BREITE, HOEHE)
+
+DIM spek[BAENDER] AS FLOAT      ' rohes Spektrum dieses Bildes
+DIM glatt[BAENDER] AS FLOAT     ' nachfallend geglaettet (ruhigere Optik)
+DIM bass AS FLOAT               ' 0..1, unteres Drittel
+DIM mitten AS FLOAT
+DIM hoehen AS FLOAT
+DIM bass_lang AS FLOAT          ' langsamer Mittelwert -> Bezug fuer den Beat
+DIM beat AS BOOLEAN             ' schlaegt dieses Bild ein Schlag ein?
+DIM beat_alter AS FLOAT         ' Sekunden seit dem letzten Schlag
+
+DIM zeit AS FLOAT               ' Sekunde im Stueck (= Ablaufplan)
+DIM dt AS FLOAT
+DIM szene AS INTEGER
+DIM szene_t AS FLOAT            ' Sekunden IN der laufenden Szene
+DIM szene_p AS FLOAT            ' 0..1 Fortschritt in der Szene
+DIM versatz AS FLOAT            ' manuelles Vorspulen (Leertaste)
+DIM modus AS FLOAT              ' Post-Effekt-Modus (siehe demo.fs)
+DIM blende AS FLOAT             ' 1 = sichtbar, 0 = schwarz
+
+DIM i AS INTEGER
+FOR i = 0 TO BAENDER - 1
+    glatt[i] = 0.0
+NEXT
+
+' ----------------------------------------------------------------------
+'  Werkzeug
+' ----------------------------------------------------------------------
+
+' Text mittig auf (cx, cy), Groesse ueber die Skalierung.
+SUB mtext(cx AS INTEGER, cy AS INTEGER, s AS STRING, skala AS FLOAT, farbe AS INTEGER)
+    TEXTROT(cx, cy, s, 0, skala, farbe)
+END SUB
+
+' Farbe aus HSV-artigem Umlauf -- spart Paletten-Tabellen.
+FUNCTION regenbogen(phase AS FLOAT, helligkeit AS FLOAT) AS INTEGER
+    DIM r AS INTEGER
+    DIM g AS INTEGER
+    DIM b AS INTEGER
+    r = INT((0.5 + 0.5 * SIN(phase)) * 255.0 * helligkeit)
+    g = INT((0.5 + 0.5 * SIN(phase + 2.09)) * 255.0 * helligkeit)
+    b = INT((0.5 + 0.5 * SIN(phase + 4.19)) * 255.0 * helligkeit)
+    IF r < 0 THEN r = 0
+    IF g < 0 THEN g = 0
+    IF b < 0 THEN b = 0
+    IF r > 255 THEN r = 255
+    IF g > 255 THEN g = 255
+    IF b > 255 THEN b = 255
+    RETURN RGB(r, g, b)
+END FUNCTION
+
+' Weicher Ein-/Ausblender am Rand einer Szene.
+FUNCTION randblende(t AS FLOAT, dauer AS FLOAT, rand AS FLOAT) AS FLOAT
+    IF t < rand THEN RETURN t / rand
+    IF t > dauer - rand THEN RETURN (dauer - t) / rand
+    RETURN 1.0
+END FUNCTION
+
+' Spektrum lesen und in bass/mitten/hoehen zusammenfassen.
+SUB spektrum_lesen()
+    AUDIO_FFT(spek)
+    DIM k AS INTEGER
+    DIM sb AS FLOAT
+    DIM sm AS FLOAT
+    DIM sh2 AS FLOAT
+    sb = 0.0
+    sm = 0.0
+    sh2 = 0.0
+    FOR k = 0 TO BAENDER - 1
+        ' Nachfallend: schnell hoch, langsam runter -- so zappelt nichts.
+        IF spek[k] > glatt[k] THEN
+            glatt[k] = spek[k]
+        ELSE
+            glatt[k] = glatt[k] * 0.86 + spek[k] * 0.14
+        END IF
+        IF k < 6 THEN
+            sb = sb + glatt[k]
+        ELSEIF k < 16 THEN
+            sm = sm + glatt[k]
+        ELSE
+            sh2 = sh2 + glatt[k]
+        END IF
+    NEXT
+    bass = sb / 6.0
+    mitten = sm / 10.0
+    hoehen = sh2 / 16.0
+    IF bass > 1.0 THEN bass = 1.0
+    IF mitten > 1.0 THEN mitten = 1.0
+    IF hoehen > 1.0 THEN hoehen = 1.0
+
+    ' Schlag = Bass deutlich ueber seinem eigenen Mittel, mit Sperrzeit.
+    bass_lang = bass_lang * 0.97 + bass * 0.03
+    beat = FALSE
+    IF bass > bass_lang * 1.28 AND bass > 0.10 THEN
+        IF COOLDOWN("beat", 160) THEN
+            beat = TRUE
+            beat_alter = 0.0
+        END IF
+    END IF
+    beat_alter = beat_alter + dt
+END SUB
+
+' ----------------------------------------------------------------------
+'  SZENE 1 -- Titel: Plasma, Logo, Sinus-Scroller
+' ----------------------------------------------------------------------
+CONST SCROLLTEXT AS STRING = "GAME BASIC GRUESST DIE WELT ...   EIN BASIC MIT PASCAL-STRENGER TYPISIERUNG UND OOP, GEBAUT FUER SPIELE ...   ALLES, WAS DU HIER SIEHST UND HOERST, LAEUFT IN EINER EINZIGEN LAUFZEIT: GBRT, IN RUST GESCHRIEBEN, MIT RAYLIB UND KIRA ...   DIE MUSIK IST EIN ECHTES PROTRACKER-MODUL, IN ECHTZEIT GESTREAMT ...   UND DAS BILD TANZT AUF DEM ECHTEN SPEKTRUM, NICHT AUF EINEM ZAEHLER ...   VIEL SPASS!        "
+
+SUB szene_titel()
+    modus = 1.0                     ' Plasma-Hintergrund im Post-Effekt
+
+    ' --- Logo, auf dem Schlag kurz groesser ---
+    DIM puls AS FLOAT
+    puls = 1.0 + 0.10 * EXP(-beat_alter * 6.0) + 0.05 * bass
+    DIM cy AS INTEGER
+    cy = INT(HOEHE * 0.34)
+    DIM s AS STRING
+    s = "GAMEBASIC"
+    DIM n AS INTEGER
+    n = LEN(s)
+    DIM breite_ges AS FLOAT
+    breite_ges = n * 62.0 * puls
+    DIM k AS INTEGER
+    FOR k = 0 TO n - 1
+        DIM x AS INTEGER
+        x = INT(BREITE / 2 - breite_ges / 2 + (k + 0.5) * 62.0 * puls)
+        DIM y AS INTEGER
+        y = cy + INT(SIN(zeit * 2.2 + k * 0.55) * 16.0)
+        mtext(x, y, MID$(s, k, 1), 1.5 * puls, regenbogen(zeit * 1.1 + k * 0.35, 1.0))
+    NEXT
+
+    mtext(BREITE \ 2, cy + 78, "eine demo", 0.62, RGB(150, 200, 230))
+
+    ' --- Spektrum als Saeulenpaar, gespiegelt ---
+    DIM bw AS INTEGER
+    bw = BREITE \ BAENDER
+    FOR k = 0 TO BAENDER - 1
+        DIM h AS INTEGER
+        h = INT(glatt[k] * HOEHE * 0.20)
+        DIM c AS INTEGER
+        c = regenbogen(k * 0.19 + zeit * 0.7, 0.55 + 0.45 * glatt[k])
+        BOX(k * bw + 2, HOEHE - h, k * bw + bw - 2, HOEHE, c)
+        BOX(k * bw + 2, 0, k * bw + bw - 2, h \ 2, c)
+    NEXT
+
+    ' --- Sinus-Scroller ---
+    DIM sx AS FLOAT
+    sx = BREITE - (zeit - 2.0) * 210.0
+    DIM zeichen AS INTEGER
+    zeichen = LEN(SCROLLTEXT)
+    FOR k = 0 TO zeichen - 1
+        DIM px AS FLOAT
+        px = sx + k * 26.0
+        IF px > -40.0 AND px < BREITE + 40.0 THEN
+            DIM py AS FLOAT
+            py = HOEHE * 0.68 + SIN(px * 0.012 + zeit * 2.0) * 42.0
+            mtext(INT(px), INT(py), MID$(SCROLLTEXT, k, 1), 0.72, _
+                  regenbogen(px * 0.01 + zeit, 1.0))
+        END IF
+    NEXT
+END SUB
+
+' ----------------------------------------------------------------------
+'  SZENE 2 -- Sternenflug: Streifen statt Punkte
+' ----------------------------------------------------------------------
+' Jeder Stern wird ZWEIMAL projiziert: an seiner Position vor diesem Bild
+' und an seiner jetzigen. Die Strecke dazwischen ist der Streifen -- je
+' schneller (also je mehr Bass), desto laenger. Gezeichnet wird alles mit
+' EINEM LINES-Aufruf.
+'
+' Achtung, echte Falle: LINES und PLOTS nehmen KEINE Stueckzahl entgegen --
+' sie zeichnen immer das GANZE Array. Unbenutzte Plaetze muessen also aus
+' dem Bild geschoben werden (-10), sonst bleiben alte Werte stehen.
+CONST STERNE AS INTEGER = 1400
+
+DIM stx[STERNE] AS FLOAT
+DIM sty[STERNE] AS FLOAT
+DIM stz[STERNE] AS FLOAT
+DIM lx1[STERNE] AS INTEGER
+DIM ly1[STERNE] AS INTEGER
+DIM lx2[STERNE] AS INTEGER
+DIM ly2[STERNE] AS INTEGER
+DIM lc[STERNE] AS INTEGER
+DIM sterne_bereit AS BOOLEAN
+DIM glow AS IMAGE
+DIM psys AS PARTICLE_SYSTEM
+
+SUB sterne_setzen()
+    DIM k AS INTEGER
+    FOR k = 0 TO STERNE - 1
+        stx[k] = RND() * 2.0 - 1.0
+        sty[k] = RND() * 2.0 - 1.0
+        stz[k] = RND() * 0.98 + 0.02
+    NEXT
+    sterne_bereit = TRUE
+END SUB
+
+SUB szene_sterne()
+    modus = 0.0
+    IF NOT sterne_bereit THEN sterne_setzen()
+
+    DIM tempo AS FLOAT
+    tempo = (0.30 + bass * 2.4) * dt
+    DIM k AS INTEGER
+    FOR k = 0 TO STERNE - 1
+        DIM z_vor AS FLOAT
+        z_vor = stz[k]
+        stz[k] = stz[k] - tempo
+        IF stz[k] <= 0.04 THEN
+            stx[k] = RND() * 2.0 - 1.0
+            sty[k] = RND() * 2.0 - 1.0
+            stz[k] = 1.0
+            z_vor = 1.0
+        END IF
+
+        ' Zentralprojektion: naeher am Auge = weiter aussen.
+        DIM ax AS FLOAT
+        DIM ay AS FLOAT
+        DIM bx AS FLOAT
+        DIM by AS FLOAT
+        ax = BREITE / 2.0 + stx[k] / z_vor * BREITE * 0.46
+        ay = HOEHE / 2.0 + sty[k] / z_vor * HOEHE * 0.46
+        bx = BREITE / 2.0 + stx[k] / stz[k] * BREITE * 0.46
+        by = HOEHE / 2.0 + sty[k] / stz[k] * HOEHE * 0.46
+
+        IF bx > -60.0 AND bx < BREITE + 60.0 AND by > -60.0 AND by < HOEHE + 60.0 THEN
+            lx1[k] = INT(ax)
+            ly1[k] = INT(ay)
+            lx2[k] = INT(bx)
+            ly2[k] = INT(by)
+            ' Naehe bestimmt die Helligkeit: hinten blaugrau, vorne weiss.
+            DIM naehe AS FLOAT
+            naehe = 1.0 - stz[k]
+            DIM w AS INTEGER
+            w = INT(70.0 + 185.0 * naehe * naehe)
+            lc[k] = RGB(INT(w * 0.72 + 40.0 * hoehen), INT(w * 0.85), 255 - INT(30.0 * naehe))
+        ELSE
+            lx1[k] = -10
+            ly1[k] = -10
+            lx2[k] = -10
+            ly2[k] = -10
+            lc[k] = 0
+        END IF
+    NEXT
+
+    BLEND_MODE("add")
+    LINES(lx1, ly1, lx2, ly2, lc)
+
+    ' --- Glut auf den Schlag ---
+    IF beat THEN
+        PARTICLE_SET_POS(psys, BREITE \ 2, HOEHE \ 2)
+        PARTICLE_SET_COLOR(psys, regenbogen(zeit * 2.0, 1.0))
+        PARTICLE_SET_COLOR_END(psys, RGB(30, 0, 70))
+        PARTICLE_EMIT(psys, 120)
+    END IF
+    PARTICLE_UPDATE(psys, INT(dt * 1000.0))
+    PARTICLE_DRAW(psys)
+
+    ' Kern, der auf dem Bass atmet
+    DIM r AS FLOAT
+    r = 0.35 + 1.5 * bass
+    DRAWIMAGEROT(glow, BREITE \ 2, HOEHE \ 2, zeit * 20.0, r, regenbogen(zeit * 0.8, 0.9))
+    BLEND_MODE("alpha")
+
+    mtext(BREITE \ 2, HOEHE - 54, "LINES  -  " + STR$(STERNE) + " Streifen in EINEM Aufruf", 0.5, RGB(140, 180, 210))
+END SUB
+
+' ----------------------------------------------------------------------
+'  SZENE 3 -- GPU-Instancing: ein Wuerfelfeld tanzt auf dem Spektrum
+' ----------------------------------------------------------------------
+CONST GITTER AS INTEGER = 40
+CONST WUERFEL AS INTEGER = GITTER * GITTER
+
+DIM mesh_box AS INTEGER
+' Drei Matrix-Listen statt einer: MODEL_INSTANCED faerbt einen ganzen
+' Draw-Call einheitlich ein. Drei Gruppen = drei Farben = drei Draw-Calls
+' fuer 1600 Wuerfel (statt 1600 Aufrufen).
+CONST GRUPPEN AS INTEGER = 3
+DIM matsA[WUERFEL] AS MAT4
+DIM matsB[WUERFEL] AS MAT4
+DIM matsC[WUERFEL] AS MAT4
+DIM leer AS MAT4
+
+SUB szene_instancing()
+    modus = 0.0
+    DIM w AS FLOAT
+    w = zeit * 0.20
+    CAMERA3D(SIN(w) * 52.0, 30.0 + SIN(zeit * 0.35) * 9.0, COS(w) * 52.0, 0, 2, 0, 50)
+
+    DIM gx AS INTEGER
+    DIM gz AS INTEGER
+    DIM na AS INTEGER
+    DIM nb AS INTEGER
+    DIM nc AS INTEGER
+    na = 0
+    nb = 0
+    nc = 0
+    FOR gx = 0 TO GITTER - 1
+        FOR gz = 0 TO GITTER - 1
+            DIM wx AS FLOAT
+            DIM wz AS FLOAT
+            wx = (gx - GITTER / 2) * 1.5
+            wz = (gz - GITTER / 2) * 1.5
+            ' Der Abstand zur Mitte waehlt das Frequenzband -- so laeuft die
+            ' Welle von innen nach aussen mit der Musik.
+            DIM ring AS INTEGER
+            ring = INT(SQR(wx * wx + wz * wz) * 0.55) MOD BAENDER
+            DIM hoch AS FLOAT
+            hoch = glatt[ring] * 18.0 + SIN(zeit * 1.6 + gx * 0.3 + gz * 0.3) * 0.9
+            DIM m AS MAT4
+            m = MAT4_MUL(MAT4_TRANSLATE(wx, hoch, wz), _
+                         QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 1, 0, zeit * 0.8 + ring * 0.4)))
+            IF ring MOD GRUPPEN = 0 THEN
+                matsA[na] = m
+                na = na + 1
+            ELSEIF ring MOD GRUPPEN = 1 THEN
+                matsB[nb] = m
+                nb = nb + 1
+            ELSE
+                matsC[nc] = m
+                nc = nc + 1
+            END IF
+        NEXT
+    NEXT
+
+    ' Ungenutzte Plaetze aus dem Bild schieben -- MODEL_INSTANCED zeichnet
+    ' (wie LINES) IMMER das ganze Array.
+    DIM k AS INTEGER
+    FOR k = na TO WUERFEL - 1
+        matsA[k] = leer
+    NEXT
+    FOR k = nb TO WUERFEL - 1
+        matsB[k] = leer
+    NEXT
+    FOR k = nc TO WUERFEL - 1
+        matsC[k] = leer
+    NEXT
+
+    ' Nah beieinander liegende Phasen -> verwandte Farben. Ein Abstand von
+    ' 2.1 waere reines Rot/Gruen/Blau und sieht nach Testbild aus.
+    MODEL_INSTANCED(mesh_box, matsA, regenbogen(zeit * 0.5, 1.0))
+    MODEL_INSTANCED(mesh_box, matsB, regenbogen(zeit * 0.5 + 0.8, 1.0))
+    MODEL_INSTANCED(mesh_box, matsC, regenbogen(zeit * 0.5 + 1.6, 1.0))
+
+    mtext(BREITE \ 2, HOEHE - 54, _
+          "MODEL_INSTANCED  -  " + STR$(WUERFEL) + " Wuerfel in 3 Draw-Calls", _
+          0.5, RGB(140, 180, 210))
+END SUB
+
+' ----------------------------------------------------------------------
+'  Platzhalter fuer die noch nicht gebauten Szenen
+' ----------------------------------------------------------------------
+SUB szene_platzhalter(titel AS STRING)
+    modus = 0.0
+    mtext(BREITE \ 2, HOEHE \ 2, titel, 1.0, RGB(90, 120, 150))
+    DIM k AS INTEGER
+    DIM bw AS INTEGER
+    bw = BREITE \ BAENDER
+    FOR k = 0 TO BAENDER - 1
+        DIM h AS INTEGER
+        h = INT(glatt[k] * HOEHE * 0.14)
+        BOX(k * bw + 3, HOEHE - h, k * bw + bw - 3, HOEHE, regenbogen(k * 0.2, 0.8))
+    NEXT
+END SUB
+
+' ----------------------------------------------------------------------
+'  Einmaliger Aufbau
+' ----------------------------------------------------------------------
+glow = GENTEX_RADIAL(128, 128, RGB(255, 255, 255), RGB(0, 0, 0))
+psys = PARTICLE_SYSTEM_NEW(BREITE \ 2, HOEHE \ 2)
+PARTICLE_SET_VELOCITY(psys, -260.0, 260.0, -260.0, 260.0)
+PARTICLE_SET_LIFETIME(psys, 500, 1300)
+PARTICLE_SET_SIZE(psys, 2, 7)
+PARTICLE_SET_GRAVITY(psys, 0.0, 30.0)
+PARTICLE_SET_FADE(psys, TRUE)
+PARTICLE_SET_MODE(psys, "glow")
+
+mesh_box = MESH_CUBE(0.8, 0.8, 0.8)
+' Platzhalter-Matrix fuer ungenutzte Array-Plaetze: weit unter die Szene.
+' Eine nicht zugewiesene MAT4 waere NIL -- MODEL_INSTANCED lehnt das ab.
+leer = MAT4_TRANSLATE(0.0, -9999.0, 0.0)
+
+LIGHT_ENABLE()
+LIGHT_AMBIENT(&H1A2030, 0.55)
+LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+
+AUDIO_MUSIC_LOAD(MUSIK)
+AUDIO_MUSIC_PLAY(-1, 1200)
+
+DIM letzte AS FLOAT
+letzte = 0.0
+
+' ----------------------------------------------------------------------
+'  HAUPTSCHLEIFE
+' ----------------------------------------------------------------------
+WHILE NOT QUITREQUESTED()
+    IF KEYHIT(KEY_ESCAPE) THEN BREAK
+    IF KEYHIT(KEY_F11) THEN SET_FULLSCREEN(NOT WINDOW_IS_FULLSCREEN())
+
+    dt = DELTA()
+    IF dt > 0.1 THEN dt = 0.1
+    zeit = AUDIO_MUSIC_POSITION() + versatz
+
+    ' Zifferntasten 1-8 springen direkt in eine Szene (zum Vorfuehren).
+    ' versatz verschiebt nur den ABLAUFPLAN -- die Musik laeuft weiter, wo
+    ' sie ist. Fuer ein Vorfuehren reicht das; die Demo bleibt in sich rund.
+    IF KEYHIT(KEY_1) THEN versatz = versatz - zeit
+    IF KEYHIT(KEY_2) THEN versatz = versatz + (T1 - zeit)
+    IF KEYHIT(KEY_3) THEN versatz = versatz + (T2 - zeit)
+    IF KEYHIT(KEY_4) THEN versatz = versatz + (T3 - zeit)
+    IF KEYHIT(KEY_5) THEN versatz = versatz + (T4 - zeit)
+    IF KEYHIT(KEY_6) THEN versatz = versatz + (T5 - zeit)
+    IF KEYHIT(KEY_7) THEN versatz = versatz + (T6 - zeit)
+    IF KEYHIT(KEY_8) THEN versatz = versatz + (T7 - zeit)
+
+    ' Leertaste = zur naechsten Szene springen (zum Vorfuehren)
+    IF KEYHIT(KEY_SPACE) THEN
+        IF zeit < T1 THEN
+            versatz = versatz + (T1 - zeit)
+        ELSEIF zeit < T2 THEN
+            versatz = versatz + (T2 - zeit)
+        ELSEIF zeit < T3 THEN
+            versatz = versatz + (T3 - zeit)
+        ELSEIF zeit < T4 THEN
+            versatz = versatz + (T4 - zeit)
+        ELSEIF zeit < T5 THEN
+            versatz = versatz + (T5 - zeit)
+        ELSEIF zeit < T6 THEN
+            versatz = versatz + (T6 - zeit)
+        ELSEIF zeit < T7 THEN
+            versatz = versatz + (T7 - zeit)
+        END IF
+    END IF
+
+    spektrum_lesen()
+
+    CLS(&H05070C)
+
+    IF zeit < T1 THEN
+        szene = 1
+        szene_t = zeit
+        blende = randblende(szene_t, T1, 1.5)
+        szene_titel()
+    ELSEIF zeit < T2 THEN
+        szene = 2
+        szene_t = zeit - T1
+        blende = randblende(szene_t, T2 - T1, 1.5)
+        szene_sterne()
+    ELSEIF zeit < T3 THEN
+        szene = 3
+        szene_t = zeit - T2
+        blende = randblende(szene_t, T3 - T2, 1.5)
+        szene_instancing()
+    ELSEIF zeit < T4 THEN
+        szene = 4
+        szene_t = zeit - T3
+        blende = randblende(szene_t, T4 - T3, 1.5)
+        szene_platzhalter("4  PBR + HDR")
+    ELSEIF zeit < T5 THEN
+        szene = 5
+        szene_t = zeit - T4
+        blende = randblende(szene_t, T5 - T4, 1.5)
+        szene_platzhalter("5  PHYSIK")
+    ELSEIF zeit < T6 THEN
+        szene = 6
+        szene_t = zeit - T5
+        blende = randblende(szene_t, T6 - T5, 1.5)
+        szene_platzhalter("6  TUNNEL")
+    ELSEIF zeit < T7 THEN
+        szene = 7
+        szene_t = zeit - T6
+        blende = randblende(szene_t, T7 - T6, 1.5)
+        szene_platzhalter("7  KLANGFARBEN")
+    ELSE
+        szene = 8
+        szene_t = zeit - T7
+        blende = randblende(szene_t, T8 - T7, 2.5)
+        szene_platzhalter("8  ABSPANN")
+    END IF
+
+    ' Post-Effekt mit den Werten dieses Bildes fuettern
+    SHADER_SET(sh, "time", zeit)
+    SHADER_SET(sh, "bass", bass)
+    SHADER_SET(sh, "hoehen", hoehen)
+    SHADER_SET(sh, "fade", blende)
+    SHADER_SET(sh, "mode", modus)
+    POSTFX(sh)
+
+    FLIP()
+WEND

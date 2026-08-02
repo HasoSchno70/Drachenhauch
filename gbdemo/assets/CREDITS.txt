@@ -1,0 +1,30 @@
+GameBasic-Demo -- Herkunft und Lizenz der Fremdmaterialien
+==========================================================
+
+MUSIK (assets/music/)
+---------------------
+stardust_jam.mod, silicon_dancer.mod, neon_techno.mod, assembly.xm
+    Drozerix
+    Bezogen ueber The Mod Archive (modarchive.org), Rubrik "Public Domain".
+    Lizenz: Public Domain -- gemeinfrei, keine Auflagen.
+    Reproduzierbar via gbdemo/download_music.py (Modul-Nummern dort).
+
+HDR-UMGEBUNG (assets/ibl_env.hdr)
+---------------------------------
+    Poly Haven (polyhaven.com), Lizenz CC0 1.0 -- gemeinfrei.
+    Uebernommen aus examples/assets/ (Bezugsskript dort:
+    examples/assets/download_hdri.py).
+
+SCHRIFT (assets/font.ttf)
+-------------------------
+    Roboto Medium, Christian Robertson / Google.
+    Lizenz: Apache License 2.0 -- Weitergabe erlaubt, Lizenztext beilegen.
+    https://www.apache.org/licenses/LICENSE-2.0
+
+SHADER (assets/shaders/)
+------------------------
+    bloom.fs, crt.fs, vignette.fs -- im Rahmen dieses Projekts geschrieben,
+    uebernommen aus examples/assets/shaders/. Teil von GameBasic.
+
+Alles Uebrige (Grafik, Partikel, Geometrie, Ablauf) erzeugt die Demo zur
+Laufzeit selbst -- es gibt keine weiteren Bilddateien.
