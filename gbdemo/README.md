@@ -16,8 +16,24 @@ Unschärfe).
 |---|---|
 | 1 – 8 | direkt in eine Szene springen |
 | LEER | eine Szene weiter |
+| A S D F G H J K | acht Klänge auf Zuruf (siehe unten) |
+| M | nächstes Musikstück |
 | F11 | Vollbild an/aus |
 | ESC | Ende |
+
+### Die Klang-Tastatur
+
+Acht Klänge, die **in jeder Szene** auf Tastendruck laufen — Kick, Snare, Zap,
+Laser, Coin, Boom, Blip, SID-Bass. Alle sind **prozedural**: `AUDIO_SFX` baut
+sie aus Wellenform, Tonhöhe, Pitch-Slide, ADSR, Vibrato und den
+SID-Erweiterungen (Pulsbreite/PWM + resonanter Filter-Sweep). Es liegt keine
+einzige Klangdatei dabei — jeder dieser Klänge steht als eine Zeile im
+Quelltext.
+
+**M** schaltet zwischen den vier gemeinfreien Musikstücken um. Wichtig dabei:
+der Ablaufplan hängt an `AUDIO_MUSIC_POSITION`, und die springt beim Laden auf
+0 zurück — die Demo schiebt deshalb `versatz` mit, sonst finge sie bei jedem
+Musikwechsel wieder bei Szene 1 an.
 
 ## Was das Ganze trägt
 

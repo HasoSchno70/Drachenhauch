@@ -35,6 +35,8 @@ IMPORT "timer"
 CONST BREITE AS INTEGER = 1280
 CONST HOEHE AS INTEGER = 720
 CONST MUSIK AS STRING = "assets/music/stardust_jam.mod"
+' Alle vier liegen bei und sind gemeinfrei -- M schaltet im Betrieb um.
+CONST STUECKE AS INTEGER = 4
 CONST BAENDER AS INTEGER = 32
 
 ' Szenen-Grenzen in Sekunden des Stuecks (Stardust Jam laeuft ~6:24).
@@ -1297,8 +1299,146 @@ MODEL_PBR(kern, 0.2, 0.35)
 AUDIO_MUSIC_LOAD(MUSIK)
 AUDIO_MUSIC_PLAY(-1, 1200)
 
+' ----------------------------------------------------------------------
+'  KLANG-TASTATUR
+' ----------------------------------------------------------------------
+' Acht Klaenge, die jederzeit auf Tastendruck laufen -- egal welche Szene
+' gerade zu sehen ist. Alle sind PROZEDURAL: AUDIO_SFX baut sie aus
+' Wellenform, Tonhoehe, Pitch-Slide, ADSR, Vibrato und (SID-Erweiterung)
+' Pulsbreite + resonantem Filter-Sweep. Keine einzige Klangdatei.
+CONST KLAENGE AS INTEGER = 8
+
+DIM klang[KLAENGE] AS SOUND
+DIM klangname[KLAENGE] AS STRING
+DIM klangtaste[KLAENGE] AS INTEGER
+DIM klangfarbe[KLAENGE] AS INTEGER
+DIM letzter_klang AS INTEGER
+DIM klang_alter AS FLOAT
+
+DIM stueck_datei[STUECKE] AS STRING
+DIM stueck_name[STUECKE] AS STRING
+DIM stueck AS INTEGER
+DIM stueck_alter AS FLOAT
+
+SUB klaviatur_bauen()
+    ' Wellenform, Frequenz, Slide, Attack, Sustain, Decay, Vib-Tiefe,
+    ' Vib-Tempo, Lautstaerke [, Stereo, Duty, PWM-Tiefe, PWM-Tempo,
+    '  Filter-Cutoff, Filter-Sweep, Resonanz]
+    klang[0] = AUDIO_SFX("sine", 150, -110, 0, 60, 220, 0, 0, 0.9)
+    klangname[0] = "KICK"
+    klang[1] = AUDIO_SFX("noise", 900, -300, 0, 40, 180, 0, 0, 0.7)
+    klangname[1] = "SNARE"
+    klang[2] = AUDIO_SFX("square", 880, 900, 0, 90, 90, 0, 0, 0.6, 0.0, 0.25, 0.2, 8.0)
+    klangname[2] = "ZAP"
+    klang[3] = AUDIO_SFX("saw", 1200, -900, 0, 140, 120, 0, 0, 0.6, 0.0, 0.5, 0.0, 0.0, 5000, -9000, 0.75)
+    klangname[3] = "LASER"
+    klang[4] = AUDIO_SFX("square", 660, 260, 0, 70, 110, 0, 0, 0.55, 0.0, 0.5)
+    klangname[4] = "COIN"
+    klang[5] = AUDIO_SFX("noise", 300, -160, 0, 260, 620, 0, 0, 0.8)
+    klangname[5] = "BOOM"
+    klang[6] = AUDIO_SFX("triangle", 1400, 0, 0, 45, 60, 0, 0, 0.5)
+    klangname[6] = "BLIP"
+    klang[7] = AUDIO_SFX("saw", 110, 0, 20, 700, 260, 0.4, 5.0, 0.75, 0.35, 0.28, 0.2, 4.5, 3200, -2600, 0.8)
+    klangname[7] = "SID-BASS"
+
+    klangtaste[0] = KEY_A
+    klangtaste[1] = KEY_S
+    klangtaste[2] = KEY_D
+    klangtaste[3] = KEY_F
+    klangtaste[4] = KEY_G
+    klangtaste[5] = KEY_H
+    klangtaste[6] = KEY_J
+    klangtaste[7] = KEY_K
+
+    DIM t AS INTEGER
+    FOR t = 0 TO KLAENGE - 1
+        klangfarbe[t] = regenbogen(t * 0.78, 1.0)
+    NEXT
+    letzter_klang = -1
+    klang_alter = 99.0
+
+    stueck_datei[0] = "assets/music/stardust_jam.mod"
+    stueck_name[0] = "Drozerix - Stardust Jam"
+    stueck_datei[1] = "assets/music/silicon_dancer.mod"
+    stueck_name[1] = "Drozerix - Silicon Dancer"
+    stueck_datei[2] = "assets/music/neon_techno.mod"
+    stueck_name[2] = "Drozerix - Neon Techno"
+    stueck_datei[3] = "assets/music/assembly.xm"
+    stueck_name[3] = "Drozerix - Assembly!"
+    stueck = 0
+    stueck_alter = 99.0
+END SUB
+
+' Wird jedes Bild gerufen: Tasten abfragen und den zuletzt gespielten
+' Klang kurz einblenden.
+SUB klaviatur_bedienen()
+    DIM t AS INTEGER
+    FOR t = 0 TO KLAENGE - 1
+        IF KEYHIT(klangtaste[t]) THEN
+            AUDIO_PLAY(klang[t], 0, 0.85)
+            letzter_klang = t
+            klang_alter = 0.0
+        END IF
+    NEXT
+    klang_alter = klang_alter + dt
+    stueck_alter = stueck_alter + dt
+
+    ' M schaltet das Musikstueck um. Wichtig dabei: der Ablaufplan haengt an
+    ' AUDIO_MUSIC_POSITION, und die springt beim Laden auf 0 zurueck. Ohne
+    ' Korrektur finge die Demo also wieder bei Szene 1 an. Deshalb wandert
+    ' die aktuelle Stelle in `versatz` -- die Szenen laufen unbeirrt weiter.
+    IF KEYHIT(KEY_M) THEN
+        stueck = (stueck + 1) MOD STUECKE
+        versatz = zeit
+        AUDIO_MUSIC_LOAD(stueck_datei[stueck])
+        AUDIO_MUSIC_PLAY(-1, 400)
+        stueck_alter = 0.0
+    END IF
+END SUB
+
+SUB klaviatur_zeigen()
+    ' Dauerhafte, dezente Zeile -- man soll wissen, dass es sie gibt.
+    DIM t AS INTEGER
+    DIM zeile AS STRING
+    zeile = ""
+    FOR t = 0 TO KLAENGE - 1
+        zeile = zeile + KEY_NAME$(klangtaste[t]) + " " + klangname[t] + "   "
+    NEXT
+    ' Abdunkeln statt uebermalen: MULT laesst durchscheinen, was darunter
+    ' liegt, macht die Zeile aber in jeder Szene lesbar -- ohne den Streifen
+    ' verschwindet sie in den Spektrum-Saeulen.
+    BLEND_MODE("mult")
+    BOX(0, HOEHE - 34, BREITE, HOEHE, RGB(60, 62, 74))
+    BLEND_MODE("alpha")
+    mtext(BREITE \ 2, HOEHE - 17, zeile + "   M MUSIK", 0.34, RGB(120, 140, 170))
+
+    ' Nach einem Musikwechsel kurz nennen, was jetzt laeuft.
+    IF stueck_alter < 3.5 THEN
+        DIM mb AS FLOAT
+        mb = 1.0
+        IF stueck_alter > 2.5 THEN mb = 3.5 - stueck_alter
+        BLEND_MODE("mult")
+        BOX(0, 6, BREITE, 44, RGB(60, 62, 74))
+        BLEND_MODE("alpha")
+        mtext(BREITE \ 2, 25, stueck_name[stueck], 0.42, _
+              RGB(INT(170 * mb), INT(200 * mb), INT(230 * mb)))
+    END IF
+
+    ' Der zuletzt gedrueckte Klang blitzt kurz auf.
+    IF letzter_klang >= 0 AND klang_alter < 1.1 THEN
+        DIM b AS FLOAT
+        b = 1.0 - klang_alter / 1.1
+        mtext(BREITE \ 2, HOEHE - 108, klangname[letzter_klang], _
+              0.7 + 0.5 * b, dunkler(klangfarbe[letzter_klang], b))
+    END IF
+END SUB
+
 DIM letzte_szene AS INTEGER
 letzte_szene = -1
+
+' NACH den Deklarationen: Top-Level-Anweisungen laufen der Reihe nach, ein
+' Aufruf davor faende die Arrays noch nicht.
+klaviatur_bauen()
 
 ' ----------------------------------------------------------------------
 '  HAUPTSCHLEIFE
@@ -1350,6 +1490,7 @@ WHILE NOT QUITREQUESTED()
         zeit = zeit - T8
     END IF
 
+    klaviatur_bedienen()
     spektrum_lesen()
 
     ' Szenennummer aus der Zeit ableiten und den 3D-Zustand nur bei einem
@@ -1412,6 +1553,8 @@ WHILE NOT QUITREQUESTED()
         blende = randblende(szene_t, T8 - T7, 2.5)
         szene_abspann()
     END IF
+
+    klaviatur_zeigen()
 
     ' Post-Effekt mit den Werten dieses Bildes fuettern
     SHADER_SET(sh, "time", zeit)
