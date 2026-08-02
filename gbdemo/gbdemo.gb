@@ -50,6 +50,11 @@ CONST T8 AS FLOAT = 384.0       ' Abspann
 SCREEN(BREITE, HOEHE, "GameBasic -- Demo", 1)
 SETFPS(60)
 WINDOW_ESC_QUIT(FALSE)
+' Vollbild von Anfang an -- eine Demo schaut man nicht im Fenster an.
+' Gezeichnet wird weiter in 1280x720; die Laufzeit skaliert ganzzahlig auf
+' den Bildschirm (auf 2560x1440 also exakt 2x, ohne Unschaerfe). F11 schaltet
+' zurueck, falls doch ein Fenster gebraucht wird.
+SET_FULLSCREEN(TRUE)
 
 ' ----------------------------------------------------------------------
 '  Globaler Zustand
@@ -436,7 +441,9 @@ SUB szene_pbr()
     CAMERA3D(SIN(w) * 10.5, 3.4 + SIN(zeit * 0.45) * 1.4, COS(w) * 10.5, 0, 1.2, 0, 50)
     SHADOW_TARGET(0, 1, 0)
 
-    MODEL(boden, 0, -1.4, 0, 1.0, &H2A3038)
+    ' Farbe aus dem Panorama gemessen (Mittelwert des Gelaendes direkt
+    ' unter dem Horizont): ein warmes Braungrau.
+    MODEL(boden, 0, -1.4, 0, 1.0, &H87735A)
 
     ' Ring aus Metallkugeln -- jede haengt an ihrem eigenen Frequenzband.
     DIM k AS INTEGER
@@ -496,15 +503,22 @@ DIM nk AS INTEGER
 DIM naechster_aufbau AS FLOAT
 DIM aufbau_zeit AS FLOAT
 DIM n_logo AS INTEGER                ' wie viele Koerper zum Logo gehoeren
-DIM steht AS BOOLEAN                 ' steht das Logo noch?
-DIM logo_x0 AS INTEGER               ' Ausdehnung des Logos (fuer den Einschlag)
-DIM logo_x1 AS INTEGER
+' Jeder Buchstabe wird EINZELN umgeworfen. Vorher kippte ein Treffer das
+' ganze Logo um -- auch das B, das gar niemand angefasst hatte.
+CONST BUCHSTABEN AS INTEGER = 2
+DIM steht[BUCHSTABEN] AS BOOLEAN     ' steht dieser Buchstabe noch?
+DIM bu_x0[BUCHSTABEN] AS INTEGER     ' seine Ausdehnung (fuer den Einschlag)
+DIM bu_x1[BUCHSTABEN] AS INTEGER
+DIM kbuchstabe[MAXK] AS INTEGER      ' zu welchem Buchstaben gehoert der Koerper?
 DIM logo_y0 AS INTEGER
 DIM weiss AS IMAGE
 DIM welt_bereit AS BOOLEAN
 
 ' Eine Buchstaben-Schablone in Kloetze uebersetzen.
-SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, farbe AS INTEGER)
+SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, _
+                farbe AS INTEGER, nummer AS INTEGER)
+    DIM erster AS BOOLEAN
+    erster = TRUE
     DIM r AS INTEGER
     FOR r = 0 TO LOGO_ZEILEN - 1
         DIM zeile AS STRING
@@ -517,8 +531,9 @@ SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, farbe A
                 ' stimmen, wenn jemand die Buchstaben aendert.
                 DIM bx AS INTEGER
                 bx = x0 + c * KLOTZ
-                IF nk = 0 OR bx < logo_x0 THEN logo_x0 = bx
-                IF nk = 0 OR bx > logo_x1 THEN logo_x1 = bx
+                IF erster OR bx < bu_x0[nummer] THEN bu_x0[nummer] = bx
+                IF erster OR bx > bu_x1[nummer] THEN bu_x1[nummer] = bx
+                erster = FALSE
                 ' Erst einmal STATISCH: sonst faellt der Querbalken des G in
                 ' dem Moment herunter, in dem die Szene beginnt -- man saehe
                 ' das Logo nie. Umgekippt wird es unten auf den Einschlag.
@@ -526,6 +541,7 @@ SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, farbe A
                                          KLOTZ / 2 - 1, KLOTZ / 2 - 1, FALSE, 0.05)
                 kfarbe[nk] = farbe
                 ist_kugel[nk] = FALSE
+                kbuchstabe[nk] = nummer
                 nk = nk + 1
             END IF
         NEXT
@@ -546,25 +562,28 @@ SUB physik_aufbauen()
 
     DIM y0 AS INTEGER
     y0 = HOEHE - 60 - LOGO_ZEILEN * KLOTZ
-    logo_setzen(logo_g, BREITE \ 2 - 6 * KLOTZ, y0, RGB(90, 220, 210))
-    logo_setzen(logo_b, BREITE \ 2 + 1 * KLOTZ, y0, RGB(230, 110, 190))
+    logo_setzen(logo_g, BREITE \ 2 - 6 * KLOTZ, y0, RGB(90, 220, 210), 0)
+    logo_setzen(logo_b, BREITE \ 2 + 1 * KLOTZ, y0, RGB(230, 110, 190), 1)
     n_logo = nk
     ' Halbe Klotzbreite plus Kugelradius Toleranz -- so loest der Einschlag
     ' genau dann aus, wenn die Kugel die aeusserste Saeule beruehrt.
-    logo_x0 = logo_x0 - KLOTZ \ 2 - 16
-    logo_x1 = logo_x1 + KLOTZ \ 2 + 16
+    DIM bi AS INTEGER
+    FOR bi = 0 TO BUCHSTABEN - 1
+        bu_x0[bi] = bu_x0[bi] - KLOTZ \ 2 - 16
+        bu_x1[bi] = bu_x1[bi] + KLOTZ \ 2 + 16
+        steht[bi] = TRUE
+    NEXT
     logo_y0 = y0 - KLOTZ
-    steht = TRUE
     welt_bereit = TRUE
 END SUB
 
-' Die stehenden Kloetze beweglich machen -- ein Aufruf pro Klotz.
-SUB logo_umkippen()
+' Nur die Kloetze EINES Buchstabens beweglich machen.
+SUB logo_umkippen(nummer AS INTEGER)
     DIM k AS INTEGER
     FOR k = 0 TO n_logo - 1
-        PHYS2D_SET_DYNAMIC(welt, kid[k], TRUE)
+        IF kbuchstabe[k] = nummer THEN PHYS2D_SET_DYNAMIC(welt, kid[k], TRUE)
     NEXT
-    steht = FALSE
+    steht[nummer] = FALSE
 END SUB
 
 SUB szene_physik()
@@ -603,22 +622,26 @@ SUB szene_physik()
 
     ' Umgekippt wird beim EINSCHLAG, nicht beim Abschuss: die Kugel braucht
     ' eine halbe Sekunde bis zum Logo, und faellt es schon vorher zusammen,
-    ' sieht es aus, als kippe es von selbst.
-    IF steht THEN
-        DIM j AS INTEGER
-        FOR j = n_logo TO nk - 1
-            IF ist_kugel[j] THEN
-                DIM bx AS FLOAT
-                DIM by AS FLOAT
-                bx = PHYS2D_BODY_X(welt, kid[j])
-                by = PHYS2D_BODY_Y(welt, kid[j])
-                IF bx > logo_x0 AND bx < logo_x1 AND by > logo_y0 THEN
-                    logo_umkippen()
-                    BREAK
-                END IF
+    ' sieht es aus, als kippe es von selbst. Und es faellt nur DER Buchstabe,
+    ' den die Kugel wirklich erreicht -- der andere steht weiter, bis ihn
+    ' selbst etwas trifft.
+    DIM j AS INTEGER
+    FOR j = n_logo TO nk - 1
+        IF ist_kugel[j] THEN
+            DIM bx AS FLOAT
+            DIM by AS FLOAT
+            bx = PHYS2D_BODY_X(welt, kid[j])
+            by = PHYS2D_BODY_Y(welt, kid[j])
+            IF by > logo_y0 THEN
+                DIM bi2 AS INTEGER
+                FOR bi2 = 0 TO BUCHSTABEN - 1
+                    IF steht[bi2] AND bx > bu_x0[bi2] AND bx < bu_x1[bi2] THEN
+                        logo_umkippen(bi2)
+                    END IF
+                NEXT
             END IF
-        NEXT
-    END IF
+        END IF
+    NEXT
 
     PHYS2D_STEP(welt, dt)
 
@@ -1113,9 +1136,13 @@ NEXT
 ' liest sich als Boden.
 boden = MESH_PLANE(400.0, 400.0, 1, 1)
 MODEL_LIT(boden)
-' Nicht zu metallisch: auf einer fast reinen Spiegelflaeche bleibt kaum
-' Diffusanteil uebrig, und der Schattenwurf verschwindet mit ihm.
-MODEL_PBR(boden, 0.30, 0.22)
+' Matt statt spiegelnd -- und das ist hier kein Geschmack, sondern
+' Konsistenz: die Kugeln spiegeln die UMGEBUNG aus dem HDR, und darin ist
+' der Boden das Gelaende des Panoramas. Ein glaenzender Untergrund zeigt
+' etwas anderes als das, was in den Kugeln zu sehen ist -- der Widerspruch
+' faellt sofort auf. Matt und in der Farbe des Panorama-Bodens setzt die
+' Flaeche das Gelaende einfach fort.
+MODEL_PBR(boden, 0.05, 0.60)
 
 ' Ein Ring statt eines Knotens: der Knoten war bei dieser Groesse nur ein
 ' undeutliches Gebilde. Ein Torus ist auf einen Blick als Form erkennbar --

@@ -8,11 +8,15 @@ bloß daneben zu laufen.
 gbrun.py gbdemo\gbdemo.gb          # oder im Editor F5
 ```
 
+Sie **startet im Vollbild**. Gezeichnet wird in 1280×720, die Laufzeit
+skaliert ganzzahlig auf den Bildschirm (auf 1440p also exakt 2×, ohne
+Unschärfe).
+
 | Taste | Wirkung |
 |---|---|
 | 1 – 8 | direkt in eine Szene springen |
 | LEER | eine Szene weiter |
-| F11 | Vollbild |
+| F11 | Vollbild an/aus |
 | ESC | Ende |
 
 ## Was das Ganze trägt
