@@ -61,5 +61,10 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.cmd("TWEEN_PROGRESS · TWEEN_RESTART · TWEEN_EASINGS", 'TWEEN_PROGRESS(t)   TWEEN_RESTART(t)   TWEEN_EASINGS()',
+    "TWEEN_PROGRESS liefert den Fortschritt von 0.0 bis 1.0 – anders als TWEEN_VALUE, das den tatsächlichen Wert liefert; damit füllst du etwa einen Ladebalken. TWEEN_RESTART setzt den Ablauf wieder auf den Anfang. TWEEN_EASINGS listet alle verfügbaren Verlaufsarten als Text auf.",
+    [
+      'PRINT TWEEN_EASINGS()',
+    ], { out: ["in_back, in_bounce, in_cubic, in_elastic, in_quad, in_sine, inout_back, inout_bounce, inout_cubic, inout_elastic, inout_quad, inout_sine, linear, out_back, out_bounce, out_cubic, out_elastic, out_quad, out_sine"] }),
   H.tip("tween oder curves?", "tween ist zeitbasiert: „bewege diesen Wert in 700 ms“. Brauchst du stattdessen eine Kurve, die du selbst über einen Parameter steuerst (etwa eine Flugbahn entlang von Stützpunkten), schau dir das Modul curves an – es liefert die reinen Kurven-Funktionen ohne eigene Zeitsteuerung."),
 ];

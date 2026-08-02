@@ -47,5 +47,26 @@ module.exports = (H) => [
     '    SAVE_WRITE(s, "highscore.save")     \' dauerhaft sichern',
     'END IF',
   ]),
+  H.h2("Weitere Typen und Verwaltung"),
+  H.cmd("SAVE_SET_FLOAT · SAVE_SET_BOOL · SAVE_GET_FLOAT · SAVE_GET_BOOL", 'SAVE_SET_FLOAT(s, schluessel$, wert)   SAVE_SET_BOOL(s, schluessel$, wahr)   SAVE_GET_FLOAT(s, schluessel$)   SAVE_GET_BOOL(s, schluessel$)',
+    "Neben ganzen Zahlen und Text speichert ein Slot auch Kommazahlen und Wahrheitswerte – Spielzeit, Lautstärke, ob das Tutorial schon lief.",
+    [
+      'SAVE_SET_FLOAT(slot, "spielzeit", 1234.5)',
+      'SAVE_SET_BOOL(slot, "tutorial_gesehen", TRUE)',
+    ]),
+  H.cmd("SAVE_GET_STRING_OR · SAVE_HAS", 'SAVE_GET_STRING_OR(s, schluessel$, ersatz$)   SAVE_HAS(s, schluessel$)',
+    "Mit Ersatzwert lesen bzw. prüfen, ob ein Wert überhaupt gespeichert ist. Das ist der saubere Umgang mit älteren Spielständen, in denen ein später hinzugekommener Wert noch fehlt.",
+    [
+      'DIM name AS STRING',
+      'name = SAVE_GET_STRING_OR(slot, "spielername", "Namenlos")',
+      'IF NOT SAVE_HAS(slot, "schwierigkeit") THEN SAVE_SET_STRING(slot, "schwierigkeit", "normal")',
+    ]),
+  H.cmd("SAVE_KEYS · SAVE_DELETE · SAVE_CLEAR", 'SAVE_KEYS(s)   SAVE_DELETE(s, schluessel$)   SAVE_CLEAR(s)',
+    "SAVE_KEYS liefert alle gespeicherten Schlüssel als Array (praktisch für einen Debug-Überblick), SAVE_DELETE entfernt einen einzelnen Wert, SAVE_CLEAR leert den ganzen Slot – etwa für „Fortschritt zurücksetzen“.",
+    [
+      'DIM k AS ARRAY OF STRING',
+      'k = SAVE_KEYS(slot)',
+      'SAVE_DELETE(slot, "alter_wert")',
+    ]),
   H.tip("save oder json?", "Für Spielstände mit ein paar benannten Werten ist save genau richtig – einfach und mit Versionsfeld. Brauchst du beliebig verschachtelte Datenstrukturen (Listen, Objekte in Objekten), ist das json-Modul (Teil V) flexibler. save ist im Grunde ein komfortabler Aufsatz auf JSON für den häufigsten Fall."),
 ];

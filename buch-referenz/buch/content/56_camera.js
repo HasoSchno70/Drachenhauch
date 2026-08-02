@@ -56,5 +56,23 @@ module.exports = (H) => [
     'WEND',
   ]),
   H.note("Die Kamera wirkt auf alle Welt-Zeichenbefehle – BOX, CIRCLE, LINE, TEXT, DRAWIMAGE, DRAWTILEMAP, SPRITE_DRAW und PARTICLE_DRAW. Den Text-HUD also bewusst NACH CAMERA_RESET() zeichnen, damit er nicht mitwandert."),
+  H.h2("Kamera abfragen und drehen"),
+  H.cmd("CAMERA_X · CAMERA_Y · CAMERA_ZOOM", 'CAMERA_X()   CAMERA_Y()   CAMERA_ZOOM()',
+    "Lesen die aktuelle Kamera-Position und den Zoom zurück – etwa nachdem CAMERA_FOLLOW sie weich nachgezogen hat, oder um den Stand im Spielstand zu sichern.",
+    [
+      'PRINT STR$(CAMERA_X()) + " / " + STR$(CAMERA_Y())',
+    ]),
+  H.cmd("CAMERA_SET_ROTATION · CAMERA_ROTATION", 'CAMERA_SET_ROTATION(grad)   CAMERA_ROTATION()',
+    "Dreht die Weltansicht um die Bildschirmmitte – für ein Erdbeben, einen Sturz oder ein Spiel, in dem sich die Welt statt der Figur dreht.",
+    [
+      'CAMERA_SET_ROTATION(SIN(GET_TIME() * 8.0) * 3.0)   \' leichtes Wackeln',
+    ]),
+  H.warn("Die Drehung dreht Positionen, nicht Formen", "CAMERA_SET_ROTATION verschiebt, wohin ein Objekt gezeichnet wird – die Objekte selbst bleiben aufrecht. Ein Sprite, das sich mitdrehen soll, bekommt den Winkel zusätzlich selbst: DRAWIMAGEROT(bild, x, y, eigener_winkel + CAMERA_ROTATION())."),
+  H.cmd("CAMERA_ORBIT", 'CAMERA_ORBIT(zx, zy, zz, radius, gier, nick[, fov])',
+    "Setzt die 3D-Kamera über Kugelkoordinaten: Sie schaut auf das Ziel (zx, zy, zz) und steht im Abstand radius, gedreht um gier (waagerecht) und nick (senkrecht, in Grad). Erspart die Trigonometrie, wenn die Kamera ein Objekt umkreisen soll.",
+    [
+      'CAMERA_ORBIT(0.0, 1.0, 0.0, 12.0, winkel, 25.0, 45.0)',
+      'winkel = winkel + 0.5',
+    ]),
   H.tip("Kamera-Tempo", "Statt die Kamera hart auf den Spieler zu setzen, kannst du ihr weich folgen lassen: die Kamera-Position pro Frame ein Stück Richtung Ziel bewegen (z. B. mit MOVETOWARD oder LERP). Das ergibt ein angenehmes, leicht nachziehendes Gefühl statt eines starren Klebens."),
 ];

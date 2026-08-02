@@ -126,5 +126,24 @@ module.exports = (H) => [
       'PRINT ECS_COUNT_WITH(w, "hp")',
     ], { out: ["1"] }),
 
+  H.h2("Weitere Component-Typen und Abfragen"),
+  H.cmd("ECS_ADD_BOOL · ECS_ADD_OBJ · ECS_GET_BOOL · ECS_GET", 'ECS_ADD_BOOL(w, e, name$, wert)   ECS_ADD_OBJ(w, e, name$, objekt)   ECS_GET_BOOL(w, e, name$)   ECS_GET(w, e, name$)',
+    "Neben Zahlen und Text kannst du auch Wahrheitswerte und beliebige Objekte an eine Entity hängen – etwa eine Klassen-Instanz oder ein Sprite-Handle. ECS_GET liest ein Objekt-Component zurück.",
+    [
+      'ECS_ADD_BOOL(welt, e, "unsichtbar", FALSE)',
+      'ECS_ADD_OBJ(welt, e, "sprite", held_sprite)',
+    ]),
+  H.cmd("ECS_GET_OR_FLOAT · ECS_GET_OR_STRING · ECS_GET_OR_BOOL", 'ECS_GET_OR_FLOAT(w, e, name$, ersatz)   ECS_GET_OR_STRING(w, e, name$, ersatz$)   ECS_GET_OR_BOOL(w, e, name$, ersatz)',
+    "Lesen mit Ersatzwert, falls die Entity dieses Component gar nicht hat – so sparst du dir die Abfrage mit ECS_HAS davor.",
+    [
+      'DIM tempo AS FLOAT',
+      'tempo = ECS_GET_OR_FLOAT(welt, e, "speed", 1.0)',
+    ]),
+  H.cmd("ECS_INTEGRATE_INT · ECS_FILL_INT", 'ECS_INTEGRATE_INT(w, ziel$, delta$)   ECS_FILL_INT(w, ziel$, wert)',
+    "Die INTEGER-Varianten der Bulk-Befehle: INTEGRATE addiert ein Component auf ein anderes (für alle Entities, die beide haben), FILL setzt ein ganzes Component auf einen festen Wert. Ein Aufruf statt einer Schleife über tausende Entities.",
+    [
+      'ECS_INTEGRATE_INT(welt, "punkte", "punkte_pro_tick")',
+      'ECS_FILL_INT(welt, "getroffen", 0)',
+    ]),
   H.tip("Wann ECS, wann Klassen?", "Für eine Handvoll unterschiedlicher Objekte (Spieler, ein Boss, ein paar Menüs) sind Klassen (Kapitel 20) übersichtlicher. ECS spielt seine Stärke aus, sobald du SEHR VIELE gleichartige Dinge hast – Geschosse, Partikel, Gegnerschwärme. Dann ein Spiel-System als Bulk-Op zu schreiben statt als Klassen-Schleife ist der Unterschied zwischen flüssigen 1000 Objekten und Ruckeln. Beide Stile lassen sich im selben Spiel mischen."),
 ];

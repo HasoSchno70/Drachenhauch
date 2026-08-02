@@ -160,5 +160,16 @@ module.exports = (H) => [
     ]),
   H.note("Umgesetzt ist MQTT 3.1.1 mit QoS 0 – die Stufe, die praktisch alle ESP32-Beispiele verwenden: Nachrichten werden einmal geschickt, ohne Empfangsbestätigung. Nicht dabei sind QoS 1/2, Testamente (Last Will) und verschlüsselte Verbindungen (TLS)."),
 
+  H.cmd("SERIAL_IS_OPEN · SERIAL_FLUSH · SERIAL_TIMEOUT", 'SERIAL_IS_OPEN(h)   SERIAL_FLUSH(h)   SERIAL_TIMEOUT(h, sekunden)',
+    "SERIAL_IS_OPEN prüft die Verbindung (ein abgezogenes USB-Kabel merkt man sonst erst beim Lesen). SERIAL_FLUSH schiebt gepufferte Daten sofort hinaus, SERIAL_TIMEOUT legt fest, wie lange ein Lesevorgang höchstens wartet.",
+    [
+      'SERIAL_TIMEOUT(h, 0.1)          \' hoechstens 100 ms warten',
+      'IF NOT SERIAL_IS_OPEN(h) THEN PRINT "Board abgezogen"',
+    ]),
+  H.cmd("USB_OPEN_PATH · USB_SERIAL", 'USB_OPEN_PATH(pfad$)   USB_SERIAL(h)',
+    "USB_OPEN_PATH öffnet ein Gerät über seinen Systempfad statt über Hersteller- und Produkt-Nummer – nötig, wenn zwei baugleiche Geräte angeschlossen sind. USB_SERIAL liefert die Seriennummer, um sie auseinanderzuhalten.",
+    [
+      'PRINT USB_SERIAL(h)',
+    ]),
   H.tip("Roh-Bytes verstehen", "Hardware schickt selten fertigen Text, sondern rohe Bytes – jede Position im empfangenen STRING ist ein Byte von 0 bis 255. Mit ASC(s[i]) holst du den Zahlenwert eines Bytes, mit CHR$(n) baust du eines zum Senden. Welche Bytes welche Bedeutung haben, steht im Datenblatt des Geräts (bei Standard-BLE-Sensoren in der offiziellen GATT-Spezifikation). Damit endet die Modul-Tour – im Anhang findest du Nachschlage-Tabellen zu allen Befehlen, Tasten und Farben."),
 ];

@@ -57,5 +57,23 @@ module.exports = (H) => [
     '    END IF',
     'END IF',
   ]),
+  H.h2("Gitter einstellen und abfragen"),
+  H.cmd("ASTAR_WIDTH · ASTAR_HEIGHT · ASTAR_SET_PASSABLE · ASTAR_CLEAR", 'ASTAR_WIDTH(g)   ASTAR_HEIGHT(g)   ASTAR_SET_PASSABLE(g, x, y)   ASTAR_CLEAR(g)',
+    "Größe abfragen, eine Mauer wieder begehbar machen (das Gegenstück zu ASTAR_SET_WALL – etwa wenn eine Tür aufgeht) oder alle Mauern auf einmal entfernen.",
+    [
+      'PRINT STR$(ASTAR_WIDTH(g)) + "x" + STR$(ASTAR_HEIGHT(g))',
+      'ASTAR_SET_PASSABLE(g, 3, 3)      \' Tuer geht auf',
+    ], { out: ["10x8"] }),
+  H.cmd("ASTAR_SET_HEURISTIC · ASTAR_SET_DIAGONAL_COST", 'ASTAR_SET_HEURISTIC(g, name$)   ASTAR_SET_DIAGONAL_COST(g, kosten)',
+    'Die Schätzfunktion bestimmt, wie der Weg gesucht wird: "manhattan" (nur waagerecht/senkrecht), "euclid" (Luftlinie) oder "chebyshev" (Diagonalen gleich teuer). Mit ASTAR_SET_DIAGONAL_COST legst du fest, was ein diagonaler Schritt kostet – 1.4 entspricht ungefähr der echten Länge und sieht am natürlichsten aus.',
+    [
+      'ASTAR_SET_HEURISTIC(g, "euclid")',
+      'ASTAR_SET_DIAGONAL_COST(g, 1.4)',
+    ]),
+  H.cmd("ASTAR_PATH_COST · ASTAR_CLEAR_PATH", 'ASTAR_PATH_COST(g)   ASTAR_CLEAR_PATH(g)',
+    "Was hat der gefundene Weg gekostet (Summe der Schritte, Diagonalen zählen mehr)? Damit vergleichst du Wege – etwa welcher von drei Gegnern am schnellsten beim Spieler ist. ASTAR_CLEAR_PATH verwirft das Ergebnis.",
+    [
+      'IF ASTAR_FIND(g, 0, 0, 9, 7) THEN PRINT ASTAR_PATH_COST(g)',
+    ], { out: ["16.0"] }),
   H.tip("Gitter und Welt", "Das astar-Gitter denkt in Kacheln (0, 1, 2 …), deine Spielwelt in Pixeln. Rechne zwischen beiden um: kachel = pixel \\ kachelgröße und zurück pixel = kachel * kachelgröße. Oft passt das Gitter genau zu deiner Tilemap (nächstes Kapitel)."),
 ];

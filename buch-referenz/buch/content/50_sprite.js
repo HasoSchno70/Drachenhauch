@@ -92,5 +92,31 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Position, Größe und Bild abfragen"),
+  H.cmd("SPRITE_GET_X · SPRITE_GET_Y · SPRITE_GET_WIDTH · SPRITE_GET_HEIGHT", 'SPRITE_GET_X(sp)   SPRITE_GET_Y(sp)   SPRITE_GET_WIDTH(sp)   SPRITE_GET_HEIGHT(sp)',
+    "Lesen zurück, wo das Sprite steht und wie groß ein Einzelbild ist – etwa um die Kamera folgen zu lassen oder eine Lebensleiste darüber zu zeichnen.",
+    [
+      'CAMERA_FOLLOW(SPRITE_GET_X(held), SPRITE_GET_Y(held), 0.1)',
+    ]),
+  H.cmd("SPRITE_GET_FRAME · SPRITE_SET_FRAME · SPRITE_CURRENT_ANIM · SPRITE_IS_FINISHED", 'SPRITE_GET_FRAME(sp)   SPRITE_SET_FRAME(sp, i)   SPRITE_CURRENT_ANIM(sp)   SPRITE_IS_FINISHED(sp)',
+    "Der Animationszustand: aktuelles Einzelbild lesen oder setzen, Name der laufenden Animation, und ob eine mit SPRITE_PLAY_ONCE gestartete Animation durchgelaufen ist – der übliche Auslöser für „nach dem Schlag zurück in den Ruhezustand“.",
+    [
+      'IF SPRITE_IS_FINISHED(held) THEN SPRITE_PLAY(held, "idle")',
+      'PRINT SPRITE_CURRENT_ANIM(held)',
+    ]),
+
+  H.h2("Treffer und Einfärben"),
+  H.cmd("SPRITE_COLLIDE · SPRITE_HIT_BOX · SPRITE_HIT_POINT", 'SPRITE_COLLIDE(a, b)   SPRITE_HIT_BOX(sp, x, y, w, h)   SPRITE_HIT_POINT(sp, x, y)',
+    "Überlappen sich zwei Sprites, trifft ein Sprite ein Rechteck (Plattform, Zone), oder liegt ein Punkt darauf (Mausklick)? Alle drei rechnen mit dem umgebenden Rechteck des Sprites.",
+    [
+      'IF SPRITE_COLLIDE(held, gegner) THEN leben = leben - 1',
+      'IF SPRITE_HIT_POINT(gegner, MOUSEX(), MOUSEY()) THEN anvisieren(gegner)',
+    ]),
+  H.cmd("SPRITE_TINT · SPRITE_TINT_CLEAR", 'SPRITE_TINT(sp, farbe)   SPRITE_TINT_CLEAR(sp)',
+    "Färbt das Sprite ein – der klassische kurze Rot-Blitz beim Treffer oder ein Grünstich für vergiftete Gegner. SPRITE_TINT_CLEAR nimmt die Färbung wieder zurück.",
+    [
+      'SPRITE_TINT(gegner, RGB(255, 80, 80))',
+      'TIMER_AFTER(120, faerbung_zuruecksetzen)',
+    ]),
   H.tip("Sprites selbst zeichnen", "Spritesheets musst du nicht von Hand malen: Der mitgelieferte Pixel-Editor gbsprites zeichnet Frames, Animationen und exportiert fertige Sheets (und sogar Atlas-Manifeste). So schließt sich der Kreis von der Grafik bis ins Spiel."),
 ];

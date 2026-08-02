@@ -139,5 +139,10 @@ module.exports = (H) => [
       'NEXT',
     ]),
 
+  H.cmd("NET_UDP_CLOSE", 'NET_UDP_CLOSE(sock)',
+    "Schließt einen UDP-Socket und gibt den Anschluss wieder frei – das Gegenstück zu NET_UDP_BIND.",
+    [
+      'NET_UDP_CLOSE(sock)',
+    ]),
   H.tip("Daten haben keine Grenzen", "TCP ist ein Strom, kein Paket-Versand: Zwei NET_SEND können beim Empfänger als ein NET_RECV ankommen – oder umgekehrt. Wenn du abgegrenzte Nachrichten brauchst, schick die Länge voraus (z. B. vierstellig) oder beende jede Nachricht mit einem Trennzeichen wie Zeilenumbruch und setze sie beim Empfänger wieder zusammen."),
 ];

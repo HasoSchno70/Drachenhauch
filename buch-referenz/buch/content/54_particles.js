@@ -73,5 +73,11 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.cmd("PARTICLE_SET_POS · PARTICLE_CLEAR", 'PARTICLE_SET_POS(sys, x, y)   PARTICLE_CLEAR(sys)',
+    "PARTICLE_SET_POS verschiebt die Quelle – so hängt eine Rauchfahne am fahrenden Auto oder eine Fackel am Spieler. PARTICLE_CLEAR löscht alle vorhandenen Teilchen sofort (beim Szenenwechsel, damit keine Funken aus dem letzten Level herüberwehen).",
+    [
+      'PARTICLE_SET_POS(rauch, px, py + 12)',
+      'PARTICLE_CLEAR(rauch)',
+    ]),
   H.tip("Effekt-Rezepte", "Explosion: einmalig viele Teilchen mit Rundum-Streuung. Rauch: langsame, große, langlebige Teilchen ohne Schwerkraft mit FADE. Regen: schmaler x-Bereich, starkes positives gy, streak-Modus. Es gibt auch einen eigenen Partikel-Editor zum Ausprobieren der Werte."),
 ];

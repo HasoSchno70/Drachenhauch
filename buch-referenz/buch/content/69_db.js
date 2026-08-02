@@ -115,5 +115,10 @@ module.exports = (H) => [
       'END TRY',
     ]),
 
+  H.cmd("DB_GET_FLOAT · DB_GET_BOOL", 'DB_GET_FLOAT(r, spalte)   DB_GET_BOOL(r, spalte)',
+    "Die restlichen Spalten-Typen neben DB_GET_INT und DB_GET_STRING – Kommazahlen (Preise, Zeiten) und Wahrheitswerte.",
+    [
+      'PRINT DB_GET_FLOAT(res, 2)',
+    ]),
   H.tip("Sauber arbeiten", "Drei Gewohnheiten ersparen viel Ärger: (1) Schema mit „CREATE TABLE IF NOT EXISTS …“ anlegen, dann ist mehrfaches Programm-Starten ungefährlich. (2) Jedes DB_RESULT nach Gebrauch mit DB_CLOSE_RESULT schließen. (3) Werte immer per ? binden, nie in den SQL-String hineinbauen. Für ganz einfache Spielstände (ein paar Zahlen und Strings) ist übrigens das save-Modul aus Kapitel 61 leichtgewichtiger – db lohnt sich, sobald es um Listen, Suchen und Sortieren geht."),
 ];

@@ -82,5 +82,18 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Maße, Blickrichtung und Feineinstellung"),
+  H.cmd("CHAR_W · CHAR_H · CHAR_FACING", 'CHAR_W(c)   CHAR_H(c)   CHAR_FACING(c)',
+    "Breite und Höhe der Figur (für eigenes Zeichnen oder Treffer-Abfragen) sowie die Blickrichtung als -1 (links) oder +1 (rechts) – damit spiegelst du das Sprite passend.",
+    [
+      'DRAWIMAGEFLIPPED(held_bild, INT(CHAR_X(held)), INT(CHAR_Y(held)), _',
+      '                 CHAR_FACING(held) < 0, FALSE)',
+    ]),
+  H.cmd("CHAR_SET_MAX_FALL · CHAR_SET_VARIABLE_JUMP_CUT", 'CHAR_SET_MAX_FALL(c, tempo)   CHAR_SET_VARIABLE_JUMP_CUT(c, faktor)',
+    "CHAR_SET_MAX_FALL begrenzt die Fallgeschwindigkeit (ohne Begrenzung fällt eine Figur nach einem tiefen Sturz durch dünne Böden hindurch). CHAR_SET_VARIABLE_JUMP_CUT steuert die variable Sprunghöhe: Lässt der Spieler die Taste früh los, wird die Aufwärtsbewegung mit diesem Faktor gekappt – 0.5 halbiert sie, 1.0 schaltet die Funktion aus.",
+    [
+      'CHAR_SET_MAX_FALL(held, 900.0)',
+      'CHAR_SET_VARIABLE_JUMP_CUT(held, 0.45)',
+    ]),
   H.tip("Der Plattformer-Baukasten", "tiled (Level) + tile_collide (Kollision) + controller (Steuerung) + sprite/animfsm (Figur) ergeben zusammen ein komplettes Jump-’n’-Run. Du verbindest fertige Module, statt alles selbst zu schreiben – genau dafür ist Teil V da."),
 ];

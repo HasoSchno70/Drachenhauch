@@ -57,5 +57,42 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Fenster, Tabellen und Eingabefelder"),
+  H.cmd("UI_WINDOW_BEGIN · UI_WINDOW_END", 'UI_WINDOW_BEGIN(titel$, x, y, w, h)   UI_WINDOW_END()',
+    "Fasst die dazwischen erzeugten Bedienelemente in einem Rahmen mit Titel zusammen. Anders als beim gui-Modul entsteht dabei kein bleibendes Fenster – es ist eine reine Gruppierung für diesen Frame.",
+    [
+      'UI_WINDOW_BEGIN("Optionen", 40, 40, 220, 160)',
+      'UI_CHECKBOX("snd", "Sound", 56, 76)',
+      'UI_WINDOW_END()',
+    ]),
+  H.cmd("UI_TABLE_SELECTED · UI_TABLE_SET_SELECTED · UI_TABLE_HEADER_CLICK", 'UI_TABLE_SELECTED(id$)   UI_TABLE_SET_SELECTED(id$, zeile)   UI_TABLE_HEADER_CLICK(id$)',
+    "Zu einer mit UI_TABLE gezeichneten Tabelle: welche Zeile ist markiert, Markierung setzen, und wurde auf eine Spaltenüberschrift geklickt (-1 = nein)? Letzteres ist die Grundlage fürs Sortieren per Klick.",
+    [
+      'DIM spalte AS INTEGER',
+      'spalte = UI_TABLE_HEADER_CLICK("scores")',
+      'IF spalte >= 0 THEN nach_spalte_sortieren(spalte)',
+    ]),
+  H.cmd("UI_TEXTFIELD_SET", 'UI_TEXTFIELD_SET(id$, text$)',
+    "Setzt den Inhalt eines Eingabefeldes von Programmseite – etwa um es vorzubelegen oder nach dem Absenden zu leeren.",
+    [
+      'IF UI_BUTTON("senden", "Senden", 20, 100, 90, 28) THEN',
+      '    nachricht_senden(UI_TEXTFIELD("chat", 20, 60, 200))',
+      '    UI_TEXTFIELD_SET("chat", "")',
+      'END IF',
+    ]),
+
+  H.h2("Aussehen des ui-Moduls"),
+  H.cmd("UI_THEME_PRESET · UI_THEME_SET · UI_THEME_GET", 'UI_THEME_PRESET(name$)   UI_THEME_SET(rolle$, farbe)   UI_THEME_GET(rolle$)',
+    'Dieselben Farbschemata wie beim gui-Modul ("dark", "light", "retro", "contrast", "modern_dark", "modern_light") und einzelne Farbrollen zum Feinjustieren.',
+    [
+      'UI_THEME_PRESET("modern_dark")',
+      'UI_THEME_SET("accent", RGB(255, 160, 40))',
+    ]),
+  H.cmd("UI_METRIC_SET · UI_METRIC_GET · UI_RESET", 'UI_METRIC_SET(name$, wert)   UI_METRIC_GET(name$)   UI_RESET()',
+    "Maße statt Farben (Innenabstand, Eckenrundung, Zeilenhöhe). UI_RESET verwirft den gemerkten Zustand aller Bedienelemente – nötig, wenn du dieselben Element-Kennungen in einer anderen Szene wiederverwendest.",
+    [
+      'UI_METRIC_SET("corner_radius", 8)',
+      'UI_RESET()',
+    ]),
   H.tip("ui oder gui?", "Das ui-Modul (Immediate-Mode) ist perfekt für schnelle Spiel-Menüs und Debug-Overlays: wenig Code, kein Vorab-Aufbau. Brauchst du dagegen persistente Fenster, die sich verschieben und überlappen lassen (wie auf einem Desktop), nimm das gui-Modul aus dem nächsten Kapitel."),
 ];

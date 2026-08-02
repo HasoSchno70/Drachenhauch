@@ -60,5 +60,10 @@ module.exports = (H) => [
     'tempo = 4.0',
     'pos = pos + richtung * tempo            \' pro Frame ein Stück fliegen',
   ]),
+  H.cmd("VEC2_ZERO · VEC2_LENGTH_SQ", 'VEC2_ZERO()   VEC2_LENGTH_SQ(v)',
+    "VEC2_ZERO ist der Nullvektor als Startwert. VEC2_LENGTH_SQ liefert die QUADRIERTE Länge – ohne Wurzel und damit schneller. Für Vergleiche („ist der Gegner näher als 100 Pixel?“) reicht das völlig, du vergleichst dann mit dem Quadrat der Entfernung.",
+    [
+      'IF VEC2_LENGTH_SQ(gegner_pos - spieler_pos) < 100.0 * 100.0 THEN angreifen()',
+    ]),
   H.tip("vec2 oder einzelne Zahlen?", "Für eine einzelne Position reichen oft zwei FLOAT-Variablen (px, py). Sobald du aber richtungsbasiert rechnest – normalisieren, Abstände, Reflektion –, machen Vektoren den Code kürzer und klarer. Für 3D gibt es das Schwester-Modul m3d (nächstes Kapitel) mit VEC3 und mehr."),
 ];

@@ -29,5 +29,18 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Belegungen verwalten und Gamepads erkennen"),
+  H.cmd("INPUT_BOUND · INPUT_UNBIND · INPUT_RESET", 'INPUT_BOUND(aktion$)   INPUT_UNBIND(aktion$)   INPUT_RESET()',
+    "INPUT_BOUND liefert die Tasten, die auf eine Aktion gebunden sind (für die Anzeige im Belegungsmenü). INPUT_UNBIND löst eine einzelne Aktion, INPUT_RESET alle – etwa vor dem Laden einer gespeicherten Tastenbelegung.",
+    [
+      'PRINT INPUT_BOUND("springen")',
+      'INPUT_UNBIND("springen")',
+      'INPUT_BIND("springen", KEY_W, JOY_BUTTON_A)',
+    ]),
+  H.cmd("INPUT_JOY_COUNT · INPUT_JOY_NAME", 'INPUT_JOY_COUNT()   INPUT_JOY_NAME(idx)',
+    "Wie viele Gamepads sind angeschlossen und wie heißen sie – für eine Anzeige „Controller 1 verbunden“ oder die Zuordnung im Mehrspieler-Modus.",
+    [
+      'IF INPUT_JOY_COUNT() = 0 THEN TEXT(10, 10, "Kein Gamepad - Tastatur aktiv")',
+    ]),
   H.tip("Querverweis", "Die ausführliche Erklärung von INPUT_BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS samt der direkten Tastatur- und Maus-Befehle (KEYPRESSED, MOUSEX/Y, MOUSEBUTTON …) findest du im Kapitel „Eingabe“ (Teil IV)."),
 ];

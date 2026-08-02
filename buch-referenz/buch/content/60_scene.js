@@ -64,5 +64,31 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Daten je Szene ablegen"),
+  H.p("Jede Szene hat ihren eigenen kleinen Datenspeicher – der Punktestand des Levels, die gewählte Schwierigkeit, ob der Schlüssel schon eingesammelt wurde. Beim Verlassen der Szene bleibt er erhalten, beim Zurückkehren steht alles wieder da."),
+  H.cmd("SCENE_SET_FLOAT · SCENE_SET_STRING · SCENE_SET_BOOL", 'SCENE_SET_FLOAT(schluessel$, wert)   SCENE_SET_STRING(schluessel$, text$)   SCENE_SET_BOOL(schluessel$, wahr)',
+    "Legen einen Wert unter einem Namen in der AKTUELLEN Szene ab (neben dem bereits gezeigten SCENE_SET_INT).",
+    [
+      'SCENE_SET_FLOAT("zeit", 12.5)',
+      'SCENE_SET_STRING("levelname", "Waldweg")',
+      'SCENE_SET_BOOL("schluessel_gefunden", TRUE)',
+    ]),
+  H.cmd("SCENE_GET_FLOAT · SCENE_GET_STRING · SCENE_GET_BOOL", 'SCENE_GET_FLOAT(schluessel$)   SCENE_GET_STRING(schluessel$)   SCENE_GET_BOOL(schluessel$)',
+    "Lesen den Wert zurück. Fehlt der Schlüssel, kommt der Standardwert des Typs (0.0, leerer Text, FALSE).",
+    [
+      'PRINT SCENE_GET_STRING("levelname")',
+    ]),
+  H.cmd("SCENE_GET_FLOAT_OR · SCENE_GET_STRING_OR · SCENE_GET_BOOL_OR", 'SCENE_GET_FLOAT_OR(schluessel$, ersatz)   SCENE_GET_STRING_OR(schluessel$, ersatz$)   SCENE_GET_BOOL_OR(schluessel$, ersatz)',
+    "Dasselbe mit selbst gewähltem Ersatzwert – die sauberere Variante, wenn 0 oder FALSE eine gültige Antwort wäre und du „gar nicht gesetzt“ davon unterscheiden willst.",
+    [
+      'DIM schwierigkeit AS STRING',
+      'schwierigkeit = SCENE_GET_STRING_OR("modus", "normal")',
+    ]),
+  H.cmd("SCENE_HAS_KEY · SCENE_DELETE · SCENE_HAS · SCENE_RESET", 'SCENE_HAS_KEY(schluessel$)   SCENE_DELETE(schluessel$)   SCENE_HAS(szene$)   SCENE_RESET()',
+    "SCENE_HAS_KEY prüft, ob ein Wert gesetzt ist, SCENE_DELETE entfernt ihn. SCENE_HAS fragt, ob eine Szene dieses Namens überhaupt auf dem Stapel liegt. SCENE_RESET räumt alles ab – Stapel und Daten – der saubere Neustart nach „Spiel beenden“.",
+    [
+      'IF NOT SCENE_HAS_KEY("startzeit") THEN SCENE_SET_FLOAT("startzeit", GET_TIME())',
+      'IF SCENE_HAS("pause") THEN PRINT "Pause liegt im Stapel"',
+    ]),
   H.tip("Push für Overlays, Switch für Wechsel", "Merke: PUSH/POP für etwas, das ÜBER dem Bisherigen liegt und danach zurückkehrt (Pause, Inventar, Dialog). SWITCH für einen echten Wechsel ohne Rückweg (Menü → Spiel → Game Over). Beim Szenenwechsel solltest du auch laufende Timer aufräumen (TIMER_CLEAR, Kapitel „timer“)."),
 ];

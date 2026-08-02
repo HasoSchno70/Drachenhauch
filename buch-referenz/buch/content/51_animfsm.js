@@ -79,5 +79,17 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.h2("Parameter lesen und weitere Typen"),
+  H.cmd("ANIM_FSM_SET_INT · ANIM_FSM_SET_BOOL", 'ANIM_FSM_SET_INT(fsm, name$, wert)   ANIM_FSM_SET_BOOL(fsm, name$, wahr)',
+    "Neben Kommazahlen und Auslösern kennt die Zustandsmaschine ganze Zahlen und Wahrheitswerte als Parameter – etwa die Anzahl der Sprünge in einer Kombination oder „steht am Boden“.",
+    [
+      'ANIM_FSM_SET_BOOL(fsm, "am_boden", CHAR_ON_GROUND(spieler))',
+      'ANIM_FSM_SET_INT(fsm, "combo", schlag_nr)',
+    ]),
+  H.cmd("ANIM_FSM_GET_FLOAT · ANIM_FSM_GET_INT · ANIM_FSM_GET_BOOL", 'ANIM_FSM_GET_FLOAT(fsm, name$)   ANIM_FSM_GET_INT(fsm, name$)   ANIM_FSM_GET_BOOL(fsm, name$)',
+    "Lesen einen Parameter zurück – nützlich beim Fehlersuchen, wenn ein Übergang nicht auslöst: einfach den Wert einblenden, den die Zustandsmaschine tatsächlich sieht.",
+    [
+      'TEXT(10, 10, "tempo=" + STR$(ANIM_FSM_GET_FLOAT(fsm, "tempo")))',
+    ]),
   H.tip("Wann lohnt sich animfsm?", "Für eine Figur mit nur zwei Animationen reicht das einfache IF aus dem sprite-Kapitel. Sobald es viele Zustände mit Bedingungen werden (laufen, springen, fallen, landen, treffen …), hält animfsm den Code sauber – und der visuelle Editor gbanim macht das Entwerfen der Zustände zum Kinderspiel."),
 ];

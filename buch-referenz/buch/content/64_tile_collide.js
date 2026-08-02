@@ -50,5 +50,11 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
+  H.cmd("TILE_AT_PIXEL", 'TILE_AT_PIXEL(m, ebene, px, py)',
+    "Welche Kachel liegt an dieser PIXEL-Position? Liefert die Kachel-Nummer (gid) – praktisch für Abfragen wie „steht die Figur auf Eis?“ oder „ist unter ihr Wasser?“, ohne selbst durch die Kachelgröße zu teilen.",
+    [
+      'DIM unter_fuessen AS INTEGER',
+      'unter_fuessen = TILE_AT_PIXEL(karte, boden, px, py + CHAR_H(held) + 1)',
+    ]),
   H.tip("Der Dreiklang fürs Platformer-Spiel", "tiled lädt das Level, tile_collide lässt den Spieler darauf laufen, und das controller-Modul (nächstes Kapitel) verpackt Sprung-Komfort wie Coyote-Zeit und Sprung-Puffer obendrauf. Zusammen ergeben sie ein vollständiges Jump-’n’-Run-Fundament."),
 ];
