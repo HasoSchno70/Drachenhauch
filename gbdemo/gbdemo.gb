@@ -99,6 +99,12 @@ SUB mtext(cx AS INTEGER, cy AS INTEGER, s AS STRING, skala AS FLOAT, farbe AS IN
     TEXTROT(cx, cy, s, 0, skala, farbe)
 END SUB
 
+' Kurzer Ruettler im Gamepad -- nur wenn ueberhaupt eins angeschlossen ist,
+' sonst meldet JOYSTICK_RUMBLE einen ungueltigen Index. Dauer in SEKUNDEN.
+SUB rumble(staerke AS FLOAT, dauer_s AS FLOAT)
+    IF JOYSTICK_COUNT() > 0 THEN JOYSTICK_RUMBLE(0, staerke, staerke, dauer_s)
+END SUB
+
 ' Farbe aus HSV-artigem Umlauf -- spart Paletten-Tabellen.
 FUNCTION regenbogen(phase AS FLOAT, helligkeit AS FLOAT) AS INTEGER
     DIM r AS INTEGER
@@ -114,6 +120,13 @@ FUNCTION regenbogen(phase AS FLOAT, helligkeit AS FLOAT) AS INTEGER
     IF g > 255 THEN g = 255
     IF b > 255 THEN b = 255
     RETURN RGB(r, g, b)
+END FUNCTION
+
+' Eine Farbe abdunkeln (0 = schwarz, 1 = unveraendert).
+FUNCTION dunkler(c AS INTEGER, f AS FLOAT) AS INTEGER
+    RETURN RGB(INT(((c SHR 16) BAND 255) * f), _
+               INT(((c SHR 8) BAND 255) * f), _
+               INT((c BAND 255) * f))
 END FUNCTION
 
 ' Weicher Ein-/Ausblender am Rand einer Szene.
@@ -513,6 +526,8 @@ DIM kbuchstabe[MAXK] AS INTEGER      ' zu welchem Buchstaben gehoert der Koerper
 DIM logo_y0 AS INTEGER
 DIM weiss AS IMAGE
 DIM welt_bereit AS BOOLEAN
+DIM funken AS PARTICLE_SYSTEM        ' Einschlag-Funken
+DIM ruckeln AS FLOAT                 ' Erschuetterung nach einem Einschlag
 
 ' Eine Buchstaben-Schablone in Kloetze uebersetzen.
 SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, _
@@ -637,6 +652,14 @@ SUB szene_physik()
                 FOR bi2 = 0 TO BUCHSTABEN - 1
                     IF steht[bi2] AND bx > bu_x0[bi2] AND bx < bu_x1[bi2] THEN
                         logo_umkippen(bi2)
+                        ' Funken am Einschlagpunkt + Erschuetterung: erst das
+                        ' macht aus dem Umschalten einen Treffer.
+                        PARTICLE_SET_POS(funken, INT(bx), INT(by))
+                        PARTICLE_SET_COLOR(funken, RGB(255, 240, 180))
+                        PARTICLE_SET_COLOR_END(funken, RGB(200, 60, 20))
+                        PARTICLE_EMIT(funken, 70)
+                        ruckeln = 1.0
+                        rumble(0.5, 0.2)
                     END IF
                 NEXT
             END IF
@@ -652,8 +675,35 @@ SUB szene_physik()
         naechster_aufbau = zeit + 14.0
     END IF
 
+    PARTICLE_UPDATE(funken, dt * 1000.0)
+    ruckeln = ruckeln * 0.90
+
     ' --- Zeichnen ---
-    BOX(0, HOEHE - 40, BREITE, HOEHE, RGB(26, 30, 44))
+    ' Hintergrund: Verlauf + Fluchtlinien geben der flachen Buehne Tiefe.
+    GRADIENTV(0, 0, BREITE, HOEHE - 40, RGB(10, 12, 22), RGB(20, 24, 40))
+    DIM g AS INTEGER
+    FOR g = -6 TO 6
+        LINE(BREITE \ 2 + g * 40, HOEHE - 40, BREITE \ 2 + g * 300, HOEHE \ 3, _
+             RGB(24, 30, 48))
+    NEXT
+    DIM gy AS INTEGER
+    FOR gy = 1 TO 5
+        DIM ly AS INTEGER
+        ly = HOEHE - 40 - gy * gy * 9
+        LINE(0, ly, BREITE, ly, RGB(22, 27, 44))
+    NEXT
+
+    ' Erschuetterung: die Kamera versetzt ALLE folgenden Zeichenbefehle --
+    ' vor der Beschriftung wieder zuruecksetzen, sonst wackelt auch die.
+    IF ruckeln > 0.01 THEN
+        CAMERA_SET(SIN(zeit * 91.0) * 9.0 * ruckeln, COS(zeit * 77.0) * 7.0 * ruckeln, 1.0)
+    END IF
+
+    ' Boden mit leuchtender Kante -- ohne die schweben die Kloetze im Nichts.
+    BOX(0, HOEHE - 40, BREITE, HOEHE, RGB(18, 22, 34))
+    BLEND_MODE("add")
+    LINEW(0, HOEHE - 40, BREITE, HOEHE - 40, 3.0, RGB(40, 90, 120))
+    BLEND_MODE("alpha")
     DIM k AS INTEGER
     FOR k = 0 TO nk - 1
         DIM cx AS FLOAT
@@ -661,6 +711,13 @@ SUB szene_physik()
         cx = PHYS2D_BODY_X(welt, kid[k])
         cy = PHYS2D_BODY_Y(welt, kid[k])
         IF cy < HOEHE + 100 THEN
+            ' Neon-Schein hinter jedem Koerper -- additiv, damit sich
+            ' ueberlappende Kloetze gegenseitig aufhellen.
+            BLEND_MODE("add")
+            ' Gedaempft und knapp: bei voller Farbe frisst der Schein die
+            ' Kloetze auf, statt sie zu umgeben.
+            DRAWIMAGEROT(glow, INT(cx), INT(cy), 0, KLOTZ / 58.0, dunkler(kfarbe[k], 0.55))
+            BLEND_MODE("alpha")
             IF ist_kugel[k] THEN
                 DIM ang AS FLOAT
                 ang = PHYS2D_BODY_ANGLE(welt, kid[k])
@@ -676,6 +733,11 @@ SUB szene_physik()
             END IF
         END IF
     NEXT
+
+    BLEND_MODE("add")
+    PARTICLE_DRAW(funken)
+    BLEND_MODE("alpha")
+    CAMERA_RESET()
 
     mtext(BREITE \ 2, 46, "physics2d (Rapier)  -  " + STR$(PHYS2D_COUNT(welt)) + " Koerper", _
           0.5, RGB(140, 180, 210))
@@ -972,7 +1034,7 @@ SUB szene_abspann()
     ' Zielpunkt nach unten -> der Knoten sitzt im oberen Drittel und laesst
     ' dem Abspann den Platz, den er braucht.
     CAMERA3D(SIN(zeit * 0.12) * 7.5, 2.4, COS(zeit * 0.12) * 7.5, 0, -1.6, 0, 45)
-    MODEL_WIRES(knoten, 0, 0, 0, 1.5 + 0.12 * bass, _
+    MODEL_WIRES(knoten, 0, 0, 0, 2.3 + 0.2 * bass, _
                 regenbogen(zeit * 0.35, 0.20 + 0.22 * bass))
 
     ' --- Der kreisende Ping: hoerbar links/rechts, sichtbar als Punkt ---
@@ -1087,6 +1149,15 @@ PARTICLE_SET_SIZE(psys, 2, 7)
 PARTICLE_SET_GRAVITY(psys, 0.0, 30.0)
 PARTICLE_SET_FADE(psys, TRUE)
 PARTICLE_SET_MODE(psys, "glow")
+
+' Einschlag-Funken fuer Szene 5: kurz, schnell, mit Schwerkraft.
+funken = PARTICLE_SYSTEM_NEW(0, 0)
+PARTICLE_SET_VELOCITY(funken, -420.0, 420.0, -520.0, 60.0)
+PARTICLE_SET_LIFETIME(funken, 250, 750)
+PARTICLE_SET_SIZE(funken, 2, 5)
+PARTICLE_SET_GRAVITY(funken, 0.0, 900.0)
+PARTICLE_SET_FADE(funken, TRUE)
+PARTICLE_SET_MODE(funken, "glow")
 
 ' Buchstaben-Schablonen fuer Szene 5 (ein '#' wird ein Klotz)
 logo_g[0] = "#####"

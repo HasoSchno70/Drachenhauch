@@ -41,7 +41,7 @@ einer Demo:
 | 2 | 0:42 | Sternenflug | `LINES` — 1400 Streifen in einem Aufruf, `particles`, additives Blenden |
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
-| 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
+| 5 | 2:52 | Physik | `physics2d` (Rapier) — Neon-Logo aus Klötzen, Funken und Erschütterung beim Einschlag; jeder Buchstabe fällt einzeln |
 | 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, echte Schweife aus einem behaltenen `RENDERTARGET` |
 | 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
 | 8 | 5:00 | Abspann | Drahtgitter-Ring, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
@@ -136,6 +136,16 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
 - **`MID$` ist 0-basiert.** Ein führendes Zeichen abschneiden heißt
   `MID$(s, 1, LEN(s) - 2)`, wenn auch hinten eines weg soll — mit `- 1` bleibt
   das letzte stehen.
+- **Ein Render-Target hat seine EIGENE Pixelgröße** — der Inhalt darf nicht mit
+  dem Fenster-Maßstab hineingezeichnet werden. Im Vollbild (Maßstab 2) landete
+  sonst alles doppelt so groß in einem Ziel fester Größe; was rechts herausfiel,
+  blieb in einem behaltenen Target als klebender Rand stehen. *(In gbrt behoben,
+  2026-08-02, mit Regressionstest.)*
+- **Ein Bloom muss ein halbes Texel vom Rand entfernt abtasten.** Auf 0..1 zu
+  klemmen reicht nicht: genau auf der Texturkante mischt die bilineare Filterung
+  die letzte Zeile mit der ersten, und der helle Inhalt vom unteren Rand blutet
+  oben wieder herein (war als Reihe Farbfetzen in der obersten Pixelzeile zu
+  sehen).
 - **Ein Spektrum-Ring braucht ein gespiegeltes Spektrum.** Legt man die Bänder
   einfach rundherum, stoßen Band 31 (Höhen, klein) und Band 0 (Bass, groß)
   direkt aneinander — ein Sprung von über 150 Pixeln zwischen zwei

@@ -87,3 +87,33 @@ SAVESCREENSHOT("out.png")
     r, g, b = _pixel(tmp_path, "out.png", (10, 10))
     assert 0 < r < 255, f"Der Punkt muss verblasst, aber noch da sein (rot={r})"
     assert g == 0 and b == 0
+
+
+def test_inhalt_wird_nicht_vom_fenster_massstab_verzerrt(run_gb, tmp_path):
+    # Ein Render-Target hat seine EIGENE Pixelgroesse. Wurde der Inhalt mit dem
+    # Fenster-Massstab hineingezeichnet (SCREEN(..., 2) -> doppelt so gross),
+    # fiel alles rechts/unten davon weg -- und in einem behaltenen Target
+    # blieben die abgeschnittenen Raender stehen.
+    run_gb("""
+SCREEN(64, 64, "rt", 2)
+DIM rt AS INTEGER
+rt = RENDERTARGET_NEW(64, 64)
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    RENDERTARGET_BEGIN(rt)
+    PLOT(50, 50, &HFF0000)
+    RENDERTARGET_END()
+    CLS(0)
+    RENDERTARGET_DRAW(rt, 0, 0)
+    FLIP()
+NEXT
+SAVESCREENSHOT("out.png")
+""", base=tmp_path)
+    # Fenster ist 128x128 (Massstab 2), der Punkt liegt im Target bei 50,50
+    # -> auf dem Schirm bei 100,100. Mit dem alten Fehler waere er bei 100,100
+    # gar nicht angekommen (im Target auf 100,100 = ausserhalb geclippt).
+    from PIL import Image
+    with Image.open(tmp_path / "out.png") as img:
+        rgb = img.convert("RGB")
+        assert rgb.size == (128, 128)
+        assert rgb.getpixel((100, 100)) == (255, 0, 0)

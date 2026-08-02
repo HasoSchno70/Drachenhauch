@@ -71,11 +71,20 @@ void main() {
         col = mix(bg, col, smoothstep(0.02, 0.30, luma(col)));
     }
 
-    // Bright-Pass-Bloom -- laesst Neon und Emissives glimmen
+    // Bright-Pass-Bloom -- laesst Neon und Emissives glimmen.
+    //
+    // Die Abtastpunkte muessen im Bild BLEIBEN -- und zwar ein halbes Texel
+    // vom Rand entfernt. Auf 0..1 zu klemmen reicht NICHT: genau auf der
+    // Texturkante mischt die bilineare Filterung die letzte Zeile mit der
+    // ersten, und der helle Inhalt vom unteren Rand blutet oben wieder
+    // herein (war als Reihe Farbfetzen in der obersten Pixelzeile zu sehen).
+    vec2 rand = px * 0.5;
     vec3 bloom = vec3(0.0);
     for (int x = -2; x <= 2; x++)
-        for (int y = -2; y <= 2; y++)
-            bloom += max(texture(texture0, uv + vec2(x, y) * px * 2.5).rgb - 0.55, 0.0);
+        for (int y = -2; y <= 2; y++) {
+            vec2 su = clamp(uv + vec2(x, y) * px * 2.5, rand, vec2(1.0) - rand);
+            bloom += max(texture(texture0, su).rgb - 0.55, 0.0);
+        }
     col += bloom / 25.0 * (1.6 + 1.8 * hoehen);
 
     if (mode > 2.5) {

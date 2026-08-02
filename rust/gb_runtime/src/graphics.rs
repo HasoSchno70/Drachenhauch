@@ -4031,7 +4031,14 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
                 let behalten = render_targets[i].behalten;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
                 let clear = if behalten { None } else { Some(clear_rt) };
-                render_scene(&mut tx, s, clear, &synth, &[0], textures, fonts,
+                // Maßstab 1, NICHT der Fenster-Maßstab `s`: ein Render-Target
+                // hat seine EIGENE Pixelgroesse. Mit `s` wurde der Inhalt im
+                // Vollbild (s=2) doppelt so gross in ein Ziel fester Groesse
+                // gezeichnet -- alles rechts/unten davon fiel weg, und in einem
+                // behaltenen Target blieben die abgeschnittenen Raender stehen
+                // ("die Kurven kleben am rechten Rand"). Hochskaliert wird beim
+                // Stempeln (Cmd::RtDraw rechnet dort mit `s`), nicht hier.
+                render_scene(&mut tx, 1, clear, &synth, &[0], textures, fonts,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
             }
