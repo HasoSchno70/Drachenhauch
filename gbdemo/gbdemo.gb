@@ -502,7 +502,7 @@ END SUB
 ' Die Buchstaben stehen als Muster da -- ein '#' wird ein Klotz. So laesst
 ' sich das Logo aendern, ohne eine einzige Koordinate anzufassen.
 CONST KLOTZ AS INTEGER = 26          ' Kantenlaenge eines Klotzes in Pixeln
-CONST MAXK AS INTEGER = 260
+CONST MAXK AS INTEGER = 460
 CONST LOGO_ZEILEN AS INTEGER = 7
 
 DIM logo_g[LOGO_ZEILEN] AS STRING
@@ -512,6 +512,7 @@ DIM welt AS PHYS2D_WORLD
 DIM kid[MAXK] AS INTEGER             ' Koerper-Nummern in der Welt
 DIM kfarbe[MAXK] AS INTEGER
 DIM ist_kugel[MAXK] AS BOOLEAN
+DIM ist_regen[MAXK] AS BOOLEAN       ' Hintergrund-Truemmer (kleiner, dunkler)
 DIM nk AS INTEGER
 DIM naechster_aufbau AS FLOAT
 DIM aufbau_zeit AS FLOAT
@@ -556,6 +557,7 @@ SUB logo_setzen(muster AS ARRAY OF STRING, x0 AS INTEGER, y0 AS INTEGER, _
                                          KLOTZ / 2 - 1, KLOTZ / 2 - 1, FALSE, 0.05)
                 kfarbe[nk] = farbe
                 ist_kugel[nk] = FALSE
+                ist_regen[nk] = FALSE
                 kbuchstabe[nk] = nummer
                 nk = nk + 1
             END IF
@@ -631,6 +633,7 @@ SUB szene_physik()
         kid[nk] = PHYS2D_ADD_CIRCLE(welt, sx, HOEHE - 250, 16, TRUE, 0.45)
         kfarbe[nk] = regenbogen(zeit * 2.0, 1.0)
         ist_kugel[nk] = TRUE
+        ist_regen[nk] = FALSE
         PHYS2D_SET_VEL(welt, kid[nk], v, -260.0)
         nk = nk + 1
     END IF
@@ -675,6 +678,29 @@ SUB szene_physik()
         naechster_aufbau = zeit + 14.0
     END IF
 
+    ' --- Hintergrund: es regnet Truemmer ---
+    ' Der eigentliche Wow-Effekt ist die MENGE: waehrend vorne das Logo
+    ' zerlegt wird, rechnet derselbe Solver im Hintergrund ein paar hundert
+    ' weitere Koerper, die sich am Boden zu Haufen stapeln.
+    IF nk < MAXK - 8 AND COOLDOWN("regen", 70) THEN
+        DIM wieviel AS INTEGER
+        wieviel = 1
+        IF beat THEN wieviel = 4          ' auf den Schlag ein Schwall
+        DIM rr AS INTEGER
+        FOR rr = 1 TO wieviel
+            IF nk < MAXK - 2 THEN
+                DIM rx AS INTEGER
+                rx = RANDINT(30, BREITE - 30)
+                kid[nk] = PHYS2D_ADD_BOX(welt, rx, -30 - rr * 30, 7, 7, TRUE, 0.25)
+                kfarbe[nk] = dunkler(regenbogen(zeit * 0.4 + rx * 0.01, 1.0), 0.45)
+                ist_kugel[nk] = FALSE
+                ist_regen[nk] = TRUE
+                kbuchstabe[nk] = -1
+                nk = nk + 1
+            END IF
+        NEXT
+    END IF
+
     PARTICLE_UPDATE(funken, dt * 1000.0)
     ruckeln = ruckeln * 0.90
 
@@ -704,8 +730,13 @@ SUB szene_physik()
     BLEND_MODE("add")
     LINEW(0, HOEHE - 40, BREITE, HOEHE - 40, 3.0, RGB(40, 90, 120))
     BLEND_MODE("alpha")
+    ' Zwei Durchgaenge: erst die Truemmer (Hintergrund), dann Logo und
+    ' Kugeln davor. Sonst legen sich die kleinen Kloetze ueber das Logo.
+    DIM durchgang AS INTEGER
     DIM k AS INTEGER
+    FOR durchgang = 0 TO 1
     FOR k = 0 TO nk - 1
+        IF (durchgang = 0) <> ist_regen[k] THEN CONTINUE
         DIM cx AS FLOAT
         DIM cy AS FLOAT
         cx = PHYS2D_BODY_X(welt, kid[k])
@@ -716,9 +747,15 @@ SUB szene_physik()
             BLEND_MODE("add")
             ' Gedaempft und knapp: bei voller Farbe frisst der Schein die
             ' Kloetze auf, statt sie zu umgeben.
-            DRAWIMAGEROT(glow, INT(cx), INT(cy), 0, KLOTZ / 58.0, dunkler(kfarbe[k], 0.55))
+            DIM gs AS FLOAT
+            gs = KLOTZ / 58.0
+            IF ist_regen[k] THEN gs = KLOTZ / 150.0
+            DRAWIMAGEROT(glow, INT(cx), INT(cy), 0, gs, dunkler(kfarbe[k], 0.55))
             BLEND_MODE("alpha")
-            IF ist_kugel[k] THEN
+            IF ist_regen[k] THEN
+                DRAWIMAGEROT(weiss, INT(cx), INT(cy), _
+                             DEG(PHYS2D_BODY_ANGLE(welt, kid[k])), 14.0 / 32.0, kfarbe[k])
+            ELSEIF ist_kugel[k] THEN
                 DIM ang AS FLOAT
                 ang = PHYS2D_BODY_ANGLE(welt, kid[k])
                 CIRCLE(INT(cx), INT(cy), 16, kfarbe[k])
@@ -732,6 +769,7 @@ SUB szene_physik()
                              KLOTZ / 32.0, kfarbe[k])
             END IF
         END IF
+    NEXT
     NEXT
 
     BLEND_MODE("add")
@@ -1110,10 +1148,16 @@ SUB szene_start(neu AS INTEGER)
         IF hdr_da THEN SKYBOX(TRUE)
         SHADOW_ENABLE(2048)
         SHADOW_AREA(14.0, 40.0)
+        ' Dunst in der Farbe des Horizonts: der Boden laeuft ins Panorama
+        ' aus, statt an einer sichtbaren Kante zu enden.
+        ' Farbe am Horizont gemessen (&H7D6D62) -- ein zu heller Dunst
+        ' erzeugt stattdessen ein leuchtendes Band an der Kante.
+        LIGHT_FOG(&H7D6D62, 0.030)
     ELSE
         SKYBOX(FALSE)
         LIGHT_AMBIENT(&H1A2030, 0.55)
         LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+        LIGHT_FOG(0, 0.0)                         ' Dunst ist global -- wieder aus
     END IF
 
     ' Szene 7 haengt Effekte in den Musik-Bus. Die bleiben sonst haengen und
@@ -1201,19 +1245,22 @@ FOR kk = 0 TO N_KUGELN - 1
     MODEL_PBR(kugeln[kk], 1.0, 0.03 + kk / (N_KUGELN - 1.0) * 0.82)
 NEXT
 
-' Weit ueber den Horizont hinaus UND spiegelnd: eine kleine, matte Platte
-' schwebt als graues Rechteck in der Landschaft (sah aus wie ein Panel).
-' Als grosse, glaenzende Flaeche nimmt sie stattdessen den Himmel auf und
-' liest sich als Boden.
-boden = MESH_PLANE(400.0, 400.0, 1, 1)
+' Der Boden muss GELAENDE sein, keine Farbflaeche. Die Kugeln spiegeln die
+' Umgebung aus dem HDR, und darin ist unter dem Horizont bewachsenes Land --
+' eine einfarbige Platte darunter widerspricht dem sofort. Also: eine
+' prozedurale Struktur als Diffuse-Map (Perlin-Rauschen, in der gemessenen
+' Gelaendefarbe getoent) und Dunst in die Ferne, damit der Boden am Horizont
+' ins Panorama uebergeht statt an einer Kante zu enden.
+' Die Flaeche NICHT riesig machen: eine Textur wird ueber die ganze Ebene
+' EINMAL gespannt (MESH_PLANE hat keine Kachelung), 400 Einheiten breit heisst
+' also 400 Einheiten fuer ein Bild -- die Struktur verschwimmt zu einer Flaeche.
+' 130 Einheiten plus Dunst zum Horizont zeigen Struktur UND verstecken die Kante.
+boden = MESH_PLANE(130.0, 130.0, 1, 1)
 MODEL_LIT(boden)
-' Matt statt spiegelnd -- und das ist hier kein Geschmack, sondern
-' Konsistenz: die Kugeln spiegeln die UMGEBUNG aus dem HDR, und darin ist
-' der Boden das Gelaende des Panoramas. Ein glaenzender Untergrund zeigt
-' etwas anderes als das, was in den Kugeln zu sehen ist -- der Widerspruch
-' faellt sofort auf. Matt und in der Farbe des Panorama-Bodens setzt die
-' Flaeche das Gelaende einfach fort.
-MODEL_PBR(boden, 0.05, 0.60)
+MODEL_PBR(boden, 0.05, 0.78)
+DIM bodentex AS IMAGE
+bodentex = GENTEX_CELLULAR(1024, 1024, 44)     ' Zellrauschen = Steppenboden
+MODEL_TEXTURE(boden, bodentex)
 
 ' Ein Ring statt eines Knotens: der Knoten war bei dieser Groesse nur ein
 ' undeutliches Gebilde. Ein Torus ist auf einen Blick als Form erkennbar --

@@ -41,7 +41,7 @@ einer Demo:
 | 2 | 0:42 | Sternenflug | `LINES` — 1400 Streifen in einem Aufruf, `particles`, additives Blenden |
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
-| 5 | 2:52 | Physik | `physics2d` (Rapier) — Neon-Logo aus Klötzen, Funken und Erschütterung beim Einschlag; jeder Buchstabe fällt einzeln |
+| 5 | 2:52 | Physik | `physics2d` (Rapier) — Neon-Logo aus Klötzen, Funken und Erschütterung beim Einschlag, dazu ein Trümmerregen im Hintergrund (mehrere hundert Körper gleichzeitig); jeder Buchstabe fällt einzeln |
 | 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, echte Schweife aus einem behaltenen `RENDERTARGET` |
 | 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
 | 8 | 5:00 | Abspann | Drahtgitter-Ring, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
@@ -136,6 +136,13 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
 - **`MID$` ist 0-basiert.** Ein führendes Zeichen abschneiden heißt
   `MID$(s, 1, LEN(s) - 2)`, wenn auch hinten eines weg soll — mit `- 1` bleibt
   das letzte stehen.
+- **`MESH_PLANE` kachelt seine Textur nicht** — sie wird *einmal* über die
+  ganze Ebene gespannt. Eine 400 Einheiten breite Fläche zeigt eine 1024er
+  Textur also so grob gestreckt, dass wieder eine Farbfläche daraus wird. In
+  Szene 4 löst das eine kleinere Fläche (130) plus `LIGHT_FOG`, das die Kante
+  am Horizont verschluckt.
+- **`LIGHT_FOG` ist globaler Zustand** wie Licht und Himmel — beim
+  Szenenwechsel zurücksetzen.
 - **Ein Render-Target hat seine EIGENE Pixelgröße** — der Inhalt darf nicht mit
   dem Fenster-Maßstab hineingezeichnet werden. Im Vollbild (Maßstab 2) landete
   sonst alles doppelt so groß in einem Ziel fester Größe; was rechts herausfiel,
