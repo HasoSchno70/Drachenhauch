@@ -36,7 +36,7 @@ einer Demo:
 | 1 | 0:00 | Titel | Plasma im Post-Effekt, Sinus-Scroller, Spektrum-Säulen |
 | 2 | 0:42 | Sternenflug | `LINES` — 1400 Streifen in einem Aufruf, `particles`, additives Blenden |
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
-| 4 | 2:08 | PBR + HDR | *in Arbeit* |
+| 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
 | 5 | 2:52 | Physik | *in Arbeit* |
 | 6 | 3:34 | Tunnel | *in Arbeit* |
 | 7 | 4:16 | Klangfarben | *in Arbeit* |
@@ -72,3 +72,11 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
 - **`MODEL_INSTANCED` färbt einen ganzen Draw-Call einheitlich.** Mehrere Farben
   = mehrere Aufrufe; drei sind immer noch drei statt 1600.
 - `PARTICLE_SET_SIZE` und `PARTICLE_SET_POS` wollen **ganze Zahlen**.
+- **GameBasic ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
+  damit lautlos die Konstante `HOEHE`, und aus `HOEHE - 54` wird `0.6 - 54`.
+  Das fällt erst als merkwürdiger Typfehler weit weg von der Ursache auf.
+- **Licht, Himmel und Schatten sind globaler Zustand.** Wer sie in einer Szene
+  umstellt, muss sie beim Wechsel wieder zurückstellen (hier `szene_start`),
+  sonst zieht der HDR-Himmel auch hinter der nächsten Szene auf.
+- `MODEL_EMISSIVE` mit Stärke über ~1.5 ergibt zusammen mit dem Bloom nur noch
+  eine weiße Scheibe — die Farbe geht verloren.

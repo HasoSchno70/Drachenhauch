@@ -408,8 +408,87 @@ SUB szene_instancing()
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SZENE 4 -- PBR unter echtem HDR-Himmel, mit Schatten
+' ----------------------------------------------------------------------
+' Hier zeigt die Laufzeit ihre schwerste Artillerie auf einmal: ein echtes
+' HDR-Panorama als Umgebungslicht (LIGHT_ENV_HDR berechnet daraus einmalig
+' Irradiance-, Prefilter- und BRDF-Maps), dieselbe Umgebung als sichtbarer
+' Hintergrund (SKYBOX), Cook-Torrance-Material je Modell (MODEL_PBR) und
+' Schattenwurf aus dem Sonnenlicht (SHADOW_*).
+'
+' Die Kugeln stehen im Ring von SPIEGELND bis MATT -- an ihnen sieht man den
+' Unterschied, den die Rauheit macht, besser als an jedem Text.
+CONST N_KUGELN AS INTEGER = 9
+
+DIM kugeln[N_KUGELN] AS INTEGER
+DIM boden AS INTEGER
+DIM kern AS INTEGER
+DIM hdr_da AS BOOLEAN
+
+SUB szene_pbr()
+    modus = 0.0
+
+    DIM w AS FLOAT
+    w = zeit * 0.22
+    CAMERA3D(SIN(w) * 10.5, 3.4 + SIN(zeit * 0.45) * 1.4, COS(w) * 10.5, 0, 1.2, 0, 50)
+    SHADOW_TARGET(0, 1, 0)
+
+    MODEL(boden, 0, -1.4, 0, 1.0, &H4A5260)
+
+    ' Ring aus Metallkugeln -- jede haengt an ihrem eigenen Frequenzband.
+    DIM k AS INTEGER
+    FOR k = 0 TO N_KUGELN - 1
+        DIM a AS FLOAT
+        a = k * 6.28318 / N_KUGELN + zeit * 0.30
+        DIM bnd AS INTEGER
+        bnd = 3 + k * 3
+        ' NICHT "hoehe" nennen: GameBasic ignoriert Gross-/Kleinschreibung,
+        ' eine lokale "hoehe" verdeckt also die Konstante HOEHE -- und aus
+        ' HOEHE - 54 wird lautlos 0.6 - 54.
+        DIM hoch AS FLOAT
+        hoch = 0.6 + glatt[bnd] * 3.4
+        MODEL(kugeln[k], COS(a) * 4.6, hoch, SIN(a) * 4.6, 1.0, &HDCE0E8)
+    NEXT
+
+    ' Kern in der Mitte: leuchtet aus sich selbst heraus, auf dem Bass.
+    ' MODEL_EMISSIVE schlaegt durch den Fog und wird vom Bloom im Post-Effekt
+    ' zum echten Glimmen -- deshalb steht hier keine zusaetzliche Grafik.
+    DIM kernfarbe AS INTEGER
+    kernfarbe = regenbogen(zeit * 0.7, 1.0)
+    ' Zurueckhaltend dosieren: der Bloom im Post-Effekt legt noch einmal drauf,
+    ' und ab etwa 1.5 ist von der Farbe nur noch eine weisse Scheibe uebrig.
+    MODEL_EMISSIVE(kern, kernfarbe, 0.25 + 1.1 * bass)
+    MODEL(kern, 0, 1.6 + SIN(zeit * 1.3) * 0.35, 0, 0.75 + 0.4 * bass, kernfarbe)
+
+    DIM hinweis AS STRING
+    IF hdr_da THEN
+        hinweis = "MODEL_PBR + LIGHT_ENV_HDR + SKYBOX + SHADOW  -  spiegelnd bis matt"
+    ELSE
+        hinweis = "MODEL_PBR + LIGHT_ENV (kein .hdr gefunden)  -  spiegelnd bis matt"
+    END IF
+    mtext(BREITE \ 2, HOEHE - 54, hinweis, 0.46, RGB(140, 180, 210))
+END SUB
+
+' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
+' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
+' sind GLOBAL -- ohne das hier zoege der HDR-Himmel aus Szene 4 auch hinter
+' dem Wuerfelfeld auf.
+SUB szene_start(neu AS INTEGER)
+    IF neu = 4 THEN
+        LIGHT_AMBIENT(0, 0)                       ' Licht kommt allein aus der Umgebung
+        LIGHT_DIRECTIONAL(-0.4, -0.75, -0.5, &H50504C)
+        IF hdr_da THEN SKYBOX(TRUE)
+        SHADOW_ENABLE(2048)
+        SHADOW_AREA(14.0, 40.0)
+    ELSE
+        SKYBOX(FALSE)
+        LIGHT_AMBIENT(&H1A2030, 0.55)
+        LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
+    END IF
+END SUB
+
 SUB szene_platzhalter(titel AS STRING)
     modus = 0.0
     mtext(BREITE \ 2, HOEHE \ 2, titel, 1.0, RGB(90, 120, 150))
@@ -444,11 +523,36 @@ LIGHT_ENABLE()
 LIGHT_AMBIENT(&H1A2030, 0.55)
 LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
 
+' --- Szene 4: Umgebung + Modelle (einmalig; das HDR-Panorama zu
+' --- durchrechnen kostet einen Moment, deshalb hier und nicht pro Bild) ---
+hdr_da = FILEEXISTS("assets/ibl_env.hdr")
+IF hdr_da THEN
+    LIGHT_ENV_HDR("assets/ibl_env.hdr", 1.0)
+ELSE
+    LIGHT_ENV(&H6090E0, &H201810, 1.0)        ' analytische Naeherung als Rueckfall
+END IF
+
+DIM kk AS INTEGER
+FOR kk = 0 TO N_KUGELN - 1
+    kugeln[kk] = MESH_SPHERE(0.62, 40, 40)
+    MODEL_LIT(kugeln[kk])
+    ' Rauheit von 0.03 (Spiegel) bis 0.85 (matt) ueber den Ring verteilt
+    MODEL_PBR(kugeln[kk], 1.0, 0.03 + kk / (N_KUGELN - 1.0) * 0.82)
+NEXT
+
+boden = MESH_PLANE(60.0, 60.0, 1, 1)     ' bis zum Horizont, sonst sieht man die Kante
+MODEL_LIT(boden)
+MODEL_PBR(boden, 0.1, 0.65)
+
+kern = MESH_SPHERE(0.9, 36, 36)
+MODEL_LIT(kern)
+MODEL_PBR(kern, 0.2, 0.35)
+
 AUDIO_MUSIC_LOAD(MUSIK)
 AUDIO_MUSIC_PLAY(-1, 1200)
 
-DIM letzte AS FLOAT
-letzte = 0.0
+DIM letzte_szene AS INTEGER
+letzte_szene = -1
 
 ' ----------------------------------------------------------------------
 '  HAUPTSCHLEIFE
@@ -494,6 +598,23 @@ WHILE NOT QUITREQUESTED()
 
     spektrum_lesen()
 
+    ' Szenennummer aus der Zeit ableiten und den 3D-Zustand nur bei einem
+    ' echten Wechsel umstellen (Skybox/Schatten jedes Bild neu zu setzen
+    ' waere Verschwendung).
+    DIM neue AS INTEGER
+    neue = 1
+    IF zeit >= T1 THEN neue = 2
+    IF zeit >= T2 THEN neue = 3
+    IF zeit >= T3 THEN neue = 4
+    IF zeit >= T4 THEN neue = 5
+    IF zeit >= T5 THEN neue = 6
+    IF zeit >= T6 THEN neue = 7
+    IF zeit >= T7 THEN neue = 8
+    IF neue <> letzte_szene THEN
+        szene_start(neue)
+        letzte_szene = neue
+    END IF
+
     CLS(&H05070C)
 
     IF zeit < T1 THEN
@@ -515,7 +636,7 @@ WHILE NOT QUITREQUESTED()
         szene = 4
         szene_t = zeit - T3
         blende = randblende(szene_t, T4 - T3, 1.5)
-        szene_platzhalter("4  PBR + HDR")
+        szene_pbr()
     ELSEIF zeit < T5 THEN
         szene = 5
         szene_t = zeit - T4
