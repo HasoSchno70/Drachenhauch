@@ -113,9 +113,15 @@ END FUNCTION
 
 ' Weicher Ein-/Ausblender am Rand einer Szene.
 FUNCTION randblende(t AS FLOAT, dauer AS FLOAT, rand AS FLOAT) AS FLOAT
-    IF t < rand THEN RETURN t / rand
-    IF t > dauer - rand THEN RETURN (dauer - t) / rand
-    RETURN 1.0
+    DIM v AS FLOAT
+    v = 1.0
+    IF t < rand THEN v = t / rand
+    IF t > dauer - rand THEN v = (dauer - t) / rand
+    ' Begrenzen: ohne das wird der Wert beim Ueberlaufen negativ, und der
+    ' Shader multipliziert die Farbe mit einer negativen Zahl.
+    IF v < 0.0 THEN v = 0.0
+    IF v > 1.0 THEN v = 1.0
+    RETURN v
 END FUNCTION
 
 ' Spektrum lesen und in bass/mitten/hoehen zusammenfassen.
@@ -870,6 +876,118 @@ SUB szene_klang()
 END SUB
 
 ' ----------------------------------------------------------------------
+'  SZENE 8 -- Abspann
+' ----------------------------------------------------------------------
+' Ruhiger Ausklang: ein Drahtgitter-Knoten dreht sich, die Sterne ziehen
+' langsam vorbei, der Abspann laeuft hoch. Dazu ein Ping, der WIRKLICH um
+' den Zuhoerer kreist -- AUDIO_EMITTER/LISTENER, Kira rechnet Panorama und
+' Entfernung selbst. Der Punkt auf dem Bild zeigt, wo der Klang gerade ist.
+CONST ZEILEN AS INTEGER = 22
+
+DIM abspann[ZEILEN] AS STRING
+DIM knoten AS INTEGER
+DIM ohr AS AUDIO_LISTENER
+DIM quelle AS AUDIO_EMITTER
+DIM ping AS SOUND
+DIM audio_raum_bereit AS BOOLEAN
+
+SUB raum_aufbauen()
+    ' Das Ohr sitzt im Ursprung, die Quelle kreist in 6 Metern Abstand.
+    ohr = AUDIO_LISTENER_NEW(0.0, 0.0, 0.0)
+    quelle = AUDIO_EMITTER_NEW(ohr, 6.0, 0.0, 0.0, 1.0, 22.0)
+    ping = AUDIO_SFX("sine", 660.0, 0.15, 0.005, 0.05, 0.45, 0.0, 0.0, 0.5)
+    audio_raum_bereit = TRUE
+END SUB
+
+SUB szene_abspann()
+    modus = 0.0
+    IF NOT audio_raum_bereit THEN raum_aufbauen()
+    IF NOT sterne_bereit THEN sterne_setzen()
+
+    ' --- Sterne, jetzt gemaechlich ---
+    DIM k AS INTEGER
+    FOR k = 0 TO STERNE - 1
+        stz[k] = stz[k] - 0.06 * dt
+        IF stz[k] <= 0.04 THEN
+            stx[k] = RND() * 2.0 - 1.0
+            sty[k] = RND() * 2.0 - 1.0
+            stz[k] = 1.0
+        END IF
+        DIM px AS FLOAT
+        DIM py AS FLOAT
+        px = BREITE / 2.0 + stx[k] / stz[k] * BREITE * 0.46
+        py = HOEHE / 2.0 + sty[k] / stz[k] * HOEHE * 0.46
+        IF px > 0.0 AND px < BREITE AND py > 0.0 AND py < HOEHE THEN
+            lx1[k] = INT(px)
+            ly1[k] = INT(py)
+        ELSE
+            lx1[k] = -10
+            ly1[k] = -10
+        END IF
+        DIM g AS INTEGER
+        g = INT(60.0 + 150.0 * (1.0 - stz[k]))
+        lc[k] = RGB(g, g, INT(g * 1.15))
+    NEXT
+    PLOTS(lx1, ly1, lc)
+
+    ' --- Drahtgitter-Knoten, langsam kreisende Kamera ---
+    ' Zielpunkt nach unten -> der Knoten sitzt im oberen Drittel und laesst
+    ' dem Abspann den Platz, den er braucht.
+    CAMERA3D(SIN(zeit * 0.12) * 8.0, 1.6, COS(zeit * 0.12) * 8.0, 0, -1.8, 0, 45)
+    MODEL_WIRES(knoten, 0, 0, 0, 2.4 + 0.3 * bass, _
+                regenbogen(zeit * 0.35, 0.22 + 0.25 * bass))
+
+    ' --- Der kreisende Ping: hoerbar links/rechts, sichtbar als Punkt ---
+    DIM w AS FLOAT
+    w = szene_t * 0.9
+    AUDIO_EMITTER_SET_POSITION(quelle, COS(w) * 6.0, 0.0, SIN(w) * 6.0)
+    IF COOLDOWN("ping", 2400) AND szene_t > 1.0 THEN AUDIO_PLAY_ON(ping, quelle, 0, 0.55)
+    DIM qx AS INTEGER
+    DIM qy AS INTEGER
+    qx = INT(BREITE / 2.0 + COS(w) * 210.0)
+    qy = INT(HOEHE * 0.26 + SIN(w) * 46.0)
+    BLEND_MODE("add")
+    DRAWIMAGEROT(glow, qx, qy, 0, 0.45, RGB(120, 220, 255))
+    BLEND_MODE("alpha")
+
+    ' --- Abspann laeuft hoch ---
+    DIM y0 AS FLOAT
+    ' Langsam genug, dass man mitliest, schnell genug, dass alles durch ist,
+    ' bevor das Logo kommt.
+    y0 = HOEHE + 40.0 - szene_t * 26.0
+    FOR k = 0 TO ZEILEN - 1
+        DIM y AS FLOAT
+        y = y0 + k * 42.0
+        IF y > -40.0 AND y < HOEHE + 40.0 THEN
+            DIM sk AS FLOAT
+            DIM c AS INTEGER
+            IF LEFT$(abspann[k], 1) = "*" THEN
+                sk = 0.72                          ' Ueberschrift
+                c = regenbogen(zeit * 0.6 + k * 0.2, 1.0)
+                ' MID$ ist 0-basiert: ab Zeichen 1, und ZWEI Zeichen kuerzer
+                ' -- sonst bleibt der Stern am Ende stehen.
+                mtext(BREITE \ 2, INT(y), MID$(abspann[k], 1, LEN(abspann[k]) - 2), sk, c)
+            ELSE
+                sk = 0.5
+                c = RGB(170, 195, 220)
+                mtext(BREITE \ 2, INT(y), abspann[k], sk, c)
+            END IF
+        END IF
+    NEXT
+
+    ' --- Zum Schluss das Logo ---
+    IF szene_t > (T8 - T7) - 26.0 THEN
+        DIM ein AS FLOAT
+        ein = (szene_t - ((T8 - T7) - 26.0)) / 5.0
+        IF ein > 1.0 THEN ein = 1.0
+        mtext(BREITE \ 2, HOEHE \ 2 - 20, "GAMEBASIC", 1.6 * (0.9 + 0.1 * ein), _
+              regenbogen(zeit * 1.1, ein))
+        mtext(BREITE \ 2, HOEHE \ 2 + 54, "danke fuers Zuschauen", 0.6, _
+              RGB(INT(150 * ein), INT(190 * ein), INT(215 * ein)))
+    END IF
+END SUB
+
+' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
 ' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
@@ -970,6 +1088,31 @@ boden = MESH_PLANE(60.0, 60.0, 1, 1)     ' bis zum Horizont, sonst sieht man die
 MODEL_LIT(boden)
 MODEL_PBR(boden, 0.1, 0.65)
 
+knoten = MESH_KNOT(1.0, 0.26, 160, 20)   ' viele Segmente = sauberes Gitter
+
+abspann[0] = "*GAMEBASIC - DEMO*"
+abspann[1] = ""
+abspann[2] = "*Was du gesehen hast*"
+abspann[3] = "Plasma, Sinus-Scroller und Spektrum-Saeulen"
+abspann[4] = "1400 Streifen in EINEM LINES-Aufruf"
+abspann[5] = "1600 Wuerfel in drei Draw-Calls (MODEL_INSTANCED)"
+abspann[6] = "PBR-Metall unter echtem HDR-Himmel, mit Schatten"
+abspann[7] = "ein Logo aus Kloetzen, von Rapier2D umgeworfen"
+abspann[8] = "Tunnel, Spektrum-Ring und Render-Target-Stempel"
+abspann[9] = "eine Effektkette, die man am Spektrum sieht"
+abspann[10] = ""
+abspann[11] = "*Alles in einer Laufzeit*"
+abspann[12] = "gbrt - Rust, raylib und Kira"
+abspann[13] = "Lexer, Parser, Compiler und VM in einem"
+abspann[14] = ""
+abspann[15] = "*Musik*"
+abspann[16] = "Drozerix - Stardust Jam"
+abspann[17] = "gemeinfrei, The Mod Archive"
+abspann[18] = "ein echtes ProTracker-Modul, live gestreamt"
+abspann[19] = ""
+abspann[20] = "*Material*"
+abspann[21] = "HDR: Poly Haven (CC0)   Schrift: Roboto (Apache 2.0)"
+
 kern = MESH_SPHERE(0.9, 36, 36)
 MODEL_LIT(kern)
 MODEL_PBR(kern, 0.2, 0.35)
@@ -1020,6 +1163,14 @@ WHILE NOT QUITREQUESTED()
         ELSEIF zeit < T7 THEN
             versatz = versatz + (T7 - zeit)
         END IF
+    END IF
+
+    ' Am Ende wieder von vorn: die Musik loopt endlos, der Ablaufplan muss
+    ' mit. (Sich auf ein Zurueckspringen der Musik-Position zu verlassen
+    ' waere heikel -- diese Zeile funktioniert so oder so.)
+    IF zeit >= T8 THEN
+        versatz = versatz - T8
+        zeit = zeit - T8
     END IF
 
     spektrum_lesen()
@@ -1082,7 +1233,7 @@ WHILE NOT QUITREQUESTED()
         szene = 8
         szene_t = zeit - T7
         blende = randblende(szene_t, T8 - T7, 2.5)
-        szene_platzhalter("8  ABSPANN")
+        szene_abspann()
     END IF
 
     ' Post-Effekt mit den Werten dieses Bildes fuettern

@@ -40,7 +40,11 @@ einer Demo:
 | 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
 | 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, Nachhall aus `RENDERTARGET_*` |
 | 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
-| 8 | 5:00 | Abspann | *in Arbeit* |
+| 8 | 5:00 | Abspann | Drahtgitter-Knoten, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
+
+Am Ende springt die Demo wieder an den Anfang — die Musik loopt endlos, der
+Ablaufplan geht mit. Ein kompletter Durchlauf wurde headless verifiziert
+(6:24, fehlerfrei, inklusive Rücksprung).
 
 ## Der Post-Effekt
 
@@ -118,6 +122,9 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   Rückkopplung („das letzte Bild wieder hineinzeichnen") gibt es also nicht.
   Szene 6 stempelt stattdessen *dasselbe* Bild mehrfach in abnehmender Größe:
   derselbe Eindruck, eine Quelle.
+- **`MID$` ist 0-basiert.** Ein führendes Zeichen abschneiden heißt
+  `MID$(s, 1, LEN(s) - 2)`, wenn auch hinten eines weg soll — mit `- 1` bleibt
+  das letzte stehen.
 - **Ein Spektrum-Ring braucht ein gespiegeltes Spektrum.** Legt man die Bänder
   einfach rundherum, stoßen Band 31 (Höhen, klein) und Band 0 (Bass, groß)
   direkt aneinander — ein Sprung von über 150 Pixeln zwischen zwei
