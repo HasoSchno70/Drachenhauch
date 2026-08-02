@@ -6,7 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "gamebasic"
 version = "2026.1"
 description = "GameBasic - eine BASIC-artige Sprache fuer die Spieleentwicklung"
-requires-python = ">=3.10"
+# 3.12 ist das, was tatsaechlich geprueft wird: CI faehrt nur diese Version,
+# der Windows-Installer buendelt sie, mypy prueft gegen sie. Vorher stand hier
+# ">=3.10" -- eine Zusage, die niemand einloest (3.10 wurde nie getestet, 3.11
+# flog am 01.08. aus der Matrix). Auf 3.10/3.11 laeuft der Code vermutlich
+# weiter; wer es dort braucht, kann die Grenze lokal senken und selbst testen.
+requires-python = ">=3.12"
 authors = [{ name = "Hans Schnorrenberger" }]
 readme = { text = "GameBasic - BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, fuer Spiele.", content-type = "text/plain" }
 classifiers = [
@@ -47,9 +52,9 @@ exclude = ["tests*", "examples*"]
 # Sprache sowie die Tracker-/Synth-/Tilemap-Modelle). Die PySide6-Editoren
 # (*_qt.py, editor_qt/, spriteeditor/) sind ausgeklammert: die Qt-Stubs sind
 # unvollstaendig und wuerden nur Rauschen erzeugen. Scope spaeter erweiterbar.
-# 3.12 statt 3.10 (requires-python bleibt >=3.10 fuer die Laufzeit-Kompatibilitaet
-# unveraendert -- betrifft nur, welche Syntax mypy beim Pruefen akzeptiert):
-# neuere numpy-Stubs (numpy>=1.24 ohne Obergrenze) nutzen inzwischen das
+# `python_version` deckt sich seit 2026-08-01 mit `requires-python` (beides
+# 3.12). Gesetzt wurde es urspruenglich aus einem anderen Grund, der weiter
+# gilt: neuere numpy-Stubs (numpy>=1.24 ohne Obergrenze) nutzen inzwischen das
 # PEP-695-`type`-Statement, das mypy bei python_version<3.12 mit einem
 # Parse-Fehler ablehnt -- selbst nur beim Import-Follow, `follow_imports =
 # "skip"` verhindert das NICHT (der Parse-Fehler passiert vor dem Skip).
