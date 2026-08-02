@@ -38,7 +38,7 @@ einer Demo:
 | 3 | 1:24 | Würfelfeld | `MODEL_INSTANCED` — 1600 Würfel in drei Draw-Calls, `m3d`-Matrizen |
 | 4 | 2:08 | PBR + HDR | `LIGHT_ENV_HDR` + `SKYBOX`, `MODEL_PBR` von spiegelnd bis matt, `SHADOW_*`, `MODEL_EMISSIVE` |
 | 5 | 2:52 | Physik | `physics2d` (Rapier) — Logo aus Klötzen, das auf den Schlag zusammenkracht |
-| 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, Nachhall aus `RENDERTARGET_*` |
+| 6 | 3:34 | Tunnel | Post-Effekt-Tunnel (1/r), Spektrum-Ring per `SPLINE`, echte Schweife aus einem behaltenen `RENDERTARGET` |
 | 7 | 4:16 | Klangfarben | die Effektkette bei der Arbeit: `AUDIO_FILTER`, LFO-Wobble, `AUDIO_DELAY`/`REVERB`/`DISTORTION`, Auto-Pan |
 | 8 | 5:00 | Abspann | Drahtgitter-Knoten, laufender Abspann, kreisender Ping über `AUDIO_EMITTER`/`LISTENER` |
 
@@ -118,10 +118,12 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
   beweglich, fällt der Querbalken des „G" in dem Moment herunter, in dem die
   Szene beginnt — man sieht das Logo nie. *(Bis 2026-08-02 gab es das Umschalten
   nicht; man musste die Körper entfernen und neu anlegen.)*
-- **Render-Targets werden in gbrt jedes Bild transparent geleert** — eine echte
-  Rückkopplung („das letzte Bild wieder hineinzeichnen") gibt es also nicht.
-  Szene 6 stempelt stattdessen *dasselbe* Bild mehrfach in abnehmender Größe:
-  derselbe Eindruck, eine Quelle.
+- **Ein Render-Target wird normalerweise jedes Bild transparent geleert.**
+  `RENDERTARGET_NEW(w, h, TRUE)` lässt es stehen — das ist die Voraussetzung für
+  Schweife. Verblassen geht nicht durch Selbst-Zeichnen (ein Target kann sich
+  nicht selbst zeichnen), sondern durch **Multiplizieren**: `BLEND_MODE("mult")`
+  und ein Vollbild-Rechteck in dunklem Grau. *(Bis 2026-08-02 gab es das
+  Stehenbleiben nicht; Szene 6 hat den Nachhall vorher nur nachgestellt.)*
 - **`MID$` ist 0-basiert.** Ein führendes Zeichen abschneiden heißt
   `MID$(s, 1, LEN(s) - 2)`, wenn auch hinten eines weg soll — mit `- 1` bleibt
   das letzte stehen.

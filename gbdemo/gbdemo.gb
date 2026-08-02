@@ -637,10 +637,12 @@ END SUB
 ' 1/r-Abbildung, der klassische Demo-Tunnel. Davor liegt ein Ring, dessen
 ' Radius Band fuer Band aus dem Spektrum kommt: die Musik als Gestalt.
 '
-' Der Nachhall entsteht NICHT aus dem letzten Bild -- Render-Targets werden
-' in gbrt jedes Bild transparent geleert, ein echter Rueckkopplungs-Puffer
-' ist also nicht zu haben. Stattdessen wird DASSELBE Bild mehrfach in
-' abnehmender Groesse additiv gestempelt: derselbe Eindruck, eine Quelle.
+' Der Nachhall ist ECHT: das Render-Target wird mit RENDERTARGET_NEW(w, h,
+' TRUE) angelegt und bleibt damit ueber das Bild hinaus stehen. Verblasst
+' wird, indem der Inhalt jedes Bild mit einem dunklen Grau MULTIPLIZIERT
+' wird -- ein Target kann sich nicht selbst zeichnen, das ist der Weg.
+' Zusaetzlich wird das Ergebnis dreimal gestaffelt gestempelt: das gibt dem
+' Ganzen Tiefe in den Tunnel hinein.
 ' Der Ring hat DOPPELT so viele Punkte wie Baender: das Spektrum laeuft von
 ' 0 bis 31 die eine Haelfte hoch und gespiegelt wieder herunter. Ohne diese
 ' Spiegelung stossen im Ring Band 31 (Hoehen, klein) und Band 0 (Bass, gross)
@@ -653,7 +655,7 @@ END SUB
 ' ersten.
 CONST RINGN AS INTEGER = BAENDER * 2       ' Punkte rund herum
 CONST RINGP AS INTEGER = RINGN + 4         ' plus Stuetzpunkte
-CONST ECHOS AS INTEGER = 6
+CONST ECHOS AS INTEGER = 3
 
 DIM rt_ring AS INTEGER
 DIM ringx[RINGP] AS INTEGER
@@ -676,6 +678,10 @@ SUB szene_tunnel()
 
     ' --- Den Ring in das Render-Target zeichnen ---
     RENDERTARGET_BEGIN(rt_ring)
+    ' Verblassen: das Stehengebliebene abdunkeln, statt es zu loeschen.
+    BLEND_MODE("mult")
+    BOX(0, 0, BREITE, HOEHE, RGB(214, 214, 220))
+    BLEND_MODE("alpha")
     DIM k AS INTEGER
     FOR k = 0 TO RINGP - 1
         DIM b AS INTEGER
@@ -709,7 +715,7 @@ SUB szene_tunnel()
     FOR e = ECHOS - 1 TO 0 STEP -1
         DIM sk AS FLOAT
         ' In den Tunnel hinein: jedes Echo kleiner, das aeusserste zuerst.
-        sk = 1.45 - e * 0.22 + SIN(zeit * 1.2 - e * 0.5) * 0.03
+        sk = 1.30 - e * 0.34 + SIN(zeit * 1.2 - e * 0.5) * 0.03
         IF sk > 0.05 THEN
             DIM hell AS FLOAT
             hell = 1.0 - e / (ECHOS * 1.15)
@@ -721,7 +727,7 @@ SUB szene_tunnel()
     BLEND_MODE("alpha")
 
     mtext(BREITE \ 2, HOEHE - 54, _
-          "RENDERTARGET + SPLINE  -  ein Bild, " + STR$(ECHOS) + " Stempel", _
+          "RENDERTARGET (behalten) + SPLINE  -  echte Schweife", _
           0.5, RGB(140, 180, 210))
 END SUB
 
@@ -1037,7 +1043,8 @@ logo_b[4] = "#...#"
 logo_b[5] = "#...#"
 logo_b[6] = "####."
 weiss = GENTEX_COLOR(32, 32, &HFFFFFF)
-rt_ring = RENDERTARGET_NEW(BREITE, HOEHE)
+' TRUE = der Inhalt bleibt ueber das Bild hinaus stehen -> echte Schweife.
+rt_ring = RENDERTARGET_NEW(BREITE, HOEHE, TRUE)
 
 mesh_box = MESH_CUBE(0.8, 0.8, 0.8)
 

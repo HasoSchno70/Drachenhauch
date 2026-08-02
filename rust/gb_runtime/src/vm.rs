@@ -3912,8 +3912,16 @@ impl<'p> Vm<'p> {
                 Value::Str(g!().dropped_files().get(i).cloned().unwrap_or_default().into())
             }
             // --- Render-Targets (Batch 4) ---
+            // RENDERTARGET_NEW(w, h [, behalten]) -- `behalten` = TRUE laesst den
+            // Inhalt ueber das Bild hinaus stehen (Rueckkopplung/Nachzieher).
             "rendertarget_new" => Value::Int(g!().rendertarget_new(
-                gi(a,0,"RENDERTARGET_NEW")? as i32, gi(a,1,"RENDERTARGET_NEW")? as i32)?),
+                gi(a,0,"RENDERTARGET_NEW")? as i32, gi(a,1,"RENDERTARGET_NEW")? as i32,
+                if a.len() >= 3 { gb(a, 2) } else { false })?),
+            "rendertarget_clear" => {
+                let farbe = if a.len() >= 2 { Some(gi(a,1,"RENDERTARGET_CLEAR")?) } else { None };
+                g!().rendertarget_clear(gi(a,0,"RENDERTARGET_CLEAR")?, farbe)?;
+                Value::Nil
+            }
             "rendertarget_begin" => { g!().rendertarget_begin(gi(a,0,"RENDERTARGET_BEGIN")?)?; Value::Nil }
             "rendertarget_end" => { g!().rendertarget_end(); Value::Nil }
             "rendertarget_draw" => {

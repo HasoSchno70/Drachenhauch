@@ -115,6 +115,14 @@ struct Layer {
 struct RenderTarget {
     rt: RenderTexture2D,
     cmds: Vec<Cmd>,
+    /// Bleibt der Inhalt ueber das Bild hinaus stehen?
+    ///
+    /// Normalerweise wird ein Target vor jedem Bild transparent geleert -- das
+    /// ist die richtige Voreinstellung fuer "Szene zwischenspeichern".
+    /// Stehenbleiben ist die Voraussetzung fuer RUECKKOPPLUNG: das Bild von
+    /// eben leicht verschoben wieder hineinzeichnen, was Schweife, Nachzieher
+    /// und den klassischen Demo-Feedback-Effekt ergibt.
+    behalten: bool,
 }
 
 struct Atlas {
@@ -1099,11 +1107,22 @@ impl Graphics {
 
     // --- Render-Targets (RENDERTARGET_*) ---
     /// Legt ein neues Render-Target (RenderTexture2D) an -> Handle (Index).
-    pub fn rendertarget_new(&mut self, w: i32, h: i32) -> Result<i64, String> {
+    pub fn rendertarget_new(&mut self, w: i32, h: i32, behalten: bool) -> Result<i64, String> {
         let rt = self.rl.load_render_texture(&self.thread, w.max(1) as u32, h.max(1) as u32)
             .map_err(|e| format!("RENDERTARGET_NEW: {}", e))?;
-        self.render_targets.push(RenderTarget { rt, cmds: Vec::new() });
+        self.render_targets.push(RenderTarget { rt, cmds: Vec::new(), behalten });
         Ok((self.render_targets.len() - 1) as i64)
+    }
+
+    /// RENDERTARGET_CLEAR(rt [, farbe]): ein behaltenes Target von Hand leeren.
+    /// Ohne Farbe transparent -- so wie es ein normales Target jedes Bild tut.
+    pub fn rendertarget_clear(&mut self, idx: i64, farbe: Option<i64>) -> Result<(), String> {
+        let i = self.check_rt(idx, "RENDERTARGET_CLEAR")?;
+        let c = match farbe { Some(v) => col(v), None => Color::new(0, 0, 0, 0) };
+        // Als erster Befehl des Puffers -- alles, was in diesem Bild schon
+        // hineingezeichnet wurde, soll ja auch weg sein.
+        self.render_targets[i].cmds.insert(0, Cmd::Clear(c));
+        Ok(())
     }
     fn check_rt(&self, idx: i64, fn_: &str) -> Result<usize, String> {
         let i = idx as usize;
@@ -4006,8 +4025,13 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
                 if render_targets[i].cmds.is_empty() { continue; }
                 let cmds = std::mem::take(&mut render_targets[i].cmds);
                 let synth = [Layer { z: 0, cmds }];
+                // Ein behaltenes Target wird NICHT geleert -- der neue Inhalt
+                // legt sich ueber den alten. Das ist der ganze Trick hinter
+                // Rueckkopplung/Nachzieheffekten.
+                let behalten = render_targets[i].behalten;
                 let mut tx = rl.begin_texture_mode(thread, &mut render_targets[i].rt);
-                render_scene(&mut tx, s, clear_rt, &synth, &[0], textures, fonts,
+                let clear = if behalten { None } else { Some(clear_rt) };
+                render_scene(&mut tx, s, clear, &synth, &[0], textures, fonts,
                     &[], cam, &[], None, (-1, -1, -1, -1), &empty_set, &empty_map, &empty_emis,
                     (false, 0, 0, 0), &[], None, None, None, None);
             }
@@ -4022,7 +4046,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             // 1) Szene in die RenderTexture rendern.
             {
                 let mut tx = rl.begin_texture_mode(thread, rt);
-                render_scene(&mut tx, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+                render_scene(&mut tx, s, Some(clear_color), layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
             }
             // 2) RT per Fragment-Shader auf den Screen praesentieren (Y-flip).
             let src = Rectangle::new(0.0, 0.0, tw, -th);
@@ -4045,7 +4069,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
             }
         } else {
             let mut d = rl.begin_drawing(thread);
-            render_scene(&mut d, s, clear_color, layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
+            render_scene(&mut d, s, Some(clear_color), layers, &order, textures, fonts, cmds3d, cam, models, light_shader.as_mut(), mat_locs, nmap_set, pbr_ref, emis_ref, ibl, rts, skybox, cam_view, cam_proj, inst_ffi);
         }
         // Web (emscripten): nach dem Praesentieren (EndDrawing oben beim Drop des
         // Draw-Handles) ans Browser-Event-Loop yielden -- sonst blockiert der
@@ -4103,8 +4127,10 @@ fn m3d_arr_to_ffi(a: &[f32; 16]) -> raylib::ffi::Matrix {
 /// Spielt 3D-Befehle (begin_mode3D) + 2D-Layer (mit Scissor-Clip-Stack) auf ein
 /// beliebiges Draw-Ziel ab -- den Screen ODER eine RenderTexture (beide impl
 /// `RaylibDraw`). So laeuft derselbe Replay-Code mit und ohne Post-Shader.
+/// `clear = None` laesst den Zielinhalt stehen (behaltene Render-Targets --
+/// Voraussetzung fuer Rueckkopplungs-/Nachzieheffekte).
 fn render_scene<D: RaylibDraw>(
-    d: &mut D, s: i32, clear: Color,
+    d: &mut D, s: i32, clear: Option<Color>,
     layers: &[Layer], order: &[usize], textures: &[Tex], fonts: &[Font],
     cmds3d: &[Cmd3D], cam3d: Camera3D, models: &[Model],
     mut light_shader: Option<&mut Shader>, mat_locs: (i32, i32, i32, i32),
@@ -4136,7 +4162,7 @@ fn render_scene<D: RaylibDraw>(
     };
     let mut clip_stack: Vec<(i32, i32, i32, i32)> = Vec::new();
     let mut cur_blend = 0i32;   // aktiver Blend-Mode (0 = Default/alpha)
-    d.clear_background(clear);
+    if let Some(c) = clear { d.clear_background(c); }
             // HDR-IBL-Maps im Draw-Kontext an Slots 11/12/13 binden (Cubemaps via
             // rlEnableTextureCubemap, BRDF-LUT 2D). Hier statt update_light_uniforms,
             // damit die Bindung garantiert bis zum Modell-Draw steht.

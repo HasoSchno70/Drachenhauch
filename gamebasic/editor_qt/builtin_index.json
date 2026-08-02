@@ -5217,6 +5217,12 @@
       "module": "core"
     },
     {
+      "name": "RENDERTARGET_CLEAR",
+      "kind": "graphics",
+      "signature": "RENDERTARGET_CLEAR(rt [, farbe])",
+      "module": "core"
+    },
+    {
       "name": "RENDERTARGET_DRAW",
       "kind": "graphics",
       "signature": "RENDERTARGET_DRAW(3..5 Argumente)",
@@ -5231,7 +5237,7 @@
     {
       "name": "RENDERTARGET_NEW",
       "kind": "graphics",
-      "signature": "RENDERTARGET_NEW(*args)",
+      "signature": "RENDERTARGET_NEW(w, h [, behalten])",
       "module": "core"
     },
     {
