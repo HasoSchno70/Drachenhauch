@@ -9,26 +9,19 @@ on:
 jobs:
   test:
     runs-on: windows-latest
+    # Eine Version: 3.12. Damit wird entwickelt, damit wird paketiert (der
+    # Windows-Installer buendelt 3.12, mypy prueft gegen 3.12) -- eine zweite
+    # Version zu testen hiess, etwas abzusichern, das niemand benutzt.
+    #
+    # 3.11 lief hier bis 2026-08-01 mit und starb reproduzierbar mit
+    # "Windows fatal exception: code 0xc0000374" (HEAP CORRUPTION im
+    # Qt-Teardown) -- auf 3.12 mit demselben PySide6-Wheel gruen. Die
+    # Fehlerursache (Zerstoerungs-Reihenfolge in den Editor-Widgets) ist damit
+    # NICHT behoben, nur nicht mehr getestet; Notizen dazu in conftest.py.
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # 3.12 = die Version, mit der entwickelt und paketiert wird (Installer,
-          # mypy-Ziel) -> voller Lauf inklusive Qt-Editoren.
-          - python-version: "3.12"
-            pytest-args: '-k "not spriteeditor_qt_canvas and not tilemapeditor_qt"'
-          # 3.11 = nur der Qt-FREIE Kern (Sprache, Werkzeuge, gbrt-Anbindung).
-          # Grund: der gemeinsame Qt-Lauf stirbt hier reproduzierbar (dreimal,
-          # immer bei 17 % des Laufs) mit "Windows fatal exception: code
-          # 0xc0000374" -- HEAP CORRUPTION im Qt-Teardown, gemeldet in der
-          # Aufraeum-Fixture. 3.12 laeuft mit demselben PySide6-Wheel (abi3,
-          # identisches Binary) gruen, lokal ist es auf keiner verfuegbaren
-          # Version reproduzierbar. Das ist ein Problem des TESTGERUESTS
-          # (tausende zurueckgelassene Fenster in EINEM Prozess), nicht des
-          # Betriebs -- wer die IDE benutzt, oeffnet ein paar Fenster und
-          # schliesst sie wieder.
-          - python-version: "3.11"
-            pytest-args: '-m "not qt"'
+        python-version: ["3.12"]
 
     # Qt-Editoren headless testen (kein Display auf den Runnern).
     env:
@@ -50,14 +43,13 @@ jobs:
       - name: Type-check with mypy
         run: mypy
 
-      # Der Umfang haengt an der Python-Version (siehe Matrix oben).
-      # spriteeditor_qt_canvas/tilemapeditor_qt bleiben auch auf 3.12 aussen
-      # vor: fuer sich genommen gruen, loesen sie im vollen kombinierten Lauf
-      # sporadisch einen nativen Access-Violation-Crash in Qts C++-Teardown aus
-      # (der Prozess stirbt, kein fangbarer Test-Fehler). Lokal pruefbar mit
+      # spriteeditor_qt_canvas/tilemapeditor_qt bleiben aussen vor: fuer sich
+      # genommen gruen, loesen sie im vollen kombinierten Lauf sporadisch einen
+      # nativen Access-Violation-Crash in Qts C++-Teardown aus (der Prozess
+      # stirbt, kein fangbarer Test-Fehler). Lokal pruefbar mit
       # `pytest tests/test_spriteeditor_qt_canvas.py tests/test_tilemapeditor_qt.py`.
       - name: Run tests
-        run: pytest tests/ -q ${{ matrix.pytest-args }}
+        run: pytest tests/ -q -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
   # Rust-Kern (gbrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher

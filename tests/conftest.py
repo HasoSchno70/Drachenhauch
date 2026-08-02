@@ -17,10 +17,15 @@ if str(_ROOT) not in sys.path:
 # --------------------------------------------------------------------------
 # Marker `qt`: alles, was PySide6 anfasst
 # --------------------------------------------------------------------------
-# Damit laesst sich der Qt-freie Kern allein fahren (`-m "not qt"`) -- CI nutzt
-# das auf Python 3.11, wo der gemeinsame Qt-Lauf reproduzierbar mit
-# "Windows fatal exception: code 0xc0000374" (HEAP CORRUPTION) im Qt-Teardown
-# stirbt (3.12 laeuft gruen, identisches PySide6-Wheel).
+# Damit laesst sich der Qt-freie Kern allein fahren: `pytest tests/ -m "not qt"`
+# ist in ~2 Minuten durch (2243 Tests) statt in ~7 -- praktisch, solange man an
+# Sprache/Runtime/Werkzeugen arbeitet und die Editoren nicht anfasst.
+#
+# Ausserdem der Notausgang, falls der Qt-Teardown wieder einen ganzen Lauf
+# zerlegt: genau dafuer lief CI kurzzeitig auf Python 3.11 mit `-m "not qt"`
+# (dort starb der gemeinsame Qt-Lauf reproduzierbar mit "Windows fatal
+# exception: code 0xc0000374"). CI faehrt inzwischen nur noch 3.12, wo das
+# Problem nicht auftritt.
 #
 # Der Marker geht ueber den QUELLTEXT der Testdatei, nicht ueber den Dateinamen:
 # 13 der 42 Qt-Dateien heissen gar nicht `*qt*` (test_fader.py,
