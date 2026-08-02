@@ -80,6 +80,17 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 - [x] 66 vec2 (content/66_vec2.js, images/66_vec2.png) · [x] 67 m3d (content/67_m3d.js, images/67_m3d.png) · [x] 68 json (content/68_json.js) · [x] 69 db (content/69_db.js) · [x] 70 regex (content/70_regex.js) · [x] 71 audio erweitert (content/71_audio.js)
 - [x] 72 curves (content/72_curves.js, images/72_curves.png) · [x] 73 net (content/73_net.js) · [x] 74 html (content/74_html.js) · [x] 75 ecs (content/75_ecs.js) · [x] 76 serial/usb/wifi/bt (content/76_hardware.js) — **Teil V KOMPLETT**
 
+### Teil VI — Eine Demo bauen
+- [x] 80 Was eine Demo ist – und was sie zusammenhält  (content/80_demo.js, images/80_demo_titel.png)
+      — AUDIO_MUSIC_POSITION als Uhr, AUDIO_FFT als Spektrum, Ablaufplan aus
+      Sekunden, Ein-/Ausblenden, Schlagerkennung (roh vs. geglättet!), ein
+      Shader für alle Szenen (POSTFX + mode-Uniform).
+- [x] 81 Die acht Szenen – und was in jeder steckt  (content/81_demo_szenen.js,
+      images/81_demo_sterne|wuerfel|pbr|physik|tunnel|klang|abspann.png)
+      — Scroller, LINES-Bulk, MODEL_INSTANCED mit Farb-Array, PBR+HDR+SKYBOX,
+      physics2d mit PHYS2D_SET_DYNAMIC, behaltenes RENDERTARGET, Effektkette,
+      Spatial Audio, AUDIO_SFX-Klangtastatur. Jede Szene mit ihrem Stolperstein.
+
 ### Anhang
 - [x] A Befehls-Index (alphabetisch)  (content/90_anhang_a.js — auto-generiert aus builtin_index.json)
 - [x] B Tastencodes  (content/91_anhang_b.js) · [x] C Farb-Konstanten  (content/92_anhang_c.js)

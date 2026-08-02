@@ -73,9 +73,12 @@
   "Modul: html": 321,
   "Modul: ecs": 325,
   "Hardware: serial, usb, wifi, bt": 330,
-  "Anhang": 338,
-  "Anhang A — Befehls-Index": 339,
-  "Anhang B — Tastencodes": 369,
-  "Anhang C — Farb-Konstanten": 371,
-  "Anhang D — Fehlermeldungen verstehen": 372
+  "Teil VI — Eine Demo bauen": 338,
+  "Was eine Demo ist – und was sie zusammenhält": 339,
+  "Die acht Szenen – und was in jeder steckt": 344,
+  "Anhang": 354,
+  "Anhang A — Befehls-Index": 355,
+  "Anhang B — Tastencodes": 385,
+  "Anhang C — Farb-Konstanten": 387,
+  "Anhang D — Fehlermeldungen verstehen": 388
 }
