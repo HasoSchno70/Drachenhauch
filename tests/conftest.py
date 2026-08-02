@@ -14,6 +14,42 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 
+# --------------------------------------------------------------------------
+# Marker `qt`: alles, was PySide6 anfasst
+# --------------------------------------------------------------------------
+# Damit laesst sich der Qt-freie Kern allein fahren (`-m "not qt"`) -- CI nutzt
+# das auf Python 3.11, wo der gemeinsame Qt-Lauf reproduzierbar mit
+# "Windows fatal exception: code 0xc0000374" (HEAP CORRUPTION) im Qt-Teardown
+# stirbt (3.12 laeuft gruen, identisches PySide6-Wheel).
+#
+# Der Marker geht ueber den QUELLTEXT der Testdatei, nicht ueber den Dateinamen:
+# 13 der 42 Qt-Dateien heissen gar nicht `*qt*` (test_fader.py,
+# test_sfxeditor.py, test_tracker_editor_*.py, ...) -- eine Namensregel wuerde
+# sie durchrutschen lassen und den Qt-freien Lauf wieder verunreinigen.
+_QT_SOURCE_CACHE: dict[str, bool] = {}
+
+
+def _module_uses_qt(path: str) -> bool:
+    hit = _QT_SOURCE_CACHE.get(path)
+    if hit is None:
+        try:
+            hit = "PySide6" in Path(path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            hit = False
+        _QT_SOURCE_CACHE[path] = hit
+    return hit
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "qt: braucht PySide6 (automatisch gesetzt)")
+
+
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if _module_uses_qt(str(item.path)):
+            item.add_marker(pytest.mark.qt)
+
+
 def _find_gbrt():
     exe = "gbrt.exe" if os.name == "nt" else "gbrt"
     for variant in ("release", "debug"):
@@ -155,19 +191,44 @@ def run_all(run_gb):
 #
 # WARUM ENTSCHAERFEN STATT ZERSTOEREN: der naheliegende Weg waere
 # `deleteLater()` auf jedes uebrige Top-Level-Widget. Genau das wurde
-# ausprobiert -- und stuerzt beim tatsaechlichen Zerstoeren ab (Access
-# Violation im `sendPostedEvents(DeferredDelete)`). Der Grund liegt NICHT im
+# ausprobiert -- und stuerzt beim tatsaechlichen Zerstoeren ab (Abbruch in
+# `CodeEditor.event()`, waehrend `sendPostedEvents(DeferredDelete)` das
+# Objekt unter dem laufenden Python-Frame zerlegt). Der Grund liegt NICHT im
 # Test, sondern in echten Zerstoerungs-Reihenfolge-Fehlern der Editor-Widgets
-# (dieselbe bekannte PySide6-Use-after-free-Serie; sichtbar auch als
-# "RuntimeError: Internal C++ object (GBHighlighter) already deleted" aus
-# `CodeEditor._on_theme_changed`). Diese Fixture repariert die NICHT und tut
-# auch nicht so -- sie nimmt den Leichen nur die Zuendschnur:
+# (dieselbe bekannte PySide6-Use-after-free-Serie).
+#
+# NACHGEMESSEN, damit das nicht wieder jemand "aufraeumt": einzeln laesst sich
+# JEDES der sieben Editor-Fenster sauber abbauen (erzeugen, schliessen,
+# deleteLater, DeferredDelete zustellen -- kein Absturz, kein Rest). Erst im
+# echten Testlauf, mit den Altlasten vieler vorheriger Tests, kippt es: die
+# Abbau-Variante dieser Fixture stuerzte in 1 von 5 Laeufen ab (immer derselbe
+# Stack). Wer es erneut versuchen will, misst also bitte im vollen Lauf und
+# mehrfach -- ein einzelner gruener Durchgang beweist hier gar nichts.
+#
+# Die Fixture nimmt den Leichen daher nur die Zuendschnur:
 #
 #   * jeder aktive QTimer wird gestoppt  -> keine faelligen/wiederholenden
 #     Timer mehr, die Queue laeuft leer, `processEvents()` kehrt zurueck
 #   * jeder QFileSystemWatcher verliert seine Pfade -> kein Watcher-Thread,
 #     der im Hintergrund weiter Aenderungs-Events nachschiebt
 #   * die Fenster werden versteckt -> keine Repaints
+#   * die schon GEPOSTETEN Repaint- und Queued-Signal-Ereignisse werden
+#     verworfen (siehe unten) -> ein `processEvents()` im naechsten Test
+#     stellt nichts mehr an die Halbtoten zu
+#
+# Zum letzten Punkt, damit die Begruendung ehrlich bleibt: er war als Fix fuer
+# den CI-Absturz auf Python 3.11 gedacht ("Windows fatal exception: code
+# 0xc0000374", HEAP CORRUPTION, gemeldet beim `topLevelWidgets()`-Aufruf hier)
+# -- die Vermutung war, dass ein `app.processEvents()` in einem spaeteren Test
+# gepostete Ereignisse an halb abgeraeumte Objekte zustellt. **Das war falsch:**
+# mit dieser Aenderung stuerzte CI an exakt derselben Stelle weiter ab. Der
+# Verdacht liegt seitdem eher auf dieser Fixture selbst (sie laeuft nach JEDEM
+# Test ueber alle uebrigen Fenster). CI faehrt auf 3.11 deshalb nur noch den
+# Qt-freien Kern (`-m "not qt"`), siehe .github/workflows/ci.yml.
+#
+# Behalten wird der Schritt trotzdem, aber aus dem gemessenen Grund: der volle
+# lokale Lauf wurde damit 22 % schneller (449 s statt 573 s) -- der Repaint-
+# Nachschub der Altlasten war auch Rechenzeit.
 #
 # Die Objekte selbst bleiben am Leben (Speicher waechst weiter). Das ist
 # unschoen, aber harmlos -- toedlich war ausschliesslich das Feuern.
@@ -207,6 +268,26 @@ def _disarm_leftover_qt_widgets() -> None:
             continue
 
 
+def _drop_pending_events() -> None:
+    """Gepostete Repaint- und Queued-Signal-Ereignisse der Altlasten wegwerfen.
+
+    Nur diese beiden Arten, NICHT alles: ein pauschales
+    `removePostedEvents(None)` wuerde auch `DeferredDelete` mitnehmen und damit
+    Objekte, die ein Test ordentlich per `deleteLater()` abgemeldet hat, fuer
+    immer am Leben lassen (davor warnt die Qt-Doku ausdruecklich).
+
+    * `UpdateRequest` -- der Repaint-Nachschub versteckter Fenster
+    * `MetaCall`      -- Slot-Aufrufe aus queued Signal-Verbindungen; genau die
+                         treffen sonst Objekte, deren C++-Seite schon weg ist
+    """
+    qtcore = sys.modules.get("PySide6.QtCore")
+    if qtcore is None:
+        return
+    ev = qtcore.QEvent.Type
+    for kind in (ev.UpdateRequest, ev.MetaCall):
+        qtcore.QCoreApplication.removePostedEvents(None, kind)
+
+
 @pytest.fixture(autouse=True)
 def _qt_widget_cleanup():
     """Legt nach jedem Test die zurueckgelassenen Qt-Fenster still.
@@ -217,6 +298,7 @@ def _qt_widget_cleanup():
     """
     yield
     _disarm_leftover_qt_widgets()
+    _drop_pending_events()
 
 
 def quiesce_qt() -> int:
