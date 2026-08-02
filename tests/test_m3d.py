@@ -252,3 +252,59 @@ PRINT w
 """
     assert run_gb(src).splitlines() == [
         "Quat(0.0, 0.0, 0.0, 1.0)", "Vec3(0.0, 0.0, 0.0)", "Vec4(0.0, 0.0, 0.0, 0.0)"]
+
+
+# --- MODEL_INSTANCED mit Farb-Array ---------------------------------------
+# Der Instancing-Shader kennt nur EINE Farbe je Draw-Call (raylibs
+# DrawMeshInstanced uebertraegt nur Matrizen). Ein Farb-Array wird deshalb
+# nach Farben gruppiert: ein Draw-Call je VERSCHIEDENER Farbe.
+def test_instanced_nimmt_ein_farb_array(run_gb, tmp_path):
+    pytest.importorskip("PIL", reason="Pillow noetig zum Pixel-Pruefen")
+    from PIL import Image
+
+    run_gb("""
+IMPORT "m3d"
+IMPORT "g3d"
+SCREEN(120, 90, "inst", 1)
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+DIM ms[2] AS MAT4
+DIM cs[2] AS INTEGER
+ms[0] = MAT4_TRANSLATE(-1.2, 0.0, 0.0)
+ms[1] = MAT4_TRANSLATE(1.2, 0.0, 0.0)
+cs[0] = &HFF0000
+cs[1] = &H0000FF
+DIM f AS INTEGER
+FOR f = 0 TO 3
+    CLS(0)
+    CAMERA3D(0, 0, 5, 0, 0, 0, 45)
+    MODEL_INSTANCED(box, ms, cs)
+    FLIP()
+NEXT
+SAVESCREENSHOT("inst.png")
+""", base=tmp_path)
+    with Image.open(tmp_path / "inst.png") as im:
+        rgb = im.convert("RGB")
+        links = rgb.getpixel((30, 45))
+        rechts = rgb.getpixel((90, 45))
+    # Links rot, rechts blau -- beide Farben sind in EINEM Aufruf angekommen.
+    assert links[0] > links[2], f"links sollte rot sein, ist {links}"
+    assert rechts[2] > rechts[0], f"rechts sollte blau sein, ist {rechts}"
+
+
+def test_instanced_meldet_ein_zu_kurzes_farb_array(run_gb):
+    from gamebasic.errors import GBRuntimeError
+
+    src = """
+IMPORT "m3d"
+IMPORT "g3d"
+SCREEN(64, 64, "inst", 1)
+DIM box AS INTEGER
+box = MESH_CUBE(1.0, 1.0, 1.0)
+DIM ms[3] AS MAT4
+DIM cs[2] AS INTEGER
+CAMERA3D(0, 0, 5, 0, 0, 0, 45)
+MODEL_INSTANCED(box, ms, cs)
+"""
+    with pytest.raises(GBRuntimeError, match="kuerzer als die Matrizen"):
+        run_gb(src)

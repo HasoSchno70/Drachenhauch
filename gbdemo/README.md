@@ -98,8 +98,13 @@ gemeinfreie Stücke liegen dabei; zum Wechseln in `gbdemo.gb` die Konstante
 - Eine **nicht zugewiesene `MAT4` ist NIL** — `MODEL_INSTANCED` lehnt das mit
   klarer Meldung ab. Mit der Stückzahl kommt man aber gar nicht mehr dorthin:
   ungenutzte Plätze werden schlicht nicht angefasst.
-- **`MODEL_INSTANCED` färbt einen ganzen Draw-Call einheitlich.** Mehrere Farben
-  = mehrere Aufrufe; drei sind immer noch drei statt 1600.
+- **`MODEL_INSTANCED` färbt einen ganzen Draw-Call einheitlich** — raylibs
+  `DrawMeshInstanced` überträgt nur Matrizen, keine Farb-Attribute. Man darf
+  aber ein `ARRAY OF INTEGER` als Farbe übergeben; die Laufzeit gruppiert dann
+  selbst und macht *einen Draw-Call je verschiedener Farbe*. Drei Farben für
+  1600 Würfel sind drei Draw-Calls — 1600 verschiedene wären 1600, dafür wäre
+  ein Verlauf im Shader die bessere Antwort. *(Das Farb-Array kam 2026-08-02;
+  vorher musste man die Matrizen selbst auf mehrere Listen verteilen.)*
 - **GameBasic ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
   damit lautlos die Konstante `HOEHE`, und aus `HOEHE - 54` wird `0.6 - 54`.
   Das fällt erst als merkwürdiger Typfehler weit weg von der Ursache auf.

@@ -352,13 +352,12 @@ CONST GITTER AS INTEGER = 40
 CONST WUERFEL AS INTEGER = GITTER * GITTER
 
 DIM mesh_box AS INTEGER
-' Drei Matrix-Listen statt einer: MODEL_INSTANCED faerbt einen ganzen
-' Draw-Call einheitlich ein. Drei Gruppen = drei Farben = drei Draw-Calls
-' fuer 1600 Wuerfel (statt 1600 Aufrufen).
-CONST GRUPPEN AS INTEGER = 3
-DIM matsA[WUERFEL] AS MAT4
-DIM matsB[WUERFEL] AS MAT4
-DIM matsC[WUERFEL] AS MAT4
+' Eine Matrix-Liste und eine Farb-Liste. MODEL_INSTANCED gruppiert selbst
+' nach Farben -- der Instancing-Shader kennt nur EINE Farbe je Draw-Call
+' (raylibs DrawMeshInstanced uebertraegt nur Matrizen), also wird daraus
+' ein Draw-Call je VERSCHIEDENER Farbe. Hier: drei.
+DIM mats[WUERFEL] AS MAT4
+DIM mcol[WUERFEL] AS INTEGER
 
 SUB szene_instancing()
     modus = 0.0
@@ -366,14 +365,19 @@ SUB szene_instancing()
     w = zeit * 0.20
     CAMERA3D(SIN(w) * 52.0, 30.0 + SIN(zeit * 0.35) * 9.0, COS(w) * 52.0, 0, 2, 0, 50)
 
+    ' Nah beieinander liegende Phasen -> verwandte Farben. Ein Abstand von
+    ' 2.1 waere reines Rot/Gruen/Blau und sieht nach Testbild aus.
+    DIM c0 AS INTEGER
+    DIM c1 AS INTEGER
+    DIM c2 AS INTEGER
+    c0 = regenbogen(zeit * 0.5, 1.0)
+    c1 = regenbogen(zeit * 0.5 + 0.8, 1.0)
+    c2 = regenbogen(zeit * 0.5 + 1.6, 1.0)
+
     DIM gx AS INTEGER
     DIM gz AS INTEGER
-    DIM na AS INTEGER
-    DIM nb AS INTEGER
-    DIM nc AS INTEGER
-    na = 0
-    nb = 0
-    nc = 0
+    DIM idx AS INTEGER
+    idx = 0
     FOR gx = 0 TO GITTER - 1
         FOR gz = 0 TO GITTER - 1
             DIM wx AS FLOAT
@@ -386,32 +390,23 @@ SUB szene_instancing()
             ring = INT(SQR(wx * wx + wz * wz) * 0.55) MOD BAENDER
             DIM hoch AS FLOAT
             hoch = glatt[ring] * 18.0 + SIN(zeit * 1.6 + gx * 0.3 + gz * 0.3) * 0.9
-            DIM m AS MAT4
-            m = MAT4_MUL(MAT4_TRANSLATE(wx, hoch, wz), _
-                         QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 1, 0, zeit * 0.8 + ring * 0.4)))
-            IF ring MOD GRUPPEN = 0 THEN
-                matsA[na] = m
-                na = na + 1
-            ELSEIF ring MOD GRUPPEN = 1 THEN
-                matsB[nb] = m
-                nb = nb + 1
+            mats[idx] = MAT4_MUL(MAT4_TRANSLATE(wx, hoch, wz), _
+                                 QUAT_TO_MAT4(QUAT_FROM_AXIS_ANGLE(0, 1, 0, zeit * 0.8 + ring * 0.4)))
+            IF ring MOD 3 = 0 THEN
+                mcol[idx] = c0
+            ELSEIF ring MOD 3 = 1 THEN
+                mcol[idx] = c1
             ELSE
-                matsC[nc] = m
-                nc = nc + 1
+                mcol[idx] = c2
             END IF
+            idx = idx + 1
         NEXT
     NEXT
 
-    ' Nah beieinander liegende Phasen -> verwandte Farben. Ein Abstand von
-    ' 2.1 waere reines Rot/Gruen/Blau und sieht nach Testbild aus.
-    ' Die Stueckzahl am Ende zeichnet nur die belegten Plaetze -- ohne sie
-    ' muesste man den Rest von Hand aus dem Bild schieben.
-    MODEL_INSTANCED(mesh_box, matsA, regenbogen(zeit * 0.5, 1.0), na)
-    MODEL_INSTANCED(mesh_box, matsB, regenbogen(zeit * 0.5 + 0.8, 1.0), nb)
-    MODEL_INSTANCED(mesh_box, matsC, regenbogen(zeit * 0.5 + 1.6, 1.0), nc)
+    MODEL_INSTANCED(mesh_box, mats, mcol, idx)
 
     mtext(BREITE \ 2, HOEHE - 54, _
-          "MODEL_INSTANCED  -  " + STR$(WUERFEL) + " Wuerfel in 3 Draw-Calls", _
+          "MODEL_INSTANCED  -  " + STR$(WUERFEL) + " Wuerfel, 3 Farben, 3 Draw-Calls", _
           0.5, RGB(140, 180, 210))
 END SUB
 

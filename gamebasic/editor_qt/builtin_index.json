@@ -3923,7 +3923,7 @@
     {
       "name": "MODEL_INSTANCED",
       "kind": "graphics",
-      "signature": "MODEL_INSTANCED(handle, mats [, tint [, anzahl]])",
+      "signature": "MODEL_INSTANCED(handle, mats [, tint_oder_array [, anzahl]])",
       "module": "m3d"
     },
     {
