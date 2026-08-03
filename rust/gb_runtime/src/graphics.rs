@@ -673,6 +673,53 @@ void main()
 }
 "#;
 
+/// Schnappschuss des ZEICHENZUSTANDS fuer `GFX_PUSH`/`GFX_POP`.
+///
+/// Warum es das gibt: Licht, Nebel, Himmel, Schatten, Kamera, Schrift und der
+/// Post-Effekt sind GLOBAL. Wer sie in einer Szene umstellt, muss sie beim
+/// Verlassen von Hand zurueckstellen -- und vergisst man eine Zeile, sieht man
+/// den Fehler erst zwei Szenen spaeter (der HDR-Himmel hinter dem naechsten
+/// Bild, der Nebel in der falschen Szene). Mit PUSH/POP wird daraus eine
+/// Eigenschaft der Sprache statt einer Disziplinfrage.
+///
+/// **Enthalten** ist ausschliesslich EINSTELLUNG, keine RESSOURCE:
+/// 2D-Kamera samt Ruetteln, aktive Layer, Hintergrundfarbe, Licht (Ambient,
+/// Nebel, alle Lichtquellen), Umgebung (analytisch + IBL-Schalter + Himmel),
+/// Schatten (an/aus, Bereich, Ziel), 3D-Kamera samt View-/Projektions-
+/// Ueberschreibung, Schrift (Groesse, Font, Abstaende) und der Post-Effekt.
+///
+/// **Nicht enthalten** (und das ist Absicht):
+/// * geladene Ressourcen -- Modelle, Texturen, Shader, Schriften,
+///   Render-Targets, IBL-Maps. Die bleiben geladen; POP schaltet nur ihre
+///   Benutzung zurueck.
+/// * die Schatten-AUFLOESUNG (`SHADOW_ENABLE(res)`) -- sie haengt an einem
+///   allozierten Tiefenpuffer, den ein POP nicht neu bauen soll.
+/// * der Blend-Modus -- der ist ohnehin nur ein Bild lang gueltig (er steht im
+///   Zeichenpuffer, nicht im Zustand) und braucht kein Zuruecksetzen.
+/// * Fenster/Vollbild, Automation, Kontaktbogen -- das ist Programm-Rahmen,
+///   nicht Szenen-Zustand.
+#[derive(Clone)]
+struct GfxState {
+    cam: (f64, f64, f64, f64),
+    shake: (f64, f64, Option<std::time::Instant>, f64, f64),
+    active_layer: usize,
+    clear_color: Color,
+    light_ambient: [f32; 4],
+    light_fog: [f32; 4],
+    light_fog_density: f32,
+    /// Nur die WERTE der Lichter -- die Uniform-Locations bleiben, wo sie sind.
+    lights: Vec<(bool, i32, [f32; 3], [f32; 3], [f32; 4])>,
+    env: ([f32; 3], [f32; 3], f32),
+    use_ibl_maps: bool,
+    skybox_enabled: bool,
+    shadow: (bool, f32, f32, [f32; 3]),
+    cam3d: Camera3D,
+    cam3d_view: Option<[f32; 16]>,
+    cam3d_proj: Option<[f32; 16]>,
+    text: (i32, i64, f32),
+    post_shader_idx: Option<usize>,
+}
+
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -866,6 +913,8 @@ pub struct Graphics {
     /// Shader und der Sampler bleibt schwarz.
     shader_textures: HashMap<usize, Vec<(i32, raylib::ffi::Texture2D)>>,
     post_shader_idx: Option<usize>,
+    /// Stapel fuer GFX_PUSH/GFX_POP.
+    gfx_stack: Vec<GfxState>,
     scene_rt: Option<RenderTexture2D>,
 }
 
@@ -960,7 +1009,7 @@ impl Graphics {
             rl, thread, width, height, scale,
             fullscreen: false, pre_fullscreen: None,
             shaders: Vec::new(), shader_textures: HashMap::new(),
-            post_shader_idx: None, scene_rt,
+            post_shader_idx: None, gfx_stack: Vec::new(), scene_rt,
             layers: vec![Layer { z: 0, cmds: Vec::new() }],
             layer_names,
             active: 0,
@@ -3591,6 +3640,83 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         let abs = crate::strip_extended_prefix(abs);
         blatt.export_image(&abs.to_string_lossy());
     }
+
+    // --- GFX_PUSH / GFX_POP ------------------------------------------------
+    /// Zeichenzustand auf den Stapel legen. Was genau dazugehoert, steht bei
+    /// `GfxState`.
+    pub fn gfx_push(&mut self) {
+        // Obergrenze, damit eine PUSH-Schleife ohne POP nicht den Speicher
+        // auffrisst -- ein Programmierfehler soll auffallen, nicht wachsen.
+        if self.gfx_stack.len() >= 64 { return; }
+        let st = GfxState {
+            cam: (self.cam_x, self.cam_y, self.cam_zoom, self.cam_rotation),
+            shake: (self.shake_amp, self.shake_dur_ms, self.shake_start, self.shake_x, self.shake_y),
+            active_layer: self.active,
+            clear_color: self.clear_color,
+            light_ambient: self.light_ambient,
+            light_fog: self.light_fog,
+            light_fog_density: self.light_fog_density,
+            lights: self.lights.iter()
+                .map(|l| (l.enabled, l.kind, l.pos, l.target, l.color)).collect(),
+            env: (self.env_sky, self.env_ground, self.env_intensity),
+            use_ibl_maps: self.use_ibl_maps,
+            skybox_enabled: self.skybox_enabled,
+            shadow: (self.shadow_enabled, self.shadow_area, self.shadow_dist, self.shadow_target),
+            cam3d: self.cam3d,
+            cam3d_view: self.cam3d_view,
+            cam3d_proj: self.cam3d_proj,
+            text: (self.text_size, self.active_font, self.text_spacing),
+            post_shader_idx: self.post_shader_idx,
+        };
+        self.gfx_stack.push(st);
+    }
+
+    /// Zustand vom Stapel zurueckholen. Liefert `false`, wenn der Stapel leer
+    /// ist -- daraus macht die VM eine klare Meldung statt eines stillen No-Ops.
+    pub fn gfx_pop(&mut self) -> bool {
+        let Some(st) = self.gfx_stack.pop() else { return false };
+        let (cx, cy, cz, cr) = st.cam;
+        self.cam_x = cx; self.cam_y = cy; self.cam_zoom = cz; self.cam_rotation = cr;
+        let (sa, sd, ss, sx, sy) = st.shake;
+        self.shake_amp = sa; self.shake_dur_ms = sd; self.shake_start = ss;
+        self.shake_x = sx; self.shake_y = sy;
+        // Layer-Index nur uebernehmen, wenn es ihn noch gibt (eine Szene darf
+        // waehrenddessen neue Layer angelegt haben, entfernt werden sie nie).
+        if st.active_layer < self.layers.len() { self.active = st.active_layer; }
+        self.clear_color = st.clear_color;
+        self.light_ambient = st.light_ambient;
+        self.light_fog = st.light_fog;
+        self.light_fog_density = st.light_fog_density;
+        // Lichter: gespeicherte Werte zurueckschreiben, spaeter hinzugekommene
+        // ABSCHALTEN -- sonst leuchtet ein Licht aus der Szene weiter.
+        for (i, l) in self.lights.iter_mut().enumerate() {
+            match st.lights.get(i) {
+                Some(&(en, kind, pos, target, color)) => {
+                    l.enabled = en; l.kind = kind; l.pos = pos; l.target = target; l.color = color;
+                }
+                None => l.enabled = false,
+            }
+        }
+        let (sky, ground, int) = st.env;
+        self.env_sky = sky; self.env_ground = ground; self.env_intensity = int;
+        self.use_ibl_maps = st.use_ibl_maps;
+        self.skybox_enabled = st.skybox_enabled;
+        let (sh_on, sh_area, sh_dist, sh_target) = st.shadow;
+        self.shadow_enabled = sh_on; self.shadow_area = sh_area;
+        self.shadow_dist = sh_dist; self.shadow_target = sh_target;
+        self.cam3d = st.cam3d;
+        self.cam3d_view = st.cam3d_view;
+        self.cam3d_proj = st.cam3d_proj;
+        let (ts, af, tsp) = st.text;
+        self.text_size = ts; self.text_spacing = tsp;
+        // Schrift nur setzen, wenn sie noch existiert (Fonts werden nie
+        // entladen, aber ein Handle aus einem anderen Lauf waere ungueltig).
+        if af < 0 || (af as usize) < self.fonts.len() { self.active_font = af; }
+        true
+    }
+
+    /// Wie tief ist der Stapel? (Zum Pruefen im Test und fuer Fehlersuche.)
+    pub fn gfx_depth(&self) -> i64 { self.gfx_stack.len() as i64 }
 
     fn write_screenshot(&mut self, path: &str) {
         let p = std::path::Path::new(path);

@@ -616,6 +616,49 @@ fn pendulum_pos(elapsed_s: f64, period_s: f64, depth: f64) -> f64 {
 
 // --- Musik (Stream) ----------------------------------------------------
 
+/// Die EINSTELLUNGEN eines Busses -- gespiegelt, weil Kira-Handles nur
+/// gesetzt, nicht gelesen werden koennen. Grundlage fuer `AUDIO_PUSH`/
+/// `AUDIO_POP`: ohne diese Kopie waere gar nicht bekannt, wohin
+/// zurueckgestellt werden soll.
+///
+/// Die Vorgabe ist der NEUTRALE Zustand -- so, wie ein Bus ohne jeden
+/// Effekt-Aufruf klingt.
+#[derive(Clone, Copy)]
+struct BusValues {
+    volume: f64,
+    pan: f64,
+    filter_cutoff: f64,
+    filter_res: f64,
+    reverb_mix: f64,
+    reverb_fb: f64,
+    reverb_damp: f64,
+    delay_mix: f64,
+    delay_fb: f64,
+    delay_time: i64,
+    dist_amount: f64,
+    dist_mix: f64,
+    comp_thresh: f64,
+    comp_ratio: f64,
+    comp_makeup: f64,
+    eq_freq: f64,
+    eq_gain: f64,
+    eq_q: f64,
+}
+
+impl Default for BusValues {
+    fn default() -> Self {
+        BusValues {
+            volume: 1.0, pan: 0.0,
+            filter_cutoff: 20000.0, filter_res: 0.0,
+            reverb_mix: 0.0, reverb_fb: 0.9, reverb_damp: 0.1,
+            delay_mix: 0.0, delay_fb: 0.5, delay_time: 300,
+            dist_amount: 0.0, dist_mix: 1.0,
+            comp_thresh: 0.0, comp_ratio: 1.0, comp_makeup: 0.0,
+            eq_freq: 1000.0, eq_gain: 0.0, eq_q: 1.0,
+        }
+    }
+}
+
 pub struct Audio {
     manager: AudioManager<DefaultBackend>,
     // Mixer-Busse: SFX/Sampler/Tone laufen auf sfx_track, Musik auf
@@ -630,6 +673,10 @@ pub struct Audio {
     sfx_fx: BusFx,
     music_fx: BusFx,
     master_fx: BusFx,
+    /// Gespiegelte Bus-Einstellungen (sfx/music/master) + Stapel fuer
+    /// AUDIO_PUSH/AUDIO_POP.
+    bus_values: [BusValues; 3],
+    audio_stack: Vec<[BusValues; 3]>,
     sounds: Vec<SoundSlot>,
     samples: Vec<Sample>,
     sample_cache: HashMap<(usize, i64, i64), i64>,
@@ -686,6 +733,7 @@ impl Audio {
             manager, sfx_track, music_track,
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
             sfx_fx, music_fx, master_fx,
+            bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
             sounds: Vec::new(), samples: Vec::new(),
             sample_cache: HashMap::new(), clocks: Vec::new(),
             listeners: Vec::new(), emitters: Vec::new(), mods: Vec::new(), num_channels: 16,
@@ -1013,6 +1061,8 @@ resonance/reverb/distortion", other)),
     /// (-1 = links, 0 = Mitte, +1 = rechts). Bisher liess sich nur ein
     /// EINZELNER Kanal pannen (AUDIO_PAN) -- nicht die Musik als Ganzes.
     pub fn bus_pan(&mut self, bus: &str, pos: f64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_BUS_PAN")?;
+        self.bus_values[bi].pan = finite(pos, 0.0).clamp(-1.0, 1.0);
         let p = finite(pos, 0.0).clamp(-1.0, 1.0) as f32;
         let fx = self.bus_fx(bus, "AUDIO_BUS_PAN")?;
         fx.panning.set_panning(Panning(p), tween_now());
@@ -1232,6 +1282,7 @@ resonance/reverb/distortion", other)),
     /// einzelnen Sound-/Musik-Volumes (Kira-Mixer).
     pub fn set_bus_volume(&mut self, bus: &str, v: f64) -> Result<(), String> {
         let vol = v.clamp(0.0, 1.0);
+        self.bus_values[Self::bus_idx(bus, "AUDIO_BUS_VOLUME")?].volume = vol;
         match bus.to_lowercase().as_str() {
             "sfx" => { self.sfx_bus = vol as f32; self.sfx_track.set_volume(db(vol), tween_now()); }
             "music" => { self.music_bus = vol as f32; self.music_track.set_volume(db(vol), tween_now()); }
@@ -1251,6 +1302,53 @@ resonance/reverb/distortion", other)),
         } as f64)
     }
 
+    /// Bus-Name -> Index in `bus_values` (0 sfx, 1 music, 2 master).
+    fn bus_idx(bus: &str, fn_: &str) -> Result<usize, String> {
+        match bus.to_lowercase().as_str() {
+            "sfx" => Ok(0), "music" => Ok(1), "master" => Ok(2),
+            other => Err(format!("{}: unbekannter Bus '{}' (sfx, music, master)", fn_, other)),
+        }
+    }
+
+    // --- AUDIO_PUSH / AUDIO_POP -------------------------------------------
+    /// Alle Bus-Einstellungen auf den Stapel legen.
+    ///
+    /// Gedacht fuer denselben Fall wie `GFX_PUSH`: eine Szene haengt Effekte in
+    /// einen Bus und soll sie beim Verlassen nicht dort lassen. Enthalten sind
+    /// Lautstaerke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor und EQ
+    /// aller drei Busse.
+    ///
+    /// **Nicht enthalten:** was gerade SPIELT (Sounds, Musik, Kanaele) und die
+    /// Modulatoren selbst. Eine laufende Modulation auf einem der obigen
+    /// Parameter wird beim POP aber ABGELOEST, weil das Zurueckschreiben
+    /// denselben Kira-Parameter beschreibt wie `AUDIO_MODULATE` -- der
+    /// Modulator laeuft dann weiter, wirkt aber nicht mehr auf diesen Bus.
+    pub fn audio_push(&mut self) {
+        if self.audio_stack.len() >= 64 { return; }   // Fehler soll auffallen, nicht wachsen
+        self.audio_stack.push(self.bus_values);
+    }
+
+    /// Bus-Einstellungen zurueckholen. `false`, wenn der Stapel leer ist.
+    pub fn audio_pop(&mut self) -> Result<bool, String> {
+        let Some(werte) = self.audio_stack.pop() else { return Ok(false) };
+        // Ueber die normalen Setter zurueckschreiben -- so landet alles auch
+        // wirklich bei Kira (und loest nebenbei Modulationen ab).
+        for (i, name) in ["sfx", "music", "master"].iter().enumerate() {
+            let w = werte[i];
+            self.set_bus_volume(name, w.volume)?;
+            self.bus_pan(name, w.pan)?;
+            self.set_filter(name, w.filter_cutoff, w.filter_res)?;
+            self.set_reverb(name, w.reverb_mix, w.reverb_fb, w.reverb_damp)?;
+            self.set_delay(name, w.delay_mix, w.delay_fb, w.delay_time)?;
+            self.set_distortion(name, w.dist_amount, w.dist_mix)?;
+            self.set_compressor(name, w.comp_thresh, w.comp_ratio, w.comp_makeup)?;
+            self.set_eq(name, w.eq_freq, w.eq_gain, w.eq_q)?;
+        }
+        Ok(true)
+    }
+
+    pub fn audio_depth(&self) -> i64 { self.audio_stack.len() as i64 }
+
     fn bus_fx(&mut self, bus: &str, fn_: &str) -> Result<&mut BusFx, String> {
         match bus.to_lowercase().as_str() {
             "sfx" => Ok(&mut self.sfx_fx),
@@ -1266,6 +1364,9 @@ resonance/reverb/distortion", other)),
     pub fn set_filter(&mut self, bus: &str, cutoff_hz: f64, resonance: f64) -> Result<(), String> {
         let c = if cutoff_hz <= 0.0 { 20000.0 } else { cutoff_hz.clamp(20.0, 20000.0) };
         let r = resonance.clamp(0.0, 1.0);
+        let bi = Self::bus_idx(bus, "AUDIO_FILTER")?;
+        self.bus_values[bi].filter_cutoff = c;
+        self.bus_values[bi].filter_res = r;
         let fx = self.bus_fx(bus, "AUDIO_FILTER")?;
         fx.filter.set_cutoff(c, tween_now());
         fx.filter.set_resonance(r, tween_now());
@@ -1276,6 +1377,10 @@ resonance/reverb/distortion", other)),
     /// mix 0..1 (0 = aus), feedback 0..1 (Nachhall-Laenge), damping 0..1
     /// (Hoehen-Daempfung). Fuer Hoehlen/Hallen.
     pub fn set_reverb(&mut self, bus: &str, mix: f64, feedback: f64, damping: f64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_REVERB")?;
+        self.bus_values[bi].reverb_mix = mix.clamp(0.0, 1.0);
+        self.bus_values[bi].reverb_fb = feedback.clamp(0.0, 1.0);
+        self.bus_values[bi].reverb_damp = damping.clamp(0.0, 1.0);
         let fx = self.bus_fx(bus, "AUDIO_REVERB")?;
         fx.reverb.set_mix(Mix(mix.clamp(0.0, 1.0) as f32), tween_now());
         fx.reverb.set_feedback(feedback.clamp(0.0, 1.0), tween_now());
@@ -1287,6 +1392,10 @@ resonance/reverb/distortion", other)),
     /// mix 0..1 (0 = aus), feedback 0..0.95 (Abfall pro Wiederholung), time_ms
     /// = Echo-Zeit (zur Laufzeit aenderbar, 1..4000; <=0 = unveraendert lassen).
     pub fn set_delay(&mut self, bus: &str, mix: f64, feedback: f64, time_ms: i64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_DELAY")?;
+        self.bus_values[bi].delay_mix = mix.clamp(0.0, 1.0);
+        self.bus_values[bi].delay_fb = feedback.clamp(0.0, 0.95);
+        if time_ms > 0 { self.bus_values[bi].delay_time = time_ms; }
         let d = &self.bus_fx(bus, "AUDIO_DELAY")?.delay;
         d.mix.store((mix.clamp(0.0, 1.0) as f32).to_bits(), Relaxed);
         d.feedback.store((feedback.clamp(0.0, 0.95) as f32).to_bits(), Relaxed);
@@ -1300,6 +1409,9 @@ resonance/reverb/distortion", other)),
     /// amount 0..1 -> 0..36 dB Drive in den Clipper; amount<=0 = aus. mix
     /// 0..1 (Default 1.0 = voll verzerrt).
     pub fn set_distortion(&mut self, bus: &str, amount: f64, mix: f64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_DISTORTION")?;
+        self.bus_values[bi].dist_amount = amount.clamp(0.0, 1.0);
+        self.bus_values[bi].dist_mix = mix.clamp(0.0, 1.0);
         let drive_db = (amount.clamp(0.0, 1.0) * 36.0) as f32;
         let m = if amount <= 0.0 { 0.0 } else { mix.clamp(0.0, 1.0) as f32 };
         let fx = self.bus_fx(bus, "AUDIO_DISTORTION")?;
@@ -1312,6 +1424,10 @@ resonance/reverb/distortion", other)),
     /// Kompressor (Glue/Pump). threshold_db typ. -24..0, ratio >= 1 (1 = aus),
     /// makeup_db hebt den Pegel danach an. ratio<=1 schaltet den Effekt aus.
     pub fn set_compressor(&mut self, bus: &str, threshold_db: f64, ratio: f64, makeup_db: f64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_COMPRESSOR")?;
+        self.bus_values[bi].comp_thresh = threshold_db;
+        self.bus_values[bi].comp_ratio = ratio;
+        self.bus_values[bi].comp_makeup = makeup_db;
         let active = ratio > 1.0;
         let fx = self.bus_fx(bus, "AUDIO_COMPRESSOR")?;
         fx.compressor.set_threshold(threshold_db, tween_now());
@@ -1325,6 +1441,10 @@ resonance/reverb/distortion", other)),
     /// (eine Band) auf einem Bus. gain_db 0 = transparent (kein Effekt),
     /// >0 anheben / <0 absenken; q = Bandbreite (hoeher = schmaler).
     pub fn set_eq(&mut self, bus: &str, freq_hz: f64, gain_db: f64, q: f64) -> Result<(), String> {
+        let bi = Self::bus_idx(bus, "AUDIO_EQ")?;
+        self.bus_values[bi].eq_freq = freq_hz.clamp(20.0, 20000.0);
+        self.bus_values[bi].eq_gain = gain_db;
+        self.bus_values[bi].eq_q = q;
         let f = freq_hz.clamp(20.0, 20000.0);
         let fx = self.bus_fx(bus, "AUDIO_EQ")?;
         fx.eq.set_frequency(f, tween_now());

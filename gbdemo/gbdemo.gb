@@ -86,6 +86,7 @@ DIM szene_p AS FLOAT            ' 0..1 Fortschritt in der Szene
 DIM versatz AS FLOAT            ' manuelles Vorspulen (Leertaste)
 DIM modus AS FLOAT              ' Post-Effekt-Modus (siehe demo.fs)
 DIM blende AS FLOAT             ' 1 = sichtbar, 0 = schwarz
+DIM gestapelt AS BOOLEAN        ' liegt ein Szenen-Zustand auf den Stapeln?
 
 DIM i AS INTEGER
 FOR i = 0 TO BAENDER - 1
@@ -920,7 +921,10 @@ FUNCTION stufenzeile(n AS INTEGER) AS STRING
     RETURN "AUDIO_MODULATE(bus$, ""pan"", lfo, -1, +1)"
 END FUNCTION
 
-' Alles auf neutral -- vor jeder Stufe und beim Verlassen der Szene.
+' Alles auf neutral -- vor jeder Stufe. Beim VERLASSEN der Szene braucht es
+' das nicht mehr: AUDIO_POP im Szenenwechsel holt den Zustand von selbst
+' zurueck (frueher stand hier der einzige Schutz davor, dass der Abspann durch
+' den Verzerrer laeuft).
 SUB klang_neutral()
     IF lfo_aktiv THEN
         AUDIO_MOD_REMOVE(lfo)
@@ -1140,10 +1144,24 @@ END SUB
 ' ----------------------------------------------------------------------
 '  Platzhalter fuer die noch nicht gebauten Szenen
 ' ----------------------------------------------------------------------
-' Beim Szenenwechsel den 3D-Zustand umstellen. Licht, Himmel und Schatten
-' sind GLOBAL -- ohne das hier zoege der HDR-Himmel aus Szene 4 auch hinter
-' dem Wuerfelfeld auf.
+' Beim Szenenwechsel den Zustand umstellen.
+'
+' Licht, Himmel, Schatten, Nebel und die Audio-Bus-Effekte sind GLOBAL. Frueher
+' musste hier jede Einstellung von Hand zurueckgedreht werden -- und eine
+' vergessene Zeile fiel erst zwei Szenen spaeter auf (der HDR-Himmel hinter dem
+' Wuerfelfeld, der Verzerrer im Abspann). GFX_PUSH/GFX_POP und AUDIO_PUSH/
+' AUDIO_POP nehmen einem das ab: die Szene stellt um, was sie braucht, und der
+' Wechsel holt alles zurueck -- ohne dass irgendwo eine Liste gepflegt wird.
 SUB szene_start(neu AS INTEGER)
+    IF gestapelt THEN
+        GFX_POP()
+        AUDIO_POP()
+        gestapelt = FALSE
+    END IF
+    GFX_PUSH()
+    AUDIO_PUSH()
+    gestapelt = TRUE
+
     IF neu = 4 THEN
         LIGHT_AMBIENT(0, 0)                       ' Licht kommt allein aus der Umgebung
         LIGHT_DIRECTIONAL(-0.4, -0.75, -0.5, &H50504C)
@@ -1152,23 +1170,10 @@ SUB szene_start(neu AS INTEGER)
         SHADOW_AREA(14.0, 40.0)
         ' Dunst in der Farbe des Horizonts: der Boden laeuft ins Panorama
         ' aus, statt an einer sichtbaren Kante zu enden.
-        ' Farbe am Horizont gemessen (&H7D6D62) -- ein zu heller Dunst
-        ' erzeugt stattdessen ein leuchtendes Band an der Kante.
         LIGHT_FOG(&H7D6D62, 0.030)
-    ELSE
-        SKYBOX(FALSE)
-        LIGHT_AMBIENT(&H1A2030, 0.55)
-        LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
-        LIGHT_FOG(0, 0.0)                         ' Dunst ist global -- wieder aus
     END IF
 
-    ' Szene 7 haengt Effekte in den Musik-Bus. Die bleiben sonst haengen und
-    ' der Abspann liefe durch einen Verzerrer.
-    IF neu = 7 THEN
-        stufe_alt = -1
-    ELSE
-        klang_neutral()
-    END IF
+    IF neu = 7 THEN stufe_alt = -1
 END SUB
 
 SUB szene_platzhalter(titel AS STRING)

@@ -405,6 +405,12 @@
       "module": "audio"
     },
     {
+      "name": "AUDIO_DEPTH",
+      "kind": "core",
+      "signature": "AUDIO_DEPTH() AS INTEGER",
+      "module": "audio"
+    },
+    {
       "name": "AUDIO_DISTORTION",
       "kind": "core",
       "signature": "AUDIO_DISTORTION(bus$, amount[, mix])",
@@ -666,6 +672,18 @@
       "name": "AUDIO_PLAY_ON",
       "kind": "core",
       "signature": "AUDIO_PLAY_ON(sound, emitter[, loops[, volume[, fade_in_ms[, easing$]]]]) -> AUDIO_CHANNEL",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_POP",
+      "kind": "core",
+      "signature": "AUDIO_POP()",
+      "module": "audio"
+    },
+    {
+      "name": "AUDIO_PUSH",
+      "kind": "core",
+      "signature": "AUDIO_PUSH()",
       "module": "audio"
     },
     {
@@ -2124,6 +2142,24 @@
       "name": "GET_TIME",
       "kind": "graphics",
       "signature": "GET_TIME() -> FLOAT",
+      "module": "core"
+    },
+    {
+      "name": "GFX_DEPTH",
+      "kind": "graphics",
+      "signature": "GFX_DEPTH() AS INTEGER",
+      "module": "core"
+    },
+    {
+      "name": "GFX_POP",
+      "kind": "graphics",
+      "signature": "GFX_POP()",
+      "module": "core"
+    },
+    {
+      "name": "GFX_PUSH",
+      "kind": "graphics",
+      "signature": "GFX_PUSH()",
       "module": "core"
     },
     {

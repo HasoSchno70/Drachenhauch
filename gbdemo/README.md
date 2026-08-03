@@ -144,9 +144,12 @@ Die kurzen Stücke loopen; der Ablaufplan läuft davon unbeirrt weiter. Herkunft
 - **GameBasic ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
   damit lautlos die Konstante `HOEHE`, und aus `HOEHE - 54` wird `0.6 - 54`.
   Das fällt erst als merkwürdiger Typfehler weit weg von der Ursache auf.
-- **Licht, Himmel und Schatten sind globaler Zustand.** Wer sie in einer Szene
-  umstellt, muss sie beim Wechsel wieder zurückstellen (hier `szene_start`),
-  sonst zieht der HDR-Himmel auch hinter der nächsten Szene auf.
+- **Licht, Himmel, Schatten und die Audio-Bus-Effekte sind globaler Zustand.**
+  Die Demo klammert jede Szene deshalb in `GFX_PUSH`/`GFX_POP` und
+  `AUDIO_PUSH`/`AUDIO_POP` — der Wechsel holt alles zurück, ohne dass irgendwo
+  eine Liste gepflegt wird. *(Bis 2026-08-03 gab es das nicht; `szene_start`
+  musste jede Einstellung von Hand zurückdrehen, und eine vergessene Zeile fiel
+  erst zwei Szenen später auf.)*
 - `MODEL_EMISSIVE` mit Stärke über ~1.5 ergibt zusammen mit dem Bloom nur noch
   eine weiße Scheibe — die Farbe geht verloren.
 - **Ein Schlagerkenner braucht das ROHE Spektrum.** Die nachfallende Glättung,

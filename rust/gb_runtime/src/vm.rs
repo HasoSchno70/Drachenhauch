@@ -4127,6 +4127,28 @@ impl<'p> Vm<'p> {
             "setfps" => { g!().set_target_fps(gi(a, 0, "SETFPS")?); Value::Nil }
             "setwindowtitle" => { g!().set_window_title(gs(a, 0, "SETWINDOWTITLE")?); Value::Nil }
             "savescreenshot" => { g!().save_screenshot(gs(a, 0, "SAVESCREENSHOT")?); Value::Nil }
+            // GFX_PUSH/GFX_POP: Zeichenzustand sichern und zurueckholen. Licht,
+            // Nebel, Himmel, Schatten, Kamera, Schrift und Post-Effekt sind
+            // global -- ohne das muss jede Szene beim Verlassen von Hand
+            // aufraeumen, und eine vergessene Zeile faellt erst spaeter auf.
+            "gfx_push" => { g!().gfx_push(); Value::Nil }
+            "gfx_pop" => {
+                if !g!().gfx_pop() {
+                    return Err("GFX_POP: der Stapel ist leer -- zu jedem GFX_POP gehoert ein GFX_PUSH".into());
+                }
+                Value::Nil
+            }
+            "gfx_depth" => Value::Int(g!().gfx_depth()),
+            // Dasselbe fuer die Audio-Busse: Effekte, die eine Szene anhaengt,
+            // sollen den Rest des Programms nicht mitnehmen.
+            "audio_push" => { self.audio_mut()?.audio_push(); Value::Nil }
+            "audio_pop" => {
+                if !self.audio_mut()?.audio_pop()? {
+                    return Err("AUDIO_POP: der Stapel ist leer -- zu jedem AUDIO_POP gehoert ein AUDIO_PUSH".into());
+                }
+                Value::Nil
+            }
+            "audio_depth" => Value::Int(self.audio_mut()?.audio_depth()),
             // Natives OS-Fenster (das SCREEN-Fenster) steuern.
             "window_resizable" => { g!().window_resizable(gb(a, 0)); Value::Nil }
             "window_min_size" => { g!().window_min_size(gi(a,0,"WINDOW_MIN_SIZE")? as i32, gi(a,1,"WINDOW_MIN_SIZE")? as i32); Value::Nil }
