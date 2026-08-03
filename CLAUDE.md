@@ -90,6 +90,12 @@ Builtins leben in `rust/gb_runtime/src/builtins.rs` (pure) bzw. `vm.rs`
    Modul) — Completion/Highlighting/LSP ziehen daraus (`editor_qt/gbrt_meta.py`).
    Optional Prosa-Doku in `editor_qt/builtin_docs.py`.
 3. Einen `tests/`-Golden-Test schreiben (`assert run_gb('PRINT NAME(...)') == ...`).
+   **Die Signatur in `builtin_index.json` muss stimmen** — der Compiler leitet
+   daraus die erlaubte Argumentzahl ab und warnt bei Abweichung (`gbrt --check`).
+   Formen, die er versteht: `NAME(a, b [, c])`, `NAME(a, b = "")` (Vorgabewert =
+   optional), `NAME(a, b, ...)` (beliebig viele), `NAME(6..8 Argumente)`.
+   `NAME(*args)` schaltet die Pruefung ab — nur nehmen, wenn es wirklich offen
+   ist. Eine zu enge Signatur erzeugt Falsch-Alarme in fremdem Code.
 4. Bei neuem Keyword: `vscode-gamebasic/build_grammar.py` neu generieren.
 
 (Es gibt KEINE Python-`@builtin`-Registry / kein `interpreter.py` mehr.)

@@ -612,10 +612,13 @@ SUB UpdatePlay()
                         IF bossHp <= 0 THEN
                             bugs[j].alive = FALSE : bugsAlive = bugsAlive - 1
                             ' Boss im Sturz erlegt = mehr Punkte (Galaga-Bonus).
-                            DIM bg AS INTEGER : bg = IIF(bugs[j].state = St.DIVE, 400, 150)
-                            score = score + bg
+                            ' NICHT "bg" nennen: das verdeckt die Konstante BG
+                            ' (Hintergrundfarbe) -- GameBasic ignoriert
+                            ' Gross-/Kleinschreibung.
+                            DIM bonus AS INTEGER : bonus = IIF(bugs[j].state = St.DIVE, 400, 150)
+                            score = score + bonus
                             Explode(bugs[j].x + 8.0, bugs[j].y + 8.0, &HFFC040, 28)
-                            Popup(bugs[j].x - 4.0, bugs[j].y, bg)
+                            Popup(bugs[j].x - 4.0, bugs[j].y, bonus)
                             ' Hielt der Boss ein Schiff? -> Rettung -> Doppeljaeger.
                             IF hasCaptured THEN
                                 hasCaptured = FALSE

@@ -5225,7 +5225,7 @@
     {
       "name": "RENDERTARGET_DRAW",
       "kind": "graphics",
-      "signature": "RENDERTARGET_DRAW(3..5 Argumente)",
+      "signature": "RENDERTARGET_DRAW(rt, x, y [, skala [, tint [, gespiegelt]]])",
       "module": "core"
     },
     {

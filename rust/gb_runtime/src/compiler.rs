@@ -260,6 +260,10 @@ struct ClassInfo {
 
 pub struct Compiler {
     global_slots: HashMap<String, usize>,
+    /// Namen aller Top-Level-CONST und ENUM (klein geschrieben). Grundlage fuer
+    /// die Verdeckungs-Warnung: GameBasic ignoriert Gross-/Kleinschreibung, eine
+    /// lokale `hoehe` verdeckt also lautlos die Konstante `HOEHE`.
+    global_consts: std::collections::HashSet<String>,
     global_vars: std::collections::HashSet<String>,
     fn_sigs: HashMap<String, FnSig>,
     compiled_fns: Vec<(String, Value)>,
@@ -308,6 +312,128 @@ fn known_builtins() -> &'static std::collections::HashSet<String> {
     })
 }
 
+/// Kleinste und groesste erlaubte Argumentzahl je Builtin, aus den Signaturen
+/// in `builtin_index.json` gelesen.
+///
+/// Warum ueberhaupt: die Grafik-/VM-Builtins greifen ihre Argumente per Index
+/// ab und ignorieren ueberzaehlige STILL. Ein `PLOTS(xs, ys, farbe, anzahl)`
+/// mit einer Stueckzahl, die es damals gar nicht gab, tat also einfach nichts
+/// -- ohne ein Wort. Genau das soll hier auffallen, und zwar zur Uebersetzungs-
+/// zeit statt gar nicht.
+///
+/// Bewusst nur eine WARNUNG und bewusst nur dort, wo die Signatur eindeutig
+/// ist: der Index wird von Hand gepflegt, eine zu enge Angabe darf kein
+/// laufendes Programm zerstoeren.
+fn builtin_arity() -> &'static std::collections::HashMap<String, (usize, usize)> {
+    use std::sync::OnceLock;
+    static MAP: OnceLock<std::collections::HashMap<String, (usize, usize)>> = OnceLock::new();
+    MAP.get_or_init(|| {
+        let raw = include_str!("../../../gamebasic/editor_qt/builtin_index.json");
+        let mut m = std::collections::HashMap::new();
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+            if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
+                for e in arr {
+                    let (Some(n), Some(sig)) = (e.get("name").and_then(|n| n.as_str()),
+                                                e.get("signature").and_then(|s| s.as_str()))
+                    else { continue };
+                    if let Some(mm) = parse_arity(sig) { m.insert(n.to_lowercase(), mm); }
+                }
+            }
+        }
+        m
+    })
+}
+
+/// Eine Signatur in (min, max) Argumente uebersetzen. `None` = nicht sicher
+/// bestimmbar; dann wird nicht geprueft.
+///
+/// Erkannt werden drei Formen:
+///   `ARC(6..8 Argumente)`       -> (6, 8)
+///   `GUI_SPLITTER(7 Argumente)` -> (7, 7)
+///   `PLOTS(xs, ys, farbe [, anzahl])` -> (3, 4)
+/// Nicht erkannt: `BILLBOARD(*args)` -- dort ist die Zahl absichtlich offen.
+fn parse_arity(sig: &str) -> Option<(usize, usize)> {
+    let start = sig.find('(')?;
+    // Bis zur SCHLIESSENDEN Klammer der Parameterliste (Rueckgabetypen wie
+    // "-> VEC3" oder "AS BOOLEAN" haengen dahinter).
+    let mut tiefe = 0i32;
+    let mut ende = None;
+    for (i, c) in sig[start..].char_indices() {
+        match c {
+            '(' => tiefe += 1,
+            ')' => { tiefe -= 1; if tiefe == 0 { ende = Some(start + i); break; } }
+            _ => {}
+        }
+    }
+    let inner = sig[start + 1..ende?].trim();
+    if inner.is_empty() { return Some((0, 0)); }
+    if inner.contains('*') { return None; }             // *args
+
+    // "6..8 Argumente" / "7 Argumente"
+    if let Some(rest) = inner.strip_suffix("Argumente").or_else(|| inner.strip_suffix("Argument")) {
+        let r = rest.trim();
+        if let Some((a, b)) = r.split_once("..") {
+            return Some((a.trim().parse().ok()?, b.trim().parse().ok()?));
+        }
+        return r.parse().ok().map(|n| (n, n));
+    }
+
+    // Normale Parameterliste: Kommas auf Klammer-Ebene 0 zaehlen. Alles ab der
+    // ersten oeffnenden eckigen Klammer ist optional.
+    // Parameterliste in einzelne Namen zerlegen und jeden einordnen. Drei
+    // Dinge machen einen Parameter optional:
+    //   * er steht hinter einer oeffnenden eckigen Klammer   `[, anzahl]`
+    //   * er traegt einen Vorgabewert                        `bind_addr = ""`
+    //   * `...` heisst "beliebig viele" -> gar keine Obergrenze
+    // Feinheit bei der Klammer: sie steht mal VOR dem trennenden Komma
+    // (`farbe [, anzahl]`) und mal vor dem Parameter selbst (`[loops[, ...]]`).
+    // Im ersten Fall gehoert sie zum NAECHSTEN Parameter, im zweiten zum
+    // laufenden -- unterschieden daran, ob der laufende schon Zeichen hat.
+    let mut min = 0usize;
+    let mut max = 0usize;
+    let mut optional_ab = false;
+    let mut naechste_optional = false;
+    let mut unbegrenzt = false;
+    let mut tok = String::new();
+
+    let mut schliesse = |tok: &mut String, min: &mut usize, max: &mut usize,
+                         optional_ab: &mut bool, unbegrenzt: &mut bool| {
+        let t = tok.trim();
+        if t.is_empty() { tok.clear(); return; }
+        if t == "..." {
+            *unbegrenzt = true;                 // zaehlt selbst nicht mit
+        } else {
+            *max += 1;
+            if t.contains('=') { *optional_ab = true; }   // Vorgabewert
+            else if !*optional_ab { *min += 1; }
+        }
+        tok.clear();
+    };
+
+    for c in inner.chars() {
+        match c {
+            '[' => {
+                if tok.trim().is_empty() { optional_ab = true; } else { naechste_optional = true; }
+            }
+            ']' => {}
+            ',' => {
+                schliesse(&mut tok, &mut min, &mut max, &mut optional_ab, &mut unbegrenzt);
+                if naechste_optional { optional_ab = true; naechste_optional = false; }
+            }
+            _ => tok.push(c),
+        }
+    }
+    schliesse(&mut tok, &mut min, &mut max, &mut optional_ab, &mut unbegrenzt);
+    if unbegrenzt { return Some((min, usize::MAX)); }
+    if max == 0 { return None; }
+    Some((min, max))
+}
+
+/// "3" bzw. "3 bis 4" -- fuer lesbare Meldungen.
+fn arity_text(min: usize, max: usize) -> String {
+    if min == max { format!("{}", min) } else { format!("{} bis {}", min, max) }
+}
+
 /// Ist `name` ein gbrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
 /// der Fall „Index konnte nicht geladen werden" (leeres Set) gelten als bekannt,
 /// damit nie faelschlich gewarnt wird.
@@ -321,6 +447,7 @@ impl Compiler {
     fn new(external_types: std::collections::HashSet<String>,
            builtin_aliases: Vec<(String, String)>) -> Self {
         Compiler { global_slots: HashMap::new(),
+                   global_consts: std::collections::HashSet::new(),
                    global_vars: std::collections::HashSet::new(),
                    fn_sigs: HashMap::new(), compiled_fns: vec![],
                    classes: HashMap::new(),
@@ -407,13 +534,17 @@ impl Compiler {
                 }
                 Node::Const { name, .. } => {
                     self.global_vars.insert(name.clone());
+                    self.global_consts.insert(name.to_lowercase());
                     self.alloc_slot(name);
                 }
                 Node::For { var, .. } => {
                     self.global_vars.insert(var.clone());
                     self.alloc_slot(var);
                 }
-                Node::EnumDecl { name, .. } => { self.alloc_slot(name); }
+                Node::EnumDecl { name, .. } => {
+                    self.global_consts.insert(name.to_lowercase());
+                    self.alloc_slot(name);
+                }
                 _ => {}
             }
         }
@@ -533,7 +664,27 @@ impl Compiler {
         self.is_known_value_type(t) || self.classes.contains_key(t)
     }
 
+    /// Warnt, wenn eine lokale Variable eine Top-Level-Konstante verdeckt.
+    ///
+    /// GameBasic ignoriert Gross-/Kleinschreibung. Ein `DIM hoehe` in einer SUB
+    /// verdeckt damit die Konstante `HOEHE` -- und weil das lautlos passiert,
+    /// taucht der Fehler weit weg von der Ursache auf: `HOEHE - 54` wird zu
+    /// `0.6 - 54`, und beschwert sich erst der Aufruf, dem man das Ergebnis
+    /// weiterreicht ("erwartet INTEGER, erhalten FLOAT -53.4").
+    ///
+    /// Bewusst nur eine WARNUNG: Verdecken ist erlaubt und manchmal gewollt.
+    fn warn_shadowed_const(&mut self, name: &str) {
+        if self.ctx.is_main { return; }
+        let klein = name.to_lowercase();
+        if !self.global_consts.contains(&klein) { return; }
+        // Nicht zweimal fuer denselben Namen in derselben Funktion melden.
+        if self.ctx.local_slots.contains_key(name) { return; }
+        self.warnings.push((self.ctx.cur_line, format!(
+            "Lokale Variable '{}' verdeckt die gleichnamige Konstante -- GameBasic ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.", name)));
+    }
+
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
+        self.warn_shadowed_const(name);
         // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
             if !self.known_elem(type_name) {
@@ -1304,6 +1455,22 @@ impl Compiler {
                     "Unbekanntes Builtin '{}' -- gbrt kennt es nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.", bname.to_uppercase())));
+            }
+            // Passt die Argumentzahl? Zu WENIGE meldet die Laufzeit selbst --
+            // zu VIELE bisher nicht: die Grafik-Builtins greifen ihre Argumente
+            // per Index ab und ignorieren den Rest stillschweigend. Ein
+            // mitgegebenes Argument tut dann einfach nichts, ohne ein Wort.
+            else if let Some(&(min, max)) = builtin_arity().get(&bname) {
+                let n = args.len();
+                if n > max {
+                    self.warnings.push((self.ctx.cur_line, format!(
+                        "{}: {} Argumente uebergeben, erwartet werden {} -- ueberzaehlige werden ignoriert.",
+                        bname.to_uppercase(), n, arity_text(min, max))));
+                } else if n < min {
+                    self.warnings.push((self.ctx.cur_line, format!(
+                        "{}: nur {} Argument(e) uebergeben, erwartet werden {}.",
+                        bname.to_uppercase(), n, arity_text(min, max))));
+                }
             }
             for a in args { self.expr(a)?; }
             self.ctx.emit(oc::CALL_BUILTIN, json!([bname, args.len()]));
@@ -2475,5 +2642,47 @@ pub fn compile_to_gbc(ast: &Node, external_types: &std::collections::HashSet<Str
             Ok((c.finish(data), warnings))
         }
         Err(msg) => Err((c.err_line, msg)),
+    }
+}
+
+#[cfg(test)]
+mod arity_tests {
+    use super::parse_arity;
+
+    #[test]
+    fn normale_parameterliste() {
+        assert_eq!(parse_arity("ABS(v: Zahl)"), Some((1, 1)));
+        assert_eq!(parse_arity("RGB(r: INTEGER, g: INTEGER, b: INTEGER)"), Some((3, 3)));
+        assert_eq!(parse_arity("PLOTS(xs, ys, farbe [, anzahl])"), Some((3, 4)));
+        assert_eq!(parse_arity("MODEL_INSTANCED(handle, mats [, tint [, anzahl]])"), Some((2, 4)));
+        assert_eq!(parse_arity("AUDIO_MUSIC_PLAY([loops[, fade_in_ms[, easing$]]])"), Some((0, 3)));
+    }
+
+    #[test]
+    fn bereichs_und_stueckangaben() {
+        assert_eq!(parse_arity("ARC(6..8 Argumente)"), Some((6, 8)));
+        assert_eq!(parse_arity("GUI_SPLITTER(7 Argumente)"), Some((7, 7)));
+    }
+
+    #[test]
+    fn rueckgabetyp_haengt_hinten_dran() {
+        assert_eq!(parse_arity("PHYS2D_IS_DYNAMIC(w, idx) AS BOOLEAN"), Some((2, 2)));
+        assert_eq!(parse_arity("VEC3_NEW(x, y, z) -> VEC3"), Some((3, 3)));
+    }
+
+    #[test]
+    fn vorgabewerte_und_beliebig_viele() {
+        // `= wert` markiert einen optionalen Parameter ...
+        assert_eq!(parse_arity("NET_TCP_LISTEN(port: INTEGER, bind_addr: STRING = \"\")"),
+                   Some((1, 2)));
+        // ... und `...` heisst "beliebig viele", zaehlt selbst aber nicht mit.
+        assert_eq!(parse_arity("PATHJOIN(a, b, ...) AS STRING"), Some((2, usize::MAX)));
+    }
+
+    #[test]
+    fn ohne_argumente_und_offene_listen() {
+        assert_eq!(parse_arity("DELTA()"), Some((0, 0)));
+        assert_eq!(parse_arity("BILLBOARD(*args)"), None);      // absichtlich offen
+        assert_eq!(parse_arity("kein_klammer_paar"), None);
     }
 }
