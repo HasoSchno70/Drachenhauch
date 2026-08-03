@@ -46,13 +46,23 @@ Alle nachgemessen, nicht vermutet:
   nach dem Anzeigen (`preserveDrawingBuffer` ist nicht gesetzt). Aus demselben
   Grund liefert `SAVESCREENSHOT` im Browser ein leeres Bild. Betrifft nur das
   Nachher, nicht das Laufende -- waehrend des Laufs ist alles zu sehen.
-- **Kein Ton.** `AUDIO_*`/`PLAYSOUND`/`PLAYMUSIC` melden
-  `Audio-Geraet konnte nicht initialisiert werden: NoDefaultOutputDevice` und
-  brechen das Programm ab. Grund: cpal hat keinen emscripten-Host mehr; sein
-  WebAudio-Host haengt an wasm-bindgen-JS-Glue, den emscripten nicht liefert.
-  **Weg nach vorn:** Kiras `MockBackend` auf emscripten einsetzen (kein Geraet
-  noetig) und ihn im `FLIP` pro Bild weitertakten -- dann laufen Programme
-  stumm, aber vollstaendig, inklusive `AUDIO_MUSIC_POSITION` als Uhr.
+- **Kein hoerbarer Ton -- aber alles andere am Klang stimmt.** cpal hat keinen
+  emscripten-Host mehr (sein WebAudio-Host haengt an wasm-bindgen-JS-Glue, das
+  emscripten nicht liefert), also lief frueher jedes Programm mit Ton in
+  `NoDefaultOutputDevice` und starb. Seit 2026-08-03 nimmt gbrt dort Kiras
+  **`MockBackend`**: kein Geraet noetig, der Mix wird aber VOLLSTAENDIG
+  gerechnet und nur weggeworfen. Getaktet wird er pro Bild in
+  `Audio::update()` (aus `FLIP`) mit der tatsaechlich verstrichenen Zeit,
+  gedeckelt auf 0,25 s pro Bild -- nach einem Halt im Hintergrund-Tab soll die
+  Aufholjagd nicht laenger dauern als die Pause.
+
+  Nachgemessen im Browser: ein Tracker-Modul spielt, `AUDIO_MUSIC_POSITION()`
+  steht nach 150 Bildern bei 2,60 s (= 2,5 s bei 60 fps, also Echtzeit), und
+  `AUDIO_FFT` liefert ein echtes Spektrum (Bandsumme 11,5 statt 0). Damit
+  laeuft auch eine Demo, deren ganzer Ablaufplan an der Musik haengt.
+
+  **Nur `FLIP` treibt die Uhr.** Ein Konsolenprogramm ohne Bildschleife bekommt
+  im Browser keinen Takt -- dort steht die Wiedergabe still.
 - **Eigene Shader in Desktop-GLSL uebersetzen nicht.** Alles mit
   `#version 330` (unsere PBR-/IBL-/Skybox-/Instancing-Shader und die
   `POSTFX`-Beispiele) faellt auf WebGL mit
@@ -62,12 +72,40 @@ Alle nachgemessen, nicht vermutet:
 - **Keine Nicht-Zweierpotenz-Texturen mit Wiederholung**
   (`GL: NPOT textures extension not found`) -- eine Warnung, kein Fehler.
 
-Die mitgelieferte Demo (`gbdemo/`) laeuft deshalb im Browser **nicht**: sie
-haengt ihren gesamten Ablaufplan an `AUDIO_MUSIC_POSITION`, und ohne Ton gibt
-es keine Uhr. Ihre HDR-Umgebung faengt den Shader-Fehler seit 2026-08-03 selbst
-ab (`TRY`/`CATCH` um `LIGHT_ENV_HDR`) und nimmt die analytische Naeherung --
-das ist auch auf dem Desktop das richtige Verhalten, wenn eine
-Grafik-Schnittstelle das Panorama nicht hergibt.
+## Die Demo im Browser (Stand 2026-08-03)
+
+`gbdemo/` **laeuft** -- getrieben von der Musik, wie auf dem Desktop, nur
+stumm. Im Browser nachgesehen:
+
+| | |
+|---|---|
+| Ablaufplan an `AUDIO_MUSIC_POSITION` | laeuft in Echtzeit |
+| Tracker-Modul (261 KB `.mod`) | wird gespielt (unhoerbar) |
+| Spektrum-Saeulen, Sinus-Scroller, Logo | vollstaendig |
+| Szenen-Spruenge mit den Zifferntasten | funktionieren |
+| 2D-Szenen (Titel, Bulk-Linien, Physik-Logo) | vollstaendig |
+| **3D-Szenen (Wuerfelfeld, Himmel/PBR)** | **schwarz** |
+
+Die 3D-Szenen bleiben schwarz, weil unsere eingebauten Shader (Beleuchtung,
+PBR, Skybox, Instancing) Desktop-GLSL sind -- dieselbe Ursache wie beim
+Post-Effekt. Die HDR-Umgebung faengt ihren Shader-Fehler seit 2026-08-03 selbst
+ab (`TRY`/`CATCH` um `LIGHT_ENV_HDR`) und nimmt die analytische Naeherung; das
+ist auch auf dem Desktop richtig, wenn eine Grafik-Schnittstelle das Panorama
+nicht hergibt. **Der naechste Hebel fuer den Browser ist deshalb der
+Shader-Port nach GLSL ES 1.00**, nicht mehr das Audio.
+
+### Zwei Fallen beim Bauen, die Stunden kosten koennen
+
+* **cargo verfolgt `EMCC_CFLAGS` nicht.** Aendert man nur ein Linker-Flag,
+  sieht cargo unveraenderte Quellen, ueberspringt das Linken -- und die alte
+  `.wasm` bleibt liegen. Der Build meldet Erfolg, das Flag ist nicht drin.
+  Genau so sah es aus, als `STACK_SIZE` "nicht half": es war nie im Binary.
+  `build_wasm.py` loescht die Ausgabe jetzt selbst, sobald sich die Flags
+  aendern (`erzwinge_relink`).
+* **Der Status "fertig" im Playground luegt bei Grafik-Programmen.** ASYNCIFY
+  laesst `callMain` schon beim ersten Bild zurueckkehren; das Programm laeuft
+  danach weiter. Wer daraus "das Programm ist zu Ende" liest, sucht Fehler an
+  der falschen Stelle.
 
 GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
@@ -180,8 +218,8 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
   hält den Hash aktuell, sodass die URL jederzeit teilbar ist.
 - **Hardware-/Netz-Module** (`db/net/http/serial/usb/wifi/bt`) sind im
   Web-Build nicht verfügbar (nur `--features graphics`).
-- **Audio:** im Browser nicht verfügbar (`NoDefaultOutputDevice`) — Begründung
-  und der Weg über Kiras `MockBackend` stehen oben unter „Bekannte Grenzen".
+- **Audio:** läuft stumm über Kiras `MockBackend` (Position/FFT/Kanäle stimmen,
+  nur hörbar ist nichts) — Details oben unter „Bekannte Grenzen".
 
 ## Nächste Schritte
 
@@ -189,6 +227,9 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 2. ~~Grafik im Browser~~ ✅ erledigt (ASYNCIFY-Yield in `flip()`, verifiziert).
 3. ~~Teilbare Links~~ ✅ erledigt (Quelle im URL-Hash).
 4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `gbrt.data`, verifiziert).
-5. **Offen:** stummes Audio über Kiras `MockBackend` (macht die Demo im Browser
-   überhaupt erst lauffähig), Shader in GLSL ES 1.00, Touch-Input fürs Handy,
-   eine kleine Beispiel-Galerie aus vorgefertigten Share-Links.
+5. ~~Stummes Audio über Kiras `MockBackend`~~ ✅ erledigt (die Demo läuft damit
+   im Browser, verifiziert).
+6. **Offen:** Shader nach GLSL ES 1.00 portieren — das ist der letzte Grund,
+   warum 3D-Szenen und Post-Effekte im Browser schwarz bleiben. Dazu
+   Touch-Input fürs Handy und eine kleine Beispiel-Galerie aus vorgefertigten
+   Share-Links.

@@ -19,7 +19,12 @@
                    padding: 8px; font-family: ui-monospace, monospace;
                    font-size: 13px; resize: vertical; tab-size: 2; }
     #stage { flex: 1 1 360px; min-width: 300px; }
-    canvas#canvas { width: 100%; background: #000; border: 1px solid #243a4d;
+    /* !important, weil raylib/emscripten die Groesse als INLINE-Stil an die
+       Leinwand schreibt (Pixelmasse des Programms). Ohne das sprengt ein
+       Programm mit SCREEN(1280, 720) die Seite samt Querbalken; so bleibt der
+       Puffer gross und scharf, angezeigt wird er in Spaltenbreite. */
+    canvas#canvas { width: 100% !important; height: auto !important;
+                    max-width: 100%; background: #000; border: 1px solid #243a4d;
                     display: block; }
     pre#output { background: #0a121c; border: 1px solid #243a4d; color: #d5edf0;
                  height: 150px; overflow: auto; padding: 8px; margin: 8px 0 0;

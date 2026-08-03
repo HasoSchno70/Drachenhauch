@@ -148,6 +148,11 @@ def emcc_flags(out_dir: str | Path) -> list:
         "-s", "ASYNCIFY",
         "-s", "ALLOW_MEMORY_GROWTH=1",
         "-s", "ASSERTIONS=1",
+        # emscripten gibt einem Programm 64 KB Stapel -- auf dem Desktop sind
+        # es 8 MB. Das Parsen eines Tracker-Moduls (xmrs) legt eine grosse
+        # Struktur an, bevor sie auf den Haufen wandert, und sprengte die 64 KB:
+        # AUDIO_MUSIC_PLAY brach mit einem nackten abort() ab.
+        "-s", "STACK_SIZE=4MB",
         # requestFullscreen gehoert dazu: raylibs ToggleFullscreen ruft es auf
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
@@ -229,6 +234,29 @@ def copy_assets(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     return sum(f.stat().st_size for f in ziel.rglob("*") if f.is_file())
 
 
+def erzwinge_relink(flags: str) -> bool:
+    """Neu linken, wenn sich die emscripten-Flags geaendert haben.
+
+    **Diese Falle kostet sonst Stunden:** cargo verfolgt `EMCC_CFLAGS` nicht.
+    Aendert man nur ein Linker-Flag (etwa `STACK_SIZE`), sieht cargo unveraenderte
+    Quellen, ueberspringt das Linken -- und die alte `.wasm` bleibt liegen. Der
+    Build meldet Erfolg, das Flag ist aber nicht drin. Genau so sah es aus, als
+    die Vergroesserung des Stapels "nicht half": sie war schlicht nie im Binary.
+
+    Das Loeschen der Ausgabe ist der einfachste Zwang -- cargo linkt neu, sobald
+    sie fehlt, kompiliert aber nichts unnoetig neu.
+    """
+    rel = CRATE / "target" / TARGET / "release"
+    stempel = rel / "emcc_flags.txt"
+    if stempel.exists() and stempel.read_text(encoding="utf-8") == flags:
+        return False
+    for muster in ("gbrt.js", "gbrt.wasm", "gbrt.data", "gbrt"):
+        (rel / muster).unlink(missing_ok=True)
+    rel.mkdir(parents=True, exist_ok=True)
+    stempel.write_text(flags, encoding="utf-8")
+    return True
+
+
 def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     src = copy_source(gb_path, out_dir)
     print(f"Quelle eingebettet: {src}")
@@ -247,6 +275,7 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     env = dict(os.environ)
     # emscripten-Flags (absolute Embed-Pfade -> CWD-unabhaengig).
     env["EMCC_CFLAGS"] = " ".join(emcc_flags(out_dir))
+    erzwinge_relink(env["EMCC_CFLAGS"])
     cmd = ["cargo", "build", "--manifest-path", str(CRATE / "Cargo.toml"),
            "--target", TARGET, "--features", "graphics", "--release"]
     print("Build:", " ".join(cmd))

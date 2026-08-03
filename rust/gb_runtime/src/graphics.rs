@@ -925,6 +925,8 @@ pub struct Graphics {
     /// `KEY_ANY_HIT` die Demo-Tasten als Nutzereingabe, und ein Attract-Modus
     /// ("bei Tastendruck abbrechen") wuerde sich selbst sofort beenden.
     auto_injected_keys: Vec<i32>,
+    /// Gemerkte Anzeigenamen je Tastencode (siehe `key_name`).
+    key_names: HashMap<i64, String>,
     // Post-Processing (Shader): die Szene wird in `scene_rt` gerendert und beim
     // FLIP per Fragment-Shader (Index in `shaders`) auf den Screen praesentiert.
     shaders: Vec<Shader>,
@@ -1137,6 +1139,7 @@ impl Graphics {
             auto_play_frame: 0,
             auto_play_base: 0,
             auto_injected_keys: Vec::new(),
+            key_names: HashMap::new(),
         };
         // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
         // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
@@ -3365,12 +3368,20 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
     /// layout-abhaengig: auf einer deutschen Tastatur heisst KEY_Y "z") --
     /// fuer Sondertasten liefert es nichts. Genau die will ein
     /// Belegungsdialog aber anzeigen, daher die eigene Ersatztabelle.
-    pub fn key_name(&self, code: i64) -> String {
+    ///
+    /// Gemerkt wird das Ergebnis je Tastencode: ein Belegungsdialog fragt den
+    /// Namen pro Bild ab, und die Antwort aendert sich nicht. Auf Plattformen
+    /// ohne `GetKeyName` (Web) warnt raylib bei JEDEM Aufruf -- ungemerkt
+    /// flutete das die Ausgabe und verdeckte alles andere.
+    pub fn key_name(&mut self, code: i64) -> String {
+        if let Some(n) = self.key_names.get(&code) { return n.clone(); }
         let Some(k) = map_key(code) else { return String::new(); };
-        match self.rl.get_key_name(k) {
+        let name = match self.rl.get_key_name(k) {
             Some(n) if !n.trim().is_empty() => n.to_uppercase(),
             _ => key_label(k).to_string(),
-        }
+        };
+        self.key_names.insert(code, name.clone());
+        name
     }
     // --- Eingabe aufzeichnen / abspielen (AUTOMATION_*) ---------------------
     // raylib zeichnet in `EndDrawing` den kompletten Eingabe-Zustand des Frames

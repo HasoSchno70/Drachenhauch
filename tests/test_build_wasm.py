@@ -74,3 +74,33 @@ def test_main_rs_has_wasm_entry():
     assert 'target_os = "emscripten"' in src
     assert "/program.gb" in src
     assert "/program.gbc" in src
+
+
+def test_flag_aenderung_erzwingt_neues_linken(tmp_path, monkeypatch):
+    """cargo verfolgt EMCC_CFLAGS nicht -- aendert man nur ein Linker-Flag,
+    ueberspringt es das Linken und die ALTE .wasm bleibt liegen. Der Build
+    meldet dann Erfolg, obwohl das Flag gar nicht drin ist (so sah es aus, als
+    STACK_SIZE "nicht half"). Deshalb loescht build_wasm.py die Ausgabe selbst,
+    sobald sich die Flags aendern."""
+    bw = _load_build_wasm()
+    rel = tmp_path / "target" / bw.TARGET / "release"
+    rel.mkdir(parents=True)
+    monkeypatch.setattr(bw, "CRATE", tmp_path)
+
+    def lege_artefakte_an():
+        for n in ("gbrt.js", "gbrt.wasm", "gbrt.data"):
+            (rel / n).write_bytes(b"alt")
+
+    lege_artefakte_an()
+    assert bw.erzwinge_relink("-s A=1") is True, "erster Lauf muss stempeln"
+    assert not (rel / "gbrt.wasm").exists(), "Ausgabe muss weg sein"
+
+    # Gleiche Flags -> nichts anfassen (kein unnoetiges Neu-Linken).
+    lege_artefakte_an()
+    assert bw.erzwinge_relink("-s A=1") is False
+    assert (rel / "gbrt.wasm").read_bytes() == b"alt"
+
+    # Geaenderte Flags -> Ausgabe faellt weg, cargo linkt neu.
+    assert bw.erzwinge_relink("-s A=2") is True
+    assert not (rel / "gbrt.wasm").exists()
+    assert not (rel / "gbrt.data").exists()
