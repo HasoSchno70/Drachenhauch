@@ -820,6 +820,18 @@ pub struct Graphics {
     pub frame_count: u64,
     max_frames: Option<u64>,
     screenshot: Option<String>,
+    // --- Kontaktbogen (GBRT_CONTACT) ---------------------------------------
+    // Ein einzelner Screenshot zeigt einen AUGENBLICK. Vieles geht aber erst
+    // ueber die Zeit schief: etwas kippt zu frueh um, ein Rand bleibt stehen,
+    // eine Bewegung ruckelt. Der Kontaktbogen nimmt in festen Abstaenden Bilder
+    // auf und setzt sie als beschriftetes Raster in EINE PNG -- damit wird ein
+    // Ablauf pruefbar, nicht nur ein Standbild.
+    contact_path: Option<String>,
+    contact_every: u64,
+    contact_cols: usize,
+    contact_max: usize,
+    contact_shots: Vec<(u64, Image)>,
+    contact_written: bool,
     shot_taken: bool,
     // --- Eingabe aufzeichnen/abspielen (AUTOMATION_*) --------------------
     // Die Liste liegt in einer Box, weil `SetAutomationEventList` sich einen
@@ -927,6 +939,19 @@ impl Graphics {
         // legt den PNG-Pfad fest (Screenshot beim letzten Frame).
         let max_frames = std::env::var("GBRT_FRAMES").ok().and_then(|s| s.parse().ok());
         let screenshot = std::env::var("GBRT_SCREENSHOT").ok();
+        // Kontaktbogen: GBRT_CONTACT=pfad.png. Ohne eigene Angaben verteilt er
+        // GBRT_CONTACT_MAX Bilder gleichmaessig ueber GBRT_FRAMES -- man setzt
+        // also im Normalfall nur zwei Umgebungsvariablen und bekommt einen
+        // Ueberblick ueber den ganzen Lauf.
+        let contact_path = std::env::var("GBRT_CONTACT").ok();
+        let contact_max: usize = std::env::var("GBRT_CONTACT_MAX").ok()
+            .and_then(|s| s.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(12);
+        let contact_cols: usize = std::env::var("GBRT_CONTACT_COLS").ok()
+            .and_then(|s| s.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(4);
+        let contact_every: u64 = std::env::var("GBRT_CONTACT_EVERY").ok()
+            .and_then(|s| s.parse().ok()).filter(|&n: &u64| n > 0)
+            .or_else(|| max_frames.map(|mx: u64| (mx / contact_max as u64).max(1)))
+            .unwrap_or(30);
         let mut layer_names = HashMap::new();
         layer_names.insert(String::new(), 0usize); // Main-Layer
         // Szene-Render-Target (Fenstergroesse) fuer Post-Processing.
@@ -1020,6 +1045,8 @@ impl Graphics {
             frame_count: 0,
             max_frames,
             screenshot,
+            contact_path, contact_every, contact_cols, contact_max,
+            contact_shots: Vec::new(), contact_written: false,
             shot_taken: false,
             auto_list: None,
             auto_recording: false,
@@ -3510,6 +3537,61 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     /// korrekt schreiben. Stattdessen lesen wir die Screen-Pixel selbst und
     /// exportieren sie via `ExportImage` (das KEINEN Prefix voranstellt) unter
     /// einem absoluten, vom `\\?\`-Prefix bereinigten Pfad.
+    /// Ein Bild fuer den Kontaktbogen aufnehmen (verkleinert, damit das
+    /// Raster nicht ins Uferlose waechst).
+    fn contact_capture(&mut self) {
+        if self.contact_shots.len() >= self.contact_max { return; }
+        let mut img = self.rl.load_image_from_screen(&self.thread);
+        // Auf hoechstens 480 Pixel Breite herunterrechnen -- lesbar genug, um
+        // Bewegung und Ablauf zu beurteilen, und ein Raster aus zwoelf solchen
+        // Bildern bleibt eine handliche Datei.
+        let bw = 480i32.min(img.width);
+        if img.width > bw {
+            let bh = (img.height as f32 * bw as f32 / img.width as f32).round() as i32;
+            img.resize(bw, bh.max(1));
+        }
+        let nr = self.frame_count;
+        self.contact_shots.push((nr, img));
+    }
+
+    /// Die gesammelten Bilder als beschriftetes Raster in EINE PNG schreiben.
+    fn contact_write(&mut self) {
+        if self.contact_written || self.contact_shots.is_empty() { return; }
+        self.contact_written = true;
+        let Some(path) = self.contact_path.clone() else { return };
+
+        const RAND: i32 = 8;          // Abstand zwischen den Kacheln
+        const BESCHRIFTUNG: i32 = 18; // Platz fuer die Bildnummer
+        let (tw, th) = {
+            let f = &self.contact_shots[0].1;
+            (f.width, f.height)
+        };
+        let spalten = self.contact_cols.min(self.contact_shots.len()).max(1) as i32;
+        let zeilen = ((self.contact_shots.len() as i32) + spalten - 1) / spalten;
+        let breite = spalten * tw + (spalten + 1) * RAND;
+        let hoehe = zeilen * (th + BESCHRIFTUNG) + (zeilen + 1) * RAND;
+
+        let mut blatt = Image::gen_image_color(breite, hoehe, Color::new(18, 20, 26, 255));
+        for (i, (nr, bild)) in self.contact_shots.iter().enumerate() {
+            let sp = (i as i32) % spalten;
+            let ze = (i as i32) / spalten;
+            let x = RAND + sp * (tw + RAND);
+            let y = RAND + ze * (th + BESCHRIFTUNG + RAND);
+            blatt.draw(bild,
+                       Rectangle::new(0.0, 0.0, bild.width as f32, bild.height as f32),
+                       Rectangle::new(x as f32, y as f32, tw as f32, th as f32),
+                       Color::WHITE);
+            blatt.draw_text(&format!("Bild {}", nr), x + 2, y + th + 3, 14,
+                            Color::new(150, 170, 200, 255));
+        }
+
+        let p = std::path::Path::new(&path);
+        let abs = if p.is_absolute() { p.to_path_buf() }
+                  else { std::env::current_dir().map(|d| d.join(p)).unwrap_or_else(|_| p.to_path_buf()) };
+        let abs = crate::strip_extended_prefix(abs);
+        blatt.export_image(&abs.to_string_lossy());
+    }
+
     fn write_screenshot(&mut self, path: &str) {
         let p = std::path::Path::new(path);
         let abs = if p.is_absolute() {
@@ -4116,6 +4198,13 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
                 self.write_screenshot(&path);
                 self.shot_taken = true;
             }
+        }
+        // Kontaktbogen: in festen Abstaenden aufnehmen, am Ende zusammensetzen.
+        if self.contact_path.is_some() && !self.contact_written {
+            if self.frame_count % self.contact_every == 0 { self.contact_capture(); }
+            let voll = self.contact_shots.len() >= self.contact_max;
+            let ende = self.max_frames.map(|mx| self.frame_count >= mx).unwrap_or(false);
+            if voll || ende { self.contact_write(); }
         }
     }
 }

@@ -450,6 +450,29 @@ beim Erreichen der Grenze wird das PNG gespeichert (auch wenn das Programm eine
 feste `FOR`-Schleife statt `QUITREQUESTED` nutzt). **Hinweis:** raylibs
 `TakeScreenshot` legt die Datei relativ zum Arbeitsverzeichnis ab.
 
+#### Kontaktbogen: einen ABLAUF pruefen statt eines Augenblicks
+
+Ein einzelner Screenshot zeigt einen Augenblick. Vieles geht aber erst ueber
+die Zeit schief -- etwas kippt zu frueh um, ein Rand bleibt stehen, eine
+Bewegung ruckelt. `GBRT_CONTACT` nimmt in festen Abstaenden Bilder auf und
+setzt sie beschriftet als Raster in EINE PNG:
+
+```
+GBRT_FRAMES=480 GBRT_CONTACT=bogen.png gbrt run demo.gb
+```
+
+| Variable | Wirkung |
+|---|---|
+| `GBRT_CONTACT` | Pfad der Raster-PNG (schaltet die Aufnahme ein) |
+| `GBRT_CONTACT_MAX` | wie viele Bilder (Standard 12) |
+| `GBRT_CONTACT_COLS` | Spalten im Raster (Standard 4) |
+| `GBRT_CONTACT_EVERY` | Abstand in Frames; ohne Angabe gleichmaessig ueber `GBRT_FRAMES` verteilt |
+
+Die Kacheln werden auf hoechstens 480 Pixel Breite heruntergerechnet (lesbar
+genug fuers Beurteilen, handliche Dateigroesse) und tragen ihre Bildnummer.
+Geschrieben wird, sobald `GBRT_CONTACT_MAX` Bilder beisammen sind oder
+`GBRT_FRAMES` erreicht ist. Ohne `GBRT_CONTACT` aendert sich nichts.
+
 Verifiziert (visuell per Screenshot) an allen 7 IMPORT-freien Grafik-Beispielen:
 `30_shapes` (alle Formen), `44_language_showcase`, `34_schneefall`,
 `39_textscroll`, `40_parallax`, `75_preloader` (LOAD_ASSETS + Alias-Cache),

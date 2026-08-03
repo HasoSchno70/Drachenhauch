@@ -255,6 +255,13 @@ Baut `rust/gb_runtime/` → `gbrt`. Nötig für Run/Export/Editor-Run + die Test
 .venv\Scripts\python.exe -m pytest tests/ -v
 ```
 
+**Headless prüfen:** `GBRT_FRAMES=n GBRT_SCREENSHOT=p.png gbrt run x.gb` liefert
+EIN Bild (ein Augenblick). Für alles, was sich über die ZEIT falsch verhält
+(zu früh umkippen, stehenbleibende Ränder, ruckelnde Bewegung) stattdessen den
+**Kontaktbogen**: `GBRT_FRAMES=480 GBRT_CONTACT=bogen.png gbrt run x.gb` setzt
+mehrere Bilder beschriftet als Raster in eine PNG (`GBRT_CONTACT_MAX`,
+`_COLS`, `_EVERY`). Details: docs/rust-runtime.md.
+
 **Programm ausführen:** `.venv\Scripts\python.exe gbrun.py examples/<file>.gb`
 (läuft über `gbrt run`). Direkt: `gbrt run datei.gb`. (Der frühere `--bench`-
 Tree-Walker-Vergleich ist entfernt — es gibt nur noch gbrt.)
