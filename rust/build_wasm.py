@@ -131,23 +131,41 @@ def _find_ninja_dir() -> Path | None:
 # ASYNCIFY laesst den blockierenden VM-/Render-Loop im Browser laufen, ohne die
 # Engine auf emscripten_set_main_loop umzubauen (langsamer, aber funktioniert).
 def emcc_flags(out_dir: str | Path) -> list:
-    """emscripten-Linker-Flags. Die `--embed-file`-Quellpfade sind ABSOLUT
+    """emscripten-Linker-Flags. Die Datei-Quellpfade sind ABSOLUT
     (forward-slash), weil rustc den Linker nicht zwingend im `out_dir`-CWD
     aufruft -> relative Pfade wuerden vom file_packager nicht gefunden.
-    (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)"""
+    (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)
+
+    Assets (`assets/` neben der .gb) kommen als PRELOAD dazu, nicht als
+    embed: emscripten legt daraus eine eigene `gbrt.data` an, die der Browser
+    nebenher laedt. Eingebettet wuerden die paar Megabyte in die `.wasm`
+    wandern und jeden Start ausbremsen.
+    """
     out = Path(out_dir).resolve()
     gb = (out / "program.gb").as_posix()
-    return [
+    flags = [
         "-s", "USE_GLFW=3",
         "-s", "ASYNCIFY",
         "-s", "ALLOW_MEMORY_GROWTH=1",
         "-s", "ASSERTIONS=1",
-        "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print']",
+        # requestFullscreen gehoert dazu: raylibs ToggleFullscreen ruft es auf
+        # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
+        # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
+        "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print','requestFullscreen']",
         # Quelle einbetten -> gbrt kompiliert sie im Browser selbst (Front-End-
         # Port, kein Pyodide). Der frühere Python-.gbc-Fallback entfällt (Stufe B:
         # Python-Compiler/serialize entfernt).
-        "--embed-file", f"{gb}@/program.gb",
     ]
+    # emscripten laesst --embed und --preload NICHT gemeinsam zu. Ohne Assets
+    # bleibt es beim Einbetten (eine Datei weniger); mit Assets wird alles
+    # vorgeladen, damit die paar Megabyte nicht in die .wasm wandern.
+    assets = out / "assets"
+    if assets.is_dir():
+        flags += ["--preload-file", f"{gb}@/program.gb",
+                  "--preload-file", f"{assets.as_posix()}@/assets"]
+    else:
+        flags += ["--embed-file", f"{gb}@/program.gb"]
+    return flags
 
 
 def check_toolchain() -> dict:
@@ -191,9 +209,33 @@ def copy_source(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
     return dst
 
 
+def copy_assets(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
+    """Uebernimmt ein `assets/`-Verzeichnis NEBEN der `.gb` nach `<out_dir>`.
+
+    Die Laufzeit chdirt im Browser nach `/`, und dort liegt auch `program.gb`
+    -- relative Pfade wie `LOADIMAGE("assets/x.png")` treffen damit genau das
+    eingebettete Verzeichnis, ohne dass ein Programm etwas anders schreiben
+    muss als auf dem Desktop.
+
+    Liefert die Groesse in Bytes (0 = kein assets/ vorhanden).
+    """
+    quelle = Path(gb_path).resolve().parent / "assets"
+    ziel = Path(out_dir) / "assets"
+    if ziel.exists():
+        shutil.rmtree(ziel)          # alte Assets nicht mitschleppen
+    if not quelle.is_dir():
+        return 0
+    shutil.copytree(quelle, ziel)
+    return sum(f.stat().st_size for f in ziel.rglob("*") if f.is_file())
+
+
 def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     src = copy_source(gb_path, out_dir)
     print(f"Quelle eingebettet: {src}")
+    groesse = copy_assets(gb_path, out_dir)
+    if groesse:
+        print(f"Assets uebernommen: {groesse / 1048576:.1f} MB "
+              f"(werden als gbrt.data vorgeladen)")
     # Windows: emscripten-Toolchain automatisch verdrahten (PATH + CC/CXX/AR/
     # Linker/bindgen-Includes), damit der Build ohne manuelles Env-Setup laeuft.
     if setup_emscripten_env():
@@ -213,11 +255,21 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
         print("cargo build fehlgeschlagen (siehe oben).")
         return rc
     rel = CRATE / "target" / TARGET / "release"
-    for name in ("gbrt.js", "gbrt.wasm"):
+    # gbrt.data entsteht nur mit --preload-file (also wenn Assets dabei sind)
+    # und liegt bei den deps, nicht neben der .wasm -- ohne sie fehlen dem
+    # Programm im Browser alle Dateien.
+    for name in ("gbrt.js", "gbrt.wasm", "gbrt.data"):
         src = rel / name
+        if not src.exists():
+            treffer = sorted(rel.glob(f"deps/{name}"))
+            src = treffer[0] if treffer else src
         if src.exists():
             shutil.copy2(src, Path(out_dir) / name)
-            print(f"kopiert: {Path(out_dir) / name}")
+            print(f"kopiert: {Path(out_dir) / name} "
+                  f"({src.stat().st_size / 1048576:.1f} MB)")
+        elif name == "gbrt.data":
+            # Kein Paket: das ist der Normalfall ohne assets/, kein Fehler.
+            (Path(out_dir) / name).unlink(missing_ok=True)
     print("\nFertig. Lokal testen:  py -m http.server -d web 8000  ->  http://localhost:8000")
     return 0
 

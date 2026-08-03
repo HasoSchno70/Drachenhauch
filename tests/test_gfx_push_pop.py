@@ -129,6 +129,58 @@ SAVESCREENSHOT("nachher.png")
         f"Bild nach GFX_POP unterscheidet sich -- '{stoerung}' wurde nicht zurueckgenommen"
 
 
+def test_posteffekt_wird_beim_pop_abgeloest(tmp_path):
+    """Der Post-Effekt liegt ueber ALLEM -- bleibt er nach dem POP haengen,
+    faerbt der Shader einer verlassenen Szene den Rest der Demo ein.
+
+    Der Test hat bewusst eine Kontrolle: das Bild WAEHREND des PUSH muss sich
+    unterscheiden. Sonst wuerde er auch dann gruen sein, wenn POSTFX gar nichts
+    getan haette."""
+    pytest.importorskip("PIL", reason="Pillow noetig zum Pixel-Vergleich")
+    from PIL import Image, ImageChops
+
+    (tmp_path / "rot.fs").write_text(
+        "#version 330\n"
+        "in vec2 fragTexCoord;\nuniform sampler2D texture0;\nout vec4 finalColor;\n"
+        "void main() { finalColor = vec4(1.0, 0.0, 0.0, 1.0); }\n", encoding="utf-8")
+
+    r = _run(tmp_path, """
+SCREEN(160, 120, "p", 1)
+DIM sh AS INTEGER
+sh = SHADER_LOAD("rot.fs")
+
+SUB zeichne()
+    DIM f AS INTEGER
+    FOR f = 0 TO 3
+        CLS(&H101018)
+        BOX(30, 30, 130, 90, &H40C0FF)
+        FLIP()
+    NEXT
+END SUB
+
+zeichne()
+SAVESCREENSHOT("vorher.png")
+
+GFX_PUSH()
+POSTFX(sh)
+zeichne()
+SAVESCREENSHOT("waehrend.png")
+GFX_POP()
+
+zeichne()
+SAVESCREENSHOT("nachher.png")
+""")
+    assert r.returncode == 0, r.stderr
+    with Image.open(tmp_path / "vorher.png") as a, \
+         Image.open(tmp_path / "waehrend.png") as m, \
+         Image.open(tmp_path / "nachher.png") as b:
+        a, m, b = a.convert("RGB"), m.convert("RGB"), b.convert("RGB")
+        wirkte = ImageChops.difference(a, m).getbbox() is not None
+        gleich = ImageChops.difference(a, b).getbbox() is None
+    assert wirkte, "POSTFX hat gar nicht gewirkt -- der Test wuerde nichts beweisen"
+    assert gleich, "Post-Effekt liegt nach GFX_POP immer noch ueber dem Bild"
+
+
 def test_zusaetzliches_licht_wird_beim_pop_abgeschaltet(tmp_path):
     # Eine Szene darf ein Licht HINZUFUEGEN. POP muss es wieder ausschalten,
     # sonst leuchtet es in der naechsten Szene weiter.

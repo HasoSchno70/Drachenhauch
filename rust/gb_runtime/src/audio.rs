@@ -178,6 +178,10 @@ use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
 enum MusicHandle {
     #[cfg(not(target_arch = "wasm32"))]
     Stream(StreamingSoundHandle<FromFileError>),
+    /// Nur der Web-Build baut diese Variante: Kira kann auf wasm nicht
+    /// streamen, dort wird Musik ganz geladen. Auf dem Desktop bleibt sie
+    /// absichtlich ungenutzt (Streaming ist dort der bessere Weg).
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     Static(StaticSoundHandle),
     Module(Arc<ModShared>),
 }

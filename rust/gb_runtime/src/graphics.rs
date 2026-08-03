@@ -1898,7 +1898,14 @@ impl Graphics {
     fn ibl_render_cube(&mut self, fs: &str, src_id: u32, src_cubemap: bool, size: i32) -> Result<u32, String> {
         let sh = self.rl.load_shader_from_memory(&self.thread, Some(CUBEMAP_VS), Some(fs));
         let id = sh.id;
-        if id == 0 { return Err("LIGHT_ENV_HDR: Cubemap-Shader nicht ladbar".into()); }
+        if id == 0 {
+            // Der Grund steht dabei, weil er nicht am Aufruf liegt: unser
+            // Cubemap-Shader ist Desktop-GLSL (#version 330) und uebersetzt auf
+            // WebGL nicht. Ein Programm kann das abfangen (TRY/CATCH) und auf
+            // das analytische LIGHT_ENV ausweichen -- die Demo tut genau das.
+            return Err("LIGHT_ENV_HDR: Cubemap-Shader nicht ladbar \
+                        (auf dieser Grafik-Schnittstelle nicht uebersetzbar, z.B. WebGL)".into());
+        }
         let loc_proj = sh.get_shader_location("matProjection");
         let loc_view = sh.get_shader_location("matView");
         let views = Self::ibl_cube_views();
@@ -3743,6 +3750,14 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         // Schrift nur setzen, wenn sie noch existiert (Fonts werden nie
         // entladen, aber ein Handle aus einem anderen Lauf waere ungueltig).
         if af < 0 || (af as usize) < self.fonts.len() { self.active_font = af; }
+        // Post-Effekt zurueck. Ohne diese Zeile bliebe der Shader der
+        // verlassenen Szene ueber allem Folgenden liegen -- genau der Fehler,
+        // gegen den PUSH/POP gebaut ist.
+        self.post_shader_idx = match st.post_shader_idx {
+            Some(i) if i < self.shaders.len() => Some(i),
+            Some(_) => None,   // Shader gibt es nicht mehr -> lieber ohne
+            None => None,
+        };
         true
     }
 

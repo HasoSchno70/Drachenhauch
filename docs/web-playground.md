@@ -27,10 +27,47 @@
 >    `emscripten_set_canvas_element_size` und zieht die Groesse in den ersten
 >    acht Bildern nach (raylib setzt sie danach noch einmal selbst).
 >
-> **Bekannte Grenze:** nach Programmende wird die Leinwand schwarz -- WebGL
-> verwirft den Zeichenpuffer nach dem Anzeigen (`preserveDrawingBuffer` ist
-> nicht gesetzt). Aus demselben Grund liefert `SAVESCREENSHOT` im Browser ein
-> leeres Bild. Beides betrifft nur das Nachher, nicht das Laufende.
+> **Assets kommen mit** (2026-08-03). Liegt neben der `.gb` ein `assets/`-Ordner,
+> packt `build_wasm.py` ihn in eine `gbrt.data` und haengt sie ueber
+> `--preload-file` ins virtuelle Dateisystem -- Programme laden ihre Bilder,
+> Schriften, Shader und Musik danach unter genau demselben Pfad wie auf dem
+> Desktop. Nachgemessen im Browser: `FILESIZE("assets/font.ttf")` liefert 168644,
+> `LOADFONT` darauf liefert ein gueltiges Handle, und der Text erscheint in der
+> eingebetteten Schrift. **`--preload-file` und `--embed-file` schliessen
+> einander aus** -- sobald Assets dabei sind, wird auch die Quelle vorgeladen.
+> Neben `gbrt.js`/`gbrt.wasm` muss dann zwingend `gbrt.data` mit ausgeliefert
+> werden, sonst startet gar nichts.
+
+## Bekannte Grenzen im Browser
+
+Alle nachgemessen, nicht vermutet:
+
+- **Leinwand wird nach Programmende schwarz.** WebGL verwirft den Zeichenpuffer
+  nach dem Anzeigen (`preserveDrawingBuffer` ist nicht gesetzt). Aus demselben
+  Grund liefert `SAVESCREENSHOT` im Browser ein leeres Bild. Betrifft nur das
+  Nachher, nicht das Laufende -- waehrend des Laufs ist alles zu sehen.
+- **Kein Ton.** `AUDIO_*`/`PLAYSOUND`/`PLAYMUSIC` melden
+  `Audio-Geraet konnte nicht initialisiert werden: NoDefaultOutputDevice` und
+  brechen das Programm ab. Grund: cpal hat keinen emscripten-Host mehr; sein
+  WebAudio-Host haengt an wasm-bindgen-JS-Glue, den emscripten nicht liefert.
+  **Weg nach vorn:** Kiras `MockBackend` auf emscripten einsetzen (kein Geraet
+  noetig) und ihn im `FLIP` pro Bild weitertakten -- dann laufen Programme
+  stumm, aber vollstaendig, inklusive `AUDIO_MUSIC_POSITION` als Uhr.
+- **Eigene Shader in Desktop-GLSL uebersetzen nicht.** Alles mit
+  `#version 330` (unsere PBR-/IBL-/Skybox-/Instancing-Shader und die
+  `POSTFX`-Beispiele) faellt auf WebGL mit
+  `'texture' : no matching overloaded function found` aus. Wer im Web Shader
+  will, schreibt sie in GLSL ES 1.00 (`#version 100`, `texture2D` statt
+  `texture`).
+- **Keine Nicht-Zweierpotenz-Texturen mit Wiederholung**
+  (`GL: NPOT textures extension not found`) -- eine Warnung, kein Fehler.
+
+Die mitgelieferte Demo (`gbdemo/`) laeuft deshalb im Browser **nicht**: sie
+haengt ihren gesamten Ablaufplan an `AUDIO_MUSIC_POSITION`, und ohne Ton gibt
+es keine Uhr. Ihre HDR-Umgebung faengt den Shader-Fehler seit 2026-08-03 selbst
+ab (`TRY`/`CATCH` um `LIGHT_ENV_HDR`) und nimmt die analytische Naeherung --
+das ist auch auf dem Desktop das richtige Verhalten, wenn eine
+Grafik-Schnittstelle das Panorama nicht hergibt.
 
 GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
@@ -143,13 +180,15 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
   hält den Hash aktuell, sodass die URL jederzeit teilbar ist.
 - **Hardware-/Netz-Module** (`db/net/http/serial/usb/wifi/bt`) sind im
   Web-Build nicht verfügbar (nur `--features graphics`).
-- **Audio/Threads:** Web-Audio + Coroutinen-Threads brauchen ggf. zusätzliche
-  emscripten-Flags (`-s AUDIO_WORKLET`, `-pthread`) — offen.
+- **Audio:** im Browser nicht verfügbar (`NoDefaultOutputDevice`) — Begründung
+  und der Weg über Kiras `MockBackend` stehen oben unter „Bekannte Grenzen".
 
 ## Nächste Schritte
 
 1. ~~Konsole im Browser~~ ✅ erledigt (Live-Editor, verifiziert).
 2. ~~Grafik im Browser~~ ✅ erledigt (ASYNCIFY-Yield in `flip()`, verifiziert).
 3. ~~Teilbare Links~~ ✅ erledigt (Quelle im URL-Hash).
-4. **Optional:** Web-Audio (`-s AUDIO_WORKLET`), Gamepad/Touch-Input fürs Handy,
+4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `gbrt.data`, verifiziert).
+5. **Offen:** stummes Audio über Kiras `MockBackend` (macht die Demo im Browser
+   überhaupt erst lauffähig), Shader in GLSL ES 1.00, Touch-Input fürs Handy,
    eine kleine Beispiel-Galerie aus vorgefertigten Share-Links.

@@ -396,7 +396,7 @@ fn parse_arity(sig: &str) -> Option<(usize, usize)> {
     let mut unbegrenzt = false;
     let mut tok = String::new();
 
-    let mut schliesse = |tok: &mut String, min: &mut usize, max: &mut usize,
+    let schliesse = |tok: &mut String, min: &mut usize, max: &mut usize,
                          optional_ab: &mut bool, unbegrenzt: &mut bool| {
         let t = tok.trim();
         if t.is_empty() { tok.clear(); return; }

@@ -1237,10 +1237,20 @@ LIGHT_DIRECTIONAL(-0.5, -0.8, -0.4, &HFFE0B0)
 
 ' --- Szene 4: Umgebung + Modelle (einmalig; das HDR-Panorama zu
 ' --- durchrechnen kostet einen Moment, deshalb hier und nicht pro Bild) ---
-hdr_da = FILEEXISTS("assets/ibl_env.hdr")
-IF hdr_da THEN
-    LIGHT_ENV_HDR("assets/ibl_env.hdr", 1.0)
-ELSE
+' Das HDR-Panorama ist ein Wunsch, keine Bedingung: im Browser (WebGL) laesst
+' sich der Cubemap-Shader nicht uebersetzen -- er ist fuer Desktop-GLSL
+' geschrieben. Statt daran zu scheitern, faellt die Szene auf das analytische
+' LIGHT_ENV zurueck. Dasselbe greift, wenn die .hdr-Datei fehlt.
+hdr_da = FALSE
+IF FILEEXISTS("assets/ibl_env.hdr") THEN
+    TRY
+        LIGHT_ENV_HDR("assets/ibl_env.hdr", 1.0)
+        hdr_da = TRUE
+    CATCH e
+        PRINT "HDR-Umgebung nicht nutzbar (" + e + ") -- nehme die Naeherung."
+    END TRY
+END IF
+IF NOT hdr_da THEN
     LIGHT_ENV(&H6090E0, &H201810, 1.0)        ' analytische Naeherung als Rueckfall
 END IF
 

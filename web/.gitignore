@@ -4,3 +4,5 @@ gbrt.wasm
 gbrt.data
 program.gb
 program.gbc
+# Kopie des assets/-Ordners neben der .gb -- Quelle ist das Programm selbst.
+assets/
