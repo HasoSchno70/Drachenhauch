@@ -153,6 +153,13 @@ def emcc_flags(out_dir: str | Path) -> list:
         # Struktur an, bevor sie auf den Haufen wandert, und sprengte die 64 KB:
         # AUDIO_MUSIC_PLAY brach mit einem nackten abort() ab.
         "-s", "STACK_SIZE=4MB",
+        # WebGL 2 (= OpenGL ES 3.0). Nur damit versteht der Browser GLSL ES
+        # 3.00, das bis auf die Versionszeile unserem Desktop-GLSL 330
+        # entspricht -- Beleuchtung, PBR, Skybox und Instancing brauchen es.
+        "-s", "MIN_WEBGL_VERSION=2",
+        "-s", "MAX_WEBGL_VERSION=2",
+        # ... und die leeren Ersatz-Bibliotheken auffindbar machen (siehe dort).
+        f"-L{leere_gl_ersatzbibliotheken().as_posix()}",
         # requestFullscreen gehoert dazu: raylibs ToggleFullscreen ruft es auf
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
@@ -232,6 +239,28 @@ def copy_assets(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
         return 0
     shutil.copytree(quelle, ziel)
     return sum(f.stat().st_size for f in ziel.rglob("*") if f.is_file())
+
+
+def leere_gl_ersatzbibliotheken() -> Path:
+    """Leere `libGLESv2.a`/`libGLdispatch.a` anlegen und ihren Ordner liefern.
+
+    raylib-sys haengt fuer sein `opengl_es_30`-Feature bedingungslos
+    `-lGLESv2 -lGLdispatch` an -- auch fuer emscripten, wo es diese
+    Bibliotheken gar nicht gibt (der Browser liefert GL selbst, und emscripten
+    linkt es ueber `-lGL-webgl2-getprocaddr`). Der Ziel-Filter fehlt dort
+    schlicht; der Build bricht mit `unable to find library -lGLdispatch` ab.
+
+    Statt auf einen Upstream-Fix zu warten, bekommt der Linker die Namen als
+    LEERE Archive. Sie tragen nichts bei -- sie beenden nur die Suche. (Ein
+    leeres ar-Archiv besteht aus genau seiner Kennung; kein Werkzeug noetig.)
+    """
+    ordner = CRATE / "target" / "wasm-gl-ersatz"
+    ordner.mkdir(parents=True, exist_ok=True)
+    for name in ("libGLESv2.a", "libGLdispatch.a"):
+        ziel = ordner / name
+        if not ziel.exists():
+            ziel.write_bytes(b"!<arch>\n")
+    return ordner
 
 
 def erzwinge_relink(flags: str) -> bool:

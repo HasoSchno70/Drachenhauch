@@ -153,6 +153,99 @@ struct LightData {
     loc_color: i32,
 }
 
+/// GLSL fuer die laufende Grafik-Schnittstelle zurechtlegen.
+///
+/// Unsere Shader sind in Desktop-GLSL 330 geschrieben. Der Browser faehrt
+/// WebGL 2, und dessen Sprache (GLSL ES 3.00) ist bis auf ZWEI Dinge dieselbe:
+/// die Versionszeile, und dass Genauigkeiten ausdruecklich angegeben werden
+/// muessen. Statt jeden Shader doppelt zu pflegen -- zwei Fassungen laufen
+/// unweigerlich auseinander -- wird hier nur der Kopf getauscht. Der Rumpf
+/// (`in`/`out`/`texture()`/`textureLod()`) ist in beiden Sprachen gueltig.
+///
+/// Das gilt auch fuer SHADER_LOAD: ein Shader, den jemand fuer den Desktop
+/// geschrieben hat, laeuft dadurch unveraendert im Browser mit.
+/// Kopf fuer WebGL 2. Die Genauigkeits-Angaben sind in GLSL ES Pflicht -- und
+/// `sampler2D` steht dort ohne Angabe auf `lowp`, was fuer eine Tiefenkarte
+/// (Schatten) zu grob waere.
+///
+/// Auf dem Desktop nur vom Test benutzt -- die Logik soll dort trotzdem
+/// nachweisbar sein, statt nur im Browser zu existieren.
+#[cfg_attr(not(target_os = "emscripten"), allow(dead_code))]
+const GLSL_KOPF_WEB: &str = "#version 300 es\n\
+                             precision highp float;\n\
+                             precision highp int;\n\
+                             precision highp sampler2D;\n\
+                             precision highp samplerCube;\n";
+
+/// Die Versionszeile durch `kopf` ersetzen (bzw. ihn voranstellen).
+///
+/// Absichtlich plattform-unabhaengig, damit die Logik auf dem Desktop
+/// **getestet** werden kann -- ein `#[cfg(emscripten)]`-Rumpf waere hier nie
+/// unter einem Test gelaufen. Gesucht wird ZEILENWEISE: ein "#version" mitten
+/// in einem Kommentar ist keine Versionsangabe.
+#[cfg_attr(not(target_os = "emscripten"), allow(dead_code))]
+fn kopf_ersetzen(src: &str, kopf: &str) -> String {
+    let mut ausgabe = String::with_capacity(src.len() + kopf.len());
+    let mut ersetzt = false;
+    for zeile in src.split_inclusive('\n') {
+        if !ersetzt && zeile.trim_start().starts_with("#version") {
+            ausgabe.push_str(kopf);
+            ersetzt = true;
+        } else {
+            ausgabe.push_str(zeile);
+        }
+    }
+    // Ohne Versionszeile gilt GLSL 1.10 bzw. ES 1.00 -- der Kopf muss trotzdem
+    // nach vorne, sonst uebersetzt gar nichts davon.
+    if !ersetzt { return format!("{kopf}{src}"); }
+    ausgabe
+}
+
+#[cfg(target_os = "emscripten")]
+pub fn fuer_ziel_uebersetzen(src: &str) -> std::borrow::Cow<'_, str> {
+    std::borrow::Cow::Owned(kopf_ersetzen(src, GLSL_KOPF_WEB))
+}
+
+#[cfg(not(target_os = "emscripten"))]
+pub fn fuer_ziel_uebersetzen(src: &str) -> std::borrow::Cow<'_, str> {
+    std::borrow::Cow::Borrowed(src)
+}
+
+#[cfg(test)]
+mod glsl_kopf_tests {
+    use super::{kopf_ersetzen, GLSL_KOPF_WEB};
+
+    #[test]
+    fn versionszeile_wird_getauscht_und_rumpf_bleibt() {
+        let quelle = "#version 330\nin vec2 fragTexCoord;\nvoid main() {}\n";
+        let neu = kopf_ersetzen(quelle, GLSL_KOPF_WEB);
+        assert!(neu.starts_with("#version 300 es\n"));
+        assert!(!neu.contains("#version 330"), "alte Version blieb stehen: {neu}");
+        assert!(neu.contains("in vec2 fragTexCoord;"), "Rumpf ging verloren");
+        assert!(neu.contains("void main() {}"));
+        // Genau EINE Versionszeile -- eine zweite waere ein Uebersetzungsfehler.
+        assert_eq!(neu.matches("#version").count(), 1);
+    }
+
+    #[test]
+    fn ohne_versionszeile_kommt_der_kopf_nach_vorne() {
+        let neu = kopf_ersetzen("void main() {}\n", GLSL_KOPF_WEB);
+        assert!(neu.starts_with("#version 300 es\n"));
+        assert!(neu.ends_with("void main() {}\n"));
+    }
+
+    #[test]
+    fn version_im_kommentar_ist_keine_versionszeile() {
+        // Sonst landete der Kopf mitten im Shader -- und die echte Angabe
+        // bliebe stehen.
+        let quelle = "#version 330\n// nutzt #version 330 Merkmale\nvoid main() {}\n";
+        let neu = kopf_ersetzen(quelle, GLSL_KOPF_WEB);
+        assert!(neu.starts_with("#version 300 es\n"));
+        assert!(neu.contains("// nutzt #version 330 Merkmale"),
+                "der Kommentar wurde angetastet: {neu}");
+    }
+}
+
 /// Eingebetteter Lighting-Vertex-Shader (raylib rlights, GLSL 330).
 const LIGHT_VS: &str = r#"#version 330
 in vec3 vertexPosition;
@@ -1621,7 +1714,8 @@ impl Graphics {
     /// view/ambient/lightCount-Locations werden gecacht.
     fn ensure_inst_shader(&mut self) {
         if self.inst_shader.is_some() { return; }
-        let mut sh = self.rl.load_shader_from_memory(&self.thread, Some(INST_VS), Some(INST_FS));
+        let mut sh = self.rl.load_shader_from_memory(&self.thread,
+            Some(&fuer_ziel_uebersetzen(INST_VS)), Some(&fuer_ziel_uebersetzen(INST_FS)));
         // instanceTransform-Attribut-Location -> SHADER_LOC_MATRIX_MODEL.
         let cname = std::ffi::CString::new("instanceTransform").unwrap();
         let attr = unsafe { raylib::ffi::rlGetLocationAttrib(sh.id, cname.as_ptr()) };
@@ -1825,7 +1919,8 @@ impl Graphics {
     /// Uniform-Locations fuer viewPos/ambient werden gecacht.
     pub fn light_enable(&mut self) {
         if self.light_shader.is_some() { return; }
-        let mut sh = self.rl.load_shader_from_memory(&self.thread, Some(LIGHT_VS), Some(LIGHT_FS));
+        let mut sh = self.rl.load_shader_from_memory(&self.thread,
+            Some(&fuer_ziel_uebersetzen(LIGHT_VS)), Some(&fuer_ziel_uebersetzen(LIGHT_FS)));
         // matModel fuer fragPosition (Weltkoordinaten) explizit binden.
         let loc_model = sh.get_shader_location("matModel");
         sh.locs_mut()[raylib::consts::ShaderLocationIndex::SHADER_LOC_MATRIX_MODEL as usize] = loc_model;
@@ -1899,7 +1994,8 @@ impl Graphics {
     /// Rendert eine einfache (1-Mip) Cubemap mit `fs` ueber die 6 Faces. Quelle ist
     /// eine 2D-Textur (equirect) oder eine Cubemap (irradiance). Liefert die GL-ID.
     fn ibl_render_cube(&mut self, fs: &str, src_id: u32, src_cubemap: bool, size: i32) -> Result<u32, String> {
-        let sh = self.rl.load_shader_from_memory(&self.thread, Some(CUBEMAP_VS), Some(fs));
+        let sh = self.rl.load_shader_from_memory(&self.thread,
+            Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(fs)));
         let id = sh.id;
         if id == 0 {
             // Der Grund steht dabei, weil er nicht am Aufruf liegt: unser
@@ -1956,7 +2052,8 @@ impl Graphics {
     /// rlGenTextureMipmaps fuer Cubemaps moeglich -> bindet GL_TEXTURE_2D).
     fn ibl_render_prefilter(&mut self, env_cubemap: u32, size: i32) -> Result<u32, String> {
         const MIPS: i32 = 5;
-        let sh = self.rl.load_shader_from_memory(&self.thread, Some(CUBEMAP_VS), Some(PREFILTER_FS));
+        let sh = self.rl.load_shader_from_memory(&self.thread,
+            Some(&fuer_ziel_uebersetzen(CUBEMAP_VS)), Some(&fuer_ziel_uebersetzen(PREFILTER_FS)));
         let id = sh.id;
         if id == 0 { return Err("LIGHT_ENV_HDR: Prefilter-Shader nicht ladbar".into()); }
         let loc_proj = sh.get_shader_location("matProjection");
@@ -2008,7 +2105,8 @@ impl Graphics {
 
     /// BRDF-Integrations-LUT (2D, NdotV x roughness) via Fullscreen-Quad.
     fn ibl_render_brdf(&mut self, size: i32) -> Result<u32, String> {
-        let sh = self.rl.load_shader_from_memory(&self.thread, Some(BRDF_VS), Some(BRDF_FS));
+        let sh = self.rl.load_shader_from_memory(&self.thread,
+            Some(&fuer_ziel_uebersetzen(BRDF_VS)), Some(&fuer_ziel_uebersetzen(BRDF_FS)));
         let id = sh.id;
         if id == 0 { return Err("LIGHT_ENV_HDR: BRDF-Shader nicht ladbar".into()); }
         let (win_w, win_h) = (self.width * self.scale, self.height * self.scale);
@@ -2102,7 +2200,8 @@ impl Graphics {
     /// Hintergrund. Ohne vorheriges LIGHT_ENV_HDR (ibl_env == 0) ein No-Op.
     pub fn skybox(&mut self, on: bool) {
         if on && self.skybox_shader.is_none() {
-            let sh = self.rl.load_shader_from_memory(&self.thread, Some(SKYBOX_VS), Some(SKYBOX_FS));
+            let sh = self.rl.load_shader_from_memory(&self.thread,
+                Some(&fuer_ziel_uebersetzen(SKYBOX_VS)), Some(&fuer_ziel_uebersetzen(SKYBOX_FS)));
             self.skybox_loc_proj = sh.get_shader_location("matProjection");
             self.skybox_loc_view = sh.get_shader_location("matView");
             self.skybox_shader = Some(sh);
@@ -2248,11 +2347,17 @@ impl Graphics {
         // Binden der Maps (Slots 11/12/13) passiert in render_scene im Draw-Kontext
         // (rlFramebufferAttach/begin_drawing wuerden eine fruehere Bindung loesen).
         if loc_use_ibl >= 0 { sh.set_shader_value(loc_use_ibl, if use_ibl { 1i32 } else { 0i32 }); }
-        if use_ibl {
-            if loc_irr >= 0 { sh.set_shader_value(loc_irr, 11i32); }
-            if loc_pre >= 0 { sh.set_shader_value(loc_pre, 12i32); }
-            if loc_brdf >= 0 { sh.set_shader_value(loc_brdf, 13i32); }
-        }
+        // Die Einheiten IMMER setzen, nicht nur mit IBL. Ohne das blieben die
+        // beiden Cubemap-Sampler auf ihrer Vorgabe 0 stehen -- auf derselben
+        // Einheit wie `texture0` (sampler2D). Zwei VERSCHIEDENE Sampler-Arten
+        // auf einer Einheit sind in WebGL 2 ein INVALID_OPERATION: der
+        // Zeichenaufruf wird verworfen, ohne dass Shader-Uebersetzung oder
+        // Verlinkung etwas melden. Genau daran blieb jedes MODEL_LIT-Modell im
+        // Browser unsichtbar. Desktop-Treiber sind an der Stelle nachsichtig --
+        // die Zuweisung schadet dort nichts (11-13 nutzt sonst niemand).
+        if loc_irr >= 0 { sh.set_shader_value(loc_irr, 11i32); }
+        if loc_pre >= 0 { sh.set_shader_value(loc_pre, 12i32); }
+        if loc_brdf >= 0 { sh.set_shader_value(loc_brdf, 13i32); }
         for (le, lt, lp, ltg, lc, en, kind, pos, target, color) in lights {
             if le >= 0 { sh.set_shader_value(le, en); }
             if lt >= 0 { sh.set_shader_value(lt, kind); }
@@ -4013,7 +4118,8 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     // --- Shader / Post-Processing ---
     /// Laedt einen Fragment-Shader (GLSL-Quelltext) -> Handle (Index) oder -1.
     pub fn load_shader(&mut self, code: &str) -> i64 {
-        let sh = self.rl.load_shader_from_memory(&self.thread, None, Some(code));
+        let sh = self.rl.load_shader_from_memory(&self.thread, None,
+                                        Some(&fuer_ziel_uebersetzen(code)));
         if !sh.is_shader_valid() { return -1; }
         self.shaders.push(sh);
         (self.shaders.len() - 1) as i64

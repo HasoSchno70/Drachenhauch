@@ -63,12 +63,15 @@ Alle nachgemessen, nicht vermutet:
 
   **Nur `FLIP` treibt die Uhr.** Ein Konsolenprogramm ohne Bildschleife bekommt
   im Browser keinen Takt -- dort steht die Wiedergabe still.
-- **Eigene Shader in Desktop-GLSL uebersetzen nicht.** Alles mit
-  `#version 330` (unsere PBR-/IBL-/Skybox-/Instancing-Shader und die
-  `POSTFX`-Beispiele) faellt auf WebGL mit
-  `'texture' : no matching overloaded function found` aus. Wer im Web Shader
-  will, schreibt sie in GLSL ES 1.00 (`#version 100`, `texture2D` statt
-  `texture`).
+- ~~Eigene Shader in Desktop-GLSL uebersetzen nicht.~~ **Erledigt seit
+  2026-08-03: 3D und Post-Effekte laufen.** Der Web-Build faehrt jetzt
+  **WebGL 2** statt WebGL 1 (`opengl_es_30` + `MIN/MAX_WEBGL_VERSION=2`).
+  Dessen Sprache GLSL ES 3.00 ist bis auf die Versionszeile und die
+  Genauigkeits-Angaben dasselbe wie Desktop-GLSL 330 -- statt alles auf die
+  aeltere Sprache herunterzuschreiben (und dabei IBL zu verlieren), wird also
+  das Ziel angehoben. `fuer_ziel_uebersetzen` in `graphics.rs` tauscht beim
+  Laden nur den Kopf; der Rumpf bleibt EINER. Das gilt auch fuer
+  `SHADER_LOAD`, ein Desktop-Shader laeuft also unveraendert im Browser.
 - **Keine Nicht-Zweierpotenz-Texturen mit Wiederholung**
   (`GL: NPOT textures extension not found`) -- eine Warnung, kein Fehler.
 
@@ -84,15 +87,28 @@ stumm. Im Browser nachgesehen:
 | Spektrum-Saeulen, Sinus-Scroller, Logo | vollstaendig |
 | Szenen-Spruenge mit den Zifferntasten | funktionieren |
 | 2D-Szenen (Titel, Bulk-Linien, Physik-Logo) | vollstaendig |
-| **3D-Szenen (Wuerfelfeld, Himmel/PBR)** | **schwarz** |
+| Post-Effekt (Plasma, Tunnel, Glimmen) | vollstaendig |
+| 3D: Wuerfelfeld mit `MODEL_INSTANCED` (1600 Wuerfel) | vollstaendig |
+| 3D: `MODEL_PBR` + `LIGHT_ENV_HDR` + `SKYBOX` + Schatten | vollstaendig |
 
-Die 3D-Szenen bleiben schwarz, weil unsere eingebauten Shader (Beleuchtung,
-PBR, Skybox, Instancing) Desktop-GLSL sind -- dieselbe Ursache wie beim
-Post-Effekt. Die HDR-Umgebung faengt ihren Shader-Fehler seit 2026-08-03 selbst
-ab (`TRY`/`CATCH` um `LIGHT_ENV_HDR`) und nimmt die analytische Naeherung; das
-ist auch auf dem Desktop richtig, wenn eine Grafik-Schnittstelle das Panorama
-nicht hergibt. **Der naechste Hebel fuer den Browser ist deshalb der
-Shader-Port nach GLSL ES 1.00**, nicht mehr das Audio.
+Damit laeuft die Demo im Browser bis auf den Ton **vollstaendig**.
+
+### Der Fund, der 3D im Browser blockierte
+
+Der Shader war nicht schuld. Nach der Umstellung auf WebGL 2 uebersetzten und
+verlinkten alle Shader fehlerfrei -- **und trotzdem war jedes `MODEL_LIT`-Modell
+unsichtbar**. Nachgemessen (Zeichenaufrufe im Browser umhaengt und `getError()`
+abgefragt): `drawArrays` lieferte `INVALID_OPERATION`.
+
+Ursache: ohne HDR-Umgebung blieben die beiden `samplerCube`-Uniformen auf ihrer
+Vorgabe -- Textureinheit 0, wo schon `texture0` als `sampler2D` liegt. **Zwei
+verschiedene Sampler-Arten auf einer Einheit sind in WebGL 2 ein Fehler**, und
+der Zeichenaufruf wird verworfen. Desktop-Treiber sind da nachsichtig, deshalb
+faellt es nur im Browser auf. Die Einheiten werden jetzt immer gesetzt.
+
+Die Lehre daraus ist allgemein: **ein fehlerfrei uebersetzter Shader sagt
+nichts darueber, ob gezeichnet wird.** Wenn Geometrie verschwindet, ist
+`getError()` nach dem Zeichenaufruf die Messung, die traegt.
 
 ### Zwei Fallen beim Bauen, die Stunden kosten koennen
 
@@ -229,7 +245,8 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `gbrt.data`, verifiziert).
 5. ~~Stummes Audio über Kiras `MockBackend`~~ ✅ erledigt (die Demo läuft damit
    im Browser, verifiziert).
-6. **Offen:** Shader nach GLSL ES 1.00 portieren — das ist der letzte Grund,
-   warum 3D-Szenen und Post-Effekte im Browser schwarz bleiben. Dazu
-   Touch-Input fürs Handy und eine kleine Beispiel-Galerie aus vorgefertigten
-   Share-Links.
+6. ~~Shader fürs Web~~ ✅ erledigt — über WebGL 2 statt eines Ports nach
+   GLSL ES 1.00 (3D, IBL, Skybox, Schatten und Post-Effekte verifiziert).
+7. **Offen:** Touch-Input fürs Handy, eine kleine Beispiel-Galerie aus
+   vorgefertigten Share-Links, und hörbarer Ton (bräuchte einen echten
+   WebAudio-Backend für Kira statt des MockBackends).
