@@ -57,10 +57,28 @@ xmrsplayer = { version = "0.13", optional = true }
 # keine C-Toolchain.
 rfd = { version = "0.14", optional = true }
 
+# --- Web-Build (emscripten): wasm-bindgen-Familie festnageln ---------------
+# Kira zieht cpal fuer JEDES wasm32-Ziel mit dem Feature `wasm-bindgen` herein
+# -- auch fuer emscripten, wo der WebAudio-Host gar nicht gebraucht wird (ein
+# Ziel-Filter-Fehler in Kiras Manifest: die Abhaengigkeit steht unter
+# cfg(target_arch = "wasm32") statt cfg(target_os = "unknown")). Er wird also
+# mitkompiliert, und ab wasm-bindgen 0.2.12x tut er das nicht mehr (neue
+# MaybeUnwindSafe-Schranke, gegen die cpal 0.17 nicht geschrieben ist).
+#
+# Deshalb hier die letzte Version festgehalten, mit der er uebersetzt. Betrifft
+# NUR den emscripten-Build -- auf dem Desktop ist wasm-bindgen gar nicht dabei.
+[target.'cfg(target_os = "emscripten")'.dependencies]
+wasm-bindgen = "=0.2.100"
+
 [features]
 default = []
 # Grafik (raylib: Fenster/GL/Input) + Audio (Kira: src/audio.rs) + native Dialoge.
-graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer", "dep:rfd"]
+graphics = ["dep:raylib", "dep:kira", "dep:mint", "dep:xmrs", "dep:xmrsplayer"]
+# Native OS-Dialoge (rfd) -- vom graphics-Feature GETRENNT, weil sie es im
+# Web-Build blockieren: rfd zieht js-sys/wasm-bindgen in einer Version nach,
+# die cpals WebAudio-Host nicht mehr uebersetzt. Auf dem Desktop immer mit
+# dabei (build_runtime.py), im WASM-Build weggelassen.
+dialogs = ["dep:rfd"]
 db = ["dep:rusqlite"]
 net = []                       # nur std::net -- Gate dient dem Opt-out
 http = ["dep:ureq"]
@@ -69,7 +87,7 @@ usb = ["dep:hidapi"]
 wifi = []                      # nur std::process (netsh) -- Gate fuer Opt-out
 bt = ["dep:btleplug", "dep:tokio", "dep:futures"]
 hardware = ["serial", "usb", "wifi", "bt"]
-full = ["graphics", "db", "net", "http", "hardware"]
+full = ["graphics", "dialogs", "db", "net", "http", "hardware"]
 
 [profile.release]
 opt-level = 3

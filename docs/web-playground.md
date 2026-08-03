@@ -1,5 +1,37 @@
 # Web-Playground (gbrt → WebAssembly)
 
+
+> **Stand 2026-08-03: der Web-Build laeuft.** Konsolen- UND Grafik-Programme
+> werden im Browser kompiliert und ausgefuehrt (verifiziert: Kreise, Formen und
+> Text auf der Leinwand, `gbrt.wasm` 8,8 MB). Der frueher als Kernhuerde
+> genannte blockierende Render-Loop ist mit ASYNCIFY kein Problem -- eine
+> `FOR`-Schleife mit `FLIP()` laeuft durch und gibt am Ende brav ihre
+> `PRINT`-Zeile aus.
+>
+> Vier Dinge waren dafuer noetig (alle im Repo):
+> 1. **`dialogs` vom `graphics`-Feature getrennt.** `rfd` (native Dateidialoge)
+>    zieht js-sys/wasm-bindgen in einer Version nach, mit der cpals
+>    WebAudio-Host nicht mehr uebersetzt -- und im Browser gibt es ohnehin keine
+>    OS-Dialoge.
+> 2. **wasm-bindgen fuer emscripten festgenagelt** (`=0.2.100`). Kira zieht cpal
+>    fuer JEDES `wasm32`-Ziel mit dem Feature `wasm-bindgen` herein, auch fuer
+>    emscripten, wo der WebAudio-Host gar nicht gebraucht wird (Ziel-Filter-
+>    Fehler in Kiras Manifest). Er wird also mitkompiliert und muss uebersetzen.
+> 3. **Kein Streaming auf wasm.** Kiras `sound::streaming` ist dort
+>    wegkonfiguriert und `StaticSoundData::from_file` gibt es nicht. Musik laeuft
+>    im Web ueber die Static-Variante (einmal ganz laden), Klaenge ueber
+>    `from_cursor` mit selbst gelesenen Bytes.
+> 4. **Leinwand-Groesse selbst setzen.** Nachgemessen: die Laufzeit meldet nach
+>    `SCREEN(480,320)` brav 480x320, der PUFFER der `<canvas>` blieb aber 1x1 --
+>    per CSS gestreckt wurde daraus eine Farbflaeche. `graphics.rs` ruft jetzt
+>    `emscripten_set_canvas_element_size` und zieht die Groesse in den ersten
+>    acht Bildern nach (raylib setzt sie danach noch einmal selbst).
+>
+> **Bekannte Grenze:** nach Programmende wird die Leinwand schwarz -- WebGL
+> verwirft den Zeichenpuffer nach dem Anzeigen (`preserveDrawingBuffer` ist
+> nicht gesetzt). Aus demselben Grund liefert `SAVESCREENSHOT` im Browser ein
+> leeres Bild. Beides betrifft nur das Nachher, nicht das Laufende.
+
 GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
 Konsolen-Ausgabe daneben.

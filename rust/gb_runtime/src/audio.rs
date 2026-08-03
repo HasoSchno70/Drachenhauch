@@ -34,7 +34,7 @@ use kira::{
     modulator::tweener::{TweenerBuilder, TweenerHandle},
     Mapping, Value as KValue,
     sound::static_sound::{StaticSoundData, StaticSoundHandle, StaticSoundSettings},
-    sound::{PlaybackState, streaming::{StreamingSoundData, StreamingSoundHandle}},
+    sound::PlaybackState,
     sound::FromFileError,
     track::{MainTrackBuilder, SpatialTrackBuilder, SpatialTrackHandle, TrackBuilder, TrackHandle},
 };
@@ -167,7 +167,16 @@ enum MusicSource {
 
 /// Laufende Musik-Instanz. Stream/Static teilen die Kira-Handle-API; Module
 /// laufen ueber einen Custom-Sound, gesteuert per Atomics in `ModShared`.
+// Kira kennt auf wasm KEIN Streaming (`sound::streaming` ist dort
+// wegkonfiguriert -- der Browser hat kein Dateisystem, von dem man nachladen
+// koennte). Im Web-Build laeuft Musik deshalb ueber die STATIC-Variante:
+// einmal ganz in den Speicher, dann abspielen. Fuer Modul-Musik aendert sich
+// gar nichts -- die spielt ohnehin ueber unseren eigenen ModuleSound.
+#[cfg(not(target_arch = "wasm32"))]
+use kira::sound::streaming::{StreamingSoundData, StreamingSoundHandle};
+
 enum MusicHandle {
+    #[cfg(not(target_arch = "wasm32"))]
     Stream(StreamingSoundHandle<FromFileError>),
     Static(StaticSoundHandle),
     Module(Arc<ModShared>),
@@ -375,6 +384,7 @@ impl Drop for ModuleSound {
 // Atomics (Volume in Decibels -> linear via as_amplitude).
 fn mh_stop(h: &mut MusicHandle, t: Tween) {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.stop(t),
         MusicHandle::Static(x) => x.stop(t),
         MusicHandle::Module(a) => a.stop_now.store(true, Relaxed),
@@ -382,6 +392,7 @@ fn mh_stop(h: &mut MusicHandle, t: Tween) {
 }
 fn mh_pause(h: &mut MusicHandle, t: Tween) {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.pause(t),
         MusicHandle::Static(x) => x.pause(t),
         MusicHandle::Module(a) => a.paused.store(true, Relaxed),
@@ -389,6 +400,7 @@ fn mh_pause(h: &mut MusicHandle, t: Tween) {
 }
 fn mh_resume(h: &mut MusicHandle, t: Tween) {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.resume(t),
         MusicHandle::Static(x) => x.resume(t),
         MusicHandle::Module(a) => a.paused.store(false, Relaxed),
@@ -396,6 +408,7 @@ fn mh_resume(h: &mut MusicHandle, t: Tween) {
 }
 fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.set_volume(d, t),
         MusicHandle::Static(x) => x.set_volume(d, t),
         MusicHandle::Module(a) => {
@@ -407,13 +420,27 @@ fn mh_set_volume(h: &mut MusicHandle, d: Decibels, t: Tween) {
 }
 fn mh_set_rate(h: &mut MusicHandle, r: f64, t: Tween) {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.set_playback_rate(r, t),
         MusicHandle::Static(x) => x.set_playback_rate(r, t),
         MusicHandle::Module(a) => a.pitch.store((r as f32).to_bits(), Relaxed),
     }
 }
+/// Eine Klangdatei komplett in den Speicher laden.
+///
+/// Statt `StaticSoundData::from_file`: das gibt es auf wasm nicht (Kira setzt
+/// dort kein Dateisystem voraus). Die Bytes selbst zu lesen und als Cursor zu
+/// uebergeben funktioniert auf BEIDEN Zielen gleich -- emscripten hat ein
+/// virtuelles Dateisystem, aus dem `std::fs::read` liest.
+fn static_von_pfad(pfad: &str) -> Result<StaticSoundData, String> {
+    let bytes = std::fs::read(pfad).map_err(|e| format!("{}: {}", pfad, e))?;
+    StaticSoundData::from_cursor(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("{:?}", e))
+}
+
 fn mh_state(h: &MusicHandle) -> PlaybackState {
     match h {
+        #[cfg(not(target_arch = "wasm32"))]
         MusicHandle::Stream(x) => x.state(),
         MusicHandle::Static(x) => x.state(),
         MusicHandle::Module(a) => if a.finished.load(Relaxed) {
@@ -1456,7 +1483,7 @@ resonance/reverb/distortion", other)),
     // ================= Core SFX =================
     pub fn load_sound(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
-        let data = StaticSoundData::from_file(&resolved)
+        let data = static_von_pfad(&resolved)
             .map_err(|e| format!("LOADSOUND: {:?}", e))?;
         Ok(self.push_slot(data, 1.0))
     }
@@ -1543,7 +1570,7 @@ resonance/reverb/distortion", other)),
     pub fn sample_load(&mut self, path: &str) -> Result<i64, String> {
         let resolved = crate::builtins::resolve_asset_path(path);
         // Kira dekodiert die Datei; wir lesen die Frames als mono f32.
-        let data = StaticSoundData::from_file(&resolved)
+        let data = static_von_pfad(&resolved)
             .map_err(|e| format!("SAMPLE_LOAD: {:?}", e))?;
         let sr = data.sample_rate;
         let mono: Vec<f32> = data.frames.iter().map(|f| (f.left + f.right) * 0.5).collect();
@@ -1717,9 +1744,12 @@ resonance/reverb/distortion", other)),
             Module::load(&bytes).map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
             MusicSource::Module(bytes)
         } else {
-            // Stream testweise oeffnen (Fehler frueh melden).
+            // Testweise oeffnen, um Fehler frueh zu melden.
+            #[cfg(not(target_arch = "wasm32"))]
             StreamingSoundData::from_file(&resolved)
                 .map_err(|e| format!("AUDIO_MUSIC_LOAD: {:?}", e))?;
+            #[cfg(target_arch = "wasm32")]
+            static_von_pfad(&resolved).map_err(|e| format!("AUDIO_MUSIC_LOAD: {}", e))?;
             MusicSource::Stream(resolved)
         };
         if let Some(h) = self.music_handle.as_mut() { mh_stop(h, tween_now()); }
@@ -1738,12 +1768,24 @@ resonance/reverb/distortion", other)),
         let endless = loops < 0;
         let mut handle = match self.music_source.as_ref() {
             None => return Ok(()),
+            #[cfg(not(target_arch = "wasm32"))]
             Some(MusicSource::Stream(path)) => {
                 let mut data = StreamingSoundData::from_file(path)
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?;
                 if endless { data = data.loop_region(0.0..); }
                 data = data.volume(vol_db).playback_rate(pitch);
                 MusicHandle::Stream(self.music_track.play(data)   // Musik-Bus
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
+            }
+            // Web: kein Streaming -> das Stueck einmal ganz laden. Fuer die
+            // ueblichen Groessen (ein paar hundert KB) ist das unauffaellig.
+            #[cfg(target_arch = "wasm32")]
+            Some(MusicSource::Stream(path)) => {
+                let mut data = static_von_pfad(path)
+                    .map_err(|e| format!("AUDIO_MUSIC_PLAY: {}", e))?;
+                if endless { data = data.loop_region(0.0..); }
+                data = data.volume(vol_db).playback_rate(pitch);
+                MusicHandle::Static(self.music_track.play(data)
                     .map_err(|e| format!("AUDIO_MUSIC_PLAY: {:?}", e))?)
             }
             Some(MusicSource::Module(bytes)) => {
@@ -1840,6 +1882,7 @@ resonance/reverb/distortion", other)),
     pub fn music_get_pitch(&self) -> f64 { self.music_pitch as f64 }
     pub fn music_position(&self) -> f64 {
         match self.music_handle.as_ref() {
+            #[cfg(not(target_arch = "wasm32"))]
             Some(MusicHandle::Stream(h)) => h.position(),
             Some(MusicHandle::Static(h)) => h.position(),
             Some(MusicHandle::Module(a)) => {

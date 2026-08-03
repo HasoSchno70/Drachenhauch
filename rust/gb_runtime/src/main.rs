@@ -45,7 +45,7 @@ mod firmata;
 mod usb;
 #[cfg(feature = "wifi")]
 mod wifi;
-#[cfg(feature = "graphics")]
+#[cfg(feature = "dialogs")]
 mod filedialog;
 #[cfg(feature = "graphics")]
 mod graphics;

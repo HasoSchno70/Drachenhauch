@@ -4163,27 +4163,44 @@ impl<'p> Vm<'p> {
             "window_passthrough" => { g!().window_passthrough(gb(a, 0)); Value::Nil }
 
             // --- Native OS-Datei-/Ordner-Dialoge (rfd; liefern Pfad oder "") ---
+            // Eigenes Feature `dialogs`: im Web-Build gibt es keine
+            // OS-Dialoge, und rfd wuerde den Build sogar verhindern (es zieht
+            // js-sys/wasm-bindgen in einer Version nach, mit der cpals
+            // WebAudio-Host nicht mehr uebersetzt). Ohne das Feature melden
+            // die Aufrufe sich klar, statt still etwas Falsches zu liefern.
+            #[cfg(feature = "dialogs")]
             "file_open_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FILE_OPEN_DIALOG")?.to_string() } else { String::new() };
                 let exts = if a.len() >= 2 { crate::filedialog::parse_exts(gs(a, 1, "FILE_OPEN_DIALOG")?) } else { vec![] };
                 Value::str_rc(&crate::filedialog::open(&title, &exts))
             }
+            #[cfg(feature = "dialogs")]
             "file_save_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
                 let default_name = if a.len() >= 2 { gs(a, 1, "FILE_SAVE_DIALOG")?.to_string() } else { String::new() };
                 let exts = if a.len() >= 3 { crate::filedialog::parse_exts(gs(a, 2, "FILE_SAVE_DIALOG")?) } else { vec![] };
                 Value::str_rc(&crate::filedialog::save(&title, &default_name, &exts))
             }
+            #[cfg(feature = "dialogs")]
             "folder_dialog" => {
                 let title = if !a.is_empty() { gs(a, 0, "FOLDER_DIALOG")?.to_string() } else { String::new() };
                 Value::str_rc(&crate::filedialog::folder(&title))
             }
+            #[cfg(feature = "dialogs")]
             "gui_message" => {
                 crate::filedialog::message(gs(a, 0, "GUI_MESSAGE")?, gs(a, 1, "GUI_MESSAGE")?);
                 Value::Nil
             }
+            #[cfg(feature = "dialogs")]
             "gui_confirm" => {
                 Value::Bool(crate::filedialog::confirm(gs(a, 0, "GUI_CONFIRM")?, gs(a, 1, "GUI_CONFIRM")?))
+            }
+            #[cfg(not(feature = "dialogs"))]
+            "file_open_dialog" | "file_save_dialog" | "folder_dialog"
+            | "gui_message" | "gui_confirm" => {
+                return Err(format!(
+                    "{}: in diesem Build nicht verfuegbar -- native OS-Dialoge gibt es                      nur auf dem Desktop (Feature `dialogs`), nicht im Browser.",
+                    name.to_uppercase()));
             }
 
             // --- Monitore / Display-Infos ---

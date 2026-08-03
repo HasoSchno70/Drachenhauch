@@ -720,6 +720,28 @@ struct GfxState {
     post_shader_idx: Option<usize>,
 }
 
+/// Web: den PUFFER der HTML-Leinwand auf die Fenstergroesse bringen.
+///
+/// Nachgemessen im Browser: nach `SCREEN(480,320)` meldet die Laufzeit brav
+/// 480x320 -- der Puffer der `<canvas>` blieb aber 1x1, und per CSS auf volle
+/// Breite gestreckt wurde daraus eine einzige Farbflaeche. raylibs Web-Pfad
+/// setzt die Groesse offenbar spaeter selbst noch einmal, deshalb wird sie in
+/// den ersten Bildern erneut gesetzt (siehe `web_canvas_ticks`) statt nur
+/// einmal beim Anlegen.
+#[cfg(target_os = "emscripten")]
+fn web_leinwand_groesse(w: i32, h: i32) {
+    extern "C" {
+        fn emscripten_set_canvas_element_size(
+            target: *const std::os::raw::c_char,
+            width: std::os::raw::c_int,
+            height: std::os::raw::c_int,
+        ) -> std::os::raw::c_int;
+    }
+    if let Ok(ziel) = std::ffi::CString::new("#canvas") {
+        unsafe { emscripten_set_canvas_element_size(ziel.as_ptr(), w, h); }
+    }
+}
+
 pub struct Graphics {
     rl: RaylibHandle,
     thread: RaylibThread,
@@ -984,6 +1006,15 @@ impl Graphics {
             rl.set_window_state(WindowState::default().set_window_hidden(true));
         }
         rl.set_target_fps(60);
+        // Web: die HTML-Leinwand auf die Fenstergroesse bringen.
+        //
+        // Nachgemessen im Browser: die Laufzeit meldet nach SCREEN(480,320)
+        // brav 480x320 -- der PUFFER der <canvas> blieb aber 1x1, und per CSS
+        // auf volle Breite gestreckt wurde daraus eine einzige Farbflaeche.
+        // raylibs Web-Pfad setzt die Groesse hier nicht durch; emscriptens
+        // eigener Aufruf tut es zuverlaessig.
+        #[cfg(target_os = "emscripten")]
+        web_leinwand_groesse(win_w, win_h);
         // Headless-Verifizierung: GBRT_FRAMES begrenzt die Frames, GBRT_SCREENSHOT
         // legt den PNG-Pfad fest (Screenshot beim letzten Frame).
         let max_frames = std::env::var("GBRT_FRAMES").ok().and_then(|s| s.parse().ok());
@@ -4316,6 +4347,12 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
         self.active = 0;
         self.active_rt = None;
         self.frame_count += 1;
+        // Web: raylib setzt die Leinwand nach dem Anlegen noch einmal selbst --
+        // die ersten Bilder lang nachziehen, danach steht sie.
+        #[cfg(target_os = "emscripten")]
+        if self.frame_count <= 8 {
+            web_leinwand_groesse(self.width * self.scale, self.height * self.scale);
+        }
         // CAMERA_SHAKE: Offset fuer den naechsten Frame wuerfeln/abklingen.
         self.update_shake();
         // Headless-Screenshot beim Erreichen der Frame-Grenze.
