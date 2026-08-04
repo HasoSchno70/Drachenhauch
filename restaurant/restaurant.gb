@@ -1,0 +1,627 @@
+' ===========================================================================
+'  R E S T A U R A N T   --   senkrechte Scheibe
+' ===========================================================================
+'
+'  Ein Gericht, eine Schlange, ein Tag. Mehr nicht -- und genau das ist der
+'  Punkt: erst wenn DIESE Minute Spass macht, lohnt sich alles Weitere
+'  (Kiosk, Imbiss, Personal, Filialen).
+'
+'  Der Kreislauf:
+'      Gast kommt -> stellt sich an -> bestellt
+'      du kochst  -> zu kurz = roh, zu lang = angebrannt
+'      servierst  -> Geld + Trinkgeld, je schneller desto mehr
+'      Geduld leer -> Gast geht -> Ruf sinkt -> morgen kommen weniger
+'
+'  Steuerung:
+'      1 / 2        Topf anheizen (Topf 2 ist erst nach dem Kauf da)
+'      LEER         fertiges Gericht an den vordersten Gast servieren
+'      ESC          beenden
+'
+' ---------------------------------------------------------------------------
+
+IMPORT "audio"
+IMPORT "save"
+
+CONST BREITE AS INTEGER = 960
+CONST HOEHE AS INTEGER = 540
+
+' --- Farben (einmal benannt, nirgends als Zahl im Code) --------------------
+CONST C_HIMMEL AS INTEGER = &H2B3A52
+CONST C_WAND AS INTEGER = &H3B4E6B
+CONST C_BODEN AS INTEGER = &H24314A
+CONST C_TRESEN AS INTEGER = &H8A5A32
+CONST C_TRESEN_HELL AS INTEGER = &HA9713F
+CONST C_WEISS AS INTEGER = &HF2F6FA
+CONST C_GRAU AS INTEGER = &H8FA0B8
+CONST C_GELB AS INTEGER = &HFFC94D
+CONST C_GRUEN AS INTEGER = &H6FD48A
+CONST C_ROT AS INTEGER = &HE4614F
+CONST C_ORANGE AS INTEGER = &HFF8A3D
+
+' --- Spielwerte (hier drehen, nicht im Code) -------------------------------
+CONST TAG_DAUER AS FLOAT = 75.0        ' Sekunden bis Feierabend
+CONST KOCHZEIT AS FLOAT = 3.0          ' bis das Gericht fertig ist
+CONST BRENNZEIT AS FLOAT = 5.5         ' ab hier ist es verkohlt
+CONST GEDULD AS FLOAT = 22.0           ' Sekunden, bis ein Gast geht
+CONST PREIS AS INTEGER = 12            ' Grundpreis je Teller
+CONST TOPF2_PREIS AS INTEGER = 320     ' erster Ausbau: ~ein guter Tag Arbeit
+
+CONST MAXGAESTE AS INTEGER = 4         ' so viele passen in die Schlange
+CONST MAXTOEPFE AS INTEGER = 2
+CONST SPEICHERDATEI AS STRING = "restaurant.sav"
+
+' --- Buehne: Kueche links, Tresen in der Mitte, Schlange rechts ------------
+CONST TRESEN_L AS INTEGER = 40
+CONST TRESEN_R AS INTEGER = 600
+CONST TRESEN_O AS INTEGER = 330
+CONST TRESEN_U AS INTEGER = 404
+CONST SCHLANGE_X AS FLOAT = 660.0      ' hier steht der vorderste Gast
+CONST SCHLANGE_ABSTAND AS FLOAT = 92.0
+
+' --- Gast-Zustaende --------------------------------------------------------
+CONST G_LEER AS INTEGER = 0
+CONST G_KOMMT AS INTEGER = 1
+CONST G_WARTET AS INTEGER = 2
+CONST G_GEHT AS INTEGER = 3
+
+' --- Topf-Zustaende --------------------------------------------------------
+CONST T_AUS AS INTEGER = 0
+CONST T_KOCHT AS INTEGER = 1
+CONST T_FERTIG AS INTEGER = 2
+CONST T_VERKOHLT AS INTEGER = 3
+
+' --- Spielphasen -----------------------------------------------------------
+CONST P_DIENST AS INTEGER = 0
+CONST P_ABRECHNUNG AS INTEGER = 1
+CONST P_LADEN AS INTEGER = 2
+
+' ---------------------------------------------------------------- Zustand
+DIM phase AS INTEGER
+DIM zeit AS FLOAT                      ' Restzeit des Tages
+DIM geld AS INTEGER
+DIM ruf AS FLOAT                       ' 0..100, steuert den Andrang
+DIM tag AS INTEGER
+DIM toepfe_frei AS INTEGER             ' wie viele Kochstellen gekauft sind
+
+DIM bedient AS INTEGER                 ' Statistik des laufenden Tages
+DIM verloren AS INTEGER
+DIM tages_geld AS INTEGER
+
+' Gaeste (parallele Felder statt Objekten -- schnell und leicht zu ueberblicken)
+DIM g_zustand[MAXGAESTE] AS INTEGER
+DIM g_x[MAXGAESTE] AS FLOAT            ' Bildposition
+DIM g_ziel[MAXGAESTE] AS FLOAT
+DIM g_geduld[MAXGAESTE] AS FLOAT
+DIM g_hupf[MAXGAESTE] AS FLOAT         ' kleine Auf-und-ab-Bewegung
+DIM g_farbe[MAXGAESTE] AS INTEGER
+DIM g_name[MAXGAESTE] AS STRING
+
+DIM t_zustand[MAXTOEPFE] AS INTEGER
+DIM t_zeit[MAXTOEPFE] AS FLOAT
+
+DIM gast_zaehler AS INTEGER            ' fuer die Namen (reihum)
+DIM naechster_gast AS FLOAT            ' Countdown bis zum naechsten Gast
+DIM meldung AS STRING                  ' kurze Einblendung ("+14 EUR")
+DIM meldung_zeit AS FLOAT
+DIM meldung_farbe AS INTEGER
+DIM ruettel AS FLOAT                   ' Bildschirm-Ruettler bei Aerger
+
+' Klaenge -- keine einzige Datei noetig
+DIM s_ping AS SOUND
+DIM s_muenze AS SOUND
+DIM s_brutzel AS SOUND
+DIM s_aerger AS SOUND
+DIM s_klick AS SOUND
+
+DIM speicher AS SAVE_HANDLE
+DIM i AS INTEGER
+DIM dt AS FLOAT
+
+' ---------------------------------------------------------------- Hilfen
+FUNCTION klemme(v AS FLOAT, u AS FLOAT, o AS FLOAT) AS FLOAT
+    IF v < u THEN RETURN u
+    IF v > o THEN RETURN o
+    RETURN v
+END FUNCTION
+
+' Zwei Farben mischen (t = 0 -> a, t = 1 -> b). Fuer Balken und Uebergaenge.
+FUNCTION misch(a AS INTEGER, b AS INTEGER, t AS FLOAT) AS INTEGER
+    DIM f AS FLOAT
+    f = klemme(t, 0.0, 1.0)
+    DIM ar AS INTEGER
+    DIM ag AS INTEGER
+    DIM ab AS INTEGER
+    DIM br AS INTEGER
+    DIM bg AS INTEGER
+    DIM bb AS INTEGER
+    ar = (a SHR 16) BAND 255 : ag = (a SHR 8) BAND 255 : ab = a BAND 255
+    br = (b SHR 16) BAND 255 : bg = (b SHR 8) BAND 255 : bb = b BAND 255
+    RETURN RGB(INT(ar + (br - ar) * f), INT(ag + (bg - ag) * f), INT(ab + (bb - ab) * f))
+END FUNCTION
+
+SUB sag(text AS STRING, farbe AS INTEGER)
+    meldung = text
+    meldung_farbe = farbe
+    meldung_zeit = 1.6
+END SUB
+
+' Ein Gastname aus einer kleinen Liste -- Namen machen aus Kloetzen Menschen.
+FUNCTION gastname(n AS INTEGER) AS STRING
+    SELECT CASE n MOD 8
+        CASE 0
+            RETURN "Frau Berger"
+        CASE 1
+            RETURN "Herr Ott"
+        CASE 2
+            RETURN "Lena"
+        CASE 3
+            RETURN "Der Postbote"
+        CASE 4
+            RETURN "Frau Ilic"
+        CASE 5
+            RETURN "Tom"
+        CASE 6
+            RETURN "Oma Kranz"
+        CASE ELSE
+            RETURN "Herr Sander"
+    END SELECT
+END FUNCTION
+
+' ---------------------------------------------------------------- Aufbau
+SUB neuer_tag()
+    phase = P_DIENST
+    zeit = TAG_DAUER
+    bedient = 0
+    verloren = 0
+    tages_geld = 0
+    naechster_gast = 1.5
+    meldung_zeit = 0.0
+    FOR i = 0 TO MAXGAESTE - 1
+        g_zustand[i] = G_LEER
+    NEXT
+    FOR i = 0 TO MAXTOEPFE - 1
+        t_zustand[i] = T_AUS
+        t_zeit[i] = 0.0
+    NEXT
+END SUB
+
+SUB klaenge_bauen()
+    s_ping = AUDIO_SFX("sine", 880.0, 220.0, 0.0, 0.04, 0.18, 0.0, 0.0, 0.45)
+    s_muenze = AUDIO_SFX("square", 1050.0, 600.0, 0.0, 0.03, 0.12, 0.0, 0.0, 0.35)
+    s_brutzel = AUDIO_SFX("noise", 400.0, -120.0, 0.01, 0.06, 0.20, 0.0, 0.0, 0.30)
+    s_aerger = AUDIO_SFX("saw", 300.0, -220.0, 0.0, 0.10, 0.25, 0.0, 0.0, 0.40)
+    s_klick = AUDIO_SFX("square", 520.0, -80.0, 0.0, 0.02, 0.06, 0.0, 0.0, 0.25)
+END SUB
+
+' ---------------------------------------------------------------- Gaeste
+FUNCTION freier_platz() AS INTEGER
+    FOR i = 0 TO MAXGAESTE - 1
+        IF g_zustand[i] = G_LEER THEN RETURN i
+    NEXT
+    RETURN -1
+END FUNCTION
+
+' Der vorderste wartende Gast (der an der Reihe ist).
+FUNCTION vorderster() AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO MAXGAESTE - 1
+        IF g_zustand[k] = G_WARTET THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB gast_erzeugen()
+    DIM p AS INTEGER
+    p = freier_platz()
+    IF p < 0 THEN RETURN
+    g_zustand[p] = G_KOMMT
+    g_x[p] = BREITE + 40.0
+    g_ziel[p] = SCHLANGE_X + p * SCHLANGE_ABSTAND
+    g_geduld[p] = GEDULD
+    g_hupf[p] = RND() * 6.28
+    g_farbe[p] = RGB(120 + INT(RND() * 120.0), 110 + INT(RND() * 110.0), 150 + INT(RND() * 100.0))
+    g_name[p] = gastname(gast_zaehler)
+    gast_zaehler = gast_zaehler + 1
+END SUB
+
+SUB gaeste_bewegen()
+    FOR i = 0 TO MAXGAESTE - 1
+        IF g_zustand[i] = G_LEER THEN CONTINUE
+        g_hupf[i] = g_hupf[i] + dt * 6.0
+
+        IF g_zustand[i] = G_KOMMT THEN
+            g_x[i] = g_x[i] - 220.0 * dt
+            IF g_x[i] <= g_ziel[i] THEN
+                g_x[i] = g_ziel[i]
+                g_zustand[i] = G_WARTET
+            END IF
+        ELSEIF g_zustand[i] = G_WARTET THEN
+            ' Nachruecken, wenn vorne einer weg ist
+            g_ziel[i] = SCHLANGE_X + i * SCHLANGE_ABSTAND
+            IF g_x[i] > g_ziel[i] THEN g_x[i] = g_x[i] - 160.0 * dt
+            g_geduld[i] = g_geduld[i] - dt
+            IF g_geduld[i] <= 0.0 THEN
+                g_zustand[i] = G_GEHT
+                verloren = verloren + 1
+                ruf = klemme(ruf - 9.0, 0.0, 100.0)
+                ruettel = 0.5
+                PLAYSOUND(s_aerger)
+                sag(g_name[i] + " geht wütend!", C_ROT)
+            END IF
+        ELSEIF g_zustand[i] = G_GEHT THEN
+            g_x[i] = g_x[i] + 300.0 * dt
+            IF g_x[i] > BREITE + 60.0 THEN g_zustand[i] = G_LEER
+        END IF
+    NEXT
+END SUB
+
+' ---------------------------------------------------------------- Kochen
+SUB topf_anheizen(nr AS INTEGER)
+    IF nr >= toepfe_frei THEN
+        sag("Diese Kochstelle hast du noch nicht", C_GRAU)
+        RETURN
+    END IF
+    IF t_zustand[nr] = T_AUS THEN
+        t_zustand[nr] = T_KOCHT
+        t_zeit[nr] = 0.0
+        PLAYSOUND(s_brutzel)
+    ELSEIF t_zustand[nr] = T_VERKOHLT THEN
+        t_zustand[nr] = T_AUS          ' Topf ausleeren
+        t_zeit[nr] = 0.0
+        PLAYSOUND(s_klick)
+    END IF
+END SUB
+
+SUB toepfe_kochen()
+    FOR i = 0 TO toepfe_frei - 1
+        IF t_zustand[i] = T_KOCHT THEN
+            t_zeit[i] = t_zeit[i] + dt
+            IF t_zeit[i] >= KOCHZEIT THEN
+                t_zustand[i] = T_FERTIG
+                PLAYSOUND(s_ping)
+            END IF
+        ELSEIF t_zustand[i] = T_FERTIG THEN
+            t_zeit[i] = t_zeit[i] + dt
+            IF t_zeit[i] >= BRENNZEIT THEN
+                t_zustand[i] = T_VERKOHLT
+                ruettel = 0.35
+                PLAYSOUND(s_aerger)
+                sag("Angebrannt!", C_ROT)
+            END IF
+        END IF
+    NEXT
+END SUB
+
+FUNCTION fertiger_topf() AS INTEGER
+    DIM k AS INTEGER
+    FOR k = 0 TO toepfe_frei - 1
+        IF t_zustand[k] = T_FERTIG THEN RETURN k
+    NEXT
+    RETURN -1
+END FUNCTION
+
+SUB servieren()
+    DIM t AS INTEGER
+    DIM g AS INTEGER
+    t = fertiger_topf()
+    g = vorderster()
+    IF t < 0 THEN
+        sag("Nichts fertig", C_GRAU)
+        RETURN
+    END IF
+    IF g < 0 THEN
+        sag("Kein Gast da", C_GRAU)
+        RETURN
+    END IF
+
+    ' Trinkgeld: wer kurz gewartet hat, gibt mehr. Das ist die ganze Spannung
+    ' zwischen "schnell" und "sorgfaeltig" -- in einer Zeile.
+    DIM anteil AS FLOAT
+    anteil = klemme(g_geduld[g] / GEDULD, 0.0, 1.0)
+    DIM trinkgeld AS INTEGER
+    trinkgeld = INT(anteil * 8.0)
+    DIM summe AS INTEGER
+    summe = PREIS + trinkgeld
+
+    geld = geld + summe
+    tages_geld = tages_geld + summe
+    bedient = bedient + 1
+    ruf = klemme(ruf + 0.6 + anteil * 0.9, 0.0, 100.0)
+
+    t_zustand[t] = T_AUS
+    t_zeit[t] = 0.0
+    g_zustand[g] = G_GEHT
+    PLAYSOUND(s_muenze)
+    sag("+" + STR$(summe) + " EUR   " + g_name[g] + " ist zufrieden", C_GELB)
+END SUB
+
+' ---------------------------------------------------------------- Zeichnen
+SUB kulisse_zeichnen()
+    ' Wand, Boden, Tresen -- bewusst wenige, grosse Flaechen.
+    GRADIENTV(0, 0, BREITE, 300, C_HIMMEL, C_WAND)
+    BOX(0, 300, BREITE, HOEHE, C_BODEN)
+    BOX(0, 296, BREITE, 302, &H1A2233)
+
+    ' Kueche hinten links
+    BOXROUND(120, 120, 600, 310, 10, &H43597A)
+    TEXT_SIZE(16)
+    TEXT(138, 132, "KÜCHE", C_GRAU)
+
+    ' Tresen
+    BOXROUND(TRESEN_L, TRESEN_O, TRESEN_R, TRESEN_U, 12, C_TRESEN)
+    BOX(TRESEN_L, TRESEN_O, TRESEN_R, TRESEN_O + 14, C_TRESEN_HELL)
+END SUB
+
+SUB toepfe_zeichnen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    FOR i = 0 TO MAXTOEPFE - 1
+        x = 240 + i * 230
+        y = 215
+        IF i >= toepfe_frei THEN
+            ' Noch nicht gekauft: Platz sichtbar frei halten, damit man sieht,
+            ' dass hier noch etwas hinkommt.
+            RECTROUND(x - 62, y - 50, x + 62, y + 62, 12, &H4C6288)
+            TEXT_SIZE(16)
+            TEXT(x - TEXT_WIDTH("gesperrt") \ 2, y - 8, "gesperrt", &H6E82A6)
+            CONTINUE
+        END IF
+
+        ' Herdplatte -- gluht, solange gekocht wird
+        DIM glut AS INTEGER
+        glut = &H55627C
+        IF t_zustand[i] = T_KOCHT THEN glut = misch(&H55627C, C_ORANGE, 0.75)
+        BOXROUND(x - 66, y + 40, x + 66, y + 62, 8, glut)
+
+        ' Topf
+        BOXROUND(x - 56, y - 34, x + 56, y + 44, 10, &H2C3446)
+        BOX(x - 62, y - 42, x + 62, y - 30, &H3C4658)
+
+        DIM inhalt AS INTEGER
+        inhalt = &H2C3446
+        IF t_zustand[i] = T_KOCHT THEN inhalt = misch(&H8A6A3A, C_GELB, t_zeit[i] / KOCHZEIT)
+        IF t_zustand[i] = T_FERTIG THEN inhalt = C_GELB
+        IF t_zustand[i] = T_VERKOHLT THEN inhalt = &H2A2018
+        IF t_zustand[i] <> T_AUS THEN BOXROUND(x - 48, y - 26, x + 48, y + 30, 8, inhalt)
+
+        ' Dampf, sobald es warm wird
+        IF t_zustand[i] = T_KOCHT OR t_zustand[i] = T_FERTIG THEN
+            DIM d AS INTEGER
+            FOR d = 0 TO 2
+                DIM dy AS FLOAT
+                dy = ((GET_TIME() * 34.0) + d * 18.0) MOD 54.0
+                CIRCLE(x - 20 + d * 20 + INT(SIN(GET_TIME() * 3.0 + d) * 5.0), _
+                       INT(y - 40.0 - dy), 5, &H4A5A74)
+            NEXT
+        END IF
+
+        ' Fortschritt: erst gruen (kocht), dann rot ablaufend (brennt gleich an)
+        IF t_zustand[i] = T_KOCHT THEN
+            DIM b AS FLOAT
+            b = klemme(t_zeit[i] / KOCHZEIT, 0.0, 1.0)
+            BOX(x - 58, y + 72, x - 58 + INT(116.0 * b), y + 82, C_GRUEN)
+        ELSEIF t_zustand[i] = T_FERTIG THEN
+            DIM r AS FLOAT
+            r = klemme((t_zeit[i] - KOCHZEIT) / (BRENNZEIT - KOCHZEIT), 0.0, 1.0)
+            BOX(x - 58, y + 72, x + 58 - INT(116.0 * r), y + 82, misch(C_GELB, C_ROT, r))
+        ELSEIF t_zustand[i] = T_VERKOHLT THEN
+            TEXT_SIZE(15)
+            TEXT(x - TEXT_WIDTH("Taste räumt aus") \ 2, y + 70, "Taste räumt aus", C_ROT)
+        END IF
+        BOX(x - 58, y + 72, x + 58, y + 73, &H55627C)
+
+        TEXT_SIZE(17)
+        TEXT(x - 5, y + 90, STR$(i + 1), C_GRAU)
+    NEXT
+END SUB
+
+' Ein fertiger Teller steht sichtbar auf dem Tresen. Ohne dieses Zeichen
+' merkt man nicht, dass man jetzt servieren KANN -- der Topf steht hinten.
+SUB teller_zeichnen()
+    IF fertiger_topf() < 0 THEN RETURN
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    x = TRESEN_R - 70
+    y = TRESEN_O - 6 + INT(SIN(GET_TIME() * 5.0) * 3.0)
+    CIRCLE(x, y, 26, C_WEISS)
+    CIRCLE(x, y, 19, C_GELB)
+    TEXT_SIZE(15)
+    TEXT(x - TEXT_WIDTH("LEER") \ 2, y - 44, "LEER", C_GELB)
+END SUB
+
+SUB gaeste_zeichnen()
+    DIM x AS INTEGER
+    DIM y AS INTEGER
+    DIM hupf AS INTEGER
+    FOR i = 0 TO MAXGAESTE - 1
+        IF g_zustand[i] = G_LEER THEN CONTINUE
+        x = INT(g_x[i])
+        hupf = 0
+        IF g_zustand[i] <> G_GEHT THEN hupf = INT(SIN(g_hupf[i]) * 3.0)
+        y = 330 + hupf
+
+        ' Koerper + Kopf
+        BOXROUND(x - 22, y, x + 22, y + 92, 12, g_farbe[i])
+        CIRCLE(x, y - 16, 18, misch(g_farbe[i], C_WEISS, 0.35))
+
+        IF g_zustand[i] = G_WARTET THEN
+            ' Geduldsbalken ueber dem Kopf -- die wichtigste Zahl im Bild
+            DIM a AS FLOAT
+            a = klemme(g_geduld[i] / GEDULD, 0.0, 1.0)
+            DIM bf AS INTEGER
+            bf = misch(C_ROT, C_GRUEN, a)
+            BOX(x - 26, y - 54, x + 26, y - 44, &H1D2536)
+            BOX(x - 25, y - 53, x - 25 + INT(50.0 * a), y - 45, bf)
+            TEXT_SIZE(14)
+            TEXT(x - TEXT_WIDTH(g_name[i]) \ 2, y - 78, g_name[i], C_GRAU)
+        END IF
+    NEXT
+END SUB
+
+SUB hud_zeichnen()
+    ' Kopfzeile
+    BOX(0, 0, BREITE, 54, &H1B2334)
+    TEXT_SIZE(22)
+    TEXT_BOLD(TRUE)
+    TEXT(24, 14, STR$(geld) + " EUR", C_GELB)
+    TEXT_BOLD(FALSE)
+
+    TEXT_SIZE(17)
+    TEXT(200, 18, "Tag " + STR$(tag), C_GRAU)
+
+    ' Restzeit als Balken
+    DIM b AS FLOAT
+    b = klemme(zeit / TAG_DAUER, 0.0, 1.0)
+    BOX(300, 20, 620, 34, &H0F1520)
+    BOX(301, 21, 301 + INT(318.0 * b), 33, misch(C_ROT, C_GRUEN, b))
+    TEXT_SIZE(14)
+    TEXT(300, 2, "Feierabend in " + STR$(INT(zeit)) + " s", C_GRAU)
+
+    ' Ruf
+    TEXT_SIZE(15)
+    TEXT(660, 6, "Ruf", C_GRAU)
+    BOX(660, 24, 900, 34, &H0F1520)
+    BOX(661, 25, 661 + INT(238.0 * (ruf / 100.0)), 33, misch(C_ROT, C_GELB, ruf / 100.0))
+
+    ' Kurzmeldung
+    IF meldung_zeit > 0.0 THEN
+        TEXT_SIZE(20)
+        TEXT(BREITE \ 2 - TEXT_WIDTH(meldung) \ 2, 74, meldung, meldung_farbe)
+    END IF
+
+    ' Steuerungs-Hinweis
+    TEXT_SIZE(14)
+    TEXT(24, HOEHE - 26, "1 / 2 = Topf anheizen     LEER = servieren     ESC = Ende", &H6E82A6)
+END SUB
+
+SUB abrechnung_zeichnen()
+    BOX(0, 0, BREITE, HOEHE, &H0C1220)
+    DIM mx AS INTEGER
+    mx = BREITE \ 2
+    TEXT_SIZE(34)
+    TEXT_BOLD(TRUE)
+    TEXT(mx - TEXT_WIDTH("Feierabend") \ 2, 90, "Feierabend", C_GELB)
+    TEXT_BOLD(FALSE)
+
+    TEXT_SIZE(20)
+    DIM z AS STRING
+    z = "Tag " + STR$(tag) + " ist geschafft"
+    TEXT(mx - TEXT_WIDTH(z) \ 2, 145, z, C_GRAU)
+
+    TEXT_SIZE(22)
+    z = "Bedient: " + STR$(bedient)
+    TEXT(mx - 150, 210, z, C_WEISS)
+    z = "Verloren: " + STR$(verloren)
+    TEXT(mx - 150, 246, z, C_ROT)
+    z = "Einnahmen: " + STR$(tages_geld) + " EUR"
+    TEXT(mx - 150, 282, z, C_GELB)
+    z = "Kasse: " + STR$(geld) + " EUR"
+    TEXT(mx - 150, 318, z, C_WEISS)
+
+    TEXT_SIZE(18)
+    IF toepfe_frei < MAXTOEPFE THEN
+        IF geld >= TOPF2_PREIS THEN
+            z = "[K] Zweite Kochstelle kaufen (" + STR$(TOPF2_PREIS) + " EUR)"
+            TEXT(mx - TEXT_WIDTH(z) \ 2, 390, z, C_GRUEN)
+        ELSE
+            z = "Zweite Kochstelle: " + STR$(TOPF2_PREIS) + " EUR (noch " + STR$(TOPF2_PREIS - geld) + " EUR)"
+            TEXT(mx - TEXT_WIDTH(z) \ 2, 390, z, C_GRAU)
+        END IF
+    ELSE
+        z = "Zwei Kochstellen -- du kannst parallel kochen"
+        TEXT(mx - TEXT_WIDTH(z) \ 2, 390, z, C_GRUEN)
+    END IF
+
+    z = "[LEER] Nächster Tag"
+    TEXT(mx - TEXT_WIDTH(z) \ 2, 450, z, C_WEISS)
+END SUB
+
+' ---------------------------------------------------------------- Speichern
+SUB spiel_speichern()
+    SAVE_SET_INT(speicher, "geld", geld)
+    SAVE_SET_INT(speicher, "tag", tag)
+    SAVE_SET_INT(speicher, "toepfe", toepfe_frei)
+    SAVE_SET_FLOAT(speicher, "ruf", ruf)
+    SAVE_WRITE(speicher, SPEICHERDATEI)
+END SUB
+
+' ================================================================== Start
+SCREEN(BREITE, HOEHE, "Restaurant -- Tag 1", 1)
+RANDOMIZE(MILLIS())
+klaenge_bauen()
+
+speicher = SAVE_LOAD_OR_NEW(SPEICHERDATEI)
+geld = SAVE_GET_INT_OR(speicher, "geld", 0)
+tag = SAVE_GET_INT_OR(speicher, "tag", 1)
+toepfe_frei = SAVE_GET_INT_OR(speicher, "toepfe", 1)
+ruf = SAVE_GET_FLOAT_OR(speicher, "ruf", 50.0)
+IF toepfe_frei < 1 THEN toepfe_frei = 1
+
+neuer_tag()
+
+WHILE NOT QUITREQUESTED()
+    dt = DELTA()
+    IF dt > 0.1 THEN dt = 0.1          ' nach einem Hänger nicht springen
+
+    IF meldung_zeit > 0.0 THEN meldung_zeit = meldung_zeit - dt
+    IF ruettel > 0.0 THEN ruettel = ruettel - dt
+
+    IF phase = P_DIENST THEN
+        zeit = zeit - dt
+
+        ' Andrang haengt am Ruf: guter Ruf = mehr Gaeste = mehr Hektik
+        naechster_gast = naechster_gast - dt
+        IF naechster_gast <= 0.0 THEN
+            gast_erzeugen()
+            naechster_gast = 4.6 - (ruf / 100.0) * 2.6 + RND() * 1.2
+        END IF
+
+        gaeste_bewegen()
+        toepfe_kochen()
+
+        IF KEYHIT(ASC("1")) THEN topf_anheizen(0)
+        IF KEYHIT(ASC("2")) THEN topf_anheizen(1)
+        IF KEYHIT(KEY_SPACE) THEN servieren()
+
+        IF zeit <= 0.0 THEN
+            zeit = 0.0
+            phase = P_ABRECHNUNG
+            spiel_speichern()
+        END IF
+    ELSE
+        IF KEYHIT(ASC("K")) AND toepfe_frei < MAXTOEPFE AND geld >= TOPF2_PREIS THEN
+            geld = geld - TOPF2_PREIS
+            toepfe_frei = toepfe_frei + 1
+            PLAYSOUND(s_muenze)
+            spiel_speichern()
+        END IF
+        IF KEYHIT(KEY_SPACE) THEN
+            tag = tag + 1
+            SETWINDOWTITLE("Restaurant -- Tag " + STR$(tag))
+            spiel_speichern()
+            neuer_tag()
+        END IF
+    END IF
+
+    ' --- Zeichnen ---
+    CLS(C_HIMMEL)
+    IF ruettel > 0.0 THEN
+        CAMERA_SET(RND() * 6.0 - 3.0, RND() * 6.0 - 3.0, 1.0)
+    ELSE
+        CAMERA_RESET()
+    END IF
+
+    IF phase = P_DIENST THEN
+        kulisse_zeichnen()
+        toepfe_zeichnen()
+        teller_zeichnen()
+        gaeste_zeichnen()
+        CAMERA_RESET()
+        hud_zeichnen()
+    ELSE
+        CAMERA_RESET()
+        abrechnung_zeichnen()
+    END IF
+
+    FLIP()
+WEND
