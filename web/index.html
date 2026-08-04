@@ -33,6 +33,12 @@
     button { background: #2de0e0; color: #06222a; border: 0; border-radius: 4px;
              padding: 6px 14px; font-weight: 600; cursor: pointer; }
     .note { color: #7a8e96; font-size: 13px; padding: 0 16px 16px; }
+    /* Galerie: unaufdringlicher als der Ausfuehren-Knopf -- sie soll ihn
+       nicht ueberstrahlen, aber auf schmalen Fenstern umbrechen duerfen. */
+    .galerie { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+    .galerie button { background: #16273a; color: #8fd8e0; font-weight: 500;
+                      border: 1px solid #2a4459; padding: 5px 10px; font-size: 13px; }
+    .galerie button:hover { background: #1d3348; color: #2de0e0; }
     code { color: #dcdcaa; }
   </style>
 </head>
@@ -46,6 +52,7 @@
     <button id="run" disabled>▶ Ausführen</button>
     <button id="share" style="background:#1a2738;color:#2de0e0;border:1px solid #2de0e0;margin-left:6px;">🔗 Link teilen</button>
     <span id="status" class="note" style="padding:0 8px;">lade …</span>
+    <span id="galerie" class="galerie"></span>
   </div>
 
   <div id="wrap">
@@ -61,6 +68,8 @@
   </div>
 
   <p class="note">
+    Die Knöpfe oben laden je ein fertiges Beispiel und starten es sofort — sie
+    laden bewusst keine Dateien, laufen also in jedem Build.
     Tippe GameBasic-Quelltext links und klicke <b>Ausführen</b> — <code>gbrt.wasm</code>
     kompiliert die Quelle <i>im Browser</i> (kein Server, kein Pyodide) und führt
     sie aus: Konsolen-Ausgabe unter dem Canvas, Grafik im Canvas. Jeder Lauf
@@ -70,7 +79,8 @@
     <code>docs/web-playground.md</code>.
   </p>
 
-  <script src="playground.js?v=2"></script>
+  <script src="beispiele.js?v=1"></script>
+  <script src="playground.js?v=3"></script>
   <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief. -->
   <script src="gbrt.js"></script>
 </body>

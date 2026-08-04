@@ -135,6 +135,27 @@
     }
   });
 
+  // --- Beispiel-Galerie (beispiele.js) ---------------------------------
+  // Ein Klick laedt das Beispiel in den Editor und startet es -- derselbe Weg
+  // wie "Ausführen", damit die Runtime auch hier frisch ist. Die Programme
+  // laden bewusst KEINE Dateien, sonst liefen sie nur in einem Build mit
+  // passendem assets/-Paket.
+  (function galerieAufbauen() {
+    const halter = document.getElementById("galerie");
+    const liste = window.GB_BEISPIELE;
+    if (!halter || !Array.isArray(liste)) return;
+    liste.forEach(function (b) {
+      const knopf = document.createElement("button");
+      knopf.textContent = b.name;
+      knopf.title = "Beispiel laden und starten";
+      knopf.addEventListener("click", function () {
+        srcEl.value = b.src;
+        runBtn.click();
+      });
+      halter.appendChild(knopf);
+    });
+  })();
+
   // Strg+Enter als Shortcut.
   srcEl.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
