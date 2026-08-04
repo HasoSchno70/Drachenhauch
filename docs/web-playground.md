@@ -60,7 +60,9 @@ Alle nachgemessen, nicht vermutet:
   exakt Echtzeit, ohne irgendwo eine Uhr abzulesen. Nachgemessen im Browser:
   nach einem Lauf steht die Wanduhr bei 8,35 s und `AUDIO_MUSIC_POSITION()` bei
   8,50 s -- die Musik-Uhr folgt der echten Zeit auf 2 % genau, und das kann sie
-  nur, wenn die Puffer tatsaechlich abgespielt werden.
+  nur, wenn die Puffer tatsaechlich abgespielt werden. **Abgehoert und fuer
+  sauber befunden** (04.08.2026) -- das Messen allein haette das Stottern aus
+  der Ratenverwechslung unten nicht aufgedeckt.
 
   **Autoplay-Sperre:** eine `AudioContext` startet angehalten, bis der Nutzer
   die Seite einmal angefasst hat. Bis dahin verbraucht WebAudio nichts, die
@@ -275,5 +277,5 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
    320×200-Leinwand → 128,3/119,5). Die **Gesten** (`GESTURE$`) blieben im Test
    leer — ob das an den synthetischen Ereignissen liegt oder eine echte Lücke
    ist, wurde nicht geklärt.
-9. **Offen:** ein echtes Gerät zum Gegenprüfen (Handy-Browser), und der Ton ist
-   bislang nur *messbar* geflossen — angehört hat ihn noch niemand.
+9. **Offen:** ein echtes Gerät zum Gegenprüfen (Handy-Browser). Der Ton selbst
+   ist abgehakt — am 04.08.2026 abgehört und für sauber befunden.
