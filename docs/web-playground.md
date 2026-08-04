@@ -68,6 +68,13 @@ Alle nachgemessen, nicht vermutet:
   Wiedergabe. Ein Programm, dessen Ablauf an `AUDIO_MUSIC_POSITION` haengt,
   wartet also auf den ersten Klick. Der Playground weist darauf hin.
 
+  **Mit DER Rate rechnen, die der Browser fahrt.** Nachgemessen: die
+  `AudioContext` lief hier mit **48000 Hz**, unsere Puffer waren mit 44100
+  angemeldet. WebAudio rechnet dann JEDEN Puffer einzeln um -- und weil bei so
+  einer Umrechnung die Nachbarpuffer fehlen, entsteht an jeder Naht ein Sprung:
+  es stottert im Puffertakt, obwohl nichts leerlauft. Die Rate kommt deshalb
+  aus `alcGetIntegerv(ALC_FREQUENCY)` und wird an Kira durchgereicht.
+
   **`-lopenal` ist Pflicht.** Das von raylib mitgebrachte `-lal` ist bloss ein
   leeres Archiv; die JS-Umsetzung steckt in `libopenal.js` und kommt nur ueber
   `-lopenal` dazu. Ohne das Flag uebersetzt und linkt alles, und der Browser
