@@ -142,6 +142,15 @@ module.exports = (H) => [
       '\' ... in der 3D-Szene (nach CAMERA3D): ...',
       'MODEL_MATRIX(box, m, RGB(224, 128, 64))',
     ]),
-  H.note("Für SEHR viele gleiche Objekte (Wälder, Asteroidenfelder, Armeen) gibt es MODEL_INSTANCED(modell, mats): Es zeichnet ein Mesh mit hunderten Matrizen aus einem Array in EINEM Draw-Call – viel schneller als ein MODEL_MATRIX pro Objekt. Außerdem lassen sich mit CAMERA3D_VIEW/PROJECTION eigene Kamera-Matrizen setzen."),
+  H.cmd("MODEL_INSTANCED", "MODEL_INSTANCED(modell, mats [, tint [, anzahl]])",
+    "Zeichnet EIN Mesh mit hunderten Matrizen aus einem ARRAY OF MAT4 – in einem einzigen Zeichenaufruf. Für Wälder, Asteroidenfelder oder Armeen ist das um Größenordnungen schneller als ein MODEL_MATRIX pro Objekt. tint ist entweder eine Farbe für alle oder ein ARRAY OF INTEGER mit einer Farbe je Matrix; anzahl begrenzt, wie viele Einträge gezeichnet werden.",
+    [
+      "DIM mats[400] AS MAT4",
+      "DIM farben[400] AS INTEGER",
+      "' ... mats und farben fuellen ...",
+      "MODEL_INSTANCED(baum, mats, farben, 400)",
+    ]),
+  H.warn("Die Grafikkarte bekommt beim Instancing nur die Matrizen mitgeliefert, keine Farben. Die Laufzeit gruppiert deshalb nach Farbe und macht EINEN Zeichenaufruf je VERSCHIEDENER Farbe – bei fünf Farbtönen ist das großartig, bei 400 verschiedenen Farben bist du wieder bei 400 Aufrufen. Wenn jede Instanz anders aussehen soll, ist ein Verlauf im Shader der bessere Weg.", "Viele verschiedene Farben kosten die Ersparnis wieder"),
+  H.note("Mit CAMERA3D_VIEW/PROJECTION lassen sich außerdem eigene Kamera-Matrizen setzen – etwa für eine Orthogonal-Ansicht oder ein schiefes Frustum."),
   H.tip("m3d und g3d gehören zusammen", "g3d (voriges Teil-IV-Kapitel) liefert die Bausteine und Primitive, m3d die Mathematik, um sie präzise zu platzieren und zu drehen. Für einfache Szenen reichen die g3d-Befehle wie CUBE/MODEL; sobald du Hierarchien (Bones, Gelenke), eigene Kameras oder viele Instanzen brauchst, kommt m3d ins Spiel."),
 ];

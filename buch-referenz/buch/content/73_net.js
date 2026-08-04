@@ -114,7 +114,7 @@ module.exports = (H) => [
       'DIM roh AS STRING',
       'roh = CLOUD_LOAD(spieler_id)',
     ]),
-  H.warn("Leerer Spielstand heißt nicht immer „neuer Spieler“", "CLOUD_LOAD wirft bei einem Fehler absichtlich keinen Laufzeitfehler – „noch nichts gespeichert“ und „Server nicht erreichbar“ sehen beide wie ein leerer Text aus. Unterscheiden kannst du sie nur über CLOUD_LAST_ERROR$: leer bedeutet echter Erstbesuch, gefüllt bedeutet Fehler. Wer das übergeht, überschreibt bei einer Netzstörung fröhlich den Spielstand mit einem frischen Anfang."),
+  H.warn("CLOUD_LOAD wirft bei einem Fehler absichtlich keinen Laufzeitfehler – „noch nichts gespeichert“ und „Server nicht erreichbar“ sehen beide wie ein leerer Text aus. Unterscheiden kannst du sie nur über CLOUD_LAST_ERROR$: leer bedeutet echter Erstbesuch, gefüllt bedeutet Fehler. Wer das übergeht, überschreibt bei einer Netzstörung fröhlich den Spielstand mit einem frischen Anfang.", "Leerer Spielstand heißt nicht immer „neuer Spieler“"),
   H.code([
     'DIM stand AS STRING',
     'stand = CLOUD_LOAD(spieler_id)',

@@ -178,7 +178,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Native Dialoge & scrollbare Fenster"),
-  H.warn("GUI_CONFIRM/GUI_MESSAGE nicht automatisiert testbar", "Beide öffnen einen echten System-Dialog und blockieren, bis der Nutzer reagiert – die folgenden Beispiele zeigen daher die Verwendung ohne Ausgabe-Kasten."),
+  H.warn("Beide öffnen einen echten System-Dialog und blockieren, bis der Nutzer reagiert – die folgenden Beispiele zeigen daher die Verwendung ohne Ausgabe-Kasten.", "GUI_CONFIRM/GUI_MESSAGE nicht automatisiert testbar"),
   H.cmd("GUI_MESSAGE · GUI_CONFIRM", 'GUI_MESSAGE(titel$, text$)   GUI_CONFIRM(titel$, text$) AS BOOLEAN',
     "GUI_MESSAGE zeigt einen einfachen Hinweis-Dialog mit OK-Knopf. GUI_CONFIRM fragt Ok/Abbrechen und liefert TRUE/FALSE – z. B. für eine „Wirklich beenden?“-Sicherheitsabfrage.",
     [

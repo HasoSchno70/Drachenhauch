@@ -146,6 +146,20 @@ module.exports = (H) => [
       'AUDIO_EQ("sfx", 1000.0, 6.0)   \' Mitten anheben',
     ]),
 
+  H.h2("Bus-Einstellungen sichern: AUDIO_PUSH und AUDIO_POP"),
+  H.p("Alle Bus-Einstellungen sind global – Lautstärke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ. Legst du für eine Höhle einen Hall auf den Master und vergisst ihn beim Verlassen, hallt auch das Menü. Statt jede Zeile von Hand zurückzunehmen, legst du den ganzen Zustand auf einen Stapel."),
+  H.cmd("AUDIO_PUSH · AUDIO_POP · AUDIO_DEPTH", "AUDIO_PUSH()   AUDIO_POP()   AUDIO_DEPTH()",
+    "AUDIO_PUSH sichert alle Bus-Einstellungen, AUDIO_POP holt sie zurück, AUDIO_DEPTH liefert die Stapeltiefe. Ein POP ohne PUSH ist ein Fehler.",
+    [
+      "AUDIO_PUSH()",
+      'AUDIO_REVERB("master", 0.6, 0.8)   \' Hoehle: nass und dunkel',
+      'AUDIO_FILTER("master", 900.0)',
+      "szene_hoehle()",
+      "AUDIO_POP()                        ' trocken wie vorher",
+    ]),
+  H.warn("Hast du mit AUDIO_MODULATE einen LFO auf einen Bus-Wert gelegt, den ein AUDIO_POP zurückschreibt, endet die Modulation an dieser Stelle – beide beschreiben denselben Regler, und der letzte gewinnt. Das ist kein Fehler, sondern eine Folge davon, wie die Werte zusammenlaufen; wer die Modulation behalten will, setzt sie nach dem POP neu.", "Eine laufende Modulation wird dabei abgelöst"),
+  H.note("Das Gegenstück für die Grafik heißt GFX_PUSH / GFX_POP und sichert Licht, Nebel, Kamera, Schatten, Schrift und den Post-Effekt – siehe Kapitel 42."),
+
   H.h2("Sample-genaues Timing: AUDIO_CLOCK"),
   H.p("Eine Uhr, die vom Audio-Thread selbst getrieben wird – nicht von deinem (ungenaueren) Game-Loop. Damit planst du Sounds exakt auf einen musikalischen Takt statt „ungefähr jetzt“. Praktisch für Rhythmusspiele oder Musik-synchronisierte Effekte."),
   H.cmd("AUDIO_CLOCK_NEW · AUDIO_CLOCK_START · AUDIO_CLOCK_TICKING", 'AUDIO_CLOCK_NEW(ticks_pro_sekunde) -> AUDIO_CLOCK   AUDIO_CLOCK_START(clock)   AUDIO_CLOCK_TICKING(clock) AS BOOLEAN',

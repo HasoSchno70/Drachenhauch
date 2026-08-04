@@ -282,3 +282,37 @@ Fragmente (Variable aus vorigem cmd()-Block im selben Kapitel, etabliertes Muste
 `<port>`-Platzhalter in Kap 73. Zwei-Pass-Build (`make_book.py`) lief sauber durch (79/79 ToC-Seiten).
 Anhang A ist auto-generiert aus builtin_index.json und zieht die neuen Builtins beim nächsten Build
 automatisch nach — kein manueller Eingriff nötig.
+
+
+## Durchsicht 2026-08-04 — "ist alles aktuell?"
+
+Systematisch geprüft statt quergelesen, mit Skripten gegen die echten Quellen:
+
+* **Veraltete Begriffe:** keine. Kein „Tree-Walker", kein `interpreter.py`,
+  kein pygame/Cython/Pyodide mehr im Text.
+* **Befehle im Buch, die es nicht mehr gibt:** keiner (alle 629 `cmd()`-Titel
+  gegen `builtin_index.json` geprüft; die 56 „Unbekannten" waren durchweg
+  Prosa-Titel wie „SAVE_SET_…").
+* **Befehle, die es gibt und die nirgends erklärt waren:** 8 — alle aus der
+  Arbeit dieser Woche. Ergänzt: `GFX_PUSH/POP/DEPTH` + `RENDERTARGET_CLEAR`
+  und der `behalten`-Parameter (Kap 42), `AUDIO_PUSH/POP/DEPTH` (Kap 71),
+  `PHYS2D_SET_DYNAMIC`/`IS_DYNAMIC` (Kap 55), Stückzahl bei den Bulk-Befehlen
+  (Kap 47), `MODEL_INSTANCED` mit Farb-Array (Kap 67).
+* **Signaturen:** 2 Abweichungen. `PLOTS` fehlte die Stückzahl (Buch-Fehler,
+  behoben). Bei `SORT(array, absteigend)` war das **Buch im Recht und der
+  Index falsch** — die Laufzeit kann absteigend sortieren, die zu enge
+  Signatur erzeugte einen Falsch-Alarm der Argumentzahl-Prüfung in jedem
+  korrekten Aufruf. `builtin_index.json` korrigiert.
+* **Alle 260 Beispiele mit abgedruckter Ausgabe gegen `gbrt` laufen lassen:**
+  233 stimmen, 24 sind Fortsetzungs-Fragmente (etabliertes Muster), 3 Treffer.
+  Davon einer echt: das `SCENE_SET_INT`-Beispiel druckte „100", lief allein
+  aber nicht (ohne aktive Szene bricht es ab) — Zeile ergänzt. Die anderen
+  beiden sind der `<port>`-Platzhalter (Kap 73) und ein Beispiel, das eine
+  eigene Datei importiert.
+* **Setzfehler quer durchs Buch:** `warn(text, titel)` nimmt den Text ZUERST
+  (anders als `tip(titel, text)`). Alle 14 zweiargumentigen Aufrufe waren
+  title-first geschrieben — in jedem dieser Kästen stand die lange Erklärung
+  fett als Überschrift und der kurze Titel klein darunter. Alle 14 gedreht,
+  die Reihenfolge an der Hilfsfunktion dokumentiert.
+
+Buch danach 396 Seiten (vorher 392).

@@ -78,6 +78,6 @@ module.exports = (H) => [
       'PRINT parts[0]; "|"; parts[1]; "|"; parts[2]; "|"; parts[3]',
     ], { out: ["4", "a|b|c|d"] }),
 
-  H.warn("Rust-Regex: keine Lookarounds/Backrefs IM Muster", "Die native Runtime nutzt die Rust-Regex-Engine. Sie deckt alle obigen Bausteine ab, unterstützt aber KEINE Lookaheads/Lookbehinds ((?=…), (?<=…)) und keine Rückverweise (\\1) IM Muster selbst. Im ERSATZ-Text von REGEX_REPLACE sind \\1, \\2 dagegen erlaubt (wie oben gezeigt). Bei einem ungültigen Muster bricht der Befehl mit einer Fehlermeldung ab."),
+  H.warn("Die native Runtime nutzt die Rust-Regex-Engine. Sie deckt alle obigen Bausteine ab, unterstützt aber KEINE Lookaheads/Lookbehinds ((?=…), (?<=…)) und keine Rückverweise (\\1) IM Muster selbst. Im ERSATZ-Text von REGEX_REPLACE sind \\1, \\2 dagegen erlaubt (wie oben gezeigt). Bei einem ungültigen Muster bricht der Befehl mit einer Fehlermeldung ab.", "Rust-Regex: keine Lookarounds/Backrefs IM Muster"),
   H.tip("Muster einmal, Nutzung oft", "regex merkt sich jedes übersetzte Muster (Pattern-Cache). Du kannst dasselbe Muster also bedenkenlos in einer Schleife über tausende Zeilen verwenden – es wird nur einmal aufgebaut. Praktische Einsätze: Eingabe-Validierung (Datum \"\\d{4}-\\d{2}-\\d{2}\", E-Mail-Grobcheck), Highscore-Parser, Chat-Wortfilter (REGEX_REPLACE der bösen Wörter durch \"***\")."),
 ];

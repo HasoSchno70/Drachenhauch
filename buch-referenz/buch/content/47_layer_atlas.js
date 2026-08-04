@@ -66,8 +66,8 @@ module.exports = (H) => [
 
   H.h2("Hunderte Formen auf einmal: Bulk-Draws"),
   H.p("Willst du sehr viele gleichartige Formen zeichnen – ein Sternenfeld, eine Punktwolke, ein Partikelregen –, ist eine Schleife mit einzelnen PLOT-Aufrufen langsam. Die Bulk-Befehle nehmen stattdessen ganze Arrays an Koordinaten und zeichnen alles in einem einzigen Aufruf. Die Farbe ist entweder eine Zahl (alle gleich) oder ein Array (eine Farbe pro Form)."),
-  H.cmd("PLOTS", 'PLOTS(xs, ys, farbe)',
-    "Zeichnet viele Pixel auf einmal. xs und ys sind gleich lange Arrays mit den Koordinaten. Ideal für Sternenfelder und Punktwolken.",
+  H.cmd("PLOTS", 'PLOTS(xs, ys, farbe [, anzahl])',
+    "Zeichnet viele Pixel auf einmal. xs und ys sind gleich lange Arrays mit den Koordinaten. Ideal für Sternenfelder und Punktwolken. anzahl zeichnet nur die ersten n Einträge.",
     [
       'DIM xs[3] AS INTEGER',
       'DIM ys[3] AS INTEGER',
@@ -75,8 +75,8 @@ module.exports = (H) => [
       'ys[0]=20 : ys[1]=40 : ys[2]=60',
       'PLOTS(xs, ys, WHITE)',
     ]),
-  H.cmd("CIRCLES · BOXES · LINES", 'CIRCLES(xs, ys, rs, farbe)   BOXES(x1s, y1s, x2s, y2s, farbe)   LINES(x1s, y1s, x2s, y2s, farbe)',
-    "Die Bulk-Varianten von CIRCLE, BOX und LINE: Jeder Parameter ist ein Array, und alle Formen werden in einem Aufruf gezeichnet. CIRCLES braucht zusätzlich ein Array der Radien.",
+  H.cmd("CIRCLES · BOXES · LINES", 'CIRCLES(xs, ys, rs, farbe [, anzahl])   BOXES(x1s, y1s, x2s, y2s, farbe [, anzahl])   LINES(x1s, y1s, x2s, y2s, farbe [, anzahl])',
+    "Die Bulk-Varianten von CIRCLE, BOX und LINE: Jeder Parameter ist ein Array, und alle Formen werden in einem Aufruf gezeichnet. CIRCLES braucht zusätzlich ein Array der Radien. Auch hier begrenzt anzahl, wie viele Einträge gezeichnet werden.",
     [
       'DIM cx[2] AS INTEGER',
       'DIM cy[2] AS INTEGER',
@@ -85,5 +85,6 @@ module.exports = (H) => [
       'cx[1]=200 : cy[1]=120 : cr[1]=35',
       'CIRCLES(cx, cy, cr, RGB(90, 140, 220))',
     ]),
+  H.warn("Das ist die häufigste Falle bei den Bulk-Befehlen. Ein fest dimensionierter Puffer – DIM xs[1000], aber nur 200 Sterne im Bild – schleppt seine 800 ungenutzten Plätze mit: Sie stehen alle auf 0 und erscheinen als Klumpen in der linken oberen Ecke. Gib die tatsächliche Anzahl mit, dann bleibt der Rest unberührt.", "Ohne anzahl wird IMMER das ganze Array gezeichnet"),
   H.tip("Wann Bulk?", "Für eine Handvoll Formen sind die normalen Befehle (CIRCLE, BOX …) völlig in Ordnung und lesbarer. Die Bulk-Varianten lohnen sich erst bei vielen hundert oder tausend gleichartigen Formen pro Frame – dann sparen sie spürbar Zeit."),
 ];

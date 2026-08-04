@@ -92,6 +92,12 @@ function _box(title, text, bg, bd, titleColor) {
   return [new Paragraph({ spacing: { before: 60 }, children: [] }), table,
           new Paragraph({ spacing: { after: 160 }, children: [] })];
 }
+// ACHTUNG, die Reihenfolgen sind NICHT gleich: tip nimmt (Titel, Text), note
+// und warn nehmen (Text, Titel) -- der Titel ist dort optional und hat eine
+// Vorgabe. Wer bei warn versehentlich den Titel zuerst schreibt, bekommt einen
+// Kasten, in dem die lange Erklaerung fett als Ueberschrift steht und der
+// kurze Titel klein darunter. Das war 2026-08-04 in ALLEN 14 zweiargumentigen
+// warn-Aufrufen des Buches so und ist beim Durchsehen aufgefallen.
 function tip(title, text) { return _box(title, text, "E7F2FA", "9CC8E6", C_ACCENT); }
 function note(text, title = "Merke") { return _box(title, text, "FDF3E0", "E0B96A", "9A6A1E"); }
 function warn(text, title = "Achtung") { return _box(title, text, "FBEAEA", "E0A0A0", "B23030"); }

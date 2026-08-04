@@ -86,7 +86,7 @@ module.exports = (H) => [
 
   H.h2("Zwischen-Zeichenflächen: Render-Targets"),
   H.p("Ein Render-Target ist eine unsichtbare Zeichenfläche im Hintergrund. Du zeichnest etwas einmal hinein und stempelst es danach beliebig oft ins Bild – das spart Arbeit, wenn ein zusammengesetztes Bild (etwa ein Abzeichen oder eine Minimap) mehrmals erscheint oder sich nur selten ändert."),
-  H.cmd("RENDERTARGET_NEW · _BEGIN · _END · _DRAW", "RENDERTARGET_NEW(b, h)   RENDERTARGET_BEGIN(rt)   RENDERTARGET_END()   RENDERTARGET_DRAW(rt, x, y[, skala[, tint]])",
+  H.cmd("RENDERTARGET_NEW · _BEGIN · _END · _DRAW", "RENDERTARGET_NEW(b, h [, behalten])   RENDERTARGET_BEGIN(rt)   RENDERTARGET_END()   RENDERTARGET_DRAW(rt, x, y[, skala[, tint]])",
     "RENDERTARGET_NEW legt eine Fläche an. Zwischen _BEGIN und _END landen alle Zeichenbefehle in dieser Fläche statt im Fenster. _DRAW stempelt die fertige Fläche an Position (x, y) ins Bild.",
     [
       'DIM rt AS INTEGER',
@@ -146,6 +146,40 @@ module.exports = (H) => [
       'SHADER_SET_TEXTURE(bloom, "maske", maske)',
     ]),
   H.note("Fertige Beispiel-Shader (CRT, Bloom, Vignette) liegen unter examples/assets/shaders/, eine vollständige Demo ist examples/86_postfx_shaders.gb."),
+
+  H.h2("Eine Fläche, die sich merkt: Schweife"),
+  H.p("Normalerweise wird ein Render-Target zu jedem Bild geleert – du zeichnest hinein, stempelst, fertig. Mit behalten = TRUE bleibt der Inhalt dagegen über das Bild hinaus stehen. Damit entsteht Rückkopplung: Was du zeichnest, liegt im nächsten Bild noch da, und was du neu darüber malst, kommt hinzu. Genau so entstehen Leuchtspuren und Schweife."),
+  H.cmd("RENDERTARGET_CLEAR", "RENDERTARGET_CLEAR(rt [, farbe])",
+    "Leert eine behaltene Fläche von Hand. Bei behalten = TRUE macht das sonst niemand mehr für dich.",
+    [
+      "DIM rt AS INTEGER",
+      "rt = RENDERTARGET_NEW(320, 240, TRUE)   ' Inhalt bleibt stehen",
+      "",
+      "' jedes Bild: alles ETWAS abdunkeln, dann den Punkt neu setzen",
+      "RENDERTARGET_BEGIN(rt)",
+      'BLEND_MODE("mult")',
+      "BOX(0, 0, 320, 240, RGB(240, 240, 240))   ' 6 % dunkler",
+      'BLEND_MODE("alpha")',
+      "CIRCLE(x, y, 4, RGB(120, 255, 200))",
+      "RENDERTARGET_END()",
+      "RENDERTARGET_DRAW(rt, 0, 0)",
+    ]),
+  H.note("Das Abdunkeln ist der Trick: Ohne es würde die Spur nie verblassen und die Fläche liefe nach ein paar Sekunden voll. Ein Vollbild-Rechteck im Multiplikations-Modus zieht jedes Bild ein paar Prozent Helligkeit ab – der Schweif wird nach hinten von selbst dunkler."),
+  H.warn("RENDERTARGET_DRAW innerhalb eines anderen Render-Targets tut nichts. Wer Rückkopplung will, nimmt behalten = TRUE – das ist genau dafür da.", "Ein Ziel kann sich nicht selbst zeichnen"),
+
+  H.h2("Zustand sichern: GFX_PUSH und GFX_POP"),
+  H.p("Licht, Nebel, Himmel, Schatten, Kamera, Schrift und der Post-Effekt sind GLOBAL. Wer sie in einer Szene umstellt, muss sie beim Verlassen von Hand zurückstellen – und wer eine Zeile vergisst, sieht den Fehler erst zwei Szenen später: den Nebel im falschen Raum, den Shader über dem Menü. Mit einem Stapel wird daraus eine Eigenschaft der Sprache statt einer Frage der Disziplin."),
+  H.cmd("GFX_PUSH · GFX_POP · GFX_DEPTH", "GFX_PUSH()   GFX_POP()   GFX_DEPTH()",
+    "GFX_PUSH legt den gesamten Zeichenzustand auf einen Stapel, GFX_POP holt ihn zurück. GFX_DEPTH sagt, wie tief der Stapel gerade ist – ein POP ohne PUSH ist ein Fehler.",
+    [
+      "GFX_PUSH()",
+      "LIGHT_FOG(RGB(120, 100, 90), 0.03)     ' nur fuer diese Szene",
+      "SHADOW_ENABLE(2048)",
+      "szene_hoehle()",
+      "GFX_POP()                              ' alles zurueck wie vorher",
+    ]),
+  H.p("Gesichert wird ausschließlich EINSTELLUNG, nie Ressource: 2D-Kamera samt Rütteln, aktive Ebene, Hintergrundfarbe, Licht, Umgebung, Schatten, 3D-Kamera, Schrift und POSTFX. Geladene Bilder, Modelle und Shader bleiben natürlich geladen – ein POP schaltet nur ihre Benutzung zurück."),
+  H.tip("Auch für den Ton", "AUDIO_PUSH und AUDIO_POP tun dasselbe für alle Bus-Einstellungen – Lautstärke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ. Mehr dazu im Audio-Kapitel."),
 
   H.tip("Alles nur in gbrt", "Diese Extras (besonders Blend-Modes, GenTex, Render-Targets und Shader) nutzen die Grafikkarte und laufen nur im gbrt-Fenster – wie der ganze Teil IV. In einem reinen Konsolenprogramm gibt es sie nicht."),
 ];

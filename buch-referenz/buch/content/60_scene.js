@@ -27,6 +27,7 @@ module.exports = (H) => [
   H.cmd("SCENE_SET_INT … · SCENE_GET_INT …", 'SCENE_SET_INT(key$, wert)   SCENE_GET_INT(key$)   (auch FLOAT/STRING/BOOL)',
     "SET legt einen Wert in der aktuellen Szene ab, GET liest ihn. Es gibt je eine Variante für INT, FLOAT, STRING und BOOL. SCENE_GET_* ist strikt – fehlt der Schlüssel, gibt es einen Fehler.",
     [
+      'SCENE_SWITCH("playing")   \' es muss eine Szene aktiv sein',
       'SCENE_SET_INT("score", 0)',
       'SCENE_SET_INT("lives", 3)',
       'SCENE_SET_INT("score", SCENE_GET_INT("score") + 100)',

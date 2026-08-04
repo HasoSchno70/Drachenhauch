@@ -87,6 +87,15 @@ module.exports = (H) => [
       'PRINT PHYS2D_COUNT(welt)',
     ]),
 
+  H.cmd("PHYS2D_SET_DYNAMIC · PHYS2D_IS_DYNAMIC", 'PHYS2D_SET_DYNAMIC(w, id, dynamisch)   PHYS2D_IS_DYNAMIC(w, id)',
+    "Schaltet einen Körper zwischen statisch (unbeweglich, wie eine Wand) und dynamisch (fällt, stößt, rollt) um. Damit steht ein Aufbau erst still und fällt genau dann zusammen, wenn du es willst.",
+    [
+      "' Turm steht statisch, bis der Ball ihn trifft",
+      'IF getroffen THEN PHYS2D_SET_DYNAMIC(welt, stein, TRUE)',
+      'PRINT PHYS2D_IS_DYNAMIC(welt, stein)',
+    ]),
+  H.tip("Erst stellen, dann fallen lassen", "Ein Stapel aus dynamischen Körpern beginnt sofort zu wackeln und sich zurechtzuruckeln, sobald die Welt läuft – bis zum ersten Wurf steht er schief. Baue ihn deshalb statisch auf und schalte die Teile erst beim Treffer auf dynamisch: Dann steht er, bis er soll."),
+
   H.h2("physics3d — echte 3D-Physik"),
   H.p("physics3d ist das Gegenstück in drei Dimensionen: dieselbe Idee, nur mit z-Achse und 3D-Körpern. Die Körper haben zusätzlich eine räumliche Drehung (als Quaternion), die du beim Zeichnen deines 3D-Modells verwendest. Zusammen mit dem g3d-Modul lassen sich so physikalisch fallende, rollende und stapelnde 3D-Objekte bauen."),
   H.cmd("PHYS3D_NEW · ADD_BOX · ADD_SPHERE · STEP", 'PHYS3D_NEW()   PHYS3D_ADD_BOX(w, x,y,z, hw,hh,hd, dynamisch, bounce)   PHYS3D_ADD_SPHERE(w, x,y,z, r, dynamisch, bounce)   PHYS3D_STEP(w, dt)',

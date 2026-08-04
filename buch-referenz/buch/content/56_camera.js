@@ -67,7 +67,7 @@ module.exports = (H) => [
     [
       'CAMERA_SET_ROTATION(SIN(GET_TIME() * 8.0) * 3.0)   \' leichtes Wackeln',
     ]),
-  H.warn("Die Drehung dreht Positionen, nicht Formen", "CAMERA_SET_ROTATION verschiebt, wohin ein Objekt gezeichnet wird – die Objekte selbst bleiben aufrecht. Ein Sprite, das sich mitdrehen soll, bekommt den Winkel zusätzlich selbst: DRAWIMAGEROT(bild, x, y, eigener_winkel + CAMERA_ROTATION())."),
+  H.warn("CAMERA_SET_ROTATION verschiebt, wohin ein Objekt gezeichnet wird – die Objekte selbst bleiben aufrecht. Ein Sprite, das sich mitdrehen soll, bekommt den Winkel zusätzlich selbst: DRAWIMAGEROT(bild, x, y, eigener_winkel + CAMERA_ROTATION()).", "Die Drehung dreht Positionen, nicht Formen"),
   H.cmd("CAMERA_ORBIT", 'CAMERA_ORBIT(zx, zy, zz, radius, gier, nick[, fov])',
     "Setzt die 3D-Kamera über Kugelkoordinaten: Sie schaut auf das Ziel (zx, zy, zz) und steht im Abstand radius, gedreht um gier (waagerecht) und nick (senkrecht, in Grad). Erspart die Trigonometrie, wenn die Kamera ein Objekt umkreisen soll.",
     [

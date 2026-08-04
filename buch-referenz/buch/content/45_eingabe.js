@@ -72,7 +72,7 @@ module.exports = (H) => [
 
   H.h2("Flanken: „genau in DIESEM Frame“"),
   H.p("KEYPRESSED und MOUSEBUTTON melden „wird gehalten“ – für einen Klick ist das fast nie gemeint. Die folgenden Befehle liefern die FLANKE, also den einen Frame, in dem sich etwas ändert. Dafür brauchst du weder das input-Modul noch eigene Buchführung."),
-  H.warn("Die Namen sind historisch", "KEYPRESSED und MOUSEBUTTON heißen so, seit es GameBasic gibt, und melden weiterhin „gehalten“. Die Flanken-Varianten haben deshalb eigene Namen: KEYHIT und MOUSE_HIT."),
+  H.warn("KEYPRESSED und MOUSEBUTTON heißen so, seit es GameBasic gibt, und melden weiterhin „gehalten“. Die Flanken-Varianten haben deshalb eigene Namen: KEYHIT und MOUSE_HIT.", "Die Namen sind historisch"),
   H.cmd("KEYHIT · KEYRELEASED · KEYREPEAT", 'KEYHIT(taste)   KEYRELEASED(taste)   KEYREPEAT(taste)',
     "KEYHIT ist TRUE in dem Frame, in dem die Taste gedrückt wird, KEYRELEASED beim Loslassen. KEYREPEAT feuert zusätzlich mit der System-Wiederholrate, solange die Taste gehalten wird – genau das Verhalten, das man beim Tippen oder in Mengen-Eingaben erwartet.",
     [
@@ -201,6 +201,6 @@ module.exports = (H) => [
       '    TEXT(10, 10, "DEMO  Frame " + STR$(AUTOMATION_FRAME()))',
       'END IF',
     ]),
-  H.warn("Aufgezeichnet wird die EINGABE, nicht der Spielablauf", "Die Wiedergabe drückt nur dieselben Tasten zur selben Zeit. Damit dasselbe herauskommt, muss der Rest gleich sein: Startzustand zurücksetzen, Zufall mit festem Startwert (RANDOMIZE 12345) festnageln und pro Frame statt pro Sekunde rechnen – die Wiedergabe zählt in Frames, mit DELTA()-basierter Bewegung ergibt dieselbe Aufnahme bei anderer Bildrate eine leicht andere Bahn."),
+  H.warn("Die Wiedergabe drückt nur dieselben Tasten zur selben Zeit. Damit dasselbe herauskommt, muss der Rest gleich sein: Startzustand zurücksetzen, Zufall mit festem Startwert (RANDOMIZE 12345) festnageln und pro Frame statt pro Sekunde rechnen – die Wiedergabe zählt in Frames, mit DELTA()-basierter Bewegung ergibt dieselbe Aufnahme bei anderer Bildrate eine leicht andere Bahn.", "Aufgezeichnet wird die EINGABE, nicht der Spielablauf"),
   H.note("Ein Ereignis aus Aufnahme-Frame N wirkt im Programmdurchlauf N+1: eingespeist wird am Ende des FLIP, direkt nachdem die echte Eingabe gelesen wurde. Vollständige Demo: examples/153_automation.gb."),
 ];

@@ -135,7 +135,7 @@ module.exports = (H) => [
 
   H.h2("Native Datei-Dialoge"),
   H.p("Statt einen Pfad im Code fest zu verdrahten, kannst du den Nutzer mit dem gewohnten Betriebssystem-Dialog wählen lassen – „Öffnen“, „Speichern unter“ oder „Ordner wählen“. Die drei Befehle blockieren das Programm, bis der Nutzer eine Wahl trifft oder abbricht (abgebrochen = leerer String \"\") – deshalb nicht in einem laufenden Spiel-Loop verwenden, sondern z. B. beim Programmstart oder über einen Menüpunkt."),
-  H.warn("Nicht automatisiert testbar", "Diese drei Befehle öffnen ein echtes System-Fenster und warten auf eine Nutzer-Eingabe. Die folgenden Beispiele zeigen daher die Verwendung, ohne eine Ausgabe abzudrucken."),
+  H.warn("Diese drei Befehle öffnen ein echtes System-Fenster und warten auf eine Nutzer-Eingabe. Die folgenden Beispiele zeigen daher die Verwendung, ohne eine Ausgabe abzudrucken.", "Nicht automatisiert testbar"),
   H.cmd("FILE_OPEN_DIALOG", 'FILE_OPEN_DIALOG([titel$[, endungen$]]) AS STRING',
     "Öffnet den „Datei öffnen“-Dialog. endungen$ filtert die Anzeige, komma-getrennt ohne Punkt (z. B. \"png,jpg\"). Liefert den gewählten Pfad oder \"\" bei Abbruch.",
     [

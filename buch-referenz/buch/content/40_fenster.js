@@ -265,7 +265,7 @@ module.exports = (H) => [
     [
       'IF GUI_CLICKED(hilfe) THEN OPENURL("https://example.org/anleitung")',
     ]),
-  H.warn("Nur http und https", "OPENURL nimmt bewusst keine anderen Schemata an. Die Adresse geht an die System-Shell weiter; ein file:-Schema wäre damit ein Weg, aus einem GameBasic-Programm heraus beliebige Programme zu starten."),
+  H.warn("OPENURL nimmt bewusst keine anderen Schemata an. Die Adresse geht an die System-Shell weiter; ein file:-Schema wäre damit ein Weg, aus einem GameBasic-Programm heraus beliebige Programme zu starten.", "Nur http und https"),
 
   H.tip("Konsole vs. Fenster", "PRINT und INPUT (Teil III) gehören zur Textkonsole. Sobald SCREEN läuft, gibst du Text mit TEXT ins Fenster und fragst Eingaben mit Tastatur-/Maus-Befehlen ab (Kapitel „Eingabe“). Mische beides nicht im selben Programmteil."),
 ];
