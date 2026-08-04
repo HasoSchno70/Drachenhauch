@@ -2,6 +2,9 @@ module.exports = (H) => [
   H.chapter("Ins Netz stellen – GameBasic im Browser"),
   H.p("Ein fertiges Spiel liegt auf deiner Festplatte. Wer es sehen soll, muss es herunterladen, entpacken, einer Warnung von Windows widersprechen und dann hoffen, dass es startet. Zwischen deiner Arbeit und einem Zuschauer liegen also fünf Gelegenheiten aufzugeben."),
   H.p("Es geht auch anders: Dieselbe Laufzeit, die auf dem Rechner läuft, gibt es als WebAssembly. Ein Link genügt – der Browser lädt sie, übersetzt deinen Quelltext selbst und führt ihn aus. Kein Plugin, kein Python, keine Installation. Dieses Kapitel zeigt, wie das geht und was im Browser anders ist als auf dem Rechner."),
+  // Breiter als die Vorgabe (480): auf einem Bildschirmfoto steht Quelltext,
+  // und der soll lesbar bleiben.
+  H.figure("82_playground.png", "Der Playground im Browser: links der Quelltext, rechts das laufende Programm. Beleuchtung und PBR im Bild kommen aus derselben Laufzeit wie auf dem Rechner – der Browser übersetzt den Quelltext selbst.", 600, 420),
 
   H.h2("Bauen und starten"),
   H.p("Zwei Befehle. Der erste baut die Laufzeit für den Browser und packt dein Programm dazu, der zweite stellt einen kleinen Server hin:"),
