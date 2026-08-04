@@ -157,10 +157,24 @@
     liste.forEach(function (b) {
       const knopf = document.createElement("button");
       knopf.textContent = b.name;
-      knopf.title = "Beispiel laden und starten";
+      knopf.title = b.titel || "Beispiel laden und starten";
       knopf.addEventListener("click", function () {
-        srcEl.value = b.src;
-        runBtn.click();
+        if (!b.datei) { srcEl.value = b.src; runBtn.click(); return; }
+        // Aus einer Datei: die Quelle liegt neben der Seite (program.gb wird
+        // vom Build dorthin kopiert). Absichtlich NICHT aus dem virtuellen
+        // Dateisystem gelesen -- dort wird /program.gb vor jedem Lauf mit dem
+        // Editorinhalt ueberschrieben, man bekaeme also den letzten Lauf.
+        setStatus("lade " + b.datei + " …");
+        fetch(b.datei + (window.GB_CACHE_BUSTER || ""))
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.status + " " + r.statusText);
+            return r.text();
+          })
+          .then(function (text) { srcEl.value = text; runBtn.click(); })
+          .catch(function (e) {
+            setStatus(b.datei + " nicht gefunden — erst bauen: "
+              + "python rust/build_wasm.py <datei.gb>  (" + e.message + ")");
+          });
       });
       halter.appendChild(knopf);
     });
