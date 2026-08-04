@@ -70,6 +70,8 @@
   <p class="note">
     Die Knöpfe oben laden je ein fertiges Beispiel und starten es sofort — sie
     laden bewusst keine Dateien, laufen also in jedem Build.
+    <b>Ton:</b> Browser lassen Klang erst zu, nachdem man die Seite einmal
+    angeklickt hat — bei einem Programm mit Musik also einmal ins Bild klicken.
     Tippe GameBasic-Quelltext links und klicke <b>Ausführen</b> — <code>gbrt.wasm</code>
     kompiliert die Quelle <i>im Browser</i> (kein Server, kein Pyodide) und führt
     sie aus: Konsolen-Ausgabe unter dem Canvas, Grafik im Canvas. Jeder Lauf
@@ -81,7 +83,20 @@
 
   <script src="beispiele.js?v=1"></script>
   <script src="playground.js?v=3"></script>
-  <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief. -->
-  <script src="gbrt.js"></script>
+  <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief.
+
+       Beim Entwickeln (localhost) mit Zeitstempel geladen: der Browser haelt
+       `gbrt.js`/`.wasm` sonst fest, und ein frischer Build wirkt schlicht
+       nicht -- man sucht den Fehler dann im Quelltext statt im Zwischen-
+       speicher. Auf einer echten Adresse bleibt der Pfad unveraendert, damit
+       die 9 MB weiterhin gecacht werden duerfen. -->
+  <script>
+    (function () {
+      var s = document.createElement("script");
+      // Denselben Stempel wie fuer .wasm/.data (playground.js, locateFile).
+      s.src = "gbrt.js" + (window.GB_CACHE_BUSTER || "");
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

@@ -98,8 +98,18 @@
     }
   }
 
+  // Beim Entwickeln alle Build-Artefakte am Zwischenspeicher vorbei laden.
+  // Der Zeitstempel an `gbrt.js` allein reicht NICHT: die `.wasm` und die
+  // `.data` holt emscripten selbst nach, ueber `locateFile`. Ohne das laedt
+  // der Browser nach einem Neubau die alte `.wasm` -- und man sucht den Fehler
+  // im Quelltext statt im Zwischenspeicher (genau das ist hier passiert).
+  window.GB_CACHE_BUSTER =
+    /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
+      ? "?b=" + Date.now() : "";
+
   // emscripten-Modulkonfiguration (global, von gbrt.js konsumiert).
   window.Module = {
+    locateFile: function (pfad) { return pfad + window.GB_CACHE_BUSTER; },
     canvas: document.getElementById("canvas"),
     noInitialRun: true,   // wir rufen main() selbst auf (zuverlässiger als auto-run)
     print: log,

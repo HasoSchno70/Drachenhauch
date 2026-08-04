@@ -697,31 +697,21 @@ impl Default for BusValues {
 // ("NoDefaultOutputDevice") -- und damit auch jede Demo, die ihren Ablaufplan
 // an AUDIO_MUSIC_POSITION haengt.
 //
-// Kiras MockBackend braucht kein Geraet, rechnet den Mix aber VOLLSTAENDIG aus
-// und wirft ihn nur weg. Dadurch bleibt alles Beobachtbare echt: Abspiel-
-// position, Kanal-Belegung, Lautstaerke-Tweens, Clocks -- und die FFT liefert
-// das tatsaechliche Spektrum des Stuecks. Nur hoerbar ist nichts.
-// Getaktet wird er pro Bild in `update()`.
+// Emscripten bringt aber eine eigene OpenAL-Umsetzung mit, die auf WebAudio
+// zeichnet. `web_audio::WebBackend` nimmt Kiras fertigen Mix und schiebt ihn
+// dort hinein -- Ton im Browser ist damit HOERBAR, und die Warteschlange taktet
+// sich von selbst in Echtzeit (siehe web_audio.rs).
 #[cfg(target_os = "emscripten")]
-type Backend = kira::backend::mock::MockBackend;
+type Backend = crate::web_audio::WebBackend;
 #[cfg(not(target_os = "emscripten"))]
 type Backend = DefaultBackend;
 
-/// Abtastrate des stummen Web-Backends. Kiras Vorgabe waere 1 Hz (fuer Tests
-/// gedacht) -- damit liefe die Musik-Uhr absurd langsam.
+/// Abtastrate im Browser.
 #[cfg(target_os = "emscripten")]
 const WEB_SR: u32 = 44100;
-/// So viele Bilder rechnet ein `process()`-Aufruf -- Kiras
-/// `internal_buffer_size`-Vorgabe. Weichen die beiden voneinander ab, laeuft
-/// die Uhr falsch.
-#[cfg(target_os = "emscripten")]
-const WEB_BUF: u32 = 128;
 
 pub struct Audio {
     manager: AudioManager<Backend>,
-    /// Web: wann zuletzt getaktet wurde (siehe `update`).
-    #[cfg(target_os = "emscripten")]
-    web_last: Option<std::time::Instant>,
     // Mixer-Busse: SFX/Sampler/Tone laufen auf sfx_track, Musik auf
     // music_track (beide routen in den Main-Track, wo der FFT-Tap haengt).
     // Bus-Volume × Sound-Volume multiplizieren sich im Mixer -> echter Master.
@@ -782,11 +772,8 @@ impl Audio {
         #[allow(unused_mut)]
         let mut settings = AudioManagerSettings::<Backend> {
             main_track_builder: main, ..Default::default() };
-        // Das Mock-Backend startet mit 1 Hz -- ohne das hier liefe die Musik
-        // rund 44000-mal zu langsam.
         #[cfg(target_os = "emscripten")]
-        { settings.backend_settings.sample_rate = WEB_SR;
-          debug_assert_eq!(settings.internal_buffer_size as u32, WEB_BUF); }
+        { settings.backend_settings = WEB_SR; }
         let mut manager = AudioManager::<Backend>::new(settings)
             .map_err(|e| format!("Audio-Geraet konnte nicht initialisiert werden: {e:?}"))?;
         let mut sfx_b = TrackBuilder::new();
@@ -798,10 +785,7 @@ impl Audio {
         let music_track = manager.add_sub_track(music_b)
             .map_err(|e| format!("Musik-Bus konnte nicht angelegt werden: {e:?}"))?;
         Ok(Audio {
-            manager,
-            #[cfg(target_os = "emscripten")]
-            web_last: None,
-            sfx_track, music_track,
+            manager, sfx_track, music_track,
             sfx_bus: 1.0, music_bus: 1.0, master_bus: 1.0,
             sfx_fx, music_fx, master_fx,
             bus_values: [BusValues::default(); 3], audio_stack: Vec::new(),
@@ -1941,29 +1925,13 @@ resonance/reverb/distortion", other)),
     }
     pub fn music_queue(&mut self, path: &str) { self.music_queue = Some(path.to_string()); }
 
-    /// Web: das Mock-Backend um die seit dem letzten Bild verstrichene Zeit
-    /// weiterrechnen. Ohne diesen Takt stuende alles still -- ein Geraet, das
-    /// von sich aus zieht, gibt es hier ja nicht.
+    /// Web: die Ausgabe-Warteschlange nachfuellen (siehe web_audio.rs).
     ///
-    /// Die Obergrenze ist wichtig: nach einem langen Halt (Tab im Hintergrund,
-    /// Ladepause) waere die verstrichene Zeit riesig, und das Aufholen wuerde
-    /// laenger dauern als die Pause selbst. Dann lieber Zeit verlieren als das
-    /// Bild einfrieren.
+    /// Kein Nachrechnen der verstrichenen Zeit noetig -- wir fuellen nur so
+    /// weit auf, wie WebAudio leergespielt hat. Das ergibt von selbst Echtzeit.
     #[cfg(target_os = "emscripten")]
     fn web_takt(&mut self) {
-        const MAX_S: f64 = 0.25;
-        let jetzt = std::time::Instant::now();
-        let dt = match self.web_last {
-            Some(t) => jetzt.duration_since(t).as_secs_f64().min(MAX_S),
-            None => 1.0 / 60.0,       // erstes Bild: eine uebliche Bilddauer
-        };
-        self.web_last = Some(jetzt);
-        let bloecke = ((dt * WEB_SR as f64) / WEB_BUF as f64).round() as u32;
-        let backend = self.manager.backend_mut();
-        // Einmal pro Bild die Befehle aus dem Hauptthread uebernehmen
-        // (neue Sounds, Tweens), dann den Ton dazu ausrechnen.
-        backend.on_start_processing();
-        for _ in 0..bloecke { backend.process(); }
+        self.manager.backend_mut().nachfuellen();
     }
 
     // ================= per-Frame-Update (aus FLIP) =================

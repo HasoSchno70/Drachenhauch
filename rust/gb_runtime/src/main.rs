@@ -19,6 +19,10 @@ mod astar;
 // (raylib bleibt fuer Fenster/Input).
 #[cfg(feature = "graphics")]
 mod audio;
+// Im Browser gibt es weder cpal-Host noch Audio-Thread -- die Ausgabe laeuft
+// ueber emscriptens OpenAL (das intern WebAudio bedient).
+#[cfg(all(feature = "graphics", target_os = "emscripten"))]
+mod web_audio;
 mod builtins;
 mod compiler;
 mod parser;

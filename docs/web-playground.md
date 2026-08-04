@@ -46,23 +46,36 @@ Alle nachgemessen, nicht vermutet:
   nach dem Anzeigen (`preserveDrawingBuffer` ist nicht gesetzt). Aus demselben
   Grund liefert `SAVESCREENSHOT` im Browser ein leeres Bild. Betrifft nur das
   Nachher, nicht das Laufende -- waehrend des Laufs ist alles zu sehen.
-- **Kein hoerbarer Ton -- aber alles andere am Klang stimmt.** cpal hat keinen
-  emscripten-Host mehr (sein WebAudio-Host haengt an wasm-bindgen-JS-Glue, das
-  emscripten nicht liefert), also lief frueher jedes Programm mit Ton in
-  `NoDefaultOutputDevice` und starb. Seit 2026-08-03 nimmt gbrt dort Kiras
-  **`MockBackend`**: kein Geraet noetig, der Mix wird aber VOLLSTAENDIG
-  gerechnet und nur weggeworfen. Getaktet wird er pro Bild in
-  `Audio::update()` (aus `FLIP`) mit der tatsaechlich verstrichenen Zeit,
-  gedeckelt auf 0,25 s pro Bild -- nach einem Halt im Hintergrund-Tab soll die
-  Aufholjagd nicht laenger dauern als die Pause.
+- **Ton ist hoerbar** (seit 2026-08-04) -- aber erst nach dem ersten Klick.
+  cpal hat keinen emscripten-Host mehr (sein WebAudio-Host haengt an
+  wasm-bindgen-JS-Glue, das emscripten nicht liefert), also lief frueher jedes
+  Programm mit Ton in `NoDefaultOutputDevice` und starb. gbrt bringt fuer den
+  Browser deshalb ein **eigenes Kira-Backend** mit
+  (`src/web_audio.rs`): Kiras `Backend`-Vertrag reicht uns den `Renderer`
+  durch, wir nehmen den fertigen Mix und schieben ihn in eine Warteschlange von
+  **OpenAL**-Puffern -- emscripten setzt OpenAL intern auf WebAudio um.
 
-  Nachgemessen im Browser: ein Tracker-Modul spielt, `AUDIO_MUSIC_POSITION()`
-  steht nach 150 Bildern bei 2,60 s (= 2,5 s bei 60 fps, also Echtzeit), und
-  `AUDIO_FFT` liefert ein echtes Spektrum (Bandsumme 11,5 statt 0). Damit
-  laeuft auch eine Demo, deren ganzer Ablaufplan an der Musik haengt.
+  **Die Warteschlange taktet sich selbst:** pro Bild wird nur so weit
+  nachgefuellt, wie WebAudio leergespielt hat. Im Beharrungszustand ist das
+  exakt Echtzeit, ohne irgendwo eine Uhr abzulesen. Nachgemessen im Browser:
+  nach einem Lauf steht die Wanduhr bei 8,35 s und `AUDIO_MUSIC_POSITION()` bei
+  8,50 s -- die Musik-Uhr folgt der echten Zeit auf 2 % genau, und das kann sie
+  nur, wenn die Puffer tatsaechlich abgespielt werden.
 
-  **Nur `FLIP` treibt die Uhr.** Ein Konsolenprogramm ohne Bildschleife bekommt
-  im Browser keinen Takt -- dort steht die Wiedergabe still.
+  **Autoplay-Sperre:** eine `AudioContext` startet angehalten, bis der Nutzer
+  die Seite einmal angefasst hat. Bis dahin verbraucht WebAudio nichts, die
+  Warteschlange bleibt voll -- und weil die Uhr an ihr haengt, steht auch die
+  Wiedergabe. Ein Programm, dessen Ablauf an `AUDIO_MUSIC_POSITION` haengt,
+  wartet also auf den ersten Klick. Der Playground weist darauf hin.
+
+  **`-lopenal` ist Pflicht.** Das von raylib mitgebrachte `-lal` ist bloss ein
+  leeres Archiv; die JS-Umsetzung steckt in `libopenal.js` und kommt nur ueber
+  `-lopenal` dazu. Ohne das Flag uebersetzt und linkt alles, und der Browser
+  bricht erst beim Start ab: *"alcOpenDevice: function import requires a
+  callable"*.
+
+  **Nur `FLIP` fuellt nach.** Ein Konsolenprogramm ohne Bildschleife bekommt im
+  Browser keinen Takt -- dort bleibt es still.
 - ~~Eigene Shader in Desktop-GLSL uebersetzen nicht.~~ **Erledigt seit
   2026-08-03: 3D und Post-Effekte laufen.** Der Web-Build faehrt jetzt
   **WebGL 2** statt WebGL 1 (`opengl_es_30` + `MIN/MAX_WEBGL_VERSION=2`).
@@ -75,15 +88,15 @@ Alle nachgemessen, nicht vermutet:
 - **Keine Nicht-Zweierpotenz-Texturen mit Wiederholung**
   (`GL: NPOT textures extension not found`) -- eine Warnung, kein Fehler.
 
-## Die Demo im Browser (Stand 2026-08-03)
+## Die Demo im Browser (Stand 2026-08-04)
 
-`gbdemo/` **laeuft** -- getrieben von der Musik, wie auf dem Desktop, nur
-stumm. Im Browser nachgesehen:
+`gbdemo/` **laeuft vollstaendig** -- mit Bild und Ton, wie auf dem Desktop.
+Im Browser nachgesehen:
 
 | | |
 |---|---|
 | Ablaufplan an `AUDIO_MUSIC_POSITION` | laeuft in Echtzeit |
-| Tracker-Modul (261 KB `.mod`) | wird gespielt (unhoerbar) |
+| Tracker-Modul (261 KB `.mod`) | wird gespielt, **hoerbar** (nach dem ersten Klick) |
 | Spektrum-Saeulen, Sinus-Scroller, Logo | vollstaendig |
 | Szenen-Spruenge mit den Zifferntasten | funktionieren |
 | 2D-Szenen (Titel, Bulk-Linien, Physik-Logo) | vollstaendig |
@@ -91,7 +104,7 @@ stumm. Im Browser nachgesehen:
 | 3D: Wuerfelfeld mit `MODEL_INSTANCED` (1600 Wuerfel) | vollstaendig |
 | 3D: `MODEL_PBR` + `LIGHT_ENV_HDR` + `SKYBOX` + Schatten | vollstaendig |
 
-Damit laeuft die Demo im Browser bis auf den Ton **vollstaendig**.
+Damit laeuft die Demo im Browser **vollstaendig**.
 
 ### Der Fund, der 3D im Browser blockierte
 
@@ -234,8 +247,9 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
   hält den Hash aktuell, sodass die URL jederzeit teilbar ist.
 - **Hardware-/Netz-Module** (`db/net/http/serial/usb/wifi/bt`) sind im
   Web-Build nicht verfügbar (nur `--features graphics`).
-- **Audio:** läuft stumm über Kiras `MockBackend` (Position/FFT/Kanäle stimmen,
-  nur hörbar ist nichts) — Details oben unter „Bekannte Grenzen".
+- **Audio:** hörbar über ein eigenes Kira-Backend, das den fertigen Mix in
+  OpenAL-Puffer schiebt (emscripten setzt OpenAL auf WebAudio um) — Details
+  oben unter „Bekannte Grenzen".
 
 ## Nächste Schritte
 
@@ -243,10 +257,16 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 2. ~~Grafik im Browser~~ ✅ erledigt (ASYNCIFY-Yield in `flip()`, verifiziert).
 3. ~~Teilbare Links~~ ✅ erledigt (Quelle im URL-Hash).
 4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `gbrt.data`, verifiziert).
-5. ~~Stummes Audio über Kiras `MockBackend`~~ ✅ erledigt (die Demo läuft damit
-   im Browser, verifiziert).
+5. ~~Audio im Browser~~ ✅ erledigt — zuerst stumm über Kiras `MockBackend`,
+   seit 2026-08-04 **hörbar** über ein eigenes Backend mit OpenAL-Ausgabe.
 6. ~~Shader fürs Web~~ ✅ erledigt — über WebGL 2 statt eines Ports nach
    GLSL ES 1.00 (3D, IBL, Skybox, Schatten und Post-Effekte verifiziert).
-7. **Offen:** Touch-Input fürs Handy, eine kleine Beispiel-Galerie aus
-   vorgefertigten Share-Links, und hörbarer Ton (bräuchte einen echten
-   WebAudio-Backend für Kira statt des MockBackends).
+7. ~~Beispiel-Galerie~~ ✅ erledigt (`web/beispiele.js`, sechs Programme ohne
+   Dateizugriff).
+8. ~~Touch-Input~~ ✅ verifiziert: `TOUCH_COUNT`/`TOUCH_X`/`TOUCH_Y` melden im
+   Browser die richtige Stelle (synthetische Berührung bei 40 %/60 % einer
+   320×200-Leinwand → 128,3/119,5). Die **Gesten** (`GESTURE$`) blieben im Test
+   leer — ob das an den synthetischen Ereignissen liegt oder eine echte Lücke
+   ist, wurde nicht geklärt.
+9. **Offen:** ein echtes Gerät zum Gegenprüfen (Handy-Browser), und der Ton ist
+   bislang nur *messbar* geflossen — angehört hat ihn noch niemand.

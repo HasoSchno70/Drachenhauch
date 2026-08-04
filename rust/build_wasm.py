@@ -160,6 +160,12 @@ def emcc_flags(out_dir: str | Path) -> list:
         "-s", "MAX_WEBGL_VERSION=2",
         # ... und die leeren Ersatz-Bibliotheken auffindbar machen (siehe dort).
         f"-L{leere_gl_ersatzbibliotheken().as_posix()}",
+        # OpenAL: emscriptens Umsetzung auf WebAudio. Sie steckt in einer
+        # JS-Bibliothek (`libopenal.js`), die NUR ueber `-lopenal` dazukommt --
+        # das von raylib mitgebrachte `-lal` ist bloss ein leeres Archiv. Ohne
+        # dieses Flag uebersetzt und linkt alles, und der Browser bricht erst
+        # beim Start ab: "alcOpenDevice: function import requires a callable".
+        "-lopenal",
         # requestFullscreen gehoert dazu: raylibs ToggleFullscreen ruft es auf
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
