@@ -90,6 +90,12 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — Scroller, LINES-Bulk, MODEL_INSTANCED mit Farb-Array, PBR+HDR+SKYBOX,
       physics2d mit PHYS2D_SET_DYNAMIC, behaltenes RENDERTARGET, Effektkette,
       Spatial Audio, AUDIO_SFX-Klangtastatur. Jede Szene mit ihrem Stolperstein.
+- [x] 82 Ins Netz stellen – GameBasic im Browser  (content/82_web.js, ohne Abbildung)
+      — build_wasm.py + http.server, Playground (Galerie, ▶ Demo, Link teilen),
+      Tabelle „Was im Browser anders ist" (Ton erst nach Klick, Leinwand nach
+      Programmende schwarz, keine Datei-Dialoge, keine Hardware-Module), FLIP als
+      Atempause für den Tab, Touch fürs Handy, „Größe ist Wartezeit“
+      (rechnen statt laden). Buch damit 392 Seiten.
 
 ### Anhang
 - [x] A Befehls-Index (alphabetisch)  (content/90_anhang_a.js — auto-generiert aus builtin_index.json)

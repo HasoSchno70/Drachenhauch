@@ -1,0 +1,56 @@
+module.exports = (H) => [
+  H.chapter("Ins Netz stellen – GameBasic im Browser"),
+  H.p("Ein fertiges Spiel liegt auf deiner Festplatte. Wer es sehen soll, muss es herunterladen, entpacken, einer Warnung von Windows widersprechen und dann hoffen, dass es startet. Zwischen deiner Arbeit und einem Zuschauer liegen also fünf Gelegenheiten aufzugeben."),
+  H.p("Es geht auch anders: Dieselbe Laufzeit, die auf dem Rechner läuft, gibt es als WebAssembly. Ein Link genügt – der Browser lädt sie, übersetzt deinen Quelltext selbst und führt ihn aus. Kein Plugin, kein Python, keine Installation. Dieses Kapitel zeigt, wie das geht und was im Browser anders ist als auf dem Rechner."),
+
+  H.h2("Bauen und starten"),
+  H.p("Zwei Befehle. Der erste baut die Laufzeit für den Browser und packt dein Programm dazu, der zweite stellt einen kleinen Server hin:"),
+  H.code([
+    "python rust\\build_wasm.py meinspiel.gb",
+    "py -m http.server -d web 8000",
+  ]),
+  H.p("Danach im Browser http://localhost:8000 öffnen. Der Bau dauert einige Minuten und braucht die emscripten-Werkzeugkette; das Ergebnis sind drei Dateien im Ordner web: gbrt.js, gbrt.wasm und – falls dein Programm Dateien braucht – gbrt.data."),
+  H.warn("Ein Doppelklick auf die index.html funktioniert NICHT. WebAssembly darf über file:// nicht geladen werden; es braucht echtes HTTP. Genau dafür ist der zweite Befehl da – er ist kein Zierrat."),
+  H.p("Die .gb-Datei, die du beim Bauen angibst, hat zwei Aufgaben: Sie ist das Programm, das der Demo-Knopf startet, und ihr Ordner assets wird mit eingepackt. Nur diese Dateien stehen im Browser zur Verfügung – ein LOADIMAGE auf etwas anderes findet nichts."),
+
+  H.h2("Der Playground"),
+  H.p("Die Seite ist mehr als ein Abspielgerät: Links steht ein Editor, rechts die Leinwand und darunter die Ausgabe. Tippen, auf Ausführen klicken, zusehen. Jeder Lauf startet eine frische Laufzeit – ein abgestürztes Programm hinterlässt keinen Scherbenhaufen für das nächste."),
+  H.bulletRich("Beispiel-Knöpfe ", "laden je ein fertiges Programm und starten es: Plasma, Sternenflug, 3D mit Beleuchtung, Physik, Spektrum."),
+  H.bulletRich("▶ Demo ", "lädt das Programm, mit dem der Build gemacht wurde – samt seiner Assets."),
+  H.bulletRich("Link teilen ", "packt den Quelltext in die Adresse. Wer den Link öffnet, sieht und startet genau dein Programm. Kein Server, keine Datenbank, keine Anmeldung – der Text steht in der URL."),
+  H.p("Zum Veröffentlichen kopierst du den Ordner web irgendwohin, wo Dateien ausgeliefert werden – GitHub Pages, ein Webspace, ein Netzlaufwerk. Es ist reine Statik; es gibt nichts, was auf einem Server laufen müsste."),
+
+  H.h2("Was im Browser anders ist"),
+  H.p("Der Browser ist kein Betriebssystem, und das merkt man an ein paar Stellen. Keine davon ist ein Fehler in deinem Programm – aber wer sie nicht kennt, sucht lange:"),
+  H.table(
+    [
+      ["Ton bleibt still, bis geklickt wird",
+       "Browser erlauben Klang erst nach einer Nutzer-Aktion (sonst würde jede Werbeseite lärmen)",
+       "Einen Startbildschirm zeigen: „Klicken zum Starten“"],
+      ["Leinwand wird nach Programmende schwarz",
+       "Der Zeichenpuffer wird nach dem Anzeigen verworfen",
+       "Nichts – während des Laufs ist alles zu sehen. SAVESCREENSHOT liefert im Browser allerdings ein leeres Bild"],
+      ["Datei-Dialoge fehlen",
+       "Es gibt kein Dateisystem des Nutzers",
+       "Spielstände über das save-Modul statt über Dialoge"],
+      ["Serial/USB/Bluetooth/WLAN und Datenbank fehlen",
+       "Diese Module sprechen mit Geräten des Rechners",
+       "Solche Programme laufen weiter nur auf dem Rechner"],
+    ],
+    { headers: ["Verhalten", "Warum", "Was du tust"],
+      widths: [2900, 3200, 2926] }),
+  H.warn("Eine Schleife OHNE FLIP friert den Tab ein. Auf dem Rechner rechnet ein Programm einfach vor sich hin; im Browser bekommt die Seite nur dann wieder Luft, wenn du ein Bild abschließt. FLIP ist dort also nicht nur „Bild zeigen“, sondern auch „kurz Platz machen“. Wer lange rechnet, streut FLIP ein."),
+  H.tip("Für Handys mitdenken", "Auf einem Telefon gibt es keine Tastatur und keine Maustasten. TOUCH_COUNT, TOUCH_X und TOUCH_Y liefern die Finger, GESTURE$ die erkannte Geste. Ein Spiel, das sich mit einem Finger steuern lässt, erreicht ein Vielfaches der Zuschauer – und kostet meist nur ein paar Zeilen."),
+
+  H.h2("Größe ist Wartezeit"),
+  H.p("Auf dem Rechner ist es gleich, ob dein Ordner assets fünf oder fünfzig Megabyte hat. Im Browser lädt jeder Besucher alles herunter, bevor das erste Bild erscheint – und wartet dabei. Ein paar Zahlen zur Einordnung: Die Laufzeit selbst ist rund 9 MB, ein Tracker-Modul mit vier Minuten Musik etwa 260 KB, eine PNG-Textur je nach Größe 20 bis 500 KB."),
+  H.p("Daraus folgt eine Faustregel, die im Netz stärker wiegt als auf dem Rechner: Was sich rechnen lässt, sollte nicht als Datei mitfahren. Ein AUDIO_SFX-Klang ist eine Zeile statt einer WAV-Datei, GENTEX_PERLIN erzeugt eine Textur statt sie zu laden, und ein Tracker-Modul klingt vier Minuten lang bei einem Bruchteil der Größe einer MP3."),
+  H.note("Genau so ist die mitgelieferte Demo gebaut – sechs Minuten Bild und Ton, und außer der Musik und einer Schrift lädt sie nichts. Alles andere entsteht beim Laufen."),
+
+  H.h2("Was du jetzt kannst"),
+  H.bulletRich("Bauen und starten ", "mit build_wasm.py und einem kleinen HTTP-Server."),
+  H.bulletRich("Teilen ", "über einen Link, der den Quelltext selbst enthält."),
+  H.bulletRich("Die Unterschiede kennen ", "– Ton nach dem ersten Klick, kein Dateisystem, FLIP als Atempause."),
+  H.bulletRich("Klein bleiben ", "– rechnen statt laden, weil jedes Byte Wartezeit ist."),
+  H.p("Damit hat dein Programm den Weg vom eigenen Bildschirm bis zu einem beliebigen Zuschauer hinter sich – und das ist der Schritt, an dem die meisten Projekte sonst hängenbleiben."),
+];
