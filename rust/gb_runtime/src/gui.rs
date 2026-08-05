@@ -342,6 +342,10 @@ pub struct Gui {
     drag_dx: i32, drag_dy: i32,
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
     resize_dx: i32, resize_dy: i32,      // Ecke->Maus-Versatz
+    /// Eigene Grafik je Widget-Art: Name -> (IMAGE-Handle, Randbreite).
+    /// Wo eine hinterlegt ist, ersetzt sie die gezeichnete Flaeche; alles
+    /// andere (Text, Haekchen, Griffe) bleibt.
+    skins: HashMap<String, (i64, i32)>,
     active_slider: Option<(usize, usize)>,
     /// Laufendes Drehregler-Ziehen: (Fenster, Widget, Maus-y beim Griff,
     /// Wert beim Griff). Der Startwert wird gemerkt, damit der Regler nicht
@@ -409,6 +413,7 @@ impl Gui {
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
+            skins: HashMap::new(),
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
@@ -1225,6 +1230,26 @@ impl Gui {
         self.wdg_mut(h, "GUI_SET_ROUND")?.rund = f;
         Ok(())
     }
+    /// Grafik fuer eine Widget-Art hinterlegen (9-Slice). `bild` = -1 nimmt
+    /// sie wieder weg.
+    pub fn set_skin(&mut self, art: String, bild: i64, rand: i32) -> Result<(), String> {
+        let a = art.to_lowercase();
+        if Kind::from_str(&a).is_none() {
+            return Err(format!("GUI_SKIN: unbekannte Widget-Art '{}'", art));
+        }
+        if bild < 0 {
+            self.skins.remove(&a);
+        } else {
+            self.skins.insert(a, (bild, rand.max(0)));
+        }
+        Ok(())
+    }
+
+    /// Hinterlegte Grafik einer Art (falls vorhanden).
+    fn skin_of(&self, kind: Kind) -> Option<(i64, i32)> {
+        self.skins.get(kind.as_str()).copied()
+    }
+
     pub fn set_color(&mut self, h: i64, role: String, color: i64) -> Result<(), String> {
         if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent") {
             return Err("GUI_SET_COLOR: role muss bg/fg/border/accent sein".into());
@@ -1841,6 +1866,34 @@ impl Gui {
     /// bisher.
     fn fbox(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, fill: i64, border: i64) {
         self.flaeche(g, x1, y1, x2, y2, fill, border, false);
+    }
+
+    /// Wie `fbox`, beruecksichtigt aber eine fuer diese Widget-Art
+    /// hinterlegte Grafik.
+    #[allow(clippy::too_many_arguments)]
+    fn fbox_w(&self, g: &mut Graphics, kind: Kind, x1: i32, y1: i32, x2: i32, y2: i32,
+              fill: i64, border: i64) {
+        if self.skin(g, kind, x1, y1, x2, y2) { return; }
+        self.flaeche(g, x1, y1, x2, y2, fill, border, false);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn fbox_tief_w(&self, g: &mut Graphics, kind: Kind, x1: i32, y1: i32, x2: i32, y2: i32,
+                   fill: i64, border: i64) {
+        if self.skin(g, kind, x1, y1, x2, y2) { return; }
+        self.flaeche(g, x1, y1, x2, y2, fill, border, true);
+    }
+
+    /// Hinterlegte Grafik zeichnen, falls es eine gibt. Liefert TRUE, wenn
+    /// sie die gezeichnete Flaeche ersetzt hat.
+    fn skin(&self, g: &mut Graphics, kind: Kind, x1: i32, y1: i32, x2: i32, y2: i32) -> bool {
+        match self.skin_of(kind) {
+            Some((bild, rand)) => {
+                let _ = g.nine_slice(bild, x1, y1, x2 - x1 + 1, y2 - y1 + 1, rand);
+                true
+            }
+            None => false,
+        }
     }
 
     /// Wie `fbox`, aber VERSENKT: der Verlauf laeuft andersherum und statt
@@ -2965,7 +3018,7 @@ impl Gui {
                 self.wtext(g, wdg, ax, ay, wdg.text.clone(), fg);
             }
             Kind::Panel => {
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 if !wdg.text.is_empty() {
                     g.box_fill(ax, ay, ax + w - 1, ay + 17, self.th("win_border"));
@@ -3003,7 +3056,7 @@ impl Gui {
                 } else {
                     let mut bg = self.wcol(wdg, "bg", "widget_bg");
                     if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
-                    self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
+                    self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bg, self.wcol(wdg, "border", "widget_border"));
                 }
                 // Icon + optionaler Text.
                 let isz = if has_icon {
@@ -3041,7 +3094,7 @@ impl Gui {
                     } else {
                         // Leer = versenkte Mulde: man sieht, dass hier etwas
                         // hineingehoert.
-                        self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
+                        self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                                        self.wcol(wdg, "bg", "widget_bg"),
                                        if wdg.hovered { acc } else { bordc });
                     }
@@ -3087,7 +3140,7 @@ impl Gui {
                 // also gleitend statt springend.
                 let mix = wdg.value.clamp(0.0, 1.0);
                 let bahn = mischen(aus, acc, mix);
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, bahn,
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bahn,
                                self.wcol(wdg, "border", "widget_border"));
                 let kx = ax + r + ((w - h) as f64 * mix) as i32;
                 self.knauf(g, kx, ay + r, r - 2, shade(self.th("widget_bg"), 40));
@@ -3126,7 +3179,7 @@ impl Gui {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let tx = ax + 5;
                 let ty = ay + (h - 14) / 2;
                 let scroll = wdg.scroll;
@@ -3162,7 +3215,7 @@ impl Gui {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let pad = 5;
                 let lh = self.ta_line_h(g);
                 let scroll = wdg.scroll;
@@ -3218,7 +3271,7 @@ impl Gui {
             Kind::Spinner => {
                 let focused = self.focus_widget == Some((wi, idx));
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let (up, down, bx) = Self::spinner_btn_rects(ax, ay, w, h);
                 let bordc = self.wcol(wdg, "border", "widget_border");
                 // Trennlinien vor und in der Buttonspalte.
@@ -3270,7 +3323,7 @@ impl Gui {
             }
             Kind::Progress => {
                 let acc = self.acc_col(wdg);
-                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };
@@ -3282,7 +3335,7 @@ impl Gui {
             Kind::Dropdown => {
                 let bg = self.wcol(wdg, "bg", "widget_bg");
                 let b = if wdg.hovered { shade(bg, 18) } else { bg };
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, b, self.wcol(wdg, "border", "widget_border"));
+                self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, b, self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
                 let txt = if wdg.sel >= 0 && (wdg.sel as usize) < wdg.items.len() {
                     wdg.items[wdg.sel as usize].clone()
@@ -3293,7 +3346,7 @@ impl Gui {
                 g.line(axr + 4, cy + 2, axr + 8, cy - 2, fg);
             }
             Kind::ListBox => {
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let fg = self.txt_col(wdg);
                 let acc = self.acc_col(wdg);
@@ -3318,7 +3371,7 @@ impl Gui {
             Kind::Canvas => {
                 // Platzhalter-Flaeche; der User malt nach GUI_DRAW mit normalen
                 // Befehlen in den per GUI_CANVAS_X/Y/W/H gelieferten Bereich.
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "win_bg"), self.wcol(wdg, "border", "widget_border"));
             }
             Kind::Separator => {
@@ -3347,7 +3400,7 @@ impl Gui {
     fn draw_tree(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let wdg = &self.windows[wi].widgets[idx];
         let (ax, ay, w, h) = self.abs_rect(wi, wdg);
-        self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+        self.fbox_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1,
             self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
         let t = wdg.tree.as_ref().unwrap();
         let vis = Self::tree_visible(t);

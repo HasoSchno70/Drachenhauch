@@ -171,3 +171,51 @@ def test_kippschalter_startet_ohne_vorgabe_aus(run_gb):
            't = GUI_TOGGLE(w, "Aus", 10, 10)\n'
            'PRINT GUI_CHECKED(t)\n')
     assert _z(run_gb(src)) == ["FALSE"]
+
+
+# --- 9-Slice-Skins --------------------------------------------------------
+
+def test_skin_setzen_und_wieder_wegnehmen(run_gb):
+    src = ('IMPORT "gui"\n'
+           'SCREEN(200, 120, "S")\n'
+           'DIM b AS IMAGE\n'
+           'b = GENTEX_COLOR(32, 32, 16750848)\n'
+           'GUI_SKIN("button", b, 8)\n'
+           'GUI_SKIN("button", -1)\n'
+           'PRINT "ok"\n')
+    assert _z(run_gb(src)) == ["ok"]
+
+
+def test_skin_meldet_unbekannte_widget_art(run_gb):
+    src = ('IMPORT "gui"\n'
+           'SCREEN(200, 120, "S")\n'
+           'DIM b AS IMAGE\n'
+           'b = GENTEX_COLOR(32, 32, 16750848)\n'
+           'TRY\n'
+           '    GUI_SKIN("knopfdruck", b, 8)\n'
+           'CATCH e\n'
+           '    PRINT e\n'
+           'END TRY\n')
+    out = run_gb(src)
+    assert "knopfdruck" in out
+
+
+def test_skin_ueberlebt_winzige_widgets(run_gb):
+    """Ein Widget kleiner als seine Skin-Raender darf zusammenschrumpfen,
+    nicht kaputtgehen -- der Rand wird dafuer gestutzt."""
+    src = ('IMPORT "gui"\n'
+           'SCREEN(200, 120, "S")\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM b AS IMAGE\n'
+           'DIM f AS INTEGER\n'
+           'b = GENTEX_COLOR(48, 48, 16750848)\n'
+           'w = GUI_WINDOW("W", 5, 5, 180, 100)\n'
+           'GUI_BUTTON(w, "x", 5, 5, 6, 4)\n'
+           'GUI_SKIN("button", b, 20)\n'
+           'FOR f = 1 TO 2\n'
+           '    GUI_UPDATE()\n'
+           '    GUI_DRAW()\n'
+           '    FLIP()\n'
+           'NEXT\n'
+           'PRINT "ok"\n')
+    assert _z(run_gb(src)) == ["ok"]

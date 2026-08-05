@@ -875,3 +875,33 @@ Kästchen, Auswahlknöpfe und Schieber sind ebenfalls plastisch: das leere
 Kästchen ist eine versenkte Mulde, das gesetzte eine gewölbte Fläche in der
 Akzentfarbe; der Schieber hat eine versenkte Rinne, deren zurückgelegter Teil
 eingefärbt wird, und einen metallischen Griff.
+
+
+## Eigene Grafiken: 9-Slice-Skins
+
+Wo der gezeichnete Look nicht reicht, ersetzt eine Grafik die Fläche eines
+Widget-Typs:
+
+```basic
+DIM haut AS IMAGE
+haut = LOADIMAGE("assets/knopf.png")
+GUI_SKIN("button", haut, 12)      ' 12 px Rand
+GUI_SKIN("button", -1)            ' wieder wegnehmen
+```
+
+`GUI_SKIN(art$, bild, rand)` gilt für **alle** Widgets dieser Art. Der Rest —
+Beschriftung, Häkchen, Schieberegler-Griff — wird weiterhin gezeichnet; nur
+der Untergrund kommt aus dem Bild.
+
+**Warum 9-Slice und nicht einfach skalieren?** Das Bild wird in neun Stücke
+geteilt: die vier Ecken bleiben unverändert, die Kanten dehnen sich nur
+entlang ihrer Achse, die Mitte in beide Richtungen. Ein schlicht skaliertes
+Bild würde seine runden Ecken zu Ellipsen ziehen, sobald der Knopf breiter
+wird als die Vorlage.
+
+Der Rand wird auf die halbe Bild- **und** Zielseite gedeckelt. Ein Widget, das
+kleiner ist als seine Skin-Ränder, schrumpft dadurch sauber zusammen, statt
+sich zu überlappen.
+
+Zulässige Arten sind alle Widget-Namen, die `GUI_KIND` liefert (`button`,
+`panel`, `textinput`, `listbox`, `progress`, …).

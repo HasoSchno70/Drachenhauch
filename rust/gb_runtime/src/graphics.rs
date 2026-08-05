@@ -3091,6 +3091,42 @@ moeglich -- bekam {},{},{},{}", r, g, b, al));
         self.emit(Cmd::TexturePartEx(i, sx, sy, sw, sh, dx, dy, dw, dh));
         Ok(())
     }
+    /// 9-Slice: ein Bild auf eine beliebige Groesse ziehen, ohne dass die
+    /// Raender mitverzerren.
+    ///
+    /// Das Bild wird in neun Stuecke geteilt (`rand` breit): die vier Ecken
+    /// bleiben unveraendert, die Kanten dehnen sich nur ENTLANG ihrer Achse,
+    /// die Mitte in beide. Genau das braucht eine Knopf-Grafik, die fuer
+    /// jede Beschriftungslaenge passen soll -- ein schlicht skaliertes Bild
+    /// wuerde seine runden Ecken zu Ellipsen ziehen.
+    #[allow(clippy::too_many_arguments)]
+    pub fn nine_slice(&mut self, idx: i64, x: i32, y: i32, w: i32, h: i32,
+                      rand: i32) -> Result<(), String> {
+        let i = idx as usize;
+        if i >= self.textures.len() {
+            return Err("9-Slice: ungueltiges IMAGE-Handle".into());
+        }
+        let (bw, bh) = (self.textures[i].tex.width, self.textures[i].tex.height);
+        let r = neun_rand(bw, bh, w, h, rand);
+        if r <= 0 {
+            return self.draw_image_part_ex(idx, 0, 0, bw, bh, x, y, w, h);
+        }
+        let (sx, sw) = neun_spannen(0, bw, r);
+        let (sy, sh) = neun_spannen(0, bh, r);
+        let (dx, dw) = neun_spannen(x, w, r);
+        let (dy, dh) = neun_spannen(y, h, r);
+        for c in 0..3 {
+            for z in 0..3 {
+                if sw[c] <= 0 || sh[z] <= 0 || dw[c] <= 0 || dh[z] <= 0 {
+                    continue;
+                }
+                self.draw_image_part_ex(idx, sx[c], sy[z], sw[c], sh[z],
+                                        dx[c], dy[z], dw[c], dh[z])?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn draw_image_flipped(&mut self, idx: i64, x: i32, y: i32, fh: bool, fv: bool) -> Result<(), String> {
         let i = idx as usize;
         if i >= self.textures.len() { return Err("DRAWIMAGEFLIPPED: ungueltiges IMAGE-Handle".into()); }
@@ -5217,6 +5253,23 @@ fn load_hdr_rgbe(path: &str) -> Result<(Vec<f32>, i32, i32), String> {
 }
 
 /// SDL/pygame-Keycode (Wert der GB-KEY_*-Konstanten) -> raylib KeyboardKey.
+/// Randbreite fuer 9-Slice, auf ein sinnvolles Mass gestutzt.
+///
+/// Der Rand darf nie mehr als die halbe Bild- ODER Zielseite belegen: sonst
+/// ueberlappten sich gegenueberliegende Ecken und die Mittelstuecke haetten
+/// negative Groesse. Das trifft genau dann zu, wenn ein Widget kleiner wird
+/// als seine Skin-Raender -- und dort soll es zusammenschrumpfen, nicht
+/// kaputtgehen.
+fn neun_rand(bw: i32, bh: i32, w: i32, h: i32, rand: i32) -> i32 {
+    rand.max(0).min(bw / 2).min(bh / 2).min(w / 2).min(h / 2)
+}
+
+/// Die drei Abschnitte einer Achse: Anfang fest, Mitte gedehnt, Ende fest.
+/// Liefert (Positionen, Laengen).
+fn neun_spannen(start: i32, laenge: i32, r: i32) -> ([i32; 3], [i32; 3]) {
+    ([start, start + r, start + laenge - r], [r, laenge - 2 * r, r])
+}
+
 /// Seitlicher Einzug einer Zeile in einem runden Rechteck.
 ///
 /// Fuer `Cmd::RoundGradient`: die Flaeche wird zeilenweise gefuellt, und in
@@ -5481,7 +5534,49 @@ mod camera_rotation_tests {
 
 #[cfg(test)]
 mod tests {
-    use super::ecken_einzug;
+    use super::{ecken_einzug, neun_rand, neun_spannen};
+
+    #[test]
+    fn neun_spannen_deckt_die_achse_luecken_und_ueberlappungsfrei_ab() {
+        let (pos, len) = neun_spannen(10, 100, 12);
+        // Jeder Abschnitt beginnt, wo der vorige endet ...
+        assert_eq!(pos[0] + len[0], pos[1]);
+        assert_eq!(pos[1] + len[1], pos[2]);
+        // ... und zusammen ergeben sie genau die Gesamtlaenge.
+        assert_eq!(len.iter().sum::<i32>(), 100);
+        assert_eq!(pos[2] + len[2], 110);
+        // Aussen fest, innen der Rest.
+        assert_eq!(len[0], 12);
+        assert_eq!(len[2], 12);
+        assert_eq!(len[1], 76);
+    }
+
+    #[test]
+    fn neun_rand_verhindert_ueberlappende_ecken() {
+        // Passt bequem -> unveraendert.
+        assert_eq!(neun_rand(48, 48, 200, 60, 12), 12);
+        // Ziel schmaler als zwei Raender -> auf die halbe Zielbreite gestutzt.
+        assert_eq!(neun_rand(48, 48, 20, 60, 12), 10);
+        // Auch das Quellbild deckelt.
+        assert_eq!(neun_rand(16, 48, 200, 60, 12), 8);
+        // Kein negativer Rand.
+        assert_eq!(neun_rand(48, 48, 200, 60, -5), 0);
+    }
+
+    #[test]
+    fn neun_teile_bleiben_bei_gestutztem_rand_gueltig() {
+        // Der Fall, in dem es frueher kaputtging: Widget kleiner als die
+        // Skin-Raender. Mit dem gestutzten Rand darf KEIN Stueck eine
+        // negative Groesse bekommen.
+        let r = neun_rand(48, 48, 20, 14, 12);
+        for (start, laenge) in [(0, 20), (0, 14)] {
+            let (_, len) = neun_spannen(start, laenge, r);
+            for l in len {
+                assert!(l >= 0, "negatives Teilstueck bei Rand {}: {:?}", r, len);
+            }
+            assert_eq!(len.iter().sum::<i32>(), laenge);
+        }
+    }
 
     #[test]
     fn ecken_einzug_rundet_oben_und_unten_gleich() {
