@@ -41,9 +41,9 @@ w1 = GUI_WINDOW("Mischpult", 20, 20, 470, 340)
 k_vol = GUI_KNOB(w1, 24, 20, 96, 0.0, 100.0, 72.0)
 k_hall = GUI_KNOB(w1, 140, 20, 96, 0.0, 100.0, 35.0)
 k_ton = GUI_KNOB(w1, 256, 20, 96, 0.0, 100.0, 88.0)
-GUI_LABEL(w1, "Lautst.", 40, 122)
-GUI_LABEL(w1, "Hall", 165, 122)
-GUI_LABEL(w1, "Klang", 278, 122)
+GUI_LABEL(w1, "Lautst.", 44, 124)
+GUI_LABEL(w1, "Hall", 172, 124)
+GUI_LABEL(w1, "Klang", 282, 124)
 
 t_musik = GUI_TOGGLE(w1, "Musik", 24, 156, TRUE)
 t_fx = GUI_TOGGLE(w1, "Effekte", 24, 194, FALSE)
@@ -131,12 +131,14 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
     GUI_UPDATE()
     GUI_DRAW()
 
-    DIM hell AS INTEGER
-    IF t_idx = 0 THEN hell = 15461355 ELSE hell = 2105376
-    TEXT(24, 380, f"Thema: {themen[t_idx]}   Plastisch: {plastisch}   Eigene Grafik: {mit_haut}")
-    TEXT(24, 404, "LEERTASTE Thema    f flach/plastisch    g eigene Grafik    ESC Ende")
+    ' Schriftfarbe zum Thema: auf hellem Grund waere das voreingestellte
+    ' Weiss unlesbar.
+    DIM tf AS INTEGER
+    IF t_idx = 0 THEN tf = 13421772 ELSE tf = 2500134
+    TEXT(24, 380, f"Thema: {themen[t_idx]}   Plastisch: {plastisch}   Eigene Grafik: {mit_haut}", tf)
+    TEXT(24, 404, "LEERTASTE Thema    f flach/plastisch    g eigene Grafik    ESC Ende", tf)
     TEXT(24, 440, f"Lautstaerke {GUI_VALUE(k_vol):.0f}   Hall {GUI_VALUE(k_hall):.0f}   " + _
-                  f"Klang {GUI_VALUE(k_ton):.0f}   Bass {GUI_VALUE(s_bass):.2f}")
-    TEXT(24, 464, f"Musik: {GUI_CHECKED(t_musik)}   Effekte: {GUI_CHECKED(t_fx)}")
+                  f"Klang {GUI_VALUE(k_ton):.0f}   Bass {GUI_VALUE(s_bass):.2f}", tf)
+    TEXT(24, 464, f"Musik: {GUI_CHECKED(t_musik)}   Effekte: {GUI_CHECKED(t_fx)}", tf)
     FLIP()
 WEND

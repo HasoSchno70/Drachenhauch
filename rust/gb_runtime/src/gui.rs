@@ -111,10 +111,17 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("widget_border", 0x161B22), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8B97A6),
             ("accent", 0x2FA8D8), ("close_hover", 0xC04848)])),
         // Helles Glas: Weiss/Silber mit demselben Blau.
+        // Helles Glas: Weiss/Silber mit demselben Blau.
+        //
+        // Fensterflaeche bewusst deutlich GRAUER als die Widgets. Vorher lagen
+        // beide bei ~0xF0 und die Knoepfe verschwanden schlicht im Untergrund;
+        // im Dunkeln faellt das nicht auf, weil dort der Verlauf traegt, aber
+        // auf Weiss hat ein weisser Verlauf fast keinen Kontrast. Die Raender
+        // sind aus demselben Grund kraeftiger als im dunklen Thema.
         "glas_hell" | "glas_light" => Some(m(&[
-            ("win_bg", 0xEDF1F5), ("win_border", 0xAEB8C4), ("title_bg", 0xDCE3EB),
-            ("title_bg_focus", 0x2A8FD0), ("title_fg", 0x1E2530), ("widget_bg", 0xF2F5F8),
-            ("widget_border", 0xA8B3C0), ("text_fg", 0x1E2530), ("muted_fg", 0x76818F),
+            ("win_bg", 0xE2E8EF), ("win_border", 0x98A4B2), ("title_bg", 0xD2DAE3),
+            ("title_bg_focus", 0x2A8FD0), ("title_fg", 0x1E2530), ("widget_bg", 0xFBFCFE),
+            ("widget_border", 0x8A96A6), ("text_fg", 0x1E2530), ("muted_fg", 0x6C7683),
             ("accent", 0x2A8FD0), ("close_hover", 0xC04848)])),
         "retro" => Some(m(&[
             ("win_bg", 0x020802), ("win_border", 0x1F8C3C), ("title_bg", 0x0A2A0A),
@@ -153,6 +160,18 @@ fn mischen(a: i64, b: i64, t: f64) -> i64 {
         ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
     };
     (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
+/// Untere Kante der Glanzflaeche.
+///
+/// Bei RUNDEN Formen (Radius >= halbe Hoehe: Kreis oder Kapsel) nimmt der
+/// Glanz die ganze Hoehe ein, sonst nur die obere Haelfte. Der Grund ist
+/// `round_gradient`: es deckelt seinen Eckenradius auf die halbe Hoehe der
+/// Flaeche, die es zeichnet. Eine halbhohe Glanzflaeche auf einem Kreis
+/// bekaeme dadurch einen zu kleinen Radius und wuerde als flache Kapsel
+/// seitlich ueber die runde Form hinausragen.
+fn gloss_unten(y1: i32, y2: i32, rad: i32) -> i32 {
+    if rad * 2 >= y2 - y1 { y2 } else { y1 + (y2 - y1) / 2 }
 }
 
 fn shade(color: i64, delta: i32) -> i64 {
@@ -480,7 +499,11 @@ impl Gui {
     fn add_widget(&mut self, win: i64, fn_: &str, mut wdg: Widget) -> Result<i64, String> {
         let wi = win as usize;
         let w = self.windows.get_mut(wi).ok_or_else(|| format!("{}: erwartet GUI_WINDOW", fn_))?;
-        wdg.color = *self.theme.get("text_fg").unwrap_or(&0xFFFFFF);
+        // `color` wird hier BEWUSST nicht aus dem Thema gefuellt. Frueher wurde
+        // die Textfarbe beim Anlegen kopiert und damit eingefroren: wer danach
+        // das Thema wechselte, hatte Beschriftungen in der Farbe des alten --
+        // im hellen Thema also weisse Schrift auf weissem Grund. -1 heisst
+        // "dem Thema folgen" und wird erst beim Zeichnen aufgeloest.
         wdg.bx = wdg.x; wdg.by = wdg.y; wdg.bw = wdg.w; wdg.bh = wdg.h;  // Anchor-Basis
         let idx = w.widgets.len();
         w.widgets.push(wdg);
@@ -489,7 +512,7 @@ impl Gui {
 
     fn blank(kind: Kind, x: i32, y: i32, w: i32, h: i32) -> Widget {
         Widget {
-            kind, x, y, w, h, text: String::new(), color: 0xFFFFFF,
+            kind, x, y, w, h, text: String::new(), color: -1,   // -1 = dem Thema folgen
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None,
@@ -1527,7 +1550,7 @@ impl Gui {
         let gi = |k: &str, d: i64| wj[k].as_i64().unwrap_or(d) as i32;
         let mut w = Self::blank(kind, gi("x", 0), gi("y", 0), gi("w", 0), gi("h", 0));
         w.text = wj["text"].as_str().unwrap_or("").to_string();
-        w.color = wj["color"].as_i64().unwrap_or(0xFFFFFF);
+        w.color = wj["color"].as_i64().unwrap_or(-1);   // -1 = dem Thema folgen
         w.value = wj["value"].as_f64().unwrap_or(0.0);
         w.min = wj["min"].as_f64().unwrap_or(0.0);
         w.max = wj["max"].as_f64().unwrap_or(1.0);
@@ -1941,14 +1964,35 @@ impl Gui {
     /// blosser Verlauf sieht weiterhin flach aus.
     fn gloss(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32) {
         let s = self.m("gloss");
-        if s <= 0 || y2 - y1 < 4 {
+        let h = y2 - y1;
+        if s <= 0 || h < 4 {
             return;
         }
         let a = ((s.clamp(0, 100) as f64 / 100.0) * 255.0) as i64;
-        let mitte = y1 + (y2 - y1) / 2;
+        // Bei RUNDEN Formen (Radius >= halbe Hoehe: Kreis oder Kapsel) muss
+        // der Glanz die ganze Hoehe einnehmen. Nur die obere Haelfte zu
+        // nehmen ginge schief, weil `round_gradient` seinen Radius auf die
+        // halbe Hoehe DIESER Flaeche deckelt -- aus dem Kreis wuerde eine
+        // flache Kapsel, die seitlich ueber die Form hinausragt. Genau das
+        // waren die eckigen Schatten an runden Knoepfen und der Klecks auf
+        // den Drehreglern.
+        let unten = gloss_unten(y1, y2, rad);
         // Alpha 1 = praktisch unsichtbar (0 hiesse in gbrt DECKEND).
-        g.round_gradient(x1, y1, x2, mitte, rad,
+        g.round_gradient(x1, y1, x2, unten, rad,
                          (a << 24) | 0xFFFFFF, 0x01FF_FFFFu32 as i64);
+    }
+
+    /// Grundfarbe fuer Griffe (Schieber-Knauf, Kippschalter-Knopf,
+    /// Drehregler-Kappe).
+    ///
+    /// NICHT einfach die Widget-Farbe: die liegt per Definition nahe am
+    /// Untergrund, und ein weisser Griff auf weissem Feld ist unsichtbar --
+    /// im dunklen Thema faellt das nicht auf, weil dort der Verlauf traegt.
+    /// Gemischt wird Richtung Textfarbe, denn die kontrastiert im JEDEM Thema
+    /// mit dem Untergrund. So hebt sich der Griff hell wie dunkel ab, ohne
+    /// dass ein Thema eine eigene Farbe dafuer angeben muss.
+    fn griff_farbe(&self, w: &Widget) -> i64 {
+        mischen(self.wcol(w, "bg", "widget_bg"), self.th("text_fg"), 0.28)
     }
 
     /// Metallischer Rundgriff (Schieber-Knauf, Kippschalter-Knopf,
@@ -1965,10 +2009,16 @@ impl Gui {
         g.circle(cx, cy + 1, r, 0x50000000);
         g.round_gradient(cx - r, cy - r, cx + r, cy + r, r,
                          shade(grund, 34), shade(grund, -28));
-        // Schmaler Lichtreflex auf dem oberen Drittel.
-        let rr = (r * 2) / 3;
-        g.round_gradient(cx - rr, cy - r + 1, cx + rr, cy - r / 4, rr,
-                         0x70FFFFFF, 0x01FF_FFFFu32 as i64);
+        // Lichtreflex ueber die GANZE Kugel, nicht als abgesetzte Kappe:
+        // ein kleineres rundes Rechteck bekaeme von `round_gradient` einen
+        // auf seine halbe Hoehe gedeckelten Radius und saehe als flacher
+        // Klecks auf der Kugel aus.
+        g.round_gradient(cx - r, cy - r, cx + r, cy + r, r,
+                         0x4EFFFFFF, 0x01FF_FFFFu32 as i64);
+        // Kontur. Auf hellem Untergrund traegt der Verlauf allein nicht --
+        // eine weisse Woelbung auf Weiss hat kaum Kontrast, und der Griff
+        // verschwaende ohne diese Kante.
+        g.circle_outline(cx, cy, r, self.th("widget_border"));
     }
 
     /// Fase: eine helle Linie oben, eine dunkle unten. Die schmalste Zutat
@@ -3013,8 +3063,9 @@ impl Gui {
         let pad = self.m("pad");
         match wdg.kind {
             Kind::Label => {
+                let eigen = if wdg.color < 0 { self.th("text_fg") } else { wdg.color };
                 let fg = if !wdg.enabled { self.th("muted_fg") }
-                         else { wdg.ov.get("fg").copied().unwrap_or(wdg.color) };
+                         else { wdg.ov.get("fg").copied().unwrap_or(eigen) };
                 self.wtext(g, wdg, ax, ay, wdg.text.clone(), fg);
             }
             Kind::Panel => {
@@ -3124,7 +3175,7 @@ impl Gui {
                                          shade(acc, 24), shade(acc, -18));
                     }
                     let hx = ax + (ratio * (w - handle_w) as f64) as i32 + handle_w / 2;
-                    self.knauf(g, hx, ay + h / 2, (h / 2).max(5), self.wcol(wdg, "bg", "widget_bg"));
+                    self.knauf(g, hx, ay + h / 2, (h / 2).max(5), self.griff_farbe(wdg));
                 } else {
                     g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg"));
                     g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
@@ -3143,7 +3194,7 @@ impl Gui {
                 self.fbox_tief_w(g, wdg.kind, ax, ay, ax + w - 1, ay + h - 1, bahn,
                                self.wcol(wdg, "border", "widget_border"));
                 let kx = ax + r + ((w - h) as f64 * mix) as i32;
-                self.knauf(g, kx, ay + r, r - 2, shade(self.th("widget_bg"), 40));
+                self.knauf(g, kx, ay + r, r - 2, self.griff_farbe(wdg));
                 if !wdg.text.is_empty() {
                     self.wtext(g, wdg, ax + w + pad, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
                 }
@@ -3162,7 +3213,7 @@ impl Gui {
                     g.ring(cx, cy, r - 3, r, von, zw, acc, true);
                 }
                 // Metallkappe + Kerbe, die den Wert zeigt.
-                self.knauf(g, cx, cy, r - 6, self.wcol(wdg, "bg", "widget_bg"));
+                self.knauf(g, cx, cy, r - 6, self.griff_farbe(wdg));
                 let rad = zw.to_radians();
                 let (i0, i1) = ((r - 14).max(2) as f64, (r - 7).max(3) as f64);
                 g.line_thick(
@@ -3540,6 +3591,49 @@ impl Gui {
             g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + TBL_SCROLL_W - 1, shade(bg, -8));
             g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + TBL_SCROLL_W - 3, if t.drag_h { accent } else { border });
         }
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::{Gui, Kind};
+
+    #[test]
+    fn beschriftung_ohne_farbe_folgt_dem_thema() {
+        // Regression: die Textfarbe wurde beim Anlegen aus dem Thema kopiert
+        // und eingefroren. Ein spaeterer Themenwechsel liess Beschriftungen
+        // in der Farbe des ALTEN Themas stehen -- im hellen Thema also weisse
+        // Schrift auf weissem Grund.
+        let mut gui = Gui::new();
+        gui.theme_preset("glas_dunkel").unwrap();
+        let w = gui.new_window("W".into(), 0, 0, 200, 100);
+        let h = gui.label(w, "Test".into(), 10, 10, None).unwrap();
+        let (wi, i) = Gui::dec_widget(h);
+        assert_eq!(gui.windows[wi].widgets[i].color, -1, "Farbe wurde eingefroren");
+        assert!(gui.windows[wi].widgets[i].kind == Kind::Label);
+
+        // Mit ausdruecklicher Farbe bleibt diese erhalten.
+        let h2 = gui.label(w, "Fest".into(), 10, 30, Some(0xFF0000)).unwrap();
+        let (wi2, i2) = Gui::dec_widget(h2);
+        assert_eq!(gui.windows[wi2].widgets[i2].color, 0xFF0000);
+    }
+}
+
+#[cfg(test)]
+mod gloss_tests {
+    use super::gloss_unten;
+
+    #[test]
+    fn runde_formen_bekommen_den_glanz_ueber_die_ganze_hoehe() {
+        // Kreis (Radius = halbe Hoehe) und Kapsel: ganze Hoehe.
+        assert_eq!(gloss_unten(0, 60, 30), 60);
+        assert_eq!(gloss_unten(10, 70, 40), 70);
+        // Normaler Knopf: nur die obere Haelfte.
+        assert_eq!(gloss_unten(0, 30, 5), 15);
+        assert_eq!(gloss_unten(100, 140, 6), 120);
+        // Genau an der Grenze zaehlt schon als rund.
+        assert_eq!(gloss_unten(0, 40, 20), 40);
+        assert_eq!(gloss_unten(0, 40, 19), 20);
     }
 }
 
