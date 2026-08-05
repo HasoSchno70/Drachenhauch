@@ -361,3 +361,31 @@ def test_zifferblatt_zahlen(run_gb, key, wert):
         'PRINT "ok"\n'
     )
     assert _lines(run_gb(src)) == ["ok"]
+
+
+# --- Leisten und Lampen ---------------------------------------------------
+
+@pytest.mark.parametrize("art", ["leiste", "balkenanzeige", "bar_gauge", "led", "lampen", "zellen"])
+def test_lineare_anzeigen_gibt_es(run_gb, art):
+    src = HEAD + f'c = CHART_NEW("{art}", 0, 0, 200, 60)\nPRINT CHART_SERIES_COUNT(c)\n'
+    assert _lines(run_gb(src)) == ["1"]
+
+
+def test_leiste_und_lampen_bringen_ihren_wert_mit(run_gb):
+    """Wie der Tacho: CHART_VALUE geht ohne vorheriges CHART_SERIES."""
+    src = HEAD + (
+        'c = CHART_NEW("leiste", 0, 0, 200, 60)\n'
+        'CHART_VALUE(c, 42.0)\n'
+        'PRINT CHART_GET(c, 0, 0)\n'
+    )
+    assert _lines(run_gb(src)) == ["42.0"]
+
+
+@pytest.mark.parametrize("key", ["skala_von", "skala_mitte", "skala_bis"])
+def test_skalenverlauf_ist_einstellbar(run_gb, key):
+    src = HEAD + (
+        'c = CHART_NEW("leiste", 0, 0, 200, 60)\n'
+        f'CHART_SET_COLOR(c, "{key}", 16711680)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]

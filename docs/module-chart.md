@@ -32,6 +32,8 @@ Namen:
 | Balken | `balken`, `bar` | Werte je Kategorie, senkrecht oder waagerecht, gruppiert oder gestapelt |
 | Linie | `linie`, `line`, `flaeche`, `area` | Verläufe über die Zeit, mehrere Reihen, wahlweise mit Fläche darunter |
 | Tacho | `tacho`, `gauge` | Ein Wert auf einer Rundskala mit Zeiger und Farbzonen |
+| Leiste | `leiste`, `balkenanzeige`, `bar_gauge` | Ein Wert auf einer liegenden oder stehenden Leiste, mit Marker |
+| Lampen | `led`, `lampen`, `zellen` | Ein Wert als Kette diskreter Zellen, die bis dahin leuchten |
 
 ## Daten
 
@@ -139,7 +141,8 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 ### Farben — `CHART_SET_COLOR`
 
 `hintergrund`, `rahmen`, `gitter`, `text`, `titel`, `achse`, `zeiger`,
-`flaeche`, `verlauf`, `schatten`, `verlauf_ende`.
+`flaeche`, `verlauf`, `schatten`, `verlauf_ende`, sowie der Skalenverlauf
+`skala_von`, `skala_mitte`, `skala_bis`.
 
 Dazu `CHART_PALETTE(c, farben)` mit einem `ARRAY OF INTEGER` — die
 Reihenfolge, aus der Reihen und Segmente ohne eigene Farbe bedient werden.
@@ -200,6 +203,38 @@ koppeln hieße, zwei Schalter für dieselbe Sache zu haben.
 
 Die Skalenstriche schaltet `striche` = 0 ganz ab (nützlich bei `baender`, wo
 die Sektoren bis zur Mitte reichen).
+
+## Leisten und Lampen
+
+Die linearen Geschwister des Tachos — ein Wert, dieselben Farbzonen, nur
+gerade statt rund.
+
+```basic
+DIM l AS CHART
+l = CHART_NEW("leiste", 20, 20, 460, 120)
+CHART_SET_NUM(l, "max", 1000)
+CHART_SET(l, "zeigerform", "balken")   ' nur bis zum Wert füllen
+CHART_VALUE(l, 630.0)
+```
+
+Beide liegen per Vorgabe **waagerecht**; `ausrichtung` = `senkrecht` stellt sie
+hochkant (der Marker wandert dann an die Seite, damit er die Leiste nicht
+verdeckt). Bei `led` bestimmt `blatt_teile` die Zellenzahl, `blatt_luecke` den
+Abstand in Pixeln und `blatt_dicke` die Höhe. `zeigerform` = `balken` füllt nur
+bis zum Wert, sonst ist die ganze Skala zu sehen und nur der Marker wandert.
+
+Die Zellen einer LED-Anzeige sind einzeln anklickbar — `CHART_HOVER` liefert
+den Index der Zelle unter der Maus.
+
+**Farbe der Skala.** Gibt es Farbzonen (`CHART_ZONE`), gewinnen sie — dieselbe
+Angabe färbt damit Tacho, Leiste und Lampen. Ohne Zonen läuft ein gerichteter
+Verlauf `skala_von` → `skala_mitte` → `skala_bis` (Vorgabe rot → gelb → grün,
+im Ton des jeweiligen Themas).
+
+> Das ist bewusst **nicht** die Palette aus `CHART_PALETTE`. Die ist
+> kategorial — acht gut unterscheidbare Farben für acht Reihen — und ergibt
+> interpoliert einen Regenbogen. Einer Skala muss man ansehen, wo „wenig" und
+> wo „viel" ist.
 
 ## Durchsichtigkeit
 

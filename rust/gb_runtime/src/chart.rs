@@ -26,6 +26,10 @@ pub enum Kind {
     Bar,
     Line,
     Gauge,
+    /// Durchgehende Leiste mit Marker -- der lineare Bruder des Tachos.
+    Leiste,
+    /// Diskrete Zellen (Lampen), die bis zum Wert leuchten.
+    Led,
 }
 
 impl Kind {
@@ -35,6 +39,8 @@ impl Kind {
             "balken" | "bar" => Some(Kind::Bar),
             "linie" | "line" | "flaeche" | "area" => Some(Kind::Line),
             "tacho" | "gauge" => Some(Kind::Gauge),
+            "leiste" | "balkenanzeige" | "bar_gauge" => Some(Kind::Leiste),
+            "led" | "lampen" | "zellen" => Some(Kind::Led),
             _ => None,
         }
     }
@@ -45,6 +51,8 @@ impl Kind {
             Kind::Bar => "balken",
             Kind::Line => "linie",
             Kind::Gauge => "tacho",
+            Kind::Leiste => "leiste",
+            Kind::Led => "led",
         }
     }
 }
@@ -143,6 +151,15 @@ pub struct Style {
     /// Zielfarbe des Daten-Verlaufs (Flag "verlauf_daten"). -1 = automatisch
     /// eine abgedunkelte Fassung der jeweiligen Reihenfarbe.
     pub c_verlauf_ende: i64,
+    /// Farbverlauf der SKALA (Tacho/Leiste/Lampen) von unten nach oben.
+    ///
+    /// Das ist bewusst NICHT die Palette: die ist kategorial (acht gut
+    /// unterscheidbare Farben fuer acht Reihen) und ergibt interpoliert einen
+    /// Regenbogen. Eine Skala braucht einen gerichteten Verlauf, dem man
+    /// ansieht, wo "wenig" und wo "viel" ist.
+    pub c_skala_von: i64,
+    pub c_skala_mitte: i64,
+    pub c_skala_bis: i64,
 
     // --- Schalter (CHART_SET_FLAG) ---
     pub f_rahmen: bool,
@@ -233,6 +250,9 @@ impl Default for Style {
             c_verlauf: 0,
             c_schatten: 0,
             c_verlauf_ende: -1,
+            c_skala_von: 0,
+            c_skala_mitte: 0,
+            c_skala_bis: 0,
             f_rahmen: true,
             f_gitter_x: false,
             f_gitter_y: true,
@@ -304,6 +324,16 @@ pub fn apply_theme(s: &mut Style, name: &str) -> bool {
     s.c_verlauf = ve;
     s.c_schatten = sh;
     s.palette = pal.to_vec();
+    // Skalenverlauf: rot -> gelb -> gruen, im jeweiligen Ton des Themas.
+    let (sv, sm, sb) = match name.to_lowercase().as_str() {
+        "hell" => (0xE53935, 0xFDD835, 0x43A047),
+        "neon" => (0xFF0064, 0xFFF000, 0x00FFC8),
+        "pastell" => (0xE0A0A8, 0xE8D08C, 0xA8CBA0),
+        _ => (0xE5393C, 0xFFC400, 0x66BB6A),
+    };
+    s.c_skala_von = sv;
+    s.c_skala_mitte = sm;
+    s.c_skala_bis = sb;
     true
 }
 
@@ -405,7 +435,16 @@ impl ChartObj {
         };
         // Der Tacho hat genau EINEN Wert -- die Reihe gleich anlegen, damit
         // CHART_VALUE ohne vorheriges CHART_SERIES funktioniert.
-        if kind == Kind::Gauge {
+        if matches!(kind, Kind::Leiste | Kind::Led) {
+            // `ausrichtung` steht per Vorgabe auf "senkrecht" -- richtig fuer
+            // Balkendiagramme (Balken stehen), aber eine Leiste liegt. Ohne
+            // das baute sie ungefragt hochkant.
+            c.style.ausrichtung = "waagerecht".into();
+            // Eine Leiste braucht keine Teilstriche, solange man sie nicht
+            // bestellt; der Tacho dagegen lebt von seiner Skala.
+            c.style.striche = 0;
+        }
+        if matches!(kind, Kind::Gauge | Kind::Leiste | Kind::Led) {
             c.add_series("", -1);
             c.series[0].values.push(0.0);
             c.series[0].shown.push(0.0);
@@ -526,7 +565,7 @@ impl ChartObj {
             s.values.clear();
             s.shown.clear();
         }
-        if self.kind == Kind::Gauge {
+        if matches!(self.kind, Kind::Gauge | Kind::Leiste | Kind::Led) {
             for s in &mut self.series {
                 s.values.push(0.0);
                 s.shown.push(0.0);
@@ -967,6 +1006,22 @@ impl ChartObj {
                     (-1, -1)
                 }
             }
+            // Die Leiste hat einen Wert -- das ganze Feld ist das Element.
+            Kind::Leiste => (0, 0),
+            // Bei den Lampen ist jede Zelle einzeln ansprechbar.
+            Kind::Led => {
+                let (zellen, _, waagerecht) = self.led_geom();
+                let (pos, len) = if waagerecht {
+                    (mx - a.x0, a.w())
+                } else {
+                    (a.y1 - my, a.h())
+                };
+                if pos < 0 || pos >= len || len <= 0 {
+                    return (-1, -1);
+                }
+                let i = (pos as f64 / (len as f64 / zellen as f64)).floor() as i32;
+                (i.clamp(0, zellen - 1), 0)
+            }
             // Der Tacho hat nur einen Wert -- die ganze Scheibe ist das Element.
             Kind::Gauge => {
                 let (cx, cy) = (a.x0 + a.w() / 2, a.y0 + a.h() / 2);
@@ -1173,6 +1228,8 @@ impl ChartObj {
             Kind::Bar => self.draw_bar(g, &a),
             Kind::Line => self.draw_line(g, &a),
             Kind::Gauge => self.draw_gauge(g, &a),
+            Kind::Leiste => self.draw_leiste(g, &a),
+            Kind::Led => self.draw_led(g, &a),
         }
     }
 
@@ -1583,6 +1640,225 @@ impl ChartObj {
             }
         }
         self.draw_axis_titles(g, a, &plot);
+    }
+
+    /// Anzahl Zellen, Luecke in Pixeln und Ausrichtung der LED-Anzeige.
+    fn led_geom(&self) -> (i32, i32, bool) {
+        let st = &self.style;
+        (
+            st.blatt_teile.max(2),
+            st.blatt_luecke.max(0.0) as i32,
+            !st.ausrichtung.eq_ignore_ascii_case("senkrecht"),
+        )
+    }
+
+    /// Farbe an der Stelle `anteil` (0..1) der Skala.
+    ///
+    /// Mit Farbzonen gewinnt die Zone, in die der Wert faellt -- dieselbe
+    /// Angabe bestimmt damit die Farbe von Tacho, Leiste und Lampen. Ohne
+    /// Zonen wird die Palette als Verlauf durchfahren.
+    fn skala_farbe(&self, anteil: f64, lo: f64, hi: f64) -> i64 {
+        let wert = lo + (hi - lo) * anteil.clamp(0.0, 1.0);
+        for z in &self.zones {
+            if wert >= z.from.min(z.to) && wert <= z.from.max(z.to) {
+                return z.color;
+            }
+        }
+        let st = &self.style;
+        let a = anteil.clamp(0.0, 1.0);
+        if a < 0.5 {
+            mix_rgb(st.c_skala_von, st.c_skala_mitte, a * 2.0)
+        } else {
+            mix_rgb(st.c_skala_mitte, st.c_skala_bis, (a - 0.5) * 2.0)
+        }
+    }
+
+    /// Wert und Grenzen einer einwertigen Anzeige (Tacho/Leiste/Lampen).
+    fn einzel_bereich(&self) -> (f64, f64, f64) {
+        let st = &self.style;
+        let lo = if st.min.is_finite() { st.min } else { 0.0 };
+        let hi = if st.max.is_finite() { st.max } else { 100.0 };
+        let hi = if (hi - lo).abs() < 1e-12 { lo + 1.0 } else { hi };
+        let wert = self
+            .series
+            .first()
+            .and_then(|s| self.anzeige(s).first())
+            .copied()
+            .unwrap_or(0.0);
+        (wert, lo, hi)
+    }
+
+    /// Wert als Kapsel bzw. Blase mit Zipfel -- geteilt von Leiste und Lampen.
+    ///
+    /// `von_oben` = die Blase sitzt UEBER der Fundstelle und zeigt nach unten
+    /// (waagerechte Anzeigen). Sonst sitzt sie rechts daneben und zeigt nach
+    /// links -- bei einer senkrechten Leiste laege sie oben sonst auf der
+    /// Leiste selbst und verdeckte genau den Bereich, um den es geht.
+    fn marker(&self, g: &mut Graphics, mx: i32, my: i32, text: &str, farbe: i64, von_oben: bool) {
+        let st = &self.style;
+        let sz = st.text_groesse + 4;
+        let tw = g.text_width_at(text, sz);
+        let (bw, bh) = (tw + 20, sz + 12);
+        // "blase" ist der dunkle Kasten, alles andere die Kapsel in Skalenfarbe.
+        let (kasten, schrift) = if st.wertanzeige == "blase" {
+            (0x1E1E1E, 0xF0F0F0)
+        } else {
+            (farbe, 0xFFFFFF)
+        };
+        let ecke = if st.wertanzeige == "blase" { 6 } else { bh / 2 };
+        let sp = 7;
+        let (x, y) = if von_oben {
+            let x = (mx - bw / 2).clamp(self.x + 2, self.x + self.w - bw - 2);
+            let y = (my - bh - 9).max(self.y + 2);
+            g.triangle(mx - sp, y + bh, mx + sp, y + bh, mx, y + bh + 9, kasten);
+            (x, y)
+        } else {
+            let x = (mx + 9).min(self.x + self.w - bw - 2);
+            let y = (my - bh / 2).clamp(self.y + 2, self.y + self.h - bh - 2);
+            g.triangle(x, my - sp, x, my + sp, x - 9, my, kasten);
+            (x, y)
+        };
+        g.round_rect(x, y, x + bw, y + bh, ecke, kasten, true);
+        g.text_styled(x + 10, y + 6, text.to_string(), schrift, st.schrift, sz);
+    }
+
+    /// Durchgehende Leiste mit Marker -- der lineare Bruder des Tachos.
+    fn draw_leiste(&self, g: &mut Graphics, a: &Area) {
+        let st = &self.style;
+        let (wert, lo, hi) = self.einzel_bereich();
+        let anteil = ((wert - lo) / (hi - lo)).clamp(0.0, 1.0);
+        let waagerecht = !st.ausrichtung.eq_ignore_ascii_case("senkrecht");
+
+        // Platz fuer den Marker freihalten, sonst stiesse er oben an.
+        let marker_h = if st.wertanzeige == "aus" { 0 } else { st.text_groesse + 28 };
+        let b = if waagerecht {
+            Area { x0: a.x0, y0: a.y0 + marker_h, x1: a.x1, y1: a.y1 }
+        } else {
+            Area { x0: a.x0, y0: a.y0, x1: a.x1 - marker_h, y1: a.y1 }
+        };
+        let quer = if waagerecht { b.h() } else { b.w() };
+        let dick = (quer as f64 * st.blatt_dicke.max(0.05) * 2.0).clamp(6.0, 400.0) as i32;
+        let dick = dick.min(quer.max(6));
+        let (x0, y0, x1, y1) = if waagerecht {
+            let m = b.y0 + (b.h() - dick) / 2;
+            (b.x0, m, b.x1, m + dick)
+        } else {
+            let m = b.x0 + (b.w() - dick) / 2;
+            (m, b.y0, m + dick, b.y1)
+        };
+        let ecke = dick / 2;
+        if st.schatten > 0 {
+            self.schatten_rrect(g, x0, y0, x1, y1, ecke);
+        }
+        g.round_rect(x0, y0, x1, y1, ecke, st.c_gitter, true);
+
+        // Verlauf in schmalen Streifen: so kommt jede Farbe aus derselben
+        // Quelle (`skala_farbe`), egal ob sie aus Zonen oder Palette stammt.
+        let laenge = if waagerecht { x1 - x0 } else { y1 - y0 };
+        // `zeigerform`="balken" fuellt nur bis zum Wert, sonst die ganze Skala.
+        let bis = if st.zeigerform.eq_ignore_ascii_case("balken") {
+            (laenge as f64 * anteil) as i32
+        } else {
+            laenge
+        };
+        const S: i32 = 3;
+        let mut k = 0;
+        while k < bis {
+            let f = k as f64 / laenge.max(1) as f64;
+            let c = with_alpha(self.skala_farbe(f, lo, hi), st.deckkraft);
+            let e = (k + S).min(bis);
+            if waagerecht {
+                g.box_fill(x0 + k, y0, x0 + e, y1, c);
+            } else {
+                g.box_fill(x0, y1 - e, x1, y1 - k, c);
+            }
+            k += S;
+        }
+        g.round_rect(x0, y0, x1, y1, ecke, st.c_rahmen, false);
+
+        if st.striche >= 2 {
+            for i in 0..=st.striche {
+                let f = i as f64 / st.striche as f64;
+                let pos = (laenge as f64 * f) as i32;
+                if waagerecht {
+                    g.line(x0 + pos, y0 + dick / 4, x0 + pos, y1 - dick / 4, st.c_achse);
+                } else {
+                    g.line(x0 + dick / 4, y1 - pos, x1 - dick / 4, y1 - pos, st.c_achse);
+                }
+            }
+        }
+
+        if st.wertanzeige != "aus" {
+            let pos = (laenge as f64 * anteil) as i32;
+            let farbe = self.skala_farbe(anteil, lo, hi);
+            let text = self.fmt_value(wert);
+            if waagerecht {
+                self.marker(g, x0 + pos, y0, &text, farbe, true);
+            } else {
+                self.marker(g, x1, y1 - pos, &text, farbe, false);
+            }
+        }
+    }
+
+    /// Diskrete Zellen, die bis zum Wert leuchten.
+    fn draw_led(&self, g: &mut Graphics, a: &Area) {
+        let st = &self.style;
+        let (wert, lo, hi) = self.einzel_bereich();
+        let anteil = ((wert - lo) / (hi - lo)).clamp(0.0, 1.0);
+        let (zellen, luecke, waagerecht) = self.led_geom();
+
+        let marker_h = if st.wertanzeige == "aus" { 0 } else { st.text_groesse + 28 };
+        let b = if waagerecht {
+            Area { x0: a.x0, y0: a.y0 + marker_h, x1: a.x1, y1: a.y1 }
+        } else {
+            Area { x0: a.x0, y0: a.y0, x1: a.x1 - marker_h, y1: a.y1 }
+        };
+        let laenge = if waagerecht { b.w() } else { b.h() };
+        let quer = if waagerecht { b.h() } else { b.w() };
+        let dick = (quer as f64 * st.blatt_dicke.max(0.05) * 2.0).clamp(6.0, 400.0) as i32;
+        let dick = dick.min(quer.max(6));
+        let fach = laenge as f64 / zellen as f64;
+        let zelle = (fach - luecke as f64).max(2.0) as i32;
+        // Aufrunden, damit ein Wert knapp ueber Null schon die erste Lampe
+        // zuendet -- sonst wirkt die Anzeige bei kleinen Werten tot.
+        let an = (anteil * zellen as f64).ceil() as i32;
+
+        for i in 0..zellen {
+            let f = if zellen > 1 { i as f64 / (zellen - 1) as f64 } else { 0.0 };
+            let grund = self.skala_farbe(f, lo, hi);
+            let c = if i < an {
+                self.hell(with_alpha(grund, st.deckkraft), self.glanz_von(i as usize))
+            } else {
+                // Aus, aber nicht unsichtbar: stark abgedunkelte Eigenfarbe,
+                // damit die Skala auch im Ruhezustand ablesbar bleibt.
+                mix_rgb(grund, st.c_hintergrund, 0.82)
+            };
+            let pos = (fach * i as f64) as i32;
+            let (x0, y0, x1, y1) = if waagerecht {
+                let m = b.y0 + (b.h() - dick) / 2;
+                (b.x0 + pos, m, b.x0 + pos + zelle, m + dick)
+            } else {
+                let m = b.x0 + (b.w() - dick) / 2;
+                (m, b.y1 - pos - zelle, m + dick, b.y1 - pos)
+            };
+            let ecke = zelle.min(dick) / 3;
+            if st.schatten > 0 && i < an {
+                self.schatten_rrect(g, x0, y0, x1, y1, ecke);
+            }
+            self.fuellung(g, x0, y0, x1, y1, ecke, c);
+        }
+
+        if st.wertanzeige != "aus" {
+            let pos = (laenge as f64 * anteil) as i32;
+            let farbe = self.skala_farbe(anteil, lo, hi);
+            let text = self.fmt_value(wert);
+            let rand = (quer - dick) / 2;
+            if waagerecht {
+                self.marker(g, b.x0 + pos, b.y0 + rand, &text, farbe, true);
+            } else {
+                self.marker(g, b.x0 + b.w() / 2 + dick / 2, b.y1 - pos, &text, farbe, false);
+            }
+        }
     }
 
     fn draw_gauge(&self, g: &mut Graphics, a: &Area) {
@@ -2040,7 +2316,7 @@ pub const KEYS_NUM: &[&str] = &[
 ];
 pub const KEYS_COLOR: &[&str] = &[
     "hintergrund", "rahmen", "gitter", "text", "titel", "achse", "zeiger", "flaeche", "verlauf",
-    "schatten", "verlauf_ende",
+    "schatten", "verlauf_ende", "skala_von", "skala_mitte", "skala_bis",
 ];
 pub const KEYS_FLAG: &[&str] = &[
     "rahmen", "gitter_x", "gitter_y", "prozent", "flaeche", "punkte", "glatt", "null_linie",
@@ -2174,6 +2450,9 @@ impl ChartObj {
             "verlauf" => s.c_verlauf = v,
             "schatten" => s.c_schatten = v,
             "verlauf_ende" => s.c_verlauf_ende = v,
+            "skala_von" => s.c_skala_von = v,
+            "skala_mitte" => s.c_skala_mitte = v,
+            "skala_bis" => s.c_skala_bis = v,
             _ => return Err(unbekannt("CHART_SET_COLOR", key, KEYS_COLOR)),
         }
         Ok(())
@@ -2217,6 +2496,24 @@ impl ChartObj {
     #[cfg(test)]
     pub fn hell_test(&self, farbe: i64, glanz: f64) -> i64 {
         mix_rgb(farbe, 0xFFFFFF, self.style.hover_glanz * glanz)
+    }
+
+    /// Nur fuer Tests -- gleiche Begruendung wie `hell_test`.
+    #[cfg(test)]
+    pub fn skala_farbe_test(&self, anteil: f64, lo: f64, hi: f64) -> i64 {
+        let wert = lo + (hi - lo) * anteil.clamp(0.0, 1.0);
+        for z in &self.zones {
+            if wert >= z.from.min(z.to) && wert <= z.from.max(z.to) {
+                return z.color;
+            }
+        }
+        let s = &self.style;
+        let a = anteil.clamp(0.0, 1.0);
+        if a < 0.5 {
+            mix_rgb(s.c_skala_von, s.c_skala_mitte, a * 2.0)
+        } else {
+            mix_rgb(s.c_skala_mitte, s.c_skala_bis, (a - 0.5) * 2.0)
+        }
     }
 }
 
@@ -2451,6 +2748,64 @@ mod tests {
         // 0 als Deckkraft darf nicht auf das Alpha-Byte 0 fallen -- das waere
         // wieder "deckend". Untere Grenze ist 1.
         assert_eq!(alpha_of(with_alpha(0xFF8800, 0.0)), 1);
+    }
+
+    #[test]
+    fn leiste_und_lampen_liegen_waagerecht() {
+        // Regression: `ausrichtung` steht per Vorgabe auf "senkrecht" --
+        // richtig fuer Balkendiagramme (Balken stehen), aber eine Leiste
+        // liegt. Ohne die Ausnahme baute sie ungefragt hochkant.
+        for art in [Kind::Leiste, Kind::Led] {
+            let c = ChartObj::new(art, 0, 0, 200, 60);
+            assert_eq!(c.style.ausrichtung, "waagerecht", "{:?}", art);
+        }
+        // Balken bleiben senkrecht.
+        assert_eq!(ChartObj::new(Kind::Bar, 0, 0, 100, 100).style.ausrichtung, "senkrecht");
+    }
+
+    #[test]
+    fn einwertige_arten_bringen_ihre_reihe_mit() {
+        for art in [Kind::Gauge, Kind::Leiste, Kind::Led] {
+            let c = ChartObj::new(art, 0, 0, 100, 100);
+            assert_eq!(c.series.len(), 1, "{:?}", art);
+            assert_eq!(c.series[0].values.len(), 1, "{:?}: CHART_VALUE muss sofort gehen", art);
+        }
+    }
+
+    #[test]
+    fn skala_farbe_verlaeuft_gerichtet_statt_kategorial() {
+        // Die Palette ist kategorial (acht gut unterscheidbare Farben fuer
+        // acht Reihen); interpoliert ergibt sie einen Regenbogen. Eine Skala
+        // braucht einen gerichteten Verlauf -- daher eine eigene Farbrolle.
+        let c = ChartObj::new(Kind::Leiste, 0, 0, 200, 60);
+        let unten = c.skala_farbe_test(0.0, 0.0, 100.0);
+        let oben = c.skala_farbe_test(1.0, 0.0, 100.0);
+        assert_eq!(unten, c.style.c_skala_von);
+        assert_eq!(oben, c.style.c_skala_bis);
+        // Rot unten, Gruen oben: die Reihenfolge der Kanaele kippt.
+        assert!((unten >> 16) & 0xFF > (unten >> 8) & 0xFF, "unten nicht rot");
+        assert!((oben >> 8) & 0xFF > (oben >> 16) & 0xFF, "oben nicht gruen");
+        // Die Mitte liegt dazwischen, nicht auf einem der Enden.
+        let mitte = c.skala_farbe_test(0.5, 0.0, 100.0);
+        assert_eq!(mitte, c.style.c_skala_mitte);
+    }
+
+    #[test]
+    fn skala_farbe_folgt_den_zonen_wenn_es_welche_gibt() {
+        let mut c = ChartObj::new(Kind::Led, 0, 0, 200, 60);
+        c.zones.push(Zone { from: 0.0, to: 50.0, color: 0x112233, name: String::new() });
+        c.zones.push(Zone { from: 50.0, to: 100.0, color: 0x445566, name: String::new() });
+        assert_eq!(c.skala_farbe_test(0.1, 0.0, 100.0), 0x112233);
+        assert_eq!(c.skala_farbe_test(0.9, 0.0, 100.0), 0x445566);
+    }
+
+    #[test]
+    fn jedes_thema_bringt_einen_skalenverlauf_mit() {
+        for name in THEMES {
+            let mut s = Style::default();
+            assert!(apply_theme(&mut s, name));
+            assert_ne!(s.c_skala_von, s.c_skala_bis, "Thema {} hat keinen Verlauf", name);
+        }
     }
 
     #[test]
