@@ -143,6 +143,18 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
     }
 }
 
+/// Zwei Farben mischen (`t` = 0 ganz `a`, 1 ganz `b`). Fuer Uebergaenge, die
+/// einem Wert folgen -- etwa die Rinne des Kippschalters, die sich beim
+/// Umlegen einfaerbt.
+fn mischen(a: i64, b: i64, t: f64) -> i64 {
+    let t = t.clamp(0.0, 1.0);
+    let ch = |sh: u32| -> i64 {
+        let (ca, cb) = (((a >> sh) & 0xFF) as f64, ((b >> sh) & 0xFF) as f64);
+        ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
+    };
+    (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
 fn shade(color: i64, delta: i32) -> i64 {
     let r = (((color >> 16) & 0xFF) as i32 + delta).clamp(0, 255);
     let g = (((color >> 8) & 0xFF) as i32 + delta).clamp(0, 255);
@@ -154,6 +166,7 @@ fn shade(color: i64, delta: i32) -> i64 {
 pub enum Kind {
     Button, Label, Checkbox, Slider, TextInput, Panel, Table, Radio, Dropdown,
     Progress, ListBox, Image, Canvas, Separator, GroupBox, TextArea, Spinner, Splitter,
+    Toggle, Knob,
     Toolbar, Tree,
 }
 
@@ -167,6 +180,7 @@ impl Kind {
             Kind::Canvas => "canvas", Kind::Separator => "separator", Kind::GroupBox => "groupbox",
             Kind::TextArea => "textarea", Kind::Spinner => "spinner", Kind::Splitter => "splitter",
             Kind::Toolbar => "toolbar", Kind::Tree => "tree",
+            Kind::Toggle => "toggle", Kind::Knob => "knob",
         }
     }
     fn from_str(s: &str) -> Option<Kind> {
@@ -178,6 +192,7 @@ impl Kind {
             "canvas" => Kind::Canvas, "separator" => Kind::Separator, "groupbox" => Kind::GroupBox,
             "textarea" => Kind::TextArea, "spinner" => Kind::Spinner, "splitter" => Kind::Splitter,
             "toolbar" => Kind::Toolbar, "tree" => Kind::Tree,
+            "toggle" => Kind::Toggle, "knob" => Kind::Knob,
             _ => return None,
         })
     }
@@ -237,6 +252,8 @@ pub struct Widget {
     // = nicht zerstoert, `visible` = wird gezeichnet + interaktiv.
     alive: bool,
     visible: bool,
+    /// Rund statt eckig zeichnen (Transport-Knoepfe, Werkzeug-Kreise).
+    rund: bool,
     // Formular-Widgets: `group` = Radio-Gruppe; `items` = Dropdown-/ListBox-
     // Eintraege; `sel` = ausgewaehlter Index (Dropdown), -1 = keiner.
     group: String,
@@ -326,6 +343,10 @@ pub struct Gui {
     resize_window: Option<usize>,        // laufender Fenster-Resize (am Griff)
     resize_dx: i32, resize_dy: i32,      // Ecke->Maus-Versatz
     active_slider: Option<(usize, usize)>,
+    /// Laufendes Drehregler-Ziehen: (Fenster, Widget, Maus-y beim Griff,
+    /// Wert beim Griff). Der Startwert wird gemerkt, damit der Regler nicht
+    /// wegspringt, wenn man ihn irgendwo auf der Kappe anfasst.
+    active_knob: Option<(usize, usize, i32, f64)>,
     active_split: Option<(usize, usize)>,    // laufendes Splitter-Drag
     split_off: i32,                          // Griff-Versatz (Maus -> Balkenkante)
     open_dropdown: Option<(usize, usize)>,   // gerade aufgeklapptes Dropdown
@@ -388,7 +409,8 @@ impl Gui {
             focus_window: None, focus_widget: None,
             drag_window: None, drag_dx: 0, drag_dy: 0,
             resize_window: None, resize_dx: 0, resize_dy: 0,
-            active_slider: None, active_split: None, split_off: 0,
+            active_slider: None,
+            active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
             open_menu: None, context_open: None, was_right_down: false,
             scroll_drag: None,
@@ -466,7 +488,7 @@ impl Gui {
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None,
-            alive: true, visible: true,
+            alive: true, visible: true, rund: false,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
             anchor: 5, bx: x, by: y, bw: w, bh: h,         // Default: oben-links (L|T)
@@ -577,6 +599,30 @@ impl Gui {
         let mut wd = Self::blank(Kind::Checkbox, x, y, cs, cs); wd.text = label; wd.checked = default;
         self.add_widget(win, "GUI_CHECKBOX", wd)
     }
+    /// Kippschalter (An/Aus-Pille). Zustand liegt wie beim Kaestchen in
+    /// `checked`, also lesbar mit GUI_CHECKED und setzbar mit GUI_SET_CHECKED.
+    /// `value` fuehrt die Schiebe-Animation (0 = aus, 1 = an).
+    pub fn toggle(&mut self, win: i64, label: String, x: i32, y: i32, default: bool) -> Result<i64, String> {
+        let h = self.m("check_size").max(14);
+        let mut wd = Self::blank(Kind::Toggle, x, y, h * 2, h);
+        wd.text = label;
+        wd.checked = default;
+        wd.value = if default { 1.0 } else { 0.0 };
+        self.add_widget(win, "GUI_TOGGLE", wd)
+    }
+
+    /// Drehregler. Wird durch senkrechtes Ziehen verstellt (nach oben = mehr) --
+    /// das ist die Bedienung, die man von Mischpult-Oberflaechen kennt und die
+    /// ohne Kreisbewegung der Maus auskommt.
+    pub fn knob(&mut self, win: i64, x: i32, y: i32, groesse: i32,
+                mn: f64, mx: f64, default: f64) -> Result<i64, String> {
+        if mx <= mn { return Err("GUI_KNOB: max muss > min sein".into()); }
+        let s = groesse.max(16);
+        let mut wd = Self::blank(Kind::Knob, x, y, s, s);
+        wd.min = mn; wd.max = mx; wd.value = default.clamp(mn, mx);
+        self.add_widget(win, "GUI_KNOB", wd)
+    }
+
     pub fn slider(&mut self, win: i64, x: i32, y: i32, w: i32, mn: f64, mx: f64, default: f64) -> Result<i64, String> {
         if mx <= mn { return Err("GUI_SLIDER: max muss > min sein".into()); }
         let sh = self.m("slider_h");
@@ -1112,15 +1158,15 @@ impl Gui {
     pub fn hovered(&self, h: i64) -> Result<bool, String> { Ok(self.wdg(h, "GUI_HOVERED")?.hovered) }
     pub fn checked(&self, h: i64) -> Result<bool, String> {
         let w = self.wdg(h, "GUI_CHECKED")?;
-        if !matches!(w.kind, Kind::Checkbox | Kind::Radio) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio".into()); }
+        if !matches!(w.kind, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return Err("GUI_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
         Ok(w.checked)
     }
     pub fn value(&self, h: i64) -> Result<f64, String> {
         let w = self.wdg(h, "GUI_VALUE")?;
         match w.kind {
-            Kind::Slider | Kind::Progress | Kind::Spinner => Ok(w.value),
+            Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => Ok(w.value),
             Kind::Splitter => Ok(if w.group == "v" { w.x as f64 } else { w.y as f64 }),
-            _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter".into()),
+            _ => Err("GUI_VALUE: Widget ist kein slider/progress/spinner/splitter/knob".into()),
         }
     }
     pub fn text(&self, h: i64) -> Result<String, String> { Ok(self.wdg(h, "GUI_TEXT")?.text.clone()) }
@@ -1138,8 +1184,11 @@ impl Gui {
     }
     pub fn set_checked(&mut self, h: i64, f: bool) -> Result<(), String> {
         let kind = self.wdg(h, "GUI_SET_CHECKED")?.kind;
-        if !matches!(kind, Kind::Checkbox | Kind::Radio) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio".into()); }
-        self.wdg_mut(h, "GUI_SET_CHECKED")?.checked = f;
+        if !matches!(kind, Kind::Checkbox | Kind::Radio | Kind::Toggle) { return Err("GUI_SET_CHECKED: Widget ist keine checkbox/radio/toggle".into()); }
+        {
+            let w = self.wdg_mut(h, "GUI_SET_CHECKED")?;
+            w.checked = f;
+        }
         // Radio: beim Setzen die Gruppen-Geschwister deselektieren.
         if kind == Kind::Radio && f {
             let (wi, i) = Self::dec_widget(h);
@@ -1150,7 +1199,7 @@ impl Gui {
     pub fn set_value(&mut self, h: i64, v: f64) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_SET_VALUE")?;
         match w.kind {
-            Kind::Slider | Kind::Progress | Kind::Spinner => { w.value = v.clamp(w.min, w.max); }
+            Kind::Slider | Kind::Progress | Kind::Spinner | Kind::Knob => { w.value = v.clamp(w.min, w.max); }
             Kind::Splitter => {
                 let c = (v.round() as i32).clamp(w.min as i32, w.max as i32);
                 if w.group == "v" { w.x = c; } else { w.y = c; }
@@ -1168,6 +1217,13 @@ impl Gui {
             return Err("GUI_ON_CHANGE: nur fuer slider, textinput, textarea, checkbox, table, radio, dropdown, listbox, spinner, splitter oder tree".into());
         }
         w.on_change = func; Ok(())
+    }
+    /// Widget rund zeichnen. Gedacht fuer Knoepfe, die nur ein Sinnbild
+    /// tragen (Wiedergabe, Pause, Weiter) -- ein runder Knopf mit Dreieck
+    /// darin liest sich sofort als Abspieltaste.
+    pub fn set_round(&mut self, h: i64, f: bool) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_SET_ROUND")?.rund = f;
+        Ok(())
     }
     pub fn set_color(&mut self, h: i64, role: String, color: i64) -> Result<(), String> {
         if !matches!(role.as_str(), "bg" | "fg" | "border" | "accent") {
@@ -1191,6 +1247,8 @@ impl Gui {
             // beim Loslassen trotzdem noch GUI_ON_CLICK aus.
             if self.press_origin == Some((wi, i)) { self.press_origin = None; }
             if self.active_slider == Some((wi, i)) { self.active_slider = None; }
+        if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
+            if self.active_knob.map(|(w, k, _, _)| (w, k)) == Some((wi, i)) { self.active_knob = None; }
             if self.active_split == Some((wi, i)) { self.active_split = None; }
         }
         Ok(())
@@ -1354,6 +1412,7 @@ impl Gui {
         if self.focus_widget.map(|(w, _)| w) == Some(wi) { self.focus_widget = None; }
         if self.press_origin.map(|(w, _)| w) == Some(wi) { self.press_origin = None; }
         if self.active_slider.map(|(w, _)| w) == Some(wi) { self.active_slider = None; }
+        if self.active_knob.map(|(w, _, _, _)| w) == Some(wi) { self.active_knob = None; }
         if self.active_split.map(|(w, _)| w) == Some(wi) { self.active_split = None; }
         if self.active_table.map(|(w, _)| w) == Some(wi) { self.active_table = None; }
         if self.table_press.map(|(w, _, _)| w) == Some(wi) { self.table_press = None; }
@@ -1839,6 +1898,26 @@ impl Gui {
                          (a << 24) | 0xFFFFFF, 0x01FF_FFFFu32 as i64);
     }
 
+    /// Metallischer Rundgriff (Schieber-Knauf, Kippschalter-Knopf,
+    /// Drehregler-Kappe). Gebaut aus konzentrischen Ringen mit wechselnder
+    /// Helligkeit -- einen Verlauf ENTLANG eines Kreises kann `ring` nicht,
+    /// gestaffelte Ringe sind die Naeherung, die ohne Textur auskommt.
+    fn knauf(&self, g: &mut Graphics, cx: i32, cy: i32, r: i32, grund: i64) {
+        let r = r.max(2);
+        if self.m("gradient") <= 0 {
+            g.circle(cx, cy, r, grund);
+            return;
+        }
+        // Schatten darunter, dann die Kappe von hell (oben) nach dunkel.
+        g.circle(cx, cy + 1, r, 0x50000000);
+        g.round_gradient(cx - r, cy - r, cx + r, cy + r, r,
+                         shade(grund, 34), shade(grund, -28));
+        // Schmaler Lichtreflex auf dem oberen Drittel.
+        let rr = (r * 2) / 3;
+        g.round_gradient(cx - rr, cy - r + 1, cx + rr, cy - r / 4, rr,
+                         0x70FFFFFF, 0x01FF_FFFFu32 as i64);
+    }
+
     /// Fase: eine helle Linie oben, eine dunkle unten. Die schmalste Zutat
     /// mit der groessten Wirkung -- sie trennt die Flaeche sichtbar vom
     /// Untergrund.
@@ -1995,6 +2074,34 @@ impl Gui {
         // Laufendes Slider-Drag.
         if let Some((wi, i)) = self.active_slider {
             if is_down { self.drag_slider(wi, i, mx); } else { self.active_slider = None; }
+        }
+        // Laufendes Drehregler-Ziehen: senkrecht, ausgehend vom Wert beim
+        // Anfassen. 140 Pixel entsprechen dem ganzen Bereich -- weit genug
+        // fuer feines Einstellen, kurz genug zum schnellen Durchfahren.
+        if let Some((wi, i, y0, v0)) = self.active_knob {
+            if is_down {
+                let w = &mut self.windows[wi].widgets[i];
+                let spanne = w.max - w.min;
+                let neu = (v0 + (y0 - my) as f64 / 140.0 * spanne).clamp(w.min, w.max);
+                if (neu - w.value).abs() > f64::EPSILON {
+                    w.value = neu;
+                    let och = w.on_change.clone();
+                    if let Some(f) = och { self.pending.push(f); }
+                }
+            } else {
+                self.active_knob = None;
+            }
+        }
+        // Kippschalter: `value` zieht dem Zustand weich nach, damit der Knopf
+        // hinuebergleitet statt zu springen.
+        for win in self.windows.iter_mut() {
+            for wdg in win.widgets.iter_mut() {
+                if wdg.kind == Kind::Toggle {
+                    let ziel = if wdg.checked { 1.0 } else { 0.0 };
+                    wdg.value += (ziel - wdg.value) * 0.28;
+                    if (ziel - wdg.value).abs() < 0.005 { wdg.value = ziel; }
+                }
+            }
         }
         // Laufendes Splitter-Drag.
         if let Some((wi, i)) = self.active_split {
@@ -2597,6 +2704,14 @@ impl Gui {
                 if let Some(f) = och { self.pending.push(f); }
             }
             Kind::Slider => { self.active_slider = Some((win, i)); self.drag_slider(win, i, mx); }
+            Kind::Toggle => {
+                let w = &mut self.windows[win].widgets[i];
+                w.checked = !w.checked;
+                let (oc, och) = (w.on_click.clone(), w.on_change.clone());
+                if let Some(f) = oc { self.pending.push(f); }
+                if let Some(f) = och { self.pending.push(f); }
+            }
+            Kind::Knob => { self.active_knob = Some((win, i, my, self.windows[win].widgets[i].value)); }
             Kind::Splitter => {
                 self.active_split = Some((win, i));
                 let vert = self.windows[win].widgets[i].group == "v";
@@ -2867,9 +2982,24 @@ impl Gui {
                     let hl = if pressed { Some(shade(bgc, -20)) }
                              else if wdg.hovered { Some(shade(bgc, 24)) } else { None };
                     if let Some(c) = hl {
-                        let rad = self.m("corner_radius").min(6);
+                        let rad = if wdg.rund { (w.min(h) / 2).max(2) } else { self.m("corner_radius").min(6) };
                         g.round_rect(ax, ay, ax + w - 1, ay + h - 1, rad, c, true);
                     }
+                } else if wdg.rund {
+                    // Runder Knopf: der Eckenradius ist die halbe kurze Seite,
+                    // damit aus dem Rechteck eine Kapsel bzw. ein Kreis wird.
+                    let mut bg = self.wcol(wdg, "bg", "widget_bg");
+                    if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
+                    let r = (w.min(h) / 2).max(2);
+                    let gr = self.m("gradient");
+                    if gr > 0 {
+                        g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, r, shade(bg, gr), shade(bg, -gr));
+                        self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, r);
+                    } else {
+                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r, bg, true);
+                    }
+                    g.round_rect(ax, ay, ax + w - 1, ay + h - 1, r,
+                                 self.wcol(wdg, "border", "widget_border"), false);
                 } else {
                     let mut bg = self.wcol(wdg, "bg", "widget_bg");
                     if pressed { bg = shade(bg, -30); } else if wdg.hovered { bg = shade(bg, 30); }
@@ -2895,7 +3025,13 @@ impl Gui {
                 if self.modern() {
                     // Gerundetes Kaestchen; gefuellt + Haekchen wenn aktiv.
                     if wdg.checked {
-                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, acc, true);
+                        if self.m("gradient") > 0 {
+                            g.round_gradient(ax, ay, ax + w - 1, ay + h - 1, 3,
+                                             shade(acc, 26), shade(acc, -22));
+                            self.gloss(g, ax, ay, ax + w - 1, ay + h - 1, 3);
+                        } else {
+                            g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, acc, true);
+                        }
                         let ck = self.th("win_bg");   // Kontrast-Haekchen auf Akzentflaeche
                         let (x1, y1) = (ax + w * 28 / 100, ay + h * 52 / 100);
                         let (x2, y2) = (ax + w * 44 / 100, ay + h * 70 / 100);
@@ -2903,8 +3039,11 @@ impl Gui {
                         g.line(x1, y1, x2, y2, ck);
                         g.line(x2, y2, x3, y3, ck);
                     } else {
-                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, self.wcol(wdg, "bg", "widget_bg"), true);
-                        g.round_rect(ax, ay, ax + w - 1, ay + h - 1, 3, if wdg.hovered { acc } else { bordc }, false);
+                        // Leer = versenkte Mulde: man sieht, dass hier etwas
+                        // hineingehoert.
+                        self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
+                                       self.wcol(wdg, "bg", "widget_bg"),
+                                       if wdg.hovered { acc } else { bordc });
                     }
                 } else {
                     g.rect(ax, ay, ax + w - 1, ay + h - 1, bordc);
@@ -2915,12 +3054,73 @@ impl Gui {
             }
             Kind::Slider => {
                 let handle_w = self.m("slider_handle_w");
-                g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg"));
-                g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { (wdg.value - wdg.min) / span } else { 0.0 };
-                let hx = ax + (ratio * (w - handle_w) as f64) as i32;
-                g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, self.acc_col(wdg));
+                let acc = self.acc_col(wdg);
+                if self.m("gradient") > 0 {
+                    // Rinne: schmal und versenkt. Der zurueckgelegte Teil wird
+                    // in der Akzentfarbe gefuellt -- so ist der Wert auch ohne
+                    // Zahl ablesbar.
+                    let (ty, tb) = (ay + h / 2 - 3, ay + h / 2 + 3);
+                    self.fbox_tief(g, ax, ty, ax + w - 1, tb,
+                                   self.wcol(wdg, "bg", "widget_bg"),
+                                   self.wcol(wdg, "border", "widget_border"));
+                    let bis = ax + (ratio * (w - 1) as f64) as i32;
+                    if bis > ax + 2 {
+                        g.round_gradient(ax + 1, ty + 1, bis, tb - 1, 3,
+                                         shade(acc, 24), shade(acc, -18));
+                    }
+                    let hx = ax + (ratio * (w - handle_w) as f64) as i32 + handle_w / 2;
+                    self.knauf(g, hx, ay + h / 2, (h / 2).max(5), self.wcol(wdg, "bg", "widget_bg"));
+                } else {
+                    g.box_fill(ax, ay + h / 2 - 1, ax + w - 1, ay + h / 2 + 1, self.wcol(wdg, "bg", "widget_bg"));
+                    g.rect(ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "border", "widget_border"));
+                    let hx = ax + (ratio * (w - handle_w) as f64) as i32;
+                    g.box_fill(hx, ay, hx + handle_w - 1, ay + h - 1, acc);
+                }
+            }
+            Kind::Toggle => {
+                let acc = self.acc_col(wdg);
+                let aus = self.wcol(wdg, "bg", "widget_bg");
+                let r = h / 2;
+                // Die Rinne faerbt sich mit dem Zustand ein -- ueber `value`,
+                // also gleitend statt springend.
+                let mix = wdg.value.clamp(0.0, 1.0);
+                let bahn = mischen(aus, acc, mix);
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, bahn,
+                               self.wcol(wdg, "border", "widget_border"));
+                let kx = ax + r + ((w - h) as f64 * mix) as i32;
+                self.knauf(g, kx, ay + r, r - 2, shade(self.th("widget_bg"), 40));
+                if !wdg.text.is_empty() {
+                    self.wtext(g, wdg, ax + w + pad, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
+                }
+            }
+            Kind::Knob => {
+                let acc = self.acc_col(wdg);
+                let r = (w.min(h) / 2).max(8);
+                let (cx, cy) = (ax + w / 2, ay + h / 2);
+                let spanne = wdg.max - wdg.min;
+                let anteil = if spanne != 0.0 { ((wdg.value - wdg.min) / spanne).clamp(0.0, 1.0) } else { 0.0 };
+                // Skalenbogen: 270 Grad, unten offen -- wie am Mischpult.
+                let (von, bis) = (135.0, 405.0);
+                let zw = von + (bis - von) * anteil;
+                g.ring(cx, cy, r - 3, r, von, bis, self.wcol(wdg, "border", "widget_border"), true);
+                if anteil > 0.0 {
+                    g.ring(cx, cy, r - 3, r, von, zw, acc, true);
+                }
+                // Metallkappe + Kerbe, die den Wert zeigt.
+                self.knauf(g, cx, cy, r - 6, self.wcol(wdg, "bg", "widget_bg"));
+                let rad = zw.to_radians();
+                let (i0, i1) = ((r - 14).max(2) as f64, (r - 7).max(3) as f64);
+                g.line_thick(
+                    cx + (rad.cos() * i0) as i32, cy + (rad.sin() * i0) as i32,
+                    cx + (rad.cos() * i1) as i32, cy + (rad.sin() * i1) as i32,
+                    2.0, self.txt_col(wdg),
+                );
+                if !wdg.text.is_empty() {
+                    let tw = g.text_width(&wdg.text);
+                    self.wtext(g, wdg, cx - tw / 2, ay + h + 2, wdg.text.clone(), self.txt_col(wdg));
+                }
             }
             Kind::TextInput => {
                 let focused = self.focus_widget == Some((wi, idx));

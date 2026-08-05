@@ -3172,6 +3172,17 @@ impl<'p> Vm<'p> {
                 Value::Int(self.gui.checkbox(gi(a,0,"GUI_CHECKBOX")?, gs(a,1,"GUI_CHECKBOX")?,
                     gi(a,2,"GUI_CHECKBOX")? as i32, gi(a,3,"GUI_CHECKBOX")? as i32, def)?)
             }
+            "gui_toggle" => {
+                let def = if a.len() >= 5 { gbool(a,4,"GUI_TOGGLE")? } else { false };
+                Value::Int(self.gui.toggle(gi(a,0,"GUI_TOGGLE")?, gs(a,1,"GUI_TOGGLE")?,
+                    gi(a,2,"GUI_TOGGLE")? as i32, gi(a,3,"GUI_TOGGLE")? as i32, def)?)
+            }
+            "gui_knob" => {
+                let mn = gnum(a,4,"GUI_KNOB")?; let mx = gnum(a,5,"GUI_KNOB")?;
+                let def = if a.len() >= 7 { gnum(a,6,"GUI_KNOB")? } else { mn };
+                Value::Int(self.gui.knob(gi(a,0,"GUI_KNOB")?, gi(a,1,"GUI_KNOB")? as i32,
+                    gi(a,2,"GUI_KNOB")? as i32, gi(a,3,"GUI_KNOB")? as i32, mn, mx, def)?)
+            }
             "gui_slider" => {
                 let mn = gnum(a,4,"GUI_SLIDER")?; let mx = gnum(a,5,"GUI_SLIDER")?;
                 let def = if a.len() >= 7 { gnum(a,6,"GUI_SLIDER")? } else { mn };
@@ -3272,6 +3283,7 @@ impl<'p> Vm<'p> {
             "gui_theme_get" => Value::Int(self.gui.theme_get(&gs(a,0,"GUI_THEME_GET")?)?),
             "gui_metric_set" => { self.gui.metric_set(gs(a,0,"GUI_METRIC_SET")?, gi(a,1,"GUI_METRIC_SET")? as i32)?; Value::Nil }
             "gui_metric_get" => Value::Int(self.gui.metric_get(&gs(a,0,"GUI_METRIC_GET")?)? as i64),
+            "gui_set_round" => { self.gui.set_round(gi(a,0,"GUI_SET_ROUND")?, gbool(a,1,"GUI_SET_ROUND")?)?; Value::Nil }
             "gui_set_color" => { self.gui.set_color(gi(a,0,"GUI_SET_COLOR")?, gs(a,1,"GUI_SET_COLOR")?, gi(a,2,"GUI_SET_COLOR")?)?; Value::Nil }
             "gui_theme_preset" => { self.gui.theme_preset(&gs(a,0,"GUI_THEME_PRESET")?)?; Value::Nil }
             "gui_reset" => { self.gui.reset(); Value::Nil }

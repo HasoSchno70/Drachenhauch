@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1255,
+  "count": 1258,
   "builtins": [
     {
       "name": "ABS",
@@ -2559,6 +2559,12 @@
       "module": "gui"
     },
     {
+      "name": "GUI_KNOB",
+      "kind": "core",
+      "signature": "GUI_KNOB(win, x: INTEGER, y: INTEGER, groesse: INTEGER, min: FLOAT, max: FLOAT, wert: FLOAT = 0) AS GUI_WIDGET",
+      "module": "gui"
+    },
+    {
       "name": "GUI_LABEL",
       "kind": "core",
       "signature": "GUI_LABEL(4..5 Argumente)",
@@ -2757,6 +2763,12 @@
       "module": "gui"
     },
     {
+      "name": "GUI_SET_ROUND",
+      "kind": "core",
+      "signature": "GUI_SET_ROUND(widget, rund: BOOLEAN)",
+      "module": "gui"
+    },
+    {
       "name": "GUI_SET_TAB",
       "kind": "core",
       "signature": "GUI_SET_TAB(widget, page)",
@@ -2898,6 +2910,12 @@
       "name": "GUI_THEME_SET",
       "kind": "core",
       "signature": "GUI_THEME_SET(key, color)",
+      "module": "gui"
+    },
+    {
+      "name": "GUI_TOGGLE",
+      "kind": "core",
+      "signature": "GUI_TOGGLE(win, text: STRING, x: INTEGER, y: INTEGER, an: BOOLEAN = FALSE) AS GUI_WIDGET",
       "module": "gui"
     },
     {

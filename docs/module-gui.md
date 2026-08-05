@@ -839,3 +839,39 @@ Fortschritts-Trog sind versenkt: der Verlauf läuft andersherum und statt der
 Glanzkante liegt ein Schatten unter dem oberen Rand. Ohne diesen Unterschied
 sieht ein Eingabefeld aus wie ein Knopf, und die Oberfläche verliert ihre
 Aussage darüber, was man anklickt und was man ausfüllt.
+
+
+## Kippschalter, Drehregler, runde Knöpfe
+
+Drei Bedienelemente, die den Glas-Themen ihre Wirkung geben:
+
+```basic
+DIM t AS GUI_WIDGET
+DIM k AS GUI_WIDGET
+DIM b AS GUI_WIDGET
+
+t = GUI_TOGGLE(w, "Musik", 24, 20, TRUE)          ' An/Aus-Pille
+k = GUI_KNOB(w, 220, 20, 90, 0.0, 100.0, 72.0)    ' Drehregler
+b = GUI_BUTTON(w, ">", 24, 285, 42, 42)
+GUI_SET_ROUND(b, TRUE)                            ' runder Transport-Knopf
+```
+
+**`GUI_TOGGLE(win, text$, x, y [, an])`** — der Zustand liegt wie beim
+Kästchen in `checked`, also lesbar mit `GUI_CHECKED` und setzbar mit
+`GUI_SET_CHECKED`. Der Knopf gleitet beim Umlegen hinüber und die Rinne färbt
+sich mit; beides läuft über einen inneren Wert, nicht sprunghaft.
+
+**`GUI_KNOB(win, x, y, groesse, min, max [, wert])`** — verstellt durch
+**senkrechtes Ziehen** (nach oben = mehr). Das ist die Bedienung von
+Mischpult-Oberflächen und kommt ohne Kreisbewegung der Maus aus; 140 Pixel
+entsprechen dem ganzen Bereich. Wert über `GUI_VALUE` / `GUI_SET_VALUE`.
+Der Wertbogen umläuft die Metallkappe über 270°, die Kerbe zeigt die Stellung.
+
+**`GUI_SET_ROUND(widget, an)`** — zeichnet einen Knopf rund statt eckig. Für
+Knöpfe, die nur ein Sinnbild tragen: ein runder Knopf mit Dreieck darin liest
+sich sofort als Abspieltaste.
+
+Kästchen, Auswahlknöpfe und Schieber sind ebenfalls plastisch: das leere
+Kästchen ist eine versenkte Mulde, das gesetzte eine gewölbte Fläche in der
+Akzentfarbe; der Schieber hat eine versenkte Rinne, deren zurückgelegter Teil
+eingefärbt wird, und einen metallischen Griff.

@@ -102,3 +102,72 @@ def test_plastik_metriken_sind_einzeln_setzbar(run_gb):
            'GUI_METRIC_SET("bevel", 1)\n'
            'PRINT GUI_METRIC_GET("gradient")\n')
     assert [l.strip() for l in run_gb(src).split("\n") if l.strip()] == ["30"]
+
+
+# --- Neue Bedienelemente: Kippschalter, Drehregler, runde Knoepfe ---------
+
+def _z(out):
+    return [l.strip() for l in out.split("\n") if l.strip()]
+
+
+def test_kippschalter_verhaelt_sich_wie_ein_kaestchen(run_gb):
+    """Der Zustand liegt in `checked` -- damit gelten GUI_CHECKED und
+    GUI_SET_CHECKED unveraendert, ohne eigene Abfragen."""
+    src = ('IMPORT "gui"\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM t AS GUI_WIDGET\n'
+           'w = GUI_WINDOW("W", 0, 0, 200, 120)\n'
+           't = GUI_TOGGLE(w, "Musik", 10, 10, TRUE)\n'
+           'PRINT GUI_CHECKED(t)\n'
+           'GUI_SET_CHECKED(t, FALSE)\n'
+           'PRINT GUI_CHECKED(t)\n'
+           'PRINT GUI_KIND(t)\n')
+    assert _z(run_gb(src)) == ["TRUE", "FALSE", "toggle"]
+
+
+def test_drehregler_haelt_seinen_wert(run_gb):
+    src = ('IMPORT "gui"\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM k AS GUI_WIDGET\n'
+           'w = GUI_WINDOW("W", 0, 0, 200, 200)\n'
+           'k = GUI_KNOB(w, 10, 10, 80, 0.0, 100.0, 72.0)\n'
+           'PRINT GUI_VALUE(k)\n'
+           'GUI_SET_VALUE(k, 30.0)\n'
+           'PRINT GUI_VALUE(k)\n'
+           'PRINT GUI_KIND(k)\n')
+    assert _z(run_gb(src)) == ["72.0", "30.0", "knob"]
+
+
+def test_drehregler_lehnt_leeren_bereich_ab(run_gb):
+    src = ('IMPORT "gui"\n'
+           'DIM w AS GUI_WINDOW\n'
+           'w = GUI_WINDOW("W", 0, 0, 200, 200)\n'
+           'TRY\n'
+           '    GUI_KNOB(w, 10, 10, 80, 5.0, 5.0, 5.0)\n'
+           'CATCH e\n'
+           '    PRINT e\n'
+           'END TRY\n')
+    out = run_gb(src)
+    assert "max" in out and "min" in out
+
+
+def test_runde_knoepfe_sind_schaltbar(run_gb):
+    src = ('IMPORT "gui"\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM b AS GUI_WIDGET\n'
+           'w = GUI_WINDOW("W", 0, 0, 200, 120)\n'
+           'b = GUI_BUTTON(w, ">", 10, 10, 40, 40)\n'
+           'GUI_SET_ROUND(b, TRUE)\n'
+           'GUI_SET_ROUND(b, FALSE)\n'
+           'PRINT "ok"\n')
+    assert _z(run_gb(src)) == ["ok"]
+
+
+def test_kippschalter_startet_ohne_vorgabe_aus(run_gb):
+    src = ('IMPORT "gui"\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM t AS GUI_WIDGET\n'
+           'w = GUI_WINDOW("W", 0, 0, 200, 120)\n'
+           't = GUI_TOGGLE(w, "Aus", 10, 10)\n'
+           'PRINT GUI_CHECKED(t)\n')
+    assert _z(run_gb(src)) == ["FALSE"]
