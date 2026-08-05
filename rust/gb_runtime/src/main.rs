@@ -23,6 +23,7 @@ mod audio;
 // ueber emscriptens OpenAL (das intern WebAudio bedient).
 #[cfg(all(feature = "graphics", target_os = "emscripten"))]
 mod web_audio;
+mod chart;
 mod builtins;
 mod compiler;
 mod parser;

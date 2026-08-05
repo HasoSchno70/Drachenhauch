@@ -5697,6 +5697,15 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
 
+            "chart_draw" => {
+                if a.len() != 1 { return Err("CHART_DRAW: erwartet 1 Argument -- Aufruf: CHART_DRAW(diagramm)".into()); }
+                let c = crate::builtins::chart_h(&a[0], "CHART_DRAW")?.clone();
+                let c = c.borrow();
+                let g = self.gfx.as_mut().ok_or("CHART_DRAW vor SCREEN aufgerufen")?;
+                c.draw(g);
+                Value::Nil
+            }
+
             "particle_draw" => {
                 let sys = match a.first() { Some(Value::Particles(p)) => p.clone(), _ => return Err("PARTICLE_DRAW erwartet PARTICLE_SYSTEM".into()) };
                 let s = sys.borrow();

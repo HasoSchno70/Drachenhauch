@@ -71,6 +71,8 @@ pub enum Value {
     Phys2d(Rc<RefCell<crate::physics2d::Phys2dWorld>>),
     /// Modul `animfsm`: Animations-State-Machine (ANIM_FSM_*, Referenz-Typ).
     AnimFsm(Rc<RefCell<crate::animfsm::AnimFsmObj>>),
+    /// Modul `chart`: Diagramm (CHART_*, Referenz-Typ -- Daten + Stil).
+    Chart(Rc<RefCell<crate::chart::ChartObj>>),
 }
 
 /// Suspendierter Zustand einer Coroutine. Der Frame (ip/locals/stack/
@@ -561,6 +563,7 @@ impl Value {
             Value::Save(s) => { let s = s.borrow(); format!("<Save v{} keys={}>", s.version, s.data.len()) }
             Value::AStar(g) => { let g = g.borrow(); format!("<AStar {}x{}>", g.w, g.h) }
             Value::Particles(p) => format!("<ParticleSystem {} particles>", p.borrow().particles.len()),
+            Value::Chart(c) => { let c = c.borrow(); format!("<CHART {} {} Reihen, {} Punkte>", c.kind.name(), c.series.len(), c.labels.len()) }
             Value::Ecs(w) => format!("<ECS_WORLD entities={}>", w.borrow().count()),
             Value::Coroutine(c) => format!("<COROUTINE {}>", c.borrow().name),
             Value::Tiled(m) => {
@@ -632,6 +635,7 @@ impl Value {
             Value::Phys3d(_) => "PHYS_WORLD",
             Value::Phys2d(_) => "PHYS2D_WORLD",
             Value::AnimFsm(_) => "ANIM_FSM",
+            Value::Chart(_) => "CHART",
         }
     }
 

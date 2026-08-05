@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1216,
+  "count": 1249,
   "builtins": [
     {
       "name": "ABS",
@@ -1063,6 +1063,150 @@
       "kind": "core",
       "signature": "CEIL(x: Zahl)",
       "module": "core"
+    },
+    {
+      "name": "CHART_ADD",
+      "kind": "core",
+      "signature": "CHART_ADD(diagramm, name: STRING, wert: FLOAT, farbe: INTEGER = -1) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_BOUNDS",
+      "kind": "core",
+      "signature": "CHART_BOUNDS(diagramm, x: INTEGER, y: INTEGER, breite: INTEGER, hoehe: INTEGER)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_CLEAR",
+      "kind": "core",
+      "signature": "CHART_CLEAR(diagramm)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_COUNT",
+      "kind": "core",
+      "signature": "CHART_COUNT(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_DATA",
+      "kind": "core",
+      "signature": "CHART_DATA(diagramm, reihe: INTEGER, werte)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_DRAW",
+      "kind": "graphics",
+      "signature": "CHART_DRAW(diagramm)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_GET",
+      "kind": "core",
+      "signature": "CHART_GET(diagramm, reihe: INTEGER, punkt: INTEGER) AS FLOAT",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_LABEL",
+      "kind": "core",
+      "signature": "CHART_LABEL(diagramm, punkt: INTEGER, text: STRING)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_NEW",
+      "kind": "core",
+      "signature": "CHART_NEW(art: STRING, x: INTEGER, y: INTEGER, breite: INTEGER, hoehe: INTEGER) AS CHART",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_PALETTE",
+      "kind": "core",
+      "signature": "CHART_PALETTE(diagramm, farben)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_PUSH",
+      "kind": "core",
+      "signature": "CHART_PUSH(diagramm, reihe: INTEGER, wert: FLOAT)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SERIES",
+      "kind": "core",
+      "signature": "CHART_SERIES(diagramm, name: STRING, farbe: INTEGER = -1) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SERIES_COUNT",
+      "kind": "core",
+      "signature": "CHART_SERIES_COUNT(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SET",
+      "kind": "core",
+      "signature": "CHART_SET(diagramm, eigenschaft: STRING, wert: STRING)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SET_COLOR",
+      "kind": "core",
+      "signature": "CHART_SET_COLOR(diagramm, eigenschaft: STRING, farbe: INTEGER)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SET_FLAG",
+      "kind": "core",
+      "signature": "CHART_SET_FLAG(diagramm, eigenschaft: STRING, an: BOOLEAN)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SET_NUM",
+      "kind": "core",
+      "signature": "CHART_SET_NUM(diagramm, eigenschaft: STRING, wert: FLOAT)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_SET_POINT",
+      "kind": "core",
+      "signature": "CHART_SET_POINT(diagramm, reihe: INTEGER, punkt: INTEGER, wert: FLOAT)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_STAT",
+      "kind": "core",
+      "signature": "CHART_STAT(diagramm, reihe: INTEGER, kennzahl: STRING) AS FLOAT",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_THEME",
+      "kind": "core",
+      "signature": "CHART_THEME(diagramm, thema: STRING)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_UPDATE",
+      "kind": "core",
+      "signature": "CHART_UPDATE(diagramm, sekunden: FLOAT)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_VALUE",
+      "kind": "core",
+      "signature": "CHART_VALUE(diagramm, wert: FLOAT)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_ZONE",
+      "kind": "core",
+      "signature": "CHART_ZONE(diagramm, von: FLOAT, bis: FLOAT, farbe: INTEGER)",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_ZONE_CLEAR",
+      "kind": "core",
+      "signature": "CHART_ZONE_CLEAR(diagramm)",
+      "module": "chart"
     },
     {
       "name": "CHAR_FACING",

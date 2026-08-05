@@ -148,7 +148,7 @@ fn need_num(v: &Value, fn_: &str) -> Result<f64, String> {
 /// zurueck, statt sich unbenannte Namen auszudenken.
 const NUMFMT_SUFFIXES: &[&str] = &["", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc"];
 
-fn numfmt(n: f64, decimals: i64) -> String {
+pub(crate) fn numfmt(n: f64, decimals: i64) -> String {
     let dec = decimals.clamp(0, 15) as usize;
     if n.is_nan() { return "NaN".to_string(); }
     if n.is_infinite() { return if n > 0.0 { "Inf".to_string() } else { "-Inf".to_string() }; }
@@ -2568,6 +2568,193 @@ fn call_inner(name: &str, a: &[Value]) -> R {
         "astar_path_cost" => { arity!(1); Ok(Value::Float(astar_h(&a[0], "ASTAR_PATH_COST")?.borrow().path_cost())) }
         "astar_clear_path" => { arity!(1); astar_h(&a[0], "ASTAR_CLEAR_PATH")?.borrow_mut().clear_path(); Ok(Value::Nil) }
 
+        // ===== Modul: chart (Diagramme) =====
+        // Aufbau/Daten/Stil sind pure Handle-Operationen; nur CHART_DRAW braucht
+        // das Fenster und sitzt darum in vm.rs::try_graphics.
+        "chart_new" => {
+            arity!(5);
+            let art = need_str(&a[0], "CHART_NEW")?;
+            let kind = crate::chart::Kind::parse(art).ok_or_else(|| format!(
+                "CHART_NEW: unbekannte Art '{}' (gueltig: kuchen, balken, linie, tacho)", art))?;
+            let (x, y) = (need_int_gerundet(&a[1], "CHART_NEW")?, need_int_gerundet(&a[2], "CHART_NEW")?);
+            let (w, h) = (need_int_gerundet(&a[3], "CHART_NEW")?, need_int_gerundet(&a[4], "CHART_NEW")?);
+            if w <= 0 || h <= 0 { return err("CHART_NEW: Breite und Hoehe muessen > 0 sein"); }
+            Ok(Value::Chart(Rc::new(RefCell::new(crate::chart::ChartObj::new(
+                kind, x as i32, y as i32, w as i32, h as i32)))))
+        }
+        "chart_bounds" => {
+            arity!(5);
+            let c = chart_h(&a[0], "CHART_BOUNDS")?; let mut c = c.borrow_mut();
+            c.x = need_int_gerundet(&a[1], "CHART_BOUNDS")? as i32;
+            c.y = need_int_gerundet(&a[2], "CHART_BOUNDS")? as i32;
+            c.w = (need_int_gerundet(&a[3], "CHART_BOUNDS")? as i32).max(1);
+            c.h = (need_int_gerundet(&a[4], "CHART_BOUNDS")? as i32).max(1);
+            Ok(Value::Nil)
+        }
+        "chart_series" => {
+            if a.len() < 2 || a.len() > 3 { return err("CHART_SERIES: erwartet 2 bis 3 Argumente -- Aufruf: CHART_SERIES(diagramm, name [, farbe])"); }
+            let farbe = match a.get(2) { Some(v) => need_int(v, "CHART_SERIES")?, None => -1 };
+            let c = chart_h(&a[0], "CHART_SERIES")?;
+            let name = need_str(&a[1], "CHART_SERIES")?.to_string();
+            Ok(Value::Int(c.borrow_mut().add_series(&name, farbe)))
+        }
+        "chart_add" => {
+            if a.len() < 3 || a.len() > 4 { return err("CHART_ADD: erwartet 3 bis 4 Argumente -- Aufruf: CHART_ADD(diagramm, name, wert [, farbe])"); }
+            let farbe = match a.get(3) { Some(v) => need_int(v, "CHART_ADD")?, None => -1 };
+            let c = chart_h(&a[0], "CHART_ADD")?;
+            let label = need_str(&a[1], "CHART_ADD")?.to_string();
+            let wert = need_num(&a[2], "CHART_ADD")?;
+            Ok(Value::Int(c.borrow_mut().add_point(&label, wert, farbe)))
+        }
+        "chart_data" => {
+            arity!(3);
+            let werte = num_array(&a[2], "CHART_DATA")?;
+            let c = chart_h(&a[0], "CHART_DATA")?;
+            let s = need_int(&a[1], "CHART_DATA")?;
+            if s < 0 { return err("CHART_DATA: Reihe darf nicht negativ sein"); }
+            c.borrow_mut().set_data(s as usize, &werte)?;
+            Ok(Value::Nil)
+        }
+        "chart_set_point" => {
+            arity!(4);
+            let c = chart_h(&a[0], "CHART_SET_POINT")?;
+            let s = need_int(&a[1], "CHART_SET_POINT")?;
+            let i = need_int(&a[2], "CHART_SET_POINT")?;
+            if s < 0 || i < 0 { return err("CHART_SET_POINT: Reihe und Punkt duerfen nicht negativ sein"); }
+            let v = need_num(&a[3], "CHART_SET_POINT")?;
+            c.borrow_mut().set_point(s as usize, i as usize, v)?;
+            Ok(Value::Nil)
+        }
+        "chart_push" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_PUSH")?;
+            let s = need_int(&a[1], "CHART_PUSH")?;
+            if s < 0 { return err("CHART_PUSH: Reihe darf nicht negativ sein"); }
+            let v = need_num(&a[2], "CHART_PUSH")?;
+            c.borrow_mut().push(s as usize, v)?;
+            Ok(Value::Nil)
+        }
+        "chart_value" => {
+            arity!(2);
+            let c = chart_h(&a[0], "CHART_VALUE")?;
+            let v = need_num(&a[1], "CHART_VALUE")?;
+            let mut c = c.borrow_mut();
+            if c.series.is_empty() { c.add_series("", -1); }
+            if c.series[0].values.is_empty() {
+                c.series[0].values.push(v);
+                c.series[0].shown.push(v);
+            } else {
+                c.series[0].values[0] = v;
+            }
+            Ok(Value::Nil)
+        }
+        "chart_label" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_LABEL")?;
+            let i = need_int(&a[1], "CHART_LABEL")?;
+            let t = need_str(&a[2], "CHART_LABEL")?.to_string();
+            let mut c = c.borrow_mut();
+            if i < 0 || i as usize >= c.labels.len() {
+                return err(&format!("CHART_LABEL: Punkt {} gibt es nicht", i));
+            }
+            c.labels[i as usize] = t;
+            Ok(Value::Nil)
+        }
+        "chart_clear" => { arity!(1); chart_h(&a[0], "CHART_CLEAR")?.borrow_mut().clear(); Ok(Value::Nil) }
+        "chart_count" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_COUNT")?.borrow().labels.len() as i64)) }
+        "chart_series_count" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_SERIES_COUNT")?.borrow().series.len() as i64)) }
+        "chart_get" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_GET")?;
+            let s = need_int(&a[1], "CHART_GET")?;
+            let i = need_int(&a[2], "CHART_GET")?;
+            let c = c.borrow();
+            let reihe = if s >= 0 { c.series.get(s as usize) } else { None }
+                .ok_or_else(|| format!("CHART_GET: Reihe {} gibt es nicht", s))?;
+            let v = if i >= 0 { reihe.values.get(i as usize) } else { None }
+                .ok_or_else(|| format!("CHART_GET: Punkt {} gibt es nicht", i))?;
+            Ok(Value::Float(*v))
+        }
+        "chart_set" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_SET")?;
+            let k = need_str(&a[1], "CHART_SET")?.to_string();
+            let v = need_str(&a[2], "CHART_SET")?.to_string();
+            c.borrow_mut().set_str(&k, &v)?;
+            Ok(Value::Nil)
+        }
+        "chart_set_num" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_SET_NUM")?;
+            let k = need_str(&a[1], "CHART_SET_NUM")?.to_string();
+            let v = need_num(&a[2], "CHART_SET_NUM")?;
+            c.borrow_mut().set_num(&k, v)?;
+            Ok(Value::Nil)
+        }
+        "chart_set_color" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_SET_COLOR")?;
+            let k = need_str(&a[1], "CHART_SET_COLOR")?.to_string();
+            let v = need_int(&a[2], "CHART_SET_COLOR")?;
+            c.borrow_mut().set_color(&k, v)?;
+            Ok(Value::Nil)
+        }
+        "chart_set_flag" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_SET_FLAG")?;
+            let k = need_str(&a[1], "CHART_SET_FLAG")?.to_string();
+            let v = need_flag(&a[2], "CHART_SET_FLAG")?;
+            c.borrow_mut().set_flag(&k, v)?;
+            Ok(Value::Nil)
+        }
+        "chart_theme" => {
+            arity!(2);
+            let c = chart_h(&a[0], "CHART_THEME")?;
+            let n = need_str(&a[1], "CHART_THEME")?.to_string();
+            if !crate::chart::apply_theme(&mut c.borrow_mut().style, &n) {
+                return err(&format!("CHART_THEME: unbekanntes Thema '{}' (gueltig: {})",
+                                    n, crate::chart::THEMES.join(", ")));
+            }
+            Ok(Value::Nil)
+        }
+        "chart_palette" => {
+            arity!(2);
+            let farben: Vec<i64> = num_array(&a[1], "CHART_PALETTE")?.iter().map(|f| *f as i64).collect();
+            if farben.is_empty() { return err("CHART_PALETTE: Farbliste ist leer"); }
+            chart_h(&a[0], "CHART_PALETTE")?.borrow_mut().set_palette(&farben);
+            Ok(Value::Nil)
+        }
+        "chart_zone" => {
+            arity!(4);
+            let c = chart_h(&a[0], "CHART_ZONE")?;
+            let von = need_num(&a[1], "CHART_ZONE")?;
+            let bis = need_num(&a[2], "CHART_ZONE")?;
+            let farbe = need_int(&a[3], "CHART_ZONE")?;
+            c.borrow_mut().zones.push(crate::chart::Zone { from: von, to: bis, color: farbe });
+            Ok(Value::Nil)
+        }
+        "chart_zone_clear" => { arity!(1); chart_h(&a[0], "CHART_ZONE_CLEAR")?.borrow_mut().zones.clear(); Ok(Value::Nil) }
+        "chart_update" => {
+            arity!(2);
+            let c = chart_h(&a[0], "CHART_UPDATE")?;
+            let dt = need_num(&a[1], "CHART_UPDATE")?;
+            if dt < 0.0 { return err("CHART_UPDATE: Sekunden duerfen nicht negativ sein"); }
+            c.borrow_mut().advance(dt);
+            Ok(Value::Nil)
+        }
+        "chart_stat" => {
+            arity!(3);
+            let c = chart_h(&a[0], "CHART_STAT")?;
+            let s = need_int(&a[1], "CHART_STAT")?;
+            let was = need_str(&a[2], "CHART_STAT")?.to_lowercase();
+            let c = c.borrow();
+            let reihe = if s >= 0 { c.series.get(s as usize) } else { None }
+                .ok_or_else(|| format!("CHART_STAT: Reihe {} gibt es nicht", s))?;
+            let st = crate::chart::stats(&reihe.values);
+            st.get(was.as_str()).copied().map(Value::Float).ok_or_else(|| format!(
+                "CHART_STAT: unbekannte Kennzahl '{}' (gueltig: anzahl, summe, mittel, min, max)", was))
+        }
+
         // ===== Modul: particles (RNG-Emit -> nicht deterministisch) =====
         "particle_system_new" => { arity!(2); Ok(Value::Particles(Rc::new(RefCell::new(ParticleSys::new(need_num(&a[0], "PARTICLE_SYSTEM_NEW")?, need_num(&a[1], "PARTICLE_SYSTEM_NEW")?))))) }
         "particle_set_pos" => { arity!(3); let s = psys(&a[0], "PARTICLE_SET_POS")?; let mut s = s.borrow_mut(); s.x = need_num(&a[1], "S")?; s.y = need_num(&a[2], "S")?; Ok(Value::Nil) }
@@ -3215,6 +3402,10 @@ fn fnv1a64(data: &[u8]) -> u64 {
 
 fn psys<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<ParticleSys>>, String> {
     match v { Value::Particles(p) => Ok(p), _ => Err(format!("{} erwartet PARTICLE_SYSTEM", fn_)) }
+}
+
+pub(crate) fn chart_h<'a>(v: &'a Value, fn_: &str) -> Result<&'a Rc<RefCell<crate::chart::ChartObj>>, String> {
+    match v { Value::Chart(c) => Ok(c), _ => Err(format!("{} erwartet CHART", fn_)) }
 }
 
 pub(crate) fn rng_uniform(a: f64, b: f64) -> f64 {

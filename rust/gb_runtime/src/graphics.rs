@@ -70,6 +70,11 @@ enum Cmd {
     RoundRect(i32, i32, i32, i32, i32, Color, bool),   // x1,y1,x2,y2, radius, color, filled
     GradientRect(i32, i32, i32, i32, Color, Color, bool), // x1,y1,x2,y2, c1, c2, vertical
     Spline(Vec<(i32, i32)>, f32, Color),               // points, thick, color
+    /// Kreisring-Ausschnitt: cx, cy, r_innen, r_aussen, winkel_von, winkel_bis,
+    /// Farbe, gefuellt. Deckt Kuchenstueck (r_innen = 0), Donut-Segment und
+    /// Tacho-Bogen mit EINER Variante ab -- raylibs `draw_ring` kann alle drei.
+    /// Winkel in Grad, 0 = rechts, wachsend im Uhrzeigersinn (Bildschirm-y).
+    Ring(i32, i32, f32, f32, f32, f32, Color, bool),
     BlendMode(i32),                                    // 0=alpha,1=additive,2=multiplied,4=subtract
     RtDraw(usize, i32, i32, f32, Color, bool),         // render-target idx, x, y, scale, tint, flip_v
 }
@@ -2498,6 +2503,15 @@ impl Graphics {
         let pts: Vec<(i32, i32)> = xs.iter().zip(ys).map(|(&x, &y)| self.w2s(x, y)).collect();
         self.emit(Cmd::Spline(pts, (w * self.cam_zoom).max(1.0) as f32, col(c)));
     }
+    /// Kreisring-Ausschnitt (Kuchenstueck bei `r_in` = 0, Donut/Tacho-Bogen
+    /// sonst). Winkel in Grad, 0 = rechts, wachsend im Uhrzeigersinn.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ring(&mut self, cx: i32, cy: i32, r_in: i32, r_out: i32,
+                von: f64, bis: f64, c: i64, filled: bool) {
+        let (cx, cy) = self.w2s(cx, cy);
+        let (ri, ro) = (self.ssize(r_in), self.ssize(r_out));
+        self.emit(Cmd::Ring(cx, cy, ri as f32, ro as f32, von as f32, bis as f32, col(c), filled));
+    }
 
     // --- Blend-Modes (Batch 2) ---
     pub fn blend_mode(&mut self, mode: i32) { self.emit(Cmd::BlendMode(mode)); }
@@ -2722,6 +2736,21 @@ impl Graphics {
         unsafe { raylib::ffi::MeasureText(c.as_ptr(), self.text_size) }
     }
     pub fn text_height(&self) -> i32 { self.text_size }
+
+    /// Textbreite bei EXPLIZITER Groesse (statt `text_size`) -- Gegenstueck zu
+    /// `text_styled`, das ebenfalls an `text_size` vorbeischreibt. Ohne das
+    /// koennte ein Aufrufer mit eigener Schriftgroesse (Modul `chart`) seinen
+    /// Text nicht mittig setzen.
+    pub fn text_width_at(&self, s: &str, size: i32) -> i32 {
+        let size = size.max(1);
+        if self.active_font >= 0 {
+            if let Some(f) = self.fonts.get(self.active_font as usize) {
+                return f.measure_text(s, size as f32, self.text_spacing).x as i32;
+            }
+        }
+        let c = std::ffi::CString::new(s).unwrap_or_default();
+        unsafe { raylib::ffi::MeasureText(c.as_ptr(), size) }
+    }
 
     // Bewusst NICHT uebernommen: animierte GIFs (`LoadImageAnim`). raylib haengt
     // die weiteren Bilder an `image.data` an, laesst `width`/`height` aber bei
@@ -4919,6 +4948,15 @@ fn render_scene<D: RaylibDraw>(
                         let rec = Rectangle::new(x as f32, y as f32, w as f32, h as f32);
                         if *filled { d.draw_rectangle_rounded(rec, roundness, 12, *col); }
                         else { d.draw_rectangle_rounded_lines(rec, roundness, 12, *col); }
+                    }
+                    Cmd::Ring(cx, cy, ri, ro, von, bis, col, filled) => {
+                        let mitte = Vector2::new((cx * s) as f32, (cy * s) as f32);
+                        let (ri, ro) = (ri * s as f32, ro * s as f32);
+                        // Ein Segment je 4 Grad haelt auch grosse Kreise rund,
+                        // ohne bei schmalen Kuchenstuecken Dreiecke zu verschwenden.
+                        let seg = (((bis - von).abs() / 4.0).ceil() as i32).clamp(6, 180);
+                        if *filled { d.draw_ring(mitte, ri, ro, *von, *bis, seg, *col); }
+                        else { d.draw_ring_lines(mitte, ri, ro, *von, *bis, seg, *col); }
                     }
                     Cmd::GradientRect(x1, y1, x2, y2, c1, c2, vertical) => {
                         let x = (*x1).min(*x2) * s; let y = (*y1).min(*y2) * s;

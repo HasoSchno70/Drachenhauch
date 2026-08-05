@@ -1,0 +1,165 @@
+' 154_chart.gb -- Modul "chart": Kuchen, Balken, Linie und Tacho.
+'
+' Alle vier Arten nebeneinander, jede mit ein paar der Stell-
+' schrauben.
+'
+'   LEERTASTE  Thema wechseln
+'   V          Verlauf auf den Daten an/aus
+'   S          weiche Schatten an/aus
+'   +/-        Deckkraft (Alpha) aller Datenfarben
+'   HOCH/RUNTER  Drehzahl
+
+IMPORT "chart"
+
+SCREEN(1000, 700, "GameBasic -- Diagramme")
+
+DIM kuchen AS CHART
+DIM balken AS CHART
+DIM linie AS CHART
+DIM tacho AS CHART
+
+' --- Kuchen (hier als Donut, mit herausgezogenen Segmenten) --------
+kuchen = CHART_NEW("kuchen", 20, 20, 470, 320)
+CHART_SET(kuchen, "titel", "Rohstoffe")
+CHART_ADD(kuchen, "Holz", 45.0, 9127187)
+CHART_ADD(kuchen, "Stein", 30.0, 8421504)
+CHART_ADD(kuchen, "Erz", 15.0, 16753920)
+CHART_ADD(kuchen, "Gold", 10.0, 16776960)
+CHART_SET_NUM(kuchen, "innenradius", 0.55)
+CHART_SET_NUM(kuchen, "abstand", 4)
+CHART_SET(kuchen, "werte", "aussen")
+CHART_SET(kuchen, "legende", "links")
+CHART_SET_FLAG(kuchen, "prozent", TRUE)
+
+' --- Balken (zwei Reihen, gestapelt) -------------------------------
+DIM r_ein AS INTEGER
+DIM r_aus AS INTEGER
+balken = CHART_NEW("balken", 510, 20, 470, 320)
+CHART_SET(balken, "titel", "Woche")
+CHART_SET(balken, "achse_x", "Tag")
+r_ein = CHART_SERIES(balken, "Einnahmen")   ' ohne Farbe = aus der Palette
+r_aus = CHART_SERIES(balken, "Ausgaben")
+
+DIM ein[7] AS FLOAT
+DIM aus[7] AS FLOAT
+DIM tage AS ARRAY OF STRING
+DIM i AS INTEGER
+FOR i = 0 TO 6
+    ein[i] = 20.0 + RND(60)
+    aus[i] = 10.0 + RND(30)
+NEXT
+CHART_DATA(balken, r_ein, ein)
+CHART_DATA(balken, r_aus, aus)
+CHART_LABEL(balken, 0, "Mo")
+CHART_LABEL(balken, 1, "Di")
+CHART_LABEL(balken, 2, "Mi")
+CHART_LABEL(balken, 3, "Do")
+CHART_LABEL(balken, 4, "Fr")
+CHART_LABEL(balken, 5, "Sa")
+CHART_LABEL(balken, 6, "So")
+CHART_SET_FLAG(balken, "stapel", TRUE)
+CHART_SET(balken, "legende", "unten")
+CHART_SET_NUM(balken, "abstand", 10)
+CHART_SET_NUM(balken, "ecken", 3)
+CHART_SET(balken, "einheit", " G")
+
+' --- Linie (Live-Kurve mit gleitendem Fenster) ---------------------
+DIM r_fps AS INTEGER
+linie = CHART_NEW("linie", 20, 360, 470, 320)
+CHART_SET(linie, "titel", "Bildrate")
+r_fps = CHART_SERIES(linie, "FPS")
+CHART_SET_NUM(linie, "fenster", 120)
+CHART_SET_NUM(linie, "min", 0)
+CHART_SET_NUM(linie, "max", 120)
+CHART_SET_FLAG(linie, "flaeche", TRUE)
+CHART_SET_FLAG(linie, "glatt", TRUE)
+CHART_SET_NUM(linie, "linien_dicke", 2.5)
+CHART_SET_NUM(linie, "flaeche_deckkraft", 0.4)
+
+' --- Tacho (Farbzonen + weich nachziehender Zeiger) ----------------
+DIM drehzahl AS FLOAT
+drehzahl = 1200.0
+tacho = CHART_NEW("tacho", 510, 360, 470, 320)
+CHART_SET(tacho, "titel", "Drehzahl")
+CHART_SET(tacho, "einheit", "")
+CHART_SET_NUM(tacho, "min", 0)
+CHART_SET_NUM(tacho, "max", 8000)
+CHART_SET_NUM(tacho, "striche", 9)
+CHART_SET_NUM(tacho, "unterstriche", 4)
+CHART_SET_NUM(tacho, "animation", 0.4)
+CHART_ZONE(tacho, 5000, 6500, 16776960)
+CHART_ZONE(tacho, 6500, 8000, 16711680)
+CHART_SET(tacho, "werte", "innen")
+
+DIM themen AS ARRAY OF STRING
+DIM t_idx AS INTEGER
+themen = SPLIT("dunkel,hell,neon,pastell", ",")
+t_idx = 0
+
+DIM alle AS ARRAY OF CHART
+DIM verlauf AS BOOLEAN
+DIM weich AS BOOLEAN
+DIM deckkraft AS FLOAT
+DIM stil AS CHART
+alle = [kuchen, balken, linie, tacho]
+verlauf = TRUE
+weich = TRUE
+deckkraft = 1.0
+
+' Schatten, Verlauf und Deckkraft betreffen alle vier gleich -- deshalb
+' eine Hilfsroutine statt vier Mal derselbe Block.
+SUB stil_anwenden()
+    FOR EACH stil IN alle
+        CHART_SET_FLAG(stil, "verlauf_daten", verlauf)
+        CHART_SET_FLAG(stil, "schatten_daten", weich)
+        CHART_SET_NUM(stil, "schatten", IIF(weich, 6, 0))
+        CHART_SET_NUM(stil, "schatten_weich", IIF(weich, 6, 0))
+        CHART_SET_NUM(stil, "deckkraft", deckkraft)
+    NEXT
+END SUB
+
+stil_anwenden()
+
+WHILE NOT KEYPRESSED(KEY_ESCAPE)
+    ' --- Eingabe ---
+    IF KEYHIT(KEY_SPACE) THEN
+        t_idx = (t_idx + 1) MOD 4
+        CHART_THEME(kuchen, themen[t_idx])
+        CHART_THEME(balken, themen[t_idx])
+        CHART_THEME(linie, themen[t_idx])
+        CHART_THEME(tacho, themen[t_idx])
+        stil_anwenden()          ' Thema setzt die Farben neu -> Stil nachziehen
+    END IF
+    IF KEYHIT(ASC("V")) THEN
+        verlauf = NOT verlauf
+        stil_anwenden()
+    END IF
+    IF KEYHIT(ASC("S")) THEN
+        weich = NOT weich
+        stil_anwenden()
+    END IF
+    IF KEYPRESSED(ASC("+")) THEN
+        deckkraft = MIN(1.0, deckkraft + 0.6 * DELTA())
+        stil_anwenden()
+    END IF
+    IF KEYPRESSED(ASC("-")) THEN
+        deckkraft = MAX(0.1, deckkraft - 0.6 * DELTA())
+        stil_anwenden()
+    END IF
+    IF KEYPRESSED(KEY_UP) THEN drehzahl = MIN(8000.0, drehzahl + 2000.0 * DELTA())
+    IF KEYPRESSED(KEY_DOWN) THEN drehzahl = MAX(0.0, drehzahl - 2000.0 * DELTA())
+
+    ' --- Daten nachfuehren ---
+    CHART_VALUE(tacho, drehzahl)
+    CHART_PUSH(linie, r_fps, FPS())
+    CHART_UPDATE(tacho, DELTA())
+
+    ' --- Zeichnen ---
+    CLS(0)
+    CHART_DRAW(kuchen)
+    CHART_DRAW(balken)
+    CHART_DRAW(linie)
+    CHART_DRAW(tacho)
+    TEXT(20, 676, f"LEERTASTE Thema ({themen[t_idx]})   V Verlauf   S Schatten   +/- Deckkraft {deckkraft:.2f}   ESC Ende")
+    FLIP()
+WEND
