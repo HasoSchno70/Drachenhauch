@@ -64,6 +64,8 @@ pub struct Zone {
     pub from: f64,
     pub to: f64,
     pub color: i64,
+    /// Beschriftung, die entlang des Bogens mitgedreht wird ("" = keine).
+    pub name: String,
 }
 
 /// Alle Aussehens-Einstellungen. Voreinstellungen = Thema "dunkel".
@@ -81,6 +83,10 @@ pub struct Style {
     pub ausrichtung: String,
     /// "nadel" | "balken" | "pfeil" (Tacho)
     pub zeigerform: String,
+    /// Tacho-Zifferblatt: "ring" | "segmente" | "striche" | "baender"
+    pub zifferblatt: String,
+    /// Wo der Wert steht: "aus" | "innen" | "pille" | "blase" | "am_zeiger"
+    pub wertanzeige: String,
 
     // --- Zahlen (CHART_SET_NUM) ---
     /// NaN = automatisch aus den Daten.
@@ -166,6 +172,14 @@ pub struct Style {
     pub hover_weite: f64,
     /// Wie stark es aufhellt (0 = gar nicht, 1 = deutlich).
     pub hover_glanz: f64,
+    /// Anzahl Segmente/Striche beim Zifferblatt "segmente"/"striche".
+    pub blatt_teile: i32,
+    /// Luecke zwischen den Segmenten in Grad.
+    pub blatt_luecke: f64,
+    /// Dicke des Skalenbogens als Anteil des Radius (0.05..0.6).
+    pub blatt_dicke: f64,
+    /// Metallische Fassung um die Scheibe (Breite in Pixeln, 0 = keine).
+    pub fassung: i32,
 
     /// Reihenfolge der Standardfarben fuer Reihen/Segmente ohne eigene Farbe.
     pub palette: Vec<i64>,
@@ -182,6 +196,8 @@ impl Default for Style {
             werte: "aus".into(),
             ausrichtung: "senkrecht".into(),
             zeigerform: "nadel".into(),
+            zifferblatt: "ring".into(),
+            wertanzeige: "innen".into(),
             min: f64::NAN,
             max: f64::NAN,
             innenradius: 0.0,
@@ -235,6 +251,10 @@ impl Default for Style {
             hover_tempo: 0.15,
             hover_weite: 8.0,
             hover_glanz: 0.35,
+            blatt_teile: 32,
+            blatt_luecke: 2.0,
+            blatt_dicke: 0.2,
+            fassung: 0,
             palette: Vec::new(),
         };
         apply_theme(&mut s, "dunkel");
@@ -1584,6 +1604,21 @@ impl ChartObj {
         let dicke = (r / 5).max(4);
         let ri = r - dicke;
 
+        // Fassung: metallischer Ring um die Scheibe (skeuomorpher Stil).
+        // Mehrere Ringe mit wechselnder Helligkeit ergeben den Metall-Eindruck,
+        // ohne dass es dafuer einen Verlauf entlang eines Kreises braeuchte
+        // (den kann `ring` nicht).
+        if st.fassung > 0 {
+            let f = st.fassung;
+            for k in 0..f {
+                let anteil = k as f64 / f.max(1) as f64;
+                // hell -> dunkel -> hell: wirkt wie eine gewoelbte Kante
+                let hell = 1.0 - (anteil - 0.35).abs() * 1.6;
+                let c = mix_rgb(st.c_rahmen, 0xFFFFFF, hell.clamp(0.0, 1.0) * 0.55);
+                g.ring(cx, cy, r + k, r + k + 1, 0.0, 360.0, c, true);
+            }
+        }
+
         // Skalenbogen als Untergrund, dann die Farbzonen darueber.
         //
         // Beim Balken-Zeiger fuellt der Fortschritt denselben Ring wie die
@@ -1592,18 +1627,90 @@ impl ChartObj {
         // sie sonst an der Fortschrittskante ihre Breite wechseln wuerden.
         let balken_zeiger = st.zeigerform.eq_ignore_ascii_case("balken");
         let zone_ri = if balken_zeiger { r - (r - ri) * 2 / 5 } else { ri };
+        // Ein Bogenstueck in der gewaehlten Zifferblatt-Bauart zeichnen.
+        // Untergrund UND Farbzonen laufen hier durch -- sonst waere der
+        // Untergrund segmentiert und die Zone ein durchgehender Ring.
+        let bogen = |g: &mut Graphics, r_in: i32, r_out: i32, w1: f64, w2: f64, farbe: i64| {
+            match st.zifferblatt.as_str() {
+                "segmente" | "striche" => {
+                    let teile = st.blatt_teile.max(2);
+                    let schritt = (bis - von) / teile as f64;
+                    let luecke = st.blatt_luecke.min(schritt * 0.9);
+                    // Nur die Teile zeichnen, die in [w1,w2] liegen -- so faerbt
+                    // eine Zone genau ihre Segmente ein.
+                    for k in 0..teile {
+                        let a1 = von + schritt * k as f64;
+                        let a2 = a1 + schritt - luecke;
+                        let mitte = (a1 + a2) / 2.0;
+                        if mitte < w1 - 1e-9 || mitte >= w2 {
+                            continue;
+                        }
+                        // "striche" ist die duenne Fassung von "segmente".
+                        let (si, so) = if st.zifferblatt == "striche" {
+                            (r_out - (r_out - r_in) / 3, r_out)
+                        } else {
+                            (r_in, r_out)
+                        };
+                        g.ring(cx, cy, si, so, a1, a2, farbe, true);
+                    }
+                }
+                "baender" => {
+                    // Volle Sektoren bis zur Mitte, mit kleiner Luecke.
+                    let l = st.blatt_luecke.min((w2 - w1).abs() * 0.4);
+                    g.ring(cx, cy, 0, r_out, w1, (w2 - l).max(w1), farbe, true);
+                }
+                _ => g.ring(cx, cy, r_in, r_out, w1, w2, farbe, true),
+            }
+        };
         let zonen = |g: &mut Graphics| {
             for z in &self.zones {
                 let (zf, zt) = (z.from.min(z.to), z.from.max(z.to));
                 let f = ((zf - lo) / (hi - lo)).clamp(0.0, 1.0);
                 let t = ((zt - lo) / (hi - lo)).clamp(0.0, 1.0);
                 if t > f {
-                    g.ring(cx, cy, zone_ri, r, von + spanne * f, von + spanne * t, z.color, true);
+                    bogen(g, zone_ri, r, von + spanne * f, von + spanne * t, z.color);
                 }
             }
         };
-        g.ring(cx, cy, ri, r, von, bis, st.c_gitter, true);
+        bogen(g, ri, r, von, bis, st.c_gitter);
         zonen(g);
+
+        // Zonen-Beschriftung entlang des Bogens (POOR / NORMAL / GUT ...).
+        for z in &self.zones {
+            if z.name.is_empty() {
+                continue;
+            }
+            let (zf, zt) = (z.from.min(z.to), z.from.max(z.to));
+            let f = ((zf - lo) / (hi - lo)).clamp(0.0, 1.0);
+            let tt = ((zt - lo) / (hi - lo)).clamp(0.0, 1.0);
+            if tt <= f {
+                continue;
+            }
+            let mitte = von + spanne * (f + tt) / 2.0;
+            let rad = mitte.to_radians();
+            // Bei "baender" liegt die Schrift weiter innen (der Sektor geht
+            // bis zur Mitte), sonst mittig im Ring.
+            let lr = if st.zifferblatt == "baender" {
+                r as f64 * 0.7
+            } else {
+                (ri + r) as f64 / 2.0
+            };
+            // Tangential ausrichten: +90 Grad zur Radialen. In der unteren
+            // Haelfte kaeme der Text auf dem Kopf an -> dort umdrehen.
+            let mut dreh = mitte + 90.0;
+            let norm = ((mitte % 360.0) + 360.0) % 360.0;
+            if norm > 90.0 && norm < 270.0 {
+                dreh += 180.0;
+            }
+            g.text_rot(
+                cx + (rad.cos() * lr) as i32,
+                cy + (rad.sin() * lr) as i32,
+                z.name.clone(),
+                dreh as f32,
+                st.text_groesse as f32 / g.text_height().max(1) as f32,
+                st.c_text,
+            );
+        }
 
         // Striche (lang) + Unterstriche (kurz) samt Beschriftung.
         let haupt = st.striche.max(0);
@@ -1725,13 +1832,63 @@ impl ChartObj {
             g.circle(cx, cy, (r / 24).max(1), st.c_hintergrund);
         }
 
-        if st.werte != "aus" {
+        // --- Wertanzeige -------------------------------------------------
+        // Der Tacho haengt allein an `wertanzeige`. `werte` bleibt fuer die
+        // Beschriftung einzelner Datenpunkte bei Kuchen/Balken zustaendig --
+        // beides zu koppeln hiesse, zwei Schalter fuer dieselbe Sache zu haben,
+        // und dann zeigt der Tacho nichts, weil der andere noch auf "aus" steht.
+        if st.wertanzeige != "aus" {
             let text = self.fmt_value(wert);
             let sz = st.text_groesse * 2;
             let tw = g.text_width_at(&text, sz);
-            // Unter die unteren Skalenzahlen (die bei ~0.7 * Beschriftungs-
-            // radius sitzen), sonst ueberlappt der Wert sie.
-            g.text_styled(cx - tw / 2, cy + (r * 3) / 5, text, st.c_text, st.schrift, sz);
+            match st.wertanzeige.as_str() {
+                "pille" => {
+                    // Abgerundete Kapsel in der Farbe der getroffenen Zone --
+                    // so sagt schon die Farbe, wie der Wert einzuordnen ist.
+                    let farbe = self
+                        .zones
+                        .iter()
+                        .find(|z| wert >= z.from.min(z.to) && wert <= z.from.max(z.to))
+                        .map(|z| z.color)
+                        .unwrap_or(st.c_zeiger);
+                    let (bw, bh) = (tw + 24, sz + 14);
+                    let (x, y) = (cx - bw / 2, cy + (r * 3) / 5 - bh / 2);
+                    g.round_rect(x, y, x + bw, y + bh, bh / 2, farbe, true);
+                    g.text_styled(x + 12, y + 7, text, 0xFFFFFF, st.schrift, sz);
+                }
+                "blase" => {
+                    // Dunkler Kasten mit Zipfel nach oben (wie die Tooltips).
+                    let (bw, bh) = (tw + 24, sz + 14);
+                    let (x, y) = (cx - bw / 2, cy + (r * 3) / 5 - bh / 2);
+                    g.round_rect(x, y, x + bw, y + bh, 6, 0x1E1E1E, true);
+                    let sp = 7;
+                    g.triangle(cx - sp, y, cx + sp, y, cx, y - 9, 0x1E1E1E);
+                    g.text_styled(x + 12, y + 7, text, 0xF0F0F0, st.schrift, sz);
+                }
+                "am_zeiger" => {
+                    // Kapsel an der Zeigerspitze -- sie wandert mit dem Wert.
+                    let w = zw.to_radians();
+                    let lr = (ri - dicke / 2) as f64;
+                    let (px, py) = (cx + (w.cos() * lr) as i32, cy + (w.sin() * lr) as i32);
+                    let s2 = st.text_groesse;
+                    let tw2 = g.text_width_at(&text, s2);
+                    let (bw, bh) = (tw2 + 18, s2 + 10);
+                    let x = (px - bw / 2).clamp(self.x + 2, self.x + self.w - bw - 2);
+                    let y = (py - bh / 2).clamp(self.y + 2, self.y + self.h - bh - 2);
+                    let farbe = self
+                        .zones
+                        .iter()
+                        .find(|z| wert >= z.from.min(z.to) && wert <= z.from.max(z.to))
+                        .map(|z| z.color)
+                        .unwrap_or(st.c_zeiger);
+                    g.round_rect(x, y, x + bw, y + bh, bh / 2, farbe, true);
+                    g.text_styled(x + 9, y + 5, text, 0xFFFFFF, st.schrift, s2);
+                }
+                // "innen": schlicht unter der Mitte.
+                _ => {
+                    g.text_styled(cx - tw / 2, cy + (r * 3) / 5, text, st.c_text, st.schrift, sz);
+                }
+            }
         }
     }
 
@@ -1871,6 +2028,7 @@ impl ChartObj {
 
 pub const KEYS_STR: &[&str] = &[
     "titel", "einheit", "achse_x", "achse_y", "legende", "werte", "ausrichtung", "zeigerform",
+    "zifferblatt", "wertanzeige",
 ];
 pub const KEYS_NUM: &[&str] = &[
     "min", "max", "innenradius", "abstand", "ecken", "rahmen_dicke", "polster", "gitter",
@@ -1878,6 +2036,7 @@ pub const KEYS_NUM: &[&str] = &[
     "striche", "unterstriche", "linien_dicke", "punkt_radius", "animation", "fenster", "schatten",
     "schatten_weich", "deckkraft", "flaeche_deckkraft",
     "hover_tempo", "hover_weite", "hover_glanz",
+    "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung",
 ];
 pub const KEYS_COLOR: &[&str] = &[
     "hintergrund", "rahmen", "gitter", "text", "titel", "achse", "zeiger", "flaeche", "verlauf",
@@ -1939,6 +2098,22 @@ impl ChartObj {
                 }
                 s.zeigerform = vv;
             }
+            "zifferblatt" => {
+                let vv = v.to_lowercase();
+                if !["ring", "segmente", "striche", "baender"].contains(&vv.as_str()) {
+                    return Err(format!(
+                        "CHART_SET: zifferblatt erwartet ring/segmente/striche/baender, nicht '{}'", v));
+                }
+                s.zifferblatt = vv;
+            }
+            "wertanzeige" => {
+                let vv = v.to_lowercase();
+                if !["aus", "innen", "pille", "blase", "am_zeiger"].contains(&vv.as_str()) {
+                    return Err(format!(
+                        "CHART_SET: wertanzeige erwartet aus/innen/pille/blase/am_zeiger, nicht '{}'", v));
+                }
+                s.wertanzeige = vv;
+            }
             _ => return Err(unbekannt("CHART_SET", key, KEYS_STR)),
         }
         Ok(())
@@ -1975,6 +2150,10 @@ impl ChartObj {
             "hover_tempo" => s.hover_tempo = v.clamp(0.0, 5.0),
             "hover_weite" => s.hover_weite = v.clamp(0.0, 100.0),
             "hover_glanz" => s.hover_glanz = v.clamp(0.0, 1.0),
+            "blatt_teile" => s.blatt_teile = v.clamp(2.0, 200.0) as i32,
+            "blatt_luecke" => s.blatt_luecke = v.clamp(0.0, 30.0),
+            "blatt_dicke" => s.blatt_dicke = v.clamp(0.05, 0.6),
+            "fassung" => s.fassung = v.clamp(0.0, 60.0) as i32,
             _ => return Err(unbekannt("CHART_SET_NUM", key, KEYS_NUM)),
         }
         Ok(())
@@ -2272,6 +2451,38 @@ mod tests {
         // 0 als Deckkraft darf nicht auf das Alpha-Byte 0 fallen -- das waere
         // wieder "deckend". Untere Grenze ist 1.
         assert_eq!(alpha_of(with_alpha(0xFF8800, 0.0)), 1);
+    }
+
+    #[test]
+    fn zifferblatt_und_wertanzeige_pruefen_ihre_werte() {
+        let mut c = ChartObj::new(Kind::Gauge, 0, 0, 100, 100);
+        for b in ["ring", "segmente", "striche", "baender"] {
+            assert!(c.set_str("zifferblatt", b).is_ok(), "{}", b);
+        }
+        for w in ["aus", "innen", "pille", "blase", "am_zeiger"] {
+            assert!(c.set_str("wertanzeige", w).is_ok(), "{}", w);
+        }
+        let e = c.set_str("zifferblatt", "kringel").unwrap_err();
+        assert!(e.contains("kringel") && e.contains("segmente"), "{}", e);
+    }
+
+    #[test]
+    fn tacho_zeigt_seinen_wert_ohne_zutun() {
+        // Regression: die Wertanzeige haing zusaetzlich am Schalter `werte`,
+        // der per Vorgabe "aus" ist -- der Tacho blieb dadurch stumm, obwohl
+        // `wertanzeige` auf "innen" stand. Zwei Schalter fuer dieselbe Sache.
+        let c = ChartObj::new(Kind::Gauge, 0, 0, 100, 100);
+        assert_eq!(c.style.wertanzeige, "innen");
+        assert_eq!(c.style.werte, "aus", "`werte` darf den Tacho nicht mitschalten");
+    }
+
+    #[test]
+    fn zonen_koennen_beschriftet_werden() {
+        let mut c = ChartObj::new(Kind::Gauge, 0, 0, 100, 100);
+        c.zones.push(Zone { from: 0.0, to: 50.0, color: 0xFF0000, name: "SCHLECHT".into() });
+        c.zones.push(Zone { from: 50.0, to: 100.0, color: 0x00FF00, name: String::new() });
+        assert_eq!(c.zones[0].name, "SCHLECHT");
+        assert!(c.zones[1].name.is_empty(), "ohne Namen bleibt sie unbeschriftet");
     }
 
     #[test]

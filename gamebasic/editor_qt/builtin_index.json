@@ -1235,7 +1235,7 @@
     {
       "name": "CHART_ZONE",
       "kind": "core",
-      "signature": "CHART_ZONE(diagramm, von: FLOAT, bis: FLOAT, farbe: INTEGER)",
+      "signature": "CHART_ZONE(diagramm, von: FLOAT, bis: FLOAT, farbe: INTEGER, name: STRING = \"\")",
       "module": "chart"
     },
     {

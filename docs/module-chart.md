@@ -73,7 +73,7 @@ CHART_LABEL(c, 0, "Mo")                ' Kategorie beschriften
 | `CHART_CLEAR(c)` | Daten verwerfen |
 | `CHART_STAT(c, reihe, kennzahl$)` | `anzahl`/`summe`/`mittel`/`min`/`max` |
 | `CHART_BOUNDS(c, x, y, b, h)` | Feld verschieben/skalieren |
-| `CHART_ZONE(c, von, bis, farbe)` / `CHART_ZONE_CLEAR(c)` | Farbzonen der Tacho-Skala |
+| `CHART_ZONE(c, von, bis, farbe [, name$])` / `CHART_ZONE_CLEAR(c)` | Farbzonen der Tacho-Skala, wahlweise beschriftet |
 | `CHART_UPDATE(c, sekunden)` | Animation weiterlaufen lassen (siehe unten) |
 | `CHART_DRAW(c)` | Zeichnen (braucht `SCREEN`) |
 
@@ -108,6 +108,8 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `werte` | Werte am Datenpunkt: `aus` / `innen` / `aussen` |
 | `ausrichtung` | Balken: `senkrecht` / `waagerecht` |
 | `zeigerform` | Tacho: `nadel` / `balken` / `pfeil` |
+| `zifferblatt` | Tacho: `ring` / `segmente` / `striche` / `baender` |
+| `wertanzeige` | Tacho: `aus` / `innen` / `pille` / `blase` / `am_zeiger` |
 
 ### Zahlen — `CHART_SET_NUM`
 
@@ -129,6 +131,8 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `fenster` | Gleitendes Fenster für `CHART_PUSH`; 0 = unbegrenzt |
 | `schatten` | Versatz des Schlagschattens in Pixeln; 0 = keiner |
 | `schatten_weich` | Weichzeichnung des Schattens in Pixeln |
+| `blatt_teile`, `blatt_luecke`, `blatt_dicke` | Teilung des Zifferblatts |
+| `fassung` | metallischer Ring um die Tacho-Scheibe (Pixel) |
 | `deckkraft` | 0…1 für **alle** Datenfarben |
 | `flaeche_deckkraft` | 0…1 für die Fläche unter einer Linie |
 
@@ -152,6 +156,50 @@ Reihenfolge, aus der Reihen und Segmente ohne eigene Farbe bedient werden.
 `CHART_THEME(c, "dunkel" | "hell" | "neon" | "pastell")` setzt alle Farbrollen
 und die Palette auf einmal. Danach lässt sich jede einzelne Farbe weiter
 übersteuern — ein späteres `CHART_THEME` setzt sie allerdings wieder zurück.
+
+## Tacho gestalten
+
+Vier Bauarten des Zifferblatts, über `zifferblatt`:
+
+| Wert | Aussehen |
+|---|---|
+| `ring` | durchgehender Bogen (Vorgabe) |
+| `segmente` | einzelne Balken mit Lücke — der klassische „Ladebalken im Kreis" |
+| `striche` | dieselbe Teilung, aber nur als schmale Striche am Außenrand |
+| `baender` | volle Sektoren bis zur Mitte |
+
+`blatt_teile` (Anzahl), `blatt_luecke` (Lücke in Grad) und `blatt_dicke`
+steuern die Teilung; `fassung` legt einen metallisch wirkenden Ring um die
+Scheibe (Breite in Pixeln, 0 = keiner).
+
+**Beschriftete Zonen.** `CHART_ZONE` nimmt als fünftes Argument einen Namen,
+der entlang des Bogens mitgedreht wird:
+
+```basic
+CHART_ZONE(t, 0,   350,  RED,    "SCHLECHT")
+CHART_ZONE(t, 350, 700,  YELLOW, "NORMAL")
+CHART_ZONE(t, 700, 1000, GREEN,  "GUT")
+```
+
+Text in der unteren Hälfte wird automatisch umgedreht, damit er nicht auf dem
+Kopf steht.
+
+**Wertanzeige** über `wertanzeige`:
+
+| Wert | Aussehen |
+|---|---|
+| `innen` | schlicht unter der Mitte (Vorgabe) |
+| `pille` | abgerundete Kapsel — **in der Farbe der getroffenen Zone** |
+| `blase` | dunkler Kasten mit Zipfel |
+| `am_zeiger` | kleine Kapsel an der Zeigerspitze, wandert mit |
+| `aus` | keine |
+
+Der Tacho hängt allein an `wertanzeige`. Der Schalter `werte` bleibt für die
+Beschriftung einzelner Datenpunkte bei Kuchen und Balken zuständig — beides zu
+koppeln hieße, zwei Schalter für dieselbe Sache zu haben.
+
+Die Skalenstriche schaltet `striche` = 0 ganz ab (nützlich bei `baender`, wo
+die Sektoren bis zur Mitte reichen).
 
 ## Durchsichtigkeit
 

@@ -2725,12 +2725,13 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             Ok(Value::Nil)
         }
         "chart_zone" => {
-            arity!(4);
+            if a.len() < 4 || a.len() > 5 { return err("CHART_ZONE: erwartet 4 bis 5 Argumente -- Aufruf: CHART_ZONE(diagramm, von, bis, farbe [, name])"); }
+            let name = match a.get(4) { Some(v) => need_str(v, "CHART_ZONE")?.to_string(), None => String::new() };
             let c = chart_h(&a[0], "CHART_ZONE")?;
             let von = need_num(&a[1], "CHART_ZONE")?;
             let bis = need_num(&a[2], "CHART_ZONE")?;
             let farbe = need_int(&a[3], "CHART_ZONE")?;
-            c.borrow_mut().zones.push(crate::chart::Zone { from: von, to: bis, color: farbe });
+            c.borrow_mut().zones.push(crate::chart::Zone { from: von, to: bis, color: farbe, name });
             Ok(Value::Nil)
         }
         "chart_zone_clear" => { arity!(1); chart_h(&a[0], "CHART_ZONE_CLEAR")?.borrow_mut().zones.clear(); Ok(Value::Nil) }

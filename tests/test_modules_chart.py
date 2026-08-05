@@ -303,3 +303,61 @@ def test_interaktions_zahlen(run_gb, key):
         'PRINT "ok"\n'
     )
     assert _lines(run_gb(src)) == ["ok"]
+
+
+# --- Tacho-Gestaltung -----------------------------------------------------
+
+@pytest.mark.parametrize("blatt", ["ring", "segmente", "striche", "baender"])
+def test_zifferblatt_bauarten(run_gb, blatt):
+    src = HEAD + (
+        'c = CHART_NEW("tacho", 0, 0, 200, 200)\n'
+        f'CHART_SET(c, "zifferblatt", "{blatt}")\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+@pytest.mark.parametrize("form", ["aus", "innen", "pille", "blase", "am_zeiger"])
+def test_wertanzeige_formen(run_gb, form):
+    src = HEAD + (
+        'c = CHART_NEW("tacho", 0, 0, 200, 200)\n'
+        f'CHART_SET(c, "wertanzeige", "{form}")\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+def test_zifferblatt_meldet_unbekannte_bauart(run_gb):
+    src = HEAD + (
+        'c = CHART_NEW("tacho", 0, 0, 200, 200)\n'
+        'TRY\n'
+        '    CHART_SET(c, "zifferblatt", "kringel")\n'
+        'CATCH e\n'
+        '    PRINT e\n'
+        'END TRY\n'
+    )
+    out = run_gb(src)
+    assert "kringel" in out and "segmente" in out
+
+
+def test_zone_mit_namen(run_gb):
+    """Der Name wird entlang des Bogens mitgedreht -- hier nur der Aufruf."""
+    src = HEAD + (
+        'c = CHART_NEW("tacho", 0, 0, 200, 200)\n'
+        'CHART_ZONE(c, 0, 50, 16711680, "SCHLECHT")\n'
+        'CHART_ZONE(c, 50, 100, 65280)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+@pytest.mark.parametrize("key,wert", [
+    ("blatt_teile", "24"), ("blatt_luecke", "3"), ("blatt_dicke", "0.25"), ("fassung", "8"),
+])
+def test_zifferblatt_zahlen(run_gb, key, wert):
+    src = HEAD + (
+        'c = CHART_NEW("tacho", 0, 0, 200, 200)\n'
+        f'CHART_SET_NUM(c, "{key}", {wert})\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
