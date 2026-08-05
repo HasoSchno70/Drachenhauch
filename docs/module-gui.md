@@ -817,6 +817,10 @@ schließbar.
 
 ## Plastischer Look: die Glas-Themen
 
+> Zum Anschauen: [examples/155_gui_glas.gb](../examples/155_gui_glas.gb) —
+> `f` schaltet dort zwischen flach und plastisch um, `g` legt eine eigene
+> Grafik auf die Knöpfe.
+
 `GUI_THEME_PRESET("glas_dunkel")` bzw. `"glas_hell"` schalten einen
 gewölbten Look ein: senkrechter Verlauf auf jeder Fläche, Glanzkante über der
 oberen Hälfte, feine Fase oben und unten.
