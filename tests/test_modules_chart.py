@@ -389,3 +389,47 @@ def test_skalenverlauf_ist_einstellbar(run_gb, key):
         'PRINT "ok"\n'
     )
     assert _lines(run_gb(src)) == ["ok"]
+
+
+# --- Liniendiagramm-Ausbau ------------------------------------------------
+
+@pytest.mark.parametrize("form", ["kreis", "quadrat", "raute", "dreieck"])
+def test_punktformen(run_gb, form):
+    src = HEAD + (
+        'c = CHART_NEW("linie", 0, 0, 200, 100)\n'
+        f'CHART_SET(c, "punktform", "{form}")\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+def test_punktform_meldet_unbekannte_form(run_gb):
+    src = HEAD + (
+        'c = CHART_NEW("linie", 0, 0, 200, 100)\n'
+        'TRY\n'
+        '    CHART_SET(c, "punktform", "stern")\n'
+        'CATCH e\n'
+        '    PRINT e\n'
+        'END TRY\n'
+    )
+    out = run_gb(src)
+    assert "stern" in out and "raute" in out
+
+
+@pytest.mark.parametrize("key", ["treppe", "fadenkreuz"])
+def test_linien_schalter(run_gb, key):
+    src = HEAD + (
+        'c = CHART_NEW("linie", 0, 0, 200, 100)\n'
+        f'CHART_SET_FLAG(c, "{key}", TRUE)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+def test_gestrichelte_linie(run_gb):
+    src = HEAD + (
+        'c = CHART_NEW("linie", 0, 0, 200, 100)\n'
+        'CHART_SET_NUM(c, "strich", 8)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]

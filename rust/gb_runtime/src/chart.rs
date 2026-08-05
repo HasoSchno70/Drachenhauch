@@ -95,6 +95,8 @@ pub struct Style {
     pub zifferblatt: String,
     /// Wo der Wert steht: "aus" | "innen" | "pille" | "blase" | "am_zeiger"
     pub wertanzeige: String,
+    /// Form der Datenpunkte: "kreis" | "quadrat" | "raute" | "dreieck"
+    pub punktform: String,
 
     // --- Zahlen (CHART_SET_NUM) ---
     /// NaN = automatisch aus den Daten.
@@ -183,6 +185,10 @@ pub struct Style {
     pub f_hover: bool,
     /// Sprechblase mit Name und Wert am Element unter der Maus.
     pub f_tooltip: bool,
+    /// Treppenverlauf statt schraeger Verbindung (Schaltzustaende, Tarife).
+    pub f_treppe: bool,
+    /// Hilfslinien durch den Punkt unter der Maus.
+    pub f_fadenkreuz: bool,
     /// Sekunden, die die Hervorhebung zum Ein-/Ausblenden braucht.
     pub hover_tempo: f64,
     /// Wie weit das hervorgehobene Element herausrueckt/waechst (Pixel).
@@ -197,6 +203,8 @@ pub struct Style {
     pub blatt_dicke: f64,
     /// Metallische Fassung um die Scheibe (Breite in Pixeln, 0 = keine).
     pub fassung: i32,
+    /// Strichlaenge gestrichelter Linien in Pixeln; 0 = durchgezogen.
+    pub strich: f64,
 
     /// Reihenfolge der Standardfarben fuer Reihen/Segmente ohne eigene Farbe.
     pub palette: Vec<i64>,
@@ -215,6 +223,7 @@ impl Default for Style {
             zeigerform: "nadel".into(),
             zifferblatt: "ring".into(),
             wertanzeige: "innen".into(),
+            punktform: "kreis".into(),
             min: f64::NAN,
             max: f64::NAN,
             innenradius: 0.0,
@@ -268,6 +277,8 @@ impl Default for Style {
             f_kurz: false,
             f_hover: true,
             f_tooltip: false,
+            f_treppe: false,
+            f_fadenkreuz: false,
             hover_tempo: 0.15,
             hover_weite: 8.0,
             hover_glanz: 0.35,
@@ -275,6 +286,7 @@ impl Default for Style {
             blatt_luecke: 2.0,
             blatt_dicke: 0.2,
             fassung: 0,
+            strich: 0.0,
             palette: Vec::new(),
         };
         apply_theme(&mut s, "dunkel");
@@ -1601,27 +1613,39 @@ impl ChartObj {
                     let _ = g.polygon(&flach, oben, true);
                 }
             }
-            if st.f_glatt {
+            if st.f_glatt && !st.f_treppe {
+                // Eine geglaettete Treppe waere ein Widerspruch -- die Treppe
+                // gewinnt, weil sie die genauere Aussage macht.
                 g.spline(&xs, &ys, st.linien_dicke, farbe);
             } else {
-                for i in 1..n {
-                    g.line_thick(xs[i - 1], ys[i - 1], xs[i], ys[i], st.linien_dicke, farbe);
-                }
+                self.zug(g, &xs, &ys, st.linien_dicke, farbe);
             }
             for i in 0..n {
                 let glanz = if self.hover_serie == si as i32 { self.glanz_von(i) } else { 0.0 };
                 if st.f_punkte {
                     let r = st.punkt_radius.max(1) + (st.hover_weite * 0.4 * glanz) as i32;
-                    g.circle(xs[i], ys[i], r, self.hell(farbe, glanz));
+                    self.punkt(g, xs[i], ys[i], r, self.hell(farbe, glanz));
                 } else if glanz > 0.05 {
                     // Ohne dauerhafte Punkte trotzdem einen zeigen, solange die
                     // Maus darauf steht -- sonst bliebe unklar, worauf sich die
                     // Sprechblase bezieht.
                     let r = (2.0 + st.hover_weite * 0.4 * glanz) as i32;
-                    g.circle(xs[i], ys[i], r.max(2), self.hell(farbe, glanz));
+                    self.punkt(g, xs[i], ys[i], r.max(2), self.hell(farbe, glanz));
                 }
             }
         }
+        // Fadenkreuz durch den Punkt unter der Maus -- erst NACH den Reihen,
+        // damit es obenauf liegt, aber vor der Beschriftung.
+        if st.f_fadenkreuz && self.hover >= 0 && (self.hover as usize) < n {
+            let i = self.hover as usize;
+            let x = plot.x0 + (dx * i as f64) as i32;
+            g.line(x, plot.y0, x, plot.y1, st.c_achse);
+            if let Some(s) = self.series.get(self.hover_serie.max(0) as usize) {
+                let y = self.val_pos(&plot, *self.anzeige(s).get(i).unwrap_or(&0.0), lo, hi, false);
+                g.line(plot.x0, y, plot.x1, y, st.c_achse);
+            }
+        }
+
         // Kategoriebeschriftung: nur so viele, wie ohne Ueberlappung passen.
         let schritt = self.label_step(g, n, plot.w());
         for i in (0..n).step_by(schritt) {
@@ -1723,6 +1747,79 @@ impl ChartObj {
     }
 
     /// Durchgehende Leiste mit Marker -- der lineare Bruder des Tachos.
+    /// Streckenzug zeichnen -- wahlweise als Treppe und/oder gestrichelt.
+    ///
+    /// Die Strichphase laeuft ueber den GANZEN Zug weiter, nicht je Abschnitt
+    /// neu: sonst begaenne an jedem Stuetzpunkt ein frischer Strich und das
+    /// Muster verdichtete sich sichtbar dort, wo die Punkte eng stehen.
+    fn zug(&self, g: &mut Graphics, xs: &[i32], ys: &[i32], dicke: f64, farbe: i64) {
+        if xs.len() < 2 {
+            return;
+        }
+        // Treppe: erst waagerecht auf den neuen x-Wert, dann senkrecht.
+        let (px, py): (Vec<i32>, Vec<i32>) = if self.style.f_treppe {
+            let mut a = Vec::with_capacity(xs.len() * 2);
+            let mut b = Vec::with_capacity(ys.len() * 2);
+            for i in 0..xs.len() {
+                if i > 0 {
+                    a.push(xs[i]);
+                    b.push(ys[i - 1]);
+                }
+                a.push(xs[i]);
+                b.push(ys[i]);
+            }
+            (a, b)
+        } else {
+            (xs.to_vec(), ys.to_vec())
+        };
+
+        let d = self.style.strich;
+        if d <= 0.0 {
+            for i in 1..px.len() {
+                g.line_thick(px[i - 1], py[i - 1], px[i], py[i], dicke, farbe);
+            }
+            return;
+        }
+        let mut phase = 0.0f64; // Position im Muster (0..2d), < d = Strich
+        for i in 1..px.len() {
+            let (x1, y1) = (px[i - 1] as f64, py[i - 1] as f64);
+            let (dx, dy) = (px[i] as f64 - x1, py[i] as f64 - y1);
+            let len = (dx * dx + dy * dy).sqrt();
+            if len < 0.5 {
+                continue;
+            }
+            let (ux, uy) = (dx / len, dy / len);
+            let mut s = 0.0;
+            while s < len {
+                let rest = if phase < d { d - phase } else { 2.0 * d - phase };
+                let e = (s + rest).min(len);
+                if phase < d {
+                    g.line_thick(
+                        (x1 + ux * s) as i32, (y1 + uy * s) as i32,
+                        (x1 + ux * e) as i32, (y1 + uy * e) as i32,
+                        dicke, farbe,
+                    );
+                }
+                phase = (phase + (e - s)) % (2.0 * d);
+                s = e;
+            }
+        }
+    }
+
+    /// Ein Datenpunkt in der eingestellten Form.
+    fn punkt(&self, g: &mut Graphics, x: i32, y: i32, r: i32, farbe: i64) {
+        let r = r.max(1);
+        match self.style.punktform.as_str() {
+            "quadrat" => g.box_fill(x - r, y - r, x + r, y + r, farbe),
+            "raute" => {
+                let flach = [x, y - r, x + r, y, x, y + r, x - r, y];
+                let _ = g.polygon(&flach, farbe, true);
+            }
+            "dreieck" => g.triangle(x, y - r, x + r, y + r, x - r, y + r, farbe),
+            _ => g.circle(x, y, r, farbe),
+        }
+    }
+
     fn draw_leiste(&self, g: &mut Graphics, a: &Area) {
         let st = &self.style;
         let (wert, lo, hi) = self.einzel_bereich();
@@ -2304,7 +2401,7 @@ impl ChartObj {
 
 pub const KEYS_STR: &[&str] = &[
     "titel", "einheit", "achse_x", "achse_y", "legende", "werte", "ausrichtung", "zeigerform",
-    "zifferblatt", "wertanzeige",
+    "zifferblatt", "wertanzeige", "punktform",
 ];
 pub const KEYS_NUM: &[&str] = &[
     "min", "max", "innenradius", "abstand", "ecken", "rahmen_dicke", "polster", "gitter",
@@ -2312,7 +2409,7 @@ pub const KEYS_NUM: &[&str] = &[
     "striche", "unterstriche", "linien_dicke", "punkt_radius", "animation", "fenster", "schatten",
     "schatten_weich", "deckkraft", "flaeche_deckkraft",
     "hover_tempo", "hover_weite", "hover_glanz",
-    "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung",
+    "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung", "strich",
 ];
 pub const KEYS_COLOR: &[&str] = &[
     "hintergrund", "rahmen", "gitter", "text", "titel", "achse", "zeiger", "flaeche", "verlauf",
@@ -2321,7 +2418,7 @@ pub const KEYS_COLOR: &[&str] = &[
 pub const KEYS_FLAG: &[&str] = &[
     "rahmen", "gitter_x", "gitter_y", "prozent", "flaeche", "punkte", "glatt", "null_linie",
     "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz",
-    "hover", "tooltip",
+    "hover", "tooltip", "treppe", "fadenkreuz",
 ];
 
 fn unbekannt(fn_: &str, key: &str, gueltig: &[&str]) -> String {
@@ -2390,6 +2487,14 @@ impl ChartObj {
                 }
                 s.wertanzeige = vv;
             }
+            "punktform" => {
+                let vv = v.to_lowercase();
+                if !["kreis", "quadrat", "raute", "dreieck"].contains(&vv.as_str()) {
+                    return Err(format!(
+                        "CHART_SET: punktform erwartet kreis/quadrat/raute/dreieck, nicht '{}'", v));
+                }
+                s.punktform = vv;
+            }
             _ => return Err(unbekannt("CHART_SET", key, KEYS_STR)),
         }
         Ok(())
@@ -2430,6 +2535,7 @@ impl ChartObj {
             "blatt_luecke" => s.blatt_luecke = v.clamp(0.0, 30.0),
             "blatt_dicke" => s.blatt_dicke = v.clamp(0.05, 0.6),
             "fassung" => s.fassung = v.clamp(0.0, 60.0) as i32,
+            "strich" => s.strich = v.clamp(0.0, 100.0),
             _ => return Err(unbekannt("CHART_SET_NUM", key, KEYS_NUM)),
         }
         Ok(())
@@ -2477,6 +2583,8 @@ impl ChartObj {
             "kurz" => s.f_kurz = v,
             "hover" => s.f_hover = v,
             "tooltip" => s.f_tooltip = v,
+            "treppe" => s.f_treppe = v,
+            "fadenkreuz" => s.f_fadenkreuz = v,
             _ => return Err(unbekannt("CHART_SET_FLAG", key, KEYS_FLAG)),
         }
         Ok(())
@@ -2748,6 +2856,31 @@ mod tests {
         // 0 als Deckkraft darf nicht auf das Alpha-Byte 0 fallen -- das waere
         // wieder "deckend". Untere Grenze ist 1.
         assert_eq!(alpha_of(with_alpha(0xFF8800, 0.0)), 1);
+    }
+
+    #[test]
+    fn punktform_und_linienschalter_pruefen_ihre_werte() {
+        let mut c = ChartObj::new(Kind::Line, 0, 0, 200, 100);
+        for f in ["kreis", "quadrat", "raute", "dreieck"] {
+            assert!(c.set_str("punktform", f).is_ok(), "{}", f);
+        }
+        let e = c.set_str("punktform", "stern").unwrap_err();
+        assert!(e.contains("stern") && e.contains("raute"), "{}", e);
+        assert!(c.set_flag("treppe", true).is_ok());
+        assert!(c.set_flag("fadenkreuz", true).is_ok());
+        assert!(c.set_num("strich", 8.0).is_ok());
+        assert_eq!(c.style.strich, 8.0);
+    }
+
+    #[test]
+    fn strich_null_heisst_durchgezogen() {
+        // Die Vorgabe muss die durchgezogene Linie sein, sonst saehen alle
+        // bestehenden Diagramme ploetzlich gestrichelt aus.
+        let c = ChartObj::new(Kind::Line, 0, 0, 200, 100);
+        assert_eq!(c.style.strich, 0.0);
+        assert!(!c.style.f_treppe);
+        assert!(!c.style.f_fadenkreuz);
+        assert_eq!(c.style.punktform, "kreis");
     }
 
     #[test]

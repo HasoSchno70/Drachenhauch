@@ -1,25 +1,29 @@
-' 154_chart.gb -- Modul "chart": Kuchen, Balken, Linie und Tacho.
+' 154_chart.gb -- Modul "chart": alle sechs Diagrammarten.
 '
-' Alle vier Arten nebeneinander, jede mit ein paar der Stell-
-' schrauben.
+' Sieben Felder, jedes mit anderen Stellschrauben. Die Maus hebt Segmente,
+' Balken und Punkte hervor und zeigt eine Sprechblase.
 '
-'   LEERTASTE  Thema wechseln
-'   V          Verlauf auf den Daten an/aus
-'   S          weiche Schatten an/aus
-'   +/-        Deckkraft (Alpha) aller Datenfarben
+'   MAUS         ueber ein Element fahren -> Hervorhebung + Sprechblase
+'   LEERTASTE    Thema wechseln
+'   V            Verlauf auf den Daten an/aus
+'   S            weiche Schatten an/aus
+'   +/-          Deckkraft (Alpha) aller Datenfarben
 '   HOCH/RUNTER  Drehzahl
 
 IMPORT "chart"
 
-SCREEN(1000, 700, "GameBasic -- Diagramme")
+SCREEN(1280, 760, "GameBasic -- Diagramme")
 
 DIM kuchen AS CHART
 DIM balken AS CHART
 DIM linie AS CHART
 DIM tacho AS CHART
+DIM leiste AS CHART
+DIM lampen AS CHART
+DIM rang AS CHART
 
-' --- Kuchen (hier als Donut, mit herausgezogenen Segmenten) --------
-kuchen = CHART_NEW("kuchen", 20, 20, 470, 320)
+' --- Kuchen: Donut mit herausgezogenen Segmenten -------------------
+kuchen = CHART_NEW("kuchen", 20, 20, 400, 340)
 CHART_SET(kuchen, "titel", "Rohstoffe")
 CHART_ADD(kuchen, "Holz", 45.0, 9127187)
 CHART_ADD(kuchen, "Stein", 30.0, 8421504)
@@ -31,41 +35,54 @@ CHART_SET(kuchen, "werte", "aussen")
 CHART_SET(kuchen, "legende", "links")
 CHART_SET_FLAG(kuchen, "prozent", TRUE)
 
-' --- Balken (zwei Reihen, gestapelt) -------------------------------
+' --- Balken: zwei Reihen, gestapelt --------------------------------
 DIM r_ein AS INTEGER
 DIM r_aus AS INTEGER
-balken = CHART_NEW("balken", 510, 20, 470, 320)
-CHART_SET(balken, "titel", "Woche")
-CHART_SET(balken, "achse_x", "Tag")
-r_ein = CHART_SERIES(balken, "Einnahmen")   ' ohne Farbe = aus der Palette
-r_aus = CHART_SERIES(balken, "Ausgaben")
-
 DIM ein[7] AS FLOAT
 DIM aus[7] AS FLOAT
 DIM tage AS ARRAY OF STRING
 DIM i AS INTEGER
+
+balken = CHART_NEW("balken", 440, 20, 400, 340)
+CHART_SET(balken, "titel", "Woche")
+CHART_SET(balken, "achse_x", "Tag")
+r_ein = CHART_SERIES(balken, "Einnahmen")   ' ohne Farbe = aus der Palette
+r_aus = CHART_SERIES(balken, "Ausgaben")
+tage = SPLIT("Mo,Di,Mi,Do,Fr,Sa,So", ",")
 FOR i = 0 TO 6
     ein[i] = 20.0 + RND(60)
     aus[i] = 10.0 + RND(30)
 NEXT
 CHART_DATA(balken, r_ein, ein)
 CHART_DATA(balken, r_aus, aus)
-CHART_LABEL(balken, 0, "Mo")
-CHART_LABEL(balken, 1, "Di")
-CHART_LABEL(balken, 2, "Mi")
-CHART_LABEL(balken, 3, "Do")
-CHART_LABEL(balken, 4, "Fr")
-CHART_LABEL(balken, 5, "Sa")
-CHART_LABEL(balken, 6, "So")
+FOR i = 0 TO 6
+    CHART_LABEL(balken, i, tage[i])
+NEXT
 CHART_SET_FLAG(balken, "stapel", TRUE)
 CHART_SET(balken, "legende", "unten")
 CHART_SET_NUM(balken, "abstand", 10)
 CHART_SET_NUM(balken, "ecken", 3)
 CHART_SET(balken, "einheit", " G")
 
-' --- Linie (Live-Kurve mit gleitendem Fenster) ---------------------
+' --- Tacho: Segment-Zifferblatt, benannte Zonen, Zeiger zieht nach --
+DIM drehzahl AS FLOAT
+drehzahl = 1200.0
+tacho = CHART_NEW("tacho", 860, 20, 400, 340)
+CHART_SET(tacho, "titel", "Drehzahl")
+CHART_SET(tacho, "zifferblatt", "segmente")
+CHART_SET(tacho, "wertanzeige", "pille")
+CHART_SET_NUM(tacho, "min", 0)
+CHART_SET_NUM(tacho, "max", 8000)
+CHART_SET_NUM(tacho, "striche", 9)
+CHART_SET_NUM(tacho, "unterstriche", 4)
+CHART_SET_NUM(tacho, "animation", 0.4)
+CHART_ZONE(tacho, 0, 5000, 5025616, "NORMAL")
+CHART_ZONE(tacho, 5000, 6500, 16776960, "ACHTUNG")
+CHART_ZONE(tacho, 6500, 8000, 16711680, "ROT")
+
+' --- Linie: Live-Kurve mit gleitendem Fenster ----------------------
 DIM r_fps AS INTEGER
-linie = CHART_NEW("linie", 20, 360, 470, 320)
+linie = CHART_NEW("linie", 20, 380, 400, 360)
 CHART_SET(linie, "titel", "Bildrate")
 r_fps = CHART_SERIES(linie, "FPS")
 CHART_SET_NUM(linie, "fenster", 120)
@@ -76,42 +93,62 @@ CHART_SET_FLAG(linie, "glatt", TRUE)
 CHART_SET_NUM(linie, "linien_dicke", 2.5)
 CHART_SET_NUM(linie, "flaeche_deckkraft", 0.4)
 
-' --- Tacho (Farbzonen + weich nachziehender Zeiger) ----------------
-DIM drehzahl AS FLOAT
-drehzahl = 1200.0
-tacho = CHART_NEW("tacho", 510, 360, 470, 320)
-CHART_SET(tacho, "titel", "Drehzahl")
-CHART_SET(tacho, "einheit", "")
-CHART_SET_NUM(tacho, "min", 0)
-CHART_SET_NUM(tacho, "max", 8000)
-CHART_SET_NUM(tacho, "striche", 9)
-CHART_SET_NUM(tacho, "unterstriche", 4)
-CHART_SET_NUM(tacho, "animation", 0.4)
-CHART_ZONE(tacho, 5000, 6500, 16776960)
-CHART_ZONE(tacho, 6500, 8000, 16711680)
-CHART_SET(tacho, "werte", "innen")
+' --- Leiste + Lampen: die linearen Anzeigen ------------------------
+leiste = CHART_NEW("leiste", 440, 380, 400, 170)
+CHART_SET(leiste, "titel", "Fuellstand")
+CHART_SET(leiste, "zeigerform", "balken")
+CHART_SET_NUM(leiste, "max", 100)
+CHART_SET(leiste, "einheit", " %")
 
+lampen = CHART_NEW("led", 440, 570, 400, 170)
+CHART_SET(lampen, "titel", "Pegel")
+CHART_SET_NUM(lampen, "blatt_teile", 16)
+CHART_SET_NUM(lampen, "blatt_luecke", 5)
+CHART_SET_NUM(lampen, "max", 100)
+
+' --- Balken waagerecht ---------------------------------------------
+DIM punkte[5] AS FLOAT
+DIM namen AS ARRAY OF STRING
+rang = CHART_NEW("balken", 860, 380, 400, 360)
+CHART_SET(rang, "titel", "Bestenliste")
+CHART_SET(rang, "ausrichtung", "waagerecht")
+CHART_SERIES(rang, "Punkte")
+punkte[0] = 92.0
+punkte[1] = 78.0
+punkte[2] = 65.0
+punkte[3] = 51.0
+punkte[4] = 34.0
+CHART_DATA(rang, 0, punkte)
+namen = SPLIT("Anna,Bruno,Cem,Dora,Emil", ",")
+FOR i = 0 TO 4
+    CHART_LABEL(rang, i, namen[i])
+NEXT
+CHART_SET(rang, "werte", "innen")
+CHART_SET_NUM(rang, "abstand", 8)
+CHART_SET_NUM(rang, "ecken", 4)
+
+' --- gemeinsamer Stil ----------------------------------------------
 DIM themen AS ARRAY OF STRING
 DIM t_idx AS INTEGER
-themen = SPLIT("dunkel,hell,neon,pastell", ",")
-t_idx = 0
-
 DIM alle AS ARRAY OF CHART
 DIM verlauf AS BOOLEAN
 DIM weich AS BOOLEAN
 DIM deckkraft AS FLOAT
 DIM stil AS CHART
-alle = [kuchen, balken, linie, tacho]
+themen = SPLIT("dunkel,hell,neon,pastell", ",")
+t_idx = 0
+alle = [kuchen, balken, linie, tacho, leiste, lampen, rang]
 verlauf = TRUE
 weich = TRUE
 deckkraft = 1.0
 
-' Schatten, Verlauf und Deckkraft betreffen alle vier gleich -- deshalb
-' eine Hilfsroutine statt vier Mal derselbe Block.
+' Schatten, Verlauf, Deckkraft und Sprechblase betreffen alle gleich --
+' deshalb eine Hilfsroutine statt sieben Mal derselbe Block.
 SUB stil_anwenden()
     FOR EACH stil IN alle
         CHART_SET_FLAG(stil, "verlauf_daten", verlauf)
         CHART_SET_FLAG(stil, "schatten_daten", weich)
+        CHART_SET_FLAG(stil, "tooltip", TRUE)
         CHART_SET_NUM(stil, "schatten", IIF(weich, 6, 0))
         CHART_SET_NUM(stil, "schatten_weich", IIF(weich, 6, 0))
         CHART_SET_NUM(stil, "deckkraft", deckkraft)
@@ -124,10 +161,9 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
     ' --- Eingabe ---
     IF KEYHIT(KEY_SPACE) THEN
         t_idx = (t_idx + 1) MOD 4
-        CHART_THEME(kuchen, themen[t_idx])
-        CHART_THEME(balken, themen[t_idx])
-        CHART_THEME(linie, themen[t_idx])
-        CHART_THEME(tacho, themen[t_idx])
+        FOR EACH stil IN alle
+            CHART_THEME(stil, themen[t_idx])
+        NEXT
         stil_anwenden()          ' Thema setzt die Farben neu -> Stil nachziehen
     END IF
     IF KEYHIT(ASC("V")) THEN
@@ -151,15 +187,22 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
 
     ' --- Daten nachfuehren ---
     CHART_VALUE(tacho, drehzahl)
+    CHART_VALUE(leiste, drehzahl / 80.0)
+    CHART_VALUE(lampen, drehzahl / 80.0)
     CHART_PUSH(linie, r_fps, FPS())
     CHART_UPDATE(tacho, DELTA())
 
     ' --- Zeichnen ---
     CLS(0)
-    CHART_DRAW(kuchen)
-    CHART_DRAW(balken)
-    CHART_DRAW(linie)
-    CHART_DRAW(tacho)
-    TEXT(20, 676, f"LEERTASTE Thema ({themen[t_idx]})   V Verlauf   S Schatten   +/- Deckkraft {deckkraft:.2f}   ESC Ende")
+    FOR EACH stil IN alle
+        CHART_DRAW(stil)
+    NEXT
+
+    ' Anklicken meldet, was getroffen wurde.
+    IF CHART_CLICKED(kuchen) >= 0 THEN
+        TEXT(20, 734, "Angeklickt: " + CHART_HOVER_LABEL$(kuchen))
+    ELSE
+        TEXT(20, 734, f"MAUS Hervorhebung   LEERTASTE Thema ({themen[t_idx]})   V Verlauf   S Schatten   +/- Deckkraft {deckkraft:.2f}   ESC Ende")
+    END IF
     FLIP()
 WEND

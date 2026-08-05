@@ -111,7 +111,8 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `ausrichtung` | Balken: `senkrecht` / `waagerecht` |
 | `zeigerform` | Tacho: `nadel` / `balken` / `pfeil` |
 | `zifferblatt` | Tacho: `ring` / `segmente` / `striche` / `baender` |
-| `wertanzeige` | Tacho: `aus` / `innen` / `pille` / `blase` / `am_zeiger` |
+| `wertanzeige` | Tacho/Leiste/Lampen: `aus` / `innen` / `pille` / `blase` / `am_zeiger` |
+| `punktform` | Linie: `kreis` / `quadrat` / `raute` / `dreieck` |
 
 ### Zahlen — `CHART_SET_NUM`
 
@@ -135,6 +136,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `schatten_weich` | Weichzeichnung des Schattens in Pixeln |
 | `blatt_teile`, `blatt_luecke`, `blatt_dicke` | Teilung des Zifferblatts |
 | `fassung` | metallischer Ring um die Tacho-Scheibe (Pixel) |
+| `strich` | Strichlänge gestrichelter Linien (Pixel); 0 = durchgezogen |
 | `deckkraft` | 0…1 für **alle** Datenfarben |
 | `flaeche_deckkraft` | 0…1 für die Fläche unter einer Linie |
 
@@ -329,6 +331,26 @@ CHART_DRAW(t)
 
 `CHART_GET` liefert immer den **gesetzten** Wert, nie den gerade angezeigten —
 ein Programm kann seine eigenen Daten also zuverlässig zurücklesen.
+
+## Liniendiagramme im Einzelnen
+
+| Einstellung | Wirkung |
+|---|---|
+| `punkte` + `punkt_radius` | Datenpunkte zeigen |
+| `punktform` | `kreis` / `quadrat` / `raute` / `dreieck` |
+| `glatt` | Kurve statt Streckenzug (Catmull-Rom) |
+| `treppe` | Treppenverlauf — für Schaltzustände, Tarifstufen, Bestände |
+| `strich` | Strichlänge in Pixeln; 0 = durchgezogen |
+| `flaeche` + `flaeche_deckkraft` | Fläche unter der Kurve |
+| `fadenkreuz` | Hilfslinien durch den Punkt unter der Maus |
+| `linien_dicke` | Strichstärke |
+
+`glatt` und `treppe` schließen sich aus — die Treppe gewinnt, weil sie die
+genauere Aussage macht.
+
+Bei gestrichelten Linien läuft die Strichphase über den **ganzen** Zug weiter,
+nicht an jedem Stützpunkt neu. Sonst verdichtete sich das Muster sichtbar
+dort, wo die Punkte eng stehen.
 
 ## Live-Kurven
 
