@@ -137,6 +137,7 @@ CHART_SET_NUM: unbekannte Eigenschaft 'innen_radius' (gueltig: min, max, innenra
 | `blatt_teile`, `blatt_luecke`, `blatt_dicke` | Teilung des Zifferblatts |
 | `fassung` | metallischer Ring um die Tacho-Scheibe (Pixel) |
 | `strich` | Strichlänge gestrichelter Linien (Pixel); 0 = durchgezogen |
+| `glanz` | Stärke der Glanzkante auf Flächen mit Verlauf (0 = keine) |
 | `deckkraft` | 0…1 für **alle** Datenfarben |
 | `flaeche_deckkraft` | 0…1 für die Fläche unter einer Linie |
 
@@ -299,8 +300,8 @@ Zwei getrennte Schalter:
 - `verlauf` färbt den **Hintergrund** des Feldes von `hintergrund` nach
   `verlauf`.
 - `verlauf_daten` färbt die **Daten**: Balken und die Fläche unter einer Linie
-  bekommen einen senkrechten Verlauf, Kuchensegmente ein abgedunkeltes
-  Innenband. Zielfarbe ist `verlauf_ende`; ist sie nicht gesetzt (-1), wird
+  bekommen einen senkrechten Verlauf plus eine Glanzkante über der oberen
+  Hälfte (Stärke über `glanz`), Kuchensegmente ein abgedunkeltes Innenband. Zielfarbe ist `verlauf_ende`; ist sie nicht gesetzt (-1), wird
   automatisch eine abgedunkelte Fassung der jeweiligen Reihenfarbe genommen —
   so passt der Verlauf ohne Zutun zu jeder Palette.
 

@@ -70,6 +70,18 @@ enum Cmd {
     RoundRect(i32, i32, i32, i32, i32, Color, bool),   // x1,y1,x2,y2, radius, color, filled
     GradientRect(i32, i32, i32, i32, Color, Color, bool), // x1,y1,x2,y2, c1, c2, vertical
     Spline(Vec<(i32, i32)>, f32, Color),               // points, thick, color
+    /// Rundes Rechteck mit SENKRECHTEM Verlauf: x1,y1,x2,y2, Eckenradius,
+    /// Farbe oben, Farbe unten.
+    ///
+    /// Der Baustein fuer alles, was plastisch aussehen soll (Knoepfe, Leisten,
+    /// Felder). `RoundRect` + `GradientRect` uebereinander geht NICHT sauber:
+    /// der Verlauf ist rechteckig und muesste um den Eckenradius eingerueckt
+    /// werden, was bei kleinen Widgets als Rand sichtbar bleibt. Hier wird
+    /// stattdessen zeilenweise gefuellt und der Eckeneinzug aus dem Radius
+    /// gerechnet -- eine Zeichenanweisung, die Schleife laeuft beim Abspielen.
+    /// Alpha wird mitinterpoliert, damit auch Glanzkanten (weiss -> unsichtbar)
+    /// damit gehen.
+    RoundGradient(i32, i32, i32, i32, i32, Color, Color),
     /// Kreisring-Ausschnitt: cx, cy, r_innen, r_aussen, winkel_von, winkel_bis,
     /// Farbe, gefuellt. Deckt Kuchenstueck (r_innen = 0), Donut-Segment und
     /// Tacho-Bogen mit EINER Variante ab -- raylibs `draw_ring` kann alle drei.
@@ -2503,6 +2515,15 @@ impl Graphics {
         let pts: Vec<(i32, i32)> = xs.iter().zip(ys).map(|(&x, &y)| self.w2s(x, y)).collect();
         self.emit(Cmd::Spline(pts, (w * self.cam_zoom).max(1.0) as f32, col(c)));
     }
+    /// Rundes Rechteck mit senkrechtem Verlauf (siehe `Cmd::RoundGradient`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn round_gradient(&mut self, x1: i32, y1: i32, x2: i32, y2: i32,
+                          radius: i32, oben: i64, unten: i64) {
+        let (x1, y1) = self.w2s(x1, y1);
+        let (x2, y2) = self.w2s(x2, y2);
+        self.emit(Cmd::RoundGradient(x1, y1, x2, y2, self.ssize(radius), col(oben), col(unten)));
+    }
+
     /// Kreisring-Ausschnitt (Kuchenstueck bei `r_in` = 0, Donut/Tacho-Bogen
     /// sonst). Winkel in Grad, 0 = rechts, wachsend im Uhrzeigersinn.
     #[allow(clippy::too_many_arguments)]
@@ -4962,6 +4983,25 @@ fn render_scene<D: RaylibDraw>(
                         if *filled { d.draw_rectangle_rounded(rec, roundness, 12, *col); }
                         else { d.draw_rectangle_rounded_lines(rec, roundness, 12, *col); }
                     }
+                    Cmd::RoundGradient(x1, y1, x2, y2, radius, c1, c2) => {
+                        let x = (*x1).min(*x2) * s;
+                        let y = (*y1).min(*y2) * s;
+                        let w = ((x2 - x1).abs() + 1) * s;
+                        let h = ((y2 - y1).abs() + 1) * s;
+                        let r = (*radius * s).clamp(0, w / 2).min(h / 2);
+                        for zeile in 0..h {
+                            let einzug = ecken_einzug(r, h, zeile);
+                            let breite = w - 2 * einzug;
+                            if breite <= 0 {
+                                continue;
+                            }
+                            let t = if h > 1 { zeile as f32 / (h - 1) as f32 } else { 0.0 };
+                            let lerp = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t) as u8;
+                            let c = Color::new(lerp(c1.r, c2.r), lerp(c1.g, c2.g),
+                                               lerp(c1.b, c2.b), lerp(c1.a, c2.a));
+                            d.draw_rectangle(x + einzug, y + zeile, breite, 1, c);
+                        }
+                    }
                     Cmd::Ring(cx, cy, ri, ro, von, bis, col, filled) => {
                         let mitte = Vector2::new((cx * s) as f32, (cy * s) as f32);
                         let (ri, ro) = (ri * s as f32, ro * s as f32);
@@ -5177,6 +5217,31 @@ fn load_hdr_rgbe(path: &str) -> Result<(Vec<f32>, i32, i32), String> {
 }
 
 /// SDL/pygame-Keycode (Wert der GB-KEY_*-Konstanten) -> raylib KeyboardKey.
+/// Seitlicher Einzug einer Zeile in einem runden Rechteck.
+///
+/// Fuer `Cmd::RoundGradient`: die Flaeche wird zeilenweise gefuellt, und in
+/// den obersten/untersten `r` Zeilen muss der Streifen um den Eckenbogen
+/// eingerueckt werden. `dy` ist der senkrechte Abstand zur Mitte des
+/// Eckenkreises (Zeilenmitte, daher die 0.5), der Einzug folgt daraus per
+/// Kreisgleichung.
+fn ecken_einzug(r: i32, h: i32, zeile: i32) -> i32 {
+    if r <= 0 {
+        return 0;
+    }
+    let dy = if zeile < r {
+        (r - zeile) as f32 - 0.5
+    } else if zeile >= h - r {
+        (zeile - (h - r)) as f32 + 0.5
+    } else {
+        return 0;
+    };
+    if dy <= 0.0 {
+        return 0;
+    }
+    let k = ((r * r) as f32 - dy * dy).max(0.0).sqrt();
+    ((r as f32 - k).round() as i32).clamp(0, r)
+}
+
 fn map_key(code: i64) -> Option<KeyboardKey> {
     use KeyboardKey::*;
     Some(match code {
@@ -5410,6 +5475,59 @@ mod camera_rotation_tests {
             let (ux, uy) = rotate_point_around(sx, sy, cx, cy, deg);
             assert!((ux - px).abs() < 1e-6, "deg={deg} ux={ux}");
             assert!((uy - py).abs() < 1e-6, "deg={deg} uy={uy}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ecken_einzug;
+
+    #[test]
+    fn ecken_einzug_rundet_oben_und_unten_gleich() {
+        let (r, h) = (8, 40);
+        // Die oberste und die unterste Zeile muessen gleich stark eingezogen
+        // sein -- sonst sitzt der Verlauf sichtbar schief in der Form.
+        for k in 0..r {
+            assert_eq!(
+                ecken_einzug(r, h, k),
+                ecken_einzug(r, h, h - 1 - k),
+                "Zeile {} oben != unten", k
+            );
+        }
+    }
+
+    #[test]
+    fn ecken_einzug_ist_in_der_mitte_null() {
+        let (r, h) = (8, 40);
+        for zeile in r..(h - r) {
+            assert_eq!(ecken_einzug(r, h, zeile), 0, "Zeile {} unnoetig eingerueckt", zeile);
+        }
+    }
+
+    #[test]
+    fn ecken_einzug_waechst_zur_kante_hin_monoton() {
+        let (r, h) = (10, 60);
+        let mut vorher = i32::MAX;
+        for zeile in 0..r {
+            let e = ecken_einzug(r, h, zeile);
+            assert!(e <= vorher, "Zeile {}: Einzug waechst wieder ({} > {})", zeile, e, vorher);
+            assert!(e <= r, "Einzug groesser als der Radius");
+            vorher = e;
+        }
+        // In der obersten Zeile ist der Einzug r - sqrt(r - 1/4) -- NICHT der
+        // volle Radius: die Zeilenmitte liegt bei 0.5, dort ist der Kreis
+        // schon ein Stueck breit. Fuer r = 10 sind das 7.
+        let erwartet = (r as f32 - (r as f32 - 0.25).sqrt()).round() as i32;
+        assert_eq!(ecken_einzug(r, h, 0), erwartet, "oberste Zeile folgt nicht dem Kreisbogen");
+        // Am Ende der Rundung ist er praktisch null.
+        assert!(ecken_einzug(r, h, r - 1) <= 1, "Rundung endet zu spaet");
+    }
+
+    #[test]
+    fn ecken_einzug_ohne_radius_ist_immer_null() {
+        for zeile in 0..10 {
+            assert_eq!(ecken_einzug(0, 10, zeile), 0);
         }
     }
 }

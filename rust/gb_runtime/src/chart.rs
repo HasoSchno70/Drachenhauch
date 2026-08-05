@@ -195,6 +195,8 @@ pub struct Style {
     pub hover_weite: f64,
     /// Wie stark es aufhellt (0 = gar nicht, 1 = deutlich).
     pub hover_glanz: f64,
+    /// Staerke der Glanzkante auf Flaechen mit Verlauf (0 = keine).
+    pub glanz: f64,
     /// Anzahl Segmente/Striche beim Zifferblatt "segmente"/"striche".
     pub blatt_teile: i32,
     /// Luecke zwischen den Segmenten in Grad.
@@ -282,6 +284,7 @@ impl Default for Style {
             hover_tempo: 0.15,
             hover_weite: 8.0,
             hover_glanz: 0.35,
+            glanz: 0.22,
             blatt_teile: 32,
             blatt_luecke: 2.0,
             blatt_dicke: 0.2,
@@ -849,17 +852,37 @@ impl ChartObj {
     }
 
     /// Gefuellte Flaeche mit runden Ecken -- mit Flag "verlauf_daten" als
-    /// senkrechter Verlauf. Der Verlauf sitzt um die Eckenrundung eingerueckt
-    /// (GradientRect ist rechteckig), der Rand bleibt in der Ausgangsfarbe.
+    /// senkrechter Verlauf, dazu eine Glanzkante auf der oberen Haelfte.
+    ///
+    /// Frueher lag dafuer ein rechteckiger Verlauf eingerueckt auf einer
+    /// runden Grundflaeche; der Rand blieb in der Ausgangsfarbe und war bei
+    /// kleinen Flaechen als Saum zu sehen. `round_gradient` fuellt die runde
+    /// Form direkt zeilenweise -- kein Saum mehr.
     #[allow(clippy::too_many_arguments)]
     fn fuellung(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, ecken: i32, farbe: i64) {
-        g.round_rect(x1, y1, x2, y2, ecken, farbe, true);
         if self.style.f_verlauf_daten {
-            let e = ecken.max(0);
-            if x2 - x1 > 2 * e && y2 - y1 > 2 * e {
-                g.gradient_rect(x1 + e, y1 + e, x2 - e, y2 - e, farbe, self.verlauf_ende(farbe), true);
-            }
+            g.round_gradient(x1, y1, x2, y2, ecken, farbe, self.verlauf_ende(farbe));
+            self.glanz(g, x1, y1, x2, y2, ecken);
+        } else {
+            g.round_rect(x1, y1, x2, y2, ecken, farbe, true);
         }
+    }
+
+    /// Glanzkante: halbdurchsichtiges Weiss ueber der oberen Haelfte, das nach
+    /// unten ausblendet. Das ist der Griff, der eine Flaeche plastisch wirken
+    /// laesst -- ohne ihn bleibt auch ein Verlauf flach.
+    fn glanz(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, ecken: i32) {
+        let staerke = self.style.glanz;
+        if staerke <= 0.0 {
+            return;
+        }
+        let h = (y2 - y1).max(2);
+        let bis = y1 + (h as f64 * 0.5) as i32;
+        let oben = with_alpha(0xFFFFFF, staerke);
+        // Unten voellig durchsichtig -- with_alpha() deckelt bei 1, deshalb
+        // hier direkt das Alpha-Byte setzen.
+        let unten = 0x01FF_FFFFu32 as i64;
+        g.round_gradient(x1, y1, x2, bis, ecken, oben, unten);
     }
 
     // --- Geometrie -------------------------------------------------------
@@ -1187,20 +1210,8 @@ impl ChartObj {
         // Schatten zuerst, damit er unter allem liegt.
         self.schatten_rrect(g, self.x, self.y, self.x + self.w, self.y + self.h, st.ecken);
         if st.f_verlauf {
-            // Ein Verlauf kann nicht rund sein (GradientRect ist rechteckig) --
-            // das runde Feld darunter fuellt die Ecken, der Verlauf legt sich
-            // leicht eingerueckt darueber.
-            g.round_rect(self.x, self.y, self.x + self.w, self.y + self.h, st.ecken, st.c_hintergrund, true);
-            let e = st.ecken.max(0);
-            g.gradient_rect(
-                self.x + e,
-                self.y + e,
-                self.x + self.w - e,
-                self.y + self.h - e,
-                st.c_hintergrund,
-                st.c_verlauf,
-                true,
-            );
+            g.round_gradient(self.x, self.y, self.x + self.w, self.y + self.h,
+                             st.ecken, st.c_hintergrund, st.c_verlauf);
         } else {
             g.round_rect(self.x, self.y, self.x + self.w, self.y + self.h, st.ecken, st.c_hintergrund, true);
         }
@@ -1849,8 +1860,11 @@ impl ChartObj {
         }
         g.round_rect(x0, y0, x1, y1, ecke, st.c_gitter, true);
 
-        // Verlauf in schmalen Streifen: so kommt jede Farbe aus derselben
-        // Quelle (`skala_farbe`), egal ob sie aus Zonen oder Palette stammt.
+        // Waagerechter Verlauf in schmalen Streifen: die Farbe kommt aus
+        // derselben Quelle (`skala_farbe`) wie beim Tacho, egal ob sie aus
+        // Zonen oder aus dem Skalenverlauf stammt. (Fuer WAAGERECHTE Verlaeufe
+        // gibt es kein rundes Gegenstueck zu `round_gradient` -- die runden
+        // Enden zieht `round_rect` darueber nach.)
         let laenge = if waagerecht { x1 - x0 } else { y1 - y0 };
         // `zeigerform`="balken" fuellt nur bis zum Wert, sonst die ganze Skala.
         let bis = if st.zeigerform.eq_ignore_ascii_case("balken") {
@@ -1870,6 +1884,9 @@ impl ChartObj {
                 g.box_fill(x0, y1 - e, x1, y1 - k, c);
             }
             k += S;
+        }
+        if st.f_verlauf_daten {
+            self.glanz(g, x0, y0, x1, y1, ecke);
         }
         g.round_rect(x0, y0, x1, y1, ecke, st.c_rahmen, false);
 
@@ -2410,7 +2427,7 @@ pub const KEYS_NUM: &[&str] = &[
     "nachkomma", "titel_groesse", "text_groesse", "schrift", "start_winkel", "end_winkel",
     "striche", "unterstriche", "linien_dicke", "punkt_radius", "animation", "fenster", "schatten",
     "schatten_weich", "deckkraft", "flaeche_deckkraft",
-    "hover_tempo", "hover_weite", "hover_glanz",
+    "hover_tempo", "hover_weite", "hover_glanz", "glanz",
     "blatt_teile", "blatt_luecke", "blatt_dicke", "fassung", "strich",
 ];
 pub const KEYS_COLOR: &[&str] = &[
@@ -2533,6 +2550,7 @@ impl ChartObj {
             "hover_tempo" => s.hover_tempo = v.clamp(0.0, 5.0),
             "hover_weite" => s.hover_weite = v.clamp(0.0, 100.0),
             "hover_glanz" => s.hover_glanz = v.clamp(0.0, 1.0),
+            "glanz" => s.glanz = v.clamp(0.0, 1.0),
             "blatt_teile" => s.blatt_teile = v.clamp(2.0, 200.0) as i32,
             "blatt_luecke" => s.blatt_luecke = v.clamp(0.0, 30.0),
             "blatt_dicke" => s.blatt_dicke = v.clamp(0.05, 0.6),
