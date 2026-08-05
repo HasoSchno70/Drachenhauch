@@ -2075,13 +2075,14 @@ impl ChartObj {
             if norm > 90.0 && norm < 270.0 {
                 dreh += 180.0;
             }
-            g.text_rot(
+            g.text_rot_styled(
                 cx + (rad.cos() * lr) as i32,
                 cy + (rad.sin() * lr) as i32,
                 z.name.clone(),
                 dreh as f32,
-                st.text_groesse as f32 / g.text_height().max(1) as f32,
                 st.c_text,
+                st.schrift,
+                st.text_groesse,
             );
         }
 
@@ -2368,13 +2369,14 @@ impl ChartObj {
         }
         if !st.achse_y.is_empty() {
             // Gedreht an der linken Kante -- waagerecht braeuchte es zu viel Platz.
-            g.text_rot(
+            g.text_rot_styled(
                 a.x0 + st.text_groesse,
-                plot.y0 + plot.h() / 2 + g.text_width_at(&st.achse_y, st.text_groesse) / 2,
+                plot.y0 + plot.h() / 2,
                 st.achse_y.clone(),
                 -90.0,
-                st.text_groesse as f32 / g.text_height().max(1) as f32,
                 st.c_text,
+                st.schrift,
+                st.text_groesse,
             );
         }
     }
@@ -2856,6 +2858,21 @@ mod tests {
         // 0 als Deckkraft darf nicht auf das Alpha-Byte 0 fallen -- das waere
         // wieder "deckend". Untere Grenze ist 1.
         assert_eq!(alpha_of(with_alpha(0xFF8800, 0.0)), 1);
+    }
+
+    #[test]
+    fn schrift_gilt_fuer_das_ganze_diagramm() {
+        // `schrift` = FONT-Handle aus LOADFONT, -1 = Standardschrift. Der
+        // gedrehte Text (Zonen-Beschriftung, Y-Achse) nahm frueher den
+        // GLOBALEN Font und stand dadurch in einer anderen Schrift als der
+        // Rest -- jetzt geht er ueber dieselbe Rolle.
+        let mut c = ChartObj::new(Kind::Gauge, 0, 0, 200, 200);
+        assert_eq!(c.style.schrift, -1, "Vorgabe ist die Standardschrift");
+        c.set_num("schrift", 3.0).unwrap();
+        assert_eq!(c.style.schrift, 3);
+        // Auch negative Handles bleiben erhalten (SETFONT-Konvention).
+        c.set_num("schrift", -1.0).unwrap();
+        assert_eq!(c.style.schrift, -1);
     }
 
     #[test]

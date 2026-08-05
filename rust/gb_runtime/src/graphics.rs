@@ -2671,6 +2671,19 @@ impl Graphics {
                                self.text_spacing, angle_deg, scale.max(0.0001)));
     }
 
+    /// Gedrehter Text mit EXPLIZITEM Font-Handle + Groesse.
+    ///
+    /// Gegenstueck zu `text_styled`: `text_rot` nimmt `active_font`/`text_size`,
+    /// womit ein Aufrufer mit eigener Schrift (Modul `chart`) seinen gedrehten
+    /// Text in einer ANDEREN Schrift bekaeme als den waagerechten.
+    #[allow(clippy::too_many_arguments)]
+    pub fn text_rot_styled(&mut self, x: i32, y: i32, s: String, angle_deg: f32,
+                           c: i64, font: i64, size: i32) {
+        let (x, y) = self.w2s(x, y);
+        self.emit(Cmd::TextRot(x, y, s, size.max(1), col(c), font,
+                               self.text_spacing, angle_deg, 1.0));
+    }
+
     /// Text mit explizitem Font-Handle + Groesse (umgeht active_font/text_size).
     /// `font` = -1 -> Default-Font. Fuer per-Widget-Styling (Modul `gui`).
     pub fn text_styled(&mut self, x: i32, y: i32, s: String, c: i64, font: i64, size: i32) {
@@ -5204,7 +5217,28 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         1073741922 => KEY_KP_0,
         1073741923 => KEY_KP_DECIMAL,
         // Buchstaben: pygame 97..122 (lowercase ascii) -> raylib 65..90.
+        // ACHTUNG: nur KLEINbuchstaben. `KEYHIT(ASC("S"))` (= 83) trifft nichts
+        // und tut still gar nichts -- `ASC("s")` ist gemeint.
         97..=122 => return key_from_i32((code - 32) as i32),
+        // Satzzeichen (SDL-Keycodes). Ohne sie lief `KEYHIT(ASC("-"))` ins
+        // Leere: die Taste existierte fuer GameBasic schlicht nicht, ohne
+        // Fehlermeldung. raylib benennt die Tasten nach ihrer PHYSISCHEN Lage
+        // im US-Layout -- auf anderen Belegungen sitzt das Zeichen also
+        // moeglicherweise woanders (deshalb sind Ziffern und Buchstaben die
+        // verlaesslichere Wahl fuer Steuertasten).
+        39 => KEY_APOSTROPHE,
+        44 => KEY_COMMA,
+        45 => KEY_MINUS,
+        46 => KEY_PERIOD,
+        47 => KEY_SLASH,
+        59 => KEY_SEMICOLON,
+        // SDLK_PLUS (43) hat in raylib keine eigene Taste -- auf US-Layout
+        // entsteht "+" als Umschalt+"=", darum dieselbe Taste wie 61.
+        43 | 61 => KEY_EQUAL,
+        91 => KEY_LEFT_BRACKET,
+        92 => KEY_BACKSLASH,
+        93 => KEY_RIGHT_BRACKET,
+        96 => KEY_GRAVE,
         // Ziffern: pygame 48..57 == raylib KEY_ZERO..KEY_NINE.
         48..=57 => return key_from_i32(code as i32),
         // F1..F12: pygame 1073741882.. -> raylib KEY_F1=290..

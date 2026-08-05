@@ -238,6 +238,31 @@ im Ton des jeweiligen Themas).
 > interpoliert einen Regenbogen. Einer Skala muss man ansehen, wo „wenig" und
 > wo „viel" ist.
 
+## Schrift
+
+Die Diagramme schreiben ihren Text mit der Schrift aus `schrift` — einem
+FONT-Handle aus `LOADFONT`. `-1` (die Vorgabe) ist die eingebaute Pixelschrift;
+eine echte TTF ist bei kleinen Größen deutlich besser lesbar.
+
+```basic
+DIM schrift AS INTEGER
+DIM fp AS STRING
+schrift = -1
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf")
+    IF schrift < 0 AND FILEEXISTS(fp) THEN schrift = LOADFONT(fp, 32)
+NEXT
+CHART_SET_NUM(c, "schrift", schrift)
+CHART_SET_NUM(c, "text_groesse", 15)
+CHART_SET_NUM(c, "titel_groesse", 22)
+```
+
+Lade die Schrift **groß** (hier 32) und stelle die Anzeigegröße über
+`text_groesse` / `titel_groesse` ein — raylib rastert die Glyphen bei der
+Ladegröße, kleiner Laden und größer Anzeigen wird unscharf.
+
+Die Größe gilt getrennt für Titel (`titel_groesse`) und alles übrige
+(`text_groesse`: Achsen, Legende, Werte, Zonen-Beschriftung, Sprechblasen).
+
 ## Durchsichtigkeit
 
 Farben in GameBasic sind `0xAARRGGBB`. Das oberste Byte ist die Deckkraft, und

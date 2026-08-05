@@ -214,3 +214,53 @@ def test_recording_blocks_playback(tmp_path):
 def test_empty_filename_is_rejected(tmp_path):
     r = _run(_HEAD + 'AUTOMATION_RECORD("")\n', tmp_path)
     assert r.returncode != 0 and "AUTOMATION_RECORD" in r.stderr
+
+
+# --------------------------------------------------- Tastencode-Umsetzung
+# Die Wiedergabe speist ROHE raylib-Tastenwerte ein -- damit laesst sich
+# `map_key` (GB-Code -> raylib-Taste) end-to-end pruefen, ohne dass jemand
+# eine Taste druecken muss.
+
+RL_KEY_S, RL_KEY_MINUS, RL_KEY_COMMA, RL_KEY_PERIOD = 83, 45, 44, 46
+
+
+def test_buchstaben_brauchen_kleinschreibung(tmp_path):
+    """GB-Tastencodes folgen SDL: Buchstaben sind KLEIN (97..122).
+
+    `KEYHIT(ASC("S"))` (= 83) trifft nichts und tut still gar nichts -- ein
+    Fehler, der beim Schreiben nicht auffaellt, weil er sich wie eine nicht
+    gedrueckte Taste verhaelt.
+    """
+    _events(tmp_path, "ev.txt", [(1, KEY_DOWN, RL_KEY_S)])
+    gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
+          'DIM f AS INTEGER\n'
+          'FOR f = 0 TO 3\n'
+          '    PRINT STR$(KEYPRESSED(ASC("s"))) + " " + STR$(KEYPRESSED(ASC("S")))\n'
+          '    FLIP()\n'
+          'NEXT\n')
+    r = _run(gb, tmp_path)
+    assert r.returncode == 0, r.stderr
+    # Ab dem Frame nach der Einspeisung ist die Kleinschreibung TRUE ...
+    assert "TRUE FALSE" in r.lines, r.lines
+    # ... und die Grossschreibung NIE.
+    assert not any(ln.startswith("TRUE TRUE") or ln.endswith(" TRUE") for ln in r.lines), r.lines
+
+
+def test_satzzeichen_sind_ansprechbar(tmp_path):
+    """Regression: Satzzeichen fehlten in der Umsetzungstabelle ganz --
+    `KEYHIT(ASC("-"))` lief ins Leere, ohne Fehlermeldung."""
+    _events(tmp_path, "ev.txt", [
+        (1, KEY_DOWN, RL_KEY_MINUS),
+        (1, KEY_DOWN, RL_KEY_COMMA),
+        (1, KEY_DOWN, RL_KEY_PERIOD),
+    ])
+    gb = (_HEAD + 'AUTOMATION_PLAY("ev.txt")\n'
+          'DIM f AS INTEGER\n'
+          'FOR f = 0 TO 3\n'
+          '    PRINT STR$(KEYPRESSED(ASC("-"))) + " " + STR$(KEYPRESSED(ASC(","))) + _\n'
+          '          " " + STR$(KEYPRESSED(ASC(".")))\n'
+          '    FLIP()\n'
+          'NEXT\n')
+    r = _run(gb, tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert "TRUE TRUE TRUE" in r.lines, r.lines

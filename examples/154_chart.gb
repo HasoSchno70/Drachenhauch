@@ -7,12 +7,24 @@
 '   LEERTASTE    Thema wechseln
 '   V            Verlauf auf den Daten an/aus
 '   S            weiche Schatten an/aus
-'   +/-          Deckkraft (Alpha) aller Datenfarben
+'   1 / 2        Deckkraft (Alpha) aller Datenfarben
 '   HOCH/RUNTER  Drehzahl
 
 IMPORT "chart"
 
-SCREEN(1280, 760, "GameBasic -- Diagramme")
+SCREEN(1280, 820, "GameBasic -- Diagramme")
+
+' Zeichensatz: die Diagramme malen ihren Text mit der Schrift, die in
+' "schrift" steht (FONT-Handle aus LOADFONT, -1 = eingebaute Pixelschrift).
+' Eine echte TTF ist bei kleinen Groessen deutlich besser lesbar.
+DIM schrift AS INTEGER
+DIM fp AS STRING
+schrift = -1
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF schrift < 0 AND FILEEXISTS(fp) THEN schrift = LOADFONT(fp, 32)
+NEXT
+IF schrift >= 0 THEN SETFONT(schrift)
+TEXT_SIZE(17)
 
 DIM kuchen AS CHART
 DIM balken AS CHART
@@ -146,6 +158,9 @@ deckkraft = 1.0
 ' deshalb eine Hilfsroutine statt sieben Mal derselbe Block.
 SUB stil_anwenden()
     FOR EACH stil IN alle
+        CHART_SET_NUM(stil, "schrift", schrift)
+        CHART_SET_NUM(stil, "text_groesse", 15)
+        CHART_SET_NUM(stil, "titel_groesse", 22)
         CHART_SET_FLAG(stil, "verlauf_daten", verlauf)
         CHART_SET_FLAG(stil, "schatten_daten", weich)
         CHART_SET_FLAG(stil, "tooltip", TRUE)
@@ -166,19 +181,19 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
         NEXT
         stil_anwenden()          ' Thema setzt die Farben neu -> Stil nachziehen
     END IF
-    IF KEYHIT(ASC("V")) THEN
+    IF KEYHIT(ASC("v")) THEN
         verlauf = NOT verlauf
         stil_anwenden()
     END IF
-    IF KEYHIT(ASC("S")) THEN
+    IF KEYHIT(ASC("s")) THEN
         weich = NOT weich
         stil_anwenden()
     END IF
-    IF KEYPRESSED(ASC("+")) THEN
+    IF KEYPRESSED(ASC("2")) THEN
         deckkraft = MIN(1.0, deckkraft + 0.6 * DELTA())
         stil_anwenden()
     END IF
-    IF KEYPRESSED(ASC("-")) THEN
+    IF KEYPRESSED(ASC("1")) THEN
         deckkraft = MAX(0.1, deckkraft - 0.6 * DELTA())
         stil_anwenden()
     END IF
@@ -200,9 +215,9 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
 
     ' Anklicken meldet, was getroffen wurde.
     IF CHART_CLICKED(kuchen) >= 0 THEN
-        TEXT(20, 734, "Angeklickt: " + CHART_HOVER_LABEL$(kuchen))
+        TEXT(20, 772, "Angeklickt: " + CHART_HOVER_LABEL$(kuchen))
     ELSE
-        TEXT(20, 734, f"MAUS Hervorhebung   LEERTASTE Thema ({themen[t_idx]})   V Verlauf   S Schatten   +/- Deckkraft {deckkraft:.2f}   ESC Ende")
+        TEXT(20, 772, f"MAUS Hervorhebung   LEERTASTE Thema ({themen[t_idx]})   V Verlauf   S Schatten   1/2 Deckkraft {deckkraft:.2f}   ESC Ende")
     END IF
     FLIP()
 WEND
