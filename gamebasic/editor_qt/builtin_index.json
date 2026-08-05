@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1249,
+  "count": 1255,
   "builtins": [
     {
       "name": "ABS",
@@ -1083,6 +1083,18 @@
       "module": "chart"
     },
     {
+      "name": "CHART_CLICKED",
+      "kind": "core",
+      "signature": "CHART_CLICKED(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_CLICKED_SERIES",
+      "kind": "core",
+      "signature": "CHART_CLICKED_SERIES(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
       "name": "CHART_COUNT",
       "kind": "core",
       "signature": "CHART_COUNT(diagramm) AS INTEGER",
@@ -1104,6 +1116,30 @@
       "name": "CHART_GET",
       "kind": "core",
       "signature": "CHART_GET(diagramm, reihe: INTEGER, punkt: INTEGER) AS FLOAT",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_HOVER",
+      "kind": "core",
+      "signature": "CHART_HOVER(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_HOVER_LABEL$",
+      "kind": "core",
+      "signature": "CHART_HOVER_LABEL$(diagramm) AS STRING",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_HOVER_SERIES",
+      "kind": "core",
+      "signature": "CHART_HOVER_SERIES(diagramm) AS INTEGER",
+      "module": "chart"
+    },
+    {
+      "name": "CHART_HOVER_VALUE",
+      "kind": "core",
+      "signature": "CHART_HOVER_VALUE(diagramm) AS FLOAT",
       "module": "chart"
     },
     {

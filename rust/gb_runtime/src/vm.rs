@@ -5700,7 +5700,9 @@ impl<'p> Vm<'p> {
             "chart_draw" => {
                 if a.len() != 1 { return Err("CHART_DRAW: erwartet 1 Argument -- Aufruf: CHART_DRAW(diagramm)".into()); }
                 let c = crate::builtins::chart_h(&a[0], "CHART_DRAW")?.clone();
-                let c = c.borrow();
+                // CHART_DRAW wertet auch die Maus aus und schreibt Hover/Klick
+                // ins Handle zurueck -> veraenderlicher Zugriff.
+                let mut c = c.borrow_mut();
                 let g = self.gfx.as_mut().ok_or("CHART_DRAW vor SCREEN aufgerufen")?;
                 c.draw(g);
                 Value::Nil

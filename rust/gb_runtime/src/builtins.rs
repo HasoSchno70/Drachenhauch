@@ -2742,6 +2742,17 @@ fn call_inner(name: &str, a: &[Value]) -> R {
             c.borrow_mut().advance(dt);
             Ok(Value::Nil)
         }
+        // --- Interaktion: von CHART_DRAW gefuellt, hier nur ausgelesen ---
+        "chart_hover" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER")?.borrow().hover as i64)) }
+        "chart_hover_series" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_HOVER_SERIES")?.borrow().hover_serie as i64)) }
+        "chart_hover_label$" | "chart_hover_label" => {
+            arity!(1);
+            Ok(Value::str_rc(&chart_h(&a[0], "CHART_HOVER_LABEL$")?.borrow().hover_label()))
+        }
+        "chart_hover_value" => { arity!(1); Ok(Value::Float(chart_h(&a[0], "CHART_HOVER_VALUE")?.borrow().hover_value())) }
+        "chart_clicked" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_CLICKED")?.borrow().geklickt as i64)) }
+        "chart_clicked_series" => { arity!(1); Ok(Value::Int(chart_h(&a[0], "CHART_CLICKED_SERIES")?.borrow().geklickt_serie as i64)) }
+
         "chart_stat" => {
             arity!(3);
             let c = chart_h(&a[0], "CHART_STAT")?;

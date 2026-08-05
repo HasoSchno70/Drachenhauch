@@ -156,6 +156,16 @@ pub struct Style {
     pub f_schatten_daten: bool,
     /// Grosse Zahlen kurz schreiben (1.2M statt 1200000) -- wie NUMFMT$.
     pub f_kurz: bool,
+    /// Element unter der Maus hervorheben (aufhellen, herausruecken, wachsen).
+    pub f_hover: bool,
+    /// Sprechblase mit Name und Wert am Element unter der Maus.
+    pub f_tooltip: bool,
+    /// Sekunden, die die Hervorhebung zum Ein-/Ausblenden braucht.
+    pub hover_tempo: f64,
+    /// Wie weit das hervorgehobene Element herausrueckt/waechst (Pixel).
+    pub hover_weite: f64,
+    /// Wie stark es aufhellt (0 = gar nicht, 1 = deutlich).
+    pub hover_glanz: f64,
 
     /// Reihenfolge der Standardfarben fuer Reihen/Segmente ohne eigene Farbe.
     pub palette: Vec<i64>,
@@ -220,6 +230,11 @@ impl Default for Style {
             f_verlauf_daten: false,
             f_schatten_daten: false,
             f_kurz: false,
+            f_hover: true,
+            f_tooltip: false,
+            hover_tempo: 0.15,
+            hover_weite: 8.0,
+            hover_glanz: 0.35,
             palette: Vec::new(),
         };
         apply_theme(&mut s, "dunkel");
@@ -300,6 +315,18 @@ pub fn with_alpha(c: i64, f: f64) -> i64 {
     (a << 24) | (c & 0x00FF_FFFF)
 }
 
+/// Zwei Farben mischen (`t` = 0 ganz `a`, 1 ganz `b`). Das Alpha von `a`
+/// bleibt erhalten -- gemischt wird nur die Farbe, nicht die Durchsichtigkeit.
+pub fn mix_rgb(a: i64, b: i64, t: f64) -> i64 {
+    let t = t.clamp(0.0, 1.0);
+    let (va, vb) = (a as u32, b as u32);
+    let ch = |sh: u32| -> i64 {
+        let (ca, cb) = (((va >> sh) & 0xFF) as f64, ((vb >> sh) & 0xFF) as f64);
+        ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
+    };
+    (((va >> 24) & 0xFF) as i64) << 24 | (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
 /// Helligkeit skalieren (`f` < 1 dunkelt ab, > 1 hellt auf), Alpha bleibt.
 pub fn scale_rgb(c: i64, f: f64) -> i64 {
     let v = c as u32;
@@ -323,6 +350,18 @@ pub struct ChartObj {
     pub series: Vec<Series>,
     pub zones: Vec<Zone>,
     pub style: Style,
+
+    // --- Interaktion (von CHART_DRAW gefuellt, ueber CHART_HOVER/... lesbar) ---
+    /// Punkt unter der Maus, -1 = keiner.
+    pub hover: i32,
+    /// Reihe unter der Maus, -1 = keine (nur Balken/Linie unterscheiden Reihen).
+    pub hover_serie: i32,
+    /// In DIESEM Bild angeklickter Punkt, -1 = keiner.
+    pub geklickt: i32,
+    pub geklickt_serie: i32,
+    /// Hervorhebungsstaerke je Punkt (0..1) -- zieht weich nach, damit das
+    /// Ein- und Ausblenden nicht springt. Laenge folgt der Punktzahl.
+    pub glanz: Vec<f64>,
 }
 
 impl ChartObj {
@@ -338,6 +377,11 @@ impl ChartObj {
             series: Vec::new(),
             zones: Vec::new(),
             style: Style::default(),
+            hover: -1,
+            hover_serie: -1,
+            geklickt: -1,
+            geklickt_serie: -1,
+            glanz: Vec::new(),
         };
         // Der Tacho hat genau EINEN Wert -- die Reihe gleich anlegen, damit
         // CHART_VALUE ohne vorheriges CHART_SERIES funktioniert.
@@ -569,6 +613,47 @@ impl ChartObj {
         (lo, hi)
     }
 
+    /// (Startwinkel, Spanne) je Segment. Leere Segmente (Wert <= 0) bekommen
+    /// eine Spanne von 0 und behalten trotzdem ihren Platz in der Liste,
+    /// damit der Index zur Beschriftung passt.
+    pub fn kuchen_stuecke(&self) -> Vec<(f64, f64)> {
+        let werte: Vec<f64> = self
+            .series
+            .first()
+            .map(|s| self.anzeige(s).iter().map(|v| v.max(0.0)).collect())
+            .unwrap_or_default();
+        let summe: f64 = werte.iter().sum();
+        let mut out = Vec::with_capacity(werte.len());
+        let mut w = -90.0f64; // bei 12 Uhr beginnen
+        for &v in &werte {
+            let spanne = if summe > 0.0 { v / summe * 360.0 } else { 0.0 };
+            out.push((w, spanne));
+            w += spanne;
+        }
+        out
+    }
+
+    /// Beschriftung des Elements unter der Maus ("" wenn keins).
+    pub fn hover_label(&self) -> String {
+        if self.hover < 0 {
+            return String::new();
+        }
+        self.labels.get(self.hover as usize).cloned().unwrap_or_default()
+    }
+
+    /// Wert des Elements unter der Maus (0 wenn keins).
+    pub fn hover_value(&self) -> f64 {
+        if self.hover < 0 {
+            return 0.0;
+        }
+        let si = self.hover_serie.max(0) as usize;
+        self.series
+            .get(si)
+            .and_then(|s| s.values.get(self.hover as usize))
+            .copied()
+            .unwrap_or(0.0)
+    }
+
     /// Zahl so beschriften, wie der Stil es vorgibt (Nachkommastellen, kurze
     /// Schreibweise, Einheit).
     pub fn fmt_value(&self, v: f64) -> String {
@@ -588,6 +673,27 @@ fn palette_at(pal: &[i64], i: usize) -> i64 {
     } else {
         pal[i % pal.len()]
     }
+}
+
+/// Welches Kuchenstueck liegt bei Winkel `w` (Grad)?  -1 = keins.
+///
+/// Die Segmente beginnen bei -90 Grad (12 Uhr), `atan2` liefert aber
+/// -180..180 -- der Winkel muss also erst in den Bereich der Segmentliste
+/// gedreht werden, sonst trifft die Maus links oben ins Leere.
+pub fn stueck_bei_winkel(stuecke: &[(f64, f64)], w: f64) -> i32 {
+    let mut w = w;
+    while w < -90.0 {
+        w += 360.0;
+    }
+    while w >= 270.0 {
+        w -= 360.0;
+    }
+    for (i, (start, spanne)) in stuecke.iter().enumerate() {
+        if *spanne > 0.0 && w >= *start && w < start + spanne {
+            return i as i32;
+        }
+    }
+    -1
 }
 
 /// Automatische Gitter-Schrittweite: die groesste "runde" Zahl (1/2/5 * 10^n),
@@ -685,7 +791,311 @@ impl ChartObj {
         }
     }
 
-    pub fn draw(&self, g: &mut Graphics) {
+    // --- Geometrie -------------------------------------------------------
+    //
+    // EINE Quelle je Diagrammart. Treffertest und Zeichnen fragen dieselbe
+    // Funktion; sonst laufen sie auseinander und die Maus trifft neben dem,
+    // was man sieht (derselbe Fehler wie frueher beim Tacho-Schatten).
+
+    /// Zeichenflaeche nach Abzug von Polster, Titel und Legende.
+    fn inhalt(&self, g: &Graphics) -> Area {
+        let st = &self.style;
+        let mut a = Area {
+            x0: self.x + st.polster,
+            y0: self.y + st.polster,
+            x1: self.x + self.w - st.polster,
+            y1: self.y + self.h - st.polster,
+        };
+        if !st.titel.is_empty() {
+            a.y0 += st.titel_groesse + 8;
+        }
+        self.legende_abzug(g, &mut a);
+        a
+    }
+
+    /// Mittelpunkt und Radien des Kuchens.
+    fn kuchen_geom(&self, a: &Area) -> (i32, i32, i32, i32) {
+        let st = &self.style;
+        let (cx, cy) = (a.x0 + a.w() / 2, a.y0 + a.h() / 2);
+        // Platz fuer das Herausruecken freihalten -- beim Hover kommt
+        // `hover_weite` noch obendrauf, sonst stiesse das Segment an den Rand.
+        let rand = st.abstand.max(0.0) + if st.f_hover { st.hover_weite } else { 0.0 };
+        let r = (a.w().min(a.h()) / 2 - rand as i32).max(4);
+        let ri = (r as f64 * st.innenradius.clamp(0.0, 0.95)) as i32;
+        (cx, cy, r, ri)
+    }
+
+    /// Alles, was Balken- und Liniendiagramm zum Platzieren brauchen.
+    fn achsen_geom(&self, g: &Graphics, a: &Area, waagerecht: bool) -> (Area, f64, f64) {
+        let (lo, hi) = self.range();
+        (self.axis_area(g, a, lo, hi, waagerecht), lo, hi)
+    }
+
+    /// Balken-Aufteilung: Fachbreite, Luecke, Balkenbreite.
+    fn balken_geom(&self, plot: &Area, waagerecht: bool) -> (f64, f64, f64) {
+        let st = &self.style;
+        let n = self.labels.len().max(1);
+        let laenge = if waagerecht { plot.h() } else { plot.w() };
+        let fach = laenge as f64 / n as f64;
+        let luecke = st.abstand.max(0.0).min(fach / 2.0);
+        let reihen = if st.f_stapel { 1 } else { self.series.len().max(1) };
+        let breite = ((fach - luecke) / reihen as f64).max(1.0);
+        (fach, luecke, breite)
+    }
+
+    // --- Treffertest -----------------------------------------------------
+
+    /// Punkt (und ggf. Reihe) unter der Maus. -1 = nichts getroffen.
+    fn treffer(&self, g: &Graphics, a: &Area) -> (i32, i32) {
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        // Ausserhalb des Feldes gar nicht erst suchen.
+        if mx < self.x || mx > self.x + self.w || my < self.y || my > self.y + self.h {
+            return (-1, -1);
+        }
+        match self.kind {
+            Kind::Pie => {
+                let (cx, cy, r, ri) = self.kuchen_geom(a);
+                let (dx, dy) = ((mx - cx) as f64, (my - cy) as f64);
+                let dist = (dx * dx + dy * dy).sqrt();
+                if dist > r as f64 || dist < ri as f64 {
+                    return (-1, -1);
+                }
+                let w = dy.atan2(dx).to_degrees();
+                match stueck_bei_winkel(&self.kuchen_stuecke(), w) {
+                    -1 => (-1, -1),
+                    i => (i, 0),
+                }
+            }
+            Kind::Bar => {
+                let waagerecht = self.style.ausrichtung.eq_ignore_ascii_case("waagerecht");
+                let (plot, lo, hi) = self.achsen_geom(g, a, waagerecht);
+                let (fach, luecke, breite) = self.balken_geom(&plot, waagerecht);
+                let quer = if waagerecht { my - plot.y0 } else { mx - plot.x0 };
+                if quer < 0 {
+                    return (-1, -1);
+                }
+                let i = (quer as f64 / fach).floor() as usize;
+                if i >= self.labels.len() {
+                    return (-1, -1);
+                }
+                // Innerhalb des Fachs: welcher Balken (bei mehreren Reihen)?
+                let rest = quer as f64 - fach * i as f64 - luecke / 2.0;
+                if self.style.f_stapel {
+                    // Gestapelt: ein Balken, die Reihe ergibt sich aus der
+                    // Position entlang der Wertachse.
+                    if rest < 0.0 || rest > breite {
+                        return (-1, -1);
+                    }
+                    let mut unten = 0.0f64;
+                    for (si, s) in self.series.iter().enumerate() {
+                        let v = *self.anzeige(s).get(i).unwrap_or(&0.0);
+                        let p1 = self.val_pos(&plot, unten, lo, hi, waagerecht);
+                        let p2 = self.val_pos(&plot, unten + v, lo, hi, waagerecht);
+                        let laengs = if waagerecht { mx } else { my };
+                        if laengs >= p1.min(p2) && laengs <= p1.max(p2) {
+                            return (i as i32, si as i32);
+                        }
+                        unten += v;
+                    }
+                    (-1, -1)
+                } else {
+                    let si = (rest / breite).floor() as i32;
+                    if si < 0 || si as usize >= self.series.len() {
+                        return (-1, -1);
+                    }
+                    // Nur treffen, wo der Balken auch wirklich ist.
+                    let v = *self
+                        .anzeige(&self.series[si as usize])
+                        .get(i)
+                        .unwrap_or(&0.0);
+                    let p1 = self.val_pos(&plot, 0.0, lo, hi, waagerecht);
+                    let p2 = self.val_pos(&plot, v, lo, hi, waagerecht);
+                    let laengs = if waagerecht { mx } else { my };
+                    if laengs >= p1.min(p2) && laengs <= p1.max(p2) {
+                        (i as i32, si)
+                    } else {
+                        (-1, -1)
+                    }
+                }
+            }
+            Kind::Line => {
+                let n = self.labels.len();
+                if n < 2 {
+                    return (-1, -1);
+                }
+                let (plot, lo, hi) = self.achsen_geom(g, a, false);
+                if mx < plot.x0 || mx > plot.x1 {
+                    return (-1, -1);
+                }
+                let dx = plot.w() as f64 / (n - 1) as f64;
+                // Naechstliegender Stuetzpunkt in x -- eine Linie trifft man
+                // nicht auf den Pixel genau, also faengt die ganze Spalte.
+                let i = (((mx - plot.x0) as f64 / dx).round() as usize).min(n - 1);
+                // Von den Reihen die, deren Punkt senkrecht am naechsten liegt.
+                let mut beste = (-1i32, i32::MAX);
+                for (si, s) in self.series.iter().enumerate() {
+                    let v = *self.anzeige(s).get(i).unwrap_or(&0.0);
+                    let py = self.val_pos(&plot, v, lo, hi, false);
+                    let d = (py - my).abs();
+                    if d < beste.1 {
+                        beste = (si as i32, d);
+                    }
+                }
+                if beste.0 >= 0 {
+                    (i as i32, beste.0)
+                } else {
+                    (-1, -1)
+                }
+            }
+            // Der Tacho hat nur einen Wert -- die ganze Scheibe ist das Element.
+            Kind::Gauge => {
+                let (cx, cy) = (a.x0 + a.w() / 2, a.y0 + a.h() / 2);
+                let r = (a.w().min(a.h()) / 2 - 2).max(6);
+                let (dx, dy) = ((mx - cx) as f64, (my - cy) as f64);
+                if (dx * dx + dy * dy).sqrt() <= r as f64 {
+                    (0, 0)
+                } else {
+                    (-1, -1)
+                }
+            }
+        }
+    }
+
+    /// Hervorhebung an das Ziel heranfuehren (weiches Ein-/Ausblenden).
+    fn glanz_fortschreiben(&mut self, dt: f64) {
+        let n = self.labels.len().max(1);
+        self.glanz.resize(n, 0.0);
+        let tempo = self.style.hover_tempo;
+        let hover = self.hover;
+        for (i, g) in self.glanz.iter_mut().enumerate() {
+            let ziel = if i as i32 == hover { 1.0 } else { 0.0 };
+            if tempo <= 0.0 {
+                *g = ziel;
+                continue;
+            }
+            let k = (1.0 - (-dt / (tempo / 3.0).max(1e-6)).exp()).clamp(0.0, 1.0);
+            *g += (ziel - *g) * k;
+            if (ziel - *g).abs() < 1e-4 {
+                *g = ziel;
+            }
+        }
+    }
+
+    /// Hervorhebungsstaerke eines Punktes (0 wenn Hover aus ist).
+    fn glanz_von(&self, i: usize) -> f64 {
+        if !self.style.f_hover {
+            return 0.0;
+        }
+        self.glanz.get(i).copied().unwrap_or(0.0)
+    }
+
+    /// Farbe eines hervorgehobenen Elements.
+    ///
+    /// Gemischt wird gegen WEISS, nicht per RGB-Skalierung: bei gesaettigten
+    /// Farben verschiebt das Skalieren den Farbton, weil der groesste Kanal
+    /// schon bei 255 klemmt und nur die kleineren mitwachsen -- ein
+    /// hervorgehobenes Orange wurde so sichtbar gelb und sah aus wie ein
+    /// anderer Eintrag der Palette.
+    fn hell(&self, farbe: i64, glanz: f64) -> i64 {
+        if glanz <= 0.0 {
+            return farbe;
+        }
+        mix_rgb(farbe, 0xFFFFFF, self.style.hover_glanz * glanz)
+    }
+
+    /// Text der Sprechblase: Reihe, Beschriftung und Wert -- je nachdem, was
+    /// es gibt. Beim Kuchen zusaetzlich der Anteil, weil genau das dort die
+    /// interessante Zahl ist.
+    fn tooltip_text(&self) -> String {
+        let wert = self.hover_value();
+        let mut kopf = String::new();
+        if self.kind != Kind::Pie {
+            if let Some(s) = self.series.get(self.hover_serie.max(0) as usize) {
+                if !s.name.is_empty() {
+                    kopf = s.name.clone();
+                }
+            }
+        }
+        let label = self.hover_label();
+        if !label.is_empty() {
+            if kopf.is_empty() {
+                kopf = label;
+            } else {
+                kopf = format!("{} - {}", kopf, label);
+            }
+        }
+        let mut wert_txt = self.fmt_value(wert);
+        if self.kind == Kind::Pie {
+            let summe: f64 = self
+                .series
+                .first()
+                .map(|s| self.anzeige(s).iter().map(|v| v.max(0.0)).sum())
+                .unwrap_or(0.0);
+            if summe > 0.0 {
+                wert_txt = format!("{} ({:.0}%)", wert_txt, wert / summe * 100.0);
+            }
+        }
+        if kopf.is_empty() {
+            wert_txt
+        } else {
+            format!("{}: {}", kopf, wert_txt)
+        }
+    }
+
+    /// Sprechblase an der Maus. Sie weicht nach innen aus, wenn sie sonst
+    /// ueber den Rand des Feldes hinausstuende -- eine Blase, die halb im
+    /// Nichts haengt, ist schlechter als eine leicht versetzte.
+    fn tooltip(&self, g: &mut Graphics) {
+        let st = &self.style;
+        let text = self.tooltip_text();
+        if text.is_empty() {
+            return;
+        }
+        let sz = st.text_groesse;
+        let tw = g.text_width_at(&text, sz);
+        let (bw, bh) = (tw + 16, sz + 12);
+        let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+        let mut x = mx + 14;
+        let mut y = my - bh - 8;
+        if x + bw > self.x + self.w {
+            x = mx - bw - 14;
+        }
+        if y < self.y {
+            y = my + 16;
+        }
+        // Dunkler Kasten mit heller Schrift -- liest sich auf jedem Thema.
+        g.round_rect(x + 2, y + 3, x + bw + 2, y + bh + 3, 5, 0x64000000, true);
+        g.round_rect(x, y, x + bw, y + bh, 5, 0x1E1E1E, true);
+        g.round_rect(x, y, x + bw, y + bh, 5, 0x646464, false);
+        g.text_styled(x + 8, y + 6, text, 0xF0F0F0, st.schrift, sz);
+    }
+
+    pub fn draw(&mut self, g: &mut Graphics) {
+        // Maus auswerten, BEVOR gezeichnet wird -- die Hervorhebung soll im
+        // selben Bild wirken, in dem sie erkannt wurde.
+        let flaeche = self.inhalt(g);
+        let (h, hs) = if self.style.f_hover || self.style.f_tooltip {
+            self.treffer(g, &flaeche)
+        } else {
+            (-1, -1)
+        };
+        self.hover = h;
+        self.hover_serie = hs;
+        if g.mouse_hit(0) {
+            self.geklickt = h;
+            self.geklickt_serie = hs;
+        } else {
+            self.geklickt = -1;
+            self.geklickt_serie = -1;
+        }
+        self.glanz_fortschreiben(g.delta());
+        self.zeichnen(g);
+        if self.style.f_tooltip && self.hover >= 0 {
+            self.tooltip(g);
+        }
+    }
+
+    fn zeichnen(&self, g: &mut Graphics) {
         let st = &self.style;
         // Schatten zuerst, damit er unter allem liegt.
         self.schatten_rrect(g, self.x, self.y, self.x + self.w, self.y + self.h, st.ecken);
@@ -721,25 +1131,19 @@ impl ChartObj {
             }
         }
 
-        let mut a = Area {
-            x0: self.x + st.polster,
-            y0: self.y + st.polster,
-            x1: self.x + self.w - st.polster,
-            y1: self.y + self.h - st.polster,
-        };
         if !st.titel.is_empty() {
             let tw = g.text_width_at(&st.titel, st.titel_groesse);
             g.text_styled(
                 self.x + (self.w - tw) / 2,
-                a.y0,
+                self.y + st.polster,
                 st.titel.clone(),
                 st.c_titel,
                 st.schrift,
                 st.titel_groesse,
             );
-            a.y0 += st.titel_groesse + 8;
         }
-        self.draw_legend(g, &mut a);
+        self.draw_legend(g);
+        let a = self.inhalt(g);
 
         if a.w() < 8 || a.h() < 8 {
             return; // Zu klein zum Zeichnen -- lieber nichts als Muell.
@@ -752,16 +1156,10 @@ impl ChartObj {
         }
     }
 
-    /// Legende an einer der vier Kanten; sie zwackt sich ihren Platz vom
-    /// Zeichenbereich ab, damit sie das Diagramm nie ueberdeckt.
-    fn draw_legend(&self, g: &mut Graphics, a: &mut Area) {
-        let st = &self.style;
-        let pos = st.legende.to_lowercase();
-        if pos == "aus" {
-            return;
-        }
-        // Kuchen beschriftet Segmente, alles andere die Reihen.
-        let eintraege: Vec<(String, i64)> = if self.kind == Kind::Pie {
+    /// Legendeneintraege (Name + Farbe). Kuchen beschriftet Segmente, alles
+    /// andere die Reihen. Namenlose Eintraege fallen weg.
+    fn legende_eintraege(&self) -> Vec<(String, i64)> {
+        let roh: Vec<(String, i64)> = if self.kind == Kind::Pie {
             self.labels
                 .iter()
                 .enumerate()
@@ -774,10 +1172,72 @@ impl ChartObj {
                 .map(|(i, s)| (s.name.clone(), self.color_of(i)))
                 .collect()
         };
-        let eintraege: Vec<(String, i64)> = eintraege.into_iter().filter(|(n, _)| !n.is_empty()).collect();
+        roh.into_iter().filter(|(n, _)| !n.is_empty()).collect()
+    }
+
+    /// Platz, den die Legende der Zeichenflaeche wegnimmt. Rein rechnend --
+    /// `inhalt()` (Treffertest) und `draw_legend` (Zeichnen) teilen sie sich,
+    /// damit die Maus nicht neben dem trifft, was zu sehen ist.
+    fn legende_abzug(&self, g: &Graphics, a: &mut Area) {
+        let st = &self.style;
+        let pos = st.legende.to_lowercase();
+        if pos == "aus" {
+            return;
+        }
+        let eintraege = self.legende_eintraege();
         if eintraege.is_empty() {
             return;
         }
+        let sz = st.text_groesse;
+        let kasten = (sz * 3) / 4;
+        let zeile = sz + 6;
+        match pos.as_str() {
+            "links" | "rechts" => {
+                let breite = eintraege
+                    .iter()
+                    .map(|(n, _)| g.text_width_at(n, sz))
+                    .max()
+                    .unwrap_or(0)
+                    + kasten
+                    + 10;
+                if pos == "links" {
+                    a.x0 += breite + 6;
+                } else {
+                    a.x1 -= breite + 6;
+                }
+            }
+            _ => {
+                if pos == "oben" {
+                    a.y0 += zeile + 6;
+                } else {
+                    a.y1 -= zeile + 6;
+                }
+            }
+        }
+    }
+
+    /// Legende an einer der vier Kanten zeichnen.
+    fn draw_legend(&self, g: &mut Graphics) {
+        let st = &self.style;
+        let pos = st.legende.to_lowercase();
+        if pos == "aus" {
+            return;
+        }
+        let eintraege = self.legende_eintraege();
+        if eintraege.is_empty() {
+            return;
+        }
+        // Flaeche VOR dem Legenden-Abzug -- dort wird sie hingezeichnet.
+        let mut a = Area {
+            x0: self.x + st.polster,
+            y0: self.y + st.polster,
+            x1: self.x + self.w - st.polster,
+            y1: self.y + self.h - st.polster,
+        };
+        if !st.titel.is_empty() {
+            a.y0 += st.titel_groesse + 8;
+        }
+        let a = &mut a;
         let sz = st.text_groesse;
         let kasten = (sz * 3) / 4;
         let zeile = sz + 6;
@@ -835,33 +1295,34 @@ impl ChartObj {
         if summe <= 0.0 {
             return;
         }
-        let (cx, cy) = (a.x0 + a.w() / 2, a.y0 + a.h() / 2);
-        let r = (a.w().min(a.h()) / 2 - st.abstand.max(0.0) as i32).max(4);
-        let ri = (r as f64 * st.innenradius.clamp(0.0, 0.95)) as i32;
+        let (cx, cy, r, ri) = self.kuchen_geom(a);
+        let stuecke = self.kuchen_stuecke();
 
-        // Bei 12 Uhr beginnen (raylib: 0 Grad = rechts), im Uhrzeigersinn.
-        let mut winkel = -90.0f64;
         for (i, &v) in werte.iter().enumerate() {
-            if v <= 0.0 {
+            let (winkel, spanne) = stuecke[i];
+            if spanne <= 0.0 {
                 continue;
             }
-            let spanne = v / summe * 360.0;
             let mitte = (winkel + spanne / 2.0).to_radians();
+            let glanz = self.glanz_von(i);
             // "abstand" schiebt das Segment aus der Mitte heraus (Tortenstueck
-            // herausgezogen) -- ohne Versatz waere es nur eine Luecke.
-            let vx = cx + (mitte.cos() * st.abstand) as i32;
-            let vy = cy + (mitte.sin() * st.abstand) as i32;
-            let farbe = with_alpha(self.slice_color(i), st.deckkraft);
+            // herausgezogen); die Hervorhebung legt beim Ueberfahren noch
+            // `hover_weite` drauf -- daher der Rand in kuchen_geom().
+            let raus = st.abstand + st.hover_weite * glanz;
+            let vx = cx + (mitte.cos() * raus) as i32;
+            let vy = cy + (mitte.sin() * raus) as i32;
+            let ra = r + (st.hover_weite * 0.35 * glanz) as i32;
+            let farbe = self.hell(with_alpha(self.slice_color(i), st.deckkraft), glanz);
             if st.f_schatten_daten && st.schatten > 0 {
-                g.ring(vx + st.schatten, vy + st.schatten, ri, r,
+                g.ring(vx + st.schatten, vy + st.schatten, ri, ra,
                        winkel, winkel + spanne, st.c_schatten, true);
             }
-            g.ring(vx, vy, ri, r, winkel, winkel + spanne, farbe, true);
+            g.ring(vx, vy, ri, ra, winkel, winkel + spanne, farbe, true);
             if st.f_verlauf_daten {
                 // Ein echter Radialverlauf ist mit `ring` nicht zu haben --
                 // ein abgedunkeltes Band auf der Innenhaelfte gibt dem
                 // Segment aber dieselbe Tiefenwirkung.
-                let band = ri + (r - ri) / 2;
+                let band = ri + (ra - ri) / 2;
                 g.ring(vx, vy, ri, band, winkel, winkel + spanne,
                        with_alpha(self.verlauf_ende(farbe), 0.55), true);
             }
@@ -873,15 +1334,14 @@ impl ChartObj {
                     self.fmt_value(v)
                 };
                 let (lr, farbe) = if st.werte == "innen" {
-                    (((r + ri) / 2) as f64, st.c_text)
+                    (((ra + ri) / 2) as f64, st.c_text)
                 } else {
-                    (r as f64 + 14.0, st.c_text)
+                    (ra as f64 + 14.0, st.c_text)
                 };
                 let tx = vx + (mitte.cos() * lr) as i32 - g.text_width_at(&text, st.text_groesse) / 2;
                 let ty = vy + (mitte.sin() * lr) as i32 - st.text_groesse / 2;
                 g.text_styled(tx, ty, text, farbe, st.schrift, st.text_groesse);
             }
-            winkel += spanne;
         }
     }
 
@@ -899,11 +1359,7 @@ impl ChartObj {
         }
         self.draw_grid(g, &plot, lo, hi, waagerecht);
 
-        let laenge = if waagerecht { plot.h() } else { plot.w() };
-        let fach = laenge as f64 / n as f64;
-        let luecke = st.abstand.max(0.0).min(fach / 2.0);
-        let reihen = if st.f_stapel { 1 } else { self.series.len() };
-        let breite = ((fach - luecke) / reihen as f64).max(1.0);
+        let (fach, luecke, breite) = self.balken_geom(&plot, waagerecht);
 
         for i in 0..n {
             let basis = fach * i as f64 + luecke / 2.0;
@@ -918,13 +1374,15 @@ impl ChartObj {
                     } else {
                         stapel_neg = bis;
                     }
-                    self.bar_rect(g, &plot, basis, breite, von, bis, lo, hi, self.data_color(si), waagerecht);
+                    let f = self.hell(self.data_color(si), self.glanz_von(i));
+                    self.bar_rect(g, &plot, basis, breite, von, bis, lo, hi, f, waagerecht);
                 }
             } else {
                 for (si, s) in self.series.iter().enumerate() {
                     let v = *self.anzeige(s).get(i).unwrap_or(&0.0);
                     let off = basis + breite * si as f64;
-                    self.bar_rect(g, &plot, off, breite, 0.0, v, lo, hi, self.data_color(si), waagerecht);
+                    let f = self.hell(self.data_color(si), self.glanz_von(i));
+                    self.bar_rect(g, &plot, off, breite, 0.0, v, lo, hi, f, waagerecht);
                     // Werte nur bei EINER Reihe anschreiben -- bei mehreren
                     // stehen die Balken so dicht, dass die Zahlen ineinander
                     // laufen wuerden. Dort tut es die Achse.
@@ -1016,8 +1474,7 @@ impl ChartObj {
         if n < 2 || self.series.is_empty() {
             return;
         }
-        let (lo, hi) = self.range();
-        let plot = self.axis_area(g, a, lo, hi, false);
+        let (plot, lo, hi) = self.achsen_geom(g, a, false);
         if plot.w() < 4 || plot.h() < 4 {
             return;
         }
@@ -1074,9 +1531,17 @@ impl ChartObj {
                     g.line_thick(xs[i - 1], ys[i - 1], xs[i], ys[i], st.linien_dicke, farbe);
                 }
             }
-            if st.f_punkte {
-                for i in 0..n {
-                    g.circle(xs[i], ys[i], st.punkt_radius.max(1), farbe);
+            for i in 0..n {
+                let glanz = if self.hover_serie == si as i32 { self.glanz_von(i) } else { 0.0 };
+                if st.f_punkte {
+                    let r = st.punkt_radius.max(1) + (st.hover_weite * 0.4 * glanz) as i32;
+                    g.circle(xs[i], ys[i], r, self.hell(farbe, glanz));
+                } else if glanz > 0.05 {
+                    // Ohne dauerhafte Punkte trotzdem einen zeigen, solange die
+                    // Maus darauf steht -- sonst bliebe unklar, worauf sich die
+                    // Sprechblase bezieht.
+                    let r = (2.0 + st.hover_weite * 0.4 * glanz) as i32;
+                    g.circle(xs[i], ys[i], r.max(2), self.hell(farbe, glanz));
                 }
             }
         }
@@ -1273,7 +1738,7 @@ impl ChartObj {
     // --- gemeinsame Achsen-Hilfen -----------------------------------------
 
     /// Zeichenflaeche nach Abzug des Platzes fuer die Achsenbeschriftung.
-    fn axis_area(&self, g: &mut Graphics, a: &Area, lo: f64, hi: f64, waagerecht: bool) -> Area {
+    fn axis_area(&self, g: &Graphics, a: &Area, lo: f64, hi: f64, waagerecht: bool) -> Area {
         let st = &self.style;
         let breiteste = {
             let s1 = self.fmt_value(lo);
@@ -1412,6 +1877,7 @@ pub const KEYS_NUM: &[&str] = &[
     "nachkomma", "titel_groesse", "text_groesse", "schrift", "start_winkel", "end_winkel",
     "striche", "unterstriche", "linien_dicke", "punkt_radius", "animation", "fenster", "schatten",
     "schatten_weich", "deckkraft", "flaeche_deckkraft",
+    "hover_tempo", "hover_weite", "hover_glanz",
 ];
 pub const KEYS_COLOR: &[&str] = &[
     "hintergrund", "rahmen", "gitter", "text", "titel", "achse", "zeiger", "flaeche", "verlauf",
@@ -1420,6 +1886,7 @@ pub const KEYS_COLOR: &[&str] = &[
 pub const KEYS_FLAG: &[&str] = &[
     "rahmen", "gitter_x", "gitter_y", "prozent", "flaeche", "punkte", "glatt", "null_linie",
     "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz",
+    "hover", "tooltip",
 ];
 
 fn unbekannt(fn_: &str, key: &str, gueltig: &[&str]) -> String {
@@ -1505,6 +1972,9 @@ impl ChartObj {
             "schatten_weich" => s.schatten_weich = v.clamp(0.0, 30.0) as i32,
             "deckkraft" => s.deckkraft = v.clamp(0.0, 1.0),
             "flaeche_deckkraft" => s.flaeche_deckkraft = v.clamp(0.0, 1.0),
+            "hover_tempo" => s.hover_tempo = v.clamp(0.0, 5.0),
+            "hover_weite" => s.hover_weite = v.clamp(0.0, 100.0),
+            "hover_glanz" => s.hover_glanz = v.clamp(0.0, 1.0),
             _ => return Err(unbekannt("CHART_SET_NUM", key, KEYS_NUM)),
         }
         Ok(())
@@ -1547,6 +2017,8 @@ impl ChartObj {
             "verlauf_daten" => s.f_verlauf_daten = v,
             "schatten_daten" => s.f_schatten_daten = v,
             "kurz" => s.f_kurz = v,
+            "hover" => s.f_hover = v,
+            "tooltip" => s.f_tooltip = v,
             _ => return Err(unbekannt("CHART_SET_FLAG", key, KEYS_FLAG)),
         }
         Ok(())
@@ -1557,6 +2029,15 @@ impl ChartObj {
         if !farben.is_empty() {
             self.style.palette = farben.to_vec();
         }
+    }
+}
+
+impl ChartObj {
+    /// Nur fuer Tests: `hell()` liegt im Grafik-Zweig, die Farbmathematik
+    /// soll aber auch ohne Fenster pruefbar sein.
+    #[cfg(test)]
+    pub fn hell_test(&self, farbe: i64, glanz: f64) -> i64 {
+        mix_rgb(farbe, 0xFFFFFF, self.style.hover_glanz * glanz)
     }
 }
 
@@ -1791,6 +2272,79 @@ mod tests {
         // 0 als Deckkraft darf nicht auf das Alpha-Byte 0 fallen -- das waere
         // wieder "deckend". Untere Grenze ist 1.
         assert_eq!(alpha_of(with_alpha(0xFF8800, 0.0)), 1);
+    }
+
+    #[test]
+    fn kuchen_stuecke_summieren_sich_auf_360() {
+        let mut c = ChartObj::new(Kind::Pie, 0, 0, 100, 100);
+        c.add_point("a", 45.0, -1);
+        c.add_point("b", 30.0, -1);
+        c.add_point("c", 25.0, -1);
+        let s = c.kuchen_stuecke();
+        assert_eq!(s.len(), 3);
+        assert!((s[0].0 - (-90.0)).abs() < 1e-9, "startet nicht bei 12 Uhr");
+        let summe: f64 = s.iter().map(|(_, sp)| sp).sum();
+        assert!((summe - 360.0).abs() < 1e-9, "Summe {}", summe);
+        // Luecken darf es nicht geben: jedes Stueck beginnt, wo das vorige endet.
+        for i in 1..s.len() {
+            assert!((s[i].0 - (s[i - 1].0 + s[i - 1].1)).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn stueck_bei_winkel_trifft_rundherum() {
+        // 4 gleiche Viertel ab 12 Uhr im Uhrzeigersinn.
+        let s = vec![(-90.0, 90.0), (0.0, 90.0), (90.0, 90.0), (180.0, 90.0)];
+        assert_eq!(stueck_bei_winkel(&s, -45.0), 0);   // oben rechts
+        assert_eq!(stueck_bei_winkel(&s, 45.0), 1);    // unten rechts
+        assert_eq!(stueck_bei_winkel(&s, 135.0), 2);   // unten links
+        // atan2 liefert fuer "oben links" -135 -- ohne Umrechnung faende man
+        // dort nichts, obwohl das vierte Viertel genau da liegt.
+        assert_eq!(stueck_bei_winkel(&s, -135.0), 3);
+        assert_eq!(stueck_bei_winkel(&s, 225.0), 3, "gleicher Punkt, andere Schreibweise");
+    }
+
+    #[test]
+    fn stueck_bei_winkel_ueberspringt_leere_segmente() {
+        let s = vec![(-90.0, 0.0), (-90.0, 360.0)];
+        assert_eq!(stueck_bei_winkel(&s, 0.0), 1, "Nullsegment darf nicht treffen");
+        assert_eq!(stueck_bei_winkel(&[], 0.0), -1);
+    }
+
+    #[test]
+    fn hover_getter_sind_ohne_zeichnen_leer() {
+        let c = ChartObj::new(Kind::Pie, 0, 0, 100, 100);
+        assert_eq!(c.hover, -1);
+        assert_eq!(c.hover_label(), "");
+        assert_eq!(c.hover_value(), 0.0);
+        assert_eq!(c.geklickt, -1);
+    }
+
+    #[test]
+    fn hervorhebung_verschiebt_den_farbton_nicht() {
+        // Regression: `scale_rgb` machte aus hervorgehobenem Orange ein Gelb,
+        // weil Rot schon bei 255 klemmte und nur Gruen mitwuchs. Das sah aus
+        // wie ein ANDERER Eintrag der Palette. Gegen Weiss mischen haelt die
+        // Reihenfolge der Kanaele -- und damit den Farbton -- ein.
+        let orange = 0xFFA500;
+        let mut c = ChartObj::new(Kind::Pie, 0, 0, 100, 100);
+        c.set_num("hover_glanz", 0.35).unwrap();
+        let hell = c.hell_test(orange, 1.0);
+        let (r, gr, b) = ((hell >> 16) & 0xFF, (hell >> 8) & 0xFF, hell & 0xFF);
+        assert!(r > gr && gr > b, "Farbton gekippt: #{:06X}", hell);
+        assert!(hell != orange, "gar nicht aufgehellt");
+        // Zum Vergleich: das alte Verfahren kippte die Reihenfolge.
+        let alt = scale_rgb(orange, 1.35);
+        assert_eq!((alt >> 16) & 0xFF, 255);
+        assert!((alt >> 8) & 0xFF > 0xA5, "alte Fassung hellte Gruen staerker auf");
+    }
+
+    #[test]
+    fn mix_rgb_haelt_das_alpha_der_ersten_farbe() {
+        assert_eq!(mix_rgb(0x000000, 0xFFFFFF, 0.5), 0x808080);
+        assert_eq!(mix_rgb(0x80000000u32 as i64, 0xFFFFFF, 0.0), 0x80000000u32 as i64);
+        // Alpha von b wird NICHT uebernommen.
+        assert_eq!(mix_rgb(0x40FF0000u32 as i64, 0xFF00FF00u32 as i64, 1.0), 0x4000FF00u32 as i64);
     }
 
     #[test]

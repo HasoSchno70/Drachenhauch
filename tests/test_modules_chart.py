@@ -263,3 +263,43 @@ def test_tacho_bringt_seine_reihe_schon_mit(run_gb):
         'PRINT CHART_SERIES_COUNT(c)\n'
     )
     assert _lines(run_gb(src)) == ["1"]
+
+
+# --- Interaktion (Hover/Klick) -------------------------------------------
+#
+# Der eigentliche Treffertest braucht Fenster und Maus und laeuft darum nicht
+# hier, sondern als Rust-#[test] auf der Winkel-/Bereichsmathematik. Golden
+# geprueft wird, dass die Abfragen ohne Zeichnen einen sauberen Leerwert
+# liefern statt zu stolpern -- genau das fragt ein Programm im ersten Bild ab.
+
+def test_hover_abfragen_sind_ohne_zeichnen_leer(run_gb):
+    src = HEAD + (
+        'c = CHART_NEW("kuchen", 0, 0, 100, 100)\n'
+        'CHART_ADD(c, "a", 1.0, 0)\n'
+        'PRINT CHART_HOVER(c)\n'
+        'PRINT CHART_HOVER_SERIES(c)\n'
+        'PRINT CHART_CLICKED(c)\n'
+        'PRINT "[" + CHART_HOVER_LABEL$(c) + "]"\n'
+        'PRINT CHART_HOVER_VALUE(c)\n'
+    )
+    assert _lines(run_gb(src)) == ["-1", "-1", "-1", "[]", "0.0"]
+
+
+@pytest.mark.parametrize("key", ["hover", "tooltip"])
+def test_interaktions_schalter(run_gb, key):
+    src = HEAD + (
+        'c = CHART_NEW("kuchen", 0, 0, 100, 100)\n'
+        f'CHART_SET_FLAG(c, "{key}", FALSE)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]
+
+
+@pytest.mark.parametrize("key", ["hover_tempo", "hover_weite", "hover_glanz"])
+def test_interaktions_zahlen(run_gb, key):
+    src = HEAD + (
+        'c = CHART_NEW("kuchen", 0, 0, 100, 100)\n'
+        f'CHART_SET_NUM(c, "{key}", 0.5)\n'
+        'PRINT "ok"\n'
+    )
+    assert _lines(run_gb(src)) == ["ok"]

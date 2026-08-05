@@ -194,6 +194,42 @@ Zwei getrennte Schalter:
   automatisch eine abgedunkelte Fassung der jeweiligen Reihenfarbe genommen —
   so passt der Verlauf ohne Zutun zu jeder Palette.
 
+## Maus: Hervorhebung, Sprechblasen, Klick
+
+`CHART_DRAW` wertet die Maus selbst aus — es braucht keinen zusätzlichen
+Aufruf. Wer die Maus über ein Segment, einen Balken oder einen Punkt bewegt,
+sieht ihn weich aufleuchten; das Kuchenstück rückt zusätzlich heraus, der
+Linienpunkt wächst.
+
+```basic
+CHART_SET_FLAG(c, "tooltip", TRUE)      ' Sprechblase mit Name und Wert
+
+' pro Bild, nach CHART_DRAW:
+IF CHART_CLICKED(c) >= 0 THEN
+    PRINT "Angeklickt: " + CHART_HOVER_LABEL$(c)
+END IF
+```
+
+| Befehl | Liefert |
+|---|---|
+| `CHART_HOVER(c)` | Punkt unter der Maus, `-1` = keiner |
+| `CHART_HOVER_SERIES(c)` | Reihe unter der Maus, `-1` = keine |
+| `CHART_HOVER_LABEL$(c)` | Beschriftung dieses Punktes (`""` = keiner) |
+| `CHART_HOVER_VALUE(c)` | sein Wert |
+| `CHART_CLICKED(c)` | in **diesem** Bild angeklickter Punkt, sonst `-1` |
+| `CHART_CLICKED_SERIES(c)` | zugehörige Reihe |
+
+Alle Werte gelten **nach** `CHART_DRAW` — vorher stehen sie auf `-1`.
+
+Einstellbar: `hover` (Effekt ganz aus), `tooltip` (Sprechblase),
+`hover_tempo` (Sekunden fürs Ein-/Ausblenden, 0 = sofort), `hover_weite`
+(wie weit herausrücken/wachsen), `hover_glanz` (wie stark aufhellen).
+
+Die Hervorhebung mischt die Farbe gegen **Weiß** statt sie hochzurechnen.
+Das ist Absicht: bei gesättigten Farben klemmt der größte Kanal schon bei 255,
+sodass nur die kleineren mitwachsen — ein hervorgehobenes Orange wurde dabei
+sichtbar gelb und sah aus wie ein anderer Eintrag der Palette.
+
 ## Animation
 
 Ohne `animation` zeigt das Diagramm immer den gesetzten Wert. Mit
