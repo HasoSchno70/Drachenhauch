@@ -53,6 +53,11 @@ fn default_metrics() -> HashMap<String, i32> {
         ("title_h", 22), ("slider_h", 14), ("check_size", 16),
         ("slider_handle_w", 10), ("caret_period", 16), ("pad", 6),
         ("corner_radius", 0), ("shadow", 0),
+        // Plastik-Metriken: 0 = flach (bisheriges Verhalten).
+        // gradient: Helligkeits-Abstand oben/unten in Farbstufen.
+        // gloss:    Staerke der Glanzkante ueber der oberen Haelfte, 0..100.
+        // bevel:    1 = helle Linie oben, dunkle unten (die Fase).
+        ("gradient", 0), ("gloss", 0), ("bevel", 0),
     ].iter().map(|(k, v)| (k.to_string(), *v as i32)).collect()
 }
 
@@ -60,6 +65,21 @@ fn default_metrics() -> HashMap<String, i32> {
 /// Fenster-Schatten + groessere Titelleiste (-> der professionelle Look); alle
 /// anderen bleiben beim flachen Default. Wird in theme_preset() angewandt.
 fn preset_metrics(name: &str) -> Option<HashMap<String, i32>> {
+    // "glas_*": runde Ecken + Verlauf + Glanzkante + Fase -- der plastische
+    // Look. Alles andere bleibt beim flachen Default, damit bestehende
+    // Programme sich nicht veraendern.
+    if name.starts_with("glas") {
+        let mut m = default_metrics();
+        m.insert("corner_radius".into(), 5);
+        m.insert("title_h".into(), 30);
+        m.insert("pad".into(), 8);
+        m.insert("shadow".into(), 18);
+        m.insert("gradient".into(), 16);
+        m.insert("gloss".into(), 26);
+        m.insert("bevel".into(), 1);
+        m.insert("slider_h".into(), 16);
+        return Some(m);
+    }
     if name.starts_with("modern") {
         let mut m = default_metrics();
         m.insert("corner_radius".into(), 7);
@@ -83,6 +103,19 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("title_bg_focus", 0x2A7DE1), ("title_fg", 0x202428), ("widget_bg", 0xD8DCE2),
             ("widget_border", 0x9AA0A8), ("text_fg", 0x202428), ("muted_fg", 0x90969C),
             ("accent", 0x2A7DE1), ("close_hover", 0xC04848)])),
+        // Dunkles Glas: Anthrazit-Blau mit Cyan-Akzent -- der Look aus dem
+        // Vorlagenbild (Verlaeufe + Glanz kommen aus dem Metrik-Profil).
+        "glas_dunkel" | "glas_dark" => Some(m(&[
+            ("win_bg", 0x232A33), ("win_border", 0x151A21), ("title_bg", 0x2C343F),
+            ("title_bg_focus", 0x1C6E96), ("title_fg", 0xEAF2F8), ("widget_bg", 0x39424F),
+            ("widget_border", 0x161B22), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8B97A6),
+            ("accent", 0x2FA8D8), ("close_hover", 0xC04848)])),
+        // Helles Glas: Weiss/Silber mit demselben Blau.
+        "glas_hell" | "glas_light" => Some(m(&[
+            ("win_bg", 0xEDF1F5), ("win_border", 0xAEB8C4), ("title_bg", 0xDCE3EB),
+            ("title_bg_focus", 0x2A8FD0), ("title_fg", 0x1E2530), ("widget_bg", 0xF2F5F8),
+            ("widget_border", 0xA8B3C0), ("text_fg", 0x1E2530), ("muted_fg", 0x76818F),
+            ("accent", 0x2A8FD0), ("close_hover", 0xC04848)])),
         "retro" => Some(m(&[
             ("win_bg", 0x020802), ("win_border", 0x1F8C3C), ("title_bg", 0x0A2A0A),
             ("title_bg_focus", 0x0F4F1F), ("title_fg", 0x33FF66), ("widget_bg", 0x0A1A0A),
@@ -1743,15 +1776,85 @@ impl Gui {
         }
     }
     /// Gefuellte Box + Rahmen, runde Ecken wenn Metrik `corner_radius` > 0.
+    /// Gefuellte Flaeche mit Rand -- die gemeinsame Grundform fast aller
+    /// Widgets. Mit den Plastik-Metriken (`gradient`/`gloss`/`bevel`) wird
+    /// daraus eine gewoelbte Flaeche; sind sie 0, bleibt alles flach wie
+    /// bisher.
     fn fbox(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, fill: i64, border: i64) {
+        self.flaeche(g, x1, y1, x2, y2, fill, border, false);
+    }
+
+    /// Wie `fbox`, aber VERSENKT: der Verlauf laeuft andersherum und statt
+    /// einer Glanzkante liegt ein Schatten unter dem oberen Rand. Das ist der
+    /// Unterschied zwischen einem Knopf, den man drueckt, und einem Feld, in
+    /// das man hineinschreibt -- ohne ihn sieht ein Eingabefeld aus wie ein
+    /// Knopf, und die Oberflaeche verliert ihre Aussage.
+    fn fbox_tief(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, fill: i64, border: i64) {
+        self.flaeche(g, x1, y1, x2, y2, fill, border, true);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn flaeche(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32,
+               fill: i64, border: i64, tief: bool) {
         let rad = self.m("corner_radius");
-        if rad > 0 {
+        let grad = self.m("gradient");
+        if grad > 0 {
+            // Erhaben: hell oben, dunkel unten. Versenkt: genau umgekehrt --
+            // so faellt das Licht scheinbar weiter von oben ein, die Flaeche
+            // liegt aber tiefer.
+            let (oben, unten) = if tief {
+                (shade(fill, -grad), shade(fill, grad / 2))
+            } else {
+                (shade(fill, grad), shade(fill, -grad))
+            };
+            g.round_gradient(x1, y1, x2, y2, rad, oben, unten);
+            if !tief {
+                self.gloss(g, x1, y1, x2, y2, rad);
+            }
+        } else if rad > 0 {
             g.round_rect(x1, y1, x2, y2, rad, fill, true);
-            g.round_rect(x1, y1, x2, y2, rad, border, false);
         } else {
             g.box_fill(x1, y1, x2, y2, fill);
+        }
+        self.bevel(g, x1, y1, x2, y2, rad, tief);
+        if rad > 0 {
+            g.round_rect(x1, y1, x2, y2, rad, border, false);
+        } else {
             g.rect(x1, y1, x2, y2, border);
         }
+    }
+
+    /// Glanzkante: halbdurchsichtiges Weiss ueber der oberen Haelfte, nach
+    /// unten ausblendend. Erst das laesst eine Flaeche gewoelbt wirken -- ein
+    /// blosser Verlauf sieht weiterhin flach aus.
+    fn gloss(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32) {
+        let s = self.m("gloss");
+        if s <= 0 || y2 - y1 < 4 {
+            return;
+        }
+        let a = ((s.clamp(0, 100) as f64 / 100.0) * 255.0) as i64;
+        let mitte = y1 + (y2 - y1) / 2;
+        // Alpha 1 = praktisch unsichtbar (0 hiesse in gbrt DECKEND).
+        g.round_gradient(x1, y1, x2, mitte, rad,
+                         (a << 24) | 0xFFFFFF, 0x01FF_FFFFu32 as i64);
+    }
+
+    /// Fase: eine helle Linie oben, eine dunkle unten. Die schmalste Zutat
+    /// mit der groessten Wirkung -- sie trennt die Flaeche sichtbar vom
+    /// Untergrund.
+    fn bevel(&self, g: &mut Graphics, x1: i32, y1: i32, x2: i32, y2: i32, rad: i32, tief: bool) {
+        if self.m("bevel") <= 0 || x2 - x1 < 4 {
+            return;
+        }
+        let ein = rad.max(1);
+        let (oben, unten) = if tief {
+            // Versenkt: Schatten oben, Lichtkante unten.
+            (0x60000000u32 as i64, 0x38FFFFFFu32 as i64)
+        } else {
+            (0x50FFFFFFu32 as i64, 0x40000000u32 as i64)
+        };
+        g.line(x1 + ein, y1 + 1, x2 - ein, y1 + 1, oben);
+        g.line(x1 + ein, y2 - 1, x2 - ein, y2 - 1, unten);
     }
 
     // --- Update (ein Frame) ---
@@ -2747,7 +2850,7 @@ impl Gui {
                 self.wtext(g, wdg, ax, ay, wdg.text.clone(), fg);
             }
             Kind::Panel => {
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 if !wdg.text.is_empty() {
                     g.box_fill(ax, ay, ax + w - 1, ay + 17, self.th("win_border"));
@@ -2823,7 +2926,7 @@ impl Gui {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let tx = ax + 5;
                 let ty = ay + (h - 14) / 2;
                 let scroll = wdg.scroll;
@@ -2859,7 +2962,7 @@ impl Gui {
                 let focused = self.focus_widget == Some((wi, idx));
                 let fg = self.txt_col(wdg);
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let pad = 5;
                 let lh = self.ta_line_h(g);
                 let scroll = wdg.scroll;
@@ -2915,7 +3018,7 @@ impl Gui {
             Kind::Spinner => {
                 let focused = self.focus_widget == Some((wi, idx));
                 let bcol = if focused { self.wcol(wdg, "accent", "accent") } else { self.wcol(wdg, "border", "widget_border") };
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1, self.wcol(wdg, "bg", "win_bg"), bcol);
                 let (up, down, bx) = Self::spinner_btn_rects(ax, ay, w, h);
                 let bordc = self.wcol(wdg, "border", "widget_border");
                 // Trennlinien vor und in der Buttonspalte.
@@ -2967,7 +3070,7 @@ impl Gui {
             }
             Kind::Progress => {
                 let acc = self.acc_col(wdg);
-                self.fbox(g, ax, ay, ax + w - 1, ay + h - 1,
+                self.fbox_tief(g, ax, ay, ax + w - 1, ay + h - 1,
                     self.wcol(wdg, "bg", "widget_bg"), self.wcol(wdg, "border", "widget_border"));
                 let span = wdg.max - wdg.min;
                 let ratio = if span != 0.0 { ((wdg.value - wdg.min) / span).clamp(0.0, 1.0) } else { 0.0 };

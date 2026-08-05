@@ -813,3 +813,29 @@ schließbar.
 - **Headless/grafisch**: `GUI_UPDATE`/`GUI_DRAW` brauchen einen aktiven
   `SCREEN`. Konstruktion, State, Geometrie und Hit-Test sind headless getestet
   (`tests/test_gui_runtime.py`).
+
+
+## Plastischer Look: die Glas-Themen
+
+`GUI_THEME_PRESET("glas_dunkel")` bzw. `"glas_hell"` schalten einen
+gewölbten Look ein: senkrechter Verlauf auf jeder Fläche, Glanzkante über der
+oberen Hälfte, feine Fase oben und unten.
+
+Das steckt in drei **Metriken**, nicht in Farben — so ist ein Thema ein
+kompletter Look statt zweier Dinge, die man von Hand kombinieren muss:
+
+| Metrik | Bedeutung |
+|---|---|
+| `gradient` | Helligkeitsabstand oben/unten; 0 = flach |
+| `gloss` | Stärke der Glanzkante, 0…100 |
+| `bevel` | 1 = helle Linie oben, dunkle unten |
+
+Einzeln setzbar über `GUI_METRIC_SET`. Alle **bestehenden** Themen stehen
+weiterhin auf 0 — schon geschriebene Programme sehen unverändert aus.
+
+**Erhaben und versenkt.** Knöpfe, Panels und Auswahlfelder sind erhaben
+(hell oben → dunkel unten, mit Glanz). Eingabefelder, Listen und der
+Fortschritts-Trog sind versenkt: der Verlauf läuft andersherum und statt der
+Glanzkante liegt ein Schatten unter dem oberen Rand. Ohne diesen Unterschied
+sieht ein Eingabefeld aus wie ein Knopf, und die Oberfläche verliert ihre
+Aussage darüber, was man anklickt und was man ausfüllt.

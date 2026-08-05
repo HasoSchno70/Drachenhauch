@@ -55,3 +55,50 @@ def test_set_font_accepts_handle(run_gb):
     # GUI_SET_FONT akzeptiert ein (auch -1=Default) Handle ohne Fehler.
     out = run_gb(_W + 'GUI_SET_FONT(b, -1)\nPRINT GUI_KIND(b)\n')
     assert out.strip() == "button"
+
+
+# --- Plastik-Metriken + Glas-Themen ---------------------------------------
+#
+# Verlauf, Glanzkante und Fase sind Metriken, keine Farben -- so bleibt ein
+# Thema ein KOMPLETTER Look (Farben + Plastik) statt beides von Hand
+# kombinieren zu muessen.
+
+def test_glas_themen_schalten_die_plastik_ein(run_gb):
+    src = ('IMPORT "gui"\n'
+           'GUI_THEME_PRESET("glas_dunkel")\n'
+           'PRINT GUI_METRIC_GET("gradient")\n'
+           'PRINT GUI_METRIC_GET("gloss")\n'
+           'PRINT GUI_METRIC_GET("bevel")\n'
+           'PRINT GUI_METRIC_GET("corner_radius")\n')
+    assert [l.strip() for l in run_gb(src).split("\n") if l.strip()] == ["16", "26", "1", "5"]
+
+
+def test_flache_themen_bleiben_flach(run_gb):
+    """Bestehende Themen duerfen sich nicht veraendern -- sonst saehen alle
+    schon geschriebenen Programme ploetzlich anders aus."""
+    src = ('IMPORT "gui"\n'
+           'GUI_THEME_PRESET("dark")\n'
+           'PRINT GUI_METRIC_GET("gradient") + GUI_METRIC_GET("gloss") + GUI_METRIC_GET("bevel")\n'
+           'GUI_THEME_PRESET("modern_dark")\n'
+           'PRINT GUI_METRIC_GET("gradient") + GUI_METRIC_GET("gloss") + GUI_METRIC_GET("bevel")\n')
+    assert [l.strip() for l in run_gb(src).split("\n") if l.strip()] == ["0", "0"]
+
+
+def test_beide_glas_themen_gibt_es_hell_und_dunkel(run_gb):
+    src = ('IMPORT "gui"\n'
+           'GUI_THEME_PRESET("glas_dunkel")\n'
+           'PRINT GUI_THEME_GET("win_bg")\n'
+           'GUI_THEME_PRESET("glas_hell")\n'
+           'PRINT GUI_THEME_GET("win_bg")\n')
+    zeilen = [l.strip() for l in run_gb(src).split("\n") if l.strip()]
+    assert zeilen[0] != zeilen[1], "hell und dunkel haben denselben Hintergrund"
+    assert int(zeilen[0]) < int(zeilen[1]), "dunkel muss dunkler sein als hell"
+
+
+def test_plastik_metriken_sind_einzeln_setzbar(run_gb):
+    src = ('IMPORT "gui"\n'
+           'GUI_METRIC_SET("gradient", 30)\n'
+           'GUI_METRIC_SET("gloss", 50)\n'
+           'GUI_METRIC_SET("bevel", 1)\n'
+           'PRINT GUI_METRIC_GET("gradient")\n')
+    assert [l.strip() for l in run_gb(src).split("\n") if l.strip()] == ["30"]
