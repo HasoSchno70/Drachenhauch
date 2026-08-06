@@ -9,7 +9,9 @@ IMPORT "ui"
 SCREEN(420, 320, "UI-Theming-Demo", 2)
 
 DIM presets AS ARRAY OF STRING
-presets = SPLIT$("dark|light|retro|contrast", "|")
+' "glas_*" bringen zusaetzlich Plastik mit: Verlauf, Glanzkante, Fase.
+' Ein Preset setzt Farben UND Metriken, ist also ein kompletter Look.
+presets = SPLIT$("dark|light|retro|contrast|glas_dunkel|glas_hell", "|")
 DIM pidx AS INTEGER
 pidx = 0
 
@@ -22,7 +24,8 @@ WHILE NOT QUITREQUESTED()
 
     ' Preset durchschalten
     IF UI_BUTTON("next", 12, 36, 150, 28, "Theme wechseln") THEN
-        pidx = (pidx + 1) MOD 4
+        pidx = (pidx + 1) MOD presets.length()   ' nicht fest 4 -- sonst faellt
+                                                 ' ein neues Thema hinten raus
         UI_THEME_PRESET(presets[pidx])
     END IF
 
