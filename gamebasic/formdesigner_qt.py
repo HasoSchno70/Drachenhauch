@@ -21,6 +21,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QRect, QRectF, QPoint, QSize, QMimeData, Signal
 from PySide6.QtGui import (
     QAction, QColor, QPainter, QPen, QBrush, QKeySequence, QFont, QPixmap, QIcon,
+    QLinearGradient,
 )
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
@@ -32,7 +33,7 @@ from PySide6.QtWidgets import (
 
 from .formdesigner import (
     FormDoc, FormProject, Control, History, PALETTE, palette_spec, GRID, HANDLES,
-    snap, resize_rect,
+    snap, resize_rect, FORM_THEMES, theme_colors,
 )
 
 try:
@@ -86,6 +87,52 @@ def _gbrt_diagnostics(gbrt, gb_path: Path) -> list:
 
 def _col(i: int) -> QColor:
     return QColor((i >> 16) & 0xFF, (i >> 8) & 0xFF, i & 0xFF)
+
+
+def _mix(a: QColor, b: QColor, t: float) -> QColor:
+    """Zwei Farben mischen (t = 0 ganz a, 1 ganz b)."""
+    t = min(1.0, max(0.0, t))
+    return QColor(int(a.red() + (b.red() - a.red()) * t),
+                  int(a.green() + (b.green() - a.green()) * t),
+                  int(a.blue() + (b.blue() - a.blue()) * t))
+
+
+def _shade(c: QColor, d: int) -> QColor:
+    return QColor(min(255, max(0, c.red() + d)),
+                  min(255, max(0, c.green() + d)),
+                  min(255, max(0, c.blue() + d)))
+
+
+def _fill_surface(qp: QPainter, r: QRect, face: QColor, border: QColor,
+                  rad: int, grad: int, gloss: int):
+    """Flaeche wie die Laufzeit: flach, gerundet oder gewoelbt mit Glanzkante.
+
+    Der Designer zeichnet mit Qt, kann also nicht dieselben Befehle nutzen wie
+    gbrt -- er baut den Eindruck nach. Genau deshalb sind die Werte
+    (`radius`/`gradient`/`gloss`) dieselben Zahlen wie in den Metriken der
+    Laufzeit, damit beide Seiten am selben Regler haengen."""
+    if grad > 0:
+        gradient = QLinearGradient(r.topLeft(), r.bottomLeft())
+        gradient.setColorAt(0.0, _shade(face, grad))
+        gradient.setColorAt(1.0, _shade(face, -grad))
+        qp.setBrush(QBrush(gradient))
+    else:
+        qp.setBrush(face)
+    qp.setPen(QPen(border, 1))
+    if rad > 0:
+        qp.drawRoundedRect(r, rad, rad)
+    else:
+        qp.drawRect(r)
+    if grad > 0 and gloss > 0 and r.height() >= 6:
+        g2 = QLinearGradient(r.topLeft(), QPoint(r.left(), r.center().y()))
+        g2.setColorAt(0.0, QColor(255, 255, 255, int(gloss * 255 / 100)))
+        g2.setColorAt(1.0, QColor(255, 255, 255, 0))
+        qp.setBrush(QBrush(g2)); qp.setPen(Qt.PenStyle.NoPen)
+        top = QRect(r.left(), r.top(), r.width(), max(2, r.height() // 2))
+        if rad > 0:
+            qp.drawRoundedRect(top, rad, rad)
+        else:
+            qp.drawRect(top)
 
 
 def _progress_frac(c) -> float:
@@ -485,15 +532,19 @@ class _Canvas(QWidget):
         qp.save()
         qp.scale(self.zoom, self.zoom)                 # ab hier alles im Zeichen-Raum
         d = self.doc
+        th = theme_colors(d.theme)
         win = QRect(PAD, PAD, d.w, d.h)
-        qp.fillRect(win, QColor(24, 34, 46))
-        qp.setPen(QPen(QColor(46, 88, 110), 1))
+        # Formularflaeche + Titelleiste im gewaehlten Thema -- vorher fest
+        # verdrahtet, sodass der Entwurf immer cyan aussah, egal was das
+        # Formular spaeter benutzt.
+        qp.fillRect(win, _col(th["win_bg"]))
+        qp.setPen(QPen(_col(th["win_border"]), 1))
         qp.drawRect(win)
         if self.snap_grid:
             self._paint_grid(qp, d)
         # Titelleiste
-        qp.fillRect(QRect(PAD, PAD, d.w, TITLE_H), QColor(18, 90, 120))
-        qp.setPen(QColor(230, 247, 255))
+        qp.fillRect(QRect(PAD, PAD, d.w, TITLE_H), _col(th["title_bg"]))
+        qp.setPen(_col(th["title_fg"]))
         qp.drawText(PAD + 6, PAD + 15, d.title)
         # Controls
         for c in d.controls:
@@ -621,9 +672,20 @@ class _Canvas(QWidget):
         r = QRect(x, y, w, h)
         k = c.kind
         en = c.enabled
-        fg = QColor(228, 238, 246) if en else QColor(120, 132, 146)
-        accent = QColor(43, 196, 232) if en else QColor(74, 112, 128)
-        border = QColor(78, 104, 128)
+        th = theme_colors(self.doc.theme)
+        fg = _col(th["text_fg"]) if en else _col(th["muted_fg"])
+        accent = _col(th["accent"]) if en else _mix(_col(th["accent"]), _col(th["win_bg"]), 0.55)
+        border = _col(th["widget_border"])
+        # Flaechenfarbe + Plastik aus dem Thema. `rad` bestimmt, ob eckig oder
+        # gerundet gezeichnet wird -- so entspricht der Entwurf dem, was die
+        # Laufzeit spaeter zeigt.
+        face = _col(th["widget_bg"]) if en else _mix(_col(th["widget_bg"]), _col(th["win_bg"]), 0.5)
+        # Versenkte Flaeche (Eingabefeld, Liste, Fortschritts-Trog): dunkler
+        # als die erhabene, damit man sieht, was man ausfuellt und was man
+        # anklickt -- dieselbe Unterscheidung wie in der Laufzeit.
+        sunk = _mix(face, _col(th["win_bg"]), 0.55)
+        rad = th["radius"]
+        grad = th["gradient"]
         al = Qt.AlignmentFlag
         font = QFont("Segoe UI")
         font.setPixelSize(max(7, c.font_size)) if c.font_size else font.setPointSize(8)
@@ -631,8 +693,7 @@ class _Canvas(QWidget):
         qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
         if k == "button":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(46, 62, 80) if en else QColor(34, 44, 56))
-            qp.drawRoundedRect(r, 5, 5)
+            _fill_surface(qp, r, face, border, rad, grad, th["gloss"])
             qp.setPen(fg); qp.drawText(r, al.AlignCenter, c.text or "Button")
         elif k == "label":
             col = _col(c.color) if (en and c.color != 0xFFFFFF) else fg
@@ -640,7 +701,8 @@ class _Canvas(QWidget):
         elif k in ("checkbox", "radio"):
             bs = min(h, 16)
             box = QRect(x, y + (h - bs) // 2, bs, bs)
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(22, 30, 40))
+            qp.setPen(QPen(border, 1))
+            qp.setBrush(_mix(face, _col(th["win_bg"]), 0.45))   # versenkte Mulde
             if k == "checkbox":
                 qp.drawRoundedRect(box, 3, 3)
                 if c.checked:
@@ -664,19 +726,19 @@ class _Canvas(QWidget):
             qp.setBrush(accent); qp.setPen(Qt.PenStyle.NoPen)
             qp.drawEllipse(QPoint(kx, midy), 6, 6)
         elif k == "textinput":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(18, 24, 32)); qp.drawRect(r)
+            _fill_surface(qp, r, sunk, border, rad, -grad, 0)
             if c.text:
                 qp.setPen(fg); txt = c.text
             else:
-                qp.setPen(QColor(120, 132, 146)); txt = c.placeholder or ""
+                qp.setPen(_col(th["muted_fg"])); txt = c.placeholder or ""
             qp.drawText(r.adjusted(6, 0, -4, 0), al.AlignVCenter, txt)
         elif k == "dropdown":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(46, 62, 80) if en else QColor(34, 44, 56)); qp.drawRect(r)
+            _fill_surface(qp, r, face, border, rad, grad, th["gloss"])
             sel = c.items[c.sel] if 0 <= c.sel < len(c.items) else ""
             qp.setPen(fg); qp.drawText(r.adjusted(6, 0, -18, 0), al.AlignVCenter, sel)
             qp.drawText(QRect(x + w - 16, y, 14, h), al.AlignCenter, "▾")
         elif k == "listbox":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
+            _fill_surface(qp, r, sunk, border, rad, -grad, 0)
             qp.save(); qp.setClipRect(r)
             lh = 15
             for i, it in enumerate(c.items):
@@ -684,18 +746,18 @@ class _Canvas(QWidget):
                 if iy >= y + h:
                     break
                 if i == c.sel:
-                    qp.fillRect(QRect(x + 1, iy, w - 2, lh), QColor(28, 84, 112))
+                    qp.fillRect(QRect(x + 1, iy, w - 2, lh), _mix(_col(th["win_bg"]), accent, 0.45))
                 qp.setPen(fg); qp.drawText(QRect(x + 5, iy, w - 8, lh), al.AlignVCenter, str(it))
             qp.restore()
         elif k == "progress":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(24, 32, 42)); qp.drawRect(r)
+            _fill_surface(qp, r, sunk, border, rad, -grad, 0)
             frac = _progress_frac(c)
             fillw = int((w - 2) * frac)
             if fillw > 0:
                 qp.fillRect(QRect(x + 1, y + 1, fillw, h - 2), accent)
         elif k == "panel":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(28, 38, 50)); qp.drawRect(r)
-            qp.fillRect(QRect(x, y, w, 16), QColor(40, 56, 72))
+            _fill_surface(qp, r, _mix(face, _col(th["win_bg"]), 0.5), border, rad, grad, 0)
+            qp.fillRect(QRect(x, y, w, 16), _col(th["title_bg"]))
             qp.setPen(fg); qp.drawText(QRect(x + 5, y, w - 8, 16), al.AlignVCenter, c.text or "")
         elif k == "separator":
             my = y + h // 2
@@ -704,24 +766,25 @@ class _Canvas(QWidget):
             qp.setPen(QPen(border, 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
             qp.drawRect(QRect(x, y + 7, w - 1, h - 8))
             if c.text:
-                qp.fillRect(QRect(x + 8, y, min(w - 16, len(c.text) * 7 + 8), 13), QColor(24, 34, 46))
+                qp.fillRect(QRect(x + 8, y, min(w - 16, len(c.text) * 7 + 8), 13), _col(th["win_bg"]))
                 qp.setPen(fg); qp.drawText(x + 12, y + 11, c.text)
         elif k == "image":
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(40, 44, 52)); qp.drawRect(r)
+            qp.setPen(QPen(border, 1)); qp.setBrush(_mix(face, _col(th["win_bg"]), 0.4)); qp.drawRect(r)
             qp.setPen(QPen(accent, 1))
             qp.drawLine(x + 4, y + h - 5, x + w // 2 - 2, y + h // 2)
             qp.drawLine(x + w // 2 - 2, y + h // 2, x + w - 5, y + h - 5)
             qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
             qp.drawEllipse(QRect(x + w - 16, y + 6, 7, 7))
         elif k == "canvas":
-            qp.setBrush(QColor(14, 20, 28)); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
-            qp.setPen(QColor(120, 134, 150)); qp.drawText(r, al.AlignCenter, "Canvas")
+            qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
+            qp.setPen(_col(th["muted_fg"])); qp.drawText(r, al.AlignCenter, "Canvas")
         else:
-            qp.setPen(QPen(border, 1)); qp.setBrush(QColor(40, 52, 66)); qp.drawRect(r)
+            _fill_surface(qp, r, face, border, rad, grad, th["gloss"])
             qp.setPen(fg); qp.drawText(r, al.AlignCenter, c.text or k)
 
         if not c.visible:                       # unsichtbares Control angedeutet toenen
-            qp.fillRect(r, QColor(18, 22, 28, 150))
+            qp.fillRect(r, QColor(_col(th["win_bg"]).red(), _col(th["win_bg"]).green(),
+                                  _col(th["win_bg"]).blue(), 150))
 
     def _paint_handles(self, qp: QPainter, c: Control):
         x = PAD + c.x
@@ -1281,7 +1344,11 @@ class _WindowInspector(QWidget):
         self.closable = QCheckBox("schliessbar")
         self.resizable = QCheckBox("groessenveraenderbar")
         self.visible = QCheckBox("sichtbar")
+        self.theme = QComboBox()
+        for name in FORM_THEMES:
+            self.theme.addItem(name or "(Vorgabe)", name)
         f.addRow("Titel", self.title)
+        f.addRow("Thema", self.theme)
         f.addRow("Breite", self.sw); f.addRow("Hoehe", self.sh)
         f.addRow("Min. Breite", self.minw); f.addRow("Min. Hoehe", self.minh)
         f.addRow("Max. Breite", self.maxw); f.addRow("Max. Hoehe", self.maxh)
@@ -1292,6 +1359,7 @@ class _WindowInspector(QWidget):
             s.valueChanged.connect(self._apply)
         for c in (self.movable, self.closable, self.resizable, self.visible):
             c.toggled.connect(self._apply)
+        self.theme.currentIndexChanged.connect(self._apply)
 
     def set_doc(self, doc: FormDoc):
         self.doc = doc
@@ -1303,6 +1371,8 @@ class _WindowInspector(QWidget):
             self.maxw.setValue(doc.max_w); self.maxh.setValue(doc.max_h)
             self.movable.setChecked(doc.movable); self.closable.setChecked(doc.closable)
             self.resizable.setChecked(doc.resizable); self.visible.setChecked(doc.visible)
+            i = self.theme.findData(doc.theme or "")
+            self.theme.setCurrentIndex(i if i >= 0 else 0)
         self._loading = False
 
     def _apply(self):
@@ -1321,6 +1391,7 @@ class _WindowInspector(QWidget):
             d.max_h = d.min_h; self.maxh.setValue(d.max_h)
         d.movable, d.closable = self.movable.isChecked(), self.closable.isChecked()
         d.resizable, d.visible = self.resizable.isChecked(), self.visible.isChecked()
+        d.theme = self.theme.currentData() or ""
         self.changed.emit()
 
 

@@ -203,3 +203,26 @@ um.
 Undo-/Redo-Stack; die Canvas legt vor jeder Mutation einen Checkpoint an und
 fasst kontinuierliche Gesten (Drag/Resize) bzw. eine Inspector-Edit-Sitzung zu
 je einem Schritt zusammen.
+
+
+## Thema des Formulars
+
+In den Formular-Eigenschaften (Inspector, wenn kein Control gewählt ist) gibt
+es die Auswahl **Thema**. Sie bestimmt zweierlei:
+
+- Das erzeugte Programm setzt `GUI_THEME_PRESET(...)` **vor** `GUI_LOAD` — das
+  Preset legt auch Metriken wie den Eckenradius fest, und die gehen in die
+  Darstellung der Widgets ein.
+- Die Entwurfsfläche malt das Thema nach, damit der Entwurf zeigt, was das
+  Formular später wirklich tut.
+
+`(Vorgabe)` heißt: kein Preset-Aufruf, also das eingebaute Cyan-Thema der
+Laufzeit. Ein Formular ohne Eintrag bekommt beim Speichern **kein** neues
+Feld — bestehende `.gbform`-Dateien ändern sich also nicht.
+
+> **Achtung bei Änderungen:** `FORM_THEME_COLORS` in
+> `gamebasic/formdesigner/document.py` ist ein **Nachbau** der Presets aus
+> `rust/gb_runtime/src/gui.rs` — der Designer zeichnet mit Qt und kann die
+> Laufzeit nicht fragen. `tests/test_formdesigner_theme.py` vergleicht beide
+> gegeneinander; wer ein Preset in gui.rs ändert oder hinzufügt, muss die
+> Tabelle nachziehen (der Test sagt genau, welcher Wert abweicht).

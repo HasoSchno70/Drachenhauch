@@ -402,6 +402,65 @@ class Control:
 
 
 # --- FormDoc ----------------------------------------------------------------
+# Auswaehlbare gui-Themen. "" = die Vorgabe der Laufzeit (Cyan), damit ein
+# altes Formular ohne Eintrag genauso aussieht wie bisher.
+#
+# ACHTUNG: die Farben unten sind ein NACHBAU der Presets aus
+# `rust/gb_runtime/src/gui.rs` -- der Designer zeichnet mit Qt, kann also
+# nicht die Laufzeit fragen. `tests/test_formdesigner_theme.py` vergleicht
+# beide gegeneinander, damit sie nicht auseinanderlaufen.
+FORM_THEMES = ("", "glas_dunkel", "glas_hell", "modern_dark", "modern_light",
+               "dark", "light", "retro", "contrast")
+
+# Farben + Plastik je Thema -- Nachbau von `preset()`/`preset_metrics()` aus
+# gui.rs. Nur die Rollen, die der Designer zum Zeichnen braucht.
+# Schluessel: win_bg, win_border, title_bg, title_fg, widget_bg,
+# widget_border, text_fg, muted_fg, accent; dazu radius/gradient/gloss.
+FORM_THEME_COLORS = {
+    "": dict(win_bg=0x18222E, win_border=0x2E3C50, title_bg=0x123C50,
+             title_fg=0xE6F7FF, widget_bg=0x26323F, widget_border=0x46586E,
+             text_fg=0xFFFFFF, muted_fg=0x7A8AA0, accent=0x2BC4E8,
+             radius=0, gradient=0, gloss=0),
+    "dark": dict(win_bg=0x18222E, win_border=0x2E3C50, title_bg=0x123C50,
+                 title_fg=0xE6F7FF, widget_bg=0x26323F, widget_border=0x46586E,
+                 text_fg=0xFFFFFF, muted_fg=0x7A8AA0, accent=0x2BC4E8,
+                 radius=0, gradient=0, gloss=0),
+    "light": dict(win_bg=0xF4F6F9, win_border=0xA8AEB6, title_bg=0xD0D5DC,
+                  title_fg=0x202428, widget_bg=0xD8DCE2, widget_border=0x9AA0A8,
+                  text_fg=0x202428, muted_fg=0x90969C, accent=0x2A7DE1,
+                  radius=0, gradient=0, gloss=0),
+    "retro": dict(win_bg=0x020802, win_border=0x1F8C3C, title_bg=0x0A2A0A,
+                  title_fg=0x33FF66, widget_bg=0x0A1A0A, widget_border=0x1F8C3C,
+                  text_fg=0x33FF66, muted_fg=0x1F8C3C, accent=0x33FF66,
+                  radius=0, gradient=0, gloss=0),
+    "contrast": dict(win_bg=0x000000, win_border=0xFFD400, title_bg=0x202000,
+                     title_fg=0xFFFFFF, widget_bg=0x000000, widget_border=0xFFD400,
+                     text_fg=0xFFFFFF, muted_fg=0xAAAAAA, accent=0xFFD400,
+                     radius=0, gradient=0, gloss=0),
+    "modern_dark": dict(win_bg=0x1E2630, win_border=0x33414F, title_bg=0x161D26,
+                        title_fg=0xEAF2F8, widget_bg=0x2A3542, widget_border=0x3C4A5A,
+                        text_fg=0xEAF2F8, muted_fg=0x8493A4, accent=0x2BC4E8,
+                        radius=7, gradient=0, gloss=0),
+    "modern_light": dict(win_bg=0xFAFBFC, win_border=0xD8DEE6, title_bg=0xEFF2F5,
+                         title_fg=0x1F2733, widget_bg=0xFFFFFF, widget_border=0xCBD3DD,
+                         text_fg=0x1F2733, muted_fg=0x8A93A0, accent=0x2A7DE1,
+                         radius=7, gradient=0, gloss=0),
+    "glas_dunkel": dict(win_bg=0x232A33, win_border=0x151A21, title_bg=0x2C343F,
+                        title_fg=0xEAF2F8, widget_bg=0x39424F, widget_border=0x161B22,
+                        text_fg=0xEAF2F8, muted_fg=0x8B97A6, accent=0x2FA8D8,
+                        radius=5, gradient=16, gloss=26),
+    "glas_hell": dict(win_bg=0xE2E8EF, win_border=0x6E7C8C, title_bg=0xD2DAE3,
+                      title_fg=0x1E2530, widget_bg=0xFBFCFE, widget_border=0x63707F,
+                      text_fg=0x1E2530, muted_fg=0x66707C, accent=0x2A8FD0,
+                      radius=5, gradient=16, gloss=26),
+}
+
+
+def theme_colors(name: str) -> dict:
+    """Farb-/Plastik-Tabelle eines Themas (unbekannt -> Vorgabe)."""
+    return FORM_THEME_COLORS.get(name or "", FORM_THEME_COLORS[""])
+
+
 @dataclass
 class FormDoc:
     title: str = "Form1"
@@ -417,6 +476,7 @@ class FormDoc:
     min_h: int = 0
     max_w: int = 0
     max_h: int = 0
+    theme: str = ""                                # gui-Preset ("" = Vorgabe der Laufzeit)
     controls: list = field(default_factory=list)   # list[Control]
     code: dict = field(default_factory=dict)       # Event-Handler-Koerper: name -> GB-Code
     # Fenster-Felder der Laufzeit, die der Designer nicht darstellt (`chrome`,
@@ -426,7 +486,7 @@ class FormDoc:
 
     _KNOWN = frozenset((
         "title", "x", "y", "w", "h", "movable", "closable", "visible",
-        "resizable", "min_w", "min_h", "max_w", "max_h", "widgets", "code",
+        "resizable", "min_w", "min_h", "max_w", "max_h", "theme", "widgets", "code",
     ))
 
     # ---- Bearbeiten ----
@@ -616,6 +676,10 @@ class FormDoc:
             "resizable": self.resizable,
             "widgets": [c.to_dict() for c in self.controls],
         }
+        if self.theme:
+            # Nur schreiben, wenn gesetzt -- sonst bekaeme jede alte Datei beim
+            # blossen Oeffnen+Speichern ein neues Feld.
+            d["theme"] = self.theme
         for k in ("min_w", "min_h", "max_w", "max_h"):   # nur wenn gesetzt
             if getattr(self, k):
                 d[k] = getattr(self, k)
@@ -647,6 +711,7 @@ class FormDoc:
             resizable=_as_bool(d, "resizable", False),
             min_w=_as_int(d, "min_w", 0), min_h=_as_int(d, "min_h", 0),
             max_w=_as_int(d, "max_w", 0), max_h=_as_int(d, "max_h", 0),
+            theme=_as_str(d, "theme", ""),
             code=code,
             extra={k: v for k, v in d.items() if k not in cls._KNOWN},
         )
@@ -695,6 +760,11 @@ class FormDoc:
             'IMPORT "gui"',
             f'SCREEN({sw}, {sh}, {_gb_str(title)}, 1)',
         ]
+        if self.theme:
+            # VOR dem Laden der Form: GUI_THEME_PRESET setzt auch die Metriken
+            # (Eckenradius, Verlauf), und die gehen in die Groessen der
+            # Widgets ein.
+            lines.append(f"GUI_THEME_PRESET({_gb_str(self.theme)})")
         if self.resizable:
             lines.append("WINDOW_RESIZABLE(TRUE)")
             if self.min_w or self.min_h:
