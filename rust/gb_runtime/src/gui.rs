@@ -119,9 +119,9 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
         // auf Weiss hat ein weisser Verlauf fast keinen Kontrast. Die Raender
         // sind aus demselben Grund kraeftiger als im dunklen Thema.
         "glas_hell" | "glas_light" => Some(m(&[
-            ("win_bg", 0xE2E8EF), ("win_border", 0x98A4B2), ("title_bg", 0xD2DAE3),
+            ("win_bg", 0xE2E8EF), ("win_border", 0x6E7C8C), ("title_bg", 0xD2DAE3),
             ("title_bg_focus", 0x2A8FD0), ("title_fg", 0x1E2530), ("widget_bg", 0xFBFCFE),
-            ("widget_border", 0x8A96A6), ("text_fg", 0x1E2530), ("muted_fg", 0x6C7683),
+            ("widget_border", 0x63707F), ("text_fg", 0x1E2530), ("muted_fg", 0x66707C),
             ("accent", 0x2A8FD0), ("close_hover", 0xC04848)])),
         "retro" => Some(m(&[
             ("win_bg", 0x020802), ("win_border", 0x1F8C3C), ("title_bg", 0x0A2A0A),
@@ -160,6 +160,17 @@ fn mischen(a: i64, b: i64, t: f64) -> i64 {
         ((ca + (cb - ca) * t).round() as i64).clamp(0, 255)
     };
     (ch(16) << 16) | (ch(8) << 8) | ch(0)
+}
+
+/// Waagerechte Lage der Knopf-Beschriftung im freien Bereich.
+///
+/// Liefert (Versatz, muss_beschnitten_werden). Passt der Text, sitzt er
+/// mittig. Passt er NICHT, beginnt er am linken Rand und wird abgeschnitten
+/// -- so bleibt die Form des Knopfes die Grenze, wie man es von Oberflaechen
+/// kennt. Ihn stattdessen zentriert ueberstehen zu lassen wuerde ihn an
+/// BEIDEN Seiten anschneiden und damit auch den Anfang unlesbar machen.
+fn knopf_text_x(frei: i32, tw: i32) -> (i32, bool) {
+    if tw > frei { (0, true) } else { ((frei - tw) / 2, false) }
 }
 
 /// Untere Kante der Glanzflaeche.
@@ -1874,6 +1885,18 @@ impl Gui {
         (self.frame_count / self.m("caret_period").max(1) as i64) % 2 == 0
     }
     /// Text mit per-Widget-Font/-Groesse (sonst unveraendert via g.text).
+    /// Schriftgroesse dieses Widgets in Pixeln.
+    fn wsize(&self, g: &Graphics, w: &Widget) -> i32 {
+        if w.font_size > 0 { w.font_size } else { g.text_height() }
+    }
+
+    /// Breite eines Textes in der Schrift DIESES Widgets. Ohne das laesst
+    /// sich Text nicht mittig setzen, sobald ein Widget eine eigene Schrift
+    /// oder Groesse hat.
+    fn wtext_width(&self, g: &Graphics, w: &Widget, s: &str) -> i32 {
+        g.text_width_at(s, self.wsize(g, w))
+    }
+
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
         if w.font == -1 && w.font_size == 0 {
             g.text(x, y, s, c);
@@ -3119,8 +3142,23 @@ impl Gui {
                     g.draw_image_rect(wdg.sel as i64, ix, iy, isz, isz);
                 }
                 if !wdg.text.is_empty() {
-                    let tx = if has_icon { ax + pad + isz + 4 } else { ax + pad };
-                    self.wtext(g, wdg, tx, ay + (h - 14) / 2, wdg.text.clone(), self.txt_col(wdg));
+                    // Beschriftung mittig -- vorher klebte sie am linken Rand.
+                    // Mit Sinnbild bleibt der Platz dafuer links stehen und
+                    // der Text zentriert sich im Rest.
+                    let sz = self.wsize(g, wdg);
+                    let tw = self.wtext_width(g, wdg, &wdg.text);
+                    let links = if has_icon { pad + isz + 4 } else { pad };
+                    let frei = (w - links - pad).max(0);
+                    let (versatz, beschnitten) = knopf_text_x(frei, tw);
+                    let tx = ax + links + versatz;
+                    let ty = ay + (h - sz) / 2;
+                    if beschnitten {
+                        g.push_clip(ax + links, ay + 1, frei, (h - 2).max(0));
+                    }
+                    self.wtext(g, wdg, tx, ty, wdg.text.clone(), self.txt_col(wdg));
+                    if beschnitten {
+                        g.pop_clip();
+                    }
                 }
             }
             Kind::Checkbox => {
@@ -3621,7 +3659,18 @@ mod label_tests {
 
 #[cfg(test)]
 mod gloss_tests {
-    use super::gloss_unten;
+    use super::{gloss_unten, knopf_text_x};
+
+    #[test]
+    fn knopf_text_sitzt_mittig_und_wird_sonst_beschnitten() {
+        // Passt: mittig, kein Beschnitt.
+        assert_eq!(knopf_text_x(100, 40), (30, false));
+        assert_eq!(knopf_text_x(100, 100), (0, false));
+        // Passt nicht: am linken Rand beginnen und abschneiden. Zentriert
+        // ueberstehen zu lassen wuerde auch den ANFANG anschneiden.
+        assert_eq!(knopf_text_x(60, 200), (0, true));
+        assert_eq!(knopf_text_x(0, 10), (0, true));
+    }
 
     #[test]
     fn runde_formen_bekommen_den_glanz_ueber_die_ganze_hoehe() {
