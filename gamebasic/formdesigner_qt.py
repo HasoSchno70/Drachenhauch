@@ -21,6 +21,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QRect, QRectF, QPoint, QSize, QMimeData, Signal
 from PySide6.QtGui import (
     QAction, QColor, QPainter, QPen, QBrush, QKeySequence, QFont, QPixmap, QIcon,
+    QShortcut,
     QLinearGradient,
 )
 from PySide6.QtWidgets import (
@@ -1190,6 +1191,7 @@ class _Inspector(QWidget):
     """Eigenschaften + Events des gewaehlten Controls editieren."""
     changed = Signal()
     handler_renamed = Signal(str, str)     # alter, neuer Handler-Name
+    control_renamed = Signal(object, str)  # Control, alter Control-Name
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -1384,6 +1386,7 @@ class _Inspector(QWidget):
             return
         c = self._c
         old_click, old_change = c.on_click, c.on_change
+        old_name = c.name
         c.name = self.name.text().strip()
         c.text = self.text.text()
         c.x, c.y, c.w, c.h = self.sx.value(), self.sy.value(), self.sw.value(), self.sh.value()
@@ -1414,6 +1417,11 @@ class _Inspector(QWidget):
         for old, new in ((old_click, c.on_click), (old_change, c.on_change)):
             if old and new and old != new:
                 self.handler_renamed.emit(old, new)
+        # Control umbenannt -> abgeleitete Handler-Namen ziehen mit. Das
+        # Dokument entscheidet das (dort wohnen die Namensregeln); gemeldet
+        # wird es, damit Code-Panel und Inspector den neuen Namen zeigen.
+        if old_name != c.name:
+            self.control_renamed.emit(c, old_name)
         self.changed.emit()
 
 
@@ -1619,7 +1627,9 @@ class FormDesigner(QMainWindow):
         self.unresolved: list[str] = []            # beim Laden fehlende .gbform
         self._suppress_row = False
         self.setWindowTitle("GameBasic Form-Designer")
-        self.resize(1500, 950)
+        self.resize(1500, 950)   # Groesse fuer den Fall, dass jemand
+                                 # aus dem Vollbild zurueckschaltet
+        QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
 
         self.canvas = _Canvas()
         scroll = QScrollArea(); scroll.setWidget(self.canvas); scroll.setWidgetResizable(False)
@@ -1673,6 +1683,7 @@ class FormDesigner(QMainWindow):
         self.canvas.context_menu.connect(self._show_context_menu)
         self.inspector.changed.connect(self._on_inspector_changed)
         self.inspector.handler_renamed.connect(self._on_handler_renamed)
+        self.inspector.control_renamed.connect(self._on_control_renamed)
         self.win_inspector.changed.connect(self._on_window_changed)
         self.code_panel.session_started.connect(self._on_code_session)
         self.code_panel.edited.connect(self._on_code_edited)
@@ -1991,6 +2002,26 @@ class FormDesigner(QMainWindow):
         if doc.code.get(new):
             return                       # dort steht schon Code -- nicht ueberschreiben
         doc.code[new] = doc.code.pop(old)
+
+    def _toggle_fullscreen(self) -> None:
+        """F11: echtes Vollbild an/aus. Zurueck geht es auf MAXIMIERT, nicht
+        auf die alte Fenstergroesse -- sonst schrumpft der Designer beim
+        Verlassen des Vollbilds auf ein kleines Fenster mitten im Bild."""
+        if self.isFullScreen():
+            self.showMaximized()
+        else:
+            self.showFullScreen()
+
+    def _on_control_renamed(self, c, old_name: str):
+        """Control umbenannt: abgeleitete Handler mitnehmen und die Anzeige
+        nachziehen. Ohne das blieb im Code-Fenster der alte Name stehen --
+        man aenderte den Namen und nichts passierte."""
+        if not self.canvas.doc.rename_control_handlers(c, old_name):
+            return
+        self.code_panel.refresh()
+        # Inspector neu befuellen, damit die Ereignis-Zeile den neuen Namen
+        # zeigt (sie haelt den alten sonst bis zum naechsten Auswaehlen).
+        self.inspector.set_control(c)
 
     def _on_inspector_changed(self):
         """Inspector-Aenderung. Alle Edits einer Selektion = EIN Undo-Schritt."""
@@ -2489,7 +2520,8 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     win = FormDesigner(project_root)
     if initial_file:
         open_initial(win, Path(initial_file))
-    win.show()
+    win.showMaximized()      # "ordentlich Platz" -- wie Audio Studio und
+                             # der Notenblatt-Editor; F11 = echtes Vollbild
     return app.exec()
 
 

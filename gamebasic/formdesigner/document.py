@@ -655,6 +655,37 @@ class FormDoc:
         self.code.setdefault(name, "")
         return name
 
+    def rename_control_handlers(self, c: Control, old_name: str) -> list:
+        """Handler mitziehen, wenn ein Control umbenannt wird.
+
+        Betroffen sind NUR Handler, die noch ihren aus dem alten Control-Namen
+        abgeleiteten Namen tragen (`btn1` -> `btn1Click`). Ein selbst
+        vergebener Name bleibt unangetastet -- wer seinen Handler bewusst
+        `SpielStarten` genannt hat, will ihn nicht beim Umbenennen des Knopfes
+        verlieren.
+
+        Der Code-Rumpf wandert mit, sonst laege er unter dem alten Schluessel
+        als unerreichbare Leiche herum und der Export erzeugte fuer den neuen
+        Namen nur ein `' TODO`.
+
+        Liefert die (alt, neu)-Paare.
+        """
+        umbenannt = []
+        if not old_name or not c.name or old_name == c.name:
+            return umbenannt
+        for ev, suffix in (("on_click", "Click"), ("on_change", "Changed")):
+            jetzt = getattr(c, ev)
+            if not jetzt or jetzt != _gb_ident(old_name + suffix):
+                continue
+            neu = self._unique_handler_name(_gb_ident(c.name + suffix))
+            if neu == jetzt:
+                continue
+            setattr(c, ev, neu)
+            if jetzt in self.code and neu not in self.code:
+                self.code[neu] = self.code.pop(jetzt)
+            umbenannt.append((jetzt, neu))
+        return umbenannt
+
     def _unique_handler_name(self, base: str) -> str:
         used = set(self.code.keys())
         for c in self.controls:

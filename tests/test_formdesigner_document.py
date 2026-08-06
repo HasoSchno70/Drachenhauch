@@ -814,3 +814,68 @@ def test_runner_max_size_with_only_one_bound_set():
     src = doc.generate_runner("f.gbform")
     assert "WINDOW_MAX_SIZE(900, 0)" not in src    # 0 wuerde GLFW hart klemmen
     assert "WINDOW_MAX_SIZE(900, 32000)" in src
+
+
+# --- Control umbenennen zieht die Handler mit ------------------------------
+
+def test_umbenennen_zieht_abgeleiteten_handler_mit():
+    """Der Handler-Name entsteht beim Anlegen aus dem Control-Namen. Wurde
+    das Control spaeter umbenannt, blieb der alte Name stehen -- im
+    Code-Fenster passierte scheinbar nichts."""
+    d = FormDoc(title="T")
+    c = d.add("button", 10, 10)
+    name = d.ensure_handler(c)
+    d.code[name] = 'PRINT "hallo"'
+    assert name == "btn1Click"
+
+    alt = c.name
+    c.name = "StartKnopf"
+    assert d.rename_control_handlers(c, alt) == [("btn1Click", "StartKnopfClick")]
+    assert c.on_click == "StartKnopfClick"
+    # Der Rumpf wandert mit, der alte Schluessel verschwindet -- sonst laege
+    # der Code unerreichbar herum und der Export erzeugte nur ein TODO.
+    assert d.code["StartKnopfClick"] == 'PRINT "hallo"'
+    assert "btn1Click" not in d.code
+
+
+def test_selbst_vergebener_handler_bleibt_beim_umbenennen():
+    """Wer seinen Handler bewusst benannt hat, will ihn nicht verlieren."""
+    d = FormDoc(title="T")
+    c = d.add("button", 10, 10)
+    c.on_click = "SpielStarten"
+    d.code["SpielStarten"] = "x"
+    alt = c.name
+    c.name = "Anders"
+    assert d.rename_control_handlers(c, alt) == []
+    assert c.on_click == "SpielStarten"
+    assert d.code["SpielStarten"] == "x"
+
+
+def test_umbenennen_ohne_handler_tut_nichts():
+    d = FormDoc(title="T")
+    c = d.add("label", 10, 10)          # Label hat kein Event
+    alt = c.name
+    c.name = "Titel"
+    assert d.rename_control_handlers(c, alt) == []
+
+
+def test_umbenennen_auf_denselben_namen_ist_ein_no_op():
+    d = FormDoc(title="T")
+    c = d.add("button", 10, 10)
+    d.ensure_handler(c)
+    assert d.rename_control_handlers(c, c.name) == []
+
+
+def test_umbenennen_kollidiert_nicht_mit_bestehendem_handler():
+    """Traegt schon ein anderes Control den Zielnamen, muss der neue
+    ausweichen -- sonst zeigten zwei Controls auf denselben Rumpf."""
+    d = FormDoc(title="T")
+    a = d.add("button", 10, 10)
+    b = d.add("button", 10, 50)
+    d.ensure_handler(a)                  # btn1Click
+    d.ensure_handler(b)                  # btn2Click
+    alt = b.name
+    b.name = a.name                      # beide heissen jetzt btn1
+    paare = d.rename_control_handlers(b, alt)
+    assert paare, "Handler haette umbenannt werden muessen"
+    assert b.on_click != a.on_click, "zwei Controls zeigen auf denselben Handler"
