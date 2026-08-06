@@ -14,7 +14,7 @@ from PySide6.QtGui import QCloseEvent, QDropEvent, QKeyEvent, QMouseEvent   # no
 from PySide6.QtCore import Qt, QPointF, QMimeData, QEvent   # noqa: E402
 
 from gamebasic.formdesigner_qt import (   # noqa: E402
-    FormDesigner, _palette_icon, _CONTROL_MIME, PAD, TITLE_H,
+    FormDesigner, _Inspector, _palette_icon, _CONTROL_MIME, PAD, TITLE_H,
 )
 
 
@@ -1270,3 +1270,50 @@ def test_code_panel_follows_a_delete_on_the_canvas(tmp_path):
     assert win.code_panel.current is None
     assert "btn1Click" not in cv.doc.code              # Rumpf mit aufgeraeumt
     win.close()
+
+
+# --- Inspector: Abschnitte -------------------------------------------------
+
+def _sichtbare_abschnitte(ins):
+    # `isHidden()` statt `isVisible()`: letzteres ist auch dann False, wenn
+    # bloss das Fenster nicht angezeigt wurde.
+    return [lbl.text() for lbl, _ in ins._sections if not lbl.isHidden()]
+
+
+def test_inspector_zeigt_nur_abschnitte_mit_inhalt(tmp_path):
+    """Ueberschriften blenden sich mit ihren Zeilen aus -- sonst staende bei
+    einem Label ein leeres 'Werte' und 'Ereignisse' im Inspector."""
+    from gamebasic.formdesigner import FormDoc
+    _app()
+    doc = FormDoc(title="T")
+
+    schieber = doc.add("slider", 10, 10)
+    ins = _Inspector()
+    ins.set_control(schieber)
+    assert "WERTE" in _sichtbare_abschnitte(ins), "Schieber hat Min/Max/Wert"
+    assert "EREIGNISSE" in _sichtbare_abschnitte(ins), "Schieber hat on_change"
+
+    beschriftung = doc.add("label", 10, 40)
+    ins.set_control(beschriftung)
+    offen = _sichtbare_abschnitte(ins)
+    assert "WERTE" not in offen, "Label hat keine Wertebereiche"
+    assert "EREIGNISSE" not in offen, "Label hat keine Ereignisse"
+    # Was jedes Control hat, bleibt sichtbar.
+    assert "ALLGEMEIN" in offen and "POSITION UND GROESSE" in offen
+
+
+def test_inspector_ohne_auswahl_ist_leer(tmp_path):
+    _app()
+    ins = _Inspector()
+    ins.set_control(None)
+    assert _sichtbare_abschnitte(ins) == []
+
+
+def test_inspector_abschnitte_decken_alle_zeilen_ab(tmp_path):
+    """Jede Eigenschaftszeile muss unter einer Ueberschrift stehen -- eine
+    Zeile ausserhalb waere fuer den Nutzer nicht zuzuordnen."""
+    _app()
+    ins = _Inspector()
+    zugeordnet = {id(w) for _, widgets in ins._sections for w in widgets}
+    fehlend = [lbl for lbl, w in ins._rows if id(w) not in zugeordnet]
+    assert not fehlend, f"Zeilen ohne Abschnitt: {fehlend}"

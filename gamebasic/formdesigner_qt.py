@@ -1235,23 +1235,39 @@ class _Inspector(QWidget):
         for cb in (self.a_l, self.a_r, self.a_t, self.a_b):
             _ah.addWidget(cb)
         self._rows = []
+        self._sections = []          # (Ueberschrift-Label, [Widgets darunter])
+        # Nach Themen gruppiert statt einer langen Zeilenliste: bei einem
+        # Control mit vielen Eigenschaften suchte man sonst die gewuenschte
+        # Zeile. Die Ueberschriften blenden sich mit ihrem Inhalt aus -- sonst
+        # staende bei einem Label ein leeres "Werte" im Inspector.
+        self._section("Allgemein")
         self._add("Name", self.name)
         self._add("Text", self.text)
         self._add("Gruppe", self.group)
         self._add("Platzhalter", self.placeholder)
+
+        self._section("Darstellung")
         self._add("Farbe", self.color_btn)
         self._add("Schriftgroesse", self.sfont)
+
+        self._section("Position und Groesse")
         self._add("X", self.sx); self._add("Y", self.sy)
         self._add("Breite", self.sw); self._add("Hoehe", self.sh)
         self._add("Anker", self._anchor_box)
-        self._add("on_click", self.on_click)
-        self._add("on_change", self.on_change)
+
+        self._section("Werte")
         self._add("Items (1/Zeile)", self.items)
         self._add("Auswahl", self.ssel)
         self._add("Min", self.vmin); self._add("Max", self.vmax); self._add("Wert", self.vval)
+
+        self._section("Zustand")
         self._add("", self.enabled)
         self._add("", self.visible)
         self._add("", self.checked)
+
+        self._section("Ereignisse")
+        self._add("on_click", self.on_click)
+        self._add("on_change", self.on_change)
         # Signale
         self.name.editingFinished.connect(self._apply)
         self.text.editingFinished.connect(self._apply)
@@ -1288,9 +1304,31 @@ class _Inspector(QWidget):
             self._update_color_btn()
             self.changed.emit()
 
+    def _section(self, titel: str):
+        """Abschnitts-Ueberschrift, die die ganze Zeile einnimmt."""
+        lbl = QLabel(titel.upper())
+        f = lbl.font(); f.setBold(True); f.setPointSizeF(max(7.0, f.pointSizeF() - 1.0))
+        lbl.setFont(f)
+        lbl.setStyleSheet("color:#5fb6d6; margin-top:8px; border-bottom:1px solid #2e4356;")
+        self._form.addRow(lbl)
+        self._sections.append((lbl, []))
+
     def _add(self, label, widget):
         self._form.addRow(label, widget)
         self._rows.append((label, widget))
+        if self._sections:
+            self._sections[-1][1].append(widget)
+
+    def _sync_sections(self):
+        """Ueberschrift nur zeigen, wenn darunter ueberhaupt etwas steht.
+
+        Geprueft wird `isHidden()`, NICHT `isVisible()`: letzteres ist auch
+        dann False, wenn blosss das Fenster noch nicht angezeigt wurde -- beim
+        Aufbau waeren so alle Ueberschriften verschwunden, obwohl ihre Zeilen
+        da sind.
+        """
+        for lbl, widgets in self._sections:
+            lbl.setVisible(any(not w.isHidden() for w in widgets))
 
     def _show(self, widget, on: bool):
         widget.setVisible(on)
@@ -1304,6 +1342,7 @@ class _Inspector(QWidget):
         if c is None:
             for _, w in self._rows:
                 self._show(w, False)
+            self._sync_sections()
             self._loading = False
             return
         sp = palette_spec(c.kind)
@@ -1337,6 +1376,7 @@ class _Inspector(QWidget):
         self._show(self.on_change, "on_change" in events)
         self._show(self.vmin, is_range); self._show(self.vmax, is_range); self._show(self.vval, is_range)
         self._show(self.checked, is_check)
+        self._sync_sections()
         self._loading = False
 
     def _apply(self):
