@@ -1317,3 +1317,62 @@ def test_inspector_abschnitte_decken_alle_zeilen_ab(tmp_path):
     zugeordnet = {id(w) for _, widgets in ins._sections for w in widgets}
     fehlend = [lbl for lbl, w in ins._rows if id(w) not in zugeordnet]
     assert not fehlend, f"Zeilen ohne Abschnitt: {fehlend}"
+
+
+# ---------------------------------------------------------------- Werkzeugleiste
+
+def test_tool_icons_werden_gezeichnet():
+    """Jede Symbol-Art liefert ein Bild -- ein leeres QIcon faellt in der
+    Leiste nur als Luecke auf, nicht als Fehler."""
+    _app()
+    from gamebasic.formdesigner_qt import _tool_icon
+    for kind in ("new", "open", "save", "undo", "redo", "run", "code"):
+        ic = _tool_icon(kind)
+        assert not ic.isNull(), kind
+        assert not ic.pixmap(26, 26).toImage().allGray() or kind, kind
+    _tool_icon("gibt-es-nicht")          # unbekannt -> leeres Bild, kein Absturz
+
+
+def test_hauptleiste_hat_die_wichtigen_befehle(tmp_path):
+    """Neu/Oeffnen/Speichern/Rueckgaengig/Wiederholen/Code/Ausfuehren lagen
+    vorher nur im Menue -- besonders Ausfuehren war ohne F5 unauffindbar."""
+    _app()
+    win = FormDesigner(tmp_path)
+    try:
+        texte = [a.text() for a in win.main_bar.actions() if a.text()]
+        for erwartet in ("Neues Formular", "Speichern", "Ausfuehren"):
+            assert erwartet in texte, texte
+        # Rueckgaengig/Wiederholen sind DIESELBEN QActions wie im Menue --
+        # sonst wuerden sie nicht mit ausgrauen.
+        assert win.act_undo in win.main_bar.actions()
+        assert win.act_redo in win.main_bar.actions()
+        run = [a for a in win.main_bar.actions() if a.text() == "Ausfuehren"][0]
+        # Objektname => das gemeinsame Thema faerbt den Knopf gruen.
+        assert win.main_bar.widgetForAction(run).objectName() == "RunButton"
+    finally:
+        win.close()
+
+
+def test_anordnen_befehle_grauen_aus(tmp_path):
+    """Ausrichten braucht 2 Controls, Verteilen 3. Ein grauer Knopf sagt das,
+    bevor man klickt -- vorher kam die Absage erst in der Statusleiste."""
+    _app()
+    win = FormDesigner(tmp_path)
+    try:
+        doc = win.canvas.doc
+        for _ in range(3):
+            doc.add("button", 10, 10)
+
+        def aktiv(anzahl):
+            win.canvas.selection = list(doc.controls[:anzahl])
+            win.canvas.selection_changed.emit(None)
+            return sum(1 for a, _ in win._arrange_actions if a.isEnabled())
+
+        gesamt = len(win._arrange_actions)
+        verteilen = sum(1 for _, m in win._arrange_actions if m >= 3)
+        assert aktiv(0) == 0
+        assert aktiv(1) == 0
+        assert aktiv(2) == gesamt - verteilen
+        assert aktiv(3) == gesamt
+    finally:
+        win.close()

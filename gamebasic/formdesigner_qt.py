@@ -22,7 +22,7 @@ from PySide6.QtCore import Qt, QRect, QRectF, QPoint, QSize, QMimeData, Signal
 from PySide6.QtGui import (
     QAction, QColor, QPainter, QPen, QBrush, QKeySequence, QFont, QPixmap, QIcon,
     QShortcut,
-    QLinearGradient,
+    QLinearGradient, QPolygon,
 )
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QListWidget, QListWidgetItem, QDockWidget,
@@ -281,6 +281,67 @@ def _palette_icon(kind: str, w: int = 92, h: int = 46, theme: str = "glas_dunkel
     pm.fill(QColor(0, 0, 0, 0))
     qp = QPainter(pm)
     _paint_glyph(qp, kind, QRect(4, 6, w - 8, h - 12), theme)
+    qp.end()
+    return QIcon(pm)
+
+
+def _tool_icon(kind: str, sz: int = 26) -> QIcon:
+    """Symbol fuer die Haupt-Werkzeugleiste, programmatisch gezeichnet.
+
+    Keine Bilddateien: so skalieren sie mit der Leistengroesse, folgen dem
+    Thema und muessen nicht mit ausgeliefert werden -- dieselbe Ueberlegung
+    wie bei den Control-Vorschauen der Palette.
+    """
+    pm = QPixmap(sz, sz)
+    pm.fill(QColor(0, 0, 0, 0))
+    qp = QPainter(pm)
+    qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    hell = QColor(198, 216, 230)
+    akzent = QColor(43, 196, 232)
+    gruen = QColor(90, 200, 120)
+    m = sz // 2
+    r = QRect(3, 3, sz - 6, sz - 6)
+
+    if kind == "new":                       # leeres Blatt mit Eselsohr
+        qp.setPen(QPen(hell, 2)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawRect(QRect(r.left() + 2, r.top(), r.width() - 5, r.height()))
+        qp.setPen(QPen(akzent, 2))
+        qp.drawLine(r.right() - 6, r.top(), r.right() - 3, r.top() + 4)
+    elif kind == "open":                    # Ordner
+        qp.setPen(QPen(hell, 2)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawLine(r.left(), r.bottom(), r.right(), r.bottom())
+        qp.drawLine(r.left(), r.top() + 4, r.left(), r.bottom())
+        qp.drawLine(r.left(), r.top() + 4, r.left() + 5, r.top() + 4)
+        qp.drawLine(r.left() + 5, r.top() + 4, r.left() + 7, r.top() + 7)
+        qp.drawLine(r.left() + 7, r.top() + 7, r.right(), r.top() + 7)
+        qp.drawLine(r.right(), r.top() + 7, r.right(), r.bottom())
+    elif kind == "save":                    # Diskette
+        qp.setPen(QPen(hell, 2)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawRect(r)
+        qp.setBrush(akzent); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawRect(QRect(r.left() + 4, r.top() + 1, r.width() - 8, 5))
+        qp.setPen(QPen(hell, 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawRect(QRect(r.left() + 3, r.bottom() - 7, r.width() - 6, 7))
+    elif kind in ("undo", "redo"):          # gebogener Pfeil
+        qp.setPen(QPen(hell, 2)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        bogen = QRect(r.left(), r.top() + 3, r.width(), r.height() - 3)
+        # Halbkreis oben, Spitze links bzw. rechts.
+        qp.drawArc(bogen, 0 * 16, 180 * 16)
+        qp.setBrush(hell); qp.setPen(Qt.PenStyle.NoPen)
+        x = r.left() if kind == "undo" else r.right()
+        d = 4 if kind == "undo" else -4
+        qp.drawPolygon(QPolygon([QPoint(x, m + 1), QPoint(x + d, m - 3),
+                                 QPoint(x + d, m + 5)]))
+    elif kind == "run":                     # Wiedergabe-Dreieck
+        qp.setBrush(gruen); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawPolygon(QPolygon([QPoint(r.left() + 2, r.top()), QPoint(r.right(), m),
+                                 QPoint(r.left() + 2, r.bottom())]))
+    elif kind == "code":                    # spitze Klammern
+        qp.setPen(QPen(akzent, 2)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawLine(r.left() + 5, m - 4, r.left() + 1, m)
+        qp.drawLine(r.left() + 1, m, r.left() + 5, m + 4)
+        qp.drawLine(r.right() - 5, m - 4, r.right() - 1, m)
+        qp.drawLine(r.right() - 1, m, r.right() - 5, m + 4)
     qp.end()
     return QIcon(pm)
 
@@ -1705,6 +1766,10 @@ class FormDesigner(QMainWindow):
             lambda z: self._zoom_lbl.setText(f"{round(z * 100)} %"))
 
         self._build_menu()
+        # NACH dem Menue: die Leiste benutzt dieselben QActions fuer
+        # Rueckgaengig/Wiederholen, damit sie automatisch mit ausgrauen.
+        self._build_main_toolbar()
+        self.addToolBarBreak()             # Anordnen-Befehle in eigene Zeile
         self._build_arrange_toolbar()
         self._add_open_form(FormDoc())     # ein leeres Start-Formular
         # Zusaetzlich zum closeEvent: laeuft der Designer in-process (gbrun.py
@@ -1827,33 +1892,88 @@ class FormDesigner(QMainWindow):
         act("Horizontal verteilen", None, lambda: self._distribute("h"), menu=ar)
         act("Vertikal verteilen", None, lambda: self._distribute("v"), menu=ar)
 
+    def _build_main_toolbar(self):
+        """Die staendig gebrauchten Befehle als Leiste. Sie lagen bisher nur
+        im Menue -- besonders "Ausfuehren" war ohne F5 nicht zu finden."""
+        tb = QToolBar("Datei")
+        tb.setIconSize(QSize(26, 26))
+        tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.addToolBar(tb)
+        self.main_bar = tb
+
+        def add(kind, tip, fn, shortcut=None):
+            a = QAction(_tool_icon(kind), tip, self)
+            a.setToolTip(f"{tip} ({shortcut})" if shortcut else tip)
+            a.triggered.connect(fn)
+            tb.addAction(a)
+            return a
+
+        add("new", "Neues Formular", self.new_form, "Strg+N")
+        add("open", "Formular oeffnen", self.open_form, "Strg+O")
+        add("save", "Speichern", self.save_form, "Strg+S")
+        tb.addSeparator()
+        # Dieselben QActions wie im Menue -- so folgen sie automatisch dem
+        # Aktiv/Inaktiv-Zustand, den _refresh_history_actions setzt.
+        self.act_undo.setIcon(_tool_icon("undo"))
+        self.act_redo.setIcon(_tool_icon("redo"))
+        tb.addAction(self.act_undo)
+        tb.addAction(self.act_redo)
+        tb.addSeparator()
+        add("code", "Code-Fenster zeigen", self._show_code_dock)
+        run = add("run", "Ausfuehren", self.run_form, "F5")
+        # Das gemeinsame Thema faerbt genau diesen Objektnamen gruen -- so
+        # sticht der wichtigste Knopf hervor, ohne eine eigene Regel.
+        btn = tb.widgetForAction(run)
+        if btn is not None:
+            btn.setObjectName("RunButton")
+
+    def _show_code_dock(self):
+        self.code_dock.show()
+        self.code_dock.raise_()
+
     def _build_arrange_toolbar(self):
         """Anordnen-Befehle als grafische Toolbar (Xojo-Stil), schneller als das Menue."""
         tb = QToolBar("Anordnen")
-        tb.setIconSize(QSize(22, 22))
+        tb.setIconSize(QSize(26, 26))
         self.addToolBar(tb)
         self.arrange_bar = tb
+        # Waagerecht und senkrecht getrennt: sechs Ausrichtungs-Symbole in
+        # einer Reihe liest man sonst als eine Wand, obwohl es zwei Achsen
+        # sind. Die Zahl ist die Mindest-Auswahl -- Verteilen braucht drei.
         groups = [
-            [("left", "Linksbuendig", lambda: self._align("left")),
-             ("center_h", "Zentriert horizontal", lambda: self._align("center_h")),
-             ("right", "Rechtsbuendig", lambda: self._align("right")),
-             ("top", "Oben buendig", lambda: self._align("top")),
-             ("center_v", "Zentriert vertikal", lambda: self._align("center_v")),
-             ("bottom", "Unten buendig", lambda: self._align("bottom"))],
-            [("same_w", "Gleiche Breite", lambda: self._same_size("w")),
-             ("same_h", "Gleiche Hoehe", lambda: self._same_size("h")),
-             ("same_both", "Gleiche Groesse", lambda: self._same_size("both"))],
-            [("dist_h", "Horizontal verteilen", lambda: self._distribute("h")),
-             ("dist_v", "Vertikal verteilen", lambda: self._distribute("v"))],
+            [("left", "Linksbuendig", lambda: self._align("left"), 2),
+             ("center_h", "Zentriert waagerecht", lambda: self._align("center_h"), 2),
+             ("right", "Rechtsbuendig", lambda: self._align("right"), 2)],
+            [("top", "Oben buendig", lambda: self._align("top"), 2),
+             ("center_v", "Zentriert senkrecht", lambda: self._align("center_v"), 2),
+             ("bottom", "Unten buendig", lambda: self._align("bottom"), 2)],
+            [("same_w", "Gleiche Breite", lambda: self._same_size("w"), 2),
+             ("same_h", "Gleiche Hoehe", lambda: self._same_size("h"), 2),
+             ("same_both", "Gleiche Groesse", lambda: self._same_size("both"), 2)],
+            [("dist_h", "Waagerecht verteilen", lambda: self._distribute("h"), 3),
+             ("dist_v", "Senkrecht verteilen", lambda: self._distribute("v"), 3)],
         ]
+        self._arrange_actions = []         # (QAction, Mindest-Auswahl)
         for gi, group in enumerate(groups):
             if gi:
                 tb.addSeparator()
-            for kind, tip, fn in group:
-                a = QAction(_arrange_icon(kind), tip, self)
-                a.setToolTip(tip)
+            for kind, tip, fn, min_n in group:
+                a = QAction(_arrange_icon(kind, 26), tip, self)
+                a.setToolTip(f"{tip} (ab {min_n} Controls)")
                 a.triggered.connect(fn)
                 tb.addAction(a)
+                self._arrange_actions.append((a, min_n))
+        self._refresh_arrange_actions()
+
+    def _refresh_arrange_actions(self):
+        """Anordnen-Befehle ausgrauen, solange zu wenig ausgewaehlt ist.
+
+        Vorher sahen alle elf Knoepfe immer klickbar aus und antworteten dann
+        mit einer Zeile in der Statusleiste -- ein grauer Knopf sagt dasselbe,
+        bevor man klickt."""
+        n = len(self.canvas.selection)
+        for a, min_n in getattr(self, "_arrange_actions", []):
+            a.setEnabled(n >= min_n)
 
     def _toggle_snap(self, on: bool):
         self.canvas.snap_grid = on
@@ -1977,6 +2097,7 @@ class FormDesigner(QMainWindow):
         Basis fuer eine evtl. folgende Inspector-Edit-Session."""
         self._insp_baseline = self.canvas.doc.to_dict()
         self._insp_dirty = False
+        self._refresh_arrange_actions()
         if c is None:                       # nichts selektiert -> Fenster-Inspector
             self.win_inspector.set_doc(self.canvas.doc)
             self._insp_stack.setCurrentWidget(self.win_inspector)

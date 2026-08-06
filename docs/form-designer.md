@@ -55,6 +55,14 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   unten/zentriert), **Gleiche Breite/Höhe/Größe** (an das zuletzt geklickte
   „primäre" Control), **Horizontal/Vertikal verteilen** (gleiche Lücken, erstes +
   letztes bleiben fix) — alles undobar.
+- **Werkzeugleisten** (zwei Zeilen, Symbole programmatisch gezeichnet):
+  oben die ständig gebrauchten Befehle — **Neu / Öffnen / Speichern**,
+  **Rückgängig / Wiederholen** (dieselben Aktionen wie im Menü, grauen also
+  gemeinsam aus), **Code-Fenster**, **Ausführen** (grün, `F5`). Darunter die
+  Anordnen-Befehle in vier Gruppen: waagerecht ausrichten, senkrecht
+  ausrichten, gleiche Größe, verteilen. Sie sind **grau, solange zu wenig
+  ausgewählt ist** (Ausrichten ab 2, Verteilen ab 3 Controls) — die Absage
+  steht damit am Knopf statt erst nach dem Klick in der Statuszeile.
 - **Rechts — Inspector:** bei gewähltem **Control** dessen Eigenschaften (Name,
   Text, **Gruppe** (nur RadioButton — Radios derselben Gruppe schließen sich
   gegenseitig aus), **Platzhalter** (nur TextInput), Position/Größe, **Anker**
