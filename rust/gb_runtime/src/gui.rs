@@ -162,6 +162,16 @@ fn mischen(a: i64, b: i64, t: f64) -> i64 {
     (ch(16) << 16) | (ch(8) << 8) | ch(0)
 }
 
+/// Welche Schrift gilt: die eigene des Widgets, sonst die global aktive.
+///
+/// -1 am Widget heisst "keine eigene" und muss auf die AKTIVE fallen, nicht
+/// auf die eingebaute Standardschrift. Sonst wechselt `GUI_SET_FONT_SIZE`
+/// allein still die Schriftart -- wer eine Groesse setzt, meint aber die
+/// Groesse.
+fn font_wahl(eigen: i64, aktiv: i64) -> i64 {
+    if eigen >= 0 { eigen } else { aktiv }
+}
+
 /// Waagerechte Lage der Knopf-Beschriftung im freien Bereich.
 ///
 /// Liefert (Versatz, muss_beschnitten_werden). Passt der Text, sitzt er
@@ -1890,19 +1900,38 @@ impl Gui {
         if w.font_size > 0 { w.font_size } else { g.text_height() }
     }
 
-    /// Breite eines Textes in der Schrift DIESES Widgets. Ohne das laesst
-    /// sich Text nicht mittig setzen, sobald ein Widget eine eigene Schrift
-    /// oder Groesse hat.
+    /// Breite eines Textes so, wie `wtext` ihn zeichnen WIRD.
+    ///
+    /// Die Fallunterscheidung muss die von `wtext` genau spiegeln: ohne
+    /// eigene Schrift und Groesse zeichnet es mit der aktiven Schrift, sonst
+    /// mit dem Handle des Widgets (-1 = Standardschrift, NICHT die aktive).
+    /// Weicht das Messen davon ab, sitzt zentrierter Text schief und der
+    /// Beschnitt greift an der falschen Stelle.
     fn wtext_width(&self, g: &Graphics, w: &Widget, s: &str) -> i32 {
-        g.text_width_at(s, self.wsize(g, w))
+        if w.font == -1 && w.font_size == 0 {
+            g.text_width(s)
+        } else {
+            g.text_width_in(s, self.wsize(g, w), self.wfont(g, w))
+        }
+    }
+
+    /// Schrift, mit der DIESES Widget zeichnet.
+    ///
+    /// Ohne eigene Schrift gilt die global gesetzte -- NICHT die eingebaute
+    /// Standardschrift. Vorher wechselte `GUI_SET_FONT_SIZE` allein still
+    /// die Schriftart auf die Pixelschrift, weil das Zeichnen dann mit dem
+    /// Handle -1 lief. Wer eine GROESSE setzt, meint aber die Groesse, nicht
+    /// eine andere Schrift.
+    fn wfont(&self, g: &Graphics, w: &Widget) -> i64 {
+        font_wahl(w.font, g.active_font())
     }
 
     fn wtext(&self, g: &mut Graphics, w: &Widget, x: i32, y: i32, s: String, c: i64) {
         if w.font == -1 && w.font_size == 0 {
             g.text(x, y, s, c);
         } else {
-            let sz = if w.font_size > 0 { w.font_size } else { g.text_height() };
-            g.text_styled(x, y, s, c, w.font, sz);
+            let (sz, font) = (self.wsize(g, w), self.wfont(g, w));
+            g.text_styled(x, y, s, c, font, sz);
         }
     }
     /// Gefuellte Box + Rahmen, runde Ecken wenn Metrik `corner_radius` > 0.
@@ -3659,7 +3688,19 @@ mod label_tests {
 
 #[cfg(test)]
 mod gloss_tests {
-    use super::{gloss_unten, knopf_text_x};
+    use super::{font_wahl, gloss_unten, knopf_text_x};
+
+    #[test]
+    fn eigene_groesse_behaelt_die_globale_schrift() {
+        // Regression: nur die Groesse zu setzen liess das Zeichnen mit dem
+        // Handle -1 laufen und damit auf die eingebaute Pixelschrift kippen.
+        let aktiv = 3;
+        assert_eq!(font_wahl(-1, aktiv), aktiv, "Groesse hat die Schrift gewechselt");
+        // Eine eigene Schrift gewinnt.
+        assert_eq!(font_wahl(7, aktiv), 7);
+        // Ohne global gesetzte Schrift bleibt es die Standardschrift.
+        assert_eq!(font_wahl(-1, -1), -1);
+    }
 
     #[test]
     fn knopf_text_sitzt_mittig_und_wird_sonst_beschnitten() {

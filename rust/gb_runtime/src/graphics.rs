@@ -2775,6 +2775,30 @@ impl Graphics {
     /// `text_styled`, das ebenfalls an `text_size` vorbeischreibt. Ohne das
     /// koennte ein Aufrufer mit eigener Schriftgroesse (Modul `chart`) seinen
     /// Text nicht mittig setzen.
+    /// Textbreite bei expliziter Groesse UND explizitem Font-Handle.
+    ///
+    /// Gegenstueck zu `text_styled`, das ebenfalls ein Handle nimmt:
+    /// `font` >= 0 ist ein geladener Font, -1 die Standardschrift. Wichtig,
+    /// weil `text_width_at` mit dem AKTIVEN Font misst -- wer einem einzelnen
+    /// Element eine eigene Schrift gegeben hat (Modul `gui`: GUI_SET_FONT),
+    /// bekaeme sonst die Breite einer ANDEREN Schrift, und alles was darauf
+    /// zentriert oder beschnitten wird saesse schief.
+    /// Gerade aktive Schrift (-1 = Standardschrift). Wer mit explizitem
+    /// Handle zeichnet, aber "wie global eingestellt" meint, braucht sie.
+    pub fn active_font(&self) -> i64 { self.active_font }
+
+    pub fn text_width_in(&self, s: &str, size: i32, font: i64) -> i32 {
+        let size = size.max(1);
+        if font >= 0 {
+            if let Some(f) = self.fonts.get(font as usize) {
+                return f.measure_text(s, size as f32, self.text_spacing).x as i32;
+            }
+        }
+        // -1 (oder ein ungueltiges Handle) = Standardschrift.
+        let c = std::ffi::CString::new(s).unwrap_or_default();
+        unsafe { raylib::ffi::MeasureText(c.as_ptr(), size) }
+    }
+
     pub fn text_width_at(&self, s: &str, size: i32) -> i32 {
         let size = size.max(1);
         if self.active_font >= 0 {

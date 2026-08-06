@@ -909,3 +909,28 @@ sich zu überlappen.
 
 Zulässige Arten sind alle Widget-Namen, die `GUI_KIND` liefert (`button`,
 `panel`, `textinput`, `listbox`, `progress`, …).
+
+
+## Schrift je Widget
+
+Global gilt die per `SETFONT` gesetzte Schrift. Einzelne Widgets können davon
+abweichen:
+
+```basic
+DIM k AS GUI_WIDGET
+k = GUI_BUTTON(w, "Gross", 20, 20, 180, 40)
+GUI_SET_FONT_SIZE(k, 24)          ' nur die Groesse
+GUI_SET_FONT(k, andere_schrift)   ' andere Schriftart (Handle aus LOADFONT)
+```
+
+`GUI_SET_FONT_SIZE` ändert **nur** die Größe — die Schriftart bleibt die
+global gesetzte. `GUI_SET_FONT(wdg, -1)` nimmt eine eigene Schrift wieder
+zurück.
+
+Über `GUI_STYLE_SET` / `GUI_APPLY_STYLE` lassen sich Schrift und Größe auch
+als benannter Stil auf mehrere Widgets übertragen.
+
+**Was daran wichtig ist:** Die Beschriftung wird in der Schrift *gemessen*, in
+der sie auch gezeichnet wird. Andernfalls säße zentrierter Text schief und der
+Beschnitt griffe an der falschen Stelle, sobald ein Widget eine eigene Schrift
+oder Größe hat.
