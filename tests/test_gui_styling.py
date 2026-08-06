@@ -270,3 +270,87 @@ def test_ui_plastik_metriken_einzeln_setzbar(run_gb):
            'UI_METRIC_SET("gloss", 40)\n'
            'PRINT UI_METRIC_GET("gradient")\n')
     assert _z(run_gb(src)) == ["24"]
+
+
+# --- Neue Ereignisse: betreten/verlassen, Fokus/Blur -----------------------
+#
+# Alle vier sind FLANKEN: sie feuern beim Uebergang, nicht in jedem Bild,
+# solange der Zustand anhaelt. Genau das ist die Stelle, die leicht schiefgeht.
+
+def test_hover_und_leave_feuern_je_einmal(run_gb):
+    src = ('IMPORT "gui"\n'
+           'SCREEN(300, 200, "E")\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM b AS GUI_WIDGET\n'
+           'DIM f AS INTEGER\n'
+           'w = GUI_WINDOW("W", 10, 10, 280, 160)\n'
+           'b = GUI_BUTTON(w, "K", 20, 20, 100, 30)\n'
+           'SUB rein() : PRINT "rein" : END SUB\n'
+           'SUB raus() : PRINT "raus" : END SUB\n'
+           'GUI_ON_HOVER(b, rein)\n'
+           'GUI_ON_LEAVE(b, raus)\n'
+           'FOR f = 1 TO 8\n'
+           '    IF f = 2 THEN MOUSE_SET_POS(60, 55)\n'
+           '    IF f = 5 THEN MOUSE_SET_POS(290, 195)\n'
+           '    GUI_UPDATE()\n'
+           '    CLS(0)\n'
+           '    GUI_DRAW()\n'
+           '    FLIP()\n'
+           'NEXT\n')
+    # Genau EIN "rein" und EIN "raus" -- bliebe die Maus stehen und wuerde
+    # jedes Bild gefeuert, staende "rein" hier dreimal.
+    assert _z(run_gb(src)) == ["rein", "raus"]
+
+
+def test_fokus_und_blur_folgen_dem_wechsel(run_gb):
+    src = ('IMPORT "gui"\n'
+           'SCREEN(300, 200, "F")\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM t AS GUI_WIDGET\n'
+           'DIM u AS GUI_WIDGET\n'
+           'DIM f AS INTEGER\n'
+           'w = GUI_WINDOW("W", 10, 10, 280, 160)\n'
+           't = GUI_TEXTINPUT(w, 20, 30, 200, 26)\n'
+           'u = GUI_TEXTINPUT(w, 20, 70, 200, 26)\n'
+           'SUB fa() : PRINT "A auf" : END SUB\n'
+           'SUB ba() : PRINT "A zu" : END SUB\n'
+           'SUB fb() : PRINT "B auf" : END SUB\n'
+           'GUI_ON_FOCUS(t, fa)\n'
+           'GUI_ON_BLUR(t, ba)\n'
+           'GUI_ON_FOCUS(u, fb)\n'
+           'FOR f = 1 TO 8\n'
+           '    IF f = 2 THEN GUI_FOCUS(t)\n'
+           '    IF f = 5 THEN GUI_FOCUS(u)\n'
+           '    GUI_UPDATE()\n'
+           '    CLS(0)\n'
+           '    GUI_DRAW()\n'
+           '    FLIP()\n'
+           'NEXT\n')
+    # Der Wechsel meldet erst das Verlieren, dann das Bekommen.
+    assert _z(run_gb(src)) == ["A auf", "A zu", "B auf"]
+
+
+def test_ereignisse_ueberleben_speichern_und_laden(run_gb):
+    """Der Form-Designer speichert Handler-NAMEN im .gbform; GUI_LOAD stellt
+    sie wieder her. Geprueft wird deshalb der ganze Weg -- nicht nur, dass
+    der Name im JSON steht, sondern dass der Handler danach auch feuert."""
+    src = ('IMPORT "gui"\n'
+           'SCREEN(300, 200, "S")\n'
+           'DIM w AS GUI_WINDOW\n'
+           'DIM w2 AS GUI_WINDOW\n'
+           'DIM b AS GUI_WIDGET\n'
+           'DIM f AS INTEGER\n'
+           'SUB rein() : PRINT "rein" : END SUB\n'
+           'w = GUI_WINDOW("W", 10, 10, 280, 160)\n'
+           'b = GUI_BUTTON(w, "K", 20, 20, 100, 30)\n'
+           'GUI_ON_HOVER(b, rein)\n'
+           'w2 = GUI_FROM_JSON(GUI_TO_JSON(w))\n'
+           'GUI_WINDOW_DESTROY(w)\n'
+           'FOR f = 1 TO 6\n'
+           '    IF f = 2 THEN MOUSE_SET_POS(60, 55)\n'
+           '    GUI_UPDATE()\n'
+           '    CLS(0)\n'
+           '    GUI_DRAW()\n'
+           '    FLIP()\n'
+           'NEXT\n')
+    assert _z(run_gb(src)) == ["rein"]

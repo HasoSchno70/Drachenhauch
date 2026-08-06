@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (
 
 from .formdesigner import (
     FormDoc, FormProject, Control, History, PALETTE, palette_spec, GRID, HANDLES,
-    snap, resize_rect, FORM_THEMES, theme_colors,
+    snap, resize_rect, FORM_THEMES, theme_colors, EVENTS,
 )
 
 try:
@@ -1209,7 +1209,11 @@ class _Inspector(QWidget):
         self.enabled = QCheckBox("aktiviert")
         self.visible = QCheckBox("sichtbar")
         self.checked = QCheckBox("angehakt")
-        self.on_click = QLineEdit(); self.on_change = QLineEdit()
+        # Ein Feld je Ereignis, aus der zentralen Liste erzeugt -- ein
+        # weiteres Ereignis in der Laufzeit braucht hier keine Zeile mehr.
+        self.ev_edits = {ev: QLineEdit() for ev in EVENTS}
+        self.on_click = self.ev_edits["on_click"]     # Namen bleiben gueltig
+        self.on_change = self.ev_edits["on_change"]
         # `group` fehlte komplett -- ohne sie landen ALLE RadioButtons in
         # derselben leeren Gruppe und schliessen sich nicht gegenseitig aus.
         self.group = QLineEdit(); self.group.setPlaceholderText("z.B. schwierigkeit")
@@ -1268,8 +1272,8 @@ class _Inspector(QWidget):
         self._add("", self.checked)
 
         self._section("Ereignisse")
-        self._add("on_click", self.on_click)
-        self._add("on_change", self.on_change)
+        for ev in EVENTS:
+            self._add(ev, self.ev_edits[ev])
         # Signale
         self.name.editingFinished.connect(self._apply)
         self.text.editingFinished.connect(self._apply)
@@ -1279,8 +1283,8 @@ class _Inspector(QWidget):
         self.visible.toggled.connect(self._apply)
         for s in (self.sx, self.sy, self.sw, self.sh, self.vmin, self.vmax, self.vval):
             s.valueChanged.connect(self._apply)
-        self.on_click.editingFinished.connect(self._apply)
-        self.on_change.editingFinished.connect(self._apply)
+        for _e in self.ev_edits.values():
+            _e.editingFinished.connect(self._apply)
         self.items.textChanged.connect(self._apply)
         self.enabled.toggled.connect(self._apply)
         self.checked.toggled.connect(self._apply)
@@ -1350,7 +1354,8 @@ class _Inspector(QWidget):
         sp = palette_spec(c.kind)
         self.name.setText(c.name); self.text.setText(c.text)
         self.sx.setValue(c.x); self.sy.setValue(c.y); self.sw.setValue(c.w); self.sh.setValue(c.h)
-        self.on_click.setText(c.on_click); self.on_change.setText(c.on_change)
+        for ev, feld in self.ev_edits.items():
+            feld.setText(getattr(c, ev))
         self.group.setText(c.group); self.placeholder.setText(c.placeholder)
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
@@ -1374,8 +1379,11 @@ class _Inspector(QWidget):
         self._show(self.ssel, has_items)
         self._show(self.group, c.kind == "radio")
         self._show(self.placeholder, c.kind == "textinput")
-        self._show(self.on_click, "on_click" in events)
-        self._show(self.on_change, "on_change" in events)
+        # Nur die Ereignisse zeigen, die diese Art wirklich ausloest -- ein
+        # angebotenes Ereignis, das nie feuert, laesst einen den Fehler im
+        # eigenen Programm suchen.
+        for ev, feld in self.ev_edits.items():
+            self._show(feld, ev in events)
         self._show(self.vmin, is_range); self._show(self.vmax, is_range); self._show(self.vval, is_range)
         self._show(self.checked, is_check)
         self._sync_sections()
@@ -1385,13 +1393,13 @@ class _Inspector(QWidget):
         if self._loading or self._c is None:
             return
         c = self._c
-        old_click, old_change = c.on_click, c.on_change
+        alte_handler = {ev: getattr(c, ev) for ev in EVENTS}
         old_name = c.name
         c.name = self.name.text().strip()
         c.text = self.text.text()
         c.x, c.y, c.w, c.h = self.sx.value(), self.sy.value(), self.sw.value(), self.sh.value()
-        c.on_click = self.on_click.text().strip()
-        c.on_change = self.on_change.text().strip()
+        for ev, feld in self.ev_edits.items():
+            setattr(c, ev, feld.text().strip())
         c.group = self.group.text().strip()
         c.placeholder = self.placeholder.text()
         items = [ln for ln in self.items.toPlainText().splitlines() if ln != ""]
@@ -1414,7 +1422,8 @@ class _Inspector(QWidget):
         # befuellt: `doc.code` ist nach Namen geschluesselt, der alte Rumpf
         # blieb sonst als unerreichbare Leiche zurueck und der Export
         # emittierte fuer den neuen Namen nur ein `' TODO`.
-        for old, new in ((old_click, c.on_click), (old_change, c.on_change)):
+        for ev, old in alte_handler.items():
+            new = getattr(c, ev)
             if old and new and old != new:
                 self.handler_renamed.emit(old, new)
         # Control umbenannt -> abgeleitete Handler-Namen ziehen mit. Das

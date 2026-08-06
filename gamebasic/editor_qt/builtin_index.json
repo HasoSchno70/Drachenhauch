@@ -1,6 +1,6 @@
 {
   "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
-  "count": 1259,
+  "count": 1263,
   "builtins": [
     {
       "name": "ABS",
@@ -2637,6 +2637,12 @@
       "module": "gui"
     },
     {
+      "name": "GUI_ON_BLUR",
+      "kind": "core",
+      "signature": "GUI_ON_BLUR(widget, fn: FUNCREF)",
+      "module": "gui"
+    },
+    {
       "name": "GUI_ON_CHANGE",
       "kind": "core",
       "signature": "GUI_ON_CHANGE(wdg, handler)",
@@ -2646,6 +2652,24 @@
       "name": "GUI_ON_CLICK",
       "kind": "core",
       "signature": "GUI_ON_CLICK(wdg, handler)",
+      "module": "gui"
+    },
+    {
+      "name": "GUI_ON_FOCUS",
+      "kind": "core",
+      "signature": "GUI_ON_FOCUS(widget, fn: FUNCREF)",
+      "module": "gui"
+    },
+    {
+      "name": "GUI_ON_HOVER",
+      "kind": "core",
+      "signature": "GUI_ON_HOVER(widget, fn: FUNCREF)",
+      "module": "gui"
+    },
+    {
+      "name": "GUI_ON_LEAVE",
+      "kind": "core",
+      "signature": "GUI_ON_LEAVE(widget, fn: FUNCREF)",
       "module": "gui"
     },
     {

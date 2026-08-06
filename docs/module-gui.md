@@ -956,3 +956,31 @@ Knopf abgeschnitten statt überzulaufen.
 
 Alle bisherigen `ui`-Themen (`dark`, `light`, `retro`, `contrast`) stehen
 weiterhin auf 0 und sehen unverändert flach aus.
+
+
+## Ereignisse
+
+Sechs Rückrufe je Widget, alle über FUNCREF (parameterlos):
+
+| Befehl | Wann |
+|---|---|
+| `GUI_ON_CLICK(w, fn)` | angeklickt |
+| `GUI_ON_CHANGE(w, fn)` | Wert/Text geändert |
+| `GUI_ON_HOVER(w, fn)` | Maus **betritt** das Widget |
+| `GUI_ON_LEAVE(w, fn)` | Maus verlässt es |
+| `GUI_ON_FOCUS(w, fn)` | bekommt die Eingabe |
+| `GUI_ON_BLUR(w, fn)` | verliert sie — der Punkt, an dem man eine Eingabe prüft |
+
+Die letzten vier sind **Flanken**: sie feuern beim Übergang, nicht in jedem
+Bild, solange der Zustand anhält. Ausgelöst werden sie in `GUI_UPDATE`;
+aufgerufen wird der Handler danach, damit er die Oberfläche nicht mitten im
+Zustands-Update umbauen kann.
+
+**Fokus bekommen nur Widgets, die ihn auch führen** — Textfeld, Textbereich
+und Zahlenfeld (oder programmatisch über `GUI_FOCUS`). Bei einem Knopf würde
+`on_focus` nie von selbst feuern; der Form-Designer bietet es dort deshalb
+gar nicht erst an.
+
+Alle sechs überleben `GUI_SAVE`/`GUI_LOAD` bzw. `GUI_TO_JSON`/`GUI_FROM_JSON`
+— das ist der Weg, über den ein im Form-Designer gebautes Formular seine
+Handler bekommt.

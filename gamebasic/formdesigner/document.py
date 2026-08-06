@@ -54,6 +54,27 @@ def _as_str(d: dict, key: str, default: str = "") -> str:
 
 # --- Control-Palette --------------------------------------------------------
 # Pro Widget-Art: Anzeigename, Default-Groesse, unterstuetzte Events.
+# Alle Ereignisse, die die Laufzeit ausloesen kann, mit dem Namenszusatz fuer
+# den erzeugten Handler. Bis hierher stand diese Liste an rund zehn Stellen
+# einzeln -- ein weiteres Ereignis nachzutragen hiess, keine davon zu
+# vergessen. Wer die Laufzeit erweitert, ergaenzt jetzt hier eine Zeile.
+EVENTS: dict = {
+    "on_click":  "Click",
+    "on_change": "Changed",
+    "on_hover":  "Hover",
+    "on_leave":  "Leave",
+    "on_focus":  "Focus",
+    "on_blur":   "Blur",
+}
+
+# Zeigen/Verlassen kann jedes anklickbare Control; Fokus bekommen NUR die,
+# die in der Laufzeit `focus_widget` setzen (Textfeld, Textbereich,
+# Zahlenfeld). Ein Ereignis anzubieten, das nie feuert, waere schlimmer als
+# keines: man sucht den Fehler dann im eigenen Programm.
+_ZEIGEN = ("on_hover", "on_leave")
+_FOKUS = ("on_focus", "on_blur")
+
+
 @dataclass(frozen=True)
 class PaletteSpec:
     kind: str
@@ -66,16 +87,16 @@ class PaletteSpec:
 
 
 PALETTE: list[PaletteSpec] = [
-    PaletteSpec("button",    "Button",       100, 28, ("on_click",), has_text=True),
+    PaletteSpec("button",    "Button",       100, 28, ("on_click",) + _ZEIGEN, has_text=True),
     PaletteSpec("label",     "Label",         80, 16, (), has_text=True),
-    PaletteSpec("checkbox",  "Checkbox",      16, 16, ("on_click", "on_change"), has_text=True),
-    PaletteSpec("radio",     "RadioButton",   16, 16, ("on_click", "on_change"), has_text=True),
-    PaletteSpec("slider",    "Slider",       160, 14, ("on_change",)),
-    PaletteSpec("textinput", "TextInput",    180, 26, ("on_change",)),
-    PaletteSpec("dropdown",  "Dropdown",     160, 24, ("on_change",), has_items=True),
-    PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",), has_items=True),
-    PaletteSpec("progress",  "ProgressBar",  180, 18, ()),
-    PaletteSpec("image",     "Image",         96, 96, ()),
+    PaletteSpec("checkbox",  "Checkbox",      16, 16, ("on_click", "on_change") + _ZEIGEN, has_text=True),
+    PaletteSpec("radio",     "RadioButton",   16, 16, ("on_click", "on_change") + _ZEIGEN, has_text=True),
+    PaletteSpec("slider",    "Slider",       160, 14, ("on_change",) + _ZEIGEN),
+    PaletteSpec("textinput", "TextInput",    180, 26, ("on_change",) + _ZEIGEN + _FOKUS),
+    PaletteSpec("dropdown",  "Dropdown",     160, 24, ("on_change",) + _ZEIGEN, has_items=True),
+    PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",) + _ZEIGEN, has_items=True),
+    PaletteSpec("progress",  "ProgressBar",  180, 18, _ZEIGEN),
+    PaletteSpec("image",     "Image",         96, 96, _ZEIGEN),
     PaletteSpec("canvas",    "Canvas",       200, 150, ()),
     PaletteSpec("panel",     "Panel",        160, 100, (), has_text=True),
     PaletteSpec("groupbox",  "GroupBox",     160, 100, (), has_text=True),
@@ -308,6 +329,10 @@ class Control:
     anchor: str = "lt"                       # Verankerung: Teilmenge von "lrtb" (Default oben-links)
     on_click: str = ""
     on_change: str = ""
+    on_hover: str = ""
+    on_leave: str = ""
+    on_focus: str = ""
+    on_blur: str = ""
     ov: dict = field(default_factory=dict)   # Farb-Overrides: bg/fg/border/accent -> int
     # Laufzeit-Felder, die der Designer (noch) nicht darstellt -- z.B. `table`,
     # `tree`, `tab_page`, `font`. Sie werden unveraendert durchgereicht, damit
@@ -319,7 +344,8 @@ class Control:
     _KNOWN = frozenset((
         "kind", "name", "x", "y", "w", "h", "text", "color", "value", "min",
         "max", "checked", "placeholder", "group", "items", "sel", "enabled",
-        "visible", "font_size", "anchor", "on_click", "on_change", "ov",
+        "visible", "font_size", "anchor", "ov",
+        *EVENTS,
     ))
 
     def to_dict(self) -> dict:
@@ -333,8 +359,9 @@ class Control:
         }
         if self.name:
             d["name"] = self.name
-        if self.on_click:
-            d["on_click"] = self.on_click
+        for _ev in EVENTS:
+            if getattr(self, _ev):
+                d[_ev] = getattr(self, _ev)
         if self.on_change:
             d["on_change"] = self.on_change
         if self.ov:
@@ -390,8 +417,7 @@ class Control:
             visible=_as_bool(d, "visible", True),
             font_size=_as_int(d, "font_size", 0),
             anchor=_as_str(d, "anchor", "lt") or "lt",
-            on_click=_as_str(d, "on_click"),
-            on_change=_as_str(d, "on_change"),
+            **{_ev: _as_str(d, _ev) for _ev in EVENTS},
             ov=ov,
             extra=extra,
         )
@@ -645,7 +671,7 @@ class FormDoc:
             return None
         name = getattr(c, ev)
         if not name:
-            suffix = {"on_click": "Click", "on_change": "Changed"}.get(ev, "Action")
+            suffix = EVENTS.get(ev, "Action")
             # Durch `_gb_ident`: der Name wird als `SUB <name>()` und als
             # FUNCREF emittiert. Ein Control "OK Knopf" erzeugte sonst
             # `SUB OK KnopfClick()` -- Parse-Fehler, und weil F5 die
@@ -673,7 +699,7 @@ class FormDoc:
         umbenannt = []
         if not old_name or not c.name or old_name == c.name:
             return umbenannt
-        for ev, suffix in (("on_click", "Click"), ("on_change", "Changed")):
+        for ev, suffix in EVENTS.items():
             jetzt = getattr(c, ev)
             if not jetzt or jetzt != _gb_ident(old_name + suffix):
                 continue
@@ -689,7 +715,7 @@ class FormDoc:
     def _unique_handler_name(self, base: str) -> str:
         used = set(self.code.keys())
         for c in self.controls:
-            for ev in ("on_click", "on_change"):
+            for ev in EVENTS:
                 if getattr(c, ev):
                     used.add(getattr(c, ev))
         if base not in used:
@@ -768,7 +794,7 @@ class FormDoc:
         """Alle eindeutigen Event-Handler-Namen (Reihenfolge der Controls)."""
         seen: list[str] = []
         for c in self.controls:
-            for h in (c.on_click, c.on_change):
+            for h in (getattr(c, ev) for ev in EVENTS):
                 if h and h not in seen:
                     seen.append(h)
         return seen
@@ -991,8 +1017,10 @@ class FormDoc:
             out.append(f"GUI_SET_ANCHOR({var}, {_gb_str(c.anchor)})")
         for role, col in c.ov.items():
             out.append(f"GUI_SET_COLOR({var}, {_gb_str(role)}, {_gb_hex(col)})")
-        if c.on_click:
-            out.append(f"GUI_ON_CLICK({var}, {c.on_click})")
-        if c.on_change:
-            out.append(f"GUI_ON_CHANGE({var}, {c.on_change})")
+        # Alle Ereignisse ueber EVENTS -- so faellt beim Hinzufuegen eines
+        # weiteren keines aus dem erzeugten Programm heraus.
+        for ev in EVENTS:
+            name = getattr(c, ev)
+            if name:
+                out.append(f"{ev.upper().replace('ON_', 'GUI_ON_', 1)}({var}, {name})")
         return out

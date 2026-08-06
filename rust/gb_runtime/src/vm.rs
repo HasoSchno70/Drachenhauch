@@ -3379,6 +3379,10 @@ impl<'p> Vm<'p> {
             "gui_set_value" => { self.gui.set_value(gi(a,0,"GUI_SET_VALUE")?, gnum(a,1,"GUI_SET_VALUE")?)?; Value::Nil }
             "gui_on_click" => { self.gui.on_click(gi(a,0,"GUI_ON_CLICK")?, gfunc(a,1,"GUI_ON_CLICK")?)?; Value::Nil }
             "gui_on_change" => { self.gui.on_change(gi(a,0,"GUI_ON_CHANGE")?, gfunc(a,1,"GUI_ON_CHANGE")?)?; Value::Nil }
+            "gui_on_hover" => { self.gui.on_hover(gi(a,0,"GUI_ON_HOVER")?, gfunc(a,1,"GUI_ON_HOVER")?)?; Value::Nil }
+            "gui_on_leave" => { self.gui.on_leave(gi(a,0,"GUI_ON_LEAVE")?, gfunc(a,1,"GUI_ON_LEAVE")?)?; Value::Nil }
+            "gui_on_focus" => { self.gui.on_focus(gi(a,0,"GUI_ON_FOCUS")?, gfunc(a,1,"GUI_ON_FOCUS")?)?; Value::Nil }
+            "gui_on_blur" => { self.gui.on_blur(gi(a,0,"GUI_ON_BLUR")?, gfunc(a,1,"GUI_ON_BLUR")?)?; Value::Nil }
             "gui_theme" => { self.gui.theme_accent(gi(a,0,"GUI_THEME")?); Value::Nil }
             "gui_theme_set" => { self.gui.theme_set(gs(a,0,"GUI_THEME_SET")?, gi(a,1,"GUI_THEME_SET")?)?; Value::Nil }
             "gui_theme_get" => Value::Int(self.gui.theme_get(&gs(a,0,"GUI_THEME_GET")?)?),

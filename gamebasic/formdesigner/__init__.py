@@ -11,10 +11,11 @@ und damit headless testbar.
 from .document import (
     Control, FormDoc, FormProject, History, PALETTE, palette_spec, GRID,
     HANDLES, snap, resize_rect, FORM_THEMES, FORM_THEME_COLORS, theme_colors,
+    EVENTS,
 )
 
 __all__ = [
     "Control", "FormDoc", "FormProject", "History", "PALETTE", "palette_spec",
     "GRID", "HANDLES", "snap", "resize_rect",
-    "FORM_THEMES", "FORM_THEME_COLORS", "theme_colors",
+    "FORM_THEMES", "FORM_THEME_COLORS", "theme_colors", "EVENTS",
 ]

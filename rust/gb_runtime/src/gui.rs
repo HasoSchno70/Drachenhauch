@@ -285,6 +285,16 @@ pub struct Widget {
     hovered: bool,
     on_click: Option<String>,
     on_change: Option<String>,
+    /// Maus betritt / verlaesst das Widget, Fokus kommt / geht.
+    on_hover: Option<String>,
+    on_leave: Option<String>,
+    on_focus: Option<String>,
+    on_blur: Option<String>,
+    /// Hover-Zustand des VORIGEN Bildes -- nur daraus laesst sich die FLANKE
+    /// bestimmen. `hovered` allein wuerde jedes Bild feuern, solange die Maus
+    /// stehenbleibt.
+    was_hovered: bool,
+    was_focused: bool,
     ov: HashMap<String, i64>,
     tbl: Option<Box<TableState>>,   // nur fuer Kind::Table
     tree: Option<Box<TreeState>>,   // nur fuer Kind::Tree
@@ -537,6 +547,8 @@ impl Gui {
             value: 0.0, min: 0.0, max: 1.0, checked: false,
             placeholder: String::new(), clicked: false, hovered: false,
             on_click: None, on_change: None, ov: HashMap::new(), tbl: None, tree: None,
+            on_hover: None, on_leave: None, on_focus: None, on_blur: None,
+            was_hovered: false, was_focused: false,
             alive: true, visible: true, rund: false,
             group: String::new(), items: Vec::new(), sel: -1,
             enabled: true, font: -1, font_size: 0,
@@ -1260,6 +1272,24 @@ impl Gui {
     pub fn on_click(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         self.wdg_mut(h, "GUI_ON_CLICK")?.on_click = func; Ok(())
     }
+
+    /// Maus betritt das Widget (einmal je Eintritt, nicht jedes Bild).
+    pub fn on_hover(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_ON_HOVER")?.on_hover = func; Ok(())
+    }
+    /// Maus verlaesst das Widget.
+    pub fn on_leave(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_ON_LEAVE")?.on_leave = func; Ok(())
+    }
+    /// Widget bekommt die Eingabe (Textfeld angeklickt, Tab-Wechsel).
+    pub fn on_focus(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_ON_FOCUS")?.on_focus = func; Ok(())
+    }
+    /// Widget verliert die Eingabe -- der Punkt, an dem man eine Eingabe
+    /// pruefen will.
+    pub fn on_blur(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
+        self.wdg_mut(h, "GUI_ON_BLUR")?.on_blur = func; Ok(())
+    }
     pub fn on_change(&mut self, h: i64, func: Option<String>) -> Result<(), String> {
         let w = self.wdg_mut(h, "GUI_ON_CHANGE")?;
         if !matches!(w.kind, Kind::Slider | Kind::TextInput | Kind::TextArea | Kind::Checkbox | Kind::Table | Kind::Radio | Kind::Dropdown | Kind::ListBox | Kind::Spinner | Kind::Splitter | Kind::Tree) {
@@ -1538,6 +1568,10 @@ impl Gui {
             "checked": w.checked, "placeholder": w.placeholder, "visible": w.visible,
         });
         if let Some(f) = &w.on_click { o["on_click"] = serde_json::json!(f); }
+        if let Some(f) = &w.on_hover { o["on_hover"] = serde_json::json!(f); }
+        if let Some(f) = &w.on_leave { o["on_leave"] = serde_json::json!(f); }
+        if let Some(f) = &w.on_focus { o["on_focus"] = serde_json::json!(f); }
+        if let Some(f) = &w.on_blur { o["on_blur"] = serde_json::json!(f); }
         if let Some(f) = &w.on_change { o["on_change"] = serde_json::json!(f); }
         if !w.ov.is_empty() { o["ov"] = serde_json::json!(w.ov); }
         if !w.group.is_empty() { o["group"] = serde_json::json!(w.group); }
@@ -1586,6 +1620,10 @@ impl Gui {
         w.placeholder = wj["placeholder"].as_str().unwrap_or("").to_string();
         w.visible = wj["visible"].as_bool().unwrap_or(true);
         w.on_click = wj["on_click"].as_str().map(|s| s.to_string());
+        w.on_hover = wj["on_hover"].as_str().map(|s| s.to_string());
+        w.on_leave = wj["on_leave"].as_str().map(|s| s.to_string());
+        w.on_focus = wj["on_focus"].as_str().map(|s| s.to_string());
+        w.on_blur = wj["on_blur"].as_str().map(|s| s.to_string());
         w.on_change = wj["on_change"].as_str().map(|s| s.to_string());
         if let Some(ov) = wj["ov"].as_object() {
             for (k, val) in ov { if let Some(c) = val.as_i64() { w.ov.insert(k.clone(), c); } }
@@ -2188,6 +2226,38 @@ impl Gui {
                 }
             }
         }
+        // --- Flanken: betreten/verlassen, Fokus bekommen/verlieren ---------
+        //
+        // Erst HIER, weil `hovered` fuer dieses Bild feststeht und der Fokus
+        // gesetzt ist. Verglichen wird gegen den Zustand des VORIGEN Bildes --
+        // `hovered` allein wuerde jedes Bild feuern, solange die Maus
+        // stehenbleibt. Die Handler wandern wie ueberall in `pending` und
+        // werden nach `update()` von der VM aufgerufen, damit ein Handler die
+        // GUI nicht mitten im Zustands-Update umbauen kann.
+        let fokus = self.focus_widget;
+        for wi in 0..self.windows.len() {
+            for i in 0..self.windows[wi].widgets.len() {
+                let w = &mut self.windows[wi].widgets[i];
+                let ist_fokus = fokus == Some((wi, i));
+                let (h_jetzt, h_vorher) = (w.hovered, w.was_hovered);
+                let (f_jetzt, f_vorher) = (ist_fokus, w.was_focused);
+                w.was_hovered = h_jetzt;
+                w.was_focused = f_jetzt;
+                let mut feuern: Vec<String> = Vec::new();
+                if h_jetzt && !h_vorher {
+                    if let Some(f) = w.on_hover.clone() { feuern.push(f); }
+                } else if !h_jetzt && h_vorher {
+                    if let Some(f) = w.on_leave.clone() { feuern.push(f); }
+                }
+                if f_jetzt && !f_vorher {
+                    if let Some(f) = w.on_focus.clone() { feuern.push(f); }
+                } else if !f_jetzt && f_vorher {
+                    if let Some(f) = w.on_blur.clone() { feuern.push(f); }
+                }
+                self.pending.extend(feuern);
+            }
+        }
+
         // Tooltip-Dwell: oberstes Widget mit Hilfetext unter der Maus bestimmen.
         // Bei Wechsel/Bewegung/gedrueckter Maus startet der Verweil-Timer neu.
         let tip_cur = self.topmost_at(mx, my).and_then(|top| {
