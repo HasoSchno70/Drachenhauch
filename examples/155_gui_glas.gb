@@ -8,11 +8,14 @@
 '   f           flach <-> plastisch (zeigt, was Verlauf/Glanz/Fase ausmachen)
 '   g           eigene Grafik (9-Slice) fuer die Knoepfe an/aus
 '   MAUS        alles ist bedienbar -- Regler ziehen, Schalter umlegen
+'
+' Das dritte Fenster zeigt, dass Schriftart und -groesse pro Widget
+' gelten: GUI_SET_FONT / GUI_SET_FONT_SIZE.
 '   ESC         Ende
 
 IMPORT "gui"
 
-SCREEN(980, 620, "GameBasic -- Glas-Oberflaeche")
+SCREEN(980, 770, "GameBasic -- Glas-Oberflaeche")
 
 ' Saubere Schrift, falls eine da ist (deutlich besser lesbar als die
 ' eingebaute Pixelschrift bei kleinen Groessen).
@@ -24,6 +27,14 @@ FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", 
 NEXT
 IF schrift >= 0 THEN SETFONT(schrift)
 TEXT_SIZE(16)
+
+' Eine zweite, deutlich andere Schrift -- damit man im dritten Fenster
+' sieht, dass die Wahl wirklich pro Widget gilt.
+DIM schrift2 AS INTEGER
+schrift2 = -1
+FOR EACH fp IN ("C:/Windows/Fonts/georgia.ttf", "C:/Windows/Fonts/times.ttf", "C:/Windows/Fonts/consola.ttf")
+    IF schrift2 < 0 AND FILEEXISTS(fp) THEN schrift2 = LOADFONT(fp, 32)
+NEXT
 
 GUI_THEME_PRESET("glas_dunkel")
 
@@ -74,6 +85,32 @@ FOR i = 0 TO 3
 NEXT
 GUI_BUTTON(w2, "Ok", 250, 244, 80, 36)
 GUI_BUTTON(w2, "Abbrechen", 336, 244, 84, 36)
+
+' --- Fenster 3: Schrift je Widget ---------------------------------------
+' Global gilt die per SETFONT gesetzte Schrift. Einzelne Widgets duerfen
+' abweichen -- in der Groesse, in der Schriftart oder in beidem.
+DIM w3 AS GUI_WINDOW
+DIM k AS GUI_WIDGET
+w3 = GUI_WINDOW("Zeichensatz je Widget", 20, 380, 940, 200)
+
+GUI_BUTTON(w3, "Standard", 24, 24, 180, 42)
+
+k = GUI_BUTTON(w3, "Nur groesser", 220, 24, 180, 42)
+GUI_SET_FONT_SIZE(k, 24)          ' aendert NUR die Groesse, nicht die Schrift
+
+k = GUI_BUTTON(w3, "Andere Schrift", 416, 24, 200, 42)
+GUI_SET_FONT(k, schrift2)
+
+k = GUI_BUTTON(w3, "Beides", 632, 24, 180, 42)
+GUI_SET_FONT(k, schrift2)
+GUI_SET_FONT_SIZE(k, 26)
+
+k = GUI_BUTTON(w3, "Sehr langer Text der nicht passt", 24, 84, 180, 42)
+GUI_SET_FONT_SIZE(k, 20)
+
+k = GUI_LABEL(w3, "Auch Beschriftungen: eigene Schrift und Groesse", 220, 94)
+GUI_SET_FONT(k, schrift2)
+GUI_SET_FONT_SIZE(k, 22)
 
 ' --- Grafik fuer den 9-Slice-Versuch ------------------------------------
 ' Ein Schachbrett zeigt am deutlichsten, dass die Ecken NICHT mitverzerren:
@@ -135,10 +172,10 @@ WHILE NOT KEYPRESSED(KEY_ESCAPE)
     ' Weiss unlesbar.
     DIM tf AS INTEGER
     IF t_idx = 0 THEN tf = 13421772 ELSE tf = 2500134
-    TEXT(24, 380, f"Thema: {themen[t_idx]}   Plastisch: {plastisch}   Eigene Grafik: {mit_haut}", tf)
-    TEXT(24, 404, "LEERTASTE Thema    f flach/plastisch    g eigene Grafik    ESC Ende", tf)
-    TEXT(24, 440, f"Lautstaerke {GUI_VALUE(k_vol):.0f}   Hall {GUI_VALUE(k_hall):.0f}   " + _
+    TEXT(24, 600, f"Thema: {themen[t_idx]}   Plastisch: {plastisch}   Eigene Grafik: {mit_haut}", tf)
+    TEXT(24, 624, "LEERTASTE Thema    f flach/plastisch    g eigene Grafik    ESC Ende", tf)
+    TEXT(24, 660, f"Lautstaerke {GUI_VALUE(k_vol):.0f}   Hall {GUI_VALUE(k_hall):.0f}   " + _
                   f"Klang {GUI_VALUE(k_ton):.0f}   Bass {GUI_VALUE(s_bass):.2f}", tf)
-    TEXT(24, 464, f"Musik: {GUI_CHECKED(t_musik)}   Effekte: {GUI_CHECKED(t_fx)}", tf)
+    TEXT(24, 684, f"Musik: {GUI_CHECKED(t_musik)}   Effekte: {GUI_CHECKED(t_fx)}", tf)
     FLIP()
 WEND
