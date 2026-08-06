@@ -219,3 +219,54 @@ def test_skin_ueberlebt_winzige_widgets(run_gb):
            'NEXT\n'
            'PRINT "ok"\n')
     assert _z(run_gb(src)) == ["ok"]
+
+
+# --- ui-Modul (Immediate-Mode): dieselbe Plastik ---------------------------
+
+def test_ui_glas_themen_bringen_plastik_mit(run_gb):
+    src = ('IMPORT "ui"\n'
+           'UI_THEME_PRESET("glas_dunkel")\n'
+           'PRINT UI_METRIC_GET("gradient")\n'
+           'PRINT UI_METRIC_GET("gloss")\n'
+           'PRINT UI_METRIC_GET("bevel")\n'
+           'PRINT UI_METRIC_GET("corner_radius")\n')
+    assert _z(run_gb(src)) == ["16", "26", "1", "5"]
+
+
+def test_ui_flache_themen_bleiben_flach(run_gb):
+    """Bestehende ui-Themen duerfen sich nicht veraendern."""
+    src = ('IMPORT "ui"\n'
+           'UI_THEME_PRESET("dark")\n'
+           'PRINT UI_METRIC_GET("gradient") + UI_METRIC_GET("gloss") + UI_METRIC_GET("bevel")\n'
+           'UI_THEME_PRESET("light")\n'
+           'PRINT UI_METRIC_GET("gradient") + UI_METRIC_GET("gloss") + UI_METRIC_GET("bevel")\n')
+    assert _z(run_gb(src)) == ["0", "0"]
+
+
+def test_ui_theme_wechsel_setzt_die_plastik_zurueck(run_gb):
+    """Ein Preset ist ein KOMPLETTER Look: wer von glas auf flach wechselt,
+    darf keine Woelbung behalten."""
+    src = ('IMPORT "ui"\n'
+           'UI_THEME_PRESET("glas_hell")\n'
+           'PRINT UI_METRIC_GET("gradient")\n'
+           'UI_THEME_PRESET("retro")\n'
+           'PRINT UI_METRIC_GET("gradient")\n')
+    assert _z(run_gb(src)) == ["16", "0"]
+
+
+def test_ui_beide_glas_themen_gibt_es(run_gb):
+    src = ('IMPORT "ui"\n'
+           'UI_THEME_PRESET("glas_dunkel")\n'
+           'PRINT UI_THEME_GET("win_bg")\n'
+           'UI_THEME_PRESET("glas_hell")\n'
+           'PRINT UI_THEME_GET("win_bg")\n')
+    zeilen = _z(run_gb(src))
+    assert int(zeilen[0]) < int(zeilen[1]), "dunkel muss dunkler sein als hell"
+
+
+def test_ui_plastik_metriken_einzeln_setzbar(run_gb):
+    src = ('IMPORT "ui"\n'
+           'UI_METRIC_SET("gradient", 24)\n'
+           'UI_METRIC_SET("gloss", 40)\n'
+           'PRINT UI_METRIC_GET("gradient")\n')
+    assert _z(run_gb(src)) == ["24"]

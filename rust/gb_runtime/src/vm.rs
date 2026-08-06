@@ -311,7 +311,69 @@ const DEFAULT_UI_THEME: &[(&str, i64)] = &[
 ];
 const DEFAULT_UI_METRICS: &[(&str, i64)] = &[
     ("checkbox_size", 14), ("slider_h", 14), ("win_title_h", 20),
+    // Plastik wie im Modul `gui`: 0 = flach (bisheriges Aussehen).
+    ("corner_radius", 0), ("gradient", 0), ("gloss", 0), ("bevel", 0),
 ];
+
+/// Die vier Plastik-Werte in einem Stueck.
+///
+/// Sie muessen VOR `self.gfx.as_mut()` gelesen werden: dieser Aufruf leiht
+/// `self` veraenderlich aus, danach ist `self.ui_state` nicht mehr lesbar.
+/// Genau deshalb reicht das Modul die Werte gebuendelt an die freie
+/// Zeichenroutine weiter, statt dort erneut ins Thema zu greifen.
+#[derive(Clone, Copy, Default)]
+struct UiPlastik {
+    rad: i32,
+    grad: i32,
+    gloss: i32,
+    bevel: i32,
+}
+
+/// Flaeche mit Rand, wahlweise gewoelbt (erhaben) oder versenkt.
+///
+/// Gegenstueck zu `Gui::flaeche`. Erhaben = hell oben, dunkel unten, mit
+/// Glanzkante; versenkt = umgekehrt, mit Schatten unter der Oberkante. Ohne
+/// die Plastik-Metriken bleibt es die schlichte gefuellte Box wie bisher.
+#[allow(clippy::too_many_arguments)]
+fn ui_flaeche(g: &mut crate::graphics::Graphics, p: UiPlastik, x: i32, y: i32, w: i32, h: i32,
+              fill: i64, border: i64, tief: bool) {
+    let (x2, y2) = (x + w - 1, y + h - 1);
+    if p.grad > 0 {
+        let (oben, unten) = if tief {
+            (ui_darken(fill, p.grad as i64), ui_lighten(fill, p.grad as f64 / 255.0))
+        } else {
+            (ui_lighten(fill, p.grad as f64 / 255.0), ui_darken(fill, p.grad as i64))
+        };
+        g.round_gradient(x, y, x2, y2, p.rad, oben, unten);
+        if !tief && p.gloss > 0 && h >= 4 {
+            let a = ((p.gloss.clamp(0, 100) as f64 / 100.0) * 255.0) as i64;
+            // Runde Formen brauchen den Glanz ueber die GANZE Hoehe -- sonst
+            // deckelt round_gradient seinen Radius und die Glanzflaeche ragt
+            // seitlich ueber die Form hinaus (derselbe Fall wie im gui-Modul).
+            let unten_y = if p.rad * 2 >= h { y2 } else { y + h / 2 };
+            g.round_gradient(x, y, x2, unten_y, p.rad, (a << 24) | 0xFFFFFF, 0x01FF_FFFFu32 as i64);
+        }
+    } else if p.rad > 0 {
+        g.round_rect(x, y, x2, y2, p.rad, fill, true);
+    } else {
+        g.box_fill(x, y, x2, y2, fill);
+    }
+    if p.bevel > 0 && w >= 4 {
+        let ein = p.rad.max(1);
+        let (o, u) = if tief {
+            (0x60000000u32 as i64, 0x38FFFFFFu32 as i64)
+        } else {
+            (0x50FFFFFFu32 as i64, 0x40000000u32 as i64)
+        };
+        g.line(x + ein, y + 1, x2 - ein, y + 1, o);
+        g.line(x + ein, y2 - 1, x2 - ein, y2 - 1, u);
+    }
+    if p.rad > 0 {
+        g.round_rect(x, y, x2, y2, p.rad, border, false);
+    } else {
+        g.rect(x, y, x2, y2, border);
+    }
+}
 
 impl UiState {
     fn new() -> Self {
@@ -329,6 +391,15 @@ impl UiState {
     }
     fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
     fn metric(&self, key: &str) -> i64 { *self.metrics.get(key).unwrap_or(&14) }
+    /// Plastik-Werte gebuendelt (siehe `UiPlastik`).
+    fn plastik(&self) -> UiPlastik {
+        UiPlastik {
+            rad: *self.metrics.get("corner_radius").unwrap_or(&0) as i32,
+            grad: *self.metrics.get("gradient").unwrap_or(&0) as i32,
+            gloss: *self.metrics.get("gloss").unwrap_or(&0) as i32,
+            bevel: *self.metrics.get("bevel").unwrap_or(&0) as i32,
+        }
+    }
 }
 
 /// Theme-Presets (UI_THEME_PRESET). Nur Farben (keine Metriken).
@@ -343,6 +414,25 @@ fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
             ("slider_track", 0xC4C9D0), ("progress_fg", 0x2FA84F), ("progress_bg", 0xCBD0D6),
             ("win_bg", 0xF4F6F9), ("win_border", 0xA8AEB6), ("win_title_bg", 0xD0D5DC),
             ("win_title_bg_focus", 0x2A7DE1),
+        ],
+        // Plastische Glas-Themen -- Gegenstueck zu den gleichnamigen im Modul
+        // `gui`. Verlauf/Glanz/Fase kommen aus den Metriken (siehe
+        // ui_preset_metrics), damit ein Thema ein KOMPLETTER Look ist.
+        "glas_dunkel" | "glas_dark" => vec![
+            ("accent", 0x2FA8D8), ("text_fg", 0xEAF2F8), ("muted_fg", 0x8B97A6),
+            ("button_bg", 0x39424F), ("panel_bg", 0x2C343F), ("panel_border", 0x161B22),
+            ("panel_title_bg", 0x39424F), ("field_bg", 0x232A33), ("field_border", 0x161B22),
+            ("slider_track", 0x232A33), ("progress_fg", 0x2FA8D8), ("progress_bg", 0x232A33),
+            ("win_bg", 0x232A33), ("win_border", 0x151A21), ("win_title_bg", 0x2C343F),
+            ("win_title_bg_focus", 0x1C6E96),
+        ],
+        "glas_hell" | "glas_light" => vec![
+            ("accent", 0x2A8FD0), ("text_fg", 0x1E2530), ("muted_fg", 0x66707C),
+            ("button_bg", 0xFBFCFE), ("panel_bg", 0xE2E8EF), ("panel_border", 0x63707F),
+            ("panel_title_bg", 0xD2DAE3), ("field_bg", 0xFDFEFF), ("field_border", 0x63707F),
+            ("slider_track", 0xCED6DF), ("progress_fg", 0x2A8FD0), ("progress_bg", 0xD6DDE5),
+            ("win_bg", 0xE2E8EF), ("win_border", 0x6E7C8C), ("win_title_bg", 0xD2DAE3),
+            ("win_title_bg_focus", 0x2A8FD0),
         ],
         "retro" => vec![
             ("accent", 0x33FF66), ("text_fg", 0x33FF66), ("muted_fg", 0x1F8C3C),
@@ -363,6 +453,17 @@ fn ui_preset(name: &str) -> Option<Vec<(&'static str, i64)>> {
         _ => return None,
     };
     Some(p)
+}
+
+/// Metrik-Profil eines Presets. Nur die "glas_*"-Themen bringen Plastik mit;
+/// alle anderen bleiben flach, damit bestehende Programme unveraendert
+/// aussehen.
+fn ui_preset_metrics(name: &str) -> Vec<(&'static str, i64)> {
+    if name.starts_with("glas") {
+        vec![("corner_radius", 5), ("gradient", 16), ("gloss", 26), ("bevel", 1)]
+    } else {
+        vec![("corner_radius", 0), ("gradient", 0), ("gloss", 0), ("bevel", 0)]
+    }
 }
 
 /// Ruft ein reines Builtin auf und faengt einen evtl. Rust-Panic ab (z.B.
@@ -5414,8 +5515,20 @@ impl<'p> Vm<'p> {
                 if hovered && down && !self.ui_state.was_mouse_down { self.ui_state.click_origin = Some(id.clone()); }
                 let clicked = hovered && !down && self.ui_state.was_mouse_down && self.ui_state.click_origin.as_deref() == Some(id.as_str());
                 let bg = if hovered && down { ui_darken(bg_color, 40) } else if hovered { ui_lighten(bg_color, 0.25) } else { bg_color };
+                let pl = self.ui_state.plastik();
                 let g = self.gfx.as_mut().unwrap();
-                g.box_fill(x,y,x+w-1,y+h-1,bg); g.rect(x,y,x+w-1,y+h-1,fg_color); g.text(x+6, y+(h-14)/2, text, fg_color);
+                ui_flaeche(g, pl, x, y, w, h, bg, fg_color, false);
+                // Beschriftung mittig und im Knopf beschnitten -- wie im
+                // Modul `gui`; links anzukleben und ueberzulaufen sieht bei
+                // Knoepfen falsch aus.
+                let sz = g.text_height();
+                let tw = g.text_width(&text);
+                let frei = (w - 12).max(0);
+                let tx = x + 6 + ((frei - tw) / 2).max(0);
+                let beschnitten = tw > frei;
+                if beschnitten { g.push_clip(x + 6, y + 1, frei, (h - 2).max(0)); }
+                g.text(tx, y + (h - sz) / 2, text, fg_color);
+                if beschnitten { g.pop_clip(); }
                 Value::Bool(clicked)
             }
             "ui_checkbox" => {
@@ -5434,8 +5547,10 @@ impl<'p> Vm<'p> {
                 }
                 let val = self.ui_state.checkbox[&id];
                 let (border, fill, fg) = (self.ui_state.th("field_border"), self.ui_state.th("accent"), self.ui_state.th("text_fg"));
+                let feld = self.ui_state.th("field_bg");
+                let pl = self.ui_state.plastik();
                 let g = self.gfx.as_mut().unwrap();
-                g.rect(x,y,x+bs-1,y+bs-1,border);
+                ui_flaeche(g, pl, x, y, bs, bs, feld, border, true);
                 if hovered { g.rect(x-1,y-1,x+bs,y+bs,fill); }
                 if val { g.box_fill(x+3,y+3,x+bs-4,y+bs-4,fill); }
                 g.text(x+bs+5, y, label, fg);
@@ -5457,13 +5572,19 @@ impl<'p> Vm<'p> {
                     self.ui_state.slider.insert(id.clone(), mn + rel * (mx_ - mn));
                 }
                 let val = self.ui_state.slider[&id];
-                let (track, border, handle) = (self.ui_state.th("slider_track"), self.ui_state.th("text_fg"), self.ui_state.th("accent"));
+                let (track, border, handle) = (self.ui_state.th("slider_track"), self.ui_state.th("field_border"), self.ui_state.th("accent"));
                 let handle_w = 10;
                 let hx = x + ((val - mn) / (mx_ - mn) * (w - handle_w) as f64) as i32;
+                let pl = self.ui_state.plastik();
                 let g = self.gfx.as_mut().unwrap();
-                g.box_fill(x, y + h/2 - 1, x+w-1, y+h/2+1, track);
-                g.rect(x,y,x+w-1,y+h-1,border);
-                g.box_fill(hx, y, hx+handle_w-1, y+h-1, handle);
+                if pl.grad > 0 {
+                    ui_flaeche(g, pl, x, y + h / 2 - 3, w, 6, track, border, true);
+                    ui_flaeche(g, pl, hx, y, handle_w, h, handle, border, false);
+                } else {
+                    g.box_fill(x, y + h/2 - 1, x+w-1, y+h/2+1, track);
+                    g.rect(x,y,x+w-1,y+h-1,border);
+                    g.box_fill(hx, y, hx+handle_w-1, y+h-1, handle);
+                }
                 Value::Float(val)
             }
             "ui_progress" => {
@@ -5475,10 +5596,13 @@ impl<'p> Vm<'p> {
                 if w >= 2 && h >= 2 {
                     let ratio = (value / maxv).max(0.0).min(1.0);
                     let fill_w = ((w - 2) as f64 * ratio) as i32;
-                    let tfg = self.ui_state.th("text_fg");
+                    let tfg = self.ui_state.th("field_border");
+                    let pl = self.ui_state.plastik();
                     let g = self.gfx.as_mut().unwrap();
-                    g.box_fill(x,y,x+w-1,y+h-1,bg); g.rect(x,y,x+w-1,y+h-1,tfg);
-                    if fill_w > 0 { g.box_fill(x+1, y+1, x+1+fill_w-1, y+h-2, fg); }
+                    ui_flaeche(g, pl, x, y, w, h, bg, tfg, true);
+                    if fill_w > 0 {
+                        ui_flaeche(g, pl, x + 1, y + 1, fill_w, (h - 2).max(1), fg, fg, false);
+                    }
                 }
                 Value::Nil
             }
@@ -5487,8 +5611,9 @@ impl<'p> Vm<'p> {
                 let title = if a.len() >= 5 { gs(a,4,"UI_PANEL")?.to_string() } else { String::new() };
                 let bg = if a.len() >= 6 { gi(a,5,"UI_PANEL")? } else { self.ui_state.th("panel_bg") };
                 let (border, tbg, fg) = (self.ui_state.th("panel_border"), self.ui_state.th("panel_title_bg"), self.ui_state.th("text_fg"));
+                let pl = self.ui_state.plastik();
                 let g = self.gfx.as_mut().unwrap();
-                g.box_fill(x,y,x+w-1,y+h-1,bg); g.rect(x,y,x+w-1,y+h-1,border);
+                ui_flaeche(g, pl, x, y, w, h, bg, border, false);
                 if !title.is_empty() {
                     g.box_fill(x,y,x+w-1,y+17,tbg); g.rect(x,y,x+w-1,y+17,border); g.text(x+6,y+2,title,fg);
                 }
@@ -5567,9 +5692,9 @@ impl<'p> Vm<'p> {
                 let txt = self.ui_state.text[&id].clone();
                 let caret_on = is_focused && (self.ui_state.frame_count / 16) % 2 == 0;
                 {
+                    let pl = self.ui_state.plastik();
                     let g = self.gfx.as_mut().ok_or("UI_TEXTFIELD vor SCREEN")?;
-                    g.box_fill(x, y, x + w - 1, y + h - 1, bg);
-                    g.rect(x, y, x + w - 1, y + h - 1, border);
+                    ui_flaeche(g, pl, x, y, w, h, bg, border, true);
                     if !txt.is_empty() {
                         g.text(x + 5, y + (h - 14) / 2, txt.clone(), fg);
                     } else if !placeholder.is_empty() && !is_focused {
@@ -5632,12 +5757,13 @@ impl<'p> Vm<'p> {
                 let (win_bg, win_border) = (self.ui_state.th("win_bg"), self.ui_state.th("win_border"));
                 let title_bg = if owns { self.ui_state.th("win_title_bg_focus") } else { self.ui_state.th("win_title_bg") };
                 let fg = self.ui_state.th("text_fg");
+                let pl = self.ui_state.plastik();
                 {
                     let g = self.gfx.as_mut().ok_or("UI_WINDOW_BEGIN vor SCREEN")?;
-                    g.box_fill(wx, wy, wx + w - 1, wy + draw_h - 1, win_bg);
-                    g.rect(wx, wy, wx + w - 1, wy + draw_h - 1, win_border);
-                    g.box_fill(wx, wy, wx + w - 1, wy + title_h - 1, title_bg);
-                    g.rect(wx, wy, wx + w - 1, wy + title_h - 1, win_border);
+                    ui_flaeche(g, pl, wx, wy, w, draw_h, win_bg, win_border, false);
+                    // Titelleiste: oben rund wie das Fenster, unten buendig --
+                    // deshalb hier ohne eigene Rundung.
+                    ui_flaeche(g, UiPlastik { rad: 0, ..pl }, wx, wy, w, title_h, title_bg, win_border, false);
                     g.text(cb_x, cb_y - 2, (if collapsed { "+" } else { "-" }).to_string(), fg);
                     g.text(wx + COLLAPSE + 8, wy + 3, title, fg);
                 }
@@ -5711,6 +5837,8 @@ impl<'p> Vm<'p> {
                 let n = gs(a,0,"UI_THEME_PRESET")?.to_lowercase();
                 let p = ui_preset(&n).ok_or_else(|| format!("UI_THEME_PRESET: unbekanntes Preset '{}'", n))?;
                 for (k, v) in p { self.ui_state.theme.insert(k.to_string(), v); }
+                // Ein Preset ist ein KOMPLETTER Look: Farben UND Plastik.
+                for (k, v) in ui_preset_metrics(&n) { self.ui_state.metrics.insert(k.to_string(), v); }
                 Value::Nil
             }
 

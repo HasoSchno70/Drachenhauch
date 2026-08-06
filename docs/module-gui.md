@@ -934,3 +934,25 @@ als benannter Stil auf mehrere Widgets übertragen.
 der sie auch gezeichnet wird. Andernfalls säße zentrierter Text schief und der
 Beschnitt griffe an der falschen Stelle, sobald ein Widget eine eigene Schrift
 oder Größe hat.
+
+
+## Der Glas-Look im `ui`-Modul
+
+Das Immediate-Mode-Modul `ui` kennt dieselben zwei Themen:
+
+```basic
+IMPORT "ui"
+UI_THEME_PRESET("glas_dunkel")     ' oder "glas_hell"
+```
+
+Es bringt dieselben Metriken mit (`gradient`, `gloss`, `bevel`,
+`corner_radius`, einzeln über `UI_METRIC_SET`), und ein Preset setzt Farben
+**und** Plastik — wer von einem Glas-Thema auf ein flaches wechselt, behält
+also keine Wölbung zurück.
+
+Umgestellt sind Knopf, Kästchen, Schieber, Fortschritt, Eingabefeld, Panel
+und Fenster. Die Knopf-Beschriftung sitzt hier ebenfalls mittig und wird im
+Knopf abgeschnitten statt überzulaufen.
+
+Alle bisherigen `ui`-Themen (`dark`, `light`, `retro`, `contrast`) stehen
+weiterhin auf 0 und sehen unverändert flach aus.
