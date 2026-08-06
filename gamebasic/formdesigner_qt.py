@@ -155,86 +155,131 @@ _PAL_ACCENT = QColor(43, 196, 232)
 _PAL_BORDER = QColor(78, 100, 122)
 
 
-def _paint_glyph(qp: QPainter, kind: str, r: QRect):
-    """Mini-Vorschau eines Controls in `r` -- fuer Palette-Icon + Drag-Bild."""
+def _paint_glyph(qp: QPainter, kind: str, r: QRect, theme: str = "glas_dunkel"):
+    """Vorschau eines Controls in `r` -- fuer Palette-Icon + Drag-Bild.
+
+    Zeichnet ueber dieselben Flaechen-Hilfen wie die Entwurfsflaeche und in den
+    Farben eines Themas. Vorher waren hier eigene, fest verdrahtete Farben und
+    grobe Rechtecke: die Palette zeigte etwas anderes als das, was nach dem
+    Ablegen erschien.
+    """
+    th = theme_colors(theme)
+    fg = _col(th["text_fg"])
+    muted = _col(th["muted_fg"])
+    accent = _col(th["accent"])
+    border = _col(th["widget_border"])
+    face = _col(th["widget_bg"])
+    sunk = _mix(face, _col(th["win_bg"]), 0.55)
+    rad, grad, gloss = th["radius"], th["gradient"], th["gloss"]
+    al = Qt.AlignmentFlag
+
     qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-    qp.setFont(QFont("Segoe UI", 7))
+    f = QFont("Segoe UI")
+    f.setPixelSize(9)
+    qp.setFont(f)
     cy = r.center().y()
-    qp.setPen(QPen(_PAL_BORDER, 1))
+
+    def flaeche(rect, farbe=None, tief=False):
+        _fill_surface(qp, rect, sunk if tief else (farbe or face), border,
+                      rad, -grad if tief else grad, 0 if tief else gloss)
+
     if kind == "button":
-        qp.setBrush(QColor(52, 68, 86)); qp.drawRoundedRect(r, 4, 4)
-        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, "Button")
+        flaeche(r)
+        qp.setPen(fg); qp.drawText(r, al.AlignCenter, "Button")
     elif kind == "label":
-        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, "Label")
+        qp.setPen(fg); qp.drawText(r, al.AlignCenter, "Label")
     elif kind in ("checkbox", "radio"):
-        box = QRect(r.left() + 2, cy - 6, 12, 12)
-        qp.setBrush(QColor(24, 32, 42))
+        bs = 13
+        box = QRect(r.left() + 2, cy - bs // 2, bs, bs)
+        qp.setPen(QPen(border, 1)); qp.setBrush(sunk)
         if kind == "checkbox":
-            qp.drawRect(box)
-            qp.setPen(QPen(_PAL_ACCENT, 2))
-            qp.drawLine(box.left() + 2, cy, box.center().x(), box.bottom() - 2)
-            qp.drawLine(box.center().x(), box.bottom() - 2, box.right() - 1, box.top() + 1)
+            qp.drawRoundedRect(box, 3, 3)
+            qp.setPen(QPen(accent, 2))
+            qp.drawLine(box.left() + 3, cy, box.center().x(), box.bottom() - 3)
+            qp.drawLine(box.center().x(), box.bottom() - 3, box.right() - 2, box.top() + 2)
         else:
             qp.drawEllipse(box)
-            qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
-            qp.drawEllipse(box.adjusted(3, 3, -3, -3))
-        qp.setPen(_PAL_FG)
+            qp.setBrush(accent); qp.setPen(Qt.PenStyle.NoPen)
+            qp.drawEllipse(box.adjusted(4, 4, -4, -4))
+        qp.setPen(fg)
         qp.drawText(QRect(box.right() + 5, r.top(), r.right() - box.right() - 5, r.height()),
-                    Qt.AlignmentFlag.AlignVCenter, kind.capitalize())
+                    al.AlignVCenter, "Check" if kind == "checkbox" else "Option")
     elif kind == "slider":
-        qp.setPen(QPen(_PAL_BORDER, 2)); qp.drawLine(r.left() + 4, cy, r.right() - 4, cy)
-        qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
-        qp.drawEllipse(QRect(r.center().x() - 5, cy - 5, 10, 10))
+        flaeche(QRect(r.left() + 2, cy - 3, r.width() - 4, 6), tief=True)
+        qp.setBrush(accent); qp.setPen(Qt.PenStyle.NoPen)
+        qp.drawRect(QRect(r.left() + 3, cy - 2, r.width() // 2 - 3, 4))
+        _fill_surface(qp, QRect(r.center().x() - 6, cy - 7, 12, 14), face, border, 6, grad, gloss)
     elif kind == "textinput":
-        qp.setBrush(QColor(20, 26, 34)); qp.drawRect(r)
-        qp.setPen(QPen(_PAL_ACCENT, 1)); qp.drawLine(r.left() + 5, r.top() + 4, r.left() + 5, r.bottom() - 4)
-        qp.setPen(QColor(150, 162, 176))
-        qp.drawText(r.adjusted(10, 0, 0, 0), Qt.AlignmentFlag.AlignVCenter, "Text…")
-    elif kind == "dropdown":
-        qp.setBrush(QColor(52, 68, 86)); qp.drawRect(r)
-        qp.setPen(_PAL_FG); qp.drawText(r.adjusted(5, 0, -16, 0), Qt.AlignmentFlag.AlignVCenter, "Auswahl")
-        qp.drawText(QRect(r.right() - 14, r.top(), 12, r.height()), Qt.AlignmentFlag.AlignCenter, "▾")
-    elif kind == "listbox":
-        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
-        qp.setPen(QColor(120, 134, 150))
+        flaeche(r, tief=True)
+        qp.setPen(QPen(accent, 1)); qp.drawLine(r.left() + 6, r.top() + 5, r.left() + 6, r.bottom() - 5)
+        qp.setPen(muted)
+        qp.drawText(r.adjusted(11, 0, -2, 0), al.AlignVCenter, "Text…")
+    elif kind == "textarea":
+        flaeche(r, tief=True)
+        qp.setPen(muted)
         for i in range(3):
-            yy = r.top() + 6 + i * 8
-            qp.drawLine(r.left() + 5, yy, r.right() - 6, yy)
+            yy = r.top() + 7 + i * 7
+            qp.drawLine(r.left() + 6, yy, r.right() - (6 if i < 2 else 18), yy)
+    elif kind == "dropdown":
+        flaeche(r)
+        qp.setPen(fg)
+        qp.drawText(r.adjusted(6, 0, -16, 0), al.AlignVCenter, "Auswahl")
+        qp.drawText(QRect(r.right() - 14, r.top(), 12, r.height()), al.AlignCenter, "▾")
+    elif kind == "listbox":
+        flaeche(r, tief=True)
+        qp.fillRect(QRect(r.left() + 2, r.top() + 3, r.width() - 4, 9),
+                    _mix(_col(th["win_bg"]), accent, 0.45))
+        qp.setPen(muted)
+        for i in range(2):
+            yy = r.top() + 17 + i * 8
+            qp.drawLine(r.left() + 6, yy, r.right() - 6, yy)
     elif kind == "progress":
-        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
-        qp.setBrush(_PAL_ACCENT); qp.setPen(Qt.PenStyle.NoPen)
-        qp.drawRect(QRect(r.left() + 1, r.top() + 1, int(r.width() * 0.6), r.height() - 2))
+        flaeche(r, tief=True)
+        inner = QRect(r.left() + 2, r.top() + 2, int((r.width() - 4) * 0.6), r.height() - 4)
+        _fill_surface(qp, inner, accent, accent, max(0, rad - 1), grad, gloss)
     elif kind == "image":
-        qp.setBrush(QColor(40, 44, 52)); qp.drawRect(r)
-        qp.setPen(QPen(_PAL_ACCENT, 1))
-        qp.drawLine(r.left() + 3, r.bottom() - 4, r.center().x() - 2, cy)
-        qp.drawLine(r.center().x() - 2, cy, r.right() - 4, r.bottom() - 4)
+        flaeche(r)
+        qp.setPen(QPen(accent, 1))
+        qp.drawLine(r.left() + 5, r.bottom() - 5, r.center().x() - 2, cy)
+        qp.drawLine(r.center().x() - 2, cy, r.right() - 6, r.bottom() - 5)
         qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
-        qp.drawEllipse(QRect(r.right() - 14, r.top() + 4, 6, 6))
+        qp.drawEllipse(QRect(r.right() - 16, r.top() + 5, 7, 7))
     elif kind == "canvas":
-        qp.setBrush(QColor(14, 20, 28)); qp.drawRect(r)
-        qp.setPen(QPen(_PAL_BORDER, 1, Qt.PenStyle.DashLine))
-        qp.drawLine(r.topLeft(), r.bottomRight())
+        qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
+        qp.setPen(muted); qp.drawText(r, al.AlignCenter, "Canvas")
     elif kind == "panel":
-        qp.setBrush(QColor(30, 40, 52)); qp.drawRect(r)
-        qp.fillRect(QRect(r.left(), r.top(), r.width(), 8), QColor(46, 60, 76))
-    elif kind == "separator":
-        qp.setPen(QPen(_PAL_BORDER, 2)); qp.drawLine(r.left() + 2, cy, r.right() - 2, cy)
+        flaeche(r, _mix(face, _col(th["win_bg"]), 0.5))
+        qp.fillRect(QRect(r.left() + 1, r.top() + 1, r.width() - 2, 9), _col(th["title_bg"]))
     elif kind == "groupbox":
-        qp.setBrush(Qt.BrushStyle.NoBrush); qp.setPen(QPen(_PAL_BORDER, 1))
-        qp.drawRect(QRect(r.left() + 2, r.top() + 4, r.width() - 4, r.height() - 6))
-        qp.fillRect(QRect(r.left() + 6, r.top() + 1, 22, 6), _PAL_BG)
-        qp.setPen(_PAL_FG); qp.drawText(QRect(r.left() + 7, r.top(), 24, 8), Qt.AlignmentFlag.AlignVCenter, "Grp")
+        qp.setPen(QPen(border, 1)); qp.setBrush(Qt.BrushStyle.NoBrush)
+        qp.drawRoundedRect(r.adjusted(1, 5, -1, -1), max(2, rad), max(2, rad))
+        qp.fillRect(QRect(r.left() + 8, r.top() + 1, 34, 9), _col(th["win_bg"]))
+        qp.setPen(muted); qp.drawText(QRect(r.left() + 9, r.top(), 34, 11), al.AlignLeft, "Gruppe")
+    elif kind == "separator":
+        qp.setPen(QPen(border, 2)); qp.drawLine(r.left() + 3, cy, r.right() - 3, cy)
+    elif kind == "spinner":
+        flaeche(r, tief=True)
+        bx = QRect(r.right() - 14, r.top() + 2, 12, r.height() - 4)
+        _fill_surface(qp, bx, face, border, max(0, rad - 1), grad, gloss)
+        qp.setPen(fg)
+        qp.drawText(bx, al.AlignCenter, "⌃⌄")
+        qp.drawText(r.adjusted(6, 0, -18, 0), al.AlignVCenter, "0")
+    elif kind == "table":
+        flaeche(r, tief=True)
+        qp.fillRect(QRect(r.left() + 1, r.top() + 1, r.width() - 2, 9), _col(th["title_bg"]))
+        qp.setPen(muted)
+        qp.drawLine(r.center().x(), r.top() + 1, r.center().x(), r.bottom() - 1)
+        qp.drawLine(r.left() + 1, r.top() + 19, r.right() - 1, r.top() + 19)
     else:
-        qp.setBrush(QColor(40, 52, 66)); qp.drawRect(r)
-        qp.setPen(_PAL_FG); qp.drawText(r, Qt.AlignmentFlag.AlignCenter, kind[:6])
+        flaeche(r)
+        qp.setPen(fg); qp.drawText(r, al.AlignCenter, kind[:8])
 
 
-def _palette_icon(kind: str, w: int = 72, h: int = 40) -> QIcon:
+def _palette_icon(kind: str, w: int = 92, h: int = 46, theme: str = "glas_dunkel") -> QIcon:
     pm = QPixmap(w, h)
     pm.fill(QColor(0, 0, 0, 0))
     qp = QPainter(pm)
-    _paint_glyph(qp, kind, QRect(3, 5, w - 6, h - 10))
+    _paint_glyph(qp, kind, QRect(4, 6, w - 8, h - 12), theme)
     qp.end()
     return QIcon(pm)
 
@@ -282,8 +327,17 @@ class _PaletteList(QListWidget):
     Canvas ziehbar (MIME `_CONTROL_MIME` = Control-Art)."""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setIconSize(QSize(72, 40))
-        self.setSpacing(3)
+        # Raster mit Beschriftung UNTER der Vorschau (statt einspaltiger
+        # Liste): so passen doppelt so viele Controls ins Bild und die
+        # Vorschau bekommt Platz, gross genug um erkennbar zu sein.
+        self.setViewMode(QListWidget.ViewMode.IconMode)
+        self.setIconSize(QSize(92, 46))
+        self.setGridSize(QSize(104, 74))
+        self.setSpacing(4)
+        self.setMovement(QListWidget.Movement.Static)   # Eintraege nicht verschiebbar
+        self.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.setWordWrap(True)
+        self.setUniformItemSizes(True)
         self.setDragEnabled(True)
         self.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -1545,7 +1599,7 @@ class FormDesigner(QMainWindow):
             self.palette.addItem(it)
         self.palette.itemClicked.connect(self._arm_place)
         pdock = self._dock("Controls", self.palette, Qt.DockWidgetArea.LeftDockWidgetArea)
-        pdock.setMinimumWidth(180)
+        pdock.setMinimumWidth(226)   # zwei Rasterspalten
 
         # Inspector -- Stack: Control-Eigenschaften ODER Fenster-Eigenschaften
         self.inspector = _Inspector()
