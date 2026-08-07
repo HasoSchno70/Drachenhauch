@@ -1,0 +1,201 @@
+' ============================================================
+'  GAMEBASIC -- gui-Tabelle an einer echten SQLite-Datenbank
+' ============================================================
+'  Zeigt die geloesten Level aus dem Spiel "Pyramid Pusher"
+'  (pyramid_pusher/pyramid_pusher.db) in der gui-Tabelle -- lesen,
+'  sortieren, filtern, bearbeiten und loeschen, alles gegen die
+'  Datenbank.
+'
+'  WICHTIG: gearbeitet wird auf einer KOPIE. Beim Start legt
+'  `VACUUM INTO` eine frische Arbeitsdatei an; die Originaldatei
+'  wird nur gelesen und nie geschrieben. Eine Demo, die den
+'  Spielstand des Nutzers aendert, waere eine schlechte Demo.
+'
+'  Zum Ausprobieren:
+'    * KOPFZELLE klicken -> sortieren. "Zeit", "Zuege" und "Schuebe"
+'      sind Zahlenspalten und werden zahlenweise sortiert.
+'    * FILTERZEILE -> z.B. "kammer" unter Level tippen.
+'    * DOPPELKLICK auf einen Levelnamen -> bearbeiten. Enter schreibt
+'      ein UPDATE in die Datenbank, ESC nimmt zurueck.
+'    * STRG/UMSCHALT+KLICK -> mehrere Zeilen waehlen,
+'      dann [Entf] oder der Knopf loescht sie (DELETE).
+'    * [F5] laedt neu aus der Datenbank.
+'
+'  Das Muster dahinter: die Tabelle haelt eine ANSICHT der Daten,
+'  die Datenbank bleibt die Wahrheit. Jede Zeile merkt sich ihre
+'  `id`; weil Sortieren und Filtern die Datenzeilen nicht umstellen,
+'  bleibt diese Zuordnung gueltig.
+'
+'  [ESC] Ende
+' ============================================================
+IMPORT "gui"
+IMPORT "db"
+
+SCREEN(1120, 680, "GameBasic - Tabelle an SQLite", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+CONST ORIGINAL = "../pyramid_pusher/pyramid_pusher.db"
+CONST ARBEIT = "tabelle_sqlite_arbeitskopie.db"
+
+' --- Arbeitskopie anlegen --------------------------------------------------
+' VACUUM INTO schreibt eine vollstaendige Kopie und weigert sich, eine
+' vorhandene Datei zu ueberschreiben -- darum vorher weg damit. So startet
+' die Demo jedes Mal mit demselben Stand.
+' Kein Abbruch-Befehl in GameBasic -- THROW ist der Weg, mit einer klaren
+' Meldung stehenzubleiben statt spaeter an einer nichtssagenden Stelle.
+IF NOT FILEEXISTS(ORIGINAL) THEN
+    THROW "Datenbank nicht gefunden: " + ORIGINAL + " -- die Demo gehoert nach examples/"
+END IF
+IF FILEEXISTS(ARBEIT) THEN DELETEFILE(ARBEIT)
+DIM quelle AS DB_CONN
+quelle = DB_OPEN(ORIGINAL)
+DB_EXEC(quelle, "VACUUM INTO '" + ARBEIT + "'")
+DB_CLOSE(quelle)
+
+DIM db AS DB_CONN
+db = DB_OPEN(ARBEIT)
+
+' --- Oberflaeche -----------------------------------------------------------
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Pyramid Pusher -- geloeste Level", (SW - 1060) \ 2, 24, 1060, 630)
+
+DIM t AS GUI_WIDGET
+t = GUI_TABLE(win, 20, 20, 1020, 470)
+DIM kopf AS ARRAY OF STRING
+kopf = SPLIT$("Code|Level|Zeit (s)|Zuege|Schuebe|Sterne", "|")
+GUI_TABLE_HEADERS(t, kopf)
+DIM breiten AS ARRAY OF INTEGER
+breiten = [90, 300, 110, 110, 120, 180]
+GUI_TABLE_COL_WIDTHS(t, breiten)
+GUI_TABLE_SET(t, "zeilenhoehe", 26)
+GUI_TABLE_SET(t, "kopfhoehe", 26)
+GUI_TABLE_SET(t, "filterzeile", 1)
+GUI_TABLE_SET(t, "zebra", 1)
+GUI_TABLE_SET(t, "mehrfachauswahl", 1)
+GUI_TABLE_SET(t, "feste_spalten", 2)
+GUI_TABLE_COL_ALIGN(t, 2, "rechts")
+GUI_TABLE_COL_ALIGN(t, 3, "rechts")
+GUI_TABLE_COL_ALIGN(t, 4, "rechts")
+GUI_TABLE_COL_EDIT(t, 1, TRUE)          ' nur der Levelname ist aenderbar
+
+DIM bLoeschen AS GUI_WIDGET
+bLoeschen = GUI_BUTTON(win, "Ausgewaehlte loeschen", 20, 504, 200, 30)
+DIM bNeu AS GUI_WIDGET
+bNeu = GUI_BUTTON(win, "Neu laden (F5)", 232, 504, 160, 30)
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "", 20, 546)
+DIM sql AS GUI_WIDGET
+sql = GUI_LABEL(win, "", 20, 570)
+
+' --- Daten -----------------------------------------------------------------
+CONST MAXZ = 500
+DIM zeilenId[MAXZ] AS INTEGER      ' Tabellen-Datenzeile -> Datenbank-id
+DIM anzahl AS INTEGER
+
+SUB melde(text AS STRING, befehl AS STRING)
+    GUI_SET_TEXT(stand, text)
+    GUI_SET_TEXT(sql, befehl)
+END SUB
+
+SUB laden()
+    GUI_TABLE_CLEAR(t)
+    anzahl = 0
+    DIM r AS DB_RESULT
+    r = DB_QUERY(db, "SELECT id, code, title, secs, moves, pushes, stars FROM solves ORDER BY id")
+    WHILE DB_NEXT(r)
+        IF anzahl >= MAXZ THEN BREAK
+        DIM sterne AS INTEGER : sterne = DB_GET_INT(r, 6)
+        DIM z AS ARRAY OF STRING
+        z = SPLIT$(DB_GET_STRING(r, 1) + "|" + DB_GET_STRING(r, 2) + "|" + _
+                   STR$(DB_GET_INT(r, 3)) + "|" + STR$(DB_GET_INT(r, 4)) + "|" + _
+                   STR$(DB_GET_INT(r, 5)) + "|" + STR$(sterne) + " von 3", "|")
+        GUI_TABLE_ADD_ROW(t, z)
+        zeilenId[anzahl] = DB_GET_INT(r, 0)
+        ' Sterne als Balken -- eine Zahl von 0 bis 3 liest man so schneller.
+        GUI_TABLE_CELL_KIND(t, anzahl, 5, "balken")
+        GUI_TABLE_CELL_VALUE(t, anzahl, 5, sterne / 3.0)
+        ' Lange Partien hervorheben: das faellt in einer Liste sonst nicht auf.
+        IF DB_GET_INT(r, 3) >= 10 THEN GUI_TABLE_CELL_COLOR(t, anzahl, 2, &HFFC060, -1)
+        anzahl = anzahl + 1
+    WEND
+    melde("Geladen: " + STR$(anzahl) + " Zeilen aus " + ARBEIT, _
+          "SELECT id, code, title, secs, moves, pushes, stars FROM solves ORDER BY id")
+END SUB
+
+laden()
+
+' --- Bearbeitung verfolgen -------------------------------------------------
+' Die Tabelle sagt, WELCHE Zelle bearbeitet wird. Beim Oeffnen merken wir uns
+' den alten Text; sobald die Bearbeitung endet und sich etwas geaendert hat,
+' geht ein UPDATE an die Datenbank. So bleibt die Datenbank die Wahrheit und
+' die Tabelle nur ihre Ansicht.
+DIM warZeile AS INTEGER : warZeile = -1
+DIM altText AS STRING : altText = ""
+
+WHILE NOT QUITREQUESTED()
+    ' ESC nimmt erst eine laufende Bearbeitung zurueck.
+    IF KEYPRESSED(27) AND GUI_TABLE_EDITING_ROW(t) < 0 THEN BREAK
+    GUI_UPDATE()
+
+    DIM jetzt AS INTEGER : jetzt = GUI_TABLE_EDITING_ROW(t)
+    IF jetzt >= 0 AND warZeile < 0 THEN
+        warZeile = jetzt
+        altText = GUI_TABLE_GET_CELL(t, jetzt, 1)
+    ELIF jetzt < 0 AND warZeile >= 0 THEN
+        DIM neuText AS STRING : neuText = GUI_TABLE_GET_CELL(t, warZeile, 1)
+        IF neuText <> altText THEN
+            DB_EXEC(db, "UPDATE solves SET title = ? WHERE id = ?", neuText, zeilenId[warZeile])
+            melde("Umbenannt: " + altText + " -> " + neuText, _
+                  "UPDATE solves SET title = '" + neuText + "' WHERE id = " + STR$(zeilenId[warZeile]))
+        END IF
+        warZeile = -1
+    END IF
+
+    ' --- Loeschen ---
+    IF GUI_CLICKED(bLoeschen) OR (KEYHIT(127) AND GUI_TABLE_EDITING_ROW(t) < 0) THEN
+        DIM n AS INTEGER : n = GUI_TABLE_SEL_COUNT(t)
+        IF n = 0 THEN
+            melde("Nichts ausgewaehlt -- Zeile anklicken, mehrere mit Strg/Umschalt.", "")
+        ELSE
+            ' Erst alle ids einsammeln, DANN loeschen: waehrend des Loeschens
+            ' verschieben sich die Zeilennummern der Tabelle.
+            DIM ids[n] AS INTEGER
+            DIM i AS INTEGER
+            FOR i = 0 TO n - 1
+                ids[i] = zeilenId[GUI_TABLE_SEL_ROW(t, i)]
+            NEXT
+            DB_BEGIN(db)
+            FOR i = 0 TO n - 1
+                DB_EXEC(db, "DELETE FROM solves WHERE id = ?", ids[i])
+            NEXT
+            DB_COMMIT(db)
+            laden()
+            melde("Geloescht: " + STR$(n) + " Zeilen (nur in der Arbeitskopie).", _
+                  "DELETE FROM solves WHERE id = ?   (" + STR$(n) + "x, in einer Transaktion)")
+        END IF
+    END IF
+
+    IF GUI_CLICKED(bNeu) OR KEYHIT(KEY_F5) THEN laden()
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
+    TEXT(20, 8, "gui-Tabelle an SQLite -- Original wird nur gelesen, geaendert wird die Arbeitskopie | [ESC] Ende", &H8FA6BC)
+    GUI_DRAW()
+    FLIP()
+WEND
+
+DB_CLOSE(db)
+' Die Arbeitskopie wieder wegraeumen -- sie ist reines Beiwerk der Demo und
+' hat im Projektordner nichts verloren.
+IF FILEEXISTS(ARBEIT) THEN DELETEFILE(ARBEIT)

@@ -697,6 +697,51 @@ gelesen, ältere Dateien laufen unverändert.
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
+### An eine Datenbank hängen
+
+Das Muster ist immer dasselbe: **die Datenbank ist die Wahrheit, die Tabelle
+ihre Ansicht.** Jede Zeile merkt sich ihren Schlüssel; weil Sortieren und
+Filtern die Datenzeilen nicht umstellen, bleibt diese Zuordnung gültig.
+
+```basic
+IMPORT "db"
+DIM r AS DB_RESULT
+r = DB_QUERY(db, "SELECT id, name, punkte FROM spieler ORDER BY id")
+WHILE DB_NEXT(r)
+    DIM z AS ARRAY OF STRING
+    z = SPLIT$(DB_GET_STRING(r, 1) + "|" + STR$(DB_GET_INT(r, 2)), "|")
+    GUI_TABLE_ADD_ROW(tbl, z)
+    zeilenId[n] = DB_GET_INT(r, 0)      ' Datenzeile -> Datenbank-id
+    n = n + 1
+WEND
+```
+
+Beim Bearbeiten schreibt man zurück, sobald die Bearbeitung *endet* — den alten
+Wert merkt man sich beim Öffnen:
+
+```basic
+DIM jetzt AS INTEGER : jetzt = GUI_TABLE_EDITING_ROW(tbl)
+IF jetzt >= 0 AND warZeile < 0 THEN
+    warZeile = jetzt : altText = GUI_TABLE_GET_CELL(tbl, jetzt, 0)
+ELIF jetzt < 0 AND warZeile >= 0 THEN
+    IF GUI_TABLE_GET_CELL(tbl, warZeile, 0) <> altText THEN
+        DB_EXEC(db, "UPDATE spieler SET name = ? WHERE id = ?", _
+                GUI_TABLE_GET_CELL(tbl, warZeile, 0), zeilenId[warZeile])
+    END IF
+    warZeile = -1
+END IF
+```
+
+Beim Löschen mehrerer Zeilen: **erst alle Schlüssel einsammeln, dann löschen** —
+während des Löschens verschieben sich die Zeilennummern der Tabelle.
+
+> **Zum Anschauen:** [examples/158_gui_tabelle_sqlite.gb](../examples/158_gui_tabelle_sqlite.gb)
+> — die gelösten Level aus `pyramid_pusher.db` in der Tabelle: sortieren,
+> filtern, umbenennen (`UPDATE`), löschen (`DELETE` in einer Transaktion).
+> Die Demo arbeitet auf einer **Kopie** (`VACUUM INTO`); die Originaldatei wird
+> nur gelesen. Eine Demo, die den Spielstand des Nutzers ändert, wäre eine
+> schlechte Demo.
+
 **Nicht umgesetzt** (bewusst): Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).

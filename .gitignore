@@ -56,3 +56,7 @@ installer/THIRD-PARTY-NOTICES.txt
 
 # Rust build output
 target/
+
+# Arbeitskopie der SQLite-Demo (examples/158) -- wird beim Beenden geloescht,
+# bleibt aber liegen, wenn die Demo abstuerzt.
+examples/tabelle_sqlite_arbeitskopie.db
