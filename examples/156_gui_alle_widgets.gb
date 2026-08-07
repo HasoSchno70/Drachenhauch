@@ -416,9 +416,12 @@ WHILE NOT QUITREQUESTED()
         GUI_SET_TEXT(stand, "Eintrag geloescht.")
     END IF
     IF GUI_CLICKED(bTest) THEN
-        DIM t AS INTEGER
-        FOR t = 0 TO eAnzahl - 1
-            eAktiv[t] = TRUE
+        ' Nicht "t" nennen: der Kurven-Code weiter unten benutzt ein FLOAT-t,
+        ' und beide meinen dieselbe globale Variable -- der Index waere dann
+        ' beim naechsten Klick eine Kommazahl.
+        DIM iAlle AS INTEGER
+        FOR iAlle = 0 TO eAnzahl - 1
+            eAktiv[iAlle] = TRUE
         NEXT
         tabelleAufbauen()
         GUI_SET_TEXT(stand, "Alle Eintraege auf aktiv gesetzt.")
