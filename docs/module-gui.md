@@ -553,6 +553,33 @@ durchgescrollt ist.
 
 Mehr feste Spalten anzugeben als vorhanden sind wird gedeckelt.
 
+### Spalten umsortieren
+
+Aus (ein versehentlicher Zug am Kopf würde sonst die Anordnung zerwürfeln, und
+zurück geht es nur von Hand). Mit
+`GUI_TABLE_SET(tbl, "spalten_verschiebbar", 1)` lässt sich eine **Kopfzelle
+seitwärts ziehen**; die Spalte tauscht live den Platz, sobald sie über die
+Mitte des Nachbarn kommt.
+
+**Klick und Zug sind dieselbe Geste.** Erst beim Loslassen steht fest, was
+gemeint war: ohne Bewegung wird sortiert, ab 5 px Bewegung wurde verschoben.
+Ohne diese Unterscheidung würde jedes Verschieben nebenbei auch noch sortieren.
+
+Auch hier gilt: **die Daten werden nicht umgestellt.** `col_order` bildet nur
+Anzeige-Position → Datenspalte ab. `GUI_TABLE_GET_CELL(tbl, r, 0)` liefert nach
+dem Verschieben immer noch dieselbe Spalte — eine Spaltennummer, die dein
+Programm sich gemerkt hat, bleibt gültig.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_MOVE_COL(tbl, von_pos, nach_pos)` | Spalte verschieben (Anzeige-Positionen) |
+| `GUI_TABLE_COL_AT(tbl, pos)` | welche **Datenspalte** steht an dieser Position? |
+| `GUI_TABLE_COL_POS(tbl, spalte)` | an welcher Position steht diese Datenspalte? |
+| `GUI_TABLE_RESET_COLS(tbl)` | ursprüngliche Reihenfolge |
+
+Feste Spalten zählen nach **Position**: schiebt man eine Spalte nach vorn, wird
+sie mit fest. Die Reihenfolge wird im `.gbform` mitgespeichert.
+
 ### Mehrfach-Auswahl
 
 Aus (dann verhält sich die Tabelle wie bisher: eine Zeile). Mit
@@ -662,8 +689,8 @@ gelesen, ältere Dateien laufen unverändert.
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
-**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren, Spalten per
-Zug umsortieren, Zeilengruppen/Baum in der Tabelle.
+**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren,
+Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
 

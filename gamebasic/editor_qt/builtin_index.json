@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1294,
+ "count": 1298,
  "builtins": [
   {
    "name": "ABS",
@@ -2919,9 +2919,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_COL_AT",
+   "kind": "module",
+   "signature": "GUI_TABLE_COL_AT(tbl, pos) AS INTEGER",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_COL_EDIT",
    "kind": "module",
    "signature": "GUI_TABLE_COL_EDIT(tbl, spalte, an)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_COL_POS",
+   "kind": "module",
+   "signature": "GUI_TABLE_COL_POS(tbl, spalte) AS INTEGER",
    "module": "gui"
   },
   {
@@ -2985,9 +2997,21 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_MOVE_COL",
+   "kind": "module",
+   "signature": "GUI_TABLE_MOVE_COL(tbl, von_pos, nach_pos)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_REMOVE_ROW",
    "kind": "module",
    "signature": "GUI_TABLE_REMOVE_ROW(tbl, zeile)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_RESET_COLS",
+   "kind": "module",
+   "signature": "GUI_TABLE_RESET_COLS(tbl)",
    "module": "gui"
   },
   {

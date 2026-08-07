@@ -3476,6 +3476,11 @@ impl<'p> Vm<'p> {
             // --- tabellenweite Einstellungen ---
             "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
             "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
+            // --- Spalten-Reihenfolge ---
+            "gui_table_move_col" => { self.gui.table_move_col(gi(a,0,"GUI_TABLE_MOVE_COL")?, gi(a,1,"GUI_TABLE_MOVE_COL")?, gi(a,2,"GUI_TABLE_MOVE_COL")?)?; Value::Nil }
+            "gui_table_col_at" => Value::Int(self.gui.table_col_at(gi(a,0,"GUI_TABLE_COL_AT")?, gi(a,1,"GUI_TABLE_COL_AT")?)?),
+            "gui_table_col_pos" => Value::Int(self.gui.table_col_pos(gi(a,0,"GUI_TABLE_COL_POS")?, gi(a,1,"GUI_TABLE_COL_POS")?)?),
+            "gui_table_reset_cols" => { self.gui.table_reset_cols(gi(a,0,"GUI_TABLE_RESET_COLS")?)?; Value::Nil }
             // --- Mehrfachauswahl ---
             "gui_table_sel_count" => Value::Int(self.gui.table_sel_count(gi(a,0,"GUI_TABLE_SEL_COUNT")?)?),
             "gui_table_sel_row" => Value::Int(self.gui.table_sel_row(gi(a,0,"GUI_TABLE_SEL_ROW")?, gi(a,1,"GUI_TABLE_SEL_ROW")?)?),

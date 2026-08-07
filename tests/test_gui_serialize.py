@@ -428,3 +428,90 @@ PRINT STR$(GUI_TABLE_GET(t, "feste_spalten"))
     z = out.strip().splitlines()
     assert z[0].startswith("99"), out    # gemerkt wird der Wunsch ...
     assert z[1].startswith("0"), out     # ... negativ wird auf 0 geklemmt
+
+
+# ----------------------------------------------------- Spalten umsortieren
+
+def _spalten(rest):
+    return f'''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 500, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 460, 200)
+DIM k AS ARRAY OF STRING : k = SPLIT$("A|B|C|D", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM z AS ARRAY OF STRING
+z = SPLIT$("a|b|c|d", "|") : GUI_TABLE_ADD_ROW(t, z)
+SUB zeig()
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO 3
+        s = s + GUI_TABLE_GET_CELL(t, 0, GUI_TABLE_COL_AT(t, i))
+    NEXT
+    PRINT s
+END SUB
+{rest}
+'''
+
+
+def test_spalte_verschieben_laesst_die_daten_unberuehrt(run_gb, tmp_path):
+    """Der Kernpunkt, genau wie beim Sortieren der Zeilen: eine gemerkte
+    Spaltennummer muss weiter auf dieselbe Spalte zeigen."""
+    out = run_gb(_spalten('''
+zeig()
+GUI_TABLE_MOVE_COL(t, 0, 3)
+zeig()
+PRINT GUI_TABLE_GET_CELL(t, 0, 0)
+PRINT STR$(GUI_TABLE_COL_POS(t, 0)) + " " + STR$(GUI_TABLE_COL_AT(t, 0))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "abcd", out
+    assert z[1] == "bcda", out       # Anzeige umgestellt
+    assert z[2] == "a", out          # Datenspalte 0 ist unveraendert "a"
+    assert z[3] == "3 1", out        # A steht auf Position 3, dort Datenspalte 1
+
+
+def test_reihenfolge_zuruecksetzen(run_gb, tmp_path):
+    out = run_gb(_spalten('''
+GUI_TABLE_MOVE_COL(t, 0, 3)
+GUI_TABLE_RESET_COLS(t)
+zeig()
+'''), base=tmp_path)
+    assert out.strip() == "abcd", out
+
+
+def test_neue_spalte_faellt_nicht_unter_den_tisch(run_gb, tmp_path):
+    """Die gespeicherte Reihenfolge wird bei jedem Abruf bereinigt und
+    ergaenzt -- sonst fehlte eine spaeter dazugekommene Spalte beim Zeichnen
+    oder eine entfernte tauchte doppelt auf."""
+    out = run_gb(_spalten('''
+GUI_TABLE_MOVE_COL(t, 0, 3)
+DIM k2 AS ARRAY OF STRING : k2 = SPLIT$("A|B|C|D|E", "|")
+GUI_TABLE_HEADERS(t, k2)
+DIM s AS STRING : s = ""
+DIM i AS INTEGER
+FOR i = 0 TO 4
+    s = s + STR$(GUI_TABLE_COL_AT(t, i)) + " "
+NEXT
+PRINT TRIM$(s)
+'''), base=tmp_path)
+    # Die neue Spalte 4 haengt sich hinten an, die Umstellung bleibt erhalten.
+    assert out.strip() == "1 2 3 0 4", out
+
+
+def test_position_ausserhalb_wird_gemeldet(run_gb, tmp_path):
+    from gamebasic.errors import GBRuntimeError
+    import pytest as _pt
+    with _pt.raises(GBRuntimeError, match="ausserhalb"):
+        run_gb(_spalten('GUI_TABLE_MOVE_COL(t, 0, 9)'), base=tmp_path)
+
+
+def test_reihenfolge_ueberlebt_speichern_und_laden(run_gb, tmp_path):
+    out = run_gb(_spalten('''
+GUI_TABLE_MOVE_COL(t, 0, 3)
+GUI_TABLE_SET(t, "feste_spalten", 2)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM t2 AS GUI_WIDGET : t2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT STR$(GUI_TABLE_COL_AT(t2, 0)) + " " + STR$(GUI_TABLE_GET(t2, "feste_spalten"))
+'''), base=tmp_path)
+    assert out.strip().startswith("1 2"), out

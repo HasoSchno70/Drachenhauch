@@ -12,6 +12,10 @@
 '    * FILTERZEILE darunter anklicken und tippen -> filtert die Spalte
 '      (Teiltext, Gross-/Kleinschreibung egal). ESC beendet die Eingabe.
 '    * SPALTENKANTE im Kopf ziehen -> Spaltenbreite aendern.
+'    * KOPFZELLE seitwaerts ziehen -> Spalte an eine andere Stelle schieben.
+'      Klick und Zug sind dieselbe Geste: ohne Bewegung wird sortiert, mit
+'      Bewegung verschoben. Die DATEN bleiben dabei unberuehrt -- eine
+'      gemerkte Spaltennummer zeigt weiter auf dieselbe Spalte.
 '    * DOPPELKLICK auf Name oder Ort -> Zelle bearbeiten. Enter uebernimmt,
 '      ESC nimmt zurueck, ein Klick woanders uebernimmt ebenfalls.
 '      Nur freigegebene Spalten lassen sich bearbeiten (GUI_TABLE_COL_EDIT) --
@@ -84,6 +88,7 @@ GUI_TABLE_COL_EDIT(t, 1, TRUE)           ' Name und Ort per Doppelklick aendern
 GUI_TABLE_COL_EDIT(t, 2, TRUE)
 GUI_TABLE_SET(t, "feste_spalten", 2)     ' Symbol + Name bleiben beim Scrollen stehen
 GUI_TABLE_SET(t, "mehrfachauswahl", 1)
+GUI_TABLE_SET(t, "spalten_verschiebbar", 1)  ' Kopf seitwaerts ziehen
 
 ' --- Daten -----------------------------------------------------------------
 DIM roh AS ARRAY OF STRING
@@ -140,7 +145,7 @@ NEXT
 GUI_TABLE_SORT(t, 3, TRUE)               ' anfangs nach Spielern absteigend
 
 DIM stand AS GUI_WIDGET
-stand = GUI_LABEL(win, "Kopf = sortieren | Filterzeile tippen | Kante ziehen | Doppelklick = bearbeiten | Strg/Umschalt+Klick = mehrere", 20, 532)
+stand = GUI_LABEL(win, "Kopf: Klick = sortieren, Zug = verschieben, Kante = Breite | Doppelklick = bearbeiten | Strg/Umschalt+Klick = mehrere", 20, 532)
 DIM zahl AS GUI_WIDGET
 zahl = GUI_LABEL(win, "", 20, 560)
 

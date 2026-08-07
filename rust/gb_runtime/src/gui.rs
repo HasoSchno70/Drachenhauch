@@ -42,6 +42,7 @@ const TBL_FILTER_H: i32 = 22;   // Hoehe der Filterzeile im Kopf
 const TBL_EDGE_GRAB: i32 = 4;   // Fangbereich der Spaltenkante (px)
 const DBL_TIME: f64 = 0.4;      // Doppelklick-Fenster (Sekunden)
 const DBL_DIST: i32 = 4;        // erlaubter Versatz zwischen beiden Klicks
+const HEAD_DRAG_MIN: i32 = 5;   // ab hier gilt eine Kopf-Geste als Zug
 
 fn default_theme() -> HashMap<String, i64> {
     [
@@ -354,6 +355,23 @@ pub struct TableState {
     /// Wieviele Spalten von links bleiben beim Waagerecht-Scrollen stehen.
     frozen: i32,
 
+    // --- Spalten-Reihenfolge -------------------------------------------------
+    /// Anzeige-Position -> DATENspalte. Leer = unveraendert.
+    ///
+    /// Wie bei den Zeilen wird auch hier nichts umgestellt: `GUI_TABLE_GET_CELL`
+    /// und alle anderen Angaben meinen weiter die DATENspalte. Wuerde man die
+    /// Daten wirklich umsortieren, zeigte jede Spaltennummer, die ein Programm
+    /// sich gemerkt hat, nach dem ersten Zug auf etwas anderes.
+    col_order: Vec<usize>,
+    /// Spalten mit der Maus umsortieren erlauben. Per Vorgabe AUS: ein
+    /// versehentlicher Zug am Kopf wuerde sonst die Anordnung zerwuerfeln, und
+    /// zurueck geht es nur von Hand.
+    reorderable: bool,
+    /// Laufender Kopf-Zug: (Anzeige-Position, Start-x, schon bewegt?).
+    /// Erst beim LOSLASSEN entscheidet sich, ob es ein Sortier-Klick war oder
+    /// ein Verschieben -- sonst wuerde jeder Zug auch noch sortieren.
+    head_drag: Option<(usize, i32, bool)>,
+
     // --- Mehrfachauswahl -----------------------------------------------------
     /// Erlaubt (sonst verhaelt sich die Tabelle wie bisher: eine Zeile).
     multi: bool,
@@ -403,7 +421,8 @@ impl Default for TableState {
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
-            frozen: 0, multi: false, sel_rows: vec![], sel_anchor: -1,
+            frozen: 0, col_order: vec![], reorderable: false, head_drag: None,
+            multi: false, sel_rows: vec![], sel_anchor: -1,
             edit_row: -1, edit_col: -1, edit_text: String::new(), edit_caret: 0,
             col_edit: vec![],
             drag_col: -1, drag_col_w: 0, drag_col_x: 0, resizable_cols: true,
@@ -495,6 +514,32 @@ impl TableState {
     fn view_of(&self, data_r: i32) -> i32 {
         if data_r < 0 { return -1; }
         self.view.iter().position(|&r| r as i32 == data_r).map(|i| i as i32).unwrap_or(-1)
+    }
+
+    /// Gueltige Reihenfolge: gespeicherte Wuensche, bereinigt und ergaenzt.
+    ///
+    /// Kommen Spalten dazu oder fallen weg, muss die Liste trotzdem JEDE Spalte
+    /// genau einmal enthalten -- sonst faellt eine beim Zeichnen unter den
+    /// Tisch oder taucht doppelt auf. Darum wird sie hier bei jedem Abruf
+    /// gesaeubert statt an zwoelf Stellen nachgefuehrt.
+    fn order(&self) -> Vec<usize> {
+        let n = self.n_cols();
+        let mut out: Vec<usize> = Vec::with_capacity(n);
+        for &c in &self.col_order {
+            if c < n && !out.contains(&c) { out.push(c); }
+        }
+        for c in 0..n {
+            if !out.contains(&c) { out.push(c); }
+        }
+        out
+    }
+    /// Spalte an eine andere Anzeige-Position schieben.
+    fn move_col(&mut self, von: usize, nach: usize) {
+        let mut o = self.order();
+        if von >= o.len() || nach >= o.len() { return; }
+        let c = o.remove(von);
+        o.insert(nach, c);
+        self.col_order = o;
     }
 
     fn ist_gewaehlt(&self, r: i32) -> bool {
@@ -682,6 +727,11 @@ struct TGeom {
     /// bestimmt. Ohne ihn haette `col_at` bei gescrollter Tabelle auf die
     /// falsche Spalte gezeigt.
     scroll_x: i32,
+    /// Anzeige-Position -> DATENspalte. `col_widths` steht in ANZEIGE-Reihenfolge;
+    /// wer an die Daten will, geht ueber diese Abbildung. Beides zusammen an
+    /// einer Stelle, damit Zeichnen und Treffertest nie verschiedene
+    /// Reihenfolgen benutzen.
+    order: Vec<usize>,
     /// Anzahl fester Spalten und ihre Gesamtbreite. Alles, was Spalten
     /// verortet, geht ueber `col_x`/`col_clip` -- eine Quelle fuer Treffertest
     /// UND Zeichnen, sonst waere ein fester Block der sicherste Weg, beide
@@ -1420,6 +1470,7 @@ impl Gui {
             "sortierbar" | "sortable" => t.sortable = n != 0,
             "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
             "feste_spalten" | "frozen" => t.frozen = n.max(0),
+            "spalten_verschiebbar" | "reorderable" => t.reorderable = n != 0,
             "mehrfachauswahl" | "multi_select" => {
                 t.multi = n != 0;
                 // Beim Einschalten die bisherige Einzelauswahl uebernehmen,
@@ -1431,7 +1482,7 @@ impl Gui {
             }
             _ => return Err(format!(
                 "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl", key)),
         }
         Ok(())
     }
@@ -1446,15 +1497,44 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl", key))
             "sortierbar" | "sortable" => if t.sortable { 1.0 } else { 0.0 },
             "spalten_ziehbar" | "resizable_cols" => if t.resizable_cols { 1.0 } else { 0.0 },
             "feste_spalten" | "frozen" => t.frozen as f64,
+            "spalten_verschiebbar" | "reorderable" => if t.reorderable { 1.0 } else { 0.0 },
             "mehrfachauswahl" | "multi_select" => if t.multi { 1.0 } else { 0.0 },
             "spalten" | "columns" => t.n_cols() as f64,
             _ => return Err(format!(
                 "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalten", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, mehrfachauswahl, spalten", key)),
         })
     }
 
     // --- Mehrfachauswahl -----------------------------------------------------
+
+    // --- Spalten-Reihenfolge -------------------------------------------------
+
+    /// Spalte von einer Anzeige-Position auf eine andere schieben.
+    pub fn table_move_col(&mut self, h: i64, von: i64, nach: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_MOVE_COL")?;
+        let n = t.n_cols() as i64;
+        if von < 0 || von >= n || nach < 0 || nach >= n {
+            return Err(format!("GUI_TABLE_MOVE_COL: Position ausserhalb 0..{}", n.saturating_sub(1)));
+        }
+        t.move_col(von as usize, nach as usize);
+        Ok(())
+    }
+    /// Welche DATENspalte steht an der Anzeige-Position `pos`?
+    pub fn table_col_at(&self, h: i64, pos: i64) -> Result<i64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_COL_AT")?;
+        Ok(t.order().get(pos.max(0) as usize).map(|&c| c as i64).unwrap_or(-1))
+    }
+    /// An welcher Anzeige-Position steht die DATENspalte `c`?
+    pub fn table_col_pos(&self, h: i64, c: i64) -> Result<i64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_COL_POS")?;
+        Ok(t.order().iter().position(|&x| x as i64 == c).map(|p| p as i64).unwrap_or(-1))
+    }
+    /// Reihenfolge zuruecksetzen.
+    pub fn table_reset_cols(&mut self, h: i64) -> Result<(), String> {
+        self.tbl_mut(h, "GUI_TABLE_RESET_COLS")?.col_order.clear();
+        Ok(())
+    }
 
     pub fn table_sel_count(&self, h: i64) -> Result<i64, String> {
         let t = self.tbl_ref(h, "GUI_TABLE_SEL_COUNT")?;
@@ -1700,7 +1780,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
         // Mehr feste Spalten als vorhanden waeren ein leerer Scrollbereich --
         // deckeln statt darauf zu vertrauen, dass niemand es versucht.
         let frozen = (t.frozen.max(0) as usize).min(n_cols);
-        let col_widths: Vec<i32> = match &t.col_widths {
+        let order = t.order();
+        // Breiten haengen an der DATENspalte, gebraucht werden sie in
+        // ANZEIGE-Reihenfolge -- hier einmal umgeordnet, damit alles weitere
+        // schlicht ueber die Position laufen kann.
+        let roh: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
                 let avail = ww - TBL_SCROLL_W - 2;
@@ -1708,6 +1792,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
                 vec![per; n_cols]
             }
         };
+        let col_widths: Vec<i32> = order.iter().map(|&c| roh[c]).collect();
         let body_x = ax + 1;
         let body_y = ay + header_h;
         let body_w_raw = ww - 2;
@@ -1722,7 +1807,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
         let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
             ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths, row_h, header_h,
-            scroll_x: t.scroll_x, frozen, frozen_w,
+            scroll_x: t.scroll_x, frozen, frozen_w, order,
             body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
             need_v, need_h,
             max_scroll_y: (total_h - body_h).max(0), max_scroll_x: (total_w - body_w).max(0),
@@ -1785,29 +1870,39 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             let kante = Self::edge_at(&gm, mx);
             if kante >= 0 {
                 let breite = gm.col_widths[kante as usize];
+                // `edge_at` liefert eine ANZEIGE-Position, die Breiten haengen
+                // aber an der Datenspalte -- ohne diese Umrechnung zoege man
+                // nach dem Umsortieren die falsche Spalte breit.
+                let daten_c = gm.order[kante as usize] as i32;
                 let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
                 if t.resizable_cols {
-                    t.drag_col = kante;
+                    t.drag_col = daten_c;
                     t.drag_col_w = breite;
                     t.drag_col_x = mx;
                     t.filter_focus = -1;
                     // Beim ersten Ziehen die berechneten Breiten festhalten,
                     // sonst haette die Tabelle gar keine eigenen Werte zum
                     // Aendern und spraenge beim Loslassen zurueck.
-                    if t.col_widths.is_none() { t.col_widths = Some(gm.col_widths.clone()); }
+                    // Die berechneten Breiten festhalten -- in DATEN-Reihenfolge,
+                    // denn so werden sie gespeichert.
+                    if t.col_widths.is_none() {
+                        let mut roh = vec![0; gm.n_cols];
+                        for (p, &c) in gm.order.iter().enumerate() { roh[c] = gm.col_widths[p]; }
+                        t.col_widths = Some(roh);
+                    }
                     self.active_table = Some((wi, idx));
                     return;
                 }
             }
-            let c = Self::col_at(&gm, mx);
+            let pos = Self::pos_at(&gm, mx);
             let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
             t.filter_focus = -1;
-            if c >= 0 && t.sortable {
-                // Dieselbe Spalte erneut -> Richtung umdrehen. Das erwartet
-                // man von jeder Tabelle.
-                if t.sort_col == c { t.sort_desc = !t.sort_desc; }
-                else { t.sort_col = c; t.sort_desc = false; }
-                t.rebuild_view();
+            if pos >= 0 {
+                // NICHT sofort sortieren: erst beim Loslassen steht fest, ob
+                // die Geste ein Klick war oder ein Zug. Sonst wuerde jedes
+                // Verschieben nebenbei auch noch sortieren.
+                t.head_drag = Some((pos as usize, mx, false));
+                self.active_table = Some((wi, idx));
             }
             return;
         }
@@ -1916,16 +2011,25 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
     /// Bildschirm-x -> Spaltenindex (-1 daneben). Rechnet mit derselben
     /// Geometrie wie das Zeichnen, damit Treffer und Anzeige nicht auseinander
     /// laufen -- derselbe Grund wie bei `chart`.
-    fn col_at(gm: &TGeom, mx: i32) -> i32 {
-        for c in 0..gm.col_widths.len() {
-            let (kx, kw) = Self::col_clip(gm, c);
+    /// Bildschirm-x -> ANZEIGE-Position (-1 daneben).
+    fn pos_at(gm: &TGeom, mx: i32) -> i32 {
+        for p in 0..gm.col_widths.len() {
+            let (kx, kw) = Self::col_clip(gm, p);
             // Nur treffen, was in seinem Bereich auch SICHTBAR ist -- sonst
             // truefe man eine Spalte, die unter dem festen Block liegt.
             if mx < kx || mx >= kx + kw { continue; }
-            let x = Self::col_x(gm, c);
-            if mx >= x && mx < x + gm.col_widths[c] { return c as i32; }
+            let x = Self::col_x(gm, p);
+            if mx >= x && mx < x + gm.col_widths[p] { return p as i32; }
         }
         -1
+    }
+
+    /// Bildschirm-x -> DATENspalte. Alles nach aussen spricht von Datenspalten;
+    /// nur Zeichnen und Treffertest rechnen in Positionen.
+    fn col_at(gm: &TGeom, mx: i32) -> i32 {
+        let p = Self::pos_at(gm, mx);
+        if p < 0 { return -1; }
+        gm.order.get(p as usize).map(|&c| c as i32).unwrap_or(-1)
     }
 
     /// Tastatur fuer die Tabelle. Eine laufende Zellbearbeitung hat Vorrang --
@@ -2021,6 +2125,28 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
     fn table_drag(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
         let gm = self.table_geom(wi, idx);
         let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+        if let Some((pos, x0, bewegt)) = t.head_drag {
+            // Erst ab einer Mindeststrecke gilt es als Zug -- ein Klick
+            // wackelt fast immer um ein, zwei Punkte.
+            if !bewegt && (mx - x0).abs() < HEAD_DRAG_MIN { return; }
+            if !t.reorderable { return; }
+            let mut pos = pos;
+            t.head_drag = Some((pos, x0, true));
+            // Ueber die Mitte des Nachbarn hinaus -> tauschen. Kein Warten auf
+            // das Loslassen: man soll SEHEN, wo die Spalte landet.
+            let mitte_links = if pos > 0 { Self::col_x(&gm, pos - 1) + gm.col_widths[pos - 1] / 2 } else { i32::MIN };
+            let mitte_rechts = if pos + 1 < gm.n_cols { Self::col_x(&gm, pos + 1) + gm.col_widths[pos + 1] / 2 } else { i32::MAX };
+            if mx < mitte_links {
+                t.move_col(pos, pos - 1);
+                pos -= 1;
+                t.head_drag = Some((pos, x0, true));
+            } else if mx > mitte_rechts {
+                t.move_col(pos, pos + 1);
+                pos += 1;
+                t.head_drag = Some((pos, x0, true));
+            }
+            return;
+        }
         if t.drag_col >= 0 {
             let c = t.drag_col as usize;
             let neu = (t.drag_col_w + (mx - t.drag_col_x)).max(TBL_MIN_COL_W);
@@ -2305,6 +2431,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
         if self.active_table == Some((wi, i)) { self.active_table = None; }
         if self.table_press.map(|(tw, ti, _)| (tw, ti)) == Some((wi, i)) { self.table_press = None; }
         if self.editing_table == Some((wi, i)) { self.editing_table = None; }
+        if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() { t.head_drag = None; }
         if self.hover_w == Some((wi, i)) { self.hover_w = None; }
         Ok(())
     }
@@ -2504,6 +2631,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             if t.zebra { tj["zebra"] = serde_json::json!(true); }
             if !t.grid { tj["grid"] = serde_json::json!(false); }
             if !t.col_align.is_empty() { tj["col_align"] = serde_json::json!(t.col_align); }
+            if !t.col_order.is_empty() { tj["col_order"] = serde_json::json!(t.col_order); }
+            if t.frozen > 0 { tj["frozen"] = serde_json::json!(t.frozen); }
             if t.row_fg.iter().any(|&x| x >= 0) { tj["row_fg"] = serde_json::json!(t.row_fg); }
             if t.row_bg.iter().any(|&x| x >= 0) { tj["row_bg"] = serde_json::json!(t.row_bg); }
             o["table"] = tj;
@@ -2610,6 +2739,10 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
                 if let Some(a) = tj["col_align"].as_array() {
                     ts.col_align = a.iter().filter_map(|x| x.as_i64().map(|n| n as i8)).collect();
                 }
+                if let Some(a) = tj["col_order"].as_array() {
+                    ts.col_order = a.iter().filter_map(|x| x.as_u64().map(|n| n as usize)).collect();
+                }
+                if let Some(v) = tj["frozen"].as_i64() { ts.frozen = v as i32; }
                 for (schluessel, ziel) in [("row_fg", true), ("row_bg", false)] {
                     if let Some(a) = tj[schluessel].as_array() {
                         let v: Vec<i64> = a.iter().map(|x| x.as_i64().unwrap_or(-1)).collect();
@@ -3298,6 +3431,19 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
                 if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
                     t.drag_v = false; t.drag_h = false;
                     t.drag_col = -1;      // Spaltenbreiten-Ziehen endet hier
+                    // Kopf-Geste auswerten: ohne Bewegung war es ein
+                    // Sortier-Klick, mit Bewegung wurde schon verschoben.
+                    if let Some((pos, _, bewegt)) = t.head_drag.take() {
+                        if !bewegt && t.sortable {
+                            let o = t.order();
+                            if let Some(&c) = o.get(pos) {
+                                let c = c as i32;
+                                if t.sort_col == c { t.sort_desc = !t.sort_desc; }
+                                else { t.sort_col = c; t.sort_desc = false; }
+                                t.rebuild_view();
+                            }
+                        }
+                    }
                 }
                 self.active_table = None;
             }
@@ -4731,12 +4877,21 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             // Kopf-Zellen. Feste Spalten stehen still, der Rest scrollt --
             // beides ueber `col_x`, damit Kopf und Daten nie versetzt sind.
             g.push_clip(ax + 1, ay + 1, gm.body_w_raw, gm.header_h - 2);
-            for c in 0..gm.n_cols {
-                let cx = Self::col_x(&gm, c);
-                let cw = gm.col_widths[c];
-                let (kx, kw) = Self::col_clip(&gm, c);
+            for p in 0..gm.n_cols {
+                let c = gm.order[p];                 // Anzeige-Position -> Datenspalte
+                let cx = Self::col_x(&gm, p);
+                let cw = gm.col_widths[p];
+                let (kx, kw) = Self::col_clip(&gm, p);
                 if cx + cw > kx && cx < kx + kw {
                     g.push_clip(kx, ay + 1, kw, gm.header_h - 2);
+                    // Die Spalte, die gerade gezogen wird, hebt sich ab --
+                    // sonst sieht man beim Verschieben nicht, was man haelt.
+                    if let Some((dp, _, true)) = t.head_drag {
+                        if dp == p {
+                            g.box_fill(cx, ay + 1, cx + cw - 1, ay + titel_h - 2,
+                                       (90i64 << 24) | (accent & 0xFFFFFF));
+                        }
+                    }
                     let s = t.header(c).to_string();
                     let al = *t.col_align.get(c).unwrap_or(&0);
                     // Platz fuer den Sortierpfeil freihalten, sonst schreibt
@@ -4749,7 +4904,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
                     if t.sort_col == c as i32 {
                         Self::sort_arrow(g, cx + cw - 11, ay + titel_h / 2, t.sort_desc, title_fg);
                     }
-                    if c < gm.n_cols - 1 {
+                    if p < gm.n_cols - 1 {
                         g.line(cx + cw, ay + 1, cx + cw, ay + gm.header_h - 2, border);
                     }
                     g.pop_clip();
@@ -4758,10 +4913,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             // Filterzeile: je Spalte ein kleines Eingabefeld.
             if t.filter_row {
                 let fy = ay + titel_h;
-                for c in 0..gm.n_cols {
-                    let cx = Self::col_x(&gm, c);
-                    let cw = gm.col_widths[c];
-                    let (kx, kw) = Self::col_clip(&gm, c);
+                for p in 0..gm.n_cols {
+                    let c = gm.order[p];
+                    let cx = Self::col_x(&gm, p);
+                    let cw = gm.col_widths[p];
+                    let (kx, kw) = Self::col_clip(&gm, p);
                     if cx + cw > kx && cx < kx + kw {
                         g.push_clip(kx, fy, kw, TBL_FILTER_H);
                         let fokus = t.filter_focus == c as i32;
@@ -4807,10 +4963,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             // Zellflaechen zuerst, danach Auswahl/Hover DARUEBER -- sonst
             // deckte eine eigene Zellfarbe die Auswahl zu und man saehe nicht
             // mehr, welche Zeile gewaehlt ist.
-            for c in 0..gm.n_cols {
-                let cx = Self::col_x(&gm, c);
-                let cw = gm.col_widths[c];
-                let (kx, kw) = Self::col_clip(&gm, c);
+            for p in 0..gm.n_cols {
+                let c = gm.order[p];
+                let cx = Self::col_x(&gm, p);
+                let cw = gm.col_widths[p];
+                let (kx, kw) = Self::col_clip(&gm, p);
                 if cx + cw > kx && cx < kx + kw {
                     let cb = Self::cell_bg(t, ri, c, zebra);
                     if cb >= 0 {
@@ -4832,10 +4989,11 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
             }
 
             // Inhalte.
-            for c in 0..gm.n_cols {
-                let cx = Self::col_x(&gm, c);
-                let cw = gm.col_widths[c];
-                let (kx, kw) = Self::col_clip(&gm, c);
+            for p in 0..gm.n_cols {
+                let c = gm.order[p];
+                let cx = Self::col_x(&gm, p);
+                let cw = gm.col_widths[p];
+                let (kx, kw) = Self::col_clip(&gm, p);
                 let clip_x = (cx + 1).max(kx);
                 let clip_w = (cw - 2).min((kx + kw) - clip_x);
                 if clip_w > 0 {
@@ -4843,7 +5001,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalte
                     self.draw_cell(g, wdg, t, ri, c, cx, row_y, cw, gm.row_h, fg, accent, border);
                     g.pop_clip();
                 }
-                if t.grid && c < gm.n_cols - 1 && cx + cw > kx && cx + cw < kx + kw {
+                if t.grid && p < gm.n_cols - 1 && cx + cw > kx && cx + cw < kx + kw {
                     g.line(cx + cw, row_y, cx + cw, row_y + gm.row_h - 1, grid_c);
                 }
             }
