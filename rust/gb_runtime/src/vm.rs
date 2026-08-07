@@ -3457,6 +3457,25 @@ impl<'p> Vm<'p> {
             "gui_table_selected" => Value::Int(self.gui.table_selected(gi(a,0,"GUI_TABLE_SELECTED")?)?),
             "gui_table_set_selected" => { self.gui.table_set_selected(gi(a,0,"GUI_TABLE_SET_SELECTED")?, gi(a,1,"GUI_TABLE_SET_SELECTED")?)?; Value::Nil }
             "gui_table_clicked" => Value::Int(self.gui.table_clicked(gi(a,0,"GUI_TABLE_CLICKED")?)?),
+            "gui_table_clicked_col" => Value::Int(self.gui.table_clicked_col(gi(a,0,"GUI_TABLE_CLICKED_COL")?)?),
+            // --- Zellen einzeln ---
+            "gui_table_set_cell" => { self.gui.table_set_cell(gi(a,0,"GUI_TABLE_SET_CELL")?, gi(a,1,"GUI_TABLE_SET_CELL")?, gi(a,2,"GUI_TABLE_SET_CELL")?, gs(a,3,"GUI_TABLE_SET_CELL")?.to_string())?; Value::Nil }
+            "gui_table_get_cell" => Value::str_rc(&self.gui.table_get_cell(gi(a,0,"GUI_TABLE_GET_CELL")?, gi(a,1,"GUI_TABLE_GET_CELL")?, gi(a,2,"GUI_TABLE_GET_CELL")?)?),
+            "gui_table_cell_color" => { self.gui.table_cell_color(gi(a,0,"GUI_TABLE_CELL_COLOR")?, gi(a,1,"GUI_TABLE_CELL_COLOR")?, gi(a,2,"GUI_TABLE_CELL_COLOR")?, gi(a,3,"GUI_TABLE_CELL_COLOR")?, gi(a,4,"GUI_TABLE_CELL_COLOR")?)?; Value::Nil }
+            "gui_table_cell_align" => { self.gui.table_cell_align(gi(a,0,"GUI_TABLE_CELL_ALIGN")?, gi(a,1,"GUI_TABLE_CELL_ALIGN")?, gi(a,2,"GUI_TABLE_CELL_ALIGN")?, &gs(a,3,"GUI_TABLE_CELL_ALIGN")?)?; Value::Nil }
+            "gui_table_cell_kind" => { self.gui.table_cell_kind(gi(a,0,"GUI_TABLE_CELL_KIND")?, gi(a,1,"GUI_TABLE_CELL_KIND")?, gi(a,2,"GUI_TABLE_CELL_KIND")?, &gs(a,3,"GUI_TABLE_CELL_KIND")?)?; Value::Nil }
+            "gui_table_cell_image" => { self.gui.table_cell_image(gi(a,0,"GUI_TABLE_CELL_IMAGE")?, gi(a,1,"GUI_TABLE_CELL_IMAGE")?, gi(a,2,"GUI_TABLE_CELL_IMAGE")?, gi(a,3,"GUI_TABLE_CELL_IMAGE")?)?; Value::Nil }
+            "gui_table_cell_value" => { self.gui.table_cell_value(gi(a,0,"GUI_TABLE_CELL_VALUE")?, gi(a,1,"GUI_TABLE_CELL_VALUE")?, gi(a,2,"GUI_TABLE_CELL_VALUE")?, gnum(a,3,"GUI_TABLE_CELL_VALUE")?)?; Value::Nil }
+            "gui_table_get_value" => Value::Float(self.gui.table_get_value(gi(a,0,"GUI_TABLE_GET_VALUE")?, gi(a,1,"GUI_TABLE_GET_VALUE")?, gi(a,2,"GUI_TABLE_GET_VALUE")?)?),
+            // --- Zeilen / Spalten ---
+            "gui_table_row_color" => { self.gui.table_row_color(gi(a,0,"GUI_TABLE_ROW_COLOR")?, gi(a,1,"GUI_TABLE_ROW_COLOR")?, gi(a,2,"GUI_TABLE_ROW_COLOR")?, gi(a,3,"GUI_TABLE_ROW_COLOR")?)?; Value::Nil }
+            "gui_table_col_align" => { self.gui.table_col_align(gi(a,0,"GUI_TABLE_COL_ALIGN")?, gi(a,1,"GUI_TABLE_COL_ALIGN")?, &gs(a,2,"GUI_TABLE_COL_ALIGN")?)?; Value::Nil }
+            "gui_table_add_row" => Value::Int(self.gui.table_add_row(gi(a,0,"GUI_TABLE_ADD_ROW")?, gstrs(a,1,"GUI_TABLE_ADD_ROW")?)?),
+            "gui_table_remove_row" => { self.gui.table_remove_row(gi(a,0,"GUI_TABLE_REMOVE_ROW")?, gi(a,1,"GUI_TABLE_REMOVE_ROW")?)?; Value::Nil }
+            "gui_table_clear" => { self.gui.table_clear(gi(a,0,"GUI_TABLE_CLEAR")?)?; Value::Nil }
+            // --- tabellenweite Einstellungen ---
+            "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
+            "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
             "gui_table_row_count" => Value::Int(self.gui.table_row_count(gi(a,0,"GUI_TABLE_ROW_COUNT")?)?),
             "gui_tree" => Value::Int(self.gui.tree(gi(a,0,"GUI_TREE")?, gi(a,1,"GUI_TREE")? as i32,
                 gi(a,2,"GUI_TREE")? as i32, gi(a,3,"GUI_TREE")? as i32, gi(a,4,"GUI_TREE")? as i32)?),

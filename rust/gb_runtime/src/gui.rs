@@ -243,14 +243,141 @@ const TREE_ROW_H: i32 = 22;       // Hoehe einer Baum-Zeile
 const TREE_INDENT: i32 = 16;      // Einrueckung pro Ebene
 const TREE_TOGGLE_W: i32 = 16;    // Breite der Auf-/Zuklapp-Flaeche
 
-#[derive(Default)]
+/// Was in einer Zelle steckt. `Text` ist der Normalfall; die uebrigen Arten
+/// zeichnen ein kleines Bedienelement in die Zelle (Stufe 2).
+#[derive(Clone, Copy, PartialEq, Default)]
+pub enum CellKind {
+    #[default]
+    Text,
+    /// Bild, in die Zelle eingepasst (Seitenverhaeltnis bleibt).
+    Image,
+    /// Ankreuzfeld -- Klick schaltet um.
+    Check,
+    /// Fortschrittsbalken, `value` 0..1.
+    Bar,
+    /// Knopf -- Klick meldet sich ueber GUI_TABLE_CLICKED_COL.
+    Button,
+}
+
+impl CellKind {
+    fn parse(s: &str) -> Option<CellKind> {
+        Some(match s.to_lowercase().as_str() {
+            "text" => CellKind::Text,
+            "bild" | "image" => CellKind::Image,
+            "haken" | "check" | "checkbox" => CellKind::Check,
+            "balken" | "bar" | "progress" => CellKind::Bar,
+            "knopf" | "button" => CellKind::Button,
+            _ => return None,
+        })
+    }
+    fn name(self) -> &'static str {
+        match self {
+            CellKind::Text => "text", CellKind::Image => "bild",
+            CellKind::Check => "haken", CellKind::Bar => "balken",
+            CellKind::Button => "knopf",
+        }
+    }
+}
+
+/// Ausrichtung: 0 links, 1 mitte, 2 rechts. Eigener Wert je Zelle mit -1 =
+/// "nimm die Spalte" -- so setzt man eine Zahlenspalte EINMAL rechtsbuendig,
+/// kann aber einzelne Zellen ausscheren lassen.
+fn parse_align(s: &str) -> Option<i8> {
+    Some(match s.to_lowercase().as_str() {
+        "links" | "left" => 0,
+        "mitte" | "zentriert" | "center" => 1,
+        "rechts" | "right" => 2,
+        _ => return None,
+    })
+}
+
+#[derive(Clone, Default)]
+pub struct Cell {
+    text: String,
+    /// -1 = Farbe des Themas (nicht eingefroren -- ein Themenwechsel wirkt).
+    fg: i64,
+    /// -1 = keine eigene Flaeche (Zeilenfarbe bzw. Zebra schlaegt durch).
+    bg: i64,
+    kind: CellKind,
+    /// Bild-Handle fuer `CellKind::Image`, sonst -1.
+    image: i64,
+    /// Haken (0/1) bzw. Fortschritt (0..1).
+    value: f64,
+    /// -1 = Ausrichtung der Spalte uebernehmen.
+    align: i8,
+}
+
+impl Cell {
+    fn text(s: String) -> Cell {
+        Cell { text: s, fg: -1, bg: -1, kind: CellKind::Text, image: -1, value: 0.0, align: -1 }
+    }
+}
+
 pub struct TableState {
     headers: Vec<String>,
-    rows: Vec<Vec<String>>,
+    rows: Vec<Vec<Cell>>,
     col_widths: Option<Vec<i32>>,
+    /// Ausrichtung je Spalte (0/1/2). Kuerzer als die Spaltenzahl = Rest links.
+    col_align: Vec<i8>,
+    /// Eigene Farben je Zeile (-1 = keine). Liegt getrennt von den Zellen,
+    /// damit "ganze Zeile rot" ein Aufruf bleibt und nicht n Aufrufe.
+    row_fg: Vec<i64>,
+    row_bg: Vec<i64>,
+    row_h: i32,
+    header_h: i32,
+    zebra: bool,
+    grid: bool,
     scroll_x: i32, scroll_y: i32,
     drag_v: bool, drag_h: bool, drag_off: i32,
     selected: i32, hover_row: i32, clicked_row: i32,
+    /// Spalte unter der Maus beim Druecken.
+    hover_col: i32,
+    /// Spalte des letzten Klicks (-1 = keine) -- fuer Knopf-Zellen.
+    clicked_col: i32,
+}
+
+impl Default for TableState {
+    fn default() -> Self {
+        TableState {
+            headers: vec![], rows: vec![], col_widths: None, col_align: vec![],
+            row_fg: vec![], row_bg: vec![],
+            row_h: TBL_ROW_H, header_h: TBL_HEADER_H,
+            zebra: false, grid: true,
+            scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
+            selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
+        }
+    }
+}
+
+impl TableState {
+    /// Spaltenzahl = die BREITESTE Angabe. Damit ist die Spaltenzahl wirklich
+    /// frei: Zeilen duerfen kuerzer sein als der Kopf (fehlende Zellen sind
+    /// leer) und laenger (der Kopf bekommt dann leere Titel). Vorher war jede
+    /// Abweichung ein Fehler -- und wer die Zeilen VOR dem Kopf setzte, konnte
+    /// die Pruefung ganz umgehen und brachte `draw_table` zum Absturz.
+    /// Ueber diese eine Quelle kann kein Index mehr danebengreifen.
+    fn n_cols(&self) -> usize {
+        self.rows.iter().map(|r| r.len()).chain(std::iter::once(self.headers.len())).max().unwrap_or(0)
+    }
+    fn cell(&self, r: usize, c: usize) -> Option<&Cell> {
+        self.rows.get(r).and_then(|row| row.get(c))
+    }
+    /// Zelle zum Schreiben, notfalls bis dorthin auffuellen.
+    fn cell_mut(&mut self, r: usize, c: usize) -> Option<&mut Cell> {
+        let row = self.rows.get_mut(r)?;
+        while row.len() <= c { row.push(Cell::text(String::new())); }
+        row.get_mut(c)
+    }
+    fn header(&self, c: usize) -> &str {
+        self.headers.get(c).map(|s| s.as_str()).unwrap_or("")
+    }
+    fn align_of(&self, r: usize, c: usize) -> i8 {
+        let ca = *self.col_align.get(c).unwrap_or(&0);
+        match self.cell(r, c) {
+            Some(cell) if cell.align >= 0 => cell.align,
+            _ => ca,
+        }
+    }
 }
 
 // Baum-Zustand (Kind::Tree): flache Knotenliste, Knoten-id == Index (stabil bis
@@ -378,6 +505,14 @@ struct MenuItem {
 struct TGeom {
     ax: i32, ay: i32, w: i32, h: i32,
     n_cols: usize, n_rows: usize, col_widths: Vec<i32>,
+    /// Zeilen- und Kopfhoehe sind einstellbar (Bilder in Zellen brauchen
+    /// Platz) -- sie stehen hier, damit Treffertest und Zeichnen dieselbe
+    /// Quelle benutzen.
+    row_h: i32, header_h: i32,
+    /// Waagerechter Scroll-Stand, aus dem der Treffertest die Spalte
+    /// bestimmt. Ohne ihn haette `col_at` bei gescrollter Tabelle auf die
+    /// falsche Spalte gezeigt.
+    scroll_x: i32,
     body_x: i32, body_y: i32, body_w: i32, body_h: i32,
     body_w_raw: i32, total_w: i32, total_h: i32,
     need_v: bool, need_h: bool, max_scroll_y: i32, max_scroll_x: i32,
@@ -888,68 +1023,231 @@ impl Gui {
         self.add_widget(win, "GUI_TABLE", wd)
     }
     pub fn table_set_headers(&mut self, h: i64, headers: Vec<String>) -> Result<(), String> {
-        // Review-Fund: validierte bisher NICHTS -- Zeilen VOR den Headern
-        // gesetzt (mit n_cols==0 zum Zeitpunkt von table_set_rows) blieben
-        // unentdeckt ragged, `draw_table` paniked dann beim naechsten
-        // GUI_DRAW mit einem Index-Out-Of-Bounds auf der kuerzeren Zeile.
-        let t = self.tbl_mut(h, "GUI_TABLE_HEADERS")?;
-        let n_cols = headers.len();
-        if n_cols != 0 {
-            if let Some(bad) = t.rows.iter().position(|r| r.len() != n_cols) {
-                return Err(format!(
-                    "GUI_TABLE_HEADERS: {} Spalten, aber Zeile {} hat bereits {}",
-                    n_cols, bad, t.rows[bad].len()));
-            }
-        }
-        t.headers = headers;
+        // Keine Laengenpruefung mehr: die Spaltenzahl ergibt sich aus der
+        // BREITESTEN Angabe (TableState::n_cols), kuerzere Zeilen sind einfach
+        // leer. Vorher war jede Abweichung ein Fehler -- und wer die Zeilen VOR
+        // dem Kopf setzte, umging die Pruefung ganz und brachte das Zeichnen
+        // zum Absturz. Ueber die eine Quelle kann kein Index danebengreifen.
+        self.tbl_mut(h, "GUI_TABLE_HEADERS")?.headers = headers;
         Ok(())
     }
     pub fn table_set_rows(&mut self, h: i64, rows: Vec<Vec<String>>) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_ROWS")?;
-        let n_cols = t.headers.len();
-        // Review-Fund: nur rows[0] wurde gegen n_cols geprueft -- eine
-        // spaetere ragged Zeile (z.B. [["a","b"],["c"]]) rutschte durch und
-        // liess `draw_table` beim Zugriff auf `row[c]` fuer die kuerzere
-        // Zeile panicken.
-        if n_cols != 0 {
-            if let Some(bad) = rows.iter().position(|r| r.len() != n_cols) {
-                return Err(format!(
-                    "GUI_TABLE_ROWS: Zeile {} hat {} Spalten, Header hat {}",
-                    bad, rows[bad].len(), n_cols));
-            }
-        }
         let old_n = t.rows.len();
-        t.rows = rows;
+        t.rows = rows.into_iter()
+            .map(|r| r.into_iter().map(Cell::text).collect())
+            .collect();
+        t.row_fg = vec![-1; t.rows.len()];
+        t.row_bg = vec![-1; t.rows.len()];
         if t.selected >= t.rows.len() as i32 { t.selected = -1; }
-        // Review-Fund: `scroll_y` wurde nur in table_hover() (verlangt einen
-        // Mauszeiger ueber dem Widget) neu geklemmt -- eine Tabelle, die weit
-        // heruntergescrollt war, dann per GUI_TABLE_ROWS auf WENIGER Zeilen
-        // schrumpft, blieb bis zur naechsten Mausbewegung leer, statt sofort
-        // wieder etwas anzuzeigen. Nur bei einem Schrumpf zuruecksetzen (nicht
-        // bei jedem Refresh mit gleicher/groesserer Zeilenzahl, sonst waere
-        // ein periodisch aktualisiertes Scoreboard nie scrollbar).
+        // Schrumpft die Tabelle, muss der Scroll zurueck -- sonst bliebe eine
+        // weit heruntergescrollte Tabelle bis zur naechsten Mausbewegung leer.
+        // Nur beim Schrumpfen, sonst waere ein periodisch aktualisiertes
+        // Scoreboard nie scrollbar.
         if t.rows.len() < old_n { t.scroll_y = 0; }
         Ok(())
     }
     pub fn table_set_col_widths(&mut self, h: i64, widths: Option<Vec<i32>>) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_COL_WIDTHS")?;
         if let Some(ref cw) = widths {
-            let n = t.headers.len();
+            let n = t.n_cols();
             if n != 0 && cw.len() != n {
-                return Err(format!("GUI_TABLE_COL_WIDTHS: {} Breiten, Header hat {} Spalten", cw.len(), n));
+                return Err(format!("GUI_TABLE_COL_WIDTHS: {} Breiten, die Tabelle hat {} Spalten",
+                                   cw.len(), n));
             }
         }
-        t.col_widths = widths; Ok(())
+        t.col_widths = widths;
+        Ok(())
     }
-    pub fn table_selected(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_SELECTED")?.selected as i64) }
+
+    // --- Zellen einzeln ------------------------------------------------------
+
+    /// Zeile/Spalte pruefen und melden, WELCHE Angabe daneben lag -- ein blosses
+    /// "Index ungueltig" laesst einen beide durchsuchen.
+    fn tbl_rc(t: &TableState, r: i64, c: i64, fn_: &str) -> Result<(usize, usize), String> {
+        if r < 0 || r >= t.rows.len() as i64 {
+            return Err(format!("{}: Zeile {} gibt es nicht (0..{})",
+                               fn_, r, t.rows.len().saturating_sub(1)));
+        }
+        let n = t.n_cols();
+        if c < 0 || c >= n as i64 {
+            return Err(format!("{}: Spalte {} gibt es nicht (0..{})",
+                               fn_, c, n.saturating_sub(1)));
+        }
+        Ok((r as usize, c as usize))
+    }
+
+    pub fn table_set_cell(&mut self, h: i64, r: i64, c: i64, text: String) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SET_CELL")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_SET_CELL")?;
+        t.cell_mut(r, c).unwrap().text = text;
+        Ok(())
+    }
+    pub fn table_get_cell(&self, h: i64, r: i64, c: i64) -> Result<String, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_GET_CELL")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_GET_CELL")?;
+        Ok(t.cell(r, c).map(|x| x.text.clone()).unwrap_or_default())
+    }
+    /// Farben je Zelle. -1 laesst die jeweilige Farbe beim Thema bzw. bei der
+    /// Zeilenfarbe -- so faerbt man nur den Vordergrund, ohne die Flaeche zu
+    /// verlieren.
+    pub fn table_cell_color(&mut self, h: i64, r: i64, c: i64, fg: i64, bg: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_CELL_COLOR")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_COLOR")?;
+        let cell = t.cell_mut(r, c).unwrap();
+        cell.fg = fg;
+        cell.bg = bg;
+        Ok(())
+    }
+    pub fn table_cell_align(&mut self, h: i64, r: i64, c: i64, wie: &str) -> Result<(), String> {
+        let a = parse_align(wie).ok_or_else(|| format!(
+            "GUI_TABLE_CELL_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
+        let t = self.tbl_mut(h, "GUI_TABLE_CELL_ALIGN")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_ALIGN")?;
+        t.cell_mut(r, c).unwrap().align = a;
+        Ok(())
+    }
+    /// Ganze Zeile faerben -- ein Aufruf statt einer je Spalte.
+    pub fn table_row_color(&mut self, h: i64, r: i64, fg: i64, bg: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_ROW_COLOR")?;
+        if r < 0 || r >= t.rows.len() as i64 {
+            return Err(format!("GUI_TABLE_ROW_COLOR: Zeile {} gibt es nicht (0..{})",
+                               r, t.rows.len().saturating_sub(1)));
+        }
+        let r = r as usize;
+        while t.row_fg.len() <= r { t.row_fg.push(-1); }
+        while t.row_bg.len() <= r { t.row_bg.push(-1); }
+        t.row_fg[r] = fg;
+        t.row_bg[r] = bg;
+        Ok(())
+    }
+    pub fn table_cell_kind(&mut self, h: i64, r: i64, c: i64, art: &str) -> Result<(), String> {
+        let k = CellKind::parse(art).ok_or_else(|| format!(
+            "GUI_TABLE_CELL_KIND: '{}' unbekannt -- text, bild, haken, balken, knopf", art))?;
+        let t = self.tbl_mut(h, "GUI_TABLE_CELL_KIND")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_KIND")?;
+        t.cell_mut(r, c).unwrap().kind = k;
+        Ok(())
+    }
+    /// Bild in die Zelle. Setzt die Art gleich mit -- sonst muesste man zwei
+    /// Aufrufe machen und der erste allein bliebe wirkungslos.
+    pub fn table_cell_image(&mut self, h: i64, r: i64, c: i64, bild: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_CELL_IMAGE")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_IMAGE")?;
+        let cell = t.cell_mut(r, c).unwrap();
+        cell.image = bild;
+        cell.kind = CellKind::Image;
+        Ok(())
+    }
+    /// Wert einer Haken- oder Balkenzelle (Haken: 0/1, Balken: 0..1).
+    pub fn table_cell_value(&mut self, h: i64, r: i64, c: i64, v: f64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_CELL_VALUE")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_CELL_VALUE")?;
+        t.cell_mut(r, c).unwrap().value = v;
+        Ok(())
+    }
+    pub fn table_get_value(&self, h: i64, r: i64, c: i64) -> Result<f64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_GET_VALUE")?;
+        let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_GET_VALUE")?;
+        Ok(t.cell(r, c).map(|x| x.value).unwrap_or(0.0))
+    }
+    pub fn table_col_align(&mut self, h: i64, c: i64, wie: &str) -> Result<(), String> {
+        let a = parse_align(wie).ok_or_else(|| format!(
+            "GUI_TABLE_COL_ALIGN: '{}' unbekannt -- links, mitte oder rechts", wie))?;
+        let t = self.tbl_mut(h, "GUI_TABLE_COL_ALIGN")?;
+        if c < 0 { return Err("GUI_TABLE_COL_ALIGN: Spalte darf nicht negativ sein".into()); }
+        let c = c as usize;
+        while t.col_align.len() <= c { t.col_align.push(0); }
+        t.col_align[c] = a;
+        Ok(())
+    }
+
+    // --- Zeilen anfuegen / entfernen ----------------------------------------
+
+    pub fn table_add_row(&mut self, h: i64, zellen: Vec<String>) -> Result<i64, String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_ADD_ROW")?;
+        t.rows.push(zellen.into_iter().map(Cell::text).collect());
+        t.row_fg.push(-1);
+        t.row_bg.push(-1);
+        Ok(t.rows.len() as i64 - 1)
+    }
+    pub fn table_remove_row(&mut self, h: i64, r: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_REMOVE_ROW")?;
+        if r < 0 || r >= t.rows.len() as i64 {
+            return Err(format!("GUI_TABLE_REMOVE_ROW: Zeile {} gibt es nicht (0..{})",
+                               r, t.rows.len().saturating_sub(1)));
+        }
+        let r = r as usize;
+        t.rows.remove(r);
+        if r < t.row_fg.len() { t.row_fg.remove(r); }
+        if r < t.row_bg.len() { t.row_bg.remove(r); }
+        // Sonst zeigt die Auswahl danach auf eine ANDERE Zeile als vorher.
+        if t.selected == r as i32 { t.selected = -1; }
+        else if t.selected > r as i32 { t.selected -= 1; }
+        Ok(())
+    }
+    pub fn table_clear(&mut self, h: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_CLEAR")?;
+        t.rows.clear();
+        t.row_fg.clear();
+        t.row_bg.clear();
+        t.selected = -1;
+        t.hover_row = -1;
+        t.scroll_x = 0;
+        t.scroll_y = 0;
+        Ok(())
+    }
+
+    // --- Tabellenweite Einstellungen ----------------------------------------
+
+    /// Ein Setter statt einem Builtin je Schalter -- wie bei `chart`. Ein
+    /// unbekannter Schluessel zaehlt die gueltigen auf, statt still nichts zu tun.
+    pub fn table_set_opt(&mut self, h: i64, key: &str, wert: f64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SET")?;
+        let n = wert as i32;
+        match key.to_lowercase().as_str() {
+            // Untergrenze: eine Zeilenhoehe von 0 waere eine Division durch null
+            // im Treffertest, eine negative ein Absturz beim Zeichnen.
+            "zeilenhoehe" | "row_height" => t.row_h = n.clamp(8, 400),
+            "kopfhoehe" | "header_height" => t.header_h = n.clamp(0, 200),
+            "zebra" => t.zebra = n != 0,
+            "gitter" | "grid" => t.grid = n != 0,
+            _ => return Err(format!(
+                "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter", key)),
+        }
+        Ok(())
+    }
+    pub fn table_get_opt(&self, h: i64, key: &str) -> Result<f64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_GET")?;
+        Ok(match key.to_lowercase().as_str() {
+            "zeilenhoehe" | "row_height" => t.row_h as f64,
+            "kopfhoehe" | "header_height" => t.header_h as f64,
+            "zebra" => if t.zebra { 1.0 } else { 0.0 },
+            "gitter" | "grid" => if t.grid { 1.0 } else { 0.0 },
+            "spalten" | "columns" => t.n_cols() as f64,
+            _ => return Err(format!(
+                "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, spalten", key)),
+        })
+    }
+
+    pub fn table_selected(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_SELECTED")?.selected as i64)
+    }
     pub fn table_set_selected(&mut self, h: i64, row: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_SELECTED")?;
         let n = t.rows.len() as i64;
         t.selected = if row >= 0 && row < n { row as i32 } else { -1 };
         Ok(())
     }
-    pub fn table_clicked(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED")?.clicked_row as i64) }
-    pub fn table_row_count(&self, h: i64) -> Result<i64, String> { Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.rows.len() as i64) }
+    pub fn table_clicked(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED")?.clicked_row as i64)
+    }
+    pub fn table_clicked_col(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_CLICKED_COL")?.clicked_col as i64)
+    }
+    pub fn table_row_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_ROW_COUNT")?.rows.len() as i64)
+    }
 
     // --- Tree (Baum-Ansicht) ------------------------------------------------
     fn tree_mut(&mut self, h: i64, fn_: &str) -> Result<&mut TreeState, String> {
@@ -1067,8 +1365,10 @@ impl Gui {
         let w = &self.windows[wi].widgets[idx];
         let (ax, ay, ww, hh) = self.abs_rect(wi, w);
         let t = w.tbl.as_ref().unwrap();
-        let n_cols = t.headers.len();
+        let n_cols = t.n_cols();
         let n_rows = t.rows.len();
+        let row_h = t.row_h;
+        let header_h = t.header_h;
         let col_widths: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
@@ -1078,18 +1378,19 @@ impl Gui {
             }
         };
         let body_x = ax + 1;
-        let body_y = ay + TBL_HEADER_H;
+        let body_y = ay + header_h;
         let body_w_raw = ww - 2;
-        let body_h_raw = hh - TBL_HEADER_H - 1;
+        let body_h_raw = hh - header_h - 1;
         let total_w: i32 = col_widths.iter().sum();
-        let total_h = n_rows as i32 * TBL_ROW_H;
+        let total_h = n_rows as i32 * row_h;
         let mut need_v = total_h > body_h_raw;
         let need_h = total_w > body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
         if need_h && total_h > body_h_raw - TBL_SCROLL_W { need_v = true; }
         let body_w = body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
         let body_h = body_h_raw - if need_h { TBL_SCROLL_W } else { 0 };
         TGeom {
-            ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths,
+            ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths, row_h, header_h,
+            scroll_x: t.scroll_x,
             body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
             need_v, need_h,
             max_scroll_y: (total_h - body_h).max(0), max_scroll_x: (total_w - body_w).max(0),
@@ -1108,10 +1409,10 @@ impl Gui {
         t.scroll_y = t.scroll_y.clamp(0, gm.max_scroll_y);
         t.scroll_x = t.scroll_x.clamp(0, gm.max_scroll_x);
         if wheel != 0 && over {
-            t.scroll_y = (t.scroll_y - wheel as i32 * TBL_ROW_H).clamp(0, gm.max_scroll_y);
+            t.scroll_y = (t.scroll_y - wheel as i32 * gm.row_h).clamp(0, gm.max_scroll_y);
         }
         if !t.drag_v && !t.drag_h && over {
-            let hr = (my - gm.body_y + t.scroll_y) / TBL_ROW_H;
+            let hr = (my - gm.body_y + t.scroll_y) / gm.row_h;
             t.hover_row = if hr >= 0 && hr < gm.n_rows as i32 { hr } else { -1 };
         }
     }
@@ -1139,7 +1440,25 @@ impl Gui {
             }
         }
         let hr = self.windows[wi].widgets[idx].tbl.as_ref().unwrap().hover_row;
-        if hr >= 0 { self.table_press = Some((wi, idx, hr)); }
+        if hr >= 0 {
+            // Spalte aus der x-Lage bestimmen -- ohne sie liesse sich ein
+            // Knopf in Spalte 3 nicht von einem Haken in Spalte 1 trennen.
+            let hc = Self::col_at(&gm, mx);
+            self.windows[wi].widgets[idx].tbl.as_mut().unwrap().hover_col = hc;
+            self.table_press = Some((wi, idx, hr));
+        }
+    }
+
+    /// Bildschirm-x -> Spaltenindex (-1 daneben). Rechnet mit derselben
+    /// Geometrie wie das Zeichnen, damit Treffer und Anzeige nicht auseinander
+    /// laufen -- derselbe Grund wie bei `chart`.
+    fn col_at(gm: &TGeom, mx: i32) -> i32 {
+        let mut cx = gm.body_x - gm.scroll_x;
+        for (c, cw) in gm.col_widths.iter().enumerate() {
+            if mx >= cx && mx < cx + cw { return c as i32; }
+            cx += cw;
+        }
+        -1
     }
 
     fn table_drag(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
@@ -1582,10 +1901,45 @@ impl Gui {
         if w.font_size != 0 { o["font_size"] = serde_json::json!(w.font_size); }
         if w.anchor != 5 { o["anchor"] = serde_json::json!(Self::anchor_str(w.anchor)); }
         if let Some(t) = &w.tbl {
-            o["table"] = serde_json::json!({
-                "headers": t.headers, "rows": t.rows,
+            // Eine schlichte Textzelle wird als STRING geschrieben, nur eine
+            // mit eigener Farbe/Art/Bild als Objekt. Damit bleibt das
+            // .gbform-Format fuer gewoehnliche Tabellen unveraendert (alte
+            // Dateien und der Form-Designer lesen es weiter), ohne dass die
+            // neuen Angaben beim Speichern verloren gehen.
+            let rows: Vec<serde_json::Value> = t.rows.iter().map(|row| {
+                serde_json::Value::Array(row.iter().map(|c| {
+                    if c.fg < 0 && c.bg < 0 && c.align < 0
+                        && c.kind == CellKind::Text && c.image < 0 && c.value == 0.0 {
+                        serde_json::json!(c.text)
+                    } else {
+                        let mut o = serde_json::Map::new();
+                        o.insert("text".into(), serde_json::json!(c.text));
+                        if c.fg >= 0 { o.insert("fg".into(), serde_json::json!(c.fg)); }
+                        if c.bg >= 0 { o.insert("bg".into(), serde_json::json!(c.bg)); }
+                        if c.align >= 0 { o.insert("align".into(), serde_json::json!(c.align)); }
+                        if c.kind != CellKind::Text {
+                            o.insert("kind".into(), serde_json::json!(c.kind.name()));
+                        }
+                        if c.image >= 0 { o.insert("image".into(), serde_json::json!(c.image)); }
+                        if c.value != 0.0 { o.insert("value".into(), serde_json::json!(c.value)); }
+                        serde_json::Value::Object(o)
+                    }
+                }).collect())
+            }).collect();
+            let mut tj = serde_json::json!({
+                "headers": t.headers, "rows": rows,
                 "col_widths": t.col_widths, "selected": t.selected,
             });
+            // Nur schreiben, was vom Standard abweicht -- sonst waere jede
+            // gespeicherte Form voller Vorgabewerte.
+            if t.row_h != TBL_ROW_H { tj["row_h"] = serde_json::json!(t.row_h); }
+            if t.header_h != TBL_HEADER_H { tj["header_h"] = serde_json::json!(t.header_h); }
+            if t.zebra { tj["zebra"] = serde_json::json!(true); }
+            if !t.grid { tj["grid"] = serde_json::json!(false); }
+            if !t.col_align.is_empty() { tj["col_align"] = serde_json::json!(t.col_align); }
+            if t.row_fg.iter().any(|&x| x >= 0) { tj["row_fg"] = serde_json::json!(t.row_fg); }
+            if t.row_bg.iter().any(|&x| x >= 0) { tj["row_bg"] = serde_json::json!(t.row_bg); }
+            o["table"] = tj;
         }
         if let Some(t) = &w.tree {
             o["tree"] = serde_json::json!({
@@ -1658,10 +2012,47 @@ impl Gui {
                             other => other.to_string(),
                         }
                     }
+                    // Zelle kann ein blosser Wert sein (altes Format, und der
+                    // Normalfall) ODER ein Objekt mit Farben/Art/Bild.
+                    fn to_cell(x: &serde_json::Value) -> Cell {
+                        if let Some(o) = x.as_object() {
+                            let mut c = Cell::text(o.get("text").map(cell_to_string).unwrap_or_default());
+                            if let Some(v) = o.get("fg").and_then(|v| v.as_i64()) { c.fg = v; }
+                            if let Some(v) = o.get("bg").and_then(|v| v.as_i64()) { c.bg = v; }
+                            if let Some(v) = o.get("align").and_then(|v| v.as_i64()) { c.align = v as i8; }
+                            if let Some(v) = o.get("kind").and_then(|v| v.as_str()) {
+                                if let Some(k) = CellKind::parse(v) { c.kind = k; }
+                            }
+                            if let Some(v) = o.get("image").and_then(|v| v.as_i64()) { c.image = v; }
+                            if let Some(v) = o.get("value").and_then(|v| v.as_f64()) { c.value = v; }
+                            c
+                        } else {
+                            Cell::text(cell_to_string(x))
+                        }
+                    }
                     ts.rows = rs.iter().map(|row| row.as_array()
-                        .map(|r| r.iter().map(cell_to_string).collect())
+                        .map(|r| r.iter().map(to_cell).collect())
                         .unwrap_or_default()).collect();
+                    ts.row_fg = vec![-1; ts.rows.len()];
+                    ts.row_bg = vec![-1; ts.rows.len()];
                 }
+                if let Some(v) = tj["row_h"].as_i64() { ts.row_h = (v as i32).clamp(8, 400); }
+                if let Some(v) = tj["header_h"].as_i64() { ts.header_h = (v as i32).clamp(0, 200); }
+                if let Some(v) = tj["zebra"].as_bool() { ts.zebra = v; }
+                if let Some(v) = tj["grid"].as_bool() { ts.grid = v; }
+                if let Some(a) = tj["col_align"].as_array() {
+                    ts.col_align = a.iter().filter_map(|x| x.as_i64().map(|n| n as i8)).collect();
+                }
+                for (schluessel, ziel) in [("row_fg", true), ("row_bg", false)] {
+                    if let Some(a) = tj[schluessel].as_array() {
+                        let v: Vec<i64> = a.iter().map(|x| x.as_i64().unwrap_or(-1)).collect();
+                        if ziel { ts.row_fg = v; } else { ts.row_bg = v; }
+                    }
+                }
+                // Nach dem Laden muessen die Zeilenfarb-Listen zur Zeilenzahl
+                // passen -- sonst greift row_fg[r] beim Zeichnen daneben.
+                ts.row_fg.resize(ts.rows.len(), -1);
+                ts.row_bg.resize(ts.rows.len(), -1);
                 if let Some(cw) = tj["col_widths"].as_array() {
                     ts.col_widths = Some(cw.iter().filter_map(|x| x.as_i64().map(|n| n as i32)).collect());
                 }
@@ -2362,7 +2753,25 @@ impl Gui {
                 let hr = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.hover_row).unwrap_or(-1);
                 if row >= 0 && hr == row {
                     let w = &mut self.windows[wi].widgets[i];
-                    if let Some(t) = w.tbl.as_mut() { t.selected = row; t.clicked_row = row; }
+                    let mut haken = false;
+                    if let Some(t) = w.tbl.as_mut() {
+                        t.selected = row;
+                        t.clicked_row = row;
+                        t.clicked_col = t.hover_col;
+                        // Eine Hakenzelle schaltet beim Klick selbst um --
+                        // sonst muesste jedes Programm das nachbauen, und die
+                        // Zelle saehe bedienbar aus, ohne es zu sein.
+                        let (r, c) = (row as usize, t.hover_col);
+                        if c >= 0 {
+                            if let Some(cell) = t.cell(r, c as usize) {
+                                if cell.kind == CellKind::Check { haken = true; }
+                            }
+                        }
+                        if haken {
+                            let cell = t.cell_mut(r, t.hover_col as usize).unwrap();
+                            cell.value = if cell.value >= 0.5 { 0.0 } else { 1.0 };
+                        }
+                    }
                     let f = w.on_change.clone();
                     if let Some(f) = f { self.pending.push(f); }
                 }
@@ -3649,6 +4058,40 @@ impl Gui {
         }
     }
 
+    /// Flaechenfarbe einer Zelle: eigene Farbe > Zeilenfarbe > Zebra > nichts.
+    /// -1 heisst jeweils "nicht gesetzt" und reicht an die naechste Stufe
+    /// weiter -- so faerbt eine Zeilenfarbe alle Zellen, eine einzelne Zelle
+    /// kann aber ausscheren.
+    fn cell_bg(t: &TableState, r: usize, c: usize, zebra_bg: i64) -> i64 {
+        if let Some(cell) = t.cell(r, c) {
+            if cell.bg >= 0 { return cell.bg; }
+        }
+        if let Some(&rb) = t.row_bg.get(r) {
+            if rb >= 0 { return rb; }
+        }
+        zebra_bg
+    }
+    fn cell_fg(t: &TableState, r: usize, c: usize, thema: i64) -> i64 {
+        if let Some(cell) = t.cell(r, c) {
+            if cell.fg >= 0 { return cell.fg; }
+        }
+        if let Some(&rf) = t.row_fg.get(r) {
+            if rf >= 0 { return rf; }
+        }
+        thema
+    }
+
+    /// x-Lage von Text in einer Zelle nach Ausrichtung. Getrennt, weil Kopf-
+    /// und Datenzellen dieselbe Regel brauchen.
+    fn align_x(links: i32, breite: i32, textbreite: i32, align: i8) -> i32 {
+        match align {
+            1 => links + (breite - textbreite) / 2,
+            2 => links + breite - textbreite - TBL_PADDING,
+            _ => links + TBL_PADDING,
+        }
+        .max(links + 2)
+    }
+
     fn draw_table(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let gm = self.table_geom(wi, idx);
         let wdg = &self.windows[wi].widgets[idx];
@@ -3663,52 +4106,97 @@ impl Gui {
         let accent = self.wcol(wdg, "accent", "accent");
         let sel_bg = shade(accent, -110);
         let hover_bg = shade(bg, 22);
+        let zebra_bg = shade(bg, 10);
+        let grid_c = shade(bg, 14);
+        let schrift = self.wsize(g, wdg);
 
         // Aussenrahmen + Kopfzeile.
         g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
         g.rect(ax, ay, ax + w - 1, ay + h - 1, border);
-        g.box_fill(ax + 1, ay + 1, ax + w - 2, ay + TBL_HEADER_H - 1, self.th("title_bg"));
-        g.line(ax, ay + TBL_HEADER_H - 1, ax + w - 1, ay + TBL_HEADER_H - 1, border);
+        if gm.header_h > 0 {
+            g.box_fill(ax + 1, ay + 1, ax + w - 2, ay + gm.header_h - 1, self.th("title_bg"));
+            g.line(ax, ay + gm.header_h - 1, ax + w - 1, ay + gm.header_h - 1, border);
 
-        // Kopf-Zellen (horizontal mitscrollend, auf Header-Breite geclippt).
-        g.push_clip(ax + 1, ay + 1, gm.body_w_raw, TBL_HEADER_H - 2);
-        let mut cx = body_x - t.scroll_x;
-        for c in 0..gm.n_cols {
-            let cw = gm.col_widths[c];
-            if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
-                g.text(cx + TBL_PADDING, ay + 4, t.headers[c].clone(), title_fg);
-                if c < gm.n_cols - 1 { g.line(cx + cw, ay + 1, cx + cw, ay + TBL_HEADER_H - 2, border); }
+            // Kopf-Zellen (waagerecht mitscrollend, auf Kopfbreite geclippt).
+            g.push_clip(ax + 1, ay + 1, gm.body_w_raw, gm.header_h - 2);
+            let mut cx = body_x - t.scroll_x;
+            for c in 0..gm.n_cols {
+                let cw = gm.col_widths[c];
+                if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
+                    let s = t.header(c).to_string();
+                    let tw = self.wtext_width(g, wdg, &s);
+                    let al = *t.col_align.get(c).unwrap_or(&0);
+                    let tx = Self::align_x(cx, cw, tw, al);
+                    let ty = ay + (gm.header_h - schrift).max(0) / 2;
+                    self.wtext(g, wdg, tx, ty, s, title_fg);
+                    if c < gm.n_cols - 1 {
+                        g.line(cx + cw, ay + 1, cx + cw, ay + gm.header_h - 2, border);
+                    }
+                }
+                cx += cw;
             }
-            cx += cw;
+            g.pop_clip();
         }
-        g.pop_clip();
 
         // Body.
         g.push_clip(body_x, body_y, body_w, body_h);
-        let first = (t.scroll_y / TBL_ROW_H).max(0);
-        let last = ((t.scroll_y + body_h) / TBL_ROW_H + 1).min(gm.n_rows as i32);
+        let first = (t.scroll_y / gm.row_h).max(0);
+        let last = ((t.scroll_y + body_h) / gm.row_h + 1).min(gm.n_rows as i32);
         for r in first..last {
-            let row_y = body_y + r * TBL_ROW_H - t.scroll_y;
-            if r == t.selected { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + TBL_ROW_H - 1, sel_bg); }
-            if r == t.hover_row { g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + TBL_ROW_H - 1, hover_bg); }
+            let ri = r as usize;
+            let row_y = body_y + r * gm.row_h - t.scroll_y;
+            let zebra = if t.zebra && r % 2 == 1 { zebra_bg } else { -1 };
+
+            // Zellflaechen zuerst, danach Auswahl/Hover DARUEBER -- sonst
+            // deckte eine eigene Zellfarbe die Auswahl zu und man saehe nicht
+            // mehr, welche Zeile gewaehlt ist.
             let mut cx = body_x - t.scroll_x;
-            let row = &t.rows[r as usize];
+            for c in 0..gm.n_cols {
+                let cw = gm.col_widths[c];
+                if cx + cw > body_x && cx < body_x + body_w {
+                    let cb = Self::cell_bg(t, ri, c, zebra);
+                    if cb >= 0 {
+                        g.box_fill(cx, row_y, cx + cw - 1, row_y + gm.row_h - 1, cb);
+                    }
+                }
+                cx += cw;
+            }
+            // Halbdurchsichtig ueber die Zellflaechen: eine eigene Zellfarbe
+            // bleibt sichtbar, die Auswahl aber auch. Alpha steckt im
+            // hoechsten Byte (0xAARRGGBB).
+            if r == t.selected {
+                g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
+                           (150i64 << 24) | (sel_bg & 0xFFFFFF));
+            } else if r == t.hover_row {
+                g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
+                           (110i64 << 24) | (hover_bg & 0xFFFFFF));
+            }
+
+            // Inhalte.
+            let mut cx = body_x - t.scroll_x;
             for c in 0..gm.n_cols {
                 let cw = gm.col_widths[c];
                 if cx + cw > body_x && cx < body_x + body_w {
                     let clip_x = (cx + 1).max(body_x);
                     let clip_w = (cw - 2).min((body_x + body_w) - clip_x);
-                    g.push_clip(clip_x, row_y, clip_w, TBL_ROW_H);
-                    g.text(cx + TBL_PADDING, row_y + 3, row[c].clone(), fg);
-                    g.pop_clip();
+                    if clip_w > 0 {
+                        g.push_clip(clip_x, row_y, clip_w, gm.row_h);
+                        self.draw_cell(g, wdg, t, ri, c, cx, row_y, cw, gm.row_h, fg, accent, border);
+                        g.pop_clip();
+                    }
+                }
+                if t.grid && c < gm.n_cols - 1 {
+                    g.line(cx + cw, row_y, cx + cw, row_y + gm.row_h - 1, grid_c);
                 }
                 cx += cw;
             }
-            g.line(body_x, row_y + TBL_ROW_H - 1, body_x + body_w - 1, row_y + TBL_ROW_H - 1, shade(bg, 14));
+            if t.grid {
+                g.line(body_x, row_y + gm.row_h - 1, body_x + body_w - 1, row_y + gm.row_h - 1, grid_c);
+            }
         }
         g.pop_clip();
 
-        // Vertikale Scrollbar.
+        // Senkrechte Bildlaufleiste.
         if gm.need_v {
             let sb_x = ax + gm.body_w_raw - TBL_SCROLL_W + 1;
             let track = body_h;
@@ -3716,9 +4204,10 @@ impl Gui {
             let ratio = if gm.max_scroll_y > 0 { t.scroll_y as f64 / gm.max_scroll_y as f64 } else { 0.0 };
             let hy = body_y + ((track - handle) as f64 * ratio) as i32;
             g.box_fill(sb_x, body_y, sb_x + TBL_SCROLL_W - 1, body_y + track - 1, shade(bg, -8));
-            g.box_fill(sb_x + 2, hy, sb_x + TBL_SCROLL_W - 3, hy + handle - 1, if t.drag_v { accent } else { border });
+            g.box_fill(sb_x + 2, hy, sb_x + TBL_SCROLL_W - 3, hy + handle - 1,
+                       if t.drag_v { accent } else { border });
         }
-        // Horizontale Scrollbar.
+        // Waagerechte Bildlaufleiste.
         if gm.need_h {
             let hs_y = ay + h - TBL_SCROLL_W - 1;
             let track = body_w;
@@ -3726,7 +4215,95 @@ impl Gui {
             let ratio = if gm.max_scroll_x > 0 { t.scroll_x as f64 / gm.max_scroll_x as f64 } else { 0.0 };
             let hx = body_x + ((track - handle) as f64 * ratio) as i32;
             g.box_fill(body_x, hs_y, body_x + track - 1, hs_y + TBL_SCROLL_W - 1, shade(bg, -8));
-            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + TBL_SCROLL_W - 3, if t.drag_h { accent } else { border });
+            g.box_fill(hx, hs_y + 2, hx + handle - 1, hs_y + TBL_SCROLL_W - 3,
+                       if t.drag_h { accent } else { border });
+        }
+    }
+
+    /// Eine einzelne Zelle zeichnen. Getrennt, weil sonst fuenf Zellarten in
+    /// der ohnehin langen Zeichenschleife stehen wuerden.
+    #[allow(clippy::too_many_arguments)]
+    fn draw_cell(&self, g: &mut Graphics, wdg: &Widget, t: &TableState,
+                 r: usize, c: usize, cx: i32, cy: i32, cw: i32, ch: i32,
+                 fg_thema: i64, accent: i64, border: i64) {
+        let leer = Cell::text(String::new());
+        let cell = t.cell(r, c).unwrap_or(&leer);
+        let fgc = Self::cell_fg(t, r, c, fg_thema);
+        let al = t.align_of(r, c);
+        let schrift = self.wsize(g, wdg);
+
+        match cell.kind {
+            CellKind::Text => {
+                let tw = self.wtext_width(g, wdg, &cell.text);
+                let tx = Self::align_x(cx, cw, tw, al);
+                self.wtext(g, wdg, tx, cy + (ch - schrift).max(0) / 2, cell.text.clone(), fgc);
+            }
+            CellKind::Image => {
+                if cell.image >= 0 {
+                    // In die Zelle einpassen, Seitenverhaeltnis behalten --
+                    // gestreckte Bilder in einer Tabelle sehen kaputt aus.
+                    let iw = g.image_width(cell.image).unwrap_or(0);
+                    let ih = g.image_height(cell.image).unwrap_or(0);
+                    if iw > 0 && ih > 0 {
+                        let rand = 2;
+                        let max_w = (cw - 2 * rand).max(1);
+                        let max_h = (ch - 2 * rand).max(1);
+                        let s = (max_w as f64 / iw as f64).min(max_h as f64 / ih as f64).min(4.0);
+                        let dw = ((iw as f64 * s) as i32).max(1);
+                        let dh = ((ih as f64 * s) as i32).max(1);
+                        let dx = match al { 1 => cx + (cw - dw) / 2, 2 => cx + cw - dw - rand, _ => cx + rand };
+                        g.draw_image_rect(cell.image, dx, cy + (ch - dh) / 2, dw, dh);
+                    }
+                }
+            }
+            CellKind::Check => {
+                let b = (ch - 8).clamp(10, 18);
+                let bx = match al { 1 => cx + (cw - b) / 2, 2 => cx + cw - b - TBL_PADDING, _ => cx + TBL_PADDING };
+                let by = cy + (ch - b) / 2;
+                g.box_fill(bx, by, bx + b - 1, by + b - 1, self.th("field_bg"));
+                g.rect(bx, by, bx + b - 1, by + b - 1, border);
+                if cell.value >= 0.5 {
+                    // Haken als zwei Striche -- ein gefuelltes Kaestchen
+                    // liesse sich von einer eingefaerbten Zelle nicht trennen.
+                    let m = b / 2;
+                    g.line(bx + 3, by + m, bx + m - 1, by + b - 4, accent);
+                    g.line(bx + m - 1, by + b - 4, bx + b - 3, by + 3, accent);
+                }
+            }
+            CellKind::Bar => {
+                let rand = 3;
+                let bw = (cw - 2 * rand).max(1);
+                let bh = (ch - 2 * rand).clamp(6, 22);
+                let bx = cx + rand;
+                let by = cy + (ch - bh) / 2;
+                let v = cell.value.clamp(0.0, 1.0);
+                g.box_fill(bx, by, bx + bw - 1, by + bh - 1, self.th("field_bg"));
+                if v > 0.0 {
+                    let fw = ((bw - 2) as f64 * v) as i32;
+                    if fw > 0 {
+                        let farbe = if cell.fg >= 0 { cell.fg } else { accent };
+                        g.box_fill(bx + 1, by + 1, bx + fw, by + bh - 2, farbe);
+                    }
+                }
+                g.rect(bx, by, bx + bw - 1, by + bh - 1, border);
+                if !cell.text.is_empty() {
+                    let tw = self.wtext_width(g, wdg, &cell.text);
+                    self.wtext(g, wdg, bx + (bw - tw) / 2, by + (bh - schrift).max(0) / 2,
+                               cell.text.clone(), fg_thema);
+                }
+            }
+            CellKind::Button => {
+                let rand = 3;
+                let bx = cx + rand;
+                let by = cy + rand;
+                let bw = (cw - 2 * rand).max(1);
+                let bh = (ch - 2 * rand).max(1);
+                self.fbox(g, bx, by, bx + bw - 1, by + bh - 1,
+                          self.th("widget_bg"), border);
+                let tw = self.wtext_width(g, wdg, &cell.text);
+                self.wtext(g, wdg, bx + (bw - tw) / 2, by + (bh - schrift).max(0) / 2,
+                           cell.text.clone(), fgc);
+            }
         }
     }
 }

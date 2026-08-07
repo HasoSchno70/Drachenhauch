@@ -111,3 +111,117 @@ def test_from_json_invalid_raises(run_gb):
 def test_load_missing_file_raises(run_gb):
     with pytest.raises(GameBasicError, match="GUI_LOAD"):
         run_gb('IMPORT "gui"\nDIM w AS GUI_WINDOW\nw = GUI_LOAD("nope_xyz.json")\n')
+
+
+# ---------------------------------------------- Zellen mit eigenen Merkmalen
+
+def test_schlichte_zellen_bleiben_strings_im_json(run_gb, tmp_path):
+    """Eine gewoehnliche Tabelle muss im .gbform genauso aussehen wie vorher --
+    sonst koennten aeltere Dateien und der Form-Designer sie nicht mehr lesen.
+    Erst eine Zelle mit Farbe/Art/Bild wird zum Objekt."""
+    out = run_gb('''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
+DIM k AS ARRAY OF STRING : k = SPLIT$("A|B", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM z AS ARRAY OF STRING : z = SPLIT$("eins|zwei", "|")
+GUI_TABLE_ADD_ROW(t, z)
+PRINT GUI_TO_JSON(w)
+''', base=tmp_path)
+    # JSON auswerten statt nach Bruchstuecken zu suchen: "text" steht auch in
+    # jedem Widget, ein blosses `not in` haette immer angeschlagen.
+    import json as _json
+    d = _json.loads(out.strip())
+    zeilen = d["widgets"][0]["table"]["rows"]
+    assert zeilen == [["eins", "zwei"]], zeilen
+
+
+def test_zelle_mit_farbe_ueberlebt_speichern_und_laden(run_gb, tmp_path):
+    """Farbe, Ausrichtung und Art muessen den Roundtrip ueberstehen -- sonst
+    saehe eine gespeicherte Form nach dem Laden anders aus als vorher."""
+    out = run_gb('''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
+DIM k AS ARRAY OF STRING : k = SPLIT$("A|B", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM z AS ARRAY OF STRING : z = SPLIT$("eins|zwei", "|")
+GUI_TABLE_ADD_ROW(t, z)
+GUI_TABLE_CELL_COLOR(t, 0, 1, &HFF0000, &H101010)
+GUI_TABLE_CELL_KIND(t, 0, 0, "haken")
+GUI_TABLE_CELL_VALUE(t, 0, 0, 1.0)
+GUI_TABLE_SET(t, "zeilenhoehe", 33)
+GUI_TABLE_SET(t, "zebra", 1)
+DIM j AS STRING : j = GUI_TO_JSON(w)
+DIM w2 AS GUI_WINDOW : w2 = GUI_FROM_JSON(j)
+DIM t2 AS GUI_WIDGET : t2 = GUI_WINDOW_WIDGET(w2, 0)
+PRINT GUI_TABLE_GET_CELL(t2, 0, 1)
+PRINT STR$(GUI_TABLE_GET_VALUE(t2, 0, 0))
+PRINT STR$(GUI_TABLE_GET(t2, "zeilenhoehe"))
+PRINT STR$(GUI_TABLE_GET(t2, "zebra"))
+''', base=tmp_path)
+    zeilen = out.strip().splitlines()
+    assert zeilen[0] == "zwei", out
+    assert zeilen[1].startswith("1"), out          # Haken-Wert
+    assert zeilen[2].startswith("33"), out         # Zeilenhoehe
+    assert zeilen[3].startswith("1"), out          # Zebra
+
+
+def test_spaltenzahl_ist_frei(run_gb, tmp_path):
+    """Kuerzere und laengere Zeilen als der Kopf sind erlaubt -- die
+    Spaltenzahl ist die BREITESTE Angabe. Frueher war jede Abweichung ein
+    Fehler, und wer die Zeilen vor dem Kopf setzte, umging die Pruefung ganz
+    und brachte das Zeichnen zum Absturz."""
+    out = run_gb('''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
+DIM k AS ARRAY OF STRING : k = SPLIT$("A|B", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM kurz AS ARRAY OF STRING : kurz = SPLIT$("nur eins", "|")
+GUI_TABLE_ADD_ROW(t, kurz)
+DIM lang AS ARRAY OF STRING : lang = SPLIT$("a|b|c|d", "|")
+GUI_TABLE_ADD_ROW(t, lang)
+PRINT STR$(GUI_TABLE_GET(t, "spalten"))
+PRINT "[" + GUI_TABLE_GET_CELL(t, 0, 1) + "]"
+PRINT GUI_TABLE_GET_CELL(t, 1, 3)
+''', base=tmp_path)
+    zeilen = out.strip().splitlines()
+    assert zeilen[0].startswith("4"), out          # breiteste Zeile bestimmt
+    assert zeilen[1] == "[]", out                  # fehlende Zelle = leer
+    assert zeilen[2] == "d", out
+
+
+def test_zeile_entfernen_zieht_die_auswahl_mit(run_gb, tmp_path):
+    """Sonst zeigte die Auswahl nach dem Loeschen auf eine ANDERE Zeile."""
+    out = run_gb('''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
+DIM z AS ARRAY OF STRING
+z = SPLIT$("a", "|") : GUI_TABLE_ADD_ROW(t, z)
+z = SPLIT$("b", "|") : GUI_TABLE_ADD_ROW(t, z)
+z = SPLIT$("c", "|") : GUI_TABLE_ADD_ROW(t, z)
+GUI_TABLE_SET_SELECTED(t, 2)
+GUI_TABLE_REMOVE_ROW(t, 0)
+PRINT STR$(GUI_TABLE_SELECTED(t)) + " " + GUI_TABLE_GET_CELL(t, GUI_TABLE_SELECTED(t), 0)
+GUI_TABLE_SET_SELECTED(t, 0)
+GUI_TABLE_REMOVE_ROW(t, 0)
+PRINT STR$(GUI_TABLE_SELECTED(t))
+''', base=tmp_path)
+    zeilen = out.strip().splitlines()
+    assert zeilen[0] == "1 c", out     # Index rutscht mit, zeigt weiter auf "c"
+    assert zeilen[1] == "-1", out      # die gewaehlte Zeile selbst geloescht
+
+
+def test_unbekannter_schluessel_nennt_die_gueltigen(run_gb, tmp_path):
+    from gamebasic.errors import GBRuntimeError
+    import pytest as _pt
+    with _pt.raises(GBRuntimeError, match="zeilenhoehe"):
+        run_gb('''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
+GUI_TABLE_SET(t, "gibtsnicht", 1)
+''', base=tmp_path)
