@@ -152,6 +152,10 @@ struct Ctx {
     local_slots: HashMap<String, usize>,
     local_types: Vec<String>,
     local_defaults: Vec<CVal>,
+    /// Je DIM-Name (klein) der zuerst deklarierte Typ + seine Zeile. Nur fuer
+    /// die Warnung bei einer zweiten Deklaration mit ANDEREM Typ -- ein
+    /// eigener Ctx je Funktion, also stimmt der Geltungsbereich von selbst.
+    dim_types: HashMap<String, (String, u32)>,
     is_main: bool,
     is_sub: bool,
     current_class: Option<String>,
@@ -163,6 +167,7 @@ impl Ctx {
               consts: vec![], break_patches: vec![], continue_patches: vec![],
               try_depth: 0,
               local_slots: HashMap::new(), local_types: vec![], local_defaults: vec![],
+              dim_types: HashMap::new(),
               is_main: true, is_sub: true, current_class: None }
     }
     /// Anonymer Local-Slot fuer Compiler-Zwischenwerte (Comprehensions, WITH,
@@ -683,8 +688,50 @@ impl Compiler {
             "Lokale Variable '{}' verdeckt die gleichnamige Konstante -- GameBasic ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.", name)));
     }
 
+    /// Typ so schreiben, wie er im Quelltext steht (`array:INTEGER` ->
+    /// `ARRAY OF INTEGER`) -- die interne Schreibweise sagt einem Nutzer nichts.
+    fn typ_klartext(t: &str) -> String {
+        // Gross geschrieben, weil der Compiler Typnamen klein ablegt, sie im
+        // Quelltext aber ueberall gross stehen (DIM x AS INTEGER).
+        if let Some(e) = t.strip_prefix("array:") { return format!("ARRAY OF {}", e.to_uppercase()); }
+        if let Some(e) = t.strip_prefix("map:") { return format!("MAP OF {}", e.to_uppercase()); }
+        t.to_uppercase()
+    }
+
+    /// Zweites DIM desselben Namens mit ANDEREM Typ melden.
+    ///
+    /// Beide Ebenen schlucken das bisher stillschweigend, mit verschiedenen
+    /// Folgen: im Hauptprogramm gewinnt die zuletzt ausgefuehrte Deklaration
+    /// (die Variable wechselt zur Laufzeit den Typ), in einer Funktion die
+    /// ERSTE (`declare_local` liefert den vorhandenen Slot zurueck und
+    /// verwirft den neuen Typ). In beiden Faellen ist der Name einfach doppelt
+    /// vergeben -- fast immer ein Versehen, und der Fehler faellt erst weit
+    /// entfernt auf ("Array-Index muss INTEGER sein, erhalten FLOAT").
+    ///
+    /// Bewusst nur eine WARNUNG: dasselbe DIM mehrfach mit GLEICHEM Typ ist
+    /// gaengig (DIM im Schleifenkoerper) und bleibt still.
+    fn warn_dim_typ_wechsel(&mut self, name: &str, eff_type: &str) {
+        let klein = name.to_lowercase();
+        let zeile = self.ctx.cur_line;
+        match self.ctx.dim_types.get(&klein) {
+            Some((alt, alt_zeile)) if alt != eff_type => {
+                let (alt, alt_zeile) = (alt.clone(), *alt_zeile);
+                let wo = if self.ctx.is_main { "Das Hauptprogramm kennt" }
+                         else { "Diese Funktion kennt" };
+                self.warnings.push((zeile, format!(
+                    "'{}' wurde in Zeile {} schon als {} angelegt, hier als {}. {} nur EINE Variable dieses Namens (Gross-/Kleinschreibung zaehlt nicht) -- einer der beiden Verwendungszwecke bekommt den falschen Typ. Zweiten Namen vergeben.",
+                    name, alt_zeile, Self::typ_klartext(&alt), Self::typ_klartext(eff_type), wo)));
+            }
+            Some(_) => {}
+            None => { self.ctx.dim_types.insert(klein, (eff_type.to_string(), zeile)); }
+        }
+    }
+
     fn stmt_dim(&mut self, name: &str, type_name: &str, array_dims: &Option<Vec<Node>>) -> CR {
         self.warn_shadowed_const(name);
+        let eff = if array_dims.is_some() { format!("array:{}", type_name) }
+                  else { type_name.to_string() };
+        self.warn_dim_typ_wechsel(name, &eff);
         // Sized-Array: `DIM x[10, 20] AS T` -- type_name = Element-Typ.
         if let Some(dims) = array_dims {
             if !self.known_elem(type_name) {

@@ -148,6 +148,25 @@ neue Builtins, z.B. fuer SID-Charakter ohne Buffer-Bake).
     zusaetzlich (`vm.rs::unknown_builtin_msg`). Logik in `preprocess.rs`
     (`missing_hardware_modules` / `missing_hardware_imports_with_lines`).
 
+### Warnungen von `gbrt --check`
+
+Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker:
+
+- **Verdeckte Konstante:** eine lokale Variable heißt wie eine globale CONST.
+- **Zweites `DIM` desselben Namens mit anderem Typ.** Die Wirkung ist je nach
+  Ebene verschieden und in beiden Fällen still: im Hauptprogramm gewinnt die
+  zuletzt *ausgeführte* Deklaration (die Variable wechselt zur Laufzeit den
+  Typ), in einer Funktion die **erste** (`Ctx::declare_local` liefert den
+  vorhandenen Slot zurück und verwirft den neuen Typ). Der Fehler platzt dann
+  weit entfernt (`Array-Index muss INTEGER sein, erhalten FLOAT`) und ist dort
+  seiner Ursache nicht mehr anzusehen. Gleicher Name **mit gleichem Typ**
+  bleibt still — `DIM` im Schleifenkörper ist gängig. Ein lokales `DIM`, das
+  ein Global verdeckt, ist ebenfalls kein Fall dafür (anderer
+  Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
+  GameBasic sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
+  (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
+  `tests/test_gbrt_check.py`.
+
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
 Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.
 
