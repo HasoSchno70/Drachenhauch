@@ -3476,6 +3476,12 @@ impl<'p> Vm<'p> {
             // --- tabellenweite Einstellungen ---
             "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
             "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
+            // --- Mehrfachauswahl ---
+            "gui_table_sel_count" => Value::Int(self.gui.table_sel_count(gi(a,0,"GUI_TABLE_SEL_COUNT")?)?),
+            "gui_table_sel_row" => Value::Int(self.gui.table_sel_row(gi(a,0,"GUI_TABLE_SEL_ROW")?, gi(a,1,"GUI_TABLE_SEL_ROW")?)?),
+            "gui_table_is_selected" => Value::Bool(self.gui.table_is_selected(gi(a,0,"GUI_TABLE_IS_SELECTED")?, gi(a,1,"GUI_TABLE_IS_SELECTED")?)?),
+            "gui_table_select" => { self.gui.table_select(gi(a,0,"GUI_TABLE_SELECT")?, gi(a,1,"GUI_TABLE_SELECT")?, gbool(a,2,"GUI_TABLE_SELECT")?)?; Value::Nil }
+            "gui_table_clear_selection" => { self.gui.table_clear_selection(gi(a,0,"GUI_TABLE_CLEAR_SELECTION")?)?; Value::Nil }
             // --- Zellen bearbeiten ---
             "gui_table_col_edit" => { self.gui.table_col_edit(gi(a,0,"GUI_TABLE_COL_EDIT")?, gi(a,1,"GUI_TABLE_COL_EDIT")?, gbool(a,2,"GUI_TABLE_COL_EDIT")?)?; Value::Nil }
             "gui_table_editing_row" => Value::Int(self.gui.table_editing_row(gi(a,0,"GUI_TABLE_EDITING_ROW")?)?),

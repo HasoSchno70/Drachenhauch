@@ -538,6 +538,46 @@ beendet die Eingabe. Mehrere Spalten wirken zusammen (UND).
 | `GUI_TABLE_FILTER(tbl, spalte, text$)` | Filter setzen (leerer Text = kein Filter) |
 | `GUI_TABLE_GET_FILTER(tbl, spalte)` | gesetzten Filter lesen |
 
+### Feste Spalten
+
+`GUI_TABLE_SET(tbl, "feste_spalten", 2)` lässt die ersten zwei Spalten beim
+waagerechten Scrollen stehen — die Kennung bleibt sichtbar, während man nach
+rechts durch die Daten wandert. Eine Akzentlinie zeigt, wo der feste Block
+endet.
+
+Alles, was Spalten verortet, geht über **eine** Quelle (`col_x` für die Lage,
+`col_clip` für den sichtbaren Bereich) — Treffertest *und* Zeichnen benutzen
+sie. Ein fester Block wäre sonst der sicherste Weg, beide auseinander laufen zu
+lassen: man klickt auf „Name" und trifft die Spalte, die darunter
+durchgescrollt ist.
+
+Mehr feste Spalten anzugeben als vorhanden sind wird gedeckelt.
+
+### Mehrfach-Auswahl
+
+Aus (dann verhält sich die Tabelle wie bisher: eine Zeile). Mit
+`GUI_TABLE_SET(tbl, "mehrfachauswahl", 1)`:
+
+- **Strg+Klick** nimmt eine Zeile dazu oder heraus
+- **Umschalt+Klick** wählt den Bereich ab der zuletzt angeklickten — in der
+  **sichtbaren** Reihenfolge, denn das ist es, was man zwischen beiden Klicks
+  sieht (über die Datenzeilen zu gehen träfe bei sortierter Tabelle etwas ganz
+  anderes)
+- normaler Klick ersetzt die Auswahl
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_SEL_COUNT(tbl)` | Anzahl gewählter Zeilen |
+| `GUI_TABLE_SEL_ROW(tbl, i)` | i-te gewählte **Datenzeile**, in Klick-Reihenfolge |
+| `GUI_TABLE_IS_SELECTED(tbl, zeile)` | ist diese Datenzeile gewählt? |
+| `GUI_TABLE_SELECT(tbl, zeile, an)` | Zeile dazunehmen / herausnehmen |
+| `GUI_TABLE_CLEAR_SELECTION(tbl)` | Auswahl leeren |
+
+`GUI_TABLE_SELECTED` liefert weiterhin die **zuletzt angeklickte** Zeile —
+vorhandener Code, der nur diese kennt, läuft unverändert. Beim Einschalten wird
+eine bestehende Einzelauswahl übernommen; beim Löschen einer Zeile rücken alle
+Indizes dahinter nach (sonst zeigte die Auswahl danach auf andere Zeilen).
+
 ### Zellen direkt bearbeiten
 
 **Doppelklick** auf eine Textzelle einer freigegebenen Spalte öffnet ein
@@ -622,9 +662,8 @@ gelesen, ältere Dateien laufen unverändert.
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
-**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren,
-Mehrfach-Auswahl, feste (mitscrollende) Spalten, Spalten umsortieren,
-Zeilengruppen/Baum in der Tabelle.
+**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren, Spalten per
+Zug umsortieren, Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
 

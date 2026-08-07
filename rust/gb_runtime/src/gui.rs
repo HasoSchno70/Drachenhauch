@@ -351,6 +351,19 @@ pub struct TableState {
     filter_row: bool,
     /// Welche Filterzelle die Tastatur bekommt (-1 = keine).
     filter_focus: i32,
+    /// Wieviele Spalten von links bleiben beim Waagerecht-Scrollen stehen.
+    frozen: i32,
+
+    // --- Mehrfachauswahl -----------------------------------------------------
+    /// Erlaubt (sonst verhaelt sich die Tabelle wie bisher: eine Zeile).
+    multi: bool,
+    /// Alle gewaehlten DATENzeilen. `selected` bleibt daneben die zuletzt
+    /// angeklickte -- damit funktioniert vorhandener Code unveraendert weiter,
+    /// der nur GUI_TABLE_SELECTED kennt.
+    sel_rows: Vec<i32>,
+    /// Ankerzeile fuer die Umschalt-Auswahl (Bereich von hier bis zum Klick).
+    sel_anchor: i32,
+
     // --- Zelle bearbeiten ---------------------------------------------------
     /// Welche Zelle gerade bearbeitet wird (-1 = keine).
     edit_row: i32,
@@ -390,6 +403,7 @@ impl Default for TableState {
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
+            frozen: 0, multi: false, sel_rows: vec![], sel_anchor: -1,
             edit_row: -1, edit_col: -1, edit_text: String::new(), edit_caret: 0,
             col_edit: vec![],
             drag_col: -1, drag_col_w: 0, drag_col_x: 0, resizable_cols: true,
@@ -481,6 +495,45 @@ impl TableState {
     fn view_of(&self, data_r: i32) -> i32 {
         if data_r < 0 { return -1; }
         self.view.iter().position(|&r| r as i32 == data_r).map(|i| i as i32).unwrap_or(-1)
+    }
+
+    fn ist_gewaehlt(&self, r: i32) -> bool {
+        // Ohne Mehrfachauswahl zaehlt nur `selected` -- sonst muesste jeder
+        // Setter zwei Stellen pflegen und sie koennten auseinander laufen.
+        if !self.multi { return self.selected == r; }
+        self.sel_rows.contains(&r)
+    }
+    fn auswahl_setzen(&mut self, r: i32) {
+        self.selected = r;
+        self.sel_rows.clear();
+        if r >= 0 { self.sel_rows.push(r); }
+        self.sel_anchor = r;
+    }
+    fn auswahl_umschalten(&mut self, r: i32) {
+        if let Some(i) = self.sel_rows.iter().position(|&x| x == r) {
+            self.sel_rows.remove(i);
+            // Die "zuletzt angeklickte" muss mitwandern, sonst zeigte
+            // GUI_TABLE_SELECTED auf eine abgewaehlte Zeile.
+            if self.selected == r { self.selected = *self.sel_rows.last().unwrap_or(&-1); }
+        } else {
+            self.sel_rows.push(r);
+            self.selected = r;
+        }
+        self.sel_anchor = r;
+    }
+    /// Bereich vom Anker bis `r` -- in der SICHTBAREN Reihenfolge. Man waehlt
+    /// mit Umschalt das aus, was dazwischen zu SEHEN ist; ueber die Datenzeilen
+    /// zu gehen wuerde bei sortierter Tabelle etwas voellig anderes greifen.
+    fn auswahl_bereich(&mut self, r: i32) {
+        let a = if self.sel_anchor >= 0 { self.sel_anchor } else { r };
+        let (ia, ib) = (self.view_of(a), self.view_of(r));
+        if ia < 0 || ib < 0 { self.auswahl_setzen(r); return; }
+        let (von, bis) = (ia.min(ib), ia.max(ib));
+        self.sel_rows.clear();
+        for i in von..=bis {
+            if let Some(&d) = self.view.get(i as usize) { self.sel_rows.push(d as i32); }
+        }
+        self.selected = r;
     }
 
     fn col_editable(&self, c: usize) -> bool {
@@ -629,6 +682,12 @@ struct TGeom {
     /// bestimmt. Ohne ihn haette `col_at` bei gescrollter Tabelle auf die
     /// falsche Spalte gezeigt.
     scroll_x: i32,
+    /// Anzahl fester Spalten und ihre Gesamtbreite. Alles, was Spalten
+    /// verortet, geht ueber `col_x`/`col_clip` -- eine Quelle fuer Treffertest
+    /// UND Zeichnen, sonst waere ein fester Block der sicherste Weg, beide
+    /// auseinander laufen zu lassen.
+    frozen: usize,
+    frozen_w: i32,
     body_x: i32, body_y: i32, body_w: i32, body_h: i32,
     body_w_raw: i32, total_w: i32, total_h: i32,
     need_v: bool, need_h: bool, max_scroll_y: i32, max_scroll_x: i32,
@@ -1170,6 +1229,9 @@ impl Gui {
         t.row_fg = vec![-1; t.rows.len()];
         t.row_bg = vec![-1; t.rows.len()];
         if t.selected >= t.rows.len() as i32 { t.selected = -1; }
+        // Die Auswahl zeigte sonst auf Zeilen, die es nicht mehr gibt.
+        t.sel_rows.retain(|&r| r < t.rows.len() as i32);
+        t.sel_anchor = -1;
         // Schrumpft die Tabelle, muss der Scroll zurueck -- sonst bliebe eine
         // weit heruntergescrollte Tabelle bis zur naechsten Mausbewegung leer.
         // Nur beim Schrumpfen, sonst waere ein periodisch aktualisiertes
@@ -1314,9 +1376,14 @@ impl Gui {
         t.rows.remove(r);
         if r < t.row_fg.len() { t.row_fg.remove(r); }
         if r < t.row_bg.len() { t.row_bg.remove(r); }
-        // Sonst zeigt die Auswahl danach auf eine ANDERE Zeile als vorher.
+        // Sonst zeigt die Auswahl danach auf eine ANDERE Zeile als vorher --
+        // alle Indizes hinter der geloeschten ruecken auf.
         if t.selected == r as i32 { t.selected = -1; }
         else if t.selected > r as i32 { t.selected -= 1; }
+        t.sel_rows.retain(|&x| x != r as i32);
+        for x in t.sel_rows.iter_mut() { if *x > r as i32 { *x -= 1; } }
+        if t.sel_anchor == r as i32 { t.sel_anchor = -1; }
+        else if t.sel_anchor > r as i32 { t.sel_anchor -= 1; }
         t.rebuild_view();
         Ok(())
     }
@@ -1325,6 +1392,8 @@ impl Gui {
         t.rows.clear();
         t.row_fg.clear();
         t.row_bg.clear();
+        t.sel_rows.clear();
+        t.sel_anchor = -1;
         t.selected = -1;
         t.hover_row = -1;
         t.scroll_x = 0;
@@ -1350,9 +1419,19 @@ impl Gui {
             "filterzeile" | "filter_row" => { t.filter_row = n != 0; if n == 0 { t.filter_focus = -1; } }
             "sortierbar" | "sortable" => t.sortable = n != 0,
             "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
+            "feste_spalten" | "frozen" => t.frozen = n.max(0),
+            "mehrfachauswahl" | "multi_select" => {
+                t.multi = n != 0;
+                // Beim Einschalten die bisherige Einzelauswahl uebernehmen,
+                // sonst waere sie nach dem Umschalten ploetzlich weg.
+                if t.multi {
+                    t.sel_rows.clear();
+                    if t.selected >= 0 { t.sel_rows.push(t.selected); }
+                }
+            }
             _ => return Err(format!(
                 "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl", key)),
         }
         Ok(())
     }
@@ -1366,11 +1445,48 @@ filterzeile, sortierbar, spalten_ziehbar", key)),
             "filterzeile" | "filter_row" => if t.filter_row { 1.0 } else { 0.0 },
             "sortierbar" | "sortable" => if t.sortable { 1.0 } else { 0.0 },
             "spalten_ziehbar" | "resizable_cols" => if t.resizable_cols { 1.0 } else { 0.0 },
+            "feste_spalten" | "frozen" => t.frozen as f64,
+            "mehrfachauswahl" | "multi_select" => if t.multi { 1.0 } else { 0.0 },
             "spalten" | "columns" => t.n_cols() as f64,
             _ => return Err(format!(
                 "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
-filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
+filterzeile, sortierbar, spalten_ziehbar, feste_spalten, mehrfachauswahl, spalten", key)),
         })
+    }
+
+    // --- Mehrfachauswahl -----------------------------------------------------
+
+    pub fn table_sel_count(&self, h: i64) -> Result<i64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_SEL_COUNT")?;
+        Ok(if t.multi { t.sel_rows.len() as i64 }
+           else if t.selected >= 0 { 1 } else { 0 })
+    }
+    /// i-te gewaehlte DATENzeile, in der Reihenfolge des Anklickens.
+    pub fn table_sel_row(&self, h: i64, i: i64) -> Result<i64, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_SEL_ROW")?;
+        if !t.multi { return Ok(if i == 0 { t.selected as i64 } else { -1 }); }
+        Ok(t.sel_rows.get(i.max(0) as usize).copied().unwrap_or(-1) as i64)
+    }
+    pub fn table_is_selected(&self, h: i64, r: i64) -> Result<bool, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_IS_SELECTED")?.ist_gewaehlt(r as i32))
+    }
+    /// Zeile zur Auswahl hinzunehmen bzw. herausnehmen (programmgesteuert).
+    pub fn table_select(&mut self, h: i64, r: i64, an: bool) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SELECT")?;
+        if r < 0 || r >= t.rows.len() as i64 {
+            return Err(format!("GUI_TABLE_SELECT: Zeile {} gibt es nicht (0..{})",
+                               r, t.rows.len().saturating_sub(1)));
+        }
+        let r = r as i32;
+        let drin = t.sel_rows.contains(&r);
+        if an != drin { t.auswahl_umschalten(r); }
+        if an { t.selected = r; }
+        Ok(())
+    }
+    pub fn table_clear_selection(&mut self, h: i64) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_CLEAR_SELECTION")?;
+        t.auswahl_setzen(-1);
+        Ok(())
     }
 
     // --- Zellen bearbeiten ---------------------------------------------------
@@ -1443,7 +1559,10 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
     pub fn table_set_selected(&mut self, h: i64, row: i64) -> Result<(), String> {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_SELECTED")?;
         let n = t.rows.len() as i64;
-        t.selected = if row >= 0 && row < n { row as i32 } else { -1 };
+        let r = if row >= 0 && row < n { row as i32 } else { -1 };
+        // Ueber auswahl_setzen, damit die Mehrfachauswahl nicht daneben
+        // stehenbleibt und beide Angaben auseinander laufen.
+        t.auswahl_setzen(r);
         Ok(())
     }
     pub fn table_clicked(&self, h: i64) -> Result<i64, String> {
@@ -1578,6 +1697,9 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         let n_rows = t.view.len();
         let row_h = t.row_h;
         let header_h = t.head_total();
+        // Mehr feste Spalten als vorhanden waeren ein leerer Scrollbereich --
+        // deckeln statt darauf zu vertrauen, dass niemand es versucht.
+        let frozen = (t.frozen.max(0) as usize).min(n_cols);
         let col_widths: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
@@ -1597,9 +1719,10 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         if need_h && total_h > body_h_raw - TBL_SCROLL_W { need_v = true; }
         let body_w = body_w_raw - if need_v { TBL_SCROLL_W } else { 0 };
         let body_h = body_h_raw - if need_h { TBL_SCROLL_W } else { 0 };
+        let frozen_w: i32 = col_widths.iter().take(frozen).sum();
         TGeom {
             ax, ay, w: ww, h: hh, n_cols, n_rows, col_widths, row_h, header_h,
-            scroll_x: t.scroll_x,
+            scroll_x: t.scroll_x, frozen, frozen_w,
             body_x, body_y, body_w, body_h, body_w_raw, total_w, total_h,
             need_v, need_h,
             max_scroll_y: (total_h - body_h).max(0), max_scroll_x: (total_w - body_w).max(0),
@@ -1760,14 +1883,32 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         }
     }
 
+    /// Linke Bildschirmkante der Spalte `c`. Feste Spalten scrollen nicht mit.
+    /// EINE Quelle fuer Treffertest und Zeichnen.
+    fn col_x(gm: &TGeom, c: usize) -> i32 {
+        let bis = c.min(gm.col_widths.len());
+        let mut x = gm.body_x + gm.col_widths[..bis].iter().sum::<i32>();
+        if c >= gm.frozen { x -= gm.scroll_x; }
+        x
+    }
+
+    /// Bereich, in dem die Spalte `c` sichtbar sein darf. Ohne dieses Clipping
+    /// schoebe sich eine gescrollte Spalte unter den festen Block.
+    fn col_clip(gm: &TGeom, c: usize) -> (i32, i32) {
+        if c < gm.frozen {
+            (gm.body_x, gm.frozen_w)
+        } else {
+            (gm.body_x + gm.frozen_w, (gm.body_w - gm.frozen_w).max(0))
+        }
+    }
+
     /// Liegt `mx` auf der rechten Kante einer Spalte? Liefert deren Index.
     /// Der Fangbereich ist bewusst breiter als ein Pixel -- eine Kante, die
     /// man auf den Punkt genau treffen muss, findet niemand.
     fn edge_at(gm: &TGeom, mx: i32) -> i32 {
-        let mut cx = gm.body_x - gm.scroll_x;
-        for (c, cw) in gm.col_widths.iter().enumerate() {
-            cx += cw;
-            if (mx - cx).abs() <= TBL_EDGE_GRAB { return c as i32; }
+        for c in 0..gm.col_widths.len() {
+            let rechts = Self::col_x(gm, c) + gm.col_widths[c];
+            if (mx - rechts).abs() <= TBL_EDGE_GRAB { return c as i32; }
         }
         -1
     }
@@ -1776,10 +1917,13 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
     /// Geometrie wie das Zeichnen, damit Treffer und Anzeige nicht auseinander
     /// laufen -- derselbe Grund wie bei `chart`.
     fn col_at(gm: &TGeom, mx: i32) -> i32 {
-        let mut cx = gm.body_x - gm.scroll_x;
-        for (c, cw) in gm.col_widths.iter().enumerate() {
-            if mx >= cx && mx < cx + cw { return c as i32; }
-            cx += cw;
+        for c in 0..gm.col_widths.len() {
+            let (kx, kw) = Self::col_clip(gm, c);
+            // Nur treffen, was in seinem Bereich auch SICHTBAR ist -- sonst
+            // truefe man eine Spalte, die unter dem festen Block liegt.
+            if mx < kx || mx >= kx + kw { continue; }
+            let x = Self::col_x(gm, c);
+            if mx >= x && mx < x + gm.col_widths[c] { return c as i32; }
         }
         -1
     }
@@ -3188,13 +3332,19 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             }
             self.press_origin = None;
             // Tabellen-Zeilen-Klick bestaetigen (Selektion + on_change).
+            let (ctrl, shift) = (g.key_ctrl(), g.key_shift());
             if let Some((wi, i, row)) = self.table_press.take() {
                 let hr = self.windows[wi].widgets[i].tbl.as_ref().map(|t| t.hover_row).unwrap_or(-1);
                 if row >= 0 && hr == row {
                     let w = &mut self.windows[wi].widgets[i];
                     let mut haken = false;
                     if let Some(t) = w.tbl.as_mut() {
-                        t.selected = row;
+                        // Strg schaltet eine Zeile um, Umschalt waehlt den
+                        // Bereich vom Anker -- sonst ersetzt der Klick die
+                        // Auswahl. Genau so kennt man es von jeder Liste.
+                        if t.multi && ctrl { t.auswahl_umschalten(row); }
+                        else if t.multi && shift { t.auswahl_bereich(row); }
+                        else { t.auswahl_setzen(row); }
                         t.clicked_row = row;
                         t.clicked_col = t.hover_col;
                         // Eine Hakenzelle schaltet beim Klick selbst um --
@@ -4578,12 +4728,15 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             g.box_fill(ax + 1, ay + 1, ax + w - 2, ay + gm.header_h - 1, self.th("title_bg"));
             g.line(ax, ay + gm.header_h - 1, ax + w - 1, ay + gm.header_h - 1, border);
 
-            // Kopf-Zellen (waagerecht mitscrollend, auf Kopfbreite geclippt).
+            // Kopf-Zellen. Feste Spalten stehen still, der Rest scrollt --
+            // beides ueber `col_x`, damit Kopf und Daten nie versetzt sind.
             g.push_clip(ax + 1, ay + 1, gm.body_w_raw, gm.header_h - 2);
-            let mut cx = body_x - t.scroll_x;
             for c in 0..gm.n_cols {
+                let cx = Self::col_x(&gm, c);
                 let cw = gm.col_widths[c];
-                if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
+                let (kx, kw) = Self::col_clip(&gm, c);
+                if cx + cw > kx && cx < kx + kw {
+                    g.push_clip(kx, ay + 1, kw, gm.header_h - 2);
                     let s = t.header(c).to_string();
                     let al = *t.col_align.get(c).unwrap_or(&0);
                     // Platz fuer den Sortierpfeil freihalten, sonst schreibt
@@ -4599,16 +4752,18 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
                     if c < gm.n_cols - 1 {
                         g.line(cx + cw, ay + 1, cx + cw, ay + gm.header_h - 2, border);
                     }
+                    g.pop_clip();
                 }
-                cx += cw;
             }
             // Filterzeile: je Spalte ein kleines Eingabefeld.
             if t.filter_row {
                 let fy = ay + titel_h;
-                let mut cx = body_x - t.scroll_x;
                 for c in 0..gm.n_cols {
+                    let cx = Self::col_x(&gm, c);
                     let cw = gm.col_widths[c];
-                    if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
+                    let (kx, kw) = Self::col_clip(&gm, c);
+                    if cx + cw > kx && cx < kx + kw {
+                        g.push_clip(kx, fy, kw, TBL_FILTER_H);
                         let fokus = t.filter_focus == c as i32;
                         self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + TBL_FILTER_H - 3,
                                        self.th("field_bg"),
@@ -4621,11 +4776,17 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
                         self.wtext(g, wdg, cx + 6, fy + (TBL_FILTER_H - schrift).max(0) / 2,
                                    s, farbe);
                         g.pop_clip();
+                        g.pop_clip();
                     }
-                    cx += cw;
                 }
             }
             g.pop_clip();
+            // Kante des festen Blocks -- ohne sie sieht man nicht, warum ein
+            // Teil der Tabelle beim Scrollen stehenbleibt.
+            if gm.frozen > 0 {
+                let fx = body_x + gm.frozen_w;
+                g.line(fx, ay + 1, fx, ay + gm.header_h - 2, accent);
+            }
         }
 
         // Body.
@@ -4646,21 +4807,23 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             // Zellflaechen zuerst, danach Auswahl/Hover DARUEBER -- sonst
             // deckte eine eigene Zellfarbe die Auswahl zu und man saehe nicht
             // mehr, welche Zeile gewaehlt ist.
-            let mut cx = body_x - t.scroll_x;
             for c in 0..gm.n_cols {
+                let cx = Self::col_x(&gm, c);
                 let cw = gm.col_widths[c];
-                if cx + cw > body_x && cx < body_x + body_w {
+                let (kx, kw) = Self::col_clip(&gm, c);
+                if cx + cw > kx && cx < kx + kw {
                     let cb = Self::cell_bg(t, ri, c, zebra);
                     if cb >= 0 {
+                        g.push_clip(kx, row_y, kw, gm.row_h);
                         g.box_fill(cx, row_y, cx + cw - 1, row_y + gm.row_h - 1, cb);
+                        g.pop_clip();
                     }
                 }
-                cx += cw;
             }
             // Halbdurchsichtig ueber die Zellflaechen: eine eigene Zellfarbe
             // bleibt sichtbar, die Auswahl aber auch. Alpha steckt im
             // hoechsten Byte (0xAARRGGBB).
-            if ri as i32 == t.selected {
+            if t.ist_gewaehlt(ri as i32) {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (150i64 << 24) | (sel_bg & 0xFFFFFF));
             } else if ri as i32 == t.hover_row {
@@ -4669,26 +4832,28 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             }
 
             // Inhalte.
-            let mut cx = body_x - t.scroll_x;
             for c in 0..gm.n_cols {
+                let cx = Self::col_x(&gm, c);
                 let cw = gm.col_widths[c];
-                if cx + cw > body_x && cx < body_x + body_w {
-                    let clip_x = (cx + 1).max(body_x);
-                    let clip_w = (cw - 2).min((body_x + body_w) - clip_x);
-                    if clip_w > 0 {
-                        g.push_clip(clip_x, row_y, clip_w, gm.row_h);
-                        self.draw_cell(g, wdg, t, ri, c, cx, row_y, cw, gm.row_h, fg, accent, border);
-                        g.pop_clip();
-                    }
+                let (kx, kw) = Self::col_clip(&gm, c);
+                let clip_x = (cx + 1).max(kx);
+                let clip_w = (cw - 2).min((kx + kw) - clip_x);
+                if clip_w > 0 {
+                    g.push_clip(clip_x, row_y, clip_w, gm.row_h);
+                    self.draw_cell(g, wdg, t, ri, c, cx, row_y, cw, gm.row_h, fg, accent, border);
+                    g.pop_clip();
                 }
-                if t.grid && c < gm.n_cols - 1 {
+                if t.grid && c < gm.n_cols - 1 && cx + cw > kx && cx + cw < kx + kw {
                     g.line(cx + cw, row_y, cx + cw, row_y + gm.row_h - 1, grid_c);
                 }
-                cx += cw;
             }
             if t.grid {
                 g.line(body_x, row_y + gm.row_h - 1, body_x + body_w - 1, row_y + gm.row_h - 1, grid_c);
             }
+        }
+        if gm.frozen > 0 {
+            let fx = body_x + gm.frozen_w;
+            g.line(fx, body_y, fx, body_y + body_h - 1, accent);
         }
         g.pop_clip();
 

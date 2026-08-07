@@ -353,3 +353,78 @@ def test_negative_spalte_beim_freigeben_wird_gemeldet(run_gb, tmp_path):
     import pytest as _pt
     with _pt.raises(GBRuntimeError, match="negativ"):
         run_gb(_tabelle([("Anna", 1)], 'GUI_TABLE_COL_EDIT(t, -1, TRUE)'), base=tmp_path)
+
+
+# ------------------------------------------- Mehrfachauswahl + feste Spalten
+
+def test_ohne_mehrfachauswahl_bleibt_es_bei_einer_zeile(run_gb, tmp_path):
+    """Vorhandener Code, der nur GUI_TABLE_SELECTED kennt, muss unveraendert
+    laufen -- deshalb ist die Mehrfachauswahl aus, bis man sie einschaltet."""
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2)], '''
+GUI_TABLE_SET_SELECTED(t, 1)
+PRINT STR$(GUI_TABLE_SEL_COUNT(t)) + " " + STR$(GUI_TABLE_SEL_ROW(t, 0))
+PRINT STR$(GUI_TABLE_IS_SELECTED(t, 0)) + " " + STR$(GUI_TABLE_IS_SELECTED(t, 1))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "1 1", out
+    assert z[1] == "FALSE TRUE", out
+
+
+def test_einschalten_uebernimmt_die_bisherige_auswahl(run_gb, tmp_path):
+    """Sonst waere die gewaehlte Zeile nach dem Umschalten ploetzlich weg."""
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2)], '''
+GUI_TABLE_SET_SELECTED(t, 1)
+GUI_TABLE_SET(t, "mehrfachauswahl", 1)
+PRINT STR$(GUI_TABLE_SEL_COUNT(t)) + " " + STR$(GUI_TABLE_SEL_ROW(t, 0))
+'''), base=tmp_path)
+    assert out.strip() == "1 1", out
+
+
+def test_mehrere_zeilen_waehlen_und_wieder_abwaehlen(run_gb, tmp_path):
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2), ("Cleo", 3)], '''
+GUI_TABLE_SET(t, "mehrfachauswahl", 1)
+GUI_TABLE_SELECT(t, 0, TRUE)
+GUI_TABLE_SELECT(t, 2, TRUE)
+PRINT STR$(GUI_TABLE_SEL_COUNT(t))
+PRINT STR$(GUI_TABLE_IS_SELECTED(t, 1))
+GUI_TABLE_SELECT(t, 0, FALSE)
+PRINT STR$(GUI_TABLE_SEL_COUNT(t)) + " " + STR$(GUI_TABLE_SEL_ROW(t, 0))
+GUI_TABLE_CLEAR_SELECTION(t)
+PRINT STR$(GUI_TABLE_SEL_COUNT(t)) + " " + STR$(GUI_TABLE_SELECTED(t))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "2", out
+    assert z[1] == "FALSE", out
+    assert z[2] == "1 2", out
+    assert z[3] == "0 -1", out
+
+
+def test_zeile_loeschen_zieht_die_ganze_auswahl_mit(run_gb, tmp_path):
+    """Alle Indizes hinter der geloeschten ruecken auf. Ohne das zeigte die
+    Auswahl danach auf voellig andere Zeilen."""
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2), ("Cleo", 3)], '''
+GUI_TABLE_SET(t, "mehrfachauswahl", 1)
+GUI_TABLE_SELECT(t, 1, TRUE)
+GUI_TABLE_SELECT(t, 2, TRUE)
+GUI_TABLE_REMOVE_ROW(t, 0)
+DIM s AS STRING : s = ""
+DIM i AS INTEGER
+FOR i = 0 TO GUI_TABLE_SEL_COUNT(t) - 1
+    s = s + GUI_TABLE_GET_CELL(t, GUI_TABLE_SEL_ROW(t, i), 0) + " "
+NEXT
+PRINT TRIM$(s)
+'''), base=tmp_path)
+    assert out.strip() == "Bruno Cleo", out    # dieselben Eintraege wie vorher
+
+
+def test_feste_spalten_werden_gedeckelt(run_gb, tmp_path):
+    """Mehr feste Spalten als vorhanden waeren ein leerer Scrollbereich."""
+    out = run_gb(_tabelle([("Anna", 1)], '''
+GUI_TABLE_SET(t, "feste_spalten", 99)
+PRINT STR$(GUI_TABLE_GET(t, "feste_spalten"))
+GUI_TABLE_SET(t, "feste_spalten", -3)
+PRINT STR$(GUI_TABLE_GET(t, "feste_spalten"))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0].startswith("99"), out    # gemerkt wird der Wunsch ...
+    assert z[1].startswith("0"), out     # ... negativ wird auf 0 geklemmt

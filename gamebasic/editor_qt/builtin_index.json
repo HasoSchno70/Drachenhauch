@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1289,
+ "count": 1294,
  "builtins": [
   {
    "name": "ABS",
@@ -2895,6 +2895,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_CLEAR_SELECTION",
+   "kind": "module",
+   "signature": "GUI_TABLE_CLEAR_SELECTION(tbl)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_CLICKED",
    "kind": "core",
    "signature": "GUI_TABLE_CLICKED(wdg)",
@@ -2973,6 +2979,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_IS_SELECTED",
+   "kind": "module",
+   "signature": "GUI_TABLE_IS_SELECTED(tbl, zeile) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_REMOVE_ROW",
    "kind": "module",
    "signature": "GUI_TABLE_REMOVE_ROW(tbl, zeile)",
@@ -2997,9 +3009,27 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_SELECT",
+   "kind": "module",
+   "signature": "GUI_TABLE_SELECT(tbl, zeile, an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_SELECTED",
    "kind": "core",
    "signature": "GUI_TABLE_SELECTED(wdg)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SEL_COUNT",
+   "kind": "module",
+   "signature": "GUI_TABLE_SEL_COUNT(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SEL_ROW",
+   "kind": "module",
+   "signature": "GUI_TABLE_SEL_ROW(tbl, i) AS INTEGER",
    "module": "gui"
   },
   {

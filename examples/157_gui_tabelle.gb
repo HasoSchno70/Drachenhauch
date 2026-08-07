@@ -19,6 +19,11 @@
 '      schlimmer als gar keine Bearbeitung.
 '    * HAKEN anklicken -> schaltet um (die Tabelle macht das selbst).
 '    * KNOPF anklicken -> GUI_TABLE_CLICKED_COL sagt, welche Spalte.
+'    * WAAGERECHT SCROLLEN (Leiste unten) -> Symbol und Name bleiben stehen,
+'      der Rest wandert. Eine helle Kante zeigt, wo der feste Block endet.
+'    * STRG+KLICK waehlt eine Zeile dazu/ab, UMSCHALT+KLICK den ganzen
+'      Bereich ab der zuletzt angeklickten -- in der SICHTBAREN Reihenfolge,
+'      denn das ist es, was man zwischen beiden Klicks sieht.
 '    * Mausrad / Bildlaufleisten -> scrollen.
 '
 '  Wichtig: Zeilennummern nach aussen sind immer DATENzeilen. Sortieren
@@ -58,10 +63,13 @@ DIM t AS GUI_WIDGET
 t = GUI_TABLE(win, 20, 20, 1060, 500)
 
 DIM kopf AS ARRAY OF STRING
-kopf = SPLIT$("|Name|Ort|Spieler|Auslastung|Favorit|Aktion", "|")
+kopf = SPLIT$("|Name|Ort|Spieler|Auslastung|Favorit|Aktion|Ping", "|")
 GUI_TABLE_HEADERS(t, kopf)
 DIM breiten AS ARRAY OF INTEGER
-breiten = [56, 230, 170, 110, 220, 90, 150]
+breiten = [56, 230, 200, 110, 220, 90, 150, 120]
+' Zusammen breiter als die Tabelle -> sie scrollt waagerecht. Hinten steht
+' bewusst eine schlichte Textspalte: beim Scrollen wird IMMER die letzte
+' Spalte angeschnitten, und ein halber Knopf sieht kaputt aus.
 GUI_TABLE_COL_WIDTHS(t, breiten)
 
 GUI_TABLE_SET(t, "zeilenhoehe", 38)      ' Bilder brauchen Platz
@@ -70,9 +78,12 @@ GUI_TABLE_SET(t, "filterzeile", 1)
 GUI_TABLE_SET(t, "zebra", 1)
 GUI_TABLE_COL_ALIGN(t, 0, "mitte")
 GUI_TABLE_COL_ALIGN(t, 3, "rechts")
+GUI_TABLE_COL_ALIGN(t, 7, "rechts")
 GUI_TABLE_COL_ALIGN(t, 5, "mitte")
 GUI_TABLE_COL_EDIT(t, 1, TRUE)           ' Name und Ort per Doppelklick aendern
 GUI_TABLE_COL_EDIT(t, 2, TRUE)
+GUI_TABLE_SET(t, "feste_spalten", 2)     ' Symbol + Name bleiben beim Scrollen stehen
+GUI_TABLE_SET(t, "mehrfachauswahl", 1)
 
 ' --- Daten -----------------------------------------------------------------
 DIM roh AS ARRAY OF STRING
@@ -94,7 +105,8 @@ FOR i = 0 TO roh.length() - 1
     DIM last AS FLOAT : last = VAL(feld[3])
 
     DIM z AS ARRAY OF STRING
-    z = SPLIT$("|" + feld[0] + "|" + feld[1] + "|" + feld[2] + "||" + "|Verbinden", "|")
+    z = SPLIT$("|" + feld[0] + "|" + feld[1] + "|" + feld[2] + "||" + "|Verbinden|" + _
+               STR$(12 + i * 7) + " ms", "|")
     GUI_TABLE_ADD_ROW(t, z)
 
     ' Spalte 0: Ampel-Bild nach Auslastung
@@ -128,7 +140,7 @@ NEXT
 GUI_TABLE_SORT(t, 3, TRUE)               ' anfangs nach Spielern absteigend
 
 DIM stand AS GUI_WIDGET
-stand = GUI_LABEL(win, "Kopf klicken = sortieren | Filterzeile tippen | Spaltenkante ziehen | Doppelklick auf Name/Ort = bearbeiten", 20, 532)
+stand = GUI_LABEL(win, "Kopf = sortieren | Filterzeile tippen | Kante ziehen | Doppelklick = bearbeiten | Strg/Umschalt+Klick = mehrere", 20, 532)
 DIM zahl AS GUI_WIDGET
 zahl = GUI_LABEL(win, "", 20, 560)
 
@@ -148,7 +160,7 @@ WHILE NOT QUITREQUESTED()
             CASE 6
                 was = "Verbinden gedrueckt"
             CASE ELSE
-                was = "ausgewaehlt"
+                was = "ausgewaehlt (" + STR$(GUI_TABLE_SEL_COUNT(t)) + " Zeilen)"
         END SELECT
         GUI_SET_TEXT(stand, GUI_TABLE_GET_CELL(t, r, 1) + " -- " + was + _
                      "  (Datenzeile " + STR$(r) + ", Spalte " + STR$(c) + ")")
