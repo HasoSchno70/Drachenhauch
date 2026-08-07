@@ -541,10 +541,18 @@ WHILE NOT QUITREQUESTED()
             LINE(cx + 2, mitte, cx + cw - 2, mitte, &H30455A)
         END IF
 
+        ' Nicht jeden Bildpunkt: auf einem 2560er Schirm waren das 2500
+        ' LINEW-Aufrufe je Bild = gemessene 5,4 ms von 16,7 ms Bildbudget.
+        ' Jeder Aussetzer liess damit ein Bild fallen -> sichtbares Zucken.
+        ' Mit ~700 Stuetzpunkten bleibt die Kurve gleich glatt und kostet
+        ' 1,9 ms. In kleinen Fenstern ist die Schrittweite von selbst 1.
+        DIM schritt AS INTEGER : schritt = MAX(1, cw \ 700)
+        DIM flanke AS INTEGER : flanke = ch \ 4      ' ab hier: echte Flanke
+        DIM fuellen AS BOOLEAN : fuellen = GUI_CHECKED(tFuellen)
         DIM px AS INTEGER
         DIM vy AS INTEGER : vy = mitte
         DIM voriges AS INTEGER : voriges = mitte
-        FOR px = 2 TO cw - 3
+        FOR px = 2 TO cw - 3 STEP schritt
             DIM t AS FLOAT
             t = (px / cw) * 6.2831853 * frq * zoom + phs
             DIM v AS FLOAT
@@ -556,11 +564,19 @@ WHILE NOT QUITREQUESTED()
                 CASE ELSE
                     v = SIN(t)                                     ' Sinus
             END SELECT
-            vy = mitte - INT(v * amp * (ch \ 2 - 8))
-            IF GUI_CHECKED(tFuellen) THEN
-                LINE(cx + px, mitte, cx + px, vy, &H15384A)
+            ' ROUND, nicht INT: INT rundet AB, die Kurve saesse sonst
+            ' durchgehend einen halben Punkt zu tief.
+            vy = mitte - ROUND(v * amp * (ch \ 2 - 8))
+            IF fuellen THEN LINE(cx + px, mitte, cx + px, vy, &H15384A)
+            IF px > 2 THEN
+                IF ABS(vy - voriges) > flanke THEN
+                    ' Rechteck/Saegezahn springen: senkrecht zeichnen, sonst
+                    ' waere die Flanke bei Schrittweite > 1 eine Schraege.
+                    LINEW(cx + px, voriges, cx + px, vy, breite, &H2BC4E8)
+                ELSE
+                    LINEW(cx + px - schritt, voriges, cx + px, vy, breite, &H2BC4E8)
+                END IF
             END IF
-            IF px > 2 THEN LINEW(cx + px - 1, voriges, cx + px, vy, breite, &H2BC4E8)
             voriges = vy
         NEXT
     END IF
