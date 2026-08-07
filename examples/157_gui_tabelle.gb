@@ -1,0 +1,157 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: die Tabelle in voller Ausbaustufe
+' ============================================================
+'  Eine Zelle ist mehr als Text. Jede traegt eigene Farben, eine
+'  Ausrichtung und eine ART:
+'      text | bild | haken | balken | knopf
+'
+'  Zum Ausprobieren:
+'    * KOPFZEILE anklicken  -> sortiert (nochmal = andere Richtung).
+'      Zahlenspalten werden zahlenweise sortiert, nicht als Text --
+'      sonst stuende 100 vor 9.
+'    * FILTERZEILE darunter anklicken und tippen -> filtert die Spalte
+'      (Teiltext, Gross-/Kleinschreibung egal). ESC beendet die Eingabe.
+'    * SPALTENKANTE im Kopf ziehen -> Spaltenbreite aendern.
+'    * HAKEN anklicken -> schaltet um (die Tabelle macht das selbst).
+'    * KNOPF anklicken -> GUI_TABLE_CLICKED_COL sagt, welche Spalte.
+'    * Mausrad / Bildlaufleisten -> scrollen.
+'
+'  Wichtig: Zeilennummern nach aussen sind immer DATENzeilen. Sortieren
+'  und Filtern stellen die Daten NICHT um, sie bauen nur eine Ansicht --
+'  eine gemerkte Zeilennummer zeigt also weiter auf denselben Eintrag.
+'  Ueber GUI_TABLE_VIEW_COUNT/VIEW_ROW geht man die Tabelle in der
+'  SICHTBAREN Reihenfolge durch.
+'
+'  [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+SCREEN(1180, 720, "GameBasic - Tabelle", 1)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+
+' --- kleine Bilder fuer die erste Spalte (keine Dateien noetig) -------------
+DIM icOk AS INTEGER   : icOk   = GENTEX_COLOR(24, 24, &H4BE87A)
+DIM icWarn AS INTEGER : icWarn = GENTEX_COLOR(24, 24, &HE8B44B)
+DIM icBad AS INTEGER  : icBad  = GENTEX_COLOR(24, 24, &HE85B5B)
+
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Serverliste", (SW - 1100) \ 2, 40, 1100, 620)
+
+DIM t AS GUI_WIDGET
+t = GUI_TABLE(win, 20, 20, 1060, 500)
+
+DIM kopf AS ARRAY OF STRING
+kopf = SPLIT$("|Name|Ort|Spieler|Auslastung|Favorit|Aktion", "|")
+GUI_TABLE_HEADERS(t, kopf)
+DIM breiten AS ARRAY OF INTEGER
+breiten = [56, 230, 170, 110, 220, 90, 150]
+GUI_TABLE_COL_WIDTHS(t, breiten)
+
+GUI_TABLE_SET(t, "zeilenhoehe", 38)      ' Bilder brauchen Platz
+GUI_TABLE_SET(t, "kopfhoehe", 26)
+GUI_TABLE_SET(t, "filterzeile", 1)
+GUI_TABLE_SET(t, "zebra", 1)
+GUI_TABLE_COL_ALIGN(t, 0, "mitte")
+GUI_TABLE_COL_ALIGN(t, 3, "rechts")
+GUI_TABLE_COL_ALIGN(t, 5, "mitte")
+
+' --- Daten -----------------------------------------------------------------
+DIM roh AS ARRAY OF STRING
+roh = SPLIT$( _
+  "Nordwind|Hamburg|128|0.92;" + _
+  "Suedlicht|Muenchen|47|0.31;" + _
+  "Ostwall|Dresden|9|0.07;" + _
+  "Westhafen|Koeln|203|0.99;" + _
+  "Mittelfeld|Kassel|88|0.55;" + _
+  "Seeblick|Rostock|14|0.11;" + _
+  "Talgrund|Freiburg|66|0.44;" + _
+  "Hochland|Garmisch|151|0.81;" + _
+  "Altstadt|Regensburg|32|0.24;" + _
+  "Neuland|Potsdam|119|0.74", ";")
+
+DIM i AS INTEGER
+FOR i = 0 TO roh.length() - 1
+    DIM feld AS ARRAY OF STRING : feld = SPLIT$(roh[i], "|")
+    DIM last AS FLOAT : last = VAL(feld[3])
+
+    DIM z AS ARRAY OF STRING
+    z = SPLIT$("|" + feld[0] + "|" + feld[1] + "|" + feld[2] + "||" + "|Verbinden", "|")
+    GUI_TABLE_ADD_ROW(t, z)
+
+    ' Spalte 0: Ampel-Bild nach Auslastung
+    DIM ic AS INTEGER
+    IF last >= 0.85 THEN
+        ic = icBad
+    ELIF last >= 0.5 THEN
+        ic = icWarn
+    ELSE
+        ic = icOk
+    END IF
+    GUI_TABLE_CELL_IMAGE(t, i, 0, ic)
+
+    ' Spalte 4: Balken mit Beschriftung, Farbe nach Auslastung
+    GUI_TABLE_CELL_KIND(t, i, 4, "balken")
+    GUI_TABLE_CELL_VALUE(t, i, 4, last)
+    GUI_TABLE_SET_CELL(t, i, 4, STR$(INT(last * 100)) + " %")
+    IF last >= 0.85 THEN GUI_TABLE_CELL_COLOR(t, i, 4, &HE85B5B, -1)
+
+    ' Spalte 5: Haken -- klickbar, die Tabelle schaltet selbst um
+    GUI_TABLE_CELL_KIND(t, i, 5, "haken")
+    GUI_TABLE_CELL_VALUE(t, i, 5, IIF(i MOD 4 = 0, 1.0, 0.0))
+
+    ' Spalte 6: Knopf
+    GUI_TABLE_CELL_KIND(t, i, 6, "knopf")
+
+    ' Volle Server hervorheben -- eine ganze Zeile mit EINEM Aufruf
+    IF last >= 0.95 THEN GUI_TABLE_ROW_COLOR(t, i, &HFFC8C8, &H3A1A1A)
+NEXT
+
+GUI_TABLE_SORT(t, 3, TRUE)               ' anfangs nach Spielern absteigend
+
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "Kopfzeile klicken = sortieren | Filterzeile anklicken und tippen | Spaltenkante ziehen", 20, 532)
+DIM zahl AS GUI_WIDGET
+zahl = GUI_LABEL(win, "", 20, 560)
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    GUI_UPDATE()
+
+    IF GUI_TABLE_CLICKED(t) >= 0 THEN
+        DIM r AS INTEGER : r = GUI_TABLE_SELECTED(t)
+        DIM c AS INTEGER : c = GUI_TABLE_CLICKED_COL(t)
+        DIM was AS STRING
+        SELECT CASE c
+            CASE 5
+                was = "Favorit ist jetzt " + IIF(GUI_TABLE_GET_VALUE(t, r, 5) >= 0.5, "gesetzt", "weg")
+            CASE 6
+                was = "Verbinden gedrueckt"
+            CASE ELSE
+                was = "ausgewaehlt"
+        END SELECT
+        GUI_SET_TEXT(stand, GUI_TABLE_GET_CELL(t, r, 1) + " -- " + was + _
+                     "  (Datenzeile " + STR$(r) + ", Spalte " + STR$(c) + ")")
+    END IF
+
+    GUI_SET_TEXT(zahl, "sichtbar: " + STR$(GUI_TABLE_VIEW_COUNT(t)) + " von " + _
+                 STR$(GUI_TABLE_ROW_COUNT(t)) + "   sortiert nach Spalte " + _
+                 STR$(GUI_TABLE_SORT_COL(t)) + _
+                 IIF(GUI_TABLE_SORT_DESC(t), " (absteigend)", " (aufsteigend)"))
+
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
+    TEXT(20, 12, "Tabelle: Zellen mit Bild, Balken, Haken und Knopf -- sortierbar, filterbar, Spalten ziehbar | [ESC] Ende", &H8FA6BC)
+    GUI_DRAW()
+    FLIP()
+WEND

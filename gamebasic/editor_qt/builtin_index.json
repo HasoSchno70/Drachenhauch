@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1279,
+ "count": 1286,
  "builtins": [
   {
    "name": "ABS",
@@ -2919,6 +2919,12 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_FILTER",
+   "kind": "module",
+   "signature": "GUI_TABLE_FILTER(tbl, spalte, text$)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_GET",
    "kind": "module",
    "signature": "GUI_TABLE_GET(tbl, schluessel$) AS FLOAT",
@@ -2928,6 +2934,12 @@
    "name": "GUI_TABLE_GET_CELL",
    "kind": "module",
    "signature": "GUI_TABLE_GET_CELL(tbl, zeile, spalte) AS STRING",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_GET_FILTER",
+   "kind": "module",
+   "signature": "GUI_TABLE_GET_FILTER(tbl, spalte) AS STRING",
    "module": "gui"
   },
   {
@@ -2988,6 +3000,36 @@
    "name": "GUI_TABLE_SET_SELECTED",
    "kind": "core",
    "signature": "GUI_TABLE_SET_SELECTED(wdg, row)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SORT",
+   "kind": "module",
+   "signature": "GUI_TABLE_SORT(tbl, spalte, absteigend)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SORT_COL",
+   "kind": "module",
+   "signature": "GUI_TABLE_SORT_COL(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_SORT_DESC",
+   "kind": "module",
+   "signature": "GUI_TABLE_SORT_DESC(tbl) AS BOOLEAN",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_VIEW_COUNT",
+   "kind": "module",
+   "signature": "GUI_TABLE_VIEW_COUNT(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_VIEW_ROW",
+   "kind": "module",
+   "signature": "GUI_TABLE_VIEW_ROW(tbl, i) AS INTEGER",
    "module": "gui"
   },
   {

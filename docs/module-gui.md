@@ -451,7 +451,7 @@ tbl = GUI_TABLE(win, 10, 40, 280, 160, headers, cells)
 | Built-in | Wirkung |
 |---|---|
 | `GUI_TABLE_HEADERS(tbl, headers)` | Spaltentitel (1D `ARRAY OF STRING`) |
-| `GUI_TABLE_ROWS(tbl, cells)` | Datenzeilen (2D `ARRAY OF STRING`); Spaltenzahl muss zu den Headern passen |
+| `GUI_TABLE_ROWS(tbl, cells)` | Datenzeilen (2D `ARRAY OF STRING`); Zeilen dürfen kürzer oder länger sein als der Kopf |
 | `GUI_TABLE_COL_WIDTHS(tbl, widths)` | Pixelbreite pro Spalte (1D `ARRAY OF INTEGER`); `NIL` = gleichmäßig verteilen |
 
 **Bedienung & Polling:**
@@ -464,10 +464,131 @@ tbl = GUI_TABLE(win, 10, 40, 280, 160, headers, cells)
 | `GUI_TABLE_ROW_COUNT(tbl)` | Anzahl Datenzeilen |
 
 **Verhalten:**
-- Kopfzeile (22 px) ist fixiert; der Body scrollt je nach Inhalt.
+- Kopfzeile ist fixiert; der Body scrollt je nach Inhalt.
 - **Mausrad** scrollt vertikal (über dem Body), **Scrollbalken-Drag** auf beiden Achsen.
 - Klick auf eine Zeile **selektiert** sie persistent (zweites Highlight unter dem Hover).
 - Schrumpfen die Daten unter den selektierten Index, fällt die Selektion auf -1.
+
+### Die Spaltenzahl ist frei
+
+Sie ergibt sich aus der **breitesten Angabe**: kürzere Zeilen als der Kopf sind
+einfach leer, längere erweitern die Tabelle (der Kopf bekommt dann leere Titel).
+Es gibt keine Reihenfolge, die man einhalten müsste — Zeilen vor dem Kopf zu
+setzen ist genauso in Ordnung wie umgekehrt.
+
+### Zellen: mehr als Text
+
+Jede Zelle trägt Text, eigene **Vorder- und Hintergrundfarbe**, eine
+**Ausrichtung** und eine **Art**:
+
+| Art | Was gezeichnet wird |
+|---|---|
+| `text` | der Text (Vorgabe) |
+| `bild` | ein IMAGE, in die Zelle eingepasst (Seitenverhältnis bleibt) |
+| `haken` | Ankreuzfeld — **Klick schaltet um**, die Tabelle macht das selbst |
+| `balken` | Fortschrittsbalken (`wert` 0..1), der Text liegt mittig darauf |
+| `knopf` | Schaltfläche; welche Spalte getroffen wurde, sagt `GUI_TABLE_CLICKED_COL` |
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_SET_CELL(tbl, zeile, spalte, text$)` | Zellinhalt |
+| `GUI_TABLE_GET_CELL(tbl, zeile, spalte)` | Zellinhalt lesen |
+| `GUI_TABLE_CELL_COLOR(tbl, z, s, vordergrund, hintergrund)` | Farben; `-1` = nicht gesetzt |
+| `GUI_TABLE_CELL_ALIGN(tbl, z, s, "links"/"mitte"/"rechts")` | Ausrichtung dieser Zelle |
+| `GUI_TABLE_CELL_KIND(tbl, z, s, art$)` | Art (siehe Tabelle oben) |
+| `GUI_TABLE_CELL_IMAGE(tbl, z, s, bild)` | Bild setzen (setzt die Art gleich mit) |
+| `GUI_TABLE_CELL_VALUE(tbl, z, s, wert)` / `GUI_TABLE_GET_VALUE(...)` | Haken (0/1) bzw. Balken (0..1) |
+| `GUI_TABLE_ROW_COLOR(tbl, zeile, vg, hg)` | ganze Zeile färben — **ein** Aufruf statt einer je Spalte |
+| `GUI_TABLE_COL_ALIGN(tbl, spalte, wie$)` | Ausrichtung der ganzen Spalte |
+
+**Farben in drei Stufen:** Zelle → Zeile → Zebra. `-1` heißt „nicht gesetzt"
+und reicht an die nächste Stufe weiter — so färbt man mit einem Aufruf eine
+ganze Zeile und lässt trotzdem einzelne Zellen ausscheren. Auswahl und Hover
+liegen **halbdurchsichtig darüber**: eine eigene Zellfarbe deckt sie nicht zu.
+
+### Zeilen einzeln pflegen
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_ADD_ROW(tbl, zellen)` | Zeile anhängen → neuer Zeilenindex |
+| `GUI_TABLE_REMOVE_ROW(tbl, zeile)` | Zeile entfernen (die Auswahl rutscht mit) |
+| `GUI_TABLE_CLEAR(tbl)` | alle Zeilen weg |
+
+### Sortieren
+
+Ein **Klick auf die Kopfzelle** sortiert, ein zweiter dreht die Richtung um; ein
+kleiner Pfeil zeigt an, wonach gerade sortiert ist. Sortiert wird
+**zahlenweise**, wenn beide Zellen als Zahl lesbar sind, sonst textweise — ohne
+das stünde `100` vor `9`.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_SORT(tbl, spalte, absteigend)` | programmgesteuert; Spalte `< 0` hebt die Sortierung auf |
+| `GUI_TABLE_SORT_COL(tbl)` / `GUI_TABLE_SORT_DESC(tbl)` | aktuelle Sortierung lesen |
+
+### Filtern
+
+`GUI_TABLE_SET(tbl, "filterzeile", 1)` blendet unter dem Kopf eine Zeile mit
+einem kleinen Eingabefeld je Spalte ein. Hineinklicken und tippen filtert die
+Spalte nach **Teiltext**, Groß-/Kleinschreibung egal; `ESC` oder `Enter`
+beendet die Eingabe. Mehrere Spalten wirken zusammen (UND).
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_FILTER(tbl, spalte, text$)` | Filter setzen (leerer Text = kein Filter) |
+| `GUI_TABLE_GET_FILTER(tbl, spalte)` | gesetzten Filter lesen |
+
+### Zeilennummern: Daten oder Ansicht?
+
+**Alle Zeilenangaben nach außen sind DATENzeilen.** Sortieren und Filtern
+stellen die Daten nicht um, sie bauen nur eine Ansicht darüber — eine
+Zeilennummer, die dein Programm sich gemerkt hat, zeigt also weiter auf
+denselben Eintrag. (Würde stattdessen sortiert werden, zeigte jede gemerkte
+Nummer nach dem ersten Kopfklick auf etwas anderes.)
+
+Um die Tabelle in der **sichtbaren** Reihenfolge durchzugehen:
+
+```basic
+DIM i AS INTEGER
+FOR i = 0 TO GUI_TABLE_VIEW_COUNT(tbl) - 1
+    DIM r AS INTEGER : r = GUI_TABLE_VIEW_ROW(tbl, i)   ' -> Datenzeile
+    PRINT GUI_TABLE_GET_CELL(tbl, r, 0)
+NEXT
+```
+
+### Aussehen und Verhalten einstellen
+
+Ein Setter mit Schlüsselwort statt einem Built-in je Schalter (wie bei
+`chart`); ein unbekannter Schlüssel zählt die gültigen auf.
+
+```basic
+GUI_TABLE_SET(tbl, "zeilenhoehe", 38)    ' Bilder brauchen Platz
+GUI_TABLE_SET(tbl, "kopfhoehe", 26)
+GUI_TABLE_SET(tbl, "zebra", 1)
+GUI_TABLE_SET(tbl, "gitter", 0)
+GUI_TABLE_SET(tbl, "filterzeile", 1)
+GUI_TABLE_SET(tbl, "sortierbar", 0)         ' Kopfklick sortiert nicht mehr
+GUI_TABLE_SET(tbl, "spalten_ziehbar", 0)    ' Spaltenkante nicht mehr ziehbar
+PRINT GUI_TABLE_GET(tbl, "spalten")         ' Spaltenzahl
+```
+
+**Spaltenbreiten mit der Maus:** die Kante zwischen zwei Kopfzellen lässt sich
+ziehen (Fangbereich ±4 px). Beim ersten Zug übernimmt die Tabelle die bis dahin
+errechneten Breiten als eigene Werte — sonst spränge sie beim Loslassen zurück.
+
+### Speichern
+
+`.gbform` bleibt lesbar: eine schlichte Textzelle wird weiterhin als **String**
+geschrieben, nur eine mit Farbe/Art/Bild als Objekt. Beide Formen werden
+gelesen, ältere Dateien laufen unverändert.
+
+> **Zum Anschauen:** [examples/157_gui_tabelle.gb](../examples/157_gui_tabelle.gb)
+> — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
+> Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
+
+**Nicht umgesetzt** (bewusst): Zellen direkt in der Tabelle bearbeiten,
+Mehrfach-Auswahl, feste (mitscrollende) Spalten, Spalten umsortieren,
+Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
 

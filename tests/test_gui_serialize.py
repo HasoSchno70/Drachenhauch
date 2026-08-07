@@ -225,3 +225,107 @@ DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
 DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 5, 5, 280, 150)
 GUI_TABLE_SET(t, "gibtsnicht", 1)
 ''', base=tmp_path)
+
+
+# ------------------------------------------------------- Sortieren + Filtern
+
+def _tabelle(zeilen, rest):
+    """Kleines Geruest: Kopf 'Name|Punkte', danach die Zeilen, dann `rest`."""
+    add = "\n".join(
+        f'z = SPLIT$("{a}|{b}", "|") : GUI_TABLE_ADD_ROW(t, z)' for a, b in zeilen)
+    return f'''
+IMPORT "gui"
+DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 400, 300)
+DIM t AS GUI_WIDGET : t = GUI_TABLE(w, 10, 10, 360, 200)
+DIM k AS ARRAY OF STRING : k = SPLIT$("Name|Punkte", "|")
+GUI_TABLE_HEADERS(t, k)
+DIM z AS ARRAY OF STRING
+{add}
+SUB zeig()
+    DIM s AS STRING : s = ""
+    DIM i AS INTEGER
+    FOR i = 0 TO GUI_TABLE_VIEW_COUNT(t) - 1
+        s = s + GUI_TABLE_GET_CELL(t, GUI_TABLE_VIEW_ROW(t, i), 0) + " "
+    NEXT
+    PRINT TRIM$(s)
+END SUB
+{rest}
+'''
+
+
+def test_zahlenspalte_wird_zahlenweise_sortiert(run_gb, tmp_path):
+    """Textweise stuende 100 vor 9 -- in einer Punktespalte die haeufigste
+    Enttaeuschung an einer Tabelle."""
+    out = run_gb(_tabelle([("Cleo", 9), ("Anna", 10), ("Bruno", 100)],
+                          'GUI_TABLE_SORT(t, 1, FALSE)\nzeig()'), base=tmp_path)
+    assert out.strip() == "Cleo Anna Bruno", out
+
+
+def test_textspalte_sortiert_ohne_ruecksicht_auf_schreibweise(run_gb, tmp_path):
+    out = run_gb(_tabelle([("bruno", 1), ("Anna", 2), ("cleo", 3)],
+                          'GUI_TABLE_SORT(t, 0, FALSE)\nzeig()'), base=tmp_path)
+    assert out.strip() == "Anna bruno cleo", out
+
+
+def test_sortierung_stellt_die_daten_nicht_um(run_gb, tmp_path):
+    """Der entscheidende Punkt: eine gemerkte Zeilennummer muss nach dem
+    Sortieren noch auf denselben Eintrag zeigen. Wuerden die Daten selbst
+    umgestellt, zeigte sie auf etwas anderes."""
+    out = run_gb(_tabelle([("Cleo", 9), ("Anna", 10), ("Bruno", 100)], '''
+PRINT GUI_TABLE_GET_CELL(t, 0, 0)
+GUI_TABLE_SORT(t, 0, FALSE)
+PRINT GUI_TABLE_GET_CELL(t, 0, 0)
+PRINT STR$(GUI_TABLE_VIEW_ROW(t, 0))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "Cleo" and z[1] == "Cleo", out   # Datenzeile 0 bleibt Cleo
+    assert z[2] == "1", out                          # oben steht jetzt Anna (Datenzeile 1)
+
+
+def test_filter_wirkt_als_teiltext_und_kombiniert(run_gb, tmp_path):
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2), ("Cleo", 3)], '''
+GUI_TABLE_FILTER(t, 0, "o")
+zeig()
+PRINT STR$(GUI_TABLE_VIEW_COUNT(t)) + "/" + STR$(GUI_TABLE_ROW_COUNT(t))
+GUI_TABLE_FILTER(t, 1, "3")
+zeig()
+GUI_TABLE_FILTER(t, 0, "")
+GUI_TABLE_FILTER(t, 1, "")
+zeig()
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "Bruno Cleo", out       # beide enthalten "o"
+    assert z[1] == "2/3", out              # Daten bleiben vollstaendig
+    assert z[2] == "Cleo", out             # zweiter Filter wirkt zusaetzlich
+    assert z[3] == "Anna Bruno Cleo", out
+
+
+def test_filter_ignoriert_die_schreibweise(run_gb, tmp_path):
+    out = run_gb(_tabelle([("Anna", 1), ("BRUNO", 2)],
+                          'GUI_TABLE_FILTER(t, 0, "bru")\nzeig()'), base=tmp_path)
+    assert out.strip() == "BRUNO", out
+
+
+def test_sortieren_auf_ungueltige_spalte_hebt_sie_auf(run_gb, tmp_path):
+    out = run_gb(_tabelle([("Cleo", 9), ("Anna", 10)], '''
+GUI_TABLE_SORT(t, 0, FALSE)
+PRINT STR$(GUI_TABLE_SORT_COL(t))
+GUI_TABLE_SORT(t, -1, FALSE)
+PRINT STR$(GUI_TABLE_SORT_COL(t))
+zeig()
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "0" and z[1] == "-1", out
+    assert z[2] == "Cleo Anna", out        # wieder Einfuege-Reihenfolge
+
+
+def test_neue_zeile_taucht_sofort_in_der_ansicht_auf(run_gb, tmp_path):
+    """Die Ansicht wird nach jeder Datenaenderung neu gebaut -- sonst zeigte
+    eine sortierte Tabelle neue Zeilen erst nach dem naechsten Kopfklick."""
+    out = run_gb(_tabelle([("Cleo", 9)], '''
+GUI_TABLE_SORT(t, 0, FALSE)
+DIM n AS ARRAY OF STRING : n = SPLIT$("Anna|1", "|")
+GUI_TABLE_ADD_ROW(t, n)
+zeig()
+'''), base=tmp_path)
+    assert out.strip() == "Anna Cleo", out

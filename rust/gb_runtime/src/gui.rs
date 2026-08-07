@@ -38,6 +38,8 @@ const TBL_ROW_H: i32 = 20;
 const TBL_SCROLL_W: i32 = 12;
 const TBL_PADDING: i32 = 6;
 const TBL_MIN_COL_W: i32 = 40;
+const TBL_FILTER_H: i32 = 22;   // Hoehe der Filterzeile im Kopf
+const TBL_EDGE_GRAB: i32 = 4;   // Fangbereich der Spaltenkante (px)
 
 fn default_theme() -> HashMap<String, i64> {
     [
@@ -334,6 +336,33 @@ pub struct TableState {
     hover_col: i32,
     /// Spalte des letzten Klicks (-1 = keine) -- fuer Knopf-Zellen.
     clicked_col: i32,
+
+    // --- Sortierung und Filter ---------------------------------------------
+    /// Sortierspalte (-1 = unsortiert) und Richtung.
+    sort_col: i32,
+    sort_desc: bool,
+    /// Sortieren per Kopfklick erlauben.
+    sortable: bool,
+    /// Filtertext je Spalte (leer = kein Filter).
+    filters: Vec<String>,
+    /// Filterzeile unter der Kopfzeile zeigen.
+    filter_row: bool,
+    /// Welche Filterzelle die Tastatur bekommt (-1 = keine).
+    filter_focus: i32,
+    /// Spalte, deren rechte Kante gerade gezogen wird (-1 = keine).
+    drag_col: i32,
+    /// Breite dieser Spalte beim Anfassen + Maus-x -- daraus ergibt sich die
+    /// neue Breite. Ohne den Startwert wuerde die Spalte beim Anfassen an den
+    /// Mauszeiger springen.
+    drag_col_w: i32,
+    drag_col_x: i32,
+    /// Spaltenbreiten mit der Maus aendern erlauben.
+    resizable_cols: bool,
+    /// Sichtbare Zeilen als Verweis auf `rows` -- das Ergebnis von Filter und
+    /// Sortierung. Die Daten selbst werden NIE umgestellt: sonst zeigten
+    /// Zeilennummern, die das Programm sich gemerkt hat, ploetzlich auf etwas
+    /// anderes. Alle Zeilenangaben nach aussen bleiben Datenzeilen.
+    view: Vec<usize>,
 }
 
 impl Default for TableState {
@@ -345,6 +374,10 @@ impl Default for TableState {
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
+            drag_col: -1, drag_col_w: 0, drag_col_x: 0, resizable_cols: true,
+            sort_col: -1, sort_desc: false, sortable: true,
+            filters: vec![], filter_row: false, filter_focus: -1,
+            view: vec![],
         }
     }
 }
@@ -371,6 +404,67 @@ impl TableState {
     fn header(&self, c: usize) -> &str {
         self.headers.get(c).map(|s| s.as_str()).unwrap_or("")
     }
+    /// Gesamthoehe des Kopfbereichs: Titelzeile plus (wenn sichtbar) die
+    /// Filterzeile. An EINER Stelle, damit Treffertest und Zeichnen nicht
+    /// auseinander laufen.
+    fn head_total(&self) -> i32 {
+        self.header_h + if self.filter_row { TBL_FILTER_H } else { 0 }
+    }
+
+    /// Passt eine Zeile auf alle gesetzten Filter? Teilstring, ohne Ruecksicht
+    /// auf Gross-/Kleinschreibung -- ein Filter, der exakte Treffer verlangt,
+    /// waere zum Suchen unbrauchbar.
+    fn passt(&self, r: usize) -> bool {
+        for (c, f) in self.filters.iter().enumerate() {
+            if f.is_empty() { continue; }
+            let txt = self.cell(r, c).map(|x| x.text.as_str()).unwrap_or("");
+            if !txt.to_lowercase().contains(&f.to_lowercase()) { return false; }
+        }
+        true
+    }
+
+    /// `view` neu bauen: erst filtern, dann sortieren.
+    ///
+    /// Wird nach JEDER Aenderung an Daten, Filter oder Sortierung gerufen --
+    /// lieber einmal zu viel als eine Tabelle, die veraltete Zeilen zeigt.
+    /// Kein heisser Pfad: nur wenn sich wirklich etwas geaendert hat.
+    ///
+    /// Sortiert wird ZAHLENWEISE, wenn beide Zellen als Zahl lesbar sind,
+    /// sonst textweise. Ohne das stuende "10" vor "9" -- in einer
+    /// Punktespalte die haeufigste Enttaeuschung an einer Tabelle.
+    fn rebuild_view(&mut self) {
+        let mut v: Vec<usize> = (0..self.rows.len()).filter(|&r| self.passt(r)).collect();
+        if self.sort_col >= 0 {
+            let c = self.sort_col as usize;
+            let desc = self.sort_desc;
+            let rows = &self.rows;                 // nur lesend -- `v` ist lokal
+            let txt = |r: usize| -> &str {
+                rows.get(r).and_then(|row| row.get(c)).map(|x| x.text.as_str()).unwrap_or("")
+            };
+            v.sort_by(|&a, &b| {
+                let (sa, sb) = (txt(a), txt(b));
+                let ord = match (sa.trim().parse::<f64>(), sb.trim().parse::<f64>()) {
+                    (Ok(x), Ok(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
+                    _ => sa.to_lowercase().cmp(&sb.to_lowercase()),
+                };
+                if desc { ord.reverse() } else { ord }
+            });
+        }
+        self.view = v;
+    }
+
+    /// Ansichtszeile -> Datenzeile. Alle Angaben nach aussen sind DATENzeilen;
+    /// nur das Zeichnen und der Treffertest arbeiten mit der Ansicht.
+    fn data_row(&self, view_i: i32) -> i32 {
+        if view_i < 0 { return -1; }
+        self.view.get(view_i as usize).map(|&r| r as i32).unwrap_or(-1)
+    }
+    /// Datenzeile -> Ansichtszeile (-1 wenn wegefiltert).
+    fn view_of(&self, data_r: i32) -> i32 {
+        if data_r < 0 { return -1; }
+        self.view.iter().position(|&r| r as i32 == data_r).map(|i| i as i32).unwrap_or(-1)
+    }
+
     fn align_of(&self, r: usize, c: usize) -> i8 {
         let ca = *self.col_align.get(c).unwrap_or(&0);
         match self.cell(r, c) {
@@ -1028,7 +1122,9 @@ impl Gui {
         // leer. Vorher war jede Abweichung ein Fehler -- und wer die Zeilen VOR
         // dem Kopf setzte, umging die Pruefung ganz und brachte das Zeichnen
         // zum Absturz. Ueber die eine Quelle kann kein Index danebengreifen.
-        self.tbl_mut(h, "GUI_TABLE_HEADERS")?.headers = headers;
+        let t = self.tbl_mut(h, "GUI_TABLE_HEADERS")?;
+        t.headers = headers;
+        t.rebuild_view();
         Ok(())
     }
     pub fn table_set_rows(&mut self, h: i64, rows: Vec<Vec<String>>) -> Result<(), String> {
@@ -1045,6 +1141,7 @@ impl Gui {
         // Nur beim Schrumpfen, sonst waere ein periodisch aktualisiertes
         // Scoreboard nie scrollbar.
         if t.rows.len() < old_n { t.scroll_y = 0; }
+        t.rebuild_view();
         Ok(())
     }
     pub fn table_set_col_widths(&mut self, h: i64, widths: Option<Vec<i32>>) -> Result<(), String> {
@@ -1081,6 +1178,7 @@ impl Gui {
         let t = self.tbl_mut(h, "GUI_TABLE_SET_CELL")?;
         let (r, c) = Self::tbl_rc(t, r, c, "GUI_TABLE_SET_CELL")?;
         t.cell_mut(r, c).unwrap().text = text;
+        t.rebuild_view();   // Filter/Sortierung haengen am Text
         Ok(())
     }
     pub fn table_get_cell(&self, h: i64, r: i64, c: i64) -> Result<String, String> {
@@ -1169,6 +1267,7 @@ impl Gui {
         t.rows.push(zellen.into_iter().map(Cell::text).collect());
         t.row_fg.push(-1);
         t.row_bg.push(-1);
+        t.rebuild_view();
         Ok(t.rows.len() as i64 - 1)
     }
     pub fn table_remove_row(&mut self, h: i64, r: i64) -> Result<(), String> {
@@ -1184,6 +1283,7 @@ impl Gui {
         // Sonst zeigt die Auswahl danach auf eine ANDERE Zeile als vorher.
         if t.selected == r as i32 { t.selected = -1; }
         else if t.selected > r as i32 { t.selected -= 1; }
+        t.rebuild_view();
         Ok(())
     }
     pub fn table_clear(&mut self, h: i64) -> Result<(), String> {
@@ -1195,6 +1295,7 @@ impl Gui {
         t.hover_row = -1;
         t.scroll_x = 0;
         t.scroll_y = 0;
+        t.view.clear();
         Ok(())
     }
 
@@ -1212,8 +1313,12 @@ impl Gui {
             "kopfhoehe" | "header_height" => t.header_h = n.clamp(0, 200),
             "zebra" => t.zebra = n != 0,
             "gitter" | "grid" => t.grid = n != 0,
+            "filterzeile" | "filter_row" => { t.filter_row = n != 0; if n == 0 { t.filter_focus = -1; } }
+            "sortierbar" | "sortable" => t.sortable = n != 0,
+            "spalten_ziehbar" | "resizable_cols" => t.resizable_cols = n != 0,
             _ => return Err(format!(
-                "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter", key)),
+                "GUI_TABLE_SET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
+filterzeile, sortierbar, spalten_ziehbar", key)),
         }
         Ok(())
     }
@@ -1224,10 +1329,57 @@ impl Gui {
             "kopfhoehe" | "header_height" => t.header_h as f64,
             "zebra" => if t.zebra { 1.0 } else { 0.0 },
             "gitter" | "grid" => if t.grid { 1.0 } else { 0.0 },
+            "filterzeile" | "filter_row" => if t.filter_row { 1.0 } else { 0.0 },
+            "sortierbar" | "sortable" => if t.sortable { 1.0 } else { 0.0 },
+            "spalten_ziehbar" | "resizable_cols" => if t.resizable_cols { 1.0 } else { 0.0 },
             "spalten" | "columns" => t.n_cols() as f64,
             _ => return Err(format!(
-                "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, spalten", key)),
+                "GUI_TABLE_GET: '{}' unbekannt -- zeilenhoehe, kopfhoehe, zebra, gitter, \
+filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         })
+    }
+
+    // --- Sortieren und Filtern ----------------------------------------------
+
+    /// Programmgesteuert sortieren. Spalte < 0 hebt die Sortierung auf.
+    pub fn table_sort(&mut self, h: i64, col: i64, desc: bool) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_SORT")?;
+        let n = t.n_cols() as i64;
+        t.sort_col = if col >= 0 && col < n { col as i32 } else { -1 };
+        t.sort_desc = desc;
+        t.rebuild_view();
+        Ok(())
+    }
+    pub fn table_sort_col(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_SORT_COL")?.sort_col as i64)
+    }
+    pub fn table_sort_desc(&self, h: i64) -> Result<bool, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_SORT_DESC")?.sort_desc)
+    }
+    /// Filter je Spalte setzen (leerer Text = kein Filter).
+    pub fn table_filter(&mut self, h: i64, col: i64, text: String) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_FILTER")?;
+        if col < 0 { return Err("GUI_TABLE_FILTER: Spalte darf nicht negativ sein".into()); }
+        let c = col as usize;
+        while t.filters.len() <= c { t.filters.push(String::new()); }
+        t.filters[c] = text;
+        t.rebuild_view();
+        t.scroll_y = 0;
+        Ok(())
+    }
+    pub fn table_get_filter(&self, h: i64, col: i64) -> Result<String, String> {
+        let t = self.tbl_ref(h, "GUI_TABLE_GET_FILTER")?;
+        Ok(t.filters.get(col.max(0) as usize).cloned().unwrap_or_default())
+    }
+    /// Wieviele Zeilen sind nach Filter/Sortierung sichtbar?
+    pub fn table_view_count(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_VIEW_COUNT")?.view.len() as i64)
+    }
+    /// Ansichtszeile -> Datenzeile. Damit laesst sich die Tabelle in der
+    /// SICHTBAREN Reihenfolge durchgehen, ohne dass die Daten umgestellt
+    /// werden muessten.
+    pub fn table_view_row(&self, h: i64, i: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_VIEW_ROW")?.data_row(i as i32) as i64)
     }
 
     pub fn table_selected(&self, h: i64) -> Result<i64, String> {
@@ -1366,9 +1518,11 @@ impl Gui {
         let (ax, ay, ww, hh) = self.abs_rect(wi, w);
         let t = w.tbl.as_ref().unwrap();
         let n_cols = t.n_cols();
-        let n_rows = t.rows.len();
+        // SICHTBARE Zeilen -- Filter und Sortierung bestimmen, was gezeichnet
+        // und getroffen wird. Der Rest der Geometrie kennt keinen Unterschied.
+        let n_rows = t.view.len();
         let row_h = t.row_h;
-        let header_h = t.header_h;
+        let header_h = t.head_total();
         let col_widths: Vec<i32> = match &t.col_widths {
             Some(cw) if cw.len() == n_cols => cw.clone(),
             _ => {
@@ -1412,8 +1566,10 @@ impl Gui {
             t.scroll_y = (t.scroll_y - wheel as i32 * gm.row_h).clamp(0, gm.max_scroll_y);
         }
         if !t.drag_v && !t.drag_h && over {
-            let hr = (my - gm.body_y + t.scroll_y) / gm.row_h;
-            t.hover_row = if hr >= 0 && hr < gm.n_rows as i32 { hr } else { -1 };
+            let hv = (my - gm.body_y + t.scroll_y) / gm.row_h;
+            // Nach aussen ist die Datenzeile gemeint -- eine sortierte Tabelle
+            // wuerde sonst beim Hovern die falsche Zeile hervorheben.
+            t.hover_row = if hv >= 0 && hv < gm.n_rows as i32 { t.data_row(hv) } else { -1 };
         }
     }
 
@@ -1439,6 +1595,53 @@ impl Gui {
                 return;
             }
         }
+        // Klick in den Kopfbereich: sortieren bzw. Filterzelle fokussieren.
+        // Kommt VOR dem Zeilen-Treffer, sonst waere der Kopf tot.
+        let (titel_h, filter_an) = {
+            let t = self.windows[wi].widgets[idx].tbl.as_ref().unwrap();
+            (t.header_h, t.filter_row)
+        };
+        if my >= gm.ay && my < gm.ay + titel_h {
+            // Zuerst pruefen, ob die Maus auf einer SPALTENKANTE liegt --
+            // sonst wuerde jeder Griff nach der Kante die Spalte sortieren.
+            let kante = Self::edge_at(&gm, mx);
+            if kante >= 0 {
+                let breite = gm.col_widths[kante as usize];
+                let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+                if t.resizable_cols {
+                    t.drag_col = kante;
+                    t.drag_col_w = breite;
+                    t.drag_col_x = mx;
+                    t.filter_focus = -1;
+                    // Beim ersten Ziehen die berechneten Breiten festhalten,
+                    // sonst haette die Tabelle gar keine eigenen Werte zum
+                    // Aendern und spraenge beim Loslassen zurueck.
+                    if t.col_widths.is_none() { t.col_widths = Some(gm.col_widths.clone()); }
+                    self.active_table = Some((wi, idx));
+                    return;
+                }
+            }
+            let c = Self::col_at(&gm, mx);
+            let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+            t.filter_focus = -1;
+            if c >= 0 && t.sortable {
+                // Dieselbe Spalte erneut -> Richtung umdrehen. Das erwartet
+                // man von jeder Tabelle.
+                if t.sort_col == c { t.sort_desc = !t.sort_desc; }
+                else { t.sort_col = c; t.sort_desc = false; }
+                t.rebuild_view();
+            }
+            return;
+        }
+        if filter_an && my >= gm.ay + titel_h && my < gm.ay + titel_h + TBL_FILTER_H {
+            let c = Self::col_at(&gm, mx);
+            let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+            t.filter_focus = c;
+            // Das Tabellen-Widget bekommt den Tastaturfokus, damit die
+            // Eingabe hier landet und nicht in einem Textfeld daneben.
+            if c >= 0 { self.focus_widget = Some((wi, idx)); }
+            return;
+        }
         let hr = self.windows[wi].widgets[idx].tbl.as_ref().unwrap().hover_row;
         if hr >= 0 {
             // Spalte aus der x-Lage bestimmen -- ohne sie liesse sich ein
@@ -1447,6 +1650,18 @@ impl Gui {
             self.windows[wi].widgets[idx].tbl.as_mut().unwrap().hover_col = hc;
             self.table_press = Some((wi, idx, hr));
         }
+    }
+
+    /// Liegt `mx` auf der rechten Kante einer Spalte? Liefert deren Index.
+    /// Der Fangbereich ist bewusst breiter als ein Pixel -- eine Kante, die
+    /// man auf den Punkt genau treffen muss, findet niemand.
+    fn edge_at(gm: &TGeom, mx: i32) -> i32 {
+        let mut cx = gm.body_x - gm.scroll_x;
+        for (c, cw) in gm.col_widths.iter().enumerate() {
+            cx += cw;
+            if (mx - cx).abs() <= TBL_EDGE_GRAB { return c as i32; }
+        }
+        -1
     }
 
     /// Bildschirm-x -> Spaltenindex (-1 daneben). Rechnet mit derselben
@@ -1461,9 +1676,54 @@ impl Gui {
         -1
     }
 
+    /// Tippen in die fokussierte Filterzelle. Bewusst schlicht: Zeichen
+    /// anhaengen, Rueckschritt loeschen, Escape/Enter beendet die Eingabe.
+    /// Kein Cursor, keine Auswahl -- ein Filter ist ein Suchfeld, kein Editor,
+    /// und die volle Textfeld-Logik hier zu wiederholen waere ein zweiter Ort,
+    /// an dem dieselben Fehler entstehen koennen.
+    fn table_filter_keys(&mut self, wi: usize, idx: usize, g: &mut Graphics) {
+        let c = {
+            let t = match self.windows[wi].widgets[idx].tbl.as_ref() { Some(t) => t, None => return };
+            if !t.filter_row { return; }
+            t.filter_focus
+        };
+        if c < 0 { return; }
+        let mut geaendert = false;
+        let eingabe: Vec<char> = g.pop_text_input().chars().collect();
+        let rueck = g.key_repeat(KEY_BACKSPACE);
+        let raus = g.key_pressed(27) || g.key_pressed(KEY_ENTER);   // 27 = ESC
+        {
+            let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+            while t.filters.len() <= c as usize { t.filters.push(String::new()); }
+            let f = &mut t.filters[c as usize];
+            for ch in eingabe {
+                if !ch.is_control() { f.push(ch); geaendert = true; }
+            }
+            if rueck && !f.is_empty() { f.pop(); geaendert = true; }
+            if raus { t.filter_focus = -1; }
+        }
+        if geaendert {
+            let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+            t.rebuild_view();
+            // Nach dem Filtern kann die alte Scroll-Position weit hinter dem
+            // Ende liegen -- dann saehe man eine leere Tabelle.
+            t.scroll_y = 0;
+            let f = self.windows[wi].widgets[idx].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
+        }
+    }
+
     fn table_drag(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
         let gm = self.table_geom(wi, idx);
         let t = self.windows[wi].widgets[idx].tbl.as_mut().unwrap();
+        if t.drag_col >= 0 {
+            let c = t.drag_col as usize;
+            let neu = (t.drag_col_w + (mx - t.drag_col_x)).max(TBL_MIN_COL_W);
+            if let Some(cw) = t.col_widths.as_mut() {
+                if c < cw.len() { cw[c] = neu; }
+            }
+            return;
+        }
         if t.drag_v && gm.max_scroll_y > 0 {
             let track = gm.body_h;
             let handle = Self::handle_height(track, gm.body_h, gm.total_h);
@@ -2728,7 +2988,10 @@ impl Gui {
             if is_down {
                 self.table_drag(wi, i, mx, my);
             } else {
-                if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() { t.drag_v = false; t.drag_h = false; }
+                if let Some(t) = self.windows[wi].widgets[i].tbl.as_mut() {
+                    t.drag_v = false; t.drag_h = false;
+                    t.drag_col = -1;      // Spaltenbreiten-Ziehen endet hier
+                }
                 self.active_table = None;
             }
         }
@@ -2783,6 +3046,7 @@ impl Gui {
                 Kind::TextInput => self.edit_textinput(wi, i, g),
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
+                Kind::Table => self.table_filter_keys(wi, i, g),
                 _ => {}
             }
         }
@@ -4092,6 +4356,17 @@ impl Gui {
         .max(links + 2)
     }
 
+    /// Kleines Dreieck als Sortier-Anzeige. Ohne sie sieht man der Tabelle
+    /// nicht an, WONACH sie gerade sortiert ist.
+    fn sort_arrow(g: &mut Graphics, cx: i32, cy: i32, desc: bool, c: i64) {
+        // Aufsteigend zeigt der Pfeil NACH OBEN, absteigend nach unten -- so
+        // herum kennt man es von jeder Tabelle. (Erst herum: die Spitze zeigte
+        // genau falsch, was im Bild sofort auffiel.)
+        let (a, b) = if desc { (3, -2) } else { (-3, 2) };
+        g.line(cx - 4, cy + b, cx, cy + a + b, c);
+        g.line(cx, cy + a + b, cx + 4, cy + b, c);
+    }
+
     fn draw_table(&self, g: &mut Graphics, wi: usize, idx: usize) {
         let gm = self.table_geom(wi, idx);
         let wdg = &self.windows[wi].widgets[idx];
@@ -4114,6 +4389,7 @@ impl Gui {
         g.box_fill(ax, ay, ax + w - 1, ay + h - 1, bg);
         g.rect(ax, ay, ax + w - 1, ay + h - 1, border);
         if gm.header_h > 0 {
+            let titel_h = t.header_h;
             g.box_fill(ax + 1, ay + 1, ax + w - 2, ay + gm.header_h - 1, self.th("title_bg"));
             g.line(ax, ay + gm.header_h - 1, ax + w - 1, ay + gm.header_h - 1, border);
 
@@ -4124,16 +4400,45 @@ impl Gui {
                 let cw = gm.col_widths[c];
                 if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
                     let s = t.header(c).to_string();
-                    let tw = self.wtext_width(g, wdg, &s);
                     let al = *t.col_align.get(c).unwrap_or(&0);
-                    let tx = Self::align_x(cx, cw, tw, al);
-                    let ty = ay + (gm.header_h - schrift).max(0) / 2;
+                    // Platz fuer den Sortierpfeil freihalten, sonst schreibt
+                    // ein langer Titel darueber.
+                    let pfeil_platz = if t.sort_col == c as i32 { 14 } else { 0 };
+                    let tw = self.wtext_width(g, wdg, &s);
+                    let tx = Self::align_x(cx, cw - pfeil_platz, tw, al);
+                    let ty = ay + (titel_h - schrift).max(0) / 2;
                     self.wtext(g, wdg, tx, ty, s, title_fg);
+                    if t.sort_col == c as i32 {
+                        Self::sort_arrow(g, cx + cw - 11, ay + titel_h / 2, t.sort_desc, title_fg);
+                    }
                     if c < gm.n_cols - 1 {
                         g.line(cx + cw, ay + 1, cx + cw, ay + gm.header_h - 2, border);
                     }
                 }
                 cx += cw;
+            }
+            // Filterzeile: je Spalte ein kleines Eingabefeld.
+            if t.filter_row {
+                let fy = ay + titel_h;
+                let mut cx = body_x - t.scroll_x;
+                for c in 0..gm.n_cols {
+                    let cw = gm.col_widths[c];
+                    if cx + cw > ax + 1 && cx < ax + 1 + gm.body_w_raw {
+                        let fokus = t.filter_focus == c as i32;
+                        self.fbox_tief(g, cx + 2, fy + 2, cx + cw - 3, fy + TBL_FILTER_H - 3,
+                                       self.th("field_bg"),
+                                       if fokus { accent } else { self.th("field_border") });
+                        let leer = t.filters.get(c).map(|s| s.is_empty()).unwrap_or(true);
+                        let s = if leer { "Filter ...".to_string() }
+                                else { t.filters[c].clone() };
+                        let farbe = if leer { shade(title_fg, -60) } else { fg };
+                        g.push_clip(cx + 4, fy + 2, (cw - 8).max(1), TBL_FILTER_H - 4);
+                        self.wtext(g, wdg, cx + 6, fy + (TBL_FILTER_H - schrift).max(0) / 2,
+                                   s, farbe);
+                        g.pop_clip();
+                    }
+                    cx += cw;
+                }
             }
             g.pop_clip();
         }
@@ -4143,8 +4448,14 @@ impl Gui {
         let first = (t.scroll_y / gm.row_h).max(0);
         let last = ((t.scroll_y + body_h) / gm.row_h + 1).min(gm.n_rows as i32);
         for r in first..last {
-            let ri = r as usize;
+            // r = Ansichtszeile (Position auf dem Schirm), ri = Datenzeile.
+            // Farben, Inhalte und die Auswahl haengen an den DATEN, die Lage
+            // an der Ansicht -- werden die verwechselt, faerbt eine sortierte
+            // Tabelle die falschen Zeilen.
+            let ri = match t.view.get(r as usize) { Some(&x) => x, None => continue };
             let row_y = body_y + r * gm.row_h - t.scroll_y;
+            // Zebra nach der ANSICHTSzeile, nicht nach der Datenzeile --
+            // sonst waeren die Streifen nach dem Filtern unregelmaessig.
             let zebra = if t.zebra && r % 2 == 1 { zebra_bg } else { -1 };
 
             // Zellflaechen zuerst, danach Auswahl/Hover DARUEBER -- sonst
@@ -4164,10 +4475,10 @@ impl Gui {
             // Halbdurchsichtig ueber die Zellflaechen: eine eigene Zellfarbe
             // bleibt sichtbar, die Auswahl aber auch. Alpha steckt im
             // hoechsten Byte (0xAARRGGBB).
-            if r == t.selected {
+            if ri as i32 == t.selected {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (150i64 << 24) | (sel_bg & 0xFFFFFF));
-            } else if r == t.hover_row {
+            } else if ri as i32 == t.hover_row {
                 g.box_fill(body_x, row_y, body_x + body_w - 1, row_y + gm.row_h - 1,
                            (110i64 << 24) | (hover_bg & 0xFFFFFF));
             }

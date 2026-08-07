@@ -3476,6 +3476,14 @@ impl<'p> Vm<'p> {
             // --- tabellenweite Einstellungen ---
             "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
             "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
+            // --- Sortieren / Filtern ---
+            "gui_table_sort" => { self.gui.table_sort(gi(a,0,"GUI_TABLE_SORT")?, gi(a,1,"GUI_TABLE_SORT")?, gbool(a,2,"GUI_TABLE_SORT")?)?; Value::Nil }
+            "gui_table_sort_col" => Value::Int(self.gui.table_sort_col(gi(a,0,"GUI_TABLE_SORT_COL")?)?),
+            "gui_table_sort_desc" => Value::Bool(self.gui.table_sort_desc(gi(a,0,"GUI_TABLE_SORT_DESC")?)?),
+            "gui_table_filter" => { self.gui.table_filter(gi(a,0,"GUI_TABLE_FILTER")?, gi(a,1,"GUI_TABLE_FILTER")?, gs(a,2,"GUI_TABLE_FILTER")?.to_string())?; Value::Nil }
+            "gui_table_get_filter" => Value::str_rc(&self.gui.table_get_filter(gi(a,0,"GUI_TABLE_GET_FILTER")?, gi(a,1,"GUI_TABLE_GET_FILTER")?)?),
+            "gui_table_view_count" => Value::Int(self.gui.table_view_count(gi(a,0,"GUI_TABLE_VIEW_COUNT")?)?),
+            "gui_table_view_row" => Value::Int(self.gui.table_view_row(gi(a,0,"GUI_TABLE_VIEW_ROW")?, gi(a,1,"GUI_TABLE_VIEW_ROW")?)?),
             "gui_table_row_count" => Value::Int(self.gui.table_row_count(gi(a,0,"GUI_TABLE_ROW_COUNT")?)?),
             "gui_tree" => Value::Int(self.gui.tree(gi(a,0,"GUI_TREE")?, gi(a,1,"GUI_TREE")? as i32,
                 gi(a,2,"GUI_TREE")? as i32, gi(a,3,"GUI_TREE")? as i32, gi(a,4,"GUI_TREE")? as i32)?),
