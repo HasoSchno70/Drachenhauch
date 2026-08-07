@@ -526,7 +526,16 @@ WHILE NOT QUITREQUESTED()
         DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
         DIM mitte AS INTEGER : mitte = cy + ch \ 2
         DIM zoom AS FLOAT : zoom = GUI_VALUE(sZoom)
-        DIM phs AS FLOAT : phs = GUI_VALUE(kPhase) + zeit * 1.5
+        ' Die Welle soll IMMER gleich schnell ueber den Schirm wandern.
+        ' Vorher wuchs die Phase mit festen 1,5 rad/s -- wieviele BILDPUNKTE
+        ' das sind, haengt aber an Frequenz und Sichtfenster: bei kleinem
+        ' Sichtfenster waren es gemessene 40 px je Bild (strobt sichtbar),
+        ' bei grossem 0,4 px (kriecht). Also in Bildpunkten rechnen und in
+        ' Radiant umrechnen -- eine Verschiebung um s Punkte entspricht
+        ' s/cw * 2*PI*frq*zoom.
+        CONST TEMPO = 100.0                     ' Bildpunkte je Sekunde
+        DIM phs AS FLOAT
+        phs = GUI_VALUE(kPhase) + zeit * (TEMPO / cw) * 6.2831853 * frq * zoom
         DIM form AS INTEGER : form = GUI_RADIO_SELECTED(rSin)
         DIM breite AS FLOAT : breite = GUI_VALUE(sBreite)
 
