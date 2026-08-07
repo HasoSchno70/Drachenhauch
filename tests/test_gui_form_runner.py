@@ -1,7 +1,12 @@
 """Form-Runner (Xojo-Stil): ein .gbform aus einer Datei laden und pruefen, dass
 Struktur + Zustaende korrekt rekonstruiert werden. GUI_LOAD ist ein reines
-Builtin (kein SCREEN) -> headless testbar. Das Feuern der Handler braucht
-Maus/SCREEN und ist in der Demo examples/105_form_runner.gb manuell verifiziert.
+Builtin (kein SCREEN) -> headless testbar.
+
+Das Feuern der Handler galt hier lange als "braucht Maus/SCREEN, nur in der
+Demo examples/105_form_runner.gb manuell verifiziert" -- und in genau dieser
+Luecke sass ein Fehler, der JEDEN vom Form-Designer erzeugten Handler
+unbrauchbar machte. Mit AUTOMATION_PLAY laesst sich ein Klick einspeisen,
+also wird es unten geprueft.
 """
 import json
 
@@ -52,3 +57,75 @@ def test_form_restores_states(run_gb, tmp_path):
         'PRINT GUI_TEXT(GUI_WINDOW_WIDGET(frm, 1))\n',          # "" (Platzhalter, kein Text)
         base=tmp_path)
     assert out.splitlines() == ["TRUE", "70.0", "Mittel", ""]
+
+
+# ------------------------------------------------------- Handler feuern lassen
+# Das ging bisher als "braucht Maus/SCREEN, manuell verifiziert" durch -- und
+# genau in dieser Luecke sass ein Fehler, der JEDEN vom Form-Designer erzeugten
+# Handler betraf. Mit AUTOMATION_PLAY laesst sich ein Klick einspeisen, also
+# wird es jetzt geprueft.
+
+def _klick_aufnahme(tmp_path, name, x, y):
+    """raylib-Aufnahmedatei: Maus hinsetzen, druecken, loslassen.
+    Event-Typen wie in tests/test_automation.py (5=up, 6=down, 7=position)."""
+    zeilen = ["# Klick", "c 4",
+              f"e 0 7 {x} {y} 0 0 // hin",
+              f"e 1 7 {x} {y} 0 0 // halten",
+              "e 2 6 0 0 0 0 // druecken",
+              "e 4 5 0 0 0 0 // loslassen"]
+    (tmp_path / name).write_text("\n".join(zeilen) + "\n", encoding="utf-8")
+
+
+def _form_mit_knopf(tmp_path, handler: str):
+    form = {"title": "T", "x": 0, "y": 0, "w": 200, "h": 120,
+            "chrome": False, "visible": True,
+            "widgets": [{"kind": "button", "x": 20, "y": 20, "w": 100, "h": 28,
+                         "text": "OK", "on_click": handler}]}
+    (tmp_path / "f.gbform").write_text(json.dumps(form), encoding="utf-8")
+
+
+import os                                    # noqa: E402
+import subprocess                            # noqa: E402
+import pytest                                # noqa: E402
+from .conftest import _GBRT                  # noqa: E402
+
+
+def _lauf(tmp_path, handler: str):
+    if _GBRT is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    _form_mit_knopf(tmp_path, handler)
+    _klick_aufnahme(tmp_path, "klick.txt", 70, 34)
+    (tmp_path / "a.gb").write_text(
+        'IMPORT "gui"\n'
+        'SCREEN(200, 120, "T", 1)\n'
+        'DIM frm AS GUI_WINDOW\n'
+        'frm = GUI_LOAD("f.gbform")\n'
+        'GUI_WINDOW_CHROME(frm, FALSE)\n'
+        'AUTOMATION_PLAY("klick.txt")\n'
+        f'SUB {handler}()\n    PRINT "GEFEUERT"\nEND SUB\n'
+        'WHILE NOT QUITREQUESTED()\n'
+        '    GUI_UPDATE()\n    CLS(0)\n    GUI_DRAW()\n    FLIP()\n'
+        'WEND\n', encoding="utf-8")
+    r = subprocess.run([str(_GBRT), "run", "a.gb"], cwd=str(tmp_path),
+                       capture_output=True, text=True, encoding="utf-8",
+                       timeout=120, env=dict(os.environ, GBRT_FRAMES="10"))
+    zeilen = [ln for ln in (r.stdout or "").splitlines()
+              if not ln.startswith(("WARNING:", "INFO:", "TRACE:"))]
+    return r, zeilen
+
+
+def test_handler_aus_der_datei_feuert(tmp_path):
+    r, zeilen = _lauf(tmp_path, "aufok")
+    assert r.returncode == 0, r.stderr
+    assert "GEFEUERT" in zeilen, zeilen
+
+
+def test_handler_feuert_auch_mit_grossbuchstaben(tmp_path):
+    """Der Compiler legt Funktionsnamen KLEIN ab, der Form-Designer schreibt
+    aber `btn1Click` ins .gbform -- der Callback-Lookup fand den erzeugten
+    `SUB btn1Click()` deshalb nie ("Funktion 'btn1Click' existiert nicht").
+    Da JEDER automatisch erzeugte Handler einen Grossbuchstaben traegt, war
+    damit kein einziger davon benutzbar."""
+    r, zeilen = _lauf(tmp_path, "btn1Click")
+    assert r.returncode == 0, r.stderr
+    assert "GEFEUERT" in zeilen, zeilen

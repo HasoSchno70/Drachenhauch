@@ -321,6 +321,7 @@ const DEFAULT_UI_METRICS: &[(&str, i64)] = &[
 /// `self` veraenderlich aus, danach ist `self.ui_state` nicht mehr lesbar.
 /// Genau deshalb reicht das Modul die Werte gebuendelt an die freie
 /// Zeichenroutine weiter, statt dort erneut ins Thema zu greifen.
+#[cfg(feature = "graphics")]
 #[derive(Clone, Copy, Default)]
 struct UiPlastik {
     rad: i32,
@@ -334,6 +335,7 @@ struct UiPlastik {
 /// Gegenstueck zu `Gui::flaeche`. Erhaben = hell oben, dunkel unten, mit
 /// Glanzkante; versenkt = umgekehrt, mit Schatten unter der Oberkante. Ohne
 /// die Plastik-Metriken bleibt es die schlichte gefuellte Box wie bisher.
+#[cfg(feature = "graphics")]
 #[allow(clippy::too_many_arguments)]
 fn ui_flaeche(g: &mut crate::graphics::Graphics, p: UiPlastik, x: i32, y: i32, w: i32, h: i32,
               fill: i64, border: i64, tief: bool) {
@@ -392,6 +394,7 @@ impl UiState {
     fn th(&self, key: &str) -> i64 { *self.theme.get(key).unwrap_or(&0xFFFFFF) }
     fn metric(&self, key: &str) -> i64 { *self.metrics.get(key).unwrap_or(&14) }
     /// Plastik-Werte gebuendelt (siehe `UiPlastik`).
+    #[cfg(feature = "graphics")]
     fn plastik(&self) -> UiPlastik {
         UiPlastik {
             rad: *self.metrics.get("corner_radius").unwrap_or(&0) as i32,

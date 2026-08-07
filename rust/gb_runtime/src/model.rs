@@ -236,8 +236,27 @@ pub struct Program {
 
 impl Program {
     /// Funktion per Name (LOAD_FUNCREF/CALL_VALUE/Callbacks -- kalte Pfade).
+    ///
+    /// **Schreibungs-unabhaengig**, und das ist kein Komfort, sondern noetig:
+    /// der Compiler legt jeden Funktionsnamen klein ab, GB-Bezeichner sind
+    /// ueberall sonst schreibungs-unabhaengig -- aber Namen, die NICHT aus
+    /// dem Compiler kommen, tragen ihre Original-Schreibweise. Das sind die
+    /// GUI-Callbacks aus einer `.gbform`-Datei (`GUI_LOAD`/`GUI_FROM_JSON`):
+    /// der Form-Designer schreibt dort `dd1Changed`, und damit fand die
+    /// Laufzeit den erzeugten `SUB dd1Changed()` beim Ausloesen NIE.
+    ///
+    /// Der Zweitversuch kostet nur im Fehlerfall etwas (dann steht ohnehin
+    /// eine Fehlermeldung an) -- der Treffer laeuft unveraendert ueber den
+    /// direkten Lookup.
     pub fn func(&self, name: &str) -> Option<&Func> {
-        self.fn_index.get(name).map(|&i| &self.functions[i])
+        if let Some(&i) = self.fn_index.get(name) {
+            return Some(&self.functions[i]);
+        }
+        let klein = name.to_lowercase();
+        if klein == name {
+            return None;                 // war schon klein -> gibt es wirklich nicht
+        }
+        self.fn_index.get(&klein).map(|&i| &self.functions[i])
     }
 }
 
@@ -513,4 +532,44 @@ pub fn load_program(j: &J) -> Result<Program, String> {
         classes,
         data,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn leere_func(name: &str) -> Func {
+        Func {
+            name: name.to_string(), n_params: 0, n_required: 0, is_variadic: false,
+            is_sub: true, is_coroutine: false, return_type: String::new(),
+            param_defaults: Vec::new(), param_byref: Vec::new(),
+            param_default_is_expr: Vec::new(), local_types: Vec::new(),
+            local_defaults: Vec::new(), constants: Vec::new(), code: Vec::new(),
+            lines: Vec::new(), local_names: Vec::new(),
+        }
+    }
+
+    /// Der Compiler legt Namen KLEIN ab; GUI-Callbacks aus einer `.gbform`
+    /// tragen dagegen die Schreibweise des Form-Designers (`dd1Changed`).
+    /// Ohne den schreibungs-unabhaengigen Zweitversuch meldete die Laufzeit
+    /// beim Ausloesen "Funktion 'dd1Changed' existiert nicht" -- also bei
+    /// JEDEM automatisch erzeugten Handler.
+    #[test]
+    fn func_findet_auch_bei_anderer_schreibweise() {
+        let mut fn_index = rustc_hash::FxHashMap::default();
+        fn_index.insert("dd1changed".to_string(), 0usize);
+        let p = Program {
+            n_globals: 0,
+            main: leere_func("__main__"),
+            functions: vec![leere_func("dd1changed")],
+            fn_index,
+            classes: rustc_hash::FxHashMap::default(),
+            data: Vec::new(),
+        };
+        assert!(p.func("dd1changed").is_some());     // wie der Compiler ablegt
+        assert!(p.func("dd1Changed").is_some());     // wie der Designer schreibt
+        assert!(p.func("DD1CHANGED").is_some());
+        assert!(p.func("gibtesnicht").is_none());
+        assert!(p.func("GibtEsNicht").is_none());    // Zweitversuch erfindet nichts
+    }
 }
