@@ -12,6 +12,11 @@
 '    * FILTERZEILE darunter anklicken und tippen -> filtert die Spalte
 '      (Teiltext, Gross-/Kleinschreibung egal). ESC beendet die Eingabe.
 '    * SPALTENKANTE im Kopf ziehen -> Spaltenbreite aendern.
+'    * DOPPELKLICK auf Name oder Ort -> Zelle bearbeiten. Enter uebernimmt,
+'      ESC nimmt zurueck, ein Klick woanders uebernimmt ebenfalls.
+'      Nur freigegebene Spalten lassen sich bearbeiten (GUI_TABLE_COL_EDIT) --
+'      in eine Tabelle versehentlich ueberall hineinschreiben zu koennen waere
+'      schlimmer als gar keine Bearbeitung.
 '    * HAKEN anklicken -> schaltet um (die Tabelle macht das selbst).
 '    * KNOPF anklicken -> GUI_TABLE_CLICKED_COL sagt, welche Spalte.
 '    * Mausrad / Bildlaufleisten -> scrollen.
@@ -66,6 +71,8 @@ GUI_TABLE_SET(t, "zebra", 1)
 GUI_TABLE_COL_ALIGN(t, 0, "mitte")
 GUI_TABLE_COL_ALIGN(t, 3, "rechts")
 GUI_TABLE_COL_ALIGN(t, 5, "mitte")
+GUI_TABLE_COL_EDIT(t, 1, TRUE)           ' Name und Ort per Doppelklick aendern
+GUI_TABLE_COL_EDIT(t, 2, TRUE)
 
 ' --- Daten -----------------------------------------------------------------
 DIM roh AS ARRAY OF STRING
@@ -121,12 +128,14 @@ NEXT
 GUI_TABLE_SORT(t, 3, TRUE)               ' anfangs nach Spielern absteigend
 
 DIM stand AS GUI_WIDGET
-stand = GUI_LABEL(win, "Kopfzeile klicken = sortieren | Filterzeile anklicken und tippen | Spaltenkante ziehen", 20, 532)
+stand = GUI_LABEL(win, "Kopf klicken = sortieren | Filterzeile tippen | Spaltenkante ziehen | Doppelklick auf Name/Ort = bearbeiten", 20, 532)
 DIM zahl AS GUI_WIDGET
 zahl = GUI_LABEL(win, "", 20, 560)
 
 WHILE NOT QUITREQUESTED()
-    IF KEYPRESSED(27) THEN BREAK
+    ' ESC nimmt eine laufende Bearbeitung zurueck -- erst danach beendet es
+    ' das Programm. Sonst waere die Ruecknahme nicht benutzbar.
+    IF KEYPRESSED(27) AND GUI_TABLE_EDITING_ROW(t) < 0 THEN BREAK
     GUI_UPDATE()
 
     IF GUI_TABLE_CLICKED(t) >= 0 THEN
@@ -143,6 +152,10 @@ WHILE NOT QUITREQUESTED()
         END SELECT
         GUI_SET_TEXT(stand, GUI_TABLE_GET_CELL(t, r, 1) + " -- " + was + _
                      "  (Datenzeile " + STR$(r) + ", Spalte " + STR$(c) + ")")
+    END IF
+
+    IF GUI_TABLE_EDITING_ROW(t) >= 0 THEN
+        GUI_SET_TEXT(stand, "Zelle wird bearbeitet -- Enter uebernimmt, ESC nimmt zurueck.")
     END IF
 
     GUI_SET_TEXT(zahl, "sichtbar: " + STR$(GUI_TABLE_VIEW_COUNT(t)) + " von " + _

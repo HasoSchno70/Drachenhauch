@@ -3476,6 +3476,10 @@ impl<'p> Vm<'p> {
             // --- tabellenweite Einstellungen ---
             "gui_table_set" => { self.gui.table_set_opt(gi(a,0,"GUI_TABLE_SET")?, &gs(a,1,"GUI_TABLE_SET")?, gnum(a,2,"GUI_TABLE_SET")?)?; Value::Nil }
             "gui_table_get" => Value::Float(self.gui.table_get_opt(gi(a,0,"GUI_TABLE_GET")?, &gs(a,1,"GUI_TABLE_GET")?)?),
+            // --- Zellen bearbeiten ---
+            "gui_table_col_edit" => { self.gui.table_col_edit(gi(a,0,"GUI_TABLE_COL_EDIT")?, gi(a,1,"GUI_TABLE_COL_EDIT")?, gbool(a,2,"GUI_TABLE_COL_EDIT")?)?; Value::Nil }
+            "gui_table_editing_row" => Value::Int(self.gui.table_editing_row(gi(a,0,"GUI_TABLE_EDITING_ROW")?)?),
+            "gui_table_editing_col" => Value::Int(self.gui.table_editing_col(gi(a,0,"GUI_TABLE_EDITING_COL")?)?),
             // --- Sortieren / Filtern ---
             "gui_table_sort" => { self.gui.table_sort(gi(a,0,"GUI_TABLE_SORT")?, gi(a,1,"GUI_TABLE_SORT")?, gbool(a,2,"GUI_TABLE_SORT")?)?; Value::Nil }
             "gui_table_sort_col" => Value::Int(self.gui.table_sort_col(gi(a,0,"GUI_TABLE_SORT_COL")?)?),

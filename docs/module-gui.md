@@ -538,6 +538,42 @@ beendet die Eingabe. Mehrere Spalten wirken zusammen (UND).
 | `GUI_TABLE_FILTER(tbl, spalte, text$)` | Filter setzen (leerer Text = kein Filter) |
 | `GUI_TABLE_GET_FILTER(tbl, spalte)` | gesetzten Filter lesen |
 
+### Zellen direkt bearbeiten
+
+**Doppelklick** auf eine Textzelle einer freigegebenen Spalte öffnet ein
+Eingabefeld genau in dieser Zelle. `Enter` übernimmt, `ESC` nimmt zurück, ein
+Klick woanders übernimmt ebenfalls (wie überall sonst auch — zurücknehmen geht
+mit `ESC`).
+
+```basic
+GUI_TABLE_COL_EDIT(tbl, 1, TRUE)     ' Spalte 1 freigeben
+```
+
+Ohne Freigabe passiert beim Doppelklick nichts: eine Tabelle, in die man
+versehentlich überall hineinschreiben kann, wäre schlimmer als eine ohne
+Bearbeitung. Nur `text`-Zellen sind betroffen — ein Haken schaltet ohnehin per
+Klick um, ein Balken oder Bild hat keinen Text zum Tippen.
+
+| Built-in | Wirkung |
+|---|---|
+| `GUI_TABLE_COL_EDIT(tbl, spalte, an)` | Spalte für die Bearbeitung freigeben |
+| `GUI_TABLE_EDITING_ROW(tbl)` / `GUI_TABLE_EDITING_COL(tbl)` | welche Zelle gerade bearbeitet wird (`-1` = keine) |
+
+Beim Übernehmen feuert `on_change` und die Ansicht (Sortierung + Filter) wird
+neu gebaut — **erst dann**, nicht bei jeder Taste: sonst spränge die Zeile
+einem beim Tippen unter dem Finger weg.
+
+**Der Editor kann:** Schreibmarke, Pfeiltasten, `Pos1`/`Ende`, `Rücktaste`,
+`Entf`, Einfügen mit `Strg+V`, und er schiebt den Text nach links wenn er
+länger ist als die Zelle. **Er kann nicht:** Text markieren. Die volle
+Textfeld-Logik hier zu wiederholen wäre ein zweiter Ort, an dem dieselben
+Fehler entstehen.
+
+> **Achtung bei `ESC`:** wenn dein Programm `ESC` zum Beenden benutzt, frag
+> vorher `GUI_TABLE_EDITING_ROW(tbl) < 0` ab — sonst beendet dieselbe Taste
+> das Programm, mit der man eine Eingabe zurücknehmen will (so macht es die
+> Demo).
+
 ### Zeilennummern: Daten oder Ansicht?
 
 **Alle Zeilenangaben nach außen sind DATENzeilen.** Sortieren und Filtern
@@ -586,7 +622,7 @@ gelesen, ältere Dateien laufen unverändert.
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
-**Nicht umgesetzt** (bewusst): Zellen direkt in der Tabelle bearbeiten,
+**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren,
 Mehrfach-Auswahl, feste (mitscrollende) Spalten, Spalten umsortieren,
 Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.

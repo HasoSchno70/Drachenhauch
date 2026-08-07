@@ -40,6 +40,8 @@ const TBL_PADDING: i32 = 6;
 const TBL_MIN_COL_W: i32 = 40;
 const TBL_FILTER_H: i32 = 22;   // Hoehe der Filterzeile im Kopf
 const TBL_EDGE_GRAB: i32 = 4;   // Fangbereich der Spaltenkante (px)
+const DBL_TIME: f64 = 0.4;      // Doppelklick-Fenster (Sekunden)
+const DBL_DIST: i32 = 4;        // erlaubter Versatz zwischen beiden Klicks
 
 fn default_theme() -> HashMap<String, i64> {
     [
@@ -349,6 +351,20 @@ pub struct TableState {
     filter_row: bool,
     /// Welche Filterzelle die Tastatur bekommt (-1 = keine).
     filter_focus: i32,
+    // --- Zelle bearbeiten ---------------------------------------------------
+    /// Welche Zelle gerade bearbeitet wird (-1 = keine).
+    edit_row: i32,
+    edit_col: i32,
+    /// Arbeitskopie waehrend der Bearbeitung. Die Zelle selbst wird erst beim
+    /// Bestaetigen geschrieben -- sonst koennte Escape nichts mehr zuruecknehmen,
+    /// und jede Taste wuerde Sortierung und Filter neu anwerfen (die Zeile
+    /// spraenge einem beim Tippen unter dem Finger weg).
+    edit_text: String,
+    edit_caret: i32,
+    /// Welche Spalten bearbeitet werden duerfen. Kuerzer als die Spaltenzahl
+    /// = der Rest ist gesperrt.
+    col_edit: Vec<bool>,
+
     /// Spalte, deren rechte Kante gerade gezogen wird (-1 = keine).
     drag_col: i32,
     /// Breite dieser Spalte beim Anfassen + Maus-x -- daraus ergibt sich die
@@ -374,6 +390,8 @@ impl Default for TableState {
             zebra: false, grid: true,
             scroll_x: 0, scroll_y: 0, drag_v: false, drag_h: false, drag_off: 0,
             selected: -1, hover_row: -1, clicked_row: -1, hover_col: -1, clicked_col: -1,
+            edit_row: -1, edit_col: -1, edit_text: String::new(), edit_caret: 0,
+            col_edit: vec![],
             drag_col: -1, drag_col_w: 0, drag_col_x: 0, resizable_cols: true,
             sort_col: -1, sort_desc: false, sortable: true,
             filters: vec![], filter_row: false, filter_focus: -1,
@@ -463,6 +481,10 @@ impl TableState {
     fn view_of(&self, data_r: i32) -> i32 {
         if data_r < 0 { return -1; }
         self.view.iter().position(|&r| r as i32 == data_r).map(|i| i as i32).unwrap_or(-1)
+    }
+
+    fn col_editable(&self, c: usize) -> bool {
+        *self.col_edit.get(c).unwrap_or(&false)
     }
 
     fn align_of(&self, r: usize, c: usize) -> i8 {
@@ -639,6 +661,17 @@ pub struct Gui {
     scroll_drag: Option<usize>,              // Fenster, dessen Inhalts-Scrollbar gezogen wird
     active_table: Option<(usize, usize)>,
     table_press: Option<(usize, usize, i32)>,   // (win, widget, row)
+    /// Tabelle mit laufender Zellbearbeitung. Ohne diesen Merker muesste man
+    /// alle Fenster durchsuchen, um einen Klick woanders zu bemerken -- und
+    /// ein vergessener Editor bliebe verwaist offen stehen.
+    editing_table: Option<(usize, usize)>,
+    /// Zeitpunkt und Ort des letzten Drucks -- daraus wird der Doppelklick
+    /// erkannt. Zeit statt Bildzaehler, damit die Erkennung nicht von der
+    /// Bildrate abhaengt.
+    last_click: Option<(f64, i32, i32)>,
+    /// Gilt der gerade laufende Druck als Doppelklick? Wird in `update` (dort
+    /// gibt es die Zeit) gesetzt und von `handle_press` gelesen.
+    dbl_click: bool,
     press_origin: Option<(usize, usize)>,
     was_mouse_down: bool,
     frame_count: i64,
@@ -696,6 +729,7 @@ impl Gui {
             active_slider: None,
             active_knob: None, active_split: None, split_off: 0,
             open_dropdown: None, active_table: None, table_press: None, press_origin: None,
+            editing_table: None, last_click: None, dbl_click: false,
             open_menu: None, context_open: None, was_right_down: false,
             scroll_drag: None,
             was_mouse_down: false, frame_count: 0,
@@ -1339,6 +1373,27 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         })
     }
 
+    // --- Zellen bearbeiten ---------------------------------------------------
+
+    /// Spalte fuer die Bearbeitung freigeben. Ohne Freigabe passiert beim
+    /// Doppelklick nichts -- eine Tabelle, in der man versehentlich ueberall
+    /// hineinschreiben kann, waere schlimmer als eine ohne Bearbeitung.
+    pub fn table_col_edit(&mut self, h: i64, c: i64, an: bool) -> Result<(), String> {
+        let t = self.tbl_mut(h, "GUI_TABLE_COL_EDIT")?;
+        if c < 0 { return Err("GUI_TABLE_COL_EDIT: Spalte darf nicht negativ sein".into()); }
+        let c = c as usize;
+        while t.col_edit.len() <= c { t.col_edit.push(false); }
+        t.col_edit[c] = an;
+        Ok(())
+    }
+    /// Zeile der Zelle, die gerade bearbeitet wird (-1 = keine).
+    pub fn table_editing_row(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_EDITING_ROW")?.edit_row as i64)
+    }
+    pub fn table_editing_col(&self, h: i64) -> Result<i64, String> {
+        Ok(self.tbl_ref(h, "GUI_TABLE_EDITING_COL")?.edit_col as i64)
+    }
+
     // --- Sortieren und Filtern ----------------------------------------------
 
     /// Programmgesteuert sortieren. Spalte < 0 hebt die Sortierung auf.
@@ -1648,7 +1703,60 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             // Knopf in Spalte 3 nicht von einem Haken in Spalte 1 trennen.
             let hc = Self::col_at(&gm, mx);
             self.windows[wi].widgets[idx].tbl.as_mut().unwrap().hover_col = hc;
+            // Doppelklick auf eine bearbeitbare Textzelle -> Bearbeiten.
+            if self.dbl_click && hc >= 0 {
+                self.table_begin_edit(wi, idx, hr, hc);
+                return;
+            }
             self.table_press = Some((wi, idx, hr));
+        }
+    }
+
+    /// Bearbeitung starten. Laeuft nur auf TEXT-Zellen einer freigegebenen
+    /// Spalte: ein Haken schaltet ohnehin per Klick um, ein Balken oder Bild
+    /// hat keinen sinnvollen Text zum Tippen.
+    fn table_begin_edit(&mut self, wi: usize, idx: usize, r: i32, c: i32) {
+        let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
+        if r < 0 || c < 0 || r as usize >= t.rows.len() { return; }
+        if !t.col_editable(c as usize) { return; }
+        let art = t.cell(r as usize, c as usize).map(|x| x.kind).unwrap_or(CellKind::Text);
+        if art != CellKind::Text { return; }
+        t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.clone()).unwrap_or_default();
+        t.edit_caret = t.edit_text.chars().count() as i32;
+        t.edit_row = r;
+        t.edit_col = c;
+        t.selected = r;
+        self.editing_table = Some((wi, idx));
+        // Die Tabelle braucht den Tastaturfokus, sonst landen die Zeichen im
+        // Textfeld daneben.
+        self.focus_widget = Some((wi, idx));
+    }
+
+    /// Bearbeitung beenden. `uebernehmen` = Text in die Zelle schreiben.
+    fn table_end_edit(&mut self, wi: usize, idx: usize, uebernehmen: bool) {
+        let mut geaendert = false;
+        {
+            let t = match self.windows[wi].widgets[idx].tbl.as_mut() { Some(t) => t, None => return };
+            if t.edit_row < 0 { return; }
+            let (r, c) = (t.edit_row as usize, t.edit_col as usize);
+            if uebernehmen {
+                let neu = std::mem::take(&mut t.edit_text);
+                if let Some(cell) = t.cell_mut(r, c) {
+                    if cell.text != neu { cell.text = neu; geaendert = true; }
+                }
+            }
+            t.edit_row = -1;
+            t.edit_col = -1;
+            t.edit_text.clear();
+            t.edit_caret = 0;
+            // Erst JETZT neu sortieren/filtern. Waehrend des Tippens waere die
+            // Zeile bei jedem Zeichen weggesprungen.
+            if geaendert { t.rebuild_view(); }
+        }
+        self.editing_table = None;
+        if geaendert {
+            let f = self.windows[wi].widgets[idx].on_change.clone();
+            if let Some(f) = f { self.pending.push(f); }
         }
     }
 
@@ -1674,6 +1782,59 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
             cx += cw;
         }
         -1
+    }
+
+    /// Tastatur fuer die Tabelle. Eine laufende Zellbearbeitung hat Vorrang --
+    /// sonst landeten die Zeichen in einem Filterfeld, das vorher den Fokus
+    /// hatte.
+    fn table_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let bearbeitet = self.windows[wi].widgets[i].tbl.as_ref()
+            .map(|t| t.edit_row >= 0).unwrap_or(false);
+        if bearbeitet { self.table_edit_keys(wi, i, g); }
+        else { self.table_filter_keys(wi, i, g); }
+    }
+
+    /// Tippen in die Zelle, die gerade bearbeitet wird.
+    ///
+    /// Schreibmarke, Pfeile, Pos1/Ende, Entfernen, Einfuegen aus der
+    /// Zwischenablage. **Keine Textauswahl** -- die volle Textfeld-Logik hier
+    /// zu wiederholen waere ein zweiter Ort, an dem dieselben Fehler entstehen
+    /// koennen; fuer eine Tabellenzelle reicht das hier.
+    fn table_edit_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let eingabe = g.pop_text_input();
+        let ctrl = g.key_ctrl();
+        let (ok, ab) = (g.key_pressed(KEY_ENTER), g.key_pressed(27));
+        let (links, rechts) = (g.key_repeat(KEY_LEFT), g.key_repeat(KEY_RIGHT));
+        let (pos1, ende) = (g.key_pressed(KEY_HOME), g.key_pressed(KEY_END));
+        let rueck = g.key_repeat(KEY_BACKSPACE);
+        let entf = g.key_repeat(KEY_DELETE);
+        let einfuegen = ctrl && g.key_pressed(K_V);
+        let ablage = if einfuegen { g.clipboard_get() } else { String::new() };
+
+        if ok { self.table_end_edit(wi, i, true); return; }
+        if ab { self.table_end_edit(wi, i, false); return; }
+
+        let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
+        let mut chars: Vec<char> = t.edit_text.chars().collect();
+        let mut caret = t.edit_caret.clamp(0, chars.len() as i32);
+
+        for ch in eingabe.chars().filter(|c| !c.is_control()) {
+            chars.insert(caret as usize, ch);
+            caret += 1;
+        }
+        for ch in ablage.chars().filter(|c| !c.is_control()) {
+            chars.insert(caret as usize, ch);
+            caret += 1;
+        }
+        if rueck && caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
+        if entf && (caret as usize) < chars.len() { chars.remove(caret as usize); }
+        if links { caret -= 1; }
+        if rechts { caret += 1; }
+        if pos1 { caret = 0; }
+        if ende { caret = chars.len() as i32; }
+
+        t.edit_text = chars.iter().collect();
+        t.edit_caret = caret.clamp(0, chars.len() as i32);
     }
 
     /// Tippen in die fokussierte Filterzelle. Bewusst schlicht: Zeichen
@@ -1999,6 +2160,7 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         if self.open_dropdown == Some((wi, i)) { self.open_dropdown = None; }
         if self.active_table == Some((wi, i)) { self.active_table = None; }
         if self.table_press.map(|(tw, ti, _)| (tw, ti)) == Some((wi, i)) { self.table_press = None; }
+        if self.editing_table == Some((wi, i)) { self.editing_table = None; }
         if self.hover_w == Some((wi, i)) { self.hover_w = None; }
         Ok(())
     }
@@ -2094,6 +2256,7 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         if self.active_split.map(|(w, _)| w) == Some(wi) { self.active_split = None; }
         if self.active_table.map(|(w, _)| w) == Some(wi) { self.active_table = None; }
         if self.table_press.map(|(w, _, _)| w) == Some(wi) { self.table_press = None; }
+        if self.editing_table.map(|(w, _)| w) == Some(wi) { self.editing_table = None; }
         if self.hover_w.map(|(w, _)| w) == Some(wi) { self.hover_w = None; }
         if self.open_dropdown.map(|(w, _)| w) == Some(wi) { self.open_dropdown = None; }
         if self.open_menu.map(|(w, _)| w) == Some(wi) { self.open_menu = None; }
@@ -2998,7 +3161,20 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         // Neuer Druck (entfaellt, wenn ein Menue den Klick verarbeitet hat).
         if just_pressed && !menu_consumed && !scroll_consumed && !tab_consumed && self.drag_window.is_none() && self.resize_window.is_none()
             && self.active_slider.is_none() && self.active_table.is_none() && self.active_split.is_none() {
+            // Doppelklick: zweiter Druck innerhalb DBL_TIME an fast derselben
+            // Stelle. Die Ortspruefung muss sein -- sonst gaelten zwei rasche
+            // Klicks auf verschiedene Zeilen als Doppelklick.
+            let jetzt = g.get_time();
+            self.dbl_click = match self.last_click {
+                Some((t0, x0, y0)) =>
+                    jetzt - t0 <= DBL_TIME && (mx - x0).abs() <= DBL_DIST && (my - y0).abs() <= DBL_DIST,
+                None => false,
+            };
+            // Nach einem erkannten Doppelklick von vorn zaehlen, sonst waere
+            // ein dritter Klick gleich wieder einer.
+            self.last_click = if self.dbl_click { None } else { Some((jetzt, mx, my)) };
             self.handle_press(mx, my);
+            self.dbl_click = false;
         }
         // Loslassen -> Button-Klick bestaetigen.
         if just_released {
@@ -3046,7 +3222,7 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
                 Kind::TextInput => self.edit_textinput(wi, i, g),
                 Kind::TextArea => self.edit_textarea(wi, i, g),
                 Kind::Spinner => self.spinner_keys(wi, i, g),
-                Kind::Table => self.table_filter_keys(wi, i, g),
+                Kind::Table => self.table_keys(wi, i, g),
                 _ => {}
             }
         }
@@ -3516,6 +3692,15 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
     }
 
     fn handle_press(&mut self, mx: i32, my: i32) {
+        // Ein Klick irgendwohin uebernimmt eine laufende Zellbearbeitung.
+        // Ohne das bliebe der Editor offen stehen, waehrend die Tastatur
+        // laengst woanders hinhoert -- ein Feld, das aussieht als koennte man
+        // hineintippen, aber nichts mehr annimmt. Uebernehmen (nicht
+        // verwerfen), weil Wegklicken ueberall sonst auch bestaetigt;
+        // zuruecknehmen geht mit ESC.
+        if let Some((ew, ei)) = self.editing_table {
+            self.table_end_edit(ew, ei, true);
+        }
         // Offenes Dropdown hat Vorrang: das Popup liegt ueber allem und reicht
         // evtl. ueber den Fensterrand hinaus (topmost_at wuerde es verfehlen).
         if let Some((dw, di)) = self.open_dropdown {
@@ -4542,6 +4727,27 @@ filterzeile, sortierbar, spalten_ziehbar, spalten", key)),
         let fgc = Self::cell_fg(t, r, c, fg_thema);
         let al = t.align_of(r, c);
         let schrift = self.wsize(g, wdg);
+
+        // Wird DIESE Zelle gerade bearbeitet? Dann ein Eingabefeld statt Text.
+        if t.edit_row == r as i32 && t.edit_col == c as i32 {
+            self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
+                           self.th("field_bg"), accent);
+            let vor: String = t.edit_text.chars().take(t.edit_caret.max(0) as usize).collect();
+            let tx = cx + 5;
+            let ty = cy + (ch - schrift).max(0) / 2;
+            // Nach links schieben, wenn der Text laenger ist als die Zelle --
+            // sonst tippt man ins Unsichtbare.
+            let voll = self.wtext_width(g, wdg, &t.edit_text);
+            let platz = cw - 10;
+            let versatz = if voll > platz { voll - platz } else { 0 };
+            g.push_clip(cx + 3, cy + 2, (cw - 6).max(1), ch - 4);
+            self.wtext(g, wdg, tx - versatz, ty, t.edit_text.clone(), fg_thema);
+            // Schreibmarke -- ohne sie sieht man nicht, wo man tippt.
+            let vx = tx - versatz + self.wtext_width(g, wdg, &vor);
+            g.line(vx, cy + 4, vx, cy + ch - 5, accent);
+            g.pop_clip();
+            return;
+        }
 
         match cell.kind {
             CellKind::Text => {

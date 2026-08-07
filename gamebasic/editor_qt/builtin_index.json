@@ -1,6 +1,6 @@
 {
  "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/gb_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
- "count": 1286,
+ "count": 1289,
  "builtins": [
   {
    "name": "ABS",
@@ -2913,9 +2913,27 @@
    "module": "gui"
   },
   {
+   "name": "GUI_TABLE_COL_EDIT",
+   "kind": "module",
+   "signature": "GUI_TABLE_COL_EDIT(tbl, spalte, an)",
+   "module": "gui"
+  },
+  {
    "name": "GUI_TABLE_COL_WIDTHS",
    "kind": "core",
    "signature": "GUI_TABLE_COL_WIDTHS(wdg, widths)",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_EDITING_COL",
+   "kind": "module",
+   "signature": "GUI_TABLE_EDITING_COL(tbl) AS INTEGER",
+   "module": "gui"
+  },
+  {
+   "name": "GUI_TABLE_EDITING_ROW",
+   "kind": "module",
+   "signature": "GUI_TABLE_EDITING_ROW(tbl) AS INTEGER",
    "module": "gui"
   },
   {

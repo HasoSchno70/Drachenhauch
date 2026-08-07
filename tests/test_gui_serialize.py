@@ -329,3 +329,27 @@ GUI_TABLE_ADD_ROW(t, n)
 zeig()
 '''), base=tmp_path)
     assert out.strip() == "Anna Cleo", out
+
+
+# ------------------------------------------------------- Zellen bearbeiten
+
+def test_bearbeiten_startet_nur_auf_freigegebenen_textspalten(run_gb, tmp_path):
+    """Ohne Freigabe passiert nichts. Eine Tabelle, in die man versehentlich
+    ueberall hineinschreiben kann, waere schlimmer als eine ohne Bearbeitung.
+    Der Doppelklick selbst braucht eine echte Maus und ist per AUTOMATION_PLAY
+    abgenommen -- hier wird der Zustand geprueft, den er setzt."""
+    out = run_gb(_tabelle([("Anna", 1), ("Bruno", 2)], '''
+PRINT STR$(GUI_TABLE_EDITING_ROW(t)) + " " + STR$(GUI_TABLE_EDITING_COL(t))
+GUI_TABLE_COL_EDIT(t, 0, TRUE)
+PRINT STR$(GUI_TABLE_EDITING_ROW(t))
+'''), base=tmp_path)
+    z = out.strip().splitlines()
+    assert z[0] == "-1 -1", out       # nichts in Bearbeitung
+    assert z[1] == "-1", out          # Freigeben allein startet nichts
+
+
+def test_negative_spalte_beim_freigeben_wird_gemeldet(run_gb, tmp_path):
+    from gamebasic.errors import GBRuntimeError
+    import pytest as _pt
+    with _pt.raises(GBRuntimeError, match="negativ"):
+        run_gb(_tabelle([("Anna", 1)], 'GUI_TABLE_COL_EDIT(t, -1, TRUE)'), base=tmp_path)
