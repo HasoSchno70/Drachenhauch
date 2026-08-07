@@ -1,0 +1,567 @@
+' ============================================================
+'  GAMEBASIC -- gui-Modul: ALLE 22 Widget-Arten in einer Anwendung
+' ============================================================
+'  Vollbild, randloses Fenster: die Form IST der Bildschirm.
+'
+'  Kein Schaukasten -- jedes Widget hat eine Aufgabe und wirkt auf etwas
+'  Sichtbares:
+'    Reiter "Werkstatt"  Baum filtert die Tabelle, Tabellenzeile fuellt den
+'                        Editor, Uebernehmen schreibt zurueck.
+'    Reiter "Regler"     Drehknoepfe/Schieber/Radios formen die Kurve auf
+'                        der Zeichenflaeche, Liste laedt Voreinstellungen.
+'    Reiter "Notizen"    Textfeld, Bild, Panel.
+'  Menueleiste + Werkzeugleiste + Rechtsklick-Menue liegen ueber allen
+'  Reitern.
+'
+'  Enthalten: button label checkbox slider textinput panel table radio
+'  dropdown progress listbox image canvas separator groupbox textarea
+'  spinner splitter toolbar tree toggle knob
+'
+'  [ESC] Ende
+' ============================================================
+IMPORT "gui"
+
+SCREEN(1280, 800, "GameBasic - alle GUI-Widgets", 1)
+SET_FULLSCREEN(TRUE)
+SETFPS(60)
+
+DIM uiFont AS INTEGER : uiFont = -1
+DIM fp AS STRING
+FOR EACH fp IN ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/arial.ttf")
+    IF uiFont < 0 AND FILEEXISTS(fp) THEN uiFont = LOADFONT(fp, 32)
+NEXT
+IF uiFont >= 0 THEN SETFONT(uiFont)
+TEXT_SIZE(16)
+GUI_THEME_PRESET("glas_dunkel")
+
+DIM SW AS INTEGER : SW = SCREENWIDTH()
+DIM SH AS INTEGER : SH = SCREENHEIGHT()
+CONST INK = &H0C1118
+
+' ---------------------------------------------------------------- Symbole
+' Prozedural erzeugt -- die Demo braucht so keine Bilddateien daneben.
+DIM icNeu AS INTEGER  : icNeu  = GENTEX_COLOR(28, 28, &H2BC4E8)
+IMAGE_DRAW_RECT(icNeu, 8, 5, 12, 18, INK)
+DIM icLade AS INTEGER : icLade = GENTEX_COLOR(28, 28, &HE8B44B)
+IMAGE_DRAW_RECT(icLade, 5, 10, 18, 11, INK)
+DIM icTest AS INTEGER : icTest = GENTEX_COLOR(28, 28, &H4BE87A)
+IMAGE_DRAW_CIRCLE(icTest, 14, 14, 7, INK)
+DIM icWeg AS INTEGER  : icWeg  = GENTEX_COLOR(28, 28, &HE85B5B)
+IMAGE_DRAW_LINE(icWeg, 8, 8, 20, 20, INK)
+IMAGE_DRAW_LINE(icWeg, 20, 8, 8, 20, INK)
+
+' Ein Bild fuer den Reiter "Notizen".
+DIM logo AS INTEGER : logo = GENTEX_RADIAL(160, 160, &H2BC4E8, &H0C1118)
+
+' ---------------------------------------------------------------- Fenster
+' Randlos + jeden Frame auf Bildschirmgroesse: das GUI-Fenster IST die App.
+DIM win AS GUI_WINDOW
+win = GUI_WINDOW("Steuerpult", 0, 0, SW, SH)
+GUI_WINDOW_CHROME(win, FALSE)
+
+' ------------------------------------------------------------ Menueleiste
+DIM mDatei AS INTEGER : mDatei = GUI_MENU(win, "Datei")
+DIM miNeu AS INTEGER  : miNeu  = GUI_MENU_ITEM(mDatei, "Beispieldaten zuruecksetzen")
+GUI_MENU_SEPARATOR(mDatei)
+DIM miEnde AS INTEGER : miEnde = GUI_MENU_ITEM(mDatei, "Beenden")
+
+DIM mThema AS INTEGER  : mThema  = GUI_MENU(win, "Thema")
+DIM miGlasD AS INTEGER : miGlasD = GUI_MENU_ITEM(mThema, "Glas dunkel")
+DIM miGlasH AS INTEGER : miGlasH = GUI_MENU_ITEM(mThema, "Glas hell")
+DIM miModD AS INTEGER  : miModD  = GUI_MENU_ITEM(mThema, "Modern dunkel")
+DIM miModH AS INTEGER  : miModH  = GUI_MENU_ITEM(mThema, "Modern hell")
+
+DIM mHilfe AS INTEGER : mHilfe = GUI_MENU(win, "Hilfe")
+DIM miUeber AS INTEGER : miUeber = GUI_MENU_ITEM(mHilfe, "Ueber ...")
+
+' Rechtsklick irgendwo im Fenster.
+DIM ctx AS INTEGER    : ctx = GUI_CONTEXT(win)
+DIM cxAlle AS INTEGER : cxAlle = GUI_MENU_ITEM(ctx, "Filter aufheben")
+GUI_MENU_SEPARATOR(ctx)
+DIM cxHilfe AS INTEGER : cxHilfe = GUI_MENU_ITEM(ctx, "Was ist das hier?")
+
+' ----------------------------------------------------------------- Reiter
+DIM reiter AS ARRAY OF STRING
+reiter = SPLIT$("Werkstatt|Regler|Notizen", "|")
+GUI_TABS(win, reiter)
+
+' Ab hier alle Y-Werte relativ unter Menueleiste + Reiterleiste; das GUI
+' rueckt den Inhalt selbst nach unten, wir rechnen ab 0 im Inhaltsbereich.
+' Alle Widget-Koordinaten sind FENSTER-Koordinaten. Die Menue- und die
+' Reiterleiste schieben den Inhaltsbereich nach unten, er ist also um CHROME
+' kuerzer als der Bildschirm -- ohne diesen Abzug rutscht die Statuszeile
+' unten aus dem Bild (und man sucht sie vergeblich).
+CONST TOP = 54                 ' unterhalb der Werkzeugleiste
+CONST CHROME = 56              ' Menueleiste + Reiterleiste
+CONST FUSS = 34                ' Platz fuer die Statuszeile
+DIM innW AS INTEGER : innW = SW - 24
+DIM innH AS INTEGER : innH = SH - CHROME - TOP - FUSS
+
+' ------------------------------------------------ Werkzeugleiste (immer da)
+DIM tb AS GUI_WIDGET : tb = GUI_TOOLBAR(win, 0, 0, SW, 46)
+GUI_SET_ANCHOR(tb, "lr")
+DIM bNeu AS GUI_WIDGET  : bNeu  = GUI_ICON_BUTTON(win, 10, 7, 34, 32, icNeu)
+GUI_TOOLTIP(bNeu, "Neuer Eintrag")
+DIM bLade AS GUI_WIDGET : bLade = GUI_ICON_BUTTON(win, 48, 7, 34, 32, icLade)
+GUI_TOOLTIP(bLade, "Beispieldaten neu laden")
+DIM bWeg AS GUI_WIDGET  : bWeg  = GUI_ICON_BUTTON(win, 86, 7, 34, 32, icWeg)
+GUI_TOOLTIP(bWeg, "Gewaehlten Eintrag loeschen")
+DIM bTest AS GUI_WIDGET : bTest = GUI_ICON_BUTTON(win, 132, 7, 130, 32, icTest, "Alle aktiv")
+GUI_TOOLTIP(bTest, "Setzt bei allen Eintraegen 'aktiv'")
+
+' ======================================================== Reiter 0: Werkstatt
+DIM w AS GUI_WIDGET
+
+w = GUI_LABEL(win, "Kategorien", 12, TOP + 4) : GUI_SET_TAB(w, 0)
+
+DIM baum AS GUI_WIDGET
+baum = GUI_TREE(win, 12, TOP + 26, 240, innH - 150)
+GUI_SET_TAB(baum, 0)
+GUI_TOOLTIP(baum, "Auswahl filtert die Tabelle rechts")
+
+' Die Trennlinie liefert nur ihre Position -- das Layout machen wir selbst.
+DIM spl AS GUI_WIDGET
+spl = GUI_SPLITTER(win, 258, TOP + 26, innH - 150, "v", 180, 520)
+GUI_SET_TAB(spl, 0)
+
+w = GUI_LABEL(win, "Eintraege", 276, TOP + 4) : GUI_SET_TAB(w, 0)
+DIM kopf AS ARRAY OF STRING
+kopf = SPLIT$("Name|Typ|Anzahl|Aktiv", "|")
+DIM tab AS GUI_WIDGET
+tab = GUI_TABLE(win, 276, TOP + 26, innW - 276, innH - 150)
+GUI_SET_TAB(tab, 0)
+GUI_TABLE_HEADERS(tab, kopf)
+DIM spalten AS ARRAY OF INTEGER
+spalten = [260, 140, 90, 70]           ' sonst teilt die Tabelle stur gleich auf
+GUI_TABLE_COL_WIDTHS(tab, spalten)
+GUI_TOOLTIP(tab, "Zeile anklicken -> laedt sie unten in den Editor")
+
+' --- Editor als gerahmte Gruppe --------------------------------------------
+DIM gbY AS INTEGER : gbY = TOP + innH - 116
+DIM grp AS GUI_WIDGET
+grp = GUI_GROUPBOX(win, 12, gbY, innW, 108, "Gewaehlter Eintrag")
+GUI_SET_TAB(grp, 0)
+
+w = GUI_LABEL(win, "Name", 30, gbY + 30) : GUI_SET_TAB(w, 0)
+DIM eingName AS GUI_WIDGET
+eingName = GUI_TEXTINPUT(win, 90, gbY + 24, 240, 30, "Name ...")
+GUI_SET_TAB(eingName, 0)
+
+w = GUI_LABEL(win, "Typ", 352, gbY + 30) : GUI_SET_TAB(w, 0)
+DIM typen AS ARRAY OF STRING
+typen = SPLIT$("Held|Gegner|Waffe|Trank|Sonstiges", "|")
+DIM waehlTyp AS GUI_WIDGET
+waehlTyp = GUI_DROPDOWN(win, 400, gbY + 24, 160, 30, typen)
+GUI_SET_TAB(waehlTyp, 0)
+
+w = GUI_LABEL(win, "Anzahl", 582, gbY + 30) : GUI_SET_TAB(w, 0)
+DIM dreh AS GUI_WIDGET
+dreh = GUI_SPINNER(win, 650, gbY + 24, 110, 0, 99, 1, 1)
+GUI_SET_TAB(dreh, 0)
+
+DIM hakenAktiv AS GUI_WIDGET
+hakenAktiv = GUI_CHECKBOX(win, "aktiv", 790, gbY + 30, TRUE)
+GUI_SET_TAB(hakenAktiv, 0)
+
+DIM trenn AS GUI_WIDGET
+trenn = GUI_SEPARATOR(win, 30, gbY + 66, innW - 36)
+GUI_SET_TAB(trenn, 0)
+
+DIM bUeber AS GUI_WIDGET
+bUeber = GUI_BUTTON(win, "Uebernehmen", 30, gbY + 74, 150, 28)
+GUI_SET_TAB(bUeber, 0)
+DIM bAnlegen AS GUI_WIDGET
+bAnlegen = GUI_BUTTON(win, "Als neu anlegen", 190, gbY + 74, 170, 28)
+GUI_SET_TAB(bAnlegen, 0)
+
+' ========================================================== Reiter 1: Regler
+' Der Rahmen muss VOR seinem Inhalt entstehen -- gezeichnet wird in der
+' Reihenfolge der Erzeugung, sonst deckt er die Regler zu.
+DIM grpReg AS GUI_WIDGET
+grpReg = GUI_GROUPBOX(win, 12, TOP + 8, innW, 210, "Kurvenform")
+GUI_SET_TAB(grpReg, 1)
+
+' Drei Drehknoepfe -- Frequenz, Hoehe, Verschiebung.
+DIM kFreq AS GUI_WIDGET : kFreq = GUI_KNOB(win, 30, TOP + 34, 74, 0.5, 8.0, 2.0)
+GUI_SET_TAB(kFreq, 1)
+GUI_TOOLTIP(kFreq, "Frequenz -- senkrecht ziehen")
+w = GUI_LABEL(win, "Frequenz", 30, TOP + 116) : GUI_SET_TAB(w, 1)
+
+DIM kAmp AS GUI_WIDGET : kAmp = GUI_KNOB(win, 130, TOP + 34, 74, 0.0, 1.0, 0.75)
+GUI_SET_TAB(kAmp, 1)
+w = GUI_LABEL(win, "Hoehe", 130, TOP + 116) : GUI_SET_TAB(w, 1)
+
+DIM kPhase AS GUI_WIDGET : kPhase = GUI_KNOB(win, 230, TOP + 34, 74, 0.0, 6.28, 0.0)
+GUI_SET_TAB(kPhase, 1)
+w = GUI_LABEL(win, "Phase", 230, TOP + 116) : GUI_SET_TAB(w, 1)
+
+' Radios: eine Gruppe, gegenseitiger Ausschluss.
+w = GUI_LABEL(win, "Wellenform", 340, TOP + 34) : GUI_SET_TAB(w, 1)
+DIM rSin AS GUI_WIDGET : rSin = GUI_RADIO(win, "welle", "Sinus", 340, TOP + 60)
+GUI_SET_TAB(rSin, 1)
+DIM rRck AS GUI_WIDGET : rRck = GUI_RADIO(win, "welle", "Rechteck", 340, TOP + 86)
+GUI_SET_TAB(rRck, 1)
+DIM rSae AS GUI_WIDGET : rSae = GUI_RADIO(win, "welle", "Saegezahn", 340, TOP + 112)
+GUI_SET_TAB(rSae, 1)
+GUI_SET_CHECKED(rSin, TRUE)      ' sonst ist beim Start KEINER markiert
+
+' Schieber + Schalter.
+w = GUI_LABEL(win, "Linienbreite", 480, TOP + 34) : GUI_SET_TAB(w, 1)
+DIM sBreite AS GUI_WIDGET
+sBreite = GUI_SLIDER(win, 480, TOP + 58, 200, 1.0, 6.0, 2.0)
+GUI_SET_TAB(sBreite, 1)
+
+w = GUI_LABEL(win, "Sichtfenster", 480, TOP + 84) : GUI_SET_TAB(w, 1)
+DIM sZoom AS GUI_WIDGET
+sZoom = GUI_SLIDER(win, 480, TOP + 108, 200, 0.5, 3.0, 1.0)
+GUI_SET_TAB(sZoom, 1)
+
+DIM tGitter AS GUI_WIDGET
+tGitter = GUI_TOGGLE(win, "Gitter", 710, TOP + 54, TRUE)
+GUI_SET_TAB(tGitter, 1)
+DIM tFuellen AS GUI_WIDGET
+tFuellen = GUI_TOGGLE(win, "Fuellen", 710, TOP + 96, FALSE)
+GUI_SET_TAB(tFuellen, 1)
+
+' Pegelanzeige -- rechnet sich aus Hoehe und Frequenz.
+w = GUI_LABEL(win, "Pegel", 850, TOP + 34) : GUI_SET_TAB(w, 1)
+DIM pegel AS GUI_WIDGET
+pegel = GUI_PROGRESS(win, 850, TOP + 58, 220, 20)
+GUI_SET_TAB(pegel, 1)
+
+' Voreinstellungen: Klick setzt alle Regler auf einmal.
+w = GUI_LABEL(win, "Voreinstellungen", 850, TOP + 90) : GUI_SET_TAB(w, 1)
+DIM vorNamen AS ARRAY OF STRING
+vorNamen = SPLIT$("Ruhig|Puls|Saege schnell|Flimmern", "|")
+DIM liste AS GUI_WIDGET
+liste = GUI_LISTBOX(win, 850, TOP + 114, 220, 92, vorNamen)
+GUI_SET_TAB(liste, 1)
+GUI_TOOLTIP(liste, "Eintrag anklicken -> setzt alle Regler")
+
+' Zeichenflaeche: GUI_DRAW malt nur den Rahmen, die Kurve malen wir danach.
+DIM leinwand AS GUI_WIDGET
+leinwand = GUI_CANVAS(win, 12, TOP + 222, innW, innH - 236)
+GUI_SET_TAB(leinwand, 1)
+
+' ========================================================= Reiter 2: Notizen
+DIM feld AS GUI_WIDGET
+feld = GUI_PANEL(win, 12, TOP + 8, innW, innH - 20)
+GUI_SET_TAB(feld, 2)
+
+w = GUI_LABEL(win, "Notizen (frei beschreibbar)", 30, TOP + 26) : GUI_SET_TAB(w, 2)
+DIM notiz AS GUI_WIDGET
+notiz = GUI_TEXTAREA(win, 30, TOP + 50, innW - 260, innH - 90, "Hier tippen ...")
+GUI_SET_TAB(notiz, 2)
+
+GUI_SET_TEXT(notiz, "Diese Anwendung zeigt alle 22 Widget-Arten des" + CHR$(10) + _
+             "gui-Moduls -- und jede tut etwas." + CHR$(10) + CHR$(10) + _
+             "Werkstatt: Baum filtert, Tabelle waehlt, Editor schreibt zurueck." + CHR$(10) + _
+             "Regler: Knoepfe und Schalter formen die Kurve." + CHR$(10) + CHR$(10) + _
+             "Frei beschreibbar -- einfach hineinklicken und tippen.")
+
+DIM bild AS GUI_WIDGET
+bild = GUI_IMAGE(win, innW - 200, TOP + 50, 160, 160, logo)
+GUI_SET_TAB(bild, 2)
+w = GUI_LABEL(win, "GENTEX_RADIAL", innW - 200, TOP + 218) : GUI_SET_TAB(w, 2)
+
+' Kennzahlen, die sich aus den echten Daten speisen -- so ist auch dieser
+' Reiter kein Standbild.
+DIM trennN AS GUI_WIDGET
+trennN = GUI_SEPARATOR(win, innW - 200, TOP + 246, 170) : GUI_SET_TAB(trennN, 2)
+DIM zahlGesamt AS GUI_WIDGET
+zahlGesamt = GUI_LABEL(win, "", innW - 200, TOP + 262) : GUI_SET_TAB(zahlGesamt, 2)
+DIM zahlAktiv AS GUI_WIDGET
+zahlAktiv = GUI_LABEL(win, "", innW - 200, TOP + 286) : GUI_SET_TAB(zahlAktiv, 2)
+DIM zahlStueck AS GUI_WIDGET
+zahlStueck = GUI_LABEL(win, "", innW - 200, TOP + 310) : GUI_SET_TAB(zahlStueck, 2)
+
+' ------------------------------------------------------ ueber allen Reitern
+DIM stand AS GUI_WIDGET
+stand = GUI_LABEL(win, "Bereit -- Reiter oben wechseln, Rechtsklick oeffnet ein Menue.", _
+                  12, TOP + innH + 10)
+GUI_SET_ANCHOR(stand, "b")
+
+' ============================================================ Daten + Logik
+CONST MAXE = 40
+DIM eName[MAXE] AS STRING
+DIM eKat[MAXE] AS STRING
+DIM eTyp[MAXE] AS STRING
+DIM eAnz[MAXE] AS INTEGER
+DIM eAktiv[MAXE] AS BOOLEAN
+DIM eAnzahl AS INTEGER
+DIM sichtIdx[MAXE] AS INTEGER      ' Tabellenzeile -> Index in den Daten
+DIM sichtN AS INTEGER
+DIM filter AS STRING : filter = ""
+DIM gewaehlt AS INTEGER : gewaehlt = -1
+
+SUB eintragSetzen(i AS INTEGER, n AS STRING, k AS STRING, t AS STRING, a AS INTEGER, ak AS BOOLEAN)
+    eName[i] = n : eKat[i] = k : eTyp[i] = t : eAnz[i] = a : eAktiv[i] = ak
+END SUB
+
+SUB beispieldaten()
+    eAnzahl = 0
+    eintragSetzen(0,  "Anna",          "Helden",     "Held",      1, TRUE)
+    eintragSetzen(1,  "Bruno",         "Helden",     "Held",      1, TRUE)
+    eintragSetzen(2,  "Cleo",          "Helden",     "Held",      1, FALSE)
+    eintragSetzen(3,  "Schleim",       "Gegner",     "Gegner",   12, TRUE)
+    eintragSetzen(4,  "Fledermaus",    "Gegner",     "Gegner",    8, TRUE)
+    eintragSetzen(5,  "Golem",         "Gegner",     "Gegner",    2, FALSE)
+    eintragSetzen(6,  "Skelett",       "Gegner",     "Gegner",   15, TRUE)
+    eintragSetzen(7,  "Kurzschwert",   "Gegenstand", "Waffe",     3, TRUE)
+    eintragSetzen(8,  "Langbogen",     "Gegenstand", "Waffe",     1, TRUE)
+    eintragSetzen(9,  "Heiltrank",     "Gegenstand", "Trank",     9, TRUE)
+    eintragSetzen(10, "Zaubertrank",   "Gegenstand", "Trank",     4, FALSE)
+    eintragSetzen(11, "Seil",          "Gegenstand", "Sonstiges", 2, TRUE)
+    eAnzahl = 12
+END SUB
+
+SUB tabelleAufbauen()
+    ' Erst zaehlen, dann genau so gross anlegen -- GUI_TABLE_ROWS zeigt ALLE
+    ' Zeilen des Arrays, ein zu grosser Puffer schleppt leere Zeilen mit.
+    sichtN = 0
+    DIM i AS INTEGER
+    FOR i = 0 TO eAnzahl - 1
+        IF filter = "" OR eKat[i] = filter THEN
+            sichtIdx[sichtN] = i
+            sichtN = sichtN + 1
+        END IF
+    NEXT
+    DIM zeilen AS INTEGER : zeilen = sichtN
+    IF zeilen = 0 THEN zeilen = 1          ' nie 0 Zeilen anlegen
+    DIM z[zeilen, 4] AS STRING
+    IF sichtN = 0 THEN
+        z[0, 0] = "(nichts in dieser Kategorie)"
+        z[0, 1] = "" : z[0, 2] = "" : z[0, 3] = ""
+    ELSE
+        FOR i = 0 TO sichtN - 1
+            DIM q AS INTEGER : q = sichtIdx[i]
+            z[i, 0] = eName[q]
+            z[i, 1] = eTyp[q]
+            z[i, 2] = STR$(eAnz[q])
+            z[i, 3] = IIF(eAktiv[q], "ja", "nein")
+        NEXT
+    END IF
+    GUI_TABLE_ROWS(tab, z)
+END SUB
+
+SUB editorFuellen(i AS INTEGER)
+    IF i < 0 OR i >= eAnzahl THEN RETURN
+    GUI_SET_TEXT(eingName, eName[i])
+    GUI_SET_VALUE(dreh, eAnz[i])
+    GUI_SET_CHECKED(hakenAktiv, eAktiv[i])
+    DIM k AS INTEGER
+    FOR k = 0 TO typen.length() - 1
+        IF typen[k] = eTyp[i] THEN GUI_DROPDOWN_SET_SELECTED(waehlTyp, k)
+    NEXT
+END SUB
+
+' --- Baum ------------------------------------------------------------------
+DIM nWurzel AS INTEGER : nWurzel = GUI_TREE_ADD(baum, -1, "Alle Eintraege")
+DIM nHelden AS INTEGER : nHelden = GUI_TREE_ADD(baum, nWurzel, "Helden")
+DIM nGegner AS INTEGER : nGegner = GUI_TREE_ADD(baum, nWurzel, "Gegner")
+DIM nDinge AS INTEGER  : nDinge  = GUI_TREE_ADD(baum, nWurzel, "Gegenstand")
+GUI_TREE_EXPAND(baum, nWurzel, TRUE)
+
+beispieldaten()
+tabelleAufbauen()
+
+' ============================================================== Hauptschleife
+DIM letzterBaum AS INTEGER : letzterBaum = -1
+DIM zeit AS FLOAT : zeit = 0.0
+
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(27) THEN BREAK
+    zeit = zeit + DELTA()
+
+    ' Das Fenster fuellt den Bildschirm -- auch nach einem Aufloesungswechsel.
+    SW = SCREENWIDTH() : SH = SCREENHEIGHT()
+    GUI_WINDOW_SET_BOUNDS(win, 0, 0, SW, SH)
+
+    GUI_UPDATE()
+
+    ' ---- Menue ----
+    IF GUI_CLICKED(miEnde) THEN BREAK
+    IF GUI_CLICKED(miNeu) OR GUI_CLICKED(bLade) THEN
+        beispieldaten() : filter = "" : gewaehlt = -1 : tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Beispieldaten neu geladen.")
+    END IF
+    IF GUI_CLICKED(miGlasD) THEN GUI_THEME_PRESET("glas_dunkel")
+    IF GUI_CLICKED(miGlasH) THEN GUI_THEME_PRESET("glas_hell")
+    IF GUI_CLICKED(miModD) THEN GUI_THEME_PRESET("modern_dark")
+    IF GUI_CLICKED(miModH) THEN GUI_THEME_PRESET("modern_light")
+    IF GUI_CLICKED(miUeber) OR GUI_CLICKED(cxHilfe) THEN
+        GUI_MESSAGE("Ueber", "Alle 22 Widget-Arten des gui-Moduls" + CHR$(10) + _
+                    "in einer Anwendung -- und jede tut etwas.")
+    END IF
+    IF GUI_CLICKED(cxAlle) THEN
+        filter = "" : tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Filter aufgehoben.")
+    END IF
+
+    ' ---- Werkzeugleiste ----
+    IF GUI_CLICKED(bNeu) AND eAnzahl < MAXE THEN
+        eintragSetzen(eAnzahl, "Neuer Eintrag", IIF(filter = "", "Gegenstand", filter), _
+                      "Sonstiges", 1, TRUE)
+        eAnzahl = eAnzahl + 1
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Eintrag angelegt -- unten benennen und uebernehmen.")
+    END IF
+    IF GUI_CLICKED(bWeg) AND gewaehlt >= 0 THEN
+        DIM d AS INTEGER
+        FOR d = gewaehlt TO eAnzahl - 2
+            eintragSetzen(d, eName[d+1], eKat[d+1], eTyp[d+1], eAnz[d+1], eAktiv[d+1])
+        NEXT
+        eAnzahl = eAnzahl - 1 : gewaehlt = -1
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Eintrag geloescht.")
+    END IF
+    IF GUI_CLICKED(bTest) THEN
+        DIM t AS INTEGER
+        FOR t = 0 TO eAnzahl - 1
+            eAktiv[t] = TRUE
+        NEXT
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Alle Eintraege auf aktiv gesetzt.")
+    END IF
+
+    ' ---- Baum filtert die Tabelle ----
+    DIM bs AS INTEGER : bs = GUI_TREE_SELECTED(baum)
+    IF bs <> letzterBaum THEN
+        letzterBaum = bs
+        IF bs = nHelden THEN
+            filter = "Helden"
+        ELIF bs = nGegner THEN
+            filter = "Gegner"
+        ELIF bs = nDinge THEN
+            filter = "Gegenstand"
+        ELSE
+            filter = ""
+        END IF
+        gewaehlt = -1
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Filter: " + IIF(filter = "", "alle", filter) + _
+                     "  (" + STR$(sichtN) + " Eintraege)")
+    END IF
+
+    ' ---- Trennlinie legt die Breite von Baum und Tabelle fest ----
+    DIM sx AS INTEGER : sx = GUI_VALUE(spl)
+    GUI_SET_BOUNDS(baum, 12, TOP + 26, sx - 12, innH - 150)
+    GUI_SET_BOUNDS(tab, sx + 18, TOP + 26, SW - 24 - (sx + 18), innH - 150)
+
+    ' ---- Tabellenzeile -> Editor ----
+    IF GUI_TABLE_CLICKED(tab) >= 0 AND sichtN > 0 THEN
+        DIM r AS INTEGER : r = GUI_TABLE_SELECTED(tab)
+        IF r >= 0 AND r < sichtN THEN
+            gewaehlt = sichtIdx[r]
+            editorFuellen(gewaehlt)
+            GUI_SET_TEXT(stand, "Gewaehlt: " + eName[gewaehlt])
+        END IF
+    END IF
+
+    ' ---- Editor zurueckschreiben ----
+    IF GUI_CLICKED(bUeber) AND gewaehlt >= 0 THEN
+        eName[gewaehlt] = GUI_TEXT(eingName)
+        eTyp[gewaehlt] = GUI_DROPDOWN_TEXT(waehlTyp)
+        eAnz[gewaehlt] = GUI_VALUE(dreh)
+        eAktiv[gewaehlt] = GUI_CHECKED(hakenAktiv)
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Uebernommen: " + eName[gewaehlt])
+    END IF
+    IF GUI_CLICKED(bAnlegen) AND eAnzahl < MAXE THEN
+        eintragSetzen(eAnzahl, GUI_TEXT(eingName), IIF(filter = "", "Gegenstand", filter), _
+                      GUI_DROPDOWN_TEXT(waehlTyp), GUI_VALUE(dreh), GUI_CHECKED(hakenAktiv))
+        eAnzahl = eAnzahl + 1
+        tabelleAufbauen()
+        GUI_SET_TEXT(stand, "Neu angelegt: " + GUI_TEXT(eingName))
+    END IF
+
+    ' ---- Voreinstellungen setzen alle Regler ----
+    DIM vs AS INTEGER : vs = GUI_LISTBOX_SELECTED(liste)
+    SELECT CASE vs
+        CASE 0
+            GUI_SET_VALUE(kFreq, 1.0) : GUI_SET_VALUE(kAmp, 0.4) : GUI_SET_VALUE(kPhase, 0.0)
+        CASE 1
+            GUI_SET_VALUE(kFreq, 3.0) : GUI_SET_VALUE(kAmp, 0.9) : GUI_SET_VALUE(kPhase, 1.6)
+        CASE 2
+            GUI_SET_VALUE(kFreq, 6.0) : GUI_SET_VALUE(kAmp, 0.7) : GUI_SET_VALUE(kPhase, 0.0)
+        CASE 3
+            GUI_SET_VALUE(kFreq, 8.0) : GUI_SET_VALUE(kAmp, 1.0) : GUI_SET_VALUE(kPhase, 3.1)
+    END SELECT
+    IF vs >= 0 THEN
+        GUI_LISTBOX_SET_SELECTED(liste, -1)     ' einmalig anwenden, nicht jeden Frame
+        GUI_SET_TEXT(stand, "Voreinstellung uebernommen.")
+    END IF
+
+    ' ---- Kennzahlen fuer den Reiter "Notizen" ----
+    IF GUI_ACTIVE_TAB(win) = 2 THEN
+        DIM na AS INTEGER : na = 0
+        DIM ns AS INTEGER : ns = 0
+        DIM q2 AS INTEGER
+        FOR q2 = 0 TO eAnzahl - 1
+            IF eAktiv[q2] THEN na = na + 1
+            ns = ns + eAnz[q2]
+        NEXT
+        GUI_SET_TEXT(zahlGesamt, "Eintraege: " + STR$(eAnzahl))
+        GUI_SET_TEXT(zahlAktiv, "davon aktiv: " + STR$(na))
+        GUI_SET_TEXT(zahlStueck, "Stueckzahl gesamt: " + STR$(ns))
+    END IF
+
+    ' ---- Pegel aus den Reglern ----
+    DIM amp AS FLOAT : amp = GUI_VALUE(kAmp)
+    DIM frq AS FLOAT : frq = GUI_VALUE(kFreq)
+    GUI_SET_VALUE(pegel, MIN(1.0, amp * 0.75 + frq / 32.0))
+
+    ' ============================ zeichnen ============================
+    GRADIENTV(0, 0, SW - 1, SH - 1, &H0A0F16, &H161E29)
+    GUI_DRAW()
+
+    ' Die Kurve NACH GUI_DRAW in den Canvas-Bereich malen (Bildschirm-Koordinaten).
+    IF GUI_ACTIVE_TAB(win) = 1 THEN
+        DIM cx AS INTEGER : cx = GUI_CANVAS_X(leinwand)
+        DIM cy AS INTEGER : cy = GUI_CANVAS_Y(leinwand)
+        DIM cw AS INTEGER : cw = GUI_CANVAS_W(leinwand)
+        DIM ch AS INTEGER : ch = GUI_CANVAS_H(leinwand)
+        DIM mitte AS INTEGER : mitte = cy + ch \ 2
+        DIM zoom AS FLOAT : zoom = GUI_VALUE(sZoom)
+        DIM phs AS FLOAT : phs = GUI_VALUE(kPhase) + zeit * 1.5
+        DIM form AS INTEGER : form = GUI_RADIO_SELECTED(rSin)
+        DIM breite AS FLOAT : breite = GUI_VALUE(sBreite)
+
+        IF GUI_CHECKED(tGitter) THEN
+            DIM g AS INTEGER
+            FOR g = cx + 40 TO cx + cw - 2 STEP 40
+                LINE(g, cy + 2, g, cy + ch - 2, &H1E2A38)
+            NEXT
+            FOR g = cy + 30 TO cy + ch - 2 STEP 30
+                LINE(cx + 2, g, cx + cw - 2, g, &H1E2A38)
+            NEXT
+            LINE(cx + 2, mitte, cx + cw - 2, mitte, &H30455A)
+        END IF
+
+        DIM px AS INTEGER
+        DIM vy AS INTEGER : vy = mitte
+        DIM voriges AS INTEGER : voriges = mitte
+        FOR px = 2 TO cw - 3
+            DIM t AS FLOAT
+            t = (px / cw) * 6.2831853 * frq * zoom + phs
+            DIM v AS FLOAT
+            SELECT CASE form
+                CASE 1
+                    v = IIF(SIN(t) >= 0.0, 1.0, -1.0)              ' Rechteck
+                CASE 2
+                    v = ((t / 6.2831853) MOD 1.0) * 2.0 - 1.0      ' Saegezahn
+                CASE ELSE
+                    v = SIN(t)                                     ' Sinus
+            END SELECT
+            vy = mitte - INT(v * amp * (ch \ 2 - 8))
+            IF GUI_CHECKED(tFuellen) THEN
+                LINE(cx + px, mitte, cx + px, vy, &H15384A)
+            END IF
+            IF px > 2 THEN LINEW(cx + px - 1, voriges, cx + px, vy, breite, &H2BC4E8)
+            voriges = vy
+        NEXT
+    END IF
+
+    TEXT(SW - 190, SH - 26, "[ESC] Ende", &H6A7C8E)
+    FLIP()
+WEND

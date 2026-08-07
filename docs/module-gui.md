@@ -800,6 +800,17 @@ Siehe [examples/45_gui.gb](../examples/45_gui.gb): Fenster mit Slider (live ins
 Label gespiegelt), Checkbox, Textfeld und Start-Button — verschiebbar und
 schließbar.
 
+**Alle 22 Widget-Arten in einer Anwendung:**
+[examples/156_gui_alle_widgets.gb](../examples/156_gui_alle_widgets.gb) —
+Vollbild, randloses Fenster (die Form *ist* der Bildschirm), Menüleiste,
+Werkzeugleiste, Kontextmenü und drei Reiter. Kein Schaukasten: jedes Widget
+hat eine Aufgabe. Der Baum filtert die Tabelle, eine Tabellenzeile füllt den
+Editor, „Übernehmen" schreibt zurück; auf dem zweiten Reiter formen
+Drehknöpfe, Schieber, Radios und Schalter live die Kurve auf der
+Zeichenfläche, die Liste lädt Voreinstellungen; der dritte Reiter führt
+Kennzahlen aus den echten Daten mit. Über das Menü lassen sich alle vier
+Themen umschalten.
+
 ## Limitationen (Stand jetzt)
 
 - **Events**: Polling (`GUI_CLICKED` …) **und** FUNCREF-Callbacks
