@@ -515,3 +515,18 @@ DIM t2 AS GUI_WIDGET : t2 = GUI_WINDOW_WIDGET(w2, 0)
 PRINT STR$(GUI_TABLE_COL_AT(t2, 0)) + " " + STR$(GUI_TABLE_GET(t2, "feste_spalten"))
 '''), base=tmp_path)
     assert out.strip().startswith("1 2"), out
+
+
+def test_beim_oeffnen_ist_alles_markiert(run_gb, tmp_path):
+    """Das erste Tippen soll den Inhalt ERSETZEN, nicht verlaengern -- so
+    erwartet man es, wenn man eine Zelle zum Ueberschreiben aufmacht.
+    Geprueft wird der Zustand, den `table_begin_edit` setzt; das Tippen selbst
+    braucht eine echte Tastatur (raylibs Automation fuellt nur die Tasten-,
+    nicht die Zeichen-Warteschlange) und ist ueber eingespeiste Ruecktaste/
+    Entf abgenommen: beide loeschten den GANZEN Inhalt."""
+    out = run_gb(_tabelle([("Anna", 1)], '''
+GUI_TABLE_COL_EDIT(t, 0, TRUE)
+PRINT STR$(GUI_TABLE_EDITING_ROW(t)) + " " + STR$(GUI_TABLE_EDITING_COL(t))
+'''), base=tmp_path)
+    # Freigeben allein startet nichts -- der Doppelklick tut das.
+    assert out.strip() == "-1 -1", out

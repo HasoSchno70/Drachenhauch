@@ -392,6 +392,18 @@ pub struct TableState {
     /// spraenge einem beim Tippen unter dem Finger weg).
     edit_text: String,
     edit_caret: i32,
+    /// Anker der Textauswahl. Zusammen mit `edit_caret` die markierte Stelle;
+    /// beide gleich = nichts markiert.
+    edit_anchor: i32,
+    /// Waagerechter Versatz, damit die Schreibmarke sichtbar bleibt.
+    edit_scroll: i32,
+    /// Maus ignorieren, solange der OEFFNENDE Doppelklick noch gedrueckt ist.
+    ///
+    /// Ohne das las der Editor denselben Klick, der ihn geoeffnet hat, sofort
+    /// als "Marke hierhin setzen" -- und hob damit die Rundum-Markierung auf,
+    /// die das Ueberschreiben erst moeglich macht. Ergebnis: die Ruecktaste
+    /// loeschte EIN Zeichen statt des Inhalts.
+    edit_maus_sperre: bool,
     /// Welche Spalten bearbeitet werden duerfen. Kuerzer als die Spaltenzahl
     /// = der Rest ist gesperrt.
     col_edit: Vec<bool>,
@@ -424,6 +436,7 @@ impl Default for TableState {
             frozen: 0, col_order: vec![], reorderable: false, head_drag: None,
             multi: false, sel_rows: vec![], sel_anchor: -1,
             edit_row: -1, edit_col: -1, edit_text: String::new(), edit_caret: 0,
+            edit_anchor: 0, edit_scroll: 0, edit_maus_sperre: false,
             col_edit: vec![],
             drag_col: -1, drag_col_w: 0, drag_col_x: 0, resizable_cols: true,
             sort_col: -1, sort_desc: false, sortable: true,
@@ -1837,6 +1850,13 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     }
 
     fn table_press(&mut self, wi: usize, idx: usize, mx: i32, my: i32) {
+        // Klick im laufenden Eingabefeld gehoert dem Editor -- sonst wuerde er
+        // hier zusaetzlich als Zeilen-Klick zaehlen.
+        if self.editing_table == Some((wi, idx)) {
+            if let Some(r) = self.edit_cell_rect(wi, idx) {
+                if Self::in_rect(mx, my, r) { return; }
+            }
+        }
         let gm = self.table_geom(wi, idx);
         if gm.need_v {
             let sb_x = gm.ax + gm.body_w_raw - TBL_SCROLL_W + 1;
@@ -1941,6 +1961,12 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if art != CellKind::Text { return; }
         t.edit_text = t.cell(r as usize, c as usize).map(|x| x.text.clone()).unwrap_or_default();
         t.edit_caret = t.edit_text.chars().count() as i32;
+        // Beim Oeffnen alles markiert -- so ersetzt das erste Tippen den
+        // bisherigen Inhalt, statt ihn zu verlaengern. Genau das erwartet man,
+        // wenn man eine Zelle zum Ueberschreiben aufmacht.
+        t.edit_anchor = 0;
+        t.edit_scroll = 0;
+        t.edit_maus_sperre = true;
         t.edit_row = r;
         t.edit_col = c;
         t.selected = r;
@@ -1967,6 +1993,8 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             t.edit_col = -1;
             t.edit_text.clear();
             t.edit_caret = 0;
+            t.edit_anchor = 0;
+            t.edit_scroll = 0;
             // Erst JETZT neu sortieren/filtern. Waehrend des Tippens waere die
             // Zeile bei jedem Zeichen weggesprungen.
             if geaendert { t.rebuild_view(); }
@@ -2048,41 +2076,81 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
     /// Zwischenablage. **Keine Textauswahl** -- die volle Textfeld-Logik hier
     /// zu wiederholen waere ein zweiter Ort, an dem dieselben Fehler entstehen
     /// koennen; fuer eine Tabellenzelle reicht das hier.
-    fn table_edit_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
-        let eingabe = g.pop_text_input();
-        let ctrl = g.key_ctrl();
-        let (ok, ab) = (g.key_pressed(KEY_ENTER), g.key_pressed(27));
-        let (links, rechts) = (g.key_repeat(KEY_LEFT), g.key_repeat(KEY_RIGHT));
-        let (pos1, ende) = (g.key_pressed(KEY_HOME), g.key_pressed(KEY_END));
-        let rueck = g.key_repeat(KEY_BACKSPACE);
-        let entf = g.key_repeat(KEY_DELETE);
-        let einfuegen = ctrl && g.key_pressed(K_V);
-        let ablage = if einfuegen { g.clipboard_get() } else { String::new() };
+    /// Bildschirm-Rechteck der Zelle, die gerade bearbeitet wird.
+    ///
+    /// Aus `table_geom` gerechnet statt beim Zeichnen gemerkt: das Zeichnen
+    /// laeuft ueber `&self` und koennte gar nichts merken -- und eine zweite,
+    /// nachgefuehrte Quelle waere genau die Sorte Doppelung, die zwischen
+    /// Treffer und Anzeige auseinander laeuft.
+    fn edit_cell_rect(&self, wi: usize, idx: usize) -> Option<(i32, i32, i32, i32)> {
+        let gm = self.table_geom(wi, idx);
+        let t = self.windows[wi].widgets[idx].tbl.as_ref()?;
+        if t.edit_row < 0 { return None; }
+        let pos = gm.order.iter().position(|&c| c as i32 == t.edit_col)?;
+        let vi = t.view_of(t.edit_row);
+        if vi < 0 { return None; }
+        let x = Self::col_x(&gm, pos);
+        let y = gm.body_y + vi * gm.row_h - t.scroll_y;
+        Some((x, y, gm.col_widths[pos], gm.row_h))
+    }
 
-        if ok { self.table_end_edit(wi, i, true); return; }
-        if ab { self.table_end_edit(wi, i, false); return; }
+    fn table_edit_keys(&mut self, wi: usize, i: usize, g: &mut Graphics) {
+        let ctrl = g.key_ctrl();
+        let shift = g.key_shift();
+        // Enter/ESC zuerst -- danach ist die Bearbeitung vorbei und alles
+        // Weitere waere Arbeit an einem Zustand, den es nicht mehr gibt.
+        if g.key_pressed(KEY_ENTER) { self.table_end_edit(wi, i, true); return; }
+        if g.key_pressed(27) { self.table_end_edit(wi, i, false); return; }
+
+        let rect = self.edit_cell_rect(wi, i);
+        let (rx, rw) = rect.map(|(x, _, w, _)| (x, w)).unwrap_or((0, 0));
 
         let t = match self.windows[wi].widgets[i].tbl.as_mut() { Some(t) => t, None => return };
         let mut chars: Vec<char> = t.edit_text.chars().collect();
         let mut caret = t.edit_caret.clamp(0, chars.len() as i32);
+        let mut anchor = t.edit_anchor.clamp(0, chars.len() as i32);
+        let scroll = t.edit_scroll;
 
-        for ch in eingabe.chars().filter(|c| !c.is_control()) {
-            chars.insert(caret as usize, ch);
-            caret += 1;
+        // Der oeffnende Doppelklick zaehlt nicht als Setzen der Marke -- erst
+        // wenn die Taste einmal losgelassen wurde, hoert der Editor auf die
+        // Maus.
+        if t.edit_maus_sperre {
+            if !g.mouse_button(0) { t.edit_maus_sperre = false; }
         }
-        for ch in ablage.chars().filter(|c| !c.is_control()) {
-            chars.insert(caret as usize, ch);
-            caret += 1;
-        }
-        if rueck && caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
-        if entf && (caret as usize) < chars.len() { chars.remove(caret as usize); }
-        if links { caret -= 1; }
-        if rechts { caret += 1; }
-        if pos1 { caret = 0; }
-        if ende { caret = chars.len() as i32; }
+        let maus_an = !t.edit_maus_sperre;
 
+        // Maus im Eingabefeld: Klick setzt die Marke, Ziehen markiert. Das
+        // Feld liegt IN der Tabelle, deshalb hier und nicht im allgemeinen
+        // Tabellen-Treffertest -- der wuerde den Klick als Zeilenauswahl
+        // deuten und die Bearbeitung beenden.
+        if maus_an && g.mouse_button(0) {
+            let (mx, my) = (g.mouse_x() as i32, g.mouse_y() as i32);
+            let ziel = mx - (rx + 5) + scroll;
+            let idx = Self::caret_index_at(g, &chars, ziel);
+            if !self.was_mouse_down {
+                let drin = rect.map(|r| Self::in_rect(mx, my, r)).unwrap_or(false);
+                if drin { caret = idx; anchor = idx; }
+            } else {
+                caret = idx;
+            }
+        }
+
+        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
+
+        // Versatz nachfuehren, damit die Schreibmarke im Feld bleibt.
+        let vor: String = chars[..caret.clamp(0, chars.len() as i32) as usize].iter().collect();
+        let marke_px = g.text_width(&vor);
+        let innen = (rw - 10).max(1);
+        let mut scroll = scroll;
+        if marke_px - scroll > innen { scroll = marke_px - innen; }
+        if marke_px - scroll < 0 { scroll = marke_px; }
+        if scroll < 0 { scroll = 0; }
+
+        let t = self.windows[wi].widgets[i].tbl.as_mut().unwrap();
         t.edit_text = chars.iter().collect();
         t.edit_caret = caret.clamp(0, chars.len() as i32);
+        t.edit_anchor = anchor.clamp(0, chars.len() as i32);
+        t.edit_scroll = scroll;
     }
 
     /// Tippen in die fokussierte Filterzelle. Bewusst schlicht: Zeichen
@@ -3681,65 +3749,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             }
         }
 
-        // --- Zeichen-Eingabe (nicht bei gedruecktem Strg) ---
-        if !ctrl {
-            let typed: String = g.pop_text_input().chars()
-                .filter(|c| !c.is_control() && *c != '\t').collect();
-            if !typed.is_empty() {
-                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-                for (k, ch) in typed.chars().enumerate() { chars.insert(caret as usize + k, ch); }
-                caret += typed.chars().count() as i32; anchor = caret;
-            }
-        } else {
-            // Strg+A: alles markieren
-            if g.key_pressed(K_A) { anchor = 0; caret = chars.len() as i32; }
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if g.key_pressed(K_C) && lo != hi {
-                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
-            }
-            if g.key_pressed(K_X) && lo != hi {
-                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
-                chars.drain(lo as usize..hi as usize); caret = lo; anchor = lo;
-            }
-            if g.key_pressed(K_V) {
-                let ins: Vec<char> = g.clipboard_get().chars().filter(|c| !c.is_control()).collect();
-                let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-                if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-                for (k, ch) in ins.iter().enumerate() { chars.insert(caret as usize + k, *ch); }
-                caret += ins.len() as i32; anchor = caret;
-            }
-        }
-
-        // --- Backspace / Delete ---
-        if g.key_pressed(KEY_BACKSPACE) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-            else if caret > 0 { chars.remove(caret as usize - 1); caret -= 1; }
-            anchor = caret;
-        }
-        if g.key_pressed(KEY_DELETE) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if lo != hi { chars.drain(lo as usize..hi as usize); caret = lo; }
-            else if (caret as usize) < chars.len() { chars.remove(caret as usize); }
-            anchor = caret;
-        }
-
-        // --- Navigation (Shift = Selektion erweitern) ---
-        let len = chars.len() as i32;
-        caret = caret.clamp(0, len); anchor = anchor.clamp(0, len);
-        if g.key_pressed(KEY_LEFT) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if !shift && lo != hi { caret = lo; } else { caret = (caret - 1).max(0); }
-            if !shift { anchor = caret; }
-        }
-        if g.key_pressed(KEY_RIGHT) {
-            let (lo, hi) = (caret.min(anchor), caret.max(anchor));
-            if !shift && lo != hi { caret = hi; } else { caret = (caret + 1).min(len); }
-            if !shift { anchor = caret; }
-        }
-        if g.key_pressed(KEY_HOME) { caret = 0; if !shift { anchor = 0; } }
-        if g.key_pressed(KEY_END) { caret = len; if !shift { anchor = len; } }
+        Self::einzeiler_tasten(g, &mut chars, &mut caret, &mut anchor, ctrl, shift);
 
         // --- Horizontalen Scroll so anpassen, dass das Caret sichtbar bleibt ---
         let caret_px = g.text_width(&chars[..caret as usize].iter().collect::<String>());
@@ -3757,6 +3767,80 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if w.text != before {
             if let Some(f) = w.on_change.clone() { self.pending.push(f); }
         }
+    }
+
+    /// Tastatur eines EINZEILIGEN Textfelds: Tippen, Strg+A/C/V/X,
+    /// Ruecktaste/Entf, Pfeile, Pos1/Ende -- jeweils mit Textauswahl
+    /// (Umschalt erweitert, Tippen ersetzt das Markierte).
+    ///
+    /// Herausgeloest, damit das Textfeld-Widget UND der Zell-Editor der Tabelle
+    /// dieselbe Logik benutzen. Vorher hatte die Zelle eine eigene, aermere
+    /// Fassung ohne Auswahl -- zwei Orte fuer dieselbe Sache, an denen dieselben
+    /// Fehler zweimal entstehen koennen.
+    ///
+    /// `chars`/`caret`/`anchor` werden an Ort und Stelle geaendert; wer sie
+    /// haelt (Widget oder Zelle) entscheidet der Aufrufer.
+    fn einzeiler_tasten(g: &mut Graphics, chars: &mut Vec<char>,
+                        caret: &mut i32, anchor: &mut i32, ctrl: bool, shift: bool) {
+        // --- Zeichen-Eingabe (nicht bei gedruecktem Strg) ---
+        if !ctrl {
+            let typed: String = g.pop_text_input().chars()
+                .filter(|c| !c.is_control() && *c != '\t').collect();
+            if !typed.is_empty() {
+                let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); *caret = lo; }
+                for (k, ch) in typed.chars().enumerate() { chars.insert(*caret as usize + k, ch); }
+                *caret += typed.chars().count() as i32; *anchor = *caret;
+            }
+        } else {
+            // Strg+A: alles markieren
+            if g.key_pressed(K_A) { *anchor = 0; *caret = chars.len() as i32; }
+            let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+            if g.key_pressed(K_C) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+            }
+            if g.key_pressed(K_X) && lo != hi {
+                g.clipboard_set(&chars[lo as usize..hi as usize].iter().collect::<String>());
+                chars.drain(lo as usize..hi as usize); *caret = lo; *anchor = lo;
+            }
+            if g.key_pressed(K_V) {
+                let ins: Vec<char> = g.clipboard_get().chars().filter(|c| !c.is_control()).collect();
+                let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+                if lo != hi { chars.drain(lo as usize..hi as usize); *caret = lo; }
+                for (k, ch) in ins.iter().enumerate() { chars.insert(*caret as usize + k, *ch); }
+                *caret += ins.len() as i32; *anchor = *caret;
+            }
+        }
+
+        // --- Ruecktaste / Entf ---
+        if g.key_pressed(KEY_BACKSPACE) {
+            let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); *caret = lo; }
+            else if *caret > 0 { chars.remove(*caret as usize - 1); *caret -= 1; }
+            *anchor = *caret;
+        }
+        if g.key_pressed(KEY_DELETE) {
+            let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+            if lo != hi { chars.drain(lo as usize..hi as usize); *caret = lo; }
+            else if (*caret as usize) < chars.len() { chars.remove(*caret as usize); }
+            *anchor = *caret;
+        }
+
+        // --- Navigation (Umschalt = Auswahl erweitern) ---
+        let len = chars.len() as i32;
+        *caret = (*caret).clamp(0, len); *anchor = (*anchor).clamp(0, len);
+        if g.key_pressed(KEY_LEFT) {
+            let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+            if !shift && lo != hi { *caret = lo; } else { *caret = (*caret - 1).max(0); }
+            if !shift { *anchor = *caret; }
+        }
+        if g.key_pressed(KEY_RIGHT) {
+            let (lo, hi) = ((*caret).min(*anchor), (*caret).max(*anchor));
+            if !shift && lo != hi { *caret = hi; } else { *caret = (*caret + 1).min(len); }
+            if !shift { *anchor = *caret; }
+        }
+        if g.key_pressed(KEY_HOME) { *caret = 0; if !shift { *anchor = 0; } }
+        if g.key_pressed(KEY_END) { *caret = len; if !shift { *anchor = len; } }
     }
 
     /// Zeilenanfang-Indizes (Char-Position nach jedem '\n', plus 0).
@@ -3994,8 +4078,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // hineintippen, aber nichts mehr annimmt. Uebernehmen (nicht
         // verwerfen), weil Wegklicken ueberall sonst auch bestaetigt;
         // zuruecknehmen geht mit ESC.
+        //
+        // AUSSER man klickt IN das Eingabefeld selbst -- dort setzt der Klick
+        // die Schreibmarke bzw. beginnt eine Markierung. Ohne diese Ausnahme
+        // koennte man im eigenen Text nicht klicken, ohne ihn zu schliessen.
         if let Some((ew, ei)) = self.editing_table {
-            self.table_end_edit(ew, ei, true);
+            let drin = self.edit_cell_rect(ew, ei)
+                .map(|r| Self::in_rect(mx, my, r)).unwrap_or(false);
+            if !drin { self.table_end_edit(ew, ei, true); }
         }
         // Offenes Dropdown hat Vorrang: das Popup liegt ueber allem und reicht
         // evtl. ueber den Fensterrand hinaus (topmost_at wuerde es verfehlen).
@@ -5058,18 +5148,27 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if t.edit_row == r as i32 && t.edit_col == c as i32 {
             self.fbox_tief(g, cx + 1, cy + 2, cx + cw - 2, cy + ch - 3,
                            self.th("field_bg"), accent);
-            let vor: String = t.edit_text.chars().take(t.edit_caret.max(0) as usize).collect();
-            let tx = cx + 5;
+            let alle: Vec<char> = t.edit_text.chars().collect();
+            let tx = cx + 5 - t.edit_scroll;
             let ty = cy + (ch - schrift).max(0) / 2;
-            // Nach links schieben, wenn der Text laenger ist als die Zelle --
-            // sonst tippt man ins Unsichtbare.
-            let voll = self.wtext_width(g, wdg, &t.edit_text);
-            let platz = cw - 10;
-            let versatz = if voll > platz { voll - platz } else { 0 };
             g.push_clip(cx + 3, cy + 2, (cw - 6).max(1), ch - 4);
-            self.wtext(g, wdg, tx - versatz, ty, t.edit_text.clone(), fg_thema);
+
+            // Markierter Bereich als Flaeche HINTER dem Text -- ohne sie sieht
+            // man nicht, was das naechste Zeichen ersetzen wuerde.
+            let (lo, hi) = (t.edit_caret.min(t.edit_anchor).clamp(0, alle.len() as i32),
+                            t.edit_caret.max(t.edit_anchor).clamp(0, alle.len() as i32));
+            if lo != hi {
+                let vor: String = alle[..lo as usize].iter().collect();
+                let mitte: String = alle[lo as usize..hi as usize].iter().collect();
+                let x1 = tx + self.wtext_width(g, wdg, &vor);
+                let x2 = x1 + self.wtext_width(g, wdg, &mitte);
+                g.box_fill(x1, cy + 4, x2 - 1, cy + ch - 5,
+                           (140i64 << 24) | (accent & 0xFFFFFF));
+            }
+            self.wtext(g, wdg, tx, ty, t.edit_text.clone(), fg_thema);
             // Schreibmarke -- ohne sie sieht man nicht, wo man tippt.
-            let vx = tx - versatz + self.wtext_width(g, wdg, &vor);
+            let bis: String = alle[..t.edit_caret.clamp(0, alle.len() as i32) as usize].iter().collect();
+            let vx = tx + self.wtext_width(g, wdg, &bis);
             g.line(vx, cy + 4, vx, cy + ch - 5, accent);
             g.pop_clip();
             return;

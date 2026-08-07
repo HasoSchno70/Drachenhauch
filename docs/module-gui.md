@@ -632,11 +632,17 @@ Beim Übernehmen feuert `on_change` und die Ansicht (Sortierung + Filter) wird
 neu gebaut — **erst dann**, nicht bei jeder Taste: sonst spränge die Zeile
 einem beim Tippen unter dem Finger weg.
 
-**Der Editor kann:** Schreibmarke, Pfeiltasten, `Pos1`/`Ende`, `Rücktaste`,
-`Entf`, Einfügen mit `Strg+V`, und er schiebt den Text nach links wenn er
-länger ist als die Zelle. **Er kann nicht:** Text markieren. Die volle
-Textfeld-Logik hier zu wiederholen wäre ein zweiter Ort, an dem dieselben
-Fehler entstehen.
+**Der Editor kann dasselbe wie ein `TextInput`** — beide benutzen dieselbe
+Routine, es gibt die Logik also nur einmal: Schreibmarke, Pfeiltasten,
+`Pos1`/`Ende`, `Rücktaste`, `Entf`, `Strg+A/C/V/X`, **Text markieren** (mit
+Umschalt+Navigation oder durch Ziehen mit der Maus im Feld), und er schiebt den
+Text mit, wenn er länger ist als die Zelle.
+
+Beim Öffnen ist der **ganze Inhalt markiert** — das erste Tippen ersetzt ihn
+also, statt ihn zu verlängern. Genau das erwartet man, wenn man eine Zelle zum
+Überschreiben aufmacht. (Der öffnende Doppelklick selbst setzt die Marke
+deshalb *nicht*; erst nach dem Loslassen hört der Editor auf die Maus. Sonst
+hätte derselbe Klick die Markierung sofort wieder aufgehoben.)
 
 > **Achtung bei `ESC`:** wenn dein Programm `ESC` zum Beenden benutzt, frag
 > vorher `GUI_TABLE_EDITING_ROW(tbl) < 0` ab — sonst beendet dieselbe Taste
@@ -691,8 +697,7 @@ gelesen, ältere Dateien laufen unverändert.
 > — Serverliste mit Ampel-Bildern, Auslastungsbalken, Favoriten-Haken und
 > Aktionsknopf; sortierbar, filterbar, Spalten ziehbar.
 
-**Nicht umgesetzt** (bewusst): Text in einer Zelle markieren,
-Zeilengruppen/Baum in der Tabelle.
+**Nicht umgesetzt** (bewusst): Zeilengruppen/Baum in der Tabelle.
 - Optionaler `GUI_ON_CHANGE(tbl, funcref)`-Callback feuert bei Selektionswechsel.
 - Farben folgen dem Theme (`GUI_SET_COLOR(tbl, ...)` überschreibt pro Widget: bg/fg/border/accent).
 
