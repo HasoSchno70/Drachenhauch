@@ -1376,3 +1376,95 @@ def test_anordnen_befehle_grauen_aus(tmp_path):
         assert aktiv(3) == gesamt
     finally:
         win.close()
+
+
+# ------------------------------------------------- Flaeche um das Formular
+# Beide Fehler, die hier passiert sind, waren im CODE unauffaellig und nur im
+# gerenderten Bild zu sehen: ein Raster, das im Thema verschwand, und ein
+# Schatten ohne Spielraum nach unten. Darum wird hier gemessen statt gelesen.
+
+def _canvas_bild(win, breite=640, hoehe=480):
+    """Canvas ohne Event-Schleife in ein Bild rendern (`render`, nicht `grab`):
+    kein `show()`, kein `processEvents()` -- im gemeinsamen pytest-Prozess ist
+    ungebremstes Pumpen der bekannte Aufhaenger."""
+    from PySide6.QtGui import QPixmap
+    win.canvas.resize(breite, hoehe)
+    pm = QPixmap(breite, hoehe)
+    win.canvas.render(pm)
+    return pm.toImage()
+
+
+def _abstand(a, b):
+    return abs(a.red() - b.red()) + abs(a.green() - b.green()) + abs(a.blue() - b.blue())
+
+
+@pytest.mark.parametrize("thema", ["", "modern_light"])
+def test_raster_hebt_sich_vom_formular_ab(tmp_path, thema):
+    """Das Raster wurde einmal aus Fenster- und RAHMEN-farbe gemischt -- die
+    liegen in beiden Themen dicht beieinander, das Raster verschwand komplett.
+    Gemischt wird darum zur Schriftfarbe, die per Definition Kontrast hat.
+
+    Gemessen wird im GERENDERTEN Bild, nicht an der Formel: haette der Test
+    die Mischung selbst nachgerechnet, waere er gruen geblieben, egal was
+    `_paint_grid` tatsaechlich zeichnet -- und genau dort sass der Fehler."""
+    _app()
+    from gamebasic.formdesigner_qt import PAD, TITLE_H, GRID, _col
+    from gamebasic.formdesigner import theme_colors
+    win = FormDesigner(tmp_path)
+    try:
+        win.canvas.doc.theme = thema
+        win.canvas.zoom = 1.0
+        win.canvas.snap_grid = True
+        img = _canvas_bild(win)
+        bg = _col(theme_colors(thema)["win_bg"])
+        # Erster Rasterpunkt im Inhaltsbereich (siehe _paint_grid).
+        punkt = img.pixelColor(PAD + GRID, PAD + TITLE_H + GRID)
+        assert _abstand(bg, punkt) >= 55, (thema, bg.name(), punkt.name())
+        # ... aber nicht so laut, dass es die Controls uebertoent.
+        assert _abstand(bg, punkt) <= 260, (thema, bg.name(), punkt.name())
+    finally:
+        win.close()
+
+
+def test_raster_verschwindet_bei_starker_verkleinerung(tmp_path):
+    """Unter GRID_MIN_ZOOM liegen die Punkte so dicht, dass sie als Rauschen
+    statt als Raster lesen."""
+    _app()
+    from gamebasic.formdesigner_qt import GRID_MIN_ZOOM
+    win = FormDesigner(tmp_path)
+    try:
+        gezeichnet = []
+        win.canvas._paint_grid = lambda *a, **k: gezeichnet.append(1)
+        win.canvas.snap_grid = True
+        win.canvas.zoom = GRID_MIN_ZOOM
+        _canvas_bild(win)
+        assert gezeichnet, "bei GRID_MIN_ZOOM soll das Raster noch kommen"
+        gezeichnet.clear()
+        win.canvas.zoom = GRID_MIN_ZOOM / 2
+        _canvas_bild(win)
+        assert not gezeichnet, "darunter soll es entfallen"
+    finally:
+        win.close()
+
+
+def test_schatten_ist_neben_dem_formular_messbar(tmp_path):
+    """Der Schatten war zuerst unsichtbar, weil die Arbeitsflaeche fast
+    schwarz war -- ein schwarzer Schatten hatte dort keinen Spielraum mehr
+    (gemessene 11 Stufen). Er muss sich deutlich vom Grund abheben."""
+    _app()
+    from gamebasic.formdesigner_qt import PAD
+    win = FormDesigner(tmp_path)
+    try:
+        win.canvas.zoom = 1.0
+        win.canvas.snap_grid = False
+        d = win.canvas.doc
+        img = _canvas_bild(win)
+        y = PAD + d.h // 2                       # halbe Hoehe, rechts daneben
+        direkt = img.pixelColor(PAD + d.w + 2, y)      # dicht am Rand: Schatten
+        weit = img.pixelColor(PAD + d.w + 60, y)       # weit weg: reiner Grund
+        # Der Grund ist bewusst angehoben, damit hier Platz nach unten bleibt.
+        assert weit.red() > 30, f"Arbeitsflaeche zu dunkel fuer einen Schatten: {weit.name()}"
+        assert _abstand(direkt, weit) >= 25, (direkt.name(), weit.name())
+        assert direkt.red() < weit.red(), "Schatten muss DUNKLER sein als der Grund"
+    finally:
+        win.close()

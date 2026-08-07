@@ -52,6 +52,8 @@ PAD = 24          # Rand um das Fenster auf der Canvas
 TITLE_H = 22      # Titelleisten-Hoehe (wie im gui-Modul)
 HANDLE = 8        # Kantenlaenge eines Resize-Griffs (px)
 RULER = 18        # Breite/Hoehe der Lineale am Rand
+SHADOW = 7        # Staffelungen des Schlagschattens unter dem Formular
+GRID_MIN_ZOOM = 0.5   # darunter wird das Raster zu Rauschen -> aus
 
 # Resize-Griff -> Maus-Cursor (diagonal/horizontal/vertikal)
 _HANDLE_CURSORS = {
@@ -644,7 +646,8 @@ class _Canvas(QWidget):
 
     def paintEvent(self, _ev):
         qp = QPainter(self)
-        qp.fillRect(self.rect(), QColor(18, 22, 28))   # Hintergrund (Widget-Raum)
+        qp.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        self._paint_backdrop(qp)                       # Hintergrund (Widget-Raum)
         qp.save()
         qp.scale(self.zoom, self.zoom)                 # ab hier alles im Zeichen-Raum
         d = self.doc
@@ -653,11 +656,12 @@ class _Canvas(QWidget):
         # Formularflaeche + Titelleiste im gewaehlten Thema -- vorher fest
         # verdrahtet, sodass der Entwurf immer cyan aussah, egal was das
         # Formular spaeter benutzt.
+        self._paint_form_shadow(qp, win)
         qp.fillRect(win, _col(th["win_bg"]))
         qp.setPen(QPen(_col(th["win_border"]), 1))
         qp.drawRect(win)
-        if self.snap_grid:
-            self._paint_grid(qp, d)
+        if self.snap_grid and self.zoom >= GRID_MIN_ZOOM:
+            self._paint_grid(qp, d, th)
         # Titelleiste
         qp.fillRect(QRect(PAD, PAD, d.w, TITLE_H), _col(th["title_bg"]))
         qp.setPen(_col(th["title_fg"]))
@@ -765,9 +769,54 @@ class _Canvas(QWidget):
             Y = PAD + TITLE_H + gy
             qp.drawLine(PAD, Y, PAD + d.w, Y)
 
-    def _paint_grid(self, qp: QPainter, d: FormDoc):
-        """Dezente Raster-Punkte im Fenster-Inhaltsbereich (unter der Titelleiste)."""
-        qp.setPen(QPen(QColor(60, 78, 96), 1))
+    def _paint_backdrop(self, qp: QPainter):
+        """Flaeche um das Formular: leichter Verlauf statt einer flachen Farbe.
+
+        Eine einzige Farbe liess das Formular wie einen Ausschnitt derselben
+        Flaeche wirken; der Verlauf gibt der Arbeitsflaeche eine Richtung,
+        ohne von den Controls abzulenken. Bleibt im Widget-Raum -- er soll
+        beim Zoomen stehen, nicht mitwandern.
+
+        Bewusst HELLER als die Docks ringsum und heller als beide
+        Formular-Themen. Vorher war die Flaeche fast schwarz, und damit hatte
+        ein Schlagschatten keinen Spielraum mehr nach unten: gemessene 11
+        Stufen Unterschied, praktisch unsichtbar. Erst ein angehobener Grund
+        gibt dem Schatten Platz -- dieselbe Ueberlegung wie bei der
+        Arbeitsflaeche in Figma oder Xojo."""
+        g = QLinearGradient(0, 0, 0, self.height() or 1)
+        g.setColorAt(0.0, QColor(52, 60, 70))
+        g.setColorAt(1.0, QColor(36, 42, 50))
+        qp.fillRect(self.rect(), QBrush(g))
+
+    def _paint_form_shadow(self, qp: QPainter, win: QRect):
+        """Weicher Schlagschatten unter dem Formular.
+
+        Er hebt die Form von der Arbeitsflaeche ab -- ohne ihn steht sie als
+        randlose Farbflaeche darin. Qt hat keinen Formen-Weichzeichner ohne
+        Umweg ueber ein QGraphicsEffect, deshalb gestaffelte Kopien mit
+        geringer Deckkraft (dasselbe Rezept wie `schatten_weich` im
+        chart-Modul): von aussen nach innen, die Ueberlagerung ergibt den
+        Verlauf. Leicht nach unten versetzt -- Licht kommt von oben."""
+        qp.save()
+        qp.setPen(Qt.PenStyle.NoPen)
+        qp.setBrush(QColor(0, 0, 0, 38))
+        for i in range(SHADOW, 0, -1):
+            qp.drawRoundedRect(win.adjusted(-i, -i + 4, i, i + 4), i + 1, i + 1)
+        qp.restore()
+
+    def _paint_grid(self, qp: QPainter, d: FormDoc, th: dict):
+        """Dezente Raster-Punkte im Fenster-Inhaltsbereich (unter der Titelleiste).
+
+        Die Farbe kommt aus dem Formular-Thema: ein fester blaugrauer Ton war
+        auf einem hellen Formular ein dunkles Punktmuster und stach mehr
+        hervor als die Controls.
+
+        Gemischt wird zur SCHRIFTFARBE, nicht zur Rahmenfarbe -- die liegt in
+        beiden Themen dicht an der Fensterfarbe, das Raster verschwand damit
+        vollstaendig. Die Schriftfarbe steht per Definition im Kontrast zum
+        Hintergrund, also ergibt ein kleiner Anteil davon in JEDEM Thema eine
+        sichtbare Andeutung: hell auf dunkel, dunkel auf hell."""
+        qp.setPen(QPen(_mix(_col(th["win_bg"]), _col(th["text_fg"]), 0.25), 1))
         x0 = PAD
         y0 = PAD + TITLE_H
         gx = GRID

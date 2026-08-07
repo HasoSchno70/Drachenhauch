@@ -45,6 +45,14 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   ein (Toggle `Ansicht → Am Raster ausrichten`, `Strg+G`). **Zoom** über `Strg`+`=`/
   `-`/`0` oder `Strg`+Mausrad (0,25×–4×). Die **Statusleiste** zeigt Position + Größe
   (bzw. Anzahl) der Selektion sowie die Zoom-Stufe.
+- **Die Fläche um das Formular** ist eine eigene Arbeitsfläche: leichter Verlauf,
+  bewusst **heller** als die Panels ringsum und als beide Formular-Themen, damit
+  ein **weicher Schlagschatten** das Formular sichtbar darauflegt. (Auf einem
+  fast schwarzen Grund hätte ein schwarzer Schatten keinen Spielraum — er war
+  dort messbar unsichtbar.) Das **Raster** mischt sich aus Fenster- und
+  Schriftfarbe des gewählten Themas, ist also in hellen wie dunklen Formularen
+  eine gleich dezente Andeutung; unter 0,5× Zoom entfällt es, weil die Punkte
+  dann als Rauschen lesen.
 - **Bearbeiten-Menü:** **Undo/Redo** (`Strg+Z` / `Strg+Y`, auch `Strg+Umschalt+Z`)
   — eine Geste (Platzieren, Ziehen, Resizen, Pfeil-Burst, Inspector-/Code-Sitzung)
   = ein Schritt. **Duplizieren** (`Strg+D`), **Kopieren/Einfügen** (`Strg+C` /
