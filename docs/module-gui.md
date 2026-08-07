@@ -542,8 +542,10 @@ beendet die Eingabe. Mehrere Spalten wirken zusammen (UND).
 
 `GUI_TABLE_SET(tbl, "feste_spalten", 2)` lässt die ersten zwei Spalten beim
 waagerechten Scrollen stehen — die Kennung bleibt sichtbar, während man nach
-rechts durch die Daten wandert. Eine Akzentlinie zeigt, wo der feste Block
-endet.
+rechts durch die Daten wandert. **Sobald tatsächlich seitwärts gescrollt ist**,
+markiert eine etwas kräftigere Trennlinie das Ende des festen Blocks; bei
+stehender Tabelle bleibt sie weg, weil sie dort nichts erklären würde. Bewusst
+nicht in der Akzentfarbe: die bedeutet überall sonst „ausgewählt/aktiv".
 
 Alles, was Spalten verortet, geht über **eine** Quelle (`col_x` für die Lage,
 `col_clip` für den sichtbaren Bereich) — Treffertest *und* Zeichnen benutzen

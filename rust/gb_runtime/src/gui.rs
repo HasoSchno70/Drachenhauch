@@ -4937,11 +4937,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 }
             }
             g.pop_clip();
-            // Kante des festen Blocks -- ohne sie sieht man nicht, warum ein
-            // Teil der Tabelle beim Scrollen stehenbleibt.
-            if gm.frozen > 0 {
+            // Kante des festen Blocks. NUR wenn wirklich seitwaerts gescrollt
+            // ist -- bei stehender Tabelle erklaert sie nichts und waere eine
+            // willkuerliche Markierung. Und im Rahmenton, nicht im Akzent: der
+            // bedeutet ueberall sonst "ausgewaehlt/aktiv", hier hiesse er
+            // "ab hier scrollt es" -- zwei Dinge in einer Farbe.
+            if gm.frozen > 0 && t.scroll_x > 0 {
                 let fx = body_x + gm.frozen_w;
-                g.line(fx, ay + 1, fx, ay + gm.header_h - 2, accent);
+                g.line(fx, ay + 1, fx, ay + gm.header_h - 2, shade(border, 40));
             }
         }
 
@@ -5009,9 +5012,9 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 g.line(body_x, row_y + gm.row_h - 1, body_x + body_w - 1, row_y + gm.row_h - 1, grid_c);
             }
         }
-        if gm.frozen > 0 {
+        if gm.frozen > 0 && t.scroll_x > 0 {
             let fx = body_x + gm.frozen_w;
-            g.line(fx, body_y, fx, body_y + body_h - 1, accent);
+            g.line(fx, body_y, fx, body_y + body_h - 1, shade(border, 40));
         }
         g.pop_clip();
 
