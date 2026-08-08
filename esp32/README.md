@@ -99,8 +99,27 @@ Der Sketch läuft fast unverändert. Zu ändern sind nur:
 und `analogRead(34)` → `analogRead(A0)` (der ESP8266 hat nur einen
 Analogeingang).
 
-## Nicht geprüft
+## Geprüft
 
-Der `.ino`-Sketch ist **nicht übersetzt worden** — auf diesem Rechner fehlt der
-ESP32-Kern in der Arduino-Toolchain (nur `arduino:avr` ist installiert). Das
-GameBasic-Gegenstück dagegen ist gegen echtes Mosquitto durchgetestet.
+**Sketch:** übersetzt gegen `esp32:esp32@3.3.11` (Board `esp32:esp32:esp32`) mit
+PubSubClient 2.8, sauberer Neubau mit `--warnings all` — keine Warnung im
+eigenen Code. Belegt 68 % des Programmspeichers und 14 % des Arbeitsspeichers,
+es bleibt also reichlich Platz für deine Ergänzungen.
+
+```
+arduino-cli compile --fqbn esp32:esp32:esp32 esp32/gamebasic_esp32
+```
+
+Die `arduino-cli` liegt übrigens in der Arduino-IDE mit drin:
+`C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`
+— sie benutzt denselben Datenordner wie die IDE, installierte Kerne und
+Bibliotheken stehen also in beiden zur Verfügung.
+
+**GameBasic-Seite:** gegen echtes Mosquitto durchgetestet, mit `mosquitto_pub`
+als Board-Attrappe.
+
+**Nicht geprüft:** die ESP8266-Abwandlung weiter oben — dafür wäre ein zweiter
+Kern nötig. Sie ist aus der Dokumentation abgeleitet, nicht übersetzt.
+
+Was ein Compiler NICHT beweisen kann: dass der Sketch auf echter Hardware das
+Richtige tut. Er zeigt nur, dass nichts Unsinniges dasteht.
