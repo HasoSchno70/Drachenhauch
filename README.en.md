@@ -49,7 +49,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Standard built-ins](docs/builtins-core.md)** — math, strings, maps, file I/O, …
 - **[Graphics built-ins](docs/builtins-grafik.md)** — native runtime (gbrt/raylib), Z-layers, sprite atlas, asset preloader
 - **[Performance](docs/PERFORMANCE.md)** — benchmark numbers + optimizations shipped (spec ops, inline caches, typed arrays, ECS bulk ops, …)
-- **[Modules](docs/README.md#module)** — `json`, `db`, `tween`, `imgfx`, `particles`, `physics`, **[`physics2d`](docs/module-physics2d.md)** (real 2D rigid-body physics via Rapier2D: gravity/collision/restitution/rotation, `PHYS2D_*`, [examples/112_physics2d.gb](examples/112_physics2d.gb)), **`physics3d`** (real 3D rigid-body physics via Rapier3D: gravity/collision/restitution, `PHYS3D_*`, [examples/107_physics3d.gb](examples/107_physics3d.gb)), `camera`, `sprite`, **[`animfsm`](docs/module-animfsm.md)** (animation state machine, Unity-Mecanim style: states + parameters + transitions from `.gbanim`, editor `gbanim`), `ui`, `scene`, `save`, `astar`, `ecs`, `vec2`, [`m3d`](docs/module-m3d.md) (3D math: VEC3/VEC4/QUAT/MAT4 + `MODEL_MATRIX`), `input`, `regex`, `audio` (channels/pan/fades + synth `AUDIO_TONE`/`AUDIO_SFX` — 4-channel chiptune demo [examples/114_chiptune.gb](examples/114_chiptune.gb); **tracker modules `.mod`/`.xm` play directly** — Amiga module player [examples/115_modplayer.gb](examples/115_modplayer.gb); **sampler `SAMPLE_LOAD`/`SAMPLE_PLAY`** — one sample across the whole keyboard, Amiga/Paula style, plus **Paula lo-fi** `AUDIO_LOFI` (8-bit + LED filter) [examples/116_sampler.gb](examples/116_sampler.gb); **mixer buses** `AUDIO_BUS_VOLUME` (SFX/music/master separated) + **real-time effects** per bus `AUDIO_FILTER`/`AUDIO_REVERB`/`AUDIO_DELAY`/`AUDIO_DISTORTION`/`AUDIO_COMPRESSOR`/`AUDIO_EQ` [examples/117_audiofx.gb](examples/117_audiofx.gb) + full showcase "Audio Studio" [examples/118_audio_studio.gb](examples/118_audio_studio.gb); **clock `AUDIO_CLOCK_NEW`/`AUDIO_PLAY_AT`** — sample-accurate music/rhythm timing: start sounds exactly on a clock tick, no polling; **non-linear easings** (`"in"`/`"out"`/`"inout"`) for fades/slides on `AUDIO_PLAY`/`AUDIO_STOP`/`AUDIO_PAN_SLIDE`/`AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP`; **spatial audio** `AUDIO_LISTENER_NEW`/`AUDIO_EMITTER_NEW`/`AUDIO_PLAY_ON` — panning + distance falloff computed entirely by Kira [examples/139_audio_spatial.gb](examples/139_audio_spatial.gb)), `curves`, `net`, **[`timer`](docs/module-timer.md)** (scheduled actions: `TIMER_AFTER/EVERY` with FUNCREF callbacks + `COOLDOWN` rate limiter, [examples/113_timer.gb](examples/113_timer.gb))
+- **Modules** — 38 of them, [table below](#modules)
 - **[Code editor](docs/editor.md)** — shortcuts, snippets, minimap, multi-cursor, sidebar, run/bench, signature help, **breadcrumbs** (scope path), **peek definition** (Alt+F12), **split view** (Ctrl+\\), **debugger** (breakpoints incl. **conditional** breakpoints/step/variables), **profiler** (hot path per line/function), **git-blame** panel, welcome showcase (demo gallery with screenshots)
 - **[Sprite editor](docs/sprite-editor.md)** — pixel-art editor (`gbsprites`): multi-frame, **layers** (visibility/opacity/merge-down, `.gbsprite` v5), animation, atlas export, **export scaling** (1x–8x, nearest-neighbor), **lasso selection** (real pixel mask) + rectangle selection, onion skin (adjustable opacity/range), tile preview
 - **[Particle editor](docs/particle-editor.md)** — effect editor (`gbparticles`): tune emitter parameters live with a real-time preview, **preset library** (factory + custom presets), GB code export
@@ -64,6 +64,81 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Web playground](docs/web-playground.md)** — `gbrt` as WebAssembly in the browser: type source into a `<textarea>` → gbrt compiles **in the browser** (no Pyodide) → **console AND animated graphics in a `<canvas>`** (the render loop yields per frame, no tab freeze). **Shareable links** (source in the URL hash → opening it = seeing it run). **Assets** (an `assets/` folder next to the `.gb`) ship along as `gbrt.data` — images, fonts and music load from the same paths as on the desktop. **Audio is audible** — a custom Kira backend feeds the finished mix into OpenAL buffers, which emscripten maps onto WebAudio; the queue paces itself in real time (browsers only allow sound after the first click). **3D works too** — the web build targets WebGL 2, whose GLSL ES 3.00 is identical to our desktop GLSL except for the header: PBR, HDR IBL, skybox, shadows, instancing and post-processing are all verified in the browser. Build via `rust/build_wasm.py`, harness in `web/`
 - **[`cloud` module](docs/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
 - **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its GameBasic counterpart [examples/159_esp32_bruecke.gb](examples/159_esp32_bruecke.gb) — which you can finish **without any board** using `mosquitto_pub`
+
+### Modules
+
+38 modules, available via `IMPORT "name"`. Each has its own page under
+[docs/](docs/README.md#module) (mostly German for now).
+
+**Game building blocks**
+
+| Module | What for |
+|---|---|
+| [`sprite`](docs/module-sprite.md) | animated sheet sprites: position, velocity, named animations, collision |
+| [`animfsm`](docs/module-animfsm.md) | animation state machine, Unity-Mecanim style, loaded from `.gbanim` (editor `gbanim`) |
+| [`camera`](docs/module-camera.md) | world translation, zoom and rotation for **every** drawing command; follow, screen↔world |
+| [`controller`](docs/module-controller.md) | character controller with coyote time, jump buffer and variable jump height |
+| [`scene`](docs/module-scene.md) | scene stack (`PUSH`/`POP`/`SWITCH`) with per-scene data |
+| [`save`](docs/module-save.md) | save slots backed by JSON, with a version field |
+| [`input`](docs/module-input.md) | named actions instead of key codes, edge detection, gamepad |
+| [`timer`](docs/module-timer.md) | scheduled actions (`TIMER_AFTER`/`EVERY`) + a `COOLDOWN` rate limiter |
+| [`tween`](docs/module-tween.md) | interpolate values smoothly, 13 easings |
+| [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, smoothstep — pure functions |
+| [`astar`](docs/module-astar.md) | A* pathfinding on a tile grid |
+| [`ecs`](docs/module-ecs.md) | entity-component-system with bulk operations for hot loops |
+
+**Physics and maths**
+
+| Module | What for |
+|---|---|
+| [`physics`](docs/module-physics.md) | pure collision maths: box/circle/ray/segment/polygon, no state |
+| [`physics2d`](docs/module-physics2d.md) | **real** 2D rigid bodies (Rapier2D): gravity, stacking, throwing, rolling — [demo](examples/112_physics2d.gb) |
+| [`physics3d`](docs/module-physics3d.md) | the same in 3D (Rapier3D) — [demo](examples/107_physics3d.gb) |
+| [`vec2`](docs/module-vec2.md) | 2D vector with operator overloading, immutable |
+| [`m3d`](docs/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, quaternions, matrices; GPU instancing via `MODEL_INSTANCED` |
+
+**Graphics and sound**
+
+| Module | What for |
+|---|---|
+| `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/builtins-grafik.md) |
+| [`particles`](docs/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
+| [`imgfx`](docs/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
+| [`audio`](docs/module-audio.md) | channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
+
+**User interface**
+
+| Module | What for |
+|---|---|
+| [`gui`](docs/module-gui.md) | 22 retained-mode widget kinds — including a **professional table** (sort, filter, frozen and reorderable columns, edit cells in place). Glass themes, toggles, knobs, 9-slice skins. [All widgets](examples/156_gui_alle_widgets.gb) · [table](examples/157_gui_tabelle.gb) · [against SQLite](examples/158_gui_tabelle_sqlite.gb) |
+| [`ui`](docs/module-ui.md) | the same in immediate mode: nothing to set up, redrawn every frame |
+| [`chart`](docs/module-chart.md) | six chart kinds (pie, bar, line, gauge, bar gauge, LED chain), four themes, mouse interaction — [demo](examples/154_chart.gb) |
+
+**Data**
+
+| Module | What for |
+|---|---|
+| [`json`](docs/module-json.md) | read/write JSON, path access (`"user.name"`, `"items.0"`) |
+| [`db`](docs/module-db.md) | SQLite with `?` placeholders and transactions |
+| [`regex`](docs/module-regex.md) | match, replace, split |
+| [`tiled`](docs/module-tiled.md) | load maps from the Tiled editor, including objects and properties |
+| [`tile_collide`](docs/module-tile-collide.md) | box against tilemap, axis by axis — classic platformer physics |
+| [`cloud`](docs/module-cloud.md) | cloud save and leaderboard against the bundled server [`cloudserver/`](cloudserver/README.md) |
+
+**Network, hardware, making**
+
+| Module | What for |
+|---|---|
+| [`net`](docs/module-net.md) | TCP and UDP, non-blocking by default — won't freeze your game loop |
+| [`html`](docs/module-html.md) | HTTP GET/POST/download + HTML scraping |
+| [`mqtt`](docs/module-mqtt.md) | the IoT world's pub/sub protocol — the way to reach an ESP32 **over Wi-Fi** |
+| [`firmata`](docs/module-firmata.md) | drive Arduino/ESP32 pins directly, no sketch of your own needed |
+| [`serial`](docs/module-serial.md) | raw COM connection for your own protocols |
+| [`usb`](docs/module-usb.md) | USB HID: maker boards, programmers, custom controllers |
+| [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scan, connect, read/write characteristics |
+| [`wifi`](docs/module-wifi.md) | scan networks, connect, signal strength |
+
+A ready-made sketch skeleton for the board lives in **[esp32/](esp32/README.md)**.
 
 ## Examples
 

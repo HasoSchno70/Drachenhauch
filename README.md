@@ -49,7 +49,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Standard-Built-ins](docs/builtins-core.md)** — Math, Strings, Maps, File-I/O, …
 - **[Grafik-Built-ins](docs/builtins-grafik.md)** — native Runtime (gbrt/raylib), Z-Layer, Sprite-Atlas, Asset-Preloader
 - **[Performance](docs/PERFORMANCE.md)** — Bench-Zahlen + umgesetzte Optimierungen (Spec-Ops, IC, Typed Arrays, ECS Bulk-Ops, …)
-- **[Module](docs/README.md#module)** — `json`, `db`, `tween`, `imgfx`, `particles`, `physics`, **[`physics2d`](docs/module-physics2d.md)** (echte 2D-Starrkörper-Physik via Rapier2D: Schwerkraft/Kollision/Restitution/Rotation, `PHYS2D_*`, [examples/112_physics2d.gb](examples/112_physics2d.gb)), **`physics3d`** (echte 3D-Starrkörper-Physik via Rapier3D: Schwerkraft/Kollision/Restitution, `PHYS3D_*`, [examples/107_physics3d.gb](examples/107_physics3d.gb)), `camera`, `sprite`, **[`animfsm`](docs/module-animfsm.md)** (Animations-State-Machine, Unity-Mecanim-Stil: States + Parameter + Transitions aus `.gbanim`, Editor `gbanim`), `ui`, `scene`, `save`, `astar`, `ecs`, `vec2`, [`m3d`](docs/module-m3d.md) (3D-Mathe: VEC3/VEC4/QUAT/MAT4 + `MODEL_MATRIX`), `input`, `regex`, `audio` (Channels/Pan/Fades + Synth `AUDIO_TONE`/`AUDIO_SFX` — 4-Kanal-Chiptune-Demo [examples/114_chiptune.gb](examples/114_chiptune.gb); **Tracker-Module `.mod`/`.xm` direkt abspielbar** — Amiga-Modul-Player [examples/115_modplayer.gb](examples/115_modplayer.gb); **Sampler `SAMPLE_LOAD`/`SAMPLE_PLAY`** — ein Sample über die ganze Klaviatur, Amiga/Paula-Stil, plus **Paula-Lo-Fi** `AUDIO_LOFI` (8-bit + LED-Filter) [examples/116_sampler.gb](examples/116_sampler.gb); **Mixer-Busse** `AUDIO_BUS_VOLUME` (SFX-/Musik-/Master getrennt) + **Echtzeit-Effekte** pro Bus `AUDIO_FILTER`/`AUDIO_REVERB`/`AUDIO_DELAY`/`AUDIO_DISTORTION`/`AUDIO_COMPRESSOR`/`AUDIO_EQ` [examples/117_audiofx.gb](examples/117_audiofx.gb) + Gesamt-Showcase „Audio-Studio" [examples/118_audio_studio.gb](examples/118_audio_studio.gb); **Clock `AUDIO_CLOCK_NEW`/`AUDIO_PLAY_AT`** — sample-genaues Musik-/Rhythmus-Timing: Sounds exakt auf einen Uhr-Tick starten, ohne Polling; **nicht-lineare Easings** (`"in"`/`"out"`/`"inout"`) für Fades/Slides bei `AUDIO_PLAY`/`AUDIO_STOP`/`AUDIO_PAN_SLIDE`/`AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP`; **raeumliches Audio** `AUDIO_LISTENER_NEW`/`AUDIO_EMITTER_NEW`/`AUDIO_PLAY_ON` — Panning + Lautstärke-Abnahme nach 3D-Position, komplett von Kira berechnet [examples/139_audio_spatial.gb](examples/139_audio_spatial.gb)), **[`gui`](docs/module-gui.md)** (Retained-Mode-Oberflaeche; **plastische Glas-Themen** hell/dunkel mit Verlauf, Glanzkante und Fase, dazu Kippschalter, Drehregler, runde Knoepfe und optionale 9-Slice-Skins; **professionelle Tabelle** -- Zellen mit eigenen Farben, Bildern, Haken, Balken und Knoepfen, Sortieren per Kopfklick, Filterzeile, ziehbare, feste und per Zug umsortierbare Spalten, Mehrfachauswahl, Zellen per Doppelklick bearbeiten: [examples/157_gui_tabelle.gb](examples/157_gui_tabelle.gb), an einer echten SQLite-Datenbank [examples/158_gui_tabelle_sqlite.gb](examples/158_gui_tabelle_sqlite.gb); **alle 22 Widget-Arten in einer Vollbild-Anwendung** -- Menue, Werkzeugleiste, Reiter, Baum+Tabelle+Editor und eine live gezeichnete Kurve: [examples/156_gui_alle_widgets.gb](examples/156_gui_alle_widgets.gb)), **[`chart`](docs/module-chart.md)** (Diagramme: Kuchen/Donut, Balken, Linie/Flaeche, analoge Tacho-Anzeigen mit Zeiger und Farbzonen, sowie Leisten und LED-Ketten; ~55 Stellschrauben ueber vier Setter `CHART_SET`/`_NUM`/`_COLOR`/`_FLAG`, vier Themen, Alpha/weiche Schatten/Farbverlaeufe; **Maus-Interaktion** -- Hervorhebung, Sprechblasen und Klick-Abfrage ueber `CHART_HOVER`/`CHART_CLICKED`, [examples/154_chart.gb](examples/154_chart.gb)), `curves`, `net`, **[`timer`](docs/module-timer.md)** (geplante Aktionen: `TIMER_AFTER/EVERY` mit FUNCREF-Callbacks + `COOLDOWN`-Ratenbegrenzer, [examples/113_timer.gb](examples/113_timer.gb))
+- **Module** — 38 Stück, [Tabelle unten](#module)
 - **[Code-Editor](docs/editor.md)** — Tastenkürzel, Snippets, Minimap, Multi-Cursor, Sidebar, Run/Bench, Signature-Help, **Breadcrumbs** (Scope-Pfad), **Peek-Definition** (Alt+F12), **Split-View** (Strg+\\), **Debugger** (Breakpoints inkl. **bedingter** Breakpoints/Step/Variablen), **Profiler** (Hotpath pro Zeile/Funktion), **Git-Blame**-Panel, Welcome-Showcase (Demo-Galerie mit Screenshots)
 - **[Sprite-Editor](docs/sprite-editor.md)** — Pixel-Art-Editor (`gbsprites`): Multi-Frame, **Ebenen** (Sichtbarkeit/Deckkraft/Merge-Down, `.gbsprite` v5), Animation, Atlas-Export, **Export-Skalierung** (1x–8x, Nearest-Neighbor), **Lasso-Auswahl** (echte Pixel-Maske) + Rechteck-Auswahl, Onion-Skin (Deckkraft/Reichweite einstellbar), Tile-Preview
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`gbparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, **Preset-Bibliothek** (Werks- + eigene Presets), GB-Code-Export
@@ -64,6 +64,81 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Web-Playground](docs/web-playground.md)** — `gbrt` als WebAssembly im Browser: Quelle im `<textarea>` tippen → gbrt kompiliert **im Browser** (kein Pyodide) → **Konsole UND animierte Grafik im `<canvas>`** (Render-Loop yieldet pro Frame, kein Tab-Freeze). **Teilbare Links** (Quelle im URL-Hash → öffnen = sehen + starten). **Assets** (`assets/` neben der `.gb`) kommen als `gbrt.data` mit — Bilder, Schriften, Musik unter demselben Pfad wie auf dem Desktop. **Ton ist hörbar** — ein eigenes Kira-Backend schiebt den fertigen Mix in OpenAL-Puffer, die emscripten auf WebAudio abbildet; die Warteschlange taktet sich dabei von selbst in Echtzeit (Browser lassen Klang erst nach dem ersten Klick zu). **3D läuft mit** — der Web-Build fährt WebGL 2, dessen GLSL ES 3.00 bis auf den Kopf identisch zu unserem Desktop-GLSL ist: PBR, HDR-IBL, Skybox, Schatten, Instancing und Post-Effekte sind im Browser verifiziert. Build `rust/build_wasm.py`, Harness `web/`
 - **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
 - **[ESP32 / ESP8266 anbinden](esp32/README.md)** — fertiges Sketch-Grundgerüst (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten Stellen für eigenen Code; **eine Datei für beide Boards**, übersetzt für ESP32/ESP8266/ESP32-C3/ESP32-S3. Redet über [`mqtt`](docs/module-mqtt.md) mit dem GameBasic-Gegenstück [examples/159_esp32_bruecke.gb](examples/159_esp32_bruecke.gb) — das sich mit `mosquitto_pub` auch **ohne Board** fertig entwickeln lässt
+
+### Module
+
+38 Module, per `IMPORT "name"` verfügbar. Jedes hat eine eigene Seite unter
+[docs/](docs/README.md#module).
+
+**Spiel-Bausteine**
+
+| Modul | Wofür |
+|---|---|
+| [`sprite`](docs/module-sprite.md) | animierte Sheet-Sprites: Position, Velocity, benannte Animationen, Kollision |
+| [`animfsm`](docs/module-animfsm.md) | Animations-Zustandsautomat im Unity-Mecanim-Stil, aus `.gbanim` (Editor `gbanim`) |
+| [`camera`](docs/module-camera.md) | Weltverschiebung, Zoom und Drehung für **alle** Zeichenbefehle; Folgen, Bildschirm↔Welt |
+| [`controller`](docs/module-controller.md) | Figuren-Steuerung mit Coyote-Zeit, Sprung-Puffer und variabler Sprunghöhe |
+| [`scene`](docs/module-scene.md) | Szenen-Stapel (`PUSH`/`POP`/`SWITCH`) mit Daten pro Szene |
+| [`save`](docs/module-save.md) | Speicherstände als JSON, mit Versionsfeld |
+| [`input`](docs/module-input.md) | benannte Aktionen statt Tastencodes, Flankenerkennung, Gamepad |
+| [`timer`](docs/module-timer.md) | geplante Aktionen (`TIMER_AFTER`/`EVERY`) + `COOLDOWN`-Ratenbegrenzer |
+| [`tween`](docs/module-tween.md) | Werte weich überführen, 13 Verlaufskurven |
+| [`curves`](docs/module-curves.md) | Bézier, Catmull-Rom, Hermite, Smoothstep — reine Funktionen |
+| [`astar`](docs/module-astar.md) | A*-Wegfindung auf einem Kachelgitter |
+| [`ecs`](docs/module-ecs.md) | Entity-Component-System mit Massen-Operationen für heiße Schleifen |
+
+**Physik und Mathematik**
+
+| Modul | Wofür |
+|---|---|
+| [`physics`](docs/module-physics.md) | reine Kollisionsmathematik: Rechteck/Kreis/Strahl/Strecke/Polygon, kein Zustand |
+| [`physics2d`](docs/module-physics2d.md) | **echte** 2D-Starrkörper (Rapier2D): Schwerkraft, Stapeln, Werfen, Rollen — [Demo](examples/112_physics2d.gb) |
+| [`physics3d`](docs/module-physics3d.md) | dasselbe in 3D (Rapier3D) — [Demo](examples/107_physics3d.gb) |
+| [`vec2`](docs/module-vec2.md) | 2D-Vektor mit überladenen Operatoren, unveränderlich |
+| [`m3d`](docs/module-m3d.md) | VEC3/VEC4/QUAT/MAT4, Quaternionen, Matrizen; GPU-Instancing über `MODEL_INSTANCED` |
+
+**Grafik und Klang**
+
+| Modul | Wofür |
+|---|---|
+| `g3d` | 3D: Kamera, Modelle (OBJ/GLTF), Skelett-Animation, PBR, HDR-IBL, Schatten, Normal-Maps, Picking — siehe [Grafik-Built-ins](docs/builtins-grafik.md) |
+| [`particles`](docs/module-particles.md) | Partikel-Emitter mit Schwerkraft, Farbverlauf über die Lebenszeit, fünf Zeichenarten |
+| [`imgfx`](docs/module-imgfx.md) | Bilder skalieren, drehen, spiegeln, einfärben — auch kantentreu für Pixelgrafik |
+| [`audio`](docs/module-audio.md) | Kanäle, Busse, Echtzeit-Effekte (Filter/Hall/Echo/Verzerrer/Kompressor/EQ), Synthese, Sampler, `.mod`/`.xm`-Wiedergabe, räumliches Audio, taktgenaue Uhr. [Modulatoren](docs/module-audio-modulatoren.md) laufen auf dem Audio-Thread weiter, auch wenn die Bildrate einbricht |
+
+**Oberfläche**
+
+| Modul | Wofür |
+|---|---|
+| [`gui`](docs/module-gui.md) | 22 Widget-Arten mit bleibendem Zustand — darunter eine **professionelle Tabelle** (sortieren, filtern, feste und umsortierbare Spalten, Zellen bearbeiten). Plastische Glas-Themen, Kippschalter, Drehregler, 9-Slice-Skins. [Alle Widgets](examples/156_gui_alle_widgets.gb) · [Tabelle](examples/157_gui_tabelle.gb) · [an SQLite](examples/158_gui_tabelle_sqlite.gb) |
+| [`ui`](docs/module-ui.md) | dasselbe als Immediate-Mode: kein Aufbau, alles pro Bild neu gezeichnet |
+| [`chart`](docs/module-chart.md) | sechs Diagrammarten (Kuchen, Balken, Linie, Tacho, Leiste, LED-Kette), vier Themen, Maus-Interaktion — [Demo](examples/154_chart.gb) |
+
+**Daten**
+
+| Modul | Wofür |
+|---|---|
+| [`json`](docs/module-json.md) | JSON lesen/schreiben, Pfad-Zugriff (`"user.name"`, `"items.0"`) |
+| [`db`](docs/module-db.md) | SQLite mit `?`-Platzhaltern und Transaktionen |
+| [`regex`](docs/module-regex.md) | Muster suchen, ersetzen, trennen |
+| [`tiled`](docs/module-tiled.md) | Karten aus dem Tiled-Editor laden, inklusive Objekte und Eigenschaften |
+| [`tile_collide`](docs/module-tile-collide.md) | Kasten-gegen-Kachelkarte, achsenweise — klassische Plattformer-Physik |
+| [`cloud`](docs/module-cloud.md) | Spielstand und Bestenliste gegen den mitgelieferten Server [`cloudserver/`](cloudserver/README.md) |
+
+**Netz, Hardware, Basteln**
+
+| Modul | Wofür |
+|---|---|
+| [`net`](docs/module-net.md) | TCP und UDP, von Haus aus nicht blockierend — friert den Spielablauf nicht ein |
+| [`html`](docs/module-html.md) | HTTP GET/POST/Download + HTML auslesen |
+| [`mqtt`](docs/module-mqtt.md) | das Pub/Sub-Protokoll der IoT-Welt — der Weg zum ESP32 **über WLAN** |
+| [`firmata`](docs/module-firmata.md) | Arduino-/ESP32-Pins direkt schalten, ohne eigenen Sketch |
+| [`serial`](docs/module-serial.md) | rohe COM-Verbindung für eigene Protokolle |
+| [`usb`](docs/module-usb.md) | USB-HID: Bastelboards, Programmieradapter, eigene Controller |
+| [`bt`](docs/module-bt.md) | Bluetooth Low Energy: scannen, verbinden, Charakteristiken lesen/schreiben |
+| [`wifi`](docs/module-wifi.md) | Netze suchen, verbinden, Signalstärke |
+
+Ein fertiges Sketch-Grundgerüst fürs Board liegt in **[esp32/](esp32/README.md)**.
 
 ## Beispiele
 
