@@ -29,6 +29,18 @@ WEND
 .venv\Scripts\python.exe gbrun.py datei.gb   # Programm direkt ausführen
 ```
 
+## Das Lehrbuch
+
+**[GameBasic — Das Lehrbuch](buch-referenz/buch/)** ist beides zugleich: ein Kurs, der vom ersten schwarzen Fenster bis zu Klassen, Modulen und fertigen Spielen führt, und ein Nachschlagewerk, in dem **jeder einzelne Befehl** mit einem lauffähigen Beispielprogramm erklärt wird. 414 Seiten, sieben Teile, 75 Kapitel, alle Codebeispiele gegen `gbrt --check` verifiziert.
+
+```
+node build_book.js                    # -> GameBasic-Lehrbuch.docx
+node build_epub.js                    # -> GameBasic-Lehrbuch.epub (fürs Lesegerät)
+<venv>\python.exe make_book.py        # Zwei-Pass-Build mit Seitenzahlen im Inhalt
+```
+
+Dieselben Kapitelquellen (`content/NN_*.js`) speisen beide Ausgaben — das `.docx` ist auf A4 gesetzt und zum Drucken, das `.epub` fließt in die Schriftgröße des Lesers und kann Nachtmodus.
+
 ## Handbuch
 
 Vollständige Doku im [docs/](docs/README.md)-Ordner:
@@ -51,10 +63,11 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Language Server + VSCode-Extension](docs/lsp.md)** — GameBasic in jedem LSP-Editor: Syntax-Highlighting, Diagnostics, Completion, Hover, Goto-Definition, References, Outline (`py -m gamebasic.lsp`, `vscode-gamebasic/`)
 - **[Web-Playground](docs/web-playground.md)** — `gbrt` als WebAssembly im Browser: Quelle im `<textarea>` tippen → gbrt kompiliert **im Browser** (kein Pyodide) → **Konsole UND animierte Grafik im `<canvas>`** (Render-Loop yieldet pro Frame, kein Tab-Freeze). **Teilbare Links** (Quelle im URL-Hash → öffnen = sehen + starten). **Assets** (`assets/` neben der `.gb`) kommen als `gbrt.data` mit — Bilder, Schriften, Musik unter demselben Pfad wie auf dem Desktop. **Ton ist hörbar** — ein eigenes Kira-Backend schiebt den fertigen Mix in OpenAL-Puffer, die emscripten auf WebAudio abbildet; die Warteschlange taktet sich dabei von selbst in Echtzeit (Browser lassen Klang erst nach dem ersten Klick zu). **3D läuft mit** — der Web-Build fährt WebGL 2, dessen GLSL ES 3.00 bis auf den Kopf identisch zu unserem Desktop-GLSL ist: PBR, HDR-IBL, Skybox, Schatten, Instancing und Post-Effekte sind im Browser verifiziert. Build `rust/build_wasm.py`, Harness `web/`
 - **[`cloud`-Modul](docs/module-cloud.md)** — Cloud-Save + Leaderboard gegen den mitgelieferten, selbst hostbaren Referenz-Server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, geteiltes API-Key-Secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core-Builtin) für Idle-/Incremental-Game-taugliche Big-Number-Formatierung (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, danach wissenschaftliche Notation). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
+- **[ESP32 / ESP8266 anbinden](esp32/README.md)** — fertiges Sketch-Grundgerüst (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten Stellen für eigenen Code; **eine Datei für beide Boards**, übersetzt für ESP32/ESP8266/ESP32-C3/ESP32-S3. Redet über [`mqtt`](docs/module-mqtt.md) mit dem GameBasic-Gegenstück [examples/159_esp32_bruecke.gb](examples/159_esp32_bruecke.gb) — das sich mit `mosquitto_pub` auch **ohne Board** fertig entwickeln lässt
 
 ## Beispiele
 
-`examples/` enthält über 50 lauffähige Demos, von "Hallo Welt" bis zum kompletten Mini-Spiel:
+`examples/` enthält über 170 lauffähige Demos, von "Hallo Welt" bis zum kompletten Mini-Spiel:
 
 | Datei | Zeigt |
 |---|---|
@@ -73,6 +86,10 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | `bench_ecs_systems.gb` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 | `77_tiled_platformer.gb` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |
 | `98_coroutines.gb` | **Coroutines/YIELD**: Generatoren, `FOR EACH`-Drain, send/return-Dialog, `CORO_RESULT`, Methoden-Coroutine |
+| `154_chart.gb` | **Diagramme**: alle sechs Arten, Themen, Maus-Interaktion |
+| `156_gui_alle_widgets.gb` | **alle 22 GUI-Widgets** in einer Vollbild-Anwendung, jedes mit echter Aufgabe |
+| `157_gui_tabelle.gb`, `158_gui_tabelle_sqlite.gb` | **professionelle Tabelle** — sortieren, filtern, Zellen bearbeiten; die zweite an einer echten SQLite-Datenbank |
+| `159_esp32_bruecke.gb` | **ESP32 anbinden** — Messwerte empfangen, Befehle zurückschicken (Sketch in [esp32/](esp32/)) |
 
 ## Architektur
 
@@ -92,7 +109,7 @@ Architektur-Details und Erweiterungs-Hinweise in [CLAUDE.md](CLAUDE.md).
 .venv\Scripts\python.exe -m pytest tests/
 ```
 
-Über 1890 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `gbrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `gbrt`.
+Über 3090 Tests — Built-ins, alle Module, Sprach-Konstrukte, Editor-Features und Example-Smoke-Tests. Korrektheit sichern **run_gb-Golden-Tests** (`assert run_gb(src) == expected`, spawnen `gbrt run`) + Rust-`#[test]`s; sie skippen ohne gebautes `gbrt`.
 
 ## Lizenz
 
