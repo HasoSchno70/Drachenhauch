@@ -348,7 +348,7 @@ function ncx() {
 
 function opf(datum) {
   const manifest = [
-    `<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
+    `<item id="nav" href="text/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>`,
     `<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>`,
     `<item id="css" href="styles/buch.css" media-type="text/css"/>`,
     ...dateien.map((d) =>
@@ -392,7 +392,9 @@ zip.file("META-INF/container.xml",
 const o = zip.folder("OEBPS");
 o.file("styles/buch.css", CSS);
 for (const d of dateien) o.file("text/" + d.name, seite(d.titel, huelleListen(d.html)));
-o.file("nav.xhtml", navXhtml());
+// nav.xhtml liegt BEI den Kapiteln, nicht in OEBPS/: seine Verweise sind
+// relativ, und von einer Ebene hoeher zeigten alle 84 ins Leere.
+o.file("text/nav.xhtml", navXhtml());
 o.file("toc.ncx", ncx());
 for (const b of bilder) o.file("images/" + b, fs.readFileSync(path.join(IMG, b)));
 o.file("content.opf", opf(new Date().toISOString().replace(/\.\d+Z$/, "Z")));

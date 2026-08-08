@@ -94,25 +94,53 @@ def test_manifest_spine_und_archiv_stimmen_ueberein(epub):
     assert not verwaist, f"nicht im Manifest: {verwaist}"
 
 
-def test_bildverweise_loesen_sich_auf(epub):
-    """Die Seiten liegen in text/, die Bilder in images/ -- ein falscher
-    relativer Pfad faellt sonst erst am Lesegeraet als leerer Rahmen auf."""
-    gefunden = 0
-    for n in [x for x in epub.namelist() if x.endswith(".xhtml")]:
-        seite = epub.read(n).decode("utf-8")
-        for src in re.findall(r'<img src="([^"]+)"', seite):
-            ziel = posixpath.normpath(posixpath.join(posixpath.dirname(n), src))
-            assert ziel in epub.namelist(), f"{n}: Bild {src} fehlt"
-            gefunden += 1
-    assert gefunden > 20, f"nur {gefunden} Bilder -- das Buch hat deutlich mehr"
+def test_alle_internen_verweise_loesen_sich_auf(epub):
+    """JEDER Verweis, nicht nur die Bilder: Kapitel-Links im Verzeichnis,
+    Stylesheets, Bilder, die Ziele im NCX.
+
+    Alle sind relativ zu der Datei, in der sie stehen. Beim ersten Bau lag
+    nav.xhtml eine Ebene ueber den Kapiteln und verlinkte trotzdem, als laege
+    es daneben -- alle 84 Verzeichnis-Eintraege und sein Stylesheet zeigten ins
+    Leere. Die Datei baute, oeffnete und zeigte Text; nur das Verzeichnis war
+    tot. Ein Test, der bloss nachsieht, ob die Titel VORKOMMEN, merkt davon
+    nichts."""
+    namen = set(epub.namelist())
+    geprueft = {"bild": 0, "seite": 0, "css": 0}
+    kaputt = []
+    for n in sorted(x for x in namen if x.endswith((".xhtml", ".ncx"))):
+        inhalt = epub.read(n).decode("utf-8")
+        for verweis in re.findall(r'(?:href|src)="([^"]+)"', inhalt):
+            if verweis.startswith(("http:", "https:", "#")):
+                continue
+            ziel = posixpath.normpath(
+                posixpath.join(posixpath.dirname(n), verweis.split("#")[0]))
+            if ziel not in namen:
+                kaputt.append(f"{n} -> {verweis}")
+            art = ("bild" if ziel.endswith(".png")
+                   else "css" if ziel.endswith(".css") else "seite")
+            geprueft[art] += 1
+
+    assert not kaputt, f"{len(kaputt)} Verweise ins Leere, u.a.: {kaputt[:5]}"
+    # Nicht nur "nichts kaputt" -- es muss auch wirklich etwas geprueft worden
+    # sein, sonst besteht der Test ein leeres Buch.
+    assert geprueft["bild"] > 20, f"nur {geprueft['bild']} Bildverweise"
+    assert geprueft["seite"] > 150, f"nur {geprueft['seite']} Seitenverweise"
+    assert geprueft["css"] > 50, f"nur {geprueft['css']} Stylesheet-Verweise"
 
 
 def test_verzeichnis_enthaelt_teile_und_kapitel(epub):
     """nav.xhtml ist das Verzeichnis fuer EPUB 3, toc.ncx fuer aeltere Geraete.
     Beide muessen dieselben Kapitel kennen."""
-    _, opf = _opf(epub)
-    nav = epub.read("OEBPS/nav.xhtml").decode("utf-8")
-    ncx = epub.read("OEBPS/toc.ncx").decode("utf-8")
+    pfad, opf = _opf(epub)
+    basis = posixpath.dirname(pfad)
+    # Den Pfad NICHT fest verdrahten: wo nav.xhtml liegt, entscheidet der
+    # Renderer (es muss bei den Kapiteln liegen, damit seine Verweise ziehen).
+    # Der verbindliche Ort steht im Manifest.
+    eintraege = {it.get("properties"): it.get("href")
+                 for it in opf.find(f"{OPF_NS}manifest")}
+    assert "nav" in eintraege, "kein nav im Manifest -- EPUB 3 findet kein Verzeichnis"
+    nav = epub.read(posixpath.join(basis, eintraege["nav"])).decode("utf-8")
+    ncx = epub.read(posixpath.join(basis, "toc.ncx")).decode("utf-8")
 
     # Auch der Vorspann muss drinstehen: im gedruckten Buch blaettert man zum
     # Vorwort, im EPUB kommt man nur ueber das Verzeichnis hin.
@@ -122,8 +150,6 @@ def test_verzeichnis_enthaelt_teile_und_kapitel(epub):
 
     # nav muss als solches ausgezeichnet sein, sonst findet EPUB 3 es nicht.
     assert 'epub:type="toc"' in nav
-    assert any(it.get("properties") == "nav"
-               for it in opf.find(f"{OPF_NS}manifest")), "kein nav im Manifest"
 
 
 def test_stylesheet_paart_jeden_hintergrund_mit_einer_schriftfarbe(epub):
