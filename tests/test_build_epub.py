@@ -1,0 +1,153 @@
+"""EPUB-Bau des Lehrbuchs pruefen.
+
+Ein EPUB ist ein ZIP mit strengen Regeln: falsch abgelegte "mimetype"-Datei,
+eine nicht wohlgeformte XHTML-Seite oder ein Verweis ins Leere, und das
+Lesegeraet zeigt gar nichts an oder bricht mitten im Buch ab. Von aussen sieht
+die Datei dabei jedes Mal gleich aus -- deshalb wird hier nicht "laeuft der
+Build durch" geprueft, sondern der Inhalt des Archivs.
+"""
+import posixpath
+import re
+import shutil
+import subprocess
+import xml.etree.ElementTree as ET
+import zipfile
+
+import pytest
+
+from pathlib import Path
+
+BUCH = Path(__file__).resolve().parent.parent / "buch-referenz" / "buch"
+EPUB = BUCH / "GameBasic-Lehrbuch.epub"
+
+OPF_NS = "{http://www.idpf.org/2007/opf}"
+CONTAINER_NS = "{urn:oasis:names:tc:opendocument:xmlns:container}"
+
+pytestmark = pytest.mark.skipif(
+    not (BUCH / "build_epub.js").exists() or shutil.which("node") is None,
+    reason="Buch-Verzeichnis oder node fehlt",
+)
+
+
+@pytest.fixture(scope="module")
+def epub():
+    """Das Buch einmal bauen und als geoeffnetes Archiv liefern."""
+    if not (BUCH / "node_modules" / "jszip").exists():
+        pytest.skip("node_modules fehlt (npm install im buch-Verzeichnis)")
+    res = subprocess.run(["node", "build_epub.js"], cwd=BUCH,
+                         capture_output=True, text=True, timeout=300)
+    assert res.returncode == 0, f"Build fehlgeschlagen:\n{res.stderr}"
+    assert EPUB.exists()
+    with zipfile.ZipFile(EPUB) as z:
+        yield z
+
+
+def _opf(z):
+    c = ET.fromstring(z.read("META-INF/container.xml"))
+    pfad = c.find(f"{CONTAINER_NS}rootfiles/{CONTAINER_NS}rootfile").get("full-path")
+    return pfad, ET.fromstring(z.read(pfad))
+
+
+def test_mimetype_ist_erster_eintrag_und_unkomprimiert(epub):
+    """Die einzige Regel, an der ein EPUB komplett scheitert: manche Leser
+    lesen die ersten Bytes des ZIP roh und erkennen die Datei sonst nicht."""
+    erster = epub.infolist()[0]
+    assert erster.filename == "mimetype"
+    assert erster.compress_type == zipfile.ZIP_STORED
+    assert epub.read("mimetype") == b"application/epub+zip"
+
+
+def test_alle_xml_dateien_sind_wohlgeformt(epub):
+    """Die Seiten entstehen aus zusammengesetzten Zeichenketten -- ein nicht
+    maskiertes & oder < im Kapiteltext bricht die Seite, und der Leser sieht
+    an dieser Stelle einfach nichts mehr."""
+    namen = [n for n in epub.namelist()
+             if n.endswith((".xhtml", ".opf", ".ncx", ".xml"))]
+    assert len(namen) > 50, "verdaechtig wenige Seiten"
+    for n in namen:
+        try:
+            ET.fromstring(epub.read(n))
+        except ET.ParseError as e:
+            pytest.fail(f"{n} ist nicht wohlgeformt: {e}")
+
+
+def test_manifest_spine_und_archiv_stimmen_ueberein(epub):
+    pfad, opf = _opf(epub)
+    assert pfad in epub.namelist()
+    basis = posixpath.dirname(pfad)
+
+    manifest = {}
+    for it in opf.find(f"{OPF_NS}manifest"):
+        ziel = posixpath.normpath(posixpath.join(basis, it.get("href")))
+        manifest[it.get("id")] = ziel
+        assert ziel in epub.namelist(), f"Manifest nennt {ziel}, fehlt im Archiv"
+
+    spine = [r.get("idref") for r in opf.find(f"{OPF_NS}spine")]
+    assert spine, "leerer Spine -- das Buch haette keine Lesereihenfolge"
+    for ref in spine:
+        assert ref in manifest, f"Spine verweist auf unbekannte id {ref}"
+
+    # Umgekehrt: eine Datei, die keiner kennt, waere unsichtbarer Ballast.
+    bekannt = set(manifest.values()) | {"mimetype", "META-INF/container.xml", pfad}
+    verwaist = [n for n in epub.namelist()
+                if n not in bekannt and not n.endswith("/")]
+    assert not verwaist, f"nicht im Manifest: {verwaist}"
+
+
+def test_bildverweise_loesen_sich_auf(epub):
+    """Die Seiten liegen in text/, die Bilder in images/ -- ein falscher
+    relativer Pfad faellt sonst erst am Lesegeraet als leerer Rahmen auf."""
+    gefunden = 0
+    for n in [x for x in epub.namelist() if x.endswith(".xhtml")]:
+        seite = epub.read(n).decode("utf-8")
+        for src in re.findall(r'<img src="([^"]+)"', seite):
+            ziel = posixpath.normpath(posixpath.join(posixpath.dirname(n), src))
+            assert ziel in epub.namelist(), f"{n}: Bild {src} fehlt"
+            gefunden += 1
+    assert gefunden > 20, f"nur {gefunden} Bilder -- das Buch hat deutlich mehr"
+
+
+def test_verzeichnis_enthaelt_teile_und_kapitel(epub):
+    """nav.xhtml ist das Verzeichnis fuer EPUB 3, toc.ncx fuer aeltere Geraete.
+    Beide muessen dieselben Kapitel kennen."""
+    _, opf = _opf(epub)
+    nav = epub.read("OEBPS/nav.xhtml").decode("utf-8")
+    ncx = epub.read("OEBPS/toc.ncx").decode("utf-8")
+
+    # Auch der Vorspann muss drinstehen: im gedruckten Buch blaettert man zum
+    # Vorwort, im EPUB kommt man nur ueber das Verzeichnis hin.
+    for titel in ("Vorwort", "Modul: chart", "Modul: gui"):
+        assert titel in nav, f"{titel} fehlt im nav.xhtml"
+        assert titel in ncx, f"{titel} fehlt im toc.ncx"
+
+    # nav muss als solches ausgezeichnet sein, sonst findet EPUB 3 es nicht.
+    assert 'epub:type="toc"' in nav
+    assert any(it.get("properties") == "nav"
+               for it in opf.find(f"{OPF_NS}manifest")), "kein nav im Manifest"
+
+
+def test_stylesheet_paart_jeden_hintergrund_mit_einer_schriftfarbe(epub):
+    """Wer `background` setzt, ohne `color` zu setzen, baut eine Falle: im
+    Nachtmodus faerbt das Lesegeraet die Schrift hell und laesst den hellen
+    Hintergrund stehen -- hell auf hell. Genau so war es beim ersten Bau."""
+    css = epub.read("OEBPS/styles/buch.css").decode("utf-8")
+    # Regeln ohne Kommentare, je Block betrachtet
+    # Regeln, die mit /* ohne-schrift: ... */ gekennzeichnet sind, tragen
+    # keinen Text (Farbfelder) -- dort waere eine Schriftfarbe sinnlos.
+    css = re.sub(r"/\* ohne-schrift:.*?\*/\s*[^{]+\{[^}]*\}", "", css, flags=re.S)
+    ohne_kommentar = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    for block in re.findall(r"\{([^{}]*)\}", ohne_kommentar):
+        setzt_bg = re.search(r"(^|;)\s*background(-color)?\s*:", block)
+        if not setzt_bg:
+            continue
+        if "transparent" in block:
+            continue
+        assert re.search(r"(^|;)\s*color\s*:", block), \
+            f"Hintergrund ohne Schriftfarbe: {{{block.strip()}}}"
+
+
+def test_nachtmodus_ist_vorgesehen(epub):
+    css = epub.read("OEBPS/styles/buch.css").decode("utf-8")
+    assert "prefers-color-scheme: dark" in css
+    # Ohne color-scheme bleibt die Schrift im Nachtmodus schwarz auf schwarz.
+    assert "color-scheme: light dark" in css

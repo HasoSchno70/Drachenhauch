@@ -99,7 +99,7 @@ function _box(title, text, bg, bd, titleColor) {
 // kurze Titel klein darunter. Das war 2026-08-04 in ALLEN 14 zweiargumentigen
 // warn-Aufrufen des Buches so und ist beim Durchsehen aufgefallen.
 function tip(title, text) { return _box(title, text, "E7F2FA", "9CC8E6", C_ACCENT); }
-function note(text, title = "Merke") { return _box(title, text, "FDF3E0", "E0B96A", "9A6A1E"); }
+function note(text, title = "Merke") { return _box(title, text, "FDF3E0", "E0B96A", "8A5E15"); }
 function warn(text, title = "Achtung") { return _box(title, text, "FBEAEA", "E0A0A0", "B23030"); }
 
 // ---------------------------------------------------------------- Code
@@ -114,6 +114,13 @@ function codeBlock(lines, opts = {}) {
     spacing: { before: 100, after: 200, line: 264, lineRule: LineRuleType.AUTO },
     indent: { left: 140 },
     keepLines: true, children: runs });
+}
+// Signatur-Zeile (Vorwort). Als Baustein, damit Inhalts-Module NICHT selbst
+// nach "docx" greifen muessen -- sonst kann ein zweiter Renderer (EPUB) sie
+// nicht darstellen.
+function sig(text) {
+  return new Paragraph({ spacing: { before: 240 },
+    children: [new TextRun({ text, italics: true, size: 22, color: C_CAP })] });
 }
 function smallLabel(text) {
   return new Paragraph({ spacing: { before: 120, after: 30 }, keepNext: true,
@@ -208,7 +215,7 @@ function h2(t) {
 }
 
 const H = { figure, p, pmix, bullet, bulletRich, tip, note, warn, code: codeBlock,
-            cmd, table, h1, h2, chapter, part, smallLabel, PageBreak };
+            cmd, table, h1, h2, chapter, part, smallLabel, sig, PageBreak };
 
 // ===================== Inhalt zusammenstellen =====================
 const children = [];

@@ -1,18 +1,28 @@
 # GameBasic – Das Lehrbuch  ·  Gliederung & Fortschritt
 
 Vollständiges Lehr- und Referenzbuch: lehrt Programmieren in GameBasic von Grund
-auf UND erklärt jeden Befehl mit kleinem Beispielprogramm. Ausgabe: editierbares
-`.docx` zum Drucken. Code wird durchgehend monospace im grauen Kasten mit blauer
+auf UND erklärt jeden Befehl mit kleinem Beispielprogramm. Ausgaben: editierbares
+`.docx` zum Drucken und ein `.epub` zum Lesen am Gerät. Code wird durchgehend monospace im grauen Kasten mit blauer
 Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 
 ## Build
 - `node build_book.js` → `GameBasic-Lehrbuch.docx` (nutzt zuletzt gemessene ToC-Seiten).
 - `<venv>\python.exe make_book.py` → Zwei-Pass-Build mit korrekten ToC-Seitenzahlen
   (LibreOffice→PDF→PyMuPDF misst Seiten). Vorschau-PNG: LibreOffice→PDF→fitz.
+  **Achtung:** rendert das PDF nur ZWISCHENDURCH (zum Messen) und endet beim
+  `.docx` — für ein PDF mit Seitenzahlen danach `make_book.render()` nachziehen.
+- `node build_epub.js` → `GameBasic-Lehrbuch.epub` (EPUB 3, ein XHTML je Kapitel,
+  nav.xhtml + NCX, Nachtmodus). Prüfung: `pytest tests/test_build_epub.py`.
 
 ## Architektur
-- `build_book.js` = fester Renderer + Bausteine `H` (h1/chapter/part/h2/p/pmix/
-  bullet/bulletRich/code/cmd/tip/note/warn/figure).
+- **Zwei Renderer, ein Inhalt.** `build_book.js` (→ .docx) und `build_epub.js`
+  (→ .epub) stellen jeweils die Bausteine `H` bereit (h1/chapter/part/h2/p/pmix/
+  bullet/bulletRich/code/cmd/tip/note/warn/figure/table/smallLabel/sig); die
+  Kapitel bekommen sie injiziert und wissen nicht, wohin sie gesetzt werden.
+  **Ein Kapitel darf deshalb NIE selbst `require("docx")` aufrufen** — dann kann
+  der EPUB-Renderer den Block nicht darstellen. Fehlt ein Baustein, kommt er in
+  BEIDE Renderer.
+- Kein docx→epub-Konverter: das .docx ist auf A4 gesetzt, EPUB ist fließend.
 - `content/NN_*.js` = je ein Kapitel, exportiert `(H) => [bloecke]`. Reihenfolge =
   Dateiname-Sortierung. **Neue Kapitel: einfach content/NN_*.js anlegen.**
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
