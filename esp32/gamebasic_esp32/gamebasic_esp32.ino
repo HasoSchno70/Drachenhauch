@@ -6,16 +6,32 @@
 //  entgegennehmen. Deine eigene Arbeit kommt an die drei mit >>> markierten
 //  Stellen weiter unten.
 //
+//  Laeuft unveraendert auf ESP32 und ESP8266 (siehe die Weiche gleich unten).
+//
 //  Vorbereitung in der Arduino-IDE (einmalig):
-//    1. Datei -> Grundeinstellungen -> "Zusaetzliche Boardverwalter-URLs":
-//       https://espressif.github.io/arduino-esp32/package_esp32_index.json
-//    2. Werkzeuge -> Board -> Boardverwalter -> "esp32" installieren
+//    1. Datei -> Grundeinstellungen -> "Zusaetzliche Boardverwalter-URLs",
+//       je nach Board (beide gleichzeitig geht auch, mit Komma getrennt):
+//         ESP32:   https://espressif.github.io/arduino-esp32/package_esp32_index.json
+//         ESP8266: https://arduino.esp8266.com/stable/package_esp8266com_index.json
+//    2. Werkzeuge -> Board -> Boardverwalter -> "esp32" bzw. "esp8266"
 //    3. Werkzeuge -> Bibliotheken verwalten -> "PubSubClient" (Nick O'Leary)
 //
 //  Gegenstueck in GameBasic: examples/159_esp32_bruecke.gb
 // ===========================================================================
 
-#include <WiFi.h>
+// Laeuft auf ESP32 UND ESP8266. Die Unterschiede stehen alle hier oben, damit
+// weiter unten nur noch eine Fassung zu lesen ist -- zwei getrennte Sketche
+// waeren binnen kurzem auseinandergelaufen.
+#if defined(ARDUINO_ARCH_ESP8266)
+  #include <ESP8266WiFi.h>
+  // Der ESP8266 hat genau EINEN Analogeingang, und der heisst A0.
+  #define ANALOG_PIN A0
+#else
+  #include <WiFi.h>
+  // Beim ESP32 ist fast jeder Pin analogfaehig; 34 ist nur ein Beispiel.
+  #define ANALOG_PIN 34
+#endif
+
 #include <PubSubClient.h>
 
 // --------------------------------------------------------------- Einstellungen
@@ -169,7 +185,7 @@ void loop() {
     //   MQTT kennt nur Bytes -- Zahlen muessen also in Text. Auf der
     //   GameBasic-Seite holst du sie mit VAL() zurueck.
 
-    long wert = analogRead(34);        // Beispiel: roher Analogwert
+    long wert = analogRead(ANALOG_PIN);   // Beispiel: roher Analogwert
     mqtt.publish(THEMA_WERTE, String(wert).c_str());
 
     // --------------------------------------------------------------------

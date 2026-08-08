@@ -40,9 +40,11 @@ aufs eigene Subnetz, nicht für alles.
 
 **Arduino-IDE** (einmalig):
 
-1. *Datei → Grundeinstellungen → Zusätzliche Boardverwalter-URLs*:
-   `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
-2. *Werkzeuge → Board → Boardverwalter* → „esp32" installieren
+1. *Datei → Grundeinstellungen → Zusätzliche Boardverwalter-URLs* — je nach
+   Board eine davon (beide gleichzeitig gehen auch, mit Komma getrennt):
+   - ESP32: `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
+   - ESP8266: `https://arduino.esp8266.com/stable/package_esp8266com_index.json`
+2. *Werkzeuge → Board → Boardverwalter* → „esp32" bzw. „esp8266" installieren
 3. *Werkzeuge → Bibliotheken verwalten* → **PubSubClient** (Nick O'Leary)
 
 **Im Sketch anpassen:** `WLAN_NAME`, `WLAN_PASSWORT`, `BROKER`.
@@ -90,25 +92,34 @@ die Hardware auf dem Tisch liegt.
 
 ## ESP8266 statt ESP32
 
-Der Sketch läuft fast unverändert. Zu ändern sind nur:
+**Nichts zu ändern** — derselbe Sketch läuft auf beiden. Die zwei Unterschiede
+stehen als `#if defined(ARDUINO_ARCH_ESP8266)` ganz oben in der Datei
+gebündelt: die WLAN-Kopfdatei heißt anders, und der ESP8266 hat genau einen
+Analogeingang (`A0` statt frei wählbarer Pins). Weiter unten ist deshalb nur
+eine Fassung zu lesen.
 
-```cpp
-#include <ESP8266WiFi.h>      // statt WiFi.h
-```
-
-und `analogRead(34)` → `analogRead(A0)` (der ESP8266 hat nur einen
-Analogeingang).
+Zwei getrennte Sketche wären der naheliegende Weg gewesen — und binnen kurzem
+auseinandergelaufen, sobald jemand nur einen von beiden pflegt.
 
 ## Geprüft
 
-**Sketch:** übersetzt gegen `esp32:esp32@3.3.11` (Board `esp32:esp32:esp32`) mit
-PubSubClient 2.8, sauberer Neubau mit `--warnings all` — keine Warnung im
-eigenen Code. Belegt 68 % des Programmspeichers und 14 % des Arbeitsspeichers,
-es bleibt also reichlich Platz für deine Ergänzungen.
+Übersetzt gegen `esp32:esp32@3.3.11`, `esp8266:esp8266@3.1.2` und
+PubSubClient 2.8, jeweils mit `--warnings all` — **keine Warnung im eigenen
+Code** auf keinem der vier Boards:
+
+| Board | FQBN | Ergebnis |
+|---|---|---|
+| ESP32 | `esp32:esp32:esp32` | OK — 68 % Flash, 14 % RAM |
+| ESP8266 NodeMCU 1.0 | `esp8266:esp8266:nodemcuv2` | OK — 23 % Flash, 35 % RAM |
+| ESP32-C3 | `esp32:esp32:esp32c3` | OK |
+| ESP32-S3 | `esp32:esp32:esp32s3` | OK |
 
 ```
 arduino-cli compile --fqbn esp32:esp32:esp32 esp32/gamebasic_esp32
 ```
+
+(Die einzige Warnung im ESP8266-Bau steckt in PubSubClients eigenem Quelltext,
+nicht in diesem Sketch.)
 
 Die `arduino-cli` liegt übrigens in der Arduino-IDE mit drin:
 `C:\Program Files\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe`
@@ -117,9 +128,6 @@ Bibliotheken stehen also in beiden zur Verfügung.
 
 **GameBasic-Seite:** gegen echtes Mosquitto durchgetestet, mit `mosquitto_pub`
 als Board-Attrappe.
-
-**Nicht geprüft:** die ESP8266-Abwandlung weiter oben — dafür wäre ein zweiter
-Kern nötig. Sie ist aus der Dokumentation abgeleitet, nicht übersetzt.
 
 Was ein Compiler NICHT beweisen kann: dass der Sketch auf echter Hardware das
 Richtige tut. Er zeigt nur, dass nichts Unsinniges dasteht.
