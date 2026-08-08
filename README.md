@@ -55,7 +55,7 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 - **[Partikel-Editor](docs/particle-editor.md)** — Effekt-Editor (`gbparticles`): Emitter-Parameter live tunen mit Echtzeit-Vorschau, **Preset-Bibliothek** (Werks- + eigene Presets), GB-Code-Export
 - **[Audio Studio](docs/tracker.md#audio-studio)** — vereint Tracker + SFX-Generator in **einem fullscreen Fenster** mit Reitern (`gbsound` / `gbrun.py --audio`; `gbsfx`/`gbtracker` öffnen denselben auf dem passenden Tab). `F11` Vollbild, `Strg+1/2` Tabwechsel.
 - **[SFX-Generator](docs/sfx-generator.md)** — Retro-Soundeffekte (sfxr-Stil, SFX-Tab): Synth mit Pitch-Slide/Hüllkurve/Vibrato/Stereo, **SID-Charakter** (Pulsbreite/PWM + resonanter Filter-Sweep), **Preset-Bibliothek** (eigene Sounds speichern), Export WAV/GB-Code (`AUDIO_SFX`)
-- **[Tracker](docs/tracker.md)** — mehrspuriger Musik-Editor (Tracker-Tab): **einstellbare Kanalzahl** (4–32, letzter Kanal immer Drum) mit **eigener Akzentfarbe pro Kanal** (Header/Noten/VU/Fader), **Kanal-Mixer-Fader** (echter Lautstärke-Schieberegler pro Spur, wirkt in Vorhören/WAV/GB-Code), **Instrument pro Note** (wie ProTracker/FastTracker/Impulse Tracker/Renoise — ein Kanal ist nur ein Stimmen-Slot, jede Note kann optional ein eigenes Instrument überschreiben, `Instr:`-Dropdown), **fertige Instrument-Bibliothek** (Flügel/Orgel/Streicher/Bass/Glocke … + Drums, ein Keyboard-Sound pro Spur als Standard), **Sample-Instrumente** (WAV/OGG laden + über die Klaviatur resampeln, MOD/XM/IT-Stil, **grafischer Loop-Editor** mit ziehbaren Wellenform-Markern, **Pan als Schieberegler**), **Keymap/Multisample + Drumkit** (verschiedene Samples auf Tasten-Zonen), **SoundFont-Import** (`.sf2` — echte GM-/Hersteller-Instrumente), mehrere Patterns einstellbarer Länge + Song-Arrangement, **Block-Auswahl** (Copy/Cut/Paste/Transpose/Interpolate), **Effekt-Spalten** (Lautstärke, Pitch-Slide/Portamento, **Arpeggio/Vibrato/Retrigger/Sample-Offset** pro Note + Instrument-Pan), **Note-Off** (Note gezielt vor der nächsten Note abschneiden), Projekt-Speichern/Laden (`.json`), Export als frame-basierter GB-Player **oder gerenderte WAV** (Song offline gemischt, **Stereo + Amiga-Hard-Panning** → `PLAYMUSIC`)
+- **[Tracker](docs/tracker.md)** — mehrspuriger Musik-Editor (Tracker-Tab), [Tabelle unten](#tracker)
 - **[Notenblatt-Editor](docs/score-editor.md)** — echte Notensatz-Darstellung (`gbscore`): Noten per Klick auf ein 5-Linien-System setzen (Violin-/Bassschlüssel, Hilfslinien, Vorzeichen), Notendauern (ganze/halbe/Viertel/Achtel/Sechzehntel + punktiert + Pause), ein Instrument pro Spur, Wiedergabe über den geteilten additiven Mixer, eigenes `.json`-Format **oder** direkter Export/Öffnen im Tracker (`gbtracker`)
 - **[Tilemap-/Level-Editor](docs/tilemap-editor.md)** — Tiles aufs Gitter malen (`gbtilemap`): mehrere Layer, Object-Layer, **mehrere Tilesets**, Per-Tile-Properties (`solid`/`damage`), Stift/Füllen/Rechteck/Pipette/**Auswahl** (Copy/Cut/Paste), Speichern/Laden als Tiled-JSON (`TILED_LOAD`), GB-Code-Renderer-Export
 - **[Form-Designer (WYSIWYG)](docs/form-designer.md)** — visueller GUI-Designer im Xojo-Stil (`gbform`): Controls platzieren/konfigurieren, als `.gbform` speichern, per `GUI_LOAD` im eigenen Code nutzen oder mit F5 starten
@@ -139,6 +139,46 @@ Vollständige Doku im [docs/](docs/README.md)-Ordner:
 | [`wifi`](docs/module-wifi.md) | Netze suchen, verbinden, Signalstärke |
 
 Ein fertiges Sketch-Grundgerüst fürs Board liegt in **[esp32/](esp32/README.md)**.
+
+### Tracker
+
+Der mehrspurige Musik-Editor im [Audio Studio](docs/tracker.md) — ein Tracker
+in der Tradition von ProTracker, FastTracker und Renoise.
+
+**Spuren**
+
+| | |
+|---|---|
+| Kanalzahl | 4–32 einstellbar, der letzte ist immer der Schlagzeug-Kanal |
+| Akzentfarbe je Kanal | Kopfzeile, Noten, Aussteuerung und Regler übernehmen sie |
+| Mixer-Fader | echter Lautstärkeregler pro Spur — wirkt beim Vorhören, in der WAV und im erzeugten GB-Code |
+
+**Instrumente**
+
+| | |
+|---|---|
+| Bibliothek | Flügel, Orgel, Streicher, Bass, Glocke … und Schlagzeug; ein Klang pro Spur als Vorgabe |
+| Instrument **pro Note** | ein Kanal ist nur ein Stimmen-Platz: jede einzelne Note darf ihr eigenes Instrument mitbringen (`Instr:`-Auswahl) |
+| Sample-Instrumente | WAV/OGG laden und über die ganze Klaviatur resampeln (MOD/XM/IT-Prinzip), mit grafischem Schleifen-Editor und Panorama-Regler |
+| Keymap / Multisample | verschiedene Samples auf Tastenbereiche verteilen — auch als Schlagzeug-Satz |
+| SoundFont | `.sf2` einlesen: echte GM- und Hersteller-Instrumente |
+
+**Bearbeiten**
+
+| | |
+|---|---|
+| Patterns | mehrere, jeweils eigene Länge, zu einem Song angeordnet |
+| Block-Auswahl | Kopieren, Ausschneiden, Einfügen, Transponieren, Zwischenwerte berechnen |
+| Effekt-Spalten | Lautstärke, Tonhöhen-Gleiten/Portamento, Arpeggio, Vibrato, Retrigger, Sample-Versatz — je Note, dazu Instrument-Panorama |
+| Note-Off | eine Note gezielt vor der nächsten abschneiden |
+
+**Ausgabe**
+
+| | |
+|---|---|
+| Projekt | speichern und laden als `.json` |
+| GB-Player | Export als bildweise abgespielter GameBasic-Code |
+| WAV | Song offline gemischt, **Stereo mit Amiga-Hard-Panning** → direkt für `PLAYMUSIC` |
 
 ## Beispiele
 

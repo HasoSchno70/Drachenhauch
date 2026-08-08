@@ -55,7 +55,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Particle editor](docs/particle-editor.md)** — effect editor (`gbparticles`): tune emitter parameters live with a real-time preview, **preset library** (factory + custom presets), GB code export
 - **[Audio Studio](docs/tracker.md#audio-studio)** — combines tracker + SFX generator in **one fullscreen window** with tabs (`gbsound` / `gbrun.py --audio`; `gbsfx`/`gbtracker` open the same window on the matching tab). `F11` fullscreen, `Ctrl+1/2` switch tabs.
 - **[SFX generator](docs/sfx-generator.md)** — retro sound effects (sfxr-style, SFX tab): synth with pitch slide/envelope/vibrato/stereo, **SID character** (pulse width/PWM + resonant filter sweep), **preset library** (save your own sounds), export WAV/GB code (`AUDIO_SFX`)
-- **[Tracker](docs/tracker.md)** — multi-track music editor (tracker tab): **configurable channel count** (4–32, last channel always drums) with **its own accent color per channel** (header/notes/VU/fader), **per-channel mixer fader** (a real volume slider per track, affects preview/WAV/GB code), **per-note instrument** (like ProTracker/FastTracker/Impulse Tracker/Renoise — a channel is just a voice slot, every note can optionally override its own instrument, `Instr:` dropdown), **ready-made instrument library** (grand piano/organ/strings/bass/bell … + drums, one keyboard sound per track by default), **sample instruments** (load WAV/OGG + resample across the keyboard, MOD/XM/IT style, **graphical loop editor** with draggable waveform markers, **pan as a slider**), **keymap/multisample + drum kit** (different samples across key zones), **SoundFont import** (`.sf2` — real GM/vendor instruments), multiple patterns of adjustable length + song arrangement, **block selection** (copy/cut/paste/transpose/interpolate), **effect columns** (volume, pitch slide/portamento, **arpeggio/vibrato/retrigger/sample offset** per note + instrument pan), **note-off** (cut a note before the next one), project save/load (`.json`), export as a frame-based GB player **or a rendered WAV** (song mixed offline, **stereo + Amiga hard-panning** → `PLAYMUSIC`)
+- **[Tracker](docs/tracker.md)** — multi-track music editor (tracker tab), [table below](#tracker)
 - **[Score editor](docs/score-editor.md)** — real music-notation display (`gbscore`): place notes by clicking a 5-line staff (treble/bass clef, ledger lines, accidentals), note durations (whole/half/quarter/eighth/sixteenth + dotted + rest), one instrument per track, playback through the shared additive mixer, its own `.json` format **or** direct export/open in the tracker (`gbtracker`)
 - **[Tilemap/level editor](docs/tilemap-editor.md)** — paint tiles onto a grid (`gbtilemap`): multiple layers, object layer, **multiple tilesets**, per-tile properties (`solid`/`damage`), pencil/fill/rectangle/eyedropper/**selection** (copy/cut/paste), save/load as Tiled JSON (`TILED_LOAD`), GB code renderer export
 - **[Form designer (WYSIWYG)](docs/form-designer.md)** — visual GUI designer in Xojo style (`gbform`): place/configure controls, save as `.gbform`, use in your own code via `GUI_LOAD` or launch with F5
@@ -139,6 +139,46 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | [`wifi`](docs/module-wifi.md) | scan networks, connect, signal strength |
 
 A ready-made sketch skeleton for the board lives in **[esp32/](esp32/README.md)**.
+
+### Tracker
+
+The multi-track music editor inside the [Audio Studio](docs/tracker.md) — a
+tracker in the tradition of ProTracker, FastTracker and Renoise.
+
+**Tracks**
+
+| | |
+|---|---|
+| Channel count | 4–32, configurable; the last one is always the drum channel |
+| Accent colour per channel | header, notes, VU meter and fader all pick it up |
+| Mixer fader | a real volume slider per track — applies to preview, WAV and the generated GB code |
+
+**Instruments**
+
+| | |
+|---|---|
+| Library | grand piano, organ, strings, bass, bell … and drums; one sound per track by default |
+| Instrument **per note** | a channel is just a voice slot: every single note may bring its own instrument (`Instr:` dropdown) |
+| Sample instruments | load WAV/OGG and resample across the whole keyboard (the MOD/XM/IT principle), with a graphical loop editor and a pan slider |
+| Keymap / multisample | spread different samples across key zones — also as a drum kit |
+| SoundFont | import `.sf2`: real GM and vendor instruments |
+
+**Editing**
+
+| | |
+|---|---|
+| Patterns | several, each with its own length, arranged into a song |
+| Block selection | copy, cut, paste, transpose, interpolate |
+| Effect columns | volume, pitch slide/portamento, arpeggio, vibrato, retrigger, sample offset — per note, plus instrument pan |
+| Note-off | cut a note deliberately before the next one starts |
+
+**Output**
+
+| | |
+|---|---|
+| Project | save and load as `.json` |
+| GB player | export as frame-driven GameBasic code |
+| WAV | song mixed offline, **stereo with Amiga hard-panning** → straight into `PLAYMUSIC` |
 
 ## Examples
 
