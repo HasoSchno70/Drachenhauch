@@ -21,6 +21,9 @@ CHART_ADD(b, "Mi", 8.0)
 CHART_ADD(b, "Do", 24.0)
 CHART_ADD(b, "Fr", 16.0)
 CHART_SET(b, "titel", "Spieler pro Tag")
+' `gitter` ist der ABSTAND zwischen zwei Linien, nicht ihre Anzahl:
+' 10 statt automatisch 5 halbiert die Beschriftungen (0/10/20).
+CHART_SET_NUM(b, "gitter", 10)
 CHART_THEME(b, "dunkel")
 
 ' Linie links unten
@@ -40,7 +43,9 @@ DIM t AS CHART
 t = CHART_NEW("tacho", 312, 170, 156, 140)
 CHART_SET_NUM(t, "min", 0.0)
 CHART_SET_NUM(t, "max", 100.0)
-CHART_ADD(t, "Last", 72.0)
+' CHART_VALUE setzt den Zeiger. CHART_ADD legt Kategorien an -- das ist
+' fuer Kuchen und Balken, ein Tacho zeigt EINEN Wert.
+CHART_VALUE(t, 72.0)
 ' Zonen ohne Namen -- auf dieser Groesse wuerden sie die Anzeige ueberlagern.
 CHART_ZONE(t, 0.0, 50.0, RGB(70, 200, 110))
 CHART_ZONE(t, 50.0, 85.0, RGB(230, 180, 70))

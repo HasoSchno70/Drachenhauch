@@ -33,7 +33,7 @@ FRAMES = {
     "43_bilder": 10, "44_farben": 10, "45_eingabe": 10, "46_sound": 10,
     "47_layer": 10, "48_3d": 20, "49_catch": 40, "50_sprite": 12,
     "51_animfsm": 30, "52_tween": 45, "54_particles": 50, "55_physics2d": 90,
-    "56_camera": 40, "58_ui": 10, "59_gui": 10, "62_astar": 10,
+    "56_camera": 40, "58_ui": 10, "59_gui": 10, "59a_chart": 10, "62_astar": 10,
     "63_tiled": 10, "64_tilecollide": 70, "65_controller": 45, "66_vec2": 10,
     "67_m3d": 20, "72_curves": 10,
 }
