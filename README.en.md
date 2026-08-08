@@ -61,7 +61,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Form designer (WYSIWYG)](docs/form-designer.md)** — visual GUI designer in Xojo style (`gbform`): place/configure controls, save as `.gbform`, use in your own code via `GUI_LOAD` or launch with F5
 - **[Animation FSM editor](docs/anim-editor.md)** — node graph for animation state machines, Unity-Mecanim style (`gbanim`): visually wire up states (bound to a sprite animation) + parameters + transitions with conditions, save as `.gbanim`, use via `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), live preview with F5
 - **[Language server + VSCode extension](docs/lsp.md)** — GameBasic in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline (`py -m gamebasic.lsp`, `vscode-gamebasic/`)
-- **[Web playground](docs/web-playground.md)** — `gbrt` as WebAssembly in the browser: type source into a `<textarea>` → gbrt compiles **in the browser** (no Pyodide) → **console AND animated graphics in a `<canvas>`** (the render loop yields per frame, no tab freeze). **Shareable links** (source in the URL hash → opening it = seeing it run). **Assets** (an `assets/` folder next to the `.gb`) ship along as `gbrt.data` — images, fonts and music load from the same paths as on the desktop. **Audio is audible** — a custom Kira backend feeds the finished mix into OpenAL buffers, which emscripten maps onto WebAudio; the queue paces itself in real time (browsers only allow sound after the first click). **3D works too** — the web build targets WebGL 2, whose GLSL ES 3.00 is identical to our desktop GLSL except for the header: PBR, HDR IBL, skybox, shadows, instancing and post-processing are all verified in the browser. Build via `rust/build_wasm.py`, harness in `web/`
+- **[Web playground](docs/web-playground.md)** — `gbrt` as WebAssembly in the browser, [table below](#web-playground)
 - **[`cloud` module](docs/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.gb](examples/146_cloud_idle.gb)
 - **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its GameBasic counterpart [examples/159_esp32_bruecke.gb](examples/159_esp32_bruecke.gb) — which you can finish **without any board** using `mosquitto_pub`
 
@@ -179,6 +179,23 @@ tracker in the tradition of ProTracker, FastTracker and Renoise.
 | Project | save and load as `.json` |
 | GB player | export as frame-driven GameBasic code |
 | WAV | song mixed offline, **stereo with Amiga hard-panning** → straight into `PLAYMUSIC` |
+
+### Web playground
+
+`gbrt` runs as WebAssembly in the browser — not a cut-down version, the same
+runtime. Type source into the text area, hit run. Details in
+[docs/web-playground.md](docs/web-playground.md) (German).
+
+| What runs in the browser | How |
+|---|---|
+| Compiling | gbrt compiles the source **in the browser itself** — no Pyodide, no server |
+| Console and graphics | both at once; the render loop yields once per frame (ASYNCIFY) so `WHILE … FLIP() … WEND` doesn't freeze the tab |
+| Sound | a custom Kira backend feeds the finished mix into OpenAL buffers, which emscripten maps onto WebAudio; the queue paces itself in real time. Browsers only allow sound after the first click |
+| 3D | WebGL 2 — its GLSL ES 3.00 is identical to the desktop GLSL except for the header. PBR, HDR IBL, skybox, shadows, instancing and post-processing are all verified in the browser |
+| Files | an `assets/` folder next to the `.gb` ships along as `gbrt.data` — images, fonts and music load from the same paths as on the desktop |
+| Shareable links | the source lives in the URL hash: opening a link means seeing it **and** running it |
+
+Built with `rust/build_wasm.py`; the harness lives in `web/`.
 
 ## Examples
 
