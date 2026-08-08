@@ -1657,7 +1657,7 @@ her und `GUI_UPDATE` ruft sie automatisch per Name auf — kein manuelles
 Verdrahten. Doku [docs/form-designer.md](docs/form-designer.md), Tests
 `tests/test_formdesigner_document.py` (Modell/Roundtrip/Codegen, headless) +
 `tests/test_formdesigner_qt.py` (Konstruktion offscreen). Neue Control-Art:
-Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. **Geplanter Funktionsumfang
+Eintrag in `PALETTE` + ggf. gui-Runtime-Widget. **Tabelle im Designer** (seit dem Tabellen-Ausbau): Palette-Eintrag `table`, Canvas-Vorschau (`_paint_table` -- Kopf/Filterzeile/Zebra/Gitter/feste-Spalten-Kante, aber KEINE erfundenen Zeilen), Inspector-Abschnitt "Tabelle" (Spalten, Breiten, Zeilen-/Kopfhoehe, feste Spalten, bearbeitbare Spalten, 7 Schalter) und ein `generate_gb_code`-Zweig. Die Einstellungen liegen in `Control.extra["table"]` -- der Designer reicht unbekannte Schluessel (z.B. `rows` aus GUI_SAVE) unveraendert durch, Oeffnen+Speichern verliert also nichts. Dafuer musste gui.rs die Schalter (filter_row/sortable/resizable_cols/reorderable/multi/col_edit) erst ins .gbform aufnehmen -- vorher liessen sie sich zwar setzen, waren beim Laden aber weg. **Geplanter Funktionsumfang
 komplett** (siehe docs/form-designer.md „Status/geplant"): Resize-Handles +
 Snap-Grid, Undo/Redo, integrierter Code-Editor (Doppelklick-Control →
 Handler), Multi-Form-Projekte (`.gbproj`) sind alle vorhanden -- diese

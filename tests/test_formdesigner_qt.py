@@ -1468,3 +1468,77 @@ def test_schatten_ist_neben_dem_formular_messbar(tmp_path):
         assert direkt.red() < weit.red(), "Schatten muss DUNKLER sein als der Grund"
     finally:
         win.close()
+
+
+# ------------------------------------------------------------ Tabelle im Designer
+
+def test_tabelle_platzieren_gibt_ihr_spalten(tmp_path):
+    """Ohne Spalten waere die Tabelle auf der Design-Flaeche ein leeres
+    Rechteck -- man saehe nicht, was man da hingesetzt hat."""
+    _app()
+    from gamebasic.formdesigner import FormDoc
+    d = FormDoc()
+    c = d.add("table", 10, 10)
+    assert c.extra["table"]["headers"], "neue Tabelle ohne Spalten"
+    assert c.extra["table"]["rows"] == [], "Zeilen gehoeren der Laufzeit"
+
+
+def test_inspector_schreibt_und_liest_die_tabellen_einstellungen(tmp_path):
+    """Roundtrip durch den Inspector: was man einstellt, muss beim naechsten
+    Auswaehlen wieder in den Feldern stehen."""
+    _app()
+    win = FormDesigner(tmp_path)
+    try:
+        c = win.canvas.doc.add("table", 10, 10)
+        insp = win.inspector
+        insp.set_control(c)
+        insp.t_headers.setPlainText("Name\nPunkte")
+        insp.t_widths.setText("120, 80")
+        insp.t_zebra.setChecked(True)
+        insp.t_filter.setChecked(True)
+        insp.t_frozen.setValue(1)
+        insp.t_edit.setText("0")
+        insp._apply()
+
+        tj = c.extra["table"]
+        assert tj["headers"] == ["Name", "Punkte"], tj
+        assert tj["col_widths"] == [120, 80], tj
+        assert tj["zebra"] is True and tj["filter_row"] is True, tj
+        assert tj["frozen"] == 1, tj
+        assert tj["col_edit"] == [True], tj
+
+        insp.set_control(c)              # neu befuellen
+        assert insp.t_headers.toPlainText() == "Name\nPunkte"
+        assert insp.t_widths.text() == "120, 80"
+        assert insp.t_edit.text() == "0"
+        assert insp.t_frozen.value() == 1
+    finally:
+        win.close()
+
+
+def test_inspector_wirft_fremde_tabellen_felder_nicht_weg(tmp_path):
+    """Ein per GUI_SAVE erzeugtes Formular bringt Felder mit, die der Designer
+    gar nicht darstellt (z.B. `rows`). Sie muessen den Umweg ueber den
+    Inspector ueberleben -- sonst verliert Oeffnen+Speichern Daten."""
+    _app()
+    win = FormDesigner(tmp_path)
+    try:
+        c = win.canvas.doc.add("table", 10, 10)
+        c.extra["table"]["rows"] = [["a", "b"], ["c", "d"]]
+        c.extra["table"]["row_fg"] = [-1, 5]
+        win.inspector.set_control(c)
+        win.inspector._apply()
+        assert c.extra["table"]["rows"] == [["a", "b"], ["c", "d"]]
+        assert c.extra["table"]["row_fg"] == [-1, 5]
+    finally:
+        win.close()
+
+
+def test_zahlenfeld_verkraftet_tippfehler(tmp_path):
+    """Ein Tippfehler in der Breiten-Liste soll nicht die ganze Zeile
+    unbrauchbar machen."""
+    _app()
+    from gamebasic.formdesigner_qt import _Inspector
+    assert _Inspector._zahlen("80, abc, 120") == [80, 120]
+    assert _Inspector._zahlen("") == []
+    assert _Inspector._zahlen("10 20;30") == [10, 20, 30]

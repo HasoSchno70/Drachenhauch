@@ -52,6 +52,7 @@ PAD = 24          # Rand um das Fenster auf der Canvas
 TITLE_H = 22      # Titelleisten-Hoehe (wie im gui-Modul)
 HANDLE = 8        # Kantenlaenge eines Resize-Griffs (px)
 RULER = 18        # Breite/Hoehe der Lineale am Rand
+TBL_FILTER_H = 22  # Hoehe der Tabellen-Filterzeile (wie TBL_FILTER_H in gui.rs)
 SHADOW = 7        # Staffelungen des Schlagschattens unter dem Formular
 GRID_MIN_ZOOM = 0.5   # darunter wird das Raster zu Rauschen -> aus
 
@@ -247,6 +248,18 @@ def _paint_glyph(qp: QPainter, kind: str, r: QRect, theme: str = "glas_dunkel"):
         qp.drawLine(r.center().x() - 2, cy, r.right() - 6, r.bottom() - 5)
         qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
         qp.drawEllipse(QRect(r.right() - 16, r.top() + 5, 7, 7))
+    elif kind == "table":
+        flaeche(r)
+        # Kopfzeile plus zwei Gitterlinien -- klein genug fuers Palettensymbol,
+        # aber sofort als Tabelle zu erkennen.
+        qp.fillRect(QRect(r.left() + 1, r.top() + 1, r.width() - 2, 9), _col(th["title_bg"]))
+        qp.setPen(QPen(_mix(face, border, 0.55), 1))
+        for i in (1, 2):
+            gy = r.top() + 10 + i * ((r.height() - 12) // 3)
+            qp.drawLine(r.left() + 1, gy, r.right() - 1, gy)
+        for i in (1, 2):
+            gx = r.left() + i * (r.width() // 3)
+            qp.drawLine(gx, r.top() + 1, gx, r.bottom() - 1)
     elif kind == "canvas":
         qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
         qp.setPen(muted); qp.drawText(r, al.AlignCenter, "Canvas")
@@ -940,6 +953,8 @@ class _Canvas(QWidget):
             qp.drawLine(x + w // 2 - 2, y + h // 2, x + w - 5, y + h - 5)
             qp.setBrush(QColor(240, 220, 120)); qp.setPen(Qt.PenStyle.NoPen)
             qp.drawEllipse(QRect(x + w - 16, y + 6, 7, 7))
+        elif k == "table":
+            self._paint_table(qp, c, r, th, face, sunk, border, fg, accent)
         elif k == "canvas":
             qp.setBrush(sunk); qp.setPen(QPen(border, 1, Qt.PenStyle.DashLine)); qp.drawRect(r)
             qp.setPen(_col(th["muted_fg"])); qp.drawText(r, al.AlignCenter, "Canvas")
@@ -950,6 +965,98 @@ class _Canvas(QWidget):
         if not c.visible:                       # unsichtbares Control angedeutet toenen
             qp.fillRect(r, QColor(_col(th["win_bg"]).red(), _col(th["win_bg"]).green(),
                                   _col(th["win_bg"]).blue(), 150))
+
+    @staticmethod
+    def _table_opt(c: Control, key: str, standard):
+        """Einstellung der Tabelle aus `extra["table"]` -- die Laufzeit-Felder
+        liegen dort unveraendert, damit ein per GUI_SAVE erzeugtes Formular
+        beim Oeffnen nichts verliert."""
+        tj = c.extra.get("table") or {}
+        v = tj.get(key, standard)
+        return v if isinstance(v, type(standard)) or standard is None else standard
+
+    def _paint_table(self, qp: QPainter, c: Control, r: QRect, th: dict,
+                     face, sunk, border, fg, accent):
+        """Vorschau der Tabelle: Kopfzeile, optional Filterzeile, ein paar
+        Gitterlinien. Bewusst nur eine ANDEUTUNG -- die Zeilen kommen im
+        Normalfall zur Laufzeit aus dem Programm, hier zu tun als wuesste der
+        Designer sie waere gelogen."""
+        x, y, w, h = r.x(), r.y(), r.width(), r.height()
+        kopf = [str(s) for s in (self._table_opt(c, "headers", []) or [])]
+        breiten = [int(v) for v in (self._table_opt(c, "col_widths", []) or [])
+                   if isinstance(v, (int, float))]
+        kh = int(self._table_opt(c, "header_h", 22))
+        zh = max(8, int(self._table_opt(c, "row_h", 20)))
+        filterzeile = bool(self._table_opt(c, "filter_row", False))
+        gitter = bool(self._table_opt(c, "grid", True))
+        zebra = bool(self._table_opt(c, "zebra", False))
+        fest = int(self._table_opt(c, "frozen", 0))
+
+        qp.save()
+        qp.setClipRect(r)
+        qp.fillRect(r, face)
+        qp.setPen(QPen(border, 1)); qp.setBrush(Qt.BrushStyle.NoBrush); qp.drawRect(r)
+
+        # Spaltenbreiten: gesetzte nehmen, sonst gleichmaessig verteilen --
+        # dieselbe Regel wie in der Laufzeit, sonst saehe der Entwurf anders
+        # aus als das Ergebnis.
+        n = max(len(kopf), len(breiten))
+        if n == 0:
+            qp.setPen(_col(th["muted_fg"]))
+            qp.drawText(r, Qt.AlignmentFlag.AlignCenter, "Tabelle (ohne Spalten)")
+            qp.restore()
+            return
+        if len(breiten) != n:
+            breiten = [max(40, (w - 12) // n)] * n
+
+        if kh > 0:
+            qp.fillRect(QRect(x + 1, y + 1, w - 2, kh - 1), _col(th["title_bg"]))
+            qp.setPen(QPen(border, 1))
+            qp.drawLine(x, y + kh - 1, x + w - 1, y + kh - 1)
+        fy = y + kh
+        koerper = y + kh + (TBL_FILTER_H if filterzeile else 0)
+
+        cx = x + 1
+        for i in range(n):
+            cw = breiten[i]
+            if cx > x + w:
+                break
+            if kh > 0:
+                qp.setPen(fg)
+                qp.drawText(QRect(cx + 5, y, max(1, cw - 8), kh),
+                            Qt.AlignmentFlag.AlignVCenter,
+                            kopf[i] if i < len(kopf) else "")
+            if filterzeile:
+                qp.fillRect(QRect(cx + 2, fy + 2, max(1, cw - 5), TBL_FILTER_H - 4), sunk)
+                qp.setPen(_col(th["muted_fg"]))
+                qp.drawText(QRect(cx + 6, fy, max(1, cw - 10), TBL_FILTER_H),
+                            Qt.AlignmentFlag.AlignVCenter, "Filter ...")
+            if gitter and i < n - 1:
+                qp.setPen(QPen(_mix(face, border, 0.6), 1))
+                qp.drawLine(cx + cw, y + 1, cx + cw, y + h - 2)
+            cx += cw
+
+        # Angedeutete Datenzeilen -- sie zeigen Zeilenhoehe und Zebra, ohne
+        # Inhalte zu erfinden.
+        i = 0
+        ry = koerper
+        while ry < y + h - 2:
+            if zebra and i % 2 == 1:
+                qp.fillRect(QRect(x + 1, ry, w - 2, min(zh, y + h - 1 - ry)),
+                            _mix(face, _col(th["win_bg"]), 0.35))
+            if gitter:
+                qp.setPen(QPen(_mix(face, border, 0.45), 1))
+                qp.drawLine(x + 1, ry + zh - 1, x + w - 2, ry + zh - 1)
+            ry += zh
+            i += 1
+
+        # Kante des festen Blocks -- im Entwurf immer zeigen, denn hier gibt es
+        # kein Scrollen, an dem man sie sonst erkennen wuerde.
+        if 0 < fest <= n:
+            fx = x + 1 + sum(breiten[:fest])
+            qp.setPen(QPen(accent, 1))
+            qp.drawLine(fx, y + 1, fx, y + h - 2)
+        qp.restore()
 
     def _paint_handles(self, qp: QPainter, c: Control):
         x = PAD + c.x
@@ -1331,6 +1438,29 @@ class _Inspector(QWidget):
         self.ssel = QSpinBox(); self.ssel.setRange(-1, 9999)
         self.ssel.setToolTip("Ausgewaehlter Eintrag (-1 = keiner)")
         self.items = QPlainTextEdit(); self.items.setMaximumHeight(90)
+
+        # --- Tabelle -------------------------------------------------------
+        # Spaltentitel und Breiten als Text, eine Zeile je Spalte: eine echte
+        # Spalten-Tabelle im Inspector waere ein Editor im Editor. Die
+        # DATENzeilen fehlen bewusst -- eine Tabelle wird zur Laufzeit
+        # gefuellt (Datei, Datenbank), nicht im Designer abgetippt.
+        self.t_headers = QPlainTextEdit(); self.t_headers.setMaximumHeight(80)
+        self.t_widths = QLineEdit(); self.t_widths.setPlaceholderText("z.B. 80, 160, 100 -- leer = gleich verteilt")
+        self.t_rowh = QSpinBox(); self.t_rowh.setRange(8, 400); self.t_rowh.setValue(20)
+        self.t_headh = QSpinBox(); self.t_headh.setRange(0, 200); self.t_headh.setValue(22)
+        self.t_frozen = QSpinBox(); self.t_frozen.setRange(0, 20)
+        self.t_zebra = QCheckBox("Zebra-Streifen")
+        self.t_grid = QCheckBox("Gitterlinien"); self.t_grid.setChecked(True)
+        self.t_filter = QCheckBox("Filterzeile im Kopf")
+        self.t_sort = QCheckBox("Sortieren per Kopfklick"); self.t_sort.setChecked(True)
+        self.t_resize = QCheckBox("Spaltenbreiten ziehbar"); self.t_resize.setChecked(True)
+        self.t_reorder = QCheckBox("Spalten verschiebbar")
+        self.t_multi = QCheckBox("Mehrfachauswahl")
+        self.t_edit = QLineEdit(); self.t_edit.setPlaceholderText("bearbeitbare Spalten, z.B. 1, 2")
+        self._t_felder = (self.t_headers, self.t_widths, self.t_rowh, self.t_headh,
+                          self.t_frozen, self.t_zebra, self.t_grid, self.t_filter,
+                          self.t_sort, self.t_resize, self.t_reorder, self.t_multi,
+                          self.t_edit)
         self.vmin = QDoubleSpinBox(); self.vmax = QDoubleSpinBox(); self.vval = QDoubleSpinBox()
         for s in (self.vmin, self.vmax, self.vval):
             s.setRange(-1e6, 1e6)
@@ -1376,6 +1506,17 @@ class _Inspector(QWidget):
         self._add("Auswahl", self.ssel)
         self._add("Min", self.vmin); self._add("Max", self.vmax); self._add("Wert", self.vval)
 
+        self._section("Tabelle")
+        self._add("Spalten (1/Zeile)", self.t_headers)
+        self._add("Breiten (px)", self.t_widths)
+        self._add("Zeilenhoehe", self.t_rowh)
+        self._add("Kopfhoehe", self.t_headh)
+        self._add("Feste Spalten", self.t_frozen)
+        self._add("Bearbeitbar", self.t_edit)
+        for _cb in (self.t_zebra, self.t_grid, self.t_filter, self.t_sort,
+                    self.t_resize, self.t_reorder, self.t_multi):
+            self._add("", _cb)
+
         self._section("Zustand")
         self._add("", self.enabled)
         self._add("", self.visible)
@@ -1390,6 +1531,14 @@ class _Inspector(QWidget):
         self.group.editingFinished.connect(self._apply)
         self.placeholder.editingFinished.connect(self._apply)
         self.ssel.valueChanged.connect(self._apply)
+        self.t_headers.textChanged.connect(self._apply)
+        self.t_widths.editingFinished.connect(self._apply)
+        self.t_edit.editingFinished.connect(self._apply)
+        for _w in (self.t_rowh, self.t_headh, self.t_frozen):
+            _w.valueChanged.connect(self._apply)
+        for _w in (self.t_zebra, self.t_grid, self.t_filter, self.t_sort,
+                   self.t_resize, self.t_reorder, self.t_multi):
+            _w.toggled.connect(self._apply)
         self.visible.toggled.connect(self._apply)
         for s in (self.sx, self.sy, self.sw, self.sh, self.vmin, self.vmax, self.vval):
             s.valueChanged.connect(self._apply)
@@ -1452,6 +1601,68 @@ class _Inspector(QWidget):
         if lbl is not None:
             lbl.setVisible(on)
 
+    @staticmethod
+    def _zahlen(text: str) -> list:
+        """Komma- oder leerzeichengetrennte Zahlen aus einem Eingabefeld.
+        Alles, was keine Zahl ist, wird still verworfen -- ein Tippfehler
+        soll nicht die ganze Zeile unbrauchbar machen."""
+        out = []
+        for teil in text.replace(";", ",").replace(" ", ",").split(","):
+            teil = teil.strip()
+            if teil.lstrip("-").isdigit():
+                out.append(int(teil))
+        return out
+
+    def _tabelle_laden(self, c: Control):
+        """Tabellen-Einstellungen aus `extra["table"]` in die Felder."""
+        tj = (c.extra.get("table") or {}) if c.kind == "table" else {}
+        self.t_headers.setPlainText("\n".join(str(s) for s in (tj.get("headers") or [])))
+        self.t_widths.setText(", ".join(str(int(v)) for v in (tj.get("col_widths") or [])
+                                        if isinstance(v, (int, float))))
+        self.t_rowh.setValue(int(tj.get("row_h", 20)))
+        self.t_headh.setValue(int(tj.get("header_h", 22)))
+        self.t_frozen.setValue(int(tj.get("frozen", 0)))
+        self.t_zebra.setChecked(bool(tj.get("zebra", False)))
+        self.t_grid.setChecked(bool(tj.get("grid", True)))
+        self.t_filter.setChecked(bool(tj.get("filter_row", False)))
+        self.t_sort.setChecked(bool(tj.get("sortable", True)))
+        self.t_resize.setChecked(bool(tj.get("resizable_cols", True)))
+        self.t_reorder.setChecked(bool(tj.get("reorderable", False)))
+        self.t_multi.setChecked(bool(tj.get("multi", False)))
+        self.t_edit.setText(", ".join(str(i) for i, an in enumerate(tj.get("col_edit") or []) if an))
+
+    def _tabelle_schreiben(self, c: Control):
+        """Felder zurueck nach `extra["table"]`. Vorhandene Schluessel (z.B.
+        `rows` aus einem geladenen Formular) bleiben erhalten -- der Designer
+        stellt sie nicht dar, darf sie aber auch nicht wegwerfen."""
+        if c.kind != "table":
+            return
+        tj = dict(c.extra.get("table") or {})
+        tj["headers"] = [ln for ln in self.t_headers.toPlainText().splitlines() if ln != ""]
+        br = self._zahlen(self.t_widths.text())
+        if br:
+            tj["col_widths"] = br
+        else:
+            tj.pop("col_widths", None)
+        tj["row_h"] = self.t_rowh.value()
+        tj["header_h"] = self.t_headh.value()
+        tj["frozen"] = self.t_frozen.value()
+        tj["zebra"] = self.t_zebra.isChecked()
+        tj["grid"] = self.t_grid.isChecked()
+        tj["filter_row"] = self.t_filter.isChecked()
+        tj["sortable"] = self.t_sort.isChecked()
+        tj["resizable_cols"] = self.t_resize.isChecked()
+        tj["reorderable"] = self.t_reorder.isChecked()
+        tj["multi"] = self.t_multi.isChecked()
+        spalten = self._zahlen(self.t_edit.text())
+        if spalten:
+            n = max(spalten) + 1
+            tj["col_edit"] = [i in spalten for i in range(n)]
+        else:
+            tj.pop("col_edit", None)
+        tj.setdefault("rows", [])
+        c.extra["table"] = tj
+
     def set_control(self, c: Control | None):
         self._c = c
         self._loading = True
@@ -1469,6 +1680,7 @@ class _Inspector(QWidget):
         self.group.setText(c.group); self.placeholder.setText(c.placeholder)
         self.items.setPlainText("\n".join(c.items))
         self.ssel.setValue(c.sel)
+        self._tabelle_laden(c)
         self.vmin.setValue(c.min); self.vmax.setValue(c.max); self.vval.setValue(c.value)
         self.enabled.setChecked(c.enabled); self.checked.setChecked(c.checked)
         self.visible.setChecked(c.visible)
@@ -1487,6 +1699,9 @@ class _Inspector(QWidget):
         self._show(self.text, has_text)
         self._show(self.items, has_items)
         self._show(self.ssel, has_items)
+        ist_tabelle = c.kind == "table"
+        for _w in self._t_felder:
+            self._show(_w, ist_tabelle)
         self._show(self.group, c.kind == "radio")
         self._show(self.placeholder, c.kind == "textinput")
         # Nur die Ereignisse zeigen, die diese Art wirklich ausloest -- ein
@@ -1512,6 +1727,7 @@ class _Inspector(QWidget):
             setattr(c, ev, feld.text().strip())
         c.group = self.group.text().strip()
         c.placeholder = self.placeholder.text()
+        self._tabelle_schreiben(c)
         items = [ln for ln in self.items.toPlainText().splitlines() if ln != ""]
         c.items = items
         if c.kind == "dropdown" and items and c.sel < 0:

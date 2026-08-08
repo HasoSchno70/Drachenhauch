@@ -97,6 +97,7 @@ PALETTE: list[PaletteSpec] = [
     PaletteSpec("listbox",   "ListBox",      160, 96, ("on_change",) + _ZEIGEN, has_items=True),
     PaletteSpec("progress",  "ProgressBar",  180, 18, _ZEIGEN),
     PaletteSpec("image",     "Image",         96, 96, _ZEIGEN),
+    PaletteSpec("table",     "Tabelle",      320, 140, ("on_change",) + _ZEIGEN),
     PaletteSpec("canvas",    "Canvas",       200, 150, ()),
     PaletteSpec("panel",     "Panel",        160, 100, (), has_text=True),
     PaletteSpec("groupbox",  "GroupBox",     160, 100, (), has_text=True),
@@ -524,6 +525,15 @@ class FormDoc:
         if sp.has_items:
             c.items = ["Eintrag 1", "Eintrag 2", "Eintrag 3"]
             c.sel = 0 if kind == "dropdown" else -1
+        if kind == "table":
+            # Ohne Spalten waere die Tabelle auf der Design-Flaeche ein leeres
+            # Rechteck -- man saehe nicht, was man da hingesetzt hat. Die
+            # ZEILEN bleiben leer: sie kommen im Normalfall zur Laufzeit aus
+            # dem Programm (Datei, Datenbank), nicht aus dem Designer.
+            c.extra["table"] = {
+                "headers": ["Spalte 1", "Spalte 2", "Spalte 3"],
+                "rows": [],
+            }
         if kind == "slider":
             c.min, c.max, c.value = 0.0, 100.0, 50.0
         self.controls.append(c)
@@ -642,6 +652,7 @@ class FormDoc:
     def _unique_name(self, kind: str) -> str:
         base = {"textinput": "txt", "button": "btn", "checkbox": "chk", "radio": "rad",
                 "dropdown": "dd", "listbox": "lst", "slider": "sld", "label": "lbl",
+                "table": "tbl",
                 "progress": "prg", "image": "img", "canvas": "cnv", "panel": "pnl"}.get(kind, kind)
         existing = {c.name for c in self.controls}
         i = 1
@@ -973,6 +984,43 @@ class FormDoc:
             out.append(f"{var} = GUI_PROGRESS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
         elif k == "canvas":
             out.append(f"{var} = GUI_CANVAS(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+        elif k == "table":
+            out.append(f"{var} = GUI_TABLE(frm, {c.x}, {c.y}, {c.w}, {c.h})")
+            tj = c.extra.get("table") or {}
+            kopf = [str(s) for s in (tj.get("headers") or [])]
+            if kopf:
+                hv = var + "_kopf"
+                out.append(f"DIM {hv}[{len(kopf)}] AS STRING")
+                for j, s in enumerate(kopf):
+                    out.append(f"{hv}[{j}] = {_gb_str(s)}")
+                out.append(f"GUI_TABLE_HEADERS({var}, {hv})")
+            br = [int(x) for x in (tj.get("col_widths") or []) if isinstance(x, (int, float))]
+            if br:
+                bv = var + "_breiten"
+                out.append(f"DIM {bv}[{len(br)}] AS INTEGER")
+                for j, x in enumerate(br):
+                    out.append(f"{bv}[{j}] = {x}")
+                out.append(f"GUI_TABLE_COL_WIDTHS({var}, {bv})")
+            # Nur ausgeben, was vom Standard abweicht -- sonst stuenden zehn
+            # GUI_TABLE_SET-Zeilen in jedem erzeugten Programm.
+            for schluessel, feld, standard in (
+                    ("zeilenhoehe", "row_h", 20), ("kopfhoehe", "header_h", 22),
+                    ("zebra", "zebra", False), ("gitter", "grid", True),
+                    ("filterzeile", "filter_row", False), ("sortierbar", "sortable", True),
+                    ("spalten_ziehbar", "resizable_cols", True),
+                    ("spalten_verschiebbar", "reorderable", False),
+                    ("mehrfachauswahl", "multi", False),
+                    ("feste_spalten", "frozen", 0)):
+                wert = tj.get(feld, standard)
+                if wert != standard:
+                    out.append(f"GUI_TABLE_SET({var}, {_gb_str(schluessel)}, {int(wert)})")
+            for j, an in enumerate(tj.get("col_edit") or []):
+                if an:
+                    out.append(f"GUI_TABLE_COL_EDIT({var}, {j}, TRUE)")
+            # Zeilen bleiben dem Programm ueberlassen: eine Tabelle wird im
+            # Normalfall zur Laufzeit gefuellt (Datei, Datenbank), nicht im
+            # Designer abgetippt.
+            out.append(f"' {var}: Zeilen zur Laufzeit fuellen -- GUI_TABLE_ADD_ROW / GUI_TABLE_ROWS")
         elif k in ("dropdown", "listbox"):
             iv = var + "_items"
             out.append(f"DIM {iv}[{len(c.items)}] AS STRING")   # 1D ARRAY OF STRING

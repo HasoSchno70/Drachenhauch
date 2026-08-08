@@ -2701,6 +2701,15 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if !t.col_align.is_empty() { tj["col_align"] = serde_json::json!(t.col_align); }
             if !t.col_order.is_empty() { tj["col_order"] = serde_json::json!(t.col_order); }
             if t.frozen > 0 { tj["frozen"] = serde_json::json!(t.frozen); }
+            // Die Schalter gehoerten bisher nicht ins .gbform -- ohne sie
+            // koennte ein Formular-Designer sie zwar setzen, beim Laden waeren
+            // sie aber wieder weg. Nur schreiben, was vom Standard abweicht.
+            if t.filter_row { tj["filter_row"] = serde_json::json!(true); }
+            if !t.sortable { tj["sortable"] = serde_json::json!(false); }
+            if !t.resizable_cols { tj["resizable_cols"] = serde_json::json!(false); }
+            if t.reorderable { tj["reorderable"] = serde_json::json!(true); }
+            if t.multi { tj["multi"] = serde_json::json!(true); }
+            if t.col_edit.iter().any(|&x| x) { tj["col_edit"] = serde_json::json!(t.col_edit); }
             if t.row_fg.iter().any(|&x| x >= 0) { tj["row_fg"] = serde_json::json!(t.row_fg); }
             if t.row_bg.iter().any(|&x| x >= 0) { tj["row_bg"] = serde_json::json!(t.row_bg); }
             o["table"] = tj;
@@ -2811,6 +2820,14 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                     ts.col_order = a.iter().filter_map(|x| x.as_u64().map(|n| n as usize)).collect();
                 }
                 if let Some(v) = tj["frozen"].as_i64() { ts.frozen = v as i32; }
+                if let Some(v) = tj["filter_row"].as_bool() { ts.filter_row = v; }
+                if let Some(v) = tj["sortable"].as_bool() { ts.sortable = v; }
+                if let Some(v) = tj["resizable_cols"].as_bool() { ts.resizable_cols = v; }
+                if let Some(v) = tj["reorderable"].as_bool() { ts.reorderable = v; }
+                if let Some(v) = tj["multi"].as_bool() { ts.multi = v; }
+                if let Some(a) = tj["col_edit"].as_array() {
+                    ts.col_edit = a.iter().map(|x| x.as_bool().unwrap_or(false)).collect();
+                }
                 for (schluessel, ziel) in [("row_fg", true), ("row_bg", false)] {
                     if let Some(a) = tj[schluessel].as_array() {
                         let v: Vec<i64> = a.iter().map(|x| x.as_i64().unwrap_or(-1)).collect();

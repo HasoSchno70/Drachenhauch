@@ -30,7 +30,8 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   Projekt geöffneten Formulare; Klick wechselt, `*` = ungespeichert, `★` =
   Startformular), darunter die **grafische Palette** aller Widget-Arten (Button,
   Label, Checkbox, Radio, Slider, TextInput, Dropdown, ListBox, ProgressBar,
-  Image, Canvas, Panel) — jeder Eintrag mit Mini-Vorschau-Icon. Platzieren auf
+  Image, **Tabelle**, Canvas, Panel, GroupBox, Separator) — jeder Eintrag mit
+  Mini-Vorschau-Icon. Platzieren auf
   zwei Wegen: **per Drag&Drop** auf die Fläche ziehen, **oder** Eintrag anklicken
   („scharf") und auf die Fläche klicken.
 - **Mitte — Design-Fläche:** das Formular, mit **realistisch gerenderten Controls**
@@ -130,6 +131,40 @@ WHILE NOT QUITREQUESTED()
     GUI_UPDATE() : CLS(0) : GUI_DRAW() : FLIP()
 WEND
 ```
+
+## Die Tabelle im Designer
+
+Die Tabelle lässt sich wie jedes andere Control platzieren; im Inspector gibt
+es dafür einen eigenen Abschnitt:
+
+| Feld | Wirkung |
+|---|---|
+| **Spalten (1/Zeile)** | Spaltentitel, ein Titel je Zeile |
+| **Breiten (px)** | z. B. `120, 80, 60` — leer heißt gleichmäßig verteilen |
+| **Zeilenhöhe / Kopfhöhe** | Bilder in Zellen brauchen mehr Höhe |
+| **Feste Spalten** | die ersten *n* scrollen waagerecht nicht mit |
+| **Bearbeitbar** | Spaltennummern, z. B. `1, 2` — nur diese lassen sich per Doppelklick ändern |
+| Schalter | Zebra, Gitter, Filterzeile, Sortieren, Breiten ziehbar, Spalten verschiebbar, Mehrfachauswahl |
+
+Die **Datenzeilen fehlen bewusst.** Eine Tabelle wird im Normalfall zur
+Laufzeit gefüllt — aus einer Datei, einer Datenbank, dem Spielstand — und nicht
+im Designer abgetippt. Der Designer legt das Gerüst fest, die Zeilen kommen aus
+dem Programm:
+
+```basic
+DIM z AS ARRAY OF STRING
+z = SPLIT$("Anna|Hamburg|420", "|")
+GUI_TABLE_ADD_ROW(tbl, z)
+```
+
+Auf der Design-Fläche zeigt die Vorschau Kopfzeile, Filterzeile, Zebra, Gitter
+und die Kante des festen Blocks — aber **keine erfundenen Inhalte**. Die Kante
+wird hier immer gezeigt (in der Laufzeit erst beim Scrollen): im Entwurf gibt
+es kein Scrollen, an dem man sie sonst erkennen könnte.
+
+Ein Formular, das mit `GUI_SAVE` aus einem laufenden Programm entstanden ist,
+bringt auch **Zeilen** mit. Der Designer stellt sie nicht dar, wirft sie aber
+auch nicht weg — Öffnen und Speichern verliert nichts.
 
 ## Dateiformat
 
