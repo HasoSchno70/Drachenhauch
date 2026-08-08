@@ -18,7 +18,6 @@ import pytest
 from pathlib import Path
 
 BUCH = Path(__file__).resolve().parent.parent / "buch-referenz" / "buch"
-EPUB = BUCH / "GameBasic-Lehrbuch.epub"
 
 OPF_NS = "{http://www.idpf.org/2007/opf}"
 CONTAINER_NS = "{urn:oasis:names:tc:opendocument:xmlns:container}"
@@ -30,15 +29,21 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture(scope="module")
-def epub():
-    """Das Buch einmal bauen und als geoeffnetes Archiv liefern."""
+def epub(tmp_path_factory):
+    """Das Buch einmal bauen und als geoeffnetes Archiv liefern.
+
+    Gebaut wird in ein Wegwerf-Verzeichnis, NICHT ueber die eingecheckte
+    Datei: in der steckt ein Zeitstempel (`dcterms:modified` ist in EPUB 3
+    Pflicht), ein Neubau am selben Ort riss also bei JEDEM Testlauf 4,8 MB
+    Unterschied im Arbeitsverzeichnis auf."""
     if not (BUCH / "node_modules" / "jszip").exists():
         pytest.skip("node_modules fehlt (npm install im buch-Verzeichnis)")
-    res = subprocess.run(["node", "build_epub.js"], cwd=BUCH,
+    ziel = tmp_path_factory.mktemp("epub") / "probe.epub"
+    res = subprocess.run(["node", "build_epub.js", str(ziel)], cwd=BUCH,
                          capture_output=True, text=True, timeout=300)
     assert res.returncode == 0, f"Build fehlgeschlagen:\n{res.stderr}"
-    assert EPUB.exists()
-    with zipfile.ZipFile(EPUB) as z:
+    assert ziel.exists(), "Build meldete Erfolg, schrieb aber nichts"
+    with zipfile.ZipFile(ziel) as z:
         yield z
 
 

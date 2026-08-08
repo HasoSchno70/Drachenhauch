@@ -10,7 +10,8 @@
 // fliessend, das .docx ist auf A4 gesetzt.  Direkt gebaut passt sich das Buch
 // der Schriftgroesse des Lesers an.
 //
-// Aufruf:  node build_epub.js
+// Aufruf:  node build_epub.js [zielpfad.epub]
+//          (ohne Argument: GameBasic-Lehrbuch.epub neben dieser Datei)
 const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
@@ -399,7 +400,13 @@ o.file("toc.ncx", ncx());
 for (const b of bilder) o.file("images/" + b, fs.readFileSync(path.join(IMG, b)));
 o.file("content.opf", opf(new Date().toISOString().replace(/\.\d+Z$/, "Z")));
 
-const ZIEL = path.join(HERE, "GameBasic-Lehrbuch.epub");
+// Ziel ueberschreibbar (erstes Argument). Der Test baut damit in ein
+// Wegwerf-Verzeichnis: die eingecheckte .epub enthaelt einen Zeitstempel
+// (dcterms:modified ist in EPUB 3 Pflicht), ein Neubau am selben Ort machte
+// also bei JEDEM Testlauf 4,8 MB Unterschied im Arbeitsverzeichnis auf.
+const ZIEL = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.join(HERE, "GameBasic-Lehrbuch.epub");
 zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }).then((buf) => {
   fs.writeFileSync(ZIEL, buf);
   const kap = dateien.filter((d) => d.kind === "chapter").length;
