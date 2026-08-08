@@ -2107,6 +2107,19 @@ impl ChartObj {
         let haupt = st.striche.max(0);
         if haupt >= 2 {
             let unter = st.unterstriche.max(0);
+            // Passen die Skalenzahlen ueberhaupt nebeneinander? Sie sitzen alle
+            // auf demselben Radius; wird der Tacho klein, ruecken sie zur Mitte
+            // und bilden dort einen Knaeuel aus uebereinander gedruckten Zahlen.
+            // Wir vergleichen den Abstand zweier benachbarter Beschriftungen
+            // (Sehne auf dem Beschriftungs-Radius) mit der breitesten Zahl --
+            // passt es nicht, bleiben die Striche und die Zahlen entfallen.
+            // Lieber eine Skala ohne Zahlen als eine unlesbare.
+            let lr_test = (ri - dicke - 10) as f64;
+            let breiteste = g
+                .text_width_at(&self.fmt_value(lo), st.text_groesse)
+                .max(g.text_width_at(&self.fmt_value(hi), st.text_groesse));
+            let zahlen_zeigen =
+                skala_zahlen_passen(lr_test, spanne, haupt, st.text_groesse, breiteste);
             for i in 0..haupt {
                 let t = i as f64 / (haupt - 1) as f64;
                 let w = (von + spanne * t).to_radians();
@@ -2119,17 +2132,19 @@ impl ChartObj {
                     2.0,
                     st.c_achse,
                 );
-                let beschriftung = self.fmt_value(lo + (hi - lo) * t);
-                let lr = (ri - dicke - 10) as f64;
-                let tw = g.text_width_at(&beschriftung, st.text_groesse);
-                g.text_styled(
-                    cx + (c * lr) as i32 - tw / 2,
-                    cy + (s * lr) as i32 - st.text_groesse / 2,
-                    beschriftung,
-                    st.c_text,
-                    st.schrift,
-                    st.text_groesse,
-                );
+                if zahlen_zeigen {
+                    let beschriftung = self.fmt_value(lo + (hi - lo) * t);
+                    let lr = lr_test;
+                    let tw = g.text_width_at(&beschriftung, st.text_groesse);
+                    g.text_styled(
+                        cx + (c * lr) as i32 - tw / 2,
+                        cy + (s * lr) as i32 - st.text_groesse / 2,
+                        beschriftung,
+                        st.c_text,
+                        st.schrift,
+                        st.text_groesse,
+                    );
+                }
                 // Unterstriche zwischen diesem und dem naechsten Hauptstrich.
                 if i + 1 < haupt {
                     for k in 1..=unter {
@@ -2439,6 +2454,23 @@ pub const KEYS_FLAG: &[&str] = &[
     "stapel", "verlauf", "verlauf_daten", "schatten_daten", "kurz",
     "hover", "tooltip", "treppe", "fadenkreuz",
 ];
+
+/// Passen die Skalenzahlen eines Tachos nebeneinander?
+///
+/// Sie sitzen alle auf demselben Radius `lr`. Wird der Tacho klein, ruecken
+/// sie zur Mitte und bilden dort einen Knaeuel uebereinander gedruckter
+/// Zahlen -- unlesbar, und schlimmer als gar keine Skala. Verglichen wird der
+/// Abstand zweier benachbarter Beschriftungen (die Sehne auf dem
+/// Beschriftungs-Radius) mit der breitesten vorkommenden Zahl.
+///
+/// Frei und ohne Grafik-Bezug, damit die Regel pruefbar ist.
+pub fn skala_zahlen_passen(lr: f64, spanne_grad: f64, haupt: i32,
+                           text_groesse: i32, breiteste: i32) -> bool {
+    if haupt < 2 || lr <= text_groesse as f64 { return false; }
+    let schritt = (spanne_grad / (haupt - 1) as f64).abs().to_radians();
+    let sehne = 2.0 * lr * (schritt / 2.0).sin();
+    sehne >= breiteste as f64
+}
 
 fn unbekannt(fn_: &str, key: &str, gueltig: &[&str]) -> String {
     format!("{}: unbekannte Eigenschaft '{}' (gueltig: {})", fn_, key, gueltig.join(", "))
@@ -2819,6 +2851,21 @@ mod tests {
         let c = ChartObj::new(Kind::Gauge, 0, 0, 100, 100);
         assert_eq!(c.series.len(), 1, "CHART_VALUE muss ohne CHART_SERIES gehen");
         assert_eq!(c.series[0].values.len(), 1);
+    }
+
+    #[test]
+    fn skala_zahlen_nur_wenn_sie_passen() {
+        // Grosser Tacho (Radius 180, 9 Striche ueber 270 Grad, Zahlen ~26 px):
+        // reichlich Platz.
+        assert!(super::skala_zahlen_passen(180.0, 270.0, 9, 14, 26));
+        // Derselbe Tacho klein (Radius 18): die Zahlen laegen uebereinander.
+        assert!(!super::skala_zahlen_passen(18.0, 270.0, 9, 14, 26));
+        // Radius kleiner als die Schrift -- die Zahlen saessen im Mittelpunkt.
+        assert!(!super::skala_zahlen_passen(10.0, 270.0, 5, 14, 20));
+        // Weniger Striche schaffen wieder Platz.
+        assert!(super::skala_zahlen_passen(60.0, 270.0, 3, 14, 26));
+        // Unter zwei Strichen gibt es keine Skala.
+        assert!(!super::skala_zahlen_passen(200.0, 270.0, 1, 14, 20));
     }
 
     #[test]

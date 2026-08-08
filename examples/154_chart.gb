@@ -172,7 +172,11 @@ END SUB
 
 stil_anwenden()
 
-WHILE NOT KEYPRESSED(KEY_ESCAPE)
+' QUITREQUESTED() statt nur ESC: eine Schleife, die es nie fragt, laeuft
+' headless (GBRT_FRAMES) endlos weiter -- die Demo liess sich damit nicht
+' als Bild aufnehmen.
+WHILE NOT QUITREQUESTED()
+    IF KEYPRESSED(KEY_ESCAPE) THEN BREAK
     ' --- Eingabe ---
     IF KEYHIT(KEY_SPACE) THEN
         t_idx = (t_idx + 1) MOD 4
