@@ -692,7 +692,7 @@ class FormDoc:
         self.code.setdefault(name, "")
         return name
 
-    def rename_control_handlers(self, c: Control, old_name: str) -> list:
+    def rename_control_handlers(self, c: Control, old_name: str) -> list[tuple[str, str]]:
         """Handler mitziehen, wenn ein Control umbenannt wird.
 
         Betroffen sind NUR Handler, die noch ihren aus dem alten Control-Namen
@@ -707,7 +707,7 @@ class FormDoc:
 
         Liefert die (alt, neu)-Paare.
         """
-        umbenannt = []
+        umbenannt: list[tuple[str, str]] = []
         if not old_name or not c.name or old_name == c.name:
             return umbenannt
         for ev, suffix in EVENTS.items():
