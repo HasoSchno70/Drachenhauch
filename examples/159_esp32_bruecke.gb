@@ -1,0 +1,91 @@
+' ESP32-Bruecke: Werte vom Board anzeigen, Befehle zum Board schicken.
+'
+' Gegenstueck zum Sketch esp32/gamebasic_esp32/gamebasic_esp32.ino.
+' Ohne Board laesst sich das trotzdem ausprobieren -- dann spielst du den
+' ESP32 selbst, aus einem zweiten Fenster:
+'
+'   mosquitto_pub -h 127.0.0.1 -t esp32/wert   -m "512"
+'   mosquitto_sub -h 127.0.0.1 -t esp32/befehl -v
+'
+' Die Adresse unten ist 127.0.0.1, weil der Broker auf DIESEM Rechner laeuft.
+' Laeuft er woanders (Raspberry Pi), hier dessen Adresse eintragen.
+
+IMPORT "mqtt"
+
+CONST BROKER AS STRING = "127.0.0.1"
+CONST PORT AS INTEGER = 1883
+
+DIM h AS MQTT_HANDLE
+h = MQTT_CONNECT(BROKER, PORT, "gamebasic-bruecke")
+
+IF NOT MQTT_IS_CONNECTED(h) THEN
+    PRINT "Kein Broker auf " + BROKER + " erreichbar."
+    THROW "Broker nicht erreichbar"
+END IF
+
+PRINT "Verbunden mit " + BROKER + "."
+
+' '#' steht fuer beliebig viele Ebenen: esp32/wert, esp32/status, esp32/xyz/abc
+MQTT_SUBSCRIBE(h, "esp32/#")
+
+DIM letzterWert AS FLOAT
+DIM status$ AS STRING
+DIM anzahl AS INTEGER
+DIM thema$ AS STRING
+DIM inhalt$ AS STRING
+DIM i AS INTEGER
+
+status$ = "unbekannt"
+anzahl = 0
+
+PRINT "Lausche 20 Sekunden auf esp32/# ..."
+PRINT ""
+
+FOR i = 1 TO 400                       ' 400 x 50 ms = 20 s
+    MQTT_UPDATE(h)
+
+    WHILE MQTT_NEXT_MESSAGE(h)
+        thema$ = MQTT_MESSAGE_TOPIC(h)
+        inhalt$ = MQTT_MESSAGE_PAYLOAD(h)
+        anzahl = anzahl + 1
+
+        SELECT CASE thema$
+            CASE "esp32/wert"
+                ' MQTT kennt nur Text -- Zahlen kommen als Zeichenkette an.
+                letzterWert = VAL(inhalt$)
+                PRINT "Messwert: " + STR$(letzterWert)
+
+                ' Regelung: wird es zu hell, Licht aus.
+                IF letzterWert > 2000 THEN
+                    MQTT_PUBLISH(h, "esp32/befehl", "aus")
+                    PRINT "   -> Befehl 'aus' geschickt"
+                END IF
+
+            CASE "esp32/befehl"
+                ' Das ist unser EIGENER Befehl, vom Broker zurueckgespiegelt:
+                ' 'esp32/#' schliesst das Thema mit ein, unter dem wir selbst
+                ' senden. MQTT kennt keine Ausnahme fuer den Absender -- wer
+                ' das nicht abfaengt, baut sich leicht eine Endlosschleife
+                ' (Nachricht kommt an -> loest Senden aus -> kommt an -> ...).
+                ' Wir ignorieren sie hier still.
+
+            CASE "esp32/status"
+                status$ = inhalt$
+                PRINT "Board ist jetzt: " + status$
+                ' 'offline' schickt der BROKER von sich aus, wenn das Board
+                ' unsauber verschwindet (letzter Wille im Sketch). Ohne das
+                ' saehe ein abgestuerztes Board genauso aus wie eines, das
+                ' gerade nichts zu melden hat.
+
+            CASE ELSE
+                PRINT thema$ + " = " + inhalt$
+        END SELECT
+    WEND
+
+    SLEEP(50)
+NEXT
+
+PRINT ""
+PRINT "Empfangen: " + STR$(anzahl) + " Nachrichten."
+PRINT "Letzter Messwert: " + STR$(letzterWert) + ", Board: " + status$
+MQTT_DISCONNECT(h)

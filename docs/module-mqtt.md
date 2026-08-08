@@ -113,3 +113,15 @@ END TRY
 Siehe [examples/148_mqtt.gb](../examples/148_mqtt.gb) (Round-Trip gegen
 einen lokalen Broker — z. B. [Mosquitto](https://mosquitto.org/), Default-Port
 1883, kein Login nötig für einen lokalen Test-Broker).
+
+## Ein echtes Board anbinden
+
+[esp32/](../esp32/) enthält ein fertiges Grundgerüst für ESP32/ESP8266
+(WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten
+Stellen für eigenen Code, dazu das GameBasic-Gegenstück
+[examples/159_esp32_bruecke.gb](../examples/159_esp32_bruecke.gb).
+
+Dort stehen auch die Fallstricke, die man sonst einzeln durchleidet:
+eindeutige Client-Kennung, die 256-Byte-Grenze von PubSubClient, warum
+`delay()` in `loop()` das Board für den Broker sterben lässt, und warum man
+seine eigenen Nachrichten zurückbekommt, wenn man einen Platzhalter abonniert.
