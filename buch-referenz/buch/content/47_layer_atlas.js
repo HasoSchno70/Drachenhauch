@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Layer, Sprite-Atlas & Bulk-Draws"),
-  H.p("Dieses Kapitel sammelt drei Techniken für aufgeräumte und schnelle Grafik: Layer ordnen das Gezeichnete in Ebenen (Hintergrund hinten, HUD vorne), ein Sprite-Atlas bündelt viele Bilder in einer Textur und zeichnet sie gebündelt, und die Bulk-Befehle zeichnen hunderte gleichartige Formen in einem einzigen Aufruf."),
+  H.p("Dieses Kapitel sammelt drei Techniken für aufgeräumte und schnelle Grafik: Layer ordnen das Gezeichnete in Ebenen (Hintergrund hinten, HUD vorne), ein Sprite-Atlas legt viele Bilder in eine Datei und macht sie über ihren Namen ansprechbar, und die Bulk-Befehle zeichnen hunderte gleichartige Formen in einem einzigen Aufruf."),
   H.figure("47_layer.png", "Eine geschichtete Szene: Sternenfeld (PLOTS) und Planeten (CIRCLES) als Bulk-Draws, HUD-Leiste auf der obersten Ebene."),
 
   H.h2("Ebenen: Layer"),
@@ -52,17 +52,17 @@ module.exports = (H) => [
       'ATLAS_DRAW_FLIPPED(atlas, "walk_a", x, y, blicktLinks, FALSE)',
     ]),
   H.cmd("BATCH_DRAW · BATCH_FLUSH", 'BATCH_DRAW(atlas, name$, x, y)   BATCH_FLUSH()',
-    "Für sehr viele Sprites aus demselben Atlas: BATCH_DRAW sammelt sie in einer Warteschlange, BATCH_FLUSH zeichnet sie alle in EINEM gebündelten Aufruf – deutlich schneller als hunderte Einzel-Draws. (FLIP und ein Layer-Wechsel lösen den Batch automatisch aus.)",
+    "Zwei Befehle aus alten Tagen. BATCH_DRAW ist heute nur ein zweiter Name für ATLAS_DRAW, und BATCH_FLUSH tut überhaupt nichts. Du brauchst beide nicht – sie bleiben nur erhalten, damit älterer Code weiterläuft.",
     [
       'DIM r AS INTEGER',
       'DIM c AS INTEGER',
       'FOR r = 0 TO 19',
       '    FOR c = 0 TO 29',
-      '        BATCH_DRAW(atlas, "stand", c * 16, r * 16)',
+      '        ATLAS_DRAW(atlas, "stand", c * 16, r * 16)',
       '    NEXT',
       'NEXT',
-      'BATCH_FLUSH()    \' alle 600 in einem Rutsch',
     ]),
+  H.warn("Der Name führt in die Irre: Es wird nichts gesammelt und nichts gebündelt. GameBasic merkt sich jeden Zeichenbefehl sofort in der aktiven Ebene und spielt beim FLIP alle Ebenen der Reihe nach ab – ein Sammeln wäre dort gar nicht möglich. Wer viele gleichartige Dinge zeichnen will, nimmt die Bulk-Befehle im nächsten Abschnitt; die sparen wirklich Arbeit.", "Kein echtes Bündeln"),
 
   H.h2("Hunderte Formen auf einmal: Bulk-Draws"),
   H.p("Willst du sehr viele gleichartige Formen zeichnen – ein Sternenfeld, eine Punktwolke, ein Partikelregen –, ist eine Schleife mit einzelnen PLOT-Aufrufen langsam. Die Bulk-Befehle nehmen stattdessen ganze Arrays an Koordinaten und zeichnen alles in einem einzigen Aufruf. Die Farbe ist entweder eine Zahl (alle gleich) oder ein Array (eine Farbe pro Form)."),

@@ -150,7 +150,7 @@ Im Spiel: das `tile_collide`-Modul nimmt EIN Tile-Layer als Collision-Layer (typ
 
 ## Tile-Rendering: Pattern mit Sprite-Atlas
 
-Tile-Layer rendern: pro Frame ueber alle Tile-Cells iterieren, gefuellte Tiles aus dem Atlas zeichnen. Mit `BATCH_DRAW` ist das auch bei grossen Maps schnell:
+Tile-Layer rendern: pro Frame ueber alle Tile-Cells iterieren, gefuellte Tiles aus dem Atlas zeichnen. (`BATCH_DRAW` unten ist nur ein Zweitname fuer `ATLAS_DRAW` und `BATCH_FLUSH` ein No-Op -- siehe Grafik-Doku; sie buendeln nichts.)
 
 ```basic
 DIM atlas AS SPRITE_ATLAS

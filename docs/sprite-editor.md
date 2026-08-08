@@ -78,12 +78,11 @@ DIM atlas AS SPRITE_ATLAS
 atlas = ATLAS_LOAD("tiles.json")
 ATLAS_DRAW(atlas, "tiles_0", x, y)
 
-' Oder fuer Batch-Rendering (z.B. Tilemap):
-BATCH_DRAW(atlas, "tiles_3", x, y)
-BATCH_FLUSH()
+' Oder fuer viele Tiles -- BATCH_DRAW ist nur ein Zweitname fuer ATLAS_DRAW:
+ATLAS_DRAW(atlas, "tiles_3", x, y)
 ```
 
-Vorteil ggue Sheet-PNG: **benannte Sub-Sprites** statt Index-Rechnerei, und die Engine-Batch-API (`BATCH_DRAW`/`BATCH_FLUSH`) profitiert vom Atlas-Format. Workflow-Loop ist geschlossen — der Editor schreibt, was die Engine direkt lesen kann.
+Vorteil ggue Sheet-PNG: **benannte Sub-Sprites** statt Index-Rechnerei -- `ATLAS_DRAW(atlas, "name", x, y)` statt selbst ausgerechneter Rechtecke. Workflow-Loop ist geschlossen — der Editor schreibt, was die Engine direkt lesen kann.
 
 ### Benannte Animations-Bereiche (Panel „Animationen")
 
@@ -245,7 +244,7 @@ Aktion "Code kopieren" liefert die `SPRITE_NEW`/`ADD_ANIM`/`PLAY`-Sequenz fuer d
 2. Jedes Frame = ein Tile-Typ (Gras, Wasser, Stein, ...)
 3. `T` einschalten fuer Tile-Preview — sicherstellen dass die Tiles gut kacheln
 4. **`Ctrl+Shift+E` als Sprite-Atlas exportieren** (PNG + JSON)
-5. Im Spiel: `atlas = ATLAS_LOAD("tiles.json")` + `BATCH_DRAW(atlas, "tiles_0", x, y)` fuer jedes Tile + `BATCH_FLUSH()` am Ende
+5. Im Spiel: `atlas = ATLAS_LOAD("tiles.json")` + `ATLAS_DRAW(atlas, "tiles_0", x, y)` fuer jedes Tile
 
 ### Particle / Explosion-Sprite-Sheet
 

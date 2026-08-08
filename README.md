@@ -213,7 +213,7 @@ Gebaut wird mit `rust/build_wasm.py`, das Gerüst liegt in `web/`.
 | `52_named_args.gb` | Named Arguments in SUB/FUNCTION/NEW |
 | `73_ecs_bullets.gb` | ECS mit pro-Entity-Loop (klassisches Pattern) |
 | `75_preloader.gb` | `LOAD_ASSETS` — alle Bilder/Sounds aus einem Manifest |
-| `76_layers_atlas.gb` | Z-Layer + Sprite-Atlas + Batch-Draw kombiniert (600 Tiles in einem `BATCH_FLUSH`) |
+| `76_layers_atlas.gb` | Z-Layer + Sprite-Atlas: 600 Tiles aus einem Atlas, in Z-Reihenfolge zusammengesetzt |
 | `bench_ecs_movement_v2.gb` | ECS-Bulk-API (`ECS_INTEGRATE_FLOAT`) — 40× schneller als pro-Entity-Loop |
 | `bench_ecs_systems.gb` | Bullet-Hell-Pattern mit 8 Bulk-Systemen pro Frame |
 | `77_tiled_platformer.gb` | **Mini-Platformer**: Tiled-Level + Atlas + Tile-Kollision + Z-Layer + Input-Mapping |

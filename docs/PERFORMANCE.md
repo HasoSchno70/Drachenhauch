@@ -216,7 +216,8 @@ funktionales Aequivalent (ohne Geschwindigkeitsvorteil).
 
 **Game-Pattern: Bulk-Ops bevorzugen.** Statt pro-Entity-Loops in BASIC
 mit ECS_GET/ADD: `ECS_INTEGRATE_FLOAT`, `ECS_SCALE_FLOAT` etc. Statt
-einzelner `DRAWIMAGE`-Calls fuer Tiles: `BATCH_DRAW` + `BATCH_FLUSH`
+einzelner `DRAWIMAGE`-Calls fuer Tiles: `DRAWTILEMAP` bzw. die Massen-
+Builtins (`PLOTS`/`BOXES`/`CIRCLES`/`LINES`). **Nicht** `BATCH_DRAW`/`BATCH_FLUSH`
 auf einem Sprite-Atlas.
 
 ## Reproduktion (historisch)

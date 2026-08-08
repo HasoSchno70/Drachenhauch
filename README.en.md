@@ -213,7 +213,7 @@ Built with `rust/build_wasm.py`; the harness lives in `web/`.
 | `52_named_args.gb` | named arguments in SUB/FUNCTION/NEW |
 | `73_ecs_bullets.gb` | ECS with a per-entity loop (classic pattern) |
 | `75_preloader.gb` | `LOAD_ASSETS` — every image/sound from one manifest |
-| `76_layers_atlas.gb` | Z-layers + sprite atlas + batch draw combined (600 tiles in one `BATCH_FLUSH`) |
+| `76_layers_atlas.gb` | Z-layers + sprite atlas: 600 tiles from one atlas, composited in z-order |
 | `bench_ecs_movement_v2.gb` | ECS bulk API (`ECS_INTEGRATE_FLOAT`) — 40× faster than a per-entity loop |
 | `bench_ecs_systems.gb` | bullet-hell pattern with 8 bulk systems per frame |
 | `77_tiled_platformer.gb` | **mini platformer**: Tiled level + atlas + tile collision + Z-layers + input mapping |

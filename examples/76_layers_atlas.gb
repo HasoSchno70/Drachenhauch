@@ -1,11 +1,12 @@
-' Z-Layers + Sprite-Atlas + Batch-Draw zusammen.
+' Z-Layers + Sprite-Atlas zusammen.
 '
-' Demonstriert das volle "AAA-Pattern":
 ' 1. ATLAS_LOAD laedt EIN Bild mit allen Sprites + benannte Rects.
 ' 2. LAYER_DEFINE setzt explizite Z-Reihenfolge (bg -> sprites -> ui).
-' 3. BATCH_DRAW queued hunderte Tiles, ein BATCH_FLUSH rendert alle in
-'    EINEM gebatchten Draw-Call -- spuerbar schneller bei vielen
-'    Sprites pro Frame.
+' 3. BATCH_DRAW/BATCH_FLUSH stehen hier nur noch aus Kompatibilitaet:
+'    BATCH_DRAW IST ATLAS_DRAW (derselbe Aufruf), BATCH_FLUSH tut
+'    nichts. Es wird nichts gesammelt und nichts gespart -- gbrt
+'    merkt sich jeden Zeichenbefehl sofort in der aktiven Ebene und
+'    spielt beim FLIP alle Ebenen der Reihe nach ab.
 ' 4. UI-Layer ist Screen-Space (Camera reset bevor wir reinzeichnen).
 '
 ' Tilemap: 30x20 zufaellige Tiles + paar Items oben.
@@ -83,7 +84,7 @@ FOR frame = 0 TO 600
     ' CAMERA_RESET() vor dem Text -- braucht IMPORT "camera".)
     LAYER("ui")
     TEXT(10, 10, "Frame: " + STR$(frame))
-    TEXT(10, 28, "Tiles: 600 batched per frame (1x blits-Call)")
+    TEXT(10, 28, "600 Tiles aus EINEM Atlas, 3 Z-Layer")
 
     FLIP()
     IF KEYPRESSED(KEY_ESCAPE) THEN
