@@ -121,3 +121,56 @@ def test_default_snippets_have_placeholders():
     out, _offset, length = expand_snippet_full(body, indent="")
     assert length > 0  # mindestens ein selektierbarer Default
     assert "${" not in out  # keine ungeparste Marker mehr im Output
+
+
+# ------------------------------------------------------------ Tabellen-Snippets
+
+def test_tabellen_snippets_vorhanden():
+    for trigger in ("tab", "tabsel"):
+        assert trigger in SNIPPETS, trigger
+
+
+def test_kein_snippet_enthaelt_ein_rohes_pipe_zeichen():
+    """`|` ist im Snippet-Format der Cursor-Anker. Ein Trennzeichen im Text
+    (z.B. SPLIT$("a|b", "|")) wird dadurch still verschluckt -- der Compiler
+    meldet nichts, weil ein kaputter String-Inhalt einwandfrei uebersetzt.
+    Genau das ist beim Tabellen-Snippet passiert."""
+    from gamebasic.editor_qt.snippets import expand_snippet_full
+    for trigger, body in SNIPPETS.items():
+        aus, _, _ = expand_snippet_full(body, "")
+        assert "|" not in aus, f"Snippet '{trigger}' verliert Zeichen am Cursor-Anker: {aus!r}"
+
+
+def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
+    """Ein Snippet, das nicht compiliert, ist schlimmer als keines."""
+    import os
+    import subprocess
+    from pathlib import Path
+
+    import pytest
+
+    from gamebasic.editor_qt.snippets import expand_snippet_full
+
+    root = Path(__file__).resolve().parent.parent
+    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    gbrt = next((root / "rust" / "gb_runtime" / "target" / v / exe
+                 for v in ("release", "debug")
+                 if (root / "rust" / "gb_runtime" / "target" / v / exe).exists()), None)
+    if gbrt is None:
+        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+
+    aufbau, _, _ = expand_snippet_full(SNIPPETS["tab"], "")
+    abfrage, _, _ = expand_snippet_full(SNIPPETS["tabsel"], "")
+    quelle = (
+        'IMPORT "gui"\n'
+        'SCREEN(640, 480, "T", 1)\n'
+        "DIM win AS GUI_WINDOW\n"
+        'win = GUI_WINDOW("T", 10, 10, 600, 400)\n'
+        + aufbau + "\n" + abfrage + "\n"
+    )
+    f = tmp_path / "snip.gb"
+    f.write_text(quelle, encoding="utf-8")
+    r = subprocess.run([str(gbrt), "--check", str(f)], capture_output=True,
+                       text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.strip() in ("[]", ""), r.stdout

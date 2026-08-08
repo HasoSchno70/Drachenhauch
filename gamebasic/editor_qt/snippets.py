@@ -68,6 +68,35 @@ SNIPPETS: dict[str, str] = {
     ),
     "scr": 'SCREEN(${1:320}, ${2:240}, "${3:Titel}", ${4:2})${0}',
     "imp": 'IMPORT "${1:module}"${0}',
+    # Array-Literale statt SPLIT$("a|b|c", "|"): im Snippet-Format ist "|" der
+    # Cursor-Anker -- ein Trennzeichen darin wird still verschluckt (erst im
+    # eingefuegten Text gesehen, der Compiler haette es nie gemeldet: ein
+    # kaputter String-Inhalt uebersetzt ja einwandfrei).
+    # Eine Tabelle braucht mehr als einen Konstruktor: Kopf, Breiten, ein paar
+    # Einstellungen und die Schleife, die sie fuellt. Von Hand tippt man das
+    # nicht gern zweimal -- und wer es aus der Doku abschreibt, vergisst
+    # zuverlaessig GUI_TABLE_HEADERS.
+    "tab": (
+        'DIM ${1:tbl} AS GUI_WIDGET\n'
+        '${1:tbl} = GUI_TABLE(${2:win}, 20, 20, 400, 240)\n'
+        'DIM ${1:tbl}_kopf AS ARRAY OF STRING\n'
+        '${1:tbl}_kopf = ["${3:Name}", "Ort", "Punkte"]\n' 
+        'GUI_TABLE_HEADERS(${1:tbl}, ${1:tbl}_kopf)\n'
+        'GUI_TABLE_SET(${1:tbl}, "zebra", 1)\n'
+        '\n'
+        "' Zeilen kommen aus dem Programm (Datei, Datenbank, Spielstand):\n"
+        'DIM ${1:tbl}_zeile AS ARRAY OF STRING\n'
+        '${1:tbl}_zeile = ["Anna", "Hamburg", "420"]\n' 
+        'GUI_TABLE_ADD_ROW(${1:tbl}, ${1:tbl}_zeile)${0}'
+    ),
+    # Das Gegenstueck: die Auswahl abfragen. Gehoert in die Frame-Schleife,
+    # darum getrennt -- sonst muesste man das halbe Snippet wieder loeschen.
+    "tabsel": (
+        'IF GUI_TABLE_CLICKED(${1:tbl}) >= 0 THEN\n'
+        '    DIM ${2:zeile} AS INTEGER : ${2:zeile} = GUI_TABLE_SELECTED(${1:tbl})\n'
+        '    ${0}\n'
+        'END IF'
+    ),
 }
 
 
