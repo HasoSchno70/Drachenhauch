@@ -71,7 +71,8 @@ _HANDLE_CURSORS = {
 # `Drachenhauch.exe`, F5 meldete dort also "Runtime nicht gebaut: python
 # rust/build_runtime.py", einen Rat, den ein Installer-Nutzer nicht befolgen
 # kann. Der Alias haelt den Namen fuer Tests patchbar (wie in output_console).
-from .editor_qt.dhrt_locate import find_dhrt as _find_dhrt, dhrt_spawn_semaphore
+from .editor_qt.dhrt_locate import (NO_WINDOW, find_dhrt as _find_dhrt,
+                                    dhrt_spawn_semaphore)
 
 
 def _dhrt_diagnostics(dhrt, dh_path: Path) -> list:
@@ -83,7 +84,8 @@ def _dhrt_diagnostics(dhrt, dh_path: Path) -> list:
         with dhrt_spawn_semaphore:
             r = subprocess.run([str(dhrt), "--check", str(dh_path)],
                                capture_output=True, text=True,
-                               encoding="utf-8", timeout=30)
+                               encoding="utf-8", timeout=30,
+                               creationflags=NO_WINDOW)
         return json.loads((r.stdout or "").strip() or "[]")
     except (OSError, ValueError, subprocess.SubprocessError):
         return []          # Pruefung nicht moeglich -> Lauf trotzdem versuchen

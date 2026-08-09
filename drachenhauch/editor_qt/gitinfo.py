@@ -110,9 +110,11 @@ def _is_hex(s: str) -> bool:
 
 def _run_git(args, cwd) -> tuple[int, str, str]:
     try:
+        from .dhrt_locate import NO_WINDOW
         p = subprocess.run(
             ["git", *args], cwd=str(cwd), capture_output=True, text=True,
             encoding="utf-8", errors="replace", timeout=20,
+            creationflags=NO_WINDOW,
         )
         return p.returncode, p.stdout, p.stderr
     except FileNotFoundError:

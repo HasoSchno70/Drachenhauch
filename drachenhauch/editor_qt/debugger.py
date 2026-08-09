@@ -85,7 +85,7 @@ class DebugController(QObject):
         os.close(fd)
         self._tmp = tmp
         try:
-            from .dhrt_locate import dhrt_spawn_semaphore
+            from .dhrt_locate import NO_WINDOW, dhrt_spawn_semaphore
             Path(tmp).write_text(source, encoding="utf-8")
             # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen
             # gleichzeitig startende `dhrt`-Subprozesse aus anderen Editor-
@@ -96,7 +96,8 @@ class DebugController(QObject):
                     [str(dhrt), "debug", tmp],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True,
-                    cwd=str(base) if base.is_dir() else None, bufsize=1)
+                    cwd=str(base) if base.is_dir() else None, bufsize=1,
+                    creationflags=NO_WINDOW)
         except Exception as exc:  # noqa: BLE001
             self._cleanup_tmp()
             self.failed.emit(f"dhrt-Start: {exc}", -1)

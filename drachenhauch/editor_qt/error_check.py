@@ -110,9 +110,11 @@ def _check_via_dhrt(source: str, base_path, dhrt,
     try:
         # Laeuft bereits unter `dhrt_spawn_semaphore` (siehe `_check_source`).
         Path(tmp).write_text(source, encoding="utf-8")
+        from .dhrt_locate import NO_WINDOW
         proc = subprocess.Popen(
             [str(dhrt), "--check", tmp],
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+            creationflags=NO_WINDOW)
         if checker is not None:
             checker._set_active_proc(proc)
         stdout, _ = proc.communicate(timeout=15)

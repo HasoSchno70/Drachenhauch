@@ -25,7 +25,12 @@ const AUTOR = "Hans Schnorrenberger";
 const ARGS = process.argv.slice(2);
 const _li = ARGS.indexOf("--lang");
 const LANG = _li >= 0 ? (ARGS[_li + 1] || "de") : "de";
-const FREI = ARGS.filter((_, i) => i !== _li && i !== _li + 1);
+// Ohne `--lang` ist `_li` gleich -1 -- dann traf `i !== _li + 1` ausgerechnet
+// Index 0 und verschluckte den ZIELPFAD. `node build_epub.js ziel.epub` schrieb
+// dadurch stumm an die Standardstelle statt dorthin, wo es sollte (von
+// tests/test_build_epub.py aufgedeckt: "Build meldete Erfolg, schrieb aber
+// nichts").
+const FREI = _li >= 0 ? ARGS.filter((_, i) => i !== _li && i !== _li + 1) : ARGS;
 
 // Feste Texte des Renderers -- sie stehen NICHT in den Kapiteln und kommen
 // darum auch nicht durch den Katalog. "Merke"/"Achtung" sind Vorgabewerte

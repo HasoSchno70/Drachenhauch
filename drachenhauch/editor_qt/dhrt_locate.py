@@ -10,6 +10,7 @@ Reihenfolge:
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -39,6 +40,23 @@ from pathlib import Path
 # Serialisierung ist dort nicht spuerbar.
 _MAX_CONCURRENT_DHRT_SPAWNS = 1
 dhrt_spawn_semaphore = threading.BoundedSemaphore(_MAX_CONCURRENT_DHRT_SPAWNS)
+
+# Kein Konsolenfenster fuer Hilfsprozesse.
+#
+# `dhrt` und `git` sind Konsolen-Programme. Startet sie eine Anwendung OHNE
+# eigene Konsole -- und genau das ist die installierte IDE (PyInstaller mit
+# `console=False`) --, legt Windows dem Kind ein EIGENES Konsolenfenster an.
+# Es blitzt auf und verschwindet sofort wieder. Im Entwicklungsbaum faellt das
+# nie auf: dort laeuft der Editor aus einem Terminal, und das Kind erbt
+# einfach dessen Konsole.
+#
+# Gemessen aus einem `pythonw`-Elternprozess (GetConsoleWindow() im Kind):
+#   subprocess ohne Flag       -> Konsolenfenster JA
+#   subprocess CREATE_NO_WINDOW-> nein
+#   QProcess                   -> nein (Qt setzt das Flag selbst)
+# Der Run-Pfad ueber QProcess braucht also nichts; jeder `subprocess`-Aufruf
+# aus der Oberflaeche heraus dagegen schon.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
 
 
 def find_dhrt(project_root: Path | None = None) -> Path | None:

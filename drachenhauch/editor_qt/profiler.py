@@ -107,7 +107,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
         # (Grafik-Render-Loop, WHILE TRUE) per "stop"-Zeile SAUBER abbrechen,
         # sodass dhrt die bis dahin gesammelten Profile-Daten noch ausgibt
         # (ein harter terminate() wuerde den finalen JSON-println verschlucken).
-        from .dhrt_locate import dhrt_spawn_semaphore
+        from .dhrt_locate import NO_WINDOW, dhrt_spawn_semaphore
         # Semaphor rund um die Prozess-ERSTELLUNG: `subprocess.Popen` laeuft
         # hier in einem Hintergrund-Thread (`Profiler._run`); auf Windows ist
         # die Handle-Vererbung in `subprocess.Popen.__init__` nicht dafuer
@@ -118,7 +118,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
             proc = subprocess.Popen(
                 [str(dhrt), "profile", "--stoppable", tmp],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                stdin=subprocess.PIPE, text=True)
+                stdin=subprocess.PIPE, text=True, creationflags=NO_WINDOW)
 
         # stdout in einem Thread leeren: der JSON-Blob kommt am Ende in einem
         # Rutsch, waehrend des Laufs schreibt dhrt (fast) nichts -> der Pipe-

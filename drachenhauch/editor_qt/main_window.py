@@ -1371,8 +1371,10 @@ class DrachenhauchEditor(QMainWindow):
         self.console.append(f"⚙ Exportiere {st.file_path.name} ...\n", "info")
         QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
+            from .dhrt_locate import NO_WINDOW
             res = subprocess.run([str(dhrt), "--export", str(st.file_path)],
-                                 capture_output=True, text=True)
+                                 capture_output=True, text=True,
+                                 creationflags=NO_WINDOW)
         except OSError as exc:
             QGuiApplication.restoreOverrideCursor()
             self.console.append(f"Export-Fehler: {exc}\n", "error")
