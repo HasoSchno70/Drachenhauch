@@ -65,8 +65,14 @@ Source: "..\rust\gb_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: i
 ; bleiben bei der Deinstallation erhalten.
 Source: "..\examples\*"; DestDir: "{commondocs}\GameBasic\examples"; \
     Flags: recursesubdirs createallsubdirs uninsneveruninstall
-; Lehrbuch (falls gebaut).
+; Sketch-Grundgeruest fuer ESP32/ESP8266 -- NEBEN die Beispiele, weil
+; examples\159_esp32_bruecke.gb im Kopfkommentar darauf verweist. Ohne das
+; laese der Nutzer dort von einem Gegenstueck, das er nicht hat.
+Source: "..\esp32\*"; DestDir: "{commondocs}\GameBasic\esp32"; \
+    Flags: recursesubdirs createallsubdirs uninsneveruninstall skipifsourcedoesntexist
+; Lehrbuch (falls gebaut) -- zum Drucken das .docx, zum Lesen am Geraet das .epub.
 Source: "..\buch-referenz\buch\GameBasic-Lehrbuch.docx"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
+Source: "..\buch-referenz\buch\GameBasic-Lehrbuch.epub"; DestDir: "{app}\docs"; Flags: skipifsourcedoesntexist
 ; Lizenz + Drittanbieter-Lizenzhinweise (Pflicht-Beilage fuer MIT/BSD/Apache/LGPL).
 Source: "EULA.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
@@ -78,6 +84,7 @@ Name: "{group}\Tilemap-Editor"; Filename: "{app}\{#AppExe}"; Parameters: "--tile
 Name: "{group}\Form-Designer"; Filename: "{app}\{#AppExe}"; Parameters: "--form"
 Name: "{group}\Audio-Studio"; Filename: "{app}\{#AppExe}"; Parameters: "--audio"
 Name: "{group}\Beispiele"; Filename: "{commondocs}\GameBasic\examples"
+Name: "{group}\Lehrbuch"; Filename: "{app}\docs\GameBasic-Lehrbuch.docx"; Flags: createonlyiffileexists
 Name: "{group}\Lizenzen\Lizenzvertrag (EULA)"; Filename: "{app}\EULA.txt"
 Name: "{group}\Lizenzen\Drittanbieter-Lizenzen"; Filename: "{app}\THIRD-PARTY-NOTICES.txt"
 Name: "{group}\{cm:UninstallProgram,GameBasic}"; Filename: "{uninstallexe}"
