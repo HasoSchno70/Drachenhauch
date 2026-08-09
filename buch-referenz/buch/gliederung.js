@@ -44,7 +44,11 @@ for (const m of mods) {
 
 let sumT = 0, sumW = 0;
 for (const z of zeilen) {
-  if (FILTER && !z.teil.startsWith(FILTER)) continue;
+  // Praefix-Vergleich reicht NICHT: "Teil III" faengt mit "Teil II" an.
+  // Der Filter trifft daher nur, wenn danach das Ende oder ein Trenner
+  // kommt -- sonst lieferte `node gliederung.js "Teil II"` auch Teil III.
+  if (FILTER && !(z.teil === FILTER
+      || z.teil.startsWith(FILTER + " ") || z.teil.startsWith(FILTER + "—"))) continue;
   sumT += z.texte; sumW += z.woerter;
   const k = z.kapitel.length ? z.kapitel.join(" / ") : "—";
   console.log(`${z.datei.padEnd(26)} ${String(z.texte).padStart(4)} Texte `

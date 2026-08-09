@@ -50,6 +50,6 @@ module.exports = (H) => [
   H.tip("Konstanten schreibt man oft in GROSSBUCHSTABEN", "Das ist nur Konvention, kein Zwang – aber es macht im Code sofort sichtbar, dass sich dieser Wert nicht ändert."),
 
   H.h2("Gute Namen"),
-  H.p("Variablennamen beginnen mit einem Buchstaben und dürfen Buchstaben, Ziffern und Unterstriche enthalten. Groß-/Kleinschreibung wird unterschieden? In Drachenhauch sind Namen unkompliziert – wähle sie vor allem sprechend. „punkte“ sagt mehr als „p“, und „spieler_x“ mehr als „sx“. Dein zukünftiges Ich wird es dir danken."),
+  H.p("Variablennamen beginnen mit einem Buchstaben und dürfen Buchstaben, Ziffern und Unterstriche enthalten. Groß- und Kleinschreibung spielt dabei keine Rolle: „punkte“, „Punkte“ und „PUNKTE“ meinen dieselbe Schublade. Wähle die Namen vor allem sprechend – „punkte“ sagt mehr als „p“, und „spieler_x“ mehr als „sx“. Dein zukünftiges Ich wird es dir danken."),
   H.warn("„step“ ist ein reserviertes Wort (es gehört zur FOR-Schleife, siehe Kapitel Schleifen). Nenne deine Zählvariable also lieber i, schritt oder tick – nicht step."),
 ];
