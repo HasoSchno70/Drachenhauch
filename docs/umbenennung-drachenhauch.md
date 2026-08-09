@@ -95,13 +95,29 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 ### Phase 4 — Außenwirkung
 
-- [ ] `README.md` + `README.en.md`
-- [ ] `docs/` (39 Dateien), `CLAUDE.md`
-- [ ] Logo austauschen (`drachenhauch/assets/logo.png` → neues)
-- [ ] GitHub-Repo umbenennen — **GitHub leitet alte URLs dauerhaft um**,
-      Klone und der bestehende Release-Link brechen also nicht
-- [ ] `v2026.1` bleibt unangetastet: es ist der letzte Stand unter dem alten
-      Namen und dokumentiert die Geschichte
+- [x] `README.md` + `README.en.md`, `docs/`, `CLAUDE.md` — 655 Stellen in 256
+      Dateien (`GameBasic` 601×, `GAMEBASIC` 54×)
+- [x] Schriftzug (`drachenhauch/assets/schriftzug.png`) als README-Kopf; er lag
+      bisher ungenutzt herum. Vorher geprüft, dass er auf **beiden**
+      GitHub-Themen trägt: dunkle Kontur auf Weiß, helle Glanzlichter auf Dunkel
+- [x] Slogan **„Feuer frei für deine Ideen."** (englisch: *Let your ideas
+      breathe fire.* — „fire at will" trüge einen Kasernenton mit, den das
+      deutsche „Feuer frei" hier nicht hat)
+- [x] Buchausgaben umbenannt und neu gebaut (`Drachenhauch-Lehrbuch.docx/.epub`,
+      `Drachenhauch-Buch.docx`)
+- [x] GitHub-Repo `Game-Basic` → `Drachenhauch`, Beschreibung neu (der Tippfehler
+      „Entwicklungs umgebung" ist mit weg). Alte URLs leiten dauerhaft um
+- [x] `v2026.1` unangetastet: der letzte Stand unter dem alten Namen
+
+> **Der Produktname steckte in Testdaten.** `LEFT$("GameBasic", 4)` war „Game" —
+> die Eingabe wanderte mit, die erwarteten Ausgaben nicht (3 Tests). Jetzt
+> „TestString" → Test + String: gleiche Lesbarkeit, aber der nächste
+> Namenswechsel bricht sie nicht wieder.
+>
+> **`DRACHENHAUCH` ist drei Zeichen länger als `GAMEBASIC`.** In
+> `examples/49_pong_scene` lief der Titel damit rechts aus dem Bild. Sichtbar
+> war das **nur im Screenshot** — kein Test und kein `--check` meldet so etwas.
+> Beim Zentrieren kam heraus, dass die Zeile darunter schon vorher zu lang war.
 
 ### Phase 5 — Auslieferung
 
