@@ -1,6 +1,6 @@
 """Reiter-Builtins (Tabs): nur Registrierung. Live verifiziert ueber
 examples/131_gui_tabs.gb."""
-from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_gui_tab_builtins_registered():

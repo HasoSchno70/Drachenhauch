@@ -5,7 +5,7 @@
 ' GUI_LOAD baut das Fenster, GUI_UPDATE ruft die passenden SUBs automatisch auf
 ' -- genau wie in Xojo: Control hat ein Event, du fuellst nur den Handler.
 '
-' Native-only (gbrt / F6).
+' Native-only (dhrt / F6).
 
 IMPORT "gui"
 

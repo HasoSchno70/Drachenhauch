@@ -53,8 +53,8 @@ def _build_kw_set() -> None:
     except Exception:
         pass
     try:
-        # Builtin-Namen aus dem eingefrorenen gbrt-Metadaten-Index (Stufe B).
-        from .gbrt_meta import builtin_names_lower
+        # Builtin-Namen aus dem eingefrorenen dhrt-Metadaten-Index (Stufe B).
+        from .dhrt_meta import builtin_names_lower
         out.update(builtin_names_lower())
     except Exception:
         pass

@@ -170,7 +170,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 | `levels/*.json` | Level-Sets (im Menü wählbar) |
 
 Tests: `tests/test_circuitrunner.py` (Konverter-Round-Trip + Demo-Schema +
-gbrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
+dhrt-Headless-Harness für Monster-Reihenfolge/-Tempo, Bestzeiten und Passwort).
 
 ## Grenzen / Ideen
 

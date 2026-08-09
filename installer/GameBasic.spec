@@ -1,9 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller-Spec fuer die GameBasic-IDE (onedir, windowed).
 # Friert gbrun.py samt gamebasic-Paket, PySide6, numpy und Pillow ein, sodass
-# GameBasic OHNE installiertes Python laeuft. gbrt(.exe) wird NICHT hier
+# GameBasic OHNE installiertes Python laeuft. dhrt(.exe) wird NICHT hier
 # gebuendelt -- build_installer.py legt es NACH dem PyInstaller-Lauf neben
-# die eingefrorene Exe (findet _find_gbrt via sys.executable-Verzeichnis,
+# die eingefrorene Exe (findet _find_dhrt via sys.executable-Verzeichnis,
 # das ist bei einem macOS .app-Bundle Contents/MacOS/).
 #
 # Aufruf ueber installer/build_installer.py (setzt SPECPATH/Pfade); manuell:

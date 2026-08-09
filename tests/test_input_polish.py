@@ -21,21 +21,21 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _run(src, tmp_path, frames=1):
     (tmp_path / "i.gb").write_text(src, encoding="utf-8")
-    env = dict(os.environ, GBRT_FRAMES=str(frames))
-    r = subprocess.run([str(_GBRT), "run", str(tmp_path / "i.gb")], capture_output=True,
+    env = dict(os.environ, DHRT_FRAMES=str(frames))
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "i.gb")], capture_output=True,
                        text=True, encoding="utf-8", env=env, timeout=90, cwd=str(tmp_path))
     r.lines = [ln for ln in (r.stdout or "").splitlines()
                if not ln.startswith(("WARNING:", "INFO:", "TRACE:"))]

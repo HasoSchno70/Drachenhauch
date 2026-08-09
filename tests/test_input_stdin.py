@@ -17,18 +17,18 @@ _ROOT = Path(__file__).resolve().parent.parent
 _GBRUN = _ROOT / "gbrun.py"
 
 
-def _gbrt_available() -> bool:
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _dhrt_available() -> bool:
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return any((_ROOT / "rust" / "drachenhauch_runtime" / "target" / variant / exe).exists()
                for variant in ("release", "debug"))
 
 
-# gbrun.py ruft intern "gbrt run" auf -- ohne gebauten gbrt bricht der
+# gbrun.py ruft intern "dhrt run" auf -- ohne gebauten dhrt bricht der
 # Subprozess mit einer "Native Runtime nicht gefunden"-Meldung ab statt das
 # GB-Programm auszufuehren. Anders als die run_gb-Fixture (conftest.py)
 # nutzt dieses Modul gbrun.py direkt als echten Subprozess (End-to-End-Test
 # der Editor-Konsole), daher der eigene Skip hier.
-pytestmark = pytest.mark.skipif(not _gbrt_available(), reason="native Runtime 'gbrt' nicht gebaut")
+pytestmark = pytest.mark.skipif(not _dhrt_available(), reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _run_with_stdin(source: str, stdin: str, tmp_path: Path) -> tuple[int, str]:

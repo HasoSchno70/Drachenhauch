@@ -670,7 +670,7 @@ class ParticleEditor(QMainWindow):
         row = QHBoxLayout()
         row.addStretch(1)
         btn_test = QPushButton("In GameBasic testen")
-        btn_test.setToolTip("Lauffaehige Demo (Maus = Emitter) im gbrt-Fenster starten")
+        btn_test.setToolTip("Lauffaehige Demo (Maus = Emitter) im dhrt-Fenster starten")
         btn_test.clicked.connect(self._run_in_gamebasic)
         row.addWidget(btn_test)
         btn_save = QPushButton("In .gb speichern...")

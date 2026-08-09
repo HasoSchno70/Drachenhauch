@@ -1,7 +1,7 @@
 """Geteilte Synthesizer-Logik (sfxr-Stil) -- Qt-frei, pure numpy.
 
 Single-Source fuer den SFX-Generator (`sfxeditor_qt.py`) UND den
-`AUDIO_SFX`-Builtin (`modules/audio.py`). Die native Runtime `gbrt`
+`AUDIO_SFX`-Builtin (`modules/audio.py`). Die native Runtime `dhrt`
 repliziert dieselbe Mathematik in Rust (`rust/drachenhauch_runtime/src/audio.rs`),
 damit der Effekt in beiden Pfaden gleich klingt.
 

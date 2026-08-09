@@ -1,7 +1,7 @@
 module.exports = (H) => [
   H.chapter("Hardware: serial, usb, wifi, bt"),
   H.p("Die letzten vier Module verbinden GameBasic mit der physischen Welt: Daten von einem Mikrocontroller lesen (serial), einen selbstgebauten Controller ansprechen (usb), das WLAN verwalten (wifi) oder einen Bluetooth-Sensor auslesen (bt). Sie sind nicht für jedes Spiel gedacht, eröffnen aber spannende Bastel-Projekte – etwa ein Spiel, das auf einen echten Knopf oder einen Temperatursensor reagiert."),
-  H.warn("Diese vier Module sind im Standard-gbrt NICHT enthalten. Rufst du eine ihrer Funktionen auf, kommt eine klare Meldung mit der Bau-Anweisung. Du brauchst einen Hardware-Build: python rust\\build_runtime.py --hardware. Außerdem hat jedes Modul eigene Voraussetzungen (Treiber, Plattform), die unten genannt sind. Die folgenden Beispiele sind daher nicht gegen die Laufzeit „abgedruckt“ – sie zeigen die Verwendung.", "Spezial-Build nötig"),
+  H.warn("Diese vier Module sind im Standard-dhrt NICHT enthalten. Rufst du eine ihrer Funktionen auf, kommt eine klare Meldung mit der Bau-Anweisung. Du brauchst einen Hardware-Build: python rust\\build_runtime.py --hardware. Außerdem hat jedes Modul eigene Voraussetzungen (Treiber, Plattform), die unten genannt sind. Die folgenden Beispiele sind daher nicht gegen die Laufzeit „abgedruckt“ – sie zeigen die Verwendung.", "Spezial-Build nötig"),
   H.note("Fast alle Abfrage-Funktionen liefern hier mehrzeilige oder komma-getrennte STRINGs (Listen von Geräten/Netzen). Du zerlegst sie mit SPLIT (Kapitel 16) in ein Array und gehst die Einträge durch."),
 
   H.h2("serial – Mikrocontroller (Arduino, ESP32)"),

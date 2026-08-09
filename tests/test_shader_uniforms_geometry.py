@@ -15,25 +15,25 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 Image = pytest.importorskip("PIL.Image", reason="Pillow fuer die Pixel-Pruefung noetig")
 
 
 def _run(files: dict, main: str, tmp_path, frames=3, shot=None):
     for name, body in files.items():
         (tmp_path / name).write_text(body, encoding="utf-8")
-    env = dict(os.environ, GBRT_FRAMES=str(frames))
+    env = dict(os.environ, DHRT_FRAMES=str(frames))
     if shot:
-        env["GBRT_SCREENSHOT"] = str(tmp_path / shot)
-    r = subprocess.run([str(_GBRT), "run", str(tmp_path / main)], capture_output=True,
+        env["DHRT_SCREENSHOT"] = str(tmp_path / shot)
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / main)], capture_output=True,
                        text=True, encoding="utf-8", env=env, timeout=90, cwd=str(tmp_path))
     r.out = [w for ln in (r.stdout or "").splitlines()
              if not ln.startswith(("WARNING:", "INFO:", "TRACE:")) for w in ln.split()]

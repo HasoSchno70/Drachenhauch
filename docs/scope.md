@@ -14,7 +14,7 @@ Globals (Top-Level)
     └─ SUB / FUNCTION lokal
 ```
 
-Implementierungs-Referenz: Scope-Auflösung in `gbrt` — [compiler.rs](../rust/gb_runtime/src/compiler.rs) (Slot-Allokation) + [vm.rs](../rust/gb_runtime/src/vm.rs) (Locals/Globals).
+Implementierungs-Referenz: Scope-Auflösung in `dhrt` — [compiler.rs](../rust/gb_runtime/src/compiler.rs) (Slot-Allokation) + [vm.rs](../rust/gb_runtime/src/vm.rs) (Locals/Globals).
 
 | Ebene | Wann | Persistenz |
 |---|---|---|

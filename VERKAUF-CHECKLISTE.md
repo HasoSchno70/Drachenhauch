@@ -15,7 +15,7 @@ verkauft werden kann. Aufgeteilt in „technisch erledigt" (im Repo gebaut) und
 |---|---|---|
 | **Windows-Installer** (komplette IDE + Runtime, **ohne Python**) | `installer/` (`build_installer.py`, `GameBasic.spec`, `GameBasic.iss`) | Endkunden installieren per Doppelklick |
 | **Beispiele am beschreibbaren Ort** | `{commondocs}\GameBasic\examples` | Editor findet Beispiele + Showcase-Bilder, Demos können schreiben |
-| **Editor startet direkt** (kein Auswahlfenster) + findet `gbrt` | `gbrun.py`, `editor_qt/gbrt_locate.py` | „Ausführen" funktioniert in der Installation |
+| **Editor startet direkt** (kein Auswahlfenster) + findet `dhrt` | `gbrun.py`, `editor_qt/dhrt_locate.py` | „Ausführen" funktioniert in der Installation |
 | **EULA** (Endbenutzer-Lizenzvertrag, Vorlage) | `installer/EULA.txt` | Zustimmungsseite im Setup; Nutzer besitzen + verkaufen ihre Spiele |
 | **Drittanbieter-Lizenzen** (auto-generiert) | `installer/gen_notices.py` → `THIRD-PARTY-NOTICES.txt` | Pflicht-Beilage für MIT/BSD/Apache/LGPL |
 | **Asset-Lizenzen geprüft + dokumentiert** | `examples/ASSET-CREDITS.md` | alles eigen/CC0/CC-BY (mit Attribution) |
@@ -62,7 +62,7 @@ Anbietername/Firma, Anschrift, E-Mail, Jahr, Gerichtsstand, Lizenzmodell
 ### 5. Vor dem ersten Verkauf einmal testen
 - Setup auf einem **frischen** Windows (ohne Python/Dev-Tools) installieren.
 - Editor starten, ein Beispiel laufen lassen, ein eigenes Spiel exportieren
-  (`gbrt --export`) und die exportierte `.exe` auf einem anderen PC starten.
+  (`dhrt --export`) und die exportierte `.exe` auf einem anderen PC starten.
 
 ---
 

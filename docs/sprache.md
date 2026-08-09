@@ -109,8 +109,8 @@ Hex und Binary sind nur INTEGER-Konstanten — keine Floats. Alle drei Schreibwe
 | `STRING` | UTF-8-Text | `""` |
 | `BOOLEAN` | `TRUE` oder `FALSE` | `FALSE` |
 | `FILE` | Datei-Handle | `NIL` |
-| `IMAGE` | Bild-Handle (nativ gbrt) | `NIL` |
-| `SOUND` | Sound-Handle (nativ gbrt) | `NIL` |
+| `IMAGE` | Bild-Handle (nativ dhrt) | `NIL` |
+| `SOUND` | Sound-Handle (nativ dhrt) | `NIL` |
 | `ARRAY OF T` | mehrdim. Array | `NIL` (oder mit Größen-Init: gefüllt) |
 | `MAP OF T` | String→T-Map | leere Map |
 | `<Klassenname>` | Instanz | `NIL` |
@@ -572,7 +572,7 @@ Greet("Dora", 50, suffix: "?")
 **Nicht verfügbar bei**:
 
 - Built-ins (`ABS`, `CIRCLE`, `JSON_PARSE`, …) — die haben keine deklarierten Param-Namen
-- Methoden-Aufrufen `obj.method(name: ...)` — die Klasse steht erst zur Laufzeit fest, daher wirft der `gbrt`-Compiler hier.
+- Methoden-Aufrufen `obj.method(name: ...)` — die Klasse steht erst zur Laufzeit fest, daher wirft der `dhrt`-Compiler hier.
 
 ### BYREF-Parameter (Multi-Return)
 
@@ -617,7 +617,7 @@ PRINT q, r       ' "3 2"
 
 **Einschränkungen:**
 - `BYREF` darf **nicht** mit einem Default-Wert kombiniert werden (was würde es heißen, eine Default-Variable per Referenz zu übergeben?).
-- `BYREF` wird von `gbrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
+- `BYREF` wird von `dhrt` unterstützt: der Compiler setzt an der Aufruf­stelle eine lvalue-Erfassung plus Post-Call-Write-Back (Copy-In/Copy-Out), die VM gibt die finalen Parameter­werte zurück. (Aktuell nur bei direkten `SUB`/`FUNCTION`-Aufrufen — nicht über `FUNCREF` oder Methoden­aufrufe, deren Klasse erst zur Laufzeit feststeht.)
 
 **Rekursion** funktioniert:
 
@@ -690,11 +690,11 @@ NEXT
 Bei unendlichen Generatoren stattdessen manuell `CORO_RESUME`/`CORO_DONE`.
 
 **Semantik & Einschränkungen:**
-- `gbrt` suspendiert eine Coroutine via **Frame-Snapshot** (ip/locals/stack werden beim `YIELD` abgelegt und beim Resume restauriert) — kein OS-Thread, deterministisch, raylib-Main-Thread-sicher.
+- `dhrt` suspendiert eine Coroutine via **Frame-Snapshot** (ip/locals/stack werden beim `YIELD` abgelegt und beim Resume restauriert) — kein OS-Thread, deterministisch, raylib-Main-Thread-sicher.
 - **Kein Cross-Frame-`YIELD`:** ein Helfer mit `YIELD` ist selbst eine Coroutine; `YIELD` läuft also nie über einen normalen Funktionsaufruf hinweg.
 - In `FUNCTION ... AS T` werden `YIELD`- *und* `RETURN`-Werte auf `T` gecoerct. Eine `SUB`-Coroutine yieldet ohne Typ-Coercion.
 - Ein manueller `WHILE NOT CORO_DONE(c)`-Loop bekommt beim letzten (beendenden) `CORO_RESUME` den `RETURN`-Wert. Gib dem Generator einen typisierten `RETURN`, damit die Zuweisung an eine typisierte Variable klappt — oder nutze `FOR EACH`.
-- Funktioniert auch im Standalone-`.exe`-Export (gleiche `gbrt`-VM).
+- Funktioniert auch im Standalone-`.exe`-Export (gleiche `dhrt`-VM).
 
 Vollständiges Beispiel: [examples/98_coroutines.gb](../examples/98_coroutines.gb).
 

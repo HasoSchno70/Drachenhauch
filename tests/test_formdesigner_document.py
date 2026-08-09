@@ -517,7 +517,7 @@ def test_gb_export_image_skipped():
 
 
 def test_gb_export_runs_in_runtime(run_gb, tmp_path):
-    # Die explizite Konstruktion muss in gbrt laufen (alle Builtin-Signaturen ok).
+    # Die explizite Konstruktion muss in dhrt laufen (alle Builtin-Signaturen ok).
     doc = FormDoc(title="RT", w=300, h=220)
     doc.add("button", 10, 10).text = "Go"
     doc.add("label", 10, 40)
@@ -585,7 +585,7 @@ def test_generated_runner_with_bodies():
     assert 'PRINT "hi"' in src
 
 
-# ----------------------------------------- Roundtrip-Treue gegenueber gbrt
+# ----------------------------------------- Roundtrip-Treue gegenueber dhrt
 # Der Designer kennt nur eine Teilmenge des Laufzeit-Formats (`gui.rs`). Alles
 # Uebrige muss er unveraendert durchreichen, sonst zerstoert ein Oeffnen+
 # Speichern im Designer Menues, Reiter, Tabellen und Baeume einer per GUI_SAVE
@@ -625,7 +625,7 @@ def test_clone_does_not_share_extra():
 
 
 def test_gui_save_form_survives_designer_roundtrip(run_gb, tmp_path):
-    # Golden gegen die Laufzeit: eine von gbrt geschriebene Form durch den
+    # Golden gegen die Laufzeit: eine von dhrt geschriebene Form durch den
     # Designer schleusen und pruefen, dass GUI_LOAD danach dasselbe sieht.
     run_gb(
         'IMPORT "gui"\n'

@@ -116,8 +116,8 @@ Oder ohne Argumente:
 
 | Kürzel | Aktion |
 |---|---|
-| `F5` | Programm starten — **native Runtime `gbrt`** (bei Direkt-Startproblemen automatisch über den `gbrun.py`-Launcher, gleicher `gbrt` mit chdir) |
-| Toolbar `Stop` | Laufendes Programm abbrechen (auch den nativen `gbrt`-Prozess) |
+| `F5` | Programm starten — **native Runtime `dhrt`** (bei Direkt-Startproblemen automatisch über den `gbrun.py`-Launcher, gleicher `dhrt` mit chdir) |
+| Toolbar `Stop` | Laufendes Programm abbrechen (auch den nativen `dhrt`-Prozess) |
 
 ## Befehlspalette (`Strg+Shift+P`)
 
@@ -369,14 +369,14 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 
 ## Run / Stop
 
-- **`Run` (F5)**: führt das Programm über die **native Runtime `gbrt`** aus (startet `gbrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `gbrun.py`-Launcher** (gleicher `gbrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
+- **`Run` (F5)**: führt das Programm über die **native Runtime `dhrt`** aus (startet `dhrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `gbrun.py`-Launcher** (gleicher `dhrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
 - **`Stop`** (Shift+F5): bricht den laufenden Prozess ab (für Game-Loops, die nicht von selbst enden).
 
-**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `gbrt`) bzw. **▶** (über `gbrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
+**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `dhrt`) bzw. **▶** (über `gbrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
 
 ## Debugger
 
-Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt und Variablen-Inspektion. Er läuft auf dem Python-Interpreter (Referenz-Pfad) — die native Runtime `gbrt` hat keinen Debug-Kanal. Am besten für Konsolen-/Logik-Programme geeignet.
+Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt und Variablen-Inspektion. Er läuft auf dem Python-Interpreter (Referenz-Pfad) — die native Runtime `dhrt` hat keinen Debug-Kanal. Am besten für Konsolen-/Logik-Programme geeignet.
 
 **Bedienung:**
 
@@ -399,12 +399,12 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 ## Profiler
 
-`Strg+Shift+Y` (oder Toolbar-Button / `Debug → Profiler`) führt das Programm über die native Runtime (`gbrt profile`) instrumentiert aus und misst pro Statement **Trefferzahl** und **Zeit**. Das Ergebnis erscheint im **Profiler**-Panel (rechts):
+`Strg+Shift+Y` (oder Toolbar-Button / `Debug → Profiler`) führt das Programm über die native Runtime (`dhrt profile`) instrumentiert aus und misst pro Statement **Trefferzahl** und **Zeit**. Das Ergebnis erscheint im **Profiler**-Panel (rechts):
 
 - **Zeilen** — jede ausgeführte Zeile mit Treffern, Zeit (ms), Anteil (Balken + %) und Quelltext, nach Zeit sortiert (Hotspots oben). Doppelklick springt zur Zeile.
 - **Funktionen** — pro `SUB`/`FUNCTION` aggregiert: Aufrufzahl + Gesamtzeit.
 
-**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Am besten für Konsolen-/Logik-Programme, aber auch **Grafik-Programme mit Endlos-Render-Loop** lassen sich profilieren: erneutes `Strg+Shift+Y` (oder das Schliessen des Fensters via `QUITREQUESTED`) bricht den Lauf **sauber** ab — gbrt liefert dann die bis dahin gesammelten Daten (intern via Stop-Signal über stdin, `gbrt profile --stoppable`; ein harter Prozess-Kill würde die Auswertung verschlucken). `INPUT` liefert unter dem Profiler "" (kein Hängen). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
+**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Am besten für Konsolen-/Logik-Programme, aber auch **Grafik-Programme mit Endlos-Render-Loop** lassen sich profilieren: erneutes `Strg+Shift+Y` (oder das Schliessen des Fensters via `QUITREQUESTED`) bricht den Lauf **sauber** ab — dhrt liefert dann die bis dahin gesammelten Daten (intern via Stop-Signal über stdin, `dhrt profile --stoppable`; ein harter Prozess-Kill würde die Auswertung verschlucken). `INPUT` liefert unter dem Profiler "" (kein Hängen). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
 
 ## Git-Blame
 
@@ -487,7 +487,7 @@ VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.gb`-Dateien im 
 
 Startet der Editor ohne offene Datei, zeigt er ein **Welcome-Panel** (kein leerer Tab): Logo, Action-Buttons (Neu / Öffnen / Beispiele / Doku) und eine **Showcase-Galerie** — kuratierte Demos als anklickbare Karten mit echtem Screenshot-Thumbnail, Titel und Kurzbeschreibung (3D/PBR/IBL, Demoscene, Partikel, Platformer …). Klick auf eine Karte öffnet die Demo. Darunter die Liste der zuletzt geöffneten Dateien. Sobald eine Datei geöffnet oder ein neuer Tab angelegt wird, verschwindet das Welcome.
 
-Die Galerie-Liste ist die Single-Source-of-Truth in `gamebasic/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `gbrt` headless — `GBRT_FRAMES` + `GBRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
+Die Galerie-Liste ist die Single-Source-of-Truth in `gamebasic/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `dhrt` headless — `DHRT_FRAMES` + `DHRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
 
 ## Explorer: Beispiele nach Kategorie
 
@@ -526,4 +526,4 @@ GameBasic-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), dar
 
 - **`step` ist Schlüsselwort** (FOR…STEP) — Variablen anders benennen (`i`, `tick`, `iter`).
 - **`gbrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Installation: `pip install PySide6`.
-- **Grafik-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess (gbrt) ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Grafik-Fenster beendet das Programm.
+- **Grafik-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess (dhrt) ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Grafik-Fenster beendet das Programm.

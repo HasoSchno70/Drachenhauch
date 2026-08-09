@@ -1,4 +1,4 @@
-// Anhang D -- Fehlermeldungen verstehen. Alle Meldungs-Wortlaute gegen gbrt verifiziert.
+// Anhang D -- Fehlermeldungen verstehen. Alle Meldungs-Wortlaute gegen dhrt verifiziert.
 module.exports = (H) => {
   const err = (msg, fix) => [{ text: msg, mono: true, size: 17 }, fix];
   const T = (rows) => H.table(rows, {
@@ -41,7 +41,7 @@ module.exports = (H) => {
         "Beim Zerlegen (a, b) = ... muss die Anzahl der Ziele exakt zur Tupel-Länge passen."),
       err("AUDIO_SFX: erwartet STRING",
         "Ein Befehl bekam ein Argument vom falschen Typ (hier eine Zahl statt eines Strings). Vergleiche den Aufruf mit der Signatur in Anhang A."),
-      err("Builtin 'WIFI_AVAILABLE' gehoert zum Hardware-Modul 'wifi', das in diesem gbrt-Build fehlt",
+      err("Builtin 'WIFI_AVAILABLE' gehoert zum Hardware-Modul 'wifi', das in diesem dhrt-Build fehlt",
         "Die Hardware-Module (serial/usb/wifi/bt) sind nur im Spezial-Build enthalten. Baue mit: python rust\\build_runtime.py --hardware (siehe Kapitel 76)."),
     ]),
 

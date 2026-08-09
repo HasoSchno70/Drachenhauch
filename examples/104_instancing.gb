@@ -10,7 +10,7 @@
 '   - Zum Vergleich kann man dasselbe mit 1024x MODEL_MATRIX(...) zeichnen
 '     (1024 Draws). MODEL_INSTANCED ist dafuer die performante Variante.
 '
-' Native-only (F6 / gbrt). Beleuchtung optional -- ohne LIGHT_* zeigt der
+' Native-only (F6 / dhrt). Beleuchtung optional -- ohne LIGHT_* zeigt der
 ' Instancing-Shader flaches Albedo (die tint-Farbe).
 
 IMPORT "g3d"

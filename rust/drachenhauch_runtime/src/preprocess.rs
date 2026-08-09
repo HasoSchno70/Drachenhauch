@@ -5,7 +5,7 @@
 //!   - Quellcode-IMPORT (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
 //!     rekursiv preprocessen, mit `' === IMPORT ... ===`-Markern inlinen.
 //!   - Built-in-Modul (`IMPORT "json"`): die Zeile wird zu einem Kommentar
-//!     `' === IMPORT MODULE json ===` -- gbrt hat die Modul-Builtins nativ,
+//!     `' === IMPORT MODULE json ===` -- dhrt hat die Modul-Builtins nativ,
 //!     es ist also kein echtes Inlining noetig.
 //!
 //! Wie in Python ist das KEIN Modulsystem mit Namespaces -- inkludierter Code
@@ -19,7 +19,7 @@ use std::sync::OnceLock;
 use regex::Regex;
 
 /// Built-in-Modul-Namen (= `gamebasic/modules/*.py`, ohne `__init__`).
-/// Muss mit `modules.discover_modules()` synchron bleiben. gbrt implementiert
+/// Muss mit `modules.discover_modules()` synchron bleiben. dhrt implementiert
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
     "animfsm", "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
@@ -167,7 +167,7 @@ fn is_known_module(rel: &str) -> bool {
     MODULES.contains(&low.as_str())
 }
 
-/// Ist das Hardware-Modul `m` in DIESEM gbrt-Build einkompiliert? Fuer
+/// Ist das Hardware-Modul `m` in DIESEM dhrt-Build einkompiliert? Fuer
 /// Nicht-Hardware-Module immer `true`. Spiegelt die Cargo-Features, die
 /// `vm.rs` zum Dispatch der `serial_`/`usb_`/`bt_`/`wifi_`-Builtins braucht.
 fn hardware_module_compiled(m: &str) -> bool {
@@ -187,7 +187,7 @@ fn hardware_module_compiled(m: &str) -> bool {
 /// Wortlaut hat wie der Fehler beim ersten Aufruf.
 pub fn hardware_missing_msg(module: &str) -> String {
     format!(
-        "Hardware-Modul '{}' ist in diesem gbrt-Build nicht enthalten -- \
+        "Hardware-Modul '{}' ist in diesem dhrt-Build nicht enthalten -- \
          Funktionsaufrufe schlagen zur Laufzeit fehl. Neu bauen mit: \
          python rust\\build_runtime.py --hardware",
         module)
@@ -274,7 +274,7 @@ fn process_inner(
         }
 
         if !exists {
-            // Fallback: Built-in-Modul (json/db/ui/...). gbrt hat sie nativ,
+            // Fallback: Built-in-Modul (json/db/ui/...). dhrt hat sie nativ,
             // also nur einen Kommentar-Marker emittieren.
             if looks_like_module_name(&rel) && is_known_module(&rel) {
                 let tag = match &alias {

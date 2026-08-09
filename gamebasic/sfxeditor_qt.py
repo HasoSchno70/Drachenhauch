@@ -442,7 +442,7 @@ class SfxGenerator(QMainWindow):
 
     def _export_code(self) -> None:
         p = self._params()
-        # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit (nativ in gbrt),
+        # AUDIO_SFX erzeugt den Effekt prozedural zur Laufzeit (nativ in dhrt),
         # kein WAV-Asset noetig. Die optionalen Trailing-Args sind positionell
         # -> alle bis zum letzten nicht-Default-Wert anhaengen.
         sfx = (f'AUDIO_SFX("{p["waveform"]}", {p["base_freq"]:g}, '

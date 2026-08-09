@@ -132,7 +132,7 @@ CAMERA3D_VIEW(MAT4_LOOKAT(VEC3_NEW(5,5,5), VEC3_ZERO(), VEC3_NEW(0,1,0)))
 - Intern f32 → bei nicht-exakten Werten kleine Rundungsabweichungen (zum
   Vergleichen `ROUND(...)` nutzen).
 - `MODEL_MATRIX` / `MODEL_INSTANCED` / `CAMERA3D_VIEW` / `CAMERA3D_PROJECTION`
-  sind **native-only** (gbrt / F6) — sie brauchen die raylib-3D-Pipeline.
+  sind **native-only** (dhrt / F6) — sie brauchen die raylib-3D-Pipeline.
 
 Demos: [examples/103_m3d.gb](../examples/103_m3d.gb) (MODEL_MATRIX),
 [examples/104_instancing.gb](../examples/104_instancing.gb) (MODEL_INSTANCED).

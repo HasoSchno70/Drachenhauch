@@ -3,7 +3,7 @@
 //!
 //! `to_json()` emittiert exakt die Struktur, die der Python-Test aus den
 //! Dataclass-Feldern baut (`{"_": NodeName, feld: ...}`), damit der Parser
-//! gegen Python verifiziert werden kann (`gbrt --ast`). Tupel (z.B.
+//! gegen Python verifiziert werden kann (`dhrt --ast`). Tupel (z.B.
 //! `If.elseif_branches`) werden als JSON-Arrays serialisiert -- wie Pythons
 //! Tuple→list. `line` ist in Python KEIN Dataclass-Feld (dynamisch gesetzt)
 //! und wird daher hier nicht getrackt/serialisiert.

@@ -219,7 +219,7 @@ Die Bulk-Ops nutzen die Sparse-Set-Struktur direkt: sie iterieren ueber den klei
 
 ## Eigene Bulk-Ops hinzufuegen
 
-ECS ist nativ in `gbrt` ([`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs)).
+ECS ist nativ in `dhrt` ([`rust/gb_runtime/src/ecs.rs`](../rust/gb_runtime/src/ecs.rs)).
 Eine neue Bulk-Op fuegt man so hinzu:
 
 1. **Methode auf `World`** in `ecs.rs` — iteriert in einer Rust-Loop ueber die

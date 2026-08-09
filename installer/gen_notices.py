@@ -32,7 +32,7 @@ def _canonical(name: str) -> str:
 # Mit der IDE gebuendelte Python-Drittpakete (PyInstaller -> dist/GameBasic).
 PY_PACKAGES = ["PySide6", "PySide6_Essentials", "PySide6_Addons",
                "shiboken6", "numpy", "pillow"]
-# Im ausgelieferten gbrt aktive Cargo-Features (rust/build_runtime.py Standard).
+# Im ausgelieferten dhrt aktive Cargo-Features (rust/build_runtime.py Standard).
 RUST_FEATURES = "graphics db net http"
 
 SEP = "=" * 78
@@ -131,7 +131,7 @@ def mpl_section() -> str:
 
 
 def rust_section() -> str:
-    out = [SEP, "RUST-KOMPONENTEN (native Runtime gbrt)", SEP, ""]
+    out = [SEP, "RUST-KOMPONENTEN (native Runtime dhrt)", SEP, ""]
     crate = ROOT / "rust" / "drachenhauch_runtime"
     try:
         raw = subprocess.run(
@@ -147,7 +147,7 @@ def rust_section() -> str:
     pkgs = [p for p in data["packages"] if p.get("id") != root_id
             and p.get("name") != "drachenhauch_runtime"]
     pkgs.sort(key=lambda p: p["name"].lower())
-    out.append(f"Die native Runtime gbrt enthaelt {len(pkgs)} Rust-Crates "
+    out.append(f"Die native Runtime dhrt enthaelt {len(pkgs)} Rust-Crates "
                f"(Features: {RUST_FEATURES}):\n")
     for p in pkgs:
         lic = p.get("license") or p.get("license_file") or "(unbekannt)"

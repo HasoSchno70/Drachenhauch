@@ -4,7 +4,7 @@ Extrahiert aus `modules/particles.py` (Stufe B), damit der Partikel-Editor
 (`particleeditor_qt`) die Vorschau-Simulation nutzen kann, ohne die Built-in-
 Registry / den Tree-Walker zu importieren -- Voraussetzung fuers Entfernen von
 `modules/particles.py` in Phase 8. Reine numpy/random-Logik (EMIT/UPDATE/CLEAR);
-das Rendering (PARTICLE_DRAW) ist nativ in gbrt und nicht Teil dieser Klasse.
+das Rendering (PARTICLE_DRAW) ist nativ in dhrt und nicht Teil dieser Klasse.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ class ParticleSystem:
     # sich per Slider (Emission/Frame=200, Lebensdauer=8000ms) im Steady-
     # State ~100000 Partikel erreichen -- reproduzierbares UI-Haengen
     # (Review-Fund). Betrifft NUR die Vorschau-Sim; exportierter GB-Code laeuft
-    # ueber die native gbrt-Laufzeit und diesen Deckel nicht.
+    # ueber die native dhrt-Laufzeit und diesen Deckel nicht.
     MAX_PARTICLES = 6000
 
     def __init__(self, x: float, y: float):

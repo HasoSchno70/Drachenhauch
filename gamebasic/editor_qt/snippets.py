@@ -31,7 +31,7 @@ _PLACEHOLDER_RE = re.compile(r"\$\{(\d+)(?::([^{}]*))?\}")
 # ``${N:default}`` markiert einen Placeholder mit auswaehlbarem Default.
 #
 # Review-Fund: "if"/"for"/"sub"/"try" sind ABSICHTLICH exakt die echten
-# GB-Keywords (case-insensitiv, wie gbrts Lexer sie behandelt) -- tippt ein
+# GB-Keywords (case-insensitiv, wie dhrts Lexer sie behandelt) -- tippt ein
 # User eines dieser Woerter und drueckt Tab aus Gewohnheit (z.B. um VOR dem
 # eigentlichen Statement einzuruecken), bekommt er IMMER das volle Snippet
 # statt eines einfachen Einrueckens, ohne offensichtlichen Ausweg. Da die

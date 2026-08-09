@@ -25,7 +25,7 @@ TITLES = os.path.join(HERE, "toc_titles.json")
 PAGES = os.path.join(HERE, "toc_pages.json")
 
 # Druckdienste (epubli & Co.) verlangen: KEINE Transparenz + Bilder ~300 dpi.
-# Die gbrt-Screenshots kommen als 480x320-RGBA (Alpha = Transparenz, und bei
+# Die dhrt-Screenshots kommen als 480x320-RGBA (Alpha = Transparenz, und bei
 # Anzeige in ~12,7 cm Breite nur ~96 dpi). prepare_images() macht sie druckfertig:
 # Alpha auf Weiss flachklopfen (-> RGB) und ganzzahlig hochskalieren, bis die
 # native Breite >= MIN_PRINT_W ist (bei 480 px -> Faktor 4 = 1920 px -> ~384 dpi).

@@ -398,7 +398,7 @@ class AboutDialog(QDialog):
         descr = QLabel(
             "BASIC-Dialekt mit strikter Typisierung und OOP, gemacht fuer Spiele.\n"
             "2D- & 3D-Grafik, Sound, GUI, Partikel, Module und mehr -- ausgefuehrt\n"
-            "von der nativen Runtime 'gbrt' (Rust/raylib), exportierbar als .exe."
+            "von der nativen Runtime 'dhrt' (Rust/raylib), exportierbar als .exe."
         )
         descr.setAlignment(Qt.AlignmentFlag.AlignCenter)
         descr.setStyleSheet(muted_style)

@@ -3,14 +3,14 @@
 """Baut die GameBasic-Distribution fuer das aktuelle Betriebssystem.
 
 Schritte (alle Plattformen):
-  1. gbrt-Runtime sicherstellen (rust/build_runtime.py, falls fehlend).
+  1. dhrt-Runtime sicherstellen (rust/build_runtime.py, falls fehlend).
   2. App-Icon aus gamebasic/assets/logo.png erzeugen (.ico Windows, .icns macOS).
   3. PyInstaller: gbrun.py + gamebasic-Paket -> dist/GameBasic[.app]/ (onedir,
      ohne Python).
   4. Plattformspezifische Paketierung:
      - Windows: Inno Setup (ISCC) -> installer/output/GameBasic-Setup-<version>.exe
-     - macOS:   gbrt neben die App-Binary legen, .app in .dmg packen (hdiutil)
-     - Linux:   gbrt neben die App-Binary legen, .tar.gz + install.sh (XDG
+     - macOS:   dhrt neben die App-Binary legen, .app in .dmg packen (hdiutil)
+     - Linux:   dhrt neben die App-Binary legen, .tar.gz + install.sh (XDG
                 Desktop-Integration ohne sudo/root)
 
 Aufruf (im .venv):
@@ -18,7 +18,7 @@ Aufruf (im .venv):
   .venv/bin/python installer/build_installer.py                # Linux/macOS
 Optionen:
   --no-installer   nur PyInstaller (kein Paketier-Schritt)
-  --rebuild-gbrt   gbrt vorher neu bauen
+  --rebuild-dhrt   dhrt vorher neu bauen
 
 **Cross-Platform-Status:** Der Windows-Pfad ist etabliert und lokal
 verifiziert. macOS/Linux sind neu (Cross-Platform-Migration Phase 4) und
@@ -40,7 +40,7 @@ INST = ROOT / "installer"
 PY = Path(sys.executable)
 SYSTEM = platform.system()  # "Windows" | "Darwin" | "Linux"
 EXE_SUFFIX = ".exe" if SYSTEM == "Windows" else ""
-GBRT = ROOT / "rust" / "drachenhauch_runtime" / "target" / "release" / f"gbrt{EXE_SUFFIX}"
+DHRT = ROOT / "rust" / "drachenhauch_runtime" / "target" / "release" / f"dhrt{EXE_SUFFIX}"
 
 
 def log(msg):
@@ -49,7 +49,7 @@ def log(msg):
 
 # --------------------------------------------------------------- Code-Signing
 # Inert, solange KEIN Zertifikat konfiguriert ist. Aktivieren ueber Umgebungs-
-# variablen (dann werden GameBasic.exe, gbrt.exe UND der Installer signiert):
+# variablen (dann werden GameBasic.exe, dhrt.exe UND der Installer signiert):
 #   GB_SIGN_CERT  = Pfad zur .pfx-Datei  ODER  SHA1-Thumbprint im Windows-Zertspeicher
 #   GB_SIGN_PASS  = Passwort der .pfx    (nur bei .pfx noetig)
 #   GB_SIGN_TS    = RFC3161-Timestamp-URL (Default: DigiCert)
@@ -103,20 +103,20 @@ def version():
     return __version__
 
 
-def ensure_gbrt(rebuild):
-    if rebuild or not GBRT.exists():
-        log("gbrt-Runtime bauen")
+def ensure_dhrt(rebuild):
+    if rebuild or not DHRT.exists():
+        log("dhrt-Runtime bauen")
         subprocess.run([str(PY), str(ROOT / "rust" / "build_runtime.py")],
                        cwd=ROOT, check=True)
-    if not GBRT.exists():
+    if not DHRT.exists():
         # Nicht hart abbrechen -- ein Paketier-Testlauf (z.B. in CI, ohne
         # volle Grafik-Toolchain) soll trotzdem eine Bundle-Struktur pruefen
-        # koennen. Die fertige App findet dann beim Start kein gbrt und
-        # meldet das ihrerseits klar (siehe gbrt_locate.py).
-        print(f"WARNUNG: {GBRT} wurde nicht gebaut -- Paket enthaelt keine "
+        # koennen. Die fertige App findet dann beim Start kein dhrt und
+        # meldet das ihrerseits klar (siehe dhrt_locate.py).
+        print(f"WARNUNG: {DHRT} wurde nicht gebaut -- Paket enthaelt keine "
               f"Runtime (nur zum Struktur-Testen brauchbar, nicht zum Verteilen).")
     else:
-        print("gbrt:", GBRT)
+        print("dhrt:", DHRT)
 
 
 def _schreibe_ico(ziel, eintraege):
@@ -257,7 +257,7 @@ def run_inno(ver):
         print("\nInno Setup (ISCC.exe) nicht gefunden. dist/GameBasic ist fertig.")
         print("Installer manuell bauen: ISCC.exe /DAppVersion=%s installer\\GameBasic.iss" % ver)
         return
-    sign(GBRT)           # gbrt.exe signieren, BEVOR Inno sie einpackt
+    sign(DHRT)           # dhrt.exe signieren, BEVOR Inno sie einpackt
     log("Inno Setup (Installer verpacken)")
     subprocess.run([iscc, f"/DAppVersion={ver}", str(INST / "GameBasic.iss")],
                    cwd=INST, check=True)
@@ -269,13 +269,13 @@ def run_inno(ver):
 
 # ------------------------------------------------------------------- macOS
 def run_macos(app: Path, ver: str):
-    # gbrt gehoert NEBEN die eingefrorene Binary (Contents/MacOS/), damit
-    # gbrt_locate.py sie ueber sys.executable findet (siehe .spec-Kommentar).
+    # dhrt gehoert NEBEN die eingefrorene Binary (Contents/MacOS/), damit
+    # dhrt_locate.py sie ueber sys.executable findet (siehe .spec-Kommentar).
     macos_dir = app / "Contents" / "MacOS"
-    if GBRT.exists():
-        shutil.copy2(GBRT, macos_dir / "gbrt")
-        os.chmod(macos_dir / "gbrt", 0o755)
-        print("gbrt kopiert ->", macos_dir / "gbrt")
+    if DHRT.exists():
+        shutil.copy2(DHRT, macos_dir / "dhrt")
+        os.chmod(macos_dir / "dhrt", 0o755)
+        print("dhrt kopiert ->", macos_dir / "dhrt")
     # EULA/Notices als Referenz mit ins Bundle (Resources) -- Pendant zu den
     # Startmenue-Eintraegen unter Windows.
     resources = app / "Contents" / "Resources"
@@ -317,7 +317,7 @@ echo "Installiere nach $DEST ..."
 mkdir -p "$DEST" "$BIN" "$APPS" "$ICONS"
 cp -r "$HERE/GameBasic/." "$DEST/"
 chmod +x "$DEST/GameBasic" 2>/dev/null || true
-[ -f "$DEST/gbrt" ] && chmod +x "$DEST/gbrt"
+[ -f "$DEST/dhrt" ] && chmod +x "$DEST/dhrt"
 
 cat > "$BIN/gamebasic" <<EOF
 #!/bin/sh
@@ -349,10 +349,10 @@ echo "GameBasic sollte jetzt auch im Anwendungsmenue auftauchen."
 
 def run_linux(exe: Path, ver: str):
     app_dir = exe.parent  # dist/GameBasic/
-    if GBRT.exists():
-        shutil.copy2(GBRT, app_dir / "gbrt")
-        os.chmod(app_dir / "gbrt", 0o755)
-        print("gbrt kopiert ->", app_dir / "gbrt")
+    if DHRT.exists():
+        shutil.copy2(DHRT, app_dir / "dhrt")
+        os.chmod(app_dir / "dhrt", 0o755)
+        print("dhrt kopiert ->", app_dir / "dhrt")
 
     log("Tarball + install.sh erzeugen")
     out_dir = INST / "output"
@@ -384,11 +384,11 @@ def run_linux(exe: Path, ver: str):
 
 
 def main():
-    rebuild = "--rebuild-gbrt" in sys.argv
+    rebuild = "--rebuild-dhrt" in sys.argv
     no_inst = "--no-installer" in sys.argv
     ver = version()
     print(f"GameBasic {ver} -- Distributions-Build ({SYSTEM})")
-    ensure_gbrt(rebuild)
+    ensure_dhrt(rebuild)
     make_icon()
     gen_notices()
     built = run_pyinstaller()

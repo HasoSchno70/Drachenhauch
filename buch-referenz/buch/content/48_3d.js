@@ -2,7 +2,7 @@ module.exports = (H) => [
   H.chapter("3D-Grafik"),
   H.p("GameBasic kann nicht nur flache 2D-Bilder, sondern auch echte 3D-Welten zeichnen – mit dem Modul g3d. Dazu kommt eine dritte Koordinate hinzu: z (Tiefe). Eine virtuelle Kamera blickt von einem Punkt im Raum auf ein Ziel, und du platzierst Körper wie Würfel, Kugeln und Zylinder an beliebigen Stellen. Dieses Kapitel zeigt die Grundbausteine; 3D ist ein großes Thema, in das du hier nur den ersten Blick wirfst."),
   H.figure("48_3d.png", "Eine einfache 3D-Szene: Boden-Raster, Würfel (mit Drahtgitter), Kugel, Zylinder und Kegel."),
-  H.note("3D läuft – wie der ganze Teil IV – nur im gbrt-Fenster. Der Aufbau ist wie in 2D: im Game-Loop CLS, dann zeichnen, dann FLIP. Nur kommt am Anfang jedes Frames die Kamera dazu, und alle Befehle stammen aus dem Modul g3d (IMPORT \"g3d\")."),
+  H.note("3D läuft – wie der ganze Teil IV – nur im dhrt-Fenster. Der Aufbau ist wie in 2D: im Game-Loop CLS, dann zeichnen, dann FLIP. Nur kommt am Anfang jedes Frames die Kamera dazu, und alle Befehle stammen aus dem Modul g3d (IMPORT \"g3d\")."),
 
   H.h2("Die Kamera"),
   H.cmd("CAMERA3D", 'CAMERA3D(px, py, pz, tx, ty, tz, fov)',

@@ -6,7 +6,7 @@ Das 3D-Pendant zu [`physics2d`](module-physics2d.md) — und der große
 Unterschied zum [`physics`](module-physics.md)-Modul, das nur stateless
 Kollisions-Mathematik liefert: hier simulieren echte dynamische Körper.
 
-> **Nur native Runtime** (`gbrt` / F6 im Editor). Die `PHYS_WORLD` hält die
+> **Nur native Runtime** (`dhrt` / F6 im Editor). Die `PHYS_WORLD` hält die
 > Simulations-Pipeline; einzelne Körper werden über einen **Integer-Index**
 > angesprochen (Rückgabe von `PHYS3D_ADD_*`).
 

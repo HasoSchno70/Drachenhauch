@@ -1,5 +1,5 @@
 ' Audio-Modul-Demo: Tone-Generation, Channels, Music.
-' Braucht: native Runtime gbrt (Audio nur nativ; ohne Soundkarte hoert
+' Braucht: native Runtime dhrt (Audio nur nativ; ohne Soundkarte hoert
 ' man halt nichts).
 IMPORT "audio"
 

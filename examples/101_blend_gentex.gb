@@ -1,5 +1,5 @@
 ' 101_blend_gentex.gb -- Blend-Modes (Batch 2) + prozedurale Texturen (Batch 3).
-' NUR native Runtime (gbrt/F6): prozedurale Texturen + additives Blending.
+' NUR native Runtime (dhrt/F6): prozedurale Texturen + additives Blending.
 
 SCREEN(640, 400, "Blend + GenTex", 1)
 

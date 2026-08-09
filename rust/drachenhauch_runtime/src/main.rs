@@ -1,4 +1,4 @@
-//! `gbrt` -- die native GameBasic-Runtime (und seit Stufe B die EINZIGE).
+//! `dhrt` -- die native GameBasic-Runtime (und seit Stufe B die EINZIGE).
 //!
 //! Fuehrt `.gb`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
 //! compile -> VM, alles in Rust) oder eine fertige `.gbc`-Datei (JSON-
@@ -6,7 +6,7 @@
 //! sichern die run_gb-Golden-Tests (tests/) -- die fruehere Python-Referenz
 //! (Tree-Walker) ist geloescht.
 //!
-//! Verwendung: gbrt <datei.gbc> [quell-label]
+//! Verwendung: dhrt <datei.gbc> [quell-label]
 //!
 //! Das optionale `quell-label` (z.B. `spiel.gb`) wird nur fuer Laufzeitfehler-
 //! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `gbrun.py
@@ -72,9 +72,9 @@ use std::process::ExitCode;
 
 /// Magic am Ende einer gebundelten `.exe`. Layout der letzten 16 Bytes:
 /// `[u64 Laenge der .gbc-Bytes, little-endian][8 Byte Magic]`. Die `.gbc`-Bytes
-/// liegen direkt vor diesem Footer. So wird `gbrt` selbst zur Spiel-Exe:
-/// `export.py` haengt `<gbc><laenge><magic>` an eine Kopie von `gbrt.exe`.
-const PAYLOAD_MAGIC: &[u8; 8] = b"GBRTPAY1";
+/// liegen direkt vor diesem Footer. So wird `dhrt` selbst zur Spiel-Exe:
+/// `export.py` haengt `<gbc><laenge><magic>` an eine Kopie von `dhrt.exe`.
+const PAYLOAD_MAGIC: &[u8; 8] = b"DHRTPAY1";
 
 /// Liest eine eingebettete `.gbc` aus der eigenen Exe (Bundle-Modus) -- oder
 /// None, wenn kein Payload angehaengt ist (normaler Dev-Modus).
@@ -83,7 +83,7 @@ const PAYLOAD_MAGIC: &[u8; 8] = b"GBRTPAY1";
 /// erwarten. Der Grund ist das Signieren: `signtool` (und `codesign` auf
 /// macOS) haengt den Zertifikatsblock ans Dateiende -- danach sind die letzten
 /// 16 Bytes nicht mehr unsere, und ein exportiertes Spiel fand sich selbst
-/// nicht mehr (es verhielt sich wieder wie ein blankes `gbrt`). Andersherum
+/// nicht mehr (es verhielt sich wieder wie ein blankes `dhrt`). Andersherum
 /// geht es nicht: erst signieren, dann anhaengen zerstoert jede Signatur --
 /// empirisch geprueft, aus `Valid` wird `NotSigned`. Also muss die Reihenfolge
 /// „exportieren, dann signieren" moeglich sein, und dafuer darf der Footer
@@ -122,7 +122,7 @@ fn embedded_gbc_in(data: &[u8]) -> Option<String> {
 }
 
 fn main() -> ExitCode {
-    // Front-End-Debug: `gbrt --tokens <datei.gb>` gibt den Token-Strom als
+    // Front-End-Debug: `dhrt --tokens <datei.gb>` gibt den Token-Strom als
     // kanonisches JSON aus (Parity-Vergleich mit dem Python-Lexer).
     {
         // Review-Fund: `std::env::args()` paniked bei nicht-UTF8-Argumenten
@@ -164,13 +164,13 @@ fn main() -> ExitCode {
         if raw.len() >= 3 && raw[1] == "--runsrc" {
             return runsrc_main(&raw[2]);
         }
-        // Stufe 5: `gbrt run datei.gb` -- eigenstaendiger End-to-End-Lauf
+        // Stufe 5: `dhrt run datei.gb` -- eigenstaendiger End-to-End-Lauf
         // (preprocess+lex+parse+compile+run, chdir ins Datei-Verzeichnis fuer
-        // relative Asset-Pfade). gbrt ist damit ohne Python lauffaehig.
+        // relative Asset-Pfade). dhrt ist damit ohne Python lauffaehig.
         if raw.len() >= 3 && raw[1] == "run" {
             return run_main(&raw[2]);
         }
-        // Stufe B (Phase 3): `gbrt profile datei.gb` -- instrumentierter Lauf,
+        // Stufe B (Phase 3): `dhrt profile datei.gb` -- instrumentierter Lauf,
         // gibt pro-Zeile Count+Zeit als JSON-Blob aus (Editor aggregiert pro
         // Scope via symbols.scan_scopes). Ersetzt den Tree-Walker-Profiler.
         if raw.len() >= 3 && raw[1] == "profile" {
@@ -183,13 +183,13 @@ fn main() -> ExitCode {
                 None => { eprintln!("profile: keine Datei angegeben"); return ExitCode::from(1); }
             }
         }
-        // Stufe B (Phase 3c): `gbrt debug datei.gb` -- interaktiver Debugger ueber
+        // Stufe B (Phase 3c): `dhrt debug datei.gb` -- interaktiver Debugger ueber
         // ein newline-JSON-Protokoll (stdin: Kommandos, stdout: Events). Ersetzt
         // den Tree-Walker-Debugger.
         if raw.len() >= 3 && raw[1] == "debug" {
             return debug_main(&raw[2]);
         }
-        // Selbst-Export: `gbrt --export datei.gb [out_dir]` buendelt das
+        // Selbst-Export: `dhrt --export datei.gb [out_dir]` buendelt das
         // Programm aus Quelltext zu einer eigenstaendigen Exe (ohne Python).
         if raw.len() >= 3 && raw[1] == "--export" {
             return export_main(&raw[2], raw.get(3).map(|s| s.as_str()));
@@ -212,7 +212,7 @@ fn main() -> ExitCode {
     // WASM/Web (emscripten): Programm aus einem festen Pfad im virtuellen FS
     // (vom Build via --embed-file eingebettet bzw. vom JS-Harness per
     // FS.writeFile reingeschrieben). Seit dem Front-End-Port (Stufe 1-5) kann
-    // gbrt die `.gb`-QUELLE selbst kompilieren -> der Playground braucht KEIN
+    // dhrt die `.gb`-QUELLE selbst kompilieren -> der Playground braucht KEIN
     // vorab-kompiliertes .gbc (und kein Pyodide) mehr. `/program.gb` (Quelle)
     // hat Vorrang; `/program.gbc` (vorkompiliert) bleibt als Fallback. Siehe
     // web/ + docs/web-playground.md.
@@ -233,11 +233,11 @@ fn main() -> ExitCode {
         // ein zweiter Panic direkt im Fehlerpfad. `argv[0]` als Programmname
         // ist per Konvention ohnehin praesent, `.get(0)` mit Fallback ist der
         // billige, sichere Weg.
-        eprintln!("Verwendung: {} <datei.gbc>", args.first().map(String::as_str).unwrap_or("gbrt"));
+        eprintln!("Verwendung: {} <datei.gbc>", args.first().map(String::as_str).unwrap_or("dhrt"));
         return ExitCode::from(1);
     }
     let path = &args[1];
-    // Komfort: `gbrt datei.gb` (ohne `run`) wird wie `gbrt run datei.gb`
+    // Komfort: `dhrt datei.gb` (ohne `run`) wird wie `dhrt run datei.gb`
     // behandelt -- aus Quelltext, mit chdir. `.gbc` laeuft den VM-Pfad.
     if path.to_lowercase().ends_with(".gb") {
         return run_main(path);
@@ -254,7 +254,7 @@ fn main() -> ExitCode {
     run_gbc_text(&text, &source_label)
 }
 
-/// `gbrt --tokens <datei.gb>` -- lext die Quelldatei und gibt pro Token eine
+/// `dhrt --tokens <datei.gb>` -- lext die Quelldatei und gibt pro Token eine
 /// JSON-Zeile `[TYP, wert, zeile]` aus (fuer Lexer-Parity gegen Python).
 fn tokens_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -276,7 +276,7 @@ fn tokens_main(path: &str) -> ExitCode {
     }
 }
 
-/// `gbrt --ast <datei.gb>` -- lext + parst und gibt den AST als JSON aus
+/// `dhrt --ast <datei.gb>` -- lext + parst und gibt den AST als JSON aus
 /// (Parser-Parity gegen Python).
 fn ast_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -296,7 +296,7 @@ fn ast_main(path: &str) -> ExitCode {
     }
 }
 
-/// `gbrt --preprocess <datei.gb>` -- expandiert IMPORTs und gibt die gemergte
+/// `dhrt --preprocess <datei.gb>` -- expandiert IMPORTs und gibt die gemergte
 /// Quelle auf stdout aus (Merge-Parity gegen preprocess.process(), Stufe 4).
 fn preprocess_main(path: &str) -> ExitCode {
     let source = match std::fs::read_to_string(path) {
@@ -363,7 +363,7 @@ fn compile_source(raw_source: &str, base: &std::path::Path, label: &str) -> Resu
     }
 }
 
-/// `gbrt profile <datei.gb>` -- fuehrt das Programm instrumentiert aus und gibt
+/// `dhrt profile <datei.gb>` -- fuehrt das Programm instrumentiert aus und gibt
 /// einen JSON-Blob `{total_time, output, lines:[{line,count,time}], stopped}` auf
 /// stdout aus. Programm-Output landet im `output`-Feld (kein stdout-Konflikt);
 /// Laufzeitfehler kommen als `error`/`error_line` mit ins JSON. Exit 0 (der Editor
@@ -432,7 +432,7 @@ fn profile_main(path: &str, stoppable: bool) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `gbrt debug <datei.gb>` -- interaktiver Debugger. Spricht ein
+/// `dhrt debug <datei.gb>` -- interaktiver Debugger. Spricht ein
 /// newline-delimited JSON-Protokoll: stdin = Kommandos ({"cmd":"continue"|
 /// "step-over"|"step-into"|"step-out"|"stop"|"set-breakpoints"|"eval", ...}),
 /// stdout = Events ({"event":"paused|output|eval-result|eval-error|finished|
@@ -473,7 +473,7 @@ fn debug_main(path: &str) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// `gbrt --check <datei.gb>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
+/// `dhrt --check <datei.gb>` -- Front-End-Diagnostik fuer Editor-Live-Error-Check
 /// und LSP. Gibt ein JSON-Array `[{line,col,severity,phase,message}]` auf stdout
 /// aus (leer = fehlerfrei). Exit 0 auch bei gefundenen Problemen; nur ein
 /// I/O-Fehler liefert Exit 1. Zeilen beziehen sich auf die GEMERGTE Quelle
@@ -517,7 +517,7 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
     };
     match compiler::compile_to_gbc(&ast, &ext_types, &aliases) {
         // E1: Bei fehlerfreiem Compile noch Warnungen fuer IMPORTs von
-        // Hardware-Modulen ergaenzen, die in diesem gbrt-Build fehlen -- damit
+        // Hardware-Modulen ergaenzen, die in diesem dhrt-Build fehlen -- damit
         // der Editor das schon auf der IMPORT-Zeile markiert (nicht erst beim
         // Lauf). Leer, wenn kein solches Modul importiert wird.
         Ok((_, warns)) => {
@@ -527,7 +527,7 @@ fn check_source(raw_source: &str, base: &std::path::Path) -> Vec<serde_json::Val
                         "line": line, "col": 0, "severity": "warning",
                         "phase": "preprocess", "message": preprocess::hardware_missing_msg(m) }))
                     .collect();
-            // G1 (systemisch): Aufrufe von Builtins, die gbrt nicht kennt, schon
+            // G1 (systemisch): Aufrufe von Builtins, die dhrt nicht kennt, schon
             // im Editor als Warnung zeigen -- statt erst zur Laufzeit zu crashen.
             for (line, msg) in warns {
                 diags.push(serde_json::json!({
@@ -550,7 +550,7 @@ fn compile_and_run_source(raw_source: &str, base: &std::path::Path, label: &str)
     }
 }
 
-/// `gbrt --runsrc <datei.gb>` -- volle Front-End-Kette in Rust, OHNE chdir
+/// `dhrt --runsrc <datei.gb>` -- volle Front-End-Kette in Rust, OHNE chdir
 /// (Dev-/Parity-Einstieg: Output gegen Python-Tree-Walker, Stufe 3/4).
 fn runsrc_main(path: &str) -> ExitCode {
     let raw_source = match std::fs::read_to_string(path) {
@@ -563,7 +563,7 @@ fn runsrc_main(path: &str) -> ExitCode {
     compile_and_run_source(&raw_source, &base, path)
 }
 
-/// `gbrt run <datei.gb>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
+/// `dhrt run <datei.gb>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
 /// Quelltext, ohne Python. Wechselt wie `gbrun.py` ins Verzeichnis der Datei,
 /// damit relative Asset-Pfade (`LOADIMAGE("assets/...")`) stimmen; Label fuer
 /// Laufzeitfehler ist der Dateiname.
@@ -620,9 +620,9 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
-/// `gbrt --export <datei.gb> [out_dir]` -- buendelt das Programm zu einer
+/// `dhrt --export <datei.gb> [out_dir]` -- buendelt das Programm zu einer
 /// eigenstaendigen Exe (Selbst-Export ohne Python): kompiliert Quelltext ->
-/// .gbc und haengt den Payload (gbc + Footer `[u64 len][GBRTPAY1]`) an eine
+/// .gbc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
 /// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
 /// Pendant zu gamebasic/export.py.
 fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
@@ -647,7 +647,7 @@ fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
     // lautlos zu einem LEEREN Payload werden -- das Bundle wurde trotzdem
     // geschrieben und "Exportiert: ..." gemeldet, obwohl `embedded_gbc()`
     // `len == 0` ablehnt und die ausgelieferte Exe beim Start nur noch
-    // "Verwendung: gbrt <datei.gbc>" ausgibt.
+    // "Verwendung: dhrt <datei.gbc>" ausgibt.
     let gbc_bytes = match serde_json::to_string(&json) {
         Ok(s) => s.into_bytes(),
         Err(e) => { eprintln!("Kann .gbc nicht serialisieren: {}", e); return ExitCode::from(1); }

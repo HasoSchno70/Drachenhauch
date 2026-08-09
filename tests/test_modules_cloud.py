@@ -1,10 +1,10 @@
 """Tests fuer das cloud-Modul (Cloud-Save + Leaderboard).
 
-Golden-Tests gegen `gbrt` (Stufe B): laufen gegen einen lokalen Mock-Server
+Golden-Tests gegen `dhrt` (Stufe B): laufen gegen einen lokalen Mock-Server
 (ThreadingHTTPServer im pytest-Prozess, wie test_modules_html.py), der das
 REST-Protokoll aus cloudserver/server.py nachbildet (nicht der echte Flask-
 Server -- der wird separat in cloudserver/test_server.py getestet). Das
-GB-Programm laeuft im gbrt-Subprozess und macht echte localhost-Requests.
+GB-Programm laeuft im dhrt-Subprozess und macht echte localhost-Requests.
 """
 import contextlib
 import json

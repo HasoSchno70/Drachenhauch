@@ -354,7 +354,7 @@ pub fn apply_theme(s: &mut Style, name: &str) -> bool {
 
 // --- Farb-Hilfen -----------------------------------------------------------
 //
-// GB-Farben sind 0xAARRGGBB; ein Alpha von 0 gilt in gbrt als DECKEND (damit
+// GB-Farben sind 0xAARRGGBB; ein Alpha von 0 gilt in dhrt als DECKEND (damit
 // alte 24-Bit-Farben unveraendert bleiben). Beim Rechnen muss man das also
 // zuerst auf 255 heben, sonst wird aus "deckend" versehentlich "unsichtbar".
 
@@ -2912,7 +2912,7 @@ mod tests {
 
     #[test]
     fn with_alpha_behandelt_die_null_als_deckend() {
-        // Eine 24-Bit-Farbe hat Alpha-Byte 0 -- das heisst in gbrt DECKEND.
+        // Eine 24-Bit-Farbe hat Alpha-Byte 0 -- das heisst in dhrt DECKEND.
         // Wer daraus naiv rechnet, macht aus "voll sichtbar" versehentlich
         // "unsichtbar"; halbe Deckkraft muss also 0x80 ergeben, nicht 0x00.
         assert_eq!(with_alpha(0xFF8800, 0.5), 0x80FF8800u32 as i64);

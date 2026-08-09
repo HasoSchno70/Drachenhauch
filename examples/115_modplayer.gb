@@ -1,6 +1,6 @@
 ' 115_modplayer.gb -- Amiga-Modul-Player (.mod / .xm)
 '
-' DER eigentliche Amiga-Sound: ProTracker-Module. raylib (und damit gbrt)
+' DER eigentliche Amiga-Sound: ProTracker-Module. raylib (und damit dhrt)
 ' dekodiert .mod und .xm direkt -- kein Zusatzcode noetig. Ein Modul
 ' enthaelt seine eigenen Samples + Pattern-Daten, also klingt es EXAKT wie
 ' damals auf dem Amiga (4 Kanaele, Sample-basiert, Paula-Stil).

@@ -1,9 +1,9 @@
-# Web-Playground (gbrt → WebAssembly)
+# Web-Playground (dhrt → WebAssembly)
 
 
 > **Stand 2026-08-03: der Web-Build laeuft.** Konsolen- UND Grafik-Programme
 > werden im Browser kompiliert und ausgefuehrt (verifiziert: Kreise, Formen und
-> Text auf der Leinwand, `gbrt.wasm` 8,8 MB). Der frueher als Kernhuerde
+> Text auf der Leinwand, `dhrt.wasm` 8,8 MB). Der frueher als Kernhuerde
 > genannte blockierende Render-Loop ist mit ASYNCIFY kein Problem -- eine
 > `FOR`-Schleife mit `FLIP()` laeuft durch und gibt am Ende brav ihre
 > `PRINT`-Zeile aus.
@@ -28,14 +28,14 @@
 >    acht Bildern nach (raylib setzt sie danach noch einmal selbst).
 >
 > **Assets kommen mit** (2026-08-03). Liegt neben der `.gb` ein `assets/`-Ordner,
-> packt `build_wasm.py` ihn in eine `gbrt.data` und haengt sie ueber
+> packt `build_wasm.py` ihn in eine `dhrt.data` und haengt sie ueber
 > `--preload-file` ins virtuelle Dateisystem -- Programme laden ihre Bilder,
 > Schriften, Shader und Musik danach unter genau demselben Pfad wie auf dem
 > Desktop. Nachgemessen im Browser: `FILESIZE("assets/font.ttf")` liefert 168644,
 > `LOADFONT` darauf liefert ein gueltiges Handle, und der Text erscheint in der
 > eingebetteten Schrift. **`--preload-file` und `--embed-file` schliessen
 > einander aus** -- sobald Assets dabei sind, wird auch die Quelle vorgeladen.
-> Neben `gbrt.js`/`gbrt.wasm` muss dann zwingend `gbrt.data` mit ausgeliefert
+> Neben `dhrt.js`/`dhrt.wasm` muss dann zwingend `dhrt.data` mit ausgeliefert
 > werden, sonst startet gar nichts.
 
 ## Bekannte Grenzen im Browser
@@ -49,7 +49,7 @@ Alle nachgemessen, nicht vermutet:
 - **Ton ist hoerbar** (seit 2026-08-04) -- aber erst nach dem ersten Klick.
   cpal hat keinen emscripten-Host mehr (sein WebAudio-Host haengt an
   wasm-bindgen-JS-Glue, das emscripten nicht liefert), also lief frueher jedes
-  Programm mit Ton in `NoDefaultOutputDevice` und starb. gbrt bringt fuer den
+  Programm mit Ton in `NoDefaultOutputDevice` und starb. dhrt bringt fuer den
   Browser deshalb ein **eigenes Kira-Backend** mit
   (`src/web_audio.rs`): Kiras `Backend`-Vertrag reicht uns den `Renderer`
   durch, wir nehmen den fertigen Mix und schieben ihn in eine Warteschlange von
@@ -145,18 +145,18 @@ nichts darueber, ob gezeichnet wird.** Wenn Geometrie verschwindet, ist
   danach weiter. Wer daraus "das Programm ist zu Ende" liest, sucht Fehler an
   der falschen Stelle.
 
-GameBasic-Programme im Browser laufen lassen — die **native Runtime `gbrt`**
+GameBasic-Programme im Browser laufen lassen — die **native Runtime `dhrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
 Konsolen-Ausgabe daneben.
 
 > **Status: baut & läuft, inkl. Grafik (verifiziert 2026-06-10).** Mit
 > installierter Toolchain (emscripten 6.0.0 + Rust-Target
 > `wasm32-unknown-emscripten`) erzeugt `rust/build_wasm.py` ein lauffähiges
-> `web/gbrt.js` + `web/gbrt.wasm`. **Konsolen- UND Grafik-Programme laufen im
+> `web/dhrt.js` + `web/dhrt.wasm`. **Konsolen- UND Grafik-Programme laufen im
 > Browser** — animierte Demos im `<canvas>` ohne den Tab einzufrieren (im Browser
-> per Preview verifiziert: bewegtes Sprite + laufender Frame-Zähler). gbrt
+> per Preview verifiziert: bewegtes Sprite + laufender Frame-Zähler). dhrt
 > kompiliert die eingebettete **Quelle** selbst im WASM (kein Pyodide). Die
-> Build-Artefakte (`gbrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored.
+> Build-Artefakte (`dhrt.js`/`.wasm`/`program.gb`/`.gbc`) sind gitignored.
 > **Teilbare Links:** „Link teilen" packt die Quelle in den URL-Hash — wer den
 > Link öffnet, sieht und startet genau dieses Programm.
 
@@ -174,7 +174,7 @@ Konsolen-Ausgabe daneben.
 > **Kein Pyodide mehr nötig (seit Front-End-Port).** Früher musste die `.gb`
 > in Python zu `.gbc` vorkompiliert werden, bevor sie der Browser ausführen
 > konnte — Live-Editieren im Browser hätte Pyodide gebraucht. Jetzt enthält
-> `gbrt` die komplette Front-End-Kette (Preprocess → Lexer → Parser → Compiler,
+> `dhrt` die komplette Front-End-Kette (Preprocess → Lexer → Parser → Compiler,
 > alle Stufen in Rust), also kompiliert die WASM-Runtime die **Quelle direkt im
 > Browser**. Der Build bettet `program.gb` (Quelle) ein; `main.rs` liest
 > `/program.gb` zuerst und kompiliert es selbst, mit `/program.gbc` als Fallback.
@@ -185,7 +185,7 @@ Konsolen-Ausgabe daneben.
 
 | Datei | Rolle |
 |---|---|
-| `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/gbrt.{js,wasm}` |
+| `rust/build_wasm.py` | `.gb` → `web/program.gb` (Quelle, im Browser kompiliert) + `web/program.gbc` (Fallback), dann `cargo`+emscripten-Build → `web/dhrt.{js,wasm}` |
 | `rust/gb_runtime/src/main.rs` | `#[cfg(target_os = "emscripten")]`-Zweig kompiliert+führt `/program.gb` aus (Fallback `/program.gbc`) aus dem virtuellen FS |
 | `web/index.html` | Live-Editor (`<textarea id="src">`) + `<canvas id="canvas">` + Output-Bereich + Run-/Teilen-Button |
 | `web/playground.js` | Live-Playground: Editor→`sessionStorage`, Reload für frische Runtime, schreibt die Quelle nach `/program.gb`, `callMain()`; stdout→Div (Module.print + console.log-Fallback). Einmal-Run-Flag `gb_run` macht hängende Programme reload-erholbar. **Teilbare Links:** Quelle base64url im URL-Hash (`#gb=…`); ein geöffneter Link lädt + startet das Programm. |
@@ -205,7 +205,7 @@ Dann:
 
 Das Skript ist tolerant: fehlt die Toolchain, kompiliert es nur `program.gbc`
 und druckt den manuellen Build-Befehl. Mit vollständiger Toolchain entstehen
-`web/gbrt.js` + `web/gbrt.wasm`.
+`web/dhrt.js` + `web/dhrt.wasm`.
 
 ## Starten
 
@@ -216,7 +216,7 @@ py -m http.server -d web 8000
 # -> http://localhost:8000
 ```
 
-Run klicken → `Module.callMain()` startet `gbrt`, das `/program.gbc` ausführt.
+Run klicken → `Module.callMain()` startet `dhrt`, das `/program.gbc` ausführt.
 
 ## Architektur-Hinweis: der Render-Loop (gelöst)
 
@@ -243,7 +243,7 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 ## Stand & Grenzen (verifiziert 2026-06-10)
 
 - **Konsolen-Programme: laufen im Browser ✅.** Quelle tippen → *Ausführen* →
-  korrekte Ausgabe. gbrt kompiliert die `.gb`-Quelle **selbst im WASM**
+  korrekte Ausgabe. dhrt kompiliert die `.gb`-Quelle **selbst im WASM**
   (Front-End-Port) — kein Pyodide, kein vorab kompiliertes `.gbc`.
 - **Grafik-Programme: laufen im Browser ✅.** Der Render-Loop yieldet pro Frame
   (ASYNCIFY-Yield in `flip()`, siehe oben) → animierte Demos im Canvas, der Tab
@@ -265,7 +265,7 @@ der unveränderte GB-Render-Loop mit dem Browser — **kein Umbau auf
 1. ~~Konsole im Browser~~ ✅ erledigt (Live-Editor, verifiziert).
 2. ~~Grafik im Browser~~ ✅ erledigt (ASYNCIFY-Yield in `flip()`, verifiziert).
 3. ~~Teilbare Links~~ ✅ erledigt (Quelle im URL-Hash).
-4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `gbrt.data`, verifiziert).
+4. ~~Assets mitliefern~~ ✅ erledigt (`--preload-file`, `dhrt.data`, verifiziert).
 5. ~~Audio im Browser~~ ✅ erledigt — zuerst stumm über Kiras `MockBackend`,
    seit 2026-08-04 **hörbar** über ein eigenes Backend mit OpenAL-Ausgabe.
 6. ~~Shader fürs Web~~ ✅ erledigt — über WebGL 2 statt eines Ports nach

@@ -1,13 +1,13 @@
-"""End-to-End-Test: `gbrt run <datei.gb>` (Stufe 5, eigenstaendig ohne Python).
+"""End-to-End-Test: `dhrt run <datei.gb>` (Stufe 5, eigenstaendig ohne Python).
 
-Stufe 5 macht gbrt eigenstaendig: `gbrt run datei.gb` preprocesst (IMPORT),
+Stufe 5 macht dhrt eigenstaendig: `dhrt run datei.gb` preprocesst (IMPORT),
 lext, parst, kompiliert und fuehrt aus -- ALLES in Rust, ohne Python. Wie
 `gbrun.py` wird ins Verzeichnis der Datei gewechselt (chdir), damit relative
 Pfade (IMPORT + Laufzeit-Asset/-Datei) stimmen.
 
-Verifikation: stdout von `gbrt run` gegen erwartete Ausgaben. Deckt explizit
+Verifikation: stdout von `dhrt run` gegen erwartete Ausgaben. Deckt explizit
 den chdir-Effekt ab (relativer Laufzeit-Datei-Zugriff) und den
-`gbrt <datei.gb>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
+`dhrt <datei.gb>`-Auto-Detect (ohne `run`). (Hiess historisch "Parity" --
 der Vergleichspartner Python-Tree-Walker ist seit Stufe B geloescht.)
 """
 import contextlib
@@ -21,9 +21,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -31,13 +31,13 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+    _DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
-def _gbrt(argv) -> tuple:
-    out = subprocess.run([str(_GBRT), *argv],
+def _dhrt(argv) -> tuple:
+    out = subprocess.run([str(_DHRT), *argv],
                          capture_output=True, text=True, encoding="utf-8")
     return out.returncode, out.stdout.replace("\r\n", "\n")
 
@@ -60,19 +60,19 @@ def test_run_with_relative_file_and_imports(tmp_path):
                   'DIM f AS FILE\nf = OpenFile("data.txt", "r")\n'
                   'PRINT ReadLine(f)\nCloseFile(f)\n'
                   'PRINT tri(10)\nPRINT VEC2_LENGTH(v)\n')
-    rc, out = _gbrt(["run", str(main)])
-    assert rc == 0, f"gbrt run Exit {rc}"
+    rc, out = _dhrt(["run", str(main)])
+    assert rc == 0, f"dhrt run Exit {rc}"
     # Golden (Stufe B): ReadLine="hallo", tri(10)=55, VEC2_LENGTH(3,4)=5.0.
     assert out == "hallo\n55\n5.0\n"
 
 
 def test_bare_gb_path_autodetect(tmp_path):
-    # `gbrt <datei.gb>` ohne `run` wird wie `run` behandelt (chdir + Quelltext).
+    # `dhrt <datei.gb>` ohne `run` wird wie `run` behandelt (chdir + Quelltext).
     _write(tmp_path, "data.txt", "zeile1\n")
     main = _write(tmp_path, "prog.gb",
                   'DIM f AS FILE\nf = OpenFile("data.txt", "r")\n'
                   'PRINT ReadLine(f)\nCloseFile(f)\nPRINT 6 * 7\n')
-    rc, out = _gbrt([str(main)])
-    assert rc == 0, f"gbrt <datei.gb> Exit {rc}"
+    rc, out = _dhrt([str(main)])
+    assert rc == 0, f"dhrt <datei.gb> Exit {rc}"
     # Golden (Stufe B): ReadLine="zeile1", 6*7=42.
     assert out == "zeile1\n42\n"

@@ -1,6 +1,6 @@
 ' Direkte Arduino/ESP32-Pin-Steuerung ueber StandardFirmata (kein eigener
 ' Sketch/Text-Protokoll noetig -- einmalig StandardFirmata hochladen).
-' Native Runtime (gbrt): mit 'python rust/build_runtime.py --hardware' bauen.
+' Native Runtime (dhrt): mit 'python rust/build_runtime.py --hardware' bauen.
 '
 ' Liste aller verfuegbaren Ports anzeigen, dann (falls vorhanden) am ersten
 ' Port Pin 13 (eingebaute LED auf vielen Boards) ein paar mal blinken lassen

@@ -43,7 +43,7 @@ Anders als die Filter geben diese **kein** neues Handle zurück, sondern malen d
 
 Komplette Fenster-Demo mit allen neuen Ops: [examples/122_imgfx.gb](../examples/122_imgfx.gb).
 
-Alle Funktionen brauchen die native Grafik-Runtime (`gbrt` mit dem `graphics`-Feature). Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
+Alle Funktionen brauchen die native Grafik-Runtime (`dhrt` mit dem `graphics`-Feature). Die Bild-Pipeline wird durch ein vorangegangenes `LOADIMAGE` oder `SCREEN` initialisiert.
 
 ## Beispiel
 

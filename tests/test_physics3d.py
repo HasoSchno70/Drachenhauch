@@ -1,6 +1,6 @@
 """Golden-Tests fuer das physics3d-Modul (Rapier3D-Starrkoerper).
 
-run_gb spawnt `gbrt run` -> skippt automatisch, wenn gbrt nicht gebaut ist.
+run_gb spawnt `dhrt run` -> skippt automatisch, wenn dhrt nicht gebaut ist.
 Konsolen-Test (keine Grafik): Schwerkraft/Kollision per qualitativer Booleans
 pruefen (keine exakten Floats -> robust ueber Plattformen).
 """

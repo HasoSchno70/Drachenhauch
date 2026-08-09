@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """Screenshots fuer das Lehrbuch neu aufnehmen -- scharf statt pixelig.
 
-Rendert jede figures/NN_*.gb ueber gbrt mit:
-  GBRT_SCALE=4   -> 4x native Aufloesung (1920x1280; scharfe Formen/Sprites,
+Rendert jede figures/NN_*.gb ueber dhrt mit:
+  DHRT_SCALE=4   -> 4x native Aufloesung (1920x1280; scharfe Formen/Sprites,
                     erfuellt die 300-dpi-Druckpruefung ohne Hoch-Skalieren)
-  GBRT_FONT=...  -> echte TTF als Default-Font (scharfe, anti-aliaste Schrift
+  DHRT_FONT=...  -> echte TTF als Default-Font (scharfe, anti-aliaste Schrift
                     statt der pixeligen raylib-Bitmap-Schrift; Umlaute inkl.)
 
 Pro Demo eine Frame-Zahl (Animationen/Physik brauchen einen entwickelten Stand).
@@ -22,7 +22,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIG = os.path.join(HERE, "figures")
 IMG = os.path.join(HERE, "images")
-GBRT = os.path.join(HERE, "..", "..", "rust", "drachenhauch_runtime", "target", "release", "gbrt.exe")
+DHRT = os.path.join(HERE, "..", "..", "rust", "drachenhauch_runtime", "target", "release", "dhrt.exe")
 FONT = os.environ.get("BUCH_FONT", r"C:\Windows\Fonts\segoeui.ttf")
 SCALE = "4"
 
@@ -45,11 +45,11 @@ def shoot(base):
         print("  (keine Quelle)", base); return False
     out = os.path.join(IMG, base + ".png")
     env = dict(os.environ)
-    env["GBRT_SCALE"] = SCALE
-    env["GBRT_FONT"] = FONT
-    env["GBRT_FRAMES"] = str(FRAMES.get(base, 60))
-    env["GBRT_SCREENSHOT"] = out
-    r = subprocess.run([GBRT, "run", src], cwd=FIG, env=env,
+    env["DHRT_SCALE"] = SCALE
+    env["DHRT_FONT"] = FONT
+    env["DHRT_FRAMES"] = str(FRAMES.get(base, 60))
+    env["DHRT_SCREENSHOT"] = out
+    r = subprocess.run([DHRT, "run", src], cwd=FIG, env=env,
                        capture_output=True, text=True, timeout=120)
     ok = os.path.exists(out) and r.returncode == 0
     print(("  OK  " if ok else "  FEHLER ") + base + (("  " + r.stderr.strip()[-120:]) if not ok else ""))

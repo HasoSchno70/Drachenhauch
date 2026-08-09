@@ -238,7 +238,7 @@ class TabbedEditorArea(QTabWidget):
         """Markiert den Tab der laufenden Datei (Praefix ▶/⚙ + Akzent-Farbe).
 
         `path=None` raeumt die Markierung wieder ab. `mode` unterscheidet
-        die genutzte Runtime: nativ gbrt ("native", ⚙) vom Tree-Walker-
+        die genutzte Runtime: nativ dhrt ("native", ⚙) vom Tree-Walker-
         Fallback ("py", ▶). Wird die Datei in keinem Tab gehalten (z.B. ein
         Selection-Run aus einer Temp-Datei), bleibt kein Tab markiert.
         """

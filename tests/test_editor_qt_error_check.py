@@ -7,14 +7,14 @@ abgedeckt.
 """
 import pytest
 
-from gamebasic.editor_qt.error_check import _check_source, _find_gbrt
+from gamebasic.editor_qt.error_check import _check_source, _find_dhrt
 
 # Compile-Phase-Diagnostik (Typ-/Semantikfehler wie unbekannte Typen oder
-# doppelte Funktionsnamen) kann NUR gbrt liefern -- der Syntax-only-Fallback
+# doppelte Funktionsnamen) kann NUR dhrt liefern -- der Syntax-only-Fallback
 # in _check_source() findet ausschliesslich Lexer-/Parser-Fehler. Ohne
-# gebauten gbrt liefert _check_source() fuer diese Faelle eine leere Liste
+# gebauten dhrt liefert _check_source() fuer diese Faelle eine leere Liste
 # statt des erwarteten Compile-Problems.
-_needs_gbrt = pytest.mark.skipif(_find_gbrt() is None, reason="native Runtime 'gbrt' nicht gebaut")
+_needs_dhrt = pytest.mark.skipif(_find_dhrt() is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _first(src, base=None):
@@ -29,7 +29,7 @@ def test_clean_source_returns_empty():
 
 
 def test_lex_error_phase():
-    # Unterminierter String -- gbrt meldet Phase "lex" (Python lumpte lex+parse).
+    # Unterminierter String -- dhrt meldet Phase "lex" (Python lumpte lex+parse).
     p = _first('PRINT "no close')
     assert p is not None
     assert p.phase in ("lex", "parse")
@@ -43,16 +43,16 @@ def test_parse_error_phase_parse():
     assert p.phase == "parse"
 
 
-@_needs_gbrt
+@_needs_dhrt
 def test_compile_error_unknown_type():
-    # DIM mit unbekanntem Typ -> Compile-Fehler (gbrt nennt den Typnamen).
+    # DIM mit unbekanntem Typ -> Compile-Fehler (dhrt nennt den Typnamen).
     p = _first("DIM p AS NoSuchClass\n")
     assert p is not None
     assert p.phase == "compile"
     assert "nosuchclass" in p.message.lower()
 
 
-@_needs_gbrt
+@_needs_dhrt
 def test_compile_error_duplicate_function():
     src = (
         "SUB foo()\n"
@@ -87,7 +87,7 @@ def test_clean_compile_with_imports():
     assert _check_source(src, None) == []
 
 
-@_needs_gbrt
+@_needs_dhrt
 def test_severity_default_is_error():
     p = _first("DIM x AS NoSuch\n")
     assert p is not None
@@ -108,11 +108,11 @@ def test_hardware_import_is_warning():
 
 
 # --------------------------------------------------- Checker-Crash sichtbar
-# Review-Fund: ein gbrt-Absturz/kaputtes JSON lieferte frueher eine leere
+# Review-Fund: ein dhrt-Absturz/kaputtes JSON lieferte frueher eine leere
 # Liste -- der Editor zeigte "keine Fehler", obwohl die Diagnose selbst
 # fehlgeschlagen war. Jetzt kommt ein sichtbares Warning-ParseProblem.
 
-def test_gbrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
+def test_dhrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
     import subprocess
     import gamebasic.editor_qt.error_check as ec
 
@@ -120,7 +120,7 @@ def test_gbrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
         def communicate(self, timeout=None):
             return "not json {{{", ""
 
-    monkeypatch.setattr(ec, "_find_gbrt", lambda: "gbrt")
+    monkeypatch.setattr(ec, "_find_dhrt", lambda: "dhrt")
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc())
     probs = ec._check_source("PRINT 1\n", tmp_path)
     assert len(probs) == 1
@@ -129,15 +129,15 @@ def test_gbrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
     assert "fehlgeschlagen" in probs[0].message.lower()
 
 
-def test_gbrt_timeout_yields_diagnostic_warning(tmp_path, monkeypatch):
+def test_dhrt_timeout_yields_diagnostic_warning(tmp_path, monkeypatch):
     import subprocess
     import gamebasic.editor_qt.error_check as ec
 
     class _FakeProc:
         def communicate(self, timeout=None):
-            raise subprocess.TimeoutExpired(cmd="gbrt", timeout=15)
+            raise subprocess.TimeoutExpired(cmd="dhrt", timeout=15)
 
-    monkeypatch.setattr(ec, "_find_gbrt", lambda: "gbrt")
+    monkeypatch.setattr(ec, "_find_dhrt", lambda: "dhrt")
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc())
     probs = ec._check_source("PRINT 1\n", tmp_path)
     assert len(probs) == 1
@@ -148,7 +148,7 @@ def test_gbrt_timeout_yields_diagnostic_warning(tmp_path, monkeypatch):
 # --------------------------------------------------- Vorherigen Check abbrechen
 
 def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
-    """Ein zweiter check()-Aufruf muss den noch laufenden gbrt-Subprozess
+    """Ein zweiter check()-Aufruf muss den noch laufenden dhrt-Subprozess
     des ersten Aufrufs abbrechen (statt ihn im Hintergrund weiterlaufen zu
     lassen und nur das Ergebnis zu verwerfen)."""
     import threading
@@ -162,7 +162,7 @@ def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
             terminated.set()
 
     checker._set_active_proc(_StubProc())
-    # _run() nicht wirklich starten (kein gbrt/Qt-Loop noetig) -- nur die
+    # _run() nicht wirklich starten (kein dhrt/Qt-Loop noetig) -- nur die
     # Cancel-Logik von check() selbst pruefen.
     monkeypatch.setattr(
         "gamebasic.editor_qt.error_check.threading.Thread.start", lambda self: None)

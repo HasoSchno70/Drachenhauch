@@ -45,12 +45,19 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 ### Phase 1 — Runtime und Endungen (das Fundament)
 
-- [ ] `rust/gb_runtime/` → `rust/drachenhauch_runtime/`, Crate- und Binary-Namen
-- [ ] Endungen in `main.rs`, `preprocess.rs`, `compiler.rs` (46 fest verdrahtete Stellen)
-- [ ] `PAYLOAD_MAGIC` bleibt `GBRTPAY1`? **Nein** — mitziehen auf `DHRTPAY1`.
+- [x] `rust/gb_runtime/` → `rust/drachenhauch_runtime/`, Crate- und Binary-Namen
+- [~] Endungen **nach Phase 3 verschoben** — siehe Anmerkung unten
+- [x] `PAYLOAD_MAGIC` `GBRTPAY1` → `DHRTPAY1` mitgezogen.
       Alte exportierte Spiele laufen dann nicht mehr mit der neuen Runtime;
       das ist bei null Downloads folgenlos und später nie wieder so billig.
-- [ ] `cargo test` grün
+- [x] `cargo test` + volle Suite grün
+
+> **Plankorrektur (2026-08-09).** Die Endungsänderung stand ursprünglich in
+> Phase 1. Sie gehört aber in Phase 3, zusammen mit dem Umbenennen der 232
+> Dateien: Brächte man der Runtime die neuen Endungen bei, während die Dateien
+> noch `.gb` heißen, wären alle Beispiele und das ganze Buch sofort kaputt —
+> genau das, was die Regel „nach jeder Phase muss die Suite grün sein"
+> verhindern soll. Endung und Dateinamen sind EIN Schritt.
 
 ### Phase 2 — Python-Schicht
 

@@ -28,7 +28,7 @@ def test_check_toolchain_returns_bools():
 
 
 # (Der frühere Test compile_program (.gb -> program.gbc via Python-serialize) ist
-#  entfernt: Stufe B bettet nur noch die Quelle ein, gbrt kompiliert im Browser.)
+#  entfernt: Stufe B bettet nur noch die Quelle ein, dhrt kompiliert im Browser.)
 
 
 def test_copy_source_embeds_gb(tmp_path):
@@ -49,7 +49,7 @@ def test_build_skips_gracefully_without_toolchain(tmp_path, monkeypatch):
                         lambda: {"emcc": False, "cargo": False, "wasm_target": False})
     rc = bw.build(gb, tmp_path)
     assert rc == 0
-    # Quelle wird eingebettet (gbrt kompiliert im Browser; kein Python-.gbc mehr).
+    # Quelle wird eingebettet (dhrt kompiliert im Browser; kein Python-.gbc mehr).
     assert (tmp_path / "program.gb").exists()
 
 
@@ -58,7 +58,7 @@ def test_web_harness_files_present():
     html = (web / "index.html").read_text(encoding="utf-8")
     assert 'id="canvas"' in html          # raylib/emscripten Canvas
     assert 'id="src"' in html             # Quelltext-Editor (Live-Playground)
-    assert "gbrt.js" in html              # laedt das wasm-Modul
+    assert "dhrt.js" in html              # laedt das wasm-Modul
     assert (web / "playground.js").exists()
     js = (web / "playground.js").read_text(encoding="utf-8")
     # Live-Editor: schreibt die User-Quelle ins FS, laedt zum Lauf frisch.
@@ -88,19 +88,19 @@ def test_flag_aenderung_erzwingt_neues_linken(tmp_path, monkeypatch):
     monkeypatch.setattr(bw, "CRATE", tmp_path)
 
     def lege_artefakte_an():
-        for n in ("gbrt.js", "gbrt.wasm", "gbrt.data"):
+        for n in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
             (rel / n).write_bytes(b"alt")
 
     lege_artefakte_an()
     assert bw.erzwinge_relink("-s A=1") is True, "erster Lauf muss stempeln"
-    assert not (rel / "gbrt.wasm").exists(), "Ausgabe muss weg sein"
+    assert not (rel / "dhrt.wasm").exists(), "Ausgabe muss weg sein"
 
     # Gleiche Flags -> nichts anfassen (kein unnoetiges Neu-Linken).
     lege_artefakte_an()
     assert bw.erzwinge_relink("-s A=1") is False
-    assert (rel / "gbrt.wasm").read_bytes() == b"alt"
+    assert (rel / "dhrt.wasm").read_bytes() == b"alt"
 
     # Geaenderte Flags -> Ausgabe faellt weg, cargo linkt neu.
     assert bw.erzwinge_relink("-s A=2") is True
-    assert not (rel / "gbrt.wasm").exists()
-    assert not (rel / "gbrt.data").exists()
+    assert not (rel / "dhrt.wasm").exists()
+    assert not (rel / "dhrt.data").exists()

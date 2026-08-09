@@ -1,6 +1,6 @@
 """Tests fuer das db-Modul (SQLite, In-Memory).
 
-Golden-Tests gegen `gbrt` (Stufe B): IMPORT "db" + `:memory:`-DB + PRINT.
+Golden-Tests gegen `dhrt` (Stufe B): IMPORT "db" + `:memory:`-DB + PRINT.
 Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest

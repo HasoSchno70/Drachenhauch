@@ -1,6 +1,6 @@
 """Tests fuer das timer-Modul (TIMER_AFTER/EVERY/CANCEL/UPDATE + COOLDOWN).
 
-Golden-Tests gegen gbrt. Zeitbasiert: gewartet wird per Busy-Wait auf
+Golden-Tests gegen dhrt. Zeitbasiert: gewartet wird per Busy-Wait auf
 MILLIS() (konsolen-tauglich, kein Grafik-Bezug) mit grosszuegigen Margen
 (Timer 20-40ms, Warten doppelt so lang).
 """

@@ -11,7 +11,7 @@ Drei Dinge, für die man das braucht:
 * **Fehlerberichte zum Nachspielen** — „so bin ich durch die Wand gelaufen".
 * **Automatische Spieltests** — derselbe Ablauf bei jedem Lauf, ohne Handarbeit.
 
-Braucht ein Fenster (`SCREEN`) und die native Runtime `gbrt`.
+Braucht ein Fenster (`SCREEN`) und die native Runtime `dhrt`.
 
 ## Befehle
 
@@ -65,7 +65,7 @@ daher im Programmdurchlauf `N+1`.
 ab, sobald der Spieler irgendeine Taste drückt — und genau dafür ist
 `KEY_ANY_HIT()` da. raylib legt eingespeiste Tasten allerdings **auch** in seine
 „zuletzt gedrückt"-Warteschlange; ungefiltert hätte die Demo sich an ihrem
-eigenen ersten Tastendruck beendet. `gbrt` blendet deshalb aus, was die laufende
+eigenen ersten Tastendruck beendet. `dhrt` blendet deshalb aus, was die laufende
 Wiedergabe selbst eingespeist hat: `KEY_ANY_HIT` meldet nur echte Eingabe,
 während `KEYHIT`/`KEYPRESSED` die aufgezeichneten Tasten weiterhin sehen (darum
 geht es ja). `JOYSTICK_ANY_BUTTON` braucht das nicht — die Wiedergabe setzt dort

@@ -1,6 +1,6 @@
 # Grafik-Built-ins
 
-Grafik, Sound und Eingabe — nativ in der Runtime `gbrt` (raylib). Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
+Grafik, Sound und Eingabe — nativ in der Runtime `dhrt` (raylib). Alle Befehle hier brauchen ein offenes Fenster — also muss vor allem anderen `SCREEN(...)` aufgerufen werden.
 
 Wenn das `camera`-Modul aktiv ist und `CAMERA_SET` aufgerufen wurde, interpretieren alle Drawing-Befehle ihre Koordinaten als **World-Koordinaten** (siehe [Camera-Modul](module-camera.md)).
 
@@ -175,7 +175,7 @@ Farbe wird als 24-Bit-INTEGER (`&HRRGGBB`) angegeben, am einfachsten via `RGB(r,
 
 > **Eckpunkt-Reihenfolge egal:** gefülltes `TRIANGLE` und `POLYGON` zeichnen
 > unabhängig von der Wicklung — ob die Punkte im oder gegen den Uhrzeigersinn
-> angegeben sind, die Fläche erscheint immer (gbrt dreht intern bei Bedarf um).
+> angegeben sind, die Fläche erscheint immer (dhrt dreht intern bei Bedarf um).
 
 ```basic
 SCREEN(320, 240, "Zeichnen-Demo", 2)
@@ -381,7 +381,7 @@ BATCH_FLUSH()   ' No-Op -- gezeichnet wurde schon oben, Zeile fuer Zeile
 - `LAYER(...)` (damit der Batch zum richtigen Layer geht)
 - `ATLAS_DRAW(...)` (Direct-Call wahrt Reihenfolge)
 
-> **Kein echtes Bündeln.** In `gbrt` ist `BATCH_DRAW` derselbe Aufruf wie `ATLAS_DRAW`
+> **Kein echtes Bündeln.** In `dhrt` ist `BATCH_DRAW` derselbe Aufruf wie `ATLAS_DRAW`
 > (ein Zweig im Dispatch), und `BATCH_FLUSH()` tut gar nichts. Die Runtime arbeitet als
 > **Aufzeichnungs-Modell**: jeder Zeichenbefehl hängt sofort ein `Cmd` an die aktive
 > Ebene, und `FLIP()` spielt alle Ebenen in Z-Reihenfolge ab. Es gibt also nichts zu

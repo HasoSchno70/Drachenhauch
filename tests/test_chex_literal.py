@@ -1,14 +1,14 @@
 """C-Stil Hex-/Binaer-Literale: 0xFF / 0b1010.
 
 Zusaetzlich zur klassischen BASIC-Form &H/&B akzeptieren beide Lexer
-(Python-Front-End + gbrt) jetzt auch die C-Schreibweise. `0`/`0.5` duerfen
+(Python-Front-End + dhrt) jetzt auch die C-Schreibweise. `0`/`0.5` duerfen
 dabei NICHT als Praefix fehlgedeutet werden.
 """
 from gamebasic.lexer import Lexer
 from gamebasic.tokens import TokenType
 
 
-# --- Laufzeit-Semantik (gbrt) -------------------------------------------
+# --- Laufzeit-Semantik (dhrt) -------------------------------------------
 
 def test_hex_literal_value(run_gb):
     assert run_gb("PRINT 0xFF\n") == "255\n"

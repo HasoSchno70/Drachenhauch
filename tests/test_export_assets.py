@@ -1,4 +1,4 @@
-"""Export-Test: `gbrt --export` muss die vom Programm referenzierten Assets ins
+"""Export-Test: `dhrt --export` muss die vom Programm referenzierten Assets ins
 Bundle kopieren -- auch ueber `../`-Pfade (z.B. ein Spiel in `code/` mit Assets
 in `../assets/`). Frueher blieb das Bundle assetlos -> beim Doppelklick nur
 schwarzer Bildschirm + sofortiges Beenden (LOADIMAGE-Fehler).
@@ -12,8 +12,8 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = _ROOT / "rust" / "drachenhauch_runtime" / "target" / variant / exe
         if p.exists():
@@ -21,8 +21,8 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def test_export_bundles_parent_relative_assets(tmp_path):
@@ -41,7 +41,7 @@ def test_export_bundles_parent_relative_assets(tmp_path):
         encoding="utf-8",
     )
     out = tmp_path / "dist"
-    r = subprocess.run([str(_GBRT), "--export", str(gb), str(out)],
+    r = subprocess.run([str(_DHRT), "--export", str(gb), str(out)],
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
 
@@ -66,7 +66,7 @@ def test_export_ignores_absolute_and_missing(tmp_path):
         encoding="utf-8",
     )
     out = tmp_path / "d2"
-    r = subprocess.run([str(_GBRT), "--export", str(gb), str(out)],
+    r = subprocess.run([str(_DHRT), "--export", str(gb), str(out)],
                        capture_output=True, text=True, timeout=60)
     assert r.returncode == 0, r.stderr
     assert (out / ("g.exe" if os.name == "nt" else "g")).exists()

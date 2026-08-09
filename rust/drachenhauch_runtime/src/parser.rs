@@ -1,6 +1,6 @@
 //! Recursive-Descent-Parser fuer GameBasic -- Rust-Port von
 //! `gamebasic/parser.py`. Stufe 2 der Front-End-Portierung. Verifiziert gegen
-//! Python via `gbrt --ast` (AST als kanonisches JSON) -- siehe
+//! Python via `dhrt --ast` (AST als kanonisches JSON) -- siehe
 //! `tests/test_rust_parser_parity.rs`/`.py`.
 
 use std::collections::HashSet;
@@ -1385,7 +1385,7 @@ fn num_of(t: &Token) -> NumV {
     }
 }
 
-/// AST als kanonisches JSON (`gbrt --ast`). Lext + parst die Quelle.
+/// AST als kanonisches JSON (`dhrt --ast`). Lext + parst die Quelle.
 /// Parst einen einzelnen Ausdruck (fuer Debugger-Bedingungen + `eval`, Stufe B).
 /// Lext die Quelle und parst genau eine Expression.
 pub fn parse_expression(source: &str) -> Result<Node, String> {

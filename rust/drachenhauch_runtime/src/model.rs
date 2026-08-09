@@ -203,7 +203,7 @@ pub struct Func {
     /// "Zeile unbekannt" zurueck.
     pub lines: Vec<u32>,
     /// Debug-Namen pro Local-Slot (parallel zu `local_types`); leer fuer
-    /// Compiler-Zwischenwerte. Nur fuer `gbrt debug` (Variablen-Inspektion);
+    /// Compiler-Zwischenwerte. Nur fuer `dhrt debug` (Variablen-Inspektion);
     /// leer wenn der Compiler keine Namen getrackt hat (alte .gbc).
     pub local_names: Vec<String>,
 }

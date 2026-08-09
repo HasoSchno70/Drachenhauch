@@ -1,4 +1,4 @@
-//! Native Audio ueber **Kira** (cpal) -- das Audio-Backend von gbrt (loeste
+//! Native Audio ueber **Kira** (cpal) -- das Audio-Backend von dhrt (loeste
 //! 2026-06-13 raylib-Audio ab). Vorteil gegenueber raylib: ein eigener Audio-
 //! Thread, vollstaendig vom Game-Loop entkoppelt (kein per-Frame-Refill ->
 //! kein Stottern bei schweren Frames), echte Mixer-Tracks/Effekte, tweenbare

@@ -1,6 +1,6 @@
 """Tests fuer das Tilemap-Editor-Datenmodell (Qt-frei).
 
-Kern-Garantie: was der Editor exportiert, liest die native Runtime `gbrt`
+Kern-Garantie: was der Editor exportiert, liest die native Runtime `dhrt`
 (`IMPORT "tiled"` + `TILED_LOAD` + Accessors) ohne Fehler und mit identischen
 Werten zurueck. Frueher gegen das Python-`tiled`-Modul (in Phase 8 geloescht).
 """
@@ -18,8 +18,8 @@ from gamebasic.tilemap.document import coerce_prop, MapObject, ObjectLayer
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for v in ("release", "debug"):
         p = _ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
         if p.exists():
@@ -27,7 +27,7 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 
 
 def _lines(out):
@@ -35,25 +35,25 @@ def _lines(out):
 
 
 def _run_in(tmp_path, body):
-    """GB-Programm im Verzeichnis `tmp_path` ueber gbrt ausfuehren (damit
+    """GB-Programm im Verzeichnis `tmp_path` ueber dhrt ausfuehren (damit
     relative TILED_LOAD-Pfade die dort gespeicherte JSON finden)."""
-    if _GBRT is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if _DHRT is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     fd = tmp_path / "_t.gb"
     fd.write_text(body, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(fd)], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
-    assert r.returncode == 0, f"gbrt run Exit {r.returncode}: {r.stderr}"
+    assert r.returncode == 0, f"dhrt run Exit {r.returncode}: {r.stderr}"
     return _lines(r.stdout.replace("\r\n", "\n"))
 
 
 def _check_compiles(tmp_path, src):
-    """`gbrt --check` auf `src`; gibt die Fehler-Diagnosen zurueck (leer = ok)."""
-    if _GBRT is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    """`dhrt --check` auf `src`; gibt die Fehler-Diagnosen zurueck (leer = ok)."""
+    if _DHRT is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     fd = tmp_path / "_check.gb"
     fd.write_text(src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--check", str(fd)], capture_output=True,
+    r = subprocess.run([str(_DHRT), "--check", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     diags = json.loads(r.stdout or "[]")
     return [d for d in diags if d.get("severity") == "error"]
@@ -465,7 +465,7 @@ def test_object_layer_save_load_json_roundtrip(tmp_path):
 
 
 def test_gb_code_compiles(tmp_path):
-    """Der exportierte GB-Code muss in gbrt lexen+parsen+kompilieren."""
+    """Der exportierte GB-Code muss in dhrt lexen+parsen+kompilieren."""
     doc = _build_sample(tmp_path)
     code = doc.gb_code(str(tmp_path / "level.json"))
     assert _check_compiles(tmp_path, code) == []

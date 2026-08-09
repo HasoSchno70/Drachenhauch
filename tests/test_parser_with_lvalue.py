@@ -3,11 +3,11 @@
 Aus dem Clean-Code-Review des Frontends. Kernbefund: `parser.py` ist der
 stale twin von `parser.rs` -- mehrere `// Review-Fund`-Fixes auf der
 Rust-Seite wurden nie zurueckportiert. Der Python-Parser bedient nur noch
-die Editor-Schicht (gbrt ist die Laufzeit), aber `_check_syntax_only`
+die Editor-Schicht (dhrt ist die Laufzeit), aber `_check_syntax_only`
 liefert nur das ERSTE Problem: ein Fehlalarm verdeckt damit alle echten
 Fehler der Datei.
 
-Leitprinzip der Tests: der Editor muss genau das akzeptieren, was gbrt
+Leitprinzip der Tests: der Editor muss genau das akzeptieren, was dhrt
 auch ausfuehrt -- nicht mehr (sonst schweigt er bei kaputtem Code) und
 nicht weniger (sonst streicht er gueltigen Code rot an).
 """
@@ -35,14 +35,14 @@ def _first(prog, type_name):
     return [s for s in prog.statements if type(s).__name__ == type_name][0]
 
 
-# --- H3: Methodenaufruf im WITH-Block (gbrt fuehrt das aus) ----------
+# --- H3: Methodenaufruf im WITH-Block (dhrt fuehrt das aus) ----------
 
 @pytest.mark.parametrize("body", [".go()", ".hp.go()", ".go().x"])
 def test_method_call_in_with_is_not_an_error(body):
     """`.go()` lief in ein hartes "Erwartet '=' oder Compound-Operator",
     weil die Lvalue-Kette `(` nicht kennt -- ein Aufruf ist ja kein
     Zuweisungsziel. Der Editor strich damit voellig gueltigen Code rot an,
-    den gbrt korrekt ausfuehrt."""
+    den dhrt korrekt ausfuehrt."""
     prog = parse(CLS + f"WITH p\n{body}\nEND WITH\n")
     stmt = _first(prog, "With").body[0]
     assert type(stmt).__name__ == "ExprStmt"
@@ -99,17 +99,17 @@ def test_multidim_index_assignment_still_works():
 
 
 # --- M3: einzeiliges IF -- Grenze klar benennen ---------------------
-# gbrt lehnt beide Formen ab (verifiziert per `gbrt --check`:
+# dhrt lehnt beide Formen ab (verifiziert per `dhrt --check`:
 # "Erwartet Zeilenende"). Frueher verschluckte der Python-Parser sie
 # still als `=`-Vergleich; sie zu AKZEPTIEREN waere die falsche Richtung
 # gewesen (Editor stumm bei Code, der nicht laeuft).
 
-def test_inline_if_member_assign_is_rejected_like_gbrt():
+def test_inline_if_member_assign_is_rejected_like_dhrt():
     with pytest.raises(ParseError, match="einzeiligen IF"):
         parse(CLS + "WITH p\nIF TRUE THEN .hp = 1\nEND WITH\n")
 
 
-def test_inline_if_tuple_assign_is_rejected_like_gbrt():
+def test_inline_if_tuple_assign_is_rejected_like_dhrt():
     with pytest.raises(ParseError, match="einzeiligen IF"):
         parse("DIM a AS INTEGER\nDIM b AS INTEGER\n"
               "IF TRUE THEN (a, b) = MINMAX(1, 2)\n")
@@ -126,7 +126,7 @@ def test_supported_inline_if_forms_still_work(src):
 
 
 # --- M2: COLON als Terminator nach PRINT / RETURN -------------------
-# gbrt akzeptiert alle vier Formen (per `gbrt --check` verifiziert); der
+# dhrt akzeptiert alle vier Formen (per `dhrt --check` verifiziert); der
 # Python-Parser warf "Unerwartetes Token COLON" -- ein Fehlalarm auf Code,
 # der laeuft. Ein solcher Fehlalarm verdeckt zudem alle echten Fehler der
 # Datei, weil `_check_syntax_only` nur das erste Problem liefert.
@@ -158,7 +158,7 @@ def test_discarded_toplevel_equality_is_reported(src):
     der Lookahead nicht erkannt hat. Ohne Netz wird der Ausdruck als
     Vergleich geparst, sein Ergebnis verworfen -- die Zuweisung verschwindet
     spurlos. Genau diese Stille liess die Keyword-Member-Faelle so lange
-    unentdeckt. Wortlaut wie gbrt (parser.rs)."""
+    unentdeckt. Wortlaut wie dhrt (parser.rs)."""
     with pytest.raises(ParseError, match="meintest du eine Zuweisung"):
         parse(src)
 
@@ -184,11 +184,11 @@ def test_unterminated_if_reports_at_the_if_line():
     assert ei.value.line == 2, f"erwartet Zeile 2 (das IF), bekam {ei.value.line}"
 
 
-# --- L5: Aufruf-Ziele wie in gbrt -----------------------------------
+# --- L5: Aufruf-Ziele wie in dhrt -----------------------------------
 
 @pytest.mark.parametrize("src", ['PRINT 1(2)', 'PRINT "s"(2)'])
-def test_calling_a_literal_is_rejected_like_gbrt(src):
-    """`1(2)` parste klaglos als Call durch, waehrend gbrt es ablehnt --
+def test_calling_a_literal_is_rejected_like_dhrt(src):
+    """`1(2)` parste klaglos als Call durch, waehrend dhrt es ablehnt --
     der Editor blieb stumm bei Code, der zur Laufzeit scheitert."""
     with pytest.raises(ParseError, match="nicht aufrufbar"):
         parse(src)

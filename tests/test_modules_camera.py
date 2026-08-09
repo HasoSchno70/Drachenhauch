@@ -1,6 +1,6 @@
 """Tests fuer die Kamera-Mathematik (auf der behaltenen `Graphics`-Klasse).
 
-Die Kamera-Built-ins sind graphics_builtin (nativ in gbrt); die zugrunde liegende
+Die Kamera-Built-ins sind graphics_builtin (nativ in dhrt); die zugrunde liegende
 Mathematik (set/get/reset_camera, _w2s/_s2w/_scale_size) lebt in `graphics.py`
 (Stufe A behalten) und wird hier direkt getestet -- unabhaengig vom Builtin-Layer.
 """

@@ -3,7 +3,7 @@
 Eigenstaendiges Qt-Programm: links die Control-Palette, in der Mitte die
 Design-Flaeche (Controls platzieren/selektieren/verschieben/loeschen), rechts
 der Inspector (Eigenschaften + Events). Speichert/laedt `.gbform` (Runtime-
-Format) und kann das Formular per "Run" mit `gbrt` starten (laedt das Layout +
+Format) und kann das Formular per "Run" mit `dhrt` starten (laedt das Layout +
 generierte Event-Handler-Stubs -- der Xojo-Lauf).
 
 Datenmodell + Code-Generierung liegen Qt-frei in `gamebasic/formdesigner/`.
@@ -67,21 +67,21 @@ _HANDLE_CURSORS = {
 
 # Geteilte Fundstelle statt einer eigenen Kopie: die lokale Variante suchte NUR
 # im Dev-Baum (`rust/drachenhauch_runtime/target/...` relativ zu dieser Datei) und kannte
-# den PyInstaller-Fall nicht -- in der installierten IDE liegt `gbrt.exe` neben
+# den PyInstaller-Fall nicht -- in der installierten IDE liegt `dhrt.exe` neben
 # `GameBasic.exe`, F5 meldete dort also "Runtime nicht gebaut: python
 # rust/build_runtime.py", einen Rat, den ein Installer-Nutzer nicht befolgen
 # kann. Der Alias haelt den Namen fuer Tests patchbar (wie in output_console).
-from .editor_qt.gbrt_locate import find_gbrt as _find_gbrt, gbrt_spawn_semaphore
+from .editor_qt.dhrt_locate import find_dhrt as _find_dhrt, dhrt_spawn_semaphore
 
 
-def _gbrt_diagnostics(gbrt, gb_path: Path) -> list:
-    """`gbrt --check` auf die erzeugte Datei. Liefert die Diagnose-Liste
+def _dhrt_diagnostics(dhrt, gb_path: Path) -> list:
+    """`dhrt --check` auf die erzeugte Datei. Liefert die Diagnose-Liste
     (leer = sauber). ACHTUNG: `--check` endet IMMER mit Code 0, die Fehler
     stehen als JSON auf stdout -- wer nur den Rueckgabewert prueft, sieht
     nichts."""
     try:
-        with gbrt_spawn_semaphore:
-            r = subprocess.run([str(gbrt), "--check", str(gb_path)],
+        with dhrt_spawn_semaphore:
+            r = subprocess.run([str(dhrt), "--check", str(gb_path)],
                                capture_output=True, text=True,
                                encoding="utf-8", timeout=30)
         return json.loads((r.stdout or "").strip() or "[]")
@@ -112,7 +112,7 @@ def _fill_surface(qp: QPainter, r: QRect, face: QColor, border: QColor,
     """Flaeche wie die Laufzeit: flach, gerundet oder gewoelbt mit Glanzkante.
 
     Der Designer zeichnet mit Qt, kann also nicht dieselben Befehle nutzen wie
-    gbrt -- er baut den Eindruck nach. Genau deshalb sind die Werte
+    dhrt -- er baut den Eindruck nach. Genau deshalb sind die Werte
     (`radius`/`gradient`/`gloss`) dieselben Zahlen wie in den Metriken der
     Laufzeit, damit beide Seiten am selben Regler haengen."""
     if grad > 0:
@@ -2099,7 +2099,7 @@ class FormDesigner(QMainWindow):
         act("Als Startformular setzen", None, self.set_main_form)
         m.addSeparator()
         act("GB-Code exportieren...", None, self.export_gb_code)
-        act("Ausfuehren (gbrt)", "F5", self.run_form)
+        act("Ausfuehren (dhrt)", "F5", self.run_form)
 
         e = self.menuBar().addMenu("&Bearbeiten")
         self.act_undo = act("Rueckgaengig", "Ctrl+Z", self.undo, menu=e)
@@ -2837,7 +2837,7 @@ class FormDesigner(QMainWindow):
     def _stop_run(self):
         """Laufenden Testlauf beenden + sein Temp-Verzeichnis raeumen. Vorher
         blieb pro F5 ein `gbform_*`-Ordner in %TEMP% liegen und die
-        gbrt-Fenster sammelten sich an -- sie ueberlebten sogar den Designer."""
+        dhrt-Fenster sammelten sich an -- sie ueberlebten sogar den Designer."""
         p = getattr(self, "_proc", None)
         if p is not None and p.poll() is None:
             try:
@@ -2851,9 +2851,9 @@ class FormDesigner(QMainWindow):
         self._run_dir = None
 
     def run_form(self):
-        gbrt = _find_gbrt(self.project_root)
-        if gbrt is None:
-            QMessageBox.warning(self, "gbrt fehlt", "Native Runtime nicht gefunden.\n"
+        dhrt = _find_dhrt(self.project_root)
+        if dhrt is None:
+            QMessageBox.warning(self, "dhrt fehlt", "Native Runtime nicht gefunden.\n"
                                 "Im Entwicklungsbaum: python rust/build_runtime.py")
             return
         self._stop_run()
@@ -2869,7 +2869,7 @@ class FormDesigner(QMainWindow):
         # Vorab pruefen: `run` scheiterte sonst STUMM. Weder stdout/stderr noch
         # der Exit-Code wurden ausgewertet, es gab also keinerlei Rueckmeldung
         # -- der Nutzer druckte mehrfach F5 und hielt den Designer fuer kaputt.
-        diags = _gbrt_diagnostics(gbrt, gb)
+        diags = _dhrt_diagnostics(dhrt, gb)
         errs = [d for d in diags if d.get("severity") != "warning"]
         if errs:
             lines = runner.splitlines()
@@ -2884,7 +2884,7 @@ class FormDesigner(QMainWindow):
                 + ("\n\n(weitere ausgelassen)" if len(errs) > 5 else ""))
             return
         try:
-            self._proc = self._spawn([str(gbrt), "run", str(gb)], str(tmp))
+            self._proc = self._spawn([str(dhrt), "run", str(gb)], str(tmp))
         except OSError as e:
             QMessageBox.critical(self, "Start fehlgeschlagen", str(e))
 
@@ -2894,9 +2894,9 @@ class FormDesigner(QMainWindow):
         `subprocess.run` der Vorab-Pruefung).
 
         Der Semaphor schuetzt die Prozess-ERSTELLUNG gegen gleichzeitig
-        startende `gbrt`-Subprozesse aus anderen Editor-Threads (verifizierter
-        Windows-Crash, siehe Kommentar in `gbrt_locate`)."""
-        with gbrt_spawn_semaphore:
+        startende `dhrt`-Subprozesse aus anderen Editor-Threads (verifizierter
+        Windows-Crash, siehe Kommentar in `dhrt_locate`)."""
+        with dhrt_spawn_semaphore:
             return subprocess.Popen(cmd, cwd=cwd)
 
     def _arm_place(self, item: QListWidgetItem):

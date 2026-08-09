@@ -35,15 +35,15 @@ def collect_builtins() -> list[str]:
     Quellen:
     - Python-Registry (`BUILTINS`/`GRAPHICS_BUILTINS`) -- die im Tree-Walker
       implementierten Builtins.
-    - `BUILTIN_DOCS` -- enthaelt auch **gbrt-only**-Builtins (nur in der nativen
+    - `BUILTIN_DOCS` -- enthaelt auch **dhrt-only**-Builtins (nur in der nativen
       Runtime implementiert, nicht mehr im Tree-Walker). So bekommen Editor-
-      Highlighting/Completion sie trotzdem; die Ausfuehrung macht gbrt.
+      Highlighting/Completion sie trotzdem; die Ausfuehrung macht dhrt.
     """
     names: set[str] = set()
     try:
-        # Builtin-Namen aus dem eingefrorenen gbrt-Metadaten-Index (Stufe B) --
+        # Builtin-Namen aus dem eingefrorenen dhrt-Metadaten-Index (Stufe B) --
         # keine Laufzeit-Abhaengigkeit vom (laengst entfernten) Tree-Walker.
-        from .gbrt_meta import builtin_names_upper
+        from .dhrt_meta import builtin_names_upper
         names.update(builtin_names_upper())
     except Exception:
         pass

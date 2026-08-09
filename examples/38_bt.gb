@@ -1,6 +1,6 @@
 ' Bluetooth Low Energy - in der Naehe befindliche Geraete scannen
 ' Voraussetzung: pip install bleak
-' Native Runtime (gbrt): mit 'python rust/build_runtime.py --hardware' bauen.
+' Native Runtime (dhrt): mit 'python rust/build_runtime.py --hardware' bauen.
 '
 ' Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10.
 

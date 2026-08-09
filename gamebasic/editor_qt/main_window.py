@@ -432,13 +432,13 @@ class GameBasicEditor(QMainWindow):
         self.act_format_doc.setShortcut(QKeySequence("Shift+Alt+F"))
         self.act_format_doc.triggered.connect(self._format_document)
 
-        # Run -- ein Button ueber die native Runtime gbrt: primaer direkt
-        # (`gbrt run`), bei Startproblemen ueber den gbrun.py-Launcher (gleicher
-        # gbrt, aber chdir ins Datei-Verzeichnis fuer relative Asset-Pfade).
+        # Run -- ein Button ueber die native Runtime dhrt: primaer direkt
+        # (`dhrt run`), bei Startproblemen ueber den gbrun.py-Launcher (gleicher
+        # dhrt, aber chdir ins Datei-Verzeichnis fuer relative Asset-Pfade).
         self.act_run = QAction(icons.get("run"), "Run", self)
         self.act_run.setShortcut(QKeySequence("F5"))
         self.act_run.setToolTip(
-            "Ausfuehren (F5) -- native Runtime gbrt.")
+            "Ausfuehren (F5) -- native Runtime dhrt.")
         self.act_run.triggered.connect(self._run_active)
 
         self.act_stop = QAction(icons.get("stop"), "Stop", self)
@@ -450,24 +450,24 @@ class GameBasicEditor(QMainWindow):
             icons.get("save"), "Export → standalone .exe", self)
         self.act_export.setShortcut(QKeySequence("Ctrl+F6"))
         self.act_export.setToolTip(
-            "Standalone-.exe buendeln (Ctrl+F6) -- gbrt + Bytecode + assets/ in "
+            "Standalone-.exe buendeln (Ctrl+F6) -- dhrt + Bytecode + assets/ in "
             "einen Ordner; laeuft ohne Python")
         self.act_export.triggered.connect(self._export_active)
 
-        # Debugger (native Runtime gbrt). Start via F7; Steuerung waehrend der Sitzung.
+        # Debugger (native Runtime dhrt). Start via F7; Steuerung waehrend der Sitzung.
         self.act_debug = QAction(icons.get("debug"), "Debuggen", self)
         self.act_debug.setShortcut(QKeySequence("F7"))
         self.act_debug.setToolTip(
-            "Debuggen mit Breakpoints + Step (F7) -- native Runtime gbrt. Klick "
+            "Debuggen mit Breakpoints + Step (F7) -- native Runtime dhrt. Klick "
             "links im Gutter setzt Breakpoints.")
         self.act_debug.triggered.connect(self._debug_start)
 
-        # Profiler (native Runtime gbrt). Laeuft das Programm durch und misst pro
+        # Profiler (native Runtime dhrt). Laeuft das Programm durch und misst pro
         # Zeile/Funktion Treffer + Zeit.
         self.act_profile = QAction(icons.get("profiler"), "Profiler", self)
         self.act_profile.setShortcut(QKeySequence("Ctrl+Shift+Y"))
         self.act_profile.setToolTip(
-            "Profiler -- misst Hotpath pro Zeile/Funktion (native Runtime gbrt). "
+            "Profiler -- misst Hotpath pro Zeile/Funktion (native Runtime dhrt). "
             "Am besten fuer Konsolen-/Logik-Programme.")
         self.act_profile.triggered.connect(self._profile_start)
 
@@ -1332,21 +1332,21 @@ class GameBasicEditor(QMainWindow):
             return
         st = self.tabs.active
         assert st is not None and st.file_path is not None
-        # Run ueber die native Runtime gbrt: primaer direkt (`gbrt run`), bei
-        # Startproblemen ueber den gbrun.py-Launcher (gleicher gbrt, aber chdir
+        # Run ueber die native Runtime dhrt: primaer direkt (`dhrt run`), bei
+        # Startproblemen ueber den gbrun.py-Launcher (gleicher dhrt, aber chdir
         # ins Datei-Verzeichnis fuer relative Asset-Pfade).
         mode = self.console.start_run_auto(st.file_path)
         if mode:
             self.tabs.set_running(st.file_path, mode)
             if mode == "native":
                 self.statusBar().showMessage(
-                    f"⚙ Laeuft nativ: {st.file_path.name} (gbrt)")
+                    f"⚙ Laeuft nativ: {st.file_path.name} (dhrt)")
             else:
                 self.statusBar().showMessage(
-                    f"▶ Laeuft: {st.file_path.name} (gbrt via gbrun.py)")
+                    f"▶ Laeuft: {st.file_path.name} (dhrt via gbrun.py)")
 
     def _export_active(self) -> None:
-        """Buendelt die aktive Datei zu einer standalone .exe (gbrt + Bytecode +
+        """Buendelt die aktive Datei zu einer standalone .exe (dhrt + Bytecode +
         assets/). Laeuft ohne Python; Ergebnis-Ordner wird im Explorer geoeffnet."""
         if not self._ensure_saved_for_run():
             return
@@ -1354,24 +1354,24 @@ class GameBasicEditor(QMainWindow):
         if st is None or st.file_path is None:
             return
         import subprocess
-        from .output_console import _find_gbrt
+        from .output_console import _find_dhrt
         from PySide6.QtGui import QGuiApplication, QDesktopServices
         from PySide6.QtCore import QUrl, Qt
 
-        gbrt = _find_gbrt(self.project_root)
-        if gbrt is None:
+        dhrt = _find_dhrt(self.project_root)
+        if dhrt is None:
             self.console.append(
-                "Native Runtime 'gbrt' nicht gefunden -- erst bauen:\n"
+                "Native Runtime 'dhrt' nicht gefunden -- erst bauen:\n"
                 "  .venv\\Scripts\\python.exe rust\\build_runtime.py\n", "error")
-            self.statusBar().showMessage("Export: gbrt fehlt", 4000)
+            self.statusBar().showMessage("Export: dhrt fehlt", 4000)
             return
-        # gbrts EIGENER Selbst-Export (Rust-Frontend kompiliert die Quelle, haengt
+        # dhrts EIGENER Selbst-Export (Rust-Frontend kompiliert die Quelle, haengt
         # den Payload an eine Kopie der Exe, kopiert assets/). KEIN Python-Compiler
-        # -> auch gbrt-only-Builtins exportieren.
+        # -> auch dhrt-only-Builtins exportieren.
         self.console.append(f"⚙ Exportiere {st.file_path.name} ...\n", "info")
         QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            res = subprocess.run([str(gbrt), "--export", str(st.file_path)],
+            res = subprocess.run([str(dhrt), "--export", str(st.file_path)],
                                  capture_output=True, text=True)
         except OSError as exc:
             QGuiApplication.restoreOverrideCursor()
@@ -1384,7 +1384,7 @@ class GameBasicEditor(QMainWindow):
             self.console.append(out.strip() + "\n", "error")
             self.statusBar().showMessage("Export fehlgeschlagen", 4000)
             return
-        # gbrt druckt "Exportiert: <pfad>"; sonst Default <stem>_dist/<stem>.exe.
+        # dhrt druckt "Exportiert: <pfad>"; sonst Default <stem>_dist/<stem>.exe.
         exe = None
         for line in out.splitlines():
             if line.startswith("Exportiert:"):
@@ -1442,7 +1442,7 @@ class GameBasicEditor(QMainWindow):
             except OSError:
                 pass
         self.console.process_finished.connect(_cleanup)
-        # Auch die Selektion laeuft ueber gbrt.
+        # Auch die Selektion laeuft ueber dhrt.
         self.console.start_run_auto(temp_path)
 
     def _ensure_saved_for_run(self) -> bool:
@@ -1556,17 +1556,17 @@ class GameBasicEditor(QMainWindow):
     def _on_profile_failed(self, message: str, editor_line: int) -> None:
         self.profile_panel.set_status("nicht messbar")
         loc = f" (Zeile {editor_line})" if editor_line and editor_line > 0 else ""
-        # Der Profiler laeuft ueber die native Runtime (gbrt) und misst ALLES,
+        # Der Profiler laeuft ueber die native Runtime (dhrt) und misst ALLES,
         # auch 3D/native-only Builtins. Die einzige "native Runtime"-Meldung ist
-        # jetzt der Fall, dass gbrt nicht gebaut ist -> klare Bau-Anleitung.
+        # jetzt der Fall, dass dhrt nicht gebaut ist -> klare Bau-Anleitung.
         if "native Runtime" in message or "nativen Runtime" in message:
             self.console.append(
-                f"\nⓘ Profiler: Die native Runtime gbrt ist nicht gebaut.\n"
+                f"\nⓘ Profiler: Die native Runtime dhrt ist nicht gebaut.\n"
                 f"   {message}\n"
                 f"   → Bauen mit:  python rust/build_runtime.py\n",
                 "muted")
             self.statusBar().showMessage(
-                "Profiler: native Runtime gbrt nicht gebaut", 6000)
+                "Profiler: native Runtime dhrt nicht gebaut", 6000)
         else:
             self.console.append(f"\n⏱ Profiler-Fehler{loc}: {message}\n", "error")
             self.statusBar().showMessage(f"Profiler-Fehler: {message}", 6000)
@@ -2377,8 +2377,8 @@ class GameBasicEditor(QMainWindow):
         # Tab-Close-Pfad (_on_tab_close_requested / tabs.close_tab) stoppt
         # den Debugger bereits korrekt und bricht den Live-Error-Checker
         # jedes Tabs ab -- beim Schliessen des GESAMTEN Fensters lief das
-        # nicht mit, sodass ein laufender `gbrt debug`/`gbrt profile`-
-        # Subprozess (oder ein noch offener `gbrt --check`-Aufruf) verwaist
+        # nicht mit, sodass ein laufender `dhrt debug`/`dhrt profile`-
+        # Subprozess (oder ein noch offener `dhrt --check`-Aufruf) verwaist
         # zurueckblieb, statt terminiert zu werden.
         if self.debugger.is_active():
             self.debugger.stop()

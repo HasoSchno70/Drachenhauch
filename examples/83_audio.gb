@@ -1,4 +1,4 @@
-' 83_audio.gb -- Sound + Musik (Core-Audio), laeuft nativ in gbrt (F6/--native;
+' 83_audio.gb -- Sound + Musik (Core-Audio), laeuft nativ in dhrt (F6/--native;
 ' Audio nur in der nativen Runtime). Builtins:
 '   LOADSOUND(pfad$) -> SOUND        PLAYSOUND(sound[, loops, lautstaerke])
 '   STOPSOUND(sound)                 PLAYMUSIC(pfad$[, loops, lautstaerke])

@@ -1,5 +1,5 @@
 # Kern: keine externen Abhaengigkeiten. Grafik/Audio laufen in der nativen
-# Runtime gbrt (Rust/raylib) -- pygame wurde entfernt.
+# Runtime dhrt (Rust/raylib) -- pygame wurde entfernt.
 # Entwicklungswerkzeuge (optional):
 # pytest>=7
 # Editoren (optional, alle PySide6-basiert -- Code/Sprite/Tilemap/SFX/Tracker):

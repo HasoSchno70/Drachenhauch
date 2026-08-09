@@ -2,7 +2,7 @@
 import pytest
 
 
-# --- gbrt-Pfad: BYREF via Copy-In/Copy-Out (Compiler emittiert lvalue-
+# --- dhrt-Pfad: BYREF via Copy-In/Copy-Out (Compiler emittiert lvalue-
 #     Capture + Post-Call-Write-Back, VM gibt finale Param-Werte zurueck) ---
 
 def test_byref_swap(run_gb):
@@ -163,7 +163,7 @@ END SUB
 
 
 # (Der frühere Test, dass der Python-Compiler BYREF ablehnt, ist entfernt:
-#  gbrt unterstützt BYREF jetzt nativ, und der Python-Compiler wird in Phase 8
+#  dhrt unterstützt BYREF jetzt nativ, und der Python-Compiler wird in Phase 8
 #  gelöscht.)
 
 

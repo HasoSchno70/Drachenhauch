@@ -10,7 +10,7 @@ on:
 # pro OS braucht und kein Push-blockierendes Korrektheitskriterium ist -- manuell
 # ueber den Actions-Tab ("Run workflow") ausloesen.
 #
-# gbrt wird hier nur mit --no-graphics gebaut (schnell, keine System-Bibliotheken
+# dhrt wird hier nur mit --no-graphics gebaut (schnell, keine System-Bibliotheken
 # noetig) -- das erzeugte Bundle enthaelt also NICHT die volle, fuer echte Nutzer
 # gedachte Runtime, nur genug um zu pruefen, dass die Paketier-Schritte selbst
 # (Icon-Erzeugung/PyInstaller/DMG/Tarball/Inno Setup) funktionieren.
@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[editors,package]"
 
-      - name: gbrt bauen (--no-graphics, nur fuer Bundle-Struktur-Test)
+      - name: dhrt bauen (--no-graphics, nur fuer Bundle-Struktur-Test)
         run: python rust/build_runtime.py --no-graphics
 
       # Windows: Inno Setup ist auf den GH-Runnern nicht vorinstalliert --

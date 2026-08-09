@@ -100,13 +100,13 @@ class BuiltinsPanel(QWidget):
         groups: dict[str, list[tuple[str, str, str]]] = {}
         seen_ids: set[int] = set()
 
-        # 1) Funktions-Built-ins -- aus dem eingefrorenen gbrt-Metadaten-Index
+        # 1) Funktions-Built-ins -- aus dem eingefrorenen dhrt-Metadaten-Index
         #    (Stufe B). Gruppierung: Modul-Builtins unter ihrem Modulnamen,
         #    Core unter "standard" bzw. "grafik" (kind=graphics).
         _ = seen_ids  # nicht mehr noetig, Index ist bereits dedupliziert
         try:
-            from . import gbrt_meta
-            entries = gbrt_meta.builtin_index()
+            from . import dhrt_meta
+            entries = dhrt_meta.builtin_index()
         except Exception:
             entries = []
         for e in entries:
@@ -115,7 +115,7 @@ class BuiltinsPanel(QWidget):
                 continue
             kind = e.get("kind", "core")
             mod = e.get("module") or "core"
-            if mod in ("gbrt", "core", ""):
+            if mod in ("dhrt", "core", ""):
                 group = "grafik" if kind == "graphics" else "standard"
             else:
                 group = mod

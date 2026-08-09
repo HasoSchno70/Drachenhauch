@@ -9,7 +9,7 @@ Steuerbefehle, auf die der ESP32 subscribt hat.
 IMPORT "mqtt"
 ```
 
-Nativ in gbrt (Feature `net` — bereits im Standard-Build enthalten, keine
+Nativ in dhrt (Feature `net` — bereits im Standard-Build enthalten, keine
 `--hardware`-Flag noetig, kein neues Cargo-Crate: reines `std::net` direkt
 gegen die OASIS-MQTT-3.1.1-Spezifikation implementiert).
 

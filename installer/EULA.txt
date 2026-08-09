@@ -10,7 +10,7 @@ Stand: [JAHR]   Anbieter: [DEIN NAME / FIRMA], [ANSCHRIFT], [E-MAIL]
 
 1. GEGENSTAND
 GameBasic ("die Software") ist eine Entwicklungsumgebung samt Laufzeitumgebung
-("gbrt") zum Erstellen von Programmen und Spielen. Dieser Vertrag wird zwischen
+("dhrt") zum Erstellen von Programmen und Spielen. Dieser Vertrag wird zwischen
 dir ("Lizenznehmer") und dem Anbieter geschlossen. Durch Installation oder
 Nutzung der Software stimmst du diesem Vertrag zu. Stimmst du nicht zu,
 installiere und nutze die Software nicht.
@@ -26,8 +26,8 @@ GameBasic erstellst, gehoeren ausschliesslich dir. Der Anbieter erhebt darauf
 keinerlei Rechte und keine Lizenzgebuehren.
 
 4. WEITERGABE DEINER WERKE (RUNTIME-REDISTRIBUTION)
-Du darfst die mit "gbrt --export" erzeugten eigenstaendigen Programme - einschliesslich
-der darin enthaltenen GameBasic-Laufzeitumgebung (gbrt) und der mitgelieferten
+Du darfst die mit "dhrt --export" erzeugten eigenstaendigen Programme - einschliesslich
+der darin enthaltenen GameBasic-Laufzeitumgebung (dhrt) und der mitgelieferten
 Open-Source-Bestandteile - frei weitergeben und auch KOMMERZIELL verkaufen, ohne
 weitere Gebuehren an den Anbieter. Du musst dabei lediglich die Lizenzhinweise der
 enthaltenen Drittkomponenten beachten (siehe THIRD-PARTY-NOTICES.txt; die dort

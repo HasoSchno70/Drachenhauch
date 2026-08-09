@@ -47,11 +47,11 @@ sieht, wie ein Graph aussieht. `Strg+N` leert das Projekt für einen Neuanfang.
 | Bedingung hinzufügen | im Transition-Inspector „+ Bedingung" |
 | Löschen | Knoten/Pfeil wählen → `Entf` |
 | Undo / Redo | `Strg+Z` / `Strg+Y` |
-| **Vorschau** | **`F5`** — startet eine Live-Vorschau mit `gbrt` |
+| **Vorschau** | **`F5`** — startet eine Live-Vorschau mit `dhrt` |
 
 ### Vorschau (F5)
 
-`gbanim` erzeugt ein temporäres GameBasic-Programm und startet es mit `gbrt`:
+`gbanim` erzeugt ein temporäres GameBasic-Programm und startet es mit `dhrt`:
 links ein **Live-Parameter-Panel** (Slider für `float`/`int`, Checkbox für
 `bool`, Button für `trigger` — über das `ui`-Modul), rechts der Sprite, der den
 **aktuellen State** spielt. So testet man die Übergänge sofort, ohne Spielcode zu

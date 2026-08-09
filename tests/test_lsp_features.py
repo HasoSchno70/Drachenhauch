@@ -105,11 +105,11 @@ def test_hover_none_on_blank():
     assert F.hover(SRC, 0, 0) is None or "Player" not in str(F.hover(SRC, 0, 0))
 
 
-def test_hover_falls_back_to_gbrt_meta_signature_when_no_curated_doc():
+def test_hover_falls_back_to_dhrt_meta_signature_when_no_curated_doc():
     # Review-Fund: BUILTIN_DOCS deckt nur ~243 von ~1106 tatsaechlichen
     # Built-ins ab -- fuer den Rest lieferte hover() bisher komplett None.
     # MODEL_TEXTURE hat keinen BUILTIN_DOCS-Eintrag, aber einen Eintrag im
-    # gefrorenen gbrt-Metadaten-Index -- wenigstens die Signatur sollte
+    # gefrorenen dhrt-Metadaten-Index -- wenigstens die Signatur sollte
     # jetzt kommen.
     h = F.hover("DIM x AS INTEGER\nx = MODEL_TEXTURE(1, 2)\n", 1, 6)
     assert h is not None

@@ -1,4 +1,4 @@
-"""Baut `gbrt` als WebAssembly (emscripten) fuer den Web-Playground.
+"""Baut `dhrt` als WebAssembly (emscripten) fuer den Web-Playground.
 
 **Status: experimentell.** Die native Runtime nutzt raylib (raylib-rs); ein
 funktionierender Web-Build braucht die emscripten-Toolchain (`emcc`) UND den
@@ -6,7 +6,7 @@ Rust-Target `wasm32-unknown-emscripten`. Beides ist in dieser Umgebung nicht
 installiert -> das Skript kompiliert dann nur die `.gbc` und gibt eine
 Anleitung aus, statt zu scheitern.
 
-Seit dem Front-End-Port (Lexer..Compiler in Rust, alle Stufen) kann gbrt die
+Seit dem Front-End-Port (Lexer..Compiler in Rust, alle Stufen) kann dhrt die
 `.gb`-QUELLE selbst kompilieren -> der Web-Build bettet jetzt die Quelle
 (`program.gb`) ein und kompiliert im Browser (KEIN Pyodide noetig). Die
 vorab-kompilierte `program.gbc` wird weiter erzeugt und als Fallback
@@ -18,7 +18,7 @@ Ablauf (mit vollstaendiger Toolchain):
   2. `cargo build --target wasm32-unknown-emscripten --features graphics --release`
      mit emscripten-Linker-Flags (ASYNCIFY fuer den blockierenden VM-Loop,
      GLFW3 fuer raylib, `--embed-file program.gb@/program.gb` + `.gbc`).
-  3. `gbrt.js` + `gbrt.wasm` nach `web/` kopieren.
+  3. `dhrt.js` + `dhrt.wasm` nach `web/` kopieren.
 
 Aufruf:
   .venv\\Scripts\\python.exe rust\\build_wasm.py examples\\01_hello.gb
@@ -137,7 +137,7 @@ def emcc_flags(out_dir: str | Path) -> list:
     (Der Repo-/web-Pfad enthaelt keine Leerzeichen -> EMCC_CFLAGS-safe.)
 
     Assets (`assets/` neben der .gb) kommen als PRELOAD dazu, nicht als
-    embed: emscripten legt daraus eine eigene `gbrt.data` an, die der Browser
+    embed: emscripten legt daraus eine eigene `dhrt.data` an, die der Browser
     nebenher laedt. Eingebettet wuerden die paar Megabyte in die `.wasm`
     wandern und jeden Start ausbremsen.
     """
@@ -170,7 +170,7 @@ def emcc_flags(out_dir: str | Path) -> list:
         # dem Web-Pfad auf, und ohne den Export bricht das Programm ab
         # (SET_FULLSCREEN(TRUE) ist in Spielen/Demos die Regel).
         "-s", "EXPORTED_RUNTIME_METHODS=['callMain','FS','print','requestFullscreen']",
-        # Quelle einbetten -> gbrt kompiliert sie im Browser selbst (Front-End-
+        # Quelle einbetten -> dhrt kompiliert sie im Browser selbst (Front-End-
         # Port, kein Pyodide). Der frühere Python-.gbc-Fallback entfällt (Stufe B:
         # Python-Compiler/serialize entfernt).
     ]
@@ -214,11 +214,11 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print(f'  set EMCC_CFLAGS={" ".join(emcc_flags(out_dir))}')
     print(f"  cargo build --manifest-path {CRATE / 'Cargo.toml'} \\")
     print(f"    --target {TARGET} --features graphics --release")
-    print("  -> target/wasm32-unknown-emscripten/release/gbrt.{js,wasm} nach web/ kopieren")
+    print("  -> target/wasm32-unknown-emscripten/release/dhrt.{js,wasm} nach web/ kopieren")
 
 
 def copy_source(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
-    """Kopiert die `.gb`-Quelle nach `<out_dir>/program.gb` -- gbrt kompiliert
+    """Kopiert die `.gb`-Quelle nach `<out_dir>/program.gb` -- dhrt kompiliert
     sie im Browser selbst (Front-End-Port). Kein Python im Browser noetig."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -285,7 +285,7 @@ def erzwinge_relink(flags: str) -> bool:
     stempel = rel / "emcc_flags.txt"
     if stempel.exists() and stempel.read_text(encoding="utf-8") == flags:
         return False
-    for muster in ("gbrt.js", "gbrt.wasm", "gbrt.data", "gbrt"):
+    for muster in ("dhrt.js", "dhrt.wasm", "dhrt.data", "dhrt"):
         (rel / muster).unlink(missing_ok=True)
     rel.mkdir(parents=True, exist_ok=True)
     stempel.write_text(flags, encoding="utf-8")
@@ -298,7 +298,7 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
     groesse = copy_assets(gb_path, out_dir)
     if groesse:
         print(f"Assets uebernommen: {groesse / 1048576:.1f} MB "
-              f"(werden als gbrt.data vorgeladen)")
+              f"(werden als dhrt.data vorgeladen)")
     # Windows: emscripten-Toolchain automatisch verdrahten (PATH + CC/CXX/AR/
     # Linker/bindgen-Includes), damit der Build ohne manuelles Env-Setup laeuft.
     if setup_emscripten_env():
@@ -319,10 +319,10 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
         print("cargo build fehlgeschlagen (siehe oben).")
         return rc
     rel = CRATE / "target" / TARGET / "release"
-    # gbrt.data entsteht nur mit --preload-file (also wenn Assets dabei sind)
+    # dhrt.data entsteht nur mit --preload-file (also wenn Assets dabei sind)
     # und liegt bei den deps, nicht neben der .wasm -- ohne sie fehlen dem
     # Programm im Browser alle Dateien.
-    for name in ("gbrt.js", "gbrt.wasm", "gbrt.data"):
+    for name in ("dhrt.js", "dhrt.wasm", "dhrt.data"):
         src = rel / name
         if not src.exists():
             treffer = sorted(rel.glob(f"deps/{name}"))
@@ -331,7 +331,7 @@ def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
             shutil.copy2(src, Path(out_dir) / name)
             print(f"kopiert: {Path(out_dir) / name} "
                   f"({src.stat().st_size / 1048576:.1f} MB)")
-        elif name == "gbrt.data":
+        elif name == "dhrt.data":
             # Kein Paket: das ist der Normalfall ohne assets/, kein Fehler.
             (Path(out_dir) / name).unlink(missing_ok=True)
     print("\nFertig. Lokal testen:  py -m http.server -d web 8000  ->  http://localhost:8000")

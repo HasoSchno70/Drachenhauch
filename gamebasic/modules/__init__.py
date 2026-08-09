@@ -1,6 +1,6 @@
 """Built-in-Modul-Namen fuer GameBasic.
 
-Stufe B: Die Python-Modul-Implementierungen wurden entfernt -- gbrt (Rust)
+Stufe B: Die Python-Modul-Implementierungen wurden entfernt -- dhrt (Rust)
 implementiert alle Built-in-Module nativ. Dieses Paket haelt nur noch die
 *Namensliste*, die `preprocess.py` braucht, um `IMPORT "<modul>"` als Built-in
 zu erkennen (und zu einem Kommentar zu machen), sowie der Editor-File-Browser
@@ -19,7 +19,7 @@ import re
 # "../etc/passwd" als Modul-Name akzeptiert werden.
 _MODULE_NAME_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9_]*$")
 
-# Statische Liste der Built-in-Modul-Namen (= gbrts preprocess.rs MODULES).
+# Statische Liste der Built-in-Modul-Namen (= dhrts preprocess.rs MODULES).
 KNOWN_MODULES: frozenset = frozenset({
     "animfsm",
     "astar", "audio", "bt", "camera", "chart", "cloud", "controller", "curves", "db", "ecs",
@@ -40,6 +40,6 @@ def is_known_module(name: str) -> bool:
 
 
 def discover_modules() -> list:
-    """Namen aller Built-in-Module (sortiert). Rein deklarativ -- gbrt
+    """Namen aller Built-in-Module (sortiert). Rein deklarativ -- dhrt
     implementiert sie nativ; der Editor-File-Browser nutzt nur die Liste."""
     return sorted(KNOWN_MODULES)

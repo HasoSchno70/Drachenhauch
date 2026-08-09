@@ -1,7 +1,7 @@
 ' ============================================================
 '  Kapitel 12 - Politur: Sound, Wellen/Level
 '  Start:  gbrun.py buch-galaga/code/kap12/politur.gb
-'  Export: gbrt --export buch-galaga/code/kap12/politur.gb
+'  Export: dhrt --export buch-galaga/code/kap12/politur.gb
 ' ============================================================
 IMPORT "curves"
 IMPORT "camera"

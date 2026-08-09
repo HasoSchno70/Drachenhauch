@@ -9,7 +9,7 @@ module.exports = (H) => [
   H.bulletRich("Einfach zu lesen: ", "Befehle wie SCREEN, PLOT, DRAWIMAGE oder PLAYSOUND sagen, was sie tun."),
   H.bulletRich("Sicher durch Typen: ", "Jede Variable hat einen klaren Typ (INTEGER, FLOAT, STRING …). Das verhindert viele Anfängerfehler, bevor sie passieren."),
   H.bulletRich("Modern: ", "Klassen und Objekte, Funktionen, Module, sogar 3D – alles dabei, wenn du es brauchst, aber nie im Weg."),
-  H.bulletRich("Schnell: ", "Dein Programm läuft direkt über die flinke Laufzeit „gbrt“ – und lässt sich auf Wunsch als fertige .exe weitergeben."),
+  H.bulletRich("Schnell: ", "Dein Programm läuft direkt über die flinke Laufzeit „dhrt“ – und lässt sich auf Wunsch als fertige .exe weitergeben."),
 
   H.p("Genug der Theorie – schau dir an, wie wenig nötig ist, um etwas auf den Bildschirm zu bringen. Das hier ist ein vollständiges, lauffähiges GameBasic-Programm:"),
   H.code([

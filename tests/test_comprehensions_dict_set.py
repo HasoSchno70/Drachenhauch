@@ -127,8 +127,8 @@ PRINT s
 # --- Cross-VM-Identitaet --------------------------------------------
 
 # (Die früheren Cython-VM-Tests (vm_native) sind entfernt: die Cython-VM wurde
-#  längst durch gbrt abgelöst; das Dict/Set-Comp-Verhalten deckt der run_gb-
-#  Golden-Test oben + test_gbrt_parity ab.)
+#  längst durch dhrt abgelöst; das Dict/Set-Comp-Verhalten deckt der run_gb-
+#  Golden-Test oben + test_dhrt_parity ab.)
 
 
 # --- Parser-Edge-Cases ----------------------------------------------

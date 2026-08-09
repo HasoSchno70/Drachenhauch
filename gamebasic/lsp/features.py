@@ -93,7 +93,7 @@ def diagnostics(text: str, base_path, checker=None) -> list[dict]:
 
     `checker` (optional): wie bei `editor_qt.error_check.LiveErrorChecker` --
     ein Objekt mit `_set_active_proc(proc)`, damit der aufrufende Worker den
-    laufenden `gbrt --check`-Subprozess kennt und bei einer neueren Anfrage
+    laufenden `dhrt --check`-Subprozess kennt und bei einer neueren Anfrage
     abbrechen kann (siehe `lsp.server._DiagWorker`)."""
     from ..editor_qt.error_check import _check_source
     base = Path(base_path) if base_path else None
@@ -177,11 +177,11 @@ def hover(text: str, line0: int, char0: int) -> dict | None:
             # Review-Fund: BUILTIN_DOCS deckt nur einen Bruchteil der
             # tatsaechlichen Built-ins ab -- fuer den Rest lieferte Hover
             # bisher komplett None, ohne jeden Hinweis. Wenigstens die
-            # Signatur (aus dem gefrorenen gbrt-Metadaten-Index, derselbe
+            # Signatur (aus dem gefrorenen dhrt-Metadaten-Index, derselbe
             # den auch der Qt-Editor als Fallback nutzt) ist besser als gar
             # kein Hover.
-            from ..editor_qt.gbrt_meta import signature as _gbrt_sig
-            gsig = _gbrt_sig(word)
+            from ..editor_qt.dhrt_meta import signature as _dhrt_sig
+            gsig = _dhrt_sig(word)
             if gsig:
                 sig, doc = gsig, ""
     if sig is None:

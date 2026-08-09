@@ -1,8 +1,8 @@
-"""Parity-Test: Rust-Lexer (`gbrt --tokens`) == Python-Lexer.
+"""Parity-Test: Rust-Lexer (`dhrt --tokens`) == Python-Lexer.
 
 Erster Wächter der Front-End-Portierung (Lexer -> Parser -> Compiler nach Rust).
 Vergleicht den Token-Strom als (Typ, Wert, Zeile) ueber alle Beispiele +
-gezielte Sprach-Snippets. Skippt, wenn `gbrt` nicht gebaut ist.
+gezielte Sprach-Snippets. Skippt, wenn `dhrt` nicht gebaut ist.
 """
 import json
 import os
@@ -17,9 +17,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLES = _ROOT / "examples"
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -27,9 +27,9 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+    _DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _py_tokens(src: str):
@@ -37,7 +37,7 @@ def _py_tokens(src: str):
 
 
 def _rs_tokens(path: Path):
-    out = subprocess.run([str(_GBRT), "--tokens", str(path)],
+    out = subprocess.run([str(_DHRT), "--tokens", str(path)],
                          capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stderr
     return [json.loads(line) for line in out.stdout.splitlines() if line.strip()]

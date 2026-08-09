@@ -1,6 +1,6 @@
 """Tests fuer das tween-Modul (Werte-Interpolation).
 
-Golden-Tests gegen `gbrt` (Stufe B): IMPORT "tween" + PRINT. tween interpoliert
+Golden-Tests gegen `dhrt` (Stufe B): IMPORT "tween" + PRINT. tween interpoliert
 ueber die Wall-Clock (MILLIS), daher ist nur die DETERMINISTISCHE Surface
 golden-testbar: 0ms-Tweens (sofort fertig), Reverse, Loop/Pingpong-"nie fertig",
 Easing-Liste, Validierung. Die frueheren Tests mit `time.sleep` (Pause/Resume/

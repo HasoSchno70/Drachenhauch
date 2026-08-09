@@ -25,9 +25,9 @@ from PySide6.QtWidgets import (
 from .theme import COLORS, EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE, theme_signals
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
 # duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
-# find_gbrt(project_root) hat dieselbe Signatur wie das bisherige lokale
-# _find_gbrt(project_root) -- der Alias ist ein direkter Drop-in.
-from .gbrt_locate import find_gbrt as _find_gbrt
+# find_dhrt(project_root) hat dieselbe Signatur wie das bisherige lokale
+# _find_dhrt(project_root) -- der Alias ist ein direkter Drop-in.
+from .dhrt_locate import find_dhrt as _find_dhrt
 
 
 # Regexes fuer Linkable-Output
@@ -362,8 +362,8 @@ class OutputConsole(QWidget):
         return True
 
     def start_run_auto(self, file_path: Path) -> str | None:
-        """Run ueber die native Runtime `gbrt`: PRIMAER direkt (`gbrt run`), bei
-        Startproblemen ueber den `gbrun.py`-Launcher (gleicher gbrt, aber chdir
+        """Run ueber die native Runtime `dhrt`: PRIMAER direkt (`dhrt run`), bei
+        Startproblemen ueber den `gbrun.py`-Launcher (gleicher dhrt, aber chdir
         ins Datei-Verzeichnis -> relative Asset-Pfade stimmen auch dann).
         Liefert den genutzten Modus (`"native"` = direkt / `"py"` = via Launcher)
         oder `None`, wenn gar nichts startete (z.B. weil schon ein Run laeuft).
@@ -374,60 +374,60 @@ class OutputConsole(QWidget):
             return None
         self.clear()
         frozen = getattr(sys, "frozen", False)
-        gbrt = _find_gbrt(self.project_root)
-        if gbrt is not None:
-            if self._start_native(file_path, gbrt):
+        dhrt = _find_dhrt(self.project_root)
+        if dhrt is not None:
+            if self._start_native(file_path, dhrt):
                 return "native"
             if frozen:
                 self.append("\n✖ Start der Runtime fehlgeschlagen.\n", "error")
                 return None
-            # gbrt vorhanden, aber Start fehlgeschlagen -> ueber gbrun.py.
-            self.append("\n↪ Direkter gbrt-Start fehlgeschlagen — versuche es "
+            # dhrt vorhanden, aber Start fehlgeschlagen -> ueber gbrun.py.
+            self.append("\n↪ Direkter dhrt-Start fehlgeschlagen — versuche es "
                         "ueber gbrun.py …\n\n", "muted")
         elif frozen:
-            # Installierte App: KEIN gbrun.py-Fallback (kein Python). gbrt.exe
+            # Installierte App: KEIN gbrun.py-Fallback (kein Python). dhrt.exe
             # sollte neben GameBasic.exe liegen.
-            self.append("✖ gbrt.exe nicht gefunden — sie sollte neben "
+            self.append("✖ dhrt.exe nicht gefunden — sie sollte neben "
                         "GameBasic.exe liegen. Bitte GameBasic neu installieren.\n",
                         "error")
             return None
         else:
-            self.append("ℹ gbrt nicht gefunden — starte ueber gbrun.py.  "
+            self.append("ℹ dhrt nicht gefunden — starte ueber gbrun.py.  "
                         "(Nativ bauen: .venv\\Scripts\\python.exe "
                         "rust\\build_runtime.py)\n\n", "muted")
         # Fallback ohne erneutes Clear, damit der Hinweis (und ein evtl.
-        # gbrt-Compile-Fehler) sichtbar bleibt.
+        # dhrt-Compile-Fehler) sichtbar bleibt.
         if self.start_run(file_path, clear=False):
             return "py"
         return None
 
-    def _start_native(self, file_path: Path, gbrt: Path) -> bool:
-        """Fuehrt die Datei mit `gbrt run` aus -- gbrts EIGENES Rust-Frontend
+    def _start_native(self, file_path: Path, dhrt: Path) -> bool:
+        """Fuehrt die Datei mit `dhrt run` aus -- dhrts EIGENES Rust-Frontend
         (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr. So laufen
-        auch gbrt-only-Builtins (die der Python-Compiler nicht kennt). Direkt als
-        QProcess, damit der Stop-Button gbrt selbst beendet. KEIN Clear / keine
-        gbrt-Suche (macht der Aufrufer). False bei Start-Fehler.
+        auch dhrt-only-Builtins (die der Python-Compiler nicht kennt). Direkt als
+        QProcess, damit der Stop-Button dhrt selbst beendet. KEIN Clear / keine
+        dhrt-Suche (macht der Aufrufer). False bei Start-Fehler.
 
-        gbrt wechselt selbst ins Datei-Verzeichnis (relative Assets) und nutzt den
+        dhrt wechselt selbst ins Datei-Verzeichnis (relative Assets) und nutzt den
         Dateinamen fuer Fehler-Labels -- Compile- UND Laufzeitfehler erscheinen als
         `datei.gb:Zeile`, sodass der Editor sie klickbar macht."""
         # Vor dem Start setzen, damit der `datei.gb:Zeile`-Link auf diese Datei
-        # springt (gilt auch fuer gbrt-Compile-Fehler).
+        # springt (gilt auch fuer dhrt-Compile-Fehler).
         self._current_run_file = file_path
-        self.append(f"▶ Nativ (gbrt): {file_path.name}\n\n", "info")
+        self.append(f"▶ Nativ (dhrt): {file_path.name}\n\n", "info")
         self._user_stopped = False
         self._native_gbc = None
 
         proc = QProcess(self)
         proc.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
-        # Arbeitsverzeichnis = Quell-Ordner (gbrt chdir't ohnehin selbst dorthin).
+        # Arbeitsverzeichnis = Quell-Ordner (dhrt chdir't ohnehin selbst dorthin).
         proc.setWorkingDirectory(str(file_path.parent))
         proc.readyReadStandardOutput.connect(self._on_stdout)
         proc.finished.connect(self._on_finished)
         proc.errorOccurred.connect(self._on_error)
-        proc.start(str(gbrt), ["run", str(file_path)])
+        proc.start(str(dhrt), ["run", str(file_path)])
         if not proc.waitForStarted(3000):
-            self.append("Konnte gbrt nicht starten.\n", "error")
+            self.append("Konnte dhrt nicht starten.\n", "error")
             return False
         self._proc = proc
         self.input_entry.setEnabled(True)

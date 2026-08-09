@@ -1,7 +1,7 @@
 """Tests fuer das sprite-Modul (Sprite-Logik: Position/Velocity/Animation/Kollision).
 
-Golden-Tests gegen `gbrt` (Stufe B): das Sprite braucht ein IMAGE-Handle -- wir
-erzeugen es headless via GENTEX_COLOR (gbrt zieht dafuer ein lazy verstecktes
+Golden-Tests gegen `dhrt` (Stufe B): das Sprite braucht ein IMAGE-Handle -- wir
+erzeugen es headless via GENTEX_COLOR (dhrt zieht dafuer ein lazy verstecktes
 Fenster hoch). SPRITE_DRAW selbst wird nicht getestet (rein nativ). Tests, die
 fueher interne Felder lasen (`sprite.flip_x`/`scale_x`/`tinted`/`tint_color`),
 ohne GB-Getter, sind auf No-Crash-Smoke + Validierung reduziert. Frueher via

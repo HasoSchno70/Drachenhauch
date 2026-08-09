@@ -1,6 +1,6 @@
 """Tests fuer Core-Built-ins (Math, Strings, Bitwise, Time, Collides).
 
-Golden-Tests gegen `gbrt` (Stufe B): PRINT <builtin-call> + Soll-Ausgabe.
+Golden-Tests gegen `dhrt` (Stufe B): PRINT <builtin-call> + Soll-Ausgabe.
 Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import math
@@ -52,7 +52,7 @@ def test_min_max_variadic(run_gb):
 
 
 def test_min_empty_raises(run_gb):
-    # gbrt-Wortlaut: "mind. 1 Argument" (TW sagte ">= 1").
+    # dhrt-Wortlaut: "mind. 1 Argument" (TW sagte ">= 1").
     with pytest.raises(GBRuntimeError, match="mind. 1"):
         run_gb("PRINT MIN()\n")
 

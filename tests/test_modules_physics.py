@@ -1,6 +1,6 @@
 """Tests fuer das Physics-Modul (pure Collision-/Vektor-/Ray-Funktionen).
 
-Golden-Tests gegen `gbrt` (Stufe B): IMPORT "physics" + PRINT. Frueher via
+Golden-Tests gegen `dhrt` (Stufe B): IMPORT "physics" + PRINT. Frueher via
 `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 

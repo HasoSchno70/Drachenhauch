@@ -1,6 +1,6 @@
 """Modul `chart` -- Diagramme (Kuchen/Balken/Linie/Tacho).
 
-Golden-Tests gegen gbrt. Gezeichnet wird hier nichts (das braucht ein
+Golden-Tests gegen dhrt. Gezeichnet wird hier nichts (das braucht ein
 Fenster) -- geprueft werden Aufbau, Daten, Kennzahlen und vor allem die
 Fehlermeldungen der vier Stil-Setter, denn deren Schluessel sind Strings
 und darum die einzige Stelle, an der ein Tippfehler erst zur Laufzeit

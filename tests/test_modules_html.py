@@ -1,8 +1,8 @@
 """Tests fuer das html-Modul (HTTP-Client + URL-Helpers + HTML-Parser).
 
-Golden-Tests gegen `gbrt` (Stufe B): HTTP-Pfade laufen gegen einen lokalen
+Golden-Tests gegen `dhrt` (Stufe B): HTTP-Pfade laufen gegen einen lokalen
 Mock-Server (ThreadingHTTPServer im pytest-Prozess); das GB-Programm laeuft im
-gbrt-Subprozess und macht echte localhost-Requests dorthin. URL-/HTML-Parser sind
+dhrt-Subprozess und macht echte localhost-Requests dorthin. URL-/HTML-Parser sind
 pure. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import contextlib

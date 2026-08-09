@@ -126,7 +126,7 @@ PRINT C.NONEXISTENT
 
 
 def test_duplicate_static_rejected_at_compile(run_gb):
-    """Doppelte STATIC CONST werden beim Compile (gbrt) abgelehnt."""
+    """Doppelte STATIC CONST werden beim Compile (dhrt) abgelehnt."""
     from gamebasic.errors import GBRuntimeError
     with pytest.raises(GBRuntimeError, match="doppelt"):
         run_gb('CLASS C\n'
@@ -136,7 +136,7 @@ def test_duplicate_static_rejected_at_compile(run_gb):
 
 
 def test_static_non_literal_rejected(run_gb):
-    """STATIC CONST mit Ausdruck statt Literal -> Compile-Fehler (gbrt)."""
+    """STATIC CONST mit Ausdruck statt Literal -> Compile-Fehler (dhrt)."""
     from gamebasic.errors import GBRuntimeError
     with pytest.raises(GBRuntimeError, match="Literal"):
         run_gb('CLASS C\n'

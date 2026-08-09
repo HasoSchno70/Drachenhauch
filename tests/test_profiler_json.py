@@ -1,6 +1,6 @@
-"""JSON-Extraktion des Profilers (Qt-/gbrt-frei -- laeuft immer).
+"""JSON-Extraktion des Profilers (Qt-/dhrt-frei -- laeuft immer).
 
-`gbrt profile` liefert das Ergebnis als eine JSON-Zeile, aber raylib schreibt
+`dhrt profile` liefert das Ergebnis als eine JSON-Zeile, aber raylib schreibt
 seine TraceLogs (WARNING/INFO) ebenfalls auf stdout. `_extract_profile_json`
 muss den JSON-Blob trotzdem zuverlaessig herausziehen -- sonst bleibt die
 Auswertung leer (Regression 99_ibl_hdr.gb: `MESH_SPHERE` loest eine

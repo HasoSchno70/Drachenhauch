@@ -6,16 +6,16 @@ from pathlib import Path
 import pytest
 
 
-def _find_gbrt():
+def _find_dhrt():
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _run(src: str, tmp_path, frames: int | None = None):
@@ -23,8 +23,8 @@ def _run(src: str, tmp_path, frames: int | None = None):
     p.write_text(src, encoding="utf-8")
     env = dict(os.environ)
     if frames is not None:
-        env["GBRT_FRAMES"] = str(frames)
-    return subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
+        env["DHRT_FRAMES"] = str(frames)
+    return subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                           encoding="utf-8", env=env, timeout=60)
 
 

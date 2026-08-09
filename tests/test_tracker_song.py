@@ -16,8 +16,8 @@ from gamebasic.tracker import (
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for v in ("release", "debug"):
         p = _ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
         if p.exists():
@@ -25,17 +25,17 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 
 
 def _check_compiles(tmp_path, src):
-    """Der exportierte GB-Code muss in gbrt kompilieren (`gbrt --check`,
+    """Der exportierte GB-Code muss in dhrt kompilieren (`dhrt --check`,
     leere Fehlerliste). Frueher via Python-Compiler (in Phase 8 geloescht)."""
-    if _GBRT is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if _DHRT is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     fd = tmp_path / "_track.gb"
     fd.write_text(src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--check", str(fd)], capture_output=True,
+    r = subprocess.run([str(_DHRT), "--check", str(fd)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     diags = json.loads(r.stdout or "[]")
     errs = [d for d in diags if d.get("severity") == "error"]

@@ -7,7 +7,7 @@
 //! hinweg zu halten (Borrow-Checker) und braucht keine Render-Texture.
 //!
 //! Pixel-Output ist renderer-abhaengig (raylib/GPU) und nicht golden-testbar
-//! -- verifiziert wird per Headless-Screenshot (GBRT_FRAMES/GBRT_SCREENSHOT);
+//! -- verifiziert wird per Headless-Screenshot (DHRT_FRAMES/DHRT_SCREENSHOT);
 //! deterministisch testbar ist nur `PRINT`/stdout.
 
 use std::collections::HashMap;
@@ -987,7 +987,7 @@ pub struct Graphics {
     fonts: Vec<Font>,
     // Render-Groesse je geladenem Font (parallel zu `fonts`). Von LOADFONT
     // gesetzt -> SETFONT uebernimmt sie als text_size (ergonomisch: die in
-    // LOADFONT gewaehlte Groesse "wirkt" direkt). 0 = Sentinel (GBRT_FONT-
+    // LOADFONT gewaehlte Groesse "wirkt" direkt). 0 = Sentinel (DHRT_FONT-
     // Default): NICHT auto-anwenden, damit der hoch gebackene Default bei der
     // programmweiten text_size bleibt.
     font_sizes: Vec<i32>,
@@ -999,7 +999,7 @@ pub struct Graphics {
     pub frame_count: u64,
     max_frames: Option<u64>,
     screenshot: Option<String>,
-    // --- Kontaktbogen (GBRT_CONTACT) ---------------------------------------
+    // --- Kontaktbogen (DHRT_CONTACT) ---------------------------------------
     // Ein einzelner Screenshot zeigt einen AUGENBLICK. Vieles geht aber erst
     // ueber die Zeit schief: etwas kippt zu frueh um, ein Rand bleibt stehen,
     // eine Bewegung ruckelt. Der Kontaktbogen nimmt in festen Abstaenden Bilder
@@ -1079,12 +1079,12 @@ impl Graphics {
     /// Das (bereits erzeugte) Fenster den ganzen aktuellen Monitor abdecken lassen:
     /// auf native Aufloesung umkonfigurieren und an die Monitor-Ecke setzen. Fuer
     /// transparente Vollbild-Overlays (Monitor-Query braucht ein offenes Fenster,
-    /// darum NACH der Erzeugung). GBRT_SCALE wird wie bei SCREEN_NATIVE respektiert.
+    /// darum NACH der Erzeugung). DHRT_SCALE wird wie bei SCREEN_NATIVE respektiert.
     pub fn cover_current_monitor(&mut self, title: &str) {
         let m = get_current_monitor();
         let mw = get_monitor_width(m).max(1);
         let mh = get_monitor_height(m).max(1);
-        let scale = std::env::var("GBRT_SCALE").ok()
+        let scale = std::env::var("DHRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(1);
         let lw = (mw / scale).max(1);
         let lh = (mh / scale).max(1);
@@ -1098,9 +1098,9 @@ impl Graphics {
     }
 
     fn new_impl(width: i32, height: i32, title: &str, scale: i32, hidden: bool, transparent: bool) -> Graphics {
-        // GBRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
+        // DHRT_SCALE erlaubt es, JEDEN SCREEN-Aufruf hochskaliert zu rendern
         // (z.B. fuer scharfe Buch-Screenshots), ohne die .gb-Quelle zu aendern.
-        let scale = std::env::var("GBRT_SCALE").ok()
+        let scale = std::env::var("DHRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
         let win_w = width * scale;
         let win_h = height * scale;
@@ -1127,20 +1127,20 @@ impl Graphics {
         // eigener Aufruf tut es zuverlaessig.
         #[cfg(target_os = "emscripten")]
         web_leinwand_groesse(win_w, win_h);
-        // Headless-Verifizierung: GBRT_FRAMES begrenzt die Frames, GBRT_SCREENSHOT
+        // Headless-Verifizierung: DHRT_FRAMES begrenzt die Frames, DHRT_SCREENSHOT
         // legt den PNG-Pfad fest (Screenshot beim letzten Frame).
-        let max_frames = std::env::var("GBRT_FRAMES").ok().and_then(|s| s.parse().ok());
-        let screenshot = std::env::var("GBRT_SCREENSHOT").ok();
-        // Kontaktbogen: GBRT_CONTACT=pfad.png. Ohne eigene Angaben verteilt er
-        // GBRT_CONTACT_MAX Bilder gleichmaessig ueber GBRT_FRAMES -- man setzt
+        let max_frames = std::env::var("DHRT_FRAMES").ok().and_then(|s| s.parse().ok());
+        let screenshot = std::env::var("DHRT_SCREENSHOT").ok();
+        // Kontaktbogen: DHRT_CONTACT=pfad.png. Ohne eigene Angaben verteilt er
+        // DHRT_CONTACT_MAX Bilder gleichmaessig ueber DHRT_FRAMES -- man setzt
         // also im Normalfall nur zwei Umgebungsvariablen und bekommt einen
         // Ueberblick ueber den ganzen Lauf.
-        let contact_path = std::env::var("GBRT_CONTACT").ok();
-        let contact_max: usize = std::env::var("GBRT_CONTACT_MAX").ok()
+        let contact_path = std::env::var("DHRT_CONTACT").ok();
+        let contact_max: usize = std::env::var("DHRT_CONTACT_MAX").ok()
             .and_then(|s| s.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(12);
-        let contact_cols: usize = std::env::var("GBRT_CONTACT_COLS").ok()
+        let contact_cols: usize = std::env::var("DHRT_CONTACT_COLS").ok()
             .and_then(|s| s.parse().ok()).filter(|&n: &usize| n > 0).unwrap_or(4);
-        let contact_every: u64 = std::env::var("GBRT_CONTACT_EVERY").ok()
+        let contact_every: u64 = std::env::var("DHRT_CONTACT_EVERY").ok()
             .and_then(|s| s.parse().ok()).filter(|&n: &u64| n > 0)
             .or_else(|| max_frames.map(|mx: u64| (mx / contact_max as u64).max(1)))
             .unwrap_or(30);
@@ -1251,10 +1251,10 @@ impl Graphics {
             auto_injected_keys: Vec::new(),
             key_names: HashMap::new(),
         };
-        // GBRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
+        // DHRT_FONT setzt einen TTF als Default-Font (scharfe Schrift in
         // Screenshots statt der pixeligen raylib-Bitmap-Schrift). Basis-Groesse
         // an die Skala gekoppelt, damit Text bei sz*scale knackig bleibt.
-        if let Ok(fp) = std::env::var("GBRT_FONT") {
+        if let Ok(fp) = std::env::var("DHRT_FONT") {
             if !fp.is_empty() {
                 let bake = (32 * scale.max(1)).clamp(32, 256);
                 if let Ok(h) = g.load_font_ext(&fp, bake) {
@@ -1269,12 +1269,12 @@ impl Graphics {
     /// sichtbar machen und auf die gewuenschte Groesse/Titel umstellen, statt ein
     /// zweites raylib-Fenster zu erzeugen (raylib paniced bei Doppel-Init).
     pub fn reconfigure(&mut self, width: i32, height: i32, title: &str, scale: i32) {
-        let scale = std::env::var("GBRT_SCALE").ok()
+        let scale = std::env::var("DHRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(scale);
         self.reconfigure_raw(width, height, title, scale);
     }
 
-    /// Wie `reconfigure`, aber `scale` wird direkt uebernommen (kein GBRT_SCALE-
+    /// Wie `reconfigure`, aber `scale` wird direkt uebernommen (kein DHRT_SCALE-
     /// Override). Gemeinsame Basis fuer SCREEN und SCREEN_NATIVE.
     fn reconfigure_raw(&mut self, width: i32, height: i32, title: &str, scale: i32) {
         self.width = width;
@@ -1294,7 +1294,7 @@ impl Graphics {
     /// Backbuffer auf den Monitor hochskaliert -> unscharf) rendert die Szene hier
     /// 1:1 in nativen Pixeln: logisches Raster = Monitor-Aufloesung, scene_rt und
     /// Replay-Viewport sind nativ gross. SCREENWIDTH()/HEIGHT() liefern dann die
-    /// Monitor-Aufloesung. GBRT_SCALE (Dev-Screenshot-Knopf) wird respektiert:
+    /// Monitor-Aufloesung. DHRT_SCALE (Dev-Screenshot-Knopf) wird respektiert:
     /// das logische Raster wird entsprechend geteilt, das Fenster bleibt nativ.
     ///
     /// Wir nutzen BORDERLESS-WINDOWED (randloses Fenster ueber den ganzen Monitor),
@@ -1306,7 +1306,7 @@ impl Graphics {
         let m = get_current_monitor();
         let mw = get_monitor_width(m).max(1);
         let mh = get_monitor_height(m).max(1);
-        let scale = std::env::var("GBRT_SCALE").ok()
+        let scale = std::env::var("DHRT_SCALE").ok()
             .and_then(|s| s.parse::<i32>().ok()).filter(|&n| n >= 1).unwrap_or(1);
         let lw = (mw / scale).max(1);
         let lh = (mh / scale).max(1);
@@ -2728,7 +2728,7 @@ impl Graphics {
 
     /// Wie `load_font`, aber mit erweitertem Zeichensatz (ASCII + Latin-1 +
     /// gaengige Typografie/Pfeile) statt nur den 95 ASCII-Glyphen. Fuer den
-    /// per `GBRT_FONT` gesetzten Default-Font, damit deutsche Umlaute (ä ö ü ß)
+    /// per `DHRT_FONT` gesetzten Default-Font, damit deutsche Umlaute (ä ö ü ß)
     /// und Buch-Sonderzeichen („ " … – · → …) gerendert werden.
     fn load_font_ext(&mut self, path: &str, size: i32) -> Result<i64, String> {
         let mut chars = String::new();
@@ -2736,7 +2736,7 @@ impl Graphics {
         for c in 0xA0u32..=0xFFu32 { chars.push(char::from_u32(c).unwrap()); }
         chars.push_str("…–—„“”‚‘’·•°→←↑↓×÷≈≠≤≥");
         let f = self.rl.load_font_ex(&self.thread, path, size.max(4), Some(&chars))
-            .map_err(|e| format!("GBRT_FONT '{}' nicht ladbar: {}", path, e))?;
+            .map_err(|e| format!("DHRT_FONT '{}' nicht ladbar: {}", path, e))?;
         unsafe { raylib::ffi::SetTextureFilter(f.texture, 1 /*BILINEAR*/); }
         self.fonts.push(f);
         self.font_sizes.push(0);   // Sentinel: Default-Font wendet seine Groesse NICHT an
@@ -3846,7 +3846,7 @@ hand/resize_ew/resize_ns/resize_nwse/resize_nesw/resize_all/not_allowed", other)
     pub fn screen_height(&self) -> i64 { (self.rl.get_screen_height() / self.scale.max(1)) as i64 }
 
     // --- Game-Loop-Grundlagen ---
-    // Headless (GBRT_FRAMES gesetzt): fester Schritt 1/60 s -> zeitbasierte
+    // Headless (DHRT_FRAMES gesetzt): fester Schritt 1/60 s -> zeitbasierte
     // Spiele laufen deterministisch und sind per Screenshot/Frame testbar
     // (echtes get_frame_time ist ohne Vsync ~0). Sonst echte Frame-Zeit.
     pub fn delta(&self) -> f64 {

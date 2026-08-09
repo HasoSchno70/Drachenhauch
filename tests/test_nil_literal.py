@@ -11,7 +11,7 @@ from gamebasic.tokens import TokenType
 from gamebasic.ast_nodes import NilLit
 
 
-# --- Laufzeit-Semantik (gbrt) -------------------------------------------
+# --- Laufzeit-Semantik (dhrt) -------------------------------------------
 
 def test_is_nil_of_nil_literal(run_gb):
     assert run_gb("PRINT IS_NIL(NIL)\n") == "TRUE\n"

@@ -60,14 +60,14 @@ class _DiagWorker:
     Qt-Signals ruft das Ergebnis einen einfachen Callback auf.
 
     Review-Fund: `LspServer._publish_diagnostics` rief `F.diagnostics(...)`
-    bisher DIREKT aus `handle()` auf -- das laeuft (bei gebautem gbrt) durch
-    `gbrt --check` als blockierenden Subprozess mit bis zu 15s Timeout.
+    bisher DIREKT aus `handle()` auf -- das laeuft (bei gebautem dhrt) durch
+    `dhrt --check` als blockierenden Subprozess mit bis zu 15s Timeout.
     `serve()`s Lese-Loop ist strikt sequentiell: WAEHREND dieser Subprozess
     laeuft, kann der Server absolut nichts anderes verarbeiten -- kein Hover,
     keine Completion, keine neuere didChange. Bei normalem Tippen (jeder
     Tastendruck sendet ein volles didChange, Full-Sync) sammeln sich so
     Subprozess-Aufrufe seriell an; ein einzelner haengender/langsamer
-    gbrt-Aufruf friert den GESAMTEN Server ein. Jetzt laeuft der eigentliche
+    dhrt-Aufruf friert den GESAMTEN Server ein. Jetzt laeuft der eigentliche
     Check in einem Daemon-Thread; `check()` selbst kehrt sofort zurueck."""
 
     def __init__(self, on_result):
@@ -83,7 +83,7 @@ class _DiagWorker:
             proc = self._active_proc
         # Einen noch laufenden Check-Subprozess abbrechen, nicht nur dessen
         # (dann veraltetes) Ergebnis verwerfen -- sonst koennten sich bei
-        # schnellem Tippen mehrere `gbrt --check`-Prozesse gleichzeitig
+        # schnellem Tippen mehrere `dhrt --check`-Prozesse gleichzeitig
         # ansammeln (identisches Muster zu LiveErrorChecker.check).
         if proc is not None:
             try:

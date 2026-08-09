@@ -205,7 +205,7 @@ END SUB
 ' ----------------------------------------------------------------------
 '  SZENE 1 -- Titel: Plasma, Logo, Sinus-Scroller
 ' ----------------------------------------------------------------------
-CONST SCROLLTEXT AS STRING = "GAME BASIC GRUESST DIE WELT ...   EIN BASIC MIT PASCAL-STRENGER TYPISIERUNG UND OOP, GEBAUT FUER SPIELE ...   ALLES, WAS DU HIER SIEHST UND HOERST, LAEUFT IN EINER EINZIGEN LAUFZEIT: GBRT, IN RUST GESCHRIEBEN, MIT RAYLIB UND KIRA ...   DIE MUSIK IST EIN ECHTES PROTRACKER-MODUL, IN ECHTZEIT GESTREAMT ...   UND DAS BILD TANZT AUF DEM ECHTEN SPEKTRUM, NICHT AUF EINEM ZAEHLER ...   VIEL SPASS!        "
+CONST SCROLLTEXT AS STRING = "GAME BASIC GRUESST DIE WELT ...   EIN BASIC MIT PASCAL-STRENGER TYPISIERUNG UND OOP, GEBAUT FUER SPIELE ...   ALLES, WAS DU HIER SIEHST UND HOERST, LAEUFT IN EINER EINZIGEN LAUFZEIT: DHRT, IN RUST GESCHRIEBEN, MIT RAYLIB UND KIRA ...   DIE MUSIK IST EIN ECHTES PROTRACKER-MODUL, IN ECHTZEIT GESTREAMT ...   UND DAS BILD TANZT AUF DEM ECHTEN SPEKTRUM, NICHT AUF EINEM ZAEHLER ...   VIEL SPASS!        "
 
 SUB szene_titel()
     modus = 1.0                     ' Plasma-Hintergrund im Post-Effekt
@@ -1296,7 +1296,7 @@ abspann[8] = "Tunnel, Spektrum-Ring und Render-Target-Stempel"
 abspann[9] = "eine Effektkette, die man am Spektrum sieht"
 abspann[10] = ""
 abspann[11] = "*Alles in einer Laufzeit*"
-abspann[12] = "gbrt - Rust, raylib und Kira"
+abspann[12] = "dhrt - Rust, raylib und Kira"
 abspann[13] = "Lexer, Parser, Compiler und VM in einem"
 abspann[14] = ""
 abspann[15] = "*Musik*"

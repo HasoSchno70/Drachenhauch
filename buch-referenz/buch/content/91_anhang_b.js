@@ -1,5 +1,5 @@
 // Anhang B -- Tastencodes (KEY_* / JOY_*). Werte aus gamebasic/graphics.py KEYS,
-// gegen gbrt verifiziert.
+// gegen dhrt verifiziert.
 module.exports = (H) => {
   const row = (name, code, note) => [{ text: name, mono: true }, { text: String(code), mono: true }, note || ""];
   const T = (rows) => H.table(rows, {

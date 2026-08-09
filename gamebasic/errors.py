@@ -2,11 +2,11 @@
 
 Nur noch drei Typen: `LexerError` und `ParseError` aus der Editor-Schicht
 (Lexer/Parser bedienen Highlighting, LSP, Error-Check, Folding, Formatter),
-`GBRuntimeError` fuer alles, was `conftest.run_gb` aus gbrts stderr
+`GBRuntimeError` fuer alles, was `conftest.run_gb` aus dhrts stderr
 zurueckuebersetzt.
 
 Entfernt: `TypeMismatchError` (seit dem Wegfall des Python-Tree-Walkers kann
-es niemand mehr werfen -- Typpruefung passiert ausschliesslich in gbrt) und
+es niemand mehr werfen -- Typpruefung passiert ausschliesslich in dhrt) und
 `GameBasicError.set_line()` (hatte projektweit keinen einzigen Aufrufer).
 """
 

@@ -1,8 +1,8 @@
-"""Stufe B, Phase 3c: interaktiver Debugger `gbrt debug`.
+"""Stufe B, Phase 3c: interaktiver Debugger `dhrt debug`.
 
 Skriptet eine stdin-Kommandosession und prueft die stdout-Events
 (paused/output/eval-result/finished) inkl. Variablen-Snapshot + Stepping.
-Skippt, wenn gbrt nicht gebaut ist.
+Skippt, wenn dhrt nicht gebaut ist.
 """
 import json
 import os
@@ -14,9 +14,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -24,17 +24,17 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="gbrt nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 
 def _debug_session(tmp_path, src, cmds):
     """Schreibt src, fuettert cmds (Liste von dicts) als stdin-Zeilen an
-    `gbrt debug`, gibt die stdout-Events (Liste von dicts) zurueck."""
+    `dhrt debug`, gibt die stdout-Events (Liste von dicts) zurueck."""
     f = tmp_path / "d.gb"
     f.write_text(src, encoding="utf-8")
     stdin = "".join(json.dumps(c) + "\n" for c in cmds)
-    r = subprocess.run([str(_GBRT), "debug", str(f)], input=stdin,
+    r = subprocess.run([str(_DHRT), "debug", str(f)], input=stdin,
                        capture_output=True, text=True, timeout=30)
     return [json.loads(line) for line in r.stdout.splitlines() if line.strip()]
 

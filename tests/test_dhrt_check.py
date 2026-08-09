@@ -1,8 +1,8 @@
-"""Stufe B, Phase 4-Vorbereitung: `gbrt --check` Diagnostik.
+"""Stufe B, Phase 4-Vorbereitung: `dhrt --check` Diagnostik.
 
-Verifiziert, dass gbrt gueltigen Code sauber meldet ([]) und die strukturellen
+Verifiziert, dass dhrt gueltigen Code sauber meldet ([]) und die strukturellen
 Compile-/Syntax-Fehler MIT Zeilennummer liefert (Voraussetzung, um die Editor/
-LSP-Diagnostik vom Python-Compiler auf gbrt umzustellen). Skippt ohne gbrt.
+LSP-Diagnostik vom Python-Compiler auf dhrt umzustellen). Skippt ohne dhrt.
 """
 import json
 import os
@@ -15,9 +15,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLES = _ROOT / "examples"
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -25,14 +25,14 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="gbrt nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 
 def _check(tmp_path, src):
     f = tmp_path / "c.gb"
     f.write_text(src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--check", str(f)],
+    r = subprocess.run([str(_DHRT), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, r.stderr      # Exit 0 auch bei Diagnosen
     return json.loads(r.stdout)
@@ -68,7 +68,7 @@ def test_all_examples_check_clean():
     for f in sorted(_EXAMPLES.glob("*.gb")):
         if "_smoketest" in f.name:
             continue
-        r = subprocess.run([str(_GBRT), "--check", str(f)],
+        r = subprocess.run([str(_DHRT), "--check", str(f)],
                            capture_output=True, text=True, timeout=30)
         diags = json.loads(r.stdout or "[]")
         errors = [d for d in diags if d.get("severity") != "warning"]
@@ -79,7 +79,7 @@ def test_all_examples_check_clean():
 
 def test_examples_use_no_unknown_builtin():
     """Drift-Schutz fuer builtin_index.json: KEIN Beispiel ruft ein Builtin auf,
-    das gbrt nicht kennt. Schlaegt fehl, sobald ein neues gbrt-Builtin benutzt,
+    das dhrt nicht kennt. Schlaegt fehl, sobald ein neues dhrt-Builtin benutzt,
     aber nicht im Index ergaenzt wurde (-> der Index bleibt vollstaendig, sonst
     wuerde gueltiger Code faelschlich die 'Unbekanntes Builtin'-Warnung kriegen).
     Greift Hand in Hand mit compiler::is_known_builtin (G1, systemisch)."""
@@ -87,14 +87,14 @@ def test_examples_use_no_unknown_builtin():
     for f in sorted(_EXAMPLES.rglob("*.gb")):
         if "_smoketest" in f.name:
             continue
-        r = subprocess.run([str(_GBRT), "--check", str(f)],
+        r = subprocess.run([str(_DHRT), "--check", str(f)],
                            capture_output=True, text=True, timeout=30)
         diags = json.loads(r.stdout or "[]")
         for d in diags:
             if "Unbekanntes Builtin" in d.get("message", ""):
                 drift.append((f.name, d.get("line"), d.get("message")))
     assert not drift, (
-        "Beispiele nutzen Builtins, die gbrt nicht (im builtin_index.json) "
+        "Beispiele nutzen Builtins, die dhrt nicht (im builtin_index.json) "
         f"kennt -> Index ergaenzen: {drift}")
 
 
@@ -114,7 +114,7 @@ def test_hardware_import_warns_at_import(tmp_path):
 
 
 def test_unknown_builtin_warns(tmp_path):
-    """G1 (systemisch): Aufruf eines Builtins, das gbrt nicht kennt (Tippfehler
+    """G1 (systemisch): Aufruf eines Builtins, das dhrt nicht kennt (Tippfehler
     oder nur-Tree-Walker wie frueher FLT), wird schon von --check als Warnung
     gemeldet -- nicht erst zur Laufzeit."""
     d = _check(tmp_path, 'DIM x AS INTEGER\nx = NOTAREALBUILTIN(5)\n')
@@ -193,7 +193,7 @@ def test_kein_beispiel_loest_die_dim_warnung_aus():
     """Eine neue Warnung, die auf dem eigenen Bestand losgeht, ist Laerm."""
     laut = []
     for f in sorted(_EXAMPLES.rglob("*.gb")):
-        r = subprocess.run([str(_GBRT), "--check", str(f)],
+        r = subprocess.run([str(_DHRT), "--check", str(f)],
                            capture_output=True, text=True, timeout=60)
         for d in json.loads(r.stdout or "[]"):
             if d.get("severity") == "warning" and "schon als" in d.get("message", ""):

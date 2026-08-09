@@ -2,7 +2,7 @@
 
 Vollständige Referenz für die Sprache GameBasic, alle eingebauten Befehle und alle Built-in-Module.
 
-GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`gbrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
+GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
 
 ## Inhalt
 
@@ -14,13 +14,13 @@ GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgele
 
 - **[Standard-Built-ins](builtins-core.md)** — Math, Strings, Bitwise, Maps, File-I/O, Konvertierung, Zeit/Random
 - **[Grafik-Built-ins](builtins-grafik.md)** — SCREEN, CLS, BOX, CIRCLE, LOADIMAGE, Sound, Tilemap, Eingabe, **`LOAD_ASSETS`** (Bulk-Preloader), **Sprite-Atlas + Batch-Draw**, **Z-Layer-Rendering**
-- **[Performance](PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `gbrt`)
+- **[Performance](PERFORMANCE.md)** — historische Bench-Zahlen + Liste umgesetzter Optimierungen (die verglichenen Python-Pfade sind seit Stufe B entfernt; Produktion = `dhrt`)
 
 ### Module
 
 Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle bereit.
 
-> **Alle Module laufen auch in der nativen Runtime (gbrt)** — die meisten sind dort immer dabei; `db`/`net`/`http` (= `html`) sind im Standard-Dev-Build (`python rust/build_runtime.py`) schon dabei, Hardware (`serial`/`usb`/`wifi`/`bt`) kommt zusätzlich mit `--hardware` dazu. Jede Modul-Doku hat unten einen Abschnitt **„In der nativen Runtime (gbrt)"** mit Feature-Flag und Eigenheiten; Überblick in [rust-runtime.md](rust-runtime.md).
+> **Alle Module laufen auch in der nativen Runtime (dhrt)** — die meisten sind dort immer dabei; `db`/`net`/`http` (= `html`) sind im Standard-Dev-Build (`python rust/build_runtime.py`) schon dabei, Hardware (`serial`/`usb`/`wifi`/`bt`) kommt zusätzlich mit `--hardware` dazu. Jede Modul-Doku hat unten einen Abschnitt **„In der nativen Runtime (dhrt)"** mit Feature-Flag und Eigenheiten; Überblick in [rust-runtime.md](rust-runtime.md).
 
 | Modul | Was es kann | Doku |
 |---|---|---|
@@ -77,7 +77,7 @@ Speichern als `hallo.gb`, dann:
 
 ## Erstes Spiel
 
-Ein minimaler Game-Loop (Grafik läuft in der nativen Runtime gbrt):
+Ein minimaler Game-Loop (Grafik läuft in der nativen Runtime dhrt):
 
 ```basic
 SCREEN(320, 240, "Mein erstes Spiel", 2)

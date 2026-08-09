@@ -1,9 +1,9 @@
 //! Lexer/Tokenizer fuer GameBasic -- Rust-Port von `gamebasic/lexer.py` +
 //! `tokens.py`. Erster Schritt der Front-End-Portierung (Lexer -> Parser ->
-//! Compiler), damit `gbrt` perspektivisch ohne Python aus Quelltext Bytecode
+//! Compiler), damit `dhrt` perspektivisch ohne Python aus Quelltext Bytecode
 //! erzeugt.
 //!
-//! Verifiziert gegen den Python-Lexer ueber `gbrt --tokens` (kanonischer
+//! Verifiziert gegen den Python-Lexer ueber `dhrt --tokens` (kanonischer
 //! JSON-Dump `[TYP, wert, zeile]` pro Token) vs. Python -- siehe
 //! `tests/test_rust_lexer_parity.py`. Case-insensitive (Keywords + Idents
 //! lowercase), `'`/`REM` Kommentare, signifikante Newlines, implizite

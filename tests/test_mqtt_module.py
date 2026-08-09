@@ -17,7 +17,7 @@ import pytest
 
 
 def test_mqtt_builtins_registered():
-    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "mqtt_connect", "mqtt_disconnect", "mqtt_is_connected",
         "mqtt_publish", "mqtt_subscribe", "mqtt_update",

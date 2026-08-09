@@ -155,6 +155,6 @@ PRINT "Stars: ", JSON_GET_INT(info, "stargazers_count")
 
 Siehe [examples/41_html.gb](../examples/41_html.gb).
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `html` laeuft nativ mit dem Cargo-Feature `http` (HTTP via `ureq` inkl. TLS/https). URL-Encode/Decode und der HTML-Parser (`HTML_TEXT`/`HTML_FIND_ALL`/`HTML_GET_ATTR`) sind als Rust-Scanner portiert (funktional; bei kaputtem HTML nicht zwingend byte-gleich zu Pythons `html.parser`). Der Standard-Dev-Build enthaelt `http`.

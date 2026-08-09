@@ -1,13 +1,13 @@
 """Game-Loop- + Shader-Builtins: nur Registrierung.
 
 DELTA/FPS/SETFPS/SET_FULLSCREEN/SETWINDOWTITLE/SAVESCREENSHOT + SHADER_* sind
-raylib-Engine-Builtins (nativ in gbrt -- Timing/Fenster/GPU brauchen einen echten
+raylib-Engine-Builtins (nativ in dhrt -- Timing/Fenster/GPU brauchen einen echten
 Screen, daher kein Funktionstest via run_gb). Hier nur, dass die Builtins bekannt
-sind (eingefrorener gbrt-Metadaten-Index). Frueher prueften wir zusaetzlich die
+sind (eingefrorener dhrt-Metadaten-Index). Frueher prueften wir zusaetzlich die
 Python-Dispatch-Delegation an einen Graphics-Stub -- diese Python-Schicht wird in
 Phase 8 entfernt; das native Verhalten deckt die Beispiel-/Screenshot-Verifikation.
 """
-from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_gameloop_builtins_registered():

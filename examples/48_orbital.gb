@@ -633,7 +633,7 @@ WHILE NOT QUITREQUESTED()
     DIM scale AS FLOAT
     scale = TWEEN_VALUE(sun_pulse)
     ' Additives Blending laesst die Schichten zu einem weichen Bloom verschmelzen
-    ' (nativ in gbrt; im Tree-Walker wirft BLEND_MODE "nur gbrt").
+    ' (nativ in dhrt; im Tree-Walker wirft BLEND_MODE "nur dhrt").
     BLEND_MODE("add")
     CIRCLE(0, 0, 52 * scale, &H100A04)        ' weiter Halo-Schein
     CIRCLE(0, 0, 38 * scale, &H1A1009)

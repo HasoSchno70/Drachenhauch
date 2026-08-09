@@ -188,6 +188,6 @@ END IF
 
 [examples/77_tiled_platformer.gb](../examples/77_tiled_platformer.gb) — voller Platformer mit Controller, Tile-Kollision, Pickups, Tastatur + Gamepad.
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `controller` laeuft nativ (immer dabei) und ist **bit-identisch** zu den Python-Pfaden — die komplette Platformer-Physik (Coyote-Time, Jump-Buffer, Variable-Jump) wurde 1:1 portiert (ueber eine 40-Frame-Simulation verifiziert).

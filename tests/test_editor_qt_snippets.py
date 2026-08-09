@@ -152,12 +152,12 @@ def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
     from gamebasic.editor_qt.snippets import expand_snippet_full
 
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    gbrt = next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    dhrt = next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
-    if gbrt is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
 
     aufbau, _, _ = expand_snippet_full(SNIPPETS["tab"], "")
     abfrage, _, _ = expand_snippet_full(SNIPPETS["tabsel"], "")
@@ -170,7 +170,7 @@ def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
     )
     f = tmp_path / "snip.gb"
     f.write_text(quelle, encoding="utf-8")
-    r = subprocess.run([str(gbrt), "--check", str(f)], capture_output=True,
+    r = subprocess.run([str(dhrt), "--check", str(f)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     assert r.returncode == 0, r.stderr
     assert r.stdout.strip() in ("[]", ""), r.stdout

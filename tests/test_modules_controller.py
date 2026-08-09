@@ -1,6 +1,6 @@
 """Tests fuer controller-Modul (Platformer-Character-Controller).
 
-Golden-Tests gegen `gbrt` (Stufe B): Tiled-Map-Fixture in `tmp_path`, GB-Programm
+Golden-Tests gegen `dhrt` (Stufe B): Tiled-Map-Fixture in `tmp_path`, GB-Programm
 treibt den Controller ueber CHAR_SET_INPUT/CHAR_UPDATE-Frames und PRINTet die
 Zustaende. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """

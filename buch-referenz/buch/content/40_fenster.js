@@ -1,7 +1,7 @@
 module.exports = (H) => [
   H.part("Teil IV — Grafik, Sound & Spiele"),
   H.chapter("Das Fenster & der Game-Loop"),
-  H.p("Jetzt wird es bunt: In Teil IV verlässt du die Textkonsole und öffnest ein echtes Grafikfenster. Hier zeichnest du Formen und Bilder, spielst Töne ab, fragst Tastatur und Maus ab – kurz: Hier entstehen Spiele. All das übernimmt die Laufzeit gbrt; ein Grafikprogramm läuft also immer im gbrt-Fenster, nicht in der Konsole."),
+  H.p("Jetzt wird es bunt: In Teil IV verlässt du die Textkonsole und öffnest ein echtes Grafikfenster. Hier zeichnest du Formen und Bilder, spielst Töne ab, fragst Tastatur und Maus ab – kurz: Hier entstehen Spiele. All das übernimmt die Laufzeit dhrt; ein Grafikprogramm läuft also immer im dhrt-Fenster, nicht in der Konsole."),
   H.p("Bevor irgendetwas gezeichnet werden kann, muss ein Fenster geöffnet sein. Und weil ein Spiel sich ständig bewegt, läuft fast jedes Grafikprogramm in einer Schleife, die viele Male pro Sekunde ein neues Bild zeichnet. Dieses Kapitel erklärt beides: das Fenster und diesen Game-Loop."),
 
   H.h2("Ein Fenster öffnen: SCREEN"),

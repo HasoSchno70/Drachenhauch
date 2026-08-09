@@ -30,7 +30,7 @@ node build_book.js
 Die Bilder werden headless aus dem Spiel/den Beispielen erzeugt, z. B.:
 
 ```
-set GBRT_FRAMES=40
-set GBRT_SCREENSHOT=buch/images/galaga_titel.png
-gbrt run buch-galaga/code/galaga.gb
+set DHRT_FRAMES=40
+set DHRT_SCREENSHOT=buch/images/galaga_titel.png
+dhrt run buch-galaga/code/galaga.gb
 ```

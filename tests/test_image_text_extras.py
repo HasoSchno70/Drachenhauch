@@ -9,22 +9,22 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _run(src: str, tmp_path, frames: int = 2):
     p = tmp_path / "t.gb"
     p.write_text(src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
-                       encoding="utf-8", env=dict(os.environ, GBRT_FRAMES=str(frames)),
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
+                       encoding="utf-8", env=dict(os.environ, DHRT_FRAMES=str(frames)),
                        timeout=60, cwd=str(tmp_path))
     # raylib schreibt seine Meldungen auf STDOUT (bekannte Eigenheit, vgl.
     # profiler.py) -- ungefiltert landen sie mitten in der Programmausgabe.

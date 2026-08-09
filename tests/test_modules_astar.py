@@ -1,6 +1,6 @@
 """Tests fuer das astar-Modul (A*-Pathfinding).
 
-Golden-Tests gegen `gbrt` (Stufe B): jeder Test ist ein eigenstaendiges
+Golden-Tests gegen `dhrt` (Stufe B): jeder Test ist ein eigenstaendiges
 GB-Programm (DIM g AS ASTAR_GRID + Operationen + PRINT). Frueher via
 `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """

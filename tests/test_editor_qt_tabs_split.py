@@ -105,7 +105,7 @@ def test_theme_change_after_split_does_not_touch_dead_highlighter():
 
 def test_close_tab_cancels_live_error_check():
     """Review-Fund: close_tab() liess einen laufenden Live-Error-Check
-    (Worker-Thread + `gbrt --check`-Subprozess) unangetastet weiterlaufen
+    (Worker-Thread + `dhrt --check`-Subprozess) unangetastet weiterlaufen
     -- der haelt eine Referenz auf den Editor/sein Dokument bis zu 15s
     laenger als noetig am Leben."""
     area = _area()

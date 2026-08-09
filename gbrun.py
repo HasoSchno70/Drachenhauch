@@ -4,7 +4,7 @@ Verwendung:
     python gbrun.py <datei.gb>
     python gbrun.py --tokens <datei.gb>   # nur Tokens ausgeben (Debug)
     python gbrun.py --ast <datei.gb>      # nur AST ausgeben (Debug)
-    python gbrun.py --native <datei.gb>   # nativ via gbrt-Runtime ausfuehren
+    python gbrun.py --native <datei.gb>   # nativ via dhrt-Runtime ausfuehren
     python gbrun.py --export <datei.gb> [ordner]  # standalone .exe buendeln
 """
 import os
@@ -386,9 +386,9 @@ def main(argv):
     # funktioniert, ins Verzeichnis der Quelldatei wechseln.
     os.chdir(abs_path.parent)
 
-    # --- Ausfuehren: immer ueber die native Runtime (gbrt) ---
+    # --- Ausfuehren: immer ueber die native Runtime (dhrt) ---
     # Stufe B: der Tree-Walker ist entfernt; sowohl der Default-Run als auch
-    # `--native` laufen ueber `gbrt run` (preprocess+lex+parse+compile+VM in Rust).
+    # `--native` laufen ueber `dhrt run` (preprocess+lex+parse+compile+VM in Rust).
     if mode in ("run", "native"):
         return _run_native(abs_path, path)
 
@@ -421,12 +421,12 @@ def main(argv):
         return 2
 
 
-def _find_gbrt():
-    """Sucht das `gbrt`-Binary. Reihenfolge:
+def _find_dhrt():
+    """Sucht das `dhrt`-Binary. Reihenfolge:
     1. Eingefrorene Installation (PyInstaller): neben der Exe bzw. im Bundle
        (_MEIPASS) -- so findet die installierte GameBasic-App ihre Runtime.
-    2. Dev-Baum: rust/drachenhauch_runtime/target/{release,debug}/gbrt[.exe]."""
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    2. Dev-Baum: rust/drachenhauch_runtime/target/{release,debug}/dhrt[.exe]."""
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     cands = []
     if getattr(sys, "frozen", False):
         cands.append(Path(sys.executable).resolve().parent / exe)
@@ -442,55 +442,55 @@ def _find_gbrt():
 
 
 def _run_native(abs_path, path):
-    """Fuehrt die `.gb`-Datei mit `gbrt run` aus -- gbrts EIGENES Rust-Frontend
+    """Fuehrt die `.gb`-Datei mit `dhrt run` aus -- dhrts EIGENES Rust-Frontend
     (preprocess+lex+parse+compile+VM), KEIN Python-Compiler mehr.
 
-    So laufen auch gbrt-only-Builtins (die der Python-Compiler nicht kennt). gbrt
+    So laufen auch dhrt-only-Builtins (die der Python-Compiler nicht kennt). dhrt
     wechselt selbst ins Verzeichnis der Datei (relative Assets) und nutzt den
     Dateinamen fuer Fehler-Labels (`datei.gb:Zeile`). stdout/stderr + ein etwaiges
-    Grafik-Fenster werden durchgereicht. Rueckgabe = Exit-Code von gbrt
-    (bzw. 3 wenn gbrt fehlt)."""
+    Grafik-Fenster werden durchgereicht. Rueckgabe = Exit-Code von dhrt
+    (bzw. 3 wenn dhrt fehlt)."""
     import subprocess
 
-    gbrt = _find_gbrt()
-    if gbrt is None:
-        print("Native Runtime 'gbrt' nicht gefunden. Einmalig bauen mit:")
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        print("Native Runtime 'dhrt' nicht gefunden. Einmalig bauen mit:")
         print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
         print("(ohne Grafik: rust\\build_runtime.py --no-graphics)")
         return 3
     try:
-        result = subprocess.run([str(gbrt), "run", str(abs_path)])
+        result = subprocess.run([str(dhrt), "run", str(abs_path)])
     except OSError as e:
-        print(f"Konnte gbrt nicht starten: {e}")
+        print(f"Konnte dhrt nicht starten: {e}")
         return 3
     return result.returncode
 
 
 def _run_export(src, out_dir):
-    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe via `gbrt --export` --
-    gbrts EIGENER Selbst-Export (kompiliert die Quelle mit dem Rust-Frontend,
+    """Buendelt `src` (.gb) zu einer eigenstaendigen Exe via `dhrt --export` --
+    dhrts EIGENER Selbst-Export (kompiliert die Quelle mit dem Rust-Frontend,
     haengt den Payload an eine Kopie der Exe, kopiert `assets/`). KEIN Python-
-    Compiler -> auch gbrt-only-Builtins exportieren.
+    Compiler -> auch dhrt-only-Builtins exportieren.
 
-    Rueckgabe: 0 ok, 1 Quelle fehlt, 3 Runtime fehlt, sonst gbrt-Exit-Code."""
+    Rueckgabe: 0 ok, 1 Quelle fehlt, 3 Runtime fehlt, sonst dhrt-Exit-Code."""
     import subprocess
 
     src = Path(src)
     if not src.exists():
         print(f"Datei nicht gefunden: {src}")
         return 1
-    gbrt = _find_gbrt()
-    if gbrt is None:
-        print("Native Runtime 'gbrt' nicht gefunden. Einmalig bauen mit:")
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        print("Native Runtime 'dhrt' nicht gefunden. Einmalig bauen mit:")
         print("  .venv\\Scripts\\python.exe rust\\build_runtime.py")
         return 3
-    args = [str(gbrt), "--export", str(src.resolve())]
+    args = [str(dhrt), "--export", str(src.resolve())]
     if out_dir:
         args.append(str(out_dir))
     try:
-        result = subprocess.run(args)   # gbrt druckt "Exportiert: <pfad>"
+        result = subprocess.run(args)   # dhrt druckt "Exportiert: <pfad>"
     except OSError as e:
-        print(f"Konnte gbrt nicht starten: {e}")
+        print(f"Konnte dhrt nicht starten: {e}")
         return 3
     if result.returncode == 0:
         print("  -> laeuft ohne Python. Assets-Konvention: 'assets/' wird mitkopiert.")

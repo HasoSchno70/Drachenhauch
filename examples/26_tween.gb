@@ -1,5 +1,5 @@
 ' Tweening-Modul: Werteinterpolation ueber Zeit. Hier als Konsolen-Demo,
-' aber genauso fuer Bewegungen/Fades in Grafik-Programmen (gbrt) nutzbar.
+' aber genauso fuer Bewegungen/Fades in Grafik-Programmen (dhrt) nutzbar.
 IMPORT "tween"
 
 PRINT "=== Linearer Tween, 500ms, von 0 nach 100 ==="

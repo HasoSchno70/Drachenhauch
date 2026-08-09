@@ -1,7 +1,7 @@
 """Tests fuer das scene-Modul (Stack-basierter Scene-Manager).
 
-Golden-Tests gegen `gbrt` (Stufe B): jeder Test ist ein eigenstaendiges
-GB-Programm (frischer gbrt-Prozess = frischer Scene-Stack). Frueher liefen sie
+Golden-Tests gegen `dhrt` (Stufe B): jeder Test ist ein eigenstaendiges
+GB-Programm (frischer dhrt-Prozess = frischer Scene-Stack). Frueher liefen sie
 via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
@@ -110,7 +110,7 @@ def test_get_missing_key_raises(run_gb):
 
 
 def test_get_wrong_type_raises(run_gb):
-    # gbrt-Wortlaut: "Key 'x' hat falschen Typ" (TW sagte "ist INT, nicht STRING").
+    # dhrt-Wortlaut: "Key 'x' hat falschen Typ" (TW sagte "ist INT, nicht STRING").
     with pytest.raises(GBRuntimeError, match="falschen Typ"):
         run_gb('IMPORT "scene"\nSCENE_PUSH("s")\n'
                'SCENE_SET_INT("x", 1)\nPRINT SCENE_GET_STRING("x")\n')

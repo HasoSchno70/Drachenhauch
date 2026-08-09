@@ -1,9 +1,9 @@
 # GameBasic — Stolpersteine & Inkonsistenzen (beim Schreiben des Lehrbuchs aufgefallen)
 
 Sammlung von Sprach-/Engine-Reibungspunkten, die beim Verfassen von
-`buch-referenz/` (alle Kapitel + Module gegen `gbrt` verifiziert) auftauchten.
+`buch-referenz/` (alle Kapitel + Module gegen `dhrt` verifiziert) auftauchten.
 **Nicht das Buch, sondern GameBasic selbst** betreffend — als Backlog zum
-späteren Beheben. Jeder Punkt ist gegen den aktuellen `gbrt`-release-Build
+späteren Beheben. Jeder Punkt ist gegen den aktuellen `dhrt`-release-Build
 reproduziert.
 
 Reihenfolge ≈ nach Nutzen/Aufwand. Erledigtes am Ende.
@@ -29,7 +29,7 @@ Einsteigern.
 als Array-Literal werten (`[1,2,3]` → `ARRAY OF INTEGER`, Typ aus den Elementen).
 
 ### A2. `NIL` ist kein Literal  —  ✅ BEHOBEN (commit f4c8b78)
-> NIL ist jetzt ein Keyword-Literal (lexer/parser/compiler in gbrt + Python-Front-End
+> NIL ist jetzt ein Keyword-Literal (lexer/parser/compiler in dhrt + Python-Front-End
 > fuer Editor/Paritaet). `x = NIL`, `x <> NIL`, `IS_NIL(NIL)` funktionieren; das in der
 > db-Doku versprochene NIL→NULL-Binding klappt nun wirklich. Tests: `tests/test_nil_literal.py`.
 ```basic
@@ -73,7 +73,7 @@ user-facing Meldungen nach „Stufe Nx"-Lecks absuchen.
 ## C — Doku-/Vertrags-Abweichungen
 
 ### C1. `NET_UDP_LAST_FROM` liefert STRING, nicht TUPLE  *(Doku diese Session gefixt)*
-gbrt gibt `"host:port"` als STRING zurück (so auch der Golden-Test
+dhrt gibt `"host:port"` als STRING zurück (so auch der Golden-Test
 `tests/test_modules_net.py`), die alte `docs/module-net.md` versprach ein
 `TUPLE (host, port)`. **Doku wurde an die Realität angeglichen.**
 **Optional offen:** Für Ergonomie könnte die Engine stattdessen ein echtes
@@ -107,7 +107,7 @@ aber ein echter Stolperstein.
 > echte Wart — f32-gestützte **Audio-Lautstärken** (`0.800000011920929`) — ist gefixt:
 > `AUDIO_BUS_GET_VOLUME`/`AUDIO_GET_VOLUME`/`AUDIO_MUSIC_GET_VOLUME` runden auf 6 Stellen
 > → `0.8`. Test: `tests/test_div_and_float_display.py`. (Analyse unten.)
-> **Befund nach Prüfung:** gbrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
+> **Befund nach Prüfung:** dhrts `fmt_float` nutzt bereits die *kürzeste round-trip-fähige*
 > Darstellung (Rust-Display ≈ Python-`repr`). `0.1+0.2 -> 0.30000000000000004` und
 > `CURVE_SMOOTHERSTEP -> 0.16308000000000003` sind die **kürzest mögliche exakte** Form —
 > kürzer ginge nur falsch (würde auf einen anderen f64 runden). Also KEIN allgemeiner
@@ -140,22 +140,22 @@ dokumentieren.)
 ## E — Kleinere Inkonsistenzen
 
 ### E1. Hardware-Module sind importierbar, aber im Standard-Build tot  —  ✅ BEHOBEN
-> gbrt warnt jetzt **schon beim IMPORT** statt erst beim ersten Funktionsaufruf.
+> dhrt warnt jetzt **schon beim IMPORT** statt erst beim ersten Funktionsaufruf.
 > Auf Hardware-Module (`serial`/`usb`/`bt`/`wifi`) ohne das passende Cargo-Feature
-> reagiert der Default-Build zweifach: (a) `gbrt --check` liefert eine
+> reagiert der Default-Build zweifach: (a) `dhrt --check` liefert eine
 > `severity:"warning"`-Diagnose auf der IMPORT-Zeile → der Editor markiert das live
-> beim Tippen; (b) `gbrt run` druckt die Warnung vor dem Lauf auf stderr. Der
+> beim Tippen; (b) `dhrt run` druckt die Warnung vor dem Lauf auf stderr. Der
 > spätere Laufzeitfehler beim tatsächlichen Aufruf bleibt (gleicher Wortlaut,
 > via `vm.rs::unknown_builtin_msg`) — die Nutzung schlägt also weiterhin fehl,
 > aber der User erfährt es sofort statt erst tief im Programm. Bewusst *nicht*
 > im Standard-Build mitgeliefert (zieht schwere Deps: tokio/btleplug/hidapi/
 > windows). `preprocess.rs`: `missing_hardware_modules` / `missing_hardware_imports_with_lines`
 > / `hardware_missing_msg`; verdrahtet in `main.rs` `compile_source` (run) +
-> `check_source` (Editor). Test: `tests/test_gbrt_check.py::test_hardware_import_warns_at_import`.
+> `check_source` (Editor). Test: `tests/test_dhrt_check.py::test_hardware_import_warns_at_import`.
 
 `IMPORT "wifi"` (serial/usb/bt ebenso) wird vom Preprocessor akzeptiert (stehen
 in `KNOWN_MODULES`), aber **jeder** Funktionsaufruf wirft erst zur Laufzeit
-„… Hardware-Modul 'wifi', das in diesem gbrt-Build fehlt. Neu bauen mit:
+„… Hardware-Modul 'wifi', das in diesem dhrt-Build fehlt. Neu bauen mit:
 python rust\build_runtime.py --hardware". Der IMPORT gelingt, die Nutzung nicht.
 (Historischer Text.) **Vorschlag:** entweder im Standard-Build mitliefern, oder
 schon beim IMPORT (statt erst beim ersten Call) warnen.
@@ -182,38 +182,38 @@ nicht, dass `band` ein reserviertes Wort ist. (Historischer Text.)
 
 ## G — Befunde beim Schreiben der „VORTEX"-Demo (examples/119, 2026-06-23)
 
-### G1. `FLT()` fehlte in gbrt + `--check` schwieg — ✅ BEHOBEN (Builtin **und** systemisch)
-> **Teil 1 (Builtin):** `FLT` ist jetzt im gbrt-Kern (`builtins.rs`: `"flt" =>
+### G1. `FLT()` fehlte in dhrt + `--check` schwieg — ✅ BEHOBEN (Builtin **und** systemisch)
+> **Teil 1 (Builtin):** `FLT` ist jetzt im dhrt-Kern (`builtins.rs`: `"flt" =>
 > Value::Float(need_num(...))`, nach `INT`) + im `builtin_index.json`. `FLT(7)/2
 > -> 3.5` nativ verifiziert.
 > **Teil 2 (systemisch — der eigentliche „nie wieder"-Fix):** Der Rust-Compiler
 > prüft jeden Builtin-Aufruf gegen den maßgeblichen `builtin_index.json` (per
 > `include_str!` eingebettet, `compiler::is_known_builtin`). Unbekannte Builtins
 > (Tippfehler ODER nur-Tree-Walker wie früher FLT) ergeben jetzt eine **nicht-
-> fatale Compile-Warnung mit Zeile** → `gbrt --check` zeigt sie im Editor (gelbe
-> Schlängellinie), `gbrt run` auf stderr. Kein Blockieren (Warning, kein Error)
+> fatale Compile-Warnung mit Zeile** → `dhrt --check` zeigt sie im Editor (gelbe
+> Schlängellinie), `dhrt run` auf stderr. Kein Blockieren (Warning, kein Error)
 > und keine False-Positives: Sweep über ALLE examples = 0 fälschlich gemeldete
 > Builtins (der Index ist vollständig). Interne `__`-Builtins ausgenommen.
-> Folge: ein neues gbrt-Builtin, das man im `builtin_index.json` zu ergänzen
-> vergisst, fällt ab sofort auf. **Drift-Schutz-Test** `test_gbrt_check.py::
+> Folge: ein neues dhrt-Builtin, das man im `builtin_index.json` zu ergänzen
+> vergisst, fällt ab sofort auf. **Drift-Schutz-Test** `test_dhrt_check.py::
 > test_examples_use_no_unknown_builtin` prüft, dass KEIN Beispiel ein Builtin
 > nutzt, das nicht im Index steht — er fand sofort **10 echte, aber unindizierte
 > Builtins** (`CAMERA_ORBIT`, `WORLD_TO_SCREEN_X/Y`, `SCREEN_TO_WORLD_DIR_X/Y/Z`,
 > `RAY_HIT_MODEL`, `PICK_MODEL`, `GETPIXEL`, `CIRCLEOUTLINE` — alle aus
 > „in-die-Runtime-ergänzt, Index vergessen"-Commits) und sie wurden nachgetragen
 > (Index: 1011 → 1021). **Hinweis:** der Index wird per `include_str!` zur
-> gbrt-BAU-Zeit eingebettet → nach Index-Änderung gbrt neu bauen. Weitere Tests:
+> dhrt-BAU-Zeit eingebettet → nach Index-Änderung dhrt neu bauen. Weitere Tests:
 > `test_unknown_builtin_warns` / `test_known_builtin_no_warning`.
 
 `FLT(x)` (z. B. `FLT(MOUSEX())`, in mehreren examples genutzt) läuft im Python-
 Tree-Walker, wirft in der nativen Runtime aber **zur Laufzeit** „Builtin 'FLT' im
-Rust-Kern noch nicht verfuegbar". **`gbrt --check` meldet es NICHT** — der Compile
+Rust-Kern noch nicht verfuegbar". **`dhrt --check` meldet es NICHT** — der Compile
 ist grün, der Fehler kommt erst beim Lauf. Workaround in GB: `x * 1.0`.
-**Zwei Probleme:** (1) Builtin-Parität Tree-Walker ↔ gbrt; (2) die Live-Diagnostik
+**Zwei Probleme:** (1) Builtin-Parität Tree-Walker ↔ dhrt; (2) die Live-Diagnostik
 (`--check`) fängt „nur-im-Tree-Walker"-Builtins nicht ab → böse Laufzeit-
-Überraschung trotz grüner Editor-Anzeige. **Vorschlag:** `FLT` in gbrt nachrüsten
+Überraschung trotz grüner Editor-Anzeige. **Vorschlag:** `FLT` in dhrt nachrüsten
 (triviale Coercion) **und/oder** `--check` so erweitern, dass es Aufrufe von
-Builtins meldet, die nicht im gbrt-Builtin-Index stehen (fängt künftig ALLE
+Builtins meldet, die nicht im dhrt-Builtin-Index stehen (fängt künftig ALLE
 solchen Lücken). Betrifft auch andere examples mit `FLT(...)`.
 
 ### G2. Kein vertikales Spiegeln von Text / Render-Targets — ✅ BEHOBEN (RT-Flip)
@@ -226,7 +226,7 @@ solchen Lücken). Betrifft auch andere examples mit `FLT(...)`.
 > darunter stempeln. Genutzt in `examples/119_vortex.gb` (Scroller-Reflexion).
 
 (Historischer Text:) Für einen Boden-Spiegel-Scroller braucht man eine vertikal
-gespiegelte Textkopie. In gbrt gibt es dafür **keinen Weg**: `TEXT` kann nicht
+gespiegelte Textkopie. In dhrt gibt es dafür **keinen Weg**: `TEXT` kann nicht
 flippen/rotieren; `RENDERTARGET_DRAW` clampt `scale` auf `≥ 0` (kein Flip über
 negative Skalierung); `DRAWIMAGEFLIPPED(img, x, y, fH, fV)` arbeitet nur auf
 **Images**, Render-Targets liegen aber in einem eigenen Handle-Raum (`graphics.rs`

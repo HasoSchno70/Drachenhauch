@@ -1,9 +1,9 @@
 """Tests fuer das net-Modul (TCP/UDP-Sockets).
 
-Golden-Tests gegen `gbrt` (Stufe B): jeder Test ist ein eigenstaendiges
+Golden-Tests gegen `dhrt` (Stufe B): jeder Test ist ein eigenstaendiges
 GB-Programm, das Server+Client im selben Prozess ueber Loopback (127.0.0.1,
 Port 0) verbindet. nil-Check via `IS_NIL()`-Builtin (nicht `IS NIL` -- das ist
-gar kein Parser-Konstrukt, weder TW noch gbrt; nur die Doku behauptet es).
+gar kein Parser-Konstrukt, weder TW noch dhrt; nur die Doku behauptet es).
 Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
@@ -60,7 +60,7 @@ def test_tcp_peer_info(run_gb):
 
 
 def test_tcp_send_validates_socket_type(run_gb):
-    # gbrt nutzt Integer-Handles -> Typfehler lautet "erwartet INTEGER".
+    # dhrt nutzt Integer-Handles -> Typfehler lautet "erwartet INTEGER".
     with pytest.raises(GBRuntimeError, match="INTEGER"):
         run_gb('IMPORT "net"\nPRINT NET_SEND("not a socket", "hi")\n')
 

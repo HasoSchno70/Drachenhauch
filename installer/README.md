@@ -2,7 +2,7 @@
 
 Erzeugt eine eigenständige GameBasic-Distribution, mit der GameBasic **ohne
 installiertes Python** läuft: die komplette IDE (Code-Editor +
-Sprite-/Tilemap-/Form-/Audio-/Anim-Editor) und die native Runtime `gbrt`
+Sprite-/Tilemap-/Form-/Audio-/Anim-Editor) und die native Runtime `dhrt`
 werden mitgeliefert. Windows bekommt einen Installer
 (`GameBasic-Setup-<version>.exe`), macOS ein `.app` in einem `.dmg`, Linux
 einen Tarball mit `install.sh`.
@@ -25,7 +25,7 @@ einen Tarball mit `install.sh`.
 ```
 
 Das macht in einem Rutsch:
-1. **gbrt-Runtime** bauen (falls `rust/gb_runtime/target/release/gbrt[.exe]` fehlt;
+1. **dhrt-Runtime** bauen (falls `rust/gb_runtime/target/release/dhrt[.exe]` fehlt;
    fehlt sie danach immer noch, wird nur gewarnt statt abzubrechen — nützlich, um
    die Paketierung selbst zu testen, ohne die volle Grafik-Toolchain zu brauchen).
 2. **App-Icon** aus `gamebasic/assets/logo.png` erzeugen (`.ico` Windows, `.icns`
@@ -36,16 +36,16 @@ Das macht in einem Rutsch:
 4. Plattformspezifische Paketierung:
    - **Windows**: Inno Setup (ISCC) → `installer/output/GameBasic-Setup-<version>.exe`
      (Beispiele + Lehrbuch + Startmenü + optional PATH/.gb-Dateiverknüpfung).
-   - **macOS**: `gbrt` neben die App-Binary legen (`Contents/MacOS/`), `.app` mit
+   - **macOS**: `dhrt` neben die App-Binary legen (`Contents/MacOS/`), `.app` mit
      `hdiutil` in `installer/output/GameBasic-<version>-macOS.dmg` packen.
-   - **Linux**: `gbrt` neben die Binary legen, `install.sh` (XDG-Desktop-
+   - **Linux**: `dhrt` neben die Binary legen, `install.sh` (XDG-Desktop-
      Integration ohne sudo/root: `~/.local/share/GameBasic` + `.desktop`-Eintrag +
      Icon) dazupacken, alles zu
      `installer/output/GameBasic-<version>-linux-x86_64.tar.gz`.
 
 ### Optionen
 - `--no-installer` – nur PyInstaller (Schritt 3), kein Paketier-Schritt.
-- `--rebuild-gbrt` – gbrt vorher neu bauen.
+- `--rebuild-dhrt` – dhrt vorher neu bauen.
 
 ## Voraussetzungen
 - Das Projekt-`.venv` mit den `editors`- und `package`-Extras: `pip install -e ".[editors,package]"`.
@@ -55,14 +55,14 @@ Das macht in einem Rutsch:
   `dist/GameBasic` stehen und der Installer-Schritt wird übersprungen.
 - **macOS** – `hdiutil` (System-Bordmittel, immer vorhanden).
 - **Linux** – keine externen Tools nötig (reines Python + Tarball).
-- Rust-Toolchain für gbrt (siehe `docs/rust-runtime.md`), falls gbrt neu gebaut wird.
+- Rust-Toolchain für dhrt (siehe `docs/rust-runtime.md`), falls dhrt neu gebaut wird.
 
 ## Cross-Platform-Verifikation (CI)
 
 `.github/workflows/package.yml` baut die Distribution manuell auslösbar
 (`workflow_dispatch`, GitHub → Actions-Tab → „Package (manuell)" → „Run
 workflow") auf `ubuntu-latest`/`macos-latest`/`windows-latest` und lädt das
-Ergebnis als Artefakt hoch — mit `gbrt --no-graphics` (schnell, ohne
+Ergebnis als Artefakt hoch — mit `dhrt --no-graphics` (schnell, ohne
 System-Bibliotheken), prüft also nur, ob die Paketier-Schritte selbst
 durchlaufen, nicht die volle Runtime.
 
@@ -78,7 +78,7 @@ durchlaufen, nicht die volle Runtime.
 - Startmenü-Einträge: **GameBasic** (öffnet direkt den **Code-Editor** – ohne
   Auswahlfenster), Sprite-Editor, Tilemap-Editor, Form-Designer, Audio-Studio,
   Beispiele.
-- Optional (im Setup abwählbar): Desktop-Verknüpfung, **PATH-Eintrag** (`gbrt`
+- Optional (im Setup abwählbar): Desktop-Verknüpfung, **PATH-Eintrag** (`dhrt`
   und `GameBasic` im Terminal nutzbar), **`.gb`-Dateiverknüpfung** (Doppelklick
   öffnet im Editor, Rechtsklick → „Mit GameBasic ausführen").
 
@@ -97,7 +97,7 @@ macOS beim ersten Start automatisch aus dem Bundle kopiert.
 ## Aufbau
 | Datei | Zweck |
 |---|---|
-| `build_installer.py` | Orchestriert gbrt → Icon → Notices → PyInstaller → plattformspezifische Paketierung (Inno/DMG/Tarball). |
+| `build_installer.py` | Orchestriert dhrt → Icon → Notices → PyInstaller → plattformspezifische Paketierung (Inno/DMG/Tarball). |
 | `GameBasic.spec` | PyInstaller-Konfiguration (onedir, windowed, bündelt das Paket + Daten; macOS bekommt zusätzlich einen `BUNDLE()`-Schritt für ein echtes `.app`). |
 | `GameBasic.iss` | Inno-Setup-Skript (Dateien, Verknüpfungen, PATH, Dateiverknüpfung, EULA) — nur Windows. |
 | `EULA.txt` | Endbenutzer-Lizenzvertrag (**Vorlage** – vor Verkauf juristisch prüfen, `[PLATZHALTER]` ersetzen). Wird im Windows-Setup als Zustimmungsseite gezeigt; auf macOS/Linux als Referenzdatei mit ins Paket kopiert. |
@@ -108,12 +108,12 @@ macOS beim ersten Start automatisch aus dem Bundle kopiert.
 ## Lizenz-Compliance (für den Verkauf)
 - **`THIRD-PARTY-NOTICES.txt`** wird bei jedem Build automatisch erzeugt (`gen_notices.py`):
   sammelt die Lizenz-/Copyright-Texte aller gebündelten Python-Pakete (PySide6/Qt
-  unter LGPLv3, NumPy, Pillow) **und** aller ~250 Rust-Crates der gbrt-Runtime
+  unter LGPLv3, NumPy, Pillow) **und** aller ~250 Rust-Crates der dhrt-Runtime
   (MIT/BSD/Apache-2.0/Zlib/MPL-2.0). MIT/BSD/Apache **verlangen** diese Beilage.
   Liegt nach Installation unter `{app}\THIRD-PARTY-NOTICES.txt` + Startmenü.
 - **`EULA.txt`** ist eine Vorlage; ersetze die `[PLATZHALTER]` und lass sie vor einem
   kommerziellen Vertrieb prüfen. Sie regelt u.a., dass **vom Nutzer erstellte Spiele
-  ihm gehören** und samt gbrt-Runtime **frei (auch kommerziell) weitergegeben** werden
+  ihm gehören** und samt dhrt-Runtime **frei (auch kommerziell) weitergegeben** werden
   dürfen – wichtig, damit deine Nutzer ihre Spiele verkaufen können.
 - **Nicht `--onefile` bauen** (LGPL/Qt): die Qt-DLLs müssen als austauschbare Dateien
   vorliegen – die `onedir`-Spec erfüllt das.
@@ -121,7 +121,7 @@ macOS beim ersten Start automatisch aus dem Bundle kopiert.
   frühere „Mario"-Satz wurde zu einem eigenständigen Plattformer-Satz umgebaut.
 
 ## Code-Signing (gegen die SmartScreen-„Unbekannter Herausgeber"-Warnung)
-Der Build signiert **automatisch** `GameBasic.exe`, `gbrt.exe` und den fertigen
+Der Build signiert **automatisch** `GameBasic.exe`, `dhrt.exe` und den fertigen
 Installer – **sobald** ein Zertifikat über Umgebungsvariablen konfiguriert ist.
 Ohne Konfiguration ist die Signierung ein No-Op (der Build läuft normal durch).
 
@@ -143,14 +143,14 @@ set GB_SIGN_TS=http://timestamp.digicert.com   REM optional (Default gesetzt)
 Offen für den Verkauf (kein Code mehr): Zertifikat kaufen, EULA-`[PLATZHALTER]`
 ausfüllen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
 
-## Wie die installierte App `gbrt` findet
-Der Installer legt `gbrt.exe` **neben** `GameBasic.exe`. `gbrun._find_gbrt()`
+## Wie die installierte App `dhrt` findet
+Der Installer legt `dhrt.exe` **neben** `GameBasic.exe`. `gbrun._find_dhrt()`
 sucht im eingefrorenen Zustand zuerst im Verzeichnis der Exe (bzw. im
 PyInstaller-Bundle) und erst danach im Dev-Baum – so funktioniert sowohl die
 Installation als auch die Entwicklungsumgebung.
 
 ## Nur die Runtime verteilen?
 Wer nur GameBasic-**Programme** ausführen/weitergeben will, braucht die IDE nicht:
-- `gbrt run datei.gb` führt ein Programm aus.
-- `gbrt --export datei.gb` baut eine **eigenständige Spiel-.exe** (hängt den
-  kompilierten Payload an eine Kopie von `gbrt`). Dafür ist kein Installer nötig.
+- `dhrt run datei.gb` führt ein Programm aus.
+- `dhrt --export datei.gb` baut eine **eigenständige Spiel-.exe** (hängt den
+  kompilierten Payload an eine Kopie von `dhrt`). Dafür ist kein Installer nötig.

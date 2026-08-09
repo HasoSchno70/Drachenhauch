@@ -92,6 +92,6 @@ Schreib- und Lesefehler nach dem Schließen werfen eine deutliche „Port wurde 
 
 Siehe [examples/35_serial.gb](../examples/35_serial.gb).
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `serial` laeuft nativ mit dem Cargo-Feature `serial` (Crate `serialport` — **kein** `pyserial` noetig). Bauen: `python rust/build_runtime.py --hardware` (oder `--full`). Fehlt das Feature, meldet der Builtin „nicht verfuegbar“.

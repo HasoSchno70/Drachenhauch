@@ -1,9 +1,9 @@
-// Live-Playground-Glue zwischen der emscripten-erzeugten gbrt.wasm und der Seite.
+// Live-Playground-Glue zwischen der emscripten-erzeugten dhrt.wasm und der Seite.
 //
 // Ablauf: Der Nutzer tippt GameBasic-Quelltext in die Textarea. "Ausführen"
 // legt die Quelle in sessionStorage ab und lädt die Seite neu -> beim Neuladen
 // schreibt das Harness sie ins virtuelle FS unter /program.gb und ruft main()
-// EINMAL auf. gbrt kompiliert die Quelle SELBST im WASM (Lexer..Compiler in
+// EINMAL auf. dhrt kompiliert die Quelle SELBST im WASM (Lexer..Compiler in
 // Rust, alle Stufen) und führt sie aus -- kein Pyodide, kein vorab kompiliertes
 // .gbc nötig (siehe main.rs, cfg target_os="emscripten": /program.gb hat
 // Vorrang). Der Reload garantiert eine FRISCHE Runtime pro Lauf -- ein erneutes
@@ -36,7 +36,7 @@
   const RUN_FLAG = "gb_run";      // Einmal-Flag: nach Reload genau einen Lauf
   const DEFAULT_SRC = [
     "' Willkommen im GameBasic-Web-Playground!",
-    "' Tippe Code und klicke Ausfuehren -- gbrt kompiliert im Browser.",
+    "' Tippe Code und klicke Ausfuehren -- dhrt kompiliert im Browser.",
     "' (PRINT-Werte mit Komma trennen, nicht Semikolon.)",
     "PRINT \"Hallo aus dem Browser!\"",
     "DIM i AS INTEGER",
@@ -99,7 +99,7 @@
   }
 
   // Beim Entwickeln alle Build-Artefakte am Zwischenspeicher vorbei laden.
-  // Der Zeitstempel an `gbrt.js` allein reicht NICHT: die `.wasm` und die
+  // Der Zeitstempel an `dhrt.js` allein reicht NICHT: die `.wasm` und die
   // `.data` holt emscripten selbst nach, ueber `locateFile`. Ohne das laedt
   // der Browser nach einem Neubau die alte `.wasm` -- und man sucht den Fehler
   // im Quelltext statt im Zwischenspeicher (genau das ist hier passiert).
@@ -107,7 +107,7 @@
     /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)
       ? "?b=" + Date.now() : "";
 
-  // emscripten-Modulkonfiguration (global, von gbrt.js konsumiert).
+  // emscripten-Modulkonfiguration (global, von dhrt.js konsumiert).
   window.Module = {
     locateFile: function (pfad) { return pfad + window.GB_CACHE_BUSTER; },
     canvas: document.getElementById("canvas"),
@@ -188,10 +188,10 @@
     }
   });
 
-  // Wenn gbrt.js fehlt (noch nicht gebaut), bleibt onRuntimeInitialized aus.
+  // Wenn dhrt.js fehlt (noch nicht gebaut), bleibt onRuntimeInitialized aus.
   setTimeout(function () {
     if (runBtn.disabled) {
-      setStatus("gbrt.wasm nicht gefunden — erst bauen: "
+      setStatus("dhrt.wasm nicht gefunden — erst bauen: "
         + "python rust/build_wasm.py <datei.gb>");
     }
   }, 4000);

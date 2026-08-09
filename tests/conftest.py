@@ -55,8 +55,8 @@ def pytest_collection_modifyitems(items):
             item.add_marker(pytest.mark.qt)
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = _ROOT / "rust" / "drachenhauch_runtime" / "target" / variant / exe
         if p.exists():
@@ -64,11 +64,11 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 
 
-def _gbrt_err_message(stderr: str) -> str:
-    """Bare Fehlermeldung aus gbrt-stderr extrahieren (ohne 'Laufzeitfehler in
+def _dhrt_err_message(stderr: str) -> str:
+    """Bare Fehlermeldung aus dhrt-stderr extrahieren (ohne 'Laufzeitfehler in
     label:line:'-Praefix), damit `pytest.raises(match=...)` die Meldung trifft."""
     s = (stderr or "").strip()
     import re
@@ -82,10 +82,10 @@ def _gbrt_err_message(stderr: str) -> str:
 
 @pytest.fixture
 def run_gb():
-    """Fuehrt einen GB-Quelltext ueber die native Runtime (`gbrt run`) aus und
+    """Fuehrt einen GB-Quelltext ueber die native Runtime (`dhrt run`) aus und
     gibt stdout zurueck (LF). Bei einem Fehler (Exit != 0) wird ein
-    GBRuntimeError mit der gbrt-Meldung geworfen -- so funktioniert
-    `pytest.raises(GBRuntimeError, match=...)` weiter (Wortlaut = gbrt).
+    GBRuntimeError mit der dhrt-Meldung geworfen -- so funktioniert
+    `pytest.raises(GBRuntimeError, match=...)` weiter (Wortlaut = dhrt).
 
     Beispiel:
         def test_print(run_gb):
@@ -96,13 +96,13 @@ def run_gb():
     from gamebasic.errors import GBRuntimeError, ParseError, LexerError
 
     def _run(source: str, base: Path | None = None) -> str:
-        if _GBRT is None:
-            pytest.skip("native Runtime 'gbrt' nicht gebaut")
+        if _DHRT is None:
+            pytest.skip("native Runtime 'dhrt' nicht gebaut")
         # Temp-Datei im System-Temp-Verzeichnis (NICHT in examples/_ROOT, sonst
         # fangen die rust-Parity-Sweeps `examples.glob("*.gb")` die Datei).
-        # gbrt-Module (IMPORT "vec2") sind verzeichnis-unabhaengig; relative
+        # dhrt-Module (IMPORT "vec2") sind verzeichnis-unabhaengig; relative
         # .gb-Datei-Imports sind in run_gb-Tests nicht in Gebrauch.
-        # `base`: wenn gesetzt, die .gb DORT ablegen -- gbrt chdirt ins Datei-
+        # `base`: wenn gesetzt, die .gb DORT ablegen -- dhrt chdirt ins Datei-
         # Verzeichnis, also finden relative Pfade (TILED_LOAD, LOADIMAGE, ...)
         # Fixture-Dateien, die der Test in `base` abgelegt hat.
         if base is not None:
@@ -112,9 +112,9 @@ def run_gb():
         os.close(fd)
         try:
             Path(tmp).write_text(source, encoding="utf-8")
-            # gbrt gibt UTF-8 aus -> explizit so dekodieren (sonst mis-decodet
+            # dhrt gibt UTF-8 aus -> explizit so dekodieren (sonst mis-decodet
             # Windows mit dem Locale-Codec cp1252 bei Nicht-ASCII-Ausgabe).
-            r = subprocess.run([str(_GBRT), "run", tmp], capture_output=True,
+            r = subprocess.run([str(_DHRT), "run", tmp], capture_output=True,
                                text=True, encoding="utf-8", timeout=60)
         finally:
             try:
@@ -123,9 +123,9 @@ def run_gb():
                 pass
         if r.returncode != 0:
             stderr = r.stderr or ""
-            msg = _gbrt_err_message(stderr)
+            msg = _dhrt_err_message(stderr)
             # Phasen-passenden Fehlertyp werfen, damit pytest.raises(ParseError/
-            # LexerError/...) wie bisher trifft. gbrt unterscheidet keine
+            # LexerError/...) wie bisher trifft. dhrt unterscheidet keine
             # TYP-Fehler von anderen Laufzeitfehlern -> die kommen als
             # GBRuntimeError (Tests dafuer pruefen die Basis GameBasicError).
             if "Parse-Fehler" in stderr:
@@ -141,8 +141,8 @@ def run_gb():
 # Hinweis: `run_vm`, `run_native` und `run_all` sind seit dem Entfernen der
 # Python-/Cython-Bytecode-VMs **Aliase auf den Tree-Walker**. Es gibt nur noch
 # zwei Ausfuehrungspfade: Tree-Walker (Python, Referenz) und die native Runtime
-# `gbrt` (Rust, Produktion). Die Compiler-/Bytecode-Abdeckung gegen `gbrt`
-# liefert der dedizierte Paritaets-Sweep in `test_gbrt_parity.py`. Die Aliase
+# `dhrt` (Rust, Produktion). Die Compiler-/Bytecode-Abdeckung gegen `dhrt`
+# liefert der dedizierte Paritaets-Sweep in `test_dhrt_parity.py`. Die Aliase
 # bleiben, damit die ~550 bestehenden Tests unveraendert weiterlaufen.
 
 @pytest.fixture
@@ -160,7 +160,7 @@ def run_native(run_gb):
 @pytest.fixture
 def run_all(run_gb):
     """Alias auf den Tree-Walker (frueher 3-Pfad-Bit-Identitaet). Die
-    Identitaet gegen die native Runtime prueft `test_gbrt_parity.py`.
+    Identitaet gegen die native Runtime prueft `test_dhrt_parity.py`.
 
         def test_x(run_all):
             assert run_all('PRINT 1 + 2') == "3\\n"
@@ -170,7 +170,7 @@ def run_all(run_gb):
 
 # Die fruehere `call_builtin`-Fixture (rief Python-Builtin-Impls direkt via
 # `interpreter.BUILTINS`) ist entfernt -- alle Modul-Tests laufen jetzt als
-# run_gb-Golden gegen gbrt (Stufe B, Phase 6/7-Teil2). Damit haengt kein Test
+# run_gb-Golden gegen dhrt (Stufe B, Phase 6/7-Teil2). Damit haengt kein Test
 # mehr an interpreter.py/modules (Phase-8-Entblocker erledigt).
 
 

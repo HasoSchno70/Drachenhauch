@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GameBasic — Web-Playground (gbrt/WASM)</title>
+  <title>GameBasic — Web-Playground (dhrt/WASM)</title>
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; font-family: system-ui, sans-serif;
@@ -45,7 +45,7 @@
 <body>
   <header>
     <h1>GameBasic — Web-Playground</h1>
-    <small>native Runtime <code>gbrt</code> als WebAssembly (experimentell)</small>
+    <small>native Runtime <code>dhrt</code> als WebAssembly (experimentell)</small>
   </header>
 
   <div class="bar">
@@ -74,7 +74,7 @@
     laufen deshalb in jedem Build.
     <b>Ton:</b> Browser lassen Klang erst zu, nachdem man die Seite einmal
     angeklickt hat — bei einem Programm mit Musik also einmal ins Bild klicken.
-    Tippe GameBasic-Quelltext links und klicke <b>Ausführen</b> — <code>gbrt.wasm</code>
+    Tippe GameBasic-Quelltext links und klicke <b>Ausführen</b> — <code>dhrt.wasm</code>
     kompiliert die Quelle <i>im Browser</i> (kein Server, kein Pyodide) und führt
     sie aus: Konsolen-Ausgabe unter dem Canvas, Grafik im Canvas. Jeder Lauf
     startet eine frische Runtime. <b>Link teilen</b> packt die Quelle in die URL —
@@ -88,7 +88,7 @@
   <!-- Vom Build erzeugt; fehlt im Repo, bis `rust/build_wasm.py` lief.
 
        Beim Entwickeln (localhost) mit Zeitstempel geladen: der Browser haelt
-       `gbrt.js`/`.wasm` sonst fest, und ein frischer Build wirkt schlicht
+       `dhrt.js`/`.wasm` sonst fest, und ein frischer Build wirkt schlicht
        nicht -- man sucht den Fehler dann im Quelltext statt im Zwischen-
        speicher. Auf einer echten Adresse bleibt der Pfad unveraendert, damit
        die 9 MB weiterhin gecacht werden duerfen. -->
@@ -96,7 +96,7 @@
     (function () {
       var s = document.createElement("script");
       // Denselben Stempel wie fuer .wasm/.data (playground.js, locateFile).
-      s.src = "gbrt.js" + (window.GB_CACHE_BUSTER || "");
+      s.src = "dhrt.js" + (window.GB_CACHE_BUSTER || "");
       document.body.appendChild(s);
     })();
   </script>

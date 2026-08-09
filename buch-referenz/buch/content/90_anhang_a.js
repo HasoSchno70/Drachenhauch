@@ -21,8 +21,8 @@ module.exports = (H) => {
     return out;
   }
 
-  // Modul-Label: core/gbrt -> "—" (kein IMPORT), sonst der Modulname.
-  const modLabel = (m) => (!m || m === "core" || m === "gbrt") ? "—" : m;
+  // Modul-Label: core/dhrt -> "—" (kein IMPORT), sonst der Modulname.
+  const modLabel = (m) => (!m || m === "core" || m === "dhrt") ? "—" : m;
 
   // alphabetisch sortieren, Duplikate (gleicher Name) zusammenfassen
   const byName = {};

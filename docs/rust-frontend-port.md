@@ -1,7 +1,7 @@
 # Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
 
-**Ziel (erreicht):** `gbrt` erzeugt jetzt selbst aus Quelltext Bytecode und
-führt ihn aus — `gbrt run datei.gb` ist ein eigenständiger End-to-End-Lauf
+**Ziel (erreicht):** `dhrt` erzeugt jetzt selbst aus Quelltext Bytecode und
+führt ihn aus — `dhrt run datei.gb` ist ein eigenständiger End-to-End-Lauf
 **ohne Python**. Python bleibt nur noch in den Editoren/Tools (+ als
 Referenz-Tree-Walker). Damit kann auch der [Web-Playground](web-playground.md)
 ein reines Rust-WASM werden (kein Pyodide nötig).
@@ -9,18 +9,18 @@ ein reines Rust-WASM werden (kein Pyodide nötig).
 Die Front-End-Toolchain (`lexer`/`tokens`/`parser`/`ast_nodes`/`compiler`/
 `preprocess`, ~5.100 Zeilen Python) wurde inkrementell nach Rust portiert —
 **jede Stufe gegen Python verifiziert** (cargo + rustc verfügbar). **Alle 5
-Stufen fertig.** gbrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `gbrt run`
-(bzw. `gbrt datei.gb`) deckt jetzt den vollen Pfad Quelltext → Bytecode → Run ab.
+Stufen fertig.** dhrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `dhrt run`
+(bzw. `dhrt datei.gb`) deckt jetzt den vollen Pfad Quelltext → Bytecode → Run ab.
 
 ## Stufen
 
 | Stufe | Rust | Verifikation | Status |
 |---|---|---|---|
-| 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `gbrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
-| 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `gbrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
-| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `gbrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
-| 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` | Merge-Ergebnis-Gleichheit (`gbrt --preprocess` == `process()`) | ✅ **fertig** |
-| 5. **Verdrahtung** | `gbrt run datei.gb` (+ `.gb`-Auto-Detect) | Output-Parität (gbrt-self-compiled vs Python-TW) | ✅ **fertig** |
+| 1. **Lexer** (`tokens`+`lexer`) | `src/lexer.rs` | Token-Strom `[TYP,wert,zeile]` via `dhrt --tokens` == Python (alle Beispiele + Snippets) | ✅ **fertig** |
+| 2. **Parser** (`ast_nodes`+`parser`) | `src/ast.rs` + `src/parser.rs` | AST als kanonisches JSON via `dhrt --ast` == Python (struktureller Vergleich) | ✅ **fertig** |
+| 3. **Compiler** (`compiler`) | `src/compiler.rs` | **Output-Parität**: `dhrt --runsrc` (Rust lex+parse+compile+run) == Python-Tree-Walker | 🟡 **3a–3e fertig** |
+| 4. **Preprocess** (`IMPORT`) | `src/preprocess.rs` | Merge-Ergebnis-Gleichheit (`dhrt --preprocess` == `process()`) | ✅ **fertig** |
+| 5. **Verdrahtung** | `dhrt run datei.gb` (+ `.gb`-Auto-Detect) | Output-Parität (dhrt-self-compiled vs Python-TW) | ✅ **fertig** |
 
 ## Stufe 1 — Lexer (fertig)
 
@@ -29,7 +29,7 @@ Stufen fertig.** gbrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `gbrt run`
   f-String-Expansion (inkl. Format-Spec `{x:.2f}` → `FORMAT$`), `&H`/`&B`,
   Zeilenfortsetzung (`_`+Newline, implizit in Klammern), lowercase-Idents,
   `$`-Suffix.
-- Debug-Einstieg `gbrt --tokens <datei.gb>` → eine JSON-Zeile `[TYP, wert,
+- Debug-Einstieg `dhrt --tokens <datei.gb>` → eine JSON-Zeile `[TYP, wert,
   zeile]` pro Token (kanonisch, umgeht Python-`repr`-Eigenheiten).
 - Test [`tests/test_rust_lexer_parity.py`](../tests/test_rust_lexer_parity.py):
   parst beide Seiten als JSON und vergleicht strukturell — **137 Fälle grün**
@@ -48,7 +48,7 @@ Stufen fertig.** gbrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `gbrt run`
   Recursive-Descent-Port (gleiche Präzedenz + Disambiguierungen: Tupel-Assign-
   Lookahead, `FOR EACH`, `IIF`, Slice-vs-Index, WITH-`.member`, List/Dict/Set-
   Comprehensions, Operator-Overloading, Properties). Debug-Einstieg
-  `gbrt --ast <datei.gb>`.
+  `dhrt --ast <datei.gb>`.
 - Test [`tests/test_rust_parser_parity.py`](../tests/test_rust_parser_parity.py):
   **96 grün** (alle parsbaren `examples/*.gb` + 41 Snippets).
 - Gotchas: (a) `.line` ist in Python KEIN Dataclass-Feld → fällt bei der
@@ -61,17 +61,17 @@ Stufen fertig.** gbrt führt `.gbc` weiterhin direkt aus (VM-Pfad); `gbrt run`
 ## Stufe 3 — Compiler (in Arbeit)
 
 [`rust/gb_runtime/src/compiler.rs`](../rust/gb_runtime/src/compiler.rs): AST →
-`.gbc`-JSON. Debug-/Run-Einstieg `gbrt --runsrc <datei.gb>` macht **alles in
+`.gbc`-JSON. Debug-/Run-Einstieg `dhrt --runsrc <datei.gb>` macht **alles in
 Rust** (lex+parse+compile+run).
 
-**Gate-Entscheidung: Output-Parität statt byte-exaktem Bytecode.** gbrt's VM
+**Gate-Entscheidung: Output-Parität statt byte-exaktem Bytecode.** dhrt's VM
 implementiert den vollen Opcode-Satz — sowohl generische (`ADD`, `LOAD_NAME`)
 als auch optimierte (`ADD_NN`, Slot-Globals, Inline-Caches). Der Rust-Compiler
 emittiert die **generischen** Opcodes (kein Constant-Folding, keine `_NN`, keine
 Inline-Caches) — das Verhalten ist identisch, der Code viel kleiner. Verifiziert
-wird per stdout-Vergleich `gbrt --runsrc` == Python-Tree-Walker
+wird per stdout-Vergleich `dhrt --runsrc` == Python-Tree-Walker
 ([`tests/test_rust_compiler_parity.py`](../tests/test_rust_compiler_parity.py)),
-dasselbe Korrektheits-Prinzip wie `test_gbrt_parity`. (Performance-Parität —
+dasselbe Korrektheits-Prinzip wie `test_dhrt_parity`. (Performance-Parität —
 Optimierungs-Opcodes — kann später nachgezogen werden, ohne Verhalten zu ändern.)
 
 **Stufe 3a (fertig):** main-only — Skalar-Globals (Slot-basiert), CONST,
@@ -84,8 +84,8 @@ OF`/`MAP OF` → `DECLARE_NAME`), Index-Zugriff/-Zuweisung (`LOAD/STORE_INDEX`),
 `INPUT`, `DATA`/`READ`/`RESTORE` (rekursive Werte-Sammlung). **31 Tests grün.**
 Local-Slots (`LOAD/STORE/DECLARE_LOCAL`) jetzt unterstützt. Nicht unterstützte
 Konstrukte liefern `Err("Stufe 3c/3d: ...")` → der Sweep überspringt sie.
-*Bekannte gbrt-Grenze (nicht 3b-spezifisch):* sizeless `DIM x AS ARRAY OF T`
-wird von gbrt nicht leer initialisiert (auch bei Python-kompiliertem `.gbc`).
+*Bekannte dhrt-Grenze (nicht 3b-spezifisch):* sizeless `DIM x AS ARRAY OF T`
+wird von dhrt nicht leer initialisiert (auch bei Python-kompiliertem `.gbc`).
 
 **Stufe 3c (fertig):** User-`SUB`/`FUNCTION` — Stub-Phase (Forward-Refs +
 Rekursion), Body-Kompilierung in eigenem Ctx (Params als Locals), `RETURN`/
@@ -130,7 +130,7 @@ imported_modules)`:
   `' === END IMPORT … ===` inlinen. `seen`-Set (kanonisierte Pfade) verhindert
   Doppel-Inkludierung → `' [IMPORT bereits inkludiert: …]`.
 - **Built-in-Modul** (`IMPORT "json"` / `… AS j`): Zeile wird zu
-  `' === IMPORT MODULE json[ AS j] ===`. gbrt hat die Modul-Builtins nativ —
+  `' === IMPORT MODULE json[ AS j] ===`. dhrt hat die Modul-Builtins nativ —
   kein echtes Inlining nötig. Der Modul-Name wird gesammelt.
 - **Externe Modul-Typen:** `preprocess::external_types(mods)` mappt importierte
   Module auf die Typen, die sie registrieren (`vec2`→`vec2`, `json`→`json_handle`,
@@ -138,45 +138,45 @@ imported_modules)`:
   diese dann als skalare `DIM`-Typen (Default NIL) — so kompiliert `DIM v AS VEC2`
   nach `IMPORT "vec2"`.
 
-`gbrt --runsrc` schaltet den Preprocessor jetzt vor; `gbrt --preprocess <datei>`
+`dhrt --runsrc` schaltet den Preprocessor jetzt vor; `dhrt --preprocess <datei>`
 gibt die gemergte Quelle aus. **Gate = Merge-Ergebnis-Gleichheit** gegen
 `process()` ([`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py),
 7 Tests: Quellcode-/Modul-/Alias-/nested+duplicate-/Trailing-Comment-IMPORT,
 fehlender Import = Fehler in beiden, plus End-to-End `--runsrc`-Output-Parität).
 Gotchas: (a) `MODULES`/`MODULE_TYPES` müssen mit `modules.discover_modules()`/
-`register_type` synchron bleiben (29 Module hardcoded — gbrt hat sie nativ);
+`register_type` synchron bleiben (29 Module hardcoded — dhrt hat sie nativ);
 (b) CRLF-Dateien: jede Zeile wird vor dem IMPORT-Regex `\r`-getrimmt (Python liest
 Textmodus, `\r\n`→`\n`); (c) Modul-Erkennung ist case-insensitiv (`load_module`
 importiert `name.lower()`). **Grenze:** aliasierte Modul-Builtins (`J_PARSE` aus
-`IMPORT "json" AS j`) sind eine Python-Registry-Laufzeit-Trick — gbrt hat sie
-(noch) nicht; das Merge-Ergebnis stimmt, der aliasierte *Aufruf* liefe in gbrt
+`IMPORT "json" AS j`) sind eine Python-Registry-Laufzeit-Trick — dhrt hat sie
+(noch) nicht; das Merge-Ergebnis stimmt, der aliasierte *Aufruf* liefe in dhrt
 nicht.
 
-## Stufe 5 — Verdrahtung / `gbrt run` (fertig)
+## Stufe 5 — Verdrahtung / `dhrt run` (fertig)
 
-[`src/main.rs`](../rust/gb_runtime/src/main.rs): `gbrt run datei.gb` ist der
+[`src/main.rs`](../rust/gb_runtime/src/main.rs): `dhrt run datei.gb` ist der
 eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
 in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
 (`set_current_dir`, wie `gbrun.py` `os.chdir(file.parent)`), damit relative
 IMPORT- **und** Laufzeit-Pfade (`OpenFile("data.txt")`, `LOADIMAGE("assets/…")`)
 stimmen, und nutzt den Dateinamen als Label für Laufzeitfehler. Komfort:
-`gbrt datei.gb` (ohne `run`, Endung `.gb`) wird genauso behandelt; `.gbc`-Pfade
+`dhrt datei.gb` (ohne `run`, Endung `.gb`) wird genauso behandelt; `.gbc`-Pfade
 laufen weiter den direkten VM-Pfad. Die Front-End-Kette ist in
 `compile_and_run_source(source, base, label)` gebündelt (geteilt mit `--runsrc`,
 das **ohne** chdir läuft — Dev-/Parity-Einstieg).
 
-Gate: stdout von `gbrt run` == Python-Tree-Walker mit demselben chdir
+Gate: stdout von `dhrt run` == Python-Tree-Walker mit demselben chdir
 ([`tests/test_rust_run_parity.py`](../tests/test_rust_run_parity.py), 2 Tests:
 relativer Laufzeit-Datei-Zugriff + Quellcode- + Modul-IMPORT, sowie der
-`gbrt <datei.gb>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
+`dhrt <datei.gb>`-Auto-Detect). Graphics-Smoke-Test (raylib) headless verifiziert.
 
 Damit ist die Toolchain **end-to-end ohne Python** lauffähig — Ziel der
 Portierung erreicht.
 
 ### Anschluss-Features (erledigt)
 
-- **Selbst-Export** `gbrt --export datei.gb [out_dir]`: kompiliert die Quelle
-  selbst → `.gbc` und hängt den Payload (`<gbc><u64 len><GBRTPAY1>`) an eine
+- **Selbst-Export** `dhrt --export datei.gb [out_dir]`: kompiliert die Quelle
+  selbst → `.gbc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
   ohne `gbrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
   [`tests/test_rust_export.py`](../tests/test_rust_export.py) (exportiert,
@@ -185,7 +185,7 @@ Portierung erreicht.
   liefert neben den externen Typen (inkl. aliasierter wie `j_handle`/`v`) eine
   `(alias, modul)`-Liste; der Compiler bildet aliasierte Builtin-Namen
   (`j_parse` → `json_parse`, `v_new` → `vec2_new`) auf den kanonischen zurück,
-  sodass gbrt sie nativ findet. Test in
+  sodass dhrt sie nativ findet. Test in
   [`tests/test_rust_preprocess_parity.py`](../tests/test_rust_preprocess_parity.py)
   (`test_e2e_runsrc_module_alias`).
 - **WASM-Quellkompilierung im Browser (gebaut + verifiziert 2026-06-04):** der
@@ -194,7 +194,7 @@ Portierung erreicht.
   braucht **kein Pyodide** mehr. Toolchain installiert (emscripten 6.0.0 +
   Rust-Target); `build_wasm.py` verdrahtet das Windows-emscripten-Env selbst
   (`setup_emscripten_env`: CC/CXX/AR/Linker → `.exe`, bindgen-Includes,
-  Ninja-Generator, cmake/ninja auf PATH). Verifiziert: `node web/gbrt.js` ==
+  Ninja-Generator, cmake/ninja auf PATH). Verifiziert: `node web/dhrt.js` ==
   Python-Tree-Walker (aus eingebetteter Quelle). Details:
   [docs/web-playground.md](web-playground.md).
 
@@ -204,4 +204,4 @@ Der Tree-Walker (`interpreter.py`) bleibt die **Referenz** und der Host der
 `@builtin`-Definitionen. Die Rust-Portierung muss bit-identisches Verhalten
 liefern; das schärfste Gate ist in Stufe 3 die **Bytecode-Gleichheit** (produziert
 der Rust-Compiler exakt das `.gbc`, das Python erzeugt, ist Verhaltensgleichheit
-garantiert, da gbrt es schon bit-identisch ausführt).
+garantiert, da dhrt es schon bit-identisch ausführt).

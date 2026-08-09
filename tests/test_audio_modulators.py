@@ -16,15 +16,15 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 _NO_DEVICE = "Audio-Geraet konnte nicht initialisiert werden"
 
@@ -32,7 +32,7 @@ _NO_DEVICE = "Audio-Geraet konnte nicht initialisiert werden"
 def _run(src: str, tmp_path, timeout=90):
     p = tmp_path / "t.gb"
     p.write_text('IMPORT "audio"\n' + src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=timeout, cwd=str(tmp_path))
     if _NO_DEVICE in (r.stderr or ""):
         pytest.skip("kein Audio-Geraet in dieser Umgebung")
@@ -120,7 +120,7 @@ def test_negative_frequency_is_rejected_before_touching_the_device(tmp_path):
     # AUDIO_CLOCK_NEW) -- damit auch ohne Geraet pruefbar.
     p = tmp_path / "n.gb"
     p.write_text('IMPORT "audio"\nAUDIO_LFO_NEW("sine", -1.0)\n', encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=60, cwd=str(tmp_path))
     assert r.returncode != 0
     assert "AUDIO_LFO_NEW" in r.stderr and "negativ" in r.stderr

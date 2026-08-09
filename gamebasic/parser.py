@@ -1,19 +1,19 @@
 """Recursive-Descent-Parser fuer GameBasic (Editor-Schicht).
 
 WICHTIG zum Einordnen: dieser Parser fuehrt NICHTS mehr aus. Seit dem
-Entfernen des Python-Tree-Walkers (Stufe B) ist `gbrt` die einzige
+Entfernen des Python-Tree-Walkers (Stufe B) ist `dhrt` die einzige
 Laufzeit und bringt sein eigenes Front-End mit
 (`rust/drachenhauch_runtime/src/parser.rs`). Was hier entsteht, bedient nur noch
 die Editor-/Tooling-Schicht: LSP, Live-Error-Check (als FALLBACK, wenn
-`gbrt --check` nicht auffindbar ist), Folding und Formatter. Das Outline
+`dhrt --check` nicht auffindbar ist), Folding und Formatter. Das Outline
 ist textbasiert (`editor_qt/symbols.py`) und nutzt den AST gar nicht.
 
 Daraus folgt die Leitregel fuer Aenderungen hier: **akzeptiere genau das,
-was gbrt auch ausfuehrt.** Zu streng heisst, der Editor streicht
+was dhrt auch ausfuehrt.** Zu streng heisst, der Editor streicht
 laufenden Code rot an (und weil der Fallback nur das ERSTE Problem
 liefert, verdeckt ein Fehlalarm alle echten Fehler der Datei); zu lax
 heisst, der Editor schweigt und das Programm scheitert erst zur Laufzeit.
-Im Zweifel gegen `gbrt --check` gegenpruefen, nicht raten.
+Im Zweifel gegen `dhrt --check` gegenpruefen, nicht raten.
 
 Die vollstaendige Grammatik steht in CLAUDE.md (Klassen, PROPERTY,
 OPERATOR, ENUM, SELECT CASE mit Guards, WITH, TRY, Comprehensions,
@@ -231,7 +231,7 @@ class Parser:
         # Ausdruck wuerde sonst als Vergleich geparst, sein Ergebnis
         # verworfen und die Zuweisung verschwaende spurlos. Genau diese
         # Stille liess die Keyword-Member-Faelle (`spr.image = 5`) so lange
-        # unentdeckt. gbrt hat denselben Wortlaut (parser.rs:171/783).
+        # unentdeckt. dhrt hat denselben Wortlaut (parser.rs:171/783).
         if isinstance(expr, BinaryOp) and expr.op == "=":
             raise ParseError(
                 "'=' als Anweisung -- meintest du eine Zuweisung?",
@@ -546,7 +546,7 @@ class Parser:
             func(name: "x", 5)                  -> Fehler im Caller (Reihenfolge)
 
         Wir akzeptieren hier alle Reihenfolgen - die Validierung "positional
-        muss vor named kommen" macht gbrts Compiler, weil
+        muss vor named kommen" macht dhrts Compiler, weil
         er den Funktions-Kontext fuer schoenere Fehlermeldungen hat.
         """
         args: list = []
@@ -646,7 +646,7 @@ class Parser:
             # Ergebnis: der Editor strich voellig gueltigen Code rot an --
             # und weil der Fallback-Check nur das ERSTE Problem liefert,
             # verdeckte dieser Fehlalarm alle echten Fehler der Datei.
-            # gbrt fuehrt dieselbe Zeile korrekt aus; der Rewind hier
+            # dhrt fuehrt dieselbe Zeile korrekt aus; der Rewind hier
             # spiegelt `dot_assign_in_with` in parser.rs.
             self.pos = start
             expr = self._expression()
@@ -785,7 +785,7 @@ class Parser:
         self._expect(TokenType.PRINT)
         # COLON zaehlt wie NEWLINE als Terminator: `PRINT : PRINT "x"` ist
         # die klassische Leerzeilen-Redewendung. Ohne COLON hier lief das in
-        # "Unerwartetes Token COLON" -- ein Fehlalarm auf Code, den gbrt
+        # "Unerwartetes Token COLON" -- ein Fehlalarm auf Code, den dhrt
         # ausfuehrt (per --check verifiziert).
         if self._check(TokenType.NEWLINE, TokenType.COLON) or self._at_end():
             self._consume_terminator()
@@ -994,7 +994,7 @@ class Parser:
         # VERGLEICH geparst, die Zuweisung verschwand spurlos aus dem AST --
         # ohne jede Fehlermeldung.
         #
-        # gbrt unterstuetzt beide Formen NICHT (verifiziert per `--check`:
+        # dhrt unterstuetzt beide Formen NICHT (verifiziert per `--check`:
         # "Erwartet Zeilenende"). Sie hier zu akzeptieren waere also die
         # falsche Richtung -- der Editor bliebe stumm bei Code, der zur
         # Laufzeit scheitert. Stattdessen dieselbe Grenze klar benennen,
@@ -1035,7 +1035,7 @@ class Parser:
         # Ausdruck wuerde sonst als Vergleich geparst, sein Ergebnis
         # verworfen und die Zuweisung verschwaende spurlos. Genau diese
         # Stille liess die Keyword-Member-Faelle (`spr.image = 5`) so lange
-        # unentdeckt. gbrt hat denselben Wortlaut (parser.rs:171/783).
+        # unentdeckt. dhrt hat denselben Wortlaut (parser.rs:171/783).
         if isinstance(expr, BinaryOp) and expr.op == "=":
             raise ParseError(
                 "'=' als Anweisung -- meintest du eine Zuweisung?",
@@ -1289,7 +1289,7 @@ class Parser:
 
     # Mapping: Operator-Token -> interner Methoden-Name. Die internen Namen
     # werden im Class-Methods-Dict gespeichert; der BinaryOp-Dispatch in
-    # gbrts VM lookt sie unter diesem Namen auf.
+    # dhrts VM lookt sie unter diesem Namen auf.
     _OPERATOR_NAMES = {
         TokenType.PLUS:  "__op_add__",
         TokenType.MINUS: "__op_sub__",
@@ -1309,7 +1309,7 @@ class Parser:
 
         Erlaubt nur in Class-Body. Wird intern als Methode mit reserviertem
         Namen registriert (z.B. `__op_add__` fuer `OPERATOR +`). Der
-        Der BinaryOp-Dispatch in gbrts VM lookt diese Methoden
+        Der BinaryOp-Dispatch in dhrts VM lookt diese Methoden
         auf, wenn ein Operand eine User-Instanz mit passender Operator-Methode
         ist.
 
@@ -1396,7 +1396,7 @@ class Parser:
         prop_name = name_tok.value
         internal_name = f"__{kind}_{prop_name.lower()}"
         params = self._params()
-        # In gbrts Compiler: getter ist FUNCTION, setter ist SUB.
+        # In dhrts Compiler: getter ist FUNCTION, setter ist SUB.
         if kind == "get":
             self._expect(TokenType.AS, "Erwartet AS <Rueckgabetyp> nach PROPERTY GET-Parametern")
             return_type = self._parse_type()
@@ -1672,7 +1672,7 @@ class Parser:
         while True:
             if self._match(TokenType.LPAREN):
                 # Ein Literal ist nicht aufrufbar. `PRINT 1(2)` parste hier
-                # klaglos als Call durch, waehrend gbrt es ablehnt -- der
+                # klaglos als Call durch, waehrend dhrt es ablehnt -- der
                 # Editor blieb also stumm bei Code, der zur Laufzeit
                 # scheitert (per --check verifiziert). Identifier,
                 # Member-Zugriffe und Index-Zugriffe bleiben aufrufbar

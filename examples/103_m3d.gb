@@ -6,7 +6,7 @@
 '   - QUATERNIONEN fuer gimbal-lock-freie Rotation (Gelenke).
 '   - Ein gemeinsames Wuerfel-Mesh, N-mal mit je eigener Welt-Matrix gezeichnet.
 '
-' Native-only (F6 / gbrt). Maus: nichts -- laeuft automatisch.
+' Native-only (F6 / dhrt). Maus: nichts -- laeuft automatisch.
 
 IMPORT "g3d"
 IMPORT "m3d"

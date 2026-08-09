@@ -1,10 +1,10 @@
 """Tests fuer den Profiler-Kern (Qt-frei). `run_profile` laeuft seit Stufe B
-ueber `gbrt profile` (native Runtime) -- skippt, wenn gbrt nicht gebaut ist."""
+ueber `dhrt profile` (native Runtime) -- skippt, wenn dhrt nicht gebaut ist."""
 import pytest
 
-from gamebasic.editor_qt.profiler import run_profile, _find_gbrt
+from gamebasic.editor_qt.profiler import run_profile, _find_dhrt
 
-pytestmark = pytest.mark.skipif(_find_gbrt() is None, reason="gbrt nicht gebaut")
+pytestmark = pytest.mark.skipif(_find_dhrt() is None, reason="dhrt nicht gebaut")
 
 
 def test_basic_counts_and_output():

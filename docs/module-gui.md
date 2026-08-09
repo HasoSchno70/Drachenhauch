@@ -919,7 +919,7 @@ GUI_ON_CLICK(ok, on_start)        ' on_start ist eine FUNCREF
 - `GUI_ON_CLICK(widget, NIL)` entfernt den Callback wieder.
 
 Intern überbrückt `GUI_ON_CLICK` die Builtin→VM-Grenze (eine FUNCREF aus einem
-Built-in heraus aufrufen) — nativ in `gbrt`.
+Built-in heraus aufrufen) — nativ in `dhrt`.
 
 ### GUI_ON_CHANGE (Wertänderung)
 

@@ -28,8 +28,8 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
 - Quellen fürs Befehlswissen: `gamebasic/editor_qt/builtin_index.json` (Signaturen),
   `gamebasic/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
-  `examples/*.gb`. Beispiele möglichst mit `gbrt run` verifizieren (Konsolen-Ausgabe).
-- Screenshots für Grafik: `GBRT_FRAMES=N GBRT_SCREENSHOT=images/x.png gbrt run datei.gb`,
+  `examples/*.gb`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
+- Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.gb`,
   PNG nach `buch-referenz/buch/images/`.
 
 ## Gliederung & Fortschritt
@@ -142,7 +142,7 @@ Teil II + Teil IV). + Kap 31 (Mathematik: ABS/SQR/POW/HYPOT/EXP/LOG, FLOOR/CEIL/
 SIGN, LERP/REMAP, SIN/COS/TAN/ATAN2/DEG/RAD, WRAP/PINGPONG/MOVETOWARD, PI/TAU).
 + Kap 32 (Zufall: RND/RANDINT/RANDF, CHOICE/WEIGHTED_CHOICE, SHUFFLE, RANDOMIZE-Seed).
 + Kap 33 (Zeichenketten-Funktionen: kompakte bulletRich-Referenz aller String-Fns,
-Verweis auf Kap 16 fürs Tutorial). 100 Seiten, alle Ausgaben gegen gbrt verifiziert.
+Verweis auf Kap 16 fürs Tutorial). 100 Seiten, alle Ausgaben gegen dhrt verifiziert.
 Ab Kap 17 auf User-Wunsch schwierige Themen ausführlicher; Referenzkapitel
 + Kap 34 (Typumwandlung & Prüfung) + Kap 35 (Array-Helfer: LEN/DIMCOUNT/DIMSIZE,
 SORT/REVERSE/INDEXOF, SUM/AVG/MIN/MAX/FILL/COPY, PUSH/POP/INSERT/REMOVE_AT/REDIM).
@@ -156,9 +156,9 @@ WRITEALL/READLINES/APPENDFILE/FILESIZE, FILEEXISTS/COPYFILE/RENAME/DELETEFILE,
 MKDIR/DIREXISTS/DIRLIST, PATHJOIN/BASENAME/DIRNAME). **TEIL III KOMPLETT (Kap 30-38).**
 **Teil IV gestartet (Grafik/Sound/Spiele):** Kap 40 (Das Fenster & Game-Loop: SCREEN/CLS/
 FLIP/QUITREQUESTED-Loop, DELTA, FPS/SETFPS, SCREENWIDTH/HEIGHT) — MIT echtem Screenshot
-(figures/40_fenster.gb → images/40_fenster.png). 130 Seiten, gegen gbrt verifiziert.
-Screenshot-Workflow: figures/NN_*.gb (Quelle) → `GBRT_FRAMES=N GBRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
-(absoluter Pfad nötig, gbrt chdirt ins figures/-Dir!) → H.figure("x.png", caption).
+(figures/40_fenster.gb → images/40_fenster.png). 130 Seiten, gegen dhrt verifiziert.
+Screenshot-Workflow: figures/NN_*.gb (Quelle) → `DHRT_FRAMES=N DHRT_SCREENSHOT=<ABS-Pfad>/images/x.png`
+(absoluter Pfad nötig, dhrt chdirt ins figures/-Dir!) → H.figure("x.png", caption).
 + Kap 41 (2D-Zeichnen: PLOT/LINE/BOX/RECT/CIRCLE/ELLIPSE/TRIANGLE/POLYGON/ARC/TEXT/
 TEXTROT) — mit Formen-Übersichts-Screenshot. GOTCHA dokumentiert: gefüllte TRIANGLE/
 POLYGON nur bei CCW-Wicklung sichtbar (raylib-Culling); Engine-Fix als Task gespawnt.
@@ -168,7 +168,7 @@ GENTEX_PERLIN/GRADIENT/CHECKED/COLOR/RADIAL, RENDERTARGET_*) — 2 Screenshots.
 imgfx IMAGE_SCALE/FLIP/ROTATE/TINT) — Screenshot mit Spritesheet. 144 Seiten.
 figures/assets/ enthält hero.png+coin.png (aus examples/mario kopiert) + held1.png (Frame 0).
 + Kap 44 (Farben: RGB, RED/GREEN/BLUE-Extraktion, Konstanten, HSV, COLOR_LERP) — Screenshot
-mit Palette/HSV-Regenbogen/COLOR_LERP. WICHTIG: gbrt-Hex = `&H` (NICHT `0x`!).
+mit Palette/HSV-Regenbogen/COLOR_LERP. WICHTIG: dhrt-Hex = `&H` (NICHT `0x`!).
 + Kap 45 (Eingabe: KEYPRESSED/KEY_*-Konstanten, MOUSEX/Y/BUTTON/WHEEL/MOUSE_VISIBLE/LOCK,
 input-Modul BIND/UPDATE/HELD/PRESSED/RELEASED/AXIS, Gamepad-Tipp) — Steuerungs-Screenshot.
 151 Seiten.
@@ -178,7 +178,7 @@ UNLOADSOUND, AUDIO_VOLUME/PAN/BUS_VOLUME erwähnt) — als GRAFISCHES Mini-Klavi
 + Kap 47 (Layer LAYER_DEFINE/LAYER/END/CLEAR, Atlas ATLAS_LOAD/DRAW/DRAW_FLIPPED/BATCH_DRAW/
 FLUSH, Bulk PLOTS/CIRCLES/BOXES/LINES) — Layer+Bulk-Screenshot (Sternenfeld+Planeten+HUD).
 GOTCHA: ATLAS_DRAW_FLIPPED-Flips brauchen 1/0 (NICHT TRUE/FALSE → „erwartet Zahl"). 158 Seiten.
-**ATLAS_DRAW_FLIPPED-Inkonsistenz danach in gbrt BEHOBEN** (flip_x/flip_y TRUE/FALSE+1/0, echtes
+**ATLAS_DRAW_FLIPPED-Inkonsistenz danach in dhrt BEHOBEN** (flip_x/flip_y TRUE/FALSE+1/0, echtes
 flip_y, tint=Arg7; commit 8aa315f); Kap-47-Beispiel auf TRUE/FALSE umgestellt.
 + Kap 48 (3D-Grafik g3d: CAMERA3D, GRID3D, CUBE/_WIRES, SPHERE/_WIRES, CYLINDER/Kegel, PLANE/
 LINE3D/POINT3D + Ausblick Modelle/Licht/Picking) — 3D-Szenen-Screenshot. **TEIL IV KOMPLETT
@@ -187,7 +187,7 @@ LINE3D/POINT3D + Ausblick Modelle/Licht/Picking) — 3D-Szenen-Screenshot. **TEI
 spielbares Arcade-Spiel (fallende Münzen mit Korb fangen) in 5 Schritten aufgebaut: Fenster+
 Steuerung, Arrays für Münzen, Fang-Kollision, AUDIO_TONE-Sound, Score-HUD; volles Listing +
 Erweiterungsideen. Führt Game-Loop/Input/DELTA/Zeichnen/Arrays/Kollision/Sound/HUD zusammen.
-168 Seiten. Spiel gegen gbrt verifiziert (läuft).
+168 Seiten. Spiel gegen dhrt verifiziert (läuft).
 Buch-Kerninhalt (Teile I-IV + Projekt) komplett. **Teil V gestartet:** Kap 50 sprite
 (SPRITE_NEW/SET_POS/VELOCITY/ADD_ANIM/PLAY/PLAY_ONCE/SET_FLIP/SET_SCALE/UPDATE/DRAW/COLLIDES) mit
 animiertem Screenshot. 173 Seiten. GOTCHA: SPRITE_UPDATE will dt als INTEGER-ms (INT(DELTA()*1000)).
@@ -231,7 +231,7 @@ JUMP_VELOCITY/GRAVITY/COYOTE_TIME/JUMP_BUFFER/VARIABLE_JUMP, SET_POS/VX/VY; Coyo
 MAT4_TRS/MUL/IDENTITY, MODEL_MATRIX/INSTANCED) — rotierte-Würfel-Screenshot. 225 S.
 + Kap 68 json (JSON_PARSE/LOAD, Pfad-Notation "user.name"/"hobbies.0", JSON_GET_STRING/INT/FLOAT/
 BOOL, JSON_LEN/HAS/TYPE, JSON_STRINGIFY/PRETTY, TRY/CATCH bei Typfehler) — Konsole, alle Ausgaben
-gegen gbrt verifiziert. + Kap 69 db (SQLite: DB_OPEN ":memory:"/Datei, DB_EXEC mit ?-Binding,
+gegen dhrt verifiziert. + Kap 69 db (SQLite: DB_OPEN ":memory:"/Datei, DB_EXEC mit ?-Binding,
 DB_LAST_ROWID, DB_QUERY/NEXT/GET_*/CLOSE_RESULT, DB_IS_NULL [NIL ist KEIN Literal → NULL per
 weggelassener Spalte], DB_COL_COUNT/NAME, Transaktionen BEGIN/COMMIT/ROLLBACK) — Konsole, verifiziert.
 + Kap 70 regex (REGEX_MATCH/TEST/FIND/FIND_ALL [Capture-Gruppe extrahiert], REPLACE/REPLACE_ONCE
@@ -241,7 +241,7 @@ AUDIO_PLAY/STOP/PAUSE/RESUME/IS_PLAYING/SET_VOLUME/GET_VOLUME/PITCH, Panorama PA
 AUTOPAN, AUDIO_SFX [wellenform$ = STRING!]/LOFI, Samples SAMPLE_LOAD/PLAY/SET_LOOP/LEN, Musik
 MUSIC_PAUSE/RESUME/STOP/POSITION/SET_VOLUME/PITCH, Busse BUS_VOLUME/GET_VOLUME sfx/music/master,
 Effekte REVERB/DELAY/FILTER/DISTORTION/COMPRESSOR/EQ, FFT-Hinweis) — kein Screenshot (Klang nicht
-abdruckbar), Aufrufe gegen gbrt geprüft. **Nächstes:** Kap 72 curves / 73 net / 74 html / 75 ecs /
+abdruckbar), Aufrufe gegen dhrt geprüft. **Nächstes:** Kap 72 curves / 73 net / 74 html / 75 ecs /
 76 serial-usb-wifi-bt, dann Anhang (A Befehls-Index / B Tastencodes / C Farben / D Fehlermeldungen).
 + Kap 72 curves (content/72_curves.js, images/72_curves.png) — CURVE_LERP/SMOOTHSTEP/SMOOTHERSTEP,
 BEZIER/BEZIER2 (Handles), CATMULL/CATMULL2 (durch die Punkte), HERMITE; LERP-Nachzieh-Muster.
@@ -249,13 +249,13 @@ Screenshot: Bezier+Catmull-Vergleich. + Kap 73 net (content/73_net.js, Konsole) 
 CONNECT/SEND/RECV/PEER_ADDR/CLOSE, UDP BIND/OPEN/SEND/RECV/LAST_FROM; non-blocking by default.
 **STOLPERSTEINE: NET_TCP_ACCEPT-Leere via IS_NIL prüfen (NICHT <> NIL); NET_UDP_LAST_FROM gibt STRING
 "host:port" (NICHT Tupel — docs/module-net.md war veraltet, mit-korrigiert).** TCP+UDP-Loopback gegen
-gbrt verifiziert. + Kap 74 html (content/74_html.js) — HTTP_GET/POST/DOWNLOAD/STATUS/HEADER, URL_ENCODE/
+dhrt verifiziert. + Kap 74 html (content/74_html.js) — HTTP_GET/POST/DOWNLOAD/STATUS/HEADER, URL_ENCODE/
 DECODE, HTML_TEXT/FIND_ALL/GET_ATTR; live gegen example.com verifiziert (Status 200, h1=Example Domain),
 URL/HTML-Parser offline verifiziert. + Kap 75 ecs (content/75_ecs.js, Konsole) — Mentales Modell
 (Entity=ID, Component=Daten, System=Query-Loop), NEW_WORLD/ENTITY/DESTROY/ALIVE/COUNT, ADD_*/GET_*/
 GET_OR_*/HAS/REMOVE, QUERY/2/3, Bulk INTEGRATE/SCALE/CLAMP/FILL/REMOVE_DEAD/COUNT_WITH (40× schneller).
 Alle Ausgaben verifiziert. + Kap 76 serial/usb/wifi/bt (content/76_hardware.js) — 4 Hardware-Module in
-EINEM Kapitel. **WICHTIG: brauchen Spezial-Build `python rust\\build_runtime.py --hardware` (Standard-gbrt
+EINEM Kapitel. **WICHTIG: brauchen Spezial-Build `python rust\\build_runtime.py --hardware` (Standard-dhrt
 wirft klare Meldung) → nicht live verifizierbar, Code-Beispiele ohne out:.** serial (Arduino/COM), usb
 (HID), wifi (netsh, nur Windows), bt (BLE); Returns meist STRING-Listen (SPLIT), Roh-Bytes via ASC/CHR$.
 **>>> TEIL V (Module, Kap 50-76) KOMPLETT — 67 content-Module, 74 Überschriften. <<<**
@@ -263,16 +263,16 @@ wirft klare Meldung) → nicht live verifizierbar, Code-Beispiele ohne out:.** s
 — über Seiten umbrechende Tabelle, optional Farb-`swatch` pro Zelle): A Befehls-Index (content/90_anhang_a.js,
 **auto-generiert: liest beim Build builtin_index.json → bleibt mit der Engine in Sync**, 1010 Befehle
 alphabetisch nach Buchstabe, Signatur + Modul-Spalte, Kern = „—") · B Tastencodes (content/91_anhang_b.js,
-KEY_*/JOY_* aus graphics.py, gegen gbrt verifiziert) · C Farb-Konstanten (content/92_anhang_c.js, 18 Farben
+KEY_*/JOY_* aus graphics.py, gegen dhrt verifiziert) · C Farb-Konstanten (content/92_anhang_c.js, 18 Farben
 mit Swatch/RGB/Hex, verifiziert) · D Fehlermeldungen (content/93_anhang_d.js, 9 häufige Meldungen mit
-exaktem gbrt-Wortlaut + Ursache/Lösung). Tabellen per LibreOffice-Render geprüft (Swatches/Header sauber).
+exaktem dhrt-Wortlaut + Ursache/Lösung). Tabellen per LibreOffice-Render geprüft (Swatches/Header sauber).
 **>>> BUCH-GESAMTSTRUKTUR KOMPLETT: Teile I-V (Kap 0-76) + Anhang A-D, 71 content-Module, 79 Überschriften,
 289 PDF-Seiten. <<<** **Nächstes (optional, Politur): TOC/Vorwort-Feinschliff, kompletter Korrekturlauf
 (Tippfehler/Konsistenz), evtl. echte gbsprites-Screenshots wo noch Platzhalter.**
 
 **Nachtrag 2026-07-12: 89 seit der Fertigstellung (14.06.) neu hinzugekommene Builtins nachgezogen**
 (per `git diff` gegen `builtin_index.json` ermittelt, siehe Memory `project_buch_referenz_update_2026_07`).
-Alle Beispiele gegen frisch gebauten `gbrt` verifiziert (Standard-Build `graphics db net http`, kein
+Alle Beispiele gegen frisch gebauten `dhrt` verifiziert (Standard-Build `graphics db net http`, kein
 `--hardware` nötig für diese Charge). Betroffen: Kap 34 (FLT), Kap 38 (FILE_OPEN_DIALOG/SAVE_DIALOG/
 FOLDER_DIALOG, native Dialoge ohne out-Kasten), Kap 40 (SCREEN_NATIVE/SCREEN_TRANSPARENT, WINDOW_ESC_QUIT/
 PASSTHROUGH/TOPMOST/UNDECORATED/X/Y/SET_WINDOW_POS, neuer Monitor-Abschnitt MONITOR_COUNT/WIDTH/HEIGHT/
@@ -287,7 +287,7 @@ Builtins mit je eigenem verifiziertem Beispiel), Kap 71 audio (AUDIO_CLOCK_* kom
 AUDIO_LISTENER_*/AUDIO_EMITTER_*/AUDIO_PLAY_AT/AUDIO_PLAY_ON), Kap 73 (NET_IS_CONNECTED), Kap 76
 (wifi-Beschreibung korrigiert: läuft seit der Cross-Platform-Migration auch auf Linux/macOS, nicht mehr
 nur Windows). Ad-hoc-Korrekturlauf (Node-Extraktion aller (codeLines,out)-Paare aus den geänderten
-content/*.js + Python-Runner gegen gbrt) bestätigt: keine echten Fehler, nur erwartete Fortsetzungs-
+content/*.js + Python-Runner gegen dhrt) bestätigt: keine echten Fehler, nur erwartete Fortsetzungs-
 Fragmente (Variable aus vorigem cmd()-Block im selben Kapitel, etabliertes Muster) und der vorbestehende
 `<port>`-Platzhalter in Kap 73. Zwei-Pass-Build (`make_book.py`) lief sauber durch (79/79 ToC-Seiten).
 Anhang A ist auto-generiert aus builtin_index.json und zieht die neuen Builtins beim nächsten Build
@@ -313,7 +313,7 @@ Systematisch geprüft statt quergelesen, mit Skripten gegen die echten Quellen:
   Index falsch** — die Laufzeit kann absteigend sortieren, die zu enge
   Signatur erzeugte einen Falsch-Alarm der Argumentzahl-Prüfung in jedem
   korrekten Aufruf. `builtin_index.json` korrigiert.
-* **Alle 260 Beispiele mit abgedruckter Ausgabe gegen `gbrt` laufen lassen:**
+* **Alle 260 Beispiele mit abgedruckter Ausgabe gegen `dhrt` laufen lassen:**
   233 stimmen, 24 sind Fortsetzungs-Fragmente (etabliertes Muster), 3 Treffer.
   Davon einer echt: das `SCENE_SET_INT`-Beispiel druckte „100", lief allein
   aber nicht (ohne aktive Szene bricht es ab) — Zeile ergänzt. Die anderen

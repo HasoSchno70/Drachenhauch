@@ -1,6 +1,6 @@
 """Lexer-Randfaelle aus dem Clean-Code-Review des Python-Frontends.
 
-Der Python-Lexer fuehrt nichts mehr aus (das macht gbrt), sondern bedient
+Der Python-Lexer fuehrt nichts mehr aus (das macht dhrt), sondern bedient
 NUR die Editor-Schicht: Highlighting, LSP, Completion, Outline, Folding,
 Formatter. Fehler hier zeigen sich also als kaputte Editor-Features -- im
 schlimmsten Fall als Ausnahme mitten in Qts Paint-Pfad.
@@ -29,7 +29,7 @@ def test_non_ascii_digits_raise_clean_lexer_error(src):
     """`str.isdigit()` ist auch fuer '²'/'٣' True, `int()` aber nicht
     fuer alle -- das erzeugte einmal eine ungefangene ValueError (der
     Highlighter faengt nur LexerError) und einmal eine stille Abweichung
-    zu gbrt, das solche Zeichen ablehnt. Beides muss jetzt ein sauberer,
+    zu dhrt, das solche Zeichen ablehnt. Beides muss jetzt ein sauberer,
     fangbarer LexerError sein."""
     with pytest.raises(LexerError):
         Lexer(src).tokenize()

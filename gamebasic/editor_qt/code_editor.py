@@ -1297,7 +1297,7 @@ class CodeEditor(
         doc = get_doc(name)
         if doc and doc[0]:
             return doc[0]
-        from .gbrt_meta import signature
+        from .dhrt_meta import signature
         return signature(name) or None
 
     def _user_signature(self, name: str) -> str | None:
@@ -1704,7 +1704,7 @@ class CodeEditor(
                 # tatsaechlichen Built-ins ab (~243 von ~1106) -- fuer den
                 # Rest zeigte Hover bisher GAR NICHTS, ohne jeden Hinweis,
                 # obwohl Signature-Help fuer dieselben Namen schon laenger
-                # auf gbrt_meta.signature() zurueckfaellt (_builtin_signature
+                # auf dhrt_meta.signature() zurueckfaellt (_builtin_signature
                 # oben). Wenigstens die Signatur (ohne Beschreibung) ist
                 # besser als eine komplett tote Tooltip.
                 sig = self._builtin_signature(word)

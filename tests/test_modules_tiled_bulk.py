@@ -1,6 +1,6 @@
 """Tests fuer die Bulk-Tilemap-Operationen (tiled-Modul).
 
-Golden-Tests gegen `gbrt` (Stufe B): Tiled-JSON-Map in `tmp_path`, via TILED_LOAD
+Golden-Tests gegen `dhrt` (Stufe B): Tiled-JSON-Map in `tmp_path`, via TILED_LOAD
 geladen (run_gb mit `base=tmp_path`). Frueher via `call_builtin` gegen die
 Python-Impl (in Phase 8 geloescht).
 """

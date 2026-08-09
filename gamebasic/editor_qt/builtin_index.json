@@ -1,5 +1,5 @@
 {
- "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die gbrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'gbrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
+ "_comment": "Eingefrorener Builtin-Index fuer Editor/LSP (Name/kind/Signatur/Modul). Stammt aus der Stufe-B-Migration (Registry-Union); seitdem von Hand gepflegt -- Quelle der Wahrheit sind die dhrt-Builtins (rust/drachenhauch_runtime/src/builtins.rs + vm.rs). module: 'core'/'dhrt' = Core-Builtins (kein IMPORT), sonst der IMPORT-Modulname.",
  "count": 1298,
  "builtins": [
   {
@@ -18,7 +18,7 @@
    "name": "ALPHA",
    "kind": "core",
    "signature": "ALPHA(farbe: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ANIM_FSM_FORCE",
@@ -114,19 +114,19 @@
    "name": "ARRAY_AVG",
    "kind": "core",
    "signature": "ARRAY_AVG(arr) AS FLOAT",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_COPY",
    "kind": "core",
    "signature": "ARRAY_COPY(arr) AS ARRAY",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_FILL",
    "kind": "core",
    "signature": "ARRAY_FILL(arr, wert)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_INDEXOF",
@@ -138,43 +138,43 @@
    "name": "ARRAY_INSERT",
    "kind": "core",
    "signature": "ARRAY_INSERT(arr, idx, wert) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_MAX",
    "kind": "core",
    "signature": "ARRAY_MAX(arr) AS T",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_MIN",
    "kind": "core",
    "signature": "ARRAY_MIN(arr) AS T",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_POP",
    "kind": "core",
    "signature": "ARRAY_POP(arr) AS T",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_PUSH",
    "kind": "core",
    "signature": "ARRAY_PUSH(arr, wert) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_REMOVE_AT",
    "kind": "core",
    "signature": "ARRAY_REMOVE_AT(arr, idx) AS T",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ARRAY_SUM",
    "kind": "core",
    "signature": "ARRAY_SUM(arr) AS INTEGER/FLOAT",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ASC",
@@ -594,7 +594,7 @@
    "name": "AUDIO_MUSIC_SET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_MUSIC_SET_VOLUME(v)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "AUDIO_MUSIC_STOP",
@@ -714,7 +714,7 @@
    "name": "AUDIO_SET_VOLUME",
    "kind": "core",
    "signature": "AUDIO_SET_VOLUME(ch, v)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "AUDIO_SFX",
@@ -846,7 +846,7 @@
    "name": "BIN$",
    "kind": "core",
    "signature": "BIN$(n) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "BLEND_MODE",
@@ -1506,7 +1506,7 @@
    "name": "CONTAINS",
    "kind": "core",
    "signature": "CONTAINS(s, teil) AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "COOLDOWN",
@@ -1584,7 +1584,7 @@
    "name": "CURRENT_MONITOR",
    "kind": "graphics",
    "signature": "CURRENT_MONITOR() AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "CURVE_BEZIER",
@@ -1770,7 +1770,7 @@
    "name": "DELETEFILE",
    "kind": "core",
    "signature": "DELETEFILE(pfad)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "DELTA",
@@ -1794,13 +1794,13 @@
    "name": "DIREXISTS",
    "kind": "core",
    "signature": "DIREXISTS(pfad) AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "DIRLIST",
    "kind": "core",
    "signature": "DIRLIST(pfad) AS ARRAY OF STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "DIRNAME",
@@ -2058,7 +2058,7 @@
    "name": "ENDSWITH",
    "kind": "core",
    "signature": "ENDSWITH(s, suffix) AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "EXP",
@@ -2088,7 +2088,7 @@
    "name": "FILESIZE",
    "kind": "core",
    "signature": "FILESIZE(pfad) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "FILES_DROPPED",
@@ -3690,7 +3690,7 @@
    "name": "ISNUMERIC",
    "kind": "core",
    "signature": "ISNUMERIC(s) AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "ISSTR",
@@ -4098,7 +4098,7 @@
    "name": "LTRIM$",
    "kind": "core",
    "signature": "LTRIM$(s) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MAPCLEAR",
@@ -4344,7 +4344,7 @@
    "name": "MKDIR",
    "kind": "core",
    "signature": "MKDIR(pfad)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MODEL",
@@ -4446,43 +4446,43 @@
    "name": "MONITOR_COUNT",
    "kind": "graphics",
    "signature": "MONITOR_COUNT() AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_HEIGHT",
    "kind": "graphics",
    "signature": "MONITOR_HEIGHT(i: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_NAME",
    "kind": "graphics",
    "signature": "MONITOR_NAME(i: INTEGER) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_REFRESH",
    "kind": "graphics",
    "signature": "MONITOR_REFRESH(i: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_WIDTH",
    "kind": "graphics",
    "signature": "MONITOR_WIDTH(i: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_X",
    "kind": "graphics",
    "signature": "MONITOR_X(i: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MONITOR_Y",
    "kind": "graphics",
    "signature": "MONITOR_Y(i: INTEGER) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "MOUSEBUTTON",
@@ -4806,7 +4806,7 @@
    "name": "OCT$",
    "kind": "core",
    "signature": "OCT$(n) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "OPENFILE",
@@ -4938,7 +4938,7 @@
    "name": "PATHJOIN",
    "kind": "core",
    "signature": "PATHJOIN(a, b, ...) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "PHYS2D_ADD_BOX",
@@ -5604,7 +5604,7 @@
    "name": "READLINES",
    "kind": "core",
    "signature": "READLINES(pfad) AS ARRAY OF STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "RECT",
@@ -5628,7 +5628,7 @@
    "name": "REDIM",
    "kind": "core",
    "signature": "REDIM(arr, laenge)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "REGEX_FIND",
@@ -5682,7 +5682,7 @@
    "name": "RENAME",
    "kind": "core",
    "signature": "RENAME(alt, neu)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "RENDERTARGET_BEGIN",
@@ -5742,7 +5742,7 @@
    "name": "REVERSE$",
    "kind": "core",
    "signature": "REVERSE$(s) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "RGB",
@@ -5754,7 +5754,7 @@
    "name": "RGBA",
    "kind": "core",
    "signature": "RGBA(r: INTEGER, g: INTEGER, b: INTEGER, a: INTEGER)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "RIGHT",
@@ -5784,7 +5784,7 @@
    "name": "RTRIM$",
    "kind": "core",
    "signature": "RTRIM$(s) AS STRING",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "SAMPLE_LEN",
@@ -6228,19 +6228,19 @@
    "name": "SET_WINDOW_MONITOR",
    "kind": "graphics",
    "signature": "SET_WINDOW_MONITOR(i: INTEGER)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "SET_WINDOW_POS",
    "kind": "graphics",
    "signature": "SET_WINDOW_POS(x: INTEGER, y: INTEGER)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "SGN",
    "kind": "core",
    "signature": "SGN(zahl) AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "SHADER_LOAD",
@@ -6540,13 +6540,13 @@
    "name": "SQRT",
    "kind": "core",
    "signature": "SQRT(zahl) AS FLOAT",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "STARTSWITH",
    "kind": "core",
    "signature": "STARTSWITH(s, praefix) AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "STOPMUSIC",
@@ -6990,7 +6990,7 @@
    "name": "TRYVAL",
    "kind": "core",
    "signature": "TRYVAL(s, default) AS INTEGER/FLOAT",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "TWEEN_DONE",
@@ -7614,7 +7614,7 @@
    "name": "WINDOW_ESC_QUIT",
    "kind": "graphics",
    "signature": "WINDOW_ESC_QUIT(an: BOOLEAN)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_FOCUS",
@@ -7650,7 +7650,7 @@
    "name": "WINDOW_MAXIMIZE",
    "kind": "graphics",
    "signature": "WINDOW_MAXIMIZE()",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_MAXIMIZED",
@@ -7662,13 +7662,13 @@
    "name": "WINDOW_MAX_SIZE",
    "kind": "graphics",
    "signature": "WINDOW_MAX_SIZE(w, h)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_MINIMIZE",
    "kind": "graphics",
    "signature": "WINDOW_MINIMIZE()",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_MINIMIZED",
@@ -7680,7 +7680,7 @@
    "name": "WINDOW_MIN_SIZE",
    "kind": "graphics",
    "signature": "WINDOW_MIN_SIZE(w, h)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_OPACITY",
@@ -7692,49 +7692,49 @@
    "name": "WINDOW_PASSTHROUGH",
    "kind": "graphics",
    "signature": "WINDOW_PASSTHROUGH(flag: BOOLEAN)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_RESIZABLE",
    "kind": "graphics",
    "signature": "WINDOW_RESIZABLE(flag: BOOLEAN)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_RESIZED",
    "kind": "graphics",
    "signature": "WINDOW_RESIZED() AS BOOLEAN",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_RESTORE",
    "kind": "graphics",
    "signature": "WINDOW_RESTORE()",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_TOPMOST",
    "kind": "graphics",
    "signature": "WINDOW_TOPMOST(flag: BOOLEAN)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_UNDECORATED",
    "kind": "graphics",
    "signature": "WINDOW_UNDECORATED(flag: BOOLEAN)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_X",
    "kind": "graphics",
    "signature": "WINDOW_X() AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WINDOW_Y",
    "kind": "graphics",
    "signature": "WINDOW_Y() AS INTEGER",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WORLD_TO_SCREEN_X",
@@ -7764,7 +7764,7 @@
    "name": "WRITEALL",
    "kind": "core",
    "signature": "WRITEALL(pfad, text)",
-   "module": "gbrt"
+   "module": "dhrt"
   },
   {
    "name": "WRITELINE",

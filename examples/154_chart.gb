@@ -173,7 +173,7 @@ END SUB
 stil_anwenden()
 
 ' QUITREQUESTED() statt nur ESC: eine Schleife, die es nie fragt, laeuft
-' headless (GBRT_FRAMES) endlos weiter -- die Demo liess sich damit nicht
+' headless (DHRT_FRAMES) endlos weiter -- die Demo liess sich damit nicht
 ' als Bild aufnehmen.
 WHILE NOT QUITREQUESTED()
     IF KEYPRESSED(KEY_ESCAPE) THEN BREAK

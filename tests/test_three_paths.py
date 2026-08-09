@@ -1,8 +1,8 @@
-"""Golden-Tests fuer drift-anfaellige Kern-Semantik (gegen `gbrt`).
+"""Golden-Tests fuer drift-anfaellige Kern-Semantik (gegen `dhrt`).
 
-Stufe B: Es gibt nur noch EINE Runtime (gbrt) -- die `run_all`-Fixture ist ein
-Alias auf `gbrt run`. Diese Tests prueften historisch die Aequivalenz von
-Tree-Walker/Python-VM/Cython-VM; jetzt sind es schlicht gbrt-Golden-Tests fuer
+Stufe B: Es gibt nur noch EINE Runtime (dhrt) -- die `run_all`-Fixture ist ein
+Alias auf `dhrt run`. Diese Tests prueften historisch die Aequivalenz von
+Tree-Walker/Python-VM/Cython-VM; jetzt sind es schlicht dhrt-Golden-Tests fuer
 die frueher drift-anfaelligen Stellen (Operatoren, Coerce, Typ-Inferenz, _fmt,
 IN, Slicing). Jeder Test asserted die erwartete Ausgabe.
 """

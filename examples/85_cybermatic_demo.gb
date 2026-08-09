@@ -1,7 +1,7 @@
 ' ============================================================================
 '  85_cybermatic_demo.gb  --  "CYBERMATIC"  (native GameBasic Showcase, HiRes)
 '
-'  Beat- UND audio-reaktive Demoscene-Nummer fuer die native Runtime (gbrt).
+'  Beat- UND audio-reaktive Demoscene-Nummer fuer die native Runtime (dhrt).
 '  Das Spektrum + die 3D-Szenen reagieren auf eine ECHTE FFT der laufenden
 '  Musik (AUDIO_FFT -> raylib-Mix-Tap). Alle 16 Takte wechselt die Szene:
 '      TUNNEL  ->  RING  ->  PLASMA

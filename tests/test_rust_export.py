@@ -1,6 +1,6 @@
-"""Test: `gbrt --export <datei.gb>` -- Selbst-Export einer eigenstaendigen Exe.
+"""Test: `dhrt --export <datei.gb>` -- Selbst-Export einer eigenstaendigen Exe.
 
-gbrt kompiliert den Quelltext selbst (ohne Python) zu `.gbc` und haengt den
+dhrt kompiliert den Quelltext selbst (ohne Python) zu `.gbc` und haengt den
 Payload an eine Kopie der eigenen Runtime-Exe. Die erzeugte Exe muss ohne
 Python laufen und denselben Output wie der Python-Tree-Walker liefern.
 """
@@ -15,9 +15,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -25,9 +25,9 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+    _DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def test_export_runs_standalone(tmp_path):
@@ -42,7 +42,7 @@ def test_export_runs_standalone(tmp_path):
         "FOR i = 1 TO 3\n  PRINT i * i\nNEXT\n",
         encoding="utf-8")
     out_dir = tmp_path / "dist"
-    res = subprocess.run([str(_GBRT), "--export", str(main), str(out_dir)],
+    res = subprocess.run([str(_DHRT), "--export", str(main), str(out_dir)],
                          capture_output=True, text=True, encoding="utf-8")
     assert res.returncode == 0, f"--export Exit {res.returncode}: {res.stderr}"
 
@@ -50,7 +50,7 @@ def test_export_runs_standalone(tmp_path):
     out_exe = out_dir / exe
     assert out_exe.exists(), "exportierte Exe fehlt"
     # Die gebuendelte Exe ist groesser als die nackte Runtime (Payload dran).
-    assert out_exe.stat().st_size > _GBRT.stat().st_size
+    assert out_exe.stat().st_size > _DHRT.stat().st_size
 
     run = subprocess.run([str(out_exe)], capture_output=True, text=True,
                          encoding="utf-8")

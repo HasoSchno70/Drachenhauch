@@ -87,5 +87,5 @@ One chapter per built-in module: `sprite`, `animfsm` (animation state machine), 
 ## Status
 
 Complete: all five parts (chapters 0–76) plus the appendix, 289 pages, every example
-verified against the real `gbrt` runtime. See [`buch/OUTLINE.md`](buch/OUTLINE.md) for the
+verified against the real `dhrt` runtime. See [`buch/OUTLINE.md`](buch/OUTLINE.md) for the
 detailed, chapter-by-chapter build log (German).

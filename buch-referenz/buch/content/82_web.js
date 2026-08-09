@@ -12,7 +12,7 @@ module.exports = (H) => [
     "python rust\\build_wasm.py meinspiel.gb",
     "py -m http.server -d web 8000",
   ]),
-  H.p("Danach im Browser http://localhost:8000 öffnen. Der Bau dauert einige Minuten und braucht die emscripten-Werkzeugkette; das Ergebnis sind drei Dateien im Ordner web: gbrt.js, gbrt.wasm und – falls dein Programm Dateien braucht – gbrt.data."),
+  H.p("Danach im Browser http://localhost:8000 öffnen. Der Bau dauert einige Minuten und braucht die emscripten-Werkzeugkette; das Ergebnis sind drei Dateien im Ordner web: dhrt.js, dhrt.wasm und – falls dein Programm Dateien braucht – dhrt.data."),
   H.warn("Ein Doppelklick auf die index.html funktioniert NICHT. WebAssembly darf über file:// nicht geladen werden; es braucht echtes HTTP. Genau dafür ist der zweite Befehl da – er ist kein Zierrat."),
   H.p("Die .gb-Datei, die du beim Bauen angibst, hat zwei Aufgaben: Sie ist das Programm, das der Demo-Knopf startet, und ihr Ordner assets wird mit eingepackt. Nur diese Dateien stehen im Browser zur Verfügung – ein LOADIMAGE auf etwas anderes findet nichts."),
 

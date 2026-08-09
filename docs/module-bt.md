@@ -123,6 +123,6 @@ END TRY
 
 Siehe [examples/38_bt.gb](../examples/38_bt.gb).
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `bt` laeuft nativ mit dem Cargo-Feature `bt` (Crate `btleplug` statt `bleak`; async wird ueber eine interne tokio-Runtime synchron getrieben). Scan/Connect/Services/Characteristics/Read/Write wie im Python-Pfad; Bytes ↔ STRING per latin-1. **Hinweis:** `BT_CONNECT(addr$)` braucht eine vorher per `BT_SCAN` gesehene Adresse. `BT_SCAN` validiert `timeout_sek` streng (endliche Zahl 0..300) — ein NaN/Infinity-Wert (z.B. aus einer Rechenkette wie `POW(10,1000)`) wirft einen sauberen Fehler statt die Runtime abstuerzen zu lassen. Bauen: `python rust/build_runtime.py --hardware`. Zieht schwere Abhaengigkeiten (tokio/btleplug/windows) — daher nicht im Standard-Dev-Build.

@@ -2,15 +2,15 @@
 
 > **⚠️ HISTORISCH (vor Stufe B).** Dieses Dokument vergleicht drei
 > Ausfuehrungspfade — Tree-Walker, Python-Bytecode-VM, Cython-Native-VM —, die
-> seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `gbrt`
+> seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `dhrt`
 > (Rust/raylib). Auch `gbrun.py --bench` existiert nicht mehr. Die Zahlen unten
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
-> `gbrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
+> `dhrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
 
-## gbrt-Optimierung 2026-06-11 (aktuell)
+## dhrt-Optimierung 2026-06-11 (aktuell)
 
-Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_gbrt.py`
-(best-of-5, Prozess-Wandzeit `gbrt run`, Windows 11):
+Performance-Offensive an der Rust-VM selbst — gemessen mit `bench_dhrt.py`
+(best-of-5, Prozess-Wandzeit `dhrt run`, Windows 11):
 
 | Bench | vorher | nachher | Speedup |
 |---|---|---|---|
@@ -223,8 +223,8 @@ auf einem Sprite-Atlas.
 ## Reproduktion (historisch)
 
 > Nicht mehr lauffähig: `setup.py build_ext` und `gbrun.py --bench` sind mit den
-> Python-Pfaden entfernt. Heute misst man direkt gegen `gbrt`
-> (`gbrt run examples/bench_fib.gb`).
+> Python-Pfaden entfernt. Heute misst man direkt gegen `dhrt`
+> (`dhrt run examples/bench_fib.gb`).
 
 ```
 python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)

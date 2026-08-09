@@ -103,8 +103,8 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
      schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
    - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
      ein generiertes Programm-Gerüst in einen Temp-Ordner, prüft es mit
-     `gbrt --check` (Fehler landen in einem Dialog statt im Nichts) und startet
-     dann `gbrt`. Ein erneutes F5 beendet den vorigen Lauf und räumt dessen
+     `dhrt --check` (Fehler landen in einem Dialog statt im Nichts) und startet
+     dann `dhrt`. Ein erneutes F5 beendet den vorigen Lauf und räumt dessen
      Temp-Ordner; das Schließen des Designers ebenso.
      Die Form läuft **randlos auf dem echten OS-Fenster** (Fenstergröße =
      Formgröße, Titel = Formtitel); ist sie „größenveränderbar", ist das
@@ -184,7 +184,7 @@ Eine im Programm gebaute und mit `GUI_SAVE` gesicherte Form lässt sich also im
 Designer öffnen und nachjustieren, ohne dass Menüs, Reiter oder Tabellendaten
 verloren gehen; bearbeiten lassen sie sich dort aber nicht (sie werden auf der
 Design-Fläche auch nicht gezeichnet). Ein Golden-Test führt diesen Roundtrip
-real durch gbrt.
+real durch dhrt.
 
 **Robustheit beim Laden:** Beschädigte oder von Hand geschriebene Dateien
 (fehlende Felder, falsche Typen, `null`) fallen feldweise auf den Default
@@ -209,7 +209,7 @@ anschließendes Speichern die Projektdatei überschrieben).
 - **Gotcha:** Das Code-Panel hängt einen `GBHighlighter` an sein Editor-Dokument.
   Ein lebender `QSyntaxHighlighter` segfaultet beim Interpreter-Shutdown, wenn er
   die Teardown-Race von Dokument + `QApplication` überlebt (im Test sichtbar als
-  Exit-Code 116, sobald vorher ein `gbrt`-Subprozess lief). Deshalb löst
+  Exit-Code 116, sobald vorher ein `dhrt`-Subprozess lief). Deshalb löst
   `FormDesigner.closeEvent` ihn via `code_panel.detach_highlighter()`
   (`setDocument(None)`); Qt-Tests müssen das Fenster mit `win.close()` schließen.
 
@@ -229,7 +229,7 @@ Setter (`GUI_SET_ENABLED/VISIBLE/VALUE/FONT_SIZE/COLOR`, `*_SET_SELECTED`).
 Handler werden per `GUI_ON_CLICK/CHANGE`-FUNCREF verdrahtet. **Grenze:**
 `image`-Controls werden übersprungen (das `.gbform` speichert keine Bildquelle —
 `GUI_IMAGE` bräuchte ein `LOADIMAGE`). Strings escapen `"`→`""`. Ein
-run_gb-Golden-Test führt die erzeugte Konstruktion real in gbrt aus **und
+run_gb-Golden-Test führt die erzeugte Konstruktion real in dhrt aus **und
 vergleicht sie gegen `GUI_LOAD` desselben `.gbform`** — beide Wege müssen
 dasselbe Formular bauen.
 

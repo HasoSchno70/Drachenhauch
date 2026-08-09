@@ -20,7 +20,7 @@ from ..tokens import KEYWORDS
 # leicht beschaedigt sein. Die Laufzeit (`gui.rs`, `widget_from_json`) faellt in
 # so einem Fall durchgaengig auf den Default zurueck (`as_i64().unwrap_or(d)`)
 # statt abzubrechen -- der Designer macht es genauso, sonst quittiert er eine
-# Datei, die gbrt anstandslos laedt, mit einem rohen Python-Traceback.
+# Datei, die dhrt anstandslos laedt, mit einem rohen Python-Traceback.
 def _as_int(d: dict, key: str, default: int) -> int:
     v = d.get(key, default)
     if isinstance(v, bool) or v is None:
@@ -147,7 +147,7 @@ def _gb_ident(s: str) -> str:
     """Bezeichner aus einem Control-Namen: nur [A-Za-z0-9_], nicht mit Ziffer,
     kein reserviertes Wort (sonst `_`-Suffix -- `DIM Print AS ...` waere sonst
     ein Parse-Fehler im exportierten Programm). `KEYWORDS` deckt exakt die
-    Woerter ab, die gbrt als Bezeichner ablehnt (empirisch abgeglichen)."""
+    Woerter ab, die dhrt als Bezeichner ablehnt (empirisch abgeglichen)."""
     t = re.sub(r"[^A-Za-z0-9_]", "_", str(s))
     if not t or t[0].isdigit():
         t = "_" + t
@@ -686,7 +686,7 @@ class FormDoc:
             # Durch `_gb_ident`: der Name wird als `SUB <name>()` und als
             # FUNCREF emittiert. Ein Control "OK Knopf" erzeugte sonst
             # `SUB OK KnopfClick()` -- Parse-Fehler, und weil F5 die
-            # gbrt-Ausgabe verwarf, passierte einfach gar nichts.
+            # dhrt-Ausgabe verwarf, passierte einfach gar nichts.
             name = self._unique_handler_name(_gb_ident((c.name or c.kind) + suffix))
             setattr(c, ev, name)
         self.code.setdefault(name, "")

@@ -181,7 +181,7 @@ Die kurzen Stücke loopen; der Ablaufplan läuft davon unbeirrt weiter. Herkunft
 - **Ein Render-Target hat seine EIGENE Pixelgröße** — der Inhalt darf nicht mit
   dem Fenster-Maßstab hineingezeichnet werden. Im Vollbild (Maßstab 2) landete
   sonst alles doppelt so groß in einem Ziel fester Größe; was rechts herausfiel,
-  blieb in einem behaltenen Target als klebender Rand stehen. *(In gbrt behoben,
+  blieb in einem behaltenen Target als klebender Rand stehen. *(In dhrt behoben,
   2026-08-02, mit Regressionstest.)*
 - **Ein Bloom muss ein halbes Texel vom Rand entfernt abtasten.** Auf 0..1 zu
   klemmen reicht nicht: genau auf der Texturkante mischt die bilineare Filterung

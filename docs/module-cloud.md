@@ -74,7 +74,7 @@ NEXT
 ## Der Referenz-Server
 
 `cloudserver/` ist ein eigener kleiner Flask-Prozess (nicht Teil von
-`gbrt`), den du selbst hostest — kein externer Cloud-Dienst, keine
+`dhrt`), den du selbst hostest — kein externer Cloud-Dienst, keine
 Account-Verwaltung. Ein einziges geteiltes API-Key-Secret schützt vor
 zufälligen Bots, aber **nicht** vor einem Spieler, der den in seinem
 kompilierten Spiel eingebetteten Key extrahiert. Für ein kleines Hobby-

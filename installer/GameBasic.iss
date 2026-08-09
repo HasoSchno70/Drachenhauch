@@ -1,6 +1,6 @@
 ; Inno-Setup-Skript fuer GameBasic.
 ; Erzeugt einen Windows-Installer aus der PyInstaller-onedir-Ausgabe
-; (..\dist\GameBasic) + der gbrt-Runtime. Aufruf ueber installer\build_installer.py
+; (..\dist\GameBasic) + der dhrt-Runtime. Aufruf ueber installer\build_installer.py
 ; (setzt AppVersion). Manuell:  ISCC.exe /DAppVersion=2026.1 installer\GameBasic.iss
 
 #ifndef AppVersion
@@ -33,7 +33,7 @@ SetupIconFile=GameBasic.ico
 LicenseFile=EULA.txt
 
 ; --- Code-Signing (optional) ---
-; build_installer.py signiert App-Exe, gbrt.exe UND den fertigen Installer extern
+; build_installer.py signiert App-Exe, dhrt.exe UND den fertigen Installer extern
 ; per signtool (gesteuert ueber GB_SIGN_CERT/GB_SIGN_PASS) -- das ist der
 ; Standardweg. Wer ZUSAETZLICH den Uninstaller bei der Kompilierung signieren
 ; lassen will, definiert beim ISCC-Aufruf ein SignTool und aktiviert die zwei
@@ -47,15 +47,15 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Desktop-Verknuepfung anlegen"; GroupDescription: "Zusaetzliche Symbole:"
-Name: "addtopath"; Description: "Installationsordner zum PATH hinzufuegen (gbrt im Terminal nutzbar)"; GroupDescription: "Optionen:"
+Name: "addtopath"; Description: "Installationsordner zum PATH hinzufuegen (dhrt im Terminal nutzbar)"; GroupDescription: "Optionen:"
 Name: "assocgb"; Description: ".gb-Dateien mit GameBasic verknuepfen"; GroupDescription: "Optionen:"
 
 [Files]
 ; Komplette eingefrorene IDE (PyInstaller onedir).
 Source: "..\dist\GameBasic\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Native Runtime neben die Exe -- die IDE findet sie (_find_gbrt) und sie liegt
+; Native Runtime neben die Exe -- die IDE findet sie (_find_dhrt) und sie liegt
 ; (bei aktivem PATH-Task) fuer das Terminal bereit.
-Source: "..\rust\drachenhauch_runtime\target\release\gbrt.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\rust\drachenhauch_runtime\target\release\dhrt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Beispielprogramme + Showcase-Thumbnails (screenshots/) in die OEFFENTLICHEN
 ; DOKUMENTE -> `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der
 ; `project_root/examples` der eingefrorenen App (gbrun._project_root): so findet

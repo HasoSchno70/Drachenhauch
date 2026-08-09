@@ -1,16 +1,16 @@
-"""Golden-Tests fuer **gbrt-only**-Builtins.
+"""Golden-Tests fuer **dhrt-only**-Builtins.
 
-Seit 2026-06-05 werden neue Builtins nur noch in der nativen Runtime `gbrt`
+Seit 2026-06-05 werden neue Builtins nur noch in der nativen Runtime `dhrt`
 (Rust) implementiert -- der Python-Tree-Walker (`interpreter.py`) wird nicht
-mehr erweitert. Diese Builtins lassen sich daher nicht per TW==gbrt-Paritaet
-testen; stattdessen laeuft das Programm durch gbrt und der Output wird gegen
+mehr erweitert. Diese Builtins lassen sich daher nicht per TW==dhrt-Paritaet
+testen; stattdessen laeuft das Programm durch dhrt und der Output wird gegen
 erwartete Literale geprueft (Golden-Test).
 
-Die Quelle wird ueber gbrts EIGENEN Rust-Compiler (`gbrt --runsrc`) kompiliert
+Die Quelle wird ueber dhrts EIGENEN Rust-Compiler (`dhrt --runsrc`) kompiliert
 und ausgefuehrt -- NICHT ueber die Python-Toolchain. Wichtig: die Python-
-`compiler.py` erkennt gbrt-only-Builtins nicht (sie stehen nicht mehr im Python-
-`BUILTINS`-Registry) und wuerde sie als User-Calls fehlkompilieren. gbrts Rust-
-Compiler emittiert CALL_BUILTIN fuer jeden unbekannten Call -> der gbrt-VM-Pfad
+`compiler.py` erkennt dhrt-only-Builtins nicht (sie stehen nicht mehr im Python-
+`BUILTINS`-Registry) und wuerde sie als User-Calls fehlkompilieren. dhrts Rust-
+Compiler emittiert CALL_BUILTIN fuer jeden unbekannten Call -> der dhrt-VM-Pfad
 loest sie nativ auf.
 """
 import os
@@ -23,9 +23,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -33,20 +33,20 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None,
-    reason="native Runtime 'gbrt' nicht gebaut (rust/build_runtime.py)")
+    _DHRT is None,
+    reason="native Runtime 'dhrt' nicht gebaut (rust/build_runtime.py)")
 
 
-def _gbrt(source: str) -> str:
-    """Schreibt `source` in eine temp .gb und fuehrt sie via `gbrt --runsrc`
+def _dhrt(source: str) -> str:
+    """Schreibt `source` in eine temp .gb und fuehrt sie via `dhrt --runsrc`
     (Rust-Frontend: preprocess->lex->parse->compile->VM); stdout mit LF."""
     fd, tmp = tempfile.mkstemp(suffix=".gb")
     os.close(fd)
     Path(tmp).write_text(source, encoding="utf-8")
     try:
-        res = subprocess.run([str(_GBRT), "--runsrc", tmp],
+        res = subprocess.run([str(_DHRT), "--runsrc", tmp],
                              capture_output=True, text=True, timeout=60)
         return res.stdout.replace("\r\n", "\n")
     finally:
@@ -57,7 +57,7 @@ def _gbrt(source: str) -> str:
 
 
 def _run(source: str) -> str:
-    return _gbrt(source).strip()
+    return _dhrt(source).strip()
 
 
 # --- WP1: Array-Aggregate ---------------------------------------------------
@@ -185,7 +185,7 @@ PRINT TRYVAL("42", -1), TRYVAL("3.5", -1), TRYVAL("oops", -1), TRYVAL("  7  ", 0
 # --- Compiler-Regression: funktions-lokale Slots (kein globaler Name-Leak) ---
 
 def test_function_local_scope_no_global_leak():
-    """Frueher kompilierte gbrts Rust-Compiler skalare DIMs und FOR-Variablen in
+    """Frueher kompilierte dhrts Rust-Compiler skalare DIMs und FOR-Variablen in
     Funktionen als GLOBALE Namen statt funktions-lokale Slots. Dann korrumpierte
     ein gleichnamiges Local einer aufgerufenen Funktion die FOR-Schleifenvariable
     -> Endlosschleife (z.B. die Cybermatic-3D-Demo hing). Hier: `fb` hat ein
@@ -395,7 +395,7 @@ PRINT y[0], y[1], y[2], y[3], y[4]'''
     assert _run(src) == "3 7 2 1 9"
 
 
-# --- G1: FLT (Int->Float-Cast) nativ in gbrt -------------------------------
+# --- G1: FLT (Int->Float-Cast) nativ in dhrt -------------------------------
 
 def test_flt_int_to_float():
     """FLT lief frueher nur im Tree-Walker; jetzt auch nativ (Stolperstein G1)."""

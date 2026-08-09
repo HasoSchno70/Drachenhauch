@@ -222,7 +222,7 @@ Datei → Oeffnen mit einem PNG, das ein bestehender Sheet ist: der Editor fragt
 
 ## Test-Sprite
 
-Aktion "Test-Sprite" im Datei-Menue: oeffnet ein kleines natives gbrt-Fenster, das die Animation rendert (mit aktuellen Frame-Dauern). Schneller Sanity-Check, ob das Timing stimmt.
+Aktion "Test-Sprite" im Datei-Menue: oeffnet ein kleines natives dhrt-Fenster, das die Animation rendert (mit aktuellen Frame-Dauern). Schneller Sanity-Check, ob das Timing stimmt.
 
 ## Code-Export
 

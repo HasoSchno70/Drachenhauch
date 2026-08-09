@@ -15,9 +15,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -25,24 +25,24 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="gbrt nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 
 def _dump_gbc(tmp_path) -> dict:
-    """Ein valides .gbc-JSON-Skelett (via `gbrt --dumpbc`) holen."""
+    """Ein valides .gbc-JSON-Skelett (via `dhrt --dumpbc`) holen."""
     src = tmp_path / "tiny.gb"
     src.write_text("PRINT 1 + 2\n", encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--dumpbc", str(src)],
+    r = subprocess.run([str(_DHRT), "--dumpbc", str(src)],
                        capture_output=True, text=True, encoding="utf-8", timeout=30)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
 
 def _run_gbc(tmp_path, data: dict) -> subprocess.CompletedProcess:
-    p = tmp_path / "corrupt.gbc"   # NICHT .gb -> gbrt nimmt den .gbc-Pfad
+    p = tmp_path / "corrupt.gbc"   # NICHT .gb -> dhrt nimmt den .gbc-Pfad
     p.write_text(json.dumps(data), encoding="utf-8")
-    return subprocess.run([str(_GBRT), str(p)], capture_output=True,
+    return subprocess.run([str(_DHRT), str(p)], capture_output=True,
                           text=True, encoding="utf-8", timeout=30)
 
 

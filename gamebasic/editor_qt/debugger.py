@@ -1,10 +1,10 @@
-"""Debugger fuer GameBasic (Editor) -- ueber die native Runtime `gbrt debug`.
+"""Debugger fuer GameBasic (Editor) -- ueber die native Runtime `dhrt debug`.
 
-`DebugController` spawnt `gbrt debug datei.gb` und spricht dessen newline-JSON-
+`DebugController` spawnt `dhrt debug datei.gb` und spricht dessen newline-JSON-
 Protokoll: ein Reader-Thread liest stdout-Events (paused/output/finished/error)
 und uebersetzt sie in Qt-Signale; Steuer-Kommandos (continue/step/stop/
 set-breakpoints) gehen als JSON-Zeilen an stdin. Die Pause-Logik (Breakpoints
-inkl. Bedingungen, Step over/into/out, Variablen-Snapshot) liegt in gbrt
+inkl. Bedingungen, Step over/into/out, Variablen-Snapshot) liegt in dhrt
 (vm.rs); hier nur noch das Protokoll <-> Qt-Glue.
 
 Die oeffentliche API (Signale + Methoden) ist unveraendert, damit main_window
@@ -27,11 +27,11 @@ from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
 # duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
-from .gbrt_locate import find_gbrt as _find_gbrt
+from .dhrt_locate import find_dhrt as _find_dhrt
 
 
 class DebugController(QObject):
-    """Steuert eine Debug-Sitzung ueber einen `gbrt debug`-Subprozess.
+    """Steuert eine Debug-Sitzung ueber einen `dhrt debug`-Subprozess.
     Lebt im UI-Thread; ein Reader-Thread marshalt Events als Qt-Signale."""
 
     paused = Signal(int, object)   # editor_line, frames {locals,globals,depth}
@@ -70,13 +70,13 @@ class DebugController(QObject):
 
     # ----------------------------------------------------- Start
     def start(self, source: str, base_path) -> bool:
-        """Startet die Debug-Sitzung (gbrt-Subprozess). Liefert True, wenn der
+        """Startet die Debug-Sitzung (dhrt-Subprozess). Liefert True, wenn der
         Prozess gestartet wurde; Parse-/Compile-Fehler kommen asynchron via
-        `failed`. False nur, wenn gbrt fehlt/nicht startbar."""
-        gbrt = _find_gbrt()
-        if gbrt is None:
+        `failed`. False nur, wenn dhrt fehlt/nicht startbar."""
+        dhrt = _find_dhrt()
+        if dhrt is None:
             self.failed.emit(
-                "Debugger benoetigt die native Runtime gbrt "
+                "Debugger benoetigt die native Runtime dhrt "
                 "(bauen: python rust/build_runtime.py).", -1)
             return False
         base = Path(base_path)
@@ -85,21 +85,21 @@ class DebugController(QObject):
         os.close(fd)
         self._tmp = tmp
         try:
-            from .gbrt_locate import gbrt_spawn_semaphore
+            from .dhrt_locate import dhrt_spawn_semaphore
             Path(tmp).write_text(source, encoding="utf-8")
             # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen
-            # gleichzeitig startende `gbrt`-Subprozesse aus anderen Editor-
-            # Threads (siehe gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer
+            # gleichzeitig startende `dhrt`-Subprozesse aus anderen Editor-
+            # Threads (siehe dhrt_locate.dhrt_spawn_semaphore-Kommentar fuer
             # den verifizierten Crash).
-            with gbrt_spawn_semaphore:
+            with dhrt_spawn_semaphore:
                 self._proc = subprocess.Popen(
-                    [str(gbrt), "debug", tmp],
+                    [str(dhrt), "debug", tmp],
                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE, text=True,
                     cwd=str(base) if base.is_dir() else None, bufsize=1)
         except Exception as exc:  # noqa: BLE001
             self._cleanup_tmp()
-            self.failed.emit(f"gbrt-Start: {exc}", -1)
+            self.failed.emit(f"dhrt-Start: {exc}", -1)
             return False
         self._mode = "running"
         self._started = False
@@ -124,7 +124,7 @@ class DebugController(QObject):
                 self._proc.stdin.write(json.dumps(obj) + "\n")
                 self._proc.stdin.flush()
             except (OSError, ValueError) as exc:
-                # Frueher hier still verschluckt: stirbt gbrt zwischen zwei
+                # Frueher hier still verschluckt: stirbt dhrt zwischen zwei
                 # Kommandos, wurde z.B. "Continue" zu einem No-Op ohne jede
                 # Rueckmeldung. Nur melden, wenn wir nicht ohnehin schon ein
                 # finished/error-Event gesehen haben (dann ist das Ende
@@ -154,7 +154,7 @@ class DebugController(QObject):
             self._handle_event(ev)
         proc.wait()
         # stdout zu, aber kein finished/error gesehen -> Compile-/Parse-Fehler
-        # (gbrt debug bricht vor dem Lauf ab und schreibt nur stderr).
+        # (dhrt debug bricht vor dem Lauf ab und schreibt nur stderr).
         if not self._got_terminal:
             err = ""
             stderr_read_failed = False
@@ -172,7 +172,7 @@ class DebugController(QObject):
             elif stderr_read_failed:
                 self._safe_emit(
                     self.failed,
-                    "gbrt-Prozess beendet, stderr nicht lesbar (moeglicher Absturz)", -1)
+                    "dhrt-Prozess beendet, stderr nicht lesbar (moeglicher Absturz)", -1)
                 self._safe_emit(self.finished, "fehler")
             else:
                 self._safe_emit(self.finished, "fertig")
@@ -249,10 +249,10 @@ class DebugController(QObject):
         self._send({"cmd": "step-out"})
 
     def stop(self) -> None:
-        """Sendet das Stop-Kommando; reagiert gbrt binnen kurzer Frist nicht
+        """Sendet das Stop-Kommando; reagiert dhrt binnen kurzer Frist nicht
         (haengt/abgestuerzt), wird der Prozess hart beendet. Frueher gab es
         hier gar keinen Fallback (anders als profiler.py/output_console.py),
-        wodurch Subprozess + Reader-Thread bei einem haengenden gbrt
+        wodurch Subprozess + Reader-Thread bei einem haengenden dhrt
         unbegrenzt weiterliefen."""
         self._send({"cmd": "stop"})
         proc = self._proc

@@ -1,8 +1,8 @@
-"""Stufe B, Phase 3: Quell-Zeilen-Tracking + `gbrt profile`.
+"""Stufe B, Phase 3: Quell-Zeilen-Tracking + `dhrt profile`.
 
-Verifiziert, dass gbrts Compiler echte Zeilennummern emittiert (Voraussetzung
-fuer Profiler/Debugger/Laufzeitfehler-Zeilen) und dass `gbrt profile` pro Zeile
-Count + Zeit liefert. Skippt, wenn gbrt nicht gebaut ist.
+Verifiziert, dass dhrts Compiler echte Zeilennummern emittiert (Voraussetzung
+fuer Profiler/Debugger/Laufzeitfehler-Zeilen) und dass `dhrt profile` pro Zeile
+Count + Zeit liefert. Skippt, wenn dhrt nicht gebaut ist.
 """
 import json
 import os
@@ -14,9 +14,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -24,8 +24,8 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="gbrt nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="dhrt nicht gebaut")
 
 _PROG = (
     'DIM total AS INTEGER\n'      # Zeile 1
@@ -44,9 +44,9 @@ def _write(tmp_path, src):
 
 
 def test_compiler_emits_real_lines(tmp_path):
-    """`gbrt --dumpbc` -> main.lines ist NICHT mehr alles Null."""
+    """`dhrt --dumpbc` -> main.lines ist NICHT mehr alles Null."""
     f = _write(tmp_path, _PROG)
-    r = subprocess.run([str(_GBRT), "--dumpbc", str(f)],
+    r = subprocess.run([str(_DHRT), "--dumpbc", str(f)],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, r.stderr
     lines = json.loads(r.stdout)["main"]["lines"]
@@ -55,9 +55,9 @@ def test_compiler_emits_real_lines(tmp_path):
 
 
 def test_profile_line_counts(tmp_path):
-    """`gbrt profile` -> Schleifen-Zeilen haben die erwarteten Counts."""
+    """`dhrt profile` -> Schleifen-Zeilen haben die erwarteten Counts."""
     f = _write(tmp_path, _PROG)
-    r = subprocess.run([str(_GBRT), "profile", str(f)],
+    r = subprocess.run([str(_DHRT), "profile", str(f)],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode == 0, r.stderr
     d = json.loads(r.stdout)
@@ -69,9 +69,9 @@ def test_profile_line_counts(tmp_path):
 
 
 def test_runtime_error_has_line(tmp_path):
-    """Bonus: gbrt-Laufzeitfehler tragen jetzt die Quell-Zeile."""
+    """Bonus: dhrt-Laufzeitfehler tragen jetzt die Quell-Zeile."""
     f = _write(tmp_path, 'PRINT "a"\nPRINT 1 \\ 0\n')
-    r = subprocess.run([str(_GBRT), "run", str(f)],
+    r = subprocess.run([str(_DHRT), "run", str(f)],
                        capture_output=True, text=True, timeout=30)
     assert r.returncode != 0
     assert ":2:" in r.stderr      # Division-durch-0 in Zeile 2

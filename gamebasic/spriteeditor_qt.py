@@ -3129,7 +3129,7 @@ class SpriteEditorWindow(QMainWindow):
         """Generiert ein temporaeres GB-Test-Programm das das Sprite
         anzeigt (animiert wenn Multi-Frame), und startet es via gbrun.py
         als Subprozess. Der User sieht das Sprite live im
-        nativen gbrt-Fenster wie es im Spiel aussehen wuerde.
+        nativen dhrt-Fenster wie es im Spiel aussehen wuerde.
         """
         import sys, subprocess, tempfile
         if not self.doc.frames:

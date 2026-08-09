@@ -1,5 +1,5 @@
 ' 100_2d_extras.gb -- 2D-Extras (Batch 1): dicke Linien, runde Rechtecke,
-' Gradienten, Splines. Grafik laeuft nur nativ in gbrt (F6 / --native).
+' Gradienten, Splines. Grafik laeuft nur nativ in dhrt (F6 / --native).
 
 SCREEN(640, 400, "2D-Extras", 1)
 

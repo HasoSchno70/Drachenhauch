@@ -1,6 +1,6 @@
 """Golden-Tests fuer das m3d-Modul (VEC3/VEC4/QUAT/MAT4).
 
-run_gb spawnt `gbrt run` -> skippt automatisch, wenn gbrt nicht gebaut ist.
+run_gb spawnt `dhrt run` -> skippt automatisch, wenn dhrt nicht gebaut ist.
 f32-intern: bei nicht-exakten Werten via ROUND vergleichen.
 """
 import pytest
@@ -192,26 +192,26 @@ def test_model_instanced_non_mat4_element_raises(run_gb):
 
 
 def test_model_instanced_headless_render(tmp_path):
-    """Echter Render-Pfad: die Instancing-Demo laeuft headless (GBRT_FRAMES)
+    """Echter Render-Pfad: die Instancing-Demo laeuft headless (DHRT_FRAMES)
     durch DrawMeshInstanced und schreibt einen Screenshot."""
     import os
     import subprocess
     from pathlib import Path
 
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
-    gbrt = next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
+    dhrt = next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
-    if gbrt is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
 
     shot = tmp_path / "instanced.png"
-    env = dict(os.environ, GBRT_FRAMES="2", GBRT_SCREENSHOT=str(shot))
+    env = dict(os.environ, DHRT_FRAMES="2", DHRT_SCREENSHOT=str(shot))
     demo = root / "examples" / "104_instancing.gb"
-    r = subprocess.run([str(gbrt), "run", str(demo)], capture_output=True,
+    r = subprocess.run([str(dhrt), "run", str(demo)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60, env=env)
-    assert r.returncode == 0, f"gbrt Exit {r.returncode}: {r.stderr}"
+    assert r.returncode == 0, f"dhrt Exit {r.returncode}: {r.stderr}"
     assert shot.exists() and shot.stat().st_size > 0, "kein Screenshot erzeugt"
 
 

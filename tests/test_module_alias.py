@@ -6,7 +6,7 @@ wird `J_PARSE`. Single-word-Namen (`vec2`) werden komplett durch den Alias erset
 
 Stufe B: die frueheren `call_builtin`/`load_module`/`EXTERNAL_TYPES`-Tests (die
 die Python-Alias-Mechanik direkt prueften) sind durch die run_gb-Golden-Tests
-unten abgedeckt -- gbrt bildet aliasierte Builtin-Namen selbst zurueck. Die
+unten abgedeckt -- dhrt bildet aliasierte Builtin-Namen selbst zurueck. Die
 Preprocess-Tests laufen weiter gegen das (behaltene) `gamebasic.preprocess`.
 """
 from pathlib import Path
@@ -37,7 +37,7 @@ def test_preprocess_alias_must_be_identifier():
     assert "PRINT 1" in merged
 
 
-# --- Aliasing end-to-end (gegen gbrt) ----------------------------------
+# --- Aliasing end-to-end (gegen dhrt) ----------------------------------
 
 def _lines(out):
     return [l.strip() for l in out.split("\n") if l.strip()]

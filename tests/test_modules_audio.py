@@ -1,7 +1,7 @@
 """Tests fuer die reine Synth-Mathematik (`gamebasic.synth`).
 
 Stufe B: Die Audio-Wiedergabe/Synthese-Builtins (AUDIO_TONE/NOISE/SFX/...) laufen
-nur nativ in gbrt; der frueher hier getestete Tree-Walker-"nur nativ"-Gate
+nur nativ in dhrt; der frueher hier getestete Tree-Walker-"nur nativ"-Gate
 entfaellt mit dem Tree-Walker (Phase 8). Was bleibt, ist die geteilte Synth-
 Mathematik in `gamebasic/synth.py` (von Builtin UND gbsfx-Export genutzt, reines
 numpy -- in Phase 8 behalten).
@@ -58,7 +58,7 @@ def test_synth_matches_envelope_shape():
     assert abs(wa[0]) < 0.1
 
 
-# --- AUDIO_MUSIC_PLAY/STOP: Argument-Validierung (gbrt-Golden) ---------------
+# --- AUDIO_MUSIC_PLAY/STOP: Argument-Validierung (dhrt-Golden) ---------------
 # Die Wiedergabe selbst braucht ein Audio-Geraet (nicht headless testbar);
 # die Wrapper-Validierung in vm.rs laeuft aber VOR der Audio-Initialisierung
 # und ist damit golden-testbar.

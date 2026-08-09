@@ -1,6 +1,6 @@
 ' Partikel-System: Konfiguration, Emit, Update, Lifecycle.
 ' Diese Demo ist nicht-grafisch und prueft nur die Logik. Ein grafisches
-' Beispiel (gbrt) waere typischerweise: jeden Frame PARTICLE_EMIT(sys, 5),
+' Beispiel (dhrt) waere typischerweise: jeden Frame PARTICLE_EMIT(sys, 5),
 ' PARTICLE_UPDATE(sys, dt), PARTICLE_DRAW(sys).
 IMPORT "particles"
 

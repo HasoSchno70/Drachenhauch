@@ -1,7 +1,7 @@
 # Vom Build erzeugte Artefakte (rust/build_wasm.py) -- nicht einchecken.
-gbrt.js
-gbrt.wasm
-gbrt.data
+dhrt.js
+dhrt.wasm
+dhrt.data
 program.gb
 program.gbc
 # Kopie des assets/-Ordners neben der .gb -- Quelle ist das Programm selbst.

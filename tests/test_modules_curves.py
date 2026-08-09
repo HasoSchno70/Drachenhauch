@@ -1,6 +1,6 @@
 """Tests fuer das curves-Modul (Animation-Curves).
 
-Golden-Tests gegen die native Runtime `gbrt` (Stufe B): IMPORT "curves" + PRINT,
+Golden-Tests gegen die native Runtime `dhrt` (Stufe B): IMPORT "curves" + PRINT,
 Soll-Ausgabe asserten. Frueher liefen sie via `call_builtin` direkt gegen die
 Python-Builtin-Impl (in Phase 8 geloescht).
 """

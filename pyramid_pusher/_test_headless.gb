@@ -1,5 +1,5 @@
 ' Headless-Test: prueft Parser + Code-Generierung gegen die echte Level-Datei
-' (laeuft ohne Grafik via gbrt --runsrc / run).
+' (laeuft ohne Grafik via dhrt --runsrc / run).
 CONST MAXLEV = 400
 CONST GWMAX = 48
 

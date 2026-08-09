@@ -234,12 +234,12 @@ PRINT x
 # --- TIMER + Joystick: Registrierung ---------------------------------
 
 def test_timer_builtin_registered():
-    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
     assert "timer" in builtin_names_lower()
 
 
 def test_joystick_builtins_registered():
-    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "joystick_count", "joystick_name",
         "joystick_axis", "joystick_button",
@@ -329,7 +329,7 @@ def test_format_invalid_mask_errors(run_gb):
 # --- INKEY$ / WAITKEY: nur Registrierung -----------------------------
 
 def test_inkey_waitkey_registered():
-    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
     n = builtin_names_lower()
     assert "inkey$" in n
     assert "waitkey" in n
@@ -515,7 +515,7 @@ def test_fstring_empty_expr_errors(run_gb):
 # --- REPEAT/DATA/READ/RESTORE/Defaults (frueher Python-VM, jetzt Tree-Walker) ---
 
 def _run_vm(src):
-    # Stufe B: laeuft jetzt ueber gbrt (frueher Tree-Walker/Python-VM).
+    # Stufe B: laeuft jetzt ueber dhrt (frueher Tree-Walker/Python-VM).
     # Eigenstaendiger Runner, damit die test_vm_*-Tests unveraendert bleiben.
     import os as _os
     import subprocess as _sp
@@ -523,20 +523,20 @@ def _run_vm(src):
     from pathlib import Path as _P
     from gamebasic.errors import GBRuntimeError, ParseError, LexerError
     root = _P(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if _os.name == "nt" else "gbrt"
-    gbrt = None
+    exe = "dhrt.exe" if _os.name == "nt" else "dhrt"
+    dhrt = None
     for v in ("release", "debug"):
         p = root / "rust" / "drachenhauch_runtime" / "target" / v / exe
         if p.exists():
-            gbrt = p
+            dhrt = p
             break
-    if gbrt is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     fd, tmp = _tf.mkstemp(suffix=".gb", prefix="_gbtest_")
     _os.close(fd)
     try:
         _P(tmp).write_text(src, encoding="utf-8")
-        r = _sp.run([str(gbrt), "run", tmp], capture_output=True,
+        r = _sp.run([str(dhrt), "run", tmp], capture_output=True,
                     text=True, encoding="utf-8", timeout=60)
     finally:
         try:
@@ -611,7 +611,7 @@ def test_vm_fstring():
 
 
 # (Der frühere Test, dass der Compiler param-referenzierende Defaults ablehnt,
-#  ist entfernt: gbrt UNTERSTÜTZT sie jetzt (Callee-Prolog, Stufe-B-Härtung) --
+#  ist entfernt: dhrt UNTERSTÜTZT sie jetzt (Callee-Prolog, Stufe-B-Härtung) --
 #  siehe test_default_can_reference_earlier_param. Der Python-Compiler wird in
 #  Phase 8 gelöscht.)
 

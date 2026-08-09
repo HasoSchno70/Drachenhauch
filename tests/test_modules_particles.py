@@ -1,6 +1,6 @@
 """Tests fuer das particles-Modul (Emitter-Logik).
 
-Golden-Tests gegen `gbrt` (Stufe B): IMPORT "particles" + PARTICLE_COUNT/EMIT/
+Golden-Tests gegen `dhrt` (Stufe B): IMPORT "particles" + PARTICLE_COUNT/EMIT/
 UPDATE/CLEAR + PRINT. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8
 geloescht). Tests, die fueher die internen NumPy-Arrays (`sys._xs`/`_ys`) lasen
 (Gravity-/Pos-/Performance-Interna), entfallen -- die Partikel-Positionen sind in

@@ -14,24 +14,24 @@ from pathlib import Path
 import pytest
 
 
-def _find_gbrt():
+def _find_dhrt():
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _run(src: str, tmp_path, frames: int = 2) -> str:
     p = tmp_path / "t.gb"
     p.write_text(src, encoding="utf-8")
-    env = dict(os.environ, GBRT_FRAMES=str(frames))
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
+    env = dict(os.environ, DHRT_FRAMES=str(frames))
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
                        encoding="utf-8", env=env, timeout=60)
     assert r.returncode == 0, r.stderr
     return r.stdout
@@ -40,13 +40,13 @@ def _run(src: str, tmp_path, frames: int = 2) -> str:
 def _check(src: str, tmp_path) -> list:
     p = tmp_path / "c.gb"
     p.write_text(src, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--check", str(p)], capture_output=True, text=True,
+    r = subprocess.run([str(_DHRT), "--check", str(p)], capture_output=True, text=True,
                        encoding="utf-8", timeout=60)
     return json.loads((r.stdout or "").strip() or "[]")
 
 
 def test_edge_builtins_are_known_to_the_compiler(tmp_path):
-    # `--check` warnt bei Builtins, die gbrt nicht kennt -- der eingebettete
+    # `--check` warnt bei Builtins, die dhrt nicht kennt -- der eingebettete
     # builtin_index.json muss die neuen Namen also enthalten.
     src = ('SCREEN(64, 64, "T", 1)\n'
            'PRINT MOUSE_HIT(0); MOUSE_RELEASED(0); KEYHIT(32); KEYRELEASED(32)\n'
@@ -92,8 +92,8 @@ def test_mouse_cursor_accepts_known_shapes(tmp_path):
 def test_mouse_cursor_rejects_unknown_shape(tmp_path):
     p = tmp_path / "bad.gb"
     p.write_text('SCREEN(64, 64, "T", 1)\nMOUSE_CURSOR("quatsch")\n', encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
-                       encoding="utf-8", env=dict(os.environ, GBRT_FRAMES="1"), timeout=60)
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
+                       encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)
     assert r.returncode != 0
     assert "MOUSE_CURSOR" in r.stderr and "quatsch" in r.stderr
 
@@ -115,6 +115,6 @@ def test_joystick_any_button_reports_minus_one_when_idle(tmp_path):
 def test_joystick_edges_reject_an_invalid_pad(tmp_path):
     p = tmp_path / "j.gb"
     p.write_text('SCREEN(64, 64, "T", 1)\nPRINT JOYSTICK_HIT(99, 7)\n', encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(p)], capture_output=True, text=True,
-                       encoding="utf-8", env=dict(os.environ, GBRT_FRAMES="1"), timeout=60)
+    r = subprocess.run([str(_DHRT), "run", str(p)], capture_output=True, text=True,
+                       encoding="utf-8", env=dict(os.environ, DHRT_FRAMES="1"), timeout=60)
     assert r.returncode != 0 and "JOYSTICK_HIT" in r.stderr

@@ -1,8 +1,8 @@
 """Async-Diagnostik fuer Live-Error-Marker.
 
-Diagnostik laeuft ueber die native Runtime: `gbrt --check datei.gb` liefert die
+Diagnostik laeuft ueber die native Runtime: `dhrt --check datei.gb` liefert die
 gefundenen Probleme (preprocess/lex/parse/compile) als JSON mit Zeile. Damit
-haengt der Editor nicht mehr am Python-Compiler (Stufe B). Faellt gbrt (nicht
+haengt der Editor nicht mehr am Python-Compiler (Stufe B). Faellt dhrt (nicht
 gebaut), greift ein Lexer/Parser-Fallback (nur Syntax) -- der Editor bleibt
 nutzbar, ohne den Python-Compiler zu importieren.
 
@@ -41,19 +41,19 @@ import shiboken6
 from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: 4 Module (error_check/debugger/profiler/output_console)
-# definierten je eine eigene, fast wortgleiche `_find_gbrt()`-Wrapper-
-# Funktion (inkl. dupliziertem Docstring) um dieselbe `gbrt_locate.find_gbrt`
-# -- als Alias importiert bleibt der Modul-Name `_find_gbrt` fuer bestehende
-# Tests patchbar (`monkeypatch.setattr(modul, "_find_gbrt", ...)`), ohne die
+# definierten je eine eigene, fast wortgleiche `_find_dhrt()`-Wrapper-
+# Funktion (inkl. dupliziertem Docstring) um dieselbe `dhrt_locate.find_dhrt`
+# -- als Alias importiert bleibt der Modul-Name `_find_dhrt` fuer bestehende
+# Tests patchbar (`monkeypatch.setattr(modul, "_find_dhrt", ...)`), ohne die
 # Wrapper-Funktion + ihren Docstring viermal zu duplizieren.
-from .gbrt_locate import find_gbrt as _find_gbrt
+from .dhrt_locate import find_dhrt as _find_dhrt
 
 
 @dataclass
 class ParseProblem:
     line: int
     message: str
-    # Severity: "error" (default) oder "warning". gbrt --check liefert beide
+    # Severity: "error" (default) oder "warning". dhrt --check liefert beide
     # (z.B. Hardware-Modul-IMPORT ohne Build = Warning); der Editor rendert
     # Warnungen mit gelber statt roter Wellenlinie.
     severity: str = "error"
@@ -65,21 +65,21 @@ class ParseProblem:
 
 def _check_source(source: str, base_path: Path | None,
                    checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
-    """Liefert ALLE Diagnostik-Probleme (leer = sauber). Bevorzugt `gbrt --check`
+    """Liefert ALLE Diagnostik-Probleme (leer = sauber). Bevorzugt `dhrt --check`
     (volle preprocess/lex/parse/compile-Diagnostik mit Zeile, inkl. Warnungen);
-    faellt gbrt, nur Syntax (Lexer/Parser) ohne den Python-Compiler -- dieser
+    faellt dhrt, nur Syntax (Lexer/Parser) ohne den Python-Compiler -- dieser
     Fallback findet nur das erste Syntaxproblem. `checker` (optional) registriert
-    den laufenden gbrt-Subprozess, damit ein neuerer `check()`-Aufruf ihn
+    den laufenden dhrt-Subprozess, damit ein neuerer `check()`-Aufruf ihn
     abbrechen kann (siehe LiveErrorChecker.check)."""
-    from .gbrt_locate import gbrt_spawn_semaphore
-    # Das Semaphor umschliesst ABSICHTLICH auch `_find_gbrt()` (nicht nur den
+    from .dhrt_locate import dhrt_spawn_semaphore
+    # Das Semaphor umschliesst ABSICHTLICH auch `_find_dhrt()` (nicht nur den
     # Popen()-Call) -- dessen `Path.resolve()` ist unter Buendel-Last (viele
     # gleichzeitig feuernde Checker-Threads) selbst abgestuerzt (siehe
-    # gbrt_locate.py-Kommentar).
-    with gbrt_spawn_semaphore:
-        gbrt = _find_gbrt()
-        if gbrt is not None:
-            return _check_via_gbrt(source, base_path, gbrt, checker)
+    # dhrt_locate.py-Kommentar).
+    with dhrt_spawn_semaphore:
+        dhrt = _find_dhrt()
+        if dhrt is not None:
+            return _check_via_dhrt(source, base_path, dhrt, checker)
     one = _check_syntax_only(source, base_path)
     return [one] if one is not None else []
 
@@ -87,13 +87,13 @@ def _check_source(source: str, base_path: Path | None,
 _DIAG_FAILED_MSG = "Diagnose fehlgeschlagen -- moeglicherweise veraltete Fehleranzeige"
 
 
-def _check_via_gbrt(source: str, base_path, gbrt,
+def _check_via_dhrt(source: str, base_path, dhrt,
                      checker: "LiveErrorChecker | None" = None) -> list[ParseProblem]:
-    """`gbrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> Liste
+    """`dhrt --check` auf einer temporaeren .gb-Datei. JSON-Diagnose -> Liste
     aller ParseProblems (Errors UND Warnungen). Zeilen sind quell-relativ (bei
     `IMPORT "datei.gb"`-Inlining moeglw. verschoben).
 
-    Frueher gab jeder gbrt-Fehler (Crash/Timeout/kaputtes JSON) eine leere
+    Frueher gab jeder dhrt-Fehler (Crash/Timeout/kaputtes JSON) eine leere
     Liste zurueck -- der Editor zeigte dann "keine Fehler", obwohl der
     Checker selbst kaputt war (irrefuehrender als gar keine Diagnose). Jetzt
     wird ein einzelnes Warning-ParseProblem geliefert, das das transparent
@@ -108,21 +108,21 @@ def _check_via_gbrt(source: str, base_path, gbrt,
     os.close(fd)
     proc = None
     try:
-        # Laeuft bereits unter `gbrt_spawn_semaphore` (siehe `_check_source`).
+        # Laeuft bereits unter `dhrt_spawn_semaphore` (siehe `_check_source`).
         Path(tmp).write_text(source, encoding="utf-8")
         proc = subprocess.Popen(
-            [str(gbrt), "--check", tmp],
+            [str(dhrt), "--check", tmp],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         if checker is not None:
             checker._set_active_proc(proc)
         stdout, _ = proc.communicate(timeout=15)
         diags = json.loads(stdout or "[]")
     except subprocess.TimeoutExpired:
-        return [ParseProblem(line=1, message="Diagnose-Timeout (gbrt --check antwortete nicht)",
+        return [ParseProblem(line=1, message="Diagnose-Timeout (dhrt --check antwortete nicht)",
                              severity="warning", phase="diagnostic")]
     except (OSError, ValueError):
         # ValueError deckt json.JSONDecodeError ab (kaputtes/leeres stdout,
-        # z.B. bei einem gbrt-Absturz oder abgebrochenem Prozess).
+        # z.B. bei einem dhrt-Absturz oder abgebrochenem Prozess).
         return [ParseProblem(line=1, message=_DIAG_FAILED_MSG,
                              severity="warning", phase="diagnostic")]
     finally:
@@ -139,7 +139,7 @@ def _check_via_gbrt(source: str, base_path, gbrt,
         line = int(d.get("line", 0)) or 1
         message = str(d.get("message", ""))
         # NUR die Phasen mappen, die auf der GEMERGTEN Quelle laufen.
-        # gbrt liefert in EINEM Array drei Koordinatensysteme (siehe
+        # dhrt liefert in EINEM Array drei Koordinatensysteme (siehe
         # main.rs::check_source): lex/parse/compile laufen auf dem
         # gemergten Text, die Hardware-Import-Warnungen werden dagegen
         # ausdruecklich aus `raw_source` berechnet und sind damit schon
@@ -158,7 +158,7 @@ def _check_via_gbrt(source: str, base_path, gbrt,
 def _origins_for(source: str, base_path) -> list | None:
     """`origins`-Tabelle der gemergten Quelle (oder None, wenn nicht ermittelbar).
 
-    gbrt preprocesst intern selbst und meldet Diagnosen deshalb in
+    dhrt preprocesst intern selbst und meldet Diagnosen deshalb in
     GEMERGTEN Zeilen -- `main.rs::check_main` sagt das ausdruecklich
     ("der Editor mappt via origins zurueck"). Genau diese Haelfte fehlte
     hier: die Zeilen wurden woertlich uebernommen, wodurch in JEDER Datei
@@ -182,7 +182,7 @@ def _origins_for(source: str, base_path) -> list | None:
 
 
 def _check_syntax_only(source: str, base_path: Path | None) -> Optional[ParseProblem]:
-    """Fallback ohne gbrt: Preprocess + Lex + Parse (nur Syntax, kein Compiler)."""
+    """Fallback ohne dhrt: Preprocess + Lex + Parse (nur Syntax, kein Compiler)."""
     try:
         from ..lexer import Lexer
         from ..parser import Parser
@@ -247,7 +247,7 @@ class LiveErrorChecker(QObject):
         super().__init__(parent)
         self._gen = 0
         self._lock = threading.Lock()
-        self._active_proc = None   # laufender `gbrt --check`-Subprozess (falls einer)
+        self._active_proc = None   # laufender `dhrt --check`-Subprozess (falls einer)
 
     def check(self, source: str, base_path: Path | None = None) -> None:
         with self._lock:
@@ -256,7 +256,7 @@ class LiveErrorChecker(QObject):
             proc = self._active_proc
         # Einen noch laufenden Check-Subprozess abbrechen -- frueher wurde
         # bei schnellem Tippen nur das ERGEBNIS verworfen (Generation-
-        # Counter), der `gbrt --check`-Prozess lief aber unbeaufsichtigt
+        # Counter), der `dhrt --check`-Prozess lief aber unbeaufsichtigt
         # bis zum Ende weiter. Bei sehr schnellem Tippen konnten sich so
         # mehrere Prozesse gleichzeitig ansammeln.
         if proc is not None:

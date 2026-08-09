@@ -1,7 +1,7 @@
 # GUI-Module — Design & Plan (für die nächste Session)
 
 > **⚠️ HISTORISCH (Design-Notiz).** Das `gui`-Modul ist inzwischen vollständig
-> umgesetzt und läuft **nativ in `gbrt`** (`rust/gb_runtime/src/gui.rs`) — nicht
+> umgesetzt und läuft **nativ in `dhrt`** (`rust/gb_runtime/src/gui.rs`) — nicht
 > mehr in `gamebasic/modules/gui.py`. Erwähnungen von „3 Pfaden"/Tree-Walker/
 > Python-VM unten beschreiben die damalige (entfernte) Architektur. Aktuelle
 > Doku: [module-gui.md](module-gui.md).

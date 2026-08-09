@@ -232,7 +232,7 @@ NET_SEND(sock, len_str + msg)
 - Client braucht die LAN-IP des Servers.
 
 **Server-Neustart auf demselben Port:** unter Windows (dem einzigen offiziell
-unterstuetzten Zielsystem von gbrt) laesst sich ein Port direkt nach dem
+unterstuetzten Zielsystem von dhrt) laesst sich ein Port direkt nach dem
 Schliessen sofort wieder binden — anders als unter Linux/macOS gibt es hier
 kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
 (empirisch verifiziert). `NET_TCP_LISTEN` setzt daher bewusst kein
@@ -242,6 +242,6 @@ kein TIME_WAIT-bedingtes "Address already in use" ohne `SO_REUSEADDR`
 
 [examples/72_net_chat.gb](../examples/72_net_chat.gb) zeigt einen kleinen Chat (TCP-Server + Client). UDP-Beispiele sind in den Tests (`tests/test_modules_net.py`) zu finden.
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `net` laeuft nativ mit dem Cargo-Feature `net` (reine `std::net`, keine zusaetzliche Crate). TCP-Listener/-Sockets + UDP, non-blocking per Default. Der Standard-Dev-Build (`python rust/build_runtime.py`) enthaelt `net` bereits.

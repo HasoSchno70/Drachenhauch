@@ -1049,12 +1049,12 @@ def test_open_initial_reports_a_missing_file(tmp_path):
 
 
 # ------------------------------------------------------- F5-Run-Pfad (Review)
-def test_run_form_uses_the_shared_gbrt_lookup(tmp_path):
+def test_run_form_uses_the_shared_dhrt_lookup(tmp_path):
     # Die lokale Kopie kannte den PyInstaller-Fall nicht -> F5 war in der
     # installierten IDE unmoeglich ("Runtime nicht gebaut").
     import gamebasic.formdesigner_qt as fq
-    from gamebasic.editor_qt.gbrt_locate import find_gbrt
-    assert fq._find_gbrt is find_gbrt
+    from gamebasic.editor_qt.dhrt_locate import find_dhrt
+    assert fq._find_dhrt is find_dhrt
 
 
 def test_run_form_reports_a_broken_program_instead_of_failing_silently(
@@ -1062,8 +1062,8 @@ def test_run_form_reports_a_broken_program_instead_of_failing_silently(
     # `Popen` lief ohne Ausgabe-Capture und ohne Exit-Code-Pruefung: jeder
     # Fehler im erzeugten Programm endete in einem stummen F5.
     import gamebasic.formdesigner_qt as fq
-    if fq._find_gbrt(tmp_path) is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if fq._find_dhrt(tmp_path) is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _app()
     win = FormDesigner(tmp_path)
     b = win.canvas.doc.add("button", 10, 10)
@@ -1082,8 +1082,8 @@ def test_run_form_reports_a_broken_program_instead_of_failing_silently(
 
 def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeypatch):
     import gamebasic.formdesigner_qt as fq
-    if fq._find_gbrt(tmp_path) is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if fq._find_dhrt(tmp_path) is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _app()
     win = FormDesigner(tmp_path)
     win.canvas.doc.add("button", 10, 10)

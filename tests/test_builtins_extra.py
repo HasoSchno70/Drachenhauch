@@ -1,5 +1,5 @@
 """Golden-Tests fuer die Befehlssatz-Ergaenzungen: Game-Math, Perlin-Noise,
-Laufzeit-Typen, Encoding/Hash und Datei/OS-Helfer. run_gb -> gbrt run."""
+Laufzeit-Typen, Encoding/Hash und Datei/OS-Helfer. run_gb -> dhrt run."""
 import pytest
 
 from gamebasic.errors import GameBasicError

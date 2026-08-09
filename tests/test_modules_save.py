@@ -1,7 +1,7 @@
 """Tests fuer das save-Modul (persistente Save-Slots, JSON-Backend).
 
-Golden-Tests gegen `gbrt` (Stufe B): GB-Programm mit IMPORT "save"; Datei-I/O
-laeuft im `base=tmp_path`-Verzeichnis (run_gb legt die .gb dort ab, gbrt chdirt
+Golden-Tests gegen `dhrt` (Stufe B): GB-Programm mit IMPORT "save"; Datei-I/O
+laeuft im `base=tmp_path`-Verzeichnis (run_gb legt die .gb dort ab, dhrt chdirt
 hin -> relative Save-Pfade landen in tmp_path). Frueher via `call_builtin` gegen
 die Python-Impl (in Phase 8 geloescht).
 """
@@ -119,7 +119,7 @@ def test_get_missing_key_raises(run_gb, tmp_path):
 
 
 def test_get_wrong_type_raises(run_gb, tmp_path):
-    # gbrt-Wortlaut: "kein INTEGER" (TW sagte "nicht INTEGER").
+    # dhrt-Wortlaut: "kein INTEGER" (TW sagte "nicht INTEGER").
     with pytest.raises(GBRuntimeError, match="kein INTEGER"):
         _run(run_gb, tmp_path, _PRE +
              'SAVE_SET_STRING(s, "k", "hi")\nPRINT SAVE_GET_INT(s, "k")\n')

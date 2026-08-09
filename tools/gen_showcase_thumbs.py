@@ -1,12 +1,12 @@
 """Erzeugt Showcase-Thumbnails fuer das Welcome-Panel.
 
 Fuer jede Demo aus `gamebasic.editor_qt.showcase.SHOWCASE` wird die native
-Runtime `gbrt` headless gestartet (`GBRT_FRAMES` begrenzt die Frames,
-`GBRT_SCREENSHOT` zieht beim letzten Frame einen PNG-Screenshot), das Bild
+Runtime `dhrt` headless gestartet (`DHRT_FRAMES` begrenzt die Frames,
+`DHRT_SCREENSHOT` zieht beim letzten Frame einen PNG-Screenshot), das Bild
 auf Thumbnail-Breite herunterskaliert und unter
 `examples/screenshots/<stem>.png` abgelegt.
 
-Aufruf (gbrt muss gebaut sein -- `rust/build_runtime.py`):
+Aufruf (dhrt muss gebaut sein -- `rust/build_runtime.py`):
     .venv\\Scripts\\python.exe tools\\gen_showcase_thumbs.py [stem ...]
 
 Ohne Argumente werden alle Showcase-Demos erzeugt; mit Argumenten nur die
@@ -28,9 +28,9 @@ from gamebasic.editor_qt.showcase import SHOWCASE, thumb_path  # noqa: E402
 THUMB_WIDTH = 480
 
 
-def _find_gbrt() -> Path | None:
+def _find_dhrt() -> Path | None:
     base = ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -38,7 +38,7 @@ def _find_gbrt() -> Path | None:
     return None
 
 
-def _generate(entry: dict, gbrt: Path) -> bool:
+def _generate(entry: dict, dhrt: Path) -> bool:
     from PIL import Image
 
     src = ROOT / "examples" / entry["file"]
@@ -54,16 +54,16 @@ def _generate(entry: dict, gbrt: Path) -> bool:
     raw = src.parent / f"{stem}.png"
     env = dict(
         os.environ,
-        GBRT_FRAMES=str(entry.get("frames", 120)),
-        GBRT_SCREENSHOT=str(raw),
+        DHRT_FRAMES=str(entry.get("frames", 120)),
+        DHRT_SCREENSHOT=str(raw),
     )
-    # `gbrt run`: kompiliert die Quelle selbst (Stufe B -- kein Python-Compiler
+    # `dhrt run`: kompiliert die Quelle selbst (Stufe B -- kein Python-Compiler
     # mehr) und chdirt ins examples/-Verzeichnis. Manche Demos laufen in einem
     # `WHILE TRUE`/ESC-Loop und beenden sich NICHT ueber das Frame-Limit -- der
-    # Headless-Screenshot wird trotzdem beim Erreichen von GBRT_FRAMES gezogen.
+    # Headless-Screenshot wird trotzdem beim Erreichen von DHRT_FRAMES gezogen.
     try:
         subprocess.run(
-            [str(gbrt), "run", str(src)],
+            [str(dhrt), "run", str(src)],
             env=env, timeout=30, capture_output=True, text=True,
         )
     except subprocess.TimeoutExpired:
@@ -85,9 +85,9 @@ def _generate(entry: dict, gbrt: Path) -> bool:
 
 
 def main() -> int:
-    gbrt = _find_gbrt()
-    if gbrt is None:
-        print("gbrt nicht gefunden -- erst bauen: rust/build_runtime.py")
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        print("dhrt nicht gefunden -- erst bauen: rust/build_runtime.py")
         return 1
     wanted = set(sys.argv[1:])
     entries = [e for e in SHOWCASE
@@ -96,7 +96,7 @@ def main() -> int:
     ok = 0
     for e in entries:
         print(f"- {e['file']}")
-        if _generate(e, gbrt):
+        if _generate(e, dhrt):
             ok += 1
     print(f"Fertig: {ok}/{len(entries)} erzeugt.")
     return 0 if ok == len(entries) else 2

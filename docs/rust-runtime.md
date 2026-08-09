@@ -4,7 +4,7 @@
 > verweist vielfach auf die damalige Verifikation „bit-identisch zu den
 > Python-Pfaden" (Tree-Walker / Python-VM / Cython-VM) und auf
 > `interpreter.py`/`vm.py`/`serialize.py`. Diese Python-Pfade und -Dateien sind
-> **alle entfernt** — `gbrt` ist heute die **einzige** Runtime und kompiliert den
+> **alle entfernt** — `dhrt` ist heute die **einzige** Runtime und kompiliert den
 > Quelltext selbst. Korrektheit sichern jetzt **run_gb-Golden-Tests** + Rust-
 > `#[test]`s. Die „bit-identisch"-Stellen unten sind also historische
 > Port-Verifikations-Notizen, kein aktueller Mehr-Pfad-Zustand.
@@ -31,7 +31,7 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
    eine standalone `.exe` gebündelt — siehe unten)*
 
 **Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
-ein Befehl kompiliert (Python) → `.gbc` → startet `gbrt`. ✅ *erledigt* (siehe
+ein Befehl kompiliert (Python) → `.gbc` → startet `dhrt`. ✅ *erledigt* (siehe
 unten).
 
 ## Offen / nächste Schritte (Stand 2026-06-01)
@@ -53,7 +53,7 @@ Schritte 1–6 fertig; zusätzlich nativ: **Audio inkl. echter FFT** (`AUDIO_FFT
   prozedurale Texturen (`GENTEX_PERLIN`/`GRADIENT`/`CHECKED`/`COLOR`, nativ),
   Clipboard + Drag&Drop (`CLIPBOARD_GET/SET`, `FILES_DROPPED`/`FILE_DROPPED`,
   nativ), **Render-Targets** (`RENDERTARGET_NEW`/`BEGIN`/`END`/`DRAW`, dual-path —
-  gbrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die
+  dhrt: eigener Command-Buffer pro Target, beim FLIP vor der Hauptszene auf die
   RenderTexture gerendert). Sound-Pan existiert bereits (`AUDIO_PAN`). Demos
   `examples/100_2d_extras.gb`, `101_blend_gentex.gb`, `102_render_target.gb`.
 - **Noch offen (klein):** Sound-Aliase (`LoadSoundAlias`, ueberlappende Wiedergabe
@@ -142,13 +142,13 @@ neue Builtins, z.B. fuer SID-Charakter ohne Buffer-Bake).
     nimmt sie dazu. Default-Dev-Build laesst Hardware weg (haelt die schweren
     Deps tokio/btleplug/windows aus dem Normal-Build).
   - **Frueh-Warnung beim IMPORT:** Importiert ein Programm ein Hardware-Modul,
-    das dem aktuellen Build fehlt, warnt gbrt schon beim IMPORT — `gbrt run`
-    auf stderr vor dem Lauf, `gbrt --check` als `severity:"warning"` auf der
+    das dem aktuellen Build fehlt, warnt dhrt schon beim IMPORT — `dhrt run`
+    auf stderr vor dem Lauf, `dhrt --check` als `severity:"warning"` auf der
     IMPORT-Zeile (Editor-Marker). Der Laufzeitfehler beim ersten Aufruf bleibt
     zusaetzlich (`vm.rs::unknown_builtin_msg`). Logik in `preprocess.rs`
     (`missing_hardware_modules` / `missing_hardware_imports_with_lines`).
 
-### Warnungen von `gbrt --check`
+### Warnungen von `dhrt --check`
 
 Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker:
 
@@ -165,10 +165,10 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
   GameBasic sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
   (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
-  `tests/test_gbrt_check.py`.
+  `tests/test_dhrt_check.py`.
 
 **Voll-Native-Portierung KOMPLETT (2026-06-03):** alle 12 zuvor Python-only-
-Module laufen jetzt nativ in gbrt. Nur die Editoren brauchen noch Python.
+Module laufen jetzt nativ in dhrt. Nur die Editoren brauchen noch Python.
 
 ### Echtes HDR-Cubemap-IBL (`LIGHT_ENV_HDR`) — erledigt
 
@@ -236,21 +236,21 @@ Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
 ```
 
 Das kompiliert die `.gb`-Datei (Lexer/Parser/Compiler bleiben in Python),
-serialisiert sie in eine **temporäre `.gbc`** und startet `gbrt` im Verzeichnis
+serialisiert sie in eine **temporäre `.gbc`** und startet `dhrt` im Verzeichnis
 der Quelldatei (damit relative Asset-Pfade wie `LOADIMAGE("assets/…")`
 stimmen). stdout/stderr und ein etwaiges Grafik-Fenster werden direkt
-durchgereicht; der Exit-Code von `gbrt` wird weitergegeben. Fehlt das Binary,
+durchgereicht; der Exit-Code von `dhrt` wird weitergegeben. Fehlt das Binary,
 verweist die Meldung auf `rust\build_runtime.py`.
 
 So bleibt Python die Toolchain (und später nur noch der Editor), während die
-Ausführung nativ läuft — kein manuelles `serialize` + `gbrt` mehr.
+Ausführung nativ läuft — kein manuelles `serialize` + `dhrt` mehr.
 
 **Im Editor:** Der **Run**-Button (F5) ist der einzige Run-Knopf und nutzt
-**primär `gbrt`** (fällt bei nicht gebauter Runtime / Compile- oder Start-Fehler
+**primär `dhrt`** (fällt bei nicht gebauter Runtime / Compile- oder Start-Fehler
 automatisch auf den Tree-Walker zurück). Der Editor kompiliert die Datei
-in-process in eine temporäre `.gbc` und startet `gbrt` **direkt** als `QProcess`
+in-process in eine temporäre `.gbc` und startet `dhrt` **direkt** als `QProcess`
 (nicht über `gbrun.py`) — so beendet der `Stop`-Button auch den nativen Prozess
-(kein verwaister gbrt). Output und Laufzeitfehler
+(kein verwaister dhrt). Output und Laufzeitfehler
 (`datei.gb:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
 
 ### Laufzeitfehler mit Zeilennummer
@@ -260,14 +260,14 @@ vom Parser) in ein zu `code` paralleles `lines`-Array (`CompiledFunction.lines`,
 serialisiert als `"lines"` in der `.gbc`). Die Rust-VM merkt sich die Zeile der
 zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei einem propagierenden
 Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `gbrun.py --native`
-reicht den Quell-Dateinamen als 2. Arg an `gbrt` durch, sodass die Meldung lautet:
+reicht den Quell-Dateinamen als 2. Arg an `dhrt` durch, sodass die Meldung lautet:
 
 ```
 Laufzeitfehler in spiel.gb:42: Index 10 ausserhalb [0..2] in Dimension 0
 ```
 
 Die Python/Cython-VMs ignorieren `lines` (additives Feld, kein Recompile nötig);
-`gbrt <datei.gbc>` ohne Label nutzt den `.gbc`-Pfad. Zeile `0` (untracked) →
+`dhrt <datei.gbc>` ohne Label nutzt den `.gbc`-Pfad. Zeile `0` (untracked) →
 Meldung ohne Zeilenangabe.
 
 **Compile-Fehler** (vor der Ausführung, in Python) tragen ebenfalls eine Zeile:
@@ -320,12 +320,12 @@ weiß pro Opcode, welche Struktur `arg` hat (Index, Slot, Name, Tupel).
 ## Schritt 2: Rust-VM-Kern
 
 Standalone-Crate [`rust/gb_runtime/`](../rust/gb_runtime) (getrennt vom
-PyO3-Helper-Crate `rust/gb_native/`). Binary `gbrt`.
+PyO3-Helper-Crate `rust/gb_native/`). Binary `dhrt`.
 
 ```
 cd rust/gb_runtime
 cargo build --release
-target/release/gbrt <datei.gbc>
+target/release/dhrt <datei.gbc>
 ```
 
 **Implementiert:** LOAD_CONST/POP/DUP, Locals (LOAD/STORE/DECLARE), Global-Slots
@@ -432,7 +432,7 @@ Laufzeit mit einer klaren Fehlermeldung.
 `IMAGEWIDTH`/`IMAGEHEIGHT`, `KEYPRESSED`, `MOUSEX`/`MOUSEY`/`MOUSEBUTTON`,
 `QUITREQUESTED`, `SLEEP`.
 
-**Game-Loop-Grundlagen** (nativ in gbrt/raylib): `DELTA()`
+**Game-Loop-Grundlagen** (nativ in dhrt/raylib): `DELTA()`
 (Sekunden seit letztem FLIP, framerate-unabhaengige Bewegung), `FPS()`,
 `SETFPS(n)` (Ziel-Framerate, 0 = ungedrosselt), `SET_FULLSCREEN(an)` (nativ
 echtes `ToggleFullscreen`, nicht mehr No-Op), `SETWINDOWTITLE(s)`,
@@ -458,13 +458,13 @@ mit Python-identischen Werten vorregistriert (`register_default_globals`).
 
 ### Headless-Verifizierung
 
-`gbrt` rendert headless und schreibt einen Screenshot, gesteuert per ENV:
+`dhrt` rendert headless und schreibt einen Screenshot, gesteuert per ENV:
 
 ```
-GBRT_FRAMES=3 GBRT_SCREENSHOT=out.png gbrt programm.gbc
+DHRT_FRAMES=3 DHRT_SCREENSHOT=out.png dhrt programm.gbc
 ```
 
-Nach `GBRT_FRAMES` Frames liefert `QUITREQUESTED()` `true` (Loop endet sauber);
+Nach `DHRT_FRAMES` Frames liefert `QUITREQUESTED()` `true` (Loop endet sauber);
 beim Erreichen der Grenze wird das PNG gespeichert (auch wenn das Programm eine
 feste `FOR`-Schleife statt `QUITREQUESTED` nutzt). **Hinweis:** raylibs
 `TakeScreenshot` legt die Datei relativ zum Arbeitsverzeichnis ab.
@@ -473,24 +473,24 @@ feste `FOR`-Schleife statt `QUITREQUESTED` nutzt). **Hinweis:** raylibs
 
 Ein einzelner Screenshot zeigt einen Augenblick. Vieles geht aber erst ueber
 die Zeit schief -- etwas kippt zu frueh um, ein Rand bleibt stehen, eine
-Bewegung ruckelt. `GBRT_CONTACT` nimmt in festen Abstaenden Bilder auf und
+Bewegung ruckelt. `DHRT_CONTACT` nimmt in festen Abstaenden Bilder auf und
 setzt sie beschriftet als Raster in EINE PNG:
 
 ```
-GBRT_FRAMES=480 GBRT_CONTACT=bogen.png gbrt run demo.gb
+DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.gb
 ```
 
 | Variable | Wirkung |
 |---|---|
-| `GBRT_CONTACT` | Pfad der Raster-PNG (schaltet die Aufnahme ein) |
-| `GBRT_CONTACT_MAX` | wie viele Bilder (Standard 12) |
-| `GBRT_CONTACT_COLS` | Spalten im Raster (Standard 4) |
-| `GBRT_CONTACT_EVERY` | Abstand in Frames; ohne Angabe gleichmaessig ueber `GBRT_FRAMES` verteilt |
+| `DHRT_CONTACT` | Pfad der Raster-PNG (schaltet die Aufnahme ein) |
+| `DHRT_CONTACT_MAX` | wie viele Bilder (Standard 12) |
+| `DHRT_CONTACT_COLS` | Spalten im Raster (Standard 4) |
+| `DHRT_CONTACT_EVERY` | Abstand in Frames; ohne Angabe gleichmaessig ueber `DHRT_FRAMES` verteilt |
 
 Die Kacheln werden auf hoechstens 480 Pixel Breite heruntergerechnet (lesbar
 genug fuers Beurteilen, handliche Dateigroesse) und tragen ihre Bildnummer.
-Geschrieben wird, sobald `GBRT_CONTACT_MAX` Bilder beisammen sind oder
-`GBRT_FRAMES` erreicht ist. Ohne `GBRT_CONTACT` aendert sich nichts.
+Geschrieben wird, sobald `DHRT_CONTACT_MAX` Bilder beisammen sind oder
+`DHRT_FRAMES` erreicht ist. Ohne `DHRT_CONTACT` aendert sich nichts.
 
 Verifiziert (visuell per Screenshot) an allen 7 IMPORT-freien Grafik-Beispielen:
 `30_shapes` (alle Formen), `44_language_showcase`, `34_schneefall`,
@@ -634,7 +634,7 @@ raylib bundelt den Mixer mit). **Core-Builtins, kein `IMPORT` nötig:**
 - `LOADSOUND(pfad$) -> SOUND` (Handle = INTEGER-Index), `PLAYSOUND(sound[,
   loops, lautstaerke])`, `STOPSOUND(sound)`.
 - `PLAYMUSIC(pfad$[, loops, lautstaerke])`, `STOPMUSIC()` — ein Stream
-  gleichzeitig; `gbrt` ruft `update_stream` pro `FLIP` (sonst stockt die
+  gleichzeitig; `dhrt` ruft `update_stream` pro `FLIP` (sonst stockt die
   Wiedergabe). Musik loopt (raylib-Default).
 
 **Audio-Reaktivität (FFT):** `AUDIO_FFT(bands)` füllt ein `ARRAY OF FLOAT` mit
@@ -659,7 +659,7 @@ zu `&'static`, damit `Sound`/`Music` in `Vec`/`Option` gehalten werden können
 3D ist **native-only**: raylib hat eine echte 3D-Pipeline, der Tree-Walker nicht. Das
 Modul `g3d` registriert die Builtins (damit der Compiler `CALL_BUILTIN`
 emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
-(„… nur in der nativen Runtime … mit F6"). In `gbrt` rendern sie über raylibs
+(„… nur in der nativen Runtime … mit F6"). In `dhrt` rendern sie über raylibs
 `begin_mode3D`-API.
 
 **Builtins** ([`g3d.py`](../gamebasic/modules/g3d.py), Rendering in
@@ -684,7 +684,7 @@ emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 - `GRID3D(linien, abstand)` — Boden-Raster.
 
 **Render-Modell** (erweitert das 2D-Recording): 3D-Cmds landen in einer eigenen
-Liste `cmds3d`; beim `FLIP` rendert `gbrt` **zuerst** alle 3D-Cmds in einem
+Liste `cmds3d`; beim `FLIP` rendert `dhrt` **zuerst** alle 3D-Cmds in einem
 `begin_mode3D(cam3d)`-Block, **danach** die 2D-Layer obenauf — das 2D-HUD liegt
 also immer über der Szene. Koordinaten sind Welt-Einheiten (kein Screen-Scale),
 Farben `&HRRGGBB`. `cmds3d` wird pro Frame geleert; ohne `CAMERA3D` gilt ein
@@ -755,7 +755,7 @@ ein generiertes 129×129-Graustufen-PNG). Per Screenshot verifiziert.
   - `RAY_HIT_QUAD(ox,oy,oz, dx,dy,dz, <4 Punkte à x,y,z>)` — ein **Viereck**
     (intern zwei Dreiecke). Die vier Punkte müssen **reihum** liegen (im Kreis,
     nicht über Kreuz), sonst prüfen die Teildreiecke die falsche Fläche.
-  - Die Richtung muss **nicht** normalisiert sein — gbrt normalisiert vor dem
+  - Die Richtung muss **nicht** normalisiert sein — dhrt normalisiert vor dem
     Test, sonst käme die Distanz in Vielfachen der Richtungslänge zurück
     (raylibs Rohverhalten).
 - **Maus-Picking** (Strahl vom Cursor durch die aktuelle 3D-Kamera,
@@ -950,7 +950,7 @@ identisch auf den Screen *oder* in die RenderTexture — `RaylibDrawHandle` und
 `Graphics.shaders`, der aktive Index in `post_shader_idx`.
 
 Auf dem Tree-Walker (konsolen-only) werfen die Shader-Builtins "nur in der
-nativen Runtime (gbrt)". Beispiel-Shader (GLSL 330):
+nativen Runtime (dhrt)". Beispiel-Shader (GLSL 330):
 [examples/assets/shaders/](../examples/assets/shaders/) (`crt.fs`/`bloom.fs`/
 `vignette.fs`), Demo [examples/86_postfx_shaders.gb](../examples/86_postfx_shaders.gb)
 (zyklisch AUS → CRT → BLOOM → VIGNETTE; CRT + Bloom per Screenshot verifiziert).
@@ -958,7 +958,7 @@ nativen Runtime (gbrt)". Beispiel-Shader (GLSL 330):
 ## TTF-Fonts (`LOADFONT` / `SETFONT` / `TEXT_SPACING`)
 
 Eigene TrueType-/OpenType-Schriften statt nur des eingebauten Default-Fonts.
-**Core-Builtins, kein `IMPORT` nötig** — nativ in gbrt (Tree-Walker konsolen-only):
+**Core-Builtins, kein `IMPORT` nötig** — nativ in dhrt (Tree-Walker konsolen-only):
 
 - `LOADFONT(pfad$, groesse) -> FONT` — lädt eine TTF/OTF in der Basis-Größe
   `groesse` (Glyph-Auflösung) und liefert ein **FONT-Handle (INTEGER)**.
@@ -1022,13 +1022,13 @@ Ein GameBasic-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
 Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
 
 **Prinzip (kein Recompile):** Der kompilierte Bytecode (`.gbc`) wird an eine
-Kopie von `gbrt.exe` **angehängt**. `gbrt` erkennt beim Start den Payload und
+Kopie von `dhrt.exe` **angehängt**. `dhrt` erkennt beim Start den Payload und
 führt ihn aus. Das Anhängen von Daten ans Ende einer PE-`.exe` bricht sie nicht
 (gleiches Prinzip wie PyInstaller-onefile) — der PE-Loader ignoriert Trailing-
 Bytes. Layout der **letzten 16 Bytes** der gebundelten Exe:
 
 ```
-[u64 Länge der .gbc-Bytes, little-endian][8 Byte Magic "GBRTPAY1"]
+[u64 Länge der .gbc-Bytes, little-endian][8 Byte Magic "DHRTPAY1"]
 ```
 
 Die `.gbc`-Bytes liegen direkt vor diesem Footer.
@@ -1041,7 +1041,7 @@ extrahiert den Bytecode.
 > am Dateiende kleben. `signtool` (Windows) und `codesign` (macOS) hängen den
 > Zertifikatsblock ebenfalls hinten an; suchte die Runtime nur in den letzten 16
 > Bytes, fände sich ein signiertes Spiel selbst nicht mehr und verhielte sich wie
-> ein blankes `gbrt`. Deshalb gilt die Reihenfolge **erst exportieren, dann
+> ein blankes `dhrt`. Deshalb gilt die Reihenfolge **erst exportieren, dann
 > signieren** — umgekehrt geht es nicht, denn Anhängen zerstört jede Signatur
 > (gemessen: aus `Valid` wird `NotSigned`). Die Suche läuft vom Dateiende nach
 > vorn und prüft jeden Kandidaten (Längenfeld plausibel? Nutzlast gültiges
@@ -1052,13 +1052,13 @@ extrahiert den Bytecode.
 > **Signieren kann nur, wer die Datei in der Hand hat.** Ein Zertifikat des
 > GameBasic-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
 > fremden Rechnern. Wer seine Spiele signiert ausliefern will, braucht ein
-> eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `gbrt` ins Exe-Verzeichnis
+> eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `dhrt` ins Exe-Verzeichnis
 (damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den
-eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`gbrt datei.gbc`).
+eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.gbc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.
 
 **Export-Seite** ([gamebasic/export.py](../gamebasic/export.py)):
-`export_standalone(src_gb, gbrt_path, out_dir)` kompiliert in-memory zu `.gbc`,
+`export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.gbc`,
 hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
 Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
 `LOADIMAGE("assets/…")` & Co.).
@@ -1090,5 +1090,5 @@ existiert) ändert sich nichts. Absolute Pfade werden nicht gebündelt.
 **Grenzen:** Nur String-**Literale** werden erkannt (zur Laufzeit
 zusammengesetzte Pfade nicht — dann Assets manuell in den Ausgabeordner kopieren).
 Die `.gbc` ist unkomprimiert eingebettet (JSON); die Exe-Größe entspricht
-`gbrt` + Bytecode. Cross-Compiling ist nicht vorgesehen — der Export bündelt das
-`gbrt` der aktuellen Plattform.
+`dhrt` + Bytecode. Cross-Compiling ist nicht vorgesehen — der Export bündelt das
+`dhrt` der aktuellen Plattform.

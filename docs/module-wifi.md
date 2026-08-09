@@ -123,6 +123,6 @@ WIFI_DELETE_PROFILE("AlteSchule_WLAN")  ' Profil entfernen
 
 Siehe [examples/36_wifi.gb](../examples/36_wifi.gb).
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `wifi` laeuft nativ mit dem Cargo-Feature `wifi` (Windows via `netsh wlan`, Linux via `nmcli`, macOS via `networksetup`/`airport` -- alle drei per `std::process`, keine zusaetzliche Crate). Jeder Subprozess-Aufruf hat ein 10-Sekunden-Timeout -- ein haengender/ueberlasteter Netzwerk-Stack friert damit nicht mehr den Game-Loop ein. Bauen: `python rust/build_runtime.py --hardware`. Der `rust-check`-CI-Job (`.github/workflows/ci.yml`) kompiliert das `wifi`-Feature auf allen drei Plattformen (ubuntu/macos/windows-latest) -- das einzige automatische Cross-Platform-Signal bisher, da echte WLAN-Hardware in CI-Runnern fehlt.

@@ -1,7 +1,7 @@
 """Tests fuer den Editor-Debugger (`DebugController`) -- Stufe B: laeuft jetzt
-ueber einen `gbrt debug`-Subprozess. Getestet end-to-end ueber die Qt-Signale
+ueber einen `dhrt debug`-Subprozess. Getestet end-to-end ueber die Qt-Signale
 (Reader-Thread -> queued signals, via processEvents zugestellt). Skippt ohne
-gbrt bzw. ohne PySide6.
+dhrt bzw. ohne PySide6.
 """
 import os
 import time
@@ -11,9 +11,9 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 
 pytest.importorskip("PySide6")
-from gamebasic.editor_qt.debugger import DebugController, _find_gbrt
+from gamebasic.editor_qt.debugger import DebugController, _find_dhrt
 
-pytestmark = pytest.mark.skipif(_find_gbrt() is None, reason="gbrt nicht gebaut")
+pytestmark = pytest.mark.skipif(_find_dhrt() is None, reason="dhrt nicht gebaut")
 
 
 @pytest.fixture(scope="module")
@@ -88,7 +88,7 @@ def test_compile_error_reports_failed_with_line(app, tmp_path):
 
 def test_stop_terminates_infinite_loop(app, tmp_path):
     # Review-Fund: stop() sendete frueher NUR das JSON-Kommando ohne
-    # Fallback -- haengt/ignoriert gbrt das Stop-Signal, blieben Subprozess
+    # Fallback -- haengt/ignoriert dhrt das Stop-Signal, blieben Subprozess
     # + Reader-Thread unbegrenzt am Leben. Der Watchdog garantiert jetzt
     # eine obere Zeitschranke (~3s) bis zum harten Beenden.
     dc, ev = _controller()

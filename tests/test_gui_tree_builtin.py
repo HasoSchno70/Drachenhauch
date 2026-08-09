@@ -1,7 +1,7 @@
 """Tree-View-Builtins: nur Registrierung. Render/Klick brauchen einen GL-Kontext
 und werden live ueber examples/137_gui_tree.gb abgenommen; das Baum-Modell
 (Hierarchie, Sichtbarkeit, Auswahl) deckt ein Rust-Unit-Test ab."""
-from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_tree_builtins_registered():

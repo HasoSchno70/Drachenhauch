@@ -12,7 +12,7 @@ gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer
 .venv\Scripts\python.exe gbrun.py pyramid_pusher\pyramid_pusher.gb
 ```
 
-…oder im **GameBasic-Editor** öffnen und **F5** drücken (läuft nativ über gbrt).
+…oder im **GameBasic-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
 
 > Grafik startet nur mit echtem OpenGL-Kontext — also aus dem Editor / per
 > `gbrun.py`, nicht aus einer headless-Shell.
@@ -170,7 +170,7 @@ Schatzkarte, Bestenliste/Zeit, Bonus-Mechaniken (Loch/Eis/Schalter+Tür),
 **Hinweis-System** (Taste **H**: beschränkte Push-BFS, markiert den nächsten
 sinnvollen Schub; bei Bonus-Mechaniken/zu komplex meldet es das ehrlich). Offen:
 
-- Am Ende: **Installer neu bauen**, damit alle neuen gbrt-Builtins enthalten sind.
+- Am Ende: **Installer neu bauen**, damit alle neuen dhrt-Builtins enthalten sind.
 
 ## Lizenz / Credits
 

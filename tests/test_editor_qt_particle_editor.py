@@ -2,7 +2,7 @@
 - min/max-Klemmung (Anzeige == Verhalten),
 - Burst (einmalige Emission),
 - Hintergrund-Umschalter,
-- lauffaehige Test-Demo ist gueltiger GB-Code (gegen gbrt --check).
+- lauffaehige Test-Demo ist gueltiger GB-Code (gegen dhrt --check).
 """
 import json
 import os
@@ -77,9 +77,9 @@ def test_bg_modes_switch_without_error(editor):
     assert editor.preview.bg_mode == "checker"
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -89,13 +89,13 @@ def _find_gbrt():
 
 def test_runnable_demo_is_valid_gb(editor, tmp_path):
     """Die 'In GameBasic testen'-Demo muss gueltiger GB-Code sein."""
-    gbrt = _find_gbrt()
-    if gbrt is None:
-        pytest.skip("gbrt nicht gebaut")
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        pytest.skip("dhrt nicht gebaut")
     demo = editor._build_runnable_demo()
     f = tmp_path / "demo.gb"
     f.write_text(demo, encoding="utf-8")
-    r = subprocess.run([str(gbrt), "--check", str(f)],
+    r = subprocess.run([str(dhrt), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)
     diags = json.loads(r.stdout or "[]")
     errors = [d for d in diags if d.get("severity") != "warning"]
@@ -104,9 +104,9 @@ def test_runnable_demo_is_valid_gb(editor, tmp_path):
 
 def test_export_snippet_is_valid_gb(editor, tmp_path):
     """Auch das Export-Snippet (auskommentierter Loop) muss kompilieren."""
-    gbrt = _find_gbrt()
-    if gbrt is None:
-        pytest.skip("gbrt nicht gebaut")
+    dhrt = _find_dhrt()
+    if dhrt is None:
+        pytest.skip("dhrt nicht gebaut")
     # _export baut den Code-String; wir greifen die Snippet-Logik indirekt ueber
     # die gleichen Setter ab, indem wir das Export-Dialog oeffnen und den Text
     # lesen. Einfacher: den Code ueber denselben Pfad wie _export erzeugen.
@@ -117,7 +117,7 @@ def test_export_snippet_is_valid_gb(editor, tmp_path):
     assert edit is not None
     f = tmp_path / "snippet.gb"
     f.write_text(edit.toPlainText(), encoding="utf-8")
-    r = subprocess.run([str(gbrt), "--check", str(f)],
+    r = subprocess.run([str(dhrt), "--check", str(f)],
                        capture_output=True, text=True, timeout=30)
     diags = json.loads(r.stdout or "[]")
     errors = [d for d in diags if d.get("severity") != "warning"]

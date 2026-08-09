@@ -34,5 +34,5 @@ def test_about_dialog_author_and_description(app):
     assert "Tree-Walker" not in blob
     assert "Python-VM" not in blob
     # Neue Runtime erwaehnt.
-    assert "gbrt" in blob
+    assert "dhrt" in blob
     dlg.deleteLater()

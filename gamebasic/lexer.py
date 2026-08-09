@@ -22,8 +22,8 @@ def _is_digit(ch: str) -> bool:
     akzeptieren nur einen Teil davon. Das erzeugte zwei Fehler auf einmal:
     `PRINT 5²` warf eine ungefangene ValueError (der Highlighter faengt nur
     LexerError ab -> Ausnahme bis in Qts Paint-Pfad), und `PRINT ٣` lexte
-    still als NUMBER(3) durch, obwohl gbrt es als "Unbekanntes Zeichen"
-    ablehnt. gbrts Lexer nutzt `is_ascii_digit` -- hier dieselbe Regel,
+    still als NUMBER(3) durch, obwohl dhrt es als "Unbekanntes Zeichen"
+    ablehnt. dhrts Lexer nutzt `is_ascii_digit` -- hier dieselbe Regel,
     damit Editor und Laufzeit dieselbe Sprache sehen.
     """
     return "0" <= ch <= "9"
@@ -32,7 +32,7 @@ def _is_digit(ch: str) -> bool:
 def _radix_int(digits: str, radix: int, what: str, line: int, col: int) -> int:
     """Hex-/Binaer-Literal -> INTEGER ueber die volle 64-Bit-Breite.
 
-    Muss exakt gbrts `Lexer::radix_i64` entsprechen (`lexer.rs`), sonst
+    Muss exakt dhrts `Lexer::radix_i64` entsprechen (`lexer.rs`), sonst
     sieht der Editor andere Werte als die Laufzeit. Bitmasken adressieren
     Bitmuster, keine Zahlengroessen: `&HFFFFFFFFFFFFFFFF` ("alle Bits
     gesetzt") wird darum als Zweierkomplement gedeutet und ergibt -1 --
@@ -269,7 +269,7 @@ class Lexer:
         - Grenze: der Platzhalter-Scanner zaehlt nur Klammern, er kennt
           keine String-Literale. Ein `{`/`}` INNERHALB eines Strings im
           Platzhalter (z.B. f"{REPLACE$(s, "}", "-")}") beendet den
-          Ausdruck darum zu frueh. gbrt hat dieselbe Grenze, das Programm
+          Ausdruck darum zu frueh. dhrt hat dieselbe Grenze, das Programm
           scheitert also ohnehin -- Editor und Laufzeit sind sich einig.
         """
         self._advance()              # 'f'

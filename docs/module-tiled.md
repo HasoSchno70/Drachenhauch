@@ -211,6 +211,6 @@ Was **nicht** unterstuetzt wird:
 
 Vollstaendiger Workflow inklusive Kollision: siehe [tile_collide-Modul](module-tile-collide.md).
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 `tiled` laeuft nativ (immer dabei, JSON-Loader via serde_json) und ist **bit-identisch** zu den Python-Pfaden — inkl. External-Tilesets, Tile-/Object-Properties und Bulk-Ops (`TILED_FILL_RECT`/`REPLACE`/`COUNT_GID`/`FLOOD_FILL`).

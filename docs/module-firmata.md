@@ -11,7 +11,7 @@ danach steuert GameBasic die Pins direkt.
 IMPORT "firmata"
 ```
 
-Nativ in gbrt (Feature `serial` — dieselbe `serialport`-Abhängigkeit wie das
+Nativ in dhrt (Feature `serial` — dieselbe `serialport`-Abhängigkeit wie das
 [`serial`](module-serial.md)-Modul, keine zusätzliche Dependency). Bauen:
 `python rust/build_runtime.py --hardware` (oder `--full`). Fehlt das Feature,
 meldet jeder `FIRMATA_*`-Aufruf „nicht verfügbar" mit dem Bau-Hinweis.

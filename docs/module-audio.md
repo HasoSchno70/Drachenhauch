@@ -1,6 +1,6 @@
 # Modul `audio`
 
-Erweiterte Audio-API (nativ in der Runtime `gbrt` ueber **Kira**/cpal — eigener Audio-Thread, vom Game-Loop entkoppelt). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
+Erweiterte Audio-API (nativ in der Runtime `dhrt` ueber **Kira**/cpal — eigener Audio-Thread, vom Game-Loop entkoppelt). Liefert die typischen Game-Engine-Bausteine: Channels (pro-Sound-Kontrolle), Pause/Resume, Fade-in/out, Stereo-Pan, Music-Position, plus Tone-Generation fuer prozedurale Sounds.
 
 Ergaenzt die Core-Builtins `LOADSOUND` / `PLAYSOUND` aus [Grafik-Built-ins](builtins-grafik.md) — die einfachen Calls reichen fuer "Sound abspielen", `audio` bringt das volle Audio-Mixing-Toolkit.
 
@@ -456,7 +456,7 @@ END IF
 
 [examples/116_sampler.gb](../examples/116_sampler.gb) — **Amiga-Stil-Sampler**: ein einziges Zupf-Sample (`SAMPLE_LOAD`) wird per `SAMPLE_PLAY` ueber die ganze Klaviatur gespielt (Resampling = Tonhoehe wie Paula). Auto-Melodie + Bass aus demselben Sample, anklickbare Tasten, `L` schaltet den Paula-Lo-Fi-Modus zu.
 
-## In der nativen Runtime (gbrt)
+## In der nativen Runtime (dhrt)
 
 Das `audio`-Modul laeuft nativ ueber **Kira** (cpal) — ein eigener Audio-Thread, vom Game-Loop entkoppelt (loeste 2026-06-13 raylib-Audio ab; mit dem `graphics`-Feature eingebunden, raylib bleibt fuer Fenster/Input). Audio-Ausgabe gehoert **nicht** zur deterministischen bit-identischen Garantie — wie `RND`/`tween`. Hinweise:
 

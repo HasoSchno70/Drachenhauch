@@ -87,12 +87,12 @@ def _form_mit_knopf(tmp_path, handler: str):
 import os                                    # noqa: E402
 import subprocess                            # noqa: E402
 import pytest                                # noqa: E402
-from .conftest import _GBRT                  # noqa: E402
+from .conftest import _DHRT                  # noqa: E402
 
 
 def _lauf(tmp_path, handler: str):
-    if _GBRT is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    if _DHRT is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _form_mit_knopf(tmp_path, handler)
     _klick_aufnahme(tmp_path, "klick.txt", 70, 34)
     (tmp_path / "a.gb").write_text(
@@ -106,9 +106,9 @@ def _lauf(tmp_path, handler: str):
         'WHILE NOT QUITREQUESTED()\n'
         '    GUI_UPDATE()\n    CLS(0)\n    GUI_DRAW()\n    FLIP()\n'
         'WEND\n', encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", "a.gb"], cwd=str(tmp_path),
+    r = subprocess.run([str(_DHRT), "run", "a.gb"], cwd=str(tmp_path),
                        capture_output=True, text=True, encoding="utf-8",
-                       timeout=120, env=dict(os.environ, GBRT_FRAMES="10"))
+                       timeout=120, env=dict(os.environ, DHRT_FRAMES="10"))
     zeilen = [ln for ln in (r.stdout or "").splitlines()
               if not ln.startswith(("WARNING:", "INFO:", "TRACE:"))]
     return r, zeilen

@@ -17,9 +17,9 @@ from pathlib import Path
 import pytest
 
 
-def _gbrt():
+def _dhrt():
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
@@ -51,18 +51,18 @@ WEND
 
 
 def test_blockgrenze_zeigt_keinen_akzent_wenn_nicht_gescrollt(tmp_path):
-    gbrt = _gbrt()
-    if gbrt is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     from PIL import Image
 
     src = tmp_path / "kante.gb"
     src.write_text(_PROG, encoding="utf-8")
     shot = tmp_path / "kante.png"
-    env = dict(os.environ, GBRT_FRAMES="3", GBRT_SCREENSHOT=str(shot))
-    r = subprocess.run([str(gbrt), "run", str(src)], capture_output=True,
+    env = dict(os.environ, DHRT_FRAMES="3", DHRT_SCREENSHOT=str(shot))
+    r = subprocess.run([str(dhrt), "run", str(src)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60, env=env)
-    assert r.returncode == 0, f"gbrt Exit {r.returncode}: {r.stderr}"
+    assert r.returncode == 0, f"dhrt Exit {r.returncode}: {r.stderr}"
     assert shot.exists() and shot.stat().st_size > 0, "kein Screenshot erzeugt"
 
     img = Image.open(shot).convert("RGB")

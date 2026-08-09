@@ -1,14 +1,14 @@
 # Befehlssatz-Roadmap (Audit 2026-06-05)
 
 > **⚠️ Lesehinweis (Stufe B).** Diese Roadmap entstand, als es noch zwei Pfade
-> gab (Python-Tree-Walker + `gbrt`). Der Tree-Walker und die Python-Toolchain
-> sind inzwischen **entfernt** — neue/geänderte Befehle kommen **nur** in `gbrt`
+> gab (Python-Tree-Walker + `dhrt`). Der Tree-Walker und die Python-Toolchain
+> sind inzwischen **entfernt** — neue/geänderte Befehle kommen **nur** in `dhrt`
 > (`builtins.rs`/`vm.rs`) + ein run_gb-Golden-Test. „BEIDE Pfade"/`interpreter.py`
 > unten sind historisch.
 
 Ergebnis eines Audits des GameBasic-Befehlssatzes (~710 Builtins): Lücken,
 Inkonsistenzen und echte Editor-↔-Export-Fallstricke. **Leitsatz: jeder neue/
-geänderte Befehl muss nativ in `gbrt` laufen** — per run_gb-Golden-Test
+geänderte Befehl muss nativ in `dhrt` laufen** — per run_gb-Golden-Test
 absichern.
 
 ## Umsetzungs-Checkliste pro Befehl
@@ -16,7 +16,7 @@ absichern.
       (bzw. passendes `gamebasic/modules/*.py`).
 - [ ] Native Runtime: `rust/gb_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
       ggf. `graphics.rs`/`audio.rs`), danach `rust\build_runtime.py`.
-- [ ] Parity-Snippet in `tests/test_gbrt_parity.py` (TW == gbrt). PRNG-/Uhr-
+- [ ] Parity-Snippet in `tests/test_dhrt_parity.py` (TW == dhrt). PRNG-/Uhr-
       basierte Befehle als „erwartet unterschiedlich" behandeln.
 - [ ] Doku: `builtin_docs.py` (Hover) + `vscode-gamebasic/build_grammar.py` neu
       generieren; README/CLAUDE bei Bedarf.
@@ -24,17 +24,17 @@ absichern.
 ---
 
 ## WP0 — Native Fallstricke (zuerst — Bugs, kein Komfort)
-Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
+Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
 
 - [x] **`PHYSICS_BROAD_*` nativ** (NEW/ADD/CLEAR/COUNT/QUERY/PAIR_A/PAIR_B/
       PAIR_COUNT). Uniform-Grid-Broadphase in `rust/gb_runtime/src/physics.rs`
       (portiert aus `gb_native/src/broadphase.rs` — selbe Paare/Reihenfolge),
       `Value::PhysicsBroad`, Dispatch + Validierung (Radius>=0, Paar-Index-
       Bounds) in `builtins.rs`. Parity-Snippet `physics_broad` (bit-identische
-      Paare TW==gbrt).
+      Paare TW==dhrt).
 - [x] **`TIME$`/`DATE$` nativ** — in `builtins.rs` (`local_datetime()`: Windows
       `GetLocalTime`, sonst UTC-Fallback via civil-from-days). Format-Test in
-      `test_gbrt_parity.py::test_time_date_format_tw_and_gbrt` (kein Exakt-
+      `test_dhrt_parity.py::test_time_date_format_tw_and_dhrt` (kein Exakt-
       Vergleich, da Wert variiert).
 - [x] **`DRAWTILEMAP` nativ** — `graphics.rs::draw_tilemap` (jedes Tile via
       `draw_image_part`, Camera/Zoom korrekt) + Dispatch in `vm.rs`. Rendert jetzt
@@ -47,21 +47,21 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
         Best-Effort (raylib-Standard-Layout; der Roh-Button-Index ist pad-
         abhaengig → fuer praezise Bindings `IMPORT "input"`). Ungueltiger Joystick-INDEX
         wirft wie der TW (Sub-Index liefert 0/false).
-      - `SCROLL`: gbrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
+      - `SCROLL`: dhrt zeichnet jeden Frame neu aus dem Command-Buffer (kein
         persistenter Framebuffer) → graceful No-Op, **Tree-Walker-only**
         (Kommentar in `vm.rs`).
 - [x] **Float-Koordinaten angleichen.** Befund: schon konsistent. Im
       Tree-Walker ist `_check_int` ein Alias auf `_check_intish`
       (`interpreter.py:3541`, seit dem Initial-Commit) → die Zeichenprimitive
       (LINE/BOX/RECT/CIRCLE/PLOT/GRADIENT*) akzeptieren Floats und trunkieren
-      sie, genau wie gbrts `gi()`. Die Audit-Annahme „TW lehnt `LINE(10.5,…)`
+      sie, genau wie dhrts `gi()`. Die Audit-Annahme „TW lehnt `LINE(10.5,…)`
       ab" war falsch. Empirisch verifiziert (beide Pfade laufen identisch);
       `vm.rs`-Kommentar praezisiert (verweist auf den Alias als Quelle).
 
-## WP1 — Array-Power (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
-> Ab dieser WP gilt die neue Direktive: neue Builtins NUR noch in gbrt (Rust),
+## WP1 — Array-Power (✅ ERLEDIGT 2026-06-05, **dhrt-only**)
+> Ab dieser WP gilt die neue Direktive: neue Builtins NUR noch in dhrt (Rust),
 > der Python-Tree-Walker (`interpreter.py`) wird nicht mehr erweitert. Tests =
-> gbrt-Golden (`tests/test_gbrt_builtins.py`, läuft via `gbrt --runsrc`).
+> dhrt-Golden (`tests/test_dhrt_builtins.py`, läuft via `dhrt --runsrc`).
 > Editor-Metadaten (Completion/Grammar/Hover) via `BUILTIN_DOCS`.
 - [x] **Dynamische Arrays:** `ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`
       (1D, mutieren IN PLACE: `values` + `dims=[len]` + `strides=[1]`).
@@ -73,14 +73,14 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 - [x] **`SORT(arr, …)`** mit Descending-`BOOL` (builtins.rs) + FUNCREF-Comparator
       (vm.rs `sort_with_comparator`, stabil, cmp(a,b)→INT).
 
-> **✅ Folge-Schritt erledigt (2026-06-05):** Run-/Export-Pfad auf gbrts Rust-
-> Frontend umgestellt. `gbrun.py --native` → `gbrt run`, `gbrun.py --export` →
-> `gbrt --export`, Editor-Run (`output_console._start_native`) → `gbrt run`,
-> Editor-Export (`main_window._export_active`) → `gbrt --export`. Damit laufen die
-> gbrt-only-Builtins überall (verifiziert: `gbrun.py --native`/`--export` + die
-> exportierte .exe). gbrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
+> **✅ Folge-Schritt erledigt (2026-06-05):** Run-/Export-Pfad auf dhrts Rust-
+> Frontend umgestellt. `gbrun.py --native` → `dhrt run`, `gbrun.py --export` →
+> `dhrt --export`, Editor-Run (`output_console._start_native`) → `dhrt run`,
+> Editor-Export (`main_window._export_active`) → `dhrt --export`. Damit laufen die
+> dhrt-only-Builtins überall (verifiziert: `gbrun.py --native`/`--export` + die
+> exportierte .exe). dhrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
 > (Editor-klickbar). (Hinweis: der Python-Compiler ist seit Stufe B entfernt —
-> gbrt kompiliert selbst; „beide Pfade" unten sind historisch.)
+> dhrt kompiliert selbst; „beide Pfade" unten sind historisch.)
 
 ## WP2 — Spiel-Quickwins (✅ ERLEDIGT 2026-06-05, nativ in beiden Pfaden)
 - [x] **`MOUSEWHEEL` exponieren** — Builtin in beiden Pfaden (Backend war da:
@@ -91,7 +91,7 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       `SHUFFLE(arr)`. PRNG ≠ Python → Parity „erwartet unterschiedlich"
       (Strukturtest prüft Bereich/Multiset-Invariante).
 - [x] **Farb-Helfer:** `HSV`→RGB, `COLOR_LERP`, `RED`/`GREEN`/`BLUE`-Extraktion.
-- [x] **Alpha-Kanal (2026-06-08, gbrt):** `RGBA(r,g,b,a)` packt Alpha ins obere
+- [x] **Alpha-Kanal (2026-06-08, dhrt):** `RGBA(r,g,b,a)` packt Alpha ins obere
       Byte (`&Haarrggbb`); `ALPHA(farbe)` liest es. `col()` (graphics.rs) wertet
       das obere Byte als Alpha aus — **0 = deckend** (Rückwärts-Kompatibilität:
       alte `&Hrrggbb`/`RGB(...)` bleiben voll deckend). Damit zeichnen
@@ -106,7 +106,7 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 - [x] **`ROUND(x, decimals)`** → FLOAT (Half-to-even via Decimal-Formatierung,
       bit-identisch: Python `f"{x:.nf}"` == Rust `format!("{:.n}")`).
 
-## WP3 — String + Datei (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
+## WP3 — String + Datei (✅ ERLEDIGT 2026-06-05, **dhrt-only**)
 - [x] **String:** `LTRIM$`/`RTRIM$`, `REVERSE$`, `STARTSWITH`/`ENDSWITH`/
       `CONTAINS`, `BIN$`/`OCT$` (mit Vorzeichen), `ISNUMERIC`/`TRYVAL` (robustes
       Parsen via `parse_number`; `VAL` bleibt unverändert).
@@ -114,7 +114,7 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
       (rekursiv), `DELETEFILE`, `RENAME`, `WRITEALL`, `READLINES`, `FILESIZE`,
       `PATHJOIN` (mit `/`). Alle pfadbasiert via `std::fs`.
 
-## WP4 — Konsistenz / Aliase (✅ ERLEDIGT 2026-06-05, **gbrt-only**)
+## WP4 — Konsistenz / Aliase (✅ ERLEDIGT 2026-06-05, **dhrt-only**)
 - [x] BASIC-Aliase: `SGN`→`SIGN`, `SQRT`→`SQR` (Match-Arm erweitert). `LTRIM$`/
       `RTRIM$`/`REVERSE$`/`STARTSWITH`/`ENDSWITH` existieren bereits als
       Primärnamen (WP3) — kein Alias nötig.
@@ -130,12 +130,12 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (gbrt):
 ---
 
 **Empfohlene Reihenfolge:** WP0 → WP2 → WP1 → WP3 → WP4. **Alle WPs erledigt
-(2026-06-05).** WP1–WP4 wurden gbrt-only umgesetzt (neue Builtins nur in der
-nativen Runtime; Run-/Export-Pfad läuft über gbrts Rust-Frontend).
+(2026-06-05).** WP1–WP4 wurden dhrt-only umgesetzt (neue Builtins nur in der
+nativen Runtime; Run-/Export-Pfad läuft über dhrts Rust-Frontend).
 
 ---
 
-## Nachtrag „rund machen" (2026-06-06, gbrt-only)
+## Nachtrag „rund machen" (2026-06-06, dhrt-only)
 
 Zweiter Lücken-Sweep gegen die echte Builtin-Liste; alles pur in
 `rust/gb_runtime/src/builtins.rs` (+ Golden-Tests `tests/test_builtins_extra.py`,

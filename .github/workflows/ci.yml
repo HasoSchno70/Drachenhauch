@@ -52,8 +52,8 @@ jobs:
         run: pytest tests/ -q -k "not spriteeditor_qt_canvas and not tilemapeditor_qt"
 
   # Cross-Platform-Migration Phase 2: erstes automatisches Signal, ob der
-  # Rust-Kern (gbrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
-  # (Stand 2026-07) lief/baute gbrt ausschliesslich unter Windows, nie in CI
+  # Rust-Kern (dhrt) auch auf Linux/macOS ueberhaupt kompiliert -- bisher
+  # (Stand 2026-07) lief/baute dhrt ausschliesslich unter Windows, nie in CI
   # verifiziert. Bewusst ohne `graphics` (braucht cmake/ALSA/X11-Wayland-Dev-
   # Header, ein spaeterer Schritt) -- hier zaehlt erstmal, ob VM-Kern +
   # Daten-Tier (db/net/http) + das wifi-Feature (Phase 3: Linux/macOS-Zweige

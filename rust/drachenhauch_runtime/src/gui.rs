@@ -3243,7 +3243,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         // waren die eckigen Schatten an runden Knoepfen und der Klecks auf
         // den Drehreglern.
         let unten = gloss_unten(y1, y2, rad);
-        // Alpha 1 = praktisch unsichtbar (0 hiesse in gbrt DECKEND).
+        // Alpha 1 = praktisch unsichtbar (0 hiesse in dhrt DECKEND).
         g.round_gradient(x1, y1, x2, unten, rad,
                          (a << 24) | 0xFFFFFF, 0x01FF_FFFFu32 as i64);
     }

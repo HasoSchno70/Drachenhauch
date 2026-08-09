@@ -1,5 +1,5 @@
 // Anhang C -- Farb-Konstanten. Werte aus gamebasic/graphics.py COLORS, gegen
-// gbrt verifiziert (z. B. ORANGE = 16753920 = RGB(255,165,0) = &HFFA500).
+// dhrt verifiziert (z. B. ORANGE = 16753920 = RGB(255,165,0) = &HFFA500).
 module.exports = (H) => {
   // [Name, R, G, B, Hex]
   const COLORS = [

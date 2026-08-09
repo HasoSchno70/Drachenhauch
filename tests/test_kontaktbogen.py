@@ -8,10 +8,10 @@ setzt sie beschriftet nebeneinander, damit ein ABLAUF pruefbar wird.
 Gesteuert wird er ueber Umgebungsvariablen wie die vorhandene
 Headless-Verifizierung:
 
-    GBRT_FRAMES=480 GBRT_CONTACT=bogen.png gbrt run demo.gb
+    DHRT_FRAMES=480 DHRT_CONTACT=bogen.png dhrt run demo.gb
 
-Ohne weitere Angaben verteilt er GBRT_CONTACT_MAX (Standard 12) Bilder
-gleichmaessig ueber GBRT_FRAMES.
+Ohne weitere Angaben verteilt er DHRT_CONTACT_MAX (Standard 12) Bilder
+gleichmaessig ueber DHRT_FRAMES.
 """
 import os
 import subprocess
@@ -22,15 +22,15 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 pytest.importorskip("PIL", reason="Pillow noetig zum Pixel-Pruefen")
 
 # Ein Punkt wandert nach rechts -- so laesst sich am Bogen ABLESEN, dass die
@@ -50,7 +50,7 @@ NEXT
 def _lauf(tmp_path, **env):
     (tmp_path / "a.gb").write_text(QUELLE, encoding="utf-8")
     umg = dict(os.environ, **{k: str(v) for k, v in env.items()})
-    r = subprocess.run([str(_GBRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
                        text=True, encoding="utf-8", env=umg, timeout=120, cwd=str(tmp_path))
     assert r.returncode == 0, r.stderr
     return tmp_path / "bogen.png"
@@ -59,8 +59,8 @@ def _lauf(tmp_path, **env):
 def test_bogen_entsteht_mit_der_erwarteten_kachelzahl(tmp_path):
     from PIL import Image
 
-    p = _lauf(tmp_path, GBRT_FRAMES=60, GBRT_CONTACT="bogen.png",
-              GBRT_CONTACT_MAX=6, GBRT_CONTACT_COLS=3)
+    p = _lauf(tmp_path, DHRT_FRAMES=60, DHRT_CONTACT="bogen.png",
+              DHRT_CONTACT_MAX=6, DHRT_CONTACT_COLS=3)
     assert p.exists(), "Kontaktbogen wurde nicht geschrieben"
     with Image.open(p) as im:
         b, h = im.size
@@ -73,8 +73,8 @@ def test_bogen_entsteht_mit_der_erwarteten_kachelzahl(tmp_path):
 def test_spaltenzahl_wirkt(tmp_path):
     from PIL import Image
 
-    p = _lauf(tmp_path, GBRT_FRAMES=60, GBRT_CONTACT="bogen.png",
-              GBRT_CONTACT_MAX=6, GBRT_CONTACT_COLS=6)
+    p = _lauf(tmp_path, DHRT_FRAMES=60, DHRT_CONTACT="bogen.png",
+              DHRT_CONTACT_MAX=6, DHRT_CONTACT_COLS=6)
     with Image.open(p) as im:
         b, h = im.size
     assert b == 6 * 160 + 7 * 8      # eine einzige Zeile
@@ -86,8 +86,8 @@ def test_kacheln_zeigen_verschiedene_zeitpunkte(tmp_path):
     # waeren alle Bilder aus demselben Augenblick.
     from PIL import Image
 
-    p = _lauf(tmp_path, GBRT_FRAMES=90, GBRT_CONTACT="bogen.png",
-              GBRT_CONTACT_MAX=3, GBRT_CONTACT_COLS=3)
+    p = _lauf(tmp_path, DHRT_FRAMES=90, DHRT_CONTACT="bogen.png",
+              DHRT_CONTACT_MAX=3, DHRT_CONTACT_COLS=3)
     with Image.open(p) as im:
         rgb = im.convert("RGB")
         positionen = []
@@ -103,11 +103,11 @@ def test_kacheln_zeigen_verschiedene_zeitpunkte(tmp_path):
 
 
 def test_ohne_umgebungsvariable_entsteht_nichts(tmp_path):
-    # Rueckwaertskompatibilitaet: wer GBRT_CONTACT nicht setzt, merkt nichts.
+    # Rueckwaertskompatibilitaet: wer DHRT_CONTACT nicht setzt, merkt nichts.
     (tmp_path / "a.gb").write_text(QUELLE, encoding="utf-8")
-    umg = dict(os.environ, GBRT_FRAMES="20")
-    umg.pop("GBRT_CONTACT", None)
-    r = subprocess.run([str(_GBRT), "run", str(tmp_path / "a.gb")], capture_output=True,
+    umg = dict(os.environ, DHRT_FRAMES="20")
+    umg.pop("DHRT_CONTACT", None)
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "a.gb")], capture_output=True,
                        text=True, encoding="utf-8", env=umg, timeout=120, cwd=str(tmp_path))
     assert r.returncode == 0, r.stderr
     assert not (tmp_path / "bogen.png").exists()

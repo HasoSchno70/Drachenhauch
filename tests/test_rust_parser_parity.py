@@ -1,9 +1,9 @@
-"""Parity-Test: Rust-Parser (`gbrt --ast`) == Python-Parser.
+"""Parity-Test: Rust-Parser (`dhrt --ast`) == Python-Parser.
 
 Stufe 2 der Front-End-Portierung. Serialisiert den Python-AST kanonisch
 (`{"_": NodeName, feld: ...}` aus den Dataclass-Feldern; `.line` ist KEIN
 Feld -> faellt raus, also reiner Struktur-Vergleich) und vergleicht gegen
-`gbrt --ast`. Skippt, wenn `gbrt` nicht gebaut ist.
+`dhrt --ast`. Skippt, wenn `dhrt` nicht gebaut ist.
 """
 import dataclasses
 import json
@@ -20,9 +20,9 @@ _ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLES = _ROOT / "examples"
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -30,9 +30,9 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+    _DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _ser(x):
@@ -61,7 +61,7 @@ def _py_ast(src: str):
 
 
 def _rs_ast(path: Path):
-    out = subprocess.run([str(_GBRT), "--ast", str(path)],
+    out = subprocess.run([str(_DHRT), "--ast", str(path)],
                          capture_output=True, text=True, encoding="utf-8")
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)

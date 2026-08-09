@@ -1,5 +1,5 @@
 """Tests fuer server.py via Flask-Test-Client (kein echter Netzwerk-Server,
-kein echtes gbrt noetig -- prueft nur die REST-API-Semantik)."""
+kein echtes dhrt noetig -- prueft nur die REST-API-Semantik)."""
 import os
 import tempfile
 

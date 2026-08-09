@@ -219,7 +219,7 @@ children.push(h2("Was sie besonders macht"));
 children.push(bulletRich("Einfach zu lesen: ", "Befehle wie SCREEN, PLOT, DRAWIMAGE oder PLAYSOUND sagen, was sie tun."));
 children.push(bulletRich("Sicher durch Typen: ", "Jede Variable hat einen klaren Typ (INTEGER, FLOAT, STRING …). Das verhindert viele Anfängerfehler."));
 children.push(bulletRich("Modern: ", "Klassen und Objekte (OOP), Funktionen, Module – alles dabei, wenn du es brauchst, aber nie im Weg."));
-children.push(bulletRich("Eine Laufzeit: ", "Dein Programm läuft direkt über die schnelle Runtime „gbrt“ – flüssig und auf Wunsch als fertige .exe exportierbar."));
+children.push(bulletRich("Eine Laufzeit: ", "Dein Programm läuft direkt über die schnelle Runtime „dhrt“ – flüssig und auf Wunsch als fertige .exe exportierbar."));
 children.push(p("Genug der Theorie – schau dir an, wie wenig nötig ist, um etwas auf den Bildschirm zu bringen. Das hier ist ein vollständiges, lauffähiges GameBasic-Programm:"));
 children.push(new Paragraph({
   shading: { fill: "F4F4F4", type: ShadingType.CLEAR },
@@ -1400,7 +1400,7 @@ figure("kap12_politur.png", "Das fertige Grundspiel: Vollbild, Sound, Level, HUD
 children.push(h2("Als Programm weitergeben (Export)"));
 children.push(p("Ein Spiel, das nur auf deinem eigenen Rechner und nur mit installiertem GameBasic läuft, ist ein bisschen wie ein selbstgebackener Kuchen, den man nicht aus der Küche tragen darf. Damit auch Freunde, Geschwister oder ahnungslose Verwandte dein Werk spielen können – ohne irgendetwas installieren zu müssen – exportierst du es als eigenständiges Programm:"));
 children.push(codeBlock([
-  "gbrt --export  dein-spiel.gb",
+  "dhrt --export  dein-spiel.gb",
 ]));
 children.push(p("Das erzeugt eine startfertige Datei (mit den Bildern und Tönen darin). Doppelklick genügt – kein GameBasic nötig."));
 

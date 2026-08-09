@@ -1,6 +1,6 @@
 # Modul `timer`
 
-Geplante Aktionen ohne MILLIS-Buchfuehrung (nativ in `gbrt`): "in 2 Sekunden
+Geplante Aktionen ohne MILLIS-Buchfuehrung (nativ in `dhrt`): "in 2 Sekunden
 mach X", "alle 500 ms mach Y" und Cooldowns in einer Zeile. Schliesst die
 Luecke zwischen den rohen Zeit-Builtins (`MILLIS`/`TIMER`/`DELTA`) und dem,
 was Spiele wirklich brauchen -- Spawner, verzoegerte Effekte, Schuss-Raten.

@@ -2,8 +2,8 @@
 
 raylib `DrawTriangle`/`DrawTriangleFan` cullen Rueckseiten nach Wicklungs-
 reihenfolge -- mit im Uhrzeigersinn (CW) angegebenen Eckpunkten wurde frueher
-NICHTS gezeichnet. gbrt dreht die Vertex-Reihenfolge intern um, wenn die signed
-area CW ergibt. Dieser Test rendert headless (GBRT_FRAMES + GBRT_SCREENSHOT) je
+NICHTS gezeichnet. dhrt dreht die Vertex-Reihenfolge intern um, wenn die signed
+area CW ergibt. Dieser Test rendert headless (DHRT_FRAMES + DHRT_SCREENSHOT) je
 ein CW- und ein CCW-Dreieck/Polygon und prueft per Pixel, dass BEIDE sichtbar
 gefuellt sind (vor dem Fix waere das CW-Exemplar schwarz geblieben).
 """
@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 
 
-def _gbrt():
+def _dhrt():
     root = Path(__file__).resolve().parent.parent
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((root / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (root / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
@@ -51,18 +51,18 @@ WEND
 
 
 def test_triangle_polygon_winding_independent(tmp_path):
-    gbrt = _gbrt()
-    if gbrt is None:
-        pytest.skip("native Runtime 'gbrt' nicht gebaut")
+    dhrt = _dhrt()
+    if dhrt is None:
+        pytest.skip("native Runtime 'dhrt' nicht gebaut")
     from PIL import Image
 
     src = tmp_path / "winding.gb"
     src.write_text(_PROG, encoding="utf-8")
     shot = tmp_path / "winding.png"
-    env = dict(os.environ, GBRT_FRAMES="2", GBRT_SCREENSHOT=str(shot))
-    r = subprocess.run([str(gbrt), "run", str(src)], capture_output=True,
+    env = dict(os.environ, DHRT_FRAMES="2", DHRT_SCREENSHOT=str(shot))
+    r = subprocess.run([str(dhrt), "run", str(src)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60, env=env)
-    assert r.returncode == 0, f"gbrt Exit {r.returncode}: {r.stderr}"
+    assert r.returncode == 0, f"dhrt Exit {r.returncode}: {r.stderr}"
     assert shot.exists() and shot.stat().st_size > 0, "kein Screenshot erzeugt"
 
     img = Image.open(shot).convert("RGB")

@@ -1,6 +1,6 @@
-"""Profiler fuer GameBasic (Editor) -- ueber die native Runtime `gbrt profile`.
+"""Profiler fuer GameBasic (Editor) -- ueber die native Runtime `dhrt profile`.
 
-gbrt fuehrt das Programm instrumentiert aus (per-Zeile Count+Zeit) und liefert
+dhrt fuehrt das Programm instrumentiert aus (per-Zeile Count+Zeit) und liefert
 das Ergebnis als JSON; hier nur noch Aggregation pro Editor-Zeile und auf
 Funktionen/Subs (via `symbols.scan_scopes`). Der Qt-Wrapper (`Profiler`) laeuft
 in einem Worker-Thread und kann den Subprozess via Stop abbrechen.
@@ -22,7 +22,7 @@ from PySide6.QtCore import QObject, Signal
 
 # Review-Fund: siehe error_check.py -- geteilter Alias statt vierfach
 # duplizierter Wrapper-Funktion, bleibt fuer bestehende Tests patchbar.
-from .gbrt_locate import find_gbrt as _find_gbrt
+from .dhrt_locate import find_dhrt as _find_dhrt
 
 
 @dataclass
@@ -52,10 +52,10 @@ class ProfileResult:
 
 
 def _extract_profile_json(out: str) -> dict:
-    """Den JSON-Blob aus gbrt's stdout herausziehen -- tolerant gegen
+    """Den JSON-Blob aus dhrt's stdout herausziehen -- tolerant gegen
     raylib-Logging.
 
-    `gbrt profile` gibt das Ergebnis als EINE JSON-Zeile via `println!` aus, aber
+    `dhrt profile` gibt das Ergebnis als EINE JSON-Zeile via `println!` aus, aber
     raylib schreibt seine `WARNING`-TraceLogs (z.B. bei `MESH_SPHERE`:
     "WARNING: MESH: vertexCount ...") ebenfalls auf stdout -- und beim
     Fenster-Shutdown (Drop nach dem println) koennen weitere Zeilen folgen. Ein
@@ -75,9 +75,9 @@ def _extract_profile_json(out: str) -> dict:
 
 
 def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
-    """Profiliert `source` ueber die native Runtime (`gbrt profile`).
+    """Profiliert `source` ueber die native Runtime (`dhrt profile`).
 
-    gbrt fuehrt das Programm instrumentiert aus und liefert pro Zeile Count+Zeit
+    dhrt fuehrt das Programm instrumentiert aus und liefert pro Zeile Count+Zeit
     als JSON; hier nur noch Aggregation pro Editor-Zeile + Scope. `should_stop`
     bricht den Subprozess ab (fuer Endlos-Loops). Zeilen beziehen sich auf die
     Quelle; bei `IMPORT "datei.gb"` (Inlining) koennen sie verschoben sein.
@@ -88,10 +88,10 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
     from . import symbols as gb_symbols
     from ..errors import GameBasicError
 
-    gbrt = _find_gbrt()
-    if gbrt is None:
+    dhrt = _find_dhrt()
+    if dhrt is None:
         raise GameBasicError(
-            "Profiler benoetigt die native Runtime gbrt "
+            "Profiler benoetigt die native Runtime dhrt "
             "(bauen: python rust/build_runtime.py).")
 
     base = Path(base_path)
@@ -103,28 +103,28 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
     proc = None
     try:
         Path(tmp).write_text(source, encoding="utf-8")
-        # `--stoppable`: gbrt liest stdin -> wir koennen einen Endlos-Loop
+        # `--stoppable`: dhrt liest stdin -> wir koennen einen Endlos-Loop
         # (Grafik-Render-Loop, WHILE TRUE) per "stop"-Zeile SAUBER abbrechen,
-        # sodass gbrt die bis dahin gesammelten Profile-Daten noch ausgibt
+        # sodass dhrt die bis dahin gesammelten Profile-Daten noch ausgibt
         # (ein harter terminate() wuerde den finalen JSON-println verschlucken).
-        from .gbrt_locate import gbrt_spawn_semaphore
+        from .dhrt_locate import dhrt_spawn_semaphore
         # Semaphor rund um die Prozess-ERSTELLUNG: `subprocess.Popen` laeuft
         # hier in einem Hintergrund-Thread (`Profiler._run`); auf Windows ist
         # die Handle-Vererbung in `subprocess.Popen.__init__` nicht dafuer
         # ausgelegt, aus mehreren Threads gleichzeitig aufgerufen zu werden
-        # (siehe gbrt_locate.gbrt_spawn_semaphore-Kommentar fuer den
+        # (siehe dhrt_locate.dhrt_spawn_semaphore-Kommentar fuer den
         # verifizierten Crash).
-        with gbrt_spawn_semaphore:
+        with dhrt_spawn_semaphore:
             proc = subprocess.Popen(
-                [str(gbrt), "profile", "--stoppable", tmp],
+                [str(dhrt), "profile", "--stoppable", tmp],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                 stdin=subprocess.PIPE, text=True)
 
         # stdout in einem Thread leeren: der JSON-Blob kommt am Ende in einem
-        # Rutsch, waehrend des Laufs schreibt gbrt (fast) nichts -> der Pipe-
+        # Rutsch, waehrend des Laufs schreibt dhrt (fast) nichts -> der Pipe-
         # Puffer kann nicht blockieren und wir behalten stdin fuer das Stop-
         # Signal in der Hand (communicate() wuerde stdin sofort schliessen ->
-        # gbrt saehe sofort EOF und braeche gleich am Anfang ab).
+        # dhrt saehe sofort EOF und braeche gleich am Anfang ab).
         chunks: list[str] = []
 
         def _drain():
@@ -187,7 +187,7 @@ def run_profile(source: str, base_path, should_stop=None) -> ProfileResult:
             counts[ln] = counts.get(ln, 0) + int(entry.get("count", 0))
             times[ln] = times.get(ln, 0.0) + float(entry.get("time", 0.0))
 
-    # Laufzeitfehler (gbrt): als GameBasicError mit Zeile melden (wie bisher).
+    # Laufzeitfehler (dhrt): als GameBasicError mit Zeile melden (wie bisher).
     if "error" in data:
         raise GameBasicError(str(data["error"]), line=int(data.get("error_line", -1) or -1))
 

@@ -78,7 +78,7 @@ lvl = TILED_LOAD("level.json")
 Tileset per `LOADIMAGE`, die Map per `TILED_LOAD` und zeichnet jedes Tile mit
 `DRAWIMAGEPART` (Quell-Rechteck aus `gid − 1`, Spalten = Tileset-Breite). Map
 als `.json` speichern, Tileset-PNG daneben legen, dann ausführen. Läuft über
-die native Runtime `gbrt`.
+die native Runtime `dhrt`.
 
 ## Format-Details
 

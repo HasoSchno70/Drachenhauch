@@ -1,9 +1,9 @@
 """Grafik-Daten-Stub fuer das Editor-Tooling (pygame ENTFERNT, Stufe A).
 
-Grafik/Audio laufen ausschliesslich in der nativen Runtime gbrt (seit Stufe B
+Grafik/Audio laufen ausschliesslich in der nativen Runtime dhrt (seit Stufe B
 der EINZIGE Ausfuehrungspfad). Dieses Modul liefert dem Python-Tooling
 (Editoren/LSP) nur noch Farb-/Tastenkonstanten und die Kamera-Mathematik. Die
-eigentlichen Zeichen-/Audio-Methoden werfen "nur in der nativen Runtime (gbrt)".
+eigentlichen Zeichen-/Audio-Methoden werfen "nur in der nativen Runtime (dhrt)".
 
 Faerben werden als 24-Bit-RGB-INTEGERs uebergeben (0xRRGGBB). Das Modul stellt
 benannte Konstanten (BLACK, WHITE, RED, ...) und eine RGB(r,g,b)-Funktion bereit;
@@ -121,19 +121,19 @@ def _rgb_tuple(color: int):
 
 
 # ---------------------------------------------------------------------------
-# Daten-Stub. Die Grafik-/Audio-Engine lebt in der nativen Runtime gbrt
+# Daten-Stub. Die Grafik-/Audio-Engine lebt in der nativen Runtime dhrt
 # (Rust/raylib) -- Tree-Walker und Python-Toolchain wurden mit Stufe B
 # geloescht; Python ist nur noch Editor-/LSP-Tooling. COLORS/KEYS (oben)
 # bleiben reine Daten; die Graphics-Klasse ist konstruierbar (Kamera-
 # Mathematik fuers Tooling), wirft aber bei jedem Draw-/Audio-/Bild-/
-# Font-Zugriff eine klare "nur in gbrt"-Meldung.
+# Font-Zugriff eine klare "nur in dhrt"-Meldung.
 # ---------------------------------------------------------------------------
 
 
 def _native_only(op: str = "Grafik"):
     raise GBRuntimeError(
-        f"{op}: Grafik/Audio laeuft nur in der nativen Runtime (gbrt) -- "
-        f"Programme per 'gbrun.py datei.gb' bzw. 'gbrt run datei.gb' starten. "
+        f"{op}: Grafik/Audio laeuft nur in der nativen Runtime (dhrt) -- "
+        f"Programme per 'gbrun.py datei.gb' bzw. 'dhrt run datei.gb' starten. "
         f"Dieser Python-Stub dient nur dem Editor-Tooling.")
 
 
@@ -189,7 +189,7 @@ class Graphics:
     def shutdown(self):
         pass
 
-    # ---- Alles andere ist native-only (gbrt) -------------------------
+    # ---- Alles andere ist native-only (dhrt) -------------------------
     def __getattr__(self, name):
         # __init__-Attribute liegen in __dict__ und kommen nie hierher.
         # Dunder normal als AttributeError (Introspektion/copy/pickle).

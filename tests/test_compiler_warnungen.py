@@ -11,7 +11,7 @@ Beide Warnungen hier stammen aus echten Stolpersteinen beim Bauen der Demo:
   weit weg von der Ursache auf.
 
 Beides sind WARNUNGEN, keine Fehler: das Programm laeuft weiter. Geprueft wird
-ueber `gbrt --check`, das die Warnungen als JSON ausgibt.
+ueber `dhrt --check`, das die Warnungen als JSON ausgibt.
 """
 import json
 import os
@@ -23,22 +23,22 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _warnungen(tmp_path, quelle: str):
-    """`gbrt --check` laufen lassen und die Warnungstexte liefern."""
+    """`dhrt --check` laufen lassen und die Warnungstexte liefern."""
     f = tmp_path / "w.gb"
     f.write_text(quelle, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "--check", str(f)], capture_output=True,
+    r = subprocess.run([str(_DHRT), "--check", str(f)], capture_output=True,
                        text=True, encoding="utf-8", timeout=60)
     return [w.get("message", "") for w in json.loads(r.stdout or "[]")]
 

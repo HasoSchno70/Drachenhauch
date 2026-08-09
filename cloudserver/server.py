@@ -105,7 +105,7 @@ def _auth_gate():
 
 @app.after_request
 def _cors(resp):
-    # Permissiv, damit z.B. ein gbrt-WASM-Build im Browser den Server
+    # Permissiv, damit z.B. ein dhrt-WASM-Build im Browser den Server
     # erreichen kann. Fuer einen oeffentlichen Server ggf. auf die eigene
     # Domain einschraenken.
     resp.headers["Access-Control-Allow-Origin"] = "*"

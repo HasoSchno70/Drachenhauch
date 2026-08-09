@@ -1,6 +1,6 @@
 """Tests fuer das json-Modul.
 
-Golden-Tests gegen `gbrt` (Stufe B): IMPORT "json" + JSON_PARSE in ein
+Golden-Tests gegen `dhrt` (Stufe B): IMPORT "json" + JSON_PARSE in ein
 JSON_HANDLE, dann abfragen + PRINT. Frueher via `call_builtin` gegen die
 Python-Impl (in Phase 8 geloescht).
 """
@@ -14,7 +14,7 @@ def _lines(out):
 
 
 def test_external_type_is_usable(run_gb):
-    """`DIM h AS JSON_HANDLE` kompiliert + laeuft -> gbrt kennt den Typ."""
+    """`DIM h AS JSON_HANDLE` kompiliert + laeuft -> dhrt kennt den Typ."""
     out = run_gb('IMPORT "json"\n'
                  'DIM h AS JSON_HANDLE\n'
                  'h = JSON_PARSE("{""a"": 1}")\n'
@@ -134,7 +134,7 @@ def test_parse_invalid_raises(run_gb):
 
 
 def test_path_into_non_container_raises(run_gb):
-    # gbrt-Wortlaut: "Pfad 'x.y' nicht aufloesbar" (TW sagte "nicht-Container").
+    # dhrt-Wortlaut: "Pfad 'x.y' nicht aufloesbar" (TW sagte "nicht-Container").
     with pytest.raises(GBRuntimeError, match="nicht aufloesbar"):
         run_gb('IMPORT "json"\n'
                'DIM h AS JSON_HANDLE\n'

@@ -71,7 +71,7 @@ def process(source: str, base_path: Path | None = None,
             # Nur wenn der Pfad nach einem Modul-Namen aussieht (kein Slash,
             # keine .gb-Endung) - sonst wuerde "missing.gb" auch als Modul
             # versucht und die Fehlermeldung wuerde irrefuehren.
-            # gbrt implementiert die Module nativ -> hier nur am Namen erkennen
+            # dhrt implementiert die Module nativ -> hier nur am Namen erkennen
             # und zu einem Kommentar machen (kein Python-Impl-Laden mehr).
             if _looks_like_module_name(rel) and _modules.is_known_module(rel):
                 tag = f" AS {alias}" if alias else ""

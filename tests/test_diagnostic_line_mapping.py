@@ -1,9 +1,9 @@
 """Diagnose-Zeilen muessen auf Puffer-Zeilen zeigen, auch mit IMPORT.
 
-Aus dem Clean-Code-Review des Python-Frontends. gbrt preprocesst intern
+Aus dem Clean-Code-Review des Python-Frontends. dhrt preprocesst intern
 selbst und meldet Diagnosen deshalb in Zeilen der GEMERGTEN Quelle --
 `main.rs::check_main` sagt das ausdruecklich ("der Editor mappt via
-origins zurueck"). Genau diese Haelfte fehlte in `_check_via_gbrt`: die
+origins zurueck"). Genau diese Haelfte fehlte in `_check_via_dhrt`: die
 Zeilen wurden woertlich uebernommen, wodurch in JEDER Datei mit
 `IMPORT "x.gb"` saemtliche Marker um die Laenge des inlinierten Codes
 verrutschten -- im Reproduktionsfall bis hinter das Dateiende.
@@ -74,7 +74,7 @@ def test_error_inside_imported_file_pins_to_line_one_and_names_file(tmp_path):
 
 
 def test_hardware_warning_line_is_not_shifted(proj):
-    """gbrt liefert in EINEM Array drei Koordinatensysteme: lex/parse/compile
+    """dhrt liefert in EINEM Array drei Koordinatensysteme: lex/parse/compile
     beziehen sich auf die gemergte Quelle, die Hardware-Import-Warnungen
     werden dagegen aus der ROHEN Quelle berechnet und sind schon
     Puffer-Zeilen. Alles blind zu mappen wuerde genau diese korrekten
@@ -83,7 +83,7 @@ def test_hardware_warning_line_is_not_shifted(proj):
     warns = [p for p in _check_source(buf, proj) if p.severity == "warning"]
     hw = [p for p in warns if "serial" in p.message]
     if not hw:
-        pytest.skip("gbrt-Build enthaelt das serial-Modul -- keine Warnung erwartet")
+        pytest.skip("dhrt-Build enthaelt das serial-Modul -- keine Warnung erwartet")
     assert hw[0].line == 2, (
         f"Hardware-Warnung gehoert auf die IMPORT-Zeile 2, bekam {hw[0].line}")
 

@@ -181,5 +181,5 @@ module.exports = (H) => [
   H.p("Gesichert wird ausschließlich EINSTELLUNG, nie Ressource: 2D-Kamera samt Rütteln, aktive Ebene, Hintergrundfarbe, Licht, Umgebung, Schatten, 3D-Kamera, Schrift und POSTFX. Geladene Bilder, Modelle und Shader bleiben natürlich geladen – ein POP schaltet nur ihre Benutzung zurück."),
   H.tip("Auch für den Ton", "AUDIO_PUSH und AUDIO_POP tun dasselbe für alle Bus-Einstellungen – Lautstärke, Balance, Filter, Hall, Echo, Verzerrer, Kompressor, EQ. Mehr dazu im Audio-Kapitel."),
 
-  H.tip("Alles nur in gbrt", "Diese Extras (besonders Blend-Modes, GenTex, Render-Targets und Shader) nutzen die Grafikkarte und laufen nur im gbrt-Fenster – wie der ganze Teil IV. In einem reinen Konsolenprogramm gibt es sie nicht."),
+  H.tip("Alles nur in dhrt", "Diese Extras (besonders Blend-Modes, GenTex, Render-Targets und Shader) nutzen die Grafikkarte und laufen nur im dhrt-Fenster – wie der ganze Teil IV. In einem reinen Konsolenprogramm gibt es sie nicht."),
 ];

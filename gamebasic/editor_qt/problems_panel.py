@@ -1,7 +1,7 @@
 """Probleme-Panel.
 
 Listet ALLE Live-Diagnosen des aktiven Editors (Errors + Warnungen aus
-`gbrt --check`) -- nicht nur das erste Problem wie die Statusbar. Klick
+`dhrt --check`) -- nicht nur das erste Problem wie die Statusbar. Klick
 springt zur Zeile.
 
 Als **Tabelle** (Zeile / Art / Meldung) statt als Liste: bei mehr als einer

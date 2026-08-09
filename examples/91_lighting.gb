@@ -10,7 +10,7 @@
 '
 ' Kamera-Modi (raylib UpdateCamera): CAMERA3D(...) einmal setzen, dann pro
 ' Frame CAMERA3D_UPDATE(mode). 1=free 2=orbital 3=first_person 4=third_person.
-'   In gbrt-Fenster: ORBITAL dreht automatisch; FREE/FIRST_PERSON = WASD+Maus.
+'   In dhrt-Fenster: ORBITAL dreht automatisch; FREE/FIRST_PERSON = WASD+Maus.
 
 IMPORT "g3d"
 

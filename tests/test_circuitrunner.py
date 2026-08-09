@@ -2,7 +2,7 @@
 
 Deckt das JSON-Levelformat ab, das die .gb-Engine laedt: convert_dat.py
 (echtes Chip's-Challenge-Binformat -> JSON) und make_demo_levels.py
-(ASCII -> JSON). Reine Python-Pipeline, kein gbrt noetig.
+(ASCII -> JSON). Reine Python-Pipeline, kein dhrt noetig.
 """
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ import pytest
 _CR = Path(__file__).resolve().parent.parent / "circuitrunner"
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = _CR.parent / "rust" / "drachenhauch_runtime" / "target" / variant / exe
         if p.exists():
@@ -129,9 +129,9 @@ def test_demo_levels_schema():
 
 
 # ---------------------------------------------------------------------------
-#  Engine-Verhalten (gbrt-Headless-Harness): MS-Monster-Bewegungsreihenfolge
+#  Engine-Verhalten (dhrt-Headless-Harness): MS-Monster-Bewegungsreihenfolge
 # ---------------------------------------------------------------------------
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 
 
 def _hexgrid(tiles):
@@ -187,7 +187,7 @@ def _make_corridor_level():
 
 
 def _run_engine_harness(tmp_path, level, harness):
-    """Engine-Quelle bis VOR die Hauptschleife + Harness headless via gbrt laufen
+    """Engine-Quelle bis VOR die Hauptschleife + Harness headless via dhrt laufen
     lassen; gibt stdout zurueck."""
     import json
     assets = _CR / "assets"
@@ -199,12 +199,12 @@ def _run_engine_harness(tmp_path, level, harness):
     (tmp_path / "synth.json").write_text(json.dumps(level), encoding="utf-8")
     gb = tmp_path / "harness.gb"
     gb.write_text(head + harness, encoding="utf-8")
-    r = subprocess.run([str(_GBRT), "run", str(gb)],
+    r = subprocess.run([str(_DHRT), "run", str(gb)],
                        capture_output=True, timeout=120)
     return r.stdout.decode("utf-8", "replace")
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 def test_monster_move_order_follows_list(tmp_path):
     harness = (
         '\njs = JSON_LOAD("synth.json")\n'
@@ -248,7 +248,7 @@ def _make_password_set():
     return {"name": "Test Set!", "ruleset": "ms", "levels": levels}
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 def test_save_highscore_and_password(tmp_path):
     # Bestzeit-Aufzeichnung (schneller ueberschreibt) + Passwort-Lookup + Set-Key.
     harness = (
@@ -310,7 +310,7 @@ def _make_timed_level():
         "traps": "", "cloners": "", "monsters": ""}]}
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 def test_save_timed_bonus(tmp_path):
     # Getimtes Level: Bestwert = verbliebene Zeit (CC-Zeitbonus), hoeher = besser.
     harness = (
@@ -341,7 +341,7 @@ def test_save_timed_bonus(tmp_path):
     assert vals_rec(out, 3) == 1, out
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 def test_hint_tile_under_player(tmp_path):
     # Spieler-Start auf einem Hinweis-Stein (lower=0x2F) -> tat(px,py)=T_HINT,
     # damit der Hinweis-Banner waehrend des Spielens erscheint.
@@ -370,7 +370,7 @@ def test_hint_tile_under_player(tmp_path):
     assert int(re.search(r"HINTLEN\s+(\d+)", out).group(1)) > 0, out
 
 
-@pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+@pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 def test_monster_moves_at_player_speed(tmp_path):
     # MON_EVERY=1: normale Monster ziehen jeden Tick einen Schritt (CC-Tempo).
     harness = (

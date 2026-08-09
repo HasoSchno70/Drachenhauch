@@ -280,7 +280,7 @@ pub struct Compiler {
     external_types: std::collections::HashSet<String>,
     /// `(alias, modul)`-Paare aus `IMPORT "<modul>" AS <alias>` -- damit
     /// aliasierte Builtin-Aufrufe (`j_parse`) auf den kanonischen Namen
-    /// (`json_parse`) zurueckabgebildet werden, den gbrt nativ kennt.
+    /// (`json_parse`) zurueckabgebildet werden, den dhrt nativ kennt.
     builtin_aliases: Vec<(String, String)>,
     /// Bereits deklarierte ENUMs (Name -> Member als (lower-name, wert)). Eine
     /// zweite ENUM-Deklaration desselben Namens ist idempotent (identische
@@ -291,13 +291,13 @@ pub struct Compiler {
     // damit Compile-Fehler im Editor/--check eine Zeile bekommen). 0 = unbekannt.
     err_line: u32,
     // Nicht-fatale Compile-Warnungen `(zeile, text)` -- z.B. Aufruf eines
-    // Builtins, das gbrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
+    // Builtins, das dhrt gar nicht kennt (Tippfehler / nur Tree-Walker). Werden
     // von `--check` als severity:"warning" gemeldet, blockieren NICHT.
     warnings: Vec<(u32, String)>,
 }
 
-/// Namen aller gbrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
-/// `builtin_index.json`. Quelle der Wahrheit fuer „kennt gbrt diesen Builtin?".
+/// Namen aller dhrt-Builtins (lowercase), eingebettet aus dem maßgeblichen
+/// `builtin_index.json`. Quelle der Wahrheit fuer „kennt dhrt diesen Builtin?".
 fn known_builtins() -> &'static std::collections::HashSet<String> {
     use std::sync::OnceLock;
     static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
@@ -439,7 +439,7 @@ fn arity_text(min: usize, max: usize) -> String {
     if min == max { format!("{}", min) } else { format!("{} bis {}", min, max) }
 }
 
-/// Ist `name` ein gbrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
+/// Ist `name` ein dhrt-Builtin? Interne `__`-Builtins (compiler-emittiert) und
 /// der Fall „Index konnte nicht geladen werden" (leeres Set) gelten als bekannt,
 /// damit nie faelschlich gewarnt wird.
 fn is_known_builtin(name: &str) -> bool {
@@ -1491,15 +1491,15 @@ impl Compiler {
             self.ctx.emit(oc::CALL_VALUE, json!([name, args.len()]));
         } else {
             // Aliasierten Builtin-Namen auf den kanonischen zurueckabbilden
-            // (j_parse -> json_parse), damit gbrt ihn nativ findet.
+            // (j_parse -> json_parse), damit dhrt ihn nativ findet.
             let bname = self.resolve_builtin_alias(&name);
-            // Systemischer G1-Fix: kennt gbrt diesen Builtin ueberhaupt? Wenn
+            // Systemischer G1-Fix: kennt dhrt diesen Builtin ueberhaupt? Wenn
             // nicht, ist es vermutlich ein Tippfehler (oder ein veralteter/
             // entfernter Builtin) -> es wuerde erst zur LAUFZEIT scheitern.
             // Hier als nicht-fatale Warnung melden (--check zeigt es im Editor).
             if !is_known_builtin(&bname) {
                 self.warnings.push((self.ctx.cur_line, format!(
-                    "Unbekanntes Builtin '{}' -- gbrt kennt es nicht (Tippfehler? \
+                    "Unbekanntes Builtin '{}' -- dhrt kennt es nicht (Tippfehler? \
                      oder veraltet/entfernt). Der Aufruf schlaegt sonst \
                      erst zur Laufzeit fehl.", bname.to_uppercase())));
             }
@@ -2412,7 +2412,7 @@ fn build_func(ctx: &Ctx, name: &str, is_main: bool, is_sub: bool,
     };
     let local_defaults: Vec<Value> = ctx.local_defaults.iter().map(enc).collect();
     // Debug-Namen pro Slot (Stufe B, 3a): local_slots invertieren; Slots ohne
-    // Namen (Compiler-Zwischenwerte) bleiben "". Nur fuer `gbrt debug`.
+    // Namen (Compiler-Zwischenwerte) bleiben "". Nur fuer `dhrt debug`.
     let mut local_names = vec![String::new(); ctx.local_types.len()];
     for (nm, &slot) in &ctx.local_slots {
         if slot < local_names.len() { local_names[slot] = nm.clone(); }

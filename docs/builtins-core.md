@@ -279,9 +279,9 @@ PRINT LEN(stack)                 ' 1
 ```
 
 > Die `ARRAY_*`-Aggregate und die dynamischen Array-Ops
-> (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind in `gbrt` implementiert
+> (`ARRAY_PUSH`/`POP`/`INSERT`/`REMOVE_AT`/`REDIM`) sind in `dhrt` implementiert
 > (`builtins.rs`/`vm.rs`) und laufen über alle Wege — `gbrun.py`/Editor-Run,
-> `gbrt run`/`--runsrc` und den `gbrt --export`-Standalone-Build.
+> `dhrt run`/`--runsrc` und den `dhrt --export`-Standalone-Build.
 
 ## Maps
 

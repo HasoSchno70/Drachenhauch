@@ -5,7 +5,7 @@ edition = "2021"
 description = "Native Drachenhauch runtime (Rust). Loads .gbc bytecode, executes VM core; optional raylib graphics."
 
 [[bin]]
-name = "gbrt"
+name = "dhrt"
 path = "src/main.rs"
 
 [dependencies]
@@ -42,7 +42,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "time"], optional = true
 futures = { version = "0.3", optional = true }
 # Audio-Backend Kira (cpal): entkoppelt vom Game-Loop, Busse/Echtzeit-Effekte.
 # Pure-Rust (keine C-Toolchain). MOD/XM via xmrs/xmrsplayer (ebenfalls pure-Rust).
-# Seit 2026-06-13 DAS Audio-Backend von gbrt (loeste raylib-Audio ab); wird mit
+# Seit 2026-06-13 DAS Audio-Backend von dhrt (loeste raylib-Audio ab); wird mit
 # `graphics` eingebunden -- src/audio.rs.
 kira = { version = "0.12", optional = true }
 # mint: winzige, abhaengigkeitsfreie Interop-Structs (Vector3/Quaternion) --

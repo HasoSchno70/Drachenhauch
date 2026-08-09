@@ -42,7 +42,7 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "writeline": ("WRITELINE(f, text)", "Schreibt eine Zeile mit Newline."),
     "write":     ("WRITE(f, text)", "Schreibt ohne Newline."),
     "fileexists": ("FILEEXISTS(pfad) AS BOOLEAN", "Existenz pruefen."),
-    # Datei/Verzeichnis pfadbasiert (gbrt-only)
+    # Datei/Verzeichnis pfadbasiert (dhrt-only)
     "direxists": ("DIREXISTS(pfad) AS BOOLEAN", "Existiert das Verzeichnis?"),
     "dirlist":   ("DIRLIST(pfad) AS ARRAY OF STRING", "Eintragsnamen eines Verzeichnisses (sortiert)."),
     "mkdir":     ("MKDIR(pfad)", "Verzeichnis anlegen (inkl. Elternverzeichnisse)."),
@@ -144,14 +144,14 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "time$":     ("TIME$() AS STRING",   'Aktuelle Uhrzeit "HH:MM:SS".'),
     "date$":     ("DATE$() AS STRING",   'Aktuelles Datum "YYYY-MM-DD".'),
     "sort": ("SORT(arr [, absteigend?-BOOL | comparator-FUNCREF])", "1D IN PLACE sortieren. BOOL-Flag fuer absteigend ODER FUNCREF-Comparator(a,b)->INT (<0/0/>0). Zweiarg-Formen: nur native Runtime."),
-    # Array-Aggregate (gbrt-only -- nativ in der Runtime, nicht im Tree-Walker)
+    # Array-Aggregate (dhrt-only -- nativ in der Runtime, nicht im Tree-Walker)
     "array_sum": ("ARRAY_SUM(arr) AS INTEGER/FLOAT", "Summe eines 1D-Zahl-Arrays."),
     "array_avg": ("ARRAY_AVG(arr) AS FLOAT", "Durchschnitt eines 1D-Zahl-Arrays (nicht leer)."),
     "array_min": ("ARRAY_MIN(arr) AS T", "Kleinstes Element eines 1D-Zahl-Arrays."),
     "array_max": ("ARRAY_MAX(arr) AS T", "Groesstes Element eines 1D-Zahl-Arrays."),
     "array_fill": ("ARRAY_FILL(arr, wert)", "Fuellt alle Elemente mit wert (IN PLACE)."),
     "array_copy": ("ARRAY_COPY(arr) AS ARRAY", "Liefert eine unabhaengige Kopie des Arrays."),
-    # Dynamische 1D-Arrays (gbrt-only)
+    # Dynamische 1D-Arrays (dhrt-only)
     "array_push": ("ARRAY_PUSH(arr, wert) AS INTEGER", "Element ans Ende; liefert die neue Laenge."),
     "array_pop": ("ARRAY_POP(arr) AS T", "Entfernt letztes Element und liefert es (Array nicht leer)."),
     "array_insert": ("ARRAY_INSERT(arr, idx, wert) AS INTEGER", "Element an Index einfuegen (0..len); neue Laenge."),
@@ -163,7 +163,7 @@ BUILTIN_DOCS: dict[str, tuple[str, str]] = {
     "repeat$":   ("REPEAT$(s, n) AS STRING", "String n-mal wiederholen."),
     "space$":    ("SPACE$(n) AS STRING",  "String aus n Leerzeichen."),
     "hex$":      ("HEX$(n) AS STRING",    'INTEGER als Hex ("FF", "1A2B", ...).'),
-    # String-Erweiterungen (gbrt-only)
+    # String-Erweiterungen (dhrt-only)
     "ltrim$":    ("LTRIM$(s) AS STRING",  "Fuehrende Leerzeichen entfernen."),
     "rtrim$":    ("RTRIM$(s) AS STRING",  "Abschliessende Leerzeichen entfernen."),
     "reverse$":  ("REVERSE$(s) AS STRING", "Zeichen umkehren."),

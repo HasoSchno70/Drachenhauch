@@ -14,24 +14,24 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+def _find_dhrt():
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     return next((_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe
                  for v in ("release", "debug")
                  if (_ROOT / "rust" / "drachenhauch_runtime" / "target" / v / exe).exists()), None)
 
 
-_GBRT = _find_gbrt()
-pytestmark = pytest.mark.skipif(_GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+_DHRT = _find_dhrt()
+pytestmark = pytest.mark.skipif(_DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 Image = pytest.importorskip("PIL.Image", reason="Pillow fuer die Pixel-Pruefung noetig")
 
 
 def _run(src, tmp_path, shot=None, frames=3):
     (tmp_path / "s.gb").write_text(src, encoding="utf-8")
-    env = dict(os.environ, GBRT_FRAMES=str(frames))
+    env = dict(os.environ, DHRT_FRAMES=str(frames))
     if shot:
-        env["GBRT_SCREENSHOT"] = str(tmp_path / shot)
-    r = subprocess.run([str(_GBRT), "run", str(tmp_path / "s.gb")], capture_output=True,
+        env["DHRT_SCREENSHOT"] = str(tmp_path / shot)
+    r = subprocess.run([str(_DHRT), "run", str(tmp_path / "s.gb")], capture_output=True,
                        text=True, encoding="utf-8", env=env, timeout=90, cwd=str(tmp_path))
     r.out = [w for ln in (r.stdout or "").splitlines()
              if not ln.startswith(("WARNING:", "INFO:", "TRACE:")) for w in ln.split()]
@@ -48,7 +48,7 @@ _SRC = 'DIM src AS IMAGE\nsrc = GENTEX_CHECKED(2, 2, 1, 1, &HFF0000, &H0000FF)\n
 
 
 def _loop(draw):
-    """Zeichnen gehoert IN die Schleife -- gbrt leert den Befehlspuffer bei
+    """Zeichnen gehoert IN die Schleife -- dhrt leert den Befehlspuffer bei
     jedem FLIP, ein einmaliges Zeichnen davor waere im Screenshot-Frame weg."""
     return f'WHILE NOT QUITREQUESTED()\n    CLS(&H000000)\n    {draw}\n    FLIP()\nWEND\n'
 

@@ -4,7 +4,7 @@
 '
 ' Steuerung: Pfeiltasten = bewegen, ESC = Ende.
 '
-' Voraussetzung: Grafik laeuft nativ in gbrt; Sprite-/Tween-Module sind eingebaut.
+' Voraussetzung: Grafik laeuft nativ in dhrt; Sprite-/Tween-Module sind eingebaut.
 
 IMPORT "sprite"
 IMPORT "tween"

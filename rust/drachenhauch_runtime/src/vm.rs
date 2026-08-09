@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// Sentinel-"Fehler", mit dem ein externes Stop-Signal (`gbrt profile`,
+/// Sentinel-"Fehler", mit dem ein externes Stop-Signal (`dhrt profile`,
 /// Editor-Stop-Button) die Dispatch-Schleife sauber abwickelt -- darf wie
 /// `__DEBUG_STOP__` NICHT von TRY/CATCH gefangen werden.
 const PROFILE_STOP: &str = "__PROFILE_STOP__";
@@ -30,7 +30,7 @@ use crate::value::{as_f64, is_num, value_eq, Cells, CoroState, FieldVal, GbArray
 /// kumulierte Zeit. Spiegelt `editor_qt/profiler.py`: die Zeit zwischen zwei
 /// Zeilenwechseln wird der VORIGEN Zeile zugeschlagen (inkl. der von dort
 /// gerufenen Funktionen). Aggregation pro SUB/FUNCTION macht der Editor via
-/// `symbols.scan_scopes` -- gbrt liefert nur die rohen Zeilen-Daten.
+/// `symbols.scan_scopes` -- dhrt liefert nur die rohen Zeilen-Daten.
 struct ProfileSink {
     counts: HashMap<u32, u64>,
     times: HashMap<u32, f64>,
@@ -509,7 +509,7 @@ fn ui_lighten(color: i64, factor: f64) -> i64 {
     (r << 16) | (g << 8) | b
 }
 
-// --- Debugger (Stufe B, `gbrt debug`) ---------------------------------------
+// --- Debugger (Stufe B, `dhrt debug`) ---------------------------------------
 #[derive(PartialEq, Clone, Copy)]
 enum StepMode { Run, Over, Into, Out }
 
@@ -641,7 +641,7 @@ pub struct Vm<'p> {
     profile_stop_flag: bool,
     // Profiler-Sink (Stufe B): None = kein Profiling-Overhead (Normalfall).
     prof: Option<ProfileSink>,
-    // Externes Stop-Signal (Editor-Stop-Button bei `gbrt profile --stoppable`):
+    // Externes Stop-Signal (Editor-Stop-Button bei `dhrt profile --stoppable`):
     // bei gesetztem Flag bricht die Dispatch-Schleife beim naechsten
     // Zeilenwechsel sauber ab (PROFILE_STOP), damit die bis dahin gesammelten
     // Profile-Daten noch ausgegeben werden (kein verlorener Prozess-Kill).
@@ -824,7 +824,7 @@ impl<'p> Vm<'p> {
         let _ = h.flush();
     }
 
-    /// Profiling fuer den naechsten `run()` aktivieren (Stufe B, `gbrt profile`).
+    /// Profiling fuer den naechsten `run()` aktivieren (Stufe B, `dhrt profile`).
     pub fn enable_profiler(&mut self) {
         self.prof = Some(ProfileSink::new());
     }
@@ -851,13 +851,13 @@ impl<'p> Vm<'p> {
     }
 
     /// Ob `run()` durch den Debugger-Stop-Befehl (oder EOF auf stdin waehrend
-    /// `gbrt debug`) abgebrochen wurde -- analog zu `was_stopped`, siehe
+    /// `dhrt debug`) abgebrochen wurde -- analog zu `was_stopped`, siehe
     /// dortiger Review-Fund-Kommentar.
     pub fn was_debug_stopped(&self) -> bool {
         self.debug_stop_flag
     }
 
-    /// Eine INPUT-Zeile lesen. Bei aktivem Stop-Kanal (`gbrt profile
+    /// Eine INPUT-Zeile lesen. Bei aktivem Stop-Kanal (`dhrt profile
     /// --stoppable`) gehoert stdin dem Stop-Reader-Thread -- INPUT liefert dann
     /// "" (wie der frueher genutzte DEVNULL-stdin), statt zu blockieren oder mit
     /// dem Stop-Reader um die Eingabe zu konkurrieren.
@@ -1014,7 +1014,7 @@ impl<'p> Vm<'p> {
         Ok(None)
     }
 
-    /// Debugging fuer den naechsten `run()` aktivieren (`gbrt debug`).
+    /// Debugging fuer den naechsten `run()` aktivieren (`dhrt debug`).
     pub fn enable_debug(&mut self) {
         self.dbg = Some(DebugState::new());
     }
@@ -3809,7 +3809,7 @@ impl<'p> Vm<'p> {
         // gleiche -- seine Zeichenprimitive (PLOT/LINE/BOX/RECT/CIRCLE/GRADIENT*)
         // pruefen via `_check_int`, das in interpreter.py ein Alias auf
         // `_check_intish` ist (interpreter.py:3541). So sind F5 (Tree-Walker) und
-        // F6 (gbrt) bei Float-Koordinaten konsistent (z.B. LINE(10.5, ...)).
+        // F6 (dhrt) bei Float-Koordinaten konsistent (z.B. LINE(10.5, ...)).
         fn gi(a: &[Value], i: usize, fn_: &str) -> R<i64> {
             match a.get(i) {
                 Some(Value::Int(n)) => Ok(*n),
@@ -5929,7 +5929,7 @@ impl<'p> Vm<'p> {
 
 // Vordefinierte Globals -- Werte IDENTISCH zu gamebasic/graphics.py
 // (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
-// vergleicht jede Python-Konstante gegen PRINT-Output von gbrt.
+// vergleicht jede Python-Konstante gegen PRINT-Output von dhrt.
 const DEFAULT_COLORS: &[(&str, i64)] = &[
     ("black", 0), ("white", 16777215), ("gray", 8421504), ("lightgray", 12632256),
     ("darkgray", 4210752), ("red", 16711680), ("green", 65280), ("blue", 255),
@@ -5984,7 +5984,7 @@ const DEFAULT_KEYS: &[(&str, i64)] = &[
 fn unknown_builtin_msg(name: &str) -> String {
     // Hardware-/IoT-Module sind hinter Cargo-Features (serial/usb/bt/wifi) und im
     // Default-Build NICHT enthalten -- der Dispatch faellt dann hierher durch. Das
-    // Builtin EXISTIERT (in gbrt implementiert), es fehlt nur im aktuellen Build.
+    // Builtin EXISTIERT (in dhrt implementiert), es fehlt nur im aktuellen Build.
     // Klare, handlungsleitende Meldung statt "noch nicht verfuegbar".
     let hw_feature = if name.starts_with("serial_") { Some("serial") }
         else if name.starts_with("usb_") { Some("usb") }
@@ -5993,7 +5993,7 @@ fn unknown_builtin_msg(name: &str) -> String {
         else { None };
     if let Some(feat) = hw_feature {
         return format!(
-            "Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem gbrt-Build \
+            "Builtin '{}' gehoert zum Hardware-Modul '{}', das in diesem dhrt-Build \
              fehlt. Neu bauen mit: python rust\\build_runtime.py --hardware",
             name.to_uppercase(), feat);
     }
@@ -6524,7 +6524,7 @@ fn coerce(value: Value, target: &str, ctx: &str) -> R<Value> {
             Value::Bool(_) => Ok(value),
             _ => Err(format!("{}: Erwartet BOOLEAN, erhalten {}", ctx, value.type_name())),
         },
-        // Pascal-Striktheit (gbrt-Haertung): TUPLE/FUNCREF nur mit passendem
+        // Pascal-Striktheit (dhrt-Haertung): TUPLE/FUNCREF nur mit passendem
         // Wert zuweisbar. Nil bleibt erlaubt (uninitialisierter DECLARE-Default
         // umgeht coerce ohnehin, aber explizite Nil-Zuweisung soll nicht crashen).
         "tuple" => match value {

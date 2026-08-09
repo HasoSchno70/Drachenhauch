@@ -1,11 +1,11 @@
-"""Parity-Test: Rust-Preprocessor (`gbrt --preprocess`) == preprocess.process().
+"""Parity-Test: Rust-Preprocessor (`dhrt --preprocess`) == preprocess.process().
 
 Stufe 4 der Front-End-Portierung. Der Rust-Preprocessor (src/preprocess.rs)
 expandiert IMPORTs (Quellcode-Inlining + Built-in-Modul-Erkennung) VOR dem
 Lexen. Gate = **Merge-Ergebnis-Gleichheit**: die gemergte Quelle muss exakt der
 von `gamebasic.preprocess.process()` entsprechen (Zeilen-Enden normalisiert).
 
-Zusaetzlich ein End-to-End-Check: `gbrt --runsrc` (jetzt mit Preprocess) auf
+Zusaetzlich ein End-to-End-Check: `dhrt --runsrc` (jetzt mit Preprocess) auf
 einem Programm mit Quellcode- UND Modul-IMPORT == Python-Tree-Walker (stdout).
 """
 import contextlib
@@ -19,9 +19,9 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 
 
-def _find_gbrt():
+def _find_dhrt():
     base = _ROOT / "rust" / "drachenhauch_runtime" / "target"
-    exe = "gbrt.exe" if os.name == "nt" else "gbrt"
+    exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     for variant in ("release", "debug"):
         p = base / variant / exe
         if p.exists():
@@ -29,9 +29,9 @@ def _find_gbrt():
     return None
 
 
-_GBRT = _find_gbrt()
+_DHRT = _find_dhrt()
 pytestmark = pytest.mark.skipif(
-    _GBRT is None, reason="native Runtime 'gbrt' nicht gebaut")
+    _DHRT is None, reason="native Runtime 'dhrt' nicht gebaut")
 
 
 def _py_merge(main: Path) -> str:
@@ -42,13 +42,13 @@ def _py_merge(main: Path) -> str:
 
 
 def _rs_merge(main: Path):
-    out = subprocess.run([str(_GBRT), "--preprocess", str(main)],
+    out = subprocess.run([str(_DHRT), "--preprocess", str(main)],
                          capture_output=True, text=True, encoding="utf-8")
     return out.returncode, out.stdout.replace("\r\n", "\n")
 
 
 def _runsrc(main: Path):
-    out = subprocess.run([str(_GBRT), "--runsrc", str(main)],
+    out = subprocess.run([str(_DHRT), "--runsrc", str(main)],
                          capture_output=True, text=True, encoding="utf-8")
     return out.returncode, out.stdout.replace("\r\n", "\n")
 
@@ -128,7 +128,7 @@ def test_e2e_runsrc_with_imports(tmp_path):
 
 def test_e2e_runsrc_module_alias(tmp_path):
     # IMPORT "..." AS x : aliasierte Builtins (J_PARSE->JSON_PARSE) + externe
-    # Typen (J_HANDLE / V) muessen in gbrt funktionieren wie im Tree-Walker.
+    # Typen (J_HANDLE / V) muessen in dhrt funktionieren wie im Tree-Walker.
     main = _write(tmp_path, "main.gb",
                   'IMPORT "json" AS j\nIMPORT "vec2" AS v\n'
                   'DIM h AS J_HANDLE\nh = J_PARSE("[10, 20, 30]")\n'

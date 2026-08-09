@@ -4,7 +4,7 @@
 ' 2. LAYER_DEFINE setzt explizite Z-Reihenfolge (bg -> sprites -> ui).
 ' 3. BATCH_DRAW/BATCH_FLUSH stehen hier nur noch aus Kompatibilitaet:
 '    BATCH_DRAW IST ATLAS_DRAW (derselbe Aufruf), BATCH_FLUSH tut
-'    nichts. Es wird nichts gesammelt und nichts gespart -- gbrt
+'    nichts. Es wird nichts gesammelt und nichts gespart -- dhrt
 '    merkt sich jeden Zeichenbefehl sofort in der aktiven Ebene und
 '    spielt beim FLIP alle Ebenen der Reihe nach ab.
 ' 4. UI-Layer ist Screen-Space (Camera reset bevor wir reinzeichnen).

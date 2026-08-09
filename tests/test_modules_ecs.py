@@ -1,6 +1,6 @@
 """Tests fuer das ecs-Modul (Entity-Component-System).
 
-Golden-Tests gegen `gbrt` (Stufe B): DIM w AS ECS_WORLD + Operationen + PRINT.
+Golden-Tests gegen `dhrt` (Stufe B): DIM w AS ECS_WORLD + Operationen + PRINT.
 Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest

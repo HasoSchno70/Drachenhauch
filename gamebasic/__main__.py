@@ -1,7 +1,7 @@
 """Erlaubt 'py -m gamebasic <datei.gb>' von ueberall.
 
 Stufe B: Der Tree-Walker ist entfernt -- Ausfuehrung laeuft ueber die native
-Runtime `gbrt` (gbrt chdirt selbst ins Datei-Verzeichnis, daher funktionieren
+Runtime `dhrt` (dhrt chdirt selbst ins Datei-Verzeichnis, daher funktionieren
 relative Asset-Pfade jetzt auch hier). `--tokens`/`--ast` nutzen den behaltenen
 Python-Lexer/-Parser (Dev/Parity).
 """
@@ -29,7 +29,7 @@ def main(argv=None):
         print(f"Datei nicht gefunden: {path}")
         return 1
 
-    # --- Ausfuehren: ueber die native Runtime (gbrt) ---
+    # --- Ausfuehren: ueber die native Runtime (dhrt) ---
     if mode == "run":
         from gbrun import _run_native  # type: ignore
         return _run_native(path.resolve(), path)

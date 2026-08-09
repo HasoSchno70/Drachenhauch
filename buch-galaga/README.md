@@ -45,7 +45,7 @@ ein eigenes Kapitel.
 
 ## Voraussetzungen
 
-- Eine GameBasic-Installation (native Runtime `gbrt` gebaut — siehe
+- Eine GameBasic-Installation (native Runtime `dhrt` gebaut — siehe
   [Haupt-README](../README.md)).
 - Der mitgelieferte **Qt-Editor** (`gbedit`) und der **Sprite-Editor**
   (`gbsprites`).

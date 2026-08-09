@@ -10,7 +10,7 @@ import pytest
 
 
 def test_firmata_builtins_registered():
-    from gamebasic.editor_qt.gbrt_meta import builtin_names_lower
+    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "firmata_ports", "firmata_open", "firmata_close", "firmata_is_open",
         "firmata_pin_mode", "firmata_digital_write", "firmata_digital_read",
