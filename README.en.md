@@ -22,7 +22,13 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-## Quick start
+## Download
+
+**[Download GameBasic for Windows](https://github.com/HasoSchno70/Game-Basic/releases/latest)** — a single installer, about 81 MB, currently version 2026.1.
+
+You do **not** need Python installed. It ships the complete development environment, the `gbrt` runtime, all 174 examples with their assets, the textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
+
+## Working from source
 
 ```
 .venv\Scripts\python.exe gbrun.py            # open the editor
