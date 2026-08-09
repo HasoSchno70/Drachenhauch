@@ -2,7 +2,7 @@
 Laufzeit-Typen, Encoding/Hash und Datei/OS-Helfer. run_gb -> dhrt run."""
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 
 # ----------------------------------------------------------- Farben / Alpha
@@ -35,7 +35,7 @@ def test_rgba_alpha_zero_clamped_to_one(run_gb):
 
 
 def test_rgba_out_of_range_errors(run_gb):
-    with pytest.raises(GameBasicError, match="RGBA"):
+    with pytest.raises(DrachenhauchError, match="RGBA"):
         run_gb("PRINT RGBA(0, 0, 0, 300)\n")
 
 
@@ -128,7 +128,7 @@ def test_hash_deterministic(run_gb):
 
 
 def test_base64_decode_invalid_raises(run_gb):
-    with pytest.raises(GameBasicError, match="BASE64_DECODE"):
+    with pytest.raises(DrachenhauchError, match="BASE64_DECODE"):
         run_gb('PRINT BASE64_DECODE("@@@@")\n')
 
 
@@ -168,5 +168,5 @@ def test_copy_rename_append(run_gb, tmp_path):
 
 
 def test_dirlist_missing_dir_raises(run_gb):
-    with pytest.raises(GameBasicError, match="DIRLIST"):
+    with pytest.raises(DrachenhauchError, match="DIRLIST"):
         run_gb('PRINT LEN(DIRLIST("does_not_exist_xyz_123"))\n')

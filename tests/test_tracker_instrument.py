@@ -4,7 +4,7 @@ import wave
 
 import numpy as np
 
-from gamebasic.tracker.instrument import (
+from drachenhauch.tracker.instrument import (
     Instrument, Zone, load_wav_mono, _decode_pcm, midi_to_freq,
 )
 
@@ -248,7 +248,7 @@ def test_envelope_release_never_overlaps_attack_phase():
     """Direkter Test von `_adsr_env`: die Release-Rampe darf nie in die
     Attack-Phase hineinreichen (sonst liest `start_lvl` einen falschen
     Wert und zerstoert die ganze Huellkurve, siehe Bugfix-Kommentar)."""
-    from gamebasic.tracker.instrument import _adsr_env
+    from drachenhauch.tracker.instrument import _adsr_env
     env = _adsr_env(n=5512, attack_ms=2, decay_ms=700, sustain=0.0,
                     release_ms=200, sr=44100)
     assert env[0] == 0.0                       # Attack startet bei 0 (unveraendert)
@@ -318,7 +318,7 @@ def test_keymap_dict_roundtrip():
 # --- Synth-Presets / Klangformung --------------------------------
 
 def test_factory_instruments_list():
-    from gamebasic.tracker.presets import factory_instruments, preset_names
+    from drachenhauch.tracker.presets import factory_instruments, preset_names
     insts = factory_instruments()
     assert len(insts) == len(preset_names())
     names = [i.name for i in insts]
@@ -327,7 +327,7 @@ def test_factory_instruments_list():
 
 
 def test_preset_has_envelope_shaping():
-    from gamebasic.tracker.presets import factory_instruments
+    from drachenhauch.tracker.presets import factory_instruments
     piano = next(i for i in factory_instruments() if i.name.startswith("Fluegel"))
     # Piano dekayt (sustain 0) -> Ende leiser als Anfang
     out = piano.render_note(60, 44100)
@@ -335,7 +335,7 @@ def test_preset_has_envelope_shaping():
 
 
 def test_organ_sustains():
-    from gamebasic.tracker.presets import factory_instruments
+    from drachenhauch.tracker.presets import factory_instruments
     organ = next(i for i in factory_instruments() if i.name == "Orgel")
     out = organ.render_note(60, 44100)
     # Orgel haelt -> Mitte etwa so laut wie frueh

@@ -24,7 +24,7 @@ def _qapp():
 
 
 def _make(_qapp, initial=0):
-    from gamebasic.editor_qt.undo_history import SnapshotUndo
+    from drachenhauch.editor_qt.undo_history import SnapshotUndo
     state = {"v": initial}
     hist = SnapshotUndo(lambda: dict(state), lambda s: state.update(s),
                         debounce_ms=0)
@@ -88,7 +88,7 @@ def test_reset_drops_history(_qapp):
 
 
 def test_limit_caps_undo_stack(_qapp):
-    from gamebasic.editor_qt.undo_history import SnapshotUndo
+    from drachenhauch.editor_qt.undo_history import SnapshotUndo
     state = {"v": 0}
     hist = SnapshotUndo(lambda: dict(state), lambda s: state.update(s),
                         debounce_ms=0, limit=3)
@@ -119,7 +119,7 @@ def _editor(_qapp, factory):
 
 
 def test_particle_editor_undo_redo(_qapp):
-    from gamebasic.particleeditor_qt import ParticleEditor
+    from drachenhauch.particleeditor_qt import ParticleEditor
     ed = _editor(_qapp, ParticleEditor)
     old = ed.size_min.value()
     ed.size_min.setValue(old + 7)
@@ -132,7 +132,7 @@ def test_particle_editor_undo_redo(_qapp):
 
 
 def test_sfx_editor_undo_redo(_qapp):
-    from gamebasic.sfxeditor_qt import SfxGenerator
+    from drachenhauch.sfxeditor_qt import SfxGenerator
     ed = _editor(_qapp, SfxGenerator)
     old = ed.base_freq.value()
     ed.base_freq.setValue(old + 123)
@@ -147,7 +147,7 @@ def test_sfx_autoplay_debounce_scheduling(_qapp):
     # Bei aktivem Auto-Play startet ein Regler-Wechsel den (entprellten)
     # Wiedergabe-Timer; ausgeschaltet bleibt er aus. Eine explizite Wiedergabe
     # bricht ein ausstehendes Auto-Play ab.
-    from gamebasic.sfxeditor_qt import SfxGenerator
+    from drachenhauch.sfxeditor_qt import SfxGenerator
     ed = _editor(_qapp, SfxGenerator)
     ed.cb_autoplay.setChecked(True)
     ed._autoplay_timer.stop()
@@ -162,7 +162,7 @@ def test_sfx_autoplay_debounce_scheduling(_qapp):
 
 
 def test_tracker_editor_undo_redo(_qapp):
-    from gamebasic.trackereditor_qt import TrackerEditor
+    from drachenhauch.trackereditor_qt import TrackerEditor
     ed = _editor(_qapp, TrackerEditor)
     ed.grid.setCurrentCell(0, 0)
     ed._set_note(0, 0, 60)
@@ -177,7 +177,7 @@ def test_tracker_editor_undo_redo(_qapp):
 def test_tracker_volume_column_ui(_qapp):
     """Volume-Spinbox setzt die Noten-Lautstaerke der gewaehlten Zelle und
     spiegelt sie beim Selektieren zurueck."""
-    from gamebasic.trackereditor_qt import TrackerEditor
+    from drachenhauch.trackereditor_qt import TrackerEditor
     ed = _editor(_qapp, TrackerEditor)
     ed.grid.setCurrentCell(0, 0)
     ed._set_note(0, 0, 60)
@@ -202,8 +202,8 @@ def test_tracker_volume_column_ui(_qapp):
 def test_tracker_slide_column_ui(_qapp):
     """Slide-Spinbox setzt den Pitch-Slide der gewaehlten Note (nur tonale
     Kanaele), spiegelt zurueck und zeigt ihn im Zelltext."""
-    from gamebasic.trackereditor_qt import TrackerEditor
-    from gamebasic.tracker import TONAL
+    from drachenhauch.trackereditor_qt import TrackerEditor
+    from drachenhauch.tracker import TONAL
     ed = _editor(_qapp, TrackerEditor)
     ed.grid.setCurrentCell(0, 0)
     ed._set_note(0, 0, 60)

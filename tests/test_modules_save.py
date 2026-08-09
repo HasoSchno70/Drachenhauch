@@ -8,7 +8,7 @@ die Python-Impl (in Phase 8 geloescht).
 import json
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _PRE = 'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_NEW()\n'
 
@@ -30,7 +30,7 @@ def test_new_returns_handle(run_gb, tmp_path):
 
 
 def test_load_missing_file_raises(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="nicht gefunden"):
+    with pytest.raises(DHRuntimeError, match="nicht gefunden"):
         _run(run_gb, tmp_path,
              'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("fehlt.save")\n')
 
@@ -44,7 +44,7 @@ def test_load_or_new_missing_returns_empty(run_gb, tmp_path):
 
 def test_load_or_new_invalid_json_still_raises(run_gb, tmp_path):
     (tmp_path / "kaputt.save").write_text("nicht echtes json", encoding="utf-8")
-    with pytest.raises(GBRuntimeError, match="JSON"):
+    with pytest.raises(DHRuntimeError, match="JSON"):
         _run(run_gb, tmp_path,
              'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD_OR_NEW("kaputt.save")\n')
 
@@ -114,13 +114,13 @@ def test_set_get_bool(run_gb, tmp_path):
 
 
 def test_get_missing_key_raises(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="nicht im Save"):
+    with pytest.raises(DHRuntimeError, match="nicht im Save"):
         _run(run_gb, tmp_path, _PRE + 'PRINT SAVE_GET_INT(s, "fehlt")\n')
 
 
 def test_get_wrong_type_raises(run_gb, tmp_path):
     # dhrt-Wortlaut: "kein INTEGER" (TW sagte "nicht INTEGER").
-    with pytest.raises(GBRuntimeError, match="kein INTEGER"):
+    with pytest.raises(DHRuntimeError, match="kein INTEGER"):
         _run(run_gb, tmp_path, _PRE +
              'SAVE_SET_STRING(s, "k", "hi")\nPRINT SAVE_GET_INT(s, "k")\n')
 
@@ -136,7 +136,7 @@ def test_int_from_integer_float_after_load(run_gb, tmp_path):
 
 
 def test_int_from_non_integer_float_rejects(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="kein INTEGER"):
+    with pytest.raises(DHRuntimeError, match="kein INTEGER"):
         _run(run_gb, tmp_path, _PRE +
              'SAVE_SET_FLOAT(s, "k", 5.5)\nPRINT SAVE_GET_INT(s, "k")\n')
 
@@ -230,7 +230,7 @@ def test_load_tolerates_missing_data(run_gb, tmp_path):
 
 def test_load_rejects_non_object(run_gb, tmp_path):
     (tmp_path / "list.save").write_text("[1, 2, 3]", encoding="utf-8")
-    with pytest.raises(GBRuntimeError, match="JSON-Objekt"):
+    with pytest.raises(DHRuntimeError, match="JSON-Objekt"):
         _run(run_gb, tmp_path,
              'IMPORT "save"\nDIM s AS SAVE_HANDLE\ns = SAVE_LOAD("list.save")\n')
 
@@ -238,12 +238,12 @@ def test_load_rejects_non_object(run_gb, tmp_path):
 # --- Type-Checking ---------------------------------------------------
 
 def test_non_handle_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="erwartet SAVE_HANDLE"):
+    with pytest.raises(DHRuntimeError, match="erwartet SAVE_HANDLE"):
         run_gb('IMPORT "save"\nPRINT SAVE_GET_INT("nicht ein handle", "k")\n')
 
 
 def test_set_bool_wrong_type_message(run_gb, tmp_path):
     # Wortlaut-Konsistenz: Standard-Muster "NAME erwartet TYP, erhalten X"
     # (frueher der Ausreisser "SAVE_SET_BOOL: BOOLEAN noetig").
-    with pytest.raises(GBRuntimeError, match="SAVE_SET_BOOL erwartet BOOLEAN, erhalten"):
+    with pytest.raises(DHRuntimeError, match="SAVE_SET_BOOL erwartet BOOLEAN, erhalten"):
         _run(run_gb, tmp_path, _PRE + 'SAVE_SET_BOOL(s, "k", 1)\n')

@@ -15,7 +15,7 @@ Stiefel und schiebbare Blöcke.
 ## Spielen
 
 ```
-gbrun.py circuitrunner\circuitrunner.gb        # oder im Editor F5
+dhrun.py circuitrunner\circuitrunner.gb        # oder im Editor F5
 ```
 
 Läuft im **randlosen Vollbild**. Im Menü mit den Pfeiltasten ein **Level-Set**
@@ -107,7 +107,7 @@ py circuitrunner\make_tiles.py
 ```
 
 Zusätzlich wird `assets/tiles.gbsprite` exportiert (**im Sprite-Editor
-`gbsprites` zu öffnen und bearbeiten** — jede Kachel ein benannter Frame). Die
+`dhsprites` zu öffnen und bearbeiten** — jede Kachel ein benannter Frame). Die
 HUD-Icons zeichnet die Engine direkt aus dem Sheet (`DRAWIMAGEPARTEX`), skaliert
 in nativer Auflösung — keine separaten Icon-Dateien.
 

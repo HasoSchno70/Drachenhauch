@@ -18,7 +18,7 @@ def _qapp():
 
 def _editor():
     try:
-        from gamebasic.trackereditor_qt import TrackerEditor
+        from drachenhauch.trackereditor_qt import TrackerEditor
         return TrackerEditor(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -79,7 +79,7 @@ def test_cell_text_shows_instrument_tag():
 
 
 def test_cell_text_no_tag_when_no_override():
-    from gamebasic.tracker import note_name
+    from drachenhauch.tracker import note_name
     ed = _editor()
     txt = ed._cell_text(0, 60, inst=None)
     assert txt.strip() == note_name(60)

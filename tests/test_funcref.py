@@ -120,28 +120,28 @@ PRINT apply(mul2, add1, 5)
 
 
 def test_funcref_rejects_non_funcref(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM f AS FUNCREF
 f = 42
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_calling_non_callable_throws(run_gb, run_vm):
     """`x()` mit x = 42 wirft."""
-    from gamebasic.errors import GBRuntimeError, GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError, DHRuntimeError
     src = '''
 DIM x AS INTEGER
 x = 42
 PRINT x()
 '''
-    with pytest.raises((GBRuntimeError, GBRuntimeError)):
+    with pytest.raises((DHRuntimeError, DHRuntimeError)):
         run_gb(src)
-    with pytest.raises((GBRuntimeError, GBRuntimeError)):
+    with pytest.raises((DHRuntimeError, DHRuntimeError)):
         run_vm(src)
 
 

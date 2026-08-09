@@ -231,7 +231,7 @@ def test_subject_evaluated_once_vm(run_vm):
 
 
 def test_select_parse_error_double_else(run_gb):
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     src = """\
 DIM x AS INTEGER
 x = 1
@@ -247,7 +247,7 @@ END SELECT
 
 
 def test_select_parse_error_case_after_else(run_gb):
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     src = """\
 DIM x AS INTEGER
 x = 1

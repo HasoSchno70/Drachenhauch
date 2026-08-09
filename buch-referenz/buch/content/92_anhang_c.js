@@ -1,4 +1,4 @@
-// Anhang C -- Farb-Konstanten. Werte aus gamebasic/graphics.py COLORS, gegen
+// Anhang C -- Farb-Konstanten. Werte aus drachenhauch/graphics.py COLORS, gegen
 // dhrt verifiziert (z. B. ORANGE = 16753920 = RGB(255,165,0) = &HFFA500).
 module.exports = (H) => {
   // [Name, R, G, B, Hex]

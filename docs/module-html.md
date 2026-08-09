@@ -34,7 +34,7 @@ PRINT "Status: ", HTTP_STATUS()
 PRINT body
 ```
 
-**Default-Timeout: 10 Sekunden.** Bei Timeout, Verbindungsfehler oder 4xx/5xx-Status wirft die Funktion `GBRuntimeError` mit Status-Code in der Meldung. Nach einem 4xx/5xx ist `HTTP_STATUS()` weiterhin lesbar — nützlich für `TRY/CATCH`-Pattern:
+**Default-Timeout: 10 Sekunden.** Bei Timeout, Verbindungsfehler oder 4xx/5xx-Status wirft die Funktion `DHRuntimeError` mit Status-Code in der Meldung. Nach einem 4xx/5xx ist `HTTP_STATUS()` weiterhin lesbar — nützlich für `TRY/CATCH`-Pattern:
 
 ```basic
 TRY

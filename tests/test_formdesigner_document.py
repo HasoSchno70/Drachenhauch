@@ -2,7 +2,7 @@
 nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
 
-from gamebasic.formdesigner import (
+from drachenhauch.formdesigner import (
     Control, FormDoc, FormProject, History, PALETTE, palette_spec, GRID,
     HANDLES, snap, resize_rect,
 )
@@ -486,9 +486,9 @@ def test_generate_runner_uses_stored_code():
 
 # --------------------------------------------------------------- GB-Code-Export
 def _parses(src):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.preprocess import process
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.preprocess import process
     merged = process(src)
     if isinstance(merged, tuple):
         merged = merged[0]
@@ -540,9 +540,9 @@ def test_gb_export_runs_in_runtime(run_gb, tmp_path):
 
 # --------------------------------------------------------------- Codegen
 def test_generated_runner_parses():
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.preprocess import process
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.preprocess import process
 
     doc = FormDoc(title="App")
     doc.add("button", 20, 200).on_click = "on_save"
@@ -698,7 +698,7 @@ def test_closable_default_matches_runtime():
 
 # ----------------------------------------- GB-Emit-Helfer
 def test_gb_num_never_uses_exponent_notation():
-    from gamebasic.formdesigner.document import _gb_num
+    from drachenhauch.formdesigner.document import _gb_num
     for v in (1e-5, 1e20, 1e-12, 0.0, -2.5):
         assert "e" not in _gb_num(v).lower(), v
         assert "." in _gb_num(v)
@@ -706,8 +706,8 @@ def test_gb_num_never_uses_exponent_notation():
 
 
 def test_gb_ident_escapes_reserved_words():
-    from gamebasic.formdesigner.document import _gb_ident
-    from gamebasic.tokens import KEYWORDS
+    from drachenhauch.formdesigner.document import _gb_ident
+    from drachenhauch.tokens import KEYWORDS
     for w in ("Print", "DATA", "to", "Step", "Next", "End", "True"):
         assert _gb_ident(w).lower() not in KEYWORDS, w
     assert _gb_ident("btnSave") == "btnSave"            # unveraendert
@@ -734,7 +734,7 @@ def test_project_normalizes_paths():
 
 
 def test_formdoc_load_rejects_a_project_manifest(tmp_path):
-    # Sonst laedt `gbform Projekt.GBPROJ` das Manifest als leeres Formular --
+    # Sonst laedt `dhform Projekt.GBPROJ` das Manifest als leeres Formular --
     # und das naechste Strg+S ueberschreibt die Projektdatei.
     p = tmp_path / "Projekt.GBPROJ"
     FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))

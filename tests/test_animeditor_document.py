@@ -1,4 +1,4 @@
-"""Headless-Tests fuer das Datenmodell + Code-Gen des `gbanim`-Editors.
+"""Headless-Tests fuer das Datenmodell + Code-Gen des `dhanim`-Editors.
 
 Modell-Operationen (add/rename/remove State, Transitions, Params), JSON-
 Roundtrip, und -- als Closed-Loop -- dass der Editor-Output vom Runtime-Modul
@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from gamebasic.animeditor import (
+from drachenhauch.animeditor import (
     ANY_STATE, AnimDoc, Condition, History, Param, State, Transition,
     snap, unique_name,
 )
@@ -228,9 +228,9 @@ def test_editor_output_loads_in_runtime(run_gb, tmp_path):
 
 # ----------------------------------------------------------------- Codegen
 def _parses(src: str):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.preprocess import process
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.preprocess import process
     merged = process(src)
     if isinstance(merged, tuple):
         merged = merged[0]

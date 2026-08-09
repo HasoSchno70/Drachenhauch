@@ -17,7 +17,7 @@ def app():
 
 def test_about_dialog_author_and_description(app):
     from PySide6.QtWidgets import QLabel
-    from gamebasic.editor_qt.dialogs import AboutDialog
+    from drachenhauch.editor_qt.dialogs import AboutDialog
 
     dlg = AboutDialog(None)
     texts = [w.text() for w in dlg.findChildren(QLabel)]
@@ -25,9 +25,9 @@ def test_about_dialog_author_and_description(app):
 
     assert "Hans Schnorrenberger" in blob
     assert "(C) 2026" in blob
-    # Versionsnummer aus gamebasic.__version__ wird angezeigt.
-    import gamebasic
-    assert f"Version {gamebasic.__version__}" in blob
+    # Versionsnummer aus drachenhauch.__version__ wird angezeigt.
+    import drachenhauch
+    assert f"Version {drachenhauch.__version__}" in blob
     assert "0.1.0" not in blob
     # Beschreibung ist aktuell -- die alten drei VM-Pfade sind weg.
     assert "Cython" not in blob

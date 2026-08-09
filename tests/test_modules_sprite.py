@@ -9,7 +9,7 @@ ohne GB-Getter, sind auf No-Crash-Smoke + Validierung reduziert. Frueher via
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 # IMAGE headless via GENTEX_COLOR + ein 16x16-Sprite in 's'.
 _PRE = ('IMPORT "sprite"\nDIM img AS IMAGE\nimg = GENTEX_COLOR(64, 64, RGB(255, 0, 0))\n'
@@ -37,7 +37,7 @@ def test_get_size(run_gb):
 
 
 def test_new_invalid_frame_size_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb('IMPORT "sprite"\nDIM img AS IMAGE\nimg = GENTEX_COLOR(64, 64, RGB(1, 1, 1))\n'
                "DIM s AS SPRITE\ns = SPRITE_NEW(img, 0, 16)\n")
 
@@ -60,7 +60,7 @@ def test_velocity_moves_position(run_gb):
 # --- Animationen -----------------------------------------------------
 
 def test_play_unknown_anim_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="unbekannte Animation"):
+    with pytest.raises(DHRuntimeError, match="unbekannte Animation"):
         run_gb(_PRE + 'SPRITE_PLAY(s, "fly")\n')
 
 
@@ -105,7 +105,7 @@ def test_set_frame(run_gb):
 
 
 def test_add_anim_invalid_range_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="last >= first"):
+    with pytest.raises(DHRuntimeError, match="last >= first"):
         run_gb(_PRE + 'SPRITE_ADD_ANIM(s, "bad", 5, 2, 8.0)\n')
 
 
@@ -120,7 +120,7 @@ def test_set_scale_no_crash(run_gb):
 
 
 def test_set_scale_negative_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb(_PRE + "SPRITE_SET_SCALE(s, -1.0, 1.0)\n")
 
 
@@ -130,7 +130,7 @@ def test_tint_and_clear_no_crash(run_gb):
 
 
 def test_tint_out_of_range_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="0..0xFFFFFF"):
+    with pytest.raises(DHRuntimeError, match="0..0xFFFFFF"):
         run_gb(_PRE + "SPRITE_TINT(s, 16777217)\n")
 
 

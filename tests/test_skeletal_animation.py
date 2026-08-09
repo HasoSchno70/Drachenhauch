@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 _ROBOT = (Path(__file__).resolve().parent.parent / "examples" / "assets" / "robot.glb")
 _ROBOT_POSIX = _ROBOT.as_posix()
@@ -65,11 +65,11 @@ def test_model_animate_blend_loops_frame_like_model_animate(run_gb):
 
 def test_model_animate_blend_invalid_anim_index_raises(run_gb):
     src = _setup('MODEL_ANIMATE_BLEND(robot, anims, 0, 0, 9999, 0, 0.5)\n')
-    with pytest.raises(GameBasicError, match="MODEL_ANIMATE_BLEND"):
+    with pytest.raises(DrachenhauchError, match="MODEL_ANIMATE_BLEND"):
         run_gb(src)
 
 
 def test_model_animate_blend_invalid_model_raises(run_gb):
     src = _setup('MODEL_ANIMATE_BLEND(9999, anims, 0, 0, 1, 0, 0.5)\n')
-    with pytest.raises(GameBasicError, match="MODEL_ANIMATE_BLEND"):
+    with pytest.raises(DrachenhauchError, match="MODEL_ANIMATE_BLEND"):
         run_gb(src)

@@ -17,7 +17,7 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path):
-    from gamebasic.editor_qt.main_window import GameBasicEditor
+    from drachenhauch.editor_qt.main_window import GameBasicEditor
     return GameBasicEditor(tmp_path)
 
 

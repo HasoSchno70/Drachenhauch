@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -83,7 +83,7 @@ def test_http_get_returns_body(run_gb):
 
 def test_http_get_404_raises_with_status_set(run_gb):
     with _mock_server({}) as base:
-        with pytest.raises(GBRuntimeError, match="404"):
+        with pytest.raises(DHRuntimeError, match="404"):
             run_gb(f'IMPORT "html"\nPRINT HTTP_GET("{base}/nope")\n')
 
 
@@ -106,7 +106,7 @@ def test_http_download_writes_file(run_gb, tmp_path):
 
 
 def test_http_get_invalid_url_raises(run_gb):
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb('IMPORT "html"\nPRINT HTTP_GET("not-a-url")\n')
 
 
@@ -142,13 +142,13 @@ def _truncated_server():
 
 def test_http_get_truncated_body_raises_instead_of_returning_partial(run_gb):
     with _truncated_server() as base:
-        with pytest.raises(GBRuntimeError):
+        with pytest.raises(DHRuntimeError):
             run_gb(f'IMPORT "html"\nPRINT HTTP_GET("{base}/x")\n')
 
 
 def test_http_download_truncated_body_raises_and_removes_partial_file(run_gb, tmp_path):
     with _truncated_server() as base:
-        with pytest.raises(GBRuntimeError):
+        with pytest.raises(DHRuntimeError):
             run_gb(f'IMPORT "html"\nHTTP_DOWNLOAD("{base}/x", "dl.bin")\n', base=tmp_path)
     # Keine abgeschnittene Datei zurueckgelassen.
     assert not (tmp_path / "dl.bin").exists()

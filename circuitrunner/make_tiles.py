@@ -966,7 +966,7 @@ def build():
          "codes": {f"0x{c:02X}": names.get(c, "?") for c in sorted(cells)}},
         indent=2), encoding="utf-8")
     try:
-        from gamebasic.spriteeditor.document import SpriteDoc, Frame
+        from drachenhauch.spriteeditor.document import SpriteDoc, Frame
         doc = SpriteDoc(S, S)
         doc.frames = [Frame(pixels=cells[c].convert("RGBA"),
                             name=f"{c:02X}_{names.get(c, '?')}") for c in sorted(cells)]

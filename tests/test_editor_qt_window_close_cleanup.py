@@ -20,7 +20,7 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path, monkeypatch):
-    from gamebasic.editor_qt import main_window as mw
+    from drachenhauch.editor_qt import main_window as mw
     # Reale Settings-/Autosave-Persistenz beim Test-closeEvent() vermeiden --
     # sonst wuerde ein Testlauf die echten %APPDATA%/GameBasic-Dateien des
     # Users ueberschreiben.

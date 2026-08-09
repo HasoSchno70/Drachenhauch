@@ -6,7 +6,7 @@ Stahl-Cyan-Roehren, Kristall-Item-Boxen) -- bewusst NICHT an Nintendo-Marken/
 
 Zeichnet Spieler, Gegner, Tiles, Items und Deko mit einer kleinen Pixel-Canvas
 (harte Kanten, begrenzte Palette = Pixelart-Look) und exportiert:
-- pro animierter Figur eine `.gbsprite` (im Editor `gbsprites` bearbeitbar)
+- pro animierter Figur eine `.gbsprite` (im Editor `dhsprites` bearbeitbar)
   + `.gif`-Vorschau,
 - ein **Master-Spritesheet** `sheet.png` + `sheet.json` (ATLAS_LOAD-Manifest)
   mit ALLEN benannten Sprites in einem Raster,
@@ -27,7 +27,7 @@ _ROOT = Path(__file__).resolve().parent.parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from gamebasic.spriteeditor.document import SpriteDoc, Frame, Anim  # noqa: E402
+from drachenhauch.spriteeditor.document import SpriteDoc, Frame, Anim  # noqa: E402
 
 OUT = Path(__file__).resolve().parent
 S = 32  # Sprite-Kantenlaenge

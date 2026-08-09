@@ -122,7 +122,7 @@ class _MockApp:
 # --- Pencil ---------------------------------------------------------
 
 def test_pencil_paints_single_pixel():
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = PencilTool()
@@ -134,7 +134,7 @@ def test_pencil_paints_single_pixel():
 
 
 def test_pencil_uses_bg_with_right_button():
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = PencilTool()
@@ -145,7 +145,7 @@ def test_pencil_uses_bg_with_right_button():
 
 def test_pencil_drag_paints_line():
     """Move zwischen zwei Punkten zieht eine Bresenham-Linie."""
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = PencilTool()
@@ -158,7 +158,7 @@ def test_pencil_drag_paints_line():
 
 
 def test_pencil_respects_bounds():
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=4, h=4)
     tool = PencilTool()
@@ -173,7 +173,7 @@ def test_pencil_respects_bounds():
 # --- Eraser ---------------------------------------------------------
 
 def test_eraser_clears_pixel():
-    from gamebasic.spriteeditor.tools import EraserTool
+    from drachenhauch.spriteeditor.tools import EraserTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     app.doc.current.pixels.putpixel((2, 2), (100, 100, 100, 255))
@@ -186,7 +186,7 @@ def test_eraser_clears_pixel():
 # --- Bucket ---------------------------------------------------------
 
 def test_bucket_fills_connected_region():
-    from gamebasic.spriteeditor.tools import BucketTool
+    from drachenhauch.spriteeditor.tools import BucketTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=4, h=4)
     # Zweite Spalte abtrennen damit nur die linke Haelfte gefuellt wird
@@ -212,7 +212,7 @@ def test_bucket_no_change_if_target_is_replacement():
     (early-return) UND kein Undo-Eintrag (Review-Fund: vorher wurde der
     Snapshot noch VOR diesem Check genommen -- ein No-op-Strg+Z war die
     Folge, obwohl sichtbar nichts passiert war)."""
-    from gamebasic.spriteeditor.tools import BucketTool
+    from drachenhauch.spriteeditor.tools import BucketTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     app.doc.current.pixels.putpixel((1, 1), (255, 0, 0, 255))  # = fg
@@ -226,7 +226,7 @@ def test_bucket_no_change_if_target_is_replacement():
 # --- Line / Rect / Ellipse -----------------------------------------
 
 def test_line_tool_draws_diagonal():
-    from gamebasic.spriteeditor.tools import LineTool
+    from drachenhauch.spriteeditor.tools import LineTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = LineTool()
@@ -238,7 +238,7 @@ def test_line_tool_draws_diagonal():
 
 
 def test_rect_tool_outline():
-    from gamebasic.spriteeditor.tools import RectTool
+    from drachenhauch.spriteeditor.tools import RectTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = RectTool(filled=False)
@@ -252,7 +252,7 @@ def test_rect_tool_outline():
 
 
 def test_rect_tool_filled():
-    from gamebasic.spriteeditor.tools import RectTool
+    from drachenhauch.spriteeditor.tools import RectTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = RectTool(filled=True)
@@ -264,7 +264,7 @@ def test_rect_tool_filled():
 
 def test_line_tool_respects_brush_size():
     """Brush-Size 3 -> die Linie ist 3 Pixel dick (quadratischer Stempel)."""
-    from gamebasic.spriteeditor.tools import LineTool
+    from drachenhauch.spriteeditor.tools import LineTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=12, h=12)
     app.brush_size = 3
@@ -279,7 +279,7 @@ def test_line_tool_respects_brush_size():
 
 def test_rect_tool_outline_brush_width():
     """Brush-Size 2 -> die Kontur ist 2 Pixel breit (nach innen gezeichnet)."""
-    from gamebasic.spriteeditor.tools import RectTool
+    from drachenhauch.spriteeditor.tools import RectTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=12, h=12)
     app.brush_size = 2
@@ -297,7 +297,7 @@ def test_rect_tool_outline_brush_width():
 def test_spray_respects_symmetry():
     """Im X-Symmetrie-Modus hat jedes gespruehte Pixel sein Spiegelbild."""
     import random
-    from gamebasic.spriteeditor.tools import SprayTool
+    from drachenhauch.spriteeditor.tools import SprayTool
     from PySide6.QtCore import Qt
     random.seed(1234)
     app = _MockApp(w=9, h=9)
@@ -319,7 +319,7 @@ def test_spray_respects_symmetry():
 
 def test_two_point_tool_preview_during_drag():
     """Live-Preview waehrend des Drags veraendert nicht den echten Buffer."""
-    from gamebasic.spriteeditor.tools import LineTool
+    from drachenhauch.spriteeditor.tools import LineTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = LineTool()
@@ -333,7 +333,7 @@ def test_two_point_tool_preview_during_drag():
 # --- Eyedropper ----------------------------------------------------
 
 def test_eyedropper_picks_color():
-    from gamebasic.spriteeditor.tools import EyedropperTool
+    from drachenhauch.spriteeditor.tools import EyedropperTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     app.doc.current.pixels.putpixel((2, 2), (10, 20, 30, 255))
@@ -344,14 +344,14 @@ def test_eyedropper_picks_color():
 
 def test_eyedropper_does_not_snapshot():
     """Eyedropper hat needs_snapshot=False -- darf nichts mutieren."""
-    from gamebasic.spriteeditor.tools import EyedropperTool
+    from drachenhauch.spriteeditor.tools import EyedropperTool
     assert EyedropperTool.needs_snapshot is False
 
 
 # --- Magic Wand ----------------------------------------------------
 
 def test_magic_wand_selects_bounding_rect():
-    from gamebasic.spriteeditor.tools import MagicWandTool
+    from drachenhauch.spriteeditor.tools import MagicWandTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=8, h=8)
     # 3x3-Block aus gleicher Farbe
@@ -367,7 +367,7 @@ def test_magic_wand_selects_bounding_rect():
 # --- Symmetrie-Modus -----------------------------------------------
 
 def test_pencil_with_x_symmetry():
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=8, h=8)
     app.symmetry_mode = "x"
@@ -381,7 +381,7 @@ def test_pencil_with_x_symmetry():
 
 
 def test_pencil_with_both_symmetry():
-    from gamebasic.spriteeditor.tools import PencilTool
+    from drachenhauch.spriteeditor.tools import PencilTool
     from PySide6.QtCore import Qt
     app = _MockApp(w=8, h=8)
     app.symmetry_mode = "both"
@@ -398,39 +398,39 @@ def test_pencil_with_both_symmetry():
 # --- Helpers -------------------------------------------------------
 
 def test_bresenham_horizontal():
-    from gamebasic.spriteeditor.tools import _bresenham
+    from drachenhauch.spriteeditor.tools import _bresenham
     pts = list(_bresenham(0, 0, 4, 0))
     assert pts == [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)]
 
 
 def test_bresenham_diagonal():
-    from gamebasic.spriteeditor.tools import _bresenham
+    from drachenhauch.spriteeditor.tools import _bresenham
     pts = list(_bresenham(0, 0, 3, 3))
     assert pts == [(0, 0), (1, 1), (2, 2), (3, 3)]
 
 
 def test_brush_offsets_size_1_is_single_pixel():
-    from gamebasic.spriteeditor.tools import _brush_offsets
+    from drachenhauch.spriteeditor.tools import _brush_offsets
     offs = _brush_offsets(1)
     assert (0, 0) in offs
 
 
 def test_brush_offsets_size_grows():
-    from gamebasic.spriteeditor.tools import _brush_offsets
+    from drachenhauch.spriteeditor.tools import _brush_offsets
     s1 = _brush_offsets(1)
     s4 = _brush_offsets(4)
     assert len(s4) > len(s1)
 
 
 def test_symmetry_points_none():
-    from gamebasic.spriteeditor.tools import _symmetry_points
+    from drachenhauch.spriteeditor.tools import _symmetry_points
     app = _MockApp(w=8, h=8)
     app.symmetry_mode = "none"
     assert _symmetry_points(app, 2, 3) == [(2, 3)]
 
 
 def test_symmetry_points_both():
-    from gamebasic.spriteeditor.tools import _symmetry_points
+    from drachenhauch.spriteeditor.tools import _symmetry_points
     app = _MockApp(w=8, h=8)
     app.symmetry_mode = "both"
     pts = sorted(_symmetry_points(app, 1, 2))
@@ -440,7 +440,7 @@ def test_symmetry_points_both():
 # --- Tool-Protocol-Vertraege --------------------------------------
 
 def test_tool_base_class_has_required_attrs():
-    from gamebasic.spriteeditor.tools import Tool
+    from drachenhauch.spriteeditor.tools import Tool
     assert hasattr(Tool, "name")
     assert hasattr(Tool, "needs_snapshot")
     assert hasattr(Tool, "begin")
@@ -449,7 +449,7 @@ def test_tool_base_class_has_required_attrs():
 
 
 def test_all_tools_inherit_from_base():
-    from gamebasic.spriteeditor.tools import (
+    from drachenhauch.spriteeditor.tools import (
         Tool, PencilTool, EraserTool, BucketTool, LineTool, RectTool,
         EllipseTool, EyedropperTool, MoveTool, MagicWandTool, SelectTool,
         SprayTool,
@@ -508,7 +508,7 @@ def _select_host(w=8, h=8):
 
 
 def test_select_drag_inside_moves_content():
-    from gamebasic.spriteeditor.tools import SelectTool
+    from drachenhauch.spriteeditor.tools import SelectTool
     app = _select_host()
     px = app.doc.current.pixels
     px.putpixel((1, 1), (255, 0, 0, 255))
@@ -532,7 +532,7 @@ def test_select_drag_inside_moves_content():
 
 
 def test_select_drag_outside_starts_new_selection():
-    from gamebasic.spriteeditor.tools import SelectTool
+    from drachenhauch.spriteeditor.tools import SelectTool
     app = _select_host()
     app.canvas.set_selection(1, 1, 2, 2)
     tool = SelectTool()
@@ -544,7 +544,7 @@ def test_select_drag_outside_starts_new_selection():
 
 
 def test_select_move_clips_at_canvas_edge():
-    from gamebasic.spriteeditor.tools import SelectTool
+    from drachenhauch.spriteeditor.tools import SelectTool
     app = _select_host()
     app.doc.current.pixels.putpixel((1, 1), (255, 0, 0, 255))
     app.canvas.set_selection(1, 1, 1, 1)
@@ -561,7 +561,7 @@ def test_select_move_clips_at_canvas_edge():
 # --- Lasso ----------------------------------------------------------
 
 def test_polygon_mask_triangle():
-    from gamebasic.spriteeditor.tools import polygon_mask
+    from drachenhauch.spriteeditor.tools import polygon_mask
     mask = polygon_mask((8, 8), [(0, 0), (7, 0), (0, 7)])
     assert mask.getpixel((1, 1)) == 255       # innen
     assert mask.getpixel((7, 7)) == 0         # ausserhalb des Dreiecks
@@ -569,12 +569,12 @@ def test_polygon_mask_triangle():
 
 
 def test_polygon_mask_too_few_points_empty():
-    from gamebasic.spriteeditor.tools import polygon_mask
+    from drachenhauch.spriteeditor.tools import polygon_mask
     assert polygon_mask((8, 8), [(0, 0), (3, 3)]).getbbox() is None
 
 
 def test_lasso_drag_sets_mask_selection():
-    from gamebasic.spriteeditor.tools import LassoTool
+    from drachenhauch.spriteeditor.tools import LassoTool
     from PySide6.QtCore import Qt
     app = _MockApp()
     tool = LassoTool()
@@ -594,7 +594,7 @@ def test_lasso_drag_sets_mask_selection():
 
 
 def test_lasso_move_inside_moves_masked_pixels_only():
-    from gamebasic.spriteeditor.tools import LassoTool, polygon_mask
+    from drachenhauch.spriteeditor.tools import LassoTool, polygon_mask
     from PySide6.QtCore import Qt
     app = _MockApp()
     px = app.doc.current.pixels
@@ -621,7 +621,7 @@ def test_lasso_move_inside_moves_masked_pixels_only():
 
 
 def test_lasso_click_outside_mask_starts_new_path():
-    from gamebasic.spriteeditor.tools import LassoTool, polygon_mask
+    from drachenhauch.spriteeditor.tools import LassoTool, polygon_mask
     from PySide6.QtCore import Qt
     app = _MockApp()
     app.canvas.set_selection_mask(polygon_mask((8, 8), [(5, 5), (7, 5), (7, 7), (5, 7)]))

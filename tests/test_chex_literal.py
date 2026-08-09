@@ -4,8 +4,8 @@ Zusaetzlich zur klassischen BASIC-Form &H/&B akzeptieren beide Lexer
 (Python-Front-End + dhrt) jetzt auch die C-Schreibweise. `0`/`0.5` duerfen
 dabei NICHT als Praefix fehlgedeutet werden.
 """
-from gamebasic.lexer import Lexer
-from gamebasic.tokens import TokenType
+from drachenhauch.lexer import Lexer
+from drachenhauch.tokens import TokenType
 
 
 # --- Laufzeit-Semantik (dhrt) -------------------------------------------

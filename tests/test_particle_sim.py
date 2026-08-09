@@ -1,4 +1,4 @@
-"""Tests fuer die reine Partikel-Simulation (gamebasic.particle_sim).
+"""Tests fuer die reine Partikel-Simulation (drachenhauch.particle_sim).
 
 Diese Klasse ist die Vorschau-Sim des Partikel-Editors -- Qt-frei, per
 NumPy vektorisiert (bis auf emit(), siehe Kommentar dort). Der Editor
@@ -6,7 +6,7 @@ selbst haelt min<=max per UI-Sync ein (siehe test_editor_qt_particle_editor
 .py::test_minmax_enforced_on_change), aber die Klasse wird auch direkt
 genutzt (Tests, zukuenftige Aufrufer) und muss daher selbst robust sein.
 """
-from gamebasic.particle_sim import ParticleSystem
+from drachenhauch.particle_sim import ParticleSystem
 
 
 def test_emit_adds_particles():

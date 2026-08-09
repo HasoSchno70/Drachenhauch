@@ -1,5 +1,5 @@
 """Tests fuer den Fuzzy-Match-Scorer (Quick-Open + Command-Palette)."""
-from gamebasic.editor_qt.fuzzy import score
+from drachenhauch.editor_qt.fuzzy import score
 
 
 def test_empty_query_returns_zero():

@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Modul: tiled"),
-  H.p("Größere Level malt man nicht im Code, sondern in einem Karten-Editor. Das tiled-Modul lädt Karten im verbreiteten Tiled-Format (als JSON) – egal ob du sie im Programm Tiled oder im mitgelieferten gbtilemap-Editor erstellt hast. Eine Karte besteht aus einem oder mehreren Ebenen (Layern) aus Kacheln, dazu optional Objekt-Ebenen für Spawn-Punkte und Zonen. Jede Kachel kann eigene Eigenschaften tragen (etwa „fest“ oder „Stachel“)."),
+  H.p("Größere Level malt man nicht im Code, sondern in einem Karten-Editor. Das tiled-Modul lädt Karten im verbreiteten Tiled-Format (als JSON) – egal ob du sie im Programm Tiled oder im mitgelieferten dhtilemap-Editor erstellt hast. Eine Karte besteht aus einem oder mehreren Ebenen (Layern) aus Kacheln, dazu optional Objekt-Ebenen für Spawn-Punkte und Zonen. Jede Kachel kann eigene Eigenschaften tragen (etwa „fest“ oder „Stachel“)."),
   H.figure("63_tiled.png", "Eine geladene Tiled-Karte (30×10 Kacheln): Boden, schwebende Plattformen und Münzen – per TILED_TILE_AT gezeichnet."),
 
   H.h2("Karte laden & Maße"),
@@ -120,5 +120,5 @@ module.exports = (H) => [
       '    PRINT TILED_TILESET_IMAGE(karte, t) + " ab gid " + STR$(TILED_TILESET_FIRSTGID(karte, t))',
       'NEXT',
     ]),
-  H.tip("Karten erstellen", "Du musst Tiled-Karten nicht von Hand als JSON schreiben: Der mitgelieferte Editor gbtilemap malt Kacheln, verwaltet Ebenen und Eigenschaften und speichert genau das Format, das TILED_LOAD liest. Zum Abprüfen von Boden und Wänden passt das tile_collide-Modul (nächstes Kapitel) perfekt dazu."),
+  H.tip("Karten erstellen", "Du musst Tiled-Karten nicht von Hand als JSON schreiben: Der mitgelieferte Editor dhtilemap malt Kacheln, verwaltet Ebenen und Eigenschaften und speichert genau das Format, das TILED_LOAD liest. Zum Abprüfen von Boden und Wänden passt das tile_collide-Modul (nächstes Kapitel) perfekt dazu."),
 ];

@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from gamebasic.editor_qt.autosave import (
+from drachenhauch.editor_qt.autosave import (
     RecoveryEntry,
     read_manifest,
     write_manifest,
@@ -26,11 +26,11 @@ def tmp_autosave(tmp_path, monkeypatch):
     folder = tmp_path / "autosave"
     folder.mkdir()
     monkeypatch.setattr(
-        "gamebasic.editor_qt.autosave.autosave_dir",
+        "drachenhauch.editor_qt.autosave.autosave_dir",
         lambda: folder,
     )
     monkeypatch.setattr(
-        "gamebasic.editor_qt.autosave.manifest_path",
+        "drachenhauch.editor_qt.autosave.manifest_path",
         lambda: folder / "manifest.json",
     )
     return folder

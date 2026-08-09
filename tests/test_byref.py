@@ -120,8 +120,8 @@ PRINT p.y
 
 def test_byref_literal_argument_raises(run_gb):
     """BYREF-Argument muss zuweisbar sein - Literal -> Fehler."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError) as exc:
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError) as exc:
         run_gb('''
 SUB foo(BYREF x AS INTEGER)
     x = 5
@@ -133,8 +133,8 @@ foo(42)
 
 def test_byref_expression_argument_raises(run_gb):
     """BYREF-Argument muss eine LValue sein - Expression nicht erlaubt."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('''
 SUB foo(BYREF x AS INTEGER)
     x = 1
@@ -151,9 +151,9 @@ foo(a + b)
 
 def test_byref_with_default_is_parser_error():
     """BYREF und Default-Wert schliessen sich aus."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.errors import ParseError
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.errors import ParseError
     src = '''
 SUB foo(BYREF x AS INTEGER = 5)
 END SUB

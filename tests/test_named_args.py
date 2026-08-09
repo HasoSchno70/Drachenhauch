@@ -1,7 +1,7 @@
 """Tests fuer Named-Arguments in SUB/FUNCTION/NEW-Aufrufen."""
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 @pytest.fixture(params=["tw", "vm"])
@@ -133,7 +133,7 @@ def test_named_in_new_class(run_either):
 # --- Fehler-Faelle ---------------------------------------------------
 
 def test_unknown_name_raises(run_either):
-    with pytest.raises(GBRuntimeError, match="Parameter.*schwurbel"):
+    with pytest.raises(DHRuntimeError, match="Parameter.*schwurbel"):
         run_either(
             'SUB f(a AS INTEGER)\n'
             'END SUB\n'
@@ -142,7 +142,7 @@ def test_unknown_name_raises(run_either):
 
 
 def test_duplicate_named_raises(run_either):
-    with pytest.raises(GBRuntimeError, match="doppelt"):
+    with pytest.raises(DHRuntimeError, match="doppelt"):
         run_either(
             'SUB f(a AS INTEGER)\n'
             'END SUB\n'
@@ -152,7 +152,7 @@ def test_duplicate_named_raises(run_either):
 
 def test_positional_and_named_overlap_raises(run_either):
     """Slot via positional UND named ist auch 'doppelt belegt'."""
-    with pytest.raises(GBRuntimeError, match="doppelt"):
+    with pytest.raises(DHRuntimeError, match="doppelt"):
         run_either(
             'SUB f(a AS INTEGER, b AS INTEGER)\n'
             'END SUB\n'
@@ -161,7 +161,7 @@ def test_positional_and_named_overlap_raises(run_either):
 
 
 def test_positional_after_named_raises(run_either):
-    with pytest.raises(GBRuntimeError, match="positional Argument nach Named"):
+    with pytest.raises(DHRuntimeError, match="positional Argument nach Named"):
         run_either(
             'SUB f(a AS INTEGER, b AS INTEGER)\n'
             'END SUB\n'
@@ -170,7 +170,7 @@ def test_positional_after_named_raises(run_either):
 
 
 def test_missing_required_param_raises(run_either):
-    with pytest.raises(GBRuntimeError, match="fehlt"):
+    with pytest.raises(DHRuntimeError, match="fehlt"):
         run_either(
             'SUB f(a AS INTEGER, b AS INTEGER)\n'
             'END SUB\n'
@@ -180,7 +180,7 @@ def test_missing_required_param_raises(run_either):
 
 def test_named_arg_on_builtin_raises(run_either):
     """Built-ins haben keine deklarierten Param-Namen -> Fehler."""
-    with pytest.raises(GBRuntimeError,
+    with pytest.raises(DHRuntimeError,
                        match="Built-in|SUB/FUNCTION"):
         run_either('PRINT ABS(x: -5)\n')
 

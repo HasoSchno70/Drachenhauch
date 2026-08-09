@@ -926,7 +926,7 @@ IMPORT "camera"
 
 Liste aller Module: siehe [README](README.md#module).
 
-Die Auflösungs-Reihenfolge: erst wird `<name>.gb` im aktuellen Verzeichnis gesucht; existiert sie nicht, dann `gamebasic/modules/<name>.py`. So kann ein eigenes `json.gb` Vorrang vor dem Built-in haben.
+Die Auflösungs-Reihenfolge: erst wird `<name>.gb` im aktuellen Verzeichnis gesucht; existiert sie nicht, dann `drachenhauch/modules/<name>.py`. So kann ein eigenes `json.gb` Vorrang vor dem Built-in haben.
 
 ## Kommentare
 

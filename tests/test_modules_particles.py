@@ -9,7 +9,7 @@ Validierung) ist hier abgedeckt.
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _PRE = ('IMPORT "particles"\nDIM s AS PARTICLE_SYSTEM\n'
         's = PARTICLE_SYSTEM_NEW(0.0, 0.0)\n')
@@ -69,29 +69,29 @@ def test_emit_many(run_gb):
 # --- Validierung ---------------------------------------------------
 
 def test_set_lifetime_invalid_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="ms_min >= 0"):
+    with pytest.raises(DHRuntimeError, match="ms_min >= 0"):
         run_gb(_PRE + "PARTICLE_SET_LIFETIME(s, -1, 100)\n")
-    with pytest.raises(GBRuntimeError, match="ms_max >= ms_min"):
+    with pytest.raises(DHRuntimeError, match="ms_max >= ms_min"):
         run_gb(_PRE + "PARTICLE_SET_LIFETIME(s, 200, 100)\n")
 
 
 def test_set_velocity_invalid_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="max muss >= min"):
+    with pytest.raises(DHRuntimeError, match="max muss >= min"):
         run_gb(_PRE + "PARTICLE_SET_VELOCITY(s, 100.0, 50.0, 0.0, 0.0)\n")
 
 
 def test_set_color_out_of_range_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="0..0xFFFFFF"):
+    with pytest.raises(DHRuntimeError, match="0..0xFFFFFF"):
         run_gb(_PRE + "PARTICLE_SET_COLOR(s, 16777217)\n")
 
 
 def test_set_size_invalid_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="min >= 1"):
+    with pytest.raises(DHRuntimeError, match="min >= 1"):
         run_gb(_PRE + "PARTICLE_SET_SIZE(s, 0, 5)\n")
 
 
 def test_emit_negative_count_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match=">= 0"):
+    with pytest.raises(DHRuntimeError, match=">= 0"):
         run_gb(_PRE + "PARTICLE_EMIT(s, -1)\n")
 
 

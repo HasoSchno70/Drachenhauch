@@ -26,7 +26,7 @@ def app():
 
 
 def _editor(app, text):
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(text)
     ed.resize(1000, 400)

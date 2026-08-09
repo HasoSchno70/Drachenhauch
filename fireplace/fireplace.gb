@@ -16,7 +16,7 @@
 '    wind.mp3       -- optional, selbst beilegen (siehe CREDITS.txt)
 '  Laeuft auch OHNE die Dateien (prozeduraler Ersatz-Kamin, stumm).
 '
-'  Native:  gbrun.py --native fireplace\fireplace.gb
+'  Native:  dhrun.py --native fireplace\fireplace.gb
 ' =====================================================================
 
 IMPORT "particles"

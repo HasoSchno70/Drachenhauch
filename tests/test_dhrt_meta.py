@@ -1,6 +1,6 @@
 """Builtin-Metadaten-Shim (Stufe B, Phase 2): eingefrorener builtin_index.json
 + dhrt_meta-Loader entkoppeln Editor/LSP von der Laufzeit (interpreter.py)."""
-from gamebasic.editor_qt import dhrt_meta
+from drachenhauch.editor_qt import dhrt_meta
 
 
 def test_index_loads_and_is_substantial():

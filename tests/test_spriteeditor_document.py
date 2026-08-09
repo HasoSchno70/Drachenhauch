@@ -14,7 +14,7 @@ import pytest
 # braucht Qt-Imports (QImage/QPixmap), aber kein Display.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from gamebasic.spriteeditor.document import (
+from drachenhauch.spriteeditor.document import (
     DEFAULT_FRAME_DURATION_MS,
     Frame,
     SpriteDoc,
@@ -455,7 +455,7 @@ def test_pil_to_qpixmap_preserves_size():
 # --- Benannte Animations-Bereiche (V4) --------------------------------------
 
 def _doc_with_anims():
-    from gamebasic.spriteeditor.document import Anim
+    from drachenhauch.spriteeditor.document import Anim
     doc = SpriteDoc(8, 8)
     for _ in range(5):
         doc.add_frame()
@@ -545,7 +545,7 @@ def test_generate_gbanim_loads_in_runtime(run_gb, tmp_path):
 # --- Struktur-Undo (Frame-Ops, Resize) ---------------------------------------
 
 def test_struct_undo_restores_deleted_frame():
-    from gamebasic.spriteeditor.document import Anim
+    from drachenhauch.spriteeditor.document import Anim
     doc = SpriteDoc(8, 8)
     doc.add_frame()
     doc.frames[1].pixels.putpixel((2, 2), (255, 0, 0, 255))
@@ -610,7 +610,7 @@ def test_anim_range_starting_at_deleted_frame_shrinks_correctly():
     eines mehrframigen Bereichs war. Bereich [2,5] (Frames 2,3,4,5), Frame
     2 geloescht -> die frueheren Frames 3,4,5 ruecken auf 2,3,4 -> neuer
     Bereich muss [2,4] sein (first bleibt stehen, last -1)."""
-    from gamebasic.spriteeditor.document import Anim
+    from drachenhauch.spriteeditor.document import Anim
     doc = SpriteDoc(8, 8)
     for _ in range(5):
         doc.add_frame()
@@ -623,7 +623,7 @@ def test_anim_range_starting_at_deleted_frame_shrinks_correctly():
 
 
 def test_anim_single_frame_range_dropped_on_delete():
-    from gamebasic.spriteeditor.document import Anim
+    from drachenhauch.spriteeditor.document import Anim
     doc = SpriteDoc(8, 8)
     doc.add_frame()
     doc.anims = [Anim("single", 1, 1, 8)]
@@ -693,26 +693,26 @@ def test_pixel_redo_invalidated_by_later_struct_op():
 # --- Onion-Skin-Helfer ---------------------------------------------
 
 def test_onion_indices_single_frame_empty():
-    from gamebasic.spriteeditor.document import onion_indices
+    from drachenhauch.spriteeditor.document import onion_indices
     assert onion_indices(0, 1, 1) == []
     assert onion_indices(0, 5, 0) == []
 
 
 def test_onion_indices_basic_prev_next():
-    from gamebasic.spriteeditor.document import onion_indices
+    from drachenhauch.spriteeditor.document import onion_indices
     out = onion_indices(2, 5, 1)
     assert out == [(1, "blue", 1.0), (3, "red", 1.0)]
 
 
 def test_onion_indices_two_frames_dedup():
     # Bei 2 Frames ist vorher == nachher -> nur EIN Eintrag (blau).
-    from gamebasic.spriteeditor.document import onion_indices
+    from drachenhauch.spriteeditor.document import onion_indices
     out = onion_indices(0, 2, 1)
     assert out == [(1, "blue", 1.0)]
 
 
 def test_onion_indices_depth_falloff_and_no_current():
-    from gamebasic.spriteeditor.document import onion_indices
+    from drachenhauch.spriteeditor.document import onion_indices
     out = onion_indices(3, 8, 3)
     idxs = [e[0] for e in out]
     assert 3 not in idxs                      # aktuelles Frame nie dabei
@@ -725,14 +725,14 @@ def test_onion_indices_depth_falloff_and_no_current():
 
 def test_onion_indices_depth_wraps_without_duplicates():
     # depth groesser als Frame-Anzahl: jeder Frame hoechstens einmal.
-    from gamebasic.spriteeditor.document import onion_indices
+    from drachenhauch.spriteeditor.document import onion_indices
     out = onion_indices(0, 3, 3)
     idxs = [e[0] for e in out]
     assert sorted(idxs) == [1, 2]
 
 
 def test_onion_tinted_alpha_and_channels():
-    from gamebasic.spriteeditor.document import onion_tinted
+    from drachenhauch.spriteeditor.document import onion_tinted
     img = Image.new("RGBA", (2, 2), (200, 100, 100, 255))
     blue = onion_tinted(img, "blue", 0.5)
     r, g, b, a = blue.getpixel((0, 0))

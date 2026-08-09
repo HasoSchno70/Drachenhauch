@@ -2,7 +2,7 @@
 (String) + GUI_SAVE/LOAD (Datei). Headless via run_gb (kein SCREEN noetig)."""
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 
 _BUILD = (
@@ -104,12 +104,12 @@ def test_tree_menu_tabs_roundtrip(run_gb):
 
 
 def test_from_json_invalid_raises(run_gb):
-    with pytest.raises(GameBasicError, match="ungueltiges JSON"):
+    with pytest.raises(DrachenhauchError, match="ungueltiges JSON"):
         run_gb('IMPORT "gui"\nDIM w AS GUI_WINDOW\nw = GUI_FROM_JSON("{nope")\n')
 
 
 def test_load_missing_file_raises(run_gb):
-    with pytest.raises(GameBasicError, match="GUI_LOAD"):
+    with pytest.raises(DrachenhauchError, match="GUI_LOAD"):
         run_gb('IMPORT "gui"\nDIM w AS GUI_WINDOW\nw = GUI_LOAD("nope_xyz.json")\n')
 
 
@@ -216,9 +216,9 @@ PRINT STR$(GUI_TABLE_SELECTED(t))
 
 
 def test_unbekannter_schluessel_nennt_die_gueltigen(run_gb, tmp_path):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     import pytest as _pt
-    with _pt.raises(GBRuntimeError, match="zeilenhoehe"):
+    with _pt.raises(DHRuntimeError, match="zeilenhoehe"):
         run_gb('''
 IMPORT "gui"
 DIM w AS GUI_WINDOW : w = GUI_WINDOW("T", 0, 0, 300, 200)
@@ -349,9 +349,9 @@ PRINT STR$(GUI_TABLE_EDITING_ROW(t))
 
 
 def test_negative_spalte_beim_freigeben_wird_gemeldet(run_gb, tmp_path):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     import pytest as _pt
-    with _pt.raises(GBRuntimeError, match="negativ"):
+    with _pt.raises(DHRuntimeError, match="negativ"):
         run_gb(_tabelle([("Anna", 1)], 'GUI_TABLE_COL_EDIT(t, -1, TRUE)'), base=tmp_path)
 
 
@@ -499,9 +499,9 @@ PRINT TRIM$(s)
 
 
 def test_position_ausserhalb_wird_gemeldet(run_gb, tmp_path):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     import pytest as _pt
-    with _pt.raises(GBRuntimeError, match="ausserhalb"):
+    with _pt.raises(DHRuntimeError, match="ausserhalb"):
         run_gb(_spalten('GUI_TABLE_MOVE_COL(t, 0, 9)'), base=tmp_path)
 
 

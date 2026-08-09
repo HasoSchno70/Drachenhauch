@@ -7,11 +7,11 @@ an, der LETZTE Kanal bleibt immer Drum/Noise."""
 import numpy as np
 import pytest
 
-from gamebasic.tracker import (
+from drachenhauch.tracker import (
     CHANNELS, MAX_CHANNELS, MIN_CHANNELS, TONAL, Pattern, Song,
     block_copy, block_interpolate, block_paste, block_transpose,
 )
-from gamebasic.tracker.mixer import render_song
+from drachenhauch.tracker.mixer import render_song
 
 
 # --------------------------------------------------------------- Kanalzahl
@@ -123,7 +123,7 @@ def test_flatten_and_gb_code_with_more_channels(tmp_path):
     assert len(channels) == 6
     assert channels[0][0] != 0
     assert channels[5][1] == 1           # Drum-Hit als 1 kodiert
-    code = s.gb_code()
+    code = s.dh_code()
     assert "DIM trk5[TRK_ROWS]" in code   # letzter Kanal exportiert
 
 
@@ -285,12 +285,12 @@ def test_gb_code_bakes_channel_vol_into_amp():
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.channel_vol[0] = 0.5
-    code = s.gb_code()
+    code = s.dh_code()
     assert "* 0.5" in code
 
 
 def test_gb_code_omits_channel_vol_multiplier_when_full():
     s = Song()
     s.patterns[0].set(0, 0, 60)
-    code = s.gb_code()
+    code = s.dh_code()
     assert "* 1.0" not in code

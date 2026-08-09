@@ -13,8 +13,8 @@ module.exports = (H) => [
 
   H.h2("Ein Programm von Hand starten"),
   H.p("Du kannst ein gespeichertes Programm auch direkt starten, ohne den Editor. In der Eingabeaufforderung, im Projektordner:"),
-  H.code(['gbrun.py mein_programm.gb']),
-  H.p("Das ist der empfohlene Weg, weil gbrun.py ins Verzeichnis deiner Datei wechselt – wichtig, sobald dein Programm Bilder oder Klänge aus Unterordnern lädt. Direkt geht es ebenso:"),
+  H.code(['dhrun.py mein_programm.gb']),
+  H.p("Das ist der empfohlene Weg, weil dhrun.py ins Verzeichnis deiner Datei wechselt – wichtig, sobald dein Programm Bilder oder Klänge aus Unterordnern lädt. Direkt geht es ebenso:"),
   H.code(['dhrt run mein_programm.gb']),
 
   H.h2("Konsole oder Fenster?"),

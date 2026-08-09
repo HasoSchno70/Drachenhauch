@@ -11,8 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.tilemap import TileMapDoc, TileLayer
-from gamebasic.tilemap.document import coerce_prop, MapObject, ObjectLayer
+from drachenhauch.tilemap import TileMapDoc, TileLayer
+from drachenhauch.tilemap.document import coerce_prop, MapObject, ObjectLayer
 
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -346,7 +346,7 @@ def test_multi_tileset_editor_load_select(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     try:
         from PySide6.QtWidgets import QApplication
-        from gamebasic.tilemapeditor_qt import TileMapEditor
+        from drachenhauch.tilemapeditor_qt import TileMapEditor
     except Exception:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
@@ -467,19 +467,19 @@ def test_object_layer_save_load_json_roundtrip(tmp_path):
 def test_gb_code_compiles(tmp_path):
     """Der exportierte GB-Code muss in dhrt lexen+parsen+kompilieren."""
     doc = _build_sample(tmp_path)
-    code = doc.gb_code(str(tmp_path / "level.json"))
+    code = doc.dh_code(str(tmp_path / "level.json"))
     assert _check_compiles(tmp_path, code) == []
 
 
 def test_gb_code_compiles_with_object_layer(tmp_path):
     """Auch mit Object-Layer bleibt der exportierte GB-Code kompilierbar."""
     doc = _build_with_objects(tmp_path)
-    code = doc.gb_code(str(tmp_path / "level.json"))
+    code = doc.dh_code(str(tmp_path / "level.json"))
     assert _check_compiles(tmp_path, code) == []
 
 
 def test_gb_code_loadimage_path_is_relative_like_json(tmp_path):
-    """Review-Fund: gb_code() schrieb frueher den ROHEN (oft absoluten,
+    """Review-Fund: dh_code() schrieb frueher den ROHEN (oft absoluten,
     maschinenspezifischen) Tileset-Bildpfad direkt in LOADIMAGE() -- anders
     als to_tiled_dict(), das den Pfad schon relativ zur Map schrieb. Das
     exportierte Programm brach dadurch beim Verschieben/Teilen des Projekt-
@@ -489,7 +489,7 @@ def test_gb_code_loadimage_path_is_relative_like_json(tmp_path):
     d = doc.to_tiled_dict(map_path)
     json_image = d["tilesets"][0]["image"]
 
-    code = doc.gb_code(map_path)
+    code = doc.dh_code(map_path)
     assert f'LOADIMAGE("{json_image}")' in code
     assert str(tmp_path).replace("\\", "/") not in code   # kein absoluter Pfad im Code
 
@@ -502,7 +502,7 @@ def test_gb_code_resolve_chain_has_upper_bound_check(tmp_path):
     Retile ungueltig gewordene GID haette im Export weiterhin (aus dem
     falschen Quell-Rechteck) irgendein Tile gezeichnet."""
     doc = _build_multi(tmp_path)   # A: firstgid=1,count=8 / B: firstgid=9,count=4
-    code = doc.gb_code(str(tmp_path / "level.json"))
+    code = doc.dh_code(str(tmp_path / "level.json"))
     assert "g >= 9 AND g < 13" in code   # Tileset B: [9, 9+4)
     assert "g >= 1 AND g < 9" in code    # Tileset A: [1, 1+8)
 
@@ -561,7 +561,7 @@ def test_editor_select_copy_paste(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     try:
         from PySide6.QtWidgets import QApplication
-        from gamebasic.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
+        from drachenhauch.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
     except Exception:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
@@ -589,7 +589,7 @@ def test_editor_select_cut_and_delete(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     try:
         from PySide6.QtWidgets import QApplication
-        from gamebasic.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
+        from drachenhauch.tilemapeditor_qt import TileMapEditor, TOOL_SELECT
     except Exception:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])
@@ -610,7 +610,7 @@ def test_editor_object_layer_undo_redo(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     try:
         from PySide6.QtWidgets import QApplication
-        from gamebasic.tilemapeditor_qt import TileMapEditor
+        from drachenhauch.tilemapeditor_qt import TileMapEditor
     except Exception:
         pytest.skip("PySide6 nicht verfuegbar")
     QApplication.instance() or QApplication([])

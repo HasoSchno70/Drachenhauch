@@ -40,7 +40,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Klang selbst erzeugen: AUDIO_SFX"),
-  H.p("AUDIO_SFX ist ein kleiner Synthesizer im Stil klassischer 8-Bit-Soundchips: aus einer Wellenform plus Hüllkurve, Tonhöhen-Verlauf und Vibrato baust du Lauf-, Sprung-, Treffer- oder Münz-Geräusche – ganz ohne Audiodatei. (Der Sound-Generator gbsfx exportiert genau solche Aufrufe.)"),
+  H.p("AUDIO_SFX ist ein kleiner Synthesizer im Stil klassischer 8-Bit-Soundchips: aus einer Wellenform plus Hüllkurve, Tonhöhen-Verlauf und Vibrato baust du Lauf-, Sprung-, Treffer- oder Münz-Geräusche – ganz ohne Audiodatei. (Der Sound-Generator dhsfx exportiert genau solche Aufrufe.)"),
   H.cmd("AUDIO_SFX", 'AUDIO_SFX(wellenform$, freq, slide, atk, sus, dec, vib_tiefe, vib_speed, vol [, ...])',
     'Erzeugt einen SOUND. wellenform$ = "sine"/"square"/"saw"/"triangle"/"noise". freq = Start-Frequenz, slide = Tonhöhen-Drift, atk/sus/dec = Hüllkurve (Anstieg/Halten/Abklingen in Sekunden), vib_tiefe/vib_speed = Vibrato, vol = Lautstärke. Weitere optionale Argumente steuern Stereo-Breite, Pulsweite und Filter.',
     [

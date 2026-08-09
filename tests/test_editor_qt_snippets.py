@@ -1,5 +1,5 @@
 """Tests fuer Snippet-Expansion."""
-from gamebasic.editor_qt.snippets import SNIPPETS, expand_snippet
+from drachenhauch.editor_qt.snippets import SNIPPETS, expand_snippet
 
 
 def test_snippets_dict_has_basics():
@@ -60,7 +60,7 @@ def test_expand_marker_only_first_consumed():
 
 # --- Placeholders -----------------------------------------------------
 
-from gamebasic.editor_qt.snippets import expand_snippet_full
+from drachenhauch.editor_qt.snippets import expand_snippet_full
 
 
 def test_placeholder_default_is_inserted():
@@ -135,7 +135,7 @@ def test_kein_snippet_enthaelt_ein_rohes_pipe_zeichen():
     (z.B. SPLIT$("a|b", "|")) wird dadurch still verschluckt -- der Compiler
     meldet nichts, weil ein kaputter String-Inhalt einwandfrei uebersetzt.
     Genau das ist beim Tabellen-Snippet passiert."""
-    from gamebasic.editor_qt.snippets import expand_snippet_full
+    from drachenhauch.editor_qt.snippets import expand_snippet_full
     for trigger, body in SNIPPETS.items():
         aus, _, _ = expand_snippet_full(body, "")
         assert "|" not in aus, f"Snippet '{trigger}' verliert Zeichen am Cursor-Anker: {aus!r}"
@@ -149,7 +149,7 @@ def test_tabellen_snippet_ergibt_uebersetzbaren_code(tmp_path):
 
     import pytest
 
-    from gamebasic.editor_qt.snippets import expand_snippet_full
+    from drachenhauch.editor_qt.snippets import expand_snippet_full
 
     root = Path(__file__).resolve().parent.parent
     exe = "dhrt.exe" if os.name == "nt" else "dhrt"

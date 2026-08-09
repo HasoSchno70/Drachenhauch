@@ -1,4 +1,4 @@
-# `gbanim` — Animations-FSM-Editor (Unity-Mecanim-Stil)
+# `dhanim` — Animations-FSM-Editor (Unity-Mecanim-Stil)
 
 Ein **Knoten-Graph-Editor** für Animations-State-Machines: Knoten sind **States**
 (an eine Sprite-Animation gebunden), Pfeile sind **Transitions** (mit
@@ -10,11 +10,11 @@ entscheidet den Zustand.
 ## Start
 
 ```
-gbanim                  # leeres Projekt
-gbanim hero.gbanim      # vorhandene FSM öffnen
+dhanim                  # leeres Projekt
+dhanim hero.gbanim      # vorhandene FSM öffnen
 ```
 
-Alternativ `gbrun.py --anim [datei.gbanim]` oder über den Start-Dialog (`gb`
+Alternativ `dhrun.py --anim [datei.gbanim]` oder über den Start-Dialog (`gb`
 ohne Argument → „Animation-Editor (FSM)"). Benötigt PySide6.
 
 **Ohne Datei startet der Editor mit einer fertigen Beispiel-FSM**
@@ -51,7 +51,7 @@ sieht, wie ein Graph aussieht. `Strg+N` leert das Projekt für einen Neuanfang.
 
 ### Vorschau (F5)
 
-`gbanim` erzeugt ein temporäres GameBasic-Programm und startet es mit `dhrt`:
+`dhanim` erzeugt ein temporäres GameBasic-Programm und startet es mit `dhrt`:
 links ein **Live-Parameter-Panel** (Slider für `float`/`int`, Checkbox für
 `bool`, Button für `trigger` — über das `ui`-Modul), rechts der Sprite, der den
 **aktuellen State** spielt. So testet man die Übergänge sofort, ohne Spielcode zu
@@ -80,13 +80,13 @@ SPRITE_DRAW(hero)
 
 ## Architektur
 
-Wie die anderen Begleit-Tools (`gbform`, `gbtilemap`) ist das **Datenmodell
+Wie die anderen Begleit-Tools (`dhform`, `dhtilemap`) ist das **Datenmodell
 Qt-frei** und headless testbar:
 
-- [`gamebasic/animeditor/document.py`](../gamebasic/animeditor/document.py) —
+- [`drachenhauch/animeditor/document.py`](../drachenhauch/animeditor/document.py) —
   `AnimDoc`/`State`/`Transition`/`Condition`/`Param` + `History`, JSON-IO,
   `generate_runner()` (Vorschau-Code-Gen).
-- [`gamebasic/animeditor_qt.py`](../gamebasic/animeditor_qt.py) — die Qt-UI
+- [`drachenhauch/animeditor_qt.py`](../drachenhauch/animeditor_qt.py) — die Qt-UI
   (Graph-Canvas, Inspector, Parameter-Panel).
 
 Tests: `tests/test_animeditor_document.py` (Modell/Roundtrip/Closed-Loop/Codegen)

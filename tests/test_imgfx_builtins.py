@@ -8,7 +8,7 @@ RECT/TEXT) sind raylib-Engine-Builtins: sie brauchen den GL-Kontext (Image
 dhrt-Index stehen -- sonst warnt der Editor live und der Drift-Test schlaegt
 an, sobald das Beispiel sie nutzt.
 """
-from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_imgfx_extension_builtins_registered():

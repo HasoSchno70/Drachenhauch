@@ -26,8 +26,8 @@ Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 - `content/NN_*.js` = je ein Kapitel, exportiert `(H) => [bloecke]`. Reihenfolge =
   Dateiname-Sortierung. **Neue Kapitel: einfach content/NN_*.js anlegen.**
 - `cmd(name, syntax, desc, codeLines, {out, fig, caption})` = Standard-Befehlseintrag.
-- Quellen fürs Befehlswissen: `gamebasic/editor_qt/builtin_index.json` (Signaturen),
-  `gamebasic/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
+- Quellen fürs Befehlswissen: `drachenhauch/editor_qt/builtin_index.json` (Signaturen),
+  `drachenhauch/editor_qt/builtin_docs.py` (Kurzbeschreibungen), `docs/*.md` (Prosa),
   `examples/*.gb`. Beispiele möglichst mit `dhrt run` verifizieren (Konsolen-Ausgabe).
 - Screenshots für Grafik: `DHRT_FRAMES=N DHRT_SCREENSHOT=images/x.png dhrt run datei.gb`,
   PNG nach `buch-referenz/buch/images/`.
@@ -268,7 +268,7 @@ mit Swatch/RGB/Hex, verifiziert) · D Fehlermeldungen (content/93_anhang_d.js, 9
 exaktem dhrt-Wortlaut + Ursache/Lösung). Tabellen per LibreOffice-Render geprüft (Swatches/Header sauber).
 **>>> BUCH-GESAMTSTRUKTUR KOMPLETT: Teile I-V (Kap 0-76) + Anhang A-D, 71 content-Module, 79 Überschriften,
 289 PDF-Seiten. <<<** **Nächstes (optional, Politur): TOC/Vorwort-Feinschliff, kompletter Korrekturlauf
-(Tippfehler/Konsistenz), evtl. echte gbsprites-Screenshots wo noch Platzhalter.**
+(Tippfehler/Konsistenz), evtl. echte dhsprites-Screenshots wo noch Platzhalter.**
 
 **Nachtrag 2026-07-12: 89 seit der Fertigstellung (14.06.) neu hinzugekommene Builtins nachgezogen**
 (per `git diff` gegen `builtin_index.json` ermittelt, siehe Memory `project_buch_referenz_update_2026_07`).

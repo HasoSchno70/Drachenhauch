@@ -6,7 +6,7 @@ Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 import math
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -43,7 +43,7 @@ def test_log_with_base(run_gb):
 
 
 def test_log_negative_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="muss > 0"):
+    with pytest.raises(DHRuntimeError, match="muss > 0"):
         run_gb("PRINT LOG(-1)\n")
 
 
@@ -53,7 +53,7 @@ def test_min_max_variadic(run_gb):
 
 def test_min_empty_raises(run_gb):
     # dhrt-Wortlaut: "mind. 1 Argument" (TW sagte ">= 1").
-    with pytest.raises(GBRuntimeError, match="mind. 1"):
+    with pytest.raises(DHRuntimeError, match="mind. 1"):
         run_gb("PRINT MIN()\n")
 
 
@@ -67,7 +67,7 @@ def test_sign(run_gb):
 
 
 def test_sqr_negative_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="negativer Zahl"):
+    with pytest.raises(DHRuntimeError, match="negativer Zahl"):
         run_gb("PRINT SQR(-1)\n")
 
 
@@ -84,24 +84,24 @@ def test_rgb_packing(run_gb):
 
 
 def test_rgb_out_of_range_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="0..255"):
+    with pytest.raises(DHRuntimeError, match="0..255"):
         run_gb("PRINT RGB(300, 0, 0)\n")
 
 
 # --- Type-Errors ---------------------------------------------------
 
 def test_sin_string_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="erwartet Zahl"):
+    with pytest.raises(DHRuntimeError, match="erwartet Zahl"):
         run_gb('PRINT SIN("nope")\n')
 
 
 def test_sin_bool_raises_as_not_number(run_gb):
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb("PRINT SIN(TRUE)\n")
 
 
 def test_arity_error_message_includes_received_count(run_gb):
-    with pytest.raises(GBRuntimeError, match="erhalten 2"):
+    with pytest.raises(DHRuntimeError, match="erhalten 2"):
         run_gb("PRINT SIN(1.0, 2.0)\n")
 
 
@@ -185,10 +185,10 @@ def test_val(run_gb):
 def test_old_bitwise_builtins_are_gone(run_gb):
     # SHL/SHR sind heute Operator-Keywords -> Parse-Fehler; die uebrigen sind
     # schlicht keine Built-ins mehr -> Laufzeitfehler. Beide leiten von
-    # GameBasicError ab.
-    from gamebasic.errors import GameBasicError
+    # DrachenhauchError ab.
+    from drachenhauch.errors import DrachenhauchError
     for name in ("BITAND", "BITOR", "BITXOR", "BITNOT", "SHL", "SHR"):
-        with pytest.raises(GameBasicError):
+        with pytest.raises(DrachenhauchError):
             run_gb(f"PRINT {name}(0, 0)\n")
 
 

@@ -1,5 +1,5 @@
 """Tests fuer den Code-Formatter (Indent-Normalisierung)."""
-from gamebasic.editor_qt.formatter import format_source
+from drachenhauch.editor_qt.formatter import format_source
 
 
 def _lines(src: str) -> list[str]:

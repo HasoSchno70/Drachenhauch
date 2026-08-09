@@ -1,4 +1,4 @@
-"""Konstruktions-/Wiring-Smoke-Tests fuer die gbanim-Qt-UI (offscreen).
+"""Konstruktions-/Wiring-Smoke-Tests fuer die dhanim-Qt-UI (offscreen).
 Faengt Import-/API-/Verdrahtungs-Fehler; Maus-Interaktion ist nicht abgedeckt.
 """
 import os
@@ -10,8 +10,8 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication   # noqa: E402
 
-from gamebasic.animeditor import AnimDoc, Condition, Transition, State  # noqa: E402
-from gamebasic.animeditor_qt import AnimEditor, _GraphCanvas, _transition_label  # noqa: E402
+from drachenhauch.animeditor import AnimDoc, Condition, Transition, State  # noqa: E402
+from drachenhauch.animeditor_qt import AnimEditor, _GraphCanvas, _transition_label  # noqa: E402
 
 
 def _app():

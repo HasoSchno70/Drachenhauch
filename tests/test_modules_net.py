@@ -8,7 +8,7 @@ Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -24,7 +24,7 @@ def test_tcp_listen_returns_listener(run_gb):
 
 
 def test_tcp_listen_invalid_port_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="out of range"):
+    with pytest.raises(DHRuntimeError, match="out of range"):
         run_gb('IMPORT "net"\nDIM l AS NET_LISTENER\nl = NET_TCP_LISTEN(99999)\n')
 
 
@@ -61,7 +61,7 @@ def test_tcp_peer_info(run_gb):
 
 def test_tcp_send_validates_socket_type(run_gb):
     # dhrt nutzt Integer-Handles -> Typfehler lautet "erwartet INTEGER".
-    with pytest.raises(GBRuntimeError, match="INTEGER"):
+    with pytest.raises(DHRuntimeError, match="INTEGER"):
         run_gb('IMPORT "net"\nPRINT NET_SEND("not a socket", "hi")\n')
 
 
@@ -171,12 +171,12 @@ def test_udp_recv_empty_when_nothing_pending(run_gb):
 
 
 def test_udp_invalid_port_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="out of range"):
+    with pytest.raises(DHRuntimeError, match="out of range"):
         run_gb('IMPORT "net"\nDIM s AS NET_UDP\ns = NET_UDP_BIND(70000)\n')
 
 
 def test_udp_send_validates_socket(run_gb):
-    with pytest.raises(GBRuntimeError, match="INTEGER"):
+    with pytest.raises(DHRuntimeError, match="INTEGER"):
         run_gb('IMPORT "net"\nPRINT NET_UDP_SEND("not a socket", "127.0.0.1", 1234, "hi")\n')
 
 

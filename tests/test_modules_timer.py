@@ -6,7 +6,7 @@ MILLIS() (konsolen-tauglich, kein Grafik-Bezug) mit grosszuegigen Margen
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _WAIT = (
     "SUB warte(ms AS INTEGER)\n"

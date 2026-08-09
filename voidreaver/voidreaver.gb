@@ -13,7 +13,7 @@
 '    Spiel          : WASD/Pfeile bewegen, Maus/Stick zielen, auto-Feuer, P = Pause
 '    LevelUp        : Upgrade-Karte anklicken
 '
-'  Native-only (3D): gbrun.py --native voidreaver\voidreaver.gb  (oder F6)
+'  Native-only (3D): dhrun.py --native voidreaver\voidreaver.gb  (oder F6)
 ' =====================================================================
 
 IMPORT "g3d"

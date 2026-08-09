@@ -72,28 +72,28 @@ PRINT c
 
 
 def test_destructure_length_mismatch_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM x AS INTEGER
 DIM y AS INTEGER
 (x, y) = (1, 2, 3)
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_destructure_non_tuple_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM x AS INTEGER
 DIM y AS INTEGER
 (x, y) = 42
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
@@ -144,14 +144,14 @@ PRINT rx, ry
 # --- Tupel-Type-Check -----------------------------------------------
 
 def test_tuple_var_rejects_non_tuple(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM t AS TUPLE
 t = 42
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 

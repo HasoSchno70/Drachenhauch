@@ -6,7 +6,7 @@ run_gb moeglich (modaler Dialog, braucht Nutzer-Interaktion). Live verifiziert
 ueber examples/127_filedialog.gb. Hier wird geprueft, dass sie im eingefrorenen
 dhrt-Index stehen -- sonst warnt der Editor live und der Drift-Test schlaegt an.
 """
-from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_filedialog_builtins_registered():

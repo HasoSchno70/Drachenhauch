@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 10 - Treffer, Punkte, Leben & Game Over
-'  Start:  gbrun.py buch-galaga/code/kap10/treffer.gb
+'  Start:  dhrun.py buch-galaga/code/kap10/treffer.gb
 ' ============================================================
 IMPORT "curves"
 

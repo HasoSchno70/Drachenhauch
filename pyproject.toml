@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gamebasic"
+name = "drachenhauch"
 version = "2026.1"
 description = "GameBasic - eine BASIC-artige Sprache fuer die Spieleentwicklung"
 # 3.12 ist das, was tatsaechlich geprueft wird: CI faehrt nur diese Version,
@@ -26,7 +26,7 @@ dependencies = []
 # PySide6-basiert; die SFX-/Tracker-Audio-Vorschau nutzt sounddevice + soundfile.
 editors = ["PySide6>=6.5", "Pillow>=10", "numpy>=1.24", "sounddevice>=0.4", "soundfile>=0.12"]
 dev = ["pytest>=7", "mypy>=1.8"]
-# Hardware-Module (jeweils separat installierbar via `pip install gamebasic[serial]`)
+# Hardware-Module (jeweils separat installierbar via `pip install drachenhauch[serial]`)
 serial = ["pyserial>=3.5"]
 usb = ["hidapi>=0.14"]
 bt = ["bleak>=0.21"]
@@ -41,10 +41,10 @@ hw = [
 package = ["pyinstaller>=6"]
 
 [project.scripts]
-gbrun = "gamebasic.__main__:main"
+dhrun = "drachenhauch.__main__:main"
 
 [tool.setuptools.packages.find]
-include = ["gamebasic*"]
+include = ["drachenhauch*"]
 exclude = ["tests*", "examples*"]
 
 [tool.mypy]
@@ -62,4 +62,4 @@ python_version = "3.12"
 ignore_missing_imports = true
 follow_imports = "silent"
 exclude = '(_qt\.py$|/editor_qt/|/spriteeditor/)'
-files = ["gamebasic"]
+files = ["drachenhauch"]

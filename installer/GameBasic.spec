@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller-Spec fuer die GameBasic-IDE (onedir, windowed).
-# Friert gbrun.py samt gamebasic-Paket, PySide6, numpy und Pillow ein, sodass
+# Friert dhrun.py samt drachenhauch-Paket, PySide6, numpy und Pillow ein, sodass
 # GameBasic OHNE installiertes Python laeuft. dhrt(.exe) wird NICHT hier
 # gebuendelt -- build_installer.py legt es NACH dem PyInstaller-Lauf neben
 # die eingefrorene Exe (findet _find_dhrt via sys.executable-Verzeichnis,
@@ -13,7 +13,7 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 ROOT = Path(SPECPATH).resolve().parent           # installer/ -> Repo-Wurzel
-ENTRY = str(ROOT / "gbrun.py")
+ENTRY = str(ROOT / "dhrun.py")
 IS_WINDOWS = platform.system() == "Windows"
 IS_MACOS = platform.system() == "Darwin"
 if IS_WINDOWS:
@@ -25,14 +25,14 @@ else:
 
 # Daten (logo.png, editor_qt/builtin_index.json, ...) + alle Submodule
 # (die Editoren werden lazy importiert -> als hiddenimports sicherstellen).
-datas = collect_data_files("gamebasic")
-hiddenimports = collect_submodules("gamebasic")
+datas = collect_data_files("drachenhauch")
+hiddenimports = collect_submodules("drachenhauch")
 
 if not IS_WINDOWS:
     # macOS/Linux haben keinen Installer-Skript-Schritt wie Inno Setup (der
     # unter Windows examples/ separat ins {commondocs}-Verzeichnis kopiert)
     # -- die Beispiele werden hier stattdessen mit ins Bundle gepackt und
-    # von gbrun._seed_examples_if_missing() beim allerersten Start in einen
+    # von dhrun._seed_examples_if_missing() beim allerersten Start in einen
     # beschreibbaren Ort (~/Documents/GameBasic) kopiert.
     examples_dir = ROOT / "examples"
     if examples_dir.is_dir():
@@ -85,7 +85,7 @@ if IS_MACOS:
         coll,
         name="GameBasic.app",
         icon=str(ICON) if ICON is not None and ICON.exists() else None,
-        bundle_identifier="de.hansschnorrenberger.gamebasic",
+        bundle_identifier="de.hansschnorrenberger.drachenhauch",
         info_plist={
             "CFBundleName": "GameBasic",
             "CFBundleDisplayName": "GameBasic",

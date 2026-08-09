@@ -7,7 +7,7 @@ Python-Impl (in Phase 8 geloescht).
 import json
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _HEAD = 'IMPORT "tiled"\nDIM m AS TILED_MAP\nm = TILED_LOAD("m.json")\n'
 
@@ -107,6 +107,6 @@ def test_flood_fill_oob_start(run_gb, tmp_path):
 # --- Validation ---------------------------------------------------
 
 def test_bulk_on_object_layer_raises(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="kein Tile-Layer"):
+    with pytest.raises(DHRuntimeError, match="kein Tile-Layer"):
         _run(run_gb, tmp_path, [0] * 24, layer_type="objectgroup", body=(
             "PRINT TILED_FLOOD_FILL(m, 0, 0, 0, 5)\n"))

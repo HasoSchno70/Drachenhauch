@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.editor_qt.error_check import _check_source, _map_back
-from gamebasic.preprocess import process
-from gamebasic.errors import LexerError
+from drachenhauch.editor_qt.error_check import _check_source, _map_back
+from drachenhauch.preprocess import process
+from drachenhauch.errors import LexerError
 
 
 HELPER = """\

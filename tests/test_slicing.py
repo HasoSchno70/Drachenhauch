@@ -77,10 +77,10 @@ PRINT s[lo:hi]
 
 
 def test_string_slice_negative_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('PRINT "abc"[-1:2]')
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm('PRINT "abc"[-1:2]')
 
 
@@ -138,15 +138,15 @@ PRINT t[1]
 
 def test_array_2d_slice_throws(run_gb, run_vm):
     """Multi-Dim-Arrays unterstuetzen kein Slicing."""
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM g[3, 3] AS INTEGER
 DIM x AS ARRAY OF INTEGER
 x = g[0:2]
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
@@ -154,7 +154,7 @@ x = g[0:2]
 
 def test_slice_assign_rejected(run_gb, run_vm):
     """`s[a:b] = ...` ist kein Slice-Assign, soll werfen."""
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     src = '''
 DIM a[5] AS INTEGER
 a[1:3] = 7

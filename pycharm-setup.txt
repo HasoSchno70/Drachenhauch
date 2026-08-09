@@ -11,13 +11,13 @@ Zahnrad oben rechts -> "Add Interpreter" -> "Add Local Interpreter"
 Bestaetigen. PyCharm sieht jetzt pygame und alle anderen Pakete.
 
 
-2) RUN-KONFIGURATION FUER gbrun.py
+2) RUN-KONFIGURATION FUER dhrun.py
 ----------------------------------
-Rechtsklick auf gbrun.py -> "Modify Run Configuration..."
+Rechtsklick auf dhrun.py -> "Modify Run Configuration..."
 oder oben rechts -> "Edit Configurations..." -> "+ Python".
 
 Name:               Pong (oder beliebig)
-Script path:        C:\Programmieren\Python\GameBasic\gbrun.py
+Script path:        C:\Programmieren\Python\GameBasic\dhrun.py
 Parameters:         examples/10_pong.gb
 Working directory:  C:\Programmieren\Python\GameBasic
 Python Interpreter: Project Default (.venv)
@@ -28,7 +28,7 @@ duplizieren.
 
 3) WENN PYCHARM NUR DIE EINZELDATEI ZEIGT
 -----------------------------------------
-Falls du bisher nur gbrun.py geoeffnet hast (kein Projektbaum):
+Falls du bisher nur dhrun.py geoeffnet hast (kein Projektbaum):
   File -> Close Project
   File -> Open... -> ORDNER C:\Programmieren\Python\GameBasic auswaehlen
   -> "Trust Project"
@@ -40,9 +40,9 @@ Du siehst dann die Struktur:
     examples/
       assets/
       *.gb
-    gamebasic/              <- das ist das Python-Paket
+    drachenhauch/              <- das ist das Python-Paket
       *.py
-    gbrun.py
+    dhrun.py
     pyproject.toml
 
 
@@ -165,12 +165,12 @@ beide nutzen automatisch den .venv-Python und brauchen nichts global.
 
 6) SPIELE ALS .EXE VERTEILEN
 ----------------------------
-Voraussetzung: native VM ist gebaut (gb-build.cmd).
+Voraussetzung: native VM ist gebaut (dh-build.cmd).
 
-    gb-package examples\10_pong.gb --windowed --onefile
+    dh-package examples\10_pong.gb --windowed --onefile
         -> dist\10_pong.exe (etwa 17 MB, einzelne Datei)
 
-    gb-package examples\17_tilemap.gb --windowed
+    dh-package examples\17_tilemap.gb --windowed
         -> dist\17_tilemap\17_tilemap.exe (Ordner mit allen DLLs,
            etwa 40 MB, schneller Start)
 

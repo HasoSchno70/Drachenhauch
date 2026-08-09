@@ -8,7 +8,7 @@ Golden-Tests gegen `dhrt` (Stufe B): der Test schreibt eine Tiled-JSON-Map in
 import json
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _HEAD = 'IMPORT "tiled"\nIMPORT "tile_collide"\n' \
         'DIM m AS TILED_MAP\nm = TILED_LOAD("level.json")\n'
@@ -156,12 +156,12 @@ def test_sweep_diagonal_via_two_axes(run_gb, tmp_path):
 # --- Argument-Validation ------------------------------------------
 
 def test_sweep_invalid_layer(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="kein Tile-Layer"):
+    with pytest.raises(DHRuntimeError, match="kein Tile-Layer"):
         _run(run_gb, tmp_path, _EMPTY, layer_type="objectgroup", body=(
             "PRINT TILE_SWEEP_X(m, 0, 0.0, 0.0, 8.0, 8.0, 5.0)\n"))
 
 
 def test_sweep_zero_size_box_errors(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         _run(run_gb, tmp_path, _EMPTY,
              "PRINT TILE_SWEEP_X(m, 0, 10.0, 10.0, 0.0, 8.0, 5.0)\n")

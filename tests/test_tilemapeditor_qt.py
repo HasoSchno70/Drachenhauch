@@ -31,7 +31,7 @@ def app():
 
 
 def _win(app, tmp_path=None):
-    from gamebasic.tilemapeditor_qt import TileMapEditor
+    from drachenhauch.tilemapeditor_qt import TileMapEditor
     return TileMapEditor(project_root=tmp_path or _ROOT)
 
 
@@ -136,7 +136,7 @@ def test_move_layer_is_undoable(app):
 def test_resize_map_is_undoable(app, monkeypatch):
     win = _win(app)
     w0, h0 = win.doc.width, win.doc.height
-    import gamebasic.tilemapeditor_qt as tm
+    import drachenhauch.tilemapeditor_qt as tm
     monkeypatch.setattr(tm, "_ask_map_params",
                         lambda *a, **k: (w0 + 3, h0 + 2, win.doc.tile_w, win.doc.tile_h))
     win._resize_map()
@@ -194,7 +194,7 @@ def test_older_tile_edit_survives_layer_structural_undo(app):
     solange Undo strikt in Stack-Reihenfolge laeuft -- das strukturelle
     "doc"-Undo direkt davor stellt die Layer-Liste in genau den Zustand
     zurueck, in dem der aeltere Eintrag urspruenglich erzeugt wurde."""
-    from gamebasic.tilemap.document import TileLayer
+    from drachenhauch.tilemap.document import TileLayer
     win = _win(app)
     layer0 = win.doc.layers[0]
     assert isinstance(layer0, TileLayer)
@@ -231,7 +231,7 @@ def test_confirm_discard_changes_dirty_respects_answer(app):
 
 
 def test_new_map_prompts_when_dirty(app, monkeypatch):
-    import gamebasic.tilemapeditor_qt as tm
+    import drachenhauch.tilemapeditor_qt as tm
     win = _win(app)
     win.doc.dirty = True
     monkeypatch.setattr(tm, "_ask_map_params",
@@ -261,7 +261,7 @@ def test_close_event_ignored_when_dirty_and_declined(app):
 # --------------------------------------------------- launch() Fehleranzeige
 
 def test_launch_reports_broken_initial_file(app, tmp_path, monkeypatch):
-    import gamebasic.tilemapeditor_qt as tm
+    import drachenhauch.tilemapeditor_qt as tm
     bad = tmp_path / "broken.json"
     bad.write_text("{not valid json", encoding="utf-8")
 
@@ -308,7 +308,7 @@ def test_edit_props_is_undoable(app, tmp_path):
     Aufrufer in dieser Datei, der keinen Undo-Snapshot anlegte -- Ctrl+Z
     konnte eine Tile-Eigenschaften-Aenderung ueberhaupt nicht rueckgaengig
     machen."""
-    from gamebasic.tilemapeditor_qt import _PropDialog
+    from drachenhauch.tilemapeditor_qt import _PropDialog
     win = _win(app, tmp_path)
     a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
     win.doc.add_tileset(str(a), 64, 32)
@@ -336,7 +336,7 @@ def test_edit_props_deleting_all_rows_marks_dirty(app, tmp_path):
     Zeile mehr in der Tabelle stand -- die Apply-Schleife ruft set_property()
     dann kein einziges Mal auf. `_edit_props()` markiert jetzt explizit
     selbst dirty, unabhaengig vom Tabelleninhalt."""
-    from gamebasic.tilemapeditor_qt import _PropDialog
+    from drachenhauch.tilemapeditor_qt import _PropDialog
     win = _win(app, tmp_path)
     a = tmp_path / "a.png"; a.write_bytes(b"\x89PNG\r\n")
     win.doc.add_tileset(str(a), 64, 32)
@@ -366,7 +366,7 @@ def test_set_doc_resets_selection_and_clipboard(app, tmp_path):
     ein Paste danach haette GIDs aus dem ALTEN Dokument in das neue
     gestempelt, die dort auf ein evtl. gar nicht existierendes Tileset
     zeigen."""
-    from gamebasic.tilemap.document import TileMapDoc
+    from drachenhauch.tilemap.document import TileMapDoc
     win = _win(app, tmp_path)
     win.canvas.tile_clipboard = [[5, 6], [7, 8]]
     win.canvas._sel_rect = (0, 0, 1, 1)
@@ -383,7 +383,7 @@ def test_doc_undo_restore_resets_selection_and_clipboard(app):
     (z.B. Resize rueckgaengig) -- Auswahl/Clipboard koennten sonst auf
     Koordinaten/Tilesets zeigen, die im wiederhergestellten Zustand nicht
     mehr gueltig sind."""
-    import gamebasic.tilemapeditor_qt as tm
+    import drachenhauch.tilemapeditor_qt as tm
     win = _win(app)
     w0, h0 = win.doc.width, win.doc.height
 
@@ -402,7 +402,7 @@ def test_doc_undo_restore_resets_selection_and_clipboard(app):
 # --------------------------------------------------- WA_DeleteOnClose
 
 def test_prop_dialog_has_delete_on_close(app, tmp_path):
-    from gamebasic.tilemapeditor_qt import _PropDialog
+    from drachenhauch.tilemapeditor_qt import _PropDialog
     from PySide6.QtCore import Qt
     win = _win(app, tmp_path)
     dlg = _PropDialog(win.doc, 0, win)
@@ -410,8 +410,8 @@ def test_prop_dialog_has_delete_on_close(app, tmp_path):
 
 
 def test_object_dialog_has_delete_on_close(app):
-    from gamebasic.tilemapeditor_qt import _ObjectDialog
-    from gamebasic.tilemap.document import MapObject
+    from drachenhauch.tilemapeditor_qt import _ObjectDialog
+    from drachenhauch.tilemap.document import MapObject
     from PySide6.QtCore import Qt
     win = _win(app)
     dlg = _ObjectDialog(MapObject(0, 0, name="spawn"), win)
@@ -419,7 +419,7 @@ def test_object_dialog_has_delete_on_close(app):
 
 
 def test_map_params_dialog_has_delete_on_close(app, monkeypatch):
-    from gamebasic.tilemapeditor_qt import _ask_map_params
+    from drachenhauch.tilemapeditor_qt import _ask_map_params
     from PySide6.QtWidgets import QDialog
     from PySide6.QtCore import Qt
     win = _win(app)

@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.lexer import Lexer
-from gamebasic.parser import Parser
+from drachenhauch.lexer import Lexer
+from drachenhauch.parser import Parser
 
 _ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLES = _ROOT / "examples"

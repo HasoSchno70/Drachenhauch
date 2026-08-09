@@ -25,13 +25,13 @@ def _qapp():
 
 def _studio(_qapp):
     from pathlib import Path
-    from gamebasic.audiostudio_qt import AudioStudio
+    from drachenhauch.audiostudio_qt import AudioStudio
     return AudioStudio(Path("."))
 
 
 def test_studio_embeds_both_editors(_qapp):
-    from gamebasic.trackereditor_qt import TrackerEditor
-    from gamebasic.sfxeditor_qt import SfxGenerator
+    from drachenhauch.trackereditor_qt import TrackerEditor
+    from drachenhauch.sfxeditor_qt import SfxGenerator
     st = _studio(_qapp)
     assert st.tabs.count() == 2
     assert isinstance(st.tracker, TrackerEditor)

@@ -111,7 +111,7 @@ IF Cfg.DEBUG THEN PRINT "debug" ELSE PRINT "release"
 
 
 def test_unknown_static_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 CLASS C
     STATIC CONST X AS INTEGER = 1
@@ -119,16 +119,16 @@ END CLASS
 
 PRINT C.NONEXISTENT
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_duplicate_static_rejected_at_compile(run_gb):
     """Doppelte STATIC CONST werden beim Compile (dhrt) abgelehnt."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="doppelt"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="doppelt"):
         run_gb('CLASS C\n'
                '    STATIC CONST X AS INTEGER = 1\n'
                '    STATIC CONST X AS INTEGER = 2\n'
@@ -137,8 +137,8 @@ def test_duplicate_static_rejected_at_compile(run_gb):
 
 def test_static_non_literal_rejected(run_gb):
     """STATIC CONST mit Ausdruck statt Literal -> Compile-Fehler (dhrt)."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="Literal"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="Literal"):
         run_gb('CLASS C\n'
                '    STATIC CONST X AS INTEGER = 1 + 1\n'
                'END CLASS\n')

@@ -1,4 +1,4 @@
-"""Tests fuer den Notenblatt-Editor (offscreen, gamebasic.scoreeditor_qt)."""
+"""Tests fuer den Notenblatt-Editor (offscreen, drachenhauch.scoreeditor_qt)."""
 import os
 from pathlib import Path
 
@@ -17,7 +17,7 @@ def _qapp():
 
 def _editor():
     try:
-        from gamebasic.scoreeditor_qt import ScoreEditor
+        from drachenhauch.scoreeditor_qt import ScoreEditor
         return ScoreEditor(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -270,7 +270,7 @@ def test_accidental_toggle_shifts_pitch():
 
 def test_instrument_and_clef_change_reflected_in_doc():
     ed = _editor()
-    from gamebasic.tracker.presets import preset_names
+    from drachenhauch.tracker.presets import preset_names
     names = preset_names()
     ed._on_instrument_changed(0, names.index("Bass"))
     assert ed.doc.tracks[0].instrument.name == "Bass"
@@ -353,7 +353,7 @@ def test_save_and_load_roundtrip(tmp_path, monkeypatch):
 
 
 def test_octave_shift_for_clef_computes_whole_octaves():
-    from gamebasic.scoreeditor_qt import ScoreEditor
+    from drachenhauch.scoreeditor_qt import ScoreEditor
 
     ed = _editor()
     track = ed.doc.tracks[0]
@@ -366,7 +366,7 @@ def test_octave_shift_for_clef_computes_whole_octaves():
 
 
 def test_octave_shift_for_clef_zero_without_pitched_notes():
-    from gamebasic.scoreeditor_qt import ScoreEditor
+    from drachenhauch.scoreeditor_qt import ScoreEditor
 
     ed = _editor()
     track = ed.doc.tracks[0]
@@ -740,8 +740,8 @@ def test_launch_with_initial_file_resets_undo_history(tmp_path, monkeypatch):
     Default-Dokument stehen -- das erste Strg+Z nach dem Oeffnen einer
     Datei setzte das geladene Stueck auf leer zurueck."""
     from PySide6.QtWidgets import QApplication
-    from gamebasic import scoreeditor_qt
-    from gamebasic.score.document import ScoreDoc
+    from drachenhauch import scoreeditor_qt
+    from drachenhauch.score.document import ScoreDoc
 
     doc = ScoreDoc()
     doc.tracks[0].add_note(0.0, 1.0, 60)
@@ -789,7 +789,7 @@ def test_add_remove_track_clears_sound_cache():
 
 def test_export_to_tracker_writes_valid_tracker_song(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
-    from gamebasic.tracker.song import Song
+    from drachenhauch.tracker.song import Song
 
     ed = _editor()
     ed.doc.tracks[0].add_note(0.0, 1.0, 60)
@@ -954,7 +954,7 @@ def test_trigger_note_staccato_respects_minimum_duration(monkeypatch):
     """Vorher (Bug): die Live-Vorschau kannte STACCATO_MIN_ROWS (die
     Mindestdauer-Garantie aus convert.py) nicht -- eine sehr kurze
     Staccato-Note klang live hoerbar kuerzer als beim Tracker-Export."""
-    from gamebasic.score.convert import ROWS_PER_BEAT, STACCATO_MIN_ROWS
+    from drachenhauch.score.convert import ROWS_PER_BEAT, STACCATO_MIN_ROWS
 
     ed = _editor()
     track = ed.doc.tracks[0]

@@ -1,8 +1,8 @@
-"""Tests fuer das Notenblatt-Datenmodell (Qt-frei, gamebasic.score.document)."""
+"""Tests fuer das Notenblatt-Datenmodell (Qt-frei, drachenhauch.score.document)."""
 import pytest
 
-from gamebasic.score.document import ScoreDoc, Track, NoteEvent, CLEFS
-from gamebasic.tracker.instrument import Instrument
+from drachenhauch.score.document import ScoreDoc, Track, NoteEvent, CLEFS
+from drachenhauch.tracker.instrument import Instrument
 
 
 def test_note_event_rest_normalization():
@@ -235,7 +235,7 @@ def test_scoredoc_save_load_roundtrip(tmp_path):
     assert d2.path == str(path)
 
     saved = d.to_dict()
-    assert saved["format"] == "gbscore-song"
+    assert saved["format"] == "dhscore-song"
     assert saved["version"] == 1
 
 

@@ -15,8 +15,8 @@ def _qapp():
 
 
 def test_preset_bar_apply_and_save(tmp_path, monkeypatch):
-    from gamebasic.editor_qt.preset_library import PresetLibrary
-    from gamebasic.editor_qt.preset_bar import PresetBar
+    from drachenhauch.editor_qt.preset_library import PresetLibrary
+    from drachenhauch.editor_qt.preset_bar import PresetBar
     from PySide6.QtWidgets import QInputDialog
 
     lib = PresetLibrary(tmp_path / "p.json", builtins={"Feuer": {"v": 1}})
@@ -49,7 +49,7 @@ def test_preset_bar_apply_and_save(tmp_path, monkeypatch):
 
 def test_particle_editor_has_factory_presets(_qapp):
     try:
-        from gamebasic.particleeditor_qt import ParticleEditor, _FACTORY_PRESETS
+        from drachenhauch.particleeditor_qt import ParticleEditor, _FACTORY_PRESETS
         ed = ParticleEditor(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -64,7 +64,7 @@ def test_particle_editor_has_factory_presets(_qapp):
 
 def test_sfx_editor_has_preset_bar(_qapp):
     try:
-        from gamebasic.sfxeditor_qt import SfxGenerator
+        from drachenhauch.sfxeditor_qt import SfxGenerator
         ed = SfxGenerator(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -78,7 +78,7 @@ def test_sfx_editor_has_preset_bar(_qapp):
 
 def test_sfx_editor_has_factory_presets(_qapp):
     try:
-        from gamebasic.sfxeditor_qt import SfxGenerator, _FACTORY_PRESETS
+        from drachenhauch.sfxeditor_qt import SfxGenerator, _FACTORY_PRESETS
         ed = SfxGenerator(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")

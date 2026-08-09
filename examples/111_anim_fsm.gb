@@ -2,7 +2,7 @@
 '  111_anim_fsm.gb  --  Animations-State-Machine (Modul "animfsm")
 '
 '  Unity-Mecanim-Stil: States (idle/run/jump) + Parameter + Uebergaenge liegen
-'  als Daten in "assets/hero.gbanim" (vom Editor `gbanim` erzeugt). Statt im
+'  als Daten in "assets/hero.gbanim" (vom Editor `dhanim` erzeugt). Statt im
 '  Spielcode von Hand SPRITE_PLAY zu schalten, setzt das Spiel nur Parameter --
 '  die FSM entscheidet den Zustand und spielt die passende Animation.
 '

@@ -1,5 +1,5 @@
 """Tests fuer die LSP-Feature-Logik (reine Funktionen, ohne Transport)."""
-from gamebasic.lsp import features as F
+from drachenhauch.lsp import features as F
 
 
 SRC = (
@@ -59,7 +59,7 @@ def test_diagnostics_syntax_error():
     diags = F.diagnostics(bad, None)
     assert len(diags) == 1
     assert diags[0]["severity"] == 1
-    assert diags[0]["source"] == "gamebasic"
+    assert diags[0]["source"] == "drachenhauch"
     assert "range" in diags[0]
 
 

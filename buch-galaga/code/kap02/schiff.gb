@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 2 - Das Schiff laden, zeichnen und bewegen
-'  Start:  gbrun.py buch-galaga/code/kap02/schiff.gb
+'  Start:  dhrun.py buch-galaga/code/kap02/schiff.gb
 ' ============================================================
 
 SCREEN(480, 640, "Mein Galaga - Kapitel 2")

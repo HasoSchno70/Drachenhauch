@@ -6,7 +6,7 @@ GB-Programm (DIM g AS ASTAR_GRID + Operationen + PRINT). Frueher via
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 # Praeludium: 10x10-Grid in 'g' anlegen.
 _PRE = 'IMPORT "astar"\nDIM g AS ASTAR_GRID\ng = ASTAR_NEW(10, 10)\n'
@@ -27,14 +27,14 @@ def test_new_creates_grid(run_gb):
 
 
 def test_new_zero_dim_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb('IMPORT "astar"\nDIM g AS ASTAR_GRID\ng = ASTAR_NEW(0, 5)\n')
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb('IMPORT "astar"\nDIM g AS ASTAR_GRID\ng = ASTAR_NEW(5, -1)\n')
 
 
 def test_set_wall_out_of_bounds(run_gb):
-    with pytest.raises(GBRuntimeError, match="ausserhalb"):
+    with pytest.raises(DHRuntimeError, match="ausserhalb"):
         run_gb(_PRE + "ASTAR_SET_WALL(g, 99, 99)\n")
 
 
@@ -134,7 +134,7 @@ def test_anti_cornercutting(run_gb):
 # --- Heuristiken ----------------------------------------------------
 
 def test_set_unknown_heuristic_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="unbekannte Heuristik"):
+    with pytest.raises(DHRuntimeError, match="unbekannte Heuristik"):
         run_gb(_PRE + 'ASTAR_SET_HEURISTIC(g, "schwurbel")\n')
 
 
@@ -159,21 +159,21 @@ def test_chebyshev_with_diagonal(run_gb):
 # --- Type-Checking --------------------------------------------------
 
 def test_non_grid_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="erwartet ASTAR_GRID"):
+    with pytest.raises(DHRuntimeError, match="erwartet ASTAR_GRID"):
         run_gb('IMPORT "astar"\nPRINT ASTAR_FIND("nicht ein grid", 0, 0, 1, 1)\n')
 
 
 def test_diagonal_cost_must_be_positive(run_gb):
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb(_PRE + "ASTAR_SET_DIAGONAL_COST(g, 0)\n")
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         run_gb(_PRE + "ASTAR_SET_DIAGONAL_COST(g, -1)\n")
 
 
 # --- Index-Bounds beim Pfad-Lesen -----------------------------------
 
 def test_path_x_y_out_of_bounds(run_gb):
-    with pytest.raises(GBRuntimeError, match="ausserhalb"):
+    with pytest.raises(DHRuntimeError, match="ausserhalb"):
         run_gb(_PRE + "ASTAR_FIND(g, 0, 0, 3, 0)\nPRINT ASTAR_PATH_X(g, 99)\n")
 
 

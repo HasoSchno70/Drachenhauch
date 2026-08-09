@@ -10,7 +10,7 @@
 '   Kanal 3  BASS   Square-Bass mit Oktav-Sprüngen, Mitte
 '   Kanal 4  DRUMS  Kick (Sinus-Pitch-Drop), Snare + HiHat (Noise), Mitte
 '
-' Der Player ist frame-basiert wie der gbtracker-Export: DELTA() sammelt
+' Der Player ist frame-basiert wie der dhtracker-Export: DELTA() sammelt
 ' Millisekunden, alle ROWMS wird die naechste Pattern-Reihe gespielt.
 ' Dazu Demoszene-Deko: Copper-Balken, Regenbogen-Titel, VU-Meter pro
 ' Kanal, echtes FFT-Spektrum der laufenden Musik und ein Sinus-Scroller.
@@ -101,7 +101,7 @@ FUNCTION NoteName(m AS INTEGER) AS STRING
 END FUNCTION
 
 ' ============================================================
-' Player: alle ROWMS eine Reihe (wie der gbtracker-Export)
+' Player: alle ROWMS eine Reihe (wie der dhtracker-Export)
 ' ============================================================
 
 DIM vu[4] AS FLOAT            ' VU-Pegel je Kanal (Anzeige, klingt nicht)

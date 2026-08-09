@@ -1,4 +1,4 @@
-"""Erzeugt ein 16x16-Tileset fuer den Tilemap-Editor (gbtilemap).
+"""Erzeugt ein 16x16-Tileset fuer den Tilemap-Editor (dhtilemap).
 
 8 Spalten x 4 Reihen = 32 Tiles, 128x64 px, mit Alpha. Pixel-Art-Stil,
 deterministisch (fester Seed). Ausgabe: editor_tileset.png neben diesem Skript.

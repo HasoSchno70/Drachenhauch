@@ -6,7 +6,7 @@ ist in reine Funktionen ausgelagert und hier abgedeckt.
 """
 from pathlib import Path
 
-from gamebasic.editor_qt.find_in_project import (
+from drachenhauch.editor_qt.find_in_project import (
     build_pattern, replacement_string, iter_gb_files, plan_replacements,
 )
 
@@ -163,7 +163,7 @@ def test_dialog_replace_all_writes_disk(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
-        from gamebasic.editor_qt.find_in_project import FindInProjectDialog
+        from drachenhauch.editor_qt.find_in_project import FindInProjectDialog
     except Exception:
         import pytest
         pytest.skip("PySide6 nicht verfuegbar")

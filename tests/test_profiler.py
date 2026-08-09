@@ -2,7 +2,7 @@
 ueber `dhrt profile` (native Runtime) -- skippt, wenn dhrt nicht gebaut ist."""
 import pytest
 
-from gamebasic.editor_qt.profiler import run_profile, _find_dhrt
+from drachenhauch.editor_qt.profiler import run_profile, _find_dhrt
 
 pytestmark = pytest.mark.skipif(_find_dhrt() is None, reason="dhrt nicht gebaut")
 
@@ -91,14 +91,14 @@ def test_stop_callback_aborts():
 
 def test_error_propagates():
     import pytest
-    from gamebasic.errors import GameBasicError
-    # Laufzeitfehler (Division durch 0) soll als GameBasicError hochkommen.
-    with pytest.raises(GameBasicError):
+    from drachenhauch.errors import DrachenhauchError
+    # Laufzeitfehler (Division durch 0) soll als DrachenhauchError hochkommen.
+    with pytest.raises(DrachenhauchError):
         run_profile("DIM x AS INTEGER\nx = 1 \\ 0\n", ".")
 
 
 def test_chdir_to_base_path_for_relative_assets(tmp_path):
-    """Der Profiler wechselt ins Datei-Verzeichnis (wie gbrun.py), damit
+    """Der Profiler wechselt ins Datei-Verzeichnis (wie dhrun.py), damit
     relative Laufzeit-Pfade funktionieren -- und stellt das cwd wieder her."""
     import os
     (tmp_path / "data.txt").write_text("hallo\n", encoding="utf-8")

@@ -5,7 +5,7 @@
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 @pytest.fixture(params=["tw", "vm"])
@@ -71,7 +71,7 @@ def test_self_in_method_returns_instance(run_either):
 def test_self_outside_method_treated_as_normal_var(run_gb):
     """Ausserhalb eines Methodenkontexts ist `Self` ein normaler
     (undeklarierter) Identifier - sollte einen Fehler werfen."""
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb('PRINT Self\n')
 
 

@@ -3,10 +3,10 @@ import wave
 
 import numpy as np
 
-from gamebasic.tracker import Song, Instrument
-from gamebasic.tracker.mixer import (render_song, save_wav, _note_events,
+from drachenhauch.tracker import Song, Instrument
+from drachenhauch.tracker.mixer import (render_song, save_wav, _note_events,
                                      apply_effect)
-from gamebasic.tracker.song import FX_ARP, FX_RET, FX_OFF, FX_VIB
+from drachenhauch.tracker.song import FX_ARP, FX_RET, FX_OFF, FX_VIB
 
 
 def _sample_inst(name="S", freq=440, secs=0.2, sr=44100, base=69):

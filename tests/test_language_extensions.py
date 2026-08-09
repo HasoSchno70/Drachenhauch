@@ -142,8 +142,8 @@ PRINT x
 
 
 def test_read_beyond_data_errors(run_gb):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="keine DATA-Werte mehr"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="keine DATA-Werte mehr"):
         run_gb('''
 DATA 1
 DIM x AS INTEGER
@@ -182,8 +182,8 @@ PRINT xs[0], xs[1], xs[2]
 
 
 def test_data_type_coercion_string_into_int_errors(run_gb):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('''
 DATA "nicht eine zahl"
 DIM x AS INTEGER
@@ -234,12 +234,12 @@ PRINT x
 # --- TIMER + Joystick: Registrierung ---------------------------------
 
 def test_timer_builtin_registered():
-    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
     assert "timer" in builtin_names_lower()
 
 
 def test_joystick_builtins_registered():
-    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "joystick_count", "joystick_name",
         "joystick_axis", "joystick_button",
@@ -252,8 +252,8 @@ def test_joystick_builtins_registered():
 def test_joystick_rumble_no_gamepad_graceful_error(run_gb):
     """Ohne angeschlossenes Gamepad wirft JOYSTICK_RUMBLE denselben
     faengbaren Fehler wie die anderen JOYSTICK_*-Funktionen (kein Crash)."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="kein Gamepad angeschlossen"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="kein Gamepad angeschlossen"):
         run_gb("JOYSTICK_RUMBLE(0, 1.0, 1.0, 0.5)")
 
 
@@ -282,13 +282,13 @@ def test_binary_literal(run_gb):
 
 
 def test_hex_literal_no_digits_errors(run_gb):
-    from gamebasic.errors import LexerError
+    from drachenhauch.errors import LexerError
     with pytest.raises(LexerError, match="Hex-Literal"):
         run_gb('PRINT &H')
 
 
 def test_amp_without_h_or_b_errors(run_gb):
-    from gamebasic.errors import LexerError
+    from drachenhauch.errors import LexerError
     with pytest.raises(LexerError, match="Hex"):
         run_gb('PRINT &Z')
 
@@ -321,15 +321,15 @@ def test_format_hex_via_mask(run_gb):
 
 
 def test_format_invalid_mask_errors(run_gb):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="FORMAT"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="FORMAT"):
         run_gb('PRINT FORMAT$("nicht eine zahl", "%d")')
 
 
 # --- INKEY$ / WAITKEY: nur Registrierung -----------------------------
 
 def test_inkey_waitkey_registered():
-    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
     n = builtin_names_lower()
     assert "inkey$" in n
     assert "waitkey" in n
@@ -392,7 +392,7 @@ show_rect(0, 0, 50)
 
 
 def test_required_after_default_rejected(run_gb):
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     with pytest.raises(ParseError, match="ohne Default"):
         run_gb('''
 SUB foo(a AS INTEGER = 1, b AS INTEGER)
@@ -401,8 +401,8 @@ END SUB
 
 
 def test_too_few_args_errors(run_gb):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="Parameter|Argument"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="Parameter|Argument"):
         run_gb('''
 SUB foo(a AS INTEGER, b AS INTEGER = 10)
 END SUB
@@ -412,8 +412,8 @@ foo()
 
 
 def test_too_many_args_errors(run_gb):
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="Argument"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="Argument"):
         run_gb('''
 SUB foo(a AS INTEGER, b AS INTEGER = 10)
 END SUB
@@ -501,13 +501,13 @@ def test_fstring_only_expr(run_gb):
 
 
 def test_fstring_unterminated_errors(run_gb):
-    from gamebasic.errors import LexerError
+    from drachenhauch.errors import LexerError
     with pytest.raises(LexerError):
         run_gb('PRINT f"hello')
 
 
 def test_fstring_empty_expr_errors(run_gb):
-    from gamebasic.errors import LexerError
+    from drachenhauch.errors import LexerError
     with pytest.raises(LexerError, match="Leerer"):
         run_gb('PRINT f"{}"')
 
@@ -521,7 +521,7 @@ def _run_vm(src):
     import subprocess as _sp
     import tempfile as _tf
     from pathlib import Path as _P
-    from gamebasic.errors import GBRuntimeError, ParseError, LexerError
+    from drachenhauch.errors import DHRuntimeError, ParseError, LexerError
     root = _P(__file__).resolve().parent.parent
     exe = "dhrt.exe" if _os.name == "nt" else "dhrt"
     dhrt = None
@@ -549,7 +549,7 @@ def _run_vm(src):
             raise ParseError(stderr.strip())
         if "Lexer-Fehler" in stderr:
             raise LexerError(stderr.strip())
-        raise GBRuntimeError(stderr.strip())
+        raise DHRuntimeError(stderr.strip())
     return (r.stdout or "").replace("\r\n", "\n")
 
 

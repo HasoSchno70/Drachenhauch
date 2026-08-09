@@ -5,10 +5,10 @@ Frueher kollidierte `[...]` ausschliesslich mit der List-Comprehension
 der Parser: FOR nach dem ersten Ausdruck = Comprehension, sonst Array-Literal.
 """
 import pytest
-from gamebasic.errors import GameBasicError
-from gamebasic.lexer import Lexer
-from gamebasic.parser import Parser
-from gamebasic.ast_nodes import ArrayLit, ListComp
+from drachenhauch.errors import DrachenhauchError
+from drachenhauch.lexer import Lexer
+from drachenhauch.parser import Parser
+from drachenhauch.ast_nodes import ArrayLit, ListComp
 
 
 def test_int_array_literal(run_gb):
@@ -64,7 +64,7 @@ def test_comprehension_still_works(run_gb):
 
 
 def test_empty_array_literal_errors(run_gb):
-    with pytest.raises(GameBasicError, match=r"Leeres Array-Literal"):
+    with pytest.raises(DrachenhauchError, match=r"Leeres Array-Literal"):
         run_gb("DIM a AS ARRAY OF INTEGER\na = []\n")
 
 

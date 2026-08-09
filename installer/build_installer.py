@@ -4,8 +4,8 @@
 
 Schritte (alle Plattformen):
   1. dhrt-Runtime sicherstellen (rust/build_runtime.py, falls fehlend).
-  2. App-Icon aus gamebasic/assets/logo.png erzeugen (.ico Windows, .icns macOS).
-  3. PyInstaller: gbrun.py + gamebasic-Paket -> dist/GameBasic[.app]/ (onedir,
+  2. App-Icon aus drachenhauch/assets/logo.png erzeugen (.ico Windows, .icns macOS).
+  3. PyInstaller: dhrun.py + drachenhauch-Paket -> dist/GameBasic[.app]/ (onedir,
      ohne Python).
   4. Plattformspezifische Paketierung:
      - Windows: Inno Setup (ISCC) -> installer/output/GameBasic-Setup-<version>.exe
@@ -99,7 +99,7 @@ def sign(path: Path):
 
 def version():
     sys.path.insert(0, str(ROOT))
-    from gamebasic import __version__
+    from drachenhauch import __version__
     return __version__
 
 
@@ -161,7 +161,7 @@ def make_icon():
         from PIL import Image
     except ImportError:
         print("Pillow fehlt -> ohne Icon."); return
-    src = ROOT / "gamebasic" / "assets" / "logo.png"
+    src = ROOT / "drachenhauch" / "assets" / "logo.png"
     if not src.exists():
         print("logo.png fehlt -> ohne Icon."); return
     im = Image.open(src).convert("RGBA")
@@ -174,7 +174,7 @@ def make_icon():
     # traegt einen langen Schweif, der bei 16 px nur noch Rauschen ist und dem
     # Motiv Platz wegnimmt. Liegt daneben ein `logo-kachel.png` (nur das
     # quadratische Motiv), wird das ab 64 px abwaerts benutzt.
-    klein_src = ROOT / "gamebasic" / "assets" / "logo-kachel.png"
+    klein_src = ROOT / "drachenhauch" / "assets" / "logo-kachel.png"
     klein = None
     if klein_src.exists():
         k = Image.open(klein_src).convert("RGBA")
@@ -319,23 +319,23 @@ cp -r "$HERE/GameBasic/." "$DEST/"
 chmod +x "$DEST/GameBasic" 2>/dev/null || true
 [ -f "$DEST/dhrt" ] && chmod +x "$DEST/dhrt"
 
-cat > "$BIN/gamebasic" <<EOF
+cat > "$BIN/drachenhauch" <<EOF
 #!/bin/sh
 exec "$DEST/GameBasic" "\\$@"
 EOF
-chmod +x "$BIN/gamebasic"
+chmod +x "$BIN/drachenhauch"
 
-[ -f "$HERE/GameBasic.png" ] && cp "$HERE/GameBasic.png" "$ICONS/gamebasic.png"
+[ -f "$HERE/GameBasic.png" ] && cp "$HERE/GameBasic.png" "$ICONS/drachenhauch.png"
 
-cat > "$APPS/gamebasic.desktop" <<EOF
+cat > "$APPS/drachenhauch.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=GameBasic
 Comment=BASIC-Dialekt mit Pascal-strikter Typisierung und OOP fuer Spiele
 Exec=$DEST/GameBasic %f
-Icon=gamebasic
+Icon=drachenhauch
 Categories=Development;IDE;
-MimeType=text/x-gamebasic;
+MimeType=text/x-drachenhauch;
 EOF
 
 update-desktop-database "$APPS" 2>/dev/null || true

@@ -12,13 +12,13 @@ geänderte Befehl muss nativ in `dhrt` laufen** — per run_gb-Golden-Test
 absichern.
 
 ## Umsetzungs-Checkliste pro Befehl
-- [ ] Tree-Walker: `@builtin`/`@graphics_builtin` in `gamebasic/interpreter.py`
-      (bzw. passendes `gamebasic/modules/*.py`).
+- [ ] Tree-Walker: `@builtin`/`@graphics_builtin` in `drachenhauch/interpreter.py`
+      (bzw. passendes `drachenhauch/modules/*.py`).
 - [ ] Native Runtime: `rust/gb_runtime/src/builtins.rs` (+ `vm.rs`-Dispatch,
       ggf. `graphics.rs`/`audio.rs`), danach `rust\build_runtime.py`.
 - [ ] Parity-Snippet in `tests/test_dhrt_parity.py` (TW == dhrt). PRNG-/Uhr-
       basierte Befehle als „erwartet unterschiedlich" behandeln.
-- [ ] Doku: `builtin_docs.py` (Hover) + `vscode-gamebasic/build_grammar.py` neu
+- [ ] Doku: `builtin_docs.py` (Hover) + `vscode-drachenhauch/build_grammar.py` neu
       generieren; README/CLAUDE bei Bedarf.
 
 ---
@@ -74,10 +74,10 @@ Läuft im Editor (Tree-Walker), crasht/divergiert im exportierten Spiel (dhrt):
       (vm.rs `sort_with_comparator`, stabil, cmp(a,b)→INT).
 
 > **✅ Folge-Schritt erledigt (2026-06-05):** Run-/Export-Pfad auf dhrts Rust-
-> Frontend umgestellt. `gbrun.py --native` → `dhrt run`, `gbrun.py --export` →
+> Frontend umgestellt. `dhrun.py --native` → `dhrt run`, `dhrun.py --export` →
 > `dhrt --export`, Editor-Run (`output_console._start_native`) → `dhrt run`,
 > Editor-Export (`main_window._export_active`) → `dhrt --export`. Damit laufen die
-> dhrt-only-Builtins überall (verifiziert: `gbrun.py --native`/`--export` + die
+> dhrt-only-Builtins überall (verifiziert: `dhrun.py --native`/`--export` + die
 > exportierte .exe). dhrts Compile-Fehler bekamen das Format `datei.gb:Zeile:`
 > (Editor-klickbar). (Hinweis: der Python-Compiler ist seit Stufe B entfernt —
 > dhrt kompiliert selbst; „beide Pfade" unten sind historisch.)

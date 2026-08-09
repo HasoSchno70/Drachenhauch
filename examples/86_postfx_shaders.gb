@@ -4,7 +4,7 @@
 ' Fragment-Shader auf den Screen praesentiert. Alle 3 Sekunden wechselt der
 ' Effekt:  AUS -> CRT -> BLOOM -> VIGNETTE.
 '
-' Ausfuehren:  gbrun.py --native examples\86_postfx_shaders.gb   (oder F6)
+' Ausfuehren:  dhrun.py --native examples\86_postfx_shaders.gb   (oder F6)
 ' Der Tree-Walker (F5) ist konsolen-only -- Shader/Grafik nur nativ in dhrt.
 ' ESC beendet.
 

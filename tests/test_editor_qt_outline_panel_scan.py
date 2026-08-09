@@ -2,7 +2,7 @@
 comment-/string-aware noch kannte er PROPERTY GET/SET -- eine Klasse mit
 nur Properties zeigte gar nichts im Outline, obwohl dieselbe Property in
 der Breadcrumb-Leiste (die symbols.scan_scopes nutzt) korrekt erschien)."""
-from gamebasic.editor_qt.outline_panel import OutlinePanel
+from drachenhauch.editor_qt.outline_panel import OutlinePanel
 
 
 def test_scan_sub_and_function():

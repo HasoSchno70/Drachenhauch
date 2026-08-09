@@ -6,8 +6,8 @@ Mathematik (set/get/reset_camera, _w2s/_s2w/_scale_size) lebt in `graphics.py`
 """
 import pytest
 
-from gamebasic.graphics import Graphics
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.graphics import Graphics
+from drachenhauch.errors import DHRuntimeError
 
 
 @pytest.fixture
@@ -26,12 +26,12 @@ def test_set_camera(g):
 
 
 def test_zero_zoom_raises(g):
-    with pytest.raises(GBRuntimeError, match="zoom muss > 0"):
+    with pytest.raises(DHRuntimeError, match="zoom muss > 0"):
         g.set_camera(0, 0, 0)
 
 
 def test_negative_zoom_raises(g):
-    with pytest.raises(GBRuntimeError, match="zoom muss > 0"):
+    with pytest.raises(DHRuntimeError, match="zoom muss > 0"):
         g.set_camera(0, 0, -1)
 
 

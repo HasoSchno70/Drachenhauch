@@ -7,9 +7,9 @@ schlimmsten Fall als Ausnahme mitten in Qts Paint-Pfad.
 """
 import pytest
 
-from gamebasic.lexer import Lexer
-from gamebasic.errors import LexerError
-from gamebasic.tokens import TokenType
+from drachenhauch.lexer import Lexer
+from drachenhauch.errors import LexerError
+from drachenhauch.tokens import TokenType
 
 
 def _lex(src):

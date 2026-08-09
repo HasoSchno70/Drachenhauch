@@ -66,7 +66,7 @@ PRINT h.value
 
 def test_property_read_only(run_gb, run_vm):
     """Property mit nur GET -> Setter-Aufruf wirft."""
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 CLASS Const42
     PROPERTY GET answer() AS INTEGER
@@ -79,15 +79,15 @@ c = NEW Const42()
 PRINT c.answer
 c.answer = 99
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_property_write_only(run_gb, run_vm):
     """Property mit nur SET -> Getter-Aufruf wirft."""
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 CLASS WriteOnly
     DIM _value AS INTEGER
@@ -102,9 +102,9 @@ w = NEW WriteOnly()
 w.value = 5
 PRINT w.value
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 

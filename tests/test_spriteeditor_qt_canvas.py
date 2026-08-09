@@ -26,7 +26,7 @@ def app():
 
 
 def _window(app):
-    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
     return SpriteEditorWindow(project_root=Path("."))
 
 

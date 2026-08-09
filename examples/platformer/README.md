@@ -1,7 +1,7 @@
 # Plattformer-Sprites (32x32, "Twilight"-Thema)
 
 Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Plattformer (eigenstaendiges "Twilight"-Thema, nicht an Nintendo angelehnt), prozedural gebaut über das Datenmodell des Sprite-Editors
-(`gamebasic.spriteeditor.document.SpriteDoc`). Alle Sprites sind **32×32 Pixel**.
+(`drachenhauch.spriteeditor.document.SpriteDoc`). Alle Sprites sind **32×32 Pixel**.
 
 ## Master-Spritesheet
 
@@ -12,7 +12,7 @@ Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Platt
 
 ## Figuren (animiert)
 
-Pro Figur: `.gbsprite` (im Editor `gbsprites` bearbeitbar) + `.png`
+Pro Figur: `.gbsprite` (im Editor `dhsprites` bearbeitbar) + `.png`
 (horizontaler Strip für `SPRITE_NEW(sheet, 32, 32)`) + `.gif` (Vorschau).
 Im Master-Sheet heißen die Frames `<figur>_<frame>`.
 
@@ -47,7 +47,7 @@ py examples/platformer/make_sprites.py
 Oder eine `.gbsprite` direkt im Editor öffnen und pixeln:
 
 ```
-gbsprites examples/platformer/hero.gbsprite
+dhsprites examples/platformer/hero.gbsprite
 ```
 
 ## Demo
@@ -58,7 +58,7 @@ Level (Boden, Röhre, Brick/?-Block, Wasser, animierte Münzen, Wolken/Busch/
 Hügel) kommt aus dem Master-Atlas `sheet.json`.
 
 ```
-gbrun.py examples/platformer/platformer_demo.gb
+dhrun.py examples/platformer/platformer_demo.gb
 ```
 
 ## Im eigenen Spiel verwenden

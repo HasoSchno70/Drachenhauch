@@ -23,14 +23,14 @@ END SUB
 
 
 def test_folded_starts_initially_empty():
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(SRC)
     assert ed.folded_starts() == []
 
 
 def test_apply_then_get_roundtrip():
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(SRC)
     ed.apply_folded_starts([1, 4])
@@ -40,7 +40,7 @@ def test_apply_then_get_roundtrip():
 def test_apply_ignores_invalid_starts():
     """Wenn die gespeicherte Start-Zeile nicht mehr zu einem Block
     passt (Datei extern bearbeitet), wird sie ignoriert -- kein Crash."""
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(SRC)
     ed.apply_folded_starts([1, 999])  # 999 ist kein gueltiger Start
@@ -48,7 +48,7 @@ def test_apply_ignores_invalid_starts():
 
 
 def test_apply_empty_is_noop():
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(SRC)
     ed.apply_folded_starts([])
@@ -56,7 +56,7 @@ def test_apply_empty_is_noop():
 
 
 def test_unfold_all_clears_state():
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(SRC)
     ed.apply_folded_starts([1, 4])

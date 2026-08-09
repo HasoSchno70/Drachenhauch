@@ -1,5 +1,5 @@
 ' Headless-Test der Spiel-Mechanik: Flood-Fill (Innenraum), Schieben, Undo,
-' Loesungserkennung. Keine Grafik -> laeuft via gbrun.py.
+' Loesungserkennung. Keine Grafik -> laeuft via dhrun.py.
 CONST GWMAX = 16
 CONST GHMAX = 16
 CONST MAXBOX = 16

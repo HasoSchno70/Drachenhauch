@@ -1,10 +1,10 @@
-"""Generiert syntaxes/gamebasic.tmLanguage.json aus den echten Projektlisten.
+"""Generiert syntaxes/drachenhauch.tmLanguage.json aus den echten Projektlisten.
 
 So bleibt das Syntax-Highlighting der VSCode-Extension deckungsgleich mit
 Lexer-Keywords + registrierten Built-ins/Konstanten. Neu ausfuehren nach
 Sprach-Aenderungen:
 
-    .venv\\Scripts\\python.exe vscode-gamebasic\\build_grammar.py
+    .venv\\Scripts\\python.exe vscode-drachenhauch\\build_grammar.py
 """
 from __future__ import annotations
 
@@ -13,11 +13,11 @@ import re
 import sys
 from pathlib import Path
 
-# Projekt importierbar machen (Skript liegt in vscode-gamebasic/).
+# Projekt importierbar machen (Skript liegt in vscode-drachenhauch/).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from gamebasic.tokens import KEYWORDS                       # noqa: E402
-from gamebasic.editor_qt.completer import (                 # noqa: E402
+from drachenhauch.tokens import KEYWORDS                       # noqa: E402
+from drachenhauch.editor_qt.completer import (                 # noqa: E402
     collect_builtins, collect_constants)
 
 TYPES = ["INTEGER", "FLOAT", "STRING", "BOOLEAN", "ARRAY", "MAP", "TUPLE",
@@ -54,11 +54,11 @@ def build() -> dict:
     consts = [c for c in collect_constants() if c not in BOOLS]
 
     patterns = [
-        {"name": "comment.line.apostrophe.gamebasic",
+        {"name": "comment.line.apostrophe.drachenhauch",
          "match": "'.*$"},
-        {"name": "comment.line.rem.gamebasic",
+        {"name": "comment.line.rem.drachenhauch",
          "match": "(?i)\\bREM\\b.*$"},
-        {"name": "string.quoted.double.gamebasic",
+        {"name": "string.quoted.double.drachenhauch",
          # Review-Fund: ohne Zeilenende-Fallback spannte diese begin/end-Regel
          # ueber Zeilen hinweg, solange (noch) keine schliessende `"` folgte --
          # lexer.py verbietet Zeilenumbrueche in Strings explizit
@@ -67,47 +67,47 @@ def build() -> dict:
          # schliessenden Anfuehrungszeichen pausieren faerbte alles bis zum
          # naechsten `"` irgendwo spaeter im Dokument als EINEN String.
          "begin": "\"", "end": "\"|$",
-         "patterns": [{"name": "constant.character.escape.gamebasic",
+         "patterns": [{"name": "constant.character.escape.drachenhauch",
                        "match": "\"\""}]},
         # Review-Fund: nur Dezimalzahlen wurden erkannt -- lexer.py unterstuetzt
         # zusaetzlich C-Stil (0xFF/0b1010) UND BASIC-Stil (&HFF/&B1010) Hex-/
         # Binaer-Literale (_scan_number/_scan_hex_or_binary), die bisher
         # unfarbig blieben. Vor der generischen Dezimal-Regel einsortiert,
         # damit z.B. "0x1A" nicht zuerst als Dezimalzahl "0" + Rest matcht.
-        {"name": "constant.numeric.hex.gamebasic",
+        {"name": "constant.numeric.hex.drachenhauch",
          "match": "\\b0[xX][0-9a-fA-F]+\\b|&[Hh][0-9a-fA-F]+"},
-        {"name": "constant.numeric.binary.gamebasic",
+        {"name": "constant.numeric.binary.drachenhauch",
          "match": "\\b0[bB][01]+\\b|&[Bb][01]+"},
-        {"name": "constant.numeric.gamebasic",
+        {"name": "constant.numeric.drachenhauch",
          "match": "\\b[0-9]+(\\.[0-9]+)?\\b"},
-        {"name": "constant.language.boolean.gamebasic",
+        {"name": "constant.language.boolean.drachenhauch",
          "match": "(?i)\\b(" + _alt(BOOLS) + ")\\b"},
-        {"name": "storage.type.gamebasic",
+        {"name": "storage.type.drachenhauch",
          "match": "(?i)\\b(" + _alt(TYPES) + ")\\b"},
-        {"name": "keyword.declaration.gamebasic",
+        {"name": "keyword.declaration.drachenhauch",
          "match": "(?i)\\b(" + _alt(decl) + ")\\b"},
-        {"name": "keyword.control.gamebasic",
+        {"name": "keyword.control.drachenhauch",
          "match": "(?i)\\b(" + _alt(control) + ")\\b"},
-        {"name": "support.function.dollar.gamebasic",
+        {"name": "support.function.dollar.drachenhauch",
          "match": "(?i)\\b(" + _alt(dollar) + ")\\$"},
-        {"name": "support.function.gamebasic",
+        {"name": "support.function.drachenhauch",
          "match": "(?i)\\b(" + _alt(plain) + ")\\b"},
-        {"name": "constant.language.gamebasic",
+        {"name": "constant.language.drachenhauch",
          "match": "(?i)\\b(" + _alt(consts) + ")\\b"},
-        {"name": "keyword.operator.gamebasic",
+        {"name": "keyword.operator.drachenhauch",
          "match": "<=|>=|<>|[-+*/\\\\=<>^]"},
     ]
     return {
         "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
         "name": "GameBasic",
-        "scopeName": "source.gamebasic",
+        "scopeName": "source.drachenhauch",
         "patterns": [{"include": "#root"}],
         "repository": {"root": {"patterns": patterns}},
     }
 
 
 def main() -> None:
-    out = Path(__file__).resolve().parent / "syntaxes" / "gamebasic.tmLanguage.json"
+    out = Path(__file__).resolve().parent / "syntaxes" / "drachenhauch.tmLanguage.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(build(), indent=2) + "\n", encoding="utf-8")
     print(f"geschrieben: {out}")

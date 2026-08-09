@@ -6,7 +6,7 @@ in test_enum_native.py separat gepflegt.
 """
 import pytest
 
-from gamebasic.errors import ParseError, GBRuntimeError
+from drachenhauch.errors import ParseError, DHRuntimeError
 
 
 # Beide Helper geben stdout zurueck, identisch verwendbar.
@@ -164,7 +164,7 @@ def test_enum_in_select_case(run_either):
 # --- Fehler-Faelle --------------------------------------------------
 
 def test_unknown_member_raises(run_either):
-    with pytest.raises(GBRuntimeError, match="hat keinen Member"):
+    with pytest.raises(DHRuntimeError, match="hat keinen Member"):
         run_either(
             'ENUM E = A, B\n'
             'PRINT E.SCHWURBEL\n'
@@ -184,7 +184,7 @@ def test_no_members_raises(run_gb):
 def test_non_literal_value_raises(run_either):
     """ENUM-Member-Werte muessen Compile-Time-Integer-Literale sein - keine
     Variablen, keine Funktionsaufrufe."""
-    with pytest.raises(GBRuntimeError, match="Literal"):
+    with pytest.raises(DHRuntimeError, match="Literal"):
         run_either(
             'CONST N AS INTEGER = 5\n'
             'ENUM E = A = N\n'
@@ -193,7 +193,7 @@ def test_non_literal_value_raises(run_either):
 
 def test_redeclaration_with_different_members_raises(run_gb):
     """Tree-Walker: zweite ENUM-Deklaration mit anderen Members -> Fehler."""
-    with pytest.raises(GBRuntimeError, match="anderweitig vergeben"):
+    with pytest.raises(DHRuntimeError, match="anderweitig vergeben"):
         run_gb(
             'ENUM E = A, B\n'
             'ENUM E = X, Y\n'

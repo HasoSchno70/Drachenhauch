@@ -4,7 +4,7 @@ Schwerpunkt: lokale Buffer-Symbole (SUB/FUNCTION/DIM/CLASS/Parameter)
 landen in der Completion -- vorher kannte der Completer nur statische
 Keywords/Builtins/Konstanten.
 """
-from gamebasic.editor_qt.completer import (
+from drachenhauch.editor_qt.completer import (
     all_completions,
     local_definition_names,
 )

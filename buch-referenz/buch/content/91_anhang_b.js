@@ -1,4 +1,4 @@
-// Anhang B -- Tastencodes (KEY_* / JOY_*). Werte aus gamebasic/graphics.py KEYS,
+// Anhang B -- Tastencodes (KEY_* / JOY_*). Werte aus drachenhauch/graphics.py KEYS,
 // gegen dhrt verifiziert.
 module.exports = (H) => {
   const row = (name, code, note) => [{ text: name, mono: true }, { text: String(code), mono: true }, note || ""];

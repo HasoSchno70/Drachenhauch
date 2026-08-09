@@ -1,17 +1,17 @@
 # Editor
 
-Der GameBasic-Editor (`gbrun.py --editor` oder einfach `gbrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Debug/Profile, Find in Project, klickbare Fehler.
+Der GameBasic-Editor (`dhrun.py --editor` oder einfach `dhrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Debug/Profile, Find in Project, klickbare Fehler.
 
 ## Starten
 
 ```
-.venv\Scripts\python.exe gbrun.py --editor
+.venv\Scripts\python.exe dhrun.py --editor
 ```
 
 Oder ohne Argumente:
 
 ```
-.venv\Scripts\python.exe gbrun.py
+.venv\Scripts\python.exe dhrun.py
 ```
 
 (Dann öffnet sich der Editor wenn `PySide6` installiert ist; sonst Hilfe-Anzeige.)
@@ -42,7 +42,7 @@ Oder ohne Argumente:
 
 **Explorer (📂 Dateien)**: Oben rechts neben dem Titel „Explorer" sitzen zwei Knöpfe, die den ganzen Baum mit einem Klick **aufklappen** bzw. **einklappen** (Tooltips „Alles ausklappen" / „Alles einklappen") — praktisch bei vielen Ordnern.
 
-**Sidebar-Breite** ist per Maus über den Sash zwischen Sidebar und Editor ziehbar. Die zuletzt eingestellte Breite wird in `~/.gamebasic-editor/settings.json` (`sidebar_width`) gespeichert.
+**Sidebar-Breite** ist per Maus über den Sash zwischen Sidebar und Editor ziehbar. Die zuletzt eingestellte Breite wird in `~/.drachenhauch-editor/settings.json` (`sidebar_width`) gespeichert.
 
 **Statusleiste** zeigt rechts: `Zeile / Spalte / Zeichen-Anzahl`, Encoding (`UTF-8`), `N Tabs`, OK/Fehler-Status, Theme-Indikator. Links: aktive optionale Editor-Deps (`✓ Pillow  ✓ DnD`).
 
@@ -116,7 +116,7 @@ Oder ohne Argumente:
 
 | Kürzel | Aktion |
 |---|---|
-| `F5` | Programm starten — **native Runtime `dhrt`** (bei Direkt-Startproblemen automatisch über den `gbrun.py`-Launcher, gleicher `dhrt` mit chdir) |
+| `F5` | Programm starten — **native Runtime `dhrt`** (bei Direkt-Startproblemen automatisch über den `dhrun.py`-Launcher, gleicher `dhrt` mit chdir) |
 | Toolbar `Stop` | Laufendes Programm abbrechen (auch den nativen `dhrt`-Prozess) |
 
 ## Befehlspalette (`Strg+Shift+P`)
@@ -151,7 +151,7 @@ User-Identifier ranken vor gleichnamigen Built-ins. Pro Kategorie eine eigene Fa
 - `Esc` oder Klick irgendwo im Editor schließt
 - Doppelklick auf einen Eintrag committed
 
-**Abschalten:** `Bearbeiten → Auto-Vervollst. beim Tippen umschalten` (oder Befehlspalette). Das Setting wird in `~/.gamebasic-editor/settings.json` gespeichert. `Strg+Leer` funktioniert weiterhin, auch wenn der Auto-Trigger aus ist.
+**Abschalten:** `Bearbeiten → Auto-Vervollst. beim Tippen umschalten` (oder Befehlspalette). Das Setting wird in `~/.drachenhauch-editor/settings.json` gespeichert. `Strg+Leer` funktioniert weiterhin, auch wenn der Auto-Trigger aus ist.
 
 ## Signature-Help / Parameter-Hints
 
@@ -369,10 +369,10 @@ Hover über einen Link zeigt Hand-Cursor; **Klick** öffnet die Datei und spring
 
 ## Run / Stop
 
-- **`Run` (F5)**: führt das Programm über die **native Runtime `dhrt`** aus (startet `dhrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `gbrun.py`-Launcher** (gleicher `dhrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
+- **`Run` (F5)**: führt das Programm über die **native Runtime `dhrt`** aus (startet `dhrt run` direkt als Prozess, sodass `Stop` ihn beendet; Arbeitsverzeichnis = Ordner der Quelldatei, relative Asset-Pfade; Laufzeitfehler als klickbares `datei.gb:Zeile`). Schlägt der direkte Start fehl — **nicht gebaut** oder **Start-Fehler** —, läuft der Run **über den `dhrun.py`-Launcher** (gleicher `dhrt`, aber mit chdir; ein Hinweis erscheint in der Konsole). (Hintergrund: [docs/rust-runtime.md](rust-runtime.md).)
 - **`Stop`** (Shift+F5): bricht den laufenden Prozess ab (für Game-Loops, die nicht von selbst enden).
 
-**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `dhrt`) bzw. **▶** (über `gbrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
+**Run-Indikator:** Bei mehreren offenen Tabs markiert der Editor den Tab der gerade laufenden Datei — Präfix **⚙** (direkt via `dhrt`) bzw. **▶** (über `dhrun.py`) plus Akzent-Textfarbe. Die Statusleiste zeigt zusätzlich Datei + Modus. Beim Run-Ende wird die Markierung zurückgesetzt.
 
 ## Debugger
 
@@ -404,13 +404,13 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 - **Zeilen** — jede ausgeführte Zeile mit Treffern, Zeit (ms), Anteil (Balken + %) und Quelltext, nach Zeit sortiert (Hotspots oben). Doppelklick springt zur Zeile.
 - **Funktionen** — pro `SUB`/`FUNCTION` aggregiert: Aufrufzahl + Gesamtzeit.
 
-**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Am besten für Konsolen-/Logik-Programme, aber auch **Grafik-Programme mit Endlos-Render-Loop** lassen sich profilieren: erneutes `Strg+Shift+Y` (oder das Schliessen des Fensters via `QUITREQUESTED`) bricht den Lauf **sauber** ab — dhrt liefert dann die bis dahin gesammelten Daten (intern via Stop-Signal über stdin, `dhrt profile --stoppable`; ein harter Prozess-Kill würde die Auswertung verschlucken). `INPUT` liefert unter dem Profiler "" (kein Hängen). Kern + Aggregation liegen in `gamebasic/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
+**Naeherung:** Die Zeit einer Zeile enthält die in aufgerufenem Code (Built-ins, `IMPORT`) verbrachte Zeit sowie den Mess-Overhead — gut für die *relative* Hotpath-Einordnung, nicht als absolute Zeit. Am besten für Konsolen-/Logik-Programme, aber auch **Grafik-Programme mit Endlos-Render-Loop** lassen sich profilieren: erneutes `Strg+Shift+Y` (oder das Schliessen des Fensters via `QUITREQUESTED`) bricht den Lauf **sauber** ab — dhrt liefert dann die bis dahin gesammelten Daten (intern via Stop-Signal über stdin, `dhrt profile --stoppable`; ein harter Prozess-Kill würde die Auswertung verschlucken). `INPUT` liefert unter dem Profiler "" (kein Hängen). Kern + Aggregation liegen in `drachenhauch/editor_qt/profiler.py` (headless getestet: `tests/test_profiler.py`).
 
 ## Git-Blame
 
 `Strg+Shift+A` (oder `Ansicht → Git-Blame`) öffnet das **Blame**-Panel: pro Zeile der Datei, wer sie zuletzt geändert hat — Zeile, Commit (Kurz-Hash), Autor, Datum, Commit-Zusammenfassung. Die Tabelle **folgt dem Cursor** (die aktuelle Zeile wird markiert), **Doppelklick** springt im Editor zur Zeile. `Aktualisieren` lädt neu.
 
-Lokale, noch nicht committete Zeilen sind als `•••` / *(uncommitted)* ausgegraut. Bei ungespeicherten Änderungen zeigt das Panel den zuletzt gespeicherten Stand (Hinweis im Status). Ist die Datei nicht in einem Git-Repository oder `git` nicht installiert, erscheint eine entsprechende Meldung statt einer leeren Tabelle. Implementierung: `gamebasic/editor_qt/gitinfo.py` (Porcelain-Parser von der I/O getrennt, headless getestet: `tests/test_gitinfo.py`).
+Lokale, noch nicht committete Zeilen sind als `•••` / *(uncommitted)* ausgegraut. Bei ungespeicherten Änderungen zeigt das Panel den zuletzt gespeicherten Stand (Hinweis im Status). Ist die Datei nicht in einem Git-Repository oder `git` nicht installiert, erscheint eine entsprechende Meldung statt einer leeren Tabelle. Implementierung: `drachenhauch/editor_qt/gitinfo.py` (Porcelain-Parser von der I/O getrennt, headless getestet: `tests/test_gitinfo.py`).
 
 ## Finden & Ersetzen im Projekt
 
@@ -423,7 +423,7 @@ Optionen:
 
 Treffer-Liste zeigt `pfad/datei.gb:42  code-snippet`. **Doppelklick** öffnet den Treffer.
 
-**Ersetzen:** Im Feld **Ersetzen durch** den Ersatztext eingeben (leer = löschen) und **Alle ersetzen** klicken. Ein Bestätigungsdialog nennt die Anzahl Vorkommen und betroffener Dateien, bevor geschrieben wird. Die Optionen (Gross/Klein, Ganzes Wort, Regex) gelten auch fürs Ersetzen; im Regex-Modus sind Rückverweise (`\1`, `\g<1>`) im Ersatztext erlaubt, sonst wird er literal eingesetzt. **Offene Tabs werden mit ihren ungespeicherten Änderungen berücksichtigt** — der Ersatz wird auf den Live-Buffer angewendet, auf die Platte geschrieben und der Tab synchron gehalten (kein Datenverlust). Implementierung/Tests: `gamebasic/editor_qt/find_in_project.py`, `tests/test_find_in_project.py`.
+**Ersetzen:** Im Feld **Ersetzen durch** den Ersatztext eingeben (leer = löschen) und **Alle ersetzen** klicken. Ein Bestätigungsdialog nennt die Anzahl Vorkommen und betroffener Dateien, bevor geschrieben wird. Die Optionen (Gross/Klein, Ganzes Wort, Regex) gelten auch fürs Ersetzen; im Regex-Modus sind Rückverweise (`\1`, `\g<1>`) im Ersatztext erlaubt, sonst wird er literal eingesetzt. **Offene Tabs werden mit ihren ungespeicherten Änderungen berücksichtigt** — der Ersatz wird auf den Live-Buffer angewendet, auf die Platte geschrieben und der Tab synchron gehalten (kein Datenverlust). Implementierung/Tests: `drachenhauch/editor_qt/find_in_project.py`, `tests/test_find_in_project.py`.
 
 `.venv/`, `build/`, `dist/`, `__pycache__/` werden ausgespart.
 
@@ -444,7 +444,7 @@ Drei Wege:
 - **Klick auf den Theme-Indikator** in der Toolbar (oben rechts) oder in der Statusleiste (unten rechts) — toggelt
 - Befehlspalette: „Theme umschalten", „Theme: Dark", „Theme: Hell"
 
-Beide Themes sind VSCode-orientiert (Dark+ und Light+), Akzentfarbe ist ein modernes Blau-500. Wahl wird in `~/.gamebasic-editor/settings.json` gespeichert.
+Beide Themes sind VSCode-orientiert (Dark+ und Light+), Akzentfarbe ist ein modernes Blau-500. Wahl wird in `~/.drachenhauch-editor/settings.json` gespeichert.
 
 ## Dokumentation aufrufen
 
@@ -459,7 +459,7 @@ Der **Markdown-Viewer** rendert die Doku theme-treu (helle Schrift auf dunklem G
 
 ## Branding (Window-Icon + About-Dialog)
 
-Das GameBasic-Logo aus `gamebasic/assets/logo.png` wird automatisch:
+Das GameBasic-Logo aus `drachenhauch/assets/logo.png` wird automatisch:
 - als **Fenster-/Taskleisten-Icon** verwendet (quadratischer Smart-Crop, 64 × 64)
 - im **About-Dialog** angezeigt — `Hilfe → Ueber GameBasic` oder Befehlspalette `Ueber GameBasic`
 
@@ -487,7 +487,7 @@ VSCode-Pattern: `Strg+P` öffnet einen Fuzzy-Finder über alle `.gb`-Dateien im 
 
 Startet der Editor ohne offene Datei, zeigt er ein **Welcome-Panel** (kein leerer Tab): Logo, Action-Buttons (Neu / Öffnen / Beispiele / Doku) und eine **Showcase-Galerie** — kuratierte Demos als anklickbare Karten mit echtem Screenshot-Thumbnail, Titel und Kurzbeschreibung (3D/PBR/IBL, Demoscene, Partikel, Platformer …). Klick auf eine Karte öffnet die Demo. Darunter die Liste der zuletzt geöffneten Dateien. Sobald eine Datei geöffnet oder ein neuer Tab angelegt wird, verschwindet das Welcome.
 
-Die Galerie-Liste ist die Single-Source-of-Truth in `gamebasic/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `dhrt` headless — `DHRT_FRAMES` + `DHRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
+Die Galerie-Liste ist die Single-Source-of-Truth in `drachenhauch/editor_qt/showcase.py`. Die Thumbnails liegen unter `examples/screenshots/` und werden per `tools/gen_showcase_thumbs.py` erzeugt (kompiliert jede Demo und zieht über `dhrt` headless — `DHRT_FRAMES` + `DHRT_SCREENSHOT` — einen Screenshot). Fehlt ein Thumbnail, zeigt die Karte einen Play-Glyph-Platzhalter.
 
 ## Explorer: Beispiele nach Kategorie
 
@@ -495,11 +495,11 @@ Der Datei-Explorer gruppiert die flache `examples/`-Sammlung (100+ Dateien) virt
 
 ## Workspace-Persistenz
 
-Beim Schließen des Editors werden alle offenen Tabs (mit Pfad) und der aktive Tab in `~/.gamebasic-editor/settings.json` gespeichert. Beim nächsten Start öffnet der Editor sie automatisch wieder.
+Beim Schließen des Editors werden alle offenen Tabs (mit Pfad) und der aktive Tab in `~/.drachenhauch-editor/settings.json` gespeichert. Beim nächsten Start öffnet der Editor sie automatisch wieder.
 
 Reihenfolge beim Start:
 
-1. Wenn `gbrun.py --editor <datei.gb>` mit Pfad-Argument: nur diese Datei wird geöffnet (überschreibt Workspace-Restore).
+1. Wenn `dhrun.py --editor <datei.gb>` mit Pfad-Argument: nur diese Datei wird geöffnet (überschreibt Workspace-Restore).
 2. Sonst: Auto-Save-Recovery — wenn ungesicherte Inhalte aus der vorigen Session vorhanden sind, fragt der Editor, ob sie wiederhergestellt werden sollen (siehe „Auto-Save").
 3. Sonst: Workspace-Restore — alle Tabs aus dem letzten Lauf werden wieder geöffnet.
 4. Sonst: ein leerer Default-Tab.
@@ -510,7 +510,7 @@ Verschollene Pfade (Datei wurde gelöscht / verschoben) werden beim Restore stil
 
 - **Recent Files** unter `Datei → Zuletzt geoeffnet` (Liste der letzten 10).
 - **Theme** wird persistent gespeichert.
-- Settings-Datei: `~/.gamebasic-editor/settings.json`.
+- Settings-Datei: `~/.drachenhauch-editor/settings.json`.
 
 ## Performance
 
@@ -525,5 +525,5 @@ GameBasic-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), dar
 ## Bekannte Eigenheiten
 
 - **`step` ist Schlüsselwort** (FOR…STEP) — Variablen anders benennen (`i`, `tick`, `iter`).
-- **`gbrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Installation: `pip install PySide6`.
+- **`dhrun.py --editor` braucht `PySide6`**: bei fehlender Installation kommt eine klare Fehlermeldung. Installation: `pip install PySide6`.
 - **Grafik-Beispiele blockieren** den Editor während sie laufen — das ist normal, der Run-Prozess (dhrt) ist getrennt vom Editor-Prozess. ESC oder Fenster-X im Grafik-Fenster beendet das Programm.

@@ -5,7 +5,7 @@ Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _SCHEMA = ('IMPORT "db"\nDIM c AS DB_CONN\nc = DB_OPEN(":memory:")\n'
            'DB_EXEC(c, "CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT, '
@@ -17,7 +17,7 @@ def _lines(out):
 
 
 def test_open_close(run_gb):
-    with pytest.raises(GBRuntimeError, match="geschlossen"):
+    with pytest.raises(DHRuntimeError, match="geschlossen"):
         run_gb('IMPORT "db"\nDIM c AS DB_CONN\nc = DB_OPEN(":memory:")\n'
                'DB_CLOSE(c)\nDB_EXEC(c, "SELECT 1")\n')
 
@@ -106,12 +106,12 @@ def test_transaction_commit(run_gb):
 
 
 def test_invalid_sql_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="DB_EXEC"):
+    with pytest.raises(DHRuntimeError, match="DB_EXEC"):
         run_gb(_SCHEMA + 'DB_EXEC(c, "DAS IST KEIN SQL")\n')
 
 
 def test_get_before_next_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="Keine aktuelle Zeile"):
+    with pytest.raises(DHRuntimeError, match="Keine aktuelle Zeile"):
         run_gb(_SCHEMA +
                'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1")\n'
                'PRINT DB_GET_INT(r, 0)\n')
@@ -120,7 +120,7 @@ def test_get_before_next_raises(run_gb):
 def test_get_int_huge_real_raises_instead_of_saturating(run_gb):
     # 1e20 ist ganzzahlig (fract()==0), aber weit ausserhalb des i64-Bereichs
     # -- vorher saettigte `f as i64` still auf i64::MAX statt zu scheitern.
-    with pytest.raises(GBRuntimeError, match="nicht INTEGER"):
+    with pytest.raises(DHRuntimeError, match="nicht INTEGER"):
         run_gb('IMPORT "db"\nDIM c AS DB_CONN\nc = DB_OPEN(":memory:")\n'
                'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1e20")\n'
                'DB_NEXT(r)\nPRINT DB_GET_INT(r, 0)\n')
@@ -138,7 +138,7 @@ def test_close_result_frees_rows_and_stays_usable(run_gb):
     # der eigentliche Speicher-Fix (rows werden geleert) ist von aussen nicht
     # direkt messbar, aber ein zweiter Zugriff nach dem Schliessen muss den
     # dokumentierten "bereits geschlossen"-Fehler werfen.
-    with pytest.raises(GBRuntimeError, match="bereits geschlossen"):
+    with pytest.raises(DHRuntimeError, match="bereits geschlossen"):
         run_gb(_SCHEMA +
                'DIM r AS DB_RESULT\nr = DB_QUERY(c, "SELECT 1")\n'
                'DB_CLOSE_RESULT(r)\nPRINT DB_NEXT(r)\n')

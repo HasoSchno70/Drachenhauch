@@ -6,7 +6,7 @@ via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -43,7 +43,7 @@ def test_push_pop_roundtrip(run_gb):
 
 
 def test_pop_on_empty_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="bereits leer"):
+    with pytest.raises(DHRuntimeError, match="bereits leer"):
         run_gb('IMPORT "scene"\nSCENE_POP()\n')
 
 
@@ -105,13 +105,13 @@ def test_set_get_bool(run_gb):
 
 
 def test_get_missing_key_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="nicht in Scene"):
+    with pytest.raises(DHRuntimeError, match="nicht in Scene"):
         run_gb('IMPORT "scene"\nSCENE_PUSH("s")\nPRINT SCENE_GET_INT("fehlt")\n')
 
 
 def test_get_wrong_type_raises(run_gb):
     # dhrt-Wortlaut: "Key 'x' hat falschen Typ" (TW sagte "ist INT, nicht STRING").
-    with pytest.raises(GBRuntimeError, match="falschen Typ"):
+    with pytest.raises(DHRuntimeError, match="falschen Typ"):
         run_gb('IMPORT "scene"\nSCENE_PUSH("s")\n'
                'SCENE_SET_INT("x", 1)\nPRINT SCENE_GET_STRING("x")\n')
 
@@ -161,7 +161,7 @@ def test_delete_missing_is_idempotent(run_gb):
 
 def test_set_without_scene_raises(run_gb):
     """Ohne Scene auf dem Stack ist set/get sinnlos und wirft."""
-    with pytest.raises(GBRuntimeError, match="Stack ist leer"):
+    with pytest.raises(DHRuntimeError, match="Stack ist leer"):
         run_gb('IMPORT "scene"\nSCENE_SET_INT("x", 1)\n')
 
 

@@ -6,7 +6,7 @@ module.exports = (H) => [
   H.figure("80_demo_titel.png", "Die Titelszene der mitgelieferten Demo: Plasma im Post-Effekt, ein Sinus-Scroller und Spektrum-Säulen, die auf der echten Musik tanzen."),
   H.p("Die vollständige Demo liegt als gbdemo/gbdemo.gb bei. Starte sie ruhig zuerst und lies dann weiter – es ist leichter zu verstehen, was du schon gesehen hast. Mit den Zifferntasten springst du in eine Szene, mit A bis K spielst du Klänge, und M schaltet zwischen acht gemeinfreien Musikstücken um."),
   H.code([
-    "gbrun.py gbdemo\\gbdemo.gb",
+    "dhrun.py gbdemo\\gbdemo.gb",
   ]),
 
   H.h2("Die zwei Bausteine, die alles tragen"),

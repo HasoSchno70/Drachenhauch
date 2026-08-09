@@ -1,44 +1,44 @@
 {
-  "name": "gamebasic",
+  "name": "drachenhauch",
   "displayName": "GameBasic",
   "description": "Sprachunterstuetzung fuer GameBasic (.gb): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
   "version": "1.0.0",
-  "publisher": "gamebasic",
+  "publisher": "drachenhauch",
   "license": "MIT",
   "engines": { "vscode": "^1.75.0" },
   "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:gamebasic"],
+  "activationEvents": ["onLanguage:drachenhauch"],
   "main": "./extension.js",
   "contributes": {
     "languages": [
       {
-        "id": "gamebasic",
-        "aliases": ["GameBasic", "gamebasic", "gb"],
+        "id": "drachenhauch",
+        "aliases": ["GameBasic", "drachenhauch", "gb"],
         "extensions": [".gb"],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
       {
-        "language": "gamebasic",
-        "scopeName": "source.gamebasic",
-        "path": "./syntaxes/gamebasic.tmLanguage.json"
+        "language": "drachenhauch",
+        "scopeName": "source.drachenhauch",
+        "path": "./syntaxes/drachenhauch.tmLanguage.json"
       }
     ],
     "configuration": {
       "title": "GameBasic",
       "properties": {
-        "gamebasic.pythonPath": {
+        "drachenhauch.pythonPath": {
           "type": "string",
           "default": "python",
           "description": "Python-Interpreter, der den GameBasic-Language-Server startet (am besten der .venv-Python des Projekts)."
         },
-        "gamebasic.serverModule": {
+        "drachenhauch.serverModule": {
           "type": "string",
-          "default": "gamebasic.lsp",
+          "default": "drachenhauch.lsp",
           "description": "Python-Modul des Language-Servers (py -m <modul>)."
         },
-        "gamebasic.enableLanguageServer": {
+        "drachenhauch.enableLanguageServer": {
           "type": "boolean",
           "default": true,
           "description": "Language-Server aktivieren (Diagnostics/Completion/Hover/...). Bei false bleibt nur Syntax-Highlighting."

@@ -141,7 +141,7 @@ module.exports = (H) => [
     [
       'IMPORT "mqtt"',
       'DIM m AS MQTT_HANDLE',
-      'm = MQTT_CONNECT("192.168.1.50", 1883, "gamebasic-spiel")',
+      'm = MQTT_CONNECT("192.168.1.50", 1883, "drachenhauch-spiel")',
       'IF NOT MQTT_IS_CONNECTED(m) THEN PRINT "Broker nicht erreichbar"',
     ]),
   H.cmd("MQTT_PUBLISH · MQTT_SUBSCRIBE", 'MQTT_PUBLISH(h, topic$, inhalt$[, behalten])   MQTT_SUBSCRIBE(h, topic$)',

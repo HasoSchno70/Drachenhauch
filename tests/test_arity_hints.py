@@ -3,28 +3,28 @@ Aufruf-Signatur an, damit man die Argumentform nicht raten muss
 (RANDF/RANDINT/CURVE_* -- die Stolpersteine aus dem Galaga-Bau)."""
 
 import pytest
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def test_randf_arity_shows_signature(run_gb):
-    with pytest.raises(GBRuntimeError, match=r"RANDF\(min, max\)"):
+    with pytest.raises(DHRuntimeError, match=r"RANDF\(min, max\)"):
         run_gb("PRINT RANDF()")
 
 
 def test_randint_arity_shows_signature(run_gb):
-    with pytest.raises(GBRuntimeError, match=r"RANDINT\(lo, hi\)"):
+    with pytest.raises(DHRuntimeError, match=r"RANDINT\(lo, hi\)"):
         run_gb("PRINT RANDINT(5)")
 
 
 def test_curve_bezier2_arity_shows_signature(run_gb):
     src = 'IMPORT "curves"\nPRINT CURVE_BEZIER2(0.5, 1.0)'
-    with pytest.raises(GBRuntimeError, match=r"CURVE_BEZIER2\(t, x0,y0"):
+    with pytest.raises(DHRuntimeError, match=r"CURVE_BEZIER2\(t, x0,y0"):
         run_gb(src)
 
 
 def test_builtin_without_signature_unchanged(run_gb):
     """Builtins ohne Tabellen-Eintrag behalten die schlichte Aritaets-Meldung."""
-    with pytest.raises(GBRuntimeError, match=r"ABS: erwartet 1 Argument"):
+    with pytest.raises(DHRuntimeError, match=r"ABS: erwartet 1 Argument"):
         run_gb("PRINT ABS()")
 
 

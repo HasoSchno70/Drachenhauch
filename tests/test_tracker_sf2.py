@@ -7,7 +7,7 @@ import struct
 
 import numpy as np
 
-from gamebasic.tracker.sf2 import SoundFont
+from drachenhauch.tracker.sf2 import SoundFont
 
 
 def _chunk(tag: bytes, data: bytes) -> bytes:

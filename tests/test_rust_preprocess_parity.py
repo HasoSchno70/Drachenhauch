@@ -3,7 +3,7 @@
 Stufe 4 der Front-End-Portierung. Der Rust-Preprocessor (src/preprocess.rs)
 expandiert IMPORTs (Quellcode-Inlining + Built-in-Modul-Erkennung) VOR dem
 Lexen. Gate = **Merge-Ergebnis-Gleichheit**: die gemergte Quelle muss exakt der
-von `gamebasic.preprocess.process()` entsprechen (Zeilen-Enden normalisiert).
+von `drachenhauch.preprocess.process()` entsprechen (Zeilen-Enden normalisiert).
 
 Zusaetzlich ein End-to-End-Check: `dhrt --runsrc` (jetzt mit Preprocess) auf
 einem Programm mit Quellcode- UND Modul-IMPORT == Python-Tree-Walker (stdout).
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _py_merge(main: Path) -> str:
-    from gamebasic.preprocess import process
+    from drachenhauch.preprocess import process
     src = main.read_text(encoding="utf-8")
     merged, _ = process(src, main.parent, file_label=main.name)
     return merged.replace("\r\n", "\n")
@@ -103,8 +103,8 @@ def test_merge_trailing_comment_on_import(tmp_path):
 
 
 def test_missing_import_errors_both(tmp_path):
-    from gamebasic.preprocess import process
-    from gamebasic.errors import LexerError
+    from drachenhauch.preprocess import process
+    from drachenhauch.errors import LexerError
     main = _write(tmp_path, "main.gb", 'IMPORT "nichtda.gb"\nPRINT 1\n')
     rc, _ = _rs_merge(main)
     assert rc != 0

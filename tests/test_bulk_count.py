@@ -14,7 +14,7 @@ Framebuffer, und der ist direkt nach dem allerersten Swap noch leer.
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 pytest.importorskip("PIL", reason="Pillow noetig zum Pixel-Pruefen")
 
@@ -149,5 +149,5 @@ DIM xs[3] AS INTEGER
 DIM ys[3] AS INTEGER
 {aufruf}
 """
-    with pytest.raises(GBRuntimeError, match=erwartet):
+    with pytest.raises(DHRuntimeError, match=erwartet):
         run_gb(src, base=tmp_path)

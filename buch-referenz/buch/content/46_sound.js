@@ -28,7 +28,7 @@ module.exports = (H) => [
       'PLAYSOUND(AUDIO_TONE(800, 80, "square", 0.5))   \' kurzer Laser',
     ]),
   H.cmd("AUDIO_NOISE · AUDIO_SFX", 'AUDIO_NOISE(dauer_ms[, vol])   AUDIO_SFX(...)',
-    "AUDIO_NOISE erzeugt Rauschen (Explosionen, Schritte, Wind). AUDIO_SFX ist ein vollwertiger Retro-Soundeffekt-Synth (Tonhöhen-Slide, Hüllkurve, Vibrato) – am bequemsten mit dem Editor gbsfx erzeugt, der fertige AUDIO_SFX-Aufrufe ausgibt.",
+    "AUDIO_NOISE erzeugt Rauschen (Explosionen, Schritte, Wind). AUDIO_SFX ist ein vollwertiger Retro-Soundeffekt-Synth (Tonhöhen-Slide, Hüllkurve, Vibrato) – am bequemsten mit dem Editor dhsfx erzeugt, der fertige AUDIO_SFX-Aufrufe ausgibt.",
     [
       'IMPORT "audio"',
       'PLAYSOUND(AUDIO_NOISE(150))                \' kurzes Rauschen',
@@ -70,5 +70,5 @@ module.exports = (H) => [
     [
       'IF neues_level THEN STOPMUSIC() : PLAYMUSIC("musik/level2.ogg")',
     ]),
-  H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor gbsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum GameBasic-Werkzeugkasten rund um den Sound."),
+  H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor dhsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum GameBasic-Werkzeugkasten rund um den Sound."),
 ];

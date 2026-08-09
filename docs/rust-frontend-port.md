@@ -122,7 +122,7 @@ DATA-Arrays ab).
 ## Stufe 4 — Preprocess / `IMPORT` (fertig)
 
 [`rust/gb_runtime/src/preprocess.rs`](../rust/gb_runtime/src/preprocess.rs):
-Port von `gamebasic/preprocess.py`. `process(source, base)` expandiert
+Port von `drachenhauch/preprocess.py`. `process(source, base)` expandiert
 `IMPORT`-Zeilen rekursiv **vor dem Lexen** und liefert `(merged_source,
 imported_modules)`:
 - **Quellcode-IMPORT** (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
@@ -157,7 +157,7 @@ nicht.
 [`src/main.rs`](../rust/gb_runtime/src/main.rs): `dhrt run datei.gb` ist der
 eigenständige End-to-End-Lauf — preprocess → lex → parse → compile → VM, alles
 in Rust. `run_main` kanonisiert den Pfad, wechselt **ins Datei-Verzeichnis**
-(`set_current_dir`, wie `gbrun.py` `os.chdir(file.parent)`), damit relative
+(`set_current_dir`, wie `dhrun.py` `os.chdir(file.parent)`), damit relative
 IMPORT- **und** Laufzeit-Pfade (`OpenFile("data.txt")`, `LOADIMAGE("assets/…")`)
 stimmen, und nutzt den Dateinamen als Label für Laufzeitfehler. Komfort:
 `dhrt datei.gb` (ohne `run`, Endung `.gb`) wird genauso behandelt; `.gbc`-Pfade
@@ -178,7 +178,7 @@ Portierung erreicht.
 - **Selbst-Export** `dhrt --export datei.gb [out_dir]`: kompiliert die Quelle
   selbst → `.gbc` und hängt den Payload (`<gbc><u64 len><DHRTPAY1>`) an eine
   Kopie der eigenen Runtime-Exe — eine eigenständige `.exe`, ohne Python, ganz
-  ohne `gbrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
+  ohne `dhrun.py`/`export.py`. `assets/` neben der Quelle wird mitkopiert. Test
   [`tests/test_rust_export.py`](../tests/test_rust_export.py) (exportiert,
   startet die Exe, vergleicht stdout mit dem Tree-Walker).
 - **Aliasierte Modul-IMPORTs** `IMPORT "json" AS j`: `preprocess::compile_env`

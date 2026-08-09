@@ -1,7 +1,7 @@
 """Drift-Schutz fuer die doppelt gepflegten Konstanten COLORS/KEYS.
 
 Die Farb- und Tasten-Konstanten existieren zweimal: in
-`gamebasic/graphics.py` (COLORS/KEYS, Editor-/LSP-Tooling) und als
+`drachenhauch/graphics.py` (COLORS/KEYS, Editor-/LSP-Tooling) und als
 vorregistrierte Globals der Runtime (`DEFAULT_COLORS`/`DEFAULT_KEYS` in
 `rust/drachenhauch_runtime/src/vm.rs`) -- von Hand synchron gehalten, ein Erbe der
 pygame-Zeit (die Werte sind SDL-Keycodes und damit Sprach-API).
@@ -12,7 +12,7 @@ einen anderen Wert), schlaegt er mit dem Namen fehl. Die Gegenrichtung
 (zusaetzliche Konstanten nur in dhrt) deckt er bewusst nicht ab -- Python
 ist die dokumentierte Quelle.
 """
-from gamebasic.graphics import COLORS, KEYS
+from drachenhauch.graphics import COLORS, KEYS
 
 
 def test_colors_match_runtime(run_gb):

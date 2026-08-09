@@ -3,7 +3,7 @@ Pyramid Pusher -- Pixel-Art-Generator.
 
 Erzeugt alle 32x32-Tiles + den Helden-Sheet + die Truhe als PNGs in diesem
 Ordner. Die Dateien sind ganz normale PNG-Sheets -- du kannst sie jederzeit im
-Sprite-Editor (`gbsprites pyramid_pusher/assets/hero.png`) oeffnen und nachmalen.
+Sprite-Editor (`dhsprites pyramid_pusher/assets/hero.png`) oeffnen und nachmalen.
 
 Aufruf:  .venv\\Scripts\\python.exe pyramid_pusher\\assets\\gen_art.py
 

@@ -4,7 +4,7 @@ Sprachunterstützung für [GameBasic](../README.md) (`.gb`-Dateien) in VS Code:
 
 - **Syntax-Highlighting** (TextMate-Grammatik, aus den echten Lexer-Keywords +
   registrierten Built-ins/Konstanten generiert).
-- **Language Server** (Python, `gamebasic.lsp`):
+- **Language Server** (Python, `drachenhauch.lsp`):
   - Diagnostics (Live-Fehler aus der Preprocess→Lex→Parse→Compile-Pipeline)
   - Auto-Completion (Keywords, Built-ins, Konstanten, Snippets, Symbole der Datei)
   - Hover-Doku (Built-ins + eigene SUB/FUNCTION/CLASS … mit Doc-Kommentar)
@@ -14,14 +14,14 @@ Sprachunterstützung für [GameBasic](../README.md) (`.gb`-Dateien) in VS Code:
 ## Voraussetzungen
 
 Der Language Server ist Teil des GameBasic-Repos und läuft über den Python des
-Projekts. Damit `python -m gamebasic.lsp` das Paket findet, am einfachsten **den
+Projekts. Damit `python -m drachenhauch.lsp` das Paket findet, am einfachsten **den
 GameBasic-Projektordner in VS Code öffnen** (der Server startet mit diesem Ordner
 als Arbeitsverzeichnis).
 
 ## Installation (Entwicklung)
 
 ```bash
-cd vscode-gamebasic
+cd vscode-drachenhauch
 npm install            # holt vscode-languageclient
 ```
 
@@ -34,24 +34,24 @@ vsce package
 
 ## Einstellungen
 
-- `gamebasic.pythonPath` — Python-Interpreter für den Server. **Auf den
+- `drachenhauch.pythonPath` — Python-Interpreter für den Server. **Auf den
   `.venv`-Python des Projekts setzen**, z. B.
   `C:\\Programmieren\\Python\\GameBasic\\.venv\\Scripts\\python.exe`.
-- `gamebasic.serverModule` — Server-Modul (Default `gamebasic.lsp`).
-- `gamebasic.enableLanguageServer` — auf `false` für nur Syntax-Highlighting.
+- `drachenhauch.serverModule` — Server-Modul (Default `drachenhauch.lsp`).
+- `drachenhauch.enableLanguageServer` — auf `false` für nur Syntax-Highlighting.
 
 ## Grammatik neu generieren
 
 Nach Sprach-Änderungen (neue Keywords/Built-ins):
 
 ```bash
-.venv\\Scripts\\python.exe vscode-gamebasic\\build_grammar.py
+.venv\\Scripts\\python.exe vscode-drachenhauch\\build_grammar.py
 ```
 
 ## Architektur
 
-Der Server (`gamebasic/lsp/`) trennt **Feature-Logik** (`features.py`, headless
+Der Server (`drachenhauch/lsp/`) trennt **Feature-Logik** (`features.py`, headless
 getestet in `tests/test_lsp_features.py`) von der **JSON-RPC-Transportschicht**
 (`server.py`, getestet in `tests/test_lsp_server.py` inkl. echtem stdio-
 Subprozess). Die Sprach-Intelligenz teilt sich denselben Code wie der eingebaute
-Qt-Editor (`gamebasic/editor_qt/`).
+Qt-Editor (`drachenhauch/editor_qt/`).

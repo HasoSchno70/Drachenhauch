@@ -7,7 +7,7 @@ Desktop). Kein Funktionstest via run_gb; live verifiziert (examples/123_overlay.
 stehen -- sonst warnt der Editor live und der Drift-Test schlaegt an, sobald ein
 Beispiel sie nutzt.
 """
-from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_transparent_window_builtins_registered():

@@ -125,25 +125,25 @@ PRINT m.getor("y", 99)
 # --- Fehler ----------------------------------------------------------
 
 def test_unknown_method_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = 'PRINT "abc".unknown_method()'
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_method_on_int_throws(run_gb, run_vm):
     """`(42).length()` macht keinen Sinn -- klarer Fehler."""
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM x AS INTEGER
 x = 42
 PRINT x.length()
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 

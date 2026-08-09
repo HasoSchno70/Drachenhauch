@@ -39,7 +39,7 @@ def test_expand_collapse_all(app, tmp_path):
     (tmp_path / "a" / "mid.gb").write_text("PRINT 2", encoding="utf-8")
     (tmp_path / "a" / "b" / "deep.gb").write_text("PRINT 3", encoding="utf-8")
 
-    from gamebasic.editor_qt.file_browser import FileBrowser
+    from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
     app.processEvents()
 
@@ -81,7 +81,7 @@ def test_refresh_preserves_expand_state(app, tmp_path):
     (tmp_path / "a" / "mid.gb").write_text("PRINT 2", encoding="utf-8")
     (tmp_path / "a" / "b" / "deep.gb").write_text("PRINT 3", encoding="utf-8")
 
-    from gamebasic.editor_qt.file_browser import FileBrowser
+    from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
     app.processEvents()
 
@@ -121,7 +121,7 @@ def test_watcher_registers_project_root_and_gb_dirs(app, tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "x.gb").write_text("PRINT 1", encoding="utf-8")
 
-    from gamebasic.editor_qt.file_browser import FileBrowser
+    from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
     app.processEvents()
 
@@ -136,7 +136,7 @@ def test_external_file_change_triggers_debounced_refresh(app, tmp_path, monkeypa
     """Eine externe Aenderung (hier simuliert per direktem Signal-Emit, da
     echte Dateisystem-Events auf manchen CI-Dateisystemen unzuverlaessig/
     verzoegert sind) muss -- nach dem Debounce -- refresh() ausloesen."""
-    from gamebasic.editor_qt.file_browser import FileBrowser
+    from drachenhauch.editor_qt.file_browser import FileBrowser
     fb = FileBrowser(tmp_path)
     app.processEvents()
 

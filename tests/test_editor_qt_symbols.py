@@ -1,6 +1,6 @@
 """Tests fuer den Symbol-Index (Goto-Definition / Find-References /
 Hover-Doc)."""
-from gamebasic.editor_qt.symbols import (
+from drachenhauch.editor_qt.symbols import (
     scan_definitions, scan_references, find_definition,
     all_user_identifier_positions, extract_user_doc,
     scan_scopes, scope_path,

@@ -7,7 +7,7 @@ sind (eingefrorener dhrt-Metadaten-Index). Frueher prueften wir zusaetzlich die
 Python-Dispatch-Delegation an einen Graphics-Stub -- diese Python-Schicht wird in
 Phase 8 entfernt; das native Verhalten deckt die Beispiel-/Screenshot-Verifikation.
 """
-from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_gameloop_builtins_registered():

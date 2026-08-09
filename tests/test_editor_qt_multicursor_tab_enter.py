@@ -19,7 +19,7 @@ def _qapp():
 
 
 def _editor(text=""):
-    from gamebasic.editor_qt.tabs import TabbedEditorArea
+    from drachenhauch.editor_qt.tabs import TabbedEditorArea
     area = TabbedEditorArea()
     st = area.open_tab(file_path=None, content=text)
     return st.editor

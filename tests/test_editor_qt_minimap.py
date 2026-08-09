@@ -21,7 +21,7 @@ def app():
 
 def _minimap(app, text):
     from PySide6.QtWidgets import QPlainTextEdit
-    from gamebasic.editor_qt.minimap import Minimap
+    from drachenhauch.editor_qt.minimap import Minimap
     ed = QPlainTextEdit()
     ed.setPlainText(text)
     mm = Minimap(ed)
@@ -63,7 +63,7 @@ def test_whitespace_runs_removed(app):
 
 
 def test_large_file_falls_back_to_monochrome(app):
-    from gamebasic.editor_qt.minimap import COLOR_MAX_LINES
+    from drachenhauch.editor_qt.minimap import COLOR_MAX_LINES
     big = "\n".join("PRINT 1" for _ in range(COLOR_MAX_LINES + 5))
     mm = _minimap(app, big)
     # Fallback: pro nicht-leerer Zeile genau ein neutrales (key=None) Segment.

@@ -16,7 +16,7 @@ def _qapp():
 
 
 def _dialog():
-    from gamebasic.editor_qt.dialogs import FindReplaceDialog
+    from drachenhauch.editor_qt.dialogs import FindReplaceDialog
 
     class _FakeEditor:
         def __init__(self):
@@ -54,7 +54,7 @@ def test_close_button_still_clears_find_hits():
 
 
 def test_theme_change_refreshes_status_label_color():
-    from gamebasic.editor_qt import theme as theme_mod
+    from drachenhauch.editor_qt import theme as theme_mod
     dlg, _ed = _dialog()
     # Auf ein anderes Theme wechseln, dann zurueck -- Hauptsache das Signal
     # feuert und der Dialog reagiert (kein stiller No-Op).

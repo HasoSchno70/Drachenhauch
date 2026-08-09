@@ -3,7 +3,7 @@
 > **⚠️ HISTORISCH (vor Stufe B).** Dieses Dokument vergleicht drei
 > Ausfuehrungspfade — Tree-Walker, Python-Bytecode-VM, Cython-Native-VM —, die
 > seit Stufe B **alle entfernt** sind. Die EINZIGE Runtime ist heute `dhrt`
-> (Rust/raylib). Auch `gbrun.py --bench` existiert nicht mehr. Die Zahlen unten
+> (Rust/raylib). Auch `dhrun.py --bench` existiert nicht mehr. Die Zahlen unten
 > sind nur noch als Optimierungs-Logbuch interessant; gemessen wird heute gegen
 > `dhrt`. Siehe [docs/rust-runtime.md](rust-runtime.md).
 
@@ -127,7 +127,7 @@ INTEGER-Variablen sind unbeeinflusst (arbitrary precision).
 
 ### 5. Cdef-Klassen fuer ECS (`_World`, `_Component`)
 
-`gamebasic/modules/ecs_native.pyx`: Sparse-Set-Storage in cdef-class
+`drachenhauch/modules/ecs_native.pyx`: Sparse-Set-Storage in cdef-class
 mit cpdef-Methoden. `_World` hat Fast-Path-Methoden (`get_float`,
 `add_float`, ...), die die gesamte `@builtin`-Wrapper-Pipeline in
 einem cpdef-Call abwickeln. **bench_ecs_movement: 1.32×.**
@@ -204,7 +204,7 @@ Builtin-API wichtiger als jede VM-Optimierung*.
 
 ## Empfehlungen
 
-**Default fuer Production: `gbrun.py --vm`** (Native-VM). 2.6–14×
+**Default fuer Production: `dhrun.py --vm`** (Native-VM). 2.6–14×
 schneller als der Tree-Walker.
 
 **Tree-Walker fuer Entwicklung.** Schnelle Iteration, bessere
@@ -222,13 +222,13 @@ auf einem Sprite-Atlas.
 
 ## Reproduktion (historisch)
 
-> Nicht mehr lauffähig: `setup.py build_ext` und `gbrun.py --bench` sind mit den
+> Nicht mehr lauffähig: `setup.py build_ext` und `dhrun.py --bench` sind mit den
 > Python-Pfaden entfernt. Heute misst man direkt gegen `dhrt`
 > (`dhrt run examples/bench_fib.gb`).
 
 ```
 python setup.py build_ext --inplace      # Cython-VMs bauen  (entfernt)
-python gbrun.py --bench examples/bench_fib.gb                # (entfernt)
+python dhrun.py --bench examples/bench_fib.gb                # (entfernt)
 ```
 
 ## Offene Pfade (mit ehrlicher Cost-Benefit-Einschaetzung)

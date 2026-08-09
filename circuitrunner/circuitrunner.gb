@@ -17,7 +17,7 @@
 '  make_demo_levels.py; echte Fansite-Sets (.dat/.ccl) wandelt
 '  convert_dat.py um. Tile-Codes 0x00..0x6F = Zellen in assets/tiles.png.
 '
-'  Start:  gbrun.py circuitrunner\circuitrunner.gb       (oder im Editor F5)
+'  Start:  dhrun.py circuitrunner\circuitrunner.gb       (oder im Editor F5)
 ' =====================================================================
 IMPORT "json"
 IMPORT "imgfx"

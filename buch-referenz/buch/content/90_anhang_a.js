@@ -1,5 +1,5 @@
 // Anhang A -- Befehls-Index. Wird beim Build aus der lebenden Builtin-Liste
-// (gamebasic/editor_qt/builtin_index.json) erzeugt, bleibt so automatisch in
+// (drachenhauch/editor_qt/builtin_index.json) erzeugt, bleibt so automatisch in
 // Sync mit der Engine. Pro Anfangsbuchstabe eine Tabelle (Signatur | Modul).
 const fs = require("fs");
 const path = require("path");
@@ -13,7 +13,7 @@ module.exports = (H) => {
 
   let entries = [];
   try {
-    const idxPath = path.join(__dirname, "..", "..", "..", "gamebasic", "editor_qt", "builtin_index.json");
+    const idxPath = path.join(__dirname, "..", "..", "..", "drachenhauch", "editor_qt", "builtin_index.json");
     const data = JSON.parse(fs.readFileSync(idxPath, "utf-8"));
     entries = (data.builtins || []).filter((e) => e && e.name && !e.name.startsWith("_"));
   } catch (err) {

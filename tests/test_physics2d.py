@@ -140,13 +140,13 @@ def test_static_floor_does_not_move(run_gb):
 
 
 def test_bad_world_type_errors(run_gb):
-    from gamebasic.errors import GameBasicError
+    from drachenhauch.errors import DrachenhauchError
     import pytest
     src = '''
         IMPORT "physics2d"
         PHYS2D_STEP(42, 0.016)
     '''
-    with pytest.raises(GameBasicError):
+    with pytest.raises(DrachenhauchError):
         run_gb(src)
 
 

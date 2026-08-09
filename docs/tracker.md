@@ -2,13 +2,13 @@
 
 Mehrspuriger Tracker zum Komponieren von Melodien/Musik — **einstellbare Kanalzahl** (4–32 über die `Kanäle:`-Spinbox, je eigene Wellenform **oder Sample-Instrument**; der LETZTE Kanal ist immer der Noise-/Drum-Kanal), mit **mehreren Patterns einstellbarer Länge** und **Song-Arrangement**. Über die reinen Chiptune-Wellenformen hinaus lassen sich **gesampelte Instrumente** (WAV/OGG) laden und über die Klaviatur spielen (Resampling). Komplementär zum [SFX-Generator](sfx-generator.md) (der einzelne Effekte macht).
 
-Der Tracker ist ein **Tab im [Audio Studio](#audio-studio)** (`gbsound`), das ihn mit dem SFX-Generator unter einem fullscreen Fenster vereint.
+Der Tracker ist ein **Tab im [Audio Studio](#audio-studio)** (`dhsound`), das ihn mit dem SFX-Generator unter einem fullscreen Fenster vereint.
 
 ## Starten
 
-Am bequemsten als Tab im **Audio Studio**: `gbsound` (oder `gbrun.py --audio`) — fullscreen, Tracker + SFX-Generator zusammen.
+Am bequemsten als Tab im **Audio Studio**: `dhsound` (oder `dhrun.py --audio`) — fullscreen, Tracker + SFX-Generator zusammen.
 
-Auch einzeln: aus dem **Code-Editor** Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (Musik) öffnen ...` (`Strg+Shift+L`); standalone `gbtracker` oder `gbrun.py --tracker` (öffnen jetzt ebenfalls das Audio Studio auf dem Tracker-Tab). Braucht `PySide6` + `numpy`.
+Auch einzeln: aus dem **Code-Editor** Toolbar-Button (Noten-Symbol) oder `Datei → Tracker (Musik) öffnen ...` (`Strg+Shift+L`); standalone `dhtracker` oder `dhrun.py --tracker` (öffnen jetzt ebenfalls das Audio Studio auf dem Tracker-Tab). Braucht `PySide6` + `numpy`.
 
 ## Bedienung
 
@@ -84,11 +84,11 @@ TRACKER_UPDATE(DELTA() * 1000.0)
 
 Das spielt den Song non-blocking ab (advanced über die Zeit, nutzt `AUDIO_TONE`/`AUDIO_NOISE` + `PLAYSOUND`). Läuft über die native Runtime `dhrt`.
 
-Das Datenmodell + I/O + Export liegen Qt-frei in `gamebasic/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `gamebasic/tracker/instrument.py`, der **Mixer/Render** in `gamebasic/tracker/mixer.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`, `tests/test_tracker_mixer.py`).
+Das Datenmodell + I/O + Export liegen Qt-frei in `drachenhauch/tracker/song.py`, die **Sample-Instrumente** (Laden/Resampling/Serialisierung) in `drachenhauch/tracker/instrument.py`, der **Mixer/Render** in `drachenhauch/tracker/mixer.py` (headless getestet: `tests/test_tracker_song.py`, `tests/test_tracker_instrument.py`, `tests/test_tracker_mixer.py`).
 
 ## Audio Studio
 
-Tracker und [SFX-Generator](sfx-generator.md) leben zusammen im **Audio Studio** — einem fullscreen Fenster mit zwei Reitern (`🎹 Tracker / Song` und `💥 SFX-Generator`). Start: `gbsound` / `gbrun.py --audio`, oder im Code-Editor die jeweiligen Menüpunkte (sie öffnen dasselbe Studio auf dem passenden Tab). `F11` schaltet echtes Vollbild, `Strg+1`/`Strg+2` wechseln die Tabs. Jeder Tab behält seinen eigenen Undo-Verlauf (`Strg+Z`/`Strg+Y` wirken auf den fokussierten Tab).
+Tracker und [SFX-Generator](sfx-generator.md) leben zusammen im **Audio Studio** — einem fullscreen Fenster mit zwei Reitern (`🎹 Tracker / Song` und `💥 SFX-Generator`). Start: `dhsound` / `dhrun.py --audio`, oder im Code-Editor die jeweiligen Menüpunkte (sie öffnen dasselbe Studio auf dem passenden Tab). `F11` schaltet echtes Vollbild, `Strg+1`/`Strg+2` wechseln die Tabs. Jeder Tab behält seinen eigenen Undo-Verlauf (`Strg+Z`/`Strg+Y` wirken auf den fokussierten Tab).
 
 > **Sampler-Ausbau (laufend):** Der Tracker wird schrittweise vom Chiptune-Synth zum vollwertigen Sampler ausgebaut. **Stufe 1 (fertig):** Sample-Instrumente laden + über die Klaviatur resampeln + vorhören. **Stufe 2 (fertig):** Grundton, Loop-Punkte (forward/pingpong), ADSR-Hüllkurve. **Stufe 4+5 (fertig):** numpy-Software-Mixer (`tracker/mixer.py`) + **Render-to-File** (`Audio (WAV)...` → Song als WAV für `PLAYMUSIC`), inkl. **Stereo + Amiga-Hard-Panning** und **Pitch-Slide für alle Instrumente**. **Stufe „Keymap" (fertig):** Multisample/Drumkit — Samples über Tasten-Zonen (`Keymap...`). **Effekt-Spalte (fertig):** Arpeggio/Vibrato/Retrigger/Sample-Offset im Render. **Kanäle/Komfort (fertig):** einstellbare Kanalzahl (4–32), Block-Copy/Transpose/Interpolate, grafischer Instrument-Editor (Wellenform+Loop-Marker), Note-Off, Kanal-Mixer-Fader + Kanalfarben, Pan als Schieberegler. **Instrument pro Note (fertig):** Architektur-Wechsel wie bei echten Trackern — Instrument-Zuweisung optional pro Note statt fest pro Kanal (`Instr:`-Dropdown, überschreibt den Spur-Standard). **Geplant:** Live-Sampler-Export (`SAMPLE_PLAY`-basierter GB-Code).
 

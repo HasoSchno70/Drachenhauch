@@ -5,10 +5,10 @@ deklariert"), obwohl Doku/Beispiele `<> NIL` und `IS_NIL(NIL)` nutzten.
 Jetzt ist NIL ein Keyword-Literal (Wert = der leere/uninitialisierte Wert).
 """
 import pytest
-from gamebasic.lexer import Lexer
-from gamebasic.parser import Parser
-from gamebasic.tokens import TokenType
-from gamebasic.ast_nodes import NilLit
+from drachenhauch.lexer import Lexer
+from drachenhauch.parser import Parser
+from drachenhauch.tokens import TokenType
+from drachenhauch.ast_nodes import NilLit
 
 
 # --- Laufzeit-Semantik (dhrt) -------------------------------------------

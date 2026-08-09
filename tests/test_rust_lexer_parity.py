@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.lexer import Lexer
+from drachenhauch.lexer import Lexer
 
 _ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLES = _ROOT / "examples"

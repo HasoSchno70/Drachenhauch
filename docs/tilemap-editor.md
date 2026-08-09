@@ -10,7 +10,7 @@ schließt damit den Kreis mit dem [Sprite-Editor](sprite-editor.md)
 
 Aus dem **Code-Editor**: Toolbar-Button (Gitter-Symbol) oder
 `Datei → Tilemap-/Level-Editor öffnen ...` (`Strg+Shift+G`). Standalone:
-`gbtilemap` oder `gbrun.py --tilemap [datei.json]` (braucht `PySide6`).
+`dhtilemap` oder `dhrun.py --tilemap [datei.json]` (braucht `PySide6`).
 
 ## Bedienung
 
@@ -88,6 +88,6 @@ die native Runtime `dhrt`.
   Objekte mit Name/Typ/Properties und Pixel-Koordinaten (Punkte als `point`,
   sonst Rechtecke). 1:1 das Format, das `TILED_LOAD` + `TILED_OBJECT_*` liest.
 
-Datenmodell + Serialisierung liegen Qt-frei in `gamebasic/tilemap/document.py`
+Datenmodell + Serialisierung liegen Qt-frei in `drachenhauch/tilemap/document.py`
 (headless getestet: `tests/test_tilemapeditor.py` prüft den Roundtrip durch
 `TILED_LOAD`).

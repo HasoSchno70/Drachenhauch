@@ -1,6 +1,6 @@
 //! Modul `animfsm`: datengetriebene Animations-State-Machine (Unity-Mecanim-Stil).
 //!
-//! Lädt eine `.gbanim`-JSON (vom `gbanim`-Editor erzeugt): **States** (je an eine
+//! Lädt eine `.gbanim`-JSON (vom `dhanim`-Editor erzeugt): **States** (je an eine
 //! Sprite-Animation gebunden, optional mit Frame-Range), benannte **Parameter**
 //! (bool/float/int/trigger) und **Transitions** mit Bedingungen. Pro Frame setzt
 //! das Spiel die Parameter (`ANIM_FSM_SET_*`/`TRIGGER`) und ruft

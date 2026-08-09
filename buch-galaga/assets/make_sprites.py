@@ -2,7 +2,7 @@
 
 Zeichnet Pixel-Art programmatisch ueber das SpriteDoc-Modell und exportiert je
 Sprite ein PNG-Sheet (fuers Spiel) + eine .gbsprite (zum Bearbeiten in
-gbsprites). preview.png zur Sichtkontrolle.
+dhsprites). preview.png zur Sichtkontrolle.
 
 Aufruf:  .venv\\Scripts\\python.exe buch-galaga\\assets\\make_sprites.py
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from gamebasic.spriteeditor.document import SpriteDoc
+from drachenhauch.spriteeditor.document import SpriteDoc
 
 OUT = Path(__file__).resolve().parent / "sprites"
 OUT.mkdir(parents=True, exist_ok=True)

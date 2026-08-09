@@ -10,7 +10,7 @@ direkt in den Tracker übernehmen (ein Tracker-Kanal pro Spur, mit Instrument).
 
 Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 `Datei → Notenblatt-Editor öffnen ...` (`Strg+Shift+N`). Standalone:
-`gbscore [datei.json]` oder `gbrun.py --score [datei.json]` (braucht
+`dhscore [datei.json]` oder `dhrun.py --score [datei.json]` (braucht
 `PySide6` und `numpy`; für echte Wiedergabe zusätzlich `sounddevice`).
 
 ## Bedienung
@@ -55,7 +55,7 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 - **Tempo (BPM)** — wirkt auf Wiedergabe-Geschwindigkeit und die spätere
   Tracker-Übernahme (`row_ms = 60000/bpm/4`).
 - **▶ Abspielen** — spielt alle Spuren gleichzeitig über den geteilten
-  additiven Mixer (`gamebasic.audio_preview.Mixer`, derselbe Mixer wie im
+  additiven Mixer (`drachenhauch.audio_preview.Mixer`, derselbe Mixer wie im
   Tracker) mit einem laufenden Cursor auf jedem Notensystem.
 - **Balken-Gruppierung** — zusammenhängende Achtel/Sechzehntel gleicher Dauer
   im selben Beat bekommen automatisch einen gemeinsamen Balken statt
@@ -86,14 +86,14 @@ Aus dem **Code-Editor**: Toolbar-Button (Notenlinien-Symbol) oder
 ## Speichern / Laden
 
 `Datei → Speichern...` schreibt ein eigenes `*.json`-Format
-(`"format": "gbscore-song"`, Zeiten in Viertel-Beats). `Öffnen...` liest es
+(`"format": "dhscore-song"`, Zeiten in Viertel-Beats). `Öffnen...` liest es
 zurück; das Laden ist permissiv (fehlende Felder bekommen sinnvolle
 Defaults, wie beim Tracker-Format auch).
 
 ## In den Tracker übernehmen
 
 Der Button **„In Tracker öffnen"** konvertiert das Stück
-(`gamebasic.score.convert.to_tracker_song`) in ein Tracker-Projekt:
+(`drachenhauch.score.convert.to_tracker_song`) in ein Tracker-Projekt:
 
 - Ein Tracker-Kanal pro Spur + der Tracker-Pflicht-Drum-Kanal am Ende.
 - Jede Spur-Note wird auf die nächste Tracker-Zeile gerundet (4 Zeilen pro
@@ -104,7 +104,7 @@ Der Button **„In Tracker öffnen"** konvertiert das Stück
 
 Alle Vereinfachungen/Kürzungen (siehe unten) werden als **Warnungen**
 angezeigt, bevor die Datei gespeichert wird — nichts geht unbemerkt verloren.
-Anschließend wird die Datei gespeichert und `gbtracker` per Subprozess mit
+Anschließend wird die Datei gespeichert und `dhtracker` per Subprozess mit
 dieser Datei gestartet.
 
 ## V1-Limitationen
@@ -144,8 +144,8 @@ Layout mit Kollisionsvermeidung.
 
 ## Datenmodell
 
-Qt-frei in `gamebasic/score/document.py` (`ScoreDoc`/`Track`/`NoteEvent`) +
-`gamebasic/score/convert.py` (`to_tracker_song`) — headless getestet:
+Qt-frei in `drachenhauch/score/document.py` (`ScoreDoc`/`Track`/`NoteEvent`) +
+`drachenhauch/score/convert.py` (`to_tracker_song`) — headless getestet:
 `tests/test_score_document.py`, `tests/test_score_convert.py`,
 `tests/test_scoreeditor_qt.py` (Offscreen-UI), `tests/test_audio_preview_mixer.py`
 (geteilter Mixer).

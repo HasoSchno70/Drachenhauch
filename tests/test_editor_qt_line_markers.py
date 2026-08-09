@@ -16,7 +16,7 @@ def _qapp():
 
 
 def _editor(src: str):
-    from gamebasic.editor_qt.code_editor import CodeEditor
+    from drachenhauch.editor_qt.code_editor import CodeEditor
     ed = CodeEditor()
     ed.set_text(src)
     return ed

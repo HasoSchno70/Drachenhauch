@@ -41,8 +41,8 @@ PRINT MAPHAS(m, "1")
 
 def test_dict_comp_string_keys_required(run_gb):
     """Key muss STRING sein -- INTEGER-Keys werfen TypeMismatch."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="erwartet STRING"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="erwartet STRING"):
         run_gb('''
 DIM m AS MAP OF INTEGER
 m = {x: x FOR x IN (1, 2, 3)}
@@ -135,16 +135,16 @@ PRINT s
 
 def test_parser_empty_brace_block_fails(run_gb):
     """`{}` allein ist kein Comprehension -- Parser-Fehler."""
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     with pytest.raises(ParseError):
         run_gb('PRINT {}\n')
 
 
 def test_parser_dict_or_set_disambiguation():
     """`{x FOR ...}` -> SetComp; `{x: y FOR ...}` -> DictComp."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.ast_nodes import SetComp, DictComp
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.ast_nodes import SetComp, DictComp
 
     set_src = "DIM s AS TUPLE\ns = {x FOR x IN (1, 2, 3)}\n"
     set_ast = Parser(Lexer(set_src).tokenize()).parse()

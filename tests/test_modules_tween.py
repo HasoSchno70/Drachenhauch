@@ -11,7 +11,7 @@ Endwert fuer jedes Easing (auch Overshoot-Easings wie out_back).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _PRE = 'IMPORT "tween"\nDIM t AS TWEEN\n'
 
@@ -44,7 +44,7 @@ def test_value_at_progress_zero_is_start(run_gb):
 # --- Easings --------------------------------------------------------
 
 def test_easing_unknown_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="unbekanntes easing"):
+    with pytest.raises(DHRuntimeError, match="unbekanntes easing"):
         run_gb(_PRE + 't = TWEEN_NEW(0.0, 1.0, 100, "schwurbel")\n')
 
 
@@ -96,12 +96,12 @@ def test_reverse_swaps_endpoints(run_gb):
 # --- Validierung ----------------------------------------------------
 
 def test_negative_duration_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match=">= 0"):
+    with pytest.raises(DHRuntimeError, match=">= 0"):
         run_gb(_PRE + "t = TWEEN_NEW(0.0, 1.0, -1)\n")
 
 
 def test_non_tween_to_value_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="erwartet TWEEN"):
+    with pytest.raises(DHRuntimeError, match="erwartet TWEEN"):
         run_gb('IMPORT "tween"\nPRINT TWEEN_VALUE("nicht ein tween")\n')
 
 
@@ -121,12 +121,12 @@ def test_pingpong_never_done(run_gb):
 
 
 def test_loop_zero_duration_rejected(run_gb):
-    with pytest.raises(GBRuntimeError, match=">"):
+    with pytest.raises(DHRuntimeError, match=">"):
         run_gb(_PRE + "t = TWEEN_NEW_LOOP(0.0, 1.0, 0)\n")
 
 
 def test_pingpong_zero_duration_rejected(run_gb):
-    with pytest.raises(GBRuntimeError, match=">"):
+    with pytest.raises(DHRuntimeError, match=">"):
         run_gb(_PRE + "t = TWEEN_NEW_PINGPONG(0.0, 1.0, 0)\n")
 
 

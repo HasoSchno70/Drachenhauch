@@ -9,13 +9,13 @@ Aus dem **Code-Editor** heraus: Toolbar-Button (buntes Partikel-Symbol neben dem
 Standalone:
 
 ```
-gbparticles
+dhparticles
 ```
 
 oder
 
 ```
-.venv\Scripts\python.exe gbrun.py --particles
+.venv\Scripts\python.exe dhrun.py --particles
 ```
 
 (Braucht `PySide6` und `numpy`.)
@@ -24,7 +24,7 @@ oder
 
 **Links** die Parameter (live in die Vorschau übernommen):
 
-- **Preset-Bibliothek** — Combo mit **Werks-Presets** (★ `Feuer`, `Rauch`, `Funken`, `Explosion`, `Regen`) als Startpunkt plus deinen **eigenen Presets**. „Speichern unter..." legt den aktuellen Zustand als benanntes Preset ab (persistiert unter `~/.gamebasic/presets/particles.json`), „Loeschen" entfernt eigene Presets (Werks-Presets sind geschützt).
+- **Preset-Bibliothek** — Combo mit **Werks-Presets** (★ `Feuer`, `Rauch`, `Funken`, `Explosion`, `Regen`) als Startpunkt plus deinen **eigenen Presets**. „Speichern unter..." legt den aktuellen Zustand als benanntes Preset ab (persistiert unter `~/.drachenhauch/presets/particles.json`), „Loeschen" entfernt eigene Presets (Werks-Presets sind geschützt).
 - **Bewegung** — `vx/vy min/max` (Start-Geschwindigkeit, px/s), `Gravity x/y` (px/s²).
 - **Aussehen** — **Modus** (`circle` / `pixel` / `square` / `streak` / `glow` — `glow` wird aktuell identisch zu `circle` gezeichnet, kein additives Blending; für echtes additives Leuchten im Spiel selbst `BLEND_MODE("add")` um `PARTICLE_DRAW` legen), Größe min/max, **Farbe**, optionaler **Farbverlauf** zu einer End-Farbe (über die Lebenszeit interpoliert, z. B. Feuer gelb→rot), **Fade** (am Lebensende abdunkeln).
 - **Lebenszeit & Emission** — Lebensdauer min/max (ms), Emission pro Frame.

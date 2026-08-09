@@ -159,10 +159,10 @@ END IF
 
 ## Edge-Cases
 
-- **Pattern ungueltig:** Wenn das Pattern Regex-Sicht ungueltig ist (z.B. unbalanced Klammern), wirft `regex` einen `GBRuntimeError` mit der Python-Fehlermeldung.
+- **Pattern ungueltig:** Wenn das Pattern Regex-Sicht ungueltig ist (z.B. unbalanced Klammern), wirft `regex` einen `DHRuntimeError` mit der Python-Fehlermeldung.
 - **Leerer Text:** `REGEX_FIND("", ".*")` matched (das `.*` matcht den leeren String). `REGEX_FIND("", "x")` liefert `""`.
 - **REGEX_SPLIT mit Pattern, das den Anfang matcht:** liefert leeren ersten String. Standard-Python-Verhalten.
 
 ## In der nativen Runtime (dhrt)
 
-`regex` laeuft auch nativ (`gbrun.py --native`, Standalone-`.exe`) — immer dabei (kein Feature-Flag, nutzt die Rust-`regex`-Crate). Bit-identisch zu den Python-Pfaden fuer die ueblichen Patterns (Zeichenklassen, Anker, Quantoren, Gruppen, Alternation). **Nicht unterstuetzt** (Rust-`regex`-Limit): Backreferences (`\1`) *im Pattern* sowie Lookahead/Lookbehind. In `REGEX_REPLACE` werden Python-Backrefs (`\1`, `\g<name>`) automatisch in die Rust-Syntax uebersetzt.
+`regex` laeuft auch nativ (`dhrun.py --native`, Standalone-`.exe`) — immer dabei (kein Feature-Flag, nutzt die Rust-`regex`-Crate). Bit-identisch zu den Python-Pfaden fuer die ueblichen Patterns (Zeichenklassen, Anker, Quantoren, Gruppen, Alternation). **Nicht unterstuetzt** (Rust-`regex`-Limit): Backreferences (`\1`) *im Pattern* sowie Lookahead/Lookbehind. In `REGEX_REPLACE` werden Python-Backrefs (`\1`, `\g<name>`) automatisch in die Rust-Syntax uebersetzt.

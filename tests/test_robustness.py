@@ -10,7 +10,7 @@
 """
 import pytest
 
-from gamebasic.errors import GameBasicError, ParseError
+from drachenhauch.errors import DrachenhauchError, ParseError
 
 
 # ------------------------------------------------ 1) Arity -> kein Absturz
@@ -21,7 +21,7 @@ from gamebasic.errors import GameBasicError, ParseError
     'PRINT PADL$("x")',
 ])
 def test_too_few_args_is_clean_error_not_crash(run_gb, src):
-    with pytest.raises(GameBasicError, match="(?i)zu wenige Argumente|erwartet"):
+    with pytest.raises(DrachenhauchError, match="(?i)zu wenige Argumente|erwartet"):
         run_gb(src)
 
 
@@ -62,22 +62,22 @@ def test_map_equals_itself(run_gb):
 
 # ------------------------------------------------ 3) Ganzzahl-Ueberlauf
 def test_add_overflow_errors(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)Ueberlauf"):
+    with pytest.raises(DrachenhauchError, match="(?i)Ueberlauf"):
         run_gb("PRINT 9223372036854775807 + 1\n")
 
 
 def test_pow_overflow_errors(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)Ueberlauf"):
+    with pytest.raises(DrachenhauchError, match="(?i)Ueberlauf"):
         run_gb("PRINT 10 ^ 30\n")
 
 
 def test_mul_overflow_errors(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)Ueberlauf"):
+    with pytest.raises(DrachenhauchError, match="(?i)Ueberlauf"):
         run_gb("PRINT 1000000000000 * 1000000000000\n")
 
 
 def test_oversized_int_literal_errors(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)zu gross|gross"):
+    with pytest.raises(DrachenhauchError, match="(?i)zu gross|gross"):
         run_gb("PRINT 99999999999999999999\n")
 
 
@@ -98,12 +98,12 @@ def test_map_of_integer_accepts_whole_float(run_gb):
 
 
 def test_map_of_integer_rejects_fractional_float(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)INTEGER"):
+    with pytest.raises(DrachenhauchError, match="(?i)INTEGER"):
         run_gb('DIM m AS MAP OF INTEGER\nMAPPUT(m, "k", 3.5)\n')
 
 
 def test_format_d_rejects_bool(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)erwartet Zahl"):
+    with pytest.raises(DrachenhauchError, match="(?i)erwartet Zahl"):
         run_gb('PRINT FORMAT$(TRUE, "%d")\n')
 
 
@@ -122,13 +122,13 @@ def test_instr_empty_needle_out_of_range(run_gb):
 
 
 def test_array_sum_overflow_errors(run_gb):
-    with pytest.raises(GameBasicError, match="(?i)Ueberlauf"):
+    with pytest.raises(DrachenhauchError, match="(?i)Ueberlauf"):
         run_gb("DIM a[2] AS INTEGER\na[0]=9223372036854775807\na[1]=1\nPRINT ARRAY_SUM(a)\n")
 
 
 def test_curve_bezier2_type_error_names_builtin(run_gb):
     # Fehlertext nennt CURVE_BEZIER2 (frueher Platzhalter "B").
-    with pytest.raises(GameBasicError, match="CURVE_BEZIER2"):
+    with pytest.raises(DrachenhauchError, match="CURVE_BEZIER2"):
         run_gb('IMPORT "curves"\nPRINT CURVE_BEZIER2(0.5,"x",0,0,0,0,0,0,0)\n')
 
 

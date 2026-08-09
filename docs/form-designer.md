@@ -4,9 +4,9 @@ Visueller GUI-Designer für GameBasic — Controls per Klick platzieren, im
 Inspector konfigurieren, als `.gbform` speichern und mit den `gui`-Builtins zur
 Laufzeit laden. Sprache der Logik bleibt GameBasic.
 
-**Start:** `gbform [datei.gbform | projekt.gbproj]` (bzw. `gbrun.py --form`).
-Benötigt PySide6. Alternativ `gb` (oder `gbrun.py`) **ohne Argument** →
-Auswahl-Dialog *Code-Editor* / *Form-Designer*. `gbedit` öffnet direkt den
+**Start:** `dhform [datei.gbform | projekt.gbproj]` (bzw. `dhrun.py --form`).
+Benötigt PySide6. Alternativ `gb` (oder `dhrun.py`) **ohne Argument** →
+Auswahl-Dialog *Code-Editor* / *Form-Designer*. `dhedit` öffnet direkt den
 Code-Editor.
 
 ## Multi-Form-Projekte
@@ -194,10 +194,10 @@ anschließendes Speichern die Projektdatei überschrieben).
 
 ## Architektur / Erweiterung
 
-- Datenmodell Qt-frei in [`gamebasic/formdesigner/document.py`](../gamebasic/formdesigner/document.py)
+- Datenmodell Qt-frei in [`drachenhauch/formdesigner/document.py`](../drachenhauch/formdesigner/document.py)
   (`FormDoc`/`Control`, `.gbform`-IO, `PALETTE`, Code-Generierung) — headless
   getestet (`tests/test_formdesigner_document.py`).
-- UI in [`gamebasic/formdesigner_qt.py`](../gamebasic/formdesigner_qt.py)
+- UI in [`drachenhauch/formdesigner_qt.py`](../drachenhauch/formdesigner_qt.py)
   (Palette/Canvas/Inspector/Code-Panel). Neue Control-Arten: Eintrag in `PALETTE`
   ergänzen — Inspector/Canvas/Serialisierung ziehen daraus.
 - **Ungespeichert-Schutz:** `FormDesigner._confirm_dirty()` fragt für **alle**
@@ -206,7 +206,7 @@ anschließendes Speichern die Projektdatei überschrieben).
   modale Dialoge abfangen — dafür gibt es in `tests/test_formdesigner_qt.py`
   eine Autouse-Fixture, die `QMessageBox.question/warning/critical` ersetzt.
   Ohne sie hält der erste Dialog den ganzen pytest-Lauf an.
-- **Gotcha:** Das Code-Panel hängt einen `GBHighlighter` an sein Editor-Dokument.
+- **Gotcha:** Das Code-Panel hängt einen `DHHighlighter` an sein Editor-Dokument.
   Ein lebender `QSyntaxHighlighter` segfaultet beim Interpreter-Shutdown, wenn er
   die Teardown-Race von Dokument + `QApplication` überlebt (im Test sichtbar als
   Exit-Code 116, sobald vorher ein `dhrt`-Subprozess lief). Deshalb löst
@@ -272,7 +272,7 @@ Laufzeit. Ein Formular ohne Eintrag bekommt beim Speichern **kein** neues
 Feld — bestehende `.gbform`-Dateien ändern sich also nicht.
 
 > **Achtung bei Änderungen:** `FORM_THEME_COLORS` in
-> `gamebasic/formdesigner/document.py` ist ein **Nachbau** der Presets aus
+> `drachenhauch/formdesigner/document.py` ist ein **Nachbau** der Presets aus
 > `rust/gb_runtime/src/gui.rs` — der Designer zeichnet mit Qt und kann die
 > Laufzeit nicht fragen. `tests/test_formdesigner_theme.py` vergleicht beide
 > gegeneinander; wer ein Preset in gui.rs ändert oder hinzufügt, muss die

@@ -1,6 +1,6 @@
 """Erzeugt Showcase-Thumbnails fuer das Welcome-Panel.
 
-Fuer jede Demo aus `gamebasic.editor_qt.showcase.SHOWCASE` wird die native
+Fuer jede Demo aus `drachenhauch.editor_qt.showcase.SHOWCASE` wird die native
 Runtime `dhrt` headless gestartet (`DHRT_FRAMES` begrenzt die Frames,
 `DHRT_SCREENSHOT` zieht beim letzten Frame einen PNG-Screenshot), das Bild
 auf Thumbnail-Breite herunterskaliert und unter
@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from gamebasic.editor_qt.showcase import SHOWCASE, thumb_path  # noqa: E402
+from drachenhauch.editor_qt.showcase import SHOWCASE, thumb_path  # noqa: E402
 
 THUMB_WIDTH = 480
 

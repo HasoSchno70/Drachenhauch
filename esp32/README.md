@@ -7,7 +7,7 @@ kommt an vier markierte Stellen.
 
 | Datei | Was |
 |---|---|
-| `gamebasic_esp32/gamebasic_esp32.ino` | der Sketch fürs Board |
+| `drachenhauch_esp32/drachenhauch_esp32.ino` | der Sketch fürs Board |
 | `../examples/159_esp32_bruecke.gb` | das GameBasic-Gegenstück |
 
 ## Wie es zusammenhängt
@@ -115,7 +115,7 @@ Code** auf keinem der vier Boards:
 | ESP32-S3 | `esp32:esp32:esp32s3` | OK |
 
 ```
-arduino-cli compile --fqbn esp32:esp32:esp32 esp32/gamebasic_esp32
+arduino-cli compile --fqbn esp32:esp32:esp32 esp32/drachenhauch_esp32
 ```
 
 (Die einzige Warnung im ESP8266-Bau steckt in PubSubClients eigenem Quelltext,

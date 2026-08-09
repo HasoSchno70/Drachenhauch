@@ -50,19 +50,19 @@ PRINT "*" * n
 
 def test_string_mul_rejects_float(run_gb, run_vm):
     """`"x" * 3.0` wird abgelehnt -- nur strikt INTEGER."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('PRINT "x" * 3.0')
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm('PRINT "x" * 3.0')
 
 
 def test_string_mul_rejects_bool(run_gb, run_vm):
     """`"x" * TRUE` wird abgelehnt -- Bool ist keine Zahl in GB."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('PRINT "x" * TRUE')
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm('PRINT "x" * TRUE')
 
 

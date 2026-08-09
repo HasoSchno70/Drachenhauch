@@ -4,7 +4,7 @@ visuelle Wirkung + Klick/Scroll brauchen SCREEN -> manuell verifiziert.
 """
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 _W = ('IMPORT "gui"\n'
       'DIM win AS GUI_WINDOW\nwin = GUI_WINDOW("W", 50, 40, 320, 260)\n')
@@ -22,14 +22,14 @@ def test_apply_style(run_gb):
 
 
 def test_style_unknown_raises(run_gb):
-    with pytest.raises(GameBasicError, match="unbekannter Style"):
+    with pytest.raises(DrachenhauchError, match="unbekannter Style"):
         run_gb(_W +
             'DIM b AS GUI_WIDGET\nb = GUI_BUTTON(win, "OK", 0, 0, 50, 20)\n'
             'GUI_APPLY_STYLE(b, "nope")\n')
 
 
 def test_style_bad_prop_raises(run_gb):
-    with pytest.raises(GameBasicError, match="GUI_STYLE_SET"):
+    with pytest.raises(DrachenhauchError, match="GUI_STYLE_SET"):
         run_gb(_W + 'GUI_STYLE_SET("s", "blarg", 1)\n')
 
 
@@ -95,7 +95,7 @@ def test_canvas_rect_follows_window(run_gb):
 
 
 def test_canvas_wrong_kind_raises(run_gb):
-    with pytest.raises(GameBasicError, match="kein canvas"):
+    with pytest.raises(DrachenhauchError, match="kein canvas"):
         run_gb(_W +
             'DIM b AS GUI_WIDGET\nb = GUI_BUTTON(win, "x", 0, 0, 50, 20)\n'
             'PRINT GUI_CANVAS_X(b)\n')

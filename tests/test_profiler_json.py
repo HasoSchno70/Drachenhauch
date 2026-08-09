@@ -5,7 +5,7 @@ seine TraceLogs (WARNING/INFO) ebenfalls auf stdout. `_extract_profile_json`
 muss den JSON-Blob trotzdem zuverlaessig herausziehen -- sonst bleibt die
 Auswertung leer (Regression 99_ibl_hdr.gb: `MESH_SPHERE` loest eine
 raylib-MESH-WARNING aus, die dem JSON vorangestellt wird)."""
-from gamebasic.editor_qt.profiler import _extract_profile_json
+from drachenhauch.editor_qt.profiler import _extract_profile_json
 
 
 def test_clean():

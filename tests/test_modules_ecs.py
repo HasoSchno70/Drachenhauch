@@ -5,7 +5,7 @@ Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _PRE = 'IMPORT "ecs"\nDIM w AS ECS_WORLD\nw = ECS_NEW_WORLD()\n'
 
@@ -114,7 +114,7 @@ def test_remove_returns_false_when_missing(run_gb):
 
 
 def test_get_missing_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="fehlt bei Entity"):
+    with pytest.raises(DHRuntimeError, match="fehlt bei Entity"):
         run_gb(_PRE + "DIM e AS INTEGER\ne = ECS_NEW_ENTITY(w)\n"
                'PRINT ECS_GET_INT(w, e, "nope")\n')
 
@@ -144,18 +144,18 @@ def test_destroy_cleans_components(run_gb):
 # --- Type-Errors ---------------------------------------------------
 
 def test_get_int_type_mismatch(run_gb):
-    with pytest.raises(GBRuntimeError, match="nicht INTEGER"):
+    with pytest.raises(DHRuntimeError, match="nicht INTEGER"):
         run_gb(_PRE + "DIM e AS INTEGER\ne = ECS_NEW_ENTITY(w)\n"
                'ECS_ADD_STRING(w, e, "x", "hi")\nPRINT ECS_GET_INT(w, e, "x")\n')
 
 
 def test_world_type_check(run_gb):
-    with pytest.raises(GBRuntimeError, match="ECS_WORLD"):
+    with pytest.raises(DHRuntimeError, match="ECS_WORLD"):
         run_gb('IMPORT "ecs"\nPRINT ECS_COUNT("not a world")\n')
 
 
 def test_add_to_dead_entity_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="nicht in World"):
+    with pytest.raises(DHRuntimeError, match="nicht in World"):
         run_gb(_PRE + 'ECS_ADD_INT(w, 999, "x", 1)\n')
 
 
@@ -258,7 +258,7 @@ PRINT ECS_GET_INT(w, e2, "pos")
 def test_add_bool_wrong_type_message(run_gb):
     # Wortlaut-Konsistenz: Standard-Muster "NAME erwartet TYP, erhalten X"
     # (frueher der Ausreisser "ECS_ADD_BOOL erwartet value (BOOLEAN)").
-    with pytest.raises(GBRuntimeError, match="ECS_ADD_BOOL erwartet BOOLEAN, erhalten"):
+    with pytest.raises(DHRuntimeError, match="ECS_ADD_BOOL erwartet BOOLEAN, erhalten"):
         _run(run_gb,
              "DIM e AS INTEGER\ne = ECS_NEW_ENTITY(w)\n"
              'ECS_ADD_BOOL(w, e, "alive", 1)\n')

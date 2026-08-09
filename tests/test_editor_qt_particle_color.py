@@ -36,7 +36,7 @@ def _red_pixel_fraction(widget, app):
 
 
 def test_swatch_stylesheet_is_scoped(app):
-    from gamebasic.particleeditor_qt import _ColorButton
+    from drachenhauch.particleeditor_qt import _ColorButton
     b = _ColorButton(0xFF0000)
     assert b.objectName() == "gbColorSwatch"
     # Regel ist auf den Button eingeschraenkt (kein unqualifiziertes
@@ -47,7 +47,7 @@ def test_swatch_stylesheet_is_scoped(app):
 def test_child_dialog_does_not_inherit_swatch_color(app):
     from PySide6.QtWidgets import QColorDialog
     from PySide6.QtGui import QColor
-    from gamebasic.particleeditor_qt import _ColorButton
+    from drachenhauch.particleeditor_qt import _ColorButton
 
     b = _ColorButton(0xFF0000)            # knallrot
     # Selbst wenn ein Dialog an den Button geparentet wird, darf er NICHT

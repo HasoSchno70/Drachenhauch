@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import pytest
 
 pytest.importorskip("PySide6")
-from gamebasic.editor_qt.debugger import DebugController, _find_dhrt
+from drachenhauch.editor_qt.debugger import DebugController, _find_dhrt
 
 pytestmark = pytest.mark.skipif(_find_dhrt() is None, reason="dhrt nicht gebaut")
 

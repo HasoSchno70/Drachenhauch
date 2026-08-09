@@ -108,7 +108,7 @@ Für proprietäre Geräte stehen die UUIDs im Hersteller-Datenblatt.
 
 ## Fehlerbehandlung
 
-Alle Operationen werfen `GBRuntimeError` mit aussagekräftiger Meldung. Typische Ursachen: Gerät außer Reichweite, BT-Adapter aus, falsche UUID, Charakteristik unterstützt die angeforderte Operation nicht.
+Alle Operationen werfen `DHRuntimeError` mit aussagekräftiger Meldung. Typische Ursachen: Gerät außer Reichweite, BT-Adapter aus, falsche UUID, Charakteristik unterstützt die angeforderte Operation nicht.
 
 ```basic
 TRY

@@ -21,12 +21,12 @@ def _qapp():
 
 
 def _problem(line, msg, severity="error", phase="compile"):
-    from gamebasic.editor_qt.error_check import ParseProblem
+    from drachenhauch.editor_qt.error_check import ParseProblem
     return ParseProblem(line=line, message=msg, severity=severity, phase=phase)
 
 
 def _panel(problems):
-    from gamebasic.editor_qt.problems_panel import ProblemsPanel
+    from drachenhauch.editor_qt.problems_panel import ProblemsPanel
     p = ProblemsPanel()
     p.set_problems(problems)
     return p

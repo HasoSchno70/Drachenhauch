@@ -22,6 +22,9 @@ const TITEL = "GameBasic – Das Lehrbuch";
 const AUTOR = "Hans Schnorrenberger";
 // Feste Kennung: bei jedem Bau dieselbe, damit ein Lesegeraet eine neue
 // Fassung als DASSELBE Buch erkennt (Lesezeichen/Fortschritt bleiben).
+// Der Name darin ist Geschichte, kein Etikett: die Kennung darf sich beim
+// Umbenennen NICHT aendern, sonst gilt das Buch als ein anderes und jeder
+// Leser verliert Lesezeichen und Fortschritt.
 const UUID = "urn:uuid:6e1f2c40-9b3a-4d17-8a55-gamebasic-lehrbuch";
 
 // ---------------------------------------------------------------- Werkzeug

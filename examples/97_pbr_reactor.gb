@@ -14,7 +14,7 @@
 '  wechselt das Kugel-Layout: RING (Kreis) -> WAVE (3D-Equalizer) -> HELIX (Spirale).
 '  Kamera kreist mit Bass-Punch.
 '
-'  NUR NATIV:  gbrun.py --native examples\97_pbr_reactor.gb   (oder F6).  ESC beendet.
+'  NUR NATIV:  dhrun.py --native examples\97_pbr_reactor.gb   (oder F6).  ESC beendet.
 '
 '  Musik: "Technological Messup" von josepharaoh99 (opengameart.org), CC0.
 '  Fehlt die Datei:  py examples\assets\download_techno.py

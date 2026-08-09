@@ -443,7 +443,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Callbacks statt Polling"),
-  H.p("Statt jeden Frame GUI_CLICKED abzufragen, kannst du einem Widget eine Funktion zuweisen – GUI_UPDATE ruft sie dann selbst auf. Das ist das Muster, das auch der Formular-Designer gbform benutzt."),
+  H.p("Statt jeden Frame GUI_CLICKED abzufragen, kannst du einem Widget eine Funktion zuweisen – GUI_UPDATE ruft sie dann selbst auf. Das ist das Muster, das auch der Formular-Designer dhform benutzt."),
   H.cmd("GUI_ON_CLICK · GUI_ON_CHANGE", 'GUI_ON_CLICK(widget, funktion)   GUI_ON_CHANGE(widget, funktion)',
     "GUI_ON_CLICK feuert bei Knopfdruck, GUI_ON_CHANGE bei Wertänderung (Slider, Checkbox, Dropdown). Die Funktion übergibst du als FUNCREF – also ohne Klammern – und sie hat keine Parameter.",
     [
@@ -582,9 +582,9 @@ module.exports = (H) => [
     ]),
 
   H.h2("Oberflächen speichern und laden"),
-  H.p("Ein ganzes Fenster samt Widgets lässt sich als JSON sichern und später wiederherstellen. Genau dieses Format schreibt der Formular-Designer gbform in seine .gbform-Dateien – du kannst eine dort gebaute Oberfläche also direkt laden."),
+  H.p("Ein ganzes Fenster samt Widgets lässt sich als JSON sichern und später wiederherstellen. Genau dieses Format schreibt der Formular-Designer dhform in seine .gbform-Dateien – du kannst eine dort gebaute Oberfläche also direkt laden."),
   H.cmd("GUI_SAVE · GUI_LOAD", 'GUI_SAVE(win, datei$)   GUI_LOAD(datei$)',
-    "GUI_SAVE schreibt ein Fenster in eine Datei, GUI_LOAD baut es daraus wieder auf und liefert das neue Fenster-Handle. Sind Event-Handler-Namen hinterlegt (gbform), ruft GUI_UPDATE die passenden Funktionen automatisch auf.",
+    "GUI_SAVE schreibt ein Fenster in eine Datei, GUI_LOAD baut es daraus wieder auf und liefert das neue Fenster-Handle. Sind Event-Handler-Namen hinterlegt (dhform), ruft GUI_UPDATE die passenden Funktionen automatisch auf.",
     [
       'GUI_SAVE(win, "layout.gbform")',
       'DIM geladen AS GUI_WINDOW',
@@ -625,6 +625,6 @@ module.exports = (H) => [
     '    FLIP()',
     'WEND',
   ]),
-  H.note("Das gui-Modul kann noch viel mehr: weitere Widgets (Dropdown, Tabelle, Radio, Fortschrittsbalken, Eingabefeld), Laufzeit-Manipulation (verschieben, ein-/ausblenden, zerstören), Speichern/Laden ganzer Oberflächen und sogar Callback-Funktionen statt Polling. Es gibt dafür einen eigenen Formular-Designer (gbform)."),
+  H.note("Das gui-Modul kann noch viel mehr: weitere Widgets (Dropdown, Tabelle, Radio, Fortschrittsbalken, Eingabefeld), Laufzeit-Manipulation (verschieben, ein-/ausblenden, zerstören), Speichern/Laden ganzer Oberflächen und sogar Callback-Funktionen statt Polling. Es gibt dafür einen eigenen Formular-Designer (dhform)."),
   H.tip("ui oder gui – nochmal kurz", "ui (voriges Kapitel): schnelle, jeden Frame neu gezeichnete Menüs – ideal für ein Hauptmenü oder Debug-Overlay. gui (dieses Kapitel): echte, verschiebbare Fenster, die bestehen bleiben – ideal für Werkzeuge, Editoren oder komplexere Oberflächen im Spiel."),
 ];

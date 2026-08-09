@@ -5,7 +5,7 @@ braucht Qt-Cursor-Operationen, die in einer Test-Umgebung Aufwand
 fordern. Die Regexes sind die kritische Stelle: ein falscher Match
 bedeutet im echten Editor einen toten Link oder gar einen falschen Sprung.
 """
-from gamebasic.editor_qt.output_console import (
+from drachenhauch.editor_qt.output_console import (
     _LINK_LINE,
     _LINK_FILE_HEADER,
     _LINK_FILE_LINE,
@@ -91,7 +91,7 @@ def test_file_line_finds_all_matches():
     assert matches[1].group(1) == "b.gb"
 
 
-# --- start_run_auto: dhrt direkt + gbrun.py-Launcher-Fallback -----------
+# --- start_run_auto: dhrt direkt + dhrun.py-Launcher-Fallback -----------
 # Policy-Test ohne echten QProcess: wir mocken die dhrt-Suche und die
 # beiden Start-Pfade, und pruefen nur, WELCHEN Modus start_run_auto waehlt.
 
@@ -114,7 +114,7 @@ def _qapp():
 
 
 def _console(_qapp, tmp_path):
-    from gamebasic.editor_qt.output_console import OutputConsole
+    from drachenhauch.editor_qt.output_console import OutputConsole
     return OutputConsole(tmp_path)
 
 
@@ -128,18 +128,18 @@ def _pump_delete_later(app):
 
 
 def test_run_auto_falls_back_when_dhrt_missing(_qapp, tmp_path, monkeypatch):
-    import gamebasic.editor_qt.output_console as oc
+    import drachenhauch.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_dhrt", lambda root: None)
     con = _console(_qapp, tmp_path)
-    # start_run (via gbrun.py) starten wir nicht wirklich -> Stub.
+    # start_run (via dhrun.py) starten wir nicht wirklich -> Stub.
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
     assert con.start_run_auto(tmp_path / "x.gb") == "py"
-    # Hinweis, dass ueber den gbrun.py-Launcher gestartet wurde.
-    assert "gbrun.py" in con.text.toPlainText()
+    # Hinweis, dass ueber den dhrun.py-Launcher gestartet wurde.
+    assert "dhrun.py" in con.text.toPlainText()
 
 
 def test_run_auto_uses_native_when_available(_qapp, tmp_path, monkeypatch):
-    import gamebasic.editor_qt.output_console as oc
+    import drachenhauch.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_dhrt", lambda root: Path("dhrt"))
     con = _console(_qapp, tmp_path)
     monkeypatch.setattr(con, "_start_native", lambda fp, dhrt: True)
@@ -148,13 +148,13 @@ def test_run_auto_uses_native_when_available(_qapp, tmp_path, monkeypatch):
 
 
 def test_run_auto_falls_back_when_native_fails(_qapp, tmp_path, monkeypatch):
-    import gamebasic.editor_qt.output_console as oc
+    import drachenhauch.editor_qt.output_console as oc
     monkeypatch.setattr(oc, "_find_dhrt", lambda root: Path("dhrt"))
     con = _console(_qapp, tmp_path)
     monkeypatch.setattr(con, "_start_native", lambda fp, dhrt: False)  # Direkt-Start-Fehler
     monkeypatch.setattr(con, "start_run", lambda fp, *a, **k: True)
     assert con.start_run_auto(tmp_path / "x.gb") == "py"
-    assert "gbrun.py" in con.text.toPlainText()
+    assert "dhrun.py" in con.text.toPlainText()
 
 
 # --- QProcess-Cleanup: kein Leak toter Prozess-Objekte ueber Run-Zyklen --

@@ -1,6 +1,6 @@
 """Tests fuer INPUT-Statement: Prompt-Flush + Lesen ueber stdin.
 
-Wir starten gbrun.py als echter Subprocess (so wie es der Editor macht)
+Wir starten dhrun.py als echter Subprocess (so wie es der Editor macht)
 und pipen Eingaben via stdin. Verifiziert end-to-end, dass INPUT in der
 Editor-Konsole zuverlaessig funktioniert.
 """
@@ -14,7 +14,7 @@ import pytest
 
 
 _ROOT = Path(__file__).resolve().parent.parent
-_GBRUN = _ROOT / "gbrun.py"
+_GBRUN = _ROOT / "dhrun.py"
 
 
 def _dhrt_available() -> bool:
@@ -23,10 +23,10 @@ def _dhrt_available() -> bool:
                for variant in ("release", "debug"))
 
 
-# gbrun.py ruft intern "dhrt run" auf -- ohne gebauten dhrt bricht der
+# dhrun.py ruft intern "dhrt run" auf -- ohne gebauten dhrt bricht der
 # Subprozess mit einer "Native Runtime nicht gefunden"-Meldung ab statt das
 # GB-Programm auszufuehren. Anders als die run_gb-Fixture (conftest.py)
-# nutzt dieses Modul gbrun.py direkt als echten Subprozess (End-to-End-Test
+# nutzt dieses Modul dhrun.py direkt als echten Subprozess (End-to-End-Test
 # der Editor-Konsole), daher der eigene Skip hier.
 pytestmark = pytest.mark.skipif(not _dhrt_available(), reason="native Runtime 'dhrt' nicht gebaut")
 

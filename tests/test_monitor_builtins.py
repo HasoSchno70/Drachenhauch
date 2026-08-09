@@ -8,7 +8,7 @@ run_gb). Hier wird geprueft, dass die Builtins im eingefrorenen dhrt-Index
 stehen -- sonst warnt der Editor live und der Drift-Test schlaegt an, sobald
 ein Beispiel (examples/120_monitors.gb) sie nutzt.
 """
-from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
 
 
 def test_monitor_builtins_registered():

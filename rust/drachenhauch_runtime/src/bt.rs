@@ -77,7 +77,7 @@ const CALL_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Treibt `fut` mit `CALL_TIMEOUT` an und flacht `Result<Result<T, E>, Elapsed>`
 /// zu `Result<T, String>` ab -- Timeout wird zu einer normalen, fangbaren
-/// GBRuntimeError statt eines unbegrenzten Hangs.
+/// DHRuntimeError statt eines unbegrenzten Hangs.
 async fn with_timeout<T, E: std::fmt::Display>(
     fut: impl std::future::Future<Output = Result<T, E>>,
     fn_: &str,

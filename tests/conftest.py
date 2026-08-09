@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 
-# Sicherstellen, dass das Projekt-Root im sys.path ist (fuer 'gamebasic' Import).
+# Sicherstellen, dass das Projekt-Root im sys.path ist (fuer 'drachenhauch' Import).
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
@@ -84,8 +84,8 @@ def _dhrt_err_message(stderr: str) -> str:
 def run_gb():
     """Fuehrt einen GB-Quelltext ueber die native Runtime (`dhrt run`) aus und
     gibt stdout zurueck (LF). Bei einem Fehler (Exit != 0) wird ein
-    GBRuntimeError mit der dhrt-Meldung geworfen -- so funktioniert
-    `pytest.raises(GBRuntimeError, match=...)` weiter (Wortlaut = dhrt).
+    DHRuntimeError mit der dhrt-Meldung geworfen -- so funktioniert
+    `pytest.raises(DHRuntimeError, match=...)` weiter (Wortlaut = dhrt).
 
     Beispiel:
         def test_print(run_gb):
@@ -93,7 +93,7 @@ def run_gb():
     """
     import subprocess
     import tempfile
-    from gamebasic.errors import GBRuntimeError, ParseError, LexerError
+    from drachenhauch.errors import DHRuntimeError, ParseError, LexerError
 
     def _run(source: str, base: Path | None = None) -> str:
         if _DHRT is None:
@@ -127,12 +127,12 @@ def run_gb():
             # Phasen-passenden Fehlertyp werfen, damit pytest.raises(ParseError/
             # LexerError/...) wie bisher trifft. dhrt unterscheidet keine
             # TYP-Fehler von anderen Laufzeitfehlern -> die kommen als
-            # GBRuntimeError (Tests dafuer pruefen die Basis GameBasicError).
+            # DHRuntimeError (Tests dafuer pruefen die Basis DrachenhauchError).
             if "Parse-Fehler" in stderr:
                 raise ParseError(msg)
             if "Lexer-Fehler" in stderr:
                 raise LexerError(msg)
-            raise GBRuntimeError(msg)
+            raise DHRuntimeError(msg)
         return (r.stdout or "").replace("\r\n", "\n")
 
     return _run

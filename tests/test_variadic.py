@@ -63,7 +63,7 @@ PRINT sum_all(100)
 
 def test_variadic_too_few_args_throws(run_gb, run_vm):
     """Wenn Pflicht-Args vor Variadic nicht erfuellt sind."""
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 SUB log(label AS STRING, ...args)
     PRINT label
@@ -71,15 +71,15 @@ END SUB
 
 log()
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_variadic_must_be_last(run_gb, run_vm):
     """`SUB foo(...args, x)` -> ParseError."""
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     src = '''
 SUB foo(...args, x AS INTEGER)
 END SUB
@@ -92,7 +92,7 @@ END SUB
 
 def test_variadic_two_variadic_rejected(run_gb, run_vm):
     """Zwei Variadic-Params -> ParseError."""
-    from gamebasic.errors import ParseError
+    from drachenhauch.errors import ParseError
     src = '''
 SUB foo(...a, ...b)
 END SUB

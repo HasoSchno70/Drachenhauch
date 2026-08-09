@@ -68,7 +68,7 @@ neue Nachrichten an noch wird die Verbindung am Leben gehalten.
 IMPORT "mqtt"
 
 DIM h AS MQTT_HANDLE
-h = MQTT_CONNECT("192.168.1.50", 1883, "gamebasic-client")
+h = MQTT_CONNECT("192.168.1.50", 1883, "drachenhauch-client")
 
 MQTT_SUBSCRIBE(h, "haus/wohnzimmer/temperatur")
 

@@ -1,14 +1,14 @@
-"""Tests fuer die reine Synth-Mathematik (`gamebasic.synth`).
+"""Tests fuer die reine Synth-Mathematik (`drachenhauch.synth`).
 
 Stufe B: Die Audio-Wiedergabe/Synthese-Builtins (AUDIO_TONE/NOISE/SFX/...) laufen
 nur nativ in dhrt; der frueher hier getestete Tree-Walker-"nur nativ"-Gate
 entfaellt mit dem Tree-Walker (Phase 8). Was bleibt, ist die geteilte Synth-
-Mathematik in `gamebasic/synth.py` (von Builtin UND gbsfx-Export genutzt, reines
+Mathematik in `drachenhauch/synth.py` (von Builtin UND dhsfx-Export genutzt, reines
 numpy -- in Phase 8 behalten).
 """
 import numpy as np
 
-from gamebasic.synth import synthesize, svf_lowpass
+from drachenhauch.synth import synthesize, svf_lowpass
 
 
 def test_synth_duty_default_unchanged():

@@ -278,7 +278,7 @@ children.push(p("Wir bauen das Spiel in kleinen, lauffähigen Schritten. Das ist
 children.push(p("Deshalb hat jedes Kapitel ein klares, sichtbares Ziel. Nach jedem Kapitel hast du etwas, das du sofort starten und ausprobieren kannst – und das dir Lust auf das nächste Kapitel macht. Der grobe Fahrplan sieht so aus:"));
 children.push(bulletRich("Erst das Fenster: ", "Spielschleife, Sternenhimmel."));
 children.push(bulletRich("Dann das Schiff: ", "laden, zeichnen, mit der Tastatur bewegen."));
-children.push(bulletRich("Sprites selbst zeichnen: ", "im Pixel-Editor gbsprites."));
+children.push(bulletRich("Sprites selbst zeichnen: ", "im Pixel-Editor dhsprites."));
 children.push(bulletRich("Schiessen, Gegner, Formation: ", "Arrays, Klassen, Bewegung."));
 children.push(bulletRich("Einflug, Stürze, Bomben, Kollisionen: ", "das eigentliche Spielgefühl."));
 children.push(bulletRich("Politur: ", "Sound, Effekte, Highscores, Export als .exe."));
@@ -526,19 +526,19 @@ children.push(bullet("Setze das Schiff an eine andere Startposition."));
 // ===================== Kapitel 3 =====================
 children.push(chapter("Kapitel 3: Sprites selbst zeichnen"));
 children.push(tip("In diesem Kapitel",
-  "Du lernst den mitgelieferten Pixel-Editor gbsprites kennen und zeichnest deine eigene Grafik: das Raumschiff und einen Gegner mit Flügelschlag-Animation. Wer lieber sofort weiterprogrammiert, nimmt einfach die fertigen Sprites aus dem assets-Ordner – beides funktioniert."));
+  "Du lernst den mitgelieferten Pixel-Editor dhsprites kennen und zeichnest deine eigene Grafik: das Raumschiff und einen Gegner mit Flügelschlag-Animation. Wer lieber sofort weiterprogrammiert, nimmt einfach die fertigen Sprites aus dem assets-Ordner – beides funktioniert."));
 
 children.push(h2("Was ist ein Sprite?"));
 children.push(p("Dieses Kapitel ist eine kleine Verschnaufpause vom Programmieren – wir tauschen die Tastatur kurz gegen den Pinsel. Wer es eilig hat und sofort weiterprogrammieren will, darf das ganze Kapitel überspringen und einfach die fertigen Sprites aus dem Projekt benutzen. Aber unter uns: Selbst zu zeichnen macht riesigen Spaß, und es ist der Moment, in dem aus „irgendeinem Spiel“ dein Spiel wird."));
 children.push(p("Ein Sprite ist ein kleines Bild aus einzelnen farbigen Pixeln. Stell dir kariertes Papier vor, bei dem jedes Kästchen genau eine Farbe bekommt – mehr ist es nicht. Das klingt nach wenig, aber die gesamte goldene Ära der Videospiele wurde aus genau solchen Kästchen gebaut. Unser Schiff ist gerade einmal 16 × 16 Pixel groß; das sind 256 Kästchen, mit denen man erstaunlich viel anstellen kann. Stark vergrößert sieht man die einzelnen Pixel ganz deutlich:"));
 figure("kap03_pixelraster.png", "Das Raumschiff als Pixel-Raster – jedes Kästchen ist ein Pixel.", 280, 280).forEach(e => children.push(e));
 
-children.push(h2("Der Sprite-Editor gbsprites"));
+children.push(h2("Der Sprite-Editor dhsprites"));
 children.push(pmix([
   ["GameBasic bringt einen eigenen Pixel-Editor mit. Du startest ihn mit dem Befehl ", false],
-  ["gbsprites", true],
+  ["dhsprites", true],
   [" – entweder leer für ein neues Bild oder mit einer Datei: ", false],
-  ["gbsprites player.png", true], [".", false],
+  ["dhsprites player.png", true], [".", false],
 ]));
 children.push(p("Die wichtigsten Werkzeuge:"));
 children.push(bulletRich("Stift ", "setzt einzelne Pixel in der gewählten Farbe."));
@@ -585,12 +585,12 @@ children.push(pmix([
 
 children.push(h2("Was du gelernt hast"));
 children.push(bulletRich("Sprite ", "= kleines Bild aus einzelnen Pixeln (hier 16 × 16)."));
-children.push(bulletRich("gbsprites ", "= der Pixel-Editor mit Stift, Füller, Pipette und Symmetrie."));
+children.push(bulletRich("dhsprites ", "= der Pixel-Editor mit Stift, Füller, Pipette und Symmetrie."));
 children.push(bulletRich("Frames ", "= mehrere Einzelbilder ergeben eine Animation (Onion-Skin hilft)."));
 children.push(bulletRich("Export ", "= .gbsprite zum Weiterbearbeiten, PNG/Sheet fürs Spiel."));
 
 children.push(h2("Übung"));
-children.push(bullet("Öffne ein vorhandenes Sprite (z. B. player.png) in gbsprites und färbe es um."));
+children.push(bullet("Öffne ein vorhandenes Sprite (z. B. player.png) in dhsprites und färbe es um."));
 children.push(bullet("Zeichne deinen eigenen Gegner mit zwei Frames."));
 children.push(bullet("Exportiere ihn als PNG und tausche ihn testweise im Spiel ein."));
 
@@ -1379,7 +1379,7 @@ children.push(codeBlock([
 ]));
 children.push(pmix([
   ["Die Zahlen steuern Wellenform, Tonhöhe, Tonhöhen-Verlauf, Hüllkurve und Lautstärke – einfach ausprobieren, bis es „pew“ und „bumm“ macht. Ein eigener Musik-Generator ", false],
-  ["gbsfx", true], [" hilft beim Tüfteln.", false],
+  ["dhsfx", true], [" hilft beim Tüfteln.", false],
 ]));
 
 children.push(h2("Wellen & Level"));

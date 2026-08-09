@@ -8,14 +8,14 @@ Wir testen alle drei Pfade (TW, Python-VM, Cython-VM) ueber `run_gb` /
 """
 import pytest
 
-from gamebasic.errors import ParseError, GBRuntimeError
+from drachenhauch.errors import ParseError, DHRuntimeError
 
 
 # --- Parser-Validierung ----------------------------------------------
 
 def _parse(src):
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
     return Parser(Lexer(src).tokenize()).parse()
 
 

@@ -28,9 +28,9 @@ Das macht in einem Rutsch:
 1. **dhrt-Runtime** bauen (falls `rust/gb_runtime/target/release/dhrt[.exe]` fehlt;
    fehlt sie danach immer noch, wird nur gewarnt statt abzubrechen — nützlich, um
    die Paketierung selbst zu testen, ohne die volle Grafik-Toolchain zu brauchen).
-2. **App-Icon** aus `gamebasic/assets/logo.png` erzeugen (`.ico` Windows, `.icns`
+2. **App-Icon** aus `drachenhauch/assets/logo.png` erzeugen (`.ico` Windows, `.icns`
    macOS, `.png` Linux).
-3. **PyInstaller**: friert `gbrun.py` + das `gamebasic`-Paket + PySide6 + numpy +
+3. **PyInstaller**: friert `dhrun.py` + das `drachenhauch`-Paket + PySide6 + numpy +
    Pillow ein (onedir, kein Python nötig) — `dist/GameBasic/` (Windows/Linux) bzw.
    `dist/GameBasic.app` (macOS).
 4. Plattformspezifische Paketierung:
@@ -72,7 +72,7 @@ durchlaufen, nicht die volle Runtime.
 - Installation nach `C:\Program Files\GameBasic`.
 - **Beispiele** (142 `.gb` + Assets + Showcase-Thumbnails `screenshots/`) nach
   `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der `project_root` der
-  installierten App (`gbrun._project_root()`), damit der Editor Beispiele **und**
+  installierten App (`dhrun._project_root()`), damit der Editor Beispiele **und**
   Showcase-Vorschaubilder findet – und der Ort ist **beschreibbar** (Program Files
   wäre schreibgeschützt). Beim Deinstallieren bleiben die Beispiele erhalten.
 - Startmenü-Einträge: **GameBasic** (öffnet direkt den **Code-Editor** – ohne
@@ -86,11 +86,11 @@ durchlaufen, nicht die volle Runtime.
 hin) ziehen — kein Installations-Skript-Schritt wie bei Inno Setup. `.gb`-Dateien
 im Finder sind über `CFBundleDocumentTypes` mit GameBasic verknüpft. Beispiele
 liegen im Bundle und werden beim **ersten Start** automatisch nach
-`~/Documents/GameBasic/examples` kopiert (`gbrun._seed_examples_if_missing`).
+`~/Documents/GameBasic/examples` kopiert (`dhrun._seed_examples_if_missing`).
 
 **Linux** (Tarball): `tar xzf GameBasic-<version>-linux-x86_64.tar.gz && ./GameBasic-dist/install.sh`
 installiert nach `~/.local/share/GameBasic` (XDG, **kein sudo/root nötig**),
-legt einen `gamebasic`-Befehl unter `~/.local/bin` an und trägt einen
+legt einen `drachenhauch`-Befehl unter `~/.local/bin` an und trägt einen
 `.desktop`-Eintrag samt Icon ein (Anwendungsmenü). Beispiele werden wie bei
 macOS beim ersten Start automatisch aus dem Bundle kopiert.
 
@@ -144,7 +144,7 @@ Offen für den Verkauf (kein Code mehr): Zertifikat kaufen, EULA-`[PLATZHALTER]`
 ausfüllen, ggf. DE-Verbraucherrecht (Impressum/Widerruf).
 
 ## Wie die installierte App `dhrt` findet
-Der Installer legt `dhrt.exe` **neben** `GameBasic.exe`. `gbrun._find_dhrt()`
+Der Installer legt `dhrt.exe` **neben** `GameBasic.exe`. `dhrun._find_dhrt()`
 sucht im eingefrorenen Zustand zuerst im Verzeichnis der Exe (bzw. im
 PyInstaller-Bundle) und erst danach im Dev-Baum – so funktioniert sowohl die
 Installation als auch die Entwicklungsumgebung.

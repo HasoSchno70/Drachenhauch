@@ -8,7 +8,7 @@
     4 = hit       (umgekippt, X-Augen)
 
 Output (alle in examples/assets/):
-    mario.gbsprite       - natives Editor-Format (zum Nach-Pixeln in gbsprites)
+    mario.gbsprite       - natives Editor-Format (zum Nach-Pixeln in dhsprites)
     mario.png            - horizontaler Sheet (5 * 16 = 80px breit)
     mario_atlas.json     - Sprite-Atlas mit benannten Frames
 
@@ -186,7 +186,7 @@ def _render_frame(design: str) -> Image.Image:
 
 def _save_native_gbsprite(frames_with_dur, path: Path):
     """Schreibt die Frames im .gbsprite-Format (JSON + base64-RGBA pro
-    Frame). Format-Spec siehe gamebasic/spriteeditor/document.py."""
+    Frame). Format-Spec siehe drachenhauch/spriteeditor/document.py."""
     data = {
         "version": 2,
         "width": 16,
@@ -261,7 +261,7 @@ def main():
     print('  ATLAS_DRAW(atlas, "mario_idle", x, y)')
     print()
     print("Nachpixeln im Editor:")
-    print(f"  gbsprites {gbsprite}")
+    print(f"  dhsprites {gbsprite}")
 
 
 if __name__ == "__main__":

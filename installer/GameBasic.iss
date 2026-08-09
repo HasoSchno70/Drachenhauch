@@ -58,7 +58,7 @@ Source: "..\dist\GameBasic\*"; DestDir: "{app}"; Flags: ignoreversion recursesub
 Source: "..\rust\drachenhauch_runtime\target\release\dhrt.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; Beispielprogramme + Showcase-Thumbnails (screenshots/) in die OEFFENTLICHEN
 ; DOKUMENTE -> `%PUBLIC%\Documents\GameBasic\examples`. Das ist exakt der
-; `project_root/examples` der eingefrorenen App (gbrun._project_root): so findet
+; `project_root/examples` der eingefrorenen App (dhrun._project_root): so findet
 ; der Editor Beispiele UND Showcase-Vorschaubilder, und der Ort ist BESCHREIBBAR
 ; (Program Files waere schreibgeschuetzt -> Demos die Dateien schreiben + „Neu"
 ; speichern wuerden scheitern). uninsneveruninstall: vom User editierte Beispiele

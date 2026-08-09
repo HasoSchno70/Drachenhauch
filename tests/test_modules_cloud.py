@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -155,7 +155,7 @@ def test_cloud_correct_api_key_works(run_gb):
 
 
 def test_cloud_call_without_configure_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="CLOUD_CONFIGURE"):
+    with pytest.raises(DHRuntimeError, match="CLOUD_CONFIGURE"):
         run_gb('IMPORT "cloud"\nPRINT CLOUD_LOAD("p")\n')
 
 

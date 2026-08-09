@@ -4,7 +4,7 @@ module.exports = (H) => [
   H.figure("51_animfsm.png", "Die Zustandsmaschine wählt den Zustand: Weil das Tempo hoch ist, läuft „run“ – ANIM_FSM_STATE zeigt den aktuellen Zustand an."),
 
   H.h2("Die .gbanim-Datei"),
-  H.p("Die Zustandsmaschine wird datengetrieben aus einer .gbanim-Datei geladen (am bequemsten im Editor gbanim gezeichnet). Sie beschreibt drei Dinge: Zustände (jeder an einen Frame-Bereich gebunden), Parameter (Werte, die du im Spiel setzt) und Übergänge (Bedingungen, wann von einem Zustand in einen anderen gewechselt wird). Eine einfache Variante mit zwei Zuständen:"),
+  H.p("Die Zustandsmaschine wird datengetrieben aus einer .gbanim-Datei geladen (am bequemsten im Editor dhanim gezeichnet). Sie beschreibt drei Dinge: Zustände (jeder an einen Frame-Bereich gebunden), Parameter (Werte, die du im Spiel setzt) und Übergänge (Bedingungen, wann von einem Zustand in einen anderen gewechselt wird). Eine einfache Variante mit zwei Zuständen:"),
   H.code([
     '// held.gbanim',
     '{',
@@ -91,5 +91,5 @@ module.exports = (H) => [
     [
       'TEXT(10, 10, "tempo=" + STR$(ANIM_FSM_GET_FLOAT(fsm, "tempo")))',
     ]),
-  H.tip("Wann lohnt sich animfsm?", "Für eine Figur mit nur zwei Animationen reicht das einfache IF aus dem sprite-Kapitel. Sobald es viele Zustände mit Bedingungen werden (laufen, springen, fallen, landen, treffen …), hält animfsm den Code sauber – und der visuelle Editor gbanim macht das Entwerfen der Zustände zum Kinderspiel."),
+  H.tip("Wann lohnt sich animfsm?", "Für eine Figur mit nur zwei Animationen reicht das einfache IF aus dem sprite-Kapitel. Sobald es viele Zustände mit Bedingungen werden (laufen, springen, fallen, landen, treffen …), hält animfsm den Code sauber – und der visuelle Editor dhanim macht das Entwerfen der Zustände zum Kinderspiel."),
 ];

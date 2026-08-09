@@ -18,7 +18,7 @@ def _qapp():
 
 def _editor():
     try:
-        from gamebasic.trackereditor_qt import TrackerEditor
+        from drachenhauch.trackereditor_qt import TrackerEditor
         return TrackerEditor(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -58,7 +58,7 @@ def test_channels_spin_changes_song_and_rebuilds_grid():
 
 
 def test_channels_spin_reflects_loaded_song(tmp_path):
-    from gamebasic.tracker import Song
+    from drachenhauch.tracker import Song
     ed = _editor()
     s = Song(channels=10)
     s.patterns[0].set(0, 0, 60)
@@ -223,7 +223,7 @@ def test_channels_spin_rebuilds_sliders_with_correct_count():
 
 
 def test_loaded_song_channel_vol_reflected_in_sliders(tmp_path):
-    from gamebasic.tracker import Song
+    from drachenhauch.tracker import Song
     ed = _editor()
     s = Song()
     s.channel_vol[2] = 0.3
@@ -232,14 +232,14 @@ def test_loaded_song_channel_vol_reflected_in_sliders(tmp_path):
 
 
 def test_channels_get_distinct_colors():
-    from gamebasic.trackereditor_qt import _channel_color
+    from drachenhauch.trackereditor_qt import _channel_color
     colors = {_channel_color(c) for c in range(8)}
     assert len(colors) == 8             # 8 Kanaele, 8 eigene Paletten-Farben
 
 
 def test_channel_header_uses_channel_color():
     from PySide6.QtGui import QColor
-    from gamebasic.trackereditor_qt import _channel_color
+    from drachenhauch.trackereditor_qt import _channel_color
     ed = _editor()
     item0 = ed.grid.horizontalHeaderItem(0)
     item1 = ed.grid.horizontalHeaderItem(1)
@@ -249,7 +249,7 @@ def test_channel_header_uses_channel_color():
 
 
 def test_cell_delegate_note_color_is_channel_specific():
-    from gamebasic.trackereditor_qt import _CellDelegate, _channel_color
+    from drachenhauch.trackereditor_qt import _CellDelegate, _channel_color
     c0 = _CellDelegate._token_color(0, "C4", channel=0)
     c1 = _CellDelegate._token_color(0, "C4", channel=1)
     assert c0 == _channel_color(0)
@@ -258,7 +258,7 @@ def test_cell_delegate_note_color_is_channel_specific():
 
 
 def test_cell_delegate_drum_and_off_colors_unaffected_by_channel():
-    from gamebasic.trackereditor_qt import _CellDelegate
+    from drachenhauch.trackereditor_qt import _CellDelegate
     assert _CellDelegate._token_color(0, "X", channel=3) == \
            _CellDelegate._token_color(0, "X", channel=5)
     assert _CellDelegate._token_color(0, "OFF", channel=3) == \

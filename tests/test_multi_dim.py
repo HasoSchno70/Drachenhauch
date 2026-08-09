@@ -106,9 +106,9 @@ def test_multi_dim_each_var_initialized_to_default(run_gb):
 
 def test_multi_dim_parser_error_still_requires_as():
     """Ohne AS am Ende soll's weiterhin einen Parser-Fehler geben."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.errors import ParseError
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.errors import ParseError
     src = "DIM a, b, c\n"
     with pytest.raises(ParseError):
         Parser(Lexer(src).tokenize()).parse()
@@ -116,9 +116,9 @@ def test_multi_dim_parser_error_still_requires_as():
 
 def test_multi_dim_ast_shape():
     """Verifiziere AST-Struktur: Single -> Dim, Multi -> MultiDim."""
-    from gamebasic.lexer import Lexer
-    from gamebasic.parser import Parser
-    from gamebasic.ast_nodes import Dim, MultiDim
+    from drachenhauch.lexer import Lexer
+    from drachenhauch.parser import Parser
+    from drachenhauch.ast_nodes import Dim, MultiDim
     single = Parser(Lexer("DIM x AS INTEGER\n").tokenize()).parse()
     assert isinstance(single.statements[0], Dim)
     multi = Parser(Lexer("DIM a, b, c AS INTEGER\n").tokenize()).parse()

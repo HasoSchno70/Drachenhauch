@@ -6,7 +6,7 @@ als **Namensnennung (Attribution)** für die CC-BY-lizenzierten Inhalte – bei
 Weitergabe bitte beibehalten.
 
 ## Eigene / selbst erzeugte Inhalte
-Selbst erstellt (mit den GameBasic-Tools `gbsprites`/`gbtracker`/`gbsfx` bzw.
+Selbst erstellt (mit den GameBasic-Tools `dhsprites`/`dhtracker`/`dhsfx` bzw.
 Generator-Skripten) und damit frei – auch kommerziell – verwendbar:
 - Alle Pixel-Grafiken/Sprites: `*.gbsprite`, `*.gif`, `*.png`, Atlanten/`*.json`
   – darunter der eigenständige Plattformer-Satz in `platformer/` und der Spieler

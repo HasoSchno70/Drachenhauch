@@ -1187,7 +1187,7 @@ impl<'p> Vm<'p> {
         // Review-Fund: ohne Obergrenze rekursiert exec->run_frame->dispatch->exec
         // auf dem NATIVEN Stack -- eine ausufernde GB-Rekursion (oder eine
         // Property/Operator, die sich selbst aufruft) fuehrte zu einem
-        // Stack-Overflow-Absturz statt einem fangbaren GBRuntimeError.
+        // Stack-Overflow-Absturz statt einem fangbaren DHRuntimeError.
         self.depth += 1;
         if self.depth > MAX_CALL_DEPTH {
             self.depth -= 1;
@@ -1456,7 +1456,7 @@ impl<'p> Vm<'p> {
         // Arity-Pruefung (diese Namen tauchen in keiner Compiler-Arity-Tabelle
         // auf) -- `CORO_RESUME()` oder `CORO_SEND(c)` kompilierten anstandslos
         // und paniked dann mit einem Index-Out-of-Bounds statt eines
-        // GBRuntimeError.
+        // DHRuntimeError.
         let need = |n: usize, fname: &str| -> R<()> {
             if a.len() != n {
                 Err(format!("{}: erwartet {} Argument(e), erhalten {}", fname, n, a.len()))

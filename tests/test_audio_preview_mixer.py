@@ -1,10 +1,10 @@
-"""Tests fuer den additiven Software-Mixer (Qt-frei, gamebasic.audio_preview).
+"""Tests fuer den additiven Software-Mixer (Qt-frei, drachenhauch.audio_preview).
 
 Betrifft ein ANDERES Modul als tests/test_tracker_mixer.py (das den
-WAV-Render-Mixer gamebasic/tracker/mixer.py testet) -- rein additiv."""
+WAV-Render-Mixer drachenhauch/tracker/mixer.py testet) -- rein additiv."""
 import numpy as np
 
-from gamebasic.audio_preview import Mixer
+from drachenhauch.audio_preview import Mixer
 
 
 def test_sample_rate_property_exposes_configured_sr():

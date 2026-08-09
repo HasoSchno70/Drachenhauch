@@ -7,15 +7,15 @@ wird `J_PARSE`. Single-word-Namen (`vec2`) werden komplett durch den Alias erset
 Stufe B: die frueheren `call_builtin`/`load_module`/`EXTERNAL_TYPES`-Tests (die
 die Python-Alias-Mechanik direkt prueften) sind durch die run_gb-Golden-Tests
 unten abgedeckt -- dhrt bildet aliasierte Builtin-Namen selbst zurueck. Die
-Preprocess-Tests laufen weiter gegen das (behaltene) `gamebasic.preprocess`.
+Preprocess-Tests laufen weiter gegen das (behaltene) `drachenhauch.preprocess`.
 """
 from pathlib import Path
 
 
-# --- Preprocessor-Parsing (gegen das behaltene gamebasic.preprocess) ----
+# --- Preprocessor-Parsing (gegen das behaltene drachenhauch.preprocess) ----
 
 def test_preprocess_accepts_alias_syntax():
-    from gamebasic.preprocess import process
+    from drachenhauch.preprocess import process
     src = 'IMPORT "json" AS j\nPRINT 1\n'
     merged, _ = process(src, Path("."), file_label="<test>")
     assert "PRINT 1" in merged
@@ -23,7 +23,7 @@ def test_preprocess_accepts_alias_syntax():
 
 
 def test_preprocess_alias_is_optional():
-    from gamebasic.preprocess import process
+    from drachenhauch.preprocess import process
     src = 'IMPORT "json"\nPRINT 1\n'
     merged, _ = process(src, Path("."), file_label="<test>")
     assert "PRINT 1" in merged
@@ -31,7 +31,7 @@ def test_preprocess_alias_is_optional():
 
 def test_preprocess_alias_must_be_identifier():
     """`AS 123` ist kein gueltiger Identifier -> der AS-Teil wird ignoriert."""
-    from gamebasic.preprocess import process
+    from drachenhauch.preprocess import process
     src = 'IMPORT "json"\nPRINT 1\n'
     merged, _ = process(src, Path("."), file_label="<test>")
     assert "PRINT 1" in merged

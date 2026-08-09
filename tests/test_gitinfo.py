@@ -4,7 +4,7 @@ import subprocess
 
 import pytest
 
-from gamebasic.editor_qt.gitinfo import (
+from drachenhauch.editor_qt.gitinfo import (
     BlameLine, blame, is_git_repo, parse_porcelain,
 )
 

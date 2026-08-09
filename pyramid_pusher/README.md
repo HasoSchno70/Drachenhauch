@@ -9,13 +9,13 @@ gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer
 ## Starten
 
 ```
-.venv\Scripts\python.exe gbrun.py pyramid_pusher\pyramid_pusher.gb
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\pyramid_pusher.gb
 ```
 
 …oder im **GameBasic-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
 
 > Grafik startet nur mit echtem OpenGL-Kontext — also aus dem Editor / per
-> `gbrun.py`, nicht aus einer headless-Shell.
+> `dhrun.py`, nicht aus einer headless-Shell.
 
 ### Vollbild / Fenster
 
@@ -130,7 +130,7 @@ Die PNGs sind ganz normale Sheets — du kannst jedes im **Sprite-Editor**
 nachmalen:
 
 ```
-gbsprites pyramid_pusher\assets\hero.png
+dhsprites pyramid_pusher\assets\hero.png
 ```
 
 ## Level prüfen / erzeugen
@@ -145,8 +145,8 @@ geprüft, bevor er geschrieben wird:
 ## Tests (headless, ohne Grafik)
 
 ```
-.venv\Scripts\python.exe gbrun.py pyramid_pusher\_test_headless.gb   # Parser + Codes
-.venv\Scripts\python.exe gbrun.py pyramid_pusher\_test_logic.gb      # Schieben/Undo/Lösung
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_headless.gb   # Parser + Codes
+.venv\Scripts\python.exe dhrun.py pyramid_pusher\_test_logic.gb      # Schieben/Undo/Lösung
 ```
 
 ## Schatzkarte & Kapitel

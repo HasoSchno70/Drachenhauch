@@ -26,7 +26,7 @@ def _fake_exec_picks_first(monkeypatch):
     """dlg.exec() blockiert normalerweise auf einer echten Event-Loop --
     hier simulieren wir stattdessen direkt eine Nutzer-Auswahl des ersten
     Eintrags, ohne den Dialog wirklich modal zu zeigen."""
-    from gamebasic.editor_qt import palette as P
+    from drachenhauch.editor_qt import palette as P
 
     def fake_exec(self):
         self.chosen.emit(self._all_entries[0])
@@ -36,7 +36,7 @@ def _fake_exec_picks_first(monkeypatch):
 
 
 def test_command_palette_shows_warning_instead_of_crashing(monkeypatch):
-    from gamebasic.editor_qt import palette as P
+    from drachenhauch.editor_qt import palette as P
     from PySide6.QtWidgets import QMessageBox
 
     _fake_exec_picks_first(monkeypatch)
@@ -51,7 +51,7 @@ def test_command_palette_shows_warning_instead_of_crashing(monkeypatch):
 
 
 def test_command_palette_runs_normal_command_without_warning(monkeypatch):
-    from gamebasic.editor_qt import palette as P
+    from drachenhauch.editor_qt import palette as P
     from PySide6.QtWidgets import QMessageBox
 
     _fake_exec_picks_first(monkeypatch)
@@ -65,7 +65,7 @@ def test_command_palette_runs_normal_command_without_warning(monkeypatch):
 
 
 def test_quick_open_shows_warning_instead_of_crashing(monkeypatch, tmp_path):
-    from gamebasic.editor_qt import palette as P
+    from drachenhauch.editor_qt import palette as P
     from PySide6.QtWidgets import QMessageBox
 
     (tmp_path / "a.gb").write_text("PRINT 1\n", encoding="utf-8")

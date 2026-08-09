@@ -4,7 +4,7 @@ Datengetriebene **Animation-State-Machine** im Stil von Unitys *Animator/Mecanim
 benannte **States** (jeder an eine Sprite-Animation gebunden), benannte
 **Parameter** (`bool`/`float`/`int`/`trigger`) und **Transitions** mit
 Bedingungen. Die komplette Maschine liegt als `.gbanim`-JSON vor — erzeugt vom
-visuellen Editor **`gbanim`** (Knoten = States, Pfeile = Transitions). Statt im
+visuellen Editor **`dhanim`** (Knoten = States, Pfeile = Transitions). Statt im
 Spielcode von Hand `SPRITE_PLAY` zu schalten, setzt das Spiel pro Frame nur die
 Parameter; `ANIM_FSM_UPDATE` entscheidet den Zustand und spielt die Animation.
 
@@ -81,5 +81,5 @@ SPRITE_DRAW(hero)
 Externer Typ `ANIM_FSM` (Referenz-Handle). Implementierung
 `rust/gb_runtime/src/animfsm.rs` (reine Logik, kein Grafik-State), Demo
 [examples/111_anim_fsm.gb](../examples/111_anim_fsm.gb) + Daten
-`examples/assets/hero.gbanim`, Tests `tests/test_animfsm.py`. Editor: **`gbanim`**
+`examples/assets/hero.gbanim`, Tests `tests/test_animfsm.py`. Editor: **`dhanim`**
 (siehe [docs/anim-editor.md](anim-editor.md)).

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 
-from gamebasic.lsp.server import LspServer, _read_message, _write_message, uri_to_path
+from drachenhauch.lsp.server import LspServer, _read_message, _write_message, uri_to_path
 
 
 def _server():
@@ -49,7 +49,7 @@ URI = "file:///tmp/test.gb"
 
 def _open(srv, text=SRC, uri=URI):
     _notif(srv, "textDocument/didOpen",
-           {"textDocument": {"uri": uri, "languageId": "gamebasic",
+           {"textDocument": {"uri": uri, "languageId": "drachenhauch",
                              "version": 1, "text": text}})
 
 
@@ -200,7 +200,7 @@ def test_uri_to_path():
 def test_end_to_end_subprocess():
     """Echter Server-Prozess: initialize -> didOpen -> definition ueber stdio."""
     proc = subprocess.Popen(
-        [sys.executable, "-m", "gamebasic.lsp"],
+        [sys.executable, "-m", "drachenhauch.lsp"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     def send(obj):
@@ -217,7 +217,7 @@ def test_end_to_end_subprocess():
         init = recv()
         assert init["result"]["capabilities"]["hoverProvider"] is True
         send({"jsonrpc": "2.0", "method": "textDocument/didOpen",
-              "params": {"textDocument": {"uri": URI, "languageId": "gamebasic",
+              "params": {"textDocument": {"uri": URI, "languageId": "drachenhauch",
                                           "version": 1, "text": SRC}}})
         # Diagnostics-Notification (clean -> leer)
         diag = recv()

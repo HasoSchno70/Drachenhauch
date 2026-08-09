@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 7 - Einflug-Manoever mit Bezier-Kurven
-'  Start:  gbrun.py buch-galaga/code/kap07/einflug.gb
+'  Start:  dhrun.py buch-galaga/code/kap07/einflug.gb
 ' ============================================================
 IMPORT "curves"
 

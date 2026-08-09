@@ -6,7 +6,7 @@ Python-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -58,7 +58,7 @@ def test_get_int_accepts_integer_float(run_gb):
 
 
 def test_get_int_rejects_non_integer_float(run_gb):
-    with pytest.raises(GBRuntimeError, match="kein Integer"):
+    with pytest.raises(DHRuntimeError, match="kein Integer"):
         run_gb('IMPORT "json"\n'
                'DIM h AS JSON_HANDLE\n'
                'h = JSON_PARSE("{""x"": 3.14}")\n'
@@ -66,7 +66,7 @@ def test_get_int_rejects_non_integer_float(run_gb):
 
 
 def test_get_string_rejects_number(run_gb):
-    with pytest.raises(GBRuntimeError, match="kein String"):
+    with pytest.raises(DHRuntimeError, match="kein String"):
         run_gb('IMPORT "json"\n'
                'DIM h AS JSON_HANDLE\n'
                'h = JSON_PARSE("{""x"": 1}")\n'
@@ -127,7 +127,7 @@ def test_pretty_indents(run_gb):
 
 
 def test_parse_invalid_raises(run_gb):
-    with pytest.raises(GBRuntimeError, match="JSON_PARSE"):
+    with pytest.raises(DHRuntimeError, match="JSON_PARSE"):
         run_gb('IMPORT "json"\n'
                'DIM h AS JSON_HANDLE\n'
                'h = JSON_PARSE("{not valid json")\n')
@@ -135,7 +135,7 @@ def test_parse_invalid_raises(run_gb):
 
 def test_path_into_non_container_raises(run_gb):
     # dhrt-Wortlaut: "Pfad 'x.y' nicht aufloesbar" (TW sagte "nicht-Container").
-    with pytest.raises(GBRuntimeError, match="nicht aufloesbar"):
+    with pytest.raises(DHRuntimeError, match="nicht aufloesbar"):
         run_gb('IMPORT "json"\n'
                'DIM h AS JSON_HANDLE\n'
                'h = JSON_PARSE("{""x"": 1}")\n'
@@ -143,5 +143,5 @@ def test_path_into_non_container_raises(run_gb):
 
 
 def test_handle_check_in_get(run_gb):
-    with pytest.raises(GBRuntimeError, match="JSON-Handle"):
+    with pytest.raises(DHRuntimeError, match="JSON-Handle"):
         run_gb('IMPORT "json"\nPRINT JSON_GET_STRING("nicht ein handle", "x")\n')

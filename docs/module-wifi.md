@@ -12,7 +12,7 @@ IMPORT "wifi"
 
 **Cross-Platform-Status:** Der Windows-Zweig ist gegen echte Hardware verifiziert. **Linux (`nmcli`) und macOS (`networksetup`/`airport`) sind neu und NICHT auf echter Hardware getestet** (Entwicklung läuft bisher nur unter Windows) — nur nach öffentlicher Doku (Linux) bzw. bestem Wissen (macOS) geschrieben. Der macOS-Zweig ist der unsicherste: `airport` (für `WIFI_SCAN`/`WIFI_SIGNAL`) liegt in einem privaten, undokumentierten Apple-Framework, dessen Verhalten sich zwischen macOS-Versionen schon mehrfach geändert hat und das neuere macOS-Versionen teils hinter einer Standortdienste-Berechtigung versteckt — schlägt es fehl, bekommst du eine klare Fehlermeldung statt eines stillen Fehlschlags. Rückmeldungen von echten Linux-/macOS-Nutzern sind ausdrücklich erwünscht (z.B. als GitHub Issue).
 
-Auf sonstigen Plattformen (BSD, ...) wirft jeder Aufruf `GBRuntimeError` mit einem deutlichen Hinweis.
+Auf sonstigen Plattformen (BSD, ...) wirft jeder Aufruf `DHRuntimeError` mit einem deutlichen Hinweis.
 
 ## Übersicht
 

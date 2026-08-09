@@ -2,7 +2,7 @@
 
 Stufe 5 macht dhrt eigenstaendig: `dhrt run datei.gb` preprocesst (IMPORT),
 lext, parst, kompiliert und fuehrt aus -- ALLES in Rust, ohne Python. Wie
-`gbrun.py` wird ins Verzeichnis der Datei gewechselt (chdir), damit relative
+`dhrun.py` wird ins Verzeichnis der Datei gewechselt (chdir), damit relative
 Pfade (IMPORT + Laufzeit-Asset/-Datei) stimmen.
 
 Verifikation: stdout von `dhrt run` gegen erwartete Ausgaben. Deckt explizit

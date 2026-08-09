@@ -2,7 +2,7 @@
 trailing-Trenner = kein Newline) + Komfort-String/Random-Aliase."""
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 
 # --------------------------------------------------------- PRINT-Trenner
@@ -75,14 +75,14 @@ def test_weighted_choice_forced(run_gb):
 
 
 def test_weighted_choice_zero_total_raises(run_gb):
-    with pytest.raises(GameBasicError, match="Summe der Gewichte"):
+    with pytest.raises(DrachenhauchError, match="Summe der Gewichte"):
         run_gb('DIM v[2] AS STRING\nDIM w[2] AS INTEGER\n'
                'v[0]="a" : v[1]="b"\nw[0]=0 : w[1]=0\n'
                'PRINT WEIGHTED_CHOICE(v, w)\n')
 
 
 def test_weighted_choice_length_mismatch_raises(run_gb):
-    with pytest.raises(GameBasicError, match="gleich lang"):
+    with pytest.raises(DrachenhauchError, match="gleich lang"):
         run_gb('DIM v[2] AS STRING\nDIM w[3] AS INTEGER\n'
                'v[0]="a" : v[1]="b"\n'
                'PRINT WEIGHTED_CHOICE(v, w)\n')

@@ -1087,7 +1087,7 @@ impl Compiler {
         // Statements) -- ein `CONST` innerhalb einer SUB/FUNCTION oder in
         // einem verschachtelten Block (IF/SELECT/...) ist vom Parser aus
         // erlaubt, brachte den Compiler hier aber zum Absturz statt eines
-        // GBRuntimeError. Gleicher Fallback wie emit_namespace_const (ENUM):
+        // DHRuntimeError. Gleicher Fallback wie emit_namespace_const (ENUM):
         // ohne Slot auf den namensbasierten DECLARE_CONST zurueckfallen.
         match self.global_slots.get(name) {
             Some(&slot) => self.ctx.emit(oc::DECLARE_GLOBAL_CONST_SLOT, json!([slot as i64, name_idx, type_idx])),

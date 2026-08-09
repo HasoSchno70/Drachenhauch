@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from gamebasic.tracker import (
+from drachenhauch.tracker import (
     CHANNELS, TONAL, Pattern, Song, midi_to_freq, note_name,
 )
 
@@ -207,7 +207,7 @@ def test_gb_code_compiles(tmp_path):
     s.add_pattern("P2", 8)
     s.patterns[1].set(1, 2, 64)
     s.order = [0, 1, 0]
-    _check_compiles(tmp_path, s.gb_code())
+    _check_compiles(tmp_path, s.dh_code())
 
 
 def test_gb_code_has_expanded_rows():
@@ -215,14 +215,14 @@ def test_gb_code_has_expanded_rows():
     s.patterns[0].set_rows(4)
     s.add_pattern("P2", 4)
     s.order = [0, 1, 0]                    # 12 Reihen total
-    code = s.gb_code()
+    code = s.dh_code()
     assert "CONST TRK_ROWS = 12" in code
 
 
 # --------------------------------------------------------------- Lautstaerke
 
 def test_set_vol_requires_note():
-    from gamebasic.tracker import VOL_MAX
+    from drachenhauch.tracker import VOL_MAX
     p = Pattern("P")
     # ohne Note ignoriert set_vol
     p.set_vol(0, 0, 8)
@@ -285,7 +285,7 @@ def test_vol_copy_independent():
 
 
 def test_vol_to_pct_mapping():
-    from gamebasic.tracker import VOL_MAX, vol_to_pct
+    from drachenhauch.tracker import VOL_MAX, vol_to_pct
     assert vol_to_pct(VOL_MAX) == 100
     assert vol_to_pct(1) >= 1            # nie 0 (reserviert fuer Standard)
 
@@ -294,7 +294,7 @@ def test_gb_code_with_volume_compiles(tmp_path):
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_vol(0, 0, 12)
-    code = s.gb_code()
+    code = s.dh_code()
     assert "DIM trkV0[TRK_ROWS]" in code
     assert "FUNCTION TRACKER_AMP" in code
     _check_compiles(tmp_path, code)
@@ -303,14 +303,14 @@ def test_gb_code_with_volume_compiles(tmp_path):
 def test_gb_code_without_volume_has_no_amp_helper():
     s = Song()
     s.patterns[0].set(0, 0, 60)
-    code = s.gb_code()
+    code = s.dh_code()
     assert "TRACKER_AMP" not in code     # ohne Lautstaerke kein Helfer/Overhead
 
 
 # --------------------------------------------------------------- Pitch-Slide
 
 def test_set_slide_requires_note():
-    from gamebasic.tracker import SLIDE_MAX
+    from drachenhauch.tracker import SLIDE_MAX
     p = Pattern("P")
     p.set_slide(0, 0, 3)
     assert p.get_slide(0, 0) is None     # ohne Note ignoriert
@@ -334,7 +334,7 @@ def test_clearing_note_clears_slide():
 
 
 def test_slide_hz_per_s_direction():
-    from gamebasic.tracker import slide_hz_per_s, midi_to_freq
+    from drachenhauch.tracker import slide_hz_per_s, midi_to_freq
     f = midi_to_freq(60)
     assert slide_hz_per_s(f, 2, 125) > 0     # aufwaerts -> positiv
     assert slide_hz_per_s(f, -2, 125) < 0    # abwaerts -> negativ
@@ -356,7 +356,7 @@ def test_gb_code_with_slide_uses_sfx(tmp_path):
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_slide(0, 0, 2)
     s.patterns[0].set(0, 1, 62)          # ohne Slide -> AUDIO_TONE
-    code = s.gb_code()
+    code = s.dh_code()
     assert "DIM trkSl0[TRK_ROWS]" in code
     assert "AUDIO_SFX" in code
     assert "AUDIO_TONE" in code          # Nicht-Slide-Note nutzt weiter TONE
@@ -366,13 +366,13 @@ def test_gb_code_with_slide_uses_sfx(tmp_path):
 def test_gb_code_without_slide_has_no_sfx():
     s = Song()
     s.patterns[0].set(0, 0, 60)
-    assert "AUDIO_SFX" not in s.gb_code()
+    assert "AUDIO_SFX" not in s.dh_code()
 
 
 # --------------------------------------------------------------- Effekt-Spalte
 
 def test_set_fx_requires_note():
-    from gamebasic.tracker.song import FX_ARP, FX_NONE
+    from drachenhauch.tracker.song import FX_ARP, FX_NONE
     p = Pattern("P")
     p.set_fx(0, 0, FX_ARP, 0x47)
     assert p.get_fx(0, 0) == (FX_NONE, 0)    # ohne Note ignoriert
@@ -384,7 +384,7 @@ def test_set_fx_requires_note():
 
 
 def test_set_fx_clamps_param():
-    from gamebasic.tracker.song import FX_RET
+    from drachenhauch.tracker.song import FX_RET
     p = Pattern("P")
     p.set(0, 0, 60)
     p.set_fx(0, 0, FX_RET, 999)
@@ -392,7 +392,7 @@ def test_set_fx_clamps_param():
 
 
 def test_clearing_note_clears_fx():
-    from gamebasic.tracker.song import FX_VIB, FX_NONE
+    from drachenhauch.tracker.song import FX_VIB, FX_NONE
     p = Pattern("P")
     p.set(0, 0, 60)
     p.set_fx(0, 0, FX_VIB, 0x68)
@@ -401,7 +401,7 @@ def test_clearing_note_clears_fx():
 
 
 def test_fx_json_roundtrip(tmp_path):
-    from gamebasic.tracker.song import FX_ARP
+    from drachenhauch.tracker.song import FX_ARP
     s = Song()
     s.patterns[0].set(2, 5, 64)
     s.patterns[0].set_fx(2, 5, FX_ARP, 0x37)
@@ -412,7 +412,7 @@ def test_fx_json_roundtrip(tmp_path):
 
 
 def test_fx_copy_independent():
-    from gamebasic.tracker.song import FX_ARP, FX_RET
+    from drachenhauch.tracker.song import FX_ARP, FX_RET
     p = Pattern("P")
     p.set(0, 0, 60)
     p.set_fx(0, 0, FX_ARP, 0x47)
@@ -422,7 +422,7 @@ def test_fx_copy_independent():
 
 
 def test_to_dict_omits_empty_fx():
-    from gamebasic.tracker.song import FX_ARP
+    from drachenhauch.tracker.song import FX_ARP
     p = Pattern("P")
     assert "fx" not in p.to_dict()
     p.set(0, 0, 60)
@@ -434,7 +434,7 @@ def test_to_dict_omits_empty_fx():
 
 def _sample_inst(name="Smp"):
     import numpy as np
-    from gamebasic.tracker.instrument import Instrument
+    from drachenhauch.tracker.instrument import Instrument
     t = np.arange(2205) / 44100.0
     return Instrument.from_array(name, np.sin(2 * np.pi * 440 * t), 44100, 69)
 
@@ -513,7 +513,7 @@ def test_gb_code_sample_channel_commented(tmp_path):
     idx = s.add_instrument(_sample_inst("Smp"))
     s.channel_inst[0] = idx
     s.patterns[0].set(0, 0, 60)
-    code = s.gb_code()
+    code = s.dh_code()
     assert "Sample-Instrument" in code      # Hinweis-Kommentar
     # Synth-Kanaele + Drum bleiben gueltig -> kompiliert weiter
     _check_compiles(tmp_path, code)
@@ -529,7 +529,7 @@ def test_no_fidelity_gaps_on_plain_song():
 
 
 def test_fidelity_gap_detected_for_fx():
-    from gamebasic.tracker.song import FX_ARP
+    from drachenhauch.tracker.song import FX_ARP
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_fx(0, 0, FX_ARP, 0x37)
@@ -545,7 +545,7 @@ def test_fidelity_gap_detected_for_per_note_instrument():
 
 
 def test_fidelity_gap_ignores_fx_none():
-    from gamebasic.tracker.song import FX_NONE
+    from drachenhauch.tracker.song import FX_NONE
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set_fx(0, 0, FX_NONE)

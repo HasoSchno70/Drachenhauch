@@ -30,7 +30,7 @@ bleibt unverändert — Rust übernimmt nur die Ausführung des kompilierten
 7. Editor: „Export → native Exe bundeln". ✅ *erledigt (Bytecode + Assets in
    eine standalone `.exe` gebündelt — siehe unten)*
 
-**Dev-Run-Loop** (quer zu den Schritten): `gbrun.py --native <datei.gb>` —
+**Dev-Run-Loop** (quer zu den Schritten): `dhrun.py --native <datei.gb>` —
 ein Befehl kompiliert (Python) → `.gbc` → startet `dhrt`. ✅ *erledigt* (siehe
 unten).
 
@@ -199,7 +199,7 @@ werden in `render_scene` im Draw-Kontext an die Slots 11/12/13 gebunden (Cubemap
 via `rlEnableTextureCubemap`, BRDF-LUT 2D via `rlEnableTexture`; Material-Maps
 nutzen 0..2, Shadow 10 → kein Clash). Dispatch `"light_env_hdr"` in
 [`vm.rs`](../rust/gb_runtime/src/vm.rs), native-only-Stub in
-[`g3d.py`](../gamebasic/modules/g3d.py).
+[`g3d.py`](../drachenhauch/modules/g3d.py).
 
 **Drei rlgl-Stolpersteine** (für Nachbauten):
 - `rlFramebufferAttach` endet mit `glBindFramebuffer(0)` → **nach jedem Attach das
@@ -227,12 +227,12 @@ kloofendal_43d_clear) als `examples/assets/ibl_env.hdr` (gitignored). Per
 Screenshot verifiziert (Spiegel→diffus über die Roughness-Reihe). Bit-Identität
 entfällt (GPU/3D); analytisches `96_ibl` bleibt unverändert.
 
-## Dev-Run-Loop: `gbrun.py --native`
+## Dev-Run-Loop: `dhrun.py --native`
 
 Für schnelles Iterieren beim Coden gibt es einen One-Command-Pfad:
 
 ```
-.venv\Scripts\python.exe gbrun.py --native examples\30_shapes.gb
+.venv\Scripts\python.exe dhrun.py --native examples\30_shapes.gb
 ```
 
 Das kompiliert die `.gb`-Datei (Lexer/Parser/Compiler bleiben in Python),
@@ -249,7 +249,7 @@ Ausführung nativ läuft — kein manuelles `serialize` + `dhrt` mehr.
 **primär `dhrt`** (fällt bei nicht gebauter Runtime / Compile- oder Start-Fehler
 automatisch auf den Tree-Walker zurück). Der Editor kompiliert die Datei
 in-process in eine temporäre `.gbc` und startet `dhrt` **direkt** als `QProcess`
-(nicht über `gbrun.py`) — so beendet der `Stop`-Button auch den nativen Prozess
+(nicht über `dhrun.py`) — so beendet der `Stop`-Button auch den nativen Prozess
 (kein verwaister dhrt). Output und Laufzeitfehler
 (`datei.gb:Zeile`, klickbar) landen in derselben Konsole wie der Python-Run.
 
@@ -259,7 +259,7 @@ Der Compiler stempelt pro Bytecode-Instruktion die **Quell-Zeile** (`stmt.line`
 vom Parser) in ein zu `code` paralleles `lines`-Array (`CompiledFunction.lines`,
 serialisiert als `"lines"` in der `.gbc`). Die Rust-VM merkt sich die Zeile der
 zuletzt ausgeführten Instruktion (`Vm.cur_line`); bei einem propagierenden
-Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `gbrun.py --native`
+Fehler bleibt die **innerste** fehlschlagende Zeile stehen. `dhrun.py --native`
 reicht den Quell-Dateinamen als 2. Arg an `dhrt` durch, sodass die Meldung lautet:
 
 ```
@@ -273,20 +273,20 @@ Meldung ohne Zeilenangabe.
 **Compile-Fehler** (vor der Ausführung, in Python) tragen ebenfalls eine Zeile:
 Parser-Fehler ohnehin, und `CompileError` wird zentral mit der Statement- bzw.
 Deklarations-Zeile angereichert (`Compiler._at` + `_stmt`, via
-`GameBasicError.set_line`). So zeigt der `--native`/F6-Pfad z. B.
+`DrachenhauchError.set_line`). So zeigt der `--native`/F6-Pfad z. B.
 `[Zeile 4] CompileError: SUB 'foo' bereits deklariert` — im Editor als
 klickbarer Link in die Quelldatei.
 
 ## Schritt 1: `.gbc`-Serialisierung
 
-[`gamebasic/serialize.py`](../gamebasic/serialize.py) wandelt ein vom
-`Compiler` erzeugtes `Module` ([bytecode.py](../gamebasic/bytecode.py)) in eine
+[`drachenhauch/serialize.py`](../drachenhauch/serialize.py) wandelt ein vom
+`Compiler` erzeugtes `Module` ([bytecode.py](../drachenhauch/bytecode.py)) in eine
 selbstbeschreibende JSON-Datei. JSON ist für den Spike bewusst gewählt
 (debuggbar); ein kompaktes Binärformat ist später drop-in möglich.
 
 **CLI:**
 ```
-.venv\Scripts\python.exe -m gamebasic.serialize [--pretty] <datei.gb> [out.gbc]
+.venv\Scripts\python.exe -m drachenhauch.serialize [--pretty] <datei.gb> [out.gbc]
 ```
 
 > **Wichtig:** `serialize.py` importiert `interpreter.py`, bevor es kompiliert.
@@ -294,7 +294,7 @@ selbstbeschreibende JSON-Datei. JSON ist für den Spike bewusst gewählt
 > Decorators in `interpreter.py` gefüllt), ob ein Identifier-Call wie `LEN(a)`
 > zu `CALL_BUILTIN` wird. Ohne diesen Import sähe der Compiler die Registry
 > nicht und erzeugte für `LEN`/`INT`/… kaputten `LOAD_NAME + CALL_VALUE`-
-> Bytecode. `gbrun.py` importiert `interpreter` am Modulanfang — dieselbe
+> Bytecode. `dhrun.py` importiert `interpreter` am Modulanfang — dieselbe
 > Umgebung wird hier hergestellt.
 
 **Wert-Encoding** (eindeutig dekodierbar — INT/FLOAT/BOOL müssen unterscheidbar
@@ -334,7 +334,7 @@ Arithmetik (ADD/SUB/MUL/DIV/MOD/POW/NEG/INT_DIV) inkl. der spezialisierten
 `_NN`-Opcodes, Vergleiche, Bitwise, Control-Flow (JUMP/JUMP_IF_*), User-Calls
 (CALL_USER/RETURN/RETURN_VOID), PRINT, HALT.
 
-**Bit-Identitäts-kritische Semantik** (1:1 aus `gamebasic/vm.py`):
+**Bit-Identitäts-kritische Semantik** (1:1 aus `drachenhauch/vm.py`):
 - `_fmt`: `NIL`/`TRUE`/`FALSE`; float-ganzzahlig → `{:.1f}` (immer Fixpunkt,
   auch `1e16` → `10000000000000000.0`), nicht-ganzzahlig → Python-`repr` mit
   E-Notation-Schwelle (`decpt <= -4` oder `> 16`), nachgebaut über Rusts `{:e}`.
@@ -500,7 +500,7 @@ Verifiziert (visuell per Screenshot) an allen 7 IMPORT-freien Grafik-Beispielen:
 ## Schritt 5: Module (IMPORT)
 
 Modul-Builtins erreichen den Compiler automatisch: `IMPORT "x"` lädt im
-Preprocessor das Python-Modul `gamebasic.modules.x`, dessen `@builtin`-
+Preprocessor das Python-Modul `drachenhauch.modules.x`, dessen `@builtin`-
 Decorators die `BUILTINS`-Registry füllen → der Compiler emittiert
 `CALL_BUILTIN`. Die Rust-VM muss nur die jeweiligen Builtins implementieren —
 **keine Serializer-Änderung nötig**.
@@ -662,7 +662,7 @@ emittiert); im Python/Tree-Walker-Pfad (F5) werfen sie eine klare Meldung
 („… nur in der nativen Runtime … mit F6"). In `dhrt` rendern sie über raylibs
 `begin_mode3D`-API.
 
-**Builtins** ([`g3d.py`](../gamebasic/modules/g3d.py), Rendering in
+**Builtins** ([`g3d.py`](../drachenhauch/modules/g3d.py), Rendering in
 `graphics.rs`/`vm.rs`):
 - `CAMERA3D(px,py,pz, tx,ty,tz, fovy)` — Perspektiv-Kamera (Up = +Y), pro Frame.
 - `CAMERA_ORBIT(tx,ty,tz, radius, yaw, pitch[, fovy])` — Orbit-Kamera: blickt aus
@@ -977,7 +977,7 @@ Variante — dafür eine fette/kursive Font-Datei laden).
 Vec<Font>` (raylib `load_font_ex`), `active_font` (-1 = Default), `text_spacing`.
 `Cmd::Text` trägt jetzt Font-Index + Spacing; beim Replay zeichnet ein gültiger
 Index via `draw_text_ex(font, …)`, sonst der Default-`draw_text`. Der Tree-Walker
-([graphics.py](../gamebasic/graphics.py)) ist konsolen-only und rendert keinen Text.
+([graphics.py](../drachenhauch/graphics.py)) ist konsolen-only und rendert keinen Text.
 
 **Bit-Identität gilt nicht** (Renderer/Font-Metriken unterscheiden sich) — wie
 bei der übrigen Grafik nur funktional. Es liegt **kein Font-Asset im Repo**;
@@ -999,7 +999,7 @@ Glow-Funken auf dem Kick und ein 2D-FFT-Spektrum. Alles **echt FFT-reaktiv**
 (`AUDIO_FFT`) zu einem Stereo-Techno-Track. `SET_FULLSCREEN(TRUE)`, Kamera kreist
 mit Bass-Punch. Musik: „Technological Messup" von **josepharaoh99**, **CC0** —
 einmalig holen mit `py examples/assets/download_techno.py` (läuft auch ohne, stumm
-via `FILEEXISTS`-Guard). Nur nativ: `gbrun.py --native examples\97_pbr_reactor.gb`.
+via `FILEEXISTS`-Guard). Nur nativ: `dhrun.py --native examples\97_pbr_reactor.gb`.
 
 [examples/85_cybermatic_demo.gb](../examples/85_cybermatic_demo.gb) bündelt in
 einem 1280×720-Frame, was die native Runtime kann — **audio-reaktiv** (echte
@@ -1009,14 +1009,14 @@ Kugel + Säule, Kamera-Punch/Shake) → `PLASMA` (audio-reaktives Würfel-Terrai
 Dazu durchgehend ein 2D-Overlay: FFT-Spektrum (`BOXES`-Bulk, oben+unten),
 Glow-Funken + Cyber-Regen (zwei Partikelsysteme), pulsierender Titel,
 Laufschrift, dezenter Beat-Flash. Nur nativ:
-`gbrun.py --native examples\85_cybermatic_demo.gb` (oder F6).
+`dhrun.py --native examples\85_cybermatic_demo.gb` (oder F6).
 
 Das Musik-Asset (~15 MB, „Cybermatic pulse" von **Alexandr Zhelanov**,
 CC-BY 4.0) liegt **nicht** im Repo (zu groß) — einmalig holen mit
 `py examples/assets/download_cybermatic.py`. Die Demo läuft auch ohne (stumm,
 via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.txt`.
 
-## Schritt 7: Standalone-Export (`gbrun.py --export` / Editor)
+## Schritt 7: Standalone-Export (`dhrun.py --export` / Editor)
 
 Ein GameBasic-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
 Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
@@ -1057,7 +1057,7 @@ extrahiert den Bytecode.
 eingebetteten Bytecode aus. Ohne Payload bleibt der Dev-Modus (`dhrt datei.gbc`).
 Beide Pfade teilen sich `run_gbc_text(text, label)`.
 
-**Export-Seite** ([gamebasic/export.py](../gamebasic/export.py)):
+**Export-Seite** ([drachenhauch/export.py](../drachenhauch/export.py)):
 `export_standalone(src_gb, dhrt_path, out_dir)` kompiliert in-memory zu `.gbc`,
 hängt `<gbc><len><magic>` an die Runtime-Bytes und schreibt `<out>/<name>.exe`.
 Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
@@ -1065,7 +1065,7 @@ Der `assets/`-Ordner neben der Quelle wird mitkopiert (Konvention für
 
 **Aufruf:**
 ```
-.venv\Scripts\python.exe gbrun.py --export examples\89_heightmap.gb [ausgabe-ordner]
+.venv\Scripts\python.exe dhrun.py --export examples\89_heightmap.gb [ausgabe-ordner]
 ```
 Default-Ausgabe: `<quelle>_dist/`. Im **Editor**: Menü *Ausführen → Export →
 standalone .exe* bzw. **Ctrl+F6** (Toolbar-Button neben Run/Bench) — bündelt die

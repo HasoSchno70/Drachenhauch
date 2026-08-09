@@ -1,10 +1,10 @@
 # SFX-Generator
 
-Tool für Retro-Soundeffekte im sfxr-Stil: eigener Synthesizer mit Pitch-Slide, Hüllkurve, Vibrato und **SID-Charakter** (Pulsbreite/PWM + resonanter Filter-Sweep), Live-Wellenform-Vorschau, Abspielen und Export als **WAV** (per `LOADSOUND` ladbar) oder GB-Code. Ist der **SFX-Tab im [Audio Studio](tracker.md#audio-studio)** (`gbsound`).
+Tool für Retro-Soundeffekte im sfxr-Stil: eigener Synthesizer mit Pitch-Slide, Hüllkurve, Vibrato und **SID-Charakter** (Pulsbreite/PWM + resonanter Filter-Sweep), Live-Wellenform-Vorschau, Abspielen und Export als **WAV** (per `LOADSOUND` ladbar) oder GB-Code. Ist der **SFX-Tab im [Audio Studio](tracker.md#audio-studio)** (`dhsound`).
 
 ## Starten
 
-Am bequemsten als Tab im **Audio Studio**: `gbsound` (oder `gbrun.py --audio`) → Reiter „SFX-Generator". Auch einzeln aus dem **Code-Editor** (Toolbar-Button / `Datei → SFX-Generator öffnen ...`, `Strg+Shift+J`) oder standalone `gbsfx` / `gbrun.py --sfx` (öffnen ebenfalls das Studio auf dem SFX-Tab). Braucht `PySide6` + `numpy`.
+Am bequemsten als Tab im **Audio Studio**: `dhsound` (oder `dhrun.py --audio`) → Reiter „SFX-Generator". Auch einzeln aus dem **Code-Editor** (Toolbar-Button / `Datei → SFX-Generator öffnen ...`, `Strg+Shift+J`) oder standalone `dhsfx` / `dhrun.py --sfx` (öffnen ebenfalls das Studio auf dem SFX-Tab). Braucht `PySide6` + `numpy`.
 
 ## Bedienung
 
@@ -16,7 +16,7 @@ Die UI ist eine **Fader-Bank im sfxr-Stil**: links eine **Preset-Leiste**, oben 
 - **Vibrato / Stereo** (amber) — Vibrato-Tiefe + -Speed, **Stereo-Breite** (0 = mono, >0 = breiter per Detune; bei `noise` dekorreliert) und **Pan** (links −1 … +1 rechts).
 
 - **Preset-Leiste** links — `Pickup/Coin`, `Laser/Shoot`, `Explosion`, `Powerup`, `Hit/Hurt`, `Jump`, `Blip/Select`. Klick lädt + spielt.
-- **Preset-Bibliothek** (oben) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.gamebasic/presets/sfx.json`) und lade sie über die Combo wieder.
+- **Preset-Bibliothek** (oben) — speichere eigene Sounds als benannte Presets („Speichern unter...", persistiert unter `~/.drachenhauch/presets/sfx.json`) und lade sie über die Combo wieder.
 - **`▶ Abspielen`** spielt den aktuellen Effekt, **`🎲 Zufall`** würfelt neue Parameter (mit Abspielen).
 - **`Auto-Play`** (Häkchen, standardmäßig an) — beim Verschieben eines Faders wird der Ton **automatisch abgespielt** (kurz entprellt, spielt also einmal, sobald du loslässt), damit du sofort hörst, ob der Wert passt. Eine explizite Wiedergabe bricht ein ausstehendes Auto-Play ab (kein Doppel-Ton).
 - **↶/↷** (oder `Strg+Z` / `Strg+Y`) machen Änderungen rückgängig bzw. wieder her — ein Preset-Laden, ein `Zufall` oder ein Fader-Drag zählt je als ein Schritt.
@@ -44,7 +44,7 @@ AUDIO_SFX(waveform$, freq, slide, attack_ms, sustain_ms, decay_ms,
           vib_depth, vib_speed, volume[, stereo_width]) -> SOUND
 ```
 
-Der Effekt wird im Spiel selbst synthetisiert — `slide` ist der Pitch-Sweep (Hz/s, negativ = fallend), Attack/Sustain/Decay die Hüllkurve, `vib_depth`/`vib_speed` ein optionales Vibrato. Der optionale `stereo_width` (0…1) macht den Sound **stereo/breiter** (Detune zwischen L/R; bei `noise` dekorreliert). Komplementär zu `AUDIO_TONE` (das nur konstante Töne kann). Läuft über die native Runtime `dhrt`; die Synth-Mathematik ist geteilt — [`gamebasic/synth.py`](../gamebasic/synth.py) (Editor-Vorschau) bzw. `rust/gb_runtime/src/audio.rs` (nativ).
+Der Effekt wird im Spiel selbst synthetisiert — `slide` ist der Pitch-Sweep (Hz/s, negativ = fallend), Attack/Sustain/Decay die Hüllkurve, `vib_depth`/`vib_speed` ein optionales Vibrato. Der optionale `stereo_width` (0…1) macht den Sound **stereo/breiter** (Detune zwischen L/R; bei `noise` dekorreliert). Komplementär zu `AUDIO_TONE` (das nur konstante Töne kann). Läuft über die native Runtime `dhrt`; die Synth-Mathematik ist geteilt — [`drachenhauch/synth.py`](../drachenhauch/synth.py) (Editor-Vorschau) bzw. `rust/gb_runtime/src/audio.rs` (nativ).
 
 **Pan** (Position links/rechts) wird beim Abspielen gesetzt — der Export schreibt dafür `AUDIO_PLAY` + `AUDIO_PAN(ch, left, right)` dazu:
 ```basic

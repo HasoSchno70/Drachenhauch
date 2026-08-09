@@ -13,9 +13,9 @@ nicht weniger (sonst streicht er gueltigen Code rot an).
 """
 import pytest
 
-from gamebasic.lexer import Lexer
-from gamebasic.parser import Parser
-from gamebasic.errors import ParseError
+from drachenhauch.lexer import Lexer
+from drachenhauch.parser import Parser
+from drachenhauch.errors import ParseError
 
 
 CLS = ("CLASS P\n"

@@ -22,7 +22,7 @@
 '
 '  Steuerung:  LEER = Szene weiter    F11 = Vollbild    ESC = Ende
 '
-'  Start:  gbrun.py gbdemo\gbdemo.gb
+'  Start:  dhrun.py gbdemo\gbdemo.gb
 ' ======================================================================
 
 IMPORT "audio"

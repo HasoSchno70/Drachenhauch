@@ -1,5 +1,5 @@
 """Tests fuer den Fold-Region-Scanner."""
-from gamebasic.editor_qt.folding import scan
+from drachenhauch.editor_qt.folding import scan
 
 
 def test_empty_source_returns_empty():

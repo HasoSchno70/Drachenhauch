@@ -3,7 +3,7 @@
 ' Zeigt Kamera, Boden-Gitter, gefuellte + Drahtgitter-Koerper, Linien und ein
 ' 2D-HUD ueber der Szene. Kamera kreist langsam um den Ursprung.
 '
-' Ausfuehren:  gbrun.py --native examples\82_3d_intro.gb   (oder F6 im Editor)
+' Ausfuehren:  dhrun.py --native examples\82_3d_intro.gb   (oder F6 im Editor)
 ' Mit F5 (Tree-Walker) kommt eine klare Meldung: 3D braucht die native Runtime.
 
 IMPORT "g3d"

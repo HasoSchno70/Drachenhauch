@@ -6,7 +6,7 @@ Python-Builtin-Impl (in Phase 8 geloescht).
 """
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -150,12 +150,12 @@ def test_hermite_with_zero_tangents_is_smooth(run_gb):
 # --- Type-Checking -------------------------------------------------
 
 def test_lerp_rejects_string(run_gb):
-    with pytest.raises(GBRuntimeError, match="erwartet"):
+    with pytest.raises(DHRuntimeError, match="erwartet"):
         run_gb('IMPORT "curves"\nPRINT CURVE_LERP("nope", 1.0, 0.5)\n')
 
 
 def test_bezier_rejects_bool(run_gb):
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb('IMPORT "curves"\nPRINT CURVE_BEZIER(TRUE, 0.0, 0.0, 0.0, 0.0)\n')
 
 

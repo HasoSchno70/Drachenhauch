@@ -21,14 +21,14 @@ def app():
 
 
 def _window(app):
-    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
     return SpriteEditorWindow(project_root=Path("."))
 
 
 # --- AnimationPreview: Fenster-/Timer-Leck -------------------------------
 
 def test_animation_preview_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import AnimationPreview
+    from drachenhauch.spriteeditor_qt import AnimationPreview
     win = _window(app)
     dlg = AnimationPreview(win, win.doc.frames, win.doc.width, win.doc.height)
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
@@ -36,7 +36,7 @@ def test_animation_preview_has_delete_on_close(app):
 
 
 def test_animation_preview_close_stops_timers(app):
-    from gamebasic.spriteeditor_qt import AnimationPreview
+    from drachenhauch.spriteeditor_qt import AnimationPreview
     win = _window(app)
     dlg = AnimationPreview(win, win.doc.frames, win.doc.width, win.doc.height)
     assert dlg._timer.isActive()
@@ -49,7 +49,7 @@ def test_animation_preview_close_stops_timers(app):
 # --- AnimsPanel: Undo fuer Animations-Bereiche ---------------------------
 
 def test_anims_panel_add_is_undoable(app, monkeypatch):
-    from gamebasic.spriteeditor_qt import AnimRangeDialog, Anim
+    from drachenhauch.spriteeditor_qt import AnimRangeDialog, Anim
     win = _window(app)
     win.doc.add_frame()
     monkeypatch.setattr(
@@ -66,7 +66,7 @@ def test_anims_panel_add_is_undoable(app, monkeypatch):
 
 
 def test_anims_panel_delete_is_undoable(app):
-    from gamebasic.spriteeditor_qt import Anim
+    from drachenhauch.spriteeditor_qt import Anim
     win = _window(app)
     win.doc.add_frame()
     win.doc.anims = [Anim("run", 0, 1, 8)]
@@ -80,7 +80,7 @@ def test_anims_panel_delete_is_undoable(app):
 
 
 def test_anims_panel_edit_is_undoable(app, monkeypatch):
-    from gamebasic.spriteeditor_qt import AnimRangeDialog, Anim
+    from drachenhauch.spriteeditor_qt import AnimRangeDialog, Anim
     win = _window(app)
     win.doc.add_frame()
     win.doc.anims = [Anim("run", 0, 1, 8)]
@@ -186,28 +186,28 @@ def test_color_slider_commit_via_debounce_timer(app):
 # --- WA_DeleteOnClose auf den restlichen Dialogen -------------------------
 
 def test_resize_canvas_dialog_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import ResizeCanvasDialog
+    from drachenhauch.spriteeditor_qt import ResizeCanvasDialog
     win = _window(app)
     dlg = ResizeCanvasDialog(win, win.doc.width, win.doc.height)
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
 
 def test_new_sprite_dialog_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import NewSpriteDialog
+    from drachenhauch.spriteeditor_qt import NewSpriteDialog
     win = _window(app)
     dlg = NewSpriteDialog(win)
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
 
 def test_color_replace_dialog_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import ColorReplaceDialog
+    from drachenhauch.spriteeditor_qt import ColorReplaceDialog
     win = _window(app)
     dlg = ColorReplaceDialog(win)
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
 
 def test_sheet_import_dialog_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import SheetImportDialog
+    from drachenhauch.spriteeditor_qt import SheetImportDialog
     from PIL import Image
     win = _window(app)
     img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
@@ -216,7 +216,7 @@ def test_sheet_import_dialog_has_delete_on_close(app):
 
 
 def test_anim_range_dialog_has_delete_on_close(app):
-    from gamebasic.spriteeditor_qt import AnimRangeDialog, Anim
+    from drachenhauch.spriteeditor_qt import AnimRangeDialog, Anim
     win = _window(app)
     dlg = AnimRangeDialog(win, win.doc, Anim("a", 0, 0, 8))
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)

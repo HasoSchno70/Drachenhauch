@@ -217,17 +217,17 @@ def _print_manual(info: dict, out_dir: str | Path = WEB) -> None:
     print("  -> target/wasm32-unknown-emscripten/release/dhrt.{js,wasm} nach web/ kopieren")
 
 
-def copy_source(gb_path: str | Path, out_dir: str | Path = WEB) -> Path:
+def copy_source(dh_path: str | Path, out_dir: str | Path = WEB) -> Path:
     """Kopiert die `.gb`-Quelle nach `<out_dir>/program.gb` -- dhrt kompiliert
     sie im Browser selbst (Front-End-Port). Kein Python im Browser noetig."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     dst = out_dir / "program.gb"
-    dst.write_text(Path(gb_path).read_text(encoding="utf-8"), encoding="utf-8")
+    dst.write_text(Path(dh_path).read_text(encoding="utf-8"), encoding="utf-8")
     return dst
 
 
-def copy_assets(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
+def copy_assets(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
     """Uebernimmt ein `assets/`-Verzeichnis NEBEN der `.gb` nach `<out_dir>`.
 
     Die Laufzeit chdirt im Browser nach `/`, und dort liegt auch `program.gb`
@@ -237,7 +237,7 @@ def copy_assets(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
 
     Liefert die Groesse in Bytes (0 = kein assets/ vorhanden).
     """
-    quelle = Path(gb_path).resolve().parent / "assets"
+    quelle = Path(dh_path).resolve().parent / "assets"
     ziel = Path(out_dir) / "assets"
     if ziel.exists():
         shutil.rmtree(ziel)          # alte Assets nicht mitschleppen
@@ -292,10 +292,10 @@ def erzwinge_relink(flags: str) -> bool:
     return True
 
 
-def build(gb_path: str | Path, out_dir: str | Path = WEB) -> int:
-    src = copy_source(gb_path, out_dir)
+def build(dh_path: str | Path, out_dir: str | Path = WEB) -> int:
+    src = copy_source(dh_path, out_dir)
     print(f"Quelle eingebettet: {src}")
-    groesse = copy_assets(gb_path, out_dir)
+    groesse = copy_assets(dh_path, out_dir)
     if groesse:
         print(f"Assets uebernommen: {groesse / 1048576:.1f} MB "
               f"(werden als dhrt.data vorgeladen)")

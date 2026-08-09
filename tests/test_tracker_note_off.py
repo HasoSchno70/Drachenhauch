@@ -8,8 +8,8 @@ der WAV-Mixer nutzt es als Sustain-Grenze ohne selbst Klang zu erzeugen."""
 import numpy as np
 import pytest
 
-from gamebasic.tracker import NOTE_OFF, Pattern, Song
-from gamebasic.tracker.mixer import render_song, _note_events
+from drachenhauch.tracker import NOTE_OFF, Pattern, Song
+from drachenhauch.tracker.mixer import render_song, _note_events
 
 
 def test_note_off_clears_vol_slide_fx():
@@ -17,7 +17,7 @@ def test_note_off_clears_vol_slide_fx():
     p.set(0, 0, 60)
     p.set_vol(0, 0, 10)
     p.set_slide(0, 0, 5)
-    from gamebasic.tracker.song import FX_ARP
+    from drachenhauch.tracker.song import FX_ARP
     p.set_fx(0, 0, FX_ARP, 0x47)
     p.set(0, 0, NOTE_OFF)
     assert p.data[0][0] == NOTE_OFF
@@ -39,7 +39,7 @@ def test_gb_code_no_trigger_on_note_off_row():
     s = Song()
     s.patterns[0].set(0, 0, 60)
     s.patterns[0].set(0, 4, NOTE_OFF)
-    code = s.gb_code()
+    code = s.dh_code()
     assert "trk0[0] = " in code
     assert "trk0[4] = " not in code     # 0 -> kein Zuweisungs-Statement noetig
 
@@ -93,7 +93,7 @@ def test_editor_set_note_off_button():
     from pathlib import Path
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from gamebasic.trackereditor_qt import TrackerEditor
+    from drachenhauch.trackereditor_qt import TrackerEditor
     ed = TrackerEditor(Path("."))
     pat = ed.song.patterns[ed.cur]
     pat.set(0, 0, 60)
@@ -112,7 +112,7 @@ def test_editor_zero_key_sets_note_off():
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from gamebasic.trackereditor_qt import TrackerEditor
+    from drachenhauch.trackereditor_qt import TrackerEditor
     ed = TrackerEditor(Path("."))
     pat = ed.song.patterns[ed.cur]
     pat.set(0, 0, 60)
@@ -122,7 +122,7 @@ def test_editor_zero_key_sets_note_off():
 
 
 def test_block_transpose_skips_note_off():
-    from gamebasic.tracker import block_transpose
+    from drachenhauch.tracker import block_transpose
     p = Pattern("P", rows=2)
     p.set(0, 0, NOTE_OFF)
     block_transpose(p, 0, 0, 0, 0, 12)
@@ -134,7 +134,7 @@ def test_block_interpolate_ignores_note_off_as_endpoint():
     wuerde zwischen 60 und der sinnlosen "Tonhoehe" -1 interpoliert). Reihe 0
     (60) und Reihe 8 (72) bleiben die gueltigen Endpunkte, die Rampe laeuft
     also ueber die Note-Off-Zelle bei Reihe 4 hinweg (bleibt dort stehen)."""
-    from gamebasic.tracker import block_interpolate
+    from drachenhauch.tracker import block_interpolate
     p = Pattern("P", rows=9)
     p.set(0, 0, 60)
     p.set(0, 4, NOTE_OFF)

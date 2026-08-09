@@ -2,12 +2,12 @@
 
 > **⚠️ HISTORISCH (Design-Notiz).** Das `gui`-Modul ist inzwischen vollständig
 > umgesetzt und läuft **nativ in `dhrt`** (`rust/gb_runtime/src/gui.rs`) — nicht
-> mehr in `gamebasic/modules/gui.py`. Erwähnungen von „3 Pfaden"/Tree-Walker/
+> mehr in `drachenhauch/modules/gui.py`. Erwähnungen von „3 Pfaden"/Tree-Walker/
 > Python-VM unten beschreiben die damalige (entfernte) Architektur. Aktuelle
 > Doku: [module-gui.md](module-gui.md).
 
 > Status: **Phase 1+2 implementiert** (Modul `gui`, Retained-Mode) -- siehe
-> [module-gui.md](module-gui.md), `gamebasic/modules/gui.py`,
+> [module-gui.md](module-gui.md), `drachenhauch/modules/gui.py`,
 > Tests `tests/test_modules_gui.py`, Demo `examples/45_gui.gb`.
 > Verifiziert: TW == Python-VM == Native-VM (bit-identisch).
 > Phase 3 (FUNCREF-Callbacks `GUI_ON_CLICK`) implementiert -- Builtin->Engine-
@@ -21,7 +21,7 @@
 
 Fenster, Buttons & weitere Widgets als **nachladbare Module** — passend zur
 bestehenden GameBasic-Modul-Architektur (`IMPORT "x"` lädt
-`gamebasic/modules/x.py` beim ersten Aufruf, registriert Builtins +
+`drachenhauch/modules/x.py` beim ersten Aufruf, registriert Builtins +
 externe Typen, **kein** Eingriff in Lexer/Parser/VM). Rein additiv,
 drei-Pfade-neutral, bit-identisch-unkritisch (Grafik/Interaktion).
 
@@ -42,7 +42,7 @@ drei-Pfade-neutral, bit-identisch-unkritisch (Grafik/Interaktion).
 
 ## Was es bereits gibt (Basis)
 
-`gamebasic/modules/ui.py` (Immediate-Mode) deckt schon ab: `UI_LABEL`,
+`drachenhauch/modules/ui.py` (Immediate-Mode) deckt schon ab: `UI_LABEL`,
 `UI_BUTTON`, `UI_CHECKBOX`, `UI_SLIDER`, `UI_PROGRESS`, `UI_PANEL` (Container
 mit Titel), `UI_TEXTFIELD` (Fokus + Tastatur), `UI_RADIO`, `UI_TABLE`,
 `UI_END_FRAME`, `UI_RESET`. State per id-String. **Route 1 baut darauf auf.**

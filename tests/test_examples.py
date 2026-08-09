@@ -39,7 +39,7 @@ _NON_DETERMINISTIC = [
 _INTERACTIVE_OR_ASSETS = [
     "09_shapes", "10_pong", "12_sprite", "13_sound",
     "17_tilemap", "21_modules", "22_tetris", "23_platformer",
-    "27_imgfx",     # laedt assets/hero.png - braucht gbrun.py (chdir)
+    "27_imgfx",     # laedt assets/hero.png - braucht dhrun.py (chdir)
     "31_sprite",    # LOADIMAGE/Sprite-Rendering -> nur native (dhrt)
     "28_particles_visual", "141_camera_visual",
 ]

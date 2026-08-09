@@ -27,7 +27,7 @@ def app():
 
 @pytest.fixture
 def editor(app):
-    from gamebasic.particleeditor_qt import ParticleEditor
+    from drachenhauch.particleeditor_qt import ParticleEditor
     return ParticleEditor(project_root=_ROOT)
 
 

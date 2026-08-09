@@ -13,7 +13,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
-from gamebasic.editor_qt.print_listing import build_listing_html
+from drachenhauch.editor_qt.print_listing import build_listing_html
 
 SRC = 'SCREEN(480, 640, "Galaga")   \' Fenster\nDIM x AS INTEGER'
 
@@ -83,7 +83,7 @@ def app():
 
 
 def test_duplex_and_margin_options(app):
-    from gamebasic.editor_qt.print_listing import PrintOptionsDialog
+    from drachenhauch.editor_qt.print_listing import PrintOptionsDialog
     dlg = PrintOptionsDialog(None, has_selection=False)
     # Defaults
     assert dlg.duplex == "none"
@@ -109,7 +109,7 @@ def test_binding_margin_mirrors_on_duplex(app):
     from PySide6.QtGui import QFont, QTextDocument, QPageLayout
     from PySide6.QtCore import QMarginsF
     from PySide6.QtPrintSupport import QPrinter
-    from gamebasic.editor_qt.print_listing import (
+    from drachenhauch.editor_qt.print_listing import (
         build_listing_html, _render_with_footer, _DUPLEX_MODES)
 
     src = "\n".join(f"line_{i} = {i}" for i in range(120))   # > 1 Seite
@@ -145,7 +145,7 @@ def test_preview_toolbar_decorated(app):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QToolBar
     from PySide6.QtPrintSupport import QPrinter, QPrintPreviewDialog
-    from gamebasic.editor_qt.print_listing import _decorate_preview
+    from drachenhauch.editor_qt.print_listing import _decorate_preview
 
     dlg = QPrintPreviewDialog(QPrinter())
     _decorate_preview(dlg)

@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 11 - Vollbild & Kamera (Spielfeld skaliert + zentriert)
-'  Start:  gbrun.py buch-galaga/code/kap11/vollbild.gb
+'  Start:  dhrun.py buch-galaga/code/kap11/vollbild.gb
 ' ============================================================
 IMPORT "curves"
 IMPORT "camera"

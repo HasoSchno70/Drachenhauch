@@ -5,7 +5,7 @@ f32-intern: bei nicht-exakten Werten via ROUND vergleichen.
 """
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 
 def _gb(body: str) -> str:
@@ -160,13 +160,13 @@ def test_mat4_get(run_gb):
 
 
 def test_mat4_invert_singular_raises(run_gb):
-    with pytest.raises(GameBasicError, match="nicht invertierbar"):
+    with pytest.raises(DrachenhauchError, match="nicht invertierbar"):
         run_gb(_gb("PRINT MAT4_INVERT(MAT4_SCALE(0, 0, 0))\n"))
 
 
 # --------------------------------------------------------------- Typ-Fehler
 def test_type_mismatch_raises(run_gb):
-    with pytest.raises(GameBasicError, match="Erwartet VEC3"):
+    with pytest.raises(DrachenhauchError, match="Erwartet VEC3"):
         run_gb(_gb("PRINT VEC3_X(VEC3_NEW(1,2,3) + VEC3_NEW(1,1,1))\n"
                    "PRINT VEC3_LENGTH(MAT4_IDENTITY())\n"))
 
@@ -181,13 +181,13 @@ def test_mat4_dim_type_accepted(run_gb):
 # Die Argument-Validierung von MODEL_INSTANCED laeuft in vm.rs, BEVOR der
 # Grafik-Kontext angefasst wird -> diese Fehlerpfade brauchen kein Fenster.
 def test_model_instanced_arg2_wrong_type_raises(run_gb):
-    with pytest.raises(GameBasicError, match="ARRAY OF MAT4 oder TUPLE"):
+    with pytest.raises(DrachenhauchError, match="ARRAY OF MAT4 oder TUPLE"):
         run_gb(_gb("MODEL_INSTANCED(0, 5)\n"))
 
 
 def test_model_instanced_non_mat4_element_raises(run_gb):
     # TUPLE mit gemischten Typen -> Element 1 ist kein MAT4.
-    with pytest.raises(GameBasicError, match="kein MAT4"):
+    with pytest.raises(DrachenhauchError, match="kein MAT4"):
         run_gb(_gb("MODEL_INSTANCED(0, (MAT4_IDENTITY(), 5))\n"))
 
 
@@ -293,7 +293,7 @@ SAVESCREENSHOT("inst.png")
 
 
 def test_instanced_meldet_ein_zu_kurzes_farb_array(run_gb):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
 
     src = """
 IMPORT "m3d"
@@ -306,5 +306,5 @@ DIM cs[2] AS INTEGER
 CAMERA3D(0, 0, 5, 0, 0, 0, 45)
 MODEL_INSTANCED(box, ms, cs)
 """
-    with pytest.raises(GBRuntimeError, match="kuerzer als die Matrizen"):
+    with pytest.raises(DHRuntimeError, match="kuerzer als die Matrizen"):
         run_gb(src)

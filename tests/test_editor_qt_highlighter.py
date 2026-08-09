@@ -4,9 +4,9 @@ Das eigentliche Token-Coloring laeuft via Qt und ist nicht trivial unit-
 testbar; die `_find_fstring_ranges`-Hilfsmethode hingegen ist eine reine
 Funktion und deckt den fehleranfaelligen Teil ab (Lookahead, Escape,
 Wort-Anfang, mehrere f-Strings in derselben Zeile)."""
-from gamebasic.editor_qt.highlighter import GBHighlighter
+from drachenhauch.editor_qt.highlighter import DHHighlighter
 
-F = GBHighlighter._find_fstring_ranges
+F = DHHighlighter._find_fstring_ranges
 
 
 def test_no_fstring_returns_empty():
@@ -68,7 +68,7 @@ def test_unterminated_fstring_extends_to_eol():
 # behandelt, weil sie bei ihrer Einfuehrung nicht in die Klassifikations-
 # Sets uebernommen wurden. Diese Tests sichern die Klassen ab, damit
 # zukuenftige neue Keywords nicht denselben Drift erzeugen.
-from gamebasic.editor_qt.highlighter import line_color_spans
+from drachenhauch.editor_qt.highlighter import line_color_spans
 
 
 def test_coroutine_type_is_classified():
@@ -92,6 +92,6 @@ def test_nil_is_classified_as_bool():
 
 
 def test_completer_keywords_include_new_features():
-    from gamebasic.editor_qt.completer import KEYWORDS
+    from drachenhauch.editor_qt.completer import KEYWORDS
     for kw in ("OPERATOR", "YIELD", "COROUTINE", "NIL"):
         assert kw in KEYWORDS, kw

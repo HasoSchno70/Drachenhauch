@@ -7,8 +7,8 @@ nur ein Stimmen-Slot). Bei uns bleibt die Instrument-Nummer pro Note OPTIONAL
 import numpy as np
 import pytest
 
-from gamebasic.tracker import Instrument, Pattern, Song
-from gamebasic.tracker.mixer import _note_events, render_song
+from drachenhauch.tracker import Instrument, Pattern, Song
+from drachenhauch.tracker.mixer import _note_events, render_song
 
 
 def _flat_inst(name: str, level: float, n: int = 4000, sr: int = 8000) -> Instrument:
@@ -49,7 +49,7 @@ def test_clearing_note_clears_inst():
 
 
 def test_note_off_clears_inst_too():
-    from gamebasic.tracker import NOTE_OFF
+    from drachenhauch.tracker import NOTE_OFF
     p = Pattern("P")
     p.set(0, 0, 60)
     p.set_inst(0, 0, 2)

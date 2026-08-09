@@ -138,10 +138,10 @@ PRINT words[2]
 # --- Fehlerfaelle ---------------------------------------------------
 
 def test_invalid_regex_throws_gb_error(run_gb, run_vm):
-    """Ungueltige Regex (z.B. unbalanced paren) wirft GBRuntimeError,
+    """Ungueltige Regex (z.B. unbalanced paren) wirft DHRuntimeError,
     nicht Python's re.error."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('IMPORT "regex"\nPRINT REGEX_TEST("abc", "(unbalanced")')
 
 

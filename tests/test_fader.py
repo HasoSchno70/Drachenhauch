@@ -17,7 +17,7 @@ def _qapp():
 
 
 def test_int_fader_roundtrip(_qapp):
-    from gamebasic.editor_qt.fader import Fader
+    from drachenhauch.editor_qt.fader import Fader
     f = Fader("Freq", 50, 8000, 800, step=1, decimals=0, unit="Hz")
     assert f.value() == 800 and isinstance(f.value(), int)
     f.setValue(1234)
@@ -25,7 +25,7 @@ def test_int_fader_roundtrip(_qapp):
 
 
 def test_float_fader_rounds_to_step(_qapp):
-    from gamebasic.editor_qt.fader import Fader
+    from drachenhauch.editor_qt.fader import Fader
     f = Fader("Vol", 0.0, 1.0, 0.7, step=0.01, decimals=2)
     assert abs(f.value() - 0.7) < 1e-9
     f.setValue(0.33)
@@ -33,7 +33,7 @@ def test_float_fader_rounds_to_step(_qapp):
 
 
 def test_fader_clamps_out_of_range(_qapp):
-    from gamebasic.editor_qt.fader import Fader
+    from drachenhauch.editor_qt.fader import Fader
     f = Fader("X", 0, 10, 5)
     f.setValue(999)
     assert f.value() == 10
@@ -42,7 +42,7 @@ def test_fader_clamps_out_of_range(_qapp):
 
 
 def test_fader_emits_on_setvalue(_qapp):
-    from gamebasic.editor_qt.fader import Fader
+    from drachenhauch.editor_qt.fader import Fader
     f = Fader("X", 0, 100, 0)
     seen = []
     f.valueChanged.connect(lambda v: seen.append(v))

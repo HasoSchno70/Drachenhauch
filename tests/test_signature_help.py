@@ -1,6 +1,6 @@
 """Tests fuer `find_active_call` (Signature-Help-Parameter-Erkennung,
-gamebasic.editor_qt.signature_help). Bisher ohne Testabdeckung."""
-from gamebasic.editor_qt.signature_help import find_active_call
+drachenhauch.editor_qt.signature_help). Bisher ohne Testabdeckung."""
+from drachenhauch.editor_qt.signature_help import find_active_call
 
 
 def test_simple_call_first_arg():

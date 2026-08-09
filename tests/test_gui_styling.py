@@ -5,7 +5,7 @@ manuell verifiziert.
 """
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 _W = ('IMPORT "gui"\n'
       'DIM win AS GUI_WINDOW\nwin = GUI_WINDOW("S", 0, 0, 300, 200)\n'
@@ -39,7 +39,7 @@ def test_font_setters_and_roundtrip(run_gb):
 
 
 def test_font_size_negative_raises(run_gb):
-    with pytest.raises(GameBasicError, match="GUI_SET_FONT_SIZE"):
+    with pytest.raises(DrachenhauchError, match="GUI_SET_FONT_SIZE"):
         run_gb(_W + 'GUI_SET_FONT_SIZE(b, -5)\n')
 
 

@@ -31,7 +31,7 @@ def _no_blocking_close_dialog(monkeypatch):
 
 
 def _editor():
-    from gamebasic.trackereditor_qt import TrackerEditor
+    from drachenhauch.trackereditor_qt import TrackerEditor
     return TrackerEditor(Path("."))
 
 
@@ -86,7 +86,7 @@ def test_save_without_path_falls_back_to_save_as(tmp_path, monkeypatch):
 
 def test_open_sets_path_and_clears_dirty(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
-    from gamebasic.tracker import Song
+    from drachenhauch.tracker import Song
     src = tmp_path / "existing.json"
     Song().save_json(str(src))
 
@@ -181,7 +181,7 @@ def test_new_song_stops_playback_and_clears_sound_cache():
 
 def test_open_stops_playback(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
-    from gamebasic.tracker import Song
+    from drachenhauch.tracker import Song
     src = tmp_path / "existing.json"
     Song().save_json(str(src))
 
@@ -220,7 +220,7 @@ def test_bpm_change_without_playback_does_not_touch_timer():
 
 def test_export_warns_when_song_uses_fx(monkeypatch):
     from PySide6.QtWidgets import QMessageBox
-    from gamebasic.tracker.song import FX_ARP
+    from drachenhauch.tracker.song import FX_ARP
     ed = _editor()
     ed.song.patterns[0].set(0, 0, 60)
     ed.song.patterns[0].set_fx(0, 0, FX_ARP, 0x37)

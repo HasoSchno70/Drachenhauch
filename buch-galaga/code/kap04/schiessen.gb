@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 4 - Schiessen mit einem Bullet-Pool
-'  Start:  gbrun.py buch-galaga/code/kap04/schiessen.gb
+'  Start:  dhrun.py buch-galaga/code/kap04/schiessen.gb
 ' ============================================================
 
 SCREEN(480, 640, "Mein Galaga - Kapitel 4")

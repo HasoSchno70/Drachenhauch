@@ -1,6 +1,6 @@
 ' === GameBasic Sprite-Editor Demo ===
 '
-' Zeigt, wie ein Sprite-Sheet, das mit dem Sprite-Editor (gbsprites)
+' Zeigt, wie ein Sprite-Sheet, das mit dem Sprite-Editor (dhsprites)
 ' erstellt wurde, in einem Programm verwendet wird.
 '
 ' Das Sheet "assets/coin_anim.png" enthaelt 4 Frames a 16x16 Pixel
@@ -8,8 +8,8 @@
 ' beim "Sheet-PNG exportieren" auch tut.
 '
 ' Eigene Sprites erstellen:
-'   gbsprites              -- Editor leer starten
-'   gbsprites <datei.png>  -- bestehendes PNG laden
+'   dhsprites              -- Editor leer starten
+'   dhsprites <datei.png>  -- bestehendes PNG laden
 '
 ' Im Code-Editor: Werkzeuge -> Sprite-Editor oeffnen
 '

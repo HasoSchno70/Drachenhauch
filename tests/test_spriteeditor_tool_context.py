@@ -70,7 +70,7 @@ def _make_mock_app():
 
 def test_mock_app_satisfies_protocol():
     """isinstance gegen runtime_checkable Protocol prueft Methoden-Existenz."""
-    from gamebasic.spriteeditor.tool_context import ToolHost
+    from drachenhauch.spriteeditor.tool_context import ToolHost
     app = _make_mock_app()
     assert isinstance(app, ToolHost)
 
@@ -78,8 +78,8 @@ def test_mock_app_satisfies_protocol():
 def test_real_window_satisfies_protocol():
     """Die echte SpriteEditorWindow-Klasse muss das Protocol erfuellen --
     sonst wuerden Tools darauf nicht laufen."""
-    from gamebasic.spriteeditor_qt import SpriteEditorWindow
-    from gamebasic.spriteeditor.tool_context import ToolHost
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
+    from drachenhauch.spriteeditor.tool_context import ToolHost
     from pathlib import Path
     w = SpriteEditorWindow(Path("."))
     assert isinstance(w, ToolHost)
@@ -88,8 +88,8 @@ def test_real_window_satisfies_protocol():
 def test_doc_protocol():
     """Sub-Protocol fuer Doc -- SpriteDoc muss `width`/`height`/`current`
     haben."""
-    from gamebasic.spriteeditor.document import SpriteDoc
-    from gamebasic.spriteeditor.tool_context import _DocProto
+    from drachenhauch.spriteeditor.document import SpriteDoc
+    from drachenhauch.spriteeditor.tool_context import _DocProto
     doc = SpriteDoc(16, 16)
     assert isinstance(doc, _DocProto)
 
@@ -97,8 +97,8 @@ def test_doc_protocol():
 def test_canvas_protocol():
     """Canvas muss invalidate_all/set_preview/set_selection/get_selection
     bieten."""
-    from gamebasic.spriteeditor_qt import SpriteCanvas, SpriteEditorWindow
-    from gamebasic.spriteeditor.tool_context import _CanvasProto
+    from drachenhauch.spriteeditor_qt import SpriteCanvas, SpriteEditorWindow
+    from drachenhauch.spriteeditor.tool_context import _CanvasProto
     from pathlib import Path
     w = SpriteEditorWindow(Path("."))
     assert isinstance(w.canvas, _CanvasProto)
@@ -108,7 +108,7 @@ def test_canvas_protocol():
 
 def test_incomplete_mock_does_not_satisfy_protocol():
     """Ein Mock ohne `mark_dirty` faellt durch."""
-    from gamebasic.spriteeditor.tool_context import ToolHost
+    from drachenhauch.spriteeditor.tool_context import ToolHost
 
     class IncompleteApp:
         doc = None
@@ -128,7 +128,7 @@ def test_incomplete_mock_does_not_satisfy_protocol():
 def test_paste_as_frame_action_uses_internal_clipboard():
     """action_paste_as_frame fuegt den internen Clipboard-Inhalt als neues
     Frame ein."""
-    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
     from pathlib import Path
     from PIL import Image
     w = SpriteEditorWindow(Path("."))
@@ -142,7 +142,7 @@ def test_paste_as_frame_action_uses_internal_clipboard():
 
 
 def test_paste_as_frame_action_empty_clipboard_noop():
-    from gamebasic.spriteeditor_qt import SpriteEditorWindow
+    from drachenhauch.spriteeditor_qt import SpriteEditorWindow
     from pathlib import Path
     w = SpriteEditorWindow(Path("."))
     w._clipboard_pil = None

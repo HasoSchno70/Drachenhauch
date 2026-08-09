@@ -26,7 +26,7 @@ Sache teurer.
 | Quelldateien | `.gb` (232) | `.dh` |
 | Bytecode | `.gbc` | `.dhc` |
 | Editor-Formate | `.gbsprite` (15), `.gbanim` (3), `.gbform` (1), `.gbproj` | `.dhsprite`, `.dhanim`, `.dhform`, `.dhproj` |
-| VSCode-Extension | `gamebasic` | `drachenhauch` |
+| VSCode-Extension | `vscode-gamebasic` | `vscode-drachenhauch` |
 
 ### Warum die Endungen mit müssen
 
@@ -61,8 +61,8 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 ### Phase 2 — Python-Schicht
 
-- [ ] `gamebasic/` → `drachenhauch/`, `pyproject.toml` (`name`, Skripte)
-- [ ] `gbrun.py` → `dhrun.py`, die 13 `gb*.cmd`
+- [x] `gamebasic/` → `drachenhauch/`, `pyproject.toml` (`name`, Skripte)
+- [x] `gbrun.py` → `dhrun.py`, die 13 `gb*.cmd` (+ `gb.sh`) → `dh*`
 - [ ] `editor_qt/`: Fenstertitel, Dateidialoge, `builtin_index.json`-Pfad
 - [ ] `pytest tests/` grün
 
@@ -80,7 +80,7 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
 
 - [ ] `README.md` + `README.en.md`
 - [ ] `docs/` (39 Dateien), `CLAUDE.md`
-- [ ] Logo austauschen (`gamebasic/assets/logo.png` → neues)
+- [ ] Logo austauschen (`drachenhauch/assets/logo.png` → neues)
 - [ ] GitHub-Repo umbenennen — **GitHub leitet alte URLs dauerhaft um**,
       Klone und der bestehende Release-Link brechen also nicht
 - [ ] `v2026.1` bleibt unangetastet: es ist der letzte Stand unter dem alten
@@ -112,6 +112,12 @@ die nichts mit uns zu tun haben. Gezählt im eigenen Quelltext:
 | `qdialogbuttonbox` (56) | **nein** — eine Qt-Klasse |
 | `gbool` (17) | **nein** — ein Typname |
 | `gbrt` (252), `gbrun` (46), `gbc` (43), `gbanim` (38), `gbform` (35), `gbsprite` (20) | ja |
+
+> **Diese Datei von jeder Massenersetzung ausnehmen.** Sie beschreibt den
+> Zustand VOR der Umbenennung — ein Lauf über sie macht aus „`gbrt` → `dhrt`"
+> die Aussage „`dhrt` → `dhrt`" und löscht damit genau die Angabe, die man
+> später zum Nachvollziehen braucht. In Phase 1 und 2 ist das je einmal
+> passiert und musste von Hand zurückgenommen werden.
 
 `QDialogButtonBox` ist der lehrreichste Fall: Ein naives Ersetzen von „gb"
 zerlegt einen Qt-Aufruf, und der Fehler zeigt sich erst, wenn jemand den

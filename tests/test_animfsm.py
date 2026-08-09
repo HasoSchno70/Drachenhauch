@@ -170,7 +170,7 @@ def test_setup_registers_anims_on_sprite(run_gb, tmp_path):
 
 
 def test_unknown_param_errors(run_gb, tmp_path):
-    from gamebasic.errors import GameBasicError
+    from drachenhauch.errors import DrachenhauchError
     _write_fsm(tmp_path, _hero_fsm())
     src = textwrap.dedent('''
         IMPORT "animfsm"
@@ -181,12 +181,12 @@ def test_unknown_param_errors(run_gb, tmp_path):
         fsm = ANIM_FSM_LOAD("hero.gbanim")
         ANIM_FSM_SET_FLOAT(fsm, "nope", 1.0)
     ''')
-    with pytest.raises(GameBasicError):
+    with pytest.raises(DrachenhauchError):
         run_gb(src, base=tmp_path)
 
 
 def test_load_validates_bad_transition(run_gb, tmp_path):
-    from gamebasic.errors import GameBasicError
+    from drachenhauch.errors import DrachenhauchError
     bad = _hero_fsm()
     bad["transitions"].append({"from": "idle", "to": "ghost", "conditions": []})
     _write_fsm(tmp_path, bad)
@@ -195,5 +195,5 @@ def test_load_validates_bad_transition(run_gb, tmp_path):
         DIM fsm AS ANIM_FSM
         fsm = ANIM_FSM_LOAD("hero.gbanim")
     ''')
-    with pytest.raises(GameBasicError):
+    with pytest.raises(DrachenhauchError):
         run_gb(src, base=tmp_path)

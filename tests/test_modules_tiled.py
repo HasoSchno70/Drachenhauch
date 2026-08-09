@@ -7,7 +7,7 @@ Python-Impl (in Phase 8 geloescht).
 import json
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def _lines(out):
@@ -61,18 +61,18 @@ def test_load_basic_map(run_gb, tmp_path):
 
 
 def test_load_missing_file(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="nicht gefunden"):
+    with pytest.raises(DHRuntimeError, match="nicht gefunden"):
         run_gb('IMPORT "tiled"\nDIM m AS TILED_MAP\nm = TILED_LOAD("missing.json")\n',
                base=tmp_path)
 
 
 def test_load_invalid_json(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="Lesefehler"):
+    with pytest.raises(DHRuntimeError, match="Lesefehler"):
         _load_raw(run_gb, tmp_path, "{not json}", "", name="bad.json")
 
 
 def test_load_wrong_type(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="erwartet eine Tiled-Map"):
+    with pytest.raises(DHRuntimeError, match="erwartet eine Tiled-Map"):
         _load_raw(run_gb, tmp_path, json.dumps({"type": "tileset"}), "", name="wrong.json")
 
 
@@ -97,7 +97,7 @@ def test_layer_index_lookup(run_gb, tmp_path):
 
 
 def test_layer_idx_out_of_bounds(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="ausserhalb"):
+    with pytest.raises(DHRuntimeError, match="ausserhalb"):
         _load(run_gb, tmp_path, _basic_map_dict(), "PRINT TILED_LAYER_NAME(m, 99)\n")
 
 
@@ -184,7 +184,7 @@ def test_object_layer(run_gb, tmp_path):
 
 
 def test_object_layer_not_found(run_gb, tmp_path):
-    with pytest.raises(GBRuntimeError, match="nicht gefunden"):
+    with pytest.raises(DHRuntimeError, match="nicht gefunden"):
         _load(run_gb, tmp_path, _basic_map_dict(),
               'PRINT TILED_OBJECT_COUNT(m, "no_such")\n')
 
@@ -192,7 +192,7 @@ def test_object_layer_not_found(run_gb, tmp_path):
 def test_object_idx_out_of_bounds(run_gb, tmp_path):
     d = _basic_map_dict()
     d["layers"].append({"type": "objectgroup", "name": "obj", "objects": []})
-    with pytest.raises(GBRuntimeError, match="ausserhalb"):
+    with pytest.raises(DHRuntimeError, match="ausserhalb"):
         _load(run_gb, tmp_path, d, 'PRINT TILED_OBJECT_NAME(m, "obj", 99)\n')
 
 
@@ -213,7 +213,7 @@ def test_tileset_firstgid(run_gb, tmp_path):
 # --- Type-Checking ------------------------------------------------
 
 def test_non_map_argument_errors(run_gb):
-    with pytest.raises(GBRuntimeError, match="TILED_MAP"):
+    with pytest.raises(DHRuntimeError, match="TILED_MAP"):
         run_gb('IMPORT "tiled"\nPRINT TILED_WIDTH("not a map")\n')
 
 
@@ -235,12 +235,12 @@ def test_tile_set_out_of_bounds_silent(run_gb, tmp_path):
 def test_tile_set_on_object_layer_errors(run_gb, tmp_path):
     d = _basic_map_dict()
     d["layers"].append({"type": "objectgroup", "name": "obj", "objects": []})
-    with pytest.raises(GBRuntimeError, match="kein Tile-Layer"):
+    with pytest.raises(DHRuntimeError, match="kein Tile-Layer"):
         _load(run_gb, tmp_path, d, "PRINT TILED_TILE_SET(m, 1, 0, 0, 1)\n")
 
 
 def test_tile_at_on_object_layer_errors(run_gb, tmp_path):
     d = _basic_map_dict()
     d["layers"].append({"type": "objectgroup", "name": "obj", "objects": []})
-    with pytest.raises(GBRuntimeError, match="kein Tile-Layer"):
+    with pytest.raises(DHRuntimeError, match="kein Tile-Layer"):
         _load(run_gb, tmp_path, d, "PRINT TILED_TILE_AT(m, 1, 0, 0)\n")

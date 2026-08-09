@@ -17,7 +17,7 @@ import pytest
 
 
 def test_mqtt_builtins_registered():
-    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "mqtt_connect", "mqtt_disconnect", "mqtt_is_connected",
         "mqtt_publish", "mqtt_subscribe", "mqtt_update",
@@ -27,7 +27,7 @@ def test_mqtt_builtins_registered():
 
 
 def test_mqtt_is_a_known_module():
-    from gamebasic.modules import is_known_module
+    from drachenhauch.modules import is_known_module
     assert is_known_module("mqtt")
 
 
@@ -35,8 +35,8 @@ def test_mqtt_connect_refused_is_catchable(run_gb):
     """Kein Broker am Port -- MQTT_CONNECT muss einen fangbaren Fehler werfen,
     nicht abstuerzen (kurzer Timeout, kein 5s-Warten auf CONNACK noetig, weil
     schon der TCP-Connect selbst scheitert)."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="MQTT_CONNECT"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="MQTT_CONNECT"):
         run_gb('''
 IMPORT "mqtt"
 DIM h AS MQTT_HANDLE

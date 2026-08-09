@@ -118,5 +118,5 @@ module.exports = (H) => [
       'SPRITE_TINT(gegner, RGB(255, 80, 80))',
       'TIMER_AFTER(120, faerbung_zuruecksetzen)',
     ]),
-  H.tip("Sprites selbst zeichnen", "Spritesheets musst du nicht von Hand malen: Der mitgelieferte Pixel-Editor gbsprites zeichnet Frames, Animationen und exportiert fertige Sheets (und sogar Atlas-Manifeste). So schließt sich der Kreis von der Grafik bis ins Spiel."),
+  H.tip("Sprites selbst zeichnen", "Spritesheets musst du nicht von Hand malen: Der mitgelieferte Pixel-Editor dhsprites zeichnet Frames, Animationen und exportiert fertige Sheets (und sogar Atlas-Manifeste). So schließt sich der Kreis von der Grafik bis ins Spiel."),
 ];

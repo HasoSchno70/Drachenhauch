@@ -4,7 +4,7 @@ Serialisierung). Klick-Interaktion (Popup) braucht SCREEN -> manuell verifiziert
 """
 import pytest
 
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 _W = ('IMPORT "gui"\n'
       'DIM win AS GUI_WINDOW\nwin = GUI_WINDOW("F", 0, 0, 300, 260)\n')
@@ -98,7 +98,7 @@ def test_form_widgets_roundtrip(run_gb):
 
 # ------------------------------------------------------------- Fehler
 def test_wrong_kind_raises(run_gb):
-    with pytest.raises(GameBasicError, match="kein dropdown"):
+    with pytest.raises(DrachenhauchError, match="kein dropdown"):
         run_gb(_W +
             'DIM b AS GUI_WIDGET\nb = GUI_BUTTON(win, "x", 0, 0, 50, 20)\n'
             'PRINT GUI_DROPDOWN_SELECTED(b)\n')

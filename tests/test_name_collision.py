@@ -6,7 +6,7 @@ Im Galaga-Prototyp bissen genau zwei Faelle: eine Variable `shoot` neben einer
 SUB `Shoot`, und ein Array `box` neben dem Builtin `BOX`."""
 
 import pytest
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 
 def test_var_shadows_user_sub_is_clear_compile_error(run_gb):
@@ -19,7 +19,7 @@ SUB Shoot()
 END SUB
 Shoot()
 '''
-    with pytest.raises(GBRuntimeError, match="Namens-Kollision.*[Vv]ariable.*SUB"):
+    with pytest.raises(DHRuntimeError, match="Namens-Kollision.*[Vv]ariable.*SUB"):
         run_gb(src)
 
 
@@ -30,7 +30,7 @@ DIM box AS INTEGER
 box = 5
 BOX(0, 0, 10, 10, 255)
 '''
-    with pytest.raises(GBRuntimeError, match="'box'.*BOX"):
+    with pytest.raises(DHRuntimeError, match="'box'.*BOX"):
         run_gb(src)
 
 
@@ -66,7 +66,7 @@ DIM mode AS INTEGER
 ENUM Mode = A, B
 mode = 1
 '''
-    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*mode.*ENUM"):
+    with pytest.raises(DHRuntimeError, match=r"Namens-Kollision.*mode.*ENUM"):
         run_gb(src)
 
 
@@ -76,7 +76,7 @@ def test_enum_then_var_is_clear_compile_error(run_gb):
 ENUM Mode = A, B
 DIM mode AS INTEGER
 '''
-    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*mode"):
+    with pytest.raises(DHRuntimeError, match=r"Namens-Kollision.*mode"):
         run_gb(src)
 
 
@@ -85,7 +85,7 @@ def test_var_vs_const_is_clear_compile_error(run_gb):
 CONST X AS INTEGER = 5
 DIM x AS INTEGER
 '''
-    with pytest.raises(GBRuntimeError, match=r"Namens-Kollision.*'x'.*CONST"):
+    with pytest.raises(DHRuntimeError, match=r"Namens-Kollision.*'x'.*CONST"):
         run_gb(src)
 
 

@@ -1,6 +1,6 @@
 ' ============================================================
 '  Kapitel 1 - Das erste Fenster mit Sternenhimmel
-'  Start:  gbrun.py buch-galaga/code/kap01/fenster.gb
+'  Start:  dhrun.py buch-galaga/code/kap01/fenster.gb
 ' ============================================================
 
 ' Ein Fenster oeffnen: Breite, Hoehe, Titel (Hochformat wie ein Arcade-Automat).

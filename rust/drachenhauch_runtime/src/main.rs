@@ -9,7 +9,7 @@
 //! Verwendung: dhrt <datei.gbc> [quell-label]
 //!
 //! Das optionale `quell-label` (z.B. `spiel.gb`) wird nur fuer Laufzeitfehler-
-//! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `gbrun.py
+//! Meldungen genutzt (`Laufzeitfehler in spiel.gb:Zeile: ...`). `dhrun.py
 //! --native` reicht den Namen der `.gb`-Quelldatei durch.
 
 mod animfsm;
@@ -564,7 +564,7 @@ fn runsrc_main(path: &str) -> ExitCode {
 }
 
 /// `dhrt run <datei.gb>` (Stufe 5) -- eigenstaendiger End-to-End-Lauf aus
-/// Quelltext, ohne Python. Wechselt wie `gbrun.py` ins Verzeichnis der Datei,
+/// Quelltext, ohne Python. Wechselt wie `dhrun.py` ins Verzeichnis der Datei,
 /// damit relative Asset-Pfade (`LOADIMAGE("assets/...")`) stimmen; Label fuer
 /// Laufzeitfehler ist der Dateiname.
 fn run_main(path: &str) -> ExitCode {
@@ -578,7 +578,7 @@ fn run_main(path: &str) -> ExitCode {
         Ok(t) => t,
         Err(e) => { eprintln!("Kann '{}' nicht lesen: {}", path, e); return ExitCode::from(1); }
     };
-    // Ins Datei-Verzeichnis wechseln (wie gbrun.py os.chdir(file.parent)).
+    // Ins Datei-Verzeichnis wechseln (wie dhrun.py os.chdir(file.parent)).
     let _ = std::env::set_current_dir(&base);
     compile_and_run_source(&raw_source, &base, &label)
 }

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QApplication   # noqa: E402
 from PySide6.QtGui import QCloseEvent, QDropEvent, QKeyEvent, QMouseEvent   # noqa: E402
 from PySide6.QtCore import Qt, QPointF, QMimeData, QEvent   # noqa: E402
 
-from gamebasic.formdesigner_qt import (   # noqa: E402
+from drachenhauch.formdesigner_qt import (   # noqa: E402
     FormDesigner, _Inspector, _palette_icon, _CONTROL_MIME, PAD, TITLE_H,
 )
 
@@ -74,7 +74,7 @@ def test_save_load_roundtrip(tmp_path):
     p = tmp_path / "f.gbform"
     win.canvas.doc.save(str(p))
     win2 = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win2.canvas.set_doc(FormDoc.load(str(p)))
     assert win2.canvas.doc.title == "MyForm"
     assert win2.canvas.doc.controls[0].items == ["a", "b"]
@@ -135,7 +135,7 @@ def test_add_and_switch_forms(tmp_path):
     win = FormDesigner(tmp_path)
     assert len(win.forms) == 1                      # ein Start-Formular
     win.active.doc.title = "Main"
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win._add_open_form(FormDoc(title="Second"))
     assert len(win.forms) == 2 and win.active_index == 1
     assert win.form_list.count() == 2
@@ -147,7 +147,7 @@ def test_add_and_switch_forms(tmp_path):
 def test_per_form_undo_isolation(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win._add_open_form(FormDoc(title="B"))          # Form 1, aktiv
     pre = win.canvas.doc.to_dict()
     win.canvas.doc.add("button", 0, 0)
@@ -161,7 +161,7 @@ def test_per_form_undo_isolation(tmp_path):
 def test_close_form_keeps_at_least_one(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win._add_open_form(FormDoc(title="B"))
     win.close_form()                                # nicht dirty -> kein Dialog
     assert len(win.forms) == 1
@@ -173,7 +173,7 @@ def test_close_form_keeps_at_least_one(tmp_path):
 def test_project_save_load_roundtrip(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win.active.doc.title = "Main"
     win.active.path = tmp_path / "main.gbform"
     win._add_open_form(FormDoc(title="Settings"), tmp_path / "settings.gbform")
@@ -218,7 +218,7 @@ def test_palette_has_graphical_icons(tmp_path):
     assert win.palette.dragEnabled()
     for i in range(win.palette.count()):
         assert not win.palette.item(i).icon().isNull()
-    from gamebasic.formdesigner import PALETTE
+    from drachenhauch.formdesigner import PALETTE
     for sp in PALETTE:
         assert not _palette_icon(sp.kind).isNull()
     win.close()
@@ -255,7 +255,7 @@ def test_drop_places_control(tmp_path):
 def test_canvas_renders_all_kinds(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import PALETTE
+    from drachenhauch.formdesigner import PALETTE
     d = win.canvas.doc
     y = 5
     for sp in PALETTE:
@@ -841,7 +841,7 @@ def test_progress_preview_uses_min_max_like_the_runtime(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
     cv = win.canvas
-    from gamebasic.formdesigner_qt import _progress_frac
+    from drachenhauch.formdesigner_qt import _progress_frac
     p = cv.doc.add("progress", 10, 10)
     p.min, p.max, p.value = 0.0, 100.0, 25.0
     assert _progress_frac(p) == 0.25                   # vorher 1.0 = randvoll
@@ -879,7 +879,7 @@ def test_close_is_blocked_when_the_user_cancels(tmp_path, monkeypatch):
 def test_confirm_dirty_covers_all_forms_not_just_the_active(tmp_path):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win._mark_dirty()                              # Formular 0 dirty
     win._add_open_form(FormDoc(title="B"))         # wechselt auf 1 (sauber)
     seen = {}
@@ -898,7 +898,7 @@ def test_confirm_dirty_covers_all_forms_not_just_the_active(tmp_path):
 def test_open_project_asks_before_dropping_forms(tmp_path, monkeypatch):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormProject
+    from drachenhauch.formdesigner import FormProject
     win.canvas.doc.title = "WICHTIG"
     win._mark_dirty()
     proj = tmp_path / "p.gbproj"
@@ -919,7 +919,7 @@ def test_save_failure_keeps_dirty_and_does_not_take_the_path(tmp_path, monkeypat
     win = FormDesigner(tmp_path)
     win._mark_dirty()
     bad = str(tmp_path / "gibtsnicht" / "x.gbform")
-    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getSaveFileName",
+    monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getSaveFileName",
                         staticmethod(lambda *a, **k: (bad, "")))
     assert win.save_form_as() is False             # kein Traceback
     assert win.path is None and win.active.dirty
@@ -930,7 +930,7 @@ def test_undo_back_to_saved_state_clears_the_star(tmp_path, monkeypatch):
     _app()
     win = FormDesigner(tmp_path)
     p = tmp_path / "f.gbform"
-    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getSaveFileName",
+    monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getSaveFileName",
                         staticmethod(lambda *a, **k: (str(p), "")))
     assert win.save_form_as() is True
     assert not win.active.dirty
@@ -961,10 +961,10 @@ def test_undo_refreshes_the_form_navigator(tmp_path):
 def test_open_form_twice_switches_instead_of_duplicating(tmp_path, monkeypatch):
     _app()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     p = tmp_path / "a.gbform"
     FormDoc(title="A").save(str(p))
-    monkeypatch.setattr("gamebasic.formdesigner_qt.QFileDialog.getOpenFileName",
+    monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getOpenFileName",
                         staticmethod(lambda *a, **k: (str(p), "")))
     win.open_form(); n = len(win.forms)
     win.open_form()
@@ -979,7 +979,7 @@ def test_project_keeps_forms_outside_its_directory(tmp_path):
     proj_dir = tmp_path / "projekt"; proj_dir.mkdir()
     extern = tmp_path / "shared"; extern.mkdir()
     win = FormDesigner(proj_dir)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win.active.doc.title = "Haupt"; win.active.path = proj_dir / "haupt.gbform"
     win._add_open_form(FormDoc(title="Extern"), extern / "extern.gbform")
     win.project_path = proj_dir / "app.gbproj"
@@ -995,7 +995,7 @@ def test_project_keeps_forms_outside_its_directory(tmp_path):
 def test_missing_form_stays_in_the_manifest(tmp_path):
     # Stumm uebersprungen UND danach dauerhaft aus dem .gbproj geloescht.
     _app()
-    from gamebasic.formdesigner import FormDoc, FormProject
+    from drachenhauch.formdesigner import FormDoc, FormProject
     FormDoc(title="OK").save(str(tmp_path / "ok.gbform"))
     FormProject(forms=["ok.gbform", "weg.gbform"], main="ok.gbform").save(
         str(tmp_path / "p.gbproj"))
@@ -1012,7 +1012,7 @@ def test_main_form_survives_saving_into_a_subdirectory(tmp_path):
     _app()
     sub = tmp_path / "sub"; sub.mkdir()
     win = FormDesigner(tmp_path)
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     win.active.doc.title = "A"; win.active.path = sub / "a.gbform"
     win._add_open_form(FormDoc(title="B"), sub / "b.gbform")
     win.set_main_form()                            # B ist aktiv -> Startformular
@@ -1024,10 +1024,10 @@ def test_main_form_survives_saving_into_a_subdirectory(tmp_path):
 
 
 def test_uppercase_gbproj_opens_as_project_not_as_form(tmp_path):
-    # `gbform Projekt.GBPROJ` lud das Manifest als Formular (case-sensitiver
+    # `dhform Projekt.GBPROJ` lud das Manifest als Formular (case-sensitiver
     # Suffix-Vergleich); ein Strg+S danach hat die Projektdatei ueberschrieben.
-    from gamebasic.formdesigner import FormDoc, FormProject
-    from gamebasic.formdesigner_qt import open_initial
+    from drachenhauch.formdesigner import FormDoc, FormProject
+    from drachenhauch.formdesigner_qt import open_initial
     FormDoc(title="A").save(str(tmp_path / "a.gbform"))
     p = tmp_path / "Projekt.GBPROJ"
     FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))
@@ -1040,7 +1040,7 @@ def test_uppercase_gbproj_opens_as_project_not_as_form(tmp_path):
 
 
 def test_open_initial_reports_a_missing_file(tmp_path):
-    from gamebasic.formdesigner_qt import open_initial
+    from drachenhauch.formdesigner_qt import open_initial
     _app()
     win = FormDesigner(tmp_path)
     assert open_initial(win, tmp_path / "tippfehler.gbform") is False
@@ -1052,8 +1052,8 @@ def test_open_initial_reports_a_missing_file(tmp_path):
 def test_run_form_uses_the_shared_dhrt_lookup(tmp_path):
     # Die lokale Kopie kannte den PyInstaller-Fall nicht -> F5 war in der
     # installierten IDE unmoeglich ("Runtime nicht gebaut").
-    import gamebasic.formdesigner_qt as fq
-    from gamebasic.editor_qt.dhrt_locate import find_dhrt
+    import drachenhauch.formdesigner_qt as fq
+    from drachenhauch.editor_qt.dhrt_locate import find_dhrt
     assert fq._find_dhrt is find_dhrt
 
 
@@ -1061,7 +1061,7 @@ def test_run_form_reports_a_broken_program_instead_of_failing_silently(
         tmp_path, monkeypatch):
     # `Popen` lief ohne Ausgabe-Capture und ohne Exit-Code-Pruefung: jeder
     # Fehler im erzeugten Programm endete in einem stummen F5.
-    import gamebasic.formdesigner_qt as fq
+    import drachenhauch.formdesigner_qt as fq
     if fq._find_dhrt(tmp_path) is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _app()
@@ -1081,7 +1081,7 @@ def test_run_form_reports_a_broken_program_instead_of_failing_silently(
 
 
 def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeypatch):
-    import gamebasic.formdesigner_qt as fq
+    import drachenhauch.formdesigner_qt as fq
     if fq._find_dhrt(tmp_path) is None:
         pytest.skip("native Runtime 'dhrt' nicht gebaut")
     _app()
@@ -1283,7 +1283,7 @@ def _sichtbare_abschnitte(ins):
 def test_inspector_zeigt_nur_abschnitte_mit_inhalt(tmp_path):
     """Ueberschriften blenden sich mit ihren Zeilen aus -- sonst staende bei
     einem Label ein leeres 'Werte' und 'Ereignisse' im Inspector."""
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     _app()
     doc = FormDoc(title="T")
 
@@ -1325,7 +1325,7 @@ def test_tool_icons_werden_gezeichnet():
     """Jede Symbol-Art liefert ein Bild -- ein leeres QIcon faellt in der
     Leiste nur als Luecke auf, nicht als Fehler."""
     _app()
-    from gamebasic.formdesigner_qt import _tool_icon
+    from drachenhauch.formdesigner_qt import _tool_icon
     for kind in ("new", "open", "save", "undo", "redo", "run", "code"):
         ic = _tool_icon(kind)
         assert not ic.isNull(), kind
@@ -1408,8 +1408,8 @@ def test_raster_hebt_sich_vom_formular_ab(tmp_path, thema):
     die Mischung selbst nachgerechnet, waere er gruen geblieben, egal was
     `_paint_grid` tatsaechlich zeichnet -- und genau dort sass der Fehler."""
     _app()
-    from gamebasic.formdesigner_qt import PAD, TITLE_H, GRID, _col
-    from gamebasic.formdesigner import theme_colors
+    from drachenhauch.formdesigner_qt import PAD, TITLE_H, GRID, _col
+    from drachenhauch.formdesigner import theme_colors
     win = FormDesigner(tmp_path)
     try:
         win.canvas.doc.theme = thema
@@ -1430,7 +1430,7 @@ def test_raster_verschwindet_bei_starker_verkleinerung(tmp_path):
     """Unter GRID_MIN_ZOOM liegen die Punkte so dicht, dass sie als Rauschen
     statt als Raster lesen."""
     _app()
-    from gamebasic.formdesigner_qt import GRID_MIN_ZOOM
+    from drachenhauch.formdesigner_qt import GRID_MIN_ZOOM
     win = FormDesigner(tmp_path)
     try:
         gezeichnet = []
@@ -1452,7 +1452,7 @@ def test_schatten_ist_neben_dem_formular_messbar(tmp_path):
     schwarz war -- ein schwarzer Schatten hatte dort keinen Spielraum mehr
     (gemessene 11 Stufen). Er muss sich deutlich vom Grund abheben."""
     _app()
-    from gamebasic.formdesigner_qt import PAD
+    from drachenhauch.formdesigner_qt import PAD
     win = FormDesigner(tmp_path)
     try:
         win.canvas.zoom = 1.0
@@ -1476,7 +1476,7 @@ def test_tabelle_platzieren_gibt_ihr_spalten(tmp_path):
     """Ohne Spalten waere die Tabelle auf der Design-Flaeche ein leeres
     Rechteck -- man saehe nicht, was man da hingesetzt hat."""
     _app()
-    from gamebasic.formdesigner import FormDoc
+    from drachenhauch.formdesigner import FormDoc
     d = FormDoc()
     c = d.add("table", 10, 10)
     assert c.extra["table"]["headers"], "neue Tabelle ohne Spalten"
@@ -1538,7 +1538,7 @@ def test_zahlenfeld_verkraftet_tippfehler(tmp_path):
     """Ein Tippfehler in der Breiten-Liste soll nicht die ganze Zeile
     unbrauchbar machen."""
     _app()
-    from gamebasic.formdesigner_qt import _Inspector
+    from drachenhauch.formdesigner_qt import _Inspector
     assert _Inspector._zahlen("80, abc, 120") == [80, 120]
     assert _Inspector._zahlen("") == []
     assert _Inspector._zahlen("10 20;30") == [10, 20, 30]

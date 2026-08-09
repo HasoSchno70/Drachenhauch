@@ -1,7 +1,7 @@
 """Tests fuer die wiederverwendbare Preset-Bibliothek (Qt-frei)."""
 import json
 
-from gamebasic.editor_qt.preset_library import PresetLibrary
+from drachenhauch.editor_qt.preset_library import PresetLibrary
 
 
 def test_add_get_names_roundtrip(tmp_path):

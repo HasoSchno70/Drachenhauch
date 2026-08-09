@@ -7,7 +7,7 @@ abgedeckt.
 """
 import pytest
 
-from gamebasic.editor_qt.error_check import _check_source, _find_dhrt
+from drachenhauch.editor_qt.error_check import _check_source, _find_dhrt
 
 # Compile-Phase-Diagnostik (Typ-/Semantikfehler wie unbekannte Typen oder
 # doppelte Funktionsnamen) kann NUR dhrt liefern -- der Syntax-only-Fallback
@@ -114,7 +114,7 @@ def test_hardware_import_is_warning():
 
 def test_dhrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
     import subprocess
-    import gamebasic.editor_qt.error_check as ec
+    import drachenhauch.editor_qt.error_check as ec
 
     class _FakeProc:
         def communicate(self, timeout=None):
@@ -131,7 +131,7 @@ def test_dhrt_crash_yields_diagnostic_warning(tmp_path, monkeypatch):
 
 def test_dhrt_timeout_yields_diagnostic_warning(tmp_path, monkeypatch):
     import subprocess
-    import gamebasic.editor_qt.error_check as ec
+    import drachenhauch.editor_qt.error_check as ec
 
     class _FakeProc:
         def communicate(self, timeout=None):
@@ -152,7 +152,7 @@ def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
     des ersten Aufrufs abbrechen (statt ihn im Hintergrund weiterlaufen zu
     lassen und nur das Ergebnis zu verwerfen)."""
     import threading
-    from gamebasic.editor_qt.error_check import LiveErrorChecker
+    from drachenhauch.editor_qt.error_check import LiveErrorChecker
 
     checker = LiveErrorChecker()
     terminated = threading.Event()
@@ -165,7 +165,7 @@ def test_check_terminates_previous_active_process(tmp_path, monkeypatch):
     # _run() nicht wirklich starten (kein dhrt/Qt-Loop noetig) -- nur die
     # Cancel-Logik von check() selbst pruefen.
     monkeypatch.setattr(
-        "gamebasic.editor_qt.error_check.threading.Thread.start", lambda self: None)
+        "drachenhauch.editor_qt.error_check.threading.Thread.start", lambda self: None)
     checker.check("PRINT 1\n", tmp_path)
     assert terminated.is_set()
 
@@ -174,7 +174,7 @@ def test_cancel_terminates_active_process_and_bumps_generation():
     """`cancel()` (Review-Fund: Tab-Close liess den Checker unbeaufsichtigt
     weiterlaufen) muss wie `check()` einen laufenden Subprozess abbrechen --
     aber OHNE einen neuen Check zu starten."""
-    from gamebasic.editor_qt.error_check import LiveErrorChecker
+    from drachenhauch.editor_qt.error_check import LiveErrorChecker
 
     checker = LiveErrorChecker()
     terminated = []
@@ -191,7 +191,7 @@ def test_cancel_terminates_active_process_and_bumps_generation():
 
 
 def test_cancel_without_active_process_is_noop():
-    from gamebasic.editor_qt.error_check import LiveErrorChecker
+    from drachenhauch.editor_qt.error_check import LiveErrorChecker
 
     checker = LiveErrorChecker()
     checker.cancel()   # kein Absturz ohne laufenden Prozess

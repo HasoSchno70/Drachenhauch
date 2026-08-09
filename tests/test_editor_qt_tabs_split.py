@@ -14,7 +14,7 @@ def _qapp():
 
 
 def _area():
-    from gamebasic.editor_qt.tabs import TabbedEditorArea
+    from drachenhauch.editor_qt.tabs import TabbedEditorArea
     return TabbedEditorArea()
 
 
@@ -81,11 +81,11 @@ def test_split_editor_breakpoint_bookmark_fold_target_shared_document():
 
 
 def test_theme_change_after_split_does_not_touch_dead_highlighter():
-    """Review-Fund: der Split-Editor legt in `__init__` einen `GBHighlighter`
+    """Review-Fund: der Split-Editor legt in `__init__` einen `DHHighlighter`
     auf seinem temporaeren Default-Dokument an. `setDocument()` gibt dieses
     Dokument her und zerstoert es -- der Highlighter stirbt mit, `_highlighter`
     zeigte danach auf ein totes C++-Objekt. Der naechste Theme-Wechsel lief
-    deshalb in ein "Internal C++ object (GBHighlighter) already deleted"
+    deshalb in ein "Internal C++ object (DHHighlighter) already deleted"
     (im gemeinsamen Testlauf massenhaft in der Konsole zu sehen)."""
     import shiboken6
     area = _area()

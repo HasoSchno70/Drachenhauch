@@ -91,32 +91,32 @@ END IF
 
 def test_in_string_needle_not_string_throws(run_gb, run_vm):
     """`5 IN "abc"` -- Mismatch, Needle muss String sein."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb('PRINT 5 IN "abc"')
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm('PRINT 5 IN "abc"')
 
 
 def test_in_map_non_string_key_throws(run_gb, run_vm):
-    from gamebasic.errors import GBRuntimeError
+    from drachenhauch.errors import DHRuntimeError
     src = '''
 DIM m AS MAP OF INTEGER
 m.put("a", 1)
 PRINT 5 IN m
 '''
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_gb(src)
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm(src)
 
 
 def test_in_unsupported_type_throws(run_gb, run_vm):
     """`5 IN 42` -- weder String, Tuple, Array, noch Map -> Fehler."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError):
         run_gb("PRINT 5 IN 42")
-    with pytest.raises(GBRuntimeError):
+    with pytest.raises(DHRuntimeError):
         run_vm("PRINT 5 IN 42")
 
 

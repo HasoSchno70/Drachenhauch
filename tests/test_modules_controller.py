@@ -7,7 +7,7 @@ Zustaende. Frueher via `call_builtin` gegen die Python-Impl (in Phase 8 geloesch
 import json
 import pytest
 
-from gamebasic.errors import GBRuntimeError
+from drachenhauch.errors import DHRuntimeError
 
 _HEAD = ('IMPORT "tiled"\nIMPORT "tile_collide"\nIMPORT "controller"\n'
          'DIM m AS TILED_MAP\nm = TILED_LOAD("level.json")\n')
@@ -67,7 +67,7 @@ def test_char_new_initializes(run_gb, tmp_path):
 
 def test_char_new_zero_size_errors(run_gb, tmp_path):
     _empty(tmp_path)
-    with pytest.raises(GBRuntimeError, match="> 0"):
+    with pytest.raises(DHRuntimeError, match="> 0"):
         _run(run_gb, tmp_path,
              "DIM c AS CHAR_CONTROLLER\nc = CHAR_NEW(0.0, 0.0, 0.0, 10.0)\n")
 
@@ -274,5 +274,5 @@ def test_on_wall_left(run_gb, tmp_path):
 # --- Type-Validierung --------------------------------------------
 
 def test_char_x_wrong_type(run_gb):
-    with pytest.raises(GBRuntimeError, match="CHAR_CONTROLLER"):
+    with pytest.raises(DHRuntimeError, match="CHAR_CONTROLLER"):
         run_gb('IMPORT "controller"\nPRINT CHAR_X("not a controller")\n')

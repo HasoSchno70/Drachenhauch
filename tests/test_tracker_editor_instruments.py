@@ -19,7 +19,7 @@ def _qapp():
 
 def _editor():
     try:
-        from gamebasic.trackereditor_qt import TrackerEditor
+        from drachenhauch.trackereditor_qt import TrackerEditor
         return TrackerEditor(Path("."))
     except Exception as exc:  # pragma: no cover
         pytest.skip(f"Editor nicht konstruierbar: {exc}")
@@ -136,8 +136,8 @@ def test_note_length_song_mode_wraps_order_to_own_pattern():
 
 
 def test_keymap_dialog_builds_instrument(tmp_path):
-    from gamebasic.trackereditor_qt import _KeymapDialog
-    from gamebasic.tracker import Zone
+    from drachenhauch.trackereditor_qt import _KeymapDialog
+    from drachenhauch.tracker import Zone
     ed = _editor()
     # zwei Samples vorbereiten + per load_fn-Callback laden
     a = tmp_path / "a.wav"; _write_wav(a, freq=200)
@@ -158,7 +158,7 @@ def test_keymap_dialog_builds_instrument(tmp_path):
     assert zones[0].lo_key == 36 and zones[0].hi_key == 36
     assert zones[1].lo_key == 37
     # Im Editor anwenden
-    from gamebasic.tracker import Instrument
+    from drachenhauch.tracker import Instrument
     inst = Instrument.keymap(dlg.get_name(), zones)
     ed.song.add_instrument(inst)
     ed._refresh_instruments()
@@ -205,7 +205,7 @@ def _build_min_sf2(tmp_path):
 def test_load_soundfont_adds_instrument(tmp_path, monkeypatch):
     """SF2 laden -> Preset-Dialog -> Keymap-Instrument im Pool."""
     from PySide6.QtWidgets import QFileDialog, QDialog
-    from gamebasic.trackereditor_qt import _Sf2PresetDialog
+    from drachenhauch.trackereditor_qt import _Sf2PresetDialog
     path = _build_min_sf2(tmp_path)
     ed = _editor()
     n0 = len(ed.song.instruments)
@@ -268,7 +268,7 @@ def test_vu_meter_lights_and_decays():
 
 
 def test_fx_column_sets_effect_on_cell():
-    from gamebasic.tracker.song import FX_ARP, FX_CODES
+    from drachenhauch.tracker.song import FX_ARP, FX_CODES
     ed = _editor()
     ed.grid.setCurrentCell(0, 0)
     ed._set_note(0, 0, 60)
@@ -302,7 +302,7 @@ def test_export_audio_stereo_hard_pan(tmp_path, monkeypatch):
 
 
 def test_instrument_dialog_applies_loop_and_env(tmp_path):
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     ed = _editor()
     p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
     inst = ed._instrument_from_file(str(p))
@@ -327,7 +327,7 @@ def test_instrument_dialog_pan_slider_applies_and_labels(tmp_path):
     """Pan ist jetzt ein Schieberegler (-100..100) statt einer Spinbox --
     apply_to() muss weiterhin das erwartete -1.0..1.0-Instrument-Feld setzen,
     und das Label soll L/R/Mitte anzeigen."""
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     ed = _editor()
     p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
     inst = ed._instrument_from_file(str(p))
@@ -344,7 +344,7 @@ def test_instrument_dialog_pan_slider_applies_and_labels(tmp_path):
 
 
 def test_instrument_dialog_pan_slider_reflects_existing_instrument_pan(tmp_path):
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     ed = _editor()
     p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
     inst = ed._instrument_from_file(str(p))
@@ -356,7 +356,7 @@ def test_instrument_dialog_pan_slider_reflects_existing_instrument_pan(tmp_path)
 
 def test_instrument_dialog_waveform_view_syncs_from_spinboxes(tmp_path):
     """Spinbox-Aenderung muss die Wellenform-Marker nachziehen (Anzeige)."""
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     ed = _editor()
     p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
     inst = ed._instrument_from_file(str(p))
@@ -370,7 +370,7 @@ def test_instrument_dialog_waveform_view_syncs_from_spinboxes(tmp_path):
 def test_instrument_dialog_waveform_drag_updates_spinboxes(tmp_path):
     """Ziehen am Wellenform-Marker (simuliert per set_loop + Signal, wie ein
     echter Drag es ausloesen wuerde) muss die Spinboxen nachziehen."""
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     ed = _editor()
     p = tmp_path / "pad.wav"; _write_wav(p, secs=0.2)
     inst = ed._instrument_from_file(str(p))
@@ -385,7 +385,7 @@ def test_waveform_view_drag_via_mouse_events(tmp_path):
     den Loop-Ende-Marker (Regressionstest fuer die Hit-Test-/Drag-Logik)."""
     from PySide6.QtCore import QPointF, Qt
     from PySide6.QtGui import QMouseEvent
-    from gamebasic.trackereditor_qt import _WaveformView
+    from drachenhauch.trackereditor_qt import _WaveformView
     import numpy as np
     samples = np.sin(np.linspace(0, 20, 2000)).astype(np.float32)
     w = _WaveformView(samples, loop_start=0, loop_end=1000)
@@ -415,7 +415,7 @@ def test_waveform_view_drag_via_mouse_events(tmp_path):
 # --- vorher, jedes wiederholte Oeffnen sammelte hidden Kind-Widgets an) -----
 
 def test_instrument_dialog_has_delete_on_close(tmp_path):
-    from gamebasic.trackereditor_qt import _InstrumentDialog
+    from drachenhauch.trackereditor_qt import _InstrumentDialog
     from PySide6.QtCore import Qt
     ed = _editor()
     inst = ed.song.instruments[0]
@@ -424,7 +424,7 @@ def test_instrument_dialog_has_delete_on_close(tmp_path):
 
 
 def test_keymap_dialog_has_delete_on_close():
-    from gamebasic.trackereditor_qt import _KeymapDialog
+    from drachenhauch.trackereditor_qt import _KeymapDialog
     from PySide6.QtCore import Qt
     ed = _editor()
     dlg = _KeymapDialog("Kit", [], ed._load_samples_from_file)
@@ -432,7 +432,7 @@ def test_keymap_dialog_has_delete_on_close():
 
 
 def test_sf2_preset_dialog_has_delete_on_close():
-    from gamebasic.trackereditor_qt import _Sf2PresetDialog
+    from drachenhauch.trackereditor_qt import _Sf2PresetDialog
     from PySide6.QtCore import Qt
     dlg = _Sf2PresetDialog([(0, 0, "Piano")])
     assert dlg.testAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)

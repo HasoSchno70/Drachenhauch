@@ -1,4 +1,4 @@
-"""D1 + D2 aus docs/gamebasic-stolpersteine.md.
+"""D1 + D2 aus docs/drachenhauch-stolpersteine.md.
 
 D1: `/` bleibt unveraendert (INTEGER wenn glatt, sonst FLOAT) -- aber die
     Fehlermeldung beim Zuweisen eines FLOAT-Ergebnisses an eine INTEGER-Variable
@@ -7,7 +7,7 @@ D2: f32-gestuetzte Audio-Lautstaerken werden gerundet ausgegeben (0.8 statt
     0.800000011920929). Die allgemeine Float-Ausgabe bleibt unveraendert (korrekt).
 """
 import pytest
-from gamebasic.errors import GameBasicError
+from drachenhauch.errors import DrachenhauchError
 
 
 # --- D1 -----------------------------------------------------------------
@@ -18,7 +18,7 @@ def test_division_unchanged(run_gb):
 
 
 def test_float_into_integer_hints_backslash(run_gb):
-    with pytest.raises(GameBasicError, match=r"ganzzahlige Division \\ statt /"):
+    with pytest.raises(DrachenhauchError, match=r"ganzzahlige Division \\ statt /"):
         run_gb("DIM x AS INTEGER\nx = 9 / 2\n")
 
 

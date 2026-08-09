@@ -1,15 +1,15 @@
-# Sprite-Editor (`gbsprites`)
+# Sprite-Editor (`dhsprites`)
 
 Ein vollwertiger Pixel-Art-Editor fuer GameBasic. Built mit PySide6, exportiert PNG-Sheets, Animated GIFs, einzelne PNG-Frames und **Sprite-Atlas-Manifeste** -- alle direkt im Spiel via `LOADIMAGE`, `SPRITE_NEW` oder `ATLAS_LOAD` ladbar.
 
 ## Starten
 
 ```
-gbsprites                        ' leerer Editor (32x32 Default)
-gbsprites assets\hero.png        ' bestehende Datei oeffnen
+dhsprites                        ' leerer Editor (32x32 Default)
+dhsprites assets\hero.png        ' bestehende Datei oeffnen
 ```
 
-Auf Windows ueber `gbsprites.cmd`. Aus dem Code-Editor heraus: Werkzeuge → Sprite-Editor.
+Auf Windows ueber `dhsprites.cmd`. Aus dem Code-Editor heraus: Werkzeuge → Sprite-Editor.
 
 ## Tools
 
@@ -104,7 +104,7 @@ Die Bereiche speisen drei Exporte:
 2. **Datei → Animations-FSM exportieren (.gbanim)**: schreibt eine direkt
    `ANIM_FSM_LOAD`-ladbare Vorlage — ein State pro Bereich (`first`/`last`/
    `fps`, erster Bereich = `default`). Transitions/Parameter ergaenzt du im
-   [gbanim-Editor](anim-editor.md).
+   [dhanim-Editor](anim-editor.md).
 3. **Sprite-Test**: das Testprogramm spielt den ersten definierten Bereich.
 
 ### Animation-GIF (`Ctrl+G`)
@@ -268,11 +268,11 @@ Falls du den Editor erweitern willst:
 
 | Datei | Inhalt |
 |---|---|
-| [`gamebasic/spriteeditor_qt.py`](../gamebasic/spriteeditor_qt.py) | UI-Schicht: SpriteEditorWindow, ColorPanel, FramesPanel, Canvas, Dialogs |
-| [`gamebasic/spriteeditor/document.py`](../gamebasic/spriteeditor/document.py) | Datenmodell: `SpriteDoc`, `Frame`. Save/Load (PNG, .gbsprite, GIF, Atlas) |
-| [`gamebasic/spriteeditor/tools.py`](../gamebasic/spriteeditor/tools.py) | Pixel-Tools (Pencil, Eraser, Bucket, Line, ...) |
-| [`gamebasic/spriteeditor/tool_context.py`](../gamebasic/spriteeditor/tool_context.py) | `ToolHost`-Protocol (welche app-Attribute die Tools brauchen) |
-| [`gamebasic/spriteeditor/icons.py`](../gamebasic/spriteeditor/icons.py) | Programmatisch gerenderte Toolbar-Icons (kein PNG-Asset noetig) |
+| [`drachenhauch/spriteeditor_qt.py`](../drachenhauch/spriteeditor_qt.py) | UI-Schicht: SpriteEditorWindow, ColorPanel, FramesPanel, Canvas, Dialogs |
+| [`drachenhauch/spriteeditor/document.py`](../drachenhauch/spriteeditor/document.py) | Datenmodell: `SpriteDoc`, `Frame`. Save/Load (PNG, .gbsprite, GIF, Atlas) |
+| [`drachenhauch/spriteeditor/tools.py`](../drachenhauch/spriteeditor/tools.py) | Pixel-Tools (Pencil, Eraser, Bucket, Line, ...) |
+| [`drachenhauch/spriteeditor/tool_context.py`](../drachenhauch/spriteeditor/tool_context.py) | `ToolHost`-Protocol (welche app-Attribute die Tools brauchen) |
+| [`drachenhauch/spriteeditor/icons.py`](../drachenhauch/spriteeditor/icons.py) | Programmatisch gerenderte Toolbar-Icons (kein PNG-Asset noetig) |
 
 Tools-API ist klar dokumentiert (siehe `tools.py`-Header). Neue Tools: subclass von `Tool`, `name` setzen, `begin/move/end` implementieren, in `SpriteEditorWindow._setup_tools()` registrieren.
 

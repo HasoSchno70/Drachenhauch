@@ -10,7 +10,7 @@ spaeter wirklich tut.
 """
 import pytest
 
-from gamebasic.formdesigner import (
+from drachenhauch.formdesigner import (
     FORM_THEMES, FORM_THEME_COLORS, FormDoc, theme_colors,
 )
 

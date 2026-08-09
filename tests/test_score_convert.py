@@ -1,9 +1,9 @@
-"""Tests fuer die Score->Tracker-Konvertierung (Qt-frei, gamebasic.score.convert)."""
+"""Tests fuer die Score->Tracker-Konvertierung (Qt-frei, drachenhauch.score.convert)."""
 import pytest
 
-from gamebasic.score.document import ScoreDoc
-from gamebasic.score.convert import to_tracker_song, _beat_to_row, _row_exact
-from gamebasic.tracker.song import MAX_CHANNELS, MIN_CHANNELS, NOTE_OFF
+from drachenhauch.score.document import ScoreDoc
+from drachenhauch.score.convert import to_tracker_song, _beat_to_row, _row_exact
+from drachenhauch.tracker.song import MAX_CHANNELS, MIN_CHANNELS, NOTE_OFF
 
 
 @pytest.mark.parametrize("beat,row", [

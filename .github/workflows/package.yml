@@ -55,7 +55,7 @@ jobs:
       - name: Artefakte hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: gamebasic-${{ matrix.os }}
+          name: drachenhauch-${{ matrix.os }}
           path: |
             dist/
             installer/output/

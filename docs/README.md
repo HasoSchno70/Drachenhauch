@@ -57,7 +57,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 ### Werkzeug
 
 - **[Code-Editor](editor.md)** — Tastenkürzel, Snippets, Sidebar, Run/Debug/Profile, Find in Project
-- **[Sprite-Editor (`gbsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
+- **[Sprite-Editor (`dhsprites`)](sprite-editor.md)** — Pixel-Art-Editor mit Multi-Frame, Animation, Onion-Skin, Sheet/Atlas/GIF-Export, Palette-Tools
 
 ## Erstes Programm
 
@@ -72,7 +72,7 @@ PRINT "Schoen dich zu sehen, ", name
 Speichern als `hallo.gb`, dann:
 
 ```
-.venv\Scripts\python.exe gbrun.py hallo.gb
+.venv\Scripts\python.exe dhrun.py hallo.gb
 ```
 
 ## Erstes Spiel

@@ -1,4 +1,4 @@
-"""Tests fuer den SFX-Generator (`gbsfx`): Synth-Kern + Editor-Exportpfade.
+"""Tests fuer den SFX-Generator (`dhsfx`): Synth-Kern + Editor-Exportpfade.
 
 Bisher gab es keine dedizierten Tests -- `synth.py` ist geteilte Mathematik
 mit dem `AUDIO_SFX`-Rust-Builtin (Parity-kritisch) und `sfxeditor_qt.py` nur
@@ -15,8 +15,8 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from gamebasic.sfxeditor_qt import _FACTORY_PRESETS, save_wav, synthesize
-from gamebasic.synth import WAVEFORMS
+from drachenhauch.sfxeditor_qt import _FACTORY_PRESETS, save_wav, synthesize
+from drachenhauch.synth import WAVEFORMS
 
 
 # ---------------------------------------------------------------- synthesize
@@ -116,7 +116,7 @@ def app():
 
 @pytest.fixture
 def editor(app):
-    from gamebasic.sfxeditor_qt import SfxGenerator
+    from drachenhauch.sfxeditor_qt import SfxGenerator
     return SfxGenerator(Path("."))
 
 

@@ -1,6 +1,6 @@
 // VSCode-Client fuer den GameBasic-Language-Server.
 //
-// Startet `python -m gamebasic.lsp` (stdio) und verbindet ihn als
+// Startet `python -m drachenhauch.lsp` (stdio) und verbindet ihn als
 // LanguageClient. Syntax-Highlighting kommt aus der TextMate-Grammatik und
 // laeuft auch ohne Server; der Server liefert Diagnostics/Completion/Hover/
 // Goto-Definition/References/Outline.
@@ -16,17 +16,17 @@ let client;
 // Fehler half nur ein manueller Fenster-Reload, ohne jeden Hinweis darauf,
 // dass genau das noetig waere (Review-Fund).
 const _RESTART_KEYS = [
-  "gamebasic.pythonPath",
-  "gamebasic.serverModule",
-  "gamebasic.enableLanguageServer",
+  "drachenhauch.pythonPath",
+  "drachenhauch.serverModule",
+  "drachenhauch.enableLanguageServer",
 ];
 
 function _buildClient() {
-  const cfg = workspace.getConfiguration("gamebasic");
+  const cfg = workspace.getConfiguration("drachenhauch");
   const pythonPath = cfg.get("pythonPath", "python");
-  const serverModule = cfg.get("serverModule", "gamebasic.lsp");
+  const serverModule = cfg.get("serverModule", "drachenhauch.lsp");
 
-  // cwd = erster Workspace-Ordner, damit `gamebasic` importierbar ist
+  // cwd = erster Workspace-Ordner, damit `drachenhauch` importierbar ist
   // (am besten den GameBasic-Projektordner oeffnen, oder pythonPath auf
   //  einen Python setzen, der das Paket findet).
   const folder =
@@ -50,14 +50,14 @@ function _buildClient() {
   };
 
   const clientOptions = {
-    documentSelector: [{ scheme: "file", language: "gamebasic" }],
+    documentSelector: [{ scheme: "file", language: "drachenhauch" }],
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher("**/*.gb"),
     },
   };
 
   return new LanguageClient(
-    "gamebasic",
+    "drachenhauch",
     "GameBasic Language Server",
     serverOptions,
     clientOptions
@@ -65,7 +65,7 @@ function _buildClient() {
 }
 
 async function _startClient() {
-  const cfg = workspace.getConfiguration("gamebasic");
+  const cfg = workspace.getConfiguration("drachenhauch");
   if (cfg.get("enableLanguageServer", true) === false) {
     return; // nur Syntax-Highlighting
   }
@@ -76,7 +76,7 @@ async function _startClient() {
     window.showErrorMessage(
       "GameBasic-Language-Server konnte nicht starten: " +
         err.message +
-        " (gamebasic.pythonPath pruefen)"
+        " (drachenhauch.pythonPath pruefen)"
     );
   }
 }

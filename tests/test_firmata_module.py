@@ -10,7 +10,7 @@ import pytest
 
 
 def test_firmata_builtins_registered():
-    from gamebasic.editor_qt.dhrt_meta import builtin_names_lower
+    from drachenhauch.editor_qt.dhrt_meta import builtin_names_lower
     expected = {
         "firmata_ports", "firmata_open", "firmata_close", "firmata_is_open",
         "firmata_pin_mode", "firmata_digital_write", "firmata_digital_read",
@@ -20,7 +20,7 @@ def test_firmata_builtins_registered():
 
 
 def test_firmata_is_a_known_module():
-    from gamebasic.modules import is_known_module
+    from drachenhauch.modules import is_known_module
     assert is_known_module("firmata")
 
 
@@ -29,8 +29,8 @@ def test_firmata_handle_type_check_and_import(run_gb):
     FIRMATA_OPEN-Call schlaegt in diesem (Standard-, nicht --hardware-)Build
     kontrolliert zur Laufzeit fehl -- genau wie SERIAL_OPEN/USB_LIST/BT_SCAN
     ohne die jeweiligen Hardware-Features."""
-    from gamebasic.errors import GBRuntimeError
-    with pytest.raises(GBRuntimeError, match="FIRMATA_OPEN"):
+    from drachenhauch.errors import DHRuntimeError
+    with pytest.raises(DHRuntimeError, match="FIRMATA_OPEN"):
         run_gb('''
 IMPORT "firmata"
 DIM h AS FIRMATA_HANDLE

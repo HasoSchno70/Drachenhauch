@@ -144,7 +144,7 @@ Wer **blockierend** lesen will (z.B. weil man weiss, dass jetzt Antwort kommen M
 NET_SET_TIMEOUT(sock, 2000)         ' 2s Timeout
 DIM answer AS STRING
 answer = NET_RECV(sock, 1024)
-' Wirft GBRuntimeError nach 2s wenn nichts kommt
+' Wirft DHRuntimeError nach 2s wenn nichts kommt
 ```
 
 ## Verbindungsabbruch erkennen

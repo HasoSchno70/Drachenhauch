@@ -29,13 +29,13 @@ Lexer/Parser für Highlighting/LSP, die Qt-Editoren, preprocess für IMPORT-Merg
 ## Verzeichnisstruktur
 
 ```
-gamebasic/             # Python = nur noch Editor-Tooling + Front-End
-  __main__.py            # py -m gamebasic <file> -> ruft `dhrt run`
+drachenhauch/             # Python = nur noch Editor-Tooling + Front-End
+  __main__.py            # py -m drachenhauch <file> -> ruft `dhrt run`
   lexer.py / tokens.py   # Tokenisierung (Highlighting/LSP/Dev)
   parser.py / ast_nodes.py
   preprocess.py          # IMPORT-Merge (.gb-Source) + Built-in-Modul-Namen erkennen
   graphics.py            # nur COLORS/KEYS + Kamera-Mathematik (kein Render; pygame raus)
-  synth.py               # Synth-Mathematik (von SFX-/Tracker-Editor + gbsfx genutzt)
+  synth.py               # Synth-Mathematik (von SFX-/Tracker-Editor + dhsfx genutzt)
   particle_sim.py        # pure numpy-Partikel-Sim (für den Partikel-Editor)
   errors.py              # Fehlertypen
   modules/__init__.py    # NUR Modul-NAMENSLISTE (KNOWN_MODULES) — keine Impls mehr
@@ -43,7 +43,7 @@ gamebasic/             # Python = nur noch Editor-Tooling + Front-End
   spriteeditor*/tilemap*/tracker*/sfxeditor*/particleeditor*  # Begleit-Editoren
 rust/gb_runtime/         # >>> die Runtime: dhrt (Rust/raylib)
   src/lexer.rs parser.rs compiler.rs vm.rs builtins.rs + <modul>.rs  # alles in Rust
-gbrun.py                 # CLI: Editor-Launcher + run/--native/--export/--tokens/--ast (run -> dhrt)
+dhrun.py                 # CLI: Editor-Launcher + run/--native/--export/--tokens/--ast (run -> dhrt)
 examples/*.gb            # Demos
 tests/                   # pytest (1561+): run_gb-Golden gegen dhrt + Rust-#[test]
 ```
@@ -67,12 +67,12 @@ Source.gb  →  preprocess.process()  →  Lexer  →  Parser  →  AST
                                                    native Ausführung (raylib)
 ```
 
-`gbrun.py` ist Default-Einstiegspunkt (macht `os.chdir(file.parent)` für relative
-Asset-Pfade). `py -m gamebasic` funktioniert auch, wechselt aber nicht ins
-Datei-Verzeichnis — Programme mit `LOADIMAGE("assets/...")` brauchen `gbrun.py`.
+`dhrun.py` ist Default-Einstiegspunkt (macht `os.chdir(file.parent)` für relative
+Asset-Pfade). `py -m drachenhauch` funktioniert auch, wechselt aber nicht ins
+Datei-Verzeichnis — Programme mit `LOADIMAGE("assets/...")` brauchen `dhrun.py`.
 
-> **Run/Export laufen über `dhrt` (Rust-Frontend).** `gbrun.py` (Default-Run +
-> `--native`) und der Editor-Run rufen `dhrt run datei.gb`; `gbrun.py --export` /
+> **Run/Export laufen über `dhrt` (Rust-Frontend).** `dhrun.py` (Default-Run +
+> `--native`) und der Editor-Run rufen `dhrt run datei.gb`; `dhrun.py --export` /
 > Editor-Export rufen `dhrt --export` (hängt den `.gbc`-Payload an eine Kopie der
 > Exe, kopiert `assets/`). dhrt chdirt selbst ins Datei-Verzeichnis (relative
 > Asset-/IMPORT-Pfade). Es gibt keinen Python-Run-/Export-Pfad mehr.
@@ -96,7 +96,7 @@ Builtins leben in `rust/gb_runtime/src/builtins.rs` (pure) bzw. `vm.rs`
    optional), `NAME(a, b, ...)` (beliebig viele), `NAME(6..8 Argumente)`.
    `NAME(*args)` schaltet die Pruefung ab — nur nehmen, wenn es wirklich offen
    ist. Eine zu enge Signatur erzeugt Falsch-Alarme in fremdem Code.
-4. Bei neuem Keyword: `vscode-gamebasic/build_grammar.py` neu generieren.
+4. Bei neuem Keyword: `vscode-drachenhauch/build_grammar.py` neu generieren.
 
 (Es gibt KEINE Python-`@builtin`-Registry / kein `interpreter.py` mehr.)
 
@@ -111,11 +111,11 @@ Persistente Fenster/Widgets (externe Typen `GUI_WINDOW`/`GUI_WIDGET` via `regist
 Dispatch in `vm.rs` `try_<modul>`; externe Typen + ihr Default in `vm.rs`/
 `value.rs`). Neues Modul: `.rs` schreiben, im `vm.rs`-`CALL_BUILTIN`-Dispatch
 einhängen, den Modul-Namen in `rust/gb_runtime/src/preprocess.rs` MODULES **und**
-in `gamebasic/modules/__init__.py` `KNOWN_MODULES` ergänzen (synchron halten —
+in `drachenhauch/modules/__init__.py` `KNOWN_MODULES` ergänzen (synchron halten —
 sonst erkennt der Preprocessor `IMPORT "modul"` nicht). Dann Golden-Test +
 `builtin_index.json`.
 
-**IMPORT-Auflösung in [preprocess.py](gamebasic/preprocess.py):**
+**IMPORT-Auflösung in [preprocess.py](drachenhauch/preprocess.py):**
 Der Pfad wird **wörtlich** aufgelöst — es wird KEINE `.gb`-Endung angehängt.
 1. Existiert der geschriebene Pfad als Datei? → textuelles Inkludieren
    (Quellcode-Modul). Dafür muss die Endung mitgeschrieben werden:
@@ -145,7 +145,7 @@ Endung schreiben: `IMPORT "json.gb"`. Beide Engines verhalten sich identisch
 | `physics2d` | **Echte 2D-Starrkoerper-Physik via Rapier2D** (voller Solver wie `physics3d`, nur 2D — fuer Stapeln/Werfen/Rollen/Sandbox; nicht zu verwechseln mit `physics` = nur Kollisions-Mathe). `PHYS2D_NEW`, `PHYS2D_SET_GRAVITY(w,gx,gy)`, `PHYS2D_ADD_BOX(w,x,y,hw,hh,dynamic,bounce)`/`ADD_CIRCLE(w,x,y,r,...)`, `PHYS2D_STEP(w,dt)`, `PHYS2D_BODY_X/Y/ANGLE/VX/VY`, `PHYS2D_SET_VEL`/`APPLY_IMPULSE`/`SET_POS`/`LOCK_ROTATION`/**`SET_DYNAMIC`**/`IS_DYNAMIC`/`REMOVE`/`COUNT` (`SET_DYNAMIC` schaltet statisch<->dynamisch um -- fuer Aufbauten, die erst stehen und dann zusammenfallen). **Bildschirm-Konvention** (Y unten, Default-Gravitation 0/980), `length_unit=100` fuer Pixel-Stabilitaet; Box-Maße = Halb-Extents; `dynamic`-Flag akzeptiert TRUE/FALSE oder 1/0 (Helfer `need_flag`). Koerper-Index stabil (Tombstones). Rapier2D pure-Rust -> ungated. Doku `docs/module-physics2d.md`, Demo `examples/112_physics2d.gb`, Tests `tests/test_physics2d.py`. | `PHYS2D_WORLD` |
 | `camera` | World-Translation+Zoom+**Rotation** für **alle** Drawing-Befehle. `CAMERA_SET/RESET/FOLLOW`, `CAMERA_SET_ROTATION`/`CAMERA_ROTATION`, `CAMERA_S2W_X/Y`. Rotation dreht nur Positionen (um die Bildschirm-Mitte), keine automatische Kontur-Rotation von Formen/Sprites — siehe `docs/module-camera.md`. | — |
 | `sprite` | Animiertes Sheet-basiertes Sprite. Position+Velocity, benannte Animationen mit FPS, `PLAY`/`PLAY_ONCE`, Flip, AABB-Kollision | `SPRITE` |
-| `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.gbanim`-JSON (Editor `gbanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.gb`, Tests `tests/test_animfsm.py`. | `ANIM_FSM` |
+| `animfsm` | **Animations-State-Machine** (Unity-Mecanim-Stil), datengetrieben aus `.gbanim`-JSON (Editor `dhanim`): States (an Sprite-Anim gebunden) + Parameter (`bool`/`float`/`int`/`trigger`) + Transitions mit Bedingungen (`gt`/`lt`/`eq`/…, Any-State `*`, `wait_finished` für one-shot). `ANIM_FSM_LOAD/SETUP/UPDATE(fsm,sprite,dt)/SET_*/TRIGGER/STATE/FORCE`. Doku `docs/module-animfsm.md`, Demo `examples/111_anim_fsm.gb`, Tests `tests/test_animfsm.py`. | `ANIM_FSM` |
 | `ui` | Immediate-Mode-UI. `UI_LABEL`, `UI_BUTTON`, `UI_CHECKBOX`, `UI_SLIDER` mit String-IDs für State. Pflicht: `UI_END_FRAME()` vor `FLIP()`. **Plastischer Look wie `gui`:** Themen `glas_dunkel`/`glas_hell` + Metriken `gradient`/`gloss`/`bevel`/`corner_radius` (0 = flach, alle alten Themen unveraendert); ein Preset setzt Farben UND Plastik. Gemeinsame Flaechen-Routine `ui_flaeche` in vm.rs (erhaben/versenkt). **Gotcha:** die Plastik-Werte muessen VOR `self.gfx.as_mut()` gelesen werden -- der Aufruf leiht `self` veraenderlich aus, danach ist `self.ui_state` nicht mehr lesbar (daher `UiPlastik` als Buendel). | — |
 | `scene` | Stack-basierter Scene-Manager. `SCENE_PUSH/POP/SWITCH/CURRENT`, pro-Scene-Daten via `SCENE_SET_INT/FLOAT/STRING/BOOL` + `_OR`-Variante. | — |
 | `save` | Persistente Save-Slots, JSON-Backend, Versionsfeld. `SAVE_NEW/LOAD/LOAD_OR_NEW/WRITE`, `SAVE_SET/GET_INT/FLOAT/STRING/BOOL`. | `SAVE_HANDLE` |
@@ -154,7 +154,7 @@ Endung schreiben: `IMPORT "json.gb"`. Beide Engines verhalten sich identisch
 | `m3d` | 3D-Mathe: **VEC3/VEC4/QUAT/MAT4** (immutable, Operator-Overloading `+ - * / = <>`, inkl. `mat*mat`/`mat*vec`/`quat*quat`). Quaternionen (`QUAT_FROM_AXIS_ANGLE/EULER/SLERP/ROTATE_VEC3`), Matrizen (`MAT4_TRS/MUL/INVERT/LOOKAT/PERSPECTIVE/ORTHO/...`, column-major). Rendering via **`MODEL_MATRIX(handle, mat[, tint])`** (hierarchische Transforms/Bones/Gizmos) + **`MODEL_INSTANCED(handle, mats[, tint[, anzahl]])`** -- `tint` darf eine Farbe ODER ein `ARRAY OF INTEGER` sein (eine Farbe je Matrix); die Laufzeit gruppiert dann nach Farben und zeichnet **einen Draw-Call je VERSCHIEDENER Farbe**, nicht je Instanz (raylibs `DrawMeshInstanced` uebertraegt nur Matrizen, keine Farb-Attribute -- bei sehr vielen verschiedenen Farben ist ein Verlauf im Shader die bessere Antwort). Echtes GPU-Instancing: dasselbe Mesh mit N MAT4-Welt-Matrizen aus einem `ARRAY OF MAT4`/`TUPLE` in EINEM Draw-Call via raylib `DrawMeshInstanced`; eigener schlanker Instancing-Shader mit Ambient+bis-4-Lichtern, kein PBR/IBL/Schatten/Normal-Maps) + **`CAMERA3D_VIEW/PROJECTION(mat)`** (Ortho/Custom-Frustum) — native-only (dhrt). Doku `docs/module-m3d.md`, Demos `examples/103_m3d.gb` + `examples/104_instancing.gb`, Tests `tests/test_m3d.py`. | `VEC3`/`VEC4`/`QUAT`/`MAT4` |
 | `input` | Action-basiertes Input-Mapping mit Edge-Detection. `INPUT_BIND/UNBIND/UPDATE`, `INPUT_HELD/PRESSED/RELEASED/AXIS/BOUND`. Multi-Key-Bindings. **Gamepad-Support**: `JOY_BUTTON_A..Y`, `JOY_DPAD_*` als Bind-Codes, `INPUT_JOY_AXIS(slot, "left_x")` mit Deadzone. | — |
 | `regex` | Python-kompatible Pattern-Matching. `REGEX_MATCH/TEST/FIND/FIND_ALL/REPLACE/REPLACE_ONCE/SPLIT`. Pattern-Cache fuer wiederholte Aufrufe. | — |
-| `audio` | Erweiterte Audio-API (nativ in dhrt ueber **Kira**/cpal -- eigener Audio-Thread, vom Game-Loop entkoppelt; loeste 2026-06-13 raylib-Audio ab, `rust/gb_runtime/src/audio.rs`). Channels, Pause/Resume/Fade (native Kira-Tweens), Stereo-Pan, Music-Position. Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in `gamebasic/synth.py`; der SFX-Generator `gbsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). **Tracker-Module** `.mod`/`.xm` laufen ueber `PLAYMUSIC`/`AUDIO_MUSIC_LOAD` in **Echtzeit gestreamt** (Kira-Custom-`Sound` `ModuleSound` pollt den reinen Rust-Player `xmrs`/`xmrsplayer` auf dem Audio-Thread; sofort geladen, exaktes Endlos-Loopen, Pitch-Resampler + Volume-Ramp im Sound, Steuerung via `Arc<ModShared>`-Atomics, Modul geleakt + im Drop freigegeben) -- echter 4-Kanal-Amiga-Sound, Demo `examples/115_modplayer.gb`. **Sampler `SAMPLE_*`** (Amiga/Paula-Prinzip): `SAMPLE_LOAD(pfad$)->SAMPLE`, `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])->AUDIO_CHANNEL` (Resampling per linearer Interpolation = Tonhoehe wie Geschwindigkeit; resampelte Noten gecacht), `SAMPLE_SET_LOOP`/`SAMPLE_LEN`. One-Shot (dur<=0) fuer Drums/Hits, dur>0 + Loop-Region fuer gehaltene Noten. Reine Resampling-Mathematik = freie `resample()` in audio.rs (Rust-`#[test]`); Demo `examples/116_sampler.gb`. **Paula-Lo-Fi** `AUDIO_LOFI(an[, bits[, cutoff_hz]])` -- Bit-Crush (Default 8-bit) + LED-Tiefpass (Default 3300 Hz) fuer NEU synthetisierte Sounds (TONE/NOISE/SFX/SAMPLE_PLAY; Cache wird geleert); pure `lofi_chain()` mit Rust-`#[test]`. **Mixer-Busse** `AUDIO_BUS_VOLUME(bus$, vol)`/`AUDIO_BUS_GET_VOLUME(bus$)` mit `bus$` = `sfx`/`music`/`master` -- SFX-/Musik-Master getrennt (Kira-Sub-Tracks: SFX/Sampler/Synth -> sfx_track, Musik -> music_track, beide -> Main mit dem FFT-Tap; Bus×Sound-Volume multiplizieren). **Echtzeit-Effekte je Bus** (Kira-Effektkette am Track, live steuerbar, kein Buffer-Bake): `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` (Tiefpass, SID/Acid-Sweep), `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` (Hall), `AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])` (Echo, eigener Ringpuffer-Effekt -> Zeit zur Laufzeit aenderbar, 1..4000 ms), `AUDIO_DISTORTION(bus$, amount[, mix])` (Overdrive/Fuzz), `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` (Dynamik, ratio<=1=aus), `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` (Glocken-EQ, gain 0=transparent); Signalfluss EQ->Filter->Distortion->Compressor->Reverb->Delay, neutral bis aktiviert, Demo `examples/117_audiofx.gb`. **Clock** `AUDIO_CLOCK_NEW(ticks_per_second)->AUDIO_CLOCK` (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing; startet pausiert) + `AUDIO_CLOCK_START/PAUSE/STOP/REMOVE`, `AUDIO_CLOCK_TICKING`/`AUDIO_CLOCK_TICKS`, `AUDIO_CLOCK_SET_SPEED` -- und **`AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]])`**: Sound-Start exakt auf einen Clock-Tick geplant, getrieben vom Kira-Audio-Thread selbst (KEIN Polling/Update-Call noetig -- anders als das frame-getriebene `timer`-Modul). BPM->ticks_per_second rechnet der Aufrufer selbst um (`bpm / 60.0 * subdivisions`). Ticking-Status wird im Wrapper selbst mitgefuehrt (nicht direkt Kiras `ClockHandle::ticking()`), weil Kira das nur asynchron per Audio-Thread-Kommando spiegelt -- eine Abfrage direkt nach START/STOP koennte sonst kurz den alten Wert zeigen. **Nicht-lineare Easings** fuer Fades/Slides: optionaler trailing `easing$`-Parameter (`"linear"` Default/`"in"`/`"out"`/`"inout"`, quadratisch) bei `AUDIO_PLAY` (fade_in_ms), `AUDIO_STOP` (fade_out_ms), `AUDIO_PAN_SLIDE` (dauer_ms), `AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP` (fade_in/out_ms) -- vorher liefen alle Tweens linear, obwohl Kira `Easing::{In,Out,InOut}Powi` eingebaut hat. Interner Helfer `FadeCurve` (audio.rs) konvertiert zu `kira::Easing` fuer den Kira-Tween-Pfad (Stream/Static-Sounds) UND dupliziert dieselbe Kurven-Mathematik als reine `apply()`-Funktion fuer den MOD/XM-Modul-Fade (eigener Atomics-Ramp in `ModShared`, kein Kira-Tween beteiligt) -- beide Pfade klingen dadurch identisch. Rust-`#[test]`s verifizieren die Kurven-Mathematik gegen Kiras eigene Formel. **Raeumliches Audio (Listener/Emitter):** `AUDIO_LISTENER_NEW(x,y,z)->AUDIO_LISTENER` ("Ohr" der Szene, z.B. Kamera-/Spielerposition; unrotiert blickt -Z), `AUDIO_LISTENER_SET_POSITION`/`AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` (nur Y-Achsen-Yaw -- deckt die typische Top-Down-/3rd-Person-Kamera ab, ohne BASIC-Nutzern volle Quaternionen zuzumuten) + `AUDIO_LISTENER_REMOVE`; `AUDIO_EMITTER_NEW(listener,x,y,z[,min_dist[,max_dist]])->AUDIO_EMITTER` (ein raeumlicher Kira-Sub-Track, an einen Listener + Position gebunden; Kira berechnet Panning + lineare Lautstaerke-Abnahme zwischen min_dist=laut/max_dist=lautlos komplett selbst -- keine eigene DSP) + `AUDIO_EMITTER_SET_POSITION`/`AUDIO_EMITTER_REMOVE`; **`AUDIO_PLAY_ON(sound,emitter[,loops[,volume[,fade_in_ms[,easing$]]]])->AUDIO_CHANNEL`** startet einen Sound auf dem Emitter-Track statt dem flachen SFX-Bus -- der zurueckgegebene `AUDIO_CHANNEL` ist danach identisch mit `AUDIO_PAUSE`/`STOP`/`VOLUME`/... steuerbar (`StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt). Listener/Emitter im selben Tombstone-Vec-Pattern wie Clocks (Kira kennt weder `remove_listener()` noch `remove_spatial_sub_track()` -- nur Handle-Drop). `mint`-Crate (winzige, abhaengigkeitsfrei Interop-Structs) baut die Position/Rotation-Werte fuer Kiras API, ohne `glam` direkt einzubinden. Rust-`#[test]`s verifizieren `yaw_quat()` (Einheits-Quaternion, korrekte Komponenten). Demo `examples/139_audio_spatial.gb`. **Modulatoren (LFO + Tweener):** `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` -> `AUDIO_MOD` (`sine`/`triangle`/`saw`/`pulse`), `AUDIO_LFO_SET`, `AUDIO_LFO_WAVEFORM`; `AUDIO_TWEENER_NEW([start])` + `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`; gebunden per `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` mit ziel$ = **`volume`** (Tremolo) / **`pan`** (Auto-Pan) / `filter` / `resonance` / `reverb` / `distortion`; dazu `AUDIO_BUS_PAN(bus$, pos)` fuer eine feste Bus-Balance (-1..+1) -- vorher liess sich nur ein EINZELNER Kanal pannen, entfernt per `AUDIO_MOD_REMOVE`. Der Wertebereich des Modulators (LFO: -1..+1 bei Standard-Amplitude) wird auf `min..max` abgebildet. **Der Punkt daran:** Kira faehrt sie auf dem AUDIO-Thread -- Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps laufen sample-genau weiter, auch wenn die Bildrate einbricht, und das GB-Programm rechnet pro Frame NICHTS nach. LFO und Tweener teilen sich den Handle-Typ `AUDIO_MOD`; ein LFO-Aufruf auf einem Tweener (und umgekehrt) meldet das im Klartext. Doku `docs/module-audio-modulatoren.md`, Demo `examples/150_audio_modulatoren.gb`. | `AUDIO_CHANNEL`, `SAMPLE`, `AUDIO_CLOCK`, `AUDIO_LISTENER`, `AUDIO_EMITTER`, `AUDIO_MOD` |
+| `audio` | Erweiterte Audio-API (nativ in dhrt ueber **Kira**/cpal -- eigener Audio-Thread, vom Game-Loop entkoppelt; loeste 2026-06-13 raylib-Audio ab, `rust/gb_runtime/src/audio.rs`). Channels, Pause/Resume/Fade (native Kira-Tweens), Stereo-Pan, Music-Position. Tone-Generation (`AUDIO_TONE`/`AUDIO_NOISE`) mit Sine/Square/Saw/Triangle/Noise. **`AUDIO_SFX`** -- prozeduraler sfxr-Stil-Synth (Waveform + Pitch-Slide + ADSR + Vibrato + optionale `stereo_width` fuer breiten Stereo-Sound; geteilte Mathematik in `drachenhauch/synth.py`; der SFX-Generator `dhsfx` exportiert solche Aufrufe, Pan via `AUDIO_PAN`). Liefert kompatible `SOUND`-Objekte (auch fuer `PLAYSOUND` nutzbar). **Tracker-Module** `.mod`/`.xm` laufen ueber `PLAYMUSIC`/`AUDIO_MUSIC_LOAD` in **Echtzeit gestreamt** (Kira-Custom-`Sound` `ModuleSound` pollt den reinen Rust-Player `xmrs`/`xmrsplayer` auf dem Audio-Thread; sofort geladen, exaktes Endlos-Loopen, Pitch-Resampler + Volume-Ramp im Sound, Steuerung via `Arc<ModShared>`-Atomics, Modul geleakt + im Drop freigegeben) -- echter 4-Kanal-Amiga-Sound, Demo `examples/115_modplayer.gb`. **Sampler `SAMPLE_*`** (Amiga/Paula-Prinzip): `SAMPLE_LOAD(pfad$)->SAMPLE`, `SAMPLE_PLAY(sample, halbtoene, vol[, dur_ms])->AUDIO_CHANNEL` (Resampling per linearer Interpolation = Tonhoehe wie Geschwindigkeit; resampelte Noten gecacht), `SAMPLE_SET_LOOP`/`SAMPLE_LEN`. One-Shot (dur<=0) fuer Drums/Hits, dur>0 + Loop-Region fuer gehaltene Noten. Reine Resampling-Mathematik = freie `resample()` in audio.rs (Rust-`#[test]`); Demo `examples/116_sampler.gb`. **Paula-Lo-Fi** `AUDIO_LOFI(an[, bits[, cutoff_hz]])` -- Bit-Crush (Default 8-bit) + LED-Tiefpass (Default 3300 Hz) fuer NEU synthetisierte Sounds (TONE/NOISE/SFX/SAMPLE_PLAY; Cache wird geleert); pure `lofi_chain()` mit Rust-`#[test]`. **Mixer-Busse** `AUDIO_BUS_VOLUME(bus$, vol)`/`AUDIO_BUS_GET_VOLUME(bus$)` mit `bus$` = `sfx`/`music`/`master` -- SFX-/Musik-Master getrennt (Kira-Sub-Tracks: SFX/Sampler/Synth -> sfx_track, Musik -> music_track, beide -> Main mit dem FFT-Tap; Bus×Sound-Volume multiplizieren). **Echtzeit-Effekte je Bus** (Kira-Effektkette am Track, live steuerbar, kein Buffer-Bake): `AUDIO_FILTER(bus$, cutoff_hz[, resonance])` (Tiefpass, SID/Acid-Sweep), `AUDIO_REVERB(bus$, mix[, feedback[, damping]])` (Hall), `AUDIO_DELAY(bus$, mix[, feedback[, time_ms]])` (Echo, eigener Ringpuffer-Effekt -> Zeit zur Laufzeit aenderbar, 1..4000 ms), `AUDIO_DISTORTION(bus$, amount[, mix])` (Overdrive/Fuzz), `AUDIO_COMPRESSOR(bus$, threshold_db, ratio[, makeup_db])` (Dynamik, ratio<=1=aus), `AUDIO_EQ(bus$, freq_hz, gain_db[, q])` (Glocken-EQ, gain 0=transparent); Signalfluss EQ->Filter->Distortion->Compressor->Reverb->Delay, neutral bis aktiviert, Demo `examples/117_audiofx.gb`. **Clock** `AUDIO_CLOCK_NEW(ticks_per_second)->AUDIO_CLOCK` (Kira-Uhr fuer sample-genaues Musik-/Rhythmus-Timing; startet pausiert) + `AUDIO_CLOCK_START/PAUSE/STOP/REMOVE`, `AUDIO_CLOCK_TICKING`/`AUDIO_CLOCK_TICKS`, `AUDIO_CLOCK_SET_SPEED` -- und **`AUDIO_PLAY_AT(sound, clock, ticks[, volume[, loops]])`**: Sound-Start exakt auf einen Clock-Tick geplant, getrieben vom Kira-Audio-Thread selbst (KEIN Polling/Update-Call noetig -- anders als das frame-getriebene `timer`-Modul). BPM->ticks_per_second rechnet der Aufrufer selbst um (`bpm / 60.0 * subdivisions`). Ticking-Status wird im Wrapper selbst mitgefuehrt (nicht direkt Kiras `ClockHandle::ticking()`), weil Kira das nur asynchron per Audio-Thread-Kommando spiegelt -- eine Abfrage direkt nach START/STOP koennte sonst kurz den alten Wert zeigen. **Nicht-lineare Easings** fuer Fades/Slides: optionaler trailing `easing$`-Parameter (`"linear"` Default/`"in"`/`"out"`/`"inout"`, quadratisch) bei `AUDIO_PLAY` (fade_in_ms), `AUDIO_STOP` (fade_out_ms), `AUDIO_PAN_SLIDE` (dauer_ms), `AUDIO_MUSIC_PLAY`/`AUDIO_MUSIC_STOP` (fade_in/out_ms) -- vorher liefen alle Tweens linear, obwohl Kira `Easing::{In,Out,InOut}Powi` eingebaut hat. Interner Helfer `FadeCurve` (audio.rs) konvertiert zu `kira::Easing` fuer den Kira-Tween-Pfad (Stream/Static-Sounds) UND dupliziert dieselbe Kurven-Mathematik als reine `apply()`-Funktion fuer den MOD/XM-Modul-Fade (eigener Atomics-Ramp in `ModShared`, kein Kira-Tween beteiligt) -- beide Pfade klingen dadurch identisch. Rust-`#[test]`s verifizieren die Kurven-Mathematik gegen Kiras eigene Formel. **Raeumliches Audio (Listener/Emitter):** `AUDIO_LISTENER_NEW(x,y,z)->AUDIO_LISTENER` ("Ohr" der Szene, z.B. Kamera-/Spielerposition; unrotiert blickt -Z), `AUDIO_LISTENER_SET_POSITION`/`AUDIO_LISTENER_SET_ORIENTATION(listener, yaw_grad)` (nur Y-Achsen-Yaw -- deckt die typische Top-Down-/3rd-Person-Kamera ab, ohne BASIC-Nutzern volle Quaternionen zuzumuten) + `AUDIO_LISTENER_REMOVE`; `AUDIO_EMITTER_NEW(listener,x,y,z[,min_dist[,max_dist]])->AUDIO_EMITTER` (ein raeumlicher Kira-Sub-Track, an einen Listener + Position gebunden; Kira berechnet Panning + lineare Lautstaerke-Abnahme zwischen min_dist=laut/max_dist=lautlos komplett selbst -- keine eigene DSP) + `AUDIO_EMITTER_SET_POSITION`/`AUDIO_EMITTER_REMOVE`; **`AUDIO_PLAY_ON(sound,emitter[,loops[,volume[,fade_in_ms[,easing$]]]])->AUDIO_CHANNEL`** startet einen Sound auf dem Emitter-Track statt dem flachen SFX-Bus -- der zurueckgegebene `AUDIO_CHANNEL` ist danach identisch mit `AUDIO_PAUSE`/`STOP`/`VOLUME`/... steuerbar (`StaticSoundHandle` unterscheidet nicht, von welchem Track-Typ es kommt). Listener/Emitter im selben Tombstone-Vec-Pattern wie Clocks (Kira kennt weder `remove_listener()` noch `remove_spatial_sub_track()` -- nur Handle-Drop). `mint`-Crate (winzige, abhaengigkeitsfrei Interop-Structs) baut die Position/Rotation-Werte fuer Kiras API, ohne `glam` direkt einzubinden. Rust-`#[test]`s verifizieren `yaw_quat()` (Einheits-Quaternion, korrekte Komponenten). Demo `examples/139_audio_spatial.gb`. **Modulatoren (LFO + Tweener):** `AUDIO_LFO_NEW(wellenform$, hz [, amplitude [, mitte]])` -> `AUDIO_MOD` (`sine`/`triangle`/`saw`/`pulse`), `AUDIO_LFO_SET`, `AUDIO_LFO_WAVEFORM`; `AUDIO_TWEENER_NEW([start])` + `AUDIO_TWEENER_TO(mod, ziel, dauer_ms [, easing$])`; gebunden per `AUDIO_MODULATE(bus$, ziel$, mod, min, max)` mit ziel$ = **`volume`** (Tremolo) / **`pan`** (Auto-Pan) / `filter` / `resonance` / `reverb` / `distortion`; dazu `AUDIO_BUS_PAN(bus$, pos)` fuer eine feste Bus-Balance (-1..+1) -- vorher liess sich nur ein EINZELNER Kanal pannen, entfernt per `AUDIO_MOD_REMOVE`. Der Wertebereich des Modulators (LFO: -1..+1 bei Standard-Amplitude) wird auf `min..max` abgebildet. **Der Punkt daran:** Kira faehrt sie auf dem AUDIO-Thread -- Tremolo, Vibrato, Wobble-Bass, Auto-Pan und Filter-Sweeps laufen sample-genau weiter, auch wenn die Bildrate einbricht, und das GB-Programm rechnet pro Frame NICHTS nach. LFO und Tweener teilen sich den Handle-Typ `AUDIO_MOD`; ein LFO-Aufruf auf einem Tweener (und umgekehrt) meldet das im Klartext. Doku `docs/module-audio-modulatoren.md`, Demo `examples/150_audio_modulatoren.gb`. | `AUDIO_CHANNEL`, `SAMPLE`, `AUDIO_CLOCK`, `AUDIO_LISTENER`, `AUDIO_EMITTER`, `AUDIO_MOD` |
 | `chart` | **Diagramme.** `CHART_NEW(art$,x,y,b,h)` -> `CHART` mit art$ = `kuchen`/`donut` (Kuchen/Ring), `balken` (senkrecht/waagerecht, gruppiert/gestapelt), `linie`/`flaeche` (Verlaufskurven, gleitendes Fenster fuer Live-Werte), `tacho` (Rundskala mit Zeiger `nadel`/`balken`/`pfeil`, Farbzonen via `CHART_ZONE`). Daten kurz (`CHART_ADD(c,name$,wert[,farbe])`) oder voll (`CHART_SERIES` + `CHART_DATA`/`CHART_PUSH`/`CHART_SET_POINT`); dazu `CHART_GET/COUNT/SERIES_COUNT/LABEL/CLEAR/BOUNDS/STAT`. **Stil ueber vier String-Setter statt ~40 Builtins:** `CHART_SET` (Text), `CHART_SET_NUM` (Zahlen), `CHART_SET_COLOR` (Farben), `CHART_SET_FLAG` (Schalter) -- Schluessel-Tabellen `KEYS_STR/NUM/COLOR/FLAG` in `chart.rs`, unbekannter Schluessel = Fehler, der die gueltigen auflistet. `CHART_THEME` (dunkel/hell/neon/pastell) + `CHART_PALETTE`. **Alpha/Schatten/Verlaeufe:** alle Farben nehmen `RGBA()` (0xAARRGGBB, Alpha 0 = DECKEND -- Helfer `with_alpha`/`scale_rgb` heben das vorher an); `deckkraft`/`flaeche_deckkraft` als globale Regler, `schatten`+`schatten_weich` (gestaffelte Kopien, raylib hat keinen Formen-Weichzeichner) mit `schatten_daten` auch fuer Balken/Segmente/Zeiger, `verlauf` (Hintergrund) und `verlauf_daten` (Balken/Flaeche senkrecht, Kuchen als abgedunkeltes Innenband = Naeherung, kein Radialverlauf). `animation` + `CHART_UPDATE(c, DELTA())` laesst Werte nachziehen -- **ohne Animation zeichnet `draw` direkt die echten Werte** (`anzeige()`), sonst waere CHART_UPDATE auch ohne Animationswunsch Pflicht. Nur `CHART_DRAW` braucht ein Fenster (in `vm.rs`), alles andere ist pure. Neues Zeichen-Primitiv dafuer: `Cmd::Ring` (raylib `draw_ring`) deckt Kuchenstueck/Donut/Tacho-Bogen ab, plus `text_width_at` (Breite bei expliziter Groesse). **Farbe `0` ist SCHWARZ, nicht "Palette"** -- dafuer `-1` bzw. Argument weglassen. **Sechs Arten** (nicht vier): dazu `leiste`/`bar_gauge` (liegende oder stehende Leiste mit wanderndem Marker) und `led`/`lampen` (diskrete Zellen, leuchten bis zum Wert) -- beide einwertig wie der Tacho, teilen sich dessen Farbzonen. Sie setzen `ausrichtung` selbst auf `waagerecht`, weil die Vorgabe `senkrecht` nur fuer Balkendiagramme richtig ist. **Skalen-Farbverlauf** ist eine EIGENE Farbrolle (`skala_von`/`skala_mitte`/`skala_bis`, rot->gelb->gruen je Thema) -- NICHT die Palette: die ist kategorial und ergibt interpoliert einen Regenbogen ohne Richtung. Farbzonen schlagen den Verlauf. **Tacho-Gestaltung:** `zifferblatt` = `ring`/`segmente`/`striche`/`baender`, `blatt_teile`/`blatt_luecke`/`blatt_dicke`, `fassung` (metallischer Ring aus gestaffelten Ringen -- ein Verlauf ENTLANG eines Kreises geht mit `ring` nicht), `CHART_ZONE(..., name$)` beschriftet die Zone entlang des Bogens (untere Haelfte wird gedreht), `wertanzeige` = `aus`/`innen`/`pille`/`blase`/`am_zeiger` (Pille nimmt die Farbe der getroffenen Zone). Der Tacho haengt allein an `wertanzeige` -- ihn zusaetzlich an `werte` zu koppeln liess ihn stumm, weil das per Vorgabe `aus` ist. **Maus:** `CHART_DRAW` wertet sie selbst aus (kein Zusatzaufruf) -> `CHART_HOVER`/`_SERIES`/`_LABEL$`/`_VALUE`, `CHART_CLICKED`/`_SERIES`; Schalter `hover`/`tooltip`, Zahlen `hover_tempo`/`hover_weite`/`hover_glanz`. Damit die Maus nicht neben dem trifft, was zu sehen ist, liegt die Geometrie an EINER Stelle (`kuchen_geom`/`kuchen_stuecke`/`achsen_geom`/`balken_geom`/`legende_abzug`), die Treffertest UND Zeichnen benutzen. Die Hervorhebung mischt gegen WEISS statt RGB zu skalieren -- beim Skalieren klemmt der groesste Kanal bei 255 und hervorgehobenes Orange wurde gelb. **Linien:** `punktform` (kreis/quadrat/raute/dreieck), `treppe`, `strich` (Strichlaenge; Phase laeuft ueber den GANZEN Zug weiter, sonst verdichtet sich das Muster bei engen Stuetzpunkten), `fadenkreuz`. `glatt`+`treppe` schliessen sich aus, die Treppe gewinnt. Doku `docs/module-chart.md`, Demo `examples/154_chart.gb`, Tests `tests/test_modules_chart.py` + Rust-`#[test]`s. | `CHART` |
 | `curves` | Animation-Kurven (komplementaer zu `tween`'s Easings): `CURVE_BEZIER/BEZIER2`, `CURVE_CATMULL/CATMULL2`, `CURVE_HERMITE`, `CURVE_LERP`, `CURVE_SMOOTHSTEP`, `CURVE_SMOOTHERSTEP`. Pure Functions, kein State. | — |
 | `net` | TCP + UDP via stdlib-Sockets (cross-platform). Default non-blocking fuer Game-Loops. `NET_TCP_LISTEN/ACCEPT/CONNECT`, `NET_SEND/RECV`, `NET_UDP_BIND/SEND/RECV`. Encoding: UTF-8. | `NET_LISTENER`, `NET_SOCKET`, `NET_UDP` |
@@ -195,7 +195,7 @@ Endung schreiben: `IMPORT "json.gb"`. Beide Engines verhalten sich identisch
 | Bitmap-Fonts | `LOADFONT_IMAGE(bild, trennfarbe, erstes_zeichen)` — Pixel-Schrift aus einem PNG, dessen Zeichen durch die Trennfarbe getrennt sind. Bleibt bewusst ungefiltert (nearest), damit Pixel-Schrift pixelig bleibt — anders als `LOADFONT` (TTF), das bilinear glaettet. `TEXT_LINE_SPACING(px)` fuer mehrzeiligen Text. **Nicht umgesetzt:** animierte GIFs (`LoadImageAnim` liefert nur Bild 0 nutzbar, raylib-rs macht `Image` readonly) und `GetClipboardImage` (Windows-only) — Begruendungen stehen im Quelltext. | — |
 | Shader-Uniforms (Ausbau) | `SHADER_SET_ARRAY(sh, name$, werte)` fuellt ein `uniform float[]` aus einem `ARRAY OF FLOAT` (Lichtpositionen, Verlaufsstufen — vorher liess sich pro Aufruf nur EIN Wert setzen). `SHADER_SET_TEXTURE(sh, name$, bild)` belegt einen **zweiten Sampler** (Masken, Paletten-LUTs, Ueberblendungen). `SHADER_SET_MATRIX(sh, name$, mat)` nimmt eine `MAT4` aus `m3d`. **Wichtig:** raylibs `SetShaderValueTexture` ruft intern `glUniform1i` und wirkt damit auf das GERADE AKTIVE Programm — ausserhalb von `BeginShaderMode` landet die Zuweisung am falschen Shader und der Sampler bleibt schwarz. dhrt merkt sie deshalb vor und setzt sie beim Zeichnen (`shader_textures` in graphics.rs). | — |
 | Linien-/Polygon-Geometrie | Im `physics`-Modul, pure Functions ohne Fenster: `PHYSICS_LINES_HIT` (schneiden sich zwei **Strecken**?) mit `PHYSICS_LINES_X/Y` fuer den Schnittpunkt (**NAN** wenn es keinen gibt — erst HIT fragen), `PHYSICS_POINT_LINE(px,py, ax,ay, bx,by, dicke)`, `PHYSICS_CIRCLE_LINE`, und `PHYSICS_POINT_POLY(px, py, xs, ys)` (Strahl-Verfahren, funktioniert auch bei konkaven Polygonen). | — |
-| Eingabe-Flanken | **"genau in DIESEM Frame"** statt "wird gehalten": `MOUSE_HIT(n)`/`MOUSE_RELEASED(n)`, `KEYHIT(c)`/`KEYRELEASED(c)`, `KEYREPEAT(c)` (+ System-Auto-Repeat), `JOYSTICK_HIT/RELEASED(idx,btn)`. **Achtung:** `MOUSEBUTTON` und `KEYPRESSED` melden weiterhin *gehalten* — die Namen sind historisch und behalten ihre Bedeutung. Dazu `JOYSTICK_ANY_BUTTON()` (zuletzt gedrueckter Knopf, -1 = keiner — fuer Belegungsdialoge) und `JOYSTICK_AXIS_COUNT(idx)`. **Belegungsdialoge auch fuer die Tastatur:** `KEY_ANY_HIT()` (Code der zuletzt gedrueckten Taste, -1 = keine) + `KEY_NAME$(code)` (Anzeigename; GLFW kennt nur die druckbaren und die layout-abhaengig, fuer Sondertasten hat dhrt eine eigene Tabelle: `LEER`/`LINKS`/`UMSCHALT`/`F5`/…). `JOYSTICK_MAPPINGS(sdl_db$)` laedt SDL-GameControllerDB-Zeilen nach. **Neue Tastencodes** (vorher gab es dafuer GAR KEINE Konstante, „Sprint mit Umschalt" war nicht abfragbar): `KEY_LSHIFT/RSHIFT`, `KEY_LCTRL/RCTRL`, `KEY_LALT/RALT`, `KEY_LSUPER/RSUPER`, `KEY_CAPSLOCK`, `KEY_INSERT/DELETE/HOME/END/PAGEUP/PAGEDOWN`, Ziffernblock `KEY_KP0..KEY_KP9` + `KEY_KP_ENTER/PLUS/MINUS/MULTIPLY/DIVIDE/PERIOD` (in `vm.rs` DEFAULT_KEYS **und** `gamebasic/graphics.py` KEYS — Drift-Schutz `tests/test_constants_sync.py`). | — |
+| Eingabe-Flanken | **"genau in DIESEM Frame"** statt "wird gehalten": `MOUSE_HIT(n)`/`MOUSE_RELEASED(n)`, `KEYHIT(c)`/`KEYRELEASED(c)`, `KEYREPEAT(c)` (+ System-Auto-Repeat), `JOYSTICK_HIT/RELEASED(idx,btn)`. **Achtung:** `MOUSEBUTTON` und `KEYPRESSED` melden weiterhin *gehalten* — die Namen sind historisch und behalten ihre Bedeutung. Dazu `JOYSTICK_ANY_BUTTON()` (zuletzt gedrueckter Knopf, -1 = keiner — fuer Belegungsdialoge) und `JOYSTICK_AXIS_COUNT(idx)`. **Belegungsdialoge auch fuer die Tastatur:** `KEY_ANY_HIT()` (Code der zuletzt gedrueckten Taste, -1 = keine) + `KEY_NAME$(code)` (Anzeigename; GLFW kennt nur die druckbaren und die layout-abhaengig, fuer Sondertasten hat dhrt eine eigene Tabelle: `LEER`/`LINKS`/`UMSCHALT`/`F5`/…). `JOYSTICK_MAPPINGS(sdl_db$)` laedt SDL-GameControllerDB-Zeilen nach. **Neue Tastencodes** (vorher gab es dafuer GAR KEINE Konstante, „Sprint mit Umschalt" war nicht abfragbar): `KEY_LSHIFT/RSHIFT`, `KEY_LCTRL/RCTRL`, `KEY_LALT/RALT`, `KEY_LSUPER/RSUPER`, `KEY_CAPSLOCK`, `KEY_INSERT/DELETE/HOME/END/PAGEUP/PAGEDOWN`, Ziffernblock `KEY_KP0..KEY_KP9` + `KEY_KP_ENTER/PLUS/MINUS/MULTIPLY/DIVIDE/PERIOD` (in `vm.rs` DEFAULT_KEYS **und** `drachenhauch/graphics.py` KEYS — Drift-Schutz `tests/test_constants_sync.py`). | — |
 | Eingabe aufzeichnen/abspielen | `AUTOMATION_RECORD(datei$)` / `AUTOMATION_STOP()` (schreibt die Datei, liefert die Anzahl) / `AUTOMATION_PLAY(datei$)` + `AUTOMATION_RECORDING/PLAYING/FRAME/COUNT` — raylibs Automation-Events (Tasten/Maus/Rad/Gamepad/Touch je Frame). Fuer Demo-/Attract-Modus, nachspielbare Fehlerberichte, automatische Spieltests. Eingespeist wird in `automation_tick()` am **Ende jedes FLIP** (direkt nach dem Einlesen der echten Eingabe -> aufgezeichnete Werte gewinnen; ein Ereignis aus Aufnahme-Frame N wirkt im Durchlauf N+1). Die Liste liegt in einer **Box**, weil `SetAutomationEventList` sich einen rohen Zeiger merkt. Aufnahme und Wiedergabe schliessen sich aus (raylib spielt waehrend einer Aufnahme nichts ab -> klare Fehlermeldung). Aufgezeichnet wird die EINGABE, nicht der Ablauf: Startzustand zuruecksetzen, `RANDOMIZE` festnageln, pro Frame statt pro Sekunde rechnen. **`KEY_ANY_HIT` blendet aus, was die laufende Wiedergabe selbst einspeist** (`auto_injected_keys` in graphics.rs) -- raylib legt eingespeiste Tasten auch in seine "zuletzt gedrueckt"-Warteschlange, ohne den Filter braeche ein Attract-Modus ("Demo endet bei Tastendruck") an seiner eigenen Demo ab; `KEYHIT`/`KEYPRESSED` sehen sie weiterhin, `JOYSTICK_ANY_BUTTON` ist nicht betroffen. Doku `docs/automation.md`, Demo `examples/153_automation.gb`, Tests `tests/test_automation.py` (schreiben die Aufnahmedatei selbst — raylibs Textformat). | — |
 | Maus-Blick + Cursor | `MOUSE_DELTA_X/Y()` (relative Bewegung — bei `MOUSE_LOCK` stehen MOUSEX/MOUSEY still, nur das Delta bewegt sich noch), `MOUSE_SET_POS(x,y)`, `MOUSE_ON_SCREEN()`, `MOUSEWHEEL_X/Y()` (Rad in **beiden** Achsen und als Kommazahl — `MOUSEWHEEL` liefert nur vertikal + ganzzahlig, feine Touchpad-Schritte fielen darin auf 0), `MOUSE_CURSOR(form$)` mit `default`/`ibeam`/`crosshair`/`hand`/`resize_ew`/`resize_ns`/`resize_nwse`/`resize_nesw`/`resize_all`/`not_allowed`. | — |
 | Touch + Gesten | `TOUCH_COUNT()`, `TOUCH_X/Y(i)`, `TOUCH_ID(i)` (stabile Finger-Kennung ueber Frames). `GESTURE$()` liefert einen **Namen** statt einer Zahl: `tap`/`doubletap`/`hold`/`drag`/`swipe_left|right|up|down`/`pinch_in`/`pinch_out` (`""` = keine). Dazu `GESTURE_DRAG_X/Y/ANGLE`, `GESTURE_PINCH_X/Y/ANGLE`, `GESTURE_HOLD_TIME()`. Demo `examples/149_input_edges.gb`. | — |
@@ -264,7 +264,7 @@ EIN Bild (ein Augenblick). Für alles, was sich über die ZEIT falsch verhält
 mehrere Bilder beschriftet als Raster in eine PNG (`DHRT_CONTACT_MAX`,
 `_COLS`, `_EVERY`). Details: docs/rust-runtime.md.
 
-**Programm ausführen:** `.venv\Scripts\python.exe gbrun.py examples/<file>.gb`
+**Programm ausführen:** `.venv\Scripts\python.exe dhrun.py examples/<file>.gb`
 (läuft über `dhrt run`). Direkt: `dhrt run datei.gb`. (Der frühere `--bench`-
 Tree-Walker-Vergleich ist entfernt — es gibt nur noch dhrt.)
 
@@ -348,7 +348,7 @@ Python-VM und Cython-VM. Folgen davon:
   Variable -- sonst `FOR EACH` nutzen.
 
 **Implementierung:** `_Coroutine` + `function_has_yield` in
-[interpreter.py](gamebasic/interpreter.py); Erzeugung in den `CALL_*`-Pfaden
+[interpreter.py](drachenhauch/interpreter.py); Erzeugung in den `CALL_*`-Pfaden
 aller Engines (is_coroutine-Branch), Treiben ueber die `CORO_*`-Builtins.
 Pro-Thread-State (`env`/`call_depth`/`_method_stack`) im Tree-Walker liegt in
 `threading.local`.
@@ -468,7 +468,7 @@ Parameter. Das gilt konsistent in allen drei Pfaden -- damit bleibt die
 - Bytecode: `LOAD_FUNCREF` (53) und `CALL_VALUE` (54). LOAD_FUNCREF nimmt
   den Function-Namen aus dem const-Pool und pusht eine `_FuncRef`-Instanz.
   CALL_VALUE pop n args, pop callee (FuncRef), dispatch via `_exec`.
-- VM-Pfade: gleicher Flow. `_FuncRef` aus `gamebasic.interpreter` importiert.
+- VM-Pfade: gleicher Flow. `_FuncRef` aus `drachenhauch.interpreter` importiert.
 
 **Einschraenkung Reihenfolge:** Im VM-Pfad wird `_global_vars` static aus
 allen Top-Level-Statements gefuellt. Wer eine Function `foo` erst aufruft
@@ -810,7 +810,7 @@ geklammerte Expression `(expr)` bleibt Klammer-Gruppierung. `(1,)`-Single-
 Tupel wie in Python wird NICHT unterstuetzt (kein Use-Case).
 
 **Destructuring-Assignment:** `(t1, t2, ..., tn) = expr`. Die `expr` muss zur
-Laufzeit ein Tupel mit exakt n Elementen ergeben -- sonst `GBRuntimeError`.
+Laufzeit ein Tupel mit exakt n Elementen ergeben -- sonst `DHRuntimeError`.
 Targets duerfen Identifier, MemberAccess oder IndexAccess sein
 (`(p.x, p.y) = polar_to_cart(r, a)` funktioniert).
 
@@ -855,7 +855,7 @@ Position zwischen `Vergleich` und `+,-`. Heisst:
 `*`/`/`. `BNOT a BAND b` ist `(BNOT a) BAND b`.
 
 **Type-Strictness:** Bool wird abgelehnt (gleiche Linie wie `_check_num`).
-Negativer Shift-Count wirft `GBRuntimeError` statt nichtssagendem Python-Fehler.
+Negativer Shift-Count wirft `DHRuntimeError` statt nichtssagendem Python-Fehler.
 
 **Keine alten Built-ins mehr:** Frueher gab's `BITAND/BITOR/BITXOR/BITNOT/SHL/SHR`
 als Funktions-Built-ins. Mit den Operatoren ueberfluessig — entfernt.
@@ -1026,7 +1026,7 @@ zaehlt NICHT als Spec-Trenner -- `_split_fstring_spec` in `lexer.py` trackt
 Klammer-/String-Tiefe. Rein Lexer-basiert, daher in allen drei Pfaden gleich.
 
 **Implementierung:** `lexer._scan_fstring` wird beim ersten `f"`-Lookahead
-aufgerufen ([lexer.py:114-115](gamebasic/lexer.py:114)) und emittiert die
+aufgerufen ([lexer.py:114-115](drachenhauch/lexer.py:114)) und emittiert die
 expandierte Token-Sequenz selbst -- mit Sub-Lexer fuer den Ausdrucks-Teil.
 
 **Beispiel:** [examples/69_fstring.gb](examples/69_fstring.gb).
@@ -1043,7 +1043,7 @@ Diese sind implementiert (waren in aelteren Doku-Staenden nicht aufgefuehrt):
 - **`WHILE cond ... WEND`** -- Pre-Test-Loop.
 - **`TRY ... CATCH [e] ... END TRY`** + **`THROW value`**. Die Catch-Variable
   ist optional und faengt den (String-)Wert. Kein typed Catch -- `THROW` wirft
-  beliebige Werte; Module-/Runtime-Fehler kommen als `GBRuntimeError`-Message.
+  beliebige Werte; Module-/Runtime-Fehler kommen als `DHRuntimeError`-Message.
 
 ```basic
 FOR EACH e IN enemies
@@ -1233,7 +1233,7 @@ Modul-eigene Typen koennen arithmetische Operatoren (`+`, `-`, `*`, `/`)
 ueberladen, ohne dass interpreter.py / vm.py / vm_native.pyx angefasst werden:
 
 ```python
-# In gamebasic/modules/<name>.py
+# In drachenhauch/modules/<name>.py
 from . import register_operators
 
 def _op_add(a, b):
@@ -1416,7 +1416,7 @@ Loop, ohne Python-Dispatch-Overhead pro Entity:
 | `ECS_REMOVE_DEAD(w, name, threshold)` | Entities mit `value <= threshold` zerstoeren |
 | `ECS_COUNT_WITH(w, name)` | O(1) Halter-Zaehlung |
 
-**Implementation:** [gamebasic/modules/ecs_py.py](gamebasic/modules/ecs_py.py)
+**Implementation:** [drachenhauch/modules/ecs_py.py](drachenhauch/modules/ecs_py.py)
 (reine Python; die frühere Cython-Variante `ecs_native.pyx` wurde entfernt).
 `_World` und `_Component` sind normale Python-Klassen. Sparse-Set-Ops als
 Methoden. Fast-Path-Methoden auf `_World` (`get_float`, `add_float`, ...)
@@ -1443,8 +1443,8 @@ Editor-/Referenzpfad — die Performance liegt vollständig in der nativen Runti
 
 | Klasse | wohnt jetzt in | Hinweis |
 |---|---|---|
-| `_GBArray` | inline in `gamebasic/interpreter.py` | reine Python-Klasse (`array.array`-Backing für INTEGER/FLOAT, sonst Liste); Public-API unverändert (`element_type`/`dims`/`strides`/`values`/`total_size`/`flat_index`/`get_at`/`set_at`). |
-| `_World`, `_Component` | `gamebasic/modules/ecs_py.py` | reine Python (Sparse-Set + Bulk-System-Ops); `ecs.py` importiert von dort. |
+| `_GBArray` | inline in `drachenhauch/interpreter.py` | reine Python-Klasse (`array.array`-Backing für INTEGER/FLOAT, sonst Liste); Public-API unverändert (`element_type`/`dims`/`strides`/`values`/`total_size`/`flat_index`/`get_at`/`set_at`). |
+| `_World`, `_Component` | `drachenhauch/modules/ecs_py.py` | reine Python (Sparse-Set + Bulk-System-Ops); `ecs.py` importiert von dort. |
 
 **pygame ist ENTFERNT (Stufe A)** — Grafik/Audio laufen nur in `dhrt`, der
 Tree-Walker ist konsolen-only. Python bedient damit primär Editoren + Compiler/
@@ -1501,7 +1501,7 @@ Hit-Check: `obj.cls is cache[0]`. Spart `_resolve_method`-Call und
 Dict-Lookup. Bei `bench_method_dispatch`: **1.34×**.
 
 Cache wird auch im stub-Pfad (Phase 4a) konsistent kopiert
-([compiler.py: stub.caches = compiled.caches](gamebasic/compiler.py)).
+([compiler.py: stub.caches = compiled.caches](drachenhauch/compiler.py)).
 
 ### Globals-as-Slots
 
@@ -1557,15 +1557,15 @@ Cython-Variante `array_native.pyx` mit typed memoryviews wurde entfernt).
 generischen `if`/`elif`-Cascade. Trifft den heissesten Pfad jeder
 STORE-Op (Local/Global/Field/Index/Parameter-Binding).
 
-## Sprite-Editor (`gbsprites`)
+## Sprite-Editor (`dhsprites`)
 
-PySide6-basierter Pixel-Art-Editor in [`gamebasic/spriteeditor_qt.py`](gamebasic/spriteeditor_qt.py)
-(UI-Schicht, 4200 LOC) plus Submodul [`gamebasic/spriteeditor/`](gamebasic/spriteeditor/)
+PySide6-basierter Pixel-Art-Editor in [`drachenhauch/spriteeditor_qt.py`](drachenhauch/spriteeditor_qt.py)
+(UI-Schicht, 4200 LOC) plus Submodul [`drachenhauch/spriteeditor/`](drachenhauch/spriteeditor/)
 mit `document.py` (Datenmodell), `tools.py` (Pixel-Tools), `tool_context.py`
 (Tool-Host-Protocol), `icons.py` (programmatische Toolbar-Icons).
 
-**Start:** `gbsprites` (leer) oder `gbsprites datei.png`. Aufruf-Trampoline in
-`gbsprites.cmd` → `gbrun.py --sprites`. User-Doku: [docs/sprite-editor.md](docs/sprite-editor.md).
+**Start:** `dhsprites` (leer) oder `dhsprites datei.png`. Aufruf-Trampoline in
+`dhsprites.cmd` → `dhrun.py --sprites`. User-Doku: [docs/sprite-editor.md](docs/sprite-editor.md).
 
 **Tools:** Pencil, Eraser, Bucket, Line, Rect, Ellipse, Eyedropper, Select,
 **Lasso** (Freiform-Auswahl mit echter Pixel-Maske — Cut/Copy/Fuellen/Spiegeln/
@@ -1604,10 +1604,10 @@ Bresenham, Brush-Offsets, Symmetrie), `tests/test_spriteeditor_tool_context.py`
 `begin/move/end`, registrieren sich in `SpriteEditorWindow._setup_tools()`.
 Tool-Konvention im `tools.py`-Header dokumentiert.
 
-## Tilemap-/Level-Editor (`gbtilemap`)
+## Tilemap-/Level-Editor (`dhtilemap`)
 
-PySide6-Tool [`gamebasic/tilemapeditor_qt.py`](gamebasic/tilemapeditor_qt.py)
-(UI) + Qt-freies Datenmodell [`gamebasic/tilemap/document.py`](gamebasic/tilemap/document.py)
+PySide6-Tool [`drachenhauch/tilemapeditor_qt.py`](drachenhauch/tilemapeditor_qt.py)
+(UI) + Qt-freies Datenmodell [`drachenhauch/tilemap/document.py`](drachenhauch/tilemap/document.py)
 (`TileMapDoc`/`TileLayer`/`ObjectLayer`/`MapObject` + Tiled-JSON-Serialisierung,
 headless testbar). Tiles aus einem Tileset-PNG aufs Gitter malen (Stift/Radierer/
 Füllen/Rechteck/Pipette/**Auswahl** `S` mit Copy/Cut/Paste rechteckiger Tile-
@@ -1623,7 +1623,7 @@ Layer-Typ steuert die Canvas-Interaktion; Undo umfasst Tile- UND Objekt-Ops
 `tile_count`/`tileset_image*`/`tile_src_rect`/`tile_properties` + `set_property`)
 zeigen aufs **aktive** Tileset (Palette/Canvas-Code unverändert). Tileset-Combo
 über der Palette wechselt/+/− Tilesets; Pipette schaltet aufs gid-Tileset um.
-**Speichern/Laden = Tiled-JSON** (genau das Format, das `gamebasic/modules/tiled.py`
+**Speichern/Laden = Tiled-JSON** (genau das Format, das `drachenhauch/modules/tiled.py`
 via `TILED_LOAD` liest: **N eingebettete Tilesets** mit eigenen `firstgid`s,
 CSV-Tile-Daten, Per-Tile-Props + `objectgroup` mit Objekten als
 `{name,type,value}`-Props; `TILED_OBJECT_*`/`TILED_TILESET_*` lesen sie). `GB-Code`
@@ -1632,7 +1632,7 @@ exportiert einen selbstständigen Renderer (`LOADIMAGE` pro Tileset + `TILED_LOA
 gezeichnet, nur ein Auslese-Hinweis kommentiert). Schließt den Kreis mit dem
 Sprite-Atlas-Export (Atlas-PNG als Tileset).
 
-**Start:** `gbtilemap [datei.json]` / `gbrun.py --tilemap` / im Editor Toolbar +
+**Start:** `dhtilemap [datei.json]` / `dhrun.py --tilemap` / im Editor Toolbar +
 `Datei`-Menü + `Strg+Shift+G` (in-process via `_open_tilemap_editor`, Icon
 `"tilemap"` in `editor_qt/icons.py`). User-Doku: [docs/tilemap-editor.md](docs/tilemap-editor.md).
 
@@ -1642,16 +1642,16 @@ Sprite-Atlas-Export (Atlas-PNG als Tileset).
 lext+parst+kompiliert. **Stolperstein:** `MAP` ist ein Keyword (MAP OF T) → im
 GB-Code-Export keine Variable `map` (heißt `lvl`).
 
-## Form-Designer / WYSIWYG (`gbform`)
+## Form-Designer / WYSIWYG (`dhform`)
 
 Eigenständiger PySide6-GUI-Designer im **Xojo-Stil** für das `gui`-Modul. Qt-frei
-das Datenmodell [`gamebasic/formdesigner/document.py`](gamebasic/formdesigner/document.py)
+das Datenmodell [`drachenhauch/formdesigner/document.py`](drachenhauch/formdesigner/document.py)
 (`FormDoc`/`Control`, `PALETTE`, `.gbform`-IO **exakt im Runtime-`gui`-JSON-Format**
 + Designer-Feld `name`, `generate_runner()`-Code-Gen), UI in
-[`gamebasic/formdesigner_qt.py`](gamebasic/formdesigner_qt.py) (Palette links /
+[`drachenhauch/formdesigner_qt.py`](drachenhauch/formdesigner_qt.py) (Palette links /
 Canvas Mitte / Inspector rechts; Platzieren/Selektieren/Verschieben/Löschen,
-Speichern/Laden, F5 = Run via `dhrt`). Start: `gbform [datei.gbform]` /
-`gbrun.py --form`. **Xojo-Prinzip:** das `.gbform` speichert pro Control den
+Speichern/Laden, F5 = Run via `dhrt`). Start: `dhform [datei.gbform]` /
+`dhrun.py --form`. **Xojo-Prinzip:** das `.gbform` speichert pro Control den
 Event-Handler-**Namen** (`on_click`/`on_change`); `GUI_LOAD` stellt sie wieder
 her und `GUI_UPDATE` ruft sie automatisch per Name auf — kein manuelles
 Verdrahten. Doku [docs/form-designer.md](docs/form-designer.md), Tests
@@ -1663,15 +1663,15 @@ Snap-Grid, Undo/Redo, integrierter Code-Editor (Doppelklick-Control →
 Handler), Multi-Form-Projekte (`.gbproj`) sind alle vorhanden -- diese
 CLAUDE.md-Zeile listete sie faelschlich noch als offen.
 
-## Notenblatt-Editor (`gbscore`)
+## Notenblatt-Editor (`dhscore`)
 
 Eigenständiges PySide6-Tool für echte Notensatz-Darstellung (5-Linien-System,
 Violin-/Bassschlüssel, Hilfslinien, Vorzeichen) statt des Zeilen-Rasters des
-Trackers. Qt-frei das Datenmodell [`gamebasic/score/document.py`](gamebasic/score/document.py)
+Trackers. Qt-frei das Datenmodell [`drachenhauch/score/document.py`](drachenhauch/score/document.py)
 (`ScoreDoc`/`Track`/`NoteEvent`, Zeiten in Viertel-Beats) + Konvertierung
-[`gamebasic/score/convert.py`](gamebasic/score/convert.py)
+[`drachenhauch/score/convert.py`](drachenhauch/score/convert.py)
 (`to_tracker_song(doc) -> (Song, warnings)`, mappt Beats auf Tracker-Zeilen
-— 4 Zeilen/Beat), UI in [`gamebasic/scoreeditor_qt.py`](gamebasic/scoreeditor_qt.py)
+— 4 Zeilen/Beat), UI in [`drachenhauch/scoreeditor_qt.py`](drachenhauch/scoreeditor_qt.py)
 (`_StaffView` pro Spur: Klick setzt/entfernt Noten via diatonischer
 Tonhöhe↔Y- und Zeit↔X-Zuordnung, Dauer-Auswahl inkl. Punktierung ist
 gleichzeitig das Snap-Raster, Vorzeichen-Toggle ♮/♯/♭, Pause-Toggle,
@@ -1691,7 +1691,7 @@ Instrument (Presets aus
 optionalen Oktav-Transpose-Dialog (`_octave_shift_for_clef` rückt den
 Notendurchschnitt der Spur ans neue System, wenn er sonst weit ab läge —
 volle Oktaven, Melodie/Intervalle bleiben exakt erhalten), Wiedergabe über
-den geteilten additiven Mixer [`gamebasic/audio_preview.py`](gamebasic/audio_preview.py)
+den geteilten additiven Mixer [`drachenhauch/audio_preview.py`](drachenhauch/audio_preview.py)
 (`Mixer` — derselbe, den auch der Tracker nutzt; ein einziger dauerhafter
 `sounddevice.OutputStream` mischt alle gleichzeitig klingenden Stimmen
 additiv, weil `sd.play()` selbst keine Überlappung kann). Statusleiste
@@ -1707,12 +1707,12 @@ zeigt `*` bei `_dirty`, `closeEvent`/`_new_doc`/`_open` fragen über
 `spriteeditor_qt.py`s `_confirm_dirty()`. Start:
 Code-Editor-Toolbar/Menü (`Strg+Shift+N`,
 `editor_qt/main_window.py:_open_score_editor`) oder
-`gbscore [datei.json]` / `gbrun.py --score`. Fenster startet maximiert
+`dhscore [datei.json]` / `dhrun.py --score`. Fenster startet maximiert
 (`F11` = echtes Vollbild, wie Audio Studio). Eigenes `*.json`-Format
-(`"format": "gbscore-song"`, permissiv wie `Song.from_dict`) via
+(`"format": "dhscore-song"`, permissiv wie `Song.from_dict`) via
 `ScoreDoc.save_json/load_json` **UND** direkte Übernahme in den Tracker
 ("In Tracker öffnen": `to_tracker_song` konvertiert, Warnungen werden
-angezeigt, das Ergebnis wird als Tracker-Projekt gespeichert und `gbtracker`
+angezeigt, das Ergebnis wird als Tracker-Projekt gespeichert und `dhtracker`
 per Subprozess mit der Datei gestartet).
 
 **Notationszusätze über einen exklusiven Eingabe-Modus** (`entry_mode`:
@@ -1730,7 +1730,7 @@ per Spinbox gewählte Zahl (1..5) zu (erneuter Klick mit derselben Zahl
 löscht sie). **Staccato**-Modus schaltet `NoteEvent.staccato` um -- wirkt
 NICHT nur optisch: `to_tracker_song` platziert dafür ein früheres
 `NOTE_OFF` (`STACCATO_FACTOR=0.5` der notierten Dauer, mind. 1 Zeile,
-siehe `gamebasic/score/convert.py`) und `ScoreEditor._trigger_note`
+siehe `drachenhauch/score/convert.py`) und `ScoreEditor._trigger_note`
 rendert für die Editor-eigene Wiedergabe entsprechend kürzer. Bindebögen/
 Fingersätze sind rein informativ, keine Tracker-Entsprechung. Ein
 Moduswechsel bricht eine offene Bindebogen-Anker-Auswahl ab
@@ -1760,24 +1760,24 @@ Doku [docs/score-editor.md](docs/score-editor.md), Tests
 Konvertierung, headless), `tests/test_scoreeditor_qt.py` (Offscreen-UI),
 `tests/test_audio_preview_mixer.py` (geteilter Mixer).
 
-## Language Server (`gamebasic.lsp`) + VSCode-Extension
+## Language Server (`drachenhauch.lsp`) + VSCode-Extension
 
 Externe Editor-Unterstützung via **LSP**, mit derselben Sprach-Intelligenz wie
-der Qt-Editor. Start: `py -m gamebasic.lsp` (stdio, JSON-RPC). Aufbau bewusst
-zweigeteilt: [`gamebasic/lsp/features.py`](gamebasic/lsp/features.py) =
+der Qt-Editor. Start: `py -m drachenhauch.lsp` (stdio, JSON-RPC). Aufbau bewusst
+zweigeteilt: [`drachenhauch/lsp/features.py`](drachenhauch/lsp/features.py) =
 **transport-freie** Feature-Logik (Text+Position → LSP-Daten: diagnostics/
 completions/hover/definition/references/document_symbols), headless testbar;
-[`gamebasic/lsp/server.py`](gamebasic/lsp/server.py) (`LspServer`) = nur
+[`drachenhauch/lsp/server.py`](drachenhauch/lsp/server.py) (`LspServer`) = nur
 JSON-RPC + Dokument-Store + Position/URI-Mapping. Beide bauen auf den schon
 vorhandenen Editor-Bausteinen auf (`editor_qt/symbols.py`, `error_check.py`,
 `builtin_docs.py`, `completer.py`) — **keine Logik-Duplizierung**. Tests:
 [`tests/test_lsp_features.py`](tests/test_lsp_features.py) (Feature-Logik) +
 [`tests/test_lsp_server.py`](tests/test_lsp_server.py) (Protokoll + echter
-stdio-Subprozess). VSCode-Extension in [`vscode-gamebasic/`](vscode-gamebasic/):
+stdio-Subprozess). VSCode-Extension in [`vscode-drachenhauch/`](vscode-drachenhauch/):
 `extension.js` startet den Server, die TextMate-Grammatik wird aus den echten
 Lexer-Keywords + Built-ins **generiert** (`build_grammar.py`). Doku
 [docs/lsp.md](docs/lsp.md). **Bei neuen Keywords/Built-ins:** Grammatik neu
-generieren (`python vscode-gamebasic/build_grammar.py`).
+generieren (`python vscode-drachenhauch/build_grammar.py`).
 
 ## Front-End-Portierung nach Rust (Lexer → Parser → Compiler)
 
@@ -1858,7 +1858,7 @@ nicht der emscripten-Build).
 ```
 .venv\Scripts\python.exe rust\build_runtime.py        # Runtime dhrt (Rust)
 .venv\Scripts\python.exe -m pytest tests/ -v          # run_gb-Golden gegen dhrt
-.venv\Scripts\python.exe gbrun.py examples/<file>.gb  # ausführen (-> dhrt run)
+.venv\Scripts\python.exe dhrun.py examples/<file>.gb  # ausführen (-> dhrt run)
 ```
 
 Nur `dhrt` wird gebaut (kein Cython/PyO3 mehr). Builtins/Module sind in Rust

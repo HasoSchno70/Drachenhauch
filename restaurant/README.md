@@ -10,7 +10,7 @@ Schlange, ein Tag. Das beantwortet die einzige Frage, die am Anfang zählt:
 ## Starten
 
 ```bash
-gbrun.py restaurant\restaurant.gb
+dhrun.py restaurant\restaurant.gb
 ```
 
 ## Steuerung
