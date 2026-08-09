@@ -6,7 +6,7 @@
 
 <p align="center"><em><a href="README.md">Deutsch</a> · English</em></p>
 
-A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust/raylib runtime, which lexes, parses, compiles and executes the source itself (graphics/audio/3D included). Python is now only the editor/tooling layer.
+A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust runtime, which lexes, parses, compiles and executes the source itself. Graphics and 3D via **raylib**, sound via **[Kira](https://github.com/tesselode/kira)** on its own audio thread. Python is now only the editor/tooling layer.
 
 ```basic
 IMPORT "sprite"
@@ -114,7 +114,7 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 | `g3d` | 3D: camera, models (OBJ/GLTF), skeletal animation, PBR, HDR IBL, shadows, normal maps, picking — see [graphics built-ins](docs/builtins-grafik.md) |
 | [`particles`](docs/module-particles.md) | particle emitters with gravity, colour gradient over lifetime, five render modes |
 | [`imgfx`](docs/module-imgfx.md) | scale, rotate, flip, tint images — including a crisp mode for pixel art |
-| [`audio`](docs/module-audio.md) | channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
+| [`audio`](docs/module-audio.md) | on **Kira**: channels, buses, real-time effects (filter/reverb/delay/distortion/compressor/EQ), synthesis, sampler, `.mod`/`.xm` playback, spatial audio, sample-accurate clock. [Modulators](docs/module-audio-modulatoren.md) keep running on the audio thread even when the frame rate drops |
 
 **User interface**
 
@@ -239,7 +239,7 @@ Pipeline: **source → preprocessor → lexer → parser → compiler → VM** �
 
 > **History:** Programs used to also run through a Python **tree-walking interpreter** and two Python **bytecode VMs** (a plain Python VM and a Cython VM), guaranteeing "bit-identical output" across all three. As of **Stage B** the tree-walker and the entire Python toolchain (interpreter/compiler/vm/serialize) have been **removed** — `dhrt` is the only runtime and compiles the source itself.
 
-**Native Rust runtime (raylib) — the only runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
+**Native Rust runtime (raylib + Kira) — the only runtime.** `dhrt` (`rust/drachenhauch_runtime/`)
 lexes, parses, compiles and executes the source itself — a self-contained Rust
 front-end, no Python anywhere in the execution path. What runs natively:
 
