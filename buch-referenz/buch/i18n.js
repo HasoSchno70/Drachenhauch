@@ -57,7 +57,20 @@ const NICHT_PROSA = [
   /^[\s\d.,;:+\-*/%()[\]{}<>=!|&^~"'`_#$?]*$/,   // nur Zeichen ohne Buchstaben
   /^&[Hh][0-9A-Fa-f]+$/,                          // Hex-Literal
   /^[A-Z][A-Z0-9_$]*$/,                           // BEFEHL / KONSTANTE
-  /^[A-Z][A-Z0-9_$]*\s*\(.*\)$/,                  // BEFEHL(...)
+  // BEFEHL(...) und BEFEHL(...) AS TYP bzw. -> TYP.
+  //
+  // Das ist der Befehls-Index (Anhang A): 202 von 229 Eintraegen sind reine
+  // Signaturen. Sie zu uebersetzen waere nicht nur Arbeit ohne Nutzen,
+  // sondern FALSCH -- in den Kapiteln bleibt die Signatur unangetastet
+  // (siehe FELDER: cmd laesst Name und Syntax durch), ein uebersetzter
+  // Index widerspraeche also dem Kapitel, auf das er verweist.
+  //
+  // Die Klammer darf KEINE weitere `)` enthalten. Mit `.*` griff der Ausdruck
+  // ueber ganze Absaetze hinweg: "KEYPRESSED(code) und die input-Befehle …
+  // (Mehr dazu in Kapitel 45.)" sah wie eine Signatur aus, weil `.*` bis zur
+  // LETZTEN Klammer lief -- der Absatz blieb dann stumm deutsch.
+  /^[A-Z][A-Z0-9_$]*\s*\([^)]*\)(\s*(AS|->)\s*\S.*)?$/,
+  /^— [A-Z] —$/,                                  // Index-Buchstabentrenner
   /^[a-z_][a-z0-9_]*$/,                           // bezeichner_ohne_leerzeichen
   /^\.[a-z]+$/,                                   // .endung
 ];
@@ -130,7 +143,14 @@ function baue(H, tr) {
     const spec = FELDER[name];
     neu[name] = (...args) => {
       if (name === "table") {
-        return fn(uebersetzeTabelle(args[0], tr), ...args.slice(1));
+        // Die Kopfzeile steckt in den Optionen (`{headers: [...]}`), nicht in
+        // den Zeilen -- ohne diesen Zweig blieb ueber jeder uebersetzten
+        // Tabelle "Konstante | Code | Bedeutung" stehen.
+        let opt = args[1];
+        if (opt && typeof opt === "object" && Array.isArray(opt.headers)) {
+          opt = { ...opt, headers: uebersetzeTabelle([opt.headers], tr)[0] };
+        }
+        return fn(uebersetzeTabelle(args[0], tr), opt, ...args.slice(2));
       }
       if (name === "pmix") {
         return fn(uebersetzePmix(args[0], tr), ...args.slice(1));

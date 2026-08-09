@@ -1,6 +1,11 @@
 // Zieht alle uebersetzbaren Texte des Lehrbuchs in einen Katalog.
 //
-//   node extract_strings.js [katalog.json]
+//   node extract_strings.js [sprache|katalog.json]
+//
+// Die Schwesterwerkzeuge (fehlend.js, offen.js) nehmen an dieser Stelle eine
+// SPRACHE. Wer hier aus Gewohnheit `en` schrieb, legte frueher eine Datei
+// namens `en` mit lauter leeren Werten an -- der echte Katalog blieb
+// unberuehrt, und die Meldung "neu: 2565" sah aus wie ein Totalverlust.
 //
 // Vorhandene Uebersetzungen bleiben erhalten -- die Datei wird gemischt,
 // nicht ueberschrieben. Neue Texte kommen mit leerem Wert dazu, Texte die
@@ -12,7 +17,8 @@ const path = require("path");
 const { sammle } = require("./i18n");
 
 const HERE = __dirname;
-const ZIEL = process.argv[2] || path.join(HERE, "i18n", "en.json");
+const ARG = process.argv[2] || "en";
+const ZIEL = ARG.endsWith(".json") ? ARG : path.join(HERE, "i18n", `${ARG}.json`);
 
 // Ein H, das nichts baut -- wir wollen nur die Aufrufe sehen.
 const nix = () => "";
