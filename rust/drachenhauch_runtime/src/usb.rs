@@ -1,4 +1,4 @@
-//! USB-HID (USB_*) -- nativer Port von `gamebasic/modules/usb.py` via
+//! USB-HID (USB_*) -- nativer Port von `drachenhauch/modules/usb.py` via
 //! `hidapi`. Feature `usb`. USB_HANDLE = INTEGER-Index in einer VM-Vec.
 //! Bytes <-> STRING via latin-1 (Codepoint 0..255 == ein Byte).
 #![cfg(feature = "usb")]

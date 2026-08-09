@@ -1,5 +1,5 @@
 //! Retained-Mode-GUI (Modul `gui`) -- nativer Port von
-//! `gamebasic/modules/gui.py`. Persistente Fenster/Widgets; pro Frame
+//! `drachenhauch/modules/gui.py`. Persistente Fenster/Widgets; pro Frame
 //! `GUI_UPDATE` (Maus/Tasten) + `GUI_DRAW` (zeichnen). Events per Polling.
 //!
 //! Stand: vollstaendig portiert -- Window + Button/Label/Checkbox/Slider/

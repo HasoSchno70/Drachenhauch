@@ -12,11 +12,11 @@ IMPORT "mqtt"
 
 TRY
     DIM h AS MQTT_HANDLE
-    h = MQTT_CONNECT("127.0.0.1", 1883, "gamebasic-demo")
+    h = MQTT_CONNECT("127.0.0.1", 1883, "drachenhauch-demo")
     PRINT "Verbunden: ", MQTT_IS_CONNECTED(h)
 
-    MQTT_SUBSCRIBE(h, "gamebasic/demo")
-    MQTT_PUBLISH(h, "gamebasic/demo", "Hallo vom Bastler-Bereich!")
+    MQTT_SUBSCRIBE(h, "drachenhauch/demo")
+    MQTT_PUBLISH(h, "drachenhauch/demo", "Hallo vom Bastler-Bereich!")
 
     DIM tries AS INTEGER
     DIM got AS BOOLEAN

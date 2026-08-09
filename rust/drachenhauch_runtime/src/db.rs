@@ -1,4 +1,4 @@
-//! SQLite-Modul (DB_*) -- nativer Port von `gamebasic/modules/db.py` via
+//! SQLite-Modul (DB_*) -- nativer Port von `drachenhauch/modules/db.py` via
 //! `rusqlite` (bundled SQLite). Feature `db`.
 //!
 //! DB_CONN/DB_RESULT sind INTEGER-Handles (Index in VM-seitige Vecs). Ein

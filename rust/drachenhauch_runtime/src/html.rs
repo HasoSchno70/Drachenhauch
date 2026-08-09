@@ -1,5 +1,5 @@
 //! HTTP- + HTML-Modul (HTTP_*/URL_*/HTML_*) -- nativer Port von
-//! `gamebasic/modules/html.py`. HTTP via `ureq`, HTML-Parsing als
+//! `drachenhauch/modules/html.py`. HTTP via `ureq`, HTML-Parsing als
 //! handgeschriebener Scanner (funktional, nicht byte-identisch zu Pythons
 //! html.parser bei kaputtem HTML). Feature `http`.
 #![cfg(feature = "http")]

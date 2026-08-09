@@ -1,4 +1,4 @@
-//! Networking-Modul (NET_*) -- nativer Port von `gamebasic/modules/net.py`
+//! Networking-Modul (NET_*) -- nativer Port von `drachenhauch/modules/net.py`
 //! via `std::net`. Feature `net` (nur stdlib, kein Crate).
 //!
 //! NET_LISTENER/NET_SOCKET/NET_UDP sind INTEGER-Handles (Index in VM-Vecs).

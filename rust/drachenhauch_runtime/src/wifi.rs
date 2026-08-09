@@ -1,4 +1,4 @@
-//! WiFi-Management (WIFI_*) -- nativer Port von `gamebasic/modules/wifi.py`.
+//! WiFi-Management (WIFI_*) -- nativer Port von `drachenhauch/modules/wifi.py`.
 //! Windows via `netsh wlan`, Linux via `nmcli` (NetworkManager), macOS via
 //! `networksetup`/`airport` (std::process, Text-Parsing). Feature `wifi`.
 //!

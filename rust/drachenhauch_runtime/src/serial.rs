@@ -1,5 +1,5 @@
 //! Serielle Schnittstelle (SERIAL_*) -- nativer Port von
-//! `gamebasic/modules/serial.py` via `serialport`. Feature `serial`.
+//! `drachenhauch/modules/serial.py` via `serialport`. Feature `serial`.
 //! SERIAL_HANDLE = INTEGER-Index in einer VM-Vec.
 #![cfg(feature = "serial")]
 

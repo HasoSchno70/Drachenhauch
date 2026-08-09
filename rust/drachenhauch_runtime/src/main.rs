@@ -88,6 +88,16 @@ const PAYLOAD_MAGIC: &[u8; 8] = b"DHRTPAY1";
 /// empirisch geprueft, aus `Valid` wird `NotSigned`. Also muss die Reihenfolge
 /// „exportieren, dann signieren" moeglich sein, und dafuer darf der Footer
 /// nicht am Dateiende kleben.
+/// Quelltext oder Bytecode? Entschieden wird das allein an der Endung.
+///
+/// `.gb` bleibt neben `.dh` gueltig: es ist die Endung aus der GameBasic-Zeit,
+/// und wer noch ein altes Programm herumliegen hat, soll es starten koennen,
+/// ohne es vorher umbenennen zu muessen. Geschrieben wird ueberall `.dh`.
+fn ist_quelldatei(pfad: &str) -> bool {
+    let p = pfad.to_lowercase();
+    p.ends_with(".dh") || p.ends_with(".gb")
+}
+
 fn embedded_gbc() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
     let data = std::fs::read(&exe).ok()?;
@@ -212,17 +222,22 @@ fn main() -> ExitCode {
     // WASM/Web (emscripten): Programm aus einem festen Pfad im virtuellen FS
     // (vom Build via --embed-file eingebettet bzw. vom JS-Harness per
     // FS.writeFile reingeschrieben). Seit dem Front-End-Port (Stufe 1-5) kann
-    // dhrt die `.gb`-QUELLE selbst kompilieren -> der Playground braucht KEIN
-    // vorab-kompiliertes .gbc (und kein Pyodide) mehr. `/program.gb` (Quelle)
-    // hat Vorrang; `/program.gbc` (vorkompiliert) bleibt als Fallback. Siehe
-    // web/ + docs/web-playground.md.
+    // dhrt die `.dh`-QUELLE selbst kompilieren -> der Playground braucht KEIN
+    // vorab-kompiliertes .dhc (und kein Pyodide) mehr. `/program.dh` (Quelle)
+    // hat Vorrang; `/program.dhc` (vorkompiliert) bleibt als Fallback. Die
+    // alten Namen werden noch gelesen, damit ein bereits gebautes web/ nicht
+    // stumm bleibt. Siehe web/ + docs/web-playground.md.
     #[cfg(target_os = "emscripten")]
     {
-        if let Ok(src) = std::fs::read_to_string("/program.gb") {
-            return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
+        for quelle in ["/program.dh", "/program.gb"] {
+            if let Ok(src) = std::fs::read_to_string(quelle) {
+                return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
+            }
         }
-        if let Ok(text) = std::fs::read_to_string("/program.gbc") {
-            return run_gbc_text(&text, "playground");
+        for bytecode in ["/program.dhc", "/program.gbc"] {
+            if let Ok(text) = std::fs::read_to_string(bytecode) {
+                return run_gbc_text(&text, "playground");
+            }
         }
     }
 
@@ -233,13 +248,13 @@ fn main() -> ExitCode {
         // ein zweiter Panic direkt im Fehlerpfad. `argv[0]` als Programmname
         // ist per Konvention ohnehin praesent, `.get(0)` mit Fallback ist der
         // billige, sichere Weg.
-        eprintln!("Verwendung: {} <datei.gbc>", args.first().map(String::as_str).unwrap_or("dhrt"));
+        eprintln!("Verwendung: {} <datei.dh|datei.dhc>", args.first().map(String::as_str).unwrap_or("dhrt"));
         return ExitCode::from(1);
     }
     let path = &args[1];
-    // Komfort: `dhrt datei.gb` (ohne `run`) wird wie `dhrt run datei.gb`
-    // behandelt -- aus Quelltext, mit chdir. `.gbc` laeuft den VM-Pfad.
-    if path.to_lowercase().ends_with(".gb") {
+    // Komfort: `dhrt datei.dh` (ohne `run`) wird wie `dhrt run datei.dh`
+    // behandelt -- aus Quelltext, mit chdir. `.dhc` laeuft den VM-Pfad.
+    if ist_quelldatei(path) {
         return run_main(path);
     }
     // Optionales Quell-Label fuer Fehlermeldungen; sonst der .gbc-Pfad.
@@ -624,7 +639,7 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
 /// eigenstaendigen Exe (Selbst-Export ohne Python): kompiliert Quelltext ->
 /// .gbc und haengt den Payload (gbc + Footer `[u64 len][DHRTPAY1]`) an eine
 /// Kopie der EIGENEN Runtime-Exe. `assets/` neben der Quelle wird mitkopiert.
-/// Pendant zu gamebasic/export.py.
+/// Pendant zu drachenhauch/export.py.
 fn export_main(path: &str, out_dir: Option<&str>) -> ExitCode {
     let abs = std::fs::canonicalize(path)
         .unwrap_or_else(|_| std::path::PathBuf::from(path));
@@ -841,7 +856,19 @@ fn run_program_value(json: serde_json::Value, source_label: &str) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{embedded_gbc_in, PAYLOAD_MAGIC};
+    use super::{embedded_gbc_in, ist_quelldatei, PAYLOAD_MAGIC};
+
+    #[test]
+    fn quelldatei_erkennt_beide_endungen_und_ignoriert_gross_klein() {
+        for gut in ["spiel.dh", "SPIEL.DH", "a/b/c.Dh", "alt.gb", "ALT.GB"] {
+            assert!(ist_quelldatei(gut), "{gut} sollte Quelltext sein");
+        }
+        // Bytecode und Fremdes duerfen NICHT als Quelle durchgehen -- sonst
+        // liefe eine .dhc durch den Compiler statt durch die VM.
+        for schlecht in ["spiel.dhc", "spiel.gbc", "spiel.dhx", "dh", "spiel.txt"] {
+            assert!(!ist_quelldatei(schlecht), "{schlecht} ist keine Quelle");
+        }
+    }
 
     /// Baut, was `--export` schreibt: <exe><gbc><laenge><magic>.
     fn bundle(exe: &[u8], gbc: &str) -> Vec<u8> {

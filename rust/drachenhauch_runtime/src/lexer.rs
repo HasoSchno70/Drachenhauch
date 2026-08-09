@@ -1,4 +1,4 @@
-//! Lexer/Tokenizer fuer GameBasic -- Rust-Port von `gamebasic/lexer.py` +
+//! Lexer/Tokenizer fuer GameBasic -- Rust-Port von `drachenhauch/lexer.py` +
 //! `tokens.py`. Erster Schritt der Front-End-Portierung (Lexer -> Parser ->
 //! Compiler), damit `dhrt` perspektivisch ohne Python aus Quelltext Bytecode
 //! erzeugt.

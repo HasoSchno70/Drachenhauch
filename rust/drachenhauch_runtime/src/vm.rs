@@ -3,7 +3,7 @@
 //! Skalar-Ops, Control-Flow, User-Calls, Strings/Arrays/Maps/Tupel, OOP
 //! (Structs/Klassen/Methoden/Properties/Operator-Overloading), Slicing, IN,
 //! DATA/READ, TRY/THROW und die puren Builtins (siehe builtins.rs).
-//! Semantik 1:1 aus `gamebasic/vm.py`, damit `stdout` bit-identisch bleibt.
+//! Semantik 1:1 aus `drachenhauch/vm.py`, damit `stdout` bit-identisch bleibt.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -5927,7 +5927,7 @@ impl<'p> Vm<'p> {
     }
 }
 
-// Vordefinierte Globals -- Werte IDENTISCH zu gamebasic/graphics.py
+// Vordefinierte Globals -- Werte IDENTISCH zu drachenhauch/graphics.py
 // (COLORS/KEYS). Von Hand synchron; Drift-Schutz: tests/test_constants_sync.py
 // vergleicht jede Python-Konstante gegen PRINT-Output von dhrt.
 const DEFAULT_COLORS: &[(&str, i64)] = &[
@@ -6340,7 +6340,7 @@ fn mul(a: Value, b: Value) -> R<Value> {
 
 /// Rundet f32-gestuetzte Audio-Werte (Lautstaerken 0..1) auf 6 Nachkommastellen,
 /// damit die f32->f64-Verbreiterung nicht als „0.800000011920929" durchschlaegt
-/// (siehe docs/gamebasic-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
+/// (siehe docs/drachenhauch-stolpersteine.md D2). 6 Stellen reichen fuer Volumes weit.
 fn round_audio(f: f64) -> f64 { (f * 1_000_000.0).round() / 1_000_000.0 }
 
 /// Baut aus den Werten eines Array-Literals `[a, b, c]` ein 1D-GbArray.

@@ -1,5 +1,5 @@
 ' SQLite-Datenbank Demo. IMPORT "db" laedt das Built-in-Modul gleichen Namens
-' (siehe gamebasic/modules/db.py).
+' (siehe drachenhauch/modules/db.py).
 IMPORT "db"
 
 ' Wir nutzen :memory: - eine In-Memory-Datenbank, die mit DB_CLOSE verschwindet.

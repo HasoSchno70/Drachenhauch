@@ -22,7 +22,7 @@ dist/
 *.spec
 *.pyd
 *.so
-gamebasic/vm_native.c
+drachenhauch/vm_native.c
 
 # OS
 .DS_Store

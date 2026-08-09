@@ -1,6 +1,6 @@
 //! IMPORT-Preprocessor -- Stufe 4 der Front-End-Portierung.
 //!
-//! Port von `gamebasic/preprocess.py`. Expandiert `IMPORT "<name>"`-Zeilen
+//! Port von `drachenhauch/preprocess.py`. Expandiert `IMPORT "<name>"`-Zeilen
 //! rekursiv VOR dem Lexen:
 //!   - Quellcode-IMPORT (`IMPORT "helper.gb"` / relativer Pfad): Datei lesen,
 //!     rekursiv preprocessen, mit `' === IMPORT ... ===`-Markern inlinen.
@@ -18,7 +18,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-/// Built-in-Modul-Namen (= `gamebasic/modules/*.py`, ohne `__init__`).
+/// Built-in-Modul-Namen (= `drachenhauch/modules/*.py`, ohne `__init__`).
 /// Muss mit `modules.discover_modules()` synchron bleiben. dhrt implementiert
 /// diese Module nativ; ein `IMPORT "<modul>"` wird hier nur zu einem Kommentar.
 const MODULES: &[&str] = &[
@@ -312,7 +312,7 @@ fn process_inner(
         // eine voellig unbeteiligte Zeile im Puffer des Nutzers. Die einzige
         // Koordinate, die der Nutzer anfassen kann, ist SEINE IMPORT-Zeile;
         // die innere Position gehoert in den Meldungstext (gleiche Behandlung
-        // wie in gamebasic/preprocess.py).
+        // wie in drachenhauch/preprocess.py).
         process_inner(&content, &inner_base, seen, out, imports)
             .map_err(|e| PreprocessError {
                 line: line_idx,

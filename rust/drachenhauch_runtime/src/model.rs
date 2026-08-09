@@ -1,4 +1,4 @@
-//! Laden des `.gbc`-Formats (siehe `gamebasic/serialize.py`) in Rust-Structs.
+//! Laden des `.gbc`-Formats (siehe `drachenhauch/serialize.py`) in Rust-Structs.
 //!
 //! Der const-Pool und die Code-Instruktionen werden beim Laden EINMALIG in
 //! native Rust-Typen dekodiert (kein serde_json zur Laufzeit der Dispatch-
@@ -11,7 +11,7 @@ use serde_json::Value as J;
 
 use crate::value::Value;
 
-/// Opcode-Konstanten -- muessen exakt zu `gamebasic/bytecode.py::Op` passen.
+/// Opcode-Konstanten -- muessen exakt zu `drachenhauch/bytecode.py::Op` passen.
 pub mod op {
     pub const LOAD_CONST: u16 = 1;
     pub const POP: u16 = 2;
@@ -494,7 +494,10 @@ fn decode_class(j: &J) -> ClassInfo {
 pub fn load_program(j: &J) -> Result<Program, String> {
     let obj = j.as_object().ok_or("Top-Level ist kein Objekt")?;
     let fmt = obj.get("format").and_then(|v| v.as_str()).unwrap_or("");
-    if fmt != "gbc" {
+    // "gbc" ist der alte Name aus der GameBasic-Zeit. Er wird weiter gelesen,
+    // weil das eine Zeile kostet und eine herumliegende Datei sonst mit
+    // "Unbekanntes Format" abgewiesen wuerde -- geschrieben wird nur "dhc".
+    if fmt != "dhc" && fmt != "gbc" {
         return Err(format!("Unbekanntes Format: {:?}", fmt));
     }
     let n_globals = obj.get("n_globals").and_then(|v| v.as_u64()).unwrap_or(0) as usize;

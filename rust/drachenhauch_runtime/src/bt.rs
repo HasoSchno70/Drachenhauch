@@ -1,4 +1,4 @@
-//! Bluetooth Low Energy (BT_*) -- nativer Port von `gamebasic/modules/bt.py`
+//! Bluetooth Low Energy (BT_*) -- nativer Port von `drachenhauch/modules/bt.py`
 //! via `btleplug` (async). Feature `bt`. BT_HANDLE = INTEGER-Index in einer
 //! VM-Vec. Async wird ueber eine globale tokio-Runtime synchron getrieben
 //! (jeder Aufruf blockiert bis zur Antwort). Bytes <-> STRING via latin-1.

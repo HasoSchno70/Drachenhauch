@@ -1,6 +1,6 @@
 //! Pure/deterministische Builtins fuer die Rust-VM (Schritt 3).
 //!
-//! Semantik 1:1 aus `gamebasic/interpreter.py` (BUILTINS). Nicht-determi-
+//! Semantik 1:1 aus `drachenhauch/interpreter.py` (BUILTINS). Nicht-determi-
 //! nistische (RND/MILLIS/TIME$/…) und Grafik-Builtins sind NICHT hier --
 //! sie liefern einen klaren Fehler (Grafik = Schritt 4).
 

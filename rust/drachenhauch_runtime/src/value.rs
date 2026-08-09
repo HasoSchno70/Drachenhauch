@@ -4,7 +4,7 @@
 //! Maps und Instanzen sind Referenz-Typen (`Rc<RefCell<…>>`) -- Zuweisung
 //! aliased, genau wie in der Python-VM (dort dasselbe Objekt im Slot).
 //!
-//! `fmt`/`truthy` muessen bit-identisch zu `gamebasic/vm.py` sein.
+//! `fmt`/`truthy` muessen bit-identisch zu `drachenhauch/vm.py` sein.
 
 use std::cell::RefCell;
 use std::collections::HashMap;

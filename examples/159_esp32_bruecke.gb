@@ -1,6 +1,6 @@
 ' ESP32-Bruecke: Werte vom Board anzeigen, Befehle zum Board schicken.
 '
-' Gegenstueck zum Sketch esp32/gamebasic_esp32/gamebasic_esp32.ino.
+' Gegenstueck zum Sketch esp32/drachenhauch_esp32/drachenhauch_esp32.ino.
 ' Ohne Board laesst sich das trotzdem ausprobieren -- dann spielst du den
 ' ESP32 selbst, aus einem zweiten Fenster:
 '
@@ -16,7 +16,7 @@ CONST BROKER AS STRING = "127.0.0.1"
 CONST PORT AS INTEGER = 1883
 
 DIM h AS MQTT_HANDLE
-h = MQTT_CONNECT(BROKER, PORT, "gamebasic-bruecke")
+h = MQTT_CONNECT(BROKER, PORT, "drachenhauch-bruecke")
 
 IF NOT MQTT_IS_CONNECTED(h) THEN
     PRINT "Kein Broker auf " + BROKER + " erreichbar."

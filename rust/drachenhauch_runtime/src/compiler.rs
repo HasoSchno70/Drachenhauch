@@ -302,7 +302,7 @@ fn known_builtins() -> &'static std::collections::HashSet<String> {
     use std::sync::OnceLock;
     static SET: OnceLock<std::collections::HashSet<String>> = OnceLock::new();
     SET.get_or_init(|| {
-        let raw = include_str!("../../../gamebasic/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
         let mut s = std::collections::HashSet::new();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
@@ -333,7 +333,7 @@ fn builtin_arity() -> &'static std::collections::HashMap<String, (usize, usize)>
     use std::sync::OnceLock;
     static MAP: OnceLock<std::collections::HashMap<String, (usize, usize)>> = OnceLock::new();
     MAP.get_or_init(|| {
-        let raw = include_str!("../../../gamebasic/editor_qt/builtin_index.json");
+        let raw = include_str!("../../../drachenhauch/editor_qt/builtin_index.json");
         let mut m = std::collections::HashMap::new();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
             if let Some(arr) = v.get("builtins").and_then(|b| b.as_array()) {
@@ -1975,7 +1975,7 @@ impl Compiler {
             }));
         }
         json!({
-            "format": "gbc", "version": 1,
+            "format": "dhc", "version": 1,
             "n_globals": self.global_slots.len(),
             "main": main, "functions": Value::Object(functions),
             "classes": Value::Object(classes), "data": data,
