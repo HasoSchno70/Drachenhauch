@@ -48,10 +48,20 @@ class _Mitschnitt:
 
 
 def test_live_diagnose_ohne_konsolenfenster(monkeypatch, tmp_path):
+    """Absichtlich `_check_via_dhrt` statt `_check_source`.
+
+    `_check_source` sucht erst das Binary und faellt ohne gebautes `dhrt` auf
+    den reinen Syntax-Pfad zurueck -- der startet gar keinen Prozess, und der
+    Test schlug auf dem CI-Runner fehl ("es wurde gar kein Prozess
+    gestartet"), obwohl der Fix da war. Der Aufruf hier braucht kein echtes
+    Binary: der Start ist ohnehin abgefangen, gemessen werden nur die Flags.
+    """
+    from pathlib import Path
+
     from drachenhauch.editor_qt import error_check
     m = _Mitschnitt()
     m.haken(monkeypatch)
-    error_check._check_source("PRINT 1\n", tmp_path)
+    error_check._check_via_dhrt("PRINT 1\n", tmp_path, Path("dhrt.exe"))
     m.pruefen()
 
 
