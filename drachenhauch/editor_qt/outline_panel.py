@@ -149,7 +149,7 @@ class OutlinePanel(QWidget):
                 results.append(("function", name, ln_idx, len(container_stack), params))
             elif upper.startswith("PROPERTY GET ") or upper.startswith("PROPERTY SET "):
                 # Wie SUB/FUNCTION ein Blatt (kein Nesting-Push/Pop noetig --
-                # GameBasic verschachtelt keine PROPERTY-Bloecke ineinander).
+                # Drachenhauch verschachtelt keine PROPERTY-Bloecke ineinander).
                 rest = stripped[13:]   # nach "PROPERTY GET "/"PROPERTY SET " (je 13 Zeichen)
                 name, params = OutlinePanel._split_name_params(rest)
                 results.append(("property", name, ln_idx, len(container_stack), params))

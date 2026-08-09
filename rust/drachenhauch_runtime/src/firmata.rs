@@ -31,7 +31,7 @@ const CMD_PROTOCOL_VERSION: u8 = 0xF9;
 const SYSEX_START: u8 = 0xF0;
 const SYSEX_END: u8 = 0xF7;
 
-/// Modus-Werte fuer FIRMATA_PIN_MODE (raw, keine GameBasic-Konstanten -- siehe
+/// Modus-Werte fuer FIRMATA_PIN_MODE (raw, keine Drachenhauch-Konstanten -- siehe
 /// docs/module-firmata.md fuer die vollstaendige Tabelle): 0=INPUT, 1=OUTPUT,
 /// 2=ANALOG, 3=PWM, 11=PULLUP.
 ///

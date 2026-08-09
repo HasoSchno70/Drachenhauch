@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Reiter (Tabs) + Tastatur-Navigation
+'  DRACHENHAUCH -- gui-Modul: Reiter (Tabs) + Tastatur-Navigation
 ' ============================================================
 '  GUI_TABS(win, labels) legt eine Reiter-Leiste an. Widgets werden mit
 '  GUI_SET_TAB(widget, seite) einer Seite zugeordnet (Seite 0,1,2 ...);
@@ -9,7 +9,7 @@
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1180, 760, "GameBasic - Reiter", 1)
+SCREEN(1180, 760, "Drachenhauch - Reiter", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

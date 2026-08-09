@@ -3,7 +3,7 @@
 ' Dict-Comprehension:  {key: val FOR var IN iterable [WHERE filter]}  -> MAP
 ' Set-Comprehension:   {expr FOR var IN iterable [WHERE filter]}      -> TUPLE (deduped)
 '
-' Dict-Keys MUESSEN STRING sein (GameBasic-MAP-Konvention). Set-Comp
+' Dict-Keys MUESSEN STRING sein (Drachenhauch-MAP-Konvention). Set-Comp
 ' liefert ein TUPLE mit deduplizierten Werten in der Reihenfolge des
 ' ersten Auftretens.
 

@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("2D-Extras"),
-  H.p("Über die Grundformen hinaus bietet GameBasic einige hübsche Extras: dicke Linien, runde Rechtecke, Farbverläufe, weiche Kurven, Mischmodi für Leucht-Effekte, fertig erzeugte Texturen und Zwischen-Zeichenflächen. Alle werden – wie das ganze Kapitel – im Grafikfenster zwischen CLS und FLIP benutzt."),
+  H.p("Über die Grundformen hinaus bietet Drachenhauch einige hübsche Extras: dicke Linien, runde Rechtecke, Farbverläufe, weiche Kurven, Mischmodi für Leucht-Effekte, fertig erzeugte Texturen und Zwischen-Zeichenflächen. Alle werden – wie das ganze Kapitel – im Grafikfenster zwischen CLS und FLIP benutzt."),
   H.figure("42_extras.png", "Farbverläufe, ein rundes Rechteck, dicke Linien und eine weiche Spline-Kurve."),
 
   H.h2("Dicke Linien & runde Rechtecke"),
@@ -113,7 +113,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Shader: eigene Effekte auf der Grafikkarte"),
-  H.p("Ein Shader ist ein kleines Programm, das die Grafikkarte für JEDEN Pixel ausführt. Damit bekommst du Effekte, die mit normalen Zeichenbefehlen unbezahlbar wären: Bildschirmkrümmung wie an einem Röhrenmonitor, Leuchten (Bloom), Farbstiche, Wellen. GameBasic reicht dir den fertigen Frame durch einen Fragment-Shader in der Sprache GLSL."),
+  H.p("Ein Shader ist ein kleines Programm, das die Grafikkarte für JEDEN Pixel ausführt. Damit bekommst du Effekte, die mit normalen Zeichenbefehlen unbezahlbar wären: Bildschirmkrümmung wie an einem Röhrenmonitor, Leuchten (Bloom), Farbstiche, Wellen. Drachenhauch reicht dir den fertigen Frame durch einen Fragment-Shader in der Sprache GLSL."),
   H.cmd("SHADER_LOAD", 'SHADER_LOAD(pfad$_oder_glsl$)',
     "Lädt einen Fragment-Shader – entweder aus einer Datei oder direkt als Quelltext im String. Liefert ein Handle oder -1, wenn das Übersetzen fehlschlägt (die Fehlermeldung der Grafikkarte steht dann in der Konsole).",
     [

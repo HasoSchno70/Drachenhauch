@@ -1,4 +1,4 @@
-"""SFX-Generator fuer GameBasic (`dhsfx` / `dhrun.py --sfx`).
+"""SFX-Generator fuer Drachenhauch (`dhsfx` / `dhrun.py --sfx`).
 
 sfxr-Stil-Tool fuer Retro-Soundeffekte: eigener Synthesizer (Waveform +
 Pitch-Slide + Hüllkurve + Vibrato), Live-Wellenform-Vorschau, Abspielen, und
@@ -161,7 +161,7 @@ class SfxGenerator(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = project_root
-        self.setWindowTitle("GameBasic SFX-Generator")
+        self.setWindowTitle("Drachenhauch SFX-Generator")
         self.resize(900, 680)
         self._counter = 0
 

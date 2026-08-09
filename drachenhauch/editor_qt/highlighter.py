@@ -1,4 +1,4 @@
-"""Syntax-Highlighter fuer GameBasic (PySide6).
+"""Syntax-Highlighter fuer Drachenhauch (PySide6).
 
 Nutzt den Lexer aus `drachenhauch.lexer` -- so bleibt der Highlighter zu
 100% konsistent mit der Sprache. Wenn ein Zeile zur Laufzeit nicht

@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: mehrzeiliges Textfeld + modale Dialoge
+'  DRACHENHAUCH -- gui-Modul: mehrzeiliges Textfeld + modale Dialoge
 ' ============================================================
 '  GUI_TEXTAREA(win, x, y, w, h[, platzhalter$]) ist ein mehrzeiliges Textfeld:
 '  tippen, ENTER = neue Zeile, Pfeile (auch hoch/runter)/Home/End/Maus zum
@@ -9,7 +9,7 @@
 '  TAB wechselt den Fokus zwischen den Feldern.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1180, 760, "GameBasic - TextArea + Dialoge", 1)
+SCREEN(1180, 760, "Drachenhauch - TextArea + Dialoge", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

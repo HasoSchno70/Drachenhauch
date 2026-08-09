@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Tree-View (Baum-Ansicht)
+'  DRACHENHAUCH -- gui-Modul: Tree-View (Baum-Ansicht)
 ' ============================================================
 '  GUI_TREE(win, x, y, w, h) ist eine Baum-Ansicht. Knoten haengt man mit
 '  GUI_TREE_ADD(tree, parent, label$) an (parent = -1 fuer Wurzel, sonst die
@@ -9,7 +9,7 @@
 '  Mausrad scrollt.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1080, 720, "GameBasic - Tree-View", 1)
+SCREEN(1080, 720, "Drachenhauch - Tree-View", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

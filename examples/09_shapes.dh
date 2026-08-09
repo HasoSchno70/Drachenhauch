@@ -1,7 +1,7 @@
 ' Grafik-Demo: Formen, Farben, Animation.
 ' Beenden mit ESC, dem Fenster-X, oder nach ~10 Sekunden automatisch.
 
-Screen(320, 240, "GameBasic - Formen-Demo")
+Screen(320, 240, "Drachenhauch - Formen-Demo")
 
 DIM frame AS INTEGER
 DIM running AS BOOLEAN
@@ -35,7 +35,7 @@ WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
     Circle(bx, by, 8, CYAN)
 
     ' --- Beschriftung ---
-    Text(10, 70, "GameBasic Grafik", WHITE)
+    Text(10, 70, "Drachenhauch Grafik", WHITE)
     Text(10, 90, "Frame: " + STR$(frame), LIGHTGRAY)
     Text(10, 110, "ESC zum Beenden", GRAY)
 

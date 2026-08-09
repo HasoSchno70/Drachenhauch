@@ -2,7 +2,7 @@
 (output_console / debugger / error_check).
 
 Reihenfolge:
-1. Eingefrorene Installation (PyInstaller): neben `GameBasic.exe` (dorthin legt
+1. Eingefrorene Installation (PyInstaller): neben `Drachenhauch.exe` (dorthin legt
    der Inno-Installer `dhrt.exe`) bzw. im Bundle (`_MEIPASS`).
 2. Dev-Baum: `<project_root>/rust/drachenhauch_runtime/target/{release,debug}/dhrt[.exe]`
    bzw. relativ zu diesem Paket (Repo-Wurzel = parents[2]).

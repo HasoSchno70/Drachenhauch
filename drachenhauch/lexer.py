@@ -1,4 +1,4 @@
-"""Lexer / Tokenizer fuer GameBasic.
+"""Lexer / Tokenizer fuer Drachenhauch.
 
 Case-insensitive: Keywords UND Bezeichner werden auf Kleinbuchstaben normalisiert.
 Kommentare: ' ... bis Zeilenende, oder REM ... bis Zeilenende.
@@ -394,7 +394,7 @@ class Lexer:
         """&HFF -> 255 (Hex), &B11010110 -> 214 (Binary).
 
         Klassisch fuer BASIC.  Underscores im Literal sind nicht erlaubt
-        (anders als Python - GameBasic bleibt strikt).
+        (anders als Python - Drachenhauch bleibt strikt).
         """
         self._advance()              # &
         marker = self._advance()     # H oder B

@@ -1,4 +1,4 @@
-"""Tilemap-/Level-Editor fuer GameBasic (`dhtilemap` / `dhrun.py --tilemap`).
+"""Tilemap-/Level-Editor fuer Drachenhauch (`dhtilemap` / `dhrun.py --tilemap`).
 
 Atlas-Tiles auf ein Gitter malen, mehrere Layer, Per-Tile-Properties
 (`solid`, `damage`, ...), Speichern/Laden als Tiled-JSON (das `TILED_LOAD`
@@ -822,7 +822,7 @@ class TileMapEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = Path(project_root)
-        self.setWindowTitle("GameBasic Tilemap-Editor")
+        self.setWindowTitle("Drachenhauch Tilemap-Editor")
         self.resize(1360, 880)
         self.doc = TileMapDoc()
         self.tileset_pixmaps: list = []     # QPixmap pro Tileset (parallel)
@@ -1082,7 +1082,7 @@ class TileMapEditor(QMainWindow):
     def _update_title(self) -> None:
         name = Path(self.doc.path).name if self.doc.path else "unbenannt"
         star = "*" if self.doc.dirty else ""
-        self.setWindowTitle(f"GameBasic Tilemap-Editor -- {name}{star}")
+        self.setWindowTitle(f"Drachenhauch Tilemap-Editor -- {name}{star}")
 
     def _confirm_discard_changes(self) -> bool:
         """Fragt bei ungespeicherten Aenderungen nach, bevor sie verworfen

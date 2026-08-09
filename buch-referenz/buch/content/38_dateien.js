@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Dateien"),
-  H.p("Mit Datei-Befehlen speicherst du Daten dauerhaft auf der Festplatte – Spielstände, Highscores, Einstellungen, Level. GameBasic bietet zwei Wege: den klassischen mit einem FILE-Handle (Datei öffnen, zeilenweise lesen/schreiben, schließen) und den bequemen pfadbasierten (ganze Datei in einem Aufruf lesen oder schreiben). Pfade sind relativ zum Verzeichnis deines Programms."),
+  H.p("Mit Datei-Befehlen speicherst du Daten dauerhaft auf der Festplatte – Spielstände, Highscores, Einstellungen, Level. Drachenhauch bietet zwei Wege: den klassischen mit einem FILE-Handle (Datei öffnen, zeilenweise lesen/schreiben, schließen) und den bequemen pfadbasierten (ganze Datei in einem Aufruf lesen oder schreiben). Pfade sind relativ zum Verzeichnis deines Programms."),
   H.note("Jedes Beispiel hier schreibt und liest echte Dateien. Achte beim Ausprobieren darauf, in welchem Ordner dein Programm liegt – dort entstehen die Dateien."),
 
   H.h2("Datei öffnen & schließen"),
@@ -171,5 +171,5 @@ module.exports = (H) => [
       'PRINT DECOMPRESS$(klein) = stand',
     ], { out: ["TRUE"] }),
   H.tip("Speicherstände leicht gemacht", "Für echte Spielstände musst du Dateien nicht selbst Zeile für Zeile verwalten: Das save-Modul (Teil V) bietet komfortable Save-Slots mit benannten Werten, und das json-Modul speichert ganze Datenstrukturen. Die rohen Datei-Befehle hier sind die Grundlage darunter."),
-  H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit und Dateien. In Teil IV geht es um das, wofür GameBasic gemacht ist: Grafik, Sound und Spiele."),
+  H.p("Damit endet Teil III. Du kennst nun die wichtigsten eingebauten Befehle für Konsole, Mathematik, Zufall, Text, Typen, Sammlungen, Zeit und Dateien. In Teil IV geht es um das, wofür Drachenhauch gemacht ist: Grafik, Sound und Spiele."),
 ];

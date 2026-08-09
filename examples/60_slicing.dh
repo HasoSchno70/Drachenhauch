@@ -51,7 +51,7 @@ PRINT "  b[1] =", b[1], "(unveraendert -- echte Kopie)"
 PRINT ""
 PRINT "=== Praktisch: erstes Wort extrahieren ==="
 DIM phrase AS STRING
-phrase = "GameBasic rocks heavy"
+phrase = "Drachenhauch rocks heavy"
 DIM space AS INTEGER
 space = INSTR(phrase, " ", 0)
 PRINT "Erstes Wort: '" + phrase[0:space] + "'"

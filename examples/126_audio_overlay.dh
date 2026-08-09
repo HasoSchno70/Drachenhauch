@@ -1,12 +1,12 @@
 ' ============================================================
-'  GAMEBASIC -- Musik-Visualizer als KLICK-DURCHLAESSIGES Desktop-Overlay
+'  DRACHENHAUCH -- Musik-Visualizer als KLICK-DURCHLAESSIGES Desktop-Overlay
 ' ============================================================
 '  Radiales Spektrum, das in Echtzeit zur laufenden Musik tanzt (AUDIO_FFT),
 '  transparent ueber dem ganzen Desktop -- und dank WINDOW_PASSTHROUGH klickst
 '  du HINDURCH, arbeitest also normal weiter, waehrend es im Hintergrund pulst.
 '
 '  Beenden: ESC (solange das Fenster den Fokus hat, also direkt nach dem Start)
-'           -- oder im GameBasic-Editor den Stop-Knopf, sonst Alt+F4.
+'           -- oder im Drachenhauch-Editor den Stop-Knopf, sonst Alt+F4.
 '  CLICKTHROUGH = FALSE setzen, wenn das Overlay den Mausfokus behalten soll.
 ' ============================================================
 CONST PI2 AS FLOAT = 6.28318530718
@@ -14,7 +14,7 @@ CONST BANDS AS INTEGER = 64          ' Spektral-Baender rundherum
 CONST CLICKTHROUGH AS INTEGER = TRUE
 
 ' Transparentes Vollbild-Overlay (SCREEN_TRANSPARENT(0,0) = ganzer Monitor).
-SCREEN_TRANSPARENT(0, 0, "GameBasic - Audio Overlay")
+SCREEN_TRANSPARENT(0, 0, "Drachenhauch - Audio Overlay")
 WINDOW_UNDECORATED(TRUE)
 WINDOW_TOPMOST(TRUE)
 IF CLICKTHROUGH THEN WINDOW_PASSTHROUGH(TRUE)

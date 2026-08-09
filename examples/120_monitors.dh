@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- Monitor- & Display-Infos
+'  DRACHENHAUCH -- Monitor- & Display-Infos
 ' ============================================================
 '  Zeigt das neue Display-Modul: alle angeschlossenen Monitore mit
 '  Aufloesung/Hz/Position, den aktuellen Monitor und die Live-Position
@@ -8,7 +8,7 @@
 '    [Pfeile] Fenster um 40 px verschieben (SET_WINDOW_POS)
 '    [ESC]   Ende
 ' ============================================================
-SCREEN(640, 460, "GameBasic - Monitore", 1)
+SCREEN(640, 460, "Drachenhauch - Monitore", 1)
 
 DIM prevSpace AS INTEGER : prevSpace = 0
 

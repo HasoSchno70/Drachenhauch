@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Splitter (verschiebbare Trennlinie)
+'  DRACHENHAUCH -- gui-Modul: Splitter (verschiebbare Trennlinie)
 ' ============================================================
 '  GUI_SPLITTER(win, x, y, length, orient$, min, max) ist ein duenner Greif-
 '  Balken, den man mit der Maus zieht. orient$ = "v" (senkrecht, zieht
@@ -9,7 +9,7 @@
 '  Einfach den Balken in der Mitte nach links/rechts ziehen.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1080, 720, "GameBasic - Splitter", 1)
+SCREEN(1080, 720, "Drachenhauch - Splitter", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

@@ -354,7 +354,7 @@ class AnimDoc:
 
     def generate_runner(self, gbanim_filename: str, screen_w: int = 640,
                         screen_h: int = 420, title: str | None = None) -> str:
-        """Lauffaehiges GameBasic-Vorschauprogramm (wie Unitys Animator-Preview):
+        """Lauffaehiges Drachenhauch-Vorschauprogramm (wie Unitys Animator-Preview):
         links ein Live-Parameter-Panel (Slider/Checkbox/Button via `ui`-Modul),
         rechts der Sprite, der den aktuellen State spielt -- inkl. State-Anzeige.
         """

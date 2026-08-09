@@ -12,7 +12,7 @@ CONST TILE_STEIN = 2
 CONST TILE_WASSER = 3
 
 ' Bildschirm: 320 x 192
-Screen(MAP_COLS * TILE_W, MAP_ROWS * TILE_H, "GameBasic - Tilemap-Demo")
+Screen(MAP_COLS * TILE_W, MAP_ROWS * TILE_H, "Drachenhauch - Tilemap-Demo")
 
 DIM tileset AS IMAGE
 DIM heroSheet AS IMAGE

@@ -1,4 +1,4 @@
-"""Test fuer den 'Ueber GameBasic'-Dialog: Autor + Copyright + aktuelle
+"""Test fuer den 'Ueber Drachenhauch'-Dialog: Autor + Copyright + aktuelle
 Beschreibung (keine veralteten Ausfuehrungspfade mehr)."""
 import os
 

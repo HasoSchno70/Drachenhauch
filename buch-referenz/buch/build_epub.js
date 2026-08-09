@@ -1,4 +1,4 @@
-// GameBasic-Lehrbuch -- baut ein EPUB 3 aus DENSELBEN Inhalts-Modulen wie das
+// Drachenhauch-Lehrbuch -- baut ein EPUB 3 aus DENSELBEN Inhalts-Modulen wie das
 // .docx.  Moeglich ist das, weil content/NN_*.js die Bausteine nicht selbst
 // importiert, sondern als (H) => [bloecke] geschrieben ist: hier kommt ein
 // zweites H herein, das XHTML erzeugt statt docx-Objekte.  Eine Quelle, zwei
@@ -11,14 +11,14 @@
 // der Schriftgroesse des Lesers an.
 //
 // Aufruf:  node build_epub.js [zielpfad.epub]
-//          (ohne Argument: GameBasic-Lehrbuch.epub neben dieser Datei)
+//          (ohne Argument: Drachenhauch-Lehrbuch.epub neben dieser Datei)
 const fs = require("fs");
 const path = require("path");
 const JSZip = require("jszip");
 
 const HERE = __dirname;
 const IMG = path.join(HERE, "images");
-const TITEL = "GameBasic – Das Lehrbuch";
+const TITEL = "Drachenhauch – Das Lehrbuch";
 const AUTOR = "Hans Schnorrenberger";
 // Feste Kennung: bei jedem Bau dieselbe, damit ein Lesegeraet eine neue
 // Fassung als DASSELBE Buch erkennt (Lesezeichen/Fortschritt bleiben).
@@ -160,7 +160,7 @@ function flatten(a, acc) { for (const x of a) Array.isArray(x) ? flatten(x, acc)
 neueDatei("Titel", "titel");
 aktuell.html.push(
   `<div class="titelseite">`,
-  `<p class="marke">GAMEBASIC</p>`,
+  `<p class="marke">DRACHENHAUCH</p>`,
   `<p class="untertitel">Das Lehrbuch</p>`,
   `<p class="zeile">Programmieren lernen und alle Befehle verstehen</p>`,
   `<p class="autor">von ${esc(AUTOR)}</p>`,
@@ -189,7 +189,7 @@ function huelleListen(teile) {
 }
 
 // ---------------------------------------------------------------- Stylesheet
-const CSS = `/* GameBasic-Lehrbuch -- EPUB.  Bewusst wenige feste Groessen:
+const CSS = `/* Drachenhauch-Lehrbuch -- EPUB.  Bewusst wenige feste Groessen:
    der Leser stellt die Schrift ein, alles rechnet in em. */
 /* Beide Modi anmelden, aber Vorder-/Hintergrund NICHT selbst setzen: das
    Lesegeraet gewinnt (Sepia, Nacht, eigene Schrift). Ohne diese Zeile nimmt
@@ -369,7 +369,7 @@ function opf(datum) {
     <dc:title>${esc(TITEL)}</dc:title>
     <dc:creator>${esc(AUTOR)}</dc:creator>
     <dc:language>de</dc:language>
-    <dc:description>Programmieren lernen und alle Befehle von GameBasic verstehen.</dc:description>
+    <dc:description>Programmieren lernen und alle Befehle von Drachenhauch verstehen.</dc:description>
     <meta property="dcterms:modified">${datum}</meta>
   </metadata>
   <manifest>
@@ -409,12 +409,12 @@ o.file("content.opf", opf(new Date().toISOString().replace(/\.\d+Z$/, "Z")));
 // also bei JEDEM Testlauf 4,8 MB Unterschied im Arbeitsverzeichnis auf.
 const ZIEL = process.argv[2]
   ? path.resolve(process.argv[2])
-  : path.join(HERE, "GameBasic-Lehrbuch.epub");
+  : path.join(HERE, "Drachenhauch-Lehrbuch.epub");
 zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" }).then((buf) => {
   fs.writeFileSync(ZIEL, buf);
   const kap = dateien.filter((d) => d.kind === "chapter").length;
   const teile = dateien.filter((d) => d.kind === "part").length;
-  console.log(`OK -> GameBasic-Lehrbuch.epub `
+  console.log(`OK -> Drachenhauch-Lehrbuch.epub `
     + `(${teile} Teile, ${kap} Kapitel, ${bilder.size} Bilder, `
     + `${(buf.length / 1024 / 1024).toFixed(1)} MB)`);
 });

@@ -1,4 +1,4 @@
-# GameBasic — Demo
+# Drachenhauch — Demo
 
 Eine Demo im Sinne der Demoszene: **ein durchlaufendes Stück**, das Szene für
 Szene zeigt, was die Laufzeit kann — und dabei auf die Musik reagiert, statt
@@ -141,7 +141,7 @@ Die kurzen Stücke loopen; der Ablaufplan läuft davon unbeirrt weiter. Herkunft
   1600 Würfel sind drei Draw-Calls — 1600 verschiedene wären 1600, dafür wäre
   ein Verlauf im Shader die bessere Antwort. *(Das Farb-Array kam 2026-08-02;
   vorher musste man die Matrizen selbst auf mehrere Listen verteilen.)*
-- **GameBasic ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
+- **Drachenhauch ignoriert Groß-/Kleinschreibung** — eine lokale `hoehe` verdeckt
   damit lautlos die Konstante `HOEHE`, und aus `HOEHE - 54` wird `0.6 - 54`.
   Das fällt erst als merkwürdiger Typfehler weit weg von der Ursache auf.
 - **Licht, Himmel, Schatten und die Audio-Bus-Effekte sind globaler Zustand.**

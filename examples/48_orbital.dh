@@ -1,4 +1,4 @@
-' === ORBITAL - GameBasic Showcase =====================================
+' === ORBITAL - Drachenhauch Showcase =====================================
 ' Pusht den Tree-Walking-Interpreter ueber den Anschlag und zeigt
 ' gleichzeitig wie viel die Sprache draufhat:
 '
@@ -42,7 +42,7 @@ CONST N_ASTEROIDS AS INTEGER = 100
 CONST N_STARS AS INTEGER = 200
 CONST TWO_PI AS FLOAT = 6.2831853
 
-SCREEN(WIDTH, HEIGHT, "Orbital - GameBasic Showcase", 2)
+SCREEN(WIDTH, HEIGHT, "Orbital - Drachenhauch Showcase", 2)
 RANDOMIZE(7)               ' deterministisch fuer reproduzierbare Verteilung
 
 ' --- TTF-Font: konsistente Metrik + scharfer Text auf BEIDEN Pfaden ---
@@ -329,7 +329,7 @@ sfx_click = LOADSOUND("assets/pickup.wav")
 
 ' --- Sinus-Scroller a la Amiga: bunter Lauftext mit Sinus-Welle ------
 DIM scroll_msg AS STRING
-scroll_msg = "    *** GAMEBASIC (c)2026 ba HASOSOFT***    100+ KLASSEN-INSTANZEN, 270 COS/SIN PRO FRAME, NUMPY-PARTIKEL, TWEEN-EASING, KAMERA-FOLLOW    ALLES IM TREE-WALKING-INTERPRETER    *** EIN SINUS-SCROLLER WIE FRUEHER AUF DEM AMIGA ***    PRESS 0..6 TO FOCUS, F FOR FREE-CAM, +/- TO ZOOM    *** ROLL ON ***    "
+scroll_msg = "    *** DRACHENHAUCH (c)2026 ba HASOSOFT***    100+ KLASSEN-INSTANZEN, 270 COS/SIN PRO FRAME, NUMPY-PARTIKEL, TWEEN-EASING, KAMERA-FOLLOW    ALLES IM TREE-WALKING-INTERPRETER    *** EIN SINUS-SCROLLER WIE FRUEHER AUF DEM AMIGA ***    PRESS 0..6 TO FOCUS, F FOR FREE-CAM, +/- TO ZOOM    *** ROLL ON ***    "
 DIM scroll_x AS FLOAT
 scroll_x = WIDTH * 1.0
 

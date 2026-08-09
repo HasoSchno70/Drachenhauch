@@ -1,4 +1,4 @@
-' === GameBasic Amiga Tribute Demo ===
+' === Drachenhauch Amiga Tribute Demo ===
 '
 ' Klassische Demoszene-Effekte im Geist der Amiga 500/1200-Aera:
 '   - Star-Field 3D (Z-Walk, Perspektiv-Projektion)
@@ -20,7 +20,7 @@ IMPORT "input"
 CONST WIDTH AS INTEGER = 320
 CONST HEIGHT AS INTEGER = 200
 
-SCREEN(WIDTH, HEIGHT, "GameBasic Amiga Tribute", 3)
+SCREEN(WIDTH, HEIGHT, "Drachenhauch Amiga Tribute", 3)
 RANDOMIZE(42)
 
 ' --- Music ------------------------------------------------------------
@@ -72,7 +72,7 @@ bar_phase = 0.0
 
 ' === Sinus-Scroller ===================================================
 DIM scroll_msg AS STRING
-scroll_msg = "                    *** GAMEBASIC AMIGA TRIBUTE 2026 ***    HALLO ALTE DEMO-CODER!    HIER ROLLT EIN STUECK 80er-DEMOSZENE - PROGRAMMIERT IN GAMEBASIC, EINEM PASCAL-STRIKTEN BASIC-DIALEKT MIT 3 AUSFUEHRUNGSPFADEN: TREE-WALKER, PYTHON-VM UND CYTHON-VM    *** GREETINGS TO HASOSOFT ***    ALLE EFFEKTE LAUFEN UNTER 1ms PRO FRAME, OHNE GPU-TRICKS    ROLL ON ROLL ON ROLL ON                    "
+scroll_msg = "                    *** DRACHENHAUCH AMIGA TRIBUTE 2026 ***    HALLO ALTE DEMO-CODER!    HIER ROLLT EIN STUECK 80er-DEMOSZENE - PROGRAMMIERT IN DRACHENHAUCH, EINEM PASCAL-STRIKTEN BASIC-DIALEKT MIT 3 AUSFUEHRUNGSPFADEN: TREE-WALKER, PYTHON-VM UND CYTHON-VM    *** GREETINGS TO HASOSOFT ***    ALLE EFFEKTE LAUFEN UNTER 1ms PRO FRAME, OHNE GPU-TRICKS    ROLL ON ROLL ON ROLL ON                    "
 DIM scroll_x AS FLOAT
 scroll_x = WIDTH * 1.0
 
@@ -143,7 +143,7 @@ SUB draw_logo(cx AS INTEGER, cy AS INTEGER, scale AS FLOAT)
     TEXT_SIZE(INT(20 * scale))
     TEXT_BOLD(TRUE)
     DIM logo AS STRING
-    logo = "GAMEBASIC"
+    logo = "DRACHENHAUCH"
     DIM tw AS INTEGER
     tw = TEXT_WIDTH(logo)
     DIM tx AS INTEGER

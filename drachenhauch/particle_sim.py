@@ -1,4 +1,4 @@
-"""Pure Partikel-Simulation (NumPy-vektorisiert) -- ohne GameBasic-Laufzeit.
+"""Pure Partikel-Simulation (NumPy-vektorisiert) -- ohne Drachenhauch-Laufzeit.
 
 Extrahiert aus `modules/particles.py` (Stufe B), damit der Partikel-Editor
 (`particleeditor_qt`) die Vorschau-Simulation nutzen kann, ohne die Built-in-

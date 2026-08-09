@@ -1,4 +1,4 @@
-"""Laedt die Musikmodule fuer die GameBasic-Demo herunter.
+"""Laedt die Musikmodule fuer die Drachenhauch-Demo herunter.
 
 Quelle: **The Mod Archive**, Rubrik *Public Domain* -- dort listet die Seite
 ausschliesslich Module, deren Urheber sie gemeinfrei gestellt haben. Alle vier

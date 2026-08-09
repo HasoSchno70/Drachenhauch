@@ -20,7 +20,7 @@
 ## Ziel
 
 Fenster, Buttons & weitere Widgets als **nachladbare Module** — passend zur
-bestehenden GameBasic-Modul-Architektur (`IMPORT "x"` lädt
+bestehenden Drachenhauch-Modul-Architektur (`IMPORT "x"` lädt
 `drachenhauch/modules/x.py` beim ersten Aufruf, registriert Builtins +
 externe Typen, **kein** Eingriff in Lexer/Parser/VM). Rein additiv,
 drei-Pfade-neutral, bit-identisch-unkritisch (Grafik/Interaktion).

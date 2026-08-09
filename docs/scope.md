@@ -1,6 +1,6 @@
 # Variablen-Scope
 
-GameBasic ist Pascal-strikt: Variablen müssen mit `DIM` deklariert werden, behalten ihren Typ, und die Sichtbarkeit folgt einem klaren Drei-Ebenen-Modell ohne Block-Scoping.
+Drachenhauch ist Pascal-strikt: Variablen müssen mit `DIM` deklariert werden, behalten ihren Typ, und die Sichtbarkeit folgt einem klaren Drei-Ebenen-Modell ohne Block-Scoping.
 
 ## Drei Scope-Ebenen
 
@@ -50,7 +50,7 @@ inkrement()
 PRINT zaehler                 ' 1
 ```
 
-In Python würde die Zuweisung `zaehler = zaehler + 1` eine *neue lokale* Variable anlegen (oder auf `UnboundLocalError` laufen). In GameBasic löst der Schreibzugriff durch die Eltern-Kette auf wie der Lesezugriff — ohne `global`-Schlüsselwort.
+In Python würde die Zuweisung `zaehler = zaehler + 1` eine *neue lokale* Variable anlegen (oder auf `UnboundLocalError` laufen). In Drachenhauch löst der Schreibzugriff durch die Eltern-Kette auf wie der Lesezugriff — ohne `global`-Schlüsselwort.
 
 ## Lokales Shadowing
 
@@ -164,7 +164,7 @@ Auch `FOR i = 1 TO 10` schmeißt, wenn `i` als CONST deklariert wurde.
 
 ## Keine Closures, keine verschachtelten SUBs
 
-GameBasic erlaubt keine SUB/FUNCTION innerhalb einer SUB/FUNCTION. Jede Routine sieht ihren eigenen lokalen Scope + (bei Methoden) Felder + Globals — fertig. Es gibt keinen "äußeren" lokalen Scope den man closen könnte.
+Drachenhauch erlaubt keine SUB/FUNCTION innerhalb einer SUB/FUNCTION. Jede Routine sieht ihren eigenen lokalen Scope + (bei Methoden) Felder + Globals — fertig. Es gibt keinen "äußeren" lokalen Scope den man closen könnte.
 
 ## Quick Reference
 

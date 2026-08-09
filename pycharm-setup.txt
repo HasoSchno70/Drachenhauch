@@ -1,13 +1,13 @@
 ==============================================================
-GameBasic in PyCharm einrichten
+Drachenhauch in PyCharm einrichten
 ==============================================================
 
 1) PROJEKT-INTERPRETER AUF DIE .venv UMSTELLEN
 ----------------------------------------------
-File -> Settings -> Project: GameBasic -> Python Interpreter
+File -> Settings -> Project: Drachenhauch -> Python Interpreter
 Zahnrad oben rechts -> "Add Interpreter" -> "Add Local Interpreter"
 -> "Existing" -> Pfad waehlen:
-    C:\Programmieren\Python\GameBasic\.venv\Scripts\python.exe
+    C:\Programmieren\Python\Drachenhauch\.venv\Scripts\python.exe
 Bestaetigen. PyCharm sieht jetzt pygame und alle anderen Pakete.
 
 
@@ -17,9 +17,9 @@ Rechtsklick auf dhrun.py -> "Modify Run Configuration..."
 oder oben rechts -> "Edit Configurations..." -> "+ Python".
 
 Name:               Pong (oder beliebig)
-Script path:        C:\Programmieren\Python\GameBasic\dhrun.py
+Script path:        C:\Programmieren\Python\Drachenhauch\dhrun.py
 Parameters:         examples/10_pong.dh
-Working directory:  C:\Programmieren\Python\GameBasic
+Working directory:  C:\Programmieren\Python\Drachenhauch
 Python Interpreter: Project Default (.venv)
 
 Das gleiche kannst du fuer 09_shapes, 12_sprite, 13_sound usw.
@@ -30,12 +30,12 @@ duplizieren.
 -----------------------------------------
 Falls du bisher nur dhrun.py geoeffnet hast (kein Projektbaum):
   File -> Close Project
-  File -> Open... -> ORDNER C:\Programmieren\Python\GameBasic auswaehlen
+  File -> Open... -> ORDNER C:\Programmieren\Python\Drachenhauch auswaehlen
   -> "Trust Project"
 
 Links das Projekt-Tool-Fenster mit Alt+1 einblenden.
 Du siehst dann die Struktur:
-  GameBasic/
+  Drachenhauch/
     .venv/                  <- PyCharm verbirgt das oft, ist normal
     examples/
       assets/
@@ -51,7 +51,7 @@ Du siehst dann die Struktur:
 File -> Settings -> Editor -> File Types
 -> Recognized File Types -> "+"
 
-Name:                     GameBasic
+Name:                     Drachenhauch
 Description:              BASIC-Dialekt fuer die Spieleentwicklung
 Line comment:             '
 Line comment at first column: NICHT angekreuzt (BASIC erlaubt
@@ -61,7 +61,7 @@ Support paired braces:    angekreuzt
 Support paired brackets:  angekreuzt
 Support paired parens:    angekreuzt
 Support string escapes:   angekreuzt
-Ignore case:              ANGEKREUZT  (GameBasic ist case-insensitive!)
+Ignore case:              ANGEKREUZT  (Drachenhauch ist case-insensitive!)
 
 Dann unten in den vier Keyword-Spalten Folgendes einfuegen
 (jede Spalte ein Wort pro Zeile, EXAKT diese Listen):

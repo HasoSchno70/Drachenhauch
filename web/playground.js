@@ -1,6 +1,6 @@
 // Live-Playground-Glue zwischen der emscripten-erzeugten dhrt.wasm und der Seite.
 //
-// Ablauf: Der Nutzer tippt GameBasic-Quelltext in die Textarea. "Ausführen"
+// Ablauf: Der Nutzer tippt Drachenhauch-Quelltext in die Textarea. "Ausführen"
 // legt die Quelle in sessionStorage ab und lädt die Seite neu -> beim Neuladen
 // schreibt das Harness sie ins virtuelle FS unter /program.dh und ruft main()
 // EINMAL auf. dhrt kompiliert die Quelle SELBST im WASM (Lexer..Compiler in
@@ -35,7 +35,7 @@
   const STORAGE_KEY = "gb_src";   // zuletzt editierte Quelle (bleibt erhalten)
   const RUN_FLAG = "gb_run";      // Einmal-Flag: nach Reload genau einen Lauf
   const DEFAULT_SRC = [
-    "' Willkommen im GameBasic-Web-Playground!",
+    "' Willkommen im Drachenhauch-Web-Playground!",
     "' Tippe Code und klicke Ausfuehren -- dhrt kompiliert im Browser.",
     "' (PRINT-Werte mit Komma trennen, nicht Semikolon.)",
     "PRINT \"Hallo aus dem Browser!\"",

@@ -1,4 +1,4 @@
-// GameBasic-Lehrbuch -- baut ein farbiges, druckbares .docx-Referenz-/Lehrbuch.
+// Drachenhauch-Lehrbuch -- baut ein farbiges, druckbares .docx-Referenz-/Lehrbuch.
 // Inhalt liegt modular in content/NN_*.js (jede Datei exportiert (H)=>[bloecke]).
 // Dieser Renderer stellt die Bausteine (H) bereit, laedt die Module sortiert und
 // setzt das Dokument zusammen.  Aufruf:  node build_book.js
@@ -224,7 +224,7 @@ const children = [];
 children.push(
   new Paragraph({ spacing: { before: 1500 }, children: [] }),
   new Paragraph({ alignment: AlignmentType.CENTER,
-    children: [new TextRun({ text: "GAMEBASIC", bold: true, color: C_TITLE, size: 92 })] }),
+    children: [new TextRun({ text: "DRACHENHAUCH", bold: true, color: C_TITLE, size: 92 })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 140, after: 80 },
     children: [new TextRun({ text: "Das Lehrbuch", size: 40, color: C_H2, bold: true })] }),
   new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 },
@@ -275,7 +275,7 @@ children.splice(TOC_INSERT_AT, 0, ...tocChildren);
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
-  title: "GameBasic – Das Lehrbuch",
+  title: "Drachenhauch – Das Lehrbuch",
   styles: {
     default: { document: { run: { font: "Arial", size: 22 } } },
     paragraphStyles: [
@@ -294,13 +294,13 @@ const doc = new Document({
   sections: [{
     properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },  // A4 (210x297mm)
     footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "GameBasic – Das Lehrbuch  ·  ", size: 16, color: C_CAP }),
+      children: [new TextRun({ text: "Drachenhauch – Das Lehrbuch  ·  ", size: 16, color: C_CAP }),
                  new TextRun({ children: [PageNumber.CURRENT], size: 16, color: C_CAP })] })] }) },
     children,
   }],
 });
 
 Packer.toBuffer(doc).then((buf) => {
-  fs.writeFileSync(path.join(__dirname, "GameBasic-Lehrbuch.docx"), buf);
-  console.log(`OK -> GameBasic-Lehrbuch.docx (${mods.length} Module, ${tocEntries.length} Ueberschriften)`);
+  fs.writeFileSync(path.join(__dirname, "Drachenhauch-Lehrbuch.docx"), buf);
+  console.log(`OK -> Drachenhauch-Lehrbuch.docx (${mods.length} Module, ${tocEntries.length} Ueberschriften)`);
 });

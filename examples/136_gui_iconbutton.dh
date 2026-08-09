@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Icon-Buttons + Toolbar
+'  DRACHENHAUCH -- gui-Modul: Icon-Buttons + Toolbar
 ' ============================================================
 '  GUI_ICON_BUTTON(win, x, y, w, h, tex[, text$]) ist ein normaler Button mit
 '  Bild. tex ist ein Textur-Handle (LOADIMAGE oder GENTEX_*). OHNE Text wird er
@@ -8,7 +8,7 @@
 '  Streifen darunter. GUI_SET_ICON(button, tex) tauscht das Icon.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1080, 700, "GameBasic - Icon-Buttons", 1)
+SCREEN(1080, 700, "Drachenhauch - Icon-Buttons", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

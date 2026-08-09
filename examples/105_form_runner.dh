@@ -9,7 +9,7 @@
 
 IMPORT "gui"
 
-SCREEN(800, 480, "GameBasic -- Form-Runner", 1)
+SCREEN(800, 480, "Drachenhauch -- Form-Runner", 1)
 
 ' --- Formular aus der .dhform-Datei laden ------------------------------------
 DIM frm AS GUI_WINDOW

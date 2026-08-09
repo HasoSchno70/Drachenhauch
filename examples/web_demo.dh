@@ -1,6 +1,6 @@
 ' web_demo.dh -- kleine animierte Grafik-Demo fuer den Web-Playground (WASM).
 ' Zeigt, dass der Render-Loop im Browser laeuft (Bewegung + Farbe + Frame-Zaehler).
-SCREEN(480, 320, "GameBasic im Browser", 1)
+SCREEN(480, 320, "Drachenhauch im Browser", 1)
 
 DIM x AS FLOAT
 DIM y AS FLOAT
@@ -27,7 +27,7 @@ WHILE NOT QUITREQUESTED()
     BOX(INT(x) - 18, INT(y) - 18, INT(x) + 18, INT(y) + 18, c)
     CIRCLE(INT(x), INT(y), 10, RGB(255, 255, 255))
     TEXT(12, 12, "Frame " + STR$(t))
-    TEXT(12, 30, "GameBasic -> WebAssembly")
+    TEXT(12, 30, "Drachenhauch -> WebAssembly")
     TEXT(12, 296, "laeuft im Browser, ohne den Tab einzufrieren")
     FLIP()
 WEND

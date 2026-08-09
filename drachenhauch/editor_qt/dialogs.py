@@ -331,11 +331,11 @@ class ShortcutsDialog(QDialog):
 
 
 class AboutDialog(QDialog):
-    """`Hilfe -> Ueber GameBasic` -- Logo + Version + Autor + Copyright."""
+    """`Hilfe -> Ueber Drachenhauch` -- Logo + Version + Autor + Copyright."""
 
     def __init__(self, parent: QWidget):
         super().__init__(parent)
-        self.setWindowTitle("Ueber GameBasic")
+        self.setWindowTitle("Ueber Drachenhauch")
         self.setModal(True)
         self.setMinimumWidth(420)
 
@@ -356,11 +356,11 @@ class AboutDialog(QDialog):
                 self._logo_pixmap = QPixmap.fromImage(qimg)
                 logo_lbl.setPixmap(self._logo_pixmap)
         except Exception:
-            logo_lbl.setText("GameBasic")
+            logo_lbl.setText("Drachenhauch")
         layout.addWidget(logo_lbl)
 
         # Titel
-        title = QLabel("GameBasic Editor")
+        title = QLabel("Drachenhauch Editor")
         title_font = title.font()
         title_font.setPointSize(14)
         title_font.setBold(True)

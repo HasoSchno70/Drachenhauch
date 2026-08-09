@@ -1,8 +1,8 @@
-# GameBasic Handbuch
+# Drachenhauch Handbuch
 
-Vollständige Referenz für die Sprache GameBasic, alle eingebauten Befehle und alle Built-in-Module.
+Vollständige Referenz für die Sprache Drachenhauch, alle eingebauten Befehle und alle Built-in-Module.
 
-GameBasic ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
+Drachenhauch ist ein BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele. Programme laufen über **`dhrt`** — die native Rust/raylib-Runtime, die Quelltext selbst lext, parst, kompiliert und ausführt. Python ist nur noch Editor-/Tooling-Schicht.
 
 ## Inhalt
 
@@ -62,7 +62,7 @@ Jedes Modul wird mit `IMPORT "<name>"` aktiviert und stellt eigene Befehle berei
 ## Erstes Programm
 
 ```basic
-PRINT "Hallo, GameBasic!"
+PRINT "Hallo, Drachenhauch!"
 
 DIM name AS STRING
 INPUT "Wie heisst du?", name
@@ -104,7 +104,7 @@ Pfeiltasten bewegen das gelbe Rechteck. ESC oder Fenster schließen beendet (üb
 
 ## Konventionen in diesem Handbuch
 
-- Codeblöcke zeigen lauffähigen GameBasic-Code (oft direkt aus `examples/` entnommen).
+- Codeblöcke zeigen lauffähigen Drachenhauch-Code (oft direkt aus `examples/` entnommen).
 - Built-in-Signaturen werden kompakt notiert: `FUNKTION(arg1, arg2[, optional]) -> RÜCKGABETYP`. `[...]` markiert optionale Argumente.
 - Type-Tags: `INTEGER`, `FLOAT`, `STRING`, `BOOLEAN`, `IMAGE`, `SOUND`, `FILE`, `MAP OF T`, `ARRAY OF T`, plus die externen Typen aus Modulen (z.B. `JSON_HANDLE`, `SPRITE`, `TWEEN`).
 - Die Sprache ist **case-insensitive** für Schlüsselwörter und Built-ins (`PRINT`, `print`, `Print` sind gleich), aber identifier (eigene Variablen-/Funktionsnamen) bleiben unterscheidbar.

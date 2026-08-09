@@ -613,7 +613,7 @@ SUB UpdatePlay()
                             bugs[j].alive = FALSE : bugsAlive = bugsAlive - 1
                             ' Boss im Sturz erlegt = mehr Punkte (Galaga-Bonus).
                             ' NICHT "bg" nennen: das verdeckt die Konstante BG
-                            ' (Hintergrundfarbe) -- GameBasic ignoriert
+                            ' (Hintergrundfarbe) -- Drachenhauch ignoriert
                             ' Gross-/Kleinschreibung.
                             DIM bonus AS INTEGER : bonus = IIF(bugs[j].state = St.DIVE, 400, 150)
                             score = score + bonus

@@ -1,4 +1,4 @@
-' Tetris-Klon in GameBasic.
+' Tetris-Klon in Drachenhauch.
 ' Steuerung: Pfeile = bewegen, Hoch = rotate, Runter = soft drop,
 '            Space = hard drop, P = pause, ESC = beenden.
 '
@@ -16,7 +16,7 @@ CONST HEIGHT  AS INTEGER = 460
 CONST FIELD_X AS INTEGER = 12
 CONST FIELD_Y AS INTEGER = 12
 
-Screen(WIDTH, HEIGHT, "GameBasic Tetris")
+Screen(WIDTH, HEIGHT, "Drachenhauch Tetris")
 
 ' --- Input-Mapping ---------------------------------------------------
 INPUT_BIND("left",  KEY_LEFT)

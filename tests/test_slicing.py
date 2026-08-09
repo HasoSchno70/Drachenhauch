@@ -64,14 +64,14 @@ def test_string_slice_empty_when_lo_ge_hi(run_gb, run_vm):
 def test_string_slice_with_variable_bounds(run_gb, run_vm):
     src = '''
 DIM s AS STRING
-s = "GameBasic"
+s = "TestString"
 DIM lo AS INTEGER
 DIM hi AS INTEGER
 lo = 4
-hi = 9
+hi = 10
 PRINT s[lo:hi]
 '''
-    expected = "Basic\n"
+    expected = "String\n"
     assert run_gb(src) == expected
     assert run_vm(src) == expected
 

@@ -16,7 +16,7 @@ PRINT "s.left(5)        =>", s.left(5)
 PRINT "s.right(5)       =>", s.right(5)
 PRINT "s.mid(0, 5)      =>", s.mid(0, 5)
 PRINT "s.indexof('W',0) =>", s.indexof("W", 0)
-PRINT "s.replace        =>", s.replace("World", "GameBasic")
+PRINT "s.replace        =>", s.replace("World", "Drachenhauch")
 PRINT "'  pad  '.trim() =>", "[" + "  pad  ".trim() + "]"
 
 PRINT ""

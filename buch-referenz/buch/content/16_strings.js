@@ -1,12 +1,12 @@
 module.exports = (H) => [
   H.chapter("Strings im Detail"),
   H.p("Ein String ist eine Zeichenkette – Text, eingeschlossen in Anführungszeichen. Du hast Strings längst benutzt; hier lernst du sie richtig kennen: ihre Länge messen, Teile herausschneiden, suchen, ersetzen, zerlegen und wieder zusammenbauen. Für fast jede Textaufgabe gibt es einen passenden eingebauten Befehl."),
-  H.note("Viele String-Funktionen tragen ein $ am Namensende (LEFT$, MID$, UPPER$ …). Das ist eine alte BASIC-Tradition und kennzeichnet, dass die Funktion einen String zurückgibt. In GameBasic darfst du das $ auch weglassen: UPPER$ und UPPER sind dasselbe."),
+  H.note("Viele String-Funktionen tragen ein $ am Namensende (LEFT$, MID$, UPPER$ …). Das ist eine alte BASIC-Tradition und kennzeichnet, dass die Funktion einen String zurückgibt. In Drachenhauch darfst du das $ auch weglassen: UPPER$ und UPPER sind dasselbe."),
 
   H.h2("Wie lang ist der Text?"),
   H.cmd("LEN", "LEN(s$)",
     "Liefert die Anzahl der Zeichen in einem String. (LEN funktioniert auch für Arrays und liefert dort die Anzahl der Elemente.)",
-    ['PRINT LEN("GameBasic")', 'PRINT LEN("")'],
+    ['PRINT LEN("Drachenhauch")', 'PRINT LEN("")'],
     { out: ["9", "0"] }),
 
   H.h2("Groß und klein"),
@@ -19,19 +19,19 @@ module.exports = (H) => [
   H.p("Mit LEFT$ und RIGHT$ holst du dir die ersten oder letzten Zeichen. MID$ schneidet ab einer beliebigen Stelle. Wichtig: Die Position bei MID$ wird ab 0 gezählt – das erste Zeichen hat die Position 0, das zweite die Position 1 und so weiter."),
   H.cmd("LEFT$  /  RIGHT$", "LEFT$(s$, n)   RIGHT$(s$, n)",
     "LEFT$ liefert die ersten n Zeichen, RIGHT$ die letzten n.",
-    ['PRINT LEFT$("GameBasic", 4)', 'PRINT RIGHT$("GameBasic", 5)'],
+    ['PRINT LEFT$("Drachenhauch", 4)', 'PRINT RIGHT$("Drachenhauch", 5)'],
     { out: ["Game", "Basic"] }),
   H.cmd("MID$", "MID$(s$, start[, n])",
     "Liefert ab der Position start (0-basiert!) bis zu n Zeichen. Lässt du n weg, geht es bis zum Ende des Strings.",
-    ['PRINT MID$("GameBasic", 4)', 'PRINT MID$("GameBasic", 4, 5)'],
+    ['PRINT MID$("Drachenhauch", 4)', 'PRINT MID$("Drachenhauch", 4, 5)'],
     { out: ["Basic", "Basic"] }),
-  H.warn("Anders als manche älteren BASIC-Dialekte zählt GameBasic Zeichen-Positionen ab 0, nicht ab 1. Das erste Zeichen von \"GameBasic\" (das G) sitzt an Position 0, das B an Position 4. Das gilt auch für INSTR und den Index-Zugriff weiter unten."),
+  H.warn("Anders als manche älteren BASIC-Dialekte zählt Drachenhauch Zeichen-Positionen ab 0, nicht ab 1. Das erste Zeichen von \"Drachenhauch\" (das G) sitzt an Position 0, das B an Position 4. Das gilt auch für INSTR und den Index-Zugriff weiter unten."),
 
   H.h2("Einzelne Zeichen mit dem Index"),
   H.p("Du kannst auf ein einzelnes Zeichen direkt über seine Position zugreifen – mit eckigen Klammern, wie bei einem Array. Mit der Doppelpunkt-Schreibweise schneidest du sogar einen ganzen Bereich heraus (das nennt man Slicing)."),
   H.code([
     'DIM wort AS STRING',
-    'wort = "GameBasic"',
+    'wort = "Drachenhauch"',
     'PRINT wort[0]',
     'PRINT wort[4:9]',
   ]),
@@ -98,7 +98,7 @@ module.exports = (H) => [
   H.code([
     'PRINT "hallo".upper()',
     'PRINT "  hi  ".trim().upper()',
-    'PRINT "GameBasic".length()',
+    'PRINT "Drachenhauch".length()',
   ]),
   H.code(["HALLO", "HI", "9"], { out: true }),
   H.tip("Text bauen mit f-Strings", "Für das Zusammensetzen von Text aus Werten ist ein f-String meist die angenehmste Wahl: f\"{name} hat {punkte} Punkte\" spart dir die vielen + und STR$. Siehe Kapitel „Ein- und Ausgabe“."),

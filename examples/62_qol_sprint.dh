@@ -6,8 +6,8 @@ PRINT "=== IN-Operator ==="
 
 ' Substring-Test
 DIM phrase AS STRING
-phrase = "Hello GameBasic World"
-PRINT "'GameBasic' IN phrase =>", "GameBasic" IN phrase
+phrase = "Hello Drachenhauch World"
+PRINT "'Drachenhauch' IN phrase =>", "Drachenhauch" IN phrase
 PRINT "'Python' IN phrase =>", "Python" IN phrase
 
 ' Tupel-Mitgliedschaft

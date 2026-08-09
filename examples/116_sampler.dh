@@ -16,7 +16,7 @@
 
 IMPORT "audio"
 
-SCREEN(640, 320, "GameBasic Sampler -- ein Sample, ganze Klaviatur", 2)
+SCREEN(640, 320, "Drachenhauch Sampler -- ein Sample, ganze Klaviatur", 2)
 SETFPS(60)
 
 DIM pluck AS SAMPLE

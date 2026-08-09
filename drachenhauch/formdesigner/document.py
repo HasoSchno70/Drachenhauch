@@ -113,7 +113,7 @@ def palette_spec(kind: str) -> PaletteSpec | None:
 
 # --- GB-Code-Emit-Helfer (fuer generate_gb_code) ----------------------------
 def _gb_str(s: str) -> str:
-    """GameBasic-String-Literal: `"` wird zu `""` escaped, Zeilenumbrueche raus."""
+    """Drachenhauch-String-Literal: `"` wird zu `""` escaped, Zeilenumbrueche raus."""
     t = str(s).replace("\r", " ").replace("\n", " ").replace('"', '""')
     return f'"{t}"'
 
@@ -130,7 +130,7 @@ def _gb_num(x) -> str:
     """FLOAT-Literal mit Dezimalpunkt (GB-FLOAT erwartet z.B. `0.0`, nicht `0`).
 
     Bewusst Fixpunkt statt `repr()`: `repr` schaltet ab |x| >= 1e16 bzw. unter
-    1e-4 auf Exponentialschreibweise (`1e-05`), die GameBasics Lexer NICHT kennt
+    1e-4 auf Exponentialschreibweise (`1e-05`), die Drachenhauchs Lexer NICHT kennt
     -- ein Slider mit feiner Skala erzeugte damit nicht parsbaren Export-Code.
     `inf`/`nan` (aus einem beschaedigten `.dhform`) werden zu 0.0."""
     try:
@@ -813,7 +813,7 @@ class FormDoc:
     def generate_runner(self, form_filename: str, screen_w: int | None = None,
                         screen_h: int | None = None, screen_title: str | None = None,
                         handler_bodies: dict | None = None) -> str:
-        """Lauffaehiges GameBasic-Programm: das Fenster wird auf Formulargroesse
+        """Lauffaehiges Drachenhauch-Programm: das Fenster wird auf Formulargroesse
         gesetzt, das `.dhform` geladen und **randlos** (chromeless) auf das echte
         OS-Fenster gelegt -- die Form IST das Fenster (Xojo-Lauf). Ist sie
         `resizable`, wird das OS-Fenster nativ groessenveraenderbar und die Form
@@ -879,7 +879,7 @@ class FormDoc:
                          screen_title: str | None = None,
                          handler_bodies: dict | None = None,
                          with_screen: bool = True, with_loop: bool = True) -> str:
-        """Eigenstaendiges GameBasic-Programm, das das Formular **explizit** mit
+        """Eigenstaendiges Drachenhauch-Programm, das das Formular **explizit** mit
         den `GUI_*`-Konstruktoren aufbaut (kein `GUI_LOAD`/`.dhform` zur Laufzeit).
         Lesbar + frei editierbar. `with_screen`/`with_loop` schalten SCREEN bzw.
         die GUI-Schleife ab (fuer Tests / Einbettung in eigenen Code)."""

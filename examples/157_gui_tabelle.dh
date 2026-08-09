@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: die Tabelle in voller Ausbaustufe
+'  DRACHENHAUCH -- gui-Modul: die Tabelle in voller Ausbaustufe
 ' ============================================================
 '  Eine Zelle ist mehr als Text. Jede traegt eigene Farben, eine
 '  Ausrichtung und eine ART:
@@ -40,7 +40,7 @@
 ' ============================================================
 IMPORT "gui"
 
-SCREEN(1180, 720, "GameBasic - Tabelle", 1)
+SCREEN(1180, 720, "Drachenhauch - Tabelle", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

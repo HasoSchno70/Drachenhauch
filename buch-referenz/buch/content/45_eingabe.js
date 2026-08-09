@@ -72,7 +72,7 @@ module.exports = (H) => [
 
   H.h2("Flanken: „genau in DIESEM Frame“"),
   H.p("KEYPRESSED und MOUSEBUTTON melden „wird gehalten“ – für einen Klick ist das fast nie gemeint. Die folgenden Befehle liefern die FLANKE, also den einen Frame, in dem sich etwas ändert. Dafür brauchst du weder das input-Modul noch eigene Buchführung."),
-  H.warn("KEYPRESSED und MOUSEBUTTON heißen so, seit es GameBasic gibt, und melden weiterhin „gehalten“. Die Flanken-Varianten haben deshalb eigene Namen: KEYHIT und MOUSE_HIT.", "Die Namen sind historisch"),
+  H.warn("KEYPRESSED und MOUSEBUTTON heißen so, seit es Drachenhauch gibt, und melden weiterhin „gehalten“. Die Flanken-Varianten haben deshalb eigene Namen: KEYHIT und MOUSE_HIT.", "Die Namen sind historisch"),
   H.cmd("KEYHIT · KEYRELEASED · KEYREPEAT", 'KEYHIT(taste)   KEYRELEASED(taste)   KEYREPEAT(taste)',
     "KEYHIT ist TRUE in dem Frame, in dem die Taste gedrückt wird, KEYRELEASED beim Loslassen. KEYREPEAT feuert zusätzlich mit der System-Wiederholrate, solange die Taste gehalten wird – genau das Verhalten, das man beim Tippen oder in Mengen-Eingaben erwartet.",
     [

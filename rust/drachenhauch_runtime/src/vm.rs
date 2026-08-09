@@ -3938,7 +3938,7 @@ impl<'p> Vm<'p> {
             "screen" => {
                 let w = gi(a, 0, "SCREEN")? as i32;
                 let h = gi(a, 1, "SCREEN")? as i32;
-                let title = if a.len() >= 3 { gs(a, 2, "SCREEN")?.to_string() } else { "GameBasic".to_string() };
+                let title = if a.len() >= 3 { gs(a, 2, "SCREEN")?.to_string() } else { "Drachenhauch".to_string() };
                 let scale = if a.len() >= 4 { gi(a, 3, "SCREEN")? as i32 } else { 1 };
                 if scale < 1 { return Err("SCREEN: skala muss >= 1 sein".into()); }
                 match self.gfx.as_mut() {
@@ -3948,14 +3948,14 @@ impl<'p> Vm<'p> {
                 Value::Nil
             }
             "screen_native" => {
-                let title = if !a.is_empty() { gs(a, 0, "SCREEN_NATIVE")?.to_string() } else { "GameBasic".to_string() };
+                let title = if !a.is_empty() { gs(a, 0, "SCREEN_NATIVE")?.to_string() } else { "Drachenhauch".to_string() };
                 g!().screen_native(&title);
                 Value::Nil
             }
             "screen_transparent" => {
                 let w = gi(a, 0, "SCREEN_TRANSPARENT")? as i32;
                 let h = gi(a, 1, "SCREEN_TRANSPARENT")? as i32;
-                let title = if a.len() >= 3 { gs(a, 2, "SCREEN_TRANSPARENT")?.to_string() } else { "GameBasic".to_string() };
+                let title = if a.len() >= 3 { gs(a, 2, "SCREEN_TRANSPARENT")?.to_string() } else { "Drachenhauch".to_string() };
                 let scale = if a.len() >= 4 { gi(a, 3, "SCREEN_TRANSPARENT")? as i32 } else { 1 };
                 if scale < 1 { return Err("SCREEN_TRANSPARENT: skala muss >= 1 sein".into()); }
                 // Transparenz ist ein Fenster-Erzeugungs-Flag (GLFW) -- nicht nachruestbar.

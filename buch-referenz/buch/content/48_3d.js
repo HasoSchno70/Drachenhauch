@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("3D-Grafik"),
-  H.p("GameBasic kann nicht nur flache 2D-Bilder, sondern auch echte 3D-Welten zeichnen – mit dem Modul g3d. Dazu kommt eine dritte Koordinate hinzu: z (Tiefe). Eine virtuelle Kamera blickt von einem Punkt im Raum auf ein Ziel, und du platzierst Körper wie Würfel, Kugeln und Zylinder an beliebigen Stellen. Dieses Kapitel zeigt die Grundbausteine; 3D ist ein großes Thema, in das du hier nur den ersten Blick wirfst."),
+  H.p("Drachenhauch kann nicht nur flache 2D-Bilder, sondern auch echte 3D-Welten zeichnen – mit dem Modul g3d. Dazu kommt eine dritte Koordinate hinzu: z (Tiefe). Eine virtuelle Kamera blickt von einem Punkt im Raum auf ein Ziel, und du platzierst Körper wie Würfel, Kugeln und Zylinder an beliebigen Stellen. Dieses Kapitel zeigt die Grundbausteine; 3D ist ein großes Thema, in das du hier nur den ersten Blick wirfst."),
   H.figure("48_3d.png", "Eine einfache 3D-Szene: Boden-Raster, Würfel (mit Drahtgitter), Kugel, Zylinder und Kegel."),
   H.note("3D läuft – wie der ganze Teil IV – nur im dhrt-Fenster. Der Aufbau ist wie in 2D: im Game-Loop CLS, dann zeichnen, dann FLIP. Nur kommt am Anfang jedes Frames die Kamera dazu, und alle Befehle stammen aus dem Modul g3d (IMPORT \"g3d\")."),
 
@@ -105,7 +105,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Skelett-Animation"),
-  H.p("Geriggte Modelle (GLTF oder IQM) bringen Animationen mit – Gehen, Rennen, Winken. GameBasic lädt sie als Satz und setzt pro Frame die gewünschte Pose."),
+  H.p("Geriggte Modelle (GLTF oder IQM) bringen Animationen mit – Gehen, Rennen, Winken. Drachenhauch lädt sie als Satz und setzt pro Frame die gewünschte Pose."),
   H.cmd("MODEL_LOAD_ANIMS · MODEL_ANIM_COUNT · MODEL_ANIM_NAME · MODEL_ANIM_FRAMES", 'MODEL_LOAD_ANIMS(pfad$)   MODEL_ANIM_COUNT(satz)   MODEL_ANIM_NAME(satz, i)   MODEL_ANIM_FRAMES(satz, i)',
     "MODEL_LOAD_ANIMS lädt alle Animationen einer Datei und liefert einen Satz. Die drei Abfragen sagen dir, wie viele es sind, wie sie heißen und wie viele Einzelbilder jede hat.",
     [
@@ -127,7 +127,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Beleuchtung"),
-  H.p("Ohne Licht sind 3D-Objekte flache Farbflächen. GameBasic bringt eine physikalisch basierte Beleuchtung (PBR) für bis zu vier Lichtquellen mit. Wichtig: Ein Modell muss mit MODEL_LIT angemeldet werden, sonst bleibt es unbeleuchtet."),
+  H.p("Ohne Licht sind 3D-Objekte flache Farbflächen. Drachenhauch bringt eine physikalisch basierte Beleuchtung (PBR) für bis zu vier Lichtquellen mit. Wichtig: Ein Modell muss mit MODEL_LIT angemeldet werden, sonst bleibt es unbeleuchtet."),
   H.cmd("LIGHT_ENABLE · LIGHT_AMBIENT · MODEL_LIT", 'LIGHT_ENABLE()   LIGHT_AMBIENT(farbe, staerke)   MODEL_LIT(m)',
     "LIGHT_ENABLE schaltet die Beleuchtung ein (einmal beim Start). LIGHT_AMBIENT setzt das Grundlicht, das überall hinfällt – ohne das sind Schattenseiten pechschwarz; die Stärke skaliert die Farbe (0.0 = aus). MODEL_LIT meldet ein Modell für die Beleuchtung an.",
     [

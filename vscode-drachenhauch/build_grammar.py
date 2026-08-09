@@ -99,7 +99,7 @@ def build() -> dict:
     ]
     return {
         "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-        "name": "GameBasic",
+        "name": "Drachenhauch",
         "scopeName": "source.drachenhauch",
         "patterns": [{"include": "#root"}],
         "repository": {"root": {"patterns": patterns}},

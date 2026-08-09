@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Zufall"),
-  H.p("Zufall macht Spiele lebendig: Würfel, zufällige Gegner-Positionen, gemischte Karten, abwechslungsreiche Beute. GameBasic bietet dafür mehrere Funktionen – von der einfachen Zufallszahl bis zum gewichteten Ziehen aus einer Liste. Weil die Werte naturgemäß bei jedem Aufruf anders ausfallen, zeigen die meisten Beispiele hier keine feste Ausgabe, sondern beschreiben den möglichen Bereich."),
+  H.p("Zufall macht Spiele lebendig: Würfel, zufällige Gegner-Positionen, gemischte Karten, abwechslungsreiche Beute. Drachenhauch bietet dafür mehrere Funktionen – von der einfachen Zufallszahl bis zum gewichteten Ziehen aus einer Liste. Weil die Werte naturgemäß bei jedem Aufruf anders ausfallen, zeigen die meisten Beispiele hier keine feste Ausgabe, sondern beschreiben den möglichen Bereich."),
 
   H.h2("Zufallszahlen"),
   H.cmd("RND", "RND()        RND(n)",
@@ -46,7 +46,7 @@ module.exports = (H) => [
   H.h2("Den Zufall steuern: RANDOMIZE"),
   H.p("Hinter den Zufallszahlen steckt ein berechneter Strom von Werten, der von einem Startwert – dem Seed – abhängt. Setzt du mit RANDOMIZE einen festen Seed, kommt danach IMMER dieselbe Folge heraus. Das klingt unzufällig, ist aber sehr nützlich: zum Testen (jeder Lauf ist gleich) oder für reproduzierbare Level („Welt Nr. 42“ sieht bei allen Spielern gleich aus)."),
   H.cmd("RANDOMIZE", "RANDOMIZE([seed])",
-    "Setzt den Startwert des Zufalls. Mit einer festen Zahl wird die Zufallsfolge reproduzierbar; ohne Argument nimmt GameBasic einen unvorhersehbaren System-Seed (das ist der Normalfall für echten Zufall).",
+    "Setzt den Startwert des Zufalls. Mit einer festen Zahl wird die Zufallsfolge reproduzierbar; ohne Argument nimmt Drachenhauch einen unvorhersehbaren System-Seed (das ist der Normalfall für echten Zufall).",
     [
       'RANDOMIZE(42)           \' fester Seed',
       'PRINT RND(6) + 1',

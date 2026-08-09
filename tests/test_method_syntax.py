@@ -42,12 +42,12 @@ PRINT "[" + "  hi  ".trim() + "]"
 def test_string_left_right_mid(run_gb, run_vm):
     src = '''
 DIM s AS STRING
-s = "GameBasic"
+s = "TestString"
 PRINT s.left(4)
-PRINT s.right(5)
-PRINT s.mid(4, 5)
+PRINT s.right(6)
+PRINT s.mid(4, 6)
 '''
-    expected = "Game\nBasic\nBasic\n"
+    expected = "Test\nString\nString\n"
     assert run_gb(src) == expected
     assert run_vm(src) == expected
 

@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Spinner (Zahlenfeld mit +/-)
+'  DRACHENHAUCH -- gui-Modul: Spinner (Zahlenfeld mit +/-)
 ' ============================================================
 '  GUI_SPINNER(win, x, y, w, min, max[, default[, step]]) ist ein Zahlenfeld
 '  mit zwei Schaltflaechen (hoch/runter). Der Wert aendert sich um "step" per
@@ -8,7 +8,7 @@
 '  GUI_ON_CHANGE feuert bei jeder Aenderung.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1080, 700, "GameBasic - Spinner", 1)
+SCREEN(1080, 700, "Drachenhauch - Spinner", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

@@ -95,7 +95,7 @@ module.exports = (H) => [
   H.bulletRich("CLS([farbe])  ", "löscht das Bild (füllt es mit einer Farbe, Standard Schwarz)."),
   H.bulletRich("… zeichnen …  ", "alle Formen, Bilder und Texte dieses Bildes."),
   H.bulletRich("FLIP()  ", "zeigt das fertige Bild an und wartet kurz (synchronisiert auf 60 Bilder/Sekunde)."),
-  H.p("Die Schleife läuft, solange das Fenster offen ist – QUITREQUESTED() wird TRUE, sobald der Benutzer das Fenster schließt. Das ist das Grundgerüst praktisch jedes GameBasic-Spiels:"),
+  H.p("Die Schleife läuft, solange das Fenster offen ist – QUITREQUESTED() wird TRUE, sobald der Benutzer das Fenster schließt. Das ist das Grundgerüst praktisch jedes Drachenhauch-Spiels:"),
   H.code([
     'SCREEN(480, 320, "Mein erstes Fenster")',
     '',
@@ -265,7 +265,7 @@ module.exports = (H) => [
     [
       'IF GUI_CLICKED(hilfe) THEN OPENURL("https://example.org/anleitung")',
     ]),
-  H.warn("OPENURL nimmt bewusst keine anderen Schemata an. Die Adresse geht an die System-Shell weiter; ein file:-Schema wäre damit ein Weg, aus einem GameBasic-Programm heraus beliebige Programme zu starten.", "Nur http und https"),
+  H.warn("OPENURL nimmt bewusst keine anderen Schemata an. Die Adresse geht an die System-Shell weiter; ein file:-Schema wäre damit ein Weg, aus einem Drachenhauch-Programm heraus beliebige Programme zu starten.", "Nur http und https"),
 
   H.tip("Konsole vs. Fenster", "PRINT und INPUT (Teil III) gehören zur Textkonsole. Sobald SCREEN läuft, gibst du Text mit TEXT ins Fenster und fragst Eingaben mit Tastatur-/Maus-Befehlen ab (Kapitel „Eingabe“). Mische beides nicht im selben Programmteil."),
 ];

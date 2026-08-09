@@ -14,7 +14,7 @@
 '
 ' SPACE = Pause/Weiter   ESC = Ende
 
-SCREEN(640, 400, "GameBasic Modul-Player (.mod / .xm)", 2)
+SCREEN(640, 400, "Drachenhauch Modul-Player (.mod / .xm)", 2)
 SETFPS(60)
 
 DIM songName AS STRING

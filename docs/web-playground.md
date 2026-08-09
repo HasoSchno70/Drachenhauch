@@ -145,7 +145,7 @@ nichts darueber, ob gezeichnet wird.** Wenn Geometrie verschwindet, ist
   danach weiter. Wer daraus "das Programm ist zu Ende" liest, sucht Fehler an
   der falschen Stelle.
 
-GameBasic-Programme im Browser laufen lassen — die **native Runtime `dhrt`**
+Drachenhauch-Programme im Browser laufen lassen — die **native Runtime `dhrt`**
 (Rust/raylib) als WebAssembly via emscripten, mit Grafik im `<canvas>` und
 Konsolen-Ausgabe daneben.
 

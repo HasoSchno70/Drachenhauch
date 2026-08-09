@@ -7,7 +7,7 @@ module.exports = (H) => [
 
   H.h2("Ein Sprite anlegen"),
   H.cmd("SPRITE_NEW", 'SPRITE_NEW(image, frame_breite, frame_höhe)',
-    "Erzeugt ein SPRITE aus einem Spritesheet. image ist das ganze Sheet (mit LOADIMAGE geladen), frame_breite × frame_höhe die Größe eines einzelnen Frames. GameBasic teilt das Sheet selbst in Frames auf.",
+    "Erzeugt ein SPRITE aus einem Spritesheet. image ist das ganze Sheet (mit LOADIMAGE geladen), frame_breite × frame_höhe die Größe eines einzelnen Frames. Drachenhauch teilt das Sheet selbst in Frames auf.",
     [
       'IMPORT "sprite"',
       'DIM sheet AS IMAGE',

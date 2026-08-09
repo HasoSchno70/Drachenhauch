@@ -7,7 +7,7 @@
 use std::io::Read;
 use std::time::Duration;
 
-const USER_AGENT: &str = "GameBasic/0.1 (+https://github.com/anthropic-ai)";
+const USER_AGENT: &str = "Drachenhauch/0.1 (+https://github.com/anthropic-ai)";
 const TIMEOUT_SECS: u64 = 10;
 // Review-Fund: `read_to_end` hatte KEINE Groessenbegrenzung -- jedes andere
 // Read-Builtin in diesem Projekt (NET_RECV/SERIAL_READ/USB_READ) deckelt bei

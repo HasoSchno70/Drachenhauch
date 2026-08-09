@@ -144,5 +144,5 @@ module.exports = (H) => [
   H.bullet("Echte Bilder: Ersetze die Kreise und den Korb-Block durch Sprites (Kapitel „Bilder“)."),
   H.bullet("Hintergrundmusik: Spiele mit PLAYMUSIC einen Loop, dazu einen anderen Ton, wenn eine Münze danebengeht."),
   H.bullet("Bonus-Objekte: Lass ab und zu etwas Besonderes fallen, das extra Punkte oder einen Effekt bringt."),
-  H.p("Damit endet die Reise durch GameBasic. Du kennst jetzt die Sprache, die eingebauten Befehle und die Werkzeuge für Grafik, Sound und Spiele. Der beste nächste Schritt ist immer derselbe: eine eigene kleine Idee nehmen und sie ausprobieren. Viel Freude beim Programmieren!"),
+  H.p("Damit endet die Reise durch Drachenhauch. Du kennst jetzt die Sprache, die eingebauten Befehle und die Werkzeuge für Grafik, Sound und Spiele. Der beste nächste Schritt ist immer derselbe: eine eigene kleine Idee nehmen und sie ausprobieren. Viel Freude beim Programmieren!"),
 ];

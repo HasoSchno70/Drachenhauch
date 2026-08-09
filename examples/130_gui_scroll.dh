@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: scrollbarer Fensterinhalt
+'  DRACHENHAUCH -- gui-Modul: scrollbarer Fensterinhalt
 ' ============================================================
 '  GUI_WINDOW_SCROLLABLE(win, TRUE): ist der Inhalt (alle Widgets) hoeher als
 '  der sichtbare Fensterbereich, scrollt er -- per Mausrad ODER ueber den
@@ -7,7 +7,7 @@
 '  Fenster ist verschieb-/resizebar.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1180, 760, "GameBasic - Scroll-Panel", 1)
+SCREEN(1180, 760, "Drachenhauch - Scroll-Panel", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

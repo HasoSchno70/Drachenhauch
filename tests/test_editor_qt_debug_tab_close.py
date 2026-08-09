@@ -17,8 +17,8 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path):
-    from drachenhauch.editor_qt.main_window import GameBasicEditor
-    return GameBasicEditor(tmp_path)
+    from drachenhauch.editor_qt.main_window import DrachenhauchEditor
+    return DrachenhauchEditor(tmp_path)
 
 
 def test_closing_actively_debugged_tab_stops_session_and_clears_reference(win):

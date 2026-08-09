@@ -1,5 +1,5 @@
 ' ============================================================================
-'  97_pbr_reactor.dh  --  "PBR REACTOR"  (native GameBasic Showcase, Fullscreen)
+'  97_pbr_reactor.dh  --  "PBR REACTOR"  (native Drachenhauch Showcase, Fullscreen)
 '
 '  Fullscreen-3D-Demo, das die NEUE Grafik-Pipeline der nativen Runtime zeigt:
 '    - PBR (Cook-Torrance) Metalle + Image-Based-Lighting (LIGHT_ENV)
@@ -36,7 +36,7 @@ DIM fft[NB] AS FLOAT
 DIM sm[NB] AS FLOAT                  ' zeitlich geglaettetes Spektrum
 DIM ring[32] AS INTEGER
 
-SCREEN(W, H, "GameBasic -- PBR REACTOR", 1)
+SCREEN(W, H, "Drachenhauch -- PBR REACTOR", 1)
 SET_FULLSCREEN(TRUE)
 SETFPS(60)
 
@@ -226,7 +226,7 @@ WHILE NOT QUITREQUESTED()
     TEXT_SIZE(44)
     TEXT(28, 22, "PBR REACTOR", hue(t * 0.6, 1.0))
     TEXT_SIZE(20)
-    TEXT(30, 70, "GameBasic native runtime : PBR . IBL . shadows . bloom . FFT", &H90A8C0)
+    TEXT(30, 70, "Drachenhauch native runtime : PBR . IBL . shadows . bloom . FFT", &H90A8C0)
     DIM scenename AS STRING
     SELECT CASE scene
         CASE 0

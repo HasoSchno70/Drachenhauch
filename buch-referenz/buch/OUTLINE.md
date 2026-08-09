@@ -1,17 +1,17 @@
-# GameBasic – Das Lehrbuch  ·  Gliederung & Fortschritt
+# Drachenhauch – Das Lehrbuch  ·  Gliederung & Fortschritt
 
-Vollständiges Lehr- und Referenzbuch: lehrt Programmieren in GameBasic von Grund
+Vollständiges Lehr- und Referenzbuch: lehrt Programmieren in Drachenhauch von Grund
 auf UND erklärt jeden Befehl mit kleinem Beispielprogramm. Ausgaben: editierbares
 `.docx` zum Drucken und ein `.epub` zum Lesen am Gerät. Code wird durchgehend monospace im grauen Kasten mit blauer
 Leiste dargestellt (Helfer `code`), Programm-Ausgabe im grünen Kasten.
 
 ## Build
-- `node build_book.js` → `GameBasic-Lehrbuch.docx` (nutzt zuletzt gemessene ToC-Seiten).
+- `node build_book.js` → `Drachenhauch-Lehrbuch.docx` (nutzt zuletzt gemessene ToC-Seiten).
 - `<venv>\python.exe make_book.py` → Zwei-Pass-Build mit korrekten ToC-Seitenzahlen
   (LibreOffice→PDF→PyMuPDF misst Seiten). Vorschau-PNG: LibreOffice→PDF→fitz.
   **Achtung:** rendert das PDF nur ZWISCHENDURCH (zum Messen) und endet beim
   `.docx` — für ein PDF mit Seitenzahlen danach `make_book.render()` nachziehen.
-- `node build_epub.js` → `GameBasic-Lehrbuch.epub` (EPUB 3, ein XHTML je Kapitel,
+- `node build_epub.js` → `Drachenhauch-Lehrbuch.epub` (EPUB 3, ein XHTML je Kapitel,
   nav.xhtml + NCX, Nachtmodus). Prüfung: `pytest tests/test_build_epub.py`.
 
 ## Architektur
@@ -37,7 +37,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
 
 ### Teil I — Erste Schritte
 - [x] 00 Vorwort + Willkommen  (content/00_vorwort.js)
-- [x] 01 Was ist GameBasic?  (content/01_was_ist.js)
+- [x] 01 Was ist Drachenhauch?  (content/01_was_ist.js)
 - [x] 02 Installation, Editor & Programme starten  (content/02_start.js)
 - [x] 03 Dein erstes Programm  (content/03_erstes_programm.js)
 
@@ -100,7 +100,7 @@ Legende: [x] fertig · [~] angefangen · [ ] offen
       — Scroller, LINES-Bulk, MODEL_INSTANCED mit Farb-Array, PBR+HDR+SKYBOX,
       physics2d mit PHYS2D_SET_DYNAMIC, behaltenes RENDERTARGET, Effektkette,
       Spatial Audio, AUDIO_SFX-Klangtastatur. Jede Szene mit ihrem Stolperstein.
-- [x] 82 Ins Netz stellen – GameBasic im Browser  (content/82_web.js,
+- [x] 82 Ins Netz stellen – Drachenhauch im Browser  (content/82_web.js,
       images/82_playground.png)
       — build_wasm.py + http.server, Playground (Galerie, ▶ Demo, Link teilen),
       Tabelle „Was im Browser anders ist" (Ton erst nach Klick, Leinwand nach

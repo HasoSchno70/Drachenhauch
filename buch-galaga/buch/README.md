@@ -1,12 +1,12 @@
 # Das Buch (Word, farbig, druckbar)
 
-Das fertige Dokument ist **`GameBasic-Buch.docx`** — öffne es in **Word** oder
+Das fertige Dokument ist **`Drachenhauch-Buch.docx`** — öffne es in **Word** oder
 **LibreOffice**, bearbeite es nach Belieben und drucke es aus. Es enthält bisher
-die **Einleitung** (Was ist GameBasic, was kann es, Vorstellung des Galaga-
+die **Einleitung** (Was ist Drachenhauch, was kann es, Vorstellung des Galaga-
 Projekts) mit Farb-Screenshots.
 
 ## Selbst bearbeiten
-Einfach `GameBasic-Buch.docx` in Word öffnen und ändern — Text, Farben, Bilder,
+Einfach `Drachenhauch-Buch.docx` in Word öffnen und ändern — Text, Farben, Bilder,
 alles frei editierbar. Zum Drucken: Datei → Drucken.
 
 ## Bilder

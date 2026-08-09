@@ -3,7 +3,7 @@ DIM s AS STRING
 DIM x AS FLOAT
 DIM n AS INTEGER
 
-s = "GameBasic"
+s = "Drachenhauch"
 PRINT "LEN(", s, ") =", LEN(s)
 PRINT "UPPER$:", UPPER$(s)
 PRINT "LOWER$:", LOWER$(s)

@@ -1,6 +1,6 @@
 """Tests fuer Module-Imports mit Alias (`IMPORT "x" AS y`).
 
-Aliasing-Strategie: GameBasic-Module teilen einen flachen Built-in-Namespace,
+Aliasing-Strategie: Drachenhauch-Module teilen einen flachen Built-in-Namespace,
 daher wird der Alias als Praefix-Ersatz angewandt: aus `JSON_PARSE` mit alias `j`
 wird `J_PARSE`. Single-word-Namen (`vec2`) werden komplett durch den Alias ersetzt.
 

@@ -1,6 +1,6 @@
 # Sprachreferenz
 
-GameBasic ist BASIC mit Pascal-strikter Typisierung. Wer schon mal QBasic, GW-BASIC oder Visual Basic geschrieben hat, fühlt sich sofort zuhause.
+Drachenhauch ist BASIC mit Pascal-strikter Typisierung. Wer schon mal QBasic, GW-BASIC oder Visual Basic geschrieben hat, fühlt sich sofort zuhause.
 
 ## Inhalt
 
@@ -805,7 +805,7 @@ PRINT p.x, p.y                     ' 110.0  55.0
 IF p.IsAlive() THEN PRINT "noch da"
 ```
 
-**Methoden-Bodies sehen Felder direkt** — kein `Self.`-Präfix nötig. Das `x = start_x` in `Init` setzt automatisch das Klassen-Feld `x`, `start_x` ist ein Parameter. GameBasic löst Namens-Lookups in Methoden so auf: erst lokale Variablen / Parameter, dann Klassen-Felder, dann globale Variablen.
+**Methoden-Bodies sehen Felder direkt** — kein `Self.`-Präfix nötig. Das `x = start_x` in `Init` setzt automatisch das Klassen-Feld `x`, `start_x` ist ein Parameter. Drachenhauch löst Namens-Lookups in Methoden so auf: erst lokale Variablen / Parameter, dann Klassen-Felder, dann globale Variablen.
 
 **Methoden rufen sich gegenseitig auf — implizit:**
 

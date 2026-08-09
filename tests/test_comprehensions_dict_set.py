@@ -93,7 +93,7 @@ s = {c FOR c IN "banana"}
 PRINT s
 ''')
     # "banana" -> chars b, a, n -> dedup in der ersten Reihenfolge
-    # GameBasic-PRINT druckt Strings ohne Quotes
+    # Drachenhauch-PRINT druckt Strings ohne Quotes
     assert "(b, a, n)" in out
 
 

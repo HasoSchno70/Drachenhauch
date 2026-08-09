@@ -21,7 +21,7 @@ def win(tmp_path, monkeypatch):
     from drachenhauch.editor_qt import main_window as mw
     monkeypatch.setattr(mw, "save_settings", lambda *_a, **_kw: None)
     monkeypatch.setattr(mw, "clear_autosaves", lambda *_a, **_kw: None)
-    return mw.GameBasicEditor(tmp_path)
+    return mw.DrachenhauchEditor(tmp_path)
 
 
 def test_system_exit_shows_not_available_message(win, monkeypatch):

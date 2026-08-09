@@ -1,6 +1,6 @@
 ' 109_prefab_scene.dh -- datengetriebene Szene aus einem Prefab-/Szenen-File.
 '
-' Idee (wie "Prefabs + Scene" in groesseren Engines, hier rein in GameBasic):
+' Idee (wie "Prefabs + Scene" in groesseren Engines, hier rein in Drachenhauch):
 '   * PREFABS = wiederverwendbare Templates (Mesh + Farbe + Groesse), im Code.
 '   * SZENE   = eine JSON-Datei mit INSTANZEN: welches Prefab, wo, wie gedreht.
 ' Die Szene laesst sich editieren (assets/scene_demo.json) -> anderes Level,

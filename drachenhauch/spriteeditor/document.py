@@ -714,7 +714,7 @@ class SpriteDoc:
         """Schreibt einen Sprite-Atlas: PNG-Sheet + JSON-Manifest mit
         benannten Frame-Rects. Direkt von ATLAS_LOAD lesbar.
 
-        Manifest-Format (gleich der `SPRITE_ATLAS`-Spec in GameBasic):
+        Manifest-Format (gleich der `SPRITE_ATLAS`-Spec in Drachenhauch):
 
             {
               "image": "<png_path.name>",

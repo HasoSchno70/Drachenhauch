@@ -1,4 +1,4 @@
-' 53_bitwise.dh -- Bitwise-Operatoren in GameBasic.
+' 53_bitwise.dh -- Bitwise-Operatoren in Drachenhauch.
 '
 ' BAND, BOR, BXOR, SHL, SHR sind binaere Operatoren.
 ' BNOT ist unaer.

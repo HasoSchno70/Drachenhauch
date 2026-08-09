@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Menueleiste + Kontextmenue
+'  DRACHENHAUCH -- gui-Modul: Menueleiste + Kontextmenue
 ' ============================================================
 '  GUI_MENU(win, "Datei") legt ein Menue in der Leiste an, GUI_MENU_ITEM
 '  fuegt Eintraege hinzu (-> Handle fuer GUI_CLICKED), GUI_MENU_SEPARATOR
@@ -8,7 +8,7 @@
 '  [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1180, 760, "GameBasic - Menues", 1)
+SCREEN(1180, 760, "Drachenhauch - Menues", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1
@@ -59,7 +59,7 @@ WHILE NOT QUITREQUESTED()
     IF GUI_CLICKED(miQuit) THEN BREAK
     IF GUI_CLICKED(miCopy) THEN status = "Bearbeiten > Kopieren"
     IF GUI_CLICKED(miPaste) THEN status = "Bearbeiten > Einfuegen"
-    IF GUI_CLICKED(miAbout) THEN status = "Hilfe > Ueber GameBasic"
+    IF GUI_CLICKED(miAbout) THEN status = "Hilfe > Ueber Drachenhauch"
     IF GUI_CLICKED(cCut) THEN status = "Kontext: Ausschneiden"
     IF GUI_CLICKED(cCopy) THEN status = "Kontext: Kopieren"
     IF GUI_CLICKED(cAll) THEN status = "Kontext: Alles markieren"

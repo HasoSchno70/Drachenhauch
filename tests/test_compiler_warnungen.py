@@ -6,7 +6,7 @@ Beide Warnungen hier stammen aus echten Stolpersteinen beim Bauen der Demo:
   und ignorieren ueberzaehlige STILL. Ein mitgegebenes Argument tat damit
   einfach nichts, ohne ein Wort. (Kostete in Szene 2 der Demo einen halben
   Nachmittag: die Stueckzahl von PLOTS wurde verschluckt.)
-* **Verdeckte Konstante** -- GameBasic ignoriert Gross-/Kleinschreibung, eine
+* **Verdeckte Konstante** -- Drachenhauch ignoriert Gross-/Kleinschreibung, eine
   lokale `hoehe` verdeckt also die Konstante `HOEHE`. Der Fehler taucht dann
   weit weg von der Ursache auf.
 

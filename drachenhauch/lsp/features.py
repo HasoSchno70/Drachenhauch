@@ -1,4 +1,4 @@
-"""LSP-Feature-Logik fuer GameBasic -- reine Funktionen, ohne Transport.
+"""LSP-Feature-Logik fuer Drachenhauch -- reine Funktionen, ohne Transport.
 
 Jede Funktion bekommt den Dokument-Text (+ ggf. LSP-Position als 0-basierte
 (line, character)) und liefert LSP-foermige Dicts/Listen zurueck. So ist die

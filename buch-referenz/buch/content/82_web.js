@@ -1,5 +1,5 @@
 module.exports = (H) => [
-  H.chapter("Ins Netz stellen – GameBasic im Browser"),
+  H.chapter("Ins Netz stellen – Drachenhauch im Browser"),
   H.p("Ein fertiges Spiel liegt auf deiner Festplatte. Wer es sehen soll, muss es herunterladen, entpacken, einer Warnung von Windows widersprechen und dann hoffen, dass es startet. Zwischen deiner Arbeit und einem Zuschauer liegen also fünf Gelegenheiten aufzugeben."),
   H.p("Es geht auch anders: Dieselbe Laufzeit, die auf dem Rechner läuft, gibt es als WebAssembly. Ein Link genügt – der Browser lädt sie, übersetzt deinen Quelltext selbst und führt ihn aus. Kein Plugin, kein Python, keine Installation. Dieses Kapitel zeigt, wie das geht und was im Browser anders ist als auf dem Rechner."),
   // Breiter als die Vorgabe (480): auf einem Bildschirmfoto steht Quelltext,

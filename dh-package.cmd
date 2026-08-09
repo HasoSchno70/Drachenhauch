@@ -1,5 +1,5 @@
 @echo off
-REM GameBasic-Spiel als .exe verpacken (PyInstaller).
+REM Drachenhauch-Spiel als .exe verpacken (PyInstaller).
 REM Verwendung:
 REM   dh-package examples\10_pong.dh
 REM   dh-package examples\17_tilemap.dh --windowed --onefile

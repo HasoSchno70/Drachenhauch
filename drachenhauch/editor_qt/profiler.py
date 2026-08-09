@@ -1,4 +1,4 @@
-"""Profiler fuer GameBasic (Editor) -- ueber die native Runtime `dhrt profile`.
+"""Profiler fuer Drachenhauch (Editor) -- ueber die native Runtime `dhrt profile`.
 
 dhrt fuehrt das Programm instrumentiert aus (per-Zeile Count+Zeit) und liefert
 das Ergebnis als JSON; hier nur noch Aggregation pro Editor-Zeile und auf

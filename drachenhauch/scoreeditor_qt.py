@@ -1,4 +1,4 @@
-"""Notenblatt-Editor fuer GameBasic (`dhscore` / `dhrun.py --score`).
+"""Notenblatt-Editor fuer Drachenhauch (`dhscore` / `dhrun.py --score`).
 
 Echte Notensatz-Darstellung (5-Linien-System, Violin-/Bassschluessel,
 Hilfslinien, Vorzeichen) statt eines Zeilen-Rasters wie im Tracker: Noten per
@@ -625,7 +625,7 @@ class ScoreEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = Path(project_root)
-        self.setWindowTitle("GameBasic Notenblatt-Editor")
+        self.setWindowTitle("Drachenhauch Notenblatt-Editor")
         self.resize(1150, 780)
         self.doc = ScoreDoc()
         self._mixer = Mixer()
@@ -653,7 +653,7 @@ class ScoreEditor(QMainWindow):
         root.setContentsMargins(10, 8, 10, 8)
         root.setSpacing(7)
 
-        title = QLabel("♪  GameBasic Notenblatt-Editor")
+        title = QLabel("♪  Drachenhauch Notenblatt-Editor")
         tf = QFont()
         tf.setBold(True)
         tf.setPointSize(13)
@@ -1029,7 +1029,7 @@ class ScoreEditor(QMainWindow):
             u.mark()
 
     def _update_title(self) -> None:
-        base = "GameBasic Notenblatt-Editor"
+        base = "Drachenhauch Notenblatt-Editor"
         if self.doc.path:
             base += f" -- {Path(self.doc.path).name}"
         if self._dirty:
@@ -1156,7 +1156,7 @@ class ScoreEditor(QMainWindow):
             return
         path, _ = QFileDialog.getOpenFileName(
             self, "Notenblatt oeffnen", str(self.project_root),
-            "GameBasic-Notenblatt (*.json)")
+            "Drachenhauch-Notenblatt (*.json)")
         if not path:
             return
         try:
@@ -1192,7 +1192,7 @@ class ScoreEditor(QMainWindow):
         default = self.doc.path or str(self.project_root)
         path, _ = QFileDialog.getSaveFileName(
             self, "Notenblatt speichern", default,
-            "GameBasic-Notenblatt (*.json)")
+            "Drachenhauch-Notenblatt (*.json)")
         if not path:
             return False
         if not path.lower().endswith(".json"):

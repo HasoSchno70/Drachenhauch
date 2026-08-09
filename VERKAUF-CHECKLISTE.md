@@ -1,6 +1,6 @@
-# GameBasic verkaufen – Checkliste
+# Drachenhauch verkaufen – Checkliste
 
-Stand der Vorbereitung, damit GameBasic als **kommerzielles Windows-Produkt**
+Stand der Vorbereitung, damit Drachenhauch als **kommerzielles Windows-Produkt**
 verkauft werden kann. Aufgeteilt in „technisch erledigt" (im Repo gebaut) und
 „noch von dir zu erledigen" (kein Code – Zertifikat, Recht, Texte).
 
@@ -13,8 +13,8 @@ verkauft werden kann. Aufgeteilt in „technisch erledigt" (im Repo gebaut) und
 
 | Baustein | Wo | Zweck |
 |---|---|---|
-| **Windows-Installer** (komplette IDE + Runtime, **ohne Python**) | `installer/` (`build_installer.py`, `GameBasic.spec`, `GameBasic.iss`) | Endkunden installieren per Doppelklick |
-| **Beispiele am beschreibbaren Ort** | `{commondocs}\GameBasic\examples` | Editor findet Beispiele + Showcase-Bilder, Demos können schreiben |
+| **Windows-Installer** (komplette IDE + Runtime, **ohne Python**) | `installer/` (`build_installer.py`, `Drachenhauch.spec`, `Drachenhauch.iss`) | Endkunden installieren per Doppelklick |
+| **Beispiele am beschreibbaren Ort** | `{commondocs}\Drachenhauch\examples` | Editor findet Beispiele + Showcase-Bilder, Demos können schreiben |
 | **Editor startet direkt** (kein Auswahlfenster) + findet `dhrt` | `dhrun.py`, `editor_qt/dhrt_locate.py` | „Ausführen" funktioniert in der Installation |
 | **EULA** (Endbenutzer-Lizenzvertrag, Vorlage) | `installer/EULA.txt` | Zustimmungsseite im Setup; Nutzer besitzen + verkaufen ihre Spiele |
 | **Drittanbieter-Lizenzen** (auto-generiert) | `installer/gen_notices.py` → `THIRD-PARTY-NOTICES.txt` | Pflicht-Beilage für MIT/BSD/Apache/LGPL |
@@ -23,7 +23,7 @@ verkauft werden kann. Aufgeteilt in „technisch erledigt" (im Repo gebaut) und
 | **Code-Signing-Hook** (inert bis Zertifikat) | `installer/build_installer.py` (`sign()`) | signiert App/Runtime/Installer automatisch, sobald Zertifikat da |
 
 **Installer bauen:** `\.venv\Scripts\python.exe installer\build_installer.py`
-→ `installer/output/GameBasic-Setup-<version>.exe`. Details: `installer/README.md`.
+→ `installer/output/Drachenhauch-Setup-<version>.exe`. Details: `installer/README.md`.
 
 ---
 

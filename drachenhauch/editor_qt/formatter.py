@@ -1,4 +1,4 @@
-"""Code-Formatter: Indent-Normalisierung fuer GameBasic.
+"""Code-Formatter: Indent-Normalisierung fuer Drachenhauch.
 
 Strategie: pro Zeile bestimmen, wie tief wir aktuell stehen
 (`indent_level`), basierend auf Block-Openern/-Closern. Tab-Zeichen

@@ -1,4 +1,4 @@
-# GameBasic
+# Drachenhauch
 
 BASIC-Dialekt mit Pascal-strikter Typisierung und OOP, ausgelegt für Spiele.
 **Eine Runtime: `dhrt`** (Rust/raylib) — sie ist Lexer → Parser → Compiler → VM
@@ -1122,7 +1122,7 @@ h = J_PARSE("[1, 2, 3]")
 PRINT J_GET_INT(h, "0")     ' 1
 ```
 
-**Aliasing-Strategie:** GameBasic-Module teilen einen flachen Built-in-
+**Aliasing-Strategie:** Drachenhauch-Module teilen einen flachen Built-in-
 Namespace -- es gibt kein echtes Namespacing. Der Alias dupliziert alle
 Built-ins / Typen, deren Name mit `<modul>_` anfaengt, unter `<alias>_`.
 Single-word-Namen (z.B. der externe Typ `vec2`) werden komplett ersetzt
@@ -1157,9 +1157,9 @@ distinct = {x MOD 3 FOR x IN (0, 1, 2, 3, 4, 5, 6, 7, 8)}
 PRINT distinct                    ' (0, 1, 2)
 ```
 
-**Dict-Keys MUESSEN STRING sein** (GameBasic-MAP-Konvention). Der MAP-
+**Dict-Keys MUESSEN STRING sein** (Drachenhauch-MAP-Konvention). Der MAP-
 Wert-Typ wird beim ersten Eintrag inferiert. Set-Comp ist eine pragmatische
-Naeherung -- GameBasic hat keinen echten SET-Typ; das deduplizierte TUPLE
+Naeherung -- Drachenhauch hat keinen echten SET-Typ; das deduplizierte TUPLE
 ist die nahe liegende Alternative.
 
 **Implementierung:** Lexer kennt jetzt `LBRACE`/`RBRACE` (nur fuer Comp-
@@ -1792,11 +1792,13 @@ relative Asset-/IMPORT-Pfade; `dhrt datei.dh` ohne `run` per `.dh`-Auto-Detect
 genauso, `.dhc` läuft weiter den direkten VM-Pfad). Debug-Einstiege
 `dhrt --tokens` / `--ast` / `--preprocess` / `--runsrc` geben Token-Strom bzw.
 AST bzw. gemergte Quelle aus bzw. führen ohne chdir aus (Dev/Parity).
-Parity gegen Python: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
-(137) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (96)
-+ [`tests/test_rust_compiler_parity.py`](tests/test_rust_compiler_parity.py) (71)
-+ [`tests/test_rust_preprocess_parity.py`](tests/test_rust_preprocess_parity.py) (7)
-+ [`tests/test_rust_run_parity.py`](tests/test_rust_run_parity.py) (2).
+Parity: [`tests/test_rust_lexer_parity.py`](tests/test_rust_lexer_parity.py)
+(193) + [`tests/test_rust_parser_parity.py`](tests/test_rust_parser_parity.py) (107)
++ [`tests/test_rust_preprocess_parity.py`](tests/test_rust_preprocess_parity.py) (8)
++ [`tests/test_rust_run_parity.py`](tests/test_rust_run_parity.py) (2) = 310.
+**Eine Compiler-Parity-Datei gibt es NICHT** (dieser Absatz nannte lange eine
+mit 71 Tests): sie verglich gegen den Python-Compiler, und der ist mit Stufe B
+gelöscht. Das Compiler-Gate ist stattdessen Output-Parität — siehe unten.
 Dateien: [`src/lexer.rs`](rust/drachenhauch_runtime/src/lexer.rs),
 [`src/ast.rs`](rust/drachenhauch_runtime/src/ast.rs),
 [`src/parser.rs`](rust/drachenhauch_runtime/src/parser.rs),

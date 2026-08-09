@@ -1,4 +1,4 @@
-//! `dhrt` -- die native GameBasic-Runtime (und seit Stufe B die EINZIGE).
+//! `dhrt` -- die native Drachenhauch-Runtime (und seit Stufe B die EINZIGE).
 //!
 //! Fuehrt `.dh`-Quelltext end-to-end aus (preprocess -> lex -> parse ->
 //! compile -> VM, alles in Rust) oder eine fertige `.dhc`-Datei (JSON-

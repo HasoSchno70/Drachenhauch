@@ -1,4 +1,4 @@
-//! Recursive-Descent-Parser fuer GameBasic -- Rust-Port von
+//! Recursive-Descent-Parser fuer Drachenhauch -- Rust-Port von
 //! `drachenhauch/parser.py`. Stufe 2 der Front-End-Portierung. Verifiziert gegen
 //! Python via `dhrt --ast` (AST als kanonisches JSON) -- siehe
 //! `tests/test_rust_parser_parity.rs`/`.py`.

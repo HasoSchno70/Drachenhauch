@@ -1,6 +1,6 @@
 """Persistenz fuer Recent-Files und Editor-Settings.
 
-Liest/Schreibt aus %APPDATA%/GameBasic (Windows) bzw. ~/.GameBasic
+Liest/Schreibt aus %APPDATA%/Drachenhauch (Windows) bzw. ~/.Drachenhauch
 (POSIX). Identisches Format wie der alte CTk-Editor, sodass sich
 Einstellungen ueber die Migration tragen.
 """
@@ -16,7 +16,7 @@ RECENT_FILES_MAX = 10
 
 def config_dir() -> Path:
     base = Path(os.environ.get("APPDATA", str(Path.home())))
-    folder = base / "GameBasic"
+    folder = base / "Drachenhauch"
     try:
         folder.mkdir(parents=True, exist_ok=True)
     except OSError:

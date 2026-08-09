@@ -6,7 +6,7 @@ CONST HEIGHT AS INTEGER = 768
 CONST SPEED AS INTEGER = 2
 CONST COIN_COUNT AS INTEGER = 6
 
-Screen(WIDTH, HEIGHT, "GameBasic - Sprite-Demo")
+Screen(WIDTH, HEIGHT, "Drachenhauch - Sprite-Demo")
 
 DIM hero AS IMAGE
 DIM coinImg AS IMAGE

@@ -62,7 +62,7 @@ module.exports = (H) => [
       '    NEXT',
       'NEXT',
     ]),
-  H.warn("Der Name führt in die Irre: Es wird nichts gesammelt und nichts gebündelt. GameBasic merkt sich jeden Zeichenbefehl sofort in der aktiven Ebene und spielt beim FLIP alle Ebenen der Reihe nach ab – ein Sammeln wäre dort gar nicht möglich. Wer viele gleichartige Dinge zeichnen will, nimmt die Bulk-Befehle im nächsten Abschnitt; die sparen wirklich Arbeit.", "Kein echtes Bündeln"),
+  H.warn("Der Name führt in die Irre: Es wird nichts gesammelt und nichts gebündelt. Drachenhauch merkt sich jeden Zeichenbefehl sofort in der aktiven Ebene und spielt beim FLIP alle Ebenen der Reihe nach ab – ein Sammeln wäre dort gar nicht möglich. Wer viele gleichartige Dinge zeichnen will, nimmt die Bulk-Befehle im nächsten Abschnitt; die sparen wirklich Arbeit.", "Kein echtes Bündeln"),
 
   H.h2("Hunderte Formen auf einmal: Bulk-Draws"),
   H.p("Willst du sehr viele gleichartige Formen zeichnen – ein Sternenfeld, eine Punktwolke, ein Partikelregen –, ist eine Schleife mit einzelnen PLOT-Aufrufen langsam. Die Bulk-Befehle nehmen stattdessen ganze Arrays an Koordinaten und zeichnen alles in einem einzigen Aufruf. Die Farbe ist entweder eine Zahl (alle gleich) oder ein Array (eine Farbe pro Form)."),

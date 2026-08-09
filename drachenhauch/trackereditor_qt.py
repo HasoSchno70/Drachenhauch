@@ -1,4 +1,4 @@
-"""Chiptune-Tracker fuer GameBasic (`dhtracker` / `dhrun.py --tracker`).
+"""Chiptune-Tracker fuer Drachenhauch (`dhtracker` / `dhrun.py --tracker`).
 
 Mehrspuriger Pattern-Editor: **einstellbare Kanalzahl** (4..32, "Kanaele:"-
 Spinbox; je eigene Waveform, der LETZTE Kanal ist immer Noise/Drum) +
@@ -596,7 +596,7 @@ class TrackerEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = Path(project_root)
-        self.setWindowTitle("GameBasic Tracker")
+        self.setWindowTitle("Drachenhauch Tracker")
         self.resize(1120, 840)
         self.song = Song()
         self.path: Path | None = None  # aktueller Speicherort (fuer Quick-Save)
@@ -616,7 +616,7 @@ class TrackerEditor(QMainWindow):
         root.setContentsMargins(10, 8, 10, 8)
         root.setSpacing(7)
 
-        title = QLabel("♪  GameBasic Tracker")
+        title = QLabel("♪  Drachenhauch Tracker")
         tf = QFont(); tf.setBold(True); tf.setPointSize(13)
         title.setFont(tf)
         title.setStyleSheet(f"color: {COLORS['accent']}; padding: 2px 0;")
@@ -924,7 +924,7 @@ class TrackerEditor(QMainWindow):
         self._update_title()
 
     def _update_title(self) -> None:
-        base = f"GameBasic Tracker -- {self.path.name}" if self.path else "GameBasic Tracker"
+        base = f"Drachenhauch Tracker -- {self.path.name}" if self.path else "Drachenhauch Tracker"
         self.setWindowTitle(base + ("*" if self.dirty else ""))
 
     def _confirm_dirty(self) -> bool:

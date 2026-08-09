@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- "VORTEX" als DESKTOP-OVERLAY (transparent)
+'  DRACHENHAUCH -- "VORTEX" als DESKTOP-OVERLAY (transparent)
 ' ============================================================
 '  Dieselbe Wirbel-Demo wie examples/119_vortex.dh, aber als randloses,
 '  transparentes Overlay ueber dem ganzen Desktop:
@@ -8,7 +8,7 @@
 '    * CLS() loescht voll durchsichtig -> der Desktop scheint durch die Luecken
 '    * KEIN additiver Hintergrund-Halo (sieht ueber dem Desktop unruhig aus)
 '  Showcase-Variante (scharfes Vollbild, dunkler Hintergrund): 119_vortex.dh.
-'  Eine GameBasic-Demo von Hans Schnorrenberger.   ESC = Ende.
+'  Eine Drachenhauch-Demo von Hans Schnorrenberger.   ESC = Ende.
 ' ============================================================
 IMPORT "particles"
 
@@ -20,7 +20,7 @@ CONST PETALS AS FLOAT = 6.0         ' Bluetenblaetter
 ' Transparentes Vollbild-Overlay. SCREEN_TRANSPARENT(0,0,..) deckt den ganzen
 ' aktuellen Monitor ab und MUSS die erste Grafik-Anweisung sein (Transparenz ist
 ' ein Fenster-Erzeugungs-Flag, nicht nachruestbar).
-SCREEN_TRANSPARENT(0, 0, "GameBasic - VORTEX Overlay")
+SCREEN_TRANSPARENT(0, 0, "Drachenhauch - VORTEX Overlay")
 WINDOW_UNDECORATED(TRUE)
 WINDOW_TOPMOST(TRUE)
 SETFPS(60)
@@ -178,7 +178,7 @@ PLAYMUSIC("assets/amiga_action_level1.ogg", -1, 0.9)
 
 ' --- Perspektiv-Scroller-Text (unten) ---
 DIM msg AS STRING
-msg = "GAMEBASIC  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS  ***  JA, AUCH ALS DESKTOP-OVERLAY  ***  GREETINGS AN DIE SZENE  ***    "
+msg = "DRACHENHAUCH  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS  ***  JA, AUCH ALS DESKTOP-OVERLAY  ***  GREETINGS AN DIE SZENE  ***    "
 DIM nmsg AS INTEGER
 nmsg = LEN(msg)
 DIM span AS FLOAT
@@ -186,7 +186,7 @@ span = nmsg * 32.0
 
 ' --- Orbit-Ring-Text (Halo rund um den Wirbel) ---
 DIM ringMsg AS STRING
-ringMsg = "GAMEBASIC  ***  VORTEX  ***  HANS SCHNORRENBERGER  ***  "
+ringMsg = "DRACHENHAUCH  ***  VORTEX  ***  HANS SCHNORRENBERGER  ***  "
 DIM rn AS INTEGER
 rn = LEN(ringMsg)
 
@@ -256,18 +256,18 @@ WHILE NOT QUITREQUESTED()
     ' --- Orbit-Ring VORN: vorderer Bogen ueber dem Wirbel ---
     DrawRingArc(1, ringRot, t)
 
-    ' --- Logo-Zoomer: GAMEBASIC zoomt zentriert ueber dem Wirbel ---
+    ' --- Logo-Zoomer: DRACHENHAUCH zoomt zentriert ueber dem Wirbel ---
     zoom = 0.55 + 0.55 * (0.5 + 0.5 * SIN(t * 1.1))
     fs = INT(86.0 * zoom)
     TEXT_SIZE(fs)
-    tw = TEXT_WIDTH("GAMEBASIC")
+    tw = TEXT_WIDTH("DRACHENHAUCH")
     lx = INT(CX) - tw \ 2
     ly = INT(CY) - fs \ 2
     thue = INT(t * 50.0) MOD 360
     BLEND_MODE("add")
-    TEXT(lx + 2, ly + 2, "GAMEBASIC", HSV(thue, 0.8, 0.30))
+    TEXT(lx + 2, ly + 2, "DRACHENHAUCH", HSV(thue, 0.8, 0.30))
     BLEND_MODE("alpha")
-    TEXT(lx, ly, "GAMEBASIC", HSV(thue, 0.85, 1.0))
+    TEXT(lx, ly, "DRACHENHAUCH", HSV(thue, 0.85, 1.0))
 
     ' --- Credit oben ---
     TEXT_SIZE(24)
@@ -302,7 +302,7 @@ WHILE NOT QUITREQUESTED()
     RENDERTARGET_DRAW(scrollRT, 0, SH - 74, 1.0, &H4A4A5E, TRUE)
 
     TEXT_SIZE(13)
-    TEXT(16, 8, "ESC = Ende   |   GameBasic VORTEX Overlay", &H7080B0)
+    TEXT(16, 8, "ESC = Ende   |   Drachenhauch VORTEX Overlay", &H7080B0)
 
     FLIP()
 WEND

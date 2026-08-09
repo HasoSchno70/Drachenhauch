@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Funktionen & SUBs"),
-  H.p("Sobald ein Programm wächst, willst du dieselbe Aufgabe nicht zehnmal hinschreiben. Funktionen und SUBs sind benannte Bausteine: Du verpackst ein Stück Arbeit einmal, gibst ihm einen Namen – und rufst es danach beliebig oft auf. Das macht Programme kürzer, lesbarer und leichter zu reparieren, denn jede Logik wohnt an genau einer Stelle. Dieses Kapitel zeigt alles, was GameBasic dir dabei in die Hand gibt."),
+  H.p("Sobald ein Programm wächst, willst du dieselbe Aufgabe nicht zehnmal hinschreiben. Funktionen und SUBs sind benannte Bausteine: Du verpackst ein Stück Arbeit einmal, gibst ihm einen Namen – und rufst es danach beliebig oft auf. Das macht Programme kürzer, lesbarer und leichter zu reparieren, denn jede Logik wohnt an genau einer Stelle. Dieses Kapitel zeigt alles, was Drachenhauch dir dabei in die Hand gibt."),
 
   H.h2("FUNCTION: ein Ergebnis berechnen"),
   H.p("Eine FUNCTION nimmt Werte entgegen, rechnet etwas aus und gibt mit RETURN ein Ergebnis zurück. Hinter AS steht der Typ des Rückgabewerts. Aufgerufen wird sie wie ein eingebauter Befehl – das Ergebnis kannst du direkt weiterverwenden."),
@@ -105,7 +105,7 @@ module.exports = (H) => [
   H.code(["15"], { out: true }),
 
   H.h2("Funktionen als Werte: FUNCREF"),
-  H.p("In GameBasic ist eine Funktion selbst ein Wert, den du in einer Variablen vom Typ FUNCREF ablegen und später aufrufen kannst. So übergibst du „was zu tun ist“ als Argument – etwa eine Vergleichsfunktion zum Sortieren oder einen Rückruf für ein Ereignis."),
+  H.p("In Drachenhauch ist eine Funktion selbst ein Wert, den du in einer Variablen vom Typ FUNCREF ablegen und später aufrufen kannst. So übergibst du „was zu tun ist“ als Argument – etwa eine Vergleichsfunktion zum Sortieren oder einen Rückruf für ein Ereignis."),
   H.cmd("FUNCREF", "DIM f AS FUNCREF\nf = funktionsname\nf(args)",
     "Eine Variable, die auf eine Funktion verweist. Der bloße Funktionsname (ohne Klammern) wird zur Referenz; mit f(...) rufst du die dahinterliegende Funktion auf.",
     [

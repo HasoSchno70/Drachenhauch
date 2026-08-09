@@ -1,4 +1,4 @@
-"""GameBasic Sprite-Editor (PySide6).
+"""Drachenhauch Sprite-Editor (PySide6).
 
 Pixel-Art-Editor mit Alpha-Kanal und Frame-Animation. Diese Version nutzt
 Qt/PySide6 statt Tk -- gibt scharfere Icons, smoothes Zoomen via
@@ -74,7 +74,7 @@ except ImportError as exc:  # pragma: no cover
 # Konstanten / Theme
 # ============================================================
 
-# Dunkles Theme -- abgestimmt auf das GameBasic-Logo (cyan/mint auf navy).
+# Dunkles Theme -- abgestimmt auf das Drachenhauch-Logo (cyan/mint auf navy).
 # Wird als globales Stylesheet auf das QApplication-Objekt gesetzt;
 # einzelne Widgets ueberschreiben nur Spezialfaelle.
 # Pixel-Editor-spezifische Farben (grid/selection/checker) bleiben
@@ -2296,7 +2296,7 @@ class SpriteEditorWindow(QMainWindow):
             "move":         MoveTool(),
         }
 
-        self.setWindowTitle("GameBasic - Sprite-Editor")
+        self.setWindowTitle("Drachenhauch - Sprite-Editor")
         self.resize(1480, 920)
         self.setAcceptDrops(True)   # PNG / .dhsprite per Drag-and-Drop oeffnen
         self._set_window_icon()
@@ -2539,7 +2539,7 @@ class SpriteEditorWindow(QMainWindow):
                            make_action_icon("sym_y"), checkable=True)
         self.act_copy_code = A("GB-Code kopieren", "Ctrl+Shift+C",
                                self.action_copy_gb_code, make_action_icon("code"))
-        self.act_test_sprite = A("Sprite testen (in GameBasic)", "F12",
+        self.act_test_sprite = A("Sprite testen (in Drachenhauch)", "F12",
                                   self.action_test_sprite,
                                   make_action_icon("test_sprite"))
 
@@ -2845,7 +2845,7 @@ class SpriteEditorWindow(QMainWindow):
     def _update_title(self):
         name = self.doc.filepath.name if self.doc.filepath else "neu"
         dirty = "*" if self.doc.dirty else ""
-        self.setWindowTitle(f"GameBasic - Sprite-Editor - {dirty}{name}")
+        self.setWindowTitle(f"Drachenhauch - Sprite-Editor - {dirty}{name}")
 
     def set_hover_pixel(self, coord):
         if coord is None:
@@ -3290,7 +3290,7 @@ class SpriteEditorWindow(QMainWindow):
         )
 
     def action_copy_gb_code(self):
-        """Legt den passenden GameBasic-Snippet (LOADIMAGE/SPRITE_NEW/...)
+        """Legt den passenden Drachenhauch-Snippet (LOADIMAGE/SPRITE_NEW/...)
         in die Zwischenablage, mit aktuellem Sprite-Namen + Frame-Anzahl
         + Sprite-Groesse vorausgefuellt."""
         n = len(self.doc.frames)
@@ -3316,7 +3316,7 @@ class SpriteEditorWindow(QMainWindow):
             )
         QApplication.clipboard().setText(snippet)
         self.statusBar().showMessage(
-            f"GameBasic-Code in Zwischenablage ({n} Frame{'s' if n > 1 else ''})",
+            f"Drachenhauch-Code in Zwischenablage ({n} Frame{'s' if n > 1 else ''})",
             2500)
 
     # --- File-Aktionen ---
@@ -3353,7 +3353,7 @@ class SpriteEditorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(
             self, "Sprite oeffnen", str(self.project_root),
             "Alle Sprite-Formate (*.dhsprite *.gbsprite *.png);;"
-            "GameBasic-Sprite (*.dhsprite *.gbsprite);;"
+            "Drachenhauch-Sprite (*.dhsprite *.gbsprite);;"
             "PNG-Bild (*.png)",
         )
         if not path:
@@ -3418,7 +3418,7 @@ class SpriteEditorWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(
             self, "Sprite speichern unter",
             str(self.project_root / f"sprite.{ext}"),
-            "GameBasic-Sprite (*.dhsprite);;PNG-Bild (*.png)",
+            "Drachenhauch-Sprite (*.dhsprite);;PNG-Bild (*.png)",
         )
         if not path:
             return False
@@ -3458,7 +3458,7 @@ class SpriteEditorWindow(QMainWindow):
         QMessageBox.information(
             self, "Sheet exportiert",
             f"{n} Frames als horizontaler Sheet gespeichert{scale_hint}:\n{path}\n\n"
-            f"In GameBasic laden:\n"
+            f"In Drachenhauch laden:\n"
             f"   IMPORT \"sprite\"\n"
             f"   img = LOADIMAGE(\"{Path(path).name}\")\n"
             f"   sp = SPRITE_NEW(img, {self.doc.width * scale}, {self.doc.height * scale})\n"
@@ -3468,7 +3468,7 @@ class SpriteEditorWindow(QMainWindow):
 
     def action_export_atlas(self):
         """Exportiert das Sheet als SPRITE_ATLAS: PNG + JSON-Manifest.
-        Schliesst den Workflow-Loop zum `SPRITE_ATLAS`-Typ in GameBasic --
+        Schliesst den Workflow-Loop zum `SPRITE_ATLAS`-Typ in Drachenhauch --
         nach dem Export kann das User-Programm `ATLAS_LOAD("xyz.json")`
         aufrufen und ueber benannte Sub-Sprites (`tiles_0`, `tiles_1`,
         ...) zugreifen.
@@ -3503,7 +3503,7 @@ class SpriteEditorWindow(QMainWindow):
             self, "Atlas exportiert",
             f"{n} Frames als Sprite-Atlas gespeichert:\n"
             f"  {png_path.name}\n  {json_path.name}\n\n"
-            f"In GameBasic laden:\n"
+            f"In Drachenhauch laden:\n"
             f"   DIM atlas AS SPRITE_ATLAS\n"
             f"   atlas = ATLAS_LOAD(\"{json_path.name}\")\n"
             f"   ATLAS_DRAW(atlas, \"{prefix}_0\", x, y)\n"
@@ -3577,7 +3577,7 @@ class SpriteEditorWindow(QMainWindow):
             default_name = self.doc.filepath.with_suffix(".dhanim").name
         path, _ = QFileDialog.getSaveFileName(
             self, "Animations-FSM exportieren (.dhanim)", default_name,
-            "GameBasic-Animation (*.dhanim)")
+            "Drachenhauch-Animation (*.dhanim)")
         if not path:
             return
         try:
@@ -3725,7 +3725,7 @@ class SpriteEditorWindow(QMainWindow):
 
     @staticmethod
     def _write_gpl(path: Path, palette: list[tuple],
-                   name: str = "GameBasic Palette"):
+                   name: str = "Drachenhauch Palette"):
         lines = ["GIMP Palette",
                  f"Name: {name}",
                  "Columns: 8",
@@ -4346,7 +4346,7 @@ class SpriteEditorWindow(QMainWindow):
             "  Strg+N Neu         Strg+O Oeffnen\n"
             "  Strg+S Speichern   Strg+Shift+S Speichern unter\n"
             "  Strg+E Sheet-PNG exportieren\n"
-            "  Strg+Shift+C  GameBasic-Code in Zwischenablage\n\n"
+            "  Strg+Shift+C  Drachenhauch-Code in Zwischenablage\n\n"
             "Bearbeiten:\n"
             "  Strg+Z Undo        Strg+Y Redo\n"
             "  Strg+X Cut         Strg+C Copy   Strg+V Paste\n"
@@ -4365,8 +4365,8 @@ class SpriteEditorWindow(QMainWindow):
 
     def show_about(self):
         QMessageBox.about(
-            self, "Ueber GameBasic Sprite-Editor",
-            "GameBasic Sprite-Editor (PySide6)\n\n"
+            self, "Ueber Drachenhauch Sprite-Editor",
+            "Drachenhauch Sprite-Editor (PySide6)\n\n"
             "Pixel-Art-Editor mit Alpha-Kanal und Frame-Animation.\n"
             "Output: PNG (Alpha) und .dhsprite (natives Format).\n\n"
             "PNG-Sheets sind direkt mit dem sprite-Modul verwendbar:\n"

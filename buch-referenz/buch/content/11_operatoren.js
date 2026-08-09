@@ -38,7 +38,7 @@ module.exports = (H) => [
     'PRINT 4 <= 4',
   ]),
   H.code(["TRUE", "FALSE", "TRUE", "TRUE"], { out: true }),
-  H.note("Zum Vergleichen nimmst du ein einzelnes =. Dasselbe Zeichen wird auch zum Zuweisen benutzt (punkte = 100). GameBasic erkennt aus dem Zusammenhang, was gemeint ist – in einer Bedingung vergleicht =, in einer Zuweisung belegt es."),
+  H.note("Zum Vergleichen nimmst du ein einzelnes =. Dasselbe Zeichen wird auch zum Zuweisen benutzt (punkte = 100). Drachenhauch erkennt aus dem Zusammenhang, was gemeint ist – in einer Bedingung vergleicht =, in einer Zuweisung belegt es."),
 
   H.h2("Logik verknüpfen: AND, OR, NOT"),
   H.p("Mehrere Wahrheitswerte verknüpfst du mit AND (und), OR (oder) und NOT (nicht). AND ist nur wahr, wenn beide Seiten wahr sind; OR ist wahr, wenn mindestens eine Seite wahr ist; NOT dreht einen Wert um."),
@@ -51,7 +51,7 @@ module.exports = (H) => [
   H.code(["FALSE", "TRUE", "FALSE", "TRUE"], { out: true }),
 
   H.h2("Punkt vor Strich – und Klammern"),
-  H.p("GameBasic hält sich an die gewohnten Vorrang-Regeln: Erst wird gerechnet (* und / vor + und -), dann verglichen, dann logisch verknüpft. Wenn du es anders willst – oder einfach sichergehen möchtest – setzt du Klammern. Klammern sind nie verkehrt und machen deine Absicht klar:"),
+  H.p("Drachenhauch hält sich an die gewohnten Vorrang-Regeln: Erst wird gerechnet (* und / vor + und -), dann verglichen, dann logisch verknüpft. Wenn du es anders willst – oder einfach sichergehen möchtest – setzt du Klammern. Klammern sind nie verkehrt und machen deine Absicht klar:"),
   H.code([
     'PRINT 2 + 3 * 4',
     'PRINT (2 + 3) * 4',

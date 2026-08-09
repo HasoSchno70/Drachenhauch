@@ -159,7 +159,7 @@ def test_zweites_dim_mit_gleichem_typ_bleibt_still(tmp_path):
 
 
 def test_dim_warnung_ignoriert_die_schreibweise(tmp_path):
-    """GameBasic unterscheidet keine Gross-/Kleinschreibung -- `Wert` und
+    """Drachenhauch unterscheidet keine Gross-/Kleinschreibung -- `Wert` und
     `wert` sind DIESELBE Variable, die Warnung muss das auch so sehen."""
     w = _dim_warnungen(tmp_path, 'DIM Wert AS INTEGER\nDIM wert AS STRING\nPRINT Wert\n')
     assert len(w) == 1, w

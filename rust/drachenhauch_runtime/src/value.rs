@@ -1,4 +1,4 @@
-//! GameBasic-Laufzeitwerte fuer die Rust-VM.
+//! Drachenhauch-Laufzeitwerte fuer die Rust-VM.
 //!
 //! Skalare (Int/Float/Str/Bool/Tuple) sind Wert-Typen (immutable). Arrays,
 //! Maps und Instanzen sind Referenz-Typen (`Rc<RefCell<…>>`) -- Zuweisung

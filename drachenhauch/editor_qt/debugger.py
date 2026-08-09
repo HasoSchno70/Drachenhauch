@@ -1,4 +1,4 @@
-"""Debugger fuer GameBasic (Editor) -- ueber die native Runtime `dhrt debug`.
+"""Debugger fuer Drachenhauch (Editor) -- ueber die native Runtime `dhrt debug`.
 
 `DebugController` spawnt `dhrt debug datei.dh` und spricht dessen newline-JSON-
 Protokoll: ein Reader-Thread liest stdout-Events (paused/output/finished/error)

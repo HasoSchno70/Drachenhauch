@@ -139,7 +139,7 @@ fn preset(name: &str) -> Option<HashMap<String, i64>> {
             ("widget_border", 0xFFD400), ("text_fg", 0xFFFFFF), ("muted_fg", 0xAAAAAA),
             ("accent", 0xFFD400), ("close_hover", 0xFF4040)])),
         // Professionelle Looks (runde Ecken + Schatten via preset_metrics):
-        // "modern_dark" passt zum GameBasic-Editor (Anthrazit + Cyan).
+        // "modern_dark" passt zum Drachenhauch-Editor (Anthrazit + Cyan).
         "modern_dark" => Some(m(&[
             ("win_bg", 0x1E2630), ("win_border", 0x33414F), ("title_bg", 0x161D26),
             ("title_bg_focus", 0x223140), ("title_fg", 0xEAF2F8), ("widget_bg", 0x2A3542),

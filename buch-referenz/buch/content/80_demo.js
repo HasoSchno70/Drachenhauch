@@ -11,7 +11,7 @@ module.exports = (H) => [
 
   H.h2("Die zwei Bausteine, die alles tragen"),
   H.p("Fast jeder Anfänger baut die Bild-Musik-Kopplung falsch herum: Er zählt Sekunden mit einer eigenen Uhr mit und hofft, dass es zur Musik passt. Es passt nie lange. Sobald die Bildrate schwankt – und sie schwankt immer –, laufen die beiden Uhren auseinander, und nach zwei Minuten sitzt der Szenenwechsel mitten im Takt statt darauf."),
-  H.p("GameBasic hat für beide Hälften des Problems einen eigenen Befehl. Zusammen sind sie das Rückgrat jeder Demo:"),
+  H.p("Drachenhauch hat für beide Hälften des Problems einen eigenen Befehl. Zusammen sind sie das Rückgrat jeder Demo:"),
   H.cmd("AUDIO_MUSIC_POSITION", "AUDIO_MUSIC_POSITION() AS FLOAT",
     "Die Sekunde IM STÜCK, nicht seit Programmstart. Sie kommt aus dem Abspielen selbst – hängt der Ablaufplan daran, kann er gar nicht gegen die Musik verrutschen.",
     [

@@ -20,8 +20,8 @@ def _qapp():
 
 @pytest.fixture
 def win(tmp_path):
-    from drachenhauch.editor_qt.main_window import GameBasicEditor
-    return GameBasicEditor(tmp_path)
+    from drachenhauch.editor_qt.main_window import DrachenhauchEditor
+    return DrachenhauchEditor(tmp_path)
 
 
 SRC = "SUB foo()\n    PRINT 1\nEND SUB\n"

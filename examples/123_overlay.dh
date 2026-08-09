@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- Desktop-Overlay (transparentes, randloses Fenster)
+'  DRACHENHAUCH -- Desktop-Overlay (transparentes, randloses Fenster)
 ' ============================================================
 '  SCREEN_TRANSPARENT + WINDOW_UNDECORATED + WINDOW_TOPMOST = ein Effekt,
 '  der frei ueber dem Desktop schwebt (kein Rahmen, immer im Vordergrund).
@@ -7,7 +7,7 @@
 '  der Desktop scheint ueberall sonst durch.
 '  [ESC] Ende
 ' ============================================================
-SCREEN_TRANSPARENT(420, 420, "GameBasic Overlay")
+SCREEN_TRANSPARENT(420, 420, "Drachenhauch Overlay")
 WINDOW_UNDECORATED(TRUE)     ' kein Fensterrahmen
 WINDOW_TOPMOST(TRUE)         ' immer im Vordergrund
 SET_WINDOW_POS(80, 80)       ' oben links auf dem Desktop platzieren
@@ -45,7 +45,7 @@ WHILE NOT QUITREQUESTED()
     ' Ring-Kontur + Label (deckend -> klar sichtbar ueber dem Desktop)
     CIRCLEOUTLINE(cx, cy, 150, &HFFFFFF)
     TEXT_SIZE(20)
-    TEXT(cx - 86, cy - 10, "GameBasic Overlay", &HFFFFFF)
+    TEXT(cx - 86, cy - 10, "Drachenhauch Overlay", &HFFFFFF)
     TEXT_SIZE(13)
     TEXT(cx - 40, cy + 150, "[ESC] Ende", &HC0D0FF)
 

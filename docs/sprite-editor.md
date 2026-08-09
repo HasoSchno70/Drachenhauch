@@ -1,6 +1,6 @@
 # Sprite-Editor (`dhsprites`)
 
-Ein vollwertiger Pixel-Art-Editor fuer GameBasic. Built mit PySide6, exportiert PNG-Sheets, Animated GIFs, einzelne PNG-Frames und **Sprite-Atlas-Manifeste** -- alle direkt im Spiel via `LOADIMAGE`, `SPRITE_NEW` oder `ATLAS_LOAD` ladbar.
+Ein vollwertiger Pixel-Art-Editor fuer Drachenhauch. Built mit PySide6, exportiert PNG-Sheets, Animated GIFs, einzelne PNG-Frames und **Sprite-Atlas-Manifeste** -- alle direkt im Spiel via `LOADIMAGE`, `SPRITE_NEW` oder `ATLAS_LOAD` ladbar.
 
 ## Starten
 
@@ -71,7 +71,7 @@ Schreibt **PNG + JSON-Manifest** gemeinsam. Das JSON beschreibt jedes Frame mit 
 
 **Frame-Namen:** Rechtsklick auf ein Frame in der Frame-Liste → **Umbenennen...** vergibt einen eigenen Namen. Benannte Frames nutzen diesen Namen direkt als Sprite-ID im Atlas (statt `<dateiname>_<index>`) — `ATLAS_DRAW(atlas, "idle", x, y)` statt `"hero_0"`. Doppelte Namen werden beim Export eindeutig gemacht (Suffix `_<index>`). Der Name wird in `.dhsprite`-Dateien mitgespeichert (Format-Version 3; aeltere Dateien laden mit leerem Namen).
 
-In GameBasic dann:
+In Drachenhauch dann:
 
 ```basic
 DIM atlas AS SPRITE_ATLAS

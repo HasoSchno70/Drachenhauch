@@ -68,7 +68,7 @@ _HANDLE_CURSORS = {
 # Geteilte Fundstelle statt einer eigenen Kopie: die lokale Variante suchte NUR
 # im Dev-Baum (`rust/drachenhauch_runtime/target/...` relativ zu dieser Datei) und kannte
 # den PyInstaller-Fall nicht -- in der installierten IDE liegt `dhrt.exe` neben
-# `GameBasic.exe`, F5 meldete dort also "Runtime nicht gebaut: python
+# `Drachenhauch.exe`, F5 meldete dort also "Runtime nicht gebaut: python
 # rust/build_runtime.py", einen Rat, den ein Installer-Nutzer nicht befolgen
 # kann. Der Alias haelt den Namen fuer Tests patchbar (wie in output_console).
 from .editor_qt.dhrt_locate import find_dhrt as _find_dhrt, dhrt_spawn_semaphore
@@ -1833,7 +1833,7 @@ class _WindowInspector(QWidget):
 
 
 class _CodePanel(QWidget):
-    """Integrierter Code-Editor: pro Event-Handler ein GameBasic-Body. Die
+    """Integrierter Code-Editor: pro Event-Handler ein Drachenhauch-Body. Die
     Combo listet die Handler des Formulars, der Editor zeigt/aendert den Body
     des gewaehlten (gespeichert in `doc.code[name]`)."""
     edited = Signal()             # Body geaendert
@@ -1961,7 +1961,7 @@ class FormDesigner(QMainWindow):
         self._main_form: _OpenForm | None = None   # Startformular (Objekt, nicht Pfad)
         self.unresolved: list[str] = []            # beim Laden fehlende .dhform
         self._suppress_row = False
-        self.setWindowTitle("GameBasic Form-Designer")
+        self.setWindowTitle("Drachenhauch Form-Designer")
         self.resize(1500, 950)   # Groesse fuer den Fall, dass jemand
                                  # aus dem Vollbild zurueckschaltet
         QShortcut(QKeySequence("F11"), self, activated=self._toggle_fullscreen)
@@ -2610,14 +2610,14 @@ class FormDesigner(QMainWindow):
         name = of.path.name if of.path else "(unbenannt)"
         star = "*" if of.dirty else ""
         proj = f"  [{self.project_path.name}]" if self.project_path else ""
-        self.setWindowTitle(f"GameBasic Form-Designer{proj}  --  {name}{star}")
+        self.setWindowTitle(f"Drachenhauch Form-Designer{proj}  --  {name}{star}")
 
     def new_form(self):
         self._add_open_form(FormDoc())
 
     def open_form(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Formular oeffnen", str(self.project_root),
-                                            "GameBasic-Form (*.dhform *.gbform);;Alle (*.*)")
+                                            "Drachenhauch-Form (*.dhform *.gbform);;Alle (*.*)")
         if not fn:
             return
         # Schon offen? Dann dorthin wechseln statt einen zweiten Puffer
@@ -2678,7 +2678,7 @@ class FormDesigner(QMainWindow):
 
     def save_form_as(self):
         fn, _ = QFileDialog.getSaveFileName(self, "Formular speichern", str(self.project_root),
-                                            "GameBasic-Form (*.dhform)")
+                                            "Drachenhauch-Form (*.dhform)")
         if not fn:
             return False
         if not fn.endswith(".dhform"):
@@ -2731,7 +2731,7 @@ class FormDesigner(QMainWindow):
     # -- Projekt (.dhproj) --
     def open_project(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Projekt oeffnen", str(self.project_root),
-                                            "GameBasic-Projekt (*.dhproj *.gbproj)")
+                                            "Drachenhauch-Projekt (*.dhproj *.gbproj)")
         if fn:
             self.load_project_file(fn)
 
@@ -2782,7 +2782,7 @@ class FormDesigner(QMainWindow):
                     return
         if self.project_path is None:
             fn, _ = QFileDialog.getSaveFileName(self, "Projekt speichern", str(self.project_root),
-                                                "GameBasic-Projekt (*.dhproj)")
+                                                "Drachenhauch-Projekt (*.dhproj)")
             if not fn:
                 self._switch_to(start)
                 return
@@ -2820,11 +2820,11 @@ class FormDesigner(QMainWindow):
         self.statusBar().showMessage(f"Projekt gespeichert: {self.project_path.name}", 3000)
 
     def export_gb_code(self):
-        """Aktives Formular als eigenstaendiges GameBasic-Programm (explizite
+        """Aktives Formular als eigenstaendiges Drachenhauch-Programm (explizite
         GUI_*-Konstruktion, kein GUI_LOAD) speichern."""
         default = str(self.path.with_suffix(".dh")) if self.path else str(self.project_root)
         fn, _ = QFileDialog.getSaveFileName(self, "GB-Code exportieren", default,
-                                            "GameBasic (*.dh)")
+                                            "Drachenhauch (*.dh)")
         if not fn:
             return
         if not fn.endswith(".dh"):

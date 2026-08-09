@@ -391,9 +391,9 @@ class OutputConsole(QWidget):
                         "ueber dhrun.py …\n\n", "muted")
         elif frozen:
             # Installierte App: KEIN dhrun.py-Fallback (kein Python). dhrt.exe
-            # sollte neben GameBasic.exe liegen.
+            # sollte neben Drachenhauch.exe liegen.
             self.append("✖ dhrt.exe nicht gefunden — sie sollte neben "
-                        "GameBasic.exe liegen. Bitte GameBasic neu installieren.\n",
+                        "Drachenhauch.exe liegen. Bitte Drachenhauch neu installieren.\n",
                         "error")
             return None
         else:

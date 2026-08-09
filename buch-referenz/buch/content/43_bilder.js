@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Bilder"),
-  H.p("Statt alles aus Formen zu zeichnen, lädst du meist fertige Bilder (Sprites, Hintergründe, Tilesets) aus PNG-Dateien. Ein Bild ist in GameBasic ein IMAGE-Wert; du lädst es einmal vor dem Game-Loop und zeichnest es dann jeden Frame. Häufig steckt in einer Datei ein ganzes „Spritesheet“ – mehrere Einzelbilder nebeneinander, aus dem du das gewünschte herausschneidest."),
+  H.p("Statt alles aus Formen zu zeichnen, lädst du meist fertige Bilder (Sprites, Hintergründe, Tilesets) aus PNG-Dateien. Ein Bild ist in Drachenhauch ein IMAGE-Wert; du lädst es einmal vor dem Game-Loop und zeichnest es dann jeden Frame. Häufig steckt in einer Datei ein ganzes „Spritesheet“ – mehrere Einzelbilder nebeneinander, aus dem du das gewünschte herausschneidest."),
   H.figure("43_bilder.png", "Ein Spritesheet als Ganzes, ein einzelner Frame daraus, skaliert/gedreht, sowie gespiegelt und getönt (imgfx)."),
   H.note("Bildpfade sind relativ zum Verzeichnis deines Programms (üblich ist ein Unterordner assets/). Lade Bilder einmalig vor dem Game-Loop – nicht in jedem Frame neu."),
 

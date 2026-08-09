@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: Tooltips (Hover-Hilfetexte)
+'  DRACHENHAUCH -- gui-Modul: Tooltips (Hover-Hilfetexte)
 ' ============================================================
 '  GUI_TOOLTIP(widget, text$) haengt einem beliebigen Widget einen Hilfetext an.
 '  Er erscheint, sobald die Maus ~0,5 s ruhig ueber dem Widget verweilt, und
@@ -8,7 +8,7 @@
 '  Einfach mit der Maus ueber die Widgets fahren und kurz verweilen.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1100, 720, "GameBasic - Tooltips", 1)
+SCREEN(1100, 720, "Drachenhauch - Tooltips", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1

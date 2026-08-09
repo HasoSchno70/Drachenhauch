@@ -51,7 +51,7 @@ sieht, wie ein Graph aussieht. `Strg+N` leert das Projekt für einen Neuanfang.
 
 ### Vorschau (F5)
 
-`dhanim` erzeugt ein temporäres GameBasic-Programm und startet es mit `dhrt`:
+`dhanim` erzeugt ein temporäres Drachenhauch-Programm und startet es mit `dhrt`:
 links ein **Live-Parameter-Panel** (Slider für `float`/`int`, Checkbox für
 `bool`, Button für `trigger` — über das `ui`-Modul), rechts der Sprite, der den
 **aktuellen State** spielt. So testet man die Übergänge sofort, ohne Spielcode zu

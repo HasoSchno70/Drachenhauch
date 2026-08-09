@@ -1,6 +1,6 @@
-# GameBasic — VSCode-Extension
+# Drachenhauch — VSCode-Extension
 
-Sprachunterstützung für [GameBasic](../README.md) (`.dh`-Dateien) in VS Code:
+Sprachunterstützung für [Drachenhauch](../README.md) (`.dh`-Dateien) in VS Code:
 
 - **Syntax-Highlighting** (TextMate-Grammatik, aus den echten Lexer-Keywords +
   registrierten Built-ins/Konstanten generiert).
@@ -13,9 +13,9 @@ Sprachunterstützung für [GameBasic](../README.md) (`.dh`-Dateien) in VS Code:
 
 ## Voraussetzungen
 
-Der Language Server ist Teil des GameBasic-Repos und läuft über den Python des
+Der Language Server ist Teil des Drachenhauch-Repos und läuft über den Python des
 Projekts. Damit `python -m drachenhauch.lsp` das Paket findet, am einfachsten **den
-GameBasic-Projektordner in VS Code öffnen** (der Server startet mit diesem Ordner
+Drachenhauch-Projektordner in VS Code öffnen** (der Server startet mit diesem Ordner
 als Arbeitsverzeichnis).
 
 ## Installation (Entwicklung)
@@ -36,7 +36,7 @@ vsce package
 
 - `drachenhauch.pythonPath` — Python-Interpreter für den Server. **Auf den
   `.venv`-Python des Projekts setzen**, z. B.
-  `C:\\Programmieren\\Python\\GameBasic\\.venv\\Scripts\\python.exe`.
+  `C:\\Programmieren\\Python\\Drachenhauch\\.venv\\Scripts\\python.exe`.
 - `drachenhauch.serverModule` — Server-Modul (Default `drachenhauch.lsp`).
 - `drachenhauch.enableLanguageServer` — auf `false` für nur Syntax-Highlighting.
 

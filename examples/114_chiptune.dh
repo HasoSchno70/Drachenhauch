@@ -19,7 +19,7 @@
 
 IMPORT "audio"
 
-SCREEN(640, 360, "GameBasic Chiptune -- 4 Kanaele", 2)
+SCREEN(640, 360, "Drachenhauch Chiptune -- 4 Kanaele", 2)
 SETFPS(60)
 
 ' ============================================================
@@ -164,7 +164,7 @@ DIM fft[24] AS FLOAT
 DIM scrollX AS FLOAT
 scrollX = 660.0
 DIM scrollTxt AS STRING
-scrollTxt = "GAMEBASIC CHIPTUNE PLAYER ... 4 KANAELE, 0 SAMPLES, 100% SYNTHESE ... LEAD + ARPEGGIO + BASS + DRUMS WIE DAMALS AUF C64 UND AMIGA ... GRUESSE AN ALLE TRACKER-MUSIKER ... WRAP!      "
+scrollTxt = "DRACHENHAUCH CHIPTUNE PLAYER ... 4 KANAELE, 0 SAMPLES, 100% SYNTHESE ... LEAD + ARPEGGIO + BASS + DRUMS WIE DAMALS AUF C64 UND AMIGA ... GRUESSE AN ALLE TRACKER-MUSIKER ... WRAP!      "
 
 DIM t AS FLOAT
 DIM names[4] AS STRING
@@ -201,9 +201,9 @@ WHILE NOT QUITREQUESTED()
 
     ' --- Titel (Regenbogen) ------------------------------------------
     TEXT_SIZE(26)
-    w = TEXT_WIDTH("* GAMEBASIC CHIPTUNE *")
-    TEXT(320 - w \ 2 + 2, 22, "* GAMEBASIC CHIPTUNE *", &H101028)
-    TEXT(320 - w \ 2, 20, "* GAMEBASIC CHIPTUNE *", HSV(INT(t * 120.0) MOD 360, 0.75, 1.0))
+    w = TEXT_WIDTH("* DRACHENHAUCH CHIPTUNE *")
+    TEXT(320 - w \ 2 + 2, 22, "* DRACHENHAUCH CHIPTUNE *", &H101028)
+    TEXT(320 - w \ 2, 20, "* DRACHENHAUCH CHIPTUNE *", HSV(INT(t * 120.0) MOD 360, 0.75, 1.0))
     TEXT_SIZE(12)
     w = TEXT_WIDTH("120 BPM / 4 KANAELE / SYNTH IN ECHTZEIT / ESC = ENDE")
     TEXT(320 - w \ 2, 52, "120 BPM / 4 KANAELE / SYNTH IN ECHTZEIT / ESC = ENDE", &H8090B0)

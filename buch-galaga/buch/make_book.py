@@ -21,8 +21,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe"
-DOCX = os.path.join(HERE, "GameBasic-Buch.docx")
-PDF = os.path.join(HERE, "GameBasic-Buch.pdf")
+DOCX = os.path.join(HERE, "Drachenhauch-Buch.docx")
+PDF = os.path.join(HERE, "Drachenhauch-Buch.pdf")
 TITLES = os.path.join(HERE, "toc_titles.json")
 PAGES = os.path.join(HERE, "toc_pages.json")
 

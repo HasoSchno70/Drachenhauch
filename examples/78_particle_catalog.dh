@@ -1,5 +1,5 @@
 ' ============================================================================
-'  GameBasic Partikel-Effekt-Katalog  --  10 Rezepte nebeneinander
+'  Drachenhauch Partikel-Effekt-Katalog  --  10 Rezepte nebeneinander
 ' ============================================================================
 '
 '  Zeigt die Render-Modi (circle/pixel/square/streak/glow) und den
@@ -26,7 +26,7 @@ IMPORT "particles"
 CONST W AS INTEGER = 1600
 CONST H AS INTEGER = 800
 
-SCREEN(W, H, "GameBasic Partikel-Effekt-Katalog")
+SCREEN(W, H, "Drachenhauch Partikel-Effekt-Katalog")
 RANDOMIZE(7)
 
 ' === Zehn Partikelsysteme, je eines pro Effekt ===========================

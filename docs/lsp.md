@@ -1,7 +1,7 @@
 # Language Server + VSCode-Extension
 
 Neben dem eingebauten Qt-Editor gibt es einen **Language Server (LSP)** und eine
-**VSCode-Extension**, die GameBasic-Unterstützung in jeden LSP-fähigen Editor
+**VSCode-Extension**, die Drachenhauch-Unterstützung in jeden LSP-fähigen Editor
 bringen — mit derselben Sprach-Intelligenz wie der Qt-Editor.
 
 ## Language Server (`drachenhauch.lsp`)

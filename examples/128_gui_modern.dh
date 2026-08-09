@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: professionelle Fenster-Styles
+'  DRACHENHAUCH -- gui-Modul: professionelle Fenster-Styles
 ' ============================================================
 '  Zeigt die neuen Presets fuer das gui-Modul. Live umschalten:
 '    [1] modern_dark   -- Anthrazit + Cyan (passt zum Editor)
@@ -10,7 +10,7 @@
 '  Fenster ist verschiebbar/resizebar.   [ESC] Ende
 ' ============================================================
 IMPORT "gui"
-SCREEN(1180, 760, "GameBasic - GUI Styles", 1)
+SCREEN(1180, 760, "Drachenhauch - GUI Styles", 1)
 SETFPS(60)
 
 ' Sauberer TTF-Font fuer ein professionelles Schriftbild (statt Pixel-Font).

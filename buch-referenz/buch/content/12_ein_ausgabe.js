@@ -28,9 +28,9 @@ module.exports = (H) => [
   H.code(["Lade...fertig"], { out: true }),
 
   H.h2("Eingeben mit INPUT"),
-  H.p("INPUT hält das Programm an, wartet auf eine Eingabe des Benutzers (abgeschlossen mit der Eingabetaste) und legt das Getippte in einer Variablen ab. Der Clou: GameBasic wandelt die Eingabe automatisch in den Typ der Variablen um. Steht dort eine INTEGER-Variable, wird aus dem getippten Text eine Zahl; bei STRING bleibt es Text."),
+  H.p("INPUT hält das Programm an, wartet auf eine Eingabe des Benutzers (abgeschlossen mit der Eingabetaste) und legt das Getippte in einer Variablen ab. Der Clou: Drachenhauch wandelt die Eingabe automatisch in den Typ der Variablen um. Steht dort eine INTEGER-Variable, wird aus dem getippten Text eine Zahl; bei STRING bleibt es Text."),
   H.cmd("INPUT", 'INPUT variable\nINPUT "Frage", variable',
-    "Liest eine Zeile von der Tastatur in die angegebene Variable. Optional stellst du einen Text als Frage voran – dann erscheint dieser vor dem Eingabe-Cursor. Ohne eigenen Text zeigt GameBasic schlicht „? “ an. Die Variable muss vorher mit DIM angelegt sein.",
+    "Liest eine Zeile von der Tastatur in die angegebene Variable. Optional stellst du einen Text als Frage voran – dann erscheint dieser vor dem Eingabe-Cursor. Ohne eigenen Text zeigt Drachenhauch schlicht „? “ an. Die Variable muss vorher mit DIM angelegt sein.",
     [
       'DIM name AS STRING',
       'INPUT "Wie heißt du? ", name',
@@ -42,11 +42,11 @@ module.exports = (H) => [
     'INPUT "Dein Alter: ", alter',
     'PRINT "Nächstes Jahr bist du "; alter + 1',
   ]),
-  H.note("Tippt der Benutzer bei einer INTEGER- oder FLOAT-Variablen etwas ein, das keine Zahl ist (z. B. „hallo“), meldet GameBasic einen Fehler. Willst du das abfangen, lies stattdessen in eine STRING-Variable ein und wandle den Text behutsam mit TRYVAL um – dort kannst du einen Ersatzwert angeben."),
+  H.note("Tippt der Benutzer bei einer INTEGER- oder FLOAT-Variablen etwas ein, das keine Zahl ist (z. B. „hallo“), meldet Drachenhauch einen Fehler. Willst du das abfangen, lies stattdessen in eine STRING-Variable ein und wandle den Text behutsam mit TRYVAL um – dort kannst du einen Ersatzwert angeben."),
   H.note("INPUT ist für Konsolen-Programme gedacht. In einem Grafik-Spiel mit eigenem Fenster fragst du Eingaben nicht mit INPUT ab, sondern liest Tastatur und Maus pro Bild aus – das lernst du in Teil IV (Kapitel „Eingabe“)."),
 
   H.h2("f-Strings: Text und Werte verweben"),
-  H.p("Sätze aus Bausteinen mit + zusammenzusetzen funktioniert, wird aber schnell unübersichtlich – überall Anführungszeichen, Pluszeichen und STR$-Umwandlungen. Schöner geht es mit einem f-String: Du schreibst ein kleines f direkt vor das öffnende Anführungszeichen und setzt die Werte in geschweifte Klammern { } mitten in den Text. GameBasic füllt sie beim Ausgeben automatisch ein."),
+  H.p("Sätze aus Bausteinen mit + zusammenzusetzen funktioniert, wird aber schnell unübersichtlich – überall Anführungszeichen, Pluszeichen und STR$-Umwandlungen. Schöner geht es mit einem f-String: Du schreibst ein kleines f direkt vor das öffnende Anführungszeichen und setzt die Werte in geschweifte Klammern { } mitten in den Text. Drachenhauch füllt sie beim Ausgeben automatisch ein."),
   H.cmd('f"..."', 'f"text {ausdruck} text ..."',
     "Ein String mit Platzhaltern. Was in geschweiften Klammern steht, wird als Ausdruck berechnet und an dieser Stelle eingesetzt. Drin darf alles stehen: Variablen, Rechnungen, sogar Funktionsaufrufe.",
     [

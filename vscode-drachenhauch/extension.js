@@ -1,4 +1,4 @@
-// VSCode-Client fuer den GameBasic-Language-Server.
+// VSCode-Client fuer den Drachenhauch-Language-Server.
 //
 // Startet `python -m drachenhauch.lsp` (stdio) und verbindet ihn als
 // LanguageClient. Syntax-Highlighting kommt aus der TextMate-Grammatik und
@@ -27,7 +27,7 @@ function _buildClient() {
   const serverModule = cfg.get("serverModule", "drachenhauch.lsp");
 
   // cwd = erster Workspace-Ordner, damit `drachenhauch` importierbar ist
-  // (am besten den GameBasic-Projektordner oeffnen, oder pythonPath auf
+  // (am besten den Drachenhauch-Projektordner oeffnen, oder pythonPath auf
   //  einen Python setzen, der das Paket findet).
   const folder =
     workspace.workspaceFolders && workspace.workspaceFolders.length
@@ -58,7 +58,7 @@ function _buildClient() {
 
   return new LanguageClient(
     "drachenhauch",
-    "GameBasic Language Server",
+    "Drachenhauch Language Server",
     serverOptions,
     clientOptions
   );
@@ -74,7 +74,7 @@ async function _startClient() {
     await client.start();
   } catch (err) {
     window.showErrorMessage(
-      "GameBasic-Language-Server konnte nicht starten: " +
+      "Drachenhauch-Language-Server konnte nicht starten: " +
         err.message +
         " (drachenhauch.pythonPath pruefen)"
     );

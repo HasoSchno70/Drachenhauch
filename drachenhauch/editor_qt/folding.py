@@ -1,4 +1,4 @@
-"""Code-Folding-Region-Scanner fuer GameBasic.
+"""Code-Folding-Region-Scanner fuer Drachenhauch.
 
 Liefert Liste von Klapp-Regionen `(start_line, end_line, kind)`, jeweils
 1-basierte Zeilennummern. Verwendet einen einfachen Stack-basierten

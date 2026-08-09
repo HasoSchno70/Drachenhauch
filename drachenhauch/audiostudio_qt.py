@@ -1,4 +1,4 @@
-"""GameBasic **Audio Studio** -- vereint Tracker, SFX-Generator und
+"""Drachenhauch **Audio Studio** -- vereint Tracker, SFX-Generator und
 Instrument-Bibliothek in EINEM fullscreen-Fenster (Reiter).
 
 Die Einzeleditoren ([TrackerEditor](trackereditor_qt.py) /
@@ -35,7 +35,7 @@ class AudioStudio(QMainWindow):
     def __init__(self, project_root: Path, initial_file: Path | None = None):
         super().__init__()
         self.project_root = Path(project_root)
-        self.setWindowTitle("GameBasic Audio Studio")
+        self.setWindowTitle("Drachenhauch Audio Studio")
         self.resize(1280, 900)
 
         self.tabs = QTabWidget()

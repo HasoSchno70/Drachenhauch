@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("2D-Zeichnen"),
-  H.p("Mit dem Fenster aus dem letzten Kapitel kannst du jetzt zeichnen. GameBasic bietet alle Grundformen: Pixel, Linien, Rechtecke, Kreise, Dreiecke, Polygone, Ellipsen, Bögen und Text. Jeder Befehl wird zwischen CLS und FLIP aufgerufen (siehe Game-Loop). Das letzte Argument ist fast immer eine Farbe – als RGB(r, g, b) oder eine der Farbkonstanten (Kapitel „Farben“)."),
+  H.p("Mit dem Fenster aus dem letzten Kapitel kannst du jetzt zeichnen. Drachenhauch bietet alle Grundformen: Pixel, Linien, Rechtecke, Kreise, Dreiecke, Polygone, Ellipsen, Bögen und Text. Jeder Befehl wird zwischen CLS und FLIP aufgerufen (siehe Game-Loop). Das letzte Argument ist fast immer eine Farbe – als RGB(r, g, b) oder eine der Farbkonstanten (Kapitel „Farben“)."),
   H.p("Das folgende Bild zeigt die wichtigsten Formen auf einen Blick; danach kommt jeder Befehl einzeln mit Beispiel."),
   H.figure("41_formen.png", "Die 2D-Grundformen: Linie, gefülltes und umrandetes Rechteck, Kreis, Dreieck, Ellipse, Polygon, Bogen und Text."),
 

@@ -1,5 +1,5 @@
 // ===========================================================================
-//  GameBasic <-> ESP32 -- Grundgeruest
+//  Drachenhauch <-> ESP32 -- Grundgeruest
 // ===========================================================================
 //  Das hier ist der Teil, den man bei jedem Projekt gleich schreibt: WLAN
 //  verbinden, Broker verbinden, bei Abbruch wieder verbinden, Nachrichten
@@ -16,7 +16,7 @@
 //    2. Werkzeuge -> Board -> Boardverwalter -> "esp32" bzw. "esp8266"
 //    3. Werkzeuge -> Bibliotheken verwalten -> "PubSubClient" (Nick O'Leary)
 //
-//  Gegenstueck in GameBasic: examples/159_esp32_bruecke.dh
+//  Gegenstueck in Drachenhauch: examples/159_esp32_bruecke.dh
 // ===========================================================================
 
 // Laeuft auf ESP32 UND ESP8266. Die Unterschiede stehen alle hier oben, damit
@@ -48,8 +48,8 @@ const uint16_t BROKER_PORT = 1883;
 String kennung;
 
 // Themen: worauf wir hoeren, worunter wir senden.
-const char* THEMA_BEFEHLE = "esp32/befehl";     // GameBasic -> Board
-const char* THEMA_WERTE   = "esp32/wert";       // Board -> GameBasic
+const char* THEMA_BEFEHLE = "esp32/befehl";     // Drachenhauch -> Board
+const char* THEMA_WERTE   = "esp32/wert";       // Board -> Drachenhauch
 const char* THEMA_STATUS  = "esp32/status";     // Lebenszeichen
 
 // Wie oft gesendet wird (Millisekunden). NICHT mit delay() arbeiten -- das
@@ -94,7 +94,7 @@ void nachrichtEmpfangen(char* thema, byte* nutzlast, unsigned int laenge) {
   Serial.print(" = ");
   Serial.println(inhalt);
 
-  // >>> HIER 2: Auf Befehle aus GameBasic reagieren ----------------------
+  // >>> HIER 2: Auf Befehle aus Drachenhauch reagieren ----------------------
   //
   //   if (inhalt == "an")  digitalWrite(2, HIGH);
   //   if (inhalt == "aus") digitalWrite(2, LOW);
@@ -115,7 +115,7 @@ void brokerVerbinden() {
 
     // Letzter Wille: sagt der Broker ALLEN Abonnenten, wenn dieses Board
     // unsauber verschwindet (Stromausfall, Funkloch). Ohne das merkt
-    // GameBasic nie, dass der Sensor weg ist -- es kommen nur einfach keine
+    // Drachenhauch nie, dass der Sensor weg ist -- es kommen nur einfach keine
     // Werte mehr, was genauso aussieht wie "gerade nichts zu melden".
     bool ok = mqtt.connect(kennung.c_str(),
                            nullptr, nullptr,       // Benutzer, Passwort
@@ -144,7 +144,7 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.println();
-  Serial.println("GameBasic-ESP32-Bruecke startet");
+  Serial.println("Drachenhauch-ESP32-Bruecke startet");
 
   kennung = "esp32-" + WiFi.macAddress();
   kennung.replace(":", "");
@@ -183,7 +183,7 @@ void loop() {
     //     mqtt.publish("esp32/temperatur", String(grad, 1).c_str());
     //
     //   MQTT kennt nur Bytes -- Zahlen muessen also in Text. Auf der
-    //   GameBasic-Seite holst du sie mit VAL() zurueck.
+    //   Drachenhauch-Seite holst du sie mit VAL() zurueck.
 
     long wert = analogRead(ANALOG_PIN);   // Beispiel: roher Analogwert
     mqtt.publish(THEMA_WERTE, String(wert).c_str());

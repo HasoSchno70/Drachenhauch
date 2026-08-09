@@ -22,11 +22,11 @@ def _qapp():
 def win(tmp_path, monkeypatch):
     from drachenhauch.editor_qt import main_window as mw
     # Reale Settings-/Autosave-Persistenz beim Test-closeEvent() vermeiden --
-    # sonst wuerde ein Testlauf die echten %APPDATA%/GameBasic-Dateien des
+    # sonst wuerde ein Testlauf die echten %APPDATA%/Drachenhauch-Dateien des
     # Users ueberschreiben.
     monkeypatch.setattr(mw, "save_settings", lambda *_a, **_kw: None)
     monkeypatch.setattr(mw, "clear_autosaves", lambda *_a, **_kw: None)
-    return mw.GameBasicEditor(tmp_path)
+    return mw.DrachenhauchEditor(tmp_path)
 
 
 def _fake_close_event():

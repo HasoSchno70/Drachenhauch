@@ -1,4 +1,4 @@
-GameBasic-Demo -- Herkunft und Lizenz der Fremdmaterialien
+Drachenhauch-Demo -- Herkunft und Lizenz der Fremdmaterialien
 ==========================================================
 
 MUSIK (assets/music/)
@@ -26,7 +26,7 @@ SCHRIFT (assets/font.ttf)
 SHADER (assets/shaders/)
 ------------------------
     bloom.fs, crt.fs, vignette.fs -- im Rahmen dieses Projekts geschrieben,
-    uebernommen aus examples/assets/shaders/. Teil von GameBasic.
+    uebernommen aus examples/assets/shaders/. Teil von Drachenhauch.
 
 Alles Uebrige (Grafik, Partikel, Geometrie, Ablauf) erzeugt die Demo zur
 Laufzeit selbst -- es gibt keine weiteren Bilddateien.

@@ -1,4 +1,4 @@
-"""AST-Knoten fuer GameBasic."""
+"""AST-Knoten fuer Drachenhauch."""
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -97,7 +97,7 @@ class DictComp(Expr):
     """Dict-Comprehension: `{key: val FOR var IN iterable WHERE filter}`.
 
     Liefert eine MAP. Der `key` muss zur Laufzeit STRING sein
-    (GameBasic-MAPs haben STRING-Keys). `value` darf beliebig sein --
+    (Drachenhauch-MAPs haben STRING-Keys). `value` darf beliebig sein --
     der MAP-Wert-Typ wird beim ersten Eintrag inferred und dann durchgehend
     enforced.
     """
@@ -112,7 +112,7 @@ class DictComp(Expr):
 class SetComp(Expr):
     """Set-Comprehension: `{expr FOR var IN iterable WHERE filter}`.
 
-    GameBasic hat keinen echten SET-Typ -- wir liefern ein TUPLE mit
+    Drachenhauch hat keinen echten SET-Typ -- wir liefern ein TUPLE mit
     de-duplizierten Werten in der Reihenfolge des ersten Auftretens.
     Praktisch fuer "alle eindeutigen Spieler-Namen" oder aehnliche
     Aggregate.

@@ -1,4 +1,4 @@
-"""Built-in-Modul-Namen fuer GameBasic.
+"""Built-in-Modul-Namen fuer Drachenhauch.
 
 Stufe B: Die Python-Modul-Implementierungen wurden entfernt -- dhrt (Rust)
 implementiert alle Built-in-Module nativ. Dieses Paket haelt nur noch die

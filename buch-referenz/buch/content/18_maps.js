@@ -2,7 +2,7 @@ module.exports = (H) => [
   H.chapter("Maps"),
   H.p("Ein Array nummeriert seine Werte mit ganzen Zahlen: 0, 1, 2, … Das ist perfekt, solange die Position der natürliche Zugang ist. Aber manchmal willst du Werte nicht über eine Nummer ansprechen, sondern über einen Namen: die Punktzahl von „Anna“, den Bestand an „Holz“, die Einstellung „lautstärke“. Genau dafür gibt es die Map."),
   H.p("Eine Map ist eine Sammlung von Paaren aus Schlüssel und Wert. Stell sie dir wie ein Wörterbuch vor: Du schlägst ein Stichwort nach (den Schlüssel) und bekommst die zugehörige Erklärung (den Wert). Oder wie ein Telefonbuch – Name nachschlagen, Nummer erhalten. Der Schlüssel ersetzt die Index-Nummer des Arrays durch etwas Sprechendes."),
-  H.note("In GameBasic sind die Schlüssel einer Map IMMER Strings. Die Werte dagegen haben den Typ, den du bei DIM angibst – MAP OF INTEGER speichert Zahlen, MAP OF STRING speichert Texte, und so weiter."),
+  H.note("In Drachenhauch sind die Schlüssel einer Map IMMER Strings. Die Werte dagegen haben den Typ, den du bei DIM angibst – MAP OF INTEGER speichert Zahlen, MAP OF STRING speichert Texte, und so weiter."),
 
   H.h2("Eine Map anlegen und füllen"),
   H.p("Deklariert wird eine Map mit DIM ... AS MAP OF Typ. Frisch angelegt ist sie leer. Mit MAPPUT legst du ein Paar ab: Du nennst den Schlüssel und den Wert. Gibt es den Schlüssel schon, wird sein alter Wert überschrieben – jeder Schlüssel kommt also nur einmal vor."),

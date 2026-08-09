@@ -1,4 +1,4 @@
-# Galaga — ein Arcade-Shooter, Schritt für Schritt mit GameBasic
+# Galaga — ein Arcade-Shooter, Schritt für Schritt mit Drachenhauch
 
 Ein schlankes Lehrbuch, das **einen Galaga-Clone von Grund auf baut**: ein
 Spielerschiff am unteren Rand, eine Formation bunter Gegner oben, die in
@@ -6,7 +6,7 @@ geschwungenen Bahnen **einfliegen**, in der Formation **schweben** und einzeln
 im Bogen **herabstürzen** — und dabei **Bomben** abwerfen, denen du ausweichen
 musst. Genau das Gefühl des Arcade-Originals.
 
-Du lernst GameBasic nicht an trockenen Beispielen, sondern indem jedes Kapitel
+Du lernst Drachenhauch nicht an trockenen Beispielen, sondern indem jedes Kapitel
 ein konkretes Stück Spiel hinzufügt. Und: **die Sprites zeichnest du selbst** im
 mitgelieferten Pixel-Editor `dhsprites`.
 
@@ -45,7 +45,7 @@ ein eigenes Kapitel.
 
 ## Voraussetzungen
 
-- Eine GameBasic-Installation (native Runtime `dhrt` gebaut — siehe
+- Eine Drachenhauch-Installation (native Runtime `dhrt` gebaut — siehe
   [Haupt-README](../README.md)).
 - Der mitgelieferte **Qt-Editor** (`dhedit`) und der **Sprite-Editor**
   (`dhsprites`).

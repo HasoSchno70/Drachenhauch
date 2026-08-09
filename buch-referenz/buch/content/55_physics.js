@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Module: physics, physics2d & physics3d"),
-  H.p("GameBasic bringt drei Physik-Module mit – wähle nach Bedarf: physics ist reine Kollisions-Mathematik ohne eigenen Zustand (du behältst die volle Kontrolle), physics2d und physics3d sind dagegen vollwertige Physik-Engines, die Schwerkraft, Stöße und Reibung selbst berechnen. Dieses Kapitel stellt alle drei vor."),
+  H.p("Drachenhauch bringt drei Physik-Module mit – wähle nach Bedarf: physics ist reine Kollisions-Mathematik ohne eigenen Zustand (du behältst die volle Kontrolle), physics2d und physics3d sind dagegen vollwertige Physik-Engines, die Schwerkraft, Stöße und Reibung selbst berechnen. Dieses Kapitel stellt alle drei vor."),
   H.figure("55_physics2d.png", "physics2d in Aktion: zehn Bälle fallen unter Schwerkraft, prallen ab und sammeln sich – alles von der Engine berechnet."),
 
   H.h2("physics — Kollisions-Mathematik"),

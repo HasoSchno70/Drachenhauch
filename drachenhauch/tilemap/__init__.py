@@ -1,4 +1,4 @@
-"""Datenmodell + Tiled-JSON-I/O fuer den GameBasic-Tilemap-Editor.
+"""Datenmodell + Tiled-JSON-I/O fuer den Drachenhauch-Tilemap-Editor.
 
 Qt-frei, damit headless testbar (Roundtrip durch das `tiled`-Modul).
 """

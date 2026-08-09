@@ -1,7 +1,7 @@
 # Circuit Runner
 
 Ein kachelbasiertes Puzzle-Spiel im Geist von **Chip's Challenge** (Atari Lynx /
-MS), geschrieben in GameBasic. Sammle alle Daten-Chips, dann öffnet der Sockel
+MS), geschrieben in Drachenhauch. Sammle alle Daten-Chips, dann öffnet der Sockel
 den Weg zum Ausgang — weiche Wasser, Feuer und Robotern aus, nutze Schlüssel,
 Stiefel und schiebbare Blöcke.
 
@@ -163,7 +163,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 
 | Datei | Zweck |
 |---|---|
-| `circuitrunner.dh` | die Spiel-Engine (GameBasic) |
+| `circuitrunner.dh` | die Spiel-Engine (Drachenhauch) |
 | `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.dhsprite` |
 | `convert_dat.py` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
 | `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |

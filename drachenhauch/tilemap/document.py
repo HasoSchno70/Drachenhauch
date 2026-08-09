@@ -27,7 +27,7 @@ PROP_TYPES = ("string", "int", "float", "bool")
 
 
 def coerce_prop(value, ptype: str):
-    """Bringt einen rohen Wert auf den GameBasic/Tiled-Typ `ptype`."""
+    """Bringt einen rohen Wert auf den Drachenhauch/Tiled-Typ `ptype`."""
     if ptype == "bool":
         if isinstance(value, str):
             return value.strip().lower() in ("1", "true", "wahr", "yes", "ja", "x")
@@ -813,7 +813,7 @@ class TileMapDoc:
                 "'     nm$ = TILED_OBJECT_NAME(lvl, " + repr(obj_layers[0].name)
                 + ", oi)\n"
                 "'   NEXT\n")
-        return f'''' === Auto-generiert vom GameBasic-Tilemap-Editor ===
+        return f'''' === Auto-generiert vom Drachenhauch-Tilemap-Editor ===
 IMPORT "tiled"
 {obj_comment}
 

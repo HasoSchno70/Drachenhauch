@@ -9,7 +9,7 @@
 use std::io::Read;
 use std::time::Duration;
 
-const USER_AGENT: &str = "GameBasic-cloud/0.1";
+const USER_AGENT: &str = "Drachenhauch-cloud/0.1";
 const TIMEOUT_SECS: u64 = 10;
 
 pub struct CloudErr {

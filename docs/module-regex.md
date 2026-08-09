@@ -86,8 +86,8 @@ PRINT ips[0]                   ' "10.0.0.1" (Capture-Gruppe, nicht "ip 10.0.0.1"
 `REGEX_REPLACE` ersetzt alle Treffer durch `repl`. Backslash-References fuer Capture-Gruppen:
 
 ```basic
-PRINT REGEX_REPLACE("Hello WORLD", "WORLD", "GameBasic")
-' "Hello GameBasic"
+PRINT REGEX_REPLACE("Hello WORLD", "WORLD", "Drachenhauch")
+' "Hello Drachenhauch"
 
 ' Swap mit Capture-Gruppen
 PRINT REGEX_REPLACE("Anna 30, Bob 25", "(\w+) (\d+)", "\2 (\1)")

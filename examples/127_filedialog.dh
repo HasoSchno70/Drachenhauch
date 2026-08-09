@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- Native Datei-/Ordner-Dialoge
+'  DRACHENHAUCH -- Native Datei-/Ordner-Dialoge
 ' ============================================================
 '  Oeffnet die echten Windows-Dialoge und zeigt den gewaehlten Pfad.
 '  Tasten:  [O] Datei oeffnen   [S] Speichern unter   [F] Ordner waehlen
@@ -7,7 +7,7 @@
 '  Alle drei liefern einen STRING (Pfad), bei Abbruch einen leeren String.
 '  Endungs-Filter: kommagetrennt ohne Punkt, z.B. "png,jpg,gb".
 ' ============================================================
-SCREEN(740, 300, "GameBasic - Datei-Dialoge", 1)
+SCREEN(740, 300, "Drachenhauch - Datei-Dialoge", 1)
 SETFPS(60)
 
 DIM lastAction AS STRING : lastAction = "(noch nichts gewaehlt)"

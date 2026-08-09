@@ -49,7 +49,7 @@ CONST T6 AS FLOAT = 256.0       ' Tunnel
 CONST T7 AS FLOAT = 300.0       ' Audio-Effekte
 CONST T8 AS FLOAT = 384.0       ' Abspann
 
-SCREEN(BREITE, HOEHE, "GameBasic -- Demo", 1)
+SCREEN(BREITE, HOEHE, "Drachenhauch -- Demo", 1)
 SETFPS(60)
 WINDOW_ESC_QUIT(FALSE)
 ' Vollbild von Anfang an -- eine Demo schaut man nicht im Fenster an.
@@ -216,7 +216,7 @@ SUB szene_titel()
     DIM cy AS INTEGER
     cy = INT(HOEHE * 0.34)
     DIM s AS STRING
-    s = "GAMEBASIC"
+    s = "DRACHENHAUCH"
     DIM n AS INTEGER
     n = LEN(s)
     DIM breite_ges AS FLOAT
@@ -468,7 +468,7 @@ SUB szene_pbr()
         a = k * 6.28318 / N_KUGELN + zeit * 0.30
         DIM bnd AS INTEGER
         bnd = 3 + k * 3
-        ' NICHT "hoehe" nennen: GameBasic ignoriert Gross-/Kleinschreibung,
+        ' NICHT "hoehe" nennen: Drachenhauch ignoriert Gross-/Kleinschreibung,
         ' eine lokale "hoehe" verdeckt also die Konstante HOEHE -- und aus
         ' HOEHE - 54 wird lautlos 0.6 - 54.
         DIM hoch AS FLOAT
@@ -1134,7 +1134,7 @@ SUB szene_abspann()
         DIM ein AS FLOAT
         ein = (szene_t - ((T8 - T7) - 26.0)) / 5.0
         IF ein > 1.0 THEN ein = 1.0
-        mtext(BREITE \ 2, HOEHE \ 2 - 20, "GAMEBASIC", 1.6 * (0.9 + 0.1 * ein), _
+        mtext(BREITE \ 2, HOEHE \ 2 - 20, "DRACHENHAUCH", 1.6 * (0.9 + 0.1 * ein), _
               regenbogen(zeit * 1.1, ein))
         mtext(BREITE \ 2, HOEHE \ 2 + 54, "danke fuers Zuschauen", 0.6, _
               RGB(INT(150 * ein), INT(190 * ein), INT(215 * ein)))
@@ -1284,7 +1284,7 @@ MODEL_TEXTURE(boden, bodentex)
 ' und passt zum Spektrum-Ring aus Szene 6.
 knoten = MESH_TORUS(1.6, 0.42, 48, 24)
 
-abspann[0] = "*GAMEBASIC - DEMO*"
+abspann[0] = "*DRACHENHAUCH - DEMO*"
 abspann[1] = ""
 abspann[2] = "*Was du gesehen hast*"
 abspann[3] = "Plasma, Sinus-Scroller und Spektrum-Saeulen"

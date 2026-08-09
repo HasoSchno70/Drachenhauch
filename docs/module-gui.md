@@ -893,7 +893,7 @@ die Styles.
 
 ## Callbacks: GUI_ON_CLICK
 
-Neben dem Polling (`IF GUI_CLICKED(b) THEN ...`) kannst du eine GameBasic-
+Neben dem Polling (`IF GUI_CLICKED(b) THEN ...`) kannst du eine Drachenhauch-
 FUNCTION/SUB als **Callback** registrieren, die automatisch beim Klick
 aufgerufen wird:
 

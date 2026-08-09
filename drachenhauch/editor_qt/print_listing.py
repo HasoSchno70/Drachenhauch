@@ -1,6 +1,6 @@
 """Listing-Druck fuer den Editor.
 
-Erzeugt aus GameBasic-Quelltext eine druckfertige HTML-Darstellung -- wahlweise
+Erzeugt aus Drachenhauch-Quelltext eine druckfertige HTML-Darstellung -- wahlweise
 farbig (Syntax-Highlighting) oder schwarz-weiss -- und schickt sie ueber eine
 Druckvorschau an den Drucker. Gedruckt wird das aktive Listing (oder, wenn etwas
 markiert ist, nur die Markierung).

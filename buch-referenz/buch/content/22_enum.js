@@ -3,7 +3,7 @@ module.exports = (H) => [
   H.p("Programme stecken voller Zustände und Kategorien: Ein Spiel ist im Menü, läuft gerade oder ist pausiert. Solche Fälle könntest du mit Zahlen darstellen (0 = Menü, 1 = läuft, 2 = Pause) – aber wer merkt sich, dass 2 für Pause steht? Ein ENUM (kurz für „Enumeration“, Aufzählung) gibt diesen Zahlen sprechende Namen. Dein Code wird dadurch lesbar und unverwechselbar."),
 
   H.h2("Ein ENUM definieren"),
-  H.p("Im einfachsten Fall zählst du die Namen kompakt in einer Zeile auf. GameBasic vergibt automatisch die Zahlen 0, 1, 2 und so weiter. Angesprochen werden die Werte über den ENUM-Namen mit Punkt – also Status.MENU. Diese Schreibweise macht sofort klar, worum es geht."),
+  H.p("Im einfachsten Fall zählst du die Namen kompakt in einer Zeile auf. Drachenhauch vergibt automatisch die Zahlen 0, 1, 2 und so weiter. Angesprochen werden die Werte über den ENUM-Namen mit Punkt – also Status.MENU. Diese Schreibweise macht sofort klar, worum es geht."),
   H.cmd("ENUM (kompakt)", "ENUM Name = WERT1, WERT2, ...",
     "Definiert eine Aufzählung. Die Mitglieder bekommen der Reihe nach die Werte 0, 1, 2, … und werden als Name.MITGLIED angesprochen.",
     [
@@ -18,7 +18,7 @@ module.exports = (H) => [
   H.h2("Eigene Werte vergeben"),
   H.p("Brauchst du bestimmte Zahlen – etwa weil sie zu Daten von außen passen müssen –, schreibst du das ENUM als Block und gibst jedem Mitglied seinen Wert. Das liest sich übersichtlich, sobald es mehr Einträge werden."),
   H.cmd("ENUM (Block)", "ENUM Name\n    MITGLIED = wert\n    ...\nEND ENUM",
-    "Block-Schreibweise mit ausdrücklichen Werten. Lässt du bei einem Mitglied den Wert weg, zählt GameBasic vom letzten vergebenen Wert um eins weiter.",
+    "Block-Schreibweise mit ausdrücklichen Werten. Lässt du bei einem Mitglied den Wert weg, zählt Drachenhauch vom letzten vergebenen Wert um eins weiter.",
     [
       'ENUM Recht',
       '    KEINS = 0',

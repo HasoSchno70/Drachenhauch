@@ -1,7 +1,7 @@
 {
   "name": "drachenhauch",
-  "displayName": "GameBasic",
-  "description": "Sprachunterstuetzung fuer GameBasic (.dh): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
+  "displayName": "Drachenhauch",
+  "description": "Sprachunterstuetzung fuer Drachenhauch (.dh): Syntax-Highlighting + Language Server (Diagnostics, Completion, Hover, Goto-Definition, References, Outline).",
   "version": "1.0.0",
   "publisher": "drachenhauch",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "languages": [
       {
         "id": "drachenhauch",
-        "aliases": ["GameBasic", "drachenhauch", "gb"],
+        "aliases": ["Drachenhauch", "drachenhauch", "gb"],
         "extensions": [".dh"],
         "configuration": "./language-configuration.json"
       }
@@ -26,12 +26,12 @@
       }
     ],
     "configuration": {
-      "title": "GameBasic",
+      "title": "Drachenhauch",
       "properties": {
         "drachenhauch.pythonPath": {
           "type": "string",
           "default": "python",
-          "description": "Python-Interpreter, der den GameBasic-Language-Server startet (am besten der .venv-Python des Projekts)."
+          "description": "Python-Interpreter, der den Drachenhauch-Language-Server startet (am besten der .venv-Python des Projekts)."
         },
         "drachenhauch.serverModule": {
           "type": "string",

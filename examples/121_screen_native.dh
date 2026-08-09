@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- Natives Vollbild (SCREEN_NATIVE)
+'  DRACHENHAUCH -- Natives Vollbild (SCREEN_NATIVE)
 ' ============================================================
 '  SCREEN_NATIVE() oeffnet Vollbild in der ECHTEN Monitor-Aufloesung:
 '  die Szene wird 1:1 in nativen Pixeln gerendert (kein Hochskalieren
@@ -7,7 +7,7 @@
 '  die Monitor-Aufloesung. Ein bewegter Punkt am Rand zeigt, dass das
 '  Bild wirklich randscharf bis in die Ecken laeuft.   [ESC] Ende
 ' ============================================================
-SCREEN_NATIVE("GameBasic - Natives Vollbild")
+SCREEN_NATIVE("Drachenhauch - Natives Vollbild")
 SETFPS(60)
 
 DIM sw AS INTEGER : sw = SCREENWIDTH()

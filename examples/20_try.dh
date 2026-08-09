@@ -1,4 +1,4 @@
-' TRY/CATCH/THROW - Fehlerbehandlung in GameBasic.
+' TRY/CATCH/THROW - Fehlerbehandlung in Drachenhauch.
 
 PRINT "=== Eigene Fehler werfen und fangen ==="
 TRY

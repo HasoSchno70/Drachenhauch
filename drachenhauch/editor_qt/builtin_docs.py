@@ -1,4 +1,4 @@
-"""Hover-Tooltips fuer GameBasic-Built-ins.
+"""Hover-Tooltips fuer Drachenhauch-Built-ins.
 
 Format: ``name_lowercase -> (signature, beschreibung)``. Wird von
 ``CodeEditor`` beim Hover ueber einem Identifier konsultiert. Inhalt

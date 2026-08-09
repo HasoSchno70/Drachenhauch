@@ -1,4 +1,4 @@
-"""Recursive-Descent-Parser fuer GameBasic (Editor-Schicht).
+"""Recursive-Descent-Parser fuer Drachenhauch (Editor-Schicht).
 
 WICHTIG zum Einordnen: dieser Parser fuehrt NICHTS mehr aus. Seit dem
 Entfernen des Python-Tree-Walkers (Stufe B) ist `dhrt` die einzige
@@ -1869,7 +1869,7 @@ class Parser:
             # Tupel-Literal: nach erstem Element kommt ein Komma -> sammle
             # weitere Elemente. Single-Element bleibt normale Klammer-
             # Gruppierung. `(1,)`-Single-Tupel-Syntax wie in Python wird NICHT
-            # unterstuetzt (kein Use-Case in GameBasic, einfacher Parser).
+            # unterstuetzt (kein Use-Case in Drachenhauch, einfacher Parser).
             if self._check(TokenType.COMMA):
                 elements = [e]
                 while self._match(TokenType.COMMA):

@@ -266,7 +266,7 @@ Die Größe gilt getrennt für Titel (`titel_groesse`) und alles übrige
 
 ## Durchsichtigkeit
 
-Farben in GameBasic sind `0xAARRGGBB`. Das oberste Byte ist die Deckkraft, und
+Farben in Drachenhauch sind `0xAARRGGBB`. Das oberste Byte ist die Deckkraft, und
 **0 bedeutet dabei deckend** (damit alte 24-Bit-Farben unverändert bleiben).
 Halbdurchsichtig geht am bequemsten über `RGBA(r, g, b, a)`:
 

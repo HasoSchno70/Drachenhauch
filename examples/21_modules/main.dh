@@ -8,7 +8,7 @@ PRINT "Lerp(0, 100, 0.25)    =", Lerp(0.0, 100.0, 0.25)
 PRINT "DegToRad(180)         =", DegToRad(180.0)
 
 PRINT ""
-PRINT "Reverse$('GameBasic')   =", Reverse$("GameBasic")
+PRINT "Reverse$('Drachenhauch')   =", Reverse$("Drachenhauch")
 PRINT "StartsWith('hello', 'he') =", StartsWith("hello", "he")
 PRINT "StartsWith('hello', 'ho') =", StartsWith("hello", "ho")
 

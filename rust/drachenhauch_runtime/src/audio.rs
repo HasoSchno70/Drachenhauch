@@ -635,7 +635,7 @@ struct Pendulum { period_s: f64, depth: f64, start: std::time::Instant }
 /// ticking()` spiegelt Kiras Audio-Thread nur asynchron (per Kommando-Queue,
 /// erst beim naechsten Audio-Callback aktualisiert) -- eine Abfrage direkt
 /// nach START/PAUSE/STOP koennte sonst kurzzeitig den alten Wert zeigen.
-/// Da GameBasic der einzige Aufrufer ist, ist der selbst mitgefuehrte Wert
+/// Da Drachenhauch der einzige Aufrufer ist, ist der selbst mitgefuehrte Wert
 /// immer sofort korrekt (kein Audio-Thread-Race).
 struct ClockSlot { handle: ClockHandle, ticking: bool }
 

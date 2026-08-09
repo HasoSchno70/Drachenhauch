@@ -16,14 +16,14 @@ module.exports = (H) => [
   H.code(["Zeile eins", "Zeile zwei", "und drei"], { out: true }),
 
   H.h2("Rechnen mit PRINT"),
-  H.p("PRINT kann nicht nur Text, sondern auch Zahlen und Rechnungen ausgeben. Steht hinter PRINT kein Text in Anführungszeichen, sondern eine Rechnung, dann rechnet GameBasic sie zuerst aus und druckt das Ergebnis:"),
+  H.p("PRINT kann nicht nur Text, sondern auch Zahlen und Rechnungen ausgeben. Steht hinter PRINT kein Text in Anführungszeichen, sondern eine Rechnung, dann rechnet Drachenhauch sie zuerst aus und druckt das Ergebnis:"),
   H.code([
     'PRINT 3 + 4',
     'PRINT 10 * 10',
     'PRINT 100 / 8',
   ]),
   H.code(["7", "100", "12.5"], { out: true }),
-  H.pmix(["Beachte: ", ["100 / 8", true], " ergibt ", ["12.5", true], " – GameBasic rechnet bei Bedarf mit Kommazahlen weiter und rundet nicht einfach ab. Mehr dazu im Kapitel über Zahlen."]),
+  H.pmix(["Beachte: ", ["100 / 8", true], " ergibt ", ["12.5", true], " – Drachenhauch rechnet bei Bedarf mit Kommazahlen weiter und rundet nicht einfach ab. Mehr dazu im Kapitel über Zahlen."]),
 
   H.h2("Text und Zahl zusammen"),
   H.p("Oft willst du Text und einen Wert in einer Zeile mischen. Mit einem Komma trennst du mehrere Dinge, die PRINT nacheinander ausgibt – mit einem Leerzeichen dazwischen:"),
@@ -31,7 +31,7 @@ module.exports = (H) => [
   H.code(["Drei mal vier ist 12"], { out: true }),
 
   H.h2("Kommentare"),
-  H.p("Mit einem Hochkomma (') schreibst du eine Notiz für dich selbst (oder den, der deinen Code später liest). Alles ab dem ' bis zum Zeilenende ignoriert GameBasic vollständig. Solche Kommentare erklären, was der Code tut, und richten nie Schaden an:"),
+  H.p("Mit einem Hochkomma (') schreibst du eine Notiz für dich selbst (oder den, der deinen Code später liest). Alles ab dem ' bis zum Zeilenende ignoriert Drachenhauch vollständig. Solche Kommentare erklären, was der Code tut, und richten nie Schaden an:"),
   H.code([
     "' Dieses Programm begruesst die Welt",
     'PRINT "Hallo!"        \' das hier wird ausgegeben',

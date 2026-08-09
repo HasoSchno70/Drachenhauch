@@ -18,7 +18,7 @@ import urllib.request
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-UA = {"User-Agent": "Mozilla/5.0 (GameBasic fireplace demo asset fetch)"}
+UA = {"User-Agent": "Mozilla/5.0 (Drachenhauch fireplace demo asset fetch)"}
 
 ASSETS = [
     ("https://upload.wikimedia.org/wikipedia/commons/thumb/8/88/"

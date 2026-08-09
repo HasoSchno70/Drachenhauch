@@ -46,12 +46,12 @@ examples/highscores.txt
 # Eingabe-Aufnahme der AUTOMATION-Demo (153_automation.dh, F9 schreibt sie)
 examples/aufnahme.txt
 
-# GameBasic-Installer: Quelle committen, Build-Artefakte ignorieren
+# Drachenhauch-Installer: Quelle committen, Build-Artefakte ignorieren
 installer/output/
-installer/GameBasic.ico
-installer/GameBasic.icns
-installer/GameBasic.png
-!installer/GameBasic.spec
+installer/Drachenhauch.ico
+installer/Drachenhauch.icns
+installer/Drachenhauch.png
+!installer/Drachenhauch.spec
 installer/THIRD-PARTY-NOTICES.txt
 
 # Rust build output

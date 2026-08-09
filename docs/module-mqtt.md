@@ -2,7 +2,7 @@
 
 MQTT-Client (Version 3.1.1) — das im Maker-/IoT-Bereich dominante Pub/Sub-
 Protokoll. Typischer Anwendungsfall: ein ESP32 publiziert Sensor-Werte auf
-ein Topic, GameBasic subscribt darauf; umgekehrt publiziert GameBasic
+ein Topic, Drachenhauch subscribt darauf; umgekehrt publiziert Drachenhauch
 Steuerbefehle, auf die der ESP32 subscribt hat.
 
 ```basic
@@ -118,7 +118,7 @@ einen lokalen Broker — z. B. [Mosquitto](https://mosquitto.org/), Default-Port
 
 [esp32/](../esp32/) enthält ein fertiges Grundgerüst für ESP32/ESP8266
 (WLAN, Broker-Verbindung, Wiederverbinden, Empfang) mit vier markierten
-Stellen für eigenen Code, dazu das GameBasic-Gegenstück
+Stellen für eigenen Code, dazu das Drachenhauch-Gegenstück
 [examples/159_esp32_bruecke.dh](../examples/159_esp32_bruecke.dh).
 
 Dort stehen auch die Fallstricke, die man sonst einzeln durchleidet:

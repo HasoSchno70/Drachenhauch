@@ -15,7 +15,7 @@
 
 IMPORT "gui"
 
-SCREEN(980, 770, "GameBasic -- Glas-Oberflaeche")
+SCREEN(980, 770, "Drachenhauch -- Glas-Oberflaeche")
 
 ' Saubere Schrift, falls eine da ist (deutlich besser lesbar als die
 ' eingebaute Pixelschrift bei kleinen Groessen).

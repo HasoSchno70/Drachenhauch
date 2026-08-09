@@ -295,7 +295,7 @@ class CodeEditor(
         self.textChanged.connect(self._color_scan_timer.start)
 
         # Debugger: Breakpoint-Zeilen (1-basiert) + aktuelle Stop-Zeile.
-        # Wert je Zeile = Bedingung (GameBasic-Ausdruck) oder None fuer
+        # Wert je Zeile = Bedingung (Drachenhauch-Ausdruck) oder None fuer
         # einen unbedingten Breakpoint -- EIN Tracker statt zweier separater
         # Container, damit Zeile+Bedingung nie auseinanderlaufen koennen.
         self._breakpoints = _LineTracker(self.document())
@@ -903,7 +903,7 @@ class CodeEditor(
         self.breakpoints_changed.emit()
 
     def edit_breakpoint_condition(self, line: int) -> None:
-        """Fragt eine Bedingung (GameBasic-Ausdruck) fuer den Breakpoint auf
+        """Fragt eine Bedingung (Drachenhauch-Ausdruck) fuer den Breakpoint auf
         `line` ab. Setzt automatisch einen Breakpoint, falls noch keiner da
         ist. Leere Eingabe -> unbedingter Breakpoint."""
         cur = self._breakpoints.get(line, None) or ""

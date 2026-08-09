@@ -1,4 +1,4 @@
-"""LSP-Server fuer GameBasic (stdio, JSON-RPC 2.0).
+"""LSP-Server fuer Drachenhauch (stdio, JSON-RPC 2.0).
 
 Die Sprach-Intelligenz liegt in `features.py`; hier nur Protokoll:
 Dokument-Store, Methoden-Dispatch, Position-/URI-Verwaltung. `LspServer.handle`

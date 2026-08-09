@@ -1,4 +1,4 @@
-"""Fehlerklassen fuer GameBasic.
+"""Fehlerklassen fuer Drachenhauch.
 
 Nur noch drei Typen: `LexerError` und `ParseError` aus der Editor-Schicht
 (Lexer/Parser bedienen Highlighting, LSP, Error-Check, Folding, Formatter),

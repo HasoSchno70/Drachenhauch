@@ -2,7 +2,7 @@
 
 CONST MAX_PUNKTE AS INTEGER = 5
 CONST PI AS FLOAT = 3.141592653589793
-CONST GRUSS = "Hallo aus GameBasic"   ' Typ wird abgeleitet -> STRING
+CONST GRUSS = "Hallo aus Drachenhauch"   ' Typ wird abgeleitet -> STRING
 
 PRINT GRUSS
 PRINT "PI =", PI

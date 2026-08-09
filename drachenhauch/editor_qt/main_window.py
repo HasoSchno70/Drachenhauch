@@ -1,4 +1,4 @@
-"""GameBasic-Editor Hauptfenster (PySide6).
+"""Drachenhauch-Editor Hauptfenster (PySide6).
 
 Features:
 - ActivityBar links: Files / Outline / Built-ins (toggelbar),
@@ -68,7 +68,7 @@ class _ClickableLabel(QLabel):
         super().mousePressEvent(ev)
 
 
-class GameBasicEditor(QMainWindow):
+class DrachenhauchEditor(QMainWindow):
     def __init__(self, project_root: Path, initial_file: Path | None = None):
         super().__init__()
         self.project_root = project_root.resolve()
@@ -85,7 +85,7 @@ class GameBasicEditor(QMainWindow):
             initial_theme = "dark"
         set_active_theme(initial_theme)
 
-        self.setWindowTitle("GameBasic Editor")
+        self.setWindowTitle("Drachenhauch Editor")
         self._apply_window_icon()
         # Beim ersten Phase-2-Start: persistierte Phase-1-Geometrie
         # (typisch 1280x800) auf das neue, groessere Default bumpen. Danach
@@ -145,7 +145,7 @@ class GameBasicEditor(QMainWindow):
 
     # ----------------------------------------------------- UI-Aufbau
     def _apply_window_icon(self) -> None:
-        """Setzt das GameBasic-Logo als Window-/Taskbar-Icon.
+        """Setzt das Drachenhauch-Logo als Window-/Taskbar-Icon.
 
         Das Logo ist breit (linkes Symbol + Schriftzug). Wir croppen das
         linke Symbol heraus (smart_square_crop aus dem branding-Modul) und
@@ -199,7 +199,7 @@ class GameBasicEditor(QMainWindow):
             self._menubar_logo_label = QLabel(self)
             self._menubar_logo_label.setPixmap(self._menubar_logo_pixmap)
             self._menubar_logo_label.setContentsMargins(0, 0, 8, 0)
-            self._menubar_logo_label.setToolTip("GameBasic")
+            self._menubar_logo_label.setToolTip("Drachenhauch")
             self._menubar_logo_label.setFixedHeight(target_h)
             self._menubar_logo_label.setFixedWidth(target_w + 8)
             mb.setCornerWidget(self._menubar_logo_label, Qt.Corner.TopRightCorner)
@@ -292,7 +292,7 @@ class GameBasicEditor(QMainWindow):
         self.statusBar().addPermanentWidget(self.cursor_label)
         # Klickbarer Sprache-Marker. GB ist die einzige Sprache, aber das
         # Schema folgt VSCode-Konvention.
-        self.lang_label = QLabel("GameBasic")
+        self.lang_label = QLabel("Drachenhauch")
         self.lang_label.setStyleSheet("padding: 0 8px;")
         self.statusBar().addPermanentWidget(self.lang_label)
         # Encoding (immer UTF-8 -- der Editor schreibt nur UTF-8).
@@ -514,7 +514,7 @@ class GameBasicEditor(QMainWindow):
         self.act_show_readme.setShortcut(QKeySequence("F1"))
         self.act_show_readme.triggered.connect(self._show_readme)
 
-        self.act_about = QAction(icons.get("info"), "Ueber GameBasic ...", self)
+        self.act_about = QAction(icons.get("info"), "Ueber Drachenhauch ...", self)
         self.act_about.triggered.connect(self._show_about)
 
         self.act_shortcuts = QAction("Tastenkuerzel ...", self)
@@ -873,7 +873,7 @@ class GameBasicEditor(QMainWindow):
         path_str, _ = QFileDialog.getOpenFileName(
             self, "GB-Datei oeffnen",
             str(self.project_root),
-            "GameBasic-Dateien (*.dh);;Alle Dateien (*)",
+            "Drachenhauch-Dateien (*.dh);;Alle Dateien (*)",
         )
         if path_str:
             self._open_file(Path(path_str))
@@ -919,7 +919,7 @@ class GameBasicEditor(QMainWindow):
         path_str, _ = QFileDialog.getSaveFileName(
             self, "Speichern unter",
             str(st.file_path) if st.file_path else str(self.project_root / "neu.dh"),
-            "GameBasic-Dateien (*.dh);;Alle Dateien (*)",
+            "Drachenhauch-Dateien (*.dh);;Alle Dateien (*)",
         )
         if not path_str:
             return False
@@ -2112,13 +2112,13 @@ class GameBasicEditor(QMainWindow):
 
     def _on_active_tab_changed(self, st: TabState | None) -> None:
         if st is None:
-            self.setWindowTitle("GameBasic Editor")
+            self.setWindowTitle("Drachenhauch Editor")
             self.file_browser.mark_active(None)
             self._refresh_outline()
             self.statusBar().clearMessage()
             return
         name = st.file_path.name if st.file_path else "(neu)"
-        self.setWindowTitle(f"{name} -- GameBasic Editor")
+        self.setWindowTitle(f"{name} -- Drachenhauch Editor")
         self.file_browser.mark_active(st.file_path)
         # Split-Action an den Zustand des neuen Tabs angleichen.
         self.act_split_editor.blockSignals(True)

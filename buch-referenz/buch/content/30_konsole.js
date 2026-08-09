@@ -1,7 +1,7 @@
 module.exports = (H) => [
   H.part("Teil III — Eingebaute Befehle"),
   H.chapter("Konsole & Ein-/Ausgabe"),
-  H.p("Mit Teil III beginnt der Nachschlage-Teil des Buches. Die folgenden Kapitel stellen die eingebauten Befehle von GameBasic geordnet nach Themen vor – jeweils mit Signatur, kurzer Erklärung und einem kleinen Beispiel. Du musst sie nicht am Stück lesen; nutze sie als Lexikon, wenn du einen bestimmten Befehl suchst."),
+  H.p("Mit Teil III beginnt der Nachschlage-Teil des Buches. Die folgenden Kapitel stellen die eingebauten Befehle von Drachenhauch geordnet nach Themen vor – jeweils mit Signatur, kurzer Erklärung und einem kleinen Beispiel. Du musst sie nicht am Stück lesen; nutze sie als Lexikon, wenn du einen bestimmten Befehl suchst."),
   H.p("Dieses erste Referenzkapitel sammelt die Befehle für die Textkonsole: ausgeben mit PRINT, einlesen mit INPUT, formatieren mit FORMAT$. Die Konsole ist die einfache textbasierte Ein- und Ausgabe – ganz ohne Grafikfenster. (Tastatur und Maus im Spielfenster behandelt Teil IV.)"),
 
   H.h2("Ausgabe"),

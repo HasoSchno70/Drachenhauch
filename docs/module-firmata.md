@@ -5,7 +5,7 @@ Direkte Pin-Steuerung eines Arduino/ESP32 (oder eines beliebigen anderen mit
 Mikrocontrollers) über eine bestehende serielle Verbindung — ohne eigene
 Sketch-Logik und ohne ein eigenes Text-Protokoll zu entwerfen. Einmalig in der
 Arduino-IDE **Datei → Beispiele → Firmata → StandardFirmata** hochladen,
-danach steuert GameBasic die Pins direkt.
+danach steuert Drachenhauch die Pins direkt.
 
 ```basic
 IMPORT "firmata"
@@ -41,7 +41,7 @@ Sensoren, einfache Motoren über PWM) reicht die Pin-I/O-Basis.
 
 ## Pin-Modi
 
-`FIRMATA_PIN_MODE` nimmt rohe Firmata-Modus-Werte (keine GameBasic-Konstanten,
+`FIRMATA_PIN_MODE` nimmt rohe Firmata-Modus-Werte (keine Drachenhauch-Konstanten,
 analog zu `JOYSTICK_BUTTON`s rohen raylib-Indizes):
 
 | Wert | Modus |

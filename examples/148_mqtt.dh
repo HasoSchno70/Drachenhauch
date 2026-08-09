@@ -1,8 +1,8 @@
 ' MQTT-Pub/Sub gegen einen lokalen Broker (z.B. Mosquitto, mosquitto.org,
 ' Default-Port 1883, kein Login fuer einen lokalen Test-Broker noetig).
 ' Dominantes ESP32/IoT-Steuerprotokoll -- typischer Anwendungsfall: ein
-' ESP32 publiziert Sensor-Werte, GameBasic subscribt darauf; umgekehrt
-' publiziert GameBasic Steuerbefehle, auf die der ESP32 subscribt hat.
+' ESP32 publiziert Sensor-Werte, Drachenhauch subscribt darauf; umgekehrt
+' publiziert Drachenhauch Steuerbefehle, auf die der ESP32 subscribt hat.
 '
 ' Verbindet sich, abonniert ein Test-Topic, publiziert eine Nachricht
 ' darauf (kommt beim eigenen Client wieder an, weil der Broker sie an alle

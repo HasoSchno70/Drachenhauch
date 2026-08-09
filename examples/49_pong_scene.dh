@@ -112,12 +112,20 @@ END SUB
 
 ' --- Menue-Scene ----------------------------------------------------
 
+' Waagerecht mittig setzen, statt die Position abzuzaehlen: die festen
+' Werte (110 / 80) passten nur zu genau einem Text. "DRACHENHAUCH PONG"
+' lief rechts aus dem 320 Pixel breiten Bild heraus -- und "Druecke ENTER
+' zum Spielen" tat das schon vorher, das fiel nur nie jemandem auf.
+SUB TextMitte(y AS INTEGER, s AS STRING, farbe AS INTEGER)
+    Text((WIDTH - TEXT_WIDTH(s)) \ 2, y, s, farbe)
+END SUB
+
 SUB DrawMenu()
     Cls(RGB(0, 16, 32))
-    Text(110, 70, "GAMEBASIC PONG", WHITE)
-    Text(80, 110, "Druecke ENTER zum Spielen", LIGHTGRAY)
-    Text(80, 130, "ESC zum Beenden", DARKGRAY)
-    Text(80, 170, "Highscore: " + STR$(Highscore()), YELLOW)
+    TextMitte(70, "DRACHENHAUCH PONG", WHITE)
+    TextMitte(110, "Druecke ENTER zum Spielen", LIGHTGRAY)
+    TextMitte(130, "ESC zum Beenden", DARKGRAY)
+    TextMitte(170, "Highscore: " + STR$(Highscore()), YELLOW)
 END SUB
 
 SUB UpdateMenu()
@@ -202,7 +210,7 @@ END SUB
 
 ' --- Hauptschleife --------------------------------------------------
 
-Screen(WIDTH, HEIGHT, "GameBasic Pong - Scenes")
+Screen(WIDTH, HEIGHT, "Drachenhauch Pong - Scenes")
 
 SCENE_SWITCH("menu")
 

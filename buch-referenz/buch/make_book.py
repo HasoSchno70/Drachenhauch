@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Zwei-Pass-Build des GameBasic-Lehrbuchs mit korrekten ToC-Seitenzahlen.
+"""Zwei-Pass-Build des Drachenhauch-Lehrbuchs mit korrekten ToC-Seitenzahlen.
 
 Pass 1:  node build_book.js  -> .docx (ToC noch ohne Zahlen) + toc_titles.json
          -> LibreOffice rendert PDF -> Seitenzahl je Ueberschrift messen
@@ -19,8 +19,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe"
-DOCX = os.path.join(HERE, "GameBasic-Lehrbuch.docx")
-PDF = os.path.join(HERE, "GameBasic-Lehrbuch.pdf")
+DOCX = os.path.join(HERE, "Drachenhauch-Lehrbuch.docx")
+PDF = os.path.join(HERE, "Drachenhauch-Lehrbuch.pdf")
 TITLES = os.path.join(HERE, "toc_titles.json")
 PAGES = os.path.join(HERE, "toc_pages.json")
 

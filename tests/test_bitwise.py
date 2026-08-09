@@ -58,7 +58,7 @@ def test_shift_negative_count_throws(run_gb, run_vm):
 
 def test_bnot_basic(run_gb, run_vm):
     src = "PRINT BNOT 0\nPRINT BNOT 5"
-    # Python ~x = -(x+1) -- gleiche Konvention wie GameBasic.
+    # Python ~x = -(x+1) -- gleiche Konvention wie Drachenhauch.
     expected = "-1\n-6\n"
     assert run_gb(src) == expected
     assert run_vm(src) == expected

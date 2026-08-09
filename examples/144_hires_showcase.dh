@@ -1,8 +1,8 @@
 ' ============================================================================
-'  GameBasic HiRes Showcase  --  1600x900, NATIV (scale = 1, kein Stretching)
+'  Drachenhauch HiRes Showcase  --  1600x900, NATIV (scale = 1, kein Stretching)
 ' ============================================================================
 '
-'  Zeigt, dass GameBasic eine hohe Aufloesung mit viel bewegter Grafik
+'  Zeigt, dass Drachenhauch eine hohe Aufloesung mit viel bewegter Grafik
 '  fluessig treibt -- ganz ohne GPU-Shader, nur mit den eingebauten
 '  Zeichenbefehlen (die intern in C/SDL laufen) und dem NumPy-vektorisierten
 '  Partikelsystem.
@@ -36,7 +36,7 @@ CONST H AS INTEGER = 900
 CONST CX AS INTEGER = 800
 CONST CY AS INTEGER = 450
 
-SCREEN(W, H, "GameBasic HiRes Showcase - 1600x900 nativ")
+SCREEN(W, H, "Drachenhauch HiRes Showcase - 1600x900 nativ")
 RANDOMIZE(1337)
 
 ' --- Hintergrund-Gradient: horizontale Baender (volle Breite) --------------
@@ -118,7 +118,7 @@ PARTICLE_SET_COLOR_END(ps, &H200840)       ' verglimmt ins dunkle Violett
 
 ' --- Scroller --------------------------------------------------------------
 DIM scroll_msg AS STRING
-scroll_msg = "            GAMEBASIC HIRES SHOWCASE   ---   1600x900 PIXEL, NATIV GERENDERT (SCALE = 1, KEIN STRETCHING)   ---   STARFIELD + 3D-WUERFEL + GLOW-BOBS + TAUSENDE PARTIKEL, ALLES IN REINEM GAMEBASIC   ---   DIE ZEICHENBEFEHLE LAUFEN INTERN IN C/SDL, PARTIKEL SIND NUMPY-VEKTORISIERT   ---   ESC ZUM BEENDEN            "
+scroll_msg = "            DRACHENHAUCH HIRES SHOWCASE   ---   1600x900 PIXEL, NATIV GERENDERT (SCALE = 1, KEIN STRETCHING)   ---   STARFIELD + 3D-WUERFEL + GLOW-BOBS + TAUSENDE PARTIKEL, ALLES IN REINEM DRACHENHAUCH   ---   DIE ZEICHENBEFEHLE LAUFEN INTERN IN C/SDL, PARTIKEL SIND NUMPY-VEKTORISIERT   ---   ESC ZUM BEENDEN            "
 CONST SCROLL_ADV AS INTEGER = 19      ' fester Zeichen-Vorschub (30pt bold)
 DIM scroll_x AS FLOAT
 scroll_x = W * 1.0
@@ -289,7 +289,7 @@ WHILE NOT QUITREQUESTED() AND NOT KEYPRESSED(KEY_ESCAPE)
 
     ' --- 6) Pulsierendes Logo (oben) ------------------------------------
     DIM logo AS STRING
-    logo = "GAMEBASIC"
+    logo = "DRACHENHAUCH"
     TEXT_SIZE(56)
     TEXT_BOLD(TRUE)
     DIM lw AS INTEGER

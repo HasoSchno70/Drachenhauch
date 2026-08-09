@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Modul: ALLE 22 Widget-Arten in einer Anwendung
+'  DRACHENHAUCH -- gui-Modul: ALLE 22 Widget-Arten in einer Anwendung
 ' ============================================================
 '  Vollbild, randloses Fenster: die Form IST der Bildschirm.
 '
@@ -21,7 +21,7 @@
 ' ============================================================
 IMPORT "gui"
 
-SCREEN(1280, 800, "GameBasic - alle GUI-Widgets", 1)
+SCREEN(1280, 800, "Drachenhauch - alle GUI-Widgets", 1)
 SET_FULLSCREEN(TRUE)
 SETFPS(60)
 

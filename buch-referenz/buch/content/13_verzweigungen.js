@@ -29,7 +29,7 @@ module.exports = (H) => [
   H.code(["noch minderjährig"], { out: true }),
 
   H.h2("Mehrere Fälle: ELSEIF"),
-  H.p("Manchmal gibt es nicht nur zwei Möglichkeiten, sondern eine ganze Treppe von Fällen. Mit ELSEIF hängst du weitere Bedingungen an. GameBasic prüft sie von oben nach unten und nimmt den ersten Block, dessen Bedingung zutrifft – die übrigen werden übersprungen. Ein abschließendes ELSE fängt alles ab, was bis dahin nicht gepasst hat."),
+  H.p("Manchmal gibt es nicht nur zwei Möglichkeiten, sondern eine ganze Treppe von Fällen. Mit ELSEIF hängst du weitere Bedingungen an. Drachenhauch prüft sie von oben nach unten und nimmt den ersten Block, dessen Bedingung zutrifft – die übrigen werden übersprungen. Ein abschließendes ELSE fängt alles ab, was bis dahin nicht gepasst hat."),
   H.cmd("IF / ELSEIF / ELSE", "IF a THEN ... ELSEIF b THEN ... ELSE ... END IF",
     "Eine Kette von Bedingungen. Der erste passende Zweig gewinnt; ELSE ist der Auffang-Zweig für alle übrigen Fälle. (ELIF ist eine erlaubte Kurzschreibweise für ELSEIF.)",
     [
@@ -95,7 +95,7 @@ module.exports = (H) => [
   H.note("Der zu prüfende Wert wird nur ein einziges Mal berechnet – selbst wenn dort ein aufwändiger Funktionsaufruf steht. Das ist ein Vorteil gegenüber einer IF-Treppe, in der du den Ausdruck bei jeder Prüfung wiederholen müsstest."),
 
   H.h2("Zusätzliche Bedingung: CASE ... WHERE"),
-  H.p("Manchmal soll ein CASE nur greifen, wenn zusätzlich eine weitere Bedingung erfüllt ist. Dafür hängst du WHERE an. Passt das Muster, der WHERE-Ausdruck ist aber falsch, probiert GameBasic den nächsten CASE. So kombinierst du den Wert mit beliebigem Zusatzwissen:"),
+  H.p("Manchmal soll ein CASE nur greifen, wenn zusätzlich eine weitere Bedingung erfüllt ist. Dafür hängst du WHERE an. Passt das Muster, der WHERE-Ausdruck ist aber falsch, probiert Drachenhauch den nächsten CASE. So kombinierst du den Wert mit beliebigem Zusatzwissen:"),
   H.code([
     'DIM hp AS INTEGER',
     'DIM trank AS BOOLEAN',

@@ -1,4 +1,4 @@
-//! AST-Knoten fuer GameBasic -- Rust-Port von `drachenhauch/ast_nodes.py`.
+//! AST-Knoten fuer Drachenhauch -- Rust-Port von `drachenhauch/ast_nodes.py`.
 //! Stufe 2 der Front-End-Portierung (siehe docs/rust-frontend-port.md).
 //!
 //! `to_json()` emittiert exakt die Struktur, die der Python-Test aus den

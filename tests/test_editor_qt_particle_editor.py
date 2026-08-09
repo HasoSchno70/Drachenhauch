@@ -88,7 +88,7 @@ def _find_dhrt():
 
 
 def test_runnable_demo_is_valid_gb(editor, tmp_path):
-    """Die 'In GameBasic testen'-Demo muss gueltiger GB-Code sein."""
+    """Die 'In Drachenhauch testen'-Demo muss gueltiger GB-Code sein."""
     dhrt = _find_dhrt()
     if dhrt is None:
         pytest.skip("dhrt nicht gebaut")

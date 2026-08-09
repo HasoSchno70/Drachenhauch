@@ -113,9 +113,14 @@ def test_upper_lower_aliases(run_gb):
 
 
 def test_left_right_mid(run_gb):
-    assert _p(run_gb, 'LEFT$("GameBasic", 4)', 'RIGHT$("GameBasic", 5)',
-              'MID$("GameBasic", 4, 5)', 'MID$("GameBasic", 4)') == \
-        ["Game", "Basic", "Basic", "Basic"]
+    # "TestString" statt des Produktnamens: der Test lebt davon, dass die
+    # Zeichenkette in zwei erkennbare Woerter zerfaellt (frueher Game+Basic).
+    # Mit dem Namen als Testdaten bricht er bei jeder Umbenennung -- genau
+    # das ist beim Wechsel auf Drachenhauch passiert, weil die EINGABE
+    # mitwanderte und die erwarteten Ausgaben nicht.
+    assert _p(run_gb, 'LEFT$("TestString", 4)', 'RIGHT$("TestString", 6)',
+              'MID$("TestString", 4, 6)', 'MID$("TestString", 4)') == \
+        ["Test", "String", "String", "String"]
 
 
 def test_left_negative_clamped(run_gb):

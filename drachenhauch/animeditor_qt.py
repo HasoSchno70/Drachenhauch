@@ -43,7 +43,7 @@ except Exception:  # pragma: no cover - Theme optional
 
 # EINE Quelle fuer die dhrt-Suche (`editor_qt/dhrt_locate.py`): die frueher hier
 # stehende Kopie kannte nur den Dev-Baum und meldete in der installierten IDE
-# "Runtime nicht gebaut", obwohl `dhrt.exe` neben `GameBasic.exe` liegt. Als
+# "Runtime nicht gebaut", obwohl `dhrt.exe` neben `Drachenhauch.exe` liegt. Als
 # Alias importiert bleibt der Modul-Name `_find_dhrt` fuer Tests patchbar.
 from .editor_qt.dhrt_locate import find_dhrt as _find_dhrt
 

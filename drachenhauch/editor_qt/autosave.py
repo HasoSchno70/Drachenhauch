@@ -1,6 +1,6 @@
 """Auto-Save fuer dirty Tabs + Crash-Recovery beim Start.
 
-Schreibt Snapshots in `%APPDATA%/GameBasic/autosave/` plus eine
+Schreibt Snapshots in `%APPDATA%/Drachenhauch/autosave/` plus eine
 `manifest.json` mit Mappings auf Original-Pfade. Beim naechsten
 Editor-Start liest `recover_unsaved()` das Manifest und liefert die
 Eintraege zur Wiederaufnahme. Nach erfolgreichem Save (oder explizitem

@@ -20,4 +20,4 @@ Git-Repo. Ihre Lizenzen verlangen Namensnennung:
    sanft ein-/ausgeblendeten Boeen abgespielt. Fehlt die Datei, laeuft das
    Demo ohne Wind. Lizenz/Quelle bitte selbst pruefen.
 
-Das Feuer (Partikel) + Flackerlicht ist eigener GameBasic-Code.
+Das Feuer (Partikel) + Flackerlicht ist eigener Drachenhauch-Code.

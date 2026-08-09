@@ -19,7 +19,7 @@ module.exports = (H) => [
   H.bulletRich("{n}  {n,m}", " – genau n bzw. zwischen n und m Wiederholungen."),
   H.bulletRich("( … )", " – eine Capture-Gruppe (merkt sich den Treffer-Teil)."),
   H.bulletRich("^  $   a|b", " – Anfang · Ende · „a oder b“."),
-  H.note("In GameBasic-Strings ist der Backslash KEIN Sonderzeichen – du schreibst das Muster also direkt als \"\\d+\", nicht \"\\\\d+\". Das macht Regex-Strings angenehm lesbar."),
+  H.note("In Drachenhauch-Strings ist der Backslash KEIN Sonderzeichen – du schreibst das Muster also direkt als \"\\d+\", nicht \"\\\\d+\". Das macht Regex-Strings angenehm lesbar."),
 
   H.h2("Prüfen: MATCH, TEST und FIND"),
   H.p("Drei Befehle beantworten unterschiedliche Fragen. REGEX_MATCH verlangt, dass das Muster den GESAMTEN Text abdeckt. REGEX_TEST fragt nur, ob das Muster irgendwo vorkommt. REGEX_FIND liefert den ersten passenden Textausschnitt zurück."),
@@ -61,10 +61,10 @@ module.exports = (H) => [
     "Ersetzt alle bzw. nur den ersten Treffer. \\1, \\2 … im Ersatz stehen für die gefundenen Gruppen.",
     [
       'IMPORT "regex"',
-      'PRINT REGEX_REPLACE("Hello WORLD", "WORLD", "GameBasic")',
+      'PRINT REGEX_REPLACE("Hello WORLD", "WORLD", "Drachenhauch")',
       'PRINT REGEX_REPLACE("Anna 30, Bob 25", "(\\w+) (\\d+)", "\\2 (\\1)")',
       'PRINT REGEX_REPLACE_ONCE("ha ha ha", "ha", "OK")',
-    ], { out: ["Hello GameBasic", "30 (Anna), 25 (Bob)", "OK ha ha"] }),
+    ], { out: ["Hello Drachenhauch", "30 (Anna), 25 (Bob)", "OK ha ha"] }),
 
   H.h2("Zerlegen: REGEX_SPLIT"),
   H.p("REGEX_SPLIT ist wie SPLIT, nur dass die Trennstelle ein Muster ist. So zerlegst du z. B. an beliebig viel Whitespace oder an Kommas mit optionalen Leerzeichen drumherum."),

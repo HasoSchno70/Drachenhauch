@@ -30,7 +30,7 @@ pip install hidapi
 
 ## Bytes ↔ STRING
 
-USB-HID-Reports sind Roh-Bytes. Damit beliebige Bytewerte verlustfrei durch GameBasic-STRINGs laufen, kodiert dieses Modul mit **latin-1** — jeder Codepoint 0..255 entspricht einem Byte:
+USB-HID-Reports sind Roh-Bytes. Damit beliebige Bytewerte verlustfrei durch Drachenhauch-STRINGs laufen, kodiert dieses Modul mit **latin-1** — jeder Codepoint 0..255 entspricht einem Byte:
 
 ```basic
 DIM data$ AS STRING

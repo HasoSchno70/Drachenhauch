@@ -1,4 +1,4 @@
-' Mini-Pong in GameBasic.
+' Mini-Pong in Drachenhauch.
 ' Steuerung: W/S = links hoch/runter, Pfeil hoch/runter = rechts.
 ' ESC oder Fenster-X = beenden.
 '
@@ -99,7 +99,7 @@ FUNCTION HitsPaddle(b AS Ball, p AS Paddle) AS BOOLEAN
 END FUNCTION
 
 ' --- Setup ---
-Screen(Field.WIDTH, Field.HEIGHT, "GameBasic - Pong")
+Screen(Field.WIDTH, Field.HEIGHT, "Drachenhauch - Pong")
 
 ' Input-Mapping. Beide Spielerseiten kriegen jeweils zwei Tastatur-
 ' Bindungen -- Player 1 standardmaessig W/S, aber Pfeile gehen auch.

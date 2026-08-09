@@ -1,5 +1,5 @@
 #version 330
-// Der Post-Effekt der GameBasic-Demo. EIN Shader fuer alle Szenen: `mode`
+// Der Post-Effekt der Drachenhauch-Demo. EIN Shader fuer alle Szenen: `mode`
 // schaltet um, `bass`/`hoehen` kommen aus dem echten AUDIO_FFT, `fade`
 // blendet zwischen den Szenen ab.
 //

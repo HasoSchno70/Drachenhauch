@@ -1069,7 +1069,7 @@ impl Graphics {
     /// Damit funktionieren LOADIMAGE & Co. auch VOR (oder ganz ohne) SCREEN.
     /// Ein spaeteres SCREEN macht das Fenster via `reconfigure` sichtbar.
     pub fn new_headless() -> Graphics {
-        Graphics::new_impl(64, 64, "GameBasic", 1, true, false)
+        Graphics::new_impl(64, 64, "Drachenhauch", 1, true, false)
     }
     /// Fenster mit transparentem Framebuffer (SCREEN_TRANSPARENT). Das Flag muss
     /// schon bei der Fenster-Erzeugung gesetzt sein -- nicht nachtraeglich machbar.
@@ -5363,7 +5363,7 @@ fn map_key(code: i64) -> Option<KeyboardKey> {
         // und tut still gar nichts -- `ASC("s")` ist gemeint.
         97..=122 => return key_from_i32((code - 32) as i32),
         // Satzzeichen (SDL-Keycodes). Ohne sie lief `KEYHIT(ASC("-"))` ins
-        // Leere: die Taste existierte fuer GameBasic schlicht nicht, ohne
+        // Leere: die Taste existierte fuer Drachenhauch schlicht nicht, ohne
         // Fehlermeldung. raylib benennt die Tasten nach ihrer PHYSISCHEN Lage
         // im US-Layout -- auf anderen Belegungen sitzt das Zeichen also
         // moeglicherweise woanders (deshalb sind Ziffern und Buchstaben die

@@ -1,6 +1,8 @@
-# GameBasic
+<p align="center">
+  <img src="drachenhauch/assets/schriftzug.png" alt="Drachenhauch" width="560">
+</p>
 
-*[Deutsch](README.md) · English*
+<p align="center"><em><a href="README.md">Deutsch</a> · English</em></p>
 
 A BASIC dialect with Pascal-strict typing and OOP, built for games. Programs run through **`dhrt`** — the native Rust/raylib runtime, which lexes, parses, compiles and executes the source itself (graphics/audio/3D included). Python is now only the editor/tooling layer.
 
@@ -24,7 +26,7 @@ WEND
 
 ## Download
 
-**[Download GameBasic for Windows](https://github.com/HasoSchno70/Game-Basic/releases/latest)** — a single installer, about 81 MB, currently version 2026.1.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Game-Basic/releases/latest)** — a single installer, about 81 MB, currently version 2026.1.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 174 examples with their assets, the textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
@@ -37,11 +39,11 @@ You do **not** need Python installed. It ships the complete development environm
 
 ## The textbook
 
-**[GameBasic — The Textbook](buch-referenz/buch/)** (German) is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. 414 pages, seven parts, 75 chapters, every code sample verified against `dhrt --check`.
+**[Drachenhauch — The Textbook](buch-referenz/buch/)** (German) is two things at once: a course that takes you from the first black window to classes, modules and finished games, and a reference in which **every single command** is explained with a runnable example program. 414 pages, seven parts, 75 chapters, every code sample verified against `dhrt --check`.
 
 ```
-node build_book.js                    # -> GameBasic-Lehrbuch.docx
-node build_epub.js                    # -> GameBasic-Lehrbuch.epub (for e-readers)
+node build_book.js                    # -> Drachenhauch-Lehrbuch.docx
+node build_epub.js                    # -> Drachenhauch-Lehrbuch.epub (for e-readers)
 <venv>\python.exe make_book.py        # two-pass build with page numbers in the TOC
 ```
 
@@ -66,10 +68,10 @@ Full documentation lives in the [docs/](docs/README.md) folder (mostly German fo
 - **[Tilemap/level editor](docs/tilemap-editor.md)** — paint tiles onto a grid (`dhtilemap`): multiple layers, object layer, **multiple tilesets**, per-tile properties (`solid`/`damage`), pencil/fill/rectangle/eyedropper/**selection** (copy/cut/paste), save/load as Tiled JSON (`TILED_LOAD`), GB code renderer export
 - **[Form designer (WYSIWYG)](docs/form-designer.md)** — visual GUI designer in Xojo style (`dhform`): place/configure controls, save as `.dhform`, use in your own code via `GUI_LOAD` or launch with F5
 - **[Animation FSM editor](docs/anim-editor.md)** — node graph for animation state machines, Unity-Mecanim style (`dhanim`): visually wire up states (bound to a sprite animation) + parameters + transitions with conditions, save as `.dhanim`, use via `ANIM_FSM_LOAD` ([module `animfsm`](docs/module-animfsm.md)), live preview with F5
-- **[Language server + VSCode extension](docs/lsp.md)** — GameBasic in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline (`py -m drachenhauch.lsp`, `vscode-drachenhauch/`)
+- **[Language server + VSCode extension](docs/lsp.md)** — Drachenhauch in any LSP editor: syntax highlighting, diagnostics, completion, hover, goto-definition, references, outline (`py -m drachenhauch.lsp`, `vscode-drachenhauch/`)
 - **[Web playground](docs/web-playground.md)** — `dhrt` as WebAssembly in the browser, [table below](#web-playground)
 - **[`cloud` module](docs/module-cloud.md)** — cloud save + leaderboard against the bundled, self-hostable reference server [`cloudserver/`](cloudserver/README.md) (Flask + SQLite, shared API-key secret): `CLOUD_CONFIGURE`/`CLOUD_SAVE`/`CLOUD_LOAD`, `LEADERBOARD_SUBMIT`/`LEADERBOARD_FETCH`. Plus **`NUMFMT$`** (core built-in) for idle-/incremental-game-style big-number formatting (`1234567` → `"1.23M"`, K/M/B/T/Qa/Qi/Sx/Sp/Oc/No/Dc, falling back to scientific notation beyond that). Demo [examples/146_cloud_idle.dh](examples/146_cloud_idle.dh)
-- **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its GameBasic counterpart [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — which you can finish **without any board** using `mosquitto_pub`
+- **[Connecting an ESP32 / ESP8266](esp32/README.md)** — a ready-made sketch skeleton (Wi-Fi, broker connection, reconnect, receiving) with four marked spots for your own code; **one file for both boards**, compiled for ESP32/ESP8266/ESP32-C3/ESP32-S3. Talks [`mqtt`](docs/module-mqtt.md) to its Drachenhauch counterpart [examples/159_esp32_bruecke.dh](examples/159_esp32_bruecke.dh) — which you can finish **without any board** using `mosquitto_pub`
 
 ### Modules
 
@@ -183,7 +185,7 @@ tracker in the tradition of ProTracker, FastTracker and Renoise.
 | | |
 |---|---|
 | Project | save and load as `.json` |
-| GB player | export as frame-driven GameBasic code |
+| GB player | export as frame-driven Drachenhauch code |
 | WAV | song mixed offline, **stereo with Amiga hard-panning** → straight into `PLAYMUSIC` |
 
 ### Web playground

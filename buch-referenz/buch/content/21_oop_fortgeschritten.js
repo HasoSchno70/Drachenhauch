@@ -141,7 +141,7 @@ module.exports = (H) => [
       'PRINT (a + b).cent',
     ],
     { out: ["400"] }),
-  H.note("Pro Operator gibt es genau eine Definition – ein Mischen von Geld + Geld und Geld + INTEGER in zwei getrennten Blöcken ist nicht möglich. Überladene Operatoren werden wie Methoden mitvererbt. Für fertige mathematische Typen liefert GameBasic übrigens schon Module mit, etwa vec2 für 2D-Vektoren (Teil V)."),
+  H.note("Pro Operator gibt es genau eine Definition – ein Mischen von Geld + Geld und Geld + INTEGER in zwei getrennten Blöcken ist nicht möglich. Überladene Operatoren werden wie Methoden mitvererbt. Für fertige mathematische Typen liefert Drachenhauch übrigens schon Module mit, etwa vec2 für 2D-Vektoren (Teil V)."),
 
   H.h2("Statische Mitglieder: zur Klasse, nicht zum Objekt"),
   H.p("Bisher gehörte jedes Feld einem Objekt. Manche Werte gehören aber zur Klasse als Ganzes – feste Kennzahlen, die für alle Objekte gleich sind und kein Objekt zum Nachschlagen brauchen: die maximale Lebenspunktzahl, der Spielname, die Schwerkraft. Dafür gibt es STATIC CONST. Du sprichst sie über den Klassennamen an, ohne je ein Objekt zu erzeugen."),
@@ -150,13 +150,13 @@ module.exports = (H) => [
     [
       'CLASS Config',
       '    STATIC CONST MAX_HP AS INTEGER = 100',
-      '    STATIC CONST SPIELNAME AS STRING = "GameBasic"',
+      '    STATIC CONST SPIELNAME AS STRING = "Drachenhauch"',
       'END CLASS',
       '',
       'PRINT Config.MAX_HP',
       'PRINT Config.SPIELNAME',
     ],
-    { out: ["100", "GameBasic"] }),
+    { out: ["100", "Drachenhauch"] }),
   H.p("Innerhalb einer Methode der Klasse greifst du genauso zu (Config.MAX_HP). Statische Konstanten sind fest – sie lassen sich zur Laufzeit nicht überschreiben. Brauchst du veränderlichen, geteilten Zustand, nimm stattdessen eine globale Variable."),
 
   H.tip("Nicht übertreiben", "Vererbung, Properties und Operatoren sind starke Werkzeuge – aber nicht jedes Programm braucht sie. Fang ruhig mit schlichten Klassen aus Feldern und Methoden an (Kapitel 20). Greife zu Vererbung, wenn echte „ist ein“-Beziehungen vorliegen (ein Hund IST ein Tier), zu Properties bei Werten mit Regeln, zu Operatoren nur bei echten Rechen-Typen. Klarheit schlägt Cleverness."),

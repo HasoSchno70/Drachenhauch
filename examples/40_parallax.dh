@@ -56,7 +56,7 @@ WHILE NOT QUITREQUESTED()
     CIRCLE(sun_x, sun_y, 22, RGB(255, 240, 180))
 
     ' --- Layer 1: ferne Berge (langsam) - gefuellte Dreiecke ------------
-    ' GameBasic hat kein TRIANGLE, also stapeln wir horizontale LINEs
+    ' Drachenhauch hat kein TRIANGLE, also stapeln wir horizontale LINEs
     ' von Spitze nach Boden: pro Zeile berechnet sich die Halb-Breite
     ' linear vom Peak aus.
     DIM mtn_w AS INTEGER

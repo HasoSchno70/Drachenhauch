@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- imgfx-Erweiterungen
+'  DRACHENHAUCH -- imgfx-Erweiterungen
 ' ============================================================
 '  Zeigt die neuen Bild-Builtins:
 '   * In ein Image zeichnen (MUTIEREND): IMAGE_DRAW_RECT/CIRCLE/LINE/TEXT
@@ -10,7 +10,7 @@
 '  [ESC] Ende
 ' ============================================================
 IMPORT "imgfx"
-SCREEN(680, 380, "GameBasic - imgfx", 1)
+SCREEN(680, 380, "Drachenhauch - imgfx", 1)
 
 ' --- 1) Eine leere Leinwand und mit IMAGE_DRAW_* bemalen (mutierend) ---
 DIM canvas AS IMAGE

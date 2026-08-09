@@ -29,7 +29,7 @@ module.exports = (H) => [
   H.warn("Greifst du auf ein Fach zu, das es nicht gibt – etwa punkte[5] bei nur 5 Fächern (gültig sind 0 bis 4) – bricht das Programm mit einem Fehler ab. Achte immer darauf, innerhalb der Grenzen zu bleiben. Die Grenze liefert dir LEN (siehe unten)."),
 
   H.h2("Ein Array gleich mit Werten füllen: das Array-Literal"),
-  H.p("Jedes Fach einzeln zu beschreiben ist umständlich, wenn du die Werte schon kennst. Dafür gibt es das Array-Literal: eine Liste von Werten in eckigen Klammern, durch Komma getrennt. Damit legst du ein fertig gefülltes Array in einer einzigen Zeile an. Welchen Typ die Fächer haben, erkennt GameBasic an den Werten selbst."),
+  H.p("Jedes Fach einzeln zu beschreiben ist umständlich, wenn du die Werte schon kennst. Dafür gibt es das Array-Literal: eine Liste von Werten in eckigen Klammern, durch Komma getrennt. Damit legst du ein fertig gefülltes Array in einer einzigen Zeile an. Welchen Typ die Fächer haben, erkennt Drachenhauch an den Werten selbst."),
   H.cmd("Array-Literal", "[wert1, wert2, ...]",
     "Erzeugt ein fertig gefülltes Array. Nur Ganzzahlen ergeben ein INTEGER-Array, Kommazahlen ein FLOAT-Array, Texte ein STRING-Array. Die Länge ist die Anzahl der Werte.",
     [

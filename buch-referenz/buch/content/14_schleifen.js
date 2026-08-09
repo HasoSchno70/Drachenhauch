@@ -1,9 +1,9 @@
 module.exports = (H) => [
   H.chapter("Schleifen"),
-  H.p("Computer sind unermüdlich – und genau das machen wir uns mit Schleifen zunutze. Eine Schleife wiederholt einen Block von Befehlen, bis eine bestimmte Bedingung erfüllt ist. Ob du von 1 bis 100 zählst, alle Gegner eines Spiels aktualisierst oder so lange würfelst, bis eine Sechs fällt: Schleifen sind das Herz fast jedes Programms. GameBasic kennt mehrere Sorten, jede für eine andere Situation."),
+  H.p("Computer sind unermüdlich – und genau das machen wir uns mit Schleifen zunutze. Eine Schleife wiederholt einen Block von Befehlen, bis eine bestimmte Bedingung erfüllt ist. Ob du von 1 bis 100 zählst, alle Gegner eines Spiels aktualisierst oder so lange würfelst, bis eine Sechs fällt: Schleifen sind das Herz fast jedes Programms. Drachenhauch kennt mehrere Sorten, jede für eine andere Situation."),
 
   H.h2("Eine feste Anzahl: FOR ... NEXT"),
-  H.p("Die FOR-Schleife zählt eine Variable von einem Startwert bis zu einem Endwert hoch und führt für jeden Wert den Block aus. Das NEXT markiert das Ende des Blocks – dort springt GameBasic zurück und erhöht die Zählvariable."),
+  H.p("Die FOR-Schleife zählt eine Variable von einem Startwert bis zu einem Endwert hoch und führt für jeden Wert den Block aus. Das NEXT markiert das Ende des Blocks – dort springt Drachenhauch zurück und erhöht die Zählvariable."),
   H.cmd("FOR ... NEXT", "FOR var = start TO ende\n    ...\nNEXT",
     "Wiederholt den Block, während die Zählvariable von start bis ende läuft (beide Grenzen eingeschlossen). Nach jedem Durchlauf wird die Variable um 1 erhöht. Die Zählvariable muss vorher mit DIM angelegt sein.",
     [

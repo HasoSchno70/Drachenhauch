@@ -1,9 +1,9 @@
-# GameBasic – The Textbook
+# Drachenhauch – The Textbook
 
 *[Deutsch](README.md) · English overview*
 
-**The book itself is written in German** (`buch/GameBasic-Lehrbuch.docx`) — a complete
-teach-yourself-and-reference book for GameBasic covering the whole language plus every
+**The book itself is written in German** (`buch/Drachenhauch-Lehrbuch.docx`) — a complete
+teach-yourself-and-reference book for Drachenhauch covering the whole language plus every
 built-in command, each with its own small example program. This page exists so that
 readers who don't read German can still see what the book covers and decide whether it's
 worth running through a translator.
@@ -14,14 +14,14 @@ in [`buch/OUTLINE.md`](buch/OUTLINE.md) — content lives in small, self-contain
 build pipeline.
 
 - Build instructions & full outline (German): [`buch/OUTLINE.md`](buch/OUTLINE.md)
-- Build: `cd buch && node build_book.js` → `GameBasic-Lehrbuch.docx`. With correct
+- Build: `cd buch && node build_book.js` → `Drachenhauch-Lehrbuch.docx`. With correct
   table-of-contents page numbers: `python make_book.py`.
 
 ## Table of contents (translated)
 
 **Part I — Getting started**
 - Foreword & welcome
-- What is GameBasic?
+- What is Drachenhauch?
 - Installation, editor & running programs
 - Your first program
 

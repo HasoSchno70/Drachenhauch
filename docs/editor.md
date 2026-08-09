@@ -1,6 +1,6 @@
 # Editor
 
-Der GameBasic-Editor (`dhrun.py --editor` oder einfach `dhrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Debug/Profile, Find in Project, klickbare Fehler.
+Der Drachenhauch-Editor (`dhrun.py --editor` oder einfach `dhrun.py` ohne Argument) ist eine eigenständige IDE: Syntax-Highlighting, Auto-Vervollständigung, Snippets, Built-in-Sidebar, Run/Debug/Profile, Find in Project, klickbare Fehler.
 
 ## Starten
 
@@ -393,7 +393,7 @@ Der Editor hat einen **Tree-Walking-Debugger** mit Breakpoints, Einzelschritt un
 
 **Ablauf:** Setz einen oder mehrere Breakpoints, drück `F7`. Das Programm läuft bis zum ersten Breakpoint (oder hält am ersten Statement, wenn keiner gesetzt ist). Die **aktuelle Zeile** wird mit einem ▶-Pfeil im Gutter und einem Zeilen-Highlight markiert; das Panel **Variablen** (rechts) zeigt die lokalen und globalen Variablen (Name / Wert / Typ) — nur deine eigenen, die eingebauten Konstanten (`BLACK`, `KEY_*`, `PI` …) sind ausgeblendet. `PRINT`-Ausgabe landet in der Konsole.
 
-**Conditional Breakpoints:** Per **Rechtsklick** im Gutter-Band lässt sich pro Breakpoint ein GameBasic-Ausdruck als Bedingung hinterlegen (z. B. `i > 100` oder `hp <= 0 AND NOT dead`). Der Debugger hält dort nur an, wenn der Ausdruck im aktuellen Kontext **wahr** ist — ideal, um in einer Schleife erst beim n-ten Durchlauf zu stoppen. Bedingte Breakpoints werden als **hohler Ring** dargestellt (unbedingte als gefüllter Punkt). Eine leere Eingabe macht den Breakpoint wieder unbedingt. Ein nicht parsebarer oder zur Laufzeit fehlerhafter Ausdruck hält fail-open an (mit Hinweis in der Konsole), damit kein Breakpoint stillschweigend verschluckt wird.
+**Conditional Breakpoints:** Per **Rechtsklick** im Gutter-Band lässt sich pro Breakpoint ein Drachenhauch-Ausdruck als Bedingung hinterlegen (z. B. `i > 100` oder `hp <= 0 AND NOT dead`). Der Debugger hält dort nur an, wenn der Ausdruck im aktuellen Kontext **wahr** ist — ideal, um in einer Schleife erst beim n-ten Durchlauf zu stoppen. Bedingte Breakpoints werden als **hohler Ring** dargestellt (unbedingte als gefüllter Punkt). Eine leere Eingabe macht den Breakpoint wieder unbedingt. Ein nicht parsebarer oder zur Laufzeit fehlerhafter Ausdruck hält fail-open an (mit Hinweis in der Konsole), damit kein Breakpoint stillschweigend verschluckt wird.
 
 **Grenzen:** `INPUT` liefert im Debugger EOF (kein Hängen). Grafik-Programme laufen, aber das Schrittweise durch eine 60-fps-Schleife ist unpraktisch — Breakpoints in Init-/Logik-Code funktionieren trotzdem. Während einer Debug-Sitzung sind Run/Bench deaktiviert.
 
@@ -459,9 +459,9 @@ Der **Markdown-Viewer** rendert die Doku theme-treu (helle Schrift auf dunklem G
 
 ## Branding (Window-Icon + About-Dialog)
 
-Das GameBasic-Logo aus `drachenhauch/assets/logo.png` wird automatisch:
+Das Drachenhauch-Logo aus `drachenhauch/assets/logo.png` wird automatisch:
 - als **Fenster-/Taskleisten-Icon** verwendet (quadratischer Smart-Crop, 64 × 64)
-- im **About-Dialog** angezeigt — `Hilfe → Ueber GameBasic` oder Befehlspalette `Ueber GameBasic`
+- im **About-Dialog** angezeigt — `Hilfe → Ueber Drachenhauch` oder Befehlspalette `Ueber Drachenhauch`
 
 Voraussetzung ist das optionale Paket `Pillow`:
 
@@ -520,7 +520,7 @@ Der Editor verarbeitet auch große Dateien (mehrere tausend Zeilen) flüssig:
 - **Asynchroner Live-Errorcheck**: der Parser läuft in einem Worker-Thread, ein Generation-Counter verwirft veraltete Resultate.
 - **Tag-Batching für Indent-Guides**: alle Spalten-Marker werden in einem einzigen `tag_add`-Call übergeben statt N einzelner Calls.
 
-GameBasic-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), darum ist jede Zeile tokenmäßig unabhängig — das macht das inkrementelle Highlighting korrekt ohne Span-Tracking.
+Drachenhauch-Tokens enden am Zeilenende (keine Multi-Line-Strings/-Kommentare), darum ist jede Zeile tokenmäßig unabhängig — das macht das inkrementelle Highlighting korrekt ohne Span-Tracking.
 
 ## Bekannte Eigenheiten
 

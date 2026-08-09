@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- Glas-Fenster (durchscheinender Hintergrund)
+'  DRACHENHAUCH -- Glas-Fenster (durchscheinender Hintergrund)
 ' ============================================================
 '  SCREEN_TRANSPARENT ohne UNDECORATED: ein normales Fenster (mit Rahmen
 '  und Titelleiste), dessen Hintergrund halbtransparent ist -> der Desktop
@@ -7,7 +7,7 @@
 '  Der Clou steckt im CLS-Alpha: CLS(&Haarrggbb) mit a < 255.
 '  [ESC] Ende
 ' ============================================================
-SCREEN_TRANSPARENT(520, 340, "GameBasic - Glas-Fenster")
+SCREEN_TRANSPARENT(520, 340, "Drachenhauch - Glas-Fenster")
 SETFPS(60)
 
 DIM w AS INTEGER : w = SCREENWIDTH()

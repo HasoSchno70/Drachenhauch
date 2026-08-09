@@ -1,4 +1,4 @@
-"""GameBasic - Eintrittspunkt fuer den Interpreter.
+"""Drachenhauch - Eintrittspunkt fuer den Interpreter.
 
 Verwendung:
     python dhrun.py <datei.dh>
@@ -20,9 +20,9 @@ def _project_root():
     """Basisordner des Editors (Beispiele/Showcase + Default-Arbeitsverzeichnis).
 
     - Eingefroren (per Installer): ein BESCHREIBBARER, fester Ort.
-      Windows: ``%PUBLIC%\\Documents\\GameBasic`` -- dort legt der Inno-
+      Windows: ``%PUBLIC%\\Documents\\Drachenhauch`` -- dort legt der Inno-
       Installer ``examples/`` (inkl. ``screenshots/``) beim Installieren ab.
-      macOS/Linux: ``~/Documents/GameBasic`` -- .dmg/AppImage/Tarball haben
+      macOS/Linux: ``~/Documents/Drachenhauch`` -- .dmg/AppImage/Tarball haben
       keinen Installations-Skript-Schritt wie Inno Setup, daher werden die
       Beispiele dort stattdessen beim allerersten Start aus dem Bundle
       kopiert (siehe `_seed_examples_if_missing`). Das PyInstaller-Bundle
@@ -33,8 +33,8 @@ def _project_root():
     if getattr(sys, "frozen", False):
         if os.name == "nt":
             public = os.environ.get("PUBLIC") or r"C:\Users\Public"
-            return Path(public) / "Documents" / "GameBasic"
-        root = Path.home() / "Documents" / "GameBasic"
+            return Path(public) / "Documents" / "Drachenhauch"
+        root = Path.home() / "Documents" / "Drachenhauch"
         _seed_examples_if_missing(root)
         return root
     return Path(__file__).resolve().parent
@@ -64,7 +64,7 @@ def _seed_examples_if_missing(root: Path) -> None:
 
 def _print_help_and_examples():
     from drachenhauch import __version__
-    print(f"GameBasic v{__version__}")
+    print(f"Drachenhauch v{__version__}")
     print()
     print("Verwendung:  python dhrun.py [--tokens|--ast] <datei.dh>")
     print("             gb.cmd                <datei.dh>     (Windows-Launcher mit .venv)")
@@ -189,7 +189,7 @@ def _launch_chooser(project_root):
         pass
 
     dlg = QDialog()
-    dlg.setWindowTitle("GameBasic")
+    dlg.setWindowTitle("Drachenhauch")
     lay = QVBoxLayout(dlg)
     title = QLabel("Was möchtest du öffnen?")
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -424,7 +424,7 @@ def main(argv):
 def _find_dhrt():
     """Sucht das `dhrt`-Binary. Reihenfolge:
     1. Eingefrorene Installation (PyInstaller): neben der Exe bzw. im Bundle
-       (_MEIPASS) -- so findet die installierte GameBasic-App ihre Runtime.
+       (_MEIPASS) -- so findet die installierte Drachenhauch-App ihre Runtime.
     2. Dev-Baum: rust/drachenhauch_runtime/target/{release,debug}/dhrt[.exe]."""
     exe = "dhrt.exe" if os.name == "nt" else "dhrt"
     cands = []

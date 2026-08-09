@@ -1,8 +1,8 @@
 # Form-Designer (WYSIWYG, Xojo-Stil)
 
-Visueller GUI-Designer für GameBasic — Controls per Klick platzieren, im
+Visueller GUI-Designer für Drachenhauch — Controls per Klick platzieren, im
 Inspector konfigurieren, als `.dhform` speichern und mit den `gui`-Builtins zur
-Laufzeit laden. Sprache der Logik bleibt GameBasic.
+Laufzeit laden. Sprache der Logik bleibt Drachenhauch.
 
 **Start:** `dhform [datei.dhform | projekt.dhproj]` (bzw. `dhrun.py --form`).
 Benötigt PySide6. Alternativ `gb` (oder `dhrun.py`) **ohne Argument** →
@@ -87,7 +87,7 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
   „größenveränderbar" gesetzt, ist das **gebaute Fenster zur Laufzeit** am
   unteren-rechten Griff ziehbar (geklemmt an Min/Max) — `GUI_WINDOW_RESIZABLE` /
   `GUI_WINDOW_SET_MIN_SIZE`/`MAX_SIZE` in der `gui`-Runtime.
-- **Unten — Code:** integrierter GameBasic-Editor (syntax-gehighlightet). Eine
+- **Unten — Code:** integrierter Drachenhauch-Editor (syntax-gehighlightet). Eine
   Combo listet die Event-Handler des Formulars, der Editor zeigt/ändert den Body
   des gewählten. **Doppelklick auf ein Control** legt für sein Haupt-Event einen
   Handler an (Name `<control>Click`/`Changed`) bzw. springt zu einem vorhandenen

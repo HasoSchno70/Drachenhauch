@@ -1,4 +1,4 @@
-' === GameBasic Logo-Wobbler ===
+' === Drachenhauch Logo-Wobbler ===
 '
 ' Klassischer Amiga-Demoszene-Effekt: das Logo wird zeilenweise
 ' horizontal verschoben, mit Sinus-Wellen pro Zeile. Plus Sternenfeld
@@ -11,7 +11,7 @@ IMPORT "imgfx"
 CONST WIDTH  AS INTEGER = 320
 CONST HEIGHT AS INTEGER = 200
 
-SCREEN(WIDTH, HEIGHT, "GameBasic Wobbler", 3)
+SCREEN(WIDTH, HEIGHT, "Drachenhauch Wobbler", 3)
 RANDOMIZE(7)
 
 ' --- Music (CC0 Chiptune von Juhani Junkala, optional) ---------------

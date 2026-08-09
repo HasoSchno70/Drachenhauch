@@ -2,7 +2,7 @@
 ' Programm, ohne Threading. Zeigt den klassischen non-blocking-Loop:
 ' Server startet -> Client verbindet -> beide tauschen Nachrichten aus.
 '
-' GameBasic hat kein Threading -- echte Server+Client-Anwendungen lauft
+' Drachenhauch hat kein Threading -- echte Server+Client-Anwendungen lauft
 ' man als separate Programme (zwei Terminals: einmal mit dem Code unten
 ' "ROLE = server" und einmal "ROLE = client"). Hier zeigt das Demo den
 ' Roundtrip im selben Prozess.

@@ -6,7 +6,7 @@
 > (`builtins.rs`/`vm.rs`) + ein run_gb-Golden-Test. „BEIDE Pfade"/`interpreter.py`
 > unten sind historisch.
 
-Ergebnis eines Audits des GameBasic-Befehlssatzes (~710 Builtins): Lücken,
+Ergebnis eines Audits des Drachenhauch-Befehlssatzes (~710 Builtins): Lücken,
 Inkonsistenzen und echte Editor-↔-Export-Fallstricke. **Leitsatz: jeder neue/
 geänderte Befehl muss nativ in `dhrt` laufen** — per run_gb-Golden-Test
 absichern.

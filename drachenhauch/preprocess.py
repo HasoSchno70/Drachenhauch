@@ -1,4 +1,4 @@
-"""IMPORT-Preprocessor fuer GameBasic.
+"""IMPORT-Preprocessor fuer Drachenhauch.
 
 `process(source, base_path, file_label)` liefert ein Tupel
 `(merged_source, origins)` zurueck. `origins[i]` ist `(file, original_line)`

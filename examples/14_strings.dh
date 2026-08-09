@@ -2,7 +2,7 @@
 ' Indizes sind 0-basiert (wie Arrays).
 
 DIM s AS STRING
-s = "GameBasic ist toll"
+s = "Drachenhauch ist toll"
 PRINT "Original: '" + s + "'"
 PRINT "LEN     :", LEN(s)
 PRINT "LEFT$ 4 :", LEFT$(s, 4)

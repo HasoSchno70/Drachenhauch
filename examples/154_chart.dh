@@ -12,7 +12,7 @@
 
 IMPORT "chart"
 
-SCREEN(1280, 820, "GameBasic -- Diagramme")
+SCREEN(1280, 820, "Drachenhauch -- Diagramme")
 
 ' Zeichensatz: die Diagramme malen ihren Text mit der Schrift, die in
 ' "schrift" steht (FONT-Handle aus LOADFONT, -1 = eingebaute Pixelschrift).

@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Mathematik"),
-  H.p("GameBasic bringt eine vollständige Mathe-Bibliothek mit – von einfachen Funktionen wie Betrag und Wurzel bis zu Trigonometrie und praktischen Spiel-Helfern. Alle hier vorgestellten Funktionen sind direkt verfügbar, ohne IMPORT. Winkel werden, wie in der Mathematik üblich, im Bogenmaß (Radiant) angegeben – mit DEG und RAD rechnest du nach Grad um."),
+  H.p("Drachenhauch bringt eine vollständige Mathe-Bibliothek mit – von einfachen Funktionen wie Betrag und Wurzel bis zu Trigonometrie und praktischen Spiel-Helfern. Alle hier vorgestellten Funktionen sind direkt verfügbar, ohne IMPORT. Winkel werden, wie in der Mathematik üblich, im Bogenmaß (Radiant) angegeben – mit DEG und RAD rechnest du nach Grad um."),
 
   H.h2("Grundfunktionen"),
   H.cmd("ABS · SQR · POW · HYPOT", "ABS(x)   SQR(x)   POW(b, e)   HYPOT(x, y)",

@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Farben"),
-  H.p("Eine Farbe ist in GameBasic eine ganze Zahl, die Rot-, Grün- und Blauanteil zusammenfasst (das Format 0xRRGGBB). Du musst diese Zahl aber nie selbst ausrechnen: RGB(r, g, b) baut sie aus drei Werten von 0 bis 255, und für die gängigen Farben gibt es fertige Konstanten. Dieses Kapitel zeigt, wie du Farben erzeugst, mischst und zerlegst."),
+  H.p("Eine Farbe ist in Drachenhauch eine ganze Zahl, die Rot-, Grün- und Blauanteil zusammenfasst (das Format 0xRRGGBB). Du musst diese Zahl aber nie selbst ausrechnen: RGB(r, g, b) baut sie aus drei Werten von 0 bis 255, und für die gängigen Farben gibt es fertige Konstanten. Dieses Kapitel zeigt, wie du Farben erzeugst, mischst und zerlegst."),
   H.figure("44_farben.png", "Farbkonstanten, ein HSV-Regenbogen, ein COLOR_LERP-Verlauf und eine Helligkeitsreihe."),
 
   H.h2("Farben bauen: RGB"),
@@ -10,7 +10,7 @@ module.exports = (H) => [
       'PRINT RGB(255, 128, 0)      \' ein Orange',
       'PRINT HEX$(RGB(255, 128, 0))',
     ], { out: ["16744448", "FF8000"] }),
-  H.note("Hexadezimale Farb-Literale schreibst du in GameBasic mit &H statt 0x: &HFF8000 ist dasselbe wie RGB(255, 128, 0). Am lesbarsten bleibt für Einsteiger aber RGB(...).") ,
+  H.note("Hexadezimale Farb-Literale schreibst du in Drachenhauch mit &H statt 0x: &HFF8000 ist dasselbe wie RGB(255, 128, 0). Am lesbarsten bleibt für Einsteiger aber RGB(...).") ,
 
   H.h2("Fertige Farbkonstanten"),
   H.p("Für die häufigsten Farben gibt es Konstanten, die du direkt als Farbe einsetzt – kürzer als RGB(...). Verfügbar sind unter anderem: BLACK, WHITE, GRAY, LIGHTGRAY, DARKGRAY, RED, GREEN, BLUE, YELLOW, CYAN, MAGENTA, ORANGE, PURPLE, BROWN, PINK sowie DARKRED, DARKGREEN, DARKBLUE."),
@@ -26,7 +26,7 @@ module.exports = (H) => [
 
   H.h2("Farben zerlegen: RED, GREEN, BLUE"),
   H.cmd("RED · GREEN · BLUE", "RED(farbe)   GREEN(farbe)   BLUE(farbe)",
-    "Holen den einzelnen Kanal (0 bis 255) aus einer Farbe heraus. Praktisch, um eine Farbe abzudunkeln oder zwei Farben zu vergleichen. (Mit Klammern sind es Funktionen; ohne Klammern ist RED dagegen die rote Farbkonstante – GameBasic unterscheidet das anhand der Klammern.)",
+    "Holen den einzelnen Kanal (0 bis 255) aus einer Farbe heraus. Praktisch, um eine Farbe abzudunkeln oder zwei Farben zu vergleichen. (Mit Klammern sind es Funktionen; ohne Klammern ist RED dagegen die rote Farbkonstante – Drachenhauch unterscheidet das anhand der Klammern.)",
     [
       'DIM c AS INTEGER',
       'c = RGB(255, 128, 0)',

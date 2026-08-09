@@ -31,13 +31,13 @@ Auf Windows funktioniert das mit dem eingebauten BT-Stack ab Win 10 — Bluetoot
 
 ## Async/Sync
 
-`bleak` ist asyncio-basiert. Dieses Modul betreibt im Hintergrund einen dedizierten Event-Loop in einem Daemon-Thread und reicht jeden Aufruf synchron durch — der GameBasic-VM blockiert pro Aufruf bis zur Antwort. Du musst dich nicht um Coroutinen oder `await` kümmern.
+`bleak` ist asyncio-basiert. Dieses Modul betreibt im Hintergrund einen dedizierten Event-Loop in einem Daemon-Thread und reicht jeden Aufruf synchron durch — der Drachenhauch-VM blockiert pro Aufruf bis zur Antwort. Du musst dich nicht um Coroutinen oder `await` kümmern.
 
 Alle Calls ausser `BT_SCAN` (das sein eigenes, von dir gewähltes Zeitfenster hat) haben ein internes 10-Sekunden-Timeout — ist ein Gerät ausser Reichweite oder antwortet nicht, scheitert `BT_CONNECT`/`BT_READ`/`BT_WRITE`/`BT_SERVICES`/`BT_CHARACTERISTICS` nach spätestens 10s mit einer fangbaren Fehlermeldung, statt den Game-Loop unbegrenzt einzufrieren.
 
 ## Bytes ↔ STRING
 
-GATT-Werte sind Roh-Bytes. Wie beim USB-Modul werden sie mit **latin-1** round-trip-fest in GameBasic-STRINGs verpackt:
+GATT-Werte sind Roh-Bytes. Wie beim USB-Modul werden sie mit **latin-1** round-trip-fest in Drachenhauch-STRINGs verpackt:
 
 ```basic
 DIM raw$ AS STRING

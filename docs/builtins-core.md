@@ -182,8 +182,8 @@ Erweiterungen *(nur native Runtime)*:
 
 ```basic
 PRINT UPPER$("hallo")           ' "HALLO"
-PRINT LEFT$("GameBasic", 4)     ' "Game"
-PRINT MID$("GameBasic", 4, 5)   ' "Basic"
+PRINT LEFT$("Drachenhauch", 4)     ' "Game"
+PRINT MID$("Drachenhauch", 4, 5)   ' "Basic"
 PRINT INSTR("hello world", "world")   ' 6
 PRINT REPLACE$("a-b-c", "-", "_")     ' "a_b_c"
 

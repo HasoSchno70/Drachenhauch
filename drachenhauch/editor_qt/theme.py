@@ -1,4 +1,4 @@
-"""Farbpaletten und QSS fuer den GameBasic-Editor (PySide6).
+"""Farbpaletten und QSS fuer den Drachenhauch-Editor (PySide6).
 
 Zwei Themes (Dark = VSCode Dark+, Light = VSCode Light+). Wechsel via
 `set_active_theme(name)` -- emittiert `theme_signals.changed`, das

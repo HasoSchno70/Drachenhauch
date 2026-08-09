@@ -23,6 +23,6 @@ WHILE NOT QUITREQUESTED()
     ' Bogen
     ARC(150, 230, 250, 300, 0.0, 3.14, RGB(255, 255, 0), 3)
     ' Text
-    TEXT(20, 260, "2D-Formen in GameBasic", RGB(220, 230, 255))
+    TEXT(20, 260, "2D-Formen in Drachenhauch", RGB(220, 230, 255))
     FLIP()
 WEND

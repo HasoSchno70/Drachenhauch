@@ -34,7 +34,7 @@ module.exports = (H) => [
   H.note("Genau diese Unveränderlichkeit macht Tupel sicher und übersichtlich: Wenn du ein Tupel irgendwohin weitergibst, kann niemand es dir hinter dem Rücken verändern. Brauchst du eine veränderbare, gleichartige Sammlung, nimm ein Array (Kapitel „Arrays“)."),
 
   H.h2("Zerlegen: Destructuring"),
-  H.p("Jetzt zum eigentlichen Trick. Statt die Einzelwerte mühsam über punkt[0], punkt[1] herauszuziehen, kannst du ein Tupel in einem Rutsch auf mehrere Variablen verteilen. Dazu schreibst du auf die linke Seite der Zuweisung selbst eine Klammer mit den Zielvariablen. GameBasic packt das Tupel aus und füllt sie der Reihe nach."),
+  H.p("Jetzt zum eigentlichen Trick. Statt die Einzelwerte mühsam über punkt[0], punkt[1] herauszuziehen, kannst du ein Tupel in einem Rutsch auf mehrere Variablen verteilen. Dazu schreibst du auf die linke Seite der Zuweisung selbst eine Klammer mit den Zielvariablen. Drachenhauch packt das Tupel aus und füllt sie der Reihe nach."),
   H.cmd("Destructuring-Zuweisung", "(var1, var2, ...) = tupel",
     "Verteilt die Elemente eines Tupels auf mehrere Variablen. Die Anzahl der Variablen links muss genau zur Anzahl der Tupel-Elemente rechts passen – sonst gibt es einen Fehler.",
     [

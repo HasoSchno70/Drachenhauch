@@ -14,7 +14,7 @@ CONST W AS INTEGER = 1280
 CONST H AS INTEGER = 720
 CONST TWO_PI AS FLOAT = 6.2831853
 
-SCREEN(W, H, "GameBasic -- Post-Processing", 1)
+SCREEN(W, H, "Drachenhauch -- Post-Processing", 1)
 
 ' Shader laden (Pfad relativ zur .dh-Datei).
 DIM sh_crt AS INTEGER

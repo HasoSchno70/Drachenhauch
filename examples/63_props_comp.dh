@@ -63,7 +63,7 @@ PRINT ""
 PRINT "=== Comprehensions auf String / Array / Map ==="
 
 ' String iteriert ueber chars
-PRINT "Vokale in 'GameBasic': ", [c FOR c IN "GameBasic" WHERE c IN "aeiouAEIOU"]
+PRINT "Vokale in 'Drachenhauch': ", [c FOR c IN "Drachenhauch" WHERE c IN "aeiouAEIOU"]
 
 ' Array
 DIM scores[5] AS INTEGER

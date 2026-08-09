@@ -1,4 +1,4 @@
-"""Minimaler Cloud-Save- + Leaderboard-Server fuer GameBasic (Modul `cloud`).
+"""Minimaler Cloud-Save- + Leaderboard-Server fuer Drachenhauch (Modul `cloud`).
 
 Ein einzelner Flask-Prozess + eine SQLite-Datei. Zwei Ressourcen:
 

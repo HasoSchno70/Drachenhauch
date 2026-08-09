@@ -1,8 +1,8 @@
 ' ============================================================
-'  GAMEBASIC -- "VORTEX"   (AAA-Showcase-Demo)
+'  DRACHENHAUCH -- "VORTEX"   (AAA-Showcase-Demo)
 ' ============================================================
 '  Voll animierter Doppel-Regenbogen-Wirbel im Vollbild zu fetziger
-'  Amiga-Musik. Zeigt, wozu GameBasic faehig ist:
+'  Amiga-Musik. Zeigt, wozu Drachenhauch faehig ist:
 '    * ZWEI gegenlaeufige Spiral-Wirbel aus hunderten Triangles (Tiefe)
 '    * HSV-Regenbogen + rotierender Licht-Glanz = 3D-Ribbon-Look
 '    * additives Glow, gluehender Kern
@@ -13,7 +13,7 @@
 '      vertikalem Flip): Buchstaben schwellen zur Mitte hin an ("auf dich zu")
 '    * fetter TTF-Zeichensatz (Arial Black / Impact), 60 fps
 '
-'  Eine GameBasic-Demo von Hans Schnorrenberger.
+'  Eine Drachenhauch-Demo von Hans Schnorrenberger.
 '  ESC = Ende.   (Anderer Song? -> Pfad in PLAYMUSIC tauschen:
 '   assets/amiga_title.ogg, cybermatic_pulse.ogg, techno_messup.ogg)
 ' ============================================================
@@ -28,7 +28,7 @@ CONST PETALS AS FLOAT = 6.0         ' Bluetenblaetter
 ' ueber SCREENWIDTH()/HEIGHT() und skaliert automatisch mit -> gestochen scharf
 ' statt 720p-Hochskalierung (SCREEN_NATIVE = randloses Vollbild, kein extra
 ' SET_FULLSCREEN noetig).
-SCREEN_NATIVE("GameBasic - VORTEX (AAA Demo)")
+SCREEN_NATIVE("Drachenhauch - VORTEX (AAA Demo)")
 SETFPS(60)
 
 DIM SW AS INTEGER
@@ -190,7 +190,7 @@ PLAYMUSIC("assets/amiga_action_level1.ogg", -1, 0.9)
 
 ' --- Perspektiv-Scroller-Text (unten) ---
 DIM msg AS STRING
-msg = "GAMEBASIC  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS IM VOLLBILD  ***  JA, AUCH DAMIT KANN MAN DEMOS BAUEN  ***  GREETINGS AN DIE SZENE  ***    "
+msg = "DRACHENHAUCH  ***  EINE DEMO VON HANS SCHNORRENBERGER  ***  ZWEI GEGENLAEUFIGE WIRBEL, LOGO-ZOOMER MIT FUNKEN, HSV-REGENBOGEN UND ADDITIVES GLOW BEI 60 FPS IM VOLLBILD  ***  JA, AUCH DAMIT KANN MAN DEMOS BAUEN  ***  GREETINGS AN DIE SZENE  ***    "
 DIM nmsg AS INTEGER
 nmsg = LEN(msg)
 DIM span AS FLOAT
@@ -198,7 +198,7 @@ span = nmsg * 32.0
 
 ' --- Orbit-Ring-Text (Halo rund um den Wirbel) ---
 DIM ringMsg AS STRING
-ringMsg = "GAMEBASIC  ***  VORTEX  ***  HANS SCHNORRENBERGER  ***  "
+ringMsg = "DRACHENHAUCH  ***  VORTEX  ***  HANS SCHNORRENBERGER  ***  "
 DIM rn AS INTEGER
 rn = LEN(ringMsg)
 
@@ -281,18 +281,18 @@ WHILE NOT QUITREQUESTED()
     '     Wirbel gezeichnet. Tiefen-Logik: siehe SUB DrawRingArc. ---
     DrawRingArc(1, ringRot, t)
 
-    ' --- Logo-Zoomer: GAMEBASIC zoomt zentriert ueber dem Wirbel ---
+    ' --- Logo-Zoomer: DRACHENHAUCH zoomt zentriert ueber dem Wirbel ---
     zoom = 0.55 + 0.55 * (0.5 + 0.5 * SIN(t * 1.1))
     fs = INT(86.0 * zoom)
     TEXT_SIZE(fs)
-    tw = TEXT_WIDTH("GAMEBASIC")
+    tw = TEXT_WIDTH("DRACHENHAUCH")
     lx = INT(CX) - tw \ 2
     ly = INT(CY) - fs \ 2
     thue = INT(t * 50.0) MOD 360
     BLEND_MODE("add")
-    TEXT(lx + 2, ly + 2, "GAMEBASIC", HSV(thue, 0.8, 0.30))
+    TEXT(lx + 2, ly + 2, "DRACHENHAUCH", HSV(thue, 0.8, 0.30))
     BLEND_MODE("alpha")
-    TEXT(lx, ly, "GAMEBASIC", HSV(thue, 0.85, 1.0))
+    TEXT(lx, ly, "DRACHENHAUCH", HSV(thue, 0.85, 1.0))
 
     ' --- Credit oben ---
     TEXT_SIZE(24)
@@ -332,7 +332,7 @@ WHILE NOT QUITREQUESTED()
     RENDERTARGET_DRAW(scrollRT, 0, SH - 74, 1.0, &H4A4A5E, TRUE)
 
     TEXT_SIZE(13)
-    TEXT(16, 8, "ESC = Ende   |   GameBasic VORTEX", &H7080B0)
+    TEXT(16, 8, "ESC = Ende   |   Drachenhauch VORTEX", &H7080B0)
 
     FLIP()
 WEND

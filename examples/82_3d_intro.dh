@@ -8,7 +8,7 @@
 
 IMPORT "g3d"
 
-SCREEN(720, 480, "GameBasic 3D", 1)
+SCREEN(720, 480, "Drachenhauch 3D", 1)
 
 DIM t AS FLOAT
 t = 0.0
@@ -42,7 +42,7 @@ WHILE NOT QUITREQUESTED()
     POINT3D(0.0, 3.0, 4.0,  WHITE)
 
     ' 2D-HUD liegt ueber der 3D-Szene.
-    TEXT(10, 10, "GameBasic 3D (g3d) -- ESC beendet", WHITE)
+    TEXT(10, 10, "Drachenhauch 3D (g3d) -- ESC beendet", WHITE)
     TEXT(10, 30, "Wuerfel . Kugel . Zylinder . Kegel . Gitter", &H9FB4C8)
 
     FLIP()

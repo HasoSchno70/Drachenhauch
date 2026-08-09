@@ -1,4 +1,4 @@
-"""Gemeinsame Pytest-Helpers fuer GameBasic-Tests."""
+"""Gemeinsame Pytest-Helpers fuer Drachenhauch-Tests."""
 import io
 import os
 import sys
@@ -183,7 +183,7 @@ def run_all(run_gb):
 # entscheidet nicht allein). In EINEM gemeinsamen pytest-Prozess summierte
 # sich das auf ~16.000 lebende QObjects mit 244 faelligen QTimern, darunter
 # 9 WIEDERHOLENDE 16-ms-Vorschau-Timer (Partikel-Editor, 60 FPS) und
-# 8 wiederholende 30-s-Autosave-Timer aus geleakten `GameBasicEditor`n.
+# 8 wiederholende 30-s-Autosave-Timer aus geleakten `DrachenhauchEditor`n.
 #
 # Solange kein Test die Event-Loop pumpt, faellt das nicht auf. Der EINE Test,
 # der es tut (`test_spriteeditor_qt_canvas.py`, "coalesced until event loop

@@ -1,5 +1,5 @@
 ' ============================================================
-'  GAMEBASIC -- gui-Tabelle an einer echten SQLite-Datenbank
+'  DRACHENHAUCH -- gui-Tabelle an einer echten SQLite-Datenbank
 ' ============================================================
 '  Zeigt die geloesten Level aus dem Spiel "Pyramid Pusher"
 '  (pyramid_pusher/pyramid_pusher.db) in der gui-Tabelle -- lesen,
@@ -31,7 +31,7 @@
 IMPORT "gui"
 IMPORT "db"
 
-SCREEN(1120, 680, "GameBasic - Tabelle an SQLite", 1)
+SCREEN(1120, 680, "Drachenhauch - Tabelle an SQLite", 1)
 SETFPS(60)
 
 DIM uiFont AS INTEGER : uiFont = -1
@@ -53,7 +53,7 @@ CONST ARBEIT = "tabelle_sqlite_arbeitskopie.db"
 ' VACUUM INTO schreibt eine vollstaendige Kopie und weigert sich, eine
 ' vorhandene Datei zu ueberschreiben -- darum vorher weg damit. So startet
 ' die Demo jedes Mal mit demselben Stand.
-' Kein Abbruch-Befehl in GameBasic -- THROW ist der Weg, mit einer klaren
+' Kein Abbruch-Befehl in Drachenhauch -- THROW ist der Weg, mit einer klaren
 ' Meldung stehenzubleiben statt spaeter an einer nichtssagenden Stelle.
 IF NOT FILEEXISTS(ORIGINAL) THEN
     THROW "Datenbank nicht gefunden: " + ORIGINAL + " -- die Demo gehoert nach examples/"

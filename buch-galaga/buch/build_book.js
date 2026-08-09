@@ -1,5 +1,5 @@
-// Baut die Einleitung des GameBasic-Galaga-Buchs als farbiges, druckbares .docx.
-// Aufruf:  node build_book.js   ->  GameBasic-Buch.docx
+// Baut die Einleitung des Drachenhauch-Galaga-Buchs als farbiges, druckbares .docx.
+// Aufruf:  node build_book.js   ->  Drachenhauch-Buch.docx
 const fs = require("fs");
 const path = require("path");
 const {
@@ -163,7 +163,7 @@ children.push(
   new Paragraph({ spacing: { before: 1400 }, children: [] }),
   new Paragraph({
     alignment: AlignmentType.CENTER,
-    children: [new TextRun({ text: "GAMEBASIC", bold: true, color: C_TITLE, size: 88 })],
+    children: [new TextRun({ text: "DRACHENHAUCH", bold: true, color: C_TITLE, size: 88 })],
   }),
   new Paragraph({
     alignment: AlignmentType.CENTER, spacing: { before: 120, after: 80 },
@@ -192,8 +192,8 @@ const TOC_INSERT_AT = children.length;
 // --- Vorwort ---
 children.push(h1("Vorwort"));
 children.push(p("Es gibt zwei Sorten von Menschen, die Computerspiele lieben: die einen wollen sie spielen, die anderen wollen wissen, wie zum Teufel das eigentlich funktioniert. Wenn du dieses Buch in der Hand hältst, gehörst du vermutlich zur zweiten Sorte – oder du bist gerade dabei, hinüberzuwechseln. Herzlich willkommen, hier ist genau dein Platz."));
-children.push(p("Ich heiße Hans Schnorrenberger, und ich habe GameBasic gebaut, weil ich es leid war, Anfängern erklären zu müssen, warum man für ein simples bewegtes Pixel auf dem Bildschirm erst einmal drei Bibliotheken installieren, ein halbes Dutzend Fehlermeldungen entschlüsseln und an einer Stelle „aus Gründen“ ein Semikolon setzen muss. Programmieren sollte sich nicht wie eine Mutprobe anfühlen. Es sollte sich anfühlen wie das, was es eigentlich ist: das Bauen kleiner Welten, in denen du die Regeln machst."));
-children.push(p("Deshalb ist GameBasic so geworden, wie es ist. Die Befehle heißen so, wie sie gemeint sind. Wenn etwas schiefgeht, sagt dir die Sprache in ganzen, lesbaren Sätzen, was los ist – und nicht in kryptischem Fachchinesisch, das man erst googeln muss, um zu verstehen, dass man es googeln muss. Und wenn dein Programm läuft, dann läuft es flott, weil im Hintergrund eine richtige Runtime werkelt und nicht bloß gute Laune."));
+children.push(p("Ich heiße Hans Schnorrenberger, und ich habe Drachenhauch gebaut, weil ich es leid war, Anfängern erklären zu müssen, warum man für ein simples bewegtes Pixel auf dem Bildschirm erst einmal drei Bibliotheken installieren, ein halbes Dutzend Fehlermeldungen entschlüsseln und an einer Stelle „aus Gründen“ ein Semikolon setzen muss. Programmieren sollte sich nicht wie eine Mutprobe anfühlen. Es sollte sich anfühlen wie das, was es eigentlich ist: das Bauen kleiner Welten, in denen du die Regeln machst."));
+children.push(p("Deshalb ist Drachenhauch so geworden, wie es ist. Die Befehle heißen so, wie sie gemeint sind. Wenn etwas schiefgeht, sagt dir die Sprache in ganzen, lesbaren Sätzen, was los ist – und nicht in kryptischem Fachchinesisch, das man erst googeln muss, um zu verstehen, dass man es googeln muss. Und wenn dein Programm läuft, dann läuft es flott, weil im Hintergrund eine richtige Runtime werkelt und nicht bloß gute Laune."));
 children.push(p("Dieses Buch baut mit dir gemeinsam ein vollständiges Arcade-Spiel: einen Klon des unsterblichen Klassikers Galaga. Wir fangen ganz vorne an – mit einem leeren schwarzen Fenster, das tapfer darauf wartet, dass etwas passiert – und hören erst auf, wenn bunte Gegner in geschwungenen Bahnen einfliegen, herabstürzen, Bomben werfen und du sie mit einem selbstgezeichneten Raumschiff zu Pixelstaub schießt. Unterwegs lernst du, fast ohne es zu merken, alles Wichtige über das Programmieren."));
 children.push(p("Ein einziger Rat noch, bevor es losgeht: Tippe die Beispiele wirklich selbst ab. Ich weiß, Kopieren wäre schneller. Aber Programmieren lernt man in den Fingern, nicht in den Augen – ungefähr so, wie man Fahrradfahren nicht aus einem Buch über Fahrräder lernt. Mach Fehler, viele sogar. Jeder Fehler, den du selbst gefunden und behoben hast, ist eine Lektion, die sitzt."));
 children.push(p("Genug der Vorrede. Schnall dich an, der Hangar ist offen."));
@@ -209,18 +209,18 @@ children.push(p("Du brauchst dafür keinerlei Vorkenntnisse. Wirklich keine. Wen
 children.push(p("Der Trick dabei ist, dass wir nie auf den großen Knall am Ende warten. Jedes Kapitel fügt ein kleines, sofort sichtbares Stück hinzu: erst ein Fenster, dann ein scrollender Sternenhimmel, dann ein Raumschiff, das auf deine Tasten hört, dann Schüsse, Gegner, geschwungene Einflug-Manöver, Sturzangriffe, Bomben. Am Ende hast du ein richtiges Spiel mit Highscore-Liste, Sound und Effekten – aber schon nach Kapitel 1 läuft etwas, das sich gut anfühlt."));
 children.push(p("Programmieren lernt man nämlich am besten, indem man etwas baut, das Spaß macht. Lehrbücher, die einem zur Begrüßung beibringen, wie man die Zahlen von 1 bis 10 untereinander ausdruckt, haben schon so manchen begeisterten Anfänger in einen gelangweilten Aussteiger verwandelt. Das passiert uns hier nicht."));
 children.push(p("Und das Beste kommt noch: Die Grafik – Raumschiff, Gegner, Schüsse, Bomben – zeichnest du selbst, mit einem Pixel-Editor, der gleich mitgeliefert wird. Dein Spiel wird also nicht irgendein Spiel sein, sondern ganz und gar deins. Wenn dein Raumschiff am Ende aussieht wie eine fliegende Bratwurst, dann ist das eine bewusste künstlerische Entscheidung, und niemand darf dir widersprechen."));
-children.push(tip("So liest du dieses Buch", "Tippe die Beispiele selbst ab und starte sie sofort – nicht erst am Ende des Kapitels, sondern zwischendurch immer wieder. Jeder Codeschnipsel läuft für sich. Und keine Sorge vor Fehlern: Die gehören dazu wie das Salz in die Suppe. GameBasic sagt dir in klaren, ganzen Sätzen, was es nicht verstanden hat – meistens hast du nur einen Buchstaben vertippt."));
+children.push(tip("So liest du dieses Buch", "Tippe die Beispiele selbst ab und starte sie sofort – nicht erst am Ende des Kapitels, sondern zwischendurch immer wieder. Jeder Codeschnipsel läuft für sich. Und keine Sorge vor Fehlern: Die gehören dazu wie das Salz in die Suppe. Drachenhauch sagt dir in klaren, ganzen Sätzen, was es nicht verstanden hat – meistens hast du nur einen Buchstaben vertippt."));
 
-// --- Was ist GameBasic ---
-children.push(h1("Was ist GameBasic?"));
-children.push(p("GameBasic ist eine Programmiersprache aus der ehrwürdigen BASIC-Familie. BASIC steht für „Beginner's All-purpose Symbolic Instruction Code“ – ein etwas sperriger Name für eine erstaunlich freundliche Idee: eine Sprache, die bewusst so leicht lesbar ist, dass sie sich fast wie englische Sätze liest. Generationen von Programmierern haben in den achtziger Jahren auf Heimcomputern mit BASIC angefangen, und viele von ihnen erinnern sich bis heute mit feuchten Augen daran."));
-children.push(p("GameBasic nimmt diese alte, gute Idee und schleppt sie ins 21. Jahrhundert. Es ist von Grund auf für Spiele gemacht: Grafik, Sound, Eingabe und Spielablauf sind direkt eingebaut. Du musst dir nicht erst aus dem halben Internet Bibliotheken zusammensuchen, von denen die Hälfte nicht zusammenpasst und die andere Hälfte seit drei Jahren nicht mehr gepflegt wird. Du schreibst SCREEN, und ein Fenster geht auf. So soll es sein."));
+// --- Was ist Drachenhauch ---
+children.push(h1("Was ist Drachenhauch?"));
+children.push(p("Drachenhauch ist eine Programmiersprache aus der ehrwürdigen BASIC-Familie. BASIC steht für „Beginner's All-purpose Symbolic Instruction Code“ – ein etwas sperriger Name für eine erstaunlich freundliche Idee: eine Sprache, die bewusst so leicht lesbar ist, dass sie sich fast wie englische Sätze liest. Generationen von Programmierern haben in den achtziger Jahren auf Heimcomputern mit BASIC angefangen, und viele von ihnen erinnern sich bis heute mit feuchten Augen daran."));
+children.push(p("Drachenhauch nimmt diese alte, gute Idee und schleppt sie ins 21. Jahrhundert. Es ist von Grund auf für Spiele gemacht: Grafik, Sound, Eingabe und Spielablauf sind direkt eingebaut. Du musst dir nicht erst aus dem halben Internet Bibliotheken zusammensuchen, von denen die Hälfte nicht zusammenpasst und die andere Hälfte seit drei Jahren nicht mehr gepflegt wird. Du schreibst SCREEN, und ein Fenster geht auf. So soll es sein."));
 children.push(h2("Was sie besonders macht"));
 children.push(bulletRich("Einfach zu lesen: ", "Befehle wie SCREEN, PLOT, DRAWIMAGE oder PLAYSOUND sagen, was sie tun."));
 children.push(bulletRich("Sicher durch Typen: ", "Jede Variable hat einen klaren Typ (INTEGER, FLOAT, STRING …). Das verhindert viele Anfängerfehler."));
 children.push(bulletRich("Modern: ", "Klassen und Objekte (OOP), Funktionen, Module – alles dabei, wenn du es brauchst, aber nie im Weg."));
 children.push(bulletRich("Eine Laufzeit: ", "Dein Programm läuft direkt über die schnelle Runtime „dhrt“ – flüssig und auf Wunsch als fertige .exe exportierbar."));
-children.push(p("Genug der Theorie – schau dir an, wie wenig nötig ist, um etwas auf den Bildschirm zu bringen. Das hier ist ein vollständiges, lauffähiges GameBasic-Programm:"));
+children.push(p("Genug der Theorie – schau dir an, wie wenig nötig ist, um etwas auf den Bildschirm zu bringen. Das hier ist ein vollständiges, lauffähiges Drachenhauch-Programm:"));
 children.push(new Paragraph({
   shading: { fill: "F4F4F4", type: ShadingType.CLEAR },
   border: { left: { style: BorderStyle.SINGLE, size: 18, color: C_ACCENT, space: 6 } },
@@ -234,8 +234,8 @@ children.push(new Paragraph({
 }));
 children.push(p("Drei Zeilen. Die erste öffnet ein Fenster, die zweite schreibt in leuchtendem Gelb „Hallo Welt!“ hinein, die dritte zeigt das Ergebnis an. Man muss kein Hellseher sein, um zu erraten, was hier passiert – und genau das ist der Punkt. In manch anderer Programmiersprache wäre dasselbe „Hallo Welt“ eine kleine Expedition mit Zwischenlager und Sherpa gewesen."));
 
-// --- Was kann GameBasic ---
-children.push(h1("Was kann GameBasic alles?"));
+// --- Was kann Drachenhauch ---
+children.push(h1("Was kann Drachenhauch alles?"));
 children.push(p("Erstaunlich viel – ehrlich gesagt weit mehr, als wir für unser bescheidenes Galaga-Spiel jemals brauchen werden. Das ist ein bisschen so, als würde man den Führerschein in einem Sportwagen machen: Wir nutzen längst nicht jede Pferdestärke, aber es ist beruhigend zu wissen, dass sie da ist, falls dich später der Ehrgeiz packt."));
 children.push(p("Ein kleiner Vorgeschmack, was alles eingebaut ist:"));
 children.push(bulletRich("2D-Grafik: ", "Linien, Rechtecke, Kreise, Farbverläufe, Splines, dicke Linien, Bilder und Sprites."));
@@ -248,7 +248,7 @@ children.push(h2("2D zeichnen"));
 figure("demo_2d.png", "Farbverläufe, runde Rechtecke, dicke Linien und eine weiche Spline-Kurve – alles mit eingebauten Befehlen.").forEach(e => children.push(e));
 
 children.push(h2("Dreidimensional"));
-figure("demo_3d.png", "GameBasic kann auch 3D: hier ein Gitterboden mit Drahtgitter-Modellen.").forEach(e => children.push(e));
+figure("demo_3d.png", "Drachenhauch kann auch 3D: hier ein Gitterboden mit Drahtgitter-Modellen.").forEach(e => children.push(e));
 
 children.push(h2("Fenster-Oberflächen"));
 figure("demo_gui.png", "Ein Einstellungs-Fenster mit Schieberegler, Checkbox, Textfeld und Button – fertige GUI-Bausteine.").forEach(e => children.push(e));
@@ -288,10 +288,10 @@ children.push(tip("Alles in Farbe und zum Selbermachen", "Dieses Buch ist als Wo
 // ===================== Kapitel 1 =====================
 children.push(chapter("Kapitel 1: Das erste Fenster"));
 children.push(tip("In diesem Kapitel",
-  "Du öffnest dein allererstes GameBasic-Fenster, lernst die „Spielschleife“ kennen und zauberst einen scrollenden Sternenhimmel – die Bühne, auf der später unser Raumschiff kämpft."));
+  "Du öffnest dein allererstes Drachenhauch-Fenster, lernst die „Spielschleife“ kennen und zauberst einen scrollenden Sternenhimmel – die Bühne, auf der später unser Raumschiff kämpft."));
 
 children.push(h2("Ein Fenster öffnen"));
-children.push(p("Jedes Spiel braucht eine Bühne, und auf dem Computer ist diese Bühne ein Fenster. Bevor irgendetwas gezeichnet, bewegt oder abgeschossen werden kann, muss dieses Fenster da sein. In manchen Sprachen ist das der Moment, in dem Anfänger zum ersten Mal aufgeben. In GameBasic ist es eine einzige Zeile:"));
+children.push(p("Jedes Spiel braucht eine Bühne, und auf dem Computer ist diese Bühne ein Fenster. Bevor irgendetwas gezeichnet, bewegt oder abgeschossen werden kann, muss dieses Fenster da sein. In manchen Sprachen ist das der Moment, in dem Anfänger zum ersten Mal aufgeben. In Drachenhauch ist es eine einzige Zeile:"));
 children.push(codeBlock(['SCREEN(480, 640, "Mein Galaga")']));
 children.push(pmix([
   ["Der Befehl ", false], ["SCREEN", true],
@@ -369,7 +369,7 @@ children.push(pmix([
 ]));
 
 children.push(h2("Das ganze Programm"));
-children.push(p("Setzt man alles zusammen, ergibt sich dein erstes vollständiges GameBasic-Programm. Tippe es ab und starte es:"));
+children.push(p("Setzt man alles zusammen, ergibt sich dein erstes vollständiges Drachenhauch-Programm. Tippe es ab und starte es:"));
 children.push(codeBlock([
   'SCREEN(480, 640, "Mein Galaga - Kapitel 1")',
   "",
@@ -429,7 +429,7 @@ children.push(pmix([
 ]));
 
 children.push(h2("Das Schiff zeichnen"));
-children.push(p("Ein geladenes Bild allein sieht man noch nicht – es liegt sozusagen im Hangar und wartet. Wir müssen GameBasic noch sagen, wo auf dem Bildschirm es erscheinen soll. Dafür braucht das Schiff eine Position, und eine Position sind schlicht zwei Zahlen: wie weit rechts (x) und wie weit unten (y)."));
+children.push(p("Ein geladenes Bild allein sieht man noch nicht – es liegt sozusagen im Hangar und wartet. Wir müssen Drachenhauch noch sagen, wo auf dem Bildschirm es erscheinen soll. Dafür braucht das Schiff eine Position, und eine Position sind schlicht zwei Zahlen: wie weit rechts (x) und wie weit unten (y)."));
 children.push(p("Ein kleiner, aber wichtiger Hinweis, der viele Anfänger anfangs stolpern lässt: Am Computer wächst die y-Achse nach unten. Oben ist klein, unten ist groß. Das fühlt sich verkehrt herum an, ist aber überall so. Unser Schiff gehört nach unten in die Mitte, also nehmen wir ein kleines x und ein großes y. Gezeichnet wird dann mit DRAWIMAGE:"));
 children.push(codeBlock([
   "DIM shipX AS INTEGER",
@@ -535,7 +535,7 @@ figure("kap03_pixelraster.png", "Das Raumschiff als Pixel-Raster – jedes Käst
 
 children.push(h2("Der Sprite-Editor dhsprites"));
 children.push(pmix([
-  ["GameBasic bringt einen eigenen Pixel-Editor mit. Du startest ihn mit dem Befehl ", false],
+  ["Drachenhauch bringt einen eigenen Pixel-Editor mit. Du startest ihn mit dem Befehl ", false],
   ["dhsprites", true],
   [" – entweder leer für ein neues Bild oder mit einer Datei: ", false],
   ["dhsprites player.png", true], [".", false],
@@ -622,7 +622,7 @@ children.push(why("Warum legen wir den Vorrat einmal fest, statt bei jedem Schus
 
 children.push(h2("Feuern auf Tastendruck"));
 children.push(p("Beim Feuern suchen wir einen freien Platz im Köcher und starten dort einen Schuss. Klingt simpel, hat aber einen Haken, über den fast jeder einmal stolpert: Die Spielschleife läuft sechzig Mal pro Sekunde. Würden wir einfach „wenn Leertaste gedrückt, dann schieße“ schreiben, dann feuerte das Schiff bei gehaltener Taste sechzig Schüsse pro Sekunde – ein Wasserfall aus Geschossen, und der Köcher wäre im selben Wimpernschlag leer."));
-children.push(p("Was wir wollen, ist ein Schuss pro Tastendruck. Dafür müssen wir den Moment erwischen, in dem die Taste gerade eben heruntergeht – nicht die ganze Zeit, in der sie unten bleibt. Diesen Moment nennt man die FLANKE eines Tastendrucks, und GameBasic hat dafür einen eigenen Befehl:"));
+children.push(p("Was wir wollen, ist ein Schuss pro Tastendruck. Dafür müssen wir den Moment erwischen, in dem die Taste gerade eben heruntergeht – nicht die ganze Zeit, in der sie unten bleibt. Diesen Moment nennt man die FLANKE eines Tastendrucks, und Drachenhauch hat dafür einen eigenen Befehl:"));
 children.push(codeBlock([
   "IF KEYHIT(KEY_SPACE) THEN",
   "    DIM s AS INTEGER",
@@ -647,7 +647,7 @@ children.push(pmix([
   ["Die ", false], ["FOR", true], ["-Schleife sucht den ersten freien Platz im Köcher; ", false],
   ["BREAK", true], [" verlässt sie sofort, sobald einer gefunden ist. Der Schuss startet knapp über dem Schiff.", false],
 ]));
-children.push(why("Wie käme man ohne KEYHIT aus? Man müsste sich von einem Frame zum nächsten selbst merken, ob die Taste schon vorher unten war, und nur dann feuern, wenn sie JETZT unten ist und vorher nicht: eine zusätzliche Variable, zwei zusätzliche Zeilen – und das für jede Taste, die eine Aktion auslöst. Genau so stand es in der ersten Fassung dieses Buchs. Es lohnt sich trotzdem, den Gedanken zu kennen: Die Unterscheidung zwischen „gehalten“ und „gerade gedrückt“ musst du in jedem Spiel treffen, egal in welcher Sprache. GameBasic nimmt dir nur die Buchführung ab."));
+children.push(why("Wie käme man ohne KEYHIT aus? Man müsste sich von einem Frame zum nächsten selbst merken, ob die Taste schon vorher unten war, und nur dann feuern, wenn sie JETZT unten ist und vorher nicht: eine zusätzliche Variable, zwei zusätzliche Zeilen – und das für jede Taste, die eine Aktion auslöst. Genau so stand es in der ersten Fassung dieses Buchs. Es lohnt sich trotzdem, den Gedanken zu kennen: Die Unterscheidung zwischen „gehalten“ und „gerade gedrückt“ musst du in jedem Spiel treffen, egal in welcher Sprache. Drachenhauch nimmt dir nur die Buchführung ab."));
 
 children.push(h2("Schüsse bewegen und zeichnen"));
 children.push(p("Ein gestarteter Schuss soll natürlich nicht in der Luft hängen bleiben wie ein vergessener Luftballon. Jeden Frame lassen wir deshalb alle gerade fliegenden Schüsse ein Stück nach oben wandern. Und sobald einer oben aus dem Bild verschwindet, geben wir seinen Platz im Köcher wieder frei – damit er für den nächsten Schuss bereitsteht. Genau das macht den Pool so sparsam:"));
@@ -815,7 +815,7 @@ children.push(tip("In diesem Kapitel",
 children.push(p("Bisher war unser Spiel eine recht einsame Angelegenheit: ein Schiff, ein paar Schüsse, viel leerer Raum. Das ändert sich jetzt schlagartig. Wir holen die Gegner ins Spiel – und nicht nur einen, sondern gleich vierundzwanzig auf einmal. Damit das nicht im Chaos endet, lernst du in diesem Kapitel ein Werkzeug kennen, das in der Programmierung allgegenwärtig ist: die Klasse."));
 children.push(h2("Eine Klasse für die Gegner"));
 children.push(p("Schauen wir uns einen einzelnen Gegner an. Was muss er über sich wissen? Wo er steht (seine Position), in welcher Reihe er sitzt (das bestimmt seine Farbe) und ob er überhaupt noch lebt. Bei einem Gegner wären das drei, vier Variablen – kein Problem. Aber bei vierundzwanzig Gegnern bräuchten wir fast hundert einzeln benannte Variablen. Spätestens bei shipPositionVonGegnerNummerSiebzehn würde uns die Lust vergehen."));
-children.push(p("Viel klüger ist es, einmal den Bauplan eines Gegners zu beschreiben und GameBasic dann zu sagen: „Mach mir bitte vierundzwanzig davon.“ Genau das ist eine Klasse – ein Bauplan für gleichartige Dinge:"));
+children.push(p("Viel klüger ist es, einmal den Bauplan eines Gegners zu beschreiben und Drachenhauch dann zu sagen: „Mach mir bitte vierundzwanzig davon.“ Genau das ist eine Klasse – ein Bauplan für gleichartige Dinge:"));
 children.push(codeBlock([
   "CLASS Bug",
   "    DIM x AS INTEGER",
@@ -911,7 +911,7 @@ children.push(tip("In diesem Kapitel",
 children.push(h2("Geschwungene Bahnen mit Bézier-Kurven"));
 children.push(p("Jetzt kommt der Moment, auf den dieses Buch insgeheim die ganze Zeit hingearbeitet hat. Eine Formation, die einfach von oben hereinschwebt, ist nett – aber das unverwechselbare Galaga-Gefühl entsteht erst durch die eleganten, geschwungenen Bahnen, in denen die Gegner hereingleiten, als hätten sie an einer Ballettschule für Außerirdische studiert."));
 children.push(p("Eine gerade Linie kriegt jeder hin – aber sie ist eben auch sterbenslangweilig. Schöne, weiche Kurven sind kniffliger. Zum Glück hat sich darüber schon jemand den Kopf zerbrochen: der französische Ingenieur Pierre Bézier, der in den sechziger Jahren bei Renault Karosserien entwarf und eine Methode brauchte, um geschwungene Bleche mathematisch zu beschreiben. Heraus kam die Bézier-Kurve, und sie steckt heute in fast jedem Schriftzeichen, jedem Logo und – ab jetzt – in unseren Gegnern."));
-children.push(p("Das Prinzip ist überraschend anschaulich: Aus vier Punkten – einem Start, einem Ziel und zwei „Zieh-Punkten“ dazwischen, die die Kurve in ihre Form locken – entsteht eine weiche Bahn. Man muss die Mathematik dahinter nicht verstehen, denn GameBasic liefert sie fix und fertig im curves-Modul:"));
+children.push(p("Das Prinzip ist überraschend anschaulich: Aus vier Punkten – einem Start, einem Ziel und zwei „Zieh-Punkten“ dazwischen, die die Kurve in ihre Form locken – entsteht eine weiche Bahn. Man muss die Mathematik dahinter nicht verstehen, denn Drachenhauch liefert sie fix und fertig im curves-Modul:"));
 children.push(codeBlock([
   'IMPORT "curves"',
 ]));
@@ -1017,7 +1017,7 @@ children.push(pmix([
   ["state AS INTEGER", true], [" das frühere Ja/Nein-Flag.", false],
 ]));
 children.push(tip("Namen klug wählen",
-  "Weil GameBasic Gross-/Kleinschreibung ignoriert, darf der ENUM-Name nicht gleich heissen wie eine deiner Variablen. Wir nennen ihn kurz St – das kollidiert mit nichts."));
+  "Weil Drachenhauch Gross-/Kleinschreibung ignoriert, darf der ENUM-Name nicht gleich heissen wie eine deiner Variablen. Wir nennen ihn kurz St – das kollidiert mit nichts."));
 
 children.push(h2("Eine Bahn für den Sturz"));
 children.push(pmix([
@@ -1365,7 +1365,7 @@ children.push(tip("In diesem Kapitel",
 
 children.push(p("Unser Spiel ist vollständig spielbar – aber spiel es einmal mit geschlossenen Augen, und dir fällt sofort auf, was fehlt: Es ist mucksmäuschenstill. Ein Arcade-Spiel ohne Krach ist wie ein Gewitter ohne Donner. In diesem letzten Kapitel geben wir dem Spiel eine Stimme, mehrere Schwierigkeitsstufen und zeigen, wie du es an Freunde weitergibst."));
 children.push(h2("Sound"));
-children.push(p("Du könntest jetzt anfangen, im Internet nach Sounddateien zu jagen, dich durch Lizenzbedingungen zu wühlen und dir am Ende doch unsicher zu sein, ob du das „pew“ verwenden darfst. Musst du aber nicht. GameBasic hat einen kleinen Synthesizer eingebaut, der dir deine Arcade-Geräusche direkt aus Zahlen zaubert – ganz so, wie es die alten Spielautomaten auch gemacht haben."));
+children.push(p("Du könntest jetzt anfangen, im Internet nach Sounddateien zu jagen, dich durch Lizenzbedingungen zu wühlen und dir am Ende doch unsicher zu sein, ob du das „pew“ verwenden darfst. Musst du aber nicht. Drachenhauch hat einen kleinen Synthesizer eingebaut, der dir deine Arcade-Geräusche direkt aus Zahlen zaubert – ganz so, wie es die alten Spielautomaten auch gemacht haben."));
 children.push(pmix([
   ["Erzeugt werden diese Töne mit ", false], ["AUDIO_SFX", true],
   [" – das ist der kleine Synthesizer – und abgespielt mit ", false], ["PLAYSOUND", true], [":", false],
@@ -1398,11 +1398,11 @@ children.push(pmix([
 figure("kap12_politur.png", "Das fertige Grundspiel: Vollbild, Sound, Level, HUD.", 420, 240).forEach(e => children.push(e));
 
 children.push(h2("Als Programm weitergeben (Export)"));
-children.push(p("Ein Spiel, das nur auf deinem eigenen Rechner und nur mit installiertem GameBasic läuft, ist ein bisschen wie ein selbstgebackener Kuchen, den man nicht aus der Küche tragen darf. Damit auch Freunde, Geschwister oder ahnungslose Verwandte dein Werk spielen können – ohne irgendetwas installieren zu müssen – exportierst du es als eigenständiges Programm:"));
+children.push(p("Ein Spiel, das nur auf deinem eigenen Rechner und nur mit installiertem Drachenhauch läuft, ist ein bisschen wie ein selbstgebackener Kuchen, den man nicht aus der Küche tragen darf. Damit auch Freunde, Geschwister oder ahnungslose Verwandte dein Werk spielen können – ohne irgendetwas installieren zu müssen – exportierst du es als eigenständiges Programm:"));
 children.push(codeBlock([
   "dhrt --export  dein-spiel.dh",
 ]));
-children.push(p("Das erzeugt eine startfertige Datei (mit den Bildern und Tönen darin). Doppelklick genügt – kein GameBasic nötig."));
+children.push(p("Das erzeugt eine startfertige Datei (mit den Bildern und Tönen darin). Doppelklick genügt – kein Drachenhauch nötig."));
 
 children.push(h2("Wie geht es weiter? (Ausblick)"));
 children.push(p("Du hast jetzt ein komplettes, spielbares Galaga-Grundgerüst gebaut. Im Beispielspiel code/galaga.dh findest du dieselben Bausteine – plus die grossen Extras, die du als Nächstes angehen kannst:"));
@@ -1457,7 +1457,7 @@ children.push(pmix([
 ]));
 
 children.push(h2("Der Attract-Modus: das Spiel spielt sich selbst"));
-children.push(p("Und jetzt das Beste. Ein Spielautomat, bei dem eine Weile niemand einwirft, fängt an, sich selbst vorzuführen – damit Vorbeigehende sehen, worum es geht. Das nennt man Attract-Modus. Bisher hätte man dafür eine kleine künstliche Intelligenz schreiben müssen, die das Schiff steuert. Es geht viel einfacher: GameBasic kann deine EINGABE aufzeichnen und später wieder einspeisen. Das Spiel merkt davon nichts – KEYHIT und KEYPRESSED liefern brav die aufgezeichneten Tastendrücke."));
+children.push(p("Und jetzt das Beste. Ein Spielautomat, bei dem eine Weile niemand einwirft, fängt an, sich selbst vorzuführen – damit Vorbeigehende sehen, worum es geht. Das nennt man Attract-Modus. Bisher hätte man dafür eine kleine künstliche Intelligenz schreiben müssen, die das Schiff steuert. Es geht viel einfacher: Drachenhauch kann deine EINGABE aufzeichnen und später wieder einspeisen. Das Spiel merkt davon nichts – KEYHIT und KEYPRESSED liefern brav die aufgezeichneten Tastendrücke."));
 children.push(codeBlock([
   'CONST DEMO_FILE  AS STRING  = "demo.txt"',
   "CONST ATTRACT_MS AS INTEGER = 12000       ' Ruhe vor dem Demo-Start",
@@ -1555,7 +1555,7 @@ children.splice(TOC_INSERT_AT, 0, ...tocBlock);
 // ===================== Dokument =====================
 const doc = new Document({
   creator: "Hans Schnorrenberger",
-  title: "GameBasic – Galaga-Buch",
+  title: "Drachenhauch – Galaga-Buch",
   styles: {
     default: { document: { run: { font: "Arial", size: 22 } } },
     paragraphStyles: [
@@ -1577,7 +1577,7 @@ const doc = new Document({
     properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
     footers: { default: new Footer({ children: [new Paragraph({
       alignment: AlignmentType.CENTER,
-      children: [new TextRun({ text: "GameBasic – Galaga  ·  ", size: 16, color: C_CAP }),
+      children: [new TextRun({ text: "Drachenhauch – Galaga  ·  ", size: 16, color: C_CAP }),
                  new TextRun({ children: [PageNumber.CURRENT], size: 16, color: C_CAP })],
     })] }) },
     children,
@@ -1585,6 +1585,6 @@ const doc = new Document({
 });
 
 Packer.toBuffer(doc).then(buf => {
-  fs.writeFileSync(path.join(__dirname, "GameBasic-Buch.docx"), buf);
-  console.log("OK -> GameBasic-Buch.docx");
+  fs.writeFileSync(path.join(__dirname, "Drachenhauch-Buch.docx"), buf);
+  console.log("OK -> Drachenhauch-Buch.docx");
 });

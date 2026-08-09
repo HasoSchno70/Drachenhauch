@@ -1,7 +1,7 @@
 ' Sound-Demo: SPACE = Beep, P = Pickup-Sound
 ' Beenden mit ESC.
 
-Screen(320, 200, "GameBasic - Sound-Demo")
+Screen(320, 200, "Drachenhauch - Sound-Demo")
 
 DIM beep AS SOUND
 DIM pickup AS SOUND
@@ -37,7 +37,7 @@ WHILE running AND NOT QuitRequested() AND NOT KeyPressed(KEY_ESCAPE)
     lastP = pNow
 
     Cls(RGB(20, 8, 30))
-    Text(40, 40, "GameBasic Sound-Demo", WHITE)
+    Text(40, 40, "Drachenhauch Sound-Demo", WHITE)
     Text(40, 80, "SPACE = Beep", YELLOW)
     Text(40, 100, "P     = Pickup-Sound", CYAN)
     Text(40, 120, "ESC   = Beenden", LIGHTGRAY)

@@ -1,4 +1,4 @@
-"""GameBasic-Editor (PySide6).
+"""Drachenhauch-Editor (PySide6).
 
 Aufruf via `drachenhauch.editor_qt.launch(project_root, initial_file)`.
 
@@ -45,10 +45,10 @@ def _ensure_app():
 
 def launch(project_root: Path, initial_file: Optional[Path] = None) -> int:
     """Startet den Editor; liefert App-Exit-Code."""
-    from .main_window import GameBasicEditor
+    from .main_window import DrachenhauchEditor
 
     app = _ensure_app()
-    win = GameBasicEditor(Path(project_root), initial_file)
+    win = DrachenhauchEditor(Path(project_root), initial_file)
     # Immer maximiert starten (fuellt den Bildschirm, behaelt aber Fenster-
     # rahmen/Taskbar -- fuer einen Editor sinnvoller als echtes Vollbild).
     # Die gespeicherte Groesse bleibt die Groesse beim Entmaximieren.

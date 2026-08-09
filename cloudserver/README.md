@@ -1,6 +1,6 @@
-# GameBasic Cloud Server
+# Drachenhauch Cloud Server
 
-Ein minimaler, selbst hostbarer Server für das GameBasic-Modul `cloud`:
+Ein minimaler, selbst hostbarer Server für das Drachenhauch-Modul `cloud`:
 Speicherstände in der Cloud ablegen und Highscore-Listen (Leaderboards)
 führen. Ein Flask-Prozess + eine SQLite-Datei — kein Account-System, keine
 externen Cloud-Dienste, nichts, was du nicht selbst kontrollierst.
@@ -17,7 +17,7 @@ set GB_CLOUD_API_KEY=test-schluessel                # Windows (PowerShell: $env:
 .venv\Scripts\python server.py
 ```
 
-Der Server läuft dann auf `http://localhost:8787`. In deinem GameBasic-Programm:
+Der Server läuft dann auf `http://localhost:8787`. In deinem Drachenhauch-Programm:
 
 ```basic
 IMPORT "cloud"

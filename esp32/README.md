@@ -1,14 +1,14 @@
-# ESP32 <-> GameBasic
+# ESP32 <-> Drachenhauch
 
 Grundgerüst, um ein ESP32-Board (oder einen ESP8266, siehe unten) über MQTT mit
-einem GameBasic-Programm reden zu lassen. Die Verkabelung ist fertig — WLAN,
+einem Drachenhauch-Programm reden zu lassen. Die Verkabelung ist fertig — WLAN,
 Broker-Verbindung, Wiederverbinden, Nachrichtenempfang. Deine eigene Arbeit
 kommt an vier markierte Stellen.
 
 | Datei | Was |
 |---|---|
 | `drachenhauch_esp32/drachenhauch_esp32.ino` | der Sketch fürs Board |
-| `../examples/159_esp32_bruecke.dh` | das GameBasic-Gegenstück |
+| `../examples/159_esp32_bruecke.dh` | das Drachenhauch-Gegenstück |
 
 ## Wie es zusammenhängt
 
@@ -16,8 +16,8 @@ Board und Programm reden **nie direkt** miteinander, sondern über einen
 MQTT-Broker (Mosquitto). Beide kennen nur dessen Adresse:
 
 ```
-ESP32  --esp32/wert-->    [ Broker ]  --> GameBasic
-ESP32  <--esp32/befehl--  [ Broker ]  <-- GameBasic
+ESP32  --esp32/wert-->    [ Broker ]  --> Drachenhauch
+ESP32  <--esp32/befehl--  [ Broker ]  <-- Drachenhauch
 ```
 
 Das klingt umständlich, spart aber die ganze Verbindungsverwaltung: Das Board
@@ -54,7 +54,7 @@ aufs eigene Subnetz, nicht für alles.
 | | wo | wofür |
 |---|---|---|
 | **1** | `setup()` | Hardware einrichten (`pinMode`, Sensor starten) |
-| **2** | `nachrichtEmpfangen()` | auf Befehle aus GameBasic reagieren |
+| **2** | `nachrichtEmpfangen()` | auf Befehle aus Drachenhauch reagieren |
 | **3** | `brokerVerbinden()` | weitere Themen abonnieren |
 | **4** | `loop()` | eigene Messwerte senden |
 
@@ -68,7 +68,7 @@ mosquitto_sub -h 127.0.0.1 -t esp32/befehl -v
 ```
 
 Starte `examples/159_esp32_bruecke.dh`, schick einen Wert — und sieh zu, wie der
-Befehl zurückkommt. So entwickelst du die GameBasic-Seite fertig, lange bevor
+Befehl zurückkommt. So entwickelst du die Drachenhauch-Seite fertig, lange bevor
 die Hardware auf dem Tisch liegt.
 
 ## Fallstricke, die im Code stehen
@@ -126,7 +126,7 @@ Die `arduino-cli` liegt übrigens in der Arduino-IDE mit drin:
 — sie benutzt denselben Datenordner wie die IDE, installierte Kerne und
 Bibliotheken stehen also in beiden zur Verfügung.
 
-**GameBasic-Seite:** gegen echtes Mosquitto durchgetestet, mit `mosquitto_pub`
+**Drachenhauch-Seite:** gegen echtes Mosquitto durchgetestet, mit `mosquitto_pub`
 als Board-Attrappe.
 
 Was ein Compiler NICHT beweisen kann: dass der Sketch auf echter Hardware das

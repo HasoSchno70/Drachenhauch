@@ -8,7 +8,7 @@ module.exports = (H) => {
 
   return [
     H.chapter("Anhang D — Fehlermeldungen verstehen"),
-    H.p("Fehler gehören zum Programmieren dazu. GameBasic meldet sie in einer festen Form, die dir genau sagt, wo und was schiefging. Dieser Anhang erklärt den Aufbau und die häufigsten Meldungen."),
+    H.p("Fehler gehören zum Programmieren dazu. Drachenhauch meldet sie in einer festen Form, die dir genau sagt, wo und was schiefging. Dieser Anhang erklärt den Aufbau und die häufigsten Meldungen."),
 
     H.h2("So liest du eine Fehlermeldung"),
     H.pmix([
@@ -47,6 +47,6 @@ module.exports = (H) => {
 
     H.tip("Schritt für Schritt zur Ursache", "Wenn du eine Meldung nicht sofort verstehst: (1) Geh zur genannten Zeile. (2) Lies, welcher Befehl oder welche Variable gemeint ist. (3) Prüfe deren Werte – oft hilft ein zusätzliches PRINT direkt davor, um zu sehen, was wirklich drinsteht. (4) Schlage bei Befehlen die erwarteten Argumente in Anhang A nach. Die meisten Fehler sind nach diesen vier Schritten klar."),
 
-    H.p("Damit endet das Lehrbuch. Du kennst nun die Sprache, die eingebauten Befehle, die Module und hast ein vollständiges Spiel gebaut. Der beste nächste Schritt ist immer derselbe: ein eigenes kleines Projekt anfangen und ausprobieren. Viel Freude beim Programmieren mit GameBasic!"),
+    H.p("Damit endet das Lehrbuch. Du kennst nun die Sprache, die eingebauten Befehle, die Module und hast ein vollständiges Spiel gebaut. Der beste nächste Schritt ist immer derselbe: ein eigenes kleines Projekt anfangen und ausprobieren. Viel Freude beim Programmieren mit Drachenhauch!"),
   ];
 };

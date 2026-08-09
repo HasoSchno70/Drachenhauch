@@ -1,12 +1,12 @@
-# GameBasic – Lizenz & Quellen der Beispiel-Assets
+# Drachenhauch – Lizenz & Quellen der Beispiel-Assets
 
-Diese Datei dokumentiert Herkunft und Lizenz aller mit den GameBasic-Beispielen
+Diese Datei dokumentiert Herkunft und Lizenz aller mit den Drachenhauch-Beispielen
 ausgelieferten Medien (Audio, 3D-Modelle, HDRIs, Grafiken). Sie dient zugleich
 als **Namensnennung (Attribution)** für die CC-BY-lizenzierten Inhalte – bei
 Weitergabe bitte beibehalten.
 
 ## Eigene / selbst erzeugte Inhalte
-Selbst erstellt (mit den GameBasic-Tools `dhsprites`/`dhtracker`/`dhsfx` bzw.
+Selbst erstellt (mit den Drachenhauch-Tools `dhsprites`/`dhtracker`/`dhsfx` bzw.
 Generator-Skripten) und damit frei – auch kommerziell – verwendbar:
 - Alle Pixel-Grafiken/Sprites: `*.dhsprite`, `*.gif`, `*.png`, Atlanten/`*.json`
   – darunter der eigenständige Plattformer-Satz in `platformer/` und der Spieler

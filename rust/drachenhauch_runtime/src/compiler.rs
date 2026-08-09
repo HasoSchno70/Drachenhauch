@@ -266,7 +266,7 @@ struct ClassInfo {
 pub struct Compiler {
     global_slots: HashMap<String, usize>,
     /// Namen aller Top-Level-CONST und ENUM (klein geschrieben). Grundlage fuer
-    /// die Verdeckungs-Warnung: GameBasic ignoriert Gross-/Kleinschreibung, eine
+    /// die Verdeckungs-Warnung: Drachenhauch ignoriert Gross-/Kleinschreibung, eine
     /// lokale `hoehe` verdeckt also lautlos die Konstante `HOEHE`.
     global_consts: std::collections::HashSet<String>,
     global_vars: std::collections::HashSet<String>,
@@ -498,7 +498,7 @@ impl Compiler {
     /// Pre-Pass: Top-Level-Globals (Skalar-DIM/CONST) -> Slot-Index.
     ///
     /// Erkennt dabei Namens-Kollisionen: ein als CONST/ENUM belegter Name darf
-    /// NICHT zugleich eine Variable sein (und umgekehrt). Weil GameBasic
+    /// NICHT zugleich eine Variable sein (und umgekehrt). Weil Drachenhauch
     /// Gross-/Kleinschreibung ignoriert, kollidiert `DIM mode` mit `ENUM Mode` --
     /// sonst gibt es erst zur Laufzeit das kryptische "CONST kann nicht
     /// ueberschrieben werden". Variable-vs-Variable (z.B. `DIM i` + `FOR i`) ist
@@ -671,7 +671,7 @@ impl Compiler {
 
     /// Warnt, wenn eine lokale Variable eine Top-Level-Konstante verdeckt.
     ///
-    /// GameBasic ignoriert Gross-/Kleinschreibung. Ein `DIM hoehe` in einer SUB
+    /// Drachenhauch ignoriert Gross-/Kleinschreibung. Ein `DIM hoehe` in einer SUB
     /// verdeckt damit die Konstante `HOEHE` -- und weil das lautlos passiert,
     /// taucht der Fehler weit weg von der Ursache auf: `HOEHE - 54` wird zu
     /// `0.6 - 54`, und beschwert sich erst der Aufruf, dem man das Ergebnis
@@ -685,7 +685,7 @@ impl Compiler {
         // Nicht zweimal fuer denselben Namen in derselben Funktion melden.
         if self.ctx.local_slots.contains_key(name) { return; }
         self.warnings.push((self.ctx.cur_line, format!(
-            "Lokale Variable '{}' verdeckt die gleichnamige Konstante -- GameBasic ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.", name)));
+            "Lokale Variable '{}' verdeckt die gleichnamige Konstante -- Drachenhauch ignoriert Gross-/Kleinschreibung. Innerhalb dieser Funktion meint der Name ab hier die Variable, nicht die Konstante.", name)));
     }
 
     /// Typ so schreiben, wie er im Quelltext steht (`array:INTEGER` ->
@@ -2539,7 +2539,7 @@ fn collect_global_names(n: &Node) -> Vec<(String, &'static str)> {
 /// Gross-/Kleinschreibungs-Unabhaengigkeit -- der nicht-offensichtliche Teil).
 fn name_clash_msg(name: &str, a: &str, b: &str) -> String {
     format!("Namens-Kollision: '{}' ist zugleich {} und {} -- das geht nicht, \
-             weil GameBasic Gross-/Kleinschreibung ignoriert. Benenne eines um.",
+             weil Drachenhauch Gross-/Kleinschreibung ignoriert. Benenne eines um.",
             name, a, b)
 }
 

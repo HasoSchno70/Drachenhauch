@@ -1,5 +1,5 @@
 ' ============================================================================
-'  85_cybermatic_demo.dh  --  "CYBERMATIC"  (native GameBasic Showcase, HiRes)
+'  85_cybermatic_demo.dh  --  "CYBERMATIC"  (native Drachenhauch Showcase, HiRes)
 '
 '  Beat- UND audio-reaktive Demoscene-Nummer fuer die native Runtime (dhrt).
 '  Das Spektrum + die 3D-Szenen reagieren auf eine ECHTE FFT der laufenden
@@ -38,7 +38,7 @@ DIM pulse AS FLOAT
 DIM bass AS FLOAT
 DIM beat AS INTEGER
 
-SCREEN(W, H, "GameBasic -- CYBERMATIC (native)", 1)
+SCREEN(W, H, "Drachenhauch -- CYBERMATIC (native)", 1)
 
 IF FILEEXISTS("assets/cybermatic_pulse.ogg") THEN
     PLAYMUSIC("assets/cybermatic_pulse.ogg", -1, 0.8)
@@ -80,7 +80,7 @@ DIM t0 AS INTEGER
 t0 = MILLIS()
 
 DIM scroll_msg AS STRING
-scroll_msg = "GAMEBASIC NATIVE RUNTIME  ***  ECHTE FFT-AUDIOREAKTIVITAET (raylib Mix-Tap)  ***  3D + PARTIKEL + BULK-2D + STREAM-AUDIO  ***  SZENEN: TUNNEL . RING . PLASMA  ***  MUSIK: CYBERMATIC PULSE / ALEXANDR ZHELANOV (CC-BY 4.0)  ***  ESC = ENDE  ***   "
+scroll_msg = "DRACHENHAUCH NATIVE RUNTIME  ***  ECHTE FFT-AUDIOREAKTIVITAET (raylib Mix-Tap)  ***  3D + PARTIKEL + BULK-2D + STREAM-AUDIO  ***  SZENEN: TUNNEL . RING . PLASMA  ***  MUSIK: CYBERMATIC PULSE / ALEXANDR ZHELANOV (CC-BY 4.0)  ***  ESC = ENDE  ***   "
 
 ' ---------------------------------------------------------------------------
 '  Hilfsfunktionen

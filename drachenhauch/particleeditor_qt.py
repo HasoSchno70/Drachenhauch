@@ -1,4 +1,4 @@
-"""Partikel-Editor fuer GameBasic (`dhparticles` / `dhrun.py --particles`).
+"""Partikel-Editor fuer Drachenhauch (`dhparticles` / `dhrun.py --particles`).
 
 Standalone-Qt-Tool: alle Parameter des `particles`-Moduls live per Slider/
 Spinbox tunen, mit Echtzeit-Vorschau, und das Ergebnis als GB-Code-Snippet
@@ -275,7 +275,7 @@ class ParticleEditor(QMainWindow):
     def __init__(self, project_root: Path):
         super().__init__()
         self.project_root = project_root
-        self.setWindowTitle("GameBasic Partikel-Editor")
+        self.setWindowTitle("Drachenhauch Partikel-Editor")
         self.resize(1240, 820)
         self.sys = _ParticleSystem(0.0, 0.0)
         self._syncing = False
@@ -656,7 +656,7 @@ class ParticleEditor(QMainWindow):
         # "Kopieren"/"Speichern" den `code`-String vom OEFFNEN des Dialogs
         # einfrieren -- tunte man danach weiter an den Reglern, gaben
         # Anzeige/Kopieren/Speichern und der (live neu bauende) "In
-        # GameBasic testen"-Button drei VERSCHIEDENE Ergebnisse. WindowModal
+        # Drachenhauch testen"-Button drei VERSCHIEDENE Ergebnisse. WindowModal
         # blockiert waehrend der Dialog offen ist genau das Eltern-Fenster
         # (`self`) -- der eingefrorene Snapshot kann dadurch gar nicht mehr
         # veralten, ohne den funktionierenden Test-Button anzutasten.
@@ -669,7 +669,7 @@ class ParticleEditor(QMainWindow):
         dl.addWidget(edit)
         row = QHBoxLayout()
         row.addStretch(1)
-        btn_test = QPushButton("In GameBasic testen")
+        btn_test = QPushButton("In Drachenhauch testen")
         btn_test.setToolTip("Lauffaehige Demo (Maus = Emitter) im dhrt-Fenster starten")
         btn_test.clicked.connect(self._run_in_drachenhauch)
         row.addWidget(btn_test)
@@ -699,7 +699,7 @@ class ParticleEditor(QMainWindow):
     def _save_snippet(self, code: str) -> None:
         path, _ = QFileDialog.getSaveFileName(
             self, "GB-Code speichern",
-            str(self.project_root / "partikel.dh"), "GameBasic (*.dh)")
+            str(self.project_root / "partikel.dh"), "Drachenhauch (*.dh)")
         if not path:
             return
         try:

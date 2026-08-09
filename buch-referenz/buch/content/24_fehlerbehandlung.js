@@ -1,9 +1,9 @@
 module.exports = (H) => [
   H.chapter("Fehlerbehandlung"),
-  H.p("Manche Dinge können schiefgehen, ohne dass du als Programmierer schuld bist: Eine Datei fehlt, eine Eingabe ergibt keinen Sinn, eine Berechnung teilt versehentlich durch null. Tritt so ein Laufzeitfehler auf, bricht GameBasic das Programm normalerweise mit einer Meldung ab. Oft willst du aber nicht abstürzen, sondern den Fehler sauber auffangen und weitermachen. Genau dafür gibt es TRY, CATCH und THROW."),
+  H.p("Manche Dinge können schiefgehen, ohne dass du als Programmierer schuld bist: Eine Datei fehlt, eine Eingabe ergibt keinen Sinn, eine Berechnung teilt versehentlich durch null. Tritt so ein Laufzeitfehler auf, bricht Drachenhauch das Programm normalerweise mit einer Meldung ab. Oft willst du aber nicht abstürzen, sondern den Fehler sauber auffangen und weitermachen. Genau dafür gibt es TRY, CATCH und THROW."),
 
   H.h2("Auffangen mit TRY ... CATCH"),
-  H.p("Du legst den heiklen Code in einen TRY-Block. Geht alles gut, läuft er ganz normal durch und der CATCH-Teil wird übersprungen. Tritt aber irgendwo im TRY-Block ein Fehler auf, springt GameBasic sofort in den CATCH-Block – der Rest des TRY-Blocks wird übersprungen, das Programm aber NICHT abgebrochen. Danach geht es hinter END TRY ganz normal weiter."),
+  H.p("Du legst den heiklen Code in einen TRY-Block. Geht alles gut, läuft er ganz normal durch und der CATCH-Teil wird übersprungen. Tritt aber irgendwo im TRY-Block ein Fehler auf, springt Drachenhauch sofort in den CATCH-Block – der Rest des TRY-Blocks wird übersprungen, das Programm aber NICHT abgebrochen. Danach geht es hinter END TRY ganz normal weiter."),
   H.p("Im CATCH kannst du eine Variable angeben (hier e). Sie enthält dann die Fehlermeldung als Text – nützlich, um zu sehen, was passiert ist."),
   H.cmd("TRY ... CATCH ... END TRY", "TRY\n    ...\nCATCH [e]\n    ...\nEND TRY",
     "Führt den TRY-Block aus. Tritt ein Fehler auf, läuft stattdessen der CATCH-Block weiter. Die optionale Variable nach CATCH nimmt die Fehlermeldung als String auf. Nach END TRY läuft das Programm normal weiter – ein abgefangener Fehler beendet es nicht.",

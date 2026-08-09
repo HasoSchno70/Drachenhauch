@@ -1,6 +1,6 @@
 module.exports = (H) => [
   H.chapter("Sound"),
-  H.p("Klang macht ein Spiel erst rund: ein Münz-Ploppen, ein Laser-Zischen, treibende Hintergrundmusik. GameBasic spielt kurze Soundeffekte und längere Musikstücke ab und kann Töne sogar selbst erzeugen, ohne dass du eine Audiodatei mitliefern musst. Klang kann man im Buch natürlich nicht abdrucken – aber man kann zeigen, was man dazu baut: Dieses Kapitel entwickelt ein kleines, anklickbares Klavier."),
+  H.p("Klang macht ein Spiel erst rund: ein Münz-Ploppen, ein Laser-Zischen, treibende Hintergrundmusik. Drachenhauch spielt kurze Soundeffekte und längere Musikstücke ab und kann Töne sogar selbst erzeugen, ohne dass du eine Audiodatei mitliefern musst. Klang kann man im Buch natürlich nicht abdrucken – aber man kann zeigen, was man dazu baut: Dieses Kapitel entwickelt ein kleines, anklickbares Klavier."),
   H.figure("46_sound.png", "Das Mini-Klavier aus diesem Kapitel: Acht Tasten (1 bis 8) spielen die Töne der C-Dur-Tonleiter."),
 
   H.h2("Sounddateien laden & abspielen"),
@@ -19,7 +19,7 @@ module.exports = (H) => [
     ]),
 
   H.h2("Töne selbst erzeugen: das audio-Modul"),
-  H.p("Mit dem Modul audio synthetisiert GameBasic Klänge zur Laufzeit – kein einziges Sounddatei nötig. AUDIO_TONE erzeugt einen Ton einer bestimmten Frequenz; das Ergebnis ist ein SOUND, den du wie gewohnt mit PLAYSOUND abspielst. Die Frequenz (in Hertz) bestimmt die Tonhöhe: 440 Hz ist das Kammerton-A."),
+  H.p("Mit dem Modul audio synthetisiert Drachenhauch Klänge zur Laufzeit – kein einziges Sounddatei nötig. AUDIO_TONE erzeugt einen Ton einer bestimmten Frequenz; das Ergebnis ist ein SOUND, den du wie gewohnt mit PLAYSOUND abspielst. Die Frequenz (in Hertz) bestimmt die Tonhöhe: 440 Hz ist das Kammerton-A."),
   H.cmd("AUDIO_TONE", 'AUDIO_TONE(frequenz, dauer_ms[, wellenform$[, lautstärke]])',
     "Erzeugt einen Ton der angegebenen Frequenz (Hz) und Dauer (ms). Die Wellenform (\"sine\", \"square\", \"saw\", \"triangle\") prägt den Klangcharakter – \"square\" klingt nach Retro-Spielkonsole. Liefert ein SOUND.",
     [
@@ -70,5 +70,5 @@ module.exports = (H) => [
     [
       'IF neues_level THEN STOPMUSIC() : PLAYMUSIC("musik/level2.ogg")',
     ]),
-  H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor dhsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum GameBasic-Werkzeugkasten rund um den Sound."),
+  H.tip("Sound-Werkzeuge", "Eigene Soundeffekte bastelst du am schnellsten im Editor dhsfx (er exportiert fertige AUDIO_SFX-Aufrufe), und ganze Musikstücke baust du im Tracker. Beide gehören zum Drachenhauch-Werkzeugkasten rund um den Sound."),
 ];

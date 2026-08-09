@@ -1,6 +1,6 @@
 """Welcome-Panel beim Editor-Start ohne offene Datei.
 
-Zeigt das GameBasic-Logo, ein paar Action-Buttons (Neu/Oeffnen/Beispiele/
+Zeigt das Drachenhauch-Logo, ein paar Action-Buttons (Neu/Oeffnen/Beispiele/
 Doku), eine kuratierte **Showcase**-Galerie mit Screenshot-Karten (Klick
 oeffnet die Demo) und eine Liste der zuletzt geoeffneten Dateien. Wird als
 Tab eingefuegt, sobald der Editor mit leerem Workspace startet; verschwindet,
@@ -199,13 +199,13 @@ class WelcomePanel(QWidget):
             from PIL.ImageQt import ImageQt
             scaled = branding.scaled_logo_image(480)
             if scaled is None:
-                self.logo_label.setText("GameBasic")
+                self.logo_label.setText("Drachenhauch")
                 return
             qimg = ImageQt(scaled).copy()
             self._logo_pixmap = QPixmap.fromImage(qimg)
             self.logo_label.setPixmap(self._logo_pixmap)
         except Exception:
-            self.logo_label.setText("GameBasic")
+            self.logo_label.setText("Drachenhauch")
 
     def _populate_recent(self) -> None:
         self.recent_list.clear()

@@ -1,10 +1,10 @@
 module.exports = (H) => [
   H.chapter("Module importieren"),
-  H.p("Je größer ein Programm wird, desto unhandlicher wird eine einzige riesige Datei. Mit IMPORT holst du Code von außerhalb herein – entweder eine der vielen eingebauten Bibliotheken von GameBasic oder eine eigene Datei, in die du wiederverwendbaren Code ausgelagert hast. Das hält deine Programme aufgeräumt und spart Tipparbeit, weil du Bewährtes nicht ständig neu schreibst."),
+  H.p("Je größer ein Programm wird, desto unhandlicher wird eine einzige riesige Datei. Mit IMPORT holst du Code von außerhalb herein – entweder eine der vielen eingebauten Bibliotheken von Drachenhauch oder eine eigene Datei, in die du wiederverwendbaren Code ausgelagert hast. Das hält deine Programme aufgeräumt und spart Tipparbeit, weil du Bewährtes nicht ständig neu schreibst."),
   H.p("Eine IMPORT-Zeile schreibst du an den Anfang deines Programms. Es gibt zwei Sorten von Modulen, die sich in einer Kleinigkeit unterscheiden – merke dir den Unterschied gut."),
 
   H.h2("Eingebaute Module"),
-  H.p("GameBasic bringt eine große Sammlung fertiger Module mit – für 2D-Vektoren, JSON, Datenbanken, Physik, Pfadfindung und vieles mehr (du lernst sie alle in Teil V kennen). Ein solches Modul holst du dir mit IMPORT und dem Modulnamen in Anführungszeichen, OHNE Dateiendung. Danach stehen dir die Funktionen und Typen des Moduls zur Verfügung."),
+  H.p("Drachenhauch bringt eine große Sammlung fertiger Module mit – für 2D-Vektoren, JSON, Datenbanken, Physik, Pfadfindung und vieles mehr (du lernst sie alle in Teil V kennen). Ein solches Modul holst du dir mit IMPORT und dem Modulnamen in Anführungszeichen, OHNE Dateiendung. Danach stehen dir die Funktionen und Typen des Moduls zur Verfügung."),
   H.cmd("IMPORT (eingebautes Modul)", 'IMPORT "modulname"',
     "Macht ein eingebautes Modul nutzbar. Der Name steht ohne Endung in Anführungszeichen. Anschließend kannst du die Funktionen und externen Typen des Moduls verwenden.",
     [
@@ -17,7 +17,7 @@ module.exports = (H) => [
     { out: ["5.0"] }),
 
   H.h2("Eigene Dateien als Modul"),
-  H.p("Du kannst deinen eigenen Code in eine separate .dh-Datei auslagern und sie importieren. Damit teilst du ein großes Programm in handliche Stücke – etwa alle Mathe-Hilfsfunktionen in mathe.dh. Beim Import einer eigenen Datei gibst du den Dateinamen MIT der Endung .dh an. GameBasic fügt den Inhalt der Datei an dieser Stelle ein, sodass du deren Funktionen und Konstanten direkt nutzen kannst."),
+  H.p("Du kannst deinen eigenen Code in eine separate .dh-Datei auslagern und sie importieren. Damit teilst du ein großes Programm in handliche Stücke – etwa alle Mathe-Hilfsfunktionen in mathe.dh. Beim Import einer eigenen Datei gibst du den Dateinamen MIT der Endung .dh an. Drachenhauch fügt den Inhalt der Datei an dieser Stelle ein, sodass du deren Funktionen und Konstanten direkt nutzen kannst."),
   H.p("Angenommen, du hast neben deinem Programm eine Datei mathe.dh mit diesem Inhalt:"),
   H.code([
     '\' Datei: mathe.dh',
@@ -37,7 +37,7 @@ module.exports = (H) => [
       'PRINT GOLDENER_SCHNITT',
     ],
     { out: ["36", "1.618"] }),
-  H.warn("Hier der feine, aber wichtige Unterschied: Ein eingebautes Modul schreibst du OHNE Endung (IMPORT \"vec2\"), eine eigene Datei MIT (IMPORT \"mathe.dh\"). Die Endung .dh sagt GameBasic: „Das ist eine Datei von mir, kein eingebautes Modul.“"),
+  H.warn("Hier der feine, aber wichtige Unterschied: Ein eingebautes Modul schreibst du OHNE Endung (IMPORT \"vec2\"), eine eigene Datei MIT (IMPORT \"mathe.dh\"). Die Endung .dh sagt Drachenhauch: „Das ist eine Datei von mir, kein eingebautes Modul.“"),
 
   H.h2("Module unter anderem Namen: AS"),
   H.p("Manche Module haben lange Funktionsnamen. Mit dem Zusatz AS gibst du einem Modul beim Import ein kürzeres Namenspräfix. Aus den JSON-Funktionen, die normalerweise mit JSON_ beginnen, werden dann etwa J_-Funktionen – das spart Tipparbeit, wenn du das Modul oft benutzt."),
@@ -54,5 +54,5 @@ module.exports = (H) => [
   H.note("Der Alias ersetzt das Präfix für alle Funktionen und Typen des Moduls (J_PARSE, J_HANDLE …). Das funktioniert bei Modulen, deren Funktionen mit dem Modulnamen beginnen – also bei den allermeisten."),
 
   H.tip("Code sauber aufteilen", "Lagere zusammengehörige Bausteine in eigene Dateien aus: eine für Mathe-Helfer, eine für deine Spieler-Klasse, eine für die Gegner. Dein Hauptprogramm beginnt dann mit ein paar IMPORT-Zeilen und bleibt übersichtlich. So findest du dich auch in großen Projekten zurecht – und kannst eine bewährte Datei im nächsten Spiel einfach wiederverwenden."),
-  H.p("Damit endet Teil II: Du beherrschst jetzt die ganze Sprache GameBasic – von Variablen über Schleifen und Funktionen bis zu Klassen, Coroutinen und Modulen. In den folgenden Teilen geht es um die eingebauten Befehle im Detail (Teil III), um Grafik, Sound und Spiele (Teil IV) und um die mitgelieferten Module (Teil V)."),
+  H.p("Damit endet Teil II: Du beherrschst jetzt die ganze Sprache Drachenhauch – von Variablen über Schleifen und Funktionen bis zu Klassen, Coroutinen und Modulen. In den folgenden Teilen geht es um die eingebauten Befehle im Detail (Teil III), um Grafik, Sound und Spiele (Teil IV) und um die mitgelieferten Module (Teil V)."),
 ];

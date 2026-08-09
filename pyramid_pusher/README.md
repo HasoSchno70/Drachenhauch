@@ -1,6 +1,6 @@
 # Pyramid Pusher — *A Sokoban-Style Escape*
 
-Ein Sokoban-Puzzlespiel im Grabkammer-Setting, geschrieben in **GameBasic**.
+Ein Sokoban-Puzzlespiel im Grabkammer-Setting, geschrieben in **Drachenhauch**.
 Schiebe die Ankh-Kisten auf die leuchtenden Zielfelder. Ist eine Kammer
 gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer.
 
@@ -12,7 +12,7 @@ gelöst, springt die Schatztruhe auf und zeigt den **Code** zur nächsten Kammer
 .venv\Scripts\python.exe dhrun.py pyramid_pusher\pyramid_pusher.dh
 ```
 
-…oder im **GameBasic-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
+…oder im **Drachenhauch-Editor** öffnen und **F5** drücken (läuft nativ über dhrt).
 
 > Grafik startet nur mit echtem OpenGL-Kontext — also aus dem Editor / per
 > `dhrun.py`, nicht aus einer headless-Shell.

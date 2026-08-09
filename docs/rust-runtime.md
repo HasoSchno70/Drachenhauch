@@ -163,7 +163,7 @@ Beide blockieren nicht (`severity:"warning"`), beide zeigen im Editor als Marker
   bleibt still — `DIM` im Schleifenkörper ist gängig. Ein lokales `DIM`, das
   ein Global verdeckt, ist ebenfalls kein Fall dafür (anderer
   Geltungsbereich). Vergleich ohne Rücksicht auf Groß-/Kleinschreibung, weil
-  GameBasic sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
+  Drachenhauch sie nicht unterscheidet. Logik: `compiler.rs::warn_dim_typ_wechsel`
   (Zustand je `Ctx`, also automatisch pro Funktion getrennt), Tests
   `tests/test_dhrt_check.py`.
 
@@ -374,7 +374,7 @@ bei `YIELD_VALUE` (Opcode 115) wird der Frame (`ip`/`locals`/`stack`/
 `CORO_RESUME`/`SEND` restauriert. Der `CoroState` hält einen rohen `*const Func`
 auf die — über die ganze Programmlaufzeit unveränderliche — `Func`, sodass
 `Value` keinen Lifetime-Parameter braucht. Möglich ist die Single-Frame-Lösung,
-weil GameBasic **kein Cross-Frame-`YIELD`** erlaubt (ein Helfer mit `YIELD` ist
+weil Drachenhauch **kein Cross-Frame-`YIELD`** erlaubt (ein Helfer mit `YIELD` ist
 selbst eine Coroutine): nur der oberste Coroutine-Frame muss fortsetzbar sein,
 verschachtelte normale Calls laufen weiter rekursiv auf dem nativen Stack.
 `CORO_*`-Builtins laufen über `try_coro` (brauchen VM-State); `FOR EACH`/
@@ -1018,7 +1018,7 @@ via `FILEEXISTS`-Guard). Provenienz/Lizenz: `examples/assets/CREDITS_cybermatic.
 
 ## Schritt 7: Standalone-Export (`dhrun.py --export` / Editor)
 
-Ein GameBasic-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
+Ein Drachenhauch-Programm zu einer eigenständigen `.exe` bündeln, die **ohne
 Python** läuft — Spiele ausliefern ohne Toolchain beim Endnutzer.
 
 **Prinzip (kein Recompile):** Der kompilierte Bytecode (`.dhc`) wird an eine
@@ -1050,7 +1050,7 @@ extrahiert den Bytecode.
 > und [tests/test_export_signierbar.py](../tests/test_export_signierbar.py).
 >
 > **Signieren kann nur, wer die Datei in der Hand hat.** Ein Zertifikat des
-> GameBasic-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
+> Drachenhauch-Herausgebers hilft exportierten Spielen nicht — die entstehen auf
 > fremden Rechnern. Wer seine Spiele signiert ausliefern will, braucht ein
 > eigenes Zertifikat und signiert die fertige `.exe` selbst. Ist ein Payload da (Bundle-Modus), wechselt `dhrt` ins Exe-Verzeichnis
 (damit relative Asset-Pfade beim Doppelklick von überall stimmen) und führt den

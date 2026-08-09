@@ -69,9 +69,10 @@ implementiert den vollen Opcode-Satz — sowohl generische (`ADD`, `LOAD_NAME`)
 als auch optimierte (`ADD_NN`, Slot-Globals, Inline-Caches). Der Rust-Compiler
 emittiert die **generischen** Opcodes (kein Constant-Folding, keine `_NN`, keine
 Inline-Caches) — das Verhalten ist identisch, der Code viel kleiner. Verifiziert
-wird per stdout-Vergleich `dhrt --runsrc` == Python-Tree-Walker
-([`tests/test_rust_compiler_parity.py`](../tests/test_rust_compiler_parity.py)),
-dasselbe Korrektheits-Prinzip wie `test_dhrt_parity`. (Performance-Parität —
+wurde per stdout-Vergleich `dhrt --runsrc` == Python-Tree-Walker. Die
+zugehörige `tests/test_rust_compiler_parity.py` ist mit Stufe B **entfallen**
+— sie verglich gegen den Python-Compiler, und den gibt es nicht mehr. Was das
+Verhalten heute sichert, sind die run_gb-Golden-Tests. (Performance-Parität —
 Optimierungs-Opcodes — kann später nachgezogen werden, ohne Verhalten zu ändern.)
 
 **Stufe 3a (fertig):** main-only — Skalar-Globals (Slot-basiert), CONST,

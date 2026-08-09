@@ -1,4 +1,4 @@
-' === GameBasic 2026 Showcase ===
+' === Drachenhauch 2026 Showcase ===
 ' Dungeon-RPG-Mini, das ALLE neuen Sprach-Features zeigt:
 '   Properties (GET/SET), List-Comprehensions, Variadic-Functions,
 '   Pattern-Matching mit Guards, IN-Operator, Method-Syntax,
@@ -137,7 +137,7 @@ END SUB
 
 ' === Programm ==========================================================
 
-banner("GameBasic 2026 Showcase  --  Dungeon Crawler")
+banner("Drachenhauch 2026 Showcase  --  Dungeon Crawler")
 
 ' Helden-Erzeugung via Comprehension + RANGE
 log("INFO", "Spawne Heldenparty...")
