@@ -1,6 +1,6 @@
 """Qt-freies Datenmodell + Code-Generierung des Animations-FSM-Editors `dhanim`.
 
-`.gbanim` = JSON im Runtime-Format des `animfsm`-Moduls (params/states/
+`.dhanim` = JSON im Runtime-Format des `animfsm`-Moduls (params/states/
 transitions/default). Zusatzfelder, die nur der Editor braucht (Knoten-`x`/`y`,
 `sheet`/`frame_w`/`frame_h`/`scale`), ignoriert die Runtime beim Laden.
 """

@@ -1,4 +1,4 @@
-"""Tests fuer das Qt-freie Form-Designer-Modell: .gbform-Roundtrip, Laden in der
+"""Tests fuer das Qt-freie Form-Designer-Modell: .dhform-Roundtrip, Laden in der
 nativen Runtime (GUI_LOAD), Code-Generierung, Palette/Namen."""
 import json
 
@@ -149,11 +149,11 @@ def test_history_limit_drops_oldest():
     assert seen == [4, 3, 2]                        # 0 und 1 wurden verworfen
 
 
-# --------------------------------------------------------------- .gbform IO
+# --------------------------------------------------------------- .dhform IO
 def test_save_load_file(tmp_path):
     doc = FormDoc(title="T")
     doc.add("button", 10, 10).on_click = "go"
-    p = tmp_path / "x.gbform"
+    p = tmp_path / "x.dhform"
     doc.save(str(p))
     raw = json.loads(p.read_text(encoding="utf-8"))
     assert raw["widgets"][0]["kind"] == "button"
@@ -164,15 +164,15 @@ def test_save_load_file(tmp_path):
 
 
 def test_gbform_loads_in_runtime(run_gb, tmp_path):
-    # Das vom Designer geschriebene .gbform muss GUI_LOAD direkt verstehen.
+    # Das vom Designer geschriebene .dhform muss GUI_LOAD direkt verstehen.
     doc = FormDoc(title="RT", x=50, y=40, w=320, h=200)
     doc.add("label", 20, 20)
     dd = doc.add("dropdown", 20, 60); dd.items = ["Rot", "Gruen", "Blau"]; dd.sel = 1
     cb = doc.add("checkbox", 20, 100); cb.checked = True
-    doc.save(str(tmp_path / "f.gbform"))
+    doc.save(str(tmp_path / "f.dhform"))
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
         'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n'
         'PRINT GUI_DROPDOWN_TEXT(GUI_WINDOW_WIDGET(frm, 1))\n'
         'PRINT GUI_CHECKED(GUI_WINDOW_WIDGET(frm, 2))\n',
@@ -186,10 +186,10 @@ def test_resizable_window_roundtrips_in_runtime(run_gb, tmp_path):
     doc = FormDoc(title="R", w=400, h=320)
     doc.resizable = True
     doc.min_w, doc.min_h = 211, 153
-    doc.save(str(tmp_path / "r.gbform"))
+    doc.save(str(tmp_path / "r.dhform"))
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("r.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("r.dhform")\n'
         'DIM j AS STRING\nj = GUI_TO_JSON(frm)\n'
         'PRINT INSTR(j, "resizable") > 0\n'         # Feld vorhanden
         'PRINT INSTR(j, "211") > 0\n'               # min_w
@@ -205,10 +205,10 @@ def test_anchoring_reflows_in_runtime(run_gb, tmp_path):
     doc.add("button", 10, 10)                       # idx0: Default "lt" -> bleibt
     b = doc.add("button", 300, 10); b.anchor = "rt" # idx1: rechts -> x += dx
     c = doc.add("button", 10, 260); c.w = 200; c.anchor = "lrtb"  # idx2: dehnt sich
-    doc.save(str(tmp_path / "a.gbform"))
+    doc.save(str(tmp_path / "a.dhform"))
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("a.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("a.dhform")\n'
         'GUI_WINDOW_SET_BOUNDS(frm, 0, 0, 500, 400)\n'
         'PRINT GUI_GET_X(GUI_WINDOW_WIDGET(frm, 0))\n'   # lt: 10
         'PRINT GUI_GET_X(GUI_WINDOW_WIDGET(frm, 1))\n'   # rt: 300+100 = 400
@@ -237,13 +237,13 @@ def test_gb_export_emits_window_resizable():
 
 
 def test_new_widgets_load_in_runtime(run_gb, tmp_path):
-    # Separator + GroupBox: neue Widget-Arten via .gbform -> GUI_LOAD.
+    # Separator + GroupBox: neue Widget-Arten via .dhform -> GUI_LOAD.
     doc = FormDoc(title="N", w=300, h=200)
     doc.add("separator", 10, 40)
     doc.add("groupbox", 10, 60).text = "Gruppe"
-    doc.save(str(tmp_path / "n.gbform"))
+    doc.save(str(tmp_path / "n.dhform"))
     out = run_gb(
-        'IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("n.gbform")\n'
+        'IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("n.dhform")\n'
         'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n'
         'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 0))\n'
         'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 1))\n', base=tmp_path)
@@ -276,10 +276,10 @@ def test_gbform_with_code_loads_in_runtime(run_gb, tmp_path):
     doc = FormDoc(title="C", w=200, h=120)
     doc.add("button", 10, 10).on_click = "on_ok"
     doc.code["on_ok"] = 'PRINT "x"'
-    doc.save(str(tmp_path / "c.gbform"))
+    doc.save(str(tmp_path / "c.dhform"))
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("c.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("c.dhform")\n'
         'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n',
         base=tmp_path)
     assert out.splitlines() == ["1"]
@@ -365,38 +365,38 @@ def test_z_order_front_back():
 # --------------------------------------------------------------- FormProject
 def test_project_add_sets_first_as_main():
     p = FormProject()
-    p.add("main.gbform")
-    p.add("settings.gbform")
-    assert p.forms == ["main.gbform", "settings.gbform"]
-    assert p.main == "main.gbform"        # erstes wird Startformular
+    p.add("main.dhform")
+    p.add("settings.dhform")
+    assert p.forms == ["main.dhform", "settings.dhform"]
+    assert p.main == "main.dhform"        # erstes wird Startformular
 
 
 def test_project_add_dedup():
     p = FormProject()
-    p.add("a.gbform"); p.add("a.gbform")
-    assert p.forms == ["a.gbform"]
+    p.add("a.dhform"); p.add("a.dhform")
+    assert p.forms == ["a.dhform"]
 
 
 def test_project_remove_repoints_main():
     p = FormProject()
-    p.add("a.gbform"); p.add("b.gbform")
-    p.remove("a.gbform")                  # war main -> faellt auf b
-    assert p.forms == ["b.gbform"] and p.main == "b.gbform"
-    p.remove("b.gbform")
+    p.add("a.dhform"); p.add("b.dhform")
+    p.remove("a.dhform")                  # war main -> faellt auf b
+    assert p.forms == ["b.dhform"] and p.main == "b.dhform"
+    p.remove("b.dhform")
     assert p.forms == [] and p.main == ""
 
 
 def test_project_roundtrip(tmp_path):
-    p = FormProject(forms=["a.gbform", "b.gbform"], main="b.gbform")
-    fp = tmp_path / "proj.gbproj"
+    p = FormProject(forms=["a.dhform", "b.dhform"], main="b.dhform")
+    fp = tmp_path / "proj.dhproj"
     p.save(str(fp))
     q = FormProject.load(str(fp))
-    assert q.forms == ["a.gbform", "b.gbform"] and q.main == "b.gbform"
+    assert q.forms == ["a.dhform", "b.dhform"] and q.main == "b.dhform"
 
 
 def test_project_from_dict_fixes_dangling_main():
-    p = FormProject.from_dict({"forms": ["a.gbform"], "main": "ghost.gbform"})
-    assert p.main == "a.gbform"           # main muss Mitglied sein
+    p = FormProject.from_dict({"forms": ["a.dhform"], "main": "ghost.dhform"})
+    assert p.main == "a.dhform"           # main muss Mitglied sein
     empty = FormProject.from_dict({"forms": [], "main": "x"})
     assert empty.main == ""
 
@@ -480,7 +480,7 @@ def test_generate_runner_uses_stored_code():
     doc = FormDoc()
     doc.add("button", 0, 0).on_click = "on_ok"
     doc.code["on_ok"] = 'PRINT "stored"'
-    src = doc.generate_runner("f.gbform")
+    src = doc.generate_runner("f.dhform")
     assert 'PRINT "stored"' in src and "SUB on_ok()" in src
 
 
@@ -547,8 +547,8 @@ def test_generated_runner_parses():
     doc = FormDoc(title="App")
     doc.add("button", 20, 200).on_click = "on_save"
     doc.add("slider", 20, 40).on_change = "on_vol"
-    src = doc.generate_runner("forms/app.gbform", screen_title="App")
-    assert 'GUI_LOAD("forms/app.gbform")' in src
+    src = doc.generate_runner("forms/app.dhform", screen_title="App")
+    assert 'GUI_LOAD("forms/app.dhform")' in src
     assert "SUB on_save()" in src and "SUB on_vol()" in src
     # Muss sauber durch Preprocess + Lexer + Parser laufen.
     merged = process(src)
@@ -563,7 +563,7 @@ def test_runner_form_fills_os_window():
     doc = FormDoc(title="App", w=400, h=300)
     doc.resizable = True
     doc.min_w, doc.min_h = 200, 150
-    src = doc.generate_runner("f.gbform")
+    src = doc.generate_runner("f.dhform")
     assert "SCREEN(400, 300" in src                       # Fenster = Formulargroesse
     assert "WINDOW_RESIZABLE(TRUE)" in src                # OS-Fenster resizebar
     assert "WINDOW_MIN_SIZE(200, 150)" in src
@@ -573,7 +573,7 @@ def test_runner_form_fills_os_window():
 
 
 def test_runner_non_resizable_no_window_flags():
-    src = FormDoc(title="X").generate_runner("f.gbform")   # resizable=False
+    src = FormDoc(title="X").generate_runner("f.dhform")   # resizable=False
     assert "WINDOW_RESIZABLE(TRUE)" not in src             # OS-Fenster NICHT resizebar
     assert "GUI_WINDOW_CHROME(frm, FALSE)" in src          # randlos trotzdem
 
@@ -581,7 +581,7 @@ def test_runner_non_resizable_no_window_flags():
 def test_generated_runner_with_bodies():
     doc = FormDoc()
     doc.add("button", 0, 0).on_click = "on_ok"
-    src = doc.generate_runner("f.gbform", handler_bodies={"on_ok": 'PRINT "hi"'})
+    src = doc.generate_runner("f.dhform", handler_bodies={"on_ok": 'PRINT "hi"'})
     assert 'PRINT "hi"' in src
 
 
@@ -609,7 +609,7 @@ def test_unknown_window_fields_survive_roundtrip(tmp_path):
            "menus": [{"label": "Datei", "in_bar": True,
                       "items": [{"label": "Beenden", "separator": False,
                                  "enabled": True}]}]}
-    p = tmp_path / "m.gbform"
+    p = tmp_path / "m.dhform"
     p.write_text(json.dumps(src), encoding="utf-8")
     FormDoc.load(str(p)).save(str(p))
     back = json.loads(p.read_text(encoding="utf-8"))
@@ -636,13 +636,13 @@ def test_gui_save_form_survives_designer_roundtrip(run_gb, tmp_path):
         'DIM tb[2] AS STRING\ntb[0] = "Eins"\ntb[1] = "Zwei"\nGUI_TABS(w, tb)\n'
         'DIM t AS GUI_WIDGET\nt = GUI_TABLE(w, 10, 40, 200, 100)\n'
         'DIM b AS GUI_WIDGET\nb = GUI_BUTTON(w, "K", 10, 160, 80, 24)\n'
-        'GUI_SET_TAB(b, 1)\nGUI_SAVE(w, "orig.gbform")\n',
+        'GUI_SET_TAB(b, 1)\nGUI_SAVE(w, "orig.dhform")\n',
         base=tmp_path)
-    FormDoc.load(str(tmp_path / "orig.gbform")).save(str(tmp_path / "after.gbform"))
+    FormDoc.load(str(tmp_path / "orig.dhform")).save(str(tmp_path / "after.dhform"))
     out = run_gb(
         'IMPORT "gui"\n'
         'DIM a AS GUI_WINDOW\nDIM b AS GUI_WINDOW\n'
-        'a = GUI_LOAD("orig.gbform")\nb = GUI_LOAD("after.gbform")\n'
+        'a = GUI_LOAD("orig.dhform")\nb = GUI_LOAD("after.dhform")\n'
         'PRINT GUI_TO_JSON(a) = GUI_TO_JSON(b)\n',
         base=tmp_path)
     assert out.strip() == "TRUE"
@@ -725,19 +725,19 @@ def test_ensure_handler_yields_a_valid_identifier():
 # ----------------------------------------- FormProject
 def test_project_normalizes_paths():
     p = FormProject()
-    p.add("forms/a.gbform"); p.add(r"forms\a.gbform"); p.add("./forms/a.gbform")
-    assert p.forms == ["forms/a.gbform"]
-    p.remove(r"forms\a.gbform")
+    p.add("forms/a.dhform"); p.add(r"forms\a.dhform"); p.add("./forms/a.dhform")
+    assert p.forms == ["forms/a.dhform"]
+    p.remove(r"forms\a.dhform")
     assert p.forms == []
-    q = FormProject.from_dict({"forms": [r"sub\s.gbform"], "main": r"sub\s.gbform"})
-    assert q.forms == ["sub/s.gbform"] and q.main == "sub/s.gbform"
+    q = FormProject.from_dict({"forms": [r"sub\s.dhform"], "main": r"sub\s.dhform"})
+    assert q.forms == ["sub/s.dhform"] and q.main == "sub/s.dhform"
 
 
 def test_formdoc_load_rejects_a_project_manifest(tmp_path):
     # Sonst laedt `dhform Projekt.GBPROJ` das Manifest als leeres Formular --
     # und das naechste Strg+S ueberschreibt die Projektdatei.
     p = tmp_path / "Projekt.GBPROJ"
-    FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))
+    FormProject(forms=["a.dhform"], main="a.dhform").save(str(p))
     try:
         FormDoc.load(str(p))
         assert False, "Manifest wurde als Formular akzeptiert"
@@ -749,9 +749,9 @@ def test_formdoc_load_rejects_a_project_manifest(tmp_path):
 def _export_vs_load(run_gb, tmp_path, doc, probes: str):
     """Dasselbe Formular einmal per GUI_LOAD und einmal per generiertem
     GB-Code aufbauen und dieselben Getter abfragen. Liefert (load, export)."""
-    doc.save(str(tmp_path / "f.gbform"))
+    doc.save(str(tmp_path / "f.dhform"))
     load_out = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\n'
-                      'frm = GUI_LOAD("f.gbform")\n' + probes, base=tmp_path)
+                      'frm = GUI_LOAD("f.dhform")\n' + probes, base=tmp_path)
     src = doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes
     return load_out.strip().splitlines(), run_gb(src, base=tmp_path).strip().splitlines()
 
@@ -779,9 +779,9 @@ def test_export_progress_shows_same_fill_as_gbform(run_gb, tmp_path):
     prg = doc.add("progress", 10, 10)
     prg.min, prg.max, prg.value = 0.0, 100.0, 25.0
     probes = "PRINT GUI_TO_JSON(frm)\n"
-    doc.save(str(tmp_path / "f.gbform"))
+    doc.save(str(tmp_path / "f.dhform"))
     a = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\n'
-               'frm = GUI_LOAD("f.gbform")\n' + probes, base=tmp_path)
+               'frm = GUI_LOAD("f.dhform")\n' + probes, base=tmp_path)
     b = run_gb(doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes,
                base=tmp_path)
 
@@ -795,12 +795,12 @@ def test_export_progress_shows_same_fill_as_gbform(run_gb, tmp_path):
 
 
 def test_export_window_is_closable_like_the_gbform(run_gb, tmp_path):
-    # GUI_WINDOW legt closable=false an, GUI_LOAD liest den .gbform-Wert.
+    # GUI_WINDOW legt closable=false an, GUI_LOAD liest den .dhform-Wert.
     doc = FormDoc(title="C", w=200, h=140)
     doc.closable = True
     probes = 'PRINT GUI_TO_JSON(frm)\n'
-    doc.save(str(tmp_path / "f.gbform"))
-    a = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.gbform")\n'
+    doc.save(str(tmp_path / "f.dhform"))
+    a = run_gb('IMPORT "gui"\nDIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
                + probes, base=tmp_path)
     b = run_gb(doc.generate_gb_code(with_screen=False, with_loop=False) + "\n" + probes,
                base=tmp_path)
@@ -811,7 +811,7 @@ def test_export_window_is_closable_like_the_gbform(run_gb, tmp_path):
 def test_runner_max_size_with_only_one_bound_set():
     doc = FormDoc(title="M", w=300, h=200)
     doc.resizable = True; doc.max_w = 900          # max_h bleibt 0
-    src = doc.generate_runner("f.gbform")
+    src = doc.generate_runner("f.dhform")
     assert "WINDOW_MAX_SIZE(900, 0)" not in src    # 0 wuerde GLFW hart klemmen
     assert "WINDOW_MAX_SIZE(900, 32000)" in src
 

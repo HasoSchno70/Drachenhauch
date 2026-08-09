@@ -568,7 +568,7 @@ children.push(pmix([
 
 children.push(h2("Speichern und exportieren"));
 children.push(pmix([
-  ["Speichere dein Werk als ", false], [".gbsprite", true],
+  ["Speichere dein Werk als ", false], [".dhsprite", true],
   [" – so kannst du es später weiter bearbeiten (mit allen Frames). Fürs Spiel exportierst du zusätzlich ein ", false],
   ["PNG", true], [": ein einzelnes Bild beim Schiff, oder bei mehreren Frames ein ", false],
   ["Sheet", false], [" (alle Frames nebeneinander in einem Bild).", false],
@@ -587,7 +587,7 @@ children.push(h2("Was du gelernt hast"));
 children.push(bulletRich("Sprite ", "= kleines Bild aus einzelnen Pixeln (hier 16 × 16)."));
 children.push(bulletRich("dhsprites ", "= der Pixel-Editor mit Stift, Füller, Pipette und Symmetrie."));
 children.push(bulletRich("Frames ", "= mehrere Einzelbilder ergeben eine Animation (Onion-Skin hilft)."));
-children.push(bulletRich("Export ", "= .gbsprite zum Weiterbearbeiten, PNG/Sheet fürs Spiel."));
+children.push(bulletRich("Export ", "= .dhsprite zum Weiterbearbeiten, PNG/Sheet fürs Spiel."));
 
 children.push(h2("Übung"));
 children.push(bullet("Öffne ein vorhandenes Sprite (z. B. player.png) in dhsprites und färbe es um."));

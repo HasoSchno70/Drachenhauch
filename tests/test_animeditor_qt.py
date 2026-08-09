@@ -210,7 +210,7 @@ def test_save_load_roundtrip(tmp_path):
     win.canvas.doc.add_state(0, 0, "idle")
     win.canvas.doc.add_state(120, 0, "run")
     win.canvas.doc.add_transition("idle", "run")
-    p = tmp_path / "x.gbanim"
+    p = tmp_path / "x.dhanim"
     win.path = p
     win.save_doc()
     assert p.exists()

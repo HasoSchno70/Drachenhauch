@@ -1,7 +1,7 @@
 """Datenmodell + Persistenz fuer den Sprite-Editor.
 
 Eingangs-Konstrukte: `Frame` (ein Pixel-Bild + Undo-/Redo-History +
-Frame-Dauer), `SpriteDoc` (mehrere Frames + Save/Load fuer .gbsprite,
+Frame-Dauer), `SpriteDoc` (mehrere Frames + Save/Load fuer .dhsprite,
 .png, .gif, Sheets).
 
 Hier kein Qt-Import -- alles arbeitet auf PIL.Image. Die Konversion
@@ -459,7 +459,7 @@ class SpriteDoc:
         avg_ms = sum(max(1, f.duration_ms) for f in frames) / len(frames)
         return max(1, min(60, round(1000.0 / avg_ms)))
 
-    # --- Engine-Export: GB-Code + .gbanim ---------------------------------
+    # --- Engine-Export: GB-Code + .dhanim ---------------------------------
 
     def _effective_anims(self) -> list[Anim]:
         """Definierte Bereiche -- oder ein Default-Bereich "idle" ueber
@@ -496,7 +496,7 @@ class SpriteDoc:
         return "\n".join(lines) + "\n"
 
     def generate_gbanim(self) -> dict:
-        """Animations-FSM-Vorlage (.gbanim) aus den Anim-Bereichen:
+        """Animations-FSM-Vorlage (.dhanim) aus den Anim-Bereichen:
         ein State pro Bereich (name=anim, first/last/fps), erster Bereich
         als default. Transitions/Parameter ergaenzt der User in dhanim --
         die Datei ist direkt von ANIM_FSM_LOAD ladbar."""

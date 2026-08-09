@@ -1,4 +1,4 @@
-"""Form-Runner (Xojo-Stil): ein .gbform aus einer Datei laden und pruefen, dass
+"""Form-Runner (Xojo-Stil): ein .dhform aus einer Datei laden und pruefen, dass
 Struktur + Zustaende korrekt rekonstruiert werden. GUI_LOAD ist ein reines
 Builtin (kein SCREEN) -> headless testbar.
 
@@ -30,14 +30,14 @@ _FORM = {
 
 
 def _write_form(tmp_path):
-    (tmp_path / "f.gbform").write_text(json.dumps(_FORM), encoding="utf-8")
+    (tmp_path / "f.dhform").write_text(json.dumps(_FORM), encoding="utf-8")
 
 
 def test_form_loads_structure(run_gb, tmp_path):
     _write_form(tmp_path)
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
         'PRINT GUI_WINDOW_WIDGET_COUNT(frm)\n'
         'PRINT f"{GUI_WINDOW_GET_X(frm)},{GUI_WINDOW_GET_W(frm)}"\n'
         'PRINT GUI_KIND(GUI_WINDOW_WIDGET(frm, 1))\n'           # textinput
@@ -50,7 +50,7 @@ def test_form_restores_states(run_gb, tmp_path):
     _write_form(tmp_path)
     out = run_gb(
         'IMPORT "gui"\n'
-        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.gbform")\n'
+        'DIM frm AS GUI_WINDOW\nfrm = GUI_LOAD("f.dhform")\n'
         'PRINT GUI_CHECKED(GUI_WINDOW_WIDGET(frm, 2))\n'        # TRUE
         'PRINT GUI_VALUE(GUI_WINDOW_WIDGET(frm, 3))\n'          # 70.0
         'PRINT GUI_DROPDOWN_TEXT(GUI_WINDOW_WIDGET(frm, 4))\n'  # Mittel (sel=1)
@@ -81,7 +81,7 @@ def _form_mit_knopf(tmp_path, handler: str):
             "chrome": False, "visible": True,
             "widgets": [{"kind": "button", "x": 20, "y": 20, "w": 100, "h": 28,
                          "text": "OK", "on_click": handler}]}
-    (tmp_path / "f.gbform").write_text(json.dumps(form), encoding="utf-8")
+    (tmp_path / "f.dhform").write_text(json.dumps(form), encoding="utf-8")
 
 
 import os                                    # noqa: E402
@@ -99,7 +99,7 @@ def _lauf(tmp_path, handler: str):
         'IMPORT "gui"\n'
         'SCREEN(200, 120, "T", 1)\n'
         'DIM frm AS GUI_WINDOW\n'
-        'frm = GUI_LOAD("f.gbform")\n'
+        'frm = GUI_LOAD("f.dhform")\n'
         'GUI_WINDOW_CHROME(frm, FALSE)\n'
         'AUTOMATION_PLAY("klick.txt")\n'
         f'SUB {handler}()\n    PRINT "GEFEUERT"\nEND SUB\n'
@@ -122,7 +122,7 @@ def test_handler_aus_der_datei_feuert(tmp_path):
 
 def test_handler_feuert_auch_mit_grossbuchstaben(tmp_path):
     """Der Compiler legt Funktionsnamen KLEIN ab, der Form-Designer schreibt
-    aber `btn1Click` ins .gbform -- der Callback-Lookup fand den erzeugten
+    aber `btn1Click` ins .dhform -- der Callback-Lookup fand den erzeugten
     `SUB btn1Click()` deshalb nie ("Funktion 'btn1Click' existiert nicht").
     Da JEDER automatisch erzeugte Handler einen Grossbuchstaben traegt, war
     damit kein einziger davon benutzbar."""

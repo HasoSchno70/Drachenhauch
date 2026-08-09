@@ -57,7 +57,7 @@ Die Start-Sprites liegen fertig in [`assets/sprites/`](assets/sprites): das
 Schiff (`player.png`), drei mehrfarbige Gegner (`bug0/1/2.png`, je 2 Frames
 Flügelschlag — eine Reihe pro Farbfamilie: violett-cyan, rot-gelb, blau-türkis),
 der Schuss (`bullet.png`) und die Bombe (`bomb.png`, 2 Frames). Jedes gibt es
-zusätzlich als `.gbsprite` — **öffne sie in `dhsprites` und gestalte sie nach
+zusätzlich als `.dhsprite` — **öffne sie in `dhsprites` und gestalte sie nach
 deinem Geschmack um.** Erzeugt werden sie reproduzierbar von
 [`assets/make_sprites.py`](assets/make_sprites.py).
 

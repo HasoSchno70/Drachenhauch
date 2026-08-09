@@ -182,7 +182,7 @@ def test_native_roundtrip(tmp_path):
     d.add_frame()
     d.frames[1].duration_ms = 250
     d.frames[1].pixels.putpixel((4, 4), (0, 255, 0, 255))
-    target = tmp_path / "sprite.gbsprite"
+    target = tmp_path / "sprite.dhsprite"
     d.save_native(target)
     assert target.exists()
     loaded = SpriteDoc.load_native(target)
@@ -194,7 +194,7 @@ def test_native_roundtrip(tmp_path):
 
 
 def test_native_load_v1_backward_compat(tmp_path):
-    """Aeltere .gbsprite-Dateien ohne duration_ms-Feld muessen weiter laden."""
+    """Aeltere .dhsprite-Dateien ohne duration_ms-Feld muessen weiter laden."""
     import base64, json
     img = Image.new("RGBA", (4, 4), (1, 2, 3, 255))
     buf = io.BytesIO()
@@ -205,7 +205,7 @@ def test_native_load_v1_backward_compat(tmp_path):
         "height": 4,
         "frames": [{"data": base64.b64encode(buf.getvalue()).decode("ascii")}],
     }
-    target = tmp_path / "old.gbsprite"
+    target = tmp_path / "old.dhsprite"
     target.write_text(json.dumps(v1_data), encoding="utf-8")
     loaded = SpriteDoc.load_native(target)
     assert loaded.frames[0].duration_ms == DEFAULT_FRAME_DURATION_MS
@@ -363,7 +363,7 @@ def test_native_roundtrip_preserves_frame_name(tmp_path):
     d = SpriteDoc(8, 8)
     d.add_frame()
     d.frames[0].name = "walk"
-    target = tmp_path / "named.gbsprite"
+    target = tmp_path / "named.dhsprite"
     d.save_native(target)
     loaded = SpriteDoc.load_native(target)
     assert loaded.frames[0].name == "walk"
@@ -385,7 +385,7 @@ def test_load_native_version2_defaults_empty_name(tmp_path):
             "duration_ms": 100,
         }],
     }
-    target = tmp_path / "legacy.gbsprite"
+    target = tmp_path / "legacy.dhsprite"
     target.write_text(_json.dumps(legacy), encoding="utf-8")
     loaded = SpriteDoc.load_native(target)
     assert loaded.frames[0].name == ""
@@ -465,7 +465,7 @@ def _doc_with_anims():
 
 def test_anims_roundtrip_native(tmp_path):
     doc = _doc_with_anims()
-    p = tmp_path / "a.gbsprite"
+    p = tmp_path / "a.dhsprite"
     doc.save_native(p)
     loaded = SpriteDoc.load_native(p)
     assert [(a.name, a.first, a.last, a.fps) for a in loaded.anims] == \
@@ -475,7 +475,7 @@ def test_anims_roundtrip_native(tmp_path):
 def test_anims_backward_compat_v3(tmp_path):
     # Datei ohne anims-Feld (V3) laedt mit leerer Bereichs-Liste.
     doc = SpriteDoc(8, 8)
-    p = tmp_path / "old.gbsprite"
+    p = tmp_path / "old.dhsprite"
     doc.save_native(p)
     import json as _json
     data = _json.loads(p.read_text(encoding="utf-8"))
@@ -527,15 +527,15 @@ def test_generate_gb_snippet_fallback_idle_fps_from_durations():
 
 
 def test_generate_gbanim_loads_in_runtime(run_gb, tmp_path):
-    # Integration: die exportierte .gbanim ist direkt ANIM_FSM_LOAD-ladbar.
+    # Integration: die exportierte .dhanim ist direkt ANIM_FSM_LOAD-ladbar.
     import json as _json
     doc = _doc_with_anims()
-    (tmp_path / "hero.gbanim").write_text(
+    (tmp_path / "hero.dhanim").write_text(
         _json.dumps(doc.generate_gbanim(), indent=2), encoding="utf-8")
     src = "\n".join([
         'IMPORT "animfsm"',
         'DIM fsm AS ANIM_FSM',
-        'fsm = ANIM_FSM_LOAD("hero.gbanim")',
+        'fsm = ANIM_FSM_LOAD("hero.dhanim")',
         'PRINT ANIM_FSM_STATE(fsm)',
     ])
     out = run_gb(src, base=tmp_path)
@@ -944,7 +944,7 @@ def test_layer_save_load_roundtrip_v5(tmp_path):
     f.pixels.putpixel((1, 1), _green())
     f.layers[1].opacity = 0.5
     f.layers[1].visible = True
-    p = tmp_path / "layered.gbsprite"
+    p = tmp_path / "layered.dhsprite"
     doc.save_native(p)
     import json
     data = json.loads(p.read_text(encoding="utf-8"))
@@ -961,13 +961,13 @@ def test_layer_save_load_roundtrip_v5(tmp_path):
 
 
 def test_load_native_clamps_out_of_range_opacity(tmp_path):
-    """Review-Fund: eine korrupte/handbearbeitete .gbsprite mit einem
+    """Review-Fund: eine korrupte/handbearbeitete .dhsprite mit einem
     Opacity-Wert > 1.0 (z.B. "500%") wurde bisher unveraendert ins
     Datenmodell uebernommen -- klemmt jetzt auf 0..1."""
     doc = SpriteDoc(4, 4)
     f = doc.current
     f.add_layer(name="Deko")
-    p = tmp_path / "bad_opacity.gbsprite"
+    p = tmp_path / "bad_opacity.dhsprite"
     doc.save_native(p)
     import json
     data = json.loads(p.read_text(encoding="utf-8"))
@@ -983,7 +983,7 @@ def test_load_native_clamps_out_of_range_opacity(tmp_path):
 def test_single_layer_file_stays_compact(tmp_path):
     # Ohne echte Ebenen-Info kein "layers"-Feld -> Datei bleibt schlank
     doc = SpriteDoc(4, 4)
-    p = tmp_path / "flat.gbsprite"
+    p = tmp_path / "flat.dhsprite"
     doc.save_native(p)
     import json
     data = json.loads(p.read_text(encoding="utf-8"))

@@ -9,7 +9,7 @@ Eine Animation-State-Machine im Unity-Mecanim-Stil:
 * **Transitions** -- gerichtete Kanten (`from` -> `to`, `from == "*"` = Any State)
   mit UND-verknuepften **Conditions** und optionalem `wait_finished`.
 
-Serialisiert als `.gbanim`-JSON, das das Runtime-Modul `animfsm` direkt laedt
+Serialisiert als `.dhanim`-JSON, das das Runtime-Modul `animfsm` direkt laedt
 (`ANIM_FSM_LOAD`). Reine Logik -- headless testbar, kein Qt.
 """
 from __future__ import annotations

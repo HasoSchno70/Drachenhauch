@@ -239,6 +239,15 @@ def test_scoredoc_save_load_roundtrip(tmp_path):
     assert saved["version"] == 1
 
 
+def test_scoredoc_laedt_alte_gbscore_kennung():
+    # Die Formatkennung hiess vor der Umbenennung "gbscore-song". Beim
+    # Umstellen auf "dhscore-song" darf keine bereits gespeicherte Datei
+    # unlesbar werden -- from_dict prueft den Marker bewusst NICHT. Ohne
+    # diesen Test waere das eine Behauptung im Docstring statt einer Zusage.
+    d = ScoreDoc.from_dict({"format": "gbscore-song", "version": 1, "bpm": 140})
+    assert d.bpm == 140
+
+
 def test_scoredoc_from_dict_is_permissive_missing_fields():
     # Handbearbeitete/formatlose Datei ohne "format"/"tracks" -> laedt trotzdem.
     d = ScoreDoc.from_dict({})

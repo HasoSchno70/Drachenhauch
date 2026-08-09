@@ -2,12 +2,12 @@
 
 Eigenstaendiges Qt-Programm: links die Control-Palette, in der Mitte die
 Design-Flaeche (Controls platzieren/selektieren/verschieben/loeschen), rechts
-der Inspector (Eigenschaften + Events). Speichert/laedt `.gbform` (Runtime-
+der Inspector (Eigenschaften + Events). Speichert/laedt `.dhform` (Runtime-
 Format) und kann das Formular per "Run" mit `dhrt` starten (laedt das Layout +
 generierte Event-Handler-Stubs -- der Xojo-Lauf).
 
 Datenmodell + Code-Generierung liegen Qt-frei in `drachenhauch/formdesigner/`.
-Start: `dhform [datei.gbform]` bzw. `dhrun.py --form`.
+Start: `dhform [datei.dhform]` bzw. `dhrun.py --form`.
 """
 from __future__ import annotations
 
@@ -569,7 +569,7 @@ class _Canvas(QWidget):
         c.y = int(ny) if ny is not None else self._snap(py)
         # Im Formular halten: ein weit nach rechts/unten gezogenes Control lag
         # sonst ausserhalb der Zeichenflaeche -- unsichtbar, nicht anklickbar,
-        # in keiner Liste, und so auch ins .gbform gespeichert. Zurueckholen
+        # in keiner Liste, und so auch ins .dhform gespeichert. Zurueckholen
         # ging nur per Undo oder Hand-Edit im JSON.
         c.x = min(max(0, c.x), self._max_x(c))
         c.y = min(max(0, c.y), self._max_y(c))
@@ -1220,7 +1220,7 @@ class _Canvas(QWidget):
             rx, ry, rw, rh = resize_rect(c.x, c.y, c.w, c.h, self._resize_handle, nx, ny)
             # Der Resize-Pfad klemmte als einziger NICHT auf >= 0: ein Zug am
             # NW-/N-/W-Griff ueber die obere/linke Formularkante hinaus schrieb
-            # `x: -56` ins .gbform, zur Laufzeit ragte das Widget aus dem
+            # `x: -56` ins .dhform, zur Laufzeit ragte das Widget aus dem
             # Fenster und wurde weggeclippt. Kante festhalten, Groesse kuerzen.
             if rx < 0:
                 rw += rx; rx = 0
@@ -1959,7 +1959,7 @@ class FormDesigner(QMainWindow):
         self.project = FormProject()
         self.project_path: Path | None = None
         self._main_form: _OpenForm | None = None   # Startformular (Objekt, nicht Pfad)
-        self.unresolved: list[str] = []            # beim Laden fehlende .gbform
+        self.unresolved: list[str] = []            # beim Laden fehlende .dhform
         self._suppress_row = False
         self.setWindowTitle("GameBasic Form-Designer")
         self.resize(1500, 950)   # Groesse fuer den Fall, dass jemand
@@ -2337,7 +2337,7 @@ class FormDesigner(QMainWindow):
         self._switch_to(row)
 
     def _rel(self, p: Path) -> str:
-        """Pfad relativ zum Projekt-Verzeichnis (fuer das `.gbproj`-Manifest).
+        """Pfad relativ zum Projekt-Verzeichnis (fuer das `.dhproj`-Manifest).
 
         `os.path.relpath` statt `Path.relative_to`: letzteres kann nicht nach
         oben laufen, und der Fallback schrieb dann den BLOSSEN DATEINAMEN ins
@@ -2617,7 +2617,7 @@ class FormDesigner(QMainWindow):
 
     def open_form(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Formular oeffnen", str(self.project_root),
-                                            "GameBasic-Form (*.gbform);;Alle (*.*)")
+                                            "GameBasic-Form (*.dhform *.gbform);;Alle (*.*)")
         if not fn:
             return
         # Schon offen? Dann dorthin wechseln statt einen zweiten Puffer
@@ -2678,11 +2678,11 @@ class FormDesigner(QMainWindow):
 
     def save_form_as(self):
         fn, _ = QFileDialog.getSaveFileName(self, "Formular speichern", str(self.project_root),
-                                            "GameBasic-Form (*.gbform)")
+                                            "GameBasic-Form (*.dhform)")
         if not fn:
             return False
-        if not fn.endswith(".gbform"):
-            fn += ".gbform"
+        if not fn.endswith(".dhform"):
+            fn += ".dhform"
         # Pfad ERST nach erfolgreichem Schreiben uebernehmen -- sonst zeigte der
         # Titel nach einem Fehlschlag eine Datei an, die nie existiert hat, und
         # ein spaeteres Strg+S schrieb still an denselben kaputten Ort.
@@ -2728,10 +2728,10 @@ class FormDesigner(QMainWindow):
         self._refresh_form_list()
         self.statusBar().showMessage(f"Startformular: {self.path.name}", 3000)
 
-    # -- Projekt (.gbproj) --
+    # -- Projekt (.dhproj) --
     def open_project(self):
         fn, _ = QFileDialog.getOpenFileName(self, "Projekt oeffnen", str(self.project_root),
-                                            "GameBasic-Projekt (*.gbproj)")
+                                            "GameBasic-Projekt (*.dhproj *.gbproj)")
         if fn:
             self.load_project_file(fn)
 
@@ -2782,12 +2782,12 @@ class FormDesigner(QMainWindow):
                     return
         if self.project_path is None:
             fn, _ = QFileDialog.getSaveFileName(self, "Projekt speichern", str(self.project_root),
-                                                "GameBasic-Projekt (*.gbproj)")
+                                                "GameBasic-Projekt (*.dhproj)")
             if not fn:
                 self._switch_to(start)
                 return
-            if not fn.endswith(".gbproj"):
-                fn += ".gbproj"
+            if not fn.endswith(".dhproj"):
+                fn += ".dhproj"
             self.project_path = Path(fn)
         # Alle Forms speichern + Manifest aufbauen (relativ zum Projektpfad).
         self.project.forms = []
@@ -2860,10 +2860,10 @@ class FormDesigner(QMainWindow):
         tmp = Path(tempfile.mkdtemp(prefix="gbform_"))
         self._run_dir = tmp
         gb = tmp / "run.dh"
-        runner = self.canvas.doc.generate_runner("form.gbform",
+        runner = self.canvas.doc.generate_runner("form.dhform",
                                                  screen_title=self.canvas.doc.title)
         if not self._write(str(tmp), lambda: (
-                self.canvas.doc.save(str(tmp / "form.gbform")),
+                self.canvas.doc.save(str(tmp / "form.dhform")),
                 gb.write_text(runner, encoding="utf-8"))):
             return
         # Vorab pruefen: `run` scheiterte sonst STUMM. Weder stdout/stderr noch
@@ -2921,7 +2921,7 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
 
 
 def open_initial(win: FormDesigner, p: Path) -> bool:
-    """Start-Argument oeffnen (`.gbform` oder `.gbproj`). True bei Erfolg.
+    """Start-Argument oeffnen (`.dhform` oder `.dhproj`). True bei Erfolg.
     Eigene Funktion, damit der Zweig ohne `app.exec()` testbar ist."""
     try:
         if not p.is_file():
@@ -2931,7 +2931,10 @@ def open_initial(win: FormDesigner, p: Path) -> bool:
         # case-sensitive Vergleich schickte sie in den Formular-Zweig, wo das
         # Manifest als leeres Formular durchging -- das naechste Strg+S hat
         # dann die Projektdatei ueberschrieben.
-        if p.suffix.lower() == ".gbproj":
+        # `.gbproj` ist der Name aus der GameBasic-Zeit -- gespeichert wird nur
+        # noch `.dhproj`, aber ein vorhandenes Projekt muss sich oeffnen lassen
+        # (der Oeffnen-Dialog zeigt es ebenfalls weiter an).
+        if p.suffix.lower() in (".dhproj", ".gbproj"):
             win.load_project_file(str(p))
         else:
             # leeres Start-Formular durch die geladene Datei ersetzen

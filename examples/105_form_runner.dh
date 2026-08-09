@@ -1,6 +1,6 @@
 ' 105_form_runner.dh -- Formular im Xojo-Stil laden + Event-Handler
 '
-' Das Layout "forms/settings.gbform" wurde visuell entworfen (JSON) und enthaelt
+' Das Layout "forms/settings.dhform" wurde visuell entworfen (JSON) und enthaelt
 ' pro Control bereits den Namen seines Event-Handlers (on_click / on_change).
 ' GUI_LOAD baut das Fenster, GUI_UPDATE ruft die passenden SUBs automatisch auf
 ' -- genau wie in Xojo: Control hat ein Event, du fuellst nur den Handler.
@@ -11,9 +11,9 @@ IMPORT "gui"
 
 SCREEN(800, 480, "GameBasic -- Form-Runner", 1)
 
-' --- Formular aus der .gbform-Datei laden ------------------------------------
+' --- Formular aus der .dhform-Datei laden ------------------------------------
 DIM frm AS GUI_WINDOW
-frm = GUI_LOAD("forms/settings.gbform")
+frm = GUI_LOAD("forms/settings.dhform")
 
 ' Control-Handles per Index merken (Reihenfolge wie im JSON), damit die Handler
 ' ihre Werte lesen koennen. (Ein Designer wuerde das spaeter generieren.)

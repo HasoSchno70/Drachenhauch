@@ -241,7 +241,7 @@ impl Program {
     /// der Compiler legt jeden Funktionsnamen klein ab, GB-Bezeichner sind
     /// ueberall sonst schreibungs-unabhaengig -- aber Namen, die NICHT aus
     /// dem Compiler kommen, tragen ihre Original-Schreibweise. Das sind die
-    /// GUI-Callbacks aus einer `.gbform`-Datei (`GUI_LOAD`/`GUI_FROM_JSON`):
+    /// GUI-Callbacks aus einer `.dhform`-Datei (`GUI_LOAD`/`GUI_FROM_JSON`):
     /// der Form-Designer schreibt dort `dd1Changed`, und damit fand die
     /// Laufzeit den erzeugten `SUB dd1Changed()` beim Ausloesen NIE.
     ///
@@ -552,7 +552,7 @@ mod tests {
         }
     }
 
-    /// Der Compiler legt Namen KLEIN ab; GUI-Callbacks aus einer `.gbform`
+    /// Der Compiler legt Namen KLEIN ab; GUI-Callbacks aus einer `.dhform`
     /// tragen dagegen die Schreibweise des Form-Designers (`dd1Changed`).
     /// Ohne den schreibungs-unabhaengigen Zweitversuch meldete die Laufzeit
     /// beim Ausloesen "Funktion 'dd1Changed' existiert nicht" -- also bei

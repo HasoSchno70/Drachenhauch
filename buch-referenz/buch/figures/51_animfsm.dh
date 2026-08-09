@@ -8,7 +8,7 @@ SPRITE_SET_POS(held, 210.0, 150.0)
 SPRITE_SET_SCALE(held, 3.0, 3.0)
 
 DIM fsm AS ANIM_FSM
-fsm = ANIM_FSM_LOAD("assets/held.gbanim")
+fsm = ANIM_FSM_LOAD("assets/held.dhanim")
 ANIM_FSM_SETUP(fsm, held)
 
 WHILE NOT QUITREQUESTED()

@@ -35,7 +35,7 @@ Brush-Groesse mit Tasten **1**, **2**, **3**, **4**. **X** tauscht FG/BG-Farbe.
 | Shortcut | Aktion |
 |---|---|
 | `Ctrl+N` | Neu (Dialog: Groesse + Anzahl Frames) |
-| `Ctrl+O` | Oeffnen (.png, .gbsprite) |
+| `Ctrl+O` | Oeffnen (.png, .dhsprite) |
 | `Ctrl+S` / `Ctrl+Shift+S` | Speichern / Speichern unter |
 | `F5` | Von Disk neu laden (z.B. wenn Datei extern geaendert wurde) |
 | `Ctrl+W` | Schliessen |
@@ -43,7 +43,7 @@ Brush-Groesse mit Tasten **1**, **2**, **3**, **4**. **X** tauscht FG/BG-Farbe.
 **Datei-Formate:**
 
 - **`.png`** — Standard. Bei Multi-Frame wird ein horizontaler Sheet geschrieben.
-- **`.gbsprite`** — natives Format (JSON + base64-RGBA pro Frame). Erhaelt Frame-Dauern, Animation-Daten und **Ebenen** (Format-Version 5; pro Frame steht zusaetzlich immer das geflattete Composite als `data`, damit aeltere Leser weiterhin ein korrektes Bild sehen). Empfohlen fuer Work-in-Progress.
+- **`.dhsprite`** — natives Format (JSON + base64-RGBA pro Frame). Erhaelt Frame-Dauern, Animation-Daten und **Ebenen** (Format-Version 5; pro Frame steht zusaetzlich immer das geflattete Composite als `data`, damit aeltere Leser weiterhin ein korrektes Bild sehen). Empfohlen fuer Work-in-Progress.
 
 ## Export-Optionen
 
@@ -69,7 +69,7 @@ SPRITE_PLAY(sp, "idle")
 
 Schreibt **PNG + JSON-Manifest** gemeinsam. Das JSON beschreibt jedes Frame mit Namen + Rect. Sprite-Namen sind standardmaessig `<dateiname>_<index>` (also bei `tiles.png`: `tiles_0`, `tiles_1`, ...).
 
-**Frame-Namen:** Rechtsklick auf ein Frame in der Frame-Liste → **Umbenennen...** vergibt einen eigenen Namen. Benannte Frames nutzen diesen Namen direkt als Sprite-ID im Atlas (statt `<dateiname>_<index>`) — `ATLAS_DRAW(atlas, "idle", x, y)` statt `"hero_0"`. Doppelte Namen werden beim Export eindeutig gemacht (Suffix `_<index>`). Der Name wird in `.gbsprite`-Dateien mitgespeichert (Format-Version 3; aeltere Dateien laden mit leerem Namen).
+**Frame-Namen:** Rechtsklick auf ein Frame in der Frame-Liste → **Umbenennen...** vergibt einen eigenen Namen. Benannte Frames nutzen diesen Namen direkt als Sprite-ID im Atlas (statt `<dateiname>_<index>`) — `ATLAS_DRAW(atlas, "idle", x, y)` statt `"hero_0"`. Doppelte Namen werden beim Export eindeutig gemacht (Suffix `_<index>`). Der Name wird in `.dhsprite`-Dateien mitgespeichert (Format-Version 3; aeltere Dateien laden mit leerem Namen).
 
 In GameBasic dann:
 
@@ -93,7 +93,7 @@ Frame-Bereiche — das Editor-Pendant zu `SPRITE_ADD_ANIM(name, first, last, fps
   **✎**/Doppelklick bearbeitet, **−** loescht. Der FPS-Wert laesst sich per
   **„aus Frame-Dauern"** aus den echten Dauern des Bereichs vorschlagen.
 - Bereiche wandern beim Einfuegen/Loeschen von Frames automatisch mit
-  (leerlaufende Bereiche werden entfernt) und werden in `.gbsprite`
+  (leerlaufende Bereiche werden entfernt) und werden in `.dhsprite`
   mitgespeichert (Format-Version 4, aeltere Dateien laden ohne Bereiche).
 
 Die Bereiche speisen drei Exporte:
@@ -101,7 +101,7 @@ Die Bereiche speisen drei Exporte:
 1. **GB-Code kopieren**: erzeugt eine `SPRITE_ADD_ANIM`-Zeile **pro Bereich**
    mit den echten FPS (ohne Bereiche: ein `"idle"` ueber alles, FPS aus den
    Frame-Dauern statt einem hardcodierten Default).
-2. **Datei → Animations-FSM exportieren (.gbanim)**: schreibt eine direkt
+2. **Datei → Animations-FSM exportieren (.dhanim)**: schreibt eine direkt
    `ANIM_FSM_LOAD`-ladbare Vorlage — ein State pro Bereich (`first`/`last`/
    `fps`, erster Bereich = `default`). Transitions/Parameter ergaenzt du im
    [dhanim-Editor](anim-editor.md).
@@ -152,7 +152,7 @@ Exporte zeigen das **Composite** der sichtbaren Ebenen (unten → oben).
   Merge/Umbenennen) laufen ueber das Struktur-Undo.
 - Frame-weite Transformationen (Spiegeln, Rotieren, Crop, Resize) wirken auf
   **alle** Ebenen; Auswahl-Operationen und Mal-Tools nur auf die aktive.
-- Ebenen persistieren in `.gbsprite` (v5). PNG/Sheet/GIF/Atlas exportieren
+- Ebenen persistieren in `.dhsprite` (v5). PNG/Sheet/GIF/Atlas exportieren
   das geflattete Composite.
 
 ## Onion-Skinning
@@ -257,7 +257,7 @@ Aktion "Code kopieren" liefert die `SPRITE_NEW`/`ADD_ANIM`/`PLAY`-Sequenz fuer d
 ### Schnelle Variationen via Color-Replace
 
 1. Basis-Sprite zeichnen
-2. `Ctrl+S` speichern (als `.gbsprite`)
+2. `Ctrl+S` speichern (als `.dhsprite`)
 3. `Ctrl+Shift+S` als `enemy_blue.png`
 4. "Farbe ersetzen..." — rot durch blau ersetzen
 5. Wiederholen fuer gruen, gelb, ...
@@ -269,7 +269,7 @@ Falls du den Editor erweitern willst:
 | Datei | Inhalt |
 |---|---|
 | [`drachenhauch/spriteeditor_qt.py`](../drachenhauch/spriteeditor_qt.py) | UI-Schicht: SpriteEditorWindow, ColorPanel, FramesPanel, Canvas, Dialogs |
-| [`drachenhauch/spriteeditor/document.py`](../drachenhauch/spriteeditor/document.py) | Datenmodell: `SpriteDoc`, `Frame`. Save/Load (PNG, .gbsprite, GIF, Atlas) |
+| [`drachenhauch/spriteeditor/document.py`](../drachenhauch/spriteeditor/document.py) | Datenmodell: `SpriteDoc`, `Frame`. Save/Load (PNG, .dhsprite, GIF, Atlas) |
 | [`drachenhauch/spriteeditor/tools.py`](../drachenhauch/spriteeditor/tools.py) | Pixel-Tools (Pencil, Eraser, Bucket, Line, ...) |
 | [`drachenhauch/spriteeditor/tool_context.py`](../drachenhauch/spriteeditor/tool_context.py) | `ToolHost`-Protocol (welche app-Attribute die Tools brauchen) |
 | [`drachenhauch/spriteeditor/icons.py`](../drachenhauch/spriteeditor/icons.py) | Programmatisch gerenderte Toolbar-Icons (kein PNG-Asset noetig) |

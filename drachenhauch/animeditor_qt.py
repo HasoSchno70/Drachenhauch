@@ -3,12 +3,12 @@
 Ein Knoten-Graph-Editor: **Knoten = States** (an eine Sprite-Animation
 gebunden), **Pfeile = Transitions** (mit Bedingungen). Links das Dokument-Panel
 (Sprite-Sheet + Parameter), in der Mitte der Graph, rechts der Inspector
-(State- bzw. Transition-Eigenschaften). Speichert/laedt `.gbanim` (Runtime-
+(State- bzw. Transition-Eigenschaften). Speichert/laedt `.dhanim` (Runtime-
 Format des `animfsm`-Moduls) und startet per F5 eine Live-Vorschau mit `dhrt`
 (Parameter-Panel + Sprite, der den aktuellen State spielt).
 
 Datenmodell + Code-Gen liegen Qt-frei in `drachenhauch/animeditor/`.
-Start: `dhanim [datei.gbanim]` bzw. `dhrun.py --anim`.
+Start: `dhanim [datei.dhanim]` bzw. `dhrun.py --anim`.
 """
 from __future__ import annotations
 
@@ -1097,7 +1097,7 @@ class AnimEditor(QMainWindow):
         self._update_title()
 
     def _update_title(self):
-        name = self.path.name if self.path else "unbenannt.gbanim"
+        name = self.path.name if self.path else "unbenannt.dhanim"
         star = "*" if self.dirty else ""
         self.setWindowTitle(f"dhanim — {name}{star}")
 
@@ -1139,7 +1139,12 @@ class AnimEditor(QMainWindow):
         if not self._confirm_dirty():
             return
         fn, _ = QFileDialog.getOpenFileName(self, "Anim-FSM oeffnen",
-                                            str(self.project_root), "Anim-FSM (*.gbanim)")
+                                            str(self.project_root),
+                                            # `.gbanim` mitfuehren: gespeichert
+                                            # wird nur noch `.dhanim`, aber eine
+                                            # vorhandene Datei soll im Dialog
+                                            # nicht unsichtbar werden.
+                                            "Anim-FSM (*.dhanim *.gbanim)")
         if not fn:
             return
         try:
@@ -1162,13 +1167,13 @@ class AnimEditor(QMainWindow):
         return True
 
     def save_doc_as(self) -> bool:
-        default = str(self.path) if self.path else str(self.project_root / "anim.gbanim")
+        default = str(self.path) if self.path else str(self.project_root / "anim.dhanim")
         fn, _ = QFileDialog.getSaveFileName(self, "Speichern unter", default,
-                                            "Anim-FSM (*.gbanim)")
+                                            "Anim-FSM (*.dhanim)")
         if not fn:
             return False
-        if not fn.endswith(".gbanim"):
-            fn += ".gbanim"
+        if not fn.endswith(".dhanim"):
+            fn += ".dhanim"
         self.path = Path(fn)
         return self.save_doc()
 
@@ -1196,8 +1201,8 @@ class AnimEditor(QMainWindow):
                     doc.sheet = ""
             else:
                 doc.sheet = ""
-        doc.save(str(tmp / "anim.gbanim"))
-        runner = doc.generate_runner("anim.gbanim",
+        doc.save(str(tmp / "anim.dhanim"))
+        runner = doc.generate_runner("anim.dhanim",
                                      title=(self.path.stem if self.path else "dhanim"))
         (tmp / "run.dh").write_text(runner, encoding="utf-8")
         # Semaphor rund um die Prozess-ERSTELLUNG: schuetzt gegen gleichzeitig
@@ -1221,7 +1226,7 @@ def launch(project_root: Path, initial_file: Path | None = None) -> int:
     # Ohne Datei: die mitgelieferte Beispiel-FSM laden, damit man sofort sieht,
     # wie ein fertiger Graph aussieht (Strg+N für ein leeres Projekt).
     if initial_file is None:
-        demo = Path(project_root) / "examples" / "anim_demo.gbanim"
+        demo = Path(project_root) / "examples" / "anim_demo.dhanim"
         if demo.exists():
             initial_file = demo
     if initial_file and Path(initial_file).exists():

@@ -8,7 +8,7 @@ Weitergabe bitte beibehalten.
 ## Eigene / selbst erzeugte Inhalte
 Selbst erstellt (mit den GameBasic-Tools `dhsprites`/`dhtracker`/`dhsfx` bzw.
 Generator-Skripten) und damit frei – auch kommerziell – verwendbar:
-- Alle Pixel-Grafiken/Sprites: `*.gbsprite`, `*.gif`, `*.png`, Atlanten/`*.json`
+- Alle Pixel-Grafiken/Sprites: `*.dhsprite`, `*.gif`, `*.png`, Atlanten/`*.json`
   – darunter der eigenständige Plattformer-Satz in `platformer/` und der Spieler
   `assets/player.*` („Twilight"-Thema, bewusst nicht an Marken/Werke angelehnt).
 - Shader: `assets/shaders/*.fs` (bloom, crt, vignette).

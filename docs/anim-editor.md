@@ -2,7 +2,7 @@
 
 Ein **Knoten-Graph-Editor** für Animations-State-Machines: Knoten sind **States**
 (an eine Sprite-Animation gebunden), Pfeile sind **Transitions** (mit
-Bedingungen). Das Ergebnis ist eine `.gbanim`-JSON, die das Runtime-Modul
+Bedingungen). Das Ergebnis ist eine `.dhanim`-JSON, die das Runtime-Modul
 [`animfsm`](module-animfsm.md) per `ANIM_FSM_LOAD` lädt. Damit schaltet man im
 Spiel keine Animationen mehr von Hand — man setzt nur Parameter, die FSM
 entscheidet den Zustand.
@@ -11,14 +11,14 @@ entscheidet den Zustand.
 
 ```
 dhanim                  # leeres Projekt
-dhanim hero.gbanim      # vorhandene FSM öffnen
+dhanim hero.dhanim      # vorhandene FSM öffnen
 ```
 
-Alternativ `dhrun.py --anim [datei.gbanim]` oder über den Start-Dialog (`gb`
+Alternativ `dhrun.py --anim [datei.dhanim]` oder über den Start-Dialog (`gb`
 ohne Argument → „Animation-Editor (FSM)"). Benötigt PySide6.
 
 **Ohne Datei startet der Editor mit einer fertigen Beispiel-FSM**
-(`examples/anim_demo.gbanim` — ein Platformer-Charakter mit idle/run/jump/fall,
+(`examples/anim_demo.dhanim` — ein Platformer-Charakter mit idle/run/jump/fall,
 Parametern `speed`/`grounded`/`jump` und allen Übergangs-Arten), damit man sofort
 sieht, wie ein Graph aussieht. `Strg+N` leert das Projekt für einen Neuanfang.
 
@@ -68,7 +68,7 @@ IMPORT "sprite"
 DIM hero AS SPRITE
 hero = SPRITE_NEW(LOADIMAGE("assets/hero_walk.png"), 16, 16)
 DIM fsm AS ANIM_FSM
-fsm = ANIM_FSM_LOAD("assets/hero.gbanim")
+fsm = ANIM_FSM_LOAD("assets/hero.dhanim")
 ANIM_FSM_SETUP(fsm, hero)
 
 ' pro Frame:
@@ -90,5 +90,5 @@ Qt-frei** und headless testbar:
   (Graph-Canvas, Inspector, Parameter-Panel).
 
 Tests: `tests/test_animeditor_document.py` (Modell/Roundtrip/Closed-Loop/Codegen)
-+ `tests/test_animeditor_qt.py` (Konstruktion/Wiring, offscreen). Das `.gbanim`-
++ `tests/test_animeditor_qt.py` (Konstruktion/Wiring, offscreen). Das `.dhanim`-
 Format ist in [docs/module-animfsm.md](module-animfsm.md) beschrieben.

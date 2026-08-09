@@ -116,7 +116,7 @@ def test_load_missing_file_raises(run_gb):
 # ---------------------------------------------- Zellen mit eigenen Merkmalen
 
 def test_schlichte_zellen_bleiben_strings_im_json(run_gb, tmp_path):
-    """Eine gewoehnliche Tabelle muss im .gbform genauso aussehen wie vorher --
+    """Eine gewoehnliche Tabelle muss im .dhform genauso aussehen wie vorher --
     sonst koennten aeltere Dateien und der Form-Designer sie nicht mehr lesen.
     Erst eine Zelle mit Farbe/Art/Bild wird zum Objekt."""
     out = run_gb('''

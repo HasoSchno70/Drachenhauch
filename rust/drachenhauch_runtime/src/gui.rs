@@ -2665,7 +2665,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
         if let Some(t) = &w.tbl {
             // Eine schlichte Textzelle wird als STRING geschrieben, nur eine
             // mit eigener Farbe/Art/Bild als Objekt. Damit bleibt das
-            // .gbform-Format fuer gewoehnliche Tabellen unveraendert (alte
+            // .dhform-Format fuer gewoehnliche Tabellen unveraendert (alte
             // Dateien und der Form-Designer lesen es weiter), ohne dass die
             // neuen Angaben beim Speichern verloren gehen.
             let rows: Vec<serde_json::Value> = t.rows.iter().map(|row| {
@@ -2701,7 +2701,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
             if !t.col_align.is_empty() { tj["col_align"] = serde_json::json!(t.col_align); }
             if !t.col_order.is_empty() { tj["col_order"] = serde_json::json!(t.col_order); }
             if t.frozen > 0 { tj["frozen"] = serde_json::json!(t.frozen); }
-            // Die Schalter gehoerten bisher nicht ins .gbform -- ohne sie
+            // Die Schalter gehoerten bisher nicht ins .dhform -- ohne sie
             // koennte ein Formular-Designer sie zwar setzen, beim Laden waeren
             // sie aber wieder weg. Nur schreiben, was vom Standard abweicht.
             if t.filter_row { tj["filter_row"] = serde_json::json!(true); }
@@ -2772,7 +2772,7 @@ filterzeile, sortierbar, spalten_ziehbar, feste_spalten, spalten_verschiebbar, m
                 if let Some(rs) = tj["rows"].as_array() {
                     // Review-Fund: `filter_map(|x| x.as_str())` liess jede
                     // NICHT-String-Zelle (Zahl, Bool, null) STILLSCHWEIGEND
-                    // aus der Zeile verschwinden -- ein `.gbform`/gespeichertes
+                    // aus der Zeile verschwinden -- ein `.dhform`/gespeichertes
                     // GUI_SAVE mit einer numerischen Tabellenzelle lud eine zu
                     // kurze Zeile, `draw_table` paniked dann beim naechsten
                     // GUI_DRAW. Jede Zelle wird jetzt zu einem String

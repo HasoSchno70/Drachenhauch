@@ -331,7 +331,7 @@ def test_fokus_und_blur_folgen_dem_wechsel(run_gb):
 
 
 def test_ereignisse_ueberleben_speichern_und_laden(run_gb):
-    """Der Form-Designer speichert Handler-NAMEN im .gbform; GUI_LOAD stellt
+    """Der Form-Designer speichert Handler-NAMEN im .dhform; GUI_LOAD stellt
     sie wieder her. Geprueft wird deshalb der ganze Weg -- nicht nur, dass
     der Name im JSON steht, sondern dass der Handler danach auch feuert."""
     src = ('IMPORT "gui"\n'

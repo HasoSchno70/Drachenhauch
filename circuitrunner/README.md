@@ -106,7 +106,7 @@ zeichnet jede Kachel/Figur per `DRAWIMAGEPART(sheet, code)`.
 py circuitrunner\make_tiles.py
 ```
 
-Zusätzlich wird `assets/tiles.gbsprite` exportiert (**im Sprite-Editor
+Zusätzlich wird `assets/tiles.dhsprite` exportiert (**im Sprite-Editor
 `dhsprites` zu öffnen und bearbeiten** — jede Kachel ein benannter Frame). Die
 HUD-Icons zeichnet die Engine direkt aus dem Sheet (`DRAWIMAGEPARTEX`), skaliert
 in nativer Auflösung — keine separaten Icon-Dateien.
@@ -164,7 +164,7 @@ Zelle 160), dann `anim_base()` in der Engine erweitern.
 | Datei | Zweck |
 |---|---|
 | `circuitrunner.dh` | die Spiel-Engine (GameBasic) |
-| `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.gbsprite` |
+| `make_tiles.py` | Tileset-Generator → `assets/tiles.png` + `.dhsprite` |
 | `convert_dat.py` | `.dat`/`.ccl` → JSON-Set (echte Fansite-Level) |
 | `make_demo_levels.py` | ASCII → `levels/circuit_runner.json` (5 Demos) |
 | `levels/*.json` | Level-Sets (im Menü wählbar) |

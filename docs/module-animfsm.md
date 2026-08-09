@@ -3,7 +3,7 @@
 Datengetriebene **Animation-State-Machine** im Stil von Unitys *Animator/Mecanim*:
 benannte **States** (jeder an eine Sprite-Animation gebunden), benannte
 **Parameter** (`bool`/`float`/`int`/`trigger`) und **Transitions** mit
-Bedingungen. Die komplette Maschine liegt als `.gbanim`-JSON vor — erzeugt vom
+Bedingungen. Die komplette Maschine liegt als `.dhanim`-JSON vor — erzeugt vom
 visuellen Editor **`dhanim`** (Knoten = States, Pfeile = Transitions). Statt im
 Spielcode von Hand `SPRITE_PLAY` zu schalten, setzt das Spiel pro Frame nur die
 Parameter; `ANIM_FSM_UPDATE` entscheidet den Zustand und spielt die Animation.
@@ -16,7 +16,7 @@ DIM hero AS SPRITE
 hero = SPRITE_NEW(LOADIMAGE("assets/hero_walk.png"), 16, 16)
 
 DIM fsm AS ANIM_FSM
-fsm = ANIM_FSM_LOAD("assets/hero.gbanim")
+fsm = ANIM_FSM_LOAD("assets/hero.dhanim")
 ANIM_FSM_SETUP(fsm, hero)            ' registriert die State-Frames als Sprite-Anims
 
 ' --- pro Frame ---
@@ -26,7 +26,7 @@ ANIM_FSM_UPDATE(fsm, hero, dt_ms)    ' Animation voran + Zustandslogik
 SPRITE_DRAW(hero)
 ```
 
-## Das `.gbanim`-Format
+## Das `.dhanim`-Format
 
 ```json
 {
@@ -69,7 +69,7 @@ SPRITE_DRAW(hero)
 
 | Builtin | Wirkung |
 |---|---|
-| `ANIM_FSM_LOAD(pfad$) AS ANIM_FSM` | `.gbanim` laden + validieren, im Default-State |
+| `ANIM_FSM_LOAD(pfad$) AS ANIM_FSM` | `.dhanim` laden + validieren, im Default-State |
 | `ANIM_FSM_SETUP(fsm, sprite)` | Frame-Ranges aller States als Sprite-Animationen registrieren + Default spielen |
 | `ANIM_FSM_UPDATE(fsm, sprite, dt_ms) AS BOOLEAN` | Animation voranschreiben, Transitions auswerten, bei Wechsel spielen. TRUE = State gewechselt |
 | `ANIM_FSM_FORCE(fsm, sprite, state$) AS BOOLEAN` | State erzwingen (ohne Bedingungen) — z.B. Reset/Respawn |
@@ -81,5 +81,5 @@ SPRITE_DRAW(hero)
 Externer Typ `ANIM_FSM` (Referenz-Handle). Implementierung
 `rust/drachenhauch_runtime/src/animfsm.rs` (reine Logik, kein Grafik-State), Demo
 [examples/111_anim_fsm.dh](../examples/111_anim_fsm.dh) + Daten
-`examples/assets/hero.gbanim`, Tests `tests/test_animfsm.py`. Editor: **`dhanim`**
+`examples/assets/hero.dhanim`, Tests `tests/test_animfsm.py`. Editor: **`dhanim`**
 (siehe [docs/anim-editor.md](anim-editor.md)).

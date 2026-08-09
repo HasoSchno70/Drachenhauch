@@ -1,6 +1,6 @@
 //! Modul `animfsm`: datengetriebene Animations-State-Machine (Unity-Mecanim-Stil).
 //!
-//! Lädt eine `.gbanim`-JSON (vom `dhanim`-Editor erzeugt): **States** (je an eine
+//! Lädt eine `.dhanim`-JSON (vom `dhanim`-Editor erzeugt): **States** (je an eine
 //! Sprite-Animation gebunden, optional mit Frame-Range), benannte **Parameter**
 //! (bool/float/int/trigger) und **Transitions** mit Bedingungen. Pro Frame setzt
 //! das Spiel die Parameter (`ANIM_FSM_SET_*`/`TRIGGER`) und ruft
@@ -99,7 +99,7 @@ pub struct AnimFsmObj {
 }
 
 impl AnimFsmObj {
-    /// Aus geparstem `.gbanim`-JSON aufbauen (validiert States/Transitions/Params).
+    /// Aus geparstem `.dhanim`-JSON aufbauen (validiert States/Transitions/Params).
     pub fn from_json(root: &J) -> Result<Self, String> {
         let obj = root
             .as_object()
@@ -172,7 +172,7 @@ impl AnimFsmObj {
                     // Review-Fund: SPRITE_ADD_ANIM (der User-facing Weg,
                     // Animationen zu registrieren) lehnt `first < 0 || last <
                     // first` ab -- ANIM_FSM_LOAD nahm first/last dagegen
-                    // ungeprueft aus einer `.gbanim`-Datei, `setup()` schrieb
+                    // ungeprueft aus einer `.dhanim`-Datei, `setup()` schrieb
                     // sie direkt in `sp.anims`. Ein State mit
                     // `{"first":5,"last":4}` (last < first) ergab dort
                     // `n = last-first+1 == 0`, und `value.rs`s

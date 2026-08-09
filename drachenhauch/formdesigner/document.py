@@ -1,6 +1,6 @@
 """Qt-freies Datenmodell des Form-Designers.
 
-`.gbform` = JSON im Runtime-GUI-Format (Window + widgets[]). Zusatzfelder, die
+`.dhform` = JSON im Runtime-GUI-Format (Window + widgets[]). Zusatzfelder, die
 nur der Designer braucht (`name`), ignoriert die Runtime beim Laden.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from ..tokens import KEYWORDS
 
 
 # --- Tolerante JSON-Coercion ------------------------------------------------
-# Ein `.gbform` kann von Hand geschrieben, von einem Fremdwerkzeug erzeugt oder
+# Ein `.dhform` kann von Hand geschrieben, von einem Fremdwerkzeug erzeugt oder
 # leicht beschaedigt sein. Die Laufzeit (`gui.rs`, `widget_from_json`) faellt in
 # so einem Fall durchgaengig auf den Default zurueck (`as_i64().unwrap_or(d)`)
 # statt abzubrechen -- der Designer macht es genauso, sonst quittiert er eine
@@ -132,7 +132,7 @@ def _gb_num(x) -> str:
     Bewusst Fixpunkt statt `repr()`: `repr` schaltet ab |x| >= 1e16 bzw. unter
     1e-4 auf Exponentialschreibweise (`1e-05`), die GameBasics Lexer NICHT kennt
     -- ein Slider mit feiner Skala erzeugte damit nicht parsbaren Export-Code.
-    `inf`/`nan` (aus einem beschaedigten `.gbform`) werden zu 0.0."""
+    `inf`/`nan` (aus einem beschaedigten `.dhform`) werden zu 0.0."""
     try:
         f = float(x)
     except (TypeError, ValueError):
@@ -194,18 +194,18 @@ def resize_rect(x: int, y: int, w: int, h: int, handle: str, nx: int, ny: int,
 # --- FormProject (Multi-Form-Manifest) --------------------------------------
 @dataclass
 class FormProject:
-    """Manifest eines Multi-Form-Projekts (`.gbproj`, JSON). Verweist auf die
-    einzelnen `.gbform`-Dateien (relativ zum Projekt-Verzeichnis) -- jede Form
+    """Manifest eines Multi-Form-Projekts (`.dhproj`, JSON). Verweist auf die
+    einzelnen `.dhform`-Dateien (relativ zum Projekt-Verzeichnis) -- jede Form
     bleibt ihre eigene Datei. `main` = Startformular (einer der `forms`-Pfade).
     Qt-frei + headless testbar."""
-    forms: list = field(default_factory=list)   # list[str] relative .gbform-Pfade
+    forms: list = field(default_factory=list)   # list[str] relative .dhform-Pfade
     main: str = ""
 
     @staticmethod
     def norm(rel: str) -> str:
         """Manifest-Pfade auf eine Schreibweise bringen (`/` statt `\\`, kein
-        `./`). Ohne das galten `forms/a.gbform`, `forms\\a.gbform` und
-        `./forms/a.gbform` als drei verschiedene Formulare -- auf Windows
+        `./`). Ohne das galten `forms/a.dhform`, `forms\\a.dhform` und
+        `./forms/a.dhform` als drei verschiedene Formulare -- auf Windows
         dieselbe Datei, die dann mehrfach in der Projektliste stand."""
         return Path(str(rel)).as_posix()
 
@@ -243,7 +243,7 @@ class FormProject:
 
     @staticmethod
     def looks_like_manifest(d) -> bool:
-        """Ist dieses JSON ein `.gbproj`-Manifest (und KEIN Formular)? `FormDoc.
+        """Ist dieses JSON ein `.dhproj`-Manifest (und KEIN Formular)? `FormDoc.
         from_dict` ist so permissiv, dass ein Manifest klaglos als leeres
         Formular durchginge -- ein anschliessendes Speichern hat dann die
         Projektdatei ueberschrieben."""
@@ -542,7 +542,7 @@ class FormDoc:
     # Identitaets- statt Wertvergleich: `Control` ist eine dataclass mit
     # generiertem `__eq__`, `list.remove()`/`in` treffen also das ERSTE
     # feldgleiche Control. Zwei feldgleiche Controls sind leicht herstellbar --
-    # eine per GUI_SAVE erzeugte `.gbform` hat gar keine `name`-Felder. Vorher
+    # eine per GUI_SAVE erzeugte `.dhform` hat gar keine `name`-Felder. Vorher
     # loeschte "das obere markieren + Entf" das untere.
     def _index_of(self, c: Control) -> int:
         for i, x in enumerate(self.controls):
@@ -558,7 +558,7 @@ class FormDoc:
 
     def prune_code(self) -> None:
         """Handler-Koerper verwerfen, auf die kein Control mehr zeigt -- sonst
-        wachsen `.gbform`-Dateien mit Leichen, und `_unique_handler_name` haengt
+        wachsen `.dhform`-Dateien mit Leichen, und `_unique_handler_name` haengt
         einem neu angelegten Handler wegen des toten Namens ein `2` an."""
         live = set(self.handler_names())
         self.code = {k: v for k, v in self.code.items() if k in live}
@@ -736,7 +736,7 @@ class FormDoc:
             i += 1
         return f"{base}{i}"
 
-    # ---- .gbform IO (Runtime-Format) ----
+    # ---- .dhform IO (Runtime-Format) ----
     def to_dict(self) -> dict:
         d: dict = {
             "title": self.title, "x": self.x, "y": self.y, "w": self.w, "h": self.h,
@@ -797,7 +797,7 @@ class FormDoc:
         d = json.loads(Path(path).read_text(encoding="utf-8"))
         if FormProject.looks_like_manifest(d):
             raise ValueError(f"{Path(path).name} ist ein Projekt-Manifest "
-                             "(.gbproj), kein Formular")
+                             "(.dhproj), kein Formular")
         return cls.from_dict(d)
 
     # ---- Code-Generierung ----
@@ -814,7 +814,7 @@ class FormDoc:
                         screen_h: int | None = None, screen_title: str | None = None,
                         handler_bodies: dict | None = None) -> str:
         """Lauffaehiges GameBasic-Programm: das Fenster wird auf Formulargroesse
-        gesetzt, das `.gbform` geladen und **randlos** (chromeless) auf das echte
+        gesetzt, das `.dhform` geladen und **randlos** (chromeless) auf das echte
         OS-Fenster gelegt -- die Form IST das Fenster (Xojo-Lauf). Ist sie
         `resizable`, wird das OS-Fenster nativ groessenveraenderbar und die Form
         fuellt es jeden Frame (Anchoring reflowt). `handler_bodies`: optional
@@ -880,7 +880,7 @@ class FormDoc:
                          handler_bodies: dict | None = None,
                          with_screen: bool = True, with_loop: bool = True) -> str:
         """Eigenstaendiges GameBasic-Programm, das das Formular **explizit** mit
-        den `GUI_*`-Konstruktoren aufbaut (kein `GUI_LOAD`/`.gbform` zur Laufzeit).
+        den `GUI_*`-Konstruktoren aufbaut (kein `GUI_LOAD`/`.dhform` zur Laufzeit).
         Lesbar + frei editierbar. `with_screen`/`with_loop` schalten SCREEN bzw.
         die GUI-Schleife ab (fuer Tests / Einbettung in eigenen Code)."""
         bodies = handler_bodies if handler_bodies is not None else self.code
@@ -908,7 +908,7 @@ class FormDoc:
         if not self.movable:
             L.append("GUI_WINDOW_MOVABLE(frm, FALSE)")
         # Beide Richtungen emittieren: `GUI_WINDOW` legt `closable: false` an
-        # (gui.rs::new_window), `GUI_LOAD` liest den `.gbform`-Wert. Ohne den
+        # (gui.rs::new_window), `GUI_LOAD` liest den `.dhform`-Wert. Ohne den
         # Positivfall fehlte dem exportierten Fenster das Schliessen-Kreuz,
         # obwohl im Designer "schliessbar" angehakt war.
         L.append(f"GUI_WINDOW_CLOSABLE(frm, {_gb_bool(self.closable)})")
@@ -956,7 +956,7 @@ class FormDoc:
         k = c.kind
         if k == "image":
             return [f"' image '{var}' uebersprungen -- GUI_IMAGE braucht eine "
-                    f"Bildquelle (LOADIMAGE), die das .gbform nicht speichert"]
+                    f"Bildquelle (LOADIMAGE), die das .dhform nicht speichert"]
         out = [f"DIM {var} AS GUI_WIDGET"]
         if k == "button":
             out.append(f"{var} = GUI_BUTTON(frm, {_gb_str(c.text)}, {c.x}, {c.y}, {c.w}, {c.h})")
@@ -1046,7 +1046,7 @@ class FormDoc:
             # keinen Range-Setter; `GUI_SET_VALUE` clampt auf [min,max]. Ein
             # roher Wert 25 (bei max=100) wurde dadurch zu 1.0 = randvoll.
             # Deshalb auf den Anteil normieren -- optisch identisch zum
-            # `.gbform`-Weg, den die Laufzeit als (value-min)/(max-min) zeichnet.
+            # `.dhform`-Weg, den die Laufzeit als (value-min)/(max-min) zeichnet.
             span = c.max - c.min
             frac = 0.0 if span == 0 else min(1.0, max(0.0, (c.value - c.min) / span))
             if (c.min, c.max) != (0.0, 1.0):

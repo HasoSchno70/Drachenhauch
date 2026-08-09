@@ -40,7 +40,7 @@ def test_unbekanntes_thema_faellt_auf_die_vorgabe_zurueck():
 def test_erzeugtes_programm_setzt_das_thema():
     d = FormDoc(title="T")
     d.theme = "glas_hell"
-    zeilen = d.generate_runner("a.gbform").split("\n")
+    zeilen = d.generate_runner("a.dhform").split("\n")
     assert 'GUI_THEME_PRESET("glas_hell")' in zeilen
     # VOR dem Laden der Form: das Preset setzt auch Metriken (Eckenradius),
     # und die gehen in die Darstellung der Widgets ein.
@@ -50,7 +50,7 @@ def test_erzeugtes_programm_setzt_das_thema():
 
 
 def test_ohne_thema_kein_preset_aufruf():
-    zeilen = FormDoc(title="T").generate_runner("a.gbform")
+    zeilen = FormDoc(title="T").generate_runner("a.dhform")
     assert "GUI_THEME_PRESET" not in zeilen
 
 

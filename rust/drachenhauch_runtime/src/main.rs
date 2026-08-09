@@ -90,13 +90,20 @@ const PAYLOAD_MAGIC: &[u8; 8] = b"DHRTPAY1";
 /// nicht am Dateiende kleben.
 /// Quelltext oder Bytecode? Entschieden wird das allein an der Endung.
 ///
-/// `.dh` bleibt neben `.dh` gueltig: es ist die Endung aus der GameBasic-Zeit,
-/// und wer noch ein altes Programm herumliegen hat, soll es starten koennen,
-/// ohne es vorher umbenennen zu muessen. Geschrieben wird ueberall `.dh`.
+/// Die alte Endung bleibt neben `.dh` gueltig: sie stammt aus der
+/// GameBasic-Zeit, und wer noch ein altes Programm herumliegen hat, soll es
+/// starten koennen, ohne es vorher umzubenennen. Geschrieben wird nur `.dh`.
+///
+/// Die alte Endung steht hier bewusst zusammengesetzt und nicht als Literal:
+/// eine Massenersetzung ".gb" -> ".dh" hat diese Funktion beim Umbenennen
+/// schon einmal zu `.dh || .dh` verstuemmelt.
 fn ist_quelldatei(pfad: &str) -> bool {
     let p = pfad.to_lowercase();
-    p.ends_with(".dh") || p.ends_with(".dh")
+    p.ends_with(".dh") || p.ends_with(ALTE_QUELL_ENDUNG)
 }
+
+/// `.gb` -- getrennt gehalten, siehe `ist_quelldatei`.
+const ALTE_QUELL_ENDUNG: &str = ".gb";
 
 fn embedded_gbc() -> Option<String> {
     let exe = std::env::current_exe().ok()?;
@@ -224,20 +231,17 @@ fn main() -> ExitCode {
     // FS.writeFile reingeschrieben). Seit dem Front-End-Port (Stufe 1-5) kann
     // dhrt die `.dh`-QUELLE selbst kompilieren -> der Playground braucht KEIN
     // vorab-kompiliertes .dhc (und kein Pyodide) mehr. `/program.dh` (Quelle)
-    // hat Vorrang; `/program.dhc` (vorkompiliert) bleibt als Fallback. Die
-    // alten Namen werden noch gelesen, damit ein bereits gebautes web/ nicht
-    // stumm bleibt. Siehe web/ + docs/web-playground.md.
+    // hat Vorrang; `/program.dhc` (vorkompiliert) bleibt als Fallback. Hier
+    // steht bewusst KEINE Duldung der alten Namen: das virtuelle Dateisystem
+    // wird bei jedem Bau frisch befuellt, ein altes `/program.gb` kann es
+    // also gar nicht geben. Siehe web/ + docs/web-playground.md.
     #[cfg(target_os = "emscripten")]
     {
-        for quelle in ["/program.dh", "/program.dh"] {
-            if let Ok(src) = std::fs::read_to_string(quelle) {
-                return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
-            }
+        if let Ok(src) = std::fs::read_to_string("/program.dh") {
+            return compile_and_run_source(&src, std::path::Path::new("/"), "playground");
         }
-        for bytecode in ["/program.dhc", "/program.dhc"] {
-            if let Ok(text) = std::fs::read_to_string(bytecode) {
-                return run_gbc_text(&text, "playground");
-            }
+        if let Ok(text) = std::fs::read_to_string("/program.dhc") {
+            return run_gbc_text(&text, "playground");
         }
     }
 
@@ -860,12 +864,14 @@ mod tests {
 
     #[test]
     fn quelldatei_erkennt_beide_endungen_und_ignoriert_gross_klein() {
-        for gut in ["spiel.dh", "SPIEL.DH", "a/b/c.Dh", "alt.dh", "ALT.GB"] {
+        let alt = super::ALTE_QUELL_ENDUNG;                     // ".gb"
+        for gut in ["spiel.dh", "SPIEL.DH", "a/b/c.Dh",
+                    &format!("alt{alt}"), &format!("ALT{}", alt.to_uppercase())] {
             assert!(ist_quelldatei(gut), "{gut} sollte Quelltext sein");
         }
         // Bytecode und Fremdes duerfen NICHT als Quelle durchgehen -- sonst
         // liefe eine .dhc durch den Compiler statt durch die VM.
-        for schlecht in ["spiel.dhc", "spiel.dhc", "spiel.dhx", "dh", "spiel.txt"] {
+        for schlecht in ["spiel.dhc", &format!("spiel{alt}c"), "spiel.dhx", "dh", "spiel.txt"] {
             assert!(!ist_quelldatei(schlecht), "{schlecht} ist keine Quelle");
         }
     }

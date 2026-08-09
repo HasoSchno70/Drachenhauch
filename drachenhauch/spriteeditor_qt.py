@@ -10,7 +10,7 @@ als horizontaler Sheet exportiert.
 
 Datei-Formate:
 - .png  -- Single-Frame oder Multi-Frame als horizontaler Sheet
-- .gbsprite -- natives Format (JSON + Base64-RGBA pro Frame)
+- .dhsprite -- natives Format (JSON + Base64-RGBA pro Frame)
 
 Tools:
     Stift (B), Radierer (E), Eimer (G), Linie (L),
@@ -1261,7 +1261,7 @@ class _PaletteSwatch(QFrame):
 
 class AssetBrowser(QWidget):
     """Scrollbarer Asset-Browser fuer das Projekt: zeigt alle .png und
-    .gbsprite-Dateien aus den ueblichen Verzeichnissen
+    .dhsprite-Dateien aus den ueblichen Verzeichnissen
     (`examples/assets/`, `examples/`, `assets/`) als Thumbnails an.
 
     Doppelklick laedt das Asset im Editor. Refresh-Button rescannt das
@@ -1317,7 +1317,7 @@ class AssetBrowser(QWidget):
         self.refresh()
 
     def _scan(self) -> list[Path]:
-        """Sammelt alle PNG/.gbsprite-Dateien aus den Standard-Asset-
+        """Sammelt alle PNG/.dhsprite-Dateien aus den Standard-Asset-
         Verzeichnissen (rekursiv). Dedupliziert nach absolutem Pfad,
         sortiert nach Datei-Name."""
         root = self.app.project_root
@@ -1327,7 +1327,7 @@ class AssetBrowser(QWidget):
             d = root.joinpath(*parts)
             if not d.is_dir():
                 continue
-            for ext in ("*.png", "*.gbsprite"):
+            for ext in ("*.png", "*.dhsprite", "*.gbsprite"):
                 for p in d.rglob(ext):
                     if not p.is_file():
                         continue
@@ -1374,8 +1374,8 @@ class AssetBrowser(QWidget):
             self.list_widget.addItem(item)
 
     def _make_thumb(self, path: Path) -> Image.Image:
-        # Erstes Frame als Vorschau (.gbsprite hat mehrere Frames)
-        if path.suffix.lower() == ".gbsprite":
+        # Erstes Frame als Vorschau (.dhsprite hat mehrere Frames)
+        if path.suffix.lower() == ".dhsprite":
             doc = SpriteDoc.load_native(path)
             img = doc.frames[0].composite()
         else:
@@ -1979,8 +1979,8 @@ class AnimRangeDialog(QDialog):
 
 class AnimsPanel(QWidget):
     """Benannte Animations-Bereiche (das SPRITE_ADD_ANIM-Aequivalent des
-    Editors). Die Bereiche leben in doc.anims (persistiert in .gbsprite v4)
-    und speisen GB-Code-Export, .gbanim-Export und den Sprite-Test."""
+    Editors). Die Bereiche leben in doc.anims (persistiert in .dhsprite v4)
+    und speisen GB-Code-Export, .dhanim-Export und den Sprite-Test."""
 
     def __init__(self, app: "SpriteEditorWindow"):
         super().__init__()
@@ -2004,7 +2004,7 @@ class AnimsPanel(QWidget):
         self.list_widget.itemDoubleClicked.connect(lambda _i: self._edit())
         layout.addWidget(self.list_widget, 1)
 
-        hint = QLabel("Bereiche landen im GB-Code-\nund .gbanim-Export.")
+        hint = QLabel("Bereiche landen im GB-Code-\nund .dhanim-Export.")
         hint.setStyleSheet("color: #7a8190; font-size: 8pt;")
         layout.addWidget(hint)
 
@@ -2298,7 +2298,7 @@ class SpriteEditorWindow(QMainWindow):
 
         self.setWindowTitle("GameBasic - Sprite-Editor")
         self.resize(1480, 920)
-        self.setAcceptDrops(True)   # PNG / .gbsprite per Drag-and-Drop oeffnen
+        self.setAcceptDrops(True)   # PNG / .dhsprite per Drag-and-Drop oeffnen
         self._set_window_icon()
 
         self._build_actions()
@@ -2475,7 +2475,7 @@ class SpriteEditorWindow(QMainWindow):
         self.act_export   = A("Sheet-PNG exportieren", "Ctrl+E", self.action_export_sheet, make_action_icon("export"))
         self.act_export_atlas = A("Sprite-Atlas exportieren (PNG + JSON)...",
                                    "Ctrl+Shift+E", self.action_export_atlas)
-        self.act_export_gbanim = A("Animations-FSM exportieren (.gbanim)...",
+        self.act_export_gbanim = A("Animations-FSM exportieren (.dhanim)...",
                                     None, self.action_export_gbanim)
         self.act_export_gif = A("Animation als GIF...", "Ctrl+G", self.action_export_gif)
         self.act_export_frame = A("Frame als PNG exportieren", None, self.action_export_frame_png)
@@ -2774,7 +2774,7 @@ class SpriteEditorWindow(QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, anims_dock)
 
         # Asset-Browser-Dock unten (default versteckt -- via Ansicht-Menue
-        # einblenden). Zeigt PNGs/.gbsprite aus den Standard-Asset-
+        # einblenden). Zeigt PNGs/.dhsprite aus den Standard-Asset-
         # Verzeichnissen des Projekts an.
         self.asset_browser = AssetBrowser(self)
         self.asset_dock = QDockWidget("Asset-Browser", self)
@@ -3295,7 +3295,7 @@ class SpriteEditorWindow(QMainWindow):
         + Sprite-Groesse vorausgefuellt."""
         n = len(self.doc.frames)
         if self.doc.filepath is not None:
-            if self.doc.filepath.suffix.lower() == ".gbsprite":
+            if self.doc.filepath.suffix.lower() == ".dhsprite":
                 fname = self.doc.filepath.with_suffix(".png").name
             else:
                 fname = self.doc.filepath.name
@@ -3352,8 +3352,8 @@ class SpriteEditorWindow(QMainWindow):
             return
         path, _ = QFileDialog.getOpenFileName(
             self, "Sprite oeffnen", str(self.project_root),
-            "Alle Sprite-Formate (*.gbsprite *.png);;"
-            "GameBasic-Sprite (*.gbsprite);;"
+            "Alle Sprite-Formate (*.dhsprite *.gbsprite *.png);;"
+            "GameBasic-Sprite (*.dhsprite *.gbsprite);;"
             "PNG-Bild (*.png)",
         )
         if not path:
@@ -3362,7 +3362,7 @@ class SpriteEditorWindow(QMainWindow):
 
     def _load_path(self, path: Path):
         try:
-            if path.suffix.lower() == ".gbsprite":
+            if path.suffix.lower() == ".dhsprite":
                 self.doc = SpriteDoc.load_native(path)
             else:
                 img = Image.open(path)
@@ -3395,7 +3395,7 @@ class SpriteEditorWindow(QMainWindow):
         import time
         self._suppress_watcher_until = time.time() + 2.0
         try:
-            if path.suffix.lower() == ".gbsprite":
+            if path.suffix.lower() == ".dhsprite":
                 self.doc.save_native(path)
             elif len(self.doc.frames) > 1:
                 self.doc.save_sheet_png(path)
@@ -3418,7 +3418,7 @@ class SpriteEditorWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(
             self, "Sprite speichern unter",
             str(self.project_root / f"sprite.{ext}"),
-            "GameBasic-Sprite (*.gbsprite);;PNG-Bild (*.png)",
+            "GameBasic-Sprite (*.dhsprite);;PNG-Bild (*.png)",
         )
         if not path:
             return False
@@ -3569,15 +3569,15 @@ class SpriteEditorWindow(QMainWindow):
         )
 
     def action_export_gbanim(self):
-        """Animations-FSM-Vorlage (.gbanim) aus den Anim-Bereichen schreiben:
+        """Animations-FSM-Vorlage (.dhanim) aus den Anim-Bereichen schreiben:
         ein State pro Bereich, erster = default. Direkt ANIM_FSM_LOAD-ladbar;
         Transitions/Parameter ergaenzt man in dhanim."""
-        default_name = "sprite.gbanim"
+        default_name = "sprite.dhanim"
         if self.doc.filepath is not None:
-            default_name = self.doc.filepath.with_suffix(".gbanim").name
+            default_name = self.doc.filepath.with_suffix(".dhanim").name
         path, _ = QFileDialog.getSaveFileName(
-            self, "Animations-FSM exportieren (.gbanim)", default_name,
-            "GameBasic-Animation (*.gbanim)")
+            self, "Animations-FSM exportieren (.dhanim)", default_name,
+            "GameBasic-Animation (*.dhanim)")
         if not path:
             return
         try:
@@ -3589,7 +3589,7 @@ class SpriteEditorWindow(QMainWindow):
             return
         n = len(self.doc.anims) or 1
         self.statusBar().showMessage(
-            f".gbanim exportiert ({n} State{'s' if n != 1 else ''}): {path}", 3000)
+            f".dhanim exportiert ({n} State{'s' if n != 1 else ''}): {path}", 3000)
 
     def action_export_frame_png(self):
         path, _ = QFileDialog.getSaveFileName(
@@ -4368,7 +4368,7 @@ class SpriteEditorWindow(QMainWindow):
             self, "Ueber GameBasic Sprite-Editor",
             "GameBasic Sprite-Editor (PySide6)\n\n"
             "Pixel-Art-Editor mit Alpha-Kanal und Frame-Animation.\n"
-            "Output: PNG (Alpha) und .gbsprite (natives Format).\n\n"
+            "Output: PNG (Alpha) und .dhsprite (natives Format).\n\n"
             "PNG-Sheets sind direkt mit dem sprite-Modul verwendbar:\n"
             "    img = LOADIMAGE(\"sheet.png\")\n"
             "    sp  = SPRITE_NEW(img, frame_w, frame_h)"
@@ -4508,7 +4508,7 @@ class SpriteEditorWindow(QMainWindow):
             d.mkdir(exist_ok=True)
         except Exception:
             pass
-        return d / "autobackup.gbsprite"
+        return d / "autobackup.dhsprite"
 
     def _backup_path_for_doc(self) -> Optional[Path]:
         if self.doc.filepath is not None:
@@ -4603,7 +4603,7 @@ class SpriteEditorWindow(QMainWindow):
 
     @staticmethod
     def _is_supported_drop(path: Path) -> bool:
-        return path.suffix.lower() in (".png", ".gbsprite")
+        return path.suffix.lower() in (".png", ".dhsprite")
 
     def dragEnterEvent(self, event):
         md = event.mimeData()

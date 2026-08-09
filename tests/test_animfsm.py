@@ -2,7 +2,7 @@
 
 Konsolen-testbar: SPRITE_NEW(0, ...) braucht keine Grafik (der Texturindex 0
 wird erst bei SPRITE_DRAW gebraucht), SPRITE_UPDATE/ANIM_FSM_* sind reine Logik.
-Wir legen eine `.gbanim`-JSON in `tmp_path` und treiben die FSM ueber Parameter.
+Wir legen eine `.dhanim`-JSON in `tmp_path` und treiben die FSM ueber Parameter.
 """
 import json
 import textwrap
@@ -33,7 +33,7 @@ def _hero_fsm():
     }
 
 
-def _write_fsm(tmp_path, data, name="hero.gbanim"):
+def _write_fsm(tmp_path, data, name="hero.dhanim"):
     (tmp_path / name).write_text(json.dumps(data), encoding="utf-8")
 
 
@@ -45,7 +45,7 @@ def test_default_state(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         PRINT ANIM_FSM_STATE(fsm)
     ''')
@@ -60,7 +60,7 @@ def test_idle_to_run_and_back(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         ' anfahren -> run
         ANIM_FSM_SET_FLOAT(fsm, "speed", 5.0)
@@ -84,7 +84,7 @@ def test_any_state_trigger_jump(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         ' aus idle per Any-State-Trigger nach jump
         ANIM_FSM_TRIGGER(fsm, "jump")
@@ -106,7 +106,7 @@ def test_trigger_consumed_after_update(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         ANIM_FSM_TRIGGER(fsm, "jump")
         ANIM_FSM_UPDATE(fsm, sp, 16)
@@ -129,7 +129,7 @@ def test_force_state(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         ANIM_FSM_FORCE(fsm, sp, "run")
         PRINT ANIM_FSM_STATE(fsm)
@@ -145,7 +145,7 @@ def test_get_params(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SET_FLOAT(fsm, "speed", 3.5)
         PRINT ANIM_FSM_GET_FLOAT(fsm, "speed")
     ''')
@@ -161,7 +161,7 @@ def test_setup_registers_anims_on_sprite(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SETUP(fsm, sp)
         ' default idle: frames 0..3 -> nach genug Zeit loopt der Frame im Bereich
         PRINT SPRITE_CURRENT_ANIM(sp)
@@ -178,7 +178,7 @@ def test_unknown_param_errors(run_gb, tmp_path):
         DIM sp AS SPRITE
         sp = SPRITE_NEW(0, 16, 16)
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
         ANIM_FSM_SET_FLOAT(fsm, "nope", 1.0)
     ''')
     with pytest.raises(DrachenhauchError):
@@ -193,7 +193,7 @@ def test_load_validates_bad_transition(run_gb, tmp_path):
     src = textwrap.dedent('''
         IMPORT "animfsm"
         DIM fsm AS ANIM_FSM
-        fsm = ANIM_FSM_LOAD("hero.gbanim")
+        fsm = ANIM_FSM_LOAD("hero.dhanim")
     ''')
     with pytest.raises(DrachenhauchError):
         run_gb(src, base=tmp_path)

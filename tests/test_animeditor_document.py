@@ -151,7 +151,7 @@ def test_roundtrip_dict():
 
 def test_save_load_file(tmp_path):
     doc = _sample_doc()
-    p = tmp_path / "hero.gbanim"
+    p = tmp_path / "hero.dhanim"
     doc.save(str(p))
     doc2 = AnimDoc.load(str(p))
     assert doc2.effective_default() == "idle"
@@ -159,7 +159,7 @@ def test_save_load_file(tmp_path):
 
 
 def test_to_dict_runtime_shape():
-    """Das `.gbanim` muss die Runtime-Pflichtfelder enthalten."""
+    """Das `.dhanim` muss die Runtime-Pflichtfelder enthalten."""
     d = _sample_doc().to_dict()
     assert d["default"] == "idle"
     assert {s["name"] for s in d["states"]} == {"idle", "run", "jump"}
@@ -173,7 +173,7 @@ def test_to_dict_runtime_shape():
 # ----------------------------------------------------------------- Beispiel-Datei
 import pathlib
 
-_DEMO = pathlib.Path(__file__).resolve().parents[1] / "examples" / "anim_demo.gbanim"
+_DEMO = pathlib.Path(__file__).resolve().parents[1] / "examples" / "anim_demo.dhanim"
 
 
 def test_shipped_demo_loads_in_editor():
@@ -190,14 +190,14 @@ def test_shipped_demo_loads_in_editor():
 def test_shipped_demo_runtime_valid(run_gb, tmp_path):
     """Die Demo muss vom animfsm-Runtime ladbar sein (kein Validierungsfehler)."""
     import shutil
-    shutil.copy(str(_DEMO), str(tmp_path / "anim_demo.gbanim"))
+    shutil.copy(str(_DEMO), str(tmp_path / "anim_demo.dhanim"))
     src = (
         'IMPORT "animfsm"\n'
         'IMPORT "sprite"\n'
         'DIM sp AS SPRITE\n'
         'sp = SPRITE_NEW(0, 16, 16)\n'
         'DIM fsm AS ANIM_FSM\n'
-        'fsm = ANIM_FSM_LOAD("anim_demo.gbanim")\n'
+        'fsm = ANIM_FSM_LOAD("anim_demo.dhanim")\n'
         'ANIM_FSM_SETUP(fsm, sp)\n'
         'PRINT ANIM_FSM_STATE(fsm)\n'
     )
@@ -206,17 +206,17 @@ def test_shipped_demo_runtime_valid(run_gb, tmp_path):
 
 # ----------------------------------------------------------------- Closed-Loop
 def test_editor_output_loads_in_runtime(run_gb, tmp_path):
-    """Editor-Output -> `.gbanim` -> ANIM_FSM_LOAD: identischer Default-State."""
+    """Editor-Output -> `.dhanim` -> ANIM_FSM_LOAD: identischer Default-State."""
     doc = _sample_doc()
     doc.sheet = ""   # kein echtes Bild im Test -> Sprite mit Dummy-Handle
-    doc.save(str(tmp_path / "hero.gbanim"))
+    doc.save(str(tmp_path / "hero.dhanim"))
     src = (
         'IMPORT "animfsm"\n'
         'IMPORT "sprite"\n'
         'DIM sp AS SPRITE\n'
         'sp = SPRITE_NEW(0, 16, 16)\n'
         'DIM fsm AS ANIM_FSM\n'
-        'fsm = ANIM_FSM_LOAD("hero.gbanim")\n'
+        'fsm = ANIM_FSM_LOAD("hero.dhanim")\n'
         'ANIM_FSM_SETUP(fsm, sp)\n'
         'PRINT ANIM_FSM_STATE(fsm)\n'
         'ANIM_FSM_SET_FLOAT(fsm, "speed", 9.0)\n'
@@ -239,8 +239,8 @@ def _parses(src: str):
 
 def test_generated_runner_parses():
     doc = _sample_doc()
-    src = doc.generate_runner("hero.gbanim", title="Hero")
-    assert 'ANIM_FSM_LOAD("hero.gbanim")' in src
+    src = doc.generate_runner("hero.dhanim", title="Hero")
+    assert 'ANIM_FSM_LOAD("hero.dhanim")' in src
     assert "UI_SLIDER" in src          # float-Parameter speed
     assert "UI_BUTTON" in src          # trigger-Parameter jump
     assert "UI_END_FRAME()" in src
@@ -250,7 +250,7 @@ def test_generated_runner_parses():
 def test_generated_runner_no_sheet_uses_placeholder():
     doc = AnimDoc(sheet="")
     doc.add_state(0, 0, "idle")
-    src = doc.generate_runner("x.gbanim")
+    src = doc.generate_runner("x.dhanim")
     assert "SPRITE_NEW(0," in src      # Dummy-Handle
     assert "SPRITE_DRAW" not in src    # stattdessen Platzhalter-BOX
     assert _parses(src) is not None
@@ -263,7 +263,7 @@ def test_generated_runner_with_bool_param_parses():
     doc.add_param("grounded", "bool")
     t = doc.add_transition("idle", "fall")
     t.conditions.append(Condition("grounded", "is_false"))
-    src = doc.generate_runner("x.gbanim")
+    src = doc.generate_runner("x.dhanim")
     assert "UI_CHECKBOX" in src
     assert _parses(src) is not None
 

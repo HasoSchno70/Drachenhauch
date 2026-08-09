@@ -71,7 +71,7 @@ def test_save_load_roundtrip(tmp_path):
     win = FormDesigner(tmp_path)
     win.canvas.doc.title = "MyForm"
     win.canvas.doc.add("dropdown", 20, 20).items = ["a", "b"]
-    p = tmp_path / "f.gbform"
+    p = tmp_path / "f.dhform"
     win.canvas.doc.save(str(p))
     win2 = FormDesigner(tmp_path)
     from drachenhauch.formdesigner import FormDoc
@@ -175,16 +175,16 @@ def test_project_save_load_roundtrip(tmp_path):
     win = FormDesigner(tmp_path)
     from drachenhauch.formdesigner import FormDoc
     win.active.doc.title = "Main"
-    win.active.path = tmp_path / "main.gbform"
-    win._add_open_form(FormDoc(title="Settings"), tmp_path / "settings.gbform")
+    win.active.path = tmp_path / "main.dhform"
+    win._add_open_form(FormDoc(title="Settings"), tmp_path / "settings.dhform")
     win._switch_to(0)
     win.set_main_form()
-    win.project_path = tmp_path / "app.gbproj"
+    win.project_path = tmp_path / "app.dhproj"
     win.save_project()
-    assert (tmp_path / "app.gbproj").exists()
+    assert (tmp_path / "app.dhproj").exists()
 
     win2 = FormDesigner(tmp_path)
-    win2.load_project_file(str(tmp_path / "app.gbproj"))
+    win2.load_project_file(str(tmp_path / "app.dhproj"))
     assert len(win2.forms) == 2
     assert win2.active.doc.title == "Main"          # main-Formular aktiv
     assert {f.doc.title for f in win2.forms} == {"Main", "Settings"}
@@ -901,7 +901,7 @@ def test_open_project_asks_before_dropping_forms(tmp_path, monkeypatch):
     from drachenhauch.formdesigner import FormProject
     win.canvas.doc.title = "WICHTIG"
     win._mark_dirty()
-    proj = tmp_path / "p.gbproj"
+    proj = tmp_path / "p.dhproj"
     FormProject(forms=[], main="").save(str(proj))
     monkeypatch.setattr(_mb(), "question",
                         staticmethod(lambda *a, **k: _mb().StandardButton.Cancel))
@@ -918,7 +918,7 @@ def test_save_failure_keeps_dirty_and_does_not_take_the_path(tmp_path, monkeypat
     _app()
     win = FormDesigner(tmp_path)
     win._mark_dirty()
-    bad = str(tmp_path / "gibtsnicht" / "x.gbform")
+    bad = str(tmp_path / "gibtsnicht" / "x.dhform")
     monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getSaveFileName",
                         staticmethod(lambda *a, **k: (bad, "")))
     assert win.save_form_as() is False             # kein Traceback
@@ -929,7 +929,7 @@ def test_save_failure_keeps_dirty_and_does_not_take_the_path(tmp_path, monkeypat
 def test_undo_back_to_saved_state_clears_the_star(tmp_path, monkeypatch):
     _app()
     win = FormDesigner(tmp_path)
-    p = tmp_path / "f.gbform"
+    p = tmp_path / "f.dhform"
     monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getSaveFileName",
                         staticmethod(lambda *a, **k: (str(p), "")))
     assert win.save_form_as() is True
@@ -962,7 +962,7 @@ def test_open_form_twice_switches_instead_of_duplicating(tmp_path, monkeypatch):
     _app()
     win = FormDesigner(tmp_path)
     from drachenhauch.formdesigner import FormDoc
-    p = tmp_path / "a.gbform"
+    p = tmp_path / "a.dhform"
     FormDoc(title="A").save(str(p))
     monkeypatch.setattr("drachenhauch.formdesigner_qt.QFileDialog.getOpenFileName",
                         staticmethod(lambda *a, **k: (str(p), "")))
@@ -980,31 +980,31 @@ def test_project_keeps_forms_outside_its_directory(tmp_path):
     extern = tmp_path / "shared"; extern.mkdir()
     win = FormDesigner(proj_dir)
     from drachenhauch.formdesigner import FormDoc
-    win.active.doc.title = "Haupt"; win.active.path = proj_dir / "haupt.gbform"
-    win._add_open_form(FormDoc(title="Extern"), extern / "extern.gbform")
-    win.project_path = proj_dir / "app.gbproj"
+    win.active.doc.title = "Haupt"; win.active.path = proj_dir / "haupt.dhform"
+    win._add_open_form(FormDoc(title="Extern"), extern / "extern.dhform")
+    win.project_path = proj_dir / "app.dhproj"
     win.save_project()
-    rel = json.loads((proj_dir / "app.gbproj").read_text(encoding="utf-8"))["forms"]
+    rel = json.loads((proj_dir / "app.dhproj").read_text(encoding="utf-8"))["forms"]
     assert any(".." in r for r in rel)             # zeigt wirklich nach draussen
     win2 = FormDesigner(proj_dir)
-    win2.load_project_file(str(proj_dir / "app.gbproj"))
+    win2.load_project_file(str(proj_dir / "app.dhproj"))
     assert {f.doc.title for f in win2.forms} == {"Haupt", "Extern"}
     win.close(); win2.close()
 
 
 def test_missing_form_stays_in_the_manifest(tmp_path):
-    # Stumm uebersprungen UND danach dauerhaft aus dem .gbproj geloescht.
+    # Stumm uebersprungen UND danach dauerhaft aus dem .dhproj geloescht.
     _app()
     from drachenhauch.formdesigner import FormDoc, FormProject
-    FormDoc(title="OK").save(str(tmp_path / "ok.gbform"))
-    FormProject(forms=["ok.gbform", "weg.gbform"], main="ok.gbform").save(
-        str(tmp_path / "p.gbproj"))
+    FormDoc(title="OK").save(str(tmp_path / "ok.dhform"))
+    FormProject(forms=["ok.dhform", "weg.dhform"], main="ok.dhform").save(
+        str(tmp_path / "p.dhproj"))
     win = FormDesigner(tmp_path)
-    win.load_project_file(str(tmp_path / "p.gbproj"))
-    assert win.unresolved == ["weg.gbform"]
+    win.load_project_file(str(tmp_path / "p.dhproj"))
+    assert win.unresolved == ["weg.dhform"]
     win.save_project()
-    forms = json.loads((tmp_path / "p.gbproj").read_text(encoding="utf-8"))["forms"]
-    assert "weg.gbform" in forms
+    forms = json.loads((tmp_path / "p.dhproj").read_text(encoding="utf-8"))["forms"]
+    assert "weg.dhform" in forms
     win.close()
 
 
@@ -1013,24 +1013,28 @@ def test_main_form_survives_saving_into_a_subdirectory(tmp_path):
     sub = tmp_path / "sub"; sub.mkdir()
     win = FormDesigner(tmp_path)
     from drachenhauch.formdesigner import FormDoc
-    win.active.doc.title = "A"; win.active.path = sub / "a.gbform"
-    win._add_open_form(FormDoc(title="B"), sub / "b.gbform")
+    win.active.doc.title = "A"; win.active.path = sub / "a.dhform"
+    win._add_open_form(FormDoc(title="B"), sub / "b.dhform")
     win.set_main_form()                            # B ist aktiv -> Startformular
-    win.project_path = tmp_path / "app.gbproj"
+    win.project_path = tmp_path / "app.dhproj"
     win.save_project()
-    m = json.loads((tmp_path / "app.gbproj").read_text(encoding="utf-8"))["main"]
-    assert m == "sub/b.gbform"                     # nicht auf a zurueckgefallen
+    m = json.loads((tmp_path / "app.dhproj").read_text(encoding="utf-8"))["main"]
+    assert m == "sub/b.dhform"                     # nicht auf a zurueckgefallen
     win.close()
 
 
-def test_uppercase_gbproj_opens_as_project_not_as_form(tmp_path):
-    # `dhform Projekt.GBPROJ` lud das Manifest als Formular (case-sensitiver
+@pytest.mark.parametrize("name", ["Projekt.DHPROJ", "Projekt.GBPROJ"])
+def test_uppercase_projektendung_oeffnet_als_projekt_nicht_als_form(tmp_path, name):
+    # `dhform Projekt.DHPROJ` lud das Manifest als Formular (case-sensitiver
     # Suffix-Vergleich); ein Strg+S danach hat die Projektdatei ueberschrieben.
+    # `.GBPROJ` prueft dasselbe fuer die Endung aus der GameBasic-Zeit: die
+    # wird noch geoeffnet (nur nicht mehr geschrieben), und beim Umbenennen
+    # waere genau diese Duldung leicht unter den Tisch gefallen.
     from drachenhauch.formdesigner import FormDoc, FormProject
     from drachenhauch.formdesigner_qt import open_initial
-    FormDoc(title="A").save(str(tmp_path / "a.gbform"))
-    p = tmp_path / "Projekt.GBPROJ"
-    FormProject(forms=["a.gbform"], main="a.gbform").save(str(p))
+    FormDoc(title="A").save(str(tmp_path / "a.dhform"))
+    p = tmp_path / name
+    FormProject(forms=["a.dhform"], main="a.dhform").save(str(p))
     _app()
     win = FormDesigner(tmp_path)
     assert open_initial(win, p) is True
@@ -1043,7 +1047,7 @@ def test_open_initial_reports_a_missing_file(tmp_path):
     from drachenhauch.formdesigner_qt import open_initial
     _app()
     win = FormDesigner(tmp_path)
-    assert open_initial(win, tmp_path / "tippfehler.gbform") is False
+    assert open_initial(win, tmp_path / "tippfehler.dhform") is False
     assert open_initial(win, tmp_path) is False           # Verzeichnis
     win.close()
 
@@ -1098,7 +1102,7 @@ def test_run_form_starts_a_valid_form_and_cleans_up_afterwards(tmp_path, monkeyp
     win.run_form()
     run_dir = win._run_dir
     assert run_dir is not None and (run_dir / "run.dh").exists()
-    assert (run_dir / "form.gbform").exists()          # neben der .dh, fuer GUI_LOAD
+    assert (run_dir / "form.dhform").exists()          # neben der .dh, fuer GUI_LOAD
     win.run_form()                                     # zweites F5
     assert proc.killed                                 # alter Prozess beendet
     assert not run_dir.exists()                        # alter Temp-Ordner weg

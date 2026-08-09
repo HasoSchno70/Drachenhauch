@@ -1,7 +1,7 @@
 """Form-Designer (WYSIWYG, Xojo-Stil) -- Qt-freies Datenmodell.
 
 `document.py` haelt das Formular-Modell (`FormDoc` + `Control`), liest/schreibt
-das `.gbform`-JSON **exakt im Runtime-Format** (das `GUI_LOAD`/`GUI_FROM_JSON`
+das `.dhform`-JSON **exakt im Runtime-Format** (das `GUI_LOAD`/`GUI_FROM_JSON`
 versteht -- siehe `rust/drachenhauch_runtime/src/gui.rs`) und generiert lauffaehigen
 GameBasic-Code (Harness + Event-Handler-Stubs).
 

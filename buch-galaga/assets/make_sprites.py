@@ -1,7 +1,7 @@
 """Erzeugt die Sprites fuer das Galaga-Buch.
 
 Zeichnet Pixel-Art programmatisch ueber das SpriteDoc-Modell und exportiert je
-Sprite ein PNG-Sheet (fuers Spiel) + eine .gbsprite (zum Bearbeiten in
+Sprite ein PNG-Sheet (fuers Spiel) + eine .dhsprite (zum Bearbeiten in
 dhsprites). preview.png zur Sichtkontrolle.
 
 Aufruf:  .venv\\Scripts\\python.exe buch-galaga\\assets\\make_sprites.py
@@ -66,7 +66,7 @@ def make_bug(name, theme):
     doc.add_frame()
     paint_regions(doc.frames[-1].pixels, BUG_B, theme)
     doc.save_sheet_png(OUT / f"{name}.png")
-    doc.save_native(OUT / f"{name}.gbsprite")
+    doc.save_native(OUT / f"{name}.dhsprite")
     return doc
 BULLET = [
     "..CC..", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", ".CWWC.", "..CC..",
@@ -96,7 +96,7 @@ def make(name, frames, w, h):
         doc.add_frame()
         paint(doc.frames[-1].pixels, g)
     doc.save_sheet_png(OUT / f"{name}.png")
-    doc.save_native(OUT / f"{name}.gbsprite")
+    doc.save_native(OUT / f"{name}.dhsprite")
     return doc
 
 

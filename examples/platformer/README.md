@@ -12,7 +12,7 @@ Ein kompletter, detailreicher Sprite- und Tile-Satz für einen generischen Platt
 
 ## Figuren (animiert)
 
-Pro Figur: `.gbsprite` (im Editor `dhsprites` bearbeitbar) + `.png`
+Pro Figur: `.dhsprite` (im Editor `dhsprites` bearbeitbar) + `.png`
 (horizontaler Strip für `SPRITE_NEW(sheet, 32, 32)`) + `.gif` (Vorschau).
 Im Master-Sheet heißen die Frames `<figur>_<frame>`.
 
@@ -44,10 +44,10 @@ prozedural gezeichnet (harte Kanten, feste Palette). Ändern und neu bauen:
 py examples/platformer/make_sprites.py
 ```
 
-Oder eine `.gbsprite` direkt im Editor öffnen und pixeln:
+Oder eine `.dhsprite` direkt im Editor öffnen und pixeln:
 
 ```
-dhsprites examples/platformer/hero.gbsprite
+dhsprites examples/platformer/hero.dhsprite
 ```
 
 ## Demo

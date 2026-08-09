@@ -3,10 +3,10 @@ module.exports = (H) => [
   H.p("Im sprite-Kapitel hast du Animationen von Hand umgeschaltet (IF vx <> 0 THEN \"walk\" ELSE \"idle\"). Bei vielen Zuständen – stehen, laufen, springen, fallen, angreifen – wird dieses Wenn-Dann schnell unübersichtlich. Das Modul animfsm nimmt dir das ab: Du beschreibst die Zustände und Übergänge einmal in einer Datei, setzt im Spiel nur noch ein paar Parameter (etwa „Tempo“), und die Zustandsmaschine wählt selbst die richtige Animation."),
   H.figure("51_animfsm.png", "Die Zustandsmaschine wählt den Zustand: Weil das Tempo hoch ist, läuft „run“ – ANIM_FSM_STATE zeigt den aktuellen Zustand an."),
 
-  H.h2("Die .gbanim-Datei"),
-  H.p("Die Zustandsmaschine wird datengetrieben aus einer .gbanim-Datei geladen (am bequemsten im Editor dhanim gezeichnet). Sie beschreibt drei Dinge: Zustände (jeder an einen Frame-Bereich gebunden), Parameter (Werte, die du im Spiel setzt) und Übergänge (Bedingungen, wann von einem Zustand in einen anderen gewechselt wird). Eine einfache Variante mit zwei Zuständen:"),
+  H.h2("Die .dhanim-Datei"),
+  H.p("Die Zustandsmaschine wird datengetrieben aus einer .dhanim-Datei geladen (am bequemsten im Editor dhanim gezeichnet). Sie beschreibt drei Dinge: Zustände (jeder an einen Frame-Bereich gebunden), Parameter (Werte, die du im Spiel setzt) und Übergänge (Bedingungen, wann von einem Zustand in einen anderen gewechselt wird). Eine einfache Variante mit zwei Zuständen:"),
   H.code([
-    '// held.gbanim',
+    '// held.dhanim',
     '{',
     '  "version": 1,',
     '  "default": "idle",',
@@ -25,14 +25,14 @@ module.exports = (H) => [
 
   H.h2("Laden & einrichten"),
   H.cmd("ANIM_FSM_LOAD · ANIM_FSM_SETUP", 'ANIM_FSM_LOAD(pfad$)   ANIM_FSM_SETUP(fsm, sprite)',
-    "ANIM_FSM_LOAD lädt und prüft die .gbanim-Datei und liefert eine ANIM_FSM (im Default-Zustand). ANIM_FSM_SETUP registriert die Frame-Bereiche aller Zustände als Animationen des Sprites und startet den Default-Zustand. Das Sprite legst du wie gewohnt mit dem sprite-Modul an.",
+    "ANIM_FSM_LOAD lädt und prüft die .dhanim-Datei und liefert eine ANIM_FSM (im Default-Zustand). ANIM_FSM_SETUP registriert die Frame-Bereiche aller Zustände als Animationen des Sprites und startet den Default-Zustand. Das Sprite legst du wie gewohnt mit dem sprite-Modul an.",
     [
       'IMPORT "sprite"',
       'IMPORT "animfsm"',
       'DIM held AS SPRITE',
       'held = SPRITE_NEW(LOADIMAGE("assets/hero.png"), 32, 32)',
       'DIM fsm AS ANIM_FSM',
-      'fsm = ANIM_FSM_LOAD("assets/held.gbanim")',
+      'fsm = ANIM_FSM_LOAD("assets/held.dhanim")',
       'ANIM_FSM_SETUP(fsm, held)',
     ]),
 

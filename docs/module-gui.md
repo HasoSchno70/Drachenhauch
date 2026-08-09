@@ -580,7 +580,7 @@ Programm sich gemerkt hat, bleibt gültig.
 | `GUI_TABLE_RESET_COLS(tbl)` | ursprüngliche Reihenfolge |
 
 Feste Spalten zählen nach **Position**: schiebt man eine Spalte nach vorn, wird
-sie mit fest. Die Reihenfolge wird im `.gbform` mitgespeichert.
+sie mit fest. Die Reihenfolge wird im `.dhform` mitgespeichert.
 
 ### Mehrfach-Auswahl
 
@@ -689,7 +689,7 @@ errechneten Breiten als eigene Werte — sonst spränge sie beim Loslassen zurü
 
 ### Speichern
 
-`.gbform` bleibt lesbar: eine schlichte Textzelle wird weiterhin als **String**
+`.dhform` bleibt lesbar: eine schlichte Textzelle wird weiterhin als **String**
 geschrieben, nur eine mit Farbe/Art/Bild als Objekt. Beide Formen werden
 gelesen, ältere Dateien laufen unverändert.
 
@@ -1040,7 +1040,7 @@ GUI_ON_CLICK(GUI_WINDOW_WIDGET(win, 0), on_login)
 
 ### Formular-Workflow (Xojo-Stil)
 
-Weil das `.gbform` pro Control den **Namen seines Event-Handlers** mitspeichert
+Weil das `.dhform` pro Control den **Namen seines Event-Handlers** mitspeichert
 (`on_click` / `on_change`) und `GUI_UPDATE` ausgelöste Handler **automatisch per
 Name aufruft**, ergibt sich der Xojo-Ablauf von selbst: Formular laden, nur die
 Handler ausfüllen — kein manuelles Verdrahten.
@@ -1050,7 +1050,7 @@ IMPORT "gui"
 SCREEN(800, 480, "App", 1)
 
 DIM frm AS GUI_WINDOW
-frm = GUI_LOAD("forms/settings.gbform")   ' Controls + Handler-Namen
+frm = GUI_LOAD("forms/settings.dhform")   ' Controls + Handler-Namen
 
 SUB on_save()                              ' du schreibst NUR die Handler ...
     PRINT "Speichern geklickt"
@@ -1062,10 +1062,10 @@ WHILE NOT QUITREQUESTED()
 WEND
 ```
 
-Vollständiges Beispiel (Formular `examples/forms/settings.gbform` +
+Vollständiges Beispiel (Formular `examples/forms/settings.dhform` +
 [examples/105_form_runner.dh](../examples/105_form_runner.dh)): ein
 Einstellungs-Dialog mit TextInput, Checkbox, Slider, Dropdown und zwei Buttons,
-dessen Handler die Control-Werte auslesen. Das `.gbform` lässt sich von Hand
+dessen Handler die Control-Werte auslesen. Das `.dhform` lässt sich von Hand
 schreiben **oder** (künftig) von einem visuellen Designer erzeugen — beides
 ergibt dieselbe JSON.
 

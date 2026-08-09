@@ -582,13 +582,13 @@ module.exports = (H) => [
     ]),
 
   H.h2("Oberflächen speichern und laden"),
-  H.p("Ein ganzes Fenster samt Widgets lässt sich als JSON sichern und später wiederherstellen. Genau dieses Format schreibt der Formular-Designer dhform in seine .gbform-Dateien – du kannst eine dort gebaute Oberfläche also direkt laden."),
+  H.p("Ein ganzes Fenster samt Widgets lässt sich als JSON sichern und später wiederherstellen. Genau dieses Format schreibt der Formular-Designer dhform in seine .dhform-Dateien – du kannst eine dort gebaute Oberfläche also direkt laden."),
   H.cmd("GUI_SAVE · GUI_LOAD", 'GUI_SAVE(win, datei$)   GUI_LOAD(datei$)',
     "GUI_SAVE schreibt ein Fenster in eine Datei, GUI_LOAD baut es daraus wieder auf und liefert das neue Fenster-Handle. Sind Event-Handler-Namen hinterlegt (dhform), ruft GUI_UPDATE die passenden Funktionen automatisch auf.",
     [
-      'GUI_SAVE(win, "layout.gbform")',
+      'GUI_SAVE(win, "layout.dhform")',
       'DIM geladen AS GUI_WINDOW',
-      'geladen = GUI_LOAD("layout.gbform")',
+      'geladen = GUI_LOAD("layout.dhform")',
     ]),
   H.cmd("GUI_TO_JSON · GUI_FROM_JSON", 'GUI_TO_JSON(win)   GUI_FROM_JSON(json$)',
     "Dasselbe ohne Datei: als String. Praktisch, um eine Oberfläche in einem Spielstand mitzusichern oder über das Netz zu schicken.",

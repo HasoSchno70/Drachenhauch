@@ -8,7 +8,7 @@
     4 = hit       (umgekippt, X-Augen)
 
 Output (alle in examples/assets/):
-    mario.gbsprite       - natives Editor-Format (zum Nach-Pixeln in dhsprites)
+    mario.dhsprite       - natives Editor-Format (zum Nach-Pixeln in dhsprites)
     mario.png            - horizontaler Sheet (5 * 16 = 80px breit)
     mario_atlas.json     - Sprite-Atlas mit benannten Frames
 
@@ -33,7 +33,7 @@ from PIL import Image
 
 # --- Palette ---------------------------------------------------------
 
-# Klassisch NES-Mario-inspirierte Farben. .gbsprite hat Alpha, also "."
+# Klassisch NES-Mario-inspirierte Farben. .dhsprite hat Alpha, also "."
 # ist transparent (Background).
 PALETTE = {
     ".": (0, 0, 0, 0),           # transparent
@@ -185,7 +185,7 @@ def _render_frame(design: str) -> Image.Image:
 
 
 def _save_native_gbsprite(frames_with_dur, path: Path):
-    """Schreibt die Frames im .gbsprite-Format (JSON + base64-RGBA pro
+    """Schreibt die Frames im .dhsprite-Format (JSON + base64-RGBA pro
     Frame). Format-Spec siehe drachenhauch/spriteeditor/document.py."""
     data = {
         "version": 2,
@@ -240,8 +240,8 @@ def main():
         names.append(name)
         print(f"  {name}: 16x16, {dur}ms")
 
-    # .gbsprite (native) -- zum Oeffnen + Nachpixeln im Editor
-    gbsprite = out_dir / "mario.gbsprite"
+    # .dhsprite (native) -- zum Oeffnen + Nachpixeln im Editor
+    gbsprite = out_dir / "mario.dhsprite"
     _save_native_gbsprite(frames_with_dur, gbsprite)
     print(f"  -> {gbsprite.name}")
 

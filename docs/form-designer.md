@@ -1,10 +1,10 @@
 # Form-Designer (WYSIWYG, Xojo-Stil)
 
 Visueller GUI-Designer für GameBasic — Controls per Klick platzieren, im
-Inspector konfigurieren, als `.gbform` speichern und mit den `gui`-Builtins zur
+Inspector konfigurieren, als `.dhform` speichern und mit den `gui`-Builtins zur
 Laufzeit laden. Sprache der Logik bleibt GameBasic.
 
-**Start:** `dhform [datei.gbform | projekt.gbproj]` (bzw. `dhrun.py --form`).
+**Start:** `dhform [datei.dhform | projekt.dhproj]` (bzw. `dhrun.py --form`).
 Benötigt PySide6. Alternativ `gb` (oder `dhrun.py`) **ohne Argument** →
 Auswahl-Dialog *Code-Editor* / *Form-Designer*. `dhedit` öffnet direkt den
 Code-Editor.
@@ -16,10 +16,10 @@ Pfad, eigener Undo-Historie und eigenem Dirty-Status (Undo läuft nie über
 Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 
 - **Neues Formular** (`Strg+N`), **Formular öffnen…** (`Strg+O`, fügt ein
-  bestehendes `.gbform` zum Projekt hinzu), **Formular schließen** (`Strg+W`).
+  bestehendes `.dhform` zum Projekt hinzu), **Formular schließen** (`Strg+W`).
 - **Speichern** (`Strg+S`) / **Speichern unter…** (`Strg+Umschalt+S`) betrifft das
   aktive Formular; **Alle speichern** (`Strg+Alt+S`) alle offenen.
-- **Projekt** = eine `.gbproj`-Manifestdatei, die die zugehörigen `.gbform`-Pfade
+- **Projekt** = eine `.dhproj`-Manifestdatei, die die zugehörigen `.dhform`-Pfade
   (relativ) und das **Startformular** auflistet. *Projekt speichern…* sichert alle
   Formulare + das Manifest; *Projekt öffnen…* lädt den ganzen Satz. *Als
   Startformular setzen* markiert das aktive Formular als `main`.
@@ -97,9 +97,9 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 
 1. **Entwerfen:** Controls platzieren, im Inspector benennen und Events
    (Handler-Namen) eintragen, z.B. `on_save` für einen Button.
-2. **Speichern** (`Strg+S`) als `.gbform` — JSON im Runtime-Format.
+2. **Speichern** (`Strg+S`) als `.dhform` — JSON im Runtime-Format.
 3. **Nutzen** — drei Wege:
-   - **Im eigenen Code:** `GUI_LOAD("meinform.gbform")` und die Handler-`SUB`s
+   - **Im eigenen Code:** `GUI_LOAD("meinform.dhform")` und die Handler-`SUB`s
      schreiben; `GUI_UPDATE` ruft sie automatisch per Name auf.
    - **Direkt testen:** `F5` (Ausführen) — der Designer schreibt das Layout +
      ein generiertes Programm-Gerüst in einen Temp-Ordner, prüft es mit
@@ -121,7 +121,7 @@ Formulare hinweg). Der Navigator links wechselt zwischen ihnen.
 IMPORT "gui"
 SCREEN(800, 480, "App", 1)
 DIM frm AS GUI_WINDOW
-frm = GUI_LOAD("forms/settings.gbform")
+frm = GUI_LOAD("forms/settings.dhform")
 
 SUB on_save()            ' Name = der im Inspector eingetragene Handler
     PRINT "gespeichert"
@@ -168,7 +168,7 @@ auch nicht weg — Öffnen und Speichern verliert nichts.
 
 ## Dateiformat
 
-`.gbform` ist exakt das JSON, das `GUI_SAVE`/`GUI_LOAD` lesen/schreiben (siehe
+`.dhform` ist exakt das JSON, das `GUI_SAVE`/`GUI_LOAD` lesen/schreiben (siehe
 [module-gui.md](module-gui.md)) — plus zwei Designer-Felder, die die Runtime
 ignoriert: `name` pro Control und ein Top-Level-`code` (`{handler_name:
 gb-code}`) mit den Event-Handler-Körpern. Der Designer und ein handgeschriebenes
@@ -189,13 +189,13 @@ real durch dhrt.
 **Robustheit beim Laden:** Beschädigte oder von Hand geschriebene Dateien
 (fehlende Felder, falsche Typen, `null`) fallen feldweise auf den Default
 zurück — genau wie `gui.rs` es tut — statt einen Fehler zu werfen. Ein
-`.gbproj`-Manifest wird beim Laden als Formular **abgelehnt** (sonst hätte ein
+`.dhproj`-Manifest wird beim Laden als Formular **abgelehnt** (sonst hätte ein
 anschließendes Speichern die Projektdatei überschrieben).
 
 ## Architektur / Erweiterung
 
 - Datenmodell Qt-frei in [`drachenhauch/formdesigner/document.py`](../drachenhauch/formdesigner/document.py)
-  (`FormDoc`/`Control`, `.gbform`-IO, `PALETTE`, Code-Generierung) — headless
+  (`FormDoc`/`Control`, `.dhform`-IO, `PALETTE`, Code-Generierung) — headless
   getestet (`tests/test_formdesigner_document.py`).
 - UI in [`drachenhauch/formdesigner_qt.py`](../drachenhauch/formdesigner_qt.py)
   (Palette/Canvas/Inspector/Code-Panel). Neue Control-Arten: Eintrag in `PALETTE`
@@ -218,7 +218,7 @@ anschließendes Speichern die Projektdatei überschrieben).
 Vorhanden: Platzieren, Auswählen, Verschieben, **Resize-Handles + Snap-Grid**,
 Löschen, **Undo/Redo**, Inspector (Kerneigenschaften + Events), **integrierter
 Code-Editor** (Doppelklick-auf-Control → Handler anlegen/anspringen),
-**Multi-Form-Projekte** (`.gbproj`), **GB-Code-Export** (explizite
+**Multi-Form-Projekte** (`.dhproj`), **GB-Code-Export** (explizite
 `GUI_*`-Konstruktion statt `GUI_LOAD`), Speichern/Laden, Ausführen (F5). Damit
 ist der geplante Funktionsumfang komplett.
 
@@ -227,10 +227,10 @@ Control den passenden Konstruktor (`GUI_LABEL` ohne w/h, `GUI_SLIDER` mit
 min/max/value, Items als sized `DIM x[n] AS STRING` …) plus nur die abweichenden
 Setter (`GUI_SET_ENABLED/VISIBLE/VALUE/FONT_SIZE/COLOR`, `*_SET_SELECTED`).
 Handler werden per `GUI_ON_CLICK/CHANGE`-FUNCREF verdrahtet. **Grenze:**
-`image`-Controls werden übersprungen (das `.gbform` speichert keine Bildquelle —
+`image`-Controls werden übersprungen (das `.dhform` speichert keine Bildquelle —
 `GUI_IMAGE` bräuchte ein `LOADIMAGE`). Strings escapen `"`→`""`. Ein
 run_gb-Golden-Test führt die erzeugte Konstruktion real in dhrt aus **und
-vergleicht sie gegen `GUI_LOAD` desselben `.gbform`** — beide Wege müssen
+vergleicht sie gegen `GUI_LOAD` desselben `.dhform`** — beide Wege müssen
 dasselbe Formular bauen.
 
 **Zwei Eigenheiten der Konstruktoren**, die der Export ausgleicht:
@@ -244,7 +244,7 @@ gezogen, springen diese fünf Control-Arten auf ihre Konstruktor-Größe zurück
 
 **Multi-Form-Architektur:** Qt-freies `FormProject` (in
 `formdesigner/document.py`) ist nur ein Manifest (`forms`-Liste + `main`); jede
-Form bleibt ihr eigenes `.gbform`. Im Fenster bündelt `_OpenForm` pro Formular
+Form bleibt ihr eigenes `.dhform`. Im Fenster bündelt `_OpenForm` pro Formular
 Dokument + Pfad + `History` + Dirty; `FormDesigner.history`/`.path` sind
 Properties auf die aktive Form, `_switch_to` tauscht Canvas/Inspector/Code-Panel
 um.
@@ -269,7 +269,7 @@ es die Auswahl **Thema**. Sie bestimmt zweierlei:
 
 `(Vorgabe)` heißt: kein Preset-Aufruf, also das eingebaute Cyan-Thema der
 Laufzeit. Ein Formular ohne Eintrag bekommt beim Speichern **kein** neues
-Feld — bestehende `.gbform`-Dateien ändern sich also nicht.
+Feld — bestehende `.dhform`-Dateien ändern sich also nicht.
 
 > **Achtung bei Änderungen:** `FORM_THEME_COLORS` in
 > `drachenhauch/formdesigner/document.py` ist ein **Nachbau** der Presets aus

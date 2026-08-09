@@ -970,9 +970,9 @@ def build():
         doc = SpriteDoc(S, S)
         doc.frames = [Frame(pixels=cells[c].convert("RGBA"),
                             name=f"{c:02X}_{names.get(c, '?')}") for c in sorted(cells)]
-        doc.save_native(ASSETS / "tiles.gbsprite")
+        doc.save_native(ASSETS / "tiles.dhsprite")
     except Exception as e:
-        print(f"(.gbsprite uebersprungen: {e})")
+        print(f"(.dhsprite uebersprungen: {e})")
     _contact(cells, ASSETS / "_contact.png")
     print(f"tiles.png ({cols}x{rows} a {S}px, SS={SS}) -- {len(cells)} Kacheln")
 

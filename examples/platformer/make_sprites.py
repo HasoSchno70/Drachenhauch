@@ -6,7 +6,7 @@ Stahl-Cyan-Roehren, Kristall-Item-Boxen) -- bewusst NICHT an Nintendo-Marken/
 
 Zeichnet Spieler, Gegner, Tiles, Items und Deko mit einer kleinen Pixel-Canvas
 (harte Kanten, begrenzte Palette = Pixelart-Look) und exportiert:
-- pro animierter Figur eine `.gbsprite` (im Editor `dhsprites` bearbeitbar)
+- pro animierter Figur eine `.dhsprite` (im Editor `dhsprites` bearbeitbar)
   + `.gif`-Vorschau,
 - ein **Master-Spritesheet** `sheet.png` + `sheet.json` (ATLAS_LOAD-Manifest)
   mit ALLEN benannten Sprites in einem Raster,
@@ -618,13 +618,13 @@ def static_tiles():
 def export():
     OUT.mkdir(parents=True, exist_ok=True)
     specs = anim_specs()
-    # 1) Pro animierte Figur: .gbsprite + .gif
+    # 1) Pro animierte Figur: .dhsprite + .gif
     for name, (frames, anims) in specs.items():
         doc = SpriteDoc(S, S)
         doc.frames = [Frame(pixels=img, name=fn, duration_ms=120)
                       for fn, img in frames]
         doc.anims = anims
-        doc.save_native(OUT / f"{name}.gbsprite")
+        doc.save_native(OUT / f"{name}.dhsprite")
         doc.save_sheet_png(OUT / f"{name}.png")   # horizontaler Strip fuer SPRITE_NEW
         doc.save_animated_gif(OUT / f"{name}.gif", scale=4)
 
@@ -669,7 +669,7 @@ def export():
 
     # 3) Kontaktbogen (zum Begutachten)
     _contact(named, OUT / "_contact.png")
-    print(f"  {len(specs)} animierte Figuren (.gbsprite + .gif)")
+    print(f"  {len(specs)} animierte Figuren (.dhsprite + .gif)")
     print(f"  Master-Sheet: sheet.png ({cols}x{rows} = {len(named)} Sprites) + sheet.json")
     print("  Kontaktbogen: _contact.png")
 

@@ -191,8 +191,8 @@ Erweiterungsideen. Führt Game-Loop/Input/DELTA/Zeichnen/Arrays/Kollision/Sound/
 Buch-Kerninhalt (Teile I-IV + Projekt) komplett. **Teil V gestartet:** Kap 50 sprite
 (SPRITE_NEW/SET_POS/VELOCITY/ADD_ANIM/PLAY/PLAY_ONCE/SET_FLIP/SET_SCALE/UPDATE/DRAW/COLLIDES) mit
 animiertem Screenshot. 173 Seiten. GOTCHA: SPRITE_UPDATE will dt als INTEGER-ms (INT(DELTA()*1000)).
-+ Kap 51 animfsm (ANIM_FSM_LOAD/SETUP/SET_FLOAT-BOOL-INT/TRIGGER/UPDATE/STATE/FORCE; .gbanim-JSON
-States/Params/Transitions) — Screenshot zeigt aktuellen Zustand. figures/assets/held.gbanim. 177 Seiten.
++ Kap 51 animfsm (ANIM_FSM_LOAD/SETUP/SET_FLOAT-BOOL-INT/TRIGGER/UPDATE/STATE/FORCE; .dhanim-JSON
+States/Params/Transitions) — Screenshot zeigt aktuellen Zustand. figures/assets/held.dhanim. 177 Seiten.
 + Kap 52 tween (TWEEN_NEW/_LOOP/_PINGPONG, TWEEN_VALUE/DONE, PAUSE/RESUME/REVERSE, Easings) —
 Easing-Balken-Screenshot. zeitbasiert (kein UPDATE nötig). 180 Seiten.
 + Kap 53 timer (TIMER_AFTER/EVERY/UPDATE/CANCEL/ACTIVE/COUNT/CLEAR + COOLDOWN; FUNCREF-Callbacks)

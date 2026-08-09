@@ -2,7 +2,7 @@
 '  111_anim_fsm.dh  --  Animations-State-Machine (Modul "animfsm")
 '
 '  Unity-Mecanim-Stil: States (idle/run/jump) + Parameter + Uebergaenge liegen
-'  als Daten in "assets/hero.gbanim" (vom Editor `dhanim` erzeugt). Statt im
+'  als Daten in "assets/hero.dhanim" (vom Editor `dhanim` erzeugt). Statt im
 '  Spielcode von Hand SPRITE_PLAY zu schalten, setzt das Spiel nur Parameter --
 '  die FSM entscheidet den Zustand und spielt die passende Animation.
 '
@@ -29,7 +29,7 @@ hero = SPRITE_NEW(sheet, 16, 16)
 SPRITE_SET_SCALE(hero, 5.0, 5.0)
 
 DIM fsm AS ANIM_FSM
-fsm = ANIM_FSM_LOAD("assets/hero.gbanim")
+fsm = ANIM_FSM_LOAD("assets/hero.dhanim")
 ANIM_FSM_SETUP(fsm, hero)
 
 DIM px AS FLOAT
