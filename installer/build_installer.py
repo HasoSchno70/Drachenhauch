@@ -119,6 +119,42 @@ def ensure_gbrt(rebuild):
         print("gbrt:", GBRT)
 
 
+def _schreibe_ico(ziel, eintraege):
+    """Ein .ico mit je Groesse EIGENER Vorlage schreiben.
+
+    Pillows `save(format="ICO")` skaliert immer dasselbe Bild -- fuer
+    unterschiedliche Zeichnungen je Groesse muss der Behaelter selbst
+    geschrieben werden. Das Format ist schlicht: Kopf, ein 16-Byte-Eintrag je
+    Aufloesung, dann die Bilddaten. Seit Windows Vista duerfen die Eintraege
+    PNG-komprimiert sein (traegt Alpha sauber und spart Platz).
+
+    `eintraege`: Liste von (Kantenlaenge, Bild), absteigend sortiert.
+    """
+    import io
+    import struct
+
+    from PIL import Image      # wie in make_icon() erst hier -- Pillow ist
+                               # nur fuer das Paketieren noetig, nicht zum Bauen
+
+    roh = []
+    for kante, bild in eintraege:
+        puffer = io.BytesIO()
+        bild.resize((kante, kante), Image.LANCZOS).save(
+            puffer, format="PNG", optimize=True)
+        roh.append((kante, puffer.getvalue()))
+
+    kopf = struct.pack("<HHH", 0, 1, len(roh))       # reserviert, Typ 1, Anzahl
+    verzeichnis, daten = b"", b""
+    versatz = len(kopf) + 16 * len(roh)
+    for kante, bytes_ in roh:
+        b = 0 if kante >= 256 else kante             # 256 wird als 0 kodiert
+        verzeichnis += struct.pack("<BBBBHHII", b, b, 0, 0, 1, 32,
+                                   len(bytes_), versatz)
+        daten += bytes_
+        versatz += len(bytes_)
+    ziel.write_bytes(kopf + verzeichnis + daten)
+
+
 def make_icon():
     log("App-Icon erzeugen")
     try:
@@ -134,11 +170,30 @@ def make_icon():
     canvas = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     canvas.paste(im, ((s - im.width) // 2, (s - im.height) // 2))
 
+    # Kleine Groessen duerfen eine EIGENE Zeichnung bekommen: das volle Logo
+    # traegt einen langen Schweif, der bei 16 px nur noch Rauschen ist und dem
+    # Motiv Platz wegnimmt. Liegt daneben ein `logo-kachel.png` (nur das
+    # quadratische Motiv), wird das ab 64 px abwaerts benutzt.
+    klein_src = ROOT / "gamebasic" / "assets" / "logo-kachel.png"
+    klein = None
+    if klein_src.exists():
+        k = Image.open(klein_src).convert("RGBA")
+        s2 = max(k.size)
+        klein = Image.new("RGBA", (s2, s2), (0, 0, 0, 0))
+        klein.paste(k, ((s2 - k.width) // 2, (s2 - k.height) // 2))
+
+    def fuer(kante):
+        """Welche Vorlage gehoert in diese Kantenlaenge?"""
+        return klein if (klein is not None and kante <= 64) else canvas
+
     if SYSTEM == "Windows":
         ico = INST / "GameBasic.ico"
-        canvas.save(ico, sizes=[(16, 16), (32, 32), (48, 48), (64, 64),
-                                (128, 128), (256, 256)])
-        print("Icon:", ico)
+        kanten = [256, 128, 64, 48, 32, 16]
+        if klein is None:
+            canvas.save(ico, sizes=[(k, k) for k in reversed(kanten)])
+        else:
+            _schreibe_ico(ico, [(k, fuer(k)) for k in kanten])
+        print("Icon:", ico, "(zwei Vorlagen)" if klein is not None else "")
     elif SYSTEM == "Darwin":
         icns = INST / "GameBasic.icns"
         canvas.save(icns, format="ICNS")
