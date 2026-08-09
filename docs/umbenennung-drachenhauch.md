@@ -73,15 +73,25 @@ muss. Wer mittendrin abbricht, hinterlässt kein kaputtes Projekt.
       README, Buch und Doku noch durchgehend „GameBasic" sagen.
 - [x] `pytest tests/` grün (3104), mypy sauber, `dhrun.py` führt aus
 
-### Phase 3 — Inhalte
+### Phase 3 — Endungen und Inhalte
 
-- [ ] 232 `.gb` → `.dh` (`git mv`, damit die Historie erhalten bleibt)
-- [ ] Editor-Projektdateien umbenennen (`.gbsprite` usw.)
-- [ ] `examples/` durchgehen: Kopfkommentare, Verweise aufeinander
-- [ ] **Alle Beispiele durch `dhrt --check`** — das findet vergessene Verweise
-- [ ] Buch: 75 Kapitel in `buch-referenz/buch/content/`, plus `shoot.py`,
-      `build_book.js`, `build_epub.js` (Titel, Dateinamen der Ausgaben)
-- [ ] Jeden Codeblock des Buchs erneut durch `--check` (das Skript dafür steht)
+- [x] **3a** Runtime versteht `.dh`/`.dhc` — *zuerst*, damit die Suite während
+      des Umbaus lauffähig bleibt. `.gb`/`.gbc` bleiben lesbar (je eine Zeile).
+- [x] **3b** 231 `.gb` → `.dh` per `git mv`, 1227 Verweise nachgezogen
+- [x] **3c** Editor-Formate `.gbsprite`/`.gbanim`/`.gbform`/`.gbproj` → `.dh*`
+      (19 Dateien, 346 Verweise). Öffnen-Dialoge zeigen die alte Endung weiter.
+- [x] **3d** Buch: alle 784 Codeblöcke durch `dhrt --check`, 0 Befunde.
+      Der Prüfer liegt jetzt als `buch-referenz/buch/pruef_codebloecke.js` im
+      Repo statt als Einzeiler pro Sitzung.
+- [x] `.docx` und `.epub` neu gebaut (der Buchtext hatte sich geändert)
+- [x] 3106 Tests grün, mypy sauber, 65 Rust-Tests, Runtime gebaut
+
+> **Die Massenersetzung frisst ihre eigenen Ausnahmen.** `.gb` → `.dh` lief
+> auch über die Duldung, die eine Stunde vorher für genau diese alte Endung
+> eingebaut worden war — aus `ends_with(".gb")` wurde `.dh`, die Prüfung
+> lautete `.dh || .dh`. Aufgefallen ist es erst beim Bauen, weil danach nur
+> pytest lief. Zwei Lehren: die alte Endung steht jetzt als Konstante statt
+> als Literal, und **nach jeder Phase wird gebaut, nicht nur getestet**.
 
 ### Phase 4 — Außenwirkung
 
