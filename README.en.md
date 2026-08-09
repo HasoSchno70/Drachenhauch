@@ -28,7 +28,7 @@ WEND
 
 ## Download
 
-**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 81 MB, currently version 2026.2.
+**[Download Drachenhauch for Windows](https://github.com/HasoSchno70/Drachenhauch/releases/latest)** — a single installer, about 84 MB, currently version 2026.2.
 
 You do **not** need Python installed. It ships the complete development environment, the `dhrt` runtime, all 174 examples with their assets, the textbook as `.docx` and `.epub`, and the ESP32 skeleton. Windows 64-bit; the file is unsigned, so SmartScreen will speak up on first launch.
 
